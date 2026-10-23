@@ -51,9 +51,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# CP950 陷阱防護：EU 探測會回 wp_sites.name，真實客戶站名可能含 CJK；不包的話 ssh 的輸出
-# 會走主控台的 ANSI 編碼進來變亂碼。scripts/audit-cp950-traps.ps1 機械稽核這一條。
-. (Join-Path $PSScriptRoot '_console-encoding-helpers.ps1')
+# CP950 陷阱防護：EU 探測會回 wp_sites.name，真實客戶站名可能含 CJK。Invoke-SshWithDeadline 自己以 UTF-8
+# 解碼 ssh 輸出（不走主控台 ANSI 編碼），並有 keepalive + 總時限（scripts/lib/ssh-deadline.ps1）。
+. (Join-Path $PSScriptRoot 'lib\ssh-deadline.ps1')
 
 $reportDir = Join-Path $WorkRoot "agency-os\reports\status"
 if (-not (Test-Path -LiteralPath $reportDir)) { New-Item -ItemType Directory -Path $reportDir -Force | Out-Null }
@@ -64,15 +64,11 @@ function Invoke-RemoteProbe {
     param([string]$Script)
     $lf = $Script.Replace([string][char]13 + [string][char]10, [string][char]10)
     $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($lf))
-    $prevEap = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    try {
-        return (Invoke-WithUtf8Console { & ssh -o BatchMode=yes -o ConnectTimeout=25 -o IdentitiesOnly=yes -i $KsAw01PrivateKey -p $KsAw01SshPort "$KsAw01SshUser@$KsAw01Host" "echo $b64 | base64 -d | sudo bash" 2>&1 } | Out-String)
-    } catch {
-        return "PROBE_ERROR ssh_failed"
-    } finally {
-        $ErrorActionPreference = $prevEap
-    }
+    $r = Invoke-SshWithDeadline -SshArgs @("-o", "IdentitiesOnly=yes", "-i", $KsAw01PrivateKey, "-p", $KsAw01SshPort, "$KsAw01SshUser@$KsAw01Host", "echo $b64 | base64 -d | sudo bash") -DeadlineSec 120 -ConnectTimeoutSec 25
+    # Timeout / transport failure is a blind spot (PROBE_ERROR is what the caller matches), never partial output.
+    if ($r.TimedOut) { return "PROBE_ERROR ssh_timeout" }
+    if ($r.ExitCode -ne 0) { return ("PROBE_ERROR ssh_exit" + $r.ExitCode + " " + $r.Output) }
+    return $r.Output
 }
 
 # ── SG 探測：檔案系統 + 資料庫 ─────────────────────────────────────────────

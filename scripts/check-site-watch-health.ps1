@@ -53,6 +53,8 @@ Set-StrictMode -Version Latest
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
 . (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
+# ssh with keepalive + hard total deadline (scripts/lib/ssh-deadline.ps1).
+. (Join-Path $PSScriptRoot "lib\ssh-deadline.ps1")
 
 $HeartbeatWarnH = 2
 $HeartbeatFailH = 6
@@ -113,10 +115,11 @@ function Invoke-DbProbe {
         } else {
             $remote = "sudo -n docker exec -e B64=$b64 $DbContainer sh -c '$inner'"
             $sshArgs = @(
-                "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10",
+                "-o", "StrictHostKeyChecking=accept-new",
                 "-p", $KsAw01SshPort, "-i", $KsAw01PrivateKey, ("{0}@{1}" -f $KsAw01SshUser, $KsAw01Host), $remote
             )
-            $out = Invoke-WithUtf8Console { & ssh @sshArgs 2>&1 }
+            $r = Invoke-SshWithDeadline -SshArgs $sshArgs -DeadlineSec 60 -ConnectTimeoutSec 10
+            return @{ ExitCode = $r.ExitCode; Output = $r.Output; TimedOut = $r.TimedOut }
         }
         return @{ ExitCode = $LASTEXITCODE; Output = (($out | ForEach-Object { [string]$_ }) -join "`n") }
     } catch {

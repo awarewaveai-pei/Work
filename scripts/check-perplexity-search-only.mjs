@@ -26,6 +26,23 @@ const KEY_READER_ALLOWED = new Set([
   "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/collect/__tests__/collect-web-search-live.test.ts",
 ]);
 
+// Files allowed to spell the key NAME at all. Readers not matched by KEY_READER (`process.env[name]`,
+// `os.environ.get("…")`) still have to spell it somewhere, so a new file naming it is a possible indirect read.
+const KEY_NAME_ALLOWED = new Set([
+  ...KEY_READER_ALLOWED,
+  PROVIDERS,
+  "mcp/user-env.template.ps1",
+  "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml",
+  "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/collect/search/drivers.ts",
+  "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/collect/MODULE_MANIFEST.json",
+  "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/collect/__tests__/collect-block-hygiene.test.ts",
+  "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/collect/__tests__/collect-web-search.test.ts",
+  "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/collect/__tests__/collect-wire-v2.test.ts",
+  "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/collect/CollectionSourcesPanel.tsx",
+  "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/collect/__tests__/CollectionSourcesPanel.test.tsx",
+  "agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/generation/module-manifests.json",
+]);
+
 // Prose that names the plugin only to say it is not installed.
 const LLM_PLUGIN_PROSE_ALLOWED = new Set(["scripts/ensure-agent-bootstrap-prompts.ps1"]);
 
@@ -77,6 +94,8 @@ export function scanText(file, text) {
   if (sdk) out.push(`${file}: uses a Perplexity SDK / gateway / MCP package ("${sdk[0]}")`);
   if (readsKey(text) && !KEY_READER_ALLOWED.has(file)) {
     out.push(`${file}: reads PERPLEXITY_API_KEY outside the guarded exits`);
+  } else if (text.includes("PERPLEXITY_API_KEY") && !KEY_NAME_ALLOWED.has(file)) {
+    out.push(`${file}: names PERPLEXITY_API_KEY outside KEY_NAME_ALLOWED (possible indirect read; add it there only if it never reads the key)`);
   }
   if (/llm-perplexity/i.test(text) && !LLM_PLUGIN_PROSE_ALLOWED.has(file)) {
     out.push(`${file}: references the llm-perplexity plugin (direct access to sonar/agent models)`);
@@ -117,6 +136,7 @@ function decode(buf) {
 }
 
 function selfTest() {
+  const WEB_SEARCH_TEST = "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/collect/__tests__/collect-web-search.test.ts";
   const cases = [
     ["app/x.ts", "fetch('https://api.perplexity.ai/v1/agent')", 1],
     ["app/y.ts", "import { perplexity } from '@ai-sdk/perplexity'", 1],
@@ -135,14 +155,17 @@ function selfTest() {
     ["agency-os/reports/agent-dispatch/d.ps1", "Invoke-RestMethod https://api.perplexity.ai/chat/completions", 1],
     ["agency-os/memory/x.mjs", "fetch('https://api.perplexity.ai/v1/agent')", 1],
     ["agency-os/config/x.json", '{"url":"https://api.perplexity.ai/chat/completions"}', 1],
-    ["app/t.test.ts", 'process.env.PERPLEXITY_API_KEY = "test-perplexity"', 0],
-    ["app/t.test.ts", "delete process.env.PERPLEXITY_API_KEY", 0],
-    ["app/t.py", 'os.environ["PERPLEXITY_API_KEY"] = "x"', 0],
-    ["app/t.ps1", '$env:PERPLEXITY_API_KEY = "x"', 0],
+    [WEB_SEARCH_TEST, 'process.env.PERPLEXITY_API_KEY = "test-perplexity"', 0],
+    [WEB_SEARCH_TEST, "delete process.env.PERPLEXITY_API_KEY", 0],
+    [WEB_SEARCH_TEST, 'os.environ["PERPLEXITY_API_KEY"] = "x"', 0],
+    [WEB_SEARCH_TEST, '$env:PERPLEXITY_API_KEY = "x"', 0],
     ["app/u.ts", 'process.env.PERPLEXITY_API_KEY = "x"; const k = process.env.PERPLEXITY_API_KEY', 1],
     ["app/u.ts", 'if (process.env.PERPLEXITY_API_KEY === undefined) {}', 1],
     ["app/u.ts", 'process.env.PERPLEXITY_API_KEY ??= "x"', 1],
     ["app/u.py", 'k = os.environ["PERPLEXITY_API_KEY"]', 1],
+    ["app/t.test.ts", 'process.env.PERPLEXITY_API_KEY = "test-perplexity"', 1],
+    ["app/n.ts", 'const name = "PERPLEXITY_API_KEY"; const k = process.env[name]', 1],
+    ["app/n.py", 'k = os.environ.get("PERPLEXITY_API_KEY")', 1],
   ];
   let bad = 0;
   for (const [f, t, want] of cases) {

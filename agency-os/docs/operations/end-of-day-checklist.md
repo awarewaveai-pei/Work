@@ -41,6 +41,7 @@
   - 遠端已超前仍強制 push（**高風險**，僅明示核准）：`-AllowPushWhileBehind`
   - 略過開頭「今日機器摘要」（進階／純 CI）：`-SkipTodayRecap`
   - 略過 **`TASKS` 自動打勾**（緊急除錯用）：`-SkipAutoTaskCheckmarks`
+  - 略過 **`TASKS` 已完成歸檔＋重複任務閘**（`archive-completed-tasks.ps1`；未完成區頂層 `[x]` 搬到歷程區）：`-SkipTasksArchive`
   - 從檔讀 commit 訊息（多代理彙總／多行說明）：`-CommitMessageFile agency-os\.agency-state\closeout-commit-msg.txt`（UTF-8；路徑相對 monorepo 根或絕對路徑皆可；與 inbox 同目錄便於管理）
 
 ### 1b) 手動三步（與 1a 擇一即可）

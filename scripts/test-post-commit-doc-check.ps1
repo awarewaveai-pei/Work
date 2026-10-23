@@ -18,6 +18,8 @@
   Run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-post-commit-doc-check.ps1   (Windows PowerShell 5.1 = what the laptop runs; pwsh also works)
 #>
 
+# CP950 protection for native stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
 Set-StrictMode -Version Latest
 
 # Fixture git calls only -- never routes through the code under test. Same reasoning as
@@ -29,9 +31,9 @@ function Invoke-FixtureGit {
     $ErrorActionPreference = 'Continue'
     try {
         if ($Cwd) {
-            $out = & git -C $Cwd @GitArgs 2>&1
+            $out = Invoke-WithUtf8Console { & git -C $Cwd @GitArgs 2>&1 }
         } else {
-            $out = & git @GitArgs 2>&1
+            $out = Invoke-WithUtf8Console { & git @GitArgs 2>&1 }
         }
         $code = $(if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE })
         if ($code -ne 0) { throw ("fixture git failed (exit $code): git " + ($GitArgs -join ' ') + "`n" + ($out -join "`n")) }

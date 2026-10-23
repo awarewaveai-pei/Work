@@ -46,7 +46,7 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
+. (Join-Path $PSScriptRoot "lib\ssh-deadline.ps1")
 
 # Verdict-to-emoji map (kept here so we never write emoji literals in source).
 $ICON_HEALTHY = [char]::ConvertFromUtf32(0x1F7E2)  # green circle
@@ -75,18 +75,17 @@ function Invoke-Ssh {
         [Parameter(Mandatory = $true)][int]$Port
     )
     $sshArgs = @(
-        "-o", "BatchMode=yes",
         "-o", "StrictHostKeyChecking=accept-new",
-        "-o", "ConnectTimeout=10",
         "-p", $Port,
         "-i", $Key,
         ("{0}@{1}" -f $User, $ServerHost),
         $Command
     )
-    $out = Invoke-WithUtf8Console { & ssh @sshArgs 2>&1 }
+    $r = Invoke-SshWithDeadline -SshArgs $sshArgs -DeadlineSec 60 -ConnectTimeoutSec 10
     return @{
-        ExitCode = $LASTEXITCODE
-        Output   = (($out | ForEach-Object { [string]$_ }) -join "`n").Trim()
+        ExitCode = $r.ExitCode
+        Output   = $r.Output
+        TimedOut = $r.TimedOut
     }
 }
 

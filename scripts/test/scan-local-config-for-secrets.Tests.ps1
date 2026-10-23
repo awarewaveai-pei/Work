@@ -7,6 +7,8 @@
   Run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test/scan-local-config-for-secrets.Tests.ps1
 #>
 
+# CP950 protection for native stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot '..\_console-encoding-helpers.ps1')
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -41,7 +43,7 @@ try {
     New-Item -ItemType Directory -Path (Join-Path $tmpRoot 'mcp') -Force | Out-Null
     Push-Location $tmpRoot
     try {
-        git init -q
+        Invoke-WithUtf8Console { git init -q }
     } finally {
         Pop-Location
     }
@@ -79,7 +81,7 @@ try {
     Set-Content -LiteralPath $configPath -Value $knownLine -Encoding UTF8
     Push-Location $tmpRoot
     try {
-        git add mcp/user-env.ps1
+        Invoke-WithUtf8Console { git add mcp/user-env.ps1 }
     } finally {
         Pop-Location
     }

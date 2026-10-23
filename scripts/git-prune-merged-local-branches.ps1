@@ -22,6 +22,8 @@ param(
     [switch]$Force
 )
 
+# CP950 protection for native stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
@@ -34,26 +36,26 @@ else {
 
 Push-Location -LiteralPath $WorkRoot
 try {
-    $null = git rev-parse --git-dir 2>$null
+    $null = Invoke-WithUtf8Console { git rev-parse --git-dir 2>$null }
     if ($LASTEXITCODE -ne 0) {
         throw "git-prune-merged-local-branches: not a git repository at $WorkRoot"
     }
 
     Write-Host "== git fetch origin --prune ==" -ForegroundColor Cyan
-    git fetch origin --prune
+    Invoke-WithUtf8Console { git fetch origin --prune }
     if ($LASTEXITCODE -ne 0) {
         throw "git fetch failed (exit $LASTEXITCODE)"
     }
 
     $mergeRef = "origin/$MainBranch"
-    $null = git rev-parse --verify $mergeRef 2>$null
+    $null = Invoke-WithUtf8Console { git rev-parse --verify $mergeRef 2>$null }
     if ($LASTEXITCODE -ne 0) {
         throw "Cannot resolve $mergeRef. Verify remote and branch name (-MainBranch)."
     }
 
-    $current = (git rev-parse --abbrev-ref HEAD).Trim()
+    $current = (Invoke-WithUtf8Console { git rev-parse --abbrev-ref HEAD }).Trim()
 
-    $lines = @(git branch --merged $mergeRef)
+    $lines = @(Invoke-WithUtf8Console { git branch --merged $mergeRef })
     $candidates = New-Object System.Collections.Generic.List[string]
     foreach ($line in $lines) {
         $name = ($line -replace '^\*\s+', '').Trim()
@@ -89,7 +91,7 @@ try {
             continue
         }
         Write-Host "git branch $delFlag $b" -ForegroundColor Yellow
-        & git @("branch", $delFlag, $b)
+        Invoke-WithUtf8Console { & git @("branch", $delFlag, $b) }
         if ($LASTEXITCODE -ne 0) {
             Write-Warning "git branch $delFlag $b failed (exit $LASTEXITCODE); try -Force if you accept dropping unmerged commits on that branch name."
         }

@@ -510,10 +510,12 @@ if (Test-Path $driftScript) {
         } elseif ($driftObj -and $driftObj.status -eq "FAIL") {
             Add-Check -Name "Deploy drift (SG next-admin)" -Pass $false -Detail ("FAIL: " + $driftObj.behind + " app-code commit(s) behind origin/main (>= " + $driftObj.failAt + "); run sg-deploy.sh now")
         } else {
-            Add-Check -Name "Deploy drift (SG next-admin)" -Pass $true -Detail ("Skipped (probe error, exit " + $driftExit + ")")
+            # BLIND (ssh probe failed/timed out) or no parseable verdict = nothing was measured; never a pass.
+            $driftWhy = if ($driftObj -and $driftObj.message) { [string]$driftObj.message } else { "exit " + $driftExit }
+            Add-Check -Name "Deploy drift (SG next-admin)" -Pass $false -Detail ("BLIND: drift not measured (" + $driftWhy + "); rerun scripts/check-deploy-drift.ps1")
         }
     } catch {
-        Add-Check -Name "Deploy drift (SG next-admin)" -Pass $true -Detail ("Skipped: " + $_.Exception.Message)
+        Add-Check -Name "Deploy drift (SG next-admin)" -Pass $false -Detail ("BLIND: " + $_.Exception.Message)
     }
 } else {
     Add-Check -Name "Deploy drift (SG next-admin)" -Pass $true -Detail "Skipped: scripts/check-deploy-drift.ps1 not present"
@@ -958,6 +960,39 @@ try {
     }
 } catch {
     Add-Check -Name $eolCheckName -Pass $false -Detail ("FAIL: git ls-files --eol crashed: " + $_.Exception.Message)
+}
+
+# 12g) Detector artifact contract: every reports/status/*-LATEST.json carries overall + measured and
+# never PASS on measured=0. Legacy files are the shrink-only list scripts/detector-contract-legacy.txt;
+# an unlisted violation or a stale allowlist entry fails this check (not a critical gate).
+$contractAudit = Join-Path $monoRoot "scripts\audit-detector-contract.ps1"
+$contractName = "Detector artifact contract (audit-detector-contract.ps1)"
+if (Test-Path -LiteralPath $contractAudit) {
+    try {
+        $caOut = (& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $contractAudit 2>&1 | Out-String).Trim() -replace "`r?`n", "; "
+        $caExit = $LASTEXITCODE
+        Add-Check -Name $contractName -Pass ($caExit -eq 0) -Detail $(if ($caExit -eq 0) { $caOut } else { "FAIL (exit $caExit): $caOut" })
+    } catch {
+        Add-Check -Name $contractName -Pass $false -Detail ("CRASHED: " + $_.Exception.Message.Substring(0, [Math]::Min(80, $_.Exception.Message.Length)))
+    }
+} else {
+    Add-Check -Name $contractName -Pass $false -Detail "MISSING: scripts/audit-detector-contract.ps1"
+}
+
+# 12h) Claude desktop MCP runtime availability (init_mcp line in main.log). Reported, never blocks:
+# failed>0 or an unreadable log reads as WARN in the detail; the artifact is reports/status/mcp-runtime-LATEST.json.
+$mcpRuntimeScript = Join-Path $monoRoot "scripts\check-mcp-runtime.ps1"
+$mcpRuntimeName = "MCP runtime availability (check-mcp-runtime.ps1)"
+if (Test-Path -LiteralPath $mcpRuntimeScript) {
+    try {
+        $mrOut = (& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $mcpRuntimeScript 2>&1 | Out-String).Trim() -replace "`r?`n", "; "
+        $mrExit = $LASTEXITCODE
+        Add-Check -Name $mcpRuntimeName -Pass $true -Detail $(if ($mrExit -eq 0) { $mrOut } else { "WARN: $mrOut" })
+    } catch {
+        Add-Check -Name $mcpRuntimeName -Pass $true -Detail ("Skipped: " + $_.Exception.Message.Substring(0, [Math]::Min(80, $_.Exception.Message.Length)))
+    }
+} else {
+    Add-Check -Name $mcpRuntimeName -Pass $true -Detail "Skipped: scripts/check-mcp-runtime.ps1 not present"
 }
 
 $total = $checks.Count

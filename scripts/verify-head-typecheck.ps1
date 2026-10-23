@@ -35,7 +35,10 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$repo = (git rev-parse --show-toplevel) -replace "/", "\"
+# CP950 protection for native stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
+Set-StrictMode -Off  # the helper turns StrictMode on in the dot-sourcing scope; this script never ran under it
+$repo = (Invoke-WithUtf8Console { git rev-parse --show-toplevel }) -replace "/", "\"
 $app  = "lobster-factory\infra\hetzner-phase1-core\apps\next-admin"
 # Short root on purpose: this repo nests paths deep enough that a checkout under $env:TEMP hits the
 # Windows 260-char limit and aborts mid-way ("Filename too long"), leaving a half-populated worktree.
@@ -43,10 +46,10 @@ $wtRoot = Join-Path ([System.IO.Path]::GetPathRoot($repo)) "Worktrees"
 if (-not (Test-Path $wtRoot)) { New-Item -ItemType Directory -Path $wtRoot | Out-Null }
 $wt   = Join-Path $wtRoot "headchk-$(Get-Random -Maximum 99999)"
 
-$sha = (git -C $repo rev-parse --short $Ref)
+$sha = (Invoke-WithUtf8Console { git -C $repo rev-parse --short $Ref })
 Write-Host "[head-typecheck] ref=$Ref ($sha) -> $wt"
 
-git -C $repo worktree add --detach --quiet $wt $Ref
+Invoke-WithUtf8Console { git -C $repo worktree add --detach --quiet $wt $Ref }
 # git reports a failed checkout on stderr and returns non-zero; without this the script would run
 # tsc in a half-populated tree and report whatever that happened to produce.
 if ($LASTEXITCODE -ne 0) { throw "worktree checkout of $Ref failed -- see git output above" }
@@ -116,7 +119,7 @@ try {
     $prevEap = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
-      & git -C $repo worktree remove --force $wt 2>&1 | Out-Null
+      Invoke-WithUtf8Console { & git -C $repo worktree remove --force $wt 2>&1 } | Out-Null
       if (Test-Path $wt) {
         # Existence is not the question -- under -Install that path is a real directory npm just
         # filled, and treating it as a junction left the whole tree behind. Ask for the reparse
@@ -131,7 +134,7 @@ try {
           # "failed to delete ...: Filename too long". The \\?\ prefix is the only way to remove
           # those paths. Reachable only with no junction inside $wt, per the check above.
           & cmd /c rmdir /s /q "\\?\$wt" 2>&1 | Out-Null
-          & git -C $repo worktree prune 2>&1 | Out-Null
+          Invoke-WithUtf8Console { & git -C $repo worktree prune 2>&1 } | Out-Null
         }
       }
       if (Test-Path $wt) { Write-Host "[head-typecheck] WARNING: scratch worktree left behind at $wt -- delete it manually" }

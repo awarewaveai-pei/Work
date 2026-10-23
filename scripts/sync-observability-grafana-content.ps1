@@ -3,6 +3,8 @@ param(
     [string]$RemoteDir = "/root/lobster-phase1"
 )
 
+# CP950 protection for native stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "lib\prod-host.ps1")
@@ -31,11 +33,11 @@ $remoteStage = "/tmp/aw-grafana-sync-$rid"
 
 Write-Host "== sync: observability compose + Grafana home + $($dashFiles.Count) provisioned dashboard(s) -> $(Get-ProdLabel $SshTarget):$RemoteDir ==" -ForegroundColor Cyan
 
-ssh @sshArgs "mkdir -p '$remoteStage' && chmod 0755 '$remoteStage'"
+Invoke-WithUtf8Console { ssh @sshArgs "mkdir -p '$remoteStage' && chmod 0755 '$remoteStage'" }
 if ($LASTEXITCODE -ne 0) { throw "ssh mkdir failed (exit $LASTEXITCODE)" }
 
 $scpArgs = @($compose, $dashProv, $homeDash) + ($dashFiles | ForEach-Object { $_.FullName })
-scp @($scp.Options + $scpArgs + "$($scp.Dest):${remoteStage}/")
+Invoke-WithUtf8Console { scp @($scp.Options + $scpArgs + "$($scp.Dest):${remoteStage}/") }
 if ($LASTEXITCODE -ne 0) { throw "scp failed (exit $LASTEXITCODE)" }
 
 $remote = @'
@@ -74,9 +76,9 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 [System.IO.File]::WriteAllText($tmpSh, $remote.Replace("`r`n", "`n"), $utf8NoBom)
 
 try {
-    scp @($scp.Options + @($tmpSh, "$($scp.Dest):/tmp/obs-grafana-content.sh"))
+    Invoke-WithUtf8Console { scp @($scp.Options + @($tmpSh, "$($scp.Dest):/tmp/obs-grafana-content.sh")) }
     if ($LASTEXITCODE -ne 0) { throw "scp script failed (exit $LASTEXITCODE)" }
-    ssh @sshArgs "chmod 0755 /tmp/obs-grafana-content.sh && sudo bash /tmp/obs-grafana-content.sh && rm -f /tmp/obs-grafana-content.sh"
+    Invoke-WithUtf8Console { ssh @sshArgs "chmod 0755 /tmp/obs-grafana-content.sh && sudo bash /tmp/obs-grafana-content.sh && rm -f /tmp/obs-grafana-content.sh" }
     if ($LASTEXITCODE -ne 0) { throw "Remote bash failed (exit $LASTEXITCODE)" }
 } finally {
     Remove-Item -LiteralPath $tmpSh -Force -ErrorAction SilentlyContinue

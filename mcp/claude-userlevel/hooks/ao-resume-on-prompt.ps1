@@ -106,7 +106,9 @@ function Get-GitDirtyEntries {
     param([string]$RepoRoot)
     Push-Location -LiteralPath $RepoRoot
     try {
-        $out = @(git status --porcelain 2>$null)
+        # $RepoRoot was resolved by its scripts\ao-resume.ps1 sentinel, so the shared CP950 wrapper sits beside it.
+        . (Join-Path $RepoRoot 'scripts\_console-encoding-helpers.ps1')
+        $out = @(Invoke-WithUtf8Console { git status --porcelain 2>$null })
         if ($LASTEXITCODE -ne 0) { return @() }
         return @($out | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     }

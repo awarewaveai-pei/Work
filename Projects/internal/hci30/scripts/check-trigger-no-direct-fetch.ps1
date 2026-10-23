@@ -156,20 +156,12 @@ param(
 #    on every `${` entry, since JS grammar guarantees an interpolation
 #    always starts a fresh expression.
 #
-# Critic review 2026-09-18 also found several PRE-EXISTING (confirmed via
-# `git diff` against the prior commit, not introduced by points 1-4 above)
-# live gaps in $forbiddenImportPattern and $xhrPattern -- deliberately NOT
-# fixed in this revision (out of THIS task's explicit 3-problem scope, and
-# each needs its own design pass rather than being bundled into an already-
-# large same-day change): a backtick-delimited or string-concatenation-split
-# `require()` specifier, a bare alias of `require` itself (the exact bug
-# class already fixed for `fetch` in point 1-3, not yet ported to
-# `require`), and a bare alias of `XMLHttpRequest` (same class again, not
-# yet ported to the XHR pattern). Tracked in agency-os/TASKS.md, dated
-# 2026-09-18, not fixed here -- same "known limitation, follow-up filed, not
-# blocking this revision" convention this file's own header already used at
-# the very top (the dynamic-property-construction gap, e.g.
-# `globalThis['fe'+'tch'](...)`) and TASKS.md already carries for that gap.
+# 2026-10-23: the require/XHR gaps critic found on 2026-09-18 are closed the
+# same way as fetch: (a) a backtick specifier is a literal like '/" ;
+# (b) require()/import() whose argument is not ONE plain literal (concat,
+# variable, `${}`) is a violation -- a dynamic module name cannot be checked;
+# (c) a bare `require` not immediately called (alias, require.resolve) and
+# any bare `XMLHttpRequest` reference are violations, not just `new XHR`.
 
 $ErrorActionPreference = 'Stop'
 
@@ -202,8 +194,11 @@ if (-not $NoAllowlist -and -not $AllowlistRelativePath) {
 # identifiers (word boundary already handles the latter; the lookbehind is
 # for the dot case specifically).
 $directFetchPattern = "(?<![.\w])fetch\b"
-$forbiddenImportPattern = "(?:from\s+['`"](?:node:)?(?:http|https|undici|axios|node-fetch)['`"]|require\s*\(\s*['`"](?:node:)?(?:http|https|undici|axios|node-fetch)['`"]\s*\)|import\s*\(\s*['`"](?:node:)?(?:http|https|undici|axios|node-fetch)['`"]\s*\))"
-$xhrPattern = '\bnew\s+XMLHttpRequest\b'
+$forbiddenImportPattern = "(?:from\s+['`"``](?:node:)?(?:http|https|undici|axios|node-fetch)['`"``]|require\s*\(\s*['`"``](?:node:)?(?:http|https|undici|axios|node-fetch)['`"``]\s*\)|import\s*\(\s*['`"``](?:node:)?(?:http|https|undici|axios|node-fetch)['`"``]\s*\))"
+# Runs on $commentsOnly (needs the argument text): require(/import( whose argument is not one plain literal.
+$dynamicModuleLoadPattern = "(?<![.\w$])(?:require|import)\s*\(\s*(?!(?:'[^'\\\r\n]*'|`"[^`"\\\r\n]*`"|``[^``$\\]*``)\s*\))"
+$requireAliasPattern = '(?<![.\w$])require\b(?!\s*\()'
+$xhrPattern = '(?<![.\w$])XMLHttpRequest\b'
 
 $RegexPrecedingKeywords = @('return', 'typeof', 'instanceof', 'in', 'of', 'case', 'yield', 'throw', 'new', 'delete', 'void', 'do', 'else', 'await')
 
@@ -545,8 +540,14 @@ function Get-TriggerDirectFetchViolations {
     if ([regex]::IsMatch($commentsOnly, $forbiddenImportPattern)) {
       $violations += "$($f.FullName): imports a raw HTTP client (http/https/undici/axios/node-fetch) outside the allowlisted runner-client module"
     }
+    if ([regex]::IsMatch($commentsOnly, $dynamicModuleLoadPattern)) {
+      $violations += "$($f.FullName): require()/import() with a non-literal module name (cannot be checked against the raw-HTTP-client list)"
+    }
+    if ([regex]::IsMatch($stripped, $requireAliasPattern)) {
+      $violations += "$($f.FullName): references require without calling it (alias / require.resolve) -- module loads must be direct literal calls"
+    }
     if ([regex]::IsMatch($stripped, $xhrPattern)) {
-      $violations += "$($f.FullName): uses XMLHttpRequest outside the allowlisted runner-client module"
+      $violations += "$($f.FullName): references XMLHttpRequest (call or alias) outside the allowlisted runner-client module"
     }
   }
   if (-not $NoAllowlist -and $allowlistMatchCount -ne 1) {
@@ -725,6 +726,14 @@ export async function run2() {
 }
 ', (New-Object System.Text.UTF8Encoding($false)))
 
+    # Bad (2026-10-23): the four require/XHR shapes critic proved on 2026-09-18.
+    [IO.File]::WriteAllText((Join-Path $tmp 'backtick-require.task.ts'), 'const u = require(`undici`);' + "`n", (New-Object System.Text.UTF8Encoding($false)))
+    [IO.File]::WriteAllText((Join-Path $tmp 'concat-require.task.ts'), "const u = require('und' + 'ici');`n", (New-Object System.Text.UTF8Encoding($false)))
+    [IO.File]::WriteAllText((Join-Path $tmp 'require-alias.task.ts'), "const req = require;`nconst u = req('undici');`n", (New-Object System.Text.UTF8Encoding($false)))
+    [IO.File]::WriteAllText((Join-Path $tmp 'xhr-alias.task.ts'), "const X = XMLHttpRequest;`nexport function run() { return new X(); }`n", (New-Object System.Text.UTF8Encoding($false)))
+    # Good: literal module loads of non-HTTP modules.
+    [IO.File]::WriteAllText((Join-Path $tmp 'literal-loads.task.ts'), "const p = require('node:path');`nconst m = await import('./local.mjs');`n", (New-Object System.Text.UTF8Encoding($false)))
+
     $found = Get-TriggerDirectFetchViolations -Dir $tmp -AllowlistRelativePath 'runner-client.mjs'
     # Real repro, running this for real: a bare `-split ':'` breaks on
     # Windows, where the violation string's own path starts "C:\..." -- the
@@ -734,9 +743,9 @@ export async function run2() {
     # violation strings use, `"$($f.FullName): ..."` above) instead of a
     # bare colon fixes it -- paths themselves never contain ": ".
     $foundFiles = @($found | Where-Object { $_ -match ': ' } | ForEach-Object { ($_ -split ': ', 2)[0] } | Sort-Object -Unique | ForEach-Object { Split-Path -Leaf $_ })
-    $expectedFiles = @('enqueue.task.ts', 'status.task.ts', 'aliased.task.ts', 'runner-client-shim.mjs', 'same-line-url-and-real-fetch.task.ts', 'template-interpolated-call.task.ts', 'regex-literal-with-quote-and-real-fetch.task.ts', 'regex-literal-with-backtick-and-real-fetch.task.ts', 'keyword-before-regex-with-quote-and-real-fetch.task.ts', 'tagged-template-interpolation-leak.task.ts') | Sort-Object
+    $expectedFiles = @('enqueue.task.ts', 'status.task.ts', 'aliased.task.ts', 'runner-client-shim.mjs', 'same-line-url-and-real-fetch.task.ts', 'template-interpolated-call.task.ts', 'regex-literal-with-quote-and-real-fetch.task.ts', 'regex-literal-with-backtick-and-real-fetch.task.ts', 'keyword-before-regex-with-quote-and-real-fetch.task.ts', 'tagged-template-interpolation-leak.task.ts', 'backtick-require.task.ts', 'concat-require.task.ts', 'require-alias.task.ts', 'xhr-alias.task.ts') | Sort-Object
     if (@(Compare-Object $foundFiles $expectedFiles).Count -ne 0) {
-      Write-Host 'check-trigger-no-direct-fetch: SELF-TEST FAILED -- expected exactly enqueue.task.ts (bare fetch call), status.task.ts (undici import), aliased.task.ts (fetch aliased to a local name then called), runner-client-shim.mjs (decoy filename, not the exact allowlisted path), same-line-url-and-real-fetch.task.ts (real fetch call sharing a line with a URL string literal), template-interpolated-call.task.ts (real fetch call inside a template literal interpolation), regex-literal-with-quote-and-real-fetch.task.ts and regex-literal-with-backtick-and-real-fetch.task.ts (real fetch call sharing a file with a regex literal containing a quote/backtick), keyword-before-regex-with-quote-and-real-fetch.task.ts (regex literal after a keyword, containing a quote), and tagged-template-interpolation-leak.task.ts (real fetch call in a second function after a tagged-template interpolation frame leak) to be flagged; clean.task.ts, runner-client.mjs, import-path-literal.task.ts, bucket-name-literal.task.ts, template-text-only.task.ts, node_modules/vendored-pkg/index.mjs, and division-and-regex-spelling-fetch.task.ts must NOT be flagged. Got:'
+      Write-Host 'check-trigger-no-direct-fetch: SELF-TEST FAILED -- expected exactly enqueue.task.ts (bare fetch call), status.task.ts (undici import), aliased.task.ts (fetch aliased to a local name then called), runner-client-shim.mjs (decoy filename, not the exact allowlisted path), same-line-url-and-real-fetch.task.ts (real fetch call sharing a line with a URL string literal), template-interpolated-call.task.ts (real fetch call inside a template literal interpolation), regex-literal-with-quote-and-real-fetch.task.ts and regex-literal-with-backtick-and-real-fetch.task.ts (real fetch call sharing a file with a regex literal containing a quote/backtick), keyword-before-regex-with-quote-and-real-fetch.task.ts (regex literal after a keyword, containing a quote), tagged-template-interpolation-leak.task.ts (real fetch call in a second function after a tagged-template interpolation frame leak), and backtick-require / concat-require / require-alias / xhr-alias .task.ts to be flagged; literal-loads.task.ts, clean.task.ts, runner-client.mjs, import-path-literal.task.ts, bucket-name-literal.task.ts, template-text-only.task.ts, node_modules/vendored-pkg/index.mjs, and division-and-regex-spelling-fetch.task.ts must NOT be flagged. Got:'
       $found | ForEach-Object { Write-Host "  $_" }
       exit 2
     }

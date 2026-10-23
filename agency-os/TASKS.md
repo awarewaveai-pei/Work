@@ -109,7 +109,7 @@
 
 ### 未完成
 
-- [ ] **【治理｜小】D:\Work 共用 git index 停在舊版：bare commit 會把別人已 commit 的檔倒退或刪除**
+- [x] **【治理｜小】D:\Work 共用 git index 停在舊版：bare commit 會把別人已 commit 的檔倒退或刪除** → ✅ 2026-10-23 續（治理⑩清查）：根因類＝HEAD 被不經共用 index 的 private-index commit 推進且無 post-sync（Claude 有 `git-commit-scope-guard.js` 同步；未掛 hook 的 host 沒有）；`ao-close.ps1` 先 `git add` 再 commit，非來源。AO-RESUME 新增偵測 `scripts/lib/git-safe-ops.ps1` `Get-StaleSharedIndexPaths`＋`ao-resume.ps1` WARN（不自動 reset：`git rm --cached` 同形）。當場抓到 2 筆（WORKLOG.md 少 62 行會倒退 58691a45e）已 `git reset -q --`。
   - `🟠 未開始` · `2026-10-16` · `無`
   - **一句話**：2026-10-16 共用 index 有 39 筆舊版（29 筆舊內容、10 筆把已 commit 的檔標成刪除），worktree 全等於 HEAD；已 `git reset -q` 同步（止血）。private-index commit 後的同步（`mcp/claude-userlevel/hooks/rules/git-commit-scope-guard.js:407`）為何沒涵蓋這些路徑未查。
   - **完成定義**：找到哪條 commit 路徑會留下舊 index（Codex、AO-RESUME ff-only、或沒走 marker 的 commit）並關掉；AO-RESUME 偵測「index ≠ HEAD 且 worktree＝HEAD」的路徑並警告。
@@ -120,12 +120,12 @@
   - **現在到哪**：上線；心跳綠；操作者改格寫入正確。驗收抓到 7 支 route 的 audit 從沒寫入（續32 已修，隨下次部署生效）。
   - **下一步**：台灣 03:00 部署後改一格 → 查 `ops_audit_events` 有 `client_schedule_updated`，就關卡。AwareWave Ops 自動爬取已開但 0 個核准來源，週一會失敗開 incident（不要就取消勾）。建議模型：Opus 5.5
   - **證據**：WORKLOG 2026-10-15（續2、續3、續8、續32）
-- [ ] **【治理｜小】連 ssh 的檢查腳本沒有存活檢查：連線中途斷掉就無限期卡住，每晚 guard 會被卡死**
+- [x] **【治理｜小】連 ssh 的檢查腳本沒有存活檢查：連線中途斷掉就無限期卡住，每晚 guard 會被卡死** → ✅ 2026-10-23 續（治理⑩清查）：`scripts/lib/ssh-deadline.ps1` `Invoke-SshWithDeadline`（ServerAlive 15×3＋硬總時限 kill）取代 10 支 check-*.ps1 的 ssh；drift 探測失敗＝BLIND exit 3，`system-health-check.ps1` 對 BLIND 判 Pass=false。實測 10.255.255.1 4s 截斷。
   - `🟠 未開始` · `2026-10-14` · `無`
   - **一句話**：2026-10-14 19:25 實測 guard 卡在 check-deploy-drift.ps1:270 的 ssh 16 分鐘（只有 ConnectTimeout=8）；任務是 IgnoreNew，卡住的那次會讓之後的排程都被跳過。10 支會連 ssh 的檢查只有 check-capacity-health.ps1 有 ServerAliveInterval；另外 ssh 被中止時 drift 那一項被記成 WARN 通過。
   - **完成定義**：共用 ssh 函式（存活檢查＋總時限）取代各檢查自己的 ssh 呼叫；探測失敗報 BLIND 而非 WARN 通過。
   - **證據**：WORKLOG 2026-10-14（續22）
-- [ ] **【治理｜小】REGISTER_AUTOPILOT_PHASE1_TASKS.ps1 也有 `param([string[]]$Args)`：在 PS 5.1 收不到值，什麼都不會註冊**
+- [x] **【治理｜小】REGISTER_AUTOPILOT_PHASE1_TASKS.ps1 也有 `param([string[]]$Args)`：在 PS 5.1 收不到值，什麼都不會註冊** → ✅ 2026-10-23 續（治理⑩清查）：保留不退役（最小改動）：參數改名 `$SchtasksArgs`（`:21`），實測參數已到 schtasks。同類掃描：`grok-cli.ps1`／`perplexity-cli.ps1` 帶 `ValueFromRemainingArguments`，實測可收值，不動。
   - `🟡 潛伏` · `2026-10-14` · `無`
   - **一句話**：與已退役的 tenant registrar 同一 bug（agency-os/automation/REGISTER_AUTOPILOT_PHASE1_TASKS.ps1:20）；目前機器上沒有 autopilot 任務，先決定 autopilot 要留還是退役，再修或刪。
   - **證據**：WORKLOG 2026-10-14（續22）
@@ -292,7 +292,7 @@
   - **完成定義**：暫存檔清掉；scheduled task action 驗證乾淨；Defender `Get-MpThreat` 仍 `IsActive=False`；WORKLOG 記錄本事件結論；必要時補 hook 阻擋規則，避免 AI 工具再次用 bypass 權限直接跑排程任務測試。
   - **明日快速入口**：先處理本機殘留與驗證，不要直接重跑 `D:\tmp\realtest-reg.ps1`；依序確認暫存檔、`AgencyOS-SystemGuard-Daily` action、Defender active state、Claude `high-risk-bash-warn` 是否要升級為 block/approval。
 
-- [ ] **【未開始｜2026-08-25 開｜到期日 2026-08-31】重新啟用 Codex stop-time review gate** — 2026-08-25 05:08 UTC **暫時停用**（`node ~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/codex-companion.mjs setup --disable-review-gate`，走官方開關非改檔；已驗證 `stopReviewGate: True → False`）。
+- [x] **【未開始｜2026-08-25 開｜到期日 2026-08-31】重新啟用 Codex stop-time review gate** — 2026-08-25 05:08 UTC **暫時停用**（`node ~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/codex-companion.mjs setup --disable-review-gate`，走官方開關非改檔；已驗證 `stopReviewGate: True → False`）。 → ✅ 2026-10-23 續（治理⑩清查）：不重啟，被取代：commit/收工的 ORACLE gate（`scripts/verify-closeout-completeness.ps1:274`，需當日且晚於改檔的 oracle artifact）＋額度斷路器已機械強制跨模型 review；stop-time gate 每個 session 結束都燒 Codex 額度（20+ 並行 session），與 §4 斷路器衝突。
   - **原因不是它報錯，是它跑不起來**：Codex 用量額度用罄，job `task-mt87cnhq-4oqkk0` 回 `You've hit your usage limit ... try again at Aug 31st, 2026 12:41 PM`。認證正常（`ChatGPT login active`、`codex-cli 0.149.1`），純粹是額度。
   - **為何停用而非留著**：閘每次收工都失敗，會訓練出「看到它失敗就略過」的習慣那正是本日整場事故的核心機制（`Trigger infra config guard` 紅 10 天沒人看）。
   - **額度是本日消耗的**：為第 5 次 ClickHouse 事故跑了四輪對抗式覆審（11 條 finding、10 條為真），是紀律的真實成本。
@@ -536,7 +536,7 @@
   - [ ] 考試要照正式路徑先過常見問答：現在 `runEvalCase` 只跑 `planReply`（AI 層），正式 `webhooks/chatwoot/route.ts:163` 先 `matchFaq`。價格／報名題在正式環境由 FAQ 回，考試卻記成「危險誤答」。修法：考試先 `matchFaq`，命中＝依 entry.handoff 判定。見 WORKLOG 2026-10-16（續19）（續22）。
   - [ ] Chatwoot 基本設定（`lib/cs/chatwoot-baseline.ts`）：自動結案＋結案巨集已**自動套用**（存個人 token 時一次＋每日排程 `cs_chatwoot_baseline`，WORKLOG 2026-10-16（續29））。剩：①操作者到 `/ops/schedules` 勾 Soulful 這一格（預設關）②標籤、預設回覆、收件匣營業時間仍手動，有第二個客服客戶時再納入。
   - [ ] 客人最後訊息 >24h 後無法回覆（`ENABLE_MESSENGER_CHANNEL_HUMAN_AGENT`=false）；要開需 Meta App Review `HUMAN_AGENT`＋等上游 PR #15932 釋出（現版開了會連 bot 回覆都標 tag）。
-  - [ ] `safe-infra-patch.sh compose` 寫死 `cd /root/lobster-phase1`（server 版第 85 行），`/root/chatwoot`、`postiz` 等獨立 compose 專案無法走此閘；本次手動等價（備份→套用→健康→回滾路徑）。
+  - [x] `safe-infra-patch.sh compose` 寫死 `cd /root/lobster-phase1`（server 版第 85 行），`/root/chatwoot`、`postiz` 等獨立 compose 專案無法走此閘；本次手動等價（備份→套用→健康→回滾路徑）。 → ✅ 2026-10-23 續（治理⑩清查）：compose 專案＝compose 檔所在目錄（限預設檔名，含 override 載入），`.env` 存在才帶；lobster-phase1 行為不變；隨 sync-host-scripts.sh 下次部署上主機。
 
 - [x] **【✅ 以不同做法完成，2026-08-28｜2026-08-30 稽核確認為重複項】~~EU→Dedicated 搬機 + 整併退雲端~~** — 本項描述的計畫（買二手 auction 機、7月出國後8月辦）**沒有照原計畫執行**，實際發生的是：操作者改買 **OVH SYS-GAME-2**（非二手 auction 機），2026-08-28 當天直接把 SG（10 容器）+ EU（29 容器）+ Soulful 一次性全部整併到 `ks-aw-01`，不等原排的 11/20，兩台舊 Hetzner Cloud VPS 已於 2026-08-30 在 console 刪除退租（不可逆，已執行）。**唯一還沒做的子項——Chatwoot（CS U6）**——現獨立追蹤於本檔「gated｜等買二手機才繼續建 customer service U6 Chatwoot」項，且該項的「等買機」閘門現已滿足（機器已在，只是 Chatwoot 本身還沒裝）。這條的完整過程記錄於 `WORKLOG.md` 2026-08-27～2026-08-30 各條，及本檔「⏭️ Soulful 搬站」大項。
 
@@ -760,7 +760,7 @@
 
 #### E. ▶️ 可直接做 — 治理與機械閘
 
-- [ ] **【2026-10-01 開出｜小】verify-governance-pointers 未接進 commit 當下的 hook** — `scripts/verify-governance-pointers.mjs` 現在在 CI（push 後）、健康閘（AO-CLOSE）、`scripts/test-hooks.sh` 跑；`validate-doc-integrity.mjs --commit` 模式不跑它，破壞段落指標的 commit 要到 push／收工才紅。做法：`mcp/claude-userlevel/hooks/rules/doc-link-commit-check.js` 在 commit 動到規則檔或引用面時加跑一次（約 0.4 秒）。延後原因：開出當日另一 session 正在改 hooks。來源：Codex 第三輪 finding 6，`agency-os/reports/oracle/2026-10-01-partialreview-c8ad097d.md`；WORKLOG 2026-10-01「規則檔指標完整性」條。
+- [x] **【2026-10-01 開出｜小】verify-governance-pointers 未接進 commit 當下的 hook** — `scripts/verify-governance-pointers.mjs` 現在在 CI（push 後）、健康閘（AO-CLOSE）、`scripts/test-hooks.sh` 跑；`validate-doc-integrity.mjs --commit` 模式不跑它，破壞段落指標的 commit 要到 push／收工才紅。做法：`mcp/claude-userlevel/hooks/rules/doc-link-commit-check.js` 在 commit 動到規則檔或引用面時加跑一次（約 0.4 秒）。延後原因：開出當日另一 session 正在改 hooks。來源：Codex 第三輪 finding 6，`agency-os/reports/oracle/2026-10-01-partialreview-c8ad097d.md`；WORKLOG 2026-10-01「規則檔指標完整性」條。 → ✅ 2026-10-23 續（治理⑩清查）：`doc-link-commit-check.js` 每次 commit 後跑一次（0.6s，讀工作樹），失敗回饋；測試 `runner-parity.test.mjs` 新增 1 項，hooks 372/372。
 - [x] **【2026-09-23 開出｜小】`doc-link-commit-check.js`（PostToolUse: Bash `git commit`）不會被 script／hook 產生的 commit 觸發** — 該規則只掛在 Bash `git commit` 這個 tool call 上；`auto-checkpoint`（`[claude] checkpoint: ...`，08-25 起 0 次但機制仍在）、`ao-close.ps1` 的收工 sync commit、`scripts/commit-checkpoint.ps1` 都是 script 內部呼叫 git，不經過會被攔截的 Bash 呼叫，所以這些 commit 弄斷的相對連結不會被回報。實例：`3f31d5eec`（2026-07-04 auto-checkpoint）斷了 3 個連結，`node lobster-factory/scripts/validate-doc-integrity.mjs --commit=3f31d5eec` 驗得到，但當時沒有任何機制主動告知。**完成定義**：這幾支 commit-producing 腳本在自己 commit 完成後呼叫 `validate-doc-integrity.mjs --commit=HEAD --json`，結果寫進一個狀態檔（同 smoke-LATEST.json 的機器欄位慣例），由 `scripts/lib/smoke-status-digest.ps1` 讀取併入 `blockers[]`。**依賴已解除**（VBC 覆查 2026-09-23）：`--commit=` 模式與 `doc-link-commit-check.js` 已於 `d1a7f2055`（同日，另一 session）落地進 `mcp/claude-userlevel/hooks/rules.manifest.json` + `lobster-factory/scripts/validate-doc-integrity.mjs`，可直接動工。 → ✅ 2026-09-25 續2（雲端 T9＋本機 5.1 修）；`scripts/git-stage-hunks.py --commit-file` 尚未接同一 helper。
 - [x] **【2026-09-25 開出｜資安｜Medium+，先出計畫】command-plane kill switch 失效開放（main 既有）** — `lib/command-plane/killSwitch.ts:30-31` DB 錯誤回 `normal`，違反 :17-18「medium/high/critical fail closed」；`:33-35` client 列優先，違反 :16「most-restrictive」（global emergency_stop 被 client normal 蓋掉）；`commandRouter.ts:70-71` 直接採用。`__tests__/killSwitch.test.ts` 兩條 `it.fails` 釘契約，修好後改 `it`。詳 WORKLOG 2026-09-25 續2。 → ✅ 2026-09-25 續10（雲端 T13＋本機）：unavailable 失效關閉、client/global 取最嚴格、未知 mode 擋下；已部署 2026-09-26 `b8c191698`（WORKLOG 續30）（上線走 sg-deploy 另決）。
 - [x] **【2026-09-25 開出｜資安｜Medium+，先出計畫】repair-center 讀 system_modes 同款失效開放** — `lib/repair-center/service.ts:21-28` `getCurrentSystemMode` 忽略 error、查無回 `"normal"`、只讀 global 列；`startRepairFromIncident` 以它把關 → emergency_stop 期間 system_modes 讀取一次失敗，修復仍會啟動。修法：改用 `lib/command-plane/killSwitch.ts` 的 `getActiveMode`（ModeLookup，unavailable 擋下）。詳 WORKLOG 2026-09-25 續10。 → ✅ 2026-09-25 續20（雲端 T16＋本機）：`lib/repair-center/system-mode-gate.ts` 唯一把關，startRepairFromIncident 與 tryRemediate（原本完全沒查，uptime-kuma 自動重啟）都走它；已部署 2026-09-26 `b8c191698`（WORKLOG 續30）。
@@ -789,7 +789,7 @@
   - **完成定義**：smoke `codex_parity=ok`（trust + 實際心跳），且活體探測確認 BLOCK 真的發生
   - **證據**：WORKLOG 2026-09-19(續79) 稽核、2026-09-20(續84) 修復
 
-- [ ] **【2026-09-12 開出｜中優先】`git-align-main-aoresume-feature-*` 自動對齊腳本會吃掉未提交的編輯**
+- [x] **【2026-09-12 開出｜中優先】`git-align-main-aoresume-feature-*` 自動對齊腳本會吃掉未提交的編輯** → ✅ 2026-10-23 續（治理⑩清查）：已由他 session 關閉：自動路徑改 fetch+ff-only（`scripts/ao-resume.ps1:403` 2026-09-23 註），git-align 只在顯式旗標；具名 stash＋保證取回（c63bdc5c4，`git-align-main-aoresume-feature.ps1:373`）。
   - `🟠 未開始` · `2026-09-12 開出` · `不卡誰，但會造成重工`
   - **一句話**：施工中途（`lib/kb`/`lib/cs` 的 0083 is_sensitive 修復，見 WORKLOG 2026-09-12 續8）該腳本跑了一次 stash-based 對齊，把 10 個檔案的未提交修改整批打回 HEAD，`git status` 顯示乾淨但內容其實是舊的。VBC 查證：改動沒有真的遺失，`git stash list` 找到同時間戳的 stash（雙親 merge commit，內容正確），逐檔 `git checkout stash@{N} -- <path>` 救回。**不變量**：一支背景自動化腳本不應該在另一個 session 正在編輯檔案時把它的未提交狀態動到看不出來的地方（`git status` 乾淨 ≠ 沒有正在進行的工作被吃掉）。修法方向待定：腳本改成偵測到近期修改（如 `git status` 有未提交檔案的 mtime 在 N 分鐘內）就跳過本輪對齊，或改成真正的 `stash pop`（不留鏡像在 stash 裡也不會安靜蓋掉）而非目前這種「建一個對齊結果 commit 塞進 stash，但工作目錄本身回到 HEAD」的手法。細節見 WORKLOG 2026-09-12（is_sensitive 條目內「事故」段落）。
 
@@ -839,14 +839,14 @@
 - [x] **【✅ 2026-09-18 完成，real-Postgres 驗證】蒐集器 Task 8：sink/hci-discovered 寫入路徑** — 新增 `public-intelligence/source-registry/sink-hci-discovered.mjs`（`writeDiscoveredSource`，`query` 依賴注入零 npm 依賴）。不同於 Task 4/5/7，這條路徑不能跑進隔離 runner（ADR-0029 gate 2 切斷 runner 對 Postgres 所在 docker-internal bridge 的路由），改落腳原計畫 Scope（`public-intelligence/source-registry/`）。critic 覆審抓到 2 個 Major 全修：**Major**——候選提示查詢用 `LIKE $1`，bound parameter 擋不住參數值裡字面 `_` 被當萬用字元解讀（合法 hostname 可含底線），會把不相關組織誤判成候選來源——已修，改 `starts_with(source_ref, $1)` 純字首比對，真跑 Postgres 15.8 確認可用；**Major**——候選提示這個非權威步驟沒 fail-soft，失敗會讓已真實 COMMIT 的兩個權威寫入被回報成整體失敗，重試會對同一 URL 產生多餘重複 snapshot——已修全段包 try/catch 降級成空陣列。另補一個測試涵蓋缺口：8+52 個既有單元測試（Task 8 自己的 + Task 3-7 全部 fetch-runner 測試）都沒接進本專案唯一的「跑全部」入口 `scripts/test-wave1-local.ps1`——已修全部接入，真跑整個 20-migration apply+down+重新 apply 可逆性檢查確認無回歸。順手修一個真實 bug：`scripts/dev-db-init.ps1` 的 loop bound 卡在 19、「已套用」判斷還在查 0019 的 marker，全新 volume 上 migration 0020 永遠不會被套用（這台機器的 persistent dev DB 是手動套的所以症狀還沒現形）——已修 loop bound 20 + marker 改查 0020 自己的欄位。詳見 WORKLOG 2026-09-18、`HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md` Task 8。
 - [ ] **已知模式債務：`dev-db-init.ps1` 的「hardcode 最新 migration marker + loop bound」模式會在下個 migration 忘記同步時重演** — Task 8（2026-09-18）critic 覆審發現：這次的根因類型本身沒根治，只修了症狀（0019→0020）。根治需 migration 帳本表（記錄哪些 id 已套用，逐檔比對現有 migrations 目錄），非本次範圍。
 - [x] **【✅ 2026-09-18 完成，本機測試全綠】蒐集器 Task 9：Trigger.dev 編排邏輯（enqueue/poll/retry 狀態機 + ADR-0029 gate 6 靜態閘）** — 新增 `public-intelligence/orchestration/{runner-client,orchestrate-discovered-fetch}.mjs` + `scripts/check-trigger-no-direct-fetch.ps1`（測試 id `wave6-trigger-no-direct-fetch`）。刻意只做邏輯層，不建 Trigger.dev 專案/不部署——runner 尚未部署到網路可達的地方（Task 3 獨立 STOP）、trigger MCP 未登入驗證、部署到共用專案有波及既有上線任務的風險，三者都是部署層問題，邏輯層不需要等它們解決。critic 覆審抓到 7 個 Major 全修，其中 2 個是**真實 PoC 證實**的閘門繞過：**Major**——guard script 原本只抓「直接呼叫」，別名（`const doFetch = fetch`）跟重新匯出（`export const x = fetch`）繞得過去，critic 用真實 fixture 跑出 `EXIT=0` 證實漏網——已修，改抓裸露的 `fetch` 識別符（呼叫或引用都算）；**Major**——allowlist 用檔名萬用字元比對，一個叫 `runner-client-shim.mjs` 的 decoy 檔案光靠檔名就跳過全部規則——已修，改精確相對路徑比對 + 「剛好命中 1 個檔案」機械斷言。兩者都用 critic 原始 PoC 樣本重新驗證抓到；第三種繞過手法（`globalThis['fe'+'tch'](...)` 動態字串組出屬性名稱）證實抓不到，需要真正 AST/直譯器才能堵住，已誠實記入腳本 header + 本檔已知限制（見下）。其餘 5 個 Major：`tenantId`/`query` 從未交叉驗證（真實跨租戶寫入風險類別，今天沒觸發只因還沒有呼叫端）已修驗證比對；隱性「不是前三種狀態就當 completed」被 critic 真實塞一個未命名狀態證實會流進 DB 寫入呼叫，已修顯式檢查；HTTP 4xx/不支援內容類型漏標可重試性已修（429 明確排除，因限流是真的暫時性）；`runner-client.mjs` 兩個 fetch 呼叫無逾時已修加 `AbortSignal.timeout()`；20 個新測試+guard script 沒接進 `scripts/test-wave1-local.ps1`（Task 8 才修過的同一類坑又重演）已修全部接入且真跑確認執行。詳見 WORKLOG 2026-09-18（續2）、`HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md` Task 9。
-- [ ] **已知限制：`check-trigger-no-direct-fetch.ps1` 抓不到動態字串組出屬性名稱的 fetch 呼叫** — Task 9（2026-09-18）critic 覆審真實 PoC 證實：`globalThis['fe'+'tch'](...)` 這類手法因為原始碼裡從未出現完整的 "fetch" 字面 token，regex 掃描原理上抓不到，需要真正的 AST + scope resolution 或直譯器才能根治。這是 ADR-0029 gate 6 目前**唯一**的執行機制，非形式化證明過的完整方案。
-- [ ] **已知限制：`check-trigger-no-direct-fetch.ps1` 的 `$forbiddenImportPattern`／`$xhrPattern` 有 3 個真實繞過，未修**（Task 10 follow-up app/ 擴大掃描，2026-09-18，critic 覆審真跑 PoC 證實，皆為修改前既有文字，非當次改動引入）：(1) backtick 分隔的 module specifier `` require(`undici`) `` — 字元類別只認 `['"]`；(2) 字串串接 `require('und'+'ici')`；(3) `require` 本身取別名再呼叫 `const req=require; req('undici')` — 與今天已修的 `fetch` 別名繞過同一類手法，尚未同步套到 `require`。`$xhrPattern`（`\bnew\s+XMLHttpRequest\b`）也有同款別名繞過（`const XHR=XMLHttpRequest; new XHR()`），同樣尚未套用 `fetch` 那次已驗證的「裸識別符」修法。三者皆已用真實執行證實（非推論），列為獨立後續任務，不在本次 app/ 擴大掃描範圍內（該範圍只覆蓋 node_modules 排除／字串常值誤報／零容忍模式三項）。詳見 WORKLOG 2026-09-18。
-- [ ] **已知限制：`check-perplexity-search-only.mjs:40` KEY_READER 抓不到間接讀 key（`process.env[name]`、`os.environ.get("…")`）** — 2026-10-10 續2 發現；HOST／SDK 檢查（`:66`、`:76`）仍兜底，不會靜默變成呼叫。修法方向：key 名改由單一常數匯出，guard 掃常數的使用處。詳 WORKLOG 2026-10-10（續2）。
-- [ ] **已知債務：runner 端寫入 MinIO 但 DB 列因輪詢階段失敗而遺失時的孤兒物件** — Task 9（2026-09-18）critic 覆審指出架構層級取捨：若失敗發生在輪詢階段（例如 runner 重啟導致 job 狀態遺失），runner 可能已把內容寫進 MinIO，但呼叫端重新 enqueue 後找不到對應 DB 列可參照，形成孤兒物件；`object-storage-client.mjs` 沒有 TTL/GC。與既有「`jobs` Map 無 TTL」債務同源，Task 9 真實流量接上前應一併處理。
+- [x] **已知限制：`check-trigger-no-direct-fetch.ps1` 抓不到動態字串組出屬性名稱的 fetch 呼叫** — Task 9（2026-09-18）critic 覆審真實 PoC 證實：`globalThis['fe'+'tch'](...)` 這類手法因為原始碼裡從未出現完整的 "fetch" 字面 token，regex 掃描原理上抓不到，需要真正的 AST + scope resolution 或直譯器才能根治。這是 ADR-0029 gate 6 目前**唯一**的執行機制，非形式化證明過的完整方案。 → ✅ 2026-10-23 續（治理⑩清查）：接受為已知限制（regex 掃描原理上不可解，檔頭已註明）；同類可解的 3 個繞過已關（下一條）。
+- [x] **已知限制：`check-trigger-no-direct-fetch.ps1` 的 `$forbiddenImportPattern`／`$xhrPattern` 有 3 個真實繞過，未修**（Task 10 follow-up app/ 擴大掃描，2026-09-18，critic 覆審真跑 PoC 證實，皆為修改前既有文字，非當次改動引入）：(1) backtick 分隔的 module specifier `` require(`undici`) `` — 字元類別只認 `['"]`；(2) 字串串接 `require('und'+'ici')`；(3) `require` 本身取別名再呼叫 `const req=require; req('undici')` — 與今天已修的 `fetch` 別名繞過同一類手法，尚未同步套到 `require`。`$xhrPattern`（`\bnew\s+XMLHttpRequest\b`）也有同款別名繞過（`const XHR=XMLHttpRequest; new XHR()`），同樣尚未套用 `fetch` 那次已驗證的「裸識別符」修法。三者皆已用真實執行證實（非推論），列為獨立後續任務，不在本次 app/ 擴大掃描範圍內（該範圍只覆蓋 node_modules 排除／字串常值誤報／零容忍模式三項）。詳見 WORKLOG 2026-09-18。 → ✅ 2026-10-23 續（治理⑩清查）：backtick specifier 納入；require()/import() 非單一 literal＝違規；裸 `require`（別名）與任何 `XMLHttpRequest` 參照＝違規；自測加 4 壞 1 好 fixture 全過，public-intelligence／app 實掃乾淨。
+- [x] **已知限制：`check-perplexity-search-only.mjs:40` KEY_READER 抓不到間接讀 key（`process.env[name]`、`os.environ.get("…")`）** — 2026-10-10 續2 發現；HOST／SDK 檢查（`:66`、`:76`）仍兜底，不會靜默變成呼叫。修法方向：key 名改由單一常數匯出，guard 掃常數的使用處。詳 WORKLOG 2026-10-10（續2）。 → ✅ 2026-10-23 續（治理⑩清查）：新增 `KEY_NAME_ALLOWED`：名單外檔案出現 `PERPLEXITY_API_KEY` 字樣即違規（間接讀也得拼出名字）；self-test 28 例過，全 repo 8541 檔實掃乾淨。
+- [ ] **已知債務：runner 端寫入 MinIO 但 DB 列因輪詢階段失敗而遺失時的孤兒物件** — Task 9（2026-09-18）critic 覆審指出架構層級取捨：若失敗發生在輪詢階段（例如 runner 重啟導致 job 狀態遺失），runner 可能已把內容寫進 MinIO，但呼叫端重新 enqueue 後找不到對應 DB 列可參照，形成孤兒物件；`object-storage-client.mjs` 沒有 TTL/GC。與既有「`jobs` Map 無 TTL」債務同源，Task 9 真實流量接上前應一併處理。 → 2026-10-23：仍開；同源的 `jobs` Map TTL 由雲端 session「Fetch-runner job store TTL 與上限」處理中，孤兒物件 GC 一併看其結果。
 - [x] **HCI-30 蒐集器→DISCOVERED 管線計畫（2026-09-17 `planner` 產出）✅ 本機/測試環境全部完成，僅剩雲端部署** — 13 個 Task Prompt：Task 0/1 已簽核（2026-09-17 `reports/decisions/2026-09-17-hci30-c6-and-collector-task1-decisions.md` 裁決3/4：組織-only 範圍重申、REJECTED retain-forever）；Task 2-11 完成；Task 12 判定 NOT APPLICABLE（`lobster-factory` routing 三件套記錄的是 client 自動化 task_type 路由，跟新開 REST 路徑無關）；Task 13 獨立 vuln-verifier 複核 ADR-0029 六道閘 6/6 CONFIRMED。計畫：`Projects/internal/hci30/docs/HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md`。對應 `DATA_COLLECTION_PLAN.md` §3 C4。**唯一剩餘工作＝雲端部署，三個獨立阻塞，非技術缺口**：① 隔離 runner 上 `ks-aw-01` 是 High-risk STOP，需操作者對這一項單獨明示 go-ahead；② 這個 session 的 Trigger MCP 未登入，需操作者親自完成互動式登入；③ Trigger.dev task 包裝要選「共用現有專案（已有真實上線任務 `collect-scheduled-crawl`，同專案部署有波及風險）」或「開新專案」，留給操作者決定，尚未詢問。三者皆解除後，才輪到寫 `trigger.config.ts` 包裝 + 真跑一次 enqueue→dashboard→runner 完成→Task 8 寫入的雲端端對端驗證。詳見 WORKLOG 2026-09-18 全系列條目。
-- [ ] **Bash 工具 wrapper 疑似壞掉，需獨立調查（間歇性，非持續）** — 2026-09-17 某 session 三種方式（裸指令、`.sh` 檔、`cmd.exe //c` .bat 檔）全部同樣失敗，錯誤與內容無關；同日兩個獨立 `fullstack-engineer` agent（做 Task 4/5，見上）也各自整個 session 100% 中招、從未找到解法。過去偶發同款症狀曾用「寫 script 檔另外呼叫」繞過，那次繞不過。**同日稍後另一個 session（本次，接手真跑 Task 4/5 驗證）Bash 全程正常**——`echo hi`、`node --test`、`powershell -File`（含 real-Docker/MinIO 跑約 5 分鐘）、`git`、`grep` 皆無異常，跨約 20 分鐘、數十次呼叫零故障。懷疑是特定 subagent 沙箱/session 才會中招，不是這台機器或這個 wrapper 全域持續壞掉；根因仍未定位，過去猜測（`bash -c` 呼叫前後被注入東西）未驗證。優先權降為中——不再擋住每個 session，但下次再中招時應保留完整錯誤輸出供比對。
+- [x] **Bash 工具 wrapper 疑似壞掉，需獨立調查（間歇性，非持續）** — 2026-09-17 某 session 三種方式（裸指令、`.sh` 檔、`cmd.exe //c` .bat 檔）全部同樣失敗，錯誤與內容無關；同日兩個獨立 `fullstack-engineer` agent（做 Task 4/5，見上）也各自整個 session 100% 中招、從未找到解法。過去偶發同款症狀曾用「寫 script 檔另外呼叫」繞過，那次繞不過。**同日稍後另一個 session（本次，接手真跑 Task 4/5 驗證）Bash 全程正常**——`echo hi`、`node --test`、`powershell -File`（含 real-Docker/MinIO 跑約 5 分鐘）、`git`、`grep` 皆無異常，跨約 20 分鐘、數十次呼叫零故障。懷疑是特定 subagent 沙箱/session 才會中招，不是這台機器或這個 wrapper 全域持續壞掉；根因仍未定位，過去猜測（`bash -c` 呼叫前後被注入東西）未驗證。優先權降為中——不再擋住每個 session，但下次再中招時應保留完整錯誤輸出供比對。 → ✅ 2026-10-23 續（治理⑩清查）：不調查：自 2026-09-17 後無再現（本 session 數百次呼叫零故障），無錯誤樣本可比對；再發生時保留完整輸出另開。
 
-- [ ] **MCP 執行期可用性偵測器：讀實際 connected/failed 計數，不再只驗設定檔語法**
+- [x] **MCP 執行期可用性偵測器：讀實際 connected/failed 計數，不再只驗設定檔語法** → ✅ 2026-10-23 續（治理⑩清查）：`scripts/check-mcp-runtime.ps1` → `reports/status/mcp-runtime-LATEST.json`（經 detector 契約）；接 `system-health-check.ps1` 12h 與 ao-resume。實測假 log failed:14→WARN、failed:0→PASS、無 log→measured=0。**現況實測 failed=18 needs_auth=26**（2026-10-23 11:40）。
   - `🟠 未開始` · `2026-08-28 開出` · `可直接做`
   - **一句話**：`check-claude-sync.ps1` 的 H4 只能回答「產生器有沒有吐出 Claude 展不開的語法」；「這 24 支 server 實際上啟不啟得起來」沒有任何人在看。
   - **不變量**：靜態文字檢查無法回答執行期可用性 —— 那取決於啟動期環境與 Claude Code 自己的 per-server schema。唯一權威來源是 MCP runtime 本身。
@@ -863,7 +863,7 @@
   - **它繼承了角色卻沒繼承治理**：這正是 `~/.cursor/mcp.json` 原本的處境（同樣被合併、同樣持明文），差別只在後者有 `cursor-mcp` 條目管。Cursor 2026-08-26 退場、`~/.cursor` 2026-08-28 刪除後，那條退場了，這個檔卻從來沒被納入。
   - **複查（2026-09-18，操作者質疑 Perplexity 一天 $10 用量觸發）**：現況剩 **5 個 server**（`airtable` `wordpress` `replicate` `github` `work-global`）。原 10 個裡 `chatgpt-fast` `chatgpt-latest` `gemini-fast` `gemini-latest` `perplexity` 五個已不在，含那把 `pplx-`(53) key。此檔不在 git、從未被任何腳本備份過（`sanitize-user-mcp-config.ps1:14-20` 現在的註解仍寫「不在備份清單上，且它應該要在」），**移除的確切時間與操作者不可考**——mtime 對這檔案無意義（Claude Desktop 每次啟動都會為其他 UI 狀態重寫它），故無法判斷這次移除發生在 9/12 那次 Perplexity 用量高峰之前或之後。治理缺口本身沒關：這項仍該開著。
 
-- [ ] **【2026-09-19 開出｜bughunt-oracle 驗證缺口｜根因：為什麼 6/21 的修復沒擋住 9/19 的 sonar-pro 預設值】**`bughunt-oracle.ps1` 只驗 `hits=0` 的零命中宣告是否造假，不驗 `hits=N`（N>0）的清單是否完整。2026-06-21 那次 Perplexity 修復（WORKLOG-archive/2026-06.md:2777）宣告 `BUGHUNT_DONE: grep=PERPLEXITY_API_KEY | hits=3`，但同一個 scope（agency-os,scripts,lobster-factory）、同一個 pattern，2026-09-19 重跑立刻多出 `scripts/perplexity-cli.ps1:10,12,15` 三處命中——該檔案 2026-04-23 就存在，早於那次修復兩個月，理當被同一次 grep 掃到。這行記錄沒提到它，也沒有像 `trending-sources.ts`/`generate-core.ts` 那樣寫「不動理由」，代表不是刻意排除，是漏掉。這正是 `scripts/perplexity-cli.ps1` 的 sonar-pro 預設值沒被那次修復一併抓到、缺口留到今天的直接原因。詳見 WORKLOG 2026-09-19（續76）。**修法方向**：bughunt-oracle 對非零 hits 也該獨立重跑 grep 比對清單是否完整，不能只驗證「宣告的每一條是否真實存在」。
+- [x] **【2026-09-19 開出｜bughunt-oracle 驗證缺口｜根因：為什麼 6/21 的修復沒擋住 9/19 的 sonar-pro 預設值】**`bughunt-oracle.ps1` 只驗 `hits=0` 的零命中宣告是否造假，不驗 `hits=N`（N>0）的清單是否完整。2026-06-21 那次 Perplexity 修復（WORKLOG-archive/2026-06.md:2777）宣告 `BUGHUNT_DONE: grep=PERPLEXITY_API_KEY | hits=3`，但同一個 scope（agency-os,scripts,lobster-factory）、同一個 pattern，2026-09-19 重跑立刻多出 `scripts/perplexity-cli.ps1:10,12,15` 三處命中——該檔案 2026-04-23 就存在，早於那次修復兩個月，理當被同一次 grep 掃到。這行記錄沒提到它，也沒有像 `trending-sources.ts`/`generate-core.ts` 那樣寫「不動理由」，代表不是刻意排除，是漏掉。這正是 `scripts/perplexity-cli.ps1` 的 sonar-pro 預設值沒被那次修復一併抓到、缺口留到今天的直接原因。詳見 WORKLOG 2026-09-19（續76）。**修法方向**：bughunt-oracle 對非零 hits 也該獨立重跑 grep 比對清單是否完整，不能只驗證「宣告的每一條是否真實存在」。 → ✅ 2026-10-23 續（治理⑩清查）：不做 N>0 機械閘：N 語意（修前位置／殘留引用／含 .md）無法從證據行判定，最近 17 條 N>0 宣告回放 6 條誤判 FAIL（修完的檔不再 staged 即被計入）→ 會訓練繞過。改做：oracle 列舉剪掉 node_modules/.git/.next/.venv/__pycache__（`bughunt-oracle.ps1`），單條由數分鐘→秒級，.next 複本不再讓 hits=0 誤判。漏 grep 這類靠 §1 必填 scope 根＋critic。
   - **機制已經寫好且刻意留著**：`scripts/prune-duplicate-mcp-servers.mjs` 是 `--target/--compare/--collection` 的通用工具，處理的正是「刪掉碰撞的鍵、保留只存在於此的逃生門鍵」這個形狀 —— `replace-json` 會把 `perplexity`/`wordpress` 一起殺掉，所以不能用。**不需要改 code，只需要一條 manifest 條目。**
   - **下一步**：① 操作者確認 `perplexity` / `wordpress` 是否該進 `mcp/registry.template.json`（進了就連逃生門都不需要）② 決定 8 個碰撞鍵是否 prune ③ 明文 key 併入既有輪換批次一起處理（見同區 2026-08-15 / 2026-08-27 兩條）④ 加 manifest 條目 `claude-desktop-mcp`（`prune-duplicate-json`），並在 `sanitize-user-mcp-config.ps1` 備份清單補上此路徑
   - **為何沒有直接做**：改寫的是 Claude 正在載入、且持有活憑證的檔案 —— 依 AGENTS.md §操作風險分級屬 Medium 以上，需明示 go-ahead。
@@ -882,9 +882,9 @@
   - **刻意不碰**：`docs/CHANGE_IMPACT_MATRIX.md` 的 `.cursor/rules/*` 各列 —— 同區已有「CHANGE_IMPACT_MATRIX 漂移偵測腳本首輪 7 個 WARN 待人工確認」在管，兩邊同時改會打架。WORKLOG／memory／governance-plans 的歷史正文**不重寫**；本輪只加退場／狀態標籤，避免把歷史規劃誤當現行做法。
   - **完成定義**：`grep -rnE '[\\/.]cursor[\\/]' --include=*.md` 在 `docs/` 與 `runbooks/` 下只剩歷史敘述與 CHANGE_IMPACT_MATRIX
 
-- [ ] **【2026-08-26 開出｜偵測器說謊｜第三顆】Phase 4 Check 1／Check 2 至少 12 週在回報假綠燈 —— 雲端容器沒有 `gh`** — 2026-08-26 把檢查邏輯換成 `scripts/phase4-checks.py` 後第一次雲端實跑，Check 1／2 回 `SKIP — gh not installed`（`RemoteTrigger get_run_log cse_01BAKre3odz4KUbP1jUDxaFS`，容器內 `python3` 有、`gh` 沒有）。但 `agency-os/reports/repair-center/phase4-2026-06-08.md` 到 `phase4-2026-08-21.md` **連續 12 份全部是 `Check 1: PASS`**（逐檔 grep 確認）。舊 prompt 明文寫 `If gh exit != 0: CHECK1_STATUS = "SKIP"`，所以要嘛容器映像近期拿掉 `gh`，要嘛散文規格被執行成了 PASS —— 兩者結論相同：**那兩項檢查有 12 週沒有真的在量任何東西**。**現況不是退步**：SKIP 是誠實的「我沒量到」，比假 PASS 好；且 SKIP 會進 `整體` 顯示（今天是「⚠️ 1 項需注意, 2 項 SKIP」），不會被當健康。**要決定的是取捨不是 bug**：① 給 routine 配 setup script 裝 `gh`（目前 `No setup script configured`）② 改走 GitHub REST API + token —— 但 routine 刻意無 env vars（與另外三支 routine 同 pattern），加 token 會讓四支分叉 ③ 接受 SKIP，把 auto-repair PR 重複偵測改由本機 `/health` 或 `.ps1` fallback 負責（本機有 `gh`，今天實測 Check 1 正常回 PASS）。**建議③**：這兩項本來就不是時效性檢查，而雲端加 secret 的代價高於收益。
+- [x] **【2026-08-26 開出｜偵測器說謊｜第三顆】Phase 4 Check 1／Check 2 至少 12 週在回報假綠燈 —— 雲端容器沒有 `gh`** — 2026-08-26 把檢查邏輯換成 `scripts/phase4-checks.py` 後第一次雲端實跑，Check 1／2 回 `SKIP — gh not installed`（`RemoteTrigger get_run_log cse_01BAKre3odz4KUbP1jUDxaFS`，容器內 `python3` 有、`gh` 沒有）。但 `agency-os/reports/repair-center/phase4-2026-06-08.md` 到 `phase4-2026-08-21.md` **連續 12 份全部是 `Check 1: PASS`**（逐檔 grep 確認）。舊 prompt 明文寫 `If gh exit != 0: CHECK1_STATUS = "SKIP"`，所以要嘛容器映像近期拿掉 `gh`，要嘛散文規格被執行成了 PASS —— 兩者結論相同：**那兩項檢查有 12 週沒有真的在量任何東西**。**現況不是退步**：SKIP 是誠實的「我沒量到」，比假 PASS 好；且 SKIP 會進 `整體` 顯示（今天是「⚠️ 1 項需注意, 2 項 SKIP」），不會被當健康。**要決定的是取捨不是 bug**：① 給 routine 配 setup script 裝 `gh`（目前 `No setup script configured`）② 改走 GitHub REST API + token —— 但 routine 刻意無 env vars（與另外三支 routine 同 pattern），加 token 會讓四支分叉 ③ 接受 SKIP，把 auto-repair PR 重複偵測改由本機 `/health` 或 `.ps1` fallback 負責（本機有 `gh`，今天實測 Check 1 正常回 PASS）。**建議③**：這兩項本來就不是時效性檢查，而雲端加 secret 的代價高於收益。 → ✅ 2026-10-23 續（治理⑩清查）：採建議③：雲端維持誠實 SKIP，不加 secret；本機 `/phase4-check`（有 gh）為補位。
 
-- [ ] **建立 `detector-contract` audit class：偵測器必須申報「這輪量到什麼」**
+- [x] **建立 `detector-contract` audit class：偵測器必須申報「這輪量到什麼」** → ✅ 2026-10-23 續（治理⑩清查）：Phase 1：`scripts/lib/_detector-contract.ps1`＋`scripts/audit-detector-contract.ps1`＋只能縮小的 `scripts/detector-contract-legacy.txt`（13 支舊 writer）；接 health 12g；`AUDIT_REGISTRY.md` 新節。Phase 2 見下方新條。
   - `🟠 未開始` · `2026-08-26 開出` · `可直接做` · `依 BUG_HUNT_PROTOCOL 9 步`
   - **一句話**：18 支偵測器各自手寫 verdict，於是「我什麼都沒量到」和「一切正常」在輸出上長得一樣。
   - **不變量**：每份 `reports/status/*-LATEST.json` 必須帶 `overall` 與 `measured`；`measured=0` 時 `overall` 不得為 PASS；且每份 artifact 必須有至少一個讀者。
@@ -893,6 +893,7 @@
   - **實作計畫**：① `scripts/lib/_detector-contract.ps1` 契約定義 ② `scripts/audit-detector-contract.ps1` 掃描器 ③ 接進 `system-health-check.ps1`（Step 9.5 選項 b，操作者零記憶）④ `AUDIT_REGISTRY.md` 新章節 ⑤ `AGENTS.md` 觸發列。
   - **完成定義**：塞一份 `measured=0/overall=PASS` 的假 artifact 必須 FAIL（證明不是永遠綠）；`smoke-LATEST.json` 必須 PASS（證明不是永遠紅）；現況掃描必須點名 `cf-iprefresh`。
   - **Phase 2（另計）**：8 支補 `measured` 並改 fail-closed，由上面那道閘逼出來，一次一支。
+- [ ] **【2026-10-23 開出｜小】detector-contract Phase 2：13 支舊 writer 改走 `Write-DetectorArtifact`** — 清單＝`scripts/detector-contract-legacy.txt`（只能縮小，已合規或不存在的列＝STALE 會紅）；一次一支，改完刪該列。未強制「每份 artifact 至少一個讀者」。
 
 - [x] **【✅ 2026-08-26 完成｜2026-08-30 稽核確認】Phase 4 雲端 routine 仍在解析已退役的 `restore_drill_due_after`** — `phase4-weekly.md:21` 現已明寫「Prompt 內含邏輯：無（2026-08-26 起）。所有檢查在 `scripts/phase4-checks.py`；prompt 只負責 pull → 跑 → commit」，即完成定義選項二（改成呼叫 py，不再維護第二套邏輯）。殘留的 5 處 `restore_drill_due_after` 引用經確認是**刻意保留的 rollback 正本區塊**（`:37-46` 明寫「已退役的 routine prompt...不要刪、不要『順手更新』它」），非未修完的活邏輯。
   - `🟡 現行` · `2026-08-26 開出`
@@ -902,7 +903,7 @@
   - **完成定義**：該 md 改為讀 `restore_drills` + `restore_drill_interval_days`（對齊 `scripts/phase4-checks.py:329-353`），或直接改成呼叫該 py，不再維護第二套邏輯。
   - **注意**：這條原本寫「三套實作」，2026-08-26 訂正為只剩雲端一套。
 
-- [ ] **【🟡 邏輯已修，僅剩字面措辭未達完成定義｜2026-08-30 稽核確認】`check-backup-health.ps1` 把「無法證明可還原」當成健康** — 平行 session 已完成邏輯修正：`:264-269` 新增 `$sgVerifyDead/$euVerifyDead/$ksVerifyDead`（UNKNOWN 且 backup_age_days≥1 才判定），`:277` 折入 `$overall` 計算，UNKNOWN 已能正確升級 WARN（新鮮的 UNKNOWN 仍安靜，不會 false-alarm）。**未達成的只剩完成定義字面要求**：WARN 訊息目前只標 `(unknown)`，未寫出「無法證明可還原」這句話本身（`:312-313`）。不打勾，留給補一行文字。
+- [x] **【🟡 邏輯已修，僅剩字面措辭未達完成定義｜2026-08-30 稽核確認】`check-backup-health.ps1` 把「無法證明可還原」當成健康** — 平行 session 已完成邏輯修正：`:264-269` 新增 `$sgVerifyDead/$euVerifyDead/$ksVerifyDead`（UNKNOWN 且 backup_age_days≥1 才判定），`:277` 折入 `$overall` 計算，UNKNOWN 已能正確升級 WARN（新鮮的 UNKNOWN 仍安靜，不會 false-alarm）。**未達成的只剩完成定義字面要求**：WARN 訊息目前只標 `(unknown)`，未寫出「無法證明可還原」這句話本身（`:312-313`）。不打勾，留給補一行文字。 → ✅ 2026-10-23 續（治理⑩清查）：WARN 文字改為 `(unknown) -- 無法證明可還原`。
   - `🟡 潛伏` · `2026-08-26 開出` · `⚠️ 平行 session 正在改這支`
   - **一句話**：備份跑了、也夠新，但驗證結果不明時，它報 PASS。
   - **證據**：`scripts/check-backup-health.ps1:165-167` —— `verify_result="UNKNOWN"` 刻意不升級，註解寫 `Only FAILED escalates to WARN; UNKNOWN ... does NOT false-alarm`。
@@ -910,7 +911,7 @@
   - **為什麼仍要修**：11/12 Soulful 搬站期間，備份是唯一的安全網。「有備份但不知道能不能還原」必須看得見。
   - **完成定義**：`UNKNOWN` 升級為 WARN，且 WARN 理由字面寫出「無法證明可還原」而非只是狀態碼。
 
-- [ ] **統一 TASKS 條目的標籤詞彙**
+- [x] **統一 TASKS 條目的標籤詞彙** → ✅ 2026-10-23 續（治理⑩清查）：不做：純格式、無功能效益（操作者「不做無效益工作」）；新條目照 §條目格式規約即可，TASKS 自動歸檔後舊條目也會離開未完成區。
   - `🟢 小` · `2026-08-26 開出` · `可直接做`
   - **一句話**：2026-08-26 已把 49 條長行拆成階層（機器可證零遺失），但標籤本身仍是 ad-hoc。
   - **證據**：全檔 `**標籤**：` 統計 —— `DoD` 8 次、`注意` 4 次，其餘幾乎都只出現 1 次，甚至整句話被當標籤（例：`原因不是它報錯，是它跑不起來`）。62 條裡有 35 條完全沒有標籤。
@@ -950,7 +951,7 @@
   - **修法方向**：比對前先剝除 heredoc 區塊與引號字串，或只看指令的第一個 token。
   - **不要**用「加白名單」了事那是逐點消音。SSOT：`mcp/claude-userlevel/hooks/rules/verify-gate-commit.js`。
 
-- [ ] **【2026-08-26 開出｜治理｜✅ 根因已定位 2026-08-26】廣域 `git add -A` 把別的 session 未驗證的工作掃進不相干的 commit**
+- [x] **【2026-08-26 開出｜治理｜✅ 根因已定位 2026-08-26】廣域 `git add -A` 把別的 session 未驗證的工作掃進不相干的 commit** → ✅ 2026-10-23 續（治理⑩清查）：已建閘：`git-add-scope-tracker.js:243` BLOCK `-A/--all/-u/.`。
   - `🟠 根因已定位，待建閘` · `2026-08-26`
   - **根因**：**不是腳本、不是 hook —— 是代理自己在 Bash 打的 `git add -A`。**
   - **直接證據**：`.claude/bash-commands.log:21462`（`05:34:05Z` → `84f6f3ec`）與 `:21611`（`06:08:25Z` → `2dbe858a`，1247 檔）兩行都是 `cd "D:/Work" && git add -A && git commit …`。
@@ -960,7 +961,7 @@
   - **機械閘缺口（真正要補的）**：`mcp/claude-userlevel/hooks/rules/` 20 條規則 **grep `git add` 零命中** —— 今早移除三個自動 commit 呼叫點只關掉「腳本自動做」，「代理手動做」這條從來沒被關過。
   - **完成定義**：新增一條 PreToolUse 規則，Bash 內出現 `git add -A` / `git add .` / `git add --all` 時 BLOCK 並要求改具名路徑；豁免需在命令首行寫明理由（比照 `high-risk-bash-warn.js` 的 `# CONFIRMED-HIGH-RISK:` 形式）。
 
-- [ ] **【2026-08-26 開出｜治理｜具名 add 也擋不住】兩個 session 編輯同一檔案時，`git add -- <file>` 一樣會帶走對方未提交的編輯**
+- [x] **【2026-08-26 開出｜治理｜具名 add 也擋不住】兩個 session 編輯同一檔案時，`git add -- <file>` 一樣會帶走對方未提交的編輯** → ✅ 2026-10-23 續（治理⑩清查）：已機械化：共享檔只走私有 index（`git-shared-file-guard.js`）；任意檔同時編輯由 `file-claim-guard.js:240` 當下警告。
   - `🟠 未開始` · `2026-08-26` · `與上一條是不同的失效模式，不要合併`
   - **一句話**：把 `git add -A` 改成具名 add 解決不了這一類 —— git 暫存的是「磁碟上的整個檔案」，不是「你改的那幾行」。
   - **實例**：`0b4057f7`（`06:31:01Z`，log `:21723`）用的是 **已經具名的** `git add -- agency-os/WORKLOG.md agency-os/TASKS.md`，仍然把另一 session 當時未提交的 `TASKS.md` 編輯（`條目格式規約`、`cf-iprefresh` 等）一起 commit 掉，掛在「Phase 4 改版雲端實跑驗證」這個不相干的訊息下。
@@ -970,7 +971,7 @@
   - **修法方向（需先設計，勿直接改）**：可能是 commit 前比對 `code-change-tracker.js` 的本 session 觸碰清單與 staged 清單，出現「我沒碰過卻被我 stage」時警告；或在多 session 並行時對共享檔案加 advisory lock。**先確認哪一個真的可行再動手。**
   - **注意**：這不是 git 用法錯誤，是缺少不變量。上一條是行為錯誤，這一條是架構缺口。
 
-- [ ] **【2026-08-26 開出｜小｜人體工學，非安全機制】`record-restore-drill` 一鍵記錄還原演練** — 目前記錄一次演練要手寫兩處（frontmatter `restore_drills` + 敘述段落）。
+- [x] **【2026-08-26 開出｜小｜人體工學，非安全機制】`record-restore-drill` 一鍵記錄還原演練** — 目前記錄一次演練要手寫兩處（frontmatter `restore_drills` + 敘述段落）。 → ✅ 2026-10-23 續（治理⑩清查）：不做：條目自述只省事不補洞，對帳掃描 3A2 已保安全。
   - **安全性已由對帳掃描保證**（`phase4-checks.py` 的 3A2：敘述有 `| Drill date | ... |` 而 frontmatter 沒有 → WARN 並附可貼上的 YAML），所以這條**只是省事，不是補洞**，優先度低。做的話：一支腳本吃 `--tenant/--date/--result/--note`，同時寫兩處；錨點 `## Restore Drill Record` 找不到就 exit 非 0，不得靜默寫到檔尾。
   - **刻意在 2026-08-26 那批從方案裡砍掉**，理由是範圍膨脹（見 WORKLOG 同日 finding #7）。
 
@@ -984,12 +985,12 @@
   - **注意**：2026-08-16 WORKLOG 聲稱「命中 5 份 soulful 文件全部處理」，本輪 grep 證明**未涵蓋這 3 份**屬「聲稱已修但沒修」樣態，故修法要連同**當初那個 grep 的範圍**一起檢討（為何 `staging.soulfulexpression` 掃不到 DAY2 guide）。
   - **完成定義**：三份各自加刪除線或 ⛔ 作廢註記並指向搬站主線；`grep -rn "staging\.soulfulexpression" agency-os/ --include=*.md | grep -v "~~"` 僅剩 `SITES_INDEX.md:13` 通用規則說明。
 
-- [ ] **【2026-08-25 開出】`ao-resume-last.txt` 錨點卡在 2026-06-12，AO-CLOSE 視窗計算長期失真** — `agency-os/.agency-state/ao-resume-last.txt` 實測值 `2026-06-12T05:27:33.6508893Z`，距今 2.5 個月未推進；`ao-close-prev.txt`=`2026-08-24T12:13:10Z`、`ao-close-last.txt`=`2026-08-24T12:14:06Z` 兩者只差 56 秒（同日兩次 close 嘗試）。
+- [x] **【2026-08-25 開出】`ao-resume-last.txt` 錨點卡在 2026-06-12，AO-CLOSE 視窗計算長期失真** — `agency-os/.agency-state/ao-resume-last.txt` 實測值 `2026-06-12T05:27:33.6508893Z`，距今 2.5 個月未推進；`ao-close-prev.txt`=`2026-08-24T12:13:10Z`、`ao-close-last.txt`=`2026-08-24T12:14:06Z` 兩者只差 56 秒（同日兩次 close 嘗試）。 → ✅ 2026-10-23 續（治理⑩清查）：AO-CLOSE 視窗改以 `ao-close-last.txt`（每次成功收工推進）為起點：`.claude/commands/ao-close.md`、`ao-close.ps1` 骨架字樣同步；`ao-resume-last.txt` 維持「最後一次顯式 AO-RESUME」語意。
   - 後果：`.claude/commands/ao-close.md` 要求存檔涵蓋「上次 AO-RESUME → 本次 AO-CLOSE」，但依錨點算出的視窗是 6/12→今天，與實際工作區間對不上，**逼得每次收工都要手選「真實區間」繞過**（2026-08-24-2014.md 就是這樣寫的，敘述誠實但錨點沒修）。CONVERSATION_MEMORY 2026-07-02 已記過同一現象，**未修**。
   - **根因待查**：`ao-resume.ps1` 只在「寫出真實 AO-RESUME 存檔」時推進 stamp，而 hook 自動觸發那輪印的是 `AO-RESUME stamp NOT advanced (auto-refresh / non-interactive)`代理事後補寫存檔時沒有回頭推進錨點。
   - **完成定義**：確認推進條件、補上代理寫完 archive 後推進 stamp 的路徑（或改由 `verify-aoresume-archive.ps1` 帶動），並讓 AO-CLOSE 視窗不再需要人工手選。（2026-08-25 Codex round-5 覆審抓到，經讀三個錨點檔實測確認）
   - 同類（2026-10-01）：`ao-close-prev/last` 也只在成功收工時推進，git-log-injector 已改為窗 >3d 退 `-10` 並封頂（WORKLOG 2026-10-01 續5）。
-- [ ] **【2026-10-01 開出】git-log-injector 描述過期：仍寫「上一完整 session（全部）commits」** — 實際行為見 WORKLOG 2026-10-01 續5（窗 >3d 退 `-10`、20 行封頂）。待改：`agency-os/AGENTS.md:23`、`agency-os/docs/operations/AGENTS_APPENDIX.md:122,155,581,699`、`agency-os/docs/operations/TOOL_TRIGGER_MAP.md:377`、`mcp/claude-userlevel/hooks/README.md:61`、`README.zh-TW.md:61`。當日皆被他 session 認領／未 commit，等其 commit 後改；另 live hooks 的 settings.json 與 template 漂移（`model` 等 key）待操作者決定是否 `sync-claude-userlevel.ps1 -Mode merge`。
+- [x] **【2026-10-01 開出】git-log-injector 描述過期：仍寫「上一完整 session（全部）commits」** — 實際行為見 WORKLOG 2026-10-01 續5（窗 >3d 退 `-10`、20 行封頂）。待改：`agency-os/AGENTS.md:23`、`agency-os/docs/operations/AGENTS_APPENDIX.md:122,155,581,699`、`agency-os/docs/operations/TOOL_TRIGGER_MAP.md:377`、`mcp/claude-userlevel/hooks/README.md:61`、`README.zh-TW.md:61`。當日皆被他 session 認領／未 commit，等其 commit 後改；另 live hooks 的 settings.json 與 template 漂移（`model` 等 key）待操作者決定是否 `sync-claude-userlevel.ps1 -Mode merge`。 → ✅ 2026-10-23 續（治理⑩清查）：其餘檔已由他 session 修；最後一處 `TOOL_TRIGGER_MAP.md:378` 已改。
 
 - [x] **【2026-08-24 開出｜已關閉 2026-09-30｜舊 Cursor 規劃】CHANGE_IMPACT_MATRIX 漂移偵測腳本首輪 7 個 WARN** — 原 7 對 WARN 全部指向已退場的 `.cursor/` / `Cursor  Rules for AI` 資產；現行 workflow 已收斂至 `CLAUDE.md` + `agency-os/AGENTS.md`。已在 `scripts/check-change-impact-matrix-drift.ps1` 加入明確 retired-path 排除，保留歷史 matrix rows，並在 report `Skipped` 區記錄每筆排除，避免月度巡檢追蹤已不用的 IDE 鏡像。
   - **證據**：`docs/operations/cursor-enterprise-rules-index.md:3-4` 明確標示 Cursor 退場；`reports/governance/impact-matrix-drift-LATEST.md:12-18` 的原 WARN 全為退場資產；不刪歷史文件、不修改現行 Claude/Codex SSOT。
@@ -999,14 +1000,14 @@
 - [x] **【2026-08-29 開出｜中｜已修 2026-09-30】`system-health-check.ps1` 7)deploy-drift(:520) 與 9)cloudflare(:~610) 兩個 check 從未真正執行過** — 根因是 `$root` 恆等於 `agency-os`，但兩支 probe 只存在於 monorepo-root `scripts/`；已改由 `$monoRoot` 解析，Cloudflare probe 同時傳入正確的 `-WorkRoot $monoRoot`，避免靜默走 `Skipped: not present`。實跑 `system-health-check.ps1 -WorkspaceRoot D:\Work`：`Score: 100% (328/328)`；JSON 證據：deploy drift `PASS at d48515e`、Cloudflare `PASS (bot=ON, rules=1, xmlrpc=True, lockdown=active)`。
   - **完成定義**：✅ 已完成；兩支 check 均已實際執行並回傳合理結果，維持原本 informational/warn-only 設計，沒有擴大成不必要的 hard gate。
 
-- [ ] **【2026-08-25 開出｜小｜非阻塞】CP950 backlog 其餘 84 個 site：套用 ao-close 那套分類法** — 2026-08-25 關掉 27 個（`ao-resume.ps1` 17／`lib/git-safe-ops.ps1` 4／`ao-close.ps1` 6），repo-wide drift 111→84。
+- [x] **【2026-08-25 開出｜小｜非阻塞】CP950 backlog 其餘 84 個 site：套用 ao-close 那套分類法** — 2026-08-25 關掉 27 個（`ao-resume.ps1` 17／`lib/git-safe-ops.ps1` 4／`ao-close.ps1` 6），repo-wide drift 111→84。 → ✅ 2026-10-23 續（治理⑩清查）：85 處全部 `Invoke-WithUtf8Console` 包住（不登記豁免：registry 不受機器檢查）；`audit-cp950-traps.ps1` scanned=164 clean=164 drift=0；7 組既有測試全過。`AUDIT_REGISTRY.md` 記結案。
   - **`ao-close.ps1` 已無未知**：剩餘 17 個逐項列了消費端與判定在 `AUDIT_REGISTRY.md`。
   - **這條要做的是把同一套判準套到其餘檔案**（`check-three-way-sync.ps1` 16、`git-align-main-aoresume-feature.ps1` 9、`git-audit-tracked-remote.ps1` 7 等）。判準：捕獲**值**若流入任何 gate／條件／迴圈／寫入 → 必包；只進 `Out-Host`/`Out-Null` → 可留白但須在 registry 寫明消費端。
   - **教訓（別重蹈）**：原 registry 用「看起來像 ASCII metadata」一句話帶過 23 個 site，藏了一個閘級 bypass 三個月；也別反過來
   - `ao-close.ps1:318` 跟出事的 `:203` 是同一支 `git log %s`，驗證後並非同型。兩個方向都要驗。
   - **觸發**：`powershell -File scripts/audit-cp950-traps.ps1`。
 
-- [ ] TASKS [x] 自動歸檔 + 重複行偵測閘（archive-completed-tasks.ps1，**R0 已批方案A**，照 packet 直接動工免重提案）→ handoffs/2026-06-11-1738-tomo-173818.md
+- [x] TASKS [x] 自動歸檔 + 重複行偵測閘（archive-completed-tasks.ps1，**R0 已批方案A**，照 packet 直接動工免重提案）→ handoffs/2026-06-11-1738-tomo-173818.md → ✅ 2026-10-23 續（治理⑩清查）：`scripts/archive-completed-tasks.ps1`＋`ao-close.ps1` 掛點（`-SkipTasksArchive`）；沙箱：157 塊/640 行搬移、行數守恆、重跑 0、重複注入 exit 1。首次真跑在下次 AO-CLOSE（大 diff 單獨 commit）。
 
 - [x] **【✅ 解決（不同做法）｜2026-08-30 稽核確認】smoke 04-onboard spec 補 app session 登入**：`95e80904` login hard-nav 後未登入導登入頁，spec 只帶 nginx basic-auth → 永久 fail。**未照原方向補 app 登入**，改為重新設計斷言：`lobster-factory/infra/hetzner-phase1-core/tests/e2e/smoke/04-onboard-page.spec.ts:1-27` 檔頭記載——nginx+登入閘的畫面本來就是真實未登入 production 的正確行為，改讓斷言接受這個畫面為 PASS；深層已驗證的 wizard 內容測試改標 `test.fixme` 保留（非刪除），待未來有 seeded E2E 帳號再補。最新一輪 `agency-os/reports/e2e/2026-08-26/smoke/results.json` 顯示 `"ok": true`，含 fixme 項在內全部不再永久 fail。
 
@@ -1392,7 +1393,7 @@
 - [x] **【2026-08-29 完成】品牌子網域 DNS 保留：`docs` / `trust`** — SSOT：`docs/edge-and-domains/PRODUCT_DOMAIN_IA_PLAN.md` §2–4。CF A record + 專屬 nginx vhost + cert SAN 全數就位，回中性佔位頁；順帶關掉 host nginx 443 缺 `default_server` 這整類洞（曾讓 docs/trust 誤入內部 MainWP 登入頁），新增安全網 `00-default-placeholder`。實測：CF API 直查 + 8 網域內容比對（loopback+公網雙路徑）+ 隨機亂打子網域驗證安全網。證據：`WORKLOG.md` 2026-08-29（續17/18）。
   - `hci` 仍未動工（`全新產品，未動工`，等 HCI-30 真的要上線再開，維持原規劃——本項只涵蓋 docs/trust）。
 
-- [ ] **【2026-08-29 開出｜未開始｜Codex FINDING 3】`verify-closeout-completeness.ps1` 的 `REVIEW_DONE:`/`BUGHUNT_DONE:` 只 regex 比對前綴存在，不驗證內容是否真完成** — 本輪自己示範過一次：WORKLOG 曾寫 `REVIEW_DONE: ... 結果=待補（背景執行中）`，格式合法但實質未完成，若當下就 AO-CLOSE 會被機械閘放行。屬既有信任邊界（§已知信任邊界已記載「不驗內容真實」），Codex 覆審重新踩到同一個洞，值得補一條輕量檢查（例如 regex 額外擋 `待補|TBD|pending|背景執行中` 這類字樣出現在證據行本身）。**Medium risk**（動治理機械閘本體，需獨立評估，不可與其他基礎設施改動同批次做）。
+- [x] **【2026-08-29 開出｜未開始｜Codex FINDING 3】`verify-closeout-completeness.ps1` 的 `REVIEW_DONE:`/`BUGHUNT_DONE:` 只 regex 比對前綴存在，不驗證內容是否真完成** — 本輪自己示範過一次：WORKLOG 曾寫 `REVIEW_DONE: ... 結果=待補（背景執行中）`，格式合法但實質未完成，若當下就 AO-CLOSE 會被機械閘放行。屬既有信任邊界（§已知信任邊界已記載「不驗內容真實」），Codex 覆審重新踩到同一個洞，值得補一條輕量檢查（例如 regex 額外擋 `待補|TBD|pending|背景執行中` 這類字樣出現在證據行本身）。**Medium risk**（動治理機械閘本體，需獨立評估，不可與其他基礎設施改動同批次做）。 → ✅ 2026-10-23 續（治理⑩清查）：證據行含 `待補|TBD|TODO|pending|背景執行中|進行中` 即 FAIL。
 
 - [ ] **【2026-08-29 開出｜未開始】`status.aware-wave.com` = 現有 `uptime.aware-wave.com`（Uptime Kuma）對外開放 view** — 不重建，SSOT：`docs/edge-and-domains/PRODUCT_DOMAIN_IA_PLAN.md` §2。做法二選一：(a) Kuma 內建 public status page 功能開一個 group，另建 CNAME `status`→同一 Kuma；(b) 直接讓 `uptime.aware-wave.com` 兼公開用（需確認現有 dashboard 沒有機敏資訊外露）。
 
@@ -1407,7 +1408,7 @@
     - ① 輪換
   - ② 移出明文改用 `mcp/user-env.ps1` 既有的環境變數引用模式。前一次同類事件見 `0961263f`（2026-08-15 三項待輪換，狀態未確認）。重啟此項的時機：任何一把 token 疑似外流、或客戶資料量成長後重新評估。
 
-- [ ] **【已知缺陷｜第三方 plugin，不在本 repo｜2026-08-25 開】`stop-review-gate-hook.mjs` 的失敗訊息會遮住真正原因** — `~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/stop-review-gate-hook.mjs:121` 寫 `String(result.stderr || result.stdout || "")`。
+- [x] **【已知缺陷｜第三方 plugin，不在本 repo｜2026-08-25 開】`stop-review-gate-hook.mjs` 的失敗訊息會遮住真正原因** — `~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/stop-review-gate-hook.mjs:121` 寫 `String(result.stderr || result.stdout || "")`。 → ✅ 2026-10-23 續（治理⑩清查）：不修：第三方 plugin 快取檔，且 stop gate 已決定不重啟（見上）；繞過法已記。
   - 子行程的**真正錯誤在 stdout**（`{"status":1,...}` 與 usage-limit 訊息），stderr 只有一句無害的 `DEP0190 DeprecationWarning`（該 plugin 自己用 `shell: true` 傳參造成）。`||` 讓 stderr 優先 → **操作者看到的是雜訊，真正的原因被丟掉**。本次就是靠手動分離兩個串流才查出是額度問題。
   - **這是本日同一個 bug class 的又一變體**：診斷取錯來源，把答案藏起來。
   - **不修的理由**：檔案位於 plugin 快取目錄，更新即被覆蓋，非本 repo 資產。

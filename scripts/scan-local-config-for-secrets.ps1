@@ -50,6 +50,8 @@ param(
     [string]$WorkRoot = ""
 )
 
+# CP950 protection for native stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
@@ -140,7 +142,7 @@ function Test-PathTrackedByGit {
     try {
         $prevEAP = $ErrorActionPreference
         $ErrorActionPreference = "Continue"
-        & git ls-files --error-unmatch $RelPath *> $null
+        Invoke-WithUtf8Console { & git ls-files --error-unmatch $RelPath *> $null }
         $tracked = ($LASTEXITCODE -eq 0)
         $ErrorActionPreference = $prevEAP
         return $tracked

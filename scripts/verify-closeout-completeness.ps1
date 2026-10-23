@@ -136,6 +136,21 @@ try {
         Write-Warning $msg
     }
 
+    # Placeholder gate: a DONE/EVIDENCE line that still says "pending" is format-valid but not done.
+    # ASCII markers are word-bounded so e.g. "spending"/"todos" do not trip it.
+    $placeholderRegex = '(?<![A-Za-z0-9_])(TBD|TODO|pending)(?![A-Za-z0-9_])|待補|背景執行中|進行中'
+    $placeholderLines = @(
+        ($section -split '\r?\n') |
+        Where-Object { $_ -match '^\s*-\s*(REVIEW_DONE|BUGHUNT_DONE|REALTEST_EVIDENCE):' -and $_ -match $placeholderRegex }
+    )
+    if ($placeholderLines.Count -gt 0) {
+        $phMsg = ("verify-closeout-completeness: {0} evidence line(s) still contain a placeholder (待補|TBD|TODO|pending|背景執行中|進行中) -- finish the work and write the real result:" -f $placeholderLines.Count)
+        foreach ($phl in $placeholderLines) { $phMsg += [Environment]::NewLine + "  " + $phl.Trim() }
+        $phMsg += [Environment]::NewLine + "Gate=$Gate"
+        if ($Gate -eq "strict") { Write-Host $phMsg -ForegroundColor Red; exit 1 }
+        Write-Warning $phMsg
+    }
+
     # REALTEST gate: if code files are staged, today's WORKLOG must have REALTEST_EVIDENCE: or REALTEST_WAIVED:.
     # Legitimate exceptions -> add REALTEST_WAIVED: <DOC_ONLY|SMOKE_COVERED|QUERY_ONLY|NA> -- <reason>
     # Extend $codeExts when new runtimes are added to the repo (add .psm1/.psd1 if PS modules ship).

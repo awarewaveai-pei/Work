@@ -5,7 +5,7 @@
 
 ## Files
 - `automation/REGISTER_SYSTEM_GUARD_TASKS.ps1`: registers the nightly system guard (`AgencyOS-SystemGuard-Daily`)
-- `automation/REGISTER_AUTOPILOT_PHASE1_TASKS.ps1`: autopilot registrar (known `$Args` bug, see TASKS.md)
+- `automation/REGISTER_AUTOPILOT_PHASE1_TASKS.ps1`: autopilot registrar (startup / 10-min alert / optional logoff closeout; not registered on this laptop)
 - `automation/claude-routines/`: SSOT for Anthropic cloud Claude routines (different scheduling primitive — see subdir README for rubric)
 - Monthly review registrar: `../scripts/register-monthly-system-review-task.ps1`
 

@@ -73,6 +73,36 @@
 **剩餘風險**：掃描與刪除之間的數秒 TOCTOU（Codex F2）；設計圖（非影片）被文章嵌入同類未擋；WP 搜尋若站上關閉 REST search 會一律拒刪（fail closed，可接受）；2 legacy 孤兒仍在。
 
 **rollback**：`git revert <本 commit>`（路由與腳本同 commit；sync-host-scripts 隨部署還原）；7393 用備份 JSON 的 raw 內容 PATCH 回。
+## 2026-10-23（續9）TASKS ⑩治理與機械閘 27 條清查：24 做完／判定不做打勾，1 仍開，新增 1（Claude）
+
+**觸發**：操作者貼 ⑩ 清單，「做過就打勾，沒需要就打勾，需要就去做」。
+
+**已做（code）**
+- C1 ssh 無存活檢查：新 `scripts/lib/ssh-deadline.ps1` `Invoke-SshWithDeadline`（ServerAlive 15×3＋硬總時限 kill，UTF-8 解碼）取代 10 支 check-*.ps1 ssh；drift 探測失敗＝BLIND exit 3，`system-health-check.ps1` BLIND→Pass=false；cloudflare lockdown 非 active 一律 WARN。
+- C2 共用 index 舊版：`git-safe-ops.ps1` `Get-StaleSharedIndexPaths`＋`ao-resume.ps1` WARN（只報不修，`git rm --cached` 同形）。當場抓到 WORKLOG.md／dmarc 決策檔 2 筆（裸 commit 會倒退 58691a45e 62 行）→ `git reset -q --`。
+- C3 detector 契約 Phase 1：`scripts/lib/_detector-contract.ps1`、`scripts/audit-detector-contract.ps1`（overall/measured/generated_utc；measured=0 不得 PASS）、只能縮小 `scripts/detector-contract-legacy.txt`（13）；health 12g。
+- C4 MCP 執行期：`scripts/check-mcp-runtime.ps1` 讀 main.log `init_mcp=` → `mcp-runtime-LATEST.json`；health 12h＋ao-resume。實測 prod 現況 failed=18 needs_auth=26。
+- C5 `doc-link-commit-check.js` commit 後加跑 `verify-governance-pointers.mjs`（工作樹）。
+- C6 `verify-closeout-completeness.ps1` 證據行含 待補/TBD/TODO/pending/背景執行中/進行中 → FAIL。
+- C7 `bughunt-oracle.ps1` 列舉剪掉 node_modules/.git/.next/.venv/__pycache__（單條數分鐘→秒；.next 複本不再讓 hits=0 誤判）。N>0 驗證**不做**：最近 17 條回放 6 條誤判（N 語意不可判定）。
+- C8 `scripts/archive-completed-tasks.ps1`＋`ao-close.ps1 -SkipTasksArchive`；已勾父項含未勾子項＝留原位。首次真跑＝下次 AO-CLOSE（沙箱 157 塊/640 行）。
+- C9 HCI30 `check-trigger-no-direct-fetch.ps1`：backtick specifier、非單一 literal require/import、裸 require、任何 XMLHttpRequest 參照 → 違規。
+- C10 `check-perplexity-search-only.mjs` `KEY_NAME_ALLOWED`：名單外出現 key 名＝違規（抓間接讀）。
+- C11 `safe-infra-patch.sh` compose：專案＝compose 檔所在目錄（限預設檔名），forward＋rollback 同用；lobster-phase1 行為不變，隨 sync-host-scripts.sh 上主機。
+- C12 autopilot registrar `$Args`→`$SchtasksArgs`；AO-CLOSE 視窗改 `ao-close-last.txt`（`.claude/commands/ao-close.md`）；`TOOL_TRIGGER_MAP.md:378` 描述。
+- C13 CP950 backlog：85 處全包 `Invoke-WithUtf8Console`，audit drift 85→0（不登記豁免）。
+- 判定不做（打勾附理由）：Codex stop gate（ORACLE gate 已取代、燒額度）、stop-review-gate-hook（第三方）、Bash wrapper（無再現）、Phase4（採③）、標籤詞彙／record-restore-drill（無效益）、動態 fetch（regex 原理限制）。已由他處完成：git add -A 閘、具名 add、git-align、injector 描述。
+- 仍開：MinIO 孤兒物件（雲端 session「Fetch-runner job store TTL」處理中）。新開：detector Phase 2。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell Invoke-SshWithDeadline 10.255.255.1 -DeadlineSec 4 ; check-deploy-drift -ServerHost 10.255.255.1 ; stale-index temp repo ; archive sandbox ; scanner self-tests ; audit-cp950-traps | exit=0 | ms=4161
+- `bash scripts/test-hooks.sh` 372/372；check-trigger self-test＋2 目錄實掃 ok；perplexity self-test 28 例＋8541 檔 ok；cp950 scanned=164 clean=164；ao-close-index-scope 11/11、ao-close-gates 19/19、ao-resume-shared-worktree 86/86、git-safe-ops-matrix 8/8。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/13m/0n -- Codex 5 輪：8171498a（6m：5 修、F6 commit 後讀工作樹＝刻意取捨駁回）、8e4046e1（1m：helper 未追蹤→同 commit）、14712bb0（4m 全修：compose 載入檔、ssh exit、generated_utc 可解析、歸檔原子寫）、d67ffbd6（2m 全修）；終審 2cebca73 NO FINDINGS
+- 不變量（同 reviewer 第 3 次報同段）：lockdown＝兩個 curl 都拿到真回應才有 verdict，`000`／ssh 非 0／逾時＝unreachable，非 active 一律降 WARN；compose＝被改的檔必須是 compose 實際載入的檔，輸入只有 shell COMPOSE_FILE（unset）、`.env` COMPOSE_FILE（拒絕）、預設查找順序（檢查），三者全關。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory,mcp | grep=skip:no_enc_helper | hits=0
+- 未跑：會打 prod／docker 的 sync-*、lobster-trigger-deploy、codex-continue、bootstrap-local-wordpress（只 parse＋audit）。
+
+**rollback**：`git revert <本 commit>`；hooks 再跑 `scripts/sync-claude-userlevel.ps1 -Mode merge`。
 ## 2026-10-23（續8）自用帳戶 comp 權利由登記表每日補齊：0117 已套 prod，程式推 main（Claude）
 
 **觸發**：操作者「同意套用第二段」（續7 的 patch）。

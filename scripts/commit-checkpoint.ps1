@@ -24,6 +24,8 @@ param(
     [string[]]$Paths,
     [switch]$DryRun
 )
+# CP950 protection for native stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 if ($WorkRoot) {
@@ -36,7 +38,7 @@ if ($WorkRoot) {
 
 Push-Location $WorkRoot
 try {
-    $null = git rev-parse --git-dir 2>$null
+    $null = Invoke-WithUtf8Console { git rev-parse --git-dir 2>$null }
     if ($LASTEXITCODE -ne 0) {
         throw "Not a git repository: $WorkRoot"
     }
@@ -57,10 +59,11 @@ try {
     # already found and fixed the narrower, path-shaped version of this same check twice.
     $inProgressMarkers = @('MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply', 'sequencer')
     $inProgress = @($inProgressMarkers | Where-Object {
-        $gp = (git rev-parse --git-path $_ 2>$null)
+        $marker = $_
+        $gp = (Invoke-WithUtf8Console { git rev-parse --git-path $marker 2>$null })
         $gp -and (Test-Path -LiteralPath $gp.Trim())
     })
-    $unmergedNow = @(git ls-files --unmerged | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    $unmergedNow = @(Invoke-WithUtf8Console { git ls-files --unmerged } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     if ($inProgress.Count -gt 0 -or $unmergedNow.Count -gt 0) {
         throw "commit-checkpoint: refusing to run -- a merge/cherry-pick/revert/rebase/stash-pop/am operation is in progress in $WorkRoot. A scoped 'git commit -- <paths>' cannot complete until it is resolved or aborted."
     }
@@ -81,7 +84,7 @@ try {
         if ($DryRun) {
             Write-Host "[dry-run] would: git add -- $p" -ForegroundColor Cyan
         } else {
-            git add -- $p
+            Invoke-WithUtf8Console { git add -- $p }
             if ($LASTEXITCODE -ne 0) {
                 throw "git add failed for '$p' (exit $LASTEXITCODE) -- possible index lock contention from a concurrent session"
             }
@@ -97,7 +100,7 @@ try {
     # an unrelated file staged by a concurrent session must not affect this script's
     # "nothing to commit" decision, and must not be scanned by the secret guard for a
     # commit that will never include it.
-    git diff --cached --quiet -- $Paths
+    Invoke-WithUtf8Console { git diff --cached --quiet -- $Paths }
     if ($LASTEXITCODE -eq 0) {
         Write-Host "commit-checkpoint: nothing staged to commit (named paths had no changes)." -ForegroundColor Yellow
         exit 0
@@ -113,7 +116,7 @@ try {
         "recovery-codes",
         "\.key$"
     )
-    $staged = @(git diff --cached --name-only -- $Paths)
+    $staged = @(Invoke-WithUtf8Console { git diff --cached --name-only -- $Paths })
     foreach ($f in $staged) {
         foreach ($pat in $blocked) {
             if ($f -match $pat) {
@@ -125,12 +128,12 @@ try {
     # `git commit <pathspec>` reads the WORKING TREE for $Paths at commit time (not the
     # index snapshot `git add` took above) -- confirm nothing external touched them in
     # between, so the just-scanned $staged content is what actually gets committed.
-    git diff --quiet -- $Paths
+    Invoke-WithUtf8Console { git diff --quiet -- $Paths }
     if ($LASTEXITCODE -ne 0) {
         throw "commit-checkpoint: working tree changed for one of `$Paths between staging and commit (concurrent write?) -- aborting instead of committing unscanned content. Re-run."
     }
 
-    git commit -m $Message -- $Paths
+    Invoke-WithUtf8Console { git commit -m $Message -- $Paths }
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }

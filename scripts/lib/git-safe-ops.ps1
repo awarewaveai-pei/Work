@@ -298,6 +298,33 @@ function Invoke-SafeGitCapture {
 }
 
 # ---------------------------------------------------------------------------
+# Get-StaleSharedIndexPaths -- index != HEAD while worktree == HEAD
+# ---------------------------------------------------------------------------
+# HEAD moved by a commit that bypassed the shared index (private-index commit with no post-commit
+# sync, e.g. a host without the scope-guard hook), so the index still holds the old blob / lacks
+# the new file. A bare commit then reverts or deletes those paths (2026-10-16: 39 entries).
+# Report only: a deliberate `git rm --cached` has the same shape, so nothing is reset here.
+function Get-StaleSharedIndexPaths {
+    param([Parameter(Mandatory = $true)] [string]$WorkRoot)
+    $rec = @((Invoke-WithUtf8Console { & git -C $WorkRoot -c core.quotepath=false diff --cached --name-status --no-renames -z 2>$null }) -join '' -split "`0")
+    if ($rec.Count -lt 2) { return @() }
+    $vsHead = New-Object System.Collections.Generic.HashSet[string] ([StringComparer]::Ordinal)
+    foreach ($p in ((Invoke-WithUtf8Console { & git -C $WorkRoot -c core.quotepath=false diff HEAD --name-only --no-renames -z 2>$null }) -join '' -split "`0")) { if ($p) { [void]$vsHead.Add($p) } }
+    $stale = @()
+    for ($i = 0; $i + 1 -lt $rec.Count; $i += 2) {
+        $st = $rec[$i]; $p = $rec[$i + 1]
+        if (-not $p) { continue }
+        if ($st -eq 'D') {
+            # Missing from the index, so `diff HEAD` calls it deleted even when the file is on disk: compare bytes.
+            $f = Join-Path $WorkRoot $p
+            if ((Test-Path -LiteralPath $f -PathType Leaf) -and
+                ((Invoke-WithUtf8Console { & git -C $WorkRoot hash-object -- $p 2>$null }) -eq (Invoke-WithUtf8Console { & git -C $WorkRoot rev-parse --verify -q "HEAD:$p" 2>$null }))) { $stale += $p }
+        } elseif (-not $vsHead.Contains($p)) { $stale += $p }
+    }
+    return $stale
+}
+
+# ---------------------------------------------------------------------------
 # Invoke-SharedWorktreeParity -- fetch + fast-forward-only mainline parity
 # ---------------------------------------------------------------------------
 # Invariant (2026-09-23, AO-RESUME churn incident): an AUTOMATIC parity step must never

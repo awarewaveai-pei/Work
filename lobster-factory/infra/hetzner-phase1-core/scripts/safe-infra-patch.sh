@@ -5,7 +5,7 @@
 # MUST use this script. Four steps are mandatory; zero tolerance for skipping.
 #
 # Usage:
-#   echo "new content" | safe-infra-patch.sh compose <file-path> <service>
+#   echo "new content" | safe-infra-patch.sh compose <file-path> <service>   # any project: /root/chatwoot/docker-compose.yml too
 #   echo "new content" | safe-infra-patch.sh nginx   <file-path>
 #   echo "new content" | safe-infra-patch.sh host-nginx /etc/nginx/<file> <vhost-to-probe>
 #   echo "new content" | safe-infra-patch.sh file    <file-path>   # no health check
@@ -39,6 +39,26 @@ if [[ "$TYPE" == host-nginx ]]; then
   BACKUP="$STAGING_DIR/safe-patch-backups/$(realpath -m "$FILE_PATH" | tr / _).safe-patch-${STAMP}"
 fi
 HEALTH_TIMEOUT="${SAFE_PATCH_HEALTH_TIMEOUT:-90}"
+# compose: the project is the compose file's own directory (lobster-phase1, chatwoot, postiz, ...). Invariant: the
+# file patched is the file `docker compose` in that directory loads (overrides included) -- so no COMPOSE_FILE, and
+# it must be the first default name present in compose's own lookup order. Compose's file inputs are exactly: shell
+# COMPOSE_FILE (unset below), COMPOSE_FILE in the project .env (refused), and that lookup order (checked).
+COMPOSE_DIR="$(cd "$(dirname "$FILE_PATH")" && pwd)"
+if [[ "$TYPE" == compose ]]; then
+  loaded=""
+  for n in compose.yaml compose.yml docker-compose.yaml docker-compose.yml; do
+    [[ -f "$COMPOSE_DIR/$n" ]] && { loaded="$n"; break; }
+  done
+  if [[ "$(basename "$FILE_PATH")" != "$loaded" ]]; then
+    echo "ERROR: docker compose in $COMPOSE_DIR loads '${loaded:-nothing}', not $(basename "$FILE_PATH")" >&2
+    exit 1
+  fi
+  if [[ -f "$COMPOSE_DIR/.env" ]] && grep -Eq '^[[:space:]]*(export[[:space:]]+)?COMPOSE_FILE[[:space:]]*=' "$COMPOSE_DIR/.env"; then
+    echo "ERROR: $COMPOSE_DIR/.env sets COMPOSE_FILE; the patched file may not be the one compose loads" >&2
+    exit 1
+  fi
+fi
+compose() { (cd "$COMPOSE_DIR" && unset COMPOSE_FILE && if [[ -f .env ]]; then docker compose --env-file .env "$@"; else docker compose "$@"; fi); }
 
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*" | tee -a "$LOGFILE"; }
 
@@ -62,7 +82,7 @@ health_ok=1
 
 wait_container_healthy() {
   local svc="$1" elapsed=0 cname status hc
-  cname=$(docker compose --env-file "$STAGING_DIR/.env" ps -q "$svc" 2>/dev/null | head -1 || true)
+  cname=$(compose ps -q "$svc" 2>/dev/null | head -1 || true)
   [[ -z "$cname" ]] && { log "health-warn | container for $svc not found"; return 0; }
   hc=$(docker inspect --format='{{if .Config.Healthcheck}}yes{{end}}' "$cname" 2>/dev/null || true)
   [[ "$hc" != "yes" ]] && { log "health-warn | $svc has no healthcheck — skipping wait"; return 0; }
@@ -82,12 +102,11 @@ case "$TYPE" in
   compose)
     [[ -z "$TARGET" ]] && { echo "ERROR: service required for compose type" >&2; health_ok=0; }
     if [[ $health_ok -eq 1 ]]; then
-      cd "$STAGING_DIR"
-      if ! docker compose --env-file .env config --quiet 2>/dev/null; then
-        log "health-fail | reason=compose config invalid"
+      if ! compose config --quiet 2>/dev/null; then
+        log "health-fail | reason=compose config invalid ($COMPOSE_DIR)"
         health_ok=0
       else
-        docker compose --env-file .env up -d --no-build "$TARGET" 2>&1 | tail -5
+        compose up -d --no-build "$TARGET" 2>&1 | tail -5
         wait_container_healthy "$TARGET" || health_ok=0
       fi
     fi
@@ -152,8 +171,7 @@ if [[ $health_ok -eq 0 ]]; then
   cp "$BACKUP" "$FILE_PATH"
   case "$TYPE" in
     compose)
-      cd "$STAGING_DIR"
-      docker compose --env-file .env up -d --no-build "$TARGET" 2>&1 | tail -3 || true
+      compose up -d --no-build "$TARGET" 2>&1 | tail -3 || true
       ;;
     nginx)
       docker exec lobster-nginx nginx -s reload 2>/dev/null || true

@@ -85,6 +85,7 @@ function Invoke-BughuntOracle {
 
     # Code-file extensions: oracle only searches source files, not documentation.
     # .md/.json/.yaml mention symbol names legitimately (WORKLOG, README, config) — not stale callers.
+    $prunedDirs = @('node_modules', '.git', '.next', '.venv', '__pycache__')
     $codeExts = [System.Collections.Generic.HashSet[string]]::new(
         [System.StringComparer]::OrdinalIgnoreCase
     )
@@ -189,7 +190,19 @@ function Invoke-BughuntOracle {
             if ($null -eq $entry) { continue }
 
             $files = if ($entry.PSIsContainer) {
-                @(Get-ChildItem -LiteralPath $sp -Recurse -File -ErrorAction SilentlyContinue)
+                # Pruned walk: vendored/generated trees are never call sites, and .next holds copies of our own
+                # code (a false hit for a hits=0 claim); recursing node_modules made one claim cost minutes.
+                $found = [System.Collections.Generic.List[System.IO.FileInfo]]::new()
+                $stack = [System.Collections.Generic.Stack[System.IO.DirectoryInfo]]::new()
+                $stack.Push([System.IO.DirectoryInfo]::new($entry.FullName))
+                while ($stack.Count -gt 0) {
+                    $d = $stack.Pop()
+                    try {
+                        foreach ($sub in $d.GetDirectories()) { if ($prunedDirs -notcontains $sub.Name) { $stack.Push($sub) } }
+                        foreach ($fi in $d.GetFiles()) { $found.Add($fi) }
+                    } catch { }  # unreadable directory: same as Get-ChildItem -ErrorAction SilentlyContinue
+                }
+                @($found)
             } else {
                 @($entry)
             }

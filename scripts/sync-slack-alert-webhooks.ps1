@@ -40,6 +40,8 @@ param(
     [string]$StorePath = ""
 )
 
+# CP950 protection for native stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
@@ -205,7 +207,7 @@ $wrapper = "echo $remoteB64 | base64 -d | sudo bash"
 
 Write-Host "== sync: writing VPS env + netdata slack config + restart ==" -ForegroundColor Cyan
 $sshArgs = Get-ProdSshArgs $SshTarget
-& ssh @sshArgs $wrapper
+Invoke-WithUtf8Console { & ssh @sshArgs $wrapper }
 if ($LASTEXITCODE -ne 0) {
     throw "Remote sync failed (ssh exit $LASTEXITCODE)"
 }

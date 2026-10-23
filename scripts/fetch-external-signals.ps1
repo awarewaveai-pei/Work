@@ -30,12 +30,14 @@ param(
     [string]$To            = ""
 )
 
+# CP950 protection for native stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "SilentlyContinue"
 
 # --- resolve work root ---
 if (-not $WorkRoot) {
-    try { $WorkRoot = (git -C $PSScriptRoot rev-parse --show-toplevel 2>$null).Trim() } catch {}
+    try { $WorkRoot = (Invoke-WithUtf8Console { git -C $PSScriptRoot rev-parse --show-toplevel 2>$null }).Trim() } catch {}
     if (-not $WorkRoot) { $WorkRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent }
 }
 

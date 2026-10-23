@@ -52,6 +52,8 @@ param(
     [switch]$AllowResetAheadOfOrigin
 )
 
+# CP950 protection for native stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
@@ -82,7 +84,7 @@ function Invoke-Git {
     param([string[]]$GitArgs)
     Push-Location -LiteralPath $WorkRoot
     try {
-        & git @GitArgs
+        Invoke-WithUtf8Console { & git @GitArgs }
         if ($LASTEXITCODE -ne 0) {
             throw ("git {0} failed (exit {1})" -f ($GitArgs -join " "), $LASTEXITCODE)
         }
@@ -155,7 +157,7 @@ function Invoke-GitFetchWithRetry {
             $savedEAP = $ErrorActionPreference
             $ErrorActionPreference = 'Continue'
             try {
-                $stderr = & git fetch origin --prune 2>&1
+                $stderr = Invoke-WithUtf8Console { & git fetch origin --prune 2>&1 }
                 $lastExit = $LASTEXITCODE
             } finally {
                 $ErrorActionPreference = $savedEAP
@@ -232,7 +234,7 @@ try {
         # stash that was never created and report a phantom restore failure (caught by the
         # clean-tree case in this change's own test matrix, 2026-08-25).
         # Not stashing untracked files is safe here: `reset --hard` does not touch them.
-        $stashExists = @(& git stash list --format="%gs" 2>$null |
+        $stashExists = @(Invoke-WithUtf8Console { & git stash list --format="%gs" 2>$null } |
                          Where-Object { $_ -like "*$stashCandidate*" }).Count -gt 0
         if ($stashExists) {
             $script:AlignStashName = $stashCandidate
@@ -359,7 +361,7 @@ To intentionally discard those commits (destructive): pass -AllowResetAheadOfOri
     # Deliberately does NOT use Invoke-Git: that helper throws, and a throw raised inside
     # finally replaces the original exception, hiding why the align actually failed.
     if ($script:AlignStashName) {
-        $entry = & git stash list --format="%gd %gs" 2>$null |
+        $entry = Invoke-WithUtf8Console { & git stash list --format="%gd %gs" 2>$null } |
                  Where-Object { $_ -like "*$($script:AlignStashName)*" } |
                  Select-Object -First 1
         if (-not $entry) {
@@ -370,7 +372,7 @@ To intentionally discard those commits (destructive): pass -AllowResetAheadOfOri
         } else {
             $ref = ($entry -split '\s+')[0]
             Write-Host "== Restoring stashed work ($ref = $($script:AlignStashName)) ==" -ForegroundColor Cyan
-            & git stash pop $ref
+            Invoke-WithUtf8Console { & git stash pop $ref }
             if ($LASTEXITCODE -ne 0) {
                 # `git stash pop` KEEPS the stash on conflict, so the work still exists.
                 # Say so loudly and name the ref: silence here is what turns a conflict

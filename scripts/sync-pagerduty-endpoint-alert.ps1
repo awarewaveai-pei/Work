@@ -5,6 +5,8 @@ param(
     [switch]$SkipIfMissing
 )
 
+# CP950 protection for native stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "lib\prod-host.ps1")
@@ -88,7 +90,7 @@ $remote = $remote.Replace("__KEY_B64__", $keyB64).Replace([string][char]13, "")
 
 Write-Host "== sync: writing /etc/default/awarewave-endpoint-alert.pagerduty + restart timer service ==" -ForegroundColor Cyan
 $sshArgs = Get-ProdSshArgs $SshTarget
-$remote | ssh @sshArgs "sudo bash -s"
+Invoke-WithUtf8Console { $remote | ssh @sshArgs "sudo bash -s" }
 if ($LASTEXITCODE -ne 0) {
     throw "Remote sync failed (ssh exit $LASTEXITCODE)"
 }

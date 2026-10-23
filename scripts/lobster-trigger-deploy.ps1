@@ -20,6 +20,8 @@ param(
     [string]$AoOrgId = "39ad4149-5044-4077-8d9a-b6b916de0e21"
 )
 
+# CP950 protection for native stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
@@ -60,16 +62,16 @@ if (-not $env:OPS_INBOX_INGEST_TOKEN) { throw "OPS_INBOX_INGEST_TOKEN not set in
 
 # ── 2. Read SERVICE_ROLE_KEY from VPS ──────────────────────────────────────
 Write-Host "[deploy] Reading SERVICE_ROLE_KEY from VPS..." -ForegroundColor Cyan
-$srk = (& ssh -o StrictHostKeyChecking=no -p 58122 -i $SshKey ubuntu@$VpsHost `
-    "sudo grep '^SERVICE_ROLE_KEY=' /root/supabase/.env | cut -d= -f2-" 2>&1).Trim()
+$srk = (Invoke-WithUtf8Console { & ssh -o StrictHostKeyChecking=no -p 58122 -i $SshKey ubuntu@$VpsHost `
+    "sudo grep '^SERVICE_ROLE_KEY=' /root/supabase/.env | cut -d= -f2-" 2>&1 }).Trim()
 if (-not $srk -or $srk.StartsWith("ssh:") -or $srk.Length -lt 20) {
     throw "Could not read SERVICE_ROLE_KEY from VPS /root/supabase/.env"
 }
 Write-Host "[deploy] SERVICE_ROLE_KEY obtained (length=$($srk.Length))." -ForegroundColor Green
 
 Write-Host "[deploy] Reading SCHEDULE_INGEST_TOKEN from VPS..." -ForegroundColor Cyan
-$cst = (& ssh -o StrictHostKeyChecking=no -p 58122 -i $SshKey ubuntu@$VpsHost `
-    "sudo grep '^SCHEDULE_INGEST_TOKEN=' /root/lobster-phase1/.env | cut -d= -f2-" 2>&1).Trim()
+$cst = (Invoke-WithUtf8Console { & ssh -o StrictHostKeyChecking=no -p 58122 -i $SshKey ubuntu@$VpsHost `
+    "sudo grep '^SCHEDULE_INGEST_TOKEN=' /root/lobster-phase1/.env | cut -d= -f2-" 2>&1 }).Trim()
 if (-not $cst -or $cst.StartsWith("ssh:") -or $cst.Length -lt 10) {
     throw "Could not read SCHEDULE_INGEST_TOKEN from VPS /root/lobster-phase1/.env"
 }
@@ -222,15 +224,15 @@ export NODE_OPTIONS='--dns-result-order=ipv4first'
 # ── 4. Write script to VPS temp file (stdin, no TTY needed) ───────────────
 # Convert Windows CRLF to Unix LF so bash doesn't choke on \r.
 Write-Host "[deploy] Uploading deploy script to VPS temp file..." -ForegroundColor Cyan
-($deployBash -replace "`r`n", "`n") | & ssh -o StrictHostKeyChecking=no -p 58122 -i $SshKey ubuntu@$VpsHost `
-    "tr -d '\r' > /tmp/lobster-deploy.sh && chmod 700 /tmp/lobster-deploy.sh"
+Invoke-WithUtf8Console { ($deployBash -replace "`r`n", "`n") | & ssh -o StrictHostKeyChecking=no -p 58122 -i $SshKey ubuntu@$VpsHost `
+    "tr -d '\r' > /tmp/lobster-deploy.sh && chmod 700 /tmp/lobster-deploy.sh" }
 if ($LASTEXITCODE -ne 0) { throw "Failed to upload deploy script to VPS." }
 Write-Host "[deploy] Script uploaded." -ForegroundColor Green
 
 # ── 5. Execute script on VPS (no TTY — trigger deploy works without it) ────
 Write-Host "[deploy] Running deploy on VPS..." -ForegroundColor Cyan
-& ssh -o StrictHostKeyChecking=no -p 58122 -i $SshKey ubuntu@$VpsHost `
-    "sudo bash /tmp/lobster-deploy.sh; EC=`$?; rm -f /tmp/lobster-deploy.sh; exit `$EC"
+Invoke-WithUtf8Console { & ssh -o StrictHostKeyChecking=no -p 58122 -i $SshKey ubuntu@$VpsHost `
+    "sudo bash /tmp/lobster-deploy.sh; EC=`$?; rm -f /tmp/lobster-deploy.sh; exit `$EC" }
 $exitCode = $LASTEXITCODE
 
 if ($exitCode -ne 0) {

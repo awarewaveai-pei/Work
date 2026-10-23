@@ -45,6 +45,8 @@ param(
     [int]$MailQuietDayLimit = 10
 )
 
+# CP950 protection for native stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "SilentlyContinue"
 
@@ -67,9 +69,9 @@ if (Test-Path -LiteralPath $userEnv) {
     try { . $userEnv } catch {}
 }
 
-# Console-encoding helpers (Invoke-WithUtf8Console) for the ssh capture in Check 5.
-$encHelpers = Join-Path $PSScriptRoot "_console-encoding-helpers.ps1"
-if (Test-Path -LiteralPath $encHelpers) { . $encHelpers }
+# Invoke-SshWithDeadline (keepalive + hard total deadline, UTF-8 decode) for the ssh probes in Checks 2b and 5.
+$sshHelper = Join-Path $PSScriptRoot "lib\ssh-deadline.ps1"
+if (Test-Path -LiteralPath $sshHelper) { . $sshHelper }
 
 # scripts/lib/smoke-status-digest.ps1 (WORKLOG 2026-09-23): reads the ten sibling
 # warn-only status reports AO-RESUME's own SSOT never surfaced (CI health and the
@@ -169,12 +171,8 @@ try {
              ".catch(e=>{console.log('POD_STATS_ERR '+e.message);});"
     $podB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($podJs))
     $podRemote = "sudo -n docker exec -e B64=$podB64 lobster-next-admin sh -c 'echo `$B64 | base64 -d | node'"
-    $prevEap = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    try {
-        $podOut = & ssh -o BatchMode=yes -o ConnectTimeout=10 -p $podPort -i $podKey ("{0}@{1}" -f $podUser, $podHost) $podRemote 2>&1
-    } finally { $ErrorActionPreference = $prevEap }
-    $podText = (($podOut | ForEach-Object { [string]$_ }) -join "`n")
+    $podRes = Invoke-SshWithDeadline -SshArgs @("-p", $podPort, "-i", $podKey, ("{0}@{1}" -f $podUser, $podHost), $podRemote) -DeadlineSec 45 -ConnectTimeoutSec 10
+    $podText = $podRes.Output
     if ($podText -match 'POD_STATS_NO_TOKEN') {
         $results["pod_order_inbox"] = "skip:token_unset"
         $noEvidence["pod_order_inbox"] = $true
@@ -187,7 +185,7 @@ try {
         $results["pod_order_inbox_detail"] = $modesResp.podOrderInbox
         if (@($podFindings | Where-Object { $_ -like "pod_order_inbox=*" -or $_ -eq "probe_lib_missing" }).Count -gt 0) { $noEvidence["pod_order_inbox"] = $true }
     } else {
-        $podCode = if ($podText -match 'POD_STATS_HTTP (\d+)') { "http" + $Matches[1] } elseif ($LASTEXITCODE -ne 0) { "ssh_exit$LASTEXITCODE" } else { "unparsed" }
+        $podCode = if ($podText -match 'POD_STATS_HTTP (\d+)') { "http" + $Matches[1] } elseif ($podRes.TimedOut) { "ssh_timeout" } elseif ($podRes.ExitCode -ne 0) { "ssh_exit$($podRes.ExitCode)" } else { "unparsed" }
         $results["pod_order_inbox"] = "warn:$podCode"
         $noEvidence["pod_order_inbox"] = $true
     }
@@ -386,10 +384,10 @@ password=%s
     } elseif (-not (Test-Path -LiteralPath $mailKey)) {
         $results["client_mail"]    = "skip:no_ssh_key"
         $noEvidence["client_mail"] = $true
-    } elseif (-not (Get-Command Invoke-WithUtf8Console -ErrorAction SilentlyContinue)) {
-        # No unwrapped fallback on purpose: a bare `& ssh` capture is exactly the
+    } elseif (-not (Get-Command Invoke-SshWithDeadline -ErrorAction SilentlyContinue)) {
+        # No unwrapped fallback on purpose: a bare `& ssh` capture has no deadline and is exactly the
         # CP950 trap class that audit-cp950-traps.ps1 exists to catch.
-        $results["client_mail"]    = "skip:no_enc_helper"
+        $results["client_mail"]    = "skip:no_ssh_helper"
         $noEvidence["client_mail"] = $true
     } else {
         # PowerShell strips quotes when handing arguments to native ssh, which tore the
@@ -403,11 +401,12 @@ password=%s
         # quiet_days = -1 means the table holds no successful send at all.
         # $sql and $remoteCmd were built by the profile switch above.
         $b64       = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($remoteCmd))
-        $sshArgs   = @("-i", $mailKey, "-p", $mailPort, "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
+        $sshArgs   = @("-i", $mailKey, "-p", $mailPort,
                        "-o", "StrictHostKeyChecking=accept-new", "$mailUser@$mailHost",
                        "echo $b64 | base64 -d | bash")
-        $raw      = Invoke-WithUtf8Console { & ssh @sshArgs 2>&1 }
-        $sshExit  = $LASTEXITCODE   # capture immediately: any later command overwrites it
+        $sshRes   = Invoke-SshWithDeadline -SshArgs $sshArgs -DeadlineSec 60 -ConnectTimeoutSec 15
+        $raw      = $sshRes.Output -split "`n"
+        $sshExit  = $sshRes.ExitCode
 
         # Strictly anchored: ssh writes advisory banners to stderr (e.g. the post-quantum
         # key-exchange warning) which 2>&1 folds into $raw. Only a bare "<int>\t<int>" row
@@ -424,7 +423,10 @@ password=%s
 
         # A transport/query failure means this detector produced NO evidence. It must not
         # read as a benign skip — that is exactly how the 2026-08-03 outage stayed hidden.
-        if ($sshExit -ne 0) {
+        if ($sshRes.TimedOut) {
+            $results["client_mail"]    = "warn:ssh_timeout"
+            $noEvidence["client_mail"] = $true
+        } elseif ($sshExit -ne 0) {
             $results["client_mail"]    = "warn:ssh_exit$sshExit"
             $noEvidence["client_mail"] = $true
         } elseif ($null -eq $failCount) {
@@ -542,7 +544,7 @@ try {
     # No network: origin/main is whatever the last fetch left, same ref sg-deploy.sh resolves on the
     # server after its own fetch. git writes "fatal:" to stderr for a missing path; 2>$null + the
     # exit code keep that out of the captured text.
-    $holdText  = (& git -C $root show "origin/main:$holdRel" 2>$null | Out-String)
+    $holdText  = (Invoke-WithUtf8Console { & git -C $root show "origin/main:$holdRel" 2>$null } | Out-String)
     $holdOnMain = ($LASTEXITCODE -eq 0 -and $holdText.Trim().Length -gt 0)
     if (-not $holdOnMain) {
         if ($holdLocal) {

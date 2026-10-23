@@ -33,6 +33,8 @@ param(
     [switch]$DryRun
 )
 
+# CP950 protection for native stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -60,7 +62,7 @@ function GitRun([string[]]$GitArgs, [string]$Dir = $root) {
     $prev = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
-        $out = & git -C $Dir @GitArgs 2>&1
+        $out = Invoke-WithUtf8Console { & git -C $Dir @GitArgs 2>&1 }
         return @{ Text = (@($out | ForEach-Object { "$_" }) -join "`n"); Exit = $LASTEXITCODE }
     } finally { $ErrorActionPreference = $prev }
 }
@@ -192,14 +194,14 @@ if (-not $DryRun) {
 # ---- one PostgreSQL for the whole session (tests/pg.py uses it through the URL) -----------------------------------
 $startedPg = $false
 if (-not $NoPostgres -and -not $DryRun) {
-    $have = (& docker ps -a --filter "name=$pgName" --format '{{.Names}}' 2>$null)
+    $have = (Invoke-WithUtf8Console { & docker ps -a --filter "name=$pgName" --format '{{.Names}}' 2>$null })
     if (-not $have) {
         $pw = [guid]::NewGuid().ToString('N')
-        & docker run -d --rm --name $pgName -e "POSTGRES_PASSWORD=$pw" -p '127.0.0.1:55432:5432' $pgImage | Out-Null
+        Invoke-WithUtf8Console { & docker run -d --rm --name $pgName -e "POSTGRES_PASSWORD=$pw" -p '127.0.0.1:55432:5432' $pgImage } | Out-Null
         if ($LASTEXITCODE -eq 0) {
             $startedPg = $true
             $env:COGNITIVE_OS_TEST_DATABASE_URL = "postgresql://postgres:$pw@127.0.0.1:55432/postgres"
-            for ($i = 0; $i -lt 60; $i++) { & docker exec $pgName pg_isready -U postgres 2>$null | Out-Null; if ($LASTEXITCODE -eq 0) { break }; Start-Sleep -Seconds 1 }
+            for ($i = 0; $i -lt 60; $i++) { Invoke-WithUtf8Console { & docker exec $pgName pg_isready -U postgres 2>$null } | Out-Null; if ($LASTEXITCODE -eq 0) { break }; Start-Sleep -Seconds 1 }
             Say 'PostgreSQL test server up on 127.0.0.1:55432'
         } else { Say 'docker is not available: PostgreSQL tests will skip (loudly)' 'Yellow' }
     } else { Say "container $pgName already exists; tests use their own container if the URL is not set" 'Yellow' }
@@ -315,7 +317,7 @@ try {
         }
     }
 } finally {
-    if ($startedPg) { & docker stop $pgName 2>$null | Out-Null }
+    if ($startedPg) { Invoke-WithUtf8Console { & docker stop $pgName 2>$null } | Out-Null }
     if ($null -eq $previousRequirePostgres) { Remove-Item Env:COGNITIVE_OS_REQUIRE_POSTGRES -ErrorAction SilentlyContinue } else { $env:COGNITIVE_OS_REQUIRE_POSTGRES = $previousRequirePostgres }
 }
 Say "finished: $done card(s) done this run" 'Cyan'

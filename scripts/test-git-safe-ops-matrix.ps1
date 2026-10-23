@@ -17,6 +17,8 @@
   Run: powershell -ExecutionPolicy Bypass -File scripts\test-git-safe-ops-matrix.ps1
 #>
 
+# CP950 protection for native stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -30,7 +32,7 @@ function Invoke-FixtureGit {
     $savedEap = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
-        $out = & git @GitArgs 2>&1
+        $out = Invoke-WithUtf8Console { & git @GitArgs 2>&1 }
         $code = $(if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE })
         # 同一個不變量：改用 scoped EAP='Continue' 後，失敗不再自動拋，所以這裡必須自己拋。
         # 否則 fixture 建置失敗會靜默，測試在後面以看不懂的形式爆掉（「測試環境壞了」的假象）

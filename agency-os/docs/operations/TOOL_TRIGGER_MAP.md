@@ -375,7 +375,7 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 | `rules/worklog-entry-number-guard.js` | Write\|Edit | BLOCK：WORKLOG 新增已存在的 `（續N）` header（並行 session 同時取 max+1）；改用 `scripts/worklog-insert-entry.py` |
 | `rules/file-claim-guard.js` | Write\|Edit（含 Codex apply_patch）＋Bash | BLOCK：檔案被另一 session 認領——寫入中（15 分鐘內）或 4h 內寫過且（工作區或 index）≠ HEAD；同檔兩個作者，先 commit 者帶走對方 hunk（2026-10-01）；多檔呼叫全有或全無；commit／還原即自動釋放；認領以 realpath 為 key、每檔加鎖，存在 tmpdir，`node mcp/claude-userlevel/hooks/lib/file-claims.js list\|release <path>`（release 僅限操作者指示）；WORKLOG／TASKS 豁免（走私有 index）。Bash（同一規則）：Pre 快照 `git status` 列出檔案的 blob、Post／PostToolUseFailure 比對；改到他人認領檔 → exit 2（事後回報）；改到無人持有的檔 → 本 session 認領；並行 Write/Edit 由認領的寫入紀錄（writes）排除，不誤算 |
 | `rules/sensitive-file-block.js` | Write\|Edit | BLOCK：寫入 .env/.pem/.key、/secrets/、credentials 路徑 |
-| `rules/git-log-injector.js` | Write\|Edit（首次）| BLOCK：顯示上一完整 session 全部 commits（fallback -10），防並行 session 重工 |
+| `rules/git-log-injector.js` | Write\|Edit（首次）| BLOCK：顯示上次收工窗的 commits（窗 >3d 或過舊 → `-10`；輸出封頂），防並行 session 重工 |
 | `rules/auto-repair-guard.js` | Write\|Edit | BLOCK（首次/分類）：編輯 Auto-Repair 邏輯路徑前強制 4 pre-checks |
 | `rules/config-protection.js` | Write\|Edit | BLOCK：禁止修改 linter/formatter config |
 | `rules/file-path-router.js` | Write\|Edit | BLOCK（首次/分類）：路由到正確 agent（auth/db/supabase/n8n/nginx/wp/trigger）|

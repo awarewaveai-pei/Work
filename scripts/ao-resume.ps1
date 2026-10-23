@@ -421,6 +421,12 @@ if ($FullMainlineParity) {
                 Write-Error "ao-resume: FullMainlineParity fetch failed: $($parity.Message)"
                 exit 1
             }
+            $staleIndex = @(Get-StaleSharedIndexPaths -WorkRoot $WorkRoot)
+            if ($staleIndex.Count -gt 0) {
+                Write-Host ("== AO-RESUME: WARN shared index stale vs HEAD ({0} path(s): index != HEAD, worktree == HEAD; a bare commit would revert them) ==" -f $staleIndex.Count) -ForegroundColor Yellow
+                foreach ($p in ($staleIndex | Select-Object -First 5)) { Write-Host ("   stale: " + $p) -ForegroundColor Yellow }
+                Write-Host "   Unless one is a deliberate 'git rm --cached': git reset -q -- <path>" -ForegroundColor Yellow
+            }
         } else {
             $alignArgs += "-AllowStash"
             $alignExit = Invoke-FullMainlineAlignWithRetry -Root $WorkRoot -AlignArgs $alignArgs
@@ -430,6 +436,15 @@ if ($FullMainlineParity) {
             }
         }
     }
+}
+
+# MCP runtime availability (Claude desktop main.log init_mcp=...). Local, sub-second; exit 1 = WARN, 2 = blind.
+$mcpRuntimeScript = Join-Path $WorkRoot "scripts\check-mcp-runtime.ps1"
+if (Test-Path -LiteralPath $mcpRuntimeScript) {
+    $mcpRuntimeOut = (& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $mcpRuntimeScript 2>&1 | Out-String).Trim()
+    Write-Host ("== AO-RESUME: MCP runtime (exit {0}) ==" -f $LASTEXITCODE) -ForegroundColor $(if ($LASTEXITCODE -eq 0) { 'Green' } else { 'Yellow' })
+    if ($mcpRuntimeOut) { Write-Host ("   " + ($mcpRuntimeOut -split "`r?`n")[-1]) }
+    $global:LASTEXITCODE = 0
 }
 
 # Refresh snapshot before git preflight so AO-RESUME / agents still see current TASKS.md

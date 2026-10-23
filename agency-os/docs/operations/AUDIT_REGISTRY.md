@@ -73,6 +73,7 @@
 - `scripts/print-today-closeout-recap.ps1` — commit `27d36dc` 2026-05-26 — Pattern B → Pattern A: `git status -sb` (CJK paths) + `git log %s` (CJK subjects) wrapped in `Invoke-WithUtf8Console`; bare `[Console]::OutputEncoding` setter removed; dot-source added
 - `scripts/ao-resume.ps1` — **17/17 sites, 2026-08-25** — every native-git capture wrapped (helper was already dot-sourced at L36; only the call sites were bare). REALTEST: extracted the real `Invoke-NonFastForwardRecovery` via AST and ran it against a fixture repo with a CJK `-LATEST.md` conflict and `core.quotePath=false` — OLD aborted (`git checkout --theirs` failed on the mojibaked path, rc=1, remote commit lost), NEW auto-resolved, rebased, pushed, rc=0.
 - `scripts/lib/git-safe-ops.ps1` — **4/4 sites, 2026-08-25** — this file is the documented SSOT for safe git invocation but only ever handled the EAP=Stop/NativeCommandError footgun, never the CP950 decode footgun, and it was **never registered in the backlog table below** (created 2026-05-30, after that table was written). Helper dot-source added + `Invoke-SafeGitFetch`/`Push`/`Capture` wrapped, so all 5 dot-sourcing callers inherit the protection. Verified: `-SelfTest` 12/12, `test-git-safe-ops-matrix.ps1` T1-T8 8/8.
+- 2026-10-23 -- remaining 85 sites closed (drift 85 -> 0), 0 exemptions. Pattern: dot-source `_console-encoding-helpers.ps1` (before the script's own `Set-StrictMode`, since the helper turns StrictMode on in the dot-sourcing scope; `verify-aoresume-archive.ps1` and `verify-head-typecheck.ps1` had none, so `Set-StrictMode -Off` follows the dot-source) and wrap the capture; `$LASTEXITCODE`, `2>&1`/`2>$null`, `.Trim()` and `| Out-Host/Out-Null` stay outside or inside as before. Piped stdin (`$x | ssh`) goes INSIDE the block (`Invoke-WithUtf8Console { $x | ssh ... }`), else the piped text never reaches the native command. `mcp/claude-userlevel/hooks/post-push-trigger-deploy.ps1` inlines the wrapper (deployed copy under `~/.claude/hooks`, repo path unknown before its first git call; ASCII-only file); `ao-resume-on-prompt.ps1` dot-sources it from the resolved `$RepoRoot\scripts`. Run `scripts/sync-claude-userlevel.ps1 -Mode merge` to deploy the two hooks.
 - `scripts/ao-close.ps1` — **6 of 23 sites, 2026-08-25** (all line numbers below are post-change) (18 remain, still 🟡 TRACKED below) — surfaced by `codex-oracle -Mode review` on the two fixes above. Both were **safety gates disarmed by mojibake**, not cosmetics:
   - `:216` `git log --format=%s` feeding the `-AllowAheadCommits` bypass. Reproduced on a big5 console: 400 commits (200 human + 200 CJK-subject checkpoints) → bare capture returned **377 lines / 177 human**, wrapped returned **400 / 200**. A human subject absorbed into the preceding `[claude] checkpoint:` line matches the checkpoint regex, so `$humanCommits` can reach 0 and AO-CLOSE waves through unpublished human work. Same shape as the 2026-05-22 origin incident.
   - `:152` (+ `:253`, `:390`, `:683` — the three identical `$branch` siblings) `git rev-parse --abbrev-ref HEAD`. Reproduced with a non-ASCII branch: OLD returned a corrupted name (2 CJK chars → 3), `origin/<garbled>` failed to verify, `RemoteFound=$false` → **the whole ahead/behind preflight block, including the `:216` gate, was skipped**. NEW returns the correct name and `RemoteFound=$true`.
@@ -100,7 +101,9 @@
 
 ### 🟡 TRACKED (low-priority, hardening deferred — fix on next Edit per AGENTS.md auto-trigger)
 
-Tool reports **85 remaining unprotected sites** across these files (was 117; 2026-08-25 closed 27 across `ao-resume.ps1`, `lib/git-safe-ops.ps1` and 6 of `ao-close.ps1`). Most are ASCII-only operations (`git rev-parse`, `git status`, `git rev-list --count`, `docker ps --format`) where CP950 trap won't materialize because the data flowing through is pure ASCII. Listed here as backlog:
+**CLOSED 2026-10-23: `audit-cp950-traps.ps1` reports drift=0 (was 85).** Every site below was wrapped in `Invoke-WithUtf8Console`; none was exempted. Wrapping was chosen over "display-only" registration because it needs no per-site claim that can rot: a site whose value is only displayed gets correct CJK on screen, and a site whose value reaches a gate / `Test-Path` / loop (e.g. `commit-checkpoint.ps1` `git diff --cached --name-only` -> sensitive-path guard, `git-prune-merged-local-branches.ps1` `git branch --merged` -> delete loop, `git rev-parse --show-toplevel` -> `Join-Path`) is protected. The table below is the historical backlog; its per-file counts and risk notes are superseded by this line. The audit has no allowlist, so the registry is not machine-honoured; the audit count is the only mechanical proof.
+
+Previous text: Tool reported 85 unprotected sites (was 117; 2026-08-25 closed 27 across `ao-resume.ps1`, `lib/git-safe-ops.ps1` and 6 of `ao-close.ps1`). The claim that most were ASCII-only was never verified per site -- see the `ao-close.ps1` row. Backlog:
 
 | File | Capture count | Risk profile |
 |------|---------------|--------------|
@@ -461,6 +464,15 @@ Minor/suggestion findings also fixed in the same pass: m1 (`@()`-wrap `.Count` a
 | Audited (tracked paths) | case-collision hits | oversized-file hits | Critic findings (pre-deploy) | Real production breaks pre-audit |
 |---------|-------|-------|-------|-----------------------------------|
 | 4715 | 0 | 17 | 3 Critical + 4 Major + 4 Minor + 4 Suggestion, all fixed same day | 0 (Tier 3-style: incident-adjacent, not itself a production break) |
+
+---
+
+## Detector artifact contract (2026-10-23)
+
+- Invariant: every `reports/status/*-LATEST.json` has `overall` + `measured`; measured=0 never PASS. Writer helper `scripts/lib/_detector-contract.ps1` (`Write-DetectorArtifact`, downgrades PASS to UNKNOWN on measured=0).
+- Audit `scripts/audit-detector-contract.ps1` (health check 12g): unlisted violation or stale allowlist entry = FAIL. Legacy list `scripts/detector-contract-legacy.txt` may only shrink; new artifacts must comply.
+- First consumer `scripts/check-mcp-runtime.ps1` (health 12h): newest `init_mcp=` line of Claude `main*.log` -> `mcp-runtime-LATEST.json`; failed>0 WARN, log unreadable -> measured=0 UNKNOWN.
+- Not enforced yet: "every artifact has >=1 reader".
 
 ---
 

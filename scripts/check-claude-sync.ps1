@@ -49,6 +49,8 @@ param(
     [switch]$Quiet
 )
 
+# CP950 protection for native stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -84,7 +86,7 @@ function Resolve-MonorepoRoot {
         if (-not $start) { continue }
         # -C makes git resolve relative to $start rather than the process cwd.
         try {
-            $r = (& git -C $start rev-parse --show-toplevel 2>$null)
+            $r = (Invoke-WithUtf8Console { & git -C $start rev-parse --show-toplevel 2>$null })
             if ($LASTEXITCODE -eq 0 -and $r) { return (Normalize-RootPath ($r -replace '/', '\')) }
         } catch { }
         $cur = $start

@@ -38,6 +38,8 @@ param(
     [switch] $DryRun
 )
 
+# CP950 protection for native stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -134,7 +136,7 @@ $wrapper = "echo $remoteB64 | base64 -d | sudo bash"
 
 Write-Host ("== sync {0} -> {1}:{2} ==" -f $VaultKey, (Get-ProdLabel $SshTarget), $RemoteFile) -ForegroundColor Cyan
 $sshArgs = Get-ProdSshArgs $SshTarget
-& ssh @sshArgs $wrapper
+Invoke-WithUtf8Console { & ssh @sshArgs $wrapper }
 $exit = $LASTEXITCODE
 if ($exit -ne 0) {
     throw "Remote sync exited $exit. Inspect output above."

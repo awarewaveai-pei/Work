@@ -15,7 +15,7 @@
         0  PASS  - server is at origin/main (behind == 0)
         1  WARN  - server is 1..(FailAt-1) commits behind
         2  FAIL  - server is FailAt commits behind, OR git/SSH error in -Strict mode
-        3  ERROR - SSH/git unreachable; emits warning but does not fail unless -Strict
+        3  ERROR - git unreachable / BLIND - ssh probe failed or hit its hard deadline (not measured); does not fail unless -Strict
 
 .PARAMETER ServerHost
     Deploy target IP/hostname. Default: 145.239.195.47 (ks-aw-01, since the 2026-08-31 KS-6 host switch)
@@ -74,8 +74,8 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot 'lib\git-safe-ops.ps1')
 Set-StrictMode -Version Latest
 
-# CP950 protection for ssh stdout capture (see scripts/_console-encoding-helpers.ps1).
-. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
+# ssh with keepalive + hard total deadline; decodes stdout as UTF-8 itself (scripts/lib/ssh-deadline.ps1).
+. (Join-Path $PSScriptRoot "lib\ssh-deadline.ps1")
 
 function Resolve-RepoRoot {
     $here = $PSScriptRoot
@@ -93,17 +93,15 @@ function Resolve-RepoRoot {
 function Invoke-Ssh {
     param([string]$Cmd)
     $sshArgs = @(
-        "-o", "BatchMode=yes",
         "-o", "StrictHostKeyChecking=accept-new",
-        "-o", "ConnectTimeout=8",
         "-i", $PrivateKey,
         "-p", "58122",
         ("{0}@{1}" -f $ServerUser, $ServerHost),
         $Cmd
     )
-    # Force UTF-8 console for SSH stdout (CP950 trap protection).
-    $out = Invoke-WithUtf8Console { & ssh @sshArgs 2>&1 }
-    return @{ ExitCode = $LASTEXITCODE; Output = ($out -join "`n") }
+    # Hard deadline: 2026-10-14 this call hung 16 min on ConnectTimeout alone. Timeout = ExitCode -1.
+    $r = Invoke-SshWithDeadline -SshArgs $sshArgs -DeadlineSec 30 -ConnectTimeoutSec 8
+    return @{ ExitCode = $r.ExitCode; Output = $r.Output; TimedOut = $r.TimedOut }
 }
 
 function Emit-Result {
@@ -186,9 +184,10 @@ try {
 # 3. SSH probe deployed commit
 $probe = Invoke-Ssh -Cmd "sudo bash -c 'cat /root/lobster-phase1/.deployed-commit 2>/dev/null || (cd /root/Work && git rev-parse HEAD) 2>/dev/null'"
 if ($probe.ExitCode -ne 0) {
-    $msg = "SSH probe failed (exit $($probe.ExitCode)): $($probe.Output)"
+    # BLIND = the deployed commit was not measured (ssh failed or hit its hard deadline). Never a PASS/WARN.
+    $msg = "SSH probe failed (exit $($probe.ExitCode), timedOut=$($probe.TimedOut)): $($probe.Output)"
     if ($Strict) { Emit-Result -Status "FAIL" -ExitCode 2 -Message $msg -Data @{ host = $ServerHost } }
-    Emit-Result -Status "ERROR" -ExitCode 3 -Message $msg -Data @{ host = $ServerHost }
+    Emit-Result -Status "BLIND" -ExitCode 3 -Message $msg -Data @{ host = $ServerHost }
 }
 $deployedCommit = ($probe.Output -split "`n" | Where-Object { $_ -match '^[0-9a-f]{7,40}$' } | Select-Object -First 1)
 if (-not $deployedCommit) {
@@ -272,7 +271,7 @@ $serverVars = @($composeProbe.Output -split "`n" | Where-Object { $_ -match '^[A
 if ($composeProbe.ExitCode -ne 0 -or $serverVars.Count -eq 0) {
     # Distinguishable from "checked, no drift found" -- surfaced in $data so a WARN-suppressing PASS
     # can never come from a probe that silently found nothing to compare.
-    $composeVarDriftCheckError = "compose var probe failed or found 0 vars (exit $($composeProbe.ExitCode)): $($composeProbe.Output)"
+    $composeVarDriftCheckError = "compose var probe failed or found 0 vars (exit $($composeProbe.ExitCode), timedOut=$($composeProbe.TimedOut)): $($composeProbe.Output)"
 } else {
     $repoComposePath = Join-Path $repoRoot "lobster-factory\infra\hetzner-phase1-core\docker-compose.yml"
     if (Test-Path $repoComposePath) {
@@ -351,6 +350,14 @@ $data = @{
 if ($behind -ge $FailAt) {
     Emit-Result -Status "FAIL" -ExitCode 2 -Message (("Production is {0} commit(s) behind origin/main (>= FailAt={1}). Run sg-deploy.sh on the server." -f $behind, $FailAt) + $holdNote) -Data $data
 }
+if ($composeVarDriftCheckError) {
+    # BLIND, not WARN: the compose-variable axis was not measured (ssh failed/timed out, or the probe found
+    # nothing to compare), so "behind" alone cannot support a PASS or a plain WARN. Placed before the
+    # behind-WARN so an unmeasured axis is never hidden behind a measured one; behind stays in -Data.
+    $code = if ($Strict) { 2 } else { 3 }
+    $status = if ($Strict) { "FAIL" } else { "BLIND" }
+    Emit-Result -Status $status -ExitCode $code -Message ("Compose-variable drift NOT measured (commit {0}, behind={1}): {2}" -f $deployedCommit.Substring(0,7), $behind, $composeVarDriftCheckError) -Data $data
+}
 if ($behind -ge $WarnAt) {
     $code = if ($Strict) { 2 } else { 1 }
     $status = if ($Strict) { "FAIL" } else { "WARN" }
@@ -360,11 +367,5 @@ if ($composeVarDrift) {
     $code = if ($Strict) { 2 } else { 1 }
     $status = if ($Strict) { "FAIL" } else { "WARN" }
     Emit-Result -Status $status -ExitCode $code -Message ("Production is at origin/main (commit {0}), but docker-compose.yml declares different variables than repo (server-only: {1}; repo-only: {2}). Fix via safe-infra-patch.sh, NOT sg-deploy.sh -- see composeVarDrift." -f $deployedCommit.Substring(0,7), $composeVarDrift.onlyOnServer.Count, $composeVarDrift.onlyInRepo.Count) -Data $data
-}
-if ($composeVarDriftCheckError) {
-    # Non-Strict WARN only -- this is "the supplementary check didn't run", not "everything is
-    # broken" (the primary commit-drift verdict above already reported correctly). Never silently
-    # dropped, unlike the pre-fix behavior this replaced.
-    Emit-Result -Status "WARN" -ExitCode 1 -Message ("Production is at origin/main (commit {0}), but the compose-variable-drift check itself failed: {1}" -f $deployedCommit.Substring(0,7), $composeVarDriftCheckError) -Data $data
 }
 Emit-Result -Status "PASS" -ExitCode 0 -Message (("Production is at origin/main (commit {0})." -f $deployedCommit.Substring(0,7)) + $holdNote) -Data $data

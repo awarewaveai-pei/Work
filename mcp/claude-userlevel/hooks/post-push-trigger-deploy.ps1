@@ -19,6 +19,22 @@
 
 $ErrorActionPreference = "Continue"
 
+# CP950 protection for git stdout capture. Same wrapper as scripts/_console-encoding-helpers.ps1,
+# inlined: this deployed copy lives in ~/.claude/hooks and the repo path is unknown until the first
+# git call below. Keep behaviour identical to the SSOT.
+function Invoke-WithUtf8Console {
+    param([Parameter(Mandatory = $true, Position = 0)][scriptblock]$ScriptBlock)
+    $prev = $null
+    $haveConsole = $false
+    try {
+        $prev = [Console]::OutputEncoding
+        $haveConsole = $true
+        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    } catch { }
+    try { & $ScriptBlock }
+    finally { if ($haveConsole) { [Console]::OutputEncoding = $prev } }
+}
+
 $logFile = "$env:TEMP\post-push-trigger-deploy.log"
 function Write-Log([string]$Message) {
     "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $Message" | Add-Content -LiteralPath $logFile
@@ -45,13 +61,13 @@ if ((Test-Path -LiteralPath $logFile) -and (Get-Item -LiteralPath $logFile).Leng
 $gitCwd = (Get-Location).Path
 $cPath = @($push.Groups[1].Value, $push.Groups[2].Value, $push.Groups[3].Value) | Where-Object { $_ } | Select-Object -First 1
 if ($cPath) { $gitCwd = if ([IO.Path]::IsPathRooted($cPath)) { $cPath } else { Join-Path $gitCwd $cPath } }
-$repoRoot = (git -C $gitCwd rev-parse --show-toplevel 2>$null)
+$repoRoot = (Invoke-WithUtf8Console { git -C $gitCwd rev-parse --show-toplevel 2>$null })
 if ($LASTEXITCODE -ne 0 -or -not $repoRoot) { Write-Log "EXIT: no repo root ($gitCwd)"; exit 0 }
 $repoRoot = $repoRoot.Trim()
 $deployScript = Join-Path $repoRoot "scripts\lobster-trigger-deploy.ps1"
 if (-not (Test-Path -LiteralPath $deployScript)) { exit 0 }
 
-$commonDir = (git -C $repoRoot rev-parse --git-common-dir 2>$null)
+$commonDir = (Invoke-WithUtf8Console { git -C $repoRoot rev-parse --git-common-dir 2>$null })
 if (-not $commonDir) { Write-Log "EXIT: no git common dir"; exit 0 }
 $commonDir = $commonDir.Trim()
 if (-not [IO.Path]::IsPathRooted($commonDir)) { $commonDir = Join-Path $repoRoot $commonDir }
@@ -66,7 +82,7 @@ $watchPaths = @(
 )
 
 function Get-Sha([string]$Ref) {
-    $s = (git -C $repoRoot rev-parse --verify --quiet $Ref 2>$null)
+    $s = (Invoke-WithUtf8Console { git -C $repoRoot rev-parse --verify --quiet $Ref 2>$null })
     if ($s -and $s.Trim() -match '^([0-9a-f]{40}|[0-9a-f]{64})$') { return $s.Trim() }
     return $null
 }
@@ -115,7 +131,7 @@ try {
         if (-not $base) {
             # First run (or unreadable marker): evaluate only a push proven to have just
             # happened by the newest origin/main reflog entry; otherwise record a baseline.
-            $entry = (git -C $repoRoot reflog show --date=unix -n 1 --format='%gd|%gs' $tracked 2>$null)
+            $entry = (Invoke-WithUtf8Console { git -C $repoRoot reflog show --date=unix -n 1 --format='%gd|%gs' $tracked 2>$null })
             if ($entry -match '@\{(\d+)\}\|update by push' -and
                 ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() - [long]$Matches[1]) -le 300) {
                 $base = Get-Sha "$tracked@{1}"
@@ -129,7 +145,7 @@ try {
         }
         if ($base -eq $current) { $pendingAfterCap = $false; Write-Log "EXIT: nothing new on origin/main"; break }
 
-        $changedFiles = @(git -C $repoRoot diff --name-only $base $current 2>$null)
+        $changedFiles = @(Invoke-WithUtf8Console { git -C $repoRoot diff --name-only $base $current 2>$null })
         $diffOk = ($LASTEXITCODE -eq 0)
         $triggered = $false
         if (-not $diffOk) {

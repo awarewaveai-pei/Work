@@ -44,6 +44,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "SilentlyContinue"
 
+# ssh with keepalive + hard total deadline (scripts/lib/ssh-deadline.ps1).
+. (Join-Path $PSScriptRoot "lib\ssh-deadline.ps1")
+
 function Resolve-Root {
     param([string]$InputRoot)
     if ($InputRoot -and (Test-Path -LiteralPath $InputRoot)) {
@@ -319,11 +322,17 @@ $lockdownSf = ''
 try {
     $ksKey = "$env:USERPROFILE\.ssh\id_ed25519"
     $probeCmd = "curl -sk -o /dev/null -m 10 -w 'AW=%{http_code};' --resolve trigger.aware-wave.com:443:145.239.195.47 https://trigger.aware-wave.com/login; curl -sk -o /dev/null -m 10 -w 'SF=%{http_code}' --resolve soulfulexpression.org:443:145.239.195.47 https://soulfulexpression.org/"
-    $lockdownOut = & ssh -i $ksKey -p 58122 -o StrictHostKeyChecking=no -o ConnectTimeout=8 -o BatchMode=yes ubuntu@145.239.195.47 $probeCmd 2>$null
-    if ($lockdownOut -match 'AW=(\d+);SF=(\d+)') {
+    # Two curl -m 10 run remotely, so the deadline must exceed 20s. A timeout is 'unreachable', never a verdict.
+    $lockdownRes = Invoke-SshWithDeadline -SshArgs @('-i', $ksKey, '-p', '58122', '-o', 'StrictHostKeyChecking=no', 'ubuntu@145.239.195.47', $probeCmd) -DeadlineSec 40 -ConnectTimeoutSec 8
+    $lockdownOut = $lockdownRes.Stdout
+    if ($lockdownRes.TimedOut -or $lockdownRes.ExitCode -ne 0) {
+        $lockdownStatus = 'unreachable'
+    } elseif ($lockdownOut -match 'AW=(\d+);SF=(\d+)') {
         $lockdownAw = $Matches[1]
         $lockdownSf = $Matches[2]
-        $lockdownStatus = if ($lockdownAw -eq '403' -and $lockdownSf -eq '403') { 'active' } else { 'inactive' }
+        # A verdict needs a real response from BOTH probes; 000 = curl got none = not measured.
+        $lockdownStatus = if ($lockdownAw -eq '000' -or $lockdownSf -eq '000') { 'unreachable' }
+                          elseif ($lockdownAw -eq '403' -and $lockdownSf -eq '403') { 'active' } else { 'inactive' }
     }
 } catch {
     $lockdownStatus = 'unreachable'
@@ -332,8 +341,9 @@ try {
 # R3-F3 (round-3 review): the lockdown check used to be config-inspection and was
 # deliberately warn-only (it could rot). It is now a live end-to-end probe with no
 # false-positive mode: 'inactive' means a direct-origin request REALLY got through.
-# That must degrade the overall verdict. 'unreachable' (ssh hiccup) stays warn-only.
-if ($lockdownStatus -eq 'inactive' -and $overall -eq 'PASS') { $overall = 'WARN' }
+# That must degrade the overall verdict. Any other non-verdict ('unreachable', ssh exit != 0) was not
+# measured, and an unmeasured check is never a PASS (2026-10-23).
+if ($lockdownStatus -ne 'active' -and $overall -eq 'PASS') { $overall = 'WARN' }
 
 $stamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
 $lines = @(

@@ -7,16 +7,16 @@ description: Run the full pre-authorized AO-CLOSE end-of-day shutdown: WORKLOG e
 
 Follow the AO-CLOSE protocol (AGENTS.md §8).
 
-**Session window = 上次 AO-RESUME → 本次 AO-CLOSE**
+**Session window = 上次 AO-CLOSE → 本次 AO-CLOSE**
 
 Before writing anything, determine the session window:
-- Read `agency-os/.agency-state/ao-resume-last.txt` for the last AO-RESUME timestamp.
-- Run `git log --since="<ao-resume-last timestamp>" --oneline` to see ALL commits in this session window.
+- Read `agency-os/.agency-state/ao-close-last.txt` (advanced by every successful AO-CLOSE). Not `ao-resume-last.txt`: it moves only on an explicit `AO-RESUME` prompt (auto-refresh never moves it), so it can lag months.
+- Run `git log --since="<ao-close-last timestamp>" --oneline` to see ALL commits in this session window.
 - This window may span multiple calendar days — do NOT limit to today's date only.
 
 Before running `ao-close.ps1`, do the following:
 
-1. Review ALL git commits since last AO-RESUME (use `git log --since` above) + `agency-os/TASKS.md` open items
+1. Review ALL git commits since last AO-CLOSE (use `git log --since` above) + `agency-os/TASKS.md` open items
 
 1a. **[TASKS sync]** Read every `- [ ]` line under `### 未完成` in `agency-os/TASKS.md`.
     For each open item completed this session, write into today's WORKLOG section:
@@ -29,9 +29,9 @@ Before running `ao-close.ps1`, do the following:
     Skip items not completed this session. Skip items already `- [x]`.
     `apply-closeout-task-checkmarks.ps1` does exact substring match — it cannot infer intent.
 
-2. Write `AUTO_TASK_DONE` entries into `agency-os/WORKLOG.md` for everything completed since last AO-RESUME (not just today)
-3. Update `agency-os/memory/CONVERSATION_MEMORY.md` with a condensed summary covering the full session window (上次 AO-RESUME → 本次 AO-CLOSE)
-4. Update `agency-os/memory/daily/YYYY-MM-DD.md` — use today's date for the file, but **Done today** section must cover the full session window (all dates since last AO-RESUME)
+2. Write `AUTO_TASK_DONE` entries into `agency-os/WORKLOG.md` for everything completed since last AO-CLOSE (not just today)
+3. Update `agency-os/memory/CONVERSATION_MEMORY.md` with a condensed summary covering the full session window (上次 AO-CLOSE → 本次 AO-CLOSE)
+4. Update `agency-os/memory/daily/YYYY-MM-DD.md` — use today's date for the file, but **Done today** section must cover the full session window (all dates since last AO-CLOSE)
 
 Then run the closeout script:
 
@@ -47,7 +47,7 @@ If `system-health-check` is not 100%, attempt to self-repair. If repair succeeds
 > 規則：① fail 訊息來自哪個 gate script → 讀那支 script 的 exit 條件；② 跑該 gate 看**實際輸出**（如 `sync-claude-userlevel.ps1 -Mode verify` 印出 drifted key）；③ 修完**重跑該 gate 確認 exit 0**；④ 連動檢查段寫**這次實測到的真因**，不是上次的標籤。
 > 註：`ao-close.ps1` 已內建 Claude Code sync 自癒（verify→偵測 drift 才 merge），多數 sync drift 不再需要手動處理。
 
-Output the four sections (all covering 上次 AO-RESUME → 本次 AO-CLOSE):
+Output the four sections (all covering 上次 AO-CLOSE → 本次 AO-CLOSE):
 - **本輪完成**（上次 AO-RESUME 至今）
 - **未完成**
 - **連動檢查**（doc-sync, health gate result）

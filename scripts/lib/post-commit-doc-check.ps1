@@ -28,6 +28,8 @@
 # checkout HAS lobster-factory/scripts/validate-doc-integrity.mjs on disk):
 #   . (Join-Path $PSScriptRoot "lib\post-commit-doc-check.ps1")
 #   Invoke-PostCommitDocCheck -ValidatorWorkRoot $WorkRoot -Source "commit-checkpoint.ps1"
+# CP950 protection for native stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot '..\_console-encoding-helpers.ps1')
 Set-StrictMode -Version Latest
 
 function Invoke-PostCommitDocCheck {
@@ -55,7 +57,7 @@ function Invoke-PostCommitDocCheck {
         if (-not (Test-Path -LiteralPath $validator)) {
             $result.error = "validator lobster-factory/scripts/validate-doc-integrity.mjs not found under the validator work root -- not the Work repo, or a partial checkout"   # no absolute paths: the status file is tracked
         } else {
-            $shaResolved = (& git -C $TargetWorkRoot rev-parse $Sha 2>$null)
+            $shaResolved = (Invoke-WithUtf8Console { & git -C $TargetWorkRoot rev-parse $Sha 2>$null })
             if ($LASTEXITCODE -ne 0 -or -not $shaResolved) {
                 $result.error = "could not resolve '$Sha' to a commit in the target work root"
             } else {

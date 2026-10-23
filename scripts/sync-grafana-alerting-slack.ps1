@@ -6,6 +6,8 @@ param(
     [string]$ContactPointName = "infra-alerts-slack"
 )
 
+# CP950 protection for native stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "lib\prod-host.ps1")
@@ -121,9 +123,9 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 
 Write-Host "== sync: Grafana unified alerting (Slack contact + root policy) + restart grafana ==" -ForegroundColor Cyan
 try {
-    scp @($scp.Options + @($tmpSh, "$($scp.Dest):/tmp/grafana-alert-sync.sh"))
+    Invoke-WithUtf8Console { scp @($scp.Options + @($tmpSh, "$($scp.Dest):/tmp/grafana-alert-sync.sh")) }
     if ($LASTEXITCODE -ne 0) { throw "scp failed (exit $LASTEXITCODE)" }
-    ssh @sshArgs "chmod 0755 /tmp/grafana-alert-sync.sh && sudo bash /tmp/grafana-alert-sync.sh && rm -f /tmp/grafana-alert-sync.sh"
+    Invoke-WithUtf8Console { ssh @sshArgs "chmod 0755 /tmp/grafana-alert-sync.sh && sudo bash /tmp/grafana-alert-sync.sh && rm -f /tmp/grafana-alert-sync.sh" }
     if ($LASTEXITCODE -ne 0) { throw "Remote bash failed (exit $LASTEXITCODE)" }
 } finally {
     Remove-Item -LiteralPath $tmpSh -Force -ErrorAction SilentlyContinue

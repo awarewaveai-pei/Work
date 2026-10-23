@@ -12,8 +12,8 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-# CP950 protection for ssh stdout capture (see scripts/_console-encoding-helpers.ps1).
-. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
+# ssh with keepalive + hard total deadline; decodes stdout as UTF-8 itself (scripts/lib/ssh-deadline.ps1).
+. (Join-Path $PSScriptRoot "lib\ssh-deadline.ps1")
 
 function Resolve-Root {
     param([string]$InputRoot)
@@ -35,34 +35,21 @@ function Invoke-Ssh {
         [int]$Port = 22
     )
     $sshArgs = @(
-        "-o", "BatchMode=yes",
         "-o", "StrictHostKeyChecking=accept-new",
-        "-o", "ConnectTimeout=10",
         "-p", $Port,
         "-i", $Key,
         ("{0}@{1}" -f $User, $ServerHost),
         $Command
     )
-    # Force UTF-8 console for SSH stdout — Big5 locale would mojibake any CJK output bytes
-    # and can eat newline bytes inside multi-byte sequences. $LASTEXITCODE propagates.
-    #
-    # $ErrorActionPreference='Continue' inside the scriptblock (child scope, so the
-    # assignment is local) is REQUIRED: under the script-level 'Stop', ANY byte a native
-    # command writes to stderr throws a terminating NativeCommandError regardless of exit
-    # code. ssh writes benign notices to stderr routinely — "Warning: Permanently added
-    # '[host]:port' to the list of known hosts" on first connect (note [host]:port is a
-    # distinct known_hosts entry, so a new port re-triggers it), sudo's first-use lecture,
-    # "sudo: unable to resolve host" on hosts missing their own name in /etc/hosts. Without
-    # this, one such notice aborts the whole script before the report is written, leaving
-    # the PREVIOUS (green) backup-health-LATEST.md in place while AO-RESUME points the
-    # reader at it — a stale-green monitor, the exact failure this check exists to prevent.
-    $out = Invoke-WithUtf8Console {
-        $ErrorActionPreference = 'Continue'
-        & ssh @sshArgs 2>&1
-    }
+    # Helper owns BatchMode/ConnectTimeout/ServerAlive*, the hard deadline, and stderr capture: ssh's
+    # benign stderr notices ("Permanently added ... to the list of known hosts", sudo's first-use
+    # lecture) never raise NativeCommandError, so one cannot abort the script before the report is
+    # written and leave the PREVIOUS green backup-health-LATEST.md in place. Timeout = ExitCode -1.
+    $r = Invoke-SshWithDeadline -SshArgs $sshArgs -DeadlineSec 90 -ConnectTimeoutSec 10
     return @{
-        ExitCode = $LASTEXITCODE
-        Output   = (($out | ForEach-Object { [string]$_ }) -join "`n").Trim()
+        ExitCode = $r.ExitCode
+        Output   = $r.Output
+        TimedOut = $r.TimedOut
     }
 }
 
@@ -337,7 +324,7 @@ if ($fatal) {
         [void]$markdown.AppendLine("- Oldest backup file time: " + $node.data.oldest_time)
         $ageTag = if ($node.data.backup_age_days -match '^\d+$' -and [int]$node.data.backup_age_days -gt 3) { " STALE" } else { "" }
         [void]$markdown.AppendLine("- Backup age: " + $node.data.backup_age_days + "d" + $ageTag)
-        $verifyTag = if ($node.data.verify_result -eq "FAILED") { " **FAILED**" } elseif ($node.data.verify_result -eq "UNKNOWN") { " (unknown)" } else { "" }
+        $verifyTag = if ($node.data.verify_result -eq "FAILED") { " **FAILED**" } elseif ($node.data.verify_result -eq "UNKNOWN") { " (unknown) -- 無法證明可還原: no verify verdict line found, so this backup is unproven restorable" } else { "" }
         [void]$markdown.AppendLine("- Verify result: " + $node.data.verify_result + " (" + $node.data.verify_time + ")" + $verifyTag)
         [void]$markdown.AppendLine("")
     }

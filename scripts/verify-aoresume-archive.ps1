@@ -18,8 +18,12 @@ param (
     [string]$WorkRoot = ""
 )
 
+# CP950 protection for native stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
+Set-StrictMode -Off  # the helper turns StrictMode on in the dot-sourcing scope; this script never ran under it
+
 if (-not $WorkRoot) {
-    $gitTop = & git rev-parse --show-toplevel 2>$null
+    $gitTop = Invoke-WithUtf8Console { & git rev-parse --show-toplevel 2>$null }
     $WorkRoot = if ($gitTop) { $gitTop -replace '/', '\' } else { $PWD.Path }
 }
 $WorkRoot = $WorkRoot.TrimEnd('\', '/')

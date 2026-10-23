@@ -1572,6 +1572,18 @@ test('doc-link-commit-check: case mismatch is broken (a CI checkout is case-sens
   assert.match(r.stderr, /c\.md -> \.\.\/worklog\.md/);
 });
 
+// The pointer verifier has its own suite (governance-pointers.test.mjs); a stub pins only the wiring.
+const POINTER_STUB = (code) => `process.stderr.write('Governance pointers FAILED: 1 issue(s)\\n  pointer_unresolved: agency-os/AGENTS.md:3 -- x\\n'); process.exit(${code});\n`;
+
+test('doc-link-commit-check: governance pointer failure after the commit is fed back; a pass is silent', () => {
+  const bad = docRepo({ 'scripts/verify-governance-pointers.mjs': POINTER_STUB(1) });
+  const r = postCommit(bad, commitChange(bad, { 'agency-os/x.md': '# x\n' }));
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /GOVERNANCE POINTERS:[\s\S]*pointer_unresolved: agency-os\/AGENTS\.md:3/);
+  const ok = docRepo({ 'scripts/verify-governance-pointers.mjs': 'process.exit(0);\n' });
+  assert.equal(postCommit(ok, commitChange(ok, { 'agency-os/x.md': '# x\n' })).status, 0);
+});
+
 test('doc-link-commit-check: markdown outside the gate\'s scan roots is not judged (runbooks/)', () => {
   const repo = docRepo({});
   const out = commitChange(repo, { 'runbooks/r.md': '[x](nope.md)\n' });

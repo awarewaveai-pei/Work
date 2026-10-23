@@ -70,8 +70,8 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-# CP950 protection for ssh stdout capture (see scripts/_console-encoding-helpers.ps1).
-. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
+# ssh with keepalive + hard total deadline; decodes stdout as UTF-8 itself (scripts/lib/ssh-deadline.ps1).
+. (Join-Path $PSScriptRoot "lib\ssh-deadline.ps1")
 
 # -------------------------------------------------------------------------------------
 # Per-host policy. Calibrated 2026-08-27 from measured readings:
@@ -118,31 +118,23 @@ function Invoke-Ssh {
         [int]$Port = 22
     )
     $sshArgs = @(
-        "-o", "BatchMode=yes",
         "-o", "StrictHostKeyChecking=accept-new",
-        "-o", "ConnectTimeout=15",
-        # ConnectTimeout bounds only the TCP/auth handshake. Without these a host that ACCEPTS
-        # the connection and then stalls -- memory thrash or IO saturation, i.e. precisely what
-        # this check exists to detect -- blocks forever, and it runs inside a blocking
-        # UserPromptSubmit hook, so the operator's first prompt of the day hangs with no output.
-        "-o", "ServerAliveInterval=10",
-        "-o", "ServerAliveCountMax=3",
         "-p", $Port,
         "-i", $Key,
         ("{0}@{1}" -f $User, $ServerHost),
         $Command
     )
-    # See check-backup-health.ps1 Invoke-Ssh for the full rationale: ssh writes benign
-    # notices to stderr, and under the script-level 'Stop' any stderr byte from a native
-    # command throws NativeCommandError regardless of exit code -- which would abort
-    # before the report is written and leave the PREVIOUS green report in place.
-    $out = Invoke-WithUtf8Console {
-        $ErrorActionPreference = 'Continue'
-        & ssh @sshArgs 2>&1
-    }
+    # Helper owns BatchMode/ConnectTimeout/ServerAlive* and a hard total deadline. ServerAlive* alone
+    # drops a dead link; a host that ACCEPTS the connection and then stalls -- memory thrash or IO
+    # saturation, i.e. precisely what this check exists to detect -- needs the deadline. This runs inside
+    # a blocking UserPromptSubmit hook, so an unbounded call hangs the operator's first prompt of the day.
+    # Timeout = ExitCode -1, which lands in the host-unreachable (BLIND) path. Benign ssh stderr notices
+    # are captured by the helper, so none can raise NativeCommandError under the script-level 'Stop'.
+    $r = Invoke-SshWithDeadline -SshArgs $sshArgs -DeadlineSec 90 -ConnectTimeoutSec 15
     return @{
-        ExitCode = $LASTEXITCODE
-        Output   = (($out | ForEach-Object { [string]$_ }) -join "`n").Trim()
+        ExitCode = $r.ExitCode
+        Output   = $r.Output
+        TimedOut = $r.TimedOut
     }
 }
 

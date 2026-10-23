@@ -24,6 +24,7 @@ param(
     [switch]$AllowAheadCommits,
     [switch]$SkipTodayRecap,
     [switch]$SkipAutoTaskCheckmarks,
+    [switch]$SkipTasksArchive,
     [switch]$SkipInboxGuard,
     # 2026-06-10: 預設 off。closeout-inbox 是 Cursor+Claude 雙 IDE 時代的協作機制（協作 AI
     # 寫 inbox → AO-CLOSE merge）。現為單 AI（僅 Claude，直接寫 WORKLOG），guard 只剩摩擦。
@@ -120,7 +121,7 @@ function Get-GitPreflightSnapshot {
 
     Push-Location $RepoRoot
     try {
-        $null = git rev-parse --git-dir 2>$null
+        $null = Invoke-WithUtf8Console { git rev-parse --git-dir 2>$null }
         if ($LASTEXITCODE -ne 0) {
             return [pscustomobject]@{
                 IsGitRepo   = $false
@@ -135,7 +136,7 @@ function Get-GitPreflightSnapshot {
             }
         }
 
-        $statusLine = (git status -sb 2>$null | Select-Object -First 1)
+        $statusLine = (Invoke-WithUtf8Console { git status -sb 2>$null } | Select-Object -First 1)
         if ($null -eq $statusLine) {
             $statusLine = ""
         } else {
@@ -149,10 +150,10 @@ function Get-GitPreflightSnapshot {
         $behind = $null
 
         if (-not [string]::IsNullOrWhiteSpace($remoteRef)) {
-            git rev-parse --verify $remoteRef 2>$null | Out-Null
+            Invoke-WithUtf8Console { git rev-parse --verify $remoteRef 2>$null } | Out-Null
             if ($LASTEXITCODE -eq 0) {
                 $remoteFound = $true
-                $lr = (git rev-list --left-right --count "${remoteRef}...HEAD" 2>$null).Trim()
+                $lr = (Invoke-WithUtf8Console { git rev-list --left-right --count "${remoteRef}...HEAD" 2>$null }).Trim()
                 $parts = @($lr -split '\s+' | Where-Object { $_ })
                 if ($parts.Count -ge 2) {
                     $behind = [int]$parts[0]
@@ -577,13 +578,13 @@ function New-AoCloseScopedIndex {
     try {
         $env:GIT_INDEX_FILE = $tmpIndex
         # git output goes to the host, never the pipeline: the function's only output is the path.
-        & git read-tree HEAD | Out-Host
+        Invoke-WithUtf8Console { & git read-tree HEAD } | Out-Host
         if ($LASTEXITCODE -ne 0) { return $null }
         foreach ($e in $Entries) {
             if ($e.Deleted) {
-                & git update-index --force-remove -- $e.Path | Out-Host
+                Invoke-WithUtf8Console { & git update-index --force-remove -- $e.Path } | Out-Host
             } else {
-                & git update-index --add --cacheinfo "$($e.Mode),$($e.Sha),$($e.Path)" | Out-Host
+                Invoke-WithUtf8Console { & git update-index --add --cacheinfo "$($e.Mode),$($e.Sha),$($e.Path)" } | Out-Host
             }
             if ($LASTEXITCODE -ne 0) { return $null }
         }
@@ -610,7 +611,7 @@ function Invoke-AoCloseScopedCommit {
         $commitArgs = @('commit')
         if ($Quiet) { $commitArgs += '-q' }
         if ($MessageFile) { $commitArgs += @('-F', $MessageFile) } else { $commitArgs += @('-m', $Message) }
-        & git @commitArgs | Out-Host
+        Invoke-WithUtf8Console { & git @commitArgs } | Out-Host
         return $LASTEXITCODE
     } finally {
         if ($null -eq $prevIndex) { Remove-Item Env:\GIT_INDEX_FILE -ErrorAction SilentlyContinue } else { $env:GIT_INDEX_FILE = $prevIndex }
@@ -753,14 +754,14 @@ if (-not $SkipInboxGuard -and $InboxGuardMode -ne "off") {
             $todayCommits = @()
         } else {
             $remoteRef = "origin/$branch"
-            git rev-parse --verify $remoteRef 2>$null | Out-Null
+            Invoke-WithUtf8Console { git rev-parse --verify $remoteRef 2>$null } | Out-Null
             if ($LASTEXITCODE -eq 0) {
                 $logRange = "$remoteRef..HEAD"
             } else {
                 $logRange = "HEAD"
             }
             $todayCommits = @(
-                git log $logRange --since="$since" --pretty=format:"%h" 2>$null |
+                Invoke-WithUtf8Console { git log $logRange --since="$since" --pretty=format:"%h" 2>$null } |
                 Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
             )
         }
@@ -812,7 +813,7 @@ if (-not $SkipInboxGuard -and $InboxGuardMode -ne "off") {
 Write-Host "== AO-CLOSE: prior-close archive report guard ==" -ForegroundColor Cyan
 Push-Location $WorkRoot
 try {
-    $lastSyncSubject = (git log -1 --pretty=format:"%s" --grep="chore: AO-CLOSE sync" 2>$null)
+    $lastSyncSubject = (Invoke-WithUtf8Console { git log -1 --pretty=format:"%s" --grep="chore: AO-CLOSE sync" 2>$null })
     if (-not [string]::IsNullOrWhiteSpace($lastSyncSubject)) {
         $m = [regex]::Match($lastSyncSubject, 'AO-CLOSE sync (\d{4}-\d{2}-\d{2}) (\d{4})')
         if ($m.Success) {
@@ -877,7 +878,7 @@ if (-not $SkipPush -and -not $AllowPushWhileBehind) {
     Write-Host "== AO-CLOSE: git fetch + push safety (ahead/behind vs origin) ==" -ForegroundColor Cyan
     Push-Location $WorkRoot
     try {
-        $null = git rev-parse --git-dir 2>$null
+        $null = Invoke-WithUtf8Console { git rev-parse --git-dir 2>$null }
         if ($LASTEXITCODE -ne 0) {
             Write-Error "ao-close: not a git repository at $WorkRoot"
             exit 1
@@ -888,7 +889,7 @@ if (-not $SkipPush -and -not $AllowPushWhileBehind) {
             Invoke-SafeGitFetch -WorkRoot $WorkRoot -Prune
         } else {
             $savedEAP = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-            try { & git fetch origin --prune 2>&1 | Out-Host; $fetchExit = $LASTEXITCODE }
+            try { Invoke-WithUtf8Console { & git fetch origin --prune 2>&1 } | Out-Host; $fetchExit = $LASTEXITCODE }
             finally { $ErrorActionPreference = $savedEAP }
             if ($fetchExit -ne 0) {
                 Write-Error "ao-close: git fetch failed (exit $fetchExit); fix network/auth or pass -SkipPush."
@@ -899,9 +900,9 @@ if (-not $SkipPush -and -not $AllowPushWhileBehind) {
         $branch = (Invoke-WithUtf8Console { git rev-parse --abbrev-ref HEAD }).Trim()
         if ($branch -ne "HEAD") {
             $remoteRef = "origin/$branch"
-            git rev-parse --verify $remoteRef 2>$null | Out-Null
+            Invoke-WithUtf8Console { git rev-parse --verify $remoteRef 2>$null } | Out-Null
             if ($LASTEXITCODE -eq 0) {
-                $lr = (git rev-list --left-right --count "${remoteRef}...HEAD").Trim()
+                $lr = (Invoke-WithUtf8Console { git rev-list --left-right --count "${remoteRef}...HEAD" }).Trim()
                 $parts = @($lr -split '\s+' | Where-Object { $_ })
                 if ($parts.Count -ge 2) {
                     $behind = [int]$parts[0]
@@ -1063,6 +1064,18 @@ if (-not $SkipAutoTaskCheckmarks -and (Test-Path -LiteralPath $applyMarks)) {
     Write-Host "== AO-CLOSE: -SkipAutoTaskCheckmarks（略過自動打勾）==" -ForegroundColor DarkYellow
 }
 
+$archiveTasks = Join-Path $WorkRoot "scripts\archive-completed-tasks.ps1"
+if (-not $SkipTasksArchive -and (Test-Path -LiteralPath $archiveTasks)) {
+    Write-Host "== AO-CLOSE: TASKS [x] archive + duplicate open-task gate ==" -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $archiveTasks -WorkRoot $WorkRoot
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "ao-close: archive-completed-tasks failed (exit $LASTEXITCODE). Fix duplicate open tasks / anchors in TASKS.md, or rerun with -SkipTasksArchive."
+        exit $LASTEXITCODE
+    }
+} elseif ($SkipTasksArchive) {
+    Write-Host "== AO-CLOSE: -SkipTasksArchive（略過 TASKS 已完成歸檔）==" -ForegroundColor DarkYellow
+}
+
 $dispatchScript = Join-Path $WorkRoot "scripts\append-agent-dispatch-to-worklog.ps1"
 if (Test-Path -LiteralPath $dispatchScript) {
     Write-Host "== AO-CLOSE: agent dispatch summary → WORKLOG ==" -ForegroundColor Cyan
@@ -1101,7 +1114,7 @@ if ($SkipPush) {
 
 Push-Location $WorkRoot
 try {
-    $null = git rev-parse --git-dir 2>$null
+    $null = Invoke-WithUtf8Console { git rev-parse --git-dir 2>$null }
     if ($LASTEXITCODE -ne 0) {
         Write-Error "ao-close: not a git repository at $WorkRoot"
         exit 1
@@ -1234,7 +1247,7 @@ Repair it first, then re-run:
         try {
             for ($i = 0; $i -lt $foreignStagedResetPaths.Count; $i += $resetChunkSize) {
                 $chunk = $foreignStagedResetPaths[$i..([Math]::Min($i + $resetChunkSize, $foreignStagedResetPaths.Count) - 1)]
-                & git reset -q -- $chunk
+                Invoke-WithUtf8Console { & git reset -q -- $chunk }
                 if ($LASTEXITCODE -ne 0) { $resetFailedAt = $i; break }
             }
         } finally { Pop-Location }
@@ -1255,7 +1268,7 @@ Repair it first, then re-run:
         try {
             for ($i = 0; $i -lt $stagePaths.Count; $i += $addChunkSize) {
                 $chunk = $stagePaths[$i..([Math]::Min($i + $addChunkSize, $stagePaths.Count) - 1)]
-                & git add -- $chunk
+                Invoke-WithUtf8Console { & git add -- $chunk }
                 if ($LASTEXITCODE -ne 0) { $addFailedAt = $i; break }
             }
         } finally { Pop-Location }
@@ -1434,7 +1447,7 @@ Repair it first, then re-run:
         Invoke-SafeGitPush -WorkRoot $WorkRoot -Branch $branch
     } else {
         $savedEAP = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-        try { & git push origin $branch 2>&1 | Out-Host; $pushFbExit = $LASTEXITCODE }
+        try { Invoke-WithUtf8Console { & git push origin $branch 2>&1 } | Out-Host; $pushFbExit = $LASTEXITCODE }
         finally { $ErrorActionPreference = $savedEAP }
         if ($pushFbExit -ne 0) {
             Write-Error "ao-close: git push failed (exit $pushFbExit; check auth / network)"
@@ -1472,7 +1485,7 @@ Repair it first, then re-run:
                     "**Session window**: last AO-RESUME -> this close ($autoCloseStamp)",
                     "",
                     "## Done this session (agent: rewrite as the CJK four-section report)",
-                    "- (agent fills: completed since last AO-RESUME)",
+                    "- (agent fills: completed since last AO-CLOSE)",
                     "",
                     "## Not done",
                     "- (agent fills)",
@@ -1506,7 +1519,7 @@ Repair it first, then re-run:
                 # here, self-contained, instead of relying on a later run to pick it up.
                 try {
                     $rptRelPath = "agency-os/reports/ao-close/$rptStamp.md"
-                    git add -- $rptRelPath
+                    Invoke-WithUtf8Console { git add -- $rptRelPath }
                     if ($LASTEXITCODE -ne 0) {
                         Write-Warning "AO-CLOSE: could not stage report skeleton (non-fatal, will remain uncommitted on disk): git add exited $LASTEXITCODE"
                     } else {
@@ -1548,7 +1561,7 @@ Repair it first, then re-run:
                                 $savedSkeletonEAP = $ErrorActionPreference
                                 $ErrorActionPreference = 'Continue'
                                 try {
-                                    & git push origin $branch 2>&1 | Out-Host
+                                    Invoke-WithUtf8Console { & git push origin $branch 2>&1 } | Out-Host
                                     $skeletonPushExit = $LASTEXITCODE
                                 }
                                 finally {

@@ -40,6 +40,8 @@ param(
     [switch]$EnsurePhpIni
 )
 
+# CP950 protection for native stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
@@ -185,28 +187,28 @@ New-Item -ItemType Directory -Path $WpRoot -Force | Out-Null
 
 if (-not (Test-Path -LiteralPath (Join-Path $WpRoot "wp-load.php"))) {
     Write-Host "Downloading WordPress..." -ForegroundColor Cyan
-    & wp core download --path="$WpRoot"
+    Invoke-WithUtf8Console { & wp core download --path="$WpRoot" }
 }
 
 if (-not (Test-Path -LiteralPath (Join-Path $WpRoot "wp-config.php"))) {
     Write-Host "Creating wp-config.php..." -ForegroundColor Cyan
-    & wp config create --path="$WpRoot" --dbname=$DbName --dbuser=root --dbpass= --dbhost=127.0.0.1
+    Invoke-WithUtf8Console { & wp config create --path="$WpRoot" --dbname=$DbName --dbuser=root --dbpass= --dbhost=127.0.0.1 }
 }
 
 # WP / PHP may emit boilerplate warnings to stderr; do not let them stop the script under $ErrorActionPreference Stop.
 $prevEapWp = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 try {
-    $null = & wp core is-installed --path="$WpRoot" 2>&1
+    $null = Invoke-WithUtf8Console { & wp core is-installed --path="$WpRoot" 2>&1 }
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Running wp core install..." -ForegroundColor Cyan
-        $null = & wp core install --path="$WpRoot" --url=http://localhost --title=Pilot --admin_user=admin --admin_password=change-me --admin_email=dev@local.test 2>&1
+        $null = Invoke-WithUtf8Console { & wp core install --path="$WpRoot" --url=http://localhost --title=Pilot --admin_user=admin --admin_password=change-me --admin_email=dev@local.test 2>&1 }
         if ($LASTEXITCODE -ne 0) { throw "wp core install failed (exit $LASTEXITCODE)" }
     } else {
         Write-Host "WordPress already installed at $WpRoot" -ForegroundColor Green
     }
 
-    $siteUrl = (& wp option get siteurl --path="$WpRoot" 2>&1 | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] }) -join ""
+    $siteUrl = (Invoke-WithUtf8Console { & wp option get siteurl --path="$WpRoot" 2>&1 } | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] }) -join ""
 } finally {
     $ErrorActionPreference = $prevEapWp
 }

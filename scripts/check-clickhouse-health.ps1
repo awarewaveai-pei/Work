@@ -94,7 +94,7 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
+. (Join-Path $PSScriptRoot "lib\ssh-deadline.ps1")
 
 $ICON_HEALTHY = [char]::ConvertFromUtf32(0x1F7E2)  # green circle
 $ICON_DRIFT   = [char]::ConvertFromUtf32(0x1F7E1)  # yellow circle
@@ -167,18 +167,17 @@ function Resolve-Root {
 function Invoke-Ssh {
     param([string]$ServerHost, [string]$Command)
     $sshArgs = @(
-        "-o", "BatchMode=yes",
         "-o", "StrictHostKeyChecking=accept-new",
-        "-o", "ConnectTimeout=15",
         "-i", $PrivateKey,
         "-p", "58122",
         ("{0}@{1}" -f $SshUser, $ServerHost),
         $Command
     )
-    $out = Invoke-WithUtf8Console { & ssh @sshArgs 2>&1 }
+    $r = Invoke-SshWithDeadline -SshArgs $sshArgs -DeadlineSec 120 -ConnectTimeoutSec 15
     return @{
-        ExitCode = $LASTEXITCODE
-        Output   = (($out | ForEach-Object { [string]$_ }) -join "`n").Trim()
+        ExitCode = $r.ExitCode
+        Output   = $r.Output
+        TimedOut = $r.TimedOut
     }
 }
 

@@ -17,8 +17,9 @@ function Resolve-WorkRoot {
 }
 
 function Invoke-Schtasks {
-    param([string[]]$Args)
-    $output = & schtasks.exe @Args 2>&1
+    # Not $Args: a declared parameter by that name is shadowed by the automatic $args and binds nothing (PS 5.1).
+    param([string[]]$SchtasksArgs)
+    $output = & schtasks.exe @SchtasksArgs 2>&1
     if ($LASTEXITCODE -ne 0) {
         throw ("schtasks failed: " + ($output | Out-String))
     }
@@ -38,13 +39,13 @@ function New-TaskSafe {
     )
     if ($PreferInteractive) {
         try {
-            Invoke-Schtasks -Args ($BaseArgs + @("/IT")) | Out-Null
+            Invoke-Schtasks -SchtasksArgs ($BaseArgs + @("/IT")) | Out-Null
             return
         } catch {
             Write-Warning "Interactive task registration failed; retrying without /IT."
         }
     }
-    Invoke-Schtasks -Args $BaseArgs | Out-Null
+    Invoke-Schtasks -SchtasksArgs $BaseArgs | Out-Null
 }
 
 function Assert-TaskExists {
@@ -68,7 +69,7 @@ $nameAlert = "AgencyOS-Autopilot-AlertMonitor"
 $nameLogoff = "AgencyOS-Autopilot-LogoffCloseout"
 
 foreach ($n in @($nameStartup, $nameAlert, $nameLogoff)) {
-    try { Invoke-Schtasks -Args @("/Delete", "/F", "/TN", $n) | Out-Null } catch {}
+    try { Invoke-Schtasks -SchtasksArgs @("/Delete", "/F", "/TN", $n) | Out-Null } catch {}
 }
 
 if ($RemoveOnly) {

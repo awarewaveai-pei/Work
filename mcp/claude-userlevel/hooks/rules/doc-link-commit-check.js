@@ -1,7 +1,8 @@
 // PostToolUse Bash: when this call created a commit, tell the agent that made it which markdown
 // links the commit broke. Verdict = validate-doc-integrity.mjs --commit (same resolver and scope as
 // the CI/health doc_integrity gate, judged on the commit's own tree). It cannot block: the commit
-// already exists. It lands while the author still knows what each link meant.
+// already exists. It lands while the author still knows what each link meant. Same moment, same reason:
+// verify-governance-pointers.mjs (section pointers into the rule set), otherwise first seen in CI/AO-CLOSE.
 // Post, not Pre: `git commit --only -- <paths>` (this repo's standard form) bypasses the index, so
 // only the finished commit says what was committed. Why this exists: WORKLOG 2026-09-23 "doc_integrity 紅 16 天".
 const fs = require('fs');
@@ -13,6 +14,7 @@ const RE_GIT_COMMIT = /^(?:sudo\s+)?git\s+(?:-[a-zA-Z0-9-]+\s+|-[a-zA-Z0-9-]+\s+
 // git's success line: "[main 1a2b3c4] subj", "[main (root-commit) 1a2b3c4] ...", "[detached HEAD 1a2b3c4] ...".
 const RE_SUMMARY = /^\[(?:[^\s\]]+|detached HEAD)(?: \(root-commit\))? ([0-9a-f]{7,40})\] /gm;
 const VALIDATOR = 'lobster-factory/scripts/validate-doc-integrity.mjs';
+const POINTERS = 'scripts/verify-governance-pointers.mjs';
 // `git commit -q` (common here: `-q -F <msgfile>`) prints no success line. Fallback: HEAD reflog
 // `commit*` entries this recent. A concurrent session's commit inside the window gets checked
 // too; the report names every sha, so a stray one is visible, not silent.
@@ -41,6 +43,28 @@ function responseText(resp) {
 
 function sh(cmd, args, cwd, timeout) {
   return spawnSync(cmd, args, { cwd, encoding: 'utf8', timeout, windowsHide: true });
+}
+
+// Section pointers into AGENTS.md / appendix (~0.6 s). Run on every commit, not on a guessed list of
+// "citing" files: any file may cite a section. It reads the working tree, so another session's
+// uncommitted edit can show up here; the issue names its file:line either way.
+function governancePointerIssues(root, ctx) {
+  const script = path.join(root, POINTERS);
+  if (!fs.existsSync(script)) return [];
+  const r = sh(process.execPath, [script, `--root=${root}`], root, 30000);
+  if (r.status === 0) return [];
+  if (r.status !== 1) {
+    ctx.shared.logFailOpen('doc-link-commit-check', new Error(`${POINTERS}: exit ${r.status}${r.error ? `, ${r.error.message}` : ''}`));
+    return [];
+  }
+  const issues = String(r.stderr).split('\n').filter((l) => l.trim()).map((l) => `[Hook]   ${l.trim()}`);
+  const [shown, hidden] = ctx.shared.capStderr(issues);
+  return [
+    '[Hook] GOVERNANCE POINTERS: working tree after this commit fails the pointer gate (CI + AO-CLOSE health go red):',
+    ...shown,
+    ...(hidden ? [`[Hook]     ...and ${hidden} more`] : []),
+    `[Hook]   Re-check: node ${POINTERS}`,
+  ];
 }
 
 module.exports = {
@@ -82,6 +106,7 @@ module.exports = {
         `[Hook]   Re-check: node ${VALIDATOR} --commit=<sha>`,
       );
     }
+    out.push(...governancePointerIssues(root, ctx));
     return out.length ? { block: out } : null;
   },
 };

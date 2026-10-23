@@ -14,6 +14,9 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# ssh with keepalive + hard total deadline (scripts/lib/ssh-deadline.ps1).
+. (Join-Path $PSScriptRoot "lib\ssh-deadline.ps1")
+
 function Resolve-AgencyRoot {
     param([string]$InputRoot)
     if ($InputRoot -and (Test-Path -LiteralPath $InputRoot)) { return (Resolve-Path -LiteralPath $InputRoot).Path }
@@ -44,21 +47,14 @@ function Convert-SizeToBytes {
     return 0.0
 }
 
+# Timeout = ExitCode -1 with the deadline note in StdErr, so the callers' "docker ... failed" throw (status ERROR) fires.
 function Invoke-SshCapture {
     param([string]$SshHostValue, [string]$SshUserValue, [string]$KeyPath, [string]$Command)
-    $outPath = [System.IO.Path]::GetTempFileName()
-    $errPath = [System.IO.Path]::GetTempFileName()
-    try {
-        $sshArgs = @("-o","BatchMode=yes","-o","ConnectTimeout=12","-p","58122","-i",$KeyPath,"$SshUserValue@$SshHostValue",$Command)
-        $proc = Start-Process -FilePath "ssh" -ArgumentList $sshArgs -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outPath -RedirectStandardError $errPath
-        return [pscustomobject]@{
-            ExitCode = $proc.ExitCode
-            StdOut = (Get-Content -LiteralPath $outPath -Raw -Encoding UTF8 -ErrorAction SilentlyContinue)
-            StdErr = (Get-Content -LiteralPath $errPath -Raw -Encoding UTF8 -ErrorAction SilentlyContinue)
-        }
-    } finally {
-        Remove-Item -LiteralPath $outPath -Force -ErrorAction SilentlyContinue
-        Remove-Item -LiteralPath $errPath -Force -ErrorAction SilentlyContinue
+    $r = Invoke-SshWithDeadline -SshArgs @("-p", "58122", "-i", $KeyPath, "$SshUserValue@$SshHostValue", $Command) -DeadlineSec 30 -ConnectTimeoutSec 12
+    return [pscustomobject]@{
+        ExitCode = $r.ExitCode
+        StdOut = $r.Stdout
+        StdErr = $r.Stderr
     }
 }
 
