@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-23（續28）修 818d6e781 留在 main 的紅燈：tarot 回 enabled:false，門禁改查「已建門頁」（Claude）
+
+**根因**：續27 把 tarot 設為已開（去 `enabled:false`），`lib/__tests__/middleware-portal-guards.test.ts`「product door nginx block refuses every path the middleware matcher skips」要求已開門有 nginx 區塊 → 紅。續27 只跑 `lib/portal`，漏 `lib/__tests__`。後果：03:00 自動部署的 `sg-deploy.sh:232-234` npm test 閘會擋下整個 next-admin。
+
+**修改**
+- `lib/portal/products.ts`：tarot 回 `enabled: false`（已建、未上線；上線＝enabled＋DNS＋nginx，High）。
+- `lib/portal/__tests__/registry-code.test.ts`：三閘迴圈 `servedNextAdminProducts()` → `builtDoors()`（`app/<page>/page.tsx` 存在即檢查），門頁一建好就受閘，不等上線。
+- `lib/__tests__/middleware-portal-guards.test.ts`：tarot 門用登記列建 `Door` 物件，不靠 `doorForHost`（未上線時解析不到）。
+
+**避免再發生**：部署相關改動收尾一律跑完整 `npx vitest run`（＝部署閘），不只跑子目錄。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（全套，314 files／2868 passed）＋ npx tsc --noEmit -p .（0 error） | exit=0 | ms=180000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回三檔 diff；閘語意由「已開」改「已建」較嚴
+- ORACLE_WAIVED: 修紅燈（狀態回退＋迴圈集合替換），全套測試為證
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=servedNextAdminProducts | hits=5（doors.ts 定義、middleware、middleware-portal-guards nginx 測、doors 相關測；registry-code 已無）
+
+**rollback**：`git revert <本 commit>`（會重回紅燈，勿單獨 revert）。
 ## 2026-10-23（續27）開門規則 R1/R2 機制＋tarot 門頁（ADR 018 §2）；發現客戶被員工角色擋（Claude）
 
 **觸發**：操作者同意階段 1 規則；第一個門改 tarot（閘模擬：tarot ①1/②0/③0，outreach ②2/③1＋路徑衝突＋9 頁）。

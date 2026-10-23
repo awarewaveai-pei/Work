@@ -11,7 +11,8 @@ import { NextRequest } from "next/server";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { isPortalPath, isWrongHostForPortal, isWrongHostForProductPage, isClientOutsideDoor, blockedResponse, middleware, config } from "../../middleware";
-import { doorForHost, servedNextAdminProducts, productHost, type Door } from "@/lib/portal/doors";
+import { doorForHost, servedNextAdminProducts, productHost, type Door, type NextAdminProduct } from "@/lib/portal/doors";
+import { PRODUCTS } from "@/lib/portal/products";
 
 describe("isPortalPath — boundary (mirrors the nginx portal(?:/|$) fix)", () => {
   it.each([
@@ -52,6 +53,12 @@ describe("isClientOutsideDoor", () => {
     expect(isClientOutsideDoor("/portal/launcher", "client", social)).toBe(true);
     expect(isClientOutsideDoor("/api/ops/clients", "client", social)).toBe(true);
     expect(isClientOutsideDoor("/tools/social", "client", social)).toBe(true);
+  });
+  it("on the tarot door a client reaches tarot, the platform APIs, and nothing staff or another product serves", () => {
+    // built but not live yet (enabled: false), so the door is constructed rather than resolved from its host
+    const tarot: Door = { kind: "product", product: PRODUCTS.find((p) => p.key === "tarot") as NextAdminProduct };
+    for (const p of ["/tarot", "/api/tools/tarot/generate", "/api/tools/designs", "/api/entitlements/features"]) expect(isClientOutsideDoor(p, "client", tarot), p).toBe(false);
+    for (const p of ["/api/ops/clients", "/api/tools/studio/generate", "/api/social/posts", "/tools/tarot", "/ops/inbox"]) expect(isClientOutsideDoor(p, "client", tarot), p).toBe(true);
   });
 });
 

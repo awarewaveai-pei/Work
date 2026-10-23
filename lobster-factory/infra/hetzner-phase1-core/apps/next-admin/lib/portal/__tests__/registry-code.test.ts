@@ -10,7 +10,7 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import { BACK_OFFICE_FEATURES } from "../../entitlements/can";
 import { ROUTE_FEATURES } from "../../entitlements/route-features";
-import { PLATFORM_APIS, doorApis, nextAdminProducts, servedNextAdminProducts, type NextAdminProduct } from "../doors";
+import { PLATFORM_APIS, doorApis, nextAdminProducts, type NextAdminProduct } from "../doors";
 import { PRODUCTS, type PortalProduct } from "../products";
 
 const ROOT = path.join(__dirname, "../../..");
@@ -99,6 +99,9 @@ const optional = (p: PortalProduct): readonly string[] => p.modules.optional ?? 
  *  are not in it (pages fetch them; each route authorizes itself). */
 const loginPages = (p: NextAdminProduct) => [`app${p.door.page}/`];
 const allPages = (p: NextAdminProduct) => [...loginPages(p), ...(p.door.anonymous ?? []).map((a) => `app/(public)${a}/`)];
+/** Doors whose page exists, open or not: the gates hold from the day a door page is built, before it goes live
+ *  (going live = enabled + DNS + nginx, middleware-portal-guards.test.ts). */
+const builtDoors = () => nextAdminProducts().filter((p) => existsSync(path.join(ROOT, "app", p.door.page.slice(1), "page.tsx")));
 const isRoute = (f: string) => /\/route\.[cm]?[jt]sx?$/.test(f);
 function doorFiles(roots: readonly string[]): Set<string> {
   return importClosure([...FILES.keys()].filter((f) => roots.some((r) => f.startsWith(r)) && !isRoute(f)));
@@ -180,8 +183,8 @@ describe("registry claims match the code", () => {
   });
 
   // A served door answers only doorApis() (doors.ts routeOnProductDoor); any other call 404s on the door.
-  it("a served door can reach every API its pages call", () => {
-    for (const p of servedNextAdminProducts()) {
+  it("a built door can reach every API its pages call", () => {
+    for (const p of builtDoors()) {
       expect(doorFiles(loginPages(p)).size, `${p.key}: no files under app${p.door.page}`).toBeGreaterThan(0);
       const apis = doorApis(p);
       const unreachable = [...doorFiles(allPages(p))].flatMap((f) => FILES.get(f)!.calls.filter((u) => !apis.some((a) => under(u, a))).map((u) => `${f}: ${u}`));
@@ -192,8 +195,8 @@ describe("registry claims match the code", () => {
   // A signed-in customer on a product door sees only brands they belong to (ADR 018 §1): its pages read through
   // brand-scoped routes, never with the service-role client staff pages use. No-login pages (door.anonymous) are
   // public by declaration and serve published data only, so they are not in scope here.
-  it("a served door's signed-in pages never read with the service-role client", () => {
-    for (const p of servedNextAdminProducts()) {
+  it("a built door's signed-in pages never read with the service-role client", () => {
+    for (const p of builtDoors()) {
       const direct = [...doorFiles(loginPages(p))].filter((f) => FILES.get(f)!.imports.some((r) => r === "lib/supabase-server"));
       expect(direct, `${p.key} door`).toEqual([]);
     }
@@ -205,8 +208,8 @@ describe("registry claims match the code", () => {
   // route's data path (WORKLOG of that door).
   const AUTHORIZERS = ["lib/tenant-guard.ts", "lib/social/authz.ts"];
   const routesUnder = (prefix: string) => [...FILES.keys()].filter((f) => isRoute(f) && f.startsWith(`app${prefix}/`));
-  it("every route a served door serves authorizes its caller", () => {
-    for (const p of servedNextAdminProducts()) {
+  it("every route a built door serves authorizes its caller", () => {
+    for (const p of builtDoors()) {
       const open = [...new Set(doorApis(p).flatMap(routesUnder))].filter((r) => !AUTHORIZERS.some((a) => importClosure([r]).has(a)));
       expect(open, `${p.key} door`).toEqual([]);
     }
