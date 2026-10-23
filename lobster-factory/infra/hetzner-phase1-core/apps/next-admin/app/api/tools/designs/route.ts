@@ -6,7 +6,7 @@ import { getSupabaseReadClient, getSupabaseWriteClient } from "../../../../lib/s
 import { buildDesignKey, isR2Configured, parseImageDataUrl, putDesignObject } from "../../../../lib/storage/r2";
 import { deleteUnreferencedAsset } from "../../../../lib/content/r2-delete-guard";
 import { decodeCursor, listDesigns, type SortOrder, type TimeRange } from "../../../../lib/studio/designs-list";
-import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "../../../../lib/tenant-guard";
+import { effectiveOrgId, assertOrgAccess, OrgAccessError, resolveTenant, toOrgAccessResponse } from "../../../../lib/tenant-guard";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -105,6 +105,12 @@ interface SaveDesignBody {
   subject?: string;
 }
 
+/** Who saved or deletes: a customer is the user middleware authenticated (x-ops-user-id), never a body field; staff keep
+ *  the advisory body value. */
+function actorUserIdOf(request: Request, claimed: string | undefined): string | null {
+  return resolveTenant(request).userKind === "client" ? request.headers.get("x-ops-user-id")?.trim() || null : claimed ?? null;
+}
+
 /** Keep only clean string tags, trim, drop blanks, cap count + length (defensive against junk). */
 function sanitizeStyleTags(tags: unknown): string[] {
   if (!Array.isArray(tags)) return [];
@@ -161,6 +167,9 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+    // The data URL prefix is only a label: the bytes must decode as an image, or the bucket hosts arbitrary files.
+    try { await sharp(p.buffer).metadata(); }
+    catch { return NextResponse.json({ ok: false, error: "image must be a png/jpeg/webp base64 data URL" }, { status: 400 }); }
     parsed = p;
   }
   let organizationId: string | null;
@@ -172,7 +181,8 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  if (body.actorUserId && !isUuid(body.actorUserId)) {
+  const actorUserId = actorUserIdOf(request, body.actorUserId);
+  if (actorUserId && !isUuid(actorUserId)) {
     return NextResponse.json({ ok: false, error: "actorUserId must be a UUID when provided" }, { status: 400 });
   }
 
@@ -218,8 +228,8 @@ export async function POST(request: Request) {
       mime_type: parsed.mime,
       byte_size: uploaded.byteSize,
       checksum_sha256: uploaded.checksumSha256,
-      // Advisory only — caller-supplied, validated as UUID shape but not authenticated.
-      created_by: body.actorUserId ?? null,
+      // Customers: the authenticated user. Staff: advisory, caller-supplied, validated as UUID shape only.
+      created_by: actorUserId,
       metadata: {
         source: body.source ?? "pod-studio",
         prompt: body.prompt ?? null,
@@ -245,7 +255,7 @@ export async function POST(request: Request) {
 
   const { error: auditError } = await supabase.from("ops_audit_events").insert({
     organization_id: organizationId,
-    actor_user_id: body.actorUserId ?? null,
+    actor_user_id: actorUserId,
     actor_role: resolved.role,
     event_type: "design_asset_saved",
     target_type: "media_assets",
@@ -290,7 +300,7 @@ export async function DELETE(request: Request) {
   // Fetch the asset to get object_key + mime_type before deleting.
   const { data: asset, error: fetchErr } = await supabase
     .from("media_assets")
-    .select("id,object_key,mime_type,organization_id,metadata")
+    .select("id,object_key,mime_type,organization_id,created_by,metadata")
     .eq("id", assetId)
     .eq("storage_backend", "r2")
     .eq("asset_domain", "ai_generated")
@@ -301,6 +311,11 @@ export async function DELETE(request: Request) {
   }
   try { assertOrgAccess(request, (asset as Record<string, unknown>).organization_id as string | null); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+  // A customer deletes only what it saved itself; staff-made assets (managed service) stay.
+  if (resolveTenant(request).userKind === "client") {
+    const own = actorUserIdOf(request, undefined);
+    if (!own || (asset as Record<string, unknown>).created_by !== own) return NextResponse.json({ ok: false, error: "not_your_asset" }, { status: 403 });
+  }
 
   // A file still shown by a WordPress post/page is refused and the row stays (r2-delete-guard.ts picks the bucket
   // from the key: video/ and remotion/ -> R2_VIDEO_BUCKET, designs/ captions/ web/ -> R2_DESIGNS_BUCKET).

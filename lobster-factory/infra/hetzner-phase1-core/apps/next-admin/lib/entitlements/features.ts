@@ -1,5 +1,5 @@
 import { sign } from "node:crypto";
-import { verdictOf, type EntitlementMode, type GateDependencies, type Subject } from "./can";
+import { modeFor, verdictOf, type EntitlementMode, type GateDependencies, type Subject } from "./can";
 import { canonicalize } from "./permit";
 import { routeFeatureKeys } from "./route-features";
 
@@ -25,7 +25,7 @@ export const resetFeatureListCache = () => cache.clear();
 
 export async function featureList(subject: Subject, actor: string, d: GateDependencies, keys: readonly string[] = [...routeFeatureKeys()].sort(),
   now = Math.floor(Date.now() / 1000)): Promise<SignedFeatureList> {
-  const mode = d.mode();
+  const mode = modeFor(d, actor);
   const cacheKey = `${subject.orgId}|${mode}|${keys.join(",")}`;
   const hit = cache.get(cacheKey);
   if (hit && hit.until > now) return hit.value;

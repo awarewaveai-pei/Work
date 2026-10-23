@@ -58,7 +58,9 @@ export const resetSubjectCache = () => { internalCache = null; };
 export async function resolveSubject(hint: SubjectHint = {}, store?: SubjectStore): Promise<Subject> {
   const s = store ?? supabaseSubjectStore();
   const tenant = hint.req ? resolveTenant(hint.req) : null;
-  const named = hint.orgId ?? hint.brandId ?? (tenant?.userKind === "client" ? tenant.orgId : null);
+  // A client with no organization binding must not fall through to the internal account below.
+  if (tenant?.userKind === "client" && !tenant.orgId) throw new Error("client_without_org");
+  const named =hint.orgId ?? hint.brandId ?? (tenant?.userKind === "client" ? tenant.orgId : null);
   let row: OrgRow | null;
   if (named) row = await s.byId(named);
   else if (hint.slug) row = await s.bySlug(hint.slug);

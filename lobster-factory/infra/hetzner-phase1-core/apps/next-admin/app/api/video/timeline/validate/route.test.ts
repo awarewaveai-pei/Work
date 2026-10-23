@@ -51,13 +51,19 @@ describe("POST /api/video/timeline/validate", () => {
     expect(response.status).toBe(200);
   });
 
-  it("rejects an unbound client Timeline", async () => {
+  it("rejects a client's Timeline bound to another organization", async () => {
     const response = await POST(request(
       { timeline: validTimeline },
-      { "x-ops-claims-role": "operator", "x-ops-user-kind": "client" },
+      { "x-ops-user-kind": "client", "x-ops-org-id": "123e4567-e89b-42d3-a456-426614174999" },
     ));
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({ ok: false, error: "forbidden: org mismatch" });
+  });
+
+  it("refuses a client with no organization binding before reading Timeline content", async () => {
+    const response = await POST(request({ timeline: validTimeline }, { "x-ops-claims-role": "operator", "x-ops-user-kind": "client" }));
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ ok: false, error: "forbidden" });
   });
 
   it("blocks a viewer before reading Timeline content", async () => {

@@ -17,6 +17,7 @@ export const ROUTE_FEATURES: Readonly<Record<string, string>> = {
   "/api/tools/presets": "design.edit",
   "/api/tools/script-forge": "video.script",
   "/api/tools/studio/generate": "studio.image",
+  "/api/tools/tarot/batch": "tarot.image",
   "/api/tools/tarot/generate": "tarot.image",
   "/api/tools/tarot/suggest-prompt": "tarot.prompt",
   "/api/tools/tarot/translate": "tarot.prompt",

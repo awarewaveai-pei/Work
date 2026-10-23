@@ -67,6 +67,12 @@ export function entitlementMode(env: Record<string, string | undefined> = proces
   return env.ENTITLEMENT_MODE === "enforce" ? "enforce" : "shadow";
 }
 
+/** Shadow mode covers AwareWave staff during rollout. A customer acting for itself (requestActor `client:<org>...`)
+ *  always gets the real verdict, the debit and fail-closed errors: shadow would otherwise hand it unbought paid features. */
+export function modeFor(d: Pick<GateDependencies, "mode">, actor: string): EntitlementMode {
+  return actor.startsWith("client:") ? "enforce" : d.mode();
+}
+
 /** Billing account (root of the org tree). `unresolved` only appears on infrastructure-error grants. */
 export interface Subject { orgId: string; kind: "internal" | "customer" | "unresolved" }
 export interface Usage { units?: number; idempotencyKey?: string; meta?: Record<string, JsonValue> }
@@ -116,7 +122,7 @@ export class Grant {
     const units = usage.units ?? 0;
     try {
       // Shadow never debits, including an allowed verdict (ADR 017 §4): only enforce moves money.
-      if (this.info.source === "credits" && this.deps.mode() === "enforce" && units > 0) {
+      if (this.info.source === "credits" && modeFor(this.deps, this.actor) === "enforce" && units > 0) {
         if (this.info.maxSpend !== null && units > this.info.maxSpend) throw new EntitlementRequired("exceeds_max_spend");
         if (!usage.idempotencyKey) throw new EntitlementRequired("idempotency_key_required");
         const ok = await this.deps.debit({ orgId: this.subject.orgId, units, idempotencyKey: usage.idempotencyKey, featureKey: this.featureKey });
@@ -124,7 +130,7 @@ export class Grant {
       }
     } catch (e) {
       // Shadow never breaks the caller; enforce surfaces a failed debit.
-      if (this.deps.mode() === "enforce") throw e;
+      if (modeFor(this.deps, this.actor) === "enforce") throw e;
       console.warn(`[entitlement] report failed (shadow): ${String(e)}`);
     }
     await safeAudit(this.deps, { event: "entitlement.usage", subject: this.subject, featureKey: this.featureKey, actor: this.actor, payload: { units, source: this.info.source, shadow: this.shadow, ...(usage.meta ?? {}) } });
@@ -173,7 +179,7 @@ function mint(d: GateDependencies, subject: Subject, featureKey: string, actor: 
 
 /** A refusal decided before `can()` could run (e.g. naming an org without AuthorizedOrg): same shadow/enforce rule. */
 export async function refuseBeforeVerdict(featureKey: string, actor: string, reason: string, d: GateDependencies, subject: Subject = { orgId: "unresolved", kind: "unresolved" }): Promise<Grant> {
-  if (d.mode() === "enforce") return mint(d, subject, featureKey, actor, { ok: false, reason });
+  if (modeFor(d, actor) === "enforce") return mint(d, subject, featureKey, actor, { ok: false, reason });
   await safeAudit(d, { event: "entitlement.would_deny", subject, featureKey, actor, payload: { reason } });
   return mint(d, subject, featureKey, actor, { ok: "shadow", reason });
 }
@@ -181,7 +187,7 @@ export async function refuseBeforeVerdict(featureKey: string, actor: string, rea
 /** Infrastructure failure before a verdict existed (subject lookup, DB, keys): shadow logs and allows, enforce refuses. */
 export async function gateFailure(featureKey: string, actor: string, error: unknown, d: GateDependencies, subject: Subject = { orgId: "unresolved", kind: "unresolved" }): Promise<Grant> {
   const reason = "infrastructure_error";
-  if (d.mode() === "enforce") return mint(d, subject, featureKey, actor, { ok: false, reason });
+  if (modeFor(d, actor) === "enforce") return mint(d, subject, featureKey, actor, { ok: false, reason });
   await safeAudit(d, { event: "entitlement.infra_error", subject, featureKey, actor, payload: { reason, error: String(error).slice(0, 200) } });
   return mint(d, subject, featureKey, actor, { ok: "shadow", reason });
 }
@@ -194,7 +200,7 @@ export async function can(subject: Subject, featureKey: string, actor: string, d
   } catch (error) {
     return gateFailure(featureKey, actor, error, d, subject);
   }
-  if (verdict.ok === true || d.mode() === "enforce") return mint(d, subject, featureKey, actor, verdict);
+  if (verdict.ok === true || modeFor(d, actor) === "enforce") return mint(d, subject, featureKey, actor, verdict);
   await safeAudit(d, { event: "entitlement.would_deny", subject, featureKey, actor, payload: { reason: verdict.reason } });
   return mint(d, subject, featureKey, actor, { ok: "shadow", reason: verdict.reason });
 }

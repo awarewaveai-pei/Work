@@ -1,4 +1,32 @@
 # Worklog
+## 2026-10-23（續29）客戶在產品門上取得產品使用權（方案 B）＋兩審查 4 項修正（Claude）
+
+**觸發**：操作者選方案 B。根因：客戶帳號無 `ops_role`（`lib/accounts/client-invite.ts:146`）→ viewer（`middleware.ts:102-108`）→ `canCreateAiImageJob`（95 呼叫點）擋客戶 → 除 social 外所有門對客戶 403。
+
+**修改**
+- `lib/ops-role.ts`：客戶身分先判；有組織 → `CLIENT_PRODUCT_ROLE`（operator）、無組織 → viewer；source `client`；不再讀客戶 claims（客戶拿不到 owner/admin）。
+- `lib/tenant-guard.ts`：`userKindOf(headers)`（精確 `"client"`），`resolveTenant` 與 `resolveOpsRole` 共用。
+- `lib/entitlements/can.ts` `modeFor(d, actor)`：`client:` 操作者一律 enforce（判決、扣點、扣點失敗、infra 錯誤、拒絕），員工照 `ENTITLEMENT_MODE`；`features.ts` 同用。
+- `lib/entitlements/subject.ts`：客戶無組織 → `client_without_org`，不落到 internal。
+- tarot 批次：POST 包 `withFeature("tarot.image")`（`route-features.ts` 登記）；每卡 `grantFor("tarot.image", { orgId: job.organizationId })`。`POD_DESIGNS_DEFAULT_ORG_ID` prod＝awarewave-ops（internal），員工批次計費不變。
+- `/api/tools/designs`：客戶 `created_by`／`actor_user_id` 取 `x-ops-user-id`（忽略 body）；客戶只刪自己存的；base64 存檔須 sharp 可解碼。
+- `cards/step-8.md`：每門開前核付費路由計費歸屬與客戶寫刪範圍；outreach `canManageOutreach` 不分租戶須先補。
+
+**審查**
+- critic（Deep）：0c/0h/1m/1l。M1 tarot 批次記 internal、L1 designs 偽造身分＋可刪員工資產＋任意位元組 → 皆修。建議：userKindOf 註解位置與措辭 → 改；登錄 L1 POST 計費 → 未做（存檔非付費 AI，已限圖片與 9MB、限本組織）。
+- Codex `agency-os/reports/oracle/2026-10-23-partialreview-2a9080b1.md`：F1 無組織客戶落 internal、F2 影子模式讓客戶免費用付費功能 → 皆修。
+- prod 唯讀：客戶登入帳號僅 1（soulful-expression，有 0118 全產品合約）→ F2 修正今日不擋任何人；無「無組織」客戶帳號。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（全套 315 files／2877 passed）＋ npx tsc --noEmit -p .（0） | exit=0 | ms=200000
+- 突變：拔 `modeFor` 客戶分支 → can/features 兩測紅；拔 designs 刪除守衛 → 紅；拔身分取標頭 → 紅；卡片計費去 orgId → 紅；皆還原綠。
+- 連帶：`app/api/video/timeline/validate/route.test.ts` 原以「無組織客戶」測組織不符，改為「綁他組織」測組織不符＋新增「無組織先被角色擋」，兩路徑皆覆蓋。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/1n -- critic M1＋Codex F1／F2 皆修並各有突變證據；critic L1 修
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=\.mode\(\)|grantFor\("tarot.image"\)|body.actorUserId | hits=3（can.ts modeFor 內唯一 d.mode()、card route 已帶 orgId、designs 僅員工分支）
+
+**剩餘**：客戶自助扣點以 `DEFAULT_CREDIT_POLICY` 佔位價計（定價待操作者，第 4 項前）；今日無客戶有錢包。cognitive 等外部服務的 `<product>:<id>` 操作者仍走影子模式。
+
+**rollback**：`git revert <本 commit>`；無資料、無設定改動。
 ## 2026-10-23（續28）修 818d6e781 留在 main 的紅燈：tarot 回 enabled:false，門禁改查「已建門頁」（Claude）
 
 **根因**：續27 把 tarot 設為已開（去 `enabled:false`），`lib/__tests__/middleware-portal-guards.test.ts`「product door nginx block refuses every path the middleware matcher skips」要求已開門有 nginx 區塊 → 紅。續27 只跑 `lib/portal`，漏 `lib/__tests__`。後果：03:00 自動部署的 `sg-deploy.sh:232-234` npm test 閘會擋下整個 next-admin。

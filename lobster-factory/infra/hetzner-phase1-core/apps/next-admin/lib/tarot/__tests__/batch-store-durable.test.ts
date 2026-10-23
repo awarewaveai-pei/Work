@@ -6,14 +6,17 @@ import { randomUUID } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createFakeBatchDb } from "./fake-batch-db";
 
-const h = vi.hoisted(() => ({ client: null as unknown, gen: vi.fn() }));
+const h = vi.hoisted(() => ({ client: null as unknown, gen: vi.fn(), grantFor: vi.fn(async () => ({})) }));
 
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => h.client }));
 vi.mock("@/lib/tarot/image-gen", async (orig) => ({
   ...(await orig<typeof import("@/lib/tarot/image-gen")>()),
   generateTarotImage: h.gen,
 }));
-vi.mock("@/lib/entitlements/grant", () => ({ grantFor: async () => ({}) }));
+vi.mock("@/lib/entitlements/grant", () => ({
+  grantFor: h.grantFor,
+  withFeature: (_key: string, handler: (req: Request, grant: unknown) => Promise<Response>) => (req: Request) => handler(req, {}),
+}));
 vi.mock("@/lib/storage/r2", async (orig) => ({
   ...(await orig<typeof import("@/lib/storage/r2")>()),
   isR2Configured: () => true,
@@ -72,6 +75,16 @@ describe("tarot batch store: rows, not memory", () => {
     const { job } = await (await status(...staffGet(jobId))).json();
     expect(job).toMatchObject({ completedCards: 1, failedCards: 0, status: "running" });
     expect(job.results).toHaveLength(1);
+  });
+
+  it("each card is billed to the organization that owns the job, not the internal account", async () => {
+    const { store, card, start } = await routes();
+    const jobId = randomUUID();
+    await store.createJob({ jobId, organizationId: ORG_B, createdBy: null, model: "flux-schnell", aspectRatio: "2:3", totalCards: 1 });
+    await start(new Request("http://x", { method: "POST", headers: { authorization: `Bearer ${SECRET}` } }), { params: Promise.resolve({ jobId }) });
+    h.grantFor.mockClear();
+    await card(...internal(jobId, card0));
+    expect(h.grantFor).toHaveBeenCalledWith("tarot.image", { orgId: ORG_B });
   });
 
   it("a job past its deadline reports timed out, not running", async () => {

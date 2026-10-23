@@ -12,6 +12,7 @@
 - 上線一個門＝DNS、憑證 SAN、主機 nginx、lobster-nginx 區塊（照 social 2026-10-15 的 WORKLOG 續30 做法），High，逐產品要 go。
 - 員工門產品目錄 `/ops/products`（原卡 `task_86d6f772` 併入本項，2026-10-23）：只讀 `products.ts` 列出每個產品的門、status、features；三軸與五種的正本只留 ADR 017 §0，不建 `customer-model.ts`（兩份會互相矛盾）。
 - 開門規則（2026-10-23 操作者同意，正本 ADR 018 §2「開門規則」1–3）：API 範圍＝自身＋`dependsOn`＋`PLATFORM_APIS`；資料以組織為界、登入門頁不用 service role、門可呼叫的路由皆授權；多頁產品用 `door.nav`。上方 1.「抽成 `lib/<key>/ui`」改為沿用員工頁原元件（social 先例），伺服器端讀全客戶資料的頁才拆。
+- 客戶身分在 `resolveOpsRole` 固定為 operator（2026-10-23，操作者選方案 B）：開每個門前逐條核對它的路由——付費工作要向請求者的組織計費（tarot 批次曾記到 internal，已修）、客戶可寫可刪的資料限本人或本組織；outreach 的 `canManageOutreach` 本身不分租戶（`lib/ops-role.ts` Cold Outreach 段），開門前必須補組織過濾。
 - 階段 0 已做 `e8f13684d`：門禁 ①（API 可達）②（不用 service role）、`ProductDoorShell`、`/ops/products`。
 - 不做：不重寫業務邏輯、不搬資料表、不改 API 前綴。
 

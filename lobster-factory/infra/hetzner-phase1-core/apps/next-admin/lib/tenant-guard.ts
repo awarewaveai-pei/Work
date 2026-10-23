@@ -24,6 +24,12 @@ const HEADER_USER_KIND = "x-ops-user-kind";
 const HEADER_ORG_ID = "x-ops-org-id";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** Client or staff, as middleware set it: shared by resolveTenant and lib/ops-role.ts resolveOpsRole so a caller's
+ *  role and tenant never disagree. Absent or any other value reads as staff (see resolveTenant below). */
+export function userKindOf(headers: Headers): UserKind {
+  return headers.get(HEADER_USER_KIND) === "client" ? "client" : "staff";
+}
+
 /**
  * Parse the tenant context from request headers set by middleware.
  *
@@ -41,7 +47,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export function resolveTenant(req: Request | { headers: Headers }): TenantContext {
   const headers = req instanceof Request ? req.headers : req.headers;
   const rawKind = headers.get(HEADER_USER_KIND) ?? "";
-  const userKind: UserKind = rawKind === "client" ? "client" : "staff";
+  const userKind = userKindOf(headers);
   const rawOrg = headers.get(HEADER_ORG_ID) ?? "";
   const orgId = rawOrg.trim() || null;
 

@@ -17,9 +17,14 @@ describe("the usable-features list that greys paid buttons (ADR 017 §4)", () =>
     expect(audit).not.toHaveBeenCalled();
   });
 
-  it("shadow greys nothing but still carries the real verdict", async () => {
-    const { list } = await featureList(CUSTOMER, "client:x:u", gateFixture({ mode: "shadow", entitlement: null }).deps, KEYS);
-    expect(list.features["social.dispatch"]).toEqual({ allowed: true, verdict: false, reason: "no_entitlement" });
+  it("shadow greys nothing for staff but still carries the real verdict; a customer sees the real state", async () => {
+    resetFeatureListCache();
+    const staff = await featureList(CUSTOMER, "ops:operator:u", gateFixture({ mode: "shadow", entitlement: null }).deps, KEYS);
+    expect(staff.list.features["social.dispatch"]).toEqual({ allowed: true, verdict: false, reason: "no_entitlement" });
+    resetFeatureListCache();
+    const customer = await featureList(CUSTOMER, "client:x:u", gateFixture({ mode: "shadow", entitlement: null }).deps, KEYS);
+    expect(customer.list).toMatchObject({ mode: "enforce" });
+    expect(customer.list.features["social.dispatch"]).toEqual({ allowed: false, verdict: false, reason: "no_entitlement" });
   });
 
   it("is signed with the permit key and kept for five minutes", async () => {

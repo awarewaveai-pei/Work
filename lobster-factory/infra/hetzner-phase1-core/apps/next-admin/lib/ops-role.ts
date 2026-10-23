@@ -1,8 +1,14 @@
 import type { OpsRole } from "./ops-contracts";
+import { resolveTenant, userKindOf } from "./tenant-guard";
 
 const SIMULATED_ROLE_HEADER = "x-ops-simulated-role";
 const CLAIMS_ROLE_HEADERS = ["x-ops-claims-role", "x-user-role", "x-clerk-role"] as const;
-type RoleSource = "claims" | "simulated" | "default_viewer";
+type RoleSource = "claims" | "simulated" | "default_viewer" | "client";
+
+// A customer (x-ops-user-kind: client, set only by middleware) never holds a staff role, whatever its claims say. On its
+// product door it uses the product as an operator would: middleware keeps it to that door's paths (isClientOutsideDoor),
+// lib/tenant-guard pins its organization, and can() bills it (ADR 018 §2 開門規則 2).
+export const CLIENT_PRODUCT_ROLE: OpsRole = "operator";
 
 function toRole(value: string | null | undefined): OpsRole | null {
   const raw = value?.trim().toLowerCase();
@@ -40,6 +46,8 @@ export function readClaimsRole(request: Request): OpsRole | null {
 }
 
 export function resolveOpsRole(request: Request): { role: OpsRole; source: RoleSource } {
+  // A client with no organization binding is misconfigured: it gets nothing (tenant-guard effectiveOrgId refuses it too).
+  if (userKindOf(request.headers) === "client") return { role: resolveTenant(request).orgId ? CLIENT_PRODUCT_ROLE : "viewer", source: "client" };
   const claimsRole = readClaimsRole(request);
   if (claimsRole) return { role: claimsRole, source: "claims" };
 

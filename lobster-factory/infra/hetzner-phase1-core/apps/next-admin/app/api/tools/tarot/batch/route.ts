@@ -8,6 +8,7 @@ import { fetchTriggerRunStatus } from "../../../../../lib/tarot/batch-run-status
 import { isTarotModel, isAspectRatio } from "../../../../../lib/tarot/image-gen";
 import { isR2Configured } from "../../../../../lib/storage/r2";
 import { effectiveOrgId, OrgAccessError, resolveTenant, toOrgAccessResponse } from "../../../../../lib/tenant-guard";
+import { withFeature } from "@/lib/entitlements/grant";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,7 +22,11 @@ function storeUnavailable(e: unknown): Response | null {
   return NextResponse.json({ ok: false, error: "batch_store_unavailable" }, { status: 503 });
 }
 
-export async function POST(req: Request): Promise<Response> {
+// The buyer is checked here, before any card starts; each card is then billed to the job's organization
+// (app/api/internal/tarot/batch/[jobId]/card/route.ts).
+export const POST = withFeature("tarot.image", handlePost);
+
+async function handlePost(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) {
     return NextResponse.json({ ok: false, error: "forbidden_role" }, { status: 403 });

@@ -150,6 +150,18 @@ describe("can() — shadow mode (ADR 017 §4)", () => {
     await expect(grant.report({ units: 1 })).resolves.toBeUndefined();
   });
 
+  it("a customer acting for itself gets the real verdict, the debit and a refused infrastructure error; staff stay shadowed", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const SELF = `client:${CUSTOMER.orgId}:user-1`;
+    expect(await can(CUSTOMER, "social.dispatch", SELF, gateFixture({ mode: "shadow", entitlement: null }).deps)).toMatchObject({ allowed: false, shadow: false, reason: "no_entitlement" });
+    expect(await can(CUSTOMER, "social.dispatch", ACTOR, gateFixture({ mode: "shadow", entitlement: null }).deps)).toMatchObject({ allowed: true, shadow: true });
+    const funded = gateFixture({ mode: "shadow", balance: 50 });
+    await (await can(CUSTOMER, "social.rewrite", SELF, funded.deps)).report({ units: 2, idempotencyKey: "idem-key-0009" });
+    expect(funded.debit).toHaveBeenCalledWith(expect.objectContaining({ orgId: CUSTOMER.orgId, units: 2 }));
+    const storeError = new Error("db down");
+    expect((await can(CUSTOMER, "social.dispatch", SELF, gateFixture({ mode: "shadow", storeError }).deps)).allowed).toBe(false);
+  });
+
   it("an unset ENTITLEMENT_MODE is shadow; only the exact word enforce enforces", () => {
     expect(entitlementMode({})).toBe("shadow");
     expect(entitlementMode({ ENTITLEMENT_MODE: "shadow" })).toBe("shadow");
@@ -177,6 +189,10 @@ describe("subject resolution (one rule)", () => {
   it("a client session bills its own org tree", async () => {
     const client = req({ "x-ops-user-kind": "client", "x-ops-org-id": "brand" });
     expect(await resolveSubject({ req: client }, store)).toEqual({ orgId: "root", kind: "customer" });
+  });
+
+  it("a client session with no organization fails instead of billing the internal account", async () => {
+    await expect(resolveSubject({ req: req({ "x-ops-user-kind": "client" }) }, store)).rejects.toThrow("client_without_org");
   });
 
   it("an unknown org fails (never silently falls back to internal)", async () => {

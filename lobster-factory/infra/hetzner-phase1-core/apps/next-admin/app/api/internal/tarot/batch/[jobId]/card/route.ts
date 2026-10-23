@@ -88,7 +88,7 @@ export async function POST(
       return NextResponse.json({ ok: false, error: "quota_exceeded", code: "quota_exceeded" }, { status: 429 });
     }
 
-    const result = await generateTarotImage({ model, prompt, aspectRatio, seed, printQuality: true }, await grantFor("tarot.image"));
+    const result = await generateTarotImage({ model, prompt, aspectRatio, seed, printQuality: true }, await grantFor("tarot.image", job.organizationId ? { orgId: job.organizationId } : {}));
     if (!result.ok) {
       const errMsg = (result as { ok: false; error: string }).error;
       outcome = { error: errMsg };

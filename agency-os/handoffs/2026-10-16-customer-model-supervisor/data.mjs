@@ -47,7 +47,7 @@ export const PRIORITY = [
 // 接下來的實際順序（2026-10-23 依 prod 現況排；證據在 NOW 與各卡）。steps＝相關步驟；每個未完成步驟至少出現一次（check 擋）。
 export const NEXT = [
   { h: '① 翻強制模式（等條件）', t: '權利已就位：點數功能先認權利列，自用、EdD、Soulful 每天自動補齊（2026-10-23 部署）。10/31 自動檢查 7 天「若強制就拒」，為零或都已解釋後，請你同意再翻（High）。', steps: [3] },
-  { h: '② 每個產品自己的門', t: '規則已定（ADR 018 §2），產品目錄已做。依缺口由少到多：tarot（門頁已做，待解客戶角色）→ cs → collect → studio → video → design → content → outreach（員工路由要先搬到 tools/outreach）。每個門上線是 High。', steps: [8] },
+  { h: '② 每個產品自己的門', t: '規則已定（ADR 018 §2），產品目錄已做。依缺口由少到多：tarot（門頁已做，待上線）→ cs → collect → studio → video → design → content → outreach（員工路由要先搬到 tools/outreach）。每個門上線是 High。', steps: [8] },
   { h: '③ WordPress 一鍵登入產品門', t: '付款開通的前提：付了錢的人要能從 aware-wave.com 進產品門（ADR 015 順序 1），所以排在門做好之後。目前未實作；動到身分驗證，屬 High。', steps: [4] },
   { h: '④ 付款後自動開通', t: '待決 1、3 回覆後開工。兩題要問金流商與會計師，費時，建議現在就問。', steps: [4] },
   { h: '⑤ 買斷安裝', t: '付款開通完成、待決 2 律師回覆後開工。', steps: [5] },
@@ -102,7 +102,7 @@ export const NOW = [
   { what: '已有付費客戶', state: 'no', ev: 'Soulful 代操合約已登記（全產品，0118）；自助付費 0：plans、錢包帳本皆 0 筆，Woo 尚未販售' },
   { what: '買斷', state: 'no', ev: '授權檔與模組清單未建；provision/ 只有一鍵架站（provisionClient.ts）' },
   { what: '許可判斷', state: 'yes', ev: '每個收費點只問 can()（e87de9225），影子模式（ENTITLEMENT_MODE 未設，can.ts:63）：照算判決並記錄，一律放行、不扣點。點數功能先認權利列（b3df190e9）；自用、EdD 免費與 Soulful 全產品合約每天自動補齊（0118），已部署；翻強制待 10/31 自動檢查與你同意；每功能扣幾點待你定價' },
-  { what: '產品自己的門', state: 'no', ev: 'social 已上線；tarot 門頁已做、尚未上線；客戶帳號沒有員工角色，tarot 路由的員工角色檢查（ops-role.ts:68）會擋客戶，待定修法；其餘 7 個未開。開門規則與三道機械閘見 ADR 018 §2；登記表 11 個產品仍是 coming_soon' },
+  { what: '產品自己的門', state: 'no', ev: 'social 已上線；tarot 門頁已做、尚未上線；客戶在門上取得產品使用權（resolveOpsRole，2026-10-23），tarot 批次已改向客戶組織計費；其餘 7 個未開。開門規則與三道機械閘見 ADR 018 §2；登記表 11 個產品仍是 coming_soon' },
 ];
 
 // ADR 017「順序」。status: not_started | in_progress | done；done 必填 commit。
