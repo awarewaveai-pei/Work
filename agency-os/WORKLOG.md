@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-23（續43）/ops/costs 分頁照財務邏輯排序（Claude）
+
+**觸發**：操作者：「tabs 你不知道要按財務邏輯排順序嗎?」
+
+**根因**：續41 把新的月報接在最後（⑥），沿用舊順序（真實花費→費率表→試算→模型→流水帳）——總表在最後、明細和總數被參考資料隔開。
+
+**修改**
+- `app/(shell)/ops/costs/CostsTabs.tsx`：① 月報 → ② 真實花費 → ③ 流水帳 → ④ 費率表 → ⑤ 月費試算 → ⑥ AI 模型（先期間總表，再實際花費與明細，再參考單價、預估、選型）；預設開月報。頁內交叉引用改用名稱不帶編號，之後再排序不會過時。
+- `page.tsx` 副標同順序；`spend-report.ts`／測試註解改名稱。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit（0）＋ npx vitest run lib/ai（43 passed）＋ preview next-admin-verify /ops/costs 開在 ① 月報、分頁順序如上 | exit=0 | ms=3000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 只動分頁陣列順序、預設值與文字；讀回 diff
+- ORACLE_WAIVED: 只改顯示順序與文字，無邏輯；邏輯部分已由續41 Codex partialreview-5a73acfe 審過
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=⑤ 流水帳|⑥ 月報|① 真實花費 | hits=0
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-23（續42）五個客戶套三軸五對象演練：真判斷跑 prod 現況＋補三個缺的方式（Claude）
 
 **觸發**：操作者「你把目前的五個客戶名單設成三軸5對象來演練測試，如果不夠在自己增加」。

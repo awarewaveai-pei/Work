@@ -16,7 +16,7 @@ function row(p: Partial<SpendRow>): SpendRow {
   };
 }
 
-// Shape of prod on 2026-10-23: tarot images carry a job_id (the only rows ⑤ used to show), cs text does not.
+// Shape of prod on 2026-10-23: tarot images carry a job_id (the only rows 流水帳 used to show), cs text does not.
 const rows: SpendRow[] = [
   row({ route: "tools/tarot/generate", kind: "image", tool: "tarot", job_id: "job-a", cost_usd: "0.003", model: "flux-schnell", vendor: "Replicate", input_tokens: 0, output_tokens: 0 }),
   row({ route: "tools/tarot/generate", kind: "image", tool: "tarot", job_id: "job-a", cost_usd: "0.003", model: "flux-schnell", vendor: "Replicate", input_tokens: 0, output_tokens: 0 }),

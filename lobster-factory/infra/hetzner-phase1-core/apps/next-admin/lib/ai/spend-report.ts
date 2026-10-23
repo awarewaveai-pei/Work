@@ -1,5 +1,5 @@
 /**
- * Spend report SSOT — every money figure on /ops/costs (① 真實花費, ⑤ 流水帳, ⑥ 月報) is computed
+ * Spend report SSOT — every money figure on /ops/costs (月報, 真實花費, 流水帳) is computed
  * here from ONE row set: `ai_call_logs`. Pure functions only; loading lives in spend-loader.ts.
  *
  * Invariant (spend-report.test.ts): every row lands in exactly one bucket of every breakdown and in

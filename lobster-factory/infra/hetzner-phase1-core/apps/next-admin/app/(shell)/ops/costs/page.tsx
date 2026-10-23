@@ -1,6 +1,6 @@
 // /ops/costs — AI & 工具成本
 // Server component: loads ai_call_logs ONCE and derives every money figure from those rows through
-// lib/ai/spend-report.ts, so ① 真實花費, ⑤ 流水帳 and ⑥ 月報 cannot disagree. UI lives in CostsTabs.
+// lib/ai/spend-report.ts, so 月報, 真實花費 and 流水帳 cannot disagree. UI lives in CostsTabs.
 
 import Link from "next/link";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
@@ -15,10 +15,10 @@ import { CostsTabs, type CostsData } from "./CostsTabs";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "AI & 工具成本 · Ops" };
 
-/** ① and ⑤ share this window; ⑥ covers the current Taipei month plus the 11 before it. */
+/** 真實花費 and 流水帳 share this window; 月報 covers the current Taipei month plus the 11 before it. */
 const WINDOW_DAYS = 30;
 const REPORT_MONTHS = 12;
-/** ⑤ lists at most this many groups; its total still covers every row in the window. */
+/** 流水帳 lists at most this many groups; its total still covers every row in the window. */
 const LEDGER_GROUPS_SHOWN = 300;
 
 async function loadCosts(): Promise<CostsData> {
@@ -75,7 +75,7 @@ export default async function CostsPage() {
           </span>
         </div>
         <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
-          真實花費（近 {WINDOW_DAYS} 天）· 單價費率表 · 月費試算 · AI 模型比較 · 流水帳 · 月報
+          月報 · 真實花費（近 {WINDOW_DAYS} 天）· 流水帳 · 單價費率表 · 月費試算 · AI 模型比較
           <Link href="/ops/clients" style={{ color: "var(--accent)", marginLeft: 12 }}>→ Clients</Link>
           <Link href="/tools/image-gen" style={{ color: "var(--accent)", marginLeft: 12 }}>→ Image Gen</Link>
         </p>

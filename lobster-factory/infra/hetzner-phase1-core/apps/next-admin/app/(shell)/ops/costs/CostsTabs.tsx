@@ -13,12 +13,12 @@ import AiModelsClient from "@/app/(shell)/tools/ai-models/AiModelsClient";
 export interface CostsData {
   note?: string;
   windowDays: number;
-  /** ① 真實花費 — and the total ⑤ 流水帳 must match. */
+  /** 真實花費 — the 流水帳 total must equal it. */
   window: SpendSummary;
-  /** ⑤ — newest groups first, capped for size; `ledgerGroupCount` is the uncapped count. */
+  /** 流水帳 — newest groups first, capped for size; `ledgerGroupCount` is the uncapped count. */
   ledger: LedgerGroup[];
   ledgerGroupCount: number;
-  /** ⑥ — Asia/Taipei calendar months, newest first. */
+  /** 月報 — Asia/Taipei calendar months, newest first. */
   months: MonthReport[];
   orgNames: Record<string, string>;
 }
@@ -179,7 +179,7 @@ function SpendTab({ s, windowDays, note }: { s: SpendSummary; windowDays: number
         <StatCard label="文字 AI" usd={text.usd} sub={`${text.count.toLocaleString()} 次呼叫`} />
         <StatCard label="圖片" usd={image.usd} sub={`${image.count.toLocaleString()} 張`} />
         <StatCard label="影片動態" usd={video.usd} sub={`${video.count.toLocaleString()} 段`} />
-        <StatCard label={`合計（近 ${windowDays} 天，不含基建）`} usd={s.totalUsd} sub={`${s.count.toLocaleString()} 筆 = ⑤ 流水帳合計`} accent />
+        <StatCard label={`合計（近 ${windowDays} 天，不含基建）`} usd={s.totalUsd} sub={`${s.count.toLocaleString()} 筆 = 流水帳合計`} accent />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "3fr 2fr", gap: 16 }}>
@@ -212,7 +212,7 @@ function SpendTab({ s, windowDays, note }: { s: SpendSummary; windowDays: number
       </div>
 
       <p style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.7, margin: 0 }}>
-        資料來源：<code>ai_call_logs</code> 全部記錄（文字 = 精準 token × 費率；圖片／影片 = 每次成功呼叫 × 單價）。與 ⑤ 流水帳、⑥ 月報同一份資料。
+        資料來源：<code>ai_call_logs</code> 全部記錄（文字 = 精準 token × 費率；圖片／影片 = 每次成功呼叫 × 單價）。與「流水帳」「月報」同一份資料。
         金額是用量 × 公開單價算出，不是廠商帳單。匯率 USD→NT$ = {TWD_RATE}。
       </p>
     </div>
@@ -377,7 +377,7 @@ function LedgerTab({ groups, groupCount, s, windowDays }: { groups: LedgerGroup[
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
     <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-      近 {windowDays} 天合計 <b style={{ color: "var(--text-primary)" }}>{NT(s.totalUsd)}</b>（{USD(s.totalUsd)}，{s.count.toLocaleString()} 筆）= ① 真實花費合計。
+      近 {windowDays} 天合計 <b style={{ color: "var(--text-primary)" }}>{NT(s.totalUsd)}</b>（{USD(s.totalUsd)}，{s.count.toLocaleString()} 筆）=「真實花費」合計。
       同一篇文章／同一批圖片的多筆呼叫合成一組；其他呼叫標「單筆」。
       {groupCount > groups.length && <> 列出最近 {groups.length} 組（共 {groupCount.toLocaleString()} 組），合計仍含全部。</>}
     </div>
@@ -568,7 +568,7 @@ function MonthlyTab({ months, orgNames, monthlyInfraUsd, note }: {
 
       <p style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.7, margin: 0 }}>
         金額依據：<b>AI 用量</b> = <code>ai_call_logs</code> 每筆呼叫 × <code>cost-model.ts</code> 公開單價（呼叫當下算好存檔），<b>不是廠商帳單</b>；
-        與 ① 真實花費、⑤ 流水帳同一份資料。<b>固定月費</b> = <code>INFRA_MONTHLY</code> 現行設定，每月都用同一組數字（過去月份的主機費可能不同），標「估算」者未對過帳單。
+        與「真實花費」「流水帳」同一份資料。<b>固定月費</b> = <code>INFRA_MONTHLY</code> 現行設定，每月都用同一組數字（過去月份的主機費可能不同），標「估算」者未對過帳單。
         沒有記錄的花費（例如直接在廠商後台用掉的額度、訂閱費）不在此表。月份以台灣時間切。匯率 USD→NT$ = {TWD_RATE}。
       </p>
     </div>
@@ -578,15 +578,17 @@ function MonthlyTab({ months, orgNames, monthlyInfraUsd, note }: {
 // ── Main export ────────────────────────────────────────────────────────────────
 
 export function CostsTabs({ data, monthlyInfraUsd }: Props) {
-  const [tab, setTab] = useState<Tab>("spend");
+  const [tab, setTab] = useState<Tab>("monthly");
 
+  // Financial order: the period report first, then actual spend, then its line items; reference
+  // prices, forecasting and model choice come after the numbers they explain.
   const tabs: { key: Tab; label: string }[] = [
-    { key: "spend",     label: "① 真實花費" },
-    { key: "rates",     label: "② 費率表" },
-    { key: "estimator", label: "③ 月費試算" },
-    { key: "models",    label: "④ AI 模型" },
-    { key: "ledger",    label: "⑤ 流水帳" },
-    { key: "monthly",   label: "⑥ 月報" },
+    { key: "monthly",   label: "① 月報" },
+    { key: "spend",     label: "② 真實花費" },
+    { key: "ledger",    label: "③ 流水帳" },
+    { key: "rates",     label: "④ 費率表" },
+    { key: "estimator", label: "⑤ 月費試算" },
+    { key: "models",    label: "⑥ AI 模型" },
   ];
 
   return (
