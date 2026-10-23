@@ -204,6 +204,43 @@ async function downscaleImageFile(file: File, maxDim = 1024, quality = 0.85): Pr
   });
 }
 
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("read_error"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+// 「下載 WebP」: one card at about 200–300 KB. Quality steps down first; only a card still over the limit at the lowest
+// quality is scaled down, so a print-size card keeps its pixels whenever quality alone gets it under.
+const WEBP_TARGET_BYTES = 300 * 1024;
+async function toWebpUnder(png: Blob, maxBytes: number): Promise<Blob> {
+  const bitmap = await createImageBitmap(png);
+  const encode = (scale: number, quality: number) => new Promise<Blob>((resolve, reject) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return reject(new Error("no_canvas"));
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((b) => (b && b.type === "image/webp" ? resolve(b) : reject(new Error("webp_unsupported"))), "image/webp", quality);
+  });
+  try {
+    let last: Blob | null = null;
+    for (const scale of [1, 0.85, 0.7]) {
+      for (const quality of [0.9, 0.82, 0.74, 0.66]) {
+        last = await encode(scale, quality);
+        if (last.size <= maxBytes) return last;
+      }
+    }
+    return last!;
+  } finally {
+    bitmap.close();
+  }
+}
+
 // Re-encode a (possibly multi-MB PNG) artwork data URL into a gallery-sized WebP data URL:
 // caps the longest side and recompresses. A raw 2K-model PNG can exceed the gallery API's
 // ~9MB limit (→ HTTP 413 → "save failed"); this keeps it safely under while staying visually
@@ -759,7 +796,7 @@ export default function TarotStudio() {
   // POST one image to the gallery; resolves true on a 2xx, false on any failure (never throws).
   // Shared by the fire-and-forget saveToGallery and the modal "存無框圖" button (which awaits
   // the boolean to show saving / saved / failed feedback).
-  function postDesign(image: string, source: string, extra?: { cardName?: string; prompt?: string; model?: string }): Promise<boolean> {
+  function postDesign(image: string, source: string, extra?: { cardName?: string; prompt?: string; model?: string; batchJobId?: string; cardIndex?: number }): Promise<boolean> {
     return fetch("/api/tools/designs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -771,6 +808,8 @@ export default function TarotStudio() {
         cardName: extra?.cardName ?? null,
         styleTags: styleTokens,
         subject: subjectText.trim() || undefined,
+        batchJobId: extra?.batchJobId,
+        cardIndex: extra?.cardIndex,
       }),
     })
       .then((r) => r.ok)
@@ -778,7 +817,7 @@ export default function TarotStudio() {
   }
 
   // Fire-and-forget save — never blocks generation or UI.
-  function saveToGallery(image: string, source: string, extra?: { cardName?: string; prompt?: string; model?: string }) {
+  function saveToGallery(image: string, source: string, extra?: { cardName?: string; prompt?: string; model?: string; batchJobId?: string; cardIndex?: number }) {
     void postDesign(image, source, extra);
   }
 
@@ -918,7 +957,7 @@ export default function TarotStudio() {
         await generateOne(t.it.card, t.i, skipDone ? undefined : Math.floor(Math.random() * 1_000_000_000), run);
       }
     });
-    if (stopped) setMessage("已停止。生成好的牌都保留，可下載 ZIP。");
+    if (stopped) setMessage("已停止。生成好的牌都保留，可下載 PNG 或 WebP。");
   }
 
   // Launch a Trigger.dev background batch for all 78 cards (browser can be closed).
@@ -1002,19 +1041,49 @@ export default function TarotStudio() {
         setMessage(`載入失敗：${data.error ?? "unknown"}`);
         return;
       }
-      const results = data.job.results;
-      setBatch((prev) => {
-        const next = [...prev];
-        for (const r of results) {
-          if (r.cardIndex >= 0 && r.cardIndex < next.length && r.url) {
-            const existing = next[r.cardIndex];
-            if (existing.url) URL.revokeObjectURL(existing.url);
-            next[r.cardIndex] = { ...existing, status: "done", url: r.url, blob: undefined };
-          }
+      // Each card goes through the same path as a card generated on this page: grade, frame, then save the framed card
+      // to My Designs. The background job stores only the frameless picture, so without this the grid showed unframed
+      // art and nothing reached My Designs (2026-10-23). The (job, card) pair makes a repeated load save nothing new.
+      const results = data.job.results.filter((r) => r.cardIndex >= 0 && r.cardIndex < TAROT_CARDS.length);
+      const failed: string[] = [];
+      const saves: Promise<boolean>[] = [];
+      let loaded = 0;
+      for (const r of results) {
+        if (!isCurrent()) return;
+        const card = TAROT_CARDS[r.cardIndex];
+        try {
+          const imgRes = await fetch(`/api/tools/tarot/batch/${job.id}/image/${r.cardIndex}`, { headers: { ...roleHeader("operator") } });
+          if (!imgRes.ok) throw new Error(`HTTP ${imgRes.status}`);
+          const art = await blobToDataUrl(await imgRes.blob());
+          const graded = !grade.neutral ? await applyGradeToDataUrl(art, grade.params).catch(() => art) : art;
+          const blob = await renderPrintCard(card, graded, template);
+          const galleryArt = await toGalleryArt(graded);
+          if (!isCurrent()) return;
+          const url = URL.createObjectURL(blob);
+          setBatch((prev) => prev.map((it, i) => {
+            if (i !== r.cardIndex) return it;
+            if (it.url?.startsWith("blob:")) URL.revokeObjectURL(it.url);
+            return { ...it, status: "done", blob, url, art: galleryArt, error: undefined };
+          }));
+          saves.push(postDesign(await blobToDataUrl(blob), "tarot", {
+            cardName: card.name,
+            prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple, order: orderOf(lockedModel) }),
+            batchJobId: job.id,
+            cardIndex: r.cardIndex,
+          }));
+          loaded++;
+          setMessage(`載入背景批次結果中… ${loaded}/${results.length}`);
+        } catch (e) {
+          failed.push(`${card.name}（${e instanceof Error ? e.message : String(e)}）`);
         }
-        return next;
-      });
-      setMessage(`已載入 ${results.length} 張背景批次結果。如需含框 ZIP，請點「下載 ZIP」（會自動套框）。`);
+      }
+      const saved = (await Promise.all(saves)).filter(Boolean).length;
+      if (!isCurrent()) return;
+      setMessage(
+        `已載入 ${loaded} 張背景批次結果並套框；存進「我的設計」${saved} 張` +
+          (saved < loaded ? `，${loaded - saved} 張沒存成功（重按「載入批次結果」會補存，已存的不會重複）` : "") + "。" +
+          (failed.length ? `\n${failed.length} 張載入失敗：${failed.join("、")}` : ""),
+      );
     } catch (e) {
       if (isCurrent()) setMessage(`載入失敗：${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -1033,8 +1102,11 @@ export default function TarotStudio() {
     if (!stopped) setMessage("✓ 已重新生成");
   }
 
-  async function downloadZip() {
-    const done = batch.filter((b) => b.status === "done" && (b.blob || b.url));
+  // format "png" = the framed print card at full size; "webp" = the same card re-encoded to about 200–300 KB.
+  // Every done card holds its framed blob (generateOne / loadBatchResults); a card that cannot be packed is named in the
+  // message instead of being skipped silently — the silent skip is how the zip came out empty (2026-10-23).
+  async function downloadZip(format: "png" | "webp") {
+    const done = batch.filter((b) => b.status === "done");
     if (done.length === 0) {
       setMessage("還沒有可下載的牌卡");
       return;
@@ -1043,48 +1115,38 @@ export default function TarotStudio() {
     try {
       const JSZip = (await import("jszip")).default;
       const zip = new JSZip();
-      // Snapshot the deck colour-grade once (洞1: background-batch cards have only an R2 url,
-      // not a pre-graded blob, so they must be (re)graded here too — foreground cards' blobs
-      // were already graded in generateOne). One snapshot = uniform deck, no mid-zip drift.
-      const deckParams = grade.neutral ? null : grade.params;
-      for (const it of batch) {
-        if (it.status !== "done") continue;
-        // Cards from background batch have url (R2) but no blob — render the print card on demand.
-        if (!it.blob && it.url) {
-          try {
-            const imgRes = await fetch(it.url);
-            const imgBlob = await imgRes.blob();
-            const artDataUrl: string = await new Promise((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(reader.result as string);
-              reader.onerror = () => reject(new Error("read_error"));
-              reader.readAsDataURL(imgBlob);
-            });
-            const gradedArt = deckParams
-              ? await applyGradeToDataUrl(artDataUrl, deckParams).catch(() => artDataUrl)
-              : artDataUrl;
-            const printBlob = await renderPrintCard(it.card, gradedArt, template);
-            const safe = it.card.name.replace(/[^a-z0-9]+/gi, "_").toLowerCase();
-            zip.file(`${String(it.card.id).padStart(2, "0")}_${safe}.png`, printBlob);
-          } catch { /* skip unrenderable cards */ }
+      const missing: string[] = [];
+      for (const it of done) {
+        const safe = `${String(it.card.id).padStart(2, "0")}_${it.card.name.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}`;
+        if (!it.blob) {
+          missing.push(it.card.name);
           continue;
         }
-        if (it.blob) {
-          const safe = it.card.name.replace(/[^a-z0-9]+/gi, "_").toLowerCase();
-          zip.file(`${String(it.card.id).padStart(2, "0")}_${safe}.png`, it.blob);
+        try {
+          if (format === "png") zip.file(`${safe}.png`, it.blob);
+          else zip.file(`${safe}.webp`, await toWebpUnder(it.blob, WEBP_TARGET_BYTES));
+        } catch {
+          missing.push(it.card.name);
         }
+      }
+      if (missing.length === done.length) {
+        setMessage(`打包失敗：${missing.length} 張都沒有可用的圖（${missing.join("、")}）。背景批次的牌請先按「載入批次結果」。`);
+        return;
       }
       const out = await zip.generateAsync({ type: "blob" });
       const url = URL.createObjectURL(out);
       const a = document.createElement("a");
       a.href = url;
       a.download = buildSemanticFilename(
-        { product: "塔羅整套", style: stylePrompt.trim() || undefined },
+        { product: format === "png" ? "塔羅整套PNG" : "塔羅整套WebP", style: stylePrompt.trim() || undefined },
         "zip",
-        "tarot-deck-print.zip",
+        `tarot-deck-${format}.zip`,
       );
       a.click();
       URL.revokeObjectURL(url);
+      const packed = done.length - missing.length;
+      setMessage(`已打包 ${packed} 張（${format === "png" ? "原始大小 PNG" : "WebP 約 200–300KB"}）。` +
+        (missing.length ? `\n${missing.length} 張沒打包：${missing.join("、")}` : ""));
     } catch (e) {
       setMessage(`打包失敗：${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -1282,8 +1344,11 @@ export default function TarotStudio() {
                       重新生成全組
                     </button>
                   )}
-                  <button className="btn-secondary" onClick={downloadZip} disabled={zipBusy || doneCount === 0}>
-                    {zipBusy ? "打包中…" : `下載 ZIP（${doneCount} 張）`}
+                  <button className="btn-secondary" onClick={() => void downloadZip("png")} disabled={zipBusy || doneCount === 0} title="含外框的牌，原始大小 PNG">
+                    {zipBusy ? "打包中…" : `下載 PNG（${doneCount} 張）`}
+                  </button>
+                  <button className="btn-secondary" onClick={() => void downloadZip("webp")} disabled={zipBusy || doneCount === 0} title="含外框的牌，每張約 200–300KB 的 WebP">
+                    {zipBusy ? "打包中…" : `下載 WebP（${doneCount} 張）`}
                   </button>
                   <span className="form-hint">
                     這組 {groupDone}/{groupItems.length} · 全部 {doneCount}/{TAROT_CARDS.length}

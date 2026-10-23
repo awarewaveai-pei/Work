@@ -45,6 +45,24 @@ describe("buildCardPrompt pose", () => {
     }
   });
 
+  // With the count only in the scene, schnell drew 5 of the Ten of Swords' blades (2026-10-23).
+  it("states a number card's count in the first sentence, in every mode and order", () => {
+    const pips = TAROT_CARDS.filter((c) => /^(TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN) OF /.test(c.name));
+    expect(pips).toHaveLength(36);
+    for (const c of pips) {
+      const word = c.name.split(" ")[0].toLowerCase();
+      for (const input of [{}, { subject: "a blue cat", heroKind: "animal-natural" as const }, { order: "content-first" as const }]) {
+        expect(buildCardPrompt(c, input).split(". ")[0], c.name).toMatch(new RegExp(`exactly ${word} (wooden wands|golden cups|swords|round golden coins engraved with pentagrams)`, "i"));
+      }
+    }
+    expect(buildCardPrompt(TAROT_CARDS.find((c) => c.name === "KING OF CUPS")!)).not.toContain("exactly");
+  });
+
+  it("keeps THE DEVIL's horns, wings and captives with a swapped subject", () => {
+    const devil = buildCardPrompt(TAROT_CARDS.find((c) => c.name === "THE DEVIL")!, { subject: "a blue cat", order: "content-first" });
+    expect(devil.split(". ")[0]).toMatch(/blue cat with bat wings and curved goat horns .* captives chained/);
+  });
+
   it("THE MOON keeps a dog and a wolf by default and turns both into the subject, tame and wild", () => {
     const moon = TAROT_CARDS.find((c) => c.name === "THE MOON")!;
     expect(buildCardPrompt(moon)).toContain("A dog and a wolf howling");

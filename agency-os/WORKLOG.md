@@ -1,4 +1,34 @@
 # Worklog
+## 2026-10-23（續33）塔羅背景批次：套框＋存我的設計＋下載 PNG/WebP；牌面：數量、惡魔、正義、面向（Claude）
+
+**觸發**：操作者回報背景批次 78 張（job c8fbba27，flux-schnell，09:28 UTC）①無外框、沒進 /tools/designs ②擬人動物 3/5/6 隻腳 ③數字牌數量不對 ④沒照原圖（惡魔）⑤下載 ZIP 空資料夾 ⑥要原尺寸 PNG 或 200–300KB WebP。
+
+**根因（file:line 為改前）**
+- C1 ①：`app/api/internal/tarot/batch/[jobId]/card/route.ts:98-108` 只把無框原圖存 R2 `tarot-batch/`，不寫 media_assets；`TarotStudio.tsx:1006-1016` 載入時只放 R2 網址，套框只在 ZIP 時做。正式機查 job c8fbba27 卡列 url 皆 `tarot-batch/…`。
+- C2 ⑤：R2 公開網址無 `Access-Control-Allow-Origin`（curl -H Origin 實測 200 但無 CORS 標頭）→ `downloadZip` `fetch(it.url)` 每張失敗，`catch {}` 吞錯（`TarotStudio.tsx:1069`）→ 空 ZIP。
+- C3 ③：數量只在 scene，第一句沒提（寶劍十第一句「swords in the back」）。
+- C4 ④：惡魔角／翅膀寫在預設 hero，換主角即消失；俘虜在後段被截。正義「facing straight ahead」→ schnell 6/6 畫成背影、無天秤。錢幣九「hooded falcon」頭罩畫到貓頭上。
+- C5 ②：擬人動物多腳。三種寫法（原句／「兩隻後腳＋兩隻前腳、共四肢」／主角第二次改 the same）各 8 張×2 seed 實生無可見差異；FLUX dev 同 prompt 四肢正常 → schnell 模型極限，未改句（不加 token）。
+
+**修改**（next-admin）
+- `app/api/tools/tarot/batch/[jobId]/image/[index]/route.ts`（新）：同源回傳該卡記錄的 R2 圖；只抓本 job 記錄的網址＋`isDesignsAsset` 限本 bucket＋角色／org 檢查；邊讀邊卡 25MB。
+- `TarotStudio.tsx`：`loadBatchResults` 每張經同源路由 → 調色 → `renderPrintCard` 套框 → 存我的設計（帶 batchJobId/cardIndex），訊息依實際存成功張數；`downloadZip(format)` 兩鍵「下載 PNG」原尺寸、「下載 WebP」`toWebpUnder` ≤300KB，打包不到的牌列名不再吞錯。
+- `app/api/tools/designs/route.ts`：`batchJobId`＋`cardIndex` 同 org 已存 → 回第一筆（reused）；metadata 存 batch_job_id/card_index。
+- `cards.ts`：`pipCount()` 二～十第一句加「exactly N <花色物件>」（錢幣＝round golden coins engraved with pentagrams，避免畫成星星）；惡魔 pose 帶翅膀角＋被鎖俘虜；節制 pose 帶紅翅；獵鷹改「wearing a small leather hood」；`facing straight ahead/forward`→`facing the viewer`（5 行）；正義 scene 加天秤；權杖四 pose 帶花環與四根杖。
+- `lib/tarot/MODULE_MANIFEST.json`：8 個欄位改正 0115 之後已過時的「無資料表、狀態在記憶體、R2 失敗回退」，加新路由與 designs 去重。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/tarot/" lib/tarot app/api/tools/designs app/api/tools/tarot（44 passed）＋ npx tsc --noEmit | exit=0 | ms=9000
+- 突變：拿掉 designs 去重 → batch-dedupe 紅；拿掉 isDesignsAsset → image route 紅；拿掉串流上限 → 「over the cap」紅；聖盃八 scene 補 cloak → 衣著測試紅（續24）；皆還原綠。
+- WebP：headless Chromium 對 898×1488 套框卡實測 PNG 2,924,031B → WebP 291,514B（scale 1、q 0.9）。
+- 實生 schnell（藍貓、擬人、梵谷、content-first，seed 7）78 張逐張對照：惡魔翅角＋鎖鏈俘虜✓、寶劍十約 10 把✓（原 5）、月亮/輪/王牌主角皆換✓、錢幣九頭罩不在貓頭✓；修正後再生：正義面向觀者＋天秤 2/2、權杖四花環四杖兩貓 2/2、錢幣七/八為錢幣非星星 2/2。schnell 仍偶爾多畫錢幣、權杖五畫 4 隻（數量極限）。
+- 長度：牌面內容最長仍 222 token／139 字（愚者梵谷）；預設風格全文最長 274 token；FLUX dev 最長 366 < 512。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n -- Codex `agency-os/reports/oracle/2026-10-23-partialreview-8795fda7.md`：F1 圖片路由先 arrayBuffer 再卡大小 → 改邊讀邊卡＋測試；F3 存設計失敗仍報已存 → 改等實際結果；F2 同 job 兩分頁同時載入可重複存 → 不做 migration，載入鍵忙碌時已停用（TarotStudio 載入鍵 `disabled={bgLoadBusy}`），route 註解記限制
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=downloadZip|batchJobId|tarot-batch/|pipCount|facing straight|hooded falcon | hits=26（多為 WORKLOG 歸檔與舊 oracle 報告；MODULE_MANIFEST 過時主張已同 commit 改正；.claude 命中僅 session 記錄）
+
+**剩餘**：擬人動物多腳與數量為 schnell 極限，換 FLUX dev／Nano Banana 較準；`codex-oracle.ps1 -Path a,b` 在 `powershell -File` 下不拆逗號（`write-oracle-artifact.ps1` 有拆），本次用陣列繞過。上線後需操作者重按「載入批次結果」驗證套框與存設計（舊 job c8fbba27 仍可載入）。
+
+**rollback**：`git revert <本 commit>`；無 migration；media_assets 新增的批次卡列可在我的設計刪除。
 ## 2026-10-23（續32）側欄標籤全英文＋依工作流程重排（續30 後操作者回饋）（Claude）
 
 **觸發**：操作者：續30 排序沒邏輯；分區標題 9px（`app/globals.css:320`）中文小到看不清；中英混雜 → 要全英文。

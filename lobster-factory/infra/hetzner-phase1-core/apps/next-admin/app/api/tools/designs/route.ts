@@ -103,6 +103,10 @@ interface SaveDesignBody {
   styleTags?: string[];
   /** Main subject of the image (tarot subject override, or studio subject) — for filename. */
   subject?: string;
+  /** Tarot background batch: the job and card this framed card came from. A second save of the same pair returns the
+   *  first row instead of adding a copy (the studio saves on every 「載入批次結果」). */
+  batchJobId?: string;
+  cardIndex?: number;
 }
 
 /** Who saved or deletes: a customer is the user middleware authenticated (x-ops-user-id), never a body field; staff keep
@@ -204,6 +208,28 @@ export async function POST(request: Request) {
     );
   }
 
+  const batchKey = typeof body.batchJobId === "string" && isUuid(body.batchJobId)
+    && Number.isInteger(body.cardIndex) && (body.cardIndex as number) >= 0
+    ? { job: body.batchJobId, card: String(body.cardIndex) }
+    : null;
+  // Check-then-insert: two loads of the same job running at the same moment (two tabs) can both insert. The studio
+  // disables 「載入批次結果」 while one runs; a unique index would close it fully but needs a migration (2026-10-23).
+  if (batchKey) {
+    const { data: existing, error: findErr } = await supabase
+      .from("media_assets")
+      .select("id,object_key,object_url,mime_type,byte_size,created_at")
+      .eq("organization_id", organizationId)
+      .eq("metadata->>batch_job_id", batchKey.job)
+      .eq("metadata->>card_index", batchKey.card)
+      .limit(1)
+      .maybeSingle();
+    if (findErr) {
+      console.error("[designs] batch dedupe lookup failed:", findErr.message);
+      return NextResponse.json({ ok: false, error: "lookup_failed" }, { status: 500 });
+    }
+    if (existing) return NextResponse.json({ ok: true, asset: existing, reused: true });
+  }
+
   const objectKey = buildDesignKey(parsed.mime);
   if (!objectKey) {
     return NextResponse.json({ ok: false, error: "unsupported_mime" }, { status: 400 });
@@ -240,6 +266,7 @@ export async function POST(request: Request) {
         brand: body.brand ?? null,
         style_tags: sanitizeStyleTags(body.styleTags),
         subject: body.subject?.trim() || null,
+        ...(batchKey ? { batch_job_id: batchKey.job, card_index: batchKey.card } : {}),
         actor_role: resolved.role,
         role_source: resolved.source,
         trace_id: traceId,
