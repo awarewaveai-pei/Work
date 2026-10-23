@@ -1,4 +1,30 @@
 # Worklog
+## 2026-10-23（續4）aware-wave.com DMARC 升第二階段：pct=25 → pct=100（報表條件達成，執行）（Claude）
+
+**觸發**：AO-RESUME 期限雷達：決策正本排定 2026-10-15，已逾期 8 天。操作者：先做唯讀報表檢查 → 通過後 go ahead 改 DNS。
+
+**報表取得**：rua 寄 `peijingartstudio@gmail.com`；Gmail 連線器登入的是 `awarewaveai@gmail.com`（且本 session 回 connection invalidated），讀不到。操作者手動下載 23 個 zip 到 `D:\tmp\dmarc\`。
+
+**檢查結果**（`python -I` 解析，scratchpad `parse_dmarc.py`）
+- 22 份有效（1 份 `(1).zip` 與原檔 SHA256 相同，排除）；涵蓋 09-30＋10-01～10-21 每天一份，無缺日（10-22 報表尚未發出）。
+- 34 封（pct=25 期間 33 封）：DKIM 34/34 pass（`aware-wave.com`＋`amazonses.com`）、SPF 34/34 pass（`send.aware-wave.com`）、disposition 全 none、quarantine/reject 0。來源 IP 全在 Amazon SES `54.240.x.x`。
+- 報表寄件方只有 google.com：期間收件人全為 Gmail（Resend `list-emails`），屬預期。Resend 10-01～10-21 寄 33 封＝報表 33 封，無 Resend 以外的 aware-wave.com 寄件來源。
+
+**修改**
+- Cloudflare DNS `_dmarc.aware-wave.com`（record `f28b0da709e0379d4921e99fc39b8c36`）→ `v=DMARC1; p=quarantine; pct=100; rua=mailto:peijingartstudio@gmail.com; fo=1`。腳本先比對舊值完全等於 pct=25 版本才 PATCH。
+- `agency-os/reports/decisions/2026-09-10-dmarc-enforcement-timeline.md`：時程表階段 2 標已執行、p=reject 日期改自 pct=100 生效日起算（≈2026-11-06）、新增階段 2 執行紀錄。
+- `agency-os/TASKS.md`：階段 2 打勾；新增階段 3（p=reject）待辦，寫明報表要操作者手動下載。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=curl | cmd=Cloudflare API PATCH dns_records/f28b0da7… then GET + curl cloudflare-dns.com/dns.google DoH + nslookup -type=TXT _dmarc.aware-wave.com 1.1.1.1 | exit=0 | ms=310
+- 覆查四方一致：CF API GET、cloudflare-dns.com、dns.google、1.1.1.1 皆回 `p=quarantine; pct=100`。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回決策紀錄與 TASKS 改動；DNS 單筆 TXT 改值，新舊值逐字比對
+- ORACLE_WAIVED: 無 source 檔改動（DNS 設定＋文件）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=pct=25 | hits=87（全為歷史快照：daily 筆記、integrated-status／weekly／monthly 報表、WORKLOG 舊條目、決策紀錄執行紀錄；唯一 live 宣稱 = TASKS 階段 2 行，已打勾。`reports/decisions/INDEX.md:16` 摘要描述整條時程，仍正確不改）
+
+**剩餘**：≈2026-11-06 升 p=reject，需操作者再下載 10-23 起的報表。長期可考慮在 peijingartstudio 設轉寄或 rua 加 awarewaveai，讓 agent 自己讀（未決定）。
+
+**rollback**：同一 record PATCH 回 `v=DMARC1; p=quarantine; pct=25; rua=mailto:peijingartstudio@gmail.com; fo=1`，TTL 300 秒內生效；文件 `git revert <本 commit>`。
 ## 2026-10-23（續3）AO-CLOSE 的 gate 只檢查本 session 要 commit 的內容（續2 收尾）（Claude）
 
 **觸發**：續2 剩餘風險「sensitive path／completeness gate 仍看整個共用 index，別人的 staged 檔會讓收工被擋」。操作者：事情還沒處理好。

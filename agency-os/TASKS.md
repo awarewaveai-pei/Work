@@ -388,7 +388,9 @@
 
 - [x] **✅ 2026-10-01 完成｜階段 1** aware-wave.com DMARC：`p=none` → `p=quarantine;pct=25` — 操作者提供 10 份 Google rua 報表（9/8–9/29），零失敗，已執行並驗證。細節見 `WORKLOG.md` 2026-10-01「DMARC 升第一階段」條目、決策正本 [`reports/decisions/2026-09-10-dmarc-enforcement-timeline.md`](reports/decisions/2026-09-10-dmarc-enforcement-timeline.md)（已同步更新執行紀錄）。
 
-- [ ] **【2026-10-15 觸發】aware-wave.com DMARC 升級第二階段（pct=25 → pct=100）** — 同上決策正本的機械時程，重複同款報表檢查（這次要確認 Gmail 搜尋沒有限制在單一寄件者，不只看 google.com）。**提醒已排**：操作者 2026-10-03 表示已自行設定 10-15 提醒（不需再建 routine）。
+- [x] **✅ 2026-10-23 完成｜階段 2** aware-wave.com DMARC：`pct=25` → `pct=100` — 21 天報表 33 封全 pass、零失敗，已執行並三方 DNS 覆查。細節見 `WORKLOG.md` 2026-10-23「DMARC 升第二階段」條目與決策正本執行紀錄。
+
+- [ ] **【≈2026-11-06 觸發】aware-wave.com DMARC 升級第三階段（p=quarantine → p=reject）** — 決策正本 [`reports/decisions/2026-09-10-dmarc-enforcement-timeline.md`](reports/decisions/2026-09-10-dmarc-enforcement-timeline.md) 同款檢查：操作者從 peijingartstudio 下載 10-23 起的 Google rua 報表到 `D:\tmp\dmarc\`（Gmail 連線器登入的是 awarewaveai，看不到 rua 信），零未解釋失敗才改。
 
 - [x] **【2026-09-19 開出、2026-09-20 整類解決｜Cognitive OS dashboard】結構化欄位只修了 5W1H 一個，其餘方法仍是裸 JSON textarea** — 表單改由每個方法自己的 typed-object record schema 產生（新 `ai_lego/apps/api/method_form.py`），不再反射 Python 簽名，特例 registry 已刪除。284 個方法逐一驗證「表單 → 真實 builder → 所有 gate」通過；1386 個欄位標籤 + 608 個選項標籤全中文（`methods/registry/method-input-forms.yaml`）；從 dashboard.html 抽出的真 JS 序列化器與測試鏡像 282/282 相同。詳見 WORKLOG 2026-09-20（續83）。
 - [x] **【2026-09-19 開出、2026-09-20 部署完成｜Cognitive OS 部署】cognitive.aware-wave.com prod 落後 repo** — 操作者 go-ahead 後在 ks-aw-01 fast-forward 到 `dd204ff65` 並跑 `deploy/deploy.sh`：test-gate PASS、healthcheck 6 秒健康、本機與對外 smoke 皆 PASS。線上實測 `/methods/framing.five_w_one_h/form` 已回 `schema_source=record_schema` 與中文欄位，`why_zh`/`example_zh` 也一併上線。保留 `cognitive-os-api:rollback` 映像可一鍵回退。詳見 WORKLOG 2026-09-20（續83）。
