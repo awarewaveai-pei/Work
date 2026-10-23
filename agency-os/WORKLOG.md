@@ -52,13 +52,13 @@
 
 **驗證結果**
 - REALTEST_EVIDENCE: tool=curl | cmd=Resend API POST /emails from ops@aware-wave.com to dmarc@aware-wave.com, GET 20s 後 last_event | exit=0 | ms=20000
-- Resend `01a166ce-6892-74a1-88a7-43ed123c4c81` last_event=delivered：Cloudflare MX 接受＝規則命中（catch-all 停用，未命中會在 SMTP 被拒）。Gmail 端收到未驗：本 session Gmail 連線器 invalidated。
+- Resend `01a166ce-6892-74a1-88a7-43ed123c4c81` last_event=delivered：Cloudflare MX 接受＝規則命中（catch-all 停用，未命中會在 SMTP 被拒）。端到端：操作者在 awarewaveai 收件匣看到該信（11:29，to dmarc），轉寄落地確認。
 - DNS：CF API GET 與 dns.google 回新 rua；cloudflare-dns.com／1.1.1.1 於 TTL 300s 後覆查一致（見 commit 訊息）。
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回決策紀錄與 TASKS；新舊 DNS 值逐字比對
 - ORACLE_WAIVED: 無 source 檔改動（DNS／Email Routing 設定＋文件）
 - BUGHUNT_DONE: scope=agency-os,scripts,.claude,runbooks,lobster-factory/docs | grep=rua= | hits=0（決策紀錄與 TASKS 以外無文件引用 rua 位址；歷史快照不改）
 
-**剩餘**：操作者 /mcp 重連 Gmail 後，搜 `routing test: dmarc@aware-wave.com` 確認轉寄落地；明日起應出現 `Report domain: aware-wave.com` 寄往 dmarc@ 的報表。
+**剩餘**：明日起 awarewaveai 應收到寄往 dmarc@ 的 `Report domain: aware-wave.com` 報表。agent 讀取需 Gmail 連線器重新授權（invalidated＝OAuth token 失效，非網路：同機 Resend／CF／DoH 呼叫皆正常）。
 
 **rollback**：PATCH 同一 record 回 `rua=mailto:peijingartstudio@gmail.com`；刪 Email Routing 規則 `44e03847…`。
 ## 2026-10-23（續4）aware-wave.com DMARC 升第二階段：pct=25 → pct=100（報表條件達成，執行）（Claude）
