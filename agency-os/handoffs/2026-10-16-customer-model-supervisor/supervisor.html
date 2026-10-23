@@ -91,7 +91,7 @@ ul.doors li span{min-width:0}
 <aside><div class="in">
   <h1>客戶怎麼來 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-10-23</span></p>
-  <div class="bar" data-computed><i class="d" style="width:33.33333333333333%"></i><i class="g" style="width:11.11111111111111%"></i></div>
+  <div class="bar" data-computed><i class="d" style="width:33.33333333333333%"></i><i class="g" style="width:22.22222222222222%"></i></div>
   <nav><a href="#rules"><span>規則</span><small></small></a><a href="#now"><span>現況</span><small></small></a><a href="#ways"><span>五種客戶</span><small>共 <span data-computed>5</span> 種，<span data-computed>2</span> 種已運作</small></a><a href="#priority"><span>先後與定價</span><small></small></a><a href="#steps"><span>待建項目</span><small><span data-computed>3</span>／<span data-computed>9</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>4</span> 項</small></a><a href="#doors"><span>入口</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
@@ -128,7 +128,7 @@ ul.doors li span{min-width:0}
 <section id="priority"><h2>先後與定價</h2><p class="lead">依你 2026-10-17 的決定排序；賣斷的收費結構是預設值，數字可改。</p><ul class="yn rules"><li><b>① 先服務自己的客戶</b><span>代操也要算得出每位客戶用了多少。<small><a href="#s1">第 <span data-computed>1</span> 項</a>、<a href="#s2">第 <span data-computed>2</span> 項</a>、<a href="#s3">第 <span data-computed>3</span> 項</a></small></span></li><li><b>② 訂閱與點數，產品要有樣子</b><span>客戶在 aware-wave.com（WordPress）付款後自動開通；每個產品有自己的門與版面，打開就能用。<small><a href="#s4">第 <span data-computed>4</span> 項</a>、<a href="#s8">第 <span data-computed>8</span> 項</a></small></span></li><li><b>③ 賣斷給一般公司</b><span>一鍵安裝到客戶主機，交接後收回存取權。<small><a href="#s5">第 <span data-computed>5</span> 項</a></small></span></li><li><b>④ 等第一個客戶出現再做</b><span>只串 API 的客戶、代理商用一套服務多家客戶、客戶要用自己的網址；各自獨立，不卡前面三段。<small><a href="#s6">第 <span data-computed>6</span> 項</a>、<a href="#s7">第 <span data-computed>7</span> 項</a>、<a href="#s9">第 <span data-computed>9</span> 項</a></small></span></li></ul>
 <h3 class="sub-h">接下來依序做（2026-10-23 依現況排）</h3>
 <p class="lead">先門、後收錢。三個答案互不等待：門是「客戶本人操作」的唯一前提，純內部工程、沒有待決；收錢的外部部分（金流商、會計師）卡兩個待決，內部部分（用量計量、人工付款入口）不等待決先做；登入目前的本機帳號已能用，WordPress 一鍵登入只在付款發生在 WordPress 時才有價值，所以跟 Woo 同一包。</p>
-<ul class="yn rules"><li><b>① 翻強制模式（等 10/31，不占工時）</b><span>權利已就位（2026-10-23 部署）；客戶本人操作時已一律強制，翻的只影響員工。10/31 自動檢查 7 天「若強制就拒」歸零或都已解釋後，請你同意再翻（High）。<small><a href="#s3">第 <span data-computed>3</span> 項</a></small></span></li><li><b>② 用量計量與門上線阻擋項</b><span>已做（2026-10-23）：每道付費縫記用量（自用與合約列只記不扣；單價待你定）、studio 精選免費路徑在付費閘前且門上藏 AI 按鈕。tarot 批次也已記操作者（0119 已套 prod，2026-10-23）。剩：員工路由在 withFeature 範圍外的付費工作仍記在自用帳戶（TASKS「員工路由用量歸屬」）。<small><a href="#s3">第 <span data-computed>3</span> 項</a>、<a href="#s8">第 <span data-computed>8</span> 項</a></small></span></li><li><b>③ 門逐個上線</b><span>規則已定（ADR 018 §2）。tarot → studio（門頁已建）→ video → design → content；cs（等 Chatwoot）、collect、outreach（員工路由要先搬）最後。每個門上線 High。第一個自助客戶不等 Woo：員工邀請（本機帳號登入已能用）＋人工寫合約列，與 Soulful 同一條路。<small><a href="#s8">第 <span data-computed>8</span> 項</a></small></span></li><li><b>④ 收錢分兩段</b><span>4a 內部先做：付款接頭、收件表、合約與權利寫入、錢包入帳、/ops/billing；付款來源先用「人工」（轉帳），不碰 Woo、不等待決。4b 等待決 1、3：Woo 六種事件、定期扣款、點數條款，WordPress 一鍵登入產品門（ADR 015 順序 1）同一包，不單獨先做（High，做了沒人走）。兩題現在就問金流商與會計師。<small><a href="#s4">第 <span data-computed>4</span> 項</a></small></span></li><li><b>⑤ 買斷安裝</b><span>收錢兩段完成、待決 2 律師回覆後開工。<small><a href="#s5">第 <span data-computed>5</span> 項</a></small></span></li><li><b>⑥ 等客戶出現</b><span>只串 API、代理商、白牌網址：出現第一個這類客戶才做。<small><a href="#s6">第 <span data-computed>6</span> 項</a>、<a href="#s7">第 <span data-computed>7</span> 項</a>、<a href="#s9">第 <span data-computed>9</span> 項</a></small></span></li></ul>
+<ul class="yn rules"><li><b>① 翻強制模式（等 10/31，不占工時）</b><span>權利已就位（2026-10-23 部署）；客戶本人操作時已一律強制，翻的只影響員工。10/31 自動檢查 7 天「若強制就拒」歸零或都已解釋後，請你同意再翻（High）。<small><a href="#s3">第 <span data-computed>3</span> 項</a></small></span></li><li><b>② 用量計量與門上線阻擋項</b><span>已做（2026-10-23）：每道付費縫記用量（自用與合約列只記不扣；單價待你定）、studio 精選免費路徑在付費閘前且門上藏 AI 按鈕。tarot 批次也已記操作者（0119 已套 prod，2026-10-23）。剩：員工路由在 withFeature 範圍外的付費工作仍記在自用帳戶（TASKS「員工路由用量歸屬」）。<small><a href="#s3">第 <span data-computed>3</span> 項</a>、<a href="#s8">第 <span data-computed>8</span> 項</a></small></span></li><li><b>③ 門逐個上線</b><span>規則已定（ADR 018 §2）。tarot → studio（門頁已建）→ video → design → content；cs（等 Chatwoot）、collect、outreach（員工路由要先搬）最後。每個門上線 High。第一個自助客戶不等 Woo：員工邀請（本機帳號登入已能用）＋人工寫合約列，與 Soulful 同一條路。<small><a href="#s8">第 <span data-computed>8</span> 項</a></small></span></li><li><b>④ 收錢分兩段</b><span>4a 已寫好並在拋棄式資料庫驗過（2026-10-23）：付款接頭、收件表、合約與權利同一交易寫入、錢包入帳與只退未用點數、拒付凍結、/ops/billing；付款來源「人工」（轉帳後用 scripts/record-payment.mjs 登記）。等你同意：套 0120 到 prod（High）→ 套 cards/step-4a.patch → 容器加 PAYMENTS_PROVIDERS、PAYMENTS_LOCAL_SECRET；第一筆前還要你定第一個方案（plans 0 筆）。4b 等待決 1、3：Woo 六種事件、定期扣款、點數條款，WordPress 一鍵登入產品門（ADR 015 順序 1）同一包，不單獨先做（High，做了沒人走）。兩題現在就問金流商與會計師。<small><a href="#s4">第 <span data-computed>4</span> 項</a></small></span></li><li><b>⑤ 買斷安裝</b><span>收錢兩段完成、待決 2 律師回覆後開工。<small><a href="#s5">第 <span data-computed>5</span> 項</a></small></span></li><li><b>⑥ 等客戶出現</b><span>只串 API、代理商、白牌網址：出現第一個這類客戶才做。<small><a href="#s6">第 <span data-computed>6</span> 項</a>、<a href="#s7">第 <span data-computed>7</span> 項</a>、<a href="#s9">第 <span data-computed>9</span> 項</a></small></span></li></ul>
 <h3 class="sub-h">賣斷怎麼收錢</h3>
 <ul class="yn rules"><li><b>買斷價</b><span>等於 36 個月訂閱價，含 12 個月更新。</span></li><li><b>更新年費</b><span>買斷價的 20%，選購；不續約仍可使用最後一版，永不鎖。</span></li><li><b>維運月費</b><span>分級選購：備份、監控、更新套用、支援回應時間；含一把維運用的金鑰。</span></li><li><b>AI 與平台 API</b><span>客戶用自己的金鑰自付。</span></li></ul></section>
 
@@ -171,16 +171,16 @@ ul.doors li span{min-width:0}
         <p><b>執行卡：</b><code>agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-3.md</code></p>
         <p><b>完成於：</b><code>e87de9225</code></p>
       </details>
-    </div></li><li class="step todo" id="s4">
+    </div></li><li class="step doing" id="s4">
     <div class="n">4</div>
     <div class="b">
       <p class="plain">客戶在 aware-wave.com 付款後，系統自動開通，不需人工處理。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（金流）</span><span class="who">負責：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-high">風險 High（金流）</span><span class="who">負責：Opus 5.5</span></p>
       <p class="donewhen"><b>完成條件：</b>測試：同一 event_id 重送不做事；退款只退未用點數；拒付凍結；假簽章 401</p>
       <details><summary>工程細節：Woo 付款通知 → 合約與權利；帳本泛化</summary>
         <p>Woo 原生 webhook（六種事件含退款與拒付）→ 收件表去重 → 同一交易寫合約、權利、帳本；media_ 帳本去前綴加 product_key（ADR 015 §4）。</p>
         <p><b>前置：</b><a href="#s3">第 <span data-computed>3</span> 項</a>；定期扣款外掛與台灣金流的支援方式（待決 1）；點數條款與預收會計處理（待決 3）；ADR 015 順序 1（WordPress 一次性碼進產品門）</p>
-        <p><b>檔案：</b><code>lobster-factory/packages/wp-bridge-plugin/</code> <code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/portal/</code></p>
+        <p><b>檔案：</b><code>lobster-factory/packages/db/migrations/0120_payment_events.sql</code> <code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/payments/</code> <code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/contracts.ts</code> <code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/payments/</code> <code>lobster-factory/packages/wp-bridge-plugin/</code></p>
         <p><b>執行卡：</b><code>agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-4.md</code></p>
       </details>
     </div></li><li class="step todo" id="s5">
