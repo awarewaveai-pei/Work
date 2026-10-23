@@ -1,4 +1,25 @@
 # Worklog
+## 2026-10-23（續26）next-admin 提前部署 d19ed55e4（塔羅主角替換＋產品門階段 0）（Claude）
+
+**觸發**：操作者下令「部署」（手動提前，未等 03:00 自動部署）。
+
+**上線內容**（`a67b0048a..d19ed55e4` 中 next-admin 相關 3 個 commit，無 migration）
+- `e71d461ea` 塔羅：每張有主角的牌換主角都跟著換、13 張對照原圖修正（續24）。
+- `d19ed55e4` 塔羅參考資料入庫，cards.ts 加註解（續25）。
+- `e8f13684d` 產品門階段 0（他 session，續22，已過 Codex 審查）：social layout 改用 `ProductDoorShell`、新 `/ops/products`。
+
+**部署前檢查**
+- `DEPLOY_HOLD`：origin/main 無此檔。
+- `check-deploy-drift.ps1`：落後 17 commit（本次部署即處理）；composeVarDrift onlyInRepo=META_* 8 個 → 來自較舊的 `0d85eb44c`，本次 3 個 commit 未動 compose，與本次無關，未處理（照 §0 只能走 `safe-infra-patch.sh`，非本任務範圍）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin（npm test gate → build → healthy after 10s → HTTP smoke 5/5 200：/login、/api/ops/summary、nginx/wordpress、node-api health、nginx/api） | exit=0 | ms=365041
+- 容器：`lobster-next-admin Up (healthy)`，無 `<hex>_` 改名；`.deployed-commit` = d19ed55e4822a9f517816e03758178db7cb2a12f（前次 a67b0048a）。
+- Playwright smoke：PASSED 26／Failed 0／Skipped 6（共 32；skip 為需登入 session 的既有略過項），證據 `agency-os/reports/e2e/2026-10-23/smoke/`
+- REVIEW_WAIVED: NA -- 部署動作本身無程式改動；上線的程式已分別在續22、續24 過 Codex 審查
+- BUGHUNT_WAIVED: NA -- 無程式改動
+
+**rollback**：主機上 `sg-deploy.sh` 失敗會自動回退；手動回退到 a67b0048a 見 `agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md` §2.1。
 ## 2026-10-23（續25）塔羅牌面依據入庫：RWS 文字描述＋78 張原圖（Claude）
 
 **觸發**：操作者決定把續24 用來核對的參考資料放進 git，`cards.ts` 開頭指向它。
