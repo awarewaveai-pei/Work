@@ -96,7 +96,7 @@ export const BACK_OFFICE: Readonly<Record<string, string>> = {
   "ops/system-modes": "員工管理系統模式。", "ops/approvals": "員工審批營運操作。",
   "ops/backup": "員工檢查備份。", "ops/inbox": "員工處理營運告警。",
   "ops/costs": "員工檢查營運成本。", "ops/ai-models": "員工查看各圖片模型的規格與送出方式。", "ops/onboarding": "員工處理客戶啟用。",
-  "ops/tools": "員工維護工具清單。", "build": "員工執行建站作業。",
+  "ops/tools": "員工維護工具清單。", "ops/products": "員工查看產品登記表：門、販售狀態、收費功能。", "build": "員工執行建站作業。",
   "ops-console": "員工檢視營運總台。", "onboard": "員工操作佈建流程。",
   "api-check": "員工檢查 API 連線。", "api-check-client": "員工檢查客戶 API 連線。",
 };

@@ -1,4 +1,25 @@
 # Worklog
+## 2026-10-23（續22）產品門階段 0：門禁兩測＋共用門外框＋/ops/products（ADR 017 順序 8）（Claude）
+
+**觸發**：操作者選方案 B，先做階段 0。
+
+**缺口（調查，file:line）**
+- C1 門上 404：`doors.ts` `routeOnProductDoor` 只放行本產品 API；`registry-code.test.ts` 跨產品測試的 `ownerOfApi` 遇員工 API 回 null → 不檢查。各產品打不到的呼叫：collect/outreach 0、cs 1、tarot 1、studio 2、video 2、content 10、design 11。
+- C2 資料範圍：`app/(shell)/ops/collect/page.tsx:11` 伺服器端 service role；outreach `OrgSwitcher` 跨客戶 → 照搬上門＝客戶看全部客戶（違 ADR 018 §1）。
+
+**修改**
+- `lib/portal/__tests__/registry-code.test.ts`：掃描器加 `calls`（呼叫參數／`new`／JSX 屬性，拆 `as`／括號）、跳過純型別 import、認 `require`、`.js`→`.ts`；`doorFiles(roots)` 自門頁 import 閉包（不含 route）；新測 ① 已開門的頁面呼叫都在自身 `door.api`、② 已開門的登入頁不 import `lib/supabase-server`（`door.anonymous` 公開頁除外：`lib/social/smartlink.ts:82,86` 只回 published 公開欄位）。
+- `app/ProductDoorShell.tsx`（新，標記同原 social layout）；`app/social/layout.tsx` 改用。
+- `app/(shell)/ops/products/page.tsx`（新，只讀 `products.ts`／`doors.ts`）；`products.ts` `BACK_OFFICE` 登記；`SidebarNav.tsx` System 加一列。原卡 `task_86d6f772` 結。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/portal lib/entitlements（148 passed）＋ tsc（本次改動 0 錯；`.next/types` 錯＝他 session 影片路由） | exit=0 | ms=9000
+- 突變：social 門頁加 `fetch("/api/ops/summary")` → ① 紅；加 `import supabase-server` → ② 紅；還原 38/38 綠。
+- 本機 `next-admin-social-ui`（無 Supabase）：`/ops/products` 渲染 11 產品；`/social` 結構 `.shell>.door-main>.door-foot`＋登出與改前同。`social.localhost` 404＝本機無 `PUBLIC_BASE_DOMAIN`，非改動造成。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n -- Codex `agency-os/reports/oracle/2026-10-23-partialreview-81bd9a5a.md`：F1 型別包裝漏抓→已修；F3 require／.js→已修；F2 樣板 `..` 跳脫→不修，記入掃描器限制（防無心之失，不防刻意繞過）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=task_86d6f772|customer-model.ts|ops/products | hits=4（step-8 卡與 data.mjs 說明、BACK_OFFICE、SidebarNav＝本次）
+
+**rollback**：`git revert <本 commit>`；無資料、無部署設定改動。
 ## 2026-10-23（續21）Cloudflare MCP 改用唯一的 CLOUDFLARE_API_TOKEN（取代 OAuth 方案）
 
 - 變更理由：OAuth 需操作者每台／每 client 手動授權；實測現役 account token 直接可用 → 一把 token 通用腳本／next-admin／MCP，零人工步驟。

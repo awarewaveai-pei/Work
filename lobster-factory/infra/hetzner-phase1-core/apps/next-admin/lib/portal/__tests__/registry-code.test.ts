@@ -2,14 +2,15 @@
 // feature is asked by a grantFor/withFeature call site (ADR 017 §4); a product whose code calls another product's
 // routes or bills its features declares it in dependsOn or optional (ADR 017 §0b). Plain library imports across
 // lib/<key>/ are not dependencies: one app ships whole (ADR 017 §5), so code location is not what must be installed.
-// Limits: an /api URL built without a literal "/api/..." prefix, or a key passed through a variable, is not seen.
+// Limits: an /api URL built without a literal "/api/..." prefix, a template whose later parts leave that prefix
+// (".."), or a key passed through a variable, is not seen.
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import { BACK_OFFICE_FEATURES } from "../../entitlements/can";
 import { ROUTE_FEATURES } from "../../entitlements/route-features";
-import { nextAdminProducts } from "../doors";
+import { nextAdminProducts, servedNextAdminProducts, type NextAdminProduct } from "../doors";
 import { PRODUCTS, type PortalProduct } from "../products";
 
 const ROOT = path.join(__dirname, "../../..");
@@ -25,27 +26,45 @@ function sources(dir: string): string[] {
   });
 }
 
-interface Scan { asked: string[]; apis: string[]; imports: string[] }
+// apis: every "/api/..." literal (registry tables included); calls: only those passed to a call or `new`, or set as a
+// JSX attribute -- what a page actually requests. Type-only imports are erased at build, so they are not imports.
+interface Scan { asked: string[]; apis: string[]; calls: string[]; imports: string[] }
+const unwrap = (n: ts.Node | undefined): ts.Node | undefined =>
+  n && (ts.isParenthesizedExpression(n) || ts.isAsExpression(n) || ts.isSatisfiesExpression(n) || ts.isNonNullExpression(n) || ts.isTypeAssertionExpression(n)) ? unwrap(n.expression) : n;
+const apiText = (node: ts.Node | undefined) => {
+  const n = unwrap(node);
+  const t = n && (ts.isStringLiteralLike(n) ? n.text : ts.isTemplateExpression(n) ? n.head.text : null);
+  return t?.startsWith("/api/") ? t.split(/[?#]/)[0].replace(/\/$/, "") : null;
+};
+const typeOnly = (n: ts.ImportDeclaration | ts.ExportDeclaration) => ts.isExportDeclaration(n) ? n.isTypeOnly
+  : !!n.importClause && (n.importClause.isTypeOnly || (!n.importClause.name && !!n.importClause.namedBindings
+    && ts.isNamedImports(n.importClause.namedBindings) && n.importClause.namedBindings.elements.length > 0
+    && n.importClause.namedBindings.elements.every((e) => e.isTypeOnly)));
 function scan(file: string, text: string): Scan {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, /\.tsx$/.test(file) ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
-  const out: Scan = { asked: [], apis: [], imports: [] };
+  const out: Scan = { asked: [], apis: [], calls: [], imports: [] };
   const spec = (s: string) => {
     const r = s.startsWith("@/") ? s.slice(2) : s.startsWith(".") ? path.posix.normalize(path.posix.join(path.posix.dirname(file), s)) : null;
     if (r) out.imports.push(r);
   };
   const visit = (n: ts.Node) => {
-    if ((ts.isImportDeclaration(n) || ts.isExportDeclaration(n)) && n.moduleSpecifier && ts.isStringLiteralLike(n.moduleSpecifier)) spec(n.moduleSpecifier.text);
+    if ((ts.isImportDeclaration(n) || ts.isExportDeclaration(n)) && n.moduleSpecifier && ts.isStringLiteralLike(n.moduleSpecifier) && !typeOnly(n)) spec(n.moduleSpecifier.text);
+    if (ts.isCallExpression(n) || ts.isNewExpression(n)) for (const a of n.arguments ?? []) { const u = apiText(a); if (u) out.calls.push(u); }
+    if (ts.isJsxAttribute(n) && n.initializer) {
+      const u = apiText(ts.isJsxExpression(n.initializer) ? n.initializer.expression : n.initializer);
+      if (u) out.calls.push(u);
+    }
     if (ts.isCallExpression(n)) {
       const arg = n.arguments[0];
       if (arg && ts.isStringLiteralLike(arg)) {
-        if (n.expression.kind === ts.SyntaxKind.ImportKeyword) spec(arg.text);
+        if (n.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(n.expression) && n.expression.text === "require")) spec(arg.text);
         if (ts.isIdentifier(n.expression) && ["grantFor", "withFeature"].includes(n.expression.text)) out.asked.push(arg.text);
       }
       const featureArg = n.arguments[1];
       if (ts.isIdentifier(n.expression) && n.expression.text === "can" && featureArg && ts.isStringLiteralLike(featureArg)) out.asked.push(featureArg.text);
     }
-    const text = ts.isStringLiteralLike(n) ? n.text : ts.isTemplateExpression(n) ? n.head.text : null;
-    if (text?.startsWith("/api/")) out.apis.push(text.split(/[?#]/)[0].replace(/\/$/, ""));
+    const u = apiText(n);
+    if (u) out.apis.push(u);
     ts.forEachChild(n, visit);
   };
   visit(source);
@@ -56,7 +75,10 @@ const FILES = new Map(["app", "lib"].flatMap((d) => sources(path.join(ROOT, d)))
   const rel = posix(f);
   return [rel, scan(rel, readFileSync(f, "utf8"))] as const;
 }));
-const resolve = (r: string) => [r, `${r}.ts`, `${r}.tsx`, `${r}/index.ts`].find((c) => FILES.has(c)) ?? null;
+const resolve = (spec: string) => {
+  const r = spec.replace(/\.[cm]?js$/, "");   // ESM-style "./x.js" names the x.ts source
+  return [r, `${r}.ts`, `${r}.tsx`, `${r}/index.ts`, `${r}/index.tsx`].find((c) => FILES.has(c)) ?? null;
+};
 
 // Code a product owns: lib/<key>/, its staff paths, its door page and door API directories (longest prefix wins).
 const OWNED = PRODUCTS.flatMap((p) => [`lib/${p.key}`, ...p.staffPaths.map((s) => `app/(shell)/${s}`),
@@ -72,6 +94,22 @@ function closure(key: string, seen = new Set<string>()): Set<string> {
   return seen;
 }
 const optional = (p: PortalProduct): readonly string[] => p.modules.optional ?? [];
+
+/** What a door renders from these directories: every file imported, transitively, from the pages under them. Routes
+ *  are not in it (pages fetch them; each route authorizes itself). */
+const loginPages = (p: NextAdminProduct) => [`app${p.door.page}/`];
+const allPages = (p: NextAdminProduct) => [...loginPages(p), ...(p.door.anonymous ?? []).map((a) => `app/(public)${a}/`)];
+function doorFiles(roots: readonly string[]): Set<string> {
+  const todo = [...FILES.keys()].filter((f) => roots.some((r) => f.startsWith(r)) && !/\/route\.[cm]?[jt]sx?$/.test(f));
+  const seen = new Set<string>();
+  while (todo.length) {
+    const f = todo.pop()!;
+    if (seen.has(f)) continue;
+    seen.add(f);
+    for (const r of FILES.get(f)!.imports) { const g = resolve(r); if (g) todo.push(g); }
+  }
+  return seen;
+}
 
 /** Every place a product's code reaches another product: its routes, or a feature it asks for (directly, or in a file it imports). */
 function edges(): Array<{ from: string; to: string; why: string }> {
@@ -137,9 +175,31 @@ describe("registry claims match the code", () => {
     }
   });
 
+  // A served door answers only its own API prefixes (doors.ts routeOnProductDoor); any other call 404s on the door.
+  it("a served door can reach every API its pages call", () => {
+    for (const p of servedNextAdminProducts()) {
+      expect(doorFiles(loginPages(p)).size, `${p.key}: no files under app${p.door.page}`).toBeGreaterThan(0);
+      const unreachable = [...doorFiles(allPages(p))].flatMap((f) => FILES.get(f)!.calls.filter((u) => !p.door.api.some((a) => under(u, a))).map((u) => `${f}: ${u}`));
+      expect(unreachable, `${p.key} door`).toEqual([]);
+    }
+  });
+
+  // A signed-in customer on a product door sees only brands they belong to (ADR 018 §1): its pages read through
+  // brand-scoped routes, never with the service-role client staff pages use. No-login pages (door.anonymous) are
+  // public by declaration and serve published data only, so they are not in scope here.
+  it("a served door's signed-in pages never read with the service-role client", () => {
+    for (const p of servedNextAdminProducts()) {
+      const direct = [...doorFiles(loginPages(p))].filter((f) => FILES.get(f)!.imports.some((r) => r === "lib/supabase-server"));
+      expect(direct, `${p.key} door`).toEqual([]);
+    }
+  });
+
   it("the scanner sees literal asks, URLs in templates, and keys in an imported file", () => {
     const s = scan("lib/x/a.ts", 'import { g } from "@/lib/tarot/b"; await grantFor("studio.image"); fetch(`/api/tools/studio/x?y=${1}`); const s = "/api/social/";');
-    expect(s).toEqual({ asked: ["studio.image"], apis: ["/api/tools/studio/x", "/api/social"], imports: ["lib/tarot/b"] });
+    expect(s).toEqual({ asked: ["studio.image"], apis: ["/api/tools/studio/x", "/api/social"], calls: ["/api/tools/studio/x"], imports: ["lib/tarot/b"] });
+    const j = scan("app/x/p.tsx", 'import type { T } from "@/lib/a"; import { type U } from "@/lib/b"; import { v, type W } from "@/lib/c"; require("@/lib/d"); const f = <form action="/api/a/b" />; new EventSource(`/api/c/${1}`); fetch(("/api/e" as const)); const tbl = ["/api/d"];');
+    expect(j.imports).toEqual(["lib/c", "lib/d"]);
+    expect(j.calls).toEqual(["/api/a/b", "/api/c", "/api/e"]);
     expect(scan("lib/x/a.ts", 'grant("studio.image"); x.grantFor("studio.image"); // grantFor("cs.answer")').asked).toEqual([]);
   });
 });
