@@ -19,8 +19,38 @@ describe("buildCardPrompt pose", () => {
 
   it("gives every {hero} card a pose written with {hero}", () => {
     const heroCards = TAROT_CARDS.filter((c) => c.scene.includes("{hero}"));
-    expect(heroCards.length).toBe(70);
+    expect(heroCards.length).toBe(76);
     for (const c of heroCards) expect(c.pose, c.name).toContain("{hero}");
+  });
+
+  // 2026-10-23: a blue cat on THE MOON still drew a dog and a wolf, and the Aces / the Wheel showed no cat at all.
+  it("puts a swapped subject on every card that has a figure", () => {
+    const figureless = ["EIGHT OF WANDS", "THREE OF SWORDS"];
+    for (const c of TAROT_CARDS) {
+      const p = buildCardPrompt(c, { subject: "a blue cat" });
+      if (figureless.includes(c.name)) expect(p, c.name).not.toContain("blue cat");
+      else expect(p, c.name).toContain("blue cat");
+    }
+  });
+
+  // A garment written next to {hero} stays on a swapped subject: "a blue cat in a red cloak" (Codex, 2026-10-23).
+  it("keeps the protagonist's garments in the default hero only", () => {
+    const GARMENT = /\b(cloak|robes?|dress|tunic|gown|armou?r|vestments?|cap|hat)\b/i;
+    for (const c of TAROT_CARDS) {
+      for (const t of [c.pose, c.scene, c.natural]) {
+        for (const clause of (t ?? "").split(/[,;]/)) {
+          if (clause.includes("{hero}")) expect(clause, c.name).not.toMatch(GARMENT);
+        }
+      }
+    }
+  });
+
+  it("THE MOON keeps a dog and a wolf by default and turns both into the subject, tame and wild", () => {
+    const moon = TAROT_CARDS.find((c) => c.name === "THE MOON")!;
+    expect(buildCardPrompt(moon)).toContain("A dog and a wolf howling");
+    const cat = buildCardPrompt(moon, { subject: "a blue cat" });
+    expect(cat).toContain("A tame blue cat and a wild blue cat howling");
+    expect(cat).not.toMatch(/\b(dog|wolf)\b/);
   });
 
   it("adds the upright sentence only with a subject, the animal-upright kind, and an upright card", () => {
@@ -89,7 +119,9 @@ describe("THE LOVERS couple", () => {
 
   it("draws a man and a woman by default, the woman looking up at the angel", () => {
     const p = buildCardPrompt(lovers);
-    expect(p).toContain("a nude man on the left and a nude woman on the right");
+    // RWS: the woman stands on the left before the serpent tree, the man on the right before the tree of flames.
+    expect(p).toContain("a nude woman on the left and a nude man on the right");
+    expect(p).toContain("behind the left figure a fruit tree entwined with a serpent, behind the right figure a bare dark tree");
     // "a second nude woman" reads as two women; "second" stays only for a same-kind pair.
     expect(p).not.toContain("second");
     expect(p).not.toContain("nude figure");
@@ -104,7 +136,7 @@ describe("THE LOVERS couple", () => {
     expect(mm).not.toContain("woman");
     const ff = buildCardPrompt(lovers, { couple: "woman-woman", subject: "a blue cat" });
     expect(ff).toContain("a female blue cat on the left and a second female blue cat on the right");
-    expect(buildCardPrompt(lovers, { subject: "a blue cat" })).toContain("a male blue cat on the left and a female blue cat on the right");
+    expect(buildCardPrompt(lovers, { subject: "a blue cat" })).toContain("a female blue cat on the left and a male blue cat on the right");
     expect(ff).not.toMatch(/\bmale blue cat/);
   });
 

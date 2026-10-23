@@ -1,4 +1,30 @@
 # Worklog
+## 2026-10-23（續24）塔羅 78 張對照原牌圖片＋主角替換涵蓋每張有主角的牌（Claude）
+
+**觸發**：操作者給 `agency-os/docs/tarot_cards/78_Tarot_Card_Visual_Descriptions_EN.md`＋`Tarot card Images/`（78 張 RWS 原圖），要求逐張對照、注意各模型字數上限，並要求【主要替換】時卡面主角跟著換（月亮換貓仍畫狗和狼）。
+
+**缺口（file:line 為改前）**
+- C1 主角替換漏網：月亮 `cards.ts:83`、命運之輪 `:75`、四張王牌 `:109,125,141,157` 的 scene 無 `{hero}` → 換主角後卡面毫無主角痕跡。
+- C2 衣服被移到王座：`e45f4417b` 為讓「動物・自然」的貓不穿衣，把皇帝 `:69`、寶劍國王 `:154`、錢幣國王 `:170` 的袍子寫成 draped over the throne → 沒換主角時原牌人物也沒穿袍子。同類：愚者「ragged clothes」、權杖騎士蠑螈在鞍布、寶劍八「裹紅布」。
+- C3 戀人左右顛倒：原圖女左（蛇蘋果樹）男右（火焰樹）；舊文男左。
+- C4 牌面不符原圖：錢幣七樹上 6 枚＋地上 1 枚（舊寫 7 枚在樹上）；寶劍騎士白馬（舊灰馬）；惡魔山羊角鬍；塔一紅斗篷一戴冠；月亮紅小龍蝦、雙塔夾小路、閉眼月臉；聖盃王牌是池塘；寶劍／錢幣王牌手從左雲、權杖／聖盃從右雲；力量獅子紅金色。其餘 66 張人物／道具／左右一致。
+
+**修改**（`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/tarot/cards.ts`）
+- 不變量（寫進 `TarotCard.scene`／`hero` 註解）：每個主角都是 `{hero}`（只有寶劍三、權杖八無人物）；主角衣著只寫在預設 `hero`，換主角即隨之消失。
+- 新欄位 `duo`（月亮）：預設 dog／wolf；有主角 → `tame <主角>`／`wild <主角>`，與 `couple` 共用 A/B 交替填法。
+- 王牌 hero=`hand`＋pose＋`airborne`；命運之輪 hero=`blue sphinx`＋pose。
+- 戀人：文字由左到右，`coupleHeroes` 男女組合改回傳 `[woman, man]`（A＝左邊女人、看天使）。先試「樹跟人寫在同一句」→ schnell 兩棵樹黏成一棵且少一人（seed 7），退回原句型。
+- 衣著類補掃（Codex F1）：聖盃五 hero=`figure in a long black cloak`、聖盃八 hero=`traveler in a red cloak`、塔去掉 red cloak（兩人共用 hero，保留 crowned）。
+- 測試 `cards.test.ts`：新增「{hero} 子句不得含 cloak/robe/dress/tunic/gown/armor/vestments/cap/hat」；{hero} 卡數 70→76；新增「有人物的牌換主角後 prompt 必含主角」「月亮預設狗狼、換主角變 tame/wild」；戀人斷言改左女右男。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/tarot/" lib/tarot（26 passed）＋ npx tsc --noEmit | exit=0 | ms=9000
+- 長度（T5 v1.1 spiece 實數，78 張×預設/梵谷×原主角/貓自然/貓人×兩種順序＝936 組）：牌面部分最長 222 token／139 字（愚者梵谷）< schnell 256、Ideogram 150；預設風格全文最長 209 token／132 字；FLUX dev 最長 366 < 512。超出的只有梵谷尾段構圖／情緒句（原設計）。Imagen 4 上限官方仍未公布。
+- 實生（FLUX schnell, seed 7/42）：月亮預設狗狼＋紅龍蝦✓、換貓兩隻貓✓；權杖王牌貓從雲出握杖✓；皇帝紅袍盔甲✓、換貓無袍✓；命運之輪貓持劍坐頂✓；戀人 3 張皆女左蛇樹、男右火焰樹✓。錢幣七 schnell 數不準（數量為模型極限，非 prompt）。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n -- Codex `agency-os/reports/oracle/2026-10-23-partialreview-ebff8085.md`：F1 聖盃五／聖盃八／塔的 scene 仍寫斗篷 → 換貓仍穿斗篷；已修（衣著移入 hero，信物類 crown/wreath/blindfold/bandage 保留），並加測試「{hero} 子句不得含衣著詞」；突變：聖盃八 scene 補回 in a red cloak → 該測試紅，還原 15/15 綠
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=coupleHeroes|draped over the throne|on the left and a|bright ragged clothes | hits=11（WORKLOG 歷史 3、cards.ts 5、cards.test.ts 3；coupleHeroes 無其他呼叫端；.claude 命中僅 file-history／bash log）
+
+**rollback**：`git revert <本 commit>`；純 prompt 資料，無資料庫、無部署設定改動。
 ## 2026-10-23（續23）TASKS.md 歸檔：已完成母項不再卡在未完成區；危機訊息驗收打勾
 
 **觸發**：操作者「把 tasks.md 已打勾的刪除」→ 改口「移到已完成歷程區，保留紀錄」→「檢查還有沒有打勾沒移的，處理好」→「改 archive-completed-tasks.ps1 同樣拆法，附測試」＋「危機訊息驗收要打勾，類似的都打勾」。
