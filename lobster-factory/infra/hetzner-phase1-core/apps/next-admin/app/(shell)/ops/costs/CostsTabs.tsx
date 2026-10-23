@@ -3,7 +3,10 @@
 import { useState } from "react";
 import { featureUnitCostUsd, usdToNtd } from "@/lib/ai/cost-calculator";
 import { TEXT_FEATURES, IMAGE_RATES, TOOL_RATES, VIDEO_MOTION_RATES, INFRA_MONTHLY, TWD_RATE } from "@/lib/ai/cost-model";
-import { spendKind, type LedgerGroup, type MonthReport, type SpendKind, type SpendSummary } from "@/lib/ai/spend-report";
+import {
+  spendKind, DAY_SPIKE_RATIO, ROUTE_SPIKE_RATIO,
+  type LedgerGroup, type LiveSpend, type MonthReport, type SpendAnomaly, type SpendKind, type SpendSummary,
+} from "@/lib/ai/spend-report";
 import { CostEstimator } from "./CostEstimator";
 import AiModelsClient from "@/app/(shell)/tools/ai-models/AiModelsClient";
 
@@ -13,8 +16,10 @@ import AiModelsClient from "@/app/(shell)/tools/ai-models/AiModelsClient";
 export interface CostsData {
   note?: string;
   windowDays: number;
-  /** 真實花費 — the 流水帳 total must equal it. */
+  /** 流水帳 window totals (same 30 Taipei days as live.daily, so the two sums match). */
   window: SpendSummary;
+  /** 真實花費 — live monitoring: pace, trend, anomalies. */
+  live: LiveSpend;
   /** 流水帳 — newest groups first, capped for size; `ledgerGroupCount` is the uncapped count. */
   ledger: LedgerGroup[];
   ledgerGroupCount: number;
@@ -168,52 +173,107 @@ function QualityNotes({ s }: { s: SpendSummary }) {
   );
 }
 
-function SpendTab({ s, windowDays, note }: { s: SpendSummary; windowDays: number; note?: string }) {
-  const text = kindUsd(s, "text"), image = kindUsd(s, "image"), video = kindUsd(s, "video");
+function anomalyText(a: SpendAnomaly): string {
+  switch (a.type) {
+    case "day_spike":
+      return `${a.day.slice(5)} 單日花費 ${NT(a.usd)}，是前 14 天中位數 ${NT(a.baselineUsd)} 的 ${DAY_SPIKE_RATIO} 倍以上。`;
+    case "route_spike":
+      return `今天 ${routeLabel(a.route)}（${KIND_LABEL[a.kind]}）已花 ${NT(a.usd)}，前 7 天平均每天 ${NT(a.baselineUsd)}（${ROUTE_SPIKE_RATIO} 倍以上）。`;
+    case "fallback_priced":
+      return `近 30 天 ${a.count} 筆模型不在費率表，用預設費率估價（${NT(a.usd)}，可能不準）。`;
+    case "zero_cost":
+      return `近 30 天 ${a.count} 筆記為 $0（沒有對應單價），實際花費可能沒算進來。`;
+  }
+}
+
+function change(cur: number, prev: number): string {
+  if (prev === 0) return cur > 0 ? "新" : "—";
+  const p = ((cur - prev) / prev) * 100;
+  return `${p >= 0 ? "+" : ""}${p.toFixed(0)}%`;
+}
+
+function DailyChart({ live }: { live: LiveSpend }) {
+  const max = Math.max(...live.daily.map((d) => d.usd), 0.0001);
+  const spikeDays = new Set(live.anomalies.flatMap((a) => (a.type === "day_spike" ? [a.day] : [])));
+  return (
+    <div style={{ padding: "14px 16px 10px" }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 120 }}>
+        {live.daily.map((d) => (
+          <div
+            key={d.day}
+            title={`${d.day}：${NT(d.usd)}（${USD(d.usd)}，${d.count} 筆）`}
+            style={{
+              flex: 1, minWidth: 0, height: `${Math.max((d.usd / max) * 100, d.usd > 0 ? 2 : 0)}%`,
+              background: spikeDays.has(d.day) ? "var(--red)" : "var(--accent)",
+              borderRadius: "3px 3px 0 0", opacity: d.usd > 0 ? 1 : 0.2,
+            }}
+          />
+        ))}
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10.5, color: "var(--text-muted)", marginTop: 6 }}>
+        <span>{live.daily[0]?.day.slice(5)}</span>
+        <span>最高 {NT(max)} / 天</span>
+        <span>今天 {live.daily[live.daily.length - 1]?.day.slice(5)}</span>
+      </div>
+    </div>
+  );
+}
+
+function SpendTab({ live, note }: { live: LiveSpend; note?: string }) {
+  const vsPrev = live.prevMonth ? change(live.projectedMonthUsd, live.prevMonth.usd) : null;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       {note && <Warn>{note}</Warn>}
-      <QualityNotes s={s} />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-        <StatCard label="文字 AI" usd={text.usd} sub={`${text.count.toLocaleString()} 次呼叫`} />
-        <StatCard label="圖片" usd={image.usd} sub={`${image.count.toLocaleString()} 張`} />
-        <StatCard label="影片動態" usd={video.usd} sub={`${video.count.toLocaleString()} 段`} />
-        <StatCard label={`合計（近 ${windowDays} 天，不含基建）`} usd={s.totalUsd} sub={`${s.count.toLocaleString()} 筆 = 流水帳合計`} accent />
+        <StatCard label="今天" usd={live.today.usd} sub={`${live.today.count.toLocaleString()} 筆`} />
+        <StatCard label="近 7 天" usd={live.last7.usd} sub={`${live.last7.count.toLocaleString()} 筆`} />
+        <StatCard label={`${live.month} 至今`} usd={live.monthToDate.usd} sub={`${live.monthToDate.count.toLocaleString()} 筆`} />
+        <StatCard
+          label="照目前速度，月底約"
+          usd={live.projectedMonthUsd}
+          sub={live.prevMonth ? `估算 · ${live.prevMonth.month} 整月 ${USD(live.prevMonth.usd)}（${vsPrev}）` : "估算 · 無上月資料可比"}
+          accent
+        />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "3fr 2fr", gap: 16 }}>
-        <Card>
-          <CardHead title="依功能 route" />
-          {s.byRoute.length === 0
-            ? <EmptyState text={`近 ${windowDays} 天尚無記錄。`} />
-            : <Table
-                head={["Route", "類型", "次數", "tokens in/out", "花費 NT$"]}
-                rows={s.byRoute.map((r) => [
-                  <span key="r" style={{ fontFamily: "monospace", fontSize: 11 }}>{r.key}</span>,
-                  KIND_LABEL[r.kind],
-                  r.count.toLocaleString(),
-                  r.kind === "text" ? `${(r.inTok / 1000).toFixed(0)}k / ${(r.outTok / 1000).toFixed(0)}k` : "—",
-                  NT(r.usd),
-                ])}
-              />
-          }
-        </Card>
-        <Card>
-          <CardHead title="依模型" />
-          {s.byModel.length === 0
-            ? <EmptyState text={`近 ${windowDays} 天尚無記錄。`} />
-            : <Table
-                head={["模型", "次數", "花費 NT$"]}
-                rows={s.byModel.map((r) => [IMAGE_RATES[r.key]?.label ?? r.key, r.count.toLocaleString(), NT(r.usd)])}
-              />
-          }
-        </Card>
-      </div>
+      <Card>
+        <CardHead title="需要注意" right={live.anomalies.length === 0 ? "無" : `${live.anomalies.length} 項`} />
+        {live.anomalies.length === 0
+          ? <EmptyState text="近 7 天沒有花費暴增，近 30 天沒有估價可疑的記錄。" />
+          : <div style={{ display: "flex", flexDirection: "column" }}>
+              {live.anomalies.map((a, i) => (
+                <div key={i} style={{ padding: "9px 16px", fontSize: 12.5, borderTop: i ? "1px solid var(--border-subtle)" : "none", color: "var(--text-primary)" }}>
+                  <span style={{ color: a.type.endsWith("spike") ? "var(--red)" : "var(--yellow)", fontWeight: 700, marginRight: 8 }}>●</span>
+                  {anomalyText(a)}
+                </div>
+              ))}
+            </div>
+        }
+      </Card>
+
+      <Card>
+        <CardHead title="每日花費 — 近 30 天（台灣時間）" right={`合計 ${NT(live.last30.usd)} · ${live.last30.count.toLocaleString()} 筆 = 流水帳合計`} />
+        <DailyChart live={live} />
+      </Card>
+
+      <Card>
+        <CardHead title="近 7 天最花錢的功能 — 和再前 7 天比" />
+        {live.topRoutes7.length === 0
+          ? <EmptyState text="近 7 天尚無記錄。" />
+          : <Table
+              head={["功能", "類型", "次數", "近 7 天 NT$", "再前 7 天 NT$", "變化"]}
+              rows={live.topRoutes7.map((r) => [
+                routeLabel(r.route), KIND_LABEL[r.kind], r.count.toLocaleString(), NT(r.usd), NT(r.prevUsd), change(r.usd, r.prevUsd),
+              ])}
+            />
+        }
+      </Card>
 
       <p style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.7, margin: 0 }}>
-        資料來源：<code>ai_call_logs</code> 全部記錄（文字 = 精準 token × 費率；圖片／影片 = 每次成功呼叫 × 單價）。與「流水帳」「月報」同一份資料。
-        金額是用量 × 公開單價算出，不是廠商帳單。匯率 USD→NT$ = {TWD_RATE}。
+        這頁看「現在花多快、有沒有異常」；某個月的總帳、依廠商／客戶分項看「月報」，每一筆看「流水帳」。三頁同一份資料（<code>ai_call_logs</code>）。
+        月底推估 = 本月至今 ÷ 本月已過的比例，只是速度估算。暴增判準：單日 ≥ 前 14 天中位數 {DAY_SPIKE_RATIO} 倍且 ≥ US$0.5；單一功能今天 ≥ 前 7 天日均 {ROUTE_SPIKE_RATIO} 倍且 ≥ US$0.2。
+        金額是用量 × 公開單價，不是廠商帳單。匯率 USD→NT$ = {TWD_RATE}。
       </p>
     </div>
   );
@@ -377,7 +437,7 @@ function LedgerTab({ groups, groupCount, s, windowDays }: { groups: LedgerGroup[
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
     <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-      近 {windowDays} 天合計 <b style={{ color: "var(--text-primary)" }}>{NT(s.totalUsd)}</b>（{USD(s.totalUsd)}，{s.count.toLocaleString()} 筆）=「真實花費」合計。
+      近 {windowDays} 天合計 <b style={{ color: "var(--text-primary)" }}>{NT(s.totalUsd)}</b>（{USD(s.totalUsd)}，{s.count.toLocaleString()} 筆）= 真實花費「每日花費」圖合計。
       同一篇文章／同一批圖片的多筆呼叫合成一組；其他呼叫標「單筆」。
       {groupCount > groups.length && <> 列出最近 {groups.length} 組（共 {groupCount.toLocaleString()} 組），合計仍含全部。</>}
     </div>
@@ -615,7 +675,7 @@ export function CostsTabs({ data, monthlyInfraUsd }: Props) {
         ))}
       </div>
 
-      {tab === "spend"     && <SpendTab s={data.window} windowDays={data.windowDays} note={data.note} />}
+      {tab === "spend"     && <SpendTab live={data.live} note={data.note} />}
       {tab === "rates"     && <RatesTab monthlyInfraUsd={monthlyInfraUsd} />}
       {tab === "estimator" && <CostEstimator />}
       {tab === "models"    && <ModelsTab />}

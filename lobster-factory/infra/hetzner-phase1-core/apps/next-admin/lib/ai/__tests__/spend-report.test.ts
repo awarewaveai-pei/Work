@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  groupLedger, monthlyReports, rowsSince, spendKind, summarizeSpend, taipeiMonth, taipeiMonthStartIso,
+  groupLedger, liveSpend, monthlyReports, rowsSince, spendKind, summarizeSpend, taipeiDayStartIso, taipeiMonth, taipeiMonthStartIso,
   type SpendRow,
 } from "../spend-report";
 import { loadSpendRows, MAX_ROWS } from "../spend-loader";
@@ -91,6 +91,56 @@ describe("monthly report", () => {
   it("spendKind: NULL kind is text, video route is video", () => {
     expect(spendKind({ kind: null, route: "/api/content/title" })).toBe("text");
     expect(spendKind({ kind: "image", route: "video/motion" })).toBe("video");
+  });
+});
+
+describe("live monitoring (真實花費)", () => {
+  // 2026-10-23 12:00 Taipei; month started 2026-10-01 00:00 Taipei = 09-30T16:00Z.
+  const now = new Date("2026-10-23T04:00:00Z");
+  const at = (iso: string, usd: number, p: Partial<SpendRow> = {}) => row({ created_at: iso, cost_usd: usd, ...p });
+  const live = [
+    at("2026-09-15T02:00:00+00:00", 3),                       // previous month
+    at("2026-09-30T15:30:00+00:00", 1),                       // 09-30 23:30 Taipei → September
+    at("2026-09-30T16:30:00+00:00", 0.1),                     // 10-01 00:30 Taipei → October
+    at("2026-10-20T01:00:00+00:00", 0.1, { route: "/cs/generate" }),
+    at("2026-10-22T16:10:00+00:00", 0.9, { route: "/cs/generate" }),   // today 00:10 Taipei
+    at("2026-10-22T15:50:00+00:00", 0.05),                    // yesterday 23:50 Taipei
+  ];
+  const l = liveSpend(live, now);
+
+  it("today / 7 days / month-to-date use Taipei days", () => {
+    expect(l.today.usd).toBeCloseTo(0.9, 9);
+    expect(l.last7.usd).toBeCloseTo(1.05, 9);
+    expect(l.monthToDate.usd).toBeCloseTo(1.15, 9);
+    expect(l.month).toBe("2026-10");
+    expect(l.prevMonth).toEqual({ month: "2026-09", usd: 4 });
+  });
+
+  it("projects month-end linearly from the elapsed fraction", () => {
+    const elapsed = (now.getTime() - Date.parse("2026-09-30T16:00:00Z")) / (31 * 86400_000);
+    expect(l.projectedMonthUsd).toBeCloseTo(1.15 / elapsed, 9);
+  });
+
+  it("daily covers 30 days ending today and sums to the same window the ledger uses", () => {
+    expect(l.daily.length).toBe(30);
+    expect(l.daily.at(-1)?.day).toBe("2026-10-23");
+    expect(l.daily[0].day).toBe("2026-09-24");
+    const windowRows = rowsSince(live, taipeiDayStartIso(now, 29));
+    expect(l.last30.usd).toBeCloseTo(summarizeSpend(windowRows).totalUsd, 9);
+    expect(groupLedger(windowRows).reduce((s, g) => s + g.totalUsd, 0)).toBeCloseTo(l.last30.usd, 9);
+  });
+
+  it("flags today's spike for a day and for a route, and nothing on a quiet history", () => {
+    expect(l.anomalies.some((a) => a.type === "day_spike" && a.day === "2026-10-23")).toBe(true);
+    expect(l.anomalies.some((a) => a.type === "route_spike" && a.route === "/cs/generate")).toBe(true);
+    const quiet = liveSpend([at("2026-10-22T16:10:00+00:00", 0.1)], now);
+    expect(quiet.anomalies).toEqual([]);
+  });
+
+  it("top routes compare the last 7 days with the 7 before", () => {
+    const t = l.topRoutes7.find((r) => r.route === "/cs/generate");
+    expect(t?.usd).toBeCloseTo(1.05, 9); // 0.1 + 0.9 + 0.05 (row() defaults to /cs/generate)
+    expect(t?.prevUsd).toBe(0);
   });
 });
 

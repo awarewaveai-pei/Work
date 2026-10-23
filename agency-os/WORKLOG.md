@@ -1,4 +1,23 @@
 # Worklog
+## 2026-10-23（續44）/ops/costs：真實花費改成即時監控，和月報分工（Claude）
+
+**觸發**：操作者問「真實花費和月報應該要有差異性，你是怎麼區分的?」→ 同意「真實花費＝即時監控、月報＝月結帳，拿掉重複的表」。
+
+**根因**：續41 兩頁同一份資料、只差時間窗（近 30 天 vs 日曆月），真實花費的依 route／模型表與月報分項重複，兩頁回答同一個問題。
+
+**修改**
+- `lib/ai/spend-report.ts`：新增純函式 `liveSpend(rows, now)`——今天／近 7 天／本月至今（台灣日）、月底線性推估＋上月整月、近 30 天每日（含 0 元日）、近 7 天 vs 再前 7 天前 5 功能、異常（單日 ≥ 前 14 天中位數 3× 且 ≥ US$0.5；單一功能今天 ≥ 前 7 天日均 3× 且 ≥ US$0.2；費率表外估價；$0 記錄）。門檻為具名常數。新增 `taipeiDay`、`taipeiDayStartIso`。
+- `app/(shell)/ops/costs/CostsTabs.tsx`：真實花費 = 4 卡（今天／7 天／本月至今／月底約，推估標「估算」並比上月）＋「需要注意」清單＋30 天每日長條圖（暴增日紅色）＋近 7 天功能變化表；拿掉依 route／依模型／依類型分項（月報才有）。流水帳標頭改對「每日花費」圖合計。
+- `page.tsx`：流水帳視窗改成和每日圖同一段 30 個台灣日（`taipeiDayStartIso(now, 29)`），兩個合計必相等；多讀 14 天供基準。
+- `lib/ai/__tests__/spend-report.test.ts`：+5 測（台灣日切、推估公式、30 天圖合計＝流水帳合計、暴增有／安靜無、7 天比較）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/ai（48 passed）＋ npx tsc --noEmit（0） | exit=0 | ms=600
+- REALTEST_EVIDENCE: tool=Bash | cmd=preview next-admin-verify /ops/costs 真實花費（prod 資料）：今天 $0.11/29 筆、近 7 天 $1.12、10 月至今 $1.93/496 筆、月底約 $2.62（9 月整月 $1.67，+57%）、需要注意＝無、每日圖合計 496 筆＝流水帳標頭「$1.93，496 筆」；console 無錯 | exit=0 | ms=3000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n -- Codex `agency-os/reports/oracle/2026-10-23-partialreview-43687b26.md` NO FINDINGS
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=SpendTab s=|真實花費」合計|byRoute | hits=0（byRoute 仍由 summarizeSpend 提供，月報 CSV 不用；無其他呼叫端）
+
+**rollback**：`git revert <本 commit>`（無 schema 變更）。
 ## 2026-10-23（續43）/ops/costs 分頁照財務邏輯排序（Claude）
 
 **觸發**：操作者：「tabs 你不知道要按財務邏輯排順序嗎?」
