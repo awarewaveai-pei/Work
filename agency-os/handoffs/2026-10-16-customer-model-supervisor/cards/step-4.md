@@ -13,9 +13,10 @@
 - 試用結束：trial 到 `current_period_end` 無付款 → 權利列 `expired`；資料保留 90 天後由同一個每日 job 標記 `erasure_due`，實際刪除走既有擦除流程（不在本步）。
 - 營運看得到：`app/(shell)/ops/billing/page.tsx` 唯讀表：每個計費帳戶的合約、權利、餘額、最近 20 筆帳本；資料只經 `lib/entitlements/tables.ts`。
 
-## 4a 狀態（2026-10-23，WORKLOG 續48）
-- 寫好、驗過、**未推**：`cards/step-4a.patch`（0120 未套 prod；推上 main 會被 `sg-deploy.sh` migration 閘擋下 03:00 部署）。套用＝操作者 go 後：套 0120 → `git apply` → 推 → 容器加 `PAYMENTS_PROVIDERS=local`、`PAYMENTS_LOCAL_SECRET`（safe-infra-patch）。
-- 已推（不需 migration）：`lib/payments/{provider,local,index}.ts`、`scripts/record-payment.mjs`（操作者登記轉帳的指令）。
+## 4a 狀態（2026-10-23，WORKLOG 續48 設計與驗證、續51 上線）
+- **已上線**（操作者 go）：0120 已套 prod；程式 `f2139d35a`（2026-10-24 03:00 自動部署進容器）；next-admin 已有 `PAYMENTS_PROVIDERS=local`、`PAYMENTS_LOCAL_SECRET`（同值在 `mcp/user-env.ps1`／vault）。
+- 登記轉帳：`scripts/secrets-vault.ps1 -Action run -Names @('PAYMENTS_LOCAL_SECRET') -Command 'node lobster-factory/infra/hetzner-phase1-core/apps/next-admin/scripts/record-payment.mjs credit_pack --org <uuid> --units <點數> --ref <轉帳編號>'`（`RUNNABLE_DEMOS.md`）。
+- 訂閱付款前要先有方案列（plans 0 筆，操作者定）。
 - 與上列設計不同處：狀態機整個在 Postgres 函式 `billing_apply_payment_event`（收件、合約、權利、帳本同一交易）；路由 `app/api/webhooks/payments/[provider]`（4b 的 woo 走同一路由，不另開 `woo-billing`）；設定 `PAYMENTS_PROVIDERS` 是清單（轉帳與 Woo 會同時存在）；錢包凍結＝新表 `credit_wallet_holds`（不動 `media_billing_accounts.status`，video Stripe webhook 會覆寫它）；贈送與合約重疊＝付費合約結束舊贈送列；全功能帳戶（0118）不能買訂閱、能買點數。
 - 帳本泛化**不在 4a**：4a 只寫 `grant`／`refund`，現有 `media_credit_ledger` 夠用；留 4b。卡上的 `0105_credit_ledger_generalize.sql` 編號已被 `0105_social_v16` 用掉，4b 另取號。
 

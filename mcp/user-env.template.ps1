@@ -141,6 +141,9 @@ $vars = @{
     HCI_FETCH_RUNNER_SHARED_SECRET       = ""
     HCI_FETCH_RUNNER_MINIO_ROOT_USER     = ""
     HCI_FETCH_RUNNER_MINIO_ROOT_PASSWORD = ""
+    # ADR 017 step 4a: signs operator-recorded payments (next-admin scripts/record-payment.mjs); same value as the
+    # next-admin container's PAYMENTS_LOCAL_SECRET (/root/lobster-phase1/.env).
+    PAYMENTS_LOCAL_SECRET = ""
 }
 
 foreach ($entry in $vars.GetEnumerator()) {
