@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-24（續7）next-admin 部署 f71262e21（Theme Editor 側欄標題色／字級）＋正式站檢查（Claude）
+
+**觸發**：操作者要在 https://app.aware-wave.com/tools/theme 自己改標題色與字級 → 需上 prod。只有本 commit 是新的 next-admin 改動；無 DEPLOY_HOLD。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin（snapshot lobster-phase1-next-admin:rollback-20261024-043135；healthy after 10s；smoke all endpoints OK；deployed commit f71262e21） | exit=0 | ms=330000
+- 正式站 /tools/theme：Sidebar 組出現 `--sidebar-section-label`（色塊 #94a3b8）與 `--sidebar-section-label-size`。
+- Playwright smoke：26 passed／0 failed／6 skipped。
+- REVIEW_WAIVED: NA -- 部署動作無程式改動；f71262e21 審查見續6
+- BUGHUNT_WAIVED: NA -- 部署動作無程式改動
+
+**rollback**：snapshot `lobster-phase1-next-admin:rollback-20261024-043135` 或 `sg-deploy.sh` 回 38cdcc3cf（`DEPLOY_ROLLBACK_RUNBOOK.md` §2.1）。
 ## 2026-10-24（續6）Theme Editor 可改側欄分區標題顏色與字級；編輯器改讀唯一 token 清單（Claude）
 
 **觸發**：操作者：分區標題顏色太淡，把它的 color 與 font size 加到 /tools/theme 自己改。
