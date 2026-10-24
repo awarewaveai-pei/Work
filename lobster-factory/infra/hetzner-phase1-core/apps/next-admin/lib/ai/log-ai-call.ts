@@ -13,6 +13,14 @@
  */
 import { getSupabaseWriteClient } from "../supabase-server";
 import { textCallCostUsd, resolveTextRate } from "./cost-calculator";
+import type { Grant } from "../entitlements/can";
+
+/** The organization a grant bills (null when it could not be resolved): a library call logs its cost there. Like the
+ *  logger itself it never throws -- reading the account must not break the call being logged. */
+export const billedOrgId = (grant: Grant): string | null => {
+  const s = (grant as Partial<Grant> | undefined)?.subject;
+  return s && s.kind !== "unresolved" ? s.orgId : null;
+};
 
 /** Shape of the `usage` block on an Anthropic Messages response (subset we need). */
 export interface AnthropicUsageLike {

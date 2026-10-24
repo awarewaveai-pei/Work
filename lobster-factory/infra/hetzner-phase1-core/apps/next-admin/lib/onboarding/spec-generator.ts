@@ -1,5 +1,6 @@
 import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
+import { billedOrgId, logAiCall } from "@/lib/ai/log-ai-call";
 import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "../ai/gateway";
 import { selectPackage } from "./package-selector";
 import type { IntakeForm, WebsiteSpec } from "./intake-form";
@@ -93,7 +94,8 @@ export async function generateWebsiteSpec(
   if (!apiKey) return { ok: false, error: "missing_anthropic_api_key" };
 
   const { package_slug, packs } = selectPackage(form);
-  const Anthropic = await loadAnthropic(await grantFor("ops.onboarding-spec"));
+  const grant = await grantFor("ops.onboarding-spec");
+  const Anthropic = await loadAnthropic(grant);
   const client = new Anthropic({ apiKey });
 
   // M4: AbortController timeout (same pattern as lib/ops-inbox/ai/claude.ts)
@@ -112,6 +114,7 @@ export async function generateWebsiteSpec(
       { signal: controller.signal }
     );
 
+    void logAiCall({ route: "onboarding/spec", response: message, organizationId: billedOrgId(grant), tool: "onboarding" });
     const incomplete = claudeIncomplete(message);
     if (incomplete) return { ok: false, error: incomplete };
     raw = claudeText(message).trim();

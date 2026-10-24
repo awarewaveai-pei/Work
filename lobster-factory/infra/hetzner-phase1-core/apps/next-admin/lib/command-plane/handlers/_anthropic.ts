@@ -10,6 +10,7 @@
 
 import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
+import { billedOrgId, logAiCall } from "@/lib/ai/log-ai-call";
 import * as Sentry from "@sentry/nextjs";
 import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "@/lib/ai/gateway";
 
@@ -44,7 +45,8 @@ export async function generateSummary(input: AnthropicSummaryInput): Promise<str
     return `_AI summary unavailable: ANTHROPIC_API_KEY not configured._\n${rawFallback(input.payload)}`;
   }
 
-  const Anthropic = await loadAnthropic(await grantFor("ops.command-plane"));
+  const grant = await grantFor("ops.command-plane");
+  const Anthropic = await loadAnthropic(grant);
   const client = new Anthropic({ apiKey });
 
   try {
@@ -66,6 +68,7 @@ export async function generateSummary(input: AnthropicSummaryInput): Promise<str
       ],
     });
 
+    void logAiCall({ route: "command-plane/summary", response, organizationId: billedOrgId(grant), tool: "command-plane" });
     const incomplete = claudeIncomplete(response);
     if (incomplete) return `_AI summary unavailable (${incomplete})._\n${rawFallback(input.payload)}`;
     const text = claudeText(response);

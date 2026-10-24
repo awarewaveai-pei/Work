@@ -132,3 +132,13 @@ describe("the Gemini Flash-Lite model in use is priced", () => {
     expect(r.matchedKey).toBe(GEMINI_LITE_MODEL);
   });
 });
+
+describe("resolveTextRate -- dated ids echoed by the API", () => {
+  it("an OpenAI dated id and a mini variant take their own row, not the bigger model's", async () => {
+    const { resolveTextRate } = await import("../cost-calculator");
+    expect(resolveTextRate("gpt-4o-mini-2024-07-18")).toMatchObject({ matchedKey: "gpt-4o-mini", fallback: false });
+    expect(resolveTextRate("gpt-5.4-mini-2026-03-01")).toMatchObject({ matchedKey: "gpt-5.4-mini", fallback: false });
+    expect(resolveTextRate("gpt-4o-mini-search-preview")).toMatchObject({ matchedKey: "gpt-4o-mini", fallback: false });
+    expect(resolveTextRate("claude-haiku-4-5-20251001")).toMatchObject({ matchedKey: "claude-haiku-4-5-20251001" });
+  });
+});

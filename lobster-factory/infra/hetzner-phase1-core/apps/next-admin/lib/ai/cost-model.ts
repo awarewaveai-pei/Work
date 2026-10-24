@@ -52,6 +52,9 @@ export const TEXT_RATES: Record<string, TextRate> = {
   "gpt-5.4-mini":              { inputPerM: 0.75, outputPerM: 4.5, cacheReadMult: 0.1, cacheWriteMult: 1, label: "GPT-5.4 mini", vendor: "OpenAI" },
   "gpt-5.4-nano":              { inputPerM: 0.2, outputPerM: 1.25, cacheReadMult: 0.1, cacheWriteMult: 1, label: "GPT-5.4 nano", vendor: "OpenAI" },
   "gpt-4o":                    { inputPerM: 2.5, outputPerM: 10, cacheReadMult: 0.5, cacheWriteMult: 1, label: "GPT-4o", vendor: "OpenAI" },
+  // outreach default (lib/outreach/ai-openai.ts) and the knowledge-base embedder (lib/kb/config.ts KB_EMBEDDING).
+  "gpt-4o-mini":               { inputPerM: 0.15, outputPerM: 0.6, cacheReadMult: 0.5, cacheWriteMult: 1, label: "GPT-4o mini", vendor: "OpenAI" },
+  "text-embedding-3-small":    { inputPerM: 0.02, outputPerM: 0, cacheReadMult: 1, cacheWriteMult: 1, label: "OpenAI text-embedding-3-small", vendor: "OpenAI" },
   // Legacy Perplexity Sonar — kept for historical cost-log lookup; no longer called (replaced by Serper).
   "sonar":                     { inputPerM: 1, outputPerM: 1, cacheReadMult: 1, cacheWriteMult: 1, label: "Perplexity Sonar (legacy)", vendor: "Perplexity" },
   // Gemini Flash-Lite: lib/ai/gemini-models.ts GEMINI_LITE_MODEL (ops-inbox diagnostics, cs fallback). Google list price

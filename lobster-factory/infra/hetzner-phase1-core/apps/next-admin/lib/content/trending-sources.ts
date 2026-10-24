@@ -1,5 +1,6 @@
 import { CLAUDE_FAST_MODEL, claudeParams, loadAnthropic } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
+import { billedOrgId, logAiCall } from "@/lib/ai/log-ai-call";
 import { isSafePublicHttps } from "./public-https";
 /**
  * trending-sources.ts — 搜尋積木家族（kind:"search"）
@@ -32,12 +33,14 @@ export async function aiChat(prompt: string, _timeoutMs = 10000): Promise<string
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return "";
   try {
-    const Anthropic = await loadAnthropic(await grantFor("content.trending"));
+    const grant = await grantFor("content.trending");
+    const Anthropic = await loadAnthropic(grant);
     const client = new Anthropic({ apiKey });
     const msg = await client.messages.create({
       ...claudeParams(CLAUDE_FAST_MODEL, 512, "medium", { thinking: "off" }),
       messages: [{ role: "user", content: prompt }],
     });
+    void logAiCall({ route: "content/trending-ai", response: msg, organizationId: billedOrgId(grant), tool: "content" });
     return msg.content[0]?.type === "text" ? msg.content[0].text : "";
   } catch { return ""; }
 }

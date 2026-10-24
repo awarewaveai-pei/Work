@@ -32,6 +32,7 @@ import type {
 import type { MatchAttribution } from "@/lib/kb/db";
 import { providerUrl } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
+import { billedOrgId, logAiCall } from "@/lib/ai/log-ai-call";
 
 class OpenAIEmbeddingProvider implements EmbeddingProvider {
   id = KB_EMBEDDING.model;
@@ -52,7 +53,9 @@ class OpenAIEmbeddingProvider implements EmbeddingProvider {
         signal: controller.signal,
       });
       if (!res.ok) throw new Error(`openai_embeddings_${res.status}`);
-      const json = (await res.json()) as { data?: Array<{ index?: number; embedding: number[] }> };
+      const json = (await res.json()) as { data?: Array<{ index?: number; embedding: number[] }>; usage?: { prompt_tokens?: number } };
+      void logAiCall({ route: "kb/embed", model: KB_EMBEDDING.model, inputTokens: json.usage?.prompt_tokens ?? 0, outputTokens: 0,
+        organizationId: billedOrgId(grant), tool: "kb" });
       // Order by the response's own `index`: the API documents an index per item and does not
       // promise array order. A shuffled response would pair each chunk with another chunk's vector
       // — retrieval then returns confidently irrelevant passages, with no error anywhere.

@@ -12,6 +12,8 @@ import { putDesignObject } from "../storage/r2";
 import { randomUUID } from "node:crypto";
 import { providerUrl } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
+import { logImageCost } from "@/lib/ai/log-ai-call";
+import { toolCostUsd } from "@/lib/ai/cost-calculator";
 
 const REALESRGAN_VERSION_DEFAULT =
   "b3ef194191d13140337468c916c2c5b96dd0cb06dffc032a022a31807f6a5ea8"; // nightmareai/real-esrgan (live-verified pin 2026-06-11)
@@ -171,6 +173,7 @@ export async function upscaleToPrintFile(
       if (currentEdge !== null && currentEdge >= targetLongEdge) break;
     }
     if (passes === 0) return { ok: false, error: "upscale_no_pass_ran" };
+    void logImageCost({ route: "studio/upscale", model: "real-esrgan", vendor: "Replicate", costUsd: toolCostUsd("upscale") * passes, tool: "studio" });
 
     let buffer: Buffer;
     try {

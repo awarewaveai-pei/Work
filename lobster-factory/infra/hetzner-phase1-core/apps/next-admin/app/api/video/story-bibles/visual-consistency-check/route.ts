@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { withFeature } from "@/lib/entitlements/grant";
+import { billedOrgId, logAiCall } from "@/lib/ai/log-ai-call";
 import type { Grant } from "@/lib/entitlements/can";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { isDesignsAsset } from "@/lib/storage/r2";
@@ -69,6 +70,7 @@ async function handlePost(req: NextRequest, grant: Grant): Promise<NextResponse>
       { ...claudeParams(CLAUDE_MODEL, 1024, "low"), ...claudeFallback(CLAUDE_MODEL), messages: [{ role: "user", content }] },
       { timeout: TIMEOUT_MS },
     );
+    void logAiCall({ route: "/api/video/story-bibles/visual-consistency-check", response: msg, organizationId: billedOrgId(grant), tool: "video" });
     const incomplete = claudeIncomplete(msg);
     if (incomplete) return NextResponse.json({ ok: false, error: `Claude 未完成回答（${incomplete}）` }, { status: 502 });
     const text = claudeText(msg);

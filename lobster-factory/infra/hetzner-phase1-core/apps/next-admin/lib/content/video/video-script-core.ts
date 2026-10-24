@@ -6,6 +6,7 @@
  */
 import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
+import { billedOrgId, logAiCall } from "@/lib/ai/log-ai-call";
 import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "../../ai/gateway";
 
 /** 與 Python pipeline.py CLAUDE_MODEL 對齊（影片生成共用同一模型 ID）。 */
@@ -202,7 +203,8 @@ export async function generateVideoScript(
 
   let response: Anthropic.Beta.Messages.BetaMessage;
   try {
-    const Anthropic = await loadAnthropic(await grantFor("video.script"));
+    const grant = await grantFor("video.script");
+    const Anthropic = await loadAnthropic(grant);
     const client = new Anthropic({ apiKey });
     // max_tokens 隨場景數放大：6 場 ≈ 4096（沿用原值，無回歸）；場景數可達 20（場景總數滑桿上限）
     // → ~550 tokens/場（narration+image_prompt+broll+JSON 結構，含 160 字長旁白梯次的餘裕），上限 8192。
@@ -213,6 +215,7 @@ export async function generateVideoScript(
       ...claudeFallback(CLAUDE_MODEL),
       messages: [{ role: "user", content: `${systemPrompt}\n\n${userContent}` }],
     });
+    void logAiCall({ route: "video/script", response, organizationId: billedOrgId(grant), tool: "video" });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, status: 502, error: `Claude API 呼叫失敗：${msg}` };

@@ -35,9 +35,11 @@ const safeTok = (n: number | undefined): number => Math.max(0, Number(n) || 0);
  */
 export function resolveTextRate(model: string): { rate: TextRate; matchedKey: string; fallback: boolean } {
   if (TEXT_RATES[model]) return { rate: TEXT_RATES[model], matchedKey: model, fallback: false };
-  const undated = model.replace(/-\d{8}$/, "");
+  // Anthropic dates as -20260101, OpenAI as -2024-07-18.
+  const undated = model.replace(/-(\d{8}|\d{4}-\d{2}-\d{2})$/, "");
   if (TEXT_RATES[undated]) return { rate: TEXT_RATES[undated], matchedKey: undated, fallback: false };
-  const prefix = Object.keys(TEXT_RATES).find((k) => model.startsWith(k));
+  // Longest key wins: "gpt-4o-mini-x" must not take the gpt-4o row (nor gpt-5.4-mini-x the gpt-5.4 row).
+  const prefix = Object.keys(TEXT_RATES).filter((k) => model.startsWith(k)).sort((a, b) => b.length - a.length)[0];
   if (prefix) return { rate: TEXT_RATES[prefix], matchedKey: prefix, fallback: false };
   return { rate: TEXT_RATES[FALLBACK_TEXT_MODEL], matchedKey: FALLBACK_TEXT_MODEL, fallback: true };
 }

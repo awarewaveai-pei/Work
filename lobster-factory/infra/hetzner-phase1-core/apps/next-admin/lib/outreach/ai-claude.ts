@@ -2,6 +2,7 @@
 // SECURITY: API key is passed in; NEVER log it.
 import { CLAUDE_FAST_MODEL, claudeParams, providerUrl } from "@/lib/ai/gateway";
 import type { Grant } from "@/lib/entitlements/can";
+import { billedOrgId, logAiCall } from "@/lib/ai/log-ai-call";
 
 export interface ClaudeResult {
   text: string;
@@ -36,7 +37,9 @@ export async function generateWithClaude(
   const j = (await resp.json()) as {
     content?: Array<{ type: string; text?: string }>;
     model?: string;
+    usage?: { input_tokens?: number; output_tokens?: number };
   };
+  void logAiCall({ route: "outreach/generate", response: { model: j.model ?? model, usage: j.usage }, organizationId: billedOrgId(grant), tool: "outreach" });
   const text = (j.content ?? [])
     .filter((b) => b.type === "text")
     .map((b) => b.text ?? "")

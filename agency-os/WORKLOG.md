@@ -1,4 +1,29 @@
 # Worklog
+## 2026-10-25（續1）每個付費 AI 呼叫都寫進 ai_call_logs：補 13 個沒記花費的呼叫點，加閘擋之後新加的；順帶修 OpenAI 帶日期的模型名被算成大模型價格（Claude）
+
+**觸發**：操作者「把另外 6 個呼叫 AI 卻沒記花費的檔也補上 logAiCall；script-forge 等另一個 session 改完再動，並加一道檢查擋之後新加的。」前情見 2026-10-24 續56 C6。
+
+**發現**
+- C1 範圍比 6 個大：用「會呼叫供應商」的樣式掃整個 app、lib、components，共 37 個檔。不記花費、而且呼叫者也沒記的有 13 處：操作者點名的 6 個（command-plane 摘要、trending AI、影片腳本、onboarding 規格、角色一致性比對、script-forge），加上 KB embedding（`lib/kb/rag.ts`，客服、KB 上傳、排程蒐集都會走到）、外展的 3 個供應商（`lib/outreach/ai-{claude,gemini,openai}.ts`，路由也沒記）、升頻（`lib/studio/upscaler.ts`，publish 路由也沒記）、塔羅批次每張卡（`app/api/internal/tarot/batch/[jobId]/card/route.ts`）、建 staging 站的主圖（`provision-staging`）。要守住的規則：/ops/costs 只讀 ai_call_logs，所以每個付費呼叫都要寫一筆。檢查器若列「豁免清單」只會讓它閉嘴，所以 13 處全部補上。
+- C2 script-forge：AUTO_CONTENT session 已經 idle，該檔沒有未提交的改動（最後是 `f233bd101`），所以這次一併處理。它是串流回應：Anthropic 從 `message_start` 取輸入和快取 token、從 `message_delta` 取輸出 token（累計值），在 `finally` 記帳，中途中斷也會記已花的部分；OpenAI 加上 `stream_options.include_usage`，取最後的 usage frame 記帳。
+- C3 記到哪個組織：函式庫拿到的是 `grantFor` 給的 grant，新增 `billedOrgId(grant)`（grant 的計費帳戶，無法判定時給 null）。它和 logger 一樣永遠不 throw：script-forge 的既有測試傳入假 grant `{}` 時，第一版直接 throw 而變紅，改成防禦式寫法。
+- C4 **舊 bug：OpenAI 帶日期的模型名被算錯價**。`resolveTextRate` 只會去掉 `-20260101` 這種日期，不會去掉 OpenAI 的 `-2024-07-18`；前綴比對又取表格裡第一個符合的。結果 `gpt-4o-mini-2024-07-18` 被算成 gpt-4o 的價格，`gpt-5.4-nano-2026-03-17` 被算成 gpt-5.4。實測外展呼叫的成本列寫成 $0.000045（gpt-4o 價），因此發現。→ 兩種日期格式都會去掉，前綴改取最長的 key。歷史紀錄：78 筆 gpt-5.4-nano（2026-06-26 至 06-29）記成 $0.39，實際約 $0.03；3 筆 gpt-5.4 帶日期的那幾筆本來就是 5.4，價格正確。歷史資料不回改，只記在這裡。
+- C5 價目表補兩列：gpt-4o-mini（外展預設，$0.15／$0.60）、text-embedding-3-small（KB，$0.02／1M）。外展 Gemini 用 `gemini-flash-latest` 這個別名，價格無法固定，紀錄會帶 `rate_fallback`（照 logAiCall 的既有設計標出來，不會藏起來）。
+- C6 閘：新增 `lib/ai/__tests__/ai-cost-logged.test.ts`。檔案裡只要出現 `messages.create/stream`、`generateContent`、`providerUrl`、`embedContent`、`embeddings.create`，就必須呼叫 `logAiCall` 或 `logImageCost`；不然就得列在 `CALLERS_LOG`（函式庫把記帳交給呼叫者，該函式的每個呼叫者都要記，或也列在表裡）。供應商網址只准出現在 `gateway.ts`（既有的 import-boundary 測試在管），所以這個樣式不會漏掉其他呼叫形狀；另外也 grep 過 chat.completions、images、responses、replicate.run，都是 0。
+
+**修改**（next-admin）：`lib/ai/log-ai-call.ts`（`billedOrgId`）、`lib/ai/cost-calculator.ts`（日期與最長前綴）、`lib/ai/cost-model.ts`（2 列）、上述 13 個呼叫點、`lib/ai/__tests__/ai-cost-logged.test.ts`（新）、`lib/ai/__tests__/cost-calculator.test.ts`。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=一次性 vitest 探針（未 commit，跑完刪除）呼叫真正的 KB embedder 和 `generateWithOpenAI`，從正式 ai_call_logs 讀回：`kb/embed` text-embedding-3-small OpenAI 2/0 token；`outreach/generate` gpt-4o-mini-2024-07-18 OpenAI 14/1 token（這筆在 C4 修好前寫入，所以記成 gpt-4o 價 $0.000045） | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（368 files／3244 passed）＋ tsc（這次的檔 0 錯；唯一的錯在另一個 session 的 social-report-jobs 測試） | exit=0 | ms=120000
+- 突變：拿掉 `rag.ts` 的記帳，閘指名 `lib/kb/rag.ts` 變紅；`resolveTextRate` 改回取第一個前綴，「gpt-4o-mini-search-preview」那一條變紅。兩次都還原後變綠。
+- REVIEW_WAIVED: NA -- 見下行
+- ORACLE_WAIVED: Codex 不能用。`~/.codex/config.toml` 在 2026-10-25 00:46 被改成 `model = "gpt-6.1-sol"`（不是本 session 改的），回 400「not supported when using Codex with a ChatGPT account」；`codex-oracle.ps1` 沒有指定模型的參數，全域設定我不動。改做書面對抗自審：① 重複記帳：trending 路由、publish 路由、tarot generate 與 content/image（`generateTarotImage` 本身不記）、studio 路由（`image-provider` 本身不記）都只有一邊記；cs 備援在 Claude 回空字串時會有兩次真實呼叫、兩筆紀錄，這是對的。② 串流 usage：`message_delta.usage.output_tokens` 是累計值，所以用指定不用加；`message_start` 之前就中斷時 token 全為 0，logAiCall 本來就會跳過。③ 呼叫成功前就記：升頻在下載和上傳前記，錢已經花了，正確；批次卡只在生成成功後記。④ 漏掉的呼叫形狀：見 C6。外加兩個突變（見上）。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=messages\.(create\|stream)\(\|generateContent\(\|providerUrl\(\|embeddings\.create\( | hits=37（全部由閘覆蓋：直接記、交給呼叫者記，或是 gateway 定義本身）
+
+**另外**：Codex 的模型設定壞了（見 ORACLE_WAIVED），之後所有 `/codex-review` 都會失敗，要操作者決定改回哪個模型。
+
+**rollback**：`git revert <本 commit>`（只多寫成本紀錄，沒有 migration）。
 ## 2026-10-24（續60）Codex card 02 customer identities：WordPress user 對應單一 billing account
 
 - **根因／不變量**：ADR 017 step 4b 缺少 WordPress user id 到 customer organization + auth user 的唯一、不可變映射；0124 以 `(provider, external_id)`、`(provider, user_id)` 唯一鍵與 service_role select/insert-only RLS 關閉整類重複／改寫問題，`plans` 非空時拒絕 drop 欄位。
