@@ -39,6 +39,7 @@ const C1 = '1b8096116';
 const C2 = '3bb0cd120';
 const C3 = 'dfc3027a5';
 const C4 = '3976fa73f';
+const C5 = 'f4cfe6dad';
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '員工工具登記表', plain: '列出所有可勾選的工具：每個產品一格、每個後台頁面一格。新增頁面或 API 若未歸入任何一格，測試就會失敗。',
@@ -85,13 +86,13 @@ export const STEPS = [
       done('C4.4', '新頁面登記到產品清單與側欄。', C4),
     ] },
   { n: 5, code: 'C5', group: 'C', title: '沒權限頁與文件', plain: '沒有權限時顯示說明頁，告訴員工所需工具，並請擁有者開通。同時把這套規則寫入架構文件。',
-    gate: '說明頁顯示工具名稱；架構決策文件與現況文件都寫入新規則。', risk: 'Low', model: 'Sonnet 5.5（照卡）', status: 'in_progress', depends: ['C2'],
+    gate: '說明頁顯示工具名稱；架構決策文件與現況文件都寫入新規則。', risk: 'Low', model: 'Sonnet 5.5（照卡）', status: 'done', commit: C5, depends: ['C2'],
     what: '/no-access 頁；ADR 019＋ADR_INDEX；APP_AWARE_WAVE_CURRENT_STATE 身分段；RUNNABLE_DEMOS',
     files: ['app/(shell)/no-access/page.tsx', 'agency-os/docs/architecture/decisions/019-staff-tool-grants.md'],
     items: [
       done('C5.1', '說明頁顯示所需工具，並請員工找擁有者開通。', C2),
-      todo('C5.2', '寫入架構決策文件，並登記到索引。'),
-      todo('C5.3', '現況文件補上員工工具權限；可執行示範清單新增一條你能自己執行的指令。'),
+      done('C5.2', '寫入架構決策文件，並登記到索引。', C5),
+      done('C5.3', '現況文件補上員工工具權限；可執行示範清單新增一條你能自己執行的指令。', C5),
     ] },
   { n: 6, code: 'C6', group: 'D', title: '上線', plain: '程式先以只記錄、不擋的方式上線。你在權限頁設定好每位員工後，觀察 7 天紀錄；確認沒有問題，再正式開始擋。',
     gate: '連續 7 天沒有「本來會擋」的紀錄，或每筆紀錄都已說明；正式開始擋後，員工只看得到已勾選的工具。', risk: 'High（正式站權限）', model: '你＋Opus 5.5', status: 'not_started', depends: ['C3', 'C4', 'C5'],
