@@ -3,7 +3,7 @@
 
 export const META = {
   title: '客戶怎麼來 監工台',
-  updated: '2026-10-24',
+  updated: '2026-10-25',
   adr017: 'agency-os/docs/architecture/decisions/017-entitlements-and-self-hosted-modules.md',
   adr018: 'agency-os/docs/architecture/decisions/018-product-doors-and-buyout-delivery.md',
   tasks: 'agency-os/TASKS.md「ADR 017 客戶怎麼買」',
@@ -50,7 +50,7 @@ export const NEXT = [
   { h: '① 翻強制模式（等 10/31，不占工時）', t: '權利已就位（2026-10-23 部署）；客戶本人操作時已一律強制，翻的只影響員工。10/31 自動檢查 7 天「若強制就拒」歸零或都已解釋後，請你同意再翻（High）。', steps: [3] },
   { h: '② 用量計量與門上線阻擋項', t: '已做（2026-10-23）：每道付費縫記用量（自用與合約列只記不扣；單價待你定）、studio 精選免費路徑在付費閘前且門上藏 AI 按鈕。tarot 批次也已記操作者（0119 已套 prod，2026-10-23）。剩：員工路由在 withFeature 範圍外的付費工作仍記在自用帳戶（TASKS「員工路由用量歸屬」）。', steps: [3, 8] },
   { h: '③ 門逐個上線', t: 'tarot、studio（2026-10-23）、video、design（2026-10-24）已上線，共用一個 nginx 門區塊。每個功能分開買或贈送（你 2026-10-24 定）：客戶帳戶持有該產品才進得了門，否則只看到「尚未開通」；每扇門左邊選單列功能，沒持有的灰掉（做好待部署）。下一個 content，逐門任務在 cards/step-8-doors-video-design-content.md；cs（等 Chatwoot）、collect、outreach（員工路由要先搬）最後。每個門上線 High。第一個自助客戶不等 Woo：員工邀請（本機帳號登入已能用）＋人工寫合約列，與 Soulful 同一條路。', steps: [8] },
-  { h: '④ 收錢分兩段', t: '4a 已上線（2026-10-23；0120 已套 prod，程式 10/24 03:00 部署）：付款接頭、收件表、合約與權利同一交易寫入、錢包入帳與只退未用點數、拒付凍結、/ops/billing；付款來源「人工」（轉帳後用 scripts/record-payment.mjs 登記）。訂閱付款前還要你定第一個方案（plans 0 筆）。4b 設計與八張小卡已寫（2026-10-24，cards/step-4.md §4b）：付款事件由 wp-bridge 外掛用官方 PHP action 送（不用 Woo 原生 webhook：沒有續約事件、失敗 5 次就停用）；WordPress 會員對應計費帳戶一張表（0124）；第一次付款的會員自動建帳戶並寄設定密碼信；WordPress 一次性碼進產品門（ADR 015 順序 1）。4b-1、4b-3、4b-4（next-admin 端）、4b-7 已完成（0124、0126 已套 prod，2026-10-25）；外掛端 4b-2 等待決 1；4b-2 等待決 1、4b-6 與 4b-7 等待決 3、4b-5 等待決 5——三題的選項都列在「待你決定」，選了就能開工。', steps: [4] },
+  { h: '④ 收錢分兩段', t: '4a 已上線（2026-10-23；0120 已套 prod，程式 10/24 03:00 部署）：付款接頭、收件表、合約與權利同一交易寫入、錢包入帳與只退未用點數、拒付凍結、/ops/billing；付款來源「人工」（轉帳後用 scripts/record-payment.mjs 登記）。訂閱付款前還要你定第一個方案（plans 0 筆）。4b 設計與八張小卡已寫（2026-10-24，cards/step-4.md §4b）：付款事件由 wp-bridge 外掛用官方 PHP action 送（不用 Woo 原生 webhook：沒有續約事件、失敗 5 次就停用）；WordPress 會員對應計費帳戶一張表（0124）；第一次付款的會員自動建帳戶並寄設定密碼信；WordPress 一次性碼進產品門（ADR 015 順序 1）。4b-1、4b-3、4b-4（next-admin 端）、4b-7 已完成（0124、0126 已套 prod，2026-10-25）；扣款、點數條款、點數規則三題已定（都選 A）；4b-2 外掛與 4b-5 點數規則進行中。4b-6 由你在 WordPress 後台做（裝 WooCommerce Subscriptions 與 TapPay、結帳必登入、條款勾選），TapPay 開通定期扣款要先問業務。', steps: [4] },
   { h: '⑤ 買斷安裝', t: '收錢兩段完成、待決 2 律師回覆後開工。', steps: [5] },
   { h: '⑥ 等客戶出現', t: '只串 API、代理商、白牌網址：出現第一個這類客戶才做。', steps: [6, 7, 9] },
 ];
@@ -129,16 +129,16 @@ export const STEPS = [
   { n: 3, card: 'cards/step-3.md', plain: '每項收費功能執行前都先確認權限；未購買時按鈕顯示停用。', title: '每個收費點只問 can(主體, feature_key, actor)', what: '社群、collect、認知平台的收費按鈕與 API 呼叫前問一次；認知平台 check_entitlement 改成 can() 薄接頭（加 actor、回 grant 物件），呼叫端 main.py 9 處同 commit。',
     files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/can.ts', 'Projects/internal/cognitive-engineering-os/ai_lego/platform/entitlement/check.py', 'Projects/internal/cognitive-engineering-os/ai_lego/apps/api/main.py'], gate: '測試：點數功能沒有權利列時看餘額，餘額 0 即拒（有 comp／contract 列先用列，2026-10-23）；代操時從 on_behalf_of 扣點，稽核記 actor；沒有 active 權利列不簽許可；沒有登記列的產品拿不到 grant', risk: 'Medium', model: 'Opus 5.5', depends: [2], status: 'done', commit: 'e87de9225' },
   { n: 4, card: 'cards/step-4.md', plain: '客戶在 aware-wave.com 付款後，系統自動開通，不需人工處理。', title: 'Woo 付款通知 → 合約與權利；帳本泛化', what: 'Woo 原生 webhook（六種事件含退款與拒付）→ 收件表去重 → 同一交易寫合約、權利、帳本；media_ 帳本去前綴加 product_key（ADR 015 §4）。',
-    files: ['lobster-factory/packages/db/migrations/0120_payment_events.sql', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/payments/', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/contracts.ts', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/payments/', 'lobster-factory/packages/wp-bridge-plugin/'], gate: '測試：同一 event_id 重送不做事；退款只退未用點數；拒付凍結；假簽章 401', risk: 'High（金流）', model: 'Opus 5.5', depends: [3], status: 'in_progress', before: '定期扣款外掛與台灣金流的支援方式（待決 1）；點數條款與預收會計處理（待決 3）；點數能不能付沒持有的功能（待決 5）；ADR 015 順序 1（WordPress 一次性碼進產品門）',
+    files: ['lobster-factory/packages/db/migrations/0120_payment_events.sql', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/payments/', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/contracts.ts', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/payments/', 'lobster-factory/packages/wp-bridge-plugin/'], gate: '測試：同一 event_id 重送不做事；退款只退未用點數；拒付凍結；假簽章 401', risk: 'High（金流）', model: 'Opus 5.5', depends: [3], status: 'in_progress', before: '扣款方式、點數條款、點數規則三題已定（2026-10-25，都選 A，寫進 ADR 017 產品決定 #3、#11 與 ADR 015 §待查）',
     items: [
       { id: '4a', plain: '人工付款入口：收件表、合約與權利同一交易、錢包入帳、/ops/billing', status: 'done', commit: 'f2139d35a' },
       { id: '4b-1', plain: 'WordPress 會員對應計費帳戶（0124 customer_identities，已套 prod 2026-10-25）', status: 'done', commit: '0eb785f1c' },
       { id: '4b-3', plain: 'next-admin woo 收件接頭：驗章、查會員、第一次付款自動建帳戶（email 須經 WordPress 證明）；被拒的付款開 ops incident（0126 已套 prod）', status: 'done', commit: '125cdad43' },
-      { id: '4b-2', plain: 'wp-bridge 外掛送付款事件（訂閱、續約、換方案、點數包、退款、取消）；等待決 1', status: 'todo' },
-      { id: '4b-6', plain: 'Woo 店面設定：結帳必登入、條款勾選、商品對應方案；等待決 3', status: 'todo' },
+      { id: '4b-2', plain: 'wp-bridge 外掛：送付款事件（WCS＋TapPay）、驗證會員 email、我的帳號「進入」按鈕', status: 'todo' },
+      { id: '4b-6', plain: 'Woo 店面設定（你在 WordPress 後台做）：裝 WCS 與 TapPay、結帳必登入、條款勾選、商品對應方案', status: 'todo' },
       { id: '4b-7', plain: '/ops/billing 顯示客戶未用點數合計（合約負債）', status: 'done', commit: '125cdad43' },
       { id: '4b-4', plain: 'WordPress 一次性碼進產品門：next-admin 端做好（只給 email 已證明的帳戶、防登入固定），按鈕在外掛 4b-2；設密鑰才開', status: 'done', commit: '125cdad43' },
-      { id: '4b-5', plain: '點數只付已持有功能（改 can() 點數分支，High）；等待決 5', status: 'todo' },
+      { id: '4b-5', plain: '點數只付已持有功能（改 can() 點數分支，High）', status: 'todo' },
     ] },
   { n: 5, card: 'cards/step-5.md', plain: '系統可一鍵完整安裝到客戶主機；交接時收回 AwareWave 的存取權。', title: '買斷安裝階段', what: '三道閘後才開工：款項落定、客戶網域與主機歸屬驗證、操作者核准；模組清單、建置時排除 SAFETY_GATE、授權檔簽發（含 max_tenants）、安裝專屬更新憑證、客戶主機商 token 以密鑰句柄傳入、交接撤 key。排在一鍵架站 Stage 4 之後。',
     files: ['lobster-factory/packages/workflows/src/provision/', 'agency-os/docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md'], gate: '授權檔離線驗章；AwareWave 伺服器停止後安裝仍可用；安裝失敗只清本次 project；客戶網域由 compose、nginx、DNS 同一組值產生並 curl 200', risk: 'High（交付）', model: 'Fable 5.1 設計 → Opus 5.5 做', depends: [3, 4], status: 'not_started', before: '交付 Postiz AGPL 前請律師確認（待決 2）' },
@@ -150,24 +150,8 @@ export const STEPS = [
 
 // 操作者自己要決定的（agent 不能替她定）
 export const OPEN = [
-  { n: 1, what: '訂閱每月扣款：WooCommerce 應使用哪個定期扣款外掛？台灣金流是否支援定期扣款？（2026-10-24 查：台灣公司開不了 Stripe；WooCommerce Subscriptions 是唯一有官方事件的訂閱外掛；各家金流都沒有拒付通知，拒付由操作者人工登記）', before: 4, src: 'ADR 017 產品決定 Q3', detail: '選項細節：cards/step-4.md §待決選項', options: [
-    { k: 'A', pick: true, t: 'WooCommerce Subscriptions（US$279/年）＋ TapPay 自動扣款：整合最完整、站內退刷；先問 TapPay 業務 SaaS 訂閱能否過件，不能就選 B' },
-    { k: 'B', t: 'WooCommerce Subscriptions ＋ 統一金流 PAYUNi Pro（外掛 NT$3,980/年）：文件完整，要申請幕後授權與綁伺服器 IP' },
-    { k: 'C', t: 'WooCommerce Subscriptions ＋ 綠界定期定額（cloudwp 外掛 NT$399/月）：外掛三年沒更新，退款要到綠界後台' },
-    { k: 'D', t: '不買訂閱外掛：賣 12 個月預付商品，到期前寄信請客戶再買；沒有自動扣款' },
-  ] },
   { n: 2, what: '買斷交付前請律師確認授權：Postiz（AGPL-3.0）、MinIO（AGPLv3，Trigger 內含）、Redis（Trigger 與核心用浮動 7-alpine，7.4 起授權改為 RSALv2／SSPL）。', before: 5, src: 'ADR 017 §5' },
-  { n: 3, what: '點數不退、不轉讓的條款如何撰寫（台灣數位內容解除權例外）；賣點數的款項使用前列為預收，請會計師確認。（2026-10-24 查：解除權例外準則第 2 條第 5 款要「事先告知＋消費者事先同意」，告知要放在商品說明旁；預收＝合約負債，扣點時轉營收。程式已同時支援不退與只退未用）', before: 4, src: 'ADR 015 §4', detail: '選項細節：cards/step-4.md §待決選項', options: [
-    { k: 'A', pick: true, t: '結帳必勾「點數購買後立即提供，不適用七日解除權；不可退、不可轉讓、不可換現金，只能在 AwareWave 產品使用」，同一句放商品說明旁；收款開發票入合約負債，/ops/billing 顯示未用點數合計給會計師' },
-    { k: 'B', t: '給 7 天猶豫期：7 天內未使用可全退，用過只退未用（退款程式現成）' },
-    { k: 'C', t: '不退，另加 12 個月未用失效：要加失效分錄的 migration、消保爭議風險；第一版不建議' },
-  ] },
   { n: 4, what: '客戶白牌網址的憑證走 Cloudflare for SaaS（客戶 CNAME 到 AwareWave）還是主機上自動簽發（on-demand ACME）？', before: 9, src: 'ADR 018 §2' },
-  { n: 5, what: '點數怎麼配「每個功能分開買或由 AwareWave 贈送」：現在有點數的客戶能按次使用沒買的功能（can.ts 點數分支），與門規則「持有才進」不一致；目前沒有客戶有點數，改規則不影響現況。', before: 4, src: 'ADR 017 產品決定 #11', detail: '選項細節：cards/step-4.md §待決選項', options: [
-    { k: 'A', pick: true, t: '點數只是付款方式：功能要有一張列才能用；comp 列免費、contract 列的點數功能按次扣錢包、沒列一律拒。與門規則同一條不變量；點數包商品對應一個方案列' },
-    { k: 'B', t: '維持現狀：有錢包就能按次用任何點數功能（進不了門但 API 可用，與門規則矛盾）' },
-    { k: 'C', t: '持有該產品任一列即可用該產品所有點數功能：點數功能不能分開賣或送' },
-  ] },
 ];
 
 // 要一起改但不是順序步驟的

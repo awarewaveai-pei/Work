@@ -25,8 +25,10 @@ const order = adr.split(/^## 順序/m)[1]?.split(/^## /m)[0] || '';
 const adrSteps = (order.match(/^\d+\. /gm) || []).length;
 if (adrSteps !== STEPS.length) fail(`ADR 017 順序有 ${adrSteps} 條，監工台有 ${STEPS.length} 步`);
 const tasks = readFileSync(path.join(repo, 'agency-os/TASKS.md'), 'utf8');
-const taskOpen = (tasks.match(/^\s*- \[[ x]\] 待決 \d+：/gm) || []).length;
-if (taskOpen !== OPEN.length) fail(`TASKS 有 ${taskOpen} 條待決，監工台有 ${OPEN.length} 條`);
+// 只綁還沒決定的：TASKS 打勾的待決已寫進 ADR，不再列在「待你決定」。
+const taskOpen = (tasks.match(/^\s*- \[ \] 待決 \d+：/gm) || []).length;
+if (taskOpen !== OPEN.length) fail(`TASKS 有 ${taskOpen} 條未決，監工台有 ${OPEN.length} 條`);
+for (const o of OPEN) if (!new RegExp(`^\\s*- \\[ \\] 待決 ${o.n}：`, 'm').test(tasks)) fail(`待決 ${o.n} 在 TASKS 不是未決`);
 for (const s of STEPS) {
   if (!s.card) continue;
   const card = readFileSync(path.join(here, s.card), 'utf8');
