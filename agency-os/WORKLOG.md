@@ -1,4 +1,25 @@
 # Worklog
+## 2026-10-24（續49）員工逐工具權限 C3：側欄、首頁、客戶中心分頁只顯示有權限的工具（Claude）
+
+- **任務**：R0-PLAN §6 C3（`agency-os/handoffs/2026-10-24-staff-tool-grants/R0-PLAN.md`）。接 C2（3bb0cd120），同一判斷 `lib/staff-access.ts`。
+- **不變量**：畫面上出現的連結＝這個人打開不會被擋的連結；連結所屬工具由同一個 `toolsFor` 決定，不另維護清單。不受限的人（owner；shadow 期間沒設定過的人）看到的與以前完全一樣。
+- **做了什麼**（路徑相對 next-admin）：
+  - `app/sidebar-sections.ts`（新）：`DEFAULT_SECTIONS` 與純函式從 `app/SidebarNav.tsx` 原樣搬出（'use client' 模組的值在 server component 讀不到），加 `visibleSections`；`SidebarNav.tsx` 轉出口，既有引用（theme 頁、sidebar-coverage 測試）不用改。
+  - `app/(shell)/layout.tsx`：讀 middleware 的 header → `staffGrantOf` → 受限者只傳可開的 href 給 `SidebarNav visible`；先套主題存的順序再過濾（不打亂 Theme Editor 的存檔）；外部連結、Soon 項只給不受限者；空分區不畫。
+  - `app/(shell)/page.tsx`：首頁四區卡片改成資料表，同一過濾；空區不畫。
+  - 客戶中心（C3.4）：`app/(shell)/ops/clients/[slug]/hub-tab-tools.ts`＝分頁→產品（內容工具／社群頻道→內容行銷、知識庫／客服→AI 客服、資料蒐集→資料蒐集器、冷開發→行銷開發信）；`page.tsx` 算 `hiddenTabs`，`ClientHubTabs` 不畫。
+  - 測試：`app/__tests__/staff-nav.test.ts`（每個側欄連結都歸格；只勾社群發文＝首頁＋Social Posts；不受限規則；header 讀回）；`staff-tools.test.ts` C3.4：用 TS AST 逐分頁追元件、同檔函式與跨檔 import 閉包的 API 呼叫，命中 `NEEDS_OTHER_TOOL["ops/clients"]` 者必須由該分頁的產品擁有；「送去 Cognitive OS」按鈕（預設關的 research bridges 後面）明列在 `HUB_TAB_BEHIND_FLAG`。
+- **Codex**（`agency-os/reports/oracle/2026-10-24-partialreview-e1acfe15.md`）：F1「分頁名對不上」不成立——Codex 看到的中文是亂碼；實檢 `TABS` 13 個、6 個對應鍵都在（node 讀檔比對，0 缺）。F2 成立——舊測試只看「工具出現在對照表某處」，新分頁漏登也會過；改成逐分頁追呼叫（上述），並驗對照表的鍵都是真的分頁。
+- **驗證**：
+  - `npx tsc --noEmit` exit 0。
+  - `npx vitest run lib/portal app/__tests__ lib/__tests__ app/api/ops/staff "app/(shell)/ops/clients" lib/supabase`：29 files，232 passed、1 failed＝C4 尚未提交的 `/ops/staff` 頁（側欄連結留給 C4 commit），不屬本 commit。
+  - 突變：刪「冷開發」→ 紅（OutreachTab 呼叫 outreach-config）；刪「社群頻道」→ 紅；資料蒐集改 cs → 紅（經跨檔的 CollectionSourcesPanel）；刪 flag 列 → 紅；還原綠。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/portal/__tests__/staff-tools.test.ts app/__tests__/staff-nav.test.ts (8+4 passed; 4 mutations red then green) | exit=0 | ms=3000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/1n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=DEFAULT_SECTIONS|applyLayout|activeSectionId|itemKey | hits=60
+- ORACLE_WAIVED: 共用工作目錄有其他 session 的大量未提交改動；本卡以 -Path 範圍審查（partialreview-e1acfe15），F2 已修並附突變證據，F1 實檢不成立。
+- **剩餘風險**：側欄只隱藏、不是授權（授權在 C2 middleware）；知識庫分頁的「送去 Cognitive OS」按鈕若日後打開 research bridges，只勾 AI 客服者 enforce 後按了會 403——到時把它移出 flag 表、測試會紅提醒。
+- **rollback**：`git revert <本 commit>`（sidebar-sections 搬回 SidebarNav；layout／首頁／分頁回到不過濾）。
 ## 2026-10-24（續48）部署被擋：圖片處理路由匯出常數，Next.js 建置失敗；路由匯出加測試
 
 - **症狀**：操作者「全部上線」後跑 `sg-deploy.sh next-admin`，docker build 失敗：`Route "app/api/tools/image/process/route.ts" does not match the required types of a Next.js Route. "MAX_CONVERSIONS" is not a valid Route export field.`（`[2026-10-24T14:22:39Z] ERROR: docker build failed`）。正式站未受影響：失敗在換容器之前，`.deployed-commit` 仍是 `51a84b203`，`lobster-next-admin` healthy。不修的話今晚 03:00 自動部署同樣失敗。

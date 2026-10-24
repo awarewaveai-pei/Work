@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { headers } from "next/headers";
+import { staffGrantOf, staffMayOpen, staffUnrestricted } from "@/lib/staff-access";
 
 function getInternalApiBase(): string {
   const raw = process.env.INTERNAL_API_BASE_URL?.trim();
@@ -37,6 +39,32 @@ async function fetchHealth(path: string): Promise<HealthResult> {
 }
 
 export const dynamic = "force-dynamic";
+
+type Card = { href: string; icon: string; iconClass: string; title: string; desc: string; external?: boolean };
+// 建站三步序列與 SidebarNav 的 build-onboard 區一致（intake → 精靈 → 部署）；Repair & Control 與 repair-control 區一致。
+const DASHBOARD_SECTIONS: Array<{ title: string; cards: Card[] }> = [
+  { title: "Monitoring", cards: [
+    { href: "/ops/inbox", icon: "📥", iconClass: "icon-ops", title: "Ops Inbox", desc: "Sentry · Uptime Kuma · Grafana 警報收件匣" },
+    { href: "/ops/clients", icon: "👥", iconClass: "icon-ops", title: "Clients", desc: "全客戶健康狀態 + WordPress 外掛更新" },
+    { href: "/api-check", icon: "⬡", iconClass: "icon-infra", title: "API Health", desc: "Node API 即時健康狀態" },
+  ] },
+  { title: "Repair & Control", cards: [
+    { href: "/ops/repairs", icon: "🛠", iconClass: "icon-ops", title: "Repair Center", desc: "Auto-repair 控制面：incident → PR → deploy gate" },
+    { href: "/ops/approvals", icon: "✓", iconClass: "icon-ops", title: "Pending Approvals", desc: "高風險指令等待簽核" },
+    { href: "/ops/system-modes", icon: "◐", iconClass: "icon-ops", title: "System Modes", desc: "全域 Kill Switch · 維護模式切換" },
+  ] },
+  { title: "Build & Onboard", cards: [
+    { href: "/ops/onboarding", icon: "✨", iconClass: "icon-prov", title: "Onboarding（客戶 Intake）", desc: "建站第 1 步：客戶探索式問卷" },
+    { href: "/onboard", icon: "✦", iconClass: "icon-prov", title: "建站精靈（技術）", desc: "建站第 2 步：資訊 → 部門選型 → 服務開通 → Build" },
+    { href: "/build", icon: "⚡", iconClass: "icon-prov", title: "Build Console", desc: "建站第 3 步：部署執行（plan_only 預覽或 enqueue 送 Trigger.dev）" },
+  ] },
+  { title: "External Services", cards: [
+    { href: "https://n8n.aware-wave.com", icon: "⚙", iconClass: "icon-ext", title: "n8n Workflows", desc: "自動化工作流程引擎", external: true },
+    { href: "https://uptime.aware-wave.com", icon: "◉", iconClass: "icon-ext", title: "Uptime Kuma", desc: "服務正常運行監控", external: true },
+    { href: "https://trigger.aware-wave.com", icon: "▶", iconClass: "icon-ext", title: "Trigger.dev", desc: "背景任務與排程系統", external: true },
+    { href: "https://aware-wave.com", icon: "◻", iconClass: "icon-ext", title: "WordPress", desc: "客戶主網站", external: true },
+  ] },
+];
 
 function StatusBadge({ ok }: { ok: boolean }) {
   return (
@@ -90,6 +118,8 @@ export default async function DashboardPage() {
   ]);
 
   const env = process.env.NODE_ENV ?? "unknown";
+  const grant = staffGrantOf(await headers());
+  const unrestricted = staffUnrestricted(grant);
 
   return (
     <>
@@ -146,122 +176,18 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* ── Monitoring ──────────────────────────────── */}
-        <div className="section-title" style={{ marginTop: 8 }}>Monitoring</div>
-        <div className="link-list" style={{ marginBottom: 28 }}>
-          <NavCard
-            href="/ops/inbox"
-            icon="📥"
-            iconClass="icon-ops"
-            title="Ops Inbox"
-            desc="Sentry · Uptime Kuma · Grafana 警報收件匣"
-          />
-          <NavCard
-            href="/ops/clients"
-            icon="👥"
-            iconClass="icon-ops"
-            title="Clients"
-            desc="全客戶健康狀態 + WordPress 外掛更新"
-          />
-          <NavCard
-            href="/api-check"
-            icon="⬡"
-            iconClass="icon-infra"
-            title="API Health"
-            desc="Node API 即時健康狀態"
-          />
-        </div>
-
-        {/* ── Repair & Control ────────────────────────── */}
-        {/* 與 SidebarNav 的 repair-control 區一致（維修主控 + 簽核 + kill-switch） */}
-        <div className="section-title">Repair &amp; Control</div>
-        <div className="link-list" style={{ marginBottom: 28 }}>
-          <NavCard
-            href="/ops/repairs"
-            icon="🛠"
-            iconClass="icon-ops"
-            title="Repair Center"
-            desc="Auto-repair 控制面：incident → PR → deploy gate"
-          />
-          <NavCard
-            href="/ops/approvals"
-            icon="✓"
-            iconClass="icon-ops"
-            title="Pending Approvals"
-            desc="高風險指令等待簽核"
-          />
-          <NavCard
-            href="/ops/system-modes"
-            icon="◐"
-            iconClass="icon-ops"
-            title="System Modes"
-            desc="全域 Kill Switch · 維護模式切換"
-          />
-        </div>
-
-        {/* ── Build & Onboard ─────────────────────────── */}
-        {/* 建站三步序列，與 SidebarNav 的 build-onboard 區一致（intake → 精靈 → 部署） */}
-        <div className="section-title">Build &amp; Onboard</div>
-        <div className="link-list" style={{ marginBottom: 28 }}>
-          <NavCard
-            href="/ops/onboarding"
-            icon="✨"
-            iconClass="icon-prov"
-            title="Onboarding（客戶 Intake）"
-            desc="建站第 1 步：客戶探索式問卷"
-          />
-          <NavCard
-            href="/onboard"
-            icon="✦"
-            iconClass="icon-prov"
-            title="建站精靈（技術）"
-            desc="建站第 2 步：資訊 → 部門選型 → 服務開通 → Build"
-          />
-          <NavCard
-            href="/build"
-            icon="⚡"
-            iconClass="icon-prov"
-            title="Build Console"
-            desc="建站第 3 步：部署執行（plan_only 預覽或 enqueue 送 Trigger.dev）"
-          />
-        </div>
-
-        {/* ── External Services ───────────────────────── */}
-        <div className="section-title">External Services</div>
-        <div className="link-list">
-          <NavCard
-            href="https://n8n.aware-wave.com"
-            icon="⚙"
-            iconClass="icon-ext"
-            title="n8n Workflows"
-            desc="自動化工作流程引擎"
-            external
-          />
-          <NavCard
-            href="https://uptime.aware-wave.com"
-            icon="◉"
-            iconClass="icon-ext"
-            title="Uptime Kuma"
-            desc="服務正常運行監控"
-            external
-          />
-          <NavCard
-            href="https://trigger.aware-wave.com"
-            icon="▶"
-            iconClass="icon-ext"
-            title="Trigger.dev"
-            desc="背景任務與排程系統"
-            external
-          />
-          <NavCard
-            href="https://aware-wave.com"
-            icon="◻"
-            iconClass="icon-ext"
-            title="WordPress"
-            desc="客戶主網站"
-            external
-          />
-        </div>
+        {/* Section titles mirror SidebarNav (repair-control, build-onboard). A restricted staff member sees only the
+            cards of the tools ticked for them (lib/staff-access.ts); a section left empty is not drawn. */}
+        {DASHBOARD_SECTIONS.map((sec) => ({ ...sec, cards: sec.cards.filter((c) => (c.external ? unrestricted : staffMayOpen(grant, c.href))) }))
+          .filter((sec) => sec.cards.length > 0)
+          .map((sec, i, all) => (
+            <div key={sec.title}>
+              <div className="section-title" style={i === 0 ? { marginTop: 8 } : undefined}>{sec.title}</div>
+              <div className="link-list" style={i < all.length - 1 ? { marginBottom: 28 } : undefined}>
+                {sec.cards.map((c) => <NavCard key={c.href} {...c} />)}
+              </div>
+            </div>
+          ))}
 
       </div>
     </>

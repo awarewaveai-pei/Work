@@ -78,12 +78,12 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
 <aside><div class="in">
   <h1>員工權限 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-10-24</span></p>
-  <div class="bar" data-computed><i class="d" style="width:16.666666666666664%"></i><i class="g" style="width:0%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>1</span>／<span data-computed>6</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>1</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:33.33333333333333%"></i><i class="g" style="width:16.666666666666664%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>2</span>／<span data-computed>6</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>1</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
-<p class="sub">擁有者可為每位員工勾選可用工具。未勾選的工具不會顯示在側欄；直接輸入網址或呼叫 API 也會被擋下。擁有者永遠可用全部工具。共 <span data-computed>6</span> 張卡、<span data-computed>23</span> 項工作，已完成 <span data-computed>4</span> 項。</p>
-<section id="now"><h2>現況</h2><p class="lead">目前可用與尚未可用的功能。</p><ul class="yn"><li class="yes"><b>可以</b><span>員工分為擁有者、管理員、操作、唯讀四種角色。<small>角色設定存在登入帳號中，目前需到 Supabase 後台手動修改。</small></span></li><li class="no"><b>還不行</b><span>為每位員工分別勾選可用工具。<small>C1、C2 完成後才有依據。</small></span></li><li class="no"><b>還不行</b><span>側欄只顯示有權限的工具。<small>C3</small></span></li><li class="no"><b>還不行</b><span>沒有權限時，直接輸入網址或呼叫 API 會被擋下。<small>C2；先只記錄、不擋，確認無誤後再由你決定開始擋。</small></span></li><li class="no"><b>還不行</b><span>在後台管理員工帳號與權限。<small>C4</small></span></li></ul></section>
+<p class="sub">擁有者可為每位員工勾選可用工具。未勾選的工具不會顯示在側欄；直接輸入網址或呼叫 API 也會被擋下。擁有者永遠可用全部工具。共 <span data-computed>6</span> 張卡、<span data-computed>23</span> 項工作，已完成 <span data-computed>9</span> 項。</p>
+<section id="now"><h2>現況</h2><p class="lead">目前可用與尚未可用的功能。</p><ul class="yn"><li class="yes"><b>可以</b><span>員工分為擁有者、管理員、操作、唯讀四種角色。<small>角色設定存在登入帳號中，目前需到 Supabase 後台手動修改。</small></span></li><li class="no"><b>還不行</b><span>為每位員工分別勾選可用工具。<small>C1、C2 完成後才有依據。</small></span></li><li class="no"><b>還不行</b><span>側欄只顯示有權限的工具。<small>C3</small></span></li><li class="no"><b>還不行</b><span>沒有權限時，直接輸入網址或呼叫 API 會被擋下。<small>程式已完成（C2），目前只記錄「本來會擋」、不擋。正式擋要等你同意（C6）。</small></span></li><li class="no"><b>還不行</b><span>在後台管理員工帳號與權限。<small>C4</small></span></li></ul></section>
 
 <section id="steps"><h2>卡片與工作</h2><p class="lead">依編號進行。每張卡列出所有工作；勾選表示完成。同一組的卡若修改不同檔案，可同時進行。High 風險步驟需經你同意才會執行。</p><ol class="steps"><li class="step done" id="C1">
     <div class="n">1</div>
@@ -100,19 +100,20 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-24-staff-tool-grants/R0-PLAN.md §6 C1</code></p>
         <p><b>完成於：</b><code>1b8096116</code></p>
       </details>
-    </div></li><li class="grp">可同時進行：<a href="#C2">C2</a>、<a href="#C4">C4</a></li><li class="step todo" id="C2">
+    </div></li><li class="grp">可同時進行：<a href="#C2">C2</a>、<a href="#C4">C4</a></li><li class="step done" id="C2">
     <div class="n">2</div>
     <div class="b">
       <p class="plain">登入時一併讀取這位員工勾選的工具。打開無權限頁面會看到說明頁；呼叫 API 會被拒絕。先只記錄、不擋；確認名單無誤後，再正式開始擋。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（登入與權限）</span><span class="who">負責：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-done">已完成</span><span class="pill risk-high">風險 High（登入與權限）</span><span class="who">負責：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>未勾選工具的員工打開該工具時會看到說明頁；呼叫 API 回應 403。擁有者永遠可以使用；偽造的權限資料會被剝除。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>C2.1</code> 登入時讀取員工勾選的工具，並移除瀏覽器偽造的同名權限資料。</span></li><li class="todo"><b>○</b><span><code>C2.2</code> 判斷規則：擁有者永遠可以；所有員工皆可用的頁面永遠可以；只記錄期間，尚未設定的員工全部可用。</span></li><li class="todo"><b>○</b><span><code>C2.3</code> 每次打開頁面或呼叫 API 都檢查。只記錄期間寫下「本來會擋」的紀錄；正式擋之後，頁面導向說明頁，API 回應 403。</span></li><li class="todo"><b>○</b><span><code>C2.4</code> 測試：擁有者不受限、未歸類網址會被擋、只記錄時放行、快取路徑同樣檢查、偽造資料被剝除。</span></li></ul>
+      <ul class="items"><li class="done"><b>✓</b><span><code>C2.1</code> 登入時讀取員工勾選的工具，並移除瀏覽器偽造的同名權限資料。 <small>完成於 <code>3bb0cd120</code></small></span></li><li class="done"><b>✓</b><span><code>C2.2</code> 判斷規則：擁有者永遠可以；所有員工皆可用的頁面永遠可以；只記錄期間，尚未設定的員工全部可用。 <small>完成於 <code>3bb0cd120</code></small></span></li><li class="done"><b>✓</b><span><code>C2.3</code> 每次打開頁面或呼叫 API 都檢查。只記錄期間寫下「本來會擋」的紀錄；正式擋之後，頁面導向說明頁，API 回應 403。 <small>完成於 <code>3bb0cd120</code></small></span></li><li class="done"><b>✓</b><span><code>C2.4</code> 測試：擁有者不受限、未歸類網址會被擋、只記錄時放行、快取路徑同樣檢查、偽造資料被剝除。 <small>完成於 <code>3bb0cd120</code></small></span></li></ul>
       <details><summary>工程細節：C2 身分帶工具、擋網址與 API</summary>
         <p>CachedIdentity.tools；app_metadata.staff_tools → x-ops-tools；staffMayUse；STAFF_TOOLS_MODE shadow|enforce；middleware 兩條路徑都判斷</p>
         <p><b>需先完成：</b><a href="#C1">C1</a></p>
         <p><b>你的決定：</b>只記錄、不擋期間，尚未設定的員工全部可用。依 2026-10-24 建議。</p>
         <p><b>檔案：</b><code>middleware.ts</code> <code>lib/supabase/session-cache.ts</code> <code>lib/staff-access.ts</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-24-staff-tool-grants/R0-PLAN.md §6 C2</code></p>
+        <p><b>完成於：</b><code>3bb0cd120</code></p>
       </details>
     </div></li><li class="step todo" id="C4">
     <div class="n">4</div>
@@ -141,13 +142,13 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
         <p><b>檔案：</b><code>app/(shell)/layout.tsx</code> <code>app/SidebarNav.tsx</code> <code>app/(shell)/page.tsx</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-24-staff-tool-grants/R0-PLAN.md §6 C3</code></p>
       </details>
-    </div></li><li class="step todo" id="C5">
+    </div></li><li class="step doing" id="C5">
     <div class="n">5</div>
     <div class="b">
       <p class="plain">沒有權限時顯示說明頁，告訴員工所需工具，並請擁有者開通。同時把這套規則寫入架構文件。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Sonnet 5.5（照卡）</span></p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Sonnet 5.5（照卡）</span></p>
       <p class="donewhen"><b>完成的樣子：</b>說明頁顯示工具名稱；架構決策文件與現況文件都寫入新規則。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>C5.1</code> 說明頁顯示所需工具，並請員工找擁有者開通。</span></li><li class="todo"><b>○</b><span><code>C5.2</code> 寫入架構決策文件，並登記到索引。</span></li><li class="todo"><b>○</b><span><code>C5.3</code> 現況文件補上員工工具權限；可執行示範清單新增一條你能自己執行的指令。</span></li></ul>
+      <ul class="items"><li class="done"><b>✓</b><span><code>C5.1</code> 說明頁顯示所需工具，並請員工找擁有者開通。 <small>完成於 <code>3bb0cd120</code></small></span></li><li class="todo"><b>○</b><span><code>C5.2</code> 寫入架構決策文件，並登記到索引。</span></li><li class="todo"><b>○</b><span><code>C5.3</code> 現況文件補上員工工具權限；可執行示範清單新增一條你能自己執行的指令。</span></li></ul>
       <details><summary>工程細節：C5 沒權限頁與文件</summary>
         <p>/no-access 頁；ADR 019＋ADR_INDEX；APP_AWARE_WAVE_CURRENT_STATE 身分段；RUNNABLE_DEMOS</p>
         <p><b>需先完成：</b><a href="#C2">C2</a></p>

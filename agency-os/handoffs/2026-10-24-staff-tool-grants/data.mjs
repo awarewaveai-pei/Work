@@ -29,13 +29,14 @@ export const NOW = [
   { what: '員工分為擁有者、管理員、操作、唯讀四種角色。', state: 'yes', ev: '角色設定存在登入帳號中，目前需到 Supabase 後台手動修改。' },
   { what: '為每位員工分別勾選可用工具。', state: 'no', ev: 'C1、C2 完成後才有依據。' },
   { what: '側欄只顯示有權限的工具。', state: 'no', ev: 'C3' },
-  { what: '沒有權限時，直接輸入網址或呼叫 API 會被擋下。', state: 'no', ev: 'C2；先只記錄、不擋，確認無誤後再由你決定開始擋。' },
+  { what: '沒有權限時，直接輸入網址或呼叫 API 會被擋下。', state: 'no', ev: '程式已完成（C2），目前只記錄「本來會擋」、不擋。正式擋要等你同意（C6）。' },
   { what: '在後台管理員工帳號與權限。', state: 'no', ev: 'C4' },
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
 const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 const C1 = '1b8096116';
+const C2 = '3bb0cd120';
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '員工工具登記表', plain: '列出所有可勾選的工具：每個產品一格、每個後台頁面一格。新增頁面或 API 若未歸入任何一格，測試就會失敗。',
@@ -50,15 +51,15 @@ export const STEPS = [
       done('C1.4', '測試：每個員工頁面與 API 都歸入一格工具；未歸類就失敗。', C1),
     ] },
   { n: 2, code: 'C2', group: 'B', title: '身分帶工具、擋網址與 API', plain: '登入時一併讀取這位員工勾選的工具。打開無權限頁面會看到說明頁；呼叫 API 會被拒絕。先只記錄、不擋；確認名單無誤後，再正式開始擋。',
-    gate: '未勾選工具的員工打開該工具時會看到說明頁；呼叫 API 回應 403。擁有者永遠可以使用；偽造的權限資料會被剝除。', risk: 'High（登入與權限）', model: 'Opus 5.5', status: 'not_started', depends: ['C1'],
+    gate: '未勾選工具的員工打開該工具時會看到說明頁；呼叫 API 回應 403。擁有者永遠可以使用；偽造的權限資料會被剝除。', risk: 'High（登入與權限）', model: 'Opus 5.5', status: 'done', commit: C2, depends: ['C1'],
     decided: '只記錄、不擋期間，尚未設定的員工全部可用。依 2026-10-24 建議。',
     what: 'CachedIdentity.tools；app_metadata.staff_tools → x-ops-tools；staffMayUse；STAFF_TOOLS_MODE shadow|enforce；middleware 兩條路徑都判斷',
     files: ['middleware.ts', 'lib/supabase/session-cache.ts', 'lib/staff-access.ts'],
     items: [
-      todo('C2.1', '登入時讀取員工勾選的工具，並移除瀏覽器偽造的同名權限資料。'),
-      todo('C2.2', '判斷規則：擁有者永遠可以；所有員工皆可用的頁面永遠可以；只記錄期間，尚未設定的員工全部可用。'),
-      todo('C2.3', '每次打開頁面或呼叫 API 都檢查。只記錄期間寫下「本來會擋」的紀錄；正式擋之後，頁面導向說明頁，API 回應 403。'),
-      todo('C2.4', '測試：擁有者不受限、未歸類網址會被擋、只記錄時放行、快取路徑同樣檢查、偽造資料被剝除。'),
+      done('C2.1', '登入時讀取員工勾選的工具，並移除瀏覽器偽造的同名權限資料。', C2),
+      done('C2.2', '判斷規則：擁有者永遠可以；所有員工皆可用的頁面永遠可以；只記錄期間，尚未設定的員工全部可用。', C2),
+      done('C2.3', '每次打開頁面或呼叫 API 都檢查。只記錄期間寫下「本來會擋」的紀錄；正式擋之後，頁面導向說明頁，API 回應 403。', C2),
+      done('C2.4', '測試：擁有者不受限、未歸類網址會被擋、只記錄時放行、快取路徑同樣檢查、偽造資料被剝除。', C2),
     ] },
   { n: 3, code: 'C3', group: 'C', title: '側欄與首頁只顯示有權限的', plain: '員工登入後，側欄與首頁只顯示已勾選的工具。整個分區都沒有權限時，不顯示分區標題。',
     gate: '只勾選社群發文工具的員工，側欄只看得到社群發文與首頁。', risk: 'Medium', model: 'Sonnet 5.5（照卡）', status: 'not_started', depends: ['C2'],
@@ -82,11 +83,11 @@ export const STEPS = [
       todo('C4.4', '新頁面登記到產品清單與側欄。'),
     ] },
   { n: 5, code: 'C5', group: 'C', title: '沒權限頁與文件', plain: '沒有權限時顯示說明頁，告訴員工所需工具，並請擁有者開通。同時把這套規則寫入架構文件。',
-    gate: '說明頁顯示工具名稱；架構決策文件與現況文件都寫入新規則。', risk: 'Low', model: 'Sonnet 5.5（照卡）', status: 'not_started', depends: ['C2'],
+    gate: '說明頁顯示工具名稱；架構決策文件與現況文件都寫入新規則。', risk: 'Low', model: 'Sonnet 5.5（照卡）', status: 'in_progress', depends: ['C2'],
     what: '/no-access 頁；ADR 019＋ADR_INDEX；APP_AWARE_WAVE_CURRENT_STATE 身分段；RUNNABLE_DEMOS',
     files: ['app/(shell)/no-access/page.tsx', 'agency-os/docs/architecture/decisions/019-staff-tool-grants.md'],
     items: [
-      todo('C5.1', '說明頁顯示所需工具，並請員工找擁有者開通。'),
+      done('C5.1', '說明頁顯示所需工具，並請員工找擁有者開通。', C2),
       todo('C5.2', '寫入架構決策文件，並登記到索引。'),
       todo('C5.3', '現況文件補上員工工具權限；可執行示範清單新增一條你能自己執行的指令。'),
     ] },

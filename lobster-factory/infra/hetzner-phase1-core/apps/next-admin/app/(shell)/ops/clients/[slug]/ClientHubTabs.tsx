@@ -114,6 +114,8 @@ export interface ClientHubTabsProps {
   wpSites: WpSiteStub[];
   /** lib/research-bridges.ts: false (default since 2026-09-23) hides the per-folder 送去 Cognitive OS button. */
   researchBridgesEnabled: boolean;
+  /** Tabs of products not ticked for this staff member (hub-tab-tools.ts); the page computes it from their grant. */
+  hiddenTabs?: readonly string[];
 }
 
 // ── Provider catalogue ────────────────────────────────────────────────────────
@@ -2630,7 +2632,8 @@ const TABS = ["內容工具", "整合", "佈建", "維護", "設定", "品牌識
 type Tab = typeof TABS[number];
 
 export function ClientHubTabs(props: ClientHubTabsProps) {
-  const { org, cfg, health, wp, runs, installRuns, deptSummary, integrations, wpSites } = props;
+  const { org, cfg, health, wp, runs, installRuns, deptSummary, integrations, wpSites, hiddenTabs = [] } = props;
+  const tabs = TABS.filter((t) => !hiddenTabs.includes(t));
   const [activeTab, setActiveTab] = useState<Tab>("維護");
 
   const initials = org.name
@@ -2679,7 +2682,7 @@ export function ClientHubTabs(props: ClientHubTabsProps) {
 
         {/* Tab bar */}
         <div style={{ display: "flex", gap: 0 }}>
-          {TABS.map((tab) => (
+          {tabs.map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}

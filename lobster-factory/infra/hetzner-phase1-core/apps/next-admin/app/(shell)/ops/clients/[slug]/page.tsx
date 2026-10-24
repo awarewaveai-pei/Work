@@ -14,6 +14,9 @@ import {
 } from "@/lib/department-catalog";
 import { isResearchBridgesEnabled } from "@/lib/research-bridges";
 import { ClientHubTabs } from "./ClientHubTabs";
+import { HUB_TAB_TOOL } from "./hub-tab-tools";
+import { headers } from "next/headers";
+import { staffGrantOf, staffMayUseTool, staffUnrestricted } from "@/lib/staff-access";
 
 export const dynamic = "force-dynamic";
 
@@ -158,6 +161,9 @@ export default async function ClientDetailPage({
     };
   })();
 
+  const grant = staffGrantOf(await headers());
+  const hiddenTabs = staffUnrestricted(grant) ? [] : Object.entries(HUB_TAB_TOOL).filter(([, key]) => !staffMayUseTool(grant!, key)).map(([tab]) => tab);
+
   return (
     <ClientHubTabs
       org={{ id: org.id, slug: org.slug, name: org.name, type: org.type, status: org.status }}
@@ -170,6 +176,7 @@ export default async function ClientDetailPage({
       integrations={(integrationsResult.data ?? []) as Parameters<typeof ClientHubTabs>[0]["integrations"]}
       wpSites={(wpSitesResult.data ?? []) as Parameters<typeof ClientHubTabs>[0]["wpSites"]}
       researchBridgesEnabled={isResearchBridgesEnabled()}
+      hiddenTabs={hiddenTabs}
     />
   );
 }

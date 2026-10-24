@@ -1,13 +1,15 @@
 // Every staff page and API belongs to a staff tool (or to every staff member), and a tool's own pages work with that
 // tool alone: what an owner ticks is enough for the pages it shows (agency-os/handoffs/2026-10-24-staff-tool-grants).
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { PUBLIC_API_PATHS } from "../../../middleware";
 import { BACK_OFFICE, PRODUCTS, STAFF_UTILITIES } from "../products";
 import { PLATFORM_APIS, doorApis, nextAdminProducts } from "../doors";
 import { STAFF_API_OWNERS, STAFF_PLATFORM, STAFF_TOOLS, covers, staffApisOf, toolsFor } from "../staff-tools";
-import { ROOT, codeIndex, isRoute } from "./code-scan";
+import ts from "typescript";
+import { ROOT, codeIndex, isRoute, scan } from "./code-scan";
+import { HUB_TAB_TOOL } from "../../../app/(shell)/ops/clients/[slug]/hub-tab-tools";
 
 // Calls a tool's page makes into another tool, so that button needs that tool ticked too (keys are path patterns, as in
 // staff-tools.ts). Declared optional modules (products.ts modules.optional) are allowed without a row here. The client
@@ -31,6 +33,12 @@ const NEEDS_OTHER_TOOL: Readonly<Record<string, Readonly<Record<string, string>>
     "/api/ops/clients/[x]/hci-import": "客戶中心的資料蒐集分頁用資料蒐集器的功能",
     "/api/ops/clients/[x]/outreach-config": "客戶中心的開發信分頁用行銷開發信的功能",
   },
+};
+
+// Client hub tab calls into another product that are not shown unless a feature flag is on, so the tab's own product
+// is all it needs by default.
+const HUB_TAB_BEHIND_FLAG: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  "知識庫": { "/api/ops/clients/[x]/cognitive-os-import": "「送去 Cognitive OS」按鈕，research bridges 關閉時不顯示（lib/research-bridges.ts，預設關）" },
 };
 
 // Routes outside the staff session gate: middleware's matcher skips them, or they carry their own token.
@@ -123,6 +131,63 @@ describe("staff tools", () => {
       const staffOnly = owners.filter((k) => STAFF_TOOLS.find((t) => t.key === k)?.group !== "product");
       expect(staffOnly, pattern).toEqual([]);
     }
+  });
+
+  it("a client hub tab that calls another product's API hides without that product (C3.4)", () => {
+    // Per tab: the component it renders, every top-level function of the file that component reaches, and the import
+    // closure of every component it imports from another file -- the API calls of all of them.
+    const FILE = "app/(shell)/ops/clients/[slug]/ClientHubTabs.tsx";
+    const text = readFileSync(path.join(ROOT, FILE), "utf8");
+    const sf = ts.createSourceFile(FILE, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const local = new Map<string, ts.Node>();
+    const imported = new Map<string, string>();
+    for (const st of sf.statements) {
+      if (ts.isFunctionDeclaration(st) && st.name) local.set(st.name.text, st);
+      if (ts.isVariableStatement(st)) for (const d of st.declarationList.declarations) if (ts.isIdentifier(d.name)) local.set(d.name.text, d);
+      if (ts.isImportDeclaration(st) && ts.isStringLiteral(st.moduleSpecifier) && st.importClause?.namedBindings && ts.isNamedImports(st.importClause.namedBindings)) {
+        const spec = st.moduleSpecifier.text;
+        const file = INDEX.resolve(spec.startsWith("@/") ? spec.slice(2) : path.posix.join(path.posix.dirname(FILE), spec));
+        if (file) for (const el of st.importClause.namedBindings.elements) imported.set(el.name.text, file);
+      }
+    }
+    const routes = (sc: { calls: string[]; templates: Array<{ route: string; prefix: string }> }) => {
+      const templated = new Set(sc.templates.map((t) => t.prefix));
+      return [...sc.calls.filter((c) => !templated.has(c)), ...sc.templates.map((t) => t.route)];
+    };
+    function callsFrom(name: string): string[] {
+      const seen = new Set<string>();
+      const files = new Set<string>();
+      const out: string[] = [];
+      const todo = [name];
+      while (todo.length) {
+        const n = todo.pop()!;
+        if (seen.has(n)) continue;
+        seen.add(n);
+        if (imported.has(n)) { files.add(imported.get(n)!); continue; }
+        const node = local.get(n);
+        if (!node) continue;
+        out.push(...routes(scan(FILE, node.getText(sf))));
+        const visit = (x: ts.Node) => { if (ts.isIdentifier(x) && (local.has(x.text) || imported.has(x.text))) todo.push(x.text); ts.forEachChild(x, visit); };
+        ts.forEachChild(node, visit);
+      }
+      for (const f of INDEX.importClosure([...files])) out.push(...routes(INDEX.files.get(f)!));
+      return out;
+    }
+    const tabs = [...text.matchAll(/activeTab === "([^"]+)" && <(\w+)/g)].map((m) => ({ tab: m[1], component: m[2] }));
+    expect(tabs.length).toBeGreaterThan(5);
+    for (const key of Object.keys(HUB_TAB_TOOL)) expect(tabs.map((t) => t.tab), key).toContain(key);
+    const hub = NEEDS_OTHER_TOOL["ops/clients"];
+    const problems: string[] = [];
+    for (const { tab, component } of tabs) {
+      for (const call of callsFrom(component)) {
+        if (!Object.keys(hub).some((p) => covers(p, call))) continue;
+        if (Object.keys(HUB_TAB_BEHIND_FLAG[tab] ?? {}).some((p) => covers(p, call))) continue;
+        const key = (HUB_TAB_TOOL as Record<string, string>)[tab];
+        const owners = toolsFor(call);
+        if (!key || !Array.isArray(owners) || !owners.includes(key)) problems.push(`${tab} (${component}) calls ${call}; HUB_TAB_TOOL gives ${key ?? "nothing"}`);
+      }
+    }
+    expect(problems).toEqual([]);
   });
 
   it("toolsFor matches dynamic segments, exact patterns and the platform", () => {
