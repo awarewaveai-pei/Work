@@ -248,8 +248,7 @@ function PropChips({
   );
 }
 
-// The Printful catalog route is not a door API: the staff page passes the loader in (MockupStudioStaff.tsx), so a
-// design door page's imports name no /api/tools/printful route (step-8 card §2 S1; card D3 decides the door's catalog).
+// The catalog loader is passed in (MockupWithCatalog.tsx), so MockupStudio itself names no /api/tools/printful route.
 export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Promise<CatalogProduct[] | null> }) {
   // design source
   const [designs, setDesigns] = useState<DesignAsset[]>([]);

@@ -273,6 +273,7 @@ describe("registry claims match the code", () => {
     "app/api/tools/studio/mockup/route.ts": "Printful mockup (free) from the request image and the public catalog; uploads that image to the shared public designs bucket and shares the Printful store quota",
     "app/api/content/seo-check/route.ts": "scores the article in the request body (lib/content/quality/seo-check-core.ts); no database, no stored data",
     "app/api/content/brand-voice/route.ts": "analyses the pasted sample, or a page fetched through lib/collect/net/remote-file (no internal host); stores nothing",
+    "app/api/tools/printful/catalog/route.ts": "public Printful product catalog, cached 1h server-side (lib/studio/printful-catalog.ts); no database, nothing per organization",
     "app/api/video/capabilities/route.ts": "reports which features our own video-service supports (booleans, formats) and the provider policy; no database, nothing per organization",
     "app/api/content/trending/route.ts":"public news feeds, the shared content_sources table and the shared content_trends cache (no organization column on either; customers read sources, only staff write them, content/sources/route.ts; only feed items in a supported region reach the cache, lib/content/topics/trends.ts)",
   };

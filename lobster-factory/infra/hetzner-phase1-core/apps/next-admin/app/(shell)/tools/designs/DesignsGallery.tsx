@@ -10,7 +10,8 @@ import {
   buildMaskSvg,
   type EdgeMaskId,
 } from "@/lib/studio/edge-mask";
-import { openInCanvas } from "@/components/tools/canvas-handoff";
+import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
+import { useDoorHref, useOnDoor } from "@/app/DoorContext";
 
 interface AssetMetadata {
   prompt?: string | null;
@@ -255,6 +256,9 @@ function Chips({
 }
 
 export default function DesignsGallery() {
+  const canvasHref = useDoorHref(CANVAS_STAFF_HREF);
+  const publishHref = useDoorHref("/tools/publish");
+  const onDoor = useOnDoor();
   /* ── tab ── */
   const [activeTab, setActiveTab] = useState<ActiveTab>("designs");
 
@@ -485,7 +489,11 @@ export default function DesignsGallery() {
     setDownloadingId(asset.id);
     const filename = `${designBaseName(asset)}.${assetExtension(asset)}`;
     try {
-      const href = `/api/tools/publish/download?url=${encodeURIComponent(asset.object_url)}&filename=${encodeURIComponent(filename)}`;
+      // Staff: publish's download proxy (any asset type). A door does not serve publish (staff-only, decision D1): there
+      // studio's designs-bucket image proxy does it; the blob is saved under `filename` here either way.
+      const href = onDoor
+        ? `/api/tools/studio/proxy-image?url=${encodeURIComponent(asset.object_url)}`
+        : `/api/tools/publish/download?url=${encodeURIComponent(asset.object_url)}&filename=${encodeURIComponent(filename)}`;
       const res = await fetch(href, { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();
@@ -497,7 +505,7 @@ export default function DesignsGallery() {
     } finally {
       setDownloadingId(null);
     }
-  }, []);
+  }, [onDoor]);
 
   const toggleExpanded = useCallback((id: string) => {
     setExpandedIds((prev) => {
@@ -605,8 +613,8 @@ export default function DesignsGallery() {
 
   const goToProductFromEdit = useCallback(async () => {
     const url = editSavedUrl ?? (await saveEdged());
-    if (url) window.location.assign("/tools/publish");
-  }, [editSavedUrl, saveEdged]);
+    if (url && publishHref) window.location.assign(publishHref);
+  }, [editSavedUrl, saveEdged, publishHref]);
 
 
 
@@ -1285,10 +1293,10 @@ export default function DesignsGallery() {
                       className="designs-kebab-menu"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {asset.object_url ? (
+                      {asset.object_url && canvasHref ? (
                         <button
                           className="designs-kebab-item"
-                          onClick={() => { setOpenMenuId(null); openInCanvas(asset.object_url!, designBaseName(asset)); }}
+                          onClick={() => { setOpenMenuId(null); openInCanvas(asset.object_url!, designBaseName(asset), canvasHref); }}
                         >
                           🎨 Canvas 編輯
                         </button>
@@ -1568,14 +1576,14 @@ export default function DesignsGallery() {
                 >
                   {editSavedUrl ? "已存回 ✓" : editSaving ? "儲存中…" : "存回 My Designs"}
                 </button>
-                <button
+                {publishHref && <button
                   className="designs-action-btn"
                   disabled={!editResult || editSaving}
                   onClick={() => void goToProductFromEdit()}
                   style={{ borderColor: "var(--accent)" }}
                 >
                   → 去建商品
-                </button>
+                </button>}
                 {editResult ? (
                   <button
                     className="designs-action-btn"

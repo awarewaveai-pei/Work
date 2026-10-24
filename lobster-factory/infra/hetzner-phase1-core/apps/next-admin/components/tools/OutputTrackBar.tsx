@@ -16,7 +16,8 @@ import { useCallback, useState } from "react";
 import { roleHeader } from "@/lib/ops-role";
 import { PRINT_DESTINATIONS, type PrintDestinationId } from "@/lib/studio/print-destinations";
 import { isNeutralParams, type ColorGradeParams } from "@/lib/studio/color-grade";
-import { openInCanvas } from "@/components/tools/canvas-handoff";
+import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
+import { useDoorHref } from "@/app/DoorContext";
 import {
   buildSemanticFilename,
   buildSemanticBase,
@@ -68,6 +69,8 @@ export default function OutputTrackBar({
   fileMeta,
   hideQuickEdit,
 }: Props) {
+  const canvasHref = useDoorHref(CANVAS_STAFF_HREF);
+  const quickEdit = !hideQuickEdit && canvasHref !== null;
   const [busy, setBusy] = useState<null | "web" | "print">(null);
   const [error, setError] = useState<string | null>(null);
   const [destId, setDestId] = useState<PrintDestinationId>(
@@ -140,7 +143,7 @@ export default function OutputTrackBar({
       </div>
 
       {/* Print + quick-edit row */}
-      {(showPrint || !hideQuickEdit) && (
+      {(showPrint || quickEdit) && (
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           {showPrint ? (
             <>
@@ -167,12 +170,12 @@ export default function OutputTrackBar({
             </>
           ) : null}
 
-          {!hideQuickEdit && (
+          {quickEdit && (
             <button
               className="btn-secondary"
               disabled={busy !== null}
               onClick={() =>
-                openInCanvas(image, fileMeta ? buildSemanticBase({ ...fileMeta, track: "編輯" }) : undefined)
+                openInCanvas(image, fileMeta ? buildSemanticBase({ ...fileMeta, track: "編輯" }) : undefined, canvasHref!)
               }
               title="上傳圖案／加文字／微調構圖"
             >

@@ -89,7 +89,11 @@ async function idbDel(key: string): Promise<void> {
  * navigating, otherwise window.location.assign would unload the page mid-write. Callers
  * invoke this fire-and-forget from onClick — the returned promise is harmless to ignore.
  */
-export async function openInCanvas(image: string, baseName?: string): Promise<void> {
+export const CANVAS_STAFF_HREF = "/tools/canvas";
+
+/** `href` is where the canvas lives on this page: `useDoorHref(CANVAS_STAFF_HREF)` -- /tools/canvas for staff, the design
+ *  door's canvas page there, null (hide the button) on a door without one. */
+export async function openInCanvas(image: string, baseName: string | undefined, href: string): Promise<void> {
   let stashed = false;
   // Fast path: small payloads (short R2/gallery URLs) live in sessionStorage.
   try {
@@ -116,7 +120,7 @@ export async function openInCanvas(image: string, baseName?: string): Promise<vo
   } catch {
     /* sessionStorage unavailable (private mode) — editor opens with default name */
   }
-  window.location.assign("/tools/canvas");
+  window.location.assign(href);
 }
 
 /**

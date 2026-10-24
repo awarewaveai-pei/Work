@@ -7,7 +7,8 @@ import OutputTrackBar from "@/components/tools/OutputTrackBar";
 import GradedPreview from "@/components/tools/GradedPreview";
 import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
 import { buildSemanticFilename, buildSemanticBase } from "@/lib/studio/semantic-filename";
-import { openInCanvas } from "@/components/tools/canvas-handoff";
+import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
+import { useDoorHref } from "@/app/DoorContext";
 import { TAROT_CARDS, PREVIEW_CARD, buildCardPrompt, STYLE_PRESETS, resolveStylePrompt, type HeroKind, type Couple, type TarotCard } from "./cards";
 import { needsEnglish, translateForDeck } from "@/lib/tarot/translate";
 import { tabStyle, chipStyle, ghostBtn } from "@/components/tools/panel-primitives";
@@ -280,6 +281,8 @@ async function toGalleryArt(dataUrl: string, maxDim = 2048, quality = 0.9): Prom
 }
 
 export default function TarotStudio() {
+  // The tarot door has no canvas page: quick edit hides there instead of opening a staff page (404).
+  const canvasHref = useDoorHref(CANVAS_STAFF_HREF);
   const { canUse, why } = usePaidFeatures();
   // Multi-select for comparison; batch generation always uses lockedModel (set at lock time).
   const [selectedModels, setSelectedModels] = useState<Set<TarotModel>>(new Set<TarotModel>());
@@ -2107,7 +2110,7 @@ export default function TarotStudio() {
                 </div>
               ) : (
                 <>
-                  <button
+                  {canvasHref && <button
                     type="button"
                     className="btn-secondary"
                     style={{ width: "100%", marginBottom: 10 }}
@@ -2120,11 +2123,12 @@ export default function TarotStudio() {
                           style: stylePrompt.trim() || undefined,
                           track: "編輯",
                         }),
+                        canvasHref,
                       )
                     }
                   >
                     ✏️ 在 Canvas 編輯
-                  </button>
+                  </button>}
                   <ImageEditPromptPanel
                     sourceImage={previewImage}
                     currentPrompt={buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple, order: orderOf(activeModel) })}

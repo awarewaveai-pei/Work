@@ -1,6 +1,6 @@
 "use client";
-// Staff-only (/tools/mockup): MockupStudio plus the Printful catalog, which no door serves yet. A door page renders
-// MockupStudio without this file, so its import closure names no /api/tools/printful route (step-8 card §2 S1).
+// MockupStudio plus the public Printful catalog (/api/tools/printful/catalog, a design door API; printful/sync stays staff-only).
+// /tools/mockup and the design door's mockup page both render this; MockupStudio itself names no catalog route.
 import MockupStudio, { type CatalogProduct } from "./MockupStudio";
 
 async function loadCatalog(): Promise<CatalogProduct[] | null> {
@@ -9,6 +9,6 @@ async function loadCatalog(): Promise<CatalogProduct[] | null> {
   return json.ok && json.products ? json.products : null;
 }
 
-export default function MockupStudioStaff() {
+export default function MockupWithCatalog() {
   return <MockupStudio loadCatalog={loadCatalog} />;
 }

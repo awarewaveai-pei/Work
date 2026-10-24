@@ -23,9 +23,9 @@ import {
 } from "@/lib/studio/culture-presets";
 import { tabStyle, chipStyle, actionPill, ghostBtn } from "@/components/tools/panel-primitives";
 import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
-import { openInCanvas } from "@/components/tools/canvas-handoff";
+import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
-import { useOnDoor } from "@/app/DoorContext";
+import { useDoorHref, useOnDoor } from "@/app/DoorContext";
 import { buildSemanticFilename, buildSemanticBase, type SemanticFileMeta } from "@/lib/studio/semantic-filename";
 import type { MockupView } from "@/lib/studio/printful-mockup";
 import {
@@ -389,6 +389,7 @@ export default function StudioWorkbench() {
   const liveAi = usePaidFeatures().canUse("ops.cheap-json");
   // My Designs and the canvas editor are the design product's staff pages; on the studio door they would 404.
   const onDoor = useOnDoor();
+  const canvasHref = useDoorHref(CANVAS_STAFF_HREF);
   const [selectedModels, setSelectedModels] = useState<Set<StudioModel>>(new Set<StudioModel>(["flux-schnell"]));
   const [productType, setProductType] = useState("tshirt");
   const [theme, setTheme] = useState("");
@@ -1700,10 +1701,10 @@ export default function StudioWorkbench() {
               )}
 
               <div style={{ paddingTop: 10, borderTop: "1px solid var(--border)" }}>
-                {!onDoor && <button
+                {canvasHref && <button
                   className="btn-secondary"
                   style={{ width: "100%", marginBottom: 6 }}
-                  onClick={() => openInCanvas(activeResult.image, buildSemanticBase({ ...fileMeta, track: "編輯" }))}
+                  onClick={() => openInCanvas(activeResult.image, buildSemanticBase({ ...fileMeta, track: "編輯" }), canvasHref)}
                 >
                   ✏️ 快速編輯
                 </button>}
@@ -1921,10 +1922,10 @@ export default function StudioWorkbench() {
 
               {/* AI edit panel + quick edit */}
               <div style={{ marginTop: 14 }}>
-                {!onDoor && <button
+                {canvasHref && <button
                   className="btn-secondary"
                   style={{ width: "100%", marginBottom: 6 }}
-                  onClick={() => openInCanvas(activeResult.image, buildSemanticBase({ ...fileMeta, track: "編輯" }))}
+                  onClick={() => openInCanvas(activeResult.image, buildSemanticBase({ ...fileMeta, track: "編輯" }), canvasHref)}
                 >
                   ✏️ 快速編輯
                 </button>}

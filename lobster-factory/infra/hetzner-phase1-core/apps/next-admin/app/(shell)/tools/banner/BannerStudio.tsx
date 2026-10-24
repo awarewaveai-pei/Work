@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { roleHeader } from "@/lib/ops-role";
-import { openInCanvas } from "@/components/tools/canvas-handoff";
+import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
 import { STUDIO_MODEL_OPTIONS, modelSupportsRefs, modelCompositesProduct, type StudioModel } from "@/lib/studio/model-options";
 import { STYLE_CATALOG } from "../tarot/tarotStyles";
 import { resolveStylePrompt } from "../tarot/cards";
@@ -995,6 +995,7 @@ export interface BannerStaffApi {
 }
 
 export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
+  const canvasHref = useDoorHref(CANVAS_STAFF_HREF);
   const { canUse, why } = usePaidFeatures();
   const designsHref = useDoorHref("/tools/designs");
   const [s, setS]         = useState<State>(INIT);
@@ -1342,9 +1343,10 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   }
 
   async function handleOpenInCanvas() {
+    if (!canvasHref) return;
     try {
       const png = await exportToPng(s);
-      openInCanvas(png, `banner-${s.preset}`);
+      openInCanvas(png, `banner-${s.preset}`, canvasHref);
     } catch (err) {
       setS((prev) => ({ ...prev, error: String(err) }));
     }
@@ -1382,9 +1384,9 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                   {brandClients.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
                 </select>
               </div>
-            ) : (
+            ) : staff ? (
               <p className="form-hint" style={{ marginTop: 12 }}>尚無品牌色。到 <a href="/ops/clients">客戶設定</a> 填入品牌色後即可在此選取帶入。</p>
-            )}
+            ) : null}
 
             <input ref={colorRefFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleColorRefUpload} />
             <button className="btn btn-ghost" style={{ fontSize: 12, marginTop: 8 }} onClick={() => colorRefFileRef.current?.click()}>
@@ -2116,10 +2118,10 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                 disabled={s.generating || s.productRemoving}>
                 下載 PNG
               </button>
-              <button className="btn btn-ghost" onClick={handleOpenInCanvas}
+              {canvasHref && <button className="btn btn-ghost" onClick={handleOpenInCanvas}
                 disabled={s.generating || s.productRemoving}>
                 在 Canvas Editor 開啟
-              </button>
+              </button>}
             </div>
             {s.saved && (
               <p className="form-hint" style={{ marginTop: 8, color: "var(--green)" }}>

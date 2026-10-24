@@ -1,4 +1,4 @@
-import MockupStudioStaff from "./MockupStudioStaff";
+import MockupWithCatalog from "./MockupWithCatalog";
 
 export const metadata = { title: "Mockup Studio · Lobster Factory" };
 
@@ -8,7 +8,7 @@ export default function MockupPage() {
       <div className="topbar">
         <span className="topbar-title">Mockup Studio</span>
       </div>
-      <MockupStudioStaff />
+      <MockupWithCatalog />
     </>
   );
 }

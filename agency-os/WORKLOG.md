@@ -1,4 +1,35 @@
 # Worklog
+## 2026-10-24（續28）design 產品門頁建好（enabled:false，四頁＋門選單）；「開到畫布」改依門決定目標——修掉已上線 tarot 門的 404 按鈕（Claude）
+
+**觸發**：操作者「繼續做」；卡 `cards/step-8-doors-video-design-content.md` §4.5（S1 注入、D-R1 presets 已完成）。
+
+**發現**
+- C1 已上線 tarot 門有壞按鈕：`TarotStudio` 的「✏️ 在 Canvas 編輯」呼叫 `openInCanvas`，它寫死 `window.location.assign("/tools/canvas")`（`components/tools/canvas-handoff.ts` 改前 :119）→ 客戶在 tarot 門按下即 404。同一函式還有 `OutputTrackBar`、`DesignsGallery`、`BannerStudio`、`StudioWorkbench` 四個呼叫者。不變量：共用元件不得寫死員工頁網址；目標由 `useDoorHref` 依「目前所在門」決定，門沒有該頁就不顯示按鈕。→ `openInCanvas(image, name, href)` 第三參數必填（型別強制每個呼叫者都要決定），五處都用 `useDoorHref(CANVAS_STAFF_HREF)`，null 即隱藏；studio 原本的 `!onDoor` 改為同一規則。
+- C2 把整個 `/api/tools/printful` 列為 design 門 API 時，閘 5 指出 `printful/sync` 未授權——它操作我們唯一的 Printful 商店（員工工作）。→ 門只開 `/api/tools/printful/catalog`（公開型錄、伺服器快取 1h、無組織資料，列 `ORG_FREE_ROUTES`）。
+- C3 `BannerStudio` 門上無品牌色時的提示仍連到 `/ops/clients`（員工頁）→ 提示只在員工頁（有 staff 注入）顯示。
+- C4（Codex F3，已上線 studio 門既有）`/api/tools/studio/mockup` 接受任意 Printful `productId`，用我們共用商店的 mockup 額度；UI 只送 `POD_PRODUCT_MODELS` 的 id（MockupStudio 目錄、PublishWizard、StudioWorkbench 走 productType）。→ 只收 `POD_PRODUCT_MODELS` 的 id，否則 400 `unknown_product`（新 `app/api/tools/studio/mockup/route.test.ts`）。
+- C5（Codex F2）`DesignsGallery` 下載走 `/api/tools/publish/download`（publish 員工專用，門上 404 → 退回開新分頁＋alert）。→ 門上改走 studio 的 `/api/tools/studio/proxy-image`（設計桶 host 白名單），員工頁照舊（publish proxy 也收影片與大檔）；門上影片下載仍會退回開新分頁（proxy-image 只收圖片）。
+
+**修改**（next-admin）
+- `components/tools/canvas-handoff.ts`：`CANVAS_STAFF_HREF`；`openInCanvas` 第三參數 `href`。呼叫端：`components/tools/OutputTrackBar.tsx`、`app/(shell)/tools/{designs/DesignsGallery,banner/BannerStudio,tarot/TarotStudio,studio/StudioWorkbench}.tsx`。
+- `DesignsGallery`「→ 去建商品」（`/tools/publish`，決定 D1 員工專用）同法：`useDoorHref("/tools/publish")`，門上隱藏。
+- 型錄：`MockupStudioStaff.tsx` → `MockupWithCatalog.tsx`（git mv），員工頁與門頁共用；註解更新。
+- `lib/portal/products.ts` design 門：`api` 加 `/api/tools/printful/catalog`；`nav` 我的設計（根）／畫布／橫幅／模型圖（向量編輯不放，決定 D-V）。
+- 門頁 `app/design/{layout,page}.tsx`、`app/design/{canvas,banner,mockup}/page.tsx`：沿用員工元件、無 topbar；canvas 照員工頁 `dynamic(..., { ssr: false })`；橫幅不帶 staff 注入（AI 文案、品牌色，決定 D-V2／D-V3）。
+- `registry-code.test.ts` `ORG_FREE_ROUTES` 加 printful catalog。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（348 files／3109 passed／32 skipped；Codex 修正後重跑）＋ npx tsc --noEmit -p .（原始碼 0；`.next/types` 只有已刪路由的生成檔）＋ lib/portal 門閘 79 passed（含 door.nav 頁存在且對應員工頁） | exit=0 | ms=22625
+- REALTEST_EVIDENCE: tool=Bash | cmd=本機 next-admin-social-ui：`/design`、`/design/canvas`、`/design/banner`、`/design/mockup` 皆 200、`.door-main`、選單「我的設計→/ ｜ 畫布→/canvas ｜ 橫幅→/banner ｜ 模型圖→/mockup」、無 topbar；`/tools/banner`、`/tools/designs` topbar 照舊；橫幅在 design 門仍有「在 Canvas Editor 開啟」（門有畫布頁，目標 `/canvas`） | exit=0 | ms=60000
+- 突變：mockup 的 productId 檢查拿掉 → 「refuses a product we do not sell…」紅；還原綠。
+- 閘證據：`products.ts` 先列整個 `/api/tools/printful` → 閘 5 紅並指名 `app/api/tools/printful/sync/route.ts`；改只列 catalog → 綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n -- Codex `agency-os/reports/oracle/2026-10-24-partialreview-e24a67cc.md`：F2、F3 採納（見 C5、C4）；F1「enabled:false 時員工主機 `/design` 仍渲染門頁」成立但不改——只有員工能到（客戶出了自己的門即被擋，`middleware.ts` isClientOutsideDoor），tarot／studio／video 建好未開時同樣行為，員工本就能用全部工具；記入剩餘。
+  - external oracle = Codex CLI (codex exec -s read-only), not self-description
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=location.(assign|href) "/tools|"/ops/、href="/tools|/ops/、router.push("/tools 於門會渲染的元件 | hits=3（StudioWorkbench 兩處「查看 My Designs」已有 `!onDoor`；BannerStudio `/ops/clients` 提示＝本次 C3 修）；`MockupStudioStaff` 舊名 0
+
+**仍待決**：門上功能清單（V7／D6，會改已上線門版面）。**剩**：門頁在未開門時員工主機也能直接開（Codex F1，與 tarot／studio／video 同）；門上影片下載退回開新分頁；design 上線（DNS、憑證、nginx 共用區塊、enabled）＝High，等操作者 go；tarot 門的畫布按鈕修正隨 03:00 部署生效。
+
+**rollback**：`git revert <本 commit>`（無資料、無 migration；design 門未上線）。
 ## 2026-10-24（續27）video 產品門頁建好（enabled:false）：客戶可核准自己組織的 Release／Story Bible；cleanup 搬 internal；兩個 410 殘骸刪除（Claude）
 
 **觸發**：操作者「繼續做」；卡 `cards/step-8-doors-video-design-content.md` §3.5（前置 S1/P1 `e28406990`、路由加固 `21e7da50b` 已完成）。本 session 無法開新 session（操作者經 Remote Control），在此直接做。

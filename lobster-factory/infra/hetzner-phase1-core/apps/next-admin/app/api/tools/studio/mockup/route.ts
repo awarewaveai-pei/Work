@@ -9,6 +9,11 @@ import {
 import { fetchProductSpec } from "../../../../../lib/studio/printful-catalog";
 import { getCatalogVariants } from "../../../../../lib/studio/print-provider";
 import { logImageCost } from "../../../../../lib/ai/log-ai-call";
+import { POD_PRODUCT_MODELS } from "@/lib/studio/pod-catalog-config";
+
+// Product doors serve this route (studio, design): only the products we sell -- the catalog Mockup Studio shows and the
+// publish flow binds -- may spend the shared Printful store's mockup quota.
+const SELLABLE_PRODUCT_IDS = new Set(POD_PRODUCT_MODELS.map((m) => m.catalogProductId));
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -71,6 +76,9 @@ export async function POST(request: Request) {
 
   // ── Route: catalog product ID vs legacy product type ──────────────────────
   if (typeof body.productId === "number") {
+    if (!SELLABLE_PRODUCT_IDS.has(body.productId)) {
+      return NextResponse.json({ ok: false, error: "unknown_product" }, { status: 400 });
+    }
     // Dynamic catalog path: fetch printfile spec, then generate
     const color = body.color === "grey" || body.color === "black" ? body.color : "white";
     const catalogSpec = await fetchProductSpec(body.productId, color);
