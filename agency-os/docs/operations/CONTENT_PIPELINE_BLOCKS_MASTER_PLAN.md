@@ -1,5 +1,7 @@
 # CONTENT PIPELINE BLOCKS — MASTER PLAN
 
+> **2026-10-24 起被取代（P5／P6／P9 與之後的自動化）**：全自動內容管線（題目佇列、排程、品牌聲音、社群、影片、YouTube）的 SSOT 是 [`../AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md`](../AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md)，進度看該檔 §10。本檔 §0.5 A 段（已完成的積木）仍是事實紀錄；B 段 P5（社群已由 social 產品實作）、P6、P9 改由新計畫的 P2／P4／P6 處理。
+
 > **這份是什麼**：繁中內容生產管線（搜尋熱點 → 文章 → 品質 → 影片 → 發佈）以「積木（block）registry」收斂成**無人值守自動化管線**的**單一藍圖 SSOT**。
 > **給 AI 看的開工指南**：任何 session 接到「video generator / 內容管線 / content pipeline / 積木 / Postiz / 自動發佈」相關任務，**先讀這份**，照「§0 開工必讀」5 分鐘掌握現況、紅線、下一步。
 > **狀態**：藍圖已定 + 真實 code 校正（file:line 佐證）+ **方向決策已鎖定**（見下）。**程式碼尚未動工**（P0 doc 完成；P1 起待 go-ahead）。
