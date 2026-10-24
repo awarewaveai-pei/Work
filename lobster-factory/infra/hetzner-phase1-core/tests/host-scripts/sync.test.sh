@@ -35,13 +35,13 @@ reset_world() {
   git init -q --bare "$ORIGIN"
   git clone -q "$ORIGIN" "$SEED" 2>/dev/null
   mkdir -p "$SEED/$P/scripts" "$SEED/$P/apps/next-admin"
-  cp "$SRC"/* "$SEED/$P/scripts/"
+  cp -r "$SRC"/* "$SEED/$P/scripts/"
   chmod 644 "$SEED/$P/scripts/"*; chmod 755 "$SEED/$P/scripts/rollback-phase1.sh"
   echo v1 > "$SEED/$P/apps/next-admin/app.txt"
   push_change base
   git clone -q "$ORIGIN" "$WORK"
   mkdir -p "$STAGE/scripts" "$STAGE/logs" "$STAGE/apps/next-admin"
-  cp "$SEED/$P/scripts/"* "$STAGE/scripts/"; chmod +x "$STAGE/scripts/"*.sh
+  cp -r "$SEED/$P/scripts/"* "$STAGE/scripts/"; chmod +x "$STAGE/scripts/"*.sh
   printf '%s=\n' SLACK_WEBHOOK_URL OPS_INBOX_SLACK_INCIDENTS_WEBHOOK TELEGRAM_BOT_TOKEN TELEGRAM_ALLOWED_CHAT_IDS > "$STAGE/.env"
   git -C "$WORK" rev-parse HEAD > "$STAGE/.deployed-commit"
 }
@@ -63,6 +63,10 @@ t_block_install_and_idempotence() {
   check "block installed backup-phase1.sh" grep -qx '\[sync-host-scripts\] installed backup-phase1.sh' <<< "$out"
   check "block content == origin/main" cmp -s "$STAGE/scripts/backup-phase1.sh" "$SEED/$P/scripts/backup-phase1.sh"
   check "block keeps host-only files" test -f "$STAGE/scripts/upload-to-r2.sh"
+  mkdir -p "$STAGE/scripts/cron.d" && echo '# retired' > "$STAGE/scripts/cron.d/gone-job"
+  out="$(sync_block)"
+  check "block removes a cron.d file deleted from the repo" not test -e "$STAGE/scripts/cron.d/gone-job"
+  check "block keeps the repo's cron.d files" test -f "$STAGE/scripts/cron.d/awarewave-schedules"
   check "block restores a lost exec bit" test -x "$STAGE/scripts/verify-backup.sh"
   check "block: every managed .sh executable" test -z "$(cd "$SEED/$P/scripts" && for f in *.sh; do [[ -x "$STAGE/scripts/$f" ]] || echo "$f"; done)"
   local m; m="$(stat -c %Y "$STAGE/scripts/sg-deploy.sh")"; sleep 1

@@ -1,0 +1,6 @@
+# /etc/cron.d/ks-aw-01-backup -- the ks-aw-01 (soulful) pipeline, lobster-factory/infra/ks-aw-01-backup/. Installed by
+# install-host-schedules.sh. Times UTC.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+15 2 * * * root /root/lobster-phase1/scripts/cron-run.sh ks_aw_01_backup '/root/scripts/backup-ks-aw-01.sh >> /var/log/ks-aw-01-backup.log 2>&1'
+45 2 * * * root /root/lobster-phase1/scripts/cron-run.sh ks_aw_01_backup_verify '/root/scripts/verify-backup-ks-aw-01.sh >> /var/log/ks-aw-01-backup.log 2>&1'

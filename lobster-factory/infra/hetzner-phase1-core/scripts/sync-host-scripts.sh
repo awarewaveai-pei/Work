@@ -12,7 +12,8 @@
 #     half-new set is worse than an old one. Emergency app deploy meanwhile: git pull by hand, then
 #     sg-deploy.sh --skip-pull (which skips this sync).
 #   - a changed file is replaced by rename, so a script that is running keeps reading its old inode;
-#     unchanged files are not touched; files that exist only on the host are kept.
+#     unchanged files are not touched; files that exist only on the host are kept -- except in cron.d/,
+#     which is mirrored (a cron file deleted in the repo is removed, so its job can be retired).
 #   - *.sh are made executable before install: git stores them 100644 and cron execs them directly.
 #   - serialized by flock on /tmp/sync-host-scripts.lock, which sg-deploy.sh also holds while it takes its
 #     own lock: a sync either finishes before that deploy exists or sees its lock and skips (exit 0), so a
@@ -86,4 +87,13 @@ for i in "${!partials[@]}"; do
   n=$((n + 1))
 done
 partials=()
+
+# cron.d/ is mirrored, not merged: a file deleted from the repo must leave here too, or install-host-schedules.sh
+# keeps installing it and the job never stops. Only this subdirectory; elsewhere host-only files are kept.
+if [[ -d "$TARGET/cron.d" ]]; then
+  while IFS= read -r -d '' f; do
+    rel="${f#"$TARGET"/}"
+    if [[ ! -f "$src/$rel" ]]; then rm -f "$f"; say "removed $rel (not in origin/main)"; fi
+  done < <(find "$TARGET/cron.d" -maxdepth 1 -type f -print0)
+fi
 say "scripts == origin/main $rev ($n installed)"

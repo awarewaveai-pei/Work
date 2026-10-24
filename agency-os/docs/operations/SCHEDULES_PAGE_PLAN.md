@@ -46,6 +46,7 @@
 5. **新客戶的預設來自 registry，不靠開站流程**：registry 每筆宣告 `defaultEnabled`（client_schedules 一律 false；site-watch 沿用它自己的 true＋自動建列）。GET 在無列時回 registry 預設（同 route.ts:49 現行做法），sweep 只讀 enabled 列。沒有列就沒有東西要維護；一鍵架站不必多做任何事。這比「開站時插入預設列」乾淨，也不會在 registry 改預設時留下一堆舊列。
 6. **失敗走現有的事件路**：sweep 裡一個 job 丟錯 → `upsertIncidentAtomic`（`NA/lib/ops-inbox/upsertIncidentAtomic.ts:22`，fingerprint `schedule:<job_key>:<org>`）→ Ops Inbox → Slack/Telegram（`lib/ops-inbox/notify/dispatcher.ts`）。不寫新的通知器。成功時零聲音。
 7. **系統排程只顯示「主機看得到的」**：目前 app 能讀到的只有備份覆蓋（`NA/lib/backup/coverage.ts` 讀 `/host-status/backup-coverage.json`，compose :254 `/var/lib/awarewave:/host-status:ro`；主機上該目錄 2026-10-14 只有這一個檔）和網站巡檢心跳（`site_watch_maintenance.last_heartbeat_at`，`store.ts:118`）。筆電的每晚檢查、雲端 Claude routine、GitHub Actions **不放進 app**：沒有誠實的資料路徑（要新建推送管線＝範圍外），它們已在 AO-RESUME 開工報告裡。之前草圖裡把它們畫進總表是錯的，以此卡為準。
+   - **2026-10-24 擴充（操作者「都要」）**：主機上所有排程都上這頁。主機 `scripts/report-host-schedules.py`（每 10 分）讀實際的 crontab／`/etc/cron.d`／`cron.{daily,…}`／`/etc/systemd/system` timer（dpkg 套件自帶的略過），加上 `cron-run.sh` 寫的每輪結果，寫 `/var/lib/awarewave/host-schedules.json`；頁面 `NA/lib/schedules/adapters/host-schedules.ts` 讀它。我們的排程 SSOT = `hetzner-phase1-core/scripts/cron.d/*`（`install-host-schedules.sh` 安裝；root crontab 退役併入 `awarewave-schedules`）；文案 `NA/lib/schedules/host-jobs.ts`。主機上沒登記的排程顯示「未登記」，登記了主機沒有的顯示「尚無資料」，cron 檔與 repo 不一致顯示「排程版本不一致」——三個方向都不會再有看不到的排程。
 8. **不做**：monthly 頻率（現在沒有任何每月工作；有了再加 `day_of_month` 和測試）、「立即執行」按鈕（爬取已有自己的「正式抓取」）、新工作（Slice 1 只搬現有兩個；第一個真的新工作出現時走 §9）。
 
 ### 3.3 為什麼不是其他做法

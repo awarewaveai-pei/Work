@@ -1,7 +1,8 @@
 name: Backup scripts tests
 
 # Guards of the backup pipeline (lobster-factory/docs/operations/BACKUP_COVERAGE_PLAN.md B10): the R2 upload retry,
-# the daily coverage check and its inventory, the cognitive/HCI offsite leg. Bash and python against stubs only:
+# the daily coverage check and its inventory, the cognitive/HCI offsite leg, and the cron files that schedule them
+# (scripts/cron.d, cron-run.sh, install-host-schedules.sh). Bash and python against stubs only:
 # no network, no containers, no secrets. ubuntu-24.04 = ks-aw-01's bash 5.2 and GNU coreutils.
 
 on:
@@ -12,6 +13,11 @@ on:
       - 'lobster-factory/infra/eu-backup/**'
       - 'lobster-factory/infra/hetzner-phase1-core/scripts/backup-*'
       - 'lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/backup-*'
+      - 'lobster-factory/infra/hetzner-phase1-core/scripts/cron.d/**'
+      - 'lobster-factory/infra/hetzner-phase1-core/scripts/cron-run.sh'
+      - 'lobster-factory/infra/hetzner-phase1-core/scripts/install-host-schedules.sh'
+      - 'lobster-factory/infra/hetzner-phase1-core/scripts/report-host-schedules.py'
+      - 'lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/host-schedules.test.py'
       - '.github/workflows/backup-scripts.yml'
   pull_request:
     branches:
@@ -20,6 +26,11 @@ on:
       - 'lobster-factory/infra/eu-backup/**'
       - 'lobster-factory/infra/hetzner-phase1-core/scripts/backup-*'
       - 'lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/backup-*'
+      - 'lobster-factory/infra/hetzner-phase1-core/scripts/cron.d/**'
+      - 'lobster-factory/infra/hetzner-phase1-core/scripts/cron-run.sh'
+      - 'lobster-factory/infra/hetzner-phase1-core/scripts/install-host-schedules.sh'
+      - 'lobster-factory/infra/hetzner-phase1-core/scripts/report-host-schedules.py'
+      - 'lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/host-schedules.test.py'
       - '.github/workflows/backup-scripts.yml'
   workflow_dispatch:
 
@@ -39,3 +50,5 @@ jobs:
         run: bash lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/backup-offsite-cognitive-hci.test.sh
       - name: Restore drill guards and its coverage row
         run: python3 lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/backup-restore-drill.test.py
+      - name: Host cron files, cron-run.sh, the installer and the schedules inventory
+        run: python3 lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/host-schedules.test.py

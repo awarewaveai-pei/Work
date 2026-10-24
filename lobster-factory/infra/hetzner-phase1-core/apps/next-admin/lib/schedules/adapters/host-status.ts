@@ -1,8 +1,10 @@
-// The host-side schedules this app can actually observe, shown read-only (SCHEDULES_PAGE_PLAN.md §3.2-7).
+// The host-side schedules this app can actually observe, shown read-only (SCHEDULES_PAGE_PLAN.md §3.2-7):
+// backup coverage, the site-watch heartbeat, then every host cron/timer (adapters/host-schedules.ts).
 // Laptop tasks, cloud routines and GitHub Actions have no data path into the app and are not listed.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { readBackupCoverage } from "@/lib/backup/coverage";
 import type { SystemRow } from "../types";
+import { hostScheduleRows, sortSystemRows } from "./host-schedules";
 
 /** Two missed hourly ticks (site-watch-heartbeat cron "5 * * * *", WF src/trigger/site-watch.ts). */
 const HEARTBEAT_STALE_MS = 2 * 60 * 60 * 1000;
@@ -10,12 +12,13 @@ const HEARTBEAT_STALE_MS = 2 * 60 * 60 * 1000;
 export async function hostStatusRows(sb: SupabaseClient | null, now = Date.now()): Promise<SystemRow[]> {
   const rows: SystemRow[] = [];
 
-  // Cadence: scripts/backup-coverage.cron (30 3 * * * UTC = 11:30 Taipei).
+  // Cadence: scripts/cron.d/backup-coverage (30 3 * * * UTC = 11:30 Taipei).
   const backup = {
     key: "backup_coverage",
     label: "備份覆蓋",
     description: "每天檢查資料庫備份，確認當日備份已複製到異地。",
     cadence: "每天 11:30",
+    group: "backup" as const,
     // Facts: scripts/backup-coverage-check.py header, scripts/backup-inventory.json (18 stores, bucket lobster-backup).
     details: {
       what: "檢查 18 個資料庫與檔案資料夾：今日備份完整、R2 有副本、每月還原演練已通過。",
@@ -51,6 +54,7 @@ export async function hostStatusRows(sb: SupabaseClient | null, now = Date.now()
     label: "巡檢心跳",
     description: "每小時喚醒網站巡檢；心跳停止時，不會檢查任何網站。",
     cadence: "每小時 :05",
+    group: "deploy",
     // Facts: WF src/trigger/site-watch.ts, lib/site-watch/notify.ts, scripts/check-site-watch-health.ps1 (>2h WARN, >6h FAIL).
     details: {
       what: "每小時由 Trigger.dev 喚醒網站巡檢；各客戶網站依自己的排程檢查。",
@@ -65,5 +69,6 @@ export async function hostStatusRows(sb: SupabaseClient | null, now = Date.now()
     detail: heartbeatError ?? "",
   });
 
-  return rows;
+  rows.push(...(await hostScheduleRows(undefined, now)));
+  return sortSystemRows(rows);
 }

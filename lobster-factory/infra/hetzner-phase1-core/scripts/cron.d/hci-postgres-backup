@@ -1,0 +1,4 @@
+# /etc/cron.d/hci-postgres-backup -- HCI30 production Postgres. Installed by install-host-schedules.sh. Times UTC.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+45 2 * * * root /root/lobster-phase1/scripts/cron-run.sh hci_postgres_backup 'bash /root/Work/Projects/internal/hci30/scripts/backup-hci-postgres-prod.sh >> /var/log/hci-postgres-backup.log 2>&1'

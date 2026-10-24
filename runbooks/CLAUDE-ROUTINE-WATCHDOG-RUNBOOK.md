@@ -71,7 +71,7 @@
 | `RemoteTrigger run` 回 `github_repo_access_denied` | 手動觸發路徑的 GitHub 授權失效（**排程路徑不受影響**，DailyBriefing 排程持續成功為證）| 到 `claude.ai/code/routines` re-authorize GitHub（可選；排程照跑）|
 | Telegram 只有英文、中文亂碼 | bash 碰了 CJK 字串（違反 §4）| 確認用檔案式送信（base64→檔案→`text@檔案`），勿用 bash 變數帶中文 |
 | watchdog 每天洗版 | state 檔邏輯壞 / 被刪 | 檢查 `/root/.routine-watchdog-state`；正常只在狀態變化時送 |
-| watchdog 沒送但報告確實舊 | cron 沒跑 / git fetch 失敗 / 缺 Telegram creds | `cat /var/log/routine-watchdog.log`；`crontab -l | grep watchdog`；確認 `/root/lobster-phase1/.env` 有 token |
+| watchdog 沒送但報告確實舊 | cron 沒跑 / git fetch 失敗 / 缺 Telegram creds | `cat /var/log/routine-watchdog.log`；`grep watchdog /etc/cron.d/awarewave-schedules`（2026-10-24 起 root crontab 已併入此檔；`/ops/schedules` 也顯示上次結果）；確認 `/root/lobster-phase1/.env` 有 token |
 
 **手動測試（SG）**：
 ```bash
@@ -95,7 +95,7 @@ rm -f /root/.routine-watchdog-state && ./scripts/routine-output-watchdog.sh   # 
 
 ## 7. Rollback
 
-- **Layer ③**：移除 cron（`crontab -e` 刪 watchdog 行）+ `rm /root/.routine-watchdog-state`。腳本在 repo，`git revert` 對應 commit。
+- **Layer ③**：移除 cron（刪 repo `lobster-factory/infra/hetzner-phase1-core/scripts/cron.d/awarewave-schedules` 的 watchdog 行 → 主機跑 `install-host-schedules.sh`）+ `rm /root/.routine-watchdog-state`。腳本在 repo，`git revert` 對應 commit。
 - **Layer ① / ②**：`git revert` `check-routine-freshness.ps1` / `system-health-check.ps1` §11 的 commit；移除 ao-resume.ps1 的 routine-freshness 區塊。
 - **routine source 改錯**：每次改前已 `RemoteTrigger get` 存原 config；`RemoteTrigger update` 回原值即復原。
 

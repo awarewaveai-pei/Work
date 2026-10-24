@@ -40,7 +40,7 @@ export interface ScheduleCell {
   unavailable: string | null;
 }
 
-/** A host-side schedule the app can only read (backup coverage, site-watch heartbeat). */
+/** A host-side schedule the app can only read (backup coverage, site-watch heartbeat, every host cron/timer). */
 export interface SystemRow {
   key: string;
   label: string;
@@ -49,8 +49,11 @@ export interface SystemRow {
   /** In Taipei time, like the rest of the page. */
   cadence: string;
   lastAt: string | null;
-  state: "ok" | "stale" | "missing" | "failed";
+  /** unregistered = on the host but not in HOST_JOBS; untracked = runs but reports no outcome (run-parts). */
+  state: "ok" | "stale" | "missing" | "failed" | "unregistered" | "untracked";
   detail: string;
+  /** Section the row is listed under (lib/schedules/host-jobs.ts HOST_GROUP_ORDER); none = listed first. */
+  group?: "backup" | "deploy" | "site";
   /** Shown when the row is clicked. Values written by GPT to the operator's rule (WORKLOG 2026-10-16). */
   details: { what: string; when: string; where: string; look: string; lookHref: string; fail: string };
 }

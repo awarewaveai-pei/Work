@@ -32,7 +32,7 @@ R2 保存規則（2026-10-14 讀 `GET /r2/buckets/lobster-backup/lifecycle`）�
 - 驗收：主機 `docker ps`＋`docker volume ls` 的每個有資料的容器都在清單上（B2 會機械比對）。
 
 ### B2 每日檢查讀清單 ✅ 2026-10-14（主機首次正式跑 PASS 20 列）
-- `backup-coverage-check.py` 在主機上跑（`backup-coverage.cron`，03:30 UTC，全部 verify 之後），寫 `/var/lib/awarewave/backup-coverage.json`。`check-backup-health.ps1` 在三條管線的 verify 檢查之外加讀這份（管線有沒有跑 vs. 有資料的東西是不是都在某條管線裡），AO-RESUME 照舊顯示；B6 也讀同一份。
+- `backup-coverage-check.py` 在主機上跑（`scripts/cron.d/backup-coverage`，03:30 UTC，全部 verify 之後），寫 `/var/lib/awarewave/backup-coverage.json`。`check-backup-health.ps1` 在三條管線的 verify 檢查之外加讀這份（管線有沒有跑 vs. 有資料的東西是不是都在某條管線裡），AO-RESUME 照舊顯示；B6 也讀同一份。
 - 正在跑的有狀態容器不在清單上 → FAIL。
 - 驗收：上線當天 cognitive、hci、chatwoot 三項顯示 FAIL（真實狀態）；拿掉某一項的 R2 檔 → 該項 FAIL。
 
@@ -56,7 +56,7 @@ R2 保存規則（2026-10-14 讀 `GET /r2/buckets/lobster-backup/lifecycle`）�
 - 驗收：頁面列數＝清單列數；B2 的 FAIL 在頁面上是紅的。
 
 ### B7 每月還原演練 ✅ 2026-10-15（上線；首次全 8 庫從 R2 演練 PASS，狀態檔＋B2 `restore-drill` 列 PASS）
-- `hetzner-phase1-core/scripts/backup-restore-drill.py`（每月 1 日 04:15，`backup-coverage.cron`）：清單裡有 `drill` 的庫，從 R2 下載最新備份（分割檔重組後比對 sha256），灌進與 prod 同 image 的一次性容器（不接網路、限記憶體），判定規則在檔頭。結果 `/var/lib/awarewave/restore-drill.json`；B2 加 `restore-drill` 列（>35 天、任一庫 FAIL、漏庫 → FAIL）。
+- `hetzner-phase1-core/scripts/backup-restore-drill.py`（每月 1 日 04:15，`scripts/cron.d/backup-coverage`）：清單裡有 `drill` 的庫，從 R2 下載最新備份（分割檔重組後比對 sha256），灌進與 prod 同 image 的一次性容器（不接網路、限記憶體），判定規則在檔頭。結果 `/var/lib/awarewave/restore-drill.json`；B2 加 `restore-drill` 列（>35 天、任一庫 FAIL、漏庫 → FAIL）。
 - 比「關鍵表筆數」更嚴：dump 裡每個 COPY 區塊的筆數＝還原後筆數（筆數來自 dump 本身，不用另存標記；做法來自 `hci30-restore-drill.yml`）。
 - 首跑抓到 5 個還原會失敗或資料沒備到的地方（都已修，runbook §4/§6 同步）：Supabase 設定 volume 只放鑰匙 → DB 起不來；先跑 image 初始化再灌 → 6 張 auth/cron 表 0 筆；`postgres` 庫的 owner／grant 沒進 dump（fixup 補、演練比對 prod）；HCI dump GRANT 給 dump 外的角色（加 `hci-roles.sql.gz`）；一鍵架站的 staging 庫（`wp_s_*`）沒備份（`backup-phase1.sh` 改 `--databases`）。
 - 驗收：演練報告每個庫一列；故意給一份壞檔 → 該列 FAIL。

@@ -36,11 +36,11 @@ FORCE=0
 # 1. Sanity
 if [[ ! -f "$DEPLOYED_FILE" ]]; then
   log "ERROR: no $DEPLOYED_FILE — sg-deploy.sh has not been run yet"
-  exit 0   # exit 0 so cron doesn't email; we just record
+  exit 1   # the check did not run; cron-run.sh records it, /ops/schedules shows it failed
 fi
 if [[ ! -f "$ENV_FILE" ]]; then
   log "ERROR: $ENV_FILE missing"
-  exit 0
+  exit 1
 fi
 
 # 2. Source SLACK_WEBHOOK_URL from .env (only that var, no other side-effects)
@@ -51,11 +51,11 @@ fi
 
 # 3. Fetch latest origin/main (quiet)
 cd "$REPO_DIR"
-git fetch origin main --quiet 2>>"$LOG_FILE" || { log "ERROR: git fetch failed"; exit 0; }
+git fetch origin main --quiet 2>>"$LOG_FILE" || { log "ERROR: git fetch failed"; exit 1; }
 ORIGIN_HEAD=$(git rev-parse origin/main 2>/dev/null)
 if [[ -z "$ORIGIN_HEAD" ]]; then
   log "ERROR: cannot resolve origin/main"
-  exit 0
+  exit 1
 fi
 
 # 3.5 Refresh host scripts from origin/main before deciding; re-run this file if that replaced it, so a
@@ -88,7 +88,7 @@ fi
 DEPLOYED=$(cat "$DEPLOYED_FILE" | tr -d '[:space:]')
 if [[ -z "$DEPLOYED" ]]; then
   log "ERROR: $DEPLOYED_FILE empty"
-  exit 0
+  exit 1
 fi
 
 # 5. Compute behind / ahead (app-code paths only — ignores governance/tooling commits)
@@ -99,7 +99,7 @@ APP_PATHS=(
 )
 git cat-file -e "${DEPLOYED}^{commit}" 2>/dev/null || {
   log "ERROR: deployed commit $DEPLOYED not in /root/Work — fetch origin?"
-  exit 0
+  exit 1
 }
 BEHIND=$(git rev-list --count "${DEPLOYED}..${ORIGIN_HEAD}" -- "${APP_PATHS[@]}" 2>/dev/null || echo 0)
 AHEAD=$(git rev-list --count "${ORIGIN_HEAD}..${DEPLOYED}" -- "${APP_PATHS[@]}" 2>/dev/null || echo 0)

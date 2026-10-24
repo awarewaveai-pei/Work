@@ -4,7 +4,7 @@
 #              + the volume cognitive-os-api mounts at .runtime (source/artifact blobs the database rows name)
 #              -> /root/backups-cognitive/<STAMP>/{<database>.dump,runtime.tgz,.complete} -> R2 cognitive/<date>/
 #   hci:       newest finished /root/backups-hci-postgres/<STAMP>/ (has .complete) -> R2 hci/<date>/
-# Runs after both (backup-coverage.cron, 02:50 UTC). Database first, blobs second: a blob erased in between is
+# Runs after both (cron.d/backup-coverage, 02:50 UTC). Database first, blobs second: a blob erased in between is
 # missing from runtime.tgz, never the other way round (a new row naming a blob the archive lacks).
 # Erasure: a cognitive dump may hold erased data for at most 7 days (backup-cognitive-db.sh:6). So: local snapshots
 # here are removed after 5 days on every run, success or not; each dump run is shipped once (a re-ship would restart

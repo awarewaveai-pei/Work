@@ -18,7 +18,7 @@ Reads backup-inventory.json next to this file and fails when:
     /api/internal/reconcile, one row per inventory reconcile check), or the check could not run.
 Writes STATUS_FILE (read by scripts/check-backup-health.ps1 and /ops/backup) and one verdict line. On PASS it touches
 OK_STAMP, otherwise sets its mtime to 0, so endpoint-alert.sh (fresh.d registration below) alerts within minutes.
-Exit 0 = all PASS, 1 = a FAIL, 2 = the check itself could not run. Cron: backup-coverage.cron.
+Exit 0 = all PASS, 1 = a FAIL, 2 = the check itself could not run. Cron: cron.d/backup-coverage.
 """
 import json
 import os

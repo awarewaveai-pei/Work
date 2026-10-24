@@ -6,7 +6,7 @@
 # A new site that disables WP-Cron is covered on the next tick; one that stops disabling it drops out.
 # (2026-09-24: soulfulexpression.org ran with DISABLE_WP_CRON and no scheduler for 4 weeks after cutover.)
 #
-# Install: `wp-cron-runner.sh --install` (root) = /etc/cron.d/wp-cron-runner every minute + logrotate +
+# Install: `wp-cron-runner.sh --install` (root) = /etc/cron.d/wp-cron-runner (repo copy cron.d/wp-cron-runner) + logrotate +
 # dead-man registration; install-maintenance-crons.sh calls it on rebuilds.
 # Heartbeat: touches $STATE_DIR/heartbeat only after a tick where every target ran clean and none is
 # still overdue; endpoint-alert.sh reads /etc/awarewave-alert/fresh.d/wp-cron-runner and alerts when it
@@ -36,15 +36,13 @@ if [[ "${1:-}" == "--install" ]]; then   # idempotent; also called by install-ma
   set -e
   for d in /etc/cron.d /etc/logrotate.d; do [[ -d "$d" ]] || { say "install: $d missing (cron/logrotate not installed?)"; exit 1; }; done
   self="$(realpath "$0")"
-  printf '%s\n' "# Managed by wp-cron-runner.sh --install -- do not edit." "SHELL=/bin/bash" \
-    "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
-    "* * * * * root ${self} >> /var/log/wp-cron-runner.log 2>&1" > /etc/cron.d/wp-cron-runner
-  chmod 0644 /etc/cron.d/wp-cron-runner
+  # The cron line's SSOT is cron.d/wp-cron-runner next to this script (install-host-schedules.sh installs the same file).
+  install -m 0644 "$(dirname "$self")/cron.d/wp-cron-runner" /etc/cron.d/wp-cron-runner
   printf '%s\n' "/var/log/wp-cron-runner.log {" "  weekly" "  rotate 8" "  compress" "  missingok" \
     "  notifempty" "}" > /etc/logrotate.d/wp-cron-runner
   mkdir -p /etc/awarewave-alert/fresh.d "$STATE_DIR"
   echo "$STATE_DIR/heartbeat 900 wp-cron-runner" > /etc/awarewave-alert/fresh.d/wp-cron-runner
-  say "installed: /etc/cron.d/wp-cron-runner -> $self, logrotate, dead-man registration (900s)"
+  say "installed: /etc/cron.d/wp-cron-runner (from cron.d/wp-cron-runner), logrotate, dead-man registration (900s)"
   exit 0
 fi
 

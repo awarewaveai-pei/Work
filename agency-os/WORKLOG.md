@@ -26,6 +26,39 @@
 **剩**：cleanup 先刪 R2 後刪 DB 列的順序（Codex F2，無呼叫者）；video 上線（DNS、憑證 SAN、nginx 共用區塊加 `video.aware-wave.com`、enabled）＝High，等操作者 go；design、content 門照卡續做。
 
 **rollback**：`git revert <本 commit>`（無資料、無 migration、門未上線）。
+## 2026-10-24（續26）主機所有排程上 /ops/schedules＋影片對帳改每天兩次（Claude）
+
+**根因**
+- 「影片對帳失敗 → 15 分後歸零」天天出現＝假警報：`reconcile-videos.sh` 每 15 分打 `127.0.0.1:3002`，剛好碰上 next-admin 換容器（今天 05:23 deploy 結束 05:30、對帳 05:30:01 `curl_failed`；10-23 17:00／22:00 空回應）。本月 76 次 deploy，碰上機率高。資料無異（前後 `orphanUnattributable:0`）。
+- 順帶發現：`reconcile-videos.sh` 每輪覆寫狀態檔時間 → 「同一問題 24h 重提醒」從未觸發（09-21～10-23 orphans=2 期間只在週日 flap 時才通知）。
+- 排程頁只列 2 項主機排程；主機實際 23 條 cron＋1 run-parts＋1 systemd timer，結果只寫 log，app 看不到。root crontab 11 行沒有任何 repo 來源。
+
+**變更**
+- `scripts/cron-run.sh`：每條排程經它執行，原指令不變，結束碼寫 `/var/lib/awarewave/jobs/<key>.json`；記錄失敗不改結束碼。
+- `scripts/cron.d/*`（7 檔）＝我們所有 cron 檔的 SSOT；root crontab 併入 `awarewave-schedules`（含 reconcile 改 `0 10,22`＝台北 06:00／18:00）。`backup-coverage.cron` 移成 `cron.d/backup-coverage`。8090＝MainWP，key `mainwp_wp_cron`。
+- `scripts/install-host-schedules.sh`：`--check`／安裝（先備份、root crontab 有未涵蓋指令就拒絕、移除 repo 已刪的檔）／`--rollback <dir>`。`install-maintenance-crons.sh` 不再寫排程、改呼叫它（舊 sg/eu 分支與從未上線的 events-sync 排程移除）；`wp-cron-runner.sh --install` 改裝 `cron.d/wp-cron-runner`。
+- `scripts/report-host-schedules.py`（每 10 分）：讀實際 crontab／cron.d／run-parts／`/etc/systemd/system` timer（dpkg 自帶略過）＋ jobs 記錄 → `/var/lib/awarewave/host-schedules.json`；未包裝的指令遮罩祕密後輸出；回報 repo 與主機 cron 檔差異。
+- next-admin：`lib/schedules/{cron-cadence,host-jobs}.ts`、`adapters/host-schedules.ts`，排程頁依「備份／部署與監控／網站與服務維護」分組；新狀態「未登記」「不回報」；清單過期全列 stale、清單有錯誤時不宣稱「主機沒有」。文案 GPT（`agency-os/reports/oracle/2026-10-24-inspect-273b113e.md`）。
+- `reconcile-videos.sh`：同輪重試 3 次（間隔 60s）、空回應算失敗、broken 時 exit 1、24h 重提醒時間戳修正。
+- 文件：SCHEDULES_PAGE_PLAN §3.2-7、BACKUP_COVERAGE_PLAN、兩份 watchdog runbook、KS-AW-01 換機 runbook、OBSERVABILITY_BASELINE、CI `backup-scripts.yml` 加測試。
+
+**Codex review（scoped，`2026-10-24-partialreview-da0baee7.md`）5 findings 全確認全修**：F1 repo 刪檔主機殘留 → `.awarewave-managed` 清單＋retire；F2 清單錯誤被忽略 → 錯誤列＋不判 missing；F3 祕密只遮 `NAME=` → 加 header／-u／URL 帳密／--password／query；F4 run-parts 檔名規則；F5 無效時間判 ok → 判 missing。cron.d 檔 Codex 未審（非 source 型別）→ 由測試＋主機 dry-run 涵蓋。
+
+**critic（Opus）0c/3M/6m，全確認；修 3M＋5m**：M1 `sync-host-scripts.sh` 不刪主機多餘檔 → repo 刪的 cron 檔永遠被裝回（`cron.d/` 改鏡像，`sync.test.sh` +2 例；harness `cp` 改 `-r`）；M2 `check-drift-and-alert.sh` 6 條 ERROR 路徑 exit 0 → 頁面假綠（改 exit 1）；其他被判讀腳本查過：`smart-restart-if-oom.sh` 設計上恆 0、MainWP curl 無 `-f` → registry `exitAlwaysZero` 頁面註明「只確認按時執行」；M3 停用的 systemd timer 永遠 ok → `@inactive` 判 stale。m：root crontab 有 `VAR=` 行拒裝；先換 `awarewave-schedules` 再立刻清 root crontab（中途失敗不會兩份都跑）＋ ERR trap 印 undo；`install-maintenance-crons.sh` 先跑 installer 再 `wp-cron-runner --install`（備份抓到原檔）；reconcile 時間戳取開頭＋重提醒 23h；清單過期時 failed 保持紅。未修：curl 加 `-f`（會改指令字串，coverage 比對失敗；以 exitAlwaysZero 誠實標示代替）。
+
+**驗證**
+- 主機唯讀 dry-run（腳本放 /tmp，只寫 /tmp）：25 項全部找到；endpoint-alert timer 已有真實結果；`install-host-schedules.sh --check` 列 7 檔差異＋root 11 行，無「未涵蓋」行。
+- 主機尚未安裝（等操作者 go-ahead）；next-admin 頁面變更隨 03:00 自動部署上線。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/host-schedules.test.py | exit=0 | ms=11533
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/schedules (next-admin) | exit=0 | ms=1200
+- REALTEST_EVIDENCE: tool=Bash | cmd=docker run ubuntu:24.04 bash /src/tests/host-scripts/sync.test.sh (69 passed, 0 failed) | exit=0 | ms=90000
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo python3 /tmp/rhs/report-host-schedules.py (HOST_SCHEDULES_FILE=/tmp/rhs/out.json) on ks-aw-01 | exit=0 | ms=3000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/8m/6n
+- ORACLE_WAIVED: scoped codex review only (shared worktree carries other sessions' unfinished changes; a whole-repo review would review their work); 5/5 findings fixed and pinned by tests; redaction guard mutation-tested (removed -> test red)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks,.claude/commands | grep=backup-coverage\.cron|wp_cron_main_site|crontab -l \| grep watchdog | hits=0
+
+**避免再發生**：新排程只能加進 `scripts/cron.d/*` 並經 `cron-run.sh`；手動加在主機上的會在排程頁顯示「未登記」，repo 與主機不一致顯示「排程版本不一致」。
 ## 2026-10-24（續25）0121 套正式庫（操作者同意）＋P3 推上 main；監工台 P3 完成（Claude）
 
 **觸發**：操作者「Apply 0121 to production now, verify it, then push P3.」

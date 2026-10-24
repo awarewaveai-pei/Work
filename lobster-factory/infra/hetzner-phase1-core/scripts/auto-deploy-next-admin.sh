@@ -7,8 +7,8 @@
 # Install: never by hand -- sync-host-scripts.sh keeps /root/lobster-phase1/scripts == origin/main
 # (this script runs it before deciding; on a fresh host sg-deploy.sh step 1.8 installs everything).
 #
-# Crontab (add via crontab -e):
-#   0 19 * * * /root/lobster-phase1/scripts/auto-deploy-next-admin.sh >> /root/lobster-phase1/logs/auto-deploy.log 2>&1
+# Schedule: scripts/cron.d/awarewave-schedules (key auto_deploy_next_admin, 0 19 * * * UTC), installed by
+# install-host-schedules.sh; root's crontab held this line until 2026-10-24.
 
 set -euo pipefail
 

@@ -348,7 +348,7 @@ done
 
 > `verify-backup-*.sh` 只驗 gzip/tar 完整性 = **「檔案沒爛」≠「還原得回來」**。
 >
-> **每月自動演練**（2026-10-14 起）：`lobster-factory/infra/hetzner-phase1-core/scripts/backup-restore-drill.py`，每月 1 日 04:15 UTC（`backup-coverage.cron`）。從 R2 下載 `backup-inventory.json` 裡每個有 `drill` 的資料庫最新備份，灌進與 prod 同 image 的拋棄式容器（不接網路、不碰 prod），判定規則在該檔開頭（dump 結尾標記、每個 COPY 區塊筆數 = 還原後筆數、vault 全部解得開、event trigger 齊全）。結果 `/var/lib/awarewave/restore-drill.json`；每日 coverage check 的 `restore-drill` 列在 >35 天沒跑或任一庫 FAIL 時變紅 → 既有告警與 `/ops/backup`。手動重跑：`sudo python3 /root/lobster-phase1/scripts/backup-restore-drill.py [<store id> ...]`（指定 store 時不寫狀態檔）。
+> **每月自動演練**（2026-10-14 起）：`lobster-factory/infra/hetzner-phase1-core/scripts/backup-restore-drill.py`，每月 1 日 04:15 UTC（`cron.d/backup-coverage`）。從 R2 下載 `backup-inventory.json` 裡每個有 `drill` 的資料庫最新備份，灌進與 prod 同 image 的拋棄式容器（不接網路、不碰 prod），判定規則在該檔開頭（dump 結尾標記、每個 COPY 區塊筆數 = 還原後筆數、vault 全部解得開、event trigger 齊全）。結果 `/var/lib/awarewave/restore-drill.json`；每日 coverage check 的 `restore-drill` 列在 >35 天沒跑或任一庫 FAIL 時變紅 → 既有告警與 `/ops/backup`。手動重跑：`sudo python3 /root/lobster-phase1/scripts/backup-restore-drill.py [<store id> ...]`（指定 store 時不寫狀態檔）。
 >
 > 首次演練（2026-10-14）抓到 3 個還原會失敗的地方，都已修：§4 step 3 只放鑰匙 → DB 起不來；§4 step 4 經 compose 起 DB 再灌 → 6 張 auth/cron 表 0 筆；HCI dump GRANT 給 dump 外的角色。2026-06-26 手動演練用「count>0」判定，看不出第二項。
 

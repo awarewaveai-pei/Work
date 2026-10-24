@@ -1,0 +1,6 @@
+# /etc/cron.d/lobster-backup -- WordPress DB + uploads + n8n volume (BACKUP_RESTORE_PROOF.md). Installed by
+# install-host-schedules.sh. Times UTC. Verify runs 30 min after the backup.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+0 2 * * * root /root/lobster-phase1/scripts/cron-run.sh lobster_backup '/root/lobster-phase1/scripts/backup-phase1.sh >> /var/log/lobster-backup.log 2>&1'
+30 2 * * * root /root/lobster-phase1/scripts/cron-run.sh lobster_backup_verify '/root/lobster-phase1/scripts/verify-backup.sh >> /var/log/lobster-backup.log 2>&1'

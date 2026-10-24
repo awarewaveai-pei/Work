@@ -6,10 +6,11 @@
 // Styling = theme tokens (/tools/theme, lib/theme/tokens.ts) + the shared chips (components/tools/panel-primitives.ts);
 // every choice is a visible chip, never a <select>. Times are shown and edited in Taipei time; rows store UTC.
 // Copy: written by GPT to the operator's rule 清楚易懂、不冗長 (WORKLOG 2026-10-15).
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { Fragment, useCallback, useEffect, useState, type CSSProperties } from "react";
 import { roleHeader } from "@/lib/ops-role";
 import { taipeiFromUtc, utcFromTaipei } from "@/lib/schedules/schedule";
 import type { JobMeta, ScheduleCell, SchedulesView, SystemRow } from "@/lib/schedules/types";
+import { HOST_UI } from "@/lib/schedules/host-jobs";
 import { chipStyle } from "@/components/tools/panel-primitives";
 
 const T = {
@@ -39,11 +40,17 @@ const T = {
   errConflict: "其他人剛修改此排程，頁面已重新載入，請再試一次",
   errSave: "儲存失敗，錯誤代碼：",
   errLoad: "頁面載入失敗，錯誤代碼：",
-  server: { ok: "正常", stale: "長時間未回報", missing: "尚無資料", failed: "執行失敗" } as Record<SystemRow["state"], string>,
+  server: {
+    ok: "正常", stale: "長時間未回報", missing: "尚無資料", failed: "執行失敗",
+    unregistered: HOST_UI.state_unregistered, untracked: HOST_UI.state_untracked,
+  } as Record<SystemRow["state"], string>,
+  group: { backup: HOST_UI.group_backup, deploy: HOST_UI.group_deploy, site: HOST_UI.group_site } as Record<NonNullable<SystemRow["group"]>, string>,
 };
 
 const DAYS = ["日", "一", "二", "三", "四", "五", "六"];
-const SERVER_BADGE: Record<SystemRow["state"], string> = { ok: "badge-green", stale: "badge-yellow", missing: "badge-gray", failed: "badge-red" };
+const SERVER_BADGE: Record<SystemRow["state"], string> = {
+  ok: "badge-green", stale: "badge-yellow", missing: "badge-gray", failed: "badge-red", unregistered: "badge-yellow", untracked: "badge-gray",
+};
 
 const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
 
@@ -213,9 +220,12 @@ export function ScheduleTable({ only }: { only?: string }) {
             <div className="section-title">{T.sectionServer}</div>
             <p style={{ color: "var(--text-muted)", fontSize: "var(--font-size-xs)", margin: "-6px 0 10px" }}>{T.serverHint}</p>
             <div className="ops-table">
-              {view.system.map((r) => (
+              {view.system.map((r, i) => (
+                <Fragment key={r.key}>
+                {r.group && r.group !== view.system[i - 1]?.group && (
+                  <div style={{ fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--text-secondary)", padding: "12px 0 4px" }}>{T.group[r.group]}</div>
+                )}
                 <div
-                  key={r.key}
                   className="ops-row"
                   role="button"
                   tabIndex={0}
@@ -226,10 +236,11 @@ export function ScheduleTable({ only }: { only?: string }) {
                   <div className="ops-row-key">{r.label}</div>
                   <div className="ops-row-val">
                     {r.description}
-                    <div>{r.cadence} · {taipeiTime(r.lastAt)}{r.detail ? ` · ${r.detail}` : ""}</div>
+                    <div>{[r.cadence, taipeiTime(r.lastAt), r.detail].filter((x) => x && x !== "—").join(" · ") || "—"}</div>
                   </div>
                   <span className={`card-badge ${SERVER_BADGE[r.state]}`}>{T.server[r.state]}</span>
                 </div>
+                </Fragment>
               ))}
             </div>
           </>
@@ -241,13 +252,13 @@ export function ScheduleTable({ only }: { only?: string }) {
           {server ? (
             <>
               <div style={{ fontWeight: 700, fontSize: "var(--font-size-md)" }}>{server.label}</div>
-              <div style={{ color: "var(--text-muted)", marginTop: 2 }}>{server.cadence} · {T.server[server.state]}</div>
-              {(["what", "when", "where", "look", "fail"] as const).map((k) => (
+              <div style={{ color: "var(--text-muted)", marginTop: 2 }}>{[server.cadence, T.server[server.state]].filter(Boolean).join(" · ")}</div>
+              {(["what", "when", "where", "look", "fail"] as const).filter((k) => server.details[k]).map((k) => (
                 <div key={k}>
                   <div style={label}>{T.detail[k]}</div>
                   <div style={{ lineHeight: "var(--line-height-base)" }}>
                     {server.details[k]}
-                    {k === "look" && (
+                    {k === "look" && server.details.lookHref !== "/ops/schedules" && (
                       <> <a href={server.details.lookHref} style={{ color: "var(--accent)" }}>前往</a></>
                     )}
                   </div>

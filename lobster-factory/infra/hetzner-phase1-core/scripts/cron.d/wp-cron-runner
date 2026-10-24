@@ -1,0 +1,5 @@
+# /etc/cron.d/wp-cron-runner -- WordPress scheduler for DISABLE_WP_CRON sites (wp-cron-runner.sh header).
+# Installed by install-host-schedules.sh and by wp-cron-runner.sh --install.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+* * * * * root /root/lobster-phase1/scripts/cron-run.sh wp_cron_runner '/root/lobster-phase1/scripts/wp-cron-runner.sh >> /var/log/wp-cron-runner.log 2>&1'

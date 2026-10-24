@@ -1,7 +1,7 @@
 /**
  * POST /api/internal/video/reconcile — 影片孤兒對帳（self-healing sweep）。
  *
- * 觸發：主機 cron `scripts/reconcile-videos.sh` 每 15 分打 127.0.0.1，帶 `x-ops-sync-key: <OPS_PROXY_SHARED_SECRET>`。
+ * 觸發：主機 cron `scripts/reconcile-videos.sh`（`scripts/cron.d/awarewave-schedules`，台北 06:00、18:00，失敗重試 3 次）打 127.0.0.1，帶 `x-ops-sync-key: <OPS_PROXY_SHARED_SECRET>`。
  * 掃 R2 video bucket，補缺的 media_assets（使用者生成中關頁 → 沒人輪詢 /status → 影片在 R2 卻沒進畫廊）。
  *
  * 放在 /api/internal：主機 loopback 不是任何產品門，middleware 對 127.0.0.1 只放 `GET /` 與

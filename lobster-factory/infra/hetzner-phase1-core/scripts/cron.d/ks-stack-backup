@@ -1,0 +1,7 @@
+# /etc/cron.d/ks-stack-backup -- the stack pipeline (lobster-factory/infra/eu-backup/) and the Cognitive OS database.
+# Installed by install-host-schedules.sh. Times UTC. BACKUP_DIR must stay /root/backups-stack (aw-autorepair-gate.sh).
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+30 2 * * * root /root/lobster-phase1/scripts/cron-run.sh stack_backup 'BACKUP_DIR=/root/backups-stack /root/scripts/backup-eu-stack.sh >> /var/log/eu-backup.log 2>&1'
+0 3 * * * root /root/lobster-phase1/scripts/cron-run.sh stack_backup_verify 'BACKUP_DIR=/root/backups-stack /root/scripts/verify-backup-eu.sh >> /var/log/eu-backup.log 2>&1'
+17 2 * * * root /root/lobster-phase1/scripts/cron-run.sh cognitive_db_backup 'COGNITIVE_DB_PASSWORD_FILE=/root/cognitive-db-password COGNITIVE_DB_BACKUP_DIR=/root/backups/cognitive-db COGNITIVE_DB_BACKUP_KEEP_DAYS=7 /opt/cognitive-os/Projects/internal/cognitive-engineering-os/ops/cognitive-db/backup-cognitive-db.sh >>/var/log/cognitive-db-backup.log 2>&1'

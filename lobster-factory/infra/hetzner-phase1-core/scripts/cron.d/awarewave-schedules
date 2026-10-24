@@ -1,0 +1,18 @@
+# /etc/cron.d/awarewave-schedules -- the jobs root's crontab held until 2026-10-24, plus the schedules inventory.
+# Installed by install-host-schedules.sh (do not edit on the host). Times UTC. Each line runs the old command
+# unchanged through cron-run.sh, which records the outcome for /ops/schedules.
+# reconcile_videos: 06:00 and 18:00 Taipei (was every 15 min; the script retries 3x in-run instead).
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+*/10 * * * * root /root/lobster-phase1/scripts/cron-run.sh host_schedules_report 'python3 /root/lobster-phase1/scripts/report-host-schedules.py >> /var/log/host-schedules.log 2>&1'
+0 10,22 * * * root /root/lobster-phase1/scripts/cron-run.sh reconcile_videos '/root/lobster-phase1/scripts/reconcile-videos.sh'
+*/30 * * * * root /root/lobster-phase1/scripts/cron-run.sh ops_probe_heartbeat '/root/lobster-phase1/scripts/ops-probe-heartbeat.sh >> /root/lobster-phase1/logs/probe.log 2>&1'
+*/5 * * * * root /root/lobster-phase1/scripts/cron-run.sh mainwp_wp_cron 'curl -s -o /dev/null http://127.0.0.1:8090/wp-cron.php?doing_wp_cron >/dev/null 2>&1'
+0 20 * * * root /root/lobster-phase1/scripts/cron-run.sh deploy_drift_check '/root/lobster-phase1/scripts/check-drift-and-alert.sh >> /var/log/sg-deploy-drift.log 2>&1'
+0 3 * * 0 root /root/lobster-phase1/scripts/cron-run.sh supabase_weekly_restart 'cd /root/supabase && docker compose restart studio kong >> /var/log/supabase-weekly-restart.log 2>&1'
+0 19 * * * root /root/lobster-phase1/scripts/cron-run.sh auto_deploy_next_admin '/root/lobster-phase1/scripts/auto-deploy-next-admin.sh >> /root/lobster-phase1/logs/auto-deploy.log 2>&1'
+11 1 * * * root /root/lobster-phase1/scripts/cron-run.sh backup_status_sync 'LC_ALL=C.UTF-8 bash /root/Work/scripts/sync-backup-status-from-mainwp.sh >> /var/log/backup-status-sync.log 2>&1'
+17 7 * * * root /root/lobster-phase1/scripts/cron-run.sh routine_watchdog 'LC_ALL=C.UTF-8 /root/Work/scripts/routine-output-watchdog.sh >> /var/log/routine-watchdog.log 2>&1'
+30 2 * * 1 root /root/lobster-phase1/scripts/cron-run.sh certbot_renew '/usr/bin/certbot renew >> /var/log/le-renew.log'
+30 3 * * 0 root /root/lobster-phase1/scripts/cron-run.sh docker_weekly_cleanup '/usr/local/bin/docker-weekly-cleanup.sh'
+5 4 * * * root /root/lobster-phase1/scripts/cron-run.sh n8n_oom_restart '/root/scripts/smart-restart-if-oom.sh n8n 500'

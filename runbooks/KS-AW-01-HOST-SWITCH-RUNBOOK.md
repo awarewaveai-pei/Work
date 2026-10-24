@@ -92,7 +92,7 @@ done | grep -E '^[0-9a-f]{64}'
   - **`nginx -t` 的 warning 也要歸零**（2026-08-31 KS-6 post-cutover audit）：所有啟用的 IPv4 TLS vhost（含 `00-default-placeholder`）的 `listen 443` 協定選項必須一致；現況統一 `listen 443 ssl http2;`。混用 `ssl` 與 `ssl http2` 雖不會令語法測試失敗，仍會出現 `protocol options redefined`，把真實新警告埋在噪音裡。
 - `/etc/letsencrypt/` 整棵：`archive/ live/ renewal/ accounts/` **加 `options-ssl-nginx.conf` `ssl-dhparams.pem`**（整併日坑：漏這兩檔 nginx -t 直接炸）；renewal conf 的 `account` 已統一單一帳號 ✓
 - `/etc/hosts` 的 `127.0.0.1 registry` 行 + `/etc/docker/daemon.json` 的 `insecure-registries:["registry:5000"]`（整併日坑；改完 `kill -HUP dockerd` 免重啟）
-- **root crontab 不是檔案，不能 rsync**（覆審 F4）：`ssh OLD 'sudo crontab -l' | ssh NEW 'sudo crontab -'`（11 行，需逐行目視確認）
+- **排程**（2026-10-24 起）：我們的排程全在 repo `lobster-factory/infra/hetzner-phase1-core/scripts/cron.d/*`，root crontab 已退役；新機 `sudo bash /root/lobster-phase1/scripts/install-host-schedules.sh` 一次裝好，`--check` 驗證。`/ops/schedules` 列出主機上未登記的排程。
 - `/etc/cron.d/{lobster-backup,ks-stack-backup,ks-aw-01-backup}` ＋ `/etc/default/{eu-backup,**ks-aw-01-backup**,awarewave-endpoint-alert*}`（600；覆審 F2：漏 `ks-aw-01-backup` 則 soulful 管線的 EXPECT_SERVICES/R2/加密設定全沒）
 - systemd `awarewave-endpoint-alert.{service,timer}` 拷入 `/etc/systemd/system/` 後**必跑**（覆審 F5：拷檔不等於註冊）：`systemctl daemon-reload && systemctl enable --now awarewave-endpoint-alert.timer`（2026-09-24 起 ExecStart = `/root/lobster-phase1/scripts/endpoint-alert.sh`，不再拷 `/usr/local/bin`）
 - **WP-Cron 排程器**：`/root/lobster-phase1/scripts/wp-cron-runner.sh --install`（cron.d 每分鐘＋logrotate＋`/etc/awarewave-alert/fresh.d/` 死人開關）。DISABLE_WP_CRON 的站（soulful-wp）沒有它 = 排程全停（2026-08-28→09-24 實例）。**切換凍結期間**：舊機與新機都 `touch /var/lib/wp-cron-runner/paused.<container>`（WP-CLI 無視維護模式），解凍後刪。
@@ -200,7 +200,7 @@ done | grep -E '^[0-9a-f]{64}'
 | 順 | 群 | 實測窗口 | 群內特記 |
 |----|----|---------|---------|
 | 1 | Uptime Kuma | ~3 分 | 起新後看板即接手監控 |
-| 2 | MainWP | ~5 分 | wp-cron 由 root crontab 行維持 |
+| 2 | MainWP | ~5 分 | wp-cron 由 `/etc/cron.d/awarewave-schedules` 的 `mainwp_wp_cron` 行維持 |
 | 3 | Render 雙服務 | 0（無狀態，新舊並跑到 DNS 切完）| DNS-only 記錄,TTL 300 |
 | 4 | Supabase+n8n+Postiz | ~6 分 | 起 supabase→healthy→n8n→postiz;**kong `KONG_NGINX_WORKER_PROCESSES=4` 已在 compose**（整併日坑:worker 數隨核心數爆 memcg）|
 | 5 | Trigger.dev | ~8 分 | registry 匿名卷必須有資料（§1c）;runner 拉 image 驗證 `docker logs trigger-supervisor` 無 Failed to pull |

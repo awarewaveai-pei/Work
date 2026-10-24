@@ -176,7 +176,7 @@ state "rmdir /state/lock.$OFF"
 
 # --- 6. --install writes cron, logrotate and the dead-man registration ---
 out="$(run "bash /r/$R_FILE --install >/dev/null 2>&1; echo NO_DIRS_RC=\$?; mkdir -p /etc/cron.d /etc/logrotate.d && bash /r/$R_FILE --install >/dev/null && cat /etc/cron.d/wp-cron-runner /etc/awarewave-alert/fresh.d/wp-cron-runner && test -s /etc/logrotate.d/wp-cron-runner && echo LR_OK" 2>&1)"
-check "--install: every-minute cron line" has "$out" "* * * * * root /r/$R_FILE >> /var/log/wp-cron-runner.log"
+check "--install: every-minute cron line, through cron-run.sh" has "$out" "* * * * * root /root/lobster-phase1/scripts/cron-run.sh wp_cron_runner '/root/lobster-phase1/scripts/wp-cron-runner.sh >> /var/log/wp-cron-runner.log 2>&1'"
 check "--install: registration points at the heartbeat" has "$out" "/state/heartbeat 900 wp-cron-runner"
 check "--install: logrotate" has "$out" "LR_OK"
 check "--install without cron/logrotate dirs fails loudly" has "$out" "NO_DIRS_RC=1"
