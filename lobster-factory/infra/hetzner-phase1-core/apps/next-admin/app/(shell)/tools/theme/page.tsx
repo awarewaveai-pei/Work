@@ -236,6 +236,9 @@ export default function ThemePage() {
             </div>
           </div>
 
+          {/* Tab component live preview (its colors are edited below, in the Tabs group) */}
+          <TabPreview />
+
           {/* Token groups grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16, marginBottom: 24 }}>
             {COLOR_GROUPS.map(group => (
@@ -276,15 +279,7 @@ export default function ThemePage() {
                 }}>{row.text}</span>
               ))}
             </div>
-            <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-              <span style={{ color: 'var(--text-primary)', fontSize: 'var(--font-size-sm)' }}>Primary</span>
-              <span style={{ color: 'var(--text-muted)',   fontSize: 'var(--font-size-sm)' }}>Muted</span>
-              <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Secondary</span>
-            </div>
           </div>
-
-          {/* Tab component live preview */}
-          <TabPreview />
 
           {/* Typography token groups */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16, marginBottom: 24 }}>
@@ -524,7 +519,7 @@ function TabPreview() {
   const [active, setActive] = useState(0);
   const DEMO_TABS = ['Overview', 'Settings', 'History', 'Disabled'];
   const DEMO_CONTENT = [
-    'This is the Overview tab. Font size, weight, and colors are all controlled by --tab-* tokens above.',
+    'This is the Overview tab. Its colors are the Tabs group below; its font size and weight are in Typography & Size.',
     'Settings content goes here. The active tab uses --tab-color-active and --tab-border-active.',
     'History content. Hover a tab to see --tab-bg-hover and --tab-color-hover in action.',
     '',
@@ -533,7 +528,7 @@ function TabPreview() {
     <div className="card" style={{ padding: 20, marginBottom: 16 }}>
       <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 14 }}>
         Tab Component — Live Preview
-        <span style={{ color: 'var(--text-muted)', fontWeight: 400, textTransform: 'none', marginLeft: 8, letterSpacing: 0 }}>changes above reflect here instantly</span>
+        <span style={{ color: 'var(--text-muted)', fontWeight: 400, textTransform: 'none', marginLeft: 8, letterSpacing: 0 }}>changes below reflect here instantly</span>
       </div>
 
       {/* Tab bar using .tab-bar + .tab + .tab--active classes */}

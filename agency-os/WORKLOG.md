@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-24（續11）Theme Editor：預覽也照分頁分類；部署 a44c90a24 後正式站檢查（Claude）
+
+**觸發**：續9 部署後在正式站檢查：Colors 分頁 46 個全是顏色 ✓；Typography & Size 的 19 個設定 ✓，但頁面上方預覽仍混顏色——Tab 預覽列出 5 個 tab 顏色 token、字型預覽有 Primary／Muted／Secondary 顏色條。
+
+**修改**（`app/(shell)/tools/theme/page.tsx`）
+- `TabPreview` 從 Typography & Size 移到 Colors 分頁（顏色在下方 Tabs 組改；說明改指 Typography & Size 管字級字重）。
+- 刪字型預覽裡的文字顏色條（文字顏色在 Colors 分頁 Text 組）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=正式站 /tools/theme 讀 DOM（Colors 46 token 全色；Typography & Size 19 個設定＋5 個預覽標籤）＋ npx vitest run lib/theme（4 passed）＋ npx tsc --noEmit（0） | exit=0 | ms=60000
+- 部署 a44c90a24：sg-deploy.sh next-admin（snapshot lobster-phase1-next-admin:rollback-20261024-050203；healthy after 10s；smoke all endpoints OK）。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回 diff：只搬一個預覽元件、刪一條預覽、改兩句說明
+- ORACLE_WAIVED: 純版面搬移（預覽元件位置與文案），無邏輯
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin | grep=TabPreview | hits=2（定義＋Colors 分頁一處使用）
+- BUGHUNT_SCOPE_NARROW: 元件只在 theme 頁
+
+**rollback**：`git revert <本 commit>`；部署回退 snapshot 見上。
 ## 2026-10-24（續10）派工作給 Codex（/codex-do）＋背景工人選帳號（/account，me／Wda Gov 手動切）（Claude）
 
 **觸發**：操作者：Codex 只用在 /codex-review 太少，要能平常派工作；自己的 $100 週額度快用完時改用單位給的 Wda Gov Team 席位，但對話歷史與監工台不能斷。定案：手動切（不讀內部用量網址），主帳號當大腦、其他帳號當工人。
