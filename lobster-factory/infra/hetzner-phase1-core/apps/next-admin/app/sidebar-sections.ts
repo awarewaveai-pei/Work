@@ -201,17 +201,22 @@ export function itemKey(item: NavItem): string {
 
 // The section holding the current page: the link with the longest href that is the path or a
 // parent of it ('/' only matches itself, or every page would land in Overview).
-export function activeSectionId(sections: NavSection[], pathname: string): string | null {
-  let best: { id: string; len: number } | null = null;
+/** The link the current page belongs to: the longest href that is the path or a parent of it. */
+export function activeLink(sections: NavSection[], pathname: string): { sectionId: string; href: string } | null {
+  let best: { sectionId: string; href: string } | null = null;
   for (const s of sections) {
     for (const item of s.items) {
       if (item.type !== 'link') continue;
       const h = item.href;
       const hit = h === '/' ? pathname === '/' : pathname === h || pathname.startsWith(h + '/');
-      if (hit && (!best || h.length > best.len)) best = { id: s.id, len: h.length };
+      if (hit && (!best || h.length > best.href.length)) best = { sectionId: s.id, href: h };
     }
   }
-  return best?.id ?? null;
+  return best;
+}
+
+export function activeSectionId(sections: NavSection[], pathname: string): string | null {
+  return activeLink(sections, pathname)?.sectionId ?? null;
 }
 
 /** Keep the links a restricted staff member may open (`mayOpen`), then drop sections left empty. External and

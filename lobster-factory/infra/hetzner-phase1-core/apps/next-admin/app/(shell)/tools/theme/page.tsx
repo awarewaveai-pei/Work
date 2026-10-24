@@ -181,34 +181,19 @@ export default function ThemePage() {
       </div>
 
       {/* ── Tab bar ─────────────────────────────────────────────────── */}
-      <div style={{
-        display: 'flex', gap: 2, marginBottom: 20,
-        borderBottom: '2px solid var(--border)',
-        paddingBottom: 0,
-      }}>
+      {/* The shared tab component, so this bar follows the Tabs tokens like every other tab bar. */}
+      <div className="tab-bar" role="tablist" style={{ marginBottom: 20 }}>
         {TABS.map(tab => (
           <button
             key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            className={activeTab === tab.id ? 'tab tab--active' : 'tab'}
             onClick={() => setActiveTab(tab.id)}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              padding: '8px 16px',
-              fontSize: 13, fontWeight: activeTab === tab.id ? 600 : 400,
-              color: activeTab === tab.id ? 'var(--accent-text)' : 'var(--text-muted)',
-              borderBottom: activeTab === tab.id ? '2px solid var(--accent)' : '2px solid transparent',
-              marginBottom: -2, borderRadius: '6px 6px 0 0',
-              display: 'flex', alignItems: 'center', gap: 6,
-              transition: 'color 0.15s',
-            }}
           >
             {tab.label}
-            {tab.badge !== undefined && (
-              <span style={{
-                background: 'var(--accent)', color: 'var(--btn-primary-text)',
-                borderRadius: 10, fontSize: 10, fontWeight: 700,
-                padding: '1px 6px', lineHeight: '14px',
-              }}>{tab.badge}</span>
-            )}
+            {tab.badge !== undefined && <span className="tab-count">{tab.badge}</span>}
           </button>
         ))}
       </div>
@@ -489,8 +474,8 @@ function TokenRow({ name, type, value, defaultValue, changed, onChange }: {
   const [resolved, setResolved] = useState('#000000');
   useEffect(() => {
     if (type !== 'color' || isHex(value)) return;
-    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    if (isHex(v) && v !== resolved) setResolved(v);
+    const v = resolveColor(name);
+    if (v && v !== resolved) setResolved(v);
   });
   const pickerValue = isHex(value) ? value : resolved;
   return (
@@ -532,6 +517,20 @@ function TokenRow({ name, type, value, defaultValue, changed, onChange }: {
       )}
     </div>
   );
+}
+
+// The #rrggbb a token renders as (var() and color-mix() resolved by the browser; alpha dropped).
+function resolveColor(name: string): string | null {
+  const probe = document.createElement('span');
+  probe.style.color = `var(${name})`;
+  document.body.appendChild(probe);
+  const c = getComputedStyle(probe).color;
+  probe.remove();
+  const m = c.match(/^rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/) ??
+    c.match(/^color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/);
+  if (!m) return null;
+  const scale = c.startsWith('color(') ? 255 : 1;
+  return '#' + m.slice(1, 4).map(v => Math.round(Number(v) * scale).toString(16).padStart(2, '0')).join('');
 }
 
 // ── Tab component live preview ────────────────────────────────────────────────

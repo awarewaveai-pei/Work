@@ -4,9 +4,9 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { OpsInboxBadge } from './(shell)/ops/inbox/components/OpsInboxBadge';
 import type { SavedLayout } from '../lib/theme/tokens';
-import { DEFAULT_SECTIONS, activeSectionId, applyLayout, visibleSections } from './sidebar-sections';
+import { DEFAULT_SECTIONS, activeLink, applyLayout, visibleSections } from './sidebar-sections';
 
-export { DEFAULT_SECTIONS, activeSectionId, applyLayout, itemKey, visibleSections, type NavItem, type NavSection } from './sidebar-sections';
+export { DEFAULT_SECTIONS, activeLink, activeSectionId, applyLayout, itemKey, visibleSections, type NavItem, type NavSection } from './sidebar-sections';
 
 // ── Component ────────────────────────────────────────────────────────────────
 // `initialLayout` is fetched server-side (app/layout.tsx) from the DB, so the saved sidebar
@@ -19,7 +19,10 @@ export function SidebarNav({ initialLayout, visible = null }: { initialLayout?: 
   const ordered = initialLayout ? applyLayout(DEFAULT_SECTIONS, initialLayout) : DEFAULT_SECTIONS;
   const sections = visible ? visibleSections(ordered, href => visible.includes(href)) : ordered;
   const pathname = usePathname() ?? '/';
-  const active = activeSectionId(sections, pathname);
+  // .sidebar-link.active (--sidebar-text-active, --sidebar-active-bg, --sidebar-active-bar) only
+  // paints when the current page's link carries the class.
+  const current = activeLink(sections, pathname);
+  const active = current?.sectionId ?? null;
   const [open, setOpen] = useState<Set<string>>(() => new Set(active ? [active] : []));
 
   // Navigating into a collapsed section (e.g. from a dashboard card) opens it.
@@ -70,7 +73,9 @@ export function SidebarNav({ initialLayout, visible = null }: { initialLayout?: 
               );
             }
             return (
-              <Link key={item.href} href={item.href} className="sidebar-link" title={item.title}>
+              <Link key={item.href} href={item.href} title={item.title}
+                className={item.href === current?.href ? 'sidebar-link active' : 'sidebar-link'}
+                aria-current={item.href === current?.href ? 'page' : undefined}>
                 <span className="sidebar-icon">{item.icon}</span> {item.label}
                 {item.badge === 'ops-inbox' && <OpsInboxBadge />}
               </Link>

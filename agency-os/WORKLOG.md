@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-25（續15）外觀設定「調了沒反應」整類關掉：側欄目前頁、區塊標題滑過、選中分頁背景、Theme Editor 自己的分頁（Claude）
+
+- **觸發**：操作者截圖三張：Theme Editor 分頁（圖一）和 Tab 預覽（圖二）不同、找不到圖一的 bg／hover 設定；`--sidebar-text-active`、`--sidebar-active-bar` 沒變色；`--sidebar-section-label` 滑過時字和背景沒得調。
+- **根因**：① `SidebarNav.tsx` 每個連結都只有 `sidebar-link`，`.sidebar-link.active`（`--sidebar-text-active`／`--sidebar-active-bg`／`--sidebar-active-bar`）從未生效；② 區塊標題滑過借 `--sidebar-text`，背景 `--sidebar-hover`／選中背景 `--sidebar-active-bg` 寫死在 globals 不可調；③ `.tab--active` 沒用 `--tab-bg-active`；④ Theme Editor 分頁列是行內樣式手刻，不吃任何 `--tab-*`。
+- **不變量**：Colors 分頁每一格都必須被畫面程式碼讀到（調了一定有反應）。
+- **做了什麼**（next-admin）：`app/sidebar-sections.ts` 新 `activeLink`（最長前綴，`activeSectionId` 改用它）；`app/SidebarNav.tsx` 目前頁連結加 `active`＋`aria-current="page"`；`lib/theme/tokens.ts` Sidebar 組加 `--sidebar-section-label-hover`（預設 `var(--sidebar-text)`）、`--sidebar-hover`、`--sidebar-active-bg`（預設沿用 globals 的 color-mix）；`app/globals.css` 標題滑過改吃 `--sidebar-section-label-hover`、`.tab--active` 加 `background: var(--tab-bg-active)`；Theme Editor 分頁列改 `.tab-bar`／`.tab`／`.tab--active`＋`.tab-count`；TokenRow 選色器起點改用探針元素解析（`color-mix` 預設也解得出）；`palette-derive.ts` 色票也設側欄滑過／選中／標題滑過，滑過與選中底色往遠離字色方向調。
+- **新守門**：`tokens-match-globals.test.ts`「every Colors-tab token is read by screen code」；`app/__tests__/sidebar-active-link.test.ts`（`activeLink` 最長前綴＋SidebarNav 必須標 active）；色票測試加側欄滑過／選中字色對比（888 種）。
+- **未處理（待操作者決定）**：Typography 分頁 5 格沒有任何畫面讀：`--font-weight-normal`／`-medium`／`-heavy`、`--line-height-tight`、`--letter-spacing-label`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/theme app/__tests__/sidebar-active-link.test.ts app/__tests__/sidebar-coverage.test.ts（27 passed）＋ npx tsc --noEmit（0 error） | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：SidebarNav 拿掉 active（sidebar-active-link 紅）、.tab--active 拿掉 tab-bg-active（tokens-match-globals 紅）；還原綠 | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=curl | cmd=localhost:3901 /tools/theme：頁面暫設顯眼測試色後讀 computed——編輯器分頁 class=tab tab--active、bg/color 跟 --tab-bg-active/--tab-color-active；側欄「Theme Editor」連結 aria-current=page、字色/背景/左條跟 --sidebar-text-active/--sidebar-active-bg/--sidebar-active-bar；標題滑過規則吃新 token；測試色已移除、無 POST | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（讀回 diff；active 判斷沿用既有最長前綴規則）
+- ORACLE_WAIVED: codex quota blocked until 2026-10-25 07:00 (scripts/oracle-quota.ps1)；以讀回＋2 個突變＋瀏覽器實測代替。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=activeSectionId | hits=14
+- **rollback**：`git revert <本 commit>`。
 ## 2026-10-25（續14）next-admin 手動部署 79f53f114（操作者：現在部署 next-admin）——主要按鈕自己一組上線（Claude）
 
 - **範圍**：prod 原為 `e12af9bf8`；`e12af9bf8..79f53f114` 的 next-admin 變更只有 `79f53f114`（Button Primary 組＋`.btn-primary` 吃 `--btn-primary-*`），無 migration；DEPLOY_HOLD 不存在。

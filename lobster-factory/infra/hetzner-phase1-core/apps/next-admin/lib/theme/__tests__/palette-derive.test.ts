@@ -23,6 +23,9 @@ describe("palette presets", () => {
       ["--accent-text", ["--body-bg", "--card-bg", "--bg-subtle", "--bg-hover"]],
       ["--btn-secondary-text", ["--btn-secondary-bg"]],
       ["--sidebar-text", ["--sidebar-bg"]],
+      ["--sidebar-text-hover", ["--sidebar-hover"]],
+      ["--sidebar-text-active", ["--sidebar-active-bg"]],
+      ["--sidebar-section-label-hover", ["--sidebar-hover"]],
       ["--btn-primary-text", ["--btn-primary-bg"]],
       ["--ai-text", ["--ai-bg"]],
     ];
@@ -39,7 +42,7 @@ describe("palette presets", () => {
   // Operator 2026-10-25: palette colors are surfaces, never text — every text token is a neutral grey.
   it("no arrangement paints text in a palette color", () => {
     const textTokens = ["--accent-text", "--text-primary", "--text-muted", "--text-secondary", "--sidebar-text", "--sidebar-text-hover",
-      "--sidebar-text-active", "--sidebar-section-label", "--btn-primary-text", "--btn-secondary-text",
+      "--sidebar-text-active", "--sidebar-section-label", "--sidebar-section-label-hover", "--btn-primary-text", "--btn-secondary-text",
       "--tab-color", "--tab-color-hover", "--tab-color-active", "--ai-text"];
     const isGrey = (hex: string) => hex.slice(1, 3) === hex.slice(3, 5) && hex.slice(3, 5) === hex.slice(5, 7);
     expect(ALL.flatMap(({ id, tokens: t }) => textTokens.filter((n) => !isGrey(t[n])).map((n) => `${id} ${n}=${t[n]}`))).toEqual([]);

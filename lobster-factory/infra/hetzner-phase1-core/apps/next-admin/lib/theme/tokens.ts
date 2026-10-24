@@ -56,6 +56,9 @@ export const COLOR_GROUPS: TokenGroup[] = [
       { name: "--sidebar-text-active", default: "#0d1526", type: "color" },
       { name: "--sidebar-active-bar", default: "#6366f1", type: "color" },
       { name: "--sidebar-section-label", default: "#94a3b8", type: "color" },
+      { name: "--sidebar-section-label-hover", default: "var(--sidebar-text)", type: "color" },
+      { name: "--sidebar-hover", default: "color-mix(in srgb, var(--accent) 8%, transparent)", type: "color" },
+      { name: "--sidebar-active-bg", default: "color-mix(in srgb, var(--accent) 14%, transparent)", type: "color" },
     ],
   },
   {

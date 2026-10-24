@@ -117,7 +117,11 @@ export function paletteToTokens(colors: readonly string[], roles: Roles = defaul
   const text = inkOnAll([bg, card, subtle, hover]);
   const line = mix(card, text, 0.12);
   const muted = softGrey(text, [bg, card, subtle, hover], 4.5);
-  const sidebarInk = inkOn(sidebar);
+  // Same rule as the page: hover / active fills move away from the ink, so they never cost contrast.
+  const sidebarAway = inkOn(sidebar) === "#ffffff" ? "#000000" : "#ffffff";
+  const sidebarHover = mix(sidebar, sidebarAway, 0.12);
+  const sidebarActive = mix(sidebar, sidebarAway, 0.22);
+  const sidebarInk = inkOnAll([sidebar, sidebarHover, sidebarActive]);
   const onAccent = inkOn(accent);
 
   if (deltaE(accent, bg) < 30) {
@@ -153,6 +157,9 @@ export function paletteToTokens(colors: readonly string[], roles: Roles = defaul
     "--sidebar-text-active": sidebarInk,
     "--sidebar-active-bar": accent,
     "--sidebar-section-label": softGrey(sidebarInk, [sidebar], 3),
+    "--sidebar-section-label-hover": sidebarInk,
+    "--sidebar-hover": sidebarHover,
+    "--sidebar-active-bg": sidebarActive,
     "--card-border": line,
     "--border": line,
     "--border-subtle": mix(card, text, 0.07),
