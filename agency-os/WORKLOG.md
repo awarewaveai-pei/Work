@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-24（續40）trigger supervisor 的 `TRIGGER_SUPERVISOR_API_URL` 上正式機；prod trigger compose = repo（Claude）
+
+**觸發**：操作者「把 trigger 那一行同步到正式機」（續35 收尾查證項）。
+
+**查證**：`e97201870`（2026-09-04）在 repo 把 supervisor 的 `TRIGGER_API_URL` 改讀獨立的 `${TRIGGER_SUPERVISOR_API_URL:-http://webapp:3000}`——起因是筆電本機 trigger 的 `TRIGGER_API_URL` 指公開網址，supervisor 把 worker token 送到別的控制平面（不變量：容器內控制流不借用對外 public-origin 變數）。一直沒上 prod。prod `/root/trigger/.env` 本來就是 `TRIGGER_API_URL=http://webapp:3000`、supervisor 實際值相同、6 小時 0 個錯誤；compose 內只有 supervisor 讀 `${TRIGGER_API_URL}`；把 repo 那行換進 prod 後 `docker compose config --format json` 完全相同。
+
+**改動**：主機 `/root/trigger/docker-compose.yml` = repo 版（差異只有這一行與兩行註解），經 safe-infra-patch 套用。repo 無改動。之後就算 `.env` 的 `TRIGGER_API_URL` 改成公開網址，supervisor 仍連內部 webapp。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=safe-infra-patch.sh compose /root/trigger/docker-compose.yml supervisor（備份 `docker-compose.yml.bak.safe-patch-20261024-134021`）；supervisor StartedAt 前後相同（渲染相同，未重建）、healthy、`printenv TRIGGER_API_URL`=http://webapp:3000；`cmp` live == repo；2 分鐘內 0 錯誤；`check-compose-invariants.py --running` 0 problems | exit=0 | ms=30000
+- REVIEW_WAIVED: NA -- repo 無改動；prod 檔改為既有 repo 內容，渲染結果相同
+- BUGHUNT_WAIVED: NA -- 無程式或文件改動
+
+**rollback**：`cp /root/trigger/docker-compose.yml.bak.safe-patch-20261024-134021 /root/trigger/docker-compose.yml`（渲染相同，無需重建）。
 ## 2026-10-24（續39）next-admin 部署 51a84b203：video、design 產品門開門＋公網煙霧測試（Claude）
 
 **觸發**：續36 同一個操作者 go（「take the video and design doors live … with smoke tests」）。手動提前部署（沒等 03:00）。b2ec12826..51a84b203 之間有 3 個 next-admin commit：5362617a4（下載路由）、b3132c733（另一個 session 的 content 門頁，`enabled:false`）、51a84b203（本次），三個今晚 03:00 本來就會上線。
