@@ -33,6 +33,7 @@ export const NOW = [
   { what: '每月列出題目', state: 'yes', ev: '今晚部署後在側欄 Marketing → Topic Queue 按「AI 提案本月題目」；每月自動跑要等第 4 階段' },
   { what: '核准的題目自己變成文章草稿和社群草稿', state: 'no', ev: '程式已推上 main（31145e3ad），題目頁「核准並開始」今晚部署後就能用；每 5 分鐘自動跑要等你同意裝主機排程' },
   { what: 'AI 審核通過後自動發布', state: 'yes', ev: '程式已推上 main（f985992a2），今晚台灣 03:00 部署後生效；網站預設「人工審核」，要由員工在網站設定按「AI 審核後自動發布」並再確認一次才會開' },
+  { what: 'ScriptForge 獨立頁，每個模組有自己的角色', state: 'yes', ev: '程式已推上 main（f233bd101），今晚台灣 03:00 部署後在側欄 Content Tools → ScriptForge；提示全部改在伺服器組，品牌讀客戶網站設定' },
   { what: '關掉分頁後影片仍會嵌回文章', state: 'no', ev: '目前要開著文章頁等影片做完（第 6 階段）' },
   { what: '發到 YouTube', state: 'no', ev: '社群工具還沒有 YouTube（第 7 階段）' },
 ];
@@ -42,6 +43,7 @@ const P2 = '30b6a022f';
 const P3 = 'eb67660a3';
 const P4A = '31145e3ad';
 const P4B = 'f985992a2';
+const P5C = 'f233bd101';
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
 const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 
@@ -104,15 +106,16 @@ export const STEPS = [
       done('P4.8', '網站設定加兩顆按鈕：人工審核／AI 審核後自動發布，預設人工審核；只有員工能改，客戶在內容門看得到但不能改', P4B),
     ] },
   { n: 5, code: 'P5', group: 'C', plain: 'ScriptForge 變成獨立工具頁：左邊 24 個模組各有一行說明，每個模組有自己的專業角色；做完可以直接送社群或送影片。', title: 'ScriptForge 獨立頁＋伺服器模組登記',
-    gate: '左欄 24 個模組都有說明；生成結果按「送社群」後，社群工具出現草稿', risk: 'Medium', model: 'Sonnet 5.5／Codex 照卡', status: 'not_started', depends: ['P2'],
+    gate: '左欄 24 個模組都有說明；生成結果按「送社群」後，社群工具出現草稿', risk: 'Medium', model: 'Sonnet 5.5／Codex 照卡', status: 'done', commit: P5C, depends: ['P2'],
+    waitFor: '今晚台灣 03:00 自動部署後在正式站生效',
     what: 'lib/script-forge/modules.ts 24 筆登記；route 只收 {module, fields}；新頁 /tools/script-forge',
     files: ['lib/script-forge/modules.ts', 'app/api/tools/script-forge/route.ts', 'app/(shell)/tools/script-forge/'],
     items: [
-      todo('P5.1', '24 個模組在伺服器登記：名稱、一行說明、專業角色、輸出格式'),
-      todo('P5.2', 'ScriptForge 的 AI 入口只收「模組＋欄位」，提示由伺服器組，不再由瀏覽器送整段提示'),
-      ...MODULES.map((m, i) => todo(`P5.${i + 3}`, `「${m}」改由伺服器組提示，用自己的專業角色`)),
-      todo('P5.26', '新的 ScriptForge 獨立頁：左欄 24 個模組附說明；影片工具裡的 ScriptForge 照常可用'),
-      todo('P5.27', '每個生成結果加「送社群」「送影片」兩顆按鈕'),
+      done('P5.1', '24 個模組在伺服器登記：名稱、一行說明、專業角色、輸出格式', P5C),
+      done('P5.2', 'ScriptForge 的 AI 入口只收「模組＋欄位」，提示由伺服器組，不再由瀏覽器送整段提示（Banner Studio 也一起改）', P5C),
+      ...MODULES.map((m, i) => done(`P5.${i + 3}`, `「${m}」改由伺服器組提示，用自己的專業角色`, P5C)),
+      done('P5.26', '新的 ScriptForge 獨立頁（側欄 Content Tools → ScriptForge）：左欄 24 個模組附說明；影片工具裡的 ScriptForge 照常可用', P5C),
+      done('P5.27', '腳本結果加「送社群」（存成社群草稿）「送去生產影片」（帶到影片工具）；「腳本轉文案」結果也能送社群', P5C),
     ] },
   { n: 6, code: 'P6', group: 'E', plain: '選了影片的題目，影片做好後自動嵌回文章、發到社群；關掉分頁也不會斷。', title: '影片接管線',
     gate: '關掉瀏覽器後，影片完成時文章裡仍出現影片，社群工具出現影片貼文', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['P4'],
