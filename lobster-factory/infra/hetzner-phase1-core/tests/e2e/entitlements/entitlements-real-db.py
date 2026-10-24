@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """ADR 017 step 3 against a real database, enforce mode, touching no production.
 
-A throwaway Postgres with 0001/0062/0063/0066/0077/0110 and PostgREST in front of it (same images as the smartlink e2e);
+A throwaway Postgres with 0001/0062/0063/0066/0077/0092/0110/0117/0118 (the expire route tops up all-features rows; the three accounts 0118 needs are seeded first) and PostgREST in front of it (same images as the smartlink e2e);
 a fresh Ed25519 key pair; then lib/entitlements/__tests__/entitlements.e2e.test.ts drives the real routes:
   the usable-features list greys a credits feature at zero balance, the paid route answers 403 {code:no_credits},
   a wallet grant makes both usable; the cognitive permit issuer refuses without an entitlement row and issues with one.
@@ -67,7 +67,7 @@ SEED_0118 = """insert into organizations(id, type, name, slug, kind) values
   ('00000000-0000-4000-8000-0000000000e1', 'client', 'EdD', 'edd-research', 'customer'),
   ('00000000-0000-4000-8000-0000000000f1', 'client', 'Soulful', 'soulful-expression', 'customer');"""
 SUITES = {
-    "entitlements": {"migrations": ("0062", "0063", "0066", "0077", "0110"), "after": (), "test": "lib/entitlements/__tests__/entitlements.e2e.test.ts"},
+    "entitlements": {"migrations": ("0062", "0063", "0066", "0077", "0092", "0110", "0117"), "after": ("0118",), "test": "lib/entitlements/__tests__/entitlements.e2e.test.ts"},
     "payments": {"migrations": ("0062", "0063", "0066", "0077", "0092", "0110", "0117"), "after": ("0118", "0120"),
                  "test": "lib/entitlements/__tests__/payments.e2e.test.ts"},
 }

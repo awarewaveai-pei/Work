@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-25（續4）真 DB e2e 預設套件重新變綠：套 0092/0117/0118，測試接受自用帳戶的全功能列（Claude）
+
+**根因**：expire 路由現在呼叫 `ensureAllFeatures`（0118，依賴 0092、0117），但預設 `entitlements` 套件只套到 0110 → 「the expiry sweep…」回 `expiry_failed`。
+**不變量**：測試資料庫的 schema 必須含 app 路由會呼叫的所有 RPC；兩個套件用同一套 0118 種子（internal／edd／soulful）。
+**做法**：
+- `tests/e2e/entitlements/entitlements-real-db.py`：`entitlements` 套件加 0092、0117，`after=("0118",)`（與 `payments` 同一段 SEED_0118）；docstring 同步。
+- `lib/entitlements/__tests__/entitlements.e2e.test.ts`：internal 帳戶改由 harness 種子建立，beforeAll 只建 CUSTOMER；掃描測試移到最後（掃完 internal 有全功能權利，會遮住「零點數 → no_credits」路徑），並斷言 `all_features_added > 0`、全功能列只屬於 internal／edd／soulful（客戶沒有）、第二次掃描 0。客戶帳戶的斷言一個沒改弱。
+**驗證**：兩個套件都 exit 0；`npx tsc --noEmit` 只剩另一個 session 的 `app/api/webhooks/payments/[provider]/route.test.ts(7,146)`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py (+ --suite payments) | exit=0 | ms=9000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=entitlements-real-db | hits=8
+- ORACLE_WAIVED: 只動 e2e 測試與其 harness，無 production source 變更
 ## 2026-10-25（續3）自動內容：每天最多開始幾題改成每個客戶自己設（0125）；題目的日期和時間建立後可以改（Claude）
 
 **觸發**：操作者問排程頁內容管線「為什麼要設 5 分鐘，而且不能調」，接著說「都做成可以改的」，並同意加 0125。
