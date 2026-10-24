@@ -16,6 +16,30 @@
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=MAX_CONVERSIONS|conversion-slots | hits=8
 - ORACLE_WAIVED: 止血型建置修正，行為與續42 相同（同一個上限搬到 lib）；以突變＋真實 `next build` 取代跨模型審查。
 - **避免再發生**：`route-exports.test.ts`；本機驗證清單裡「改 route 檔」要求跑一次 `next build` 或這條測試。
+## 2026-10-24（續47）/ops/schedules 第二次改版：分頁改按「工作」、一列一個網站、搜尋／篩選／批次、24 格小時表（Claude）
+
+**觸發**：操作者看 f8ec57597（續38）：「比爛還爛，萬一我之後有很多要管理的網站怎麼辦？」；「時間要按 24 次才能選到嗎？」。操作者看過完整頁面截圖後核准 commit、今晚 03:00 上線。
+**根因**：續38 一個客戶一個分頁 → 分頁數隨客戶數無上限成長；時間 ± 一小時步進 → 最多 23 下。不變量：會無限成長的東西（客戶）只能是列，不能是分頁；任何設定值都要兩下內可達。
+
+**做法**（NA＝`lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- `NA/app/(shell)/ops/schedules/ScheduleTable.tsx`：分頁＝工作（`view.jobs`）＋伺服器三群；工作分頁 `JobTable` 一列一個客戶（開關／頻率／星期／時間／上次結果＋最後修改者），搜尋、篩選 全部／失敗／已啟用／未啟用（帶數量）、失敗排最上、失敗列紅底；勾選列批次開關／改頻率／改時間（依序 PATCH，結束重載一次，部分失敗顯示第一個錯誤＋成功數）。`HourPicker`：時間是按鈕，點開 6×4 的 24 格小時表（fixed 定位避開橫向捲動框裁切；選完／Esc／點外面／捲動即關）。伺服器分頁 `ServerTable` 一列一筆、細節第二行直接顯示、可搜尋、只看異常。客戶頁 `only` → `ClientJobs` 一張表一列一個工作，無分頁。
+- `NA/../tests/e2e/social/dev-server-no-supabase.mjs`：沒給 port 時讀 `$PORT`（預覽工具會指派別的 port）；`.claude/launch.json` 加 `next-admin-ui-3903`（另一個 session 占著 3902）。
+- `agency-os/docs/operations/SCHEDULES_PAGE_PLAN.md` §3.2 第 4 點改版說明改寫。
+
+**審查發現與處置**（Codex 兩輪）
+- `agency-os/reports/oracle/2026-10-24-partialreview-9c64d830.md`：F1 客戶頁仍一個工作一個分頁（`ClientHubTabs.tsx` 傳 `only`，API 回全部工作）→ `only` 時不建工作分頁，改 `ClientJobs` 一張表。
+- `agency-os/reports/oracle/2026-10-24-partialreview-3e2c8b15.md`：NO FINDINGS。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/schedules | exit=0 | ms=1240（57 綠）
+- REALTEST_EVIDENCE: tool=Bash | cmd=next dev 無 Supabase（dev-server-no-supabase.mjs，port 3903/3904）＋瀏覽器 fetch mock（24 個假網站，由 CLIENT_JOBS／SITE_WATCH_JOB／hostScheduleRowsFrom 真 registry 產生）：勾 3 列按「每 6 小時」→ 3 筆 frequency=every_6h＋已儲存；點 00:00 → 24 格表 → 點 15:00 → 存檔、表關閉、列顯示 15:00＋已儲存；切部署與監控分頁截圖 | exit=0 | ms=1500（未碰 prod；暫存 `public/__tmp-mock-view.json`／temp test 已刪）
+- 客戶頁（`only`）未在瀏覽器實跑：該頁 server component 需 Supabase；以 tsc＋Codex 第二輪覆蓋。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=HourStepper|早一小時|晚一小時|changedNever | hits=0
+
+**剩餘風險**：正式資料未看（03:00 部署後）；客戶頁版面未實際截圖；批次是依序 PATCH，網站很多時要等幾秒。
+**rollback**：`git revert <本 commit>`（回到續38 版）。
 ## 2026-10-24（續46）員工逐工具權限 C2：身分帶工具、middleware 每頁每 API 判斷（預設 shadow 只記錄）（Claude）
 
 - **任務**：R0-PLAN §6 C2（`agency-os/handoffs/2026-10-24-staff-tool-grants/R0-PLAN.md`）。操作者 2026-10-24 交給本 session（「員工權限你去開一個session做」）；翻 enforce（C6.4）是 High，不在本卡。

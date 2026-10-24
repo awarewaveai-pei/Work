@@ -74,6 +74,14 @@
       "port": 8766
     },
     {
+      "name": "next-admin-ui-3903",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "lobster-factory/infra/hetzner-phase1-core/tests/e2e/social/dev-server-no-supabase.mjs"
+      ],
+      "port": 3903
+    },
+    {
       "name": "next-admin-social-ui",
       "runtimeExecutable": "node",
       "runtimeArgs": [
