@@ -87,8 +87,8 @@ export const STEPS = [
     ] },
   { n: 4, code: 'P4', group: 'D', plain: '在排程頁勾一格後，核准的題目會自己變成 WordPress 草稿和社群草稿；選了「AI 審核自動發」的網站，通過檢查就自動發布。', title: '排程管線＋AI 審核',
     gate: '在測試網站核准一題，幾分鐘內 WordPress 和社群工具都出現草稿；人工審核模式下永遠不會自己發布', risk: 'High（自動發布、主機排程）', model: 'Opus 5.5', status: 'in_progress', depends: ['P3'],
-    decided: '每天最多開始 2 題；主機每 5 分鐘叫醒排程；資料庫也鎖住題目的網站屬於同一客戶（2026-10-24 你說「你決定」）',
-    before: '待決 6、待決 7',
+    decided: '每天最多開始 2 題；主機每 5 分鐘叫醒排程；資料庫也鎖住題目的網站屬於同一客戶（2026-10-24 你說「你決定」；0122 已套正式庫，ac55a28fc）',
+    before: '待決 7',
     what: '既有排程器升到每 5 分鐘、由主機 cron 驅動；job content_pipeline；題目狀態機；規則閘先、AI 後',
     files: ['lib/schedules/schedule.ts', 'lib/schedules/jobs.ts', 'lib/content/topics/tick.ts', 'lib/content/topics/make.ts', 'scripts/schedules-run-due.sh', 'packages/db/migrations/0122_content_topics_site_org.sql'],
     items: [
@@ -148,6 +148,5 @@ export const STEPS = [
 // 操作者自己要決定或親手做的（agent 不能替她定）
 export const OPEN = [
   { n: 4, what: '到 Google 申請 YouTube 發文授權（要你本人操作）', before: 'P7', src: '計畫 §0 D4' },
-  { n: 6, what: '同意把 0122 套到正式資料庫（題目的網站一定屬於同一客戶；目前 0 個題目，可回復）。套好才能推上 main，否則當晚部署會被擋', before: 'P4', src: '計畫 §0 D8' },
   { n: 7, what: '同意在主機裝每 5 分鐘的排程時鐘（今晚部署後）；跑順一天後停掉外部的每小時排程', before: 'P4', src: '計畫 §0 D6、P4.4' },
 ];
