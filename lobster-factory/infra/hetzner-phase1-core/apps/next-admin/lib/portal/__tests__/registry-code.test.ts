@@ -153,8 +153,9 @@ describe("registry claims match the code", () => {
   // (lib/tenant-guard) or by brand (lib/social/authz). A route that reads the database makes that decision itself: it
   // imports, by name, one of the AUTHORIZERS functions below and calls it. A guard module reached through some other
   // import does not count -- r2-delete-guard reaches tenant-guard through wp-sites, grant.ts through its billing subject, and
-  // neither decides what the route reads (the presets hole, step-8 card P2). A route that reads no database may lean
-  // on what it imports, or on the billing subject (lib/entitlements/grant): it says who pays, and nothing is read.
+  // neither decides what the route reads (the presets hole, step-8 card P2). A route that reads no database may instead
+  // ask a feature itself (withFeature / grantFor, lib/entitlements/grant): the subject is then the caller's own account
+  // and nothing else is read. Reaching grant.ts or a guard only through an import decides nothing for the route.
   // This catches a route that forgot authorization, not one that calls it and ignores the answer: opening a door also
   // means reading each route's data path (WORKLOG of that door).
   /** Module -> its functions that decide what a caller may act on. Beyond the two guards, each is a library seam that
@@ -174,8 +175,6 @@ describe("registry claims match the code", () => {
   // (tables.ts billingOverview: every organization's billing).
   const NOT_ROUTE_DATA = new Set(["lib/ops-role.ts", "lib/ai/log-ai-call.ts",
     ...["grant", "can", "subject", "runtime"].map((f) => `lib/entitlements/${f}.ts`)]);
-  const STOP_AT = new Set(["lib/ops-role.ts"]);
-  const BILLING = "lib/entitlements/grant.ts";
   const readsDb = (r: string) => [...importClosure([r], NOT_ROUTE_DATA)].some((f) => !NOT_ROUTE_DATA.has(f) && FILES.get(f)!.db);
   const decidesItself = (r: string) => FILES.get(r)!.called.some((b) => {
     const [m, name] = b.split("#");
@@ -193,11 +192,11 @@ describe("registry claims match the code", () => {
     "app/api/content/brand-voice/route.ts": "analyses the pasted sample, or a page fetched through lib/collect/net/remote-file (no internal host); stores nothing",
     "app/api/tools/printful/catalog/route.ts": "public Printful product catalog, cached 1h server-side (lib/studio/printful-catalog.ts); no database, nothing per organization",
     "app/api/video/capabilities/route.ts": "reports which features our own video-service supports (booleans, formats) and the provider policy; no database, nothing per organization",
+    "app/api/entitlements/features/route.ts": "the caller's own feature list: resolveSubject({ req }) with no org hint (client -> its middleware org, staff -> internal), the subject withFeature uses; reads only that account's grant (NOT_ROUTE_DATA)",
     "app/api/content/trending/route.ts":"public news feeds, the shared content_sources table and the shared content_trends cache (no organization column on either; customers read sources, only staff write them, content/sources/route.ts; only feed items in a supported region reach the cache, lib/content/topics/trends.ts)",
   };
   const routesUnder = (prefix: string) => [...FILES.keys()].filter((f) => isRoute(f) && (f.startsWith(`app${prefix}/`)));
-  const authorizes = (r: string) => r in ORG_FREE_ROUTES || decidesItself(r)
-    || (!readsDb(r) && [BILLING, ...Object.keys(AUTHORIZERS)].some((a) => importClosure([r], STOP_AT).has(a)));
+  const authorizes = (r: string) => r in ORG_FREE_ROUTES || decidesItself(r) || (!readsDb(r) && FILES.get(r)!.asked.length > 0);
   it("every route a built door serves authorizes its caller", () => {
     for (const p of builtDoors()) {
       expect([...new Set(doorApis(p).flatMap(routesUnder))].filter((r) => !authorizes(r)), `${p.key} door`).toEqual([]);
@@ -224,6 +223,10 @@ describe("registry claims match the code", () => {
       expect(judged(`import { effectiveOrgId as orgOf } from "@/lib/tenant-guard"; ${db} orgOf(req, null);`)).toBe(true);
       expect(judged('import { createClient } from "@supabase/supabase-js"; import { withFeature } from "@/lib/entitlements/grant";')).toBe(false);
       expect(judged('import { withFeature } from "@/lib/entitlements/grant"; import { billingOverview } from "@/lib/entitlements/tables";')).toBe(false);
+      // grant.ts -> subject.ts -> tenant-guard, and grant.ts reached through a library, decide nothing for the route
+      expect(judged('import { requestActor } from "@/lib/entitlements/subject"; requestActor(req);')).toBe(false);
+      expect(judged('import { prepareArticleGeneration } from "@/lib/content/article/generate-core"; prepareArticleGeneration({});')).toBe(false);
+      expect(judged('import { withFeature } from "@/lib/entitlements/grant"; export const POST = withFeature("studio.image", h);')).toBe(true);
     } finally { FILES.delete(r); }
   });
 

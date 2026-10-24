@@ -312,7 +312,7 @@
   - **NEXT ②**（2026-10-23，WORKLOG 同日 NEXT ② 與 0119 條目）：用量計量已推（付費縫 `grant.recordUse()`＋閘）、studio 精選免費＋門上藏 AI、tarot 批次記操作者（0119 已套 prod）。剩下一行。建議模型：Opus 5.5
   - [x] **員工路由用量歸屬**（2026-10-23 done，WORKLOG 2026-10-23 續46）：`withFeature` 加 `org`（經 `actorFor`），代操記到客戶、actor＝員工；10 條付費路由包起來，rag 向量化指名 org；閘 ④ 擴到全部 API 路由（`UNSCOPED_ROUTES` 23 條附理由）。
   - **第 8 項產品門**（2026-10-24，WORKLOG 續27／續28／續34；逐列狀態在 `agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-8-doors-video-design-content.md`）：tarot、studio、video、design 已上線（2026-10-24 續36：每扇門只讓持有該產品的帳戶進；點數規則待決＝ADR 017 產品決定 #11）；content（`b3132c733`）門頁已建、`enabled:false`。[ ] content 上線（High，等操作者 go）；門上功能清單 V7／D6／C4 已做（2026-10-24：左邊選單，持有的正常、沒持有的灰，五扇門共用）。建議模型：Opus 5.5
-    - [ ] 閘 ③「門路由要授權」對任何 import `grant.ts` 的路由都算已授權（`grant.ts → subject.ts → tenant-guard.ts`，`STOP_AT` 沒停在 `grant.ts`）；改前即如此，見 WORKLOG 2026-10-23 續46。建議模型：Opus 5.5
+    - [x] 閘 ③「門路由要授權」只看路由自己的程式（2026-10-25 done，WORKLOG 2026-10-25 續6）：經 import 摸到 `grant.ts`／guard 不再算；查證無外洩，`entitlements/features` 列 `ORG_FREE_ROUTES`。
   - [x] **第 4a 項（收錢內部段）已上線**（2026-10-23，WORKLOG 續48、續51）：0120 已套 prod、`f2139d35a`、容器有 `PAYMENTS_*`。
     - [ ] 第一個方案列（plans 0 筆；訂閱付款前必須，功能與上限由操作者定）。建議模型：Opus 5.5
     - [x] 真 DB e2e 預設套件在 HEAD 已紅（2026-10-25 已修，見 WORKLOG）：`tests/e2e/entitlements/entitlements-real-db.py` 只套到 0110，expire 路由的 `ensureAllFeatures`（0118）失敗 →「the expiry sweep ends a trial…」`expiry_failed`；修＝該套件套 0117/0118 並讓測試接受自用帳戶的全功能列（`--suite payments` 已示範 0118 種子）。建議模型：Opus 5.5

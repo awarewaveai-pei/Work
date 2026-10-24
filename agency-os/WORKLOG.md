@@ -1,4 +1,31 @@
 # Worklog
+## 2026-10-25（續6）閘 ③「門路由要授權」：只看路由自己的程式，經 import 摸到 grant.ts／guard 不再算數（Claude）
+
+**觸發**：TASKS ADR 017 第 8 項子項（WORKLOG 2026-10-23 續46）：`authorizes()` 用 `importClosure([r], STOP_AT)`，`STOP_AT` 只有 `ops-role.ts`，`grant.ts → subject.ts → tenant-guard.ts` 讓任何摸到 entitlements 的路由都過。
+
+**步驟 1 查證（有沒有真的漏）**：暫時探針列出全部已建門路由中「不自己呼叫 authorizer、不在 `ORG_FREE_ROUTES`、不讀 DB、靠閉包過」的路由。
+- 20 條（content/generate、hook-brief、humanize、image、keywords、market-analysis、outline、seo-fix、title；studio/culture、edit-prompt、generate、genfill、inpaint、remove-bg、trending；tarot/generate、suggest-prompt、translate；video/story-bibles/visual-consistency-check）都**自己** `withFeature(...)`（各檔第 1–7 行 import `@/lib/entitlements/grant`）：舊 `BILLING` 條就放行，tenant-guard 那條路對它們是多餘的。內容都是對 request body 呼叫 AI；寫的只有 `ai_call_logs`（org = 計費帳戶）與 content/image 的 designs bucket（`lib/storage/r2.ts:94` 隨機 key）；沒有讀別的組織資料。
+- 唯一只靠 `subject.ts → tenant-guard` 過的是 `app/api/entitlements/features/route.ts:12`：`resolveSubject({ req })` 不帶 org（`lib/entitlements/subject.ts:58-73`：client → middleware 的 org，staff → 自用帳戶），只讀呼叫者自己帳戶的 grant。
+- 結論：prod 沒有外洩；漏的是閘：舊閘接受「只經 import 摸到 grant.ts 或 guard」的路由（例：路由只 import `lib/content/article/generate-core`，它內部 `grantFor` → 舊閘算已授權）。
+
+**不變量**：門路由碰組織資料 → 路由**自己的程式**呼叫 `AUTHORIZERS` 的函式；不讀 DB → 路由自己問 feature（`withFeature`／`grantFor`，subject = 呼叫者自己的帳戶）；否則列 `ORG_FREE_ROUTES` 附理由。經 import 抵達的 grant.ts／guard 一律不算。
+
+**修改**（next-admin `lib/portal/__tests__/registry-code.test.ts`）
+- `authorizes` = ORG_FREE ∨ `decidesItself` ∨（不讀 DB ∧ `FILES.get(r).asked.length > 0`）；刪 `STOP_AT`、`BILLING` 與「不讀 DB 可靠 import」那條。
+- 收緊後只紅 `entitlements/features`（門閘＋platform API 閘）→ 列 `ORG_FREE_ROUTES`，理由：只讀呼叫者自己帳戶的功能清單，同 `NOT_ROUTE_DATA` 已定義的「呼叫者自己的 grant」。
+- fixture 三條：只 import subject.ts 並呼叫 `requestActor` → false；只呼叫 generate-core → false；自己 `withFeature("studio.image", h)` → true。
+
+**驗證**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/portal（7 files，60 passed） | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：authorizes 換回舊閉包版（STOP_AT=ops-role、BILLING）→ 「an authorizer is a function its module exports…」紅（subject.ts fixture expected false got true）；還原 → 12 passed | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit（next-admin） | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n（讀回 diff；n1：content/generate 的 referenceUrls 直接 fetch 任意 http(s) URL（`lib/content/article/generate-core.ts:602-606`），非本閘範圍，未改）
+- ORACLE_WAIVED: 改動只在一支測試檔（閘本身）；本機 Codex 模型設定今日四次 no final message（同日 續5）；以突變（舊閘紅、新閘綠）＋探針逐路由讀碼代替。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib | grep=STOP_AT | hits=3（TASKS 本條、open-tasks-snapshot 同條、step-8 卡 D-R1 舊建議；程式碼 0）
+
+**避免再發生**：閘的放行條件只看路由檔自己的 `called`／`asked`，閉包只用於「讀不讀 DB」，fixture 釘住兩種舊漏法。
+
+**剩餘**：n1 SSRF 疑慮（generate-core referenceUrls）未查，屬 content 門上線前的資料路徑閱讀。
 ## 2026-10-25（續4）真 DB e2e 預設套件重新變綠：套 0092/0117/0118，測試接受自用帳戶的全功能列（Claude）
 
 **根因**：expire 路由現在呼叫 `ensureAllFeatures`（0118，依賴 0092、0117），但預設 `entitlements` 套件只套到 0110 → 「the expiry sweep…」回 `expiry_failed`。
