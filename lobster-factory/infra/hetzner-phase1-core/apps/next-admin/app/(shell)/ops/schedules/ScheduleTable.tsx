@@ -87,7 +87,8 @@ const input: CSSProperties = {
   border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text-primary)",
 };
 /** Client-job rows: select | site | on | frequency | weekday | hour | last result. */
-const JOB_GRID = "28px minmax(140px, 1.2fr) 48px minmax(150px, 1.3fr) 236px 118px minmax(170px, 1.4fr)";
+/** The weekday column only exists when some frequency on screen uses a weekday (a monthly job has none). */
+const jobGrid = (showDay: boolean) => `28px minmax(140px, 1.2fr) 48px minmax(150px, 1.3fr)${showDay ? " 236px" : ""} 118px minmax(170px, 1.4fr)`;
 /** Server rows: schedule | when | last run | state. */
 const SERVER_GRID = "minmax(220px, 2fr) minmax(130px, 1fr) minmax(150px, 1fr) 96px";
 
@@ -266,6 +267,7 @@ function JobTable({ job, orgs, cells, query, setQuery, filter, setFilter, select
   const picked = cells.filter((c) => selected.has(c.organizationId));
   const allPicked = rows.length > 0 && rows.every((c) => selected.has(c.organizationId));
   const usesHour = job.frequencies.some((f) => f.usesHour);
+  const showDay = job.frequencies.some((f) => f.usesDay);
   const toggle = (id: string, on: boolean) => { const s = new Set(selected); if (on) s.add(id); else s.delete(id); setSelected(s); };
 
   return (
@@ -300,18 +302,18 @@ function JobTable({ job, orgs, cells, query, setQuery, filter, setFilter, select
       </div>
 
       <div style={{ ...card, overflowX: "auto" }}>
-        <div style={{ display: "grid", gridTemplateColumns: JOB_GRID, gap: 10, padding: "8px 14px", borderBottom: "1px solid var(--border)", minWidth: 900, alignItems: "center" }}>
+        <div style={{ display: "grid", gridTemplateColumns: jobGrid(showDay), gap: 10, padding: "8px 14px", borderBottom: "1px solid var(--border)", minWidth: 900, alignItems: "center" }}>
           <span><input type="checkbox" checked={allPicked} aria-label={T.bulkClear}
             onChange={(e) => { const s = new Set(selected); rows.forEach((c) => (e.target.checked ? s.add(c.organizationId) : s.delete(c.organizationId))); setSelected(s); }} /></span>
           <span style={headCell}>{T.col.site}</span>
           <span style={headCell}>{T.col.on}</span>
           <span style={headCell}>{T.col.freq}</span>
-          <span style={headCell}>{T.col.day}</span>
+          {showDay && <span style={headCell}>{T.col.day}</span>}
           <span style={headCell}>{T.col.hour}</span>
           <span style={headCell}>{T.col.last}</span>
         </div>
         {rows.map((c) => (
-          <JobRow key={c.organizationId} job={job} c={c} name={name(c.organizationId)} single={false}
+          <JobRow key={c.organizationId} job={job} c={c} name={name(c.organizationId)} single={false} showDay={showDay}
             picked={selected.has(c.organizationId)} onPick={(on) => toggle(c.organizationId, on)}
             saving={saving} saved={savedKeys.has(`${c.jobKey}:${c.organizationId}`)} onSave={(patch) => save([{ cell: c, patch }])} />
         ))}
@@ -325,21 +327,22 @@ function JobTable({ job, orgs, cells, query, setQuery, filter, setFilter, select
 function ClientJobs({ jobs, cells, saving, savedKeys, save }: {
   jobs: JobMeta[]; cells: ScheduleCell[]; saving: boolean; savedKeys: Set<string>; save: (items: Array<{ cell: ScheduleCell; patch: Patch }>) => void;
 }) {
+  const showDay = jobs.some((j) => j.frequencies.some((f) => f.usesDay));
   return (
     <div style={{ ...card, overflowX: "auto" }}>
-      <div style={{ display: "grid", gridTemplateColumns: JOB_GRID, gap: 10, padding: "8px 14px", borderBottom: "1px solid var(--border)", minWidth: 900, alignItems: "center" }}>
+      <div style={{ display: "grid", gridTemplateColumns: jobGrid(showDay), gap: 10, padding: "8px 14px", borderBottom: "1px solid var(--border)", minWidth: 900, alignItems: "center" }}>
         <span />
         <span style={headCell}>{T.col.job}</span>
         <span style={headCell}>{T.col.on}</span>
         <span style={headCell}>{T.col.freq}</span>
-        <span style={headCell}>{T.col.day}</span>
+        {showDay && <span style={headCell}>{T.col.day}</span>}
         <span style={headCell}>{T.col.hour}</span>
         <span style={headCell}>{T.col.last}</span>
       </div>
       {jobs.map((job) => {
         const c = cells.find((x) => x.jobKey === job.key);
         return c ? (
-          <JobRow key={job.key} job={job} c={c} name={job.label} sub={`${job.description}　${T.cost}：${job.cost}`} single picked={false} onPick={() => {}}
+          <JobRow key={job.key} job={job} c={c} name={job.label} sub={`${job.description}　${T.cost}：${job.cost}`} single showDay={showDay} picked={false} onPick={() => {}}
             saving={saving} saved={savedKeys.has(`${c.jobKey}:${c.organizationId}`)} onSave={(patch) => save([{ cell: c, patch }])} />
         ) : null;
       })}
@@ -391,8 +394,8 @@ function HourPicker({ hour, disabled, onChange }: { hour: number; disabled: bool
   );
 }
 
-function JobRow({ job, c, name, sub, single, picked, onPick, saving, saved, onSave }: {
-  job: JobMeta; c: ScheduleCell; name: string; sub?: string; single: boolean; picked: boolean; onPick: (on: boolean) => void;
+function JobRow({ job, c, name, sub, single, showDay, picked, onPick, saving, saved, onSave }: {
+  job: JobMeta; c: ScheduleCell; name: string; sub?: string; single: boolean; showDay: boolean; picked: boolean; onPick: (on: boolean) => void;
   saving: boolean; saved: boolean; onSave: (p: Patch) => void;
 }) {
   const freq = job.frequencies.find((f) => f.value === c.frequency);
@@ -400,7 +403,7 @@ function JobRow({ job, c, name, sub, single, picked, onPick, saving, saved, onSa
   const dim: CSSProperties = c.enabled ? {} : { opacity: 0.55 };
   return (
     <div style={{
-      display: "grid", gridTemplateColumns: JOB_GRID, gap: 10, padding: "8px 14px", borderBottom: "1px solid var(--border-subtle)", minWidth: 900, alignItems: "center",
+      display: "grid", gridTemplateColumns: jobGrid(showDay), gap: 10, padding: "8px 14px", borderBottom: "1px solid var(--border-subtle)", minWidth: 900, alignItems: "center",
       background: c.lastError ? "color-mix(in srgb, var(--red) 8%, transparent)" : picked ? "color-mix(in srgb, var(--accent) 10%, transparent)" : undefined,
     }}>
       <span>{!single && <input type="checkbox" checked={picked} onChange={(e) => onPick(e.target.checked)} aria-label={name} />}</span>
@@ -416,11 +419,13 @@ function JobRow({ job, c, name, sub, single, picked, onPick, saving, saved, onSa
           <button key={f.value} type="button" disabled={saving} style={chipStyle(c.frequency === f.value)} aria-pressed={c.frequency === f.value} onClick={() => onSave({ frequency: f.value })}>{f.label}</button>
         ))}
       </span>
-      <span style={{ display: "flex", gap: 3, flexWrap: "nowrap", ...dim }}>
-        {freq?.usesDay ? DAYS.map((d, day) => (
-          <button key={day} type="button" disabled={saving} style={{ ...chipStyle(tp.day === day), padding: "3px 0", width: 29, textAlign: "center" }} aria-pressed={tp.day === day} onClick={() => onSave(utcFromTaipei(day, tp.hour))}>{d}</button>
-        )) : <span style={muted}>—</span>}
-      </span>
+      {showDay && (
+        <span style={{ display: "flex", gap: 3, flexWrap: "nowrap", ...dim }}>
+          {freq?.usesDay ? DAYS.map((d, day) => (
+            <button key={day} type="button" disabled={saving} style={{ ...chipStyle(tp.day === day), padding: "3px 0", width: 29, textAlign: "center" }} aria-pressed={tp.day === day} onClick={() => onSave(utcFromTaipei(day, tp.hour))}>{d}</button>
+          )) : <span style={muted}>—</span>}
+        </span>
+      )}
       <span style={dim}>
         {freq?.usesHour ? <HourPicker hour={tp.hour} disabled={saving} onChange={(h) => onSave(utcFromTaipei(tp.day, h))} /> : <span style={muted}>—</span>}
       </span>

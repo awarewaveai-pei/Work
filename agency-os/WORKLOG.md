@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-24（續55）排程頁：用不到星期的工作不再顯示「星期」欄（Claude）
+
+**觸發**：操作者截圖社群月報分頁「為什麼要【星期】？」——整欄都是「—」。
+**根因**：`ScheduleTable.tsx` 表格欄位固定，星期欄對所有工作都畫。不變量：欄位只在畫面上的某個頻率用得到時才出現。
+**做法**：`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/schedules/ScheduleTable.tsx` `jobGrid(showDay)`；工作分頁 `showDay = job.frequencies.some(usesDay)`；客戶頁 `ClientJobs` 看那家所有工作是否有任一用到星期。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=本機 next dev（無 Supabase）＋fetch mock，逐一切分頁讀表頭：自動爬取＝網站|開關|頻率|星期|台北時間|上次結果；社群月報／網站巡檢／自動內容管線＝無星期 | exit=0 | ms=1600
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- ORACLE_WAIVED: 純版面欄位條件（一個布林決定是否畫欄），已用真實渲染逐分頁驗證
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app | grep=JOB_GRID | hits=0
+- BUGHUNT_SCOPE_NARROW: 常數只在這個檔案；agency-os/scripts 無 UI
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-24（續54）員工逐工具權限 C5：ADR 019、現況文件身分段、可執行示範（Claude）
 
 - **任務**：R0-PLAN §6 C5（C5.1 `/no-access` 已在 C2 3bb0cd120 做）。
