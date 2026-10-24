@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-25（續17）next-admin 手動部署 3e069ee69（操作者：做好直接部署）——側欄目前頁／分頁設定／字體上線（Claude）
+
+- **範圍**：prod 原為 `79f53f114`；帶上 `b00195d25`（側欄目前頁、區塊標題滑過、選中分頁背景、Theme Editor 分頁改共用元件）＋`3e069ee69`（字體選擇、字重行高字距接上畫面）；無 migration；DEPLOY_HOLD 不存在。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin（npm test 閘、rollback 快照 rollback-20261024-203058、healthy 15s、HTTP smoke 5/5 200；.deployed-commit=3e069ee69，容器名正常） | exit=0 | ms=390773
+- REALTEST_EVIDENCE: tool=curl | cmd=curl -sI https://app.aware-wave.com/login（無 Content-Security-Policy 標頭）＋ fonts.googleapis.com Noto Serif TC 樣式表 200 | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=scripts/playwright-runner.ps1 -Mode smoke -SkipInstall（26 passed, 6 skipped） | exit=0 | ms=0（未計時）
+- REVIEW_WAIVED: NA -- 部署本身無程式改動；程式審查見（續15）（續16）
+- BUGHUNT_WAIVED: NA -- 部署紀錄，無程式改動
+- **rollback**：快照 `lobster-phase1-next-admin:rollback-20261024-203058`，依 DEPLOY_ROLLBACK_RUNBOOK §2。
 ## 2026-10-25（續16）Typography：字體可選（內文／標題／程式碼）、字重行高字距接上畫面、各分頁各自計數（Claude）
 
 - **觸發**：操作者「還要做 font weight, font family, 和其他你認為我應該要有的東西, 做好直接部署」。
