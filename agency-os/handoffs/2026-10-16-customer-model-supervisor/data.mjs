@@ -135,7 +135,7 @@ export const STEPS = [
       { id: '4a', plain: '人工付款入口：收件表、合約與權利同一交易、錢包入帳、/ops/billing', status: 'done', commit: 'f2139d35a' },
       { id: '4b-1', plain: 'WordPress 會員對應計費帳戶（0124 customer_identities，已套 prod 2026-10-25）', status: 'done', commit: '0eb785f1c' },
       { id: '4b-3', plain: 'next-admin woo 收件接頭：驗章、查會員、第一次付款自動建帳戶（email 須經 WordPress 證明）；被拒的付款開 ops incident（0126 已套 prod）', status: 'done', commit: '125cdad43' },
-      { id: '4b-2', plain: 'wp-bridge 外掛：送付款事件（WCS＋TapPay）、驗證會員 email、我的帳號「進入」按鈕', status: 'todo' },
+      { id: '4b-2', plain: 'wp-bridge 外掛：送付款事件（WCS＋TapPay）、驗證會員 email、我的帳號「進入」按鈕；0.18.0 尚未發版（發版、裝到 aware-wave.com、貼兩把密鑰由你做）', status: 'done', commit: 'ff5614403' },
       { id: '4b-6', plain: 'Woo 店面設定（你在 WordPress 後台做）：裝 WCS 與 TapPay、結帳必登入、條款勾選、商品對應方案', status: 'todo' },
       { id: '4b-7', plain: '/ops/billing 顯示客戶未用點數合計（合約負債）', status: 'done', commit: '125cdad43' },
       { id: '4b-4', plain: 'WordPress 一次性碼進產品門：next-admin 端做好（只給 email 已證明的帳戶、防登入固定），按鈕在外掛 4b-2；設密鑰才開', status: 'done', commit: '125cdad43' },
