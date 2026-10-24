@@ -1,4 +1,25 @@
 # Worklog
+## 2026-10-24（續12）重新整理先閃預設主題：prerender 頁在 build 時烤進「無主題」＋讀取失敗被快取（Claude）
+
+**觸發**：操作者：重新整理時先出現原來的設定（問是否用 !important——沒有，全站無 !important）。
+
+**根因**
+- C1 根 layout `app/layout.tsx:12-16` 以 `<html style>` 注入已存主題，但靜態可 prerender 的頁在 build 時產生，build 無 DB → `<html>` 無 style。正式站實測：`/tools/theme`、`/tools/social`、`/tools/tarot`、`/cs-widget` 回 `x-nextjs-prerender: 1` 且 `<html lang="zh-TW">` 無 style；`/`、`/ops/costs` 等動態頁有。`/tools/theme` 之後由編輯器在瀏覽器 setProperty → 閃一下。
+- C2 `lib/theme/store.ts` 讀取失敗（無 client／timeout／DB error）回 EMPTY，被 `unstable_cache`（revalidate 300）存成「無主題」最多 5 分鐘。
+
+**修改**
+- `app/layout.tsx`：`export const dynamic = "force-dynamic"`（主題是執行期資料；讀取已快取，成本低）。
+- `lib/theme/store.ts`：`fetchThemeConfig` 失敗即 throw（不進快取）；`getThemeConfig` catch → EMPTY（仍 fail-open）；沒有 row 才回可快取的 EMPTY。
+- 新測 `lib/theme/__tests__/store-cache.test.ts`：失敗讀取不黏住、下一次讀到已存主題；根 layout 必須 force-dynamic。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=正式站 fetch 10 頁比對 `<html style>` 與 x-nextjs-prerender（4 頁無主題）＋ npx vitest run lib/theme app/api/theme（6 passed）＋ npx tsc --noEmit（0） | exit=0 | ms=90000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n -- Codex `agency-os/reports/oracle/2026-10-24-review-a5d794b2.md`：3 項皆屬他 session（6f7689dd）未 commit 的 brand-voice 改動（wp-sites.ts／brand-voice.ts／syndicate-brand.test.ts），本改動無 finding
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin | grep=getThemeConfig | hits=3（app/layout.tsx、app/(shell)/layout.tsx、app/api/theme/route.ts；皆只讀回傳值，不依賴「不會 throw」——getThemeConfig 本身仍不 throw）
+- BUGHUNT_SCOPE_NARROW: 主題讀取只在 next-admin
+- 部署後正式站逐頁檢查見下一條。
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-24（續11）Theme Editor：預覽也照分頁分類；部署 a44c90a24 後正式站檢查（Claude）
 
 **觸發**：續9 部署後在正式站檢查：Colors 分頁 46 個全是顏色 ✓；Typography & Size 的 19 個設定 ✓，但頁面上方預覽仍混顏色——Tab 預覽列出 5 個 tab 顏色 token、字型預覽有 Primary／Muted／Secondary 顏色條。
