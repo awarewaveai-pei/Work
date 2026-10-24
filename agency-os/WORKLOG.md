@@ -1,4 +1,26 @@
 # Worklog
+## 2026-10-24（續6）Theme Editor 可改側欄分區標題顏色與字級；編輯器改讀唯一 token 清單（Claude）
+
+**觸發**：操作者：分區標題顏色太淡，把它的 color 與 font size 加到 /tools/theme 自己改。
+
+**根因**
+- C1 標題顏色 `--sidebar-section-label`（#94a3b8，`app/globals.css:57`）存在但不在可編輯清單；字級寫死 `9px`（`.sidebar-section-label`）。
+- C2 編輯器 `app/(shell)/tools/theme/page.tsx` 自帶一份 COLOR_GROUPS／TYPOGRAPHY_GROUPS（與 `lib/theme/tokens.ts` 相同 63 項），`tokens.ts` 檔頭卻寫「編輯器 import 這裡」；`/api/theme` 只認 tokens.ts → 新增 token 必須改兩處，漏一處就「看得到存不進」或「存得進看不到」。
+
+**修改**
+- `lib/theme/tokens.ts` Sidebar 組：加 `--sidebar-section-label`（color #94a3b8）、`--sidebar-section-label-size`（text 9px）。
+- `app/globals.css`：`:root` 加 `--sidebar-section-label-size: 9px`；`.sidebar-section-label` 用它。
+- `app/(shell)/tools/theme/page.tsx`：刪私有 token 清單（-144 行），import tokens.ts。
+- 新測 `lib/theme/__tests__/tokens-match-globals.test.ts`：每個可編輯 token 的預設＝globals.css `:root`（APPEARANCE 文件「兩處必須一致」變成檢查）＋兩個新 token 在清單中。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/theme（2 passed，65 token 全一致）＋ npx tsc --noEmit（0） | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n -- Codex `agency-os/reports/oracle/2026-10-24-review-5a58dacc.md` NO FINDINGS
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin | grep=sidebar-section-label | hits=10（globals.css:57,58,321,325 定義與使用；SidebarNav.tsx:249,256 class；tokens.ts:39,40；測試:26,27）
+- BUGHUNT_SCOPE_NARROW: token 只在 next-admin 使用
+- 正式站檢查見下一條部署記錄。
+
+**rollback**：`git revert <本 commit>`；prod `app_theme` 若已存新 token，revert 後該值被 API 拒存、`layout.tsx` 仍會套用已存值（無害）。
 ## 2026-10-24（續5）next-admin 部署 38cdcc3cf（折疊側欄）＋正式站檢查（Claude）
 
 **觸發**：操作者「commit 並現在部署，然後在正式站檢查」（本機無帳密可登入）。同批帶 tarot `ef54cf21d`＋其 revert `98f5ff176`（淨效果為零）。無 DEPLOY_HOLD。

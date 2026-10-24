@@ -36,6 +36,8 @@ export const COLOR_GROUPS: TokenGroup[] = [
       { name: "--sidebar-text-hover", default: "#0d1526", type: "color" },
       { name: "--sidebar-text-active", default: "#0d1526", type: "color" },
       { name: "--sidebar-active-bar", default: "#6366f1", type: "color" },
+      { name: "--sidebar-section-label", default: "#94a3b8", type: "color" },
+      { name: "--sidebar-section-label-size", default: "9px", type: "text" },
     ],
   },
   {

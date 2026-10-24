@@ -55,6 +55,7 @@
 
   /* 2026-06-18 audit — previously hardcoded hex values, now tokens */
   --sidebar-section-label: #94a3b8;
+  --sidebar-section-label-size: 9px;
   --sidebar-disabled-text: #aab4c5;
   --sidebar-coming-soon-bg: rgba(245,158,11,.15);
   --sidebar-coming-soon-text: #d97706;
@@ -317,7 +318,7 @@ body {
 }
 
 .sidebar-section-label {
-  font-size: 9px;
+  font-size: var(--sidebar-section-label-size);
   font-weight: 900;
   letter-spacing: .16em;
   text-transform: uppercase;
