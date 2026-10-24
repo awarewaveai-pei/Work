@@ -111,6 +111,7 @@ export const BACK_OFFICE: Readonly<Record<string, StaffPage>> = {
   "ops/ai-models": { name: "模型資料", why: "舊網址，轉到 /tools/ai-models 的圖片模型規格分頁。", tool: "tools/ai-models" },
   "ops/onboarding": { name: "客戶啟用", why: "員工處理客戶啟用。" },
   "ops/tools": { name: "工具清單", why: "員工維護工具清單。" }, "ops/products": { name: "產品表", why: "員工查看產品登記表：門、販售狀態、收費功能。" },
+  "ops/staff": { name: "員工權限", why: "擁有者設定每位員工的角色與可用工具；其他人只能查看。" },
   "build": { name: "建站", why: "員工執行建站作業。" },
   "ops-console": { name: "營運總台", why: "員工檢視營運總台。" }, "onboard": { name: "佈建", why: "員工操作佈建流程。" },
   "api-check": { name: "API 檢查", why: "員工檢查 API 連線。" }, "api-check-client": { name: "API 檢查", why: "員工檢查客戶 API 連線。", tool: "api-check" },

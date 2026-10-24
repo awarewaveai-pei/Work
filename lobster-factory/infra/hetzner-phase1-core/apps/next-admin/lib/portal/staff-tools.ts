@@ -50,6 +50,7 @@ export const STAFF_API_OWNERS: Readonly<Record<string, readonly string[]>> = {
   "/api/tools/publish": ["studio"],
   "/api/tools/printful": ["studio"],
   "/api/sentry-test": ["ops/repairs"],
+  "/api/ops/staff": ["ops/staff"],
 };
 
 /** Pages and APIs every signed-in staff member may use, whatever is ticked. */

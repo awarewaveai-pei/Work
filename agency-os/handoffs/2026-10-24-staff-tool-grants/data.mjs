@@ -28,7 +28,7 @@ export const COPY = {
 export const NOW = [
   { what: '員工分為擁有者、管理員、操作、唯讀四種角色。', state: 'yes', ev: '角色設定存在登入帳號中，目前需到 Supabase 後台手動修改。' },
   { what: '為每位員工分別勾選可用工具。', state: 'no', ev: 'C1、C2 完成後才有依據。' },
-  { what: '側欄只顯示有權限的工具。', state: 'no', ev: 'C3' },
+  { what: '側欄只顯示有權限的工具。', state: 'yes', ev: '已設定工具的員工，側欄、首頁、客戶中心分頁只顯示勾選的工具（C3）。部署後生效。' },
   { what: '沒有權限時，直接輸入網址或呼叫 API 會被擋下。', state: 'no', ev: '程式已完成（C2），目前只記錄「本來會擋」、不擋。正式擋要等你同意（C6）。' },
   { what: '在後台管理員工帳號與權限。', state: 'no', ev: 'C4' },
 ];
@@ -37,6 +37,7 @@ const todo = (id, plain) => ({ id, plain, status: 'todo' });
 const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 const C1 = '1b8096116';
 const C2 = '3bb0cd120';
+const C3 = 'dfc3027a5';
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '員工工具登記表', plain: '列出所有可勾選的工具：每個產品一格、每個後台頁面一格。新增頁面或 API 若未歸入任何一格，測試就會失敗。',
@@ -62,14 +63,14 @@ export const STEPS = [
       done('C2.4', '測試：擁有者不受限、未歸類網址會被擋、只記錄時放行、快取路徑同樣檢查、偽造資料被剝除。', C2),
     ] },
   { n: 3, code: 'C3', group: 'C', title: '側欄與首頁只顯示有權限的', plain: '員工登入後，側欄與首頁只顯示已勾選的工具。整個分區都沒有權限時，不顯示分區標題。',
-    gate: '只勾選社群發文工具的員工，側欄只看得到社群發文與首頁。', risk: 'Medium', model: 'Sonnet 5.5（照卡）', status: 'not_started', depends: ['C2'],
+    gate: '只勾選社群發文工具的員工，側欄只看得到社群發文與首頁。', risk: 'Medium', model: 'Sonnet 5.5（照卡）', status: 'done', commit: C3, depends: ['C2'],
     what: 'layout.tsx 讀 headers → SidebarNav 過濾；首頁分區同一過濾',
     files: ['app/(shell)/layout.tsx', 'app/SidebarNav.tsx', 'app/(shell)/page.tsx'],
     items: [
-      todo('C3.1', '側欄只顯示有權限的工具；沒有工具的分區不顯示。'),
-      todo('C3.2', '首頁的分區套用相同規則。'),
-      todo('C3.3', '測試：側欄每個連結都歸入一格工具。'),
-      todo('C3.4', '客戶中心裡屬於其他產品的分頁（AI 客服、資料蒐集、開發信、網站與社群），員工沒勾該產品就不顯示。'),
+      done('C3.1', '側欄只顯示有權限的工具；沒有工具的分區不顯示。', C3),
+      done('C3.2', '首頁的分區套用相同規則。', C3),
+      done('C3.3', '測試：側欄每個連結都歸入一格工具。', C3),
+      done('C3.4', '客戶中心裡屬於其他產品的分頁（AI 客服、資料蒐集、開發信、網站與社群），員工沒勾該產品就不顯示。', C3),
     ] },
   { n: 4, code: 'C4', group: 'B', title: '員工權限頁 /ops/staff', plain: '新增後台頁面：每位員工一列，按鈕切換角色，勾選框選擇工具，按下儲存即生效。擁有者那一列全部勾選且無法修改。',
     gate: '擁有者可在頁面上替員工勾選工具並儲存；約 15 秒後，該員工的側欄跟著改變。擁有者那一列無法取消勾選；最後一位擁有者無法被降級。', risk: 'High（帳號權限）', model: 'Opus 5.5', status: 'not_started', depends: ['C1'],

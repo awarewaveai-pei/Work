@@ -151,6 +151,7 @@ export const DEFAULT_SECTIONS: NavSection[] = [
     label: 'System',
     items: [
       { type: 'link', href: '/ops/products', icon: '▤', label: 'Products',     title: '產品登記表：門、販售狀態、收費功能' },
+      { type: 'link', href: '/ops/staff',    icon: '👤', label: 'Staff Access', title: '員工權限：每位員工的角色與可用工具（只有擁有者能改）' },
       { type: 'link', href: '/ops-console',  icon: '▣', label: 'Ops Console',  title: '架構邊界 · Tenant 設定 · M3 · AI Job' },
       { type: 'link', href: '/tools/theme',  icon: '🎨', label: 'Theme Editor', title: '主題色票 + CSS token 即時編輯器' },
     ],

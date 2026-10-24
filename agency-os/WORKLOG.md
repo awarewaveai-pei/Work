@@ -1,4 +1,28 @@
 # Worklog
+## 2026-10-24（續53）員工逐工具權限 C4：員工權限頁 /ops/staff（只有擁有者能改角色與工具）（Claude）
+
+- **任務**：R0-PLAN §6 C4（`agency-os/handoffs/2026-10-24-staff-tool-grants/R0-PLAN.md`）；操作者決定 D2：只有擁有者能改別人的工具與角色。
+- **不變量**：任何時候至少一位擁有者；擁有者永遠全部工具；授權只存在 `app_metadata`（middleware 讀的同一處），沒有第二份。
+- **做了什麼**（路徑相對 next-admin）：
+  - `lib/accounts/staff-accounts.ts`：`listStaff`（GoTrue admin 分頁，排除 `user_kind=client`；查不到＝丟錯，不當成「沒有擁有者」）、`updateStaff`（擁有者工具鎖、最後一位擁有者鎖；以 GoTrue 當下的 `app_metadata` 合併後寫回，其他欄位不掉）、`inviteStaff`（新帳號 viewer、沒有工具、email 未驗證，寄 recovery 連結到員工門 `/login/set-password`，與客戶帳號同一條路；客戶 email 拒、已驗證員工拒、未驗證員工重寄）；寫入在本程序內一次一筆（單一容器），兩位擁有者同時互降不會兩個都過；`auditStaffChange` 寫 `ops_audit_events`（`organizations.kind='internal'`，`target_type=staff_member`）。
+  - `app/api/ops/staff/route.ts`：GET（owner／admin 讀，含 email）、PATCH（owner；role 與 tools 驗值，未知工具 400）、POST 邀請（owner）。
+  - `app/(shell)/ops/staff/page.tsx`＋`StaffAccess.tsx`：每人一列、四顆角色按鈕、產品／工具／後台三排勾選框、全選／全不選／儲存；擁有者列「全部工具 ✓（擁有者不能取消）」；從沒設定的人顯示「目前所有工具都能用，儲存後只能用打勾的」；非擁有者只能看。
+  - 登記：`BACK_OFFICE["ops/staff"]`（員工權限）、`STAFF_API_OWNERS["/api/ops/staff"]`、側欄 System → Staff Access。
+  - 測試 `app/api/ops/staff/route.test.ts`：只列員工、admin 只能讀、非擁有者全部 403、改完其他 app_metadata 欄位保留且有 audit、擁有者工具 409、未知工具／角色 400、客戶 404、最後一位擁有者 409、兩人同時互降只過一個、新員工 viewer＋無工具＋連結在員工網域、客戶 email 409。
+- **Codex**：`agency-os/reports/oracle/2026-10-24-partialreview-b73bfa4c.md`（-Path 8 檔）：F1 寫入成功但 audit 沒寫到仍回 200→成立，改成寫入前先找到內部組織，找不到 503 `audit_unavailable` 不寫；寫入後 insert 失敗記 error 並回 `audited:false`。F2 邀請在建帳號後寄信失敗→帳號沒有 audit→成立，失敗回應帶 userId，route 仍寫 `staff.invited`。F3 enforce 下 admin 沒勾「員工權限」讀不到→刻意如此（與其他工具同規則：角色＋工具都要），不改。F4 網路錯誤按鈕卡住→成立，改 try/finally。各補測試。
+- **驗證**：
+  - `npx tsc --noEmit` exit 0。
+  - `npx vitest run lib/portal app/__tests__ lib/__tests__ app/api/ops/staff "app/(shell)/ops/clients" lib/supabase`：29 files／233 passed（route test 修正後 8 條）。
+  - 突變（續）：拿掉寄信失敗的 audit → 紅；拿掉寫入前的 audit 檢查 → 紅。
+  - 全套 `npx vitest run`：365 files／3216 passed（F 修正前）；修正後 staff route＋portal＋app tests 85 passed。
+  - 突變：拿掉最後一位擁有者檢查 → 紅；拿掉一次一筆 → 「同時互降」紅；拿掉擁有者工具鎖 → 紅；還原綠。
+  - 未在瀏覽器實看：本機 `.env.local` 指向正式 Supabase 且要登入，不拿正式帳號測；03:00 部署後由操作者在 /ops/staff 實看（C6.2）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/portal app/__tests__ lib/__tests__ app/api/ops/staff "app/(shell)/ops/clients" lib/supabase (29 files, 233 passed) | exit=0 | ms=9000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=ops/staff|api/ops/staff|staff-accounts | hits=36
+- ORACLE_WAIVED: 共用工作目錄有其他 session 的大量未提交改動；本卡以 -Path 範圍審查（partialreview-b73bfa4c）。
+- **剩餘風險**：一次一筆只在單一容器內成立（現況 next-admin 單容器）；日後多副本要改成資料庫鎖。舊員工帳號若沒有 `user_kind` 仍視為員工（與 middleware 一致）。
+- **rollback**：`git revert <本 commit>`；已寫入的 `app_metadata.staff_tools` 在 shadow 下不擋任何人。
 ## 2026-10-24（續52）排程頁小時表透明：底色改為「卡片色疊在頁面色上」（Claude）
 
 **觸發**：操作者截圖「這啥小？怎麼透明的？」：/ops/schedules 點時間跳出的 24 格小時表看得到底下的列。
