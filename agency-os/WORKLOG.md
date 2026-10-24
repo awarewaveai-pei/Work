@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-24（續16）compose 不變量機械檢查＋lobster／soulful／mainwp 全收斂（續8 後續 1+2）（Claude）
+
+**為何**：續8 只關了 lobster-wordpress 一個實例；同類現況：soulful-wp oom_kill=156、mainwp-web oom_kill=12（兩者 swap 中、Apache 150 workers），其餘服務 swap 允許、無 pids 上限、健康檢查無界。
+**不變量**（`scripts/check-compose-invariants.py`）：I1 memory 上限／I2 memswap=memory／I3 pids 上限／I4 實際執行的 healthcheck（compose 優先，否則 Dockerfile）＝單一指令且帶正數 timeout／I5 Apache-prefork WordPress `MaxRequestWorkers×worker_rss_mb+base_mb ≤ memory`（conf 內宣告）。repo 內每份 tracked compose 必須列 ENFORCED 或 PENDING；讀不到的檔／Dockerfile = problem。接 `scripts/verify-build-gates.ps1`。
+**變更**：
+- `scripts/verify-build-gates.ps1`：閘放在 `-LobsterOnly` 提前結束之前。
+- lobster compose：11 服務補 memswap／pids／有界探針；hci-fetch-runner 512M、hci-object-storage 1G 首次有記憶體上限。
+- soulful：wp 4G→6G＋`apache-mpm-prefork.conf`（16 workers）經 Dockerfile COPY、HEALTHCHECK `-m 4`；db／redis 探針包 `timeout`。
+- mainwp：host compose 首次進 repo `lobster-factory/infra/mainwp/`（只含 env 引用）；db 384M→512M（peak 貼上限）、web 256M→512M＋掛載 prefork conf（6 workers）＋新 healthcheck。
+- prod：safe-infra-patch 逐服務重建（lobster 7、mainwp 2、soulful 3，皆 healthy）；nginx／hci-postgres 只差 memswap／pids → `docker update` 即時、不重啟；soulful 舊 image 標 `soulful-wordpress:rollback-20261024`。
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/check-compose-invariants.py lobster compose（修前）→ 31 problems；修後全 repo 模式 0 | exit=0 | ms=400
+- REALTEST_EVIDENCE: tool=Bash | cmd=python tests/scripts/test_check_compose_invariants.py → 10/10；I2/I3/I5/0 值/運算子/替換/最後 FROM/最後 COPY/讀檔失敗/compose 覆蓋 各拔一次 → 指名測試紅、還原綠 | exit=0 | ms=160
+- REALTEST_EVIDENCE: tool=SSH | cmd=python3 /root/Work/scripts/check-compose-invariants.py <live lobster/soulful/mainwp compose> → 0 problems；docker inspect 15 容器 Memory==MemorySwap、PidsLimit 有值、healthy；MaxRequestWorkers lobster 16／soulful 16／mainwp 6；sg-deploy wordpress@706e41f57 smoke 5/5；aware-wave.com／app／soulfulexpression.org 200 | exit=0 | ms=410000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/14m/0n（Codex 四輪 `agency-os/reports/oracle/2026-10-24-review-{67b734b7,2a9c0ab8,3eac4e32,0be46abe}.md`；R1 F1-3、R2 F1-4、R3 F1/F3-5 已修＋測試；第 2 輪後依 AGENTS §4 寫不變量分析：7 項全出在手寫 shell 解析 → 改封閉規則「單一指令＋正數 timeout，shell 運算子／$()／反引號一律拒」；拒修：R1 F4 他 session 檔、R3 F2 每服務必有 healthcheck＝新不變量、R4 F1 最壞併發由 I2 限在容器內、R4 F2 參數字串偽造＝刻意做錯非遺漏）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,runbooks,lobster-factory/docs,lobster-factory/infra/hetzner-phase1-core/docs,agency-os/tenants | grep=soulful-wp.*4G\|mainwp-web.*256\|mainwp-db.*384\|smart-restart-if-oom | hits=0
+**剩餘**：PENDING 11 份 prod compose 未收斂（TASKS §G）；主機 `/root/scripts/smart-restart-if-oom.sh n8n 500`（門檻重啟＝補丁型）待 n8n compose 收斂時移除。**rollback**：各 compose `*.bak.safe-patch-<stamp>`＋`up -d <svc>`；soulful `docker tag soulful-wordpress:rollback-20261024 soulful-wordpress:local`＋`up -d soulful-wp`；`docker update` 兩服務以原值再 update。
 ## 2026-10-24（續15）AUTO_CONTENT 監工台：8 階段 61 項工作逐項列出，狀態只存 data.mjs；監工台套件加選用工作清單（Claude）
 
 **觸發**：操作者「你先做一個監工台 我才能知道你的進度」「要做的內容都要寫入」。

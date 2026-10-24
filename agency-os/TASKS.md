@@ -413,7 +413,7 @@
 
 #### G. ▶️ 可直接做 — 基礎建設與客戶站
 
-- [ ] **【基礎設施｜中】`soulful-wp`／`mainwp-web` 與 lobster-wordpress 同類：Apache 150 workers × 實測 181MB ≫ 4G memcg、healthcheck 無 `--max-time`、swap 允許；mainwp-web 無 healthcheck 無上限** — 同一招：`memswap_limit`＝memory、`pids`、healthcheck `--max-time`、prefork 對齊記憶體（soulful image 是 `soulful-wordpress:local`，conf 進它的 Dockerfile）。見 WORKLOG 2026-10-24 lobster-wordpress OOM 條。建議模型：Opus 5.5
+- [ ] **【基礎設施｜中】其餘 prod compose 收斂到 compose 不變量** — `scripts/check-compose-invariants.py` PENDING 中標 prod 的 11 檔（supabase／trigger／n8n／chatwoot／postiz／uptime-kuma／observability／video／remotion／cognitive-os×2）逐檔：量 swap 與 peak → memswap=memory、pids、healthcheck 有界 → 移入 ENFORCED。見 WORKLOG 2026-10-24 compose 不變量條。建議模型：Opus 5.5
 - [ ] **【基礎設施｜小】主機 nginx 有 repo 沒有的 `hci.aware-wave.com` server 區塊（漂移）** — `/root/lobster-phase1/nginx/default.conf` 含 hci 區塊，repo `lobster-factory/infra/hetzner-phase1-core/nginx/default.conf` 沒有；任何人以 repo 檔覆蓋主機檔會讓 hci 站下線。修：把該區塊收進 repo（先比對主機現值）。2026-09-26 PI-b 分流時發現，詳 WORKLOG 2026-09-26（續34）。
 - [ ] **【MainWP】建站自動接上 MainWP：bridge 已修好（2026-09-24），剩 next-admin 部署（DEPLOY_HOLD）＋真建站 E2E**
   - `🟡 等 E2E` · `2026-09-21` · `hold 已解除；剩真建站 E2E`
