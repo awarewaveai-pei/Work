@@ -664,7 +664,7 @@ export function CostsTabs({ data, monthlyInfraUsd }: Props) {
             style={{
               padding: "10px 20px", border: "none", background: "none",
               cursor: "pointer", fontSize: 13, fontWeight: tab === t.key ? 700 : 500,
-              color: tab === t.key ? "var(--accent)" : "var(--text-secondary)",
+              color: tab === t.key ? "var(--accent-text)" : "var(--text-secondary)",
               borderBottom: `2px solid ${tab === t.key ? "var(--accent)" : "transparent"}`,
               marginBottom: -2, transition: "color .15s, border-color .15s",
               whiteSpace: "nowrap",

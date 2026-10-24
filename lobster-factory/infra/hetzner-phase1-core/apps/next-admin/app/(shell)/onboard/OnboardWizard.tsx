@@ -499,7 +499,7 @@ function Step2WpType({
           <div><span>🟢 自動安裝（WP.org）</span><strong style={{ color: "var(--badge-green-text)" }}>{autoCount} 個</strong></div>
           <div>
             <span>🔵 條件安裝（LiteSpeed 主機才裝）</span>
-            <strong style={{ color: "var(--accent)" }}>{conditionalCount} 個</strong>
+            <strong style={{ color: "var(--accent-text)" }}>{conditionalCount} 個</strong>
           </div>
           <div>
             <span>🟡 需手動上傳（付費 zip）</span>
@@ -507,7 +507,7 @@ function Step2WpType({
           </div>
         </div>
         {conditionalCount > 0 && (
-          <p className="form-hint" style={{ marginTop: 6, fontSize: 11, color: "var(--accent)" }}>
+          <p className="form-hint" style={{ marginTop: 6, fontSize: 11, color: "var(--accent-text)" }}>
             條件外掛：{info.resolvedConditionalPlugins.map((p) => p.slug).join(", ")}
             &nbsp;— 只在 LiteSpeed 主機上安裝（Hostinger VPS 預設是 LiteSpeed；Cloudways/Nginx 不裝）
           </p>
@@ -771,7 +771,7 @@ function Step4Svc({
                     onChange={() => toggle(p.id)}
                     style={{ width: 16, height: 16 }}
                   />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: active ? "var(--accent)" : "var(--text-muted)" }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: active ? "var(--accent-text)" : "var(--text-muted)" }}>
                     {active ? "✓ 開通" : "略過"}
                   </span>
                 </label>

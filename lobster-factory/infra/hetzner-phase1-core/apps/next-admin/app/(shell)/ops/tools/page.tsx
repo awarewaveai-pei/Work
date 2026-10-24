@@ -126,7 +126,7 @@ export default function OpsToolsPage() {
   return (
     <div style={{ background: "var(--bg-canvas)", minHeight: "100vh", padding: "28px 32px", maxWidth: 900, margin: "0 auto" }}>
       <nav style={{ marginBottom: 16, fontSize: 13, color: "var(--text-muted)" }}>
-        <Link href="/ops/inbox" style={{ color: "var(--accent)", textDecoration: "none" }}>← Ops Inbox</Link>
+        <Link href="/ops/inbox" style={{ color: "var(--accent-text)", textDecoration: "none" }}>← Ops Inbox</Link>
         {" / "}
         <span>Tools</span>
       </nav>
@@ -356,7 +356,7 @@ function ToolRow({ tool, onRemove }: { tool: AiTool; onRemove?: () => void }) {
             {TOOL_TYPE_LABEL[tool.type]}
           </span>
           {tool.builtin && (
-            <span style={{ fontSize: 10, color: "var(--accent)", background: "var(--ai-bg)", padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>
+            <span style={{ fontSize: 10, color: "var(--ai-text)", background: "var(--ai-bg)", padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>
               內建
             </span>
           )}
@@ -408,7 +408,7 @@ function ChannelRow({ channel, onRemove }: { channel: NotifyChannel; onRemove?: 
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
           <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{channel.name}</span>
           {channel.builtin && (
-            <span style={{ fontSize: 10, color: "var(--accent)", background: "var(--ai-bg)", padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>
+            <span style={{ fontSize: 10, color: "var(--ai-text)", background: "var(--ai-bg)", padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>
               內建
             </span>
           )}

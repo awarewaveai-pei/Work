@@ -2086,7 +2086,7 @@ export default function CanvasEditor() {
               <div style={{ opacity: 0.55, fontSize: 11 }}>
                 {hslTab === "all" ? "全部色相（整體偏移）" : `${HSL_RANGES.find(r => r.key === hslTab)?.label ?? ""} 色段`}
                 {hasAnyHslAdjustment(hslMixer) && (
-                  <span style={{ color: "var(--accent)", marginLeft: 6 }}>已調整</span>
+                  <span style={{ color: "var(--accent-text)", marginLeft: 6 }}>已調整</span>
                 )}
               </div>
 
@@ -2103,7 +2103,7 @@ export default function CanvasEditor() {
                   <label key={row.axis} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                     <span style={{ display: "flex", justifyContent: "space-between" }}>
                       <span>{row.label}</span>
-                      <span style={{ opacity: 0.7, fontVariantNumeric: "tabular-nums", color: v !== 0 ? "var(--accent)" : undefined }}>
+                      <span style={{ opacity: 0.7, fontVariantNumeric: "tabular-nums", color: v !== 0 ? "var(--accent-text)" : undefined }}>
                         {v > 0 ? `+${v}` : `${v}`}
                       </span>
                     </span>

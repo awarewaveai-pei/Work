@@ -79,8 +79,8 @@ export default async function CostsPage() {
         </div>
         <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
           月報 · 真實花費（即時監控）· 流水帳（近 {WINDOW_DAYS} 天） · 單價費率表 · 月費試算 · AI 模型比較
-          <Link href="/ops/clients" style={{ color: "var(--accent)", marginLeft: 12 }}>→ Clients</Link>
-          <Link href="/tools/image-gen" style={{ color: "var(--accent)", marginLeft: 12 }}>→ Image Gen</Link>
+          <Link href="/ops/clients" style={{ color: "var(--accent-text)", marginLeft: 12 }}>→ Clients</Link>
+          <Link href="/tools/image-gen" style={{ color: "var(--accent-text)", marginLeft: 12 }}>→ Image Gen</Link>
         </p>
       </div>
 

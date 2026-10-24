@@ -42,7 +42,7 @@ type AnyModel = TaggedText | TaggedImage | TaggedCoding | TaggedVideo | TaggedTt
 
 const SPEED_STYLE: Record<number, { label: string; color: string; bg: string }> = {
   1: { label: "最快", color: "var(--badge-green-text)",       bg: "var(--badge-green-bg)" },
-  2: { label: "快",   color: "var(--accent)",                 bg: "var(--ai-bg)" },
+  2: { label: "快",   color: "var(--ai-text)",                 bg: "var(--ai-bg)" },
   3: { label: "中等", color: "var(--build-risk-medium-text)", bg: "var(--build-risk-medium-bg)" },
   4: { label: "慢",   color: "var(--build-risk-medium-text)", bg: "var(--build-risk-medium-bg)" },
   5: { label: "最慢", color: "var(--badge-red-text)",         bg: "var(--badge-red-bg)" },
@@ -76,14 +76,14 @@ const LATENCY_RANK: Record<string, number> = {
 function textCostStyle(c: number) {
   if (c === 0)  return { label: "免費", color: "var(--badge-green-text)",       bg: "var(--badge-green-bg)" };
   if (c < 0.5)  return { label: "$",    color: "var(--badge-green-text)",       bg: "var(--badge-green-bg)" };
-  if (c < 2)    return { label: "$$",   color: "var(--accent)",                 bg: "var(--ai-bg)" };
+  if (c < 2)    return { label: "$$",   color: "var(--ai-text)",                 bg: "var(--ai-bg)" };
   if (c < 4)    return { label: "$$$",  color: "var(--build-risk-medium-text)", bg: "var(--build-risk-medium-bg)" };
   return              { label: "$$$$", color: "var(--build-risk-medium-text)", bg: "var(--build-risk-medium-bg)" };
 }
 
 function imageCostStyle(c: number) {
   if (c < 0.03)  return { label: "$",    color: "var(--badge-green-text)",       bg: "var(--badge-green-bg)" };
-  if (c < 0.07)  return { label: "$$",   color: "var(--accent)",                 bg: "var(--ai-bg)" };
+  if (c < 0.07)  return { label: "$$",   color: "var(--ai-text)",                 bg: "var(--ai-bg)" };
   if (c < 0.12)  return { label: "$$$",  color: "var(--build-risk-medium-text)", bg: "var(--build-risk-medium-bg)" };
   return               { label: "$$$$", color: "var(--build-risk-medium-text)", bg: "var(--build-risk-medium-bg)" };
 }
@@ -185,7 +185,7 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
 function SrcLink({ href, label }: { href: string; label: string }) {
   return (
     <a href={href} target="_blank" rel="noreferrer" style={{
-      color: "var(--accent)", textDecoration: "none",
+      color: "var(--accent-text)", textDecoration: "none",
       border: "1px solid var(--card-border)", background: "var(--card-bg)",
       borderRadius: 999, padding: "2px 8px", fontSize: 10.5, whiteSpace: "nowrap",
     }}>
@@ -367,9 +367,9 @@ function CodingCard({ m, sel, onToggle }: { m: CodingToolComparison; sel: boolea
 function VideoCard({ m, sel, onToggle }: { m: VideoModelComparison; sel: boolean; onToggle: () => void }) {
   const spd = SPEED_STYLE[m.speedRank];
   const cstUsd = m.costPerSecUsd * 5; // 5-second clip
-  const cst = m.costPerSecUsd === 0 ? { label: "訂閱制", color: "var(--accent)", bg: "var(--ai-bg)" }
+  const cst = m.costPerSecUsd === 0 ? { label: "訂閱制", color: "var(--ai-text)", bg: "var(--ai-bg)" }
     : cstUsd < 0.05 ? { label: "$", color: "var(--badge-green-text)", bg: "var(--badge-green-bg)" }
-    : cstUsd < 0.15 ? { label: "$$", color: "var(--accent)", bg: "var(--ai-bg)" }
+    : cstUsd < 0.15 ? { label: "$$", color: "var(--ai-text)", bg: "var(--ai-bg)" }
     : cstUsd < 0.30 ? { label: "$$$", color: "var(--build-risk-medium-text)", bg: "var(--build-risk-medium-bg)" }
     : { label: "$$$$", color: "var(--build-risk-medium-text)", bg: "var(--build-risk-medium-bg)" };
   return (
@@ -414,7 +414,7 @@ function TtsCard({ m, sel, onToggle }: { m: TtsModelComparison; sel: boolean; on
   const spd = SPEED_STYLE[m.speedRank];
   const cst = m.costPer1kCharsUsd === 0 ? { label: "免費", color: "var(--badge-green-text)", bg: "var(--badge-green-bg)" }
     : m.costPer1kCharsUsd < 0.01 ? { label: "$", color: "var(--badge-green-text)", bg: "var(--badge-green-bg)" }
-    : m.costPer1kCharsUsd < 0.05 ? { label: "$$", color: "var(--accent)", bg: "var(--ai-bg)" }
+    : m.costPer1kCharsUsd < 0.05 ? { label: "$$", color: "var(--ai-text)", bg: "var(--ai-bg)" }
     : { label: "$$$", color: "var(--build-risk-medium-text)", bg: "var(--build-risk-medium-bg)" };
   const qualityColor: Record<string, string> = { 基礎:"#64748b", 良好:"#1e40af", 優:"#065f46", 最佳:"#9d174d" };
   return (
@@ -465,7 +465,7 @@ function SearchCard({ m, sel, onToggle }: { m: SearchApiComparison; sel: boolean
   const spd = SPEED_STYLE[LATENCY_RANK[m.latency] ?? 3];
   const cst = m.costPer1kQueriesUsd === 0 ? { label: "免費", color: "var(--badge-green-text)", bg: "var(--badge-green-bg)" }
     : m.costPer1kQueriesUsd < 2 ? { label: "$", color: "var(--badge-green-text)", bg: "var(--badge-green-bg)" }
-    : m.costPer1kQueriesUsd < 4 ? { label: "$$", color: "var(--accent)", bg: "var(--ai-bg)" }
+    : m.costPer1kQueriesUsd < 4 ? { label: "$$", color: "var(--ai-text)", bg: "var(--ai-bg)" }
     : { label: "$$$", color: "var(--build-risk-medium-text)", bg: "var(--build-risk-medium-bg)" };
   return (
     <div style={sel ? CARD_SEL : CARD}>

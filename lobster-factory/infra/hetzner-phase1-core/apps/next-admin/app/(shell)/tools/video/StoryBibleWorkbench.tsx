@@ -10,7 +10,7 @@ type Bible = { schemaVersion: "1.0.0"; organizationId: string; seriesId: string;
 
 const emptyBible = (): Bible => ({ schemaVersion: "1.0.0", organizationId: "", seriesId: "series_1", revision: 1, state: "draft", characters: [], locations: [], props: [], continuity: { currentState: [], prohibitions: [], openThreads: [] }, episode: { episodeId: "ep_1", premise: "", hook: "", beats: [""], stateDelta: {} }, provenance: { capabilityVersion: "1.0.0", sourceArtifactIds: [] } });
 const input: React.CSSProperties = { boxSizing: "border-box", width: "100%", padding: "8px 9px", borderRadius: 7, border: "1px solid var(--border-subtle)", background: "var(--card-bg)", color: "var(--text-primary)", fontSize: 12 };
-const button = (color = "var(--accent)"): React.CSSProperties => ({ padding: "8px 12px", border: 0, borderRadius: 7, background: color, color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" });
+const button = (color = "var(--accent)"): React.CSSProperties => ({ padding: "8px 12px", border: 0, borderRadius: 7, background: color, color: color === "var(--accent)" ? "var(--btn-primary-text)" : "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" });
 const card: React.CSSProperties = { border: "1px solid var(--border-subtle)", borderRadius: 10, background: "var(--card-bg)", padding: 14 };
 function strings(value: string): string[] { return value.split("\n").map((x) => x.trim()).filter(Boolean); }
 function list(value: string[]): string { return value.join("\n"); }

@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-25（續9）外觀色票：37 組四色票做成 Theme Editor 預設，四色可換 24 種排法，色票不當字色（Claude）
+
+- **任務**：操作者給 47 組四色票（去重 45），要做成 /tools/theme 的預設；預覽篩選後刪 8 組、23 組換排法；規則「色票不針對文字」「四色可在頁面／側欄／按鈕／提示框之間換，不寫死」。
+- **不變量**：①色票只當底色，所有字色是灰階（黑白灰，對底色 ≥4.5:1）；②四色角色可任意排列（4!），起始排法＝操作者在預覽挑的那種，存成明確角色對照（不存「第幾種」，規則改了也不會變）；③可調 token 以外的顏色不得寫死，必須跟著可調 token 走；④強調色不得直接當字色，字一律走 `--accent-text`。
+- **做了什麼**（next-admin 相對路徑）：`lib/theme/palettes.ts`（37 組＋`start`）；`lib/theme/palette-derive.ts`（`paletteToTokens(colors, roles)`、`allRoleMaps` 24 種、`arrangements` 6 種給預覽；中間調頁面／按鈕或側欄和頁面太像出黃字提醒）；`app/(shell)/tools/theme/PalettePresets.tsx`（新，Colors 分頁最上：選色票、Start arrangement、Shuffle 走 24 種不重複、點色互換；只改編輯器值，Save 才存）；`page.tsx` 接上＋TokenRow 色塊能顯示 `var()` 值；`tokens.ts` 新 `--accent-text`（預設 `var(--accent)`）；`globals.css` 4 個寫死底色改別名（`--bg-card`/`--bg-canvas`/`--surface`/`--topbar-bg`）、12 處寫死靛藍改 `color-mix(var(--accent))`；48 檔 130 處 `color: var(--accent)`（含條件式）改 `var(--accent-text)`。
+- **踩到並修掉的**：`--accent-text` 起初預設寫死 `#6366f1`，瀏覽器讀 prod 存檔（`--accent: #008f11`）發現會把 130 處綠字變靛藍→改預設 `var(--accent)`，實測解析為 `#008f11`。
+- **critic（Deep）修掉的**：M1 深色頁卡片往白字方向調、白字在卡片／滑過底只剩 3.6–4.4:1（含 p27 起始排法）→底色一律往遠離字色的方向調，字色取「頁面、卡片、subtle、hover 全部」最差對比最高的那個；M2 `--accent-text` 有 15 處畫在 `--ai-bg` 上（11 處同一行＋4 處多行樣式物件），9 組起始排法低於 4.5:1（最低 1.33）→改用 `--ai-text`；m1 強調色實心底寫死白字 4 處（theme 分頁徽章、UpdateNotice 的未定義 `--accent-contrast`、ClientHubTabs、StoryBibleWorkbench）→`--btn-primary-text`；m2 測試只跑 6 種排法但編輯器可到 24 種→測試改跑 888 種（37×24），刪掉沒有正式呼叫者的 `arrangements()`。新守門：同一樣式物件內 `--ai-bg`＋`--accent-text`、或強調色實心底＋寫死白字 → 測試紅。
+- **上線後可見變化**（操作者 2026-10-25 已知悉同意）：prod 存的外觀終於套到原本寫死處——卡片／頂欄白→`#f1f0ef`、側欄滑過與選中淡底靛藍→淡綠、logo 漸層靛藍→綠；AI 提示框上的 15 處字從綠（accent）改為 prod 存的 `--ai-text` `#5781bc`。
+- **預覽頁**：https://claude.ai/artifact/APjWfafVSSh1BDuDRfBqnF（篩選用，產生器在 session scratchpad，不進 repo）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/theme（4 files，15 passed；色票檢查涵蓋 888 種排法 × 每個字色對它所在的每種底色） | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit（全專案 0 error） | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變 4 個：`--accent-text` 指向字級 token（tokens-match-globals 紅）、ClientCard 改回 var(--accent)（accent-not-text 紅，指出 ClientCard.tsx:117）、UpdateNotice 改回白字（紅）、ops/tools 359 改回 accent-text on ai-bg（紅）；各自還原綠 | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=curl | cmd=localhost:3901 /tools/theme 瀏覽器實測：選 p39 套起始排法、Shuffle 換角色、點色互換、黃字提醒、`--bg-card` 跟著 `--card-bg`；GET /api/theme 讀 prod 存檔；全程無 POST；重整後 changed=0 | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/5n（critic subagent：M1/M2/m1/m2 全修；nit 未修：`--accent-text` 預設時選色器開在 #000000、切分頁後色票選擇狀態消失；另書面對抗自審 6 項，第 1 項發現並修掉 accent-text 預設）
+- ORACLE_WAIVED: codex quota blocked until 2026-10-25 07:00 (scripts/oracle-quota.ps1)；以 critic Deep＋書面自審＋4 個突變代替。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=accent-text | hits=149
+- **剩餘風險**：`color-mix` 需 Chrome 111／Safari 16.2／Firefox 113 以上，更舊瀏覽器只失去淡色底；套色票後連結／強調字變灰階，只靠粗體區分（操作者規則）。
+- **rollback**：`git revert <本 commit>`（資料不動；DB 存檔不含新 token）。
 ## 2026-10-25（續8）ADR 017 4b-5：點數只付已持有功能——只有錢包打不開任何功能；列上明示 pay: credits 才扣錢包（Claude）
 
 - **任務**：操作者 2026-10-25 待決 5 選 A，接著做 4b-5。

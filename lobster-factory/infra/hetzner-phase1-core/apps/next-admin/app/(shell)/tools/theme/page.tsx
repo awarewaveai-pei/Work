@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { DEFAULT_SECTIONS, applyLayout, itemKey, type NavSection } from '@/app/SidebarNav';
 import { COLOR_GROUPS, TYPOGRAPHY_GROUPS, type SavedLayout, type TokenGroup } from '@/lib/theme/tokens';
+import PalettePresets from './PalettePresets';
 
 // Merge all groups for STATIC_DEFAULTS and API save
 const ALL_GROUPS = [...COLOR_GROUPS, ...TYPOGRAPHY_GROUPS];
@@ -55,6 +56,10 @@ export default function ThemePage() {
     document.documentElement.style.setProperty(name, value);
     setSavedMsg('');
   }, []);
+
+  const applyTokens = useCallback((tokens: Record<string, string>) => {
+    Object.entries(tokens).forEach(([k, v]) => handleChange(k, v));
+  }, [handleChange]);
 
   const handleSave = async () => {
     if (changedCount === 0 && !orderChanged) {
@@ -159,7 +164,7 @@ export default function ThemePage() {
           <p style={{ color: 'var(--text-muted)', marginTop: 4, fontSize: 13 }}>
             Changes apply live across the whole app.
             {(changedCount > 0 || orderChanged) && (
-              <span style={{ color: 'var(--accent)', marginLeft: 8 }}>
+              <span style={{ color: 'var(--accent-text)', marginLeft: 8 }}>
                 {[
                   changedCount > 0 && `${changedCount} token${changedCount > 1 ? 's' : ''} changed`,
                   orderChanged && 'order changed',
@@ -189,7 +194,7 @@ export default function ThemePage() {
               background: 'none', border: 'none', cursor: 'pointer',
               padding: '8px 16px',
               fontSize: 13, fontWeight: activeTab === tab.id ? 600 : 400,
-              color: activeTab === tab.id ? 'var(--accent)' : 'var(--text-muted)',
+              color: activeTab === tab.id ? 'var(--accent-text)' : 'var(--text-muted)',
               borderBottom: activeTab === tab.id ? '2px solid var(--accent)' : '2px solid transparent',
               marginBottom: -2, borderRadius: '6px 6px 0 0',
               display: 'flex', alignItems: 'center', gap: 6,
@@ -199,7 +204,7 @@ export default function ThemePage() {
             {tab.label}
             {tab.badge !== undefined && (
               <span style={{
-                background: 'var(--accent)', color: '#fff',
+                background: 'var(--accent)', color: 'var(--btn-primary-text)',
                 borderRadius: 10, fontSize: 10, fontWeight: 700,
                 padding: '1px 6px', lineHeight: '14px',
               }}>{tab.badge}</span>
@@ -211,6 +216,8 @@ export default function ThemePage() {
       {/* ── Colors tab ──────────────────────────────────────────────── */}
       {activeTab === 'colors' && (
         <>
+          <PalettePresets onApply={applyTokens} />
+
           {/* Quick Colors */}
           <div className="card" style={{ padding: 20, marginBottom: 16 }}>
             <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 14 }}>
@@ -333,7 +340,7 @@ export default function ThemePage() {
                       style={{ background: 'none', border: 'none', cursor: 'pointer', flex: 1, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6, padding: 0 }}
                     >
                       <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>{sec.label}</span>
-                      {secItemsChanged && <span style={{ fontSize: 10, color: 'var(--accent)', background: 'var(--accent-light)', padding: '1px 5px', borderRadius: 4 }}>edited</span>}
+                      {secItemsChanged && <span style={{ fontSize: 10, color: 'var(--accent-text)', background: 'var(--accent-light)', padding: '1px 5px', borderRadius: 4 }}>edited</span>}
                       <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 2 }}>{sec.items.length} items</span>
                       <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>{isExpanded ? '▲' : '▼'}</span>
                     </button>
@@ -472,7 +479,11 @@ function TokenRow({ name, type, value, defaultValue, changed, onChange }: {
   name: string; type: 'color' | 'text'; value: string; defaultValue: string;
   changed: boolean; onChange: (name: string, value: string) => void;
 }) {
-  const swatchColor = type === 'color' && value.startsWith('#') ? value : defaultValue;
+  // A value may point at another token (--accent-text defaults to var(--accent)): the swatch paints
+  // it as CSS, the native picker only takes #rrggbb.
+  const isHex = (v: string) => /^#[0-9a-fA-F]{6}$/.test(v);
+  const swatchColor = type === 'color' ? value : defaultValue;
+  const pickerValue = isHex(value) ? value : isHex(defaultValue) ? defaultValue : '#000000';
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       {type === 'color' ? (
@@ -481,7 +492,7 @@ function TokenRow({ name, type, value, defaultValue, changed, onChange }: {
             display: 'inline-block', width: 28, height: 28, borderRadius: 6,
             background: swatchColor, border: '1px solid var(--border)', overflow: 'hidden',
           }}>
-            <input type="color" value={swatchColor} onChange={e => onChange(name, e.target.value)}
+            <input type="color" value={pickerValue} onChange={e => onChange(name, e.target.value)}
               style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
             />
           </span>
@@ -502,7 +513,7 @@ function TokenRow({ name, type, value, defaultValue, changed, onChange }: {
       />
       <span style={{
         fontSize: 11, fontFamily: 'ui-monospace, Menlo, monospace',
-        color: changed ? 'var(--accent)' : 'var(--text-muted)',
+        color: changed ? 'var(--accent-text)' : 'var(--text-muted)',
         flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
       }}>{name}</span>
       {changed && (

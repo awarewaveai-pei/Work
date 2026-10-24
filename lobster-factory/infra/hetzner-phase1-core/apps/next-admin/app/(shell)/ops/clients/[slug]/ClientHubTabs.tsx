@@ -283,14 +283,14 @@ function ContentTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cfg
     <>
       {/* ── WP 連線 ──────────────────────────────────────────────────────── */}
       <Card title="WP 連線" action={
-        <Link href="/tools/content/sites" style={{ fontSize: 11, color: "var(--accent)", textDecoration: "none" }}>
+        <Link href="/tools/content/sites" style={{ fontSize: 11, color: "var(--accent-text)", textDecoration: "none" }}>
           管理連線 →
         </Link>
       }>
         {wpSites.length === 0 ? (
           <NoData>
             未找到對應此客戶的 WP 連線。<br />
-            <Link href="/tools/content/sites" style={{ color: "var(--accent)", textDecoration: "none" }}>
+            <Link href="/tools/content/sites" style={{ color: "var(--accent-text)", textDecoration: "none" }}>
               + 新增 WP 連線
             </Link>
           </NoData>
@@ -451,7 +451,7 @@ function ContentTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cfg
                     onClick={() => applyPreset(p.sel)}
                     style={{
                       padding: "4px 12px", borderRadius: 6, fontSize: 11, border: "1px solid var(--accent)",
-                      cursor: "pointer", background: "transparent", color: "var(--accent)", fontWeight: 500,
+                      cursor: "pointer", background: "transparent", color: "var(--accent-text)", fontWeight: 500,
                     }}
                   >
                     {p.label}
@@ -590,7 +590,7 @@ function IntegrationsTab({ integrations }: Pick<ClientHubTabsProps, "integration
           {group.providers.some((p) => getStatus(p.key) === "failed") && (
             <Link
               href="/ops/integrations"
-              style={{ fontSize: 11, color: "var(--accent)", textDecoration: "none", display: "block", marginTop: 8 }}
+              style={{ fontSize: 11, color: "var(--accent-text)", textDecoration: "none", display: "block", marginTop: 8 }}
             >
               查看詳細整合設定 →
             </Link>
@@ -628,7 +628,7 @@ function ProvisioningTab({ deptSummary, runs, cfg }: Pick<ClientHubTabsProps, "d
             </span>
           </div>
         ))}
-        <Link href={`/ops/clients/${deptSummary.slug}`} style={{ fontSize: 11, color: "var(--accent)", textDecoration: "none", display: "block", marginTop: 6 }}>
+        <Link href={`/ops/clients/${deptSummary.slug}`} style={{ fontSize: 11, color: "var(--accent-text)", textDecoration: "none", display: "block", marginTop: 6 }}>
           設定部門覆蓋 →
         </Link>
       </Card>
@@ -651,11 +651,11 @@ function ProvisioningTab({ deptSummary, runs, cfg }: Pick<ClientHubTabsProps, "d
           </div>
         ))}
         <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-          <Link href="/ops/onboarding" style={{ fontSize: 11, color: "var(--accent)", textDecoration: "none" }}>
+          <Link href="/ops/onboarding" style={{ fontSize: 11, color: "var(--accent-text)", textDecoration: "none" }}>
             重新 Onboarding →
           </Link>
           <span style={{ color: "var(--text-muted)", fontSize: 11 }}>·</span>
-          <Link href="/build" style={{ fontSize: 11, color: "var(--accent)", textDecoration: "none" }}>
+          <Link href="/build" style={{ fontSize: 11, color: "var(--accent-text)", textDecoration: "none" }}>
             Build Console →
           </Link>
         </div>
@@ -782,7 +782,7 @@ function MaintenanceTab({ org, cfg, wp, runs, installRuns }: Pick<ClientHubTabsP
       <div style={{ display: "flex", gap: 10 }}>
         <Link
           href={`/ops/repairs?client_slug=${org.slug}`}
-          style={{ fontSize: 12, color: "var(--accent)", textDecoration: "none" }}
+          style={{ fontSize: 12, color: "var(--accent-text)", textDecoration: "none" }}
         >
           → Repair Center
         </Link>
@@ -862,7 +862,7 @@ function SettingsTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cf
           </div>
         ))}
         <div style={{ marginTop: 8 }}>
-          <Link href="/ops/integrations" style={{ fontSize: 11, color: "var(--accent)", textDecoration: "none" }}>
+          <Link href="/ops/integrations" style={{ fontSize: 11, color: "var(--accent-text)", textDecoration: "none" }}>
             → 整合設定
           </Link>
         </div>
@@ -875,7 +875,7 @@ function SettingsTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cf
       <Card
         title="WP 網站連線 (wp_sites)"
         action={
-          <Link href="/tools/content/sites" style={{ fontSize: 11, color: "var(--accent)", textDecoration: "none" }}>
+          <Link href="/tools/content/sites" style={{ fontSize: 11, color: "var(--accent-text)", textDecoration: "none" }}>
             完整管理 →
           </Link>
         }
@@ -883,7 +883,7 @@ function SettingsTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cf
         {wpSites.length === 0 ? (
           <NoData>
             未找到與此客戶 URL 相符的 WP 連線。<br />
-            <Link href="/tools/content/sites" style={{ color: "var(--accent)", textDecoration: "none" }}>
+            <Link href="/tools/content/sites" style={{ color: "var(--accent-text)", textDecoration: "none" }}>
               + 新增 WP 連線
             </Link>
           </NoData>
@@ -2614,7 +2614,7 @@ function OutreachTab({ org }: Pick<ClientHubTabsProps, "org">) {
             disabled={saving}
             style={{
               padding: "8px 20px", borderRadius: 6, border: "none", cursor: saving ? "default" : "pointer",
-              background: saving ? "var(--card-border)" : "var(--accent)", color: "#fff",
+              background: saving ? "var(--card-border)" : "var(--accent)", color: saving ? "var(--text-primary)" : "var(--btn-primary-text)",
               fontSize: 12, fontWeight: 600, opacity: saving ? 0.7 : 1,
             }}
           >
@@ -2653,7 +2653,7 @@ export function ClientHubTabs(props: ClientHubTabsProps) {
             width: 40, height: 40, borderRadius: 10, flexShrink: 0,
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 14, fontWeight: 700,
-            background: "var(--bg-canvas)", color: "var(--accent)",
+            background: "var(--bg-canvas)", color: "var(--accent-text)",
             border: "1px solid var(--card-border)",
           }}>
             {initials}
@@ -2662,7 +2662,7 @@ export function ClientHubTabs(props: ClientHubTabsProps) {
             <h1 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>{org.name}</h1>
             <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
               {org.slug} · {org.type} · {org.status}
-              {cfg.site_url && <> · <a href={cfg.site_url} target="_blank" rel="noreferrer" style={{ color: "var(--accent)", textDecoration: "none" }}>{cfg.site_url.replace(/^https?:\/\//, "")}</a></>}
+              {cfg.site_url && <> · <a href={cfg.site_url} target="_blank" rel="noreferrer" style={{ color: "var(--accent-text)", textDecoration: "none" }}>{cfg.site_url.replace(/^https?:\/\//, "")}</a></>}
             </div>
           </div>
           {health && (
@@ -2690,7 +2690,7 @@ export function ClientHubTabs(props: ClientHubTabsProps) {
                 padding: "8px 16px",
                 border: "none", borderBottom: `2px solid ${activeTab === tab ? "var(--accent)" : "transparent"}`,
                 background: "transparent", cursor: "pointer",
-                fontSize: 12, color: activeTab === tab ? "var(--accent)" : "var(--text-secondary)",
+                fontSize: 12, color: activeTab === tab ? "var(--accent-text)" : "var(--text-secondary)",
                 fontWeight: activeTab === tab ? 600 : 400,
                 whiteSpace: "nowrap",
               }}

@@ -389,7 +389,7 @@ const linkButtonStyle: CSSProperties = {
   border: "1px solid #e2e8f0",
   borderRadius: 8,
   padding: "6px 10px",
-  color: "var(--accent)",
+  color: "var(--accent-text)",
   textDecoration: "none",
   fontSize: 12,
   fontWeight: 650,

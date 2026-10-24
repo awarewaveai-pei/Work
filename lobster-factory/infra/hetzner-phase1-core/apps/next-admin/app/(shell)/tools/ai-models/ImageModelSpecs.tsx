@@ -48,7 +48,7 @@ export default function ImageModelSpecs() {
                 <td style={td}><div style={{ fontWeight: 700 }}>{s.label}</div><div style={{ fontSize: 12, color: "var(--text-muted)" }}>{s.vendor}</div></td>
                 <td style={td}>{s.promptLimit}</td>
                 <td style={td}>{ROLE_ZH[s.referenceRole]}</td>
-                <td style={td}>{s.rewrite}{s.rewriteOff ? <div style={{ fontSize: 12, color: "var(--accent)" }}>本系統已關閉</div> : null}</td>
+                <td style={td}>{s.rewrite}{s.rewriteOff ? <div style={{ fontSize: 12, color: "var(--accent-text)" }}>本系統已關閉</div> : null}</td>
                 <td style={td}>{s.seed ? "可以" : "不行"}</td>
                 <td style={td}>{s.negativePrompt}</td>
                 <td style={td}>{s.vendorOrder}</td>
@@ -59,7 +59,7 @@ export default function ImageModelSpecs() {
                 </td>
                 <td style={td}>
                   {s.sources.map((u) => (
-                    <div key={u}><a href={u} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--accent)", wordBreak: "break-all" }}>{new URL(u).hostname}</a></div>
+                    <div key={u}><a href={u} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--accent-text)", wordBreak: "break-all" }}>{new URL(u).hostname}</a></div>
                   ))}
                 </td>
               </tr>

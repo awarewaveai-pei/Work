@@ -2334,7 +2334,7 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
                     style={{
                       fontSize: "11px", padding: "3px 10px", borderRadius: "6px",
                       border: "1px solid var(--accent)", background: "transparent",
-                      color: "var(--accent)", cursor: "pointer", whiteSpace: "nowrap",
+                      color: "var(--accent-text)", cursor: "pointer", whiteSpace: "nowrap",
                     }}
                   >
                     {savingDefaults ? "儲存中…" : "💾 存為客戶預設"}
@@ -2474,7 +2474,7 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
           <div style={{ border: "1px solid rgba(59,130,246,0.3)", borderRadius: "12px", marginBottom: "20px", overflow: "hidden" }}>
             <div style={{ background: "linear-gradient(135deg,rgba(59,130,246,0.08),rgba(59,130,246,0.02))", borderBottom: "1px solid rgba(59,130,246,0.2)", padding: "10px 16px", display: "flex", alignItems: "center", gap: "8px" }}>
               <span style={{ fontSize: "15px" }}>📝</span>
-              <span style={{ fontWeight: 700, fontSize: "13px", color: "var(--accent)" }}>文章 / 內容設定</span>
+              <span style={{ fontWeight: 700, fontSize: "13px", color: "var(--accent-text)" }}>文章 / 內容設定</span>
             </div>
             <div style={{ padding: "0 16px" }}>
           {/* ── 文章結構 ── */}
@@ -3245,7 +3245,7 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
           <div style={{ border: "1px solid rgba(139,92,246,0.3)", borderRadius: "12px", marginBottom: "20px", overflow: "hidden" }}>
             <div style={{ background: "linear-gradient(135deg,rgba(139,92,246,0.08),rgba(139,92,246,0.02))", borderBottom: "1px solid rgba(139,92,246,0.2)", padding: "10px 16px", display: "flex", alignItems: "center", gap: "8px" }}>
               <span style={{ fontSize: "15px" }}>🎯</span>
-              <span style={{ fontWeight: 700, fontSize: "13px", color: "var(--accent)" }}>品牌資料</span>
+              <span style={{ fontWeight: 700, fontSize: "13px", color: "var(--accent-text)" }}>品牌資料</span>
               {!onDoor && <span style={{ fontSize: "11px", color: "var(--text-muted)", marginLeft: 4 }}>— 自動帶入 app.aware-wave.com/ops/clients 客戶資料</span>}
             </div>
             <div style={{ padding: "0 16px" }}>
@@ -3368,7 +3368,7 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
                   {AUDIENCE_PRESETS.map(p => (
                     <button key={p.label} type="button" disabled={isGenerating}
                       onClick={() => applyAPPreset(p.sel as Record<string, string[]>)}
-                      style={{ padding: "4px 12px", borderRadius: 6, fontSize: 11, border: "1px solid var(--accent)", cursor: "pointer", background: "transparent", color: "var(--accent)", fontWeight: 500 }}>
+                      style={{ padding: "4px 12px", borderRadius: 6, fontSize: 11, border: "1px solid var(--accent)", cursor: "pointer", background: "transparent", color: "var(--accent-text)", fontWeight: 500 }}>
                       {p.label}
                     </button>
                   ))}

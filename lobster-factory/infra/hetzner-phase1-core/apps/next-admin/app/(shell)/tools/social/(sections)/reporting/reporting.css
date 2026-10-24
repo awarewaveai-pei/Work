@@ -22,4 +22,4 @@
 .rp-spark path { fill: none; stroke-width: 2.5; vector-effect: non-scaling-stroke; }
 .rp-past { display: flex; flex-direction: column; gap: 4px; max-height: 190px; overflow: auto; }
 .rp-prow { display: flex; align-items: center; gap: 10px; }
-.sm-app .rp-prow .rp-open { flex: 1; min-width: 0; text-align: left; border: 0; background: transparent; padding: 4px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent); }
+.sm-app .rp-prow .rp-open { flex: 1; min-width: 0; text-align: left; border: 0; background: transparent; padding: 4px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent-text); }

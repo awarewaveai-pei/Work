@@ -14,6 +14,8 @@ export const COLOR_GROUPS: TokenGroup[] = [
     tokens: [
       { name: "--accent", default: "#6366f1", type: "color" },
       { name: "--accent-hover", default: "#818cf8", type: "color" },
+      // follows --accent unless set, so a saved accent keeps coloring links exactly as before
+      { name: "--accent-text", default: "var(--accent)", type: "color" },
       { name: "--btn-primary-bg", default: "#6366f1", type: "color" },
       { name: "--btn-primary-hover", default: "#4f52e0", type: "color" },
       { name: "--btn-primary-text", default: "#ffffff", type: "color" },

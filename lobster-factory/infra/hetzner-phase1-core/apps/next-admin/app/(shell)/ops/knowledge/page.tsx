@@ -136,9 +136,9 @@ export default async function KnowledgeOverview() {
       <h1 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>知識庫</h1>
       <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "6px 0 20px", lineHeight: 1.6 }}>
         所有客戶的知識文件總覽。要新增或修改某個客戶的文件，到{" "}
-        <Link href="/ops/clients" style={{ color: "var(--accent)" }}>客戶中心</Link> 開該客戶 →「客服」分頁。
+        <Link href="/ops/clients" style={{ color: "var(--accent-text)" }}>客戶中心</Link> 開該客戶 →「客服」分頁。
         要讓它自動從網站或搜尋結果長出來，到{" "}
-        <Link href="/ops/collect" style={{ color: "var(--accent)" }}>資料蒐集</Link>。
+        <Link href="/ops/collect" style={{ color: "var(--accent-text)" }}>資料蒐集</Link>。
       </p>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
@@ -178,7 +178,7 @@ export default async function KnowledgeOverview() {
                   </td>
                   <td style={td}>
                     {r.orgSlug ? (
-                      <Link href={`/ops/clients/${r.orgSlug}`} style={{ color: "var(--accent)" }}>{r.orgName}</Link>
+                      <Link href={`/ops/clients/${r.orgSlug}`} style={{ color: "var(--accent-text)" }}>{r.orgName}</Link>
                     ) : (
                       r.orgName
                     )}

@@ -219,7 +219,7 @@ export function IncidentCard({ incident, canAct }: { incident: Incident; canAct:
             <span
               style={{
                 fontSize: 11,
-                color: "var(--accent)",
+                color: "var(--ai-text)",
                 background: "var(--ai-bg)",
                 padding: "1px 6px",
                 borderRadius: 4,
@@ -311,7 +311,7 @@ export function IncidentCard({ incident, canAct }: { incident: Incident; canAct:
           <OpenInCursorButton incident={incident} primary={false} />
           <Link
             href={`/ops/inbox/${incident.id}`}
-            style={{ fontSize: 12, color: "var(--accent)", textDecoration: "none", fontWeight: 500 }}
+            style={{ fontSize: 12, color: "var(--accent-text)", textDecoration: "none", fontWeight: 500 }}
           >
             詳情 →
           </Link>

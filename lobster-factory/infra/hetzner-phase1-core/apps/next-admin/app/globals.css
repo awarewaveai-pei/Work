@@ -9,13 +9,14 @@
   --sidebar-text: #475569;
   --sidebar-text-hover: #0d1526;
   --sidebar-text-active: #0d1526;
-  --sidebar-hover: rgba(99,102,241,0.08);
-  --sidebar-active-bg: rgba(99,102,241,0.14);
+  --sidebar-hover: color-mix(in srgb, var(--accent) 8%, transparent);
+  --sidebar-active-bg: color-mix(in srgb, var(--accent) 14%, transparent);
   --sidebar-active-bar: #6366f1;
   --code-bg: #07101f;   /* dedicated dark bg for <pre> code blocks (was --sidebar-bg) */
   --accent: #6366f1;
   --accent-hover: #818cf8;
-  --accent-light: rgba(99,102,241,0.08);
+  --accent-text: var(--accent);   /* words in the accent role; follows --accent until a preset or edit sets it */
+  --accent-light: color-mix(in srgb, var(--accent) 8%, transparent);
   --body-bg: #f2f5fb;
   --card-bg: #ffffff;
   --card-border: #e6eaf4;
@@ -27,15 +28,15 @@
   --radius: 12px;
   --radius-sm: 8px;
   --shadow: 0 1px 3px rgb(0 0 0/.04), 0 4px 16px rgb(0 0 0/.06);
-  --shadow-hover: 0 4px 24px rgb(99 102 241/.1), 0 1px 4px rgb(0 0 0/.05);
+  --shadow-hover: 0 4px 24px color-mix(in srgb, var(--accent) 10%, transparent), 0 1px 4px rgb(0 0 0/.05);
   /* aliases used by build / dept / onboard components */
-  --bg-canvas: #f2f5fb;
-  --bg-card: #ffffff;
+  --bg-canvas: var(--body-bg);
+  --bg-card: var(--card-bg);
   --bg-subtle: #f5f7fd;
   --bg-hover: #eef1f9;
   --border: #e6eaf4;
   --border-subtle: #e6eaf4;
-  --surface: #ffffff;
+  --surface: var(--card-bg);
   --surface-2: #f5f7fd;
   --text-secondary: #64748b;
   --severity-critical: #dc2626;
@@ -59,7 +60,7 @@
   --sidebar-disabled-text: #aab4c5;
   --sidebar-coming-soon-bg: rgba(245,158,11,.15);
   --sidebar-coming-soon-text: #d97706;
-  --topbar-bg: #ffffff;
+  --topbar-bg: var(--card-bg);
   --pre-text: #e2e8f0;
   --badge-green-bg: #d1fae5;
   --badge-green-text: #065f46;
@@ -130,8 +131,8 @@
   --intake-error-block-border: #fca5a5;
   --intake-error-block-text: #991b1b;
   --designs-card-hover-border: #cdd3e8;
-  --designs-card-selected-ring: rgba(99,102,241,0.25);
-  --designs-badge-tarot-bg: rgba(99,102,241,0.1);
+  --designs-card-selected-ring: color-mix(in srgb, var(--accent) 25%, transparent);
+  --designs-badge-tarot-bg: color-mix(in srgb, var(--accent) 10%, transparent);
   --designs-badge-tarot-text: #4f46e5;
   --designs-badge-studio-bg: rgba(59,130,246,0.1);
   --designs-badge-studio-text: #1d4ed8;
@@ -144,8 +145,8 @@
   --designs-action-danger-hover-bg: #fff5f5;
   --designs-toolbar-danger-hover-bg: #fff5f5;
   --designs-chip-hover-border: #c0c8da;
-  --sidebar-logo-gradient-start: #6366f1;
-  --sidebar-logo-gradient-end: #818cf8;
+  --sidebar-logo-gradient-start: var(--accent);
+  --sidebar-logo-gradient-end: var(--accent-hover);
   --sidebar-logo-text-color: #ffffff;
   --approval-card-bg: #ffffff;
   --approval-card-border: #e2e8f0;
@@ -287,7 +288,7 @@ body {
   color: var(--sidebar-logo-text-color);
   flex-shrink: 0;
   letter-spacing: -0.5px;
-  box-shadow: 0 2px 8px rgb(99 102 241/.4);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 .sidebar-logo-text {
@@ -715,7 +716,7 @@ body {
 }
 
 .link-card:hover .link-card-arrow {
-  color: var(--accent);
+  color: var(--accent-text);
   transform: translateX(2px);
 }
 
@@ -882,11 +883,11 @@ pre {
   cursor: pointer;
   letter-spacing: -0.01em;
   transition: background .15s, box-shadow .15s;
-  box-shadow: 0 1px 4px rgb(99 102 241/.25);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 .btn-primary:hover {
   background: var(--accent-hover);
-  box-shadow: 0 2px 8px rgb(99 102 241/.35);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 .btn-primary:disabled {
   opacity: .45;
@@ -919,7 +920,7 @@ pre {
 .btn-ghost:hover {
   background: var(--chip-bg, #f1f3f5);
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .btn-ghost:disabled {
   opacity: .4;
@@ -983,8 +984,8 @@ pre {
 
 .build-profile-card.selected {
   border-color: var(--accent);
-  background: rgba(99,102,241,0.04);
-  box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 .build-profile-title,
@@ -1114,7 +1115,7 @@ pre {
 }
 
 .build-prerequisites-list a {
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 600;
 }
 
@@ -1408,12 +1409,12 @@ pre {
   border-radius: 10px;
   margin-top: 24px;
   letter-spacing: -0.01em;
-  box-shadow: 0 4px 16px rgb(99 102 241/.35);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--accent) 35%, transparent);
   transition: background .15s, box-shadow .15s, transform .1s;
 }
 
 .build-submit:not(:disabled):hover {
-  box-shadow: 0 6px 24px rgb(99 102 241/.45);
+  box-shadow: 0 6px 24px color-mix(in srgb, var(--accent) 45%, transparent);
   transform: translateY(-1px);
 }
 
@@ -1534,7 +1535,7 @@ pre {
   border: 1px solid var(--border);
 }
 
-.dept-file-path    { font-size: 12px; font-weight: 700; color: var(--accent); }
+.dept-file-path    { font-size: 12px; font-weight: 700; color: var(--accent-text); }
 .dept-file-fields  { font-size: 12px; color: var(--text-secondary); }
 .dept-file-recommended { color: var(--dept-file-recommended-text); }
 
@@ -1892,7 +1893,7 @@ pre {
 }
 
 .intake-stepper-label.active {
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 700;
 }
 
@@ -1925,7 +1926,7 @@ pre {
 
 /* Required asterisk */
 .intake-required {
-  color: var(--accent);
+  color: var(--accent-text);
   margin-left: 2px;
 }
 
@@ -2110,7 +2111,7 @@ pre {
 .intake-success-link {
   display: inline-block;
   margin-top: 10px;
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 600;
   font-size: 13px;
   text-decoration: none;
@@ -2648,8 +2649,8 @@ pre {
   font-size: 10.5px;
   font-weight: 500;
   background: var(--accent-light);
-  color: var(--accent);
-  border: 1px solid rgba(99,102,241,0.15);
+  color: var(--accent-text);
+  border: 1px solid color-mix(in srgb, var(--accent) 15%, transparent);
 }
 
 /* ── Prompt toggle ── */

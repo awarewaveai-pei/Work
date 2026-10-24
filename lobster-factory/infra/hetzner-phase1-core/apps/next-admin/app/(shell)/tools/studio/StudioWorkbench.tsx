@@ -1073,7 +1073,7 @@ export default function StudioWorkbench() {
                     cursor: "pointer",
                     border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
                     background: active ? "rgba(99,102,241,0.12)" : "rgba(127,127,127,0.04)",
-                    color: active ? "var(--accent)" : "var(--text-primary)",
+                    color: active ? "var(--accent-text)" : "var(--text-primary)",
                     fontWeight: active ? 600 : 400,
                     transition: "all 0.15s",
                   }}
@@ -1286,7 +1286,7 @@ export default function StudioWorkbench() {
             ))}
           </div>
           {fusionPickMode && region && (
-            <p style={{ fontSize: 11, color: "var(--accent)", margin: "0 0 6px" }}>✋ 手選混搭中：點一個國家設為「混搭第二國」（再點取消）</p>
+            <p style={{ fontSize: 11, color: "var(--accent-text)", margin: "0 0 6px" }}>✋ 手選混搭中：點一個國家設為「混搭第二國」（再點取消）</p>
           )}
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 10 }}>
             {(CULTURE_REGIONS.find((g) => g.group === regionTab)?.items ?? []).map((it) => {
@@ -1482,7 +1482,7 @@ export default function StudioWorkbench() {
                     })());
                   }}
                   title={item.maxRefs > 0 ? `最多 ${item.maxRefs} 張參考圖` : "純文字生圖"}
-                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 10px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`, background: active ? "rgba(99,102,241,0.12)" : "rgba(127,127,127,0.04)", color: active ? "var(--accent)" : "var(--text-primary)", fontWeight: active ? 600 : 400, transition: "all 0.15s" }}>
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 10px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`, background: active ? "rgba(99,102,241,0.12)" : "rgba(127,127,127,0.04)", color: active ? "var(--accent-text)" : "var(--text-primary)", fontWeight: active ? 600 : 400, transition: "all 0.15s" }}>
                   <span>{active && selectedModels.size === 1 ? "✓ " : active ? "☑ " : ""}{item.label}</span>
                   <span style={{ fontSize: 10, color: "var(--text-muted)" }}>
                     NT${item.costNt}{item.maxRefs > 0 ? ` · ${item.maxRefs}ref` : " · text"}

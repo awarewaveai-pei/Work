@@ -48,7 +48,7 @@ const T = {
 /** A search-run folder is named "<keyword> <YYYYMMDDHHmm>" (lib/collect/sinks/kb.ts); the keyword is the topic. */
 const folderKeyword = (name: string) => name.replace(/\s*\d{12}$/, "").trim() || name;
 const STATUS: Record<TopicStatus, [string, string]> = {
-  proposed: ["提案", "var(--text-muted)"], approved: ["已核准", "var(--accent)"], rejected: ["已退回", "var(--text-muted)"],
+  proposed: ["提案", "var(--text-muted)"], approved: ["已核准", "var(--accent-text)"], rejected: ["已退回", "var(--text-muted)"],
   generating: ["製作中", "var(--yellow)"], drafted: ["已有草稿", "var(--yellow)"], waiting_video: ["等影片", "var(--yellow)"],
   embedded: ["影片已嵌入", "var(--yellow)"], reviewed: ["已審核", "var(--green)"], scheduled: ["已排程", "var(--green)"],
   published: ["已發布", "var(--green)"], failed: ["失敗", "var(--red)"],

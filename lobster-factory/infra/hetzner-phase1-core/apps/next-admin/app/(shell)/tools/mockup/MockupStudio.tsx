@@ -150,7 +150,7 @@ function CatalogGrid({
       <div style={{ fontSize: 13, marginBottom: 4 }}>
         選擇產品（多選）
         {selectedIds.size > 0 && (
-          <span style={{ marginLeft: 8, color: "var(--accent)", fontSize: 12 }}>已選 {selectedIds.size} 個</span>
+          <span style={{ marginLeft: 8, color: "var(--accent-text)", fontSize: 12 }}>已選 {selectedIds.size} 個</span>
         )}
       </div>
       {catalogLoading && <p style={{ fontSize: 12, opacity: 0.6 }}>載入產品目錄中…</p>}
@@ -236,7 +236,7 @@ function PropChips({
               borderRadius: 12,
               border: on ? "1.5px solid var(--accent)" : "1.5px solid var(--border)",
               background: on ? "var(--ai-bg)" : "transparent",
-              color: on ? "var(--accent)" : "var(--text-muted)",
+              color: on ? "var(--ai-text)" : "var(--text-muted)",
               cursor: "pointer",
             }}
           >

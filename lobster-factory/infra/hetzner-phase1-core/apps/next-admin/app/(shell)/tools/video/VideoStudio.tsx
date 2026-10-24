@@ -691,7 +691,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
                     borderBottom: `3px solid ${studioTab === t.id ? "var(--accent)" : "transparent"}`,
                     background: "transparent", cursor: "pointer", fontSize: 13.5, whiteSpace: "nowrap",
                     fontWeight: studioTab === t.id ? 700 : 500,
-                    color: studioTab === t.id ? "var(--accent)" : "var(--text-secondary)",
+                    color: studioTab === t.id ? "var(--accent-text)" : "var(--text-secondary)",
                     transition: "color 0.15s, border-color 0.15s",
                   }}
                 >
@@ -964,7 +964,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
                   <details style={{ borderRadius: 8, border: "1px solid var(--border-subtle)", overflow: "hidden" }}>
                     <summary style={{ padding: "8px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", background: "var(--bg-subtle)", listStyle: "none", display: "flex", alignItems: "center", gap: 6 }}>
                       ▸ 視覺風格{videoStyle
-                        ? <span style={{ color: "var(--accent)", fontWeight: 400 }}>&nbsp;— {videoStyle}</span>
+                        ? <span style={{ color: "var(--accent-text)", fontWeight: 400 }}>&nbsp;— {videoStyle}</span>
                         : <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>&nbsp;（不指定 = 電影感預設）</span>}
                     </summary>
                     <div style={{ padding: "10px 14px" }}>
@@ -1077,8 +1077,8 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
               {/* Draft loading inline */}
               {draftLoading && (
                 <div style={{ background: "var(--ai-bg)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 16px" }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", marginBottom: 6 }}>生成草稿中…</div>
-                  <div style={{ fontSize: 12, color: "var(--accent)" }}>Claude 生成腳本 + Flux 生成圖片（約 30–60 秒）</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent-text)", marginBottom: 6 }}>生成草稿中…</div>
+                  <div style={{ fontSize: 12, color: "var(--accent-text)" }}>Claude 生成腳本 + Flux 生成圖片（約 30–60 秒）</div>
                 </div>
               )}
 
@@ -1102,7 +1102,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
                 <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-subtle)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>③ 費用預覽</span>
                   <button type="button" onClick={() => setInfoOpen(true)}
-                    style={{ fontSize: 11, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
+                    style={{ fontSize: 11, color: "var(--accent-text)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
                     完整明細 →
                   </button>
                 </div>
@@ -1122,7 +1122,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
                   {/* Total */}
                   <div style={{ borderTop: "2px solid var(--border-subtle)", paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                     <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>每支合計</span>
-                    <span style={{ fontSize: 26, fontWeight: 800, color: "var(--accent)" }}>{NT(costBreakdown.totalUsd)}</span>
+                    <span style={{ fontSize: 26, fontWeight: 800, color: "var(--accent-text)" }}>{NT(costBreakdown.totalUsd)}</span>
                   </div>
                   {/* CTA */}
                   <button onClick={handleGenerateDraft} disabled={!canGenerate}
@@ -1168,7 +1168,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <span style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>生成記錄</span>
             <button onClick={loadHistory} disabled={historyLoading}
-              style={{ fontSize: 11.5, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
+              style={{ fontSize: 11.5, color: "var(--accent-text)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
               {historyLoading ? "載入中…" : "↻ 重新整理"}
             </button>
           </div>
@@ -1292,7 +1292,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
                     <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>每支合計</span>
                     <span style={{ fontSize: 11.5, color: "var(--text-secondary)", marginLeft: 8 }}>({USD(costBreakdown.totalUsd)})</span>
                   </div>
-                  <span style={{ fontSize: 22, fontWeight: 800, color: "var(--accent)" }}>{NT(costBreakdown.totalUsd)}</span>
+                  <span style={{ fontSize: 22, fontWeight: 800, color: "var(--accent-text)" }}>{NT(costBreakdown.totalUsd)}</span>
                 </div>
               </Card>
             </div>
@@ -1383,7 +1383,7 @@ function DraftEditor({
                   width: "100%", padding: "4px 0", borderRadius: 6, fontSize: 11, fontWeight: 600,
                   border: "1px solid var(--border-subtle)",
                   background: (disabled || regenIds.has(scene.id)) ? "var(--border-subtle)" : "var(--bg-canvas)",
-                  color: (disabled || regenIds.has(scene.id)) ? "var(--text-muted)" : "var(--accent)",
+                  color: (disabled || regenIds.has(scene.id)) ? "var(--text-muted)" : "var(--accent-text)",
                   cursor: (disabled || regenIds.has(scene.id)) ? "not-allowed" : "pointer",
                 }}>
                 {regenIds.has(scene.id) ? "⏳ 生成中" : "🔄 重新生成"}
@@ -1460,7 +1460,7 @@ function ProgressTracker({ step }: { step: string }) {
   const currentIdx = getCurrentStepIndex(step);
   return (
     <div style={{ background: "var(--ai-bg)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 16px" }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", marginBottom: 12 }}>🔄 正在生成…</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent-text)", marginBottom: 12 }}>🔄 正在生成…</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {PROGRESS_STEPS.slice(0, -1).map((s, idx) => {
           const done = idx < currentIdx;
@@ -1479,19 +1479,19 @@ function ProgressTracker({ step }: { step: string }) {
               <div style={{ flex: 1 }}>
                 <span style={{
                   fontSize: 12.5, fontWeight: active ? 700 : 500,
-                  color: done ? "var(--green)" : active ? "var(--accent)" : "var(--text-muted)",
+                  color: done ? "var(--green)" : active ? "var(--accent-text)" : "var(--text-muted)",
                 }}>
                   {s.label}
                 </span>
                 {active && (
-                  <span style={{ marginLeft: 8, fontSize: 11, color: "var(--accent)" }}>{step}</span>
+                  <span style={{ marginLeft: 8, fontSize: 11, color: "var(--accent-text)" }}>{step}</span>
                 )}
               </div>
             </div>
           );
         })}
       </div>
-      <div style={{ marginTop: 10, fontSize: 11, color: "var(--accent)" }}>
+      <div style={{ marginTop: 10, fontSize: 11, color: "var(--accent-text)" }}>
         可以關閉頁面，完成後影片會出現在「📋 生成記錄」。
       </div>
     </div>
@@ -1635,7 +1635,7 @@ function HistoryRow({ item, active, onSelect, checked, onCheck }: {
           {dateStr} · {item.sceneCount || "?"} 場景 · {formatCount} 格式
         </div>
       </div>
-      <div style={{ fontSize: 11.5, color: active ? "var(--accent)" : "var(--text-muted)", fontWeight: 600 }}>
+      <div style={{ fontSize: 11.5, color: active ? "var(--accent-text)" : "var(--text-muted)", fontWeight: 600 }}>
         {active ? "▲ 收起" : "▼ 展開"}
       </div>
     </div>
@@ -1686,7 +1686,7 @@ function FlowCard({
             {step.label}
           </span>
           {muted && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", background: "var(--badge-gray-bg)", padding: "1px 6px", borderRadius: 4 }}>已停用</span>}
-          {isActive && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--accent)", background: "var(--ai-bg)", padding: "1px 6px", borderRadius: 4, animation: "pulse 1s infinite" }}>進行中</span>}
+          {isActive && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--ai-text)", background: "var(--ai-bg)", padding: "1px 6px", borderRadius: 4, animation: "pulse 1s infinite" }}>進行中</span>}
         </div>
         <div style={{ fontSize: 11.5, color: "var(--text-secondary)", marginTop: 3 }}>
           {step.tool} · <span style={{ color: "var(--text-muted)" }}>{step.vendor}</span>
@@ -2020,7 +2020,7 @@ function RemotionStudio({ scriptPrefill, organizationId }: { scriptPrefill?: Scr
           background: "var(--ai-bg)", border: "1px solid var(--border)", borderRadius: 8,
           padding: "9px 14px", fontSize: 12, display: "flex", alignItems: "center", gap: 8,
         }}>
-          <span style={{ fontWeight: 700, color: "var(--accent)" }}>✨ 腳本已帶入</span>
+          <span style={{ fontWeight: 700, color: "var(--accent-text)" }}>✨ 腳本已帶入</span>
           <span style={{ color: "var(--text-secondary)" }}>{scriptPrefill.headline || scriptPrefill.topic} — 文字欄位已預填；圖片點「AI 生圖」自動生成</span>
         </div>
       )}
@@ -2049,11 +2049,11 @@ function RemotionStudio({ scriptPrefill, organizationId }: { scriptPrefill?: Scr
                   transition: "background 0.15s",
                 }} />
                 <div>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: active ? "var(--accent)" : "var(--text-muted)", fontFamily: "monospace", lineHeight: 1.2 }}>{t.aspect}</div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: active ? "var(--accent-text)" : "var(--text-muted)", fontFamily: "monospace", lineHeight: 1.2 }}>{t.aspect}</div>
                   <div style={{ fontSize: 9, color: "var(--text-muted)", lineHeight: 1.2 }}>{t.duration}</div>
                 </div>
               </div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: active ? "var(--accent)" : "var(--text-primary)", lineHeight: 1.3, marginBottom: 4 }}>{t.name}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: active ? "var(--accent-text)" : "var(--text-primary)", lineHeight: 1.3, marginBottom: 4 }}>{t.name}</div>
               <div style={{ fontSize: 10.5, color: "var(--text-secondary)", lineHeight: 1.4 }}>{t.desc}</div>
             </button>
           );
@@ -2114,7 +2114,7 @@ function RemotionStudio({ scriptPrefill, organizationId }: { scriptPrefill?: Scr
                             border: "1px solid var(--border-subtle)", fontSize: 11, fontWeight: 700,
                             cursor: (busy || aiLoading || !aiPrompt) ? "not-allowed" : "pointer",
                             background: aiLoading ? "var(--border-subtle)" : (aiPrompt ? "var(--ai-bg)" : "var(--bg-subtle)"),
-                            color: aiLoading ? "var(--text-muted)" : (aiPrompt ? "var(--accent)" : "var(--text-muted)"),
+                            color: aiLoading ? "var(--text-muted)" : (aiPrompt ? "var(--ai-text)" : "var(--text-muted)"),
                             whiteSpace: "nowrap", transition: "all 0.15s",
                           }}>
                           {aiLoading ? "⏳" : "✨ AI"}
@@ -2150,7 +2150,7 @@ function RemotionStudio({ scriptPrefill, organizationId }: { scriptPrefill?: Scr
 
       {/* Status */}
       {status === "submitting" && (
-        <div style={{ background: "var(--ai-bg)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 16px", fontSize: 12.5, color: "var(--accent)", fontWeight: 700 }}>
+        <div style={{ background: "var(--ai-bg)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 16px", fontSize: 12.5, color: "var(--ai-text)", fontWeight: 700 }}>
           ⏳ 提交到 remotion-service 中…
         </div>
       )}
@@ -2159,8 +2159,8 @@ function RemotionStudio({ scriptPrefill, organizationId }: { scriptPrefill?: Scr
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
             <span style={{ fontSize: 16 }}>🎬</span>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--accent)" }}>渲染中 — Chrome + ffmpeg</div>
-              <div style={{ fontSize: 11.5, color: "var(--accent)", opacity: 0.8 }}>預計 2–5 分鐘。可保持頁面開啟等待。</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--accent-text)" }}>渲染中 — Chrome + ffmpeg</div>
+              <div style={{ fontSize: 11.5, color: "var(--accent-text)", opacity: 0.8 }}>預計 2–5 分鐘。可保持頁面開啟等待。</div>
             </div>
           </div>
           <div style={{ height: 3, background: "var(--border-subtle)", borderRadius: 2, overflow: "hidden" }}>
@@ -2175,7 +2175,7 @@ function RemotionStudio({ scriptPrefill, organizationId }: { scriptPrefill?: Scr
           <div style={{ fontSize: 13, fontWeight: 700, color: "var(--red)", marginBottom: 4 }}>渲染失敗</div>
           <div style={{ fontSize: 12.5, color: "var(--badge-red-text)", marginBottom: 8 }}>{error}</div>
           <button onClick={() => setStatus("idle")}
-            style={{ fontSize: 12, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", fontWeight: 600, padding: 0 }}>
+            style={{ fontSize: 12, color: "var(--accent-text)", background: "none", border: "none", cursor: "pointer", fontWeight: 600, padding: 0 }}>
             ← 修改後重試
           </button>
         </div>

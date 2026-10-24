@@ -64,7 +64,7 @@ export default function VideoTabs() {
       {/* ── Section 1：前製腳本 ── */}
       <section>
         <div style={SECTION_HEADER}>
-          <span style={{ fontSize: 16, fontWeight: 700, color: "var(--accent)" }}>📝 前製腳本</span>
+          <span style={{ fontSize: 16, fontWeight: 700, color: "var(--accent-text)" }}>📝 前製腳本</span>
           <span style={{ fontSize: 12, fontWeight: 400, color: "var(--text-muted)" }}>
             用 AI 寫台詞、分鏡、字幕、標題
           </span>
@@ -86,7 +86,7 @@ export default function VideoTabs() {
       {/* ── Section 2：影片生產 ── */}
       <section ref={produceRef} style={{ borderTop: "4px solid var(--border-subtle)" }}>
         <div style={SECTION_HEADER}>
-          <span style={{ fontSize: 16, fontWeight: 700, color: "var(--accent)" }}>🎬 影片生產</span>
+          <span style={{ fontSize: 16, fontWeight: 700, color: "var(--accent-text)" }}>🎬 影片生產</span>
           <span style={{ fontSize: 12, fontWeight: 400, color: "var(--text-muted)" }}>
             腳本 → AI 生圖 → 配音 → MP4
           </span>

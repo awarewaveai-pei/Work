@@ -98,7 +98,7 @@ export function InboxGuidePanel({ publicBaseUrl }: { publicBaseUrl: string }) {
                       marginBottom: 2,
                     }}
                   >
-                    <span style={{ color: "var(--accent)", fontWeight: 600, marginRight: 6 }}>POST</span>
+                    <span style={{ color: "var(--accent-text)", fontWeight: 600, marginRight: 6 }}>POST</span>
                     {base + row.path}
                   </div>
                   <div style={{ fontSize: 10, color: "var(--text-muted)" }}>{row.note}</div>

@@ -505,7 +505,7 @@ function ServerRow({ r }: { r: SystemRow }) {
         <div style={{ ...muted, marginTop: 2 }}>{r.description}</div>
         {extra.map((x) => <div key={x} style={{ ...muted, marginTop: 2, wordBreak: "break-all" }}>{x}</div>)}
         {r.details.lookHref !== "/ops/schedules" && (
-          <div style={{ ...muted, marginTop: 2 }}>{T.detail.look}：{r.details.look} <a href={r.details.lookHref} style={{ color: "var(--accent)" }}>前往</a></div>
+          <div style={{ ...muted, marginTop: 2 }}>{T.detail.look}：{r.details.look} <a href={r.details.lookHref} style={{ color: "var(--accent-text)" }}>前往</a></div>
         )}
       </span>
       <span style={{ fontSize: "var(--font-size-sm)" }}>{r.details.when || r.cadence || "—"}</span>

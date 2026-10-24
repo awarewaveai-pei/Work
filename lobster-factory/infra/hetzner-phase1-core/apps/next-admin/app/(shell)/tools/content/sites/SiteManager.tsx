@@ -93,7 +93,7 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
   return (
     <div style={{ marginTop: 8 }}>
       <button type="button" onClick={() => setOpen(o => !o)}
-        style={{ fontSize: 12, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+        style={{ fontSize: 12, color: "var(--accent-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
         {open ? "▲ 收合" : "▼ Content Studio 預設設定"}
       </button>
       {open && (
@@ -823,10 +823,10 @@ export default function SiteManager() {
 
       {/* Footer nav */}
       <div style={{ marginTop: 8, display: "flex", gap: 12 }}>
-        {studioHref && <a href={studioHref} style={{ color: "var(--accent)", fontSize: 13, textDecoration: "none" }}>
+        {studioHref && <a href={studioHref} style={{ color: "var(--accent-text)", fontSize: 13, textDecoration: "none" }}>
           ← 返回 Content Studio
         </a>}
-        {calendarHref && <a href={calendarHref} style={{ color: "var(--accent)", fontSize: 13, textDecoration: "none" }}>
+        {calendarHref && <a href={calendarHref} style={{ color: "var(--accent-text)", fontSize: 13, textDecoration: "none" }}>
           內容行事曆 →
         </a>}
       </div>

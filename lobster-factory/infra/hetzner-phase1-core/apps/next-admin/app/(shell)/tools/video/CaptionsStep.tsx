@@ -105,8 +105,8 @@ export default function CaptionsStep({ organizationId, onContinue }: { organizat
         <div style={{ border: "1px solid var(--green)", background: "var(--intake-success-bg)", borderRadius: 8, padding: 12, fontSize: 12 }}>
           <b>字幕已產生</b>
           <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-            {artifacts?.srt?.object_url && <a href={artifacts.srt.object_url} target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>下載 SRT</a>}
-            {artifacts?.vtt?.object_url && <a href={artifacts.vtt.object_url} target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>下載 VTT</a>}
+            {artifacts?.srt?.object_url && <a href={artifacts.srt.object_url} target="_blank" rel="noreferrer" style={{ color: "var(--accent-text)" }}>下載 SRT</a>}
+            {artifacts?.vtt?.object_url && <a href={artifacts.vtt.object_url} target="_blank" rel="noreferrer" style={{ color: "var(--accent-text)" }}>下載 VTT</a>}
           </div>
         </div>
       )}

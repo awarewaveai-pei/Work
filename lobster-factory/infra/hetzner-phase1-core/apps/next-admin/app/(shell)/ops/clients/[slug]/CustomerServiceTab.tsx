@@ -25,7 +25,7 @@ const btnPrimary: CSSProperties = {
   fontSize: 12, padding: "6px 14px", borderRadius: 6, cursor: "pointer",
   background: "var(--accent)", color: "var(--btn-primary-text)", border: "none",
 };
-const btnGhost: CSSProperties = { ...btnPrimary, background: "transparent", color: "var(--accent)", border: "1px solid var(--accent)" };
+const btnGhost: CSSProperties = { ...btnPrimary, background: "transparent", color: "var(--accent-text)", border: "1px solid var(--accent)" };
 const btnDanger: CSSProperties = { ...btnPrimary, background: "transparent", color: "var(--red)", border: "1px solid var(--red)" };
 const field: CSSProperties = {
   fontSize: 12, padding: "6px 9px", borderRadius: 6, border: "1px solid var(--card-border)",

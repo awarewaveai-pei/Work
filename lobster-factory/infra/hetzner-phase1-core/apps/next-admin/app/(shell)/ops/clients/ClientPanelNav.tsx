@@ -70,7 +70,7 @@ export function ClientPanelNav({ orgs }: { orgs: OrgStub[] }) {
                 padding: "7px 8px", borderRadius: 6,
                 fontSize: 12, textDecoration: "none", marginBottom: 1,
                 background: isActive ? "rgba(88,85,208,0.10)" : "transparent",
-                color: isActive ? "var(--accent)" : "var(--text-primary)",
+                color: isActive ? "var(--accent-text)" : "var(--text-primary)",
                 fontWeight: isActive ? 500 : 400,
               }}
             >

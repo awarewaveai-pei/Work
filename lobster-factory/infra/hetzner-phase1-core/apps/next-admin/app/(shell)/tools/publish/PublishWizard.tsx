@@ -1129,7 +1129,7 @@ export default function PublishWizard() {
         >
           🚀 全部一鍵完成（印刷檔＋AI 批次商品圖＋文案＋Woo＋Printful native）
         </button>
-        {busy ? <span style={{ fontSize: 13, color: "var(--accent)" }}>⏳ {allRun.stage}…</span> : null}
+        {busy ? <span style={{ fontSize: 13, color: "var(--accent-text)" }}>⏳ {allRun.stage}…</span> : null}
         {allRun.state === "done" ? (
           <span style={{ fontSize: 13, color: "var(--green)" }}>✅ 全部完成：Woo 草稿 + Printful native 都建好了（含全部商品圖）— 後台 review 後 publish 即可開賣</span>
         ) : null}
@@ -1255,7 +1255,7 @@ export default function PublishWizard() {
           >
             ⊕ 生成每色商品圖（模特＋平拍）
           </button>
-          {colorGen.state === "running" ? <span style={{ fontSize: 12, color: "var(--accent)" }}>⏳ {colorGen.stage}…</span> : null}
+          {colorGen.state === "running" ? <span style={{ fontSize: 12, color: "var(--accent-text)" }}>⏳ {colorGen.stage}…</span> : null}
           {colorGen.state === "done" ? <span style={{ fontSize: 12, color: "var(--green)" }}>已生成 {colorGen.count} 張商品圖，其中 {colorGen.swatches} 張設為各色變體圖 ✓</span> : null}
           {colorGen.error ? <span style={{ color: "var(--red)", fontSize: 12 }}>{colorGen.error}</span> : null}
         </div>

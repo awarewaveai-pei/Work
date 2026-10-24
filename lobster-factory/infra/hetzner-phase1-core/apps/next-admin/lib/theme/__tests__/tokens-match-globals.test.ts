@@ -28,7 +28,10 @@ describe("theme tokens", () => {
 
   // Operator 2026-10-24: the Colors tab holds only colors and the Typography & Size tab holds none.
   it("the Colors tab holds only colors and the Typography & Size tab holds no color", () => {
-    const isColor = (v: string) => /^(#|rgba?\(|hsla?\(|transparent$)/i.test(v);
+    // var(--x) counts only when --x is itself a literal color in the Colors tab (--accent-text → --accent)
+    const literal = (v: string) => /^(#|rgba?\(|hsla?\(|transparent$)/i.test(v);
+    const colorDefaults = new Map(COLOR_GROUPS.flatMap((g) => g.tokens).map((t) => [t.name, t.default]));
+    const isColor = (v: string) => literal(v) || literal(colorDefaults.get(/^var\((--[a-z0-9-]+)\)$/.exec(v)?.[1] ?? "") ?? "");
     expect(COLOR_GROUPS.flatMap((g) => g.tokens).filter((t) => t.type !== "color" || !isColor(t.default)).map((t) => t.name)).toEqual([]);
     expect(TYPOGRAPHY_GROUPS.flatMap((g) => g.tokens).filter((t) => t.type !== "text" || isColor(t.default)).map((t) => t.name)).toEqual([]);
   });

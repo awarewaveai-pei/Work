@@ -34,7 +34,7 @@ export function UpdateNotice({ buildId }: { buildId: string | null }) {
       role="alert"
       style={{
         position: "sticky", top: 0, zIndex: 1000, display: "flex", gap: 12, alignItems: "center", justifyContent: "center",
-        padding: "10px 16px", background: "var(--accent)", color: "var(--accent-contrast, #fff)", fontSize: 14, fontWeight: 600,
+        padding: "10px 16px", background: "var(--accent)", color: "var(--btn-primary-text)", fontSize: 14, fontWeight: 600,
       }}
     >
       網站已更新。這一頁還是舊版，按鈕會照舊版運作，請重新整理。

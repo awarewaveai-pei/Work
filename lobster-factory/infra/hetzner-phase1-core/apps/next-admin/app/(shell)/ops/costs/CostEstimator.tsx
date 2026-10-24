@@ -113,7 +113,7 @@ export function CostEstimator() {
 
         <button
           onClick={() => setShowAdvanced((v) => !v)}
-          style={{ background: "none", border: "none", color: "var(--accent)", fontSize: 12, fontWeight: 600, cursor: "pointer", textAlign: "left", padding: 0 }}
+          style={{ background: "none", border: "none", color: "var(--accent-text)", fontSize: 12, fontWeight: 600, cursor: "pointer", textAlign: "left", padding: 0 }}
         >
           {showAdvanced ? "▾ 收起進階逐功能" : "▸ 進階：逐功能呼叫次數"}
         </button>

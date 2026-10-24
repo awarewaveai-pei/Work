@@ -30,7 +30,7 @@ export function chipStyle(active: boolean): CSSProperties {
     padding: "3px 10px", borderRadius: 12, fontSize: 11, cursor: "pointer",
     border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
     background: active ? "rgba(99,102,241,0.15)" : "rgba(127,127,127,0.08)",
-    color: active ? "var(--accent)" : "var(--text-muted)",
+    color: active ? "var(--accent-text)" : "var(--text-muted)",
     fontWeight: active ? 600 : 400, transition: "all 0.15s",
   };
 }

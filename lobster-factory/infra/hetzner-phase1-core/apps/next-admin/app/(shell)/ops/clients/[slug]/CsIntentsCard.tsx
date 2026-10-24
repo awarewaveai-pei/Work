@@ -438,7 +438,7 @@ export function CsIntentsCard({ slug, intents, loading, loadError = null, reload
             <ChipBtn key={f} label={`${l} ${loading ? "" : counts[f]}`.trim()} active={filter === f} onClick={() => applyFilter(f)} />
           ))}
           <span style={{ flex: 1 }} />
-          <button onClick={() => { setAdding((v) => !v); setAddedMsg(null); }} style={{ ...btn, background: "transparent", color: "var(--accent)", border: "1px solid var(--accent)" }}>
+          <button onClick={() => { setAdding((v) => !v); setAddedMsg(null); }} style={{ ...btn, background: "transparent", color: "var(--accent-text)", border: "1px solid var(--accent)" }}>
             {adding ? "收起新增" : "＋ 新增意圖"}
           </button>
         </div>

@@ -114,7 +114,7 @@ export function ClientCard({ org, health }: { org: OrgRow; health: HealthResult 
 
         {/* Row 2: site URL */}
         {cfg.site_url && (
-          <div style={{ fontSize: 12, color: "var(--accent)", marginBottom: 10, wordBreak: "break-all" }}>
+          <div style={{ fontSize: 12, color: "var(--accent-text)", marginBottom: 10, wordBreak: "break-all" }}>
             {cfg.site_url}
           </div>
         )}

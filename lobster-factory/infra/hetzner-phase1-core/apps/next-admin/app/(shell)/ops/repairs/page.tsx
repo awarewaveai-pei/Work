@@ -152,7 +152,7 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
           <div>
             <h1 style={{ fontSize: 26, fontWeight: 750, color: "var(--text-primary)", marginBottom: 6 }}>修復中心</h1>
             {clientSlug ? (
-              <div style={{ fontSize: 12, color: "var(--accent)", fontWeight: 650, marginBottom: 6 }}>
+              <div style={{ fontSize: 12, color: "var(--accent-text)", fontWeight: 650, marginBottom: 6 }}>
                 client: {clientSlug}
               </div>
             ) : null}
@@ -461,7 +461,7 @@ function providerLabel(provider: string): string {
   return labels[provider] ?? provider;
 }
 
-const linkStyle: React.CSSProperties = { color: "var(--accent)", textDecoration: "none" };
+const linkStyle: React.CSSProperties = { color: "var(--accent-text)", textDecoration: "none" };
 const linkButtonStyle: React.CSSProperties = { ...linkStyle, border: "1px solid var(--yellow)", borderRadius: 8, padding: "7px 10px", fontSize: 12, fontWeight: 700, alignSelf: "center", whiteSpace: "nowrap" };
 const quickLinkStyle: React.CSSProperties = { display: "block", border: "1px solid var(--border)", borderRadius: 8, background: "var(--card-bg)", color: "var(--text-secondary)", padding: "8px 10px", fontSize: 12, textDecoration: "none" };
 const rowStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start", border: "1px solid var(--border)", borderRadius: 8, padding: 14 };

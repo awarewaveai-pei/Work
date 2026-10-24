@@ -1428,7 +1428,7 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
                     </button>
                   ))}
                   {(bgStatus === "pending" || bgStatus === "running") && (
-                    <span style={{ fontSize: 12, color: "var(--accent)" }}>
+                    <span style={{ fontSize: 12, color: "var(--accent-text)" }}>
                       進行中 {bgProgress.done}/{bgProgress.total} 張…
                       {bgJobId && <span style={{ color: "var(--text-muted)", marginLeft: 6 }}>job: {bgJobId.slice(0, 8)}</span>}
                     </span>
@@ -1807,7 +1807,7 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
                           …
                         </div>
                       )}
-                      <div style={{ fontSize: 11, marginTop: 4, color: active ? "var(--accent)" : "var(--text-muted)" }}>
+                      <div style={{ fontSize: 11, marginTop: 4, color: active ? "var(--accent-text)" : "var(--text-muted)" }}>
                         {t.label}
                       </div>
                     </div>
@@ -1835,7 +1835,7 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
             <span>圖片模型</span>
             <span
               style={{
-                fontSize: 11, color: hasSelectedModel ? "var(--accent)" : "var(--text-muted)",
+                fontSize: 11, color: hasSelectedModel ? "var(--accent-text)" : "var(--text-muted)",
                 marginLeft: "auto", marginRight: 6,
                 maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               }}
@@ -1886,7 +1886,7 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
                         ...chipStyle(active),
                         display: "flex", alignItems: "center", justifyContent: "space-between",
                         padding: "6px 10px",
-                        color: active ? "var(--accent)" : "var(--text)",
+                        color: active ? "var(--accent-text)" : "var(--text)",
                         opacity: locked ? 0.5 : 1,
                         cursor: locked ? "default" : "pointer",
                       }}
@@ -2103,7 +2103,7 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
             }}
           >
             <span>快速編輯</span>
-            <span style={{ fontSize: 11, color: previewImage ? "var(--accent)" : "var(--text-muted)", marginLeft: "auto", marginRight: 6 }}>
+            <span style={{ fontSize: 11, color: previewImage ? "var(--accent-text)" : "var(--text-muted)", marginLeft: "auto", marginRight: 6 }}>
               {previewImage ? "AI 修圖" : "需先生成預覽"}
             </span>
             <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{panelOpen.edit ? "▲" : "▼"}</span>

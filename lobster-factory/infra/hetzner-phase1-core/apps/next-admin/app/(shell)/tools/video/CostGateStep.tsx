@@ -39,7 +39,7 @@ export default function CostGateStep({ mode, onConfirm }: { mode: ProductionMode
           ))}
           <div style={{ borderTop: "2px solid var(--border-subtle)", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
             <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>粗估合計</span>
-            <span style={{ fontSize: 20, fontWeight: 800, color: "var(--accent)" }}>{NT(estimate.totalUsd)}</span>
+            <span style={{ fontSize: 20, fontWeight: 800, color: "var(--accent-text)" }}>{NT(estimate.totalUsd)}</span>
           </div>
         </div>
       )}

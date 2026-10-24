@@ -39,7 +39,7 @@ export default async function CustomerServiceOverview() {
       <h1 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>AI 客服營運中心</h1>
       <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "6px 0 20px", lineHeight: 1.6 }}>
         跨客戶的客服營運面。每個客戶的知識庫 / 意圖 / kill-switch 在
-        <Link href="/ops/clients" style={{ color: "var(--accent)", textDecoration: "none" }}> 客戶中心 → 客服分頁</Link>。
+        <Link href="/ops/clients" style={{ color: "var(--accent-text)", textDecoration: "none" }}> 客戶中心 → 客服分頁</Link>。
         對話載體 Chatwoot 待搬大記憶體機（U6）；cs-engine 與資料層（pgvector）已上線。
       </p>
 
@@ -66,9 +66,9 @@ export default async function CustomerServiceOverview() {
       </div>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <Link href="/ops/clients" style={{ fontSize: 12, color: "var(--accent)", textDecoration: "none" }}>→ 客戶中心（per-client 客服設定）</Link>
-        <Link href="/ops/costs" style={{ fontSize: 12, color: "var(--accent)", textDecoration: "none" }}>→ AI 成本帳本</Link>
-        <Link href="/ops/system-modes" style={{ fontSize: 12, color: "var(--accent)", textDecoration: "none" }}>→ 全域 Kill Switch</Link>
+        <Link href="/ops/clients" style={{ fontSize: 12, color: "var(--accent-text)", textDecoration: "none" }}>→ 客戶中心（per-client 客服設定）</Link>
+        <Link href="/ops/costs" style={{ fontSize: 12, color: "var(--accent-text)", textDecoration: "none" }}>→ AI 成本帳本</Link>
+        <Link href="/ops/system-modes" style={{ fontSize: 12, color: "var(--accent-text)", textDecoration: "none" }}>→ 全域 Kill Switch</Link>
       </div>
     </div>
   );

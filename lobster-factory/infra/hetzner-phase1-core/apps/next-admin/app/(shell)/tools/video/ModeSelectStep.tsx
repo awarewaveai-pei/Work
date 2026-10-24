@@ -45,7 +45,7 @@ export default function ModeSelectStep({
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 14, fontWeight: 700, color: active ? "var(--accent)" : "var(--text-primary)" }}>{m.label}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: active ? "var(--accent-text)" : "var(--text-primary)" }}>{m.label}</span>
                 <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", background: "var(--bg-subtle)", padding: "2px 8px", borderRadius: 999 }}>{m.badge}</span>
               </div>
               <div style={{ fontSize: 11.5, color: "var(--text-secondary)", lineHeight: 1.6 }}>{m.desc}</div>

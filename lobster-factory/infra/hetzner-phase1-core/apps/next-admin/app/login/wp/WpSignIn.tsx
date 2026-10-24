@@ -87,10 +87,10 @@ export function WpSignIn() {
       {state.kind === "failed" ? (
         <>
           <p style={{ margin: 0, fontWeight: 700 }}>這個登入連結已經失效</p>
-          <p style={note}>連結只能用一次。請回到 aware-wave.com 的「我的帳號」再按一次「進入」，或改用 <a href="/login" style={{ color: "var(--accent)" }}>這扇門的登入頁</a>。</p>
+          <p style={note}>連結只能用一次。請回到 aware-wave.com 的「我的帳號」再按一次「進入」，或改用 <a href="/login" style={{ color: "var(--accent-text)" }}>這扇門的登入頁</a>。</p>
         </>
       ) : null}
-      {state.kind === "signedOut" ? <p style={{ margin: 0 }}>已登出。請用自己的帳號從 aware-wave.com 或 <a href="/login" style={{ color: "var(--accent)" }}>這扇門的登入頁</a> 登入。</p> : null}
+      {state.kind === "signedOut" ? <p style={{ margin: 0 }}>已登出。請用自己的帳號從 aware-wave.com 或 <a href="/login" style={{ color: "var(--accent-text)" }}>這扇門的登入頁</a> 登入。</p> : null}
     </div>
   );
 }

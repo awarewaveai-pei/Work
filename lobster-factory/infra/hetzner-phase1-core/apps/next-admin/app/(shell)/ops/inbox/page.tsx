@@ -114,7 +114,7 @@ export default async function OpsInboxListPage({ searchParams }: { searchParams:
         <div style={{
           display: "flex", alignItems: "center", gap: 8,
           background: "var(--ai-bg)", border: "1px solid var(--severity-low)", borderRadius: 8,
-          padding: "8px 14px", marginBottom: 16, fontSize: 13, color: "var(--accent)",
+          padding: "8px 14px", marginBottom: 16, fontSize: 13, color: "var(--ai-text)",
         }}>
           <span>篩選客戶：<strong>{sp.client_slug}</strong></span>
           <Link
