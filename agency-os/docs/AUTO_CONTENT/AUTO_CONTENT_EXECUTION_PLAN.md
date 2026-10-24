@@ -198,7 +198,7 @@
 
 | 卡 | 改 | 做 | 驗 |
 |---|---|---|---|
-| P5.1 | 新 `NA/lib/script-forge/modules.ts`＋測試 | 24 筆 `{id,label,icon,group,blurb,role,outputSchema(zod),build(fields,brand,lang,scenes)}`；id／group 照 `ScriptForge.tsx:225-250`；blurb 照需求 §8；`role` 每模組一句；`build` 內容＝原瀏覽器 prompt 逐字搬移（P5.3 起逐卡填） | 測：24 筆、id 唯一、每筆 role＋schema 非空 |
+| P5.1 | 新 `NA/lib/script-forge/modules.ts`＋測試 | 24 筆 `{id,label,icon,group,blurb,video,role,tasks:{<task>:{build(fields,ctx),shape}}}`（一模組可有多個 AI 呼叫＝task；`shape`＝答案頂層 key、fixture 釘，不加 zod 依賴；共用結果卡的 task 放隱藏模組 `result`）；id／group 照 `ScriptForge.tsx:225-250`；blurb 照需求 §8；`role` 每模組一句；`build` 內容＝原瀏覽器 prompt 逐字搬移（P5.3 起逐卡填） | 測：24 筆、id 唯一、每筆 role＋schema 非空 |
 | P5.2 | `script-forge/route.ts` | body `{module, fields, model, siteId}`；system＝`modules[module].role`＋共用輸出規則＋I1 品牌段；prompt＝`build()`；未登記 module 400；串流不變；舊 `prompt` 欄位移除 | 測：未知 module 400；已知 module 串流 |
 | P5.3–P5.25 | `ScriptForge.tsx` 每模組一卡（manual, article, industry, ab, host, brand_story, sales, speech, pitch, seo, hook, pain, viral, thumbnail, repurpose, translate, preview, predict, brand_build, brand, calendar, proposal, story_bible 只接 forge 不改 workbench） | 該模組 `await claude(prompt)`→`forge(moduleId, fields)`；prompt 文字搬進 P5.1 該筆 `build`；輸出 JSON 形狀 fixture 釘 | fixture 綠；該模組 grep 無 `claude(` |
 | P5.26 | 新頁 `NA/app/(shell)/tools/script-forge/page.tsx`＋側欄 Content Tools | 左欄 24 模組（名稱＋blurb），點入才載模組；`/tools/video` 第 1 步仍 import 同元件（`VideoPipeline.tsx:108`、`VideoTabs.tsx:72` 不動） | sidebar-coverage；`/playwright` |

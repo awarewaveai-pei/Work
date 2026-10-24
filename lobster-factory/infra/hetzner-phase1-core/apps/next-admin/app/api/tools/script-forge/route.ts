@@ -5,13 +5,19 @@ import type { Grant } from "@/lib/entitlements/can";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { normalizeAiTextModel, isOpenAiTextModel, type AiTextModel } from "@/lib/ai/text-model-options";
 import { claudeFallback, claudeParams } from "@/lib/ai/gateway";
+import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { canAccessOrg } from "@/lib/tenant-guard";
+import { loadSiteBrand } from "@/lib/content/brand-voice-store";
+import { renderSiteVoice } from "@/lib/content/brand-voice";
+import { forgePrompt, type ForgeCtx } from "@/lib/script-forge/modules";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 // ScriptForge 影片腳本生成器的單一 LLM 中轉端點（多供應商）。
-// 前端（app/tools/video/ScriptForge.tsx）24 個模組全走同一個 claude(prompt) → 這條 route。
+// 瀏覽器只送 { module, task, fields, siteId, lang, sceneCount, customScenes }：角色、輸出規則、提示與品牌段
+// 都在伺服器組（lib/script-forge/modules.ts forgePrompt，plan I6；品牌讀客戶網站 content_defaults，I1）。
 // 設計對齊 app/api/content/generate/route.ts + lib/content/article/generate-core.ts：
 //   - role gate（resolveOpsRole + canCreateAiImageJob，與其他 AI 端點同權限）
 //   - apiKey 只存在伺服器（ANTHROPIC_API_KEY / OPENAI_API_KEY），絕不下放瀏覽器
@@ -20,14 +26,32 @@ export const maxDuration = 120;
 //   - 回 text/plain ReadableStream，保留逐字串流 UX（前端逐塊累加後 JSON.parse）
 // model 由前端從 lib/ai/text-model-options.ts 的同一份選單挑（Content Studio 共用）。
 
-const SYS = `你是世界頂級短影音腳本策略師、廣告創意總監與多語言內容專家。輸出必須是純JSON，不加任何markdown包裹或前言後記。台詞口語自然；畫面指令具體；字幕最多12字。`;
-
 const MAX_PROMPT_CHARS = 24000;
 const MAX_TOKENS = 4000;
+const LANGS = ["繁體中文", "English", "簡體中文", "日本語", "한국어", "Español", "Bahasa Melayu"];
 
 interface ScriptForgeBody {
-  prompt?: string;
+  module?: string;
+  task?: string;
+  fields?: Record<string, unknown>;
+  siteId?: string;
+  lang?: string;
+  sceneCount?: number;
+  customScenes?: number;
   model?: string;
+}
+
+const intIn = (v: unknown, lo: number, hi: number, d: number) =>
+  typeof v === "number" && Number.isInteger(v) && v >= lo && v <= hi ? v : d;
+
+/** The selected client's voice for the prompt; null brand = no siteId; "denied" = not the caller's or no such site. */
+async function brandFor(req: Request, siteId: string): Promise<ForgeCtx["brand"] | "denied"> {
+  if (!siteId) return null;
+  const sb = getSupabaseWriteClient();
+  if (!sb) throw new Error("script_forge:no_supabase_client");
+  const site = await loadSiteBrand(sb, siteId);
+  if (!site || !canAccessOrg(req, site.organizationId)) return "denied";
+  return { voice: renderSiteVoice(site.defaults) || site.name, forbidden: (site.defaults.marketing?.forbiddenClaims ?? "").trim() };
 }
 
 export const POST = withFeature("video.script", handlePost);
@@ -44,9 +68,20 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
     return new NextResponse("invalid json", { status: 400 });
   }
 
+  const fields = body.fields && typeof body.fields === "object" && !Array.isArray(body.fields) ? body.fields : {};
+  const brand = await brandFor(req, typeof body.siteId === "string" ? body.siteId.trim() : "");
+  if (brand === "denied") return new NextResponse("site not found", { status: 404 });
+  const sceneCount = intIn(body.sceneCount, 1, 20, 6);
+  const ctx: ForgeCtx = {
+    lang: typeof body.lang === "string" && LANGS.includes(body.lang) ? body.lang : LANGS[0],
+    sceneCount, customScenes: intIn(body.customScenes, 0, sceneCount, Math.min(3, sceneCount)), brand,
+  };
+  const built = forgePrompt(String(body.module ?? ""), String(body.task ?? ""), fields, ctx);
+  if (!built) return new NextResponse("unknown module or task", { status: 400 });
   // 上限保護：bound 輸入 token 成本（CJK ≈ 1 token/字）。文章轉腳本模組會貼整篇，故給寬鬆 24k 但仍封頂。
-  const prompt = (typeof body.prompt === "string" ? body.prompt : "").slice(0, MAX_PROMPT_CHARS).trim();
+  const prompt = built.prompt.slice(0, MAX_PROMPT_CHARS).trim();
   if (!prompt) return new NextResponse("prompt required", { status: 400 });
+  const system = built.system;
 
   // model 白名單化（非清單值 → DEFAULT_AI_TEXT_MODEL）。決定供應商與所需金鑰。
   const model: AiTextModel = normalizeAiTextModel(body.model);
@@ -69,9 +104,9 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
       const encoder = new TextEncoder();
       try {
         if (useOpenAi) {
-          await streamOpenAi(controller, encoder, model, prompt, apiKey, ac.signal, grant);
+          await streamOpenAi(controller, encoder, model, system, prompt, apiKey, ac.signal, grant);
         } else {
-          await streamAnthropic(controller, encoder, model, prompt, apiKey, ac.signal, grant);
+          await streamAnthropic(controller, encoder, model, system, prompt, apiKey, ac.signal, grant);
         }
       } catch (err) {
         // 串流已開始 → 無法改 HTTP status；把錯誤塞進串流尾端讓前端 JSON.parse 失敗時可見。
@@ -102,6 +137,7 @@ async function streamAnthropic(
   controller: ReadableStreamDefaultController<Uint8Array>,
   encoder: TextEncoder,
   model: string,
+  system: string,
   prompt: string,
   apiKey: string,
   signal: AbortSignal,
@@ -110,7 +146,7 @@ async function streamAnthropic(
   const Anthropic = await loadAnthropic(grant);
   const client = new Anthropic({ apiKey });
   const stream = await client.beta.messages.create(
-    { ...claudeParams(model, MAX_TOKENS), ...claudeFallback(model), system: SYS, messages: [{ role: "user", content: prompt }], stream: true },
+    { ...claudeParams(model, MAX_TOKENS), ...claudeFallback(model), system, messages: [{ role: "user", content: prompt }], stream: true },
     { signal },
   );
   for await (const event of stream) {
@@ -127,6 +163,7 @@ async function streamOpenAi(
   controller: ReadableStreamDefaultController<Uint8Array>,
   encoder: TextEncoder,
   model: string,
+  system: string,
   prompt: string,
   apiKey: string,
   signal: AbortSignal,
@@ -140,7 +177,7 @@ async function streamOpenAi(
       max_completion_tokens: MAX_TOKENS,
       stream: true,
       messages: [
-        { role: "system", content: SYS },
+        { role: "system", content: system },
         { role: "user", content: prompt },
       ],
     }),

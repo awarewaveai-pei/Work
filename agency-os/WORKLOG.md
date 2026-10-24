@@ -1,4 +1,32 @@
 # Worklog
+## 2026-10-24（續43）AUTO_CONTENT P5：ScriptForge 提示全部搬到伺服器模組登記表、獨立頁 /tools/script-forge（左欄 24 模組＋說明）、送社群／送影片（Claude＋fullstack-engineer）
+
+**觸發**：操作者「先不用真跑，直接開始 P5（ScriptForge 獨立頁）」；卡 `agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md` §7 P5.1–P5.27。
+**根因**：24 模組共用一句角色、提示在瀏覽器組好整段送 `NA/app/api/tools/script-forge/route.ts`（任何人可送任意提示，I6）；品牌由頁面貼進提示；ScriptForge 只存在於影片工具第 1 步。
+
+**做法**（NA＝`lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- `NA/lib/script-forge/modules.ts`：24 頁面模組＋隱藏 `result`（共用結果卡）＋隱藏 `banner`；每模組自己的 role、blurb（需求 §8）、`tasks:{build(fields,ctx),shape}`；`forgePrompt` 組 system＝role＋共用輸出規則＋禁用說法，prompt＝語言／場景行＋task。`shape`＝答案頂層 key（fixture 釘，未加 zod 依賴；計畫 P5.1 已改）。
+- route 只收 `{module,task,fields,siteId,lang,sceneCount,customScenes}`；品牌由 `siteId` 伺服器讀（`loadSiteBrand`＋`canAccessOrg`，他客戶／不存在→404）；舊整段 `prompt` 路徑刪除（Banner Studio 兩個提示一併搬進 `banner` 模組，`BannerStudio.tsx`／`BannerStudioStaff.tsx` 改送 task）。
+- `ScriptForge.tsx`：25 個 `claude(\`…\`)` → `forge(module,task,fields)`（fullstack-engineer 依卡搬移；`claude()`、`langified`、頁面 `bv` 全刪）；`sideMenu` 模式＝左欄模組名＋一行說明；「送社群」`SendToSocial`（存成該客戶品牌的社群草稿，不呼叫 AI）只在注入 `saveSocialDraft` 時出現——注入者只有員工頁 `NA/app/(shell)/tools/script-forge/ScriptForgePage.tsx`，影片門不呼叫 social API。
+- 送影片：`NA/app/(shell)/tools/video/script-handoff.ts`（sessionStorage 一次性）→ `VideoPipeline.tsx` 開頁時接手，同頁內「送去生產影片」行為。
+- 頁面名稱／說明在 `NA/lib/script-forge/nav.ts`（瀏覽器唯一載入的部分）；`modules.ts` 只在伺服器，測試擋任何 client 檔 import 它。
+- 新頁 `NA/app/(shell)/tools/script-forge/page.tsx`；側欄 Content Tools「ScriptForge」；`lib/portal/products.ts` video `staffPaths`＋`tools/script-forge`、`optional:["social"]`；`staff-tools.test.ts NEEDS_OTHER_TOOL` 記 video→`/api/social/posts`。
+
+**審查發現與處置**
+- Codex `agency-os/reports/oracle/2026-10-24-partialreview-114d1d76.md`：F1 頁面 import `FORGE_NAV` 連帶把全部提示打包進瀏覽器（I6 白做）→ 拆出 `nav.ts`，`modules.ts` re-export 同一份、測試比對兩邊一致＋掃 "use client" 檔不得 import registry；F2 送影片的 sessionStorage 交接可能被同分頁下一個登入者接到 → 帶時間戳，60 秒內才接。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/script-forge app/api/tools/script-forge app/__tests__ "app/(shell)/tools" lib/portal | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=python 逐字比對：HEAD 版 ScriptForge 25 個提示模板的 84 段靜態文字皆原樣出現在 modules.ts | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p . | exit=0 | ms=0（本變更檔 0 錯）
+- 突變：拔 route `canAccessOrg`→「他客戶網站 404」紅；頁面改 import `modules`→「no client file imports the registry」紅；皆還原綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
+- ORACLE_WAIVED: 114d1d76 之後只改它點名的兩項（各附測試；F1 附突變），不開第二輪
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude/commands,.claude/agents | grep=api/tools/script-forge|claude\(|FORGE_NAV|scriptForge\( | hits=68（多為文件與其他工具的 claude( ；呼叫 script-forge route 的只剩 ScriptForge forge() 與 BannerStudioStaff；`claude(` 在 ScriptForge 0）
+- 頁面實測：本機 dev 需登入正式帳號（.env.local 指正式庫），不登入；改以 jsdom 渲染測（左欄 24 個說明、點 Hook 進模組、影片流程版無左欄）。
+
+**剩餘風險**：Story Bible 的提示片段（`storyBibleContextBlock`、角色 id 提示）仍在頁面組好當欄位送出（內容與舊版位元相同）；缺值舊版會印出字面 `undefined`，新版印空字串（行為變好）。
+**rollback**：`git revert <本 commit>`（新頁可刪，`/tools/video` 不受影響；route 回到舊整段提示需同時 revert 頁面）。
 ## 2026-10-24（續42）塔羅門：匯出與修圖提示詞按鈕呼叫門上沒開的 API
 
 - **症狀**：已上線的塔羅門（`tarot.aware-wave.com`，`app/tarot/page.tsx` 直接渲染 `TarotStudio`）有兩個按鈕會 404：匯出列 `components/tools/OutputTrackBar.tsx:87`（`POST /api/tools/image/process`）與 AI 修圖提示詞 `components/tools/ImageEditPromptPanel.tsx`（`/api/tools/studio/edit-prompt`，商品工作室的收費功能 `studio.edit-prompt`；塔羅不依賴 studio）。設計門的畫布也用同一個匯出列，同樣 404。

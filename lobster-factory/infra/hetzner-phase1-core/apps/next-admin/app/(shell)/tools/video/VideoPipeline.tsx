@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ScriptForge from "./ScriptForge";
+import { takeForVideo } from "./script-handoff";
 import VideoStudio from "./VideoStudio";
 import FootageEditor from "./FootageEditor";
 import ReleaseDeliveryPanel from "./ReleaseDeliveryPanel";
@@ -79,6 +80,15 @@ export default function VideoPipeline() {
     setMaxReached((prev) => (next > prev ? next : prev));
     requestAnimationFrame(() => topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
+
+  // A script sent from the standalone ScriptForge page arrives like the in-page 「送去生產影片」 (script-handoff.ts).
+  useEffect(() => {
+    const h = takeForVideo();
+    if (!h) return;
+    if (h.kind === "remotion") { setRemotionPrefill(h.payload as unknown as RemotionPrefill); setMode("remotion"); }
+    else { setScriptPrefill(h.payload as unknown as ScriptPrefill); setMode("quick_video"); }
+    goto(2);
+  }, []);
 
   function reset() {
     setStep(1); setMaxReached(1); setMode(null); setScriptPrefill(undefined); setRemotionPrefill(undefined);

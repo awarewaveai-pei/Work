@@ -9,10 +9,10 @@ import { roleHeader } from "@/lib/ops-role";
 type ClientRow = { slug: string; name: string; clientConfig?: { brandColors?: { primary?: string; secondary?: string; accent?: string } } };
 
 const staff: BannerStaffApi = {
-  scriptForge: (prompt) => fetch("/api/tools/script-forge", {
+  scriptForge: (task, fields) => fetch("/api/tools/script-forge", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...roleHeader("operator") },
-    body: JSON.stringify({ prompt, model: DEFAULT_AI_TEXT_MODEL }),
+    body: JSON.stringify({ module: "banner", task, fields, model: DEFAULT_AI_TEXT_MODEL }),
   }),
   brandClients: async () => {
     const r = await fetch("/api/ops/clients", { headers: { ...roleHeader("operator") } });

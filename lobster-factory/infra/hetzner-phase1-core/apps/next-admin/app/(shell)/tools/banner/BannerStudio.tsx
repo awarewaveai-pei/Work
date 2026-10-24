@@ -990,7 +990,8 @@ function StepCard({
 // (BannerStudioStaff.tsx); without them the AI copy card and the brand picker do not render (step-8 card §6 D-V2/D-V3).
 export interface BannerStaffApi {
   /** The text model's streamed answer to `prompt` (the script-forge response). */
-  scriptForge(prompt: string): Promise<Response>;
+  /** One task of the server's banner module (lib/script-forge/modules.ts): the prompt is built there, not here. */
+  scriptForge(task: "design" | "copy", fields: Record<string, unknown>): Promise<Response>;
   brandClients(): Promise<{ slug: string; name: string; colors: string[] }[]>;
 }
 
@@ -1088,24 +1089,8 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
     if (!s.copyBrief.trim()) return;
     setS((prev) => ({ ...prev, designing: true, error: null }));
     try {
-      const prompt =
-        `【AI Banner 一鍵設計】\n` +
-        `產品/活動：${s.copyBrief}\n` +
-        `平台尺寸：${p.label} ${p.w}×${p.h}\n\n` +
-        `扮演國際級轉換廣告設計師，設計一張「會讓訪客點擊下單」的 banner。輸出純 JSON（無 markdown 包裹），欄位全部選填、能填則填：\n` +
-        `{"headline":"主標，可用 **字** 包住要強調的重點字（例：省 **50%** 起）",` +
-        `"subtext":"副標或行動說明",` +
-        `"ctaText":"按鈕文字，例 立即選購","ctaBg":"#rrggbb","ctaTextColor":"#rrggbb",` +
-        `"badgeText":"促銷徽章（不需要可空字串）","badgeStyle":"ribbon|pill|burst","badgeColor":"#rrggbb","badgePos":"tl|tr",` +
-        `"showPrice":true,"priceNow":"NT$590","priceWas":"NT$890",` +
-        `"trustType":"none|stars|reviews|guarantee","trustStars":5,"trustText":"12,000+ 則好評",` +
-        `"textColor":"#rrggbb","accentColor":"#rrggbb","accentHighlight":false,` +
-        `"textPos":"top|center|bottom","textAlignH":"left|center|right","textScrim":true,"textOutline":true,` +
-        `"bgMode":"gradient","gradFrom":"#rrggbb","gradTo":"#rrggbb",` +
-        `"aiBgSubject":"英文場景描述(供 AI 生背景)","aiBgVibe":"英文氛圍"}\n\n` +
-        `配色和諧、對比足夠、CTA 醒目；文字用繁體中文；只輸出 JSON。`;
       if (!staff) return;
-      const res = await staff.scriptForge(prompt);
+      const res = await staff.scriptForge("design", { brief: s.copyBrief, label: p.label, w: p.w, h: p.h });
       if (!res.ok || !res.body) throw new Error(`設計生成失敗（${res.status}）`);
       const reader = res.body.getReader();
       const dec = new TextDecoder();
@@ -1276,19 +1261,8 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
     setS((prev) => ({ ...prev, copyGenerating: true, copyVariants: [], copyStream: "", error: null }));
     try {
       const platform = p.group === "wp" ? "WP 網站 Banner" : "社交媒體貼文圖";
-      const prompt =
-        `【Banner 文案生成】\n` +
-        `用途：${platform} · ${p.label} (${p.w}×${p.h})\n` +
-        `語氣風格：${s.copyTone}\n` +
-        `產品/服務描述：${s.copyBrief}\n\n` +
-        `請生成 5 組 banner 文案，每組包含：\n` +
-        `- headline：主標題，簡潔有力，8-15 字\n` +
-        `- subtext：副標題或行動呼籲（CTA），10-25 字\n\n` +
-        `輸出純 JSON，不含任何 markdown 包裹：\n` +
-        `{"variants":[{"headline":"...","subtext":"..."},{"headline":"...","subtext":"..."},{"headline":"...","subtext":"..."},{"headline":"...","subtext":"..."},{"headline":"...","subtext":"..."}]}`;
-      const langified = `【預設輸出語言：繁體中文】未另行指定時，所有文字請用繁體中文；JSON key 保持英文。\n\n${prompt}`;
       if (!staff) return;
-      const res = await staff.scriptForge(langified);
+      const res = await staff.scriptForge("copy", { platform, label: p.label, w: p.w, h: p.h, tone: s.copyTone, brief: s.copyBrief });
       if (!res.ok || !res.body) throw new Error(`文案生成失敗（${res.status}）`);
       const reader = res.body.getReader();
       const dec    = new TextDecoder();
