@@ -8,7 +8,7 @@
  * privilege-escalation hole, not a cosmetic bug.
  */
 import { describe, it, expect } from "vitest";
-import { requireClientOrg, PortalAccessError, effectiveOrgId, OrgAccessError } from "../tenant-guard";
+import { requireClientOrg, PortalAccessError, effectiveOrgId, OrgAccessError, orgIdentity, canAccessOrg } from "../tenant-guard";
 
 const ORG = "aaaaaaaa-0000-4000-8000-00000000000a";
 const ORG2 = "bbbbbbbb-0000-4000-8000-00000000000b";
@@ -100,5 +100,17 @@ describe("effectiveOrgId — client callers are unaffected by the uuid guard", (
   it("still throws OrgAccessError for a client account with no org binding (unchanged pre-existing behavior)", () => {
     const clientReq = req({ "x-ops-user-kind": "client" });
     expect(() => effectiveOrgId(clientReq, ORG)).toThrow(OrgAccessError);
+  });
+});
+
+describe("orgIdentity -- a server job acting for one organization", () => {
+  it("passes the organization check for that organization only, never as staff", () => {
+    const id = orgIdentity(ORG);
+    expect(canAccessOrg(id, ORG)).toBe(true);
+    expect(canAccessOrg(id, ORG2)).toBe(false);
+    expect(effectiveOrgId(id, ORG2)).toBe(ORG);
+  });
+  it("refuses an empty organization", () => {
+    expect(() => orgIdentity("")).toThrow("orgIdentity");
   });
 });

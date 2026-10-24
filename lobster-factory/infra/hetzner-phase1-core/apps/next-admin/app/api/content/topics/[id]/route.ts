@@ -32,7 +32,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (t.version !== version) return NextResponse.json({ ok: false, error: "changed elsewhere; reload", topic: t }, { status: 409 });
     const moved = action === "formats"
       ? await setFormats(sb, t, Array.isArray(b.formats) ? b.formats.filter((f): f is TopicFormat => (TOPIC_FORMATS as readonly string[]).includes(f as string)) : [])
-      : await move(sb, t, TARGET[action], action === "retry" ? { last_error: null } : {});
+      : await move(sb, t, TARGET[action], action === "retry" || action === "approve" ? { last_error: null } : {});
     if (!moved) return NextResponse.json({ ok: false, error: "changed elsewhere; reload" }, { status: 409 });
     return NextResponse.json({ ok: true, topic: moved });
   } catch (e) {

@@ -1,4 +1,35 @@
 # Worklog
+## 2026-10-24（續29）AUTO_CONTENT P4 第一批：內容管線排程（草稿＋規則審核，不發布）、每 5 分鐘頻率、「核准並開始」、主機時鐘腳本；0122 寫好未套（Claude）
+
+**觸發**：操作者對 P4 三個待決說「你決定」→ D5 N=2、D6 主機 cron、D8 採用（`agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md` §0）。
+**根因（為何要這批）**：題目佇列（P3）只能人工推；文章管線 `NA/lib/content/pipeline.ts` 無排程呼叫、publish 積木要 Request（`blocks/publish-wordpress.ts:35-43`）、run-due 只會 daily/weekly（`lib/schedules/schedule.ts:33`）。
+
+**做法**（NA＝`lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- I7 身分：`NA/lib/tenant-guard.ts orgIdentity`（client 身分；外來同名 header 由 `middleware.ts:22,303` 剝除）＋`NA/lib/entitlements/grant.ts runForOrg`（無 Request 的工作在 fn 內 grantFor 記該客戶、具名 actor）。積木與 publish core 零改。
+- 頻率：`schedule.ts` `Frequency` 型別一處；every_5m due＝lastRunAt 空或 ≥4.5 分；run key 帶 5 分鐘槽 `HHmm`。
+- P4.3 取消：prod `cs_ai_replies` 30 天 27/27 由 after() 完成 → run-due 維持 claim→回應→after()（等待會讓 10 分鐘爬取撐破 curl 逾時）。
+- 狀態機 `NA/lib/content/topics/tick.ts`：generating>30 分＝中斷→failed；drafted→reviewed（含影片格式者留 drafted 等 P6）；due approved 依每日上限 2 開始（0121 RPC）→ `makeStarted`。製作 `make.ts`：文章積木→meta（新 `lib/content/article/meta.ts`）→quality+publish 積木（draft、orgIdentity）；社群 `writeSocialPosts`→`savePost` 一則草稿；每個部分做完即帶自己的檢查存 `artifacts.article|social`（`review.ts articleChecks/socialChecks`：完整、字數≥1000、SEO 綠燈、社群、禁用說法），題目 `review`＝全部檢查；失敗丟 `MakeError` 帶已做部分、failed 列保留，重試跳過已做部分（不重寫第二篇 WP 草稿）；開始前 `blocker` 查網站（不在／停用／他客戶→退回 proposed＋原因，不佔每日名額）。
+- job `content_pipeline`（`lib/schedules/jobs.ts`，每 5 分鐘，cost 句由 `topics/cost.ts topicCostUsd`；無 WP 站＝unavailable，`view.ts` 數 wp_sites）。
+- 「核准並開始」`NA/app/api/content/topics/[id]/start/route.ts`（withFeature：有文章＝content.article，社群-only＝content.syndicate；org＝題目客戶；計入每日上限；製作在 after() 以按的人為 actor）；題目頁顯示審核結果與草稿連結。
+- `lib/social/write-posts-claude.ts claudeWriter`：社群寫手的 Claude client 抽出，syndicate 與管線共用。
+- 主機時鐘 `HOST/schedules-run-due.sh`＋`cron.d/awarewave-schedules` `*/5` 行＋`host-jobs.ts schedules_run_due`；**未安裝**（High，待操作者 go；`sg-deploy` 不跑 install-host-schedules）。
+- 0122 `packages/db/migrations/0122_content_topics_site_org.sql`（+down、scripts copy、local-verify）：wp_sites unique (id, organization_id)＋複合 FK on delete set null (site_id)；db-expert：0c/0M/1m（先鎖兩表，已改）。**未 commit、未套**：commit 上 main 而 prod 未套＝`sg-deploy.sh:185-209` 擋當晚部署；等操作者 go 後同一步套＋推。
+- 延後（P4 第二批）：自動發布（I5）＋站別 publishMode 按鈕（P4.8）同批上，設定與行為一起。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/portal lib/entitlements app/api lib/content lib/social lib/schedules lib/__tests__ | exit=0 | ms=0（173 檔 1257 綠；未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash lobster-factory/packages/db/scripts/0122_content_topics_site_org-local-verify.sh | exit=0 | ms=7032（postgres:15.8：跨客戶站／無主站／改站所屬／刪站／down／重套）
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql 唯讀：client_schedules 3 列全未啟用；cs_ai_replies 30 天 27/27 completed；content_topics 0 列、FK 名稱；.env 與容器皆有 SCHEDULE_INGEST_TOKEN（只數不印） | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p . | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/7m/0n（另駁回 1）
+  - Codex `agency-os/reports/oracle/2026-10-24-partialreview-8f6e8db3.md`（files-reviewed 含全部新檔）：M1 meta regex 的 `\s` 在 template literal 被吃掉（僅靠 trim 碰巧可用）→ 改 `\\s`＋緊接冒號的測試；M2 `dueApproved` limit 在格式過濾前→改查詢內 `overlaps`；M3 社群失敗後重試會重寫 WP 草稿→部分保留；M4 網站被刪仍佔每日名額→`blocker` 先查；F5（腳本無執行權）駁回：`HOST/sync-host-scripts.sh:59,72` 部署時 chmod 全部 .sh。
+  - Codex 複審 `2026-10-24-partialreview-a25cb568.md`：M5 社群-only 題目被 content.article 擋→依格式選 feature（route-features 列兩鍵）；M6 題目頁價格不看格式→`topicCostTwd(formats)`。確認 `2026-10-24-partialreview-6ccacc43.md`：M7 開始按鈕提示句寫死「WordPress 草稿和社群草稿」→同類第三次（價格、feature、提示句都沒跟格式）→不變量：開始路徑上每句話都由題目 formats 導出；已掃該路徑全部文字（TopicsBoard 提示、價格、jobs.ts 描述）。
+  - db-expert（0122）：0c/0M/1m（先鎖兩表，已改）。
+  - 頁面實測：dev server 3902＋假 API（scratchpad `topics-p4-check.mjs`）：文章-only 題目按鈕「核准並開始（約 NT$5.8）」、提示「立刻做成 WordPress 草稿…」、POST `/t1/start` {version}；已審核題目顯示「規則審核：沒通過」與四項、草稿連結正確、無開始鈕。
+- ORACLE_WAIVED: 6ccacc43 之後只改 TopicsBoard 提示句／價格顯示與 jobs.ts 描述句（照 M7 修，無邏輯），已實測渲染
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude/commands,.claude/agents | grep=scheduledRunKey\(|"daily" \| "weekly"|runForOrg\(|orgIdentity\(|claudeWriter\(|JobClientFacts | hits=30（舊型別只剩 schedule.ts 定義；兩處舊註解「只有 Trigger 每小時呼叫」已改：run-due/route.ts 檔頭、schedule.ts isDueNow）
+
+**rollback**：`git revert <本 commit>`（job 未啟用、主機時鐘未裝＝無執行路徑）；0122 未套。
 ## 2026-10-24（續28）design 產品門頁建好（enabled:false，四頁＋門選單）；「開到畫布」改依門決定目標——修掉已上線 tarot 門的 404 按鈕（Claude）
 
 **觸發**：操作者「繼續做」；卡 `cards/step-8-doors-video-design-content.md` §4.5（S1 注入、D-R1 presets 已完成）。

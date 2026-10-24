@@ -10,6 +10,7 @@ export const ROUTE_FEATURES: Readonly<Record<string, string | readonly string[]>
   "/api/content/keywords": "content.keywords",
   "/api/content/market-analysis": "content.market-analysis",
   "/api/content/topics/plan": "content.plan",
+  "/api/content/topics/[id]/start": ["content.article", "content.syndicate"],
   "/api/content/outline": "content.outline",
   "/api/content/seo-fix": "content.seo-fix",
   "/api/content/syndicate": "content.syndicate",

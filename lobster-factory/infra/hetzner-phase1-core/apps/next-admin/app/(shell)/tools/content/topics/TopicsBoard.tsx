@@ -4,7 +4,10 @@
 // /api/content/topics*, which checks the site's organization; a stale page gets 409 and reloads.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { NEXT, TOPIC_FORMATS, type Topic, type TopicFormat, type TopicStatus } from "@/lib/content/topics/store";
-import { planCostTwd } from "@/lib/content/topics/cost";
+import { planCostTwd, topicCostTwd } from "@/lib/content/topics/cost";
+import { DAILY_START_CAP, makesNow } from "@/lib/content/topics/tick";
+import type { TopicReview } from "@/lib/content/topics/review";
+import type { TopicArtifacts } from "@/lib/content/topics/make";
 
 const T = {
   noSites: "還沒有可用的客戶網站，先到 WordPress Sites 加一個。",
@@ -27,6 +30,12 @@ const T = {
   reload: "有人剛改過，已重新載入。",
   kbHint: "從知識庫的資料夾加題目（點一下會填進上面）：",
   fromKb: "來源：知識庫",
+  start: "核准並開始",
+  started: "已開始製作，約 2 分鐘後按上個月／下個月再回來就看得到草稿。",
+  // what starting makes follows the topic's formats, like its price (topicCostTwd)
+  startHint: (f: TopicFormat[]) => `立刻做成 ${[f.includes("article") && "WordPress 草稿", f.includes("social") && "社群草稿"].filter(Boolean).join("和")}，不會發布；每天最多開始 ${DAILY_START_CAP} 題。`,
+  review: "規則審核",
+  wpDraft: "打開 WordPress 草稿",
 };
 /** A search-run folder is named "<keyword> <YYYYMMDDHHmm>" (lib/collect/sinks/kb.ts); the keyword is the topic. */
 const folderKeyword = (name: string) => name.replace(/\s*\d{12}$/, "").trim() || name;
@@ -125,6 +134,16 @@ export function TopicsBoard() {
     if (!sel) return;
     setBusy(true); setNote("");
     try { await act(sel, action, formats); } finally { await load(); setBusy(false); }
+  }
+
+  async function start() {
+    if (!sel) return;
+    setBusy(true); setNote("");
+    try {
+      const r = await fetch(`/api/content/topics/${sel.id}/start`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ version: sel.version }) });
+      const j = await r.json().catch(() => ({ ok: false })) as { ok: boolean; error?: string; code?: string };
+      setNote(j.ok ? T.started : (j.error ?? j.code ?? `失敗（${r.status}）`));
+    } finally { await load(); setBusy(false); }
   }
 
   async function plan() {
@@ -247,6 +266,27 @@ export function TopicsBoard() {
                 )}
               </div>
               {sel.last_error && <p style={{ margin: 0, fontSize: "var(--font-size-sm)", color: "var(--red)" }}>{T.error}：{sel.last_error}</p>}
+              {(() => {
+                const url = (sel.artifacts as TopicArtifacts).article?.wp_edit_url;
+                return typeof url === "string" && /^https:\/\//.test(url)
+                  ? <a href={url} target="_blank" rel="noreferrer" style={{ fontSize: "var(--font-size-sm)" }}>{T.wpDraft}</a> : null;
+              })()}
+              {sel.review && (
+                <div style={{ display: "grid", gap: 4, fontSize: "var(--font-size-sm)" }}>
+                  <div>{T.review}：<span style={{ color: (sel.review as TopicReview).pass ? "var(--green)" : "var(--red)" }}>{(sel.review as TopicReview).pass ? "通過" : "沒通過"}</span></div>
+                  {((sel.review as TopicReview).checks ?? []).map((c) => (
+                    <div key={c.name} style={{ color: c.pass ? "var(--text-muted)" : "var(--red)" }}>{c.pass ? "✓" : "✗"} {c.detail}</div>
+                  ))}
+                </div>
+              )}
+              {["proposed", "approved"].includes(sel.status) && makesNow(sel) && (
+                <div style={{ display: "grid", gap: 4 }}>
+                  <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void start()} style={{ whiteSpace: "normal" }}>
+                    {T.start}（約 NT${topicCostTwd(sel.formats).usual}{topicCostTwd(sel.formats).max > topicCostTwd(sel.formats).usual ? `，最多 NT$${topicCostTwd(sel.formats).max}` : ""}）
+                  </button>
+                  <span style={{ fontSize: "var(--font-size-xs)", color: "var(--text-muted)" }}>{T.startHint(sel.formats)}</span>
+                </div>
+              )}
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {(ACTION_FOR[sel.status] ?? []).filter(([a]) => a !== "approve" || NEXT[sel.status].includes("approved")).map(([a, label]) => (
                   <button key={a} type="button" className="btn btn-secondary" disabled={busy} onClick={() => void one(a)}>{label}</button>

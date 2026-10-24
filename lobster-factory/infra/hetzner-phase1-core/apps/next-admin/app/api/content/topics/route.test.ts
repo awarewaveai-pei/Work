@@ -78,7 +78,7 @@ describe("PATCH /api/content/topics/[id]", () => {
   it("approves at the version the page showed", async () => {
     m.move.mockResolvedValue({ id: "t1", status: "approved", version: 3 });
     expect((await PATCH(req("/api/content/topics/t1", STAFF, "PATCH", { action: "approve", version: 2 }), idParams)).status).toBe(200);
-    expect(m.move).toHaveBeenCalledWith({}, m.topic, "approved", {});
+    expect(m.move).toHaveBeenCalledWith({}, m.topic, "approved", { last_error: null });   // a topic sent back with a reason is approved clean
   });
 
   it("a stale page is 409; another organization's topic is 404; neither writes", async () => {

@@ -214,3 +214,13 @@ export function effectiveOrgId(
   }
   return trimmed;
 }
+
+/**
+ * The identity a server job uses when it works for one organization (lib/content/topics/tick.ts): it reads as a client
+ * of that organization, so every existing check (canAccessOrg, resolveWpSite) lets it reach that organization's data
+ * and nothing else. Built in server code only; middleware strips these headers from every incoming request.
+ */
+export function orgIdentity(organizationId: string): { headers: Headers } {
+  if (!organizationId) throw new Error("orgIdentity: organizationId required");
+  return { headers: new Headers({ [HEADER_USER_KIND]: "client", [HEADER_ORG_ID]: organizationId }) };
+}

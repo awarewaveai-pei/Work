@@ -12,10 +12,10 @@
 | D2 | ScriptForge 腳本歷史維持瀏覽器 localStorage | 非管線路徑，不為它多一表 |
 | D3 | 影片階段 P6 在 P4 上線一週後開工 | 先驗證文章＋社群閉環 |
 | D4 | YouTube 走社群產品（Postiz youtube provider），等 Google OAuth app 審核（人工） | 需求 6.3：全部社群含 YouTube 統一在 social |
-| D5 | 自動化開關＝`/ops/schedules` 的 `content_pipeline` 格，每站一格，預設關 | AGENTS §0 自動化預設 OFF |
-| D6 | 時鐘＝主機 cron 每 5 分鐘呼叫既有 `/api/internal/schedules/run-due`；不加 Trigger task、不加第二條 cron 專線 | 操作者 2026-10-24：盡量不外接；SCHEDULES_PAGE_PLAN §3.3 反對第三套排程 |
+| D5 | 自動化開關＝`/ops/schedules` 的 `content_pipeline` 格，每客戶一格，預設關；每客戶每 UTC 日最多開始 N=2 題（`NA/lib/content/topics/tick.ts DAILY_START_CAP`，操作者 2026-10-24 授權決定） | AGENTS §0 自動化預設 OFF；成本上限 |
+| D6 | 時鐘＝主機 cron 每 5 分鐘呼叫既有 `/api/internal/schedules/run-due`（`HOST/schedules-run-due.sh`）；不加 Trigger task、不加第二條 cron 專線；run-due 照舊 claim 後在 `after()` 跑（prod 證據：`cs_ai_replies` 30 天 27/27 由 after() 完成） | 操作者 2026-10-24：盡量不外接；SCHEDULES_PAGE_PLAN §3.3 反對第三套排程；等待會讓 10 分鐘的爬取撐破 curl 逾時 |
 | D7 | 範圍採 B（全部八階段）；A（P1–P4）＝第一個里程碑 | A 的卡＝B 的前四階段，零重工 |
-| D8 | 待定（db-expert M8）：資料庫層強制「題目的網站必須屬於同一個客戶」（wp_sites unique (id, organization_id)＋複合 FK）。現況：程式層已擋（POST 用網站自己的客戶、`move` 不能改 site_id）。代價：有題目引用的網站不能改所屬客戶 | 縱深防禦 vs 搬站彈性，產品取捨 |
+| D8 | 採用（操作者 2026-10-24「你決定」）：`DB/migrations/0122_content_topics_site_org.sql`＝`wp_sites unique (id, organization_id)`＋`content_topics (site_id, organization_id)` 複合 FK `on delete set null (site_id)`；有題目用的網站不能改所屬客戶（app 無此路徑）。套 prod 需操作者 go | 縱深防禦；代價實際為零 |
 
 ## 1. 任務理解
 
@@ -183,13 +183,13 @@
 | 卡 | 改 | 做 | 驗 | 突變 |
 |---|---|---|---|---|
 | P4.0 VBC | — | 查 prod `collection_runs` 最長時長、run-due `after()` 是否跑完；寫 WORKLOG | SSH／SQL | — |
-| P4.1 | `publish-wordpress.ts:35-43`；`wordpress-core.ts:316` | I7：`identity: {kind:"request",req} \| {kind:"org",organizationId,actor}`；org 身分只能發到 `wp_sites.organization_id` 相同的站；積木不再要 Request | 測：org 身分發他站→403；Request 路徑綠 | 拔 org 比對 → 測紅 |
+| P4.1 | `NA/lib/tenant-guard.ts orgIdentity`；`NA/lib/entitlements/grant.ts runForOrg` | I7：`orgIdentity(org)`＝該客戶的 client 身分（middleware 剝除外來同名 header，`middleware.ts:22,303`），既有 `resolveWpSite` 租戶檢查原樣生效，積木與 core 零改；`runForOrg(org, actor, fn)`＝無 Request 的工作在 fn 內 grantFor 一律記該客戶、具名 actor，指名他客戶被拒 | 測：org 身分發他站→403；Request 路徑綠 | 拔 org 比對 → 測紅 |
 | P4.2 | `schedule.ts:33-52`（CHECK 已在 P3.1） | `isDueNow`：`every_5m` 不看時／日，`lastRunAt` 空或 ≥4.5 分鐘前即 due；`scheduledRunKey` every_5m 帶 5 分鐘桶 `HHmm` | `lib/schedules/__tests__/schedule.test.ts` 固定時鐘 | 4.5 分改 0 → 雙 firing 測紅 |
-| P4.3 | `run-due/route.ts:100` | `await runClaimed(claimed)` 在回應前跑完（時鐘是 cron，不必早回）；`maxDuration` 300；`after()` 只留 claimReview；回應含每 job summary | `run-due/route.test.ts` 綠 | — |
+| P4.3 | — | 取消（見 D6）：run-due 維持 claim→回應→`after()` 跑；結果記在該格 `last_error`／營運收件匣 | — | — |
 | P4.4 | `HOST/install-maintenance-crons.sh`＋新 `HOST/schedules-run-due.sh` | cron `*/5 * * * *` curl `http://127.0.0.1:<next-admin port>/api/internal/schedules/run-due` 帶 `SCHEDULE_INGEST_TOKEN`（讀 `/root/lobster-phase1/.env`，照 `reconcile-videos.sh:16-30`）；log `/var/log/schedules-run-due.log`；失敗同款 Telegram 去重告警。驗綠一天後停用 Trigger `schedules-heartbeat`（重疊期 claim 去重）。High：主機 cron 變更，先說再做 | `sudo tail /var/log/schedules-run-due.log` 每 5 分一筆 JSON；`client_schedules.last_run_at` 更新；`host-loopback-callers.test.ts` 綠 | — |
 | P4.5 | `jobs.ts:34`＋新 `NA/lib/content/topics/tick.ts`＋測試 | job `content_pipeline`：`frequencies:[{value:"every_5m",label:"每 5 分鐘",usesHour:false,usesDay:false}]`；`cost` 句含 N 與每題估價；`unavailable`＝站無 organization_id。`run(org, runKey)`＝`tickContentTopics(org, {budgetMs:200_000, maxStartsPerDay:N})`：① `startableToday` → approved→generating；② `inProgress` 每列照 §3.2 推一步，每步前 claim；預算到即回 summary；單列失敗→failed 不中斷他列；job 本身 throw 只在 store 壞 | 測（假積木）：完整狀態機；中途 throw 下次續；預算到即停；N 上限；雙 firing 不重跑 | 拔 claim → 測紅；拔 N → 測紅 |
-| P4.6 | `tick.ts` 審核步 | I5：規則閘（無 `GENERATION_` 標記、`runSeoCheck` 分數 ≥ 門檻、`forbidden[]` 零命中、字數下限）→ 站設定開才加一次 Haiku 品牌符合度 → `review={pass,checks[],at}`；`publishMode=ai_review_auto` 且 pass → publish 積木 `publish|future`＋社群 `setState schedule`；否則停 reviewed | 測：human_review 永不出草稿；auto 但 fail 不發；auto 且 pass 發 | 拔規則閘 → 測紅 |
-| P4.7 | `/api/content/topics/[id]/start` | 「核准並開始」：核准後對該列同步跑 `tickContentTopics` 一步（意圖當下做，時鐘補尾；同 social `publish_now` 形狀 `state.ts:66`）；計入當日 N | e2e：按下後 WP 立刻有草稿 | — |
+| P4.6 | `NA/lib/content/topics/review.ts`＋`make.ts`；自動發布＝P4 第二個 commit（與 P4.8 同批，設定與行為一起上） | I5：規則閘（無 `GENERATION_` 標記、`runSeoCheck` 分數 ≥ 門檻、`forbidden[]` 零命中、字數下限）→ 站設定開才加一次 Haiku 品牌符合度 → `review={pass,checks[],at}`；`publishMode=ai_review_auto` 且 pass → publish 積木 `publish|future`＋社群 `setState schedule`；否則停 reviewed | 測：human_review 永不出草稿；auto 但 fail 不發；auto 且 pass 發 | 拔規則閘 → 測紅 |
+| P4.7 | `NA/app/api/content/topics/[id]/start/route.ts`（withFeature：有文章＝content.article、社群-only＝content.syndicate；開始前查網站，不佔名額；製作在 after() 以按的人為 actor） | 「核准並開始」：核准後對該列同步跑 `tickContentTopics` 一步（意圖當下做，時鐘補尾；同 social `publish_now` 形狀 `state.ts:66`）；計入當日 N | e2e：按下後 WP 立刻有草稿 | — |
 | P4.8 | 站別管理頁（`SiteManager`） | `publishMode` 兩顆按鈕（人審／AI 審核自動發）預設人審；`/ops/schedules` 格自動出現（`ScheduleTable.tsx:273-289` 依 usesHour/usesDay 隱藏時間） | PATCH 持久；截圖 | — |
 
 ### P5 ScriptForge 獨立頁＋伺服器模組登記（卡寫死 → Sonnet／Codex；blurb → data-filler）

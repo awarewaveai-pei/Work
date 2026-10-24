@@ -4,7 +4,7 @@
 // "could not read" (that is how automation silently stops while the heartbeat stays green).
 
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import type { Schedule } from "@/lib/schedules/schedule";
+import type { Frequency, Schedule } from "@/lib/schedules/schedule";
 
 export interface StoredSchedule extends Schedule {
   organizationId: string;
@@ -20,7 +20,7 @@ interface Row {
   organization_id: string;
   job_key: string;
   enabled: boolean;
-  frequency: "daily" | "weekly";
+  frequency: Frequency;
   hour_utc: number;
   day_of_week_utc: number;
   last_run_at: string | null;
@@ -74,7 +74,7 @@ export interface UpsertScheduleInput {
   organizationId: string;
   jobKey: string;
   enabled: boolean;
-  frequency: "daily" | "weekly";
+  frequency: Frequency;
   hourUtc: number;
   dayOfWeekUtc: number;
   /** "role:source", same shape as collection_sources.approved_by. */

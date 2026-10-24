@@ -5,6 +5,7 @@
 // Body: { enabled, frequency, hourUtc, dayOfWeekUtc } (+ expectedVersion for site_watch; 409 on a
 // concurrent edit). owner/admin only, every write audited. The table reloads its view after a write.
 
+import type { Frequency } from "@/lib/schedules/schedule";
 import { NextResponse } from "next/server";
 import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
@@ -48,7 +49,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
       organizationId: orgId,
       jobKey: job.key,
       enabled: body.enabled === true,
-      frequency: frequency as "daily" | "weekly",
+      frequency: frequency as Frequency,
       hourUtc: Number.isInteger(body.hourUtc) ? (body.hourUtc as number) : job.defaults.hourUtc,
       dayOfWeekUtc: Number.isInteger(body.dayOfWeekUtc) ? (body.dayOfWeekUtc as number) : job.defaults.dayOfWeekUtc,
       updatedBy: `${resolved.role}:${resolved.source}`,

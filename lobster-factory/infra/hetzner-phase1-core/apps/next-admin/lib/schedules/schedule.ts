@@ -6,9 +6,12 @@
 // day encoding: JS Date#getUTCDay() (0=Sunday..6=Saturday) here and in the table -- one encoding, no
 // translation table to get off by one.
 
+/** client_schedules.frequency (0097; every_5m since 0121). */
+export type Frequency = "daily" | "weekly" | "every_5m";
+
 export interface Schedule {
   enabled: boolean;
-  frequency: "daily" | "weekly";
+  frequency: Frequency;
   hourUtc: number;
   /** Only consulted when frequency === "weekly". */
   dayOfWeekUtc: number;
@@ -21,17 +24,23 @@ function isSameUtcDate(a: Date, b: Date): boolean {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** every_5m: a firing less than this after the last one is the same firing seen twice (cron and heartbeat overlap). */
+const EVERY_5M_GAP_MS = 4.5 * 60 * 1000;
 
 /**
  * True exactly during the one hour, once per cadence, that this schedule should fire.
  *
- * Called from an hourly heartbeat (Trigger.dev cron, `0 * * * *`), so "current UTC hour equals
+ * Called every 5 minutes (host cron; the hourly Trigger.dev heartbeat until retired), so "current UTC hour equals
  * hourUtc" is true for a whole hour — the lastRunAt check is what stops a heartbeat that fires
  * twice in the same hour (a retry, a redeploy overlap) from running the crawl twice. It is deliberately
  * NOT millisecond-precise: a schedule set for hour 3 and checked at 03:47 is still due.
  */
 export function isDueNow(schedule: Schedule, now: Date): boolean {
   if (!schedule.enabled) return false;
+  if (schedule.frequency === "every_5m") {
+    const last = schedule.lastRunAt ? new Date(schedule.lastRunAt).getTime() : NaN;
+    return Number.isNaN(last) || now.getTime() - last >= EVERY_5M_GAP_MS;
+  }
   if (now.getUTCHours() !== schedule.hourUtc) return false;
   if (schedule.frequency === "weekly" && now.getUTCDay() !== schedule.dayOfWeekUtc) return false;
   if (!schedule.lastRunAt) return true;
@@ -45,10 +54,14 @@ export function isDueNow(schedule: Schedule, now: Date): boolean {
   return now.getTime() - last.getTime() >= 6 * DAY_MS;
 }
 
-/** A stable run key for one scheduled firing — `scheduled-<job>-<org 8 chars>-<UTC date>`. */
-export function scheduledRunKey(organizationId: string, jobKey: string, now: Date): string {
+/** A stable run key for one scheduled firing — `scheduled-<job>-<org 8 chars>-<UTC date>`, plus the 5-minute
+ *  slot `HHmm` for every_5m (the claim then allows one run per slot instead of one per day). */
+export function scheduledRunKey(organizationId: string, jobKey: string, now: Date, frequency: Frequency = "daily"): string {
   const date = now.toISOString().slice(0, 10).replace(/-/g, "");
-  return `scheduled-${jobKey}-${organizationId.slice(0, 8)}-${date}`;
+  const slot = frequency === "every_5m"
+    ? `-${String(now.getUTCHours()).padStart(2, "0")}${String(now.getUTCMinutes() - (now.getUTCMinutes() % 5)).padStart(2, "0")}`
+    : "";
+  return `scheduled-${jobKey}-${organizationId.slice(0, 8)}-${date}${slot}`;
 }
 
 /** Taipei is UTC+8 all year (no DST). The table shows and edits Taipei time; the row stores UTC. */

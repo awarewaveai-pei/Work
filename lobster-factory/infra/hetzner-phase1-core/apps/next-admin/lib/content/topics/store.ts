@@ -150,3 +150,21 @@ export async function startedOn(sb: SupabaseClient, organizationId: string, day:
   if (error) fail("started_on", error);
   return count ?? 0;
 }
+
+/** What a sweep may start now: approved, its day reached or none set, making one of `formats`, earliest first. The format
+ *  filter is in the query, before the limit: topics nobody can make yet must not fill the page and hide the rest. */
+export async function dueApproved(sb: SupabaseClient, organizationId: string, now: Date, formats: TopicFormat[], limit = 10): Promise<Topic[]> {
+  const { data, error } = await sb.from("content_topics").select("*")
+    .eq("organization_id", organizationId).eq("status", "approved").overlaps("formats", formats)
+    .or(`scheduled_for.is.null,scheduled_for.lte.${now.toISOString()}`)
+    .order("scheduled_for", { ascending: true, nullsFirst: true }).limit(limit);
+  if (error) fail("due", error);
+  return (data ?? []) as Topic[];
+}
+
+/** A brand's topics in these statuses (the sweep's in-progress rows). */
+export async function inStatus(sb: SupabaseClient, organizationId: string, statuses: TopicStatus[]): Promise<Topic[]> {
+  const { data, error } = await sb.from("content_topics").select("*").eq("organization_id", organizationId).in("status", statuses);
+  if (error) fail("in_status", error);
+  return (data ?? []) as Topic[];
+}

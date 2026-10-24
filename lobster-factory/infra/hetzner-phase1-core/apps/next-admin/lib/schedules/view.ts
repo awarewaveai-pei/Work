@@ -27,11 +27,15 @@ export async function loadSchedulesView(sb: SupabaseClient, opts: { slug?: strin
   if (opts.slug && !orgs.length) return null;
 
   const stored = await listSchedules(opts.slug ? orgs[0].id : undefined);
+  const sites = await sb.from("wp_sites").select("organization_id").eq("active", true).in("organization_id", orgs.map((o) => o.id));
+  if (sites.error) throw new Error(`schedules_db:wp_sites:${sites.error.message}`);
+  const wpSites = new Map<string, number>();
+  for (const s of (sites.data ?? []) as Array<{ organization_id: string }>) wpSites.set(s.organization_id, (wpSites.get(s.organization_id) ?? 0) + 1);
   const cells: ScheduleCell[] = [];
   for (const job of CLIENT_JOBS) {
     for (const org of orgs) {
       const row = stored.find((s) => s.organizationId === org.id && s.jobKey === job.key);
-      const unavailable = job.unavailable?.({ siteUrl: org.site_url, chatwoot: org.chatwoot }) ?? null;
+      const unavailable = job.unavailable?.({ siteUrl: org.site_url, chatwoot: org.chatwoot, wpSites: wpSites.get(org.id) ?? 0 }) ?? null;
       cells.push(
         row
           ? { ...row, stored: true, version: null, unavailable }

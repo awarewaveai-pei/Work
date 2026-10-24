@@ -1,9 +1,8 @@
-import { CLAUDE_FAST_MODEL, claudeParams, loadAnthropic } from "@/lib/ai/gateway";
 import type { Grant } from "@/lib/entitlements/can";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
-import { logAiCall } from "@/lib/ai/log-ai-call";
-import { textCallCostUsd, resolveTextRate } from "@/lib/ai/cost-calculator";
+import { resolveTextRate } from "@/lib/ai/cost-calculator";
+import { claudeWriter } from "@/lib/social/write-posts-claude";
 import { isWriterKey, writeSocialPosts, WriterParseError, type WriterKey } from "@/lib/social/write-posts";
 import { siteVoiceFor } from "./brand-voice-store";
 
@@ -44,25 +43,12 @@ async function handlePost(req: Request, grant: Grant, route: string): Promise<Re
   catch (e) { console.error("[syndicate] brand voice lookup failed:", e); return new NextResponse("brand voice lookup failed", { status: 500 }); }
   if (voice === null) return new NextResponse("site not found", { status: 404 });
 
-  const Anthropic = await loadAnthropic(grant);
-  const client = new Anthropic({ apiKey });
-  let usd = 0;
-  let model = "";
-  const ask = async (prompt: string): Promise<string> => {
-    const msg = await client.messages.create({
-      ...claudeParams(CLAUDE_FAST_MODEL, 2000, "medium", { thinking: "off" }),
-      messages: [{ role: "user", content: prompt }],
-    });
-    void logAiCall({ route, response: msg, actorRole: role });
-    model = msg.model;
-    usd += textCallCostUsd({ model: msg.model, inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens, cacheReadTokens: msg.usage.cache_read_input_tokens, cacheWriteTokens: msg.usage.cache_creation_input_tokens });
-    return msg.content[0]?.type === "text" ? msg.content[0].text.trim() : "{}";
-  };
+  const { ask, spent } = await claudeWriter(grant, apiKey, route, role);
 
   try {
     const articleUrl = typeof body.articleUrl === "string" ? body.articleUrl.trim() : "";
     const { posts, tooLong, missing } = await writeSocialPosts({ article, keys, mediaType, articleUrl, voice }, ask);
-    return NextResponse.json({ ok: true, posts, tooLong, missing, _cost: { usd, model, vendor: resolveTextRate(model).rate.vendor } });
+    return NextResponse.json({ ok: true, posts, tooLong, missing, _cost: { usd: spent.usd, model: spent.model, vendor: resolveTextRate(spent.model).rate.vendor } });
   } catch (e) {
     if (e instanceof WriterParseError) return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
     throw e;

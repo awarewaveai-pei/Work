@@ -57,6 +57,19 @@ export async function grantFor(featureKey: string, ctx: GrantContext = {}): Prom
   return grant;
 }
 
+/**
+ * A server job with no request (a schedule) that works for one organization: every grantFor inside `fn` bills that
+ * organization as `actor`, the way withFeature scopes a request. Naming another organization inside is refused (the
+ * actor is not "system", so evaluate treats it as a caller bound to this org). Never call it with an org taken from
+ * user input: its caller must already know the work belongs to `organizationId`.
+ */
+export async function runForOrg<T>(organizationId: string, actor: string, fn: () => Promise<T>,
+  opts: { deps?: GateDependencies; subjects?: SubjectStore } = {}): Promise<T> {
+  if (!organizationId || !actor || actor === "system") throw new Error("runForOrg: organizationId and a named actor required");
+  const subject = await resolveSubject({ orgId: organizationId }, opts.subjects);
+  return scope.run({ subject, actor, org: organizationId, grants: new Map(), deps: opts.deps, subjects: opts.subjects }, fn);
+}
+
 export interface FeatureOptions<R, C> {
   deps?: GateDependencies;
   subjects?: SubjectStore;

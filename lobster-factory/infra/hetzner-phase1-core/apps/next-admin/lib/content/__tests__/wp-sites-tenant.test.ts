@@ -10,7 +10,7 @@ const { getSupabaseWriteClient } = vi.hoisted(() => ({ getSupabaseWriteClient: v
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient }));
 
 import { resolveWpSite, listAccessibleWpSites } from "../wp-sites";
-import { OrgAccessError } from "@/lib/tenant-guard";
+import { OrgAccessError, orgIdentity } from "@/lib/tenant-guard";
 
 const ORG_A = "aaaaaaaa-0000-4000-8000-00000000000a";
 const ORG_B = "bbbbbbbb-0000-4000-8000-00000000000b";
@@ -48,6 +48,12 @@ describe("resolveWpSite — 租戶邊界", () => {
 
   it("client 指定別人的站 → 拋 OrgAccessError（呼叫端轉 403）", async () => {
     await expect(resolveWpSite(clientA, "site-b")).rejects.toBeInstanceOf(OrgAccessError);
+  });
+
+  it("排程以客戶身分（orgIdentity）只能發到該客戶自己的站", async () => {
+    expect((await resolveWpSite(orgIdentity(ORG_A), "site-a"))?.site.id).toBe("site-a");
+    await expect(resolveWpSite(orgIdentity(ORG_A), "site-b")).rejects.toBeInstanceOf(OrgAccessError);
+    await expect(resolveWpSite(orgIdentity(ORG_A), "site-x")).rejects.toBeInstanceOf(OrgAccessError);
   });
 
   it("client 指定無主站（organization_id 為 null）→ 擋下，fail-closed", async () => {

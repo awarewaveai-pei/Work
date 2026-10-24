@@ -56,6 +56,26 @@ describe("isDueNow", () => {
   });
 });
 
+describe("every_5m (the host cron calls run-due every 5 minutes)", () => {
+  const five: Schedule = { ...base, frequency: "every_5m", hourUtc: 0 };
+  it("ignores hour and day, and is due with no prior run", () => {
+    expect(isDueNow(five, new Date("2026-09-15T17:40:00Z"))).toBe(true);
+  });
+  it("a firing within 4.5 minutes of the last run is the same firing seen twice", () => {
+    const ran = { ...five, lastRunAt: "2026-09-15T17:40:10Z" };
+    expect(isDueNow(ran, new Date("2026-09-15T17:43:00Z"))).toBe(false);
+    expect(isDueNow(ran, new Date("2026-09-15T17:45:00Z"))).toBe(true);
+  });
+  it("the run key names the 5-minute slot, so the claim allows one run per slot", () => {
+    const org = "aaaaaaaa-0000-4000-8000-000000000001";
+    const k = (t: string) => scheduledRunKey(org, "content_pipeline", new Date(t), "every_5m");
+    expect(k("2026-09-15T17:40:00Z")).toBe("scheduled-content_pipeline-aaaaaaaa-20260915-1740");
+    expect(k("2026-09-15T17:44:59Z")).toBe(k("2026-09-15T17:40:00Z"));
+    expect(k("2026-09-15T17:45:00Z")).not.toBe(k("2026-09-15T17:44:59Z"));
+    expect(scheduledRunKey(org, "collect_crawl", new Date("2026-09-15T17:40:00Z"))).toBe("scheduled-collect_crawl-aaaaaaaa-20260915");
+  });
+});
+
 describe("Taipei <-> UTC (the table edits Taipei time, the row stores UTC)", () => {
   it("Monday 03 UTC is Monday 11 Taipei; Sunday 20 UTC is Monday 04 Taipei", () => {
     expect(taipeiFromUtc(1, 3)).toEqual({ day: 1, hour: 11 });

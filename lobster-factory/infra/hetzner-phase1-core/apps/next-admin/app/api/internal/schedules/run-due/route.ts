@@ -1,6 +1,7 @@
 // POST /api/internal/schedules/run-due
 //
-// The one call the Trigger.dev hourly heartbeat makes (packages/workflows/src/trigger/schedules-heartbeat.ts).
+// Called every 5 minutes by the host cron (scripts/schedules-run-due.sh, cron.d/awarewave-schedules) and, until it is
+// retired, by the Trigger.dev hourly heartbeat (packages/workflows/src/trigger/schedules-heartbeat.ts).
 // All scheduling logic lives here: which (client, job) rows are due (lib/schedules store + isDueNow) and
 // running them (the registry's run(), lib/schedules/jobs.ts). Own bearer token (SCHEDULE_INGEST_TOKEN),
 // never the shared OPS_INBOX_INGEST_TOKEN (verifyIngestToken.ts M2: one leaked token must not forge others).
@@ -90,7 +91,7 @@ export async function POST(request: Request) {
   const claimed: Array<{ schedule: StoredSchedule; runKey: string }> = [];
   const claimErrors: string[] = [];
   for (const schedule of due) {
-    const runKey = scheduledRunKey(schedule.organizationId, schedule.jobKey, now);
+    const runKey = scheduledRunKey(schedule.organizationId, schedule.jobKey, now, schedule.frequency);
     try {
       if (await claimScheduleRun(schedule.organizationId, schedule.jobKey, runKey)) claimed.push({ schedule, runKey });
     } catch (e) {

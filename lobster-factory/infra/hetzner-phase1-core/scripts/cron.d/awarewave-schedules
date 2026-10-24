@@ -2,11 +2,13 @@
 # Installed by install-host-schedules.sh (do not edit on the host). Times UTC. Each line runs the old command
 # unchanged through cron-run.sh, which records the outcome for /ops/schedules.
 # reconcile_videos: 06:00 and 18:00 Taipei (was every 15 min; the script retries 3x in-run instead).
+# schedules_run_due: the client schedules' clock (lib/schedules); replaces the Trigger.dev hourly heartbeat.
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 */10 * * * * root /root/lobster-phase1/scripts/cron-run.sh host_schedules_report 'python3 /root/lobster-phase1/scripts/report-host-schedules.py >> /var/log/host-schedules.log 2>&1'
 0 10,22 * * * root /root/lobster-phase1/scripts/cron-run.sh reconcile_videos '/root/lobster-phase1/scripts/reconcile-videos.sh'
 */30 * * * * root /root/lobster-phase1/scripts/cron-run.sh ops_probe_heartbeat '/root/lobster-phase1/scripts/ops-probe-heartbeat.sh >> /root/lobster-phase1/logs/probe.log 2>&1'
+*/5 * * * * root /root/lobster-phase1/scripts/cron-run.sh schedules_run_due '/root/lobster-phase1/scripts/schedules-run-due.sh'
 */5 * * * * root /root/lobster-phase1/scripts/cron-run.sh mainwp_wp_cron 'curl -s -o /dev/null http://127.0.0.1:8090/wp-cron.php?doing_wp_cron >/dev/null 2>&1'
 0 20 * * * root /root/lobster-phase1/scripts/cron-run.sh deploy_drift_check '/root/lobster-phase1/scripts/check-drift-and-alert.sh >> /var/log/sg-deploy-drift.log 2>&1'
 0 3 * * 0 root /root/lobster-phase1/scripts/cron-run.sh supabase_weekly_restart 'cd /root/supabase && docker compose restart studio kong >> /var/log/supabase-weekly-restart.log 2>&1'

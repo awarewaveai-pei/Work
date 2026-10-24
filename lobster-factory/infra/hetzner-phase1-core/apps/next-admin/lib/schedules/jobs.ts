@@ -8,17 +8,22 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { loadCis } from "@/lib/cs/cis";
 import { applyChatwootBaseline } from "@/lib/cs/chatwoot-baseline";
 import { MONTHLY_JOB, runMonthlyReport } from "@/lib/social/reports";
+import { DAILY_START_CAP } from "@/lib/content/topics/tick";
+import { topicCostUsd } from "@/lib/content/topics/cost";
 import type { JobMeta } from "./types";
+import type { Frequency } from "./schedule";
 
 /** What view.ts knows about a client when deciding whether a job can run there. */
 export interface JobClientFacts {
   siteUrl: unknown;
   chatwoot: unknown;
+  /** Active WordPress sites (wp_sites) of the client. */
+  wpSites?: number;
 }
 
 export interface ClientJob extends JobMeta {
   /** What a client with no row reads as. enabled is always false (AGENTS.md 自動化預設 OFF). */
-  defaults: { frequency: "daily" | "weekly"; hourUtc: number; dayOfWeekUtc: number };
+  defaults: { frequency: Frequency; hourUtc: number; dayOfWeekUtc: number };
   /** Throws on any failure, including one the job reports instead of throwing; the sweep records it and
    * raises the incident. Returns a one-line summary. */
   run(organizationId: string, runKey: string): Promise<string>;
@@ -82,6 +87,22 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
     // 01:00 UTC = 09:00 Taipei
     defaults: { frequency: "daily", hourUtc: 1, dayOfWeekUtc: 1 },
     run: (organizationId) => runMonthlyReport(organizationId),
+  },
+  {
+    key: "content_pipeline",
+    label: "自動內容管線",
+    description: `把已核准、到了排定日的題目依它選的格式做成 WordPress 草稿和社群草稿，再跑規則審核；每天最多開始 ${DAILY_START_CAP} 題，不會自己發布。題目在「內容 › 題目佇列」核准。`,
+    // Prices: lib/ai/cost-model.ts TEXT_FEATURES article + syndicate (lib/content/topics/cost.ts).
+    cost: `每題約 ${topicCostUsd().usual} 美元（文章＋社群改寫；社群太長要重寫時最多 ${topicCostUsd().max} 美元）；每天最多 ${DAILY_START_CAP} 題。沒有到期題目時免費。`,
+    frequencies: [{ value: "every_5m", label: "每 5 分鐘", usesHour: false, usesDay: false }],
+    defaults: { frequency: "every_5m", hourUtc: 0, dayOfWeekUtc: 1 },
+    unavailable: (c) => (c.wpSites ? null : "沒有 WordPress 網站"),
+    async run(organizationId) {
+      const sb = getSupabaseWriteClient();
+      if (!sb) throw new Error("content_pipeline:no_supabase_client");
+      const [{ tickTopics }, { topicDeps }] = await Promise.all([import("@/lib/content/topics/tick"), import("@/lib/content/topics/make")]);
+      return tickTopics(topicDeps(sb, organizationId, "schedule:content_pipeline"));
+    },
   },
 ];
 
