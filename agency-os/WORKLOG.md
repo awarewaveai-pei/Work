@@ -27,6 +27,36 @@
 - 未做：主帳號 `me` 的 CLI 登入（refresh token 2026-10-22 過期，要操作者重新登入）。
 
 **rollback**：`git revert <本 commit>`；`sync-claude-userlevel.ps1 -Mode merge` 會照還原後的範本重寫；cc.py 用 scratchpad 的 `cc.py.bak` 還原。
+## 2026-10-24（續17）事故：next-admin 部署失敗＋自動回退失敗 → app.aware-wave.com 約 6 分鐘不通；根因 pids 上限被健康檢查殭屍填滿；加 init: true；主題修正上線（Claude）
+
+**時間線（UTC）**
+- 05:23 他 session（aab8ec2e，WordPress OOM 防護）safe-infra-patch：lobster-redis `pids: 64`、健康檢查改 `timeout 2 redis-cli …`；05:26 soulful 同型。
+- 05:24 本 session `sg-deploy.sh next-admin`（42e4716cc）→ 05:30 next-admin 60s 內未 healthy → auto-rollback → `dependency failed to start: container lobster-redis is unhealthy` → ROLLBACK_FAILED；next-admin 卡 Created，`/login` 000。
+- 05:3x 止血（無設定改動）：`docker restart lobster-redis` → healthy；`docker compose up -d --no-build next-admin`（回退映像 e8983147e）→ healthy、login 200。
+- 05:4x 操作者批准修正；05:42 soulful-redis 52/64 → restart 止血；05:42–05:43 safe-infra-patch 加 `init: true`；05:46 重新部署 → 706e41f57。
+
+**根因**：lobster-redis `pids.current` 60/64：54 個 `timeout` 殭屍（`ps --ppid <redis>` Zs timeout）＋6 執行緒。容器無 init，PID 1（redis-server）不回收健康檢查遺留的孤兒 → 每次 exec 留殭屍 → 填滿 pids 上限 → `OCI runtime exec failed: procReady not received` → 健康檢查失敗；滿額時 BGSAVE 也無法 fork。
+
+**修改（prod，皆 safe-infra-patch，log `/root/lobster-phase1/safe-patch.log`）**
+- `/root/lobster-phase1/docker-compose.yml`：12 個有 pids 上限的服務加 `init: true`，只重建 `redis`（next-admin 隨部署重建）。backup `.bak.safe-patch-20261024-054250`。
+- `/root/soulful/docker-compose.yml`：3 個服務加 `init: true`，只重建 `soulful-redis`。backup `.bak.safe-patch-20261024-054259`。
+- `/root/mainwp/docker-compose.yml`：2 個服務加 `init: true`（file 模式，不重建；無殭屍）。backup `.bak.safe-patch-20261024-054306`。
+- 其餘 14 個服務（db、wordpress、n8n、hci-*…）下次重建時生效；當下掃描無殭屍。
+- 產生器：本 session scratchpad `add_init.py`（只在有 pids 上限且尚無 init 的服務標頭後插一行；三檔 `docker compose config` 皆過）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker inspect HostConfig.Init／pids.current＋60s 觀察（lobster-redis、soulful-redis PID1=docker-init，pids 7/64 不增；lobster-next-admin init=true pids 12）＋ sg-deploy.sh next-admin（healthy after 11s，smoke OK，706e41f57） | exit=0 | ms=900000
+- 正式站 10 頁 fetch：全部 `<html style>` 含已存主題（`--accent:#00663f`），`x-nextjs-prerender` 皆無（主題閃爍修正 42e4716cc 生效）。Playwright smoke 26 passed／0 failed／6 skipped。
+- 同批上線他 session commit：7d8d618a4（brand voice，自有 Codex review 7b056e48）、e28406990（door.nav）。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回三檔 diff：17 行 `init: true` 皆在服務標頭下一行；`docker compose config` 三檔皆過
+- BUGHUNT_DONE: scope=prod compose ×3 | grep=pids: | hits=17 服務（皆已加 init）
+- BUGHUNT_SCOPE_NARROW: 改動只在主機 compose；repo `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml` 正被 aab8ec2e 改（未 commit），本 session 不碰，見剩餘。
+
+**剩餘**
+- repo compose 對照檔與 prod 不一致（缺 `init: true`），由 aab8ec2e 併入其未 commit 改動。
+- 不變量待加到 `scripts/check-compose-invariants.py`（aab8ec2e 進行中檔）：**有 pids 上限 ⇒ 必須 `init: true`**（I3 pids＋I4 健康檢查帶 timeout 的組合就是這次的殭屍來源）。已寫 TASKS.md。
+
+**rollback**：三檔各自 backup（上列）經 safe-infra-patch 還原；next-admin snapshot `lobster-phase1-next-admin:rollback-20261024-054628`。
 ## 2026-10-24（續16）compose 不變量機械檢查＋lobster／soulful／mainwp 全收斂（續8 後續 1+2）（Claude）
 
 **為何**：續8 只關了 lobster-wordpress 一個實例；同類現況：soulful-wp oom_kill=156、mainwp-web oom_kill=12（兩者 swap 中、Apache 150 workers），其餘服務 swap 允許、無 pids 上限、健康檢查無界。
