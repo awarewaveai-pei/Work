@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-24（續39）next-admin 部署 51a84b203：video、design 產品門開門＋公網煙霧測試（Claude）
+
+**觸發**：續36 同一個操作者 go（「take the video and design doors live … with smoke tests」）。手動提前部署（沒等 03:00）。b2ec12826..51a84b203 之間有 3 個 next-admin commit：5362617a4（下載路由）、b3132c733（另一個 session 的 content 門頁，`enabled:false`）、51a84b203（本次），三個今晚 03:00 本來就會上線。
+
+**部署前**：origin/main 沒有 `DEPLOY_HOLD`；`apply-db-migration.mjs --status` STATUS_OK（applied 122）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin（主機 npm test → build → healthy 15s → HTTP smoke 5/5；`.deployed-commit` 從 b2ec12826 變成 51a84b203） | exit=0 | ms=427000
+- REALTEST_EVIDENCE: tool=curl | cmd=公網（`--path-as-is`），video 與 design 各測：`/` 和 `/<門頁>` 都 307 到 login；`/login?next=%2F` 200；`/api/ops/summary`、`/api/social/brands`、`/portal/launcher`、`/api/internal/x`、`/intake`、`/vector-editor.html` 都 404；`/a%2Fb` 400；`/edge-masks/mask-01.png` 200；`/api/tools/designs`、`/api/video/capabilities`、`/api/tools/designs/download` 都 401（要登入）；video 上的 `/design`、design 上的 `/video` 都 404 | exit=0 | ms=30000
+- REALTEST_EVIDENCE: tool=curl | cmd=回歸：app `/video` 404；`/tools/video` 307 到 login；social、tarot、studio 的 `/` 都 307；social `/api/internal/x` 404；portal `/launcher` 307；aware-wave.com 200 | exit=0 | ms=10000
+- REALTEST_EVIDENCE: tool=Bash | cmd=scripts/playwright-runner.ps1 -Mode smoke -SkipInstall（26 passed／0 failed／6 skipped，證據在 `agency-os/reports/e2e/2026-10-24/smoke`） | exit=0 | ms=120000
+- REVIEW_WAIVED: NA -- 部署動作；程式審查見續36（Codex partialreview-720f0df9）
+- BUGHUNT_WAIVED: NA -- 本條沒有程式改動
+
+**未驗**：登入後的畫面需要有人用瀏覽器登入看，包括：客戶在 video、design 網址看到工作台；沒持有產品的客戶看到「尚未開通」頁。本機沒有帳號密碼，不代為輸入。prod 只有 Soulful 一個客戶帳號，它持有全部產品，所以「尚未開通」頁目前只有單元測試涵蓋。
+
+**rollback**：照 `DEPLOY_ROLLBACK_RUNBOOK.md` §2.1 回前一版 b2ec12826；nginx、DNS 的回退見續36。
 ## 2026-10-24（續37）AUTO_CONTENT P4 第二批：AI 審核後自動發布（I5）＋網站「發布方式」兩顆按鈕（Claude）
 
 **觸發**：操作者「部署已完成（b2ec12826，抽測 26 通過），直接從 P4 第二批開始」；卡 `agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md` §7 P4.6、P4.8。
