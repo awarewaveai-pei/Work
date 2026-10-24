@@ -2,6 +2,7 @@
 # Installed by install-host-schedules.sh (do not edit on the host). Times UTC. Each line runs the old command
 # unchanged through cron-run.sh, which records the outcome for /ops/schedules.
 # reconcile_videos: 06:00 and 18:00 Taipei (was every 15 min; the script retries 3x in-run instead).
+# n8n_oom_restart (smart-restart-if-oom.sh) retired 2026-10-24: n8n runs under the compose invariants (mem/pids limits).
 # schedules_run_due: the client schedules' clock (lib/schedules); replaces the Trigger.dev hourly heartbeat.
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -17,4 +18,3 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 17 7 * * * root /root/lobster-phase1/scripts/cron-run.sh routine_watchdog 'LC_ALL=C.UTF-8 /root/Work/scripts/routine-output-watchdog.sh >> /var/log/routine-watchdog.log 2>&1'
 30 2 * * 1 root /root/lobster-phase1/scripts/cron-run.sh certbot_renew '/usr/bin/certbot renew >> /var/log/le-renew.log'
 30 3 * * 0 root /root/lobster-phase1/scripts/cron-run.sh docker_weekly_cleanup '/usr/local/bin/docker-weekly-cleanup.sh'
-5 4 * * * root /root/lobster-phase1/scripts/cron-run.sh n8n_oom_restart '/root/scripts/smart-restart-if-oom.sh n8n 500'

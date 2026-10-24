@@ -98,7 +98,7 @@ describe("hostScheduleRowsFrom", () => {
   });
 
   it("a job whose exit code cannot fail says so when ok", () => {
-    const r = row(hostScheduleRowsFrom(doc([]), NOW), "n8n_oom_restart");
+    const r = row(hostScheduleRowsFrom(doc([]), NOW), "mainwp_wp_cron");
     expect(r?.state).toBe("ok");
     expect(r?.detail).not.toBe("");
   });

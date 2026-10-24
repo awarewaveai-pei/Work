@@ -120,6 +120,8 @@
 - ORACLE_WAIVED: scoped codex review only (shared worktree carries other sessions' unfinished changes; a whole-repo review would review their work); 5/5 findings fixed and pinned by tests; redaction guard mutation-tested (removed -> test red)
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks,.claude/commands | grep=backup-coverage\.cron|wp_cron_main_site|crontab -l \| grep watchdog | hits=0
 
+**追加（compose 收斂 session 通知）**：`n8n_oom_restart` 從 `cron.d/awarewave-schedules`、`host-jobs.ts`、測試三處移除——n8n 已在 compose 不變量下（主機實測 mem=1g、pids=64、init=true），07:55Z 主機 root crontab 該行已刪、`smart-restart-if-oom.sh` 移至 `/root/retired/`（實測 crontab 剩 10 行）。不移除的話，裝上後每天 04:05 會失敗。
+
 **避免再發生**：新排程只能加進 `scripts/cron.d/*` 並經 `cron-run.sh`；手動加在主機上的會在排程頁顯示「未登記」，repo 與主機不一致顯示「排程版本不一致」。
 ## 2026-10-24（續25）0121 套正式庫（操作者同意）＋P3 推上 main；監工台 P3 完成（Claude）
 

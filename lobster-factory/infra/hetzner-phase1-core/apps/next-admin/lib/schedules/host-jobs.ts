@@ -42,7 +42,6 @@ export const HOST_JOBS: Record<string, HostJob> = {
   mainwp_wp_cron: { label: "MainWP 排程", description: "每 5 分鐘觸發 MainWP 的 WordPress 排程，同步並檢查各客戶網站。", group: "site", exitAlwaysZero: true },
   certbot_renew: { label: "SSL 憑證續期", description: "每週檢查網站 SSL 憑證，接近到期時自動續期，避免憑證失效。", group: "site" },
   supabase_weekly_restart: { label: "Supabase 定期重啟", description: "每週重新啟動 Supabase 管理介面與 API 閘道，降低長時間運作造成的記憶體累積。", group: "site" },
-  n8n_oom_restart: { label: "n8n 記憶體重啟", description: "每天檢查 n8n 記憶體用量，超過 500 MB 才重新啟動，避免拖慢主機。", group: "site" , exitAlwaysZero: true },
   docker_weekly_cleanup: { label: "Docker 閒置清理", description: "每週清理閒置超過 7 天的 Docker 映像檔與暫存，釋出空間且保留使用中項目。", group: "site" },
   run_parts_netdata_updater: { label: "Netdata 自動更新", description: "每天自動更新主機監控工具 Netdata，讓監控維持在最新版本。", group: "site" },
 };
