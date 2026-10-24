@@ -64,15 +64,15 @@
 ### 3.5 任務清單（依序）
 | # | 任務 | file:line | 風險 |
 |---|---|---|---|
-| V0 | 先完成 content 路由加固 C-R1…C-R6（video 門連帶開放 content） | 見 §5.5 | H |
-| V1 | `app/video/{layout,page}.tsx`：照 `NA/app/studio/{layout,page}.tsx` 做；page 要把 `searchParams` 傳下去（員工頁是 server component，`TOOLS/video/page.tsx:9-12`），不加 topbar | 新檔 | L |
-| V2 | 修門上連結：`VideoPipeline.tsx:102` `/tools/video?advanced=1` → 門上用 `?advanced=1`（P1 helper 或 `useOnDoor`） | `TOOLS/video/VideoPipeline.tsx:102` | L |
-| V3 | 門上隱藏／唯讀 `MediaOperationsPanel` 的 billing 區（客戶沒有寫權限） | `TOOLS/video/MediaOperationsPanel.tsx:16-17` | L |
-| V4 | `capabilities` 補 `ORG_FREE_ROUTES` 條目（含理由）；`qa/report`、`remotion-status` 410 stub 無人呼叫（只被 `qa/report/route.test.ts` 引用）可直接刪，連測試檔。**不要**只補理由而不看呼叫者 | `registry-code.test.ts:234-238`；`app/api/video/{capabilities,qa/report,remotion-status}/route.ts` | L |
-| V5 | `cleanup`：路由是 cron 專用，搬到 `/api/internal/video/cleanup`（matcher 不經過門，`middleware.ts:413` matcher 排除 `api/internal`）或加 `userKind==="client"` 403；同步 cron 呼叫端（目前無） | `app/api/video/cleanup/route.ts:19-25` | M |
-| V6 | 決策 D3（客戶可否核准 release／story bible）→ 若是，改 `canApproveMediaRelease` 為「客戶限本組織」或新增 `canApproveOwnMedia`；若否，門上隱藏 Release 步驟並寫入 manifest | `app/api/video/release/route.ts:14`；`lib/ops-role.ts:81`；`TOOLS/video/ReleaseDeliveryPanel.tsx:83` | M |
-| V7 | 登記表 `features[]` 渲染功能清單（step-8 第 3 點）、`lib/video/MODULE_MANIFEST.json` 無 TODO | `NA/lib/video/MODULE_MANIFEST.json` | L |
-| V8 | 驗收：`npx vitest run lib/portal lib/video`、`npx tsc --noEmit -p .`；`Host: video.localhost` 開 `/` 看精簡版面；突變：改名 `app/video/page.tsx` → `products.test.ts` 紅 | step-8 Acceptance | L |
+| V0 | **✅ `7d8d618a4`、`21e7da50b`** 先完成 content 路由加固 C-R1…C-R6（video 門連帶開放 content） | 見 §5.5 | H |
+| V1 | **✅ `2dd183f44`** `app/video/{layout,page}.tsx`：照 `NA/app/studio/{layout,page}.tsx` 做；page 要把 `searchParams` 傳下去（員工頁是 server component，`TOOLS/video/page.tsx:9-12`），不加 topbar | 新檔 | L |
+| V2 | **✅ `2dd183f44`**（改相對連結 `?advanced=1`，兩邊都對，不需 helper） 修門上連結：`VideoPipeline.tsx:102` `/tools/video?advanced=1` → 門上用 `?advanced=1`（P1 helper 或 `useOnDoor`） | `TOOLS/video/VideoPipeline.tsx:102` | L |
+| V3 | **✅ 不需改**（只讀；`/api/video/billing` GET 先 `assertOrgAccess`，客戶只見本組織） 門上隱藏／唯讀 `MediaOperationsPanel` 的 billing 區（客戶沒有寫權限） | `TOOLS/video/MediaOperationsPanel.tsx:16-17` | L |
+| V4 | **✅ `2dd183f44`**（`capabilities` 列 `ORG_FREE_ROUTES`、錯誤不回原始例外；兩個 410 殘骸刪除） `capabilities` 補 `ORG_FREE_ROUTES` 條目（含理由）；`qa/report`、`remotion-status` 410 stub 無人呼叫（只被 `qa/report/route.test.ts` 引用）可直接刪，連測試檔。**不要**只補理由而不看呼叫者 | `registry-code.test.ts:234-238`；`app/api/video/{capabilities,qa/report,remotion-status}/route.ts` | L |
+| V5 | **✅ `2dd183f44`**（搬 `/api/internal/video/cleanup`；Codex F2 R2／DB 刪除順序既有、無呼叫者，列剩餘） `cleanup`：路由是 cron 專用，搬到 `/api/internal/video/cleanup`（matcher 不經過門，`middleware.ts:413` matcher 排除 `api/internal`）或加 `userKind==="client"` 403；同步 cron 呼叫端（目前無） | `app/api/video/cleanup/route.ts:19-25` | M |
+| V6 | **✅ `2dd183f44`**（`canApproveMedia`；兩路由仍 `assertOrgAccess`，突變證據見 WORKLOG 2026-10-24 續27） 決策 D3（客戶可否核准 release／story bible）→ 若是，改 `canApproveMediaRelease` 為「客戶限本組織」或新增 `canApproveOwnMedia`；若否，門上隱藏 Release 步驟並寫入 manifest | `app/api/video/release/route.ts:14`；`lib/ops-role.ts:81`；`TOOLS/video/ReleaseDeliveryPanel.tsx:83` | M |
+| V7 | **待操作者決定**（門上功能清單會改三個已上線門版面；manifest 無 TODO） 登記表 `features[]` 渲染功能清單（step-8 第 3 點）、`lib/video/MODULE_MANIFEST.json` 無 TODO | `NA/lib/video/MODULE_MANIFEST.json` | L |
+| V8 | **✅ `2dd183f44`**（本機 `/video` 門框、無側欄；門閘綠） 驗收：`npx vitest run lib/portal lib/video`、`npx tsc --noEmit -p .`；`Host: video.localhost` 開 `/` 看精簡版面；突變：改名 `app/video/page.tsx` → `products.test.ts` 紅 | step-8 Acceptance | L |
 | V9 | `enabled:false` 維持到 go-live（DNS、憑證 SAN、nginx 區塊 `nginx/default.conf:430` 加 `video.aware-wave.com`）——High，等操作者 go | `NA/lib/portal/products.ts:47` | H |
 
 ## 4. DESIGN 門
