@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-25（續16）Typography：字體可選（內文／標題／程式碼）、字重行高字距接上畫面、各分頁各自計數（Claude）
+
+- **觸發**：操作者「還要做 font weight, font family, 和其他你認為我應該要有的東西, 做好直接部署」。
+- **根因**：Typography 分頁 5 格沒有任何畫面讀（globals.css 78 處字重、8 處行高、4 處字距寫死數字）；沒有字體設定，globals 的 `'Inter'` 從未載入（實際是系統字）；程式碼字體兩處各寫一套。
+- **不變量**：Colors＋Typography 每一格都必須被畫面讀到；字體值只能是清單內的一個（字體字串有引號逗號，通用值檢查擋得掉，改為逐字比對）。
+- **做了什麼**（next-admin）：新 `lib/theme/fonts.ts`（9 個選擇：System、Inter、Noto Sans TC、Noto Serif TC、Source Serif 4、Roboto、System Mono、JetBrains Mono、IBM Plex Mono；`isAllowedFontValue`、`googleFontsHref`）；`tokens.ts` Font Family 組 `--font-family-base`（預設＝原本的 System 字串）／`--font-family-heading`（預設 `var(--font-family-base)`）／`--font-family-mono`，新 `isSafeTokenValue`；`app/api/theme/route.ts` 改用 `isSafeTokenValue`；`app/layout.tsx` 只在存的字體是 Google 字體時加樣式表連結；`globals.css` body／h1–h6／兩處程式碼吃字體 token，字重 400–800 共 77 處、行高 1.3／1.6 共 8 處、字距 0.07em 4 處改 token（預設不變，畫面不動；字重 900 兩處無對應 token 保留）；編輯器 `FontChoices.tsx`（按鈕不用下拉，每顆用自己的字體顯示範例，點才載入 Google 字體）；分頁徽章改各算各的（字體改動原本顯示在 Colors）。
+- **守門**：`fonts.test.ts`（預設在清單內、依種類收、清單外與注入字串一律拒、只有網路字體產生連結）；`tokens-match-globals.test.ts` 的「每格都要被畫面讀到」擴大到 Typography。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/theme app/__tests__/sidebar-active-link.test.ts app/__tests__/sidebar-coverage.test.ts（32 passed）＋ npx tsc --noEmit（0 error） | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：字體驗證改成全放行（fonts.test 2 紅）、字距 4 處改回 0.07em（tokens-match-globals 紅指名 --letter-spacing-label）；還原綠 | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=curl | cmd=localhost:3901 /tools/theme：改前 body 字重 400、Save 按鈕 700（與改前同）；選內文 Noto Serif TC＋程式碼 JetBrains Mono → body 與 h1 字體跟著變（標題 Same as body）、兩個樣式表連結注入、document.fonts.check 皆 true；字體改動徽章顯示在 Typography；只有 GET /api/theme | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（讀回 diff；存檔驗證只對字體 token 改為清單比對，其餘仍走 SAFE_VALUE_RE）
+- ORACLE_WAIVED: codex quota blocked until 2026-10-25 07:00 (scripts/oracle-quota.ps1)；以讀回＋2 個突變（含存檔驗證守衛）＋瀏覽器實測代替。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=font-family-base | hits=17
+- **rollback**：`git revert <本 commit>`（DB 存檔沒有字體 token 時畫面與改前相同）。
 ## 2026-10-25（續15）外觀設定「調了沒反應」整類關掉：側欄目前頁、區塊標題滑過、選中分頁背景、Theme Editor 自己的分頁（Claude）
 
 - **觸發**：操作者截圖三張：Theme Editor 分頁（圖一）和 Tab 預覽（圖二）不同、找不到圖一的 bg／hover 設定；`--sidebar-text-active`、`--sidebar-active-bar` 沒變色；`--sidebar-section-label` 滑過時字和背景沒得調。

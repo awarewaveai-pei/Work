@@ -3,6 +3,7 @@ import "./globals.css";
 import { PHProvider } from "./providers";
 import { PostHogAnalytics } from "./posthog-analytics";
 import { getThemeConfig } from "../lib/theme/store";
+import { FONT_TOKENS, googleFontsHref } from "../lib/theme/fonts";
 
 export const metadata = { title: "Lobster Factory Admin" };
 
@@ -15,9 +16,17 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   // CSS vars before first paint — no FOUC. Sidebar shell lives in (shell)/layout.tsx.
   const { tokens } = await getThemeConfig();
   const themeStyle = tokens as CSSProperties;
+  // A saved web font (lib/theme/fonts.ts) is fetched only when a font token picks one.
+  const fontsHref = googleFontsHref(Object.keys(FONT_TOKENS).map((k) => tokens[k]).filter(Boolean));
 
   return (
     <html lang="zh-TW" style={themeStyle}>
+      {fontsHref && (
+        <head>
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+          <link rel="stylesheet" href={fontsHref} />
+        </head>
+      )}
       <body>
         <PHProvider>
           <PostHogAnalytics />

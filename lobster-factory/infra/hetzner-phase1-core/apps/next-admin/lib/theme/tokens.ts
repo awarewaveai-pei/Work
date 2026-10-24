@@ -3,7 +3,10 @@
 // default baseline), and lib/theme/store (server read/write). Previously these
 // definitions were duplicated in app/tools/theme/page.tsx and app/api/theme/route.ts.
 
-export type TokenDef = { name: string; default: string; type: "color" | "text" };
+import { FONT_CHOICES, FONT_TOKENS, SAME_AS_BODY, isAllowedFontValue } from "./fonts";
+
+// "font" tokens hold a font stack picked from lib/theme/fonts.ts, never typed text.
+export type TokenDef = { name: string; default: string; type: "color" | "text" | "font" };
 export type TokenGroup = { label: string; tokens: TokenDef[] };
 
 // Colors tab = only colors; Typography & Size tab = only sizes, weights, spacing and radius. Each
@@ -117,6 +120,14 @@ export const COLOR_GROUPS: TokenGroup[] = [
 
 export const TYPOGRAPHY_GROUPS: TokenGroup[] = [
   {
+    label: "Font Family",
+    tokens: [
+      { name: "--font-family-base", default: FONT_CHOICES.find((c) => c.id === "system")!.stack, type: "font" },
+      { name: "--font-family-heading", default: SAME_AS_BODY, type: "font" },
+      { name: "--font-family-mono", default: FONT_CHOICES.find((c) => c.id === "system-mono")!.stack, type: "font" },
+    ],
+  },
+  {
     label: "Font Sizes",
     tokens: [
       { name: "--font-size-xs", default: "11px", type: "text" },
@@ -169,6 +180,13 @@ export const VALID_TOKEN_NAMES: ReadonlySet<string> = new Set(Object.keys(DEFAUL
 // Only accept safe CSS values (no injection vectors). Mirrors the prior route.ts gate.
 export const SAFE_VALUE_RE =
   /^(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)|hsla?\([^)]+\)|[0-9]+(\.[0-9]+)?(px|em|rem|%|vh|vw|dvh|dvw|s|ms)?|0|inherit|transparent|[a-z][\w-]*)$/;
+
+// The one check the API runs on every saved value: font tokens only by exact match against the
+// font list (stacks need quotes and commas), everything else through SAFE_VALUE_RE.
+export function isSafeTokenValue(name: string, value: string): boolean {
+  if (name in FONT_TOKENS) return isAllowedFontValue(name, value);
+  return SAFE_VALUE_RE.test(value);
+}
 
 // Sidebar layout shape (persisted alongside tokens so reorder is cross-device too).
 export interface SavedLayout {

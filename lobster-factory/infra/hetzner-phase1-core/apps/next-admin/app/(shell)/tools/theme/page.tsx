@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { DEFAULT_SECTIONS, applyLayout, itemKey, type NavSection } from '@/app/SidebarNav';
 import { COLOR_GROUPS, TYPOGRAPHY_GROUPS, type SavedLayout, type TokenGroup } from '@/lib/theme/tokens';
 import PalettePresets from './PalettePresets';
+import FontChoices from './FontChoices';
 
 // Merge all groups for STATIC_DEFAULTS and API save
 const ALL_GROUPS = [...COLOR_GROUPS, ...TYPOGRAPHY_GROUPS];
@@ -141,6 +142,10 @@ export default function ThemePage() {
   };
 
   const changedCount = Object.entries(values).filter(([k, v]) => v !== serverDefaults[k]).length;
+  // Each tab's badge counts only its own tokens (a font change used to show on Colors).
+  const changedIn = (groups: TokenGroup[]) => groups.flatMap(g => g.tokens).filter(t => values[t.name] !== serverDefaults[t.name]).length;
+  const colorChanges = changedIn(COLOR_GROUPS);
+  const typeChanges = changedIn(TYPOGRAPHY_GROUPS);
   const sectionOrderChanged = sections.map(s => s.id).join() !== DEFAULT_SECTIONS.map(s => s.id).join();
   const itemOrderChanged = sections.some(sec => {
     const def = DEFAULT_SECTIONS.find(d => d.id === sec.id);
@@ -150,8 +155,8 @@ export default function ThemePage() {
   const orderChanged = sectionOrderChanged || itemOrderChanged;
 
   const TABS: { id: Tab; label: string; badge?: number }[] = [
-    { id: 'colors',     label: 'Colors',     badge: changedCount > 0 ? changedCount : undefined },
-    { id: 'typography', label: 'Typography & Size' },
+    { id: 'colors',     label: 'Colors',     badge: colorChanges > 0 ? colorChanges : undefined },
+    { id: 'typography', label: 'Typography & Size', badge: typeChanges > 0 ? typeChanges : undefined },
     { id: 'sidebar',    label: 'Sidebar',    badge: orderChanged ? 1 : undefined },
   ];
 
@@ -403,6 +408,9 @@ function TokenGroupCard({ group, values, serverDefaults, onChange }: {
         {group.tokens.map(token => {
           const def = serverDefaults[token.name] ?? token.default;
           const changed = values[token.name] !== def;
+          if (token.type === 'font') {
+            return <FontChoices key={token.name} name={token.name} value={values[token.name] ?? def} defaultValue={def} onChange={onChange} />;
+          }
           return (
             <TokenRow
               key={token.name}

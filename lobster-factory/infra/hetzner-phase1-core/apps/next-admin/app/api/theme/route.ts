@@ -9,7 +9,7 @@
  */
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canWriteTenantConfig } from "../../../lib/ops-role";
-import { DEFAULT_TOKENS, VALID_TOKEN_NAMES, SAFE_VALUE_RE, type SavedLayout } from "../../../lib/theme/tokens";
+import { DEFAULT_TOKENS, VALID_TOKEN_NAMES, isSafeTokenValue, type SavedLayout } from "../../../lib/theme/tokens";
 import { getThemeConfig, saveThemeConfig, revalidateThemeCache } from "../../../lib/theme/store";
 
 export const runtime = "nodejs";
@@ -64,7 +64,7 @@ export async function POST(req: Request) {
     if (!VALID_TOKEN_NAMES.has(name)) {
       return NextResponse.json({ ok: false, error: `unknown_token: ${name}` }, { status: 400 });
     }
-    if (typeof value !== "string" || !SAFE_VALUE_RE.test(value.trim())) {
+    if (typeof value !== "string" || !isSafeTokenValue(name, value.trim())) {
       return NextResponse.json({ ok: false, error: `unsafe_value for ${name}` }, { status: 400 });
     }
     if (value.trim() !== DEFAULT_TOKENS[name]) tokens[name] = value.trim();

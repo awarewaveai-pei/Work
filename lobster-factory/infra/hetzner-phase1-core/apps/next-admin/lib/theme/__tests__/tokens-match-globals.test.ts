@@ -35,7 +35,7 @@ describe("theme tokens", () => {
     const ref = (v: string) => /^var\((--[a-z0-9-]+)\)$/.exec(v)?.[1] ?? /^color-mix\(in srgb, var\((--[a-z0-9-]+)\) \d+%, transparent\)$/.exec(v)?.[1] ?? "";
     const isColor = (v: string): boolean => literal(v) || (ref(v) !== "" && isColor(colorDefaults.get(ref(v)) ?? ""));
     expect(COLOR_GROUPS.flatMap((g) => g.tokens).filter((t) => t.type !== "color" || !isColor(t.default)).map((t) => t.name)).toEqual([]);
-    expect(TYPOGRAPHY_GROUPS.flatMap((g) => g.tokens).filter((t) => t.type !== "text" || isColor(t.default)).map((t) => t.name)).toEqual([]);
+    expect(TYPOGRAPHY_GROUPS.flatMap((g) => g.tokens).filter((t) => (t.type !== "text" && t.type !== "font") || isColor(t.default)).map((t) => t.name)).toEqual([]);
   });
 
   // Operator 2026-10-25: the Button Primary group must move every primary button. .btn-primary
@@ -50,7 +50,8 @@ describe("theme tokens", () => {
   // Operator 2026-10-25: --tab-bg-active, --btn-primary-bg (on .btn-primary) and --sidebar-active-bar
   // (no link ever carried .active) sat in the Colors tab doing nothing. Every color knob must be read
   // by some screen code outside lib/theme.
-  it("every Colors-tab token is read by screen code", () => {
+  // Operator 2026-10-25 (later): Typography too — five weight / line-height / spacing knobs were unread.
+  it("every Colors and Typography token is read by screen code", () => {
     const ROOT = path.resolve(__dirname, "../../..");
     const walk = (d: string): string[] => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => {
       const p = path.join(d, e.name);
@@ -60,7 +61,7 @@ describe("theme tokens", () => {
     const src = ["app", "components", "lib"].flatMap((d) => walk(path.join(ROOT, d)))
       .filter((f) => !f.replace(/\\/g, "/").includes("/lib/theme/"))
       .map((f) => fs.readFileSync(f, "utf8")).join("\n");
-    const unused = COLOR_GROUPS.flatMap((g) => g.tokens.map((t) => t.name))
+    const unused = ALL_TOKEN_GROUPS.flatMap((g) => g.tokens.map((t) => t.name))
       .filter((n) => !new RegExp(`var\\(${n}[,)]`).test(src));
     expect(unused).toEqual([]);
   });
