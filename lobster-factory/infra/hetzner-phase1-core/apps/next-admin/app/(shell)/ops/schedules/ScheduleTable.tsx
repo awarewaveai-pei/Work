@@ -1,30 +1,33 @@
 "use client";
 
-// The schedules table (agency-os/docs/operations/SCHEDULES_PAGE_PLAN.md §3.2-3/4). One component for
+// The schedules page body (agency-os/docs/operations/SCHEDULES_PAGE_PLAN.md §3.2-3/4). One component for
 // /ops/schedules (every client) and the client page's 維護 tab (`only` = that client's slug): one data
-// source, so the two views cannot disagree. Rows = clients (they grow), columns = jobs (few), the clicked cell's settings beside.
-// Styling = theme tokens (/tools/theme, lib/theme/tokens.ts) + the shared chips (components/tools/panel-primitives.ts);
-// every choice is a visible chip, never a <select>. Times are shown and edited in Taipei time; rows store UTC.
+// source, so the two views cannot disagree.
+// Layout (operator 2026-10-24): one tab bar -- one tab per client, then one per server group -- so a tab's
+// content fits on screen; every setting is shown open on its card, nothing waits for a click to appear.
+// Styling = theme tokens (/tools/theme, lib/theme/tokens.ts) + the shared chips (components/tools/panel-primitives.ts)
+// + the app tab bar (SubTabs); every choice is a visible chip, never a <select>. Times are shown and edited
+// in Taipei time; rows store UTC.
 // Copy: written by GPT to the operator's rule 清楚易懂、不冗長 (WORKLOG 2026-10-15).
-import { Fragment, useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { roleHeader } from "@/lib/ops-role";
 import { taipeiFromUtc, utcFromTaipei } from "@/lib/schedules/schedule";
-import type { JobMeta, ScheduleCell, SchedulesView, SystemRow } from "@/lib/schedules/types";
-import { HOST_UI } from "@/lib/schedules/host-jobs";
+import type { JobMeta, ScheduleCell, ScheduleOrg, SchedulesView, SystemRow } from "@/lib/schedules/types";
+import { HOST_GROUP_ORDER, HOST_UI } from "@/lib/schedules/host-jobs";
 import { chipStyle } from "@/components/tools/panel-primitives";
+import { SubTabs, type SubTab } from "../clients/[slug]/hub-ui";
 
 const T = {
   statEnabled: "可執行排程",
   statRanToday: "今日已執行",
   statFailing: "失敗排程",
-  sectionClient: "客戶排程",
-  sectionServer: "伺服器排程（唯讀）",
-  serverHint: "點選伺服器工作列，查看詳細資料。",
+  tabsLabel: "排程分類",
+  tabProblems: "異常",
+  serverReadOnly: "伺服器排程只能查看，不能在這裡修改。",
   cost: "每次執行費用",
   detail: { what: "工作內容", when: "執行時間", where: "結果存放位置", look: "查看位置", fail: "失敗處理" },
   cellOff: "未啟用",
   cellBlocked: "已啟用，無法執行：",
-  panelEmpty: "請先點選一個排程。",
   panelOn: "啟用排程",
   panelFrequency: "執行頻率",
   panelWeekday: "執行星期",
@@ -36,6 +39,7 @@ const T = {
   resultFailed: "失敗：",
   panelChangedBy: "最後修改者",
   changedNever: "尚未修改，使用預設值",
+  saved: "已儲存",
   errForbidden: "只有擁有者或管理員可以修改",
   errConflict: "其他人剛修改此排程，頁面已重新載入，請再試一次",
   errSave: "儲存失敗，錯誤代碼：",
@@ -48,9 +52,12 @@ const T = {
 };
 
 const DAYS = ["日", "一", "二", "三", "四", "五", "六"];
+const HOURS = Array.from({ length: 24 }, (_, h) => h);
 const SERVER_BADGE: Record<SystemRow["state"], string> = {
   ok: "badge-green", stale: "badge-yellow", missing: "badge-gray", failed: "badge-red", unregistered: "badge-yellow", untracked: "badge-gray",
 };
+/** Server states that count as a problem on the tab label. `untracked` is by design (run-parts reports no outcome). */
+const SERVER_BAD = new Set<SystemRow["state"]>(["failed", "stale", "unregistered", "missing"]);
 
 const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
 
@@ -69,25 +76,28 @@ function cadence(job: JobMeta, c: ScheduleCell): string {
   return f.usesHour ? `${f.label} ${hh(tp.hour)}` : f.label;
 }
 
+/** Tab count text: "3" or "3 · 1 異常" — the problem count is the reason to open a tab first. */
+const countText = (n: number, bad: number) => (bad ? `${n} · ${bad} ${T.tabProblems}` : String(n));
+
 const card: CSSProperties = {
   background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: "var(--radius)", boxShadow: "var(--shadow)",
+  padding: "14px 16px", fontSize: "var(--font-size-sm)", color: "var(--text-primary)", minWidth: 0,
 };
-const th: CSSProperties = {
-  textAlign: "left", padding: "10px 14px", fontSize: "var(--font-size-xs)", fontWeight: "var(--font-weight-semibold)" as CSSProperties["fontWeight"],
-  color: "var(--text-muted)", borderBottom: "1px solid var(--border)", whiteSpace: "nowrap",
-};
-const td: CSSProperties = { padding: "12px 14px", borderBottom: "1px solid var(--border-subtle)", verticalAlign: "top", fontSize: "var(--font-size-sm)" };
-const label: CSSProperties = { fontSize: "var(--font-size-xs)", color: "var(--text-muted)", margin: "14px 0 6px" };
+const grid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 14, alignItems: "start" };
+const label: CSSProperties = { fontSize: "var(--font-size-xs)", color: "var(--text-muted)", margin: "12px 0 6px" };
+const muted: CSSProperties = { color: "var(--text-muted)", fontSize: "var(--font-size-xs)", lineHeight: "var(--line-height-base)" };
+
+type TabKey = `org:${string}` | `group:${NonNullable<SystemRow["group"]>}`;
+type Patch = Partial<Pick<ScheduleCell, "enabled" | "frequency" | "hourUtc" | "dayOfWeekUtc">>;
 
 export function ScheduleTable({ only }: { only?: string }) {
   const [view, setView] = useState<SchedulesView | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<{ jobKey: string; organizationId: string } | null>(null);
-  const [serverKey, setServerKey] = useState<string | null>(null);
-  const pickCell = (jobKey: string, organizationId: string) => { setSelected({ jobKey, organizationId }); setServerKey(null); };
-  const pickServer = (key: string) => { setServerKey(key); setSelected(null); };
+  const [tab, setTab] = useState<TabKey | null>(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  /** The card that just saved, for its 已儲存 mark. */
+  const [savedKey, setSavedKey] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -105,12 +115,19 @@ export function ScheduleTable({ only }: { only?: string }) {
     void load();
   }, [load]);
 
-  async function save(cell: ScheduleCell, patch: Partial<Pick<ScheduleCell, "enabled" | "frequency" | "hourUtc" | "dayOfWeekUtc">>) {
+  useEffect(() => {
+    if (!savedKey) return;
+    const t = setTimeout(() => setSavedKey(null), 2500);
+    return () => clearTimeout(t);
+  }, [savedKey]);
+
+  async function save(cell: ScheduleCell, patch: Patch) {
     const slug = view?.orgs.find((o) => o.id === cell.organizationId)?.slug;
     if (!slug) return;
     const next = { ...cell, ...patch };
     setSaving(true);
     setNotice(null);
+    setSavedKey(null);
     try {
       const res = await fetch(`/api/ops/clients/${encodeURIComponent(slug)}/schedules/${cell.jobKey}`, {
         method: "PATCH",
@@ -124,6 +141,8 @@ export function ScheduleTable({ only }: { only?: string }) {
       if (!res.ok || !body?.ok) {
         const code = String(body?.error ?? `HTTP ${res.status}`);
         setNotice(code === "forbidden_role" ? T.errForbidden : code === "version_conflict" ? T.errConflict : `${T.errSave}${code}`);
+      } else {
+        setSavedKey(`${cell.jobKey}:${cell.organizationId}`);
       }
     } catch (e) {
       setNotice(`${T.errSave}${String(e)}`);
@@ -137,199 +156,163 @@ export function ScheduleTable({ only }: { only?: string }) {
   if (!view) return <p style={{ color: "var(--text-muted)", fontSize: "var(--font-size-sm)" }}>…</p>;
 
   const cellOf = (jobKey: string, orgId: string) => view.cells.find((c) => c.jobKey === jobKey && c.organizationId === orgId);
-  const sel = selected ? cellOf(selected.jobKey, selected.organizationId) : undefined;
-  const selJob = sel ? view.jobs.find((j) => j.key === sel.jobKey) : undefined;
-  const selOrg = sel ? view.orgs.find((o) => o.id === sel.organizationId) : undefined;
-  const selFreq = selJob?.frequencies.find((f) => f.value === sel?.frequency);
-  const selTp = sel ? taipeiFromUtc(sel.dayOfWeekUtc, sel.hourUtc) : null;
-  const server = serverKey ? view.system.find((r) => r.key === serverKey) : undefined;
+  const orgCells = (orgId: string) => view.cells.filter((c) => c.organizationId === orgId);
+  // Rows without a group are problems (drift, unregistered, partial inventory): shown above the tabs on every tab.
+  const problems = view.system.filter((r) => !r.group);
+  const groups = only ? [] : HOST_GROUP_ORDER.filter((g) => view.system.some((r) => r.group === g));
+
+  const tabs: Array<SubTab<TabKey>> = [
+    ...view.orgs.map((o) => {
+      const cs = orgCells(o.id);
+      return { key: `org:${o.id}` as TabKey, label: o.name, count: countText(cs.filter((c) => c.enabled).length, cs.filter((c) => c.lastError).length) };
+    }),
+    ...groups.map((g) => {
+      const rs = view.system.filter((r) => r.group === g);
+      return { key: `group:${g}` as TabKey, label: T.group[g], count: countText(rs.length, rs.filter((r) => SERVER_BAD.has(r.state)).length) };
+    }),
+  ];
+  const active: TabKey | undefined = tabs.find((t) => t.key === tab)?.key ?? tabs[0]?.key;
+  const activeOrg = active?.startsWith("org:") ? view.orgs.find((o) => `org:${o.id}` === active) : undefined;
+  const activeGroup = active?.startsWith("group:") ? groups.find((g) => `group:${g}` === active) : undefined;
 
   return (
     <div>
       {!only && (
-        <div className="card-grid" style={{ marginBottom: 24 }}>
+        // One line, not three stat cards: the tabs must start near the top so a tab fits on screen.
+        <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginBottom: 16, fontSize: "var(--font-size-sm)", color: "var(--text-muted)" }}>
           {[
             [T.statEnabled, view.summary.enabled, "var(--text-primary)"],
             [T.statRanToday, view.summary.ranToday, "var(--text-primary)"],
             [T.statFailing, view.summary.failing, view.summary.failing ? "var(--red)" : "var(--text-primary)"],
           ].map(([k, v, color]) => (
-            <div key={String(k)} className="card">
-              <div className="card-label">{k}</div>
-              <div className="card-value" style={{ color: String(color), marginTop: 8 }}>{v}</div>
-            </div>
+            <span key={String(k)}>{k} <b style={{ color: String(color), fontSize: "var(--font-size-md)" }}>{v}</b></span>
           ))}
         </div>
       )}
 
+      {problems.length > 0 && (
+        <div style={{ ...grid, marginBottom: 16 }}>
+          {problems.map((r) => <ServerCard key={r.key} r={r} />)}
+        </div>
+      )}
+
+      {tabs.length > 1 && <SubTabs<TabKey> tabs={tabs} active={active as TabKey} onChange={setTab} label={T.tabsLabel} idPrefix="schedules" />}
+
       {notice && <p style={{ color: "var(--red)", fontSize: "var(--font-size-sm)", margin: "0 0 12px" }}>{notice}</p>}
 
-      <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
-        <div style={{ flex: "1 1 520px", minWidth: 0 }}>
-        <div className="section-title">{T.sectionClient}</div>
-        <div style={{ ...card, overflowX: "auto", marginBottom: 28 }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", color: "var(--text-primary)" }}>
-            <thead>
-              <tr>
-                <th style={{ ...th, width: 180 }} />
-                {view.jobs.map((job) => (
-                  <th key={job.key} style={{ ...th, whiteSpace: "normal", minWidth: 200 }}>
-                    <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--text-primary)" }}>{job.label}</div>
-                    <div style={{ fontWeight: 400, marginTop: 4, lineHeight: "var(--line-height-base)" }}>{job.description}</div>
-                    <div style={{ fontWeight: 400, marginTop: 4, lineHeight: "var(--line-height-base)", color: "var(--text-secondary)" }}>{T.cost}：{job.cost}</div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {view.orgs.map((o) => (
-                <tr key={o.id}>
-                  <td style={{ ...td, fontWeight: 600 }}>{o.name}</td>
-                  {view.jobs.map((job) => {
-                    const c = cellOf(job.key, o.id);
-                    if (!c) return <td key={job.key} style={td} />;
-                    const isSel = selected?.jobKey === job.key && selected.organizationId === o.id;
-                    return (
-                      <td
-                        key={job.key}
-                        onClick={() => pickCell(job.key, o.id)}
-                        style={{ ...td, cursor: "pointer", background: isSel ? "var(--bg-hover)" : undefined, boxShadow: isSel ? "inset 3px 0 0 var(--accent)" : undefined }}
-                      >
-                        <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={(e) => e.stopPropagation()}>
-                          <input type="checkbox" checked={c.enabled} disabled={saving} onChange={(e) => void save(c, { enabled: e.target.checked })} aria-label={`${job.label} · ${o.name}`} />
-                          <span style={{ color: c.enabled ? "var(--text-primary)" : "var(--text-muted)" }}>{c.enabled ? cadence(job, c) : T.cellOff}</span>
-                        </label>
-                        {c.enabled && c.unavailable && (
-                          <div style={{ fontSize: "var(--font-size-xs)", color: "var(--yellow)", marginTop: 4 }}>{T.cellBlocked}{c.unavailable}</div>
-                        )}
-                        {c.enabled && !c.unavailable && (c.lastError || c.lastRunAt) && (
-                          <div style={{ fontSize: "var(--font-size-xs)", color: "var(--text-muted)", marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
-                            <span className={`dot ${c.lastError ? "dot-red" : "dot-green"}`} />
-                            {c.lastError ? `${T.resultFailed}${taipeiTime(c.lastErrorAt)}` : `${T.panelLastRun} ${taipeiTime(c.lastRunAt)}`}
-                          </div>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {view.system.length > 0 && (
+      <div role="tabpanel" id={active ? `schedules-panel-${active}` : undefined} aria-labelledby={active ? `schedules-tab-${active}` : undefined}>
+        {activeOrg && (
+          <div style={grid}>
+            {view.jobs.map((job) => {
+              const c = cellOf(job.key, activeOrg.id);
+              return c ? (
+                <JobCard key={job.key} job={job} org={activeOrg} c={c} saving={saving}
+                  saved={savedKey === `${c.jobKey}:${c.organizationId}`} onSave={(p) => void save(c, p)} />
+              ) : null;
+            })}
+          </div>
+        )}
+        {activeGroup && (
           <>
-            <div className="section-title">{T.sectionServer}</div>
-            <p style={{ color: "var(--text-muted)", fontSize: "var(--font-size-xs)", margin: "-6px 0 10px" }}>{T.serverHint}</p>
-            <div className="ops-table">
-              {view.system.map((r, i) => (
-                <Fragment key={r.key}>
-                {r.group && r.group !== view.system[i - 1]?.group && (
-                  <div style={{ fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--text-secondary)", padding: "12px 0 4px" }}>{T.group[r.group]}</div>
-                )}
-                <div
-                  className="ops-row"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => pickServer(r.key)}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") pickServer(r.key); }}
-                  style={{ gridTemplateColumns: "minmax(140px, max-content) 1fr auto", cursor: "pointer", background: serverKey === r.key ? "var(--bg-hover)" : undefined, boxShadow: serverKey === r.key ? "inset 3px 0 0 var(--accent)" : undefined }}
-                >
-                  <div className="ops-row-key">{r.label}</div>
-                  <div className="ops-row-val">
-                    {r.description}
-                    <div>{[r.cadence, taipeiTime(r.lastAt), r.detail].filter((x) => x && x !== "—").join(" · ") || "—"}</div>
-                  </div>
-                  <span className={`card-badge ${SERVER_BADGE[r.state]}`}>{T.server[r.state]}</span>
-                </div>
-                </Fragment>
-              ))}
+            <p style={{ ...muted, margin: "0 0 12px" }}>{T.serverReadOnly}</p>
+            <div style={grid}>
+              {view.system.filter((r) => r.group === activeGroup).map((r) => <ServerCard key={r.key} r={r} />)}
             </div>
           </>
         )}
-        </div>
+      </div>
+    </div>
+  );
+}
 
+/** One client's job, every setting open whether it is on or off. */
+function JobCard({ job, org, c, saving, saved, onSave }: {
+  job: JobMeta; org: ScheduleOrg; c: ScheduleCell; saving: boolean; saved: boolean; onSave: (p: Patch) => void;
+}) {
+  const freq = job.frequencies.find((f) => f.value === c.frequency);
+  const tp = taipeiFromUtc(c.dayOfWeekUtc, c.hourUtc);
+  return (
+    <section style={{ ...card, boxShadow: c.lastError ? "inset 3px 0 0 var(--red), var(--shadow)" : card.boxShadow }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ fontWeight: 700, fontSize: "var(--font-size-md)" }}>{job.label}</div>
+        {saved && <span style={{ color: "var(--green)", fontSize: "var(--font-size-xs)", whiteSpace: "nowrap" }}>✓ {T.saved}</span>}
+      </div>
+      <div style={{ ...muted, marginTop: 4 }}>{job.description}</div>
+      <div style={{ ...muted, color: "var(--text-secondary)", marginTop: 2 }}>{T.cost}：{job.cost}</div>
 
-        <aside style={{ ...card, flex: "0 1 320px", minWidth: 280, padding: "16px 18px", fontSize: "var(--font-size-sm)", color: "var(--text-primary)", position: "sticky", top: 16 }}>
-          {server ? (
-            <>
-              <div style={{ fontWeight: 700, fontSize: "var(--font-size-md)" }}>{server.label}</div>
-              <div style={{ color: "var(--text-muted)", marginTop: 2 }}>{[server.cadence, T.server[server.state]].filter(Boolean).join(" · ")}</div>
-              {(["what", "when", "where", "look", "fail"] as const).filter((k) => server.details[k]).map((k) => (
-                <div key={k}>
-                  <div style={label}>{T.detail[k]}</div>
-                  <div style={{ lineHeight: "var(--line-height-base)" }}>
-                    {server.details[k]}
-                    {k === "look" && server.details.lookHref !== "/ops/schedules" && (
-                      <> <a href={server.details.lookHref} style={{ color: "var(--accent)" }}>前往</a></>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </>
-          ) : !sel || !selJob || !selOrg || !selTp ? (
-            <p style={{ color: "var(--text-muted)", margin: 0 }}>{T.panelEmpty}</p>
-          ) : (
-            <>
-              <div style={{ fontWeight: 700, fontSize: "var(--font-size-md)" }}>{selJob.label}</div>
-              <div style={{ color: "var(--text-muted)", marginTop: 2 }}>{selOrg.name}</div>
-              <div style={{ color: "var(--text-secondary)", marginTop: 8, fontSize: "var(--font-size-xs)", lineHeight: "var(--line-height-base)" }}>{T.cost}：{selJob.cost}</div>
-              {sel.enabled && sel.unavailable && <div style={{ color: "var(--yellow)", marginTop: 8 }}>{T.cellBlocked}{sel.unavailable}</div>}
+      <label style={{ display: "flex", gap: 8, alignItems: "center", cursor: "pointer", marginTop: 12, fontWeight: 600 }}>
+        <input type="checkbox" checked={c.enabled} disabled={saving} onChange={(e) => onSave({ enabled: e.target.checked })} aria-label={`${T.panelOn} · ${job.label} · ${org.name}`} />
+        {c.enabled ? `${T.panelOn}：${cadence(job, c)}` : T.cellOff}
+      </label>
+      {c.enabled && c.unavailable && <div style={{ color: "var(--yellow)", marginTop: 6, fontSize: "var(--font-size-xs)" }}>{T.cellBlocked}{c.unavailable}</div>}
 
-              <label style={{ display: "flex", gap: 8, alignItems: "center", cursor: "pointer", marginTop: 14 }}>
-                <input type="checkbox" checked={sel.enabled} disabled={saving} onChange={(e) => void save(sel, { enabled: e.target.checked })} />
-                {T.panelOn}
-              </label>
-
-              <div style={label}>{T.panelFrequency}</div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {selJob.frequencies.map((f) => (
-                  <button key={f.value} type="button" disabled={saving} style={chipStyle(sel.frequency === f.value)} onClick={() => void save(sel, { frequency: f.value })}>{f.label}</button>
-                ))}
-              </div>
-
-              {selFreq?.usesDay && (
-                <>
-                  <div style={label}>{T.panelWeekday}</div>
-                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                    {DAYS.map((d, day) => (
-                      <button key={day} type="button" disabled={saving} style={chipStyle(selTp.day === day)} onClick={() => void save(sel, utcFromTaipei(day, selTp.hour))}>{d}</button>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {selFreq?.usesHour && (
-                <>
-                  <div style={label}>{T.panelHour}</div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <input
-                      key={`${sel.jobKey}:${sel.organizationId}:${selTp.hour}`}
-                      type="number" min={0} max={23} defaultValue={selTp.hour} disabled={saving} aria-label={T.panelHour}
-                      onBlur={(e) => {
-                        const h = Number(e.target.value);
-                        if (Number.isInteger(h) && h >= 0 && h <= 23 && h !== selTp.hour) void save(sel, utcFromTaipei(selTp.day, h));
-                      }}
-                      style={{ width: 64, padding: "4px 8px", fontSize: "var(--font-size-sm)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text-primary)" }}
-                    />
-                    <span style={{ color: "var(--text-muted)" }}>:00</span>
-                  </div>
-                </>
-              )}
-
-              <div style={label}>{T.panelLastRun}</div>
-              <div>{sel.lastRunAt ? taipeiTime(sel.lastRunAt) : T.resultNever}</div>
-              <div style={label}>{T.panelLastResult}</div>
-              {sel.lastError ? (
-                <div style={{ color: "var(--red)", wordBreak: "break-all" }}>{T.resultFailed}{taipeiTime(sel.lastErrorAt)} · {sel.lastError}</div>
-              ) : (
-                <div>{sel.lastRunAt ? T.resultOk : T.resultNever}</div>
-              )}
-              <div style={label}>{T.panelChangedBy}</div>
-              <div style={{ color: "var(--text-secondary)" }}>{sel.updatedBy ? `${sel.updatedBy} · ${taipeiTime(sel.updatedAt)}` : T.changedNever}</div>
-            </>
-          )}
-        </aside>
+      {/* Shown on and off alike: a job can be set up first and switched on later (the old side panel allowed it). */}
+      <div style={label}>{T.panelFrequency}</div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {job.frequencies.map((f) => (
+          <button key={f.value} type="button" disabled={saving} style={chipStyle(c.frequency === f.value)} aria-pressed={c.frequency === f.value} onClick={() => onSave({ frequency: f.value })}>{f.label}</button>
+        ))}
       </div>
 
-    </div>
+      {freq?.usesDay && (
+        <>
+          <div style={label}>{T.panelWeekday}</div>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            {DAYS.map((d, day) => (
+              <button key={day} type="button" disabled={saving} style={chipStyle(tp.day === day)} aria-pressed={tp.day === day} onClick={() => onSave(utcFromTaipei(day, tp.hour))}>{d}</button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {freq?.usesHour && (
+        <>
+          <div style={label}>{T.panelHour}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 4 }} role="group" aria-label={T.panelHour}>
+            {HOURS.map((h) => (
+              <button key={h} type="button" disabled={saving} style={{ ...chipStyle(tp.hour === h), padding: "3px 0", textAlign: "center" }} aria-pressed={tp.hour === h}
+                onClick={() => { if (h !== tp.hour) onSave(utcFromTaipei(tp.day, h)); }}>{hh(h)}</button>
+            ))}
+          </div>
+        </>
+      )}
+
+      <div style={{ ...muted, marginTop: 12, display: "grid", gridTemplateColumns: "auto 1fr", columnGap: 10, rowGap: 2 }}>
+        <span>{T.panelLastRun}</span>
+        <span style={{ color: "var(--text-primary)" }}>{c.lastRunAt ? taipeiTime(c.lastRunAt) : T.resultNever}</span>
+        <span>{T.panelLastResult}</span>
+        {c.lastError ? (
+          <span style={{ color: "var(--red)", wordBreak: "break-all" }}>{T.resultFailed}{taipeiTime(c.lastErrorAt)} · {c.lastError}</span>
+        ) : (
+          <span style={{ color: "var(--text-primary)" }}>{c.lastRunAt ? T.resultOk : T.resultNever}</span>
+        )}
+        <span>{T.panelChangedBy}</span>
+        <span>{c.updatedBy ? `${c.updatedBy} · ${taipeiTime(c.updatedAt)}` : T.changedNever}</span>
+      </div>
+    </section>
+  );
+}
+
+/** One host schedule, read-only, its details open. */
+function ServerCard({ r }: { r: SystemRow }) {
+  const last = [taipeiTime(r.lastAt), r.detail].filter((x) => x && x !== "—").join(" · ");
+  return (
+    <section style={{ ...card, boxShadow: SERVER_BAD.has(r.state) ? "inset 3px 0 0 var(--red), var(--shadow)" : card.boxShadow }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ fontWeight: 700, fontSize: "var(--font-size-md)" }}>{r.label}</div>
+        <span className={`card-badge ${SERVER_BADGE[r.state]}`} style={{ whiteSpace: "nowrap" }}>{T.server[r.state]}</span>
+      </div>
+      <div style={{ ...muted, marginTop: 4 }}>{r.description}</div>
+      <div style={{ ...muted, marginTop: 10, display: "grid", gridTemplateColumns: "auto 1fr", columnGap: 10, rowGap: 4 }}>
+        {r.details.what && r.details.what !== r.description && (<><span>{T.detail.what}</span><span style={{ color: "var(--text-primary)" }}>{r.details.what}</span></>)}
+        {(r.details.when || r.cadence) && (<><span>{T.detail.when}</span><span style={{ color: "var(--text-primary)" }}>{r.details.when || r.cadence}</span></>)}
+        <span>{T.panelLastRun}</span><span style={{ color: "var(--text-primary)" }}>{last || "—"}</span>
+        {r.details.fail && (<><span>{T.detail.fail}</span><span>{r.details.fail}</span></>)}
+        {r.details.where && (<><span>{T.detail.where}</span><span style={{ wordBreak: "break-all" }}>{r.details.where}</span></>)}
+        {r.details.lookHref !== "/ops/schedules" && (
+          <><span>{T.detail.look}</span><span>{r.details.look} <a href={r.details.lookHref} style={{ color: "var(--accent)" }}>前往</a></span></>
+        )}
+      </div>
+    </section>
   );
 }

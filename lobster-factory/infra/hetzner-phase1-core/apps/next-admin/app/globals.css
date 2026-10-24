@@ -2331,12 +2331,15 @@ pre {
 
 /* ── Tab bar（圖片 / 影片）── */
 /* ── Generic tab component (uses --tab-* tokens) ── */
+/* Too many tabs for the width wrap to a second row; a label never breaks mid-word (網站與服務維/護). */
 .tab-bar {
   display: flex;
+  flex-wrap: wrap;
   gap: 2px;
   border-bottom: 2px solid var(--tab-bar-border);
 }
 .tab {
+  white-space: nowrap;
   padding: var(--tab-padding);
   border: none;
   background: var(--tab-bg);

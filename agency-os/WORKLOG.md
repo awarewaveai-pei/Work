@@ -16,6 +16,31 @@
 **未驗**：登入後的畫面需要有人用瀏覽器登入看，包括：客戶在 video、design 網址看到工作台；沒持有產品的客戶看到「尚未開通」頁。本機沒有帳號密碼，不代為輸入。prod 只有 Soulful 一個客戶帳號，它持有全部產品，所以「尚未開通」頁目前只有單元測試涵蓋。
 
 **rollback**：照 `DEPLOY_ROLLBACK_RUNBOOK.md` §2.1 回前一版 b2ec12826；nginx、DNS 的回退見續36。
+## 2026-10-24（續38）/ops/schedules 版面改版：刪「請先點選一個排程」側欄、改分頁、設定全部攤開（Claude）
+
+**觸發**：操作者（ADHD／OCD／ASD）「非常痛恨現在的 UI/UX」：①內容要先點格子才出現（不確定）②備份／網站與服務維護／部署與監控要一直往下滑 ③伺服器排程可否改時間。操作者核准先做 ①②，③等用過再說（High：要新增頁面→主機 cron 寫入路徑）。
+**根因**：舊 `ScheduleTable` 右側欄預設空白（`請先點選一個排程。`），所有設定藏在點擊後；伺服器排程三群直排在客戶表下方。
+
+**做法**（NA＝`lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- `NA/app/(shell)/ops/schedules/ScheduleTable.tsx` 重寫版面（API／資料不動）：一條分頁列（每客戶一頁＋伺服器 備份／部署與監控／網站與服務維護 各一頁，標籤帶數量與「N 異常」），沿用 `SubTabs`（`clients/[slug]/hub-ui.tsx`）；每工作一張卡，開關不論都攤開頻率／星期 chips＋台北時間 24 顆按鈕（取代數字框）；存檔成功卡上「✓ 已儲存」；伺服器卡細節直接展開；無群組的異常列放分頁列上方；三張統計卡縮成一行。客戶頁 `only` 只有一頁 → 無分頁列。
+- `NA/app/globals.css` `.tab-bar` 加 `flex-wrap`、`.tab` 加 `nowrap`：全 app 分頁標籤不再字中斷行（截圖見「網站與服務維/護」），放不下換第二行。
+- `agency-os/docs/operations/SCHEDULES_PAGE_PLAN.md` §3.2 第 4 點加改版說明（§3.4 草圖標舊版）。
+- 欄位對齊不變量：新版顯示舊版顯示過的每個欄位（cell：cadence／unavailable／lastRun／lastResult／changedBy／cost；server：cadence／lastAt／detail／state／what／when／where／look／fail）。
+
+**審查發現與處置**（Codex 三輪）
+- `agency-os/reports/oracle/2026-10-24-partialreview-41d2d643.md`：F1 `missing` 不算異常 → 加入（`untracked` 為設計如此，不加）；F2 漏 `details.what` → 與 description 不同時顯示；F3 關閉的工作看不到設定（回歸：舊側欄可改）→ 開關都攤開。
+- `agency-os/reports/oracle/2026-10-24-partialreview-720fa728.md`：F2 漏上次執行時間、F3 漏伺服器 cadence → 補回（觸發上面的欄位對齊比對）；F4 客戶頁可能出伺服器分頁 → 後端 `NA/lib/schedules/view.ts:474` 已回 `[]`，仍加 `only ? []` 防線；F1 存檔後 version 過期 → 駁回：`finally { await load() }` 重抓整份 view。
+- `agency-os/reports/oracle/2026-10-24-partialreview-a7c52f47.md`：F1 空 view 空白頁 → 駁回：未知 slug 由 `NA/app/api/ops/schedules/route.ts:22` 回 404 顯示錯誤；全站零客戶且零主機列在 prod 不可達。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/schedules | exit=0 | ms=1240（57 綠）
+- REALTEST_EVIDENCE: tool=Bash | cmd=next dev 無 Supabase（tests/e2e/social/dev-server-no-supabase.mjs）＋瀏覽器 fetch mock（假資料由 CLIENT_JOBS／SITE_WATCH_JOB／hostScheduleRowsFrom 真 registry 產生）點 09:00 → PATCH 送出、標籤變「每週一 09:00」、已儲存出現；切「部署與監控」分頁截圖 | exit=0 | ms=800（未碰 prod 資料；暫存 `public/__tmp-mock-view.json` 與 temp test 已刪）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/8m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=請先點選一個排程|serverHint|點選伺服器工作列 | hits=1（只剩計畫文件改版說明自己引用，正確）
+
+**剩餘風險**：prod 真資料未看（今晚 03:00 自動部署後才上線）；`.tab` 全域 nowrap 讓其他頁分頁過多時改換行而非擠壓。③ 伺服器排程可改 = 未做，待操作者用過再決定。
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-24（續37）AUTO_CONTENT P4 第二批：AI 審核後自動發布（I5）＋網站「發布方式」兩顆按鈕（Claude）
 
 **觸發**：操作者「部署已完成（b2ec12826，抽測 26 通過），直接從 P4 第二批開始」；卡 `agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md` §7 P4.6、P4.8。
