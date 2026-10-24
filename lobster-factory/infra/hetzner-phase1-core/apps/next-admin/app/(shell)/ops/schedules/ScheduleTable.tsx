@@ -33,15 +33,17 @@ const T = {
   bulkOn: "全部開啟",
   bulkOff: "全部關閉",
   bulkTime: "套用時間",
+  bulkDom: "套用日期",
   bulkClear: "取消選取",
   shown: "顯示 {n} / {total} 個 · 失敗的排在最上面",
   serverReadOnly: "伺服器排程只能查看，不能在這裡修改。",
   cost: "每次執行費用",
-  col: { site: "網站", on: "開關", freq: "頻率", day: "星期", hour: "台北時間", last: "上次結果", job: "排程", when: "執行時間", state: "狀態" },
+  col: { site: "網站", on: "開關", freq: "頻率", day: "星期", dom: "日期", hour: "台北時間", last: "上次結果", job: "排程", when: "執行時間", state: "狀態" },
   detail: { what: "工作內容", when: "執行時間", where: "結果存放位置", look: "查看位置", fail: "失敗處理" },
   cellBlocked: "已啟用，無法執行：",
   panelOn: "啟用排程",
   pickHour: "選擇台北時間",
+  pickDom: "選擇日期（每月 1–28 號）",
   resultOk: "成功",
   resultNever: "尚未執行",
   resultFailed: "失敗：",
@@ -87,13 +89,23 @@ const input: CSSProperties = {
   border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text-primary)",
 };
 /** Client-job rows: select | site | on | frequency | weekday | hour | last result. */
-/** The weekday column only exists when some frequency on screen uses a weekday (a monthly job has none). */
-const jobGrid = (showDay: boolean) => `28px minmax(140px, 1.2fr) 48px minmax(150px, 1.3fr)${showDay ? " 236px" : ""} 118px minmax(170px, 1.4fr)`;
+/** Which day columns are on screen: a column exists only when some frequency shown uses it (a monthly job has no weekday). */
+type DayCols = { day: boolean; dom: boolean };
+const colsOf = (jobs: JobMeta[]): DayCols => ({
+  day: jobs.some((j) => j.frequencies.some((f) => f.usesDay)),
+  dom: jobs.some((j) => j.frequencies.some((f) => f.usesDayOfMonth)),
+});
+const jobGrid = (cols: DayCols) =>
+  `28px minmax(140px, 1.2fr) 48px minmax(150px, 1.3fr)${cols.day ? " 236px" : ""}${cols.dom ? " 96px" : ""} 118px minmax(170px, 1.4fr)`;
+const HOURS = Array.from({ length: 24 }, (_, h) => h);
+/** 1-28: every month has them (0123). */
+const MONTH_DAYS = Array.from({ length: 28 }, (_, i) => i + 1);
+const domText = (d: number) => `${d} 號`;
 /** Server rows: schedule | when | last run | state. */
 const SERVER_GRID = "minmax(220px, 2fr) minmax(130px, 1fr) minmax(150px, 1fr) 96px";
 
 type TabKey = `job:${string}` | `group:${NonNullable<SystemRow["group"]>}`;
-type Patch = Partial<Pick<ScheduleCell, "enabled" | "frequency" | "hourUtc" | "dayOfWeekUtc">>;
+type Patch = Partial<Pick<ScheduleCell, "enabled" | "frequency" | "hourUtc" | "dayOfWeekUtc" | "dayOfMonth">>;
 type JobFilter = "all" | "failed" | "on" | "off";
 
 export function ScheduleTable({ only }: { only?: string }) {
@@ -106,6 +118,7 @@ export function ScheduleTable({ only }: { only?: string }) {
   /** Selected organization ids on the current job tab (cleared on tab change). */
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkHour, setBulkHour] = useState(6);
+  const [bulkDom, setBulkDom] = useState(1);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   /** Row keys that just saved, for their 已儲存 mark. */
@@ -143,7 +156,7 @@ export function ScheduleTable({ only }: { only?: string }) {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...roleHeader("admin") },
         body: JSON.stringify({
-          enabled: next.enabled, frequency: next.frequency, hourUtc: next.hourUtc, dayOfWeekUtc: next.dayOfWeekUtc,
+          enabled: next.enabled, frequency: next.frequency, hourUtc: next.hourUtc, dayOfWeekUtc: next.dayOfWeekUtc, dayOfMonth: next.dayOfMonth,
           ...(cell.version !== null ? { expectedVersion: cell.version } : {}),
         }),
       });
@@ -229,7 +242,7 @@ export function ScheduleTable({ only }: { only?: string }) {
           <JobTable
             job={activeJob} orgs={view.orgs} cells={jobCells(activeJob.key)}
             query={query} setQuery={setQuery} filter={jobFilter} setFilter={setJobFilter}
-            selected={selected} setSelected={setSelected} bulkHour={bulkHour} setBulkHour={setBulkHour}
+            selected={selected} setSelected={setSelected} bulkHour={bulkHour} setBulkHour={setBulkHour} bulkDom={bulkDom} setBulkDom={setBulkDom}
             saving={saving} savedKeys={savedKeys} save={(items) => void save(items)}
           />
         )}
@@ -251,10 +264,10 @@ function Toolbar({ query, setQuery, placeholder, children }: { query: string; se
 }
 
 /** One job, one row per client: every setting on the row, failures first, bulk edits for many clients. */
-function JobTable({ job, orgs, cells, query, setQuery, filter, setFilter, selected, setSelected, bulkHour, setBulkHour, saving, savedKeys, save }: {
+function JobTable({ job, orgs, cells, query, setQuery, filter, setFilter, selected, setSelected, bulkHour, setBulkHour, bulkDom, setBulkDom, saving, savedKeys, save }: {
   job: JobMeta; orgs: ScheduleOrg[]; cells: ScheduleCell[];
   query: string; setQuery: (q: string) => void; filter: JobFilter; setFilter: (f: JobFilter) => void;
-  selected: Set<string>; setSelected: (s: Set<string>) => void; bulkHour: number; setBulkHour: (h: number) => void;
+  selected: Set<string>; setSelected: (s: Set<string>) => void; bulkHour: number; setBulkHour: (h: number) => void; bulkDom: number; setBulkDom: (d: number) => void;
   saving: boolean; savedKeys: Set<string>; save: (items: Array<{ cell: ScheduleCell; patch: Patch }>) => void;
 }) {
   const name = (id: string) => orgs.find((o) => o.id === id)?.name ?? id;
@@ -267,7 +280,7 @@ function JobTable({ job, orgs, cells, query, setQuery, filter, setFilter, select
   const picked = cells.filter((c) => selected.has(c.organizationId));
   const allPicked = rows.length > 0 && rows.every((c) => selected.has(c.organizationId));
   const usesHour = job.frequencies.some((f) => f.usesHour);
-  const showDay = job.frequencies.some((f) => f.usesDay);
+  const cols = colsOf([job]);
   const toggle = (id: string, on: boolean) => { const s = new Set(selected); if (on) s.add(id); else s.delete(id); setSelected(s); };
 
   return (
@@ -289,9 +302,15 @@ function JobTable({ job, orgs, cells, query, setQuery, filter, setFilter, select
             ))}
             {usesHour && (
               <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <HourPicker hour={bulkHour} disabled={saving} onChange={setBulkHour} />
+                <GridPicker value={bulkHour} options={HOURS} format={hh} label={T.pickHour} disabled={saving} onChange={setBulkHour} />
                 <button type="button" disabled={saving} style={chipStyle(false)}
                   onClick={() => save(picked.map((cell) => ({ cell, patch: utcFromTaipei(taipeiFromUtc(cell.dayOfWeekUtc, cell.hourUtc).day, bulkHour) })))}>{T.bulkTime}</button>
+              </span>
+            )}
+            {cols.dom && (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <GridPicker value={bulkDom} options={MONTH_DAYS} format={domText} label={T.pickDom} columns={7} disabled={saving} onChange={setBulkDom} />
+                <button type="button" disabled={saving} style={chipStyle(false)} onClick={() => save(picked.map((cell) => ({ cell, patch: { dayOfMonth: bulkDom } })))}>{T.bulkDom}</button>
               </span>
             )}
             <button type="button" style={chipStyle(false)} onClick={() => setSelected(new Set())}>{T.bulkClear}</button>
@@ -302,18 +321,19 @@ function JobTable({ job, orgs, cells, query, setQuery, filter, setFilter, select
       </div>
 
       <div style={{ ...card, overflowX: "auto" }}>
-        <div style={{ display: "grid", gridTemplateColumns: jobGrid(showDay), gap: 10, padding: "8px 14px", borderBottom: "1px solid var(--border)", minWidth: 900, alignItems: "center" }}>
+        <div style={{ display: "grid", gridTemplateColumns: jobGrid(cols), gap: 10, padding: "8px 14px", borderBottom: "1px solid var(--border)", minWidth: 900, alignItems: "center" }}>
           <span><input type="checkbox" checked={allPicked} aria-label={T.bulkClear}
             onChange={(e) => { const s = new Set(selected); rows.forEach((c) => (e.target.checked ? s.add(c.organizationId) : s.delete(c.organizationId))); setSelected(s); }} /></span>
           <span style={headCell}>{T.col.site}</span>
           <span style={headCell}>{T.col.on}</span>
           <span style={headCell}>{T.col.freq}</span>
-          {showDay && <span style={headCell}>{T.col.day}</span>}
+          {cols.day && <span style={headCell}>{T.col.day}</span>}
+          {cols.dom && <span style={headCell}>{T.col.dom}</span>}
           <span style={headCell}>{T.col.hour}</span>
           <span style={headCell}>{T.col.last}</span>
         </div>
         {rows.map((c) => (
-          <JobRow key={c.organizationId} job={job} c={c} name={name(c.organizationId)} single={false} showDay={showDay}
+          <JobRow key={c.organizationId} job={job} c={c} name={name(c.organizationId)} single={false} cols={cols}
             picked={selected.has(c.organizationId)} onPick={(on) => toggle(c.organizationId, on)}
             saving={saving} saved={savedKeys.has(`${c.jobKey}:${c.organizationId}`)} onSave={(patch) => save([{ cell: c, patch }])} />
         ))}
@@ -327,22 +347,23 @@ function JobTable({ job, orgs, cells, query, setQuery, filter, setFilter, select
 function ClientJobs({ jobs, cells, saving, savedKeys, save }: {
   jobs: JobMeta[]; cells: ScheduleCell[]; saving: boolean; savedKeys: Set<string>; save: (items: Array<{ cell: ScheduleCell; patch: Patch }>) => void;
 }) {
-  const showDay = jobs.some((j) => j.frequencies.some((f) => f.usesDay));
+  const cols = colsOf(jobs);
   return (
     <div style={{ ...card, overflowX: "auto" }}>
-      <div style={{ display: "grid", gridTemplateColumns: jobGrid(showDay), gap: 10, padding: "8px 14px", borderBottom: "1px solid var(--border)", minWidth: 900, alignItems: "center" }}>
+      <div style={{ display: "grid", gridTemplateColumns: jobGrid(cols), gap: 10, padding: "8px 14px", borderBottom: "1px solid var(--border)", minWidth: 900, alignItems: "center" }}>
         <span />
         <span style={headCell}>{T.col.job}</span>
         <span style={headCell}>{T.col.on}</span>
         <span style={headCell}>{T.col.freq}</span>
-        {showDay && <span style={headCell}>{T.col.day}</span>}
+        {cols.day && <span style={headCell}>{T.col.day}</span>}
+        {cols.dom && <span style={headCell}>{T.col.dom}</span>}
         <span style={headCell}>{T.col.hour}</span>
         <span style={headCell}>{T.col.last}</span>
       </div>
       {jobs.map((job) => {
         const c = cells.find((x) => x.jobKey === job.key);
         return c ? (
-          <JobRow key={job.key} job={job} c={c} name={job.label} sub={`${job.description}　${T.cost}：${job.cost}`} single showDay={showDay} picked={false} onPick={() => {}}
+          <JobRow key={job.key} job={job} c={c} name={job.label} sub={`${job.description}　${T.cost}：${job.cost}`} single cols={cols} picked={false} onPick={() => {}}
             saving={saving} saved={savedKeys.has(`${c.jobKey}:${c.organizationId}`)} onSave={(patch) => save([{ cell: c, patch }])} />
         ) : null;
       })}
@@ -350,9 +371,11 @@ function ClientJobs({ jobs, cells, saving, savedKeys, save }: {
   );
 }
 
-/** The hour shows as a button; clicking it opens all 24 hours as a grid -- any hour in two clicks.
+/** A value shows as a button; clicking it opens every choice as a grid (24 hours, 28 days) -- any value in two clicks.
  *  Fixed-positioned so the rows' horizontal-scroll box does not clip it; closes on pick, Escape, outside click or scroll. */
-function HourPicker({ hour, disabled, onChange }: { hour: number; disabled: boolean; onChange: (h: number) => void }) {
+function GridPicker({ value, options, format, label, columns = 6, disabled, onChange }: {
+  value: number; options: number[]; format: (v: number) => string; label: string; columns?: number; disabled: boolean; onChange: (v: number) => void;
+}) {
   const [at, setAt] = useState<{ left: number; top: number } | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -366,27 +389,28 @@ function HourPicker({ hour, disabled, onChange }: { hour: number; disabled: bool
     window.addEventListener("scroll", close, true);
     return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); window.removeEventListener("scroll", close, true); };
   }, [at]);
+  const width = columns * 48 + 8 * 2;
   const open = () => {
     const r = btnRef.current?.getBoundingClientRect();
     if (!r) return;
-    const width = 290, height = 150;
+    const height = Math.ceil(options.length / columns) * 32 + 16;
     setAt({ left: Math.max(8, Math.min(r.left, window.innerWidth - width - 8)), top: r.bottom + height + 8 > window.innerHeight ? r.top - height - 4 : r.bottom + 4 });
   };
   return (
     <>
-      <button ref={btnRef} type="button" disabled={disabled} aria-label={T.pickHour} aria-expanded={Boolean(at)}
+      <button ref={btnRef} type="button" disabled={disabled} aria-label={label} aria-expanded={Boolean(at)}
         style={{ ...chipStyle(Boolean(at)), padding: "3px 12px", fontSize: "var(--font-size-sm)", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}
-        onClick={() => (at ? setAt(null) : open())}>{hh(hour)}</button>
+        onClick={() => (at ? setAt(null) : open())}>{format(value)}</button>
       {at && (
-        <div ref={panelRef} role="group" aria-label={T.pickHour} style={{
-          position: "fixed", left: at.left, top: at.top, zIndex: 50, width: 290, padding: 8, display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 4,
+        <div ref={panelRef} role="group" aria-label={label} style={{
+          position: "fixed", left: at.left, top: at.top, zIndex: 50, width, padding: 8, display: "grid", gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 4,
           // Themes may give --card-bg alpha (cards show the page through); a floating panel must not, so the card
           // tint is laid over the page colour, which is always opaque.
           background: "linear-gradient(var(--card-bg), var(--card-bg)), var(--body-bg)", border: "1px solid var(--card-border)", borderRadius: "var(--radius)", boxShadow: "var(--shadow)",
         }}>
-          {Array.from({ length: 24 }, (_, h) => (
-            <button key={h} type="button" style={{ ...chipStyle(h === hour), padding: "4px 0", textAlign: "center", fontVariantNumeric: "tabular-nums" }} aria-pressed={h === hour}
-              onClick={() => { setAt(null); if (h !== hour) onChange(h); }}>{hh(h)}</button>
+          {options.map((v) => (
+            <button key={v} type="button" style={{ ...chipStyle(v === value), padding: "4px 0", textAlign: "center", fontVariantNumeric: "tabular-nums" }} aria-pressed={v === value}
+              onClick={() => { setAt(null); if (v !== value) onChange(v); }}>{format(v)}</button>
           ))}
         </div>
       )}
@@ -394,8 +418,8 @@ function HourPicker({ hour, disabled, onChange }: { hour: number; disabled: bool
   );
 }
 
-function JobRow({ job, c, name, sub, single, showDay, picked, onPick, saving, saved, onSave }: {
-  job: JobMeta; c: ScheduleCell; name: string; sub?: string; single: boolean; showDay: boolean; picked: boolean; onPick: (on: boolean) => void;
+function JobRow({ job, c, name, sub, single, cols, picked, onPick, saving, saved, onSave }: {
+  job: JobMeta; c: ScheduleCell; name: string; sub?: string; single: boolean; cols: DayCols; picked: boolean; onPick: (on: boolean) => void;
   saving: boolean; saved: boolean; onSave: (p: Patch) => void;
 }) {
   const freq = job.frequencies.find((f) => f.value === c.frequency);
@@ -403,7 +427,7 @@ function JobRow({ job, c, name, sub, single, showDay, picked, onPick, saving, sa
   const dim: CSSProperties = c.enabled ? {} : { opacity: 0.55 };
   return (
     <div style={{
-      display: "grid", gridTemplateColumns: jobGrid(showDay), gap: 10, padding: "8px 14px", borderBottom: "1px solid var(--border-subtle)", minWidth: 900, alignItems: "center",
+      display: "grid", gridTemplateColumns: jobGrid(cols), gap: 10, padding: "8px 14px", borderBottom: "1px solid var(--border-subtle)", minWidth: 900, alignItems: "center",
       background: c.lastError ? "color-mix(in srgb, var(--red) 8%, transparent)" : picked ? "color-mix(in srgb, var(--accent) 10%, transparent)" : undefined,
     }}>
       <span>{!single && <input type="checkbox" checked={picked} onChange={(e) => onPick(e.target.checked)} aria-label={name} />}</span>
@@ -419,15 +443,22 @@ function JobRow({ job, c, name, sub, single, showDay, picked, onPick, saving, sa
           <button key={f.value} type="button" disabled={saving} style={chipStyle(c.frequency === f.value)} aria-pressed={c.frequency === f.value} onClick={() => onSave({ frequency: f.value })}>{f.label}</button>
         ))}
       </span>
-      {showDay && (
+      {cols.day && (
         <span style={{ display: "flex", gap: 3, flexWrap: "nowrap", ...dim }}>
           {freq?.usesDay ? DAYS.map((d, day) => (
             <button key={day} type="button" disabled={saving} style={{ ...chipStyle(tp.day === day), padding: "3px 0", width: 29, textAlign: "center" }} aria-pressed={tp.day === day} onClick={() => onSave(utcFromTaipei(day, tp.hour))}>{d}</button>
           )) : <span style={muted}>—</span>}
         </span>
       )}
+      {cols.dom && (
+        <span style={dim}>
+          {freq?.usesDayOfMonth
+            ? <GridPicker value={c.dayOfMonth} options={MONTH_DAYS} format={domText} label={T.pickDom} columns={7} disabled={saving} onChange={(d) => onSave({ dayOfMonth: d })} />
+            : <span style={muted}>—</span>}
+        </span>
+      )}
       <span style={dim}>
-        {freq?.usesHour ? <HourPicker hour={tp.hour} disabled={saving} onChange={(h) => onSave(utcFromTaipei(tp.day, h))} /> : <span style={muted}>—</span>}
+        {freq?.usesHour ? <GridPicker value={tp.hour} options={HOURS} format={hh} label={T.pickHour} disabled={saving} onChange={(h) => onSave(utcFromTaipei(tp.day, h))} /> : <span style={muted}>—</span>}
       </span>
       <span style={{ ...muted, display: "flex", flexDirection: "column" }}>
         {c.lastError ? (

@@ -17,8 +17,8 @@ import { timingSafeEqual } from "@/lib/security/timingSafeEqual";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { ingestIncident } from "@/lib/ops-inbox/ingest";
 import { claimScheduleRun, listEnabledSchedules, recordScheduleError, recordScheduleRun, type StoredSchedule } from "@/lib/schedules/store";
-import { isDueNow, scheduledRunKey } from "@/lib/schedules/schedule";
-import { clientJob } from "@/lib/schedules/jobs";
+import { NotDueYet, isDueNow, scheduledRunKey } from "@/lib/schedules/schedule";
+import { asRegistered, clientJob } from "@/lib/schedules/jobs";
 import { refreshClaimReviewIfDue } from "@/lib/collect/lookups/answer";
 
 export const runtime = "nodejs";
@@ -64,6 +64,8 @@ async function runClaimed(claimed: Array<{ schedule: StoredSchedule; runKey: str
       await recordScheduleRun(schedule.organizationId, schedule.jobKey);
       console.info(`[schedules] ${runKey} ok ${summary}`);
     } catch (e) {
+      // the job's own clock says not yet: nothing happened, so nothing is recorded; the next due day retries
+      if (e instanceof NotDueYet) { console.info(`[schedules] ${runKey} not due yet: ${e.message}`); continue; }
       const error = String(e).slice(0, 200);
       await recordScheduleError(schedule.organizationId, schedule.jobKey, error).catch((x) =>
         console.error(`[schedules] ${runKey} last_error not recorded: ${String(x)}`),
@@ -82,7 +84,7 @@ export async function POST(request: Request) {
   const now = new Date();
   let schedules: StoredSchedule[];
   try {
-    schedules = await listEnabledSchedules();
+    schedules = (await listEnabledSchedules()).map(asRegistered);
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e).slice(0, 200) }, { status: 500 });
   }

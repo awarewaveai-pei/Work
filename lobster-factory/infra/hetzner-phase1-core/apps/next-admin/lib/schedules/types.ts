@@ -7,6 +7,8 @@ export interface FrequencyOption {
   usesHour: boolean;
   /** The weekday picker applies to this frequency. */
   usesDay: boolean;
+  /** The day-of-month picker (1-28, Taipei) applies to this frequency (monthly / quarterly / yearly). */
+  usesDayOfMonth?: boolean;
 }
 
 export interface JobMeta {
@@ -29,6 +31,8 @@ export interface ScheduleCell {
   frequency: string;
   hourUtc: number;
   dayOfWeekUtc: number;
+  /** 1-28, Taipei calendar day; only meaningful for a frequency with usesDayOfMonth. */
+  dayOfMonth: number;
   lastRunAt: string | null;
   lastError: string | null;
   lastErrorAt: string | null;

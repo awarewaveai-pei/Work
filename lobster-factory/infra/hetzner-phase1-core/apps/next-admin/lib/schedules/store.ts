@@ -23,6 +23,7 @@ interface Row {
   frequency: Frequency;
   hour_utc: number;
   day_of_week_utc: number;
+  day_of_month: number;
   last_run_at: string | null;
   last_run_key: string | null;
   last_error: string | null;
@@ -39,6 +40,7 @@ function toSchedule(r: Row): StoredSchedule {
     frequency: r.frequency,
     hourUtc: r.hour_utc,
     dayOfWeekUtc: r.day_of_week_utc,
+    dayOfMonth: r.day_of_month,
     lastRunAt: r.last_run_at,
     lastRunKey: r.last_run_key,
     lastError: r.last_error,
@@ -77,6 +79,9 @@ export interface UpsertScheduleInput {
   frequency: Frequency;
   hourUtc: number;
   dayOfWeekUtc: number;
+  /** 1-28, Taipei calendar day (0123). Left out = an existing row keeps its day (a page loaded before 0123 does not send
+   *  it); a new row gets the column default 1. */
+  dayOfMonth?: number;
   /** "role:source", same shape as collection_sources.approved_by. */
   updatedBy: string;
 }
@@ -92,6 +97,7 @@ export interface WriteResult {
 export async function upsertSchedule(input: UpsertScheduleInput): Promise<WriteResult> {
   if (input.hourUtc < 0 || input.hourUtc > 23) return { ok: false, errors: ["hour_utc_out_of_range"] };
   if (input.dayOfWeekUtc < 0 || input.dayOfWeekUtc > 6) return { ok: false, errors: ["day_of_week_utc_out_of_range"] };
+  if (input.dayOfMonth !== undefined && (!Number.isInteger(input.dayOfMonth) || input.dayOfMonth < 1 || input.dayOfMonth > 28)) return { ok: false, errors: ["day_of_month_out_of_range"] };
   const sb = getSupabaseWriteClient();
   if (!sb) return { ok: false, errors: ["no_supabase_client"] };
 
@@ -105,6 +111,7 @@ export async function upsertSchedule(input: UpsertScheduleInput): Promise<WriteR
         frequency: input.frequency,
         hour_utc: input.hourUtc,
         day_of_week_utc: input.dayOfWeekUtc,
+        ...(input.dayOfMonth !== undefined ? { day_of_month: input.dayOfMonth } : {}),
         updated_by: input.updatedBy,
         updated_at: new Date().toISOString(),
       },
@@ -114,6 +121,23 @@ export async function upsertSchedule(input: UpsertScheduleInput): Promise<WriteR
     .single();
   if (error || !data) return { ok: false, errors: [`write_failed:${error?.message ?? "no_row"}`] };
   return { ok: true, schedule: toSchedule(data as Row), errors: [] };
+}
+
+/** Turns one (client, job) on or off and nothing else: a switch elsewhere (the social 報表管理 page) must not write back a
+ * send day or hour it read earlier over one the staff just changed. No row yet = the job's defaults, switched as asked. */
+export async function setScheduleEnabled(
+  organizationId: string, jobKey: string, enabled: boolean, updatedBy: string,
+  defaults: Pick<UpsertScheduleInput, "frequency" | "hourUtc" | "dayOfWeekUtc" | "dayOfMonth">,
+): Promise<WriteResult> {
+  const { data, error } = await client()
+    .from("client_schedules")
+    .update({ enabled, updated_by: updatedBy, updated_at: new Date().toISOString() })
+    .eq("organization_id", organizationId)
+    .eq("job_key", jobKey)
+    .select("*");
+  if (error) return { ok: false, errors: [`write_failed:${error.message}`] };
+  if ((data ?? []).length === 1) return { ok: true, schedule: toSchedule((data as Row[])[0]), errors: [] };
+  return upsertSchedule({ organizationId, jobKey, enabled, updatedBy, ...defaults });
 }
 
 /**

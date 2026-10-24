@@ -4,8 +4,8 @@
 // (lib/social/reports.ts loadReportData -> metrics.ts summarize). A number a platform does not give is "—", never a 0.
 import { useEffect, useMemo, useState } from "react";
 import type { Report, ReportData, ReportPart } from "@/lib/social/reports";
-import { COLOUR_VAR, REPORT_COLOURS, PRESETS, presetPeriod, type Preset } from "@/lib/social/report-period";
-import { api } from "../../api";
+import { COLOUR_VAR, REPORT_COLOURS, PRESETS, REPORT_JOBS, presetPeriod, type Preset, type ReportKind } from "@/lib/social/report-period";
+import { api, type ReportSchedules } from "../../api";
 import { PfMark } from "../../Calendar";
 import EmptyState from "../../EmptyState";
 import { platformOf, shortDate } from "../../model";
@@ -13,7 +13,9 @@ import { socialBase } from "../../routes";
 import type { SlotContext } from "../../SocialManager";
 import "./reporting.css";
 
-const PER: Record<Preset, string> = { lastw: "上週", lastm: "上個月", lastq: "上一季" };
+/** The automatic sends, in period order; the send day and hour are set on the staff schedules page. */
+const SENDS = (Object.keys(REPORT_JOBS) as ReportKind[]).map((kind) => ({ kind, noun: REPORT_JOBS[kind].noun }));
+const PER: Record<Preset, string> = { lastw: "上週", lastm: "上個月", lastq: "上一季", lasty: "去年" };
 export const PARTS: Array<{ k: ReportPart; t: string }> = [
   { k: "sum", t: "摘要（追蹤者、觸及、互動）" }, { k: "plat", t: "各平台成效" }, { k: "top", t: "表現最好的 5 則貼文" }, { k: "cmp", t: "和上一期比較" },
 ];
@@ -34,7 +36,7 @@ export default function Reporting({ ctx }: { ctx: SlotContext }) {
   const [past, setPast] = useState<Report[] | null>(null);
   const [preview, setPreview] = useState<ReportData | null>(null);
   const [previewErr, setPreviewErr] = useState<string | null>(null);
-  const [monthly, setMonthly] = useState<{ enabled: boolean; lastError: string | null } | null>(null);
+  const [sends, setSends] = useState<ReportSchedules | null>(null);
   const [busy, setBusy] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
   const range = useMemo(() => presetPeriod(ctx.today, per), [ctx.today, per]);
@@ -45,9 +47,9 @@ export default function Reporting({ ctx }: { ctx: SlotContext }) {
   // the page stays mounted when the brand changes: drop the old brand's lists at once and ignore its late answers
   useEffect(() => {
     let live = true;
-    setPast(null); setMonthly(null); setOff([]); setHint(null);
+    setPast(null); setSends(null); setOff([]); setHint(null);
     api.reports(brand.id).then((r) => { if (live) setPast(r.reports); }).catch((e) => { if (live) setHint(msg(e)); });
-    api.monthly(brand.id).then((r) => { if (live) setMonthly(r.monthly); }).catch(() => { if (live) setMonthly(null); });
+    api.reportSchedules(brand.id).then((r) => { if (live) setSends(r.schedules); }).catch(() => { if (live) setSends(null); });
     return () => { live = false; };
   }, [brand.id]);
   useEffect(() => {
@@ -79,9 +81,10 @@ export default function Reporting({ ctx }: { ctx: SlotContext }) {
       setBusy(false);
     }
   }
-  async function setMail(on: boolean) {
-    setMonthly((m) => ({ enabled: on, lastError: m?.lastError ?? null }));
-    try { setMonthly((await api.setMonthly(brand.id, on)).monthly); } catch (e) { setMonthly((m) => ({ enabled: !on, lastError: m?.lastError ?? null })); setHint(msg(e)); }
+  async function setMail(kind: ReportKind, on: boolean) {
+    const flip = (v: boolean) => setSends((s) => (s ? { ...s, [kind]: { ...s[kind], enabled: v } } : s));
+    flip(on);
+    try { setSends((await api.setReportSchedule(brand.id, kind, on)).schedules); } catch (e) { flip(!on); setHint(msg(e)); }
   }
   async function remove(r: Report) {
     if (!window.confirm(`刪掉報表「${r.name}」？`)) return;
@@ -124,8 +127,12 @@ export default function Reporting({ ctx }: { ctx: SlotContext }) {
             <div>
               <h3 className="sm-muted">內容</h3>
               {PARTS.map((p) => <label key={p.k} className="rp-ck"><input type="checkbox" checked={parts.includes(p.k)} onChange={(e) => setParts((l) => toggle(l, p.k, e.target.checked))} />{p.t}</label>)}
-              <label className="rp-ck"><input type="checkbox" checked={!!monthly?.enabled} disabled={!canWrite || monthly === null} onChange={(e) => void setMail(e.target.checked)} />每月 1 號自動寄給客戶</label>
-              {monthly?.lastError && <div className="sm-err">上次自動寄出失敗：{monthly.lastError}</div>}
+              {SENDS.map(({ kind, noun }) => (
+                <div key={kind}>
+                  <label className="rp-ck"><input type="checkbox" checked={!!sends?.[kind].enabled} disabled={!canWrite || sends === null} onChange={(e) => void setMail(kind, e.target.checked)} />自動寄{noun}給客戶{sends && `（${sends[kind].when}）`}</label>
+                  {sends?.[kind].lastError && <div className="sm-err">上次自動寄出{noun}失敗：{sends[kind].lastError}</div>}
+                </div>
+              ))}
             </div>
           </div>
         </div>

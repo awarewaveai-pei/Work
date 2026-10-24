@@ -8,7 +8,7 @@ const run = vi.hoisted(() => vi.fn());
 const ingestIncident = vi.hoisted(() => vi.fn());
 const refreshClaimReviewIfDue = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/schedules/store", () => ({ listEnabledSchedules, recordScheduleRun, recordScheduleError, claimScheduleRun }));
-vi.mock("@/lib/schedules/jobs", () => ({ clientJob: (key: string) => (key === "collect_crawl" ? { key, run } : undefined) }));
+vi.mock("@/lib/schedules/jobs", () => ({ clientJob: (key: string) => (key === "collect_crawl" ? { key, run } : undefined), asRegistered: <T,>(row: T) => row }));
 vi.mock("@/lib/ops-inbox/ingest", () => ({ ingestIncident }));
 vi.mock("@/lib/collect/lookups/answer", () => ({ refreshClaimReviewIfDue }));
 const sb = vi.hoisted(() => ({
@@ -39,6 +39,7 @@ const dueSchedule = (organizationId: string, jobKey = "collect_crawl") => ({
   frequency: "daily" as const,
   hourUtc: new Date().getUTCHours(), // guarantees isDueNow() is true right now, no fake timers needed
   dayOfWeekUtc: 1,
+  dayOfMonth: 1,
   lastRunAt: null,
   lastRunKey: null,
   lastError: null,
@@ -142,6 +143,17 @@ describe("POST /api/internal/schedules/run-due", () => {
       sb,
       expect.objectContaining({ source: "schedule", fingerprint: `schedule:collect_crawl:${ORG_A}`, client_slug: "acme" }),
     );
+  });
+
+  it("a job that says not yet (its own clock) records nothing: no run, no error, no incident", async () => {
+    const { NotDueYet } = await import("@/lib/schedules/schedule");
+    listEnabledSchedules.mockResolvedValue([dueSchedule(ORG_A)]);
+    run.mockRejectedValue(new NotDueYet("2026-10-31 is not over yet in America/New_York"));
+    await sweep();
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(recordScheduleRun).not.toHaveBeenCalled();
+    expect(recordScheduleError).not.toHaveBeenCalled();
+    expect(ingestIncident).not.toHaveBeenCalled();
   });
 
   it("a row whose job left the registry is a failure, not a silent skip", async () => {

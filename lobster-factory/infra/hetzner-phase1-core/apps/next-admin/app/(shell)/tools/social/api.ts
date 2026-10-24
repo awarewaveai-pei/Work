@@ -149,9 +149,12 @@ export const api = {
   createReport: (brand: string, r: import("@/lib/social/reports").ReportSpec) => call<{ id: string }>("POST", "/api/social/reports", { brand, ...r }),
   deleteReport: (brand: string, id: string) => call<object>("DELETE", `/api/social/reports?${q({ brand, id })}`),
   report: (id: string) => call<{ report: import("@/lib/social/reports").Report; data: import("@/lib/social/reports").ReportData }>("GET", `/api/social/reports/${id}`),
-  monthly: (brand: string) => call<{ monthly: { enabled: boolean; lastRunAt: string | null; lastError: string | null } }>("GET", `/api/social/reports/monthly?${q({ brand })}`),
-  setMonthly: (brand: string, enabled: boolean) => call<{ monthly: { enabled: boolean; lastRunAt: string | null; lastError: string | null } }>("PUT", "/api/social/reports/monthly", { brand, enabled }),
+  reportSchedules: (brand: string) => call<{ schedules: ReportSchedules }>("GET", `/api/social/reports/monthly?${q({ brand })}`),
+  setReportSchedule: (brand: string, kind: import("@/lib/social/reports").ReportKind, enabled: boolean) =>
+    call<{ schedules: ReportSchedules }>("PUT", "/api/social/reports/monthly", { brand, kind, enabled }),
 };
+/** The brand's automatic report sends (週報 / 月報 / 季報 / 年報); `when` = the send day and hour in Taipei time. */
+export type ReportSchedules = Record<import("@/lib/social/reports").ReportKind, { enabled: boolean; lastRunAt: string | null; lastError: string | null; when: string }>;
 /** GET /api/social/smartlink; base = the public address up to the slug; clicks = the brand's last 28 days */
 export interface SmartLinkData {
   link: { slug: string; title: string; bio: string; colour: import("./model").Tag["colour"]; published: boolean } | null;

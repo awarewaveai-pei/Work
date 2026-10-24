@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isDueNow, scheduledRunKey, taipeiFromUtc, utcFromTaipei, type Schedule } from "@/lib/schedules/schedule";
 
-const base: Schedule = { enabled: true, frequency: "daily", hourUtc: 3, dayOfWeekUtc: 1, lastRunAt: null };
+const base: Schedule = { enabled: true, frequency: "daily", hourUtc: 3, dayOfWeekUtc: 1, dayOfMonth: 1, lastRunAt: null };
 
 describe("isDueNow", () => {
   it("is never due when disabled, even at the exact hour", () => {
@@ -90,5 +90,46 @@ describe("Taipei <-> UTC (the table edits Taipei time, the row stores UTC)", () 
         expect(taipeiFromUtc(u.dayOfWeekUtc, u.hourUtc)).toEqual({ day: d, hour: h });
       }
     }
+  });
+});
+
+describe("monthly / quarterly / yearly (0123: dayOfMonth is a Taipei day; a missed day is retried 2 more days)", () => {
+  // hourUtc 1 = 09:00 Taipei, same calendar day
+  const monthly: Schedule = { ...base, frequency: "monthly", hourUtc: 1, dayOfMonth: 5 };
+  it("fires on its day at its hour, not the day before or at another hour", () => {
+    expect(isDueNow(monthly, new Date("2026-11-05T01:10:00Z"))).toBe(true);
+    expect(isDueNow(monthly, new Date("2026-11-04T01:10:00Z"))).toBe(false);
+    expect(isDueNow(monthly, new Date("2026-11-05T02:10:00Z"))).toBe(false);
+  });
+  it("a missed day is retried on the next two days at the same hour, then given up until next month", () => {
+    expect(isDueNow(monthly, new Date("2026-11-06T01:10:00Z"))).toBe(true);
+    expect(isDueNow(monthly, new Date("2026-11-07T01:10:00Z"))).toBe(true);
+    expect(isDueNow(monthly, new Date("2026-11-08T01:10:00Z"))).toBe(false);
+  });
+  it("once it ran this month it is not due again until next month's day", () => {
+    const ran = { ...monthly, lastRunAt: "2026-11-05T01:02:00Z" };
+    expect(isDueNow(ran, new Date("2026-11-06T01:10:00Z"))).toBe(false);
+    expect(isDueNow(ran, new Date("2026-12-05T01:10:00Z"))).toBe(true);
+  });
+  it("the day is Taipei's: 03:00 Taipei on the 1st is 19:00 UTC on the last day of the month before", () => {
+    const early: Schedule = { ...base, frequency: "monthly", hourUtc: 19, dayOfMonth: 1 };
+    expect(isDueNow(early, new Date("2026-10-31T19:05:00Z"))).toBe(true);    // Taipei 2026-11-01 03:05
+    expect(isDueNow(early, new Date("2026-10-30T19:05:00Z"))).toBe(false);   // Taipei 2026-10-31
+    // ran at Taipei 11-01 03:02 (UTC still October): November is done, the catch-up day after is not due
+    expect(isDueNow({ ...early, lastRunAt: "2026-10-31T19:02:00Z" }, new Date("2026-11-01T19:05:00Z"))).toBe(false);
+  });
+  it("quarterly fires only in January, April, July, October", () => {
+    const q: Schedule = { ...base, frequency: "quarterly", hourUtc: 1, dayOfMonth: 1 };
+    expect(isDueNow(q, new Date("2026-10-01T01:10:00Z"))).toBe(true);
+    expect(isDueNow(q, new Date("2026-11-01T01:10:00Z"))).toBe(false);
+    expect(isDueNow({ ...q, lastRunAt: "2026-07-01T01:02:00Z" }, new Date("2026-10-01T01:10:00Z"))).toBe(true);
+    expect(isDueNow({ ...q, lastRunAt: "2026-10-01T01:02:00Z" }, new Date("2026-10-02T01:10:00Z"))).toBe(false);
+  });
+  it("yearly fires only in January, once a year", () => {
+    const y: Schedule = { ...base, frequency: "yearly", hourUtc: 1, dayOfMonth: 2 };
+    expect(isDueNow(y, new Date("2027-01-02T01:10:00Z"))).toBe(true);
+    expect(isDueNow(y, new Date("2027-02-02T01:10:00Z"))).toBe(false);
+    expect(isDueNow({ ...y, lastRunAt: "2026-01-02T01:02:00Z" }, new Date("2027-01-03T01:10:00Z"))).toBe(true);
+    expect(isDueNow({ ...y, lastRunAt: "2027-01-02T01:02:00Z" }, new Date("2027-01-03T01:10:00Z"))).toBe(false);
   });
 });

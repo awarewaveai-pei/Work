@@ -2,7 +2,7 @@
 //
 // job = a registry key (lib/schedules/jobs.ts) → client_schedules; job = "site_watch" → site-watch's own
 // locked update (adapters/site-watch.ts). Any other key is 404: the page cannot invent a job.
-// Body: { enabled, frequency, hourUtc, dayOfWeekUtc } (+ expectedVersion for site_watch; 409 on a
+// Body: { enabled, frequency, hourUtc, dayOfWeekUtc, dayOfMonth } (+ expectedVersion for site_watch; 409 on a
 // concurrent edit). owner/admin only, every write audited. The table reloads its view after a write.
 
 import type { Frequency } from "@/lib/schedules/schedule";
@@ -52,6 +52,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
       frequency: frequency as Frequency,
       hourUtc: Number.isInteger(body.hourUtc) ? (body.hourUtc as number) : job.defaults.hourUtc,
       dayOfWeekUtc: Number.isInteger(body.dayOfWeekUtc) ? (body.dayOfWeekUtc as number) : job.defaults.dayOfWeekUtc,
+      // left out (a page loaded before 0123) = the row keeps its day
+      dayOfMonth: Number.isInteger(body.dayOfMonth) ? (body.dayOfMonth as number) : undefined,
       updatedBy: `${resolved.role}:${resolved.source}`,
     });
     if (!result.ok) return NextResponse.json({ ok: false, error: result.errors.join(",") }, { status: 400 });
@@ -61,6 +63,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
       frequency: result.schedule?.frequency,
       hourUtc: result.schedule?.hourUtc,
       dayOfWeekUtc: result.schedule?.dayOfWeekUtc,
+      dayOfMonth: result.schedule?.dayOfMonth,
     });
   }
 

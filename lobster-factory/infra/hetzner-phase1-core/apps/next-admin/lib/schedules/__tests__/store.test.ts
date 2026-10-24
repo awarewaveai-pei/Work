@@ -9,7 +9,7 @@ vi.mock("@/lib/supabase-server", () => ({
   getSupabaseWriteClient: () => db.client,
 }));
 
-const { listSchedules, listEnabledSchedules, upsertSchedule, claimScheduleRun, recordScheduleRun, recordScheduleError } = await import("@/lib/schedules/store");
+const { listSchedules, listEnabledSchedules, upsertSchedule, setScheduleEnabled, claimScheduleRun, recordScheduleRun, recordScheduleError } = await import("@/lib/schedules/store");
 
 function matches(row: Record<string, unknown>, filters: Record<string, unknown>): boolean {
   return Object.entries(filters).every(([k, v]) => row[k] === v);
@@ -58,7 +58,7 @@ function fakeClient(rows: Record<string, unknown>[]) {
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 const ORG_B = "22222222-2222-4222-8222-222222222222";
-const base = { frequency: "daily" as const, hourUtc: 3, dayOfWeekUtc: 1, updatedBy: "owner:test" };
+const base = { frequency: "daily" as const, hourUtc: 3, dayOfWeekUtc: 1, dayOfMonth: 1, updatedBy: "owner:test" };
 
 beforeEach(() => {
   db.rows = [];
@@ -81,6 +81,22 @@ describe("schedules store", () => {
     const rows = await listSchedules(ORG);
     expect(rows).toHaveLength(2);
     expect(rows.find((s) => s.jobKey === "collect_crawl")).toMatchObject({ enabled: true, frequency: "weekly", dayOfWeekUtc: 2 });
+  });
+
+  it("a write that leaves out the send day keeps the row's day (a page loaded before 0123)", async () => {
+    await upsertSchedule({ ...base, organizationId: ORG, jobKey: "social_monthly_report", enabled: true, frequency: "monthly", dayOfMonth: 15 });
+    const { dayOfMonth: _omit, ...noDay } = base;
+    await upsertSchedule({ ...noDay, organizationId: ORG, jobKey: "social_monthly_report", enabled: false, frequency: "monthly" });
+    expect((await listSchedules(ORG))[0]).toMatchObject({ enabled: false, dayOfMonth: 15 });
+  });
+
+  it("setScheduleEnabled flips only the switch: a send day and hour set elsewhere survive; no row = the job's defaults", async () => {
+    await upsertSchedule({ ...base, organizationId: ORG, jobKey: "social_monthly_report", enabled: true, frequency: "monthly", hourUtc: 5, dayOfMonth: 15 });
+    const defaults = { frequency: "monthly" as const, hourUtc: 1, dayOfWeekUtc: 1, dayOfMonth: 1 };
+    await setScheduleEnabled(ORG, "social_monthly_report", false, "editor:social", defaults);
+    expect((await listSchedules(ORG))[0]).toMatchObject({ enabled: false, hourUtc: 5, dayOfMonth: 15 });
+    await setScheduleEnabled(ORG_B, "social_monthly_report", true, "editor:social", defaults);
+    expect((await listSchedules(ORG_B))[0]).toMatchObject({ enabled: true, frequency: "monthly", hourUtc: 1, dayOfMonth: 1 });
   });
 
   it("listEnabledSchedules excludes disabled rows", async () => {

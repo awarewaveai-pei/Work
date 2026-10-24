@@ -168,7 +168,10 @@ async function handle(route) {
   if (p === "/api/social/members") return ok({ members: [{ user_id: "u1", email: "pei@example.com", role: "owner", created_at: day(-10, 1) }, { user_id: "u2", email: "client@example.com", role: "editor", created_at: day(-1, 1) }] });
   if (p === "/api/social/log") return ok({ log: LOG });
   if (p === "/api/social/metrics") return ok({ analytics: analytics(Number(url.searchParams.get("days") ?? 28), url.searchParams.get("account")) });
-  if (p === "/api/social/reports/monthly") return ok({ monthly: { enabled: false, lastRunAt: null, lastError: null } });
+  if (p === "/api/social/reports/monthly") {
+    const off = (when) => ({ enabled: false, lastRunAt: null, lastError: null, when });
+    return ok({ schedules: { weekly: off("每週一 09:00"), monthly: off("每月 1 號 09:00"), quarterly: off("每季第一個月 1 號 09:00"), yearly: off("每年 1 月 1 號 09:00") } });
+  }
   if (p === "/api/social/reports") return url.searchParams.get("preview") === "1" ? ok({ data: reportData() }) : ok({ reports: [REPORT, { ...REPORT, id: "r2", name: "上週成效報告", created_at: day(-8, 10) }] });
   if (p.startsWith("/api/social/reports/")) return ok({ report: REPORT, data: reportData() });
   if (p === "/api/social/lists" ) return ok({ lists: LISTS });

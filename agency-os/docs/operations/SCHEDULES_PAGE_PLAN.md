@@ -169,3 +169,4 @@ Low/Medium 直接做；標 **High** 的逐項等操作者 go-ahead。每步完�
 
 - 第一個新工作候選：WP 外掛更新檢查（`NA/app/api/ops/clients/[slug]/wp-update/` 既有邏輯包成 `run`）、客戶月報（先定內容與收件人，否則不做）。每個新工作 = registry 一筆 + `run` + 一支測試。
 - monthly：`frequency` CHECK 加 'monthly'、`day_of_month` 1–28、`isDueNow` 加一個分支＋測試。
+  - **2026-10-24 已做**（`DB/migrations/0123_client_schedules_day_of_month.sql`）：另加 quarterly（1/4/7/10 月）、yearly（1 月）；`day_of_month` 是**台北**日（UTC 表達不了台北的「幾號」）；錯過的那天同一小時再補 2 天，每期只跑一次（`NA/lib/schedules/schedule.ts` `periodicDue`）。用者：社群週報／月報／季報／年報（`NA/lib/social/report-period.ts` `REPORT_JOBS`）。

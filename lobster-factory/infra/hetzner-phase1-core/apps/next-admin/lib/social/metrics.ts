@@ -338,8 +338,9 @@ export interface Analytics extends Summary {
 
 const POSTS_CAP = 200;
 
-/** What 數據分析 shows for a brand: `account` = one channel or null for all of them, the last `n` days. */
-export async function loadAnalytics(brandId: string, tz: string, account: string | null, n: number, now = new Date()): Promise<Analytics> {
+/** What 數據分析 shows for a brand: `account` = one channel or null for all of them, the last `n` days. `postsCap` = how many of
+ *  the newest posts get their numbers (the page: 200; a report: all of the period's). */
+export async function loadAnalytics(brandId: string, tz: string, account: string | null, n: number, now = new Date(), postsCap = POSTS_CAP): Promise<Analytics> {
   const sb = db();
   const p = periodOf(zoned(now, tz).date, n);
   const { data: accs, error: e1 } = await sb.from("social_accounts").select("id, platform, label, status, picture, handle")
@@ -364,7 +365,7 @@ export async function loadAnalytics(brandId: string, tz: string, account: string
   const found = await publishedTargets(sb, { accountIds: ids, brandId, from: instantAt(p.from, "00:00", tz), to: instantAt(addDays(p.to, 1), "00:00", tz) });
   const byPost = new Map<string, PubTarget[]>();
   for (const t of found) byPost.set(t.post_id, [...(byPost.get(t.post_id) ?? []), t]);
-  const newest = [...byPost.values()].slice(0, POSTS_CAP);   // `found` is newest first, so are the groups
+  const newest = [...byPost.values()].slice(0, postsCap);   // `found` is newest first, so are the groups
   type P = { id: string; body: string; published_at: string; media: Array<{ position: number; item: { postiz_path: string | null } | null }> };
   const detail = new Map<string, P>();
   for (let i = 0; i < newest.length; i += 100) {

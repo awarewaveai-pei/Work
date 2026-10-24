@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-24（續59）社群四種報表排程：最後驗收、正式庫 0123、推送準備（Codex）
+
+- **授權／範圍**：操作者要求依 `handoffs/2026-10-24-social-report-schedules-CODEX.md` Steps 1–6 完成，0123 正式資料庫已明示核准；Claude 寫功能，Codex 讀清單全部 diff／新檔做最後審查，不重寫功能。私有 index 僅納入交接檔案、本 entry 與必要 down 副本。
+- **根因／結果**：月報原本用 daily＋月初守衛，沒有可設定寄出日的週／月／季／年報。0123 新增台北 day_of_month（1–28）及 monthly/quarterly/yearly；四個 job 分別開關，日期由排程頁設定。periodicDue 每期一次，失敗同一小時再補兩天，不跨月。
+- **最終審查**：既有三輪 `2026-10-24-partialreview-{232e01f7,74be1d9f,1b2af618}.md` 的修正逐一核對：`NA/lib/schedules/jobs.ts:127` asRegistered 消除 rollout 舊 daily；`store.ts:114` 省略日保留原值、`:128` 開關只更新 enabled；`NA/lib/social/reports.ts:135` 品牌期間未結束丟 NotDueYet，`NA/app/api/internal/schedules/run-due/route.ts:68` 不記錯誤／成功；`NA/lib/social/report-period.ts:7` 共用 MAX_DAYS=366，`reports.ts:94` 報表貼文不截斷。NA=`lobster-factory/infra/hetzner-phase1-core/apps/next-admin`。
+- **唯一新增修正**：先前 WORKLOG 續58 已記 down-migration-copies CI 紅；本次重現 `scripts/__tests__/down-migration-copies.test.mjs:46` 僅缺 0123 scripts 副本。新增 `lobster-factory/packages/db/scripts/0123_client_schedules_day_of_month_down.sql`，直接複製 migrations 版、byte-identical，指定檢查轉綠。無功能程式變更。
+- **正式庫**：先 check，再 apply 0123，APPLY_OK 1/1；--status 顯示 `0123_client_schedules_day_of_month.sql -- applied`，STATUS_OK applied=123；SSH `\d public.client_schedules` 確認 day_of_month int NOT NULL DEFAULT 1、1–28 CHECK 及六種頻率 CHECK。migration runner 將 ledger 與 DDL 同 transaction 提交並 reload PostgREST。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (NA) | exit=0 | ms=3569
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/schedules lib/social app/api/ops/clients app/api/internal/schedules app/api/social (354 passed, 3 skipped) | exit=0 | ms=3469
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scripts/apply-db-migration.mjs 0123 (production APPLY_OK 1/1; --status and SSH schema verified) | exit=0 | ms=17545
+- REALTEST_EVIDENCE: tool=Bash | cmd=node --test scripts/__tests__/down-migration-copies.test.mjs (1 passed, both rollback copies identical) | exit=0 | ms=69
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n
+- ORACLE_WAIVED: 本次為操作者指定的 Claude→Codex 交接最後審查，當前 Codex 已完整審交接 diff 並核對前三輪修正；前三份 CLI artifacts 明示 partial，沒有宣稱它們滿足全工作樹 gate。共用目錄其他 session 改動不屬本次範圍，依交接不再重跑另一輪 CLI oracle；唯一新增 SQL 是已審 down 檔的逐 byte 副本。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=runMonthlyReport;MAX_DAYS = 93;1–3 號 | hits=0
+- **抓蟲判讀**：rg 使用上述三個 alternation。0 是活躍報表 stale 引用數；排除本 WORKLOG、三輪 oracle 歷史、交接說明，以及 `agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md:75` 的另一個 proposeMonth 工作。SOCIAL_MANAGER_PLAN 舊卡歷史不改。跨檔確認 runtime 與測試共用 MAX_DAYS、sweep/view 都經 asRegistered。
+- **附帶檢查**：`audit-cross-machine-bom.ps1` exit 1：133 份既有記憶檔中 58 份缺 BOM；本次未修改 memory 或跨機同步檔，不擴張此次範圍。DEPLOY_HOLD 不存在。hook heartbeat 本 session PreToolUse 已刷新。
+- **剩餘限制**：2 月 27／28 日補寄窗較短（既有接受決定）；部分收件人寄送失敗時保留報表、開 incident、人工補寄（既有設計）。程式待台灣 2026-10-25 03:00 自動部署；本次僅套庫與 push，不手動部署。
+- **rollback／防再發**：先 git revert 本 commit，再執行 0123 down SQL；週期列先追加至 client_schedules_0123_backup，down 同時刪 ledger。雙份 down 由既有 down-migration-copies test 防漏；排程／時區／舊頁相容由本次指定 Vitest 覆蓋。
 ## 2026-10-24（續58）next-admin 手動部署 4c36c46c7（操作者：「現在就部署」）：員工逐工具權限 C3–C5 上線，shadow 不擋（Claude）
 
 - **觸發**：操作者 2026-10-24「現在就部署」（明示 go；High）。

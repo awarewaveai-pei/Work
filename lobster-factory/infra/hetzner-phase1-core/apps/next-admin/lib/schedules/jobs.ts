@@ -7,7 +7,7 @@ import "@/lib/collect/blocks";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { loadCis } from "@/lib/cs/cis";
 import { applyChatwootBaseline } from "@/lib/cs/chatwoot-baseline";
-import { MONTHLY_JOB, runMonthlyReport } from "@/lib/social/reports";
+import { REPORT_JOBS, runPeriodReport, type ReportKind } from "@/lib/social/reports";
 import { DAILY_START_CAP } from "@/lib/content/topics/tick";
 import { topicCostUsd } from "@/lib/content/topics/cost";
 import type { JobMeta } from "./types";
@@ -23,7 +23,7 @@ export interface JobClientFacts {
 
 export interface ClientJob extends JobMeta {
   /** What a client with no row reads as. enabled is always false (AGENTS.md 自動化預設 OFF). */
-  defaults: { frequency: Frequency; hourUtc: number; dayOfWeekUtc: number };
+  defaults: { frequency: Frequency; hourUtc: number; dayOfWeekUtc: number; dayOfMonth: number };
   /** Throws on any failure, including one the job reports instead of throwing; the sweep records it and
    * raises the incident. Returns a one-line summary. */
   run(organizationId: string, runKey: string): Promise<string>;
@@ -36,6 +36,18 @@ const DAILY_WEEKLY: JobMeta["frequencies"] = [
   { value: "weekly", label: "每週", usesHour: true, usesDay: true },
 ];
 
+const REPORT_COST = "免費（只讀已收集的數字，寄信用 Resend，不用 AI）。";
+/** One social report job per period (lib/social/reports.ts REPORT_JOBS): its own switch, send day and hour. Default 09:00 Taipei. */
+function reportJob(kind: ReportKind, label: string, description: string, frequency: JobMeta["frequencies"][number], dayOfWeekUtc = 1): ClientJob {
+  return {
+    key: REPORT_JOBS[kind].job, label, description, cost: REPORT_COST, frequencies: [frequency],
+    // 01:00 UTC = 09:00 Taipei; day_of_month is a Taipei day (0123)
+    defaults: { frequency: frequency.value as Frequency, hourUtc: 1, dayOfWeekUtc, dayOfMonth: 1 },
+    run: (organizationId) => runPeriodReport(kind, organizationId),
+  };
+}
+const REPORT_TAIL = "給品牌的擁有者和客戶；在社群發文的「報表管理」頁可以打開。";
+
 export const CLIENT_JOBS: readonly ClientJob[] = [
   {
     key: "collect_crawl",
@@ -45,7 +57,7 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
     // caps: DEFAULT_BUDGET 200 fetches (lib/collect/run.ts), MAX_QUERIES 16 (lib/collect/search/query-plan.ts).
     cost: "網頁抓取免費；新增或變更頁面每次最多約 0.02 美元。有實體檔案來源時，每次最多約 0.12 美元。",
     frequencies: DAILY_WEEKLY,
-    defaults: { frequency: "weekly", hourUtc: 3, dayOfWeekUtc: 1 },
+    defaults: { frequency: "weekly", hourUtc: 3, dayOfWeekUtc: 1, dayOfMonth: 1 },
     async run(organizationId, runKey) {
       const result = await runCollection({ organizationId, runKey });
       // runCollection reports e.g. no_approved_sources in errors[] without throwing: an enabled schedule
@@ -61,7 +73,7 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
     cost: "免費（只呼叫 Chatwoot，不用 AI）。",
     frequencies: DAILY_WEEKLY,
     // 02:00 UTC = 10:00 Taipei: a failure (token revoked) is raised while someone is awake to fix it.
-    defaults: { frequency: "daily", hourUtc: 2, dayOfWeekUtc: 1 },
+    defaults: { frequency: "daily", hourUtc: 2, dayOfWeekUtc: 1, dayOfMonth: 1 },
     unavailable: (c) => (c.chatwoot && typeof c.chatwoot === "object" ? null : "沒有接 Chatwoot"),
     async run(organizationId) {
       const cis = await loadCis(organizationId);
@@ -77,17 +89,16 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
         : "unchanged";
     },
   },
-  {
-    key: MONTHLY_JOB,
-    label: "社群月報自動寄出",
-    description: "每月 1 號把上個月的社群成效報告連結寄給品牌的擁有者和客戶；開關在社群發文的「報表管理」頁。",
-    cost: "免費（只讀已收集的數字，寄信用 Resend，不用 AI）。",
-    // the job decides the month itself (only the 1st-3rd, once per month), so the cadence is a daily look
-    frequencies: [{ value: "daily", label: "每天檢查（只在每月 1–3 號寄）", usesHour: true, usesDay: false }],
-    // 01:00 UTC = 09:00 Taipei
-    defaults: { frequency: "daily", hourUtc: 1, dayOfWeekUtc: 1 },
-    run: (organizationId) => runMonthlyReport(organizationId),
-  },
+  // A missed send day (host down, mail failed) is retried the next 2 days at the same hour (schedule.ts CATCH_UP_DAYS);
+  // a weekly one waits for next week. Each period is sent once (runPeriodReport dedupes).
+  reportJob("weekly", "社群週報自動寄出", `每週把上週一到週日的社群成效報告連結寄${REPORT_TAIL}`,
+    { value: "weekly", label: "每週", usesHour: true, usesDay: true }),
+  reportJob("monthly", "社群月報自動寄出", `每月把上個月的社群成效報告連結寄${REPORT_TAIL}`,
+    { value: "monthly", label: "每月", usesHour: true, usesDay: false, usesDayOfMonth: true }),
+  reportJob("quarterly", "社群季報自動寄出", `每季（1、4、7、10 月）把上一季的社群成效報告連結寄${REPORT_TAIL}`,
+    { value: "quarterly", label: "每季", usesHour: true, usesDay: false, usesDayOfMonth: true }),
+  reportJob("yearly", "社群年報自動寄出", `每年 1 月把去年一整年的社群成效報告連結寄${REPORT_TAIL}`,
+    { value: "yearly", label: "每年 1 月", usesHour: true, usesDay: false, usesDayOfMonth: true }),
   {
     key: "content_pipeline",
     label: "自動內容管線",
@@ -95,7 +106,7 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
     // Prices: lib/ai/cost-model.ts TEXT_FEATURES article + syndicate (lib/content/topics/cost.ts).
     cost: `每題約 ${topicCostUsd().usual} 美元（文章＋社群改寫；社群太長要重寫時最多 ${topicCostUsd().max} 美元）；每天最多 ${DAILY_START_CAP} 題。沒有到期題目時免費。`,
     frequencies: [{ value: "every_5m", label: "每 5 分鐘", usesHour: false, usesDay: false }],
-    defaults: { frequency: "every_5m", hourUtc: 0, dayOfWeekUtc: 1 },
+    defaults: { frequency: "every_5m", hourUtc: 0, dayOfWeekUtc: 1, dayOfMonth: 1 },
     unavailable: (c) => (c.wpSites ? null : "沒有 WordPress 網站"),
     async run(organizationId) {
       const sb = getSupabaseWriteClient();
@@ -108,4 +119,12 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
 
 export function clientJob(key: string): ClientJob | undefined {
   return CLIENT_JOBS.find((j) => j.key === key);
+}
+
+/** A stored row read through the registry: a frequency the job no longer offers (a row written before the job changed --
+ *  e.g. the monthly report's old 'daily' look, written by a page still open across the 0123 deploy) counts as the job's
+ *  default frequency, so the sweep and the page never run or show a cadence the job does not have. */
+export function asRegistered<T extends { jobKey: string; frequency: Frequency }>(row: T): T {
+  const job = clientJob(row.jobKey);
+  return job && !job.frequencies.some((f) => f.value === row.frequency) ? { ...row, frequency: job.defaults.frequency } : row;
 }

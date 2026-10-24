@@ -3,7 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { siteWatchCells, SITE_WATCH_JOB } from "./adapters/site-watch";
 import { hostStatusRows } from "./adapters/host-status";
-import { CLIENT_JOBS } from "./jobs";
+import { CLIENT_JOBS, asRegistered } from "./jobs";
 import { listSchedules } from "./store";
 import type { ScheduleCell, SchedulesView } from "./types";
 
@@ -38,7 +38,7 @@ export async function loadSchedulesView(sb: SupabaseClient, opts: { slug?: strin
       const unavailable = job.unavailable?.({ siteUrl: org.site_url, chatwoot: org.chatwoot, wpSites: wpSites.get(org.id) ?? 0 }) ?? null;
       cells.push(
         row
-          ? { ...row, stored: true, version: null, unavailable }
+          ? { ...asRegistered(row), stored: true, version: null, unavailable }
           : {
               jobKey: job.key,
               organizationId: org.id,
