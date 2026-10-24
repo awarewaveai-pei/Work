@@ -59,9 +59,15 @@ export function openList(OPEN, STEPS, C) {
   if (!OPEN.length) return `<p class="lead">${esc(C.none || '')}</p>`;
   return `<ol class="open">${OPEN.map((o) => {
     const s = STEPS.find((x) => key(x) === o.before) || { n: o.before, code: o.before };
-    return `<li><div class="n">${o.n}</div><div class="b"><p class="plain">${esc(o.what)}</p><p class="meta"><a href="#${anchor(s)}" class="who">${t(C.before, { n: s.n, code: s.code })}</a><span class="who">${esc(C.src)}：${esc(o.src)}</span></p></div></li>`;
+    // options（選用）：操作者直接選的選項，pick＝推薦；detail＝選項細節所在的卡
+    const opts = o.options ? `<ul class="opts">${o.options.map((x) => `<li class="${x.pick ? 'pick' : ''}"><b>${esc(x.k)}${x.pick ? ' ★' : ''}</b><span>${esc(x.t)}</span></li>`).join('')}</ul>` : '';
+    return `<li><div class="n">${o.n}</div><div class="b"><p class="plain">${esc(o.what)}</p>${opts}<p class="meta"><a href="#${anchor(s)}" class="who">${t(C.before, { n: s.n, code: s.code })}</a><span class="who">${esc(C.src)}：${esc(o.src)}</span>${o.detail ? `<span class="who">${esc(o.detail)}</span>` : ''}</p></div></li>`;
   }).join('')}</ol>`;
 }
+
+export const OPEN_CSS = `ul.opts{list-style:none;margin:4px 0 6px;padding:0;display:grid;gap:4px;font-size:14px}
+ul.opts li{display:grid;grid-template-columns:auto 1fr;gap:8px;min-width:0;color:var(--muted)} ul.opts li b{color:var(--todo);white-space:nowrap}
+ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}`;
 
 // rows: [label, html]
 export const pathRows = (rows) => `<div class="paths">${rows.map(([b, h]) => `<div><b>${esc(b)}</b>${h}</div>`).join('')}</div>`;

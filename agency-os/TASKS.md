@@ -323,11 +323,11 @@
   - 2026-10-16 §0 改三軸（部署／商業／操作），順序加 6 API 通道、7 轉售；第 1 步啟動時一併改 System Foundry：問卷只加 1 題「裝在客戶自己的主機」（self_hosted；License 只暗示不等於）；藍圖末節「交付登記」是一張推導表——五種方式＝既有答案的組合（自用＝員工使用要＋收費不要；代操＝員工要＋外部客戶不要＋收費要；訂閱＝外部客戶要＋訂閱要；點數＝外部客戶要＋預付點數要；買斷＝License 要）、三軸（誰操作＝SCOPE-001/002＋Q-CH-004；錢＝Q-COM-001/002/004/005/006/008；裝在哪＝新題）、根組織數＝Q-ORG-001/002/003/006；問卷另加一節「AwareWave 積木」（每個登記產品一題，由 `scripts/sync-foundry-catalog.mjs` 從 `products.ts` 生成，勾了就把該產品 manifest 當模組放進藍圖、依賴自動閉包；操作者 2026-10-18「可以選擇項目組裝上去」）；子網域與 WordPress 登入來源是 AwareWave 實作值，不進技術中立的問卷，由 `new-product.mjs --from-foundry <generated 目錄>` 補問（讀 `foundry-plan.json`＋「交付登記」，十項宣告填 MODULE_MANIFEST；ADR 017 §0b 第 8 條）；藍圖必寫「許可只問 `can()`」（2026-10-17 更正：昨天寫「缺代操」是錯的，代操是組合不是題），WORKLOG 2026-10-16「三條軸」條目；**v1.7 計畫**（2026-10-18 審核：選擇正確、產出不能開工、無監工台）：`agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/V1_7_HANDOFF_PLAN.md` 六張卡 V17-1…6
   - **執行卡**：`agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-1.md … step-9.md`（Decision／Files／指令→預期／突變／Rollback）
   - **操作者待決（2026-10-16「目前尚未決定，之後決定」）**，各卡住一步，第 1、2、3 步（代操計費）不受影響：
-    - [ ] 待決 1：訂閱每月扣款用哪個 WooCommerce 定期扣款外掛；台灣金流是否支援定期扣款（ADR 017 產品決定 Q3）→ 擋第 4 步（付款）
+    - [ ] 待決 1：訂閱每月扣款用哪個 WooCommerce 定期扣款外掛；台灣金流是否支援定期扣款（ADR 017 產品決定 Q3）→ 擋第 4 步（付款）；**選項 A★ WCS＋TapPay／B WCS＋PAYUNi／C WCS＋綠界定期定額／D 不買外掛賣 12 個月預付**（2026-10-24，`cards/step-4.md` §待決選項；台灣公司開不了 Stripe）
     - [ ] 待決 2：買斷交付前請律師確認授權——Postiz（AGPL-3.0）、MinIO（AGPLv3，Trigger 內含）、Redis（Trigger 與核心用浮動 7-alpine，7.4 起 RSALv2／SSPL）（ADR 017 §5 授權盤點）→ 擋第 5 步
-    - [ ] 待決 3：點數不退、不轉讓的條款寫法（台灣數位內容解除權例外）；賣點數的款項用掉前列預收，請會計師確認（ADR 015 §4）→ 擋第 4 步（付款）
+    - [ ] 待決 3：點數不退、不轉讓的條款寫法（台灣數位內容解除權例外）；賣點數的款項用掉前列預收，請會計師確認（ADR 015 §4）→ 擋第 4 步（付款）；**選項 A★ 結帳必勾「不適用七日解除權、不退不轉讓」＋合約負債／B 7 天內未用可全退／C 不退＋12 個月失效（不建議）**（2026-10-24，`cards/step-4.md` §待決選項）
     - [ ] 待決 4：客戶白牌網址的憑證走 Cloudflare for SaaS 還是主機 on-demand ACME（ADR 018 §2）→ 擋第 9 步（白牌網址），等第一個客戶再定
-    - [ ] 待決 5：點數能不能付「沒持有的功能」——操作者 2026-10-24「每個功能都要分開購買或我們送」；現 `can.ts` credits 分支在沒有權利列時用錢包付（ADR 017 產品決定 #11）→ 擋第 4 步 4b（點數）；目前無帳戶有點數
+    - [ ] 待決 5：點數能不能付「沒持有的功能」——操作者 2026-10-24「每個功能都要分開購買或我們送」；現 `can.ts` credits 分支在沒有權利列時用錢包付（ADR 017 產品決定 #11）→ 擋第 4 步 4b（點數）；目前無帳戶有點數；**選項 A★ 功能要有列才能用、contract 列的點數功能按次扣錢包／B 維持現狀／C 持有產品即可**（2026-10-24，`cards/step-4.md` §待決選項）
 - [ ] **【Cognitive OS｜小】`.runtime` 的 run lock 檔只增不刪：分析和背景 AI 動作每次各留一個檔**
   - `🟢 小` · `2026-10-14` · `無`
   - **一句話**：`run_lock.py` 規定 lock 檔不刪；分析（`main.py` `_interpretation_lock_path`）和背景 AI 動作（`api/blocks/ai.py` `_lock_path`）每次開新檔，放在持久 volume（`docker-compose.yml:41`），只會累積。

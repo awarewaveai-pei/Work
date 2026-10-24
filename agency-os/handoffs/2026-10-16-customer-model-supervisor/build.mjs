@@ -4,7 +4,7 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { esc, t, page, section, yesNo, ruleList, stepList, stepLink, openList, pathRows } from '../../../scripts/supervisor-kit/build.mjs';
+import { esc, t, page, section, yesNo, ruleList, stepList, stepLink, openList, pathRows, ITEM_CSS, OPEN_CSS } from '../../../scripts/supervisor-kit/build.mjs';
 import { META, COPY, RULES, PRIORITY, NEXT, PRICING, DOORS, AXES, WAYS, NOW, STEPS, OPEN, SIDE, DRILL } from './data.mjs';
 
 // 本頁專屬：五種客戶卡、入口列
@@ -66,7 +66,7 @@ export function render() {
     ])),
   ].join('\n\n');
   const live = WAYS.filter((w) => w.live).length;
-  return page({ META, COPY, STEPS, OPEN, body, css: CSS, counts: { ways: t(COPY.ways.count, { total: WAYS.length, live }) } });
+  return page({ META, COPY, STEPS, OPEN, body, css: CSS + ITEM_CSS + OPEN_CSS, counts: { ways: t(COPY.ways.count, { total: WAYS.length, live }) } });
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

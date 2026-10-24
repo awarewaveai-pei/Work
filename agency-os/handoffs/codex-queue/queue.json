@@ -25,6 +25,50 @@
           "cmd": "python -m unittest tests.unit.test_codex_queue"
         }
       ]
+    },
+    {
+      "id": "02-customer-identities",
+      "file": "cards/02-customer-identities.md",
+      "gate": null,
+      "depends": [],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin",
+          "cmd": "npx vitest run lib/entitlements/__tests__/identities.test.ts"
+        },
+        {
+          "cwd": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin",
+          "cmd": "npx vitest run lib/entitlements/__tests__/import-boundary.test.ts"
+        },
+        {
+          "cwd": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin",
+          "cmd": "npx tsc --noEmit"
+        }
+      ]
+    },
+    {
+      "id": "03-woo-billing-provider",
+      "file": "cards/03-woo-billing-provider.md",
+      "gate": null,
+      "depends": [
+        "02-customer-identities"
+      ],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin",
+          "cmd": "npx vitest run lib/payments/__tests__/woo-billing.test.ts"
+        },
+        {
+          "cwd": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin",
+          "cmd": "npx vitest run lib/entitlements/__tests__/import-boundary.test.ts"
+        },
+        {
+          "cwd": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin",
+          "cmd": "npx tsc --noEmit"
+        }
+      ]
     }
   ]
 }

@@ -66,8 +66,8 @@
 ### 2. 商品目錄：產品 → 功能（名字在程式）→ 方案（資料）→ 價格（Woo）
 
 - `lib/portal/products.ts` 仍是唯一產品清單（012 §5）。每個產品加 `features[]`：`feature_key`、名稱、上限種類（012 §1 QUOTA／RATE_LIMIT／SAFETY_GATE）、能不能買斷。
-- 新表 `plans`：`plan_key`、`product_key`、`kind`（base 基本／addon 加購）、給哪些 `feature_key`、各 QUOTA 上限、`woo_product_ids`。新方案＝加一列。
-- 價格只在 WooCommerce。付款通知帶 Woo 商品 id，控制面用 `plans.woo_product_ids` 查出方案（對應放在 Supabase，ADR 005:16）。
+- 新表 `plans`：`plan_key`、`product_key`、`kind`（base 基本／addon 加購）、給哪些 `feature_key`、各 QUOTA 上限。新方案＝加一列。
+- 價格只在 WooCommerce。付款通知帶 `plan_key`：Woo 商品 meta `_awarewave_plan_key`（點數包另有 `_awarewave_credit_units`）是商品→方案的唯一對應，由 wp-bridge 外掛在送事件時填入；控制面只認 `plan_key`，不認 Woo 商品 id（2026-10-24 改，`plans.woo_product_ids` 由 0124 移除；原寫法「`plans.woo_product_ids` 查方案」作廢。執行卡 step-4 §4b 設計更新）。
 - **SAFETY_GATE**（例：HCI 持續監測，012:57）不進任何方案，也不能買斷。買斷版的安裝在建置時就排除含 SAFETY_GATE 功能的程式碼，不靠執行時開關（客戶擁有主機，開關改得掉）。做法是**目錄邊界**而不是人工清單：SAFETY_GATE 功能的程式只准住在 `lib/safety-gated/**` 與 `app/(shell)/**/safety/**`；`BUYOUT=1` 建置時這兩個目錄被 alias 成空模組，測試從所有入口走 import 圖證明到不了它們，再在 image 內 grep 證明（Codex 2026-10-18 M16）。登記表機械閘檢查「可買斷的模組沒有任何 SAFETY_GATE 功能」。
 
 ### 3. 線上：合約 → 權利 → 許可

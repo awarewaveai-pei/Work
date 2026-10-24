@@ -43,3 +43,107 @@ curl -s -X POST http://localhost:3000/api/webhooks/woo-billing -H "X-WC-Webhook-
 
 ## Rollback
 webhook route 下架（回 410）；`0105` 的 down 只在 view 過渡期內可套，帳本有新列即前進修（Codex C2）；Woo 側停用 webhook；`git revert`。
+
+## 4b 待決選項（2026-10-24 整理；操作者選，選完寫回 TASKS.md 該待決行與 ADR 017 產品決定表）
+
+研究正本：WORKLOG 2026-10-24「4b 待決選項」條目 §金流研究（含來源 URL）。每題：選項＝操作者直接選一個；★＝推薦；「程式影響」＝選了之後哪張卡會變。
+
+### 待決 1　訂閱每月扣款：外掛＋台灣金流
+
+事實（2026-10-24 查）：台灣登記公司不能直接開 Stripe（stripe.com/global 無台灣）。WooCommerce Subscriptions（WCS，US$279/年）是唯一有自己 webhook topic 與官方 PHP action 的訂閱外掛；SUMO／YITH／WP Swings 都沒查到。台灣金流能接 WCS 自動扣款的：TapPay（整合最完整、站內退刷，但虛擬訂閱商品銀行過件較嚴）、統一金流 PAYUNi Pro（外掛 NT$3,980/年，幕後授權＋Token API，文件完整）、綠界定期定額（cloudwp 外掛 NT$399/月，2023-03 後沒更新，退款要到綠界後台）、藍新定期定額（整合度差、有收款頻率限制）。aware-wave.com 已裝綠界一次付清外掛（`APP_AWARE_WAVE_COMPLETE_REFERENCE.md:870`）。各家爭議款（拒付）通知都沒有官方 webhook 說明，要書面問金流商。
+
+| 選項 | 內容 | 代價 | 程式影響 |
+|---|---|---|---|
+| **A ★** | WCS ＋ TapPay（自動扣款）；點數包一次性刷卡走同一金流 | WCS US$279/年＋TapPay 月費／費率（各來源 2.4–2.75%，要報價）；先問 TapPay 業務「SaaS 訂閱能不能過件」，不能就改 B | 4b-2 用 WCS 的 PHP action（卡裡已寫 WCS 版） |
+| B | WCS ＋ PAYUNi Pro | WCS＋NT$3,980/年；要申請幕後授權、綁伺服器 IP | 同 A，只換金流外掛，4b-2 不變 |
+| C | WCS ＋ 綠界定期定額（cloudwp） | 外掛 NT$399/月且三年沒更新；退款要到綠界後台（退款事件改由操作者在 /ops/billing 人工登記 `local` refund） | 4b-2 退款 hook 不做，改 runbook 一行 |
+| D | 不買訂閱外掛：賣「12 個月預付」一次性商品，到期前 30 天寄信請客戶再買 | 零外掛費；沒有自動扣款，流失率高；`period_end`＝付款日＋12 個月 | 4b-2 只做 `woocommerce_payment_complete`；`subscription_canceled` 不會自動發生（客戶不續＝到期）；WCS 列全刪 |
+
+決定後第一件事：去金流商開定期定額／Token 扣款（審核 3–5 工作天起），**不卡程式**：4b-1、4b-3、4b-4 不等它。
+
+### 待決 3　點數條款與預收會計
+
+事實：《通訊交易解除權合理例外情事適用準則》第 2 條第 5 款——「非以有形媒介提供之數位內容或一經提供即為完成之線上服務，經消費者事先同意始提供」可排除七日解除權；條件是**事先告知＋消費者事先同意**，告知要放在商品說明旁，只塞在定型化契約裡法院多認定無效（消保處 2016 指引）。會計：2018 起 IFRS 15「預收款項」改稱「合約負債」；收到點數款時是合約負債，扣點時才轉營收。程式已能同時支援「不退」與「只退未用」（0120 `billing_apply_payment_event` 的 `refund/credit_pack` 分支只退未用部分）。
+
+| 選項 | 條款 | 會計 | 程式影響 |
+|---|---|---|---|
+| **A ★** | 結帳頁必勾「我同意點數購買後立即開始提供，不適用七日解除權；點數不可退、不可轉讓、不可換現金，只能在 AwareWave 產品使用」；同一句放在每個點數包商品說明旁 | 收款開發票、入合約負債；每月底 `/ops/billing` 的「未用點數合計」＝合約負債餘額，給會計師轉營收 | 4b-6（Woo 結帳勾選）＋4b-7（/ops/billing 一欄）；退款事件只用於拒付／人工例外 |
+| B | 給 7 天猶豫期：7 天內未使用可全退，用過只退未用 | 同 A，另加「退款分錄」 | 4b-6 條款文字不同；0120 refund 分支現成，不改程式 |
+| C | 不退條款＋另加「12 個月未使用失效」 | 失效點數要有「逾期未行使權利」處理（IFRS 15 B44–B47），會計師先確認；台灣消保對點數到期有爭議風險 | 多一個每日 job 標失效＋帳本 `expire` 分錄（0066 `entry_type` 要加值＝migration）；**不建議第一版做** |
+
+A／B 都要會計師一句話確認「收款開發票＋合約負債」；C 另問律師。選完把條款字句交 Woo 店長貼進商品頁與結帳頁，4b-6 只負責「沒勾不能結帳」。
+
+### 待決 5　點數能不能付「沒持有的功能」
+
+事實：`can.ts:40-56` 現在是「有 comp／contract 列先用列、免扣點；沒有列而功能 `billing=credits` 就看錢包」，所以**有錢包的客戶能按次用任何沒買的點數功能**；門已改成「持有該產品任一列才進得了門」（`lib/portal/door-access.ts`），兩邊規則不一致。操作者 2026-10-24：「每個功能都要分開購買或我們送」。目前沒有任何帳戶有點數，改 can() 不影響現況。
+
+| 選項 | 規則（一句） | 不變量 | 代價 | 程式影響 |
+|---|---|---|---|---|
+| **A ★** | 點數只是付款方式，不是使用權：功能要有一張列才能用；`comp` 列＝免費；`contract` 列＋`billing=contract`＝包在月費裡；`contract` 列＋`billing=credits`＝按次扣錢包 | 「每個功能的使用權永遠來自一張列；錢包只付已持有功能的用量」——與門規則同一條 | 點數功能要先「持有」：點數包商品對應一個 `kind=addon` 方案，`features`＝該產品的 credits 功能、`ends_at` null（4b-2 的 product meta `_awarewave_plan_key` 指它，第一次買包就寫列） | 4b-5 改 `issuePermit`（有 contract 列且 `billing=credits` → `source=credits`、`max_spend`＝錢包；沒列一律拒）＋測試＋突變 |
+| B | 維持現狀：錢包即通行證 | 「有錢就能用」 | 與門規則矛盾（進不了門但 API 可用），#11 不成立 | 無 |
+| C | 持有產品即可：帳戶持有該產品任一列 → 該產品所有 credits 功能可用點數 | 「使用權在產品層，不在功能層」 | 點數功能無法分開賣／送；與 #1「產品＋加購」勉強相容 | 4b-5 改 `issuePermit` 用 `holdsProduct`；比 A 少一個方案列 |
+
+推薦 A：只有一條不變量、與門、與 #11 一致；代價只是多一個方案列，而方案列本來就要建（plans 0 筆）。
+
+## 4b 設計更新（2026-10-24；取代上方 Decision 的「Woo 原生 webhook、不經 wp-bridge」）
+
+- **事件由 wp-bridge 外掛送，不用 Woo 原生 webhook。** 理由：WCS 沒有「續約成功」topic，只能從 `order.updated` 推論；Woo webhook 失敗 5 次自動停用且不重送（`app/api/webhooks/woo-order/route.ts:20-25`）；換訂閱外掛時 topic 全變。wp-bridge 掛官方 PHP action（WCS action reference），組成 `PaymentEvent` 直接 POST 到既有路由 `/api/webhooks/payments/woo`，用 Action Scheduler（WooCommerce 內建）排隊重試到 2xx 或 4xx；WordPress／Woo 欄位只出現在 PHP 與 `lib/payments/woo-billing.ts`（ADR 017 §0b 第 6 條；`import-boundary.test.ts:14` 的 `PROVIDER_ADAPTERS` 加這個檔）。`lib/payments/woo.ts` 是 wp-bridge 的「寫入 WordPress」接頭，不混用。
+- **簽章**：與 `local` 同一構法——`X-AwareWave-Payment-Signature = base64(HMAC-SHA256(raw body, PAYMENTS_WOO_SECRET))`（`lib/payments/local.ts:14`），secret 在 next-admin 環境變數與 WordPress `aware_wave_payments_secret` option（只能由管理員在 wp-bridge 設定頁貼入，不進 git）。
+- **會員↔計費帳戶**：新表 `customer_identities(provider text, external_id text, user_id uuid → profiles, organization_id uuid → organizations, created_at; unique(provider, external_id); unique(provider, user_id))`，provider 先只收 `awarewave-wp`（`external_id`＝WP user id，不是 email：ADR 015 §2「email 會改」）。付款事件帶 `wp_user_id`＋`email`＋`display_name`，控制面查表得 `organization_id`；**第一次付款的會員沒有帳戶就當場建**：`organizations`（kind customer，slug 由 email 本地部分＋4 碼亂數）＋ `inviteClientAccount`（`lib/accounts/client-invite.ts:200`，寄「設定密碼」信到該產品門）＋ identity 列；以 `(provider, external_id)` 唯一鍵保證重試不建第二個。訪客結帳（`customer_id=0`）不受理：Woo 設「結帳必須登入」（4b-6），事件仍到就回 400 `guest_checkout`，PHP 不重試並寫訂單備註。
+- **商品→方案**：Woo 商品 meta `_awarewave_plan_key`（訂閱商品、點數包商品都填；點數包另填 `_awarewave_credit_units`）是唯一對應；`plans.woo_product_ids` 欄用不到，0124 移除（plans 0 筆）。控制面只認 `plan_key`，不認 Woo 商品 id。
+- **event_id**（PHP 產生，重送同值）：`wc:<action>:<order_id|subscription_id>[:<period_end>]`；續約用 subscription id＋期末，同一期重送＝replay；`billing_apply_payment_event` 已處理遲到的舊續約（0120「a late, older event never shortens the period」）。
+- **六種事件對應**（WCS 版；待決 1 選 D 時只留第 1、4、5 列）：
+
+| Woo／WCS action | PaymentEvent | 備註 |
+|---|---|---|
+| `woocommerce_payment_complete`（首單含訂閱商品） | `subscription_paid`，`period_end`＝訂閱 `next_payment`（無則 `end`） | 試用方案：WCS 試用期＝`trial_end`，首單 0 元也會觸發 |
+| `woocommerce_subscription_renewal_payment_complete` | `subscription_paid` | 只在續約；首單、switch 不重複觸發 |
+| `woocommerce_subscriptions_switched_item` | `subscription_paid`（新 plan_key） | 0120 以 plan 不同判「換方案」 |
+| `woocommerce_payment_complete`（訂單只含點數包） | `credit_pack`，`units`＝Σ `_awarewave_credit_units`×數量，`order_ref`＝訂單 id | 同一訂單同時有訂閱與點數包＝兩個事件、兩個 event_id |
+| `woocommerce_order_status_refunded`（全額） | 訂閱→`refund/subscription`；點數包→`refund/credit_pack` | 部分退款不送事件，操作者用 `record-payment.mjs` 登記 `local` refund |
+| `woocommerce_subscription_status_cancelled`／`_expired` | `subscription_canceled` | `pending-cancel` 與 on-hold（續約失敗）不送：0120 寬限 7 天，之後列自然到期 |
+| 拒付 | **不自動**：台灣金流都沒查到拒付 webhook；操作者收到金流商通知後 `record-payment.mjs chargeback --org`（`local`），複核後 `chargeback_cleared` | 4a 已支援 |
+
+- **WordPress 一次性碼進產品門（ADR 015 順序 1，4b-4）**：WP「我的帳號」每個已持有產品一顆「進入」按鈕 → PHP 以同一 HMAC 簽 `{wp_user_id, product_key, ts, nonce}` POST `/api/auth/wp-handoff` → next-admin 查 `customer_identities`、確認 `holdsProduct`、`auth.admin.generateLink({type:'magiclink'})` 取 `hashed_token`，回 `https://<產品門>/login/wp#token_hash=…`（60 秒、一次）→ PHP 302 → 門上 `/login/wp` 用 `verifyOtp` 換 session（同 `/login/set-password` 的作法，`lib/accounts/client-invite.ts:47`）。登入來源 `awarewave-wp` 的程式只在 `lib/auth/sources/awarewave-wp.ts`（`import-boundary.test.ts:14` 已列）。沒有帳戶的會員（還沒付款）按鈕不出現。
+
+## 4b 執行卡（便宜模型照做；每張獨立 commit、各自 Acceptance；順序與依賴如標）
+
+### 4b-1　會員對應計費帳戶（不等待決；Codex 卡 `agency-os/handoffs/codex-queue/cards/02-customer-identities.md`）
+- Files：`lobster-factory/packages/db/migrations/0124_customer_identities.sql`＋`.down.sql`；`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/identities.ts`（`findBillingAccount({provider, externalId})`、`linkIdentity({provider, externalId, userId, organizationId})`；只經 service role）；`lib/entitlements/__tests__/identities.test.ts`。
+- 0124 內容：上表 `customer_identities`＋RLS（service_role only，照 0120 同一段 `do $$` 樣式）＋`alter table plans drop column woo_product_ids`；down 反向（plans 0 筆、identities 0 筆才能 down，否則 raise）。
+- Acceptance：`npx vitest run lib/entitlements/__tests__/identities.test.ts` 綠，測試名含 `an unknown identity resolves to null`、`linking the same identity twice is a no-op`、`one wp user cannot link to two accounts`；`npx tsc --noEmit` 綠；`import-boundary.test.ts` 綠（新檔在 `lib/entitlements/`）。套 prod（High，操作者 go）：照 0120 的套法（WORKLOG 2026-10-23 續51），之後 `psql -c '\d customer_identities'`。
+- Rollback：`0124.down.sql`。
+
+### 4b-2　wp-bridge：付款事件（WCS 版；待決 1 選定後開工，選 D 刪 WCS 列）
+- Files：`lobster-factory/packages/wp-bridge-plugin/includes/Billing/PaymentEvents.php`（action → PaymentEvent → `as_enqueue_async_action` 排隊）、`includes/Billing/PaymentSender.php`（HMAC、POST、2xx 停、5xx／網路錯重試最多 20 次指數退避、4xx 停並寫訂單備註）、`includes/Admin/AdminPage.php` 加 secret 與目標 URL 欄位＋「送付款事件」開關（預設關）、商品編輯頁 `_awarewave_plan_key`／`_awarewave_credit_units` 兩個欄位、`tests/Billing/PaymentEventsTest.php`；`aware-wave-wp-bridge.php` `AWBRIDGE_VERSION` 升一版。
+- Acceptance：`composer test` 綠，測試名含 `a paid order with a plan product becomes subscription_paid with the subscription next payment as period_end`、`a credit pack order sums units by quantity`、`a full refund of a pack order becomes refund credit_pack`、`a guest order is dropped with an order note and never queued`、`the same action twice yields the same event_id`；`composer lint` 綠。發版：`bash scripts/release-wp-bridge.sh`（兩個 repo）；aware-wave.com 更新外掛（High）。
+- Rollback：關設定頁「送付款事件」開關。
+
+### 4b-3　next-admin `woo` 收件接頭（依賴 4b-1；Codex 卡 `03-woo-billing-provider.md`）
+- Files：`lib/payments/woo-billing.ts`（`verify`＝HMAC 同 local；`parse`：body `{event_id, wp_user_id, email, display_name, ...PaymentEvent 去掉 organization_id}` → 查 `findBillingAccount` → 沒有就 `createCustomerFromWp()`（org＋`inviteClientAccount`＋`linkIdentity`）→ 回 `ReceivedPayment`）；`lib/payments/index.ts` `PROVIDERS` 加 `woo`；`lib/entitlements/__tests__/import-boundary.test.ts:14` `PROVIDER_ADAPTERS` 加 `lib/payments/woo-billing.ts`；`lib/payments/__tests__/woo-billing.test.ts`。
+- 注意：`PaymentProvider.parse` 現在是同步的（`provider.ts:28`）；改成 `parse(rawBody): Promise<ReceivedPayment>`，`local.ts` 與 route 跟著 `await`。guest（`wp_user_id` 0／缺）→ `PaymentParseError("guest_checkout")`（route 回 400）。
+- Acceptance：`npx vitest run lib/payments app/api/webhooks/payments` 綠，測試名含 `a known wp member resolves to its billing account`、`a first-time payer gets an organization, an invite and an identity in that order`、`a retry after a half-made account does not create a second organization`、`a guest checkout is refused with 400`、`an invalid X-AwareWave-Payment-Signature is refused with 401`；突變：拔 `linkIdentity` 的唯一鍵查核 → `a retry…` 紅。prod：`PAYMENTS_PROVIDERS=local,woo`＋`PAYMENTS_WOO_SECRET`（`safe-infra-patch.sh compose`；驗 `docker exec … printenv PAYMENTS_WOO_SECRET`）。
+- Rollback：`PAYMENTS_PROVIDERS=local`（路由回 404）。
+
+### 4b-4　WordPress 一次性碼進產品門（依賴 4b-1、4b-3）
+- Files：next-admin `app/api/auth/wp-handoff/route.ts`（HMAC 驗章、`ts` ±60 秒、nonce 一次性存新表 `auth_handoff_nonces(provider, nonce) unique`（0125）、`holdsProduct` 不持有回 403）、`lib/auth/sources/awarewave-wp.ts`（generateLink magiclink → 門 URL）、`app/login/wp/page.tsx`（`verifyOtp` 換 session，失敗顯示「連結已失效，回 aware-wave.com 再按一次」）、`middleware.ts` matcher 讓 `/login/wp` 免登入（比照 `/login/set-password`；`middleware-portal-guards.test.ts` 會比對 nginx）、`nginx/default.conf` 門區塊放行 `/login/wp`；wp-bridge `includes/Billing/MyAccountDoors.php`（我的帳號頁按鈕）。
+- Acceptance：`npx vitest run app/api/auth lib/auth app/__tests__/middleware-portal-guards.test.ts` 綠，測試名含 `a handoff for a product the account does not hold is refused`、`a replayed nonce is refused`、`a stale timestamp is refused`；本機 `curl -X POST …/api/auth/wp-handoff` 帶正確簽章 → 302 到 `https://tarot.localhost/login/wp#token_hash=…`。上線＝每扇門 nginx 改（High）。
+- Rollback：wp-bridge 設定頁關「我的帳號按鈕」；route 下架回 410。
+
+### 4b-5　點數只付已持有功能（待決 5 選 A；High：改 can()）
+- Files：`lib/entitlements/can.ts:40-56`（`issuePermit`：找到列且 `feature.billing==="credits"` 且 `row.source==="contract"` → `source:"credits"`、`entitlement_id: row.id`、`max_spend: min(balance, singleLimit)`，餘額不足拒 `insufficient_credits`；找到 `comp` 列照舊免費；沒列一律 `no_active_entitlement`，刪掉「沒列看錢包」分支）；`lib/entitlements/__tests__/can.test.ts`、`customer-drill.test.ts`（`drill-credits` 列改成「有 addon 列＋錢包 50」與「只有錢包、沒列→拒」兩列）；ADR 017 產品決定 #11「待決」改成決定；監工台 `DRILL` 點數列文字。
+- Acceptance：`npx vitest run lib/entitlements` 綠，測試名含 `a wallet alone opens nothing`、`a contract row on a credits feature spends the wallet`、`a comp row on a credits feature is free`；突變：把「沒列看錢包」分支加回去 → `a wallet alone opens nothing` 紅。
+- Rollback：`git revert`；資料不動。
+
+### 4b-6　Woo 店面設定（操作者在 WordPress 後台做；卡只列清單）
+- 結帳必須登入（WooCommerce → 設定 → 帳號與隱私：關閉訪客結帳）；結帳頁條款勾選（WooCommerce 內建「條款與條件」頁＝待決 3 條款全文，勾選才能下單）；每個點數包與訂閱商品的「簡短說明」第一行貼待決 3 的一句告知；商品 meta `_awarewave_plan_key`／`_awarewave_credit_units`（4b-2 的欄位）。
+- 驗證：以測試會員下單一筆 0 元試用 → `/ops/billing` 出現合約；Woo 訂單備註有「已送 AwareWave event wc:…」。
+
+### 4b-7　/ops/billing 加「未用點數合計」（待決 3 選 A／B；無依賴）
+- Files：0120 `billing_overview` 不改；`app/(shell)/ops/billing/page.tsx` 頂端一列「全部帳戶未用點數合計 N 點＝合約負債」＝Σ各帳戶 `balance`；測試一條。Acceptance：`npx vitest run "app/(shell)/ops/billing"` 綠。
+
+### 4b-8　帳本泛化（ADR 015 §4 第 2 步；只有會計師要「按產品分」才做）
+- `media_credit_ledger` 加 `product_key`（nullable→回填→not null），不改表名（view 雙名過渡的理由已不存在：帳本現在只有 grant／refund 幾筆）；debit 已帶 `featureKey`（`ledger.ts:13` `p_reference_id`），產品可由 `PRODUCTS` 反查，所以**預設不做**，列在這裡避免再議。
+
+### 順序與依賴
+`4b-1`（現在，Codex）→ `4b-3`（Codex，依賴 4b-1）→ 待決 1 定 → `4b-2` → 待決 3 定 → `4b-6`、`4b-7` → `4b-4`（門上線 High）→ 待決 5 定 → `4b-5`（High）。`4b-8` 不排。每張 done 時在 `data.mjs` `STEPS[3]` 的 `items` 打勾（id＝4b-N）；本卡不寫狀態。

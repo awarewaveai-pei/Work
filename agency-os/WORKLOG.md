@@ -13,6 +13,28 @@
 - BUGHUNT_WAIVED: NA -- 部署，不改程式
 - **下一步**：操作者目前是唯一員工帳號；新增員工時在 /ops/staff「新增員工」寄邀請並勾工具。2026-11-01 看紀錄（TASKS 條目＋行事曆已建）。
 - **rollback**：`DEPLOY_ROLLBACK_RUNBOOK.md` §2.1（回 eaca393e0 映像）；或不動＝shadow 本來就不擋。
+## 2026-10-24（續57）ADR 017 第 4 步 4b：待決 1、3、5 整理成選項；4b 設計更新與八張小卡；4b-1、4b-3 派 Codex（Claude）
+
+- **任務**：續做「客戶怎麼來」。第 8 步（產品門）由 session「01. 產品門與收費登入決策審查」在做（`list_sessions` 2026-10-24 14:55Z running），沒人做 4b；從第 4 步開始，完成＝待決 1、3、5 都有操作者可直接選的選項、卡寫到便宜模型能照做。
+- **根因（為什麼 4b 卡著）**：三個待決只寫「要問」，沒有選項與代價；原卡「Woo 原生 webhook」在查了 WCS 之後不成立（沒有續約 topic，`class-wcs-webhooks.php` 只有 subscription.created/updated/deleted/switched；Woo webhook 失敗 5 次自動停用且不重送，`app/api/webhooks/woo-order/route.ts:20-25`）；WP 會員↔計費帳戶沒有任何對應表（`grep wp_user_id migrations` 0 hits）。
+- **做了什麼**：
+  - `cards/step-4.md` 新增三節：§4b 待決選項（三題各 3–4 個選項、★推薦、代價、程式影響）、§4b 設計更新（事件由 wp-bridge 用官方 PHP action 送；HMAC 同 `local.ts:14`；`customer_identities` 表；第一次付款自動建帳戶走 `inviteClientAccount` `client-invite.ts:200`；商品→方案只認 Woo 商品 meta `_awarewave_plan_key`，`plans.woo_product_ids` 0124 移除；event_id 規則；六種事件對應表；WordPress 一次性碼進門＝`generateLink magiclink` → `/login/wp` `verifyOtp`）、§4b 執行卡 4b-1…4b-8（Files／Acceptance 測試名／突變／Rollback）。
+  - 監工台 `data.mjs`：OPEN 1、3、5 加 `options`（★）與 `detail`；STEPS[4] 加 `items`（4a done `f2139d35a`、4b-1…4b-7 todo）；NEXT ④ 改寫。`scripts/supervisor-kit/build.mjs` `openList` 渲染 `options`／`detail`（選用欄位，其他四個監工台輸出不變，各自 `node check.mjs` 皆 ok），新 `OPEN_CSS`。
+  - `TASKS.md` 待決 1、3、5 行末各加一句選項與指向。
+  - Codex 隊列：`codex-queue/cards/02-customer-identities.md`（0124＋`lib/entitlements/identities.ts`）、`03-woo-billing-provider.md`（`lib/payments/woo-billing.ts`、`parse` 改 async、`PROVIDER_ADAPTERS` 加檔）；`queue.json` 兩條，`validate-codex-queue.py --profile general` → `queue valid: 3 card(s)`；`codex-continue.ps1 -MaxCards 2` 背景執行中（結果另記）。
+- **金流研究（web-researcher，2026-10-24；全部第三方費率簽約前以報價為準）**：
+  - Stripe 不支援台灣主體（https://stripe.com/global 無 Taiwan；WC Stripe 外掛頁 45 國無台灣）。
+  - WooCommerce Subscriptions US$279/年（https://woocommerce.com/products/woocommerce-subscriptions/）；topic 清單 https://github.com/wp-premium/woocommerce-subscriptions/blob/master/includes/class-wcs-webhooks.php；PHP action `woocommerce_subscription_renewal_payment_complete`／`_payment_failed`／`_status_cancelled` https://woocommerce.com/document/subscriptions/develop/action-reference/。SUMO／YITH／WP Swings 無官方 webhook 文件（https://funnelkit.com/best-woocommerce-subscription-plugins/）。
+  - TapPay：整合最完整、站內退刷、無收款頻率限制，虛擬訂閱商品銀行過件較嚴（https://cloudwp.pro/blog/woocommerce/woocommerce-subscriptions-payment-gateway/）；PAYUNi Pro NT$3,980/年、幕後授權＋Token API（https://docs.wpbrewer.com/wpbr-payuni-pro）；綠界定期定額 cloudwp 外掛 NT$399/月、v1.1 2023-03-27（https://cloudwp.pro/plugin-market/ecpay-subscriptions-pro/）；藍新定期定額整合度差。費率比較 https://www.design-hu.com.tw/woocommerce/woocommerce-indro/woocommerce-payment-gateway-comparison.html。各家拒付通知皆無官方 webhook 說明。
+  - 法規：通訊交易解除權合理例外情事適用準則 §2 第 5 款（https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=J0170012）；會計：預收款項 2018 起稱合約負債（IFRS 15）。
+- **驗證結果**
+  - REALTEST_EVIDENCE: tool=Bash | cmd=node build.mjs && node check.mjs（customer-model）＋四個其他監工台 node check.mjs | exit=0 | ms=0（未計時）
+  - REALTEST_EVIDENCE: tool=Bash | cmd=python validate-codex-queue.py --queue agency-os/handoffs/codex-queue --profile general | exit=0 | ms=0（未計時）
+  - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/1m/0n（m：check 抓到 `4b-6／4b-7` 被當手打數字，已改字）
+  - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=woo_product_ids|PROVIDER_ADAPTERS|openList | hits=41（woo_product_ids 其餘命中＝0110 定義與本次卡片；0124 由 Codex 卡移除欄位）
+  - ORACLE_WAIVED: 本 commit 只有文件、監工台資料與 kit 渲染（選用欄位），無 source 檔邏輯；Codex 卡的程式由 Codex 寫、Claude `/claude-review`。
+- **剩餘風險**：WCS 續約／取消在 webhook 層怎麼呈現未實測（本設計改走 PHP action，官方有文件，但 aware-wave.com 要先裝 WCS 才能在測試站驗）；台灣金流拒付一律人工登記；4b-3 的帳戶自動建立跨 GoTrue 與 Postgres 無法同一交易，靠 `(provider, external_id)` 唯一鍵與重試冪等。
+- **rollback**：`git revert <本 commit>`；Codex 卡在 `refs/codex/do`，未合進 main 前不影響。
 ## 2026-10-24（續56）gemini-2.0-flash-lite 已下架 → 改用 gemini-3.5-flash-lite，模型名只寫在一處；收件匣 AI 分類與客服 Gemini 備援開始記花費（Claude）
 
 **觸發**：操作者「把 gemini-2.0-flash-lite 換成現在可用的模型（收件匣分類、客服備援、價目表），實測一次能回應」「去處理好」。發現經過見續51 C4。
