@@ -28,6 +28,7 @@ export const COPY = {
 export const NOW = [
   { what: '計畫定案', state: 'yes', ev: '需求逐條對照程式查證，八個階段（commit cfc6e08d7）' },
   { what: '文章、社群貼文、影片腳本共用同一份品牌語氣', state: 'yes', ev: '程式已推上 main（7d8d618a4）；今晚台灣 03:00 自動部署後在正式站生效' },
+  { what: '社群貼文不會超過平台字數上限', state: 'yes', ev: '程式已推上 main（30b6a022f）；超長會自動重寫一次，仍太長就不送出；今晚台灣 03:00 部署後生效' },
   { what: '熱門話題抓到後會存下來', state: 'no', ev: '目前抓完就丟（第 3 階段）' },
   { what: '每月自動列出題目', state: 'no', ev: '第 3 階段' },
   { what: '核准的題目自己變成文章草稿和社群草稿', state: 'no', ev: '文章管線已能產生草稿，但沒有排程去叫它（第 4 階段）' },
@@ -37,6 +38,7 @@ export const NOW = [
 ];
 
 const P1 = '7d8d618a4';
+const P2 = '30b6a022f';
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
 const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 
@@ -60,13 +62,13 @@ export const STEPS = [
       done('P1.5', '影片腳本也讀同一份品牌語氣', P1),
     ] },
   { n: 2, code: 'P2', group: 'B', plain: '一個「寫社群貼文」功能給四個地方共用；每個平台的字數上限只記在一處，超過就重寫。', title: '寫社群貼文共用核心',
-    gate: '每個平台產出的貼文都不超過該平台的字數上限；文章工具和社群工具改寫出來的結果守同一套規則', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['P1'],
+    gate: '每個平台產出的貼文都不超過該平台的字數上限；文章工具和社群工具改寫出來的結果守同一套規則', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: P2, depends: ['P1'],
     what: '新 lib/social/write-posts.ts；平台規格由 limits.ts BODY_LIMITS 導出；syndicate 變薄殼',
     files: ['lib/social/write-posts.ts', 'lib/content/syndicate.ts', 'lib/social/limits.ts'],
     items: [
-      todo('P2.1', '建「寫社群貼文」共用功能：字數上限只從一處讀，超過就重寫一次'),
-      todo('P2.2', '文章工具和社群工具的兩個改寫入口都用它，收費項目不變'),
-      todo('P2.3', '社群工具的平台對照表改由共用功能提供，只留一份'),
+      done('P2.1', '建「寫社群貼文」共用功能：字數上限只從一處讀，超過就重寫一次；仍太長的不送出', P2),
+      done('P2.2', '文章工具和社群工具的兩個改寫入口都用它，收費項目不變', P2),
+      done('P2.3', '社群工具的平台對照表改由共用功能提供，只留一份', P2),
     ] },
   { n: 3, code: 'P3', group: 'C', plain: '熱門話題抓到就存下來；每月自動列出約 28 個題目，在一頁上勾選核准、選要做文章／社群／影片。', title: '熱搜落地＋題目佇列',
     gate: '同一天同一則熱搜只存一筆；題目頁看得到這個月的題目，可以核准、退回、選格式', risk: 'High（資料庫新表）', model: 'Opus 5.5', status: 'not_started', depends: ['P2'],
