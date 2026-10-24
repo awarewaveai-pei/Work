@@ -38,6 +38,8 @@ export async function GET() {
       providers: allowedMediaProviders(),
     });
   } catch (e: unknown) {
+    // Served on the video door: log the cause, answer a fixed message (the raw error can name internal hosts).
+    console.warn(`[video/capabilities] ${e instanceof Error ? e.message : String(e)}`);
     return NextResponse.json({
       ok: false,
       capabilities: {
@@ -48,7 +50,7 @@ export async function GET() {
       },
       formats: [],
       providers: allowedMediaProviders(),
-      error: e instanceof Error ? e.message : "video-service capability check failed",
+      error: "video-service capability check failed",
     }, { status: 503 });
   }
 }

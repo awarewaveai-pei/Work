@@ -77,9 +77,15 @@ export function canCreateAiImageJob(role: OpsRole): boolean {
   return role === "owner" || role === "admin" || role === "operator";
 }
 
-/** A Release is an approval to make a tenant artifact externally deliverable. */
+/** A Release is an approval to make a tenant artifact externally deliverable. Staff side: owner/admin only. */
 export function canApproveMediaRelease(role: OpsRole): boolean {
   return role === "owner" || role === "admin";
+}
+
+/** Who may approve a media Release or a Story Bible: staff owner/admin, or the customer itself (operator 2026-10-23 D3).
+ *  The route must still assertOrgAccess on the item's organization -- that is what limits a customer to its own. */
+export function canApproveMedia(resolved: ReturnType<typeof resolveOpsRole>): boolean {
+  return canApproveMediaRelease(resolved.role) || (resolved.source === "client" && resolved.role === CLIENT_PRODUCT_ROLE);
 }
 
 // === 路線 B Ops Inbox 新增（docs/Ops_Observability_PathB_Plan.md §5.4） ===

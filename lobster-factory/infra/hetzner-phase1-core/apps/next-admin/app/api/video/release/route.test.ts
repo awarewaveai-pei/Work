@@ -34,6 +34,20 @@ describe("POST /api/video/release", () => {
     expect(getSupabaseWriteClient).not.toHaveBeenCalled();
   });
 
+  it("a customer approves a Release for its own organization and is refused another's before any database read (D3)", async () => {
+    const other = "123e4567-e89b-42d3-a456-426614174009";
+    const client = (orgId: string) => new NextRequest("http://localhost/api/video/release", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-ops-user-kind": "client", "x-ops-org-id": org },
+      body: JSON.stringify({ organizationId: orgId, candidateAssetId: asset, candidateChecksum: checksum }),
+    });
+    expect((await POST(client(other))).status).toBe(403);
+    expect(getSupabaseWriteClient).not.toHaveBeenCalled();
+    loadAuthoritativeReleaseEvidence.mockResolvedValue({ ok: true, reports: [], gate: { ok: true, code: "approved", message: "approved", reportIds: ["server-qa"] } });
+    expect((await POST(client(org))).status).toBe(200);
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ organization_id: org }));
+  });
+
   it("does not accept forged client reports when server evidence blocks", async () => {
     loadAuthoritativeReleaseEvidence.mockResolvedValue({ ok: true, reports: [], gate: { ok: false, code: "missing_qa", message: "missing required QA", reportIds: [] } });
     const response = await POST(request("owner", { organizationId: org, candidateAssetId: asset, candidateChecksum: checksum, reports: [{ id: "forged", status: "passed" }], requiredKinds: ["technical"] }));

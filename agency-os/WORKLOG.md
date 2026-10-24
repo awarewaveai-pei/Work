@@ -1,4 +1,31 @@
 # Worklog
+## 2026-10-24（續27）video 產品門頁建好（enabled:false）：客戶可核准自己組織的 Release／Story Bible；cleanup 搬 internal；兩個 410 殘骸刪除（Claude）
+
+**觸發**：操作者「繼續做」；卡 `cards/step-8-doors-video-design-content.md` §3.5（前置 S1/P1 `e28406990`、路由加固 `21e7da50b` 已完成）。本 session 無法開新 session（操作者經 Remote Control），在此直接做。
+
+**修改**（next-admin）
+- V1 `app/video/{layout,page}.tsx`：沿用員工頁 `VideoPipeline`／`?advanced=1` → `VideoTabs`，`ProductDoorShell productKey="video"`；無 topbar；單頁不設 `door.nav`。
+- V2 `VideoPipeline.tsx:102` 進階連結 `/tools/video?advanced=1` → `?advanced=1`（相對連結，員工頁與門頁都對）。
+- V3 不改：`MediaOperationsPanel` 只讀；`/api/video/billing` GET 先 `assertOrgAccess`（`route.ts:13-18`），客戶只看到自己組織。
+- V4 `capabilities` 列 `ORG_FREE_ROUTES`（只回我們 video-service 的能力布林值與 provider 政策，無 DB）；錯誤分支不再回原始例外字串（可能含內部主機），改 console.warn＋固定訊息。`qa/report`、`remotion-status`（410 殘骸）全 repo 無呼叫者 → 刪除（含 `qa/report/route.test.ts`）。
+- V5 `cleanup` → `app/api/internal/video/cleanup/route.ts`（matcher 不經過、門的 nginx 擋 `api/internal`；仍驗 `x-ops-sync-key`）；匯入改 `@/`；閘 6 清單路徑同步。repo 無呼叫者。
+- V6（決定 D3）`lib/ops-role.ts` 新 `canApproveMedia(resolved)`＝員工 owner/admin 或客戶本人（`source==="client"` 且有組織）；`canApproveMediaRelease` 保持只有員工。`video/release`、`story-bibles/[id]/approve` 改用它；兩者原本就對該筆組織 `assertOrgAccess`（客戶被綁自己組織）＝限本組織。新測：`ops-role-client.test.ts` 一則、`release/route.test.ts` 一則（他組織 403 且不讀 DB、本組織 200）、新 `story-bibles/[id]/approve/route.test.ts` 三則（本組織可、他組織 403、員工 operator 403）。
+- V7 manifest 無 TODO（0）；「門上渲染功能清單」未做——會改三個已上線門的版面，列為待決，見下。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（346 files／3096 passed／32 skipped）＋ npx tsc --noEmit -p .（只有 `.next/types` 指向已刪路由的 3 個生成檔錯誤，原始碼 0）＋ lib/portal 門閘（video 門已建，閘 3／4／5 綠） | exit=0 | ms=19204
+- REALTEST_EVIDENCE: tool=Bash | cmd=本機 next-admin-social-ui（無 Supabase）：`/video` → `.door-main`＋`.door-foot`、無側欄、無 topbar、10 步驟管線；`/video?advanced=1` → VideoTabs；`/tools/video` topbar 照舊、進階連結解析為 `/tools/video?advanced=1`；console 錯誤只有無 Supabase 的主題讀取與未登入 API（員工頁同樣） | exit=0 | ms=60000
+- 突變（擁有權守衛各一次）：`story-bibles/[id]/approve` 拿掉 `assertOrgAccess` → 「a customer cannot approve another organization's draft」紅；`video/release` 拿掉 `assertOrgAccess` → 「a customer approves a Release for its own organization and is refused another's」紅；皆還原綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n -- Codex `agency-os/reports/oracle/2026-10-24-partialreview-84d487ff.md`，兩項都在搬移的 cleanup 既有邏輯：F1 JSON `null` body → `body.days` TypeError 500：採納，body 非物件即用預設 30 天；F2 R2 刪成功、DB 列刪失敗會留下指向已刪物件的列：成立但不改——既有順序、全 repo 與主機皆無呼叫者（無 cron），列入剩餘。
+  - external oracle = Codex CLI (codex exec -s read-only), not self-description
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=api/video/cleanup\|api/video/remotion-status\|api/video/qa/report | hits=13（程式 0；`lib/video/MODULE_MANIFEST.json:7,11` 與其 Foundry 生成檔待更新——同一行有他 session 未提交的 reconcile 改動，等其 commit 後再改並重產目錄；`agency-os/docs/video_generator/*` 為日期快照，不回改；卡片為任務敘述）
+- `/verify` H2：`~/.claude/hooks` 頂層舊檔與 SSOT `mcp/claude-userlevel/hooks/rules/` 漂移（既有，與本次無關），未執行 `sync-claude-userlevel`。
+
+**待決**：門上渲染「功能清單」（step-8 卡第 3 點、V7／C4）——tarot、studio 上線時沒有，加了會改三個已上線門的版面，需操作者決定要不要。
+
+**剩**：cleanup 先刪 R2 後刪 DB 列的順序（Codex F2，無呼叫者）；video 上線（DNS、憑證 SAN、nginx 共用區塊加 `video.aware-wave.com`、enabled）＝High，等操作者 go；design、content 門照卡續做。
+
+**rollback**：`git revert <本 commit>`（無資料、無 migration、門未上線）。
 ## 2026-10-24（續25）0121 套正式庫（操作者同意）＋P3 推上 main；監工台 P3 完成（Claude）
 
 **觸發**：操作者「Apply 0121 to production now, verify it, then push P3.」

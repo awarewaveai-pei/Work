@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CLIENT_PRODUCT_ROLE, canApproveCommand, canApproveMediaRelease, canChangeSystemMode, canCreateAiImageJob, canWriteTenantConfig, resolveOpsRole } from "../ops-role";
+import { CLIENT_PRODUCT_ROLE, canApproveCommand, canApproveMedia, canApproveMediaRelease, canChangeSystemMode, canCreateAiImageJob, canWriteTenantConfig, resolveOpsRole } from "../ops-role";
 
 const req = (headers: Record<string, string>) => new Request("https://tarot.aware-wave.com/api/tools/tarot/generate", { headers });
 
@@ -20,6 +20,13 @@ describe("resolveOpsRole for a customer identity", () => {
     const { role } = resolveOpsRole(req({ "x-ops-user-kind": "client", "x-ops-org-id": "org-1" }));
     expect(canCreateAiImageJob(role)).toBe(true);
     for (const staffOnly of [canApproveMediaRelease, canChangeSystemMode, canApproveCommand, canWriteTenantConfig]) expect(staffOnly(role), staffOnly.name).toBe(false);
+  });
+
+  it("a customer may approve its own media (D3); staff need owner/admin; a client without an org may not", () => {
+    expect(canApproveMedia(resolveOpsRole(req({ "x-ops-user-kind": "client", "x-ops-org-id": "org-1" })))).toBe(true);
+    expect(canApproveMedia(resolveOpsRole(req({ "x-ops-user-kind": "client" })))).toBe(false);
+    expect(canApproveMedia(resolveOpsRole(req({ "x-ops-claims-role": "operator" })))).toBe(false);
+    expect(canApproveMedia(resolveOpsRole(req({ "x-ops-claims-role": "admin" })))).toBe(true);
   });
 
   it("staff resolution is unchanged: claims win, otherwise least privilege", () => {

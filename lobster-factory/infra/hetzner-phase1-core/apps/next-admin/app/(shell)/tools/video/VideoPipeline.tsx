@@ -99,7 +99,7 @@ export default function VideoPipeline() {
         ))}
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
           {step > 1 && <span style={{ fontSize: 11, color: "var(--text-muted)" }}>租戶：{organizationId ? organizationId.slice(0, 8) + "…" : "未選"}</span>}
-          <a href="/tools/video?advanced=1" style={{ fontSize: 11, color: "var(--text-secondary)", textDecoration: "underline" }}>進階（跳過流程，直接操作單一引擎）</a>
+          <a href="?advanced=1" style={{ fontSize: 11, color: "var(--text-secondary)", textDecoration: "underline" }}>進階（跳過流程，直接操作單一引擎）</a>
         </div>
       </div>
 

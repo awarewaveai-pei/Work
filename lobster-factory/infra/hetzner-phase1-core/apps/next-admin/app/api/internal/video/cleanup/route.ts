@@ -1,12 +1,13 @@
 /**
- * POST /api/video/cleanup
+ * POST /api/internal/video/cleanup
  * Delete videos older than N days (default 30). Protected by x-ops-sync-key.
- * Designed to be called by a weekly cron.
+ * Designed to be called by a weekly cron. Lives under /api/internal (the middleware matcher skips it, product doors
+ * refuse it in nginx) so no door serves it -- it acts on every organization's videos.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseWriteClient } from "../../../../lib/supabase-server";
-import { deleteUnreferencedAsset } from "../../../../lib/content/r2-delete-guard";
-import { videoObjectKey } from "../../../../lib/content/blocks/video-pipeline";
+import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { deleteUnreferencedAsset } from "@/lib/content/r2-delete-guard";
+import { videoObjectKey } from "@/lib/content/blocks/video-pipeline";
 
 function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -22,8 +23,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 
-  const body = await req.json().catch(() => ({}));
-  const days = Math.max(1, Number(body.days) || 30);
+  const body: unknown = await req.json().catch(() => null);
+  const days = Math.max(1, Number(body && typeof body === "object" ? (body as { days?: unknown }).days : undefined) || 30);
   const cutoff = new Date(Date.now() - days * 86_400_000).toISOString();
 
   const supabase = getSupabaseWriteClient();

@@ -273,6 +273,7 @@ describe("registry claims match the code", () => {
     "app/api/tools/studio/mockup/route.ts": "Printful mockup (free) from the request image and the public catalog; uploads that image to the shared public designs bucket and shares the Printful store quota",
     "app/api/content/seo-check/route.ts": "scores the article in the request body (lib/content/quality/seo-check-core.ts); no database, no stored data",
     "app/api/content/brand-voice/route.ts": "analyses the pasted sample, or a page fetched through lib/collect/net/remote-file (no internal host); stores nothing",
+    "app/api/video/capabilities/route.ts": "reports which features our own video-service supports (booleans, formats) and the provider policy; no database, nothing per organization",
     "app/api/content/trending/route.ts":"public news feeds, the shared content_sources table and the shared content_trends cache (no organization column on either; customers read sources, only staff write them, content/sources/route.ts; only feed items in a supported region reach the cache, lib/content/topics/trends.ts)",
   };
   const routesUnder = (prefix: string) => [...FILES.keys()].filter((f) => isRoute(f) && (f.startsWith(`app${prefix}/`)));
@@ -332,7 +333,7 @@ describe("registry claims match the code", () => {
     "app/api/ops/schedules/route.ts": "reads the schedules view",
     "app/api/social/reports/monthly/route.ts": "toggles a client_schedules row; reads job defaults from lib/schedules/jobs.ts, never runs a job",
     "app/api/video/[id]/route.ts": "deletes a video row and its unreferenced object (videoObjectKey only)",
-    "app/api/video/cleanup/route.ts": "deletes unreferenced R2 objects (videoObjectKey only)",
+    "app/api/internal/video/cleanup/route.ts": "deletes unreferenced R2 objects (videoObjectKey only)",
     "app/api/video/status/route.ts": "polls our own video-service and records the finished asset; no paid step",
     "app/api/video/remotion-render/route.ts": "submits to our own Remotion renderer (resolveOrgId only)",
     "app/api/video/remotion-job-status/route.ts": "polls our own Remotion renderer and records the asset",

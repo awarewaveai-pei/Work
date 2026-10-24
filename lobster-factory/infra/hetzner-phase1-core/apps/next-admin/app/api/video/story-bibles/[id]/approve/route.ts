@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { canApproveMediaRelease, resolveOpsRole } from "@/lib/ops-role";
+import { canApproveMedia, resolveOpsRole } from "@/lib/ops-role";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
-  if (!canApproveMediaRelease(resolveOpsRole(req).role)) return NextResponse.json({ ok: false, error: "owner_or_admin_required" }, { status: 403 });
+  if (!canApproveMedia(resolveOpsRole(req))) return NextResponse.json({ ok: false, error: "owner_or_admin_required" }, { status: 403 });
   const { id } = await params;
   const db = getSupabaseWriteClient(); if (!db) return NextResponse.json({ ok: false, error: "db unavailable" }, { status: 503 });
   const current = await db.from("media_story_bible_revisions").select("id, organization_id, series_id, revision, status").eq("id", id).maybeSingle();

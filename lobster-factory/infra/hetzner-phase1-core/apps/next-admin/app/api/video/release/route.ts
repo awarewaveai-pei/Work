@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { canApproveMediaRelease, resolveOpsRole } from "@/lib/ops-role";
+import { canApproveMedia, resolveOpsRole } from "@/lib/ops-role";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { loadAuthoritativeReleaseEvidence } from "@/lib/content/video/release-evidence";
 
@@ -10,8 +10,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 
 /** Promote a candidate to a durable Release after the same fail-closed QA gate as preflight. */
 export async function POST(req: Request): Promise<Response> {
-  const { role } = resolveOpsRole(req);
-  if (!canApproveMediaRelease(role)) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  if (!canApproveMedia(resolveOpsRole(req))) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   if (process.env.MEDIA_PRODUCTION_PERSISTENCE_ENABLED !== "true") return NextResponse.json({ ok: false, error: "release_persistence_disabled" }, { status: 503 });
   let body: Record<string, unknown>; try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 }); }
   const organizationId = typeof body.organizationId === "string" ? body.organizationId : "";
