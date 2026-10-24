@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-24（續23）Claude 使用者層設定 verify 永久假 drift：驗證端只剝頂層 `_comment`，寫入端已剝任何深度（Claude）
+
+**觸發**：上一輪交接「verify-build-gates 一項失敗：Claude 使用者層設定漂移，等另一 session 完成會自行收斂」。查證：那個 session 已 commit `da4b0f35f`（13:54），檔案乾淨，`sync-claude-userlevel.ps1 -Mode verify` 仍 exit 1——不會自行收斂。
+
+**根因**：同一條規則兩處實作分岔。`da4b0f35f` 把寫入端 `scripts/sync-claude-userlevel.ps1:141`（`Expand-VarsRecursive`）改成任何深度的 `_` 鍵都不寫；verify 模式呼叫的 `scripts/verify-settings-governed-keys.mjs` 仍只 `delete tplRaw['_comment']`（頂層）。模板 `hooks._comment` 永遠比 live 多一鍵 → `hooks` 永遠 drift。逐事件比對 template／live hooks：除 `_comment` 外完全相同。副作用：`scripts/ao-close.ps1:944` 自癒區塊每次收工都跑 `-Mode merge` 重寫 settings.json。
+**不變量**：驗證端用與寫入端相同的「`_` 鍵＝註解、任何深度略過」規則；由測試釘住。
+
+**改動**
+- C1 `scripts/verify-settings-governed-keys.mjs` `expandAll`：略過任何深度 `_` 開頭鍵；刪頂層 `delete tplRaw['_comment']` 特例。
+- C2 `tests/hooks/settings-deny-parity.test.mjs` 新測試：模板含頂層＋巢狀 `_comment`、live 無 → exit 0；hooks 指令真不同 → exit 1。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell.exe -File scripts/sync-claude-userlevel.ps1 -Mode verify（修前 exit 1 `drifted key: hooks`；修後 `RESULT: PASS`） | exit=0 | ms=9000
+- `node --test tests/hooks/settings-deny-parity.test.mjs` 5 pass／0 fail；突變：驗證腳本換回 HEAD 版 → 4 pass／1 fail，還原 → 5／0。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n
+  - external oracle = Codex CLI（`agency-os/reports/oracle/2026-10-24-partialreview-47d4e341.md`，NO FINDINGS）
+- BUGHUNT_DONE: scope=agency-os,scripts,tests,.claude,mcp | grep=_comment|verify-settings-governed-keys | hits=53
+  - `git grep -c` 追蹤檔。驗證腳本唯一呼叫端 `sync-claude-userlevel.ps1:382`；`settings.template.json` 5 處 `_comment` 皆由 C1 涵蓋；`mcp.template.json` 走 `Sync-Json-Replace`（寫入端已剝，不經此驗證腳本）；`settings-deny-parity.test.mjs:77` `underscoreKeys` 同規則；其餘為 WORKLOG／文件／無關 JSON。
+
+**rollback**：`git revert <本 commit>`（只影響 verify 判讀，不改 live 設定）。
 ## 2026-10-24（續22）next-admin 部署 655283785（他 session：doors 資料範圍 21e7da50b、social 單一寫手 30b6a022f）（Claude）
 
 **觸發**：操作者「要」——把 706e41f57 之後他 session 已推 main 的 next-admin commit 提前上線。無 DEPLOY_HOLD；部署前 lobster-redis／soulful-redis／node-api 皆 healthy。

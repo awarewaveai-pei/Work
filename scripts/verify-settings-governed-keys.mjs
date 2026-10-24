@@ -66,7 +66,9 @@ function expandAll(obj) {
   if (Array.isArray(obj)) return obj.map(expandAll);
   if (typeof obj === 'object') {
     const out = {};
-    for (const [k, v] of Object.entries(obj)) out[k] = expandAll(v);
+    // '_' keys are template comments at ANY depth -- same rule as Expand-VarsRecursive in sync-claude-userlevel.ps1,
+    // which never writes them; comparing them here made verify report hooks drift forever (2026-10-24).
+    for (const [k, v] of Object.entries(obj)) if (!k.startsWith('_')) out[k] = expandAll(v);
     return out;
   }
   return obj;
@@ -114,7 +116,6 @@ let tplRaw, liveRaw;
 try { tplRaw  = JSON.parse(fs.readFileSync(templatePath, 'utf8')); } catch (e) { console.error(`Cannot parse template: ${e.message}`); process.exit(2); }
 try { liveRaw = JSON.parse(fs.readFileSync(livePath,     'utf8')); } catch (e) { console.error(`Cannot parse live:     ${e.message}`); process.exit(2); }
 
-delete tplRaw['_comment'];
 const tpl  = expandAll(tplRaw);
 const live = liveRaw;
 

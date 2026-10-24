@@ -84,3 +84,20 @@ test('settings.template.json permission rules have no empty parentheses inside a
     assert.ok(inner === undefined || !inner.includes('()'), `rule the CLI refuses ("Empty parentheses"): ${rule}`);
   }
 });
+
+// verify-settings-governed-keys.mjs must drop '_' keys at the same depths the writer does, or a live file the writer
+// produced reads as drifted forever (2026-10-24: hooks._comment kept verify at exit 1 after every merge).
+test('verify-settings-governed-keys ignores nested comment keys the writer never copies', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'governed-keys-'));
+  const tpl = { _comment: 'top', hooks: { _comment: 'nested', Stop: [{ matcher: '.*', hooks: [{ type: 'command', command: 'x' }] }] } };
+  const live = { hooks: { Stop: [{ matcher: '.*', hooks: [{ type: 'command', command: 'x' }] }] } };
+  fs.writeFileSync(path.join(tmp, 't.json'), JSON.stringify(tpl));
+  fs.writeFileSync(path.join(tmp, 'l.json'), JSON.stringify(live));
+  const run = () => spawnSync(process.execPath, [path.join(REPO_ROOT, 'scripts', 'verify-settings-governed-keys.mjs'),
+    path.join(tmp, 't.json'), path.join(tmp, 'l.json'), 'overwriteKeys=hooks'], { encoding: 'utf8' });
+  assert.equal(run().status, 0, 'nested _comment must not count as drift');
+  live.hooks.Stop[0].hooks[0].command = 'y';
+  fs.writeFileSync(path.join(tmp, 'l.json'), JSON.stringify(live));
+  assert.equal(run().status, 1, 'a real hooks difference must still be drift');
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
