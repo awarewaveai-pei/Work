@@ -1,4 +1,26 @@
 # Worklog
+## 2026-10-24（續9）Theme Editor：Colors 分頁只放顏色、Typography & Size 只放尺寸；每個 token 只出現一次（Claude）
+
+**觸發**：操作者：/tools/theme 的 Colors 與 Typography 裡顏色、字型、字級混在一起。
+
+**根因**（`lib/theme/tokens.ts` 舊分組）
+- C1 Colors 分頁含非顏色：`--radius`／`--radius-sm`（Borders & Radius）、`--sidebar-section-label-size`（續6 加入 Sidebar 組）。
+- C2 Typography 分頁含顏色組 Text Colors、Backgrounds；Backgrounds 的 4 個 token 與 Colors 分頁重複（同一值兩處可改，69 筆實為 65 個）。
+- C3 Tab Component 組混字級、字重與顏色；`--tab-bg*` 三個是顏色卻標 text。
+
+**修改**
+- `lib/theme/tokens.ts`：Colors＝Brand／Text／Backgrounds／Sidebar／Borders／Status／Button Secondary／Tabs／Special（全 color）；Typography & Size＝Font Sizes（含 sidebar 標題字級、tab 字級）／Font Weights（含 tab 字重）／Line Height & Spacing／Corner Radius。token 名稱與預設值不變（腳本核對前後集合相同：65 個）。
+- `app/(shell)/tools/theme/page.tsx`：分頁名 Typography → Typography & Size。
+- `lib/theme/__tests__/tokens-match-globals.test.ts`：加「每個 token 只出現一次」「Colors 全是顏色、Typography & Size 沒有顏色」。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/theme（4 passed）＋ npx tsc --noEmit（0）＋ regroup.py 前後 token 集合相同（65） | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回 diff：只搬分組、3 個 tab-bg 改 color 型、分頁名；已存的 prod 值以 token 名稱為鍵，不受影響
+- ORACLE_WAIVED: 純資料重分組＋一個分頁名，token 名稱／預設不變且由測試與腳本核對；無邏輯變更
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin | grep=COLOR_GROUPS|TYPOGRAPHY_GROUPS | hits=10 lines（tokens.ts:11,105,147；page.tsx:5,8,241,291；測試:4,32,33；皆讀同一份新分組）
+- BUGHUNT_SCOPE_NARROW: 分組只在 next-admin 使用
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-24（續8）lobster-wordpress OOM 抖動 11 小時拖垮整機：止血＋關掉「慢→無上限堆積→swap 抖動」整類（Claude）
 
 **症狀**（Telegram 2026-10-23T23:28Z → 10-24T03:42Z）：endpoint-alert 連報 `127.0.0.1:8080/wp-json → 000`、`job wp-cron-runner stale`、`job backup-coverage stale`；Uptime Kuma 全部監控間歇 `Knex: Timeout acquiring a connection`（Kuma 自己的 SQLite 被整機 iowait 餓死＝受害者，不是服務掛）。

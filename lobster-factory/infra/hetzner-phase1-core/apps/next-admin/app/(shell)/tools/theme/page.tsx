@@ -146,7 +146,7 @@ export default function ThemePage() {
 
   const TABS: { id: Tab; label: string; badge?: number }[] = [
     { id: 'colors',     label: 'Colors',     badge: changedCount > 0 ? changedCount : undefined },
-    { id: 'typography', label: 'Typography' },
+    { id: 'typography', label: 'Typography & Size' },
     { id: 'sidebar',    label: 'Sidebar',    badge: orderChanged ? 1 : undefined },
   ];
 

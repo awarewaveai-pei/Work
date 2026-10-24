@@ -6,6 +6,8 @@
 export type TokenDef = { name: string; default: string; type: "color" | "text" };
 export type TokenGroup = { label: string; tokens: TokenDef[] };
 
+// Colors tab = only colors; Typography & Size tab = only sizes, weights, spacing and radius. Each
+// token appears in exactly one group (lib/theme/__tests__/tokens-match-globals.test.ts checks).
 export const COLOR_GROUPS: TokenGroup[] = [
   {
     label: "Brand",
@@ -15,6 +17,14 @@ export const COLOR_GROUPS: TokenGroup[] = [
       { name: "--btn-primary-bg", default: "#6366f1", type: "color" },
       { name: "--btn-primary-hover", default: "#4f52e0", type: "color" },
       { name: "--btn-primary-text", default: "#ffffff", type: "color" },
+    ],
+  },
+  {
+    label: "Text",
+    tokens: [
+      { name: "--text-primary", default: "#0d1526", type: "color" },
+      { name: "--text-muted", default: "#64748b", type: "color" },
+      { name: "--text-secondary", default: "#64748b", type: "color" },
     ],
   },
   {
@@ -37,7 +47,14 @@ export const COLOR_GROUPS: TokenGroup[] = [
       { name: "--sidebar-text-active", default: "#0d1526", type: "color" },
       { name: "--sidebar-active-bar", default: "#6366f1", type: "color" },
       { name: "--sidebar-section-label", default: "#94a3b8", type: "color" },
-      { name: "--sidebar-section-label-size", default: "9px", type: "text" },
+    ],
+  },
+  {
+    label: "Borders",
+    tokens: [
+      { name: "--card-border", default: "#e6eaf4", type: "color" },
+      { name: "--border", default: "#e6eaf4", type: "color" },
+      { name: "--border-subtle", default: "#e6eaf4", type: "color" },
     ],
   },
   {
@@ -55,13 +72,24 @@ export const COLOR_GROUPS: TokenGroup[] = [
     ],
   },
   {
-    label: "Borders & Radius",
+    label: "Button Secondary",
     tokens: [
-      { name: "--card-border", default: "#e6eaf4", type: "color" },
-      { name: "--border", default: "#e6eaf4", type: "color" },
-      { name: "--border-subtle", default: "#e6eaf4", type: "color" },
-      { name: "--radius", default: "12px", type: "text" },
-      { name: "--radius-sm", default: "8px", type: "text" },
+      { name: "--btn-secondary-bg", default: "#ffffff", type: "color" },
+      { name: "--btn-secondary-border", default: "#d4d9e8", type: "color" },
+      { name: "--btn-secondary-text", default: "#0d1526", type: "color" },
+    ],
+  },
+  {
+    label: "Tabs",
+    tokens: [
+      { name: "--tab-color", default: "#64748b", type: "color" },
+      { name: "--tab-color-hover", default: "#0d1526", type: "color" },
+      { name: "--tab-color-active", default: "#6366f1", type: "color" },
+      { name: "--tab-bg", default: "transparent", type: "color" },
+      { name: "--tab-bg-hover", default: "rgba(99,102,241,0.05)", type: "color" },
+      { name: "--tab-bg-active", default: "transparent", type: "color" },
+      { name: "--tab-border-active", default: "#6366f1", type: "color" },
+      { name: "--tab-bar-border", default: "#e6eaf4", type: "color" },
     ],
   },
   {
@@ -70,14 +98,6 @@ export const COLOR_GROUPS: TokenGroup[] = [
       { name: "--code-bg", default: "#07101f", type: "color" },
       { name: "--ai-bg", default: "#e0f2fe", type: "color" },
       { name: "--ai-text", default: "#0369a1", type: "color" },
-    ],
-  },
-  {
-    label: "Button Secondary",
-    tokens: [
-      { name: "--btn-secondary-bg", default: "#ffffff", type: "color" },
-      { name: "--btn-secondary-border", default: "#d4d9e8", type: "color" },
-      { name: "--btn-secondary-text", default: "#0d1526", type: "color" },
     ],
   },
 ];
@@ -92,6 +112,8 @@ export const TYPOGRAPHY_GROUPS: TokenGroup[] = [
       { name: "--font-size-md", default: "15px", type: "text" },
       { name: "--font-size-lg", default: "17px", type: "text" },
       { name: "--font-size-xl", default: "22px", type: "text" },
+      { name: "--sidebar-section-label-size", default: "9px", type: "text" },
+      { name: "--tab-font-size", default: "14px", type: "text" },
     ],
   },
   {
@@ -102,6 +124,7 @@ export const TYPOGRAPHY_GROUPS: TokenGroup[] = [
       { name: "--font-weight-semibold", default: "600", type: "text" },
       { name: "--font-weight-bold", default: "700", type: "text" },
       { name: "--font-weight-heavy", default: "800", type: "text" },
+      { name: "--tab-font-weight", default: "600", type: "text" },
     ],
   },
   {
@@ -113,35 +136,10 @@ export const TYPOGRAPHY_GROUPS: TokenGroup[] = [
     ],
   },
   {
-    label: "Text Colors",
+    label: "Corner Radius",
     tokens: [
-      { name: "--text-primary", default: "#0d1526", type: "color" },
-      { name: "--text-muted", default: "#64748b", type: "color" },
-      { name: "--text-secondary", default: "#64748b", type: "color" },
-    ],
-  },
-  {
-    label: "Backgrounds",
-    tokens: [
-      { name: "--body-bg", default: "#f2f5fb", type: "color" },
-      { name: "--card-bg", default: "#ffffff", type: "color" },
-      { name: "--bg-subtle", default: "#f5f7fd", type: "color" },
-      { name: "--sidebar-bg", default: "#f7f9fc", type: "color" },
-    ],
-  },
-  {
-    label: "Tab Component",
-    tokens: [
-      { name: "--tab-font-size", default: "14px", type: "text" },
-      { name: "--tab-font-weight", default: "600", type: "text" },
-      { name: "--tab-color", default: "#64748b", type: "color" },
-      { name: "--tab-color-hover", default: "#0d1526", type: "color" },
-      { name: "--tab-color-active", default: "#6366f1", type: "color" },
-      { name: "--tab-bg", default: "transparent", type: "text" },
-      { name: "--tab-bg-hover", default: "rgba(99,102,241,0.05)", type: "text" },
-      { name: "--tab-bg-active", default: "transparent", type: "text" },
-      { name: "--tab-border-active", default: "#6366f1", type: "color" },
-      { name: "--tab-bar-border", default: "#e6eaf4", type: "color" },
+      { name: "--radius", default: "12px", type: "text" },
+      { name: "--radius-sm", default: "8px", type: "text" },
     ],
   },
 ];
