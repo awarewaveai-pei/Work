@@ -11,8 +11,8 @@ import {
 let n = 0;
 const uniqueKey = () => `sb-test-auth-token=tok-${n++}`;
 
-const staff = (role: CachedIdentity["role"]): CachedIdentity => ({ role, userKind: "staff", orgId: "", userId: "u-staff" });
-const client = (orgId: string): CachedIdentity => ({ role: "viewer", userKind: "client", orgId, userId: `u-${orgId}` });
+const staff = (role: CachedIdentity["role"]): CachedIdentity => ({ role, userKind: "staff", orgId: "", userId: "u-staff", tools: null });
+const client = (orgId: string): CachedIdentity => ({ role: "viewer", userKind: "client", orgId, userId: `u-${orgId}`, tools: null });
 
 describe("session-cache", () => {
   it("fresh hit within 15s, miss after", () => {

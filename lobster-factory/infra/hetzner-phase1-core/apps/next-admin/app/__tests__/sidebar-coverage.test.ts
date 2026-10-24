@@ -6,6 +6,7 @@ import { DEFAULT_SECTIONS, activeSectionId, applyLayout, itemKey } from "../Side
 // A built page nobody can click to is a page nobody uses: every static page under app/(shell) is
 // linked from the sidebar, or listed here with the page that links to it.
 const REACHED_ELSEWHERE: Record<string, string> = {
+  "/no-access": "middleware sends a page refused by staff tool grants here (lib/staff-access.ts)",
   "/ops/ai-models": "redirects to /tools/ai-models?tab=image-specs",
   "/outreach/settings/service-profiles": "tab of /outreach/settings",
   "/outreach/settings/suppression": "tab of /outreach/settings",

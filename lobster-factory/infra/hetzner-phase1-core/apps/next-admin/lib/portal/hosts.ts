@@ -13,6 +13,11 @@ export function portalHost(env: Env = process.env): string {
   return cleanHost(env.PORTAL_HOST) || `portal.${baseDomain(env)}`;
 }
 
+/** The staff console's hosts (STAFF_HOSTS, comma-separated; default app.<base>). The first is where staff are sent. */
+export function staffHosts(env: Env = process.env): string[] {
+  return (env.STAFF_HOSTS ?? `app.${baseDomain(env)}`).split(",").map(cleanHost).filter(Boolean);
+}
+
 export function productHost(p: PortalProduct, env: Env = process.env): string {
   return cleanHost(env[`PRODUCT_HOST_${p.key.toUpperCase()}`]) || `${p.subdomain}.${baseDomain(env)}`;
 }

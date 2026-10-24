@@ -1,4 +1,27 @@
 # Worklog
+## 2026-10-24（續46）員工逐工具權限 C2：身分帶工具、middleware 每頁每 API 判斷（預設 shadow 只記錄）（Claude）
+
+- **任務**：R0-PLAN §6 C2（`agency-os/handoffs/2026-10-24-staff-tool-grants/R0-PLAN.md`）。操作者 2026-10-24 交給本 session（「員工權限你去開一個session做」）；翻 enforce（C6.4）是 High，不在本卡。
+- **不變量**：員工到得了某頁／API ⇔ 該路徑所屬工具在他的授權裡；owner 永遠全部。判斷只有一個（`lib/staff-access.ts staffDenial`），middleware 快取路徑與驗證路徑都呼叫同一個函式。
+- **做了什麼**（路徑相對 next-admin）：
+  - `lib/supabase/session-cache.ts`：`CachedIdentity.tools`（null＝從沒設定）；與角色同一個快取，改授權 ≤15 秒生效。
+  - `middleware.ts`：讀 `app_metadata.staff_tools`；`x-ops-tools` 加進剝除清單後才注入；`staffToolDenial()` 在快取路徑與驗證路徑都跑（只對 staff、只在員工門與產品門）。shadow → `console.warn [staff-tools] would_deny`、行為不變；enforce → 頁 307 `/no-access?tool=`（產品門送回員工門）、API 403 `{error:"tool_not_granted",tools}`；兩者都帶 Supabase 剛換的 cookie。
+  - `lib/staff-access.ts`：`staffToolsMode()`（只認 `enforce`）、`staffDenial`、`parseStaffTools`（未知 key 丟掉）、`staffGrantOf`／`staffMayOpen`／`staffUnrestricted`（C3 側欄與首頁用）、`logStaffVerdict`（每人×原因×工具 10 分鐘一行）。
+  - `app/(shell)/no-access/page.tsx`（C5.1 一併做：Codex F1，否則 enforce 時導到 404）；`STAFF_PLATFORM.pages` 加 `/no-access$`。
+  - `lib/portal/hosts.ts staffHosts()`，`doors.ts` 改用（同一份員工網域清單）。
+  - 測試：`lib/__tests__/middleware-staff-tools.test.ts`（mock Supabase：owner 不受限、未歸格路徑拒、shadow 放行且記錄、快取路徑也擋、產品門、客戶不套用、偽造 header 被剝、cookie、log 不灌爆）；`products.test.ts`／`sidebar-coverage.test.ts` 承認平台頁 `/no-access`。
+- **Codex**（`agency-os/reports/oracle/2026-10-24-partialreview-06a455ee.md`，-Path 範圍 8 檔）：F1 `/no-access` 不存在→已建頁＋測試頁存在；F2 API 403 漏帶換過的 cookie→改成頁與 API 都帶＋測試；F3 每條不同路徑各記一行可灌 log→改以工具組去重＋測試。三條都成立、都修。
+- **驗證**：
+  - `npx tsc --noEmit` exit 0。
+  - `npx vitest run lib/__tests__/middleware-staff-tools.test.ts lib/portal app/__tests__ lib/supabase`：13 files／97 passed。全套 `npx vitest run`（C2 第一版）：362 files／3200 passed。
+  - 突變：拔 owner 短路 → 2 條紅；拔快取路徑檢查 → 2 條紅；log 去重改回路徑 → 「不灌爆」紅；API 403 不帶 cookie → cookie 測試紅；還原全綠。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/__tests__/middleware-staff-tools.test.ts lib/portal app/__tests__ lib/supabase (13 files, 97 passed) | exit=0 | ms=4000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=x-ops-tools|CachedIdentity|staff_tools|STAFF_TOOLS_MODE | hits=62
+- ORACLE_WAIVED: 共用工作目錄有其他 session 的大量未提交改動，整庫審查會把別人的 diff 一起送審；本卡以 -Path 範圍審查（partialreview-06a455ee），三條 finding 全修並附突變證據。
+- **剩餘風險**：shadow 期間沒設定的員工每種工具會記一行 would_deny（設計如此，C6.3 讀它）；知識庫分頁的「從 Cognitive OS 匯入」按鈕屬資料蒐集器，只勾 AI 客服者 enforce 後該按鈕 403（C3.4 只隱藏整個分頁）。
+- **rollback**：`git revert <本 commit>`；或不動程式＝保持 `STAFF_TOOLS_MODE` 未設（shadow，行為不變）。`app_metadata.staff_tools` 殘留無害。
+- **避免再發生**：新身分 header 一律加進 `CLAIM_HEADERS`；新的「拒絕」回應一律帶 `cookiesToCopy`（`clientForbiddenResponse` 與 `staffToolDenial` 同一做法）。
 ## 2026-10-24（續45）健康檢查「git fetch 紀錄超過 30 天」誤報：偵測器讀的紀錄檔自 09-23 起沒人寫，改讀每次 fetch 都會寫的那一份（Claude）
 
 **觸發**：P5 commit 前 `verify-build-gates.ps1` 失敗：`Critical gate failed: Git fetch ledger stale >30d`，但同一小時內 fetch 都成功。

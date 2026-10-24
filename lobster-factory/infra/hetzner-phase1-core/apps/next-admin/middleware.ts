@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseMiddlewareClient, isSupabaseAuthConfigured, type RefreshedCookie } from "@/lib/supabase/ssr";
 import { getFreshCachedRole, consumeStaleCachedRole, cacheValidatedRole, type CachedIdentity } from "@/lib/supabase/session-cache";
 import type { OpsRole } from "@/lib/ops-contracts";
-import { doorForHost, isAnonymousPath, isProductPath, portalHost, productPageOwner, routeOnProductDoor, type Door } from "@/lib/portal/doors";
+import { doorForHost, isAnonymousPath, isProductPath, portalHost, productPageOwner, routeOnProductDoor, staffHosts, type Door } from "@/lib/portal/doors";
+import { TOOLS_HEADER, encodeToolsHeader, logStaffVerdict, parseStaffTools, staffDenial, staffToolsMode } from "@/lib/staff-access";
 
 // Identity layer for the admin console (Supabase Auth, email+password).
 // Browser flow: validate the Supabase session cookie → resolve role from the user's
@@ -20,6 +21,8 @@ const CLAIM_HEADERS = [
   "x-ops-claims-role", "x-user-role", "x-clerk-role",
   // Tenant identity — set only by this middleware; strip client-supplied values.
   "x-ops-user-kind", "x-ops-org-id", "x-ops-user-id",
+  // Staff tool grant (lib/staff-access.ts) -- the sidebar and home page read it.
+  TOOLS_HEADER,
 ] as const;
 const SIMULATED_HEADER = "x-ops-simulated-role";
 const SYNC_KEY_HEADER = "x-ops-sync-key";
@@ -122,6 +125,31 @@ function applyIdentityHeaders(headers: Headers, identity: CachedIdentity): void 
   if (identity.orgId) headers.set("x-ops-org-id", identity.orgId);
   // the auth user id (ADR 018 §3): per-person grants such as social_brand_members key on it
   if (identity.userId) headers.set("x-ops-user-id", identity.userId);
+  if (identity.userKind === "staff" && identity.tools !== null) headers.set(TOOLS_HEADER, encodeToolsHeader(identity.tools));
+}
+
+/** Staff tool grants (agency-os/handoffs/2026-10-24-staff-tool-grants): a staff member reaches a page or API only when
+ *  the tool it belongs to is ticked for them. On the staff and product doors only (the portal serves no staff path).
+ *  Shadow (the default) logs would_deny and changes nothing; enforce sends a page to /no-access and refuses an API. */
+export function staffToolDenial(request: NextRequest, pathname: string, door: Door, identity: CachedIdentity, cookiesToCopy: RefreshedCookie[] = []): NextResponse | null {
+  if (identity.userKind !== "staff" || (door.kind !== "staff" && door.kind !== "product")) return null;
+  const verdict = staffDenial(identity, pathname);
+  if (!verdict) return null;
+  const mode = staffToolsMode();
+  logStaffVerdict(mode, identity.userId, identity.role, pathname, verdict);
+  if (mode !== "enforce") return null;
+  let res: NextResponse;
+  if (isApiPath(pathname)) {
+    res = NextResponse.json({ error: "tool_not_granted", tools: verdict.tools }, { status: 403 });
+  } else {
+    // a product door does not serve /no-access (it would land under the product's prefix): send staff to the staff door
+    const target = door.kind === "product" ? new URL("/no-access", `https://${staffHosts()[0]}`) : new URL("/no-access", request.url);
+    if (verdict.tools[0]) target.searchParams.set("tool", verdict.tools[0]);
+    res = NextResponse.redirect(target);
+  }
+  // a refusal still carries the session cookies Supabase just rotated (same as clientForbiddenResponse)
+  for (const cookie of cookiesToCopy) res.cookies.set(cookie.name, cookie.value, cookie.options);
+  return res;
 }
 
 // Exported (alongside the other pure helpers below) so verify-recent's tests can exercise
@@ -354,6 +382,8 @@ export async function middleware(request: NextRequest) {
     const fresh = getFreshCachedRole(sessionKey);
     if (fresh !== null) {
       if (isClientOutsideDoor(pathname, fresh.userKind, door)) return clientForbiddenResponse(request);
+      const denied = staffToolDenial(request, pathname, door, fresh);
+      if (denied) return denied;
       applyIdentityHeaders(baseHeaders, fresh);
       return forward(baseHeaders);
     }
@@ -368,7 +398,7 @@ export async function middleware(request: NextRequest) {
       const meta = data.user.app_metadata as Record<string, unknown> | undefined;
       const role = resolveRoleFromUser(meta);
       const { userKind, orgId } = resolveTenantFromMeta(meta);
-      identity = { role, userKind, orgId, userId: data.user.id };
+      identity = { role, userKind, orgId, userId: data.user.id, tools: parseStaffTools(meta?.staff_tools) };
       if (sessionKey) cacheValidatedRole(sessionKey, identity);
     } else if (error && sessionKey && isTransientAuthError(error)) {
       // Auth server unreachable / throttled — don't punish a logged-in user. Trust the last
@@ -388,6 +418,8 @@ export async function middleware(request: NextRequest) {
   if (isClientOutsideDoor(pathname, identity.userKind, door)) {
     return clientForbiddenResponse(request, refreshedCookies);
   }
+  const denied = staffToolDenial(request, pathname, door, identity, refreshedCookies);
+  if (denied) return denied;
 
   applyIdentityHeaders(baseHeaders, identity);
 

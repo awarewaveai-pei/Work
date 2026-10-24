@@ -3,9 +3,9 @@
 // PRODUCT_HOST_<KEY> -- a buyout install on a customer's domain sets these and changes no code.
 
 import { PRODUCTS, type PortalProduct, type ProductDoor } from "./products";
-import { baseDomain, cleanHost as clean, portalHost, productHost } from "./hosts";
+import { cleanHost as clean, portalHost, productHost, staffHosts } from "./hosts";
 
-export { baseDomain, portalHost, productHost } from "./hosts";
+export { baseDomain, portalHost, productHost, staffHosts } from "./hosts";
 
 type Env = Record<string, string | undefined>;
 export type NextAdminProduct = PortalProduct & { door: Extract<ProductDoor, { app: "next-admin" }> };
@@ -33,7 +33,7 @@ export function doorForHost(host: string, env: Env = process.env): Door {
   if (h === portalHost(env)) return { kind: "portal" };
   const product = servedNextAdminProducts().find((p) => productHost(p, env) === h);
   if (product) return { kind: "product", product };
-  const staff = (env.STAFF_HOSTS ?? `app.${baseDomain(env)}`).split(",").map(clean).filter(Boolean);
+  const staff = staffHosts(env);
   if (env.NODE_ENV === "development") staff.push("localhost");
   if (staff.includes(h)) return { kind: "staff" };
   // Existing compose and sg-deploy probes use loopback. This is never a staff door.

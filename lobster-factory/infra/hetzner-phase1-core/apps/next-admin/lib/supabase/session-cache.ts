@@ -45,7 +45,9 @@ const MAX_ENTRIES = 500;     // bound memory
 // can inject x-ops-user-kind / x-ops-org-id without calling getUser() again. A missing entry
 // (first request, cache eviction) always forces a fresh getUser() which fills both fields.
 export type UserKind = "staff" | "client";
-export interface CachedIdentity { role: OpsRole; userKind: UserKind; orgId: string; userId: string }
+// tools: the staff tool grant (app_metadata.staff_tools, lib/staff-access.ts); null = never set. Cached with the role, so a
+// changed grant reaches a session within FRESH_MS, the same bound as a role change.
+export interface CachedIdentity { role: OpsRole; userKind: UserKind; orgId: string; userId: string; tools: readonly string[] | null }
 type Entry = CachedIdentity & { at: number; staleUses: number };
 const cache = new Map<string, Entry>();
 
@@ -64,6 +66,8 @@ function prune(now: number): void {
   }
 }
 
+const identityOf = (e: Entry): CachedIdentity => ({ role: e.role, userKind: e.userKind, orgId: e.orgId, userId: e.userId, tools: e.tools });
+
 /**
  * Cache hit only if validated within FRESH_MS — safe to skip the network call entirely.
  * Returns the full identity (role + tenant) so the middleware can inject all headers without
@@ -71,7 +75,7 @@ function prune(now: number): void {
  */
 export function getFreshCachedRole(key: string, now: number = Date.now()): CachedIdentity | null {
   const e = cache.get(key);
-  return e && now - e.at <= FRESH_MS ? { role: e.role, userKind: e.userKind, orgId: e.orgId, userId: e.userId } : null;
+  return e && now - e.at <= FRESH_MS ? identityOf(e) : null;
 }
 
 /**
@@ -84,7 +88,7 @@ export function consumeStaleCachedRole(key: string, now: number = Date.now()): C
   if (!e || now - e.at > STALE_MS) return null;
   if (e.staleUses >= MAX_STALE_USES) return null;
   e.staleUses += 1;
-  return { role: e.role, userKind: e.userKind, orgId: e.orgId, userId: e.userId };
+  return identityOf(e);
 }
 
 /** Record a successful network validation. Resets the stale-use allowance and moves to LRU tail. */

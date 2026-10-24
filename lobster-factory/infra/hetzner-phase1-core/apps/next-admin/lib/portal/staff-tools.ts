@@ -54,7 +54,7 @@ export const STAFF_API_OWNERS: Readonly<Record<string, readonly string[]>> = {
 
 /** Pages and APIs every signed-in staff member may use, whatever is ticked. */
 export const STAFF_PLATFORM: { pages: readonly string[]; apis: readonly string[] } = {
-  pages: ["/$"],
+  pages: ["/$", "/no-access$"],   // /no-access: where the gate sends a page it refuses (a loop otherwise)
   apis: [...PLATFORM_APIS, "/api/ops/build-id", "/api/ops/analytics-context"],
 };
 

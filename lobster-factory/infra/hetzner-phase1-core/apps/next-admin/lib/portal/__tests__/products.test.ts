@@ -4,6 +4,7 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import { MIGRATIONS_DIR, migrationFiles } from "../../kb/__tests__/migration-source";
 import { RESERVED_SUBDOMAINS, nextAdminProducts } from "../doors";
+import { STAFF_PLATFORM, covers } from "../staff-tools";
 import { BACK_OFFICE, STAFF_UTILITIES, DEFAULT_SIGNUP_PRODUCT, LOGIN_SOURCES, PRODUCTS, SELF_SIGNUP_PRODUCTS, isSelfSignupProductKey } from "../products";
 
 // The registry is the one list of products (ADR 012 §5). The signup form and /api/signup read it; the database's own
@@ -146,6 +147,7 @@ describe("product registry", () => {
     const actual = [...dirs(shell).filter((n) => !["tools", "ops"].includes(n)),
       ...["tools", "ops"].flatMap((group) => dirs(path.join(shell, group)).map((n) => `${group}/${n}`))];
     for (const dir of actual) {
+      if (STAFF_PLATFORM.pages.some((p) => covers(p, `/${dir}`))) continue;   // every staff member's page: no cell owns it
       const owners = PRODUCTS.filter((p) => p.staffPaths.includes(dir));
       const count = owners.length + Number(dir in BACK_OFFICE) + Number(dir in STAFF_UTILITIES);
       expect(count, `${dir}: exactly one owner`).toBe(1);
