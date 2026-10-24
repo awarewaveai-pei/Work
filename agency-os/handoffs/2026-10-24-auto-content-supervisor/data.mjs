@@ -31,8 +31,8 @@ export const NOW = [
   { what: '社群貼文不會超過平台字數上限', state: 'yes', ev: '程式已推上 main（30b6a022f）；超長會自動重寫一次，仍太長就不送出；今晚台灣 03:00 部署後生效' },
   { what: '熱門話題抓到後會存下來', state: 'yes', ev: '資料表已套正式庫（0121）；程式（eb67660a3）今晚台灣 03:00 部署後開始存，90 天自動清理' },
   { what: '每月列出題目', state: 'yes', ev: '今晚部署後在側欄 Marketing → Topic Queue 按「AI 提案本月題目」；每月自動跑要等第 4 階段' },
-  { what: '核准的題目自己變成文章草稿和社群草稿', state: 'no', ev: '文章管線已能產生草稿，但沒有排程去叫它（第 4 階段）' },
-  { what: 'AI 審核通過後自動發布', state: 'no', ev: '第 4 階段；人工審核仍是預設' },
+  { what: '核准的題目自己變成文章草稿和社群草稿', state: 'no', ev: '程式已推上 main（31145e3ad），題目頁「核准並開始」今晚部署後就能用；每 5 分鐘自動跑要等你同意裝主機排程' },
+  { what: 'AI 審核通過後自動發布', state: 'no', ev: '規則審核已會記錄結果；自動發布和網站上的兩顆按鈕是第 4 階段下一批' },
   { what: '關掉分頁後影片仍會嵌回文章', state: 'no', ev: '目前要開著文章頁等影片做完（第 6 階段）' },
   { what: '發到 YouTube', state: 'no', ev: '社群工具還沒有 YouTube（第 7 階段）' },
 ];
@@ -40,6 +40,7 @@ export const NOW = [
 const P1 = '7d8d618a4';
 const P2 = '30b6a022f';
 const P3 = 'eb67660a3';
+const P4A = '31145e3ad';
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
 const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 
@@ -85,19 +86,20 @@ export const STEPS = [
       done('P3.6', '蒐尋器存進知識庫的資料，可以一鍵加成題目', P3),
     ] },
   { n: 4, code: 'P4', group: 'D', plain: '在排程頁勾一格後，核准的題目會自己變成 WordPress 草稿和社群草稿；選了「AI 審核自動發」的網站，通過檢查就自動發布。', title: '排程管線＋AI 審核',
-    gate: '在測試網站核准一題，幾分鐘內 WordPress 和社群工具都出現草稿；人工審核模式下永遠不會自己發布', risk: 'High（自動發布、主機排程）', model: 'Opus 5.5', status: 'not_started', depends: ['P3'],
-    before: '待決 1、待決 3、待決 5',
+    gate: '在測試網站核准一題，幾分鐘內 WordPress 和社群工具都出現草稿；人工審核模式下永遠不會自己發布', risk: 'High（自動發布、主機排程）', model: 'Opus 5.5', status: 'in_progress', depends: ['P3'],
+    decided: '每天最多開始 2 題；主機每 5 分鐘叫醒排程；資料庫也鎖住題目的網站屬於同一客戶（2026-10-24 你說「你決定」）',
+    before: '待決 6、待決 7',
     what: '既有排程器升到每 5 分鐘、由主機 cron 驅動；job content_pipeline；題目狀態機；規則閘先、AI 後',
-    files: ['lib/schedules/schedule.ts', 'lib/schedules/jobs.ts', 'lib/content/topics/tick.ts', 'scripts/install-maintenance-crons.sh'],
+    files: ['lib/schedules/schedule.ts', 'lib/schedules/jobs.ts', 'lib/content/topics/tick.ts', 'lib/content/topics/make.ts', 'scripts/schedules-run-due.sh', 'packages/db/migrations/0122_content_topics_site_org.sql'],
     items: [
-      todo('P4.0', '先查正式站背景工作實際能跑多久，決定每次處理多少'),
-      todo('P4.1', '自動發文時用客戶身分驗證，只能發到該客戶自己的網站'),
-      todo('P4.2', '排程器能判斷「每 5 分鐘」該不該跑'),
-      todo('P4.3', '排程被叫醒時，等工作做完才回應，不再靠背景偷跑'),
+      done('P4.0', '查過正式站：回應後才做的背景工作 30 天 27 次全部做完，排程照這個方式跑', P4A),
+      done('P4.1', '自動發文時用客戶身分驗證，只能發到該客戶自己的網站', P4A),
+      done('P4.2', '排程器能判斷「每 5 分鐘」該不該跑', P4A),
+      done('P4.3', '排程被叫醒時照舊先登記、回應後再做（不等，長的爬取才不會逾時）', P4A),
       todo('P4.4', '主機每 5 分鐘叫醒排程器一次，取代外部排程服務（要你同意）'),
-      todo('P4.5', '新排程工作「內容管線」：每次把題目往前推，做到文章草稿和社群草稿；每天最多 N 題'),
-      todo('P4.6', '審核：先跑程式規則（禁用詞、SEO 分數、字數），可選加一次 AI 品牌檢查；選了自動發才會發布'),
-      todo('P4.7', '題目頁「核准並開始」：按下當下就做第一步'),
+      done('P4.5', '新排程工作「內容管線」：每次把題目往前推，做到文章草稿和社群草稿；每天最多 2 題', P4A),
+      todo('P4.6', '審核：程式規則（禁用詞、SEO 綠燈、字數、社群）已會記錄；還差「選了自動發才會發布」'),
+      done('P4.7', '題目頁「核准並開始」：按下當下就開始做', P4A),
       todo('P4.8', '網站設定加兩顆按鈕：人工審核／AI 審核自動發，預設人工審核'),
     ] },
   { n: 5, code: 'P5', group: 'C', plain: 'ScriptForge 變成獨立工具頁：左邊 24 個模組各有一行說明，每個模組有自己的專業角色；做完可以直接送社群或送影片。', title: 'ScriptForge 獨立頁＋伺服器模組登記',
@@ -145,8 +147,7 @@ export const STEPS = [
 
 // 操作者自己要決定或親手做的（agent 不能替她定）
 export const OPEN = [
-  { n: 1, what: '每個網站每天最多自動做幾篇（建議 2 篇；這個數字也是每天 AI 花費的上限）', before: 'P4', src: '計畫 §4 I8' },
-  { n: 3, what: '同意主機排程改成每 5 分鐘一次，取代現在的外部排程服務', before: 'P4', src: '計畫 §0 D6' },
   { n: 4, what: '到 Google 申請 YouTube 發文授權（要你本人操作）', before: 'P7', src: '計畫 §0 D4' },
-  { n: 5, what: '要不要在資料庫層也鎖住「題目的網站一定屬於同一個客戶」：多一層保護，代價是有題目的網站不能再改所屬客戶（程式層已經擋住）', before: 'P4', src: '計畫 §0 D8' },
+  { n: 6, what: '同意把 0122 套到正式資料庫（題目的網站一定屬於同一客戶；目前 0 個題目，可回復）。套好才能推上 main，否則當晚部署會被擋', before: 'P4', src: '計畫 §0 D8' },
+  { n: 7, what: '同意在主機裝每 5 分鐘的排程時鐘（今晚部署後）；跑順一天後停掉外部的每小時排程', before: 'P4', src: '計畫 §0 D6、P4.4' },
 ];
