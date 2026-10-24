@@ -15,7 +15,7 @@
 | D5 | 自動化開關＝`/ops/schedules` 的 `content_pipeline` 格，每客戶一格，預設關；每客戶每 UTC 日最多開始 N=2 題（`NA/lib/content/topics/tick.ts DAILY_START_CAP`，操作者 2026-10-24 授權決定） | AGENTS §0 自動化預設 OFF；成本上限 |
 | D6 | 時鐘＝主機 cron 每 5 分鐘呼叫既有 `/api/internal/schedules/run-due`（`HOST/schedules-run-due.sh`）；不加 Trigger task、不加第二條 cron 專線；run-due 照舊 claim 後在 `after()` 跑（prod 證據：`cs_ai_replies` 30 天 27/27 由 after() 完成） | 操作者 2026-10-24：盡量不外接；SCHEDULES_PAGE_PLAN §3.3 反對第三套排程；等待會讓 10 分鐘的爬取撐破 curl 逾時 |
 | D7 | 範圍採 B（全部八階段）；A（P1–P4）＝第一個里程碑 | A 的卡＝B 的前四階段，零重工 |
-| D8 | 採用（操作者 2026-10-24「你決定」）：`DB/migrations/0122_content_topics_site_org.sql`＝`wp_sites unique (id, organization_id)`＋`content_topics (site_id, organization_id)` 複合 FK `on delete set null (site_id)`；有題目用的網站不能改所屬客戶（app 無此路徑）。套 prod 需操作者 go | 縱深防禦；代價實際為零 |
+| D8 | 採用（操作者 2026-10-24「你決定」）：`DB/migrations/0122_content_topics_site_org.sql`＝`wp_sites unique (id, organization_id)`＋`content_topics (site_id, organization_id)` 複合 FK `on delete set null (site_id)`；有題目用的網站不能改所屬客戶（app 無此路徑）。2026-10-24 已套 prod（操作者同意） | 縱深防禦；代價實際為零 |
 
 ## 1. 任務理解
 

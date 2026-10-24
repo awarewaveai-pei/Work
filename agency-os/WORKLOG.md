@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-24（續30）0122 套正式庫（操作者同意）並推上 main：題目的網站必屬同一客戶（D8）（Claude）
+
+**觸發**：操作者「Apply 0122 to production now, verify it, then push it.」
+**為何先套再推**：`lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh:185-209` migration 閘遇 repo 有未套用 migration 即拒部署；0122 在續29 刻意不 commit，等這一步。
+**內容**：`lobster-factory/packages/db/migrations/0122_content_topics_site_org.sql`（+down、scripts copy、local-verify）；設計與審查見續29。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scripts/apply-db-migration.mjs 0122 | exit=0 | ms=18202（APPLY_OK 1/1；套前 content_topics 0 列、origin/main 無他人 0122）
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql：content_topics_site_organization_fkey＝FOREIGN KEY (site_id, organization_id) REFERENCES wp_sites(id, organization_id) ON DELETE SET NULL (site_id)；wp_sites_id_organization_key UNIQUE；schema_migrations 有 0122；交易內實插（rollback）：他客戶站→foreign_key_violation、同客戶站→接受；rollback 後 0 列 | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl 127.0.0.1:3002 /login、/api/ops/summary（sg-deploy smoke 同路徑）→ 200、200 | exit=0 | ms=0（未計時）
+- REVIEW_WAIVED: NA -- 套用的就是續29 已審（db-expert 0c/0M/1m 已改、Codex 8f6e8db3 含 0122）的同一份檔
+- BUGHUNT_WAIVED: NA -- 只套用已審 migration，無程式變更
+
+**rollback**：`packages/db/migrations/0122_content_topics_site_org.down.sql`（無資料變更，可隨時跑；先 revert app 無需——app 不依賴 0122）。
 ## 2026-10-24（續29）AUTO_CONTENT P4 第一批：內容管線排程（草稿＋規則審核，不發布）、每 5 分鐘頻率、「核准並開始」、主機時鐘腳本；0122 寫好未套（Claude）
 
 **觸發**：操作者對 P4 三個待決說「你決定」→ D5 N=2、D6 主機 cron、D8 採用（`agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md` §0）。
