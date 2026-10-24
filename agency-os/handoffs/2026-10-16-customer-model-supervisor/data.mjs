@@ -151,5 +151,7 @@ export const OPEN = [
 export const SIDE = [
   { what: 'System Foundry v1.7：選擇引擎留，產出重做——刪 74 節樣板、每模組一張可執行卡、每個產生的系統自帶監工台（supervisor-kit 共用）、接軌登記表與產生器、範例自動重生、加「裝在客戶自己的主機」一題', when: '已完成（V17-1～V17-8 全部 done）', step: 1, src: 'agency-os/handoffs/2026-10-18-foundry-v17-supervisor/data.mjs' },
   { what: '員工門產品目錄 app.aware-wave.com/ops/products：只讀 products.ts；三軸與五種的正本只留 ADR 017 §0，不另建 customer-model.ts', when: '併入', step: 8, src: 'cards/step-8.md' },
+  { what: '門的授權檢查太寬：只要路由 import 了 grant.ts，就被當成「已檢查呼叫者」（grant.ts → subject.ts → tenant-guard.ts，檢查沒在 grant.ts 停下）。舊問題，不是這次造成的', when: '待做（舊問題）', step: 8, src: 'agency-os/TASKS.md「閘 ③「門路由要授權」」那一行；WORKLOG 2026-10-23 續46' },
+  { what: '影片存檔時沒帶組織、而 POD_DESIGNS_DEFAULT_ORG_ID 又沒設定，這支影片就不會被登記，用量也記不到客戶身上。舊問題，屬於「影片歸屬改為持久化 mapping」那一項', when: '待做（舊問題）', step: 3, src: 'agency-os/TASKS.md「影片歸屬改為持久化 outName → organization_id mapping」' },
 ];
 
