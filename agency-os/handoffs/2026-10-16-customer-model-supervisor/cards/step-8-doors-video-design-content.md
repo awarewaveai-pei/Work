@@ -71,7 +71,7 @@
 | V4 | **✅ `2dd183f44`**（`capabilities` 列 `ORG_FREE_ROUTES`、錯誤不回原始例外；兩個 410 殘骸刪除） `capabilities` 補 `ORG_FREE_ROUTES` 條目（含理由）；`qa/report`、`remotion-status` 410 stub 無人呼叫（只被 `qa/report/route.test.ts` 引用）可直接刪，連測試檔。**不要**只補理由而不看呼叫者 | `registry-code.test.ts:234-238`；`app/api/video/{capabilities,qa/report,remotion-status}/route.ts` | L |
 | V5 | **✅ `2dd183f44`**（搬 `/api/internal/video/cleanup`；Codex F2 R2／DB 刪除順序既有、無呼叫者，列剩餘） `cleanup`：路由是 cron 專用，搬到 `/api/internal/video/cleanup`（matcher 不經過門，`middleware.ts:413` matcher 排除 `api/internal`）或加 `userKind==="client"` 403；同步 cron 呼叫端（目前無） | `app/api/video/cleanup/route.ts:19-25` | M |
 | V6 | **✅ `2dd183f44`**（`canApproveMedia`；兩路由仍 `assertOrgAccess`，突變證據見 WORKLOG 2026-10-24 續27） 決策 D3（客戶可否核准 release／story bible）→ 若是，改 `canApproveMediaRelease` 為「客戶限本組織」或新增 `canApproveOwnMedia`；若否，門上隱藏 Release 步驟並寫入 manifest | `app/api/video/release/route.ts:14`；`lib/ops-role.ts:81`；`TOOLS/video/ReleaseDeliveryPanel.tsx:83` | M |
-| V7 | **待操作者決定**（門上功能清單會改三個已上線門版面；manifest 無 TODO） 登記表 `features[]` 渲染功能清單（step-8 第 3 點）、`lib/video/MODULE_MANIFEST.json` 無 TODO | `NA/lib/video/MODULE_MANIFEST.json` | L |
+| V7 | **✅ 2026-10-24 左邊選單**（操作者定：左邊選單、持有的正常、沒持有的灰、工具區不動；五扇門共用 `app/DoorNav.tsx`；manifest 無 TODO） 登記表 `features[]` 渲染功能清單（step-8 第 3 點）、`lib/video/MODULE_MANIFEST.json` 無 TODO | `NA/lib/video/MODULE_MANIFEST.json` | L |
 | V8 | **✅ `2dd183f44`**（本機 `/video` 門框、無側欄；門閘綠） 驗收：`npx vitest run lib/portal lib/video`、`npx tsc --noEmit -p .`；`Host: video.localhost` 開 `/` 看精簡版面；突變：改名 `app/video/page.tsx` → `products.test.ts` 紅 | step-8 Acceptance | L |
 | V9 | **✅ 2026-10-24 上線**（DNS、憑證 15 SAN、主機 nginx、lobster-nginx、enabled；門只讓持有 video 的帳戶進，WORKLOG 當日 video／design 上線條） `enabled:false` 維持到 go-live（DNS、憑證 SAN、nginx 區塊 `nginx/default.conf:430` 加 `video.aware-wave.com`）——High，等操作者 go | `NA/lib/portal/products.ts:47` | H |
 
@@ -117,7 +117,7 @@
 | D3 | **✅ `dc5ad2405`**（只開 `/api/tools/printful/catalog` 給 design 門＋`ORG_FREE_ROUTES`；`printful/sync` 員工專用，閘 5 擋過） `printful/catalog`：加 `PLATFORM_APIS`＋`ORG_FREE_ROUTES`（理由：公開型錄、無組織欄、快取） | `doors.ts:63`；`registry-code.test.ts:234`；`app/api/tools/printful/catalog/route.ts` | L |
 | D4 | **✅ `e28406990`、`dc5ad2405`**（staff 注入；門上 `/ops/clients` 提示隱藏） 橫幅：抽出 `/api/ops/clients`（品牌色）與 `/api/tools/script-forge`（AI 配色／文案）呼叫（S1）；門上隱藏三顆按鈕＋`:1392` 連結；決策 D-V2／D-V3 後再決定是否補替代路由 | `TOOLS/banner/BannerStudio.tsx:1096,1127,1292,1392` | M |
 | D5 | **✅ `dc5ad2405`**（「去建商品」門上隱藏；下載門上走 studio proxy-image） 門上連結改 door-aware：`BannerStudio.tsx:2132`、其他 `/tools/*` 連結（grep `href="/tools` 於 5 頁） | 同左 | L |
-| D6 | **待操作者決定**（門上功能清單，同 V7）；manifest 無 TODO `features[]`（`design.edit` 為 contract，`products.ts:62`）渲染清單；`lib/design/MODULE_MANIFEST.json` 無 TODO | — | L |
+| D6 | **✅ 2026-10-24 左邊選單（同 V7）**；manifest 無 TODO `features[]`（`design.edit` 為 contract，`products.ts:62`）渲染清單；`lib/design/MODULE_MANIFEST.json` 無 TODO | — | L |
 | D7 | **✅ `dc5ad2405`**（本機四頁門框＋選單；mockup 只收販售商品 id，突變證據 WORKLOG 2026-10-24 續28） 驗收同 V8（`Host: design.localhost`，每個 nav 頁進得去、`/designs` 載入）；突變：presets 拿掉 org 檢查 → 指名測試紅 | — | L |
 | D8 | **✅ 2026-10-24 上線**（同 V9；門只讓持有 design 的帳戶進） 上線（DNS／nginx `server_name`）— High，要 go | `nginx/default.conf:430` | H |
 
@@ -165,7 +165,7 @@
 | C1 | **✅ `b3132c733`**（events 頁不傳 `sync`） `app/content/{layout,page}.tsx`＋`app/content/{calendar,sites,events}/page.tsx`；`products.ts:64` 加 `nav`（內容編輯／行事曆／網站／節日） | 新檔 | M |
 | C2 | **✅ `b3132c733`**（全走 `useDoorHref`；門上另隱藏電子報、「管理來源」、`+ 新增網站`，網址欄唯讀——伺服器本就拒絕客戶） 門上連結改 door-aware：`ContentStudio.tsx:2102,2319`、`ContentCalendar.tsx:326`、`SiteManager.tsx:823,826`；`/ops/clients`、`/tools/social` 連結隱藏（`:2108,2372,3276,3686`、`ContentCalendar.tsx:325`） | 同左 | L |
 | C3 | **✅ S1 已達成、`b3132c733` 驗**（只有 `ContentStudioStaff` 傳 `video`） `ContentStudio` 影片選項（`:2948` `ai-video`）在門上不顯示；`:663` 自動觸發只在員工頁注入的模組內 | `ContentStudio.tsx:663,2948` | M |
-| C4 | **待操作者決定**（同 V7／D6）；manifest 無 TODO，兩句舊說法 `b3132c733` 更正 `features[]` 渲染清單（12 個 content 功能，`products.ts:66`）、`lib/content/MODULE_MANIFEST.json` 無 TODO | — | L |
+| C4 | **✅ 2026-10-24 左邊選單（同 V7，content 門開了就有）**；manifest 無 TODO，兩句舊說法 `b3132c733` 更正 `features[]` 渲染清單（12 個 content 功能，`products.ts:66`）、`lib/content/MODULE_MANIFEST.json` 無 TODO | — | L |
 | C5 | **✅ `b3132c733`**（本機四頁門框＋選單；突變證據 WORKLOG 2026-10-24 續34） 驗收同 V8；突變：`sites/[id]` 拿掉 assert → 指名測試紅；`sources` 拿掉角色閘 → 紅 | — | L |
 | C6 | 上線（DNS／nginx）— High，要 go | `nginx/default.conf:430` | H |
 

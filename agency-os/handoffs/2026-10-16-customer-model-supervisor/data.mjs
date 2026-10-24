@@ -3,13 +3,13 @@
 
 export const META = {
   title: '客戶怎麼來 監工台',
-  updated: '2026-10-23',
+  updated: '2026-10-24',
   adr017: 'agency-os/docs/architecture/decisions/017-entitlements-and-self-hosted-modules.md',
   adr018: 'agency-os/docs/architecture/decisions/018-product-doors-and-buyout-delivery.md',
   tasks: 'agency-os/TASKS.md「ADR 017 客戶怎麼買」',
   adr012: 'agency-os/docs/architecture/decisions/012-shared-platform-layer.md',
   adr015: 'agency-os/docs/architecture/decisions/015-awarewave-account-and-shared-wallet.md',
-  worklog: 'agency-os/WORKLOG.md 2026-10-16 續13（三軸）、續14（監工台）、續15（七張卡）；2026-10-18 全鏈自審條目；2026-10-23 續36（先後決策）',
+  worklog: 'agency-os/WORKLOG.md 2026-10-16 續13（三軸）、續14（監工台）、續15（七張卡）；2026-10-18 全鏈自審條目；2026-10-23 續36（先後決策）；2026-10-24 續36（video、design 上線，門只讓持有產品的帳戶進）、續39（部署）',
   self: 'agency-os/handoffs/2026-10-16-customer-model-supervisor/',
   url: 'https://claude.ai/artifact/Htm4xqe362YM987Fo8YLCr',
 };
@@ -49,7 +49,7 @@ export const PRIORITY = [
 export const NEXT = [
   { h: '① 翻強制模式（等 10/31，不占工時）', t: '權利已就位（2026-10-23 部署）；客戶本人操作時已一律強制，翻的只影響員工。10/31 自動檢查 7 天「若強制就拒」歸零或都已解釋後，請你同意再翻（High）。', steps: [3] },
   { h: '② 用量計量與門上線阻擋項', t: '已做（2026-10-23）：每道付費縫記用量（自用與合約列只記不扣；單價待你定）、studio 精選免費路徑在付費閘前且門上藏 AI 按鈕。tarot 批次也已記操作者（0119 已套 prod，2026-10-23）。剩：員工路由在 withFeature 範圍外的付費工作仍記在自用帳戶（TASKS「員工路由用量歸屬」）。', steps: [3, 8] },
-  { h: '③ 門逐個上線', t: 'tarot、studio 已上線（2026-10-23，與 social 共用一個 nginx 門區塊）。下一批 video → design → content，逐門任務在 cards/step-8-doors-video-design-content.md；cs（等 Chatwoot）、collect、outreach（員工路由要先搬）最後。每個門上線 High。第一個自助客戶不等 Woo：員工邀請（本機帳號登入已能用）＋人工寫合約列，與 Soulful 同一條路。', steps: [8] },
+  { h: '③ 門逐個上線', t: 'tarot、studio（2026-10-23）、video、design（2026-10-24）已上線，共用一個 nginx 門區塊。每個功能分開買或贈送（你 2026-10-24 定）：客戶帳戶持有該產品才進得了門，否則只看到「尚未開通」；每扇門左邊選單列功能，沒持有的灰掉（做好待部署）。下一個 content，逐門任務在 cards/step-8-doors-video-design-content.md；cs（等 Chatwoot）、collect、outreach（員工路由要先搬）最後。每個門上線 High。第一個自助客戶不等 Woo：員工邀請（本機帳號登入已能用）＋人工寫合約列，與 Soulful 同一條路。', steps: [8] },
   { h: '④ 收錢分兩段', t: '4a 已上線（2026-10-23；0120 已套 prod，程式 10/24 03:00 部署）：付款接頭、收件表、合約與權利同一交易寫入、錢包入帳與只退未用點數、拒付凍結、/ops/billing；付款來源「人工」（轉帳後用 scripts/record-payment.mjs 登記）。訂閱付款前還要你定第一個方案（plans 0 筆）；點數包部署後即可登記。4b 等待決 1、3：Woo 六種事件、定期扣款、點數條款，WordPress 一鍵登入產品門（ADR 015 順序 1）同一包，不單獨先做（High，做了沒人走）。兩題現在就問金流商與會計師。', steps: [4] },
   { h: '⑤ 買斷安裝', t: '收錢兩段完成、待決 2 律師回覆後開工。', steps: [5] },
   { h: '⑥ 等客戶出現', t: '只串 API、代理商、白牌網址：出現第一個這類客戶才做。', steps: [6, 7, 9] },
@@ -117,7 +117,7 @@ export const NOW = [
   { what: '代操用量按客戶計', state: 'no', ev: '程式已接（2026-10-23）：每道付費縫 grant.recordUse() 每個 grant 記一列 entitlement.usage（lib/ai/gateway.ts、collect、video.tts），閘擋「credits 功能走不到 recordUse」；2026-10-24 03:00 自動部署後生效。扣點仍 0（每功能單價待你定）；錢包入帳只經付款事件（0120 billing_apply_payment_event，4a，2026-10-23）' },
   { what: '買斷', state: 'no', ev: '授權檔與模組清單未建；provision/ 只有一鍵架站（provisionClient.ts）' },
   { what: '許可判斷', state: 'yes', ev: '每個收費點只問 can()（e87de9225），影子模式（ENTITLEMENT_MODE 未設，can.ts:63）：照算判決並記錄，一律放行、不扣點。點數功能先認權利列（b3df190e9）；自用、EdD 免費與 Soulful 全產品合約每天自動補齊（0118），已部署；翻強制待 10/31 自動檢查與你同意；每功能扣幾點待你定價' },
-  { what: '產品自己的門', state: 'yes', ev: 'social、tarot、studio 已上線（tarot／studio 2026-10-23：DNS、憑證 13 SAN、兩層 nginx、部署 fb2972943，公網煙霧測試通過）；其餘 6 個未開，video／design／content 有逐門任務卡。開門規則與機械閘見 ADR 018 §2；登記表 11 個產品仍是 coming_soon（開放販售另做）' },
+  { what: '產品自己的門', state: 'yes', ev: 'social、tarot、studio、video、design 已上線（video／design 2026-10-24：DNS、憑證 15 SAN、兩層 nginx、部署 51a84b203，公網與 Playwright 煙霧測試通過）；門只讓持有該產品的帳戶進（lib/portal/door-access.ts）；其餘 6 個未開，content 有逐門任務卡。開門規則與機械閘見 ADR 018 §2；登記表 11 個產品仍是 coming_soon（開放販售另做）' },
 ];
 
 // ADR 017「順序」。status: not_started | in_progress | done；done 必填 commit。
@@ -129,7 +129,7 @@ export const STEPS = [
   { n: 3, card: 'cards/step-3.md', plain: '每項收費功能執行前都先確認權限；未購買時按鈕顯示停用。', title: '每個收費點只問 can(主體, feature_key, actor)', what: '社群、collect、認知平台的收費按鈕與 API 呼叫前問一次；認知平台 check_entitlement 改成 can() 薄接頭（加 actor、回 grant 物件），呼叫端 main.py 9 處同 commit。',
     files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/can.ts', 'Projects/internal/cognitive-engineering-os/ai_lego/platform/entitlement/check.py', 'Projects/internal/cognitive-engineering-os/ai_lego/apps/api/main.py'], gate: '測試：點數功能沒有權利列時看餘額，餘額 0 即拒（有 comp／contract 列先用列，2026-10-23）；代操時從 on_behalf_of 扣點，稽核記 actor；沒有 active 權利列不簽許可；沒有登記列的產品拿不到 grant', risk: 'Medium', model: 'Opus 5.5', depends: [2], status: 'done', commit: 'e87de9225' },
   { n: 4, card: 'cards/step-4.md', plain: '客戶在 aware-wave.com 付款後，系統自動開通，不需人工處理。', title: 'Woo 付款通知 → 合約與權利；帳本泛化', what: 'Woo 原生 webhook（六種事件含退款與拒付）→ 收件表去重 → 同一交易寫合約、權利、帳本；media_ 帳本去前綴加 product_key（ADR 015 §4）。',
-    files: ['lobster-factory/packages/db/migrations/0120_payment_events.sql', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/payments/', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/contracts.ts', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/payments/', 'lobster-factory/packages/wp-bridge-plugin/'], gate: '測試：同一 event_id 重送不做事；退款只退未用點數；拒付凍結；假簽章 401', risk: 'High（金流）', model: 'Opus 5.5', depends: [3], status: 'in_progress', before: '定期扣款外掛與台灣金流的支援方式（待決 1）；點數條款與預收會計處理（待決 3）；ADR 015 順序 1（WordPress 一次性碼進產品門）' },
+    files: ['lobster-factory/packages/db/migrations/0120_payment_events.sql', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/payments/', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/contracts.ts', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/payments/', 'lobster-factory/packages/wp-bridge-plugin/'], gate: '測試：同一 event_id 重送不做事；退款只退未用點數；拒付凍結；假簽章 401', risk: 'High（金流）', model: 'Opus 5.5', depends: [3], status: 'in_progress', before: '定期扣款外掛與台灣金流的支援方式（待決 1）；點數條款與預收會計處理（待決 3）；點數能不能付沒持有的功能（待決 5）；ADR 015 順序 1（WordPress 一次性碼進產品門）' },
   { n: 5, card: 'cards/step-5.md', plain: '系統可一鍵完整安裝到客戶主機；交接時收回 AwareWave 的存取權。', title: '買斷安裝階段', what: '三道閘後才開工：款項落定、客戶網域與主機歸屬驗證、操作者核准；模組清單、建置時排除 SAFETY_GATE、授權檔簽發（含 max_tenants）、安裝專屬更新憑證、客戶主機商 token 以密鑰句柄傳入、交接撤 key。排在一鍵架站 Stage 4 之後。',
     files: ['lobster-factory/packages/workflows/src/provision/', 'agency-os/docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md'], gate: '授權檔離線驗章；AwareWave 伺服器停止後安裝仍可用；安裝失敗只清本次 project；客戶網域由 compose、nginx、DNS 同一組值產生並 curl 200', risk: 'High（交付）', model: 'Fable 5.1 設計 → Opus 5.5 做', depends: [3, 4], status: 'not_started', before: '交付 Postiz AGPL 前請律師確認（待決 2）' },
   { n: 6, card: 'cards/step-6.md', plain: '客戶只透過程式串接、不使用畫面時，系統也能計費。', title: 'API 通道', what: '計費帳戶發 API key（scope = feature_key 子集），actor = api_key:<id>，用量走同一個 report()；登記表 accessChannels 加 api。', files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/'], gate: '測試：key 的 scope 外功能會被拒絕', risk: 'Medium', model: 'Opus 5.5', depends: [3], status: 'not_started', waitFor: '待第一個只串 API 的客戶出現' },
@@ -144,6 +144,7 @@ export const OPEN = [
   { n: 2, what: '買斷交付前請律師確認授權：Postiz（AGPL-3.0）、MinIO（AGPLv3，Trigger 內含）、Redis（Trigger 與核心用浮動 7-alpine，7.4 起授權改為 RSALv2／SSPL）。', before: 5, src: 'ADR 017 §5' },
   { n: 3, what: '點數不退、不轉讓的條款如何撰寫（台灣數位內容解除權例外）；賣點數的款項使用前列為預收，請會計師確認。', before: 4, src: 'ADR 015 §4' },
   { n: 4, what: '客戶白牌網址的憑證走 Cloudflare for SaaS（客戶 CNAME 到 AwareWave）還是主機上自動簽發（on-demand ACME）？', before: 9, src: 'ADR 018 §2' },
+  { n: 5, what: '點數怎麼配「每個功能分開買或贈送」：現在有點數的客戶能按次使用沒買的功能；改成點數只付已持有功能的用量，還是另有方式？目前沒有客戶有點數。', before: 4, src: 'ADR 017 產品決定 #11' },
 ];
 
 // 要一起改但不是順序步驟的

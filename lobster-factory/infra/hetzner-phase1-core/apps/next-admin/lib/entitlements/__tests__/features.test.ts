@@ -1,6 +1,6 @@
 import { verify } from "node:crypto";
 import { beforeEach, describe, expect, it } from "vitest";
-import { featureList, resetFeatureListCache } from "../features";
+import { featureList, listedFeatureKeys, resetFeatureListCache } from "../features";
 import { canonicalize } from "../permit";
 import { CUSTOMER, gateFixture } from "./gate-fixtures";
 
@@ -25,6 +25,13 @@ describe("the usable-features list that greys paid buttons (ADR 017 §4)", () =>
     const customer = await featureList(CUSTOMER, "client:x:u", gateFixture({ mode: "shadow", entitlement: null }).deps, KEYS);
     expect(customer.list).toMatchObject({ mode: "enforce" });
     expect(customer.list.features["social.dispatch"]).toEqual({ allowed: false, verdict: false, reason: "no_entitlement" });
+  });
+
+  it("by default lists every feature a door shows, including ones asked outside a route; cognitive's methods stay out", async () => {
+    const { list } = await featureList(CUSTOMER, "client:x:u", gateFixture({}).deps);
+    for (const k of ["social.dispatch", "social.auto-reply", "video.motion", "design.edit"]) expect(list.features, k).toHaveProperty([k]);
+    expect(Object.keys(list.features).sort()).toEqual(listedFeatureKeys());
+    expect(Object.keys(list.features).some((k) => k.startsWith("cognitive."))).toBe(false);
   });
 
   it("is signed with the permit key and kept for five minutes", async () => {

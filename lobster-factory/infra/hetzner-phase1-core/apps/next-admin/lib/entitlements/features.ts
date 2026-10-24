@@ -1,6 +1,7 @@
 import { sign } from "node:crypto";
 import { modeFor, verdictOf, type EntitlementMode, type GateDependencies, type Subject } from "./can";
 import { canonicalize } from "./permit";
+import { PRODUCTS } from "@/lib/portal/products";
 import { routeFeatureKeys } from "./route-features";
 
 // "What this account can use" (ADR 017 §4): one signed list per billing account, so a screen greys the paid buttons it
@@ -23,7 +24,12 @@ export interface SignedFeatureList { list: FeatureList; signature: string | null
 const cache = new Map<string, { value: SignedFeatureList; until: number }>();
 export const resetFeatureListCache = () => cache.clear();
 
-export async function featureList(subject: Subject, actor: string, d: GateDependencies, keys: readonly string[] = [...routeFeatureKeys()].sort(),
+/** Route features plus every feature of a product with a next-admin door: the door menu lists each one, and some are
+ *  asked outside a route (social.dispatch, social.auto-reply, video.motion). Cognitive's methods stay out (external door). */
+export const listedFeatureKeys = (): string[] => [...new Set([...routeFeatureKeys(),
+  ...PRODUCTS.filter((p) => p.door.app === "next-admin").flatMap((p) => p.features.map((f) => f.feature_key))])].sort();
+
+export async function featureList(subject: Subject, actor: string, d: GateDependencies, keys: readonly string[] = listedFeatureKeys(),
   now = Math.floor(Date.now() / 1000)): Promise<SignedFeatureList> {
   const mode = modeFor(d, actor);
   const cacheKey = `${subject.orgId}|${mode}|${keys.join(",")}`;

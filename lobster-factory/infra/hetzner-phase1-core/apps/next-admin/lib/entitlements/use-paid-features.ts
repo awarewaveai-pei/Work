@@ -25,10 +25,13 @@ export function usePaidFeatures() {
     return () => { live = false; };
   }, []);
   const canUse = (featureKey: string) => features?.[featureKey]?.allowed ?? true;
+  /** Held per a loaded list: false while loading, on an error or for a key the list lacks. A screen that STATES what the
+   *  account holds (the door menu) uses this; a button keeps canUse, since the API asks can() anyway. */
+  const holds = (featureKey: string) => features?.[featureKey]?.allowed === true;
   /** Tooltip for a greyed button; undefined while it is usable. */
   const why = (featureKey: string) => {
     const entry = features?.[featureKey];
     return entry && !entry.allowed ? WHY[entry.reason ?? ""] ?? "目前無法使用" : undefined;
   };
-  return { canUse, why };
+  return { canUse, holds, why };
 }

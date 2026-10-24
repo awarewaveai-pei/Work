@@ -1,4 +1,30 @@
 # Worklog
+## 2026-10-24（續44）每扇產品門加左邊選單：產品名、頁面、功能清單（持有的正常、沒持有的灰掉），工具區不動（Claude）
+
+**觸發**：操作者「門上功能清單放在左邊選單：已買的可按、沒買的灰掉，工具區不動。五扇已上線的門都做。」（卡 V7／D6／C4，step-8 第 3 點）
+
+**發現**
+- C1 簽章功能清單（`/api/entitlements/features`）原本只列「路由會問的功能」，漏了 `social.dispatch`、`social.auto-reply`、`video.motion`；這三個由排程、webhook、render 去問，不經路由。清單沒有的 key，`canUse` 會當成可用，選單就會把沒買的功能顯示成已買。要守住的規則：門上列出的每個功能，清單裡都要有。→ 新增 `listedFeatureKeys()`＝路由功能，加上所有 next-admin 門產品的功能。cognitive 的約 300 個方法不列進去（外部門），否則每個帳戶每 5 分鐘要多查 300 次。
+- C2 門原本沒有左邊選單，只有頂端一條橫向頁面列（`.door-nav`）。→ `.door-main` 改成橫排：左欄 `.door-side`（200px，放產品名、`door.nav` 頁面、功能清單），右邊 `.door-content`（工具＋登出）。手機寬度改成上下排。工具本身沒改，只是往右移。
+- C3 本機畫面：第一版用 `--text-primary`，在綠色主題的深色側欄上幾乎看不見。→ 改用 staff 側欄的 token（`--sidebar-text*`、`--sidebar-active-bg`、`--sidebar-disabled-text`、`--sidebar-border`），每個主題自己決定顏色。
+- C4（Codex F1）`usePaidFeatures().canUse` 在載入中、出錯、或清單缺 key 時都回 true（按鈕照這樣做沒問題，因為 API 還會再問 `can()`）；但選單是在「陳述」帳戶持有什麼，這樣會誤報為已買。→ hook 新增 `holds()`：清單載入完成、而且該功能 allowed 才算持有；選單改用 `holds`。
+- C5「已買的可按」：功能不是頁面，沒有地方可以連過去。持有的功能用正常顏色顯示，實際按的是工具裡對應的按鈕（按鈕本來就會依同一份清單變灰）。
+
+**修改**（next-admin）：`app/DoorNav.tsx`（左欄＋功能清單）、`app/ProductDoorShell.tsx`（`.door-content` 包住工具與登出；「尚未開通」頁外包一層 div，配合新的橫排版面）、`app/globals.css`（door-side、door-content、door-feature、手機寬度）、`lib/entitlements/features.ts`（`listedFeatureKeys`）、`lib/entitlements/use-paid-features.ts`（`holds`）、`app/__tests__/door-nav.test.tsx`（新）、`lib/entitlements/__tests__/features.test.ts`（預設清單測試）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p .（原始碼 0）＋ npx vitest run（358 files／3171 passed，Codex 修正前） | exit=0 | ms=120000
+- REALTEST_EVIDENCE: tool=Bash | cmd=本機 next-admin-social-ui：`/design` 左欄有「設計編輯器／我的設計（active）／畫布／橫幅／模型圖／功能：畫布與向量編輯」；`/video` 左欄有「影片製作／功能：腳本生成、場景圖生成、影片動態、付費旁白」，右邊 ScriptForge 照舊；手機寬度 `/tarot` 的選單疊在上方 | exit=0 | ms=60000
+- 突變：`listedFeatureKeys` 去掉門產品的功能，結果「the signed list covers every feature a door lists」變紅；還原後變綠。
+- 突變：`holds` 改成和 `canUse` 一樣、載入前回 true，結果「before the list loads … a feature is not held」變紅；還原後變綠。
+- REALTEST_EVIDENCE: tool=Bash | cmd=Codex 修正後 npx vitest run app/__tests__/door-nav.test.tsx lib/entitlements/__tests__/features.test.ts（7 passed）＋ tsc 0 | exit=0 | ms=30000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n -- Codex `agency-os/reports/oracle/2026-10-24-partialreview-0cb66334.md`：F1（清單載入失敗時選單把全部功能顯示成已買）已修，見 C4；F2（測試只測 helper，沒測 `featureList()` 預設的 key）已修，`features.test.ts` 改成直接呼叫 `featureList` 不給 keys，斷言含 `social.dispatch`、`social.auto-reply`、`video.motion`、`design.edit`，且不含 cognitive。
+  - external oracle = Codex CLI (codex exec -s read-only), not self-description
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=door-nav-link\|door-nav\b\|usePaidFeatures\|routeFeatureKeys() | hits=18（`.door-nav-link` 只在 DoorNav 與 CSS；`usePaidFeatures` 其他呼叫者仍用 `canUse`，沒有改；`routeFeatureKeys()` 另一個呼叫者是 `grant.ts:85` withFeature 的登記檢查，沒有改）
+
+監工台（`data.mjs`）：META 更新到 10-24；NEXT ③、NOW「產品自己的門」改成 video、design 已上線，加上門的持有判斷與選單；OPEN 加待決 5（點數），步驟 4 的 before 寫入待決 5；TASKS 加待決 5、第 8 項那行更新；卡的 V7、D6、C4 標記完成。`node check.mjs` ok（5 ways、9 steps、5 open）。
+
+**rollback**：`git revert <本 commit>`（只改畫面和清單的 key，沒有資料、沒有 migration）。
 ## 2026-10-24（續43）AUTO_CONTENT P5：ScriptForge 提示全部搬到伺服器模組登記表、獨立頁 /tools/script-forge（左欄 24 模組＋說明）、送社群／送影片（Claude＋fullstack-engineer）
 
 **觸發**：操作者「先不用真跑，直接開始 P5（ScriptForge 獨立頁）」；卡 `agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md` §7 P5.1–P5.27。

@@ -460,38 +460,57 @@ body {
   min-height: 100vh;
 }
 
-/* A product's own door (ADR 018, app/<product>/layout.tsx): .main without the staff sidebar. */
+/* A product's own door (ADR 018, app/<product>/layout.tsx): its own left menu (app/DoorNav.tsx), no staff sidebar. */
 .door-main {
   flex: 1;
   display: flex;
-  flex-direction: column;
   min-height: 100vh;
+}
+.door-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 .door-foot {
   display: flex;
   justify-content: flex-end;
   padding: 8px 32px 16px;
 }
-/* A multi-page door's menu (registry door.nav, app/DoorNav.tsx). */
+.door-side {
+  width: 200px;
+  flex-shrink: 0;
+  padding: 20px 12px;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--sidebar-border);
+}
+/* Sidebar tokens, as the staff sidebar: each theme sets them for its own sidebar background. */
+.door-side-title { padding: 0 12px 12px; font-size: 15px; font-weight: 700; color: var(--sidebar-text-active); }
+.door-side-head { padding: 16px 12px 6px; font-size: 12px; font-weight: 600; color: var(--sidebar-section-label); }
+/* A multi-page door's pages (registry door.nav). */
 .door-nav {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 10px 32px;
-  background: var(--topbar-bg);
-  border-bottom: 1px solid var(--card-border);
+  flex-direction: column;
+  gap: 2px;
+}
+.door-features { list-style: none; margin: 0; padding: 0; }
+.door-feature { padding: 5px 12px; font-size: 13px; color: var(--sidebar-text); }
+.door-feature.off { color: var(--sidebar-disabled-text); cursor: not-allowed; }
+@media (max-width: 640px) {
+  .door-main { flex-direction: column; }
+  .door-side { width: auto; border-right: 0; border-bottom: 1px solid var(--sidebar-border); }
 }
 .door-nav-link {
   padding: 6px 12px;
   border-radius: 6px;
-  color: var(--text-muted);
+  color: var(--sidebar-text);
   font-size: 14px;
   text-decoration: none;
 }
-.door-nav-link:hover { color: var(--text-primary); }
+.door-nav-link:hover { color: var(--sidebar-text-hover); background: var(--sidebar-hover); }
 .door-nav-link.active {
-  color: var(--text-primary);
-  background: var(--card-border);
+  color: var(--sidebar-text-active);
+  background: var(--sidebar-active-bg);
   font-weight: 600;
 }
 

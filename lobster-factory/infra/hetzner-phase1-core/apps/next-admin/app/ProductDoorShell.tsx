@@ -19,7 +19,7 @@ export async function ProductDoorShell({ productKey, children }: { productKey: P
   if (access !== "open") {
     return (
       <div className="shell">
-        <div className="door-main" style={{ maxWidth: 480, margin: "80px auto", padding: 24, textAlign: "center" }}>
+        <div className="door-main"><div style={{ maxWidth: 480, margin: "80px auto", padding: 24, textAlign: "center" }}>
           {access === "not_held" ? (
             <>
               <h1 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>「{product!.name}」尚未開通</h1>
@@ -30,7 +30,7 @@ export async function ProductDoorShell({ productKey, children }: { productKey: P
             <p style={{ fontSize: 13.5, color: "var(--badge-red-text)" }}>暫時無法確認開通狀態，請重新整理頁面再試一次。</p>
           )}
           <div className="door-foot"><LogoutButton /></div>
-        </div>
+        </div></div>
       </div>
     );
   }
@@ -38,10 +38,12 @@ export async function ProductDoorShell({ productKey, children }: { productKey: P
     <div className="shell">
       <div className="door-main">
         <DoorProvider nav={door.nav ?? []}>
-          <DoorNav page={door.page} />
-          {children}
+          <DoorNav page={door.page} name={product!.name} features={product!.features.map((f) => ({ key: f.feature_key, name: f.name }))} />
+          <div className="door-content">
+            {children}
+            <div className="door-foot"><LogoutButton /></div>
+          </div>
         </DoorProvider>
-        <div className="door-foot"><LogoutButton /></div>
       </div>
     </div>
   );
