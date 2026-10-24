@@ -1,4 +1,12 @@
 # Worklog
+## 2026-10-25（續12）next-admin 手動部署 e12af9bf8（操作者：修完後部署）——外觀色票上線（Claude）
+
+- **範圍**：prod 原為 03:00 自動部署的 `81f81cf03`；`81f81cf03..e12af9bf8` 的 next-admin 變更只有 `eee5eaae3`＋`e12af9bf8`（外觀色票），無 migration；DEPLOY_HOLD 不存在。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin（npm test 閘、rollback 快照 rollback-20261024-191321、healthy 11s、HTTP smoke 5/5 200；.deployed-commit=e12af9bf8，容器名正常） | exit=0 | ms=405437
+- REALTEST_EVIDENCE: tool=Bash | cmd=scripts/playwright-runner.ps1 -Mode smoke -SkipInstall（26 passed, 6 skipped） | exit=0 | ms=0（未計時）
+- REVIEW_WAIVED: NA -- 部署本身無程式改動；程式審查見（續9）（續11）
+- BUGHUNT_WAIVED: NA -- 部署紀錄，無程式改動
+- **rollback**：`docker tag lobster-phase1-next-admin:rollback-20261024-191321` 依 DEPLOY_ROLLBACK_RUNBOOK §2，或 revert 兩個 commit 後重跑 sg-deploy。
 ## 2026-10-25（續11）外觀色票收尾：選色器開在實際顏色、切分頁不忘記色票選擇（Claude）
 
 - **任務**：（續9）critic 留下的兩個 nit，操作者「能修就修」。
