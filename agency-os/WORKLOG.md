@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-24（續60）Codex card 02 customer identities：WordPress user 對應單一 billing account
+
+- **根因／不變量**：ADR 017 step 4b 缺少 WordPress user id 到 customer organization + auth user 的唯一、不可變映射；0124 以 `(provider, external_id)`、`(provider, user_id)` 唯一鍵與 service_role select/insert-only RLS 關閉整類重複／改寫問題，`plans` 非空時拒絕 drop 欄位。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/entitlements/__tests__/identities.test.ts` | exit=0 | ms=390
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/entitlements/__tests__/import-boundary.test.ts` | exit=0 | ms=2300
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test scripts/__tests__/down-migration-copies.test.mjs` | exit=0 | ms=67
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | ms=3988
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（第二輪；第一輪發現並修正不同 external_id 的 23505 false no-op）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`customer_identities|findBillingAccount|linkIdentity|woo_product_ids` | hits=68
+- **Mutation**：移除 `linkIdentity` 的 23505 re-read 後，`linking the same identity twice is a no-op` 1 failed；恢復後 identities 4/4 通過。
+- **其他 gate**：down migration paired-copy 1/1，兩份 down 檔 SHA256 相同；`git diff --check` 通過。未套用 production migration、未 deploy、未改 route／can.ts／contracts.ts／0120／lib/payments。
+- **rollback**：`git revert <本 commit>`；0124 down 另以排他鎖確認 identities 空表後才可回復。
+- **Claude 審查（main session，Opus 5.5）**：逐行讀 `157d4b47a`。對抗檢查：(1) 23505 來自 `user_id` 唯一鍵而 external_id 不同 → `findExistingIdentity` 先查 external_id 得 null、再查 user_id 得他人列 → `identity_conflict`（`identities.ts:79-85`）；(2) 錯誤不當成「查無」（`identities.ts:34`）；(3) 表只 select/insert，無 update/delete（0124 `do $$` 段）；(4) 0124 只在 plans 0 筆時 drop 欄位、down 只在 identities 0 筆時回復；(5) `TABLES` 加入 `customer_identities`（`import-boundary.test.ts:8`）。無 finding。
+- REALTEST_EVIDENCE: tool=Bash | cmd=main 工作樹 npx vitest run identities.test.ts import-boundary.test.ts（9 passed）＋npx tsc --noEmit＋node --test scripts/__tests__/down-migration-copies.test.mjs（1 pass） | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：`identities.ts` 23505 判斷改成一律拋錯 → identities 2 failed（same identity no-op、one wp user two accounts）；還原 4 passed | exit=0 | ms=0（未計時）
+- ORACLE_WAIVED: claude-oracle.ps1 回「'claude' CLI not on PATH」；改書面對抗審查（上列 5 點）＋突變證據（AGENTS.md §4 無額度／無工具的備援）。
+- **0124 已套 prod**（操作者 2026-10-25 go）：`node scripts/apply-db-migration.mjs 0124` → `APPLY_OK 1/1: 0124`；`--status` 列 `0124_customer_identities.sql -- applied`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql 唯讀：customer_identities rows 0、RLS t、service_role INSERT,SELECT、anon/authenticated 0 grant、UNIQUE (provider, external_id) | UNIQUE (provider, user_id)、plans.woo_product_ids 欄 0 | exit=0 | ms=0（未計時）
 ## 2026-10-24（續59）社群四種報表排程：最後驗收、正式庫 0123、推送準備（Codex）
 
 - **授權／範圍**：操作者要求依 `handoffs/2026-10-24-social-report-schedules-CODEX.md` Steps 1–6 完成，0123 正式資料庫已明示核准；Claude 寫功能，Codex 讀清單全部 diff／新檔做最後審查，不重寫功能。私有 index 僅納入交接檔案、本 entry 與必要 down 副本。
