@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-24（續25）0121 套正式庫（操作者同意）＋P3 推上 main；監工台 P3 完成（Claude）
+
+**觸發**：操作者「Apply 0121 to production now, verify it, then push P3.」
+**為何先套再推**：`lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh:185-209` migration 閘遇到 repo 有未套用的 migration 就拒絕部署；共用工作目錄裡別的 session 推 main 會連帶推上 eb67660a3，不套就會擋下當晚所有部署。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scripts/apply-db-migration.mjs 0121 | exit=0 | ms=0（APPLY_OK 1/1；未計時）
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec supabase-db psql 唯讀查詢：content_trends／content_topics 存在、兩個 RPC 存在、8 個索引、RLS on、anon／authenticated 無表與函式權限、service_role 有、client_schedules_frequency_check 含 every_5m、schema_migrations 有 0121、既有 client_schedules 3 列、content_trends_top('TW', 30 天) 可執行回 0 列 | exit=0 | ms=0（未計時）
+- REVIEW_WAIVED: NA -- 套用的就是續24 已審（db-expert＋Codex 91a10d9c）的同一份 0121
+- BUGHUNT_WAIVED: NA -- 只套用已 commit 的 migration，無程式變更
+- 推送：`055943c76..eb67660a3 main -> main`。
+
+**rollback**：題目表空、無 every_5m 排程時可跑 `packages/db/migrations/0121_content_topics.down.sql`；之後只能往前修。
 ## 2026-10-24（續24）AUTO_CONTENT P3：熱搜存檔＋題目佇列（0121 寫好、拋棄式 DB 驗過、db-expert 審過；未套正式庫）（Claude）
 
 **觸發**：操作者「Start P3 … Stop before applying 0121 to production」。

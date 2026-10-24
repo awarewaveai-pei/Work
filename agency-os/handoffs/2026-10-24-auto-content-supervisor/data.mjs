@@ -29,8 +29,8 @@ export const NOW = [
   { what: '計畫定案', state: 'yes', ev: '需求逐條對照程式查證，八個階段（commit cfc6e08d7）' },
   { what: '文章、社群貼文、影片腳本共用同一份品牌語氣', state: 'yes', ev: '程式已推上 main（7d8d618a4）；今晚台灣 03:00 自動部署後在正式站生效' },
   { what: '社群貼文不會超過平台字數上限', state: 'yes', ev: '程式已推上 main（30b6a022f）；超長會自動重寫一次，仍太長就不送出；今晚台灣 03:00 部署後生效' },
-  { what: '熱門話題抓到後會存下來', state: 'no', ev: '目前抓完就丟（第 3 階段）' },
-  { what: '每月自動列出題目', state: 'no', ev: '第 3 階段' },
+  { what: '熱門話題抓到後會存下來', state: 'yes', ev: '資料表已套正式庫（0121）；程式（eb67660a3）今晚台灣 03:00 部署後開始存，90 天自動清理' },
+  { what: '每月列出題目', state: 'yes', ev: '今晚部署後在側欄 Marketing → Topic Queue 按「AI 提案本月題目」；每月自動跑要等第 4 階段' },
   { what: '核准的題目自己變成文章草稿和社群草稿', state: 'no', ev: '文章管線已能產生草稿，但沒有排程去叫它（第 4 階段）' },
   { what: 'AI 審核通過後自動發布', state: 'no', ev: '第 4 階段；人工審核仍是預設' },
   { what: '關掉分頁後影片仍會嵌回文章', state: 'no', ev: '目前要開著文章頁等影片做完（第 6 階段）' },
@@ -39,6 +39,7 @@ export const NOW = [
 
 const P1 = '7d8d618a4';
 const P2 = '30b6a022f';
+const P3 = 'eb67660a3';
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
 const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 
@@ -71,21 +72,21 @@ export const STEPS = [
       done('P2.3', '社群工具的平台對照表改由共用功能提供，只留一份', P2),
     ] },
   { n: 3, code: 'P3', group: 'C', plain: '熱門話題抓到就存下來；每月自動列出約 28 個題目，在一頁上勾選核准、選要做文章／社群／影片。', title: '熱搜落地＋題目佇列',
-    gate: '同一天同一則熱搜只存一筆；題目頁看得到這個月的題目，可以核准、退回、選格式', risk: 'High（資料庫新表）', model: 'Opus 5.5', status: 'not_started', depends: ['P2'],
-    before: '待決 2',
+    gate: '同一天同一則熱搜只存一筆；題目頁看得到這個月的題目，可以核准、退回、選格式', risk: 'High（資料庫新表）', model: 'Opus 5.5', status: 'done', commit: P3, depends: ['P2'],
+    waitFor: '資料庫已套用；程式今晚台灣 03:00 自動部署後在正式站生效',
     what: 'migration 0121：content_trends、content_topics、client_schedules 加每 5 分鐘頻率；題目頁 /tools/content/topics',
     files: ['packages/db/migrations/0121_content_topics.sql', 'lib/content/topics/', 'app/(shell)/tools/content/topics/'],
     items: [
-      todo('P3.1', '資料庫加熱搜紀錄表和題目表，排程器加「每 5 分鐘」頻率（套到正式庫要你同意）'),
-      todo('P3.2', '每次抓熱搜都存下來，同一天同一則只存一筆'),
-      todo('P3.3', '題目的讀寫功能：提案、核准、退回、記錄做到哪一步'),
-      todo('P3.4', '每月自動提案約 28 個題目：參考近 30 天熱搜、知識庫和品牌語氣，日期分散在整個月'),
-      todo('P3.5', '新的題目頁：月份一覽，勾選核准或退回，選要做文章／社群／影片'),
-      todo('P3.6', '蒐尋器存進知識庫的資料，可以一鍵加成題目'),
+      done('P3.1', '資料庫加熱搜紀錄表和題目表，排程器加「每 5 分鐘」頻率（套到正式庫要你同意）', P3),
+      done('P3.2', '每次抓熱搜都存下來，同一天同一則只存一筆', P3),
+      done('P3.3', '題目的讀寫功能：提案、核准、退回、記錄做到哪一步', P3),
+      done('P3.4', '每月自動提案約 28 個題目：參考近 30 天熱搜、知識庫和品牌語氣，日期分散在整個月', P3),
+      done('P3.5', '新的題目頁：月份一覽，勾選核准或退回，選要做文章／社群／影片', P3),
+      done('P3.6', '蒐尋器存進知識庫的資料，可以一鍵加成題目', P3),
     ] },
   { n: 4, code: 'P4', group: 'D', plain: '在排程頁勾一格後，核准的題目會自己變成 WordPress 草稿和社群草稿；選了「AI 審核自動發」的網站，通過檢查就自動發布。', title: '排程管線＋AI 審核',
     gate: '在測試網站核准一題，幾分鐘內 WordPress 和社群工具都出現草稿；人工審核模式下永遠不會自己發布', risk: 'High（自動發布、主機排程）', model: 'Opus 5.5', status: 'not_started', depends: ['P3'],
-    before: '待決 1、待決 3',
+    before: '待決 1、待決 3、待決 5',
     what: '既有排程器升到每 5 分鐘、由主機 cron 驅動；job content_pipeline；題目狀態機；規則閘先、AI 後',
     files: ['lib/schedules/schedule.ts', 'lib/schedules/jobs.ts', 'lib/content/topics/tick.ts', 'scripts/install-maintenance-crons.sh'],
     items: [
@@ -145,7 +146,7 @@ export const STEPS = [
 // 操作者自己要決定或親手做的（agent 不能替她定）
 export const OPEN = [
   { n: 1, what: '每個網站每天最多自動做幾篇（建議 2 篇；這個數字也是每天 AI 花費的上限）', before: 'P4', src: '計畫 §4 I8' },
-  { n: 2, what: '同意把新的資料表（熱搜紀錄、題目）加到正式資料庫', before: 'P3', src: '計畫 §5 風險 High' },
   { n: 3, what: '同意主機排程改成每 5 分鐘一次，取代現在的外部排程服務', before: 'P4', src: '計畫 §0 D6' },
   { n: 4, what: '到 Google 申請 YouTube 發文授權（要你本人操作）', before: 'P7', src: '計畫 §0 D4' },
+  { n: 5, what: '要不要在資料庫層也鎖住「題目的網站一定屬於同一個客戶」：多一層保護，代價是有題目的網站不能再改所屬客戶（程式層已經擋住）', before: 'P4', src: '計畫 §0 D8' },
 ];
