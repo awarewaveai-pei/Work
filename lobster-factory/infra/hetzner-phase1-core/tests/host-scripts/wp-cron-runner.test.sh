@@ -141,6 +141,39 @@ sleep 2
 left="$(docker exec "$OFF" sh -c 'for p in /proc/[0-9]*; do tr "\0" " " < $p/cmdline 2>/dev/null; echo; done | grep -c "[c]ron event run"')"
 check "timed-out run leaves no WP-CLI process in the container" test "$left" = 0
 
+# --- 5d. a WP-CLI probe that hangs is killed inside the container and read as unhealthy (2026-10-23: 165
+# probes piled up in a thrashing container; only the run had a timeout) ---
+# aw_hang: `wp` in the cron-off site becomes `sleep 120` while /tmp/aw-hang exists.
+docker exec "$OFF" sh -c 'mv /usr/local/bin/wp /usr/local/bin/wp.real && printf "%s\n" "#!/bin/sh" \
+  "[ -e /tmp/aw-hang ] && exec sleep 120" "exec /usr/local/bin/wp.real \"\$@\"" > /usr/local/bin/wp && chmod +x /usr/local/bin/wp && touch /tmp/aw-hang'
+state 'rm -f /state/heartbeat'
+t0=$(date +%s)
+out="$(run "WP_CRON_PROBE_TIMEOUT=3 bash /r/$R_FILE" 2>&1)"; rc=$?
+check "hung probe -> exit 1" test "$rc" = 1
+check "hung probe -> named as unreadable" has "$out" "$OFF: probe unreadable"
+check "hung probe -> tick returns within the probe timeout, not 120s" test $(( $(date +%s) - t0 )) -lt 60
+check "hung probe -> heartbeat withheld" not state 'test -f /state/heartbeat'
+sleep 2
+left="$(docker exec "$OFF" sh -c 'for p in /proc/[0-9]*; do tr "\0" " " < $p/cmdline 2>/dev/null; echo; done | grep -c "[s]leep 120"')"
+check "hung probe leaves no process in the container" test "$left" = 0
+
+# --- 5e. the lock covers discovery and probes: a held lock skips the site before touching it ---
+t0=$(date +%s)
+out="$(run "flock /state/lock.$OFF sleep 60 & sleep 1; WP_CRON_PROBE_TIMEOUT=3 timeout 30 bash /r/$R_FILE; echo RC=\$?; kill \$!" 2>&1)"
+check "locked hung site: skipped" has "$out" "$OFF: previous run still active"
+check "locked hung site: not probed (no unreadable, no timeout)" not has "$out" "$OFF: probe unreadable"
+check "locked hung site: tick did not wait on it" test $(( $(date +%s) - t0 )) -lt 20
+docker exec "$OFF" sh -c 'rm -f /tmp/aw-hang; mv -f /usr/local/bin/wp.real /usr/local/bin/wp'
+
+# --- 5f. a lock file that cannot be opened is unhealthy, not "skipped" (codex F1 2026-10-24) ---
+state "rm -f /state/lock.$OFF /state/heartbeat; mkdir /state/lock.$OFF"
+out="$(run "bash /r/$R_FILE" 2>&1)"; rc=$?
+check "unopenable lock -> exit 1" test "$rc" = 1
+check "unopenable lock -> named" has "$out" "$OFF: cannot open"
+check "unopenable lock -> not read as contention" not has "$out" "previous run still active"
+check "unopenable lock -> heartbeat withheld" not state 'test -f /state/heartbeat'
+state "rmdir /state/lock.$OFF"
+
 # --- 6. --install writes cron, logrotate and the dead-man registration ---
 out="$(run "bash /r/$R_FILE --install >/dev/null 2>&1; echo NO_DIRS_RC=\$?; mkdir -p /etc/cron.d /etc/logrotate.d && bash /r/$R_FILE --install >/dev/null && cat /etc/cron.d/wp-cron-runner /etc/awarewave-alert/fresh.d/wp-cron-runner && test -s /etc/logrotate.d/wp-cron-runner && echo LR_OK" 2>&1)"
 check "--install: every-minute cron line" has "$out" "* * * * * root /r/$R_FILE >> /var/log/wp-cron-runner.log"

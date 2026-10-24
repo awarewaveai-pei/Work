@@ -179,7 +179,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "curl -fsS http://127.0.0.1/ > /dev/null || exit 1"
+          "curl -fsS --max-time 4 http://127.0.0.1/ > /dev/null || exit 1"
         ]
       interval: 20s
       timeout: 5s
@@ -187,11 +187,18 @@ services:
       start_period: 90s
     networks:
       - lobster-net
+    # No swap (memswap == memory): with Docker's default swap = memory, a container at its limit thrashes on the
+    # host's 1 GB swap for hours instead of being OOM-killed -- 2026-10-23 that put the whole host at 88% iowait.
+    memswap_limit: 1536M
     deploy:
       resources:
         limits:
-          memory: 768M
-          cpus: '0.50'
+          # Sized together with apps/wordpress/apache-mpm-prefork.conf (16 workers x ~80 MB measured 2026-10-24
+          # + ~250 MB base); the image's default 150 workers could ask for 10 GB. pids: workers + healthcheck
+          # curls + WP-CLI probes stay far below -- a pile-up hits this wall, not the memory one.
+          memory: 1536M
+          cpus: '1.00'
+          pids: 256
     logging: *lobster-logging
 
   node-api:

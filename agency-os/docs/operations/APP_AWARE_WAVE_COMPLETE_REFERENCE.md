@@ -68,7 +68,7 @@
 | `lobster-nginx` | nginx:stable | 80 | 128M / 0.5CPU | Reverse proxy |
 | `lobster-redis` | redis:7-alpine | 127.0.0.1:6379 | 512M / 0.5CPU | Cache |
 | `lobster-wordpress-db` | mariadb:11 | 內部 | 1G / 1.0CPU | WP 資料庫 |
-| `lobster-wordpress` | 自建 Dockerfile | 127.0.0.1:8080 | 768M / 0.5CPU | WordPress |
+| `lobster-wordpress` | 自建 Dockerfile | 127.0.0.1:8080 | 1536M / 1.0CPU（無 swap、pids 256、Apache 16 workers，2026-10-24） | WordPress |
 | `lobster-node-api` | 自建 Dockerfile | 127.0.0.1:3001 | 512M / 0.5CPU | Express API |
 | `lobster-next-admin` | 自建 Dockerfile | 127.0.0.1:3002 | 1G / 1.0CPU | Admin UI |
 
