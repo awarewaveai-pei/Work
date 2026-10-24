@@ -877,13 +877,8 @@ Repo evidence:
 Deploy only the Next tools app after code is merged:
 
 ```bash
-cd /root/Work/lobster-factory/infra/hetzner-phase1-core
-./deploy.sh next-admin
+sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin
 ```
 
-If the host uses Apache vhosts as the outer proxy, sync them first:
-
-```bash
-./deploy.sh --apache
-./deploy.sh next-admin
-```
+(test gate, healthcheck, smoke and automatic rollback; the old `deploy.sh` and its Apache vhosts were removed 2026-10-24 --
+the host's outer proxy is system nginx, `/etc/nginx/sites-available/`.)

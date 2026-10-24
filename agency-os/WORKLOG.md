@@ -65,6 +65,29 @@
 部署與公網煙霧測試見下一條。
 
 **rollback**：程式用 `sg-deploy` 回前一版，或 revert 本 commit；lobster-nginx 用 `default.conf.bak.safe-patch-20261024-125429` 加 `safe-infra-patch.sh nginx`；主機 nginx 用上列備份加 `safe-infra-patch.sh host-nginx`；DNS 刪 `9fa9f779…`、`f8e50b6b…`；憑證不必回退。
+## 2026-10-24（續35）n8n 明文密碼移出 compose；刪 prod 不存在的 Apache vhost 與退租主機的 deploy.sh（Claude）
+
+**觸發**：操作者「1 和 2 照你說的做」（續32 收尾列的兩項）。
+
+**根因**
+- C1 `/root/n8n/docker-compose.yml` 直接寫 `DB_POSTGRESDB_PASSWORD`／`N8N_BASIC_AUTH_USER`／`N8N_BASIC_AUTH_PASSWORD` 明文；`/root/n8n/.env` 不存在。repo 版早用 `${N8N_DB_PASSWORD}` 等，但 prod 沒跟上，且 repo 缺 prod 需要的 `lobster-net`。
+- C2 `lobster-factory/infra/hetzner-phase1-core/apache/sites-available/*.conf`（6 檔）與 `deploy.sh`：2026-04-21 為退租主機 `5.223.93.113` 寫的；prod 無 Apache（外層是系統 nginx `/etc/nginx/sites-available/`），`deploy.sh` 會 `git reset --hard` 且不經 sg-deploy 的 test／health／rollback，與 AGENTS §0「部署只走 sg-deploy.sh」衝突。Codex 這次把舊 `uptime.conf` 的 3050 當成真的（續32）＝殘檔會誤導。
+
+**改動**
+- M1 主機：三個值寫入 `/root/n8n/.env`（600，單引號＝字面值），compose 三行改 `${N8N_DB_PASSWORD}`／`${N8N_AUTH_USER}`／`${N8N_AUTH_PASSWORD}`；經 safe-infra-patch 套用。值本身未變、未印出。
+- M2 repo `lobster-factory/infra/n8n/docker-compose.yml` = prod 版（補 `lobster-net`，去掉多餘的 `name: n8n`——目錄名已是 n8n）。
+- M3 刪 `apache/sites-available/{api,app,aware-wave.com,n8n,trigger,uptime}.conf` 與 `deploy.sh`；指向它們的文件改指真實位置：`agency-os/docs/operations/n8n-self-hosted-mcp-troubleshooting.md:80`、`lobster-factory/infra/hetzner-phase1-core/.env.example:20`、`lobster-factory/docs/ONE_CLICK_BUILD_SYSTEM.md`（改為 sg-deploy.sh）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=n8n-move.sh prepare（新舊 compose 經 `docker compose config --format json` 完全相同 CONFIG_IDENTICAL）→ apply（safe-infra-patch OK，備份 `/root/n8n/docker-compose.yml.bak.safe-patch-20261024-125825`）；容器內三值 sha256 前後相同（6bbe37af171f／8481921f7c1f／13ac48572626）；compose 剩餘明文 0；healthz 本機 200、公開 200 | exit=0 | ms=40000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/check-compose-invariants.py → 15 file(s), 0 problem(s) | exit=0 | ms=500
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回 n8n compose diff（4 行：lobster-net、name）、三份文件改句；刪除檔逐一確認 prod 無 Apache（`/etc/apache2` 不存在）、`deploy.sh` 無呼叫端
+- ORACLE_WAIVED: compose 內容＝已在 prod 驗證的設定（config 渲染相同），其餘為刪除死檔與文件指標
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks,.claude,lobster-factory,mcp,.github | grep=hetzner-phase1-core/apache|apache/sites-available|hetzner-phase1-core/deploy\.sh|deploy\.sh --apache | hits=3
+  - 3 處皆已改（M3 所列）；WORKLOG／oracle 報告為歷史記錄不改。
+
+**剩餘**：`/root/n8n/*.bak*`（4 月～今天 5 份）仍含明文，留作回滾；`/root` 為 700，僅 root 可讀。
+**rollback**：`cp /root/n8n/docker-compose.yml.bak.safe-patch-20261024-125825 /root/n8n/docker-compose.yml` 後經 safe-infra-patch `up -d n8n`；`.env` 可留（未被引用時無作用）；repo `git revert`。
 ## 2026-10-24（續34）content 產品門頁建好（enabled:false，四頁＋門選單）；門上隱藏員工專用的電子報、趨勢來源管理、新增網站與改網址（Claude）
 
 **觸發**：操作者「續做第 8 項產品門」；卡 `cards/step-8-doors-video-design-content.md` §5.5 C1–C5（C-R1…C-R6、S1、P1、D1 已完成）。照 video（`2dd183f44`）、design（`dc5ad2405`）做法。

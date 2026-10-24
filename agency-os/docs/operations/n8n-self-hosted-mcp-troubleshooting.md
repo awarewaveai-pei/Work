@@ -77,7 +77,7 @@ npm run n8n:mcp-smoke
 
 4. **反向代理與 `N8N_PATH`**  
    前方若有 **Nginx／Apache／Cloudflare**：須把 **`/mcp-server/`**（以及 **`/mcp/`**、**`/webhook/`** 等）依 **上文對照表**與 **容器 `N8N_PATH`** 對齊後轉到 n8n **5678**，並避免錯誤 **buffering**（SSE 失敗有時像 404／中斷）。  
-   Repo：**Apache** `lobster-factory/infra/hetzner-phase1-core/apache/sites-available/n8n.conf`；**系統 Nginx** 片段 `lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/lobster-aware-wave-locations.inc`（**/n8n/**）。Staging：`n8n-staging-client-onboarding-e2e.md`。
+   專用網域 n8n.aware-wave.com：主機 **系統 Nginx** `/etc/nginx/sites-available/n8n.aware-wave.com`（主機本地檔，改動走 `safe-infra-patch.sh host-nginx`；prod 無 Apache，repo 舊 apache vhost 已於 2026-10-24 刪除）；**系統 Nginx** 片段 `lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/lobster-aware-wave-locations.inc`（**/n8n/**）。Staging：`n8n-staging-client-onboarding-e2e.md`。
 
 ## 保持 n8n 版本更新（自託管）
 
