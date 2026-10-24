@@ -114,7 +114,7 @@ powershell -ExecutionPolicy Bypass -File <WORK_ROOT>\scripts\ao-resume.ps1 -Full
 
 ### Step 0a — Hook-failure prominence rule (Phase C2/C3 of plan Z, 2026-05-28)
 
-If `exit_code` is non-zero OR `agency-os/.agency-state/git-fetch-last.json` shows `success: false`:
+If `exit_code` is non-zero OR the newest `fetch` entry of `agency-os/.agency-state/git-network-last.json` (`lastOp`, else `history`) shows `success: false`:
 
 **§0 燈號必須反映此失敗**（依 D10 鐵則，hook exit≠0 → 不得🟢；git-align/fetch 失敗 → 🔴），**且 section 1 第一行 MUST be a ⚠️ banner**（§0 是 TL;DR 燈號，§1 放詳細 banner，兩者並存不衝突）。Format:
 

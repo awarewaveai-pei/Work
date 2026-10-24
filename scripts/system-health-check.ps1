@@ -922,12 +922,12 @@ if (Test-Path -LiteralPath $aoResumeArchiveScript) {
 }
 
 # 12e) Git fetch ledger recency.
-# Phase Z5 (2026-06-12) consumes the Phase Z git-fetch-last.json ledger written by
-# git-align-main-aoresume-feature.ps1. The health score may be relaxed by
+# Phase Z5 (2026-06-12) consumes the git network ledger every fetch writes
+# (scripts/lib/git-safe-ops.ps1 Write-GitNetworkLedger; git-fetch-last.json retired 2026-10-24). The health score may be relaxed by
 # ao-close.ps1 -AllowNonPerfectHealth, but criticalFailures still block publish,
 # so >30d stale or unreadable ledger cannot be bypassed by score relaxation.
-$fetchLedgerPath = Join-Path $monoRoot "agency-os\.agency-state\git-fetch-last.json"
-$fetchCheckName = "Git fetch ledger recency (git-fetch-last.json)"
+$fetchLedgerPath = Join-Path $monoRoot "agency-os\.agency-state\git-network-last.json"
+$fetchCheckName = "Git fetch ledger recency (git-network-last.json)"
 $fetchGateLib = Join-Path $monoRoot "scripts\lib\fetch-recency-gate.ps1"
 if (Test-Path -LiteralPath $fetchGateLib) {
     . (Resolve-Path -LiteralPath $fetchGateLib).Path

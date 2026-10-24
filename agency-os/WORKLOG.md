@@ -1,4 +1,26 @@
 # Worklog
+## 2026-10-24（續45）健康檢查「git fetch 紀錄超過 30 天」誤報：偵測器讀的紀錄檔自 09-23 起沒人寫，改讀每次 fetch 都會寫的那一份（Claude）
+
+**觸發**：P5 commit 前 `verify-build-gates.ps1` 失敗：`Critical gate failed: Git fetch ledger stale >30d`，但同一小時內 fetch 都成功。
+**根因**：同一事實有兩份紀錄。`scripts/system-health-check.ps1:929` 讀 `agency-os/.agency-state/git-fetch-last.json`，唯一寫入者是 `scripts/git-align-main-aoresume-feature.ps1 Write-GitFetchLedger`；2026-09-23 起 AO-RESUME 自動同步改走 `scripts/lib/git-safe-ops.ps1 Invoke-SharedWorktreeParity`→`Invoke-SafeGitFetch`，它寫的是 `git-network-last.json`（`Write-GitNetworkLedger`）。舊檔停在 09-23，30 天後今天變 critical——偵測器的資料源被換掉、偵測器沒跟著換。
+
+**做法**（不變量：fetch 紀錄只有一份＝`git-network-last.json`，所有讀者讀它）
+- `scripts/lib/fetch-recency-gate.ps1`：讀 `git-network-last.json` 最新一筆 fetch（`lastFetch`→`lastOp`→`history`）；沒有 fetch 紀錄＝critical。
+- `scripts/lib/git-safe-ops.ps1 Write-GitNetworkLedger`：多存 `lastFetch`（history 20 筆共用，連續 push 會把 fetch 擠掉；Codex F1）。
+- `scripts/system-health-check.ps1` 路徑改 `git-network-last.json`；`git-align` 的 `Write-GitFetchLedger` 改呼叫 `Write-GitNetworkLedger`（不再寫第二份）；`.claude/commands/ao-resume.md` Step 0a 改讀同一份。
+- `scripts/test/fetch-recency-gate.Tests.ps1`：改用新格式；加「只有 push 沒有 fetch＝critical」「1 次 fetch 後 20 次 push 仍找得到 fetch（用真正的寫入函式）」。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/test/fetch-recency-gate.Tests.ps1 | exit=0 | ms=0（8 passed；未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/verify-build-gates.ps1 | exit=0 | ms=0（ALL PASSED；改前 exit=1 critical）
+- 突變：gate 拿掉 `lastFetch` 優先→「1 次 fetch 後 20 次 push」測紅，還原綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+- Codex `agency-os/reports/oracle/2026-10-24-partialreview-591e163d.md`：F1 push 擠掉 fetch→已修（`lastFetch`）；F2 兩個寫入者同時讀改寫可能掉一筆→寫入早就如此（非本次引入），下一次 fetch（每小時）即補，門檻 7／30 天，列剩餘風險；F3 `machine-environment-audit.ps1 -FetchOrigin` 經 `Invoke-SafeGitCapture` fetch 不記帳→AO-RESUME 每 session 的 fetch 仍持續餵，說明改為「經 Invoke-SafeGitFetch 的每次 fetch」。
+- ORACLE_WAIVED: 591e163d 後只改 F1（附測試＋突變），不開第二輪
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude/commands,mcp | grep=git-fetch-last | hits=3（皆為說明「已退役」的註解：git-align、fetch-recency-gate、system-health-check）
+
+**剩餘風險**：F2 寫入競態（極短暫，自癒）。
+**rollback**：`git revert <本 commit>`（舊檔仍在，但不會再更新，revert 後 gate 立刻再 critical）。
 ## 2026-10-24（續44）每扇產品門加左邊選單：產品名、頁面、功能清單（持有的正常、沒持有的灰掉），工具區不動（Claude）
 
 **觸發**：操作者「門上功能清單放在左邊選單：已買的可按、沒買的灰掉，工具區不動。五扇已上線的門都做。」（卡 V7／D6／C4，step-8 第 3 點）

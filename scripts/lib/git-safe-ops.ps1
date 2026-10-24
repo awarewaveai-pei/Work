@@ -83,6 +83,7 @@ function Write-GitNetworkLedger {
         $statePath = Join-Path $stateDir 'git-network-last.json'
 
         $history = @()
+        $existing = $null
         if (Test-Path -LiteralPath $statePath) {
             try {
                 $existing = Get-Content -LiteralPath $statePath -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -104,9 +105,16 @@ function Write-GitNetworkLedger {
 
         $history = @($entry) + @($history | Select-Object -First 19)
 
+        # lastFetch survives any number of pushes (the 20-entry history is shared by both ops): the health gate's
+        # fetch recency (scripts/lib/fetch-recency-gate.ps1) reads it first.
+        $lastFetch = $null
+        if ($Op -eq 'fetch') { $lastFetch = $entry }
+        elseif ($existing -and $existing.PSObject.Properties.Name -contains 'lastFetch') { $lastFetch = $existing.lastFetch }
+
         $payload = [pscustomobject]@{
             schemaVersion = 1
             lastOp        = $entry
+            lastFetch     = $lastFetch
             history       = $history
         }
 

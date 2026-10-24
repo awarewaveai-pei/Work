@@ -94,10 +94,10 @@ function Invoke-Git {
 }
 
 function Write-GitFetchLedger {
-    # Record the outcome of git fetch attempts so AO-RESUME (and any agent reading
-    # the state file) can distinguish "no new commits because we are caught up"
-    # from "no new commits because fetch failed and we don't actually know".
-    # Without this, a DNS hiccup looks identical to a quiet repo (observed 2026-05-28).
+    # The fetch outcome goes into the one network ledger every fetch writes (scripts/lib/git-safe-ops.ps1
+    # Write-GitNetworkLedger -> agency-os/.agency-state/git-network-last.json), which the health gate and
+    # AO-RESUME Step 0a read. git-fetch-last.json is retired (2026-10-24): it had one writer, which AO-RESUME
+    # stopped calling on 2026-09-23, so the gate went stale while fetches succeeded.
     param(
         [bool]$Success,
         [int]$Attempts = 1,
@@ -106,33 +106,13 @@ function Write-GitFetchLedger {
         [datetime]$StartUtc,
         [string]$RootDir
     )
-    try {
-        $stateDir  = Join-Path $RootDir 'agency-os\.agency-state'
-        if (-not (Test-Path -LiteralPath $stateDir)) {
-            New-Item -ItemType Directory -Path $stateDir -Force | Out-Null
-        }
-        $statePath = Join-Path $stateDir 'git-fetch-last.json'
-        $payload = [pscustomobject]@{
-            schemaVersion = 1
-            startedAtUtc  = $StartUtc.ToString('o')
-            finishedAtUtc = (Get-Date).ToUniversalTime().ToString('o')
-            success       = $Success
-            attempts      = $Attempts
-            exitCode      = $ExitCode
-            errorExcerpt  = $ErrorText
-        }
-        $json = $payload | ConvertTo-Json -Depth 4
-        $utf8 = New-Object System.Text.UTF8Encoding($true)
-        [System.IO.File]::WriteAllText($statePath, $json, $utf8)
-    } catch {
-        Write-Host ("  WARN: failed to write git-fetch-last.json: " + $_.Exception.Message) -ForegroundColor Yellow
-    }
+    Write-GitNetworkLedger -Op 'fetch' -Success $Success -Attempts $Attempts -ExitCode $ExitCode -ErrorText $ErrorText -StartUtc $StartUtc -WorkRoot $RootDir
 }
 
 function Invoke-GitFetchWithRetry {
     # Retries `git fetch origin --prune` on transient network/DNS failures.
     # Backoff: 5s, 10s, 20s (exponential). Each attempt writes outcome to
-    # agency-os/.agency-state/git-fetch-last.json so downstream consumers don't
+    # agency-os/.agency-state/git-network-last.json so downstream consumers don't
     # confuse "fetch failed silently" with "no remote changes". On final failure,
     # prints a loud red banner and throws — preserving original Invoke-Git contract.
     param(
@@ -152,7 +132,7 @@ function Invoke-GitFetchWithRetry {
             # AO-RESUME crash (2026-06-05 fired exactly here). Same pattern as the
             # canonical lib (scripts/lib/git-safe-ops.ps1 Invoke-SafeGitFetch). Kept
             # in-place (not delegated to the lib) because this function's
-            # Write-GitFetchLedger writes git-fetch-last.json, which
+            # Write-GitFetchLedger writes the network ledger (git-network-last.json), which
             # .claude/commands/ao-resume.md Step 0a reads for its HOOK FAILED banner.
             $savedEAP = $ErrorActionPreference
             $ErrorActionPreference = 'Continue'
@@ -183,7 +163,7 @@ function Invoke-GitFetchWithRetry {
     Write-Host "============================================================" -ForegroundColor Red
     Write-Host "GIT FETCH FAILED after $MaxAttempts attempts (last exit $lastExit)" -ForegroundColor Red
     Write-Host "  Sync state with origin is UNKNOWN — do NOT trust 'no new commits' conclusions." -ForegroundColor Red
-    Write-Host "  Ledger: agency-os/.agency-state/git-fetch-last.json" -ForegroundColor Red
+    Write-Host "  Ledger: agency-os/.agency-state/git-network-last.json" -ForegroundColor Red
     Write-Host "  Last error excerpt:" -ForegroundColor Red
     Write-Host ("    " + $lastError.Substring(0, [Math]::Min(300, $lastError.Length))) -ForegroundColor Red
     Write-Host "============================================================" -ForegroundColor Red
