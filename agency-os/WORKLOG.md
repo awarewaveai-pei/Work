@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-25（續13）主要按鈕自己一組、而且真的有作用：.btn-primary 改吃 --btn-primary-*（Claude）
+
+- **觸發**：操作者「button 的 class 沒有寫出來，無法手動調整，只看到 Button Secondary」。
+- **根因**：`--btn-primary-bg/hover/text` 藏在 Brand 組；而且 `globals.css` `.btn-primary`（138 處 className）底色吃 `--accent`／滑過吃 `--accent-hover`，只有 23 處行內樣式吃 `--btn-primary-bg`——同一種按鈕兩個顏色來源，調按鈕色對大部分按鈕無效。
+- **不變量**：主要按鈕只有一個顏色來源（Button Primary 三個 token）；每個按鈕狀態色都可調。
+- **做了什麼**（next-admin）：`lib/theme/tokens.ts` 新組 Button Primary（從 Brand 拆出），Button Secondary 加 `--btn-secondary-hover-border`（原寫死在 globals，`.btn-secondary:hover` 用）；`app/globals.css` `.btn-primary` 底色／陰影改 `--btn-primary-bg`、`:hover` 改 `--btn-primary-hover`；`lib/theme/palette-derive.ts` 色票也算 `--btn-secondary-hover-border`；守門 `tokens-match-globals.test.ts`：`.btn-primary`／`:hover` 不得再吃 accent。
+- **prod 影響**：已存外觀（操作者已套 p15）按鈕色＝強調色 `#0a81ab`，上線後按鈕顏色不變；滑過色由 `#096e91` 變色票算的 `#2790b5`。`.build-step-badge`／`.designs-chip.active` 是選中標記（強調色角色），維持 `--accent`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/theme（16 passed）＋ npx tsc --noEmit（0 error） | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：`.btn-primary` 底色改回 var(--accent) → tokens-match-globals 紅；還原綠 | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=curl | cmd=localhost:3901 /tools/theme：Colors 分頁出現 Brand／Button Primary／Button Secondary 三組，Save 按鈕 computed background = --btn-primary-bg；只有 GET /api/theme | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（讀回 diff；確認 prod 存檔 btn-primary-bg＝accent，無可見退步）
+- ORACLE_WAIVED: codex quota blocked until 2026-10-25 07:00 (scripts/oracle-quota.ps1)；以讀回＋突變＋瀏覽器實測代替。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=btn-primary-hover | hits=11
+- **rollback**：`git revert <本 commit>`。
 ## 2026-10-25（續12）next-admin 手動部署 e12af9bf8（操作者：修完後部署）——外觀色票上線（Claude）
 
 - **範圍**：prod 原為 03:00 自動部署的 `81f81cf03`；`81f81cf03..e12af9bf8` 的 next-admin 變更只有 `eee5eaae3`＋`e12af9bf8`（外觀色票），無 migration；DEPLOY_HOLD 不存在。

@@ -36,6 +36,15 @@ describe("theme tokens", () => {
     expect(TYPOGRAPHY_GROUPS.flatMap((g) => g.tokens).filter((t) => t.type !== "text" || isColor(t.default)).map((t) => t.name)).toEqual([]);
   });
 
+  // Operator 2026-10-25: the Button Primary group must move every primary button. .btn-primary
+  // painted --accent while 23 inline buttons painted --btn-primary-bg — one button, two sources.
+  it(".btn-primary paints with the Button Primary tokens, not the accent", () => {
+    const rule = (sel: string) => css.match(new RegExp(`\\n${sel.replace(/[.:]/g, "\\$&")}\\s*\\{([^}]*)\\}`))?.[1] ?? "";
+    expect(rule(".btn-primary")).toMatch(/background:\s*var\(--btn-primary-bg\)/);
+    expect(rule(".btn-primary:hover")).toMatch(/background:\s*var\(--btn-primary-hover\)/);
+    expect(rule(".btn-primary") + rule(".btn-primary:hover")).not.toMatch(/var\(--accent(-hover)?\)/);
+  });
+
   it("the sidebar section header color and size are editable", () => {
     const names = tokens.map((t) => t.name);
     expect(names).toContain("--sidebar-section-label");

@@ -159,6 +159,7 @@ export function paletteToTokens(colors: readonly string[], roles: Roles = defaul
     "--btn-secondary-bg": card,
     "--btn-secondary-border": mix(card, text, 0.2),
     "--btn-secondary-text": text,
+    "--btn-secondary-hover-border": mix(card, text, 0.32),
     "--tab-color": muted,
     "--tab-color-hover": text,
     "--tab-color-active": text,

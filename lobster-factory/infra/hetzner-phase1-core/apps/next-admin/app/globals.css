@@ -879,15 +879,15 @@ pre {
   font-size: 14px; /* text you read is never under 14px (operator 2026-10-14) */
   font-weight: 700;
   color: var(--btn-primary-text);
-  background: var(--accent);
+  background: var(--btn-primary-bg);
   cursor: pointer;
   letter-spacing: -0.01em;
   transition: background .15s, box-shadow .15s;
-  box-shadow: 0 1px 4px color-mix(in srgb, var(--accent) 25%, transparent);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--btn-primary-bg) 25%, transparent);
 }
 .btn-primary:hover {
-  background: var(--accent-hover);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 35%, transparent);
+  background: var(--btn-primary-hover);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--btn-primary-bg) 35%, transparent);
 }
 .btn-primary:disabled {
   opacity: .45;
