@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-24（續51）實測：員工替 Soulful 代操的付費呼叫，用量記在 Soulful、操作者是員工；順帶發現 gemini-2.0-flash-lite 已下架（Claude）
+
+**觸發**：操作者「跑一次最便宜的付費呼叫（替 Soulful 代操），確認用量記在 Soulful、操作者是員工」。驗證對象是 staff-usage-attribution session 的 `4fc6bacf4`（WORKLOG 2026-10-23 續46）。該 commit 部署後，正式環境還沒有任何付費 AI 呼叫，用量紀錄是 0 筆。
+
+**做法**：用一次性的 vitest 檔（`zz-usage-probe-eac0.test.ts`，跑完就刪，沒有 commit）跑已部署的同一段程式：`withFeature("content.title", handler, { org: () => Soulful })`，搭配員工 owner 的 header（就是 middleware 會注入的那組），進入 `loadGoogleGenerativeAI(grant)` 後呼叫 Gemini。資料庫用正式環境（supabase.aware-wave.com，service key 從 `mcp/user-env.ps1` 讀）。簽章金鑰在本機用一次性 ed25519 臨時產生（正式金鑰只在容器裡，不搬出來）。本機 `ANTHROPIC_API_KEY` 是空的，所以改用 Gemini。
+
+**發現**
+- C1 用量歸屬正確：`ops_audit_events` 出現 2 筆 `entitlement.usage`（跑了兩次，每次一筆），`organization_id` 是 Soulful，`payload.actor` 是 `ops:owner:<員工 uid>`，`on_behalf_of` 等於 Soulful，`source` 是 contract，`shadow` 是 false，`provider` 是 gemini，`units` 是 0（還沒定價，不扣點）。
+- C2 查詢陷阱：這類紀錄的 `target_type` 是 `organizations`，`entitlement` 寫在 `payload.role_source`（`lib/ops-audit.ts:20`）。要用 `event_type like 'entitlement.%'` 查；用 `target_type='entitlement'` 一定查到 0 筆。我第一次就是這樣誤判成「沒紀錄」。
+- C3 用量在拿到 grant、進入付費入口時就記一筆（`gateway.ts` 的 `void grant.recordUse`），所以供應商呼叫失敗也會有紀錄。這次兩次 AI 呼叫都失敗了（見 C4），但都有紀錄。units 是 0，對帳無影響；兩筆留著不刪。
+- C4 **gemini-2.0-flash-lite 已下架**：Google 回 404「no longer available」（2.5-flash-lite 也回「no longer available to new users」）。程式還在用：`lib/ops-inbox/ai/gemini.ts:7`（收件匣 AI 分類）、`lib/ops-inbox/ai/triggerAutoClassify.ts:34`、`lib/cs/config.ts:17`（客服的 Gemini 備援），`lib/ai/cost-model.ts:58` 是價目表。正式環境 log 沒有命中，因為容器今天 13:09 部署重建，log 只從那時開始。下次這些路徑一跑就會 404。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run zz-usage-probe-eac0.test.ts（正式資料庫、員工 owner header、org=Soulful；兩次都在 Gemini 404 處失敗）＋ ssh psql 唯讀查 `ops_audit_events where event_type like 'entitlement.%'`：2 筆 entitlement.usage，org Soulful，actor ops:owner，source contract，shadow false | exit=0 | ms=20000
+- REVIEW_WAIVED: NA -- 沒有程式改動（一次性探針已刪）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=gemini-2.0-flash-lite | hits=5（3 個呼叫點、1 個價目表、1 個註解，見 C4）
+
+**未做**：C4 換模型要另外修，等操作者決定。
 ## 2026-10-24（續50）next-admin 手動部署 eaca393e0（操作者「全部上線」）
 
 - **為什麼**：操作者要提前上線、不等 03:00 自動部署，並要其他 session 已推上 main 的改動一起上（「還有其他sessions的部署也一起推吧」）。
