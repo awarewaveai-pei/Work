@@ -326,6 +326,26 @@ body {
   margin-bottom: 5px;
 }
 
+/* Foldable section header: the same label, as a full-width button (SidebarNav.tsx). */
+.sidebar-section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-radius: 6px;
+}
+.sidebar-section-toggle:hover { color: var(--sidebar-text); background: var(--sidebar-hover); }
+.sidebar-section-toggle:focus-visible { outline: 2px solid var(--sidebar-text); outline-offset: 1px; }
+.sidebar-chevron { font-size: 10px; width: 10px; letter-spacing: 0; }
+.sidebar-section-toggle[aria-expanded="false"] { margin-bottom: 0; }
+
 .sidebar-link {
   display: flex;
   align-items: center;

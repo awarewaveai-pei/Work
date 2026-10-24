@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-24（續4）側欄分區可折疊；Repair Center 紅點在 inbox 健康 503 時仍顯示（Claude）
+
+**觸發**：操作者：sidebar 太長，要折疊式。
+
+**修改**
+- `app/SidebarNav.tsx`：新 `activeSectionId(sections, pathname)`（最長 href 前綴；`/` 只配自己）；分區標題變按鈕（`aria-expanded`、▸/▾），只開目前頁面所在分區，導航進別區自動打開；單項分區（Overview）不折；Repair & Control 收合時紅點顯示在標題上。狀態只在 React state（layout 不卸載，跨頁保留；重整回預設），不用瀏覽器儲存。
+- `app/globals.css`：`.sidebar-section-toggle`／`.sidebar-chevron`（沿用既有 sidebar token）。
+- `app/(shell)/ops/inbox/components/OpsInboxBadge.tsx`：不再丟掉非 2xx 回應；`/api/ops/inbox/health` 探針過期時回 503 但帶 `open_count`（`app/api/ops/inbox/health/route.ts:75,93`），只要 body 有數字就顯示（Codex F1）。
+- 測試：`app/__tests__/sidebar-coverage.test.ts` 加 activeSectionId；新 `app/(shell)/ops/inbox/components/__tests__/OpsInboxBadge.test.tsx`（503＋counts → 顯示 3；無 counts → 空）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run OpsInboxBadge.test.tsx sidebar-coverage.test.ts（10 passed）＋ npx vitest run lib/portal（45 passed）＋ npx tsc --noEmit（0） | exit=0 | ms=120000
+- 瀏覽器：本機 dev 需登入、操作者無本機帳密 → 改為部署後在正式站檢查（見下一條部署記錄）。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n -- Codex `agency-os/reports/oracle/2026-10-24-review-b38e9eb5.md` F1：badge 丟棄 503 → 折疊後看不到告警；已修＋測試
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin | grep=OpsInboxBadge | hits=3（SidebarNav.tsx import＋兩處使用；元件只此一處）
+- BUGHUNT_SCOPE_NARROW: 元件只在 next-admin 使用
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-24（續3）全產品帳戶權利補齊驗證：PASS（排程 verify-internal-comp-2026-10-24）（Claude）
 
 **觸發**：排程任務 `verify-internal-comp-2026-10-24`（唯讀；驗 f66fc97aa／0118 的 organization_all_features 三帳戶）。

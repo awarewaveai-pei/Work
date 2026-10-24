@@ -1,5 +1,7 @@
 'use client';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { OpsInboxBadge } from './(shell)/ops/inbox/components/OpsInboxBadge';
 import type { SavedLayout } from '../lib/theme/tokens';
 
@@ -197,18 +199,63 @@ export function itemKey(item: NavItem): string {
   return `disabled-${item.label}`;
 }
 
+// The section holding the current page: the link with the longest href that is the path or a
+// parent of it ('/' only matches itself, or every page would land in Overview).
+export function activeSectionId(sections: NavSection[], pathname: string): string | null {
+  let best: { id: string; len: number } | null = null;
+  for (const s of sections) {
+    for (const item of s.items) {
+      if (item.type !== 'link') continue;
+      const h = item.href;
+      const hit = h === '/' ? pathname === '/' : pathname === h || pathname.startsWith(h + '/');
+      if (hit && (!best || h.length > best.len)) best = { id: s.id, len: h.length };
+    }
+  }
+  return best?.id ?? null;
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 // `initialLayout` is fetched server-side (app/layout.tsx) from the DB, so the saved sidebar
-// order renders identically on every device. Pure function of the prop — no client storage.
+// order renders identically on every device. No client storage: sections start collapsed except
+// the current page's one; open/closed lives in state, which survives navigation (the layout stays
+// mounted) and resets on reload.
 export function SidebarNav({ initialLayout }: { initialLayout?: SavedLayout | null }) {
   const sections = initialLayout ? applyLayout(DEFAULT_SECTIONS, initialLayout) : DEFAULT_SECTIONS;
+  const pathname = usePathname() ?? '/';
+  const active = activeSectionId(sections, pathname);
+  const [open, setOpen] = useState<Set<string>>(() => new Set(active ? [active] : []));
+
+  // Navigating into a collapsed section (e.g. from a dashboard card) opens it.
+  useEffect(() => {
+    if (active) setOpen(prev => (prev.has(active) ? prev : new Set(prev).add(active)));
+  }, [active]);
+
+  const toggle = (id: string) => setOpen(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
 
   return (
     <>
-      {sections.map(section => (
+      {sections.map(section => {
+        // A one-item section (Overview) has nothing to fold.
+        const foldable = section.items.length > 1;
+        const isOpen = !foldable || open.has(section.id);
+        const hasBadge = section.items.some(i => i.type === 'link' && i.badge === 'ops-inbox');
+        return (
         <div key={section.id} className="sidebar-section">
-          <div className="sidebar-section-label">{section.label}</div>
-          {section.items.map((item, i) => {
+          {foldable ? (
+            <button type="button" className="sidebar-section-label sidebar-section-toggle"
+              aria-expanded={isOpen} onClick={() => toggle(section.id)}>
+              <span className="sidebar-chevron" aria-hidden>{isOpen ? '▾' : '▸'}</span>
+              {section.label}
+              {!isOpen && hasBadge && <OpsInboxBadge />}
+            </button>
+          ) : (
+            <div className="sidebar-section-label">{section.label}</div>
+          )}
+          {isOpen && section.items.map((item, i) => {
             if (item.type === 'disabled') {
               return (
                 <span key={i} className="sidebar-link-disabled">
@@ -233,7 +280,8 @@ export function SidebarNav({ initialLayout }: { initialLayout?: SavedLayout | nu
             );
           })}
         </div>
-      ))}
+        );
+      })}
     </>
   );
 }

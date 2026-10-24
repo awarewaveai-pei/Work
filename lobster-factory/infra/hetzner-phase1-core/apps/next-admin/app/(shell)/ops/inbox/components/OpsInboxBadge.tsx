@@ -9,10 +9,12 @@ export function OpsInboxBadge() {
     let alive = true;
     const tick = async () => {
       try {
+        // /api/ops/inbox/health answers 503 while the probe is stale but still carries the counts;
+        // that is exactly when the badge matters, so read the body whatever the status.
         const r = await fetch("/api/ops/inbox/health");
-        if (!alive || !r.ok) return;
-        const j = await r.json();
-        setCounts({ critical: j.critical_count ?? 0, total: j.open_count ?? 0 });
+        const j = await r.json().catch(() => null);
+        if (!alive || typeof j?.open_count !== "number") return;
+        setCounts({ critical: j.critical_count ?? 0, total: j.open_count });
       } catch {}
     };
     void tick();

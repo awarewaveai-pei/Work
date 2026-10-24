@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "fs";
 import path from "path";
-import { DEFAULT_SECTIONS, applyLayout, itemKey } from "../SidebarNav";
+import { DEFAULT_SECTIONS, activeSectionId, applyLayout, itemKey } from "../SidebarNav";
 
 // A built page nobody can click to is a page nobody uses: every static page under app/(shell) is
 // linked from the sidebar, or listed here with the page that links to it.
@@ -81,6 +81,16 @@ describe("sidebar coverage", () => {
     let digest = "";
     try { Page(); } catch (e) { digest = String((e as { digest?: string }).digest ?? e); }
     expect(digest).toContain("/tools/ai-models?tab=image-specs");
+  });
+
+  it("the section of the current page is the one that starts open", () => {
+    expect(activeSectionId(DEFAULT_SECTIONS, "/")).toBe("overview");
+    expect(activeSectionId(DEFAULT_SECTIONS, "/outreach/leads")).toBe("cold-outreach");
+    expect(activeSectionId(DEFAULT_SECTIONS, "/tools/social/ads")).toBe("marketing");
+    // the longer href wins: /tools/content/calendar is Marketing, though /tools/content is Content Tools
+    expect(activeSectionId(DEFAULT_SECTIONS, "/tools/content/calendar")).toBe("marketing");
+    expect(activeSectionId(DEFAULT_SECTIONS, "/tools/content")).toBe("content-tools");
+    expect(activeSectionId(DEFAULT_SECTIONS, "/tools/contentx")).toBeNull();
   });
 
   it("no page is linked twice and section ids are unique", () => {
