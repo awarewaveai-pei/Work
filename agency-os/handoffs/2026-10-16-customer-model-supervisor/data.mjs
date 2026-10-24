@@ -50,7 +50,7 @@ export const NEXT = [
   { h: '① 翻強制模式（等 10/31，不占工時）', t: '權利已就位（2026-10-23 部署）；客戶本人操作時已一律強制，翻的只影響員工。10/31 自動檢查 7 天「若強制就拒」歸零或都已解釋後，請你同意再翻（High）。', steps: [3] },
   { h: '② 用量計量與門上線阻擋項', t: '已做（2026-10-23）：每道付費縫記用量（自用與合約列只記不扣；單價待你定）、studio 精選免費路徑在付費閘前且門上藏 AI 按鈕。tarot 批次也已記操作者（0119 已套 prod，2026-10-23）。剩：員工路由在 withFeature 範圍外的付費工作仍記在自用帳戶（TASKS「員工路由用量歸屬」）。', steps: [3, 8] },
   { h: '③ 門逐個上線', t: 'tarot、studio（2026-10-23）、video、design（2026-10-24）已上線，共用一個 nginx 門區塊。每個功能分開買或贈送（你 2026-10-24 定）：客戶帳戶持有該產品才進得了門，否則只看到「尚未開通」；每扇門左邊選單列功能，沒持有的灰掉（做好待部署）。下一個 content，逐門任務在 cards/step-8-doors-video-design-content.md；cs（等 Chatwoot）、collect、outreach（員工路由要先搬）最後。每個門上線 High。第一個自助客戶不等 Woo：員工邀請（本機帳號登入已能用）＋人工寫合約列，與 Soulful 同一條路。', steps: [8] },
-  { h: '④ 收錢分兩段', t: '4a 已上線（2026-10-23；0120 已套 prod，程式 10/24 03:00 部署）：付款接頭、收件表、合約與權利同一交易寫入、錢包入帳與只退未用點數、拒付凍結、/ops/billing；付款來源「人工」（轉帳後用 scripts/record-payment.mjs 登記）。訂閱付款前還要你定第一個方案（plans 0 筆）。4b 設計與八張小卡已寫（2026-10-24，cards/step-4.md §4b）：付款事件由 wp-bridge 外掛用官方 PHP action 送（不用 Woo 原生 webhook：沒有續約事件、失敗 5 次就停用）；WordPress 會員對應計費帳戶一張表（0124）；第一次付款的會員自動建帳戶並寄設定密碼信；WordPress 一次性碼進產品門（ADR 015 順序 1）。不等待決的 4b-1、4b-3 已派 Codex；4b-2 等待決 1、4b-6 與 4b-7 等待決 3、4b-5 等待決 5——三題的選項都列在「待你決定」，選了就能開工。', steps: [4] },
+  { h: '④ 收錢分兩段', t: '4a 已上線（2026-10-23；0120 已套 prod，程式 10/24 03:00 部署）：付款接頭、收件表、合約與權利同一交易寫入、錢包入帳與只退未用點數、拒付凍結、/ops/billing；付款來源「人工」（轉帳後用 scripts/record-payment.mjs 登記）。訂閱付款前還要你定第一個方案（plans 0 筆）。4b 設計與八張小卡已寫（2026-10-24，cards/step-4.md §4b）：付款事件由 wp-bridge 外掛用官方 PHP action 送（不用 Woo 原生 webhook：沒有續約事件、失敗 5 次就停用）；WordPress 會員對應計費帳戶一張表（0124）；第一次付款的會員自動建帳戶並寄設定密碼信；WordPress 一次性碼進產品門（ADR 015 順序 1）。4b-1 已完成（0124 已套 prod）；4b-3 等 Codex 設定修好後重派；4b-2 等待決 1、4b-6 與 4b-7 等待決 3、4b-5 等待決 5——三題的選項都列在「待你決定」，選了就能開工。', steps: [4] },
   { h: '⑤ 買斷安裝', t: '收錢兩段完成、待決 2 律師回覆後開工。', steps: [5] },
   { h: '⑥ 等客戶出現', t: '只串 API、代理商、白牌網址：出現第一個這類客戶才做。', steps: [6, 7, 9] },
 ];
@@ -132,7 +132,7 @@ export const STEPS = [
     files: ['lobster-factory/packages/db/migrations/0120_payment_events.sql', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/payments/', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/contracts.ts', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/payments/', 'lobster-factory/packages/wp-bridge-plugin/'], gate: '測試：同一 event_id 重送不做事；退款只退未用點數；拒付凍結；假簽章 401', risk: 'High（金流）', model: 'Opus 5.5', depends: [3], status: 'in_progress', before: '定期扣款外掛與台灣金流的支援方式（待決 1）；點數條款與預收會計處理（待決 3）；點數能不能付沒持有的功能（待決 5）；ADR 015 順序 1（WordPress 一次性碼進產品門）',
     items: [
       { id: '4a', plain: '人工付款入口：收件表、合約與權利同一交易、錢包入帳、/ops/billing', status: 'done', commit: 'f2139d35a' },
-      { id: '4b-1', plain: 'WordPress 會員對應計費帳戶（0124 customer_identities）；不等待決，已派 Codex', status: 'todo' },
+      { id: '4b-1', plain: 'WordPress 會員對應計費帳戶（0124 customer_identities，已套 prod 2026-10-25）', status: 'done', commit: '0eb785f1c' },
       { id: '4b-3', plain: 'next-admin woo 收件接頭：驗章、查會員、第一次付款自動建帳戶；不等待決，已派 Codex', status: 'todo' },
       { id: '4b-2', plain: 'wp-bridge 外掛送付款事件（訂閱、續約、換方案、點數包、退款、取消）；等待決 1', status: 'todo' },
       { id: '4b-6', plain: 'Woo 店面設定：結帳必登入、條款勾選、商品對應方案；等待決 3', status: 'todo' },
