@@ -78,11 +78,11 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
 <aside><div class="in">
   <h1>員工權限 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-10-24</span></p>
-  <div class="bar" data-computed><i class="d" style="width:83.33333333333334%"></i><i class="g" style="width:0%"></i></div>
+  <div class="bar" data-computed><i class="d" style="width:83.33333333333334%"></i><i class="g" style="width:16.666666666666664%"></i></div>
   <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>5</span>／<span data-computed>6</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>1</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
-<p class="sub">擁有者可為每位員工勾選可用工具。未勾選的工具不會顯示在側欄；直接輸入網址或呼叫 API 也會被擋下。擁有者永遠可用全部工具。共 <span data-computed>6</span> 張卡、<span data-computed>23</span> 項工作，已完成 <span data-computed>19</span> 項。</p>
+<p class="sub">擁有者可為每位員工勾選可用工具。未勾選的工具不會顯示在側欄；直接輸入網址或呼叫 API 也會被擋下。擁有者永遠可用全部工具。共 <span data-computed>6</span> 張卡、<span data-computed>23</span> 項工作，已完成 <span data-computed>20</span> 項。</p>
 <section id="now"><h2>現況</h2><p class="lead">目前可用與尚未可用的功能。</p><ul class="yn"><li class="yes"><b>可以</b><span>員工分為擁有者、管理員、操作、唯讀四種角色。<small>角色設定存在登入帳號中，目前需到 Supabase 後台手動修改。</small></span></li><li class="yes"><b>可以</b><span>為每位員工分別勾選可用工具。<small>在 /ops/staff 勾選（C4）。台灣時間 03:00 自動部署後可用。</small></span></li><li class="yes"><b>可以</b><span>側欄只顯示有權限的工具。<small>已設定工具的員工，側欄、首頁、客戶中心分頁只顯示勾選的工具（C3）。部署後生效。</small></span></li><li class="no"><b>還不行</b><span>沒有權限時，直接輸入網址或呼叫 API 會被擋下。<small>程式已完成（C2），目前只記錄「本來會擋」、不擋。正式擋要等你同意（C6）。</small></span></li><li class="yes"><b>可以</b><span>在後台管理員工帳號與權限。<small>/ops/staff：改角色、勾工具、寄邀請給新員工。只有擁有者能改。部署後可用。</small></span></li></ul></section>
 
 <section id="steps"><h2>卡片與工作</h2><p class="lead">依編號進行。每張卡列出所有工作；勾選表示完成。同一組的卡若修改不同檔案，可同時進行。High 風險步驟需經你同意才會執行。</p><ol class="steps"><li class="step done" id="C1">
@@ -158,13 +158,13 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-24-staff-tool-grants/R0-PLAN.md §6 C5</code></p>
         <p><b>完成於：</b><code>f4cfe6dad</code></p>
       </details>
-    </div></li><li class="step todo" id="C6">
+    </div></li><li class="step doing" id="C6">
     <div class="n">6</div>
     <div class="b">
       <p class="plain">程式先以只記錄、不擋的方式上線。你在權限頁設定好每位員工後，觀察 7 天紀錄；確認沒有問題，再正式開始擋。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（正式站權限）</span><span class="who">負責：你＋Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-high">風險 High（正式站權限）</span><span class="who">負責：你＋Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>連續 7 天沒有「本來會擋」的紀錄，或每筆紀錄都已說明；正式開始擋後，員工只看得到已勾選的工具。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>C6.1</code> 推上 main，台灣時間 03:00 自動部署。這時只記錄、不擋，使用上沒有任何變化。</span></li><li class="todo"><b>○</b><span><code>C6.2</code> 你在權限頁替每位員工勾選工具。</span></li><li class="todo"><b>○</b><span><code>C6.3</code> 觀察 7 天「本來會擋」的紀錄，逐筆說明或補上設定。</span></li><li class="todo"><b>○</b><span><code>C6.4</code> 正式開始擋，需要你同意。</span></li></ul>
+      <ul class="items"><li class="done"><b>✓</b><span><code>C6.1</code> 推上 main，台灣時間 03:00 自動部署。這時只記錄、不擋，使用上沒有任何變化。 <small>完成於 <code>4c36c46c7</code></small></span></li><li class="todo"><b>○</b><span><code>C6.2</code> 你在權限頁替每位員工勾選工具。</span></li><li class="todo"><b>○</b><span><code>C6.3</code> 觀察 7 天「本來會擋」的紀錄，逐筆說明或補上設定。</span></li><li class="todo"><b>○</b><span><code>C6.4</code> 正式開始擋，需要你同意。</span></li></ul>
       <details><summary>工程細節：C6 上線</summary>
         <p>push main → 03:00 auto-deploy（shadow）；/ops/staff 設定；docker logs grep [staff-tools]；STAFF_TOOLS_MODE=enforce 走 safe-infra-patch.sh compose</p>
         <p><b>需先完成：</b><a href="#C3">C3</a>、<a href="#C4">C4</a>、<a href="#C5">C5</a>；待決 1</p>

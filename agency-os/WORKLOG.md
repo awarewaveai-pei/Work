@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-24（續58）next-admin 手動部署 4c36c46c7（操作者：「現在就部署」）：員工逐工具權限 C3–C5 上線，shadow 不擋（Claude）
+
+- **觸發**：操作者 2026-10-24「現在就部署」（明示 go；High）。
+- **內容**：上次部署 eaca393e0（已含 C2）→ 4c36c46c7：C3 側欄／首頁／客戶中心分頁過濾、C4 /ops/staff、C5 文件、另一 session 的兩個排程頁修正（2b0f3fb04、1d17f16c1）。無 migration／compose／nginx 改動（`git diff --stat eaca393e0 origin/main` 對這三處為空）。
+- **部署前**：`check-deploy-drift.ps1` FAIL＝落後 10 個 commit（部署本身即修正）；compose 變數差異 META_* 8 個只在 repo（另一 session 的社群 Meta 工作，未同步到主機，本次不碰）。`verify-build-gates.ps1` 唯一紅＝`down-migration-copies.test.mjs`：另一 session 尚未提交的 0123 migration 在共用工作目錄、缺 scripts 端 down 副本；不在 origin/main，不隨本次部署。
+- **部署**：ks-aw-01 `sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin` exit 0：healthy 11 秒、HTTP smoke 5/5 OK、`.deployed-commit`＝4c36c46c7。`docker ps`：`lobster-next-admin Up (healthy)`，名稱正常。
+- **上線檢查**：`docker exec lobster-next-admin printenv STAFF_TOOLS_MODE` exit 1＝未設＝shadow；近 5 分鐘 `[staff-tools]` 0 行、無 error；容器內唯讀查：`organizations.kind='internal'` 1 筆（/ops/staff 寫入有地方記 audit）；員工帳號只有 1 個＝awarewaveai@gmail.com，角色 owner、工具從沒設定（owner 不受影響）。
+- **Playwright smoke**：`scripts/playwright-runner.ps1 -Mode smoke -SkipInstall` 26 passed／6 skipped。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin | exit=0 | ms=398118
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/playwright-runner.ps1 -Mode smoke -SkipInstall (26 passed, 6 skipped) | exit=0 | ms=66000
+- REVIEW_WAIVED: NA -- 部署，不改程式；程式審查在 C2–C5 各 entry
+- BUGHUNT_WAIVED: NA -- 部署，不改程式
+- **下一步**：操作者目前是唯一員工帳號；新增員工時在 /ops/staff「新增員工」寄邀請並勾工具。2026-11-01 看紀錄（TASKS 條目＋行事曆已建）。
+- **rollback**：`DEPLOY_ROLLBACK_RUNBOOK.md` §2.1（回 eaca393e0 映像）；或不動＝shadow 本來就不擋。
 ## 2026-10-24（續56）gemini-2.0-flash-lite 已下架 → 改用 gemini-3.5-flash-lite，模型名只寫在一處；收件匣 AI 分類與客服 Gemini 備援開始記花費（Claude）
 
 **觸發**：操作者「把 gemini-2.0-flash-lite 換成現在可用的模型（收件匣分類、客服備援、價目表），實測一次能回應」「去處理好」。發現經過見續51 C4。
