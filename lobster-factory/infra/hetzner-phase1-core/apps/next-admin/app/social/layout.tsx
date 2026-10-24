@@ -4,5 +4,5 @@ import type { ReactNode } from "react";
 import { ProductDoorShell } from "../ProductDoorShell";
 
 export default function SocialDoorLayout({ children }: { children: ReactNode }) {
-  return <ProductDoorShell>{children}</ProductDoorShell>;
+  return <ProductDoorShell productKey="social">{children}</ProductDoorShell>;
 }

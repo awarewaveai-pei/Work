@@ -40,7 +40,7 @@ import {
 
 const MOCKUP_MODELS = STUDIO_MODEL_OPTIONS;
 
-interface CatalogProduct {
+export interface CatalogProduct {
   id: number;
   title: string;
   image: string;
@@ -248,7 +248,9 @@ function PropChips({
   );
 }
 
-export default function MockupStudio() {
+// The Printful catalog route is not a door API: the staff page passes the loader in (MockupStudioStaff.tsx), so a
+// design door page's imports name no /api/tools/printful route (step-8 card §2 S1; card D3 decides the door's catalog).
+export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Promise<CatalogProduct[] | null> }) {
   // design source
   const [designs, setDesigns] = useState<DesignAsset[]>([]);
   const [designRef, setDesignRef] = useState<string | null>(null);
@@ -322,12 +324,11 @@ export default function MockupStudio() {
         if (json.ok) setDesigns((json.assets ?? []).filter((a) => a.object_url));
       } catch { /* unavailable */ }
     })();
-    void (async () => {
+    if (loadCatalog) void (async () => {
       setCatalogLoading(true);
       try {
-        const res = await fetch("/api/tools/printful/catalog", { cache: "no-store" });
-        const json = (await res.json()) as { ok: boolean; products?: CatalogProduct[] };
-        if (json.ok && json.products) setCatalog(json.products);
+        const products = await loadCatalog();
+        if (products) setCatalog(products);
       } catch { /* unavailable */ } finally { setCatalogLoading(false); }
     })();
     void (async () => {
@@ -341,7 +342,7 @@ export default function MockupStudio() {
         }
       } catch { /* unavailable */ }
     })();
-  }, []);
+  }, [loadCatalog]);
 
   const modelDesc = useMemo(() => {
     if (modelDescManual.trim()) return modelDescManual.trim();

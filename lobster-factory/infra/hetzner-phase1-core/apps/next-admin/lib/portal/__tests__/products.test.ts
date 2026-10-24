@@ -32,6 +32,7 @@ function dbProductKeys(files: Array<{ file: string; text: string }>): string[] {
   return allowed;
 }
 
+const under = (p: string, prefix: string) => p === prefix || p.startsWith(`${prefix}/`);
 const MIGRATIONS = () => migrationFiles().map((file) => ({ file, text: readFileSync(path.join(MIGRATIONS_DIR, file), "utf8") }));
 
 // Top-level route segments of the staff door (app/ and its route groups), so a product's page prefix cannot shadow one.
@@ -80,6 +81,29 @@ describe("product registry", () => {
         expect(existsSync(path.join(APP_DIR, p.door.page.slice(1), "page.tsx")), p.key).toBe(true);
       }
       for (const a of p.door.api) expect(a, p.key).toMatch(/^\/api\/[a-z][a-z0-9-]*(?:\/[a-z][a-z0-9-]*)*$/);
+    }
+  });
+
+  // ADR 018 §2 rule 3: a multi-page door lists its pages in door.nav (ProductDoorShell renders it); each is a built
+  // page that mirrors one of the product's staff pages (useDoorHref maps links by it), and no staff page answers a
+  // built door page's path (a reserved, unbuilt door may still share one, see the shadowing test above).
+  it("every door.nav page is built and mirrors one of the product's staff pages; no staff page shares a door page's path", () => {
+    const pageUrls = (dir: string, url: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? (e.name.startsWith("_") ? [] : pageUrls(path.join(dir, e.name), e.name.startsWith("(") ? url : `${url}/${e.name}`))
+        : e.name === "page.tsx" ? [url || "/"] : []);
+    const staffUrls = new Set(pageUrls(path.join(APP_DIR, "(shell)"), ""));
+    for (const p of nextAdminProducts()) {
+      const nav = p.door.nav ?? [];
+      expect(new Set(nav.map((n) => n.path)).size, p.key).toBe(nav.length);
+      for (const n of nav) {
+        expect(n.path, p.key).toMatch(/^(?:[a-z][a-z0-9-]*(?:\/[a-z][a-z0-9-]*)*)?$/);
+        expect(n.name.trim(), `${p.key} nav ${n.path}`).not.toBe("");
+        expect(existsSync(path.join(APP_DIR, p.door.page.slice(1), ...n.path.split("/").filter(Boolean), "page.tsx")), `${p.key} nav ${n.path}: no page`).toBe(true);
+        expect(p.staffPaths.some((s) => under(n.staff, s)), `${p.key} nav ${n.path}: ${n.staff} is not its staff path`).toBe(true);
+        expect(staffUrls.has(`/${n.staff}`), `${p.key} nav ${n.path}: no staff page ${n.staff}`).toBe(true);
+      }
+      const doorDir = path.join(APP_DIR, p.door.page.slice(1));
+      for (const url of existsSync(doorDir) ? pageUrls(doorDir, p.door.page) : []) expect(staffUrls.has(url), `${p.key}: a staff page answers door page ${url}`).toBe(false);
     }
   });
 

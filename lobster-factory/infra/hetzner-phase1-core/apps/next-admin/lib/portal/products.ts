@@ -4,7 +4,11 @@ export type LoginSource = "local" | "awarewave-wp" | "customer-wp";
 export const LOGIN_SOURCES: readonly LoginSource[] = ["local", "awarewave-wp", "customer-wp"];
 // anonymous: path prefixes served with no login, on this product's own door only (pages and GET/HEAD routes;
 // lib/portal/__tests__/products.test.ts reads the files under them).
-export type ProductDoor = { app: "next-admin"; page: string; api: readonly string[]; anonymous?: readonly string[]; enabled?: boolean } | { app: "external" };
+// nav: a multi-page door's menu (ADR 018 §2 rule 3), rendered by app/ProductDoorShell.tsx. path: the page below the door
+// ("" = its home), served from app<page>/<path>/page.tsx; staff: the staff page showing the same component, so
+// useDoorHref (app/DoorContext.tsx) can turn a shared component's staff link into the door link.
+export interface DoorNavItem { path: string; name: string; staff: string }
+export type ProductDoor = { app: "next-admin"; page: string; api: readonly string[]; anonymous?: readonly string[]; enabled?: boolean; nav?: readonly DoorNavItem[] } | { app: "external" };
 export interface ProductFeature {
   feature_key: string;
   name: string;
@@ -52,10 +56,11 @@ const PRODUCT_DEFINITIONS = [
     loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,
     features: [quota("tarot.image", "塔羅圖生成"), quota("tarot.prompt", "提示詞建議")],
     accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/tarot/MODULE_MANIFEST.json" }, staffPaths: ["tools/tarot"] },
+  // tools/publish (POD listing to our own Woo store) is studio's and staff-only: no door page (step-8 card §6 D1).
   { key: "studio", name: "商品設計工作室", description: "生成商品圖片、文案與修圖素材。", subdomain: "studio", door: { app: "next-admin", page: "/studio", api: ["/api/tools/studio"] },
     loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,
     features: [quota("studio.image", "圖片生成"), quota("studio.product-copy", "商品文案"), quota("studio.edit-prompt", "修圖提示詞"), quota("studio.remove-bg", "去背"), quota("studio.inpaint", "局部重繪"), quota("studio.fill", "生成填補"), quota("studio.upscale", "圖片放大")],
-    accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/studio/MODULE_MANIFEST.json" }, staffPaths: ["tools/studio"] },
+    accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/studio/MODULE_MANIFEST.json" }, staffPaths: ["tools/studio", "tools/publish"] },
   { key: "design", name: "設計編輯器", description: "編輯畫布、橫幅、模型圖與向量設計。", subdomain: "design", door: { app: "next-admin", page: "/design", enabled: false, api: ["/api/tools/presets"] },
     loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,
     // Paid image operations belong to studio above; Fabric editing itself calls no paid model.
@@ -64,7 +69,7 @@ const PRODUCT_DEFINITIONS = [
   { key: "content", name: "內容行銷", description: "產生文章、搜尋素材並安排內容發布。", subdomain: "content", door: { app: "next-admin", page: "/content", enabled: false, api: ["/api/content"] },
     loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,
     features: [quota("content.article", "文章生成"), quota("content.humanize", "文章人性化"), quota("content.seo-fix", "SEO 修正"), quota("content.brand-voice", "品牌語氣擷取"), quota("content.outline", "大綱生成"), quota("content.title", "標題建議"), quota("content.keywords", "關鍵字建議"), quota("content.hook-brief", "Hook 草稿"), quota("content.syndicate", "多平台內容改寫"), quota("content.market-analysis", "市場分析"), quota("content.trending", "趨勢分析"), quota("content.image", "內容配圖")],
-    accessChannels: ["ui"], modules: { dependsOn: ["studio"], optional: ["video"], manifest: "lib/content/MODULE_MANIFEST.json" }, staffPaths: ["tools/content", "tools/publish", "tools/events"] },
+    accessChannels: ["ui"], modules: { dependsOn: ["studio"], optional: ["video"], manifest: "lib/content/MODULE_MANIFEST.json" }, staffPaths: ["tools/content", "tools/events"] },
   // cs and collect also use /api/ops/clients/[slug]/{cs-*,collection-sources}: not a prefix a door can own; ADR 017 step 8 decides.
   { key: "cs", name: "AI 客服", description: "根據知識庫回答問題並處理客服交接。", subdomain: "cs", door: { app: "next-admin", page: "/cs", enabled: false, api: ["/api/ops/cs"] },
     loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,

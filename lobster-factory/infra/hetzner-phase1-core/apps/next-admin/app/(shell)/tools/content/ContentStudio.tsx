@@ -473,7 +473,16 @@ function ChipBtn({ label, active, onClick, disabled }: { label: string; active: 
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-export default function ContentStudio() {
+// The article's AI video comes from the video product, which a content door does not serve (it is only optional):
+// the staff page passes these calls in (ContentStudioStaff.tsx), so a door page's imports name no /api/video route
+// (registry-code.test.ts gate 3) and the door shows no AI video option.
+export interface ContentVideoApi {
+  generate(body: Record<string, unknown>): Promise<{ ok: boolean; euJobId?: string; jobId?: string; error?: string }>;
+  status(jobId: string): Promise<{ ok: boolean; status?: string; video?: { outputs?: Record<string, string> }; error?: string }>;
+  embed(body: { postId: number; siteId?: string; videoUrl: string }): Promise<{ ok: boolean; error?: string }>;
+}
+
+export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
   const { canUse, why } = usePaidFeatures();
   const searchParams = useSearchParams();
   // 字串而非 searchParams 物件本身當依賴 —— 物件每次 render 都是新的，會讓下面的
@@ -624,7 +633,7 @@ export default function ContentStudio() {
   // prevent double-trigger since React batches the setState calls that produce pubStatus==="done".
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (pubStatus === "done" && publishedPostId !== null && videoStatus === "idle" && form.media.youtubeSource === "ai-video") {
+    if (video && pubStatus === "done" && publishedPostId !== null && videoStatus === "idle" && form.media.youtubeSource === "ai-video") {
       void handleGenerateVideo(publishedPostId);
     }
   }, [pubStatus, publishedPostId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1468,7 +1477,7 @@ export default function ContentStudio() {
       if (d.formSnapshot) {
         const restored = { ...DEFAULT_FORM, ...d.formSnapshot };
         // Normalize removed youtubeSource values ("auto" was removed in 2026-06) to "none"
-        if (!["none", "ai-video"].includes(restored.media?.youtubeSource)) {
+        if (!["none", ...(video ? ["ai-video"] : [])].includes(restored.media?.youtubeSource)) {
           restored.media = { ...restored.media, youtubeSource: "none" };
         }
         setForm(restored);
@@ -1701,29 +1710,26 @@ export default function ContentStudio() {
   // Fire video generation AFTER article is published (postId must be known).
   // When render completes, call /api/video/embed-to-wp to replace <!-- VIDEO_PLACEHOLDER -->.
   async function handleGenerateVideo(postId: number) {
-    if (videoStatus === "generating" || videoStatus === "embedding") return;
+    if (!video || videoStatus === "generating" || videoStatus === "embedding") return;
     setVideoStatus("generating"); setVideoError("");
     try {
-      const res = await fetch("/api/video/generate", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          // /api/video/generate requires `topic` (it uses topic as both topic + keyword) — without it
-          // the route 400s before a job is ever created (critic 2026-06-19). seoTitle (→ keyword
-          // fallback) is the natural article topic.
-          topic: metaData?.seoTitle || form.keyword,
-          articleTitle: metaData?.seoTitle || form.keyword,
-          articleContent: generated,
-          language: form.language || "繁體中文",
-          visualStyle: videoStyleZh ? resolveVideoStyle(videoStyleZh) : undefined,
-          sceneCount: videoTotalScenes,
-          customScenes: Math.min(videoCustomScenes, videoTotalScenes),
-          brollScenes: Math.max(0, videoTotalScenes - videoCustomScenes),
-          imageModel: videoImageModel,
-          outputFormats: VIDEO_FORMAT_CHOICES.filter((f) => videoFormats.has(f)),
-          ...parseVoiceModel(videoVoiceId),
-        }),
+      const json = await video.generate({
+        // /api/video/generate requires `topic` (it uses topic as both topic + keyword) — without it
+        // the route 400s before a job is ever created (critic 2026-06-19). seoTitle (→ keyword
+        // fallback) is the natural article topic.
+        topic: metaData?.seoTitle || form.keyword,
+        articleTitle: metaData?.seoTitle || form.keyword,
+        articleContent: generated,
+        language: form.language || "繁體中文",
+        visualStyle: videoStyleZh ? resolveVideoStyle(videoStyleZh) : undefined,
+        sceneCount: videoTotalScenes,
+        customScenes: Math.min(videoCustomScenes, videoTotalScenes),
+        brollScenes: Math.max(0, videoTotalScenes - videoCustomScenes),
+        imageModel: videoImageModel,
+        outputFormats: VIDEO_FORMAT_CHOICES.filter((f) => videoFormats.has(f)),
+        siteId: selectedSiteId || undefined,
+        ...parseVoiceModel(videoVoiceId),
       });
-      const json = await res.json() as { ok: boolean; euJobId?: string; jobId?: string; error?: string };
       if (!json.ok) { setVideoStatus("error"); setVideoError(json.error ?? "影片生成失敗"); return; }
       const jobId = json.euJobId ?? json.jobId ?? "";
       setVideoJobId(jobId);
@@ -1731,8 +1737,7 @@ export default function ContentStudio() {
       if (videoPollRef.current) clearInterval(videoPollRef.current);
       videoPollRef.current = setInterval(async () => {
         try {
-          const sr = await fetch(`/api/video/status?jobId=${encodeURIComponent(jobId)}`, { method: "POST" });
-          const sj = await sr.json() as { ok: boolean; status?: string; video?: { outputs?: Record<string, string> }; error?: string };
+          const sj = await video.status(jobId);
           if (!sj.ok || sj.status === "error") {
             clearInterval(videoPollRef.current!); videoPollRef.current = null;
             setVideoStatus("error"); setVideoError(sj.error ?? "影片渲染失敗"); return;
@@ -1754,11 +1759,7 @@ export default function ContentStudio() {
               return;
             }
             setVideoStatus("embedding");
-            const embedRes = await fetch("/api/video/embed-to-wp", {
-              method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ postId, siteId: selectedSiteId || undefined, videoUrl: primaryUrl }),
-            });
-            const ej = await embedRes.json() as { ok: boolean; error?: string };
+            const ej = await video.embed({ postId, siteId: selectedSiteId || undefined, videoUrl: primaryUrl });
             if (ej.ok) setVideoStatus("done");
             else { setVideoStatus("error"); setVideoError(ej.error ?? "影片嵌入 WP 失敗"); }
           }
@@ -2912,7 +2913,7 @@ export default function ContentStudio() {
                   <select className="form-select" value={form.media.youtubeSource} disabled={isGenerating}
                     onChange={e => setMedia("youtubeSource", e.target.value)}>
                     <option value="none">None</option>
-                    <option value="ai-video">🎬 AI 影片</option>
+                    {video && <option value="ai-video">🎬 AI 影片</option>}
                   </select>
                 </div>
                 <div>
@@ -2934,7 +2935,7 @@ export default function ContentStudio() {
               </div>
 
               {/* AI 影片設定（選 ai-video 時展開）*/}
-              {form.media.youtubeSource === "ai-video" && (
+              {video && form.media.youtubeSource === "ai-video" && (
                 <div style={{ marginTop: "8px", padding: "12px 14px", borderRadius: "8px", border: "1px solid var(--ai-bg)", background: "var(--ai-bg)", display: "flex", flexDirection: "column", gap: "12px" }}>
                   {/* 素材模式 */}
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>

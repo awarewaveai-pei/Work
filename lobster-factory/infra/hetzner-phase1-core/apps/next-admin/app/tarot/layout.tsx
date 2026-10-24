@@ -4,5 +4,5 @@ import type { ReactNode } from "react";
 import { ProductDoorShell } from "../ProductDoorShell";
 
 export default function TarotDoorLayout({ children }: { children: ReactNode }) {
-  return <ProductDoorShell>{children}</ProductDoorShell>;
+  return <ProductDoorShell productKey="tarot">{children}</ProductDoorShell>;
 }

@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { roleHeader } from "@/lib/ops-role";
-import { DEFAULT_AI_TEXT_MODEL } from "@/lib/ai/text-model-options";
 import { openInCanvas } from "@/components/tools/canvas-handoff";
 import { STUDIO_MODEL_OPTIONS, modelSupportsRefs, modelCompositesProduct, type StudioModel } from "@/lib/studio/model-options";
 import { STYLE_CATALOG } from "../tarot/tarotStyles";
 import { resolveStylePrompt } from "../tarot/cards";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
+import { useDoorHref } from "@/app/DoorContext";
 
 // ---------------------------------------------------------------------------
 // Size presets & constants
@@ -985,8 +985,18 @@ function StepCard({
 // Component
 // ---------------------------------------------------------------------------
 
-export default function BannerStudio() {
+// Calls a design door does not serve: AI copy and one-click design bill video.script through /api/tools/script-forge
+// (video is only optional to design), and brand colours come from the staff client list. The staff page passes them in
+// (BannerStudioStaff.tsx); without them the AI copy card and the brand picker do not render (step-8 card §6 D-V2/D-V3).
+export interface BannerStaffApi {
+  /** The text model's streamed answer to `prompt` (the script-forge response). */
+  scriptForge(prompt: string): Promise<Response>;
+  brandClients(): Promise<{ slug: string; name: string; colors: string[] }[]>;
+}
+
+export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   const { canUse, why } = usePaidFeatures();
+  const designsHref = useDoorHref("/tools/designs");
   const [s, setS]         = useState<State>(INIT);
   const bgFileRef         = useRef<HTMLInputElement>(null);
   const productFileRef    = useRef<HTMLInputElement>(null);
@@ -1093,11 +1103,8 @@ export default function BannerStudio() {
         `"bgMode":"gradient","gradFrom":"#rrggbb","gradTo":"#rrggbb",` +
         `"aiBgSubject":"英文場景描述(供 AI 生背景)","aiBgVibe":"英文氛圍"}\n\n` +
         `配色和諧、對比足夠、CTA 醒目；文字用繁體中文；只輸出 JSON。`;
-      const res = await fetch("/api/tools/script-forge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...roleHeader("operator") },
-        body: JSON.stringify({ prompt, model: DEFAULT_AI_TEXT_MODEL }),
-      });
+      if (!staff) return;
+      const res = await staff.scriptForge(prompt);
       if (!res.ok || !res.body) throw new Error(`設計生成失敗（${res.status}）`);
       const reader = res.body.getReader();
       const dec = new TextDecoder();
@@ -1121,25 +1128,15 @@ export default function BannerStudio() {
     }
   }
 
-  // ── brand colours: fetch clients that have brandColors set on /ops/clients ──
+  // ── brand colours: clients that have brandColors set on /ops/clients (staff page only) ──
   useEffect(() => {
+    if (!staff) return;
     let cancelled = false;
-    fetch("/api/ops/clients", { headers: { ...roleHeader("operator") } })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { clients?: { slug: string; name: string; clientConfig?: { brandColors?: { primary?: string; secondary?: string; accent?: string } } }[] } | null) => {
-        if (cancelled || !d?.clients) return;
-        const list = d.clients
-          .map((c) => {
-            const bc = c.clientConfig?.brandColors;
-            const colors = [bc?.primary, bc?.secondary, bc?.accent].filter((x): x is string => !!x && /^#[0-9a-fA-F]{6}$/.test(x));
-            return { slug: c.slug, name: c.name, colors };
-          })
-          .filter((c) => c.colors.length > 0);
-        setBrandClients(list);
-      })
+    staff.brandClients()
+      .then((list) => { if (!cancelled) setBrandClients(list); })
       .catch(() => { /* clients endpoint unavailable — brand picker just stays empty */ });
     return () => { cancelled = true; };
-  }, []);
+  }, [staff]);
 
   // ── colour-tool handlers ──
   function handleColorRefUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1289,11 +1286,8 @@ export default function BannerStudio() {
         `輸出純 JSON，不含任何 markdown 包裹：\n` +
         `{"variants":[{"headline":"...","subtext":"..."},{"headline":"...","subtext":"..."},{"headline":"...","subtext":"..."},{"headline":"...","subtext":"..."},{"headline":"...","subtext":"..."}]}`;
       const langified = `【預設輸出語言：繁體中文】未另行指定時，所有文字請用繁體中文；JSON key 保持英文。\n\n${prompt}`;
-      const res = await fetch("/api/tools/script-forge", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json", ...roleHeader("operator") },
-        body:    JSON.stringify({ prompt: langified, model: DEFAULT_AI_TEXT_MODEL }),
-      });
+      if (!staff) return;
+      const res = await staff.scriptForge(langified);
       if (!res.ok || !res.body) throw new Error(`文案生成失敗（${res.status}）`);
       const reader = res.body.getReader();
       const dec    = new TextDecoder();
@@ -1376,7 +1370,7 @@ export default function BannerStudio() {
           display: "flex", flexDirection: "column", gap: 12 }}>
 
           <StepCard title="配色 / 品牌色" icon="🎨" order={1}>
-            {brandClients.length > 0 ? (
+            {!staff ? null : brandClients.length > 0 ? (
               <div className="form-row" style={{ marginTop: 12 }}>
                 <label className="form-label">品牌</label>
                 <select className="form-select" defaultValue=""
@@ -1446,7 +1440,7 @@ export default function BannerStudio() {
           </StepCard>
 
           {/* Step 0: 文案生成 */}
-          <StepCard title="文案生成" step="Step 0" icon="✍️" hint="選填" order={6}>
+          {staff && <StepCard title="文案生成" step="Step 0" icon="✍️" hint="選填" order={6}>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
               <div className="form-row">
                 <label className="form-label">描述</label>
@@ -1501,7 +1495,7 @@ export default function BannerStudio() {
                 </div>
               )}
             </div>
-          </StepCard>
+          </StepCard>}
 
           {/* Step 1: 尺寸 */}
           <StepCard title="尺寸" step="Step 1" icon="📐" order={2}>
@@ -2129,7 +2123,7 @@ export default function BannerStudio() {
             </div>
             {s.saved && (
               <p className="form-hint" style={{ marginTop: 8, color: "var(--green)" }}>
-                ✓ 已儲存至 <a href="/tools/designs" style={{ color: "var(--green)" }}>My Designs</a>
+                ✓ 已儲存至 {designsHref ? <a href={designsHref} style={{ color: "var(--green)" }}>My Designs</a> : "My Designs"}
               </p>
             )}
           </div>

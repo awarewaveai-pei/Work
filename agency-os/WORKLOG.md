@@ -15,6 +15,36 @@
 - BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=進度只看本檔 §10|填進 §10 | hits=0（計畫內兩處已改指監工台）
 
 **rollback**：`git revert <本 commit>`；artifact 可在 claude.ai 刪除。
+## 2026-10-24（續14）三扇門共用前置（step-8 附卡 §2）：共用工作室不再呼叫門到不了的 API；`door.nav` 登記＋門外框選單；`useDoorHref`（Claude）
+
+**觸發**：主線 session 指派（附卡 `agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-8-doors-video-design-content.md` §2 S1／P1／helper，§6 D1、D-V、D-V2、D-V3）。
+
+**根因**：閘 3（`NA/lib/portal/__tests__/registry-code.test.ts`「a built door can reach every API its pages call」）掃門頁的靜態 import 閉包，而 ContentStudio、BannerStudio、MockupStudio、events 頁把員工限定呼叫寫在共用元件內（`/api/video/{generate,status,embed-to-wp}`、`/api/tools/script-forge`、`/api/ops/clients`、`/api/tools/printful/catalog`、`/api/tools/events/sync`），所以 runtime 隱藏按鈕仍會讓閘變紅。另外 `ProductDoor` 沒有 `nav`，多頁門沒辦法宣告子頁（ADR 018 §2 規則 3）。
+**不變量**：門頁 import 得到的共用元件裡，不出現門的 `doorApis()` 以外的 `/api` 字面量。員工限定的呼叫只放在 `*Staff.tsx`（或員工 `page.tsx`），由 props 注入；沒有注入的 prop 時，該控制項就不渲染。共用元件裡指向站內頁的連結一律經 `useDoorHref(staffHref)`：員工頁照原樣，門上對應 `door.nav` 登記的頁，沒有對應就回 null（把連結藏起來）。
+
+**改動**（`NA`＝`lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- S1：`NA/app/(shell)/tools/content/ContentStudio.tsx` 收 `video?: ContentVideoApi`；沒有它時不顯示「AI 影片」選項、不自動觸發，草稿還原時 ai-video 改成 none。新 `ContentStudioStaff.tsx`（三個 video 呼叫，保留 siteId，見續13）。`banner/BannerStudio.tsx` 收 `staff?: BannerStaffApi`（scriptForge、brandClients）；沒有時「文案生成」卡與品牌色選擇器不渲染（D-V2／D-V3）。新 `BannerStudioStaff.tsx`。`mockup/MockupStudio.tsx` 收 `loadCatalog?`；新 `MockupStudioStaff.tsx`（門上的型錄待附卡 D3 決定）。events：`page.tsx` 拆出共用 `EventsCalendar.tsx`（`sync?`），員工 `page.tsx` 只負責同步呼叫。三個員工 `page.tsx` 改 import `*Staff`。
+- D1：`NA/lib/portal/products.ts` 的 `tools/publish` 從 content 移到 studio 的 staffPaths（員工專用，不蓋門頁）。PublishWizard 沒有任何門頁 import，不需要拆。
+- P1：`products.ts` 新增 `DoorNavItem {path,name,staff}`、`ProductDoor.nav?`。`NA/app/ProductDoorShell.tsx` 收 `productKey`，從登記表讀 nav 交給 `DoorProvider`。新 `NA/app/DoorNav.tsx`（選單，兩種路徑寫法都標 active）。`globals.css` 加 `.door-nav*`。social／tarot／studio 的 layout 傳 productKey。
+- Helper：`NA/app/DoorContext.tsx` 的 context 改存門的 nav（null＝員工頁）。`useOnDoor` 行為不變，新增 `useDoorHref`、`useDoorNav` 與純函式 `doorHref`。BannerStudio 的 My Designs 連結改走 `useDoorHref`，作為第一個呼叫端。
+- 測試 `NA/lib/portal/__tests__/products.test.ts`：每個 nav 的 path 都要有 `app/<page>/<path>/page.tsx`，staff 必須屬於該產品的 staffPaths 而且有員工頁，已蓋好的門頁路徑不得等於任何 `(shell)` 員工頁路徑。`nav.staff` 是卡片沒寫的欄位：useDoorHref 要靠它從員工連結對應到門的連結，所以加上。
+
+**驗證結果**
+- `npx tsc --noEmit -p .` exit 0。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（NA 全套）| exit=1 | ms=18610（336 檔中 1 檔紅：registry-code「every route a built door serves authorizes its caller」→ `app/api/social/rewrite/route.ts`，來自另一 session 未提交的閘 5 收緊；HEAD 版 registry-code 對本工作樹只紅 `content/sources`（另一 session 正改的路由）；閘 3 兩版都綠；本改動沒碰任何 route）
+- REALTEST_EVIDENCE: tool=Bash | cmd=暫存 jsdom 測試把 HEAD 的 ContentStudio／BannerStudio／MockupStudio／events 頁跟新的員工包裝並排渲染（mock fetch）| exit=0 | ms=999（4 組 innerHTML 逐字相同、fetch 清單相同；門版本少的正好是 `/api/ops/clients`、printful catalog、同步鈕；暫存檔已刪）
+- REALTEST_EVIDENCE: tool=Bash | cmd=暫存 vitest 沿用閘 3 的 scan／importClosure，從 content、design、video 的共用元件出發算閉包 | exit=0 | ms=0（門到不了的呼叫 0 條；對照組以 *Staff 為根，列出剛好 7 條被搬走的呼叫；未計時）
+- 突變：studio 加假 nav（staff 指向 tools/content）→ products.test 紅「tools/content is not its staff path」；還原 → 11 測綠。
+- 瀏覽器畫面：next-admin-verify（:3901）需要真帳號登入，agent 不代填密碼，所以改用上面的 jsdom 逐字比對代替；操作者可以自己登入看 `/tools/content`、`/tools/banner`、`/tools/mockup`、`/tools/events`。
+- `/verify`（`scripts/verify-build-gates.ps1`）只有 system-health H2 紅，其餘全綠。H2 紅是既有的環境漂移，跟本改動無關：hook 正本已搬到 `mcp/claude-userlevel/hooks/rules/`，`~/.claude/hooks/` 還留著 23 份舊的頂層副本。本 commit 不動 hooks／settings。主線 session 指示照常 commit，並且不要跑 `sync-claude-userlevel`（那是操作者的設定）。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n -- Codex 全工作樹 `agency-os/reports/oracle/2026-10-24-review-96718953.md`（276KB packet、NO FINDINGS；本改動 14 個 source 檔都列在 files-reviewed 中；packet 也含其他 session 的改動）
+  - external oracle = Codex CLI (codex exec -s read-only), not self-description
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=ProductDoorShell|DoorProvider|useOnDoor|useDoorHref|from "./ContentStudio"|from "./BannerStudio"|from "./MockupStudio"|tools/publish | hits=32（ProductDoorShell 呼叫端 3 個 layout 都已傳 productKey；useOnDoor 在 StudioWorkbench 行為不變；`content/__tests__/ContentStudio.site-wiring.test.tsx` 不帶 props import ContentStudio，全套綠；`.next/types` 是建置產物；docs 提到 tools/publish 的地方沒有寫歸屬）
+
+**共用檔**：ContentStudio.tsx 只帶本 session 的 hunk。續13 的 siteId 一行落在本 session 的 video.generate hunk 內，照常保留。registry-code.test.ts 屬於另一 session，不在本 commit。
+
+**剩餘風險**：門頁還沒蓋，nav 測試目前只靠突變證明不是空轉，要等 design／content 門加 nav 才會真正跑到。門上 MockupStudio 沒有型錄，會顯示「無法載入 Printful 產品目錄」，等 D3 處理。
+**rollback**：`git revert <本 commit>`（只改前端與登記表，沒有 schema 或 route）。
 ## 2026-10-24（續13）AUTO_CONTENT P1：品牌聲音只剩一份（站別 content_defaults）；社群改寫、影片腳本讀伺服器品牌；ScriptForge 刪 sf_brand；by-id 站別 API 加租戶閘（Claude）
 
 **觸發**：操作者「去做」（計畫 `agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md` P1，`cfc6e08d7`）。

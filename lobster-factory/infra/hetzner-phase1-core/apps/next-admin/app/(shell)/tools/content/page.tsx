@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import ContentStudio from "./ContentStudio";
+import ContentStudioStaff from "./ContentStudioStaff";
 
 export const metadata = { title: "SEO Content Studio · Lobster Factory" };
 
@@ -11,7 +11,7 @@ export default function ContentPage() {
         <span className="topbar-env">AI-powered · publishes to WordPress draft</span>
       </div>
       <Suspense fallback={null}>
-        <ContentStudio />
+        <ContentStudioStaff />
       </Suspense>
     </>
   );
