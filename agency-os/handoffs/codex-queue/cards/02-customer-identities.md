@@ -43,3 +43,7 @@ From `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`:
 - Mutation (run once, then restore): remove the `23505` re-read in `linkIdentity` → `linking the same identity twice is a no-op` fails.
 
 Applying 0124 to prod is the operator's step (High), not this card's.
+
+## Decision made
+
+Yes: `0124_customer_identities.sql` drops `plans.woo_product_ids` (and the down file adds it back). Approved by the card author 2026-10-24; `plans` has 0 rows; applying to production is the operator's separate step, not this card's. No further confirmation needed.
