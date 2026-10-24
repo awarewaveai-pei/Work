@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import sharp from "sharp";
-import { MAX_CONVERSIONS, POST } from "./route";
+import { POST } from "./route";
+import { MAX_CONVERSIONS } from "../../../../../lib/studio/conversion-slots";
 
 // valid PNG base64 data URL input (200×200 solid block)
 async function pngDataUrl(): Promise<string> {

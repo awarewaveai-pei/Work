@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-24（續48）部署被擋：圖片處理路由匯出常數，Next.js 建置失敗；路由匯出加測試
+
+- **症狀**：操作者「全部上線」後跑 `sg-deploy.sh next-admin`，docker build 失敗：`Route "app/api/tools/image/process/route.ts" does not match the required types of a Next.js Route. "MAX_CONVERSIONS" is not a valid Route export field.`（`[2026-10-24T14:22:39Z] ERROR: docker build failed`）。正式站未受影響：失敗在換容器之前，`.deployed-commit` 仍是 `51a84b203`，`lobster-next-admin` healthy。不修的話今晚 03:00 自動部署同樣失敗。
+- **根因**：續42 的並發上限把 `MAX_CONVERSIONS` 從 route.ts `export` 給測試用。Next.js 路由檔只接受 HTTP 方法與 route segment config；`tsc --noEmit` 與 vitest 都看不到，只有 `next build` 會擋。
+- **不變量**：路由檔的值匯出只能是 Next.js 允許的名稱；共用值放 `lib/`。
+- **修法**：
+  - 新 `lib/studio/conversion-slots.ts`：`MAX_CONVERSIONS`、`takeConversionSlot()`／`releaseConversionSlot()`；route.ts 改用它，不再匯出常數；route.test.ts 從 lib 引用。
+  - 新 `app/__tests__/route-exports.test.ts`：以 TypeScript AST 讀每個 `app/**/route.ts` 的值匯出（宣告、export 清單、re-export；型別匯出略過），不在允許清單就紅。整類關掉：之後任何人在路由檔匯出常數，本機測試就擋，不必等到正式建置。
+- **驗證**：
+  - `npx vitest run app/__tests__/route-exports.test.ts app/api/tools/image`：19 passed。
+  - 突變：route.ts 加回 `export const MAX_CONVERSIONS = 2;` → 新測試紅（指名該檔與名稱）；還原綠。
+  - `next build`：在乾淨的 detached worktree（HEAD＋本修正 4 檔，不含其他 session 未提交的改動）跑：exit 0，81 秒（Compiled with warnings；唯一警告是 Windows 複製 standalone 時建立符號連結的 EPERM，屬建置環境）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx next build (clean detached worktree of HEAD + this fix) | exit=0 | ms=81000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=MAX_CONVERSIONS|conversion-slots | hits=8
+- ORACLE_WAIVED: 止血型建置修正，行為與續42 相同（同一個上限搬到 lib）；以突變＋真實 `next build` 取代跨模型審查。
+- **避免再發生**：`route-exports.test.ts`；本機驗證清單裡「改 route 檔」要求跑一次 `next build` 或這條測試。
 ## 2026-10-24（續46）員工逐工具權限 C2：身分帶工具、middleware 每頁每 API 判斷（預設 shadow 只記錄）（Claude）
 
 - **任務**：R0-PLAN §6 C2（`agency-os/handoffs/2026-10-24-staff-tool-grants/R0-PLAN.md`）。操作者 2026-10-24 交給本 session（「員工權限你去開一個session做」）；翻 enforce（C6.4）是 High，不在本卡。
