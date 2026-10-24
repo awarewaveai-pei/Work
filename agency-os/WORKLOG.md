@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-24（續50）next-admin 手動部署 eaca393e0（操作者「全部上線」）
+
+- **為什麼**：操作者要提前上線、不等 03:00 自動部署，並要其他 session 已推上 main 的改動一起上（「還有其他sessions的部署也一起推吧」）。
+- **範圍**：`51a84b203` → `eaca393e0`，next-admin 共 13 個 commit：員工權限 C1（`1b8096116`）、C2 只記錄模式（`3bb0cd120`）、塔羅門修正（`742acf6cf`）、建置修正（`2ae7da7bc`）、門左側選單（`f1a7c8693`）、ScriptForge 獨立頁（`f233bd101`）、內容 AI 審核自動發布（`f985992a2`，網站預設人工審核）、`/ops/schedules` 兩版（`f8ec57597`、`eaca393e0`）、健康檢查修正（`390b52625`）等。沒有新的 migration；沒有 `DEPLOY_HOLD`。
+- **第一次失敗**：docker build 擋在 `MAX_CONVERSIONS` 路由匯出（續48）；失敗在換容器前，正式站未受影響。修正 `2ae7da7bc` 後重跑。
+- **next-admin 以外**：`e90d8d13c`（n8n 密鑰移到 600 的 `.env`）已由原 session 在主機套用——`/root/n8n/.env` 600、20:58 建立；主機 `/root/n8n/docker-compose.yml` 與 repo `diff` exit 0。刪除的 Apache vhost 與 `deploy.sh` 屬已退租主機，無需部署。其他 session 未提交的工作目錄改動**未**部署。
+- **既有警告（未處理）**：`check-deploy-drift` 報 repo compose 比主機多 8 個 `META_*` 變數（`onlyInRepo`），非本次 commit 造成；compose 只能走 `safe-infra-patch.sh compose`。
+- **驗證**：
+  - `sg-deploy.sh next-admin`：healthy after 11s；HTTP smoke `/login` 200、`/api/ops/summary` 200、nginx/wordpress 200、node-api 200、nginx/api 200；exit 0。
+  - `docker ps`：`lobster-next-admin  Up (healthy)`，名稱正常；`.deployed-commit = eaca393e0`。
+  - `docker exec lobster-next-admin printenv STAFF_TOOLS_MODE` → exit 1（未設＝只記錄）；新容器 5 分鐘內無 error 記錄。
+  - `scripts/playwright-runner.ps1 -Mode smoke -SkipInstall`：26 passed、6 skipped、exit 0。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin + playwright-runner.ps1 -Mode smoke (26 passed, 6 skipped) | exit=0 | ms=32300
+- REVIEW_WAIVED: NA -- 部署操作，無程式改動；各 commit 的審查在各自條目
+- BUGHUNT_WAIVED: NA -- 部署操作，無程式改動
 ## 2026-10-24（續49）員工逐工具權限 C3：側欄、首頁、客戶中心分頁只顯示有權限的工具（Claude）
 
 - **任務**：R0-PLAN §6 C3（`agency-os/handoffs/2026-10-24-staff-tool-grants/R0-PLAN.md`）。接 C2（3bb0cd120），同一判斷 `lib/staff-access.ts`。
