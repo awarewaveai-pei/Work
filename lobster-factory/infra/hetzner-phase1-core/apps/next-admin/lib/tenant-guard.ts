@@ -120,6 +120,15 @@ export function assertOrgAccess(
   }
 }
 
+/**
+ * For a route (or one method of it) that acts on data no single organization owns -- a shared table, or one of our own
+ * services -- so no organization check can scope it: null for staff, a 403 Response for a customer, even where its
+ * product door serves the route. Usage: `const denied = staffOnly(req); if (denied) return denied;`
+ */
+export function staffOnly(req: Request | { headers: Headers }): Response | null {
+  return resolveTenant(req).userKind === "staff" ? null : toOrgAccessResponse(new OrgAccessError("forbidden: staff only"));
+}
+
 /** Thrown when a portal.aware-wave.com route is hit by a caller that is not a bound client. */
 export class PortalAccessError extends Error {
   readonly status = 403;

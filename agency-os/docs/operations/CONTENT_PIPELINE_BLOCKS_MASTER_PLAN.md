@@ -128,7 +128,7 @@
 |---|---|
 | google-news / reddit / ptt / serper | :246 / :261 / :279 / :307（serper `enabled:!!SERPER_API_KEY :312`，取代原 perplexity 即時 block）|
 | env 自訂 feed / DB 臨時源 / 彙整入口 runTrending | :342 / buildDbSearchBlocks:200 / :372 |
-| SSRF guard isSafePublicHttps | :77 |
+| SSRF guard isSafePublicHttps | `lib/content/public-https.ts:12`（2026-10-24 移出） |
 
 ### Route 管線（20 route，`app/api/content/*/route.ts`；幾乎全 production）
 | kind | route | file:line | 做什麼 | 外部依賴 |

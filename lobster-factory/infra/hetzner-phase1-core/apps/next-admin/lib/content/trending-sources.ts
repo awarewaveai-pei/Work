@@ -1,5 +1,6 @@
 import { CLAUDE_FAST_MODEL, claudeParams, loadAnthropic } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
+import { isSafePublicHttps } from "./public-https";
 /**
  * trending-sources.ts — 搜尋積木家族（kind:"search"）
  *
@@ -60,31 +61,6 @@ function decodeEntities(s: string): string {
   return s
     .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"').replace(/&#39;/g, "'");
-}
-
-/**
- * SSRF guard: https only, no internal/loopback/private hosts. Used for any
- * non-hardcoded (env / future DB-UI) feed URL.
- *
- * 限制：只比對 URL 字面 host，不解析 DNS → 擋不住 DNS rebinding。因此 env
- * CONTENT_TRENDING_FEEDS 視為「受信任營運者」輸入；未來開放任意使用者貼 feed 時，
- * 必須在 fetch 前加 DNS 解析後比對或 allowlist。
- */
-export function isSafePublicHttps(rawUrl: string): boolean {
-  let u: URL;
-  try { u = new URL(rawUrl); } catch { return false; }
-  if (u.protocol !== "https:") return false;
-  let h = u.hostname.toLowerCase();
-  if (h.startsWith("[") && h.endsWith("]")) h = h.slice(1, -1);  // 去 IPv6 中括號
-  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".internal")) return false;
-  if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(h)) return false;
-  if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(h)) return false;
-  if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(h)) return false;  // CGNAT 100.64/10
-  if (h === "::1") return false;
-  if (h.startsWith("fc") || h.startsWith("fd")) return false;            // ULA fc00::/7
-  if (h.startsWith("fe8") || h.startsWith("fe9") || h.startsWith("fea") || h.startsWith("feb")) return false; // link-local
-  if (h.includes("::ffff:")) return false;                              // IPv4-mapped
-  return true;
 }
 
 const MAX_FEED_BYTES = 2_000_000;

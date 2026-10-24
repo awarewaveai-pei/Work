@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { siteRowGate } from "@/lib/content/wp-sites";
+import { siteRowGate, siteUrlWriteGate } from "@/lib/content/wp-sites";
 import type { ManagedSite } from "@/app/api/content/sites/route";
 import type { SiteContentDefaults } from "@/lib/content/brand-voice";
 
@@ -27,7 +27,17 @@ export async function PATCH(
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (typeof body.name   === "string")  patch.name   = body.name.trim();
-  if (typeof body.url    === "string")  patch.url    = body.url.trim().replace(/\/$/, "");
+  if (typeof body.url    === "string") {
+    // The edit form always sends url; only a changed one goes through the staff-only gate.
+    const url = body.url.trim().replace(/\/$/, "");
+    const { data: current, error: readError } = await supabase.from("wp_sites").select("url").eq("id", id).maybeSingle();
+    if (readError) return NextResponse.json({ ok: false, error: readError.message }, { status: 500 });
+    if (url !== (current as { url: string } | null)?.url.replace(/\/$/, "")) {
+      const urlDenied = siteUrlWriteGate(req, url);
+      if (urlDenied) return urlDenied;
+      patch.url = url;
+    }
+  }
   if (typeof body.color  === "string")  patch.color  = body.color.trim();
   if (typeof body.active === "boolean") patch.active = body.active;
   if (typeof body.note     === "string")  patch.note     = body.note.trim() || null;

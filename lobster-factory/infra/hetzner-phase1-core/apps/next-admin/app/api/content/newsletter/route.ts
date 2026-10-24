@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { isBridgeConfigured, createNewsletter } from "@/lib/crm/fluentcrm";
 import { blockedChangeResponse } from "@/lib/system-modes/blocked-change";
+import { staffOnly } from "@/lib/tenant-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,6 +13,7 @@ export const dynamic = "force-dynamic";
 // RED LINE (governance, WP_BRIDGE_CONTROL_PLANE_DESIGN.md §I): draft only — NEVER schedules, NEVER
 // sends. This route creates the draft row and nothing else; the operator reviews recipients and
 // presses send manually in FluentCRM. We pass only content fields (title/subject/preview/body_html).
+// The bridge is our own (WPBRIDGE_*): there is no per-customer FluentCRM, so a customer on a product door gets 403.
 
 const MAX_MARKDOWN_BYTES = 600_000;
 
@@ -165,6 +167,8 @@ function buildTeaserHtml(opts: { title: string; excerpt: string; heroImage?: str
 export async function POST(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
+  const denied = staffOnly(req);
+  if (denied) return denied;
 
   if (!isBridgeConfigured()) {
     return NextResponse.json(

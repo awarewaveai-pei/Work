@@ -13,8 +13,8 @@
 | 「同一套契約、多個 registry」的既有慣例（自承） | [registry.ts:10-12](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/content/blocks/registry.ts) |
 | `BlockKind` union 全 repo **僅一處定義** | registry.ts:18 |
 | 既有 Signal 積木（已上線，本計畫**不碰**） | [trending-sources.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/content/trending-sources.ts) |
-| SSRF 閘：只驗字面 host | `isSafePublicHttps()`，trending-sources.ts:72-87 |
-| **`safeFetchText()` 未設 `redirect:"manual"`** → 302 可繞過 SSRF 閘 | trending-sources.ts:92-95 |
+| SSRF 閘：只驗字面 host | `isSafePublicHttps()`，lib/content/public-https.ts:12-27 |
+| **`safeFetchText()` 未設 `redirect:"manual"`** → 302 可繞過 SSRF 閘 | trending-sources.ts:68-71 |
 | Evidence 溯源模型（append-only + FORCE RLS） | [0004:117-126,179-181](../../../Projects/internal/hci30/database/migrations/0004_wave1_source_provenance_up.sql) |
 | **`hci.sources.source_ref` 無 unique 約束** → 以 URL upsert 需另一個 hci migration | `0001_wave1_synthetic_up.sql:94` |
 | hci schema 有 table-inventory drift 檢查（加表會被擋） | 0004:93-108, 205-220 |

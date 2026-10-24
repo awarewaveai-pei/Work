@@ -220,6 +220,12 @@
 
 > 已由 critic 驗證屬實、尚未修。優先於任何功能。
 
+- [ ] **客戶自助登記 WordPress 站（現在只限員工寫網址）的前置：站別網址的每個使用端都要能承受客戶給的網址**
+  - `🟠 未開始` · `2026-10-24` · `無卡點`（產品要開放客戶自加站時才做；內容門可先以「員工代登記」上線）
+  - **一句話**：`wp-sites.ts siteUrlWriteGate` 讓客戶不能新增站或改網址，因為存進 `wp_sites` 的網址會帶站的密碼被多處抓取，且沒有一處釘 IP 或依組織過濾。
+  - **下一步**：①`r2-delete-guard.ts findAssetReferences` 只掃該檔所屬組織的站；②`lib/payments/woo.ts bridgeSiteOrg` 與 `lib/studio/wp-bridge-client.ts` 的主機對照只認員工登記的列；③`0039` 的 `lower(url)` 全域唯一改為（組織, 網址）唯一（migration，High，要 go）；④publish、`sites/[id]/test`、wp-post 等 WP 請求改走 `lib/collect/net` 位址閘＋釘 IP（不跟隨未檢查的轉址）；完成後再放寬 `siteUrlWriteGate`。
+  - **證據**：WORKLOG 2026-10-24 續21（critic H1/M1/M2、Codex F1–F3）。
+
 - [ ] **Codex 佇列的驗收 check 在沙箱外跑 Codex 寫的程式**
   - `🟠 未開始` · `2026-10-24` · `無卡點`
   - **一句話**：`scripts/codex-continue.ps1` 在 Codex 沙箱外執行卡片的 check；Codex 改過的測試或 `package.json` lifecycle script 會在 Claude 審查前就在本機跑（COS 與 general 兩個佇列同一類）

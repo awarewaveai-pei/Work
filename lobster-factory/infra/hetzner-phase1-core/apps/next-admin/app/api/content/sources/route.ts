@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { isSafePublicHttps } from "@/lib/content/trending-sources";
+import { isSafePublicHttps } from "@/lib/content/public-https";
+import { staffOnly } from "@/lib/tenant-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,6 +11,8 @@ export const dynamic = "force-dynamic";
 // per trending request and run as ephemeral search blocks (trending-sources.ts buildDbSearchBlocks).
 // Service-role-only table; this route is the only accessor (ops-role gated). SSRF: url is validated
 // with isSafePublicHttps at insert time AND re-checked at fetch time — same posture as env feeds.
+// The table has no organization column: every tenant's trending reads it. A customer on a product door may read the
+// list; adding, editing and deleting are staff-only (step-8 card decision D2).
 
 // geos allowlist mirrors GEO_RSS keys in trending-sources.ts (built-in Google News regions).
 const VALID_GEOS = new Set(["TW", "HK", "SG", "US", "GB", "JP", "AU"]);
@@ -75,6 +78,8 @@ export async function GET(req: Request): Promise<Response> {
 export async function POST(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
+  const denied = staffOnly(req);
+  if (denied) return denied;
 
   const supabase = getSupabaseWriteClient();
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
@@ -107,6 +112,8 @@ export async function POST(req: Request): Promise<Response> {
 export async function PATCH(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
+  const denied = staffOnly(req);
+  if (denied) return denied;
 
   const supabase = getSupabaseWriteClient();
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
@@ -148,6 +155,8 @@ export async function PATCH(req: Request): Promise<Response> {
 export async function DELETE(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
+  const denied = staffOnly(req);
+  if (denied) return denied;
 
   const supabase = getSupabaseWriteClient();
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });

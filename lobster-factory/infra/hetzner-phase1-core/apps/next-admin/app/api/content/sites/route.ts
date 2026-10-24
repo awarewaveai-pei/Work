@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { getWpSites } from "@/lib/content/wp-sites";
-import { canAccessOrg } from "@/lib/tenant-guard";
+import { getWpSites, siteUrlWriteGate } from "@/lib/content/wp-sites";
+import { canAccessOrg, effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import type { SiteContentDefaults } from "@/lib/content/brand-voice";
 
 export const runtime = "nodejs";
@@ -101,9 +101,9 @@ export async function GET(req: Request): Promise<Response> {
     }
   }
 
-  // Fallback: env vars (read-only, shown as "env" source)
+  // Fallback: env vars (read-only, shown as "env" source). Env sites belong to no organization: a customer sees none.
   const { sites: envSites } = await getWpSites();
-  const sites: ManagedSite[] = envSites.map(s => ({
+  const sites: ManagedSite[] = envSites.filter(s => canAccessOrg(req, s.organizationId)).map(s => ({
     ...s,
     active: true,
     tokenSet: true,
@@ -136,13 +136,17 @@ export async function POST(req: Request): Promise<Response> {
   if (!url)      return NextResponse.json({ ok: false, error: "url required" }, { status: 400 });
   if (!username) return NextResponse.json({ ok: false, error: "username required" }, { status: 400 });
   if (!token)    return NextResponse.json({ ok: false, error: "Application Password required" }, { status: 400 });
-  if (!/^https?:\/\//i.test(url))
-    return NextResponse.json({ ok: false, error: "url 必須以 http:// 或 https:// 開頭" }, { status: 400 });
+  const urlDenied = siteUrlWriteGate(req, url);
+  if (urlDenied) return urlDenied;
+  // Staff may name the owning organization or leave the site unassigned (effectiveOrgId checks it is a uuid).
+  let organizationId: string | null;
+  try { organizationId = effectiveOrgId(req, typeof body.organizationId === "string" ? body.organizationId : null); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
   const { data, error } = await supabase
     .from("wp_sites")
-    .insert({ name, url, username, token, color, note, active: true })
-    .select("id, name, url, color, active, note, created_at")
+    .insert({ name, url, username, token, color, note, active: true, organization_id: organizationId })
+    .select("id, name, url, color, active, note, created_at, organization_id")
     .single();
 
   if (error) {
@@ -150,7 +154,7 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ ok: false, error: msg }, { status: 409 });
   }
 
-  const row = data as { id: string; name: string; url: string; color: string; active: boolean; note: string | null; created_at: string };
+  const row = data as { id: string; name: string; url: string; color: string; active: boolean; note: string | null; created_at: string; organization_id: string | null };
   const site: ManagedSite = {
     id: row.id,
     name: row.name,
@@ -162,6 +166,7 @@ export async function POST(req: Request): Promise<Response> {
     note: row.note,
     source: "db",
     createdAt: row.created_at,
+    organization_id: row.organization_id,
   };
   return NextResponse.json({ ok: true, site }, { status: 201 });
 }

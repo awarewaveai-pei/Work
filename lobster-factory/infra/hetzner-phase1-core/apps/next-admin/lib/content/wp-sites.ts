@@ -1,5 +1,5 @@
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { assertOrgAccess, canAccessOrg } from "@/lib/tenant-guard";
+import { assertOrgAccess, canAccessOrg, staffOnly } from "@/lib/tenant-guard";
 
 export interface WpSite {
   id: string;
@@ -159,4 +159,17 @@ export async function siteRowGate(req: Request | { headers: Headers }, siteId: s
   return canAccessOrg(req, (data as { organization_id: string | null }).organization_id)
     ? null
     : Response.json({ ok: false, error: "forbidden: org mismatch" }, { status: 403 });
+}
+
+/**
+ * Who may put a URL into wp_sites (POST /api/content/sites, a PATCH that changes url): staff only, a customer gets the
+ * 403. Every stored URL is fetched with the site's credentials by code that neither pins the address nor scopes by
+ * organization -- publish, the connection test, the R2 reference scan over all sites (r2-delete-guard.ts), the bridge
+ * host map (lib/payments/woo.ts bridgeSiteOrg) -- and lower(url) is unique across organizations (0039). Customer
+ * self-service sites need all of those closed first (TASKS.md). null = the caller may write this URL.
+ */
+export function siteUrlWriteGate(req: Request | { headers: Headers }, url: string): Response | null {
+  const denied = staffOnly(req);
+  if (denied) return denied;
+  return /^https?:\/\//i.test(url) ? null : Response.json({ ok: false, error: "url 必須以 http:// 或 https:// 開頭" }, { status: 400 });
 }

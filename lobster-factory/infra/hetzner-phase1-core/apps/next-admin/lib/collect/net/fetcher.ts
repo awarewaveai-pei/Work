@@ -295,7 +295,8 @@ export function createCollectFetch(opts: CollectFetchOptions) {
           return pointer;
         }
         if (!location) throw new CollectFetchError(`redirect_without_location_${res.status}`, "http", res.status);
-        current = new URL(location, current).toString(); // relative Location headers are legal
+        try { current = new URL(location, current).toString(); } // relative Location headers are legal
+        catch { throw new CollectFetchError(`redirect_bad_location_${res.status}`, "http", res.status); }
         log(`redirect ${res.status} -> ${current}`);
         continue; // and the gate runs again for this new URL
       }

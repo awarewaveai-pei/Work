@@ -28,7 +28,10 @@ function sources(dir: string): string[] {
 
 // apis: every "/api/..." literal (registry tables included); calls: only those passed to a call or `new`, or set as a
 // JSX attribute -- what a page actually requests. Type-only imports are erased at build, so they are not imports.
-interface Scan { asked: string[]; apis: string[]; calls: string[]; imports: string[]; meters: boolean }
+// called: "<module>#<name>" for each function imported by name and called in the file (`import { a as b }; b()` is a).
+// db: the file itself opens a database client (a value import of a database driver).
+interface Scan { asked: string[]; apis: string[]; calls: string[]; called: string[]; db: boolean; imports: string[]; meters: boolean }
+const DB_DRIVERS = new Set(["@supabase/supabase-js", "@supabase/ssr", "pg", "postgres"]);
 const unwrap = (n: ts.Node | undefined): ts.Node | undefined =>
   n && (ts.isParenthesizedExpression(n) || ts.isAsExpression(n) || ts.isSatisfiesExpression(n) || ts.isNonNullExpression(n) || ts.isTypeAssertionExpression(n)) ? unwrap(n.expression) : n;
 const apiText = (node: ts.Node | undefined) => {
@@ -42,14 +45,25 @@ const typeOnly = (n: ts.ImportDeclaration | ts.ExportDeclaration) => ts.isExport
     && n.importClause.namedBindings.elements.every((e) => e.isTypeOnly)));
 function scan(file: string, text: string): Scan {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, /\.tsx$/.test(file) ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
-  const out: Scan = { asked: [], apis: [], calls: [], imports: [], meters: false };
+  const out: Scan = { asked: [], apis: [], calls: [], called: [], db: false, imports: [], meters: false };
+  const bindings: Array<{ mod: string; name: string; local: string }> = [];
+  const callees = new Set<string>();
   const spec = (s: string) => {
     const r = s.startsWith("@/") ? s.slice(2) : s.startsWith(".") ? path.posix.normalize(path.posix.join(path.posix.dirname(file), s)) : null;
     if (r) out.imports.push(r);
+    return r;
   };
   const visit = (n: ts.Node) => {
-    if ((ts.isImportDeclaration(n) || ts.isExportDeclaration(n)) && n.moduleSpecifier && ts.isStringLiteralLike(n.moduleSpecifier) && !typeOnly(n)) spec(n.moduleSpecifier.text);
-    if (ts.isCallExpression(n) || ts.isNewExpression(n)) for (const a of n.arguments ?? []) { const u = apiText(a); if (u) out.calls.push(u); }
+    if ((ts.isImportDeclaration(n) || ts.isExportDeclaration(n)) && n.moduleSpecifier && ts.isStringLiteralLike(n.moduleSpecifier) && !typeOnly(n)) {
+      const r = spec(n.moduleSpecifier.text);
+      if (DB_DRIVERS.has(n.moduleSpecifier.text)) out.db = true;
+      const b = ts.isImportDeclaration(n) ? n.importClause?.namedBindings : undefined;
+      if (r && b && ts.isNamedImports(b)) for (const e of b.elements) if (!e.isTypeOnly) bindings.push({ mod: r, name: (e.propertyName ?? e.name).text, local: e.name.text });
+    }
+    if (ts.isCallExpression(n) || ts.isNewExpression(n)) {
+      for (const a of n.arguments ?? []) { const u = apiText(a); if (u) out.calls.push(u); }
+      if (ts.isIdentifier(n.expression)) callees.add(n.expression.text);
+    }
     if (ts.isJsxAttribute(n) && n.initializer) {
       const u = apiText(ts.isJsxExpression(n.initializer) ? n.initializer.expression : n.initializer);
       if (u) out.calls.push(u);
@@ -69,6 +83,7 @@ function scan(file: string, text: string): Scan {
     ts.forEachChild(n, visit);
   };
   visit(source);
+  out.called = bindings.filter((b) => callees.has(b.local)).map((b) => `${b.mod}#${b.name}`);
   return out;
 }
 
@@ -220,34 +235,76 @@ describe("registry claims match the code", () => {
   });
 
   // ADR 018 §2 開門規則 2: every route a door serves decides who the caller may see -- by organization
-  // (lib/tenant-guard) or by brand (lib/social/authz) -- itself or through what it imports. The billing subject
-  // (lib/entitlements/grant) counts only for a route that reads no database: it says who pays, not what may be read.
-  // A staff role check (lib/ops-role) is not organization scoping, so the walk stops there.
-  // This catches a route that forgot authorization, not one that imports it and skips it: opening a door also means
-  // reading each route's data path (WORKLOG of that door).
-  const AUTHORIZERS = ["lib/tenant-guard.ts", "lib/social/authz.ts"];
+  // (lib/tenant-guard) or by brand (lib/social/authz). A route that reads the database makes that decision itself: it
+  // imports, by name, one of the AUTHORIZERS functions below and calls it. A guard module reached through some other
+  // import does not count -- r2-delete-guard reaches tenant-guard through wp-sites, grant.ts through its billing subject, and
+  // neither decides what the route reads (the presets hole, step-8 card P2). A route that reads no database may lean
+  // on what it imports, or on the billing subject (lib/entitlements/grant): it says who pays, and nothing is read.
+  // This catches a route that forgot authorization, not one that calls it and ignores the answer: opening a door also
+  // means reading each route's data path (WORKLOG of that door).
+  /** Module -> its functions that decide what a caller may act on. Beyond the two guards, each is a library seam that
+   *  calls them before it reads or writes, read for it. */
+  const AUTHORIZERS: Readonly<Record<string, readonly string[]>> = {
+    "lib/tenant-guard.ts": ["assertOrgAccess", "canAccessOrg", "effectiveOrgId", "requireClientOrg", "staffOnly"],
+    "lib/social/authz.ts": ["actorFor", "callerOf", "requireBrandRole", "requireStaffForNewChannel"],
+    "lib/content/wp-sites.ts": ["listAccessibleWpSites", "resolveWpSite", "siteRowGate"], // canAccessOrg / assertOrgAccess on the site's organization
+    "lib/content/social-org.ts": ["resolveSocialOrg"],                        // assertOrgAccess on the named organization
+    "lib/content/publish/wordpress-core.ts": ["publishToWordPress"],          // resolveWpSite before it reads a credential
+    "lib/content/syndicate.ts": ["syndicateHandler"],                         // its one read, siteVoiceFor, checks the site's organization
+    "lib/content/video/timeline-remotion-request.ts": ["prepareTimelineRemotionRequest"], // assertOrgAccess, then reads that org's assets
+  };
+  // What a route reaches that is not its own data: the role check, the caller's own grant (who it is, what it may use,
+  // and runtime.ts, the store can() reads for that subject), the AI call log. Other lib/entitlements files are data
+  // (tables.ts billingOverview: every organization's billing).
+  const NOT_ROUTE_DATA = new Set(["lib/ops-role.ts", "lib/ai/log-ai-call.ts",
+    ...["grant", "can", "subject", "runtime"].map((f) => `lib/entitlements/${f}.ts`)]);
   const STOP_AT = new Set(["lib/ops-role.ts"]);
   const BILLING = "lib/entitlements/grant.ts";
-  // the route's own data access, not the entitlement store grant.ts reads on its behalf
-  const readsDb = (r: string) => importClosure([r], new Set([...STOP_AT, BILLING])).has("lib/supabase-server.ts");
+  const readsDb = (r: string) => [...importClosure([r], NOT_ROUTE_DATA)].some((f) => !NOT_ROUTE_DATA.has(f) && FILES.get(f)!.db);
+  const decidesItself = (r: string) => FILES.get(r)!.called.some((b) => {
+    const [m, name] = b.split("#");
+    const f = resolve(m);
+    return !!f && (AUTHORIZERS[f] ?? []).includes(name);
+  });
   // Routes a door serves that read no organization's data, each read for it; listed in place of an authorizer.
   const ORG_FREE_ROUTES: Readonly<Record<string, string>> = {
     "app/api/tools/events/upcoming/route.ts": "shared holiday table `events`, no organization column",
     "app/api/tools/studio/proxy-image/route.ts": "streams only public designs-bucket objects (exact-host allowlist)",
     "app/api/tools/studio/mockup/route.ts": "Printful mockup (free) from the request image and the public catalog; uploads that image to the shared public designs bucket and shares the Printful store quota",
+    "app/api/content/seo-check/route.ts": "scores the article in the request body (lib/content/quality/seo-check-core.ts); no database, no stored data",
+    "app/api/content/brand-voice/route.ts": "analyses the pasted sample, or a page fetched through lib/collect/net/remote-file (no internal host); stores nothing",
+    "app/api/content/trending/route.ts":"public news feeds plus the shared content_sources table (no organization column; customers read it, only staff write it, content/sources/route.ts)",
   };
   const routesUnder = (prefix: string) => [...FILES.keys()].filter((f) => isRoute(f) && (f.startsWith(`app${prefix}/`)));
-  const authorizes = (r: string) => r in ORG_FREE_ROUTES || AUTHORIZERS.some((a) => importClosure([r], STOP_AT).has(a))
-    || (!readsDb(r) && importClosure([r], STOP_AT).has(BILLING));
+  const authorizes = (r: string) => r in ORG_FREE_ROUTES || decidesItself(r)
+    || (!readsDb(r) && [BILLING, ...Object.keys(AUTHORIZERS)].some((a) => importClosure([r], STOP_AT).has(a)));
   it("every route a built door serves authorizes its caller", () => {
     for (const p of builtDoors()) {
       expect([...new Set(doorApis(p).flatMap(routesUnder))].filter((r) => !authorizes(r)), `${p.key} door`).toEqual([]);
     }
-    const served = new Set(builtDoors().flatMap((p) => doorApis(p).flatMap(routesUnder)));
+    // Any declared door, built or not: a door's routes are made safe before its page is built.
+    const declared = new Set(nextAdminProducts().flatMap((p) => doorApis(p).flatMap(routesUnder)));
     for (const [r, why] of Object.entries(ORG_FREE_ROUTES)) {
-      expect(served.has(r), `${r}: listed but no built door serves it`).toBe(true);
+      expect(declared.has(r), `${r}: listed but no door serves it`).toBe(true);
       expect(why.trim().length, r).toBeGreaterThan(0);
     }
+  });
+
+  it("an authorizer is a function its module exports, imported by name; a guard reached through another import is not", () => {
+    for (const [f, names] of Object.entries(AUTHORIZERS)) {
+      const text = readFileSync(path.join(ROOT, f), "utf8");
+      for (const n of names) expect(new RegExp(`export (?:async )?(?:function|const) ${n}\\b`).test(text), `${f} ${n}`).toBe(true);
+    }
+    const r = "app/api/x/route.ts";
+    const judged = (text: string) => { FILES.set(r, scan(r, text)); return authorizes(r); };
+    const db = 'import { getSupabaseWriteClient } from "@/lib/supabase-server";';
+    try {
+      expect(judged(`import { getWpSites } from "@/lib/content/wp-sites"; import { OrgAccessError } from "@/lib/tenant-guard"; ${db} getWpSites();`)).toBe(false);
+      expect(judged(`import { effectiveOrgId as orgOf } from "@/lib/tenant-guard"; ${db}`)).toBe(false);          // imported, never called
+      expect(judged(`import { effectiveOrgId as orgOf } from "@/lib/tenant-guard"; ${db} orgOf(req, null);`)).toBe(true);
+      expect(judged('import { createClient } from "@supabase/supabase-js"; import { withFeature } from "@/lib/entitlements/grant";')).toBe(false);
+      expect(judged('import { withFeature } from "@/lib/entitlements/grant"; import { billingOverview } from "@/lib/entitlements/tables";')).toBe(false);
+    } finally { FILES.delete(r); }
   });
 
   // A library grantFor with no request scope is judged for the internal account as `system` (lib/entitlements/grant.ts),
@@ -264,7 +321,6 @@ describe("registry claims match the code", () => {
     "app/api/internal/schedules/run-due/route.ts": "each due job runs for its client org (lib/schedules/jobs.ts runCollection({ organizationId })); KB ingest embeds for that org",
     "app/api/internal/collect/runs/execute/route.ts": "Cognitive OS research run for a project, no client org on the request: collect.fetch bills internal (lib/collect/run.ts runResearchCollection)",
     // reach paid code only through an import; the handler runs no paid call
-    "app/api/content/sources/route.ts": "imports isSafePublicHttps from trending-sources; CRUD on trending source rows",
     "app/api/internal/cognitive-os/import-project-sources/route.ts": "reads KB sources (@/lib/kb barrel) and sends them to our own Cognitive OS",
     "app/api/ops/clients/[slug]/cognitive-os-import/route.ts": "reads KB sources (@/lib/kb barrel) and sends them to our own Cognitive OS",
     "app/api/ops/clients/[slug]/hci-import/route.ts": "reads KB sources (@/lib/kb barrel) and sends them to our own HCI service",
@@ -298,17 +354,21 @@ describe("registry claims match the code", () => {
     for (const prefix of PLATFORM_APIS) {
       const routes = routesUnder(prefix);
       expect(routes.length, prefix).toBeGreaterThan(0);
-      for (const r of routes) expect(r in ORG_FREE_ROUTES || importClosure([r], STOP_AT).has("lib/tenant-guard.ts"), r).toBe(true);
+      for (const r of routes) expect(authorizes(r), r).toBe(true);
     }
   });
 
   it("the scanner sees literal asks, URLs in templates, and keys in an imported file", () => {
     const s = scan("lib/x/a.ts", 'import { g } from "@/lib/tarot/b"; await grantFor("studio.image"); fetch(`/api/tools/studio/x?y=${1}`); const s = "/api/social/";');
-    expect(s).toEqual({ asked: ["studio.image"], apis: ["/api/tools/studio/x", "/api/social"], calls: ["/api/tools/studio/x"], imports: ["lib/tarot/b"], meters: false });
+    expect(s).toEqual({ asked: ["studio.image"], apis: ["/api/tools/studio/x", "/api/social"], calls: ["/api/tools/studio/x"], called: [], db: false, imports: ["lib/tarot/b"], meters: false });
+    expect(scan("lib/x/a.ts", 'import { g as h, k } from "@/lib/b"; import type { C } from "@supabase/supabase-js"; h(); k;').called).toEqual(["lib/b#g"]);
+    expect(scan("lib/x/a.ts", 'import type { C } from "@supabase/supabase-js";').db).toBe(false);
+    expect(scan("lib/x/a.ts", 'import { createClient } from "@supabase/supabase-js";').db).toBe(true);
     expect(scan("lib/x/m.ts", "void grant.recordUse({}); recordUse();").meters).toBe(true);
     expect(scan("lib/x/m.ts", "recordUse(); // grant.recordUse()").meters).toBe(false);
     const j = scan("app/x/p.tsx", 'import type { T } from "@/lib/a"; import { type U } from "@/lib/b"; import { v, type W } from "@/lib/c"; require("@/lib/d"); const f = <form action="/api/a/b" />; new EventSource(`/api/c/${1}`); fetch(("/api/e" as const)); const tbl = ["/api/d"];');
     expect(j.imports).toEqual(["lib/c", "lib/d"]);
+    expect(j.called).toEqual([]);
     expect(j.calls).toEqual(["/api/a/b", "/api/c", "/api/e"]);
     expect(scan("lib/x/a.ts", 'grant("studio.image"); x.grantFor("studio.image"); // grantFor("cs.answer")').asked).toEqual([]);
   });

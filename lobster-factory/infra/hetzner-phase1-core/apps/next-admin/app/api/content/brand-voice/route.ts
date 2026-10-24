@@ -4,6 +4,7 @@ import type { Grant } from "@/lib/entitlements/can";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { logAiCall } from "@/lib/ai/log-ai-call";
+import { fetchRemoteFile, RemoteFileError } from "@/lib/collect/net/remote-file";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,19 +20,30 @@ export interface BrandVoiceProfile {
   promptInjection: string;
 }
 
-async function fetchUrlText(url: string): Promise<string> {
+// The person's own page, fetched through collect's fetcher (address gate on every redirect hop, the connection pinned
+// to the checked address): a pasted URL never reaches an internal host. https only, ports 80/443, at most 2 MB.
+const URL_REFUSED: Record<RemoteFileError["reason"], string> = {
+  refused: "網址必須是公開的 https 網址", unreachable: "網址讀取失敗", not_found: "網址找不到頁面",
+  too_large: "頁面超過 2 MB", wrong_type: "網址不是網頁",
+};
+async function fetchUrlText(url: string): Promise<{ text: string } | { error: string }> {
+  let bytes: Uint8Array;
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return "";
-    const html = await res.text();
-    return html
-      .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .replace(/<style[\s\S]*?<\/style>/gi, "")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s{2,}/g, " ")
-      .trim()
-      .slice(0, 5000);
-  } catch { return ""; }
+    ({ bytes } = await fetchRemoteFile(url, {
+      maxBytes: 2_000_000, timeoutMs: 8000, accept: (t) => t.startsWith("text/") || t === "application/xhtml+xml",
+    }));
+  } catch (e) {
+    if (e instanceof RemoteFileError) return { error: URL_REFUSED[e.reason] };
+    throw e;
+  }
+  const text = new TextDecoder().decode(bytes)
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .slice(0, 5000);
+  return { text };
 }
 
 export const POST = withFeature("content.brand-voice", handlePost);
@@ -51,7 +63,9 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
   // Fetch URL if provided
   const url = (typeof body.url === "string" ? body.url : "").trim();
   if (!sampleText && url && /^https?:\/\//.test(url)) {
-    sampleText = await fetchUrlText(url);
+    const page = await fetchUrlText(url);
+    if ("error" in page) return NextResponse.json({ ok: false, error: page.error }, { status: 400 });
+    sampleText = page.text;
   }
 
   if (!sampleText || sampleText.length < 50) {

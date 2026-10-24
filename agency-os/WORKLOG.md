@@ -1,4 +1,51 @@
 # Worklog
+## 2026-10-24（續21）門前路由授權：presets／content 路由補租戶與員工閘、客戶不得寫站別網址、brand-voice SSRF 走固定位址抓取、閘 5 要求「讀 DB 的路由自己 import 並呼叫授權函式」（Claude）
+
+**觸發**：主線 session 派工（第 8 項附卡 `agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-8-doors-video-design-content.md` §4.5 D-R1、§5.5 C-R1…C-R6、§2 P2；決策 D2）。video 門 `dependsOn:["content"]` 會連帶開放全部 `/api/content/*`，所以要在 video／design／content 門頁蓋好前關掉。
+
+**根因**：這些路由在客戶上門前只服務員工（員工本就跨租戶），授權寫成「角色閘」不是「組織閘」；客戶身分在 `lib/ops-role.ts:50` 固定為 operator，角色閘全放行。閘 5（`registry-code.test.ts`）用 import 閉包找 `tenant-guard`：`presets → r2-delete-guard → wp-sites → tenant-guard`、`grant.ts → subject.ts → tenant-guard` 都算「有授權」→ 假陽性。
+**不變量**：①門上可達、會讀 DB 的路由，自己 import 並呼叫一個決定「呼叫者可動誰的資料」的函式（`tenant-guard` 的 `assertOrgAccess/effectiveOrgId/canAccessOrg/requireClientOrg/staffOnly`、`social/authz`、或登記的 library seam），否則列 `ORG_FREE_ROUTES` 附理由。②無組織欄的共用資料或我們自己的服務 → `staffOnly`。③`wp_sites.url` 只有員工能寫：存進去的網址會帶站的密碼被多處抓取（publish、連線測試、wp-post、`r2-delete-guard.ts` 掃全部站、`lib/payments/woo.ts bridgeSiteOrg` 主機對照），沒有一處釘 IP 或依組織過濾，且 `0039` 的 `lower(url)` 全域唯一——在唯一入口關掉，而不是逐一補使用端。
+
+**改動**（`NA`＝`lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- C1 `NA/lib/tenant-guard.ts` 新 `staffOnly(req)`：客戶回 403 Response，員工 null。
+- C2 D-R1 `NA/app/api/tools/presets/route.ts`：GET／POST／DELETE 一律 `presetOrg()`＝`effectiveOrgId`；POST 記 `created_by`（客戶 = middleware `x-ops-user-id`）；客戶只刪自己建的（同 `tools/designs/route.ts:342-345`）。
+- C3 C-R3 `content/sources/route.ts` POST／PATCH／DELETE `staffOnly`（D2 客戶唯讀）。未改成 `canWriteTenantConfig`：D2 的目的是客戶唯讀，換角色閘會順手拿走員工 operator 的權限。
+- C4 C-R4 `newsletter/route.ts`（我們自己的 FluentCRM）、`social-admin/integrations/route.ts`（全部組織的 Postiz 頻道）：`staffOnly`。
+- C5 C-R2 `wp-sites.ts siteUrlWriteGate()`：新增站與 PATCH 改網址只限員工（不變量③）；編輯表單送回原網址時不擋。`sites/route.ts` POST `organization_id: effectiveOrgId(...)`；GET env 備援過濾 `canAccessOrg`（env 站無組織，客戶看不到）。C-R1（`siteRowGate`）已由 AUTO_CONTENT session `7d8d618a4` 落地。客戶自助登記站的前置開 TASKS。
+- C6 C-R5 `brand-voice/route.ts`：抓樣本網址走 `lib/collect/net/remote-file.ts fetchRemoteFile`（每跳過位址閘、連線釘在檢查過的 IP），失敗回原因（不再顯示誤導的「需要至少 50 字」）。卡片原寫法只套 `isSafePublicHttps`，擋不住 302 轉內網與 DNS rebinding（`lib/collect/net/ssrf.ts:1-21`）。`lib/collect/net/fetcher.ts` 轉址 `Location` 無法解析 → `CollectFetchError`（原為未捕捉 TypeError → 500，Codex F4）。
+- C7 `isSafePublicHttps` 搬到 `NA/lib/content/public-https.ts`（sources 不必 import 整個 trending／AI 堆疊；因此刪 `UNSCOPED_ROUTES` 的 sources 列），並補擋 `localhost.`（結尾點）、單段名稱（Docker 服務名）、`.local`、multicast／保留段、`[::]`、NAT64 `64:ff9b::`（critic L1、Codex F2）。
+- C8 `video/workbench/bootstrap/route.ts`：`resolveTenant` 手寫過濾改 `effectiveOrgId`（同結果，未綁組織的客戶改為 403，不再查假 UUID）；`resolveTenant` 只讀 header，已從授權函式表移除。
+- C9 P2 閘 5（`registry-code.test.ts`）：scanner 記錄「按名 import 且在檔內呼叫」（`called`）與「直接 import 資料庫驅動」（`db`）；`AUTHORIZERS` = 模組→授權函式（兩個 guard + seam：`wp-sites`、`social-org`、`publish/wordpress-core`、`syndicate`、`video/timeline-remotion-request`，各自讀過、在讀取前檢查）；`readsDb` = 閉包內任何檔開資料庫客戶端，只略過 ops-role、AI 呼叫記錄、呼叫者自己的權限（`entitlements/{grant,can,subject,runtime}`；`tables.ts` 等仍算資料）；`ORG_FREE_ROUTES` 新增 seo-check、trending、brand-voice，過期檢查改「任一宣告的門」；平台 API 測試共用 `authorizes()`；合成用例：只 import 模組其他 helper、import 但不呼叫、直接 `createClient`、`billingOverview` 都判不過。
+- C10 文件 file:line 指向搬家後位置：`agency-os/docs/data-collection/DATA_COLLECTION_PLAN.md:16-17`、`agency-os/docs/operations/CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md:131`。
+
+**模擬**（暫時把閘 5 套到全部宣告的門）：content、design 門 0 條紅；video 只剩卡片 V4／V5 的 `capabilities`、`cleanup`、`qa/report`、`remotion-status`；outreach `gmail/oauth/callback`（與本卡無關）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd NA && npx vitest run (throwaway worktree D:\tmp\mut-door-routes2 = HEAD 1450c0d67 + 本次檔案) | exit=0 | ms=28169
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd NA && npx tsc --noEmit -p . (same worktree) | exit=0 | ms=101269
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scratchpad/mutate3.py（Codex 第 2 輪後的 2 個新守衛：IPv6 允許清單、PATCH 網址比對正規化；目標檔只有本次改動，原地跑、byte 還原）| exit=0 | ms=2925
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd NA && npx vitest run lib/content app/api/content lib/portal app/api/tools/presets app/api/video/workbench && npx tsc --noEmit -p .（第 3 輪修正後；60 檔 349 測試）| exit=0 | ms=8777
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scratchpad/mutate2.py（21 個突變，每個守衛一個）| exit=0 | ms=37987
+  - 21/21 拔守衛 → 指名測試紅；還原後 19 檔 122 測試綠、檔案 byte 相同。第一次全套有 1 條 `app/api/social/__tests__/routes.test.ts` 5 秒逾時（同時 tsc 跑 101 秒），單獨重跑 26/26 綠、全套重跑 340 檔綠；該檔不在本次改動內。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/4m/2n
+  - critic agent 初判 fail：H1 r2-delete-guard 掃全部站、M1 bridge 主機對照、M2 全域唯一網址 → 皆源自「客戶能寫 wp_sites.url」，以 C5 `siteUrlWriteGate` 在入口關整類；M3 閘 5 假陰性 (a) entitlements 全略過 (b) 直接 createClient (c) resolveTenant → C9 修、合成用例守；L1 → C7；L2 brand-voice 誤導訊息與 http → C6 回原因（http 不再接受：樣本頁走固定位址抓取只收 https）。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/9m/0n
+  - 外部 oracle = Codex CLI：`agency-os/reports/oracle/2026-10-24-partialreview-923586a3.md`（6：F1–F3 同 critic H1 類 → C5；F4 轉址 Location → C6；F5 import 未呼叫 → C9 `called`；F6 ORG_FREE 白名單 = 設計，讀過才列）、`-6cf9d299.md`（3：F1 IPv6 multicast → C7 改允許清單；F2 舊列網址帶結尾斜線 → PATCH 比對正規化；F3 同名區域函式遮蔽 = 靜態掃描限制，閘擋「忘記」不擋「刻意規避」）、`-a2ee6e8b.md`（0）。
+  - 不變量分析（同一 reviewer 對 `isSafePublicHttps` 連報 2 次）：字面 host 檢查永遠列舉不完非公開寫法；真正的保護是解析後釘 IP（`lib/collect/net`），客戶面抓取已全走它；`isSafePublicHttps` 只守員工輸入的 feed 網址。故 IPv6 改允許清單（2000::/3），不再逐一列舉前綴（也修掉 `fc`/`fd` 前綴誤擋 `fdic.gov` 這類網域）。
+- ORACLE_WAIVED: whole-repo oracle 不適用——共用工作樹含其他 session 未提交改動；本次檔案以 `-Path` 三輪 partialreview 審過（上列三份），最後一輪晚於最後改檔。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=isSafePublicHttps | hits=13（2 份文件 file:line 過期 → C10；`0039`/`0042` migration 註解為歷史不改；其餘正確）
+- BUGHUNT_DONE: scope=lobster-factory | grep=siteUrlWriteGate|staffOnly\(|presetOrg | hits=19（10 檔：本次定義、呼叫點與測試；`lib/__tests__/ops-role-client.test.ts:22` 是既有迴圈變數同名，無關）
+- BUGHUNT_SCOPE_NARROW: .claude 未涉及（改動不碰 commands／hooks）；scripts 只在 isSafePublicHttps 一項掃過
+
+**剩餘風險**
+- 客戶在門上不能新增站或改站網址（員工代登記）。開放自助需先做 TASKS「客戶自助登記 WordPress 站…的前置」4 項（含一個 migration，High）。
+- 員工登記的站，publish／連線測試／wp-post 對其網址仍用一般 `fetch`（未釘 IP、跟隨轉址）——同一 TASKS 項 ④。
+- 閘 5 抓「忘記授權」，不抓「呼叫了但忽略結果」；`ORG_FREE_ROUTES` 是讀過才列的白名單（Codex F6：設計如此）。
+- 閘 5 只對已蓋門頁生效；video 門頁蓋好時 V4／V5 四條會紅（卡片既有項）。
+
+- `/verify` H2 紅是既有 `~/.claude/hooks` 漂移（SSOT 已搬到 `mcp/claude-userlevel/hooks/rules/`），與本次無關；依主線指示未跑 `sync-claude-userlevel`。
+
+**rollback**：`git revert <本 commit>`（純程式＋測試＋文件，無 migration、無設定）。
 ## 2026-10-24（續20）compose 不變量 I6：每個服務 `init: true`；repo 三個 compose 對齊 prod（Claude）
 
 **觸發**：操作者「去處理好，不要一直增加 TASKS」→ 收掉續17 開的 TASKS 條目。

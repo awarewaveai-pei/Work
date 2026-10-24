@@ -1,6 +1,6 @@
 // SSRF gate for the collection fetcher.
 //
-// WHY NOT REUSE lib/content/trending-sources.ts's isSafePublicHttps: that one is documented as
+// WHY NOT REUSE lib/content/public-https.ts's isSafePublicHttps: that one is documented as
 // literal-host-only and is applied to operator-configured feed URLs, which is a different threat
 // model. Here the URLs come from crawled pages — an attacker controls them — and every redirect hop
 // is another chance to point at 169.254.169.254.

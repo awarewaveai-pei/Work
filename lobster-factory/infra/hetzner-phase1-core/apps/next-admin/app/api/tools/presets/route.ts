@@ -10,6 +10,7 @@ import {
   putDesignObject,
 } from "../../../../lib/storage/r2";
 import { deleteUnreferencedAsset } from "../../../../lib/content/r2-delete-guard";
+import { effectiveOrgId, OrgAccessError, resolveTenant, toOrgAccessResponse } from "../../../../lib/tenant-guard";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -26,6 +27,26 @@ function featureEnabled(): boolean {
 
 function defaultOrganizationId(): string | null {
   return process.env.POD_DESIGNS_DEFAULT_ORG_ID ?? null;
+}
+
+/** The organization a request acts for: a customer's own, whatever the request names; staff name one or get the
+ *  default. A Response = refuse with it. */
+function presetOrg(request: Request, requested: string | null | undefined): string | Response {
+  let organizationId: string | null;
+  try { organizationId = effectiveOrgId(request, requested ?? defaultOrganizationId()); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+  if (!organizationId || !isUuid(organizationId)) {
+    return NextResponse.json(
+      { ok: false, error: "organizationId is required (or set POD_DESIGNS_DEFAULT_ORG_ID)" },
+      { status: 400 },
+    );
+  }
+  return organizationId;
+}
+
+/** A customer's own user (middleware's x-ops-user-id), recorded on what it saves so it deletes only that. */
+function clientUserId(request: Request): string | null {
+  return resolveTenant(request).userKind === "client" ? request.headers.get("x-ops-user-id")?.trim() || null : null;
 }
 
 function isUuid(value: string): boolean {
@@ -47,14 +68,8 @@ export async function GET(request: Request) {
   }
   resolveOpsRole(request);
 
-  const url = new URL(request.url);
-  const organizationId = url.searchParams.get("organizationId") ?? defaultOrganizationId();
-  if (!organizationId || !isUuid(organizationId)) {
-    return NextResponse.json(
-      { ok: false, error: "organizationId is required (or set POD_DESIGNS_DEFAULT_ORG_ID)" },
-      { status: 400 },
-    );
-  }
+  const organizationId = presetOrg(request, new URL(request.url).searchParams.get("organizationId"));
+  if (organizationId instanceof Response) return organizationId;
 
   const supabase = getSupabaseWriteClient() ?? getSupabaseReadClient();
   if (!supabase) {
@@ -133,13 +148,8 @@ async function handlePost(request: Request): Promise<Response> {
     );
   }
 
-  const organizationId = body.organizationId ?? defaultOrganizationId();
-  if (!organizationId || !isUuid(organizationId)) {
-    return NextResponse.json(
-      { ok: false, error: "organizationId is required (or set POD_DESIGNS_DEFAULT_ORG_ID)" },
-      { status: 400 },
-    );
-  }
+  const organizationId = presetOrg(request, body.organizationId);
+  if (organizationId instanceof Response) return organizationId;
 
   if (!isR2Configured()) {
     return NextResponse.json(
@@ -176,6 +186,7 @@ async function handlePost(request: Request): Promise<Response> {
       mime_type: parsed.mime,
       byte_size: uploaded.byteSize,
       checksum_sha256: uploaded.checksumSha256,
+      created_by: clientUserId(request),
       metadata: {
         source: "mockup-studio",
         preset_name: presetName,
@@ -235,18 +246,13 @@ async function handleDelete(request: Request): Promise<Response> {
     return NextResponse.json({ ok: false, error: "supabase_write_not_configured" }, { status: 503 });
   }
 
-  // Resolve org boundary — DELETE must be scoped to the caller's org.
-  const deleteOrgId = new URL(request.url).searchParams.get("organizationId") ?? defaultOrganizationId();
-  if (!deleteOrgId || !isUuid(deleteOrgId)) {
-    return NextResponse.json(
-      { ok: false, error: "organizationId is required (or set POD_DESIGNS_DEFAULT_ORG_ID)" },
-      { status: 400 },
-    );
-  }
+  // DELETE is scoped to the caller's org (a customer's own, whatever the query names).
+  const deleteOrgId = presetOrg(request, url.searchParams.get("organizationId"));
+  if (deleteOrgId instanceof Response) return deleteOrgId;
 
   const { data: asset, error: fetchErr } = await supabase
     .from("media_assets")
-    .select("id,object_key,organization_id")
+    .select("id,object_key,organization_id,created_by")
     .eq("id", assetId)
     .eq("organization_id", deleteOrgId)
     .eq("storage_backend", "r2")
@@ -255,6 +261,11 @@ async function handleDelete(request: Request): Promise<Response> {
 
   if (fetchErr || !asset) {
     return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+  }
+  // A customer deletes only what it saved itself; staff-made presets of its organization stay (as /api/tools/designs).
+  if (resolveTenant(request).userKind === "client") {
+    const own = clientUserId(request);
+    if (!own || asset.created_by !== own) return NextResponse.json({ ok: false, error: "not_your_asset" }, { status: 403 });
   }
 
   // Same rule as every saved asset: refused while a WordPress post/page still shows it (r2-delete-guard.ts).

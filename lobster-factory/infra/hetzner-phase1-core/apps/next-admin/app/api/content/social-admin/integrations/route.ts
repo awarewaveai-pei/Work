@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canWriteTenantConfig } from "@/lib/ops-role";
 import { listAllIntegrations, getPostizConfig } from "@/lib/content/postiz";
+import { staffOnly } from "@/lib/tenant-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Lists every organization's Postiz channels: staff only, whatever a customer's role reads as.
 export async function GET(req: Request): Promise<Response> {
+  const denied = staffOnly(req);
+  if (denied) return denied;
   const { role } = resolveOpsRole(req);
   if (!canWriteTenantConfig(role)) {
     return new NextResponse("forbidden", { status: 403 });

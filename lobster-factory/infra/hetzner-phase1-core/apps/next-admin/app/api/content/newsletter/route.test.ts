@@ -47,3 +47,14 @@ describe("POST /api/content/newsletter -- bridge gate result", () => {
     expect((await post()).status).toBe(201);
   });
 });
+
+// The bridge is our own FluentCRM, not the customer's (step-8 card C-R4).
+describe("POST /api/content/newsletter -- customer", () => {
+  it("403 before anything reaches the bridge", async () => {
+    const res = await POST(new Request("http://localhost/api/content/newsletter", { method: "POST",
+      headers: { "x-ops-user-kind": "client", "x-ops-org-id": "11111111-1111-4111-8111-111111111111" },
+      body: JSON.stringify({ subject: "S", markdown: "# T\n\nbody" }) }));
+    expect(res.status).toBe(403);
+    expect(createNewsletter).not.toHaveBeenCalled();
+  });
+});
