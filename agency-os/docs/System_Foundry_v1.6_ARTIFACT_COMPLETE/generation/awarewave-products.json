@@ -2258,6 +2258,13 @@
           "billing": "credits"
         },
         {
+          "feature_key": "content.plan",
+          "name": "每月題目規劃",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
           "feature_key": "content.trending",
           "name": "趨勢分析",
           "limitKind": "QUOTA",
@@ -2286,7 +2293,6 @@
       },
       "staffPaths": [
         "tools/content",
-        "tools/publish",
         "tools/events"
       ]
     },
@@ -2369,7 +2375,30 @@
         "page": "/design",
         "enabled": false,
         "api": [
-          "/api/tools/presets"
+          "/api/tools/presets",
+          "/api/tools/printful/catalog"
+        ],
+        "nav": [
+          {
+            "path": "",
+            "name": "我的設計",
+            "staff": "tools/designs"
+          },
+          {
+            "path": "canvas",
+            "name": "畫布",
+            "staff": "tools/canvas"
+          },
+          {
+            "path": "banner",
+            "name": "橫幅",
+            "staff": "tools/banner"
+          },
+          {
+            "path": "mockup",
+            "name": "模型圖",
+            "staff": "tools/mockup"
+          }
         ]
       },
       "loginSources": [
@@ -2550,7 +2579,6 @@
       "door": {
         "app": "next-admin",
         "page": "/studio",
-        "enabled": false,
         "api": [
           "/api/tools/studio"
         ]
@@ -2620,7 +2648,8 @@
         "manifest": "lib/studio/MODULE_MANIFEST.json"
       },
       "staffPaths": [
-        "tools/studio"
+        "tools/studio",
+        "tools/publish"
       ]
     },
     {
@@ -2631,7 +2660,6 @@
       "door": {
         "app": "next-admin",
         "page": "/tarot",
-        "enabled": false,
         "api": [
           "/api/tools/tarot"
         ]

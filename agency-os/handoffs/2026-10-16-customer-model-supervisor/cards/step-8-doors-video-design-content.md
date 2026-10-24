@@ -112,13 +112,13 @@
 |---|---|---|---|
 | D-R1 | **✅ `21e7da50b`**（另：客戶只刪自己建的 preset，`created_by`） **presets 全面補租戶檢查**：GET `effectiveOrgId(request, url.searchParams.get("organizationId") ?? default)`；POST 用 `effectiveOrgId(request, body.organizationId ?? default)`；DELETE 先 `effectiveOrgId` 再 `.eq("organization_id", …)`（客戶限本人 `created_by`，抄 `tools/designs/route.ts:342-345`）。一個守衛一個測試：客戶帶他人 org → 403（拿掉檢查 → 測試紅 → 還原綠） | `app/api/tools/presets/route.ts:48-51,136,239` | **H** |
 | D-R2 | **✅ `21e7da50b`**：讀 DB 的路由須自己 import **並呼叫**登記的授權函式（`AUTHORIZERS`），否則列 `ORG_FREE_ROUTES`；「讀 DB」= 閉包內任何資料庫驅動 import 收緊閘 5（P2）使 presets 類假陽性無法再過 | `registry-code.test.ts:228-241` | L |
-| D1 | 前置 P1（`door.nav`）、S1（隱藏呼叫的注入模式）、`canvas-handoff` door-aware（P1 helper） | `components/tools/canvas-handoff.ts:119`；`ProductDoorShell.tsx` | M |
-| D2 | `app/design/{layout,page}.tsx`＋子頁 `app/design/{designs,canvas,banner,mockup}/page.tsx`（共用元件；canvas 頁照 `TOOLS/canvas/page.tsx` 的 dynamic 寫法）；`products.ts:59` 加 `nav`；員工路徑 `tools/*` 與門頁 `app/design/*` 不同名 | 新檔 | M |
-| D3 | `printful/catalog`：加 `PLATFORM_APIS`＋`ORG_FREE_ROUTES`（理由：公開型錄、無組織欄、快取） | `doors.ts:63`；`registry-code.test.ts:234`；`app/api/tools/printful/catalog/route.ts` | L |
-| D4 | 橫幅：抽出 `/api/ops/clients`（品牌色）與 `/api/tools/script-forge`（AI 配色／文案）呼叫（S1）；門上隱藏三顆按鈕＋`:1392` 連結；決策 D-V2／D-V3 後再決定是否補替代路由 | `TOOLS/banner/BannerStudio.tsx:1096,1127,1292,1392` | M |
-| D5 | 門上連結改 door-aware：`BannerStudio.tsx:2132`、其他 `/tools/*` 連結（grep `href="/tools` 於 5 頁） | 同左 | L |
-| D6 | `features[]`（`design.edit` 為 contract，`products.ts:62`）渲染清單；`lib/design/MODULE_MANIFEST.json` 無 TODO | — | L |
-| D7 | 驗收同 V8（`Host: design.localhost`，每個 nav 頁進得去、`/designs` 載入）；突變：presets 拿掉 org 檢查 → 指名測試紅 | — | L |
+| D1 | **✅ `e28406990`、`dc5ad2405`**（`openInCanvas` 第三參數必填，五個呼叫者走 `useDoorHref`；順帶修已上線 tarot 門的 404 按鈕） 前置 P1（`door.nav`）、S1（隱藏呼叫的注入模式）、`canvas-handoff` door-aware（P1 helper） | `components/tools/canvas-handoff.ts:119`；`ProductDoorShell.tsx` | M |
+| D2 | **✅ `dc5ad2405`** `app/design/{layout,page}.tsx`＋子頁 `app/design/{designs,canvas,banner,mockup}/page.tsx`（共用元件；canvas 頁照 `TOOLS/canvas/page.tsx` 的 dynamic 寫法）；`products.ts:59` 加 `nav`；員工路徑 `tools/*` 與門頁 `app/design/*` 不同名 | 新檔 | M |
+| D3 | **✅ `dc5ad2405`**（只開 `/api/tools/printful/catalog` 給 design 門＋`ORG_FREE_ROUTES`；`printful/sync` 員工專用，閘 5 擋過） `printful/catalog`：加 `PLATFORM_APIS`＋`ORG_FREE_ROUTES`（理由：公開型錄、無組織欄、快取） | `doors.ts:63`；`registry-code.test.ts:234`；`app/api/tools/printful/catalog/route.ts` | L |
+| D4 | **✅ `e28406990`、`dc5ad2405`**（staff 注入；門上 `/ops/clients` 提示隱藏） 橫幅：抽出 `/api/ops/clients`（品牌色）與 `/api/tools/script-forge`（AI 配色／文案）呼叫（S1）；門上隱藏三顆按鈕＋`:1392` 連結；決策 D-V2／D-V3 後再決定是否補替代路由 | `TOOLS/banner/BannerStudio.tsx:1096,1127,1292,1392` | M |
+| D5 | **✅ `dc5ad2405`**（「去建商品」門上隱藏；下載門上走 studio proxy-image） 門上連結改 door-aware：`BannerStudio.tsx:2132`、其他 `/tools/*` 連結（grep `href="/tools` 於 5 頁） | 同左 | L |
+| D6 | **待操作者決定**（門上功能清單，同 V7）；manifest 無 TODO `features[]`（`design.edit` 為 contract，`products.ts:62`）渲染清單；`lib/design/MODULE_MANIFEST.json` 無 TODO | — | L |
+| D7 | **✅ `dc5ad2405`**（本機四頁門框＋選單；mockup 只收販售商品 id，突變證據 WORKLOG 2026-10-24 續28） 驗收同 V8（`Host: design.localhost`，每個 nav 頁進得去、`/designs` 載入）；突變：presets 拿掉 org 檢查 → 指名測試紅 | — | L |
 | D8 | 上線（DNS／nginx `server_name`）— High，要 go | `nginx/default.conf:430` | H |
 
 ## 5. CONTENT 門（含 video／design 共用的 content 路由加固）
