@@ -161,12 +161,12 @@
 | C-R4 | **✅ `21e7da50b`**（`staffOnly`；門上隱藏電子報仍待 C2） `newsletter` 與 `social-admin/integrations` 加 `resolveTenant` 客戶明確 403；門上隱藏電子報 | `app/api/content/newsletter/route.ts:165-171`、`…/social-admin/integrations/route.ts:8-12` | H |
 | C-R5 | **✅ `21e7da50b`，改採更嚴的做法**：走 `lib/collect/net/remote-file`（每跳位址閘＋釘 IP），只套 `isSafePublicHttps` 擋不住轉址與 DNS rebinding `brand-voice` URL 套 `isSafePublicHttps` | `app/api/content/brand-voice/route.ts:22-24,52-54` | M |
 | C-R6 | **✅ `21e7da50b`**（seo-check 列 `ORG_FREE_ROUTES`；image GET 不讀 DB，閘 5 以計費規則放行，免列） `seo-check`、`content/image` GET 補 `ORG_FREE_ROUTES`＋理由 | `registry-code.test.ts:234-238` | L |
-| C0 | 前置 P1（nav）、S1（影片、events 同步、publish 抽出）、決策 D1（`tools/publish` 歸 studio） | `products.ts:67`；`ContentStudio.tsx:1743,1770,1793` | M |
-| C1 | `app/content/{layout,page}.tsx`＋`app/content/{calendar,sites,events}/page.tsx`；`products.ts:64` 加 `nav`（內容編輯／行事曆／網站／節日） | 新檔 | M |
-| C2 | 門上連結改 door-aware：`ContentStudio.tsx:2102,2319`、`ContentCalendar.tsx:326`、`SiteManager.tsx:823,826`；`/ops/clients`、`/tools/social` 連結隱藏（`:2108,2372,3276,3686`、`ContentCalendar.tsx:325`） | 同左 | L |
-| C3 | `ContentStudio` 影片選項（`:2948` `ai-video`）在門上不顯示；`:663` 自動觸發只在員工頁注入的模組內 | `ContentStudio.tsx:663,2948` | M |
-| C4 | `features[]` 渲染清單（12 個 content 功能，`products.ts:66`）、`lib/content/MODULE_MANIFEST.json` 無 TODO | — | L |
-| C5 | 驗收同 V8；突變：`sites/[id]` 拿掉 assert → 指名測試紅；`sources` 拿掉角色閘 → 紅 | — | L |
+| C0 | **✅ `e28406990`**（P1、S1；D1 publish 歸 studio） 前置 P1（nav）、S1（影片、events 同步、publish 抽出）、決策 D1（`tools/publish` 歸 studio） | `products.ts:67`；`ContentStudio.tsx:1743,1770,1793` | M |
+| C1 | **✅ `b3132c733`**（events 頁不傳 `sync`） `app/content/{layout,page}.tsx`＋`app/content/{calendar,sites,events}/page.tsx`；`products.ts:64` 加 `nav`（內容編輯／行事曆／網站／節日） | 新檔 | M |
+| C2 | **✅ `b3132c733`**（全走 `useDoorHref`；門上另隱藏電子報、「管理來源」、`+ 新增網站`，網址欄唯讀——伺服器本就拒絕客戶） 門上連結改 door-aware：`ContentStudio.tsx:2102,2319`、`ContentCalendar.tsx:326`、`SiteManager.tsx:823,826`；`/ops/clients`、`/tools/social` 連結隱藏（`:2108,2372,3276,3686`、`ContentCalendar.tsx:325`） | 同左 | L |
+| C3 | **✅ S1 已達成、`b3132c733` 驗**（只有 `ContentStudioStaff` 傳 `video`） `ContentStudio` 影片選項（`:2948` `ai-video`）在門上不顯示；`:663` 自動觸發只在員工頁注入的模組內 | `ContentStudio.tsx:663,2948` | M |
+| C4 | **待操作者決定**（同 V7／D6）；manifest 無 TODO，兩句舊說法 `b3132c733` 更正 `features[]` 渲染清單（12 個 content 功能，`products.ts:66`）、`lib/content/MODULE_MANIFEST.json` 無 TODO | — | L |
+| C5 | **✅ `b3132c733`**（本機四頁門框＋選單；突變證據 WORKLOG 2026-10-24 續34） 驗收同 V8；突變：`sites/[id]` 拿掉 assert → 指名測試紅；`sources` 拿掉角色閘 → 紅 | — | L |
 | C6 | 上線（DNS／nginx）— High，要 go | `nginx/default.conf:430` | H |
 
 ## 6. 決定（操作者 2026-10-23：全部採建議）
