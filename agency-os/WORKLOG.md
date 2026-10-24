@@ -1,4 +1,28 @@
 # Worklog
+## 2026-10-24（續19）AUTO_CONTENT P2：寫社群貼文只剩一個核心；平台硬上限只來自 BODY_LIMITS，超過就重寫一次、仍超過就不送（Claude）
+
+**觸發**：操作者「Start phase 2」（計畫 P2，監工台 https://claude.ai/artifact/TUMBoFwaMCKbPgVmLVjEUZ ）。
+
+**根因**：平台規則三份：`syndicate.ts` 的 PLATFORM_SPECS 散文字數、`lib/social/limits.ts` BODY_LIMITS（Postiz 真正擋的）、`wp-article.ts` SYNDICATE_KEY 對照。兩者會互相矛盾：Threads 散文要求 100–200 words，BODY_LIMITS 是 500 UTF-8 bytes（200 個中文字＝600 bytes），產出必被 Postiz 拒。改寫結果從不量長度。另：影片附加說明查表用 `twitter`、表鍵是 `x`，X 從沒拿到影片提示。改寫只有 HTTP handler，排程（P4）無法呼叫。
+**不變量**：一個寫手 `lib/social/write-posts.ts writeSocialPosts(input, ask)`；硬上限只從 BODY_LIMITS 寫進提示、只用 `bodyLength` 量；超過的平台重寫一次，仍超過放 `tooLong`，送 Postiz 的呼叫端（社群工具、之後的管線）跳過；Postiz→寫手平台對照只有這一份（`writerKeysFor`、`textsForAccounts`）。
+
+**改動**（`NA`＝`lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 新 `NA/lib/social/write-posts.ts`＋測試；`NA/lib/content/syndicate.ts` 變薄殼（角色、品牌、AI client、log、最多兩次呼叫的成本加總）；回應多 `tooLong`。
+- `NA/lib/social/wp-article.ts` 刪 SYNDICATE_KEY／syndicatePlatforms／textsFromSyndicate；`ArticleSource.tsx` 改用核心並跳過 tooLong。
+- 行為變更：AI 回答完全沒有 JSON 物件時改回 500「Failed to parse social posts」（舊版回 ok＋空 posts）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/social lib/content/__tests__ lib/portal | exit=0 | ms=0（36 檔 296 測過、3 skip；未計時）
+- `npx tsc --noEmit`：本次檔案 0 錯（唯一錯誤在他 session 編輯中的 BannerStudio.tsx）。
+- 突變：textsForAccounts 不跳過 tooLong → 1 測紅；拔掉重寫一次 → 1 測紅；還原全綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n -- Codex `agency-os/reports/oracle/2026-10-24-partialreview-3457fac3.md`。F1（社群工具 AI 改寫按鈕只標一次呼叫的價，超長重寫會多一次）實查成立，已修：`write-posts.ts MAX_WRITER_CALLS`，`rewriteCostTwd()` 回 usual／max，按鈕顯示「約 NT$x，太長要重寫時最多 NT$y」，測試釘 max＝成本表×MAX_WRITER_CALLS。
+  - external oracle = Codex CLI (codex exec -s read-only), not self-description
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=PLATFORM_SPECS|VIDEO_PLATFORM_ADDENDUM|syndicatePlatforms|textsFromSyndicate|SYNDICATE_KEY | hits=3（全在計畫檔的卡片描述與抓蟲說明；程式 0）
+
+**檔案鎖**：hook 把 wp-article.ts／ArticleSource.tsx 記成 session aab8ec2e 在改；diff 只有本 session 的改動，操作者同意後 `file-claims.js release` 接手。
+
+**剩餘風險**：ContentStudio 的改寫結果區仍顯示 tooLong 的文字（人工複製用），沒有標示超長；該檔正由他 session 改寫中，標示留到 P5／該 session 收尾後。
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-24（續18）CLI 一直讀不到 settings.json：每個 CLI session 都沒有 hooks、沒有 deny 規則；Wda 工人跑通並先證明閘門有效（Claude）
 
 **觸發**：Wda Gov 背景工人實測，audit-log hook 沒記錄。操作者在 Wda profile 開 `/hooks`，畫面是 Settings Error。

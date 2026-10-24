@@ -1,10 +1,10 @@
 // A WordPress article as the start of a social post (SOCIAL_MANAGER_PLAN.md C10). Free path: the article's own excerpt,
 // featured image and link (WP REST, the site's application password; read only). The AI path rewrites it per channel
-// through /api/social/rewrite (lib/content/syndicate.ts, also served as /api/content/syndicate); this file maps our
-// platforms to its keys and prices the call from lib/ai/cost-model.ts (TEXT_FEATURES "syndicate") so the button shows
-// the cost before anyone presses it.
+// through /api/social/rewrite (lib/social/write-posts.ts; its platform map is the only one); this file prices the call
+// from lib/ai/cost-model.ts (TEXT_FEATURES "syndicate") so the button shows the cost before anyone presses it.
 import { featureUnitCostUsd } from "@/lib/ai/cost-calculator";
 import { TEXT_FEATURES, TWD_RATE } from "@/lib/ai/cost-model";
+import { MAX_WRITER_CALLS } from "./write-posts";
 
 export interface WpArticle { title: string; excerpt: string; content: string; link: string; image: string | null }
 
@@ -30,38 +30,11 @@ export function articleFromWp(raw: {
   };
 }
 
-/** /api/content/syndicate's platform keys (its PLATFORM_SPECS) for ours; x and Bluesky share the single-post spec. */
-const SYNDICATE_KEY: Record<string, { ask: string; answer: string }> = {
-  facebook: { ask: "facebook", answer: "facebook" },
-  instagram: { ask: "instagram", answer: "instagram" },
-  "instagram-standalone": { ask: "instagram", answer: "instagram" },
-  threads: { ask: "threads", answer: "threads" },
-  linkedin: { ask: "linkedin", answer: "linkedin" },
-  "linkedin-page": { ask: "linkedin", answer: "linkedin" },
-  x: { ask: "twitter", answer: "twitter_single" },
-  bluesky: { ask: "twitter", answer: "twitter_single" },
-  pinterest: { ask: "pinterest", answer: "pinterest" },
-  tiktok: { ask: "tiktok", answer: "tiktok" },
-  reddit: { ask: "reddit", answer: "reddit" },
-};
-
-export function syndicatePlatforms(platforms: string[]): string[] {
-  return [...new Set(platforms.map((p) => SYNDICATE_KEY[p]?.ask).filter((k): k is string => !!k))];
-}
-
-/** Each channel's own text from syndicate's answer; a channel it did not write for keeps the shared text. */
-export function textsFromSyndicate(answer: Record<string, string>, accounts: Array<{ id: string; platform: string }>): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const a of accounts) {
-    const k = SYNDICATE_KEY[a.platform]?.answer;
-    if (k && typeof answer[k] === "string" && answer[k].trim()) out[a.id] = answer[k].trim();
-  }
-  return out;
-}
-
-/** What one rewrite costs, from the cost model (one syndicate call whatever the number of channels). */
-export function rewriteCostTwd(): number {
+/** What one rewrite costs, from the cost model: usual = one syndicate call whatever the number of channels; max = with
+ *  the one shorter rewrite write-posts.ts makes when a post is over its platform's limit. */
+export function rewriteCostTwd(): { usual: number; max: number } {
   const f = TEXT_FEATURES.find((x) => x.key === "syndicate");
   if (!f) throw new Error("cost-model has no syndicate feature");
-  return Math.ceil(featureUnitCostUsd(f) * TWD_RATE * 10) / 10;
+  const twd = (calls: number) => Math.ceil(featureUnitCostUsd(f) * calls * TWD_RATE * 10) / 10;
+  return { usual: twd(1), max: twd(MAX_WRITER_CALLS) };
 }

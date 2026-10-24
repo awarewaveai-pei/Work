@@ -1,9 +1,10 @@
-// C10: the free path reads the article's own excerpt / image / link; the AI path maps our channels to syndicate's keys
-// and back, and the button's price is the cost model's syndicate feature.
+// C10: the free path reads the article's own excerpt / image / link; the AI path's price is the cost model's syndicate
+// feature (its channel mapping lives in lib/social/write-posts.ts).
 import { describe, expect, it } from "vitest";
 import { featureUnitCostUsd } from "@/lib/ai/cost-calculator";
 import { TEXT_FEATURES, TWD_RATE } from "@/lib/ai/cost-model";
-import { articleFromWp, rewriteCostTwd, syndicatePlatforms, textsFromSyndicate } from "../wp-article";
+import { articleFromWp, rewriteCostTwd } from "../wp-article";
+import { MAX_WRITER_CALLS } from "../write-posts";
 
 describe("WordPress article -> post", () => {
   it("excerpt path: plain text from the REST answer, https featured image only", () => {
@@ -16,13 +17,12 @@ describe("WordPress article -> post", () => {
     expect(articleFromWp({ _embedded: { "wp:featuredmedia": [{ source_url: "http://insecure/img.jpg" }] } }).image).toBeNull();
   });
 
-  it("AI path: our platforms to syndicate's keys, its answer back to each channel; the price comes from the cost model", () => {
-    expect(syndicatePlatforms(["bluesky", "x", "facebook", "linkedin-page", "mastodon"])).toEqual(["twitter", "facebook", "linkedin"]);
-    const texts = textsFromSyndicate({ twitter_single: "short one", facebook: "  longer one  ", linkedin: "" },
-      [{ id: "b", platform: "bluesky" }, { id: "f", platform: "facebook" }, { id: "l", platform: "linkedin" }]);
-    expect(texts).toEqual({ b: "short one", f: "longer one" });   // empty answer: the channel keeps the shared text
+  it("AI path: the button's price comes from the cost model (platform mapping: write-posts.test.ts)", () => {
     const f = TEXT_FEATURES.find((x) => x.key === "syndicate")!;
-    expect(rewriteCostTwd()).toBe(Math.ceil(featureUnitCostUsd(f) * TWD_RATE * 10) / 10);
-    expect(rewriteCostTwd()).toBeGreaterThan(0);
+    const { usual, max } = rewriteCostTwd();
+    expect(usual).toBe(Math.ceil(featureUnitCostUsd(f) * TWD_RATE * 10) / 10);
+    expect(usual).toBeGreaterThan(0);
+    // the button's upper bound covers the one shorter rewrite write-posts.ts may make
+    expect(max).toBe(Math.ceil(featureUnitCostUsd(f) * MAX_WRITER_CALLS * TWD_RATE * 10) / 10);
   });
 });

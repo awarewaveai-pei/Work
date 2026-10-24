@@ -4,7 +4,8 @@
 // lib/social/wp-article.ts rewriteCostTwd from lib/ai/cost-model.ts). Either one fills the editor; nothing is saved
 // until someone presses one of its four buttons.
 import { useState } from "react";
-import { rewriteCostTwd, syndicatePlatforms, textsFromSyndicate, type WpArticle } from "@/lib/social/wp-article";
+import { rewriteCostTwd, type WpArticle } from "@/lib/social/wp-article";
+import { textsForAccounts, writerKeysFor, type WriteResult } from "@/lib/social/write-posts";
 import { api, ApiError } from "./api";
 import { PfMark } from "./Calendar";
 import type { Account, Brand } from "./model";
@@ -55,16 +56,16 @@ export default function ArticleSource({ brand, accounts, siteId, postId, title, 
     setNote(null);
     try {
       const a = await article();
-      const platforms = syndicatePlatforms(connected.map((x) => x.platform));
+      const platforms = writerKeysFor(connected.map((x) => x.platform));
       if (!platforms.length) throw new Error("先連接至少一個社群帳號。");
       const res = await fetch("/api/social/rewrite", {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ article: `${a.title}\n\n${a.content || a.excerpt}`, platforms, articleUrl: a.link, mediaType: a.image ? "image" : "text", siteId }),
       });
       if (!res.ok) throw new Error(`AI 改寫失敗（${res.status}）：${(await res.text()).slice(0, 200)}`);
-      const json = (await res.json()) as { ok: boolean; posts?: Record<string, string>; error?: string };
+      const json = (await res.json()) as { ok: boolean; posts?: WriteResult["posts"]; tooLong?: WriteResult["tooLong"]; error?: string };
       if (!json.ok || !json.posts) throw new Error(json.error ?? "AI 改寫沒有回內容");
-      const custom = textsFromSyndicate(json.posts, connected);
+      const custom = textsForAccounts({ posts: json.posts, tooLong: json.tooLong ?? [] }, connected);
       const mediaIds = await image(a);
       onPrefill({ for: key, body: a.excerpt || a.title, link: a.link, sourceUrl: a.link, custom, mediaIds });
       setNote({ text: `AI 替 ${Object.keys(custom).length} 個頻道各寫了一版，看過再存。` });
@@ -80,7 +81,7 @@ export default function ArticleSource({ brand, accounts, siteId, postId, title, 
       <PfMark platform="wordpress" />
       <span className="sm-ellipsis" style={{ flex: 1, minWidth: 0 }} title={title}>{title}</span>
       <button type="button" disabled={!!busy} onClick={useExcerpt}>{busy === "excerpt" ? "讀取中…" : "用文章摘要"}</button>
-      <button type="button" disabled={!!busy} onClick={useAi}>{busy === "ai" ? "改寫中…" : `AI 改寫（約 NT$${rewriteCostTwd()}）`}</button>
+      <button type="button" disabled={!!busy} onClick={useAi}>{busy === "ai" ? "改寫中…" : `AI 改寫（約 NT$${rewriteCostTwd().usual}，太長要重寫時最多 NT$${rewriteCostTwd().max}）`}</button>
       {note && <span className={note.error ? "sm-err" : "sm-muted"} style={{ flexBasis: "100%" }}>{note.text}</span>}
     </div>
   );
