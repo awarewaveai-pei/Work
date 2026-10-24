@@ -4,8 +4,9 @@
 I1 memory limit set; I2 memswap_limit == memory (no swap); I3 pids limit set;
 I4 the healthcheck that runs (compose, else the image's Dockerfile HEALTHCHECK) is
    one command with a positive timeout: `timeout N`, curl -m, wget -T, AbortSignal.timeout(N), or pg_isready;
-I5 Apache-prefork WordPress: MaxRequestWorkers x worker_rss_mb + base_mb <= memory (both declared in the mpm conf).
-Why: WORKLOG 2026-10-24 (lobster-wordpress OOM-thrashed the host for 11 h).
+I5 Apache-prefork WordPress: MaxRequestWorkers x worker_rss_mb + base_mb <= memory (both declared in the mpm conf);
+I6 init: true -- a PID 1 that does not reap fills the pids cap with zombie healthcheck processes.
+Why: WORKLOG 2026-10-24 (lobster-wordpress OOM-thrashed the host for 11 h; I6: lobster-redis hit pids 60/64).
 
   python scripts/check-compose-invariants.py              ENFORCED files + every tracked compose file is listed below
   python scripts/check-compose-invariants.py <file>...    those files only (e.g. the live copies on the host)
@@ -119,6 +120,8 @@ def check_service(path, svc):
         out.append(f"I2 memswap_limit must equal memory ({lim.get('memory', svc.get('mem_limit'))})")
     if not (lim.get("pids") or svc.get("pids_limit")):
         out.append("I3 no pids limit")
+    if svc.get("init") is not True:
+        out.append("I6 no init: true")
 
     ctx, df = build_paths(base, svc)
     dockerfile = ""

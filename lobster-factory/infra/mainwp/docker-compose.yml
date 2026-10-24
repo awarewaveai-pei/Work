@@ -2,6 +2,7 @@ version: "3.9"
 
 services:
   mainwp-db:
+    init: true
     image: mysql:8.0
     container_name: mainwp-db
     restart: unless-stopped
@@ -36,6 +37,7 @@ services:
         max-file: "3"
 
   mainwp-web:
+    init: true
     image: wordpress:6.7-apache
     container_name: mainwp-web
     restart: unless-stopped

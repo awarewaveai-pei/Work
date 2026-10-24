@@ -16,6 +16,7 @@ spec.loader.exec_module(cci)
 GOOD = """services:
   web:
     image: nginx:1
+    init: true
     memswap_limit: 256M
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS -m 4 http://127.0.0.1/ || exit 1"]
@@ -51,6 +52,10 @@ class Invariants(unittest.TestCase):
 
     def test_i3_no_pids_limit(self):
         self.assertIn("I3 no pids limit", self.run_compose(GOOD.replace("          pids: 64\n", "")))
+
+    def test_i6_no_init(self):
+        self.assertIn("I6 no init: true", self.run_compose(GOOD.replace("    init: true\n", "")))
+        self.assertIn("I6 no init: true", self.run_compose(GOOD.replace("init: true", "init: false")))
 
     def test_i4_unbounded_probes(self):
         for bad in ["curl -fsS http://127.0.0.1/", "wget -qO- http://127.0.0.1/", "redis-cli ping",

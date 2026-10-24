@@ -413,13 +413,6 @@
 
 #### G. ▶️ 可直接做 — 基礎建設與客戶站
 
-- [ ] **compose 不變量：有 pids 上限的服務必須 `init: true`（防健康檢查殭屍填滿）**
-  - `🟢 小` · `2026-10-24` · `aab8ec2e（compose 防護 session）`
-  - **一句話**：pids 上限＋健康檢查 `timeout` 包裝、無 init → 殭屍填滿上限；2026-10-24 lobster-redis 60/64 害 next-admin 部署與回退都失敗。
-  - **現在到哪**：prod 三個 compose 17 個服務已加 `init: true`（WORKLOG 2026-10-24 事故條）；repo 對照檔與 `scripts/check-compose-invariants.py` 未加。
-  - **下一步**：checker 加規則「pids 上限 ⇒ init: true」＋測試；repo `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml` 補同樣 17 行。
-  - **完成定義**：拔掉任一 `init: true` → checker 測試變紅；repo 與 prod 一致。
-
 - [ ] **【基礎設施｜中】其餘 prod compose 收斂到 compose 不變量** — `scripts/check-compose-invariants.py` PENDING 中標 prod 的 11 檔（supabase／trigger／n8n／chatwoot／postiz／uptime-kuma／observability／video／remotion／cognitive-os×2）逐檔：量 swap 與 peak → memswap=memory、pids、healthcheck 有界 → 移入 ENFORCED。見 WORKLOG 2026-10-24 compose 不變量條。建議模型：Opus 5.5
 - [ ] **【基礎設施｜小】主機 nginx 有 repo 沒有的 `hci.aware-wave.com` server 區塊（漂移）** — `/root/lobster-phase1/nginx/default.conf` 含 hci 區塊，repo `lobster-factory/infra/hetzner-phase1-core/nginx/default.conf` 沒有；任何人以 repo 檔覆蓋主機檔會讓 hci 站下線。修：把該區塊收進 repo（先比對主機現值）。2026-09-26 PI-b 分流時發現，詳 WORKLOG 2026-09-26（續34）。
 - [ ] **【MainWP】建站自動接上 MainWP：bridge 已修好（2026-09-24），剩 next-admin 部署（DEPLOY_HOLD）＋真建站 E2E**

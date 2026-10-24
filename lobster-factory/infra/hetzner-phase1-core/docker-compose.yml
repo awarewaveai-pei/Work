@@ -15,6 +15,7 @@ x-logging: &lobster-logging
 
 services:
   nginx:
+    init: true
     image: nginx:stable
     container_name: lobster-nginx
     restart: unless-stopped
@@ -44,6 +45,7 @@ services:
     logging: *lobster-logging
 
   redis:
+    init: true
     image: redis:7-alpine
     container_name: lobster-redis
     restart: unless-stopped
@@ -72,6 +74,7 @@ services:
   # SG phase1 does not run local n8n by default — avoids duplicate workflows/RAM vs DNS (n8n.aware-wave.com → EU).
   # To start it on a host: COMPOSE_PROFILES=local-n8n docker compose --env-file .env up -d
   n8n:
+    init: true
     profiles:
       - local-n8n
     image: docker.n8n.io/n8nio/n8n:${N8N_IMAGE_TAG:-2.18.5}
@@ -122,6 +125,7 @@ services:
     logging: *lobster-logging
 
   wordpress-db:
+    init: true
     image: mariadb:11
     container_name: lobster-wordpress-db
     restart: unless-stopped
@@ -158,6 +162,7 @@ services:
     logging: *lobster-logging
 
   wordpress:
+    init: true
     build:
       context: ./apps/wordpress
       dockerfile: Dockerfile
@@ -212,6 +217,7 @@ services:
     logging: *lobster-logging
 
   node-api:
+    init: true
     build:
       context: ./apps/node-api
       dockerfile: Dockerfile
@@ -252,6 +258,7 @@ services:
     logging: *lobster-logging
 
   next-admin:
+    init: true
     build:
       context: ./apps/next-admin
       dockerfile: Dockerfile
@@ -611,6 +618,7 @@ services:
   #   * published on 127.0.0.1 only (host-side smoke/debug) - never 0.0.0.0: the 2026-04-20
   #     intrusion came in through a 0.0.0.0 publish (runbooks/HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md).
   renderer:
+    init: true
     build:
       context: ./apps/renderer
     image: lobster-phase1-renderer:local
@@ -657,6 +665,7 @@ services:
   # ADR-0007 gate 1 requires this service definition to live HERE, in the single existing
   # deployment orchestration surface, not a second docker-compose*.yml under Projects/internal/hci30/).
   hci-postgres:
+    init: true
     image: postgres:15.8
     container_name: hci-postgres
     restart: unless-stopped
@@ -695,6 +704,7 @@ services:
   # database, lobster-net (external) so nginx can reach it by name -- same dual-membership pattern
   # cognitive-os-api already uses for the identical reason.
   hci-app:
+    init: true
     build:
       # `./apps/hci-app`, matching every other service's convention (relative to THIS compose
       # file's own directory on the deploy host, $STAGING_DIR -- sg-deploy.sh rsyncs source there,
@@ -773,6 +783,7 @@ services:
   # the netns on any runner restart and never came back. The cap_add entries exist only for that
   # entrypoint; restart: unless-stopped is safe precisely because every start re-applies the policy.
   hci-fetch-runner:
+    init: true
     build:
       # Sub-path of hci-app's own staged copy (./apps/hci-app/...) -- see that service's build
       # context comment for why a git-repo-relative path here would not resolve on the real host.
@@ -822,6 +833,7 @@ services:
   # Trigger.dev's own internal MinIO (lobster-factory/infra/trigger/docker-compose.yml's `minio`
   # service): separate image pull, separate network, separate volume, separate credentials.
   hci-object-storage:
+    init: true
     # Pinned by digest, not `:latest` -- this instance holds raw, attacker-influenced fetched
     # content, the same risk class this repo already pins ClickHouse against (agency-os/AGENTS.md).
     # Same digest already validated locally (infra/local/compose.fetch-runner.yml) -- not re-chosen

@@ -1,4 +1,23 @@
 # Worklog
+## 2026-10-24（續20）compose 不變量 I6：每個服務 `init: true`；repo 三個 compose 對齊 prod（Claude）
+
+**觸發**：操作者「去處理好，不要一直增加 TASKS」→ 收掉續17 開的 TASKS 條目。
+
+**修改**
+- `scripts/check-compose-invariants.py`：新 I6「`init: true`」（I3 已要求每個服務有 pids 上限；無 init 時 PID 1 不回收健康檢查孤兒 → 殭屍填滿上限，續17 lobster-redis 60/64）。
+- `tests/scripts/test_check_compose_invariants.py`：GOOD 範本加 `init: true`；`test_i6_no_init`（拿掉／設 false → I6）。
+- repo `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`（12）、`lobster-factory/infra/soulful/docker-compose.yml`（3）、`lobster-factory/infra/mainwp/docker-compose.yml`（2）：與 prod 相同的 17 行 `init: true`（只增不改，diff 17 insertions）。
+- `agency-os/TASKS.md`：刪續17 開的條目（已完成）。
+- 過程中失誤：首次寫回用 `open(target,'w')` 先清空再讀，Windows stdout 非 UTF-8 讀取失敗 → 兩檔本機被清空；未 commit、未上主機，`git show HEAD:<f> > <f>` 還原後改用 `--write` 直接以 UTF-8 寫。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/check-compose-invariants.py（3 files, 0 problems）＋ python tests/scripts/test_check_compose_invariants.py（OK）＋ 主機 `python3 /tmp/cci.py` 三個 live compose（0 problems） | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回 diff：checker +2 行邏輯＋docstring、測試 +4 行、compose 只有 17 行 `init: true`
+- ORACLE_WAIVED: 一條等值判斷規則＋其測試＋與已驗證 prod 相同的設定行；無其他邏輯
+- BUGHUNT_DONE: scope=scripts,tests,lobster-factory/infra | grep=init: true | hits=17（三個 ENFORCED compose 各服務一行；PENDING 11 檔收斂時 I6 會自動要求）
+- BUGHUNT_SCOPE_NARROW: 規則只在 compose checker 與其 ENFORCED 檔
+
+**rollback**：`git revert <本 commit>`（prod 的 `init: true` 另有 safe-patch 備份，見續17）。
 ## 2026-10-24（續19）AUTO_CONTENT P2：寫社群貼文只剩一個核心；平台硬上限只來自 BODY_LIMITS，超過就重寫一次、仍超過就不送（Claude）
 
 **觸發**：操作者「Start phase 2」（計畫 P2，監工台 https://claude.ai/artifact/TUMBoFwaMCKbPgVmLVjEUZ ）。

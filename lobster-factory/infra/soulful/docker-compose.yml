@@ -22,6 +22,7 @@ x-soulful-logging: &soulful-logging
 
 services:
   soulful-db:
+    init: true
     # Pinned to the exact version running live (MariaDB 11.8.8-log, verified 2026-08-27).
     # Not `11` or `11.8` — a silent minor bump under a site with WooCommerce HPOS tables
     # is not a risk worth taking during a migration.
@@ -63,6 +64,7 @@ services:
     logging: *soulful-logging
 
   soulful-redis:
+    init: true
     # Object cache backend. Pinned to the exact patch running at pin time (7.4.11,
     # verified on the host 2026-08-27) for the same reason soulful-db is: a silent minor
     # bump under a live store is not a risk worth taking during a migration.
@@ -109,6 +111,7 @@ services:
     logging: *soulful-logging
 
   soulful-wp:
+    init: true
     build:
       context: .
       dockerfile: Dockerfile
