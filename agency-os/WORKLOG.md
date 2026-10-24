@@ -1,4 +1,32 @@
 # Worklog
+## 2026-10-24（續18）CLI 一直讀不到 settings.json：每個 CLI session 都沒有 hooks、沒有 deny 規則；Wda 工人跑通並先證明閘門有效（Claude）
+
+**觸發**：Wda Gov 背景工人實測，audit-log hook 沒記錄。操作者在 Wda profile 開 `/hooks`，畫面是 Settings Error。
+
+**根因**
+- C1 `~/.claude/settings.json`（＝`D:\Work\.claude\settings.json`，junction）有 `hooks._comment` 與 deny 規則 `Bash(:(){ *)`。CLI 2.1.79 判為無效，**整份檔不讀**：所有 hooks 和 deny 都不生效。桌面 app 照讀，所以主 session 沒發現。影響範圍：所有 CLI session（終端機 `claude`、`claude -p`、`cc.py`）。
+- C2 來源：`scripts/sync-claude-userlevel.ps1` 只刪最上層 `_comment`，巢狀的 `hooks._comment` 被照抄。`scripts/wire-remote-hooks.sh` 產生的遠端設定也有巢狀 `permissions._deny_comment`。
+- C3 背景工人每次都是新 session id，`ao-resume-on-prompt.ps1` 會跑完整 AO-RESUME（fetch＋ff 共用 checkout），驗證跑了 5 分鐘還是逾時。
+- C4 只看 trust、audit log 不足以證明閘門有效（Codex review e06de991 F1–F3）。
+
+**修改**
+- `scripts/sync-claude-userlevel.ps1`：`Expand-VarsRecursive` 不論層級都略過 `_` 開頭的鍵，移除兩處只刪最上層的程式碼；`-Mode merge` 已重寫正式檔（備份 `agency-os/Backups/claude-userlevel-20261024-133310`）。
+- `mcp/claude-userlevel/settings.template.json`：fork-bomb deny 改成 `Bash(*:|:&*)`。
+- `scripts/wire-remote-hooks.sh`：註解移到 shell 註解，JSON 裡不放 `_` 鍵。
+- `tests/hooks/settings-deny-parity.test.mjs`：規則括號裡不得有 `()`；產生的檔案不得有 `_` 鍵。
+- `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1`：`AWAREWAVE_HEADLESS_WORKER=1` 且不是明確的 AO-RESUME 時直接放行。`scripts/claude-account.py` 與 `C:/Users/user1115/ClaudeAgent/cc.py`（repo 外，備份在 scratchpad）都設這個值。
+- `scripts/claude-account.py`：新增 `verify-hooks`，要 CLI 自己的兩份紀錄都成立：`permission_denials` 有 sudo，hook debug log（隨機路徑）有 `Hook PreToolUse:Bash (PreToolUse) success`。marker 綁定 folder＋CLI 版本＋settings／runner.js／rules.manifest 的 sha256。`run` 在三種情況拒絕執行：未 trust、未通過證明、證明後檔案已變動。
+- `.claude/commands/account.md`、`.claude/SKILL_AND_COMMAND_INDEX.md`、`TOOL_TRIGGER_MAP.md`：補兩個新指令的列（`test-hooks.sh` asset parity 要求）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/claude-account.py verify-hooks --account wda（修前：audit log 沒有 canary，`Found 0 hook matchers`；修後：deny＝True、PreToolUse hook＝True，exit 0）＋ run --account wda "Reply with exactly: wda worker ok"（team 方案，exit 0） | exit=0 | ms=30000
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh（exit 0）＋ node --test tests/hooks/settings-deny-parity.test.mjs（4 pass） | exit=0 | ms=300000
+- 突變：把舊規則 `Bash(:(){ *)` 放回範本 → 新測試紅（Empty parentheses）→ 還原後 4 pass。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n -- Codex oracle `agency-os/reports/oracle/2026-10-24-partialreview-e06de991.md`，F1 marker 不隨設定失效、F2 audit log 可被 worker 偽造、F3 只證明 audit 沒證明 deny／runner：三項都已改（指紋 marker＋CLI 自己的兩份紀錄）。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp/claude-userlevel,tests/hooks | grep=_comment|_deny_comment|Bash\(:\( | hits=manifest.json:2,67（manifest 不是 CLI 設定檔，`excludeFromHash` 本來就列 `_comment`）、sync 註解 1、wire 已移除；正式 `~/.claude/settings.json` 遞迴掃描 0 個 `_` 鍵
+- 未做：主帳號 `me` 的 CLI 登入（refresh token 2026-10-22 過期，要操作者重新登入）。
+
+**rollback**：`git revert <本 commit>`；`sync-claude-userlevel.ps1 -Mode merge` 會照還原後的範本重寫；cc.py 用 scratchpad 的 `cc.py.bak` 還原。
 ## 2026-10-24（續16）compose 不變量機械檢查＋lobster／soulful／mainwp 全收斂（續8 後續 1+2）（Claude）
 
 **為何**：續8 只關了 lobster-wordpress 一個實例；同類現況：soulful-wp oom_kill=156、mainwp-web oom_kill=12（兩者 swap 中、Apache 150 workers），其餘服務 swap 允許、無 pids 上限、健康檢查無界。

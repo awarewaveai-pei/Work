@@ -38,7 +38,7 @@
       "Bash(rd /s *)",
       "Bash(format *)",
       "Bash(mkfs.* *)",
-      "Bash(:(){ *)"
+      "Bash(*:|:&*)"
     ],
     "additionalDirectories": [
       "${USERPROFILE}\\AppData\\Roaming\\Claude",

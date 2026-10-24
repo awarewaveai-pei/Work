@@ -65,5 +65,22 @@ test('wire-remote-hooks.sh generates a settings.local.json that denies Workflow'
     assert.ok(out.permissions.deny.includes(tool), `generated settings must deny ${tool}`);
   }
   assert.ok(out.hooks?.PreToolUse, 'hook wiring must survive the permissions addition');
+  assert.deepEqual(underscoreKeys(out), [], 'generated settings must carry no comment keys');
   fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+// The CLI rejects an unknown nested key or a malformed rule and then skips the WHOLE settings file -- every hook and
+// deny rule (2026-10-24: hooks._comment and "Bash(:(){ *)" made every CLI session run with no gates).
+// sync-claude-userlevel.ps1 strips '_' keys at any depth; rules are copied verbatim, so they are checked here.
+function underscoreKeys(obj, at = '') {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return [];
+  return Object.entries(obj).flatMap(([k, v]) => (k.startsWith('_') ? [at + k] : []).concat(underscoreKeys(v, `${at}${k}.`)));
+}
+
+test('settings.template.json permission rules have no empty parentheses inside a Tool(...) pattern', () => {
+  const perm = JSON.parse(fs.readFileSync(TEMPLATE, 'utf8')).permissions;
+  for (const rule of [...(perm.deny ?? []), ...(perm.allow ?? [])]) {
+    const inner = rule.match(/^[^(]+\((.*)\)$/)?.[1];
+    assert.ok(inner === undefined || !inner.includes('()'), `rule the CLI refuses ("Empty parentheses"): ${rule}`);
+  }
 });

@@ -33,6 +33,8 @@
 | `/review` | 對上次 commit 以來變更的檔做 code review，深度依改動大小與敏感度調整。 | [commands/review.md](commands/review.md) |
 | `/codex-review` | 跨模型 oracle——**Claude 寫的**改動的 R0 Review 動作，落地 ORACLE gate artifact。 | [commands/codex-review.md](commands/codex-review.md) |
 | `/claude-review` | 跨模型 oracle——**Codex 寫的**改動的 R0 Review 動作（反向 oracle）。 | [commands/claude-review.md](commands/claude-review.md) |
+| `/codex-do` | 把一件卡寫死的工作派給 Codex（通用佇列，Codex 在自己的 worktree 寫，Claude 審過才進 main）。 | [commands/codex-do.md](commands/codex-do.md) |
+| `/account` | 看／切背景 Claude 工人用哪個訂閱（me＝自己的方案、wda＝單位 Team 席位），只手動切。 | [commands/account.md](commands/account.md) |
 | `/audit-repo-hygiene` | repo hygiene 稽核：case-collision（AO-CLOSE 硬闥）+ oversized-file（資訊性）。 | [commands/audit-repo-hygiene.md](commands/audit-repo-hygiene.md) |
 | `/apply-audit` | 以完整紀律套用 audit 報告的 ready-to-apply patches。 | [commands/apply-audit.md](commands/apply-audit.md) |
 | `/audit-encoding` | 跑 PowerShell 腳本的 CP950 / encoding-trap 稽核。 | [commands/audit-encoding.md](commands/audit-encoding.md) |

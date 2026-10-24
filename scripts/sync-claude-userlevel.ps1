@@ -136,6 +136,9 @@ function Expand-VarsRecursive($obj) {
   if ($obj -is [PSCustomObject]) {
     $copy = [ordered]@{}
     foreach ($p in $obj.PSObject.Properties) {
+      # '_'-prefixed keys are template comments at ANY depth. The CLI rejects an unknown nested key and then skips the
+      # whole settings file -- every hook and deny rule (2026-10-24: hooks._comment reached ~/.claude/settings.json).
+      if ($p.Name.StartsWith('_')) { continue }
       $copy[$p.Name] = Expand-VarsRecursive $p.Value
     }
     return [PSCustomObject]$copy
@@ -327,7 +330,6 @@ function Sync-Json-Merge($spec, [string]$mode) {
 
   $tplRaw = Get-Content $src -Raw -Encoding UTF8 | ConvertFrom-Json
   # Strip comment fields and expand vars
-  $tplRaw.PSObject.Properties.Remove('_comment') 2>$null
   $tpl = Expand-VarsRecursive $tplRaw
 
   $existing = $null
@@ -433,7 +435,6 @@ function Sync-Json-Replace($spec, [string]$mode) {
   if (-not (Test-Path $src)) { throw "Source JSON missing: $src" }
 
   $tplRaw = Get-Content $src -Raw -Encoding UTF8 | ConvertFrom-Json
-  $tplRaw.PSObject.Properties.Remove('_comment') 2>$null
   $tpl = Expand-VarsRecursive $tplRaw
   $tplJson = $tpl | ConvertTo-Json -Depth 20 -Compress
 

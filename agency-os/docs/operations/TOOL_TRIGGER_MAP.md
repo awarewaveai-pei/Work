@@ -229,6 +229,8 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 |-----|------|------|
 | `/codex-review`（2026-08-30 起主力，本 repo 自建 command）| 包住 `/codex:adversarial-review` + 固定附帶隱藏依賴/NO FINDINGS focus text + 自動落地 ORACLE gate artifact | 🟢 R0 [驗證計畫] Review 動作（寫入者 = Claude）；`/review` 的 critic 連續失敗 ≥2 次時的第一層 fallback |
 | `/claude-review`（2026-09-19 起，本 repo 自建 command）| `scripts/claude-oracle.ps1`：capture → `claude -p` 唯讀審查 → ORACLE artifact（`-Reviewer claude`）| 🟢 R0 [驗證計畫] Review 動作（寫入者 = Codex）；額度鍵 `critic` |
+| `/codex-do`（2026-10-24 起）| 一件卡寫死的工作寫成卡 → `scripts/codex-continue.ps1 -QueueDir agency-os/handoffs/codex-queue` → driver 自驗 → `/claude-review` → 進 main | 🟢 操作者說「派給 Codex／交給 Codex 做」；AGENTS.md §5「卡已寫死每一步」 |
+| `/account`（2026-10-24 起）| `scripts/claude-account.py`：背景 Claude 工人用 me 或 wda 訂閱；`verify-hooks` 實測 hooks 有跑才放行 | 🟢 操作者說「換帳號／切到 wda／額度快用完」；只手動切 |
 | `scripts/codex-oracle.ps1 -Mode inspect` | Codex 唯讀讀 repo，回摘要問答 | 🟢 規劃前想省 Claude context 時；`-Prompt "<具體問題>"`（inspect 用途不變，仍為主力）|
 | `scripts/codex-oracle.ps1 -Mode review` | Codex 對抗式覆審 working tree（含 untracked 新檔）| 🟡 **降級為備援**：`/codex-review` 連續失敗 ≥2 次時的第二層 fallback（2026-08-30 起）|
 | ORACLE gate（`verify-closeout-completeness.ps1` §ORACLE gate）| staged 含 source 檔時強制要求當日 review artifact 存在 | 🔴 Hook（AO-CLOSE 自動強制）；刪除的檔案改用 `path@blob-hash` 內容綁定（2026-08-24），修改的檔案仍用時間戳排序 |

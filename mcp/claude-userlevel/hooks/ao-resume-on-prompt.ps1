@@ -203,6 +203,14 @@ try {
     if ($obj.PSObject.Properties.Name -contains "session_id") { $sessionId = [string]$obj.session_id }
     $isAoResume = Test-IsAoResumePrompt -Prompt $prompt
 
+    # Headless Claude workers (scripts/claude-account.py run, ClaudeAgent/cc.py) are always a NEW session id, so the
+    # auto-trigger below would run a full fetch+ff of the shared checkout per task (2026-10-24: wda canary timed out).
+    # Process ancestry cannot tell them apart (a claude.exe is above every hook), so the launcher sets this marker.
+    if ($env:AWAREWAVE_HEADLESS_WORKER -eq '1' -and -not $isAoResume) {
+        Write-HookResponse '{"continue":true}'
+        exit 0
+    }
+
     if ($HookHost -eq 'codex' -and -not $isAoResume) {
         if (-not (Test-IsGreetingPrompt -Prompt $prompt) -or (Test-LaunchedByClaude)) {
             Write-HookResponse '{"continue":true}'
