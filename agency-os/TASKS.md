@@ -420,7 +420,6 @@
 
 #### G. ▶️ 可直接做 — 基礎建設與客戶站
 
-- [ ] **【基礎設施｜中】其餘 prod compose 收斂到 compose 不變量** — `scripts/check-compose-invariants.py` PENDING 中標 prod 的 11 檔（supabase／trigger／n8n／chatwoot／postiz／uptime-kuma／observability／video／remotion／cognitive-os×2）逐檔：量 swap 與 peak → memswap=memory、pids、healthcheck 有界 → 移入 ENFORCED。見 WORKLOG 2026-10-24 compose 不變量條。建議模型：Opus 5.5
 - [ ] **【基礎設施｜小】主機 nginx 有 repo 沒有的 `hci.aware-wave.com` server 區塊（漂移）** — `/root/lobster-phase1/nginx/default.conf` 含 hci 區塊，repo `lobster-factory/infra/hetzner-phase1-core/nginx/default.conf` 沒有；任何人以 repo 檔覆蓋主機檔會讓 hci 站下線。修：把該區塊收進 repo（先比對主機現值）。2026-09-26 PI-b 分流時發現，詳 WORKLOG 2026-09-26（續34）。
 - [ ] **【MainWP】建站自動接上 MainWP：bridge 已修好（2026-09-24），剩 next-admin 部署（DEPLOY_HOLD）＋真建站 E2E**
   - `🟡 等 E2E` · `2026-09-21` · `hold 已解除；剩真建站 E2E`
@@ -430,7 +429,6 @@
   - **現在到哪**：REST key（server env）＋Unique Security ID＋child 安裝全上線（Trigger v20260921.3、next-admin 33251522a）；真 MainWP 以同一份碼註冊 staging 成功（WORKLOG 續100）。真建站 E2E run_cmuatt4cc02a021lnlhrm5drl → `provisioning_failed: Timed out while waiting for handshake`（SG_SSH_HOST=5.223.93.113）。
   - **完成定義**：真實建站後 MainWP 出現該站且 connected；run output 無 unique id／secret。
 - [ ] **【2026-09-11 開出｜KB K1】per-model partial HNSW 是否真的被用到，未經 EXPLAIN 證實** — 0072 加了 `idx_cs_chunks_hnsw_te3s`（`WHERE embed_model = 'text-embedding-3-small'`），0051 的全表 `idx_cs_chunks_embedding` 仍在，兩個 HNSW 同時維護 = 雙倍寫入成本；而 `p_model` 是 bind parameter，partial index 未必會被選中。塞 ~2000 列跑 `EXPLAIN (ANALYZE)` 確認後再決定刪哪一個。順帶：0051 的 `bm25_tsv` 欄與 `idx_cs_chunks_bm25` 至今無人寫也無人讀（死欄位＋死索引），一併處置。
-- [ ] **【維運｜cognitive-os】只換環境變數沒有安全腳本**：`safe-infra-patch.sh compose` 固定 /root/lobster-phase1；2026-10-21 換 `COGNITIVE_OS_ANTHROPIC_API_KEY` 時手寫重建腳本（需 export `COGNITIVE_OS_REGION`、檢查 compose exit 與 StartedAt）。做法與坑見 WORKLOG 2026-10-21「Cognitive OS 的 COGNITIVE_OS_ANTHROPIC_API_KEY」條；應收成 safe-infra-patch 的一個模式或 deploy.sh 的 `--env-only`。
 - [ ] **已知債務：runner 端寫入 MinIO 但 DB 列因輪詢階段失敗而遺失時的孤兒物件** — Task 9（2026-09-18）critic 覆審指出架構層級取捨：若失敗發生在輪詢階段（例如 runner 重啟導致 job 狀態遺失），runner 可能已把內容寫進 MinIO，但呼叫端重新 enqueue 後找不到對應 DB 列可參照，形成孤兒物件；`object-storage-client.mjs` 沒有 TTL/GC。與既有「`jobs` Map 無 TTL」債務同源，Task 9 真實流量接上前應一併處理。 → 2026-10-23：job store TTL＋上限已合（40366864a，`fetch-runner/server.mjs:82`）。孤兒 GC 不可用 bucket lifecycle（會刪已引用的 append-only 證據）→ 需「先寫 DB pending 列 → 寫 MinIO → sweep 逾時 pending」；**觸發＝fetch-runner 接真實流量前**（現只在 `infra/local`）。
 - [ ] **【部署 env｜續110 延後 ①–③】Trigger 部署 env 三個殘留：`TRIGGER_*` 同步不到、`triggerUrl` 型別、可選值不隨輪替傳播**
   - `🟡 潛伏` · `2026-09-23 發現；2026-09-26 補登` · `續110 寫了「開 TASKS G」但該條從未 commit（b443b77d3 只含 WORKLOG 與程式）`
