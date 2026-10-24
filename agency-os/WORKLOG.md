@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-24（續3）全產品帳戶權利補齊驗證：PASS（排程 verify-internal-comp-2026-10-24）（Claude）
+
+**觸發**：排程任務 `verify-internal-comp-2026-10-24`（唯讀；驗 f66fc97aa／0118 的 organization_all_features 三帳戶）。
+
+**結論**：PASS。三帳戶各 338 列 active 權利＝登記表 338 功能；台灣 09:00（01:00Z）後全庫 0 筆 `entitlement.would_deny`（含刻意無權利的 mongolia-03／e2e-verify-0704／test-wp-webhook-co 也是 0）。
+
+**證據**
+- 部署：`ssh -p 58122 ubuntu@145.239.195.47 'sudo docker exec lobster-next-admin sh -c "grep -rl entitlement_ensure_all_features /app/.next/server | head -1"'` → `/app/.next/server/chunks/482.js`；容器 StartedAt `2026-10-23T19:14:54Z`（= 台灣 03:14 自動部署）。
+- 登記表：`npx tsx -e "...PRODUCTS.reduce((n,p)=>n+p.features.length,0)"`（next-admin 目錄）→ `338`。
+- 權利列（`set default_transaction_read_only=on;` 後 join organization_all_features × organization_entitlements on source_ref, status='active'）→ `awarewave-ops|338`、`edd-research|338`、`soulful-expression|338`。
+- would_deny（`ops_audit_events` event_type='entitlement.would_deny' and created_at >= '2026-10-24T01:00:00Z'，group by org）→ 0 列；查詢時間 `2026-10-24 03:48:27Z`。
+- 註：338 列在 2026-10-23 已由 0118＋提前部署補齊（TASKS 監工台 NEXT ①），本次確認自動部署後未回退；未另查 Trigger 01:00Z run 本身。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec supabase-db psql -tA（read_only；權利列計數＋would_deny 計數） | exit=0 | ms=4289
+- REVIEW_WAIVED: NA -- 唯讀驗證，無程式或資料改動
+- BUGHUNT_WAIVED: NA -- 無程式改動
+- ORACLE_WAIVED: 唯讀驗證，無 source 改動
+
+**rollback**：無（未改任何資料／程式）。
 ## 2026-10-24（續2）撤回 ef54cf21d 的牌面改寫（六～十小組＋RWS 排法）（Claude）
 
 **觸發**：操作者：「這個不要了」。
