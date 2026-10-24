@@ -22,6 +22,17 @@ try {
     Assert-True ($result.Inlined -notcontains '.claude/sessions/transcript.md') 'session transcript was captured'
     Assert-True (($result.Skipped -join "`n") -match [regex]::Escape('.claude/sessions/transcript.md')) 'skipped transcript was not reported'
 
+    # -Path scope: pathspec magic is stripped and brackets/parentheses are plain text, never wildcards
+    # (2026-10-24: ":(literal)app/[id]/route.ts" scopes inlined no untracked file at all).
+    Assert-True (Test-OracleInScope -Relative 'app/api/topics/[id]/route.ts' -Path @(':(literal)app/api/topics/[id]/route.ts')) 'literal pathspec with brackets did not match its own file'
+    Assert-True (Test-OracleInScope -Relative 'app/(shell)/tools/topics/page.tsx' -Path @('app/(shell)/tools/topics')) 'folder scope with parentheses did not match a file under it'
+    Assert-True (-not (Test-OracleInScope -Relative 'app/api/topics/i/route.ts' -Path @('app/api/topics/[id]/route.ts'))) 'brackets were read as a character class'
+    Assert-True (-not (Test-OracleInScope -Relative 'lib/content/topicsX/a.ts' -Path @('lib/content/topics'))) 'a sibling folder with the same prefix matched'
+    Assert-True (Test-OracleInScope -Relative 'anything.ts' -Path @()) 'no scope must mean everything'
+    [IO.File]::WriteAllText((Join-Path $root 'scripts\[id].ps1'), 'Write-Output ok', (New-Object Text.UTF8Encoding($false)))
+    $scoped = Invoke-OracleUntrackedCapture -Root $root -Candidates @('scripts/[id].ps1', 'scripts/new.ps1') -Policy $policy -Path @(':(literal)scripts/[id].ps1')
+    Assert-True ((@($scoped.Inlined) -join ',') -eq 'scripts/[id].ps1') 'a literal -Path scope did not inline exactly its own untracked file'
+
     # Mutation proof: removing the runtime guard must make the transcript visible
     # again; otherwise the regression test would be decorative.
     $mutatedPolicy = Get-OracleCapturePolicy

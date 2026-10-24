@@ -1,4 +1,37 @@
 # Worklog
+## 2026-10-24（續24）AUTO_CONTENT P3：熱搜存檔＋題目佇列（0121 寫好、拋棄式 DB 驗過、db-expert 審過；未套正式庫）（Claude）
+
+**觸發**：操作者「Start P3 … Stop before applying 0121 to production」。
+
+**根因**：熱搜（`NA/lib/content/trending-sources.ts runTrending`）抓完只回 JSON 不存；沒有「這個月要做什麼」的資料表，自動管線無題目可做。
+**不變量**：題目只有一張表、一個狀態表（`store.ts NEXT`）；每次狀態變更都帶「讀到的狀態＋版本」守衛；啟動（approved→generating）只能經 `content_topics_start`（每客戶 advisory lock 內數當日啟動數），每日上限不被並發突破；每支題目 API 由網站或題目本身決定客戶並 `canAccessOrg`，他客戶 404。
+
+**改動**（`NA`＝`lobster-factory/infra/hetzner-phase1-core/apps/next-admin`，`DB`＝`lobster-factory/packages/db`）
+- `DB/migrations/0121_content_topics.sql`＋`.down.sql`（＋`DB/scripts/0121_content_topics_down.sql`、`0121_content_topics-local-verify.sh`）：content_trends、content_trends_top、content_topics、content_topics_start、client_schedules every_5m。
+- `NA/lib/content/topics/`：trends.ts（存檔＋90 天清理＋30 天排行）、store.ts、plan.ts（每月提案）、cost.ts；`NA/app/api/content/trending/route.ts` 存檔一行。
+- API `NA/app/api/content/topics/`（route、`[id]`、plan）；頁 `NA/app/(shell)/tools/content/topics/`；側欄 Marketing「Topic Queue」；新收費功能 `content.plan`（products、route-features、cost-model）。
+- 計畫 P3 卡改成實作；新增待決 D8（資料庫層鎖「題目網站屬同客戶」）。
+- 熱搜快取只收支援地區：新 `NA/lib/content/geos.ts`（無 import）＝唯一地區清單；`trending-sources.ts GEO_RSS` 以它為型別鍵、`trends.ts` 只寫清單內地區、`app/api/content/sources/route.ts` 改讀它並刪自己的 VALID_GEOS 字面複本（session a320a90e 指出 ?geo= 可寫任意字到共用快取，並要求 sources 不得 import trending-sources 以免碰到收費功能，閘 4）；`registry-code.test.ts` 的 trending ORG_FREE 說明補 content_trends（該 session 同意由本 commit 改這一行）。
+
+**db-expert 審查（opus）**：可套 prod，0 Critical／0 Major／9 Minor。修 7：M1 索引改 (org, status, scheduled_for)、刪重複；M2 site_id 索引；M3 down 先鎖表；M4 熱搜 90 天清理；M5 30 天排行改 RPC；M6 last_error 截 500；M7 每日上限改 RPC＋advisory lock。M9 計畫卡已同步。M8 交操作者（D8）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash lobster-factory/packages/db/scripts/0121_content_topics-local-verify.sh（postgres:15.8-alpine 拋棄式容器）| exit=0 | ms=0（PASS：限制、版本 claim、站刪除、every_5m、RLS／權限、兩個 RPC、索引、down 有題目／every_5m 時拒絕、再套兩次冪等；未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run app/api/content/topics lib/content/topics lib/portal app/__tests__/sidebar-coverage.test.ts | exit=0 | ms=0（審查修正後 lib/social lib/content lib/portal app/api/content sidebar-coverage：84 檔 532 測；未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scratchpad/topics-check.mjs（Playwright 對 no-Supabase dev server :3902，攔截 API）→ 核准 PATCH 帶 version、改格式不動狀態、失敗題目顯示原因與重試、知識庫資料夾填入表單並以 source kb 送出、無 select | exit=0 | ms=0（未計時）
+- 正式庫唯讀查詢：`client_schedules_frequency_check` 名稱與定義、最新已套 0120、新表不存在。
+- `npx tsc --noEmit`：本次檔案 0 錯。突變：拔 `[id]` 的 canAccessOrg → 1 測紅；漏寫平台不重問 → 1 測紅；審查工具改回 `-like` 比對 → capture 測試紅；還原綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n -- Codex `agency-os/reports/oracle/2026-10-24-partialreview-91a10d9c.md`（16 檔含 11 個新檔，packet 78.7KB）。同日較早的 `…-5a1d79ee.md`「NO FINDINGS」只收到 5 個已追蹤檔，不算審查。F1 every_5m 資料庫接受但 isDueNow 不懂：實查目前不可達（`NA/app/api/ops/clients/[slug]/schedules/[job]/route.ts:46` 只收 job 自己宣告的頻率，無 job 宣告 every_5m），排到 P4.2 與第一個用它的 job 同 commit；F2 抓到 0 筆不清理：已修（有效地區每次都清）；F3 不存在的月份回 500：已修（`store.ts isMonth` 01–12，三支路由回 400）。
+  - external oracle = Codex CLI (codex exec -s read-only), not self-description
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n -- P1／P2 補審 Codex `agency-os/reports/oracle/2026-10-24-partialreview-59a1fa74.md`（DiffRef fd172fe2a..30b6a022f，8 個當初沒審到的新檔）。F1 AI 漏寫平台或非字串時靜默成功：已修（同一次重試補問，仍缺回 `missing`，syndicate 回應帶出）；F2 無網址時 [LINK] 原樣送出：已修（提示禁止＋殘留移除）；F3 siteRowGate 測試沒驗查詢條件：已補（斷言 eq id）。
+  - external oracle = Codex CLI (codex exec -s read-only), not self-description
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=content_topics|content_trends|content.plan|every_5m | hits=0（程式外無舊引用；every_5m 只出現在 0121 與計畫）
+
+**更正（P1 續13、P2 續19 的 REVIEW_DONE 不完整）**：那兩次 Codex 審查（`…-7b056e48.md`、`…-3457fac3.md`）只看到修改過的已追蹤檔，新檔（P1 的 brand-voice*.ts 與測試、P2 的 write-posts.ts 與測試）從沒送進去。根因：`scripts/oracle-capture-policy.ps1` 用含 `:(literal)` 前綴的字串比對未追蹤檔，`scripts/codex-oracle.ps1` 用 `-like`（`[id]` 被當字元集合）。修：同一個 `Test-OracleInScope`（去掉 pathspec 前綴、純字串相等或在資料夾下），`tests/oracle-capture-policy.test.ps1` 加 5 條；上面兩份補審即為修正後的結果。記憶 `feedback_oracle_check_files_reviewed`：每次審查要看 files-reviewed 是否含新檔。
+
+**未做（等你）**：0121 套正式庫（監工台待決 2）。套前：先部署程式也安全（存熱搜失敗只 warn）；一旦有題目或 every_5m 排程就不能 down，只能往前修。
+**已知限制**：手機寬度下 app 外框左側欄仍占約 280px，內容區太窄而橫向捲動；排程頁同樣，屬外框問題。
+**rollback**：程式 `git revert <本 commit>`；0121 在出現第一筆題目前可跑 down。
 ## 2026-10-24（續23）Claude 使用者層設定 verify 永久假 drift：驗證端只剝頂層 `_comment`，寫入端已剝任何深度（Claude）
 
 **觸發**：上一輪交接「verify-build-gates 一項失敗：Claude 使用者層設定漂移，等另一 session 完成會自行收斂」。查證：那個 session 已 commit `da4b0f35f`（13:54），檔案乾淨，`sync-claude-userlevel.ps1 -Mode verify` 仍 exit 1——不會自行收斂。

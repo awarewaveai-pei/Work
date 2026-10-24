@@ -1,9 +1,9 @@
 // siteRowGate: the one tenant check for the by-id site routes (edit, delete, connection test).
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const m = vi.hoisted(() => ({ row: { data: null as unknown, error: null as { message: string } | null } }));
+const m = vi.hoisted(() => ({ row: { data: null as unknown, error: null as { message: string } | null }, eqs: [] as Array<[string, unknown]> }));
 vi.mock("@/lib/supabase-server", () => {
-  const q = { select: () => q, eq: () => q, maybeSingle: async () => m.row };
+  const q = { select: () => q, eq: (c: string, v: unknown) => { m.eqs.push([c, v]); return q; }, maybeSingle: async () => m.row };
   return { getSupabaseWriteClient: () => ({ from: () => q }) };
 });
 
@@ -16,7 +16,12 @@ const CLIENT_A = req({ "x-ops-user-kind": "client", "x-ops-org-id": ORG_A });
 const CLIENT_B = req({ "x-ops-user-kind": "client", "x-ops-org-id": "bbbbbbbb-0000-4000-8000-00000000000b" });
 
 describe("siteRowGate", () => {
-  beforeEach(() => { m.row = { data: { organization_id: ORG_A }, error: null }; });
+  beforeEach(() => { m.row = { data: { organization_id: ORG_A }, error: null }; m.eqs = []; });
+
+  it("reads exactly the requested row", async () => {
+    await siteRowGate(STAFF, "site-42");
+    expect(m.eqs).toEqual([["id", "site-42"]]);
+  });
 
   it("lets staff and the owning client through", async () => {
     expect(await siteRowGate(STAFF, "s")).toBeNull();

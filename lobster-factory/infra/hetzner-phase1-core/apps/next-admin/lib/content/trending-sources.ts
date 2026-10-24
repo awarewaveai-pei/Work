@@ -16,6 +16,7 @@ import { isSafePublicHttps } from "./public-https";
  */
 
 import { register, byKind, geoMatch, type BlockCtx, type ContentBlock } from "./blocks/registry";
+import type { TrendingGeo } from "./geos";
 
 export interface TrendingItem {
   title: string;
@@ -192,7 +193,7 @@ export function buildDbSearchBlocks(
 
 // ─── 地區設定 ────────────────────────────────────────────────────────────────
 
-const GEO_RSS: Record<string, { hl: string; gl: string; ceid: string }> = {
+const GEO_RSS: Record<TrendingGeo, { hl: string; gl: string; ceid: string }> = {   // keyed off lib/content/geos.ts
   TW: { hl: "zh-TW", gl: "TW", ceid: "TW:zh-Hant" },
   HK: { hl: "zh-HK", gl: "HK", ceid: "HK:zh-Hant" },
   SG: { hl: "en-SG", gl: "SG", ceid: "SG:en" },

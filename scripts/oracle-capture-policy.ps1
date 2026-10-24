@@ -73,6 +73,23 @@ function Get-OracleSkipReason {
     return $null
 }
 
+# Is a repo-relative file inside a -Path scope? The one check for untracked files (codex-oracle.ps1 and
+# Invoke-OracleUntrackedCapture). A scope may carry git pathspec magic (":(literal)app/[id]/route.ts", needed so git
+# does not read [id] or (shell) as a pattern); the magic is stripped and the rest compared as plain text: equal, or
+# a folder the file sits under. Never -like: "[id]" is a wildcard character class there (2026-10-24: three reviews
+# silently skipped every new file under such paths).
+function Test-OracleInScope {
+    param([Parameter(Mandatory)][string]$Relative, [string[]]$Path = @())
+    if ($Path.Count -eq 0) { return $true }
+    $file = ($Relative.Trim() -replace '\\', '/')
+    foreach ($p in $Path) {
+        $scope = (($p -replace '^:\([^)]*\)', '') -replace '\\', '/').TrimEnd('/')
+        if (-not $scope) { continue }
+        if ($file -eq $scope -or $file.StartsWith($scope + '/')) { return $true }
+    }
+    return $false
+}
+
 function Invoke-OracleUntrackedCapture {
     param(
         [Parameter(Mandatory)][string]$Root,
@@ -91,13 +108,7 @@ function Invoke-OracleUntrackedCapture {
         $relative = ($candidate.Trim() -replace '\\', '/')
         if (-not $relative) { continue }
 
-        if ($Path.Count -gt 0) {
-            $inScope = @($Path | Where-Object {
-                $scope = (($_ -replace '\\', '/').TrimEnd('/'))
-                $relative -eq $scope -or $relative.StartsWith($scope + '/')
-            }).Count -gt 0
-            if (-not $inScope) { continue }
-        }
+        if (-not (Test-OracleInScope -Relative $relative -Path $Path)) { continue }
 
         $reason = Get-OracleSkipReason -RelativePath $relative -Policy $Policy
         if ($reason) { $skipped.Add("$relative ($reason)"); continue }

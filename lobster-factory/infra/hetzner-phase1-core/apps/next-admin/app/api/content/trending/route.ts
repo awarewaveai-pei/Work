@@ -3,6 +3,7 @@ import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { runTrending, aiChat, parseJsonStrings, buildDbSearchBlocks } from "@/lib/content/trending-sources";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { withFeature } from "@/lib/entitlements/grant";
+import { saveTrends } from "@/lib/content/topics/trends";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -100,6 +101,9 @@ async function trendingResponse(geo: string): Promise<Response> {
   // per request so a UI deletion takes effect immediately (best-effort: DB miss falls back to built-ins).
   const extra = await loadDbSourceBlocks();
   const items = await runTrending(geo, extra);   // 搜尋積木：跑所有啟用且符合 geo 的來源
+  // Kept for the monthly topic plan (lib/content/topics/trends.ts); a failed write never changes this answer.
+  const sb = getSupabaseWriteClient();
+  if (sb) await saveTrends(sb, geo, items).catch((e) => console.warn("[trending] trends not saved:", String(e).slice(0, 200)));
   return NextResponse.json({ ok: true, items, geo });
 }
 

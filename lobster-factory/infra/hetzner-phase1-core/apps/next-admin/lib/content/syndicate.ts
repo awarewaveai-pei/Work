@@ -61,8 +61,8 @@ async function handlePost(req: Request, grant: Grant, route: string): Promise<Re
 
   try {
     const articleUrl = typeof body.articleUrl === "string" ? body.articleUrl.trim() : "";
-    const { posts, tooLong } = await writeSocialPosts({ article, keys, mediaType, articleUrl, voice }, ask);
-    return NextResponse.json({ ok: true, posts, tooLong, _cost: { usd, model, vendor: resolveTextRate(model).rate.vendor } });
+    const { posts, tooLong, missing } = await writeSocialPosts({ article, keys, mediaType, articleUrl, voice }, ask);
+    return NextResponse.json({ ok: true, posts, tooLong, missing, _cost: { usd, model, vendor: resolveTextRate(model).rate.vendor } });
   } catch (e) {
     if (e instanceof WriterParseError) return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
     throw e;

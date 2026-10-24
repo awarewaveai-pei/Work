@@ -15,6 +15,7 @@
 | D5 | 自動化開關＝`/ops/schedules` 的 `content_pipeline` 格，每站一格，預設關 | AGENTS §0 自動化預設 OFF |
 | D6 | 時鐘＝主機 cron 每 5 分鐘呼叫既有 `/api/internal/schedules/run-due`；不加 Trigger task、不加第二條 cron 專線 | 操作者 2026-10-24：盡量不外接；SCHEDULES_PAGE_PLAN §3.3 反對第三套排程 |
 | D7 | 範圍採 B（全部八階段）；A（P1–P4）＝第一個里程碑 | A 的卡＝B 的前四階段，零重工 |
+| D8 | 待定（db-expert M8）：資料庫層強制「題目的網站必須屬於同一個客戶」（wp_sites unique (id, organization_id)＋複合 FK）。現況：程式層已擋（POST 用網站自己的客戶、`move` 不能改 site_id）。代價：有題目引用的網站不能改所屬客戶 | 縱深防禦 vs 搬站彈性，產品取捨 |
 
 ## 1. 任務理解
 
@@ -170,12 +171,12 @@
 
 | 卡 | 改 | 做 | 驗 | 突變 |
 |---|---|---|---|---|
-| P3.1 | `DB/migrations/0121_content_topics.sql`＋`.down.sql` | ① `client_schedules.frequency` CHECK 加 `every_5m`；② `content_trends(id, geo, source, title, traffic, category, related_queries jsonb, fetched_on date, hash text, UNIQUE(hash,fetched_on))`；③ `content_topics(id, organization_id FK, site_id, title, keyword, angle, source text CHECK in(trending,kb,plan,manual), source_ref jsonb, month date, formats text[], status text CHECK in(proposed,approved,generating,drafted,waiting_video,embedded,reviewed,scheduled,published,failed), publish_mode text, scheduled_for timestamptz, artifacts jsonb default '{}', review jsonb, version int default 1, last_error text, started_on date, created_by text, created_at, updated_at)`；index (organization_id,status)、(status,scheduled_for)；RLS service_role only（照 0097:49-54） | 拋棄式 DB 套→還原→再套；`db-expert` 審 | — |
-| P3.2 | `trending/route.ts:98-104` | `trendingResponse` 後 upsert `content_trends`（hash＝source+title 正規化），回應不變；DB 失敗只 warn | 新測：同日同 item 一列；DB 壞仍回 items | 拔 onConflict → 測紅 |
-| P3.3 | 新 `NA/lib/content/topics/store.ts`＋測試 | `list(org, month)`、`propose(rows)`、`setStatus(id, from→to, version)`（claim：`UPDATE … WHERE id AND version=?`，0 列＝他人已推）、`startableToday(org, N)`、`inProgress(org)`、`fail(id, err)`；DB 錯一律 throw（照 `schedules/store.ts:3-4`） | vitest | 拔 version 條件 → claim 測紅 |
-| P3.4 | 新 `NA/lib/content/topics/plan.ts`；`route-features.ts`＋`products.ts:64` 加 `content.plan` | `proposeMonth(org, month)`：輸入＝30 天 `content_trends`（站 geo）去重前 50＋KB 最近 10 folder 標題＋I1 品牌；呼叫 P5.1 登記表的 `calendar` 模組 build（搬 `ScriptForge.tsx:993` prompt）；輸出 28 列 proposed，`scheduled_for` 分散於當月、`formats` 由 AI 建議但預設 {article,social}；`grantFor("content.plan",{orgId,actor})` | 測（假模型）：28 列、keyword 不重複、全月分散 | 拔去重 → 測紅 |
-| P3.5 | 新頁 `NA/app/(shell)/tools/content/topics/page.tsx`＋`TopicsTable.tsx`；`SidebarNav.tsx:62` 後加一列；`/api/content/topics/*` route | §3.3 畫面；核取方格＋按鈕，無 select；右欄細節；「核准所選／退回所選／核准並開始／重試」 | sidebar-coverage 綠；`/playwright` 截圖比對 §3.3 | — |
-| P3.6 | `/ops/collect` KB folder 卡 | 「加為題目」→ `propose` 一列 source=kb（引用 folder id，不複製內容） | 測 | — |
+| P3.1 | `DB/migrations/0121_content_topics.sql`＋`.down.sql`（`DB/scripts/0121_content_topics_down.sql` 同內容）＋`DB/scripts/0121_content_topics-local-verify.sh` | `content_trends`（全域快取，unique (hash, fetched_on)）；RPC `content_trends_top(geo, since, n)`（依出現天數排）；`content_topics`（organization_id、site_id→wp_sites set null、title、keyword、angle、source trending/kb/plan/manual、source_ref、month、scheduled_for、formats、status 11 種含 rejected、artifacts、review、version、last_error≤500、started_on、created_by；unique (organization_id, month, keyword)；index (organization_id, status, scheduled_for)、(organization_id, started_on)、(site_id)）；RPC `content_topics_start`（advisory lock 下數當日啟動數再 claim）；`client_schedules.frequency` 加 `every_5m`；RLS service_role only。發布模式不存題目列（站層 D1）。down：鎖表後有題目或 every_5m 即拒絕 | `bash DB/scripts/0121_content_topics-local-verify.sh` → PASS；`db-expert` 審 | — |
+| P3.2 | `trending/route.ts`；新 `NA/lib/content/topics/trends.ts` | `saveTrends`：hash＝sha256(geo\|source\|正規化標題)，upsert 忽略重複，順手刪該 geo 90 天前的列；失敗只 warn，回應不變。`recentTrends` 走 `content_trends_top` | `vitest lib/content/topics/__tests__/trends.test.ts` | — |
+| P3.3 | 新 `NA/lib/content/topics/store.ts`＋測試 | `NEXT` 狀態表；`listTopics`、`topicById`、`proposeTopics`（同月同關鍵字略過）、`move`（status＋version 守衛，last_error 截 500，不允許改 site_id，不得直接到 generating）、`setFormats`、`startTopic`（RPC，每日上限）、`startedOn`；DB 錯一律 throw | `vitest lib/content/topics/__tests__/store.test.ts` | 拔 version 條件 → claim 測紅 |
+| P3.4 | 新 `NA/lib/content/topics/plan.ts`、`cost.ts`；`route-features.ts`＋`products.ts`＋`cost-model.ts` 加 `content.plan`／`content-plan` | `proposeMonth`：站必須屬於該客戶；網站目標國家→熱搜地區；近 30 天熱搜前 50＋知識庫資料夾名＋品牌語氣 → 一次 Opus（`planAsker`）→ `parsePlan` 檢查（關鍵字不重複、日期在月內、格式與來源合法、最多 28）→ proposed | `vitest lib/content/topics/__tests__/plan.test.ts` | 拔去重 → 測紅 |
+| P3.5 | 新頁 `NA/app/(shell)/tools/content/topics/`（page＋TopicsBoard）；側欄 Marketing「Topic Queue」；API `NA/app/api/content/topics/`（GET 列表＋資料夾、POST 加一題、`[id]` PATCH 核准／退回／改回提案／重試／改格式、`plan` POST） | 網站按鈕、上下月、AI 提案（按鈕顯示成本）、勾選核准／退回、右側細節；每支 API 由網站或題目決定客戶並 `canAccessOrg`，他客戶 404、過期版本 409 | `vitest app/api/content/topics`；sidebar-coverage 綠；Playwright 對 no-Supabase dev server | 拔 `[id]` 的 canAccessOrg → 測紅 |
+| P3.6 | `TopicsBoard.tsx`＋`GET /api/content/topics?folders=1` | 題目頁列出該客戶知識庫資料夾，點一下把資料夾名（去掉時間戳）填進加題目表單，來源記 kb＋folder_id（不複製資料） | Playwright：點資料夾 → POST 帶 source kb | — |
 
 ### P4 排程管線（啟用＝操作者在 `/ops/schedules` 勾格）
 

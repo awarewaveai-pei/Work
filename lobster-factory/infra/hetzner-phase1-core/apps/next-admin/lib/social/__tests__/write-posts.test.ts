@@ -47,7 +47,7 @@ describe("writeSocialPosts", () => {
     const ask = vi.fn().mockResolvedValueOnce(answer({ facebook: "看文章 [LINK]", linkedin: "短文" }));
     const r = await writeSocialPosts({ article: "a", keys: ["facebook", "linkedin"], articleUrl: "https://s.example/a" }, ask);
     expect(ask).toHaveBeenCalledTimes(1);
-    expect(r).toEqual({ posts: { facebook: "看文章 https://s.example/a", linkedin: "短文" }, tooLong: [] });
+    expect(r).toEqual({ posts: { facebook: "看文章 https://s.example/a", linkedin: "短文" }, tooLong: [], missing: [] });
   });
 
   it("an over-limit post gets one shorter rewrite of that platform only", async () => {
@@ -58,7 +58,7 @@ describe("writeSocialPosts", () => {
     expect(ask).toHaveBeenCalledTimes(2);
     expect(ask.mock.calls[1][0]).toContain('Use these exact keys: "threads"');
     expect(ask.mock.calls[1][0]).toContain("too long: threads 600/500");
-    expect(r).toEqual({ posts: { threads: "字".repeat(100), facebook: "好" }, tooLong: [] });
+    expect(r).toEqual({ posts: { threads: "字".repeat(100), facebook: "好" }, tooLong: [], missing: [] });
   });
 
   it("still too long after the rewrite: reported, never silently cut", async () => {
@@ -66,6 +66,23 @@ describe("writeSocialPosts", () => {
     const r = await writeSocialPosts({ article: "a", keys: ["twitter_single"] }, ask);
     expect(r.tooLong).toEqual([{ key: "twitter_single", length: 400, limit: BODY_LIMITS.x }]);
     expect(r.posts.twitter_single).toHaveLength(400);
+  });
+
+  it("a platform the answer left out or gave a non-string for is asked again, then reported as missing", async () => {
+    const ask = vi.fn()
+      .mockResolvedValueOnce(answer({ facebook: "好" }).replace("}", ',"linkedin":123}'))
+      .mockResolvedValueOnce(answer({ linkedin: "  " }));
+    const r = await writeSocialPosts({ article: "a", keys: ["facebook", "linkedin", "threads"] }, ask);
+    expect(ask.mock.calls[1][0]).toContain('Use these exact keys: "linkedin", "threads"');
+    expect(r.missing).toEqual(["linkedin", "threads"]);
+    expect(r.posts).toEqual({ facebook: "好" });
+  });
+
+  it("without an article URL the prompt forbids [LINK] and a placeholder written anyway is removed", async () => {
+    const ask = vi.fn().mockResolvedValueOnce(answer({ instagram: "好文 [LINK]\n#tag" }));
+    const r = await writeSocialPosts({ article: "a", keys: ["instagram"] }, ask);
+    expect(ask.mock.calls[0][0]).toContain("There is no article link: do not write [LINK]");
+    expect(r.posts.instagram).toBe("好文\n#tag");
   });
 
   it("an unreadable first answer is an error; an unreadable rewrite keeps the first answer marked too long", async () => {

@@ -245,10 +245,7 @@ if ($Mode -eq 'review') {
                 # $Path, if $Path itself has exactly one element). Only @()-wrapping
                 # guarantees a true array regardless of match count. Confirmed via
                 # isolated repro + critic cross-check, 2026-08-29.
-                $untracked = @($untracked | Where-Object {
-                    $f = $_
-                    @($Path | Where-Object { $f -like (($_ -replace '\\', '/').TrimEnd('/') + '*') }).Count -gt 0
-                })
+                $untracked = @($untracked | Where-Object { Test-OracleInScope -Relative $_ -Path $Path })
             }
 
             $capture = Invoke-OracleUntrackedCapture -Root $root -Candidates $untracked -Policy $capturePolicy -Path $Path

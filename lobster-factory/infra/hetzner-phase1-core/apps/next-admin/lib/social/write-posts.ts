@@ -88,6 +88,8 @@ export interface WriteResult {
   posts: Partial<Record<WriterKey, string>>;
   /** Still over the hard limit after one shorter rewrite: shown to a person, never sent. */
   tooLong: Array<{ key: WriterKey; length: number; limit: number }>;
+  /** Asked for but not answered (missing, empty or not text) even after the retry: the caller says so. */
+  missing: WriterKey[];
 }
 
 export class WriterParseError extends Error {}
@@ -101,7 +103,9 @@ export function buildPrompt(input: WriteInput, keys: WriterKey[], shorten: Write
     const p: WriterPlatform = PLATFORMS[k];
     return `- ${k}: ${video && p.video ? `${p.video} ` : ""}${p.style}${limitPhrase(p)}`;
   }).join("\n");
-  const urlLine = input.articleUrl ? `\nArticle URL (use as [LINK] where indicated): ${input.articleUrl}` : "";
+  const urlLine = input.articleUrl
+    ? `\nArticle URL (use as [LINK] where indicated): ${input.articleUrl}`
+    : "\nThere is no article link: do not write [LINK] or any placeholder for one.";
   const mediaLine = video
     ? "\nIMPORTANT: This content will accompany a VIDEO. Write captions/copy that complement the video — do NOT describe the video or repeat its script."
     : input.mediaType === "image" ? "\nThis content will accompany an IMAGE. Reference the visual without describing it literally." : "";
@@ -126,7 +130,9 @@ function parsePosts(text: string, keys: WriterKey[], articleUrl?: string): Parti
   const out: Partial<Record<WriterKey, string>> = {};
   for (const k of keys) {
     const v = raw[k];
-    if (typeof v === "string") out[k] = articleUrl ? v.replace(/\[LINK\]/g, articleUrl) : v;
+    if (typeof v !== "string" || !v.trim()) continue;
+    // no URL: a placeholder the model wrote anyway is removed, never published
+    out[k] = articleUrl ? v.replace(/\[LINK\]/g, articleUrl) : v.replace(/[ \t]*\[LINK\]/g, "").trim();
   }
   return out;
 }
@@ -143,15 +149,16 @@ export async function writeSocialPosts(input: WriteInput, ask: (prompt: string) 
     const o = posts[k] === undefined ? null : overLength(k, posts[k]!);
     return o ? [{ key: k, ...o }] : [];
   });
+  const unanswered = () => keys.filter((k) => posts[k] === undefined);
   let tooLong = measure(keys);
-  if (tooLong.length) {
-    const retryKeys = tooLong.map((t) => t.key);
+  if (tooLong.length || unanswered().length) {
+    const retryKeys = [...tooLong.map((t) => t.key), ...unanswered()];
     try {
       Object.assign(posts, parsePosts(await ask(buildPrompt(input, retryKeys, tooLong)), retryKeys, input.articleUrl));
-      tooLong = measure(retryKeys);
+      tooLong = measure(keys);
     } catch (e) {
-      if (!(e instanceof WriterParseError)) throw e;   // an unreadable retry keeps the first answer, still marked too long
+      if (!(e instanceof WriterParseError)) throw e;   // an unreadable retry keeps the first answer
     }
   }
-  return { posts, tooLong };
+  return { posts, tooLong, missing: unanswered() };
 }

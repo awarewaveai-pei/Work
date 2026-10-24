@@ -3,6 +3,7 @@ import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { isSafePublicHttps } from "@/lib/content/public-https";
 import { staffOnly } from "@/lib/tenant-guard";
+import { TRENDING_GEOS } from "@/lib/content/geos";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,8 +15,8 @@ export const dynamic = "force-dynamic";
 // The table has no organization column: every tenant's trending reads it. A customer on a product door may read the
 // list; adding, editing and deleting are staff-only (step-8 card decision D2).
 
-// geos allowlist mirrors GEO_RSS keys in trending-sources.ts (built-in Google News regions).
-const VALID_GEOS = new Set(["TW", "HK", "SG", "US", "GB", "JP", "AU"]);
+// geos allowlist = the one region list (lib/content/geos.ts).
+const VALID_GEOS: ReadonlySet<string> = new Set(TRENDING_GEOS);
 
 interface SourceRow {
   id: string;
