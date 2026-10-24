@@ -9,6 +9,7 @@
 | 卡 | 操作者 2026-10-14 看過 §3.4，步 2、5 給 go |
 | Slice 1 | 步 1–3、5、7 完成（`4ff292b38`、`d6e537717`、0097 已套、`schedules-heartbeat` 18:00 UTC 首跑綠、過渡 route 與舊 token 已刪）。**剩**：步 4 寫入 smoke 與步 6 真實一跑需操作者登入（改一格 → `ops_audit_events`；勾一格到下一個整點 → `collection_runs`） |
 | 前置 | 筆電 tenant 自動化已退役（`f8ffaf4b1`，WORKLOG 2026-10-14 續22） |
+| 時鐘（2026-10-24） | 頻率多一種 `every_5m`（0121；`lib/schedules/schedule.ts` isDueNow 4.5 分鐘下限）供 `content_pipeline` 格用。主機 cron `*/5` `schedules_run_due`（`cron.d/awarewave-schedules`，`HOST/schedules-run-due.sh`）呼叫同一支 run-due，2026-10-24 12:11Z 裝好；只在失敗時寫 `/var/log/schedules-run-due.log`，每輪結果在 `/var/lib/awarewave/jobs/schedules_run_due.json`。跑順一天後停用 Trigger `schedules-heartbeat`（等操作者，`AUTO_CONTENT_EXECUTION_PLAN.md` P4.4） |
 
 ## 1. 目標
 

@@ -69,6 +69,39 @@
           "cmd": "npx tsc --noEmit"
         }
       ]
+    },
+    {
+      "id": "04-video-finalize-core",
+      "file": "cards/04-video-finalize-core.md",
+      "gate": null,
+      "depends": [],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin",
+          "cmd": "npx vitest run lib/content/video/__tests__/finalize.test.ts"
+        },
+        {
+          "cwd": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin",
+          "cmd": "npx vitest run app/api/video/embed-to-wp/route.test.ts"
+        },
+        {
+          "cwd": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin",
+          "cmd": "npx vitest run lib/content/video/__tests__/video-status-tenant.test.ts"
+        },
+        {
+          "cwd": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin",
+          "cmd": "npx vitest run lib/system-modes/__tests__/production-change-coverage.test.ts"
+        },
+        {
+          "cwd": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin",
+          "cmd": "npx vitest run lib/security/__tests__/get-no-side-effects.test.ts"
+        },
+        {
+          "cwd": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin",
+          "cmd": "npx tsc --noEmit"
+        }
+      ]
     }
   ]
 }

@@ -188,7 +188,7 @@
 | P4.1 | `NA/lib/tenant-guard.ts orgIdentity`；`NA/lib/entitlements/grant.ts runForOrg` | I7：`orgIdentity(org)`＝該客戶的 client 身分（middleware 剝除外來同名 header，`middleware.ts:22,303`），既有 `resolveWpSite` 租戶檢查原樣生效，積木與 core 零改；`runForOrg(org, actor, fn)`＝無 Request 的工作在 fn 內 grantFor 一律記該客戶、具名 actor，指名他客戶被拒 | 測：org 身分發他站→403；Request 路徑綠 | 拔 org 比對 → 測紅 |
 | P4.2 | `schedule.ts:33-52`（CHECK 已在 P3.1） | `isDueNow`：`every_5m` 不看時／日，`lastRunAt` 空或 ≥4.5 分鐘前即 due；`scheduledRunKey` every_5m 帶 5 分鐘桶 `HHmm` | `lib/schedules/__tests__/schedule.test.ts` 固定時鐘 | 4.5 分改 0 → 雙 firing 測紅 |
 | P4.3 | — | 取消（見 D6）：run-due 維持 claim→回應→`after()` 跑；結果記在該格 `last_error`／營運收件匣 | — | — |
-| P4.4 | `HOST/install-maintenance-crons.sh`＋新 `HOST/schedules-run-due.sh` | cron `*/5 * * * *` curl `http://127.0.0.1:<next-admin port>/api/internal/schedules/run-due` 帶 `SCHEDULE_INGEST_TOKEN`（讀 `/root/lobster-phase1/.env`，照 `reconcile-videos.sh:16-30`）；log `/var/log/schedules-run-due.log`；失敗同款 Telegram 去重告警。驗綠一天後停用 Trigger `schedules-heartbeat`（重疊期 claim 去重）。High：主機 cron 變更，先說再做 | `sudo tail /var/log/schedules-run-due.log` 每 5 分一筆 JSON；`client_schedules.last_run_at` 更新；`host-loopback-callers.test.ts` 綠 | — |
+| P4.4 | `HOST/install-maintenance-crons.sh`＋新 `HOST/schedules-run-due.sh` | cron `*/5 * * * *` curl `http://127.0.0.1:<next-admin port>/api/internal/schedules/run-due` 帶 `SCHEDULE_INGEST_TOKEN`（讀 `/root/lobster-phase1/.env`，照 `reconcile-videos.sh:16-30`）；log `/var/log/schedules-run-due.log`；失敗同款 Telegram 去重告警。驗綠一天後停用 Trigger `schedules-heartbeat`（重疊期 claim 去重）。High：主機 cron 變更，先說再做 | `/var/lib/awarewave/jobs/schedules_run_due.json` 每 5 分更新且 `exit_code:0`（`cron-run.sh` 寫；`/var/log/schedules-run-due.log` 只記失敗，不存在＝零失敗）；`client_schedules.last_run_at` 更新；`host-loopback-callers.test.ts` 綠 | — |
 | P4.5 | `jobs.ts:34`＋新 `NA/lib/content/topics/tick.ts`＋測試 | job `content_pipeline`：`frequencies:[{value:"every_5m",label:"每 5 分鐘",usesHour:false,usesDay:false}]`；`cost` 句含 N 與每題估價；`unavailable`＝站無 organization_id。`run(org, runKey)`＝`tickContentTopics(org, {budgetMs:200_000, maxStartsPerDay:N})`：① `startableToday` → approved→generating；② `inProgress` 每列照 §3.2 推一步，每步前 claim；預算到即回 summary；單列失敗→failed 不中斷他列；job 本身 throw 只在 store 壞 | 測（假積木）：完整狀態機；中途 throw 下次續；預算到即停；N 上限；雙 firing 不重跑 | 拔 claim → 測紅；拔 N → 測紅 |
 | P4.6 | `NA/lib/content/topics/review.ts`＋`make.ts`；自動發布＝P4 第二個 commit（與 P4.8 同批，設定與行為一起上） | I5：規則閘（無 `GENERATION_` 標記、`runSeoCheck` 分數 ≥ 門檻、`forbidden[]` 零命中、字數下限）→ 站設定開才加一次 Haiku 品牌符合度 → `review={pass,checks[],at}`；`publishMode=ai_review_auto` 且 pass → publish 積木 `publish|future`＋社群 `setState schedule`；否則停 reviewed | 測：human_review 永不出草稿；auto 但 fail 不發；auto 且 pass 發 | 拔規則閘 → 測紅 |
 | P4.7 | `NA/app/api/content/topics/[id]/start/route.ts`（withFeature：有文章＝content.article、社群-only＝content.syndicate；開始前查網站，不佔名額；製作在 after() 以按的人為 actor） | 「核准並開始」：核准後對該列同步跑 `tickContentTopics` 一步（意圖當下做，時鐘補尾；同 social `publish_now` 形狀 `state.ts:66`）；計入當日 N | e2e：按下後 WP 立刻有草稿 | — |
@@ -208,7 +208,7 @@
 
 | 卡 | 改 | 做 | 驗 |
 |---|---|---|---|
-| P6.1 | `status/route.ts`、`embed-to-wp/route.ts` → 新 `NA/lib/content/video/finalize.ts` | I4：抽 `finalizeVideoJob(jobId)`、`embedVideoInPost({siteId,postId,videoUrl}, identity)`；兩 route 變殼；行為不變 | 既有 status／embed 測試綠 |
+| P6.1 | `status/route.ts`、`embed-to-wp/route.ts` → 新 `NA/lib/content/video/finalize.ts`＋`embed-in-post.ts`（分兩檔：嵌入不可碰到 video-pipeline 的付費功能） | I4：抽 `finalizeVideoJob(job)`（呼叫端先讀 job、先做自己的存取檢查）、`embedVideoInPost(identity, {siteId,postId,videoUrl,releaseId?,variant?})`；兩 route 變殼；行為不變（卡 `agency-os/handoffs/codex-queue/cards/04-video-finalize-core.md`） | 既有 status／embed 測試綠 |
 | P6.2 | `tick.ts` | §3.2 drafted→waiting_video→embedded：prepare 走 `byId("video/pipeline")`（org 身分）；每 firing `finalizeVideoJob`；done→embed＋社群影片貼文（media 經 social media 表，`uploadVideo` `postiz.ts:194` 由 dispatch 處理）；error→failed | 狀態機測；e2e 關分頁情境仍嵌回 |
 | P6.3 | 刪 `NA/app/api/content/social-publish|social-channels|social-admin`、ContentStudio Postiz 面板、Python `publisher.py` | grep 無 caller 才刪 | tsc 0；doors.test 綠；TASKS.md:131 打勾 |
 
@@ -228,7 +228,7 @@
 | P8.2 | `lib/content|social|video/MODULE_MANIFEST.json`＋`products.ts` features 加 `content.plan` |
 | P8.3 | `RUNNABLE_DEMOS.md` 一條操作者能跑的指令 |
 | P8.4 | `node scripts/sync-foundry-catalog.mjs` 重產 |
-| P8.5 | TASKS.md `:122,:145,:349` 收斂指本檔；`SCHEDULES_PAGE_PLAN.md` §0 記 every_5m 與 cron 時鐘 |
+| P8.5 | TASKS.md「社群管理平台 V1」「Postiz Task 2 OAuth app 審核」「內容引擎積木化」三條收斂指本檔（行號會漂，用條目名）；`SCHEDULES_PAGE_PLAN.md` §0 記 every_5m 與 cron 時鐘 |
 
 ## 8. 驗證
 - 實測：`npx tsc --noEmit`；`npx vitest run <卡測試>`；P4／P6 在拋棄式 org（staging WP 站＋social 測試品牌）真跑一次 firing；`REALTEST_EVIDENCE` 行。

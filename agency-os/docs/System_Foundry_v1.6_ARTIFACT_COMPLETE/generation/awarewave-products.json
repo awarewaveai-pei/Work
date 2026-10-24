@@ -2395,7 +2395,6 @@
       "door": {
         "app": "next-admin",
         "page": "/design",
-        "enabled": false,
         "api": [
           "/api/tools/presets",
           "/api/tools/printful/catalog"
@@ -2727,7 +2726,6 @@
       "door": {
         "app": "next-admin",
         "page": "/video",
-        "enabled": false,
         "api": [
           "/api/video",
           "/api/tools/script-forge"
@@ -2776,10 +2774,14 @@
         "dependsOn": [
           "content"
         ],
+        "optional": [
+          "social"
+        ],
         "manifest": "lib/video/MODULE_MANIFEST.json"
       },
       "staffPaths": [
-        "tools/video"
+        "tools/video",
+        "tools/script-forge"
       ]
     }
   ]

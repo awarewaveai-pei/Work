@@ -127,7 +127,7 @@
 
 - [ ] **【Soulful 搬站後收尾｜無死線】網域轉 Cloudflare Registrar** — 網域付到 2028，無時壓；DKIM selector 是 `hostingermail1`，轉移時勿動 DNS。（付費外掛授權盤點：操作者 2026-10-23 說不用做。）
   - 出自：兩條 Soulful 搬站項（操作者 2026-10-23 確認搬站完成，已歸檔）；其餘收尾（origin lockdown、Hostinger 拉取用公鑰）隨 Hostinger 11/12 到期或已由 ks-aw-01 origin guard 取代。
-- [ ] **【產品｜社群管理平台 V1】照 ADR 016 與 SOCIAL_MANAGER_PLAN.md 做：G5 升級 Postiz，C3 起逐卡**
+- [ ] **【產品｜社群管理平台 V1】照 ADR 016 與 SOCIAL_MANAGER_PLAN.md 做：G5 升級 Postiz，C3 起逐卡**（文章→社群自動排程已由 `AUTO_CONTENT_EXECUTION_PLAN.md` P2／P4 做完；舊 `/api/content/social-publish` 的刪除在該計畫 P6.3）
   - `🟠 未開始` · `2026-10-14` · `G3 Meta 審核狀態（操作者）；G5 要 go-ahead`
   - **一句話**：Metricool 等級的統一發文＋行事曆，Postiz 只當送信員；先自己管多品牌，再開放訂閱
   - **現在到哪**：C1–C12 全部上線（social.aware-wave.com 可發文）。2026-10-16 操作者：「功能不齊全、UI/UX 非常醜」→ 對照 Postiz v2.25／Metricool 盤點完：13 項 UI 缺陷（U1–U13）、19 項功能缺口（F1–F19）、建版＝樣稿 1:1 所以是設計問題、手機版壞掉；順手修 B1（換貼文時編輯器留著上一則文字）。正本 `lobster-factory/docs/social/SOCIAL_MANAGER_GAP_REPORT.md`；render 腳本 `tests/e2e/social/render-views.mjs`
@@ -150,7 +150,7 @@
   - **2026-10-23 續15**：host nginx／lobster-nginx 皆 `proxy_read_timeout 300s`、生圖硬上限 58s（`lib/tarot/image-gen.ts:17`）→ 逾時假說也排除；09-11 的 log 已輪替；Claude 瀏覽器未登入、不可代輸密碼 → **需操作者登入後點一次「重新生成」**（開 devtools Network 看該請求的 status／response），才能再往下。
   - **完成定義**：草稿審核頁「重新生成」單張圖成功，真實 UI 操作驗證（非只測 API）。
   - **證據**：`agency-os/WORKLOG.md` 2026-09-11「remotion-render 502」條目 [剩餘風險] ①。
-- [ ] **【人工｜Postiz Task 2 OAuth app 審核】各平台 dev app 提交** — Meta IG+FB（一個 Meta app，App Review，最高價值）/ Reddit / LinkedIn。callback = `https://postiz.aware-wave.com/integrations/social/<slug>`；client_id/secret 加進 EU `/root/postiz/.env`（`<PLATFORM>_CLIENT_ID/SECRET`）+ restart。
+- [ ] **【人工｜Postiz Task 2 OAuth app 審核】各平台 dev app 提交** — （YouTube＝Google OAuth app 也走這條；完成後解鎖 `AUTO_CONTENT_EXECUTION_PLAN.md` P7。）Meta IG+FB（一個 Meta app，App Review，最高價值）/ Reddit / LinkedIn。callback = `https://postiz.aware-wave.com/integrations/social/<slug>`；client_id/secret 加進 EU `/root/postiz/.env`（`<PLATFORM>_CLIENT_ID/SECRET`）+ restart。
   - **X 跳過**（API $100/月）。非 Claude 可做，等各平台審核通過再接線。
   - **現況 2026-10-14**：Meta ✅ app `2998470257172880` 建好、全權限、redirect、隱私／條款頁；FB 粉專 Aware Wave + Soulful Expression Art Therapy 已連 Postiz 並寫入 `social_postiz_connections`（WORKLOG 2026-10-14 續20）。剩：App icon（人工拖檔）、App Review + 商家驗證（正式發文權限）、IG（需專業帳號綁粉專）。Reddit ⛔ 要開支援單；LinkedIn ⛔ 人脈不足無法建公司頁。
 - [ ] **【診斷】Mockup Studio 功能異常 — server-side 已排除（2026-06-16），卡操作者症狀**：操作者回報 mockup 有問題未提供細節（2026-06-13）。MockupStudio.tsx 實走 `/api/tools/studio/generate`（nano-banana-2 + referenceImages）。
@@ -368,7 +368,7 @@
   - **Phase 2** ✅ 驗證 + 部署（a383ed73）：`batch-mockup.ts`（4 specs：白背+2模特+裝飾平拍，分長短袖）— vitest 5/5
   - **Phase 3** ✅ 驗證 + 部署（a383ed73）：`runAll` 批次合成串接（`genMockup` generate→存 designs + gallery white-bg=主圖 + all-fail fallback 設計圖原稿 + progress n/4）— critic Low 0c/0M、npm test 426 passed
   - **Phase 4**（剩）：真機端到端 — browser 跑 runAll 真生成驗 pipeline + **AI 圖品質操作者 review**（模特手/臉，plan §7 需人判斷）+ P4 試單（Printful 履約解析正確 variant + 設計稿）
-- [ ] **【進行中｜內容引擎積木化】搜尋積木 registry 已 live，剩來源/UI/第二批** — ✅ **已完成並部署（2026-06-16，commit `e336d5da`）**：後端積木註冊骨架 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/content/blocks/registry.ts`（`register/byKind/listAll/geoMatch` + `ContentBlock` 契約，前端 `AB.registerBlock` 後端鏡像）+ 搜尋家族 5 source 自註冊 `lib/content/trending-sources.ts`（google-news/reddit/ptt/perplexity/env-custom-rss）+ 契約 SSOT `lib/content/blocks/README.md`（修好 `public/vector-editor.html:902` 斷裂參照）。
+- [ ] **【進行中｜內容引擎積木化】搜尋積木 registry 已 live，剩來源/UI/第二批** — **2026-10-25：管線部分（舊 §0.5 B 段 P5／P6／P9）由 `agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md` 接手，進度看那邊的監工台；本條只剩積木來源／UI。** ✅ **已完成並部署（2026-06-16，commit `e336d5da`）**：後端積木註冊骨架 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/content/blocks/registry.ts`（`register/byKind/listAll/geoMatch` + `ContentBlock` 契約，前端 `AB.registerBlock` 後端鏡像）+ 搜尋家族 5 source 自註冊 `lib/content/trending-sources.ts`（google-news/reddit/ptt/perplexity/env-custom-rss）+ 契約 SSOT `lib/content/blocks/README.md`（修好 `public/vector-editor.html:902` 斷裂參照）。
   - `app/api/content/trending/route.ts` 改走 `runTrending()`=`byKind("search")`。驗證：tsc 0 + critic Deep 0C/0M + node registry 語意斷言 + SG compiled bundle 含 `search/perplexity`/`CONTENT_TRENDING_FEEDS` + 容器 `PERPLEXITY_API_KEY` SET(53)=Perplexity 積木啟用。
   - **剩餘未做**：
   1. **RSS / Inoreader 實際來源未加**：引擎已支援任意 RSS/Atom（`rssSearchBlock` + `CONTENT_TRENDING_FEEDS` env），但**目前 env 空、零 feed 配置**；Inoreader 全 repo+vault=0（`grep -i inoreader` no match；`user-env.ps1` 無 key）。**最快路徑（零碼零部署）**：取使用者 Inoreader 資料夾/標籤**公開 RSS URL** + 其他 RSS URL → 寫進 SG `CONTENT_TRENDING_FEEDS` → 重啟 next-admin。**OAuth 路徑**（folder/tag 同步、已讀狀態）需註冊 app + `INOREADER_APP_ID/KEY` + OAuth flow（目前全空，較大工）。**待使用者給 feed URL 或選 OAuth**。
