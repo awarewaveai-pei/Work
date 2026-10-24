@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import type { ManagedSite } from "@/app/api/content/sites/route";
+import { useDoorHref, useOnDoor } from "@/app/DoorContext";
 import { FUNNEL_STAGES, PRICE_POSITIONS, type SiteContentDefaults } from "@/lib/content/brand-voice";
 
 const MKT_PRESETS: Record<string, string[]> = {
@@ -459,12 +460,14 @@ function SiteForm({
   onCancel,
   saving,
   error,
+  urlLocked = false,
 }: {
   initial: typeof EMPTY_FORM & { id?: string };
   onSave: (data: typeof EMPTY_FORM) => void;
   onCancel: () => void;
   saving: boolean;
   error: string | null;
+  urlLocked?: boolean;
 }) {
   const [form, setForm] = useState(initial);
   const isEdit = Boolean(initial.id);
@@ -516,6 +519,8 @@ function SiteForm({
             style={inputStyle}
             placeholder="https://example.com"
             value={form.url}
+            readOnly={urlLocked}
+            title={urlLocked ? "網址要由我們變更" : undefined}
             onChange={e => set("url", e.target.value)}
           />
         </label>
@@ -591,6 +596,11 @@ function SiteForm({
 }
 
 export default function SiteManager() {
+  // On the content door a customer edits its own sites, but adding one or changing a URL is staff-only
+  // (siteUrlWriteGate, lib/content/wp-sites.ts): those controls do not show there.
+  const onDoor = useOnDoor();
+  const studioHref = useDoorHref("/tools/content");
+  const calendarHref = useDoorHref("/tools/content/calendar");
   const [sites, setSites] = useState<ManagedSite[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -703,16 +713,16 @@ export default function SiteManager() {
         <div>
           <h2 style={{ color: "var(--text-primary)", margin: 0, fontSize: 22 }}>WordPress 網站連線</h2>
           <p style={{ color: "var(--text-muted)", margin: "4px 0 0", fontSize: 13 }}>
-            管理所有客戶的 WP 站點。Token 加密儲存，不會顯示明文。
+            {onDoor ? "你的 WordPress 網站。" : "管理所有客戶的 WP 站點。"}Token 加密儲存，不會顯示明文。
           </p>
         </div>
-        <button
+        {!onDoor && <button
           className="btn btn-primary"
           onClick={() => { setShowForm(true); setEditingSite(null); setFormError(null); }}
           disabled={showForm || Boolean(editingSite)}
         >
           + 新增網站
-        </button>
+        </button>}
       </div>
 
       {/* Add form */}
@@ -740,7 +750,7 @@ export default function SiteManager() {
             color: "var(--text-muted)",
           }}
         >
-          尚無 WordPress 網站連線。點「+ 新增網站」開始設定。
+          {onDoor ? "尚無 WordPress 網站連線。要新增網站，請聯絡我們。" : "尚無 WordPress 網站連線。點「+ 新增網站」開始設定。"}
         </div>
       )}
 
@@ -761,6 +771,7 @@ export default function SiteManager() {
               onCancel={() => { setEditingSite(null); setFormError(null); }}
               saving={saving}
               error={formError}
+              urlLocked={onDoor}
             />
           ) : (
             <SiteCard
@@ -806,12 +817,12 @@ export default function SiteManager() {
 
       {/* Footer nav */}
       <div style={{ marginTop: 8, display: "flex", gap: 12 }}>
-        <a href="/tools/content" style={{ color: "var(--accent)", fontSize: 13, textDecoration: "none" }}>
+        {studioHref && <a href={studioHref} style={{ color: "var(--accent)", fontSize: 13, textDecoration: "none" }}>
           ← 返回 Content Studio
-        </a>
-        <a href="/tools/content/calendar" style={{ color: "var(--accent)", fontSize: 13, textDecoration: "none" }}>
+        </a>}
+        {calendarHref && <a href={calendarHref} style={{ color: "var(--accent)", fontSize: 13, textDecoration: "none" }}>
           內容行事曆 →
-        </a>
+        </a>}
       </div>
     </div>
   );

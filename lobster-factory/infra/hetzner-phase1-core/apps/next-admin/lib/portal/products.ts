@@ -68,7 +68,9 @@ const PRODUCT_DEFINITIONS = [
     // Paid image operations belong to studio above; Fabric editing itself calls no paid model.
     features: [quota("design.edit", "畫布與向量編輯", "contract")], accessChannels: ["ui"],
     modules: { dependsOn: ["studio"], optional: ["video"], manifest: "lib/design/MODULE_MANIFEST.json" }, staffPaths: ["tools/canvas", "tools/designs", "tools/mockup", "tools/banner", "tools/vector-editor"] },
-  { key: "content", name: "內容行銷", description: "產生文章、搜尋素材並安排內容發布。", subdomain: "content", door: { app: "next-admin", page: "/content", enabled: false, api: ["/api/content"] },
+  { key: "content", name: "內容行銷", description: "產生文章、搜尋素材並安排內容發布。", subdomain: "content", door: { app: "next-admin", page: "/content", enabled: false, api: ["/api/content"],
+      nav: [{ path: "", name: "內容編輯", staff: "tools/content" }, { path: "calendar", name: "行事曆", staff: "tools/content/calendar" },
+        { path: "sites", name: "網站", staff: "tools/content/sites" }, { path: "events", name: "節日", staff: "tools/events" }] },
     loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,
     features: [quota("content.article", "文章生成"), quota("content.humanize", "文章人性化"), quota("content.seo-fix", "SEO 修正"), quota("content.brand-voice", "品牌語氣擷取"), quota("content.outline", "大綱生成"), quota("content.title", "標題建議"), quota("content.keywords", "關鍵字建議"), quota("content.hook-brief", "Hook 草稿"), quota("content.syndicate", "多平台內容改寫"), quota("content.market-analysis", "市場分析"), quota("content.plan", "每月題目規劃"), quota("content.trending", "趨勢分析"), quota("content.image", "內容配圖")],
     accessChannels: ["ui"], modules: { dependsOn: ["studio"], optional: ["video"], manifest: "lib/content/MODULE_MANIFEST.json" }, staffPaths: ["tools/content", "tools/events"] },

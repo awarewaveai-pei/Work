@@ -16,6 +16,7 @@ import { resolveStylePrompt } from "@/app/(shell)/tools/tarot/cards";
 import { DEFAULT_IMAGE_MODEL, IMAGE_RATES } from "@/lib/ai/cost-model";
 import { AI_TEXT_MODEL_GROUPS as AI_MODEL_GROUPS, AI_TEXT_MODELS as AI_MODELS, DEFAULT_AI_TEXT_MODEL } from "@/lib/ai/text-model-options";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
+import { useDoorHref, useOnDoor } from "@/app/DoorContext";
 
 // ─── Video config constants (mirrors VideoStudio) ────────────────────────────
 
@@ -485,6 +486,13 @@ export interface ContentVideoApi {
 export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
   const { canUse, why } = usePaidFeatures();
   const searchParams = useSearchParams();
+  // On the content door (app/content): staff links go through useDoorHref (null = no door page, hide); the newsletter
+  // (our own FluentCRM) and trending-source management are staff-only (step-8 card §5 C-R3/C-R4).
+  const onDoor = useOnDoor();
+  const calendarHref = useDoorHref("/tools/content/calendar");
+  const sitesHref = useDoorHref("/tools/content/sites");
+  const clientsHref = useDoorHref("/ops/clients");
+  const socialHref = useDoorHref("/tools/social");
   // 字串而非 searchParams 物件本身當依賴 —— 物件每次 render 都是新的，會讓下面的
   // effect 每 render 重跑並蓋掉操作者手動選的站。
   const paramSiteId = searchParams.get("siteId") ?? "";
@@ -2064,18 +2072,18 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
               </select>
             </div>
           )}
-          <a href="/tools/content/calendar"
+          {calendarHref && <a href={calendarHref}
             style={{ fontSize: "12px", padding: "5px 12px", border: "1px solid var(--card-border)",
               borderRadius: "6px", color: "var(--text-muted)", textDecoration: "none",
               background: "var(--bg-card)", display: "flex", alignItems: "center", gap: "5px" }}>
             📅 內容行事曆
-          </a>
-          <a href="/ops/clients"
+          </a>}
+          {clientsHref && <a href={clientsHref}
             style={{ fontSize: "12px", padding: "5px 12px", border: "1px solid var(--card-border)",
               borderRadius: "6px", color: "var(--text-muted)", textDecoration: "none",
               background: "var(--bg-card)", display: "flex", alignItems: "center", gap: "5px" }}>
             🔗 客戶管理
-          </a>
+          </a>}
         </div>
       </div>
 
@@ -2089,7 +2097,7 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
             </button>
             {showTrending && (
               <div style={{ display: "flex", gap: "4px" }}>
-                {(["trending", "suggest", "questions", "sources"] as const).map(t => (
+                {(["trending", "suggest", "questions", "sources"] as const).filter(t => !onDoor || t !== "sources").map(t => (
                   <button key={t} onClick={() => setTrendTab(t)}
                     style={{ fontSize: "11px", padding: "3px 10px", borderRadius: "4px", border: "1px solid var(--card-border)", cursor: "pointer",
                       background: trendTab === t ? "var(--btn-primary-bg)" : "var(--bg-card)",
@@ -2165,7 +2173,7 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
             )}
             {trendTab === "trending" && trendingItems.length === 0 && !trendLoading && (
               <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                點擊「搜尋」載入今日熱搜（內建：Google News / Reddit / PTT / Serper，外加你在「⚙️ 管理來源」新增的自訂 RSS 來源）
+                點擊「搜尋」載入今日熱搜（內建：Google News / Reddit / PTT / Serper{onDoor ? "" : "，外加你在「⚙️ 管理來源」新增的自訂 RSS 來源"}）
               </div>
             )}
 
@@ -2207,7 +2215,7 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
             )}
 
             {/* Sources management tab (migration 0042) */}
-            {trendTab === "sources" && (
+            {!onDoor && trendTab === "sources" && (
               <div>
                 <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "10px", lineHeight: 1.6 }}>
                   內建來源：📰 Google News · 👽 Reddit · 🗣️ PTT · 🔍 Serper（不可刪）。
@@ -2281,7 +2289,7 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
               {wpSites.length === 0 && (
                 <span style={{ fontSize: "12px", color: "var(--yellow)" }}>
                   尚未連接任何網站 — 文章仍可生成，但無法推送。{" "}
-                  <a href="/tools/content/sites" style={{ color: "var(--btn-primary-bg)" }}>前往連接 ↗</a>
+                  {sitesHref && <a href={sitesHref} style={{ color: "var(--btn-primary-bg)" }}>前往連接 ↗</a>}
                 </span>
               )}
               {unresolvedSiteParam && (
@@ -2332,9 +2340,9 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
                     {savingDefaults ? "儲存中…" : "💾 存為客戶預設"}
                   </button>
                 )}
-                {(() => {
+                {clientsHref && (() => {
                   const sel = wpSites.find(x => x.id === selectedSiteId);
-                  const clientHref = sel?.org_slug ? `/ops/clients/${sel.org_slug}` : "/ops/clients";
+                  const clientHref = sel?.org_slug ? `${clientsHref}/${sel.org_slug}` : clientsHref;
                   return (
                     <a href={clientHref} style={{ fontSize: "12px", color: "var(--text-muted)", textDecoration: "none" }}>
                       管理客戶 →
@@ -3238,7 +3246,7 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
             <div style={{ background: "linear-gradient(135deg,rgba(139,92,246,0.08),rgba(139,92,246,0.02))", borderBottom: "1px solid rgba(139,92,246,0.2)", padding: "10px 16px", display: "flex", alignItems: "center", gap: "8px" }}>
               <span style={{ fontSize: "15px" }}>🎯</span>
               <span style={{ fontWeight: 700, fontSize: "13px", color: "var(--accent)" }}>品牌資料</span>
-              <span style={{ fontSize: "11px", color: "var(--text-muted)", marginLeft: 4 }}>— 自動帶入 app.aware-wave.com/ops/clients 客戶資料</span>
+              {!onDoor && <span style={{ fontSize: "11px", color: "var(--text-muted)", marginLeft: 4 }}>— 自動帶入 app.aware-wave.com/ops/clients 客戶資料</span>}
             </div>
             <div style={{ padding: "0 16px" }}>
 
@@ -3647,8 +3655,8 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
                     <div style={{ borderTop: "1px solid var(--card-border)", paddingTop: 14, marginTop: 4, display: "flex", alignItems: "center", gap: 10 }}>
                       <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>排程、審核、送出都在社群發文。上面的貼文可以複製過去。</span>
                       {/* the brand = this site's organization; never a link without it (the social manager would open another brand). New tab: the generated copy above lives only in this page's state */}
-                      {currentSite?.organization_id
-                        ? <a href={`/tools/social?brand=${encodeURIComponent(currentSite.organization_id)}`} target="_blank" rel="noopener noreferrer" className="btn-secondary" style={{ fontSize: 13 }}>到社群發文</a>
+                      {!socialHref ? null : currentSite?.organization_id
+                        ? <a href={`${socialHref}?brand=${encodeURIComponent(currentSite.organization_id)}`} target="_blank" rel="noopener noreferrer" className="btn-secondary" style={{ fontSize: 13 }}>到社群發文</a>
                         : <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{currentSite ? "這個網站還沒綁定客戶組織，無法直接開它的社群發文" : "先選客戶"}</span>}
                     </div>
                   </div>
@@ -3657,8 +3665,8 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
             )}
           </SectionToggle>
 
-          {/* ── 電子報草稿（FluentCRM，只建草稿不寄出） ── */}
-          {!hasContent ? (
+          {/* ── 電子報草稿（FluentCRM，只建草稿不寄出；員工專用） ── */}
+          {onDoor ? null : !hasContent ? (
             <div style={{ fontSize: "12px", color: "var(--text-muted)", padding: "8px 0 16px", textAlign: "center" }}>📧 電子報草稿 — 生成文章後才能使用</div>
           ) : (
             <div style={{ marginTop: "16px", paddingBottom: "8px" }}>

@@ -1,4 +1,31 @@
 # Worklog
+## 2026-10-24（續34）content 產品門頁建好（enabled:false，四頁＋門選單）；門上隱藏員工專用的電子報、趨勢來源管理、新增網站與改網址（Claude）
+
+**觸發**：操作者「續做第 8 項產品門」；卡 `cards/step-8-doors-video-design-content.md` §5.5 C1–C5（C-R1…C-R6、S1、P1、D1 已完成）。照 video（`2dd183f44`）、design（`dc5ad2405`）做法。
+
+**發現**
+- C1 C3（影片選項門上不顯示）已由 S1 完成：`ContentStudio` 的 `ai-video` 選項與自動觸發都要 `video` prop，只有 `ContentStudioStaff.tsx` 傳；門頁直接渲染 `ContentStudio` → 無影片選項、閉包無 `/api/video`。本次只驗。
+- C2 門上會 404 或員工專用的東西，伺服器早已擋客戶（`staffOnly`、`siteUrlWriteGate`），但畫面仍給按鈕：電子報（我們自己的 FluentCRM）、「⚙️ 管理來源」分頁、`+ 新增網站`、編輯時的網址欄。不變量同 design：共用元件的員工連結一律經 `useDoorHref`（門沒有該頁 = null = 不顯示）；伺服器拒絕客戶的操作，門上不顯示按鈕。
+- C3 `lib/content/MODULE_MANIFEST.json` 兩句舊說法：「publish wizard 的 mockups」（publish 已歸 studio，D1）、「ContentStudio.tsx 呼叫 /api/video/*」（S1 後在 `ContentStudioStaff.tsx`）。
+
+**修改**（next-admin）
+- 門頁 `app/content/{layout,page}.tsx`、`app/content/{calendar,sites,events}/page.tsx`：沿用員工元件、無 topbar；主頁 `Suspense`（`useSearchParams`）；events 不傳 `sync`（快取刷新員工專用）。
+- `lib/portal/products.ts` content 門 `nav`：內容編輯（根）／行事曆／網站／節日，各對應 `tools/content`、`tools/content/calendar`、`tools/content/sites`、`tools/events`。
+- `ContentStudio.tsx`：行事曆／前往連接／客戶管理／管理客戶→／到社群發文 改 `useDoorHref`；門上隱藏電子報區塊、「管理來源」分頁與提示句、`/ops/clients` 說明。
+- `ContentCalendar.tsx`、`SiteManager.tsx`：連結改 `useDoorHref`；`SiteManager` 門上不顯示 `+ 新增網站`、網址欄唯讀（`urlLocked`）、空狀態改「請聯絡我們」。
+- `lib/content/MODULE_MANIFEST.json` 依賴說明更正；`node scripts/sync-foundry-catalog.mjs`（`--check` PASS）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（352 files／3131 passed／32 skipped）＋ npx tsc --noEmit -p .（原始碼 0；`.next/types` 1 條為他人已刪路由 `api/tools/publish/download` 的生成檔）＋ lib/portal＋middleware-portal-guards 門閘 79 passed（含 content 門 nav 頁存在） | exit=0 | ms=24510
+- REALTEST_EVIDENCE: tool=Bash | cmd=本機 next-admin-social-ui：`/content`、`/content/{calendar,sites,events}` 皆 200、`.door-main`、無 topbar、選單「內容編輯→/ ｜ 行事曆→/calendar ｜ 網站→/sites ｜ 節日→/events」；門上連結只剩 `/calendar`、`/sites`，無電子報、無「管理來源」、無 `+ 新增網站`、無 `/ops/clients`；員工 `/tools/content` 仍有「⚙️ 管理來源」與 `/ops/clients`、`/tools/content/sites` 仍有 `+ 新增網站` | exit=0 | ms=90000
+- 突變（C5）：`sites/[id]` 兩處 `siteRowGate` 拿掉 → `registry-code.test.ts`「every route a built door serves authorizes its caller」紅並指名 `app/api/content/sites/[id]/route.ts`；`sources` 三處 `staffOnly` 拿掉 → `sources/route.test.ts` 客戶 add／edit／delete 3 條紅；皆以 `git show HEAD:` 還原，重跑 17 passed。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n -- Codex `agency-os/reports/oracle/2026-10-24-partialreview-3368ad2c.md`（files-reviewed 含 5 個新門頁＋5 個改動檔）：NO FINDINGS。
+  - external oracle = Codex CLI (codex exec -s read-only), not self-description
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=href="/tools|href="/ops|`/tools/|`/ops/|"/tools/content 於門會渲染的元件（ContentStudio、ContentCalendar、SiteManager、EventsCalendar、SeoCheckPanel、CostChip）＋ ContentStudio.tsx calls /api/video、publish wizard's mockups | hits=10（門閉包內 8 處皆改 `useDoorHref`；其餘 `ClientHubTabs.tsx`、`SidebarNav.tsx` 為員工專用頁，不在門閉包；manifest 舊說法 2 句本次更正）
+
+**仍待決**：門上功能清單（V7／D6／C4，會改已上線門版面）。**剩**：門頁在未開門時員工主機也能直接開（同 tarot／studio／video／design，Codex 前次 F1）；content 上線（DNS、憑證、nginx、enabled）＝High，等操作者 go。
+
+**rollback**：`git revert <本 commit>`（無資料、無 migration；content 門未上線）。
 ## 2026-10-24（續33）My Designs 所有下載改走同一支同源下載路由，每扇門都能用（影片也能存檔）；下載卡住不再永遠掛著（Claude）
 
 **觸發**：操作者問「為什麼不去處理好」，指的是上一筆 design 門收尾留下的「門上影片下載會改開新分頁」。

@@ -2178,6 +2178,28 @@
         "enabled": false,
         "api": [
           "/api/content"
+        ],
+        "nav": [
+          {
+            "path": "",
+            "name": "內容編輯",
+            "staff": "tools/content"
+          },
+          {
+            "path": "calendar",
+            "name": "行事曆",
+            "staff": "tools/content/calendar"
+          },
+          {
+            "path": "sites",
+            "name": "網站",
+            "staff": "tools/content/sites"
+          },
+          {
+            "path": "events",
+            "name": "節日",
+            "staff": "tools/events"
+          }
         ]
       },
       "loginSources": [
