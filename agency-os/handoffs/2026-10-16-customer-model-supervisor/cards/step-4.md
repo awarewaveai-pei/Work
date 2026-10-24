@@ -118,17 +118,22 @@ A／B 都要會計師一句話確認「收款開發票＋合約負債」；C 另
 - Files：`lobster-factory/packages/wp-bridge-plugin/includes/Billing/PaymentEvents.php`（action → PaymentEvent → `as_enqueue_async_action` 排隊）、`includes/Billing/PaymentSender.php`（HMAC、POST、2xx 停、5xx／網路錯重試最多 20 次指數退避、4xx 停並寫訂單備註）、`includes/Admin/AdminPage.php` 加 secret 與目標 URL 欄位＋「送付款事件」開關（預設關）、商品編輯頁 `_awarewave_plan_key`／`_awarewave_credit_units` 兩個欄位、`tests/Billing/PaymentEventsTest.php`；`aware-wave-wp-bridge.php` `AWBRIDGE_VERSION` 升一版。
 - Acceptance：`composer test` 綠，測試名含 `a paid order with a plan product becomes subscription_paid with the subscription next payment as period_end`、`a credit pack order sums units by quantity`、`a full refund of a pack order becomes refund credit_pack`、`a guest order is dropped with an order note and never queued`、`the same action twice yields the same event_id`；`composer lint` 綠。發版：`bash scripts/release-wp-bridge.sh`（兩個 repo）；aware-wave.com 更新外掛（High）。
 - Rollback：關設定頁「送付款事件」開關。
+- **必做（critic 2026-10-25 第二輪 M）**：事件帶 `email_verified: true` 只在外掛已證明會員擁有該 email 之後（WooCommerce 不驗 email：註冊時寄驗證信，按連結才標記 `aware_wave_email_verified` user meta）；沒驗證的會員首次付款，控制面回 400 `email_unverified`、不建帳戶、開 ops incident，所以外掛要在結帳前就擋（未驗證不能結帳），否則錢收了帳戶卻開不起來。測試名加 `an unverified member cannot check out and no event carries email_verified true`。
 
 ### 4b-3　next-admin `woo` 收件接頭（依賴 4b-1；Codex 卡 `03-woo-billing-provider.md`）
 - Files：`lib/payments/woo-billing.ts`（`verify`＝HMAC 同 local；`parse`：body `{event_id, wp_user_id, email, display_name, ...PaymentEvent 去掉 organization_id}` → 查 `findBillingAccount` → 沒有就 `createCustomerFromWp()`（org＋`inviteClientAccount`＋`linkIdentity`）→ 回 `ReceivedPayment`）；`lib/payments/index.ts` `PROVIDERS` 加 `woo`；`lib/entitlements/__tests__/import-boundary.test.ts:14` `PROVIDER_ADAPTERS` 加 `lib/payments/woo-billing.ts`；`lib/payments/__tests__/woo-billing.test.ts`。
 - 注意：`PaymentProvider.parse` 現在是同步的（`provider.ts:28`）；改成 `parse(rawBody): Promise<ReceivedPayment>`，`local.ts` 與 route 跟著 `await`。guest（`wp_user_id` 0／缺）→ `PaymentParseError("guest_checkout")`（route 回 400）。
 - Acceptance：`npx vitest run lib/payments app/api/webhooks/payments` 綠，測試名含 `a known wp member resolves to its billing account`、`a first-time payer gets an organization, an invite and an identity in that order`、`a retry after a half-made account does not create a second organization`、`a guest checkout is refused with 400`、`an invalid X-AwareWave-Payment-Signature is refused with 401`；突變：拔 `linkIdentity` 的唯一鍵查核 → `a retry…` 紅。prod：`PAYMENTS_PROVIDERS=local,woo`＋`PAYMENTS_WOO_SECRET`（`safe-infra-patch.sh compose`；驗 `docker exec … printenv PAYMENTS_WOO_SECRET`）。
 - Rollback：`PAYMENTS_PROVIDERS=local`（路由回 404）。
+- 實作（2026-10-25）與上列不同處：組織 slug＝`wp-member-<WP user id>`（不用亂數）——slug 唯一鍵讓重試與兩個同時到的首付事件落在同一列，不會多建組織；帳戶解析放 `lib/entitlements/wp-customers.ts`（`customer_identities`、`plans` 只准在 lib/entitlements）；`PaymentProvider.parse` 改成可同步或非同步（local 照舊同步，不必改呼叫端）；sender 帶 `organization_id` 一律拒（`organization_id_not_allowed`）；寄信失敗但帳戶已建＝照樣連結與入帳。
+
 
 ### 4b-4　WordPress 一次性碼進產品門（依賴 4b-1、4b-3）
 - Files：next-admin `app/api/auth/wp-handoff/route.ts`（HMAC 驗章、`ts` ±60 秒、nonce 一次性存新表 `auth_handoff_nonces(provider, nonce) unique`（0125）、`holdsProduct` 不持有回 403）、`lib/auth/sources/awarewave-wp.ts`（generateLink magiclink → 門 URL）、`app/login/wp/page.tsx`（`verifyOtp` 換 session，失敗顯示「連結已失效，回 aware-wave.com 再按一次」）、`middleware.ts` matcher 讓 `/login/wp` 免登入（比照 `/login/set-password`；`middleware-portal-guards.test.ts` 會比對 nginx）、`nginx/default.conf` 門區塊放行 `/login/wp`；wp-bridge `includes/Billing/MyAccountDoors.php`（我的帳號頁按鈕）。
 - Acceptance：`npx vitest run app/api/auth lib/auth app/__tests__/middleware-portal-guards.test.ts` 綠，測試名含 `a handoff for a product the account does not hold is refused`、`a replayed nonce is refused`、`a stale timestamp is refused`；本機 `curl -X POST …/api/auth/wp-handoff` 帶正確簽章 → 302 到 `https://tarot.localhost/login/wp#token_hash=…`。上線＝每扇門 nginx 改（High）。
 - Rollback：wp-bridge 設定頁關「我的帳號按鈕」；route 下架回 410。
+- 實作（2026-10-25）與上列不同處：不建 nonce 表（不用 migration）——nonce 記在程序記憶體（next-admin 單一容器，同 `lib/accounts/staff-accounts.ts`），ts ±60 秒限制重啟後可重放的窗；GoTrue 連結型別用 `recovery`（不會建使用者，同邀請信）；簽章用獨立密鑰 `AUTH_WP_HANDOFF_SECRET`（不與付款共用）；**middleware 與 nginx 都不用改**：matcher 本來就跳過 `login`、`api/auth`（`middleware.ts:445`），門的 nginx 擋 `api/auth`（handoff 只在 app 網域）、放行 `/login/*`（`nginx/default.conf:452`）。上線＝設 `AUTH_WP_HANDOFF_SECRET`＋wp-bridge 按鈕（4b-2 同一包）。
+
 
 ### 4b-5　點數只付已持有功能（待決 5 選 A；High：改 can()）
 - Files：`lib/entitlements/can.ts:40-56`（`issuePermit`：找到列且 `feature.billing==="credits"` 且 `row.source==="contract"` → `source:"credits"`、`entitlement_id: row.id`、`max_spend: min(balance, singleLimit)`，餘額不足拒 `insufficient_credits`；找到 `comp` 列照舊免費；沒列一律 `no_active_entitlement`，刪掉「沒列看錢包」分支）；`lib/entitlements/__tests__/can.test.ts`、`customer-drill.test.ts`（`drill-credits` 列改成「有 addon 列＋錢包 50」與「只有錢包、沒列→拒」兩列）；ADR 017 產品決定 #11「待決」改成決定；監工台 `DRILL` 點數列文字。
@@ -137,6 +142,7 @@ A／B 都要會計師一句話確認「收款開發票＋合約負債」；C 另
 
 ### 4b-6　Woo 店面設定（操作者在 WordPress 後台做；卡只列清單）
 - 結帳必須登入（WooCommerce → 設定 → 帳號與隱私：關閉訪客結帳）；結帳頁條款勾選（WooCommerce 內建「條款與條件」頁＝待決 3 條款全文，勾選才能下單）；每個點數包與訂閱商品的「簡短說明」第一行貼待決 3 的一句告知；商品 meta `_awarewave_plan_key`／`_awarewave_credit_units`（4b-2 的欄位）。
+- 會員 email 驗證：外掛 4b-2 的驗證信必須開（設定頁開關），未驗證的會員看不到結帳按鈕。
 - 驗證：以測試會員下單一筆 0 元試用 → `/ops/billing` 出現合約；Woo 訂單備註有「已送 AwareWave event wc:…」。
 
 ### 4b-7　/ops/billing 加「未用點數合計」（待決 3 選 A／B；無依賴）

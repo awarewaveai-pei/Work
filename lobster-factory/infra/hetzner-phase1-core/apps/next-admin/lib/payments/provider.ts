@@ -22,8 +22,13 @@ export interface PaymentProvider {
   name: PaymentProviderName;
   /** true only for a request this provider sent: a signature over the exact raw body. */
   verify(headers: Headers, rawBody: string): boolean;
-  /** Throws PaymentParseError for anything that is not one well-formed event. */
-  parse(rawBody: string): ReceivedPayment;
+  /** Throws (or rejects with) PaymentParseError for anything that is not one well-formed event. A provider whose events
+   *  name the payer by an outside id (woo: the WordPress member) resolves the billing account here, so it is async. */
+  parse(rawBody: string): ReceivedPayment | Promise<ReceivedPayment>;
+  /** Called by the route for every final refusal of a request that passed verify(): a parse refusal or a control-plane
+   *  rejection. A provider whose sender cannot be told (woo: the shop already took the money) alerts the operator here.
+   *  Must not throw. */
+  refused?(rawBody: string, code: string): Promise<void>;
 }
 
 export class PaymentParseError extends Error {

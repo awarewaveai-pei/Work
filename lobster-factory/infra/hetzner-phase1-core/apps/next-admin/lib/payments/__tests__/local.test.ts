@@ -13,7 +13,8 @@ describe("local payment provider (ADR 017 step 4a)", () => {
   it("answers only when PAYMENTS_PROVIDERS names it", () => {
     expect(paymentProvider("local", {})).toBeNull();
     expect(paymentProvider("local", { PAYMENTS_PROVIDERS: "woo" })).toBeNull();
-    expect(paymentProvider("woo", { PAYMENTS_PROVIDERS: "local,woo" })).toBeNull();   // 4b: no woo connector yet
+    expect(paymentProvider("woo", { PAYMENTS_PROVIDERS: "local" })).toBeNull();
+    expect(paymentProvider("woo", { PAYMENTS_PROVIDERS: "local,woo" })?.name).toBe("woo");
     expect(paymentProvider("local", { PAYMENTS_PROVIDERS: " Local , woo" })?.name).toBe("local");
   });
 
@@ -27,13 +28,13 @@ describe("local payment provider (ADR 017 step 4a)", () => {
     expect(short.verify(headers(raw, "short"), raw)).toBe(false);
   });
 
-  it("parses each event kind into the control plane's PaymentEvent and nothing else", () => {
+  it("parses each event kind into the control plane's PaymentEvent and nothing else", async () => {
     const p = local();
-    expect(p.parse(body({ kind: "subscription_paid", organization_id: ORG, plan_key: "social_pro", period_end: "2026-11-23T00:00:00Z", external_ref: "TX-9", extra: 1 })))
+    expect(await p.parse(body({ kind: "subscription_paid", organization_id: ORG, plan_key: "social_pro", period_end: "2026-11-23T00:00:00Z", external_ref: "TX-9", extra: 1 })))
       .toEqual({ eventId: "bank-2026-10-23-001", event: { kind: "subscription_paid", organization_id: ORG, plan_key: "social_pro", period_end: "2026-11-23T00:00:00Z", external_ref: "TX-9" } });
-    expect(p.parse(body({ kind: "credit_pack", organization_id: ORG, units: 500, order_ref: "TX-1" })).event).toEqual({ kind: "credit_pack", organization_id: ORG, units: 500, order_ref: "TX-1" });
-    expect(p.parse(body({ kind: "refund", target: "credit_pack", organization_id: ORG, order_ref: "TX-1" })).event.kind).toBe("refund");
-    expect(p.parse(body({ kind: "chargeback_cleared", organization_id: ORG, note: "bank confirmed" })).event).toEqual({ kind: "chargeback_cleared", organization_id: ORG, note: "bank confirmed" });
+    expect((await p.parse(body({ kind: "credit_pack", organization_id: ORG, units: 500, order_ref: "TX-1" }))).event).toEqual({ kind: "credit_pack", organization_id: ORG, units: 500, order_ref: "TX-1" });
+    expect((await p.parse(body({ kind: "refund", target: "credit_pack", organization_id: ORG, order_ref: "TX-1" }))).event.kind).toBe("refund");
+    expect((await p.parse(body({ kind: "chargeback_cleared", organization_id: ORG, note: "bank confirmed" }))).event).toEqual({ kind: "chargeback_cleared", organization_id: ORG, note: "bank confirmed" });
   });
 
   it("what the operator's scripts/record-payment.mjs signs is exactly what the local provider accepts", async () => {
@@ -46,7 +47,7 @@ describe("local payment provider (ADR 017 step 4a)", () => {
     ]) {
       const p = buildPayment(argv, SECRET);
       expect(local().verify(new Headers({ [LOCAL_SIGNATURE_HEADER]: p.signature }), p.body)).toBe(true);
-      expect(local().parse(p.body).event.kind).toBe(argv[0]);
+      expect((await local().parse(p.body)).event.kind).toBe(argv[0]);
       expect(p.url).toMatch(/\/api\/webhooks\/payments\/local$/);
     }
     expect(buildPayment(["credit_pack", "--org", ORG, "--units", "5", "--ref", "TX-9"], SECRET).body).toContain(`"event_id":"credit_pack:${ORG}:TX-9"`);

@@ -11,7 +11,7 @@ const sdkAllowed = (file: string) => file === "lib/ai/gateway.ts" || file.starts
 const tableAllowed = (file: string) => file.startsWith("lib/entitlements/") || file.startsWith("app/portal/");
 // Raw HTTP to a paid model provider: the origin may only be spelled in the gateway (providerUrl asserts the grant).
 const PROVIDER_HOST = /(?:api\.openai\.com|api\.anthropic\.com|generativelanguage\.googleapis\.com|api\.replicate\.com)/i;   // hosts are case-insensitive
-const PROVIDER_ADAPTERS = new Set(["lib/payments/woo.ts", "lib/auth/sources/awarewave-wp.ts", "lib/crm/fluentcrm.ts"]);
+const PROVIDER_ADAPTERS = new Set(["lib/payments/woo.ts", "lib/payments/woo-billing.ts", "lib/auth/sources/awarewave-wp.ts", "lib/crm/fluentcrm.ts"]);
 
 function providerDependency(spec: string, file: string): boolean {
   // Consumers may call a public adapter; vendor packages and the old bridge transport are private.

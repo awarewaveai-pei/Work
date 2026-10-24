@@ -11,6 +11,7 @@ const SOURCE_LABEL: Record<string, string> = {
   posthog: "PostHog",
   site_watch: "網站巡檢",
   schedule: "排程工作",
+  payments: "付款",
 };
 
 const SOURCE_COLOR: Record<string, { bg: string; text: string }> = {
@@ -21,6 +22,7 @@ const SOURCE_COLOR: Record<string, { bg: string; text: string }> = {
   posthog: { bg: "#fdf4ff", text: "#86198f" },
   site_watch: { bg: "#ecfdf5", text: "#047857" },
   schedule: { bg: "#f1f5f9", text: "#334155" },
+  payments: { bg: "#fef2f2", text: "#b91c1c" },
 };
 
 const SEV_COLOR: Record<string, string> = {
@@ -54,6 +56,8 @@ function getSourceUrl(incident: Incident): string | null {
       return incident.client_slug ? `/ops/clients/${incident.client_slug}` : null;
     case "schedule":
       return "/ops/schedules";
+    case "payments":
+      return "/ops/billing";
     default:
       return null;
   }

@@ -26,6 +26,31 @@
 **避免再發生**：閘的放行條件只看路由檔自己的 `called`／`asked`，閉包只用於「讀不讀 DB」，fixture 釘住兩種舊漏法。
 
 **剩餘**：n1 SSRF 疑慮（generate-core referenceUrls）未查，屬 content 門上線前的資料路徑閱讀。
+## 2026-10-25（續5）ADR 017 4b-3／4b-4／4b-7：woo 付款接頭、WordPress 一次性碼進門、/ops/billing 未用點數合計（Claude）
+
+- **任務**：操作者 2026-10-25「卡 03 直接 Claude 做，其他尚未做的快動手」。卡 03（4b-3）、4b-4、4b-7 是 4b 裡不等待決的三張。
+- **不變量**：①一個 WordPress 會員＝一個計費帳戶（組織 slug `wp-member-<id>` 唯一＋0124 兩個唯一鍵）；②只有「已證明 email」的帳戶能從 WordPress 一鍵進門；③只有付款事件能建帳戶，且 email、方案先查過才寫；④已驗章的事件被拒＝操作者一定看得到（ops incident，source `payments`，0126）。
+- **做了什麼**（next-admin 相對路徑）：
+  - 付款：`lib/payments/hmac.ts`（local 與 woo 同一簽章構法）；`lib/payments/woo-billing.ts`（body 帶 wp_user_id／email／email_verified，sender 不可指定 organization_id，`refused()` 開 incident 只記檢查過的 event id 與 kind）；`lib/entitlements/wp-customers.ts`（查或建帳戶：GoTrue＋profiles 雙處查 email、未知方案先拒、409 一律終拒）；`provider.ts` parse 可非同步＋`refused` 鉤子；route 在 parse 拒與控制面拒兩處都呼叫 `refused`；`index.ts` 註冊 woo；import-boundary 加 adapter。
+  - 進門：`lib/auth/sources/awarewave-wp.ts`（獨立密鑰 `AUTH_WP_HANDOFF_SECRET`、±60 秒、nonce 一次、持有產品、仍是該組織 client、email 已證明，才發 GoTrue recovery 連結）；`app/api/auth/wp-handoff/route.ts`；`app/login/wp/`（不取代已開的登入、按鈕才換、登入後顯示帳號＋「不是我的帳號」）。middleware 與 nginx 不改（matcher 已跳過 `login`、`api/auth`，門擋 `api/auth`）。
+  - 帳務頁：`lib/entitlements/billing-summary.ts`＋`app/(shell)/ops/billing/page.tsx` 頂端一列（只算客戶帳戶的正餘額）。
+  - incident 來源 `payments`：`lobster-factory/packages/db/migrations/0126_ops_incidents_payments_source.sql`＋down＋scripts 副本；`lib/ops-inbox/types.ts`、`lib/repair-center/policy.ts`（human_only）、收件匣卡片標籤與連到 /ops/billing。
+  - 監工台 kit：`steps.count` 可用 {doing}{parked}，`parkedOutOfBar` 選用；客戶怎麼來頁改「完成／進行中／等客戶出現」。
+  - 卡 step-4：4b-3、4b-4 實作差異；4b-2／4b-6 加「外掛必須驗證會員 email，未驗證不能結帳」。
+- **Critic 兩輪**（Codex oracle 四次無輸出：本機 Codex 設定 `model = "gpt-6.1-sol"`，ChatGPT 帳號不支援）：
+  - 第一輪 fail：H1 未證明 email 也發 recovery 連結（WooCommerce 用別人 email 註冊付款即可取得該帳戶並偽造 0103 證明）→ 修；M1 /login/wp 登入固定攻擊 → 修；M2 退款／取消也建帳戶 → 修；M3 終拒無聲＋孤兒組織 → 修（寫入前查 email、incident）；L1 連結取代文件化；L2 再查 client/org → 修。
+  - 第二輪 warn：M 控制面 409/422 拒絕沒告警 → route 單一出口 `refused`；M WordPress 端沒證明會員擁有 email → 事件須帶 `email_verified: true` 才建帳戶（外掛責任寫進 4b-2）；L profiles 也查 email；L 409 帶 userId 也終拒；L 0126 down 註明 NOT VALID 後舊列不能更新；L incident 欄位先驗格式。全修。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/payments lib/auth lib/entitlements app/api/webhooks/payments lib/repair-center lib/ops-inbox app/__tests__ lib/__tests__ lib/portal（61 files，670 passed） | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit（本次檔案 0 error；lib/schedules/adapters/site-watch.ts 的 error 屬排程 session 進行中的 dailyLimit） | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變 12 個守衛逐一拔掉→各自指名測試紅、還原綠：重複 slug 重讀、slug 擁有權、持有產品、nonce、email 已證明、仍是 client、只有付款建帳戶、寫入前查 email、email_verified、409 帶 userId、控制面拒告警、incident event id 驗格式 | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=node --test scripts/__tests__/down-migration-copies.test.mjs（1 pass）＋五個監工台 node check.mjs 全 ok | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（兩輪 critic：第一輪 1H/3M/2L、第二輪 2M/4L，全修並各有突變）
+- ORACLE_WAIVED: codex-oracle.ps1 兩種封包大小四次「no final message」（本機 Codex 模型設定不被帳號支援）；以兩輪獨立 critic＋12 個突變代替。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=PaymentProvider|IncidentSource|ops_incidents_source_check|woo_product_ids | hits=111
+- **0126 已套 prod**（操作者 2026-10-25 go）：`APPLY_OK 1/1: 0126`；`--status` 列 0125、0126 皆 applied。
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql 唯讀：ops_incidents_source_check 含 0100 全部來源＋payments；schema_migrations 有 0126；既有 incident 來源不受影響 | exit=0 | ms=0（未計時）
+- **未做／剩餘**：woo 接頭與 WordPress 進門都還是關的（`PAYMENTS_PROVIDERS` 不含 woo、`AUTH_WP_HANDOFF_SECRET` 未設）；外掛端 4b-2 等待決 1。
+- **rollback**：`git revert <本 commit>`；0126 down（先把 source='payments' 的 incident 結案）。
 ## 2026-10-25（續4）真 DB e2e 預設套件重新變綠：套 0092/0117/0118，測試接受自用帳戶的全功能列（Claude）
 
 **根因**：expire 路由現在呼叫 `ensureAllFeatures`（0118，依賴 0092、0117），但預設 `entitlements` 套件只套到 0110 → 「the expiry sweep…」回 `expiry_failed`。

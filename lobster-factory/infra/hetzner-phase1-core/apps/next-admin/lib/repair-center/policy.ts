@@ -92,6 +92,14 @@ const REPAIR_SOURCE_POLICY_BY_SOURCE = {
     rationale: "爬取時拒收大量頁面、整輪沒存到內容，或隔離了夾帶指令的頁面（lib/collect/report-store.ts）；原因在來源網站或內容，由操作者判斷。",
     can_escalate_to_pr: false,
   },
+  payments: {
+    source: "payments",
+    label: "付款",
+    policy: "human_only",
+    family: "manual",
+    rationale: "WooCommerce 付款事件被控制面拒收（lib/payments/woo-billing.ts）：多半已收到錢，但帳號歸屬對不上（訪客結帳、email 已是別的帳號、會員不認得）；由操作者用事件編號找訂單、對帳，必要時用 record-payment.mjs 人工登記。",
+    can_escalate_to_pr: false,
+  },
   manual: {
     source: "manual",
     label: "手動",

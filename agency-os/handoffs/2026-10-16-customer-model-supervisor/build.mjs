@@ -66,7 +66,7 @@ export function render() {
     ])),
   ].join('\n\n');
   const live = WAYS.filter((w) => w.live).length;
-  return page({ META, COPY, STEPS, OPEN, body, css: CSS + ITEM_CSS + OPEN_CSS, counts: { ways: t(COPY.ways.count, { total: WAYS.length, live }) } });
+  return page({ META, COPY, STEPS, OPEN, body, css: CSS + ITEM_CSS + OPEN_CSS, parkedOutOfBar: true, counts: { ways: t(COPY.ways.count, { total: WAYS.length, live }) } });
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

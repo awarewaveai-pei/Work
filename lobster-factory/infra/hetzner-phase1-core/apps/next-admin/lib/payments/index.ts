@@ -1,12 +1,14 @@
 import { localProvider } from "./local";
+import { wooBillingProvider } from "./woo-billing";
 import type { PaymentProvider, PaymentProviderName } from "./provider";
 
 export type { PaymentEvent, PaymentProvider, PaymentProviderName, ReceivedPayment } from "./provider";
 export { PaymentParseError } from "./provider";
 
-// 4b adds woo here (lib/payments/woo.ts, already on the import-boundary adapter list).
+// woo = lib/payments/woo-billing.ts (the wp-bridge plugin's events); lib/payments/woo.ts is the bridge write client.
 const PROVIDERS: Partial<Record<PaymentProviderName, (env: Record<string, string | undefined>) => PaymentProvider>> = {
   local: localProvider,
+  woo: wooBillingProvider,
 };
 
 /** A provider answers only when PAYMENTS_PROVIDERS (comma list, e.g. "local" or "local,woo") names it; unset = none.

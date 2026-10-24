@@ -2,6 +2,7 @@
 // entries and last payment events. One call to 0120 billing_overview through lib/entitlements/tables.ts; nothing here
 // writes. Payments are recorded through POST /api/webhooks/payments/<provider>.
 import { billingOverview, type BillingAccount } from "@/lib/entitlements/tables";
+import { unusedCustomerCredits } from "@/lib/entitlements/billing-summary";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "帳務 · Ops" };
@@ -93,6 +94,15 @@ export default async function BillingPage() {
           每個付費帳戶一張卡：合約、能用的功能、點數餘額、最近的帳本和付款。這頁只看不改。例：客戶轉帳買了 500 點，登記後這裡的餘額多 500，付款紀錄多一列「點數包」。
         </p>
       </div>
+      {!failure && accounts.length ? (() => {
+        const unused = unusedCustomerCredits(accounts);
+        return (
+          <div style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 12, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "var(--text-secondary)" }}>
+            客戶未用點數合計 <b style={{ color: "var(--text-primary)", fontSize: 15 }}>{unused.units.toLocaleString("zh-TW")}</b> 點（{unused.accounts} 個帳戶）
+            <div style={{ ...muted, marginTop: 2 }}>給會計：這是還沒用掉的點數，記在合約負債（預收）；用掉才轉營收。自用帳戶不算。</div>
+          </div>
+        );
+      })() : null}
       {failure ? (
         <div style={{ background: "var(--card-bg)", border: "1px solid var(--red)", borderRadius: 12, padding: 16, fontSize: 13, color: "var(--text-primary)" }}>
           讀不到帳務資料：{failure}

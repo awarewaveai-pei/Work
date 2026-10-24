@@ -141,10 +141,14 @@ details code{font-size:12px;word-break:break-all}
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}`;
 
 // counts：各 nav 鍵右側的小字（已轉義 html）；steps／open 由 kit 算。css：該頁專屬樣式。
-export function page({ META, COPY, STEPS, OPEN, counts = {}, body, css = '' }) {
+// steps.count 可用 {done} {doing} {parked} {total}；parked＝有 waitFor（等第一個這類客戶才做）且未完成的步驟。
+// parkedOutOfBar：進度條分母不算 parked（選用；不設＝舊行為，其他監工台輸出不變）。
+export function page({ META, COPY, STEPS, OPEN, counts = {}, body, css = '', parkedOutOfBar = false }) {
   const done = STEPS.filter((s) => s.status === 'done').length;
   const doing = STEPS.filter((s) => s.status === 'in_progress').length;
-  const c = { steps: t(COPY.steps.count, { done, total: STEPS.length }), open: t(COPY.open.count, { n: OPEN.length }), ...counts };
+  const parked = STEPS.filter((s) => s.status !== 'done' && s.waitFor).length;
+  const barTotal = parkedOutOfBar ? STEPS.length - parked : STEPS.length;
+  const c = { steps: t(COPY.steps.count, { done, doing, parked, total: STEPS.length }), open: t(COPY.open.count, { n: OPEN.length }), ...counts };
   const nav = Object.entries(COPY.nav).map(([k, label]) => `<a href="#${k}"><span>${esc(label)}</span><small>${c[k] ?? ''}</small></a>`).join('');
   return `<title>${esc(META.title)}</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -156,7 +160,7 @@ ${CSS}${css ? `\n${css}` : ''}
 <aside><div class="in">
   <h1>${esc(META.title)}</h1>
   <p class="upd">${t(COPY.updated, { date: META.updated })}</p>
-  <div class="bar" data-computed><i class="d" style="width:${(done / STEPS.length) * 100}%"></i><i class="g" style="width:${(doing / STEPS.length) * 100}%"></i></div>
+  <div class="bar" data-computed><i class="d" style="width:${(done / barTotal) * 100}%"></i><i class="g" style="width:${(doing / barTotal) * 100}%"></i></div>
   <nav>${nav}</nav>
 </div></aside>
 <main>

@@ -2,25 +2,16 @@
 // (§0b rule 6) use the same path. Body = {"event_id": "...", ...PaymentEvent}; header X-AwareWave-Payment-Signature =
 // base64(HMAC-SHA256(raw body, PAYMENTS_LOCAL_SECRET)), the same construction Woo uses for X-WC-Webhook-Signature.
 // The secret is shared only by the operator's recording command and the app; under 32 characters nothing verifies.
-import { createHmac } from "node:crypto";
-import { timingSafeEqual } from "@/lib/security/timingSafeEqual";
+import { PAYMENT_SIGNATURE_HEADER, signPayment, verifyPayment } from "./hmac";
 import { PaymentParseError, toPaymentEvent, type PaymentProvider } from "./provider";
 
-export const LOCAL_SIGNATURE_HEADER = "x-awarewave-payment-signature";
-const MIN_SECRET = 32;
-
-export const signLocalPayment = (rawBody: string, secret: string): string =>
-  createHmac("sha256", secret).update(rawBody, "utf8").digest("base64");
+export const LOCAL_SIGNATURE_HEADER = PAYMENT_SIGNATURE_HEADER;
+export const signLocalPayment = signPayment;
 
 export function localProvider(env: Record<string, string | undefined>): PaymentProvider {
-  const secret = (env.PAYMENTS_LOCAL_SECRET ?? "").trim();
   return {
     name: "local",
-    verify(headers, rawBody) {
-      const given = headers.get(LOCAL_SIGNATURE_HEADER);
-      if (secret.length < MIN_SECRET || !given) return false;
-      return timingSafeEqual(given, signLocalPayment(rawBody, secret));
-    },
+    verify: (headers, rawBody) => verifyPayment(rawBody, headers.get(LOCAL_SIGNATURE_HEADER), env.PAYMENTS_LOCAL_SECRET),
     parse(rawBody) {
       let body: unknown;
       try { body = JSON.parse(rawBody); } catch { throw new PaymentParseError("invalid_json"); }

@@ -3,6 +3,10 @@ import { LOCAL_SIGNATURE_HEADER, signLocalPayment } from "@/lib/payments/local";
 
 const apply = vi.fn();
 vi.mock("@/lib/entitlements/contracts", () => ({ applyPaymentEvent: (...args: unknown[]) => apply(...args) }));
+const refusedIncident = vi.fn(async (..._args: unknown[]) => ({ id: "i1", error: null }));
+vi.mock("@/lib/ops-inbox/ingest", () => ({ ingestIncident: (_db: unknown, draft: { raw: { event_id: string; code: string } }) => refusedIncident(_db, draft.raw.event_id, draft.raw.code, draft) }));
+vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => ({}) }));
+vi.mock("@/lib/entitlements/wp-customers", async (orig) => ({ ...(await orig<object>()), ensureWpCustomer: async () => ({ organizationId: "00000000-0000-4000-8000-0000000000c1", created: false }) }));
 
 const SECRET = "local-payments-test-secret-0123456789";
 const ORG = "00000000-0000-4000-8000-0000000000c1";
@@ -57,6 +61,38 @@ describe("POST /api/webhooks/payments/[provider]", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const down = await post(raw, signLocalPayment(raw, SECRET));
     expect([down.status, await down.json()]).toEqual([500, { ok: false, error: "payment_not_recorded" }]);
+  });
+
+  it("woo answers 404 until PAYMENTS_PROVIDERS names it", async () => {
+    expect((await post(raw, signLocalPayment(raw, SECRET), "woo")).status).toBe(404);
+    vi.stubEnv("PAYMENTS_PROVIDERS", "local,woo");
+    vi.stubEnv("PAYMENTS_WOO_SECRET", SECRET);
+    // named now: the signature is checked (401), and a guest order is refused before any account work (400)
+    expect((await post(raw, null, "woo")).status).toBe(401);
+    const guest = JSON.stringify({ event_id: "wc:x:1", wp_user_id: 0, email: "a@b.tw", kind: "credit_pack", units: 1, order_ref: "1" });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await post(guest, signLocalPayment(guest, SECRET), "woo");
+    expect([res.status, await res.json()]).toEqual([400, { ok: false, error: "guest_checkout" }]);
+    expect(apply).not.toHaveBeenCalled();
+    expect(refusedIncident).toHaveBeenCalledWith(expect.anything(), "wc:x:1", "guest_checkout", expect.anything());
+  });
+
+  it("a woo event the control plane rejects still raises the operator incident", async () => {
+    vi.stubEnv("PAYMENTS_PROVIDERS", "woo");
+    vi.stubEnv("PAYMENTS_WOO_SECRET", SECRET);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    refusedIncident.mockClear();
+    const ev = JSON.stringify({ event_id: "wc:paid:9", wp_user_id: 57, email: "a@b.tw", email_verified: true, kind: "subscription_paid", plan_key: "gone", period_end: "2026-11-25T00:00:00Z" });
+    apply.mockResolvedValueOnce({ ok: false, status: 422, code: "unknown_plan" });
+    const res = await post(ev, signLocalPayment(ev, SECRET), "woo");
+    expect([res.status, await res.json()]).toEqual([422, { ok: false, error: "unknown_plan" }]);
+    expect(refusedIncident).toHaveBeenCalledWith(expect.anything(), "wc:paid:9", "unknown_plan", expect.anything());
+    // local has no refusal hook: the operator who recorded it sees the answer
+    vi.stubEnv("PAYMENTS_PROVIDERS", "local");
+    refusedIncident.mockClear();
+    apply.mockResolvedValueOnce({ ok: false, status: 409, code: "account_frozen" });
+    expect((await post(raw, signLocalPayment(raw, SECRET))).status).toBe(409);
+    expect(refusedIncident).not.toHaveBeenCalled();
   });
 
   it("refuses an oversized body before reading or verifying it, by Content-Length", async () => {

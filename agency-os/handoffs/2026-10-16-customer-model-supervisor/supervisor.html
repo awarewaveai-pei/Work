@@ -96,8 +96,8 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
 <aside><div class="in">
   <h1>客戶怎麼來 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-10-24</span></p>
-  <div class="bar" data-computed><i class="d" style="width:33.33333333333333%"></i><i class="g" style="width:22.22222222222222%"></i></div>
-  <nav><a href="#rules"><span>規則</span><small></small></a><a href="#now"><span>現況</span><small></small></a><a href="#ways"><span>五種客戶</span><small>共 <span data-computed>5</span> 種，<span data-computed>2</span> 種已運作</small></a><a href="#priority"><span>先後與定價</span><small></small></a><a href="#steps"><span>待建項目</span><small><span data-computed>3</span>／<span data-computed>9</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>5</span> 項</small></a><a href="#doors"><span>入口</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:50%"></i><i class="g" style="width:33.33333333333333%"></i></div>
+  <nav><a href="#rules"><span>規則</span><small></small></a><a href="#now"><span>現況</span><small></small></a><a href="#ways"><span>五種客戶</span><small>共 <span data-computed>5</span> 種，<span data-computed>2</span> 種已運作</small></a><a href="#priority"><span>先後與定價</span><small></small></a><a href="#steps"><span>待建項目</span><small><span data-computed>3</span> 完成、<span data-computed>2</span> 進行中、<span data-computed>3</span> 等客戶出現</small></a><a href="#open"><span>待你決定</span><small><span data-computed>5</span> 項</small></a><a href="#doors"><span>入口</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
 <p class="sub">說明客戶來源、付款方、操作人，以及系統尚缺的項目。</p>
@@ -137,7 +137,7 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
 <h3 class="sub-h">賣斷怎麼收錢</h3>
 <ul class="yn rules"><li><b>買斷價</b><span>等於 36 個月訂閱價，含 12 個月更新。</span></li><li><b>更新年費</b><span>買斷價的 20%，選購；不續約仍可使用最後一版，永不鎖。</span></li><li><b>維運月費</b><span>分級選購：備份、監控、更新套用、支援回應時間；含一把維運用的金鑰。</span></li><li><b>AI 與平台 API</b><span>客戶用自己的金鑰自付。</span></li></ul></section>
 
-<section id="steps"><h2>待建項目</h2><p class="lead">項目須依序完成，每項都有完成條件。風險 High 的項目須經你同意後才能動工。</p><ol class="steps"><li class="step done" id="s1">
+<section id="steps"><h2>待建項目</h2><p class="lead">項目須依序完成，每項都有完成條件。風險 High 的項目須經你同意後才能動工。標「待第一個…客戶出現」的項目刻意不做，不算進進度條。</p><ol class="steps"><li class="step done" id="s1">
     <div class="n">1</div>
     <div class="b">
       <p class="plain">新產品只有一個入口：執行 scripts/new-product.mjs，回答五題，登記列、頁面骨架、收費點與測試就產生好；漏填或未登記的工具都會讓測試失敗。</p>
