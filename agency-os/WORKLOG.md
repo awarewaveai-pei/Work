@@ -1,4 +1,38 @@
 # Worklog
+## 2026-10-25（續7）Codex 改回能用的模型（gpt-6-astra）；補跑 103852367 的審查，兩輪共 11 個發現全部修好；圖片花費改成只在 generateTarotImage 記一次（Claude）
+
+**觸發**：操作者「查一下 ChatGPT 帳號的 Codex 支援哪些模型，挑一個能用的改回 ~/.codex/config.toml，再補跑這次的 Codex 審查。」
+
+**Codex 模型**
+- `~/.codex/models_cache.json`（CLI 在 2026-10-25 01:37 抓的清單）列出 7 個可見模型。改設定之前，審查用的是 `gpt-5.6-luna`（`~/.codex/sessions` 的紀錄）。每個候選各送一句「Reply OK」實測：`gpt-6.1-sol` 回 400「not supported when using Codex with a ChatGPT account」；`gpt-6-sol`、`gpt-6-astra`、`gpt-5.6-sol`、`gpt-5.6-luna` 都回 OK。→ 選帳號能用、清單排序最高的 `gpt-6-astra`（排序 2；排序 1 就是被拒的 6.1-sol）。只改 config 第 2 行，備份成 `~/.codex/config.toml.bak-model-20261025`。
+- 第三輪審查時 Codex 回「hit your usage limit … try again at 6:38 AM」→ 已執行 `oracle-quota.ps1 -Action set -Tool codex -Hours 5`。
+
+**第一輪審查**（`-DiffRef 103852367`，`agency-os/reports/oracle/2026-10-25-partialreview-b2a49fdd.md`，8 個發現，逐條讀碼確認都成立）
+- F1 外展 Gemini 的預設是別名 `gemini-flash-latest`，價目表沒有，退回 Opus 的價格和 Anthropic 這個 vendor。Google 沒公布別名指向哪個模型（API 只回「Gemini Flash Latest」），所以先照價目頁上最新的 Flash（3.8 Flash：$0.75／$3.75，快取 $0.075，2026-12-31 前；2027-01-01 起翻倍）加一列，標「est.」。
+- F2／F6 script-forge 改用 `client.beta.messages.stream`：SDK 遇到 fallback 會改標實際的模型，usage 計數器用覆寫而不是累加。串流正常結束時，用量從 `finalMessage()` 取（SDK 會在結束時清掉 `currentMessage`，第二輪 F1 就是抓到這點）；中途中斷時，用 `currentMessage` 的快照。OpenAI 串流若在最後的 usage frame 之前中斷，就沒有任何用量資料可記，這是供應商不回報、不是漏記。
+- F3／F8 圖片：供應商已完成（已收費）、下載才失敗，以前完全不記；vendor 也被寫死成 Replicate。
+- F4 `logImageCost` 的 organization_id 寫死 null → 新增 `organizationId` 參數。
+- F5 閘只看「檔案裡有沒有 logger」，所以 video-pipeline 的場景圖被同檔另一個影片動態的記帳蓋過，沒被抓到 → 新規則：每個檔的記帳呼叫數要不少於付費呼叫數（`/predictions/${id}` 的輪詢不算新的呼叫）；突變後指名「video-pipeline.ts: 2 paid calls, 1 logs」。
+- F7 OpenAI 的 `prompt_tokens_details.cached_tokens` 被當成一般輸入計價 → `openaiUsageTokens()`，外展、script-forge、文章生成三處都改用它。
+
+**第二輪審查**（`2026-10-25-partialreview-9fd4ac3b.md`，3 個發現）→ 同一位審查者第二次對同一段程式報問題，照規則先寫不變量分析：
+- 不變量：供應商每收一次費，ai_call_logs 就恰好一筆，記在 grant 的計費帳戶、用實際跑的模型和 vendor 計價；連「收費後才失敗」也要記。
+- 根因：圖片的記帳分散在 6 個呼叫端，每個呼叫端只知道一部分事實（有沒有收費、vendor、計費帳戶），所以每輪只修到其中幾個。這次的三個發現就是這樣來的：F1 正常結束的串流沒記（snapshot 被清空）、F2 批次卡用 `job.organizationId`，但 grant 的計費帳戶可能是母組織、F3 另外三個舊的呼叫端沒處理 billed。
+- 整類修法：`generateTarotImage` 自己記帳，它是唯一同時知道是否收費、跑了哪個模型、grant 計費帳戶的地方。呼叫端只傳 `costLog { route, tool, jobId }`。6 個呼叫端（content/image、tools/tarot/generate、studio generate 經 image-provider、塔羅批次卡、provision-staging、影片場景圖）都拿掉自己的記帳，所以不會重複；舊呼叫端「有 jobId 才記」的條件也一併消失（git log 和 WORKLOG 都查不到這條件的理由）。閘把 image-gen 列為「多個供應商分支只記一次」。
+- 另外：OpenAI 圖片 API 回 200 但沒有圖，也標成 billed；兩個舊路由殘留的 import 已清掉。
+
+**修改**（next-admin）：`lib/ai/{log-ai-call,cost-model}.ts`、`lib/tarot/image-gen.ts`、`app/api/tools/script-forge/route.ts`（含測試）、`lib/outreach/ai-openai.ts`、`lib/content/article/generate-core.ts`、`lib/content/blocks/video-pipeline.ts`、`app/api/content/image/route.ts`、`app/api/tools/{tarot,studio}/generate/route.ts`、`app/api/internal/tarot/batch/[jobId]/card/route.ts`、`app/api/internal/hosting/provision-staging/route.ts`、`lib/ai/__tests__/ai-cost-logged.test.ts`；新測試 `lib/ai/__tests__/billed-usage-log.test.ts`、`lib/tarot/__tests__/image-gen-cost-log.test.ts`。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=一次性探針（未 commit，跑完刪除）：外展 gpt-4o-mini 真實呼叫，現在記 $0.000003（修好前同樣 14/1 token 記成 $0.000045）；用 grant「tarot.image，org=Soulful，actor=員工 owner」產生 1 張真的 flux-schnell 圖，ai_call_logs 有 1 筆：route probe/image-cost-log、BFL/Replicate、$0.003、organization Soulful | exit=0 | ms=40000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（379 files／3308 passed）＋ tsc（這次的檔 0 錯）＋ 收尾後相關資料夾 308 passed | exit=0 | ms=120000
+- 突變：拿掉 billed 標記，image-gen 測試變紅；script-forge 不取 `finalMessage()`，「a completed stream logs…」變紅；拿掉場景圖記帳，閘指名 video-pipeline 變紅。三次都還原後變綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/11m/0n -- Codex `agency-os/reports/oracle/2026-10-25-partialreview-b2a49fdd.md`（8 個）、`2026-10-25-partialreview-9fd4ac3b.md`（3 個），全部修好，見上。
+  - external oracle = Codex CLI (codex exec -s read-only), not self-description
+- ORACLE_WAIVED: 第三輪 Codex 用量額度用完（6:38 AM 重置，已觸發斷路器）。改做書面對抗自審：① grep 顯示 `generateTarotImage`／`generateImage` 的 7 個呼叫點都只經 image-gen 記帳，3 個舊路由已沒有任何 `logImageCost` 或 `imageCostUsd`；② image-provider 原封不動傳 params，所以 costLog 不會丟；③ unknown_model 和缺 token 的失敗不是 billed，所以不記；④ 影片動態（`generateVideoMotionBatch`）是另一筆費用，仍由 video-pipeline 自己記，不算重複。外加上面三個突變。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=generateTarotImage\(\|generateImage\(\|logImageCost\( | hits=7 個呼叫點全部由 image-gen 記帳；`logImageCost` 只剩 image-gen 透過 logImageResult、studio 三個工具路由、video 動態、升頻
+
+**rollback**：`git revert <本 commit>`；Codex 設定用 `~/.codex/config.toml.bak-model-20261025` 還原。
 ## 2026-10-25（續6）閘 ③「門路由要授權」：只看路由自己的程式，經 import 摸到 grant.ts／guard 不再算數（Claude）
 
 **觸發**：TASKS ADR 017 第 8 項子項（WORKLOG 2026-10-23 續46）：`authorizes()` 用 `importClosure([r], STOP_AT)`，`STOP_AT` 只有 `ops-role.ts`，`grant.ts → subject.ts → tenant-guard.ts` 讓任何摸到 entitlements 的路由都過。

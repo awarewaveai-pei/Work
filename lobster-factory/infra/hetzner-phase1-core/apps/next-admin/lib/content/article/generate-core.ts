@@ -1,7 +1,7 @@
 import { loadAnthropic, type Anthropic, providerUrl } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
 import { DEFAULT_AI_TEXT_MODEL, isAiTextModel, isOpenAiTextModel, type AiTextModel } from "../../ai/text-model-options";
-import { logAiCall } from "../../ai/log-ai-call";
+import { logAiCall, openaiUsageTokens, type OpenAiUsageLike } from "../../ai/log-ai-call";
 import { claudeFallback, claudeParams } from "../../ai/gateway";
 import { textCallCostUsd, resolveTextRate } from "../../ai/cost-calculator";
 
@@ -821,7 +821,7 @@ async function* streamOpenAiGeneration(
     const dec = new TextDecoder();
     let buf = "";
     let finishReason = "";
-    let openaiUsage: { prompt_tokens?: number; completion_tokens?: number } | null = null;
+    let openaiUsage: OpenAiUsageLike | null = null;
     while (true) {
       if (signal?.aborted) break;
       const { done, value } = await reader.read();
@@ -842,7 +842,7 @@ async function* streamOpenAiGeneration(
         try {
           const j = JSON.parse(payload) as {
             choices?: Array<{ delta?: { content?: string }; finish_reason?: string | null }>;
-            usage?: { prompt_tokens?: number; completion_tokens?: number };
+            usage?: OpenAiUsageLike;
             error?: { message?: string };
           };
           // Mid-stream error frame (content filter / quota exhausted mid-generation). Surface it as a
@@ -866,12 +866,11 @@ async function* streamOpenAiGeneration(
       void logAiCall({
         route: "content/article-generate",
         model: config.model,
-        inputTokens: openaiUsage.prompt_tokens ?? 0,
-        outputTokens: openaiUsage.completion_tokens ?? 0,
+        ...openaiUsageTokens(openaiUsage),
         jobId: config.jobId,
         tool: "content",
       });
-      const costUsd = textCallCostUsd({ model: config.model, inputTokens: openaiUsage.prompt_tokens ?? 0, outputTokens: openaiUsage.completion_tokens ?? 0 });
+      const costUsd = textCallCostUsd({ model: config.model, ...openaiUsageTokens(openaiUsage) });
       const { rate } = resolveTextRate(config.model);
       if (config.sourcesCostUsd) {
         yield `\n[COST_JSON]${JSON.stringify({ usd: config.sourcesCostUsd, model: "search", vendor: "Serper", route: "content/fetchRealSources" })}`;

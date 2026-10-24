@@ -8,13 +8,20 @@ vi.mock("@/lib/entitlements/grant", () => ({ withFeature: (_k: string, h: (r: Re
 vi.mock("@/lib/ai/gateway", () => ({
   claudeParams: () => ({}), claudeFallback: () => ({}), providerUrl: () => "http://x",
   loadAnthropic: async () => class {
-    beta = { messages: { create: async (p: { system: string; messages: Array<{ content: string }> }) => {
+    beta = { messages: { stream: (p: { system: string; messages: Array<{ content: string }> }) => {
       sent.calls.push(p);
-      return (async function* () { yield { type: "content_block_delta", delta: { type: "text_delta", text: '{"hooks":[]}' } }; })();
+      const events = (async function* () { yield { type: "content_block_delta", delta: { type: "text_delta", text: '{"hooks":[]}' } }; })();
+      const done = { model: "claude-x", usage: { input_tokens: 7, output_tokens: 3 } };
+      return Object.assign(events, { currentMessage: undefined, finalMessage: async () => done });
     } } };
   },
 }));
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => ({}) }));
+const logged = vi.hoisted(() => ({ calls: [] as Array<Record<string, unknown>> }));
+vi.mock("@/lib/ai/log-ai-call", async (orig) => ({
+  ...(await orig<typeof import("@/lib/ai/log-ai-call")>()),
+  logAiCall: async (a: Record<string, unknown>) => { logged.calls.push(a); },
+}));
 vi.mock("@/lib/content/brand-voice-store", () => ({
   loadSiteBrand: async (_sb: unknown, id: string) => (id === "own"
     ? { siteId: id, organizationId: ORG, name: "Shop", defaults: { brandVoiceInstructions: "溫暖親切", marketing: { forbiddenClaims: "治癒" } } }
@@ -27,7 +34,7 @@ const post = (b: object) => POST(new Request("https://video.aware-wave.com/api/t
   method: "POST", headers: { "content-type": "application/json", ...client }, body: JSON.stringify(b),
 }));
 
-beforeEach(() => { vi.stubEnv("ANTHROPIC_API_KEY", "k"); sent.calls = []; });
+beforeEach(() => { vi.stubEnv("ANTHROPIC_API_KEY", "k"); sent.calls = []; logged.calls = []; });
 
 describe("POST /api/tools/script-forge", () => {
   it("an unknown module or task is 400 and calls no AI", async () => {
@@ -51,5 +58,11 @@ describe("POST /api/tools/script-forge", () => {
     expect((await post({ module: "hook", task: "hooks", fields: { topic: "x" }, siteId: "other" })).status).toBe(404);
     expect((await post({ module: "hook", task: "hooks", fields: { topic: "x" }, siteId: "gone" })).status).toBe(404);
     expect(sent.calls).toEqual([]);
+  });
+
+  it("a completed stream logs the message the SDK finished with (currentMessage is cleared at the end)", async () => {
+    const res = await post({ module: "hook", task: "hooks", fields: { topic: "x" }, siteId: "own" });
+    await res.text();
+    expect(logged.calls).toEqual([expect.objectContaining({ route: "/api/tools/script-forge", response: { model: "claude-x", usage: { input_tokens: 7, output_tokens: 3 } } })]);
   });
 });

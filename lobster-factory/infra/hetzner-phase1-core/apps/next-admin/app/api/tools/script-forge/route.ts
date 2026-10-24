@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { loadAnthropic, type Anthropic, providerUrl } from "@/lib/ai/gateway";
 import { withFeature } from "@/lib/entitlements/grant";
-import { billedOrgId, logAiCall } from "@/lib/ai/log-ai-call";
+import { billedOrgId, logAiCall, openaiUsageTokens, type OpenAiUsageLike } from "@/lib/ai/log-ai-call";
 import type { Grant } from "@/lib/entitlements/can";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { normalizeAiTextModel, isOpenAiTextModel, type AiTextModel } from "@/lib/ai/text-model-options";
@@ -146,31 +146,23 @@ async function streamAnthropic(
 ): Promise<void> {
   const Anthropic = await loadAnthropic(grant);
   const client = new Anthropic({ apiKey });
-  const stream = await client.beta.messages.create(
-    { ...claudeParams(model, MAX_TOKENS), ...claudeFallback(model), system, messages: [{ role: "user", content: prompt }], stream: true },
+  // The SDK stream accumulates the message: it relabels the model when a fallback serves the answer and overwrites the
+  // cumulative usage counters. A completed stream hands it to finalMessage() (currentMessage is cleared at the end);
+  // an aborted one leaves the partial snapshot in currentMessage.
+  const stream = client.beta.messages.stream(
+    { ...claudeParams(model, MAX_TOKENS), ...claudeFallback(model), system, messages: [{ role: "user", content: prompt }] },
     { signal },
   );
-  // The raw stream carries usage on two events: input (and cache) on message_start, output on message_delta.
-  const usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
-  let served = model;
   try {
     for await (const event of stream) {
-      if (event.type === "message_start") {
-        served = event.message.model ?? model;
-        usage.input_tokens = event.message.usage.input_tokens ?? 0;
-        usage.cache_read_input_tokens = event.message.usage.cache_read_input_tokens ?? 0;
-        usage.cache_creation_input_tokens = event.message.usage.cache_creation_input_tokens ?? 0;
-      } else if (event.type === "message_delta") {
-        usage.output_tokens = event.usage.output_tokens ?? usage.output_tokens;
-      }
       if (signal.aborted) break;
       if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
         controller.enqueue(encoder.encode(event.delta.text));
       }
     }
   } finally {
-    // Also on abort: the tokens read so far were billed.
-    void logAiCall({ route: "/api/tools/script-forge", response: { model: served, usage }, organizationId: billedOrgId(grant), tool: "video" });
+    const billed = stream.currentMessage ?? (await stream.finalMessage().catch(() => undefined));
+    if (billed) void logAiCall({ route: "/api/tools/script-forge", response: billed, organizationId: billedOrgId(grant), tool: "video" });
   }
 }
 
@@ -208,7 +200,7 @@ async function streamOpenAi(
   const reader = res.body.getReader();
   const dec = new TextDecoder();
   let buf = "";
-  let usageFrame: { prompt_tokens?: number; completion_tokens?: number } | null = null;
+  let usageFrame: OpenAiUsageLike | null = null;
   while (true) {
     if (signal.aborted) break;
     const { done, value } = await reader.read();
@@ -226,7 +218,7 @@ async function streamOpenAi(
         const j = JSON.parse(payload) as {
           choices?: Array<{ delta?: { content?: string } }>;
           error?: { message?: string };
-          usage?: { prompt_tokens?: number; completion_tokens?: number };
+          usage?: OpenAiUsageLike;
         };
         if (j.usage) usageFrame = j.usage; // final frame (stream_options.include_usage)
         if (j.error) {
@@ -239,7 +231,6 @@ async function streamOpenAi(
     }
   }
   if (usageFrame) {
-    void logAiCall({ route: "/api/tools/script-forge", model, inputTokens: usageFrame.prompt_tokens ?? 0,
-      outputTokens: usageFrame.completion_tokens ?? 0, organizationId: billedOrgId(grant), tool: "video" });
+    void logAiCall({ route: "/api/tools/script-forge", model, ...openaiUsageTokens(usageFrame), organizationId: billedOrgId(grant), tool: "video" });
   }
 }

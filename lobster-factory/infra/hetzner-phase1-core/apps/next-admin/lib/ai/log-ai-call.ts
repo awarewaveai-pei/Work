@@ -12,7 +12,8 @@
  * The Anthropic SDK response carries `.usage` (input_tokens, output_tokens, cache_*); we read it.
  */
 import { getSupabaseWriteClient } from "../supabase-server";
-import { textCallCostUsd, resolveTextRate } from "./cost-calculator";
+import { textCallCostUsd, resolveTextRate, imageCostUsd } from "./cost-calculator";
+import { IMAGE_RATES, DEFAULT_IMAGE_MODEL } from "./cost-model";
 import type { Grant } from "../entitlements/can";
 
 /** The organization a grant bills (null when it could not be resolved): a library call logs its cost there. Like the
@@ -75,6 +76,18 @@ export function geminiUsageTokens(u: GeminiUsageLike | undefined): Pick<LogAiCal
     outputTokens: (u?.candidatesTokenCount ?? 0) + (u?.thoughtsTokenCount ?? 0),
     cacheReadTokens: cached,
   };
+}
+
+/** OpenAI's `usage` (Chat Completions / Embeddings). Cached prompt tokens are inside prompt_tokens and bill at the
+ *  cache rate, so they leave the plain input count. */
+export interface OpenAiUsageLike {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  prompt_tokens_details?: { cached_tokens?: number } | null;
+}
+export function openaiUsageTokens(u: OpenAiUsageLike | null | undefined): Pick<LogAiCallArgs, "inputTokens" | "outputTokens" | "cacheReadTokens"> {
+  const cached = u?.prompt_tokens_details?.cached_tokens ?? 0;
+  return { inputTokens: Math.max(0, (u?.prompt_tokens ?? 0) - cached), outputTokens: u?.completion_tokens ?? 0, cacheReadTokens: cached };
 }
 
 function isFromResponse(a: LogAiCallArgs | LogAiCallFromResponse): a is LogAiCallFromResponse {
@@ -163,6 +176,8 @@ export interface LogImageCostArgs {
   tool?: string | null;
   /** "video" for per-scene video motion; defaults to "image". */
   kind?: "image" | "video";
+  /** The billing account the image was made for (billedOrgId(grant)); null when not known. */
+  organizationId?: string | null;
 }
 
 /** Best-effort per-call cost logger for image/video — one ai_call_logs row. Never throws. */
@@ -171,7 +186,7 @@ export async function logImageCost(args: LogImageCostArgs): Promise<void> {
     const supabase = getSupabaseWriteClient();
     if (!supabase) return;
     await supabase.from("ai_call_logs").insert({
-      organization_id: null,
+      organization_id: args.organizationId ?? null,
       route: args.route,
       model: args.model,
       vendor: args.vendor,
@@ -187,4 +202,12 @@ export async function logImageCost(args: LogImageCostArgs): Promise<void> {
       metadata: {},
     });
   } catch { /* never break the caller */ }
+}
+
+/** One lib/tarot/image-gen.ts result. Logged when the provider charged: on success, and on a failure after the provider
+ *  finished (`billed`, e.g. the download of a finished image failed). Vendor and price come from IMAGE_RATES. */
+export function logImageResult(result: { ok: boolean; billed?: boolean }, args: { route: string; model: string; jobId?: string | null; tool?: string | null; organizationId?: string | null }): void {
+  if (!result.ok && !result.billed) return;
+  const rate = IMAGE_RATES[args.model] ?? IMAGE_RATES[DEFAULT_IMAGE_MODEL];
+  void logImageCost({ ...args, vendor: rate.vendor, costUsd: imageCostUsd(args.model) });
 }

@@ -13,6 +13,7 @@ import { getDesignsPublicBase } from "../storage/r2";
 import { MODEL_SPECS } from "./model-specs";
 import { providerUrl } from "@/lib/ai/gateway";
 import type { Grant } from "@/lib/entitlements/can";
+import { billedOrgId, logImageResult } from "@/lib/ai/log-ai-call";
 
 const GEN_TIMEOUT_MS = 58_000; // stay under the 60s nginx/route ceiling
 export const REPLICATE_POLL_MS = 2_500;
@@ -288,11 +289,14 @@ export interface TarotGenParams {
   /** When true, FLUX models use explicit print-quality pixel dims instead of megapixels:"1".
    *  Tarot cards: 300 DPI @ 7.6×12.6 cm = 896×1488 px. Studio/Mockup: omit (stays 1 MP). */
   printQuality?: boolean;
+  /** Where the cost row says the image came from; the row itself is always written (generateTarotImage). */
+  costLog?: { route: string; tool: string; jobId?: string | null };
 }
 
 export type TarotGenResult =
   | { ok: true; image: string; seed: number | null }
-  | { ok: false; error: string };
+  /** billed: the provider finished (and charged) before the failure, so the caller still logs the cost. */
+  | { ok: false; error: string; billed?: boolean };
 
 function parseDataUrl(dataUrl: string): { mime: string; buffer: Buffer } | null {
   const m = /^data:(.+?);base64,(.+)$/.exec(dataUrl);
@@ -471,9 +475,18 @@ async function generateFlux(params: TarotGenParams, config: ModelConfig, signal:
   }
 
   const outUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
-  if (!outUrl) return { ok: false, error: "replicate_empty_output" };
-  const image = await urlToDataUrl(outUrl as string, signal);
-  return { ok: true, image, seed };
+  if (!outUrl) return { ok: false, error: "replicate_empty_output", billed: true };
+  return fetchFinishedOutput(outUrl as string, signal, seed);
+}
+
+// The prediction succeeded, so Replicate has charged: a failed download is reported as billed.
+async function fetchFinishedOutput(url: string, signal: AbortSignal, seed: number | null): Promise<TarotGenResult> {
+  try {
+    return { ok: true, image: await urlToDataUrl(url, signal), seed };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg === "The operation was aborted." ? "generation_timeout" : msg, billed: true };
+  }
 }
 
 // ── Generic Replicate — new models via per-model buildInput abstraction ─────────
@@ -531,9 +544,8 @@ async function generateReplicate(params: TarotGenParams, config: ModelConfig, si
   }
 
   const outUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
-  if (!outUrl) return { ok: false, error: "replicate_empty_output" };
-  const image = await urlToDataUrl(outUrl as string, signal);
-  return { ok: true, image, seed };
+  if (!outUrl) return { ok: false, error: "replicate_empty_output", billed: true };
+  return fetchFinishedOutput(outUrl as string, signal, seed);
 }
 
 // ── OpenAI gpt-image-1 ──────────────────────────────────────────────────────────
@@ -599,12 +611,21 @@ async function generateOpenai(params: TarotGenParams, config: ModelConfig, signa
 
   const json = (await res.json()) as { data?: { b64_json?: string }[] };
   const b64 = json.data?.[0]?.b64_json;
-  if (!b64) return { ok: false, error: "openai_empty_output" };
+  if (!b64) return { ok: false, error: "openai_empty_output", billed: true }; // a 200 from the images API is charged
   return { ok: true, image: `data:image/png;base64,${b64}`, seed: null };
 }
 
 /** Shared by tarot, studio, content and video: the caller asks for its own product's feature (e.g. grantFor("studio.image")). */
 export async function generateTarotImage(params: TarotGenParams, grant: Grant): Promise<TarotGenResult> {
+  const result = await runGeneration(params, grant);
+  // The one place an image's cost is logged: only here are all of its facts known -- whether the provider charged
+  // (ok, or billed after a failed download), the model that ran, and the account the grant bills. Callers pass costLog.
+  logImageResult(result, { route: params.costLog?.route ?? "tarot/image-gen", model: params.model, tool: params.costLog?.tool ?? "image",
+    jobId: params.costLog?.jobId ?? null, organizationId: billedOrgId(grant) });
+  return result;
+}
+
+async function runGeneration(params: TarotGenParams, grant: Grant): Promise<TarotGenResult> {
   const config = TAROT_MODELS[params.model];
   if (!config) return { ok: false, error: "unknown_model" };
   const controller = new AbortController();

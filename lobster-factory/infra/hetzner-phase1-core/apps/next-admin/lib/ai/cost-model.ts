@@ -60,6 +60,9 @@ export const TEXT_RATES: Record<string, TextRate> = {
   // Gemini Flash-Lite: lib/ai/gemini-models.ts GEMINI_LITE_MODEL (ops-inbox diagnostics, cs fallback). Google list price
   // 2026-10-24: $0.30 / $2.50 per 1M, cache read $0.03. 2.0 is retired (404) and stays for older cost-log rows.
   "gemini-3.5-flash-lite":     { inputPerM: 0.3, outputPerM: 2.5, cacheReadMult: 0.1, cacheWriteMult: 1, label: "Gemini 3.5 Flash-Lite", vendor: "Google" },
+  // Outreach default (lib/outreach/ai-gemini.ts) is the alias, whose target Google does not publish: priced as the newest
+  // Flash on the list (3.8 Flash, $0.75 / $3.75, cache $0.075, through 2026-12-31; it doubles on 2027-01-01).
+  "gemini-flash-latest":       { inputPerM: 0.75, outputPerM: 3.75, cacheReadMult: 0.1, cacheWriteMult: 1, label: "Gemini Flash (latest alias, est.)", vendor: "Google" },
   "gemini-2.0-flash-lite":     { inputPerM: 0.1, outputPerM: 0.4, cacheReadMult: 0.25, cacheWriteMult: 1, label: "Gemini 2.0 Flash-Lite (retired)", vendor: "Google" },
 };
 

@@ -22,8 +22,6 @@ import { getSupabaseWriteClient } from "../../../../../lib/supabase-server";
 import type { WebsiteSpec } from "../../../../../lib/onboarding/intake-form";
 import { generateTarotImage } from "../../../../../lib/tarot/image-gen";
 import { grantFor } from "@/lib/entitlements/grant";
-import { logImageCost } from "@/lib/ai/log-ai-call";
-import { imageCostUsd } from "@/lib/ai/cost-calculator";
 import { isR2Configured, buildWebImageKey, parseImageDataUrl, putDesignObject } from "../../../../../lib/storage/r2";
 import { generateStagingAdminPassword, vaultStagingAdminPassword } from "../../../../../lib/hosting/staging-admin-credential";
 import { checkProductionChangeAllowed } from "../../../../../lib/system-modes/production-change-gate";
@@ -156,9 +154,9 @@ async function generateAndInstallHeroImage(conn: SshClient, slug: string, spec: 
   // imagen-4 (Google) over flux-schnell: flux-schnell renders gibberish pseudo-text on hero banners
   // even with negative prompts; Imagen honours "no text" reliably for clean photographic heroes.
   const prompt = `${style}. A wide cinematic hero banner photograph for ${spec.site_name || "a brand"}. Photorealistic, atmospheric, tasteful, high detail. Absolutely no text, no words, no letters, no captions, no signage, no logo, no watermark anywhere in the image.`;
-  const gen = await generateTarotImage({ model: "imagen-4", prompt, aspectRatio: "16:9" }, await grantFor("ops.staging-image"));
+  const gen = await generateTarotImage({ model: "imagen-4", prompt, aspectRatio: "16:9",
+    costLog: { route: "internal/hosting/provision-staging", tool: "hosting" } }, await grantFor("ops.staging-image"));
   if (!gen.ok) return `hero image gen failed: ${"error" in gen ? gen.error : "gen_failed"}`;
-  void logImageCost({ route: "internal/hosting/provision-staging", model: "imagen-4", vendor: "Google/Replicate", costUsd: imageCostUsd("imagen-4"), tool: "hosting" });
   const parsed = parseImageDataUrl(gen.image);
   if (!parsed) return "hero image: unparseable output";
   const key = buildWebImageKey();

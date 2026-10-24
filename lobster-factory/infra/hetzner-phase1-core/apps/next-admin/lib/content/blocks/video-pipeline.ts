@@ -359,6 +359,7 @@ export async function buildSceneAsset(
     prompt: styledPrompt,
     aspectRatio,
     referenceImages: referenceImageUrl ? [referenceImageUrl] : undefined,
+    costLog: { route: "video/scene-image", tool: "video" },
   }, await grantFor("video.image"));
   if (img.ok === false) return { ok: false, status: 502, error: `場景 ${scene.id} 圖片生成失敗：${img.error}` };
   const parsed = parseImageDataUrl(img.image);

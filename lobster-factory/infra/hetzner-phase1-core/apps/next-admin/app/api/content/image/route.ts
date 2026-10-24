@@ -16,7 +16,6 @@ import {
   putDesignObject,
 } from "@/lib/storage/r2";
 import { imageCostUsd } from "@/lib/ai/cost-calculator";
-import { logImageCost } from "@/lib/ai/log-ai-call";
 
 /** Parse a data URL → { buffer, mime }. Returns null on malformed input. */
 function parseDataUrl(dataUrl: string): { buffer: Buffer; mime: string } | null {
@@ -227,7 +226,8 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
     ? `${prompt}, ${styleMod}`
     : `${prompt}, professional social media graphic, high quality, clean composition, no text overlay`;
 
-  const result = await generateTarotImage({ model, prompt: finalPrompt, aspectRatio, seed, referenceImages }, grant);
+  const result = await generateTarotImage({ model, prompt: finalPrompt, aspectRatio, seed, referenceImages,
+    costLog: { route: "content/image", tool: "content", jobId: typeof body._jobId === "string" ? body._jobId : null } }, grant);
 
   if (!result.ok) {
     const code = (result as { ok: false; error: string }).error;
@@ -258,10 +258,6 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
   }
 
   const costUsd = imageCostUsd(model);
-  const jobId = typeof body._jobId === "string" ? body._jobId : null;
-  if (jobId) {
-    void logImageCost({ route: "content/image", model, vendor: "Image", costUsd, jobId, tool: "content" });
-  }
 
   return NextResponse.json({
     ok: true,

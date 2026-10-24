@@ -11,8 +11,6 @@ import { NextResponse } from "next/server";
 import { timingSafeEqual } from "@/lib/security/timingSafeEqual";
 import { generateTarotImage, isTarotModel, isAspectRatio } from "@/lib/tarot/image-gen";
 import { grantFor } from "@/lib/entitlements/grant";
-import { logImageCost } from "@/lib/ai/log-ai-call";
-import { imageCostUsd } from "@/lib/ai/cost-calculator";
 import { BatchStoreUnavailableError, claimCard, finishCard, getJob } from "@/lib/tarot/batch-store";
 import { putDesignObject, parseImageDataUrl } from "@/lib/storage/r2";
 import { checkAndConsumeQuota } from "@/lib/tarot/quota";
@@ -93,13 +91,13 @@ export async function POST(
     // Asked as the person who started the batch (0119), not "system": a customer's deck gets the customer's verdict
     // and the usage row names who used it. Jobs from before 0119 have no actor and keep the old system judgment.
     const asker = { actor: job.actor ?? "system", ...(job.organizationId ? { orgId: job.organizationId } : {}) };
-    const result = await generateTarotImage({ model, prompt, aspectRatio, seed, printQuality: true }, await grantFor("tarot.image", asker));
+    const result = await generateTarotImage({ model, prompt, aspectRatio, seed, printQuality: true,
+      costLog: { route: "internal/tarot/batch/card", tool: "tarot", jobId } }, await grantFor("tarot.image", asker));
     if (!result.ok) {
       const errMsg = (result as { ok: false; error: string }).error;
       outcome = { error: errMsg };
       return NextResponse.json({ ok: false, error: errMsg, cardIndex }, { status: 200 });
     }
-    void logImageCost({ route: "internal/tarot/batch/card", model, vendor: "Replicate", costUsd: imageCostUsd(model), jobId, tool: "tarot" });
 
     // R2 is the only home of the image (the batch POST refuses to start without R2). Key: tarot-batch/{jobId}/{NNN}.png
     const parsed = parseImageDataUrl(result.image);

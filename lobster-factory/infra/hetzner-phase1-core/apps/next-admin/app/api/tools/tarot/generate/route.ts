@@ -5,8 +5,6 @@ import type { Grant } from "@/lib/entitlements/can";
 import { generateTarotImage, isTarotModel, isAspectRatio } from "../../../../../lib/tarot/image-gen";
 import { checkAndConsumeQuota } from "../../../../../lib/tarot/quota";
 import { MAX_REFS_PER_REQUEST } from "../../../../../lib/tarot/model-specs";
-import { imageCostUsd } from "../../../../../lib/ai/cost-calculator";
-import { logImageCost } from "../../../../../lib/ai/log-ai-call";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -105,13 +103,10 @@ async function handlePost(request: Request, grant: Grant): Promise<Response> {
     seed: body.seed ?? null,
     aspectRatio: isAspectRatio(body.aspectRatio) ? body.aspectRatio : undefined,
     printQuality: body.printQuality === true,
+    costLog: { route: "tools/tarot/generate", tool: "tarot", jobId: typeof body._jobId === "string" ? body._jobId : null },
   }, grant);
 
   if (result.ok) {
-    const jobId = typeof body._jobId === "string" ? body._jobId : null;
-    if (jobId) {
-      void logImageCost({ route: "tools/tarot/generate", model: body.model, vendor: "Replicate", costUsd: imageCostUsd(body.model), jobId, tool: "tarot" });
-    }
     return NextResponse.json(result);
   }
   // Return HTTP 200 with ok:false so the JSON reaches the browser. A 5xx here would let

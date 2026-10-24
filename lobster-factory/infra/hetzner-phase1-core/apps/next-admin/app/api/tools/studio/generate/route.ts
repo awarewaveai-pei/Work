@@ -9,8 +9,6 @@ import {
   STUDIO_MODEL_OPTIONS,
 } from "../../../../../lib/studio/image-provider";
 import { getDesignsPublicBase } from "../../../../../lib/storage/r2";
-import { imageCostUsd } from "../../../../../lib/ai/cost-calculator";
-import { logImageCost } from "../../../../../lib/ai/log-ai-call";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -121,13 +119,10 @@ async function handlePost(request: Request, grant: Grant): Promise<Response> {
     referenceImages,
     seed: body.seed ?? null,
     aspectRatio: isAspectRatio(body.aspectRatio) ? body.aspectRatio : undefined,
+    costLog: { route: "tools/studio/generate", tool: "studio", jobId: typeof body._jobId === "string" ? body._jobId : null },
   }, grant);
 
   if (result.ok) {
-    const jobId = typeof body._jobId === "string" ? body._jobId : null;
-    if (jobId) {
-      void logImageCost({ route: "tools/studio/generate", model: body.model ?? "unknown", vendor: "Replicate", costUsd: imageCostUsd(body.model ?? ""), jobId, tool: "studio" });
-    }
     return NextResponse.json(result);
   }
   // HTTP 200 with ok:false so the JSON reaches the browser (nginx error_page would
