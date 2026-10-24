@@ -3,9 +3,10 @@
 // Buttons and checkboxes only, no dropdowns (memory feedback_no_dropdowns_multiselect). Every change goes through
 // /api/content/topics*, which checks the site's organization; a stale page gets 409 and reloads.
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { NEXT, TOPIC_FORMATS, type Topic, type TopicFormat, type TopicStatus } from "@/lib/content/topics/store";
+import { NEXT, TOPIC_FORMATS, canReschedule, daysIn, taipeiParts, type Topic, type TopicFormat, type TopicStatus } from "@/lib/content/topics/store";
 import { planCostTwd, topicCostTwd } from "@/lib/content/topics/cost";
 import { DAILY_START_CAP, makesNow } from "@/lib/content/topics/tick";
+import { GridPicker } from "@/components/tools/GridPicker";
 import type { TopicReview } from "@/lib/content/topics/review";
 import type { TopicArtifacts } from "@/lib/content/topics/make";
 import { autoPublishes, type SiteContentDefaults } from "@/lib/content/brand-voice";
@@ -20,7 +21,6 @@ const T = {
   pick: "點左邊一個題目，這裡會顯示細節。",
   add: "加一個題目",
   addBtn: "加入",
-  day: "日",
   title: "標題",
   keyword: "搜尋關鍵字",
   angle: "切入角度（選填）",
@@ -34,7 +34,14 @@ const T = {
   start: "核准並開始",
   started: "已開始製作，約 2 分鐘後按上個月／下個月再回來就看得到草稿。",
   // what starting makes follows the topic's formats, like its price (topicCostTwd)
-  startHint: (f: TopicFormat[], auto: boolean) => `立刻做成 ${[f.includes("article") && "WordPress 草稿", f.includes("social") && "社群草稿"].filter(Boolean).join("和")}，${auto ? "檢查全部通過就自動發布（網站設定：AI 審核後自動發布）" : "不會發布（網站設定：人工審核）"}；每天最多開始 ${DAILY_START_CAP} 題。`,
+  startHint: (f: TopicFormat[], auto: boolean, cap: number) => `立刻做成 ${[f.includes("article") && "WordPress 草稿", f.includes("social") && "社群草稿"].filter(Boolean).join("和")}，${auto ? "檢查全部通過就自動發布（網站設定：AI 審核後自動發布）" : "不會發布（網站設定：人工審核）"}；每天最多開始 ${cap} 題（在排程頁 Schedules 的「自動內容管線」改）。`,
+  when: "排定時間（台北）",
+  hour: "時間",
+  pickDay: "選日期",
+  pickHour: "選台北時間",
+  saveWhen: "儲存時間",
+  whenFixed: "製作中、已審核、正在發布或已發布，時間不能改。",
+  movedTo: (m: string) => `已改到 ${m}，切到那個月就看得到。`,
   review: "規則審核",
   wpDraft: "打開 WordPress 草稿",
 };
@@ -67,7 +74,16 @@ const shiftMonth = (m: string, by: number) => {
   d.setUTCMonth(d.getUTCMonth() + by);
   return d.toISOString().slice(0, 7);
 };
-const dayOf = (t: Topic) => (t.scheduled_for ? new Date(t.scheduled_for).getUTCDate() : null);
+/** "12日 09:00" in Taipei time, or "—". */
+const whenText = (t: Topic) => {
+  if (!t.scheduled_for) return "—";
+  const p = taipeiParts(t.scheduled_for);
+  return `${p.day}日 ${String(p.hour).padStart(2, "0")}:00`;
+};
+const HOURS = Array.from({ length: 24 }, (_, h) => h);
+const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
+const dayText = (d: number) => `${d} 日`;
+const daysOf = (month: string) => Array.from({ length: daysIn(month) }, (_, i) => i + 1);
 
 export function TopicsBoard() {
   const [sites, setSites] = useState<Site[] | null>(null);
@@ -79,7 +95,10 @@ export function TopicsBoard() {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
   const [draftFormats, setDraftFormats] = useState<TopicFormat[] | null>(null);
-  const [add, setAdd] = useState({ day: 1, title: "", keyword: "", angle: "", formats: ["article", "social"] as TopicFormat[] });
+  const [add, setAdd] = useState({ day: 1, hour: 9, title: "", keyword: "", angle: "", formats: ["article", "social"] as TopicFormat[] });
+  /** The selected topic's time being edited (Taipei); null = unchanged. */
+  const [draftWhen, setDraftWhen] = useState<{ month: string; day: number; hour: number } | null>(null);
+  const [dailyCap, setDailyCap] = useState(DAILY_START_CAP);
   const [fromFolder, setFromFolder] = useState<{ id: string; name: string } | null>(null);
   const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([]);
 
@@ -97,26 +116,27 @@ export function TopicsBoard() {
   const load = useCallback(async () => {
     if (!siteId) return;
     const r = await fetch(`/api/content/topics?siteId=${encodeURIComponent(siteId)}&month=${month}&folders=1`);
-    const j = await r.json() as { ok: boolean; topics?: Topic[]; folders?: Array<{ id: string; name: string }>; error?: string };
+    const j = await r.json() as { ok: boolean; topics?: Topic[]; folders?: Array<{ id: string; name: string }>; dailyCap?: number; error?: string };
     if (!j.ok) { setNote(j.error ?? `讀取失敗（${r.status}）`); return; }
     setTopics(j.topics ?? []);
+    if (typeof j.dailyCap === "number") setDailyCap(j.dailyCap);
     setFolders(j.folders ?? []);
     setChecked(new Set());
   }, [siteId, month]);
   useEffect(() => { setSelId(""); setNote(""); void load(); }, [load]);
 
   const sel = topics.find((t) => t.id === selId);
-  useEffect(() => { setDraftFormats(null); }, [selId]);
+  useEffect(() => { setDraftFormats(null); setDraftWhen(null); }, [selId]);
   const counts = useMemo(() => {
     const c: Partial<Record<TopicStatus, number>> = {};
     for (const t of topics) c[t.status] = (c[t.status] ?? 0) + 1;
     return c;
   }, [topics]);
 
-  async function act(t: Topic, action: string, formats?: TopicFormat[]): Promise<boolean> {
+  async function act(t: Topic, action: string, formats?: TopicFormat[], when?: { month: string; day: number; hour: number }): Promise<boolean> {
     const r = await fetch(`/api/content/topics/${t.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, version: t.version, ...(formats ? { formats } : {}) }),
+      body: JSON.stringify({ action, version: t.version, ...(formats ? { formats } : {}), ...(when ?? {}) }),
     });
     if (r.status === 409) { setNote(T.reload); return false; }
     const j = await r.json() as { ok: boolean; error?: string };
@@ -135,6 +155,15 @@ export function TopicsBoard() {
     if (!sel) return;
     setBusy(true); setNote("");
     try { await act(sel, action, formats); } finally { await load(); setBusy(false); }
+  }
+
+  async function saveWhen() {
+    if (!sel || !draftWhen) return;
+    setBusy(true); setNote("");
+    try {
+      const ok = await act(sel, "schedule", undefined, draftWhen);
+      if (ok && draftWhen.month !== month) setNote(T.movedTo(draftWhen.month));
+    } finally { await load(); setBusy(false); }
   }
 
   async function start() {
@@ -163,7 +192,7 @@ export function TopicsBoard() {
       const r = await fetch("/api/content/topics", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ siteId, month, ...add, ...(fromFolder ? { source: "kb", sourceRef: { folder_id: fromFolder.id, text: fromFolder.name } } : {}) }) });
       const j = await r.json() as { ok: boolean; error?: string };
-      if (j.ok) { setAdd({ day: 1, title: "", keyword: "", angle: "", formats: ["article", "social"] }); setFromFolder(null); }
+      if (j.ok) { setAdd({ day: 1, hour: 9, title: "", keyword: "", angle: "", formats: ["article", "social"] }); setFromFolder(null); }
       else setNote(j.error ?? `失敗（${r.status}）`);
     } finally { await load(); setBusy(false); }
   }
@@ -171,6 +200,10 @@ export function TopicsBoard() {
   if (!sites) return <p style={{ color: "var(--text-muted)" }}>…</p>;
   if (!sites.length) return <p style={{ color: "var(--text-muted)" }}>{T.noSites}</p>;
   const editable = sel && ["proposed", "approved"].includes(sel.status);
+  const selWhen = sel?.scheduled_for ? taipeiParts(sel.scheduled_for) : { month, day: 1, hour: 9 };
+  const when = draftWhen ?? selWhen;
+  // a day past the end of the month just switched to (31 -> November) becomes its last day
+  const setWhen = (w: { month: string; day: number; hour: number }) => setDraftWhen({ ...w, day: Math.min(w.day, daysIn(w.month)) });
   const formats = draftFormats ?? sel?.formats ?? [];
   const toggle = (list: TopicFormat[], f: TopicFormat) => (list.includes(f) ? list.filter((x) => x !== f) : [...list, f]);
 
@@ -202,12 +235,12 @@ export function TopicsBoard() {
             {!topics.length && <p style={{ margin: 0, padding: 14, color: "var(--text-muted)" }}>{T.empty}</p>}
             {topics.map((t) => (
               <div key={t.id} onClick={() => setSelId(t.id)}
-                style={{ display: "grid", gridTemplateColumns: "28px 40px minmax(0,1fr) auto", gap: 10, alignItems: "center", padding: "9px 12px",
+                style={{ display: "grid", gridTemplateColumns: "28px 84px minmax(0,1fr) auto", gap: 10, alignItems: "center", padding: "9px 12px",
                   borderTop: "1px solid var(--border)", cursor: "pointer", background: t.id === selId ? "var(--bg-hover)" : undefined }}>
                 <input type="checkbox" aria-label={t.title} disabled={t.status !== "proposed"} checked={checked.has(t.id)}
                   onClick={(e) => e.stopPropagation()}
                   onChange={(e) => setChecked((c) => { const n = new Set(c); if (e.target.checked) n.add(t.id); else n.delete(t.id); return n; })} />
-                <span style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>{dayOf(t) ?? "—"}{T.day}</span>
+                <span style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>{whenText(t)}</span>
                 <span style={{ minWidth: 0 }}>
                   <span style={{ display: "block", color: "var(--text-primary)" }}>{t.title}</span>
                   <span style={{ fontSize: "var(--font-size-xs)", color: "var(--text-muted)" }}>{t.formats.map((f) => FORMAT[f]).join("、")} · {SOURCE[t.source]}</span>
@@ -220,8 +253,8 @@ export function TopicsBoard() {
           <div style={{ ...card, display: "grid", gap: 8 }}>
             <div className="section-title" style={{ margin: 0 }}>{T.add}</div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <input id="topic-add-day" aria-label={T.day} type="number" min={1} max={31} value={add.day} style={{ width: 70 }}
-                onChange={(e) => setAdd({ ...add, day: Number(e.target.value) || 1 })} />
+              <GridPicker value={Math.min(add.day, daysIn(month))} options={daysOf(month)} format={dayText} label={T.pickDay} columns={7} disabled={busy} onChange={(d) => setAdd({ ...add, day: d })} />
+              <GridPicker value={add.hour} options={HOURS} format={hh} label={T.pickHour} disabled={busy} onChange={(h) => setAdd({ ...add, hour: h })} />
               <input id="topic-add-title" placeholder={T.title} value={add.title} style={{ flex: "2 1 220px", minWidth: 0 }} onChange={(e) => setAdd({ ...add, title: e.target.value })} />
               <input id="topic-add-keyword" placeholder={T.keyword} value={add.keyword} style={{ flex: "1 1 160px", minWidth: 0 }} onChange={(e) => setAdd({ ...add, keyword: e.target.value })} />
             </div>
@@ -250,9 +283,24 @@ export function TopicsBoard() {
             <>
               <div>
                 <div style={{ fontWeight: 700, color: "var(--text-primary)" }}>{sel.title}</div>
-                <div style={{ fontSize: "var(--font-size-sm)", color: "var(--text-muted)" }}>{sel.keyword} · {dayOf(sel) ?? "—"}{T.day} · <span style={{ color: STATUS[sel.status][1] }}>{STATUS[sel.status][0]}</span></div>
+                <div style={{ fontSize: "var(--font-size-sm)", color: "var(--text-muted)" }}>{sel.keyword} · {whenText(sel)} · <span style={{ color: STATUS[sel.status][1] }}>{STATUS[sel.status][0]}</span></div>
               </div>
               {sel.angle && <p style={{ margin: 0, fontSize: "var(--font-size-sm)" }}>{sel.angle}</p>}
+              <div style={{ display: "grid", gap: 6 }}>
+                <div style={{ fontSize: "var(--font-size-sm)" }}>{T.when}</div>
+                {canReschedule(sel, new Date()) ? (
+                  <>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                      <button type="button" className="btn btn-ghost" disabled={busy} aria-label="上個月" onClick={() => setWhen({ ...when, month: shiftMonth(when.month, -1) })}>‹</button>
+                      <span style={{ fontVariantNumeric: "tabular-nums" }}>{when.month}</span>
+                      <button type="button" className="btn btn-ghost" disabled={busy} aria-label="下個月" onClick={() => setWhen({ ...when, month: shiftMonth(when.month, 1) })}>›</button>
+                      <GridPicker value={when.day} options={daysOf(when.month)} format={dayText} label={T.pickDay} columns={7} disabled={busy} onChange={(d) => setWhen({ ...when, day: d })} />
+                      <GridPicker value={when.hour} options={HOURS} format={hh} label={T.pickHour} disabled={busy} onChange={(h) => setWhen({ ...when, hour: h })} />
+                    </div>
+                    {draftWhen && <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void saveWhen()}>{T.saveWhen}</button>}
+                  </>
+                ) : <span style={{ fontSize: "var(--font-size-xs)", color: "var(--text-muted)" }}>{T.whenFixed}</span>}
+              </div>
               <div style={{ fontSize: "var(--font-size-sm)", color: "var(--text-muted)" }}>
                 {T.source}：{SOURCE[sel.source]}{typeof sel.source_ref.text === "string" && sel.source_ref.text ? `（${sel.source_ref.text}）` : ""}
               </div>
@@ -285,7 +333,7 @@ export function TopicsBoard() {
                   <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void start()} style={{ whiteSpace: "normal" }}>
                     {T.start}（約 NT${topicCostTwd(sel.formats).usual}{topicCostTwd(sel.formats).max > topicCostTwd(sel.formats).usual ? `，最多 NT$${topicCostTwd(sel.formats).max}` : ""}）
                   </button>
-                  <span style={{ fontSize: "var(--font-size-xs)", color: "var(--text-muted)" }}>{T.startHint(sel.formats, autoPublishes(sites.find((s) => s.id === siteId)?.contentDefaults))}</span>
+                  <span style={{ fontSize: "var(--font-size-xs)", color: "var(--text-muted)" }}>{T.startHint(sel.formats, autoPublishes(sites.find((s) => s.id === siteId)?.contentDefaults), dailyCap)}</span>
                 </div>
               )}
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

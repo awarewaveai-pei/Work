@@ -10,6 +10,8 @@ const m = vi.hoisted(() => ({
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => ({}) }));
 vi.mock("@/lib/content/brand-voice-store", () => ({ loadSiteBrand: async () => m.site }));
 vi.mock("@/lib/kb/folders", () => ({ listFolders: m.listFolders }));
+// the brand's daily limit set on /ops/schedules
+vi.mock("@/lib/schedules/store", () => ({ storedDailyLimit: async () => 3 }));
 vi.mock("@/lib/entitlements/grant", () => ({ withFeature: (_k: string, h: (r: Request, g: unknown) => unknown) => (r: Request) => h(r, {}) }));
 vi.mock("@/lib/content/topics/plan", () => ({ proposeMonth: m.proposeMonth, planAsker: () => async () => "" }));
 vi.mock("@/lib/content/topics/store", async (orig) => ({
@@ -38,7 +40,7 @@ beforeEach(() => {
 describe("GET /api/content/topics", () => {
   it("staff and the owning client read the site's month (+ folders on request)", async () => {
     const r = await GET(req("/api/content/topics?siteId=s1&month=2026-11&folders=1", STAFF));
-    expect(await r.json()).toEqual({ ok: true, topics: [], folders: [{ id: "f1", name: "藝術治療 202610011200" }] });
+    expect(await r.json()).toEqual({ ok: true, topics: [], folders: [{ id: "f1", name: "藝術治療 202610011200" }], dailyCap: 3 });
     expect(m.listTopics).toHaveBeenCalledWith({}, "org-a", "2026-11");
     expect((await GET(req("/api/content/topics?siteId=s1&month=2026-11", CLIENT_A))).status).toBe(200);
   });
@@ -64,7 +66,7 @@ describe("POST /api/content/topics", () => {
     const body = { siteId: "s1", month: "2026-02", title: "標題", keyword: "關鍵字", day: 31, formats: ["video", "nope"], source: "kb", sourceRef: { folder_id: "f1" } };
     expect((await POST(req("/api/content/topics", STAFF, "POST", body))).status).toBe(200);
     expect(m.proposeTopics.mock.calls[0][1][0]).toMatchObject({ organization_id: "org-a", site_id: "s1", month: "2026-02-01",
-      scheduled_for: "2026-02-28T01:00:00Z", formats: ["video"], source: "kb", source_ref: { folder_id: "f1" } });
+      scheduled_for: "2026-02-28T01:00:00.000Z", formats: ["video"], source: "kb", source_ref: { folder_id: "f1" } });
     expect((await POST(req("/api/content/topics", STAFF, "POST", body))).status).toBe(409);
   });
 
@@ -84,6 +86,13 @@ describe("PATCH /api/content/topics/[id]", () => {
   it("a stale page is 409; another organization's topic is 404; neither writes", async () => {
     expect((await PATCH(req("/api/content/topics/t1", STAFF, "PATCH", { action: "approve", version: 1 }), idParams)).status).toBe(409);
     expect((await PATCH(req("/api/content/topics/t1", CLIENT_B, "PATCH", { action: "approve", version: 2 }), idParams)).status).toBe(404);
+    expect(m.move).not.toHaveBeenCalled();
+  });
+
+  it("a time past the month's end or an hour out of range is 400 before any write", async () => {
+    for (const bad of [{ month: "2026-02", day: 30, hour: 9 }, { month: "2026-11", day: 3, hour: 24 }, { month: "2026-13", day: 1, hour: 9 }]) {
+      expect((await PATCH(req("/api/content/topics/t1", STAFF, "PATCH", { action: "schedule", version: 2, ...bad }), idParams)).status).toBe(400);
+    }
     expect(m.move).not.toHaveBeenCalled();
   });
 

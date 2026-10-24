@@ -78,6 +78,7 @@ export async function siteWatchCells(sb: SupabaseClient, orgs: WatchOrg[]): Prom
       hourUtc: target?.hour_utc ?? SITE_WATCH_DEFAULTS.hour_utc,
       dayOfWeekUtc: 0,
       dayOfMonth: 1,
+      dailyLimit: null,
       lastRunAt: target?.last_completed_bucket_start ?? null,
       lastError: failing.length ? failing.map((s) => `${s.kind}:${s.last_failure_code ?? s.alert_state}`).join("; ") : null,
       lastErrorAt: failing.length ? failing.reduce((m, s) => (s.updated_at > m ? s.updated_at : m), failing[0].updated_at) : null,

@@ -11,6 +11,7 @@ import { requestActor } from "@/lib/entitlements/subject";
 import { move, topicById } from "@/lib/content/topics/store";
 import { DAILY_START_CAP, makeStarted, makesNow } from "@/lib/content/topics/tick";
 import { topicDeps } from "@/lib/content/topics/make";
+import { storedDailyLimit } from "@/lib/schedules/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,8 +41,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (blocked) return NextResponse.json({ ok: false, error: blocked }, { status: 409 });
       const approved = t.status === "proposed" ? await move(sb, t, "approved", { last_error: null }) : t;
       if (!approved) return NextResponse.json({ ok: false, error: "changed elsewhere; reload" }, { status: 409 });
-      const started = await deps.start(approved, new Date().toISOString().slice(0, 10), DAILY_START_CAP);
-      if (!started) return NextResponse.json({ ok: false, error: `今天已經開始 ${DAILY_START_CAP} 題（每天上限），明天再開始`, topic: approved }, { status: 409 });
+      // the brand's limit set on /ops/schedules (content_pipeline), the same one its schedule uses
+      const cap = (await storedDailyLimit(t.organization_id, "content_pipeline")) ?? DAILY_START_CAP;
+      const started = await deps.start(approved, new Date().toISOString().slice(0, 10), cap);
+      if (!started) return NextResponse.json({ ok: false, error: `今天已經開始 ${cap} 題（每天上限，在排程頁 Schedules 的「自動內容管線」改），明天再開始`, topic: approved }, { status: 409 });
       after(() => makeStarted(deps, started).then((r) => console.info(`[content/topics/start] ${started.id} ${r}`),
         (e) => console.error(`[content/topics/start] ${started.id} not recorded:`, e)));
       return NextResponse.json({ ok: true, topic: started });

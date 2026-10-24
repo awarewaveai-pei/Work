@@ -1,4 +1,54 @@
 # Worklog
+## 2026-10-25（續3）自動內容：每天最多開始幾題改成每個客戶自己設（0125）；題目的日期和時間建立後可以改（Claude）
+
+**觸發**：操作者問排程頁內容管線「為什麼要設 5 分鐘，而且不能調」，接著說「都做成可以改的」，並同意加 0125。
+**根因**：
+- `DAILY_START_CAP = 2` 寫死在 `NA/lib/content/topics/tick.ts:15`，沒有地方存每個客戶自己的值。
+- 排程頁把固定的 every_5m 檢查頻率畫成一個按不動的頻率按鈕，看起來像壞了。
+- 題目的 `scheduled_for` 只在建立時寫一次（`app/api/content/topics/route.ts`），時間固定台北 09:00，之後沒有任何路徑能改。
+**不變量**：
+- 「每天上限」存在 (客戶, 工作) 那一列；排程、「核准並開始」、頁面提示三處都讀同一個值。
+- 自動發布可能正握著的列，人不能寫（M1）。
+**做法**（NA = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）：
+- `lobster-factory/packages/db/migrations/0125_client_schedules_daily_limit.sql`：加 `client_schedules.daily_limit int null check 1–10`；null 表示用預設 2，套上去不改變行為。down 先把設過的值備份到 `client_schedules_0125_backup` 再 drop；down 另放一份在 `packages/db/scripts/0125_client_schedules_daily_limit_down.sql`。
+- `NA/lib/schedules/store.ts`：讀寫 dailyLimit，欄位沒帶就保留原值；新增 `storedDailyLimit()`，DB 錯誤會 throw。
+- `jobs.ts`：content_pipeline 加 `dailyLimit {1–10, default DAILY_START_CAP}`；`run(org, runKey, schedule)` 把存的列帶進去（run-due 傳入）；`dailyLimitOf()`。
+- `view.ts`：每格帶目前生效的上限。PATCH `.../schedules/[job]/route.ts` 只收有 dailyLimit 的工作，值只能是它的選項之一。
+- `[id]/start/route.ts`：用客戶自己的上限。
+- `ScheduleTable.tsx`：
+  - 固定頻率、沒得選的工作不顯示頻率欄；整頁沒有工作用到小時時，也不顯示時間欄。
+  - 新增「每天最多開始」欄（1–10 格子），可批次「套用上限」。
+  - 只有改到上限才送 dailyLimit，所以開關切換不會把預設值寫成客戶自己的值。
+- `GridPicker` 原樣搬到 `NA/components/tools/GridPicker.tsx`，兩頁共用。
+- 題目時間（`NA/lib/content/topics/store.ts`）：
+  - `taipeiParts`／`fromTaipei`（固定 +8，台灣沒有夏令時間）。
+  - `reschedule()` 依 status＋version 守衛寫入，同時改 `month`（台北月份）；遇到 23505 轉成 409。
+  - `canReschedule()`：proposed／approved／rejected／failed 可以改。scheduled 只在時間還沒到時可以改，寫入時再用 `.gt(scheduled_for, now)` 擋一次。reviewed 和製作中都不能改。
+- PATCH `[id]` 新增 `action:"schedule" {month, day, hour}`；POST 收 `hour`，預設 9，等於舊的 T01:00Z；GET 回 `dailyCap`。
+- `TopicsBoard.tsx`：
+  - 清單顯示「日 時:00」。
+  - 新增題目時可以選日期和時間（格子）。
+  - 右側「排定時間（台北）」可以改月、日、時，按「儲存時間」。
+  - 提示文字顯示客戶自己的上限。
+- 文件：`agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md` D5 加一句「2026-10-25 起每客戶自己設 1–10」；`tick.ts:15` 的註解改成「沒設時的預設」。
+
+**critic 發現**（Codex oracle 兩次都沒有輸出，log 是空的，不是額度問題，改由 critic 審）：
+- M1（已修）：`claimTopic` 只把 version +1、status 不變。如果在 claim 和 `move(published)` 之間有人改了 scheduled／reviewed 的時間，`move` 會回 moved_elsewhere，文章已經上線，資料庫卻還寫等待中，到新時間會再發一次。修法：拿掉 reviewed；scheduled 只在時間還沒到時可以改，寫入時再檢查一次。這樣成立，是因為 tick 只會 claim 已經到時間的 scheduled 列（`tick.ts` 掃 scheduled 那段）。
+- m1（已修）：補測試，cap 從排程傳到 tick（`content-pipeline-job.test.ts`）、start 路由用客戶上限（`[id]/start/route.test.ts`）、PATCH schedule 的驗證（`route.test.ts`）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd NA && npx tsc --noEmit（只剩另一個 session 未提交的 app/api/auth/wp-handoff、lib/auth/sources/awarewave-wp.ts 錯誤，非本改動） | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd NA && npx vitest run lib/schedules lib/content app/api/ops/clients app/api/internal/schedules app/api/content → 82 files / 551 passed | exit=0 | ms=4000
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：拿掉 store.ts reschedule 的 `.gt("scheduled_for", now)` → store.test.ts 1 failed（"never a row the publisher may hold"）；還原 → 16 passed | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scripts/apply-db-migration.mjs 0125 → APPLY_OK 1/1；--status 顯示「0125 ... -- applied」；ssh ubuntu@ks-aw-01 docker exec supabase-db psql：daily_limit integer null=YES、CHECK 1–10、已設定列 0 | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=本機 next dev（無 Supabase）＋fetch mock：排程頁內容管線只有「網站｜開關｜每天最多開始｜上次結果」；點 2 題打開 1–10 格子，選 10 → PATCH body 帶 dailyLimit:10，那一列顯示 10 題 ✓ 已儲存。題目頁清單顯示「3日 09:00」，改成 13:00 再按儲存 → PATCH {action:"schedule",month:"2026-10",day:3,hour:13}；製作中的題目顯示「時間不能改」 | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/1n
+- ORACLE_WAIVED: codex-oracle 兩次 no final message（log C:\Users\user1115\AppData\Local\Temp\codex-oracle-log-c202f601.txt 是空的，沒有額度字樣）；改由獨立 critic 子代理審 diff，加上突變證據
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=DAILY_START_CAP | hits=20
+- 抓蟲沒改的兩處：`NA/lib/content/MODULE_MANIFEST.json` 和產生出來的 `module-manifests.json` 寫「at most DAILY_START_CAP topics start per organization per UTC day」。每客戶每日上限的不變量仍成立，只是值改成可設；而且 MODULE_MANIFEST.json 有另一個 session 未提交的改動，這次不碰。
+
+**剩餘風險**：正式機在今晚 03:00 部署前仍跑舊程式，舊程式不讀 daily_limit。部署後要在正式頁面實際看一次。
+**rollback**：先 `git revert <本 commit>`，再跑 `lobster-factory/packages/db/migrations/0125_client_schedules_daily_limit.down.sql`（會先備份已設定的值）。
 ## 2026-10-25（續2）全自動內容 P6.1：影片收尾與嵌回文章抽成共用功能（兩支 route 變殼，行為不變）＋P8.2/P8.4/P8.5（Claude）
 
 - **根因／不變量**：I4＝瀏覽器與 5 分鐘時鐘用同一份程式收尾、嵌回影片；原邏輯只活在 `app/api/video/status/route.ts`、`embed-to-wp/route.ts` 內且需要 Request，P6.2 無法呼叫。新 `lib/content/video/finalize.ts`（`finalizeVideoJob(job)`，呼叫端先做存取檢查）＋`embed-in-post.ts`（`embedVideoInPost(identity, input)`，resolveWpSite→系統模式閘→WP）。

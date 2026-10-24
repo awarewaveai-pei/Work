@@ -7,7 +7,10 @@ vi.mock("@/lib/schedules/jobs", () => ({
   clientJob: (key: string) =>
     key === "collect_crawl"
       ? { key, label: "自動爬取", frequencies: [{ value: "daily" }, { value: "weekly" }], defaults: { frequency: "weekly", hourUtc: 3, dayOfWeekUtc: 1 } }
-      : undefined,
+      : key === "content_pipeline"
+        ? { key, label: "自動內容管線", frequencies: [{ value: "every_5m" }], defaults: { frequency: "every_5m", hourUtc: 0, dayOfWeekUtc: 1 },
+            dailyLimit: { label: "每天最多開始", unit: "題", options: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], default: 2 } }
+        : undefined,
 }));
 vi.mock("@/lib/schedules/adapters/site-watch", () => ({ SITE_WATCH_JOB: { key: "site_watch" }, writeSiteWatchCell }));
 
@@ -51,6 +54,15 @@ describe("PATCH /api/ops/clients/[slug]/schedules/[job]", () => {
     const res = await PATCH(req({ role: "admin", body: { enabled: true, frequency: "hourly" } }), ctx("collect_crawl"));
     expect(res.status).toBe(400);
     expect(upsertSchedule).not.toHaveBeenCalled();
+  });
+
+  it("a daily limit is stored only for a job that offers one, and only one of its choices", async () => {
+    expect((await PATCH(req({ role: "admin", body: { enabled: true, frequency: "weekly", dailyLimit: 3 } }), ctx("collect_crawl"))).status).toBe(400);
+    expect((await PATCH(req({ role: "admin", body: { enabled: true, frequency: "every_5m", dailyLimit: 11 } }), ctx("content_pipeline"))).status).toBe(400);
+    expect(upsertSchedule).not.toHaveBeenCalled();
+    upsertSchedule.mockResolvedValue({ ok: true, schedule: { enabled: true, frequency: "every_5m", dailyLimit: 3 }, errors: [] });
+    expect((await PATCH(req({ role: "admin", body: { enabled: true, frequency: "every_5m", dailyLimit: 3 } }), ctx("content_pipeline"))).status).toBe(200);
+    expect(upsertSchedule).toHaveBeenCalledWith(expect.objectContaining({ jobKey: "content_pipeline", dailyLimit: 3 }));
   });
 
   it("an admin write lands on (client, job) with the actor recorded", async () => {

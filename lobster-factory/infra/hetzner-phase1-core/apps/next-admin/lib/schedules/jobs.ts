@@ -12,6 +12,7 @@ import { DAILY_START_CAP } from "@/lib/content/topics/tick";
 import { topicCostUsd } from "@/lib/content/topics/cost";
 import type { JobMeta } from "./types";
 import type { Frequency } from "./schedule";
+import type { StoredSchedule } from "./store";
 
 /** What view.ts knows about a client when deciding whether a job can run there. */
 export interface JobClientFacts {
@@ -26,7 +27,7 @@ export interface ClientJob extends JobMeta {
   defaults: { frequency: Frequency; hourUtc: number; dayOfWeekUtc: number; dayOfMonth: number };
   /** Throws on any failure, including one the job reports instead of throwing; the sweep records it and
    * raises the incident. Returns a one-line summary. */
-  run(organizationId: string, runKey: string): Promise<string>;
+  run(organizationId: string, runKey: string, schedule?: StoredSchedule): Promise<string>;
   /** Why this job cannot run for the client (shown in the cell, enabling has no effect); null = it can. */
   unavailable?(client: JobClientFacts): string | null;
 }
@@ -102,23 +103,30 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
   {
     key: "content_pipeline",
     label: "自動內容管線",
-    description: `把已核准、到了排定日的題目依它選的格式做成 WordPress 草稿和社群草稿，再跑規則審核；每天最多開始 ${DAILY_START_CAP} 題。網站設成「AI 審核後自動發布」且審核全部通過才會發布，其餘留在草稿。題目在「內容 › 題目佇列」核准。`,
+    description: "隨時檢查題目佇列：已核准的題目到了排定時間，就依它選的格式做成 WordPress 草稿和社群草稿，再跑規則審核。網站設成「AI 審核後自動發布」且審核全部通過才會發布，其餘留在草稿。題目和排定時間在「內容 › 題目佇列」設定。",
     // Prices: lib/ai/cost-model.ts TEXT_FEATURES article + syndicate (lib/content/topics/cost.ts).
-    cost: `每題約 ${topicCostUsd().usual} 美元（文章＋社群改寫；社群太長要重寫時最多 ${topicCostUsd().max} 美元）；每天最多 ${DAILY_START_CAP} 題。沒有到期題目時免費。`,
+    cost: `每題約 ${topicCostUsd().usual} 美元（文章＋社群改寫；社群太長要重寫時最多 ${topicCostUsd().max} 美元），一天最多花到「每天最多開始」的題數。沒有到期題目時免費。`,
+    // every_5m is how often it looks, not a choice: the page shows no frequency for a job with one fixed cadence
     frequencies: [{ value: "every_5m", label: "每 5 分鐘", usesHour: false, usesDay: false }],
+    dailyLimit: { label: "每天最多開始", unit: "題", options: Array.from({ length: 10 }, (_, i) => i + 1), default: DAILY_START_CAP },
     defaults: { frequency: "every_5m", hourUtc: 0, dayOfWeekUtc: 1, dayOfMonth: 1 },
     unavailable: (c) => (c.wpSites ? null : "沒有 WordPress 網站"),
-    async run(organizationId) {
+    async run(organizationId, _runKey, schedule) {
       const sb = getSupabaseWriteClient();
       if (!sb) throw new Error("content_pipeline:no_supabase_client");
       const [{ tickTopics }, { topicDeps }] = await Promise.all([import("@/lib/content/topics/tick"), import("@/lib/content/topics/make")]);
-      return tickTopics(topicDeps(sb, organizationId, "schedule:content_pipeline"));
+      return tickTopics(topicDeps(sb, organizationId, "schedule:content_pipeline"), { cap: schedule?.dailyLimit ?? DAILY_START_CAP });
     },
   },
 ];
 
 export function clientJob(key: string): ClientJob | undefined {
   return CLIENT_JOBS.find((j) => j.key === key);
+}
+
+/** The daily limit in force for a client: its stored one, else the job's default; null = the job has no daily limit. */
+export function dailyLimitOf(job: Pick<JobMeta, "dailyLimit">, stored: number | null | undefined): number | null {
+  return job.dailyLimit ? stored ?? job.dailyLimit.default : null;
 }
 
 /** A stored row read through the registry: a frequency the job no longer offers (a row written before the job changed --

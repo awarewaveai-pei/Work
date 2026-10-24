@@ -60,7 +60,7 @@ async function runClaimed(claimed: Array<{ schedule: StoredSchedule; runKey: str
     try {
       const job = clientJob(schedule.jobKey);
       if (!job) throw new Error(`unknown_job:${schedule.jobKey} (row exists, registry entry does not)`);
-      const summary = await job.run(schedule.organizationId, runKey);
+      const summary = await job.run(schedule.organizationId, runKey, schedule);
       await recordScheduleRun(schedule.organizationId, schedule.jobKey);
       console.info(`[schedules] ${runKey} ok ${summary}`);
     } catch (e) {

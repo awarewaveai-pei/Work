@@ -11,7 +11,7 @@
 import type { Topic, TopicFormat, TopicStatus } from "./store";
 import type { TopicReview } from "./review";
 
-/** Topics a brand may start per UTC day (plan D5: N=2). The cost sentence on /ops/schedules quotes it. */
+/** Topics a brand may start per UTC day when its content_pipeline row sets no limit (plan D5; 0125 daily_limit, 1-10). */
 export const DAILY_START_CAP = 2;
 /** Far beyond one making (article ~2 min + social), so only a restart mid-way leaves a row this old in 'generating'. */
 export const STALE_GENERATING_MS = 30 * 60 * 1000;

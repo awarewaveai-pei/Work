@@ -14,6 +14,8 @@ export interface StoredSchedule extends Schedule {
   lastErrorAt: string | null;
   updatedBy: string | null;
   updatedAt: string | null;
+  /** 1-10 per day (0125); null = the job's default (jobs.ts dailyLimit). Only jobs with a dailyLimit read it. */
+  dailyLimit: number | null;
 }
 
 interface Row {
@@ -24,6 +26,7 @@ interface Row {
   hour_utc: number;
   day_of_week_utc: number;
   day_of_month: number;
+  daily_limit?: number | null;
   last_run_at: string | null;
   last_run_key: string | null;
   last_error: string | null;
@@ -47,6 +50,7 @@ function toSchedule(r: Row): StoredSchedule {
     lastErrorAt: r.last_error_at,
     updatedBy: r.updated_by,
     updatedAt: r.updated_at,
+    dailyLimit: r.daily_limit ?? null,
   };
 }
 
@@ -82,6 +86,8 @@ export interface UpsertScheduleInput {
   /** 1-28, Taipei calendar day (0123). Left out = an existing row keeps its day (a page loaded before 0123 does not send
    *  it); a new row gets the column default 1. */
   dayOfMonth?: number;
+  /** 1-10 (0125). Left out = an existing row keeps its limit; a new row gets null (the job's default). */
+  dailyLimit?: number;
   /** "role:source", same shape as collection_sources.approved_by. */
   updatedBy: string;
 }
@@ -98,6 +104,7 @@ export async function upsertSchedule(input: UpsertScheduleInput): Promise<WriteR
   if (input.hourUtc < 0 || input.hourUtc > 23) return { ok: false, errors: ["hour_utc_out_of_range"] };
   if (input.dayOfWeekUtc < 0 || input.dayOfWeekUtc > 6) return { ok: false, errors: ["day_of_week_utc_out_of_range"] };
   if (input.dayOfMonth !== undefined && (!Number.isInteger(input.dayOfMonth) || input.dayOfMonth < 1 || input.dayOfMonth > 28)) return { ok: false, errors: ["day_of_month_out_of_range"] };
+  if (input.dailyLimit !== undefined && (!Number.isInteger(input.dailyLimit) || input.dailyLimit < 1 || input.dailyLimit > 10)) return { ok: false, errors: ["daily_limit_out_of_range"] };
   const sb = getSupabaseWriteClient();
   if (!sb) return { ok: false, errors: ["no_supabase_client"] };
 
@@ -112,6 +119,7 @@ export async function upsertSchedule(input: UpsertScheduleInput): Promise<WriteR
         hour_utc: input.hourUtc,
         day_of_week_utc: input.dayOfWeekUtc,
         ...(input.dayOfMonth !== undefined ? { day_of_month: input.dayOfMonth } : {}),
+        ...(input.dailyLimit !== undefined ? { daily_limit: input.dailyLimit } : {}),
         updated_by: input.updatedBy,
         updated_at: new Date().toISOString(),
       },
@@ -138,6 +146,15 @@ export async function setScheduleEnabled(
   if (error) return { ok: false, errors: [`write_failed:${error.message}`] };
   if ((data ?? []).length === 1) return { ok: true, schedule: toSchedule((data as Row[])[0]), errors: [] };
   return upsertSchedule({ organizationId, jobKey, enabled, updatedBy, ...defaults });
+}
+
+/** The client's stored daily limit for a job; null = no row or none set (the caller uses the job's default). Throws on a
+ *  DB failure: a limit that could not be read must not silently become the default. */
+export async function storedDailyLimit(organizationId: string, jobKey: string): Promise<number | null> {
+  const { data, error } = await client().from("client_schedules").select("daily_limit")
+    .eq("organization_id", organizationId).eq("job_key", jobKey).maybeSingle();
+  if (error) throw new Error(`schedules_db:daily_limit:${error.message}`);
+  return (data as { daily_limit?: number | null } | null)?.daily_limit ?? null;
 }
 
 /**

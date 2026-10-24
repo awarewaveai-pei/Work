@@ -75,6 +75,19 @@ export function monthKey(d: string | Date): string {
   return `${s.slice(0, 7)}-01`;
 }
 
+/** Taipei is UTC+8 all year (no DST): a topic's time is chosen and shown in Taipei time, stored as UTC. */
+const TAIPEI_MS = 8 * 60 * 60 * 1000;
+export const daysIn = (month: string) => new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate();
+/** A stored time as the Taipei month ("YYYY-MM"), day and hour it was picked as. */
+export function taipeiParts(iso: string): { month: string; day: number; hour: number } {
+  const d = new Date(Date.parse(iso) + TAIPEI_MS);
+  return { month: d.toISOString().slice(0, 7), day: d.getUTCDate(), hour: d.getUTCHours() };
+}
+/** A Taipei month / day / hour as the UTC time stored in scheduled_for. */
+export function fromTaipei(month: string, day: number, hour: number): string {
+  return new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, day, hour) - TAIPEI_MS).toISOString();
+}
+
 export async function listTopics(sb: SupabaseClient, organizationId: string, month: string): Promise<Topic[]> {
   const { data, error } = await sb.from("content_topics").select("*")
     .eq("organization_id", organizationId).eq("month", monthKey(month)).order("scheduled_for", { ascending: true, nullsFirst: false });
@@ -140,6 +153,34 @@ export async function setFormats(sb: SupabaseClient, t: Pick<Topic, "id" | "orga
     .eq("id", t.id).eq("organization_id", t.organization_id).eq("status", t.status).eq("version", t.version)
     .select("*");
   if (error) fail("formats", error);
+  return ((data ?? []) as Topic[])[0] ?? null;
+}
+
+/** Whether a person may move the topic's time now. Never a row the publisher may be holding: it claims a 'scheduled' row
+ *  (version bump, status unchanged) once its time has passed, writes to WordPress and the social tool, then moves it by
+ *  that version -- a change in between would leave it published but recorded as waiting, and publish it again later.
+ *  'reviewed' is claimed in passing inside one tick, so it is not movable at all; a manual site's reviewed draft does
+ *  not publish by itself, so its time means nothing. While a topic is being made (generating .. embedded) its maker
+ *  moves it by the version it read, so a change then would strand the making; published is done. */
+export function canReschedule(t: Pick<Topic, "status" | "scheduled_for">, now: Date): boolean {
+  if (t.status === "scheduled") return !!t.scheduled_for && Date.parse(t.scheduled_for) > now.getTime();
+  return (["proposed", "approved", "rejected", "failed"] as TopicStatus[]).includes(t.status);
+}
+
+/** Moves a topic to another time (and the month it falls in, Taipei); same status and version guard as move. A topic
+ *  waiting to publish ('scheduled') goes out at the new time; one moved into the past goes out at the next check. */
+export async function reschedule(sb: SupabaseClient, t: Pick<Topic, "id" | "organization_id" | "status" | "version" | "scheduled_for">, scheduledFor: string): Promise<Topic | null> {
+  const now = new Date();
+  if (!canReschedule(t, now)) throw new TopicMoveRefused(t.status === "scheduled" ? "已經到排定時間，正在發布，不能改" : `the time is fixed while a topic is ${t.status}`);
+  let q = sb.from("content_topics")
+    .update({ scheduled_for: scheduledFor, month: monthKey(taipeiParts(scheduledFor).month), version: t.version + 1, updated_at: now.toISOString() })
+    .eq("id", t.id).eq("organization_id", t.organization_id).eq("status", t.status).eq("version", t.version);
+  // checked again in the write: its time may pass between the read and here
+  if (t.status === "scheduled") q = q.gt("scheduled_for", now.toISOString());
+  const { data, error } = await q.select("*");
+  // (organization_id, month, keyword) is unique: that month already has this keyword
+  if (error?.code === "23505") throw new TopicMoveRefused("那個月已經有同一個關鍵字的題目");
+  if (error) fail("reschedule", error);
   return ((data ?? []) as Topic[])[0] ?? null;
 }
 

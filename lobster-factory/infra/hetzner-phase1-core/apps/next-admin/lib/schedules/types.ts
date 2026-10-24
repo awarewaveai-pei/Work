@@ -19,6 +19,8 @@ export interface JobMeta {
   /** What one run costs (paid APIs only; our own server is not counted). */
   cost: string;
   frequencies: FrequencyOption[];
+  /** A per-client "at most N a day" the page lets staff set (content_pipeline); absent = the job has none. */
+  dailyLimit?: { label: string; unit: string; options: number[]; default: number };
 }
 
 /** One (job, client) cell of the schedules table. */
@@ -33,6 +35,8 @@ export interface ScheduleCell {
   dayOfWeekUtc: number;
   /** 1-28, Taipei calendar day; only meaningful for a frequency with usesDayOfMonth. */
   dayOfMonth: number;
+  /** The limit in force (stored, or the job's default); null = the job has no dailyLimit. */
+  dailyLimit: number | null;
   lastRunAt: string | null;
   lastError: string | null;
   lastErrorAt: string | null;

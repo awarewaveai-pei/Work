@@ -1,12 +1,12 @@
 // content_topics store: moves only along NEXT, guarded by the status and version read; DB errors throw.
 import { describe, expect, it, vi } from "vitest";
-import { NEXT, TOPIC_STATUSES, TopicMoveRefused, monthKey, move, proposeTopics, startTopic, startedOn } from "../store";
+import { NEXT, TOPIC_STATUSES, TopicMoveRefused, canReschedule, fromTaipei, monthKey, move, proposeTopics, reschedule, startTopic, startedOn, taipeiParts } from "../store";
 
 /** A query builder that records every filter and answers with `result`. */
 function fakeSb(result: { data?: unknown; error?: { message: string } | null; count?: number }) {
   const calls: Array<[string, unknown[]]> = [];
   const q: Record<string, unknown> = {};
-  for (const k of ["select", "eq", "update", "upsert", "order"]) q[k] = (...a: unknown[]) => { calls.push([k, a]); return q; };
+  for (const k of ["select", "eq", "gt", "update", "upsert", "order"]) q[k] = (...a: unknown[]) => { calls.push([k, a]); return q; };
   q.then = (res: (v: unknown) => unknown) => Promise.resolve({ data: result.data ?? null, error: result.error ?? null, count: result.count }).then(res);
   return { sb: { from: vi.fn(() => q) } as never, calls };
 }
@@ -54,6 +54,41 @@ describe("move", () => {
 
   it("a database error throws", async () => {
     await expect(move(fakeSb({ error: { message: "down" } }).sb, t, "proposed")).rejects.toThrow("content_topics:move:down");
+  });
+});
+
+describe("reschedule", () => {
+  it("Taipei time both ways, across a month boundary", () => {
+    expect(fromTaipei("2026-12", 1, 1)).toBe("2026-11-30T17:00:00.000Z");
+    expect(taipeiParts("2026-11-30T17:00:00.000Z")).toEqual({ month: "2026-12", day: 1, hour: 1 });
+  });
+
+  it("moves time and month (the Taipei one) under the status and version guard", async () => {
+    const { sb, calls } = fakeSb({ data: [{ ...t, version: 4 }] });
+    expect((await reschedule(sb, { ...t, scheduled_for: null }, "2026-11-30T17:00:00.000Z"))?.version).toBe(4);
+    expect(calls.find(([k]) => k === "update")![1][0]).toMatchObject({ scheduled_for: "2026-11-30T17:00:00.000Z", month: "2026-12-01", version: 4 });
+    expect(calls.filter(([k]) => k === "eq").map(([, a]) => a)).toContainEqual(["version", 3]);
+  });
+
+  it("refused while the topic is being made: the maker's own move would be stranded", async () => {
+    await expect(reschedule(fakeSb({ data: [] }).sb, { ...t, status: "generating", scheduled_for: null }, "2026-11-01T01:00:00Z")).rejects.toThrow(TopicMoveRefused);
+  });
+
+  it("never a row the publisher may hold: a scheduled row only while its time is ahead (checked in the write too); reviewed never", async () => {
+    const now = new Date();
+    const ahead = new Date(now.getTime() + 3600e3).toISOString(), past = new Date(now.getTime() - 60e3).toISOString();
+    expect(canReschedule({ status: "scheduled", scheduled_for: ahead }, now)).toBe(true);
+    expect(canReschedule({ status: "scheduled", scheduled_for: past }, now)).toBe(false);
+    expect(canReschedule({ status: "reviewed", scheduled_for: ahead }, now)).toBe(false);
+    await expect(reschedule(fakeSb({ data: [] }).sb, { ...t, status: "scheduled", scheduled_for: past }, ahead)).rejects.toThrow(TopicMoveRefused);
+    const { sb, calls } = fakeSb({ data: [] });
+    expect(await reschedule(sb, { ...t, status: "scheduled", scheduled_for: ahead }, ahead)).toBeNull();
+    expect(calls.find(([k]) => k === "gt")?.[1][0]).toBe("scheduled_for");
+  });
+
+  it("a month that already has the keyword is refused, not a server error", async () => {
+    const { sb } = fakeSb({ error: { message: "duplicate key", code: "23505" } as never });
+    await expect(reschedule(sb, { ...t, scheduled_for: null }, "2026-12-01T01:00:00Z")).rejects.toThrow(TopicMoveRefused);
   });
 });
 

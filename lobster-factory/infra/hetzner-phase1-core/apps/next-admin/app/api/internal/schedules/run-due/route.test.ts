@@ -104,7 +104,7 @@ describe("POST /api/internal/schedules/run-due", () => {
     expect(body).toMatchObject({ checked: 2, due: 1 });
     expect(body.started).toEqual([expect.stringMatching(/^scheduled-collect_crawl-11111111-\d{8}$/)]);
     expect(run).toHaveBeenCalledTimes(1);
-    expect(run).toHaveBeenCalledWith(ORG_A, body.started[0]);
+    expect(run).toHaveBeenCalledWith(ORG_A, body.started[0], expect.objectContaining({ organizationId: ORG_A, jobKey: "collect_crawl" }));
     expect(recordScheduleRun).toHaveBeenCalledWith(ORG_A, "collect_crawl");
     expect(ingestIncident).not.toHaveBeenCalled();
   });
