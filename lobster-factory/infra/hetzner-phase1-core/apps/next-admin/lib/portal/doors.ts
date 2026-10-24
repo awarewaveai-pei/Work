@@ -51,7 +51,9 @@ export function isAnonymousPath(pathname: string, product: NextAdminProduct): bo
  *  (lib/tenant-guard); lib/portal/__tests__/registry-code.test.ts enforces it. */
 // designs: the shared saved-designs library. entitlements/features: the signed list that greys unbought buttons.
 // events/upcoming: the shared holiday calendar, read-only (events/sync, which writes it, stays staff-only).
-export const PLATFORM_APIS: readonly string[] = ["/api/tools/designs", "/api/entitlements/features", "/api/tools/events/upcoming"];
+// image/process: the export bar (components/tools/OutputTrackBar) every image studio shows -- WebP / print file from the
+// request image, no database, no paid model.
+export const PLATFORM_APIS: readonly string[] = ["/api/tools/designs", "/api/entitlements/features", "/api/tools/events/upcoming", "/api/tools/image/process"];
 
 /** The APIs a product door serves: its own, those of the products installed with it (dependsOn, transitively), and
  *  the platform's. An optional product's APIs are not served: its buttons hide on the door. */

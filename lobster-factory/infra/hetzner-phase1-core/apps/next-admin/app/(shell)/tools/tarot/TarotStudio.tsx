@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import { roleHeader } from "@/lib/ops-role";
 import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
 import OutputTrackBar from "@/components/tools/OutputTrackBar";
 import GradedPreview from "@/components/tools/GradedPreview";
-import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
+import type { ImageEditPromptPanelProps } from "@/components/tools/ImageEditPromptPanel";
 import { buildSemanticFilename, buildSemanticBase } from "@/lib/studio/semantic-filename";
 import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
 import { useDoorHref } from "@/app/DoorContext";
@@ -280,7 +280,13 @@ async function toGalleryArt(dataUrl: string, maxDim = 2048, quality = 0.9): Prom
   });
 }
 
-export default function TarotStudio() {
+// Staff-only parts the tarot door does not serve: the AI edit-prompt panel asks studio.edit-prompt (studio is only
+// optional to tarot). The staff page passes it in (TarotStudioStaff.tsx); the door page renders TarotStudio without
+// it, so the door's import closure never names /api/tools/studio/edit-prompt (same pattern as BannerStudioStaff).
+export interface TarotStaffApi { EditPromptPanel: ComponentType<ImageEditPromptPanelProps> }
+
+export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
+  const EditPromptPanel = staff?.EditPromptPanel;
   // The tarot door has no canvas page: quick edit hides there instead of opening a staff page (404).
   const canvasHref = useDoorHref(CANVAS_STAFF_HREF);
   const { canUse, why } = usePaidFeatures();
@@ -2129,7 +2135,7 @@ export default function TarotStudio() {
                   >
                     ✏️ 在 Canvas 編輯
                   </button>}
-                  <ImageEditPromptPanel
+                  {EditPromptPanel && <EditPromptPanel
                     sourceImage={previewImage}
                     currentPrompt={buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple, order: orderOf(activeModel) })}
                     imageModel={activeModel}
@@ -2160,7 +2166,7 @@ export default function TarotStudio() {
                         : image;
                       saveToGallery(gradedEdit, "tarot-preview-edit", { model: meta.model, prompt: meta.prompt });
                     }}
-                  />
+                  />}
                 </>
               )}
             </div>

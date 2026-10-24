@@ -1,4 +1,28 @@
 # Worklog
+## 2026-10-24（續42）塔羅門：匯出與修圖提示詞按鈕呼叫門上沒開的 API
+
+- **症狀**：已上線的塔羅門（`tarot.aware-wave.com`，`app/tarot/page.tsx` 直接渲染 `TarotStudio`）有兩個按鈕會 404：匯出列 `components/tools/OutputTrackBar.tsx:87`（`POST /api/tools/image/process`）與 AI 修圖提示詞 `components/tools/ImageEditPromptPanel.tsx`（`/api/tools/studio/edit-prompt`，商品工作室的收費功能 `studio.edit-prompt`；塔羅不依賴 studio）。設計門的畫布也用同一個匯出列，同樣 404。
+- **根因**：門測試「a built door can reach every API its pages call」的掃描範圍只有 `app/`、`lib/`，漏掉 `components/`（員工權限 C1 擴充掃描器時發現，續41）。
+- **不變量**：門頁會匯入的每個目錄都要被掃；門頁呼叫的每個 API 都在該門的 API 範圍內。
+- **修法**：
+  - `lib/portal/__tests__/code-scan.ts`：門的索引改為 `codeIndex(["app", "lib", "components"])`，整類關掉。
+  - `lib/portal/doors.ts`：`/api/tools/image/process` 加入 `PLATFORM_APIS`；`registry-code.test.ts` `ORG_FREE_ROUTES` 附理由（只轉換請求裡的圖片：無資料庫、無外連、無付費模型；`route.ts:85-140`）。
+  - 修圖提示詞面板改由員工頁傳入：`TarotStudio({ staff })` 只在有 `staff.EditPromptPanel` 時顯示；新檔 `app/(shell)/tools/tarot/TarotStudioStaff.tsx` 傳入 `ImageEditPromptPanel`；員工頁改用它，門頁不變（同 `BannerStudioStaff` 做法）。塔羅門上不顯示這個收費按鈕，員工頁照舊。
+  - `lib/portal/staff-tools.ts`：移除 `/api/tools/image/process` 列（已屬所有員工）。
+  - `app/api/tools/image/process/route.ts`：同一行程同時最多 `MAX_CONVERSIONS`＝2 個 web／print 轉檔（sharp、Ghostscript），超過回 429 `busy`，`finally` 釋放；canvas 直通不計。原因：此路由開到每扇門且不收費，CPU 是唯一成本；門前 nginx 限流每 IP 20–30 r/s 對 9 MB 轉檔太寬。
+  - `middleware-door.test.ts`：塔羅門 `POST /api/tools/image/process` → 401（走到登入檢查，修正前 404）；`/api/tools/studio/edit-prompt` → 仍 404。
+- **驗證**：
+  - `npx tsc --noEmit -p .` exit 0。
+  - `npx vitest run lib/portal app/__tests__ lib/entitlements lib/__tests__/middleware-csrf.test.ts lib/studio app/api/tools/image`：37 files、396 passed。（中途一度 2 紅，都指向另一個 session 未登記的 `/tools/script-forge` 新頁；該 session 補登記後轉綠——C1 的覆蓋測試照設計擋下未歸格頁。）
+  - 正式站 `POD_DESIGNS_ENABLED`：`sudo docker exec lobster-next-admin printenv POD_DESIGNS_ENABLED` → `true`（exit 0）。
+  - 突變：拿掉 `PLATFORM_APIS` 的 image/process → 中介層測試、門可達測試、門路由授權測試三條紅；門頁改用 `TarotStudioStaff` → 門可達測試紅（指名 edit-prompt）；還原後 17 項綠；拿掉並發上限檢查 → 「429 busy」測試紅，還原綠。
+  - 未做：沒有在瀏覽器實際點按鈕（門要登入有塔羅權利的客戶帳號）；以中介層真實呼叫代替。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/portal app/__tests__ lib/entitlements lib/__tests__/middleware-csrf.test.ts lib/studio app/api/tools/image (37 files, 396 passed; middleware() on tarot host: image/process 401, edit-prompt 404; 429 cap) | exit=0 | ms=6816
+- **Codex**：第 1 次（partialreview-af7999c3）沙箱讀不到檔，**不算審查**；重跑附上路由內容（partialreview-bdcb0fef）：F1 測試只證明門看得到路由，若旗標關閉客戶仍 503 → 實測正式站旗標為 true，路由本身由 `route.test.ts` 覆蓋，不改；F2（PLAUSIBLE）免費重運算開到每扇門沒有上限 → 成立，加並發上限＋測試＋突變。
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/1n
+- ORACLE_WAIVED: 共用工作目錄有其他 session 的大量未提交改動，整庫審查會一起送審別人的 diff；本修正以 -Path 範圍審查（partialreview-bdcb0fef），成立的 finding 已修並附突變證據。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=image/process|ImageEditPromptPanel|TarotStudio\b|TarotStudioStaff|PLATFORM_APIS | hits=254
+- **避免再發生**：門的掃描含 `components/`；門頁新加的元件若呼叫門外 API，門可達測試會紅。
 ## 2026-10-24（續41）員工逐工具權限：監工台＋C1 員工工具登記表
 
 - **任務**：操作者要每個員工可勾選能用的工具（側欄／網址／API 都擋；owner 永遠全部、不可取消）。「寫入監工台再開工」＝照建議值批准方案 B（一產品一格、一後台頁一格；只 owner 改；先 shadow）。計畫與卡：`agency-os/handoffs/2026-10-24-staff-tool-grants/R0-PLAN.md` §5–§6；監工台 https://claude.ai/artifact/RbxhBAEU7KsaxuJ9zKeJL6（commit a016c5c4f）。

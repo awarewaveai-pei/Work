@@ -78,26 +78,27 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
 <aside><div class="in">
   <h1>員工權限 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-10-24</span></p>
-  <div class="bar" data-computed><i class="d" style="width:0%"></i><i class="g" style="width:0%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>0</span>／<span data-computed>6</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>1</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:16.666666666666664%"></i><i class="g" style="width:0%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>1</span>／<span data-computed>6</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>1</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
-<p class="sub">擁有者可為每位員工勾選可用工具。未勾選的工具不會顯示在側欄；直接輸入網址或呼叫 API 也會被擋下。擁有者永遠可用全部工具。共 <span data-computed>6</span> 張卡、<span data-computed>23</span> 項工作，已完成 <span data-computed>0</span> 項。</p>
+<p class="sub">擁有者可為每位員工勾選可用工具。未勾選的工具不會顯示在側欄；直接輸入網址或呼叫 API 也會被擋下。擁有者永遠可用全部工具。共 <span data-computed>6</span> 張卡、<span data-computed>23</span> 項工作，已完成 <span data-computed>4</span> 項。</p>
 <section id="now"><h2>現況</h2><p class="lead">目前可用與尚未可用的功能。</p><ul class="yn"><li class="yes"><b>可以</b><span>員工分為擁有者、管理員、操作、唯讀四種角色。<small>角色設定存在登入帳號中，目前需到 Supabase 後台手動修改。</small></span></li><li class="no"><b>還不行</b><span>為每位員工分別勾選可用工具。<small>C1、C2 完成後才有依據。</small></span></li><li class="no"><b>還不行</b><span>側欄只顯示有權限的工具。<small>C3</small></span></li><li class="no"><b>還不行</b><span>沒有權限時，直接輸入網址或呼叫 API 會被擋下。<small>C2；先只記錄、不擋，確認無誤後再由你決定開始擋。</small></span></li><li class="no"><b>還不行</b><span>在後台管理員工帳號與權限。<small>C4</small></span></li></ul></section>
 
-<section id="steps"><h2>卡片與工作</h2><p class="lead">依編號進行。每張卡列出所有工作；勾選表示完成。同一組的卡若修改不同檔案，可同時進行。High 風險步驟需經你同意才會執行。</p><ol class="steps"><li class="step todo" id="C1">
+<section id="steps"><h2>卡片與工作</h2><p class="lead">依編號進行。每張卡列出所有工作；勾選表示完成。同一組的卡若修改不同檔案，可同時進行。High 風險步驟需經你同意才會執行。</p><ol class="steps"><li class="step done" id="C1">
     <div class="n">1</div>
     <div class="b">
       <p class="plain">列出所有可勾選的工具：每個產品一格、每個後台頁面一格。新增頁面或 API 若未歸入任何一格，測試就會失敗。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">負責：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-done">已完成</span><span class="pill risk-med">風險 Medium</span><span class="who">負責：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>每個員工頁面與 API 都歸入一格工具，或標明為所有員工皆可使用；測試通過。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>C1.1</code> 從產品清單整理所有可勾選的工具，每格附上中文名稱。</span></li><li class="todo"><b>○</b><span><code>C1.2</code> 不在產品頁面上的員工專用 API，逐一歸入所屬工具；多個工具共用的 API，擁有任一工具即可使用。</span></li><li class="todo"><b>○</b><span><code>C1.3</code> 輸入網址即可判斷所屬工具。</span></li><li class="todo"><b>○</b><span><code>C1.4</code> 測試：每個員工頁面與 API 都歸入一格工具；未歸類就失敗。</span></li></ul>
+      <ul class="items"><li class="done"><b>✓</b><span><code>C1.1</code> 從產品清單整理所有可勾選的工具，每格附上中文名稱。 <small>完成於 <code>1b8096116</code></small></span></li><li class="done"><b>✓</b><span><code>C1.2</code> 不在產品頁面上的員工專用 API，逐一歸入所屬工具；多個工具共用的 API，擁有任一工具即可使用。 <small>完成於 <code>1b8096116</code></small></span></li><li class="done"><b>✓</b><span><code>C1.3</code> 輸入網址即可判斷所屬工具。 <small>完成於 <code>1b8096116</code></small></span></li><li class="done"><b>✓</b><span><code>C1.4</code> 測試：每個員工頁面與 API 都歸入一格工具；未歸類就失敗。 <small>完成於 <code>1b8096116</code></small></span></li></ul>
       <details><summary>工程細節：C1 員工工具登記表</summary>
         <p>lib/portal/staff-tools.ts 由 PRODUCTS／STAFF_UTILITIES／BACK_OFFICE 推出 STAFF_TOOLS；STAFF_API_OWNERS 補員工專用 API；toolsFor(pathname) 最長前綴</p>
         <p><b>需先完成：</b>無</p>
         <p><b>你的決定：</b>一個產品一格；一個後台頁面一格；後台外觀與模型資料各一格。依 2026-10-24 建議。</p>
         <p><b>檔案：</b><code>lib/portal/staff-tools.ts</code> <code>lib/portal/products.ts</code> <code>lib/portal/__tests__/staff-tools.test.ts</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-24-staff-tool-grants/R0-PLAN.md §6 C1</code></p>
+        <p><b>完成於：</b><code>1b8096116</code></p>
       </details>
     </div></li><li class="grp">可同時進行：<a href="#C2">C2</a>、<a href="#C4">C4</a></li><li class="step todo" id="C2">
     <div class="n">2</div>

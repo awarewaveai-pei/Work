@@ -124,9 +124,9 @@ export function codeIndex(dirs: readonly string[]) {
   return { files, resolve, importClosure };
 }
 
-// The door tests' index. It leaves out components/: including it turns the tarot door red on calls it really makes
-// (OutputTrackBar's /api/tools/image/process, ImageEditPromptPanel's studio edit-prompt), a door fix of its own.
-const DOOR_INDEX = codeIndex(["app", "lib"]);
+// The door tests' index: every directory a page can import from. Leaving components/ out hid two live tarot-door calls
+// the door did not serve (OutputTrackBar's image/process, ImageEditPromptPanel's studio edit-prompt; fixed 2026-10-24).
+const DOOR_INDEX = codeIndex(["app", "lib", "components"]);
 export const FILES = DOOR_INDEX.files;
 export const resolve = DOOR_INDEX.resolve;
 export const importClosure = DOOR_INDEX.importClosure;

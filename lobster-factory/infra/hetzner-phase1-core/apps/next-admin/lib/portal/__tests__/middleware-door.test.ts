@@ -10,6 +10,11 @@ describe("host visibility boundary", () => {
       expect((await middleware(request)).status).toBe(404);
     }
   });
+  it("the tarot door serves the export bar's image API and still refuses studio's paid edit-prompt", async () => {
+    const post = (p: string) => middleware(new NextRequest(`https://tarot.aware-wave.com${p}`, { method: "POST", headers: { host: "tarot.aware-wave.com" } }));
+    expect((await post("/api/tools/image/process")).status).toBe(401);   // reaches the session gate (was 404 before 2026-10-24)
+    expect((await post("/api/tools/studio/edit-prompt")).status).toBe(404);
+  });
   it("a reserved product door leaves its existing staff route available", () => {
     expect(productPageOwner("/outreach")).toBeNull();
     expect(productPageOwner("/outreach/campaigns")).toBeNull();

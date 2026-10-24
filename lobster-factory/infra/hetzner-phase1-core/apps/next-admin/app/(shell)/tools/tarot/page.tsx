@@ -1,4 +1,4 @@
-import TarotStudio from "./TarotStudio";
+import TarotStudioStaff from "./TarotStudioStaff";
 
 export const metadata = { title: "Tarot Print Generator · Lobster Factory" };
 
@@ -8,7 +8,7 @@ export default function TarotToolPage() {
       <div className="topbar">
         <span className="topbar-title">Tarot Print Generator</span>
       </div>
-      <TarotStudio />
+      <TarotStudioStaff />
     </>
   );
 }

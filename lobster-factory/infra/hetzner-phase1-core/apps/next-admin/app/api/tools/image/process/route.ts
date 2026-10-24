@@ -35,6 +35,11 @@ export const maxDuration = 60;
 
 // ~9 MB base64 per image — same ceiling as remove-bg / designs save.
 const MAX_IMAGE_CHARS = 12_000_000;
+// web/print conversions (sharp, Ghostscript) running at once in this process. Every product door serves this route
+// (lib/portal/doors.ts PLATFORM_APIS) and it bills nothing, so CPU is the only cost: past the cap the caller gets 429
+// instead of queueing. canvas mode is a pass-through and is not counted.
+export const MAX_CONVERSIONS = 2;
+let converting = 0;
 const DATA_URL_RE = /^data:image\/(png|jpe?g|webp);base64,/;
 
 type Mode = "web" | "print" | "canvas";
@@ -116,6 +121,11 @@ export async function POST(request: Request) {
   const input = decodeDataUrl(image);
   const colorGrade = normaliseColorGrade(body.colorGrade);
 
+  const heavy = mode !== "canvas";
+  if (heavy && converting >= MAX_CONVERSIONS) {
+    return jsonError("目前轉檔的圖片較多，請稍後再試。", 429, { code: "busy" });
+  }
+  if (heavy) converting++;
   try {
     if (mode === "canvas") {
       // Pass-through: editing is client-side (Fabric.js). Echo the validated image
@@ -179,5 +189,7 @@ export async function POST(request: Request) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[image/process] bake failed (mode=${mode}):`, message);
     return NextResponse.json({ ok: false, error: "影像處理失敗，請重試或換一張圖。", code: "bake_failed" });
+  } finally {
+    if (heavy) converting--;
   }
 }

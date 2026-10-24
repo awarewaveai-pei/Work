@@ -184,6 +184,7 @@ describe("registry claims match the code", () => {
   // Routes a door serves that read no organization's data, each read for it; listed in place of an authorizer.
   const ORG_FREE_ROUTES: Readonly<Record<string, string>> = {
     "app/api/tools/events/upcoming/route.ts": "shared holiday table `events`, no organization column",
+    "app/api/tools/image/process/route.ts": "converts the base64 image in the request body (sharp / Ghostscript); no database, no fetch, no paid model",
     "app/api/tools/studio/proxy-image/route.ts": "streams only public designs-bucket objects (exact-host allowlist)",
     "app/api/tools/designs/download/route.ts": "streams only public designs- and video-bucket objects as a download (exact-host allowlist); no database",
     "app/api/tools/studio/mockup/route.ts": "Printful mockup (free) from the request image and the public catalog; uploads that image to the shared public designs bucket and shares the Printful store quota",

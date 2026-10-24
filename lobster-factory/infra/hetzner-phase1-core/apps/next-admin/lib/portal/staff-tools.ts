@@ -49,7 +49,6 @@ export const STAFF_API_OWNERS: Readonly<Record<string, readonly string[]>> = {
   "/api/tools/events/sync": ["content"],
   "/api/tools/publish": ["studio"],
   "/api/tools/printful": ["studio"],
-  "/api/tools/image/process": ["studio", "tarot"],
   "/api/sentry-test": ["ops/repairs"],
 };
 

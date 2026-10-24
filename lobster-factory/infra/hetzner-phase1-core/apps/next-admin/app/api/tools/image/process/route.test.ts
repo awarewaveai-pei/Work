@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import sharp from "sharp";
-import { POST } from "./route";
+import { MAX_CONVERSIONS, POST } from "./route";
 
 // valid PNG base64 data URL input (200×200 solid block)
 async function pngDataUrl(): Promise<string> {
@@ -167,5 +167,28 @@ describe("POST /api/tools/image/process — bake modes", () => {
     );
     expect(res.status).toBe(200);
     expect((await res.json()).ok).toBe(true);
+  });
+});
+
+describe("POST /api/tools/image/process — concurrency cap", () => {
+  beforeEach(() => vi.stubEnv("POD_DESIGNS_ENABLED", "true"));
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("refuses a conversion past the cap with 429 and frees the slot when one finishes", async () => {
+    const image = await pngDataUrl();
+    const web = () => POST(makeRequest({ mode: "web", image, preset: "web-tarot" }, OP));
+    // start MAX_CONVERSIONS + 1 at once: each reaches the counter before any conversion (sharp, awaited) finishes
+    const results = await Promise.all(Array.from({ length: MAX_CONVERSIONS + 1 }, web));
+    const codes = results.map((r) => r.status).sort();
+    expect(codes.filter((c) => c === 429)).toHaveLength(1);
+    expect((await results.find((r) => r.status === 429)!.json()).code).toBe("busy");
+    // every slot is released (finally), so the next one runs
+    expect((await web()).status).toBe(200);
+  });
+
+  it("canvas pass-through is not counted", async () => {
+    const image = await pngDataUrl();
+    const res = await Promise.all(Array.from({ length: MAX_CONVERSIONS + 2 }, () => POST(makeRequest({ mode: "canvas", image }, OP))));
+    expect(res.every((r) => r.status === 200)).toBe(true);
   });
 });

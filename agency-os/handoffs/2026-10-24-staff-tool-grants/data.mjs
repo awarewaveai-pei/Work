@@ -34,18 +34,20 @@ export const NOW = [
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
+const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
+const C1 = '1b8096116';
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '員工工具登記表', plain: '列出所有可勾選的工具：每個產品一格、每個後台頁面一格。新增頁面或 API 若未歸入任何一格，測試就會失敗。',
-    gate: '每個員工頁面與 API 都歸入一格工具，或標明為所有員工皆可使用；測試通過。', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: [],
+    gate: '每個員工頁面與 API 都歸入一格工具，或標明為所有員工皆可使用；測試通過。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: C1, depends: [],
     decided: '一個產品一格；一個後台頁面一格；後台外觀與模型資料各一格。依 2026-10-24 建議。',
     what: 'lib/portal/staff-tools.ts 由 PRODUCTS／STAFF_UTILITIES／BACK_OFFICE 推出 STAFF_TOOLS；STAFF_API_OWNERS 補員工專用 API；toolsFor(pathname) 最長前綴',
     files: ['lib/portal/staff-tools.ts', 'lib/portal/products.ts', 'lib/portal/__tests__/staff-tools.test.ts'],
     items: [
-      todo('C1.1', '從產品清單整理所有可勾選的工具，每格附上中文名稱。'),
-      todo('C1.2', '不在產品頁面上的員工專用 API，逐一歸入所屬工具；多個工具共用的 API，擁有任一工具即可使用。'),
-      todo('C1.3', '輸入網址即可判斷所屬工具。'),
-      todo('C1.4', '測試：每個員工頁面與 API 都歸入一格工具；未歸類就失敗。'),
+      done('C1.1', '從產品清單整理所有可勾選的工具，每格附上中文名稱。', C1),
+      done('C1.2', '不在產品頁面上的員工專用 API，逐一歸入所屬工具；多個工具共用的 API，擁有任一工具即可使用。', C1),
+      done('C1.3', '輸入網址即可判斷所屬工具。', C1),
+      done('C1.4', '測試：每個員工頁面與 API 都歸入一格工具；未歸類就失敗。', C1),
     ] },
   { n: 2, code: 'C2', group: 'B', title: '身分帶工具、擋網址與 API', plain: '登入時一併讀取這位員工勾選的工具。打開無權限頁面會看到說明頁；呼叫 API 會被拒絕。先只記錄、不擋；確認名單無誤後，再正式開始擋。',
     gate: '未勾選工具的員工打開該工具時會看到說明頁；呼叫 API 回應 403。擁有者永遠可以使用；偽造的權限資料會被剝除。', risk: 'High（登入與權限）', model: 'Opus 5.5', status: 'not_started', depends: ['C1'],
