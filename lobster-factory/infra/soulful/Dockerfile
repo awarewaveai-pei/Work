@@ -88,6 +88,8 @@ RUN set -eux; \
     wp --allow-root --version | grep -q "2.12.0" || { echo "FATAL: wp-cli did not install"; exit 1; }
 
 COPY php-limits.ini /usr/local/etc/php/conf.d/zz-soulful-limits.ini
+# Apache worker count sized to the compose memory limit (docker-compose.yml soulful-wp).
+COPY apache-mpm-prefork.conf /etc/apache2/mods-available/mpm_prefork.conf
 
 # mod_rewrite is required for WordPress permalinks. The site's .htaccess also carries
 # LiteSpeed cache directives; Apache ignores them harmlessly because they sit inside
@@ -95,4 +97,4 @@ COPY php-limits.ini /usr/local/etc/php/conf.d/zz-soulful-limits.ini
 RUN a2enmod rewrite headers expires
 
 HEALTHCHECK --interval=20s --timeout=5s --start-period=90s --retries=5 \
-  CMD curl -fsS http://127.0.0.1/ >/dev/null || exit 1
+  CMD curl -fsS -m 4 http://127.0.0.1/ >/dev/null || exit 1

@@ -33,6 +33,14 @@ try {
     else { Remove-Item Env:\LOBSTER_WORK_ROOT -ErrorAction SilentlyContinue }
 }
 
+# Compose resource invariants (memory, no swap, pids, bounded healthchecks, Apache workers vs memory): WORKLOG 2026-10-24.
+Write-Host "== Compose invariants: every prod service fails fast ==" -ForegroundColor Cyan
+& python -X utf8 (Join-Path $WorkRoot "scripts\check-compose-invariants.py")
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "verify-build-gates: check-compose-invariants FAIL (lines above name file, service, invariant)"
+    exit $LASTEXITCODE
+}
+
 if ($LobsterOnly) {
     Write-Host "verify-build-gates: LobsterOnly -> skipped agency-os health check" -ForegroundColor Yellow
     Write-Host "verify-build-gates: ALL PASSED (lobster only)" -ForegroundColor Green

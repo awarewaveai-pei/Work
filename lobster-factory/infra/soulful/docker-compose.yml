@@ -48,16 +48,18 @@ services:
     # network. Publishing it even on 127.0.0.1 is unnecessary here and every published
     # DB port is one config slip away from the 2026-04-20 crypto-miner incident.
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      test: ["CMD", "timeout", "4", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 60s
     networks: [soulful-net]
+    memswap_limit: 6G
     deploy:
       resources:
         limits:
           memory: 6G
+          pids: 512
     logging: *soulful-logging
 
   soulful-redis:
@@ -92,16 +94,18 @@ services:
       - ${REDIS_PASSWORD}
     # No ports: stanza -- reachable only on the internal network, same rule as soulful-db.
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "--no-auth-warning", "ping"]
+      test: ["CMD", "timeout", "2", "redis-cli", "-a", "${REDIS_PASSWORD}", "--no-auth-warning", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
       start_period: 10s
     networks: [soulful-net]
+    memswap_limit: 768M
     deploy:
       resources:
         limits:
           memory: 768M
+          pids: 64
     logging: *soulful-logging
 
   soulful-wp:
@@ -131,13 +135,15 @@ services:
     ports:
       - "127.0.0.1:8081:80"
     networks: [soulful-net]
+    memswap_limit: 6G
     deploy:
       resources:
         limits:
           # PHP memory_limit is 1536M per process (matching live). Apache prefork can
           # hold several of those concurrently, so the container ceiling is deliberately
           # well above a single process rather than equal to it.
-          memory: 4G
+          memory: 6G
+          pids: 256
     logging: *soulful-logging
 
 volumes:

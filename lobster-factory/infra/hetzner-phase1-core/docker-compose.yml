@@ -34,11 +34,13 @@ services:
       - /var/log/lobster-nginx:/var/log/nginx:rw
     networks:
       - lobster-net
+    memswap_limit: 128M
     deploy:
       resources:
         limits:
           memory: 128M
           cpus: '0.50'
+          pids: 512
     logging: *lobster-logging
 
   redis:
@@ -51,17 +53,19 @@ services:
     ports:
       - "${REDIS_HOST_PORT:-127.0.0.1:6379}:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "--no-auth-warning", "ping"]
+      test: ["CMD", "timeout", "2", "redis-cli", "-a", "${REDIS_PASSWORD}", "--no-auth-warning", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
     networks:
       - lobster-net
+    memswap_limit: 512M
     deploy:
       resources:
         limits:
           memory: 512M
           cpus: '0.50'
+          pids: 64
     logging: *lobster-logging
 
   # Canonical self-hosted n8n for AwareWave is on EU (see SERVICE_CREDENTIALS_MAP.md).
@@ -100,7 +104,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "node -e \"require('http').get('http://127.0.0.1:5678/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""
+          "timeout 4 node -e \"require('http').get('http://127.0.0.1:5678/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""
         ]
       interval: 15s
       timeout: 5s
@@ -108,11 +112,13 @@ services:
       start_period: 40s
     networks:
       - lobster-net
+    memswap_limit: 512M
     deploy:
       resources:
         limits:
           memory: 512M
           cpus: '0.50'
+          pids: 256
     logging: *lobster-logging
 
   wordpress-db:
@@ -130,6 +136,8 @@ services:
       test:
         [
           "CMD",
+          "timeout",
+          "4",
           "healthcheck.sh",
           "--connect",
           "--innodb_initialized"
@@ -140,11 +148,13 @@ services:
       start_period: 40s
     networks:
       - lobster-net
+    memswap_limit: 1G
     deploy:
       resources:
         limits:
           memory: 1G
           cpus: '1.00'
+          pids: 512
     logging: *lobster-logging
 
   wordpress:
@@ -224,7 +234,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://127.0.0.1:3001/health > /dev/null || exit 1"
+          "wget -T 4 -qO- http://127.0.0.1:3001/health > /dev/null || exit 1"
         ]
       interval: 10s
       timeout: 5s
@@ -232,11 +242,13 @@ services:
       start_period: 25s
     networks:
       - lobster-net
+    memswap_limit: 512M
     deploy:
       resources:
         limits:
           memory: 512M
           cpus: '0.50'
+          pids: 256
     logging: *lobster-logging
 
   next-admin:
@@ -569,7 +581,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://127.0.0.1:3000/ > /dev/null || exit 1"
+          "wget -T 4 -qO- http://127.0.0.1:3000/ > /dev/null || exit 1"
         ]
       interval: 15s
       timeout: 5s
@@ -579,11 +591,13 @@ services:
       - lobster-net
       - observability
       - renderer-net
+    memswap_limit: 1G
     deploy:
       resources:
         limits:
           memory: 1G
           cpus: '1.00'
+          pids: 512
     logging: *lobster-logging
 
   # Headless-browser render service for next-admin's rendered collection tier (apps/renderer,
@@ -622,11 +636,12 @@ services:
       - no-new-privileges:true
     shm_size: "1gb"
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz',{signal:AbortSignal.timeout(4000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 20s
+    memswap_limit: 2G
     deploy:
       resources:
         limits:
@@ -665,6 +680,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    memswap_limit: 768M
     deploy:
       resources:
         limits:
@@ -672,6 +688,7 @@ services:
           # (lobster-factory/infra/supabase/docker-compose.yml) -- same-scale workload, same limit.
           memory: 768M
           cpus: '1.00'
+          pids: 256
     logging: *lobster-logging
 
   # HCI-30's app/server.mjs (Express REST API). Joins BOTH networks: hci-net to reach its own
@@ -725,7 +742,7 @@ services:
       hci-postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4030/health > /dev/null || exit 1"]
+      test: ["CMD-SHELL", "wget -T 4 -qO- http://127.0.0.1:4030/health > /dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -734,6 +751,7 @@ services:
       - hci-net
       - lobster-net
       - hci-fetch-runner-net
+    memswap_limit: 512M
     deploy:
       resources:
         limits:
@@ -741,6 +759,7 @@ services:
           # footprint, which this service has nothing in common with.
           memory: 512M
           cpus: '0.50'
+          pids: 256
     logging: *lobster-logging
 
   # ADR-0029 gate 1: "its own container/service definition inside the existing docker-compose
@@ -777,7 +796,7 @@ services:
     networks:
       - hci-fetch-runner-net
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8090/healthz"]
+      test: ["CMD", "curl", "-fsS", "-m", "2", "http://127.0.0.1:8090/healthz"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -791,6 +810,12 @@ services:
       - SETPCAP
     security_opt:
       - no-new-privileges:true
+    memswap_limit: 512M
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          pids: 256
     logging: *lobster-logging
 
   # Dedicated object storage for hci-fetch-runner's raw fetched content -- NOT the same instance as
@@ -813,10 +838,16 @@ services:
     volumes:
       - hci_fetch_runner_objectstore:/bitnami/minio/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/live || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS -m 2 http://127.0.0.1:9000/minio/health/live || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 20
+    memswap_limit: 1G
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          pids: 256
     logging: *lobster-logging
 
 networks:
