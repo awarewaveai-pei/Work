@@ -45,6 +45,7 @@
 | [016-social-manager-third-product.md](016-social-manager-third-product.md) | 社群管理是第三個產品：排程資料在我們的資料庫、Postiz 只負責送出、所有品牌共用一台 Postiz 但 key 不出伺服器；先自己管多品牌再開放訂閱；樣稿＝規格、樣式只來自 app globals.css；收件匣＝Chatwoot（提案，等樣稿定案） | 2026-10-14 |
 | [017-entitlements-and-self-hosted-modules.md](017-entitlements-and-self-hosted-modules.md) | 客戶怎麼買：線上用權利表（訂閱／試用／贈送＋點數，功能級簽章許可，方案是資料、價格在 Woo）；買斷＝一鍵架站到客戶主機、用客戶自己的 API、模組選購、離線授權檔；客戶既有網站是接進來的來源（已接受） | 2026-10-14 |
 | [018-product-doors-and-buyout-delivery.md](018-product-doors-and-buyout-delivery.md) | 產品交付三扇門：aware-wave.com（WordPress）收錢與會員、`<產品>.aware-wave.com` 給付費客戶只見該產品與自己的品牌、app.aware-wave.com 給員工；網址與登入來源由 `products.ts`＋環境變數決定，買斷同一份程式換設定裝到客戶網域；測試擋漏填（已接受） | 2026-10-15 |
+| [019-staff-tool-grants.md](019-staff-tool-grants.md) | 員工逐工具權限：擁有者替每位員工勾選工具（一產品一格、一後台頁一格），存 `app_metadata.staff_tools`；側欄、網址、API 同一個判斷；擁有者永遠全部；先 shadow 只記錄，操作者同意才擋（已接受） | 2026-10-24 |
 
 ## 本機檢查（可選）
 

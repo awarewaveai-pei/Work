@@ -1,4 +1,15 @@
 # Worklog
+## 2026-10-24（續54）員工逐工具權限 C5：ADR 019、現況文件身分段、可執行示範（Claude）
+
+- **任務**：R0-PLAN §6 C5（C5.1 `/no-access` 已在 C2 3bb0cd120 做）。
+- **根因**：規則只在計畫與程式裡；架構決策、`APP_AWARE_WAVE_CURRENT_STATE.md` 身分段、`RUNNABLE_DEMOS.md` 都沒寫 `app_metadata.staff_tools`、誰能改、`STAFF_TOOLS_MODE` 預設 shadow。
+- **做了什麼**：`agency-os/docs/architecture/decisions/019-staff-tool-grants.md`＋`ADR_INDEX.md` 一列；`APP_AWARE_WAVE_CURRENT_STATE.md` §1.1 加一條；`RUNNABLE_DEMOS.md` 一列（四個測試檔指令、部署後開 /ops/staff、正式機 `docker logs … | grep '\[staff-tools\]'`）；監工台 C4 打勾（3976fa73f）。
+- **驗證**：ADR 引用的檔皆存在（`lib/staff-access.ts`、`lib/portal/staff-tools.ts`、`lib/supabase/session-cache.ts`、`app/sidebar-sections.ts`）；`node scripts/verify-governance-pointers.mjs` PASSED；`node build.mjs && node check.mjs` ok。
+- REALTEST_WAIVED: DOC_ONLY -- 只改文件與監工台資料
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=staff_tools|STAFF_TOOLS_MODE | hits=54
+- ORACLE_WAIVED: 本 commit 只有文件，無 source 檔。
+- **rollback**：`git revert <本 commit>`。
 ## 2026-10-24（續53）員工逐工具權限 C4：員工權限頁 /ops/staff（只有擁有者能改角色與工具）（Claude）
 
 - **任務**：R0-PLAN §6 C4（`agency-os/handoffs/2026-10-24-staff-tool-grants/R0-PLAN.md`）；操作者決定 D2：只有擁有者能改別人的工具與角色。

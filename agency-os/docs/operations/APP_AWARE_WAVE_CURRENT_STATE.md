@@ -26,6 +26,7 @@ app.aware-wave.com = AwareWave 的維運後台（Next.js 15 + React 19，部署�
 ### 1.1 機制
 - **身分層 = Supabase Auth（email + 密碼）**。Auth project = **`https://supabase.aware-wave.com`**（= next-admin 容器的 `NEXT_PUBLIC_SUPABASE_URL`；**不是** soulfulexpression 那個 project）。
 - 使用者角色存在 Supabase user 的 **`app_metadata.ops_role`**（值 = `owner|admin|operator|viewer`；伺服器控制，使用者不可改）。
+- **員工逐工具權限（2026-10-24，ADR 019）**：`app_metadata.staff_tools`＝勾選的工具 key（沒有此欄＝從沒設定）。擁有者在 `/ops/staff` 設定（只有擁有者能改、擁有者永遠全部、最後一位擁有者不能降級）。middleware 讀它、注入 `x-ops-tools`（先剝除偽造值），每頁每 API 用 `lib/staff-access.ts staffDenial` 判斷；側欄、首頁、客戶中心分頁同一判斷。`STAFF_TOOLS_MODE` 只認 `enforce`；預設 shadow 只記 `[staff-tools] would_deny`、不擋。
 - **登入流程**：`/login`（client）→ `signInWithPassword`（`@supabase/ssr` browser client，cookie session）→ 成功後 **`window.location.assign(next)` 完整頁面跳轉**（不可用 router.replace soft-nav，會 hang）。
 - **middleware**（`middleware.ts`，Edge runtime）：驗 Supabase session（`getUser()`）→ 解析 `app_metadata.ops_role` → 注入 `x-ops-claims-role` header → 既有 RBAC（`lib/ops-role.ts`）照舊消費，**下游全不改**。
 

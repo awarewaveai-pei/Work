@@ -27,10 +27,10 @@ export const COPY = {
 // 現在真的能不能用（2026-10-24 查）
 export const NOW = [
   { what: '員工分為擁有者、管理員、操作、唯讀四種角色。', state: 'yes', ev: '角色設定存在登入帳號中，目前需到 Supabase 後台手動修改。' },
-  { what: '為每位員工分別勾選可用工具。', state: 'no', ev: 'C1、C2 完成後才有依據。' },
+  { what: '為每位員工分別勾選可用工具。', state: 'yes', ev: '在 /ops/staff 勾選（C4）。台灣時間 03:00 自動部署後可用。' },
   { what: '側欄只顯示有權限的工具。', state: 'yes', ev: '已設定工具的員工，側欄、首頁、客戶中心分頁只顯示勾選的工具（C3）。部署後生效。' },
   { what: '沒有權限時，直接輸入網址或呼叫 API 會被擋下。', state: 'no', ev: '程式已完成（C2），目前只記錄「本來會擋」、不擋。正式擋要等你同意（C6）。' },
-  { what: '在後台管理員工帳號與權限。', state: 'no', ev: 'C4' },
+  { what: '在後台管理員工帳號與權限。', state: 'yes', ev: '/ops/staff：改角色、勾工具、寄邀請給新員工。只有擁有者能改。部署後可用。' },
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
@@ -38,6 +38,7 @@ const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 const C1 = '1b8096116';
 const C2 = '3bb0cd120';
 const C3 = 'dfc3027a5';
+const C4 = '3976fa73f';
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '員工工具登記表', plain: '列出所有可勾選的工具：每個產品一格、每個後台頁面一格。新增頁面或 API 若未歸入任何一格，測試就會失敗。',
@@ -73,15 +74,15 @@ export const STEPS = [
       done('C3.4', '客戶中心裡屬於其他產品的分頁（AI 客服、資料蒐集、開發信、網站與社群），員工沒勾該產品就不顯示。', C3),
     ] },
   { n: 4, code: 'C4', group: 'B', title: '員工權限頁 /ops/staff', plain: '新增後台頁面：每位員工一列，按鈕切換角色，勾選框選擇工具，按下儲存即生效。擁有者那一列全部勾選且無法修改。',
-    gate: '擁有者可在頁面上替員工勾選工具並儲存；約 15 秒後，該員工的側欄跟著改變。擁有者那一列無法取消勾選；最後一位擁有者無法被降級。', risk: 'High（帳號權限）', model: 'Opus 5.5', status: 'not_started', depends: ['C1'],
+    gate: '擁有者可在頁面上替員工勾選工具並儲存；約 15 秒後，該員工的側欄跟著改變。擁有者那一列無法取消勾選；最後一位擁有者無法被降級。', risk: 'High（帳號權限）', model: 'Opus 5.5', status: 'done', commit: C4, depends: ['C1'],
     decided: '只有擁有者能修改其他人的角色與工具。依 2026-10-24 建議。',
     what: 'GET/PATCH /api/ops/staff（auth.admin，只 owner 寫、last-owner 鎖、audit）；頁面 chips＋checkbox；邀請新員工',
     files: ['app/api/ops/staff/route.ts', 'app/(shell)/ops/staff/page.tsx', 'lib/portal/products.ts'],
     items: [
-      todo('C4.1', '讀取與修改員工的 API：只有擁有者能修改；擁有者的工具無法更動；最後一位擁有者無法降級；每次修改都留下紀錄。'),
-      todo('C4.2', '頁面：每位員工一列，四顆角色按鈕；工具分成「產品」「工具」「後台」三排勾選；提供全選、全不選與儲存。'),
-      todo('C4.3', '新增員工：輸入 email 寄出邀請，預設為唯讀且沒有任何工具。'),
-      todo('C4.4', '新頁面登記到產品清單與側欄。'),
+      done('C4.1', '讀取與修改員工的 API：只有擁有者能修改；擁有者的工具無法更動；最後一位擁有者無法降級；每次修改都留下紀錄。', C4),
+      done('C4.2', '頁面：每位員工一列，四顆角色按鈕；工具分成「產品」「工具」「後台」三排勾選；提供全選、全不選與儲存。', C4),
+      done('C4.3', '新增員工：輸入 email 寄出邀請，預設為唯讀且沒有任何工具。', C4),
+      done('C4.4', '新頁面登記到產品清單與側欄。', C4),
     ] },
   { n: 5, code: 'C5', group: 'C', title: '沒權限頁與文件', plain: '沒有權限時顯示說明頁，告訴員工所需工具，並請擁有者開通。同時把這套規則寫入架構文件。',
     gate: '說明頁顯示工具名稱；架構決策文件與現況文件都寫入新規則。', risk: 'Low', model: 'Sonnet 5.5（照卡）', status: 'in_progress', depends: ['C2'],

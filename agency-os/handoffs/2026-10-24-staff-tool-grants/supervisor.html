@@ -78,12 +78,12 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
 <aside><div class="in">
   <h1>員工權限 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-10-24</span></p>
-  <div class="bar" data-computed><i class="d" style="width:50%"></i><i class="g" style="width:16.666666666666664%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>3</span>／<span data-computed>6</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>1</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:66.66666666666666%"></i><i class="g" style="width:16.666666666666664%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>4</span>／<span data-computed>6</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>1</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
-<p class="sub">擁有者可為每位員工勾選可用工具。未勾選的工具不會顯示在側欄；直接輸入網址或呼叫 API 也會被擋下。擁有者永遠可用全部工具。共 <span data-computed>6</span> 張卡、<span data-computed>23</span> 項工作，已完成 <span data-computed>13</span> 項。</p>
-<section id="now"><h2>現況</h2><p class="lead">目前可用與尚未可用的功能。</p><ul class="yn"><li class="yes"><b>可以</b><span>員工分為擁有者、管理員、操作、唯讀四種角色。<small>角色設定存在登入帳號中，目前需到 Supabase 後台手動修改。</small></span></li><li class="no"><b>還不行</b><span>為每位員工分別勾選可用工具。<small>C1、C2 完成後才有依據。</small></span></li><li class="yes"><b>可以</b><span>側欄只顯示有權限的工具。<small>已設定工具的員工，側欄、首頁、客戶中心分頁只顯示勾選的工具（C3）。部署後生效。</small></span></li><li class="no"><b>還不行</b><span>沒有權限時，直接輸入網址或呼叫 API 會被擋下。<small>程式已完成（C2），目前只記錄「本來會擋」、不擋。正式擋要等你同意（C6）。</small></span></li><li class="no"><b>還不行</b><span>在後台管理員工帳號與權限。<small>C4</small></span></li></ul></section>
+<p class="sub">擁有者可為每位員工勾選可用工具。未勾選的工具不會顯示在側欄；直接輸入網址或呼叫 API 也會被擋下。擁有者永遠可用全部工具。共 <span data-computed>6</span> 張卡、<span data-computed>23</span> 項工作，已完成 <span data-computed>17</span> 項。</p>
+<section id="now"><h2>現況</h2><p class="lead">目前可用與尚未可用的功能。</p><ul class="yn"><li class="yes"><b>可以</b><span>員工分為擁有者、管理員、操作、唯讀四種角色。<small>角色設定存在登入帳號中，目前需到 Supabase 後台手動修改。</small></span></li><li class="yes"><b>可以</b><span>為每位員工分別勾選可用工具。<small>在 /ops/staff 勾選（C4）。台灣時間 03:00 自動部署後可用。</small></span></li><li class="yes"><b>可以</b><span>側欄只顯示有權限的工具。<small>已設定工具的員工，側欄、首頁、客戶中心分頁只顯示勾選的工具（C3）。部署後生效。</small></span></li><li class="no"><b>還不行</b><span>沒有權限時，直接輸入網址或呼叫 API 會被擋下。<small>程式已完成（C2），目前只記錄「本來會擋」、不擋。正式擋要等你同意（C6）。</small></span></li><li class="yes"><b>可以</b><span>在後台管理員工帳號與權限。<small>/ops/staff：改角色、勾工具、寄邀請給新員工。只有擁有者能改。部署後可用。</small></span></li></ul></section>
 
 <section id="steps"><h2>卡片與工作</h2><p class="lead">依編號進行。每張卡列出所有工作；勾選表示完成。同一組的卡若修改不同檔案，可同時進行。High 風險步驟需經你同意才會執行。</p><ol class="steps"><li class="step done" id="C1">
     <div class="n">1</div>
@@ -115,19 +115,20 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-24-staff-tool-grants/R0-PLAN.md §6 C2</code></p>
         <p><b>完成於：</b><code>3bb0cd120</code></p>
       </details>
-    </div></li><li class="step todo" id="C4">
+    </div></li><li class="step done" id="C4">
     <div class="n">4</div>
     <div class="b">
       <p class="plain">新增後台頁面：每位員工一列，按鈕切換角色，勾選框選擇工具，按下儲存即生效。擁有者那一列全部勾選且無法修改。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（帳號權限）</span><span class="who">負責：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-done">已完成</span><span class="pill risk-high">風險 High（帳號權限）</span><span class="who">負責：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>擁有者可在頁面上替員工勾選工具並儲存；約 15 秒後，該員工的側欄跟著改變。擁有者那一列無法取消勾選；最後一位擁有者無法被降級。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>C4.1</code> 讀取與修改員工的 API：只有擁有者能修改；擁有者的工具無法更動；最後一位擁有者無法降級；每次修改都留下紀錄。</span></li><li class="todo"><b>○</b><span><code>C4.2</code> 頁面：每位員工一列，四顆角色按鈕；工具分成「產品」「工具」「後台」三排勾選；提供全選、全不選與儲存。</span></li><li class="todo"><b>○</b><span><code>C4.3</code> 新增員工：輸入 email 寄出邀請，預設為唯讀且沒有任何工具。</span></li><li class="todo"><b>○</b><span><code>C4.4</code> 新頁面登記到產品清單與側欄。</span></li></ul>
+      <ul class="items"><li class="done"><b>✓</b><span><code>C4.1</code> 讀取與修改員工的 API：只有擁有者能修改；擁有者的工具無法更動；最後一位擁有者無法降級；每次修改都留下紀錄。 <small>完成於 <code>3976fa73f</code></small></span></li><li class="done"><b>✓</b><span><code>C4.2</code> 頁面：每位員工一列，四顆角色按鈕；工具分成「產品」「工具」「後台」三排勾選；提供全選、全不選與儲存。 <small>完成於 <code>3976fa73f</code></small></span></li><li class="done"><b>✓</b><span><code>C4.3</code> 新增員工：輸入 email 寄出邀請，預設為唯讀且沒有任何工具。 <small>完成於 <code>3976fa73f</code></small></span></li><li class="done"><b>✓</b><span><code>C4.4</code> 新頁面登記到產品清單與側欄。 <small>完成於 <code>3976fa73f</code></small></span></li></ul>
       <details><summary>工程細節：C4 員工權限頁 /ops/staff</summary>
         <p>GET/PATCH /api/ops/staff（auth.admin，只 owner 寫、last-owner 鎖、audit）；頁面 chips＋checkbox；邀請新員工</p>
         <p><b>需先完成：</b><a href="#C1">C1</a></p>
         <p><b>你的決定：</b>只有擁有者能修改其他人的角色與工具。依 2026-10-24 建議。</p>
         <p><b>檔案：</b><code>app/api/ops/staff/route.ts</code> <code>app/(shell)/ops/staff/page.tsx</code> <code>lib/portal/products.ts</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-24-staff-tool-grants/R0-PLAN.md §6 C4</code></p>
+        <p><b>完成於：</b><code>3976fa73f</code></p>
       </details>
     </div></li><li class="grp">可同時進行：<a href="#C3">C3</a>、<a href="#C5">C5</a></li><li class="step done" id="C3">
     <div class="n">3</div>
