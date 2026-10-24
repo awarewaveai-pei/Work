@@ -1,4 +1,25 @@
 # Worklog
+## 2026-10-24（續31）主機排程換上 `scripts/cron.d/*`，root crontab 退役（Claude）
+
+承續 2026-10-24 主機所有排程上 /ops/schedules 條目（354c2c40e、c8decdde7）。操作者 go-ahead「可以，去主機換上新的排程設定」。
+
+**步驟**
+1. 主機 `/root/Work` fetch → `sync-host-scripts.sh`：scripts == origin/main c8decdde7（19 installed，含 cron-run.sh、cron.d/、installer）。
+2. `install-host-schedules.sh --check`：7 檔差異＝原指令外包 `cron-run.sh <key> '...'`，逐條目視指令字串不變；root crontab 10 行全部涵蓋（無 NOT in 行；n8n 那行已由 compose 收斂 session 先刪）。
+3. 安裝 12:11:57Z：7 檔進 `/etc/cron.d`，root crontab 清空，`.awarewave-managed` 寫入。備份 `/root/lobster-phase1/.state/cron-backup-20261024T121157Z`。
+4. 一併上線：他 session 31145e3ad 加的 `schedules_run_due`（每 5 分，客戶排程時鐘）；route 已在 prod（無 token POST → 401）。已通知該 session（Trigger.dev 每小時心跳仍在，兩邊同時觸發）。
+
+**驗證**
+- 盤點：26 項、0 未登記、drift=[]、errors=0；容器內 `/host-status/host-schedules.json` 讀得到。
+- 實際 cron 觸發記錄：wp_cron_runner 12:12、schedules_run_due／mainwp_wp_cron 12:15 皆 exit 0。
+- 每日備份等工作的第一筆記錄在今晚 02:00 UTC 後；排程頁 UI 隨 03:00（台北）自動部署上線。
+
+**rollback**：`sudo bash /root/lobster-phase1/scripts/install-host-schedules.sh --rollback /root/lobster-phase1/.state/cron-backup-20261024T121157Z`（還原 7 檔舊內容＋root crontab 10 行）。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo bash /root/lobster-phase1/scripts/install-host-schedules.sh (ks-aw-01) | exit=0 | ms=2000
+- REALTEST_EVIDENCE: tool=SSH | cmd=cat /var/lib/awarewave/jobs/{schedules_run_due,mainwp_wp_cron}.json after 12:15 tick | exit=0 | ms=200000
+- REVIEW_WAIVED: NA -- host install of already-reviewed files (354c2c40e critic+codex); diff read line by line in --check
+- BUGHUNT_WAIVED: NA -- no code change in this entry
 ## 2026-10-24（續30）0122 套正式庫（操作者同意）並推上 main：題目的網站必屬同一客戶（D8）（Claude）
 
 **觸發**：操作者「Apply 0122 to production now, verify it, then push it.」
