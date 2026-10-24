@@ -214,10 +214,12 @@ export default function ThemePage() {
       </div>
 
       {/* ── Colors tab ──────────────────────────────────────────────── */}
+      {/* Mounted on every tab (only hidden) so the chosen palette and arrangement survive a tab switch. */}
+      <div hidden={activeTab !== 'colors'}>
+        <PalettePresets onApply={applyTokens} />
+      </div>
       {activeTab === 'colors' && (
         <>
-          <PalettePresets onApply={applyTokens} />
-
           {/* Quick Colors */}
           <div className="card" style={{ padding: 20, marginBottom: 16 }}>
             <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 14 }}>
@@ -480,10 +482,17 @@ function TokenRow({ name, type, value, defaultValue, changed, onChange }: {
   changed: boolean; onChange: (name: string, value: string) => void;
 }) {
   // A value may point at another token (--accent-text defaults to var(--accent)): the swatch paints
-  // it as CSS, the native picker only takes #rrggbb.
-  const isHex = (v: string) => /^#[0-9a-fA-F]{6}$/.test(v);
+  // it as CSS, the native picker only takes #rrggbb, so it opens on the color the browser resolved.
+  // Read after mount (no SSR mismatch) and on every render, since the token it points at can change.
+  const isHex = (v: string) => /^#[0-9a-fA-F]{6}$/i.test(v);
   const swatchColor = type === 'color' ? value : defaultValue;
-  const pickerValue = isHex(value) ? value : isHex(defaultValue) ? defaultValue : '#000000';
+  const [resolved, setResolved] = useState('#000000');
+  useEffect(() => {
+    if (type !== 'color' || isHex(value)) return;
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    if (isHex(v) && v !== resolved) setResolved(v);
+  });
+  const pickerValue = isHex(value) ? value : resolved;
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       {type === 'color' ? (

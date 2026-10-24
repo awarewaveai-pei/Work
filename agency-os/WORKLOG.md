@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-25（續11）外觀色票收尾：選色器開在實際顏色、切分頁不忘記色票選擇（Claude）
+
+- **任務**：（續9）critic 留下的兩個 nit，操作者「能修就修」。
+- **做了什麼**（next-admin `app/(shell)/tools/theme/page.tsx`）：TokenRow 值是 `var(--x)` 時，掛載後讀 `getComputedStyle` 解析出的顏色當選色器起點（每次 render 重讀，指向的 token 改了也跟上；不在 render 中讀，免 SSR 不一致）；PalettePresets 移出 `activeTab === 'colors'` 條件，改 `<div hidden>` 常駐，切分頁不再卸載。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/theme（15 passed）＋ npx tsc --noEmit（0 error） | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=curl | cmd=localhost:3901 /tools/theme 瀏覽器實測：`--accent-text` 選色器值 #008f11（prod 存的 accent）；選 p21＋Shuffle→切 Sidebar（區塊 hidden）→切回 Colors，p21 仍選中、四色角色相同；全程只有 GET /api/theme | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（讀回 diff：useEffect 無 deps 但只在值不同時 setState，不會迴圈；hidden 的 div 不影響其他分頁版面）
+- ORACLE_WAIVED: codex quota blocked until 2026-10-25 07:00 (scripts/oracle-quota.ps1)；兩處 UI 小修，以讀回＋瀏覽器實測代替。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=PalettePresets | hits=4
+- **rollback**：`git revert <本 commit>`。
 ## 2026-10-25（續10）ADR 017 4b-2：wp-bridge 0.18.0——WooCommerce／WCS 付款事件、會員信箱驗證後才能結帳、我的帳號「進入」按鈕（Claude）
 
 - **任務**：4b-2（待決 1 選 WCS＋TapPay）。全部在一個設定開關後（AwareWave Bridge → 付款與會員，預設關）；商品欄位與設定頁常駐。
