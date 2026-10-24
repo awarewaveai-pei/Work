@@ -52,6 +52,23 @@ export interface LogAiCallFromResponse {
   tool?: string | null;
 }
 
+/** Gemini's `response.usageMetadata` (subset). Thinking tokens bill as output; cached prompt tokens bill at the cache
+ *  rate, so they leave the plain input count. */
+export interface GeminiUsageLike {
+  promptTokenCount?: number;
+  candidatesTokenCount?: number;
+  thoughtsTokenCount?: number;
+  cachedContentTokenCount?: number;
+}
+export function geminiUsageTokens(u: GeminiUsageLike | undefined): Pick<LogAiCallArgs, "inputTokens" | "outputTokens" | "cacheReadTokens"> {
+  const cached = u?.cachedContentTokenCount ?? 0;
+  return {
+    inputTokens: Math.max(0, (u?.promptTokenCount ?? 0) - cached),
+    outputTokens: (u?.candidatesTokenCount ?? 0) + (u?.thoughtsTokenCount ?? 0),
+    cacheReadTokens: cached,
+  };
+}
+
 function isFromResponse(a: LogAiCallArgs | LogAiCallFromResponse): a is LogAiCallFromResponse {
   return (a as LogAiCallFromResponse).response !== undefined;
 }

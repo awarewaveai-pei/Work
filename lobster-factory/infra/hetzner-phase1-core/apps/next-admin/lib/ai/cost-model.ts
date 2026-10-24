@@ -54,8 +54,10 @@ export const TEXT_RATES: Record<string, TextRate> = {
   "gpt-4o":                    { inputPerM: 2.5, outputPerM: 10, cacheReadMult: 0.5, cacheWriteMult: 1, label: "GPT-4o", vendor: "OpenAI" },
   // Legacy Perplexity Sonar — kept for historical cost-log lookup; no longer called (replaced by Serper).
   "sonar":                     { inputPerM: 1, outputPerM: 1, cacheReadMult: 1, cacheWriteMult: 1, label: "Perplexity Sonar (legacy)", vendor: "Perplexity" },
-  // Gemini Flash-Lite (ops-inbox diagnostics only).
-  "gemini-2.0-flash-lite":     { inputPerM: 0.1, outputPerM: 0.4, cacheReadMult: 0.25, cacheWriteMult: 1, label: "Gemini 2.0 Flash-Lite", vendor: "Google" },
+  // Gemini Flash-Lite: lib/ai/gemini-models.ts GEMINI_LITE_MODEL (ops-inbox diagnostics, cs fallback). Google list price
+  // 2026-10-24: $0.30 / $2.50 per 1M, cache read $0.03. 2.0 is retired (404) and stays for older cost-log rows.
+  "gemini-3.5-flash-lite":     { inputPerM: 0.3, outputPerM: 2.5, cacheReadMult: 0.1, cacheWriteMult: 1, label: "Gemini 3.5 Flash-Lite", vendor: "Google" },
+  "gemini-2.0-flash-lite":     { inputPerM: 0.1, outputPerM: 0.4, cacheReadMult: 0.25, cacheWriteMult: 1, label: "Gemini 2.0 Flash-Lite (retired)", vendor: "Google" },
 };
 
 /** Fallback when an unknown text model id is logged — the app default model's rate. */

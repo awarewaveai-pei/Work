@@ -2,6 +2,7 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import type { AiDiagnosis, Incident } from "@/lib/ops-inbox/types";
 import { collectEvidence, renderEvidenceText } from "@/lib/repair-center/evidence";
 import { CLAUDE_FAST_MODEL } from "@/lib/ai/gateway";
+import { GEMINI_LITE_MODEL } from "@/lib/ai/gemini-models";
 import { summarizeIncidentWithClaude } from "./claude";
 import { summarizeIncidentWithGemini } from "./gemini";
 import { checkAndConsumeGeminiQuota } from "./quotaGuard";
@@ -31,7 +32,7 @@ async function runAiSummarize(
     const quota = await checkAndConsumeGeminiQuota(limit);
     if (quota.allowed) {
       const summary = await summarizeIncidentWithGemini(incident, evidenceText);
-      return { provider: "gemini", model: "gemini-2.0-flash-lite", summary };
+      return { provider: "gemini", model: GEMINI_LITE_MODEL, summary };
     }
   }
 

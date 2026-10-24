@@ -122,3 +122,13 @@ describe("estimateMonthly", () => {
     expect(r.totalNtd).toBeCloseTo(usdToNtd(r.totalUsd), 6);
   });
 });
+
+describe("the Gemini Flash-Lite model in use is priced", () => {
+  it("GEMINI_LITE_MODEL has its own price row, not the fallback (lib/ai/gemini-models.ts)", async () => {
+    const { GEMINI_LITE_MODEL } = await import("../gemini-models");
+    const { resolveTextRate } = await import("../cost-calculator");
+    const r = resolveTextRate(GEMINI_LITE_MODEL);
+    expect(r.fallback).toBe(false);
+    expect(r.matchedKey).toBe(GEMINI_LITE_MODEL);
+  });
+});

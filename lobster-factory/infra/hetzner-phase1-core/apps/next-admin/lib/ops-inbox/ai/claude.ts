@@ -1,5 +1,6 @@
 import { CLAUDE_FAST_MODEL, claudeParams, loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
+import { logAiCall } from "@/lib/ai/log-ai-call";
 import type { Incident } from "@/lib/ops-inbox/types";
 
 const CLAUDE_TIMEOUT_MS = 12_000;
@@ -39,6 +40,7 @@ export async function summarizeIncidentWithClaude(incident: Incident, evidenceTe
       },
       { signal: controller.signal },
     );
+    void logAiCall({ route: "ops-inbox/classify", response, organizationId: incident.organization_id ?? null, tool: "ops-inbox" });
 
     const block = response.content[0];
     if (block.type !== "text") throw new Error("unexpected response type");

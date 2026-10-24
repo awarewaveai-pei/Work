@@ -6,6 +6,7 @@
 // See agency-os/docs/Customer_service/Customer_service_automation_plan.md §3.4, §14.
 
 import { CLAUDE_FAST_MODEL } from "@/lib/ai/claude-params";
+import { GEMINI_LITE_MODEL } from "@/lib/ai/gemini-models";
 
 export const CS_MODELS = {
   /** Cheap, fast — intent classification + supervisor grounding verdict. */
@@ -14,7 +15,7 @@ export const CS_MODELS = {
   /** Main customer-facing generation. */
   generate: "claude-opus-5-5",
   /** Cross-provider failover when Claude errors/times out. */
-  geminiFallback: "gemini-2.0-flash-lite",
+  geminiFallback: GEMINI_LITE_MODEL,
 } as const;
 
 // Embedding + retrieval fan-out constants moved to lib/kb/config.ts in K0 (ADR 011 §決策 3):

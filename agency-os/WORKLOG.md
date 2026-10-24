@@ -1,4 +1,31 @@
 # Worklog
+## 2026-10-24（續56）gemini-2.0-flash-lite 已下架 → 改用 gemini-3.5-flash-lite，模型名只寫在一處；收件匣 AI 分類與客服 Gemini 備援開始記花費（Claude）
+
+**觸發**：操作者「把 gemini-2.0-flash-lite 換成現在可用的模型（收件匣分類、客服備援、價目表），實測一次能回應」「去處理好」。發現經過見續51 C4。
+
+**發現**
+- C1 正式環境也壞了：在 `lobster-next-admin` 容器裡用正式的 key 呼叫，`gemini-2.0-flash-lite` 回 404，`gemini-3.5-flash-lite` 回 200（4676 ms）。受影響的是收件匣 AI 分類（Claude 失敗後的備援）和客服 Gemini 備援；這兩條平常很少走到，所以沒有人發現。
+- C2 根因：同一個模型名寫死在 3 處（`lib/ops-inbox/ai/gemini.ts:7`、`triggerAutoClassify.ts:34`、`lib/cs/config.ts:17`），下架時沒有任何地方會大聲報錯。要守住的規則：整個 app 只在一處寫 lite 模型名，而且它在價目表裡一定要有自己的價格。→ 新增 `lib/ai/gemini-models.ts` 的 `GEMINI_LITE_MODEL`，三個地方都改 import 它；`cost-calculator.test.ts` 加一個測試，價目表沒有這個模型的價格就變紅。
+- C3 選模型：我們的 key 能叫的模型清單裡有 3.1 和 3.5 兩個 lite。各打 5 次：3.1 花 1.2–8.1 秒，其中 1 次失敗；3.5 穩定在 3.4–5.0 秒。這兩條都是備援路徑，穩定比便宜重要，所以選 3.5。價格照 Google 官方價目頁（2026-10-24）：每百萬 token 輸入 $0.30、輸出 $2.50、快取讀取 $0.03。2.0 那一列保留並標「retired」，舊的花費紀錄還要用它算錢。
+- C4（Codex F1，`partialreview-a1e35d35`）兩條 Gemini 路徑都沒寫 `ai_call_logs`，花費頁會少算。另外查到收件匣的 Claude 路徑也從來沒記過。→ `log-ai-call.ts` 新增 `geminiUsageTokens()`：thinking token 算成輸出，快取的 prompt 算快取讀取；客服 Gemini 備援用呼叫端的 route 和組織記帳；收件匣的 Gemini 和 Claude 兩條都記 `ops-inbox/classify`，帶事件的組織。
+- C5（Codex F1，`partialreview-f787aba3`）測試原本只檢查「有一筆符合」，抓不到重複記帳。→ 改成斷言剛好一筆。突變：多記一筆，結果變紅。
+- C6 同一類問題還有 6 個檔：呼叫 AI 卻沒有 `logAiCall`。包括 `lib/command-plane/handlers/_anthropic.ts`、`lib/content/trending-sources.ts`、`lib/content/video/video-script-core.ts`、`lib/onboarding/spec-generator.ts`、`app/api/tools/script-forge/route.ts`（另一個 session 正在改）、`app/api/video/story-bibles/visual-consistency-check/route.ts`。這次範圍外，交操作者決定。
+
+**修改**（next-admin）：`lib/ai/gemini-models.ts`（新）、`lib/ai/cost-model.ts`、`lib/ai/log-ai-call.ts`、`lib/cs/config.ts`、`lib/cs/llm.ts`、`lib/ops-inbox/ai/{gemini,claude,triggerAutoClassify}.ts`、`lib/ai/__tests__/cost-calculator.test.ts`、`lib/ai/__tests__/gemini-cost-log.test.ts`（新）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-next-admin node fetch（正式 key）：gemini-3.5-flash-lite 200 4676ms；gemini-2.0-flash-lite 404 | exit=0 | ms=5000
+- REALTEST_EVIDENCE: tool=Bash | cmd=一次性 vitest 探針（未 commit，跑完刪除）呼叫真正的 `generateText`：本機沒有 Claude key，所以會走 Gemini 備援，回 "OK" 花 5.2 秒；`summarizeIncidentWithGemini` 跑 3 次，花 4.5、3.9、3.8 秒，都有中文摘要。正式 `ai_call_logs` 讀回 1 筆：route probe/gemini-cost-log、model gemini-3.5-flash-lite、Google、10/1 token、$0.000005，沒有 rate_fallback | exit=0 | ms=40000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（365 files／3219 passed，加入記帳前）＋ lib/ai、lib/cs、lib/ops-inbox 316 passed ＋ tsc（這幾個資料夾 0 錯；唯一的錯在另一個 session 的 `lib/schedules/__tests__/social-report-jobs.test.ts`） | exit=0 | ms=60000
+- 突變：拿掉 3.5 的價格列，價格測試變紅；拿掉客服 Gemini 的記帳，「the cs fallback logs one row」變紅；多記一筆，同一個測試變紅。三次都還原後變綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n -- Codex `agency-os/reports/oracle/2026-10-24-partialreview-a1e35d35.md`（F1 Gemini 沒記帳，見 C4）、`2026-10-24-partialreview-f787aba3.md`（F1 測試抓不到重複記帳，見 C5）；兩個都修了，Codex 沒有回報 token 對應或重複記帳的問題。
+  - external oracle = Codex CLI (codex exec -s read-only), not self-description
+- ORACLE_WAIVED: f787aba3 之後只改了 `gemini-cost-log.test.ts` 的兩行斷言（toContainEqual 改成 toEqual 長度 1），沒有改原始碼。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=gemini-2.0-flash-lite | hits=2（`cost-model.ts` 的歷史價格列，以及 `gemini-models.ts` 說明下架的註解；呼叫點 0）
+
+**上線**：今晚 03:00 自動部署。在那之前，這兩條備援路徑如果被觸發仍會 404；主要路徑走 Claude，不受影響。
+
+**rollback**：`git revert <本 commit>`（沒有資料、沒有 migration）。
 ## 2026-10-24（續55）排程頁：用不到星期的工作不再顯示「星期」欄（Claude）
 
 **觸發**：操作者截圖社群月報分頁「為什麼要【星期】？」——整欄都是「—」。

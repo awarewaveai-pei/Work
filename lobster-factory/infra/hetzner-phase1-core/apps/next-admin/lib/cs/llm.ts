@@ -5,7 +5,7 @@
 import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { loadGoogleGenerativeAI } from "@/lib/ai/gateway";
 import type { Grant } from "@/lib/entitlements/can";
-import { logAiCall } from "@/lib/ai/log-ai-call";
+import { geminiUsageTokens, logAiCall } from "@/lib/ai/log-ai-call";
 import { CS_MODELS, CS_TIMEOUTS } from "@/lib/cs/config";
 import { claudeParams } from "@/lib/ai/gateway";
 
@@ -75,14 +75,16 @@ const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T> => {
   return Promise.race([p, t]);
 };
 
-/** Gemini text completion — the failover path. Throws if GEMINI_API_KEY missing. */
-async function geminiText(prompt: string, timeoutMs: number, grant: Grant): Promise<string> {
+/** Gemini text completion — the failover path. Throws if GEMINI_API_KEY missing. Metered like claudeTurn. */
+async function geminiText(prompt: string, timeoutMs: number, grant: Grant, log: { route: string; organizationId?: string | null }): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("missing GEMINI_API_KEY");
   const GoogleGenerativeAI = await loadGoogleGenerativeAI(grant);
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: CS_MODELS.geminiFallback });
   const result = await withTimeout(model.generateContent(prompt), timeoutMs);
+  void logAiCall({ route: log.route, model: CS_MODELS.geminiFallback, ...geminiUsageTokens(result.response.usageMetadata),
+    organizationId: log.organizationId ?? null, tool: "cs" });
   return result.response.text().trim();
 }
 
@@ -126,7 +128,7 @@ export async function generateText(opts: GenerateTextInput): Promise<GenerateTex
     throw new Error("empty_claude_response");
   } catch {
     // Failover. If Gemini also fails, let it throw — orchestrator catches and routes to a human.
-    const text = await geminiText(`${opts.system}\n\n${opts.user}`, timeoutMs, opts.grant);
+    const text = await geminiText(`${opts.system}\n\n${opts.user}`, timeoutMs, opts.grant, { route: opts.route, organizationId: opts.organizationId });
     return { text, provider: "gemini" };
   }
 }
