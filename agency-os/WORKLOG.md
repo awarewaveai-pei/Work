@@ -1,4 +1,12 @@
 # Worklog
+## 2026-10-25（續14）next-admin 手動部署 79f53f114（操作者：現在部署 next-admin）——主要按鈕自己一組上線（Claude）
+
+- **範圍**：prod 原為 `e12af9bf8`；`e12af9bf8..79f53f114` 的 next-admin 變更只有 `79f53f114`（Button Primary 組＋`.btn-primary` 吃 `--btn-primary-*`），無 migration；DEPLOY_HOLD 不存在。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin（npm test 閘、rollback 快照 rollback-20261024-195947、healthy 15s、HTTP smoke 5/5 200；.deployed-commit=79f53f114，容器名正常） | exit=0 | ms=399818
+- REALTEST_EVIDENCE: tool=Bash | cmd=scripts/playwright-runner.ps1 -Mode smoke -SkipInstall（26 passed, 6 skipped） | exit=0 | ms=0（未計時）
+- REVIEW_WAIVED: NA -- 部署本身無程式改動；程式審查見（續13）
+- BUGHUNT_WAIVED: NA -- 部署紀錄，無程式改動
+- **rollback**：快照 `lobster-phase1-next-admin:rollback-20261024-195947`，依 DEPLOY_ROLLBACK_RUNBOOK §2；或 revert 79f53f114 後重跑 sg-deploy。
 ## 2026-10-25（續13）主要按鈕自己一組、而且真的有作用：.btn-primary 改吃 --btn-primary-*（Claude）
 
 - **觸發**：操作者「button 的 class 沒有寫出來，無法手動調整，只看到 Button Secondary」。
