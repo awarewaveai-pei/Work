@@ -1,3 +1,4 @@
+import type { JsonValue } from "./permit";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { PRODUCTS } from "@/lib/portal/products";
@@ -19,6 +20,21 @@ const SUBSCRIPTION_STATUS_PRIORITY: Record<string, number> = {
 };
 
 /** Control-plane access only: never give a browser a service-role client. */
+type EntitlementRow = { id: string; organization_id: string; product_key: string; feature_key: string; source: "contract" | "comp";
+  source_ref: string | null; starts_at: string; ends_at: string | null; status: string; limits: Record<string, JsonValue> };
+
+/** Which of several live rows decides (they arrive oldest first). The row now also decides who pays (can.ts): a row
+ *  that covers the use (no `pay: "credits"`) wins over a credit-pack row, so a gift or a contract is never charged to
+ *  the wallet because the pack row happens to be older (critic 2026-10-25 M). Among equals the oldest, as before. */
+export function pickEntitlementRow<T extends { limits: Record<string, unknown> | null; source: string }>(rows: T[]): T | null {
+  // Rank: covers the use (no `pay`) > a valid credit-pack row (contract + "credits") > anything malformed, which can.ts
+  // refuses -- so a bad marker never hides a valid row (critic 2026-10-25 second pass M). Oldest first within a rank.
+  const rank = (r: T) => (r.limits?.pay === undefined ? 0 : r.limits.pay === "credits" && r.source === "contract" ? 1 : 2);
+  let best: T | null = null;
+  for (const r of rows) if (best === null || rank(r) < rank(best)) best = r;
+  return best;
+}
+
 export function createEntitlementStore(client: SupabaseClient | null = getSupabaseWriteClient()): CanStore & {
   expireEntitlements(now?: Date): Promise<number>;
   endLapsedTrials(now?: Date): Promise<number>;
@@ -30,12 +46,13 @@ export function createEntitlementStore(client: SupabaseClient | null = getSupaba
   return {
     async findActiveEntitlement({ organizationId, productKey, featureKey, now }) {
       const time = new Date(now * 1000).toISOString();
-      const { data, error } = await db.from("organization_entitlements")
+      const { data: rows, error } = await db.from("organization_entitlements")
         .select("id, organization_id, product_key, feature_key, source, source_ref, starts_at, ends_at, status, limits")
         .eq("organization_id", organizationId).eq("product_key", productKey).eq("feature_key", featureKey)
         .eq("status", "active").lte("starts_at", time)
-        .or(`ends_at.is.null,ends_at.gt.${time}`).order("created_at").order("id").limit(1).maybeSingle();
+        .or(`ends_at.is.null,ends_at.gt.${time}`).order("created_at").order("id").limit(20);
       if (error) throw new Error(error.message);
+      const data = pickEntitlementRow((rows ?? []) as EntitlementRow[]);
       if (!data) return null;
       return {
         id: data.id, organizationId: data.organization_id, productKey: data.product_key,

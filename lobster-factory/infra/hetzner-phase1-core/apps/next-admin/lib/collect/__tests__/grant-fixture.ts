@@ -2,4 +2,4 @@
 import { can, type Grant } from "@/lib/entitlements/can";
 import { CUSTOMER, gateFixture } from "@/lib/entitlements/__tests__/gate-fixtures";
 
-export const collectGrant = (): Promise<Grant> => can(CUSTOMER, "collect.fetch", "system", gateFixture({ balance: 100 }).deps);
+export const collectGrant = (): Promise<Grant> => can(CUSTOMER, "collect.fetch", "system", gateFixture({ credits: true, balance: 100 }).deps);

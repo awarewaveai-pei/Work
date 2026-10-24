@@ -139,6 +139,7 @@ A／B 都要會計師一句話確認「收款開發票＋合約負債」；C 另
 - Files：`lib/entitlements/can.ts:40-56`（`issuePermit`：找到列且 `feature.billing==="credits"` 且 `row.source==="contract"` → `source:"credits"`、`entitlement_id: row.id`、`max_spend: min(balance, singleLimit)`，餘額不足拒 `insufficient_credits`；找到 `comp` 列照舊免費；沒列一律 `no_active_entitlement`，刪掉「沒列看錢包」分支）；`lib/entitlements/__tests__/can.test.ts`、`customer-drill.test.ts`（`drill-credits` 列改成「有 addon 列＋錢包 50」與「只有錢包、沒列→拒」兩列）；ADR 017 產品決定 #11「待決」改成決定；監工台 `DRILL` 點數列文字。
 - Acceptance：`npx vitest run lib/entitlements` 綠，測試名含 `a wallet alone opens nothing`、`a contract row on a credits feature spends the wallet`、`a comp row on a credits feature is free`；突變：把「沒列看錢包」分支加回去 → `a wallet alone opens nothing` 紅。
 - Rollback：`git revert`；資料不動。
+- 實作（2026-10-25）與上列不同處：扣錢包改為**列上明示**——列的 limits `pay: "credits"` 且功能 `billing: credits` 才扣（點數包的加購方案在 `plans.limits` 標）；照字面「contract 列＋點數功能就扣」會讓 0118 全功能合約（Soulful 代操）在翻 enforce 後開始扣點，突變證明（拿掉明示→Soulful 演練紅）。permit 格式不變（credits 仍 `entitlement_id: null`，列的合約放 `source_ref`）。點數包要附加購方案：外掛 4b-2 對有 `_awarewave_plan_key` 的點數包另送 `subscription_paid`（期末＋1090 天）。
 
 ### 4b-6　Woo 店面設定（操作者在 WordPress 後台做；卡只列清單）
 - 結帳必須登入（WooCommerce → 設定 → 帳號與隱私：關閉訪客結帳）；結帳頁條款勾選（WooCommerce 內建「條款與條件」頁＝待決 3 條款全文，勾選才能下單）；每個點數包與訂閱商品的「簡短說明」第一行貼待決 3 的一句告知；商品 meta `_awarewave_plan_key`／`_awarewave_credit_units`（4b-2 的欄位）。

@@ -14,14 +14,14 @@ const store: SubjectStore = {
 
 describe("runForOrg", () => {
   it("a library grantFor inside bills the organization the job works for, as the job's actor", async () => {
-    const deps = gateFixture({ balance: 50 }).deps;
+    const deps = gateFixture({ credits: true, balance: 50 }).deps;
     const grant = await runForOrg(CUSTOMER.orgId, "schedule:content_pipeline", () => grantFor("social.rewrite"), { deps, subjects: store });
     expect(grant.subject).toEqual(CUSTOMER);
     expect(grant.actor).toBe("schedule:content_pipeline");
   });
 
   it("naming another organization inside is refused", async () => {
-    const deps = gateFixture({ balance: 50 }).deps;
+    const deps = gateFixture({ credits: true, balance: 50 }).deps;
     await expect(runForOrg(CUSTOMER.orgId, "schedule:x", () => grantFor("social.rewrite", { orgId: OTHER }), { deps, subjects: store }))
       .rejects.toMatchObject({ code: "not_authorized_for_org" });
   });

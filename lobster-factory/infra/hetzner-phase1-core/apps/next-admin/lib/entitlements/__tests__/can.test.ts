@@ -22,17 +22,43 @@ describe("can() — enforce", () => {
     expect(grant.info.entitlementId).toBe("ent-1");
   });
 
-  it("a credits feature without a row still needs balance", async () => {
-    const funded = gateFixture({ entitlement: null, balance: 50 });
-    expect(await can(CUSTOMER, "social.rewrite", ACTOR, funded.deps)).toMatchObject({ allowed: true, info: { source: "credits" } });
-    expect(funded.findActiveEntitlement).toHaveBeenCalledWith(expect.objectContaining({ featureKey: "social.rewrite" }));
-    const refused = await can(CUSTOMER, "social.rewrite", ACTOR, gateFixture({ entitlement: null, balance: 0 }).deps);
-    expect(refused).toMatchObject({ allowed: false, reason: "no_credits" });
-    // a row for another feature is not this feature's row: the wallet still decides
-    expect(await can(CUSTOMER, "social.rewrite", ACTOR, gateFixture({ balance: 0 }).deps)).toMatchObject({ allowed: false, reason: "no_credits" });
+  it("a wallet alone opens nothing", async () => {
+    // a funded wallet and no row for this feature (the fixture row is social.dispatch): refused, and the wallet is never read
+    const { deps, findActiveEntitlement } = gateFixture({ balance: 500 });
+    expect(await can(CUSTOMER, "social.rewrite", ACTOR, deps)).toMatchObject({ allowed: false, reason: "no_entitlement" });
+    expect(findActiveEntitlement).toHaveBeenCalledWith(expect.objectContaining({ featureKey: "social.rewrite" }));
+    expect(await can(CUSTOMER, "social.rewrite", ACTOR, gateFixture({ entitlement: null, balance: 500 }).deps)).toMatchObject({ allowed: false, reason: "no_entitlement" });
+    // a lapsed row is no row
+    const lapsed = gateFixture({ entitlement: { featureKey: "social.rewrite", source: "comp", endsAt: Math.floor(Date.now() / 1000) - 1 }, balance: 500 });
+    expect(await can(CUSTOMER, "social.rewrite", ACTOR, lapsed.deps)).toMatchObject({ allowed: false, reason: "no_entitlement" });
   });
 
-  it("a credits feature uses an active comp or contract row before the wallet", async () => {
+  it("a contract row on a credits feature spends the wallet", async () => {
+    const funded = gateFixture({ credits: true, balance: 50 });
+    const grant = await can(CUSTOMER, "social.rewrite", ACTOR, funded.deps);
+    expect(grant).toMatchObject({ allowed: true, maxSpend: 50, info: { source: "credits", entitlementId: null } });
+    await grant.report({ units: 3, idempotencyKey: "idem-key-0006" });
+    expect(funded.debit).toHaveBeenCalledWith(expect.objectContaining({ orgId: CUSTOMER.orgId, units: 3 }));
+    expect(await can(CUSTOMER, "social.rewrite", ACTOR, gateFixture({ credits: true, balance: 0 }).deps)).toMatchObject({ allowed: false, reason: "no_credits" });
+  });
+
+  it("a pay marker anywhere but a contract row of a credits-billed feature is refused as bad plan data, never free", async () => {
+    const cases = [
+      { featureKey: "social.dispatch", ask: "social.dispatch", source: "contract" as const, limits: { pay: "credits" } }, // contract-billed feature
+      { featureKey: "social.rewrite", ask: "social.rewrite", source: "comp" as const, limits: { pay: "credits" } },        // a gift that says pay
+      { featureKey: "social.rewrite", ask: "social.rewrite", source: "contract" as const, limits: { pay: "Credits" } },
+      { featureKey: "social.rewrite", ask: "social.rewrite", source: "contract" as const, limits: { pay: true } },
+      { featureKey: "social.rewrite", ask: "social.rewrite", source: "contract" as const, limits: { pay: { mode: "credits" } } },
+    ];
+    for (const c of cases) {
+      const { deps, debit } = gateFixture({ entitlement: { featureKey: c.featureKey, source: c.source, limits: c.limits }, balance: 500 });
+      expect(await can(CUSTOMER, c.ask, ACTOR, deps)).toMatchObject({ allowed: false, reason: "invalid_pay_marker" });
+      expect(debit).not.toHaveBeenCalled();
+    }
+  });
+
+  it("a comp row on a credits feature is free", async () => {
+    // comp and contract rows without pay: credits (gifts, all-features accounts, managed-client contracts) cover the use
     for (const source of ["comp", "contract"] as const) {
       const { deps, debit } = gateFixture({ entitlement: { featureKey: "social.rewrite", source }, balance: 0 });
       const grant = await can(CUSTOMER, "social.rewrite", ACTOR, deps);
@@ -40,19 +66,17 @@ describe("can() — enforce", () => {
       await grant.report({ units: 3, idempotencyKey: "idem-key-0005" });
       expect(debit).not.toHaveBeenCalled();
     }
-    const lapsed = gateFixture({ entitlement: { featureKey: "social.rewrite", source: "comp", endsAt: Math.floor(Date.now() / 1000) - 1 }, balance: 0 });
-    expect(await can(CUSTOMER, "social.rewrite", ACTOR, lapsed.deps)).toMatchObject({ allowed: false, reason: "no_credits" });
   });
 
   it("a credits permit carries source=credits, no entitlement_id and max_spend = min(balance, cap)", async () => {
-    const small = await can(CUSTOMER, "social.rewrite", ACTOR, gateFixture({ balance: 40 }).deps);
+    const small = await can(CUSTOMER, "social.rewrite", ACTOR, gateFixture({ credits: true, balance: 40 }).deps);
     expect(small.info).toMatchObject({ source: "credits", entitlementId: null, maxSpend: 40 });
-    const big = await can(CUSTOMER, "social.rewrite", ACTOR, gateFixture({ balance: 5000 }).deps);
+    const big = await can(CUSTOMER, "social.rewrite", ACTOR, gateFixture({ credits: true, balance: 5000 }).deps);
     expect(big.maxSpend).toBe(100);
   });
 
   it("a staff actor acting for a customer org debits that org and the audit row names the staff user", async () => {
-    const { deps, debit, audit } = gateFixture({ balance: 50 });
+    const { deps, debit, audit } = gateFixture({ credits: true, balance: 50 });
     const grant = await can(CUSTOMER, "social.rewrite", ACTOR, deps);
     await grant.report({ units: 3, idempotencyKey: "idem-key-0001" });
     expect(debit).toHaveBeenCalledWith({ orgId: CUSTOMER.orgId, units: 3, idempotencyKey: "idem-key-0001", featureKey: "social.rewrite" });
@@ -63,7 +87,7 @@ describe("can() — enforce", () => {
     const denied = await can(CUSTOMER, "social.dispatch", ACTOR, gateFixture({ entitlement: null }).deps);
     expect(() => { (denied as never as { info: { allowed: boolean } }).info.allowed = true; }).toThrow(TypeError);
     expect(denied.allowed).toBe(false);
-    const { deps, debit } = gateFixture({ balance: 50 });
+    const { deps, debit } = gateFixture({ credits: true, balance: 50 });
     const grant = await can(CUSTOMER, "social.rewrite", ACTOR, deps);
     expect(() => { (grant.subject as { orgId: string }).orgId = "victim"; }).toThrow(TypeError);
     expect(Object.isFrozen(CUSTOMER)).toBe(false);   // the caller's own object is untouched
@@ -73,7 +97,7 @@ describe("can() — enforce", () => {
 
   it("shadow never debits, even when the verdict allows", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    const { deps, debit } = gateFixture({ mode: "shadow", balance: 50 });
+    const { deps, debit } = gateFixture({ credits: true, mode: "shadow", balance: 50 });
     const grant = await can(CUSTOMER, "social.rewrite", ACTOR, deps);
     expect(grant.allowed).toBe(true);
     await grant.report({ units: 3, idempotencyKey: "idem-key-0005" });
@@ -81,7 +105,7 @@ describe("can() — enforce", () => {
   });
 
   it("a debit needs the caller's idempotency key, and an audit failure after a debit does not throw", async () => {
-    const { deps, debit, audit } = gateFixture({ balance: 50 });
+    const { deps, debit, audit } = gateFixture({ credits: true, balance: 50 });
     const grant = await can(CUSTOMER, "social.rewrite", ACTOR, deps);
     await expect(grant.report({ units: 1 })).rejects.toThrow("idempotency_key_required");
     expect(debit).not.toHaveBeenCalled();
@@ -92,9 +116,9 @@ describe("can() — enforce", () => {
   });
 
   it("refuses spend above max_spend and an unfunded debit", async () => {
-    const grant = await can(CUSTOMER, "social.rewrite", ACTOR, gateFixture({ balance: 10 }).deps);
+    const grant = await can(CUSTOMER, "social.rewrite", ACTOR, gateFixture({ credits: true, balance: 10 }).deps);
     await expect(grant.report({ units: 11 })).rejects.toThrow("exceeds_max_spend");
-    const broke = await can(CUSTOMER, "social.rewrite", ACTOR, gateFixture({ balance: 10, debitAllowed: false }).deps);
+    const broke = await can(CUSTOMER, "social.rewrite", ACTOR, gateFixture({ credits: true, balance: 10, debitAllowed: false }).deps);
     await expect(broke.report({ units: 1, idempotencyKey: "idem-key-0002" })).rejects.toThrow("no_credits");
   });
 
@@ -123,7 +147,7 @@ describe("can() — shadow mode (ADR 017 §4)", () => {
 
   it("a shadow-allowed credits call is never debited", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    const { deps, debit } = gateFixture({ mode: "shadow", balance: 0 });
+    const { deps, debit } = gateFixture({ credits: true, mode: "shadow", balance: 0 });
     const grant = await can(CUSTOMER, "social.rewrite", ACTOR, deps);
     await grant.report({ units: 5 });
     expect(debit).not.toHaveBeenCalled();
@@ -140,7 +164,7 @@ describe("can() — shadow mode (ADR 017 §4)", () => {
 
   it("unreadable signing keys, an audit failure and a failing report never throw to the caller", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    const keys = gateFixture({ mode: "shadow", balance: 5 });
+    const keys = gateFixture({ credits: true, mode: "shadow", balance: 5 });
     keys.deps.publicKeys = () => { throw new Error("entitlement_public_keys_missing"); };
     expect((await can(CUSTOMER, "social.rewrite", ACTOR, keys.deps)).allowed).toBe(true);
     const noAudit = gateFixture({ mode: "shadow", entitlement: null });
@@ -155,7 +179,7 @@ describe("can() — shadow mode (ADR 017 §4)", () => {
     const SELF = `client:${CUSTOMER.orgId}:user-1`;
     expect(await can(CUSTOMER, "social.dispatch", SELF, gateFixture({ mode: "shadow", entitlement: null }).deps)).toMatchObject({ allowed: false, shadow: false, reason: "no_entitlement" });
     expect(await can(CUSTOMER, "social.dispatch", ACTOR, gateFixture({ mode: "shadow", entitlement: null }).deps)).toMatchObject({ allowed: true, shadow: true });
-    const funded = gateFixture({ mode: "shadow", balance: 50 });
+    const funded = gateFixture({ credits: true, mode: "shadow", balance: 50 });
     await (await can(CUSTOMER, "social.rewrite", SELF, funded.deps)).report({ units: 2, idempotencyKey: "idem-key-0009" });
     expect(funded.debit).toHaveBeenCalledWith(expect.objectContaining({ orgId: CUSTOMER.orgId, units: 2 }));
     const storeError = new Error("db down");
@@ -203,12 +227,12 @@ describe("subject resolution (one rule)", () => {
 describe("withFeature / grantFor", () => {
   const store: SubjectStore = { byId: async () => null, bySlug: async () => null, internal: async () => ({ id: INTERNAL.orgId, parent_organization_id: null, kind: "internal" }) };
 
-  it("answers 403 {code: no_credits} in enforce and runs the handler with the grant otherwise", async () => {
+  it("answers 403 {code: no_entitlement} in enforce and runs the handler with the grant otherwise", async () => {
     const handler = vi.fn(async () => new Response("ok"));
     const refused = withFeature("content.title", handler, { deps: gateFixture({ entitlement: null }).deps, subjects: store });
     const res = await refused(new Request("http://localhost/api/content/title", { method: "POST" }));
     expect(res.status).toBe(403);
-    expect(await res.json()).toMatchObject({ code: "no_credits" });
+    expect(await res.json()).toMatchObject({ code: "no_entitlement" });
     expect(handler).not.toHaveBeenCalled();
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const shadow = withFeature("content.title", handler, { deps: gateFixture({ mode: "shadow", entitlement: null }).deps, subjects: store });
@@ -217,7 +241,7 @@ describe("withFeature / grantFor", () => {
   });
 
   it("a library grantFor inside the route reuses the route's grant for the same feature, with no second verdict", async () => {
-    const { deps, findActiveEntitlement } = gateFixture({ balance: 50 });
+    const { deps, findActiveEntitlement } = gateFixture({ credits: true, balance: 50 });
     let inner: unknown;
     const route = withFeature("content.title", async (_req, grant) => { inner = { route: grant, lib: await grantFor("content.title") }; return new Response("ok"); }, { deps, subjects: store });
     await route(new Request("http://localhost/api/content/title", { method: "POST" }));
@@ -232,13 +256,13 @@ describe("withFeature / grantFor", () => {
 
   it("naming an org without AuthorizedOrg is refused when a person is calling; server data with no caller may name it", async () => {
     const customer = { ...store, byId: async () => ({ id: CUSTOMER.orgId, parent_organization_id: null, kind: "customer" as const }) };
-    const deps = gateFixture({ balance: 50 }).deps;
+    const deps = gateFixture({ credits: true, balance: 50 }).deps;
     const staff = new Request("http://localhost/api/x", { headers: { "x-ops-user-kind": "staff", "x-ops-claims-role": "operator" } });
     await expect(grantFor("social.rewrite", { req: staff, orgId: CUSTOMER.orgId, deps, subjects: customer })).rejects.toMatchObject({ code: "not_authorized_for_org" });
     expect((await grantFor("social.rewrite", { orgId: CUSTOMER.orgId, deps, subjects: customer })).subject).toEqual(CUSTOMER);
   });
 
   it("grantFor throws EntitlementRequired when enforce refuses", async () => {
-    await expect(grantFor("content.title", { deps: gateFixture({ entitlement: null }).deps, subjects: store })).rejects.toMatchObject({ code: "no_credits" });
+    await expect(grantFor("content.title", { deps: gateFixture({ entitlement: null }).deps, subjects: store })).rejects.toMatchObject({ code: "no_entitlement" });
   });
 });

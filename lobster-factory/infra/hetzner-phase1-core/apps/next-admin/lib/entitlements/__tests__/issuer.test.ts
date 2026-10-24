@@ -22,8 +22,8 @@ describe("permit issuer for the cognitive service (ADR 017 §3)", () => {
 
   it("no active entitlement means allowed=false with reason no_entitlement, and credits follow the wallet", async () => {
     expect((await issueForService("cognitive", ask({}), gateFixture({ entitlement: null }).deps, root)).body).toEqual({ allowed: false, reason: "no_entitlement" });
-    expect((await issueForService("cognitive", ask({ feature_key: "ai.draft_record" }), gateFixture({ balance: 0 }).deps, root)).body).toEqual({ allowed: false, reason: "no_credits" });
-    expect((await issueForService("cognitive", ask({ feature_key: "ai.draft_record" }), gateFixture({ balance: 5 }).deps, root)).body.allowed).toBe(true);
+    expect((await issueForService("cognitive", ask({ feature_key: "ai.draft_record" }), gateFixture({ credits: true, balance: 0 }).deps, root)).body).toEqual({ allowed: false, reason: "no_credits" });
+    expect((await issueForService("cognitive", ask({ feature_key: "ai.draft_record" }), gateFixture({ credits: true, balance: 5 }).deps, root)).body.allowed).toBe(true);
   });
 
   it("the cognitive token cannot mint another product's feature, a foreign actor form, or a child org", async () => {

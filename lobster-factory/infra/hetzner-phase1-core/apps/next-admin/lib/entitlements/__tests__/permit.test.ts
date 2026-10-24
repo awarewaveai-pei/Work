@@ -80,25 +80,39 @@ describe("can issues only registry-backed, bounded grants", () => {
     expect(await can(binding, deps)).toEqual({ allowed: false, reason: "no_active_entitlement" });
   });
   const creditBinding = { ...binding, feature_key: "social.rewrite" };
-  it.each([20, 5, 2])("credits cap is min(balance %s, single limit), without an entitlement", async (balance) => {
-    const deps = dependencies();
+  // A credit-pack add-on row (ADR 017 #11): the right to use comes from it, the wallet pays per use.
+  const packRow: EntitlementRecord = { ...row, id: "pack-row", featureKey: "social.rewrite", sourceRef: "pack-contract", endsAt: null, limits: { pay: "credits" } };
+  const creditDeps = (changes: Partial<CanDependencies> = {}) => {
+    const deps = dependencies(changes);
+    vi.mocked(deps.store.findActiveEntitlement).mockResolvedValue(packRow);
+    return deps;
+  };
+  it.each([20, 5, 2])("credits cap is min(balance %s, single limit), on a pay-credits row", async (balance) => {
+    const deps = creditDeps();
     vi.mocked(deps.store.getCreditBalance).mockResolvedValue(balance);
     const result = await can(creditBinding, deps);
     expect(result.allowed).toBe(true);
     if (result.allowed === false) throw new Error(result.reason);
     expect(verifyPermit(result.permit, publicKeys, creditBinding, valid.now)).toMatchObject({
-      source: "credits", entitlement_id: null, max_spend: Math.min(balance, 8), expires_at: valid.now + 600,
+      source: "credits", entitlement_id: null, source_ref: "pack-contract", limits: { pay: "credits" }, max_spend: Math.min(balance, 8), expires_at: valid.now + 600,
     });
     expect(deps.store.findActiveEntitlement).toHaveBeenCalledWith(expect.objectContaining({ featureKey: "social.rewrite" }));
   });
-  it.each([1.99, 0, -1, NaN, Infinity])("rejects insufficient or invalid balance %s", async (balance) => {
+  it("a funded wallet with no row for the feature is refused and the wallet is never read", async () => {
     const deps = dependencies();
+    vi.mocked(deps.store.findActiveEntitlement).mockResolvedValue(null);
+    vi.mocked(deps.store.getCreditBalance).mockResolvedValue(1000);
+    expect(await can(creditBinding, deps)).toEqual({ allowed: false, reason: "no_active_entitlement" });
+    expect(deps.store.getCreditBalance).not.toHaveBeenCalled();
+  });
+  it.each([1.99, 0, -1, NaN, Infinity])("rejects insufficient or invalid balance %s", async (balance) => {
+    const deps = creditDeps();
     vi.mocked(deps.store.getCreditBalance).mockResolvedValue(balance);
     expect(await can(creditBinding, deps)).toEqual({ allowed: false, reason: "insufficient_credits" });
   });
   it.each([null, { minimumCharge: 0, singleLimit: 8 }, { minimumCharge: 2, singleLimit: 1 },
     { minimumCharge: 2, singleLimit: Infinity }])("rejects missing or invalid credit policy %#", async (policy) => {
-    const deps = dependencies({ creditPolicy: vi.fn().mockResolvedValue(policy) });
+    const deps = creditDeps({ creditPolicy: vi.fn().mockResolvedValue(policy) });
     expect(await can(creditBinding, deps)).toEqual({ allowed: false, reason: "missing_credit_policy" });
   });
   it.each([{ ...binding, product_key: "unknown" }, { ...binding, feature_key: "unknown" },

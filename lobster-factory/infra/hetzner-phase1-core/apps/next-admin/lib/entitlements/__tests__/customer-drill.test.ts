@@ -15,7 +15,8 @@ afterEach(() => vi.restoreAllMocks());
 // actorFor reads brand member rows for a staff member below owner/admin; the drill has none.
 vi.mock("@/lib/social/store", () => ({ memberRoles: async () => new Map() }));
 
-type Account = { id: string; slug: string; kind: "internal" | "customer"; parent?: string; covers?: { source: "comp" | "contract"; products?: string[] }; wallet?: number };
+// pack = products whose credits features a credit-pack add-on row grants with limits {pay: "credits"} (ADR 017 #11).
+type Account = { id: string; slug: string; kind: "internal" | "customer"; parent?: string; covers?: { source: "comp" | "contract"; products?: string[] }; wallet?: number; pack?: string[] };
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const ACCOUNTS: Record<string, Account> = {
   // prod, 2026-10-23
@@ -26,7 +27,8 @@ const ACCOUNTS: Record<string, Account> = {
   e2e: { id: id(5), slug: "e2e-verify-0704-5c1356", kind: "customer" },
   wptest: { id: id(6), slug: "test-wp-webhook-co-c705c6", kind: "customer" },
   // added for the ways no real account covers
-  creditsBuyer: { id: id(7), slug: "drill-credits", kind: "customer", wallet: 50 },
+  creditsBuyer: { id: id(7), slug: "drill-credits", kind: "customer", wallet: 50, pack: ["content"] },
+  walletOnly: { id: id(10), slug: "drill-wallet-only", kind: "customer", wallet: 500 },
   socialSubscriber: { id: id(8), slug: "drill-social-subscriber", kind: "customer", covers: { source: "contract", products: ["social"] } },
   soulfulBrand: { id: id(9), slug: "drill-soulful-brand", kind: "customer", parent: id(2) },
 };
@@ -38,6 +40,7 @@ const subjects: SubjectStore = {
   internal: async () => row(ACCOUNTS.internal),
 };
 const productOf = new Map(PRODUCTS.flatMap((p) => p.features.map((f) => [f.feature_key, p.key] as const)));
+const creditsFeatures = new Set(PRODUCTS.flatMap((p) => p.features.filter((f) => f.billing === "credits").map((f) => f.feature_key)));
 
 const pair = generateKeyPairSync("ed25519");
 function deps(mode: EntitlementMode) {
@@ -49,6 +52,10 @@ function deps(mode: EntitlementMode) {
       store: {
         async findActiveEntitlement({ organizationId, productKey, featureKey }): Promise<EntitlementRecord | null> {
           const a = byId.get(organizationId);
+          if (a?.pack?.includes(productKey) && creditsFeatures.has(featureKey)) {
+            return { id: `ent-${a.slug}-${featureKey}`, organizationId, productKey, featureKey, source: "contract",
+              sourceRef: `pack:${a.slug}`, startsAt: now - 60, endsAt: null, status: "active", limits: { pay: "credits" } };
+          }
           if (!a?.covers || (a.covers.products && !a.covers.products.includes(productKey))) return null;
           return { id: `ent-${a.slug}-${featureKey}`, organizationId, productKey, featureKey, source: a.covers.source,
             sourceRef: `all-features:${a.slug}`, startsAt: now - 60, endsAt: null, status: "active", limits: {} };
@@ -149,9 +156,9 @@ describe("drill: our accounts on the three axes", () => {
 
   it("訂閱待付款 mongolia-03 (no rows, no wallet): the customer is refused; staff work is allowed in shadow but audited, refused in enforce", async () => {
     expect((await ask(ACCOUNTS.mongolia, "social.dispatch", client(ACCOUNTS.mongolia))).grant).toMatchObject({ allowed: false, reason: "no_entitlement" });
-    expect((await ask(ACCOUNTS.mongolia, "tarot.image", client(ACCOUNTS.mongolia))).grant).toMatchObject({ allowed: false, reason: "no_credits" });
+    expect((await ask(ACCOUNTS.mongolia, "tarot.image", client(ACCOUNTS.mongolia))).grant).toMatchObject({ allowed: false, reason: "no_entitlement" });
     const shadow = await ask(ACCOUNTS.mongolia, "tarot.image", staff, "shadow");
-    expect(shadow.grant).toMatchObject({ allowed: true, shadow: true, reason: "no_credits" });
+    expect(shadow.grant).toMatchObject({ allowed: true, shadow: true, reason: "no_entitlement" });
     expect(shadow.audit).toHaveBeenCalledWith(expect.objectContaining({ event: "entitlement.would_deny", featureKey: "tarot.image" }));
     expect((await ask(ACCOUNTS.mongolia, "tarot.image", staff, "enforce")).grant.allowed).toBe(false);
   });
@@ -162,19 +169,27 @@ describe("drill: our accounts on the three axes", () => {
     }
   });
 
-  it("點數 drill-credits (added; hosted / credits / customer): the wallet answers credits features, never contract ones", async () => {
+  it("點數 drill-credits (added; credit-pack add-on row for content + wallet 50): the wallet pays only for the features the pack grants", async () => {
     const r = await ask(ACCOUNTS.creditsBuyer, "content.title", client(ACCOUNTS.creditsBuyer));
     expect(r.grant).toMatchObject({ allowed: true, maxSpend: 50, info: { source: "credits", entitlementId: null } });
     await r.grant.recordUse({ provider: "anthropic" });
     expect(r.debit).not.toHaveBeenCalled(); // units stay 0 until the operator sets per-feature prices
     expect((await ask(ACCOUNTS.creditsBuyer, "social.dispatch", client(ACCOUNTS.creditsBuyer))).grant).toMatchObject({ allowed: false, reason: "no_entitlement" });
+    // a credits feature of a product the pack does not cover: the wallet does not open it
+    expect((await ask(ACCOUNTS.creditsBuyer, "tarot.image", client(ACCOUNTS.creditsBuyer))).grant).toMatchObject({ allowed: false, reason: "no_entitlement" });
+  });
+
+  it("點數 drill-wallet-only (added; wallet 500, no rows): a wallet alone opens nothing", async () => {
+    for (const feature of ["content.title", "tarot.image", "social.dispatch"]) {
+      expect((await ask(ACCOUNTS.walletOnly, feature, client(ACCOUNTS.walletOnly))).grant).toMatchObject({ allowed: false, reason: "no_entitlement" });
+    }
   });
 
   it("訂閱 one product drill-social-subscriber (added; contract rows for social only): social works, other products do not", async () => {
     const who = client(ACCOUNTS.socialSubscriber);
     expect((await ask(ACCOUNTS.socialSubscriber, "social.dispatch", who)).grant).toMatchObject({ allowed: true, info: { source: "contract" } });
     expect((await ask(ACCOUNTS.socialSubscriber, "social.rewrite", who)).grant).toMatchObject({ allowed: true, info: { source: "contract" } });
-    expect((await ask(ACCOUNTS.socialSubscriber, "tarot.image", who)).grant).toMatchObject({ allowed: false, reason: "no_credits" });
+    expect((await ask(ACCOUNTS.socialSubscriber, "tarot.image", who)).grant).toMatchObject({ allowed: false, reason: "no_entitlement" });
   });
 
   it.todo("賣斷 (self_hosted / perpetual / customer): licence file and offline verification are not built (ADR 017 order 5)");

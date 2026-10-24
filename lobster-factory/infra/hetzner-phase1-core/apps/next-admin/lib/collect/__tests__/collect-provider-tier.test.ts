@@ -97,7 +97,7 @@ describe("createProviderCall", () => {
 
   it("a paid vendor is never called without an allowed collect.fetch grant (ADR 017 §4)", async () => {
     const transport = vi.fn(async () => firecrawlResponse("x"));
-    const refused = await can(CUSTOMER, "collect.fetch", "system", gateFixture({ balance: 0 }).deps);
+    const refused = await can(CUSTOMER, "collect.fetch", "system", gateFixture({ credits: true, balance: 0 }).deps);
     for (const grant of [null, refused]) {
       const call = createProviderCall({ grant, budget: createBudget(), env, transport: transport as unknown as typeof fetch });
       await expect(call("firecrawl", { path: "/v1/scrape", body: { url: "https://shop.example.com/" } }))

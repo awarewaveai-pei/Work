@@ -37,23 +37,32 @@ export async function issuePermit(request: PermitBinding, deps: CanDependencies)
   const now = deps.now?.() ?? Math.floor(Date.now() / 1000);
   let details: Pick<PermitPayload, "source" | "source_ref" | "entitlement_id" | "limits" | "max_spend">;
   let expiresAt = now + 600;
-  // Who pays is per account x feature (ADR 017 §0): an active comp/contract row wins for every feature, credits
-  // included, and never debits (report() debits only source=credits); the wallet answers only when no row does.
+  // The right to use a feature always comes from one active row (ADR 017 product decision #11, operator 2026-10-25):
+  // a wallet alone opens nothing, the same rule as the door (lib/portal/door-access.ts). The row also says who pays:
+  // by default its comp or contract covers the use (never debits); a row whose limits say `pay: "credits"` (the
+  // add-on plan a credit pack grants) spends the wallet per use, only on a feature the registry bills in credits.
+  // Opt-in on the row, not "every contract row on a credits feature": all-features contracts (0118, managed clients)
+  // cover their use and must not start debiting when enforce is switched on.
   const found = await deps.store.findActiveEntitlement({ organizationId: request.tenant, productKey: request.product_key, featureKey: request.feature_key, now });
   const row = found && found.status === "active" && found.organizationId === request.tenant && found.productKey === request.product_key && found.featureKey === request.feature_key
     && Number.isFinite(found.startsAt) && found.startsAt <= now && (found.endsAt === null || (Number.isFinite(found.endsAt) && Math.floor(found.endsAt) > now)) ? found : null;
-  if (row) {
-    // Do not let a cached permit extend an entitlement's own deadline.
-    expiresAt = Math.min(expiresAt, row.endsAt === null ? expiresAt : Math.floor(row.endsAt));
-    details = { source: row.source, source_ref: row.sourceRef, entitlement_id: row.id, limits: row.limits, max_spend: null };
-  } else if (feature.billing === "credits") {
+  if (!row) return deny("no_active_entitlement");
+  // Do not let a cached permit extend an entitlement's own deadline.
+  expiresAt = Math.min(expiresAt, row.endsAt === null ? expiresAt : Math.floor(row.endsAt));
+  // `pay` is a marker only plan data writes: any value other than "credits", or "credits" on a comp row or on a
+  // contract-billed feature, is a plan mistake -- refused, never read as free use (critic 2026-10-25 M/L).
+  if (row.limits.pay !== undefined && (row.limits.pay !== "credits" || row.source !== "contract" || feature.billing !== "credits")) {
+    return deny("invalid_pay_marker");
+  }
+  if (row.limits.pay === "credits") {
     const policy = await deps.creditPolicy?.(request.product_key, request.feature_key);
     if (!policy || !Number.isFinite(policy.minimumCharge) || policy.minimumCharge <= 0 || !Number.isFinite(policy.singleLimit) || policy.singleLimit < policy.minimumCharge) return deny("missing_credit_policy");
     const balance = await deps.store.getCreditBalance(request.tenant);
     if (!Number.isFinite(balance) || balance < policy.minimumCharge) return deny("insufficient_credits");
-    details = { source: "credits", source_ref: null, entitlement_id: null, limits: {}, max_spend: Math.min(balance, policy.singleLimit) };
+    // Permit format: a credits grant names no entitlement_id (permit.ts); the row's contract travels in source_ref.
+    details = { source: "credits", source_ref: row.sourceRef, entitlement_id: null, limits: row.limits, max_spend: Math.min(balance, policy.singleLimit) };
   } else {
-    return deny("no_active_entitlement");
+    details = { source: row.source, source_ref: row.sourceRef, entitlement_id: row.id, limits: row.limits, max_spend: null };
   }
   const payload: PermitPayload = { ...request, ...details, format_version: 1, issued_at: now, expires_at: expiresAt, kid: deps.key.kid };
   return { allowed: true, payload, permit: signPermit(payload, deps.key.privateKey) };

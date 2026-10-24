@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-25（續8）ADR 017 4b-5：點數只付已持有功能——只有錢包打不開任何功能；列上明示 pay: credits 才扣錢包（Claude）
+
+- **任務**：操作者 2026-10-25 待決 5 選 A，接著做 4b-5。
+- **不變量**：①功能的使用權永遠來自一張有效列，只有錢包一律拒（與門 `lib/portal/door-access.ts` 同一條）；②誰付錢由列說：預設已含（不扣），列的 limits `pay: "credits"` 且登記表 `billing: credits` 才按次扣；③`pay` 標記放錯地方＝方案資料錯，拒絕（不當成免費）；④同一功能有多列時，已含的列優先於點數包列。
+- **與決定字面不同處**：照字面「contract 列＋點數功能就扣錢包」會讓 0118 全功能合約（Soulful 代操）在翻 enforce 後開始扣點；改為列上明示，突變證明（「所有 contract 列都扣」→ Soulful 演練紅）。
+- **做了什麼**（next-admin 相對路徑）：`lib/entitlements/can.ts` `issuePermit`（刪「沒列看錢包」分支、加 `pay` 標記規則與 `invalid_pay_marker`；permit 格式不變，credits 的合約放 `source_ref`）；`lib/entitlements/tables.ts` `pickEntitlementRow`（最多讀 20 列，已含的優先）；測試 `can`／`permit`／`customer-drill`（加 drill-wallet-only、點數包只開包內產品）／`pick-row`（新）／`gate-fixtures`（`credits: true`＝點數包列，只給點數功能）／`features`／`issuer`／`run-for-org`／`lib/ai gateway`／`lib/collect` grant fixture；拒絕原因 `no_credits`→`no_entitlement` 處照新規則改（UI 未對應這兩個碼）。
+- **外掛**：已告知 4b-2 session：有 `_awarewave_plan_key` 的點數包每次購買另送 `subscription_paid`（期末＋1090 天）；沒設方案的點數包寫訂單備註。
+- **文件**：ADR 017 #11、卡 step-4 4b-5「實作差異」、step-3 卡驗收名稱指向、監工台第 3 項完成條件與兩列點數演練；TASKS／監工台新增待決 6（點數包使用權期限，critic M）。
+- **critic**：第一輪 warn（H：沒有資料寫 pay——prod 唯讀查 ledger 0、有餘額錢包 0、plans 0、帶 pay 的列 0，翻 enforce／今晚部署不影響任何帳戶；M 使用權會過期點數不會→待決 6；M 最舊列決定誰付→已含列優先；M pay 在合約功能上變免費→改拒；L comp 列帶 pay→改拒；L 認知平台從不扣點→既有，記此）。第二輪 warn：M 帶錯誤 pay 值的列會被選中而擋掉有效列→選列改三級排序（已含＞有效點數包＞錯誤標記），突變 1 紅；L limit(20) 實務上最多 2 列（0120／0118 不變量）；L 客戶本人本來就一律強制，無錢包用戶即刻被拒——prod 0 錢包，無影響。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib app（381 files，3317 passed） | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit（本次檔案 0 error） | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變 4 個：恢復「只有錢包放行」（4 紅）、「所有 contract 列都扣」（4 紅含 Soulful）、拿掉 pay 標記檢查（1 紅）、選列改回最舊（1 紅）、選列不分有效與錯誤標記（1 紅）；還原綠 | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql 唯讀：media_credit_ledger 0 列、有餘額錢包 0、plans 0、organization_entitlements 帶 pay 0 | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/4n（兩輪；第一輪 1H 經 prod 查證無實際影響；其餘已修或列待決 6）
+- ORACLE_WAIVED: 本機 Codex 模型設定不被帳號支援（codex-oracle 前次四度無輸出）；以兩輪 critic＋4 個突變代替。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=no_credits|insufficient_credits|getCreditBalance|findActiveEntitlement | hits=61
+- **剩餘風險**：待決 6 未定前，點數包使用權 1090 天後到期；認知平台（Python）拿到 credits 許可也不扣點（既有）。
+- **rollback**：`git revert <本 commit>`（資料不動）。
 ## 2026-10-25（續7）Codex 改回能用的模型（gpt-6-astra）；補跑 103852367 的審查，兩輪共 11 個發現全部修好；圖片花費改成只在 generateTarotImage 記一次（Claude）
 
 **觸發**：操作者「查一下 ChatGPT 帳號的 Codex 支援哪些模型，挑一個能用的改回 ~/.codex/config.toml，再補跑這次的 Codex 審查。」

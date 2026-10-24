@@ -12,7 +12,7 @@ describe("provider gateway", () => {
 
   it("refuses a denied grant and loads the SDK for an allowed one", async () => {
     const denied = await can(CUSTOMER, "content.title", "ops:operator:u", gateFixture({ entitlement: null }).deps);
-    await expect(loadAnthropic(denied)).rejects.toMatchObject({ code: "no_credits" });
+    await expect(loadAnthropic(denied)).rejects.toMatchObject({ code: "no_entitlement" });
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const allowed = await can(INTERNAL, "ops.inbox-ai", "system", gateFixture().deps);
     expect(typeof (await loadAnthropic(allowed))).toBe("function");
@@ -20,7 +20,7 @@ describe("provider gateway", () => {
 
   it("a grant reaching any paid seam records one usage row however often it is used, and never debits", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    const { deps, audit, debit } = gateFixture({ entitlement: null, balance: 50 });
+    const { deps, audit, debit } = gateFixture({ credits: true, balance: 50 });
     const usage = () => audit.mock.calls.filter(([e]) => e.event === "entitlement.usage");
     const grant = await can(CUSTOMER, "content.title", "client:c:u", deps);
     await loadAnthropic(grant);

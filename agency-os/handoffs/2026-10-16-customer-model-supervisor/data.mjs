@@ -62,7 +62,8 @@ export const DRILL = [
   { way: '自用', who: 'edd-research（你的研究，贈送）', axes: 'hosted／comp／staff 或 customer', result: '全產品免費可用。' },
   { way: '訂閱', who: 'mongolia-03（等刷卡）', axes: 'hosted／（尚無）／customer', result: '客戶本人全部拒絕；員工替它做在影子模式放行但記「若強制就拒」，強制後拒絕。' },
   { way: '訂閱', who: 'e2e-verify-0704、test-wp-webhook-co（測試）', axes: 'hosted／（尚無）／customer', result: '同未付款客戶，全部拒絕。' },
-  { way: '點數', who: 'drill-credits（加的，錢包 50 點）', axes: 'hosted／credits／customer', result: '點數功能用錢包放行（單次上限 50）；合約功能拒絕；目前不扣點（單價待你定）。' },
+  { way: '點數', who: 'drill-credits（加的，content 點數包加購列＋錢包 50 點）', axes: 'hosted／credits／customer', result: '包含的點數功能用錢包付（單次上限 50）；包以外的功能與合約功能拒絕；目前不扣點（單價待你定）。' },
+  { way: '點數', who: 'drill-wallet-only（加的，只有錢包 500 點、沒有列）', axes: 'hosted／credits／customer', result: '全部拒絕：只有錢包打不開任何功能（2026-10-25 決定 A）。' },
   { way: '訂閱', who: 'drill-social-subscriber（加的，只訂社群）', axes: 'hosted／contract／customer', result: '社群可用，其他產品拒絕。' },
   { way: '賣人＝買斷', who: '（未建）', axes: 'self_hosted／perpetual／customer', result: '授權檔與離線驗章還沒做（順序 5），演練標為待建。' },
 ];
@@ -127,9 +128,9 @@ export const STEPS = [
   { n: 2, card: 'cards/step-2.md', plain: '資料庫記錄誰購買哪個方案、何時到期，以及哪位員工替哪位客戶操作。', title: 'Migration：plans、organization_entitlements、organizations.kind；許可帶 actor', what: '三表只給控制面；0062 加 plan_key、source_ref、放寬 CHECK；organizations.kind internal／customer（Account#0 → internal）；控制面簽功能級許可，欄位含 actor、on_behalf_of。',
     files: ['lobster-factory/packages/db/migrations/', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/'], gate: '靜態檢查：付費 AI 的 SDK 與錢包帳本只准在 lib/entitlements/** 與 lib/ai/gateway.ts 引用；三張權利表只准在 lib/entitlements/** 與 app/portal/**；WordPress／Woo／Fluent 符號只准在各自接頭檔；其他位置出現就建置失敗', risk: 'Medium', model: 'Opus 5.5（先出計畫）', depends: [1], status: 'done', commit: 'ee3e7bde5' },
   { n: 3, card: 'cards/step-3.md', plain: '每項收費功能執行前都先確認權限；未購買時按鈕顯示停用。', title: '每個收費點只問 can(主體, feature_key, actor)', what: '社群、collect、認知平台的收費按鈕與 API 呼叫前問一次；認知平台 check_entitlement 改成 can() 薄接頭（加 actor、回 grant 物件），呼叫端 main.py 9 處同 commit。',
-    files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/can.ts', 'Projects/internal/cognitive-engineering-os/ai_lego/platform/entitlement/check.py', 'Projects/internal/cognitive-engineering-os/ai_lego/apps/api/main.py'], gate: '測試：點數功能沒有權利列時看餘額，餘額 0 即拒（有 comp／contract 列先用列，2026-10-23）；代操時從 on_behalf_of 扣點，稽核記 actor；沒有 active 權利列不簽許可；沒有登記列的產品拿不到 grant', risk: 'Medium', model: 'Opus 5.5', depends: [2], status: 'done', commit: 'e87de9225' },
+    files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/can.ts', 'Projects/internal/cognitive-engineering-os/ai_lego/platform/entitlement/check.py', 'Projects/internal/cognitive-engineering-os/ai_lego/apps/api/main.py'], gate: '測試：功能一定要有權利列，只有錢包一律拒；列寫 pay: credits 的點數功能才扣錢包、餘額不足即拒（2026-10-25 改，4b-5）；代操時從 on_behalf_of 扣點，稽核記 actor；沒有 active 權利列不簽許可；沒有登記列的產品拿不到 grant', risk: 'Medium', model: 'Opus 5.5', depends: [2], status: 'done', commit: 'e87de9225' },
   { n: 4, card: 'cards/step-4.md', plain: '客戶在 aware-wave.com 付款後，系統自動開通，不需人工處理。', title: 'Woo 付款通知 → 合約與權利；帳本泛化', what: 'Woo 原生 webhook（六種事件含退款與拒付）→ 收件表去重 → 同一交易寫合約、權利、帳本；media_ 帳本去前綴加 product_key（ADR 015 §4）。',
-    files: ['lobster-factory/packages/db/migrations/0120_payment_events.sql', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/payments/', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/contracts.ts', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/payments/', 'lobster-factory/packages/wp-bridge-plugin/'], gate: '測試：同一 event_id 重送不做事；退款只退未用點數；拒付凍結；假簽章 401', risk: 'High（金流）', model: 'Opus 5.5', depends: [3], status: 'in_progress', before: '扣款方式、點數條款、點數規則三題已定（2026-10-25，都選 A，寫進 ADR 017 產品決定 #3、#11 與 ADR 015 §待查）',
+    files: ['lobster-factory/packages/db/migrations/0120_payment_events.sql', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/payments/', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/contracts.ts', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/payments/', 'lobster-factory/packages/wp-bridge-plugin/'], gate: '測試：同一 event_id 重送不做事；退款只退未用點數；拒付凍結；假簽章 401', risk: 'High（金流）', model: 'Opus 5.5', depends: [3], status: 'in_progress', before: '扣款方式、點數條款、點數規則三題已定（2026-10-25，都選 A，寫進 ADR 017 產品決定 #3、#11 與 ADR 015 §待查）；點數包使用權期限（待決 6）',
     items: [
       { id: '4a', plain: '人工付款入口：收件表、合約與權利同一交易、錢包入帳、/ops/billing', status: 'done', commit: 'f2139d35a' },
       { id: '4b-1', plain: 'WordPress 會員對應計費帳戶（0124 customer_identities，已套 prod 2026-10-25）', status: 'done', commit: '0eb785f1c' },
@@ -152,6 +153,11 @@ export const STEPS = [
 export const OPEN = [
   { n: 2, what: '買斷交付前請律師確認授權：Postiz（AGPL-3.0）、MinIO（AGPLv3，Trigger 內含）、Redis（Trigger 與核心用浮動 7-alpine，7.4 起授權改為 RSALv2／SSPL）。', before: 5, src: 'ADR 017 §5' },
   { n: 4, what: '客戶白牌網址的憑證走 Cloudflare for SaaS（客戶 CNAME 到 AwareWave）還是主機上自動簽發（on-demand ACME）？', before: 9, src: 'ADR 018 §2' },
+  { n: 6, what: '點數包帶的使用權多久：點數不會過期，但點數包的使用權有期末（目前購買日＋1090 天，再買就延長）。超過 3 年沒再買，剩下的點數就用不了、卻還記在合約負債。目前 prod 沒有任何錢包，現在不會發生。', before: 4, src: 'critic 2026-10-25（4b-5）', detail: '選項細節：TASKS 待決 6', options: [
+    { k: 'A', pick: true, t: '使用權不設期末：點數包的加購方案由點數包事件寫成沒有期末的列，點數用完前一直能用（要改 0120 的付款函式，migration High）' },
+    { k: 'B', t: '維持購買日＋1090 天，再買就延長；到期前 30 天寄信提醒' },
+    { k: 'C', t: '使用權到期時剩餘點數照比例退款：違反「點數不退」' },
+  ] },
 ];
 
 // 要一起改但不是順序步驟的
