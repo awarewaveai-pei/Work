@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-24（續22）next-admin 部署 655283785（他 session：doors 資料範圍 21e7da50b、social 單一寫手 30b6a022f）（Claude）
+
+**觸發**：操作者「要」——把 706e41f57 之後他 session 已推 main 的 next-admin commit 提前上線。無 DEPLOY_HOLD；部署前 lobster-redis／soulful-redis／node-api 皆 healthy。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin（snapshot lobster-phase1-next-admin:rollback-20261024-061914；healthy after 10s；smoke all endpoints OK；deployed commit 655283785） | exit=0 | ms=330000
+- `git merge-base --is-ancestor` 21e7da50b、30b6a022f 皆含於 655283785；next-admin／lobster-redis healthy 且 init=true。
+- 正式站 5 頁（/、/tools/theme、/tools/social、/tools/content、/ops/costs）200 且 `<html style>` 帶主題。Playwright smoke 26 passed／0 failed／6 skipped。
+- REVIEW_WAIVED: NA -- 部署動作無程式改動；各 commit 審查見其 WORKLOG 條目
+- BUGHUNT_WAIVED: NA -- 部署動作無程式改動
+
+**rollback**：snapshot `lobster-phase1-next-admin:rollback-20261024-061914` 或 `sg-deploy.sh` 回 706e41f57（`DEPLOY_ROLLBACK_RUNBOOK.md` §2.1）。
 ## 2026-10-24（續21）門前路由授權：presets／content 路由補租戶與員工閘、客戶不得寫站別網址、brand-voice SSRF 走固定位址抓取、閘 5 要求「讀 DB 的路由自己 import 並呼叫授權函式」（Claude）
 
 **觸發**：主線 session 派工（第 8 項附卡 `agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-8-doors-video-design-content.md` §4.5 D-R1、§5.5 C-R1…C-R6、§2 P2；決策 D2）。video 門 `dependsOn:["content"]` 會連帶開放全部 `/api/content/*`，所以要在 video／design／content 門頁蓋好前關掉。
