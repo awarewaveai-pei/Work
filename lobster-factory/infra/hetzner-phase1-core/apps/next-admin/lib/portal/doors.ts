@@ -28,7 +28,9 @@ export function nextAdminProducts(): NextAdminProduct[] {
   return PRODUCTS.filter((p): p is NextAdminProduct => p.door.app === "next-admin");
 }
 
-/** Registration reserves a host before page/DNS/nginx rollout. Legacy doors predate this field. */
+/** Registration reserves a host before page/DNS/nginx rollout. Legacy doors predate this field. A built but closed door's
+ *  page still renders on the staff host: that is the staff preview before go-live; a customer there gets only /portal
+ *  (middleware.ts isClientOutsideDoor). */
 export function servedNextAdminProducts(): NextAdminProduct[] {
   return nextAdminProducts().filter((p) => p.door.enabled !== false);
 }

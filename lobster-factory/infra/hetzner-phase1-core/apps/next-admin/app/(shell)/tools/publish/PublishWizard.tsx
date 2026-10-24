@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { APPAREL_PRINT_DESTINATIONS } from "@/lib/studio/apparel-print-destinations";
 import { POD_PRODUCT_MODELS, podModelById } from "@/lib/studio/pod-catalog-config";
+import { bucketDownloadHref } from "@/lib/storage/download-href";
 import { SeoCheckPanel } from "@/app/(shell)/tools/content/SeoCheckPanel";
 import type { RankMathReport, RankMathCheck } from "@/lib/seo/rankmath-checker";
 
@@ -45,12 +46,6 @@ const hasUsablePfMap = (vmap?: VariantMapEntry[]): boolean =>
   vmap.length > 0 &&
   vmap.every((m) => typeof m?.sku === "string" && m.sku.length > 0 && typeof m?.price === "string" && PF_PRICE_RE.test(m.price));
 
-// Build a SAME-ORIGIN download URL for a My Designs asset. The R2 bucket is cross-origin, so an
-// <a download> straight to the R2 URL is ignored by browsers (opens a tab instead of downloading).
-// Routing through /api/tools/publish/download re-streams the same public bytes with a
-// `Content-Disposition: attachment` header → a real one-click download (see that route's comment).
-const downloadHref = (url: string, filename: string): string =>
-  `/api/tools/publish/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;
 
 // Suggested retail = 2× wholesale cost (≈50% gross margin), rounded down to a .99 charm price.
 // A starting point the operator can override — NOT a hard rule (shipping/fees are separate).
@@ -1168,9 +1163,9 @@ export default function PublishWizard() {
           </button>
           {upscale.printFileUrl ? (
             <>
-              <a href={downloadHref(upscale.printFileUrl, `${printFileSlug}-print.png`)} download style={{ fontSize: 12, fontWeight: 600 }}>⬇ 下載 PNG（300DPI）</a>
+              <a href={bucketDownloadHref(upscale.printFileUrl, `${printFileSlug}-print.png`)} download style={{ fontSize: 12, fontWeight: 600 }}>⬇ 下載 PNG（300DPI）</a>
               {upscale.printFilePdfUrl ? (
-                <a href={downloadHref(upscale.printFilePdfUrl, `${printFileSlug}-print.pdf`)} download style={{ fontSize: 12, fontWeight: 600 }}>⬇ 下載 PDF（300DPI）</a>
+                <a href={bucketDownloadHref(upscale.printFilePdfUrl, `${printFileSlug}-print.pdf`)} download style={{ fontSize: 12, fontWeight: 600 }}>⬇ 下載 PDF（300DPI）</a>
               ) : null}
               <span style={{ fontSize: 12, color: upscale.meetsTarget ? "var(--green)" : "var(--yellow)" }}>
                 {upscale.achievedPx ? `${upscale.achievedPx}px` : "尺寸未知"}
@@ -1192,13 +1187,13 @@ export default function PublishWizard() {
               🇹🇼 {APPAREL_PRINT_DESTINATIONS["tw-local"].note}{" "}
               {/* Same-origin proxy adds Content-Disposition: attachment → a real one-click download
                   (the cross-origin R2 URL would otherwise just open a tab). */}
-              <a href={downloadHref(upscale.printFileUrl, `${printFileSlug}-print.png`)} download style={{ fontWeight: 600 }}>
+              <a href={bucketDownloadHref(upscale.printFileUrl, `${printFileSlug}-print.png`)} download style={{ fontWeight: 600 }}>
                 ⬇ PNG
               </a>
               {upscale.printFilePdfUrl ? (
                 <>
                   {" · "}
-                  <a href={downloadHref(upscale.printFilePdfUrl, `${printFileSlug}-print.pdf`)} download style={{ fontWeight: 600 }}>
+                  <a href={bucketDownloadHref(upscale.printFilePdfUrl, `${printFileSlug}-print.pdf`)} download style={{ fontWeight: 600 }}>
                     ⬇ PDF
                   </a>
                 </>

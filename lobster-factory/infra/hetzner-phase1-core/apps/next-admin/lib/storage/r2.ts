@@ -54,8 +54,16 @@ export function getDesignsPublicBase(): string {
  * the parsed origin is https with the exact bucket host. Mirrors the guard in lib/tarot/image-gen.ts.
  */
 export function isDesignsAsset(url: unknown): url is string {
-  if (typeof url !== "string") return false;
-  const base = getDesignsPublicBase();
+  return isUnderBase(url, getDesignsPublicBase());
+}
+
+/** True iff `url` is a public object of the designs bucket or the video bucket (R2_VIDEO_PUBLIC_BASE), same guard. */
+export function isPublicBucketAsset(url: unknown): url is string {
+  return isDesignsAsset(url) || isUnderBase(url, (process.env.R2_VIDEO_PUBLIC_BASE ?? "").replace(/\/+$/, ""));
+}
+
+function isUnderBase(url: unknown, base: string): url is string {
+  if (typeof url !== "string" || !base) return false;
   if (!url.startsWith(base + "/")) return false;
   try {
     const u = new URL(url);

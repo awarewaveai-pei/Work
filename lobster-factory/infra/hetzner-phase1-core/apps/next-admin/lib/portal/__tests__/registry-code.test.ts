@@ -270,6 +270,7 @@ describe("registry claims match the code", () => {
   const ORG_FREE_ROUTES: Readonly<Record<string, string>> = {
     "app/api/tools/events/upcoming/route.ts": "shared holiday table `events`, no organization column",
     "app/api/tools/studio/proxy-image/route.ts": "streams only public designs-bucket objects (exact-host allowlist)",
+    "app/api/tools/designs/download/route.ts": "streams only public designs- and video-bucket objects as a download (exact-host allowlist); no database",
     "app/api/tools/studio/mockup/route.ts": "Printful mockup (free) from the request image and the public catalog; uploads that image to the shared public designs bucket and shares the Printful store quota",
     "app/api/content/seo-check/route.ts": "scores the article in the request body (lib/content/quality/seo-check-core.ts); no database, no stored data",
     "app/api/content/brand-voice/route.ts": "analyses the pasted sample, or a page fetched through lib/collect/net/remote-file (no internal host); stores nothing",

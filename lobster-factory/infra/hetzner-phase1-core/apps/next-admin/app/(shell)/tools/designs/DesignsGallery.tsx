@@ -11,7 +11,8 @@ import {
   type EdgeMaskId,
 } from "@/lib/studio/edge-mask";
 import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
-import { useDoorHref, useOnDoor } from "@/app/DoorContext";
+import { useDoorHref } from "@/app/DoorContext";
+import { bucketDownloadHref } from "@/lib/storage/download-href";
 
 interface AssetMetadata {
   prompt?: string | null;
@@ -258,7 +259,6 @@ function Chips({
 export default function DesignsGallery() {
   const canvasHref = useDoorHref(CANVAS_STAFF_HREF);
   const publishHref = useDoorHref("/tools/publish");
-  const onDoor = useOnDoor();
   /* ── tab ── */
   const [activeTab, setActiveTab] = useState<ActiveTab>("designs");
 
@@ -480,7 +480,7 @@ export default function DesignsGallery() {
 
 
   /* Single-image download — fetch through the SAME-ORIGIN download proxy
-     (/api/tools/publish/download, Content-Disposition: attachment, isDesignsAsset-allowlisted) instead
+     (bucketDownloadHref: Content-Disposition: attachment, bucket-host allowlisted) instead
      of the cross-origin R2 URL: a same-origin fetch can't be blocked by R2 CORS, which was the cause of
      the "opened a tab, had to 右鍵另存" complaint. Gallery images are small, so a blob save is fine.
      Still falls back to opening a tab if even the proxy fails. */
@@ -489,12 +489,7 @@ export default function DesignsGallery() {
     setDownloadingId(asset.id);
     const filename = `${designBaseName(asset)}.${assetExtension(asset)}`;
     try {
-      // Staff: publish's download proxy (any asset type). A door does not serve publish (staff-only, decision D1): there
-      // studio's designs-bucket image proxy does it; the blob is saved under `filename` here either way.
-      const href = onDoor
-        ? `/api/tools/studio/proxy-image?url=${encodeURIComponent(asset.object_url)}`
-        : `/api/tools/publish/download?url=${encodeURIComponent(asset.object_url)}&filename=${encodeURIComponent(filename)}`;
-      const res = await fetch(href, { cache: "no-store" });
+      const res = await fetch(bucketDownloadHref(asset.object_url, filename), { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();
       downloadBlob(blob, filename);
@@ -505,7 +500,7 @@ export default function DesignsGallery() {
     } finally {
       setDownloadingId(null);
     }
-  }, [onDoor]);
+  }, []);
 
   const toggleExpanded = useCallback((id: string) => {
     setExpandedIds((prev) => {
@@ -691,7 +686,7 @@ export default function DesignsGallery() {
 
       for (const [index, asset] of selected.entries()) {
         try {
-          const res = await fetch(asset.object_url!, { cache: "no-store" });
+          const res = await fetch(bucketDownloadHref(asset.object_url!), { cache: "no-store" });
           if (!res.ok) {
             failed++;
             continue;
@@ -768,7 +763,7 @@ export default function DesignsGallery() {
     if (!video.object_url) return;
     setVideoDownloadingId(video.id);
     try {
-      const res = await fetch(video.object_url, { cache: "no-store" });
+      const res = await fetch(bucketDownloadHref(video.object_url), { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();
       const ext = video.object_key.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? "mp4";
@@ -816,7 +811,7 @@ export default function DesignsGallery() {
       const usedVideoNames = new Set<string>();
       for (const v of selected) {
         try {
-          const res = await fetch(v.object_url!, { cache: "no-store" });
+          const res = await fetch(bucketDownloadHref(v.object_url!), { cache: "no-store" });
           if (!res.ok) { failed++; continue; }
           const blob = await res.blob();
           const ext = v.object_key.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? "mp4";

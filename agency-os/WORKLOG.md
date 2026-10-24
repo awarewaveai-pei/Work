@@ -1,4 +1,31 @@
 # Worklog
+## 2026-10-24（續33）My Designs 所有下載改走同一支同源下載路由，每扇門都能用（影片也能存檔）；下載卡住不再永遠掛著（Claude）
+
+**觸發**：操作者問「為什麼不去處理好」，指的是上一筆 design 門收尾留下的「門上影片下載會改開新分頁」。
+
+**發現**
+- C1 下載路由放在 `/api/tools/publish/download`，但 publish 只給員工用（決定 D1），所以門上一按就 404。圖庫原本分三種走法：員工的單張下載走 publish、門上的單張下載走 studio 的 proxy-image（只收圖片）、影片和批次下載直接抓 R2 網址（跨網域，CORS 會擋）。要守住的規則是：圖庫的每一種下載都走同一支同源路由，而且每扇門都要能用這支路由。→ 路由搬到 `/api/tools/designs/download`。它在 PLATFORM_APIS 底下，每扇門都會提供。網址白名單從「只有設計桶」放寬為「設計桶或影片桶（`R2_VIDEO_PUBLIC_BASE`）」，仍然比對完整主機名、只收 https。改法是 `lib/storage/r2.ts` 新增 `isPublicBucketAsset`，與 `isDesignsAsset` 共用 `isUnderBase`。圖庫的單張、批次、影片、影片批次四種下載，以及 PublishWizard，都改用 `lib/storage/download-href.ts` 的 `bucketDownloadHref`。
+- C2（Codex F1，這次才變嚴重）自架的 Next 不會執行 `maxDuration`。如果上游送出 header 之後就不再送資料，這個請求會一直掛著。以前只有員工打得到這支路由，現在門上的客戶也打得到。→ 加上 `withStallTimeout`：只在客戶端正在等下一段資料時才計時（ReadableStream 的 pull），30 秒沒有資料就中止上游並讓串流報錯。客戶端網路慢不會被誤殺。
+- C3「門建好但還沒開時，員工主機上仍能打開門頁」是故意的：這是上線前給員工的預覽。客戶在員工主機上只能進 /portal（`middleware.ts` 的 isClientOutsideDoor，測試 `middleware-portal-guards.test.ts:38`）。已把這件事寫成 `lib/portal/doors.ts` servedNextAdminProducts 的註解，之後的審查就不會再報。
+- C4 另一個 session 的 `tsconfig.claude-tmp.json` 已經不存在，不用處理。
+
+**修改**（next-admin）
+- `app/api/tools/publish/download/route.ts` 用 git mv 搬成 `app/api/tools/designs/download/route.ts`：白名單改用 `isPublicBucketAsset`，並加上 `withStallTimeout`。新增 `route.test.ts`，三個測試：影片桶的檔案以附件形式下載、上游卡住就結束、其他主機在抓取前就拒絕。
+- `lib/storage/r2.ts`：新增 `isPublicBucketAsset`、`isUnderBase`。新增 `lib/storage/download-href.ts`。
+- `DesignsGallery.tsx`：四種下載都改走 `bucketDownloadHref`，移除只在 downloadOne 用到的 `onDoor` 分支。`PublishWizard.tsx` 改用同一個 helper。
+- `registry-code.test.ts` 的 ORG_FREE_ROUTES 加入這支下載路由。`doors.ts` 加上預覽註解。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（352 files／3131 passed／32 skipped）＋ npx tsc --noEmit -p .（原始碼 0）＋ lib/portal 門閘＋下載路由 50 passed | exit=0 | ms=25000
+- 突變 1：把 `isPublicBucketAsset` 的 `||` 改成 `&&`（影片桶不再放行），結果「streams a video-bucket object」變紅，還原後變綠。
+- 突變 2：拿掉 `withStallTimeout`，結果「ends the download when the bucket stops sending」逾時變紅，還原後變綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n -- Codex `agency-os/reports/oracle/2026-10-24-partialreview-8fde35ad.md`：F1（上游卡住後請求一直掛著）成立，已修，見 C2。Codex 沒有找到白名單繞過的方法。
+  - external oracle = Codex CLI (codex exec -s read-only), not self-description
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=publish/download | hits=10（全部是歷史或紀錄：WORKLOG、WORKLOG-archive、兩份 Codex artifact、.claude 的 session 紀錄；程式碼只剩新路由註解裡提到「原本是」的那一行，沒有任何呼叫）
+
+**仍待決**：video、design 上線（DNS、憑證、nginx、enabled）屬 High，等操作者 go。門上功能清單（V7／D6／C4，會改三扇已上線門的版面）由操作者決定。
+
+**rollback**：`git revert <本 commit>`（無資料、無 migration；舊路徑回來，門上下載會退回開新分頁）。
 ## 2026-10-24（續32）compose 不變量收斂完成：其餘 12 份 prod compose 全進 ENFORCED；`--running` 比對容器實況；safe-infra-patch 可改非預設檔名、任何失敗都回滾（Claude）
 
 **觸發**：操作者「go，把 11 份 prod compose 整理完，做完把 TASKS §G 那條關掉」（續16／續20 的剩餘項）。
