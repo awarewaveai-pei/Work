@@ -14,7 +14,14 @@ export interface MarketingBrief {
   forbiddenClaims?: string;
 }
 
+/** How the content pipeline ends for a site (plan D1, I5): human_review = everything stays a draft for a person;
+ *  ai_review_auto = a topic whose review passed goes out by itself. Changed only by its own field of PATCH
+ *  /api/content/sites/[id] (a whole-defaults save keeps the stored value). */
+export const PUBLISH_MODES = ["human_review", "ai_review_auto"] as const;
+export type PublishMode = (typeof PUBLISH_MODES)[number];
+
 export interface SiteContentDefaults {
+  publishMode?: PublishMode;
   language?: string;
   targetCountry?: string;
   imageModel?: string;
@@ -95,4 +102,9 @@ export function renderSiteVoice(d: SiteContentDefaults | undefined): string {
 /** The forbidden claims as separate terms, for the rule check that runs before anything is published. */
 export function forbiddenTerms(d: SiteContentDefaults | undefined): string[] {
   return t(d?.marketing?.forbiddenClaims).split(/[,，、;；\n]/).map(s => s.trim()).filter(Boolean);
+}
+
+/** Only the exact stored value turns auto publish on: missing, misspelt or any other value = human review. */
+export function autoPublishes(d: SiteContentDefaults | undefined): boolean {
+  return d?.publishMode === "ai_review_auto";
 }

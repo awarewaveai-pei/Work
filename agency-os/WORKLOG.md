@@ -1,4 +1,35 @@
 # Worklog
+## 2026-10-24（續37）AUTO_CONTENT P4 第二批：AI 審核後自動發布（I5）＋網站「發布方式」兩顆按鈕（Claude）
+
+**觸發**：操作者「部署已完成（b2ec12826，抽測 26 通過），直接從 P4 第二批開始」；卡 `agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md` §7 P4.6、P4.8。
+**根因（為何要這批）**：P4 第一批（續29）題目只做到草稿＋規則審核，`reviewed` 之後無人推；站別無發布模式欄位（plan D1）。
+
+**做法**（NA＝`lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- WP 更新 core `NA/lib/content/publish/wp-post-core.ts`（`updateWpPost`：身分→`resolveWpSite` 租戶檢查→`checkProductionChangeAllowed`→REST 更新）；`NA/app/api/content/wp-post/route.ts` PATCH 變薄殼（行事曆行為不變；空 patch 改在查站前回 400）。
+- I5 閘 `NA/lib/content/topics/tick.ts publishReviewed`：`review.pass===true` 且 `autoPublishes()`（`NA/lib/content/brand-voice.ts`，只認精確值 `ai_review_auto`）才發；排定日未到→`scheduled`（不送），到日由 sweep `publishNow`；讀設定失敗→failed（不默默變人工）；已在 `reviewed` 的列不追溯發布。
+- 發布 `NA/lib/content/topics/make.ts publishDrafts`：寫入前重讀模式；WP 草稿→publish，拿 link；社群草稿補 `link_url` 後以 editor `schedule`（+2 分；品牌 require_review→`submit`）；人已動過的社群貼文不碰；部分成功以 `MakeError` 保留 `published`／`sent`，重試不重送。
+- `publishMode` 只能由員工以專屬欄位設（`NA/app/api/content/sites/[id]/route.ts`）：整包 contentDefaults 存檔保留原模式；寫入以讀到的模式為條件（`content_defaults->>publishMode`），競態回 409。
+- UI：`NA/app/(shell)/tools/content/sites/PublishModeButtons.tsx`（人工審核／AI 審核後自動發布，預設人工；開自動要再確認；內容門唯讀）；`SiteManager.tsx` 只加 import＋渲染兩處 hunk（同檔另一 session 的門 hunk 未一起 commit）；題目頁提示與 `/ops/schedules` 描述改依模式。
+- 計畫 §0 加 D9、§3.2 改兩列。
+
+**審查發現與處置**
+- C0。Codex `agency-os/reports/oracle/2026-10-24-partialreview-48d4a11a.md`：F1 `scheduled→published` 只看時間、沒確認 WP 上線（系統宣稱≠實況）→ 根除：不用 WP `future`，到日由我們發（D9）；F2 模式切回人審與進行中發布的競態→ 寫入前重讀已收窄至毫秒級，無法跨 WP 上鎖，列剩餘風險。
+- critic（Opus，獨立）：M1 future 分支社群與文章同時刻排、連結是 `?p=ID`、wp-cron 可能不跑 → D9 同步根除；M2 `isLive` 走 `resolveWpSite` 會拋 `OrgAccessError` 卡死整個客戶的佇列 → 隨 D9 刪除 `isLive`；m1 永久輪詢 → 同刪；m2 publishMode 讀寫競態 → 條件寫入＋409；m3 讀設定 DB 錯誤卡在 reviewed → failed；m4 客戶 social 角色可能唯讀卻被以 editor 排程 → publishMode 改員工專屬（內容門唯讀）。
+- Codex 複審 `agency-os/reports/oracle/2026-10-24-partialreview-61281681.md`：F1 `waitsForDay` 留著 future 時代的 60 秒餘裕→排定 30 秒後的題目會提早發 → 改成嚴格 `> now`；F2 兩個重疊 firing 可同時對同一 scheduled 列外寫 → 新 `store.ts claimTopic`（同狀態 version bump）先 claim 再外寫；F3 站存了非字串 publishMode（如 true）→ 條件寫入永遠 409 無法修 → 比對值照 `->>` 呈現（`JSON.stringify`）。
+- 結構測試 `blocked-change contract` 擋下 core 自寫 `status: 423` → 改成無 status 的 blocked 分支，殼走 `blockedChangeResponse`。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/content app/api/content lib/schedules lib/social app/api/social "app/(shell)/tools/content" lib/system-modes | exit=0 | ms=0（98 檔 670 綠；未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p . | exit=0 | ms=0（本變更檔 0 錯；同時段另一 session 未完成的 `lib/portal/doors.ts`／`ProductDoorShell.tsx` 有錯，非本變更）
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec supabase-db psql（begin read only）wp_sites／client_schedules／content_topics 計數 | exit=0 | ms=5479（3 站 0 站有 publishMode；content_pipeline 0 列；題目 0 → 今晚 03:00 部署後無任何自動發布路徑）
+- 突變：拔 `review.pass` 檢查→2 紅；拔 `!auto`→4 紅；拔 `waitsForDay`→1 紅；拔 publish 前 claim→「兩個 firing 只發一次」紅；拔路由 publishMode 剝除→stale-save 測紅；全部還原 22/22 綠。
+- 真跑一次 firing（plan §8 拋棄式 org＋staging WP）**未做**：需要 staging WP 站＋測試社群品牌，正式庫目前無；所有站預設人工、排程格未建，故部署無風險。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/7m/4n
+- ORACLE_WAIVED: 61281681 之後只改它點名的三項（各附測試＋突變），不再開第三輪（同一 reviewer 第 3 輪前需不變量分析：不變量＝外寫前必先 claim、發布時刻只由我們的時鐘決定、模式只經員工專屬條件寫入，已寫入計畫 D9）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude/commands,.claude/agents | grep=publishMode|autoPublishes\(|updateWpPost\(|publishReviewed\(|wpPostPatch\(|不會自己發布|不發布 | hits=50（舊主張只剩 `tick.ts` 製作步驟註解「drafts only」，仍為真；未追蹤的 `全自動內容 監工台.html` 非本 session）
+
+**剩餘風險**：模式切回人審若恰在發布寫入那一秒內，該篇仍會發出（下一篇起生效）；真 firing 未跑。
+**rollback**：`git revert <本 commit>`；或把站設回「人工審核」即停自動發布（plan §9）。
 ## 2026-10-24（續36）video、design 產品門上線（操作者 go）；每扇門只讓「持有該產品」的帳戶進（操作者「每個功能都要分開購買或我們送」）（Claude）
 
 **觸發**：操作者「Go ahead: take the video and design doors live (DNS, certificate, host nginx, lobster-nginx, enabled), with smoke tests」，過程中補兩句：「video.aware-wave.com、design.aware-wave.com 要加購 是積木LEGO」「每個功能都要分開購買或我們送」。

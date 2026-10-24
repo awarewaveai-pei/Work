@@ -8,6 +8,7 @@ import { planCostTwd, topicCostTwd } from "@/lib/content/topics/cost";
 import { DAILY_START_CAP, makesNow } from "@/lib/content/topics/tick";
 import type { TopicReview } from "@/lib/content/topics/review";
 import type { TopicArtifacts } from "@/lib/content/topics/make";
+import { autoPublishes, type SiteContentDefaults } from "@/lib/content/brand-voice";
 
 const T = {
   noSites: "還沒有可用的客戶網站，先到 WordPress Sites 加一個。",
@@ -33,7 +34,7 @@ const T = {
   start: "核准並開始",
   started: "已開始製作，約 2 分鐘後按上個月／下個月再回來就看得到草稿。",
   // what starting makes follows the topic's formats, like its price (topicCostTwd)
-  startHint: (f: TopicFormat[]) => `立刻做成 ${[f.includes("article") && "WordPress 草稿", f.includes("social") && "社群草稿"].filter(Boolean).join("和")}，不會發布；每天最多開始 ${DAILY_START_CAP} 題。`,
+  startHint: (f: TopicFormat[], auto: boolean) => `立刻做成 ${[f.includes("article") && "WordPress 草稿", f.includes("social") && "社群草稿"].filter(Boolean).join("和")}，${auto ? "檢查全部通過就自動發布（網站設定：AI 審核後自動發布）" : "不會發布（網站設定：人工審核）"}；每天最多開始 ${DAILY_START_CAP} 題。`,
   review: "規則審核",
   wpDraft: "打開 WordPress 草稿",
 };
@@ -54,7 +55,7 @@ const ACTION_FOR: Partial<Record<TopicStatus, Array<[string, string]>>> = {
   failed: [["retry", "重試"]],
 };
 
-interface Site { id: string; name: string; organization_id?: string | null }
+interface Site { id: string; name: string; organization_id?: string | null; contentDefaults?: SiteContentDefaults }
 const card: React.CSSProperties = { background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 10, padding: 12 };
 const chip = (on: boolean): React.CSSProperties => ({
   padding: "4px 10px", borderRadius: 999, border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`, cursor: "pointer",
@@ -284,7 +285,7 @@ export function TopicsBoard() {
                   <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void start()} style={{ whiteSpace: "normal" }}>
                     {T.start}（約 NT${topicCostTwd(sel.formats).usual}{topicCostTwd(sel.formats).max > topicCostTwd(sel.formats).usual ? `，最多 NT$${topicCostTwd(sel.formats).max}` : ""}）
                   </button>
-                  <span style={{ fontSize: "var(--font-size-xs)", color: "var(--text-muted)" }}>{T.startHint(sel.formats)}</span>
+                  <span style={{ fontSize: "var(--font-size-xs)", color: "var(--text-muted)" }}>{T.startHint(sel.formats, autoPublishes(sites.find((s) => s.id === siteId)?.contentDefaults))}</span>
                 </div>
               )}
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

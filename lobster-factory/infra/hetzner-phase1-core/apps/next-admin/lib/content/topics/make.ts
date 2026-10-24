@@ -3,26 +3,39 @@
 // every AI call bills that organization as the named actor, and publishes with orgIdentity, so the WordPress write
 // passes the same organization check a customer's own request does (plan I7). A part already made (kept on the row by
 // an earlier failed attempt) is not made again: a retry after the social step failed does not write a second article.
+// Auto publish (gated in tick.ts publishReviewed, always "now") changes those same drafts: the WordPress draft to
+// publish through the calendar's core, then the social draft gets the live article's link and is scheduled a moment
+// ahead as an editor would -- a brand that requires social review gets it submitted instead. Only staff set a site to
+// auto publish (sites/[id] route), so acting as editor here is that staff decision, not the starting person's role.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { grantFor, runForOrg } from "@/lib/entitlements/grant";
 import { orgIdentity } from "@/lib/tenant-guard";
 import { loadSiteBrand, type SiteBrand } from "@/lib/content/brand-voice-store";
-import { forbiddenTerms, renderBrandVoice, renderSiteVoice, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { autoPublishes, forbiddenTerms, renderBrandVoice, renderSiteVoice, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { updateWpPost } from "@/lib/content/publish/wp-post-core";
 import { runContentPipeline, type PipelineFailure } from "@/lib/content/pipeline";
 import { parseArticleMeta } from "@/lib/content/article/meta";
-import { listAccounts, savePost } from "@/lib/social/store";
+import { getPost, listAccounts, savePost } from "@/lib/social/store";
+import { applyAction } from "@/lib/social/actions";
+import { requiresReview } from "@/lib/social/review";
 import { textsForAccounts, writerKeysFor, writeSocialPosts } from "@/lib/social/write-posts";
 import { claudeWriter } from "@/lib/social/write-posts-claude";
 import { articleChecks, reviewOf, socialChecks, type ReviewCheck } from "./review";
-import { dueApproved, inStatus, move, startTopic, type Topic } from "./store";
-import { MakeError, NOW_FORMATS, type Made, type TickDeps } from "./tick";
+import { claimTopic, dueApproved, inStatus, move, startTopic, type Topic } from "./store";
+import { MakeError, NOW_FORMATS, type Made, type Published, type TickDeps } from "./tick";
 
-/** What content_topics.artifacts holds: one entry per made part. */
+/** What content_topics.artifacts holds: one entry per made part; `published` / `sent` once auto publish put it out. */
 export interface TopicArtifacts {
-  article?: { wp_post_id: number | null; wp_edit_url: string | null; seo_score: number | null; summary: string; source: string; checks: ReviewCheck[] };
+  article?: {
+    wp_post_id: number | null; wp_edit_url: string | null; seo_score: number | null; summary: string; source: string; checks: ReviewCheck[];
+    published?: { status: string; link: string; at: string };
+  };
   /** post_id null = no channel the writer can write for (the checks say so). */
-  social?: { post_id: string | null; checks: ReviewCheck[] };
+  social?: { post_id: string | null; checks: ReviewCheck[]; sent?: { state: string; scheduled_at: string | null; at: string } };
 }
+
+/** The social post is due this far ahead (state.ts schedule needs a future time; the sender looks 10 min ahead). */
+export const SOCIAL_NOW_LEAD_MS = 2 * 60_000;
 
 /** The article generator's input: the topic, and the site's stored defaults the article tool's form starts from. */
 export function articleInput(t: Pick<Topic, "keyword" | "title" | "angle">, d: SiteContentDefaults): Record<string, unknown> {
@@ -99,6 +112,45 @@ async function makeDrafts(sb: SupabaseClient, t: Topic, actor: string): Promise<
   return { artifacts: artifacts as Record<string, unknown>, review: reviewOf(checks, new Date()) };
 }
 
+/** The topic's social draft: the article's link, then scheduled (or submitted, when the brand requires social review). */
+async function sendSocial(t: Topic, postId: string, link: string | undefined, now: Date, actor: string): Promise<NonNullable<NonNullable<TopicArtifacts["social"]>["sent"]>> {
+  let post = await getPost(t.organization_id, postId);
+  // a person already scheduled, submitted or deleted it: theirs, left as it is
+  if (post.state !== "draft") return { state: post.state, scheduled_at: post.scheduled_at, at: now.toISOString() };
+  if (link && !post.link_url) {
+    const saved = await savePost(t.organization_id, post.id, post.version, { link_url: link }, null, null, actor);
+    post = { ...post, link_url: link, version: saved.version };
+  }
+  const review = await requiresReview(t.organization_id);
+  const scheduledAt = new Date(now.getTime() + SOCIAL_NOW_LEAD_MS).toISOString();
+  const done = await applyAction(t.organization_id, post, review ? "submit" : "schedule", "editor", review ? {} : { scheduledAt },
+    actor, { source: "content_pipeline", topic_id: t.id });
+  return { state: done.state, scheduled_at: review ? null : scheduledAt, at: now.toISOString() };
+}
+
+async function publishDrafts(sb: SupabaseClient, t: Topic, actor: string): Promise<Published> {
+  const site = await siteFor(sb, t);
+  if (typeof site === "string") throw new Error(site);
+  // the gate in tick.ts read the setting a moment ago; read again at the write, so a switch back to human review wins
+  if (!autoPublishes(site.defaults)) throw new Error("網站已改成人工審核，沒有發布（草稿都在）");
+  const now = new Date();
+  const artifacts: TopicArtifacts = { ...(t.artifacts as TopicArtifacts) };
+  try {
+    const a = artifacts.article;
+    if (t.formats.includes("article") && !a?.published) {
+      if (!a?.wp_post_id || !t.site_id) throw new Error("沒有 WordPress 草稿編號，無法發布");
+      const r = await updateWpPost(orgIdentity(t.organization_id), t.site_id, a.wp_post_id, { status: "publish" });
+      if (!r.ok) throw new Error(`WordPress 發布失敗：${(r as Extract<typeof r, { ok: false }>).error}`);   // strict:false
+      artifacts.article = { ...a, published: { status: r.post.status, link: r.post.link, at: now.toISOString() } };
+    }
+    const s = artifacts.social;
+    if (s?.post_id && !s.sent) artifacts.social = { ...s, sent: await sendSocial(t, s.post_id, artifacts.article?.published?.link, now, actor) };
+  } catch (e) {
+    throw new MakeError(e instanceof Error ? e.message : String(e), artifacts as Record<string, unknown>);
+  }
+  return { artifacts: artifacts as Record<string, unknown> };
+}
+
 /** The real store and makers behind tickTopics, bound to one organization and the actor the work is done as. */
 export function topicDeps(sb: SupabaseClient, organizationId: string, actor: string): TickDeps {
   const own = (t: Topic) => {
@@ -111,6 +163,9 @@ export function topicDeps(sb: SupabaseClient, organizationId: string, actor: str
     blocker: async (t) => { own(t); const s = await siteFor(sb, t); return typeof s === "string" ? s : null; },
     start: (t, day, cap) => startTopic(sb, t, day, cap),
     move: (t, to, patch) => move(sb, t, to, patch),
+    claim: (t) => { own(t); return claimTopic(sb, t); },
     make: (t) => { own(t); return runForOrg(organizationId, actor, () => makeDrafts(sb, t, actor)); },
+    autoPublishes: async (t) => { own(t); const s = await siteFor(sb, t); return typeof s !== "string" && autoPublishes(s.defaults); },
+    publish: (t) => { own(t); return publishDrafts(sb, t, actor); },
   };
 }

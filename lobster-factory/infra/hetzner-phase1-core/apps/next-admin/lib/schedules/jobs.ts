@@ -91,7 +91,7 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
   {
     key: "content_pipeline",
     label: "自動內容管線",
-    description: `把已核准、到了排定日的題目依它選的格式做成 WordPress 草稿和社群草稿，再跑規則審核；每天最多開始 ${DAILY_START_CAP} 題，不會自己發布。題目在「內容 › 題目佇列」核准。`,
+    description: `把已核准、到了排定日的題目依它選的格式做成 WordPress 草稿和社群草稿，再跑規則審核；每天最多開始 ${DAILY_START_CAP} 題。網站設成「AI 審核後自動發布」且審核全部通過才會發布，其餘留在草稿。題目在「內容 › 題目佇列」核准。`,
     // Prices: lib/ai/cost-model.ts TEXT_FEATURES article + syndicate (lib/content/topics/cost.ts).
     cost: `每題約 ${topicCostUsd().usual} 美元（文章＋社群改寫；社群太長要重寫時最多 ${topicCostUsd().max} 美元）；每天最多 ${DAILY_START_CAP} 題。沒有到期題目時免費。`,
     frequencies: [{ value: "every_5m", label: "每 5 分鐘", usesHour: false, usesDay: false }],

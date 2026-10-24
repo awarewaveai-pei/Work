@@ -5,6 +5,7 @@ import { OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 import { blockedChangeResponse } from "@/lib/system-modes/blocked-change";
+import { updateWpPost, wpPostPatch } from "@/lib/content/publish/wp-post-core";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +23,8 @@ async function getSiteAuth(
   return { url: resolved.site.url, authHeader: resolved.authHeader, organizationId: resolved.site.organizationId };
 }
 
-// PATCH /api/content/wp-post — update WP post (date, status, title)
+// PATCH /api/content/wp-post — update WP post (date, status, title, content); the change itself is
+// lib/content/publish/wp-post-core.ts (shared with the content pipeline's auto publish).
 export async function PATCH(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
@@ -36,62 +38,15 @@ export async function PATCH(req: Request): Promise<Response> {
   if (!siteId) return NextResponse.json({ ok: false, error: "siteId required" }, { status: 400 });
   if (isNaN(postId)) return NextResponse.json({ ok: false, error: "postId must be a positive integer" }, { status: 400 });
 
-  let site;
-  try { site = await getSiteAuth(req, siteId); }
+  let r;
+  try { r = await updateWpPost(req, siteId, postId, wpPostPatch(body)); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
-  if (!site) return NextResponse.json({ ok: false, error: "Site not found or token missing" }, { status: 404 });
-
-  // Build WP patch payload — only include explicitly provided fields
-  const wpPatch: Record<string, unknown> = {};
-  if (typeof body.date === "string" && body.date.trim()) wpPatch.date = body.date.trim();
-  if (typeof body.status === "string" && ["draft", "publish", "future", "pending"].includes(body.status))
-    wpPatch.status = body.status;
-  if (typeof body.title === "string" && body.title.trim()) wpPatch.title = body.title.trim();
-  // content: used for video embedding — replaces <!-- VIDEO_PLACEHOLDER --> with the embed URL.
-  // WARNING: this overwrites the entire post_content; only use when you have the full patched HTML.
-  if (typeof body.content === "string" && body.content.trim()) wpPatch.content = body.content.trim();
-
-  if (Object.keys(wpPatch).length === 0)
-    return NextResponse.json({ ok: false, error: "No fields to update" }, { status: 400 });
-
-  const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), site.organizationId);
-  if (!gate.allowed) {
-    return blockedChangeResponse(gate.mode);
+  if (!r.ok) {
+    const failed = r as Extract<typeof r, { ok: false }>;   // strict:false: !ok does not narrow
+    if (failed.mode !== undefined) return blockedChangeResponse(failed.mode);
+    return NextResponse.json({ ok: false, error: failed.error }, { status: failed.status ?? 500 });
   }
-
-  const endpoint = `${site.url}/wp-json/wp/v2/posts/${postId}`;
-  let res: Response;
-  try {
-    res = await fetch(endpoint, {
-      method: "POST", // WP REST API uses POST for updates (with _method or just POST)
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: site.authHeader,
-        "X-HTTP-Method-Override": "PUT",
-      },
-      body: JSON.stringify(wpPatch),
-      signal: AbortSignal.timeout(12000),
-    });
-  } catch {
-    return NextResponse.json({ ok: false, error: "WordPress connection failed" }, { status: 502 });
-  }
-
-  const json = await res.json().catch(() => ({})) as Record<string, unknown>;
-
-  if (!res.ok) {
-    const msg = typeof json.message === "string" ? json.message.slice(0, 200) : `WP error ${res.status}`;
-    return NextResponse.json({ ok: false, error: msg }, { status: res.status });
-  }
-
-  return NextResponse.json({
-    ok: true,
-    post: {
-      id: json.id,
-      status: json.status,
-      date: json.date,
-      link: json.link,
-    },
-  });
+  return NextResponse.json({ ok: true, post: r.post });
 }
 
 // DELETE /api/content/wp-post — move WP post to trash

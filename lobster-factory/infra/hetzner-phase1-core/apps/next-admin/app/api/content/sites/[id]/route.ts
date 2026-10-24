@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { siteRowGate, siteUrlWriteGate } from "@/lib/content/wp-sites";
+import { staffOnly } from "@/lib/tenant-guard";
 import type { ManagedSite } from "@/app/api/content/sites/route";
-import type { SiteContentDefaults } from "@/lib/content/brand-voice";
+import { PUBLISH_MODES, type PublishMode, type SiteContentDefaults } from "@/lib/content/brand-voice";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,18 +45,42 @@ export async function PATCH(
   if (typeof body.username === "string" && body.username.trim()) patch.username = body.username.trim();
   // Token/AppPassword only updated when explicitly provided and non-empty
   if (typeof body.token    === "string" && body.token.trim()) patch.token = body.token.trim();
-  // Content Studio per-site defaults (full replace — caller sends complete object)
-  if (body.contentDefaults !== undefined && typeof body.contentDefaults === "object" && body.contentDefaults !== null)
-    patch.content_defaults = body.contentDefaults;
+  // Content Studio per-site defaults (full replace — caller sends complete object), except publishMode: it is set only
+  // by its own field, staff only (auto publish sends to the customer's site and social channels without a person), and
+  // the write is conditional on the mode read here -- a save racing a mode switch gets 409 instead of undoing it.
+  const defaultsGiven = typeof body.contentDefaults === "object" && body.contentDefaults !== null && !Array.isArray(body.contentDefaults);
+  if (body.publishMode !== undefined) {
+    const modeDenied = staffOnly(req);
+    if (modeDenied) return modeDenied;
+    if (!(PUBLISH_MODES as readonly unknown[]).includes(body.publishMode))
+      return NextResponse.json({ ok: false, error: `publishMode must be one of ${PUBLISH_MODES.join(", ")}` }, { status: 400 });
+  }
+  let modeRead: string | null | undefined;   // undefined = content_defaults not written
+  if (defaultsGiven || body.publishMode !== undefined) {
+    const { data: current, error: readError } = await supabase.from("wp_sites").select("content_defaults").eq("id", id).maybeSingle();
+    if (readError) return NextResponse.json({ ok: false, error: readError.message }, { status: 500 });
+    const stored = ((current as { content_defaults: SiteContentDefaults | null } | null)?.content_defaults) ?? {};
+    const given: SiteContentDefaults = { ...((defaultsGiven ? body.contentDefaults : stored) as SiteContentDefaults) };
+    delete given.publishMode;
+    const mode = (body.publishMode ?? stored.publishMode) as PublishMode | undefined;
+    patch.content_defaults = mode ? { ...given, publishMode: mode } : given;
+    // as `content_defaults->>publishMode` renders it, so even a malformed stored value (true, 1) can be overwritten
+    const raw = (stored as Record<string, unknown>).publishMode;
+    modeRead = raw === undefined || raw === null ? null : typeof raw === "string" ? raw : JSON.stringify(raw);
+  }
 
-  const { data, error } = await supabase
-    .from("wp_sites")
-    .update(patch)
-    .eq("id", id)
+  let update = supabase.from("wp_sites").update(patch).eq("id", id);
+  if (modeRead !== undefined) {
+    update = modeRead === null ? update.is("content_defaults->>publishMode", null) : update.eq("content_defaults->>publishMode", modeRead);
+  }
+  const { data, error } = await update
     .select("id, name, url, color, active, note, created_at, token, username, content_defaults")
     .single();
 
   if (error) {
+    if (error.code === "PGRST116" && modeRead !== undefined) {
+      return NextResponse.json({ ok: false, error: "網站設定剛被別人改過，請重新整理後再存一次" }, { status: 409 });
+    }
     const status = error.code === "PGRST116" ? 404 : 500;
     return NextResponse.json({ ok: false, error: error.message }, { status });
   }
