@@ -4440,6 +4440,16 @@
 - rollback：git revert狀態commit；實作獨立revert 1ef1ee419。無prod部署。
 
 
+## 2026-10-25
+
+- AUTO_TASK_DONE: 外觀系統臨時工作（操作者當面提出，未預列 TASKS）：37 組色票預設、Button Primary 組、側欄目前頁與標題滑過、Theme Editor 分頁改共用元件、字體三選；prod 3e069ee69（續9–續17）
+- REVIEW_WAIVED: DOC_ONLY -- AO-CLOSE sync commit 只含 WORKLOG／memory／daily；程式改動的審查證據在續9、續11、續13、續15、續16
+- BUGHUNT_WAIVED: DOC_ONLY -- AO-CLOSE sync commit 只含 WORKLOG／memory／daily
+- REALTEST_WAIVED: DOC_ONLY -- 同上，無程式檔
+
+### Daily
+- (TBD)
+
 ## 2026-10-23
 
 - AUTO_TASK_DONE_APPLIED (2026-10-22T17:38:10Z): 共用 checkout 永遠追不上 origin（2026-10-22 已解）
