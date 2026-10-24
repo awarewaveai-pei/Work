@@ -95,17 +95,23 @@ export const DEFAULT_SIGNUP_PRODUCT: ProductKey = SELF_SIGNUP_PRODUCTS[0].key;
 export function isSelfSignupProductKey(value: unknown): value is ProductKey {
   return typeof value === "string" && SELF_SIGNUP_PRODUCTS.some((p) => p.key === value);
 }
-export const STAFF_UTILITIES: Readonly<Record<string, string>> = {
-  "tools/theme": "員工調整後台外觀，不呼叫付費 AI。",
-  "tools/ai-models": "員工查閱模型資料，不呼叫付費 AI。",
+// Staff-only pages that are not products. name: the cell on the staff permission page (lib/portal/staff-tools.ts);
+// tool: grant it with another page's cell instead of a cell of its own (a redirect or a variant of that page).
+export interface StaffPage { name: string; why: string; tool?: string }
+export const STAFF_UTILITIES: Readonly<Record<string, StaffPage>> = {
+  "tools/theme": { name: "後台外觀", why: "員工調整後台外觀，不呼叫付費 AI。" },
+  "tools/ai-models": { name: "模型資料", why: "員工查閱模型資料，不呼叫付費 AI。" },
 };
-export const BACK_OFFICE: Readonly<Record<string, string>> = {
-  "ops/clients": "員工管理客戶組織。", "ops/schedules": "員工管理維護排程。",
-  "ops/repairs": "員工處理服務修復。", "ops/integrations": "員工管理連線設定。",
-  "ops/system-modes": "員工管理系統模式。", "ops/approvals": "員工審批營運操作。",
-  "ops/backup": "員工檢查備份。", "ops/inbox": "員工處理營運告警。",
-  "ops/costs": "員工檢查營運成本。", "ops/billing": "員工查看每個付費帳戶的合約、權利、點數與付款（唯讀）。", "ops/ai-models": "舊網址，轉到 /tools/ai-models 的圖片模型規格分頁。", "ops/onboarding": "員工處理客戶啟用。",
-  "ops/tools": "員工維護工具清單。", "ops/products": "員工查看產品登記表：門、販售狀態、收費功能。", "build": "員工執行建站作業。",
-  "ops-console": "員工檢視營運總台。", "onboard": "員工操作佈建流程。",
-  "api-check": "員工檢查 API 連線。", "api-check-client": "員工檢查客戶 API 連線。",
+export const BACK_OFFICE: Readonly<Record<string, StaffPage>> = {
+  "ops/clients": { name: "客戶", why: "員工管理客戶組織。" }, "ops/schedules": { name: "排程", why: "員工管理維護排程。" },
+  "ops/repairs": { name: "維修", why: "員工處理服務修復。" }, "ops/integrations": { name: "串接", why: "員工管理連線設定。" },
+  "ops/system-modes": { name: "系統模式", why: "員工管理系統模式。" }, "ops/approvals": { name: "簽核", why: "員工審批營運操作。" },
+  "ops/backup": { name: "備份", why: "員工檢查備份。" }, "ops/inbox": { name: "告警", why: "員工處理營運告警。" },
+  "ops/costs": { name: "成本", why: "員工檢查營運成本。" }, "ops/billing": { name: "帳務", why: "員工查看每個付費帳戶的合約、權利、點數與付款（唯讀）。" },
+  "ops/ai-models": { name: "模型資料", why: "舊網址，轉到 /tools/ai-models 的圖片模型規格分頁。", tool: "tools/ai-models" },
+  "ops/onboarding": { name: "客戶啟用", why: "員工處理客戶啟用。" },
+  "ops/tools": { name: "工具清單", why: "員工維護工具清單。" }, "ops/products": { name: "產品表", why: "員工查看產品登記表：門、販售狀態、收費功能。" },
+  "build": { name: "建站", why: "員工執行建站作業。" },
+  "ops-console": { name: "營運總台", why: "員工檢視營運總台。" }, "onboard": { name: "佈建", why: "員工操作佈建流程。" },
+  "api-check": { name: "API 檢查", why: "員工檢查 API 連線。" }, "api-check-client": { name: "API 檢查", why: "員工檢查客戶 API 連線。", tool: "api-check" },
 };

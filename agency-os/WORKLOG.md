@@ -1,4 +1,26 @@
 # Worklog
+## 2026-10-24（續41）員工逐工具權限：監工台＋C1 員工工具登記表
+
+- **任務**：操作者要每個員工可勾選能用的工具（側欄／網址／API 都擋；owner 永遠全部、不可取消）。「寫入監工台再開工」＝照建議值批准方案 B（一產品一格、一後台頁一格；只 owner 改；先 shadow）。計畫與卡：`agency-os/handoffs/2026-10-24-staff-tool-grants/R0-PLAN.md` §5–§6；監工台 https://claude.ai/artifact/RbxhBAEU7KsaxuJ9zKeJL6（commit a016c5c4f）。
+- **根因／不變量**：今天員工權限只有四種角色（`middleware.ts:102-109`），沒有「人 × 工具」；要擋得住 API，路徑→工具必須由登記表推出、且每個員工頁與 API 都歸格，否則 C2 開擋時就是漏洞或誤擋。
+- **C1 做了什麼**：
+  - `lib/portal/staff-tools.ts`：`STAFF_TOOLS`（28 格：9 產品、2 員工小工具、17 後台）由 `PRODUCTS`（`staffPaths`＋`doorApis()` 去掉平台 API）、`STAFF_UTILITIES`、`BACK_OFFICE` 推出；`STAFF_API_OWNERS` 補員工專用 API（`[x]` 一段、`$` 只此路徑、多列命中取最具體的一列，再加上門 API 的產品）；`STAFF_PLATFORM`（首頁、build-id、analytics-context、門的平台 API）；`toolsFor(pathname)`。
+  - `products.ts`：`BACK_OFFICE`／`STAFF_UTILITIES` 值改 `{ name, why, tool? }`；`ops/ai-models` 併入「模型資料」、`api-check-client` 併入「API 檢查」。
+  - 掃描器抽成 `lib/portal/__tests__/code-scan.ts`（`codeIndex(dirs)`；新增 `prefixCalls`＝樣板網址只知開頭、`templates`＝樣板還原成路由）；`registry-code.test.ts` 改引用，行為不變（門的索引仍只掃 app、lib）。
+  - `middleware.ts`：`PUBLIC_API_PATHS` 只加 `export`（測試排除用）。
+- **Codex 第 1 輪**（`agency-os/reports/oracle/2026-10-24-partialreview-927f9e73.md`）：F1 成立——寬的 `/api/ops/clients` 與窄列取聯集，讓「客戶」格拿到 AI 客服知識庫 API；改成「最具體的一列勝出」，產品 API 不給後台格共同擁有（客戶中心的網站／社群／客服分頁列入 `NEEDS_OTHER_TOOL`），加守衛測試。F2 是計畫文字錯（`/api/theme` 只有外觀頁呼叫、POST 改全站外觀），程式不動、改 R0-PLAN §4／§6。
+- **Codex 第 2 輪**（`agency-os/reports/oracle/2026-10-24-partialreview-2065404a.md`）：F1 成立——測試把樣板網址縮成開頭（`/api/ops/clients`），「客戶」格因此過關，看不到客戶中心其實呼叫 AI 客服、資料蒐集、開發信的路由。改：掃描器把樣板還原成路由（`templateRoute`：含替換的那一段變 `[x]`），測試依完整路由判斷，只有還原後沒有任何一列命中才退回比對開頭；客戶中心內嵌的 13 條他產品路由列入 `NEEDS_OTHER_TOOL["ops/clients"]`，C3.4 負責沒勾就不顯示該分頁。
+- **不變量分析**（同一 reviewer 對同一段已報 2 次）：兩次都是「寬的擁有者遮住窄的擁有者」——第 1 次在 `toolsFor` 的聯集，第 2 次在測試的開頭比對。這一類的不變量＝**一條路由的擁有者只由最具體的那條規則決定，判斷時用的路由也必須是最具體的那一條**。現在兩處都照此：`toolsFor` 取最具體列；測試用還原後的路由，不用開頭。剩下唯一的退路（第一段就是變數的樣板）只在完全沒有規則命中時才用。
+- **順手發現（不在本卡範圍，未修）**：掃描器納入 `components/` 後，已上線的塔羅門頁會呼叫門上沒開的 `/api/tools/image/process`（OutputTrackBar）與 `/api/tools/studio/edit-prompt`（ImageEditPromptPanel）→ 塔羅門上這兩個按鈕應是 404。操作者 2026-10-24 要在本 session 接著修（下一條 entry）。
+- **驗證**：
+  - `npx tsc --noEmit -p .` exit 0。
+  - `npx vitest run lib/portal app/__tests__ lib/entitlements lib/__tests__/middleware-csrf.test.ts`：20 files／225 passed／12 skipped。
+  - 突變：刪 `"/api/ops/integrations"` 列 → 「每個 API 歸格」「頁面只靠本工具就能用」紅；刪塔羅跨工具列 → 後者紅；把「客戶」加回 `/api/content/sites` → 「產品 API 不給後台格」紅；最具體改最寬 → 兩條紅；刪客戶中心「開發信分頁」列 → 頁面測試紅（第 2 輪的洞確實關掉）；全部還原後綠。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/portal app/__tests__ lib/entitlements lib/__tests__/middleware-csrf.test.ts (20 files, 225 passed) | exit=0 | ms=6471
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/2m/1n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=BACK_OFFICE\b|STAFF_UTILITIES|PUBLIC_API_PATHS | hits=55
+- **避免再發生**：新頁面或 API 沒歸格 → `staff-tools.test.ts` 紅；頁面跨工具呼叫須寫進 `NEEDS_OTHER_TOOL` 附理由。
+- ORACLE_WAIVED: 共用工作目錄有其他 session 的大量未提交改動，整庫審查會把別人的 diff 一起送審；本卡改以 -Path 範圍審查兩輪（partialreview-927f9e73、partialreview-2065404a），三條 finding 全部修正並附突變證據。
 ## 2026-10-24（續40）trigger supervisor 的 `TRIGGER_SUPERVISOR_API_URL` 上正式機；prod trigger compose = repo（Claude）
 
 **觸發**：操作者「把 trigger 那一行同步到正式機」（續35 收尾查證項）。

@@ -26,7 +26,7 @@ const SYNC_KEY_HEADER = "x-ops-sync-key";
 
 // /api/ops/* endpoints that authenticate server-to-server with their own Bearer token
 // (verifyIngestToken / Uptime-Kuma health probe) and carry no browser session.
-const PUBLIC_API_PATHS = new Set<string>([
+export const PUBLIC_API_PATHS = new Set<string>([
   "/api/ops/summary",
   "/api/ops/inbox/health",
   "/api/ops/inbox/digest",

@@ -12,89 +12,7 @@ import { BACK_OFFICE_FEATURES } from "../../entitlements/can";
 import { ROUTE_FEATURES } from "../../entitlements/route-features";
 import { PLATFORM_APIS, doorApis, nextAdminProducts, type NextAdminProduct } from "../doors";
 import { PRODUCTS, type PortalProduct } from "../products";
-
-const ROOT = path.join(__dirname, "../../..");
-const posix = (f: string) => path.relative(ROOT, f).split(path.sep).join("/");
-const under = (p: string, prefix: string) => p === prefix || p.startsWith(`${prefix}/`);
-
-function sources(dir: string): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
-    if (["node_modules", ".next", "__tests__"].includes(e.name)) return [];
-    const f = path.join(dir, e.name);
-    if (e.isDirectory()) return sources(f);
-    return /\.[cm]?[jt]sx?$/.test(e.name) && !/\.(?:test|spec|d)\.[cm]?[jt]sx?$/.test(e.name) ? [f] : [];
-  });
-}
-
-// apis: every "/api/..." literal (registry tables included); calls: only those passed to a call or `new`, or set as a
-// JSX attribute -- what a page actually requests. Type-only imports are erased at build, so they are not imports.
-// called: "<module>#<name>" for each function imported by name and called in the file (`import { a as b }; b()` is a).
-// db: the file itself opens a database client (a value import of a database driver).
-interface Scan { asked: string[]; apis: string[]; calls: string[]; called: string[]; db: boolean; imports: string[]; meters: boolean }
-const DB_DRIVERS = new Set(["@supabase/supabase-js", "@supabase/ssr", "pg", "postgres"]);
-const unwrap = (n: ts.Node | undefined): ts.Node | undefined =>
-  n && (ts.isParenthesizedExpression(n) || ts.isAsExpression(n) || ts.isSatisfiesExpression(n) || ts.isNonNullExpression(n) || ts.isTypeAssertionExpression(n)) ? unwrap(n.expression) : n;
-const apiText = (node: ts.Node | undefined) => {
-  const n = unwrap(node);
-  const t = n && (ts.isStringLiteralLike(n) ? n.text : ts.isTemplateExpression(n) ? n.head.text : null);
-  return t?.startsWith("/api/") ? t.split(/[?#]/)[0].replace(/\/$/, "") : null;
-};
-const typeOnly = (n: ts.ImportDeclaration | ts.ExportDeclaration) => ts.isExportDeclaration(n) ? n.isTypeOnly
-  : !!n.importClause && (n.importClause.isTypeOnly || (!n.importClause.name && !!n.importClause.namedBindings
-    && ts.isNamedImports(n.importClause.namedBindings) && n.importClause.namedBindings.elements.length > 0
-    && n.importClause.namedBindings.elements.every((e) => e.isTypeOnly)));
-function scan(file: string, text: string): Scan {
-  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, /\.tsx$/.test(file) ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
-  const out: Scan = { asked: [], apis: [], calls: [], called: [], db: false, imports: [], meters: false };
-  const bindings: Array<{ mod: string; name: string; local: string }> = [];
-  const callees = new Set<string>();
-  const spec = (s: string) => {
-    const r = s.startsWith("@/") ? s.slice(2) : s.startsWith(".") ? path.posix.normalize(path.posix.join(path.posix.dirname(file), s)) : null;
-    if (r) out.imports.push(r);
-    return r;
-  };
-  const visit = (n: ts.Node) => {
-    if ((ts.isImportDeclaration(n) || ts.isExportDeclaration(n)) && n.moduleSpecifier && ts.isStringLiteralLike(n.moduleSpecifier) && !typeOnly(n)) {
-      const r = spec(n.moduleSpecifier.text);
-      if (DB_DRIVERS.has(n.moduleSpecifier.text)) out.db = true;
-      const b = ts.isImportDeclaration(n) ? n.importClause?.namedBindings : undefined;
-      if (r && b && ts.isNamedImports(b)) for (const e of b.elements) if (!e.isTypeOnly) bindings.push({ mod: r, name: (e.propertyName ?? e.name).text, local: e.name.text });
-    }
-    if (ts.isCallExpression(n) || ts.isNewExpression(n)) {
-      for (const a of n.arguments ?? []) { const u = apiText(a); if (u) out.calls.push(u); }
-      if (ts.isIdentifier(n.expression)) callees.add(n.expression.text);
-    }
-    if (ts.isJsxAttribute(n) && n.initializer) {
-      const u = apiText(ts.isJsxExpression(n.initializer) ? n.initializer.expression : n.initializer);
-      if (u) out.calls.push(u);
-    }
-    if (ts.isCallExpression(n)) {
-      const arg = n.arguments[0];
-      if (arg && ts.isStringLiteralLike(arg)) {
-        if (n.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(n.expression) && n.expression.text === "require")) spec(arg.text);
-        if (ts.isIdentifier(n.expression) && ["grantFor", "withFeature"].includes(n.expression.text)) out.asked.push(arg.text);
-      }
-      if (ts.isPropertyAccessExpression(n.expression) && n.expression.name.text === "recordUse") out.meters = true;
-      const featureArg = n.arguments[1];
-      if (ts.isIdentifier(n.expression) && n.expression.text === "can" && featureArg && ts.isStringLiteralLike(featureArg)) out.asked.push(featureArg.text);
-    }
-    const u = apiText(n);
-    if (u) out.apis.push(u);
-    ts.forEachChild(n, visit);
-  };
-  visit(source);
-  out.called = bindings.filter((b) => callees.has(b.local)).map((b) => `${b.mod}#${b.name}`);
-  return out;
-}
-
-const FILES = new Map(["app", "lib"].flatMap((d) => sources(path.join(ROOT, d))).map((f) => {
-  const rel = posix(f);
-  return [rel, scan(rel, readFileSync(f, "utf8"))] as const;
-}));
-const resolve = (spec: string) => {
-  const r = spec.replace(/\.[cm]?js$/, "");   // ESM-style "./x.js" names the x.ts source
-  return [r, `${r}.ts`, `${r}.tsx`, `${r}/index.ts`, `${r}/index.tsx`].find((c) => FILES.has(c)) ?? null;
-};
+import { ROOT, under, sources, scan, FILES, resolve, isRoute, importClosure } from "./code-scan";
 
 // Code a product owns: lib/<key>/, its staff paths, its door page and door API directories (longest prefix wins).
 const OWNED = PRODUCTS.flatMap((p) => [`lib/${p.key}`, ...p.staffPaths.map((s) => `app/(shell)/${s}`),
@@ -118,21 +36,8 @@ const allPages = (p: NextAdminProduct) => [...loginPages(p), ...(p.door.anonymou
 /** Doors whose page exists, open or not: the gates hold from the day a door page is built, before it goes live
  *  (going live = enabled + DNS + nginx, middleware-portal-guards.test.ts). */
 const builtDoors = () => nextAdminProducts().filter((p) => existsSync(path.join(ROOT, "app", p.door.page.slice(1), "page.tsx")));
-const isRoute = (f: string) => /\/route\.[cm]?[jt]sx?$/.test(f);
 function doorFiles(roots: readonly string[]): Set<string> {
   return importClosure([...FILES.keys()].filter((f) => roots.some((r) => f.startsWith(r)) && !isRoute(f)));
-}
-function importClosure(start: readonly string[], stopAt: ReadonlySet<string> = new Set()): Set<string> {
-  const todo = [...start];
-  const seen = new Set<string>();
-  while (todo.length) {
-    const f = todo.pop()!;
-    if (seen.has(f)) continue;
-    seen.add(f);
-    if (stopAt.has(f)) continue;
-    for (const r of FILES.get(f)!.imports) { const g = resolve(r); if (g) todo.push(g); }
-  }
-  return seen;
 }
 
 /** Every place a product's code reaches another product: its routes, or a feature it asks for (directly, or in a file it imports). */
@@ -373,7 +278,7 @@ describe("registry claims match the code", () => {
 
   it("the scanner sees literal asks, URLs in templates, and keys in an imported file", () => {
     const s = scan("lib/x/a.ts", 'import { g } from "@/lib/tarot/b"; await grantFor("studio.image"); fetch(`/api/tools/studio/x?y=${1}`); const s = "/api/social/";');
-    expect(s).toEqual({ asked: ["studio.image"], apis: ["/api/tools/studio/x", "/api/social"], calls: ["/api/tools/studio/x"], called: [], db: false, imports: ["lib/tarot/b"], meters: false });
+    expect(s).toEqual({ asked: ["studio.image"], apis: ["/api/tools/studio/x", "/api/social"], calls: ["/api/tools/studio/x"], prefixCalls: ["/api/tools/studio/x"], templates: [{ prefix: "/api/tools/studio/x", route: "/api/tools/studio/x" }], called: [], db: false, imports: ["lib/tarot/b"], meters: false });
     expect(scan("lib/x/a.ts", 'import { g as h, k } from "@/lib/b"; import type { C } from "@supabase/supabase-js"; h(); k;').called).toEqual(["lib/b#g"]);
     expect(scan("lib/x/a.ts", 'import type { C } from "@supabase/supabase-js";').db).toBe(false);
     expect(scan("lib/x/a.ts", 'import { createClient } from "@supabase/supabase-js";').db).toBe(true);
@@ -383,6 +288,8 @@ describe("registry claims match the code", () => {
     expect(j.imports).toEqual(["lib/c", "lib/d"]);
     expect(j.called).toEqual([]);
     expect(j.calls).toEqual(["/api/a/b", "/api/c", "/api/e"]);
+    expect(j.prefixCalls).toEqual(["/api/c"]);   // only the template's URL is a prefix
+    expect(j.templates).toEqual([{ prefix: "/api/c", route: "/api/c/[x]" }]);
     expect(scan("lib/x/a.ts", 'grant("studio.image"); x.grantFor("studio.image"); // grantFor("cs.answer")').asked).toEqual([]);
   });
 });

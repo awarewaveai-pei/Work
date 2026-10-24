@@ -150,8 +150,9 @@ describe("product registry", () => {
       const count = owners.length + Number(dir in BACK_OFFICE) + Number(dir in STAFF_UTILITIES);
       expect(count, `${dir}: exactly one owner`).toBe(1);
     }
-    for (const [dir, reason] of Object.entries({ ...BACK_OFFICE, ...STAFF_UTILITIES })) {
-      expect(reason.trim().length, dir).toBeGreaterThan(0);
+    for (const [dir, page] of Object.entries({ ...BACK_OFFICE, ...STAFF_UTILITIES })) {
+      expect(page.why.trim().length, dir).toBeGreaterThan(0);
+      expect(page.name.trim().length, dir).toBeGreaterThan(0);
       expect(actual, dir).toContain(dir);
     }
     for (const p of PRODUCTS) for (const dir of p.staffPaths) expect(actual, p.key).toContain(dir);

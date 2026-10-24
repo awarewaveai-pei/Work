@@ -82,7 +82,7 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
   <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>0</span>／<span data-computed>6</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>1</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
-<p class="sub">擁有者可為每位員工勾選可用工具。未勾選的工具不會顯示在側欄；直接輸入網址或呼叫 API 也會被擋下。擁有者永遠可用全部工具。共 <span data-computed>6</span> 張卡、<span data-computed>22</span> 項工作，已完成 <span data-computed>0</span> 項。</p>
+<p class="sub">擁有者可為每位員工勾選可用工具。未勾選的工具不會顯示在側欄；直接輸入網址或呼叫 API 也會被擋下。擁有者永遠可用全部工具。共 <span data-computed>6</span> 張卡、<span data-computed>23</span> 項工作，已完成 <span data-computed>0</span> 項。</p>
 <section id="now"><h2>現況</h2><p class="lead">目前可用與尚未可用的功能。</p><ul class="yn"><li class="yes"><b>可以</b><span>員工分為擁有者、管理員、操作、唯讀四種角色。<small>角色設定存在登入帳號中，目前需到 Supabase 後台手動修改。</small></span></li><li class="no"><b>還不行</b><span>為每位員工分別勾選可用工具。<small>C1、C2 完成後才有依據。</small></span></li><li class="no"><b>還不行</b><span>側欄只顯示有權限的工具。<small>C3</small></span></li><li class="no"><b>還不行</b><span>沒有權限時，直接輸入網址或呼叫 API 會被擋下。<small>C2；先只記錄、不擋，確認無誤後再由你決定開始擋。</small></span></li><li class="no"><b>還不行</b><span>在後台管理員工帳號與權限。<small>C4</small></span></li></ul></section>
 
 <section id="steps"><h2>卡片與工作</h2><p class="lead">依編號進行。每張卡列出所有工作；勾選表示完成。同一組的卡若修改不同檔案，可同時進行。High 風險步驟需經你同意才會執行。</p><ol class="steps"><li class="step todo" id="C1">
@@ -133,7 +133,7 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
       <p class="plain">員工登入後，側欄與首頁只顯示已勾選的工具。整個分區都沒有權限時，不顯示分區標題。</p>
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">負責：Sonnet 5.5（照卡）</span></p>
       <p class="donewhen"><b>完成的樣子：</b>只勾選社群發文工具的員工，側欄只看得到社群發文與首頁。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>C3.1</code> 側欄只顯示有權限的工具；沒有工具的分區不顯示。</span></li><li class="todo"><b>○</b><span><code>C3.2</code> 首頁的分區套用相同規則。</span></li><li class="todo"><b>○</b><span><code>C3.3</code> 測試：側欄每個連結都歸入一格工具。</span></li></ul>
+      <ul class="items"><li class="todo"><b>○</b><span><code>C3.1</code> 側欄只顯示有權限的工具；沒有工具的分區不顯示。</span></li><li class="todo"><b>○</b><span><code>C3.2</code> 首頁的分區套用相同規則。</span></li><li class="todo"><b>○</b><span><code>C3.3</code> 測試：側欄每個連結都歸入一格工具。</span></li><li class="todo"><b>○</b><span><code>C3.4</code> 客戶中心裡屬於其他產品的分頁（AI 客服、資料蒐集、開發信、網站與社群），員工沒勾該產品就不顯示。</span></li></ul>
       <details><summary>工程細節：C3 側欄與首頁只顯示有權限的</summary>
         <p>layout.tsx 讀 headers → SidebarNav 過濾；首頁分區同一過濾</p>
         <p><b>需先完成：</b><a href="#C2">C2</a></p>

@@ -55,7 +55,7 @@ rollback：移除 middleware 兩行＋側欄 filter。
 → **否決**：隱藏≠授權，API 照打；操作者明說「API 也擋」。補丁。
 
 **B 完整（建議）**：
-1. `lib/portal/staff-tools.ts`：由登記表推導 `STAFF_TOOLS[]`＝`{key, name, pages[], apis[]}`；`BACK_OFFICE`／`STAFF_UTILITIES` 值由字串改成 `{name, why, apis?}`；`PLATFORM_STAFF_PATHS`（`/`, `/api/theme`, `/api/entitlements/features`, `/api/ops/summary`…任何員工都可）。測試：每頁目錄、每 API route 目錄恰屬一工具或 PLATFORM。
+1. `lib/portal/staff-tools.ts`：由登記表推導 `STAFF_TOOLS[]`＝`{key, name, pages[], apis[]}`；`BACK_OFFICE`／`STAFF_UTILITIES` 值由字串改成 `{name, why, apis?}`；`STAFF_PLATFORM`（`/`、門的平台 API、`/api/ops/build-id`、`/api/ops/analytics-context`：任何員工都可）。測試：每頁目錄、每 API route 目錄恰屬一工具或 PLATFORM。
 2. `lib/staff-access.ts`：`toolOf(pathname)`、`staffMayUse(identity, key)`（owner ⇒ true）、`staffToolsMode()` shadow|enforce。
 3. middleware：解析 `app_metadata.staff_tools`→`CachedIdentity.tools`→注 `x-ops-tools`（加進 strip 清單）；fast／slow 兩路徑都查，shadow 只 `console.warn [staff-tools] would_deny`，enforce 頁→`/no-access?tool=`、API→403 `{error:"tool_not_granted",tool}`。
 4. 側欄＋dashboard：layout 讀 headers → 允許集合 → 過濾 `DEFAULT_SECTIONS`（空分區不畫）。測試：每個側欄連結恰對一工具。
@@ -81,7 +81,7 @@ B。零新表、零 migration；一個判斷三個出口；登記表＝勾選矩
 | 卡號 | 做什麼 |
 |---|---|
 | C1.1 | `lib/portal/staff-tools.ts`：由 `PRODUCTS`（`staffPaths`＋`doorApis()` 去掉 `PLATFORM_APIS`）、`STAFF_UTILITIES`、`BACK_OFFICE` 推出 `STAFF_TOOLS[]`＝`{key,name,pages[],apis[]}`；`BACK_OFFICE`／`STAFF_UTILITIES` 加中文短名欄 |
-| C1.2 | 員工專用 API（不在任何門上）逐一歸格：`STAFF_API_OWNERS` 前綴→工具 key[]（共用 API 列多格，任一格即可用）；`PLATFORM_STAFF`＝所有員工都能用（`/`、`/api/theme`、`/api/entitlements/features`、`/api/ops/build-id`…） |
+| C1.2 | 員工專用 API（不在任何門上）逐一歸格：`STAFF_API_OWNERS` 前綴→工具 key[]（共用 API 列多格，任一格即可用；多條命中取**最具體**的一條；產品的 API 不給後台格共同擁有，別的頁要用就列「需另勾」）；`STAFF_PLATFORM`＝所有員工都能用（`/`、門的平台 API、`/api/ops/build-id`、`/api/ops/analytics-context`） |
 | C1.3 | `toolsFor(pathname)`：最長前綴，回傳 `"platform"`／工具 key[]／`null`（沒歸格） |
 | C1.4 | 測試：`app/(shell)/**` 每個頁目錄、`app/api/**` 每個 route（webhooks／internal／auth 與 `PUBLIC_API_PATHS` 除外）`toolsFor` 不為 null；每個工具至少一頁；key 不重複 |
 
@@ -101,6 +101,7 @@ B。零新表、零 migration；一個判斷三個出口；登記表＝勾選矩
 | C3.1 | `app/(shell)/layout.tsx` 讀 headers 算可用工具，傳給 `SidebarNav`；過濾連結，空分區不畫 |
 | C3.2 | 首頁 `app/(shell)/page.tsx` 分區同一過濾 |
 | C3.3 | 測試：每個側欄連結 `toolsFor` 不為 null |
+| C3.4 | 客戶中心內嵌的其他產品分頁（AI 客服、資料蒐集、開發信、內容行銷的網站與社群）：員工沒勾該產品就不顯示；清單＝`staff-tools.test.ts` `NEEDS_OTHER_TOOL["ops/clients"]` |
 
 ### C4 員工權限頁 /ops/staff
 
