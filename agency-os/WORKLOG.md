@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-24（續52）排程頁小時表透明：底色改為「卡片色疊在頁面色上」（Claude）
+
+**觸發**：操作者截圖「這啥小？怎麼透明的？」：/ops/schedules 點時間跳出的 24 格小時表看得到底下的列。
+**根因**：`HourPicker` 浮層底色用 `var(--card-bg)`；操作者的主題（DB 主題，`lib/theme/tokens.ts:34` 可設）把卡片色設成帶透明度，卡片本來就透出頁面色，浮在別的內容上就透出底下的列。不變量：浮層底色必須不透明，不能只依賴一個主題可改成半透明的變數。
+**做法**：`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/schedules/ScheduleTable.tsx` 浮層 `background: linear-gradient(var(--card-bg), var(--card-bg)), var(--body-bg)`（卡片色疊在一定不透明的頁面色上，主題配色不變）。同類掃描：app/components 內 `position: fixed|absolute` 同一行配 `var(--card-bg)` 底色 0 筆。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=本機 next dev（無 Supabase）＋fetch mock，把 --card-bg 設成 rgba(255,255,255,0.15)、--body-bg #f2f0eb 重現操作者主題，打開小時表 → computed background-color rgb(242,240,235)、截圖浮層完全蓋住底下深綠側欄 | exit=0 | ms=300
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- ORACLE_WAIVED: 單一 CSS 背景值，改動本身已用真實渲染（半透明主題重現）驗證；無邏輯分支
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/components | grep=position: "(fixed|absolute)".*var\(--card-bg\) | hits=0
+- BUGHUNT_SCOPE_NARROW: 只有 next-admin 的 TSX 會用這個主題變數做浮層；agency-os/scripts 無 UI
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-24（續51）實測：員工替 Soulful 代操的付費呼叫，用量記在 Soulful、操作者是員工；順帶發現 gemini-2.0-flash-lite 已下架（Claude）
 
 **觸發**：操作者「跑一次最便宜的付費呼叫（替 Soulful 代操），確認用量記在 Soulful、操作者是員工」。驗證對象是 staff-usage-attribution session 的 `4fc6bacf4`（WORKLOG 2026-10-23 續46）。該 commit 部署後，正式環境還沒有任何付費 AI 呼叫，用量紀錄是 0 筆。

@@ -377,7 +377,9 @@ function HourPicker({ hour, disabled, onChange }: { hour: number; disabled: bool
       {at && (
         <div ref={panelRef} role="group" aria-label={T.pickHour} style={{
           position: "fixed", left: at.left, top: at.top, zIndex: 50, width: 290, padding: 8, display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 4,
-          background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: "var(--radius)", boxShadow: "var(--shadow)",
+          // Themes may give --card-bg alpha (cards show the page through); a floating panel must not, so the card
+          // tint is laid over the page colour, which is always opaque.
+          background: "linear-gradient(var(--card-bg), var(--card-bg)), var(--body-bg)", border: "1px solid var(--card-border)", borderRadius: "var(--radius)", boxShadow: "var(--shadow)",
         }}>
           {Array.from({ length: 24 }, (_, h) => (
             <button key={h} type="button" style={{ ...chipStyle(h === hour), padding: "4px 0", textAlign: "center", fontVariantNumeric: "tabular-nums" }} aria-pressed={h === hour}
