@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-25（續10）ADR 017 4b-2：wp-bridge 0.18.0——WooCommerce／WCS 付款事件、會員信箱驗證後才能結帳、我的帳號「進入」按鈕（Claude）
+
+- **任務**：4b-2（待決 1 選 WCS＋TapPay）。全部在一個設定開關後（AwareWave Bridge → 付款與會員，預設關）；商品欄位與設定頁常駐。
+- **不變量**：①`email_verified: true` 只由 `EmailVerification::isVerified`（已驗證地址＝目前 user_email）決定，改 email 即失效；②event_id 決定性（同一 action 重送＝同 id，server inbox 去重）；③body 入列時凍結，重試送同一位元組；④只有含 AwareWave 方案／點數包的訂單會被碰（狀態 hook 看得到全店訂單）。
+- **做了什麼**（`lobster-factory/packages/wp-bridge-plugin/`）：`includes/Billing/PaymentEvents.php`（六事件；payment_complete 只認 parent 訂閱＋點數包；點數包有 `_awarewave_plan_key` 另送 `subscription_paid` 期末＋1090 天、`external_ref pack:<訂單>`，沒有則備註「點數包未設定使用方案：買家無法使用點數」——customer-model session 依 4b-5 要求；訪客＝備註不排隊）、`PaymentSender.php`（HMAC、2xx 停；401／404／408／429／5xx／網路退避重試共 20 次；其他 4xx 最終＋備註；已結束訂閱的 `subscription_paid` 重試丟棄）、`EmailVerification.php`（48h 單次簽章連結，註冊與改 email 寄）、`CheckoutGate.php`（classic／block／pay-for-order 三處）、`MyAccountDoors.php`（`/api/auth/wp-handoff`，獨立密鑰，只轉址 target 同網域 https）、`ProductFields.php`、`Settings`／`Signature`／四個 port＋四個 WP 實作、`BillingModule.php`；`includes/Admin/BillingSettingsPage.php`；`aware-wave-wp-bridge.php` 0.17.0→0.18.0；`phpunit.xml` 加 `tests/Billing`；`tests/Billing/*`（12 測試）。
+- **與卡字面不同處**：訂閱事件 id 含 plan_key（WCS 同週期商品放同一訂閱）；設定頁放新子選單 `BillingSettingsPage`（不改 `AdminPage.php`）；開關關掉時已排隊事件不送、寫備註。
+- **critic**（Deep，1 輪）：0C／3M／5m。已修：M1 401 改重試、「已開 ops 事件」只在 server 確實開時寫；M2 加 `woocommerce_order_status_processing`／`_completed`（手動標已付款）；M3 已結束訂閱的遲到 paid 丟棄；m2 pay-for-order 也擋；m4 退款含 switch 訂單；m5 部分退款 hook 補備註。不修：m1（以結帳時驗證狀態送出會把未證明的新地址標為已驗證；現行＝安全側，server 拒並開 incident）；m3（0120 一產品一 base 合約、換 plan 原地更新並結束舊列，`0120_payment_events.sql:217`）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=php -d extension=mbstring -d extension=sodium phpunit-9.6.phar（plugin 全套 115 tests，含 tests/Billing 12） | exit=0 | ms=314
+- REALTEST_EVIDENCE: tool=Bash | cmd=php -l 22 檔（includes/Billing/*、BillingSettingsPage、tests/Billing/*、aware-wave-wp-bridge.php） | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變（暫存複本）：拔 CheckoutGate email_unverified 分支 → `an unverified member cannot check out…` 紅；`email_verified` 寫死 true → 同測試紅；真樹綠 | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=node createHmac('sha256',k).update(b).digest('base64') 固定向量 = PHP Signature::sign（PaymentSenderTest） | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/5n（6 修、2 不修附理由）
+- ORACLE_WAIVED: codex 額度斷路器 BLOCKED 至 2026-10-25 07:00（scripts/oracle-quota.ps1 exit 3）；以 Deep critic＋2 個突變代替。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=aware_wave_email_verified | hits=4
+- BUGHUNT_SCOPE_NARROW: 只新增外掛檔與兩個 option／meta 名；既有 symbol 無改名，`.claude/` 不涉及。
+- **剩餘風險**：WCS 提前續約時 next_payment 是否在 hook 前更新未在真 WCS 驗（staging 驗）；點數包全額退款不撤其附加方案列；開關關閉時佇列事件需人工登記；PHP 7.4 相容只靠人工檢查（本機 8.4）。
+- **上線（操作者 High，未做）**：`bash scripts/release-wp-bridge.sh`、aware-wave.com 更新外掛、設定頁貼兩把密鑰（與 next-admin `PAYMENTS_WOO_SECRET`／`AUTH_WP_HANDOFF_SECRET` 同值）、打開開關。
+- **rollback**：設定頁關開關；或 `git revert <本 commit>`。
 ## 2026-10-25（續9）外觀色票：37 組四色票做成 Theme Editor 預設，四色可換 24 種排法，色票不當字色（Claude）
 
 - **任務**：操作者給 47 組四色票（去重 45），要做成 /tools/theme 的預設；預覽篩選後刪 8 組、23 組換排法；規則「色票不針對文字」「四色可在頁面／側欄／按鈕／提示框之間換，不寫死」。

@@ -3,7 +3,7 @@
  * Plugin Name:       AwareWave WP Bridge
  * Plugin URI:        https://aware-wave.com
  * Description:       Ed25519-authenticated, self-healing control plane that lets an AI operate this site safely (signed requests, render-verify, auto-rollback).
- * Version:           0.17.0
+ * Version:           0.18.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            AwareWave
@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'AWBRIDGE_VERSION', '0.17.0' );
+define( 'AWBRIDGE_VERSION', '0.18.0' );
 define( 'AWBRIDGE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AWBRIDGE_REST_NAMESPACE', 'aware-wave-bridge/v1' );
 
@@ -82,4 +82,9 @@ add_action(
 // attribute TERM (Products → Attributes → Color → term). Define a colour once on the term and EVERY
 // variable product using that attribute renders swatches — no per-product setup. (0.17.0)
 ( new Admin\AttributeSwatchTerms() )->register();
+
+// ADR 017 4b-2: WooCommerce / Subscriptions payments → signed events to app.aware-wave.com, member email
+// verification before checkout, and My Account 「進入」 door buttons. One switch (AwareWave Bridge → 付款與會員),
+// default OFF; product fields and the settings page are always present. (0.18.0)
+( new Billing\BillingModule() )->register();
 

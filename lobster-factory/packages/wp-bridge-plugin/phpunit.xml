@@ -14,6 +14,7 @@
     <testsuites>
         <testsuite name="unit">
             <directory>tests/Auth</directory>
+            <directory>tests/Billing</directory>
             <directory>tests/Content</directory>
             <directory>tests/Http</directory>
             <directory>tests/Transaction</directory>
