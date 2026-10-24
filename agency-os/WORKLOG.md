@@ -1,4 +1,39 @@
 # Worklog
+## 2026-10-24（續36）video、design 產品門上線（操作者 go）；每扇門只讓「持有該產品」的帳戶進（操作者「每個功能都要分開購買或我們送」）（Claude）
+
+**觸發**：操作者「Go ahead: take the video and design doors live (DNS, certificate, host nginx, lobster-nginx, enabled), with smoke tests」，過程中補兩句：「video.aware-wave.com、design.aware-wave.com 要加購 是積木LEGO」「每個功能都要分開購買或我們送」。
+
+**發現**
+- C1 門不檢查有沒有買：任何客戶帳號只要登入，就能開任何一扇門（`ProductDoorShell` 沒有讀權利）。門裡收費按鈕會問 `can()`，但不收費的部分照樣能用，例如 design 的畫布、橫幅、模型圖頁。要守住的規則：客戶要持有該產品的有效權利列（contract 或 comp），才進得了那扇門。→ 新增 `lib/portal/door-access.ts` 的 `doorAccess`：員工照進；客戶要有 org，而且 `lib/entitlements/door-holds.ts` `holdsProduct` 要查得到有效、在期間內的列；查詢失敗＝顯示錯誤頁，不開門。`ProductDoorShell` 改成 async，沒持有時只顯示「尚未開通」頁和「回到我的產品」（portal launcher）。這條規則套用到所有門（social、tarot、studio、video、design、content）。
+- C2 上線前查 prod：客戶帳號只有一個（Soulful，`2bf60452…`），它持有全部 10 個產品（`all-features:soulful`，contract）。訂閱表 `organization_product_subscriptions` 是空的，所以不能拿訂閱表當判斷依據，否則 Soulful 會被擋在外面。改用權利列判斷。
+- C3 兩個門閘都抓到問題，而且都抓對了。閘 3：Shell 原本 import `doors.ts`（路由），掃描器把它的 `/api` 當成門頁呼叫。→ 把主機名函式拆到 `lib/portal/hosts.ts`，`doors.ts` re-export，原本 11 處 import 不用改。閘 4：門頁不得用 service-role 讀資料，但權利表只有 service-role 讀得到（0110）。→ 只讀「呼叫者自己 org」的那一個函式放在 `door-holds.ts`，列進閘 4 的唯一例外 `DOOR_OWN_ORG_READS`，並附理由；同時斷言該檔確實 import service-role，這個例外才算數。
+- C4 點數：照 ADR 017 §0，錢包會替沒有權利列的功能按次付費（`can.ts` credits 分支）。這和新規則衝突。現在沒有任何帳戶有點數，所以不會發生。改 `can()` 屬於金流（High），記成 ADR 017 產品決定 #11「待決」，隨順序 4b 做。
+
+**修改**
+- next-admin：`app/ProductDoorShell.tsx`、`lib/portal/door-access.ts`（新）、`lib/entitlements/door-holds.ts`（新）、`lib/portal/hosts.ts`（新，從 `doors.ts` 拆出）、`lib/portal/doors.ts`、`lib/portal/products.ts`（video、design 拿掉 `enabled: false`）、`lib/portal/__tests__/door-access.test.ts`（新）、`lib/entitlements/__tests__/door-holds.test.ts`（新）、`lib/portal/__tests__/registry-code.test.ts`（閘 4 例外表）。
+- nginx：`nginx/default.conf` 共用門區塊加 video、design；`nginx/system-sites/sg-stack.aware-wave.com.conf` 的 80／443 server_name 加 video、design。
+- ADR 017 產品決定加 #11。卡 `step-8-doors-video-design-content.md` 的 V9、D8 標記完成。
+
+**上線步驟（prod）**
+- Cloudflare：`video` A → 145.239.195.47 proxied（`9fa9f779…`）；`design` 同上（`f8e50b6b…`）。上線前兩筆記錄都不存在。
+- 漂移檢查：主機 `sg-stack.aware-wave.com` 和 lobster-nginx `default.conf` 的 md5 都等於 repo HEAD（8b5a6e70／0ce32a65）。
+- 主機 nginx：`safe-infra-patch.sh host-nginx … app.aware-wave.com` OK，備份 `_etc_nginx_sites-available_sg-stack.aware-wave.com.safe-patch-20261024-125343`。
+- 憑證：`certbot certonly --cert-name aware-wave.com --nginx --expand`，共 15 個網域，SAN 含 video、design，notAfter 2027-01-22；`00-default-placeholder` 前後 md5 都是 fde8a78a；`nginx -t` 後 reload。
+- lobster-nginx：`safe-infra-patch.sh nginx` OK，備份 `default.conf.bak.safe-patch-20261024-125429`。
+- 部署前公網：video、design 的 `/` 都回 404（舊程式門未開，TLS 正常）；social、tarot `/` 回 307；app `/login` 回 200。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p .（原始碼 0）＋ npx vitest run（370 files：3155 passed，唯一 1 紅是 `blocked-change.test.ts` 掃到另一個 session 未追蹤的 `lib/content/publish/wp-post-core.ts`，不在本次範圍、未提交，主機 npm test 不會跑到）＋ lib/portal、lib/entitlements、middleware 守衛 213 passed | exit=0 | ms=60000
+- 突變：`doorAccess` 未持有也回 open，結果「a customer whose account holds no row of the product does not enter」變紅；還原後變綠。
+- 閘證據：閘 3 指名 `lib/portal/doors.ts: /api`；閘 4 指名 `lib/entitlements/tables.ts`。修好後兩個都變綠。
+- REALTEST_EVIDENCE: tool=SSH | cmd=Cloudflare 2 筆 A；safe-infra-patch host-nginx OK；certbot expand 得到 15 SAN；safe-infra-patch nginx OK | exit=0 | ms=40000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n -- Codex `agency-os/reports/oracle/2026-10-24-partialreview-720f0df9.md`：F2「例外只檢查 import，不檢查 org 篩選」成立，已修：新增 `lib/entitlements/__tests__/door-holds.test.ts`，釘住 `.eq("organization_id", …)`；閘 4 要求每個例外都要有這類測試（`DOOR_OWN_ORG_READ_TESTS`）。突變：拿掉 org 篩選，結果「reads only the caller's own organization's…」變紅，還原後變綠。F1「user_kind 缺漏＝staff，所以門會開」不採納：這是整個 app 的身分模型（`middleware.ts:113`、`tenant-guard.ts:6`），不是門專屬的問題；兩條建立客戶帳號的路都寫入 `user_kind:"client"`（`app/portal/api/signup/route.ts:200`、`lib/accounts/client-invite.ts:146`）；prod 只有 2 個帳號：client 1 個（Soulful），沒有 user_kind 的 1 個是員工。門的判斷照用同一個模型，不另立規則。
+  - external oracle = Codex CLI (codex exec -s read-only), not self-description
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=from "@/lib/portal/doors"\|from "./doors"\|portalHost\|enabled: false | hits=14（10 個檔 import `portal/doors`，`doors.ts` re-export 保留舊 import；`enabled: false` 只剩 content、cs、collect、outreach）
+
+部署與公網煙霧測試見下一條。
+
+**rollback**：程式用 `sg-deploy` 回前一版，或 revert 本 commit；lobster-nginx 用 `default.conf.bak.safe-patch-20261024-125429` 加 `safe-infra-patch.sh nginx`；主機 nginx 用上列備份加 `safe-infra-patch.sh host-nginx`；DNS 刪 `9fa9f779…`、`f8e50b6b…`；憑證不必回退。
 ## 2026-10-24（續34）content 產品門頁建好（enabled:false，四頁＋門選單）；門上隱藏員工專用的電子報、趨勢來源管理、新增網站與改網址（Claude）
 
 **觸發**：操作者「續做第 8 項產品門」；卡 `cards/step-8-doors-video-design-content.md` §5.5 C1–C5（C-R1…C-R6、S1、P1、D1 已完成）。照 video（`2dd183f44`）、design（`dc5ad2405`）做法。

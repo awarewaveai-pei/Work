@@ -3,26 +3,15 @@
 // PRODUCT_HOST_<KEY> -- a buyout install on a customer's domain sets these and changes no code.
 
 import { PRODUCTS, type PortalProduct, type ProductDoor } from "./products";
+import { baseDomain, cleanHost as clean, portalHost, productHost } from "./hosts";
+
+export { baseDomain, portalHost, productHost } from "./hosts";
 
 type Env = Record<string, string | undefined>;
 export type NextAdminProduct = PortalProduct & { door: Extract<ProductDoor, { app: "next-admin" }> };
 
 /** Subdomains a product may not take: the staff and portal doors, and the public site. */
 export const RESERVED_SUBDOMAINS: readonly string[] = ["app", "portal", "www"];
-
-const clean = (v: string | undefined) => (v ?? "").trim().toLowerCase();
-
-export function baseDomain(env: Env = process.env): string {
-  return clean(env.PUBLIC_BASE_DOMAIN) || "aware-wave.com";
-}
-
-export function portalHost(env: Env = process.env): string {
-  return clean(env.PORTAL_HOST) || `portal.${baseDomain(env)}`;
-}
-
-export function productHost(p: PortalProduct, env: Env = process.env): string {
-  return clean(env[`PRODUCT_HOST_${p.key.toUpperCase()}`]) || `${p.subdomain}.${baseDomain(env)}`;
-}
 
 export function nextAdminProducts(): NextAdminProduct[] {
   return PRODUCTS.filter((p): p is NextAdminProduct => p.door.app === "next-admin");

@@ -73,7 +73,7 @@
 | V6 | **✅ `2dd183f44`**（`canApproveMedia`；兩路由仍 `assertOrgAccess`，突變證據見 WORKLOG 2026-10-24 續27） 決策 D3（客戶可否核准 release／story bible）→ 若是，改 `canApproveMediaRelease` 為「客戶限本組織」或新增 `canApproveOwnMedia`；若否，門上隱藏 Release 步驟並寫入 manifest | `app/api/video/release/route.ts:14`；`lib/ops-role.ts:81`；`TOOLS/video/ReleaseDeliveryPanel.tsx:83` | M |
 | V7 | **待操作者決定**（門上功能清單會改三個已上線門版面；manifest 無 TODO） 登記表 `features[]` 渲染功能清單（step-8 第 3 點）、`lib/video/MODULE_MANIFEST.json` 無 TODO | `NA/lib/video/MODULE_MANIFEST.json` | L |
 | V8 | **✅ `2dd183f44`**（本機 `/video` 門框、無側欄；門閘綠） 驗收：`npx vitest run lib/portal lib/video`、`npx tsc --noEmit -p .`；`Host: video.localhost` 開 `/` 看精簡版面；突變：改名 `app/video/page.tsx` → `products.test.ts` 紅 | step-8 Acceptance | L |
-| V9 | `enabled:false` 維持到 go-live（DNS、憑證 SAN、nginx 區塊 `nginx/default.conf:430` 加 `video.aware-wave.com`）——High，等操作者 go | `NA/lib/portal/products.ts:47` | H |
+| V9 | **✅ 2026-10-24 上線**（DNS、憑證 15 SAN、主機 nginx、lobster-nginx、enabled；門只讓持有 video 的帳戶進，WORKLOG 當日 video／design 上線條） `enabled:false` 維持到 go-live（DNS、憑證 SAN、nginx 區塊 `nginx/default.conf:430` 加 `video.aware-wave.com`）——High，等操作者 go | `NA/lib/portal/products.ts:47` | H |
 
 ## 4. DESIGN 門
 
@@ -119,7 +119,7 @@
 | D5 | **✅ `dc5ad2405`**（「去建商品」門上隱藏；下載門上走 studio proxy-image） 門上連結改 door-aware：`BannerStudio.tsx:2132`、其他 `/tools/*` 連結（grep `href="/tools` 於 5 頁） | 同左 | L |
 | D6 | **待操作者決定**（門上功能清單，同 V7）；manifest 無 TODO `features[]`（`design.edit` 為 contract，`products.ts:62`）渲染清單；`lib/design/MODULE_MANIFEST.json` 無 TODO | — | L |
 | D7 | **✅ `dc5ad2405`**（本機四頁門框＋選單；mockup 只收販售商品 id，突變證據 WORKLOG 2026-10-24 續28） 驗收同 V8（`Host: design.localhost`，每個 nav 頁進得去、`/designs` 載入）；突變：presets 拿掉 org 檢查 → 指名測試紅 | — | L |
-| D8 | 上線（DNS／nginx `server_name`）— High，要 go | `nginx/default.conf:430` | H |
+| D8 | **✅ 2026-10-24 上線**（同 V9；門只讓持有 design 的帳戶進） 上線（DNS／nginx `server_name`）— High，要 go | `nginx/default.conf:430` | H |
 
 ## 5. CONTENT 門（含 video／design 共用的 content 路由加固）
 

@@ -303,7 +303,7 @@
   - **2026-10-23 先後決策**（WORKLOG 續36；監工台 NEXT 已重排）：門先（tarot→studio→video→design→content；cs／collect／outreach 最後）；錢的內部段緊接（每個付費路由接 `grant.report()` 用量回報＝全 app 現 0 呼叫點；第 4 項拆 4a 人工付款入口不等待決）；Woo 六事件＋WordPress 一鍵登入＝4b，等待決 1、3。第一個自助客戶走員工邀請＋人工合約列（Soulful 同路）。建議模型：Opus 5.5
   - **NEXT ②**（2026-10-23，WORKLOG 同日 NEXT ② 與 0119 條目）：用量計量已推（付費縫 `grant.recordUse()`＋閘）、studio 精選免費＋門上藏 AI、tarot 批次記操作者（0119 已套 prod）。剩下一行。建議模型：Opus 5.5
   - [x] **員工路由用量歸屬**（2026-10-23 done，WORKLOG 2026-10-23 續46）：`withFeature` 加 `org`（經 `actorFor`），代操記到客戶、actor＝員工；10 條付費路由包起來，rag 向量化指名 org；閘 ④ 擴到全部 API 路由（`UNSCOPED_ROUTES` 23 條附理由）。
-  - **第 8 項產品門**（2026-10-24，WORKLOG 續27／續28／續34；逐列狀態在 `agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-8-doors-video-design-content.md`）：tarot、studio 已上線；video（`2dd183f44`）、design（`dc5ad2405`）、content（`b3132c733`）門頁已建、`enabled:false`。[ ] video／design／content 上線（High，等操作者 go）；[ ] 門上功能清單 V7／D6／C4（改已上線門版面，等操作者決定）。建議模型：Opus 5.5
+  - **第 8 項產品門**（2026-10-24，WORKLOG 續27／續28／續34；逐列狀態在 `agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-8-doors-video-design-content.md`）：tarot、studio、video、design 已上線（2026-10-24 續36：每扇門只讓持有該產品的帳戶進；點數規則待決＝ADR 017 產品決定 #11）；content（`b3132c733`）門頁已建、`enabled:false`。[ ] content 上線（High，等操作者 go）；[ ] 門上功能清單 V7／D6／C4（改已上線門版面，等操作者決定）。建議模型：Opus 5.5
     - [ ] 閘 ③「門路由要授權」對任何 import `grant.ts` 的路由都算已授權（`grant.ts → subject.ts → tenant-guard.ts`，`STOP_AT` 沒停在 `grant.ts`）；改前即如此，見 WORKLOG 2026-10-23 續46。建議模型：Opus 5.5
   - [x] **第 4a 項（收錢內部段）已上線**（2026-10-23，WORKLOG 續48、續51）：0120 已套 prod、`f2139d35a`、容器有 `PAYMENTS_*`。
     - [ ] 第一個方案列（plans 0 筆；訂閱付款前必須，功能與上限由操作者定）。建議模型：Opus 5.5
