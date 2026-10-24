@@ -148,5 +148,5 @@ export const STEPS = [
 // 操作者自己要決定或親手做的（agent 不能替她定）
 export const OPEN = [
   { n: 4, what: '到 Google 申請 YouTube 發文授權（要你本人操作）', before: 'P7', src: '計畫 §0 D4' },
-  { n: 7, what: '同意在主機裝每 5 分鐘的排程時鐘（今晚部署後）；跑順一天後停掉外部的每小時排程', before: 'P4', src: '計畫 §0 D6、P4.4' },
+  { n: 7, what: '主機每 5 分鐘的排程時鐘已裝好（2026-10-24 12:11Z，另一個工作階段經你同意安裝）。跑順一天後，同意停掉外部（Trigger.dev）的每小時排程', before: 'P4', src: '計畫 §0 D6、P4.4' },
 ];
