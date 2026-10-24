@@ -4,10 +4,10 @@
 
 export const META = {
   title: '全自動內容 監工台',
-  updated: '2026-10-24',
+  updated: '2026-10-25',
   plan: 'agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md',
   req: 'agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_PIPELINE_REQUIREMENTS.md',
-  worklog: 'agency-os/WORKLOG.md 2026-10-24',
+  worklog: 'agency-os/WORKLOG.md 2026-10-24、2026-10-25',
   self: 'agency-os/handoffs/2026-10-24-auto-content-supervisor/',
   url: 'https://claude.ai/artifact/TUMBoFwaMCKbPgVmLVjEUZ',
 };
@@ -118,11 +118,11 @@ export const STEPS = [
       done('P5.27', '腳本結果加「送社群」（存成社群草稿）「送去生產影片」（帶到影片工具）；「腳本轉文案」結果也能送社群', P5C),
     ] },
   { n: 6, code: 'P6', group: 'E', plain: '選了影片的題目，影片做好後自動嵌回文章、發到社群；關掉分頁也不會斷。', title: '影片接管線',
-    gate: '關掉瀏覽器後，影片完成時文章裡仍出現影片，社群工具出現影片貼文', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['P4'],
+    gate: '關掉瀏覽器後，影片完成時文章裡仍出現影片，社群工具出現影片貼文', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['P4'],
     what: '抽 finalizeVideoJob／embedVideoInPost 成共用核心；排程每輪檢查影片；退場舊的文章頁 Postiz 面板',
-    files: ['lib/content/video/finalize.ts', 'lib/content/topics/tick.ts'],
+    files: ['lib/content/video/finalize.ts', 'lib/content/video/embed-in-post.ts', 'lib/content/topics/tick.ts'],
     items: [
-      todo('P6.1', '「影片完成」和「嵌回文章」抽成共用功能，瀏覽器和排程都用它'),
+      done('P6.1', '「影片完成」和「嵌回文章」抽成共用功能，瀏覽器和排程都用它（行為不變；嵌回文章另放一檔，不會碰到付費的影片功能）', '3a9439900'),
       todo('P6.2', '排程每輪檢查影片；做好就嵌回文章，並發社群影片貼文'),
       todo('P6.3', '刪掉文章頁舊的社群發布面板和舊的 Python 直連發布'),
     ] },
@@ -142,10 +142,10 @@ export const STEPS = [
     files: ['lib/portal/products.ts', 'agency-os/docs/operations/RUNNABLE_DEMOS.md'],
     items: [
       done('P8.1', '舊的內容積木藍圖改成指向這份計畫', 'cfc6e08d7'),
-      todo('P8.2', '產品清單和模組說明加上「題目規劃」這項新功能'),
+      done('P8.2', '產品清單和模組說明加上「題目規劃」這項新功能', '2a926449d'),
       todo('P8.3', '可執行示範清單加一條你自己能跑的指令'),
-      todo('P8.4', 'System Foundry 的產品目錄重新產生'),
-      todo('P8.5', '待辦清單和排程頁計畫改指這份計畫'),
+      done('P8.4', 'System Foundry 的產品目錄重新產生', '2a926449d'),
+      done('P8.5', '待辦清單和排程頁計畫改指這份計畫', '2a926449d'),
     ] },
 ];
 
