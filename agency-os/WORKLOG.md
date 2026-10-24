@@ -1,4 +1,41 @@
 # Worklog
+## 2026-10-24（續32）compose 不變量收斂完成：其餘 12 份 prod compose 全進 ENFORCED；`--running` 比對容器實況；safe-infra-patch 可改非預設檔名、任何失敗都回滾（Claude）
+
+**觸發**：操作者「go，把 11 份 prod compose 整理完，做完把 TASKS §G 那條關掉」（續16／續20 的剩餘項）。
+
+**根因／發現**
+- C1 PENDING 標 prod 的 11 份（supabase／trigger／n8n／chatwoot／postiz／uptime-kuma／observability／video／remotion／cognitive-os×2）允許 swap、無 pids 上限、探針無界；`Projects/internal/ziwei-doushu/docker-compose.yml` 標「local dev」但 oracle-web 在 prod（`/opt/oracle`）→ 實為 12 份。
+- C2 檔≠容器：續20 宣稱 ENFORCED 17 服務 `init: true`，實測 9 個容器 `Init=false`（hci-postgres／hci-app／hci-fetch-runner／renderer／nginx／mainwp-db／mainwp-web／soulful-db／soulful-wp）——檔改了沒重建。checker 只讀檔，看不到。
+- C3 image 自帶 HEALTHCHECK 無界（uptime-kuma `extra/healthcheck`、remotion、supabase-meta），檔案檢查看不到。
+- C4 safe-infra-patch 只能改目錄預設檔名 → observability／video（`.env.video`）／cognitive-db 無安全路徑。
+- C5 safe-infra-patch 既有 bug（Codex 第 2 輪 F1）：`compose up` 本身失敗時 `set -e` 直接結束、跳過 Step 4 回滾，新檔留在原處。
+- C6 實測峰值貼上限或已用 swap（關 swap 前必須先加）：n8n 512/512、supabase-db 769/768＋swap 71M、meta 256/256＋46M、kong 760/768、trigger-postgres 512/512＋14M、minio 384/384、promtail 128/128、studio 469/512、oracle-web 449/512；trigger-registry 無記憶體上限。
+- C7 陷阱：`/root/render-services/docker-compose.yml` 另有一份過期的 `lobster-video-service` 定義（同 container_name；實際容器來自 `apps/video-service/docker-compose.video.yml`）；chatwoot 的 anchor 寫成可被 `up -d` 啟動的 `base` service。
+
+**不變量**：每個 prod service 的「運行中的容器」= 檔案宣告（R1 Memory／R2 MemorySwap=Memory／R3 PidsLimit／R6 Init）且實際執行的健康檢查有界（R4）；safe-infra-patch 寫入新內容後，除成功外任何結束都回滾。
+
+**改動**
+- M1 12 份 compose：memswap=memory、pids（2×觀測峰值取 2 的次方，下限 64）、`init: true`、探針前置 `timeout N`（N=healthcheck timeout−1；含 `;`/`|` 的改寫成單一指令）。記憶體只在峰值≥80% 或有 swap 時調為 1.5×(峰值+swap)：n8n 1g、supabase db 1280m／meta 512m／kong 1152m／rest 384m／studio 768m、trigger postgres 896m／minio 640m／electric 512m／docker-proxy 128m／registry 256m（新）、promtail 256m、oracle-web 768m。chatwoot `base` → `x-chatwoot-base`；render-services 刪過期 video 定義；meta 健康檢查加 `start_period: 30s`（首套時 3×5s 內未就緒被判 unhealthy）。repo 有意差異保留：n8n `${...}`、trigger `TRIGGER_SUPERVISOR_API_URL`、supabase 註解、remotion build manifest。
+- M2 `scripts/check-compose-invariants.py`：12 份移入 ENFORCED；`--running` 比對 R1/R2/R3/R4/R6。測試 `tests/scripts/test_check_compose_invariants.py` 12 OK。
+- M3 `lobster-factory/infra/hetzner-phase1-core/scripts/safe-infra-patch.sh`：目標 service 有容器且其標籤列此檔 → 用該容器的 project／working dir／files／env file；寫入前裝 EXIT trap，`finished=1` 之前的任何結束都回滾。新測試 `tests/host-scripts/safe-infra-patch-compose-labels.test.sh`（真 docker compose，16 項）。
+- M4 主機：root crontab 刪 `smart-restart-if-oom.sh n8n 500`（備份 `/root/crontab.bak.20261024-075520`），腳本移 `/root/retired/`。repo `scripts/cron.d/awarewave-schedules` 的 `n8n_oom_restart`（他 session 354c2c40e）經訊息由該 session 於 c8decdde7 三處移除（已驗 origin/main 只剩退役註解）。
+- M5 `agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md` §2.7：逐 service、逐步候選檔、非預設檔名、cognitive 插值變數、`--running` 驗收。
+- M6 TASKS §G 條目關閉；TASKS「cognitive-os 只換環境變數沒有安全腳本」關閉（`COGNITIVE_OS_REGION=aw01` 匯出後 `safe-infra-patch compose` 即可，本次 cos 4 服務即此路徑）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=preflight.py ×12（live vs 候選 `docker compose config` 僅 memory/swap/pids/init/healthcheck 不同；每個新探針在其運行容器內 exec，exit 0） | exit=0 | ms=240000
+- REALTEST_EVIDENCE: tool=SSH | cmd=safe-infra-patch.sh compose 逐 service：uptime-kuma、oracle-web、remotion、n8n、cognitive-os×4、postiz×4、chatwoot×4、trigger×9、supabase×11（per-step 候選）＋ ENFORCED 9 容器重建，全部 healthy；n8n healthz 200（本機＋公開） | exit=0 | ms=1500000
+- REALTEST_EVIDENCE: tool=SSH | cmd=python3 check-compose-invariants.py --running <12 live 檔> | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=Bash | cmd=safe-infra-patch-compose-labels.test.sh 19/19；拔 label 模式 → 3 紅；拔 EXIT trap → 5 紅；拔訊號 trap → TERM 案例紅；host-nginx test 14/14；test_check_compose_invariants 12 OK | exit=0 | ms=400000
+- 剩 observability／video／cognitive-db 三檔：需新 safe-infra-patch 上主機（本 commit → sync-host-scripts），見下一 commit 的補記
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/8m/0n
+  - external oracle = Codex CLI：`agency-os/reports/oracle/2026-10-24-partialreview-2d2a7fec.md`（F1 uptime 埠：prod 是 nginx→127.0.0.1:3005、公開 302→/dashboard，repo apache `uptime.conf` 是 4 月殘檔＝誤報；F2 空 env-file 標籤：新測試證偽）、`2026-10-24-partialreview-b1246aa0.md`（F1 compose up 失敗跳過回滾＝真，以 EXIT trap 不變量修；F2 測試未驗 FROM_ENV＝真，已補；F3 清理 label 與 host-nginx 測試共用＝真，改 `aw-sip-test`）、`2026-10-24-partialreview-1826e63d.md`（第 3 輪，寫不變量分析後修：「exit 0 ⇔ 新檔已驗證且保留；其他任何結束（錯誤、TERM/HUP/INT、回報成功時失敗）⇔ 還原」；F1 訊號：加 `trap 'exit 1' TERM HUP INT`＋TERM 測試；F3 `finished=1` 移到最後一行；F2 建立時的 shell 變數 compose 不記錄＝能力外，runbook §2.7 已寫「插值變數要自己給」，不修）
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks,.claude,lobster-factory/docs,lobster-factory/infra,mcp | grep=smart-restart-if-oom|not converged \(TASKS|safe-infra-patch.*固定 /root/lobster-phase1 | hits=3
+  - `scripts/cron.d/awarewave-schedules:20`（M4 已通知擁有者）；`TASKS.md:433`（M6 關閉）；`TASKS.md:796`（已 [x] 歷史）。
+
+- ORACLE_WAIVED: 第 3 輪後的修正只有 2 行（訊號 trap、finished=1 移位）＋1 個 TERM 測試；以突變證據取代第 4 輪（拔訊號 trap → 指名測試紅、還原綠），書面自審：TERM→`exit 1`→EXIT trap→finished=0→rollback→exit 1；正常結束 finished=1 為最後指令，任何前面的失敗都回滾
+
+**rollback**：各 live 檔 `*.bak.safe-patch-<stamp>`（收斂前原版＝各檔 20261024-07xx 的第一個：kuma 072913、oracle 072931、remotion 072939、n8n 072957、cos 073042、postiz 073115、chatwoot 073324、trigger 073446、supabase 073642）＋ 用舊 safe-infra-patch 逐 service `up -d`；cron：`crontab /root/crontab.bak.20261024-075520`＋腳本移回 `/root/scripts/`；repo `git revert`。
 ## 2026-10-24（續31）主機排程換上 `scripts/cron.d/*`，root crontab 退役（Claude）
 
 承續 2026-10-24 主機所有排程上 /ops/schedules 條目（354c2c40e、c8decdde7）。操作者 go-ahead「可以，去主機換上新的排程設定」。

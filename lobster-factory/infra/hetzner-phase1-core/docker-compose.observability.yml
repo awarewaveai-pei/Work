@@ -27,6 +27,10 @@ services:
     networks:
       - observability
     logging: *obs-logging
+    mem_limit: 512m
+    memswap_limit: 512m
+    pids_limit: 128
+    init: true
 
   promtail:
     image: grafana/promtail:2.9.4
@@ -43,6 +47,10 @@ services:
     networks:
       - observability
     logging: *obs-logging
+    mem_limit: 256m
+    memswap_limit: 256m
+    pids_limit: 64
+    init: true
 
   grafana:
     image: grafana/grafana:10.4.3
@@ -71,6 +79,10 @@ services:
     networks:
       - observability
     logging: *obs-logging
+    mem_limit: 256m
+    memswap_limit: 256m
+    pids_limit: 64
+    init: true
 
 volumes:
   loki_data:

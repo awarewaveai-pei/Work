@@ -47,7 +47,7 @@ services:
     networks:
       - lobster-net
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8420/health', timeout=3).status == 200 else 1)"]
+      test: ["CMD", "timeout", "4", "python", "-c", "__import__('sys').exit(0 if __import__('urllib.request').request.urlopen('http://127.0.0.1:8420/health', timeout=3).status == 200 else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -59,6 +59,9 @@ services:
   # (nginx/default.conf `set $web`): Docker DNS answers with every replica, nginx takes them round-robin. More replicas = copy
   # the cognitive-os-web-3 block with a new name and add it to deploy/deploy.sh SERVICES. cognitive-os-web builds the image,
   # the others run it.
+    memswap_limit: 3g
+    pids_limit: 1024
+    init: true
   cognitive-os-web:
     build:
       context: ./apps/cognitive-web
@@ -72,6 +75,9 @@ services:
       environment:
         - COS_API_ORIGIN=http://cognitive-os-api:8420
       mem_limit: 256m
+      memswap_limit: 256m
+      pids_limit: 128
+      init: true
       mem_reservation: 64m
       networks:
         lobster-net:
@@ -81,7 +87,7 @@ services:
         cognitive-os-api:
           condition: service_healthy
       healthcheck:
-        test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:3000/login"]
+        test: ["CMD", "timeout", "4", "wget", "--spider", "--quiet", "http://127.0.0.1:3000/login"]
         interval: 30s
         timeout: 5s
         retries: 3

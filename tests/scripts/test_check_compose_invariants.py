@@ -109,6 +109,18 @@ class Invariants(unittest.TestCase):
         for ref in ["wordpress@sha256:abc", "library/wordpress", "docker.io/library/wordpress:6"]:
             self.assertTrue(any(x.startswith("I5") for x in self.run_compose(wp.replace("wordpress:6.7-apache", ref))), ref)
 
+    def test_running_container_must_match_the_file(self):
+        svc = {"init": True, "memswap_limit": "256M", "deploy": {"resources": {"limits": {"memory": "256M", "pids": 64}}}}
+        ok = {"name": "web", "Memory": 256 << 20, "MemorySwap": 256 << 20, "PidsLimit": 64, "Init": True}
+        run = lambda c: cci.check_running("f.yml", "web", svc, containers=lambda p, n: c)
+        self.assertEqual(run([ok]), [])
+        self.assertEqual(run([]), [])   # nothing running = NOTE, not a pass claim on a container
+        for key, bad in [("Memory", 128 << 20), ("MemorySwap", 512 << 20), ("PidsLimit", None), ("Init", False)]:
+            out = run([{**ok, key: bad}])
+            self.assertTrue(len(out) == 1 and key in out[0], (key, out))
+        self.assertTrue(any(x.startswith("R4") for x in run([{**ok, "Healthcheck": "extra/healthcheck"}])))
+        self.assertEqual(run([{**ok, "Healthcheck": "timeout 4 extra/healthcheck"}]), [])
+
     def test_repo_files_are_listed_and_green(self):
         cwd = os.getcwd()
         try:

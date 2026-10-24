@@ -30,29 +30,30 @@
 # → THEN this file falls under safe-infra-patch.sh's patch-protection for every future edit.
 name: chatwoot
 
-services:
-  base: &base
-    # >= v4.14.2 required: older tags send every Messenger reply with tag ACCOUNT_UPDATE, which Meta
-    # rejects since 2026-04-27 (code 100 / subcode 1893061) -- all replies fail. Upgrade = pull, then
-    # `docker compose run --rm chatwoot-rails bundle exec rails db:chatwoot_prepare` before `up -d`.
-    image: chatwoot/chatwoot:v4.18.0
-    env_file: .env
-    volumes:
-      - chatwoot_storage:/app/storage
-    restart: unless-stopped
-    logging:
-      driver: json-file
-      options:
-        max-size: "25m"
-        max-file: "5"
-    networks:
-      - chatwoot_internal
-    depends_on:
-      chatwoot-postgres:
-        condition: service_healthy
-      chatwoot-redis:
-        condition: service_healthy
+x-chatwoot-base: &base
+  # >= v4.14.2 required: older tags send every Messenger reply with tag ACCOUNT_UPDATE, which Meta
+  # rejects since 2026-04-27 (code 100 / subcode 1893061) -- all replies fail. Upgrade = pull, then
+  # `docker compose run --rm chatwoot-rails bundle exec rails db:chatwoot_prepare` before `up -d`.
+  image: chatwoot/chatwoot:v4.18.0
+  env_file: .env
+  volumes:
+    - chatwoot_storage:/app/storage
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "25m"
+      max-file: "5"
+  networks:
+    - chatwoot_internal
+  depends_on:
+    chatwoot-postgres:
+      condition: service_healthy
+    chatwoot-redis:
+      condition: service_healthy
+  init: true
 
+services:
   chatwoot-rails:
     <<: *base
     container_name: chatwoot-rails
@@ -67,11 +68,14 @@ services:
     entrypoint: docker/entrypoints/rails.sh
     command: ['bundle', 'exec', 'rails', 's', '-p', '3000', '-b', '0.0.0.0']
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000"]
+      test: ["CMD", "timeout", "9", "wget", "--spider", "-q", "http://127.0.0.1:3000"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 60s
+    memswap_limit: 5g
+    pids_limit: 128
+    init: true
 
   chatwoot-sidekiq:
     <<: *base
@@ -86,11 +90,14 @@ services:
     # No HTTP surface — Sidekiq's own "process is alive" is the ceiling of what's checkable here;
     # queue-depth/stuck-job monitoring is a Chatwoot Super Admin UI concern, not a container gate.
     healthcheck:
-      test: ["CMD", "pgrep", "-f", "sidekiq"]
+      test: ["CMD", "timeout", "9", "pgrep", "-f", "sidekiq"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 60s
+    memswap_limit: 3g
+    pids_limit: 128
+    init: true
 
   chatwoot-postgres:
     image: pgvector/pgvector:pg16
@@ -121,10 +128,13 @@ services:
     networks:
       - chatwoot_internal
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U chatwoot -d chatwoot_production"]
+      test: ["CMD-SHELL", "timeout 4 pg_isready -U chatwoot -d chatwoot_production"]
       interval: 10s
       timeout: 5s
       retries: 5
+    memswap_limit: 4g
+    pids_limit: 256
+    init: true
 
   chatwoot-redis:
     image: redis:7.2-alpine
@@ -144,10 +154,13 @@ services:
     networks:
       - chatwoot_internal
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      test: ["CMD-SHELL", "timeout 4 redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    memswap_limit: 1g
+    pids_limit: 256
+    init: true
 
 volumes:
   chatwoot_storage:

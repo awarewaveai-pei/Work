@@ -31,11 +31,14 @@ services:
     networks:
       - lobster-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      test: ["CMD-SHELL", "timeout 4 pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 10s
       timeout: 5s
       retries: 6
       start_period: 15s
+    memswap_limit: 1g
+    pids_limit: 128
+    init: true
 
 volumes:
   cognitive-db-data:

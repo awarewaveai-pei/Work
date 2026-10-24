@@ -26,6 +26,9 @@ services:
     command: redis-server --save "" --appendonly no --requirepass ${REDIS_PASSWORD}
     networks:
       - postiz_internal
+    memswap_limit: 128m
+    pids_limit: 64
+    init: true
 
   temporal-postgresql:
     image: postgres:16
@@ -44,12 +47,15 @@ services:
     volumes:
       - temporal_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      test: ["CMD-SHELL", "timeout 4 pg_isready -U temporal"]
       interval: 10s
       timeout: 5s
       retries: 10
     networks:
       - temporal_internal
+    memswap_limit: 512m
+    pids_limit: 256
+    init: true
 
   temporal:
     image: temporalio/auto-setup:1.28.1
@@ -77,7 +83,7 @@ services:
     healthcheck:
       # Healthy = the default namespace exists. Cluster health goes SERVING before auto-setup registers it, and a
       # Postiz backend started in that window stays dead (its search-attribute call fails once and is swallowed).
-      test: ["CMD-SHELL", "temporal operator namespace describe --namespace default --address temporal:7233 >/dev/null"]
+      test: ["CMD-SHELL", "timeout 9 temporal operator namespace describe --namespace default --address temporal:7233 >/dev/null"]
       interval: 15s
       timeout: 10s
       retries: 20
@@ -87,6 +93,9 @@ services:
         condition: service_healthy
     networks:
       - temporal_internal
+    memswap_limit: 1g
+    pids_limit: 1024
+    init: true
 
   postiz:
     image: ghcr.io/gitroomhq/postiz-app:v2.25.1
@@ -141,7 +150,7 @@ services:
       - temporal_internal
     # The backend answers 401 without an API key once it listens; the frontend alone answering is not up.
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/public/v1/is-connected').then(r=>process.exit(r.status===401?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "timeout", "9", "node", "-e", "fetch('http://localhost:3000/public/v1/is-connected').then(r=>process.exit(r.status===401?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -153,6 +162,9 @@ services:
         condition: service_started
       temporal:
         condition: service_healthy
+    memswap_limit: 3g
+    pids_limit: 1024
+    init: true
 
 volumes:
   postiz_uploads:

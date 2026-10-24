@@ -44,11 +44,7 @@ services:
     ports:
       - "127.0.0.1:8732:8732"
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8732/health',timeout=4).getcode()==200 else 1)\"",
-        ]
+      test: ["CMD", "timeout", "4", "python", "-c", "__import__('sys').exit(0 if __import__('urllib.request').request.urlopen('http://127.0.0.1:8732/health',timeout=3).getcode()==200 else 1)"]
       interval: 20s
       timeout: 5s
       retries: 3
@@ -60,8 +56,11 @@ services:
       resources:
         limits:
           memory: 1536M   # EU 有 ~2.5G available；render 為 ffmpeg 模式記憶體溫和，1.5G 留足餘裕
+          pids: 256
           cpus: "2.00"
     logging: *video-logging
+    memswap_limit: 1536M
+    init: true
 
 networks:
   video-net:

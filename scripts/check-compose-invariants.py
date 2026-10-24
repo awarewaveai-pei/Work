@@ -10,8 +10,13 @@ Why: WORKLOG 2026-10-24 (lobster-wordpress OOM-thrashed the host for 11 h; I6: l
 
   python scripts/check-compose-invariants.py              ENFORCED files + every tracked compose file is listed below
   python scripts/check-compose-invariants.py <file>...    those files only (e.g. the live copies on the host)
+  python3 check-compose-invariants.py --running <file>... on the host: also each running container of those services --
+      a compose edit takes effect only when the container is recreated (2026-10-24: 9 services had `init: true` in the
+      file and not in the container). R1 Memory, R2 MemorySwap == Memory, R3 PidsLimit, R6 Init, each equal to the file;
+      R4 the healthcheck the container runs (an image's own HEALTHCHECK included) bounds itself, as in I4.
 Exit 1 = violations, or a file / Dockerfile that could not be read.
 """
+import json
 import os
 import re
 import subprocess
@@ -23,20 +28,21 @@ ENFORCED = [
     "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml",
     "lobster-factory/infra/soulful/docker-compose.yml",
     "lobster-factory/infra/mainwp/docker-compose.yml",
+    "lobster-factory/infra/chatwoot/docker-compose.yml",
+    "lobster-factory/infra/n8n/docker-compose.yml",
+    "lobster-factory/infra/postiz/docker-compose.yml",
+    "lobster-factory/infra/supabase/docker-compose.yml",
+    "lobster-factory/infra/trigger/docker-compose.yml",
+    "lobster-factory/infra/hetzner-eu/uptime-kuma-compose.yml",
+    "lobster-factory/infra/hetzner-phase1-core/docker-compose.observability.yml",
+    "lobster-factory/infra/hetzner-phase1-core/apps/video-service/docker-compose.video.yml",
+    "lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/docker-compose.remotion.yml",
+    "Projects/internal/cognitive-engineering-os/docker-compose.yml",
+    "Projects/internal/cognitive-engineering-os/ops/cognitive-db/docker-compose.cognitive-db.yml",
+    "Projects/internal/ziwei-doushu/docker-compose.yml",   # prod: oracle-web at /opt/oracle (was listed as local dev)
 ]
-# Not converged yet (prod) or not production at all. A new compose file must be added to one of the two lists.
+# Not production. A new compose file must be added to one of the two lists.
 PENDING = {
-    "lobster-factory/infra/chatwoot/docker-compose.yml": "prod, not converged (TASKS.md)",
-    "lobster-factory/infra/n8n/docker-compose.yml": "prod, not converged (TASKS.md)",
-    "lobster-factory/infra/postiz/docker-compose.yml": "prod, not converged (TASKS.md)",
-    "lobster-factory/infra/supabase/docker-compose.yml": "prod, not converged (TASKS.md)",
-    "lobster-factory/infra/trigger/docker-compose.yml": "prod, not converged (TASKS.md)",
-    "lobster-factory/infra/hetzner-eu/uptime-kuma-compose.yml": "prod, not converged (TASKS.md)",
-    "lobster-factory/infra/hetzner-phase1-core/docker-compose.observability.yml": "prod, not converged (TASKS.md)",
-    "lobster-factory/infra/hetzner-phase1-core/apps/video-service/docker-compose.video.yml": "prod, not converged (TASKS.md)",
-    "lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/docker-compose.remotion.yml": "prod, not converged (TASKS.md)",
-    "Projects/internal/cognitive-engineering-os/docker-compose.yml": "prod, not converged (TASKS.md)",
-    "Projects/internal/cognitive-engineering-os/ops/cognitive-db/docker-compose.cognitive-db.yml": "prod, not converged (TASKS.md)",
     "lobster-factory/infra/hetzner-phase1-core/docker-compose.staging.yml": "staging overlay",
     "lobster-factory/infra/hetzner-phase1-core/docker-compose.renderer-staging.yml": "staging overlay",
     "lobster-factory/infra/hetzner-phase1-core/docker-compose.recommended-ai-native.yml": "reference, not deployed",
@@ -45,7 +51,6 @@ PENDING = {
     "Projects/internal/hci30/infra/local/compose.dev.yml": "local dev",
     "Projects/internal/hci30/infra/local/compose.fetch-runner.yml": "local dev",
     "Projects/internal/hci30/infra/local/compose.test.yml": "local test",
-    "Projects/internal/ziwei-doushu/docker-compose.yml": "local dev",
 }
 # In the repo hci-app's build context lives outside apps/ (= sg-deploy.sh app_git_source_root); the host has it in apps/.
 REPO_CONTEXT = {"./apps/hci-app": "../../../Projects/internal/hci30"}
@@ -109,11 +114,48 @@ def build_paths(base, svc):
     return ctx, os.path.join(ctx, "Dockerfile" if isinstance(b, str) else b.get("dockerfile", "Dockerfile"))
 
 
+def limits(svc):
+    lim = ((svc.get("deploy") or {}).get("resources") or {}).get("limits") or {}
+    return lim, to_bytes(lim.get("memory", svc.get("mem_limit", ""))), lim.get("pids") or svc.get("pids_limit")
+
+
+def docker_containers(path, name):
+    """HostConfig of every container of service `name` created from compose file `path` (its compose labels)."""
+    ids = subprocess.run(["docker", "ps", "-q", "--filter", f"label=com.docker.compose.service={name}"],
+                         capture_output=True, text=True, check=True).stdout.split()
+    fmt = ('{{index .Config.Labels "com.docker.compose.project.config_files"}}|{{.Name}}|{{.HostConfig.Memory}}|'
+           '{{.HostConfig.MemorySwap}}|{{.HostConfig.PidsLimit}}|{{.HostConfig.Init}}|{{json .Config.Healthcheck}}')
+    out = []
+    for cid in ids:
+        files, cname, mem, swap, pids, init, hc = subprocess.run(["docker", "inspect", "-f", fmt, cid], capture_output=True,
+                                                                text=True, check=True).stdout.strip().split("|", 6)
+        if os.path.abspath(path) in files.split(","):
+            out.append({"name": cname.lstrip("/"), "Memory": int(mem), "MemorySwap": int(swap),
+                        "PidsLimit": None if pids in ("", "<nil>") else int(pids), "Init": init == "true",
+                        "Healthcheck": hc_cmd((json.loads(hc) or {}).get("Test"))})
+    return out
+
+
+def check_running(path, name, svc, containers=docker_containers):
+    _, mem, pids = limits(svc)
+    found = containers(path, name)
+    if not found:
+        print(f"NOTE {path}: {name}: no running container (not checked)")
+    out = []
+    for c in found:
+        want = {"R1 Memory": mem, "R2 MemorySwap": mem, "R3 PidsLimit": int(pids) if pids else None, "R6 Init": True}
+        got = {"R1 Memory": c["Memory"], "R2 MemorySwap": c["MemorySwap"], "R3 PidsLimit": c["PidsLimit"], "R6 Init": c["Init"]}
+        out += [f"{k} of container {c['name']} is {got[k]}, file says {v} (recreate it)" for k, v in want.items() if got[k] != v]
+        # The probe that actually runs: an image HEALTHCHECK of a non-built service is invisible to the file check (I4).
+        if c.get("Healthcheck") and not bounded(c["Healthcheck"]):
+            out.append(f"R4 container {c['name']} runs a healthcheck that does not bound itself: {c['Healthcheck'][:90]}")
+    return out
+
+
 def check_service(path, svc):
     base = os.path.dirname(path)
     out = []
-    lim = ((svc.get("deploy") or {}).get("resources") or {}).get("limits") or {}
-    mem = to_bytes(lim.get("memory", svc.get("mem_limit", "")))
+    lim, mem, _ = limits(svc)
     if mem is None:
         out.append("I1 no memory limit")
     elif to_bytes(svc.get("memswap_limit", "")) != mem:
@@ -163,17 +205,19 @@ def check_service(path, svc):
     return out
 
 
-def check_file(path):
+def check_file(path, running=False):
     text = read(path)
     if text is None:
         return [f"{path}: not readable"]
     data = yaml.safe_load(text) or {}
     return [f"{path}: {name}: {v}" for name, svc in (data.get("services") or {}).items()
-            for v in check_service(path, svc or {})]
+            for v in check_service(path, svc or {}) + (check_running(path, name, svc or {}) if running else [])]
 
 
 def main(argv):
     problems = []
+    running = "--running" in argv
+    argv = [a for a in argv if a != "--running"]
     files = argv
     if not argv:
         root = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=True).stdout.strip()
@@ -184,7 +228,7 @@ def main(argv):
                      for f in sorted(tracked) if COMPOSE_RE.search(f) and f not in ENFORCED and f not in PENDING]
         problems += [f"{f}: listed but not tracked" for f in ENFORCED + list(PENDING) if f not in tracked]
     for f in files:
-        problems += check_file(f)
+        problems += check_file(f, running)
     for p in problems:
         print(p)
     print(f"check-compose-invariants: {len(files)} file(s), {len(problems)} problem(s)")

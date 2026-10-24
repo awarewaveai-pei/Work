@@ -39,12 +39,39 @@ if [[ "$TYPE" == host-nginx ]]; then
   BACKUP="$STAGING_DIR/safe-patch-backups/$(realpath -m "$FILE_PATH" | tr / _).safe-patch-${STAMP}"
 fi
 HEALTH_TIMEOUT="${SAFE_PATCH_HEALTH_TIMEOUT:-90}"
-# compose: the project is the compose file's own directory (lobster-phase1, chatwoot, postiz, ...). Invariant: the
-# file patched is the file `docker compose` in that directory loads (overrides included) -- so no COMPOSE_FILE, and
-# it must be the first default name present in compose's own lookup order. Compose's file inputs are exactly: shell
-# COMPOSE_FILE (unset below), COMPOSE_FILE in the project .env (refused), and that lookup order (checked).
+# compose. Invariant: the file patched is a file compose loads for TARGET, and compose runs with exactly the inputs
+# that created it. (a) TARGET already has a container whose compose labels list this file: reuse its project, working
+# dir, files and env file -- the only way to reach a non-default name (docker-compose.observability.yml in lobster-phase1,
+# docker-compose.video.yml with --env-file .env.video). Exactly one such container, else refused.
+# (b) no container yet: the project is the file's own directory and the file must be the first default name in compose's
+# lookup order; COMPOSE_FILE in shell (unset below) or in the project .env (refused) would change what loads.
 COMPOSE_DIR="$(cd "$(dirname "$FILE_PATH")" && pwd)"
-if [[ "$TYPE" == compose ]]; then
+COMPOSE_ARGS=()
+if [[ "$TYPE" == compose && -n "$TARGET" ]]; then
+  ABS_FILE="$COMPOSE_DIR/$(basename "$FILE_PATH")"
+  L='{{index .Config.Labels "com.docker.compose.project"}}|{{index .Config.Labels "com.docker.compose.project.working_dir"}}|{{index .Config.Labels "com.docker.compose.project.config_files"}}|{{index .Config.Labels "com.docker.compose.project.environment_file"}}'
+  matches=()
+  while IFS= read -r cid; do
+    [[ -n "$cid" ]] || continue
+    m="$(docker inspect --format "$L" "$cid")"
+    IFS=, read -ra files <<<"$(cut -d'|' -f3 <<<"$m")"
+    for f in "${files[@]}"; do [[ "$f" == "$ABS_FILE" ]] && { matches+=("$m"); break; }; done
+  done < <(docker ps -aq --filter "label=com.docker.compose.service=$TARGET")
+  if (( ${#matches[@]} > 1 )) && [[ "$(printf '%s\n' "${matches[@]}" | sort -u | wc -l)" -gt 1 ]]; then
+    echo "ERROR: containers of service $TARGET from $ABS_FILE disagree on project/files/env: ${matches[*]}" >&2
+    exit 1
+  fi
+  if (( ${#matches[@]} )); then
+    IFS='|' read -r c_project c_dir c_files c_env <<<"${matches[0]}"
+    COMPOSE_DIR="$c_dir"
+    COMPOSE_ARGS=(-p "$c_project" --project-directory "$c_dir")
+    IFS=, read -ra files <<<"$c_files"
+    for f in "${files[@]}"; do COMPOSE_ARGS+=(-f "$f"); done
+    IFS=, read -ra envs <<<"$c_env"
+    for e in "${envs[@]}"; do [[ -n "$e" ]] && COMPOSE_ARGS+=(--env-file "$e"); done
+  fi
+fi
+if [[ "$TYPE" == compose && ${#COMPOSE_ARGS[@]} -eq 0 ]]; then
   loaded=""
   for n in compose.yaml compose.yml docker-compose.yaml docker-compose.yml; do
     [[ -f "$COMPOSE_DIR/$n" ]] && { loaded="$n"; break; }
@@ -58,7 +85,11 @@ if [[ "$TYPE" == compose ]]; then
     exit 1
   fi
 fi
-compose() { (cd "$COMPOSE_DIR" && unset COMPOSE_FILE && if [[ -f .env ]]; then docker compose --env-file .env "$@"; else docker compose "$@"; fi); }
+compose() {
+  (cd "$COMPOSE_DIR" && unset COMPOSE_FILE
+   if (( ${#COMPOSE_ARGS[@]} )); then docker compose "${COMPOSE_ARGS[@]}" "$@"
+   elif [[ -f .env ]]; then docker compose --env-file .env "$@"; else docker compose "$@"; fi)
+}
 
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*" | tee -a "$LOGFILE"; }
 
@@ -74,6 +105,30 @@ if [[ -z "$NEW_CONTENT" ]]; then
   echo "ERROR: no content on stdin" >&2
   exit 1
 fi
+# Invariant: exit 0 <=> the new content was verified and stays; any other end -- an unexpected failure under set -e
+# (2026-10-24: a failing `compose up` exited here before Step 4 and kept the new file), TERM/HUP/INT (SSH dropped) or a
+# failure while reporting success -- restores the backup. So finished=1 is the script's last statement.
+finished=0
+rollback() {
+  log "rollback | file=$FILE_PATH | restoring=$BACKUP"
+  cp "$BACKUP" "$FILE_PATH"
+  case "$TYPE" in
+    compose)
+      compose up -d --no-build "$TARGET" 2>&1 | tail -3 || true
+      ;;
+    nginx)
+      docker exec lobster-nginx nginx -s reload 2>/dev/null || true
+      ;;
+    host-nginx)
+      { nginx -t >/dev/null 2>&1 && systemctl reload nginx; } || log "rollback-warn | host nginx not reloaded; run nginx -t"
+      ;;
+  esac
+  log "rollback-done | file=$FILE_PATH | status=restored"
+  echo "SAFE-PATCH FAILED: rolled back to backup $BACKUP" >&2
+}
+on_exit() { trap - EXIT; set +e; [[ $finished -eq 1 ]] || { rollback; exit 1; }; }
+trap on_exit EXIT
+trap 'exit 1' TERM HUP INT
 printf '%s\n' "$NEW_CONTENT" > "$FILE_PATH"
 log "apply | file=$FILE_PATH | bytes=${#NEW_CONTENT}"
 
@@ -165,25 +220,9 @@ case "$TYPE" in
     ;;
 esac
 
-# ── Step 4: Rollback if failed ────────────────────────────────────────────────
-if [[ $health_ok -eq 0 ]]; then
-  log "rollback | file=$FILE_PATH | restoring=$BACKUP"
-  cp "$BACKUP" "$FILE_PATH"
-  case "$TYPE" in
-    compose)
-      compose up -d --no-build "$TARGET" 2>&1 | tail -3 || true
-      ;;
-    nginx)
-      docker exec lobster-nginx nginx -s reload 2>/dev/null || true
-      ;;
-    host-nginx)
-      { nginx -t >/dev/null 2>&1 && systemctl reload nginx; } || log "rollback-warn | host nginx not reloaded; run nginx -t"
-      ;;
-  esac
-  log "rollback-done | file=$FILE_PATH | status=restored"
-  echo "SAFE-PATCH FAILED: rolled back to backup $BACKUP" >&2
-  exit 1
-fi
+# ── Step 4: Rollback if failed (on_exit) ──────────────────────────────────────
+[[ $health_ok -eq 1 ]] || exit 1
 
 log "success | type=$TYPE | file=$FILE_PATH | backup=$BACKUP"
 echo "safe-infra-patch OK. Backup: $BACKUP"
+finished=1

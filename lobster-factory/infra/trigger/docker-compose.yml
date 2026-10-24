@@ -24,7 +24,7 @@ services:
     container_name: trigger-postgres
     restart: unless-stopped
     logging: *trigger-logging
-    mem_limit: 512m
+    mem_limit: 896m
     cpus: "1.0"
     command:
       - -c
@@ -38,11 +38,14 @@ services:
     networks:
       - lf-trg-webapp
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      test: ["CMD-SHELL", "timeout 4 pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 30s
       timeout: 5s
       retries: 5
       start_period: 15s
+    memswap_limit: 896m
+    pids_limit: 256
+    init: true
 
   redis:
     image: redis:${REDIS_IMAGE_TAG:-7-alpine}
@@ -56,11 +59,14 @@ services:
     networks:
       - lf-trg-webapp
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "timeout", "4", "redis-cli", "ping"]
       interval: 30s
       timeout: 5s
       retries: 5
       start_period: 10s
+    memswap_limit: 256m
+    pids_limit: 128
+    init: true
 
   clickhouse:
     image: bitnamilegacy/clickhouse:${CLICKHOUSE_IMAGE_TAG:-25.7.5-debian-12-r0}
@@ -87,11 +93,7 @@ services:
       - ${CLICKHOUSE_PUBLISH_IP:-127.0.0.1}:9123:8123
       - ${CLICKHOUSE_PUBLISH_IP:-127.0.0.1}:9090:9000
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "clickhouse-client --host localhost --port 9000 --user \"$$CLICKHOUSE_ADMIN_USER\" --password \"$$CLICKHOUSE_ADMIN_PASSWORD\" --query 'SELECT 1'",
-        ]
+      test: ["CMD-SHELL", "timeout 4 clickhouse-client --host localhost --port 9000 --user \"$$CLICKHOUSE_ADMIN_USER\" --password \"$$CLICKHOUSE_ADMIN_PASSWORD\" --query 'SELECT 1'"]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -114,6 +116,9 @@ services:
   # table, merge memory bound in force). Run it before deploying a config change:
   #     ./clickhouse/validate-override.sh
   # It is also enforced in .github/workflows/trigger-infra-config-guard.yml.
+    memswap_limit: 3072m
+    pids_limit: 2048
+    init: true
 
   registry:
     image: registry:${REGISTRY_IMAGE_TAG:-2}
@@ -130,13 +135,17 @@ services:
       REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
     ports:
       - ${REGISTRY_PUBLISH_IP:-127.0.0.1}:5000:5000
+    mem_limit: 256m
+    memswap_limit: 256m
+    pids_limit: 64
+    init: true
 
   minio:
     image: bitnamilegacy/minio:${MINIO_IMAGE_TAG:-latest}
     container_name: trigger-minio
     restart: unless-stopped
     logging: *trigger-logging
-    mem_limit: 384m
+    mem_limit: 640m
     cpus: "0.3"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
@@ -151,18 +160,21 @@ services:
       - ${MINIO_PUBLISH_IP:-127.0.0.1}:9000:9000
       - ${MINIO_PUBLISH_IP:-127.0.0.1}:9001:9001
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "timeout", "9", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 20s
+    memswap_limit: 640m
+    pids_limit: 128
+    init: true
 
   electric:
     image: electricsql/electric:${ELECTRIC_IMAGE_TAG:-1.2.4}
     container_name: trigger-electric
     restart: unless-stopped
     logging: *trigger-logging
-    mem_limit: 384m
+    mem_limit: 512m
     cpus: "0.5"
     depends_on:
       postgres:
@@ -174,7 +186,7 @@ services:
     networks:
       - lf-trg-webapp
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/v1/health"]
+      test: ["CMD", "timeout", "4", "curl", "-f", "http://localhost:3000/v1/health"]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -183,6 +195,9 @@ services:
   # Netdata: cgroup_trigger-webapp.mem_usage fires on % of THIS limit. If steady RSS
   # grew (workload) or the host shows ~70%+ RAM, raise mem_limit and redeploy; keep
   # NODE_MAX_OLD_SPACE_SIZE ~55–65% of mem_limit for the Node process heap headroom.
+    memswap_limit: 512m
+    pids_limit: 256
+    init: true
   webapp:
     image: ghcr.io/triggerdotdev/trigger.dev:${TRIGGER_IMAGE_TAG:-v4.4.4}
     container_name: trigger-webapp
@@ -214,13 +229,7 @@ services:
     ports:
       - ${WEBAPP_PUBLISH_IP:-127.0.0.1}:8030:3000
     healthcheck:
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "http.get('http://localhost:3000/healthcheck', res => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))",
-        ]
+      test: ["CMD", "timeout", "9", "node", "-e", "http.get('http://localhost:3000/healthcheck', res => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -274,13 +283,16 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY}
       FROM_EMAIL: ${FROM_EMAIL:-noreply@aware-wave.com}
       REPLY_TO_EMAIL: ${REPLY_TO_EMAIL:-awarewaveai@gmail.com}
+    memswap_limit: 2560m
+    pids_limit: 128
+    init: true
 
   docker-proxy:
     image: tecnativa/docker-socket-proxy:${DOCKER_PROXY_IMAGE_TAG:-latest}
     container_name: trigger-docker-proxy
     restart: unless-stopped
     logging: *trigger-logging
-    mem_limit: 64m
+    mem_limit: 128m
     cpus: "0.1"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -294,11 +306,14 @@ services:
       - INFO=1
       - NETWORKS=1
     healthcheck:
-      test: ["CMD", "nc", "-z", "127.0.0.1", "2375"]
+      test: ["CMD", "timeout", "4", "nc", "-z", "127.0.0.1", "2375"]
       interval: 30s
       timeout: 5s
       retries: 5
       start_period: 10s
+    memswap_limit: 128m
+    pids_limit: 128
+    init: true
 
   supervisor:
     image: ghcr.io/triggerdotdev/supervisor:${TRIGGER_IMAGE_TAG:-v4.4.4}
@@ -343,17 +358,14 @@ services:
       # 代價：失敗 run 的容器也會被移除，無法事後 docker logs；但 run logs 已存於 webapp DB + OTEL。
       DOCKER_AUTOREMOVE_EXITED_CONTAINERS: "1"
     healthcheck:
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "http.get('http://localhost:8020/health', res => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))",
-        ]
+      test: ["CMD", "timeout", "9", "node", "-e", "http.get('http://localhost:8020/health', res => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 60s
+    memswap_limit: 1280m
+    pids_limit: 512
+    init: true
 
 networks:
   lf-trg-webapp:

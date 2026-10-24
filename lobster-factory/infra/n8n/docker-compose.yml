@@ -10,7 +10,7 @@ services:
       options:
         max-size: "25m"
         max-file: "5"
-    mem_limit: 512m
+    mem_limit: 1g
     cpus: "0.5"
     ports:
       - '127.0.0.1:5678:5678'
@@ -38,6 +38,9 @@ services:
       - n8n_data:/home/node/.n8n
     networks:
       - supabase_default
+    memswap_limit: 1g
+    pids_limit: 64
+    init: true
 
 volumes:
   n8n_data:

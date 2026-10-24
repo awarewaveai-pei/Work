@@ -197,6 +197,14 @@ cat /var/lib/awarewave-alert/fail_streak
 
 > 歷史背景：2026-05-07 之前無此 rsync 機制，staging `apps/next-admin/` 自 4/27 凍結 10 天（Build Console、New Client、always-on Command Plane Phase 1 等 19 個 commit、3,785 行更新堆積未上線）。`sg-deploy.sh` 即為此機械化解法。
 
+### 2.7 主機 compose 設定變更（safe-infra-patch，2026-10-24）
+
+- 一次一個 service：`safe-infra-patch.sh compose <live 檔> <service> < 新內容`。檔內有多個 service 時每步用**只含已完成＋本步**的版本——全新版一次寫入後，後面每步的備份已是新版，失敗時回滾回不到舊版。依賴先做（db／redis 再 app），`up -d <svc>` 才不會連帶重建依賴。
+- 非目錄預設檔名（`docker-compose.observability.yml`、video 的 `--env-file .env.video`、`docker-compose.cognitive-db.yml`）：目標 service 已有容器時，腳本照該容器的 compose 標籤重現 project／files／env file。插值變數仍要自己給：cognitive-os `COGNITIVE_OS_REGION`（＝`deploy/.env` 的 `COGNITIVE_OS_DATABASE_URLS=` 第一段）、cognitive-db `COGNITIVE_DB_PASSWORD_FILE`（＝容器 secret 掛載來源）。
+- `/opt/cognitive-os` 是 git checkout：先 commit 到 main，套完再 `git -C /opt/cognitive-os fetch origin main && git -C /opt/cognitive-os checkout origin/main -- <檔>`，之後 ff pull 不衝突。
+- 檔案改了≠容器生效（2026-10-24：9 個容器檔內 `init: true`、容器沒有）。改完必跑 `python3 /root/Work/scripts/check-compose-invariants.py --running <live 檔...>`，R1–R6 全 0 才算完成。
+- 寫入新內容後任何非成功的結束（含 `compose up` 本身失敗）都經 EXIT trap 回滾。
+
 ---
 
 ## 3. 回滾流程（本地映像）

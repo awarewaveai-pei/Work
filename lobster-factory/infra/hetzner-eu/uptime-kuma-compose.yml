@@ -1,24 +1,23 @@
-# Uptime Kuma — EU server (204.168.175.41)
-# Use this file to recreate the container with correct settings.
-# Live data is in the named Docker volume "uptime-kuma" (/app/data).
-#
-# To recreate: docker compose -f /root/uptime-kuma-compose.yml up -d
-# To stop:     docker compose -f /root/uptime-kuma-compose.yml down  (preserves volume)
-#
-# Memory limit (512 MB) added 2026-05-18 to prevent swap pressure
-# under Trigger.dev runner bursts on this server.
-
+# Uptime Kuma — migrated from EU 2026-08-28. EU ran host-network :3001; on ks that
+# port belongs to lobster-node-api, so kuma is bridge-networked on 127.0.0.1:3005
+# (nginx vhost uptime.aware-wave.com proxies to it). mem = EU parity 512m.
 services:
   uptime-kuma:
     image: louislam/uptime-kuma:1
     container_name: uptime-kuma
     restart: unless-stopped
-    network_mode: host
     mem_limit: 512m
+    ports: ["127.0.0.1:3005:3001"]
+    volumes: ["uptime-kuma:/app/data"]
     memswap_limit: 512m
-    volumes:
-      - uptime-kuma:/app/data
-
+    pids_limit: 256
+    init: true
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 25 extra/healthcheck"]
+      interval: 60s
+      timeout: 30s
+      retries: 5
+      start_period: 180s
 volumes:
   uptime-kuma:
     external: true

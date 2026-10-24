@@ -35,13 +35,7 @@ services:
     tmpfs:
       - /dev/shm:size=512m
     healthcheck:
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "require('http').get('http://127.0.0.1:8733/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
-        ]
+      test: ["CMD", "timeout", "4", "node", "-e", "require('http').get('http://127.0.0.1:8733/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
       interval: 20s
       timeout: 5s
       retries: 3
@@ -53,8 +47,11 @@ services:
       resources:
         limits:
           memory: 1024M
+          pids: 512
           cpus: "2.00"
     logging: *remotion-logging
+    memswap_limit: 1024M
+    init: true
 
 networks:
   video-net:

@@ -27,16 +27,19 @@ services:
     #   - .env.production
     ports:
       - "127.0.0.1:3010:3000" # 保留供本機 health-check
-    mem_limit: 512m
+    mem_limit: 768m
     mem_reservation: 256m
     networks:
       - lobster-net
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "timeout", "4", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 20s
+    memswap_limit: 768m
+    pids_limit: 512
+    init: true
 
 networks:
   lobster-net:

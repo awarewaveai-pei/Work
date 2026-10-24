@@ -17,19 +17,13 @@ services:
       options:
         max-size: "25m"
         max-file: "5"
-    mem_limit: 512m
+    mem_limit: 768m
     cpus: "0.3"
     restart: unless-stopped
     ports:
       - "127.0.0.1:3000:3000"
     healthcheck:
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "fetch('http://studio:3000/api/platform/profile').then((r) => {if (r.status !== 200) throw new Error(r.status)})"
-        ]
+      test: ["CMD", "timeout", "9", "node", "-e", "fetch('http://studio:3000/api/platform/profile').then((r) => {if (r.status !== 200) throw new Error(r.status)})"]
       timeout: 10s
       interval: 30s
       retries: 3
@@ -73,6 +67,9 @@ services:
     volumes:
       - ./volumes/snippets:/app/snippets:Z
       - ./volumes/functions:/app/edge-functions:Z
+    memswap_limit: 768m
+    pids_limit: 512
+    init: true
 
   kong:
     container_name: supabase-kong
@@ -82,7 +79,7 @@ services:
       options:
         max-size: "25m"
         max-file: "5"
-    mem_limit: 512m
+    mem_limit: 1152m
     cpus: "0.5"
     restart: unless-stopped
     networks:
@@ -90,7 +87,7 @@ services:
         aliases:
           - api-gw
     healthcheck:
-      test: ["CMD", "kong", "health"]
+      test: ["CMD", "timeout", "4", "kong", "health"]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -129,6 +126,9 @@ services:
       DASHBOARD_USERNAME: ${DASHBOARD_USERNAME}
       DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD}
     entrypoint: /home/kong/kong-entrypoint.sh
+    memswap_limit: 1152m
+    pids_limit: 256
+    init: true
 
   auth:
     container_name: supabase-auth
@@ -142,15 +142,7 @@ services:
     cpus: "0.2"
     restart: unless-stopped
     healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--no-verbose",
-          "--tries=1",
-          "--spider",
-          "http://localhost:9999/health"
-        ]
+      test: ["CMD", "timeout", "4", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
       timeout: 5s
       interval: 30s
       retries: 3
@@ -274,6 +266,9 @@ services:
       # GOTRUE_HOOK_SEND_EMAIL_ENABLED: "false"
       # GOTRUE_HOOK_SEND_EMAIL_URI: "http://host.docker.internal:54321/functions/v1/email_sender"
       # GOTRUE_HOOK_SEND_EMAIL_SECRETS: "v1,whsec_VGhpcyBpcyBhbiBleGFtcGxlIG9mIGEgc2hvcnRlciBCYXNlNjQgc3RyaW5n"
+    memswap_limit: 128m
+    pids_limit: 128
+    init: true
 
   rest:
     container_name: supabase-rest
@@ -283,7 +278,7 @@ services:
       options:
         max-size: "25m"
         max-file: "5"
-    mem_limit: 256m
+    mem_limit: 384m
     cpus: "0.5"
     restart: unless-stopped
     depends_on:
@@ -305,6 +300,9 @@ services:
       [
         "postgrest"
       ]
+    memswap_limit: 384m
+    pids_limit: 512
+    init: true
 
   realtime:
     # This container name looks inconsistent but is correct because realtime constructs tenant id by parsing the subdomain
@@ -323,11 +321,7 @@ services:
         # Disable this if you are using an external Postgres database
         condition: service_healthy
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "curl -sSfL --head -o /dev/null -H \"Authorization: Bearer ${ANON_KEY}\" http://localhost:4000/api/tenants/realtime-dev/health"
-        ]
+      test: ["CMD-SHELL", "timeout 4 curl -sSfL --head -o /dev/null -H \"Authorization: Bearer ${ANON_KEY}\" http://localhost:4000/api/tenants/realtime-dev/health"]
       timeout: 5s
       interval: 30s
       retries: 3
@@ -359,6 +353,9 @@ services:
       DISABLE_HEALTHCHECK_LOGGING: "true"
 
   # To use S3 backed storage: docker compose -f docker-compose.yml -f docker-compose.s3.yml up
+    memswap_limit: 384m
+    pids_limit: 512
+    init: true
   storage:
     container_name: supabase-storage
     image: supabase/storage-api:v1.44.2
@@ -379,15 +376,7 @@ services:
       imgproxy:
         condition: service_started
     healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--no-verbose",
-          "--tries=1",
-          "--spider",
-          "http://storage:5000/status"
-        ]
+      test: ["CMD", "timeout", "4", "wget", "--no-verbose", "--tries=1", "--spider", "http://storage:5000/status"]
       timeout: 5s
       interval: 30s
       retries: 3
@@ -427,6 +416,9 @@ services:
       S3_PROTOCOL_ACCESS_KEY_SECRET: ${S3_PROTOCOL_ACCESS_KEY_SECRET}
     volumes:
       - ./volumes/storage:/var/lib/storage:z
+    memswap_limit: 384m
+    pids_limit: 128
+    init: true
 
   imgproxy:
     container_name: supabase-imgproxy
@@ -442,12 +434,7 @@ services:
     volumes:
       - ./volumes/storage:/var/lib/storage:z
     healthcheck:
-      test:
-        [
-          "CMD",
-          "imgproxy",
-          "health"
-        ]
+      test: ["CMD", "timeout", "4", "imgproxy", "health"]
       timeout: 5s
       interval: 30s
       retries: 3
@@ -457,6 +444,9 @@ services:
       IMGPROXY_USE_ETAG: "true"
       IMGPROXY_AUTO_WEBP: ${IMGPROXY_AUTO_WEBP}
       IMGPROXY_MAX_SRC_RESOLUTION: 16.8
+    memswap_limit: 256m
+    pids_limit: 128
+    init: true
 
   meta:
     container_name: supabase-meta
@@ -466,7 +456,7 @@ services:
       options:
         max-size: "25m"
         max-file: "5"
-    mem_limit: 256m
+    mem_limit: 512m
     cpus: "0.2"
     restart: unless-stopped
     depends_on:
@@ -481,6 +471,15 @@ services:
       PG_META_DB_USER: supabase_admin
       PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
       CRYPTO_KEY: ${PG_META_CRYPTO_KEY}
+    memswap_limit: 512m
+    pids_limit: 256
+    init: true
+    healthcheck:
+      test: ["CMD", "timeout", "4", "node", "-e", "fetch('http://localhost:8080/health').then((r) => {if (r.status !== 200) throw new Error(r.status)})"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   functions:
     container_name: supabase-edge-functions
@@ -519,6 +518,9 @@ services:
         "--main-service",
         "/home/deno/functions/main"
       ]
+    memswap_limit: 256m
+    pids_limit: 64
+    init: true
 
   analytics:
     container_name: supabase-analytics
@@ -541,12 +543,7 @@ services:
     #     target: /opt/app/rel/logflare/bin/gcloud.json
     #     read_only: true
     healthcheck:
-      test:
-        [
-          "CMD",
-          "curl",
-          "http://localhost:4000/health"
-        ]
+      test: ["CMD", "timeout", "4", "curl", "http://localhost:4000/health"]
       timeout: 5s
       interval: 30s
       retries: 10
@@ -576,6 +573,9 @@ services:
       # GOOGLE_PROJECT_NUMBER: ${GOOGLE_PROJECT_NUMBER}
 
   # Comment out everything below this point if you are using an external Postgres database
+    memswap_limit: 384m
+    pids_limit: 256
+    init: true
   db:
     container_name: supabase-db
     image: supabase/postgres:15.8.1.085
@@ -584,7 +584,7 @@ services:
       options:
         max-size: "25m"
         max-file: "5"
-    mem_limit: 768m
+    mem_limit: 1280m
     cpus: "1.0"
     restart: unless-stopped
     volumes:
@@ -606,15 +606,7 @@ services:
       # Use named volume to persist pgsodium decryption key between restarts
       - db-config:/etc/postgresql-custom
     healthcheck:
-      test:
-        [
-        "CMD",
-        "pg_isready",
-        "-U",
-        "postgres",
-        "-h",
-        "localhost"
-        ]
+      test: ["CMD", "timeout", "4", "pg_isready", "-U", "postgres", "-h", "localhost"]
       interval: 30s
       timeout: 5s
       retries: 10
@@ -636,6 +628,9 @@ services:
         "-c",
         "log_min_messages=fatal" # prevents Realtime polling queries from appearing in logs
       ]
+    memswap_limit: 1280m
+    pids_limit: 256
+    init: true
 
   vector:
     container_name: supabase-vector
@@ -653,15 +648,7 @@ services:
       - ./volumes/logs/vector.yml:/etc/vector/vector.yml:ro,z
       - ${DOCKER_SOCKET_LOCATION}:/var/run/docker.sock:ro,z
     healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--no-verbose",
-          "--tries=1",
-          "--spider",
-          "http://vector:9001/health"
-        ]
+      test: ["CMD", "timeout", "4", "wget", "--no-verbose", "--tries=1", "--spider", "http://vector:9001/health"]
       timeout: 5s
       interval: 30s
       retries: 3
@@ -676,6 +663,9 @@ services:
       - "label=disable"
 
   # Update the DATABASE_URL if you are using an external Postgres database
+    memswap_limit: 128m
+    pids_limit: 256
+    init: true
   supavisor:
     container_name: supabase-pooler
     image: supabase/supavisor:2.7.4
@@ -693,16 +683,7 @@ services:
     volumes:
       - ./volumes/pooler/pooler.exs:/etc/pooler/pooler.exs:ro,z
     healthcheck:
-      test:
-        [
-          "CMD",
-          "curl",
-          "-sSfL",
-          "--head",
-          "-o",
-          "/dev/null",
-          "http://127.0.0.1:4000/api/health"
-        ]
+      test: ["CMD", "timeout", "4", "curl", "-sSfL", "--head", "-o", "/dev/null", "http://127.0.0.1:4000/api/health"]
       interval: 30s
       timeout: 5s
       retries: 10
@@ -734,6 +715,9 @@ services:
         "-c",
         "/app/bin/migrate && /app/bin/supavisor eval \"$$(cat /etc/pooler/pooler.exs)\" && /app/bin/server"
       ]
+    memswap_limit: 384m
+    pids_limit: 256
+    init: true
 
 volumes:
   db-config:
