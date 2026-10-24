@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-25（續2）全自動內容 P6.1：影片收尾與嵌回文章抽成共用功能（兩支 route 變殼，行為不變）＋P8.2/P8.4/P8.5（Claude）
+
+- **根因／不變量**：I4＝瀏覽器與 5 分鐘時鐘用同一份程式收尾、嵌回影片；原邏輯只活在 `app/api/video/status/route.ts`、`embed-to-wp/route.ts` 內且需要 Request，P6.2 無法呼叫。新 `lib/content/video/finalize.ts`（`finalizeVideoJob(job)`，呼叫端先做存取檢查）＋`embed-in-post.ts`（`embedVideoInPost(identity, input)`，resolveWpSite→系統模式閘→WP）。
+- **分兩檔的理由**：一檔時 embed route 的 import 閉包碰到 `video-pipeline`（video.image/motion/tts/script）且 `registry-code.test.ts:179-186` 看不到 authorizer；分檔後 `AUTHORIZERS` 登記 `embedVideoInPost`（同 `publishToWordPress` 的登記方式），不加 UNSCOPED_ROUTES 豁免。卡 `agency-os/handoffs/codex-queue/cards/04-video-finalize-core.md`「Decision made」。
+- **critic 抓到並修正（M1）**：library 原本只檢查未 trim 的 siteId；`resolveWpSite` 會 trim 後對空字串走「第一個可存取網站」（`wp-sites.ts:116,123-126`）→ 管線呼叫 `siteId:" "` 會改錯站。改為 library 內 trim siteId/videoUrl/releaseId、空 variant→default（瀏覽器路線本來就 trim，行為不變）；新測試「blank siteId refused before resolveWpSite」＋斷言 resolveWpSite 第二參數。
+- **未修（n1，既有類別）**：`{headers}` 身分型別可傳空 Headers → 預設 staff（`tenant-guard.ts:29-31`），`resolveWpSite`／`publishToWordPress` 同；P6.2 呼叫端必須用 `orgIdentity(org)`（計畫 P6.2 已寫 org 身分）。
+- **派工紀錄**：Codex 三次 `model_not_found`（`~/.codex/config.toml:2` `gpt-6.1-sol`，ChatGPT 帳號不支援；card 03 同因 blocked）→ 改派 Sonnet `fullstack-engineer` 在隔離 worktree `D:/tmp/codex-do` 做；`refs/codex/do` 先歸位 main（card 02 已以 `0eb785f1c` 進 main）。
+- **P8**：`2a926449d`（manifests、Foundry 重產、SCHEDULES_PAGE_PLAN §0、TASKS 三條指向計畫、P4.4 驗收改讀 `schedules_run_due.json`）。P8.3 未做：`RUNNABLE_DEMOS.md` 有別的 session 未提交 hunk（file-claim 擋）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/content/video/__tests__/finalize.test.ts lib/content/video/__tests__/embed-in-post.test.ts app/api/video/embed-to-wp/route.test.ts lib/content/video/__tests__/video-status-tenant.test.ts lib/system-modes/__tests__/production-change-coverage.test.ts lib/security/__tests__/get-no-side-effects.test.ts lib/portal/__tests__/registry-code.test.ts lib/content/__tests__/wp-sites-tenant.test.ts`（main 工作樹，59 passed） | exit=0 | ms=4052
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（worktree D:/tmp/codex-do） | exit=0 | ms=3525
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變一：刪 `embed-in-post.ts` 的 checkProductionChangeAllowed → 3 failed（embed-in-post gate case、production-change-coverage 兩項）；還原 11/11。突變二：siteId 不 trim → 「blank siteId」1 failed；還原 3/3 | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/3n（M1＋n1 variant 正規化＋n2 siteId 斷言已修；n3 身分型別為既有類別，記上）；主 session 逐行比對搬移區塊：僅 `jobId→job.id`（`job-store.ts:66` 同值）與 `video` 常數上提
+- ORACLE_WAIVED: Codex 不可用（`model_not_found`，見上）；改 Opus critic 深審＋兩個突變證據（AGENTS.md §4 備援）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`embed-to-wp/route.ts|video/status/route.ts|validateRenderOutputs|EXPECTED_VIDEO_DIMENSIONS` | hits=38（17 檔；舊稽核文件與歷史 WORKLOG 行號，不回改；計畫 P6.1 列已改指兩新檔）
+- **rollback**：`git revert <本 commit>`（純搬移，無 migration、無設定）。
 ## 2026-10-25（續1）每個付費 AI 呼叫都寫進 ai_call_logs：補 13 個沒記花費的呼叫點，加閘擋之後新加的；順帶修 OpenAI 帶日期的模型名被算成大模型價格（Claude）
 
 **觸發**：操作者「把另外 6 個呼叫 AI 卻沒記花費的檔也補上 logAiCall；script-forge 等另一個 session 改完再動，並加一道檢查擋之後新加的。」前情見 2026-10-24 續56 C6。

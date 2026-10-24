@@ -200,11 +200,11 @@ describe("production-change gate coverage", () => {
       "app/api/tools/printful/sync/route.ts",
       "lib/studio/pod-order-inbox.ts",
       "app/api/webhooks/chatwoot/route.ts",
+      "lib/content/video/embed-in-post.ts",
     ];
     for (const rel of [
       ...known,
       "lib/repair-center/ssh.ts",
-      "app/api/video/embed-to-wp/route.ts",
       "lib/studio/print-provider.ts",
       "lib/cs/chatwoot-client.ts",
     ]) {
