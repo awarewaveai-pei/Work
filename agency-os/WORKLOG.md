@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-24（續5）next-admin 部署 38cdcc3cf（折疊側欄）＋正式站檢查（Claude）
+
+**觸發**：操作者「commit 並現在部署，然後在正式站檢查」（本機無帳密可登入）。同批帶 tarot `ef54cf21d`＋其 revert `98f5ff176`（淨效果為零）。無 DEPLOY_HOLD。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin（snapshot lobster-phase1-next-admin:rollback-20261024-041007；healthy after 11s；5 個 smoke 端點 200；deployed commit 38cdcc3cf） | exit=0 | ms=360000
+- 正式站（操作者已登入）`/outreach/leads`：Overview 固定、Cold Outreach 展開 9 項、其餘 10 區收合；收合的 Repair & Control 標題顯示紅點 12；點 Clients 標題 → 展開 4 項。截圖已給操作者。
+- Playwright smoke：26 passed／0 failed／6 skipped。
+- REVIEW_WAIVED: NA -- 部署動作無程式改動；38cdcc3cf 審查見續4
+- BUGHUNT_WAIVED: NA -- 部署動作無程式改動
+
+**rollback**：主機 snapshot `lobster-phase1-next-admin:rollback-20261024-041007` 或 `sg-deploy.sh` 回 edffb48fc（`DEPLOY_ROLLBACK_RUNBOOK.md` §2.1）。
 ## 2026-10-24（續4）側欄分區可折疊；Repair Center 紅點在 inbox 健康 503 時仍顯示（Claude）
 
 **觸發**：操作者：sidebar 太長，要折疊式。
