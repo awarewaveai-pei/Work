@@ -1,16 +1,18 @@
 <#
 .SYNOPSIS
-  Runs the Codex card queue for the cognitive platform: one card at a time, each in a throwaway worktree, each
-  accepted by THIS script (not by Codex's own claim), until the queue is empty, a card needs a decision, a card is
-  blocked, or Codex's quota is gone.
+  Runs a Codex card queue: one card at a time, each in a throwaway worktree, each accepted by THIS script (not by
+  Codex's own claim), until the queue is empty, a card needs a decision, a card is blocked, or Codex's quota is gone.
+  Two queues use it: the cognitive platform build (agency-os/handoffs/cos-codex-queue, the default) and the general
+  /codex-do queue (agency-os/handoffs/codex-queue). What differs between them lives in each queue.json `settings`
+  (profile, intro, postgres, worktree, state_dir, work_ref, junctions), never in this script.
 
 .DESCRIPTION
   Why (operator, 2026-10-04): when Claude's quota runs out, Codex must keep building without anyone approving every
   command. `codex exec --approve-for-me` runs commands inside the workspace-write sandbox with an automatic reviewer
   (probed on this machine 2026-10-04: runs python, writes files). Everything else is mechanical here:
-    - the queue and the standing rules live in agency-os/handoffs/cos-codex-queue/ (queue.json, PREAMBLE.md, cards/);
-    - Codex works ONLY in the worktree ($Worktree, detached HEAD). Its commits are kept reachable as refs/codex/work
-      in the main repository (a ref, not a branch). Nothing is merged into main, pushed or deployed by this script:
+    - the queue and the standing rules live in -QueueDir (queue.json, PREAMBLE.md, cards/, gates/);
+    - Codex works ONLY in the worktree ($Worktree, detached HEAD). Its commits are kept reachable as the queue's
+      work_ref (refs/codex/work for COS) in the main repository (a ref, not a branch). Nothing is merged into main, pushed or deployed by this script:
       a Claude session clears agency-os/reports/review-debt.md first (a reviewer must not be the author);
     - a card is DONE only when this script saw: at least one new commit, a clean worktree, the commit touching
       review-debt.md, and every `check` command of the card exiting 0 (run here, outside Codex);
@@ -20,12 +22,13 @@
 .EXAMPLE
   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-continue.ps1
   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-continue.ps1 -MaxCards 1 -DryRun
+  powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-continue.ps1 -QueueDir agency-os/handoffs/codex-queue -MaxCards 1
 #>
 [CmdletBinding()]
 param(
     [string]$QueueDir = 'agency-os/handoffs/cos-codex-queue',
-    [string]$Worktree = 'D:/tmp/cos-codex',
-    [string]$StateDir = 'D:/tmp/cos-codex-state',
+    [string]$Worktree = '',   # empty = the queue's settings.worktree
+    [string]$StateDir = '',   # empty = the queue's settings.state_dir
     [int]$MaxCards = 50,
     [int]$CardTimeoutMin = 120,
     [int]$MaxAttempts = 3,
@@ -40,7 +43,6 @@ $ErrorActionPreference = 'Stop'
 
 $root = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path -replace '\\', '/'
 $queueRoot = Join-Path $root $QueueDir
-$cos = 'Projects/internal/cognitive-engineering-os'
 $pgName = 'cos-db-test-codex-pg'
 $pgImage = 'postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24'
 $quotaScript = Join-Path $PSScriptRoot 'oracle-quota.ps1'
@@ -134,14 +136,28 @@ function Run-Command([string]$CmdLine, [string]$Dir, [string]$LogFile, [int]$Tim
 $codexExe = Resolve-CodexExe
 if (-not $codexExe) { Write-Error 'codex CLI not found on PATH (npm install -g @openai/codex)'; exit 2 }
 if (-not (Test-Path -LiteralPath (Join-Path $queueRoot 'queue.json'))) { Write-Error "no queue.json in $queueRoot"; exit 2 }
+$queue = Read-Json (Join-Path $queueRoot 'queue.json')
+function Setting([string]$Name, $Default) {
+    if ($queue.PSObject.Properties['settings'] -and $queue.settings.PSObject.Properties[$Name]) { return $queue.settings.$Name }
+    return $Default
+}
+$profileName = [string](Setting 'profile' 'cos')
+if (-not $Worktree) { $Worktree = [string](Setting 'worktree' '') }
+if (-not $StateDir) { $StateDir = [string](Setting 'state_dir' '') }
+$workRef = [string](Setting 'work_ref' '')
+$intro = [string](Setting 'intro' 'You are a worker.')
+$usePostgres = [bool](Setting 'postgres' $false) -and -not $NoPostgres
+# Two queues sharing a worktree, state file or ref would rebase and mark each other's cards: each queue names its own.
+if (-not $Worktree -or -not $StateDir -or $workRef -notmatch '^refs/codex/[a-z0-9-]+$') {
+    Write-Error "queue settings must name worktree, state_dir and work_ref (refs/codex/<name>): $queueRoot"; exit 2
+}
 $null = New-Item -ItemType Directory -Force -Path $StateDir, (Join-Path $StateDir 'logs')
 
 & powershell -NoProfile -ExecutionPolicy Bypass -File $quotaScript -Action check -Tool codex | Out-Null
 if ($LASTEXITCODE -eq 3) { Say 'Codex quota is blocked (oracle-quota.ps1); nothing started' 'Yellow'; exit 3 }
 
-$queue = Read-Json (Join-Path $queueRoot 'queue.json')
 $queueValidator = Join-Path $root 'Projects/internal/cognitive-engineering-os/scripts/validate-codex-queue.py'
-$queueValidation = & python $queueValidator 2>&1
+$queueValidation = & python $queueValidator --queue $QueueDir --profile $profileName 2>&1
 $queueValidationExit = $LASTEXITCODE
 if ($queueValidationExit -ne 0) {
     Say "queue validation failed before any card: $($queueValidation -join "`n")" 'Red'
@@ -175,25 +191,29 @@ function Gate-Open($Card) {
     return (Test-Path -LiteralPath (Join-Path $queueRoot ("gates/" + $Card.gate)))
 }
 
-# ---- worktree (detached; its commits stay reachable as refs/codex/work) ----------------------------------------
+# ---- worktree (detached; its commits stay reachable as $workRef) ----------------------------------------
 if (-not $DryRun) {
     if (-not (Test-Path -LiteralPath $Worktree)) {
-        $base = (GitRun @('rev-parse', '--verify', '-q', 'refs/codex/work')).Text
+        $base = (GitRun @('rev-parse', '--verify', '-q', $workRef)).Text
         if (-not $base -or $base -match 'fatal') { $base = (GitRun @('rev-parse', 'HEAD')).Text }
         $r = GitRun @('worktree', 'add', '--detach', $Worktree, $base.Trim())
         if ($r.Exit -ne 0) { Write-Error "worktree add failed: $($r.Text)"; exit 2 }
         Say "worktree created at $Worktree from $($base.Trim().Substring(0, 9))"
     }
-    $junction = Join-Path $Worktree "$cos/apps/cognitive-web/node_modules"
-    $target = Join-Path $root "$cos/apps/cognitive-web/node_modules"
-    if (-not (Test-Path -LiteralPath $junction) -and (Test-Path -LiteralPath $target)) {
-        & cmd.exe /c "mklink /J `"$($junction -replace '/', '\')`" `"$($target -replace '/', '\')`"" | Out-Null
+    # node_modules is untracked: link the main checkout's copy so tsc/vitest checks run in the worktree
+    foreach ($rel in @(Setting 'junctions' @())) {
+        if (-not $rel) { continue }
+        $junction = Join-Path $Worktree $rel
+        $target = Join-Path $root $rel
+        if (-not (Test-Path -LiteralPath $junction) -and (Test-Path -LiteralPath $target)) {
+            & cmd.exe /c "mklink /J `"$($junction -replace '/', '\')`" `"$($target -replace '/', '\')`"" | Out-Null
+        }
     }
 }
 
 # ---- one PostgreSQL for the whole session (tests/pg.py uses it through the URL) -----------------------------------
 $startedPg = $false
-if (-not $NoPostgres -and -not $DryRun) {
+if ($usePostgres -and -not $DryRun) {
     $have = (Invoke-WithUtf8Console { & docker ps -a --filter "name=$pgName" --format '{{.Names}}' 2>$null })
     if (-not $have) {
         $pw = [guid]::NewGuid().ToString('N')
@@ -212,7 +232,11 @@ $done = 0
 $exitCode = 0
 $previousRequirePostgres = [Environment]::GetEnvironmentVariable('COGNITIVE_OS_REQUIRE_POSTGRES', 'Process')
 try {
-    $env:COGNITIVE_OS_REQUIRE_POSTGRES = '1'
+    # postgres:false must not inherit a parent shell's PostgreSQL flag or URL (restored in finally)
+    $previousTestDbUrl = [Environment]::GetEnvironmentVariable('COGNITIVE_OS_TEST_DATABASE_URL', 'Process')
+    if ($usePostgres) { $env:COGNITIVE_OS_REQUIRE_POSTGRES = '1' } else {
+        Remove-Item Env:COGNITIVE_OS_REQUIRE_POSTGRES, Env:COGNITIVE_OS_TEST_DATABASE_URL -ErrorAction SilentlyContinue
+    }
     foreach ($card in $queue.cards) {
         if ($done -ge $MaxCards) { break }
         $id = [string]$card.id
@@ -235,7 +259,7 @@ try {
             Set-Card $id @{ status = 'blocked'; note = "rebase of the Codex chain onto main failed: $($rb.Text.Split("`n")[0])" }
             Say "blocked: the Codex chain does not rebase onto main (conflict). A person resolves it in $Worktree" 'Red'; $exitCode = 1; break
         }
-        $null = GitRun @('update-ref', 'refs/codex/work', (GitRun @('rev-parse', 'HEAD') $Worktree).Text.Trim())
+        $null = GitRun @('update-ref', $workRef, (GitRun @('rev-parse', 'HEAD') $Worktree).Text.Trim())
 
         $cardOk = $false
         $feedback = ''
@@ -249,7 +273,7 @@ try {
             # from becoming this attempt's BLOCKED / DECISION_NEEDED result after a CLI crash.
             $logBase = Join-Path $StateDir ("logs/{0}-{1}-{2}" -f $id, $attempt, ([guid]::NewGuid().ToString('N')))
             $prompt = @(
-                "You are continuing the cognitive platform build as a worker. Work only in the current directory ($Worktree).",
+                "$intro Work only in the current directory ($Worktree).",
                 "Read these two UTF-8 files completely, then do the card: 1) $($queueRoot -replace '\\','/')/PREAMBLE.md  2) $($queueRoot -replace '\\','/')/$($card.file)",
                 "When the card is done, make exactly the commit(s) the preamble describes and end your final message with one line: CARD_DONE $id",
                 "If you need a decision only the operator can make, stop and end your final message with one line: DECISION_NEEDED: <the question>",
@@ -291,6 +315,11 @@ try {
                 if (-not $chk) { continue }
                 $n++
                 $dir = if ($chk.PSObject.Properties['cwd'] -and $chk.cwd) { Join-Path $Worktree $chk.cwd } else { $Worktree }
+                # the validator refuses '..'/absolute cwd; this is the same rule at the point of use
+                $full = [System.IO.Path]::GetFullPath($dir).TrimEnd('\') + '\'
+                if (-not $full.StartsWith(([System.IO.Path]::GetFullPath($Worktree).TrimEnd('\') + '\'), [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $problems += "check cwd escapes the worktree: $($chk.cwd)"; continue
+                }
                 $log = "$logBase.check$n.txt"
                 $code = Run-Command ([string]$chk.cmd) $dir $log 1800
                 if ($code -ne 0) {
@@ -300,9 +329,9 @@ try {
             }
             if ($problems.Count -eq 0) {
                 $head = (GitRun @('rev-parse', 'HEAD') $Worktree).Text.Trim()
-                $null = GitRun @('update-ref', 'refs/codex/work', $head)
+                $null = GitRun @('update-ref', $workRef, $head)
                 Set-Card $id @{ status = 'done'; commit = $head; finished = (Get-Date).ToString('s'); note = '' }
-                Say "  done: $id at $($head.Substring(0, 9)) (kept as refs/codex/work; review-debt.md lists it)" 'Green'
+                Say "  done: $id at $($head.Substring(0, 9)) (kept as $workRef; review-debt.md lists it)" 'Green'
                 $cardOk = $true; $done++
             } else {
                 $feedback = ($problems -join "`n---`n")
@@ -319,6 +348,7 @@ try {
 } finally {
     if ($startedPg) { Invoke-WithUtf8Console { & docker stop $pgName 2>$null } | Out-Null }
     if ($null -eq $previousRequirePostgres) { Remove-Item Env:COGNITIVE_OS_REQUIRE_POSTGRES -ErrorAction SilentlyContinue } else { $env:COGNITIVE_OS_REQUIRE_POSTGRES = $previousRequirePostgres }
+    if (-not $usePostgres -and $null -ne $previousTestDbUrl) { $env:COGNITIVE_OS_TEST_DATABASE_URL = $previousTestDbUrl }
 }
 Say "finished: $done card(s) done this run" 'Cyan'
 exit $exitCode

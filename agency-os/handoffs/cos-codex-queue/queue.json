@@ -1,5 +1,16 @@
 {
   "about": "Card queue for scripts/codex-continue.ps1. Cards run in order; a card waits for its depends and its gate; high_stop cards are never run by the driver; done_elsewhere (a note naming where) marks a card another worker finished. Commit queue changes on main before running (the driver rebases Codex's worktree onto main per card). Add a card = a file in cards/ + an entry here + the file starts with '# Card <number>'. See README.md.",
+  "settings": {
+    "profile": "cos",
+    "intro": "You are continuing the cognitive platform build as a worker.",
+    "postgres": true,
+    "worktree": "D:/tmp/cos-codex",
+    "state_dir": "D:/tmp/cos-codex-state",
+    "work_ref": "refs/codex/work",
+    "junctions": [
+      "Projects/internal/cognitive-engineering-os/apps/cognitive-web/node_modules"
+    ]
+  },
   "cards": [
     {
       "id": "00-queue-integrity",

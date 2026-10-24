@@ -1,4 +1,32 @@
 # Worklog
+## 2026-10-24（續10）派工作給 Codex（/codex-do）＋背景工人選帳號（/account，me／Wda Gov 手動切）（Claude）
+
+**觸發**：操作者：Codex 只用在 /codex-review 太少，要能平常派工作；自己的 $100 週額度快用完時改用單位給的 Wda Gov Team 席位，但對話歷史與監工台不能斷。定案：手動切（不讀內部用量網址），主帳號當大腦、其他帳號當工人。
+
+**根因**
+- C1 `scripts/codex-continue.ps1` 寫死 COS：佇列驗證器路徑與 COS 測試、Postgres 預設開、`refs/codex/work`、cognitive-web node_modules、提示首句。別的工作無法排進佇列。
+- C2 驗證器 `validate_queue` 寫死 `QUEUE_REL` 與 COS 的指令白名單（只許 COS unittest／tsc／vitest）。
+- C3 背景 Claude 工人只有 `cc.py`（API key），沒有「用另一個訂閱」的路；`D:\Work\.claude` 是 `~/.claude` 的 junction，故另一個 `CLAUDE_CONFIG_DIR` 只需登入＋共用 `projects/`，不必複製 hooks。
+
+**修改**
+- `scripts/codex-continue.ps1`：差異全移到各佇列 `queue.json` `settings`（profile／intro／postgres／worktree／state_dir／work_ref／junctions）；兩佇列不得共用 worktree、state、ref（缺即 exit 2）；check `cwd` 在使用點再驗不出 worktree；`postgres:false` 清掉繼承的 PG 旗標與 URL。
+- `tests/unit/test_codex_queue.py`（COS）：`command_shape_error(cmd, profile)`、`validate_queue(..., queue_rel, profile)`；general 加 `npm test`／`node --test <x.test.mjs>`／`python -m pytest <x.py>`／任意 unittest 模組；cwd 須為 repo 內相對路徑；profile 與 settings 不符即錯。`scripts/validate-codex-queue.py` 加 `--queue`／`--profile`。
+- `agency-os/handoffs/cos-codex-queue/queue.json`：加 settings（原路徑原樣）。新 `agency-os/handoffs/codex-queue/`（queue.json、PREAMBLE、README、gates/README、cards/01）。
+- `.claude/commands/codex-do.md`、`.claude/commands/account.md`、`scripts/claude-account.py`（show／use／init-wda／run／resume-cmd；worker 去掉父程序 CLAUDE*／ANTHROPIC*；登入判定看 refresh token 是否仍有效）。
+- `agency-os/AGENTS.md` §5：派工與換帳號一行；API key 改為兩個訂閱都不可用時。
+- Codex 卡 01 產出（原 d3c020d7a，審畢併入）：`RUNNABLE_DEMOS.md` 一列、`review-debt.md` 一列（已劃掉）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=codex-continue.ps1 -QueueDir agency-os/handoffs/codex-queue -MaxCards 1（真 codex exec：card 01 done at d3c020d7a，driver 自驗 commit／clean／review-debt／check） | exit=0 | ms=420000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_codex_queue（10 OK）；兩佇列 -DryRun（COS 讀到原 state、general 0 張）；validate-codex-queue.py 兩模式＋錯 profile exit 1；init-wda 對非 junction 的 projects exit 2；claude-account.py show／use wda（未登入拒絕 exit 2） | exit=0 | ms=30000
+- 突變：拔 check-cwd 守衛 → test_broken_copies 2 failures → 還原 10 OK。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n -- Codex oracle `agency-os/reports/oracle/2026-10-24-partialreview-184d2bb6.md`。F2 cwd 逃出 worktree、F3 PG 環境繼承、F4 projects 非 junction、F5 resume 指令帶父程序 auth：已修。F1 `npm test` 會跑 lifecycle script：成立，但屬同一類「check 在沙箱外執行 Codex 寫的程式」（COS 的 unittest 一直如此），未關，見剩餘風險。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=validate_queue\(|command_shape_error\(|refs/codex/work | hits=15 呼叫皆在 test_codex_queue.py 與 validate-codex-queue.py，皆用預設（cos）或已傳參；refs/codex/work 只剩 COS settings 與說明
+- 未實測：Wda Gov 工人（待操作者登入）；`me` 工人（CLI 檔案登入 refresh token 已於 2026-10-22 過期，桌面 app 另行登入）。
+
+**剩餘風險**：驅動程式在 Codex 沙箱外跑 check，Codex 寫入的測試／package.json 會在 Claude 審查前執行（F1 那一類）。治本＝check 也在隔離環境跑，已開 TASKS。
+
+**rollback**：`git revert <本 commit>`；刪 `~/.claude-wda`、`~/.claude-active-account`；`git update-ref -d refs/codex/do`；`git worktree remove D:/tmp/codex-do`。
 ## 2026-10-24（續9）Theme Editor：Colors 分頁只放顏色、Typography & Size 只放尺寸；每個 token 只出現一次（Claude）
 
 **觸發**：操作者：/tools/theme 的 Colors 與 Typography 裡顏色、字型、字級混在一起。

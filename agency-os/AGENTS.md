@@ -80,7 +80,8 @@
   | 填：YAML／範例／課文等純資料 | 派 `data-filler`（Haiku） |
 
   手上工作與目前 session 模型不匹配 → **回覆首行**寫 `⚠ 建議切 <模型>：<一句原因>`；匹配不提。agent 不能改自己 session 的模型，由操作者在模型選單切；「做（卡寫死）」與「填」不必切，主 session 用 Agent tool 派上表小幫手，自己只驗收。計畫的「下一步」行與 AO-RESUME §8 每個下一步都附 `建議模型：<…>`。
-- **訂閱額度用完 → 改走 API Key**：回覆含 `usage limit`／`weekly limit`（週四 04:00 台灣重設）時，把剩餘工作交給 `C:/Users/user1115/ClaudeAgent/.venv/Scripts/python.exe C:/Users/user1115/ClaudeAgent/cc.py --quiet --project D:\Work --budget <美元> "<任務>"`（`--quiet` 只回最後結論，完整記錄在 RESULT 的 `log` 檔，省訂閱額度；完整 Claude Code：CLAUDE.md、hooks、Git、skills 全載入；最後一行 `RESULT {session_id,cost_usd}`，`--resume <session_id>` 續接；月預算約 US$100，單次預算預設 3）。派出者驗收 diff，commit／WORKLOG 證據鏈照常。**不是** GUI 工作台（`app.py`，沙箱無 Git）。
+- **派工與換帳號**（操作者手動，不自動切）：卡寫死的工作派 Codex 用 `/codex-do`；背景 Claude 工人用 `/account` 選帳號（me／wda＝單位 Team 席位），額度將盡由操作者打 `/account wda`，本視窗印接手指令（`scripts/claude-account.py`）。
+- **兩個訂閱都用完 → 改走 API Key**：回覆含 `usage limit`／`weekly limit`（週四 04:00 台灣重設）且 wda 也不可用時，把剩餘工作交給 `C:/Users/user1115/ClaudeAgent/.venv/Scripts/python.exe C:/Users/user1115/ClaudeAgent/cc.py --quiet --project D:\Work --budget <美元> "<任務>"`（`--quiet` 只回最後結論，完整記錄在 RESULT 的 `log` 檔，省訂閱額度；完整 Claude Code：CLAUDE.md、hooks、Git、skills 全載入；最後一行 `RESULT {session_id,cost_usd}`，`--resume <session_id>` 續接；月預算約 US$100，單次預算預設 3）。派出者驗收 diff，commit／WORKLOG 證據鏈照常。**不是** GUI 工作台（`app.py`，沙箱無 Git）。
 - **共享工作目錄同時最多 2 個 session**。`spawn_task` 卡片只有操作者開的主線 session 可留；卡片開出的 session 發現範圍外問題寫 `TASKS.md` 一行＋WORKLOG 連結，**不得再留卡**；卡片由操作者決定何時點開，一次一張。§Agent 扇出治理
 - **Session 切換**（操作者不記；閘 `suggest-compact.js` 只在 CTX ≥ 80% 注入一次 `[Hook][CTX]`；**每種提醒同一 session 只說一次**，說過就不再提，操作者沒照做也不追）：
 

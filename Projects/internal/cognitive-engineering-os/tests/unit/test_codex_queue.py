@@ -14,6 +14,8 @@ import unittest
 
 
 QUEUE_REL = Path("agency-os/handoffs/cos-codex-queue")
+GENERAL_QUEUE_REL = Path("agency-os/handoffs/codex-queue")
+PROFILES = ("cos", "general")
 COS_TESTS_REL = Path("Projects/internal/cognitive-engineering-os/tests")
 REQUIRED_TOKENS = ("CARD_DONE", "DECISION_NEEDED:", "BLOCKED:")
 # A check runs through cmd.exe, so only these command shapes pass and every argument is one
@@ -22,12 +24,18 @@ SAFE_TOKEN = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_./=~-]*$")
 VITEST_PATH = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:test|spec)\.(?:ts|tsx|js|jsx|mjs)$")
 UNITTEST_COMMAND = re.compile(r"^python\s+-m\s+unittest(?:\s+(.+?))?\s*$")
 UNITTEST_MODULE = re.compile(r"^tests\.unit(?:\.[A-Za-z_]\w*)+$")
+# The general queue (/codex-do) works anywhere in the repo, so it adds these shapes; cos keeps its narrower set.
+GENERAL_UNITTEST_MODULE = re.compile(r"^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*$")
+PYTEST_PATH = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_./-]*\.py$")
+NODE_TEST_PATH = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_./-]*\.test\.(?:mjs|cjs|js)$")
 CARD_NUMBER = re.compile(r"^(\d+)-")
 GATE_LINE = re.compile(r"^\s*-\s+([^:\s]+)\s*:")
 
 
-def command_shape_error(command: str) -> str | None:
+def command_shape_error(command: str, profile: str = "cos") -> str | None:
     """Return why a check command is not an allowed shape, or None when it is."""
+    if profile not in PROFILES:
+        return f"unknown queue profile: {profile}"
     if command != command.strip() or "  " in command or any(ch in command for ch in "\t\r\n"):
         return "check must be single-spaced on one line"
     tokens = command.split(" ")
@@ -37,8 +45,19 @@ def command_shape_error(command: str) -> str | None:
         modules = tokens[3:]
         if not modules:
             return "unittest check has no module"
-        bad = [module for module in modules if not UNITTEST_MODULE.fullmatch(module)]
-        return f"unittest module is outside tests.unit: {bad[0]}" if bad else None
+        pattern = GENERAL_UNITTEST_MODULE if profile == "general" else UNITTEST_MODULE
+        bad = [module for module in modules if not pattern.fullmatch(module)]
+        return f"unittest module is not allowed: {bad[0]}" if bad else None
+    if profile == "general":
+        if tokens == ["npm", "test"]:
+            return None
+        for prefix, pattern, label in ((["python", "-m", "pytest"], PYTEST_PATH, "pytest"), (["node", "--test"], NODE_TEST_PATH, "node --test")):
+            if tokens[:len(prefix)] == prefix:
+                paths = tokens[len(prefix):]
+                if not paths:
+                    return f"{label} check names no test file"
+                bad = [path for path in paths if not pattern.match(path)]
+                return f"{label} path is not a test file: {bad[0]}" if bad else None
     if tokens == ["npx", "tsc", "--noEmit"]:
         return None
     if tokens[:3] == ["npx", "vitest", "run"]:
@@ -107,15 +126,23 @@ def _module_is_named_in_dependency_chain(module: str, card: dict, cards_by_id: d
     return False
 
 
-def validate_queue(queue: dict, base_folder: Path) -> list[str]:
+def validate_queue(queue: dict, base_folder: Path, queue_rel: Path = QUEUE_REL, profile: str = "cos") -> list[str]:
     """Return every queue contract violation, using only the supplied queue and base folder."""
     errors: list[str] = []
+    if profile not in PROFILES:
+        return [f"unknown queue profile: {profile}"]
     base = Path(base_folder).resolve()
-    queue_root = base / QUEUE_REL
+    queue_root = base / queue_rel
     cards = queue.get("cards") if isinstance(queue, dict) else None
-    if not isinstance(cards, list) or not cards:
+    # the general queue is empty between /codex-do runs; cos always holds its build plan
+    if not isinstance(cards, list) or (not cards and profile == "cos"):
         errors.append("queue.cards must be a non-empty list")
         cards = []
+    settings = queue.get("settings", {}) if isinstance(queue, dict) else {}
+    if not isinstance(settings, dict):
+        errors.append("queue.settings must be an object")
+    elif settings.get("profile", "cos") != profile:
+        errors.append(f"queue.settings.profile is {settings.get('profile', 'cos')!r} but was validated as {profile!r}")
     cards_by_id = {card["id"]: card for card in cards if isinstance(card, dict) and isinstance(card.get("id"), str)}
 
     ids: list[str | None] = []
@@ -165,14 +192,17 @@ def validate_queue(queue: dict, base_folder: Path) -> list[str]:
             if not isinstance(command, str) or not command.strip():
                 errors.append(f"card {card_id}: check {check_index} cmd must be non-empty")
                 continue
-            if "cwd" in check and check["cwd"] is not None and not isinstance(check["cwd"], str):
-                errors.append(f"card {card_id}: check {check_index} cwd must be a string")
+            if "cwd" in check and check["cwd"] is not None:
+                cwd = check["cwd"]
+                # the driver joins cwd onto the Codex worktree: an escape would run the check in the main checkout
+                if not isinstance(cwd, str) or ".." in Path(cwd).parts or Path(cwd).is_absolute() or ":" in cwd or cwd.startswith(("/", "\\")):
+                    errors.append(f"card {card_id}: check {check_index} cwd must be a relative path inside the repository")
 
-            shape_error = command_shape_error(command)
+            shape_error = command_shape_error(command, profile)
             if shape_error:
                 errors.append(f"card {card_id}: check {check_index} refused: {shape_error}: {command}")
                 continue
-            match = UNITTEST_COMMAND.match(command)
+            match = UNITTEST_COMMAND.match(command) if profile == "cos" else None
             if match:
                 for module in (match.group(1) or "").split():
                     module_path = base / COS_TESTS_REL.parent / Path(*module.split("."))
@@ -217,7 +247,7 @@ def validate_queue(queue: dict, base_folder: Path) -> list[str]:
         if isinstance(card, dict) and isinstance(card.get("gate"), str) and card["gate"] not in gate_names:
             errors.append(f"card {card.get('id')}: gate is not documented: {card['gate']}")
 
-    for relative, label in ((QUEUE_REL / "PREAMBLE.md", "PREAMBLE.md"), (Path("scripts/codex-continue.ps1"), "scripts/codex-continue.ps1")):
+    for relative, label in ((queue_rel / "PREAMBLE.md", "PREAMBLE.md"), (Path("scripts/codex-continue.ps1"), "scripts/codex-continue.ps1")):
         path = base / relative
         if not path.is_file():
             errors.append(f"{label} does not exist")
@@ -347,6 +377,8 @@ if (-not (Test-Path -LiteralPath $errPath)) { throw 'captured stderr log was not
             "empty check list": (lambda queue: queue["cards"][0].update(check=[]), "check must be a non-empty list"),
             "high stop ssh": (lambda queue: (queue["cards"][0].update(high_stop=True), queue["cards"][0]["check"][0].update(cmd="ssh host true")), "refused"),
             "ordinary card ssh": (lambda queue: queue["cards"][0]["check"][0].update(cmd="ssh host docker compose up -d"), "refused"),
+            "cwd escapes": (lambda queue: queue["cards"][0]["check"][0].update(cwd="../../Work"), "relative path inside"),
+            "cwd absolute": (lambda queue: queue["cards"][0]["check"][0].update(cwd="D:/Work"), "relative path inside"),
         }
         for name, (mutate, expected) in cases.items():
             with self.subTest(name=name):
@@ -384,6 +416,31 @@ if (-not (Test-Path -LiteralPath $errPath)) { throw 'captured stderr log was not
         for command in allowed:
             with self.subTest(command=command):
                 self.assertIsNone(command_shape_error(command))
+
+    def test_general_queue_is_valid_and_declares_its_profile(self) -> None:
+        general = json.loads((self.repo / GENERAL_QUEUE_REL / "queue.json").read_text(encoding="utf-8"))
+        self.assertEqual(validate_queue(general, self.repo, GENERAL_QUEUE_REL, "general"), [])
+        self.assertTrue(any("profile" in error for error in validate_queue(general, self.repo, GENERAL_QUEUE_REL, "cos")))
+        self.assertTrue(any("profile" in error for error in validate_queue(self.queue, self.repo, QUEUE_REL, "general")))
+
+    def test_general_profile_adds_repo_test_shapes_and_still_refuses_side_effects(self) -> None:
+        allowed = (
+            "npm test", "python -m pytest tests/test_a.py", "node --test tests/hooks/a.test.mjs",
+            "python -m unittest scripts.tests.test_a", "npx tsc --noEmit", "npx vitest run lib/a.test.ts",
+        )
+        for command in allowed:
+            with self.subTest(command=command):
+                self.assertIsNone(command_shape_error(command, "general"))
+        refused = (
+            "npm run deploy", "npm test -- --watch", "npm install", "node scripts/x.mjs", "node --test",
+            "python -m pytest", "python -m pytest ../x.py", "python -m pytest a.py && git push",
+            "ssh host true", "git push", "docker compose up -d", "powershell -File x.ps1",
+        )
+        for command in refused:
+            with self.subTest(command=command):
+                self.assertIsNotNone(command_shape_error(command, "general"))
+        self.assertIsNotNone(command_shape_error("npm test", "cos"))
+        self.assertIsNotNone(command_shape_error("npm test", "nope"))
 
 
 if __name__ == "__main__":

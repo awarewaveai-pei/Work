@@ -1,0 +1,30 @@
+{
+  "about": "General Codex queue for /codex-do (.claude/commands/codex-do.md). Same driver and same acceptance as the COS queue (scripts/codex-continue.ps1); this queue declares its own worktree, state, ref and the wider 'general' check shapes. Add a card = a file in cards/ starting '# Card <number>' + an entry here. See README.md.",
+  "settings": {
+    "profile": "general",
+    "intro": "You are a Codex worker doing one task card for the AwareWave repository.",
+    "postgres": false,
+    "worktree": "D:/tmp/codex-do",
+    "state_dir": "D:/tmp/codex-do-state",
+    "work_ref": "refs/codex/do",
+    "junctions": [
+      "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/node_modules",
+      "Projects/internal/cognitive-engineering-os/apps/cognitive-web/node_modules"
+    ]
+  },
+  "cards": [
+    {
+      "id": "01-register-codex-do-demo",
+      "file": "cards/01-register-codex-do-demo.md",
+      "gate": null,
+      "depends": [],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
+      ]
+    }
+  ]
+}
