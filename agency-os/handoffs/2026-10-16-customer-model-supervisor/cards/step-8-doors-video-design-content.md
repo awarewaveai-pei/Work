@@ -110,8 +110,8 @@
 ### 4.5 任務清單（依序）
 | # | 任務 | file:line | 風險 |
 |---|---|---|---|
-| D-R1 | **presets 全面補租戶檢查**：GET `effectiveOrgId(request, url.searchParams.get("organizationId") ?? default)`；POST 用 `effectiveOrgId(request, body.organizationId ?? default)`；DELETE 先 `effectiveOrgId` 再 `.eq("organization_id", …)`（客戶限本人 `created_by`，抄 `tools/designs/route.ts:342-345`）。一個守衛一個測試：客戶帶他人 org → 403（拿掉檢查 → 測試紅 → 還原綠） | `app/api/tools/presets/route.ts:48-51,136,239` | **H** |
-| D-R2 | 收緊閘 5（P2）使 presets 類假陽性無法再過 | `registry-code.test.ts:228-241` | L |
+| D-R1 | **✅ `21e7da50b`**（另：客戶只刪自己建的 preset，`created_by`） **presets 全面補租戶檢查**：GET `effectiveOrgId(request, url.searchParams.get("organizationId") ?? default)`；POST 用 `effectiveOrgId(request, body.organizationId ?? default)`；DELETE 先 `effectiveOrgId` 再 `.eq("organization_id", …)`（客戶限本人 `created_by`，抄 `tools/designs/route.ts:342-345`）。一個守衛一個測試：客戶帶他人 org → 403（拿掉檢查 → 測試紅 → 還原綠） | `app/api/tools/presets/route.ts:48-51,136,239` | **H** |
+| D-R2 | **✅ `21e7da50b`**：讀 DB 的路由須自己 import **並呼叫**登記的授權函式（`AUTHORIZERS`），否則列 `ORG_FREE_ROUTES`；「讀 DB」= 閉包內任何資料庫驅動 import 收緊閘 5（P2）使 presets 類假陽性無法再過 | `registry-code.test.ts:228-241` | L |
 | D1 | 前置 P1（`door.nav`）、S1（隱藏呼叫的注入模式）、`canvas-handoff` door-aware（P1 helper） | `components/tools/canvas-handoff.ts:119`；`ProductDoorShell.tsx` | M |
 | D2 | `app/design/{layout,page}.tsx`＋子頁 `app/design/{designs,canvas,banner,mockup}/page.tsx`（共用元件；canvas 頁照 `TOOLS/canvas/page.tsx` 的 dynamic 寫法）；`products.ts:59` 加 `nav`；員工路徑 `tools/*` 與門頁 `app/design/*` 不同名 | 新檔 | M |
 | D3 | `printful/catalog`：加 `PLATFORM_APIS`＋`ORG_FREE_ROUTES`（理由：公開型錄、無組織欄、快取） | `doors.ts:63`；`registry-code.test.ts:234`；`app/api/tools/printful/catalog/route.ts` | L |
@@ -155,12 +155,12 @@
 ### 5.5 任務清單（依序）
 | # | 任務 | file:line | 風險 |
 |---|---|---|---|
-| C-R1 | `sites/[id]` PATCH／DELETE／`test`：先讀列 `organization_id` → `assertOrgAccess` → 再改／刪／探測（抄 `video/[id]/route.ts:24-42` 與 `drafts/route.ts:171-182` 的寫法）；各一個守衛測試 | `app/api/content/sites/[id]/route.ts:10-40,67-84`、`…/test/route.ts:10-25` | **H** |
-| C-R2 | `sites` POST：`organization_id: effectiveOrgId(req, body.organizationId)`；URL 套 `isSafePublicHttps`（PATCH 同）；GET 備援對客戶回空 | `app/api/content/sites/route.ts:153-179,139-150` | M |
-| C-R3 | `sources` 寫入限 `canWriteTenantConfig`（決策 D2 後）；門上隱藏管理 UI | `app/api/content/sources/route.ts:75-77,107-109,148-150` | M |
-| C-R4 | `newsletter` 與 `social-admin/integrations` 加 `resolveTenant` 客戶明確 403；門上隱藏電子報 | `app/api/content/newsletter/route.ts:165-171`、`…/social-admin/integrations/route.ts:8-12` | H |
-| C-R5 | `brand-voice` URL 套 `isSafePublicHttps` | `app/api/content/brand-voice/route.ts:22-24,52-54` | M |
-| C-R6 | `seo-check`、`content/image` GET 補 `ORG_FREE_ROUTES`＋理由 | `registry-code.test.ts:234-238` | L |
+| C-R1 | **✅ `7d8d618a4`**（`wp-sites.ts siteRowGate`，AUTO_CONTENT session） `sites/[id]` PATCH／DELETE／`test`：先讀列 `organization_id` → `assertOrgAccess` → 再改／刪／探測（抄 `video/[id]/route.ts:24-42` 與 `drafts/route.ts:171-182` 的寫法）；各一個守衛測試 | `app/api/content/sites/[id]/route.ts:10-40,67-84`、`…/test/route.ts:10-25` | **H** |
+| C-R2 | **✅ `21e7da50b`，改採更嚴的做法**：客戶不得新增站或改網址（`wp-sites.ts siteUrlWriteGate`；存進 `wp_sites` 的網址被多處帶密碼抓取、未釘 IP、未依組織過濾，見 WORKLOG 續21）；POST 綁組織、GET 備援對客戶回空。客戶自助登記站的前置在 TASKS `sites` POST：`organization_id: effectiveOrgId(req, body.organizationId)`；URL 套 `isSafePublicHttps`（PATCH 同）；GET 備援對客戶回空 | `app/api/content/sites/route.ts:153-179,139-150` | M |
+| C-R3 | **✅ `21e7da50b`**（`staffOnly`；員工 operator 權限不變） `sources` 寫入限 `canWriteTenantConfig`（決策 D2 後）；門上隱藏管理 UI | `app/api/content/sources/route.ts:75-77,107-109,148-150` | M |
+| C-R4 | **✅ `21e7da50b`**（`staffOnly`；門上隱藏電子報仍待 C2） `newsletter` 與 `social-admin/integrations` 加 `resolveTenant` 客戶明確 403；門上隱藏電子報 | `app/api/content/newsletter/route.ts:165-171`、`…/social-admin/integrations/route.ts:8-12` | H |
+| C-R5 | **✅ `21e7da50b`，改採更嚴的做法**：走 `lib/collect/net/remote-file`（每跳位址閘＋釘 IP），只套 `isSafePublicHttps` 擋不住轉址與 DNS rebinding `brand-voice` URL 套 `isSafePublicHttps` | `app/api/content/brand-voice/route.ts:22-24,52-54` | M |
+| C-R6 | **✅ `21e7da50b`**（seo-check 列 `ORG_FREE_ROUTES`；image GET 不讀 DB，閘 5 以計費規則放行，免列） `seo-check`、`content/image` GET 補 `ORG_FREE_ROUTES`＋理由 | `registry-code.test.ts:234-238` | L |
 | C0 | 前置 P1（nav）、S1（影片、events 同步、publish 抽出）、決策 D1（`tools/publish` 歸 studio） | `products.ts:67`；`ContentStudio.tsx:1743,1770,1793` | M |
 | C1 | `app/content/{layout,page}.tsx`＋`app/content/{calendar,sites,events}/page.tsx`；`products.ts:64` 加 `nav`（內容編輯／行事曆／網站／節日） | 新檔 | M |
 | C2 | 門上連結改 door-aware：`ContentStudio.tsx:2102,2319`、`ContentCalendar.tsx:326`、`SiteManager.tsx:823,826`；`/ops/clients`、`/tools/social` 連結隱藏（`:2108,2372,3276,3686`、`ContentCalendar.tsx:325`） | 同左 | L |
