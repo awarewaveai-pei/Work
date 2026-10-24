@@ -168,6 +168,8 @@ export async function generateVideoScript(
     targetMinutes?: number;
     /** 明確場景數（前端「場景總數」滑桿）→ 覆蓋 targetMinutes 推導的場景數。 */
     sceneCount?: number;
+    /** The site's stored voice (lib/content/brand-voice.ts renderSiteVoice); empty = no brand block. */
+    brandVoice?: string;
   },
   apiKey: string
 ): Promise<VideoScriptResult> {
@@ -195,7 +197,8 @@ export async function generateVideoScript(
     `- visual：「custom」= 此場景適合 AI 插畫；「broll」= 此場景適合真實影片素材\n` +
     `- title：影片標題（${lang}）\n` +
     `- description：SEO 影片描述（${lang}，50–120 字）\n\n` +
-    `JSON 架構：\n${schemaExample(sceneCount)}`;
+    `JSON 架構：\n${schemaExample(sceneCount)}` +
+    (input.brandVoice?.trim() ? `\n\n品牌語氣（旁白、標題、描述都要遵守；不得使用禁用聲明）：\n${input.brandVoice.trim()}` : "");
 
   let response: Anthropic.Beta.Messages.BetaMessage;
   try {

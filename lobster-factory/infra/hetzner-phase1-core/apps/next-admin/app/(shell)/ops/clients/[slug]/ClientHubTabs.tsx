@@ -13,7 +13,7 @@ import { CollectionSourcesPanel } from "@/app/(shell)/ops/collect/CollectionSour
 import { KnowledgeDetailModal } from "./KnowledgeDetailModal";
 import type { ClientConfig, WpUpdateLatest } from "@/app/api/ops/clients/route";
 import type { DepartmentSummaryPayload } from "@/app/api/ops/clients/[slug]/department-summary/route";
-import type { SiteContentDefaults } from "@/app/api/content/sites/route";
+import { FUNNEL_STAGES, PRICE_POSITIONS, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import type { ImportSummary } from "@/lib/cognitive-os/import-sources";
 
 // ── Content-defaults dropdown options (mirror ContentStudio constants) ─────────
@@ -44,21 +44,6 @@ const READABILITIES = [
   { value: "10th grade",              label: "一般（10 年級）" },
   { value: "College",                 label: "大學程度" },
   { value: "Professional",            label: "專業級" },
-];
-const FUNNEL_STAGES = [
-  { value: "",              label: "不指定" },
-  { value: "awareness",     label: "認知（剛發現問題）" },
-  { value: "interest",      label: "興趣（在比較方案）" },
-  { value: "consideration", label: "考慮（評估是否適合）" },
-  { value: "decision",      label: "決策（準備購買）" },
-  { value: "retention",     label: "留存（深化既有客戶）" },
-];
-const PRICE_POSITIONS = [
-  { value: "",        label: "不指定" },
-  { value: "premium", label: "高端精品（價值與稀缺）" },
-  { value: "midhigh", label: "中高端（品質與專業）" },
-  { value: "mid",     label: "中端（性價比）" },
-  { value: "value",   label: "平價親民" },
 ];
 
 // ── Audience profile chip constants (mirrors ScriptForge.tsx) ─────────────────

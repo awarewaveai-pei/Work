@@ -14,6 +14,7 @@ import type { VideoServiceCapability } from "@/lib/content/video/render-client";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { thenRun, withFeature } from "@/lib/entitlements/grant";
+import { siteVoiceFor } from "@/lib/content/brand-voice-store";
 
 interface GenerateBody {
   topic?: string;
@@ -31,6 +32,8 @@ interface GenerateBody {
   introDuration?: number;
   /** 要輸出的格式（["16x9","9x16","4x5"] 子集）；每格式原生生成。省略 = 全三格式。 */
   outputFormats?: string[];
+  /** The article's site: its stored brand voice goes into the script prompt. */
+  siteId?: string;
 }
 
 export async function POST(req: NextRequest): Promise<Response> {
@@ -59,6 +62,15 @@ export async function POST(req: NextRequest): Promise<Response> {
   let orgId: string | null;
   try { orgId = effectiveOrgId(req, resolveDefaultOrgId()); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e) as NextResponse; throw e; }
+
+  // siteId = the article's site; its stored brand voice shapes the script (lib/content/brand-voice-store.ts).
+  let brandVoice: string | null;
+  try { brandVoice = await siteVoiceFor(req, typeof body.siteId === "string" ? body.siteId.trim() : ""); }
+  catch (e) {
+    console.error("[video/generate] brand voice lookup failed:", e);
+    return NextResponse.json({ ok: false, status: 500, error: "brand voice lookup failed" }, { status: 500 });
+  }
+  if (brandVoice === null) return NextResponse.json({ ok: false, status: 404, error: "site not found" }, { status: 404 });
 
   // Side-effect import to populate the block registry
   await import("@/lib/content/blocks/register-all");
@@ -90,6 +102,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     introTitle: body.introTitle,
     introDuration: body.introDuration,
     outputFormats: body.outputFormats,
+    brandVoice,
     // 供積木組出帶租戶身分的 R2 目錄名（見 buildVideoOutName）。ctx 是 BlockCtx（index signature），
     // 積木讀不到就退回舊行為，所以這個欄位缺失是「少了租戶前綴」而非崩潰。
     organizationId: orgId,

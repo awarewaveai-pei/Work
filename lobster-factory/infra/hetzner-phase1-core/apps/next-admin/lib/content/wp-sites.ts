@@ -143,3 +143,20 @@ export async function listAccessibleWpSites(
     usernames: Object.fromEntries(allowed.map((s) => [s.id, usernames[s.id] ?? ""])),
   };
 }
+
+/**
+ * The by-id site routes (PATCH / DELETE / test under app/api/content/sites/[id]) act on one row, active or not:
+ * the site manager edits and re-enables stopped sites, so resolveWpSite (active only) is not the seam for them.
+ * null = the caller may act on the row; otherwise the response to return: 404 no such row, 403 not the caller's
+ * (the same split as resolveWpSite). A DB error throws.
+ */
+export async function siteRowGate(req: Request | { headers: Headers }, siteId: string): Promise<Response | null> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) throw new Error("wp_sites:no_supabase_client");
+  const { data, error } = await sb.from("wp_sites").select("organization_id").eq("id", siteId).maybeSingle();
+  if (error) throw new Error(`wp_sites:owner:${error.message}`);
+  if (!data) return Response.json({ ok: false, error: "site not found" }, { status: 404 });
+  return canAccessOrg(req, (data as { organization_id: string | null }).organization_id)
+    ? null
+    : Response.json({ ok: false, error: "forbidden: org mismatch" }, { status: 403 });
+}

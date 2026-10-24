@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import type { ManagedSite, SiteContentDefaults } from "@/app/api/content/sites/route";
+import { siteRowGate } from "@/lib/content/wp-sites";
+import type { ManagedSite } from "@/app/api/content/sites/route";
+import type { SiteContentDefaults } from "@/lib/content/brand-voice";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +19,8 @@ export async function PATCH(
 
   const supabase = getSupabaseWriteClient();
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
+  const denied = await siteRowGate(req, id);
+  if (denied) return denied;
 
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return new NextResponse("invalid json", { status: 400 }); }
@@ -74,6 +78,8 @@ export async function DELETE(
 
   const supabase = getSupabaseWriteClient();
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
+  const denied = await siteRowGate(req, id);
+  if (denied) return denied;
 
   const { error } = await supabase
     .from("wp_sites")

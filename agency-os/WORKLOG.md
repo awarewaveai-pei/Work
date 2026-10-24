@@ -1,4 +1,31 @@
 # Worklog
+## 2026-10-24（續13）AUTO_CONTENT P1：品牌聲音只剩一份（站別 content_defaults）；社群改寫、影片腳本讀伺服器品牌；ScriptForge 刪 sf_brand；by-id 站別 API 加租戶閘（Claude）
+
+**觸發**：操作者「去做」（計畫 `agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md` P1，`cfc6e08d7`）。
+
+**根因**：品牌存三處：`wp_sites.content_defaults`（只經瀏覽器送 AI）、ScriptForge `localStorage sf_brand`（換電腦就沒、且不含站別 brandVoiceInstructions）、社群改寫完全不讀。另：行銷簡報標籤表抄三份（ContentStudio／SiteManager／ClientHubTabs，後者文字不同）；`/api/content/sites/[id]` PATCH／DELETE／test 只驗角色、不驗租戶（內容門未開故未外露）。
+**不變量**：品牌只存 content_defaults；一個渲染器 `lib/content/brand-voice.ts`（純、前後端共用）；一個伺服器讀取 `brand-voice-store.ts siteVoiceFor()`（找不到或非本租戶一律 404）；瀏覽器不存品牌副本。by-id 站別路由一律過 `wp-sites.ts siteRowGate`。
+**設計修正（對計畫 P1.2）**：文章頁表單是逐篇可改的預填，保留由瀏覽器送 `details`；headless 呼叫端在 P4 用同一渲染器組 `details`，`generate-core` 不改。
+
+**改動**（`NA`＝`lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 新 `NA/lib/content/brand-voice.ts`、`brand-voice-store.ts`；`sites/route.ts` 型別改 import；三份 FUNNEL/PRICE 表與 `compileMarketingBrief` 刪除改 import。
+- `NA/lib/content/syndicate.ts`、`NA/app/api/video/generate/route.ts`：收 `siteId` → `siteVoiceFor` → prompt 加品牌段；無 siteId 時 prompt 與改前逐字相同。`video-script-core.ts`／`video-pipeline.ts` 傳 `brandVoice`。呼叫端 ContentStudio（改寫、自動影片）、social `ArticleSource.tsx` 送 siteId。
+- `ScriptForge.tsx`：品牌＝所選客戶 content_defaults 經 `renderSiteVoice`；本機只記 `sf_site`（選了誰）；品牌語氣／品牌速建／產業模板改 PATCH 該站（只合併改到的欄位，其餘鍵保留）。
+- `NA/lib/content/wp-sites.ts siteRowGate`＋`sites/[id]/route.ts`（PATCH、DELETE）、`sites/[id]/test/route.ts`。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/content/__tests__ lib/content/video/__tests__ lib/content/blocks/__tests__ lib/social lib/portal "app/(shell)/tools/content/__tests__" app/api/video app/api/content | exit=0 | ms=0（84 檔 476 測過、3 skip；未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scratchpad/sf-brand-check.mjs（Playwright 對 no-Supabase dev server :3902，攔截 /api/content/sites 與 /api/tools/script-forge）→ 舊 sf_brand 被忽略、選客戶後 sf_site 記住、品牌編輯器預填 brandVoiceInstructions、存檔 PATCH 保留 featuredImageFont 與 marketing.usp | exit=0 | ms=0（未計時）
+- `npx tsc --noEmit` exit 0。
+- 突變：forbiddenTerms 分隔符改成只認逗號 → brand-voice 1 測紅；syndicate 拔 canAccessOrg → 他租戶 404 測紅；siteRowGate 拔 canAccessOrg → 2 測紅；還原全綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n -- Codex `agency-os/reports/oracle/2026-10-24-partialreview-7b056e48.md`。F1（syndicate、video/generate 把 siteVoiceFor 的資料庫錯誤原文回給呼叫者）實查成立，已修：伺服器記 log、對外固定回 `brand voice lookup failed`，測試斷言回應不含 DB 訊息。
+  - external oracle = Codex CLI (codex exec -s read-only), not self-description
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=sf_brand|compileMarketingBrief|const FUNNEL_STAGES|loadClient( | hits=8（next-admin 0；`lobster-factory/scripts/script_forge_video.jsx` 舊獨立原型 4 處 sf_brand 不在 app 內、不動；計畫檔與 WORKLOG 歷史敘述；memory `project_scriptforge_video_integration.md` 的 loadClient 敘述已同步更新）
+
+**共用檔**：ContentStudio.tsx 同時有 session 955b84c8 未 commit 的影片 API 改寫（依賴未追蹤的 ContentStudioStaff.tsx）；本 commit 只帶本 session 的 hunk（import、標籤表、簡報函式、改寫 siteId）。自動影片的 siteId 一行落在對方的改寫 hunk 內，隨對方 commit 上線。
+
+**剩餘風險**：既有客戶若只在 ScriptForge 本機存過手寫品牌（sf_brand），那份不會自動搬回 DB，需在品牌語氣頁重存一次；ScriptForge 的客戶選擇仍是 `<select>`（UI 規則另案）。
+**rollback**：`git revert <本 commit>`；資料面零變更（只寫 content_defaults 既有 jsonb）。
 ## 2026-10-24（續12）重新整理先閃預設主題：prerender 頁在 build 時烤進「無主題」＋讀取失敗被快取（Claude）
 
 **觸發**：操作者：重新整理時先出現原來的設定（問是否用 !important——沒有，全站無 !important）。

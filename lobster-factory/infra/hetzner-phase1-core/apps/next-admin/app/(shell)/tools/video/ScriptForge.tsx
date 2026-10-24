@@ -6,6 +6,7 @@ import { chipStyle } from "@/components/tools/panel-primitives";
 import StoryBibleWorkbench from "./StoryBibleWorkbench";
 import OrganizationPicker from "./OrganizationPicker";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
+import { renderSiteVoice } from "@/lib/content/brand-voice";
 
 // Palette mapped onto the GLOBAL theme CSS vars so ScriptForge matches the rest of the
 // app (was a bespoke coral/violet/jade palette) AND follows /tools/theme automatically.
@@ -829,13 +830,13 @@ function makeSimpleModule(title,desc,icon,promptFn,tag,extraFields){
 
 const ArticleModule=makeSimpleModule("文章轉腳本","貼入文章，AI萃取精華轉成可拍攝腳本","📄",(f,plat,bv,sc)=>`分析文章並生成${plat}腳本。${bv}\n文章：${(f.article||"").slice(0,3000)}\n純JSON：{"title":"","hook":"","core_idea":"","scenes":[{"time":"","visual":"","dialogue":"","subtitle":"","shoot_tip":"","edit_tip":""}],"cta":"","alt_hooks":["","",""],"titles":["","","","",""],"hashtags":["","","","",""],"shoot_checklist":["",""],"edit_notes":""}\n台詞口語化，${sc}個場景。`,"文章轉腳本",[{key:"article",label:"貼入文章 *",type:"area",placeholder:"貼入部落格、新聞稿、長文...",rows:8,required:true}]);
 
-function IndustryModule({setBrand,brand}){
+function IndustryModule({saveVoice,brand}){
   const[sel,setSel]=useState(null);const[platform,setPlatform]=useState("");const[topic,setTopic]=useState("");const[loading,setLoading]=useState(false);const[script,setScript]=useState(null);const[score,setScore]=useState(null);
   const {sceneCount}=useContext(ScriptSettingsCtx);
   const ind=sel?INDUSTRIES[sel]:null;
   async function doGen(){if(!sel||!platform||!topic)return;setLoading(true);setScript(null);const plat=PLATFORMS.find(p=>p.id===platform)?.label||"";try{const raw=await claude(`為${ind.label}產業生成${plat}腳本。主題：${topic}\n語氣：${ind.voice}\n禁用詞：${ind.forbidden}\n偏好詞：${ind.preferred}\n建議結構：${ind.structure}\n純JSON：{"title":"","hook":"","core_idea":"","scenes":[{"time":"","visual":"","dialogue":"","subtitle":"(≤12字)","shoot_tip":"","edit_tip":""}],"cta":"","alt_hooks":["","",""],"titles":["","","","",""],"hashtags":["","","","",""],"shoot_checklist":["",""],"edit_notes":""}\n${sceneCount}個場景。`);const s=pj(raw);setScript(s);const sr=await claude(`評估腳本。鉤子：${s.hook}|場景：${s.scenes?.length}\n純JSON：{"scores":{"hook":0,"rhythm":0,"clarity":0,"emotion":0,"shootability":0,"conversion":0},"overall":0,"optimized_hook":"","optimized_cta":""}`);setScore(pj(sr));}catch{}setLoading(false);}
   if(script&&!loading)return<ScriptResult script={script} score={score} onReset={()=>{setScript(null);setTopic("");setPlatform("");}} autoSaveTag={`產業模板：${ind?.label}`}/>;
-  return(<div style={{display:"grid",gap:18}}><div><h2 style={{fontSize:19,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",marginBottom:3}}>產業模板庫</h2><p style={{fontSize:12.5,color:C.mid}}>選產業，自動套入語氣、結構、禁用詞</p></div><div><SL ch="選擇產業 *"/><div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:7}}>{Object.entries(INDUSTRIES).map(([id,ind])=><button key={id} onClick={()=>setSel(id)} style={{padding:"12px 6px",borderRadius:10,border:`2px solid ${sel===id?C.coral:C.border}`,background:sel===id?C.corallt:C.white,cursor:"pointer",textAlign:"center",transition:"all .15s",fontFamily:"inherit"}}><div style={{fontSize:18,marginBottom:3}}>{ind.icon}</div><div style={{fontSize:9.5,fontWeight:sel===id?700:400,color:sel===id?C.coral:C.ink,lineHeight:1.2}}>{ind.label}</div></button>)}</div></div>{ind&&<Card style={{background:C.corallt,borderColor:C.coral}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}><div style={{fontSize:14,fontWeight:800,color:C.coral}}>{ind.icon} {ind.label}</div><GBtn ch="設為品牌語氣" onClick={()=>{const b={name:ind.label,voice:ind.voice,forbidden:ind.forbidden,preferred:ind.preferred,cta_style:""};setBrand(b);localStorage.setItem("sf_brand",JSON.stringify(b));}} style={{fontSize:10.5,padding:"4px 9px"}}/></div><div style={{display:"grid",gap:5}}><div><span style={{fontSize:9.5,color:C.mid,fontWeight:700}}>語氣：</span><span style={{fontSize:12,color:C.ink}}>{ind.voice}</span></div><div><span style={{fontSize:9.5,color:C.rose,fontWeight:700}}>禁用：</span><span style={{fontSize:12,color:C.ink}}>{ind.forbidden}</span></div><div><span style={{fontSize:9.5,color:C.jade,fontWeight:700}}>偏好：</span><span style={{fontSize:12,color:C.ink}}>{ind.preferred}</span></div></div></Card>}{ind&&<><div><SL ch="影片主題 *"/><IN value={topic} onChange={e=>setTopic(e.target.value)} placeholder={`例如：${ind.hooks[0]}`}/></div><div><SL ch="目標平台 *"/><PlatGrid value={platform} onChange={setPlatform}/></div>{loading&&<Spin label={`AI 正在生成${ind.label}腳本...`}/>}{!loading&&<PBtn ch={`${ind.icon} 生成腳本 →`} onClick={doGen} disabled={!topic||!platform} full/>}</>}</div>);
+  return(<div style={{display:"grid",gap:18}}><div><h2 style={{fontSize:19,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",marginBottom:3}}>產業模板庫</h2><p style={{fontSize:12.5,color:C.mid}}>選產業，自動套入語氣、結構、禁用詞</p></div><div><SL ch="選擇產業 *"/><div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:7}}>{Object.entries(INDUSTRIES).map(([id,ind])=><button key={id} onClick={()=>setSel(id)} style={{padding:"12px 6px",borderRadius:10,border:`2px solid ${sel===id?C.coral:C.border}`,background:sel===id?C.corallt:C.white,cursor:"pointer",textAlign:"center",transition:"all .15s",fontFamily:"inherit"}}><div style={{fontSize:18,marginBottom:3}}>{ind.icon}</div><div style={{fontSize:9.5,fontWeight:sel===id?700:400,color:sel===id?C.coral:C.ink,lineHeight:1.2}}>{ind.label}</div></button>)}</div></div>{ind&&<Card style={{background:C.corallt,borderColor:C.coral}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}><div style={{fontSize:14,fontWeight:800,color:C.coral}}>{ind.icon} {ind.label}</div><GBtn ch="設為品牌語氣" onClick={async()=>{const err=await saveVoice({instructions:[ind.voice,ind.preferred&&`常用詞：${ind.preferred}`].filter(Boolean).join("\n"),forbidden:ind.forbidden});alert(err||"已存成目前客戶的品牌語氣");}} style={{fontSize:10.5,padding:"4px 9px"}}/></div><div style={{display:"grid",gap:5}}><div><span style={{fontSize:9.5,color:C.mid,fontWeight:700}}>語氣：</span><span style={{fontSize:12,color:C.ink}}>{ind.voice}</span></div><div><span style={{fontSize:9.5,color:C.rose,fontWeight:700}}>禁用：</span><span style={{fontSize:12,color:C.ink}}>{ind.forbidden}</span></div><div><span style={{fontSize:9.5,color:C.jade,fontWeight:700}}>偏好：</span><span style={{fontSize:12,color:C.ink}}>{ind.preferred}</span></div></div></Card>}{ind&&<><div><SL ch="影片主題 *"/><IN value={topic} onChange={e=>setTopic(e.target.value)} placeholder={`例如：${ind.hooks[0]}`}/></div><div><SL ch="目標平台 *"/><PlatGrid value={platform} onChange={setPlatform}/></div>{loading&&<Spin label={`AI 正在生成${ind.label}腳本...`}/>}{!loading&&<PBtn ch={`${ind.icon} 生成腳本 →`} onClick={doGen} disabled={!topic||!platform} full/>}</>}</div>);
 }
 
 function ABModule({brand}){
@@ -969,22 +970,24 @@ function PredictModule(){
   return(<div style={{display:"grid",gap:12}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><h2 style={{fontSize:17,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",margin:0}}>績效預測報告</h2><GBtn ch="重新分析" onClick={()=>setResult(null)}/></div><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:9}}>{[["前3秒留存",result.predicted_retention?.["3s_hook_rate"]],["完播率",result.predicted_retention?.full_watch_rate],["預估轉換率",result.conversion_estimate?.conversion_rate]].map(([l,v])=><Card key={l} style={{textAlign:"center",padding:14}}><div style={{fontSize:26,fontWeight:900,color:mC(v),fontFamily:"DM Serif Display,serif"}}>{v}</div><div style={{fontSize:10.5,color:C.mid,marginTop:1}}>{l}</div></Card>)}</div>{result.viral_coefficient&&<Card style={{borderColor:result.viral_coefficient.score>=7?C.jade:C.gold}}><SL ch="🔥 病毒係數"/><div style={{display:"flex",alignItems:"center",gap:10}}><div style={{fontSize:36,fontWeight:900,color:result.viral_coefficient.score>=7?C.jade:C.gold,fontFamily:"DM Serif Display,serif"}}>{result.viral_coefficient.score}<span style={{fontSize:12,color:C.mid}}>/10</span></div><div><Tag ch={result.viral_coefficient.label} c={result.viral_coefficient.score>=7?C.jade:C.gold} bg={result.viral_coefficient.score>=7?C.jadelt:C.goldlt}/><div style={{fontSize:12,color:C.ink,marginTop:3}}>{result.viral_coefficient.reason}</div></div></div></Card>}{result.top3_improvements&&<Card><SL ch="⚡ 三大改善建議"/>{result.top3_improvements.map((t,i)=><div key={i} style={{padding:"7px 0",borderBottom:i<2?`1px solid ${C.border}`:"none"}}><div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}><div style={{width:17,height:17,borderRadius:"50%",background:C.coral,color:C.white,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:800,flexShrink:0}}>{i+1}</div><span style={{fontSize:12.5,fontWeight:700,color:C.black}}>{t.issue}</span><Tag ch={t.impact} c={C.jade} bg={C.jadelt} small/></div><div style={{fontSize:11.5,color:C.mid,paddingLeft:23}}>{t.fix}</div></div>)}</Card>}{result.algorithm_score&&<Card><SL ch="🤖 演算法評估"/><div style={{fontSize:34,fontWeight:900,color:C.violet,marginBottom:10,fontFamily:"DM Serif Display,serif"}}>{result.algorithm_score.score}<span style={{fontSize:12,color:C.mid}}>/100</span></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>{result.algorithm_score.factors&&<div style={{background:C.jadelt,borderRadius:8,padding:"8px 10px"}}><SL ch="✅ 有利"/>{result.algorithm_score.factors.map((f,i)=><div key={i} style={{fontSize:11.5,color:C.ink,padding:"2px 0"}}>{f}</div>)}</div>}{result.algorithm_score.risks&&<div style={{background:C.roselt,borderRadius:8,padding:"8px 10px"}}><SL ch="⚠ 風險"/>{result.algorithm_score.risks.map((r,i)=><div key={i} style={{fontSize:11.5,color:C.ink,padding:"2px 0"}}>{r}</div>)}</div>}</div></Card>}{result.best_post_time&&<Card style={{background:C.goldlt,borderColor:C.gold}}><SL ch="⏰ 最佳發布時間"/><div style={{fontSize:12.5,color:C.ink}}>{result.best_post_time}</div></Card>}</div>);
 }
 
-function BrandBuildModule({setBrand}){
+function BrandBuildModule({saveVoice}){
   const[step,setStep]=useState(0);const[answers,setAnswers]=useState({});const[current,setCurrent]=useState("");const[loading,setLoading]=useState(false);const[result,setResult]=useState(null);const[saved,setSaved]=useState(false);
   const questions=[{key:"name",q:"你的品牌或頻道叫什麼名字？",placeholder:"例如：小林的生活日記"},{key:"product",q:"你主要賣什麼或分享什麼？",placeholder:"例如：手工蠟燭、健身課程"},{key:"audience",q:"你的主要受眾是誰？他們的痛點？",placeholder:"例如：30歲女性，工作壓力大"},{key:"personality",q:"希望品牌給人什麼感覺？3個形容詞",placeholder:"例如：溫柔、真實、有質感"},{key:"dislike",q:"你最不想要什麼感覺？",placeholder:"例如：不要太誇張、不要像傳統廣告"}];
   const q=questions[step];
   function next(){if(!current.trim())return;const na={...answers,[q.key]:current};setAnswers(na);setCurrent("");if(step<questions.length-1){setStep(step+1);}else{buildBrand(na);}}
   async function buildBrand(ans){setLoading(true);try{const raw=await claude(`根據客戶訪談生成品牌語氣設定。品牌：${ans.name}\n產品：${ans.product}\n受眾：${ans.audience}\n感覺：${ans.personality}\n排斥：${ans.dislike}\n純JSON：{"name":"","voice":"","audience":"","forbidden":"","preferred":"","cta_style":"","sample_hooks":["","",""],"brand_summary":""}`);setResult(pj(raw));}catch{}setLoading(false);}
-  function saveBrand(){if(!result)return;setBrand(result);localStorage.setItem("sf_brand",JSON.stringify(result));setSaved(true);}
+  async function saveBrand(){if(!result)return;const err=await saveVoice({instructions:[result.voice,result.preferred&&`常用詞：${result.preferred}`,result.cta_style&&`CTA 風格：${result.cta_style}`].filter(Boolean).join("\n"),audience:result.audience,forbidden:result.forbidden});if(err){alert(err);return;}setSaved(true);}
   if(loading)return<Spin label="AI 正在建立品牌語氣..."/>;
   if(result)return(<div style={{display:"grid",gap:14}}><div><h2 style={{fontSize:19,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",marginBottom:3}}>品牌語氣已生成！</h2></div><div style={{background:C.coral,borderRadius:13,padding:18,color:C.white}}><div style={{fontSize:11,fontWeight:700,letterSpacing:1.5,marginBottom:3,opacity:.7}}>品牌定位</div><div style={{fontSize:17,fontWeight:900,fontFamily:"DM Serif Display,serif",marginBottom:5}}>{result.name}</div><div style={{fontSize:12.5,opacity:.85}}>{result.brand_summary}</div></div>{[["品牌語氣",result.voice],["目標受眾",result.audience]].map(([l,v])=><Card key={l}><SL ch={l}/><div style={{fontSize:12.5,color:C.ink,lineHeight:1.6}}>{v}</div></Card>)}<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Card style={{borderColor:C.rose,background:C.roselt}}><SL ch="🚫 禁用"/><div style={{fontSize:12.5,color:C.ink}}>{result.forbidden}</div></Card><Card style={{borderColor:C.jade,background:C.jadelt}}><SL ch="✅ 偏好"/><div style={{fontSize:12.5,color:C.ink}}>{result.preferred}</div></Card></div>{result.sample_hooks&&<Card><SL ch="範例鉤子"/>{result.sample_hooks.map((h,i)=><div key={i} style={{fontSize:12.5,color:C.violet,fontStyle:"italic",padding:"4px 0",borderBottom:i<result.sample_hooks.length-1?`1px solid ${C.border}`:"none"}}>「{h}」</div>)}</Card>}<PBtn ch={saved?"✅ 已儲存！":"💾 儲存為品牌語氣"} onClick={saveBrand} full/><GBtn ch="重新填寫" onClick={()=>{setStep(0);setAnswers({});setCurrent("");setResult(null);setSaved(false);}} style={{width:"100%",padding:"10px"}}/></div>);
   return(<div style={{display:"grid",gap:18}}><div><h2 style={{fontSize:19,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",marginBottom:3}}>品牌速建</h2><p style={{fontSize:12.5,color:C.mid}}>AI問你5個問題，自動建立完整品牌語氣</p></div><div style={{display:"flex",gap:4,marginBottom:2}}>{questions.map((_,i)=><div key={i} style={{flex:1,height:3,borderRadius:99,background:i<=step?C.coral:C.border,transition:"background .3s"}}/>)}</div><Card style={{background:C.corallt,borderColor:C.coral,padding:22}}><div style={{fontSize:10.5,color:C.coral,fontWeight:700,letterSpacing:1,marginBottom:6}}>問題 {step+1} / {questions.length}</div><div style={{fontSize:16,fontWeight:800,color:C.black,lineHeight:1.4,marginBottom:14,fontFamily:"DM Serif Display,serif"}}>{q.q}</div><TA value={current} onChange={e=>setCurrent(e.target.value)} placeholder={q.placeholder} rows={3}/></Card><PBtn ch={step<questions.length-1?"下一題 →":"🧠 生成品牌語氣"} onClick={next} disabled={!current.trim()} full/></div>);
 }
 
-function BrandModule({brand,setBrand}){
-  const[form,setForm]=useState(brand||{name:"",voice:"",audience:"",forbidden:"",preferred:"",cta_style:""});const[saved,setSaved]=useState(false);
-  function save(){setBrand(form);localStorage.setItem("sf_brand",JSON.stringify(form));setSaved(true);setTimeout(()=>setSaved(false),2000);}
-  return(<div style={{display:"grid",gap:18}}><div><h2 style={{fontSize:19,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",marginBottom:3}}>品牌語氣設定</h2><p style={{fontSize:12.5,color:C.mid}}>設定一次，所有模組自動套用</p></div>{[["品牌名稱","name","text","例如：我的創作頻道"],["品牌語氣描述","voice","area","例如：溫柔、專業、有藝術感，像一位耐心的導師"],["目標受眾","audience","text","例如：25–35歲想學創作的上班族"],["禁用詞","forbidden","area","例如：爆款、逆襲、財富自由"],["常用詞","preferred","area","例如：一起、慢慢來、真實、細節"],["CTA風格","cta_style","text","例如：柔性引導，用「如果你有興趣」開頭"]].map(([l,k,type,ph])=><div key={k}><SL ch={l}/>{type==="area"?<TA value={form[k]} onChange={e=>setForm({...form,[k]:e.target.value})} placeholder={ph} rows={3}/>:<IN value={form[k]} onChange={e=>setForm({...form,[k]:e.target.value})} placeholder={ph}/>}</div>)}<PBtn ch={saved?"✅ 已儲存！":"💾 儲存品牌語氣"} onClick={save} full/>{brand?.voice&&<Card style={{background:C.jadelt,borderColor:C.jade}}><SL ch="目前已儲存"/><div style={{fontSize:12.5,color:C.ink,lineHeight:1.6,marginBottom:5}}>{brand.voice}</div>{brand.forbidden&&<div style={{fontSize:11.5,color:C.mid}}>🚫 禁用：{brand.forbidden}</div>}{brand.preferred&&<div style={{fontSize:11.5,color:C.mid}}>✅ 偏好：{brand.preferred}</div>}</Card>}</div>);
+function BrandModule({site,saveVoice}){
+  const d=site?.contentDefaults||{};const m=d.marketing||{};
+  const[form,setForm]=useState({instructions:d.brandVoiceInstructions||"",tone:d.tone||"",audience:m.audience||"",forbidden:m.forbiddenClaims||"",primaryCta:m.primaryCta||""});const[saved,setSaved]=useState(false);const[err,setErr]=useState("");
+  async function save(){const e=await saveVoice(form);if(e){setErr(e);return;}setErr("");setSaved(true);setTimeout(()=>setSaved(false),2000);}
+  if(!site)return(<div style={{display:"grid",gap:10}}><h2 style={{fontSize:19,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",marginBottom:3}}>品牌語氣設定</h2><p style={{fontSize:12.5,color:C.mid}}>先在右上「載入客戶」選一個客戶。品牌語氣存在客戶的網站設定，文章、社群貼文和腳本共用同一份。</p></div>);
+  return(<div style={{display:"grid",gap:18}}><div><h2 style={{fontSize:19,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",marginBottom:3}}>品牌語氣設定</h2><p style={{fontSize:12.5,color:C.mid}}>存在「{site.name}」的客戶設定；文章、社群貼文和所有腳本模組共用這一份</p></div>{[["品牌語氣描述","instructions","area","例如：溫柔、專業、有藝術感，像一位耐心的導師"],["語氣","tone","text","例如：溫暖、專業"],["目標受眾","audience","text","例如：25–35歲想學創作的上班族"],["禁用詞","forbidden","area","例如：爆款、逆襲、財富自由"],["主要行動呼籲","primaryCta","text","例如：預約免費體驗課"]].map(([l,k,type,ph])=><div key={k}><SL ch={l}/>{type==="area"?<TA value={form[k]} onChange={e=>setForm({...form,[k]:e.target.value})} placeholder={ph} rows={3}/>:<IN value={form[k]} onChange={e=>setForm({...form,[k]:e.target.value})} placeholder={ph}/>}</div>)}{err&&<div style={{fontSize:12,color:C.rose}}>{err}</div>}<PBtn ch={saved?"✅ 已儲存！":"💾 儲存品牌語氣"} onClick={save} full/></div>);
 }
 
 function CalendarModule({brand}){
@@ -1017,7 +1020,7 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { 
   SF_NOT_USABLE = why("video.script");
   const notUsable = SF_NOT_USABLE;
   const[nav,setNav]=useState("manual");
-  const[brand,setBrand]=useState(()=>{try{const s=localStorage.getItem("sf_brand");return s?JSON.parse(s):null;}catch{return null;}});
+  const[siteId,setSiteId]=useState<string>(()=>{try{return localStorage.getItem("sf_site")||"";}catch{return "";}});
   const groups=["生成","工具","分析","設定","規劃","紀錄"];
   const gNavs=groups.map(g=>({group:g,items:NAVS.filter(n=>n.group===g)}));
   // ── 串接客戶：載入 內容工具›網站管理 的客戶 contentDefaults.marketing 當品牌語境（零新後端，GET 已回 marketing）──
@@ -1044,15 +1047,24 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { 
   // active 過濾已移到 route.ts GET 的預設（2026-08-26）；這裡原本自己濾一次，是把同一條
   // 規則放在消費端的第二份抄本 —— ContentStudio 沒抄到那份，死站就漏出去了。刪掉抄本。
   useEffect(()=>{(async()=>{try{const r=await fetch("/api/content/sites");const j=await r.json();if(j?.ok&&Array.isArray(j.sites))setClients(j.sites);}catch{/* best-effort：未登入/無客戶 → 下拉為空 */}})();},[]);
-  function loadClient(id:string){
-    const s=clients.find((c:any)=>c.id===id);if(!s)return;
-    const m=s.contentDefaults?.marketing||{};
-    // CTA + 疑慮也折進 voice（模組只讀 brand.voice/forbidden/name；critic 2026-06-19 Minor：勿留死欄位）
-    const voice=[m.positioning&&`品牌定位：${m.positioning}`,m.audience&&`目標受眾：${m.audience}`,m.usp&&`獨特賣點：${m.usp}`,m.emotionalTriggers&&`情緒訴求：${m.emotionalTriggers}`,m.pricePositioning&&`價格定位：${m.pricePositioning}`,m.primaryCta&&`主要行動呼籲：${m.primaryCta}`,m.objections&&`需化解的疑慮：${m.objections}`,s.contentDefaults?.tone&&`語氣：${s.contentDefaults.tone}`].filter(Boolean).join("；");
-    const b={name:s.name,voice:voice||s.name,forbidden:m.forbiddenClaims||"",_clientId:s.id};
-    setBrand(b);try{localStorage.setItem("sf_brand",JSON.stringify(b));}catch{}
+  // 品牌語氣只有一份：所選客戶網站的 content_defaults（lib/content/brand-voice.ts）。這台電腦只記住選了哪個客戶。
+  const site=clients.find((c:any)=>c.id===siteId)||null;
+  const brand=useMemo(()=>site?{name:site.name,voice:renderSiteVoice(site.contentDefaults)||site.name,forbidden:site.contentDefaults?.marketing?.forbiddenClaims||"",_clientId:site.id}:null,[site]);
+  function pickSite(id:string){setSiteId(id);try{if(id)localStorage.setItem("sf_site",id);else localStorage.removeItem("sf_site");}catch{}}
+  /** Writes the given fields into the selected client's content_defaults; undefined = keep, "" = clear. Returns an error to show, or null. */
+  async function saveVoice(f:{instructions?:string;tone?:string;audience?:string;forbidden?:string;primaryCta?:string}):Promise<string|null>{
+    if(!site)return "先在右上「載入客戶」選一個客戶，品牌語氣存在客戶的網站設定。";
+    const d=site.contentDefaults||{};const m=d.marketing||{};
+    const pick=(v:string|undefined,old:string|undefined)=>v===undefined?old:(v.trim()||undefined);
+    const contentDefaults={...d,brandVoiceInstructions:pick(f.instructions,d.brandVoiceInstructions),tone:pick(f.tone,d.tone),marketing:{...m,audience:pick(f.audience,m.audience),forbiddenClaims:pick(f.forbidden,m.forbiddenClaims),primaryCta:pick(f.primaryCta,m.primaryCta)}};
+    try{
+      const r=await fetch(`/api/content/sites/${site.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({contentDefaults})});
+      const j=await r.json().catch(()=>null);
+      if(!r.ok||!j?.ok)return `儲存失敗：${j?.error??r.status}`;
+      setClients(prev=>prev.map((c:any)=>c.id===site.id?{...c,contentDefaults:j.site?.contentDefaults??contentDefaults}:c));
+      return null;
+    }catch{return "網路錯誤，請重試";}
   }
-  function clearBrand(){setBrand(null);try{localStorage.removeItem("sf_brand");}catch{}}
   return(
     <ScriptSettingsCtx.Provider value={{ sceneCount, customScenes }}>
     <ProductionBridge.Provider value={onSendToProduction ?? null}>
@@ -1115,7 +1127,7 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { 
             <select value={model} onChange={e=>{setModel(e.target.value);SF_MODEL=e.target.value;}} title="文字 AI 模型（與內容工具共用同一份選單）" style={{padding:"5px 9px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:11.5,fontFamily:"inherit",cursor:"pointer"}}>
               {["Claude","OpenAI"].map((g)=><optgroup key={g} label={g}>{AI_TEXT_MODELS.filter((m)=>m.group===g).map((m)=><option key={m.value} value={m.value}>{m.label}</option>)}</optgroup>)}
             </select>
-            {clients.length>0&&<select value={brand?._clientId||""} onChange={e=>{if(e.target.value){loadClient(e.target.value);}else if(brand?._clientId){clearBrand();}else if(brand){if(confirm("清除目前手動建立的品牌語境？"))clearBrand();}}} title="載入客戶品牌語境（來自 內容工具 › 網站管理 的行銷預設）" style={{padding:"5px 9px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:11.5,fontFamily:"inherit",cursor:"pointer",maxWidth:160}}>
+            {clients.length>0&&<select value={siteId} onChange={e=>pickSite(e.target.value)} title="載入客戶品牌語境（來自 內容工具 › 網站管理 的行銷預設）" style={{padding:"5px 9px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:11.5,fontFamily:"inherit",cursor:"pointer",maxWidth:160}}>
               <option value="">👤 載入客戶…</option>
               {clients.map((c:any)=><option key={c.id} value={c.id}>{c.name}</option>)}
             </select>}
@@ -1128,7 +1140,7 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { 
         {nav==="story_bible"&&<StoryBibleWorkbench/>}
         {nav==="manual"&&<ManualModule brand={brand}/>}
         {nav==="article"&&<ArticleModule brand={brand}/>}
-        {nav==="industry"&&<IndustryModule setBrand={setBrand} brand={brand}/>}
+        {nav==="industry"&&<IndustryModule saveVoice={saveVoice} brand={brand}/>}
         {nav==="ab"&&<ABModule brand={brand}/>}
         {nav==="host"&&<HostModule/>}
         {nav==="brand_story"&&<BrandStoryModule brand={brand}/>}
@@ -1144,8 +1156,8 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { 
         {nav==="translate"&&<TranslateModule/>}
         {nav==="preview"&&<PreviewModule/>}
         {nav==="predict"&&<PredictModule/>}
-        {nav==="brand_build"&&<BrandBuildModule setBrand={setBrand}/>}
-        {nav==="brand"&&<BrandModule brand={brand} setBrand={setBrand}/>}
+        {nav==="brand_build"&&<BrandBuildModule saveVoice={saveVoice}/>}
+        {nav==="brand"&&<BrandModule key={siteId} site={site} saveVoice={saveVoice}/>}
         {nav==="calendar"&&<CalendarModule brand={brand}/>}
         {nav==="proposal"&&<ProposalModule/>}
         {nav==="history"&&<HistoryModule setNav={setNav}/>}

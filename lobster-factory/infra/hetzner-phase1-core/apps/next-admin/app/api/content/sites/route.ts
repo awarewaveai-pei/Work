@@ -3,46 +3,11 @@ import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { getWpSites } from "@/lib/content/wp-sites";
 import { canAccessOrg } from "@/lib/tenant-guard";
+import type { SiteContentDefaults } from "@/lib/content/brand-voice";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export interface SiteContentDefaults {
-  language?: string;
-  targetCountry?: string;
-  imageModel?: string;
-  tone?: string;
-  articleType?: string;
-  readability?: string;
-  pointOfView?: string;
-  featuredImageFont?: string;
-  featuredImageTitlePosition?: string;
-  brandVoiceInstructions?: string;
-  marketing?: {
-    audience?: string;
-    positioning?: string;
-    usp?: string;
-    primaryCta?: string;
-    funnelStage?: string;
-    pricePositioning?: string;
-    emotionalTriggers?: string;
-    objections?: string;
-    forbiddenClaims?: string;
-  };
-  audienceProfile?: {
-    contentGoal?: string;
-    contentTone?: string;
-    audienceAction?: string;
-    age?: string[];
-    gender?: string[];
-    job?: string[];
-    jobCustom?: string;
-    emotion?: string[];
-    emotionCustom?: string;
-    awareness?: string[];
-    spending?: string[];
-  };
-}
 
 export interface ManagedSite {
   id: string;

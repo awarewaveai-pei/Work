@@ -4,6 +4,7 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from "react"
 import { useSearchParams } from "next/navigation";
 import type { WpSite } from "@/lib/content/wp-sites";
 import type { ManagedSite } from "@/app/api/content/sites/route";
+import { FUNNEL_STAGES, PRICE_POSITIONS, renderMarketingBrief } from "@/lib/content/brand-voice";
 import { pickInitialSite } from "@/lib/content/pick-initial-site";
 import type { BrandVoiceProfile } from "@/app/api/content/brand-voice/route";
 import type { RankMathReport } from "@/lib/seo/rankmath-checker";
@@ -100,24 +101,6 @@ const READABILITIES = [
   { value: "10th grade",              label: "一般（10 年級）" },
   { value: "College",                 label: "大學程度" },
   { value: "Professional",            label: "專業級" },
-];
-
-// #4 — Marketing brief selects. Funnel stage steers the article's intent + which CTA to lean on;
-// price positioning steers tone/word choice. Both compile into the generation `details` block.
-const FUNNEL_STAGES = [
-  { value: "",              label: "不指定" },
-  { value: "awareness",     label: "認知（剛發現問題，建立信任）" },
-  { value: "interest",      label: "興趣（在比較方案、找資訊）" },
-  { value: "consideration", label: "考慮（評估是否適合自己）" },
-  { value: "decision",      label: "決策（準備行動／購買）" },
-  { value: "retention",     label: "留存（既有客戶深化關係）" },
-];
-const PRICE_POSITIONS = [
-  { value: "",        label: "不指定" },
-  { value: "premium", label: "高端精品（強調價值與稀缺）" },
-  { value: "midhigh", label: "中高端（品質與專業）" },
-  { value: "mid",     label: "中端（性價比）" },
-  { value: "value",   label: "平價親民（可近性）" },
 ];
 
 // Audience profile chip constants (mirrors ClientHubTabs — edit both places if changing)
@@ -279,7 +262,7 @@ interface MediaHub {
 }
 
 // #4 — structured marketing brief. Compiled into a YAML-ish block prepended to `details` at generate
-// time (compileMarketingBrief), so the backend contract is unchanged (it still reads only `details`).
+// time (renderMarketingBrief, lib/content/brand-voice.ts), so the backend contract is unchanged (it still reads only `details`).
 interface MarketingBrief {
   audience: string;          // 目標受眾
   forbiddenClaims: string;   // 避免使用／禁用聲明（逗號分隔）
@@ -366,25 +349,6 @@ interface BulkRow {
 type BulkSettings = Omit<GenerateForm, "keyword" | "title" | "scheduleDate" | "nlpKeywords" | "outline" | "internalLinks" | "referenceUrls">;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-// #4 — compile the structured marketing brief into a human-readable instruction block that gets
-// prepended to `details`. Returns "" when nothing is filled in, so an empty brief adds nothing.
-function compileMarketingBrief(m: MarketingBrief): string {
-  const stageLabel = FUNNEL_STAGES.find(s => s.value === m.funnelStage)?.label ?? "";
-  const priceLabel = PRICE_POSITIONS.find(p => p.value === m.pricePositioning)?.label ?? "";
-  const rows: string[] = [];
-  if (m.audience.trim())          rows.push(`目標受眾: ${m.audience.trim()}`);
-  if (m.positioning.trim())       rows.push(`品牌定位: ${m.positioning.trim()}`);
-  if (m.usp.trim())               rows.push(`獨特賣點/差異化: ${m.usp.trim()}`);
-  if (m.funnelStage)              rows.push(`漏斗階段: ${stageLabel}（請對齊此階段的讀者心態與行動呼籲）`);
-  if (m.primaryCta.trim())        rows.push(`主要行動呼籲 (CTA): ${m.primaryCta.trim()}`);
-  if (m.emotionalTriggers.trim()) rows.push(`情緒觸發點/讀者渴望: ${m.emotionalTriggers.trim()}`);
-  if (m.objections.trim())        rows.push(`需化解的疑慮/抗拒點: ${m.objections.trim()}`);
-  if (m.pricePositioning)         rows.push(`價格定位: ${priceLabel}`);
-  if (m.forbiddenClaims.trim())   rows.push(`避免使用/禁用聲明: ${m.forbiddenClaims.trim()}`);
-  if (rows.length === 0) return "";
-  return ["=== 行銷簡報 (Marketing Brief) — 依此精準打中目標、提高轉換 ===", ...rows, "=== END 行銷簡報 ==="].join("\n");
-}
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-").slice(0, 60);
@@ -1306,7 +1270,7 @@ export default function ContentStudio() {
       } catch { /* best-effort */ }
 
       // #4 — fold the structured marketing brief into `details` (backend contract unchanged).
-      const brief = compileMarketingBrief(form.marketing);
+      const brief = renderMarketingBrief(form.marketing);
       const rawDetails = form.details.trim();
       const effectiveDetails = brief ? (rawDetails ? `${brief}\n\n${rawDetails}` : brief) : rawDetails;
 
@@ -1813,7 +1777,7 @@ export default function ContentStudio() {
       const res  = await fetch("/api/content/syndicate", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          article: generated, platforms, twitterMode, articleUrl: pubResult?.view_url,
+          article: generated, platforms, twitterMode, articleUrl: pubResult?.view_url, siteId: selectedSiteId || undefined,
           mediaType: distMediaType === "video" ? "video" : distMediaType === "image" ? "image" : "text",
         }),
       });

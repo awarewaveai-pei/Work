@@ -1,23 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { ManagedSite, SiteContentDefaults } from "@/app/api/content/sites/route";
+import type { ManagedSite } from "@/app/api/content/sites/route";
+import { FUNNEL_STAGES, PRICE_POSITIONS, type SiteContentDefaults } from "@/lib/content/brand-voice";
 
-const FUNNEL_STAGES = [
-  { value: "",              label: "不指定" },
-  { value: "awareness",     label: "認知（剛發現問題，建立信任）" },
-  { value: "interest",      label: "興趣（在比較方案、找資訊）" },
-  { value: "consideration", label: "考慮（評估是否適合自己）" },
-  { value: "decision",      label: "決策（準備行動／購買）" },
-  { value: "retention",     label: "留存（既有客戶深化關係）" },
-];
-const PRICE_POSITIONS = [
-  { value: "",        label: "不指定" },
-  { value: "premium", label: "高端精品（強調價值與稀缺）" },
-  { value: "midhigh", label: "中高端（品質與專業）" },
-  { value: "mid",     label: "中端（性價比）" },
-  { value: "value",   label: "平價親民（可近性）" },
-];
 const MKT_PRESETS: Record<string, string[]> = {
   audience: ["台灣 30-45 歲女性", "有焦慮/壓力的上班族", "正在尋找自我療癒的成人", "對心理健康有興趣的父母", "藝術愛好者（非專業）", "身心科/諮商後進階探索者"],
   primaryCta: ["預約免費體驗課", "立即報名工作坊", "加入候補名單", "下載免費指南", "訂閱電子報", "聯絡我們了解更多"],

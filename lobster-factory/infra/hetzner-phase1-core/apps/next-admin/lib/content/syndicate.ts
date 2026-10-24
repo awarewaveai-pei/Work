@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { logAiCall } from "@/lib/ai/log-ai-call";
 import { textCallCostUsd, resolveTextRate } from "@/lib/ai/cost-calculator";
+import { siteVoiceFor } from "./brand-voice-store";
 
 /**
  * When generating copy for a VIDEO post, prepend this addendum per platform.
@@ -71,6 +72,14 @@ async function handlePost(req: Request, grant: Grant, route: string): Promise<Re
 
   if (platforms.length === 0) return new NextResponse("no valid platforms", { status: 400 });
 
+  // siteId = the article's site; its stored brand voice (wp_sites.content_defaults) shapes every post.
+  let voice: string | null;
+  try { voice = await siteVoiceFor(req, typeof body.siteId === "string" ? body.siteId.trim() : ""); }
+  catch (e) { console.error("[syndicate] brand voice lookup failed:", e); return new NextResponse("brand voice lookup failed", { status: 500 }); }
+  if (voice === null) return new NextResponse("site not found", { status: 404 });
+  // Empty voice = the prompt is byte-identical to before siteId existed.
+  const voiceBlock = voice ? `\nBrand voice (follow it in every post; never use a forbidden claim):\n${voice}\n` : "";
+
   const articleUrl = typeof body.articleUrl === "string" ? body.articleUrl.trim() : "";
   const urlLine = articleUrl ? `\nArticle URL (use as [LINK] where indicated): ${articleUrl}` : "";
 
@@ -96,7 +105,7 @@ async function handlePost(req: Request, grant: Grant, route: string): Promise<Re
       role: "user",
       content: `Create social media posts from this article for these platforms:
 ${specs}${urlLine}${mediaLine}
-
+${voiceBlock}
 Article (first 3000 chars):
 ${article.slice(0, 3000)}
 

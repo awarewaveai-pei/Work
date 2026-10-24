@@ -59,7 +59,7 @@ export default function ArticleSource({ brand, accounts, siteId, postId, title, 
       if (!platforms.length) throw new Error("先連接至少一個社群帳號。");
       const res = await fetch("/api/social/rewrite", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ article: `${a.title}\n\n${a.content || a.excerpt}`, platforms, articleUrl: a.link, mediaType: a.image ? "image" : "text" }),
+        body: JSON.stringify({ article: `${a.title}\n\n${a.content || a.excerpt}`, platforms, articleUrl: a.link, mediaType: a.image ? "image" : "text", siteId }),
       });
       if (!res.ok) throw new Error(`AI 改寫失敗（${res.status}）：${(await res.text()).slice(0, 200)}`);
       const json = (await res.json()) as { ok: boolean; posts?: Record<string, string>; error?: string };

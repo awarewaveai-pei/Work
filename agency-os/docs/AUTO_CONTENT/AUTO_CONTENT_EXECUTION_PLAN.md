@@ -111,7 +111,7 @@
 
 | # | 不變量 | 關掉的整類 |
 |---|---|---|
-| I1 | 品牌聲音只有一個伺服器解析器 `brandVoiceFor()`，讀 `wp_sites.content_defaults`；瀏覽器不送語氣文字 | 三份品牌、換電腦就沒、社群沒套 |
+| I1 | 品牌只存 `wp_sites.content_defaults` 一份；一個渲染器 `NA/lib/content/brand-voice.ts`（瀏覽器與伺服器共用）、一個伺服器讀取 `brand-voice-store.ts siteVoiceFor()`（含租戶檢查）；瀏覽器不存品牌副本 | 三份品牌、換電腦就沒、社群沒套 |
 | I2 | 平台數字只在 `limits.ts BODY_LIMITS`；AI 規格由它導出；只有一個 `writeSocialPosts()`，四個入口都叫它 | 三份平台規則 |
 | I3 | 全系統一個時鐘：主機 cron */5 → 既有 `run-due`；長工不在 Next.js 等待：題目列＝狀態機，每次 firing 在預算內推進、可中斷續跑、claim 防重跑 | 第二套排程、關分頁丟結果、背景被切、一步一天 |
 | I4 | 「影片完成」只有一個 finalize core；瀏覽器輪詢與 job 都叫它 | 瀏覽器輪詢才嵌回 |
@@ -152,8 +152,8 @@
 
 | 卡 | 改 | 做 | 驗 | 突變 |
 |---|---|---|---|---|
-| P1.1 | 新 `NA/lib/content/brand-voice.ts`＋`__tests__/brand-voice.test.ts` | `brandVoiceFor(sb, {siteId}\|{orgId})`→`BrandVoice{name,tone,instructions,marketing,audienceProfile,forbidden:string[]}`（型別搬自 `sites/route.ts:10-45`，sites route 改 import）；純函式 `renderBrandVoice(v)` 產 prompt 段；`forbidden`＝`marketing.forbiddenClaims` 切逗號 | `npx vitest run lib/content/__tests__/brand-voice.test.ts` | 拔 forbidden 切分 → 1 測紅 |
-| P1.2 | `generate-core.ts:555` `prepareArticleGeneration`；`ContentStudio.tsx:1177-1178` | body 有 `siteId` 時伺服器讀 I1 併入 prompt；`details` 只剩使用者臨時指示；瀏覽器不再把 brandVoiceInstructions 塞 details | 既有 generate 測試綠；新測：body 無 details 仍含品牌段 | 刪 server 讀取 → 測紅 |
+| P1.1 | 新 `NA/lib/content/brand-voice.ts`（純：`SiteContentDefaults` 型別、`FUNNEL_STAGES`／`PRICE_POSITIONS`、`renderMarketingBrief`／`renderBrandVoice`／`renderSiteVoice`／`forbiddenTerms`）＋`brand-voice-store.ts`（`loadSiteBrand`、`siteVoiceFor`）＋測試 | 型別搬自 `sites/route.ts`；三份標籤表（ContentStudio、SiteManager、ClientHubTabs）收成一份 | `npx vitest run lib/content/__tests__/brand-voice.test.ts` | 拔 forbidden 分隔符 → 1 測紅 |
+| P1.2 | `ContentStudio.tsx` | 改用共用 `renderMarketingBrief`（刪本地 `compileMarketingBrief` 與三份標籤表）。文章頁表單＝逐篇可改的預填，維持由瀏覽器送 `details`；headless 呼叫端（P4.5）用 `renderBrandVoice(d.marketing, d.brandVoiceInstructions)` 組 `details`，`generate-core` 不改 | 既有 ContentStudio 測試綠 | — |
 | P1.3 | `syndicate.ts:42` | body 接受 `siteId`，讀 I1 進 system prompt（P2 搬進 core） | 新 `lib/content/__tests__/syndicate-brand.test.ts` | — |
 | P1.4 | `script-forge/route.ts:33`；`ScriptForge.tsx:1017,1044-1052,978,986,838` | route 接受 `siteId`，伺服器組品牌段；刪全部 `sf_brand` 讀寫；「品牌語氣」「品牌速建」「產業模板→設為品牌語氣」改成 PATCH `/api/content/sites/[id]`（`sites/[id]/route.ts:34-35` 已收 contentDefaults） | grep `sf_brand` 全 repo＝0；tsc 0 | — |
 | P1.5 | `NA/lib/content/video/video-script-core.ts` | 影片腳本讀 I1 | 該檔測試綠 | — |
@@ -235,7 +235,7 @@ master plan §0.5 B 段 P5/P6/P9 指本檔；`lib/content|social|video/MODULE_MA
 | 階段 | 狀態 | commit | 備註／建議模型 |
 |---|---|---|---|
 | P0 查證＋計畫 | ✅ 2026-10-24 | — | 本檔 |
-| P1 | 🔲 | | Opus 5.5 |
+| P1 | ✅ 2026-10-24 | 見 WORKLOG 2026-10-24 AUTO_CONTENT P1 | 另補 by-id 站別 API 租戶閘 `siteRowGate`（`NA/lib/content/wp-sites.ts`） |
 | P2 | 🔲 | | Opus 5.5 |
 | P3 | 🔲 | | Opus 5.5；0121 套 prod High |
 | P4 | 🔲 | | Opus 5.5；P4.4 主機 cron High；啟用＝勾格 |
@@ -244,4 +244,4 @@ master plan §0.5 B 段 P5/P6/P9 指本檔；`lib/content|social|video/MODULE_MA
 | P7 | 🔲 | | 等 P7.0 |
 | P8 | 🔲 | | 隨階段 |
 
-開場句：`續做 AUTO_CONTENT P1：讀 agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md §4 I1 與 §7 P1 卡，從 P1.1 brand-voice.ts 開始；完成＝P1 五卡 commit 填進 §10。建議模型：Opus 5.5`
+開場句：`續做 AUTO_CONTENT P2：讀 agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md §4 I2 與 §7 P2 卡，從 P2.1 write-posts.ts 開始；完成＝P2 三卡 commit 填進 §10。建議模型：Opus 5.5`

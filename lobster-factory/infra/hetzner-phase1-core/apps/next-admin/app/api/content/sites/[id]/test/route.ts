@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { wpAuthHeader } from "@/lib/content/wp-sites";
+import { siteRowGate, wpAuthHeader } from "@/lib/content/wp-sites";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +17,8 @@ export async function POST(
 
   const supabase = getSupabaseWriteClient();
   if (!supabase) return NextResponse.json({ ok: false, message: "Supabase not configured" }, { status: 503 });
+  const denied = await siteRowGate(req, id);
+  if (denied) return denied;
 
   const { data, error } = await supabase
     .from("wp_sites")
