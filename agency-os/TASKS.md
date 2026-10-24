@@ -111,6 +111,14 @@
 
 > 外部時鐘不等人。這一區由上往下就是先後順序。
 
+- [ ] **【≈2026-11-01】員工逐工具權限：看 7 天「本來會擋」紀錄，再決定要不要開始擋**
+  - `🔴 現行` · `2026-10-24 開／2026-11-01 看` · `卡在你（先勾好每位員工）`
+  - **一句話**：程式 2026-10-25 03:00 上線，只記錄不擋（ADR 019）；要確認沒人被誤擋才開。
+  - **下一步**：①你在 https://app.aware-wave.com/ops/staff 替每位員工勾工具、按儲存；②11-01 我在主機跑 `docker logs lobster-next-admin 2>&1 | grep '\[staff-tools\]'`，逐行說明或補勾；③你說「開始擋」→ `STAFF_TOOLS_MODE=enforce` 走 `safe-infra-patch.sh compose`（High）。
+  - **完成定義**：7 天紀錄每行都有解釋；開擋後 `docker exec lobster-next-admin printenv STAFF_TOOLS_MODE` 印 `enforce`。
+  - **提醒已建**：peijingartstudio 日曆 2026-11-01 09:00（前一天彈窗＋當天 email），勿重複建立。
+  - **證據**：監工台 https://claude.ai/artifact/RbxhBAEU7KsaxuJ9zKeJL6 C6；WORKLOG 2026-10-24 續46／49／53／54。
+
 - [ ] **【≈2026-11-06 觸發】aware-wave.com DMARC 升級第三階段（p=quarantine → p=reject）** — 決策正本 [`reports/decisions/2026-09-10-dmarc-enforcement-timeline.md`](reports/decisions/2026-09-10-dmarc-enforcement-timeline.md) 同款檢查：10-23 起的 rua 報表寄 `dmarc@aware-wave.com` → 轉寄 awarewaveai（Gmail 連線器可讀；10-22 前的舊報表在 peijingartstudio），零未解釋失敗才改。**提醒已建**：peijingartstudio 日曆 2026-11-06 09:00（前一天彈窗＋當天 email），勿重複建立。
 
 #### B. 🔒 卡在你（你動手才會動，我做不了）
