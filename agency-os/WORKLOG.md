@@ -1,4 +1,33 @@
 # Worklog
+## 2026-10-24（續8）lobster-wordpress OOM 抖動 11 小時拖垮整機：止血＋關掉「慢→無上限堆積→swap 抖動」整類（Claude）
+
+**症狀**（Telegram 2026-10-23T23:28Z → 10-24T03:42Z）：endpoint-alert 連報 `127.0.0.1:8080/wp-json → 000`、`job wp-cron-runner stale`、`job backup-coverage stale`；Uptime Kuma 全部監控間歇 `Knex: Timeout acquiring a connection`（Kuma 自己的 SQLite 被整機 iowait 餓死＝受害者，不是服務掛）。
+
+**根因鏈**（主機實測 04:00Z）：
+- C1 `lobster-wordpress` memcg 768M 頂滿、`memory.events oom=788 oom_kill=182`、swap.current 805MB（Docker 預設 memswap = 2×memory → 容器在主機 1GB swap 上抖動而不是被乾淨 OOM-kill）→ 整機 load 150–281、`%wa 88.8`、PSI memory some=99%。
+- C2 容器內 626 個 process：165 個 wp-cron-runner 探針（`wp eval _get_cron_array`）＋161 個 healthcheck `curl -fsS http://127.0.0.1/`（無 `--max-time`）＋142 個 apache2 worker（prefork 預設 `MaxRequestWorkers 150` × 實測 ~70–80MB RSS = 可要到 10GB）。
+- C3 `wp-cron-runner.sh` 只有 cron run 有 lock＋timeout；discovery exec 與前後兩次 probe 既無 timeout 也不在 lock 內 → 容器一慢，每分鐘多堆一個。首次 `probe unreadable` 2026-10-23T16:39Z，heartbeat 從 16:23Z 停到 04:12Z。
+- C4 23:23:45Z kernel OOM 殺到 `runc:[2:INIT]`（PID 1）→ 23:59Z 容器 restart #1 → 再抖 4 小時；02:00Z 備份的 `tar czf /var/www/html` 卡死 → `wp-html.tgz` 損壞、R2 無當日檔 → backup-coverage FAIL。
+- 不是流量：2 小時 access log 僅 1 筆外部請求。
+
+**處置**：
+1. 止血：`docker restart` 90s 超時（PID 1 已死、docker 收不掉）→ `docker rm -f lobster-wordpress` + `docker compose up -d --no-build wordpress`（04:10:46Z）→ `/wp-json/` 200/0.19s、healthy、172MiB/7 pids；04:12Z iowait 0、Kuma Knex 0 次、wp-cron heartbeat 恢復。
+2. 治本（不變量：「runner 每次 tick 對同一容器最多一個、每個 docker exec 有界；容器對記憶體的需求上限 < memcg；容器頂到上限就 OOM-kill，不准借 swap 拖整機」）：
+   - `lobster-factory/infra/hetzner-phase1-core/scripts/wp-cron-runner.sh`：per-container flock 移到 discovery 之前（`tick()` 函式在鎖內跑 discovery→probe→run→probe）；`wpx` 容器內 `timeout -k 10 $PROBE_TIMEOUT`（預設 60s）＋主機側 backstop；discovery exec 主機側 timeout 並順帶檢查 `timeout(1)` 存在（`WP-NOTIMEOUT` = unhealthy）；`exec 8>lock` 失敗 = unhealthy（codex F1：bash 失敗後繼續、flock 吃壞 fd、原本會永遠「skipped」且 heartbeat 照新）。
+   - `tests/host-scripts/wp-cron-runner.test.sh` 新增 5d（`wp` 換成 `sleep 120`：3s timeout 內回、容器內無殘留、heartbeat 不發）、5e（鎖被持有時不碰探針、<20s 回）、5f（lock 是目錄 → exit 1 `cannot open`）。
+   - `docker-compose.yml` wordpress：healthcheck `curl --max-time 4`；`memswap_limit: 1536M` = memory（無 swap）；memory 768M→1536M；cpus 0.5→1.0；`pids: 256`。prod 用 `safe-infra-patch.sh compose` 套，backup `docker-compose.yml.bak.safe-patch-20261024-042345`。
+   - `apps/wordpress/Dockerfile` + 新檔 `apache-mpm-prefork.conf`：`MaxRequestWorkers 16`、`MaxConnectionsPerChild 1000`（16×80MB＋250MB base < 1536M）。prod 走 `sg-deploy.sh wordpress`（rsync→snapshot→build→up→health→smoke）。
+   - `agency-os/docs/operations/APP_AWARE_WAVE_COMPLETE_REFERENCE.md:71` 資源欄更新。
+3. 備份補跑：`backup-phase1.sh` 04:24Z `wp-html.tgz (123M) → R2 [200]`；`backup-coverage-check.py` PASSED；兩個 fresh.d 戳記恢復。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=MSYS_NO_PATHCONV=1 bash lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/wp-cron-runner.test.sh | exit=0 | ms=~480000（二輪 39/0 → 43/0 passed, 0 failed；修前 runner 跑同測試 36/3 紅：5d「tick returns within the probe timeout」、5e「skipped」「did not wait」＝突變證據）
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker inspect lobster-wordpress --format Memory/MemorySwap/PidsLimit/NanoCpus/Healthcheck → Memory=1610612736 MemorySwap=1610612736 Pids=256 NanoCpus=1000000000 HC=curl -fsS --max-time 4；curl /wp-json 200 0.185s | exit=0 | ms=13000
+- REALTEST_EVIDENCE: tool=SSH | cmd=sync-host-scripts.sh (installed wp-cron-runner.sh @77cd04ded) && sg-deploy.sh wordpress → healthy 8s、smoke 5/5 OK、deployed 77cd04ded；docker exec grep mpm_prefork → MaxRequestWorkers 16；curl https://aware-wave.com/ 200 0.26s；heartbeat 04:47:09Z；load 3.01 | exit=0 | ms=49000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n（Codex oracle `agency-os/reports/oracle/2026-10-24-review-34f580ed.md` F1 修、F2 接受（discovery shell 不跑 PHP/DB，pids 256 封頂）、F3/F4 測試架構範圍接受；round 2 `agency-os/reports/oracle/2026-10-24-review-1e7456f8.md` NO FINDINGS）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,runbooks,lobster-factory/docs,lobster-factory/infra/hetzner-phase1-core | grep=768M\|MaxRequestWorkers\|memswap\|WP_CRON_PROBE_TIMEOUT\|wp-cron-runner | hits=8（1 處過時：APP_AWARE_WAVE_COMPLETE_REFERENCE.md:71 已改；其餘為 install/registration 引用，仍正確）
+
+**剩餘風險／後續**：`soulful-wp` 同類（4G 上限、Apache 150 workers × 實測 181MB、healthcheck 無 `--max-time`、swap 允許）→ TASKS.md 一行；`mainwp-web` 無 healthcheck 與記憶體上限。首次探針為何在 16:39Z 開始卡（容器內部慢的起點）無 log 可追，PSI/oom 計數清零後觀察。**rollback**：compose 用上述 `.bak.safe-patch` 還原＋`up -d`；runner 用 `git revert` 後 `sync-host-scripts.sh`；image 用 `rollback-phase1.sh` 當次 snapshot tag。
 ## 2026-10-24（續7）next-admin 部署 f71262e21（Theme Editor 側欄標題色／字級）＋正式站檢查（Claude）
 
 **觸發**：操作者要在 https://app.aware-wave.com/tools/theme 自己改標題色與字級 → 需上 prod。只有本 commit 是新的 next-admin 改動；無 DEPLOY_HOLD。
