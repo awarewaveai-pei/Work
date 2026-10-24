@@ -2,7 +2,7 @@
 
 > 需求：[`AUTO_CONTENT_PIPELINE_REQUIREMENTS.md`](AUTO_CONTENT_PIPELINE_REQUIREMENTS.md)。本檔＝查證結果＋決策＋架構＋卡片＋進度帳；讀者是執行卡片的 agent。
 > 路徑縮寫：`NA`＝`lobster-factory/infra/hetzner-phase1-core/apps/next-admin`、`DB`＝`lobster-factory/packages/db`、`WF`＝`lobster-factory/packages/workflows`、`HOST`＝`lobster-factory/infra/hetzner-phase1-core/scripts`。`file:line` 以 2026-10-24 `fd172fe2a` 為準；執行每張卡前重 grep。
-> 取代 [`CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md`](../operations/CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md) §0.5 B 段 P5／P6／P9（2026-06-16 後未更新；社群已由 social 產品實作）。進度只看本檔 §10。
+> 取代 [`CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md`](../operations/CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md) §0.5 B 段 P5／P6／P9（2026-06-16 後未更新；社群已由 social 產品實作）。進度只看監工台 `agency-os/handoffs/2026-10-24-auto-content-supervisor/data.mjs`（本檔不寫狀態）。
 
 ## 0. 決策（2026-10-24 定；改決策＝改這張表＋受影響的卡）
 
@@ -218,7 +218,14 @@
 | P7.2 | formats 含 youtube → 社群貼文 target youtube（影片 16x9） |
 
 ### P8 治理收尾（隨階段，不留最後）
-master plan §0.5 B 段 P5/P6/P9 指本檔；`lib/content|social|video/MODULE_MANIFEST.json`＋`products.ts`（`content.plan`）；`RUNNABLE_DEMOS.md` 一條指令；`node scripts/sync-foundry-catalog.mjs`；TASKS.md `:122,:145,:349` 收斂指本檔；`SCHEDULES_PAGE_PLAN.md` §0 記 every_5m 與 cron 時鐘。
+
+| 卡 | 做 |
+|---|---|
+| P8.1 | `CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md` 開頭指向本檔（§0.5 B 段 P5/P6/P9 由本計畫接手） |
+| P8.2 | `lib/content|social|video/MODULE_MANIFEST.json`＋`products.ts` features 加 `content.plan` |
+| P8.3 | `RUNNABLE_DEMOS.md` 一條操作者能跑的指令 |
+| P8.4 | `node scripts/sync-foundry-catalog.mjs` 重產 |
+| P8.5 | TASKS.md `:122,:145,:349` 收斂指本檔；`SCHEDULES_PAGE_PLAN.md` §0 記 every_5m 與 cron 時鐘 |
 
 ## 8. 驗證
 - 實測：`npx tsc --noEmit`；`npx vitest run <卡測試>`；P4／P6 在拋棄式 org（staging WP 站＋social 測試品牌）真跑一次 firing；`REALTEST_EVIDENCE` 行。
@@ -230,18 +237,8 @@ master plan §0.5 B 段 P5/P6/P9 指本檔；`lib/content|social|video/MODULE_MA
 ## 9. Rollback
 每卡一 commit → revert；0121 `.down.sql`；job 無列＝關、刪 registry 筆＝消失；cron 一行刪除即回 Trigger 心跳；`publishMode` 回 human_review 即停自動發布；P5 新頁可刪，`/tools/video` 不受影響。
 
-## 10. 進度帳（唯一進度真相；完成填 commit）
+## 10. 進度
 
-| 階段 | 狀態 | commit | 備註／建議模型 |
-|---|---|---|---|
-| P0 查證＋計畫 | ✅ 2026-10-24 | — | 本檔 |
-| P1 | ✅ 2026-10-24 | 見 WORKLOG 2026-10-24 AUTO_CONTENT P1 | 另補 by-id 站別 API 租戶閘 `siteRowGate`（`NA/lib/content/wp-sites.ts`） |
-| P2 | 🔲 | | Opus 5.5 |
-| P3 | 🔲 | | Opus 5.5；0121 套 prod High |
-| P4 | 🔲 | | Opus 5.5；P4.4 主機 cron High；啟用＝勾格 |
-| P5 | 🔲 | | Sonnet／Codex 照卡；blurb data-filler |
-| P6 | 🔲 | | Opus 5.5；D3 |
-| P7 | 🔲 | | 等 P7.0 |
-| P8 | 🔲 | | 隨階段 |
+狀態只在監工台 `agency-os/handoffs/2026-10-24-auto-content-supervisor/data.mjs`（每張卡 done＋commit），頁面由同資料夾 `build.mjs` 產生、`check.mjs` 驗本檔 §7 卡號與監工台一一對應。完成一張卡：改 data.mjs → `node build.mjs` → `node check.mjs` → 重新發布同一網址。
 
-開場句：`續做 AUTO_CONTENT P2：讀 agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md §4 I2 與 §7 P2 卡，從 P2.1 write-posts.ts 開始；完成＝P2 三卡 commit 填進 §10。建議模型：Opus 5.5`
+開場句：`續做 AUTO_CONTENT P2：讀 agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md §4 I2 與 §7 P2 卡，從 P2.1 write-posts.ts 開始；完成＝P2 三卡 done＋commit 寫進監工台 data.mjs。建議模型：Opus 5.5`

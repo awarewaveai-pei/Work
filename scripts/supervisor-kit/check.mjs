@@ -21,6 +21,23 @@ export function checkCommon({ here, STEPS, OPEN, NOW = [], COPY, render, fields 
     if (s.card && !existsSync(path.join(here, s.card))) fail(`${id}: 執行卡 ${s.card} 不存在`);
   });
 
+  // 1b. 選用的 items：id 不重複；status 只有 done／todo；done 必有 commit；步驟狀態跟 items 一致
+  const itemIds = new Set();
+  for (const s of STEPS) {
+    if (!s.items) continue;
+    const id = key(s);
+    for (const it of s.items) {
+      if (itemIds.has(it.id)) fail(`${id}: 工作項 ${it.id} 重複`);
+      itemIds.add(it.id);
+      if (!it.plain) fail(`${it.id}: 缺 plain`);
+      if (!['done', 'todo'].includes(it.status)) fail(`${it.id}: status ${it.status}`);
+      if (it.status === 'done' && !/^[0-9a-f]{9,}$/.test(it.commit || '')) fail(`${it.id}: done 沒有 commit`);
+    }
+    const n = s.items.filter((it) => it.status === 'done').length;
+    const want = n === 0 ? 'not_started' : n === s.items.length ? 'done' : 'in_progress';
+    if (s.status !== want) fail(`${id}: 工作項 ${n}/${s.items.length} 完成，status 應為 ${want}，寫的是 ${s.status}`);
+  }
+
   // 2. 待決每條指向存在的步驟，且那步的 before 寫了「待決 n」；before 不得寫不存在的待決
   for (const o of OPEN) {
     const s = byKey.get(o.before);

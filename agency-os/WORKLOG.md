@@ -1,4 +1,20 @@
 # Worklog
+## 2026-10-24（續15）AUTO_CONTENT 監工台：8 階段 61 項工作逐項列出，狀態只存 data.mjs；監工台套件加選用工作清單（Claude）
+
+**觸發**：操作者「你先做一個監工台 我才能知道你的進度」「要做的內容都要寫入」。
+
+**做法**：`agency-os/handoffs/2026-10-24-auto-content-supervisor/`（data.mjs → build.mjs → check.mjs）→ https://claude.ai/artifact/TUMBoFwaMCKbPgVmLVjEUZ 。每階段底下列計畫 §7 每張卡（P5 的 23 個模組逐一列名），✓＝done＋commit。
+**不變量**：狀態只在 data.mjs；計畫 §10 改成指向監工台、P8 改成 P8.1–P8.5 表；check.mjs 驗計畫 §7 階段與卡號（含 `P5.3–P5.25` 區間展開）＝監工台 items、標題與 §10 不寫狀態、階段狀態由 items 算。
+**套件**：`scripts/supervisor-kit/build.mjs` 加選用 `itemList`／`ITEM_CSS`（只在步驟有 items 時輸出，樣式由該頁 css 參數帶入）；`check.mjs` 加 items 規則（id 不重複、done 必有 commit、步驟狀態一致）。既有三個監工台 check 全過、輸出不變。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=node build.mjs && node check.mjs（本監工台）＋三個既有監工台 node check.mjs | exit=0 | ms=0（ok: 8 phases, 61 items, 6 done, 4 open；既有三頁 page fresh；未計時）
+- 突變：data.mjs 拿掉 P2.3 → `FAIL P2: 計畫卡號 P2.1,P2.2,P2.3 ≠ 監工台 P2.1,P2.2`；還原綠。
+- Playwright 截圖 1280／390 寬：scrollWidth＝視窗寬，無橫向捲動。
+- REVIEW_WAIVED: DOC_ONLY -- 監工台頁面與資料檔；套件改動只加選用分支，三個既有頁面的產物逐字不變（check 第 4 條比對 html）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=進度只看本檔 §10|填進 §10 | hits=0（計畫內兩處已改指監工台）
+
+**rollback**：`git revert <本 commit>`；artifact 可在 claude.ai 刪除。
 ## 2026-10-24（續13）AUTO_CONTENT P1：品牌聲音只剩一份（站別 content_defaults）；社群改寫、影片腳本讀伺服器品牌；ScriptForge 刪 sf_brand；by-id 站別 API 加租戶閘（Claude）
 
 **觸發**：操作者「去做」（計畫 `agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md` P1，`cfc6e08d7`）。

@@ -32,7 +32,8 @@ export function stepList(STEPS, L, cardRef) {
     <div class="b">
       <p class="plain">${esc(s.plain)}</p>
       <p class="meta"><span class="pill st-${STATUS[s.status][1]}">${esc(STATUS[s.status][0])}</span><span class="pill risk-${riskClass(s.risk)}">${esc(L.risk)} ${esc(s.risk)}</span><span class="who">${esc(L.who)}：${esc(s.model)}</span>${s.waitFor ? `<span class="who wait">${esc(s.waitFor)}</span>` : ''}</p>
-      <p class="donewhen"><b>${esc(L.evidence)}：</b>${esc(s.gate)}</p>
+      <p class="donewhen"><b>${esc(L.evidence)}：</b>${esc(s.gate)}</p>${s.items ? `
+      ${itemList(s.items, L)}` : ''}
       <details><summary>${esc(L.details)}：${s.code ? `${esc(s.code)} ` : ''}${esc(s.title)}</summary>
         ${[
     s.what && `<p>${esc(s.what)}</p>`,
@@ -46,6 +47,13 @@ export function stepList(STEPS, L, cardRef) {
     </div></li>`).join('');
   }).join('')}</ol>`;
 }
+
+// 步驟底下的每一項工作（選用；有 items 的監工台才顯示）。樣式由該頁的 css 參數給（ITEM_CSS），其他頁的輸出不變。
+export const itemList = (items, L) => `<ul class="items">${items.map((it) => `<li class="${it.status}"><b>${it.status === 'done' ? '✓' : '○'}</b><span><code>${esc(it.id)}</code> ${esc(it.plain)}${it.commit ? ` <small>${esc(L.doneAt)} <code>${esc(it.commit)}</code></small>` : ''}</span></li>`).join('')}</ul>`;
+export const ITEM_CSS = `ul.items{list-style:none;margin:2px 0 8px;padding:0;display:grid;gap:4px;font-size:14px}
+ul.items li{display:grid;grid-template-columns:18px 1fr;gap:6px;min-width:0}
+ul.items li b{color:var(--todo)} ul.items li.done b{color:var(--done)} ul.items li.done span{color:var(--muted)}
+ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}`;
 
 export function openList(OPEN, STEPS, C) {
   if (!OPEN.length) return `<p class="lead">${esc(C.none || '')}</p>`;
