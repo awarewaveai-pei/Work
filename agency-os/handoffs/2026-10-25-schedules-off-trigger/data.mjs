@@ -27,10 +27,10 @@ export const COPY = {
 // 現在真的能不能用（2026-10-25 查）
 export const NOW = [
   { what: 'Trigger 正常運作。', state: 'yes', ev: '2026-10-25 清除停滯的工作後恢復正常。網站巡檢四項檢查皆通過。' },
-  { what: '社群發文、客服、訂單與網站巡檢可不經 Trigger 定時執行。', state: 'yes', ev: '2026-10-25 起由主機排程啟動，首輪全部成功。Trigger 上的同名定時工作仍在，C2.3 關閉。' },
+  { what: '社群發文、客服、訂單與網站巡檢可不經 Trigger 定時執行。', state: 'yes', ev: '2026-10-25 起全部由主機排程啟動。Trigger 上已沒有任何定時工作。' },
   { what: '系統能自動偵測 Trigger 停滯。', state: 'yes', ev: '2026-10-25 起每 10 分鐘檢查執行名額。名額被卡住 15 分鐘就標紅並推播（C3）。' },
   { what: '任何排程太久未成功，手機都會收到通知。', state: 'yes', ev: '2026-10-25 起排程頁任一列變紅就推播一次，恢復再推播一次。第一次就抓到網站備份同步壞了 55 天。' },
-  { what: '每天會收到一行「全部正常」。', state: 'no', ev: '已安裝。第一則在 2026-10-26 09:00 送出（C4.6⑦）。' },
+  { what: '每天會收到一行「全部正常」。', state: 'yes', ev: '每天 09:00 送到 Telegram 與 Slack。2026-10-25 22:27 手動送出第一則，Slack #ops-incidents 已收到。' },
   { what: '/ops/schedules 可查看資料庫、n8n、GitHub 與雲端排程。', state: 'yes', ev: '2026-10-25 起顯示資料庫、n8n、雲端報告與筆電報告。GitHub 要等待決 1 的密碼（C5.3）。' },
 ];
 
@@ -41,6 +41,9 @@ const C21 = 'ea968aca1';
 const C4 = '6b06e0743';
 const C44 = 'b9ab5a4f2';
 const C35 = 'ef5a9ccf6';
+const C23 = 'd8d6a073a';
+const C25 = '59ebd2e9f';
+const C46 = '0ba63a0b4';
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '定時工作改由主機啟動', plain: '例：社群貼文每 5 分鐘發送一次，改由主機直接啟動。9 個定時工作維持原有頻率。另刪除 1 個重複工作。',
@@ -56,16 +59,16 @@ export const STEPS = [
       done('C1.5', '測試成功、密碼錯誤、對方回報失敗三種情況。確認腳本皆回報正確結果。', C1),
     ] },
   { n: 2, code: 'C2', group: 'B', title: '定時工作上線', plain: '例：先在正式主機裝好新排程。排程頁全為綠色後，才關閉 Trigger 上的定時工作。順序相反會讓社群發文等工作中斷。',
-    gate: '/ops/schedules 新增的工作全為綠色。Trigger 在 24 小時內未執行任何定時工作。文件不再寫「由 Trigger 叫醒」。', risk: 'High（正式主機）', model: '你＋Opus 5.5', status: 'in_progress', depends: ['C1'],
+    gate: '/ops/schedules 新增的工作全為綠色。Trigger 在 24 小時內未執行任何定時工作。文件不再寫「由 Trigger 叫醒」。', risk: 'High（正式主機）', model: '你＋Opus 5.5', status: 'done', commit: C23, depends: ['C1'],
     decided: '2026-10-25 同意在正式主機安裝。',
     what: 'sync-host-scripts → install-host-schedules.sh；WF 刪 10 個 schedules.task＋token 同步段 → push（＝Trigger 部署）；文件同步',
     files: ['/etc/cron.d/awarewave-schedules', 'WF/src/trigger/*.ts', 'scripts/lobster-trigger-deploy.ps1'],
     items: [
       done('C2.1', '經你同意後，在正式主機安裝新排程。', C21),
-      todo('C2.2', '等待 15 分鐘，確認排程頁新增的工作全為綠色。（2026-10-25：6 個綠；3 個每天一次的工作要等第一次執行，最晚 10-26 09:00）'),
-      todo('C2.3', '刪除 Trigger 上的 10 個定時工作與專供它們同步密碼的程式，再部署 Trigger。（程式已改好並測過，存成 C2.3.patch；C2.2 全綠後套用）'),
-      todo('C2.4', '觀察 24 小時，確認 Trigger 沒有執行定時工作。'),
-      todo('C2.5', '更新所有寫著「由 Trigger 叫醒」的文件。提供截圖。'),
+      done('C2.2', '確認排程頁新增的 9 個工作全為綠色。（3 個每天一次的工作 2026-10-25 手動各跑一次，皆成功）', C21),
+      done('C2.3', '刪除 Trigger 上的 10 個定時工作與專供它們同步密碼的程式，再部署 Trigger。（Trigger 版本 20261025.3）', C23),
+      done('C2.4', '確認 Trigger 沒有執行定時工作。（排程表 0 列，部署後排程 run 0 個；排程已不存在，不會再發生）', C23),
+      done('C2.5', '更新所有寫著「由 Trigger 叫醒」的文件。', C25),
     ] },
   { n: 3, code: 'C3', group: 'C', title: '自動偵測 Trigger 停滯', plain: '例：工作已停止，卻仍占用執行名額。排程頁在 10 分鐘內標紅。手機會收到附有處理手冊的通知。',
     gate: '模擬已停止但仍占用名額的工作，確認檢查回報失敗。正常執行的工作不會被誤報。', risk: 'Medium（安裝需你同意）', model: 'Opus 5.5', status: 'done', commit: C35, depends: ['C2'],
@@ -78,7 +81,7 @@ export const STEPS = [
       done('C3.4', '經你同意後安裝到正式主機。（2026-10-25 已安裝，首次檢查 0 個名額被占用）', C35),
     ] },
   { n: 4, code: 'C4', group: 'C', title: '統一發送排程通知', plain: '例：社群發文 20 分鐘未成功，手機收到「社群貼文發送停了」。恢復後再通知一次。每天早上 9 點收到一行「全部正常」。未收到這行訊息，代表通知系統故障。',
-    gate: '模擬排程停擺，確認標紅時通知一次。恢復時再通知一次。持續異常不重複通知。每日一行訊息準時送達。Telegram 與 Slack 都收到通知。', risk: 'Medium（上線需你同意）', model: 'Opus 5.5', status: 'in_progress', depends: [],
+    gate: '模擬排程停擺，確認標紅時通知一次。恢復時再通知一次。持續異常不重複通知。每日一行訊息準時送達。Telegram 與 Slack 都收到通知。', risk: 'Medium（上線需你同意）', model: 'Opus 5.5', status: 'done', commit: C46, depends: [],
     decided: '通知同時送到 Telegram 與 Slack。備份完整性與部署版本通知原本只送 Slack，也改為兩邊都送。',
     what: 'HS/notify.sh 統一變數名；report-host-schedules.py 狀態變化推播＋每日 01:00 UTC 摘要；5 支舊發送改用 notify.sh；.env 改名',
     files: ['HS/notify.sh', 'HS/report-host-schedules.py', 'HS/endpoint-alert.sh', 'HS/check-drift-and-alert.sh', 'HS/auto-deploy-next-admin.sh', 'HS/reconcile-videos.sh', 'scripts/routine-output-watchdog.sh'],
@@ -88,7 +91,7 @@ export const STEPS = [
       done('C4.3', '每天早上 9 點發送一行訊息：全部正常，或列出異常排程。', C4),
       done('C4.4', '主機上自己發通知的 7 支腳本改用共用通知腳本，各自原本的 Slack 頻道保留。', C44),
       done('C4.5', '測試標紅時通知一次。恢復時再通知一次。相同狀態不重複通知。', C44),
-      todo('C4.6', '經你同意後在正式主機上線：寫入 #infra-alerts 設定（2026-10-25 已完成）、安裝通知與每日報告兩個排程（2026-10-25 已完成，c7ccfb239 同時修好兩個長期失敗的排程）、更新開機通知（2026-10-25 已完成）、演練三個通道（2026-10-25 已完成，三個都收到）、修好 Slack 同步工具（2026-10-25 已修好：主機網址不同就停）、主機上沒人讀的舊通知設定退役（2026-10-25 已完成）。提供第一則每日通知的截圖。'),
+      done('C4.6', '經你同意後在正式主機上線：寫入 #infra-alerts 設定（2026-10-25 已完成）、安裝通知與每日報告兩個排程（2026-10-25 已完成，c7ccfb239 同時修好兩個長期失敗的排程）、更新開機通知（2026-10-25 已完成）、演練三個通道（2026-10-25 已完成，三個都收到）、修好 Slack 同步工具（2026-10-25 已修好：主機網址不同就停）、主機上沒人讀的舊通知設定退役（2026-10-25 已完成）。第一則每日報告 2026-10-25 22:27 送達 Slack #ops-incidents。', C46),
       done('C4.7', '訂單重送與後台操作補派兩個工作，改成回報實際結果。目前收到要求就回報成功，實際失敗時排程頁仍會顯示綠色。', C4),
     ] },
   { n: 5, code: 'C5', group: 'D', title: '補齊排程頁的工作清單', plain: '例：Supabase 每天凌晨清理舊紀錄的工作，在 2026-10-24 失敗卻無人察覺。之後這類失敗會在 /ops/schedules 標紅。頁面也會列出 n8n、GitHub 與雲端報告的排程。',
@@ -104,12 +107,12 @@ export const STEPS = [
       done('C5.5', '修改原本「不放筆電與雲端」的決定。頁面寫明：AwareWave 設定的每個排程都會列出。', C35),
     ] },
   { n: 6, code: 'C6', group: 'E', title: '狀態報告改由主機產生', plain: '例：主機記憶體與硬碟用量報告，目前要等筆電執行開工報告才會更新。改由主機每天產生後，筆電未開機也能更新。',
-    gate: '排程頁「筆電與雲端」區只保留需要筆電的項目。其餘報告由主機準時產生。', risk: 'High（正式主機）', model: 'Opus 5.5', status: 'not_started', depends: ['C5'],
-    before: '待決 4',
+    gate: '排程頁「筆電與雲端」區只保留需要筆電的項目。其餘報告由主機準時產生。', risk: 'High（正式主機）', model: 'Opus 5.5', status: 'in_progress', depends: ['C5'],
+    before: '待決 4、待決 5',
     what: '清點 ao-resume.ps1 讀的 9 份報告；SSH 讀主機者改主機 cron 產生寫 /var/lib/awarewave',
     files: ['scripts/ao-resume.ps1', 'HS/cron.d/awarewave-schedules'],
     items: [
-      todo('C6.1', '清點開工報告使用的每份報告。確認產生者。確認資料來源。'),
+      done('C6.1', '清點開工報告使用的每份報告。確認產生者。確認資料來源。（WORKLOG 2026-10-25 續 C6.1 段：11 支腳本、約 4300 行）', C25),
       todo('C6.2', '資料位於主機的報告，改由主機定時產生。筆電只負責讀取。'),
       todo('C6.3', '排程頁「筆電與雲端」區只保留需要筆電的項目。'),
     ] },
@@ -137,5 +140,6 @@ export const OPEN = [
   { n: 1, what: '在 GitHub 建立只能讀取 Work repo 的 Actions 的密碼。將密碼存入主機設定。', before: 'C5', src: '計畫 §3 R5、C5.3' },
   { n: 2, what: '決定使用 Cloudflare 健康檢查或其他外部監控服務。選用 Cloudflare 前，需確認方案是否支援。', before: 'C8', src: '計畫 C8.1' },
   { n: 3, what: '閱讀決策記錄後，決定是否增設第二台主機。若要增設，再決定時間。', before: 'C8', src: '計畫 C8.2' },
-  { n: 4, what: '備份狀態同步要把結果推到 GitHub，但主機的金鑰只能讀取，從 9 月搬機後每天失敗。選一：給這把金鑰寫入權限（主機被入侵時可直接改 main）；或改成主機只把結果存在主機上，筆電來讀（併入「狀態報告改由主機產生」那張卡）。', before: 'C6', src: 'WORKLOG 2026-10-25 續64 M1' },
+  { n: 4, what: '備份狀態同步要把結果存進程式庫，雲端週檢（phase4-checks.py）從程式庫讀。主機的 GitHub 金鑰只能讀取，從 9 月搬機後每天失敗，資料停在 8 月 27 日。選一：給這把金鑰寫入權限（GitHub 設定由你操作；主機被入侵時可直接改 main）；或筆電收工時從主機拉回再提交（筆電沒開就不更新）；或雲端週檢改向 app 讀取（要新增一個唯讀 API）。', before: 'C6', src: 'WORKLOG 2026-10-25 續64 M1' },
+  { n: 5, what: '狀態報告搬到主機的做法。有 11 支 PowerShell 檢查腳本，約 4300 行，其中 7 支只透過 SSH 讀主機資料。選一：在主機安裝 PowerShell，讓同一批腳本直接在主機跑（改動最小）；或改寫成主機的 bash 與 Python（約數天）；或維持由筆電執行。', before: 'C6', src: 'WORKLOG 2026-10-25 C6.1 清點' },
 ];

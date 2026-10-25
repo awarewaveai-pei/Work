@@ -1,4 +1,27 @@
 # Worklog
+## 2026-10-25（續82）排程離開 Trigger C2.2–C2.5＋C4.6⑦＋C6.1（操作者「還有一堆沒做好, 趕快去整批做好」）：Trigger 不再有任何定時工作；第一則每日報告送達；狀態報告清點（Claude）
+
+- **C2.2**：三個每日工作不等首跑，主機 `cron-run.sh <key> poke.sh …` 手動各一次（rotation 每槽一次、metrics upsert、expire 冪等＝重跑安全）→ 9 列全有成功紀錄。
+- **C2.3**（`d8d6a073a`）：套 `C2.3.patch`（續80 準備），WF typecheck＋vitest 132、NA site-watch＋schedules 139 綠 → push → post-push hook「deploy OK」→ Trigger prod worker `20261025.3`。
+- **C2.4**：trigger-postgres `TaskSchedule` 0 列、`TaskScheduleInstance` active 0；14:27Z 後 `scheduleId is not null` 的 TaskRun 0；`dispatch-action-run` 持續由主機觸發。排程列已刪＝不會再產生排程 run，不另等 24h。
+- **C2.5**（`59ebd2e9f`）：路由檔頭（social dispatch／rotation／metrics、cs sweep、run-due、site-watch due／run）、`lib/cs/sweep.ts`、`lib/social/dispatch.ts`、`lib/studio/pod-order-inbox.ts`、3 個 MODULE_MANIFEST、`.env.example`、`infra/trigger/TASK_REFERENCE.md`（刪 3 個排程節、token 列，加「沒有 task 定時跑」）、`SITE_WATCH_MASTER_PLAN.md:38,51,219,239`、`check-site-watch-health.ps1` 訊息、`runbooks/TRIGGER-RUNS-STUCK-QUEUED.md` 症狀改指 `trigger_slots_check`、hci30 三處註解（引用已刪檔）。歷史（TASKS、ADR 017、migration、舊計畫）不改。
+- **C4.6⑦**：手動 `cron-run.sh schedule_digest` → Slack #ops-incidents 22:27「📋 每日排程報告：共 44 個排程，4 個需要注意」（網站備份同步失敗＝待決 4；備份還原演練、每日排程報告、SSL 續期＝尚無資料）。
+- **C6.1 清點**（`scripts/ao-resume.ps1` 讀的 `reports/status/*-LATEST`）：
+  - 只 SSH 讀主機資料（可搬）：`check-vps-auto-reboot-health.ps1`（374 行）、`check-backup-health.ps1`（408）、`check-capacity-health.ps1`（750）、`check-clickhouse-health.ps1`（579）、`check-site-watch-health.ps1`（306，另讀 Supabase）、`check-staging-orphans.ps1`（260，另讀 Supabase）、`check-smoke-tests.ps1`（675，彙總）。
+  - 需筆電 vault：`check-cloudflare-security.ps1`（411，CF token）、`check-ci-health.ps1`（394，gh）。
+  - 已有主機替代：`check-routine-freshness.ps1`（78）＝C5 `cloud_*` 列＋`routine_watchdog`。
+  - 本質在筆電：`check-mcp-runtime.ps1`（64）。
+  - C6.2 做法＝監工台待決 5（主機裝 PowerShell 原腳本照跑／改寫 bash＋Python／維持筆電）。
+- M1 待決 4 補述：`BACKUP_AUTO_STATUS.json` 讀者＝雲端 routine `scripts/phase4-checks.py`（從 repo 讀），最後一次更新 `c32977678` 2026-08-27 → 結果非進 repo 不可；選項見監工台待決 4。
+- REALTEST_EVIDENCE: tool=SSH | cmd=cron-run social_rotation／social_metrics／entitlements_expire → 各 exit_code 0（14:25:21Z／14:25:27Z／14:25:28Z） | exit=0 | ms=8000
+- REALTEST_EVIDENCE: tool=SSH | cmd=trigger-postgres：BackgroundWorker prod 最新 20261025.3（14:26:40Z）；TaskSchedule 0；TaskScheduleInstance active 0；TaskRun scheduleId 非空且 >14:27Z = 0 | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=WebFetch | cmd=Slack MCP read #ops-incidents（C0B004HJYV8）→ 22:27:40「每日排程報告：共 44 個排程，4 個需要注意」 | exit=0 | ms=2000
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin vitest lib/cs lib/social lib/studio lib/site-watch lib/schedules → 622 passed；manifest JSON 解析；verify-governance-pointers PASSED | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（C2.3 刪除＝續80 已審 patch 原樣套用；C2.5 只改註解與文件）
+- ORACLE_WAIVED: C2.3 為已測 patch 的原樣套用；C2.5 無邏輯改動
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks,.claude,Projects | grep=site-watch-heartbeat|schedules-heartbeat|dispatch-action-run-schedule|ao-infrastructure-check-schedule | hits=70（collect／cs MODULE_MANIFEST 兩處同 commit 改；剩歷史：TASKS、ADR 017、SCHEDULES_PAGE_PLAN 舊表、SITE_WATCH_MASTER_PLAN 步驟紀錄、WORKLOG、本監工台 R0-PLAN／patch）
+- **剩餘**：C5.3（待決 1）、C6.2–6.3（待決 4、5）、C7（換正式環境密碼＝High，未動）、C8（待決 2、3）。
+- **rollback**：C2.3 `git revert d8d6a073a` 後 push（＝Trigger 重新部署回排程；主機 cron 同時存在靠冪等）；C2.5 `git revert 59ebd2e9f`。
 ## 2026-10-25（續81）客戶怎麼來監工台補今天的結論：4b-9 真實付款演練、4b-10 員工後台給／收產品、買斷授權改 Keygen CE；4b-2／4b-5 過時狀態更正（Claude）
 
 - **觸發**：操作者「需要加什麼到 【客戶怎麼來】 就去做吧」。
