@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-10-25 04:52:41
+- Generated: 2026-10-26 04:40:59
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -18,7 +18,7 @@
 - [ ] **【≈2026-11-01】員工逐工具權限：看 7 天「本來會擋」紀錄，再決定要不要開始擋**
 - [ ] **【≈2026-11-06 觸發】aware-wave.com DMARC 升級第三階段（p=quarantine → p=reject）** — 決策正本 [`reports/decisions/2026-09-10-dmarc-enforcement-timeline.md`](reports/decisions/2026-09-10-dmarc-enforcement-timeline.md) 同款檢查：10-23 起的 rua 報表寄 `dmarc@aware-wave.com` → 轉寄 awarewaveai（Gmail 連線器可讀；10-22 前的舊報表在 peijingartstudio），零未解釋失敗才改。**提醒已建**：peijingartstudio 日曆 2026-11-06 09:00（前一天彈窗＋當天 email），勿重複建立。
 - [ ] **【Soulful 搬站後收尾｜無死線】網域轉 Cloudflare Registrar** — 網域付到 2028，無時壓；DKIM selector 是 `hostingermail1`，轉移時勿動 DNS。（付費外掛授權盤點：操作者 2026-10-23 說不用做。）
-- [ ] **【產品｜社群管理平台 V1】照 ADR 016 與 SOCIAL_MANAGER_PLAN.md 做：G5 升級 Postiz，C3 起逐卡**（文章→社群自動排程已由 `AUTO_CONTENT_EXECUTION_PLAN.md` P2／P4 做完；舊 `/api/content/social-publish` 的刪除在該計畫 P6.3）
+- [ ] **【產品｜社群管理平台 V1】照 ADR 016 與 SOCIAL_MANAGER_PLAN.md 做：G5 升級 Postiz，C3 起逐卡**（文章→社群自動排程已由 `AUTO_CONTENT_EXECUTION_PLAN.md` P2／P4 做完。舊 `/api/content/social-publish`、`social-admin`、`social-channels` 還有 caller：影片 Release 面板 `ReleaseDeliveryPanel.tsx:90`、客戶中心社群頻道分頁 `ClientHubTabs.tsx:1892-1972`；兩處改走社群產品後才能刪三支 route，2026-10-25 查，計畫 P6.3）
 - [ ] **【研究線｜P1 全部完成（WC-15 ⑤ 2026-10-02 驗過）；P2 DOD 8/8 完成（2026-10-02）；剩操作者定門檻】三條線（合作風險／決策利弊／EdD）做成 Cognitive OS 上的 Project 工作流** — 現況與下一步只看計畫正本 `Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` §0／§12.8／§12.9；P1 紀錄 WORKLOG 續37／41／52／54／55／59；P2 09b 剩：操作者門檻裁定（DOD-2 已用新專案 `857b6f41…`「勿刪」通過，WORKLOG 2026-10-02 續2）；「舊專案刪不掉」後端已排除、待操作者描述畫面（WORKLOG 2026-10-02 續1）。
 - [ ] **【Cognitive OS P4｜待操作者決定】報告核准角色與來源搜尋規模** — ① `POST /projects/{id}/reports/{rid}/approval` 任何有效 session 都能核准，是否限角色；② `GET /sources/search` 無分頁／全文索引／限流（現為上限 100 筆＋每請求讀 200 份 artifact，超出標 `truncated`／`incomplete`），租戶或資料量變大時再做；③ 報告 `run_results` 要等 project-level run binding 才開放。WORKLOG 2026-10-01（續7）。
 - [ ] **【蒐集｜設計問題，需判斷】density 是不是該有單獨否決權** — 同一批實測裡 `rusi.org/people/farrell`、`royalsoc.org.au/...`被 `low_text_density` 擋下，但那些頁面的抽取其實是對的：正文短、站本身 HTML 很重（605KB）。`MIN_DENSITY` 的用意是「抽到的是導覽列而不是正文」，可是對「短但完整的個人檔案頁」它會誤判，而個人檔案頁正是背景調查最需要的東西。可能的治本方向：density 改成第二訊號（只在 textBytes 貼近下限時才否決），與 soft-404 的 weak-marker 邏輯同構——但這會放寬所有來源的入庫條件，影響客戶 KB，**不是可以順手改的東西**。需要先蒐集實際 textBytes/density 分布再決定。
@@ -64,9 +64,9 @@
 - [ ] **【產品｜施工】app.aware-wave.com 排程頁：一個地方管理所有例行工作**
 - [ ] **【產品｜ADR 017 客戶怎麼買】已接受；照 ADR「順序」1–7 開卡做**
     - [ ] 第一個方案列（plans 0 筆；訂閱付款前必須，功能與上限由操作者定）。建議模型：Opus 5.5
-    - [ ] 待決 2：買斷交付前請律師確認授權——Postiz（AGPL-3.0）、MinIO（AGPLv3，Trigger 內含）、Redis（Trigger 與核心用浮動 7-alpine，7.4 起 RSALv2／SSPL）（ADR 017 §5 授權盤點）→ 擋第 5 步
+    - [ ] 待決 2：買斷交付前請律師確認授權——Postiz（AGPL-3.0）、MinIO（AGPLv3，Trigger 內含）、Redis（Trigger 與核心用浮動 7-alpine，7.4 起 RSALv2／SSPL）、Keygen CE（Fair Core License，買斷授權檔簽發，2026-10-25 現成方案評估）（ADR 017 §5 授權盤點）→ 擋第 5 步
     - [ ] 待決 4：客戶白牌網址的憑證走 Cloudflare for SaaS 還是主機 on-demand ACME（ADR 018 §2）→ 擋第 9 步（白牌網址），等第一個客戶再定
-    - [ ] 待決 6：點數包帶的使用權多久——點數不會過期（待決 3 選 A），但點數包的使用權列（加購方案）有期末（0120 訂閱需期末，目前定購買日＋1090 天、再買就延長）；超過 3 年沒再買，剩下的點數就用不了、卻還記在合約負債。選項：A★ 使用權列不設期末（改 0120：點數包的加購方案用 credit_pack 事件寫無期末列，migration High）；B 維持 1090 天＋到期前 30 天寄信提醒；C 使用權到期時剩餘點數照比例退款（違反待決 3 的不退）→ 擋 4b-2 正式上線（critic 2026-10-25 M）；目前 prod 沒有任何錢包，現在不會發生
+  - [ ] **4b 對帳報表**（設計 2026-10-25，WORKLOG 續26）：`/ops/billing` 每天比對「WooCommerce 已付款、含 AwareWave 商品、付款方式在白名單」的訂單與 `payment_events`，列出漏送／多送；wp-bridge 0.18.1 的付款方式白名單是第 1、2 層，這是第 3 層。建議模型：Opus 5.5
 - [ ] **【Cognitive OS｜小】`.runtime` 的 run lock 檔只增不刪：分析和背景 AI 動作每次各留一個檔**
 - [ ] **【Cognitive OS web】結果頁已照示意稿（已上線）；剩各頁渲染閘與示意稿裡還沒做的動作** — 已上正式站：外框／首頁／工具／工作流／專案（WORKLOG 續36）、填寫頁（續38）、兩堂課＋課程連結（續39），`79bf7cc5`（續40）。結果頁＝卡片①–⑨＋核准卡、解讀契約 1.1.0 與 detail_integrity 閘（續61），已上正式站 `1fbb021f`（續62）。我的專案：專案名點得進專案頁、每次分析一列且打得開、每次「執行分析」開自己的專案、建立／最後更新到分鐘（2026-09-27 續1），已上正式站 `b6936ecc`（續3）。剩：① `check-mocks.py --page` 只有 result，首頁／工具目錄／工具頁／工作流頁沒有渲染 HTML 閘；② 工作流逐站頁（P3）；③ 結果頁對示意稿 310 筆已全修（2026-09-28 續11＋續15），已隨 `73b9ac8f8` 上線（2026-09-29 續8；登入後畫面待正式站測試身分），見 `Projects/internal/cognitive-engineering-os/docs/RESULT_PAGE_GAP_REPORT.md`；④ 上線 High-STOP（報告 §9），先定每租戶每日 token 額度（一次分析約 1.8–4.3 萬）。
 - [ ] **下一步（操作者 2026-10-15 同意順序）** ① 轉真人確認句＋問名字：程式在 main（`c3ef11ba9`），**未部署**。操作者 2026-10-15 決定：不單獨部署（sg-deploy 只能部署 main HEAD，會連帶上線還沒套 0100–0102 的社群 C5–C11），**跟社群 C12 同一次 sg-deploy 上線**（見本檔「社群發文 C12 上線」③）。部署後驗收：非角色帳號（John Doe）傳訊 → AI 轉真人 → 客人收到確認句＋問名字 → 回名字 → Chatwoot 聯絡人改名；`cs_ai_replies` 有 completed_at。見 WORKLOG 2026-10-15（續19）。② 再做下一項 KB。
@@ -74,7 +74,7 @@
 - [ ] **【2026-09-05 開出｜P0/P1｜Media Production LEGO Platform】統一影片、短劇、字幕、實拍 QA 與網站／社群交付** — 正本：[`docs/video_generator/MEDIA_PRODUCTION_LEGO_PLATFORM_PLAN.md`](docs/video_generator/MEDIA_PRODUCTION_LEGO_PLATFORM_PLAN.md)。
 - [ ] **【進行中｜軟體先行·U0–U5 + widget U4 完成並 prod live，剩 U6 gated】全自動客服系統**
 - [ ] **【進行中｜POD 一鍵自動上架】設計圖 → Woo + Printful 多款多色全自動** — 計畫 SSOT = `lobster-factory/docs/PLAN-pod-one-click-auto-publish-design-to-woo-printful.md`（5 階段）。目標：操作者**只做設計圖**、一鍵自動 合成商品圖(白背/2模特/平拍,分長短袖,<100KB) + 建 3 款 Woo 草稿(Gildan 2400 **長袖** id57 / Stanley-Stella STTU169 id456 / Gildan 5000 id438，各 4 色 × S-2XL) + Printful native 建品綁設計稿。
-- [ ] **【進行中｜內容引擎積木化】搜尋積木 registry 已 live，剩來源/UI/第二批** — **2026-10-25：管線部分（舊 §0.5 B 段 P5／P6／P9）由 `agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md` 接手，進度看那邊的監工台；本條只剩積木來源／UI。** ✅ **已完成並部署（2026-06-16，commit `e336d5da`）**：後端積木註冊骨架 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/content/blocks/registry.ts`（`register/byKind/listAll/geoMatch` + `ContentBlock` 契約，前端 `AB.registerBlock` 後端鏡像）+ 搜尋家族 5 source 自註冊 `lib/content/trending-sources.ts`（google-news/reddit/ptt/perplexity/env-custom-rss）+ 契約 SSOT `lib/content/blocks/README.md`（修好 `public/vector-editor.html:902` 斷裂參照）。
+- [ ] **【進行中｜內容引擎積木化】搜尋積木 registry 已 live，剩來源/UI/第二批** — **2026-10-25：管線部分（舊 §0.5 B 段 P5／P6／P9）由 `agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md` 接手，進度看那邊的監工台；本條只剩積木來源／UI。Perplexity 積木已於 2026-10-25 退役（`6cfcba142`，操作者不再使用），即時搜尋改 `search/serper`（`lib/content/trending-sources.ts:289`）；下文 perplexity 字樣是 06-16 當時的紀錄。** ✅ **已完成並部署（2026-06-16，commit `e336d5da`）**：後端積木註冊骨架 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/content/blocks/registry.ts`（`register/byKind/listAll/geoMatch` + `ContentBlock` 契約，前端 `AB.registerBlock` 後端鏡像）+ 搜尋家族 5 source 自註冊 `lib/content/trending-sources.ts`（google-news/reddit/ptt/perplexity/env-custom-rss）+ 契約 SSOT `lib/content/blocks/README.md`（修好 `public/vector-editor.html:902` 斷裂參照）。
 - [ ] **wp-bridge plugin 補 `/product` dry_run 支援**：現只有 /option 有（RestController:167）；2026-06-11 一鍵上架測試因此真建了 draft #7164。plugin 端改 → bump AWBRIDGE_VERSION → release flow（WP-BRIDGE-RELEASE-RUNBOOK）。
 - [ ] **wp-bridge 續做 operation：featured image** / update-existing-post / product update+delete（v0.7.0 只做 product CREATE，其餘端點仍待補）。
 - [ ] **【POD Studio 自建動工】** plan=`.claude/plans/pod-studio-p2a-p4-execution-PLAN.md`；藍本=`lobster-factory/docs/POD_STUDIO_ROADMAP.md`。✅
@@ -105,7 +105,8 @@
 - [ ] app.aware-wave onboarding/provisioning IA 重整 — Phase 1 退役 ops-console（已規劃、Q1-Q3 已決、未動 code）+ verify intake 觸發建站 + Phase 2/3 → handoffs/2026-06-05-2028-onboarding-ia-consolidation.md
 - [ ] **【🟠 Major M2-M4/M7-M10 + 🟡 Minor m2-m6/m8-m11】**
 - [ ] **【2026-08-29 開出｜未開始】`status.aware-wave.com` = 現有 `uptime.aware-wave.com`（Uptime Kuma）對外開放 view** — 不重建，SSOT：`docs/edge-and-domains/PRODUCT_DOMAIN_IA_PLAN.md` §2。做法二選一：(a) Kuma 內建 public status page 功能開一個 group，另建 CNAME `status`→同一 Kuma；(b) 直接讓 `uptime.aware-wave.com` 兼公開用（需確認現有 dashboard 沒有機敏資訊外露）。
-- [ ] **續做全自動內容工具：P6–P8（P4 剩 P4.4 收尾）**：計畫 SSOT `agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md`（§0 決策含 D9、§3.2 狀態機、§7 卡）；進度只在 `agency-os/handoffs/2026-10-24-auto-content-supervisor/data.mjs`（改完 `node build.mjs && node check.mjs`，再發布同一網址 https://claude.ai/artifact/TUMBoFwaMCKbPgVmLVjEUZ）。已完成：P1–P3、P4（自動發布 `f985992a2`，續37）、P5 ScriptForge 獨立頁＋伺服器模組登記 `f233bd101`（續43）。**下一步**：① 2026-10-25 起問操作者是否停用 Trigger `schedules-heartbeat`（Trigger deploy＝High）→ P4.4 打勾。② P8.2–P8.5 隨階段補。③ P6 影片接管線（D3：P4 上線一週後，約 2026-10-31 起）→ P7 YouTube（等操作者 Google OAuth，待決 4）。④ P5 剩餘：Story Bible 的提示片段（`storyBibleContextBlock`、角色 id 提示）仍由頁面組好當欄位送，可在 P6 碰 Story Bible 時一併搬。⑤ 真跑一次自動發布需 staging WP＋測試社群品牌（操作者 10-24 說先不用）。建議模型：Opus 5.5。
+- [ ] **AUTOCONTENT-GAP 全自動內容管線缺口：「搜集熱搜」與「提案題目」兩步沒接上排程（2026-10-26 查證）**：交接全文（自足、只讀這一檔）`agency-os/handoffs/2026-10-26-autocontent-gap.md`。**下一步**：照該檔 §5 第一步開始（卡片全文在 §7）。建議模型：Opus 5.5 實作。**操作者待辦**：申請 YouTube Data API key（免費額度）放進 `mcp/user-env.ps1` 與主機 env `YOUTUBE_API_KEY`，P9.1 的 YouTube 熱門來源才會啟用；沒 key 不擋其他卡。
+- [ ] **ADR 017「賣家」4c：收銀台可裝在任何網站**（操作者 2026-10-25 定方向；設計卡 `agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-4-seller.md`，commit 6726922eb）。**D1–D5 已決（操作者 2026-10-25，全部照★）**：每站 Ed25519 公鑰／AwareWave 目錄＋賣家自有方案／`<product>.resell` 權利列／月結報表人工發票／一站一帳戶；寫入 ADR 017 產品決定 #12 與順序 4「4c」。**4c-4 已推（38a8198fb）、4c-1 `0133_seller_sites` 已套 prod（WORKLOG 2026-10-25 續68、續70）。** **下一步**：4c-2 next-admin（`lib/payments/sites.ts`、`hmac.ts`／`woo-billing.ts` 查表驗章、`wp-customers.ts` 加 site、`awarewave-wp.ts` 站鑰匙、`/ops/sellers`、0130 總帳賣家欄）→ 4c-3 外掛代理商模式（Ed25519 產鑰、設定頁 key_id）。每張卡各自 commit、Acceptance 在卡上。回報操作者一律繁體中文。建議模型：Opus 5.5（卡寫死）→ 可派 `fullstack-engineer`／Codex。
 - [ ] **排程頁收尾＋社群成員修正上線（schedules-page-closeout）**：排程頁已上線 prod `38102e22f`（費用、伺服器詳細、修改紀錄修正 `7b5381d80`）；社群「成員」結果改在區塊內顯示 `888de6aad` 已推未部署。卡點：今晚 03:00 自動部署的測試閘會被 `lib/system-modes/__tests__/production-change-coverage.test.ts` 擋——`app/api/ops/clients/[slug]/cs-config/chatwoot-token/route.ts`（CS session `2abb9acd5`）沒呼叫 `checkProductionChangeAllowed`。**下一步**：① 操作者在 https://app.aware-wave.com/ops/schedules 改一格後跑 `ssh -p 58122 ubuntu@145.239.195.47 "sudo docker exec supabase-db psql -U supabase_admin -d postgres -tA -c \"select event_type, created_at from ops_audit_events where event_type='client_schedule_updated' order by created_at desc limit 3\""`，有列＝修改紀錄修正生效 ② 把 `agency-os/docs/operations/SCHEDULES_PAGE_PLAN.md` §0 與本檔「app.aware-wave.com 排程頁」條目改完成、移到已完成歷程（共享檔走 `scripts/git-partial-worktree-commit.py stage`）③ 確認 CS session 修好 chatwoot-token 的 gate 測試後，部署帶上 `888de6aad`，操作者在 social 設定→成員用 awarewaveai@gmail.com 加入再移除驗收 ④ 開帳號功能在 session local_108dbe7d 進行中，不重做。證據：WORKLOG 2026-10-16 續3、續6。建議模型：Opus 5.5
 - [ ] **Soulful 客服：課程類考試第 3 次 25/30 沒過（危險誤答 0、該轉真人 10/10）**：剩 5 題＝檢索排序 4＋分類 1，逐題見 WORKLOG 2026-10-17（續20）。**下一步**：等網站內容做好 → 做下一條「每段加一句說明」→ 重考；#26「五生理論是誰提出」分到 other，可在 courses_services 說明加「課程背後的理論與由來」（操作者決定）。另：操作者在 `/ops/schedules` 勾 Soulful「Chatwoot 基本設定檢查」（自動結案目前關）。建議模型：Opus 5.5
 - [ ] **（等 Soulful 網站內容做好才開工）知識庫：每段加一句說明後重建索引**：**原因**＝客人問「適合誰」「要用什麼材料」這種籠統問題時，系統在長頁面裡找不到對的那一段（例：五生頁 91 段，「適合對象」段排第 16，AI 只拿前 4 段，就回答「資料沒寫」）；課程類考試 #3 有 4 題因此失敗。**目的**＝讓 AI 找得到答案所在的段落，課程類考試過 95%，AI 才能直接回答客人，不必每題都轉真人。觸發＝操作者說網站內容做好、重新匯入之後。做法＝匯入時 Haiku 替每段寫「哪一頁、哪一節、講什麼」存 `contextual_prefix`，嵌入用「說明＋原文」，要給 `lib/cs/llm.ts` 加 prompt caching；Soulful 一次約 1 USD。完成＝程式＋測試、部署前問操作者、量考試 #3 那 4 題排名、重考逐題回報、確認保險／證照仍轉真人。細節 WORKLOG 2026-10-17（續20、續21）。建議模型：Opus 5.5
@@ -347,61 +348,32 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-10-25.md
-# Daily Note - 2026-10-25
+## 5) memory/daily/2026-10-26.md
+# Daily Note - 2026-10-26
 
+## Done today
 
-### verify-recent --ack (2026-10-24T19:11:00.6105648Z)
+- 覆蓋本收尾窗口（上次 AO-CLOSE 2026-10-24T20:53:07Z 起）：完成 0128／wp-bridge credit pack 無期末、YouTube P7 真實影片、Trigger host cron／告警 C2–C6、0133–0137 控制面寫入收窄與多項 next-admin／billing／content 修正。
+- 修復 app、Social、video、portal 及共享產品入口的 nginx `Request Header Or Cookie Too Large`；safe-infra-patch、靜態測試、7-door public probe、Chrome 驗證均通過，正式備份可回滾。
+- 建立 AUTOCONTENT-GAP 自足 handoff；YouTube Data API key 留為操作者待辦。完成本輪 WORKLOG、memory 與 archive 收尾資料準備。
 
-**Reason**: two small UI edits in theme/page.tsx (picker start color, keep palette mounted); tsc 0, vitest 15 passed, browser-verified; critic skipped, read-back review in WORKLOG
+## Current state
 
-**Acknowledged unverified files** (count=1):
+- nginx 入口已恢復；portal 進入預期的客戶帳號限制流程，不是 nginx 400。
+- repo 有其他 session 的未提交變更；本次只記錄本窗口證據，不重置、不清理、不冒認。
+- 仍有多項產品、法遵、瀏覽器驗證與操作者決策待辦，詳見 `agency-os/TASKS.md`。
 
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\(shell)\tools\theme\page.tsx`
+## Next steps
 
-
-### verify-recent --ack (2026-10-24T19:42:54.7472991Z)
-
-**Reason**: Button Primary group split + .btn-primary reads --btn-primary-*; tsc 0, vitest 16, mutation red/green, browser-verified; critic skipped (read-back in WORKLOG)
-
-**Acknowledged unverified files** (count=1):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\theme\tokens.ts`
-
-
-### verify-recent --ack (2026-10-24T20:22:36.8507860Z)
-
-**Reason**: sidebar active link, section hover tokens, tab-bg-active, editor tabs on .tab; tsc 0, vitest 27, 2 mutations red/green, browser-verified; critic skipped (read-back in WORKLOG)
-
-**Acknowledged unverified files** (count=1):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\theme\palette-derive.ts`
-
-
-### verify-recent --ack (2026-10-24T20:29:01.0514965Z)
-
-**Reason**: font family tokens + typography literals wired + per-tab badge; tsc 0, vitest 32, 2 mutations incl. save-validation guard red/green, browser-verified; critic skipped (read-back in WORKLOG)
-
-**Acknowledged unverified files** (count=3):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\theme\fonts.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\(shell)\tools\theme\FontChoices.tsx`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\(shell)\tools\theme\page.tsx`
-
-## Done today（視窗 2026-10-22 17:41Z → 2026-10-25）
-
-- 外觀：37 組色票預設（24 排法、灰階字、888 種對比測試）、Button Primary 組、側欄目前頁／標題滑過、Theme Editor 分頁改共用元件、字體三選＋字重行高字距接上畫面；prod `3e069ee69`（WORKLOG 續9–17）。
-- 客戶模型 ADR 017 4b-1/2/3/4/5/7；wp-bridge v0.18.0；待決 1/3/5 定案。
-- 員工工具權限 C1–C5（shadow）；/ops/staff。
-- 自動內容 P3–P8（54/61）；0121/0122/0125 套 prod；排程頁按工作分頁。
-- 產品門：影片、設計門上線；內容門建好未開。
-- AI 呼叫全記 ai_call_logs；Gemini lite 模型更換；compose 不變量 15/15。
+- 依 `agency-os/TASKS.md`：員工逐工具權限 11-01 檢查、DMARC 第三階段、社群 V1／Meta 審核、ADR 017 4b 對帳與 seller 4c-2。
+- 操作者申請 YouTube Data API key，依 `agency-os/handoffs/2026-10-26-autocontent-gap.md` 接續 P9.1；不因缺 key 阻擋其他來源。
+- 重新整理原本入口分頁；若再見 400，保留 request path 與時間，不要貼 Cookie 值。
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-10-25 04:49:13`
+- Time: `2026-10-26 04:40:50`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -411,8 +383,8 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20261025-044855.md`
-- Closeout: `reports/closeout/closeout-20261025-044912.md`
+- Health: `reports/health/health-20261026-044036.md`
+- Closeout: `reports/closeout/closeout-20261026-044050.md`
 
 ## Action
 - No blocking issue detected.
