@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-10-25 (AO-CLOSE, 視窗 2026-10-22 17:41Z → 2026-10-25)** — 多 session 並行約 180 commits。(1) **外觀系統**（本 session）：37 組四色票做成 Theme Editor 預設（24 種排法、Shuffle、點色互換；色票只當底色，字一律灰階且對每種底色 ≥4.5:1，測 888 種）；`--accent-text`／`--btn-primary-*`／側欄目前頁 `.active`／`--tab-bg-active`／字體三選（Font Family）全部接上；守門「Colors＋Typography 每格都要被畫面讀到」；四次手動部署，prod 現為 `3e069ee69`。(2) **客戶模型 ADR 017 4b**：4b-1/2/3/4/5/7 完成（wp-bridge v0.18.0 付款事件、WP 會員進門、點數只付已持有功能），待決 1/3/5 選 A（WCS＋TapPay）。(3) **員工工具權限** C1–C5 上線（shadow），C6 待操作者翻 enforce（11-01 看 would_deny）。(4) **自動內容** P3–P8 多項完成（54/61），0121/0122/0125 套 prod。(5) **產品門**：影片、設計門上線；內容門頁面建好（enabled:false）。(6) 每個付費 AI 呼叫寫 ai_call_logs；gemini-2.0-flash-lite 退場；prod 15 個 compose 不變量。
 - **2026-10-23 (AO-CLOSE, 視窗 2026-10-22 09:31 → 2026-10-23 00:11)** — 多 session 並行約 30 commits。(1) **塔羅生圖**：RWS 78 張雙審（13 圖修正、56 小牌牌意、戀人牌男女／男男／女女 `829347e99`）；主角三鈕 人物／動物・擬人／動物・自然（`9810ae5b8`），動物・自然改為每張牌各自四腳動作（`e45f4417b`）；各圖像模型依官方規格排提示詞＋System 新增 AI Models 頁（`3451dcac6`）；schnell 梵谷筆觸改實數 T5 token；愚人假簽名查明為 schnell 固有。(2) **治理／git**：per-session worktree 試行後撤回 push-from-worktree 規則（`9abb5d886`）；根因＝共用 checkout 追不上 origin → AO-RESUME parity 改乾淨 3-way 帶過 dirty 檔（`4d73ef128`、`b623ab7fd`），WORKLOG.md 宣告 merge=union（`005386b96`）；共用 checkout commit 一律帶 pathspec（`c9c3a017d`）；file-claim-guard／asset-mcp-refs／sync-check S1 改以 git 判定，不再對機器產生檔誤報。(3) **產品**：市場分析換 Opus 5.5（`f37a1c782`）；社群 C25 Codex 審 3 項修正（`bfa17b4a0`）、C12 標完成；My Designs 篩選選項固定、每列「全部」用本列總數（`d26b8b281`）。上線＝今晚 03:00 自動部署 main。(4) **AO-CLOSE commit 範圍（00:32 後）**：sync commit `6c5572280` 誤帶他人預先 staged 的 5 份 oracle 刪除（`87d6435e5` 加回）；根因＝porcelain `D `+`??` 同路徑兩筆被覆蓋，且 bare commit 帶整個共用 index。`20f8f6c30`＋`6d0f3886f`：scope 快照→私有 index，gate 與 commit 都只看本 session 路徑；git-add-scope-tracker 記錄 rename 兩邊。操作者回報這輪 AO-CLOSE 花掉 14% 額度且未一次修完。
 - **2026-10-22 (AO-CLOSE, 本 session)** — 10-21 19:00 UTC next-admin 自動部署失敗：`d2534b6a2`（Codex）在 social.css 加 3 個 `color-mix(`，`page-rules.test.ts:30` 禁顏色函式 → 主機 npm test 紅。`7afe37e37` 改用既有 token（遮罩 ::before+opacity、`--badge-red-bg`、hover `filter`），操作者 go ahead 後手動 sg-deploy：0aa0b1f → 7afe37e37，2809 passed、healthy、smoke 5/5（WORKLOG 2026-10-22 續2）。附帶：`collect-sources-store.test.ts:171` 吃本機 `RENDERER_SH*` 環境變數（筆電紅、主機綠），測試不封閉未修。教訓：Codex commit 只跑 targeted 測試會漏頁面規則測試。
 - **2026-10-03 (AO-CLOSE, 視窗 2026-09-30 01:42 → 2026-10-03)** — 主線三條：(1) **Cognitive OS**：報告核准防偽造／競態、跨專案來源搜尋、字級 U22（10-01 部署 `b51095cbf`）；正式站舊專案抹除（WC-15 ⑤）、P2 DOD-2 PASS；要回 JSON 的 AI 呼叫一律帶 schema、schema 失敗只記違規路徑不記值（`118958b5f`）；新方法 生命時間線、個人 SWOT（案主版）、風險矩陣 5×5 圖、根因分析工作流（PR #28/#30），工具數 286；10-03 收工前部署 `ebbf363cc`（試跑 PASS，細節 WORKLOG 2026-10-03）。主機 checkout 改唯讀 deploy key，remote URL 不再含 token。(2) **治理／hooks**：AGENTS.md 模型路由表＋每輪觸發索引（由 TOOL_TRIGGER_MAP 產生，pointer 閘守）；file-claim-guard（同檔未提交只准一個 session 寫，含 Bash）；git-log-injector 截斷；CI perplexity 閘豁免 append-only 紀錄資料。(3) **認知主權平台**（新產品，Cognitive OS 為引擎）：13 塊積木、18 份 12 欄契約、supervisor 頁多輪重排成一頁圖；仍是設計文件，未寫程式。另：DMARC 第一階段 pct=25（10-15 升 100）、4 個漏套 migration 上 prod、0094 RLS 待 go。next-admin 自 10-01 `4fb538b5d` 後無改動，未部署。
@@ -519,7 +520,7 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-10-22 17:36:13 UTC_
+_Last synced: 2026-10-25 20:40:47 UTC_
 
 ## 2026-06-16 AO-CLOSE memory — session window 2026-06-11T05:07Z → 2026-06-16 afternoon
 
@@ -625,3 +626,10 @@ _Last synced: 2026-10-22 17:36:13 UTC_
 - Current Codex work: verified the Cognitive OS research-line closure status; delivered report API lifecycle and Markdown export in commit `53dc77535` (pushed); prepared an isolated, uncommitted cross-project source-search slice with unit/golden verification; preserved unrelated shared-worktree changes.
 - Current blockers remain operator/prod dependent: Cognitive OS P2-09 paid DOD gates, P1 WC-15 production verification, PI-b05/P-ARF-data, and remaining P4 exports/approval/recipe-binding work. No production mutation or Airtable import was performed.
 - AO-CLOSE policy: no reset, clean, broad staging, or deletion; foreign dirty/staged work remains preserved for the owning session.
+
+## 2026-10-26 AO-CLOSE memory — 10/25–10/26 session window
+
+- 付款／客戶模型：WooCommerce Subscriptions＋TapPay 方向已定；credit pack 使用權採無期末，0128／wp-bridge 0.18.3 已落地；ADR 017 seller 4c 方向與 0133–0137 控制面寫入收窄已記錄／依操作者授權套用。
+- 排程／內容／營運：Trigger timers 改由 ks-aw-01 host cron；C4 告警與日誌路徑完成多階段修正；P6 影片管線、P7 YouTube 實片與 P8 驗收完成；AUTOCONTENT-GAP 留自足 handoff，YouTube Data API key 是操作者待辦。
+- 事故修復：app、Social、video、portal 與共享產品入口的 nginx auth header buffer 對齊為 `large_client_header_buffers 4 32k;`；正式機經 safe-infra-patch 套用並保留 backup。公開 7-door probe 與 Chrome 驗證已恢復，無再見 Cookie 400；portal 顯示預期的客戶帳號限制頁。
+- 收尾約束：健康檢查曾有舊 archive-lift state 的文件引用失敗，並非 nginx 失敗；本次 AO-CLOSE 需以最新 archive、WORKLOG、daily note、health/build/doc-sync chain 收斂，並保留其他 session 的 dirty work。
