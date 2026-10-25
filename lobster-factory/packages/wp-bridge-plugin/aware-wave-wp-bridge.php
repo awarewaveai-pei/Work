@@ -3,7 +3,7 @@
  * Plugin Name:       AwareWave WP Bridge
  * Plugin URI:        https://aware-wave.com
  * Description:       Ed25519-authenticated, self-healing control plane that lets an AI operate this site safely (signed requests, render-verify, auto-rollback).
- * Version:           0.18.2
+ * Version:           0.18.3
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            AwareWave
@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'AWBRIDGE_VERSION', '0.18.2' );
+define( 'AWBRIDGE_VERSION', '0.18.3' );
 define( 'AWBRIDGE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AWBRIDGE_REST_NAMESPACE', 'aware-wave-bridge/v1' );
 

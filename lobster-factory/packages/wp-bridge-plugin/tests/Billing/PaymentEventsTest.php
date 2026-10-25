@@ -80,11 +80,14 @@ final class PaymentEventsTest extends TestCase {
 
 		$this->events->onPaymentComplete( 200 );
 
-		$this->assertCount( 3, $this->queue->jobs ); // the pack + one plan event per pack plan key
+		$this->assertCount( 1, $this->queue->jobs );
 		$b = $this->body();
 		$this->assertSame( 'credit_pack', $b['kind'] );
 		$this->assertSame( 750, $b['units'] );
 		$this->assertSame( '200', $b['order_ref'] );
+		// Two different pack plans cannot ride one event: credits go in, the plan is left to a person.
+		$this->assertArrayNotHasKey( 'plan_key', $b );
+		$this->assertSame( array( 200, '點數包使用方案不一致（credits-300、credits-50）：點數已入帳，使用方案請人工登記' ), $this->shop->notes[0] );
 	}
 
 	public function test_an_order_with_a_subscription_and_a_pack_is_two_events_with_two_ids(): void {
@@ -95,7 +98,7 @@ final class PaymentEventsTest extends TestCase {
 		$this->events->onPaymentComplete( 250 );
 
 		$this->assertSame( array( 'subscription_paid', 'credit_pack' ), array( $this->body( 0 )['kind'], $this->body( 1 )['kind'] ) );
-		$this->assertCount( 3, array_unique( array_column( $this->queue->jobs, 'event_id' ) ) );
+		$this->assertCount( 2, array_unique( array_column( $this->queue->jobs, 'event_id' ) ) );
 	}
 
 	public function test_a_full_refund_of_a_pack_order_becomes_refund_credit_pack(): void {
@@ -147,12 +150,12 @@ final class PaymentEventsTest extends TestCase {
 		$this->events->onSubscriptionEnded( 501, 'cancelled' );
 
 		$ids = array_column( $this->queue->jobs, 'event_id' );
-		$this->assertCount( 8, $ids ); // payment_complete = credit_pack + pack plan, each twice
-		$this->assertSame( array_slice( $ids, 0, 2 ), array_slice( $ids, 2, 2 ) );
+		$this->assertCount( 6, $ids );
+		$this->assertSame( $ids[0], $ids[1] );
+		$this->assertSame( $ids[2], $ids[3] );
 		$this->assertSame( $ids[4], $ids[5] );
-		$this->assertSame( $ids[6], $ids[7] );
-		$this->assertCount( 4, array_unique( $ids ) );
-		$this->assertSame( 'subscription_canceled', $this->body( 6 )['kind'] );
+		$this->assertCount( 3, array_unique( $ids ) );
+		$this->assertSame( 'subscription_canceled', $this->body( 4 )['kind'] );
 	}
 
 	public function test_an_unverified_member_cannot_check_out_and_no_event_carries_email_verified_true(): void {
@@ -165,7 +168,7 @@ final class PaymentEventsTest extends TestCase {
 			$this->order( 600 + $uid, $uid, array( array( 'product_id' => 20, 'qty' => 1 ) ) );
 			$this->events->onPaymentComplete( 600 + $uid );
 		}
-		$this->assertCount( 4, $this->queue->jobs );
+		$this->assertCount( 2, $this->queue->jobs );
 		foreach ( array_keys( $this->queue->jobs ) as $i ) {
 			$this->assertFalse( $this->body( $i )['email_verified'] );
 		}
@@ -175,19 +178,20 @@ final class PaymentEventsTest extends TestCase {
 		$this->assertNull( CheckoutGate::refusal( false, false, false ), 'other shop products are not gated' );
 	}
 
-	public function test_a_credit_pack_with_a_plan_key_also_sends_subscription_paid_for_that_plan(): void {
+	public function test_a_credit_pack_with_a_plan_key_carries_plan_key_and_sends_no_subscription_event(): void {
 		$this->order( 700, 7, array( array( 'product_id' => 20, 'qty' => 2 ) ) );
 
 		$this->events->onPaymentComplete( 700 );
 
-		$this->assertCount( 2, $this->queue->jobs );
-		$this->assertSame( 'credit_pack', $this->body( 0 )['kind'] );
-		$plan = $this->body( 1 );
-		$this->assertSame( 'subscription_paid', $plan['kind'] );
-		$this->assertSame( 'credits-300', $plan['plan_key'] );
-		$this->assertSame( 'pack:700', $plan['external_ref'] );
-		$this->assertSame( gmdate( 'Y-m-d\TH:i:s\Z', self::NOW + 1090 * 86400 ), $plan['period_end'] );
-		$this->assertSame( 'wc:payment_complete:700:pack-plan:credits-300', $plan['event_id'] );
+		// One event: the usage right has no end date, so there is no subscription_paid / period_end to send.
+		$this->assertCount( 1, $this->queue->jobs );
+		$pack = $this->body( 0 );
+		$this->assertSame( 'credit_pack', $pack['kind'] );
+		$this->assertSame( 600, $pack['units'] );
+		$this->assertSame( '700', $pack['order_ref'] );
+		$this->assertSame( 'credits-300', $pack['plan_key'] );
+		$this->assertArrayNotHasKey( 'period_end', $pack );
+		$this->assertSame( 'wc:payment_complete:700:credit_pack', $pack['event_id'] );
 		$this->assertCount( 0, $this->shop->notes );
 
 		// A pack without a plan key: points only, and the shop owner is told the buyer cannot spend them.
@@ -197,6 +201,7 @@ final class PaymentEventsTest extends TestCase {
 		$this->events->onPaymentComplete( 701 );
 		$this->assertCount( 1, $this->queue->jobs );
 		$this->assertSame( 'credit_pack', $this->body()['kind'] );
+		$this->assertArrayNotHasKey( 'plan_key', $this->body() );
 		$this->assertSame( array( 701, '點數包未設定使用方案：買家無法使用點數' ), $this->shop->notes[0] );
 	}
 

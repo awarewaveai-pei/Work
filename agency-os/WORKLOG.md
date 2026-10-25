@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-25（續37）wp-bridge 0.18.3：點數包改成一個 `credit_pack` 帶 `plan_key`，不再送 `subscription_paid`（ADR 017 決策 6 = A）（Claude）
+
+- **為什麼**：操作者決策 6 = A，點數包的使用權沒有到期日。舊規則多送一個 `subscription_paid`（`:pack-plan:<plan>`，period_end +1090 天）作廢。伺服器 `next-admin lib/payments/provider.ts:66` 已接受 `credit_pack.plan_key`（選填）；migration 0128 在同一 transaction 寫入方案。
+- **改了什麼**（`lobster-factory/packages/wp-bridge-plugin/`）：
+  - `includes/Billing/PaymentEvents.php`：同一張訂單的點數包合併成一個 `credit_pack`，event_id 與 order_ref 不變。只有一種方案時帶 `plan_key`；刪除 `PACK_PLAN_SEC` 與 pack-plan 事件。
+  - 新增：同一單混了兩種以上方案時，一個事件只能帶一個 `plan_key`，所以點數照樣入帳，留訂單備註「點數包使用方案不一致（…）：點數已入帳，使用方案請人工登記」。
+  - 沒設定方案的點數包仍留備註「點數包未設定使用方案：買家無法使用點數」。
+  - 版本 0.18.3。**未發版、未動伺服器**（依 brief）。
+- **測試**（`tests/Billing/PaymentEventsTest.php`）：
+  - 改名為 `test_a_credit_pack_with_a_plan_key_carries_plan_key_and_sends_no_subscription_event`。
+  - 混合方案測試改成驗備註。
+  - 事件數斷言 3→2、8→6、4→2。
+- REALTEST_EVIDENCE: tool=Bash | cmd=php phpunit-9.6.phar（plugin 全套 116 tests、422 assertions） | exit=0 | ms=18
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變（scratch 副本拔掉 `$pack['plan_key'] = …`）→ 指名測試紅（1 error）；原碼綠 | exit=1 | ms=20
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（讀回 diff；伺服器 schema 已 grep 對照 provider.ts:13,66）
+- ORACLE_WAIVED: codex quota blocked until 2026-10-25 19:40 (scripts/oracle-quota.ps1)；以突變證據代替
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks,lobster-factory | grep=pack-plan|+1090 (git grep, tracked) | hits=5 -- TASKS.md:331, step-4.md:142 already state the new rule; ao-resume / integrated-status reports are snapshots; payments.e2e.test.ts:148 is only an event_id string in the peer session test
+- **rollback**：`git revert`；未發版，所以網站上不必回滾。
 ## 2026-10-25（續36）續29 的三件未做完：`/client-status` 改直讀 Supabase；soulful 外掛 17 個更新；aware-wave.com 裝 FluentSMTP（只差 Resend 金鑰）（Claude）
 
 - **`/client-status`**：根因 `/api/ops/clients` 在員工登入之後（`next-admin/middleware.ts` 無 session → 401/404），skill 的 Basic auth 是舊做法。新 `scripts/client-status.ps1` 直讀 Supabase `organizations`（同 Telegram `/client_status`，`lib/command-plane/handlers/clientStatus.ts`）；`.claude/commands/client-status.md` 改用它；`.claude/agents/client-onboarding.md` §VERIFY 同一個舊 curl 一併換掉。PS 5.1 `Invoke-RestMethod` 陣列要 `ForEach-Object` 展開。

@@ -19,7 +19,6 @@ final class PaymentEvents {
 	const KEY            = '/^[a-z0-9][a-z0-9_.-]{0,99}$/';
 	const MAX_UNITS      = 10000000;
 	const MAX_PERIOD_SEC = 94608000; // 3 years
-	const PACK_PLAN_SEC  = 94176000; // 1090 days: under the server's 3-year limit
 
 	/** @var Shop */
 	private $shop;
@@ -91,32 +90,22 @@ final class PaymentEvents {
 				$this->shop->addNote( $orderId, 'AwareWave：點數 ' . $units . ' 超過單筆上限 ' . self::MAX_UNITS . '，未送出；請人工登記。' );
 				return;
 			}
+			// A wallet alone opens nothing (can.ts, 4b-5): plan_key names the add-on plan that grants the right to spend
+			// it; the server writes that right with no end date in the same transaction as the credits (migration 0128).
+			$pack = array( 'kind' => 'credit_pack', 'units' => $units, 'order_ref' => (string) $orderId );
+			if ( count( $packPlans ) === 1 ) {
+				$pack['plan_key'] = (string) array_keys( $packPlans )[0];
+			} elseif ( count( $packPlans ) > 1 ) {
+				$this->shop->addNote( $orderId, '點數包使用方案不一致（' . implode( '、', array_keys( $packPlans ) ) . '）：點數已入帳，使用方案請人工登記' );
+			}
 			$this->emit(
 				$order['customer_id'],
 				$orderId,
 				'wc:payment_complete:' . $orderId . ':credit_pack',
-				array( 'kind' => 'credit_pack', 'units' => $units, 'order_ref' => (string) $orderId ),
+				$pack,
 				0,
 				$orderId
 			);
-			// A wallet alone opens nothing (can.ts, 4b-5): the pack's add-on plan grants the right to spend it. The server
-			// renews the same contract on each purchase and never shortens it, so the right runs ~3 years past the last pack.
-			$end = (int) call_user_func( $this->clock ) + self::PACK_PLAN_SEC;
-			foreach ( array_keys( $packPlans ) as $plan ) {
-				$this->emit(
-					$order['customer_id'],
-					$orderId,
-					'wc:payment_complete:' . $orderId . ':pack-plan:' . $plan,
-					array(
-						'kind'         => 'subscription_paid',
-						'plan_key'     => $plan,
-						'period_end'   => gmdate( 'Y-m-d\TH:i:s\Z', $end ),
-						'external_ref' => 'pack:' . $orderId,
-					),
-					0,
-					$orderId
-				);
-			}
 		}
 	}
 
