@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-25（續84）排程離開 Trigger 結案：待決 1–5 與 C7 由我決定（操作者「你決定」）——備份狀態改在主機判斷、GitHub 排程上頁免 token、主機外存活探針；C6.2–6.3、C7 不做（Claude）
+
+- **決策紀錄**：`agency-os/reports/decisions/2026-10-25-schedules-off-trigger-open-items.md`（每項附 file:line／實測與回頭條件）；INDEX 一列。R0-PLAN §6 刪 C7、C6.2／C6.3，C8.1／C8.2 改寫為已決定的做法。
+- **#4 備份狀態**（`6377f38e6`）：`scripts/sync-backup-status-from-mainwp.sh` 不再 commit；merge 到 `/var/lib/awarewave/backup-status/<slug>.json`（首次由 repo JSON 播種），以 `phase4-checks.py --judge-backup-json`（新 `judge_backup_status()`＝3B–3D 唯一實作）判斷；警告／狀態檔建不出來／缺設定／0 個 active 租戶 → exit 1。dry run 對暫存複本做同樣 merge＋judge。repo `BACKUP_AUTO_STATUS.json` 只留靜態設定；雲端 Phase 4 3B–3D 改為一行「主機判斷」（`phase4-weekly.md`、`check_tenant`）。
+- **#1 C5.3**（同 commit）：`report-host-schedules.py` 讀 origin/main 有 `schedule:` 的 workflow，公開 API 取最近一次已決定的排程 run（略過 cancelled／skipped）；NA 家族列「GitHub 定時檢查」；外部讀取錯誤改為每個來源一列（`external_inventory_errors:<source>`）。
+- **#2 C8.1**（同 commit）：`.github/workflows/host-liveness-probe.yml` 每 5 分：TCP 58122＋直連 origin HTTPS（Cloudflare BFM 擋資料中心 IP，經 proxy 必 403；origin 對非 CF 回 nginx 403＝主機在）；失敗＝GitHub 失敗信。
+- **測試閘事故**：15:35Z 部署被 `lib/__tests__/trigger-callbacks-server-to-server.test.ts`「掃到 ≥10 個呼叫者」擋下——C2.3 刪 timer task 後剩 4 個；C2.3 當時只跑 NA `lib/site-watch`＋`lib/schedules`，漏全套。改為點名 3 個必在的呼叫者（不是調門檻）（`2cf911d48`）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=主機 `bash sync-backup-status-from-mainwp.sh --dry-run`（不寫檔）→ 實跑 cron-run backup_status_sync：company-soulful-expression CHANGED，3B PASS（距上次成功 6 天 2026-10-19T00:09:06Z）、3C PASS、3D PASS，judged=1 hard=0，exit 0；`/var/lib/awarewave/backup-status/company-soulful-expression.json` 建立；`/root/Work` 無 ahead | exit=0 | ms=8000
+- REALTEST_EVIDENCE: tool=SSH | cmd=主機 report-host-schedules（6377f38e6）→ 45 entries、external_errors []；`gha_weekly_workflows_security_audit` last 2026-10-19 exit 0、`gha_host_liveness_probe` 尚無排程 run | exit=0 | ms=4000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`gh workflow run host-liveness-probe.yml` → run 40207792015 conclusion=success（GitHub 機器上 TCP＋origin HTTPS 通過）；本機：活主機 tcp ok＋HTTP 403、死位址 000 | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=phase4-checks.py --selftest all pass、--format json 全 PASS；host-schedules.test.py 20 OK；next-admin 全套 vitest 3379 passed；tsc 乾淨 | exit=0 | ms=120000
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo sg-deploy.sh next-admin（重試，2cf911d48）→ 3379 passed、healthy 15s、smoke all OK；排程頁「資料庫、n8n 與 GitHub」3 列（probe 尚無排程 run、audit 正常、pg_cron 正常），備份同步列不再異常 | exit=0 | ms=600000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/2m/3n（M1 狀態檔建不出來時跳過判斷＝綠、M2 被取消的 probe run 判成失敗、m1 dry run 沒判、m2 外部錯誤共用一列、m3 說明過時——全修；加 0 租戶守衛）
+- ORACLE_WAIVED: critic Standard 獨立審（session 額度中斷後續跑完成）；無 auth／金流／個資
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks,.claude | grep=BACKUP_AUTO_STATUS | hits=39（程式讀者：`sync-backup-status-from-mainwp.sh`（設定＋播種）、`phase4-checks.py` selftest fixture、`mainwp-backup-merge.py` docstring；文件已改為「靜態設定」）
+- **結果**：監工台 7 卡 29 項全完成、待決 0。
+- **rollback**：`git revert 2cf911d48 6377f38e6`（備份同步回到 commit 版會再推不上去）；主機狀態檔 `/var/lib/awarewave/backup-status/` 可直接刪；probe 停用＝GitHub Actions 頁 Disable workflow。
 ## 2026-10-25（續83）Social／video／portal Cookie 400：補齊 next-admin 入口設定，已正式套用（Codex）
 
 - **根因／範圍**：先前 app 修正未涵蓋其他 server。`lobster-factory/infra/hetzner-phase1-core/nginx/default.conf:391` 的 portal、`:435` 的 Social／tarot／studio／video／design 同樣代理 next-admin，但仍用預設請求標頭容量。操作者已批准 Social 修正，並追加 video 與 portal。

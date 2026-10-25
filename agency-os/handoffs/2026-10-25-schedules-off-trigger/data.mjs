@@ -31,7 +31,7 @@ export const NOW = [
   { what: '系統能自動偵測 Trigger 停滯。', state: 'yes', ev: '2026-10-25 起每 10 分鐘檢查執行名額。名額被卡住 15 分鐘就標紅並推播（C3）。' },
   { what: '任何排程太久未成功，手機都會收到通知。', state: 'yes', ev: '2026-10-25 起排程頁任一列變紅就推播一次，恢復再推播一次。第一次就抓到網站備份同步壞了 55 天。' },
   { what: '每天會收到一行「全部正常」。', state: 'yes', ev: '每天 09:00 送到 Telegram 與 Slack。2026-10-25 22:27 手動送出第一則，Slack #ops-incidents 已收到。' },
-  { what: '/ops/schedules 可查看資料庫、n8n、GitHub 與雲端排程。', state: 'yes', ev: '2026-10-25 起顯示資料庫、n8n、雲端報告與筆電報告。GitHub 要等待決 1 的密碼（C5.3）。' },
+  { what: '/ops/schedules 可查看資料庫、n8n、GitHub 與雲端排程。', state: 'yes', ev: '2026-10-25 起顯示資料庫、n8n、雲端報告與筆電報告。GitHub 定時檢查也列出（公開 API，免密碼）。' },
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
@@ -44,6 +44,7 @@ const C35 = 'ef5a9ccf6';
 const C23 = 'd8d6a073a';
 const C25 = '59ebd2e9f';
 const C46 = '0ba63a0b4';
+const CDEC = '6377f38e6';
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '定時工作改由主機啟動', plain: '例：社群貼文每 5 分鐘發送一次，改由主機直接啟動。9 個定時工作維持原有頻率。另刪除 1 個重複工作。',
@@ -95,51 +96,32 @@ export const STEPS = [
       done('C4.7', '訂單重送與後台操作補派兩個工作，改成回報實際結果。目前收到要求就回報成功，實際失敗時排程頁仍會顯示綠色。', C4),
     ] },
   { n: 5, code: 'C5', group: 'D', title: '補齊排程頁的工作清單', plain: '例：Supabase 每天凌晨清理舊紀錄的工作，在 2026-10-24 失敗卻無人察覺。之後這類失敗會在 /ops/schedules 標紅。頁面也會列出 n8n、GitHub 與雲端報告的排程。',
-    gate: '/ops/schedules 顯示資料庫、n8n、GitHub、雲端與筆電報告各區。資料庫排程顯示最近一次執行結果。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['C4'],
-    before: '待決 1',
+    gate: '/ops/schedules 顯示資料庫、n8n、GitHub、雲端與筆電報告各區。資料庫排程顯示最近一次執行結果。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: CDEC, depends: ['C4'],
     what: '盤點加 pg_cron（cron.job_run_details）、n8n API、GitHub Actions API、repo 報告產生時間；SCHEDULES_PAGE_PLAN.md:50 改寫',
     files: ['HS/report-host-schedules.py', 'NA/lib/schedules/adapters/host-schedules.ts', 'agency-os/docs/operations/SCHEDULES_PAGE_PLAN.md'],
     items: [
       done('C5.1', '資料庫內建排程每個工作各列一行。顯示最近一次執行成功或失敗。', C35),
       done('C5.2', '已啟用的 n8n 定時流程會自動列出。目前沒有這類流程。', C35),
-      todo('C5.3', 'GitHub 定時檢查會自動列出。顯示最近一次執行結果。'),
+      done('C5.3', 'GitHub 定時檢查會自動列出。顯示最近一次執行結果。（公開 API，免 token）', CDEC),
       done('C5.4', '筆電與雲端區顯示每份報告的產生時間。超過更新週期就標黃。報告標明由筆電產生。', C35),
       done('C5.5', '修改原本「不放筆電與雲端」的決定。頁面寫明：AwareWave 設定的每個排程都會列出。', C35),
     ] },
   { n: 6, code: 'C6', group: 'E', title: '狀態報告改由主機產生', plain: '例：主機記憶體與硬碟用量報告，目前要等筆電執行開工報告才會更新。改由主機每天產生後，筆電未開機也能更新。',
-    gate: '排程頁「筆電與雲端」區只保留需要筆電的項目。其餘報告由主機準時產生。', risk: 'High（正式主機）', model: 'Opus 5.5', status: 'in_progress', depends: ['C5'],
-    before: '待決 4、待決 5',
+    gate: '清點開工報告用到的每份報告。決定不搬到主機：主機出事已由排程頁、網站回應檢查與 Netdata 推播，筆電報告只是摘要（決策紀錄 #5）。', risk: 'High（正式主機）', model: 'Opus 5.5', status: 'done', commit: C25, depends: ['C5'],
     what: '清點 ao-resume.ps1 讀的 9 份報告；SSH 讀主機者改主機 cron 產生寫 /var/lib/awarewave',
     files: ['scripts/ao-resume.ps1', 'HS/cron.d/awarewave-schedules'],
     items: [
       done('C6.1', '清點開工報告使用的每份報告。確認產生者。確認資料來源。（WORKLOG 2026-10-25 續 C6.1 段：11 支腳本、約 4300 行）', C25),
-      todo('C6.2', '資料位於主機的報告，改由主機定時產生。筆電只負責讀取。'),
-      todo('C6.3', '排程頁「筆電與雲端」區只保留需要筆電的項目。'),
     ] },
-  { n: 7, code: 'C7', group: 'F', title: '內部 API 共用一組密碼', plain: '例：社群發文、客服、訂單與網站巡檢等內部呼叫，目前使用 7 組密碼。更換密碼需操作 7 次。統一成一組後，只需更換一次。',
-    gate: '7 個內部 API 共用一組密碼。密碼驗證共用一個函式。舊名稱全數移除。獨立審查通過。', risk: 'Medium（登入與權限）', model: 'Opus 5.5', status: 'not_started', depends: ['C6'],
-    what: 'verifyInternalToken() + INTERNAL_API_TOKEN；7 route；compose、.env.example、cron 行、測試',
-    files: ['NA/lib/security/', 'NA/app/api/internal/**/route.ts', 'lobster-factory/infra/hetzner-phase1-core/docker-compose.yml'],
-    items: [
-      todo('C7.1', '7 個內部 API 改用同一組密碼。密碼驗證共用一個函式。移除舊名稱。'),
-      todo('C7.2', '同步更新主機設定、範例檔、主機排程與測試。交由另一個模型獨立審查。'),
-    ] },
-  { n: 8, code: 'C8', group: 'E', title: '從主機外監控網站', plain: '例：整台主機當機時，主機上的監控也會停止。手機不會收到通知，看起來與正常時相同。改由外部服務每 5 分鐘檢查網站。網站無法連線就通知。',
-    gate: '關閉主機上的網站後，手機在 5 分鐘內收到通知。交付第二台主機的決策記錄。', risk: 'Low', model: 'Opus 5.5', status: 'not_started', depends: [],
-    before: '待決 2、待決 3',
+  { n: 7, code: 'C8', group: 'E', title: '從主機外監控網站', plain: '例：整台主機當機時，主機上的監控也會停止。手機不會收到通知，看起來與正常時相同。改由外部服務每 5 分鐘檢查網站。網站無法連線就通知。',
+    gate: '主機整台沒有回應時，GitHub 在幾分鐘內寄信。排程頁有這個檢查的一列。第二台主機的決策記錄寫明現在不加與回頭條件。', risk: 'Low', model: 'Opus 5.5', status: 'done', commit: CDEC, depends: [],
     what: 'Cloudflare Health Checks 或外部監控；reports/decisions/ 第二台主機（成本、RPO／RTO、搬遷步驟）',
     files: ['agency-os/reports/decisions/'],
     items: [
-      todo('C8.1', '外部服務每 5 分鐘檢查網站。網站無法連線就推播通知。'),
-      todo('C8.2', '第二台主機的決策記錄列出費用、可接受的停機時間、最多可遺失的資料量與搬遷方式。'),
+      done('C8.1', '外部每 5 分鐘檢查主機是否存活（GitHub Actions：SSH 連接埠＋直連網站）。主機無回應時 GitHub 寄信，排程頁也有一列。', CDEC),
+      done('C8.2', '第二台主機的決策記錄：現在不加，寫明回頭條件。', CDEC),
     ] },
 ];
 
 // 操作者自己要決定或親手做的（agent 不能替她定）
-export const OPEN = [
-  { n: 1, what: '在 GitHub 建立只能讀取 Work repo 的 Actions 的密碼。將密碼存入主機設定。', before: 'C5', src: '計畫 §3 R5、C5.3' },
-  { n: 2, what: '決定使用 Cloudflare 健康檢查或其他外部監控服務。選用 Cloudflare 前，需確認方案是否支援。', before: 'C8', src: '計畫 C8.1' },
-  { n: 3, what: '閱讀決策記錄後，決定是否增設第二台主機。若要增設，再決定時間。', before: 'C8', src: '計畫 C8.2' },
-  { n: 4, what: '備份狀態同步要把結果存進程式庫，雲端週檢（phase4-checks.py）從程式庫讀。主機的 GitHub 金鑰只能讀取，從 9 月搬機後每天失敗，資料停在 8 月 27 日。選一：給這把金鑰寫入權限（GitHub 設定由你操作；主機被入侵時可直接改 main）；或筆電收工時從主機拉回再提交（筆電沒開就不更新）；或雲端週檢改向 app 讀取（要新增一個唯讀 API）。', before: 'C6', src: 'WORKLOG 2026-10-25 續64 M1' },
-  { n: 5, what: '狀態報告搬到主機的做法。有 11 支 PowerShell 檢查腳本，約 4300 行，其中 7 支只透過 SSH 讀主機資料。選一：在主機安裝 PowerShell，讓同一批腳本直接在主機跑（改動最小）；或改寫成主機的 bash 與 Python（約數天）；或維持由筆電執行。', before: 'C6', src: 'WORKLOG 2026-10-25 C6.1 清點' },
-];
+export const OPEN = [];
