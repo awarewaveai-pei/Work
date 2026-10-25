@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-26（續5）Soulful YouTube 實發驗證停在選影片：Soulful 唯一自有影片 R2 回 404；監工台 P7.0／P7 完成 commit 改 935c70364（Claude）
+
+- 唯讀確認：`social_accounts` 有 Soulful（組織 `2bf60452…` Soulful Expression Art Therapy）youtube／connected，label「Soulful Expression」，postiz_integration_id `cmvo2egkv0003qs8kx4xs0pjc`。
+- 影片：該組織 `video_jobs` 只有 `bb5ff510-71f5-42d5-bc86-8fd838cacc80`（done、16x9 1920x1080、title=`tl_827ddc9a…` 時間軸測試件），其 R2 網址 `…/video/tl_827ddc9a_ee5b_4ca1_bc73_822f5619a98a/16x9.mp4` 回 404（檔已不在）；`social_media` 無該組織影片。依邊界不借 AW 影片、不生成新付費影片 → **未發布、未建任何貼文列**，等操作者選片。
+- 其他候選（`video_jobs.organization_id` 為空＝無歸屬，6 月產物，R2 狀態未驗）：「新手學畫最常踩的三個坑，你中了幾個？」「5 Surprising Ways Art Reduces Anxiety」（16x9 已測 404）。
+- 監工台：P7 階段與 P7.0 完成 commit 由 `4425d4bf8` 改為 `935c70364`（P7 閘真發影片那次）；`node build.mjs && node check.mjs` = ok（61 項 60 done）。
+- REALTEST_EVIDENCE: tool=curl | cmd=curl -sI https://pub-bd79a1c3b4554025bd92a6192b032427.r2.dev/video/tl_827ddc9a_ee5b_4ca1_bc73_822f5619a98a/16x9.mp4 | exit=0 | ms=700
+- REVIEW_WAIVED: DOC_ONLY -- 只改監工台資料與 WORKLOG
+- BUGHUNT_WAIVED: DOC_ONLY -- 只改監工台資料
+- ORACLE_WAIVED: 無 source 檔改動
 ## 2026-10-26（續4）全自動內容 P7 閘通過：社群工具真發一支影片到 AW YouTube 頻道（操作者授權 2026-10-25／nginx go 2026-10-26）（Claude）
 
 - **根因**：`addVideo` 上傳 postiz 回 413——postiz vhost 無 `client_max_body_size`（nginx 預設 1MB）。Postiz 自身影片上限 1GB 不擋。
