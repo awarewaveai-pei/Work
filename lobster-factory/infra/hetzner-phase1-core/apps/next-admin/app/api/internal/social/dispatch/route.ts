@@ -1,7 +1,6 @@
 // POST /api/internal/social/dispatch
 //
-// Called every 5 minutes by the self-hosted Trigger schedule `social-dispatch`
-// (packages/workflows/src/trigger/social-dispatch.ts). All sending logic lives in lib/social/dispatch.ts; this route
+// Called every 5 minutes by the host cron (scripts/poke.sh, cron.d/awarewave-schedules). All sending logic lives in lib/social/dispatch.ts; this route
 // only gates it. Own token SOCIAL_DISPATCH_TOKEN (verifyIngestToken.ts M2: one token per caller class).
 // Off by default (AGENTS.md §0 自動化預設 OFF): SOCIAL_DISPATCH_ENABLED=true turns it on, SOCIAL_DISPATCH_MODE=apply
 // sends; =draft runs everything but Postiz only stores drafts (the production rehearsal); anything else is a dry run
@@ -34,7 +33,7 @@ export async function POST(request: Request) {
   try {
     const result = await runDispatch(dispatchPorts(), { mode });
     if (mode === "dry_run" || result.sent || result.errored || result.errors.length || result.backoffUntil) console.log("[social/dispatch]", JSON.stringify(result).slice(0, 2000));
-    // a post that could not be worked fails the Trigger run (Sentry), not a 200 nobody reads
+    // a post that could not be worked fails the host clock's run (poke.sh exit 1: the /ops/schedules row turns red and one push goes out), not a 200 nobody reads
     return NextResponse.json({ ok: result.errors.length === 0, enabled: true, ...result }, { status: result.errors.length ? 502 : 200 });
   } catch (err) {
     // store unreadable (DB down, migration 0100 missing): a 500, never a green "nothing due"

@@ -12,7 +12,7 @@
   (runbooks/ADD-PERIODIC-HEALTH-CHECK.md, 2026-08-25 addendum):
     a heartbeat  site_watch_maintenance.last_heartbeat_at age: >2h WARN, >6h or never FAIL. Stamped
                  by /api/internal/site-watch/due BEFORE its kill-switch check, so this is the
-                 Trigger.dev -> next-admin -> DB chain whether the system is switched on or off.
+                 host cron (site-watch-tick.sh) -> next-admin -> DB chain whether the system is switched on or off.
     b executor   kill switch on (enabled heartbeat < 2h) and a monitored target has not completed a
                  run within its period + 2h (hourly 3h / every_6h 8h / daily 26h) -> WARN. Per
                  target on purpose: one target whose page crashes the renderer never completes,
@@ -211,8 +211,8 @@ if ($blindSpots.Count -gt 0) {
 
     $hb = Get-Num $kv['hb_age_s']
     $probes['heartbeat'] =
-        if ($null -eq $hb) { New-Probe "FAIL" "no heartbeat ever recorded (Trigger task site-watch-heartbeat not deployed, or never reached /due)" }
-        elseif ($hb -gt $HeartbeatFailH * 3600) { New-Probe "FAIL" ("last heartbeat {0} ago (> {1}h): Trigger -> next-admin -> DB chain is down" -f (Format-H $hb), $HeartbeatFailH) }
+        if ($null -eq $hb) { New-Probe "FAIL" "no heartbeat ever recorded (host cron site_watch_tick not installed, or never reached /due)" }
+        elseif ($hb -gt $HeartbeatFailH * 3600) { New-Probe "FAIL" ("last heartbeat {0} ago (> {1}h): host cron -> next-admin -> DB chain is down" -f (Format-H $hb), $HeartbeatFailH) }
         elseif ($hb -gt $HeartbeatWarnH * 3600) { New-Probe "WARN" ("last heartbeat {0} ago (> {1}h)" -f (Format-H $hb), $HeartbeatWarnH) }
         else { New-Probe "PASS" ("last heartbeat {0} ago" -f (Format-H $hb)) }
 
@@ -223,7 +223,7 @@ if ($blindSpots.Count -gt 0) {
     $lastResult = Get-Num $kv['last_result_age_s']
     $probes['executor'] =
         if (-not $switchedOn) { New-Probe "SKIP" ("kill switch off (last enabled heartbeat: {0} ago) -- no run expected" -f (Format-H $ehb)) }
-        elseif ($overdue -gt 0) { New-Probe "WARN" ("{0} of {1} monitored target(s) completed no run within period + {2}h: {3} -- Trigger site-watch-run red runs, renderer" -f $overdue, $monitored, $OverdueSlackH, $kv['overdue_slugs']) }
+        elseif ($overdue -gt 0) { New-Probe "WARN" ("{0} of {1} monitored target(s) completed no run within period + {2}h: {3} -- site_watch_tick failures (/ops/schedules), renderer" -f $overdue, $monitored, $OverdueSlackH, $kv['overdue_slugs']) }
         else { New-Probe "PASS" ("{0} monitored target(s), none overdue; newest result: {1}" -f $monitored, $(if ($null -eq $lastResult) { "none yet" } else { (Format-H $lastResult) + " ago" })) }
 
     $owed = Get-Num $kv['owed_notifications']

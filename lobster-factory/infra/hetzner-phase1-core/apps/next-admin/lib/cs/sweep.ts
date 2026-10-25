@@ -1,8 +1,8 @@
 // Hands claimed Chatwoot messages whose outcome never reached Chatwoot to a human. The webhook
 // (app/api/webhooks/chatwoot/route.ts) answers right after claimMessage and runs the pipeline in after();
 // work cut off there (container restart on deploy) or a failed delivery leaves cs_ai_replies.completed_at
-// NULL (migration 0099). Called by POST /api/internal/cs/sweep, which the Trigger schedule
-// `cs-inbound-sweep` hits every 5 minutes. Never re-runs the AI: the message may be minutes old and a
+// NULL (migration 0099). Called by POST /api/internal/cs/sweep, which the host cron
+// (scripts/poke.sh) hits every 5 minutes. Never re-runs the AI: the message may be minutes old and a
 // second pass could reply twice.
 
 import { loadCis } from "@/lib/cs/cis";

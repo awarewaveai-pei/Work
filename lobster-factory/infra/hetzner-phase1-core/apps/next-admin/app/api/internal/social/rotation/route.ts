@@ -1,7 +1,6 @@
 // POST /api/internal/social/rotation
 //
-// Called daily at 00:05 UTC by the self-hosted Trigger schedule `social-rotation`
-// (packages/workflows/src/trigger/social-rotation.ts): materialises the next 7 days of every active rotation list
+// Called daily at 00:05 UTC by the host cron (scripts/poke.sh, cron.d/awarewave-schedules): materialises the next 7 days of every active rotation list
 // (lib/social/rotation.ts; once per slot, migration 0101). Same caller class and token as the sender
 // (SOCIAL_DISPATCH_TOKEN) and the same switch: off unless SOCIAL_DISPATCH_ENABLED=true, so no automation adds posts
 // while sending is off (AGENTS.md §0 自動化預設 OFF). The same daily run marks channels Postiz shows as disabled

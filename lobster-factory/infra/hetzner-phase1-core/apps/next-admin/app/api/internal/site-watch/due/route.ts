@@ -1,5 +1,5 @@
-// POST /api/internal/site-watch/due — the hourly heartbeat's first call (packages/workflows/src/
-// trigger/site-watch.ts). Stamps the watchdog heartbeat, syncs targets (every active org with a
+// POST /api/internal/site-watch/due — the hourly round's first call (host cron
+// scripts/site-watch-tick.sh). Stamps the watchdog heartbeat, syncs targets (every active org with a
 // site_url), then returns the targets that are due now OR owe a notification (I2). A hint only: each
 // run re-checks under its own lease.
 // Kill switch off (SITE_WATCH_ENABLED) = empty list, nothing synced, nothing run — but the heartbeat is

@@ -1,7 +1,8 @@
 # Runbook: Trigger.dev 正式環境 run 全部卡在 queued
 
 ## 症狀
-- `site-watch-LATEST.md` 探針 a 🔴「heartbeat N h 沒來」，或任何 Trigger 排程任務停了。
+- `/ops/schedules`「Trigger 名額檢查」（`trigger_slots_check`，`hetzner-phase1-core/scripts/check-trigger-slots.sh`，每 10 分）變紅並推播；輸出在主機 `/var/log/trigger-slots.log`（`STUCK (<env>): <run> <task> <status>`）。
+- 或按鈕啟動的 Trigger 工作（建站、塔羅批次、研究抓取）一直排隊。2026-10-25 起 Trigger 已無定時工作，所有時鐘在主機 cron。
 - Trigger MCP `list_runs`（prod，`proj_6c4f24492a705729fc2c`）：新 run 全是 `queued`，近 24h 0 個 `completed`。
 - 容器全 healthy；webapp log 只有 `POST /engine/v1/worker-actions/dequeue 200 ... 10000 ms`（長輪詢空手而回）。重啟容器**無效**（名額記在 Redis）。
 

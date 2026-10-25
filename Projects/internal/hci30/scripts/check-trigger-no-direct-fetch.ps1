@@ -19,7 +19,7 @@ param(
 # http/https/undici/axios import, XMLHttpRequest) anywhere in $Dir's task
 # source, except inside the ONE file at $AllowlistRelativePath (the
 # designated "runner client" module that legitimately makes that call, same
-# shape as lobster-factory's own schedules-heartbeat.ts delegating to a
+# shape as lobster-factory's former schedules-heartbeat.ts (deleted 2026-10-25) delegating to a
 # separate postRunDue() rather than fetching inline).
 #
 # KNOWN GAP, found by critic review 2026-09-18 via real PoC (not

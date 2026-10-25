@@ -1,13 +1,13 @@
 // POST /api/internal/schedules/run-due
 //
-// Called every 5 minutes by the host cron (scripts/poke.sh, cron.d/awarewave-schedules) and, until it is
-// retired, by the Trigger.dev hourly heartbeat (packages/workflows/src/trigger/schedules-heartbeat.ts).
+// Called every 5 minutes by the host cron (scripts/poke.sh, cron.d/awarewave-schedules); the Trigger.dev
+// heartbeat that also called it was removed 2026-10-25.
 // All scheduling logic lives here: which (client, job) rows are due (lib/schedules store + isDueNow) and
 // running them (the registry's run(), lib/schedules/jobs.ts). Own bearer token (SCHEDULE_INGEST_TOKEN),
 // never the shared OPS_INBOX_INGEST_TOKEN (verifyIngestToken.ts M2: one leaked token must not forge others).
 //
 // Each due firing is CLAIMED before the answer (claimScheduleRun: one run key per client, job and UTC
-// day), then run after it: a crawl may take 10 minutes, the Trigger task gives up and retries after
+// day), then run after it: a crawl may take 10 minutes, a caller may give up and retry after
 // 300 s, and the claim is what keeps that retry from running the job twice. A run that throws records
 // last_error and raises one incident per (job, client); the others still run. A store failure is a 500,
 // never a green "nothing due".

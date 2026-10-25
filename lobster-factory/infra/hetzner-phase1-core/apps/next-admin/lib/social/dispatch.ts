@@ -1,4 +1,4 @@
-// The social sender (SOCIAL_MANAGER_PLAN.md C5; ADR 016 §2). One run, every 5 minutes (Trigger task social-dispatch
+// The social sender (SOCIAL_MANAGER_PLAN.md C5; ADR 016 §2). One run, every 5 minutes (host cron poke.sh
 // -> POST /api/internal/social/dispatch): claim posts due within 10 minutes, create one Postiz post per target, then
 // read Postiz back and move targets to published / error. The database functions of migration 0100 keep the
 // invariants (claim once, one Postiz post per send, write-backs only on their own claim, a published target never

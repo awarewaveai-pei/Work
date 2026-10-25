@@ -35,7 +35,7 @@
 
 ## 3. 架構（實作即 SSOT；`file:line` 以 2026-09-23 為準，改程式時同步 §3／§4）
 ### 3.1 資料流
-Trigger.dev 每小時 heartbeat（`WF/src/trigger/site-watch.ts` `site-watch-heartbeat`，cron `5 * * * *`）→ `POST /api/internal/site-watch/due`（bearer `SITE_WATCH_INGEST_TOKEN`；先寫 heartbeat 時戳（§7 步 3）；kill switch OFF → 空；`site_watch_sync_targets()` 為每個 active org 且 `client_config.site_url` 為 http(s) 建 target，預設 enabled／daily／22；回「到期 ∪ 欠通知」target id）→ 每 target 一個 child task → `POST /api/internal/site-watch/run/<id>` → `NA/lib/site-watch/runner.ts runTarget()` :52：claim lease → retire 不在清單的頁 → 到期則每頁 renew → renderer `/snapshot` → 比對 → `site_watch_record_check` → `site_watch_complete_run` → 通知步驟（`notify.ts runNotifications` :65）→ release。另每小時 `POST /api/internal/site-watch/cleanup`（每 UTC 日實跑一次）。
+主機 cron 每小時一輪（2026-10-25 起；`hetzner-phase1-core/scripts/site-watch-tick.sh`，`cron.d/awarewave-schedules` key `site_watch_tick`，`5 * * * *`；原 Trigger `site-watch-heartbeat` 已刪）→ `POST /api/internal/site-watch/due`（bearer `SITE_WATCH_INGEST_TOKEN`；先寫 heartbeat 時戳（§7 步 3）；kill switch OFF → 空；`site_watch_sync_targets()` 為每個 active org 且 `client_config.site_url` 為 http(s) 建 target，預設 enabled／daily／22；回「到期 ∪ 欠通知」target id）→ 每 target 一個 child task → `POST /api/internal/site-watch/run/<id>` → `NA/lib/site-watch/runner.ts runTarget()` :52：claim lease → retire 不在清單的頁 → 到期則每頁 renew → renderer `/snapshot` → 比對 → `site_watch_record_check` → `site_watch_complete_run` → 通知步驟（`notify.ts runNotifications` :65）→ release。另每小時 `POST /api/internal/site-watch/cleanup`（每 UTC 日實跑一次）。
 **為何 Trigger 只做薄層**：renderer 只掛 `renderer-net`，只有 next-admin 連得到（`INFRA/docker-compose.yml:522`）。同 collect 模式（`WF/src/trigger/collect-scheduled-crawl.ts` 檔頭）。
 
 ### 3.2 元件
@@ -48,7 +48,7 @@ Trigger.dev 每小時 heartbeat（`WF/src/trigger/site-watch.ts` `site-watch-hea
 | R2 通用傳輸 | `NA/lib/storage/r2.ts`（`r2PutObject/r2GetObject/r2DeleteObject/r2ListObjects`） | Cloudflare REST；designs 函式改委派，錯誤碼不變 |
 | 核心 lib | `NA/lib/site-watch/`：`config`／`runKey`／`pages`／`diff`／`storage`／`rendererClient`／`store`（只呼叫 RPC）／`messages`／`notify`／`runner`／`objects`／`cleanup`／`console`／`wiring` | 純函式 + 編排；DB 只經 `store.ts` |
 | Routes | `NA/app/api/internal/site-watch/{due,run/[targetId],cleanup}/route.ts`；`NA/app/api/ops/clients/[slug]/site-watch/{route,accept-baseline/route,image/route}.ts` | 內部 = bearer；操作者 = `resolveOpsRole`，寫入需 owner/admin |
-| 排程 | `WF/src/trigger/site-watch.ts`（`site-watch-heartbeat` + `site-watch-run`）、`WF/src/lib/siteWatch/post.ts`（+ `post.test.ts`）；跨套件狀態字串守在 `NA/lib/site-watch/__tests__/trigger-contract.test.ts` | heartbeat → batchTrigger per-target child（`concurrencyLimit: 2`）→ cleanup；兩者 `maxAttempts: 1`；token 未設 → heartbeat 安靜略過（watchdog a 抓） |
+| 排程 | 2026-10-25 起 `hetzner-phase1-core/scripts/site-watch-tick.sh`（主機 cron；Trigger `site-watch.ts`／`siteWatch/post.ts`／`trigger-contract.test.ts` 已刪，`d8d6a073a`） | `/due` → targets 以 `xargs -P 2` 逐一 `/run/<id>`（`curl -m 330`）→ `/cleanup`；任一步失敗 exit 1＝`/ops/schedules` 列紅＋推播 |
 | UI | `NA/app/(shell)/ops/clients/[slug]/SiteWatchCard.tsx`（維護分頁最上方）；共用 `hub-ui.tsx`（`Card/ChipBtn/NoData/SubLabel/relativeTime` 自 ClientHubTabs 原樣搬出）；文案 `NA/lib/site-watch/labels.ts`（server 訊息與卡片共用，無 import） | 狀態 + 最近 10 次 + 證據圖 + 接受新基準；測試 `__tests__/SiteWatchCard.render.test.tsx`。開關／頻率／小時 2026-10-14 移到排程表（`SCHEDULES_PAGE_PLAN.md` §4.2，`lib/schedules/adapters/site-watch.ts`；PATCH `/api/ops/clients/[slug]/schedules/site_watch`） |
 | Watchdog | `scripts/check-site-watch-health.ps1` → `agency-os/reports/status/site-watch-LATEST.{md,json}`；`scripts/ao-resume.ps1` capacity 區塊之後呼叫；`TOOL_TRIGGER_MAP.md` 一列 | 監控者的監控（§7 步 3 探針 a–d）；prod 走 SSH ks-aw-01 → `supabase-db` psql（SQL base64 進容器解碼）；`-LocalDbContainer` = 同 SQL 對本機容器（判定實證用） |
 
@@ -216,7 +216,7 @@ Trigger.dev 每小時 heartbeat（`WF/src/trigger/site-watch.ts` `site-watch-hea
 - **P3 部署後 smoke**：sg-deploy 後對 app.aware-wave.com 關鍵頁 `/snapshot`，pageErrors >0 → 觸發 rollback；掛在 `sg-deploy.sh` 步 7 smoke 段（步 4 的 `/snapshot` smoke 是它的雛形）。
 
 ## 9. 回滾
-`SITE_WATCH_ENABLED=false`（立即停，0 renderer 呼叫）→ Trigger 停 `site-watch-heartbeat` → `git revert` → `DB/scripts/0091_site_watch_down.sql`（會刪 source='site_watch' 的 incidents）。renderer `/render` 與 collect 路徑不受影響（`withContext` 重構有 renderer test + §7 步 1 實測 + 部署 smoke）。watchdog 在系統關閉時：探針 a 仍 🟢（heartbeat 照打）、b／c 為 SKIP（無 enabled heartbeat；欠的訊息顯示為「暫停」）。
+`SITE_WATCH_ENABLED=false`（立即停，0 renderer 呼叫）→ 主機 cron 註解 `site_watch_tick` 行（`install-host-schedules.sh`）→ `git revert` → `DB/scripts/0091_site_watch_down.sql`（會刪 source='site_watch' 的 incidents）。renderer `/render` 與 collect 路徑不受影響（`withContext` 重構有 renderer test + §7 步 1 實測 + 部署 smoke）。watchdog 在系統關閉時：探針 a 仍 🟢（heartbeat 照打）、b／c 為 SKIP（無 enabled heartbeat；欠的訊息顯示為「暫停」）。
 
 ## 10. 文件關係、維護規則、變更紀錄
 - 本檔 = 計畫正本；`0091_site_watch.sql` 檔頭 = I1–I3 鏡像 + 指回本檔；`TASKS.md §I` 一列 = 進度指針；WORKLOG = 過程；`agency-os/reports/oracle/2026-09-21-review-*.md` = 09-21 四輪 Codex 對舊 plan 的審查（歷史）；`RUNNABLE_DEMOS.md`／`MONITORING_SYSTEMS_INVENTORY.md` = 登記（§7 步 8）。
@@ -236,4 +236,4 @@ Trigger.dev 每小時 heartbeat（`WF/src/trigger/site-watch.ts` `site-watch-hea
 | 同一時間很多客戶同一原因告警 | 多半是**監控端**壞（renderer egress／DNS），不是客戶全掛 | 先 `docker logs lobster-renderer --tail 50`、`docker exec lobster-renderer iptables -L OUTPUT -n`；確認後 `SITE_WATCH_ENABLED=false` 止血（§9） |
 | 想暫停某客戶 | — | 卡片開關關掉（開著的告警會收到 ⏹ 結束訊息） |
 | 想全部暫停 | — | `SITE_WATCH_ENABLED=false` 走 `safe-infra-patch.sh`（§9） |
-| 想馬上跑一次 | — | Trigger dashboard 手動 trigger `site-watch-heartbeat`（只跑到期的；daily 目標同桶不重跑） |
+| 想馬上跑一次 | — | 主機 `sudo /root/lobster-phase1/scripts/cron-run.sh site_watch_tick /root/lobster-phase1/scripts/site-watch-tick.sh`（只跑到期的；daily 目標同桶不重跑） |

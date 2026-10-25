@@ -6,7 +6,7 @@
 // with its `{outcome, retryable, ...}` result (throw to trigger Trigger.dev's
 // own retry policy, or return for a terminal outcome) -- exactly the
 // "thin task, real logic lives in an importable function" pattern
-// lobster-factory's own schedules-heartbeat.ts already uses (it delegates
+// lobster-factory's former schedules-heartbeat.ts (deleted 2026-10-25) used (it delegates
 // to postRunDue() rather than containing its own logic inline).
 //
 // ADR-0029 gate 6: this file imports ONLY ./runner-client.mjs for network

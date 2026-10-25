@@ -1,7 +1,6 @@
 // POST /api/internal/social/metrics
 //
-// Called daily at 19:30 UTC (03:30 Taiwan) by the self-hosted Trigger schedule `social-metrics`
-// (packages/workflows/src/trigger/social-metrics.ts): snapshots every connected channel's numbers into
+// Called daily at 19:30 UTC (03:30 Taiwan) by the host cron (scripts/poke.sh, cron.d/awarewave-schedules): snapshots every connected channel's numbers into
 // social_metrics_daily / social_post_metrics (lib/social/metrics.ts; sources per platform there). Same caller class,
 // token and switch as rotation (SOCIAL_DISPATCH_TOKEN; off unless SOCIAL_DISPATCH_ENABLED=true): the social automation
 // is one switch. Reads platforms only; writes nothing but our own snapshot rows.

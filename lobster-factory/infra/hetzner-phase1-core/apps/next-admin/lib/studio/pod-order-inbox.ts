@@ -10,7 +10,7 @@
  * Woo re-delivery, the sweep, the system-modes POST) can never both call Printful for one order.
  * A claimed row whose worker died is reclaimable after STALE_PENDING_MS.
  * Drain triggers: after each webhook response, after a switch back to normal, and the 10-minute sweep
- * (POST /api/internal/pod-orders/sweep, self-hosted Trigger `pod-order-inbox-sweep`).
+ * (POST /api/internal/pod-orders/sweep, host cron scripts/poke.sh).
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";

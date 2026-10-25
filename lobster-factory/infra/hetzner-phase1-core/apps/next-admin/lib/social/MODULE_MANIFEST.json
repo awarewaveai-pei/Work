@@ -29,7 +29,7 @@
     "PRODUCT_HOST_SOCIAL": "optional product host",
     "loginSources": ["local", "awarewave-wp", "customer-wp"],
     "apiKeys": "POSTIZ_API_BASE_URL, POSTIZ_API_KEY (lib/content/postiz.ts:38-39), META_PAGE_TOKEN_<PAGE_ID> and META_APP_SECRET (C27; never sent to the browser), META_MARKETING_ACCESS_TOKEN (C28; never sent to the browser), and the platform authorisations held in Postiz (ADR 017 section 5 row social). The smart link page needs no key: its visitor hash salt is random per process (lib/social/smartlink.ts:116).",
-    "generatedByInstall": "SOCIAL_DISPATCH_TOKEN (app/api/internal/social/dispatch/route.ts:5; the Trigger worker reads the same value, packages/workflows/src/trigger/social-dispatch.ts:32)",
+    "generatedByInstall": "SOCIAL_DISPATCH_TOKEN (app/api/internal/social/dispatch/route.ts:5; the host cron's poke.sh reads the same value from /root/lobster-phase1/.env)",
     "switches": "SOCIAL_DISPATCH_ENABLED=true turns sending on, SOCIAL_DISPATCH_MODE=apply|draft chooses real sends or Postiz drafts; anything else is a dry run (app/api/internal/social/dispatch/route.ts:6-8)",
     "installUnit": "Each services entry names the service this product calls; the installer installs that entry's whole compose file (ADR 017 section 5 inventory)."
   }

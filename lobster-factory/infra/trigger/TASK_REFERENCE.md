@@ -3,6 +3,9 @@
 > **Who this is for**: operators running Lobster Factory tasks from the Trigger.dev dashboard or CLI.  
 > **What each task does, what env vars it needs, and copy-paste test payloads.**  
 > All UUIDs in payloads below are test sentinels — replace with real IDs for production runs.
+> **No task here runs on a timer** (2026-10-25): every clock is a host cron line in
+> `hetzner-phase1-core/scripts/cron.d/awarewave-schedules`, listed on `/ops/schedules`. The host starts
+> `dispatch-action-run` (every 10 min) and `ao-infrastructure-check` (04:00 UTC) through `scripts/trigger-task.sh`.
 
 ---
 
@@ -16,7 +19,7 @@ Synced on each deploy by `scripts/lobster-trigger-deploy.ps1` through `syncEnvVa
 | `LOBSTER_SUPABASE_SERVICE_ROLE_KEY` | all DB tasks | Secret — set as Secret type in dashboard |
 | `LOBSTER_ENABLE_DB_WRITES` | all DB tasks | `"true"` to enable actual DB inserts (default: off) |
 | `LOBSTER_MANIFEST_EXECUTION_MODE` | `apply-manifest` | `"off"` \| `"dry_run"` \| `"apply"` (default: `"off"`) |
-| `LOBSTER_AO_ORG_ID` | `ao-infrastructure-check-schedule` | AwareWave org UUID for audit records |
+| `LOBSTER_AO_ORG_ID` | `ao-infrastructure-check` (default org when the payload has none) | AwareWave org UUID for audit records |
 | `TRIGGER_API_URL` | `ao-infrastructure-check` | **not synced**: `syncEnvVars` drops every `TRIGGER_*` key (`@trigger.dev/build` `UNSYNCABLE_ENV_VARS_PREFIXES`) |
 | `N8N_URL` | `ao-infrastructure-check` | n8n base URL |
 | `UPTIME_KUMA_URL` | `ao-infrastructure-check` | Uptime Kuma base URL |
@@ -26,8 +29,6 @@ Synced on each deploy by `scripts/lobster-trigger-deploy.ps1` through `syncEnvVa
 | `OPS_INBOX_INGEST_TOKEN` | `record-tenant-integration`, `orchestrate-tenant-provisioning` | Bearer token for AW webhook ingest |
 | `AWAREWAVE_WEBHOOK_BASE_URL` | `record-tenant-integration`, `orchestrate-tenant-provisioning` | `https://app.aware-wave.com` |
 | `MAINWP_DASHBOARD_URL` / `MAINWP_CONSUMER_KEY` / `MAINWP_CONSUMER_SECRET` | `create-wp-site`, `adopt-client-os` (addSiteToMainWp) | read_write MainWP REST v2 key; source = ks-aw-01 `/root/lobster-phase1/.env`, synced by `scripts/lobster-trigger-deploy.ps1`. Never in the run payload. |
-| `SCHEDULE_INGEST_TOKEN` | `schedules-heartbeat` | Dedicated bearer token (never `OPS_INBOX_INGEST_TOKEN`) for `/api/internal/schedules/run-due`; source = ks-aw-01 `/root/lobster-phase1/.env`, synced by `scripts/lobster-trigger-deploy.ps1` |
-| `SITE_WATCH_INGEST_TOKEN` | `site-watch-heartbeat`, `site-watch-run` | Dedicated bearer token (never shared with the collect/ops-inbox tokens) for `/api/internal/site-watch/*`; source = the RUNNING `lobster-next-admin` container (`docker exec … printenv`, i.e. the value next-admin actually accepts; set via `/root/lobster-phase1/.env` + compose in SITE_WATCH_MASTER_PLAN step 10d), synced by `scripts/lobster-trigger-deploy.ps1` |
 | `SENTRY_AUTH_TOKEN` | `orchestrate-tenant-provisioning` | Sentry provisioning auth token |
 | `SENTRY_ORG_SLUG` | `orchestrate-tenant-provisioning` | e.g. `aware-wave` |
 | `TENANT_PROVISION_GITHUB_TOKEN` | `orchestrate-tenant-provisioning` | GitHub PAT with org:write scope |
@@ -74,13 +75,6 @@ Checks (7 total): Supabase REST, Trigger.dev API, n8n, Uptime Kuma, Sentry (`/ap
 
 ---
 
-### `ao-infrastructure-check-schedule`
-
-**What it does**: Scheduled task — triggers `ao-infrastructure-check` every day at **04:00 UTC (12:00 TPE)**. Appears in the Trigger.dev Schedules tab.  
-No payload needed — uses `LOBSTER_AO_ORG_ID` env var automatically.
-
----
-
 ### `dispatch-action-run`
 
 **What it does**: Polls `ops_action_runs` table for pending records (up to 10 at a time) and routes each to the correct workflow by `action_key`:
@@ -96,17 +90,6 @@ No payload needed — uses `LOBSTER_AO_ORG_ID` env var automatically.
 ```
 
 **Expected output**: `{ dispatched: 0, total: 0 }` when no pending runs.
-
----
-
-### `dispatch-action-run-schedule`
-
-**What it does**: Cron `*/10 * * * *` — **safety-net** backstop that triggers `dispatch-action-run` every 10 min.  
-The PRIMARY dispatch path is on-demand: every `ops_action_runs` enqueue calls `kickActionRunDispatcher()`
-(`next-admin/lib/kick-dispatcher.ts`) → immediate dispatch. This schedule only catches the rare case a kick
-fails so an enqueued action is never silently stuck. Cadence was cut `*/1`→`*/10` on 2026-06-25 (the
-every-minute poll spawned ~1,440 no-op runner containers/day; queue is usually empty). Do NOT remove entirely
-— that reintroduces a single point of failure on the kick. Appears in Trigger.dev Schedules tab.
 
 ---
 
@@ -224,40 +207,6 @@ every-minute poll spawned ~1,440 no-op runner containers/day; queue is usually e
 
 ---
 
-### `schedules-heartbeat`
-
-**What it does**: Hourly cron (`0 * * * *`, declarative schedule) that pokes next-admin's
-`/api/internal/schedules/run-due`. Owns no scheduling logic itself -- next-admin decides which
-(client, job) rows of `client_schedules` are due (`lib/schedules/schedule.ts` `isDueNow`), claims
-them and runs them after answering (`lib/schedules/jobs.ts`). Every job defaults to off, so this
-firing hourly does nothing until an operator ticks a cell on `/ops/schedules`
-(agency-os/docs/operations/SCHEDULES_PAGE_PLAN.md). Replaced `collect-scheduled-crawl` (2026-10-15).
-
-**Requires**: `SCHEDULE_INGEST_TOKEN` + `AWAREWAVE_WEBHOOK_BASE_URL`
-
-**Test payload**: none (scheduled task, no input). Safe to test-run any time --
-nothing due returns `{"ok":true,"checked":N,"due":0,"started":[],"claimErrors":[]}` with no side effects.
-
----
-
-### `site-watch-heartbeat` / `site-watch-run`
-
-**What it does**: Hourly cron (`5 * * * *`) that POSTs next-admin `/api/internal/site-watch/due`
-(stamps the watchdog heartbeat; returns targets due now or owing a notification), batch-triggers one
-`site-watch-run` child per target (`queue.concurrencyLimit: 2` -- renderer takes one snapshot at a
-time), then POSTs `/cleanup` (real work once per UTC day). Both `retry.maxAttempts: 1`: the next
-heartbeat is the retry, and the target lease (C3) makes duplicates harmless. `site-watch-run` fails
-(Sentry) when next-admin reports `renderer_unavailable`. Plan of record:
-`agency-os/docs/operations/SITE_WATCH_MASTER_PLAN.md`.
-
-**Requires**: `SITE_WATCH_INGEST_TOKEN` + `AWAREWAVE_WEBHOOK_BASE_URL`
-
-**Test payload**: heartbeat none; run `{"targetId":"<site_watch_targets.id>"}`. With next-admin
-`SITE_WATCH_ENABLED` unset/false (default), the heartbeat returns `{"enabled":false,"targets":[]}`
-and only stamps liveness -- safe to test-run any time.
-
----
-
 ### `record-tenant-integration`
 
 **What it does**: Simple helper — records a single integration binding to the AW webhook (`/api/tenant-integrations/ingest`). Used when you want to manually register an integration that was set up outside of automated provisioning.
@@ -315,7 +264,6 @@ Checked 2026-09-23 (names only, read-only query of trigger-postgres `Environment
 
 | Variable | Why absent |
 |---|---|
-| `SITE_WATCH_INGEST_TOKEN` | lands at SITE_WATCH_MASTER_PLAN step 10d |
 | `TRIGGER_API_URL` | `TRIGGER_*` keys are never synced (see its row) |
 | the seven `orchestrate-tenant-provisioning` credentials | deliberately **not synced**: the task has never run in prod, and syncing them lets it create real GitHub repos / Sentry + PostHog projects / n8n workflows, so wiring them is an operator decision (`agency-os/TASKS.md`). Not set in the dashboard either. |
 
