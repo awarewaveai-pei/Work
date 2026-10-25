@@ -149,6 +149,19 @@
           "cmd": "python -m pytest lobster-factory/packages/db/tests/test_0136_control_plane_writes.py"
         }
       ]
+    },
+    {
+      "id": "08-rls-0137-partner-referrals",
+      "file": "cards/08-rls-0137-partner-referrals.md",
+      "gate": null,
+      "depends": [],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": ".",
+          "cmd": "python -m pytest lobster-factory/packages/db/tests/test_0137_partner_referrals_writes.py"
+        }
+      ]
     }
   ]
 }

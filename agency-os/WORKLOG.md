@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-26（續8）0137 套 prod＋推 main（操作者定案佣金／歸屬）：partner_referrals 成員只剩 SELECT（Codex 寫，Claude 審）
+
+- **觸發**：操作者「partner_referrals 算佣金／歸屬：照 0136 關掉成員寫入，派 Codex 做完套 prod」。Codex 卡 08 寫完檔案後額度用完（driver exit 3），未自行 commit；Claude 審後複製進 main。
+- **改動**：`lobster-factory/packages/db/migrations/0137_partner_referrals_writes_only.sql`（+down、+`packages/db/scripts/` 副本 `cmp` 相同；down 對照 `0010_clerk_org_mapping_and_rls_expansion.sql:339-351` 逐字）；測試 `lobster-factory/packages/db/tests/test_0137_partner_referrals_writes.py`；盤點報告 `partner_referrals` 改判控制面洞→0137。
+- 套前：政策 `partner_referrals_{delete,insert,select,update}`；0 列；next-admin 無 `partner_referrals` 引用。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m pytest -q lobster-factory/packages/db/tests/test_0137_partner_referrals_writes.py | exit=0 | ms=16900（1 passed：成員 PATCH/DELETE 前成功後 403、SELECT 照常、service_role CRUD、down→up）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`node scripts/apply-db-migration.mjs 0137`＋讀回＋rollback 探測＋全容器 log 掃描 | exit=0 | ms=20000（APPLY_OK 1/1，applied 137；只剩 `partner_referrals_select`；anon／authenticated 寫權 f；service_role t；authenticated update → permission denied；容器 log 權限錯誤 0）
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（Claude 讀 up/down 全文、對 0010 原文）
+- ORACLE_WAIVED: Codex 寫、Claude 審即反向 oracle；操作者要求不花 Claude 訂閱
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=partner_referrals | hits=0（next-admin app/lib 無引用；其餘為 migrations 與報告）
+- **結果**：成員寫入盤點 22 張全關（0134 organizations、0135 profiles、0136 21 表、0137 partner_referrals），只剩 `sales_leads`（客戶業務資料，保留）。
+- **rollback**：手動 `0137_partner_referrals_writes_only.down.sql`；`git revert` 本 commit。
 ## 2026-10-26（續7）0136 套 prod＋推 main（操作者「直接處理好」）：21 張控制面表成員只剩 SELECT；`current_clerk_org_id_from_jwt` 不再信任 `user_metadata.org_id`（Codex 寫，Claude 審）
 
 - **觸發**：操作者「派 Codex 寫 0136…」「直接處理好 不用看草稿」。依據 `agency-os/reports/audits/2026-10-26-rls-member-write-sweep.md`（卡 06，bc75c667e）。
