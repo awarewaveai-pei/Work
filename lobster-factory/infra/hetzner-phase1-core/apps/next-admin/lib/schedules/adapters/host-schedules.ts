@@ -3,7 +3,7 @@
 // A stale or missing file is reported as such -- never as the last "ok" it happens to contain.
 import { readFile } from "node:fs/promises";
 import { cronCadence, staleAfterMs } from "../cron-cadence";
-import { HOST_GROUP_ORDER, HOST_JOBS, HOST_UI } from "../host-jobs";
+import { HOST_FAMILIES, HOST_GROUP_ORDER, HOST_JOBS, HOST_UI, type HostJob } from "../host-jobs";
 import type { SystemRow } from "../types";
 
 export const HOST_SCHEDULES_FILE = process.env.HOST_SCHEDULES_STATUS_FILE || "/host-status/host-schedules.json";
@@ -17,6 +17,10 @@ interface HostEntry {
   records_result: boolean;
   log: string | null;
   command?: string;
+  /** Family rows (pg_cron_*, n8n_*): the job's own name. */
+  name?: string;
+  /** Overrides the cadence's staleness (a report that may be N days old). */
+  stale_after_s?: number;
   last: { started_at: string | null; finished_at: string | null; exit_code: number | null } | null;
 }
 
@@ -26,6 +30,8 @@ export interface HostSchedulesDoc {
   cron_files_drift: string[];
   /** Sources the reporter could not read: the inventory is partial, so "not on the host" cannot be claimed. */
   errors?: string[];
+  /** Off-host sources (pg_cron, n8n, repo reports) the reporter could not read: their rows are unknown, nothing else. */
+  external_errors?: string[];
 }
 
 const fill = (tpl: string, vars: Record<string, string | number>) =>
@@ -42,13 +48,23 @@ function details(what: string, when: string, log: string | null, fail?: string):
   };
 }
 
+/** A registered job, or a family row named after its source (HOST_FAMILIES). */
+function jobFor(e: HostEntry): HostJob | undefined {
+  if (!e.key) return undefined;
+  if (HOST_JOBS[e.key]) return HOST_JOBS[e.key];
+  const f = HOST_FAMILIES.find((x) => e.source.startsWith(x.source));
+  const name = e.name ?? e.key;
+  return f && { label: fill(f.label, { name }), description: fill(f.description, { name }), group: "external", fail: f.fail };
+}
+
 function judge(e: HostEntry, intervalMs: number | null, now: number): Pick<SystemRow, "state" | "detail" | "lastAt"> {
   if (e.schedule === "@inactive") return { state: "stale", detail: HOST_UI.detail_timer_stopped, lastAt: e.last?.finished_at ?? null };
   if (!e.records_result) return { state: "untracked", detail: HOST_UI.detail_untracked, lastAt: null };
   const at = e.last?.finished_at ?? null;
   if (!e.last || !at || Number.isNaN(Date.parse(at))) return { state: "missing", detail: HOST_UI.detail_no_record, lastAt: null };
   if (e.last.exit_code !== 0) return { state: "failed", detail: fill(HOST_UI.detail_exit, { code: e.last.exit_code ?? "?" }), lastAt: at };
-  if (intervalMs !== null && now - Date.parse(at) > staleAfterMs(intervalMs)) return { state: "stale", detail: "", lastAt: at };
+  const staleMs = e.stale_after_s ? e.stale_after_s * 1000 : intervalMs !== null ? staleAfterMs(intervalMs) : null;
+  if (staleMs !== null && now - Date.parse(at) > staleMs) return { state: "stale", detail: "", lastAt: at };
   return { state: "ok", detail: "", lastAt: at };
 }
 
@@ -78,9 +94,16 @@ export function hostScheduleRowsFrom(doc: HostSchedulesDoc, now: number): System
       lastAt: doc.generated_at, state: "failed", detail: "", details: details(desc, "", null) });
   }
 
+  const extErrors = doc.external_errors ?? [];
+  if (extErrors.length) {
+    const desc = fill(HOST_UI.external_errors_desc, { errors: extErrors.join("；").slice(0, 300) });
+    rows.push({ key: "external_inventory_errors", label: HOST_UI.external_errors_label, description: desc, cadence: "",
+      lastAt: doc.generated_at, state: "failed", detail: "", details: details(desc, "", null) });
+  }
+
   for (const e of doc.entries) {
     const c = cronCadence(e.schedule);
-    const job = e.key ? HOST_JOBS[e.key] : undefined;
+    const job = jobFor(e);
     if (!e.key || !job) {
       const desc = fill(HOST_UI.unregistered_desc, { command: e.command ?? e.key ?? e.source });
       rows.push({

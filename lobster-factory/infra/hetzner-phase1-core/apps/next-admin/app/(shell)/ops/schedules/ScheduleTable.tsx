@@ -58,7 +58,7 @@ const T = {
     ok: HOST_UI.state_ok, stale: HOST_UI.state_stale, missing: HOST_UI.state_missing, failed: HOST_UI.state_failed,
     unregistered: HOST_UI.state_unregistered, untracked: HOST_UI.state_untracked,
   } as Record<SystemRow["state"], string>,
-  group: { backup: HOST_UI.group_backup, deploy: HOST_UI.group_deploy, site: HOST_UI.group_site } as Record<NonNullable<SystemRow["group"]>, string>,
+  group: { backup: HOST_UI.group_backup, deploy: HOST_UI.group_deploy, site: HOST_UI.group_site, external: HOST_UI.group_external, laptop: HOST_UI.group_laptop } as Record<NonNullable<SystemRow["group"]>, string>,
 };
 
 const DAYS = ["日", "一", "二", "三", "四", "五", "六"];

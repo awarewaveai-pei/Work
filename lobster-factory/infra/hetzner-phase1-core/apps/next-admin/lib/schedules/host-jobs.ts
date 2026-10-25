@@ -3,7 +3,7 @@
 // missing -- so this list and scripts/cron.d cannot drift apart unseen. Copy written by GPT (codex-oracle inspect
 // 2026-10-24, agency-os/reports/oracle/2026-10-24-inspect-273b113e.md), used as written.
 
-export type HostJobGroup = "backup" | "deploy" | "site";
+export type HostJobGroup = "backup" | "deploy" | "site" | "external" | "laptop";
 
 export interface HostJob {
   label: string;
@@ -15,7 +15,7 @@ export interface HostJob {
   exitAlwaysZero?: true;
 }
 
-export const HOST_GROUP_ORDER: HostJobGroup[] = ["backup", "deploy", "site"];
+export const HOST_GROUP_ORDER: HostJobGroup[] = ["backup", "deploy", "site", "external", "laptop"];
 
 export const HOST_JOBS: Record<string, HostJob> = {
   backup_coverage_check: { label: "備份完整性檢查", description: "每天確認資料庫與檔案備份完整、異地有副本，且每月還原演練通過。", group: "backup", fail: "檢查失敗時，Slack 會收到告警，備份頁也會顯示失敗項目。" },
@@ -48,6 +48,7 @@ export const HOST_JOBS: Record<string, HostJob> = {
   ao_infrastructure_check: { label: "基礎服務檢查", description: "每天檢查資料庫、Trigger、n8n、監控、Sentry、PostHog 能否連線，並確認客戶資料彼此隔離。", group: "deploy" },
   schedule_alerts: { label: "排程異常通知", description: "每 10 分鐘檢查本頁，有排程變紅或恢復時，送一則通知到 Telegram 與 Slack；持續異常不重複通知。", group: "deploy", fail: "本列失敗代表通知沒有送出，或送出後沒有記下；各通道是否收到，看每日排程報告。" },
   schedule_digest: { label: "每日排程報告", description: "每天 09:00 送一行排程報告到 Telegram 與 Slack；沒收到這行代表通知系統故障。", group: "deploy" },
+  trigger_slots_check: { label: "Trigger 名額檢查", description: "每 10 分鐘檢查 Trigger 的執行名額，找出已停止卻仍占用名額的工作；名額被占滿時，所有 Trigger 工作都會停住。", group: "deploy", fail: "發現卡住的名額時本列標示失敗並推播；處理方式見 runbooks/TRIGGER-RUNS-STUCK-QUEUED.md。" },
   dispatch_action_run: { label: "後台操作補派", description: "每 10 分鐘把未送出的後台操作（例如建站）交給 Trigger 執行；平常按下按鈕就會立即送出。", group: "deploy" },
   social_dispatch: { label: "社群貼文發送", description: "每 5 分鐘將到期的社群貼文送到 Postiz 發布，並取回發布結果。", group: "site" },
   social_rotation: { label: "社群輪播排程", description: "每天將輪播清單展開成未來 7 天的排程貼文。", group: "site" },
@@ -55,13 +56,29 @@ export const HOST_JOBS: Record<string, HostJob> = {
   cs_inbound_sweep: { label: "客服漏接轉人工", description: "每 5 分鐘找出 AI 未完成回覆的客服訊息，轉交員工處理。", group: "site" },
   pod_order_inbox_sweep: { label: "印製訂單重送", description: "每 10 分鐘重送已付款、但尚未送到 Printful 的訂單。", group: "site" },
   entitlements_expire: { label: "方案到期處理", description: "每天關閉已到期的方案與試用，並為新功能補上預設權限。", group: "site" },
+  // Clocks off this host's cron, inventoried by report-host-schedules.py (handoffs/2026-10-25-schedules-off-trigger C5).
+  // pg_cron_<job> and n8n_<id> rows are named from HOST_FAMILIES below; these are the fixed ones.
+  cloud_phase4_weekly: { label: "修復中心週檢報告", description: "雲端 Claude routine 每週產生修復中心週檢報告並存進程式庫；超過 8 天沒有新報告時標示過時。", group: "laptop", fail: "過時時，「雲端排程報告檢查」會發 Telegram 通知。" },
+  cloud_weekly_review: { label: "每週自動化週報", description: "雲端 Claude routine 每週產生自動化週報並存進程式庫；超過 9 天沒有新報告時標示過時。", group: "laptop", fail: "過時時，「雲端排程報告檢查」會發 Telegram 通知。" },
+  cloud_monthly_review: { label: "每月檢討報告", description: "雲端 Claude routine 每月產生檢討報告並存進程式庫；超過 35 天沒有新報告時標示過時。", group: "laptop", fail: "過時時，「雲端排程報告檢查」會發 Telegram 通知。" },
+  laptop_status_reports: { label: "筆電狀態報告", description: "筆電執行開工與收工報告時，會更新一批狀態報告並存進程式庫；超過 3 天沒有更新時標示過時。", group: "laptop", fail: "筆電關機也會過時，所以只在本頁標示，不推播通知。" },
   run_parts_netdata_updater: { label: "Netdata 自動更新", description: "每天自動更新主機監控工具 Netdata，讓監控維持在最新版本。", group: "site" },
 };
+
+/** Rows named by their source, not listed one by one: a pg_cron job or n8n workflow added later shows up by itself.
+ * Matched on the entry's source (set only by the reporter's collectors), never on the key: a host cron line keyed
+ * n8n_backup must still show as unregistered. */
+export const HOST_FAMILIES: Array<{ source: string; label: string; description: string; fail: string }> = [
+  { source: "pg_cron:", label: "資料庫排程：{name}", description: "Supabase 資料庫內建排程（pg_cron）「{name}」，結果取自資料庫的執行紀錄。", fail: "最近一次執行失敗時，本列標示失敗並推播。" },
+  { source: "n8n:", label: "n8n 流程：{name}", description: "n8n 中已啟用、由時間觸發的流程「{name}」，結果取自 n8n 的執行紀錄。", fail: "最近一次執行失敗時，本列標示失敗並推播。" },
+];
 
 export const HOST_UI = {
   group_backup: "備份",
   group_deploy: "部署與監控",
   group_site: "網站與服務維護",
+  group_external: "資料庫與 n8n",
+  group_laptop: "筆電與雲端",
   state_ok: "正常",
   state_stale: "長時間未回報",
   state_missing: "尚無資料",
@@ -86,6 +103,9 @@ export const HOST_UI = {
   errors_label: "主機排程清單不完整",
   errors_desc: "主機排程清單有部分內容無法讀取：{errors}",
   detail_unknown: "主機排程清單不完整，無法確認主機上是否有這個排程。",
+  external_errors_label: "外部排程讀取失敗",
+  external_errors_desc: "以下來源暫時無法讀取，這些來源的排程狀態未知：{errors}",
+  digest_quiet: "ℹ️ 筆電與雲端有 {n} 項過時（筆電關機時屬正常，不推播）",
   detail_timer_stopped: "主機上的計時器已停止，這個排程不會再執行。",
   detail_exit_always_zero: "這個工作失敗時不會回報，本頁只能確認它有按時執行。",
   fail_default: "執行失敗時，本頁會標示「執行失敗」。",

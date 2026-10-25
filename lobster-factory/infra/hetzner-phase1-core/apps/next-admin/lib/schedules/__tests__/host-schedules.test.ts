@@ -103,6 +103,35 @@ describe("hostScheduleRowsFrom", () => {
     expect(r?.detail).not.toBe("");
   });
 
+  it("a pg_cron or n8n job is named from its source, not unregistered", () => {
+    const rows = hostScheduleRowsFrom(doc([
+      ent("pg_cron_archive", { started_at: null, finished_at: iso(H), exit_code: 1 }, { source: "pg_cron:supabase-db", schedule: "0 2 * * *", name: "archive" }),
+      ent("n8n_abc", { started_at: null, finished_at: iso(H), exit_code: 0 }, { source: "n8n:abc", schedule: "@timer", name: "ping" }),
+    ]), NOW);
+    expect(row(rows, "pg_cron_archive")).toMatchObject({ state: "failed", group: "external", label: "資料庫排程：archive" });
+    expect(row(rows, "n8n_abc")).toMatchObject({ state: "ok", group: "external", cadence: "依觸發器設定" });
+    expect(rows.some((r) => r.state === "unregistered")).toBe(false);
+  });
+
+  it("a host cron line keyed like a family is still unregistered", () => {
+    const rows = hostScheduleRowsFrom(doc([ent("n8n_backup", { started_at: iso(H), finished_at: iso(H), exit_code: 0 })]), NOW);
+    expect(rows.find((r) => r.key.includes("n8n_backup"))?.state).toBe("unregistered");
+  });
+
+  it("an off-host source that cannot be read is its own failure and does not stale the host's jobs", () => {
+    const d = doc([], { external_errors: ["n8n: connection refused"] });
+    d.entries = d.entries.filter((e) => e.key !== "lobster_backup");
+    const rows = hostScheduleRowsFrom(d, NOW);
+    expect(row(rows, "external_inventory_errors")?.state).toBe("failed");
+    expect(row(rows, "lobster_backup")?.state).toBe("missing");
+  });
+
+  it("a report may be as old as its own limit, not its cadence's", () => {
+    const at = (days: number) => ent("cloud_weekly_review", { started_at: null, finished_at: iso(days * 24 * H), exit_code: 0 }, { schedule: "@weekly", stale_after_s: 9 * 86400 });
+    expect(row(hostScheduleRowsFrom(doc([at(8.5)]), NOW), "cloud_weekly_review")?.state).toBe("ok");
+    expect(row(hostScheduleRowsFrom(doc([at(9.5)]), NOW), "cloud_weekly_review")?.state).toBe("stale");
+  });
+
   it("cron file drift is its own failed row", () => {
     const rows = hostScheduleRowsFrom(doc([], { cron_files_drift: ["lobster-backup"] }), NOW);
     expect(row(rows, "host_cron_drift")).toMatchObject({ state: "failed" });

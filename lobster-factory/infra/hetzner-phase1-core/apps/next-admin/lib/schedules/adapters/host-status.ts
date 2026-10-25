@@ -1,6 +1,6 @@
 // The host-side schedules this app can actually observe, shown read-only (SCHEDULES_PAGE_PLAN.md §3.2-7):
-// backup coverage, then every host cron/timer (adapters/host-schedules.ts; site-watch is its site_watch_tick row).
-// Laptop tasks, cloud routines and GitHub Actions have no data path into the app and are not listed.
+// backup coverage, then every host cron/timer and the clocks the host can read for us (adapters/host-schedules.ts):
+// pg_cron, n8n, and the cloud-routine / laptop reports committed to the repo. GitHub Actions: not yet (needs a token).
 import { readBackupCoverage } from "@/lib/backup/coverage";
 import type { SystemRow } from "../types";
 import { hostScheduleRows, sortSystemRows } from "./host-schedules";

@@ -1,0 +1,1141 @@
+diff --git a/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/site-watch/__tests__/trigger-contract.test.ts b/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/site-watch/__tests__/trigger-contract.test.ts
+deleted file mode 100644
+index 0aaaea5d2..000000000
+--- a/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/site-watch/__tests__/trigger-contract.test.ts
++++ /dev/null
+@@ -1,31 +0,0 @@
+-// The Trigger task (packages/workflows/src/trigger/site-watch.ts) turns run status
+-// "renderer_unavailable" into a failed, Sentry-reported run — the one place a renderer outage is loud
+-// at the moment it happens. It matches a string mirrored from runner.ts across a package boundary no
+-// compiler sees, so a rename on either side would make every renderer outage silent there.
+-import { readFileSync } from "node:fs";
+-import path from "node:path";
+-import { describe, expect, it } from "vitest";
+-
+-const NEXT_ADMIN = path.resolve(__dirname, "../../..");
+-const WORKFLOWS = path.resolve(NEXT_ADMIN, "../../../../packages/workflows");
+-
+-function unionLiterals(file: string, typeName: string): string[] {
+-  const src = readFileSync(file, "utf8");
+-  const m = new RegExp(`export type ${typeName} =([^;]+);`).exec(src);
+-  expect(m, `${typeName} not found in ${file}`).toBeTruthy();
+-  return [...m![1].matchAll(/"([a-z_]+)"/g)].map((x) => x[1]).sort();
+-}
+-
+-describe("site-watch run status contract (next-admin runner ↔ Trigger task)", () => {
+-  it("the Trigger side mirrors exactly the statuses the runner can return", () => {
+-    const runner = unionLiterals(path.join(NEXT_ADMIN, "lib/site-watch/runner.ts"), "RunStatus");
+-    const mirrored = unionLiterals(path.join(WORKFLOWS, "src/lib/siteWatch/post.ts"), "SiteWatchRunStatus");
+-    expect(runner).toContain("renderer_unavailable");
+-    expect(mirrored).toEqual(runner);
+-  });
+-
+-  it("the task still fails the run on renderer_unavailable", () => {
+-    const task = readFileSync(path.join(WORKFLOWS, "src/trigger/site-watch.ts"), "utf8");
+-    expect(task).toMatch(/status === "renderer_unavailable"\)\s*\{\s*throw /);
+-  });
+-});
+diff --git a/lobster-factory/packages/workflows/src/lib/entitlements/postExpire.test.ts b/lobster-factory/packages/workflows/src/lib/entitlements/postExpire.test.ts
+deleted file mode 100644
+index 0064a7d56..000000000
+--- a/lobster-factory/packages/workflows/src/lib/entitlements/postExpire.test.ts
++++ /dev/null
+@@ -1,30 +0,0 @@
+-import { afterEach, describe, expect, it, vi } from "vitest";
+-import { postExpire } from "./postExpire";
+-
+-afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+-
+-describe("entitlements-expire heartbeat", () => {
+-  it("posts the dedicated token to the global endpoint and returns its count", async () => {
+-    vi.stubEnv("SCHEDULE_INGEST_TOKEN", "test-only-token");
+-    vi.stubEnv("AWAREWAVE_WEBHOOK_BASE_URL", "https://example.test/");
+-    const fetcher = vi.fn().mockResolvedValue(Response.json({ ok: true, expired: 1501 }));
+-    vi.stubGlobal("fetch", fetcher);
+-    expect(await postExpire()).toEqual({ ok: true, expired: 1501 });
+-    expect(fetcher).toHaveBeenCalledWith("https://example.test/api/internal/entitlements/expire", expect.objectContaining({
+-      method: "POST", headers: { Authorization: "Bearer test-only-token" },
+-    }));
+-  });
+-
+-  it("fails on missing token, HTTP error or malformed success", async () => {
+-    vi.stubEnv("SCHEDULE_INGEST_TOKEN", "");
+-    const fetcher = vi.fn();
+-    vi.stubGlobal("fetch", fetcher);
+-    await expect(postExpire()).rejects.toThrow("SCHEDULE_INGEST_TOKEN");
+-    expect(fetcher).not.toHaveBeenCalled();
+-    vi.stubEnv("SCHEDULE_INGEST_TOKEN", "test-only-token");
+-    fetcher.mockResolvedValue(new Response("failed", { status: 500 }));
+-    await expect(postExpire()).rejects.toThrow("500");
+-    fetcher.mockResolvedValue(Response.json({ ok: true, expired: -1 }));
+-    await expect(postExpire()).rejects.toThrow("invalid");
+-  });
+-});
+diff --git a/lobster-factory/packages/workflows/src/lib/entitlements/postExpire.ts b/lobster-factory/packages/workflows/src/lib/entitlements/postExpire.ts
+deleted file mode 100644
+index a43e3f2ce..000000000
+--- a/lobster-factory/packages/workflows/src/lib/entitlements/postExpire.ts
++++ /dev/null
+@@ -1,16 +0,0 @@
+-export async function postExpire(): Promise<{ ok: true; expired: number }> {
+-  const token = process.env.SCHEDULE_INGEST_TOKEN?.trim();
+-  const base = (process.env.AWAREWAVE_WEBHOOK_BASE_URL ?? "https://app.aware-wave.com").replace(/\/$/, "");
+-  if (!token) throw new Error("SCHEDULE_INGEST_TOKEN is required on Trigger worker");
+-  const response = await fetch(`${base}/api/internal/entitlements/expire`, {
+-    method: "POST",
+-    headers: { Authorization: `Bearer ${token}` },
+-    signal: AbortSignal.timeout(60_000),
+-  });
+-  if (!response.ok) throw new Error(`entitlements/expire ${response.status}`);
+-  const result = await response.json() as { ok?: boolean; expired?: number };
+-  if (result.ok !== true || !Number.isSafeInteger(result.expired) || result.expired! < 0) {
+-    throw new Error("invalid entitlements/expire response");
+-  }
+-  return result as { ok: true; expired: number };
+-}
+diff --git a/lobster-factory/packages/workflows/src/lib/schedules/postRunDue.test.ts b/lobster-factory/packages/workflows/src/lib/schedules/postRunDue.test.ts
+deleted file mode 100644
+index f5d47f0e3..000000000
+--- a/lobster-factory/packages/workflows/src/lib/schedules/postRunDue.test.ts
++++ /dev/null
+@@ -1,43 +0,0 @@
+-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+-import { postRunDue } from "./postRunDue";
+-
+-const originalFetch = global.fetch;
+-const originalEnv = { ...process.env };
+-
+-beforeEach(() => {
+-  process.env.SCHEDULE_INGEST_TOKEN = "test-token";
+-  process.env.AWAREWAVE_WEBHOOK_BASE_URL = "https://app.aware-wave.com";
+-});
+-
+-afterEach(() => {
+-  global.fetch = originalFetch;
+-  process.env = { ...originalEnv };
+-});
+-
+-describe("postRunDue", () => {
+-  it("throws before ever calling fetch when the token is not configured", async () => {
+-    delete process.env.SCHEDULE_INGEST_TOKEN;
+-    const fetchSpy = vi.fn();
+-    global.fetch = fetchSpy as unknown as typeof fetch;
+-    await expect(postRunDue()).rejects.toThrow(/SCHEDULE_INGEST_TOKEN/);
+-    expect(fetchSpy).not.toHaveBeenCalled();
+-  });
+-
+-  it("posts to the schedules sweep with the bearer token, and parses the JSON result", async () => {
+-    const body = { ok: true, checked: 3, due: 1, started: ["scheduled-collect_crawl-11111111-20261015"], claimErrors: [] };
+-    const fetchSpy = vi.fn(async (url: string, init?: RequestInit) => {
+-      expect(url).toBe("https://app.aware-wave.com/api/internal/schedules/run-due");
+-      expect(init?.method).toBe("POST");
+-      expect((init?.headers as Record<string, string>).Authorization).toBe("Bearer test-token");
+-      return new Response(JSON.stringify(body), { status: 200 });
+-    });
+-    global.fetch = fetchSpy as unknown as typeof fetch;
+-
+-    expect(await postRunDue()).toEqual(body);
+-  });
+-
+-  it("throws with the response body on a non-2xx status, rather than swallowing it", async () => {
+-    global.fetch = vi.fn(async () => new Response("unauthorized", { status: 401 })) as unknown as typeof fetch;
+-    await expect(postRunDue()).rejects.toThrow(/401/);
+-  });
+-});
+diff --git a/lobster-factory/packages/workflows/src/lib/schedules/postRunDue.ts b/lobster-factory/packages/workflows/src/lib/schedules/postRunDue.ts
+deleted file mode 100644
+index c52dd8985..000000000
+--- a/lobster-factory/packages/workflows/src/lib/schedules/postRunDue.ts
++++ /dev/null
+@@ -1,31 +0,0 @@
+-// Calls next-admin's schedules sweep (all scheduling logic lives there — see that route's own header).
+-// A dedicated bearer token, never OPS_INBOX_INGEST_TOKEN, so a leak here cannot forge anything on the
+-// other endpoints that token guards (and vice versa).
+-
+-export type RunDueResult = {
+-  ok: boolean;
+-  checked: number;
+-  due: number;
+-  /** Run keys claimed by this sweep; next-admin runs them after answering. */
+-  started: string[];
+-  claimErrors: string[];
+-};
+-
+-export async function postRunDue(): Promise<RunDueResult> {
+-  const token = process.env.SCHEDULE_INGEST_TOKEN?.trim();
+-  const base = (process.env.AWAREWAVE_WEBHOOK_BASE_URL ?? "https://app.aware-wave.com").replace(/\/$/, "");
+-  if (!token) {
+-    throw new Error("SCHEDULE_INGEST_TOKEN is required on Trigger worker");
+-  }
+-
+-  const res = await fetch(`${base}/api/internal/schedules/run-due`, {
+-    method: "POST",
+-    headers: { Authorization: `Bearer ${token}` },
+-  });
+-
+-  const text = await res.text();
+-  if (!res.ok) {
+-    throw new Error(`schedules/run-due ${res.status}: ${text.slice(0, 400)}`);
+-  }
+-  return JSON.parse(text) as RunDueResult;
+-}
+diff --git a/lobster-factory/packages/workflows/src/lib/siteWatch/post.test.ts b/lobster-factory/packages/workflows/src/lib/siteWatch/post.test.ts
+deleted file mode 100644
+index bd3168be4..000000000
+--- a/lobster-factory/packages/workflows/src/lib/siteWatch/post.test.ts
++++ /dev/null
+@@ -1,78 +0,0 @@
+-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+-import { postSiteWatchCleanup, postSiteWatchDue, postSiteWatchRun, siteWatchConfigured } from "./post";
+-
+-const originalFetch = global.fetch;
+-const originalEnv = { ...process.env };
+-
+-beforeEach(() => {
+-  process.env.SITE_WATCH_INGEST_TOKEN = "sw-token";
+-  process.env.AWAREWAVE_WEBHOOK_BASE_URL = "https://app.aware-wave.com/";
+-});
+-
+-afterEach(() => {
+-  global.fetch = originalFetch;
+-  process.env = { ...originalEnv };
+-});
+-
+-function fetchReturning(status: number, body: unknown) {
+-  return vi.fn(async (_url: string, _init?: RequestInit) =>
+-    new Response(typeof body === "string" ? body : JSON.stringify(body), { status }),
+-  );
+-}
+-
+-describe("site-watch posts", () => {
+-  it("siteWatchConfigured: only a non-blank dedicated token counts (the heartbeat skips otherwise)", () => {
+-    expect(siteWatchConfigured()).toBe(true);
+-    process.env.SITE_WATCH_INGEST_TOKEN = "   ";
+-    expect(siteWatchConfigured()).toBe(false);
+-    delete process.env.SITE_WATCH_INGEST_TOKEN;
+-    process.env.SCHEDULE_INGEST_TOKEN = "schedule-token";
+-    expect(siteWatchConfigured()).toBe(false);
+-  });
+-
+-  it("throws before calling fetch when the token is missing — never falls back to another token", async () => {
+-    delete process.env.SITE_WATCH_INGEST_TOKEN;
+-    process.env.SCHEDULE_INGEST_TOKEN = "schedule-token";
+-    process.env.OPS_INBOX_INGEST_TOKEN = "ops-token";
+-    const spy = vi.fn();
+-    global.fetch = spy as unknown as typeof fetch;
+-    await expect(postSiteWatchDue()).rejects.toThrow(/SITE_WATCH_INGEST_TOKEN/);
+-    await expect(postSiteWatchRun("t")).rejects.toThrow(/SITE_WATCH_INGEST_TOKEN/);
+-    await expect(postSiteWatchCleanup()).rejects.toThrow(/SITE_WATCH_INGEST_TOKEN/);
+-    expect(spy).not.toHaveBeenCalled();
+-  });
+-
+-  it("due: POSTs with the dedicated bearer to the base URL (trailing slash stripped) and a timeout", async () => {
+-    const spy = fetchReturning(200, { ok: true, enabled: true, synced: 0, targets: ["a"] });
+-    global.fetch = spy as unknown as typeof fetch;
+-    await expect(postSiteWatchDue()).resolves.toEqual({ ok: true, enabled: true, synced: 0, targets: ["a"] });
+-    const [url, init] = spy.mock.calls[0];
+-    expect(url).toBe("https://app.aware-wave.com/api/internal/site-watch/due");
+-    expect(init?.method).toBe("POST");
+-    expect((init?.headers as Record<string, string>).Authorization).toBe("Bearer sw-token");
+-    expect(init?.signal).toBeInstanceOf(AbortSignal);
+-  });
+-
+-  it("run: one target per call, id URL-encoded into the path", async () => {
+-    const spy = fetchReturning(200, { ok: true, result: { targetId: "x", status: "ran", pages: [], notifications: [] } });
+-    global.fetch = spy as unknown as typeof fetch;
+-    await postSiteWatchRun("11111111-2222-3333-4444-555555555555");
+-    expect(spy.mock.calls[0][0]).toBe("https://app.aware-wave.com/api/internal/site-watch/run/11111111-2222-3333-4444-555555555555");
+-    await postSiteWatchRun("../due");
+-    expect(spy.mock.calls[1][0]).toBe("https://app.aware-wave.com/api/internal/site-watch/run/..%2Fdue");
+-  });
+-
+-  it("cleanup: POSTs to /cleanup", async () => {
+-    const spy = fetchReturning(200, { ok: true, result: { claimed: false, purgedRows: 0, deletedObjects: 0, failedDeletes: 0, skippedObjects: null } });
+-    global.fetch = spy as unknown as typeof fetch;
+-    await postSiteWatchCleanup();
+-    expect(spy.mock.calls[0][0]).toBe("https://app.aware-wave.com/api/internal/site-watch/cleanup");
+-  });
+-
+-  it("non-2xx throws with status and body instead of being swallowed", async () => {
+-    global.fetch = fetchReturning(401, "unauthorized") as unknown as typeof fetch;
+-    await expect(postSiteWatchDue()).rejects.toThrow(/\/due 401: unauthorized/);
+-    global.fetch = fetchReturning(503, { ok: false, error: "db_unavailable" }) as unknown as typeof fetch;
+-    await expect(postSiteWatchRun("t")).rejects.toThrow(/503/);
+-  });
+-});
+diff --git a/lobster-factory/packages/workflows/src/lib/siteWatch/post.ts b/lobster-factory/packages/workflows/src/lib/siteWatch/post.ts
+deleted file mode 100644
+index 36be4861d..000000000
+--- a/lobster-factory/packages/workflows/src/lib/siteWatch/post.ts
++++ /dev/null
+@@ -1,77 +0,0 @@
+-// Calls next-admin's site-watch routes (all monitoring logic lives there; agency-os/docs/operations/
+-// SITE_WATCH_MASTER_PLAN.md §3.1). Same shape as ../schedules/postRunDue.ts: a dedicated
+-// bearer token — never OPS_INBOX_INGEST_TOKEN or SCHEDULE_INGEST_TOKEN — so a leak of one
+-// cannot forge calls on the endpoints the others guard.
+-
+-export type SiteWatchDueResult = {
+-  ok: boolean;
+-  enabled: boolean;
+-  synced: number;
+-  due?: number;
+-  owed?: number;
+-  targets: string[];
+-};
+-
+-export type SiteWatchRunStatus =
+-  | "kill_switch"
+-  | "not_found"
+-  | "leased"
+-  | "not_due"
+-  | "ran"
+-  | "stopped"
+-  | "lease_lost"
+-  | "renderer_unavailable";
+-
+-export type SiteWatchRunResult = {
+-  ok: boolean;
+-  result: {
+-    targetId: string;
+-    status: SiteWatchRunStatus;
+-    runKey?: string;
+-    pages: Array<{ pageId: string; ok: boolean; failureCode: string | null; visual: string | null }>;
+-    notifications: Array<{ pageId: string; kind: string; phase: string; outcome: string }>;
+-    error?: string;
+-  };
+-};
+-
+-export type SiteWatchCleanupResult = {
+-  ok: boolean;
+-  result: { claimed: boolean; purgedRows: number; deletedObjects: number; failedDeletes: number; skippedObjects: string | null };
+-};
+-
+-// The run and cleanup routes declare maxDuration 300; wait a little longer than that so the route,
+-// not this client, decides when a run is over. (Cloudflare may still answer 524 at ~100s on the
+-// public URL; the route keeps running server-side and its lease makes that safe — plan §6.2 R9.)
+-const DUE_TIMEOUT_MS = 60_000;
+-const LONG_TIMEOUT_MS = 330_000;
+-
+-/** The token is synced from ks-aw-01 only once site-watch is rolled out (plan §7 step 10d/e). */
+-export function siteWatchConfigured(): boolean {
+-  return !!process.env.SITE_WATCH_INGEST_TOKEN?.trim();
+-}
+-
+-async function post<T>(path: string, timeoutMs: number): Promise<T> {
+-  const token = process.env.SITE_WATCH_INGEST_TOKEN?.trim();
+-  if (!token) throw new Error("SITE_WATCH_INGEST_TOKEN is required on Trigger worker");
+-  const base = (process.env.AWAREWAVE_WEBHOOK_BASE_URL ?? "https://app.aware-wave.com").replace(/\/$/, "");
+-  const res = await fetch(`${base}/api/internal/site-watch${path}`, {
+-    method: "POST",
+-    headers: { Authorization: `Bearer ${token}` },
+-    signal: AbortSignal.timeout(timeoutMs),
+-  });
+-  const text = await res.text();
+-  if (!res.ok) throw new Error(`site-watch ${path} ${res.status}: ${text.slice(0, 400)}`);
+-  return JSON.parse(text) as T;
+-}
+-
+-export function postSiteWatchDue(): Promise<SiteWatchDueResult> {
+-  return post<SiteWatchDueResult>("/due", DUE_TIMEOUT_MS);
+-}
+-
+-export function postSiteWatchRun(targetId: string): Promise<SiteWatchRunResult> {
+-  return post<SiteWatchRunResult>(`/run/${encodeURIComponent(targetId)}`, LONG_TIMEOUT_MS);
+-}
+-
+-export function postSiteWatchCleanup(): Promise<SiteWatchCleanupResult> {
+-  return post<SiteWatchCleanupResult>("/cleanup", LONG_TIMEOUT_MS);
+-}
+diff --git a/lobster-factory/packages/workflows/src/trigger/ao-infrastructure-check.ts b/lobster-factory/packages/workflows/src/trigger/ao-infrastructure-check.ts
+index a754203bc..7ab66a4ad 100644
+--- a/lobster-factory/packages/workflows/src/trigger/ao-infrastructure-check.ts
++++ b/lobster-factory/packages/workflows/src/trigger/ao-infrastructure-check.ts
+@@ -15,7 +15,7 @@
+  *   7. RLS isolation smoke (no cross-tenant data leak)
+  */
+ 
+-import { task, logger, schedules, tasks } from "@trigger.dev/sdk";
++import { task, logger } from "@trigger.dev/sdk";
+ import { z } from "zod";
+ import { newUuid } from "../utils/uid";
+ import { buildWorkflowRunRow, buildWorkflowRunInsertSql } from "../db/sql/workflowRunsSql";
+@@ -75,20 +75,6 @@ async function pingUrl(
+   }
+ }
+ 
+-/**
+- * Daily scheduled infrastructure check — 04:00 UTC (12:00 TPE).
+- * Uses LOBSTER_AO_ORG_ID env var as the audit org; falls back to a sentinel UUID.
+- * Results appear in the Trigger.dev Runs tab and in workflow_runs (if DB writes enabled).
+- */
+-export const aoInfrastructureCheckSchedule = schedules.task({
+-  id: "ao-infrastructure-check-schedule",
+-  cron: "0 4 * * *",
+-  run: async () => {
+-    const orgId = process.env.LOBSTER_AO_ORG_ID ?? "00000000-0000-0000-0000-000000000000";
+-    return tasks.trigger("ao-infrastructure-check", { organizationId: orgId });
+-  },
+-});
+-
+ export const aoInfrastructureCheck = task({
+   id: "ao-infrastructure-check",
+   run: async (payload: unknown) => {
+diff --git a/lobster-factory/packages/workflows/src/trigger/cs-inbound-sweep.test.ts b/lobster-factory/packages/workflows/src/trigger/cs-inbound-sweep.test.ts
+deleted file mode 100644
+index 5f2870f55..000000000
+--- a/lobster-factory/packages/workflows/src/trigger/cs-inbound-sweep.test.ts
++++ /dev/null
+@@ -1,46 +0,0 @@
+-// cs-inbound-sweep: skips quietly without a token, otherwise POSTs next-admin's sweep route with its own
+-// bearer; a non-2xx is a failed run (the next tick retries).
+-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+-
+-vi.mock("@trigger.dev/sdk", () => ({
+-  schedules: { task: (def: unknown) => def },
+-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+-}));
+-vi.mock("../observability/sentry", () => ({ captureWorkflowException: vi.fn() }));
+-
+-import { csInboundSweep } from "./cs-inbound-sweep";
+-
+-const run = () => (csInboundSweep as unknown as { run: () => Promise<unknown> }).run();
+-const originalFetch = global.fetch;
+-
+-beforeEach(() => {
+-  process.env.AWAREWAVE_WEBHOOK_BASE_URL = "https://app.example/";
+-});
+-afterEach(() => {
+-  global.fetch = originalFetch;
+-  delete process.env.CS_SWEEP_TOKEN;
+-  delete process.env.AWAREWAVE_WEBHOOK_BASE_URL;
+-});
+-
+-describe("cs-inbound-sweep", () => {
+-  it("no token on the worker: skipped, no request", async () => {
+-    const f = vi.fn();
+-    global.fetch = f as unknown as typeof fetch;
+-    expect(await run()).toEqual({ configured: false });
+-    expect(f).not.toHaveBeenCalled();
+-  });
+-
+-  it("token set: POSTs the sweep route with its bearer", async () => {
+-    process.env.CS_SWEEP_TOKEN = "tok";
+-    const f = vi.fn(async () => new Response(JSON.stringify({ ok: true, handedOff: 1, failed: 0 }), { status: 200 }));
+-    global.fetch = f as unknown as typeof fetch;
+-    expect(await run()).toEqual({ configured: true, ok: true, handedOff: 1, failed: 0 });
+-    expect(f).toHaveBeenCalledWith("https://app.example/api/internal/cs/sweep", expect.objectContaining({ method: "POST", headers: { Authorization: "Bearer tok" } }));
+-  });
+-
+-  it("a non-2xx answer fails the run", async () => {
+-    process.env.CS_SWEEP_TOKEN = "tok";
+-    global.fetch = vi.fn(async () => new Response("unauthorized", { status: 401 })) as unknown as typeof fetch;
+-    await expect(run()).rejects.toThrow(/cs\/sweep 401/);
+-  });
+-});
+diff --git a/lobster-factory/packages/workflows/src/trigger/cs-inbound-sweep.ts b/lobster-factory/packages/workflows/src/trigger/cs-inbound-sweep.ts
+deleted file mode 100644
+index e853fc5a7..000000000
+--- a/lobster-factory/packages/workflows/src/trigger/cs-inbound-sweep.ts
++++ /dev/null
+@@ -1,42 +0,0 @@
+-/**
+- * Every 5 minutes: poke next-admin's POST /api/internal/cs/sweep, which hands Chatwoot messages whose
+- * AI pipeline never finished (cut off after the webhook answered) to a human. All logic lives in
+- * next-admin (lib/cs/sweep.ts); this task only calls it.
+- *
+- * Token: CS_SWEEP_TOKEN, synced by scripts/lobster-trigger-deploy.ps1 from the RUNNING next-admin (so
+- * Trigger never holds a token next-admin does not accept). Unset -> skip quietly.
+- */
+-import { logger, schedules } from "@trigger.dev/sdk";
+-import { captureWorkflowException } from "../observability/sentry";
+-
+-export async function postCsSweep(token: string): Promise<{ ok: boolean; handedOff: number; failed: number }> {
+-  const base = (process.env.AWAREWAVE_WEBHOOK_BASE_URL ?? "https://app.aware-wave.com").replace(/\/$/, "");
+-  const res = await fetch(`${base}/api/internal/cs/sweep`, {
+-    method: "POST",
+-    headers: { Authorization: `Bearer ${token}` },
+-    signal: AbortSignal.timeout(60_000),
+-  });
+-  const text = await res.text();
+-  if (!res.ok) throw new Error(`cs/sweep ${res.status}: ${text.slice(0, 400)}`);
+-  return JSON.parse(text) as { ok: boolean; handedOff: number; failed: number };
+-}
+-
+-export const csInboundSweep = schedules.task({
+-  id: "cs-inbound-sweep",
+-  cron: "*/5 * * * *",
+-  // The next tick is the retry; the route only closes a claim after its handoff went through.
+-  retry: { maxAttempts: 1 },
+-  run: async () => {
+-    const token = process.env.CS_SWEEP_TOKEN?.trim();
+-    if (!token) {
+-      logger.warn("cs-inbound-sweep: CS_SWEEP_TOKEN not set on this worker; skipped");
+-      return { configured: false };
+-    }
+-    try {
+-      return { configured: true, ...(await postCsSweep(token)) };
+-    } catch (error) {
+-      captureWorkflowException(error, { workflowId: "cs-inbound-sweep", route: "task.run" });
+-      throw error;
+-    }
+-  },
+-});
+diff --git a/lobster-factory/packages/workflows/src/trigger/dispatch-action-run.ts b/lobster-factory/packages/workflows/src/trigger/dispatch-action-run.ts
+index a034f9d7e..1d796c02c 100644
+--- a/lobster-factory/packages/workflows/src/trigger/dispatch-action-run.ts
++++ b/lobster-factory/packages/workflows/src/trigger/dispatch-action-run.ts
+@@ -10,7 +10,7 @@
+  *   ops.profile-c.adopt-client-os           → adopt-client-os
+  */
+ 
+-import { task, tasks, logger, schedules } from "@trigger.dev/sdk";
++import { task, tasks, logger } from "@trigger.dev/sdk";
+ import { z } from "zod";
+ import { supabaseRestQuery, supabaseRestPatch } from "../db/supabase/supabaseRestInsert";
+ import { checkOrgSystemMode } from "../lib/systemMode";
+@@ -259,23 +259,3 @@ export const dispatchActionRun = task({
+     return { status: n.failed ? "fail" : "pass", ...n, total: runs.length };
+   },
+ });
+-
+-// ─────────────────────────────────────────────
+-// Safety-net dispatcher — backstop only, NOT the primary path.
+-// Primary dispatch is on-demand: every ops_action_runs enqueue calls
+-// kickActionRunDispatcher() (lib/kick-dispatcher.ts) → immediate dispatch
+-// (verified HTTP 200 in prod, WORKLOG 2026-06-25). This schedule only catches
+-// the rare case a kick fails (Trigger restart / network blip / token issue),
+-// so an enqueued action is never silently stuck. Cadence cut */1 → */10 on
+-// 2026-06-25: the every-minute poll spawned ~1,440 no-op runner containers/day
+-// (queue usually empty); */10 keeps the no-stuck-action guarantee at 1/10th the
+-// idle container churn. Do NOT remove entirely — that reintroduces a single
+-// point of failure on the kick.
+-// ─────────────────────────────────────────────
+-export const dispatchActionRunSchedule = schedules.task({
+-  id: "dispatch-action-run-schedule",
+-  cron: "*/10 * * * *",
+-  run: async () => {
+-    return tasks.trigger("dispatch-action-run", {});
+-  },
+-});
+diff --git a/lobster-factory/packages/workflows/src/trigger/entitlements-expire.ts b/lobster-factory/packages/workflows/src/trigger/entitlements-expire.ts
+deleted file mode 100644
+index 300033f5b..000000000
+--- a/lobster-factory/packages/workflows/src/trigger/entitlements-expire.ts
++++ /dev/null
+@@ -1,18 +0,0 @@
+-import { schedules, logger } from "@trigger.dev/sdk";
+-import { postExpire } from "../lib/entitlements/postExpire";
+-import { captureWorkflowException } from "../observability/sentry";
+-
+-export const entitlementsExpire = schedules.task({
+-  id: "entitlements-expire",
+-  cron: "0 1 * * *",
+-  run: async () => {
+-    try {
+-      const result = await postExpire();
+-      logger.info("entitlements-expire: swept", { expired: result.expired });
+-      return result;
+-    } catch (error) {
+-      captureWorkflowException(error, { workflowId: "entitlements-expire", route: "task.run" });
+-      throw error;
+-    }
+-  },
+-});
+diff --git a/lobster-factory/packages/workflows/src/trigger/index.ts b/lobster-factory/packages/workflows/src/trigger/index.ts
+index b9a34e39f..0e69a033b 100644
+--- a/lobster-factory/packages/workflows/src/trigger/index.ts
++++ b/lobster-factory/packages/workflows/src/trigger/index.ts
+@@ -2,16 +2,9 @@ export { recordTenantIntegration } from "./record-tenant-integration";
+ export { orchestrateTenantProvisioning } from "./orchestrate-tenant-provisioning";
+ export { createWpSite } from "./create-wp-site";
+ export { applyManifest } from "./apply-manifest";
+-export { dispatchActionRun, dispatchActionRunSchedule } from "./dispatch-action-run";
+-export { aoInfrastructureCheck, aoInfrastructureCheckSchedule } from "./ao-infrastructure-check";
++export { dispatchActionRun } from "./dispatch-action-run";
++export { aoInfrastructureCheck } from "./ao-infrastructure-check";
+ export { adoptClientOs } from "./adopt-client-os";
+ export { wpInstallPlugins } from "../tasks/wp-install-plugins";
+ export { tarotBatchGenerate } from "./tarot-batch-generate";
+-export { siteWatchHeartbeat, siteWatchRun } from "./site-watch";
+ export { collectResearchRun } from "./collect-research-run";
+-export { podOrderInboxSweep } from "./pod-order-inbox-sweep";
+-export { csInboundSweep } from "./cs-inbound-sweep";
+-export { socialDispatch } from "./social-dispatch";
+-export { socialRotation } from "./social-rotation";
+-export { socialMetrics } from "./social-metrics";
+-export { entitlementsExpire } from "./entitlements-expire";
+diff --git a/lobster-factory/packages/workflows/src/trigger/pod-order-inbox-sweep.test.ts b/lobster-factory/packages/workflows/src/trigger/pod-order-inbox-sweep.test.ts
+deleted file mode 100644
+index c29b4f319..000000000
+--- a/lobster-factory/packages/workflows/src/trigger/pod-order-inbox-sweep.test.ts
++++ /dev/null
+@@ -1,46 +0,0 @@
+-// pod-order-inbox-sweep: skips quietly without a token (rollout not done), otherwise POSTs next-admin's
+-// sweep route with its own bearer; a non-2xx is a failed run (the next tick retries).
+-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+-
+-vi.mock("@trigger.dev/sdk", () => ({
+-  schedules: { task: (def: unknown) => def },
+-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+-}));
+-vi.mock("../observability/sentry", () => ({ captureWorkflowException: vi.fn() }));
+-
+-import { podOrderInboxSweep } from "./pod-order-inbox-sweep";
+-
+-const run = () => (podOrderInboxSweep as unknown as { run: () => Promise<unknown> }).run();
+-const originalFetch = global.fetch;
+-
+-beforeEach(() => {
+-  process.env.AWAREWAVE_WEBHOOK_BASE_URL = "https://app.example/";
+-});
+-afterEach(() => {
+-  global.fetch = originalFetch;
+-  delete process.env.POD_INBOX_SWEEP_TOKEN;
+-  delete process.env.AWAREWAVE_WEBHOOK_BASE_URL;
+-});
+-
+-describe("pod-order-inbox-sweep", () => {
+-  it("no token on the worker: skipped, no request", async () => {
+-    const f = vi.fn();
+-    global.fetch = f as unknown as typeof fetch;
+-    expect(await run()).toEqual({ configured: false });
+-    expect(f).not.toHaveBeenCalled();
+-  });
+-
+-  it("token set: POSTs the sweep route with its bearer", async () => {
+-    process.env.POD_INBOX_SWEEP_TOKEN = "tok";
+-    const f = vi.fn(async () => new Response(JSON.stringify({ ok: true, scheduled: true }), { status: 200 }));
+-    global.fetch = f as unknown as typeof fetch;
+-    expect(await run()).toEqual({ configured: true, ok: true, scheduled: true });
+-    expect(f).toHaveBeenCalledWith("https://app.example/api/internal/pod-orders/sweep", expect.objectContaining({ method: "POST", headers: { Authorization: "Bearer tok" } }));
+-  });
+-
+-  it("a non-2xx answer fails the run", async () => {
+-    process.env.POD_INBOX_SWEEP_TOKEN = "tok";
+-    global.fetch = vi.fn(async () => new Response("unauthorized", { status: 401 })) as unknown as typeof fetch;
+-    await expect(run()).rejects.toThrow(/pod-orders\/sweep 401/);
+-  });
+-});
+diff --git a/lobster-factory/packages/workflows/src/trigger/pod-order-inbox-sweep.ts b/lobster-factory/packages/workflows/src/trigger/pod-order-inbox-sweep.ts
+deleted file mode 100644
+index ab2057e59..000000000
+--- a/lobster-factory/packages/workflows/src/trigger/pod-order-inbox-sweep.ts
++++ /dev/null
+@@ -1,49 +0,0 @@
+-/**
+- * Every 10 minutes: poke next-admin's POST /api/internal/pod-orders/sweep, which replays paid Woo
+- * orders still waiting in pod_order_inbox (deferred by a system mode, a failed Printful call due for
+- * retry, or a claim whose worker died). All inbox logic lives in next-admin
+- * (lib/studio/pod-order-inbox.ts); this task only calls it.
+- *
+- * Token: POD_INBOX_SWEEP_TOKEN, synced by scripts/lobster-trigger-deploy.ps1 from the RUNNING
+- * next-admin (so Trigger never holds a token next-admin does not accept). Unset -> skip quietly; the AO
+- * smoke check reports orders whose retry went overdue (scripts/lib/pod-order-inbox-probe.ps1).
+- */
+-import { logger, schedules } from "@trigger.dev/sdk";
+-import { captureWorkflowException } from "../observability/sentry";
+-
+-export function podInboxSweepConfigured(): boolean {
+-  return !!process.env.POD_INBOX_SWEEP_TOKEN?.trim();
+-}
+-
+-export async function postPodInboxSweep(): Promise<{ ok: boolean; scheduled?: boolean }> {
+-  const token = process.env.POD_INBOX_SWEEP_TOKEN?.trim();
+-  if (!token) throw new Error("POD_INBOX_SWEEP_TOKEN is required on Trigger worker");
+-  const base = (process.env.AWAREWAVE_WEBHOOK_BASE_URL ?? "https://app.aware-wave.com").replace(/\/$/, "");
+-  const res = await fetch(`${base}/api/internal/pod-orders/sweep`, {
+-    method: "POST",
+-    headers: { Authorization: `Bearer ${token}` },
+-    signal: AbortSignal.timeout(30_000),
+-  });
+-  const text = await res.text();
+-  if (!res.ok) throw new Error(`pod-orders/sweep ${res.status}: ${text.slice(0, 400)}`);
+-  return JSON.parse(text) as { ok: boolean; scheduled?: boolean };
+-}
+-
+-export const podOrderInboxSweep = schedules.task({
+-  id: "pod-order-inbox-sweep",
+-  cron: "*/10 * * * *",
+-  // The next tick is the retry; the route itself is idempotent (optimistic claims).
+-  retry: { maxAttempts: 1 },
+-  run: async () => {
+-    if (!podInboxSweepConfigured()) {
+-      logger.warn("pod-order-inbox-sweep: POD_INBOX_SWEEP_TOKEN not set on this worker; skipped");
+-      return { configured: false };
+-    }
+-    try {
+-      return { configured: true, ...(await postPodInboxSweep()) };
+-    } catch (error) {
+-      captureWorkflowException(error, { workflowId: "pod-order-inbox-sweep", route: "task.run" });
+-      throw error;
+-    }
+-  },
+-});
+diff --git a/lobster-factory/packages/workflows/src/trigger/schedules-heartbeat.ts b/lobster-factory/packages/workflows/src/trigger/schedules-heartbeat.ts
+deleted file mode 100644
+index 89ecc16a9..000000000
+--- a/lobster-factory/packages/workflows/src/trigger/schedules-heartbeat.ts
++++ /dev/null
+@@ -1,32 +0,0 @@
+-/**
+- * Hourly heartbeat for every client's routine jobs (migration 0097 client_schedules;
+- * agency-os/docs/operations/SCHEDULES_PAGE_PLAN.md).
+- *
+- * Deliberately thin: this task owns NO scheduling logic. It pokes next-admin once an hour;
+- * /api/internal/schedules/run-due decides which (client, job) rows are due, claims them and runs
+- * them after answering — so this task returns in seconds even when a crawl takes ten minutes.
+- *
+- * Set on Trigger worker: SCHEDULE_INGEST_TOKEN, AWAREWAVE_WEBHOOK_BASE_URL (e.g. https://app.aware-wave.com).
+- *
+- * Every job defaults to off (AGENTS.md "自動化預設 OFF"), so this firing hourly does nothing until an
+- * operator ticks a cell on /ops/schedules.
+- */
+-
+-import { schedules, logger } from "@trigger.dev/sdk";
+-import { postRunDue } from "../lib/schedules/postRunDue";
+-import { captureWorkflowException } from "../observability/sentry";
+-
+-export const schedulesHeartbeat = schedules.task({
+-  id: "schedules-heartbeat",
+-  cron: "0 * * * *",
+-  run: async () => {
+-    try {
+-      const result = await postRunDue();
+-      logger.info("schedules-heartbeat: swept", { checked: result.checked, due: result.due, started: result.started });
+-      return result;
+-    } catch (error) {
+-      captureWorkflowException(error, { workflowId: "schedules-heartbeat", route: "task.run" });
+-      throw error;
+-    }
+-  },
+-});
+diff --git a/lobster-factory/packages/workflows/src/trigger/site-watch.ts b/lobster-factory/packages/workflows/src/trigger/site-watch.ts
+deleted file mode 100644
+index 699e22bc5..000000000
+--- a/lobster-factory/packages/workflows/src/trigger/site-watch.ts
++++ /dev/null
+@@ -1,80 +0,0 @@
+-/**
+- * site-watch: client-site monitoring heartbeat (agency-os/docs/operations/SITE_WATCH_MASTER_PLAN.md).
+- *
+- * Deliberately thin, same as schedules-heartbeat.ts: no scheduling logic here. next-admin's
+- * /api/internal/site-watch/due stamps the watchdog heartbeat, decides which targets are due or owe
+- * a notification, and each target then runs in its own child (C4: no route call loops over clients).
+- * next-admin has to do the work anyway — the renderer is only reachable on its docker network.
+- *
+- * Set on Trigger worker: SITE_WATCH_INGEST_TOKEN, AWAREWAVE_WEBHOOK_BASE_URL (trigger.config.ts).
+- * Kill switch SITE_WATCH_ENABLED lives in next-admin (default OFF): until an operator turns it on,
+- * every heartbeat only stamps liveness and returns no targets.
+- */
+-
+-import { logger, schedules, task } from "@trigger.dev/sdk";
+-import { postSiteWatchCleanup, postSiteWatchDue, postSiteWatchRun, siteWatchConfigured } from "../lib/siteWatch/post";
+-import { captureWorkflowException } from "../observability/sentry";
+-
+-export const siteWatchRun = task({
+-  id: "site-watch-run",
+-  // One attempt: a crashed run is retried by the next heartbeat once its lease expires (C3), and an
+-  // SDK retry inside the same lease window would only be refused as "leased".
+-  retry: { maxAttempts: 1 },
+-  // The renderer takes one snapshot at a time with a queue of 20, and the caller gives up at 150s.
+-  // Unthrottled, first enable or the daily 22:00 bucket fans every target out at once: most get 503
+-  // busy or time out while the renderer keeps shooting pages nobody waits for (plan §6.2 R6).
+-  // Queued here, each child waits its turn at zero cost.
+-  queue: { concurrencyLimit: 2 },
+-  maxDuration: 400,
+-  run: async (payload: { targetId: string }) => {
+-    try {
+-      const res = await postSiteWatchRun(payload.targetId);
+-      const r = res.result;
+-      logger.info("site-watch-run", { targetId: r.targetId, status: r.status, runKey: r.runKey, pages: r.pages, notifications: r.notifications });
+-      // The monitor itself failed: never a verdict on the site (C5), so it must be loud HERE.
+-      if (r.status === "renderer_unavailable") {
+-        throw new Error(`site-watch renderer_unavailable for target ${r.targetId}: ${r.error ?? "unknown"}`);
+-      }
+-      return r;
+-    } catch (error) {
+-      captureWorkflowException(error, { workflowId: "site-watch-run", route: "task.run", tags: { targetId: payload.targetId } });
+-      throw error;
+-    }
+-  },
+-});
+-
+-export const siteWatchHeartbeat = schedules.task({
+-  id: "site-watch-heartbeat",
+-  // :05, off the collect heartbeat's :00. Daily targets (hour_utc 22) run at 22:05 UTC = 06:05 Taipei.
+-  cron: "5 * * * *",
+-  // A retry after the children were triggered would trigger them again; the next hour is the retry.
+-  retry: { maxAttempts: 1 },
+-  run: async () => {
+-    // Not rolled out on this worker yet (any Trigger deploy ships this schedule, rollout or not).
+-    // Not an error to page on every hour: once next-admin is live, the watchdog's heartbeat probe
+-    // reports the missing stamps (scripts/check-site-watch-health.ps1).
+-    if (!siteWatchConfigured()) {
+-      logger.warn("site-watch-heartbeat: SITE_WATCH_INGEST_TOKEN not set on this worker; skipped");
+-      return { configured: false };
+-    }
+-    try {
+-      const due = await postSiteWatchDue();
+-      if (due.targets.length > 0) {
+-        await siteWatchRun.batchTrigger(due.targets.map((targetId) => ({ payload: { targetId } })));
+-      }
+-      const cleanup = await postSiteWatchCleanup();
+-      logger.info("site-watch-heartbeat", {
+-        enabled: due.enabled,
+-        synced: due.synced,
+-        due: due.due ?? 0,
+-        owed: due.owed ?? 0,
+-        triggered: due.targets.length,
+-        cleanup: cleanup.result,
+-      });
+-      return { enabled: due.enabled, triggered: due.targets.length, cleanup: cleanup.result };
+-    } catch (error) {
+-      captureWorkflowException(error, { workflowId: "site-watch-heartbeat", route: "task.run" });
+-      throw error;
+-    }
+-  },
+-});
+diff --git a/lobster-factory/packages/workflows/src/trigger/social-dispatch.test.ts b/lobster-factory/packages/workflows/src/trigger/social-dispatch.test.ts
+deleted file mode 100644
+index 5a385324f..000000000
+--- a/lobster-factory/packages/workflows/src/trigger/social-dispatch.test.ts
++++ /dev/null
+@@ -1,46 +0,0 @@
+-// social-dispatch: skips quietly without a token, otherwise POSTs next-admin's dispatch route with its own bearer; a
+-// non-2xx is a failed run (the next tick retries).
+-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+-
+-vi.mock("@trigger.dev/sdk", () => ({
+-  schedules: { task: (def: unknown) => def },
+-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+-}));
+-vi.mock("../observability/sentry", () => ({ captureWorkflowException: vi.fn() }));
+-
+-import { socialDispatch } from "./social-dispatch";
+-
+-const run = () => (socialDispatch as unknown as { run: () => Promise<unknown> }).run();
+-const originalFetch = global.fetch;
+-
+-beforeEach(() => {
+-  process.env.AWAREWAVE_WEBHOOK_BASE_URL = "https://app.example/";
+-});
+-afterEach(() => {
+-  global.fetch = originalFetch;
+-  delete process.env.SOCIAL_DISPATCH_TOKEN;
+-  delete process.env.AWAREWAVE_WEBHOOK_BASE_URL;
+-});
+-
+-describe("social-dispatch", () => {
+-  it("no token on the worker: skipped, no request", async () => {
+-    const f = vi.fn();
+-    global.fetch = f as unknown as typeof fetch;
+-    expect(await run()).toEqual({ configured: false });
+-    expect(f).not.toHaveBeenCalled();
+-  });
+-
+-  it("token set: POSTs the dispatch route with its bearer", async () => {
+-    process.env.SOCIAL_DISPATCH_TOKEN = "tok";
+-    const f = vi.fn(async () => new Response(JSON.stringify({ ok: true, enabled: true, sent: 2 }), { status: 200 }));
+-    global.fetch = f as unknown as typeof fetch;
+-    expect(await run()).toEqual({ configured: true, ok: true, enabled: true, sent: 2 });
+-    expect(f).toHaveBeenCalledWith("https://app.example/api/internal/social/dispatch", expect.objectContaining({ method: "POST", headers: { Authorization: "Bearer tok" } }));
+-  });
+-
+-  it("a non-2xx answer fails the run", async () => {
+-    process.env.SOCIAL_DISPATCH_TOKEN = "tok";
+-    global.fetch = vi.fn(async () => new Response("bad gateway", { status: 502 })) as unknown as typeof fetch;
+-    await expect(run()).rejects.toThrow(/social\/dispatch 502/);
+-  });
+-});
+diff --git a/lobster-factory/packages/workflows/src/trigger/social-dispatch.ts b/lobster-factory/packages/workflows/src/trigger/social-dispatch.ts
+deleted file mode 100644
+index 73d306d3c..000000000
+--- a/lobster-factory/packages/workflows/src/trigger/social-dispatch.ts
++++ /dev/null
+@@ -1,44 +0,0 @@
+-/**
+- * Every 5 minutes: poke next-admin's POST /api/internal/social/dispatch, which sends due social posts to Postiz and
+- * reads their results back (SOCIAL_MANAGER_PLAN.md C5). All logic lives in next-admin (lib/social/dispatch.ts); this
+- * task only calls it. Whether it sends at all (SOCIAL_DISPATCH_ENABLED / SOCIAL_DISPATCH_MODE) is next-admin's
+- * setting, not this worker's.
+- *
+- * Token: SOCIAL_DISPATCH_TOKEN, synced by scripts/lobster-trigger-deploy.ps1 from the RUNNING next-admin (so Trigger
+- * never holds a token next-admin does not accept). Unset -> skip quietly.
+- */
+-import { logger, schedules } from "@trigger.dev/sdk";
+-import { captureWorkflowException } from "../observability/sentry";
+-
+-export async function postSocialDispatch(token: string): Promise<Record<string, unknown>> {
+-  const base = (process.env.AWAREWAVE_WEBHOOK_BASE_URL ?? "https://app.aware-wave.com").replace(/\/$/, "");
+-  const res = await fetch(`${base}/api/internal/social/dispatch`, {
+-    method: "POST",
+-    headers: { Authorization: `Bearer ${token}` },
+-    signal: AbortSignal.timeout(290_000),
+-  });
+-  const text = await res.text();
+-  if (!res.ok) throw new Error(`social/dispatch ${res.status}: ${text.slice(0, 400)}`);
+-  return JSON.parse(text) as Record<string, unknown>;
+-}
+-
+-export const socialDispatch = schedules.task({
+-  id: "social-dispatch",
+-  cron: "*/5 * * * *",
+-  // The next tick is the retry; a send is leased in the database, so a retry never sends twice.
+-  retry: { maxAttempts: 1 },
+-  maxDuration: 300,
+-  run: async () => {
+-    const token = process.env.SOCIAL_DISPATCH_TOKEN?.trim();
+-    if (!token) {
+-      logger.warn("social-dispatch: SOCIAL_DISPATCH_TOKEN not set on this worker; skipped");
+-      return { configured: false };
+-    }
+-    try {
+-      return { configured: true, ...(await postSocialDispatch(token)) };
+-    } catch (error) {
+-      captureWorkflowException(error, { workflowId: "social-dispatch", route: "task.run" });
+-      throw error;
+-    }
+-  },
+-});
+diff --git a/lobster-factory/packages/workflows/src/trigger/social-metrics.ts b/lobster-factory/packages/workflows/src/trigger/social-metrics.ts
+deleted file mode 100644
+index cdb25f6d5..000000000
+--- a/lobster-factory/packages/workflows/src/trigger/social-metrics.ts
++++ /dev/null
+@@ -1,41 +0,0 @@
+-/**
+- * Daily at 19:30 UTC (03:30 Taiwan): poke next-admin's POST /api/internal/social/metrics, which snapshots every connected
+- * channel's numbers for 數據分析 (SOCIAL_MANAGER_PLAN.md C24; logic in next-admin lib/social/metrics.ts). Same token and
+- * on/off switch as social-rotation: SOCIAL_DISPATCH_TOKEN, synced by scripts/lobster-trigger-deploy.ps1 from the RUNNING
+- * next-admin. Unset -> skip quietly. 19:30 UTC is before the host's 20:00 UTC reboot and after next-admin's 03:00 Taiwan
+- * deploy.
+- */
+-import { logger, schedules } from "@trigger.dev/sdk";
+-import { captureWorkflowException } from "../observability/sentry";
+-
+-export async function postSocialMetrics(token: string): Promise<Record<string, unknown>> {
+-  const base = (process.env.AWAREWAVE_WEBHOOK_BASE_URL ?? "https://app.aware-wave.com").replace(/\/$/, "");
+-  const res = await fetch(`${base}/api/internal/social/metrics`, {
+-    method: "POST",
+-    headers: { Authorization: `Bearer ${token}` },
+-    signal: AbortSignal.timeout(300_000),
+-  });
+-  const text = await res.text();
+-  if (!res.ok) throw new Error(`social/metrics ${res.status}: ${text.slice(0, 400)}`);
+-  return JSON.parse(text) as Record<string, unknown>;
+-}
+-
+-export const socialMetrics = schedules.task({
+-  id: "social-metrics",
+-  cron: "30 19 * * *",
+-  // a rerun fetches the same days again and overwrites them (snapshot merge), so retrying is safe
+-  retry: { maxAttempts: 2 },
+-  run: async () => {
+-    const token = process.env.SOCIAL_DISPATCH_TOKEN?.trim();
+-    if (!token) {
+-      logger.warn("social-metrics: SOCIAL_DISPATCH_TOKEN not set on this worker; skipped");
+-      return { configured: false };
+-    }
+-    try {
+-      return { configured: true, ...(await postSocialMetrics(token)) };
+-    } catch (error) {
+-      captureWorkflowException(error, { workflowId: "social-metrics", route: "task.run" });
+-      throw error;
+-    }
+-  },
+-});
+diff --git a/lobster-factory/packages/workflows/src/trigger/social-rotation.test.ts b/lobster-factory/packages/workflows/src/trigger/social-rotation.test.ts
+deleted file mode 100644
+index 0e281a01b..000000000
+--- a/lobster-factory/packages/workflows/src/trigger/social-rotation.test.ts
++++ /dev/null
+@@ -1,46 +0,0 @@
+-// social-rotation: skips quietly without a token, otherwise POSTs next-admin's dispatch route with its own bearer; a
+-// non-2xx is a failed run (the next day retries).
+-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+-
+-vi.mock("@trigger.dev/sdk", () => ({
+-  schedules: { task: (def: unknown) => def },
+-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+-}));
+-vi.mock("../observability/sentry", () => ({ captureWorkflowException: vi.fn() }));
+-
+-import { socialRotation } from "./social-rotation";
+-
+-const run = () => (socialRotation as unknown as { run: () => Promise<unknown> }).run();
+-const originalFetch = global.fetch;
+-
+-beforeEach(() => {
+-  process.env.AWAREWAVE_WEBHOOK_BASE_URL = "https://app.example/";
+-});
+-afterEach(() => {
+-  global.fetch = originalFetch;
+-  delete process.env.SOCIAL_DISPATCH_TOKEN;
+-  delete process.env.AWAREWAVE_WEBHOOK_BASE_URL;
+-});
+-
+-describe("social-rotation", () => {
+-  it("no token on the worker: skipped, no request", async () => {
+-    const f = vi.fn();
+-    global.fetch = f as unknown as typeof fetch;
+-    expect(await run()).toEqual({ configured: false });
+-    expect(f).not.toHaveBeenCalled();
+-  });
+-
+-  it("token set: POSTs the dispatch route with its bearer", async () => {
+-    process.env.SOCIAL_DISPATCH_TOKEN = "tok";
+-    const f = vi.fn(async () => new Response(JSON.stringify({ ok: true, enabled: true, sent: 2 }), { status: 200 }));
+-    global.fetch = f as unknown as typeof fetch;
+-    expect(await run()).toEqual({ configured: true, ok: true, enabled: true, sent: 2 });
+-    expect(f).toHaveBeenCalledWith("https://app.example/api/internal/social/rotation", expect.objectContaining({ method: "POST", headers: { Authorization: "Bearer tok" } }));
+-  });
+-
+-  it("a non-2xx answer fails the run", async () => {
+-    process.env.SOCIAL_DISPATCH_TOKEN = "tok";
+-    global.fetch = vi.fn(async () => new Response("bad gateway", { status: 502 })) as unknown as typeof fetch;
+-    await expect(run()).rejects.toThrow(/social\/rotation 502/);
+-  });
+-});
+diff --git a/lobster-factory/packages/workflows/src/trigger/social-rotation.ts b/lobster-factory/packages/workflows/src/trigger/social-rotation.ts
+deleted file mode 100644
+index 0390326b5..000000000
+--- a/lobster-factory/packages/workflows/src/trigger/social-rotation.ts
++++ /dev/null
+@@ -1,40 +0,0 @@
+-/**
+- * Daily at 00:05 UTC: poke next-admin's POST /api/internal/social/rotation, which turns the next 7 days of every active
+- * rotation list into scheduled posts (SOCIAL_MANAGER_PLAN.md C7; logic in next-admin lib/social/rotation.ts, once per
+- * slot by migration 0101). Same token and same on/off switch as social-dispatch: SOCIAL_DISPATCH_TOKEN, synced by
+- * scripts/lobster-trigger-deploy.ps1 from the RUNNING next-admin. Unset -> skip quietly.
+- */
+-import { logger, schedules } from "@trigger.dev/sdk";
+-import { captureWorkflowException } from "../observability/sentry";
+-
+-export async function postSocialRotation(token: string): Promise<Record<string, unknown>> {
+-  const base = (process.env.AWAREWAVE_WEBHOOK_BASE_URL ?? "https://app.aware-wave.com").replace(/\/$/, "");
+-  const res = await fetch(`${base}/api/internal/social/rotation`, {
+-    method: "POST",
+-    headers: { Authorization: `Bearer ${token}` },
+-    signal: AbortSignal.timeout(120_000),
+-  });
+-  const text = await res.text();
+-  if (!res.ok) throw new Error(`social/rotation ${res.status}: ${text.slice(0, 400)}`);
+-  return JSON.parse(text) as Record<string, unknown>;
+-}
+-
+-export const socialRotation = schedules.task({
+-  id: "social-rotation",
+-  cron: "5 0 * * *",
+-  // A rerun the same day adds nothing (a slot is materialised once), so the next day is the retry.
+-  retry: { maxAttempts: 2 },
+-  run: async () => {
+-    const token = process.env.SOCIAL_DISPATCH_TOKEN?.trim();
+-    if (!token) {
+-      logger.warn("social-rotation: SOCIAL_DISPATCH_TOKEN not set on this worker; skipped");
+-      return { configured: false };
+-    }
+-    try {
+-      return { configured: true, ...(await postSocialRotation(token)) };
+-    } catch (error) {
+-      captureWorkflowException(error, { workflowId: "social-rotation", route: "task.run" });
+-      throw error;
+-    }
+-  },
+-});
+diff --git a/lobster-factory/packages/workflows/trigger.config.ts b/lobster-factory/packages/workflows/trigger.config.ts
+index ced990d5e..58ea44354 100644
+--- a/lobster-factory/packages/workflows/trigger.config.ts
++++ b/lobster-factory/packages/workflows/trigger.config.ts
+@@ -52,29 +52,6 @@ export default defineConfig({
+         const awBase = process.env.AWAREWAVE_WEBHOOK_BASE_URL ?? "";
+         if (awBase.trim()) out.AWAREWAVE_WEBHOOK_BASE_URL = awBase.trim().replace(/\/$/, "");
+ 
+-        // schedules-heartbeat -> next-admin /api/internal/schedules/run-due.
+-        // Dedicated token (never OPS_INBOX_INGEST_TOKEN) so a leak here cannot forge the other
+-        // OPS_INBOX_INGEST_TOKEN-guarded endpoints, and vice versa.
+-        const scheduleToken = process.env.SCHEDULE_INGEST_TOKEN ?? "";
+-        if (scheduleToken.trim()) out.SCHEDULE_INGEST_TOKEN = scheduleToken.trim();
+-
+-        // site-watch-heartbeat / site-watch-run -> next-admin /api/internal/site-watch/*. Own token,
+-        // same blast-radius rule as the collect one above.
+-        const siteWatchToken = process.env.SITE_WATCH_INGEST_TOKEN ?? "";
+-        if (siteWatchToken.trim()) out.SITE_WATCH_INGEST_TOKEN = siteWatchToken.trim();
+-
+-        // pod-order-inbox-sweep -> next-admin /api/internal/pod-orders/sweep. Own token, same rule.
+-        const podSweepToken = process.env.POD_INBOX_SWEEP_TOKEN ?? "";
+-        if (podSweepToken.trim()) out.POD_INBOX_SWEEP_TOKEN = podSweepToken.trim();
+-
+-        // cs-inbound-sweep -> next-admin /api/internal/cs/sweep. Own token, same rule.
+-        const csSweepToken = process.env.CS_SWEEP_TOKEN ?? "";
+-        if (csSweepToken.trim()) out.CS_SWEEP_TOKEN = csSweepToken.trim();
+-
+-        // social-dispatch -> next-admin /api/internal/social/dispatch. Own token, same rule.
+-        const socialDispatchToken = process.env.SOCIAL_DISPATCH_TOKEN ?? "";
+-        if (socialDispatchToken.trim()) out.SOCIAL_DISPATCH_TOKEN = socialDispatchToken.trim();
+-
+         // collect-research-run -> next-admin /api/internal/collect/runs/execute (RESEARCH_LINES_MASTER_PLAN
+         // WC-P1-13). Own token, same rule.
+         const researchExecuteToken = process.env.COLLECT_RESEARCH_EXECUTE_TOKEN ?? "";
+diff --git a/scripts/lobster-trigger-deploy.ps1 b/scripts/lobster-trigger-deploy.ps1
+index b33bd58de..f46188693 100644
+--- a/scripts/lobster-trigger-deploy.ps1
++++ b/scripts/lobster-trigger-deploy.ps1
+@@ -69,21 +69,12 @@ if (-not $srk -or $srk.StartsWith("ssh:") -or $srk.Length -lt 20) {
+ }
+ Write-Host "[deploy] SERVICE_ROLE_KEY obtained (length=$($srk.Length))." -ForegroundColor Green
+ 
+-Write-Host "[deploy] Reading SCHEDULE_INGEST_TOKEN from VPS..." -ForegroundColor Cyan
+-$cst = (Invoke-WithUtf8Console { & ssh -o StrictHostKeyChecking=no -p 58122 -i $SshKey ubuntu@$VpsHost `
+-    "sudo grep '^SCHEDULE_INGEST_TOKEN=' /root/lobster-phase1/.env | cut -d= -f2-" 2>&1 }).Trim()
+-if (-not $cst -or $cst.StartsWith("ssh:") -or $cst.Length -lt 10) {
+-    throw "Could not read SCHEDULE_INGEST_TOKEN from VPS /root/lobster-phase1/.env"
+-}
+-Write-Host "[deploy] SCHEDULE_INGEST_TOKEN obtained (length=$($cst.Length))." -ForegroundColor Green
+-
+ # ── 3. Build bash deploy script ────────────────────────────────────────────
+ # PowerShell here-string: $pat/$srk/$phk/$oit/$AoOrgId are expanded by PS.
+ # Bash variable refs in echo lines use backtick-escaped $: `$VAR → $VAR in output.
+ $pat        = $env:TRIGGER_DEPLOY_PAT
+ $phk        = $env:POSTHOG_API_KEY
+ $oit        = $env:OPS_INBOX_INGEST_TOKEN
+-$cstTok     = $cst
+ # Optional — empty string is safe: syncEnvVars skips empty values
+ $execSteps  = if ($env:LOBSTER_EXECUTE_MANIFEST_STEPS)  { $env:LOBSTER_EXECUTE_MANIFEST_STEPS }  else { "" }
+ $wpSshKey   = if ($env:LOBSTER_WP_SSH_PRIVATE_KEY)      { $env:LOBSTER_WP_SSH_PRIVATE_KEY }      else { "" }
+@@ -147,7 +138,6 @@ export POSTHOG_HOST=https://us.i.posthog.com
+ # Webhooks
+ export OPS_INBOX_INGEST_TOKEN='$oit'
+ export AWAREWAVE_WEBHOOK_BASE_URL=https://app.aware-wave.com
+-export SCHEDULE_INGEST_TOKEN='$cstTok'
+ 
+ # wp-install-plugins: SSH execution gate + global SSH key
+ export LOBSTER_EXECUTE_MANIFEST_STEPS='$execSteps'
+@@ -159,17 +149,6 @@ for v in MAINWP_DASHBOARD_URL MAINWP_CONSUMER_KEY MAINWP_CONSUMER_SECRET; do
+   export "`$v=`$(grep -m1 "^`$v=" /root/lobster-phase1/.env | cut -d= -f2-)"
+ done
+ 
+-# site-watch token. OPTIONAL (absent until SITE_WATCH_MASTER_PLAN.md step 10d; a required read would block
+-# every unrelated deploy until then) and taken from the RUNNING next-admin, not .env: Trigger must only hold
+-# a token next-admin accepts, or a half-applied 10d / rotation turns every hourly heartbeat into a red 401.
+-# Empty = not synced; the heartbeat skips quietly and check-site-watch-health.ps1 reports it.
+-export "SITE_WATCH_INGEST_TOKEN=`$(docker exec lobster-next-admin printenv SITE_WATCH_INGEST_TOKEN 2>/dev/null)"
+-# pod-order-inbox-sweep token: same rule -- optional, from the RUNNING next-admin, empty = the schedule skips.
+-export "POD_INBOX_SWEEP_TOKEN=`$(docker exec lobster-next-admin printenv POD_INBOX_SWEEP_TOKEN 2>/dev/null)"
+-# cs-inbound-sweep token: same rule -- optional, from the RUNNING next-admin, empty = the schedule skips.
+-export "CS_SWEEP_TOKEN=`$(docker exec lobster-next-admin printenv CS_SWEEP_TOKEN 2>/dev/null)"
+-# social-dispatch token: same rule -- optional, from the RUNNING next-admin, empty = the schedule skips.
+-export "SOCIAL_DISPATCH_TOKEN=`$(docker exec lobster-next-admin printenv SOCIAL_DISPATCH_TOKEN 2>/dev/null)"
+ # collect-research-run token: same rule -- optional, from the RUNNING next-admin; empty = the relay task fails and
+ # Cognitive OS reads the run as failed at its deadline.
+ export "COLLECT_RESEARCH_EXECUTE_TOKEN=`$(docker exec lobster-next-admin printenv COLLECT_RESEARCH_EXECUTE_TOKEN 2>/dev/null)"
+@@ -188,10 +167,6 @@ echo "  UPTIME_KUMA_URL:                `$UPTIME_KUMA_URL"
+ echo "  LOBSTER_EXECUTE_MANIFEST_STEPS: `$LOBSTER_EXECUTE_MANIFEST_STEPS"
+ if [ -n "`$LOBSTER_WP_SSH_PRIVATE_KEY" ]; then echo "  LOBSTER_WP_SSH_PRIVATE_KEY set: yes"; else echo "  LOBSTER_WP_SSH_PRIVATE_KEY set: no"; fi
+ if [ -n "`$MAINWP_CONSUMER_SECRET" ]; then echo "  MAINWP_* set: yes (`$MAINWP_DASHBOARD_URL)"; else echo "  MAINWP_* set: no"; fi
+-if [ -n "`$SITE_WATCH_INGEST_TOKEN" ]; then echo "  SITE_WATCH_INGEST_TOKEN set: yes (from running next-admin)"; else echo "  SITE_WATCH_INGEST_TOKEN set: no (next-admin has none; site-watch-heartbeat will skip)"; fi
+-if [ -n "`$POD_INBOX_SWEEP_TOKEN" ]; then echo "  POD_INBOX_SWEEP_TOKEN set: yes (from running next-admin)"; else echo "  POD_INBOX_SWEEP_TOKEN set: no (next-admin has none; pod-order-inbox-sweep will skip)"; fi
+-if [ -n "`$CS_SWEEP_TOKEN" ]; then echo "  CS_SWEEP_TOKEN set: yes (from running next-admin)"; else echo "  CS_SWEEP_TOKEN set: no (next-admin has none; cs-inbound-sweep will skip)"; fi
+-if [ -n "`$SOCIAL_DISPATCH_TOKEN" ]; then echo "  SOCIAL_DISPATCH_TOKEN set: yes (from running next-admin)"; else echo "  SOCIAL_DISPATCH_TOKEN set: no (next-admin has none; social-dispatch will skip)"; fi
+ if [ -n "`$COLLECT_RESEARCH_EXECUTE_TOKEN" ]; then echo "  COLLECT_RESEARCH_EXECUTE_TOKEN set: yes (from running next-admin)"; else echo "  COLLECT_RESEARCH_EXECUTE_TOKEN set: no (next-admin has none; collect-research-run will fail at the relay)"; fi
+ if [ -n "`$BATCH_INTERNAL_SECRET" ]; then echo "  BATCH_INTERNAL_SECRET set: yes (from running next-admin)"; else echo "  BATCH_INTERNAL_SECRET set: no (next-admin has none; tarot-batch-generate will fail)"; fi
+ 

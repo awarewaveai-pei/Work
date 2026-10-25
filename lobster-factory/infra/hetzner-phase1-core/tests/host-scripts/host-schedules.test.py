@@ -79,6 +79,37 @@ class Reporter(unittest.TestCase):
             self.assertIsNone(rhs.RUN_PARTS_NAME.match(name), name)
 
 
+class External(unittest.TestCase):
+    """Clocks off this host's cron (C5): every one becomes an entry the page can judge, with its last outcome."""
+
+    def test_pg_cron_rows(self):
+        got = rhs.pg_cron_entries("archive-stale-repair-runs\t0 2 * * *\tfailed\t2026-10-24T02:00:13Z\nnew job\t*/5 * * * *\t\t\n")
+        self.assertEqual([(e["key"], e["name"], e["schedule"]) for e in got],
+                         [("pg_cron_archive_stale_repair_runs", "archive-stale-repair-runs", "0 2 * * *"),
+                          ("pg_cron_new_job", "new job", "*/5 * * * *")])
+        self.assertEqual(got[0]["last"]["exit_code"], 1)
+        self.assertIsNone(got[1]["last"])  # never finished = no record, not "ok"
+
+    def test_n8n_rows(self):
+        got = rhs.n8n_entries("Abc12\tdaily ping\tsuccess\t2026-10-25T01:00:00Z\nXy\tbroken\terror\t2026-10-25T01:00:00Z\n")
+        self.assertEqual([(e["key"], e["last"]["exit_code"]) for e in got], [("n8n_Abc12", 0), ("n8n_Xy", 1)])
+        self.assertEqual(rhs.n8n_entries(""), [])
+
+    def test_repo_report(self):
+        e = rhs.repo_report_entry("cloud_weekly_review", "a/b.md", "@weekly", 9, 1_700_000_000)
+        self.assertEqual((e["stale_after_s"], e["last"]["finished_at"], e["last"]["exit_code"]), (9 * 86400, "2023-11-14T22:13:20Z", 0))
+        self.assertIsNone(rhs.repo_report_entry("k", "p", "@daily", 3, None)["last"])
+
+    def test_build_lists_external_entries(self):
+        ext = rhs.pg_cron_entries("j\t0 2 * * *\tsucceeded\t2026-10-25T02:00:00Z\n")
+        doc = rhs.build([], [], [], {}, [], [], [], 0, ext)
+        self.assertEqual([e["key"] for e in doc["entries"]], ["pg_cron_j"])
+
+    def test_external_errors_kept_apart(self):
+        doc = rhs.build([], [], [], {}, [], [], [], 0, [], ["n8n: down"])
+        self.assertEqual((doc["errors"], doc["external_errors"]), ([], ["n8n: down"]))
+
+
 @unittest.skipUnless(BASH, "bash not found")
 class CronRun(unittest.TestCase):
     def test_keeps_exit_code_and_records_it(self):

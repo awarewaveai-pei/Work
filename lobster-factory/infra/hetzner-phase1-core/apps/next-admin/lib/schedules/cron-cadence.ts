@@ -32,6 +32,8 @@ export function cronCadence(schedule: string): Cadence {
     "@weekly": { text: "每週", intervalMs: 7 * DAY },
     "@monthly": { text: "每月", intervalMs: 31 * DAY },
     "@inactive": { text: "已停止", intervalMs: null },
+    // A systemd timer or an n8n trigger whose rule the reporter does not translate: shown, never judged late.
+    "@timer": { text: "依觸發器設定", intervalMs: null },
   };
   if (named[s]) return named[s];
 

@@ -11,6 +11,13 @@ A cron line run through `cron-run.sh <key> '<cmd>'` gets that key and the outcom
 JOBS_DIR/<key>.json. Any other line is reported with key null and its command (secrets redacted): the page shows it
 as unregistered, so a schedule added by hand on the host is never invisible.
 cron_files_drift = /etc/cron.d files whose repo copy (scripts/cron.d/, installed by install-host-schedules.sh) differs.
+Clocks that are not on this host's cron but that we set (handoffs/2026-10-25-schedules-off-trigger C5), as entries too:
+  - pg_cron jobs in supabase-db (key pg_cron_<job>, name = jobname; last finished run from cron.job_run_details);
+  - active n8n workflows with a schedule/cron trigger node (key n8n_<id>, name = workflow name);
+  - reports another machine commits to the repo (cloud routines, the laptop's status reports): last = the newest commit
+    of that path on /root/Work origin/main (fetched daily by other jobs), stale_after_s = how old it may get.
+A collector that cannot read its source adds to external_errors (the page shows that as a failure), never an empty
+list; kept apart from errors, which means "this host's own schedules are only partly known".
 Writes OUT_FILE by rename (next-admin reads it at /host-status/host-schedules.json). Exit 0 written, 2 could not write.
 """
 import glob
@@ -25,6 +32,15 @@ import time
 OUT_FILE = os.environ.get("HOST_SCHEDULES_FILE", "/var/lib/awarewave/host-schedules.json")
 JOBS_DIR = os.environ.get("CRON_RUN_JOBS_DIR", "/var/lib/awarewave/jobs")
 REPO_CRON_DIR = os.environ.get("REPO_CRON_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "cron.d"))
+WORK_REPO = os.environ.get("WORK_REPO_DIR", "/root/Work")
+DAY_S = 86400
+# (key, repo path, cadence, stale after days) -- the same contract as scripts/routine-output-watchdog.sh.
+REPO_REPORTS = [
+    ("cloud_phase4_weekly", "agency-os/reports/repair-center/phase4-LATEST.md", "@weekly", 8),
+    ("cloud_weekly_review", "agency-os/reports/weekly/weekly-automation-LATEST.md", "@weekly", 9),
+    ("cloud_monthly_review", "agency-os/reports/monthly/monthly-review-LATEST.md", "@monthly", 35),
+    ("laptop_status_reports", "agency-os/reports/status", "@daily", 3),
+]
 
 ENV_LINE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\s*=")
 WRAPPED = re.compile(r"(?:^|\s)\S*cron-run\.sh\s+([a-z0-9_]+)\s+'([^']*)'\s*$")
@@ -99,15 +115,55 @@ def entry_for(line, records):
     return e
 
 
-def build(lines, run_parts, timers, records, drift, skipped, errors, now):
+def slug(s):
+    return re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_")
+
+
+def done(ts, ok):
+    """A finished run as the page reads it (exit 0 / 1); no finish time = no record."""
+    return {"started_at": None, "finished_at": ts, "exit_code": 0 if ok else 1} if ts else None
+
+
+def pg_cron_entries(tsv):
+    """psql -At rows 'jobname<TAB>schedule<TAB>status<TAB>end_time' -> entries (one per active job)."""
+    out = []
+    for line in tsv.splitlines():
+        if not line.strip():
+            continue
+        name, sched, status, end = (line.split("\t") + ["", "", "", ""])[:4]
+        out.append({"source": "pg_cron:supabase-db", "schedule": sched, "key": "pg_cron_" + slug(name), "name": name,
+                    "records_result": True, "log": "cron.job_run_details", "last": done(end, status == "succeeded")})
+    return out
+
+
+def n8n_entries(tsv):
+    """psql -At rows 'id<TAB>name<TAB>status<TAB>stopped_at' -> entries (active workflows with a time trigger)."""
+    out = []
+    for line in tsv.splitlines():
+        if not line.strip():
+            continue
+        wid, name, status, stopped = (line.split("\t") + ["", "", "", ""])[:4]
+        # The id as is: n8n ids differ by case, a slug would merge two workflows into one row.
+        out.append({"source": "n8n:" + wid, "schedule": "@timer", "key": "n8n_" + wid, "name": name,
+                    "records_result": True, "log": "n8n execution_entity", "last": done(stopped, status == "success")})
+    return out
+
+
+def repo_report_entry(key, path, cadence, days, commit_epoch):
+    return {"source": "repo:" + path, "schedule": cadence, "key": key, "records_result": True, "log": None,
+            "stale_after_s": days * DAY_S, "last": done(iso(commit_epoch) if commit_epoch else None, True)}
+
+
+def build(lines, run_parts, timers, records, drift, skipped, errors, now, external=(), external_errors=()):
     entries = [entry_for(l, records) for l in lines]
     for path, sched in run_parts:
         key = re.sub(r"[^a-z0-9]+", "_", os.path.basename(path).lower()).strip("_")
         entries.append({"source": path, "schedule": sched, "key": "run_parts_" + key, "records_result": False,
                         "log": None, "last": None})
     entries.extend(timers)
+    entries.extend(external)
     return {"generated_at": iso(now), "entries": entries, "cron_files_drift": sorted(drift),
-            "skipped_package_files": sorted(skipped), "errors": errors}
+            "skipped_package_files": sorted(skipped), "errors": errors, "external_errors": list(external_errors)}
 
 
 # ---- host I/O (not unit-tested; the test drives build() / parse_cron() / entry_for()) ----
@@ -216,10 +272,50 @@ def collect_drift():
     return drift
 
 
+PG_CRON_SQL = (
+    "select j.jobname, j.schedule, coalesce(d.status, ''), "
+    "coalesce(to_char(d.end_time at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'), '') from cron.job j "
+    "left join lateral (select status, end_time from cron.job_run_details where jobid = j.jobid and end_time is not null "
+    "order by end_time desc limit 1) d on true where j.active order by j.jobname")
+N8N_SQL = (
+    "select w.id, w.name, coalesce(e.status, ''), "
+    "coalesce(to_char(e.\"stoppedAt\" at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'), '') from workflow_entity w "
+    "left join lateral (select status, \"stoppedAt\" from execution_entity where \"workflowId\" = w.id "
+    "and mode = 'trigger' and \"stoppedAt\" is not null order by \"stoppedAt\" desc limit 1) e on true "
+    "left join workflow_history h on h.\"versionId\" = w.\"activeVersionId\" "
+    "where w.active and (coalesce(h.nodes, w.nodes)::text like '%n8n-nodes-base.scheduleTrigger%' "
+    "or coalesce(h.nodes, w.nodes)::text like '%n8n-nodes-base.cron%') "
+    "order by w.name")
+
+
+def psql(db, sql):
+    return subprocess.run(["docker", "exec", "supabase-db", "psql", "-U", "postgres", "-d", db, "-At", "-F", "\t",
+                           "-v", "ON_ERROR_STOP=1", "-c", sql], capture_output=True, text=True, check=True, timeout=30).stdout
+
+
+def collect_external(errors):
+    out = []
+    for label, db, sql, parse in (("pg_cron", "postgres", PG_CRON_SQL, pg_cron_entries), ("n8n", "n8n", N8N_SQL, n8n_entries)):
+        try:
+            out += parse(psql(db, sql))
+        except (OSError, subprocess.SubprocessError) as e:
+            errors.append(f"{label}: {getattr(e, 'stderr', '') or e}".strip()[:200])
+    for key, path, cadence, days in REPO_REPORTS:
+        try:
+            ts = subprocess.run(["git", "-C", WORK_REPO, "log", "-1", "--format=%ct", "origin/main", "--", path],
+                                capture_output=True, text=True, check=True, timeout=30).stdout.strip()
+            out.append(repo_report_entry(key, path, cadence, days, int(ts) if ts.isdigit() else None))
+        except (OSError, subprocess.SubprocessError) as e:
+            errors.append(f"repo {path}: {e}"[:200])
+    return out
+
+
 def main():
     errors, skipped = [], []
+    external_errors = []
     doc = build(collect_cron(errors, skipped), collect_run_parts(skipped), collect_timers(errors),
-                collect_records(errors), collect_drift(), skipped, errors, time.time())
+                collect_records(errors), collect_drift(), skipped, errors, time.time(),
+                collect_external(external_errors), external_errors)
     try:
         os.makedirs(os.path.dirname(OUT_FILE), exist_ok=True)
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(OUT_FILE), prefix=".host-schedules.")
@@ -232,7 +328,7 @@ def main():
         return 2
     unreg = sum(1 for e in doc["entries"] if e["key"] is None)
     print(f"[{doc['generated_at']}] {len(doc['entries'])} entries, {unreg} unregistered, "
-          f"drift={doc['cron_files_drift']}, errors={len(errors)}")
+          f"drift={doc['cron_files_drift']}, errors={len(errors)}, external_errors={len(external_errors)}")
     return 0
 
 

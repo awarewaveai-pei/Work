@@ -63,7 +63,7 @@ export interface SystemRow {
   state: "ok" | "stale" | "missing" | "failed" | "unregistered" | "untracked";
   detail: string;
   /** Section the row is listed under (lib/schedules/host-jobs.ts HOST_GROUP_ORDER); none = listed first. */
-  group?: "backup" | "deploy" | "site";
+  group?: "backup" | "deploy" | "site" | "external" | "laptop";
   /** Shown when the row is clicked. Values written by GPT to the operator's rule (WORKLOG 2026-10-16). */
   details: { what: string; when: string; where: string; look: string; lookHref: string; fail: string };
 }

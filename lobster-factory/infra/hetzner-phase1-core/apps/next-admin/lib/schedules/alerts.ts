@@ -23,8 +23,13 @@ export interface AlertPlan {
   recovered: OpenEpisode[];
 }
 
+/** Rows shown but never pushed: a laptop that is switched off makes them stale, and that is not a fault
+ * (the cloud-routine rows already have their own Telegram alert, routine_watchdog). */
+export const QUIET_GROUPS: ReadonlyArray<NonNullable<SystemRow["group"]>> = ["laptop"];
+
 /** host_schedules is the "list file unreadable" row (state missing): a fault of its own, not a job without a record. */
-export const isRed = (r: SystemRow): boolean => ALERT_STATES.includes(r.state) || (r.key === "host_schedules" && r.state !== "ok");
+export const isRed = (r: SystemRow): boolean =>
+  !(r.group && QUIET_GROUPS.includes(r.group)) && (ALERT_STATES.includes(r.state) || (r.key === "host_schedules" && r.state !== "ok"));
 const settled = (r: SystemRow): boolean => r.state === "ok" || r.state === "untracked";
 
 /**
@@ -69,11 +74,15 @@ export function formatChange(plan: AlertPlan, pageUrl: string): string {
 
 /** Rows that need a look: anything not ok, except the two states that are not faults (untracked = by design). */
 export function formatDigest(rows: SystemRow[], pageUrl: string): string {
-  const attention = rows.filter((r) => r.state !== "ok" && r.state !== "untracked");
+  const quiet = (r: SystemRow) => !!r.group && QUIET_GROUPS.includes(r.group);
+  const off = (r: SystemRow) => r.state !== "ok" && r.state !== "untracked";
+  const attention = rows.filter((r) => off(r) && !quiet(r));
+  const quietOff = rows.filter((r) => off(r) && quiet(r)).length;
   const head = attention.length
     ? `📋 每日排程報告：共 ${rows.length} 個排程，${attention.length} 個需要注意`
     : `📋 每日排程報告：${rows.length} 個排程全部正常`;
-  return [head, ...attention.map(line), "", pageUrl].join("\n");
+  const note = quietOff ? [HOST_UI.digest_quiet.replace("{n}", String(quietOff))] : [];
+  return [head, ...attention.map(line), ...note, "", pageUrl].join("\n");
 }
 
 export interface Delivery {
@@ -132,7 +141,7 @@ export async function runScheduleDigest(deps: Pick<AlertDeps, "rows" | "send" | 
   try {
     const rows = await deps.rows();
     const d = await deps.send(formatDigest(rows, deps.pageUrl));
-    return { ok: d.complete, red: rows.filter((r) => ALERT_STATES.includes(r.state)).length, recovered: 0, channels: d.channels };
+    return { ok: d.complete, red: rows.filter(isRed).length, recovered: 0, channels: d.channels };
   } catch (e) {
     return { ok: false, red: 0, recovered: 0, errors: [String(e).slice(0, 200)] };
   }

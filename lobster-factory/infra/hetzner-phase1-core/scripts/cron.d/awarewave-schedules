@@ -9,6 +9,7 @@
 # waits for its verdict; site-watch-tick.sh is the hourly site-watch round. Frequencies are the old Trigger crons.
 # schedule_alerts / schedule_digest: one Telegram+Slack message when a row on /ops/schedules turns red or recovers, and a
 # daily 09:00 Taipei line (C4; lib/schedules/alerts.ts) -- if that line does not arrive, the alerting itself is down.
+# trigger_slots_check: a Trigger.dev concurrency slot held by a run that is not running (C3; the 2026-10-23 outage).
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 */10 * * * * root /root/lobster-phase1/scripts/cron-run.sh host_schedules_report 'python3 /root/lobster-phase1/scripts/report-host-schedules.py >> /var/log/host-schedules.log 2>&1'
@@ -24,6 +25,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 5 * * * * root /root/lobster-phase1/scripts/cron-run.sh site_watch_tick '/root/lobster-phase1/scripts/site-watch-tick.sh'
 */10 * * * * root /root/lobster-phase1/scripts/cron-run.sh dispatch_action_run '/root/lobster-phase1/scripts/trigger-task.sh dispatch_action_run dispatch-action-run'
 0 4 * * * root /root/lobster-phase1/scripts/cron-run.sh ao_infrastructure_check '/root/lobster-phase1/scripts/trigger-task.sh ao_infrastructure_check ao-infrastructure-check'
+*/10 * * * * root /root/lobster-phase1/scripts/cron-run.sh trigger_slots_check '/root/lobster-phase1/scripts/check-trigger-slots.sh >> /var/log/trigger-slots.log 2>&1'
 */10 * * * * root /root/lobster-phase1/scripts/cron-run.sh schedule_alerts '/root/lobster-phase1/scripts/poke.sh schedule_alerts /api/internal/schedules/alerts SCHEDULE_INGEST_TOKEN'
 0 1 * * * root /root/lobster-phase1/scripts/cron-run.sh schedule_digest '/root/lobster-phase1/scripts/poke.sh schedule_digest /api/internal/schedules/alerts?digest=1 SCHEDULE_INGEST_TOKEN'
 */5 * * * * root /root/lobster-phase1/scripts/cron-run.sh mainwp_wp_cron 'curl -s -o /dev/null http://127.0.0.1:8090/wp-cron.php?doing_wp_cron >/dev/null 2>&1'

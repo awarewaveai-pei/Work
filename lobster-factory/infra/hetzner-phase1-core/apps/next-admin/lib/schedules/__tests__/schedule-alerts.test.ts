@@ -32,6 +32,18 @@ describe("planAlerts", () => {
     expect(planAlerts(rows, [ep("a"), ep("b")]).red).toEqual([]); // still red: no repeat
   });
 
+  it("a stale laptop row is shown but never pushed", () => {
+    const laptop: SystemRow = { ...row("laptop_status_reports", "stale"), group: "laptop" };
+    expect(planAlerts([laptop, row("a", "failed")], []).red.map((r) => r.key)).toEqual(["a"]);
+  });
+
+  it("the daily line does not count a stale laptop row as needing attention", () => {
+    const laptop: SystemRow = { ...row("laptop_status_reports", "stale"), group: "laptop" };
+    const text = formatDigest([laptop, row("a", "ok")], "u");
+    expect(text).toContain("全部正常");
+    expect(text).toContain("筆電與雲端有 1 項過時");
+  });
+
   it("recovers only a listed, settled row; missing, unregistered or gone keeps its episode", () => {
     const p = planAlerts([row("a", "ok"), row("t", "untracked"), row("m", "missing"), row("u", "unregistered")], [ep("a"), ep("t"), ep("m"), ep("u"), ep("gone")]);
     expect(p.recovered.map((o) => o.key)).toEqual(["a", "t"]);
