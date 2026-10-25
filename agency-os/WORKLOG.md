@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-25（續83）Social／video／portal Cookie 400：補齊 next-admin 入口設定，已正式套用（Codex）
+
+- **根因／範圍**：先前 app 修正未涵蓋其他 server。`lobster-factory/infra/hetzner-phase1-core/nginx/default.conf:391` 的 portal、`:435` 的 Social／tarot／studio／video／design 同樣代理 next-admin，但仍用預設請求標頭容量。操作者已批准 Social 修正，並追加 video 與 portal。
+- **已修改／提交**：上述兩個 server 使用 app 相同的 4×32 KiB 緩衝。`tests/host-scripts/nginx-auth-headers.test.mjs:9` 檢查 app、portal 與產品共用區塊的每個 hostname；先紅（Social 缺少設定）後綠（1 passed）。`runbooks/NGINX-400-COOKIE-HEADER.md:22` 補同類範圍及七入口公開驗收迴圈。程式／設定／runbook 已提交 `dc0a68b3a`，未夾帶另一 session 的排程監工台變動。
+- **實測**：公開無憑證合成 Cookie（8192 個 x）在 social／tarot／studio／video／design 都回 400、一般根目錄 307、登入頁 200；app 同一 Cookie 回 307。portal `/portal` 一般 307／大 Cookie 400，`/portal/login` 一般 200／大 Cookie 400。不是站點消失，是請求先被拒絕。
+- **正式套用**：初次多命令 SSH 檢查被 `permission-deny-mirror` 阻擋；操作者續指示「commit + 上線」後，附正式操作確認的單一檢查及 safe-patch 命令通過工具閘。線上基線 SHA-256 `189b3bdc475474c51f8518f7ace9da9d2ecc22e56ce5a73a840d93140c7c3f8d`；scp 上傳配置 hash 與本機一致，經 `/root/lobster-phase1/scripts/safe-infra-patch.sh nginx /root/lobster-phase1/nginx/default.conf` 於 2026-10-25 23:32 台灣時間成功套用。nginx -T 三個 server 皆有新容量、正式檔 SHA-256 `c6d97728b893a3c30b7f75074c8fde1921d01266cba68e0b58020da5ca676ba2` 與 repo 一致。
+- **上線驗收**：app／social／tarot／studio／video／design／portal 七入口皆一般請求 307、大 Cookie 307、登入頁 200；portal 使用 `/portal`、`/portal/login`。原故障 Chrome Social 分頁重載後顯示登入頁；video 已登入且顯示影片製作頁；portal 顯示需要客戶帳號提示（內部員工帳號正常拒絕），均無 400。整體健康報告 `agency-os/reports/health/health-20261025-233508.json`：99.7%（319/320），唯一失敗是既有 AO-CLOSE archive 的已完成待決6引用仍被要求 open TASKS；不是 nginx 失敗。
+- REALTEST_EVIDENCE: tool=curl | cmd=runbooks/NGINX-400-COOKIE-HEADER.md public synthetic Cookie matrix (before patch) | exit=0 | ms=24355
+- REALTEST_EVIDENCE: tool=Bash | cmd=node --test lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/nginx-auth-headers.test.mjs | exit=0 | ms=61
+- REALTEST_EVIDENCE: tool=SSH | cmd=safe-infra-patch.sh nginx /root/lobster-phase1/nginx/default.conf (uploaded reviewed config stdin) | exit=0 | ms=7398
+- REALTEST_EVIDENCE: tool=curl | cmd=runbooks/NGINX-400-COOKIE-HEADER.md public synthetic Cookie matrix (after patch, seven doors) | exit=0 | ms=28624
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/0m/0n
+- ORACLE_WAIVED: scripts/claude-oracle.ps1 exit=1 -- claude CLI not on PATH；逐項對抗自審已完成：設定在 server 層、app 保留、兩個同類入口補齊、guard 遍歷產品共用區塊 hostname、修改僅配置與診斷文件；本機檢查不等於 nginx -t 或正式驗收。
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks,lobster-factory | grep=[l]arge_client_header_buffers | hits=6
+- **避免再發生／限制**：新增設定檢查先於修正執行並捕捉缺漏。既有 16 KiB Next.js／Cloudflare 邊界維持 runbook 記錄，不宣稱任意長 Cookie 皆支援。BOM audit：138 檔、75 有 BOM、63 既存缺 BOM；本次 repo 文件免 BOM，未更動 memory。Claude CLI 缺失的交叉審查限制仍在；使用上述自審與真實前後測替代。
+- **rollback**：備份 `/root/lobster-phase1/nginx/default.conf.bak.safe-patch-20261025-153240`；把該備份送進同一 nginx patch wrapper 可回復。未修改 compose、secrets 或應用程式。
+
 ## 2026-10-25（續82）排程離開 Trigger C2.2–C2.5＋C4.6⑦＋C6.1（操作者「還有一堆沒做好, 趕快去整批做好」）：Trigger 不再有任何定時工作；第一則每日報告送達；狀態報告清點（Claude）
 
 - **C2.2**：三個每日工作不等首跑，主機 `cron-run.sh <key> poke.sh …` 手動各一次（rotation 每槽一次、metrics upsert、expire 冪等＝重跑安全）→ 9 列全有成功紀錄。
