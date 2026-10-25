@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-25（續72）組織列只准控制面寫：0134 草稿（拿掉成員的 organizations UPDATE／DELETE 政策＋收回 anon／authenticated 寫入權）；拋棄式 DB 20/20 通過；未套 prod、migration 未 commit（Claude）
+
+- **觸發**：續68 critic 發現（續70 剩餘風險）：`organizations_update`／`organizations_delete`（`lobster-factory/packages/db/migrations/0010_clerk_org_mapping_and_rls_expansion.sql:526-534`）只要求 `user_has_org_access(id)`，Supabase 預設權限又給 authenticated 寫入 → 客戶成員帶自己 JWT 經 PostgREST 可改自己組織列任何欄（`kind`→internal＝後台免費；`parent_organization_id`／`org_level`＝改計費主體）或直接 DELETE。
+- **盤點**（不變量＝組織列只由控制面寫）：next-admin 所有 `from("organizations")` 寫入（`app/api/build/runs/route.ts:79`、`lib/cognitive-os/import-sources.ts:173`、`app/api/onboarding/trigger-build/route.ts:168`、`app/api/ops/tenants/[id]/config/route.ts:116`、`app/api/internal/hosting/provision-staging/route.ts:268`、`app/api/ops/organizations/route.ts:52`、`app/api/ops/clients/[slug]/{brand-colors:70,wp-update:465,cs-config:133,cis:129,wp-report:99,outreach-config:126}`、`lib/entitlements/wp-customers.ts:41`）都用 `getSupabaseWriteClient`／`getSupabaseServerClient`（`lib/supabase-server.ts:29,42`，service role，缺鍵時退 anon 而非使用者 JWT）；`createSupabaseUserClient`／`createSupabaseBrowserClient`（`lib/supabase/route-client.ts:30`、`lib/supabase/ssr.ts:27`）的呼叫端 0 處碰 organizations；`deprovision-staging.sh:84` 用 service role；`portal_complete_signup`（`0063:55`、`0110:105`）是 security definer。→ 使用者 session 寫入 organizations＝0 處。
+- **方案**：A＝拿掉兩個政策＋revoke insert/update/delete/truncate（採用；無呼叫端，零行為改變）；B＝只開 `name` 等欄位權限／觸發器（否決：開一條沒人用的寫入路徑，日後加欄位又要記得排除）。
+- **檔案（未 commit）**：`lobster-factory/packages/db/migrations/0134_organizations_control_plane_writes_only.sql`（+`.down.sql`，+`packages/db/scripts/0134_organizations_control_plane_writes_only_down.sql` 副本）；up 結尾 do-block 斷言：非 SELECT 政策 0、anon／authenticated 無表級與欄位級寫權，否則整個 migration 失敗。0133 的 `sold_by` 觸發器保留（縱深）。
+- C1 **同類、範圍外未修**：`profiles_update_self`（`0019`）讓使用者改自己 profile 任何欄，含 `default_organization_id`；`lib/entitlements/wp-customers.ts:60-62` 用它決定 WordPress 會員落在哪個帳戶。需另做盤點（使用者是否需要改自己的 profile）再決定同樣收窄。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -I scratchpad/verify_0134.py（拋棄式 postgres:15.8＋postgrest v14.6；0001/0004/0010 organizations 政策原文/0062/0063/0066/0077/0092/0110；成員 JWT PATCH kind／parent、DELETE；anon；service_role PATCH/INSERT/DELETE；down 後再 up） | exit=0 | ms=25000（20/20 PASS：套前三招皆成功＝測試咬得到洞；套後三招 403 `42501 permission denied`、列不變、成員 SELECT 照常；anon 401；service_role 三動作照常；down 後洞重現、再套後關閉）
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n（n1：0133:107 註解在 0134 後過時；已套用的舊檔不回改）
+- ORACLE_WAIVED: 本條無 commit 的 source 檔；migration commit 時（操作者核可後）跑 `/codex-review`
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=organizations_(update|delete) | hits=19（0010 原定義、0133:107 註解、0134 三檔、worklog-excerpt、step-4-seller 卡片；無其他依賴）
+- **High（RLS）**：未套 prod、migration 三檔未 commit（commit 進 main 而未套會擋 03:00 自動部署，`check-migrations-applied.sh`）。操作者核可後：先 `node scripts/apply-db-migration.mjs 0134` 套 prod，讀回 `pg_policies`＋`has_table_privilege('authenticated','public.organizations','UPDATE')`=false，再 commit 推 main。
+- **rollback**：`0134_organizations_control_plane_writes_only.down.sql`（還原 0010 兩政策＋寫入權，並刪 schema_migrations 列）。
 ## 2026-10-25（續71）排程離開 Trigger C4.6⑤：`sync-slack-alert-webhooks.ps1` 不再能把 #infra-alerts 改送別的頻道（讀 vault 新鍵、主機網址不同即停）；Grafana 同步同類錯鍵一併改（Claude）
 
 - **觸發**：操作者「go ahead C4.6⑤」。根因見續61（預設 vault 鍵 `AGENCY_OS_SLACK_WEBHOOK_URL`＝另一頻道）。
