@@ -1,4 +1,15 @@
 # Worklog
+## 2026-10-25（續33）0127 套 prod＋5bdf7f9f9 推 main（操作者 go）：帳務新版今晚 03:00 自動部署（Claude）
+
+**觸發**：操作者「go ahead：套 0127 到正式庫，確認後 push main，讓今晚 03:00 自動部署。」設計與驗證見續32。
+- 套庫：`node scripts/apply-db-migration.mjs 0127` → APPLY_OK 1/1；`--status` → STATUS_OK {"applied":128}（零缺漏，migration 閘今晚放行）。
+- prod 唯讀讀回（`begin read only` … `rollback`）：schema_migrations 有 0127；`billing_account`／`billing_attention` 在、security invoker；anon／authenticated 不可執行、service_role 可；`billing_overview` 仍在（線上舊版照常）；`billing_attention` totals 全 0、rows 0；`billing_account(internal)`→`awarewave-ops`。交叉核對：舊 `billing_overview` 3 帳戶、客戶未用點數 0＝新函式一致。
+- push：`5db9dd75b..5bdf7f9f9 main -> main`；無 `DEPLOY_HOLD`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=ssh ubuntu@ks-aw-01 sudo docker exec -i supabase-db psql（唯讀交易，scratchpad verify-0127-prod.sql）→ 上列讀回 | exit=0 | ms=4522
+- REVIEW_WAIVED: NA -- 套已審查的 0127（續32 critic）＋push，無新程式碼
+- BUGHUNT_WAIVED: NA -- 無程式碼改動
+
+**待操作者**：新版上線（明早）後，新 migration 刪 `billing_overview`（收縮步）。
 ## 2026-10-25（續32）/ops/billing 撐數千客戶：帳務改進客戶頁「帳務」分頁＋全站合計與待處理清單；客戶名單改伺服器搜尋（0127 未套 prod）（Claude）
 
 **觸發**：操作者「將來會有數千名客戶, 你現在這種排版方式非常不適當」→ 方案定案「照這個做。本機測過再問我套正式庫。」
