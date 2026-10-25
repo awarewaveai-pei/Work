@@ -1,4 +1,15 @@
 # Worklog
+## 2026-10-25（續74）排程離開 Trigger C4.6⑥：`/etc/default/awarewave-endpoint-alert*` 沒人讀的通道設定退役（搬至 .state，未刪）（Claude）
+
+- **觸發**：操作者「go ahead C4.6⑥」。
+- **讀者清點**：repo `endpoint-alert.sh` 只讀 CHECK_URLS／CHECK_URLS_SLOW／HEARTBEAT_URL／TIMEOUT_SEC／RENOTIFY_AFTER_SEC／PAGERDUTY_*（發送走 notify.sh＋`.env`，b9ab5a4f2）；主機 grep `awarewave-endpoint-alert` 讀者＝endpoint-alert.sh、unit／timer、slack-webhook-selftest.sh、`/usr/local/bin/endpoint-alert.sh`（unit 不跑，sha 與現行不同）。
+- **退役**（repo `802721499`）：unit 移除 `.telegram` EnvironmentFile；刪 `slack-webhook-selftest.sh`（唯一讀 WEBHOOK_URL 者，演練改 `slack-alert-drill.sh`）；`slack-notification-routing.md` invariant、`lobster-factory/infra/netdata/README.md` 開頭註明 ks-aw-01 未部署（Netdata Cloud）。
+- **主機**：搬到 `/root/lobster-phase1/.state/retired-endpoint-alert-20261025T131122Z/`（700）：`.telegram`、`.local.bak-20260828-wp404`、`/usr/local/bin/endpoint-alert.sh`、`scripts/slack-webhook-selftest.sh`，另備份主檔、`.local`、舊 unit。主檔只剩 `TIMEOUT_SEC`（刪 WEBHOOK_URL、被 `.local` 覆蓋的 CHECK_URLS）；`.local` 刪 `OPS_INCIDENTS_WEBHOOK_URL`（行數 −1 檢查）；unit 由 origin/main 安裝＋daemon-reload。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`systemctl start awarewave-endpoint-alert.service` → Result=success ExecMainStatus=0；鍵名讀回：主檔 TIMEOUT_SEC、`.local` CHECK_URLS／CHECK_URLS_SLOW／HEARTBEAT_URL | exit=0 | ms=2000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n（n1：`.local` 殘留註解「Secondary webhook: #ops-incidents」，無值，未改）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks,.claude | grep=slack-webhook-selftest | hits=11（程式碼只剩 `scripts/sync-slack-alert-webhooks.ps1:17` 說明「已不寫」；其餘 WORKLOG／WORKLOG-archive 歷史）
+- **剩餘**：⑦ 明早 09:00 每日一行截圖；C2.2 三個每日工作首跑；待決 4（備份同步推不上 GitHub）。
+- **rollback**：`R=/root/lobster-phase1/.state/retired-endpoint-alert-20261025T131122Z; cp -p $R/awarewave-endpoint-alert* /etc/default/; cp -p $R/awarewave-endpoint-alert.service /etc/systemd/system/ && systemctl daemon-reload`；repo `git revert 802721499`。
 ## 2026-10-25（續73）客戶頁「帳號」只列客戶已買且已開門的產品，每個帳號附各產品角色（去設定）；設定密碼連結不再指向未開門的產品（Claude）
 
 - **觸發**：操作者問客戶帳號頁要不要比照 `/ops/staff`；定案 B（「客戶會買的產品不一定是哪幾個」）。
