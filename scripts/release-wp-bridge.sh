@@ -98,6 +98,7 @@ for i in $(seq 1 9); do
 	if gh release view "$TAG" -R "$REPO" 2>/dev/null | grep -q "aware-wave-wp-bridge-$TAG.zip"; then
 		say "RELEASE OK: $TAG with asset aware-wave-wp-bridge-$TAG.zip"
 		gh release view "$TAG" -R "$REPO" | grep -E "tag:|asset:|url:"
+		say "NEXT: wp-bridge runs on every managed site -- roll it out: powershell -File scripts/rollout-wp-bridge.ps1 -DryRun, then without -DryRun (High)"
 		exit 0
 	fi
 	say "  waiting for release asset... ($i/9)"

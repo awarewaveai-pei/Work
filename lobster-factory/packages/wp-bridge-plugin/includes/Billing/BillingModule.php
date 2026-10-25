@@ -1,8 +1,9 @@
 <?php
 /**
- * Wires ADR 017 4b-2 into WordPress. Product fields and the settings page are always present; everything that
- * acts on members or money (payment events, the sender, email verification, the checkout gate, door buttons)
- * registers only while the switch is on. Rollback = switch off.
+ * Wires ADR 017 4b-2 into WordPress. wp-bridge runs on every managed site (client sites too), so billing exists only
+ * on a site opted in (the switch option exists): there the settings page is present, and the product fields and
+ * everything that acts on members or money (payment events, email verification, the checkout gate, door buttons)
+ * register only while the switch is on. Rollback = switch off.
  *
  * @package AwareWave\WpBridge\Billing
  */
@@ -14,7 +15,11 @@ use AwareWave\WpBridge\Admin\BillingSettingsPage;
 final class BillingModule {
 
 	public function register(): void {
-		( new ProductFields() )->register();
+		// A client site never sees AwareWave billing: nothing (not even the settings page) until the operator opts the
+		// site in once with `wp option add aware_wave_payments_enabled ''` (runbooks/WP-BRIDGE-RELEASE-RUNBOOK.md).
+		if ( get_option( Settings::OPT_ENABLED, false ) === false ) {
+			return;
+		}
 		( new BillingSettingsPage() )->register();
 
 		$settings = Settings::fromOptions();
@@ -34,6 +39,8 @@ final class BillingModule {
 		if ( ! $settings->enabled ) {
 			return;
 		}
+
+		( new ProductFields() )->register();
 
 		$events = new PaymentEvents( $shop, new WpMembers(), $queue, $settings->allowedGateways );
 		// woocommerce_payment_complete fires only when a gateway calls payment_complete(); an admin marking an order paid,

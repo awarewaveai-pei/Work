@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-25（續28）wp-bridge 是所有網站共用：0.18.2 客戶站看不到 AwareWave 收費功能；新 `scripts/rollout-wp-bridge.ps1` 一次升級主機上每個網站（Claude）
+
+- **根因**（操作者「wp-bridge 是所有網站通用的」「商品編輯頁也會多三個 AwareWave 欄位，客戶看到可能會疑惑」）：①發版流程只到 GitHub Release，安裝靠手動，只升了 aware-wave.com，soulful 停在 0.17.0；②0.18.0/0.18.1 的商品欄位與「付款與會員」頁在所有網站都出現（soulful 有 WooCommerce 10.7.0）。
+- **不變量**：①一次發版＝主機上每個裝了 wp-bridge 的網站都升到同一版（自動探索，不靠名單）；②AwareWave 收費功能只出現在操作者啟用過的網站（`aware_wave_payments_enabled` option 存在）。
+- **做了什麼**：`includes/Billing/BillingModule.php`（option 不存在＝什麼都不註冊；商品欄位只在開關開啟時註冊）、設定頁說明、`AWBRIDGE_VERSION` 0.18.2；新 `scripts/rollout-wp-bridge.ps1`（`lib/prod-host.ps1` 取主機；每站 DB 備份→舊外掛資料夾備份→`wp plugin install --force`（保留啟用狀態）→chown 回 plugins 擁有者→檢查版本／REST health／首頁；失敗自動還原、exit 1；docker 失效或找不到任何站＝exit 1）；`scripts/release-wp-bridge.sh` 成功後印 rollout 下一步；`runbooks/WP-BRIDGE-RELEASE-RUNBOOK.md`「操作者端」改成 rollout 流程＋啟用規則；`.claude/commands/wp-bridge-release.md` 同步。
+- **盤點**：ks-aw-01 上 WordPress 容器 `lobster-wordpress`（aware-wave.com 0.18.1）、`soulful-wp`（0.17.0）、`mainwp-web`（無 wp-bridge）；其他 tenant 無正式站。
+- **Codex oracle**（`agency-os/reports/oracle/2026-10-25-partialreview-8ec4681c.md`）：2 項皆修。F1 soulful-db 只有 `MARIADB_*`（實測 env 名稱）→ 備份改讀 `MARIADB_*` 退 `MYSQL_*`、`mariadb-dump` 退 `mysqldump`（同 `lobster-factory/infra/ks-aw-01-backup/backup-ks-aw-01.sh:96-98`）；F2 `docker ps` 失敗或 0 站時誤報成功 → exit 1，`-Site` 指名不存在也 exit 1。
+- REALTEST_EVIDENCE: tool=Bash | cmd=php -d extension=mbstring -d extension=sodium phpunit-9.6.phar（plugin 全套 116 tests） | exit=0 | ms=248
+- REALTEST_EVIDENCE: tool=SSH | cmd=rollout-wp-bridge.ps1 -DryRun -Version 0.18.1 → soulful-wp would upgrade 0.17.0 -> 0.18.1、lobster-wordpress up to date | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=SSH | cmd=rollout-wp-bridge.ps1 -DryRun -Site nosuch-wp → FAIL no site running wp-bridge found | exit=1 | ms=0（未計時）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n（Codex CLI；2 修）
+- ORACLE_WAIVED: opt-in 守衛（BillingModule option 存在檢查）在 Codex 擷取後才加，1 行，自審：option 不存在→return，設定頁存檔寫 ''（存在），不會把已啟用的站關掉。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks,.claude | grep=rollout-wp-bridge | hits=14
+- **rollback**：`rollout-wp-bridge.ps1` 失敗自動還原；手動：`/root/backups/wordpress/<container>-wpbridge-<舊版>-<UTC>.tgz` 解回 plugins、DB 用同目錄 `.sql`。
 ## 2026-10-25（續27）wp-bridge 0.18.1 發版並裝上 aware-wave.com（Claude）
 
 - **發版**：tag v0.18.1 已推；GitHub Actions 仍因帳號付款未啟動（操作者已處理，GitHub 尚未放行）→ 同續24，本機 `git archive` 打包、`gh release create --verify-tag`。https://github.com/awarewaveai-pei/aware-wave-wp-bridge/releases/tag/v0.18.1

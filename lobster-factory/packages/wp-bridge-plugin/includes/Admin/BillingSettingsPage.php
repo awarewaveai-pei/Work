@@ -34,7 +34,7 @@ final class BillingSettingsPage {
 		foreach ( $notices as $n ) {
 			echo '<div class="notice notice-' . esc_attr( $n[0] ) . '"><p>' . esc_html( $n[1] ) . '</p></div>';
 		}
-		echo '<p>開關打開後：付款完成、續約、換方案、全額退款、取消／到期會送到 app.aware-wave.com；未確認信箱的會員不能結帳 AwareWave 商品；「我的帳號」出現產品「進入」按鈕。關掉＝全部停止（已排隊未送的事件會在訂單備註標示未送出）。</p>';
+		echo '<p>開關打開後：付款完成、續約、換方案、全額退款、取消／到期會送到 app.aware-wave.com；未確認信箱的會員不能結帳 AwareWave 商品；「我的帳號」出現產品「進入」按鈕；商品編輯頁出現 AwareWave 方案／點數／產品欄位。客戶網站不賣 AwareWave 方案就保持關閉。關掉＝全部停止（已排隊未送的事件會在訂單備註標示未送出）。</p>';
 		echo '<form method="post">';
 		wp_nonce_field( 'awbridge_billing_save' );
 		echo '<input type="hidden" name="awbridge_billing" value="save"><table class="form-table">';

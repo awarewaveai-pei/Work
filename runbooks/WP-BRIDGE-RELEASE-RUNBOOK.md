@@ -30,8 +30,11 @@ bash scripts/release-wp-bridge.sh              # 真發版
 
 ## 操作者端
 
-1. 後台 → 外掛 → 安裝外掛 → 上傳外掛 → 選 `aware-wave-wp-bridge-vX.Y.Z.zip` → 覆蓋舊版。
-2. 驗證：`https://<站>/wp-json/aware-wave-bridge/v1/health` → `"version":"X.Y.Z"`。
+1. 先看：`powershell -ExecutionPolicy Bypass -File .\scripts\rollout-wp-bridge.ps1 -DryRun`（列出主機上每個裝了 wp-bridge 的網站與版本；自動探索，不靠名單）。
+2. 升級全部：`powershell -ExecutionPolicy Bypass -File .\scripts\rollout-wp-bridge.ps1`（High：每站 DB 備份 → 舊外掛資料夾備份 → `wp plugin install --force` → 檢查版本／`/health`／首頁；失敗自動還原舊版、exit 1；備份在 `/root/backups/wordpress/`）。
+3. 客戶站（soulful 等）另跑 `/client-status` 與 `/playwright client <slug>`（AGENTS.md §7 Client site DoD）。
+4. wp-bridge 是**所有網站共用**：發版後必 rollout，不能只升 aware-wave.com。只有本機主機以外的網站才用後台「上傳外掛」覆蓋。
+5. AwareWave 收費功能（付款與會員設定頁、商品欄位、驗證信、結帳閘）只出現在**啟用過**的網站：`wp option add aware_wave_payments_enabled ''`（aware-wave.com 已啟用；客戶站不要加）。0.18.2 起。
 
 ## 排查
 
@@ -46,5 +49,5 @@ bash scripts/release-wp-bridge.sh              # 真發版
 ## 相關
 
 - 指令：`.claude/commands/wp-bridge-release.md`
-- 腳本：`scripts/release-wp-bridge.sh`
+- 腳本：`scripts/release-wp-bridge.sh`（發版）、`scripts/rollout-wp-bridge.ps1`（裝到所有網站）
 - 端點現況：`POST /post` `/option/{name}` `/product`（v0.7.0+）、`GET /health` `/blocks`

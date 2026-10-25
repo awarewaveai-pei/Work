@@ -40,8 +40,7 @@ bash scripts/release-wp-bridge.sh
 ## 完成後告訴操作者
 
 - Release URL：`https://github.com/awarewaveai-pei/aware-wave-wp-bridge/releases/tag/vX.Y.Z`
-- 後台「上傳外掛」用該 zip 覆蓋舊版
-- 驗證：`https://<站>/wp-json/aware-wave-bridge/v1/health` 顯示新 `version`
+- 接著 rollout 到**所有**裝了 wp-bridge 的網站（共用外掛）：`.\scripts\rollout-wp-bridge.ps1 -DryRun` → `.\scripts\rollout-wp-bridge.ps1`（High；流程與客戶站驗收見 `runbooks/WP-BRIDGE-RELEASE-RUNBOOK.md`「操作者端」）
 
 ## 失敗排查
 
