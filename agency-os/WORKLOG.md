@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-25（續75）0134 套 prod＋推 main（操作者 go）：organizations 只剩 SELECT 政策，anon／authenticated 只剩 SELECT 權（Claude）
+
+- **觸發**：操作者「go ahead：0134 先套 prod，讀回政策和權限，再 commit 推 main」。接續 72（盤點、方案、拋棄式驗證）。
+- **套前改動**（critic n2 採納）：revoke 加 `references, trigger`（防日後 definer 型 exec 函式借 TRIGGER 權提權），斷言與 down 同步；down 與 `packages/db/scripts/` 副本 `cmp` 相同。
+- 套前唯讀快照：`--status` applied 133／missing 0134；政策 `organizations_{delete,select,update}`；authenticated UPDATE/DELETE=t；orgs 6、internal 1。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -I scratchpad/verify_0134.py（改後重跑，拋棄式 postgres 15.8＋postgrest v14.6） | exit=0 | ms=25000（20/20 PASS）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`node scripts/apply-db-migration.mjs 0134` | exit=0 | ms=17683（APPLY_OK 1/1；`--status` → `STATUS_OK {"applied":134}`；ledger 列 2026-10-25 13:13:02Z）
+- REALTEST_EVIDENCE: tool=SSH | cmd=唯讀讀回 pg_policies／role_table_grants／has_table_privilege／pg_trigger | exit=0 | ms=2000（政策只剩 `organizations_select:SELECT`；authenticated、anon 權限只剩 SELECT；寫入權與欄位權皆 f；service_role 讀寫 t；觸發器 `organizations_parent_is_group`、`organizations_sold_by_{control_plane_only,is_root}` 在；orgs 6、internal 1 不變）
+- REALTEST_EVIDENCE: tool=SSH | cmd=交易內 `set local role authenticated; update … where false` / `delete … where false`，`set local role service_role; update … where false`，皆 rollback | exit=0 | ms=1000（authenticated 兩者 `permission denied for table organizations`；service_role `UPDATE 0` 正常；未改任何列）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker ps --filter name=lobster-next-admin`；`docker logs --since 5m \| grep -ciE 'permission denied\|42501\|organizations'` | exit=0 | ms=1500（Up healthy；0 筆）
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/2n（n1 `lib/supabase-server.ts:42` 缺 service key 時退 anon、`provision-staging/route.ts:268` 不檢查 error——既有，0134 未變差，未修；n2 已採納）
+- ORACLE_WAIVED: codex 額度斷路器 BLOCKED 至 22:36（`oracle-quota.ps1 -Action check -Tool codex` exit 3）；替代＝獨立 critic 全量重推導（寫入路徑盤點、SQL 語意、ledger 注入、down 對 0010）＋突變證據（拋棄式 DB 套前三招成功／套後 403／down 重現／再套關閉）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=organizations_(update|delete) | hits=19（同續72；無新依賴）
+- **剩餘**：C1 `profiles_update_self`（0019）可改 `default_organization_id`，`lib/entitlements/wp-customers.ts:60-62` 依它歸戶——同類未修；n1 寫入路徑退 anon 未修。
+- **rollback**：手動 `lobster-factory/packages/db/migrations/0134_organizations_control_plane_writes_only.down.sql`（經 `sudo -n docker exec -i supabase-db psql -U supabase_admin`；自刪 ledger 列、還原 0010 兩政策與寫入權＝重開洞）；`git revert` 本 commit。
 ## 2026-10-25（續74）排程離開 Trigger C4.6⑥：`/etc/default/awarewave-endpoint-alert*` 沒人讀的通道設定退役（搬至 .state，未刪）（Claude）
 
 - **觸發**：操作者「go ahead C4.6⑥」。
