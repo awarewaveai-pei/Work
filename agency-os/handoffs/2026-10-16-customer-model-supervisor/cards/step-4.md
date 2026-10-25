@@ -153,5 +153,15 @@ A／B 都要會計師一句話確認「收款開發票＋合約負債」；C 另
 ### 4b-8　帳本泛化（ADR 015 §4 第 2 步；只有會計師要「按產品分」才做）
 - `media_credit_ledger` 加 `product_key`（nullable→回填→not null），不改表名（view 雙名過渡的理由已不存在：帳本現在只有 grant／refund 幾筆）；debit 已帶 `featureKey`（`ledger.ts:13` `p_reference_id`），產品可由 `PRODUCTS` 反查，所以**預設不做**，列在這裡避免再議。
 
+### 4b-9　真實付款演練（依賴 4b-6、第一個方案；收第一筆真錢前必做）
+- 為什麼：外掛（`aware-wave-store-plugin/tests/`，15 測試）與控制面（`lib/payments`、`lib/entitlements`）各自有測試，但 WordPress→控制面整條沒跑過；2026-10-25 prod `payment_events`＝0。
+- 步驟：aware-wave.com 建私密測試商品（訂閱 0 元試用＋NT$1 點數包，`_awarewave_plan_key`／`_awarewave_credit_units` 填好）→ 測試會員（email 已驗證）各下一筆，TapPay 用沙盒卡號 → 逐段看：Woo 訂單備註「已送 AwareWave event wc:…」、`payment_events` 有列、`/ops/billing` 出現合約、`organization_entitlements` active 列、錢包加點、首購自動建帳戶與設定密碼信到信箱、我的帳號「進入」一鍵進門、門內用一次付費功能後 `entitlement.usage` 有列 → 全額退款點數包只退未用 → 取消訂閱後寬限 7 天到期 → WCS 後台手動觸發一次續扣，續約事件到達。
+- 驗收：每段一行實際輸出寫進 WORKLOG（REALTEST）；任一段不符 → 開修，修完整條重跑。
+- Rollback：外掛設定頁關「送付款事件」；測試帳戶與列用 `record-payment.mjs` 反向登記，不刪列。
+
+### 4b-10　員工後台給／收產品（無依賴；High：權限）
+- 為什麼：2026-10-25 查，給某客戶產品只有三條路——付款事件、`organization_all_features`（0118，SQL）、`scripts/record-payment.mjs`（`apps/next-admin/scripts/`）；`/ops/billing` 只讀（`page.tsx:5`）。代操、贈送、「只開部分產品」都要員工能在畫面上做。
+- 範圍（開工前先出七段計畫給操作者批准）：客戶頁一個區塊，勾產品＝寫一筆 comp 或 contract 權利列（同一張 `organization_entitlements`，頁面不另存）；收回＝把列設 expired；每次寫稽核；只有 owner／admin。
+
 ### 順序與依賴
-`4b-1`（現在，Codex）→ `4b-3`（Codex，依賴 4b-1）→ 待決 1 定 → `4b-2` → 待決 3 定 → `4b-6`、`4b-7` → `4b-4`（門上線 High）→ 待決 5 定 → `4b-5`（High）。`4b-8` 不排。每張 done 時在 `data.mjs` `STEPS[3]` 的 `items` 打勾（id＝4b-N）；本卡不寫狀態。
+`4b-1`（現在，Codex）→ `4b-3`（Codex，依賴 4b-1）→ 待決 1 定 → `4b-2` → 待決 3 定 → `4b-6`、`4b-7` → `4b-4`（門上線 High）→ 待決 5 定 → `4b-5`（High）。`4b-8` 不排。`4b-9` 在 4b-6 與第一個方案之後、收第一筆真錢之前；`4b-10` 獨立。每張 done 時在 `data.mjs` `STEPS[3]` 的 `items` 打勾（id＝4b-N）；本卡不寫狀態。

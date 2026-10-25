@@ -9,7 +9,7 @@ export const META = {
   tasks: 'agency-os/TASKS.md「ADR 017 客戶怎麼買」',
   adr012: 'agency-os/docs/architecture/decisions/012-shared-platform-layer.md',
   adr015: 'agency-os/docs/architecture/decisions/015-awarewave-account-and-shared-wallet.md',
-  worklog: 'agency-os/WORKLOG.md 2026-10-16 續13（三軸）、續14（監工台）、續15（七張卡）；2026-10-18 全鏈自審條目；2026-10-23 續36（先後決策）；2026-10-24 續36（video、design 上線，門只讓持有產品的帳戶進）、續39（部署）、續57（4b 待決選項、設計更新、八張小卡）',
+  worklog: 'agency-os/WORKLOG.md 2026-10-16 續13（三軸）、續14（監工台）、續15（七張卡）；2026-10-18 全鏈自審條目；2026-10-23 續36（先後決策）；2026-10-24 續36（video、design 上線，門只讓持有產品的帳戶進）、續39（部署）、續57（4b 待決選項、設計更新、八張小卡）；2026-10-25 續73（帳號頁只列持有產品）、續76＋續79（現成方案評估）',
   self: 'agency-os/handoffs/2026-10-16-customer-model-supervisor/',
   url: 'https://claude.ai/artifact/Htm4xqe362YM987Fo8YLCr',
 };
@@ -50,8 +50,8 @@ export const NEXT = [
   { h: '① 翻強制模式（等 10/31，不占工時）', t: '權利已就位（2026-10-23 部署）；客戶本人操作時已一律強制，翻的只影響員工。10/31 自動檢查 7 天「若強制就拒」歸零或都已解釋後，請你同意再翻（High）。', steps: [3] },
   { h: '② 用量計量與門上線阻擋項', t: '已做（2026-10-23）：每道付費縫記用量（自用與合約列只記不扣；單價待你定）、studio 精選免費路徑在付費閘前且門上藏 AI 按鈕。tarot 批次也已記操作者（0119 已套 prod，2026-10-23）。剩：員工路由在 withFeature 範圍外的付費工作仍記在自用帳戶（TASKS「員工路由用量歸屬」）。', steps: [3, 8] },
   { h: '③ 門逐個上線', t: 'tarot、studio（2026-10-23）、video、design（2026-10-24）已上線，共用一個 nginx 門區塊。每個功能分開買或贈送（你 2026-10-24 定）：客戶帳戶持有該產品才進得了門，否則只看到「尚未開通」；每扇門左邊選單列功能，沒持有的灰掉（做好待部署）。下一個 content，逐門任務在 cards/step-8-doors-video-design-content.md；cs（等 Chatwoot）、collect、outreach（員工路由要先搬）最後。每個門上線 High。第一個自助客戶不等 Woo：員工邀請（本機帳號登入已能用）＋人工寫合約列，與 Soulful 同一條路。', steps: [8] },
-  { h: '④ 收錢分兩段', t: '4a 已上線（2026-10-23；0120 已套 prod，程式 10/24 03:00 部署）：付款接頭、收件表、合約與權利同一交易寫入、錢包入帳與只退未用點數、拒付凍結、/ops/billing；付款來源「人工」（轉帳後用 scripts/record-payment.mjs 登記）。訂閱付款前還要你定第一個方案（plans 0 筆）。4b 設計與八張小卡已寫（2026-10-24，cards/step-4.md §4b）：付款事件由 wp-bridge 外掛用官方 PHP action 送（不用 Woo 原生 webhook：沒有續約事件、失敗 5 次就停用）；WordPress 會員對應計費帳戶一張表（0124）；第一次付款的會員自動建帳戶並寄設定密碼信；WordPress 一次性碼進產品門（ADR 015 順序 1）。4b-1、4b-3、4b-4（next-admin 端）、4b-7 已完成（0124、0126 已套 prod，2026-10-25）；扣款、點數條款、點數規則三題已定（都選 A）；4b-2 外掛與 4b-5 點數規則進行中。4b-6 由你在 WordPress 後台做（裝 WooCommerce Subscriptions 與 TapPay、結帳必登入、條款勾選），TapPay 開通定期扣款要先問業務。', steps: [4] },
-  { h: '⑤ 買斷安裝', t: '收錢兩段完成、待決 2 律師回覆後開工。', steps: [5] },
+  { h: '④ 收錢分兩段', t: '4a 已上線（2026-10-23；0120 已套 prod，程式 10/24 03:00 部署）：付款接頭、收件表、合約與權利同一交易寫入、錢包入帳與只退未用點數、拒付凍結、/ops/billing；付款來源「人工」（轉帳後用 scripts/record-payment.mjs 登記）。訂閱付款前還要你定第一個方案（plans 0 筆）。4b 設計與八張小卡已寫（2026-10-24，cards/step-4.md §4b）：付款事件由 wp-bridge 外掛用官方 PHP action 送（不用 Woo 原生 webhook：沒有續約事件、失敗 5 次就停用）；WordPress 會員對應計費帳戶一張表（0124）；第一次付款的會員自動建帳戶並寄設定密碼信；WordPress 一次性碼進產品門（ADR 015 順序 1）。4b-1～4b-5、4b-7 已完成（0124、0126 已套 prod；收費外掛 aware-wave-store 1.0.0 已裝 aware-wave.com，2026-10-25）；扣款、點數條款、點數規則三題已定（都選 A）。4b-6 由你在 WordPress 後台做（裝 WooCommerce Subscriptions 與 TapPay、結帳必登入、條款勾選），TapPay 開通定期扣款要先問業務；也要你定第一個方案。收第一筆真錢前做 4b-9 真實付款演練：各段單獨有測試，但 WordPress→控制面整條沒跑過（prod payment_events 0 筆）。', steps: [4] },
+  { h: '⑤ 買斷安裝', t: '收錢兩段完成、待決 2 律師回覆後開工。授權檔改由自架 Keygen CE 簽發，不自寫簽章（現成方案評估 2026-10-25）。', steps: [5] },
   { h: '⑥ 等客戶出現', t: '只串 API、代理商、白牌網址：出現第一個這類客戶才做。', steps: [6, 7, 9] },
 ];
 // 實際帳戶演練：way 必須是 WAYS 的名字（check 擋）。結果＝customer-drill.test.ts 的斷言。
@@ -135,14 +135,16 @@ export const STEPS = [
       { id: '4a', plain: '人工付款入口：收件表、合約與權利同一交易、錢包入帳、/ops/billing', status: 'done', commit: 'f2139d35a' },
       { id: '4b-1', plain: 'WordPress 會員對應計費帳戶（0124 customer_identities，已套 prod 2026-10-25）', status: 'done', commit: '0eb785f1c' },
       { id: '4b-3', plain: 'next-admin woo 收件接頭：驗章、查會員、第一次付款自動建帳戶（email 須經 WordPress 證明）；被拒的付款開 ops incident（0126 已套 prod）', status: 'done', commit: '125cdad43' },
-      { id: '4b-2', plain: 'wp-bridge 外掛：送付款事件（WCS＋TapPay）、驗證會員 email、我的帳號「進入」按鈕；0.18.0 尚未發版（發版、裝到 aware-wave.com、貼兩把密鑰由你做）', status: 'done', commit: 'ff5614403' },
+      { id: '4b-2', plain: '外掛：送付款事件（WCS＋TapPay）、驗證會員 email、我的帳號「進入」按鈕；收費程式已拆到 aware-wave-store 1.0.0，裝在 aware-wave.com（WORKLOG 續53）', status: 'done', commit: 'ff5614403' },
       { id: '4b-6', plain: 'Woo 店面設定（你在 WordPress 後台做）：裝 WCS 與 TapPay、結帳必登入、條款勾選、商品對應方案', status: 'todo' },
       { id: '4b-7', plain: '/ops/billing 顯示客戶未用點數合計（合約負債）', status: 'done', commit: '125cdad43' },
       { id: '4b-4', plain: 'WordPress 一次性碼進產品門：next-admin 端做好（只給 email 已證明的帳戶、防登入固定），按鈕在外掛 4b-2；設密鑰才開', status: 'done', commit: '125cdad43' },
-      { id: '4b-5', plain: '點數只付已持有功能（改 can() 點數分支，High）', status: 'todo' },
+      { id: '4b-5', plain: '點數只付已持有功能（改 can() 點數分支，High）', status: 'done', commit: '81f81cf03' },
+      { id: '4b-9', plain: '真實付款演練：0 元試用與沙盒卡號各一筆，從 WordPress 結帳一路驗到開通、加點、一鍵進門、扣點、退款與取消（等 4b-6 與第一個方案）', status: 'todo' },
+      { id: '4b-10', plain: '員工後台給／收某客戶的產品（贈送、只開部分產品）：現在只能改資料庫或 record-payment.mjs，沒有頁面', status: 'todo' },
     ] },
-  { n: 5, card: 'cards/step-5.md', plain: '系統可一鍵完整安裝到客戶主機；交接時收回 AwareWave 的存取權。', title: '買斷安裝階段', what: '三道閘後才開工：款項落定、客戶網域與主機歸屬驗證、操作者核准；模組清單、建置時排除 SAFETY_GATE、授權檔簽發（含 max_tenants）、安裝專屬更新憑證、客戶主機商 token 以密鑰句柄傳入、交接撤 key。排在一鍵架站 Stage 4 之後。',
-    files: ['lobster-factory/packages/workflows/src/provision/', 'agency-os/docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md'], gate: '授權檔離線驗章；AwareWave 伺服器停止後安裝仍可用；安裝失敗只清本次 project；客戶網域由 compose、nginx、DNS 同一組值產生並 curl 200', risk: 'High（交付）', model: 'Fable 5.1 設計 → Opus 5.5 做', depends: [3, 4], status: 'not_started', before: '交付 Postiz AGPL 前請律師確認（待決 2）' },
+  { n: 5, card: 'cards/step-5.md', plain: '系統可一鍵完整安裝到客戶主機；交接時收回 AwareWave 的存取權。', title: '買斷安裝階段', what: '三道閘後才開工：款項落定、客戶網域與主機歸屬驗證、操作者核准；模組清單、建置時排除 SAFETY_GATE、授權檔由自架 Keygen CE 簽發（含 max_tenants）、安裝專屬更新憑證、客戶主機商 token 以密鑰句柄傳入、交接撤 key。排在一鍵架站 Stage 4 之後。',
+    files: ['lobster-factory/packages/workflows/src/provision/', 'agency-os/docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md'], gate: '授權檔離線驗章；AwareWave 伺服器停止後安裝仍可用；安裝失敗只清本次 project；客戶網域由 compose、nginx、DNS 同一組值產生並 curl 200', risk: 'High（交付）', model: 'Fable 5.1 設計 → Opus 5.5 做', depends: [3, 4], status: 'not_started', before: '交付前請律師確認 Postiz AGPL 與 Keygen Fair Core License（待決 2）' },
   { n: 6, card: 'cards/step-6.md', plain: '客戶只透過程式串接、不使用畫面時，系統也能計費。', title: 'API 通道', what: '計費帳戶發 API key（scope = feature_key 子集），actor = api_key:<id>，用量走同一個 report()；登記表 accessChannels 加 api。', files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/'], gate: '測試：key 的 scope 外功能會被拒絕', risk: 'Medium', model: 'Opus 5.5', depends: [3], status: 'not_started', waitFor: '待第一個只串 API 的客戶出現' },
   { n: 7, card: 'cards/step-7.md', plain: '代理商用同一套系統服務多家客戶時，系統按客戶數計費。', title: '轉售（代理商版）', what: '授權檔 max_tenants > 1，安裝內「根組織」數受它限制：一家公司或一個集團（含子公司、分公司、部門）都算 1，不另收；代理商買去替多家不相干的客戶代操才是 >1，另訂價，隔離責任在客戶主機（操作者 2026-10-16 定案）。', files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/（授權檔格式，順序 5 建）'], gate: '測試：建立的租戶超過 max_tenants 時會被拒絕', risk: 'Medium', model: 'Opus 5.5', depends: [5], status: 'not_started', waitFor: '待第一個轉售客戶出現' },
   { n: 8, card: 'cards/step-8.md', plain: '每個產品都有自己的門與版面，一打開就是可用的樣子：產品名、功能清單、示範資料；不再只是後台裡的一頁。', title: '每個產品長成單一產品的樣子', what: '每個登記產品：頁面抽成共用元件、加 app/<key>/ 產品門路由（精簡版面）、開場即可用狀態、MODULE_MANIFEST 無 TODO；status: available 由測試擋；門上線（DNS、憑證、兩層 nginx）逐產品 High。不搬資料表、不改 API 前綴。', files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/<key>/', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/<key>/ui/', 'lobster-factory/infra/hetzner-phase1-core/nginx/default.conf'], gate: '測試：available 的產品必有門頁、完整 manifest、至少一個功能；本機以 <subdomain>.localhost 開門看到產品版面；上線後 playwright smoke 綠', risk: 'Medium（每個門上線 High）', model: 'Fable 5.1 定規則 → Opus 5.5 逐產品做', depends: [1, 3], status: 'in_progress' },
@@ -151,7 +153,7 @@ export const STEPS = [
 
 // 操作者自己要決定的（agent 不能替她定）
 export const OPEN = [
-  { n: 2, what: '買斷交付前請律師確認授權：Postiz（AGPL-3.0）、MinIO（AGPLv3，Trigger 內含）、Redis（Trigger 與核心用浮動 7-alpine，7.4 起授權改為 RSALv2／SSPL）。', before: 5, src: 'ADR 017 §5' },
+  { n: 2, what: '買斷交付前請律師確認授權：Postiz（AGPL-3.0）、MinIO（AGPLv3，Trigger 內含）、Redis（Trigger 與核心用浮動 7-alpine，7.4 起授權改為 RSALv2／SSPL）、Keygen CE（Fair Core License，授權檔簽發用）。', before: 5, src: 'ADR 017 §5' },
   { n: 4, what: '客戶白牌網址的憑證走 Cloudflare for SaaS（客戶 CNAME 到 AwareWave）還是主機上自動簽發（on-demand ACME）？', before: 9, src: 'ADR 018 §2' },
 ];
 
@@ -160,6 +162,8 @@ export const SIDE = [
   { what: 'System Foundry v1.7：選擇引擎留，產出重做——刪 74 節樣板、每模組一張可執行卡、每個產生的系統自帶監工台（supervisor-kit 共用）、接軌登記表與產生器、範例自動重生、加「裝在客戶自己的主機」一題', when: '已完成（V17-1～V17-8 全部 done）', step: 1, src: 'agency-os/handoffs/2026-10-18-foundry-v17-supervisor/data.mjs' },
   { what: '員工門產品目錄 app.aware-wave.com/ops/products：只讀 products.ts；三軸與五種的正本只留 ADR 017 §0，不另建 customer-model.ts', when: '併入', step: 8, src: 'cards/step-8.md' },
   { what: '門的授權檢查太寬：只要路由 import 了 grant.ts，就被當成「已檢查呼叫者」（grant.ts → subject.ts → tenant-guard.ts，檢查沒在 grant.ts 停下）。舊問題，不是這次造成的', when: '待做（舊問題）', step: 8, src: 'agency-os/TASKS.md「閘 ③「門路由要授權」」那一行；WORKLOG 2026-10-23 續46' },
+  { what: '現成方案評估：訂閱維持 WooCommerce Subscriptions＋TapPay；權利、錢包、代操維持自寫（市面沒有外掛做到「WordPress 掛了產品照跑」與「先預留再結算」）；買斷授權改用 Keygen CE；組織與席位可用 Memberships for Teams，等第一個企業客戶再評估', when: '已完成（2026-10-25）', step: 5, src: 'agency-os/reports/decisions/2026-10-25-customer-model-buy-vs-build.md' },
+  { what: '客戶頁「帳號」只列客戶持有、且門已開的產品，每個帳號附各產品角色與「去設定」；設定密碼連結不再指向未開的門', when: '已完成（2026-10-25，e25ef5710）', step: 8, src: 'agency-os/WORKLOG.md 2026-10-25 續73' },
   { what: '影片存檔時沒帶組織、而 POD_DESIGNS_DEFAULT_ORG_ID 又沒設定，這支影片就不會被登記，用量也記不到客戶身上。舊問題，屬於「影片歸屬改為持久化 mapping」那一項', when: '待做（舊問題）', step: 3, src: 'agency-os/TASKS.md「影片歸屬改為持久化 outName → organization_id mapping」' },
 ];
 

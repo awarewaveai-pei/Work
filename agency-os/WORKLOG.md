@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-25（續81）客戶怎麼來監工台補今天的結論：4b-9 真實付款演練、4b-10 員工後台給／收產品、買斷授權改 Keygen CE；4b-2／4b-5 過時狀態更正（Claude）
+
+- **觸發**：操作者「需要加什麼到 【客戶怎麼來】 就去做吧」。
+- **改動**（監工台 `agency-os/handoffs/2026-10-16-customer-model-supervisor/`）
+  - `data.mjs`：第 4 項 items 加 `4b-9`（真實付款演練，等 4b-6＋第一個方案）、`4b-10`（員工後台給／收產品，現只能 SQL 或 `record-payment.mjs`）；`4b-5` → done `81f81cf03`；`4b-2` 文字改「aware-wave-store 1.0.0 已裝 aware-wave.com（續53）」；NEXT ④⑤ 同步；第 5 項「授權檔由自架 Keygen CE 簽發」；待決 2 加 Keygen Fair Core License；SIDE 加「現成方案評估」「帳號頁（e25ef5710）」兩列；META.worklog 加續73／76／79。
+  - `cards/step-4.md`：新 §4b-9（逐段驗收清單）、§4b-10（範圍＋開工前七段計畫）；順序與依賴一行。
+  - `cards/step-5.md`：授權檔改 Keygen CE（`issue-licence.mjs` 成薄包裝）＋開工前四項查證（TTL 與 `updates_until`、metadata 對應、ks-aw-01 部署、FCL），查不合回自寫。
+  - `agency-os/TASKS.md` 待決 2 加 Keygen CE（FCL）。
+  - artifact 重新發布 https://claude.ai/artifact/Htm4xqe362YM987Fo8YLCr（Version 42）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node build.mjs && node check.mjs → "ok: 5 ways, 9 steps, 2 open, page fresh"；抽 supervisor.html 文字確認 4b-9、4b-10、Keygen、e25ef5710 都在 | exit=0 | ms=600
+- REVIEW_WAIVED: DOC_ONLY -- 監工台資料與卡片，無程式；狀態更正皆有 commit／WORKLOG 依據（81f81cf03、續53）
+- BUGHUNT_WAIVED: DOC_ONLY
+- **rollback**：`git revert <本 commit>`；artifact 回上一版由 Artifact 版本歷史。
 ## 2026-10-25（續80）排程離開 Trigger C3＋C5（操作者「整批做」，主機安裝與部署一次授權）：Trigger 名額卡住 10 分內標紅；排程頁補 pg_cron／n8n／雲端與筆電報告；C2.3 改好存 patch 待套用（Claude）
 
 - **C3**（`ef5a9ccf6`）：`HS/check-trigger-slots.sh` 每 10 分讀 Redis `engine:runqueue:*:env:*:currentConcurrency` 成員 → trigger-postgres TaskRun＋RuntimeEnvironment；非 EXECUTING／WAITING_TO_RESUME／RETRYING_AFTER_FAILURE 且 ≥15 分、或無 TaskRun 列 → exit 1；DEVELOPMENT／PREVIEW 只列不判；exit 2＝無 env concurrency key（key 版型變了）或查詢少列。log `/var/log/trigger-slots.log`；`host-jobs.ts` 列 `trigger_slots_check`。
