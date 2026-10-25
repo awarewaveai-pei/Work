@@ -35,7 +35,7 @@ export const NOW = [
   { what: 'AI 審核通過後自動發布', state: 'yes', ev: '程式已推上 main（f985992a2），今晚台灣 03:00 部署後生效；網站預設「人工審核」，要由員工在網站設定按「AI 審核後自動發布」並再確認一次才會開' },
   { what: 'ScriptForge 獨立頁，每個模組有自己的角色', state: 'yes', ev: '程式已推上 main（f233bd101），今晚台灣 03:00 部署後在側欄 Content Tools → ScriptForge；提示全部改在伺服器組，品牌讀客戶網站設定' },
   { what: '關掉分頁後影片仍會嵌回文章', state: 'yes', ev: '程式已推上 main（98f89a622），今晚台灣 03:00 部署後生效：題目勾了影片，排程每 5 分鐘自己做影片、嵌進文章、附到社群草稿；每支約 0.05 美元；要先在排程頁打開「自動內容管線」' },
-  { what: '發到 YouTube', state: 'no', ev: '社群工具還沒有 YouTube（第 7 階段）' },
+  { what: '發到 YouTube', state: 'no', ev: '程式已推上 main（ae5e0675b）：社群工具能發 YouTube（貼文第一行＝影片標題），題目選 YouTube 會自動排進頻道。還差你建 Google OAuth 用戶端（API Key 不能上傳）' },
 ];
 
 const P1 = '7d8d618a4';
@@ -127,14 +127,14 @@ export const STEPS = [
       done('P6.3', '文章頁舊社群面板和 Python 直連發布早已移除；三支舊社群 API 還有兩個畫面在用，先留著（記在社群管理平台的待辦）', '229b7f8f8'),
     ] },
   { n: 7, code: 'P7', group: 'F', plain: '影片可以直接發到 YouTube，和其他平台一起在社群工具排程。', title: 'YouTube',
-    gate: '在社群工具選 YouTube 頻道排程一支影片，YouTube 後台看得到', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['P6'],
+    gate: '在社群工具選 YouTube 頻道排程一支影片，YouTube 後台看得到', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['P6'],
     before: '待決 4',
     what: 'Postiz youtube provider；撰寫頁收 YouTube 標題；寫貼文核心加 youtube 規格',
     files: ['lib/content/postiz.ts', 'lib/social/compose.ts'],
     items: [
       todo('P7.0', '到 Google 申請 YouTube 授權，在 Postiz 連上頻道（要你本人做）'),
-      todo('P7.1', '社群工具加 YouTube：撰寫頁可以填 YouTube 標題'),
-      todo('P7.2', '選了 YouTube 的題目，影片自動排進 YouTube'),
+      done('P7.1', '社群工具加 YouTube：貼文第一行就是影片標題；存檔、撰寫頁、送出用同一套規則', 'ae5e0675b'),
+      done('P7.2', '選了 YouTube 的題目，影片自動排進 YouTube；沒連頻道就不開始、不花錢', 'ae5e0675b'),
     ] },
   { n: 8, code: 'P8', group: 'G', plain: '每個階段做完就同步產品清單、模組說明和可執行示範；全部做完時收尾。', title: '治理收尾',
     gate: '產品清單、模組說明、可執行示範都和程式對得上；舊的內容積木藍圖指向新計畫', risk: 'Low', model: 'Opus 5.5', status: 'done', commit: '229b7f8f8', depends: [],
@@ -151,6 +151,6 @@ export const STEPS = [
 
 // 操作者自己要決定或親手做的（agent 不能替她定）
 export const OPEN = [
-  { n: 4, what: '到 Google 申請 YouTube 發文授權（要你本人操作）', before: 'P7', src: '計畫 §0 D4' },
+  { n: 4, what: '到 Google Cloud 建「OAuth 用戶端 ID」（網頁應用程式，重新導向網址 https://postiz.aware-wave.com/integrations/social/youtube），把用戶端 ID 和密鑰存進憑證檔。你手上的是 API Key，只能讀、不能上傳影片', before: 'P7', src: '計畫 §7 P7.0' },
   { n: 7, what: '主機每 5 分鐘的排程時鐘從 2026-10-24 12:11Z 跑到現在都沒出錯（Trigger 停擺 34 小時期間也照跑）。停掉 Trigger 的每小時排程，併進「排程離開 Trigger」那件工作一起做，那邊會問你', before: 'P4', src: '計畫 P4.4；agency-os/handoffs/2026-10-25-schedules-off-trigger/R0-PLAN.md C1.5' },
 ];
