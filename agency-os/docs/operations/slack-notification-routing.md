@@ -11,7 +11,7 @@ This is the current AwareWave notification contract. Keep this page aligned with
 
 | Channel | Role | Expected producers | Notes |
 | --- | --- | --- | --- |
-| `#infra-alerts` | Tier 1 firehose for infrastructure signals | endpoint-alert, Netdata direct Slack, Grafana contact point, other raw infra monitors | Noisy is acceptable. This channel must not depend on Ops Inbox being healthy. |
+| `#infra-alerts` | Tier 1 firehose for infrastructure signals | endpoint-alert, Grafana contact point, other raw infra monitors | Noisy is acceptable. This channel must not depend on Ops Inbox being healthy. |
 | `#ops-incidents` | Tier 2 curated incident stream | endpoint-alert secondary webhook, SG deploy drift, Ops Inbox notifications | Deduped/throttled where possible. This is the channel humans should triage first. |
 
 Telegram is not a third Slack channel. It is the phone backup for operator-critical signals:
@@ -39,9 +39,7 @@ This avoids notification loops, duplicate fan-out, and ambiguous ownership.
 
 ### Netdata
 
-- Direct Slack path: Netdata sends host-level alerts to `#infra-alerts`.
-- Secondary curated path: Netdata `custom_sender()` calls `/usr/local/bin/netdata-ops-inbox-notify.sh`, which posts to `/api/webhooks/netdata`; Ops Inbox then notifies `#ops-incidents`.
-- Secrets live in `/etc/netdata/ops-inbox-webhook.env`, owned `root:netdata` with mode `0640`.
+- ks-aw-01 (2026-10-25): Netdata alerts through Netdata Cloud (claimed; email). The host has no `health_alarm_notify.conf`, so neither the old direct Slack route nor the `custom_sender()` -> Ops Inbox route runs; `sync-slack-alert-webhooks.ps1` no longer writes them (`lobster-factory/infra/netdata/README.md` still describes the EU-era setup).
 
 ### Ops Inbox
 
@@ -103,7 +101,7 @@ Expected:
 
 - Never commit Slack webhook URLs or ingest tokens.
 - Never commit Telegram bot tokens or chat IDs.
-- Sync scripts must recreate both Netdata routes, not only the Slack route.
+- `sync-slack-alert-webhooks.ps1` writes only `.env` `SLACK_INFRA_ALERTS_WEBHOOK` from vault `SLACK_INFRA_ALERTS_WEBHOOK`, and stops when the host already holds a different URL (`-ReplaceUrl` to rotate). Vault `AGENCY_OS_SLACK_WEBHOOK_URL` is another channel, never #infra-alerts.
 - Keep `/etc/default/awarewave-endpoint-alert.local` as the operator override file for custom `CHECK_URLS`, heartbeat, and renotify settings.
 - Every host script sends through `lobster-factory/infra/hetzner-phase1-core/scripts/notify.sh`: Telegram (`OPS_INBOX_TELEGRAM_CHAT_IDS`, when `OPS_INBOX_TELEGRAM_NOTIFY_ENABLED` is on) + `#ops-incidents` (`OPS_INBOX_SLACK_INCIDENTS_WEBHOOK`), plus a script's own channel by name. Settings live in `/root/lobster-phase1/.env` (same names next-admin uses). Only `slack-webhook-selftest.sh` still reads `WEBHOOK_URL` from `/etc/default`; that goes when `/etc/default` is retired.
 - Schedules on `/ops/schedules` that turn red or recover are announced by next-admin (`/api/internal/schedules/alerts`), plus a daily 09:00 Taipei line; no host script needs its own "I failed" message.

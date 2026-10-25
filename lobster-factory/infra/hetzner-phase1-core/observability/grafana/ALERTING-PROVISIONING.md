@@ -14,7 +14,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\sync-grafana-alert
 
 效果：
 
-- **Contact point**：`infra-alerts-slack`（與 `AGENCY_OS_SLACK_WEBHOOK_URL` 相同）
+- **Contact point**：`infra-alerts-slack`（vault `SLACK_INFRA_ALERTS_WEBHOOK`＝#infra-alerts；`AGENCY_OS_SLACK_WEBHOOK_URL` 是另一個頻道，勿用）
 - **根通知政策**：預設路由改為上述 Slack（含 `resetPolicies`）
 
 之後在 Grafana **Alerting → Alert rules** 自建規則（例如 Loki），觸發時會走 Slack。

@@ -1,5 +1,5 @@
 param(
-    [string]$VaultSecretName = "AGENCY_OS_SLACK_WEBHOOK_URL",
+    [string]$VaultSecretName = "SLACK_INFRA_ALERTS_WEBHOOK",  # #infra-alerts; AGENCY_OS_SLACK_WEBHOOK_URL is another channel (2026-10-25)
     [string]$SshTarget = "",
     [string]$StorePath = "",
     [string]$RemoteDir = "/root/lobster-phase1",

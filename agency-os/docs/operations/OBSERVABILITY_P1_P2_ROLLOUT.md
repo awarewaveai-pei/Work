@@ -8,7 +8,7 @@
 
 - 對外端點探測腳本：`lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh`（可選 **PagerDuty Events API v2**）
 - systemd unit：`lobster-factory/infra/hetzner-phase1-core/scripts/awarewave-endpoint-alert.service`（載入可選 `/etc/default/awarewave-endpoint-alert.pagerduty`）
-- Slack + Netdata 同步：`scripts/sync-slack-alert-webhooks.ps1`
+- #infra-alerts webhook 同步（只寫主機 `.env` `SLACK_INFRA_ALERTS_WEBHOOK`；主機值不同即停，換網址加 `-ReplaceUrl`）：`scripts/sync-slack-alert-webhooks.ps1`
 - Grafana Unified Alerting → Slack（聯絡點 + 根政策）：`scripts/sync-grafana-alerting-slack.ps1`（說明：`lobster-factory/infra/hetzner-phase1-core/observability/grafana/ALERTING-PROVISIONING.md`）
 - PagerDuty routing key 同步：`scripts/sync-pagerduty-endpoint-alert.ps1`
 - Log stack（可選）：`lobster-factory/infra/hetzner-phase1-core/docker-compose.observability.yml` + `observability/`  
@@ -118,7 +118,8 @@ docker compose -f docker-compose.observability.yml ps
 
 | 鍵名 | 用途 |
 |:---|:---|
-| `AGENCY_OS_SLACK_WEBHOOK_URL` | Slack incoming webhook（已由 `sync-slack-alert-webhooks.ps1` 使用） |
+| `SLACK_INFRA_ALERTS_WEBHOOK` | #infra-alerts incoming webhook（`sync-slack-alert-webhooks.ps1`、`sync-grafana-alerting-slack.ps1`） |
+| `AGENCY_OS_SLACK_WEBHOOK_URL` | 另一個頻道（主機 `.env` `SLACK_WEBHOOK_URL`）；`notify-ops.ps1` 用，**不是** #infra-alerts |
 | `PAGERDUTY_ROUTING_KEY_ENDPOINT_ALERT` | endpoint-alert → PD Events API v2 |
 
 **不要**把 PD routing key 或 Slack webhook 寫進 git 或聊天；輪替後只更新 vault 再跑同步腳本。
