@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-25（續58）ADR 017「賣家」一軸設計卡：收銀台可裝在任何網站，只做決定、不改程式（Claude）
+
+**觸發**：操作者開場「續做 ADR 017「賣家」一軸…完成 = 設計卡 cards/step-4-seller.md 給操作者看（不寫 migration、不改程式）」（TASKS.md 收件匣條目，commit 711c40d47）。
+
+**根因**：「誰賣的」寫死＝AwareWave：`lib/payments/woo-billing.ts:44` 一把 `PAYMENTS_WOO_SECRET`；`lib/entitlements/wp-customers.ts:21` slug `wp-member-<WP user id>`；0124 `customer_identities unique (provider, external_id)` 沒有「哪個網站」維度（第二站 user id 從 1 起算必撞）；`plans`（0110）無擁有者；0120 事件不記來源網站；`awarewave-wp.ts:45` 進門鑰匙也一把。
+
+**產出**：`agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-4-seller.md`（8 節：現況 file:line／賣家與三軸、組織樹、順序 7 的關係／4 條不變量／schema 草案（`seller_sites`、`customer_identities.site_id`、`organizations.sold_by_organization_id`、`plans.owner_organization_id`、`payment_events.site_id`）／遷移順序（第一天行為零改變：aware-wave.com 列 `hmac-env` 指環境變數）／操作者六題 D1–D6 各附★／4c 執行卡形狀＋測試名＋突變／風險）。
+
+**設計結論**：①賣家不是第四軸，是 B 軸合約另一方＝計費帳戶一欄；②買家不能掛 `parent_organization_id`（0077:63 要 group；計費主體 coalesce 會變賣家付錢；0120 只收根帳戶）→ `sold_by_organization_id`；③TASKS 原寫「每站密鑰雜湊」不可行：HMAC 驗章要原文；建議 Ed25519 每站公鑰（D1 A）；④與順序 7 轉售是兩條路（self_hosted vs hosted）。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node agency-os/handoffs/2026-10-16-customer-model-supervisor/check.mjs` | exit=0 | ms=400（`ok: 5 ways, 9 steps, 2 open, page fresh`；新卡未掛 STEPS，不破監工台閘）
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（自審：卡中每個 file:line 於寫前讀過原檔；設計卡無程式，ORACLE 不適用）
+- ORACLE_WAIVED: 純設計文件，無 source 檔 staged
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`step-4-seller|sold_by_organization_id|seller_sites` | hits=0（新識別符，repo 內尚無引用；下一步寫 TASKS／ADR 時再掛）
+- WORKLOG: 本條目
+
+**剩餘風險**：D1–D5 未決前不得開 4c；卡未掛進監工台 `data.mjs`（操作者勾完再掛，避免 NEXT 多一條未決）。
+
+**Rollback**：`git rm` 該卡。
 ## 2026-10-25（續57）0131 套 prod＋b90f0e20b 推 main（操作者 go）：總帳搜尋含付款訂單編號（Claude）
 
 **觸發**：操作者「go ahead：套 0131 到正式庫，確認後 push main。」接續 56。
