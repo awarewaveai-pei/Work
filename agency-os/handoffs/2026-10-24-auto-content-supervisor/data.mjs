@@ -44,6 +44,7 @@ const P3 = 'eb67660a3';
 const P4A = '31145e3ad';
 const P4B = 'f985992a2';
 const P5C = 'f233bd101';
+const P44 = 'd8d6a073a';  // schedules-off-trigger C2.3: Trigger hourly heartbeat removed; host cron */5 since 2026-10-24
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
 const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 
@@ -89,9 +90,8 @@ export const STEPS = [
       done('P3.6', '蒐尋器存進知識庫的資料，可以一鍵加成題目', P3),
     ] },
   { n: 4, code: 'P4', group: 'D', plain: '在排程頁勾一格後，核准的題目會自己變成 WordPress 草稿和社群草稿；選了「AI 審核自動發」的網站，通過檢查就自動發布。', title: '排程管線＋AI 審核',
-    gate: '在測試網站核准一題，幾分鐘內 WordPress 和社群工具都出現草稿；人工審核模式下永遠不會自己發布', risk: 'High（自動發布、主機排程）', model: 'Opus 5.5', status: 'in_progress', depends: ['P3'],
+    gate: '在測試網站核准一題，幾分鐘內 WordPress 和社群工具都出現草稿；人工審核模式下永遠不會自己發布', risk: 'High（自動發布、主機排程）', model: 'Opus 5.5', status: 'done', commit: P44, depends: ['P3'],
     decided: '每天最多開始 2 題；主機每 5 分鐘叫醒排程；資料庫也鎖住題目的網站屬於同一客戶（2026-10-24 你說「你決定」；0122 已套正式庫，ac55a28fc）',
-    before: '待決 7',
     what: '既有排程器升到每 5 分鐘、由主機 cron 驅動；job content_pipeline；題目狀態機；規則閘先、AI 後',
     files: ['lib/schedules/schedule.ts', 'lib/schedules/jobs.ts', 'lib/content/topics/tick.ts', 'lib/content/topics/make.ts', 'scripts/schedules-run-due.sh', 'packages/db/migrations/0122_content_topics_site_org.sql'],
     items: [
@@ -99,7 +99,7 @@ export const STEPS = [
       done('P4.1', '自動發文時用客戶身分驗證，只能發到該客戶自己的網站', P4A),
       done('P4.2', '排程器能判斷「每 5 分鐘」該不該跑', P4A),
       done('P4.3', '排程被叫醒時照舊先登記、回應後再做（不等，長的爬取才不會逾時）', P4A),
-      todo('P4.4', '主機每 5 分鐘叫醒排程器一次，取代外部排程服務（要你同意）'),
+      done('P4.4', '主機每 5 分鐘叫醒排程器一次，取代外部排程服務。Trigger 的每小時排程已刪（2026-10-25，排程離開 Trigger C2.3）', P44),
       done('P4.5', '新排程工作「內容管線」：每次把題目往前推，做到文章草稿和社群草稿；每天最多 2 題', P4A),
       done('P4.6', '審核通過＋網站選了自動發才發布；排定日未到就等到當天再發；社群貼文在文章上線後才排、帶文章連結', P4B),
       done('P4.7', '題目頁「核准並開始」：按下當下就開始做', P4A),
@@ -151,5 +151,4 @@ export const STEPS = [
 
 // 操作者自己要決定或親手做的（agent 不能替她定）
 export const OPEN = [
-  { n: 7, what: '主機每 5 分鐘的排程時鐘從 2026-10-24 12:11Z 跑到現在都沒出錯（Trigger 停擺 34 小時期間也照跑）。停掉 Trigger 的每小時排程，併進「排程離開 Trigger」那件工作一起做，那邊會問你', before: 'P4', src: '計畫 P4.4；agency-os/handoffs/2026-10-25-schedules-off-trigger/R0-PLAN.md C1.5' },
 ];
