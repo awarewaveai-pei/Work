@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-25（續26）wp-bridge 0.18.1：只有白名單付款方式能開通 AwareWave 權利——貨到付款／超商取貨付款在收錢前就是「處理中」（Claude）
+
+- **根因**：WooCommerce 貨到付款下單即設 processing（`woocommerce/includes/gateways/cod/class-wc-gateway-cod.php:322-324`「payment won't be taken until delivery」），`maybe_set_date_paid` 也會填付款日；0.18.0 為接住手動標已付款把 processing／completed 當付款（續10 critic M2）→ 貨到付款買點數包＝沒收錢先開通。
+- **不變量**：只有「錢已確認」的訂單送開通事件；「哪種付款方式先收錢」是金流事實，由操作者勾選，預設全不勾；退款只收回該訂單自己開通過的。
+- **做了什麼**（`lobster-factory/packages/wp-bridge-plugin/`）：`Settings` 加 `aware_wave_payments_gateways`；`PaymentEvents` 首單／續約／換方案檢查付款方式（續約看續約訂單自己的方式），開通事件在付款訂單上記 `_awarewave_granted`，全額退款只看該標記；`CheckoutGate::narrowGateways`（`woocommerce_available_payment_gateways`：購物車或 order-pay 有 AwareWave 商品時只留白名單）＋classic 結帳檢查送出的付款方式；設定頁勾選框（WooCommerce 已安裝付款方式）；`Shop` 加 `markGranted`／`wasGranted`；`AWBRIDGE_VERSION` 0.18.1。
+- **Codex oracle**（`agency-os/reports/oracle/2026-10-25-partialreview-fefd5f54.md`）：3 項。F1 升級前排隊事件繞過白名單——prod WooCommerce 訂單數 0（`wc shop_order list --format=count`），不可能有 0.18.0 佇列事件，不改；F2 續約看訂閱而非續約訂單的方式——修（hook 第二參數）；F3 移出白名單後退款被吞——修（`_awarewave_granted`）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=php -d extension=mbstring -d extension=sodium phpunit-9.6.phar（plugin 全套 116 tests，含新 `a cash on delivery order in processing sends no event and checkout offers only allowed methods`） | exit=0 | ms=236
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變（暫存複本）：拔 onPaymentComplete 的 paidByAllowedMethod → 上述測試紅；真樹綠 | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（Codex CLI；2 修、1 經 prod 查證無影響）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=aware_wave_payments_gateways | hits=1
+- BUGHUNT_SCOPE_NARROW: 新 option／meta 只在外掛內；`.claude/` 不涉及。
+- **剩餘風險**：換方案（switch）訂單沒有開通標記，其全額退款不送事件、寫備註請人工登記；第 3 層對帳報表見 TASKS「4b 對帳報表」。
+- **rollback**：裝回 0.18.0 zip；或設定頁關開關。
 ## 2026-10-25（續25）Perplexity 殘留清掉 4 處：AI 模型比較頁、費用文件、TASKS 條目、本機 settings.json（操作者：我以後不用 Perplexity）（Claude）
 
 - [觸發] `6cfcba142` 已把 Perplexity 程式、key、CI guard 退役；操作者 2026-10-25「我以後不用 Perplexity」，要求清掉剩下 4 處殘留。

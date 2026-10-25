@@ -13,6 +13,7 @@ final class WooShop implements Shop {
 	const META_PLAN    = '_awarewave_plan_key';
 	const META_UNITS   = '_awarewave_credit_units';
 	const META_PRODUCT = '_awarewave_product_key';
+	const META_GRANTED = '_awarewave_granted';
 
 	public function order( int $orderId ): ?array {
 		$order = wc_get_order( $orderId );
@@ -22,6 +23,7 @@ final class WooShop implements Shop {
 		return array(
 			'id'             => $orderId,
 			'customer_id'    => (int) $order->get_customer_id(),
+			'payment_method' => (string) $order->get_payment_method(),
 			'total'          => (float) $order->get_total(),
 			'total_refunded' => (float) $order->get_total_refunded(),
 			'lines'          => $this->lines( $order ),
@@ -50,6 +52,7 @@ final class WooShop implements Shop {
 			'id'           => $subscriptionId,
 			'customer_id'  => (int) $sub->get_customer_id(),
 			'status'       => (string) $sub->get_status(),
+			'payment_method' => (string) $sub->get_payment_method(),
 			'next_payment' => $next,
 			'end'          => (int) $sub->get_time( 'end' ),
 			'lines'        => $this->lines( $sub ),
@@ -65,6 +68,19 @@ final class WooShop implements Shop {
 			'credit_units' => max( 0, (int) get_post_meta( $productId, self::META_UNITS, true ) ),
 			'product_key'  => (string) get_post_meta( $productId, self::META_PRODUCT, true ),
 		);
+	}
+
+	public function markGranted( int $orderId ): void {
+		$order = wc_get_order( $orderId );
+		if ( $order && $order->get_meta( self::META_GRANTED ) !== '1' ) {
+			$order->update_meta_data( self::META_GRANTED, '1' );
+			$order->save_meta_data();
+		}
+	}
+
+	public function wasGranted( int $orderId ): bool {
+		$order = wc_get_order( $orderId );
+		return $order && $order->get_meta( self::META_GRANTED ) === '1';
 	}
 
 	public function addNote( int $orderOrSubscriptionId, string $note ): void {

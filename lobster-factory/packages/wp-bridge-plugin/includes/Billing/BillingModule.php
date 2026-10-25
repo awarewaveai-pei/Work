@@ -35,7 +35,7 @@ final class BillingModule {
 			return;
 		}
 
-		$events = new PaymentEvents( $shop, new WpMembers(), $queue );
+		$events = new PaymentEvents( $shop, new WpMembers(), $queue, $settings->allowedGateways );
 		// woocommerce_payment_complete fires only when a gateway calls payment_complete(); an admin marking an order paid,
 		// or a gateway that sets the status itself, reaches only the status hooks. Same deterministic ids = the server
 		// inbox absorbs the second firing.
@@ -49,9 +49,11 @@ final class BillingModule {
 		}
 		add_action(
 			'woocommerce_subscription_renewal_payment_complete',
-			function ( $subscription ) use ( $events ) {
-				$events->onRenewalPaymentComplete( (int) $subscription->get_id() );
-			}
+			function ( $subscription, $renewalOrder = null ) use ( $events ) {
+				$events->onRenewalPaymentComplete( (int) $subscription->get_id(), is_object( $renewalOrder ) ? (int) $renewalOrder->get_id() : 0 );
+			},
+			10,
+			2
 		);
 		add_action(
 			'woocommerce_subscriptions_switched_item',
@@ -80,7 +82,7 @@ final class BillingModule {
 		}
 
 		( new EmailVerification() )->register();
-		( new CheckoutGate( $shop ) )->register();
+		( new CheckoutGate( $shop, $settings ) )->register();
 		( new MyAccountDoors( $settings, $shop, $http ) )->register();
 	}
 }

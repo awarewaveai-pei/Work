@@ -30,7 +30,7 @@ final class PaymentEventsTest extends TestCase {
 		$this->shop    = new FakeShop();
 		$this->members = new FakeMembers();
 		$this->queue   = new FakeQueue();
-		$this->events  = new PaymentEvents( $this->shop, $this->members, $this->queue, function () {
+		$this->events  = new PaymentEvents( $this->shop, $this->members, $this->queue, array( 'tappay' ), function () {
 			return self::NOW;
 		} );
 		$this->shop->products[10] = array( 'plan_key' => 'tarot-monthly' );
@@ -40,7 +40,7 @@ final class PaymentEventsTest extends TestCase {
 	}
 
 	private function order( int $id, int $customer, array $lines, float $total = 100.0, float $refunded = 0.0 ): void {
-		$this->shop->orders[ $id ] = array( 'id' => $id, 'customer_id' => $customer, 'total' => $total, 'total_refunded' => $refunded, 'lines' => $lines );
+		$this->shop->orders[ $id ] = array( 'id' => $id, 'customer_id' => $customer, 'payment_method' => 'tappay', 'total' => $total, 'total_refunded' => $refunded, 'lines' => $lines );
 	}
 
 	private function body( int $i = 0 ): array {
@@ -51,7 +51,7 @@ final class PaymentEventsTest extends TestCase {
 		$next = self::NOW + 30 * 86400;
 		$this->order( 100, 7, array( array( 'product_id' => 10, 'qty' => 1 ) ) );
 		$this->shop->relations[100]['parent'] = array( 101 );
-		$this->shop->subscriptions[101] = array( 'id' => 101, 'customer_id' => 7, 'next_payment' => $next, 'end' => self::NOW + 400 * 86400, 'lines' => array( array( 'product_id' => 10, 'qty' => 1 ) ) );
+		$this->shop->subscriptions[101] = array( 'id' => 101, 'customer_id' => 7, 'status' => 'active', 'payment_method' => 'tappay', 'next_payment' => $next, 'end' => self::NOW + 400 * 86400, 'lines' => array( array( 'product_id' => 10, 'qty' => 1 ) ) );
 
 		$this->events->onPaymentComplete( 100 );
 
@@ -90,7 +90,7 @@ final class PaymentEventsTest extends TestCase {
 	public function test_an_order_with_a_subscription_and_a_pack_is_two_events_with_two_ids(): void {
 		$this->order( 250, 7, array( array( 'product_id' => 10, 'qty' => 1 ), array( 'product_id' => 20, 'qty' => 1 ) ) );
 		$this->shop->relations[250]['parent'] = array( 251 );
-		$this->shop->subscriptions[251] = array( 'id' => 251, 'customer_id' => 7, 'next_payment' => self::NOW + 86400, 'end' => 0, 'lines' => array( array( 'product_id' => 10, 'qty' => 1 ) ) );
+		$this->shop->subscriptions[251] = array( 'id' => 251, 'customer_id' => 7, 'status' => 'active', 'payment_method' => 'tappay', 'next_payment' => self::NOW + 86400, 'end' => 0, 'lines' => array( array( 'product_id' => 10, 'qty' => 1 ) ) );
 
 		$this->events->onPaymentComplete( 250 );
 
@@ -100,6 +100,8 @@ final class PaymentEventsTest extends TestCase {
 
 	public function test_a_full_refund_of_a_pack_order_becomes_refund_credit_pack(): void {
 		$this->order( 300, 7, array( array( 'product_id' => 20, 'qty' => 1 ) ), 990.0, 990.0 );
+		$this->events->onPaymentComplete( 300 ); // granted first: a refund takes back only what the order granted
+		$this->queue->jobs = array();
 
 		$this->events->onOrderRefunded( 300 );
 
@@ -135,7 +137,7 @@ final class PaymentEventsTest extends TestCase {
 
 	public function test_the_same_action_twice_yields_the_same_event_id(): void {
 		$this->order( 500, 7, array( array( 'product_id' => 20, 'qty' => 1 ) ) );
-		$this->shop->subscriptions[501] = array( 'id' => 501, 'customer_id' => 7, 'next_payment' => self::NOW + 86400, 'end' => 0, 'lines' => array( array( 'product_id' => 10, 'qty' => 1 ) ) );
+		$this->shop->subscriptions[501] = array( 'id' => 501, 'customer_id' => 7, 'status' => 'active', 'payment_method' => 'tappay', 'next_payment' => self::NOW + 86400, 'end' => 0, 'lines' => array( array( 'product_id' => 10, 'qty' => 1 ) ) );
 
 		$this->events->onPaymentComplete( 500 );
 		$this->events->onPaymentComplete( 500 );
@@ -196,6 +198,35 @@ final class PaymentEventsTest extends TestCase {
 		$this->assertCount( 1, $this->queue->jobs );
 		$this->assertSame( 'credit_pack', $this->body()['kind'] );
 		$this->assertSame( array( 701, '點數包未設定使用方案：買家無法使用點數' ), $this->shop->notes[0] );
+	}
+
+	public function test_a_cash_on_delivery_order_in_processing_sends_no_event_and_checkout_offers_only_allowed_methods(): void {
+		// COD sets "processing" at checkout, before any money (woocommerce/includes/gateways/cod/class-wc-gateway-cod.php:322).
+		$this->order( 800, 7, array( array( 'product_id' => 20, 'qty' => 1 ) ) );
+		$this->shop->orders[800]['payment_method'] = 'cod';
+		$this->shop->relations[800]['parent']     = array( 801 );
+		$this->shop->subscriptions[801]           = array( 'id' => 801, 'customer_id' => 7, 'status' => 'active', 'payment_method' => 'cod', 'next_payment' => self::NOW + 86400, 'end' => 0, 'lines' => array( array( 'product_id' => 10, 'qty' => 1 ) ) );
+
+		$this->events->onPaymentComplete( 800 );
+		$this->events->onRenewalPaymentComplete( 801 );
+		$this->events->onOrderRefunded( 800 );
+
+		$this->assertCount( 0, $this->queue->jobs );
+		$this->assertStringContainsString( 'cod', $this->shop->notes[0][1] );
+
+		// A card subscription renewed by a cash-on-delivery renewal order: the renewal order's method decides.
+		$this->shop->subscriptions[801]['payment_method'] = 'tappay';
+		$this->order( 802, 7, array( array( 'product_id' => 10, 'qty' => 1 ) ) );
+		$this->shop->orders[802]['payment_method'] = 'cod';
+		$this->events->onRenewalPaymentComplete( 801, 802 );
+		$this->assertCount( 0, $this->queue->jobs );
+		$this->events->onRenewalPaymentComplete( 801, 0 ); // no renewal order known: the subscription's method
+		$this->assertCount( 1, $this->queue->jobs );
+
+		$all = array( 'tappay' => 1, 'cod' => 1, 'bacs' => 1 );
+		$this->assertSame( array( 'tappay' => 1 ), CheckoutGate::narrowGateways( $all, array( 'tappay' ), true ) );
+		$this->assertSame( array(), CheckoutGate::narrowGateways( $all, array(), true ), 'nothing allowlisted = AwareWave items cannot be paid' );
+		$this->assertSame( $all, CheckoutGate::narrowGateways( $all, array( 'tappay' ), false ), 'other shop carts keep every method' );
 	}
 
 	public function test_a_verification_link_works_once_only_before_it_expires_and_only_for_the_address_it_was_sent_to(): void {

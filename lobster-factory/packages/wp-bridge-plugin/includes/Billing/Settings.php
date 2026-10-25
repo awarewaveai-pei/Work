@@ -15,6 +15,7 @@ final class Settings {
 	const OPT_TARGET          = 'aware_wave_payments_target';
 	const OPT_PAYMENTS_SECRET = 'aware_wave_payments_secret';
 	const OPT_HANDOFF_SECRET  = 'aware_wave_handoff_secret';
+	const OPT_GATEWAYS        = 'aware_wave_payments_gateways';
 	const DEFAULT_TARGET      = 'https://app.aware-wave.com';
 
 	/** @var bool */
@@ -25,12 +26,16 @@ final class Settings {
 	public $paymentsSecret;
 	/** @var string */
 	public $handoffSecret;
+	/** @var list<string> payment method ids that take the money before the order is processing; default none */
+	public $allowedGateways;
 
-	public function __construct( bool $enabled, string $target, string $paymentsSecret, string $handoffSecret ) {
-		$this->enabled        = $enabled;
-		$this->target         = rtrim( $target, '/' );
-		$this->paymentsSecret = $paymentsSecret;
-		$this->handoffSecret  = $handoffSecret;
+	/** @param list<string> $allowedGateways */
+	public function __construct( bool $enabled, string $target, string $paymentsSecret, string $handoffSecret, array $allowedGateways = array() ) {
+		$this->enabled         = $enabled;
+		$this->target          = rtrim( $target, '/' );
+		$this->paymentsSecret  = $paymentsSecret;
+		$this->handoffSecret   = $handoffSecret;
+		$this->allowedGateways = array_values( array_filter( array_map( 'strval', $allowedGateways ), 'strlen' ) );
 	}
 
 	public static function fromOptions(): self {
@@ -39,7 +44,8 @@ final class Settings {
 			get_option( self::OPT_ENABLED, '' ) === '1',
 			self::normalizeTarget( $target ) ?? self::DEFAULT_TARGET,
 			(string) get_option( self::OPT_PAYMENTS_SECRET, '' ),
-			(string) get_option( self::OPT_HANDOFF_SECRET, '' )
+			(string) get_option( self::OPT_HANDOFF_SECRET, '' ),
+			(array) get_option( self::OPT_GATEWAYS, array() )
 		);
 	}
 

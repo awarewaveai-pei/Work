@@ -10,7 +10,7 @@ namespace AwareWave\WpBridge\Billing;
 
 interface Shop {
 
-	/** @return array{id:int,customer_id:int,total:float,total_refunded:float,lines:list<array{product_id:int,qty:int}>}|null */
+	/** @return array{id:int,customer_id:int,payment_method:string,total:float,total_refunded:float,lines:list<array{product_id:int,qty:int}>}|null */
 	public function order( int $orderId ): ?array;
 
 	/**
@@ -21,11 +21,16 @@ interface Shop {
 	 */
 	public function subscriptionIdsForOrder( int $orderId, array $types ): array;
 
-	/** next_payment / end: unix seconds, 0 = none; status without the wc- prefix. @return array{id:int,customer_id:int,status:string,next_payment:int,end:int,lines:list<array{product_id:int,qty:int}>}|null */
+	/** next_payment / end: unix seconds, 0 = none; status without the wc- prefix. @return array{id:int,customer_id:int,status:string,payment_method:string,next_payment:int,end:int,lines:list<array{product_id:int,qty:int}>}|null */
 	public function subscription( int $subscriptionId ): ?array;
 
 	/** @return array{plan_key:string,credit_units:int,product_key:string} */
 	public function productMeta( int $productId ): array;
+
+	/** Marks an order whose payment was turned into rights (order meta), so a later full refund takes them back. */
+	public function markGranted( int $orderId ): void;
+
+	public function wasGranted( int $orderId ): bool;
 
 	/** Orders and subscriptions both take notes (a WCS subscription is an order type). */
 	public function addNote( int $orderOrSubscriptionId, string $note ): void;

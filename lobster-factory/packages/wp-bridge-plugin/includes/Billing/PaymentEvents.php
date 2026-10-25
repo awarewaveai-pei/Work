@@ -29,12 +29,18 @@ final class PaymentEvents {
 	private $queue;
 	/** @var callable():int */
 	private $clock;
+	/** @var list<string> */
+	private $allowedGateways;
 
-	public function __construct( Shop $shop, Members $members, Queue $queue, ?callable $clock = null ) {
-		$this->shop    = $shop;
-		$this->members = $members;
-		$this->queue   = $queue;
-		$this->clock   = $clock ?? 'time';
+	/**
+	 * @param list<string> $allowedGateways payment methods that take the money BEFORE the order is processing (Settings).
+	 */
+	public function __construct( Shop $shop, Members $members, Queue $queue, array $allowedGateways, ?callable $clock = null ) {
+		$this->shop            = $shop;
+		$this->members         = $members;
+		$this->queue           = $queue;
+		$this->allowedGateways = array_values( array_map( 'strval', $allowedGateways ) );
+		$this->clock           = $clock ?? 'time';
 	}
 
 	/** woocommerce_payment_complete: subscriptions this order STARTED (parent) + credit packs on it. Renewal and switch orders start nothing here. */
@@ -51,8 +57,17 @@ final class PaymentEvents {
 			$this->shop->addNote( $orderId, 'AwareWave：訪客訂單沒有會員可記帳，未送付款事件；請人工對帳。' );
 			return;
 		}
+		// "processing" means paid only for methods that take the money first; cash on delivery / pay at pickup reach it unpaid.
+		if ( ! $this->paidByAllowedMethod( $order['payment_method'], $orderId ) ) {
+			return;
+		}
 		foreach ( $parents as $subId ) {
-			$this->subscriptionPaid( 'payment_complete', (int) $subId, $orderId );
+			$sub = $this->shop->subscription( (int) $subId );
+			if ( $sub ) {
+				foreach ( $this->planKeys( $sub['lines'] ) as $plan ) {
+					$this->paidEvent( 'payment_complete', $sub, $plan, $orderId, '', $orderId );
+				}
+			}
 		}
 		$units     = 0;
 		$packPlans = array();
@@ -80,7 +95,9 @@ final class PaymentEvents {
 				$order['customer_id'],
 				$orderId,
 				'wc:payment_complete:' . $orderId . ':credit_pack',
-				array( 'kind' => 'credit_pack', 'units' => $units, 'order_ref' => (string) $orderId )
+				array( 'kind' => 'credit_pack', 'units' => $units, 'order_ref' => (string) $orderId ),
+				0,
+				$orderId
 			);
 			// A wallet alone opens nothing (can.ts, 4b-5): the pack's add-on plan grants the right to spend it. The server
 			// renews the same contract on each purchase and never shortens it, so the right runs ~3 years past the last pack.
@@ -95,28 +112,45 @@ final class PaymentEvents {
 						'plan_key'     => $plan,
 						'period_end'   => gmdate( 'Y-m-d\TH:i:s\Z', $end ),
 						'external_ref' => 'pack:' . $orderId,
-					)
+					),
+					0,
+					$orderId
 				);
 			}
 		}
 	}
 
-	/** woocommerce_subscription_renewal_payment_complete. */
-	public function onRenewalPaymentComplete( int $subscriptionId ): void {
-		$this->subscriptionPaid( 'subscription_renewal_payment_complete', $subscriptionId, $subscriptionId );
+	/**
+	 * woocommerce_subscription_renewal_payment_complete($subscription, $renewalOrder). The renewal order's own method
+	 * decides: a subscription stored with a card can still be renewed by a cash-on-delivery order (Codex 2026-10-25 F2).
+	 */
+	public function onRenewalPaymentComplete( int $subscriptionId, int $renewalOrderId = 0 ): void {
+		$sub = $this->shop->subscription( $subscriptionId );
+		if ( ! $sub ) {
+			return;
+		}
+		$renewal = $renewalOrderId > 0 ? $this->shop->order( $renewalOrderId ) : null;
+		$method  = $renewal ? $renewal['payment_method'] : $sub['payment_method'];
+		$noteId  = $renewal ? $renewalOrderId : $subscriptionId;
+		if ( ! $this->paidByAllowedMethod( $method, $noteId ) ) {
+			return;
+		}
+		foreach ( $this->planKeys( $sub['lines'] ) as $plan ) {
+			$this->paidEvent( 'subscription_renewal_payment_complete', $sub, $plan, $subscriptionId, '', $renewal ? $renewalOrderId : 0 );
+		}
 	}
 
 	/** woocommerce_subscriptions_switched_item: the new item's plan; the item id makes a second switch in one period its own event. */
 	public function onSwitchedItem( int $subscriptionId, int $newProductId, int $newItemId ): void {
 		$sub = $this->shop->subscription( $subscriptionId );
-		if ( ! $sub ) {
+		if ( ! $sub || ! $this->paidByAllowedMethod( $sub['payment_method'], $subscriptionId ) ) {
 			return;
 		}
 		$plan = $this->shop->productMeta( $newProductId )['plan_key'];
 		if ( $plan === '' ) {
 			return;
 		}
-		$this->paidEvent( 'subscriptions_switched_item', $sub, $plan, $subscriptionId, (string) $newItemId );
+		$this->paidEvent( 'subscriptions_switched_item', $sub, $plan, $subscriptionId, (string) $newItemId, 0 );
 	}
 
 	/** woocommerce_order_status_refunded, full refunds only (partial: the operator records a `local` refund). */
@@ -127,6 +161,11 @@ final class PaymentEvents {
 		}
 		$subs = $this->shop->subscriptionIdsForOrder( $orderId, array( 'parent', 'renewal', 'switch' ) );
 		if ( ! $subs && ! $this->hasBillingLine( $order['lines'] ) ) {
+			return;
+		}
+		// Take back only what this order granted; the allowlist may have changed since (Codex 2026-10-25 F3).
+		if ( ! $this->shop->wasGranted( $orderId ) ) {
+			$this->shop->addNote( $orderId, 'AwareWave：此訂單沒有自動開通過，退款不送事件；如曾人工開通請人工登記退款。' );
 			return;
 		}
 		if ( $order['total_refunded'] + 0.005 < $order['total'] ) {
@@ -176,18 +215,8 @@ final class PaymentEvents {
 		}
 	}
 
-	private function subscriptionPaid( string $action, int $subscriptionId, int $noteId ): void {
-		$sub = $this->shop->subscription( $subscriptionId );
-		if ( ! $sub ) {
-			return;
-		}
-		foreach ( $this->planKeys( $sub['lines'] ) as $plan ) {
-			$this->paidEvent( $action, $sub, $plan, $noteId, '' );
-		}
-	}
-
 	/** @param array{id:int,customer_id:int,next_payment:int,end:int} $sub */
-	private function paidEvent( string $action, array $sub, string $plan, int $noteId, string $extra ): void {
+	private function paidEvent( string $action, array $sub, string $plan, int $noteId, string $extra, int $grantOrderId ): void {
 		$now = (int) call_user_func( $this->clock );
 		$end = $sub['next_payment'] > 0 ? $sub['next_payment'] : $sub['end'];
 		if ( $end <= $now || $end > $now + self::MAX_PERIOD_SEC ) {
@@ -204,8 +233,17 @@ final class PaymentEvents {
 				'period_end'   => gmdate( 'Y-m-d\TH:i:s\Z', $end ),
 				'external_ref' => (string) $sub['id'],
 			),
-			$sub['id']
+			$sub['id'],
+			$grantOrderId
 		);
+	}
+
+	private function paidByAllowedMethod( string $method, int $noteId ): bool {
+		if ( in_array( $method, $this->allowedGateways, true ) ) {
+			return true;
+		}
+		$this->shop->addNote( $noteId, 'AwareWave：付款方式「' . ( $method === '' ? '無' : $method ) . '」不在自動開通名單（付款與會員設定頁），未送付款事件；收到款後請人工登記。' );
+		return false;
 	}
 
 	/** @param list<array{product_id:int,qty:int}> $lines */
@@ -236,7 +274,8 @@ final class PaymentEvents {
 	}
 
 	/** Member fields + the event, queued with its body frozen: a retry signs and sends the very same bytes. */
-	private function emit( int $customerId, int $noteId, string $eventId, array $event, int $subscriptionId = 0 ): void {
+	/** $grantOrderId: the order whose money this event turns into rights; marked so its full refund takes them back. */
+	private function emit( int $customerId, int $noteId, string $eventId, array $event, int $subscriptionId = 0, int $grantOrderId = 0 ): void {
 		if ( $customerId < 1 ) {
 			$this->shop->addNote( $noteId, 'AwareWave：訪客訂單沒有會員可記帳，未送付款事件 ' . $eventId . '；請人工對帳。' );
 			return;
@@ -266,5 +305,8 @@ final class PaymentEvents {
 				'attempt'  => 0,
 			) + ( $subscriptionId > 0 ? array( 'subscription_id' => $subscriptionId ) : array() )
 		);
+		if ( $grantOrderId > 0 ) {
+			$this->shop->markGranted( $grantOrderId );
+		}
 	}
 }

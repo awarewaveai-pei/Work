@@ -21,6 +21,16 @@ final class FakeShop implements Shop {
 	public $products = array();
 	/** @var list<array{0:int,1:string}> */
 	public $notes = array();
+	/** @var array<int,bool> */
+	public $granted = array();
+
+	public function markGranted( int $orderId ): void {
+		$this->granted[ $orderId ] = true;
+	}
+
+	public function wasGranted( int $orderId ): bool {
+		return ! empty( $this->granted[ $orderId ] );
+	}
 
 	public function order( int $orderId ): ?array {
 		return $this->orders[ $orderId ] ?? null;

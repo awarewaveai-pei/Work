@@ -41,6 +41,7 @@ final class BillingSettingsPage {
 		echo '<tr><th>啟用</th><td><label><input type="checkbox" name="enabled" value="1"' . checked( $s->enabled, true, false ) . '> 送付款事件、結帳前驗證信箱、進入按鈕</label></td></tr>';
 		echo '<tr><th>控制面網址</th><td><input name="target" class="regular-text" value="' . esc_attr( $s->target ) . '"><p class="description">預設 ' . esc_html( Settings::DEFAULT_TARGET ) . '；只接受 https。</p></td></tr>';
 		$this->secretRow( 'payments_secret', '付款事件密鑰', $s->paymentsSecret, 'next-admin 的 PAYMENTS_WOO_SECRET，同一值。' );
+		$this->gatewayRow( $s->allowedGateways );
 		$this->secretRow( 'handoff_secret', '進入按鈕密鑰', $s->handoffSecret, 'next-admin 的 AUTH_WP_HANDOFF_SECRET，同一值；不要與付款密鑰相同。' );
 		echo '</table>';
 		submit_button( '儲存' );
@@ -52,6 +53,20 @@ final class BillingSettingsPage {
 		echo '<input name="member" class="regular-text" placeholder="會員 email 或 ID"> ';
 		submit_button( '重寄', 'secondary', 'submit', false );
 		echo '</form></div>';
+	}
+
+	/** @param list<string> $allowed */
+	private function gatewayRow( array $allowed ): void {
+		echo '<tr><th>自動開通的付款方式</th><td>';
+		$gateways = function_exists( 'WC' ) && WC()->payment_gateways() ? WC()->payment_gateways()->payment_gateways() : array();
+		if ( ! $gateways ) {
+			echo '<p>WooCommerce 尚未啟用或沒有付款方式。</p>';
+		}
+		foreach ( $gateways as $id => $gw ) {
+			echo '<label style="display:block"><input type="checkbox" name="gateways[]" value="' . esc_attr( $id ) . '"' . checked( in_array( $id, $allowed, true ), true, false ) . '> '
+				. esc_html( wp_strip_all_tags( (string) $gw->get_title() ) ) . ' <code>' . esc_html( $id ) . '</code></label>';
+		}
+		echo '<p class="description">只勾「付款完成才把訂單變成處理中」的線上付款（例如 TapPay 刷卡）。<b>不要勾</b>貨到付款、超商取貨付款、銀行轉帳、支票：它們在收到錢之前訂單就會是處理中。購物車有 AwareWave 商品時，結帳頁只顯示勾選的方式；一個都不勾＝AwareWave 商品無法結帳。</p></td></tr>';
 	}
 
 	private function secretRow( string $name, string $label, string $current, string $help ): void {
@@ -106,6 +121,9 @@ final class BillingSettingsPage {
 			delete_option( Settings::OPT_HANDOFF_SECRET );
 			$out[] = array( 'error', '進入按鈕密鑰不可與付款密鑰相同，已清除進入按鈕密鑰。' );
 		}
+		$installed = function_exists( 'WC' ) && WC()->payment_gateways() ? array_keys( WC()->payment_gateways()->payment_gateways() ) : array();
+		$picked    = isset( $_POST['gateways'] ) && is_array( $_POST['gateways'] ) ? array_map( 'sanitize_key', wp_unslash( $_POST['gateways'] ) ) : array();
+		update_option( Settings::OPT_GATEWAYS, array_values( array_intersect( $installed, $picked ) ), true );
 		update_option( Settings::OPT_ENABLED, empty( $_POST['enabled'] ) ? '' : '1', true );
 		$out[] = array( 'success', '已儲存。' );
 		return $out;
