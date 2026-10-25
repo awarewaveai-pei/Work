@@ -1,8 +1,12 @@
 "use client";
 
+// The layout hands over the first NAV_FIRST clients; typing searches every client on the server
+// (GET /api/ops/clients?q=), so the list never holds the whole organizations table.
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { roleHeader } from "@/lib/ops-role";
+import { NAV_FIRST, NAV_SEARCH_LIMIT, orgColor } from "./nav-orgs";
 
 export interface OrgStub {
   slug: string;
@@ -21,15 +25,31 @@ const NAV_STYLE: React.CSSProperties = {
   overflow: "hidden",
 };
 
-export function ClientPanelNav({ orgs }: { orgs: OrgStub[] }) {
+export function ClientPanelNav({ orgs, total }: { orgs: OrgStub[]; total: number }) {
   const [search, setSearch] = useState("");
+  const [found, setFound] = useState<OrgStub[] | null>(null);   // null = no search running; show the first page
+  const [failed, setFailed] = useState(false);
   const pathname = usePathname();
 
-  const filtered = orgs.filter(
-    (o) =>
-      o.name.toLowerCase().includes(search.toLowerCase()) ||
-      o.slug.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    const q = search.trim();
+    if (!q) { setFound(null); setFailed(false); return; }
+    const ctrl = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/ops/clients?q=${encodeURIComponent(q)}`, { headers: { ...roleHeader("operator") }, signal: ctrl.signal });
+        const json = await res.json();
+        if (!res.ok || json.ok !== true) throw new Error(String(json.error ?? res.status));
+        setFound((json.clients as Array<{ slug: string; name: string; color: string | null }>).map((c) => ({ slug: c.slug, name: c.name, color: orgColor(c.slug, c.color) })));
+        setFailed(false);
+      } catch {
+        if (!ctrl.signal.aborted) { setFound([]); setFailed(true); }
+      }
+    }, 250);
+    return () => { clearTimeout(timer); ctrl.abort(); };
+  }, [search]);
+
+  const filtered = found ?? orgs;
 
   return (
     <nav aria-label="客戶列表" style={NAV_STYLE}>
@@ -54,7 +74,7 @@ export function ClientPanelNav({ orgs }: { orgs: OrgStub[] }) {
       <div style={{ flex: 1, overflowY: "auto", padding: "6px" }}>
         {filtered.length === 0 && (
           <div style={{ fontSize: 12, color: "var(--text-muted)", padding: "12px 8px" }}>
-            {search ? "無符合的客戶" : "尚無客戶"}
+            {failed ? "搜尋失敗，請再試一次" : search ? "無符合的客戶" : "尚無客戶"}
           </div>
         )}
         {filtered.map((org) => {
@@ -84,6 +104,14 @@ export function ClientPanelNav({ orgs }: { orgs: OrgStub[] }) {
             </Link>
           );
         })}
+        {found === null && total > orgs.length && (
+          <div style={{ fontSize: 11, color: "var(--text-muted)", padding: "8px" }}>
+            共 {total.toLocaleString("zh-TW")} 個客戶，這裡列最早的 {NAV_FIRST} 個；其他請用上面的搜尋。
+          </div>
+        )}
+        {found !== null && found.length >= NAV_SEARCH_LIMIT && (
+          <div style={{ fontSize: 11, color: "var(--text-muted)", padding: "8px" }}>只列前 {NAV_SEARCH_LIMIT} 個符合的，請打得更完整。</div>
+        )}
       </div>
 
       <div style={{ padding: "8px 10px", borderTop: "1px solid var(--card-border)" }}>

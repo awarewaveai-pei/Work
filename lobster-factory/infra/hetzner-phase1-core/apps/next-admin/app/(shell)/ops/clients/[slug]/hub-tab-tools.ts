@@ -7,4 +7,5 @@ export const HUB_TAB_TOOL = {
   "客服": "cs",            // cs-config, cs-intents, cs-eval-cases, /api/ops/cs/eval
   "資料蒐集": "collect",   // collection-sources, hci-import, cognitive-os-import
   "冷開發": "outreach",    // outreach-config
+  "帳務": "ops/billing",   // read server-side by page.tsx (billing_account), only when this key is ticked
 } as const satisfies Record<string, string>;

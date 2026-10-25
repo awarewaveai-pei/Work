@@ -190,6 +190,15 @@ describe("staff tools", () => {
     expect(problems).toEqual([]);
   });
 
+  it("a hub tab whose data the page reads server-side is hidden, and not read, without its tool (帳務 needs ops/billing)", () => {
+    // No API call for the scan above to see: page.tsx reads billing_account itself and skips the read when the tab is hidden.
+    const page = readFileSync(path.join(APP, "(shell)/ops/clients/[slug]/page.tsx"), "utf8");
+    const readOnlyWhenShown = [...page.matchAll(/hiddenTabs\.includes\("([^"]+)"\)/g)].map((m) => m[1]);
+    expect(readOnlyWhenShown).toContain("帳務");
+    for (const tab of readOnlyWhenShown) expect(tab in HUB_TAB_TOOL, tab).toBe(true);
+    expect((HUB_TAB_TOOL as Record<string, string>)["帳務"]).toBe("ops/billing");
+  });
+
   it("toolsFor matches dynamic segments, exact patterns and the platform", () => {
     expect(toolsFor("/")).toBe("platform");
     expect(toolsFor("/api/ops/build-id")).toBe("platform");

@@ -107,7 +107,7 @@ export const BACK_OFFICE: Readonly<Record<string, StaffPage>> = {
   "ops/repairs": { name: "維修", why: "員工處理服務修復。" }, "ops/integrations": { name: "串接", why: "員工管理連線設定。" },
   "ops/system-modes": { name: "系統模式", why: "員工管理系統模式。" }, "ops/approvals": { name: "簽核", why: "員工審批營運操作。" },
   "ops/backup": { name: "備份", why: "員工檢查備份。" }, "ops/inbox": { name: "告警", why: "員工處理營運告警。" },
-  "ops/costs": { name: "成本", why: "員工檢查營運成本。" }, "ops/billing": { name: "帳務", why: "員工查看每個付費帳戶的合約、權利、點數與付款（唯讀）。" },
+  "ops/costs": { name: "成本", why: "員工檢查營運成本。" }, "ops/billing": { name: "帳務", why: "員工查看全部帳戶的點數合計與需要處理的帳戶，以及客戶頁的帳務分頁（唯讀）。" },
   "ops/ai-models": { name: "模型資料", why: "舊網址，轉到 /tools/ai-models 的圖片模型規格分頁。", tool: "tools/ai-models" },
   "ops/onboarding": { name: "客戶啟用", why: "員工處理客戶啟用。" },
   "ops/tools": { name: "工具清單", why: "員工維護工具清單。" }, "ops/products": { name: "產品表", why: "員工查看產品登記表：門、販售狀態、收費功能。" },

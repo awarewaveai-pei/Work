@@ -1,4 +1,5 @@
-// GET /api/ops/clients — list all organizations with client_config + wp_update_latest
+// GET /api/ops/clients — list all organizations with client_config + wp_update_latest; ?q= = name or slug contains q,
+// at most NAV_SEARCH_LIMIT rows (the client list's search box, ClientPanelNav.tsx).
 // No RBAC required for read (same pattern as GET /api/ops/system-modes).
 // Data lives in organizations.metadata (JSONB). No extra table needed.
 //
@@ -9,6 +10,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "../../../../lib/supabase-server";
 import { resolveOpsRole, canModifyIncidentStatus } from "@/lib/ops-role";
 import type { ClusterId } from "@/lib/department-catalog";
+import { NAV_SEARCH_LIMIT } from "@/app/(shell)/ops/clients/nav-orgs";
 
 export const dynamic = "force-dynamic";
 
@@ -106,10 +108,15 @@ export interface ClientRow {
   clientKind: "internal" | "external" | "demo" | "sandbox" | "partner" | string;
   relationship: "first_party" | "customer" | "partner" | string;
   status: string;
+  /** metadata.color (the dot in the client list); null = the list picks one from the slug. */
+  color: string | null;
   clientConfig: ClientConfig;
   wpUpdateLatest: WpUpdateLatest | null;
   createdAt: string;
 }
+
+/** q as a PostgREST or() value: characters that end or wildcard a filter are dropped, then the value is quoted. */
+const clientSearchTerm =(q: string | null) => (q ?? "").replace(/[",()*%\\]/g, " ").trim().slice(0, 80);
 
 export async function GET(request: Request) {
   const resolved = resolveOpsRole(request);
@@ -122,10 +129,16 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "supabase_not_configured" }, { status: 503 });
   }
 
-  const { data, error } = await supabase
+  const rawQ = new URL(request.url).searchParams.get("q");
+  const q = clientSearchTerm(rawQ);
+  // A search never returns the whole table: a q of only stripped characters matches nothing.
+  if (rawQ !== null && !q) return NextResponse.json({ ok: true, clients: [], count: 0 });
+  let query = supabase
     .from("organizations")
     .select("id,slug,name,type,status,metadata,created_at")
     .order("created_at", { ascending: true });
+  if (q) query = query.or(`name.ilike."*${q}*",slug.ilike."*${q}*"`).limit(NAV_SEARCH_LIMIT);
+  const { data, error } = await query;
 
   if (error) {
     return NextResponse.json(
@@ -144,6 +157,7 @@ export async function GET(request: Request) {
       clientKind: typeof meta.client_kind === "string" ? meta.client_kind : row.slug === "awarewave-ops" ? "internal" : "external",
       relationship: typeof meta.relationship === "string" ? meta.relationship : row.slug === "awarewave-ops" ? "first_party" : "customer",
       status: row.status,
+      color: typeof meta.color === "string" ? meta.color : null,
       clientConfig: (meta.client_config as ClientConfig) ?? {},
       wpUpdateLatest: (meta.wp_update_latest as WpUpdateLatest) ?? null,
       createdAt: row.created_at,

@@ -8,6 +8,7 @@ import { Card, ChipBtn, NoData, SubLabel, relativeTime } from "./hub-ui";
 import { SiteWatchCard } from "./SiteWatchCard";
 import { AccountsCard } from "./AccountsCard";
 import { CustomerServiceTab } from "./CustomerServiceTab";
+import { BillingTab, type BillingTabData } from "./BillingTab";
 import { ScheduleTable } from "@/app/(shell)/ops/schedules/ScheduleTable";
 import { CollectionSourcesPanel } from "@/app/(shell)/ops/collect/CollectionSourcesPanel";
 import { KnowledgeDetailModal } from "./KnowledgeDetailModal";
@@ -116,6 +117,10 @@ export interface ClientHubTabsProps {
   researchBridgesEnabled: boolean;
   /** Tabs of products not ticked for this staff member (hub-tab-tools.ts); the page computes it from their grant. */
   hiddenTabs?: readonly string[];
+  /** 帳務 tab data; when the staff member may not use ops/billing the tab is hidden and nothing was read. */
+  billing: BillingTabData;
+  /** ?tab= on the URL (/ops/billing links straight to 帳務); ignored when unknown or hidden. */
+  initialTab?: string;
 }
 
 // ── Provider catalogue ────────────────────────────────────────────────────────
@@ -2628,13 +2633,13 @@ function OutreachTab({ org }: Pick<ClientHubTabsProps, "org">) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-const TABS = ["內容工具", "整合", "佈建", "維護", "設定", "品牌識別", "知識庫", "資料蒐集", "客服", "社群頻道", "帳號", "憑證庫", "冷開發"] as const;
+const TABS = ["內容工具", "整合", "佈建", "維護", "設定", "品牌識別", "知識庫", "資料蒐集", "客服", "社群頻道", "帳號", "帳務", "憑證庫", "冷開發"] as const;
 type Tab = typeof TABS[number];
 
 export function ClientHubTabs(props: ClientHubTabsProps) {
   const { org, cfg, health, wp, runs, installRuns, deptSummary, integrations, wpSites, hiddenTabs = [] } = props;
   const tabs = TABS.filter((t) => !hiddenTabs.includes(t));
-  const [activeTab, setActiveTab] = useState<Tab>("維護");
+  const [activeTab, setActiveTab] = useState<Tab>(() => tabs.find((t) => t === props.initialTab) ?? "維護");
 
   const initials = org.name
     .split(/\s+/)
@@ -2714,6 +2719,7 @@ export function ClientHubTabs(props: ClientHubTabsProps) {
         {activeTab === "客服" && <CustomerServiceTab org={org} cfg={cfg} />}
         {activeTab === "社群頻道" && <SocialChannelsTab org={org} />}
         {activeTab === "帳號" && <AccountsCard slug={org.slug} />}
+        {activeTab === "帳務" && <BillingTab data={props.billing} slug={org.slug} />}
         {activeTab === "憑證庫" && <CredentialsTab org={org} />}
         {activeTab === "冷開發" && <OutreachTab org={org} />}
       </div>

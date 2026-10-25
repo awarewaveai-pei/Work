@@ -1,4 +1,29 @@
 # Worklog
+## 2026-10-25（續32）/ops/billing 撐數千客戶：帳務改進客戶頁「帳務」分頁＋全站合計與待處理清單；客戶名單改伺服器搜尋（0127 未套 prod）（Claude）
+
+**觸發**：操作者「將來會有數千名客戶, 你現在這種排版方式非常不適當」→ 方案定案「照這個做。本機測過再問我套正式庫。」
+**根因**：0120 `billing_overview`（`0120_payment_events.sql:389`）一次回全部帳戶＋每戶完整明細，頁面每戶一張大卡；未用點數在 app 端加總（舊 `billing-summary.ts`）；客戶左側名單整表載入再在瀏覽器過濾（舊 `layout.tsx:16`、`ClientPanelNav.tsx:28`），WP 每個買家都是一筆 organization（`wp-customers.ts:42`）。不變量：頁面成本不隨帳戶數成長；一個客戶只有一個家（`/ops/clients/<slug>`）。
+**做法**
+- 0127（只加不刪）：新 `billing_account(org)`（品牌解析到根帳戶，帳本／付款上限 200）、`billing_attention(limit, offset)`（全部根帳戶合計＋待處理一頁：錢包凍結／透支／合約逾期／功能暫停；limit 夾 1..200）。皆 security invoker、service_role only。`billing_overview` 保留：線上舊版（或回滾到它）仍呼叫它；down 只刪兩個新函式；兩處 down（`migrations/*.down.sql`、`scripts/*_down.sql`）。
+- 客戶頁新分頁「帳務」（`BillingTab.tsx`；`hub-tab-tools.ts` 綁 `ops/billing`，沒勾的員工分頁隱藏且伺服器不讀）；`?tab=帳務` 深連結。
+- `/ops/billing` 只剩合計＋待處理清單（每頁 50，頁碼上限 1,000,000 防 int4 溢位，連到客戶頁帳務分頁）。
+- 客戶名單：伺服器只給最早 50 個（`nav-orgs.ts` `NAV_FIRST`）；搜尋走 `GET /api/ops/clients?q=`（PostgREST `or()` ilike，值加引號、去掉 `",()*%\`，最多 20 筆；q 只剩被刪字元時回空，不回整表）；點的顏色改由 slug 決定（搜尋結果與名單一致）。
+- 刪 `billing-summary.ts`＋測試（規則進 SQL，由 0127 verify 守）。
+- `staff-tools.test.ts` 新測試：page.tsx 用 `hiddenTabs.includes("帳務")` 跳過讀取，且 `HUB_TAB_TOOL["帳務"]`＝`ops/billing`。
+**同類未修（剩餘風險）**：其他整表載入 organizations 的選單：`ops/collect/page.tsx:21`、`outreach/layout.tsx:15`、`tools/banner/BannerStudioStaff.tsx:18`（經 `GET /api/ops/clients` 無 q）、`api/content/sites/route.ts:56`。全帳本 `sum(units) group by` 隨帳本筆數成長（30 萬筆 26 ms）。
+**並行**：`payments.e2e.test.ts`、`entitlements-real-db.py` 另一 session（0128）也改；其 commit `2cbea343c` 的 runner 漏 0128，本次一併補上。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/packages/db/scripts/0127_billing_account_views-local-verify.py（拋棄式 postgres:15.8：up→down→up 全程 billing_overview md5 不變；service_role only；3000 帳戶＋100 品牌＋301529 筆帳本：合計＝獨立計算、549 列分 11 頁各一次、limit 夾值、品牌→根帳戶、帳本 20 筆、未知 id→null；billing_attention 26 ms、billing_account 8 ms）→ PASS 0127（修正後重跑）| exit=0 | ms=21096
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py --suite payments（真 Postgres＋PostgREST v14.6，0120/0127/0128，帳務頁＋帳務分頁 renderToStaticMarkup）→ 11 passed（修正後重跑）| exit=0 | ms=10838
+- REALTEST_EVIDENCE: tool=Bash | cmd=拋棄式 PostgREST v14.6：`or=(name.ilike."*q*",slug.ilike."*q*")`，q＝`wave ops`／`SOUL`／`acct-0`／`nomatch` → 各命中預期 slug／空 | exit=0 | ms=30000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p .（0）＋ npx vitest run → 382 files／3328 passed（修正後重跑）| exit=0 | ms=20832
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變 `staff-tools.test.ts -t "a hub tab whose data the page reads server-side"`：刪 `HUB_TAB_TOOL` 帳務列 → 1 failed；page.tsx 改成隱藏也讀 → 1 failed；還原 → 1 passed | exit=0 | ms=40000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/2m/2n（critic subagent：M1 搜尋只打被刪字元回整表→已修；M2 0127 刪 billing_overview 使套庫到部署之間舊版帳務頁壞→改只加不刪；n1 超大 ?page= int4 溢位→已修；n2 全帳本加總隨帳本成長→剩餘風險）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=billingOverview|billing_overview|billing-summary|unusedCustomerCredits | hits=506（皆歷史：WORKLOG 舊條目、.claude/sessions 日誌、已完成卡片 step-4.md:150、0120 原檔、0127 註解、0120／0127 verify 腳本（測 migration 本身）；next-admin app 程式碼 0）
+- ORACLE_WAIVED: Codex usage limit 至 2026-10-25 19:40（codex exec 回 "You've hit your usage limit"；`oracle-quota.ps1 -Action set` 已記）；codex-oracle 兩次無回覆。備援＝獨立 critic subagent＋上列突變證據。
+
+**待操作者（High）**：①套 0127 到 prod（`node scripts/apply-db-migration.mjs 0127`；未套前 03:00 自動部署被 migration 閘擋，正式站維持舊版）②部署後，新 migration 刪 `billing_overview`（收縮步；新版上線前不可刪）。
 ## 2026-10-25（續31）Codex 補審 12dd0e699 的 5 個發現全修：gpt-image-1 已關閉 → gpt-image-2 並照實際 token 計價；Replicate 逾時會取消並記帳；非 uuid 的 job id 不再弄丟整列；沒寫組織的花費記到 grant scope 的帳戶（Claude）
 
 **觸發**：操作者「請 Codex 補審 12dd0e699（圖片花費集中記帳那一輪），有問題就修。」Codex（gpt-6-astra）`agency-os/reports/oracle/2026-10-25-partialreview-36e26ad9.md`，5 個發現，逐條讀碼並實測，全部成立。

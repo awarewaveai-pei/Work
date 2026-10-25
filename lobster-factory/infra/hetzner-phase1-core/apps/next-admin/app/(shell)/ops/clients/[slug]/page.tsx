@@ -17,6 +17,8 @@ import { ClientHubTabs } from "./ClientHubTabs";
 import { HUB_TAB_TOOL } from "./hub-tab-tools";
 import { headers } from "next/headers";
 import { staffGrantOf, staffMayUseTool, staffUnrestricted } from "@/lib/staff-access";
+import { billingAccount } from "@/lib/entitlements/tables";
+import type { BillingTabData } from "./BillingTab";
 
 export const dynamic = "force-dynamic";
 
@@ -35,10 +37,13 @@ async function probeHealth(url: string | undefined) {
 
 export default async function ClientDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const { slug } = await params;
+  const { tab } = await searchParams;
 
   const supabase = getSupabaseServerClient();
   if (!supabase) {
@@ -162,7 +167,9 @@ export default async function ClientDetailPage({
   })();
 
   const grant = staffGrantOf(await headers());
-  const hiddenTabs = staffUnrestricted(grant) ? [] : Object.entries(HUB_TAB_TOOL).filter(([, key]) => !staffMayUseTool(grant!, key)).map(([tab]) => tab);
+  const hiddenTabs = staffUnrestricted(grant) ? [] : Object.entries(HUB_TAB_TOOL).filter(([, key]) => !staffMayUseTool(grant!, key)).map(([t]) => t);
+  const billing: BillingTabData = hiddenTabs.includes("帳務") ? { account: null, error: null }
+    : await billingAccount(org.id).then((account) => ({ account, error: null }), (e: unknown) => ({ account: null, error: e instanceof Error ? e.message : String(e) }));
 
   return (
     <ClientHubTabs
@@ -177,6 +184,8 @@ export default async function ClientDetailPage({
       wpSites={(wpSitesResult.data ?? []) as Parameters<typeof ClientHubTabs>[0]["wpSites"]}
       researchBridgesEnabled={isResearchBridgesEnabled()}
       hiddenTabs={hiddenTabs}
+      billing={billing}
+      initialTab={tab}
     />
   );
 }

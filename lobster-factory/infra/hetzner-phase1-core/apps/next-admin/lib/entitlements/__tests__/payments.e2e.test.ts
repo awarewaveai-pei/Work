@@ -1,9 +1,10 @@
 // ADR 017 step 4a against a real Postgres + PostgREST: signed local payments through the real route, 0120's
-// billing_apply_payment_event, and /ops/billing. Run only by
+// billing_apply_payment_event, /ops/billing and the client hub 帳務 tab (0127). Run only by
 //   python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py --suite payments
 // (sets ENTITLEMENTS_REST); skipped otherwise (npm test, the deploy gate). Touches no production.
 import type http from "node:http";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { LOCAL_SIGNATURE_HEADER, signLocalPayment } from "@/lib/payments/local";
@@ -142,6 +143,7 @@ describe.skipIf(!REST)("payments against a real database (ADR 017 step 4a)", () 
       .toMatchObject({ ok: true, refunded_units: 70, granted_units: 100 });
     expect(await balance()).toBe(0);
   });
+
   it("a pack that names its add-on plan grants that plan's rows with no end date, once (0128, decision 6)", async () => {
     const pack = (n: string) => ({ event_id: `pack-plan-${n}`, kind: "credit_pack", organization_id: PACK_BUYER, units: 200, order_ref: `PO-${n}`, plan_key: "content_pack" });
     const first = await send(pack("1"));
@@ -168,7 +170,6 @@ describe.skipIf(!REST)("payments against a real database (ADR 017 step 4a)", () 
     expect(await rows("media_credit_ledger", { organization_id: PACK_BUYER })).toHaveLength(before.length);   // same transaction: no credits either
   });
 
-
   it("a chargeback suspends entitlements and freezes the wallet", async () => {
     await send({ event_id: "pack-002", kind: "credit_pack", organization_id: CUSTOMER, units: 50, order_ref: "O-2" });
     const sub = (await send({ ...paid, event_id: "bank-004", external_ref: "TX-004" })).body.contract;
@@ -181,12 +182,17 @@ describe.skipIf(!REST)("payments against a real database (ADR 017 step 4a)", () 
     expect(await balance()).toBe(50);
   });
 
-  it("/ops/billing shows the account: contract, grants, balance, ledger and payments", async () => {
+  it("/ops/billing shows the totals; the client's 帳務 tab shows the account: contract, grants, balance, ledger and payments", async () => {
     const { default: BillingPage } = await import("../../../app/(shell)/ops/billing/page");
-    const html = renderToStaticMarkup(await BillingPage());
-    expect(html).toContain("Payments Customer");
-    expect(html).toContain("social_basic");
-    expect(html).toContain("cb-001-cleared");
-    expect(html).not.toContain("讀不到帳務資料");
+    const page = renderToStaticMarkup(await BillingPage({}));
+    expect(page).toContain("客戶未用點數");
+    expect(page).not.toContain("讀不到帳務資料");
+    const { billingAccount } = await import("../tables");
+    const { BillingTab } = await import("../../../app/(shell)/ops/clients/[slug]/BillingTab");
+    const account = await billingAccount(CUSTOMER);
+    const tab = renderToStaticMarkup(createElement(BillingTab, { data: { account, error: null }, slug: account!.slug }));
+    expect(tab).toContain("social_basic");
+    expect(tab).toContain("cb-001-cleared");
+    expect(tab).not.toContain("讀不到帳務資料");
   });
 });

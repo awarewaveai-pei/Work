@@ -143,7 +143,7 @@ export function createEntitlementStore(client: SupabaseClient | null = getSupaba
   };
 }
 
-/** One billing account on /ops/billing (0120 billing_overview; grants grouped, so 300+ feature rows stay one line). */
+/** One billing account, the 帳務 tab on /ops/clients/<slug> (0127 billing_account; grants grouped, so 300+ feature rows stay one line). */
 export interface BillingAccount {
   organization_id: string; name: string; slug: string; kind: "internal" | "customer";
   all_features: { source: string; source_ref: string; note: string | null } | null;
@@ -156,12 +156,27 @@ export interface BillingAccount {
   payments: Array<{ at: string; provider: string; event_id: string; kind: string; result: Record<string, unknown> | null }>;
 }
 
-export async function billingOverview(client: SupabaseClient | null = getSupabaseWriteClient()): Promise<BillingAccount[]> {
+/** The account an organization bills to (a brand resolves to its root); null = no such organization. */
+export async function billingAccount(organizationId: string, client: SupabaseClient | null = getSupabaseWriteClient()): Promise<BillingAccount | null> {
   if (!client) throw new Error("entitlements_db_unavailable");
-  const { data, error } = await client.rpc("billing_overview", { p_ledger_rows: 20, p_event_rows: 10 });
+  const { data, error } = await client.rpc("billing_account", { p_organization_id: organizationId, p_ledger_rows: 20, p_event_rows: 10 });
   if (error) throw new Error(error.message);
-  if (!Array.isArray(data)) throw new Error("invalid_billing_overview");
-  return data as BillingAccount[];
+  return (data ?? null) as BillingAccount | null;
+}
+
+export type AttentionReason = "frozen" | "overdrawn" | "past_due" | "suspended";
+/** /ops/billing (0127 billing_attention): totals over every root account, and one page of the accounts that need a person. */
+export interface BillingAttention {
+  totals: { unused_units: number; unused_accounts: number; attention: number } & Record<AttentionReason, number>;
+  rows: Array<{ organization_id: string; name: string; slug: string; kind: "internal" | "customer"; balance: number; frozen_since: string | null; reasons: AttentionReason[] }>;
+}
+
+export async function billingAttention(limit: number, offset: number, client: SupabaseClient | null = getSupabaseWriteClient()): Promise<BillingAttention> {
+  if (!client) throw new Error("entitlements_db_unavailable");
+  const { data, error } = await client.rpc("billing_attention", { p_limit: limit, p_offset: offset });
+  if (error) throw new Error(error.message);
+  if (!data || !Array.isArray((data as BillingAttention).rows)) throw new Error("invalid_billing_attention");
+  return data as BillingAttention;
 }
 
 const TRIAL_PAGE = 200;
