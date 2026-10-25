@@ -1,4 +1,15 @@
 # Worklog
+## 2026-10-25（續50）0129 刪 billing_overview（0127 的收縮步，操作者 go）：已套 prod（Claude）
+
+**觸發**：操作者「go ahead：套 0129 到正式庫，確認後 commit 並 push main。」接續 33（0127 只加不刪）。
+- 前提已驗：prod 跑 `cd42c9030`（`.deployed-commit`，2026-10-25T09:19:34Z），含 5bdf7f9f9／d95ed0bee／6678e71af；`git grep billing_overview cd42c9030` 只剩 migration 與 verify 腳本；`docker logs lobster-next-admin --since 2h` 無 billing 錯誤。
+- 0129：`drop function billing_overview(integer, integer)`；down 由 0120 原文逐字重建（只為回滾到 5bdf7f9f9 之前的程式）；兩處 down（`migrations/*.down.sql`、`scripts/*_down.sql`）。0127 verify 加 0129 up→down→up；payments e2e runner 加 0129。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/packages/db/scripts/0127_billing_account_views-local-verify.py（含 0129：drop 後 0127 兩函式合計不變；down 還原 0120 原文 md5 與 service_role/anon 權限）→ PASS 0127 + 0129 | exit=0 | ms=23776
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py --suite payments（schema 含 0129）→ 11 passed | exit=0 | ms=10393
+- REALTEST_EVIDENCE: tool=SSH | cmd=`node scripts/apply-db-migration.mjs 0129` → APPLY_OK；唯讀讀回：ledger 有 0129、billing_overview 不存在、billing_account／billing_attention 正常（totals 全 0、internal→awarewave-ops）；`--status` → applied 129 | exit=0 | ms=4126
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（自審：up 一行 drop；down＝0120:389-426 由腳本逐字擷取，verify 以 md5 對照）
+- ORACLE_WAIVED: codex quota blocked until 2026-10-25 19:40 (scripts/oracle-quota.ps1)；改動為一行 drop＋逐字擷取的 down，由 verify md5 機械比對。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=billing_overview | hits=376（41 檔：WORKLOG／.claude/sessions 歷史、0120／0127／0129 migration 與 verify 腳本；next-admin app 程式碼 0，`git grep` 部署 commit cd42c9030 同）
 ## 2026-10-25（續49）app.aware-wave.com 登入後 nginx 400：Cookie 標頭超限（Codex）
 
 - **根因**：乾淨 / 回 307，原 Chrome 分頁回 400 Request Header Or Cookie Too Large；合成 7168-byte Cookie 回 307、8192-byte 回 400。主機 nginx 1.24.0，回 400 的容器 lobster-nginx 是 1.30.4；流量經 nginx/system-sites/sg-stack.aware-wave.com.conf:37 → nginx/default.conf:231 → next-admin。middleware.ts:73-76 記錄 Supabase session 可分段；實際瀏覽器 Cookie 名稱/長度未讀取。

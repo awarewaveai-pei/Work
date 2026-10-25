@@ -4,7 +4,8 @@ Bootstraps 0001..0120 like the 0120 verify, then: up leaves 0120's billing_overv
 service_role only; 3000 root accounts + 100 brands + 300k ledger rows: billing_attention's totals equal an independent
 count (internal excluded, an overdrawn account never offsets another, brands are not roots), its pages cover every
 attention account exactly once, limits are clamped; billing_account resolves a brand to its root, caps the ledger at
-20 rows, returns null for an unknown id; and its execution time.
+20 rows, returns null for an unknown id; and its execution time. Last, 0129 (the contract step): drops billing_overview,
+leaves 0127's reads answering; its down restores billing_overview byte for byte.
     python lobster-factory/packages/db/scripts/0127_billing_account_views-local-verify.py"""
 from pathlib import Path
 import json
@@ -17,6 +18,8 @@ DB = Path(__file__).resolve().parents[1]
 NAME = "billing-0127-verify-" + uuid.uuid4().hex[:10]
 UP = DB / "migrations/0127_billing_account_views.sql"
 DOWN = DB / "migrations/0127_billing_account_views.down.sql"
+DROP_UP = DB / "migrations/0129_drop_billing_overview.sql"
+DROP_DOWN = DB / "migrations/0129_drop_billing_overview.down.sql"
 INTERNAL, EDD, SOULFUL = "39ad4149-5044-4077-8d9a-b6b916de0e21", "ecf4e311-4f38-4288-9396-e70fd7697aca", "2bf60452-3d4d-47c2-9970-b9046ed1a35a"
 CUST, BRAND = "00000000-0000-4000-8000-0000000000c1", "00000000-0000-4000-8000-0000000000b1"
 N = 3000
@@ -178,7 +181,18 @@ def main():
             out = query(f"set role service_role; explain (analyze, format json) {sql};").stdout
             plan = json.loads(out[out.index("["):])
             print(f"OK {label}: {plan[0]['Execution Time']:.0f} ms execution")
-        print("PASS 0127")
+
+        query(DROP_UP.read_text(encoding="utf-8"))
+        assert one("select to_regprocedure('public.billing_overview(integer,integer)') is null") == "t"
+        assert attention(50, 0)["totals"] == expected
+        query(DROP_DOWN.read_text(encoding="utf-8"))
+        assert one("select md5(prosrc) from pg_proc where proname = 'billing_overview'") == overview_src
+        assert one("select has_function_privilege('service_role', 'public.billing_overview(integer,integer)', 'execute')") == "t"
+        assert one("select has_function_privilege('anon', 'public.billing_overview(integer,integer)', 'execute')") == "f"
+        query(DROP_UP.read_text(encoding="utf-8"))
+        assert one("select to_regprocedure('public.billing_overview(integer,integer)') is null") == "t"
+        print("OK 0129 up, down, up: billing_overview dropped, 0127's reads unchanged; down restores 0120's text and grants")
+        print("PASS 0127 + 0129")
     finally:
         command(["docker", "rm", "-f", NAME], succeeds=False)
 
