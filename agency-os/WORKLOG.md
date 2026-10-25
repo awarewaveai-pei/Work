@@ -1,4 +1,20 @@
 # Worklog
+## 2026-10-25（續25）Perplexity 殘留清掉 4 處：AI 模型比較頁、費用文件、TASKS 條目、本機 settings.json（操作者：我以後不用 Perplexity）（Claude）
+
+- [觸發] `6cfcba142` 已把 Perplexity 程式、key、CI guard 退役；操作者 2026-10-25「我以後不用 Perplexity」，要求清掉剩下 4 處殘留。
+- [已修改]
+  - `lib/ai/model-comparison.ts`：刪 `ModelVendor` 的 `"Perplexity"`、3 列（文字模型 Sonar、搜尋 API Sonar、coding 工具 Perplexity/Comet）、3 個價格連結、只有它用的 speed 值 `"依搜尋深度"`；`AiModelsClient.tsx`：刪 2 個來源標籤。
+  - `agency-os/docs/features/feature-content-studio-cost-tracking.md`：06-18 計畫正文不回改（AGENTS §9），開頭加現況說明（fetchRealSources→Serper `generate-core.ts:194`、market-analysis→Claude `market-analysis/route.ts:14`），狀態改「已實作」。
+  - `agency-os/TASKS.md` 內容引擎積木化條目：加一句「Perplexity 積木已退役，改 `search/serper`（`trending-sources.ts:289`），下文是 06-16 紀錄」。
+  - `~/.claude/settings.json`（不在 git）：刪 allow 1＋deny 3 條 `mcp__perplexity__*`；repo 範本 `mcp/claude-userlevel/settings.template.json` 早就沒有，merge 模式不會刪本機多的條目。備份在 scratchpad `settings.json.bak`。
+- [刻意保留] GEO／SEO／RankMath 文件、`generate-core.ts:83` 產文 prompt、`MONITORING_SYSTEMS_INVENTORY.md`（PerplexityBot）：講的是它身為 AI 搜尋引擎、會引用客戶網站；migration 0042/0043 註解（已套 prod）；`verify-asset-mcp-refs.mjs`＋測試（拿已退役工具名當案例）；WORKLOG／報告／Cursor 原始規格（歷史）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p .（next-admin） | exit=0 | ms=4837
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run app/__tests__/sidebar-coverage.test.ts lib/portal/__tests__/staff-tools.test.ts（16 passed） | exit=0 | ms=5336
+- REALTEST_EVIDENCE: tool=Bash | cmd=node --test tests/hooks/settings-deny-parity.test.mjs（4 pass）＋ python json.loads(~/.claude/settings.json) 刪後仍可解析 | exit=0 | ms=431
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（Codex oracle `agency-os/reports/oracle/2026-10-25-partialreview-5bee4a7e.md`，files-reviewed 含兩個 .ts 檔，NO FINDINGS）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude,.github,docs,tests | grep=perplexity | hits=25（全部歸在「刻意保留」或已加退役說明；`.claude/agents|commands|skills` 0）
+- 瀏覽器實測：沒做（/tools/ai-models 需要登入；改動是純資料刪除，tsc 綠）。
+- **rollback**：`git revert <本 commit>`；settings.json 用 scratchpad 備份還原。
 ## 2026-10-25（續24）wp-bridge 0.18.0 發版並裝上 aware-wave.com；WooCommerce 11.2.1 安裝；付款開關打開（操作者「你去處理」「打開」）（Claude）
 
 - **發版**：`scripts/release-wp-bridge.sh` 推 tag v0.18.0 到 `awarewaveai-pei/aware-wave-wp-bridge`；GitHub Actions 未啟動（job 註記：帳號付款失敗／支出上限，Release 與 CI 兩個 workflow 皆 3–4 秒失敗）→ 本機 `git archive` 從 tag `fa0dfb90c` 打包（同 release.yml 結構，82 檔、17 個 Billing 檔、正斜線），`gh release create v0.18.0 --verify-tag` 上傳。https://github.com/awarewaveai-pei/aware-wave-wp-bridge/releases/tag/v0.18.0

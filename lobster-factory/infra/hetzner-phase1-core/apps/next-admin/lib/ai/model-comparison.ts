@@ -1,4 +1,4 @@
-export type ModelVendor = "OpenAI" | "Anthropic" | "Google" | "Perplexity" | "xAI";
+export type ModelVendor = "OpenAI" | "Anthropic" | "Google" | "xAI";
 
 export interface TextModelComparison {
   vendor: ModelVendor;
@@ -8,7 +8,7 @@ export interface TextModelComparison {
   style: string;
   cost: string;
   context: string;
-  speed: "最快" | "快" | "中" | "慢" | "依搜尋深度";
+  speed: "最快" | "快" | "中" | "慢";
   speedRank: 1 | 2 | 3 | 4 | 5; // 1=fastest
   costInputPer1M: number; // USD per 1M input tokens (for sort)
   costOutputPer1M: number; // USD per 1M output tokens
@@ -45,8 +45,6 @@ export const AI_MODEL_SOURCES = {
   geminiModels: "https://ai.google.dev/gemini-api/docs/models",
   geminiPricing: "https://ai.google.dev/gemini-api/docs/pricing",
   geminiCodeAssist: "https://developers.google.com/gemini-code-assist/docs/overview",
-  perplexityPricing: "https://docs.perplexity.ai/docs/pricing",
-  perplexityModels: "https://docs.perplexity.ai/models/model-cards",
   xaiModels: "https://docs.x.ai/docs/models",
   grokBuild: "https://x.ai/blog/grok-3",
 } as const;
@@ -179,22 +177,6 @@ export const TEXT_MODEL_COMPARISONS: readonly TextModelComparison[] = [
     strengths: "速度快、成本低、適合大量管線與即時功能",
     tradeoffs: "高難推理、品牌文字細膩度不如 Pro/Claude/OpenAI 高階",
     sourceKeys: ["geminiModels", "geminiPricing"],
-  },
-  {
-    vendor: "Perplexity",
-    model: "Sonar / Sonar Pro / Agent API",
-    surface: "Perplexity API / Comet",
-    bestFor: "需要引用來源、即時資料、競品研究、新聞/市場摘要",
-    style: "答案導向、引用導向，像研究助理",
-    cost: "官方 pricing 依模型與 provider；受 search context / request 影響",
-    context: "依 live model table；檢索內容會進入成本與延遲",
-    speed: "依搜尋深度",
-    speedRank: 3,
-    costInputPer1M: 1.0,
-    costOutputPer1M: 1.0,
-    strengths: "有引用、適合查證與最新資訊",
-    tradeoffs: "成本不是只看 token；深度搜尋會變慢且變貴",
-    sourceKeys: ["perplexityPricing", "perplexityModels"],
   },
   {
     vendor: "xAI",
@@ -461,7 +443,6 @@ export const SEARCH_API_SOURCES = {
   serper: "https://serper.dev/pricing",
   brave: "https://brave.com/search/api/",
   tavily: "https://tavily.com/#pricing",
-  perplexitySonar: "https://docs.perplexity.ai/docs/pricing",
   googlePse: "https://developers.google.com/custom-search/v1/overview",
 } as const;
 
@@ -507,20 +488,6 @@ export const SEARCH_API_COMPARISONS: readonly SearchApiComparison[] = [
     strengths: "回傳格式最適合 LLM 消費；自動過濾廣告/無關段落",
     tradeoffs: "免費量少；需 AI 介入的延遲比 Serper 高",
     sourceKeys: ["tavily"],
-  },
-  {
-    vendor: "Perplexity",
-    product: "Sonar / Sonar Pro",
-    surface: "Perplexity API",
-    bestFor: "需要帶引用來源的 AI 摘要、市場調查、即時新聞彙整",
-    style: "AI 回答 + 來源標注；像有引用的研究助理",
-    costPer1kQueriesUsd: 5.0,
-    costNote: "Sonar $5/1k requests；Sonar Pro $8/1k；含 token 費用",
-    resultsType: "AI answer + citations",
-    latency: "1–3s",
-    strengths: "引用最清楚；適合品牌/競品研究與即時資訊",
-    tradeoffs: "最貴（含 LLM 費用）；延遲高；深度搜尋更慢",
-    sourceKeys: ["perplexitySonar"],
   },
   {
     vendor: "Google",
@@ -589,23 +556,6 @@ export const CODING_TOOL_COMPARISONS: readonly CodingToolComparison[] = [
     strengths: "免費入口強、速度快、Cloud/devops 任務方便",
     tradeoffs: "非 Google 生態大型 repo 的端到端代理成熟度需實測",
     sourceKeys: ["geminiCodeAssist", "geminiModels", "geminiPricing"],
-  },
-  {
-    vendor: "Perplexity",
-    tool: "Perplexity / Comet",
-    model: "Sonar + third-party Agent API",
-    surface: "Browser / API",
-    bestFor: "文件查證、套件/框架最新用法、方案比較、issue 背景研究",
-    cost: "依 Agent API live table；搜尋深度與 context 影響成本",
-    speed: "中",
-    speedRank: 3,
-    costInputPer1M: 1.0,
-    costOutputPer1M: 1.0,
-    context: "依模型；搜尋檢索會增加延遲與成本",
-    workflowStyle: "研究型 coding assistant：先找資料、引用來源，再給建議",
-    strengths: "查最新 docs、引用、比較工具選型很強",
-    tradeoffs: "不適合直接改 repo；實作建議交給 Codex/Claude Code/Gemini CLI",
-    sourceKeys: ["perplexityPricing", "perplexityModels"],
   },
   {
     vendor: "xAI",

@@ -1,8 +1,10 @@
 # Feature Plan: Content Studio 每篇文章費用追蹤
 
-**狀態**: 待實作  
+**狀態**: 已實作（`CostChip.tsx`）；下文是 2026-06-18 的原計畫，未回改  
 **建立日期**: 2026-06-18  
 **影響頁面**: `/tools/content`, `/ops/costs`
+
+> **2026-10-25 現況**：Perplexity 已全面退役（`6cfcba142`，操作者不再使用）。下文提到 Perplexity 的地方現在是：`fetchRealSources` → Serper（`lib/content/article/generate-core.ts:194`）；`market-analysis` → Claude（`app/api/content/market-analysis/route.ts:14`）；trending 的 Perplexity fallback 已不存在。
 
 ---
 

@@ -58,8 +58,6 @@ const TEXT_SOURCE_LABEL: Record<string, string> = {
   geminiModels: "Gemini models",
   geminiPricing: "Gemini pricing",
   geminiCodeAssist: "Code Assist",
-  perplexityPricing: "Perplexity pricing",
-  perplexityModels: "Perplexity models",
   xaiModels: "xAI models",
   grokBuild: "Grok Build",
 };
