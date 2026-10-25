@@ -1,6 +1,7 @@
 {
   "_comment": "Config for scripts/update-client-wp-plugins.ps1. No secrets here — DB creds read live from wp-config.php via WP-CLI.",
   "clientSlug": "soulful",
+  "orgSlug": "soulful-expression",
   "clientName": "Soulful Expression Art Therapy",
   "tenantFolder": "company-soulful-expression",
 

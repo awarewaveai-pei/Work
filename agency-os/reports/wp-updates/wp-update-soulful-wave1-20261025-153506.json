@@ -1,0 +1,32 @@
+﻿{
+    "ok":  true,
+    "client":  "soulful",
+    "ran_at":  "2026-10-25T15:36:35.9878514+08:00",
+    "plugins_group":  "wave1",
+    "backup_path":  "D:\\Work\\agency-os\\tenants\\company-soulful-expression\\backups\\pre-update-soulful-wave1-20261025-153506.sql.gz",
+    "updated_count":  1,
+    "skipped_license_count":  2,
+    "failed_count":  0,
+    "rollback":  false,
+    "health_final":  "HTTP 200 OK",
+    "results":  [
+                    {
+                        "plugin":  "advanced-custom-fields-pro",
+                        "from":  "6.4.2",
+                        "to":  "6.8.10",
+                        "status":  "skipped_license"
+                    },
+                    {
+                        "plugin":  "ultimate-member",
+                        "from":  "2.12.1",
+                        "to":  "2.14.1",
+                        "status":  "updated"
+                    },
+                    {
+                        "plugin":  "woocommerce-points-and-rewards",
+                        "from":  "1.8.10",
+                        "to":  "1.18.25",
+                        "status":  "skipped_license"
+                    }
+                ]
+}

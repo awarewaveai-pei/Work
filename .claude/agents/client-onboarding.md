@@ -200,13 +200,10 @@ In MainWP Dashboard → Extensions → Webhooks (or Advanced Settings):
 ## §VERIFY — always run at the end
 
 ```bash
-# 1. Client appears in /ops/clients
-curl -s https://app.aware-wave.com/api/ops/clients \
-  -u "awarewave:<GRAFANA_BASIC_PASSWORD>" \
-  | python3 -c "import sys,json; [print(c['slug'],c['clientConfig'].get('platform')) for c in json.load(sys.stdin)['clients']]"
-
-# 2. Health probe passes
-# Expected: client card shows ● HTTP 200
+# 1+2. Client is in Supabase with its config, and the health probe passes
+#      (/api/ops/clients needs a staff session; this reads the same data directly)
+powershell -ExecutionPolicy Bypass -File ./scripts/client-status.ps1 -Slug <slug>
+# Expected: the client row shows "OK HTTP 200" and the right platform/hosting
 
 # 3. SSH (if applicable): test connection
 ssh -p <port> -i ~/.ssh/<keyfile> <user>@<host> "wp --info --path=<wp_path> --allow-root"

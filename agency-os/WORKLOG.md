@@ -1,4 +1,28 @@
 # Worklog
+## 2026-10-25（續36）續29 的三件未做完：`/client-status` 改直讀 Supabase；soulful 外掛 17 個更新；aware-wave.com 裝 FluentSMTP（只差 Resend 金鑰）（Claude）
+
+- **`/client-status`**：根因 `/api/ops/clients` 在員工登入之後（`next-admin/middleware.ts` 無 session → 401/404），skill 的 Basic auth 是舊做法。新 `scripts/client-status.ps1` 直讀 Supabase `organizations`（同 Telegram `/client_status`，`lib/command-plane/handlers/clientStatus.ts`）；`.claude/commands/client-status.md` 改用它；`.claude/agents/client-onboarding.md` §VERIFY 同一個舊 curl 一併換掉。PS 5.1 `Invoke-RestMethod` 陣列要 `ForEach-Object` 展開。
+- **soulful 外掛**（`scripts/update-client-wp-plugins.ps1`）：17 更新、0 失敗、0 回滾。ultimate-member 2.14.1、fluentform 6.2.16、litespeed 7.9.2、akismet、cartflows 3.3.0、code-snippets 4.0.0、fluent-booking 2.5.0、fluent-crm 3.2.6、fluent-smtp 2.4.1、hostinger、kadence-blocks 3.8.0.2、mainwp-child 6.3、rank-math、redis-cache 3.0.0（`wp redis update-dropin`）、site-kit、vibe-ai、wpvivid。5 個要授權（WP-CLI 下載不到，要在 WP 後台更新）：ACF Pro、Kadence Blocks Pro、Permalink Manager Pro、WC Points & Rewards、Astra Portfolio。
+- **更新腳本根因與修正**：
+  - M1 備份要先 scp 回筆電，筆電下行 ~15 KB/s（8 MB 548 s），wave2 在備份中被 timeout 砍掉（沒動到外掛）。不變量：自家主機的更新前備份不依賴筆電網路。`ks-aw-01-docker` 改成 DB dump＋plugins tgz 留在主機 `/root/backups/wordpress/`（30 天清理），回滾同時還原外掛檔案與 DB（舊版只還 DB）。`shared-ssh` 行為不變。
+  - M2 dashboard 同步 key 只讀 env、缺時 `Write-Verbose` 靜默跳過，而且 slug `soulful` ≠ org slug `soulful-expression`，所以 dashboard 停在 2026-05-08。改成 env→User→vault 讀 key、缺時 `Write-Warning`，config 加 `orgSlug`；今天三輪合併補送 → `/client-status` 顯示今日。
+  - m1 CSV 外掛清單會進檔名（逗號＋300 字）→ `custom`。
+- **critic**（Codex 額度擋到 19:40）：1 Major 3 minor 全修。
+  - Major：shared-ssh 加 `set -e` 會跳過 DB 密碼暫存檔的 `rm` → 只有 docker profile 用 `-e`。
+  - 回滾改成先解到旁邊再 rename 交換；失敗的程式碼移到 docroot 外 `/var/www/plugins.failed-<ts>`；外掛步驟失敗 DB 照樣還原；tar「file changed」不再擋備份；加 30 天清理。
+- **aware-wave.com 寄信**：soulful 用的是 Hostinger 信箱 SMTP（info@soulfulexpression.org），別的網域不能用。aware-wave.com 已在 Resend 驗證（verified、sending enabled）。
+  - 做了：備份（`lobster-wordpress-pre-fluentsmtp-20261025T074902Z.sql`＋plugins tgz）、裝 FluentSMTP 2.4.1、預填 `smtp.resend.com:587 TLS`、帳號 `resend`、寄件者 `AwareWave <noreply@aware-wave.com>`（`AWAREWAVE_STACK_QUICKREF.md:127`），只缺密碼。
+  - 操作者：Resend 建 sending key → WP 後台 設定 › FluentSMTP › Resend SMTP › 密碼欄貼上 → 寄測試信。
+- **發現（未修）**：Supabase soulful `client_config.hosting_type` 仍寫 hostinger（站已在 ks-aw-01）；soulful 的 `hostinger` 外掛已無用途。
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell scripts/client-status.ps1（6 orgs，3 up）與 -Slug soulful（今日 17 updated） | exit=0 | ms=2000
+- REALTEST_EVIDENCE: tool=SSH | cmd=update-client-wp-plugins.ps1 -ClientSlug soulful wave1/wave2/CSV（17 updated 0 failed）＋ -BackupOnly（host .sql.gz＋.tgz） | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=SSH | cmd=回滾交換序列於拋棄式容器（同 soulful-wp image）：舊檔回來、owner www-data、壞檔在 docroot 外；壞 tgz 不動 live | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=playwright-runner.ps1 -Mode client -ClientSlug company-soulful-expression（更新後 7 passed）；curl / 200、/account/ 302、/cart/ 200；core verify-checksums OK；fatal 0 | exit=0 | ms=45800
+- REALTEST_EVIDENCE: tool=SSH | cmd=aware-wave.com wp plugin list fluent-smtp active 2.4.1；home 200、wp-login 200 | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/3n（全修）
+- ORACLE_WAIVED: codex quota blocked until 2026-10-25 19:40 (scripts/oracle-quota.ps1)；改用 critic agent＋拋棄式容器實測回滾
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=api/ops/clients | hits=2
+- **rollback**：腳本 `git revert`；soulful 外掛 `/root/backups/wordpress/soulful-wp-plugins-pre-update-20261025T073406Z.tgz` 解回 plugins，DB 用同目錄 `soulful-wp-pre-update-*-20261025-*.sql.gz`；aware-wave.com `wp plugin delete fluent-smtp` 或 `lobster-wordpress-*pre-fluentsmtp-20261025T074902Z*`。
 ## 2026-10-25（續35）next-admin 手動部署 5db9dd75b（操作者 go）：OpenAI 圖片改用 gpt-image-2 提前上線，公網與 Playwright 煙霧測試通過（Claude）
 
 **觸發**：操作者「Go ahead: deploy next-admin now with sg-deploy, then smoke test.」原因：gpt-image-1 已關閉，正式環境的 openai-low／medium／high 圖片選項全壞（續31 F1），不等 03:00。

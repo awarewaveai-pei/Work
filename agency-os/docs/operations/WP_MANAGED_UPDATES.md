@@ -81,7 +81,7 @@ Hostinger shared hosting provides site-cloning via hPanel (Subdomains). The Day 
 ```
 1. Load config from tenants/<client>/core/wp-update-config.json
 2. Pre-flight: SSH reachable? Site returning HTTP 200?
-3. Backup: mysqldump via SSH → gzip → SCP to local → SHA-256 verify
+3. Backup: mysqldump via SSH → gzip → `Dump completed` trailer check. `ks-aw-01-docker`: DB dump + plugins-folder tgz stay on the host in `/root/backups/wordpress/` (pruned after 30 days; no laptop download; 2026-10-25 a slow download killed a run mid-backup). `shared-ssh`: downloaded to local `backups/`
 4. Resolve plugin list (wave / csv / all / list)
 5. For each plugin:
    a. wp plugin update <slug> --format=json
@@ -134,14 +134,12 @@ Each managed client needs one config at `tenants/<folder>/core/wp-update-config.
 
 When a health check fails after a plugin update:
 
-1. Script SCPs the backup `.sql.gz` back to server at `/tmp/wp-rollback-<timestamp>.sql.gz`
-2. SSH command: `gunzip -c /tmp/wp-rollback-<timestamp>.sql.gz | mysql --defaults-extra-file=/tmp/.wpmycreds -h <host> <dbname>`
-3. Removes the temp credentials file (`/tmp/.wpmycreds`)
-4. Reports failure with: which plugin failed, which backup was restored, timestamp
-5. Halts — does NOT continue to next plugin
+`ks-aw-01-docker`: unpacks the host plugins tgz beside the live folder, swaps them by rename (failed code kept in the container at `/var/www/plugins.failed-<timestamp>`, outside the docroot), restores the DB from the host dump (even if the plugins step failed), halts. Files AND DB return to the pre-update state.
 
-**Rollback limitations:**
-- Only restores DB — file changes from the plugin update persist in `wp-content/plugins/`
+`shared-ssh`:
+1. Script SCPs the backup `.sql.gz` back to the server and restores the DB
+2. Halts — does NOT continue to next plugin
+3. Only restores DB — file changes from the plugin update persist in `wp-content/plugins/`
 - If manual file rollback needed: SSH → `wp plugin install <slug> --version=<old_version> --force`
 
 ---

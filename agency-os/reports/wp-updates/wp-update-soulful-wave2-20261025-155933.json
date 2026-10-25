@@ -1,0 +1,39 @@
+﻿{
+    "ok":  true,
+    "client":  "soulful",
+    "ran_at":  "2026-10-25T16:00:53.0298626+08:00",
+    "plugins_group":  "wave2",
+    "backup_path":  "host:/root/backups/wordpress/soulful-wp-pre-update-wave2-20261025-155933.sql.gz",
+    "backup_plugins_path":  "host:/root/backups/wordpress/soulful-wp-plugins-pre-update-wave2-20261025-155933.tgz",
+    "updated_count":  2,
+    "skipped_license_count":  2,
+    "failed_count":  0,
+    "rollback":  false,
+    "health_final":  "HTTP 200 OK",
+    "results":  [
+                    {
+                        "plugin":  "fluentform",
+                        "from":  "6.2.12",
+                        "to":  "6.2.16",
+                        "status":  "updated"
+                    },
+                    {
+                        "plugin":  "kadence-blocks-pro",
+                        "from":  "2.7.8",
+                        "to":  "2.8.20.1",
+                        "status":  "skipped_license"
+                    },
+                    {
+                        "plugin":  "litespeed-cache",
+                        "from":  "7.8.1",
+                        "to":  "7.9.2",
+                        "status":  "updated"
+                    },
+                    {
+                        "plugin":  "permalink-manager-pro",
+                        "from":  "2.5.1.4",
+                        "to":  "2.6.1",
+                        "status":  "skipped_license"
+                    }
+                ]
+}

@@ -1,0 +1,105 @@
+﻿{
+    "ok":  true,
+    "client":  "soulful",
+    "ran_at":  "2026-10-25T16:04:37.3305233+08:00",
+    "plugins_group":  "akismet,astra-portfolio,cartflows,code-snippets,google-site-kit,hostinger,kadence-blocks,seo-by-rank-math,fluent-booking,fluent-crm,fluent-smtp,mainwp-child,redis-cache,vibe-ai,wpvivid-backuprestore",
+    "backup_path":  "host:/root/backups/wordpress/soulful-wp-pre-update-akismet,astra-portfolio,cartflows,code-snippets,google-site-kit,hostinger,kadence-blocks,seo-by-rank-math,fluent-booking,fluent-crm,fluent-smtp,mainwp-child,redis-cache,vibe-ai,wpvivid-backuprestore-20261025-160120.sql.gz",
+    "backup_plugins_path":  "host:/root/backups/wordpress/soulful-wp-plugins-pre-update-akismet,astra-portfolio,cartflows,code-snippets,google-site-kit,hostinger,kadence-blocks,seo-by-rank-math,fluent-booking,fluent-crm,fluent-smtp,mainwp-child,redis-cache,vibe-ai,wpvivid-backuprestore-20261025-160120.tgz",
+    "updated_count":  14,
+    "skipped_license_count":  1,
+    "failed_count":  0,
+    "rollback":  false,
+    "health_final":  "HTTP 200 OK",
+    "results":  [
+                    {
+                        "plugin":  "akismet",
+                        "from":  "5.7",
+                        "to":  "5.7.2",
+                        "status":  "updated"
+                    },
+                    {
+                        "plugin":  "cartflows",
+                        "from":  "3.0.1",
+                        "to":  "3.3.0",
+                        "status":  "updated"
+                    },
+                    {
+                        "plugin":  "code-snippets",
+                        "from":  "3.9.6",
+                        "to":  "4.0.0",
+                        "status":  "updated"
+                    },
+                    {
+                        "plugin":  "fluent-booking",
+                        "from":  "2.2.0",
+                        "to":  "2.5.0",
+                        "status":  "updated"
+                    },
+                    {
+                        "plugin":  "fluent-crm",
+                        "from":  "3.1.8",
+                        "to":  "3.2.6",
+                        "status":  "updated"
+                    },
+                    {
+                        "plugin":  "fluent-smtp",
+                        "from":  "2.3.0",
+                        "to":  "2.4.1",
+                        "status":  "updated"
+                    },
+                    {
+                        "plugin":  "hostinger",
+                        "from":  "3.0.66",
+                        "to":  "3.0.80",
+                        "status":  "updated"
+                    },
+                    {
+                        "plugin":  "kadence-blocks",
+                        "from":  "3.7.8.2",
+                        "to":  "3.8.0.2",
+                        "status":  "updated"
+                    },
+                    {
+                        "plugin":  "mainwp-child",
+                        "from":  "6.1.2",
+                        "to":  "6.3",
+                        "status":  "updated"
+                    },
+                    {
+                        "plugin":  "seo-by-rank-math",
+                        "from":  "1.0.275",
+                        "to":  "1.0.280",
+                        "status":  "updated"
+                    },
+                    {
+                        "plugin":  "redis-cache",
+                        "from":  "2.6.1",
+                        "to":  "3.0.0",
+                        "status":  "updated"
+                    },
+                    {
+                        "plugin":  "google-site-kit",
+                        "from":  "1.178.0",
+                        "to":  "1.190.0",
+                        "status":  "updated"
+                    },
+                    {
+                        "plugin":  "astra-portfolio",
+                        "from":  "1.13.1",
+                        "to":  "1.13.6",
+                        "status":  "skipped_license"
+                    },
+                    {
+                        "plugin":  "vibe-ai",
+                        "from":  "1.16.5",
+                        "to":  "1.21.0",
+                        "status":  "updated"
+                    },
+                    {
+                        "plugin":  "wpvivid-backuprestore",
+                        "from":  "0.9.132",
+                        "to":  "0.9.136",
+                        "status":  "updated"
+                    }
+                ]
+}

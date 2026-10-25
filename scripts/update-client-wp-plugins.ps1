@@ -7,11 +7,12 @@
   Flow (per run):
     1. Load client config from tenants/<folder>/core/wp-update-config.json
     2. Pre-flight: SSH reachable + site returning 200
-    3. Backup: mysqldump via SSH, SCP to local backups/, verify checksum
+    3. Backup: mysqldump via SSH, verify the dump trailer. ks-aw-01-docker keeps it ON THE HOST
+       (/root/backups/wordpress/, DB + plugins folder); shared-ssh downloads it to local backups/
     4. Resolve plugin list (wave1/wave2/wave3/all/csv/list)
     5. Update — wave1/wave2: one-by-one with health check between each
                   wave3/all:  batch then single health check
-    6. On health-check fail: SCP backup back, restore DB, halt
+    6. On health-check fail: restore DB (ks-aw-01-docker: and the plugins folder), halt
     7. Write JSON report to agency-os/reports/wp-updates/
 
   "Staging" is replaced by: backup-first + per-plugin health check + auto-rollback.
@@ -35,7 +36,7 @@
   Default $true. Set $false only for testing/dry-run scenarios.
 
 .PARAMETER BackupOnly
-  Take and download the pre-update backup, then stop (no updates).
+  Take the pre-update backup (downloaded for shared-ssh, kept on the host for ks-aw-01-docker), then stop.
 
 .PARAMETER DryRun
   Show what would be updated. No SSH writes.
@@ -201,6 +202,8 @@ function Test-SiteHealth {
 
 # ── Resolve plugin list ───────────────────────────────────────────────────────
 $pluginGroup = $Plugins.ToLower()
+# For file names: a CSV list would put commas and 300+ characters into a path.
+$fileGroup = if ($pluginGroup -match '^[a-z0-9]+$') { $pluginGroup } else { 'custom' }
 $targetSlugs = switch -Wildcard ($pluginGroup) {
   'wave1'  { $config.waves.wave1 }
   'wave2'  { $config.waves.wave2 }
@@ -295,6 +298,10 @@ if ($DryRun) {
 # ── [3/5] Backup ─────────────────────────────────────────────────────────────
 $timestamp   = (Get-Date -Format 'yyyyMMdd-HHmmss')
 $backupLocal = $null
+# ks-aw-01-docker: the backup never leaves the host. A download to the operator's laptop made the
+# safety gate depend on home-network speed (2026-10-25: 4 MB in 15 min, run killed mid-backup).
+$hostBackupDir = '/root/backups/wordpress'
+$backupHostDb = $backupHostPlugins = $null
 $dbHost = $dbName = $dbUser = $dbPass = $null
 
 # DB name comes from the site's own wp-config in both profiles. Only shared-ssh needs the site's DB
@@ -311,20 +318,40 @@ $inDb = 'P="${MARIADB_ROOT_PASSWORD:-${MYSQL_ROOT_PASSWORD:-}}"; [ -n "$P" ] || 
 
 if ($BackupFirst) {
   Write-Host "`n[3/5] Taking pre-update backup..."
-  $backupRemote = "/tmp/pre-update-${ClientSlug}-${pluginGroup}-${timestamp}.sql.gz"
+  $backupRemote = "/tmp/pre-update-${ClientSlug}-${fileGroup}-${timestamp}.sql.gz"
+  if ($hostProfile -eq 'ks-aw-01-docker') {
+    $backupHostDb      = "$hostBackupDir/$wpC-pre-update-$fileGroup-$timestamp.sql.gz"
+    $backupHostPlugins = "$hostBackupDir/$wpC-plugins-pre-update-$fileGroup-$timestamp.tgz"
+    $backupRemote      = $backupHostDb
+  }
   # pipefail + the dump trailer: a failed dump must not pass as a valid (empty) gzip.
   $dumpBody = if ($hostProfile -eq 'ks-aw-01-docker') {
-    "sudo docker exec $dbC sh -c '$inDb; exec `$(command -v mariadb-dump || command -v mysqldump) -uroot --single-transaction --routines --triggers $dbName' | gzip > $backupRemote"
+    "sudo mkdir -p $hostBackupDir`n" +
+    "sudo docker exec $dbC sh -c '$inDb; exec `$(command -v mariadb-dump || command -v mysqldump) -uroot --single-transaction --routines --triggers $dbName' | gzip | sudo tee $backupRemote >/dev/null`n" +
+    "sudo docker exec $wpC sh -c 'tar --warning=no-file-changed -C /var/www/html/wp-content -czf - plugins; [ `$? -le 1 ]' | sudo tee $backupHostPlugins >/dev/null`n" +
+    "sudo tar -tzf $backupHostPlugins >/dev/null`n" +
+    "sudo find $hostBackupDir -maxdepth 1 -name '$wpC-*pre-update-*' -mtime +30 -delete"
   } else {
     "printf '[mysqldump]\npassword=%s\n' '$dbPass' > /tmp/.wpmycreds_$timestamp`nmysqldump --defaults-extra-file=/tmp/.wpmycreds_$timestamp --single-transaction -h $dbHost -u $dbUser $dbName | gzip > $backupRemote; rc=`$?`nrm -f /tmp/.wpmycreds_$timestamp`n[ `$rc -eq 0 ]"
   }
-  $dumpCmd = "set -o pipefail`numask 077`n$dumpBody && gzip -t $backupRemote && gunzip -c $backupRemote | tail -1 | grep -q 'Dump completed' && echo BACKUP_OK"
+  $sudo = if ($hostProfile -eq 'ks-aw-01-docker') { 'sudo ' } else { '' }
+  $dumpCmd = if ($hostProfile -eq 'ks-aw-01-docker') {
+    "set -eo pipefail`numask 077`n$dumpBody`nsudo gzip -t $backupRemote`nsudo gunzip -c $backupRemote | tail -1 | grep -q 'Dump completed'`necho BACKUP_OK"
+  } else {
+    # No -e here: the body must always reach the rm of its password file.
+    "set -o pipefail`numask 077`n$dumpBody && gzip -t $backupRemote && gunzip -c $backupRemote | tail -1 | grep -q 'Dump completed' && echo BACKUP_OK"
+  }
   $dumpResult = Invoke-SSH $dumpCmd -PassThru
   if ($dumpResult -notmatch 'BACKUP_OK') {
-    Invoke-SSH "rm -f $backupRemote" | Out-Null
-    throw "Backup failed or incomplete (no 'Dump completed' trailer). Output: $dumpResult"
+    Invoke-SSH "${sudo}rm -f $backupRemote $(if ($backupHostPlugins) { $backupHostPlugins })" | Out-Null
+    throw "Backup failed or incomplete (no 'Dump completed' trailer, or plugins archive unreadable). Output: $dumpResult"
   }
 
+  if ($hostProfile -eq 'ks-aw-01-docker') {
+    Write-Host "  Backup : host $backupHostDb"
+    Write-Host "           host $backupHostPlugins"
+    if ($BackupOnly) { Write-Host "BackupOnly: done, nothing updated."; exit 0 }
+  } else {
   # SCP to local
   $tenantBackupDir = Join-Path $TenantsDir "$($config.tenantFolder)\backups"
   if (-not (Test-Path $tenantBackupDir)) {
@@ -338,6 +365,7 @@ if ($BackupFirst) {
 
   Write-Host "  Backup : $backupLocal ($([math]::Round((Get-Item $backupLocal).Length / 1MB, 1)) MB)"
   if ($BackupOnly) { Write-Host "BackupOnly: done, nothing updated."; exit 0 }
+  }
 } else {
   Write-Host "`n[3/5] Backup skipped (BackupFirst=false)"
 }
@@ -345,6 +373,26 @@ if ($BackupFirst) {
 # ── Rollback helper ─────────────────────────────────────────────────────────
 function Invoke-Rollback {
   param([string]$BackupPath)
+  if ($backupHostDb) {
+    # Plugins folder first (the failed code goes aside, kept for inspection), then the DB.
+    Write-Host "  ROLLBACK: restoring plugins folder and DB from the host backup..."
+    $aside = "/var/www/plugins.failed-$timestamp"   # outside the docroot: not reachable as PHP over HTTP
+    $stage = "/var/www/html/wp-content/plugins.restore-$timestamp"
+    $cmd = "set -o pipefail`n" +
+      "sudo docker exec $wpC mkdir $stage && sudo cat $backupHostPlugins | sudo docker exec -i $wpC tar -C $stage -xzf - && " +
+      "sudo docker exec $wpC sh -c 'cd /var/www/html/wp-content && mv plugins $aside && mv $stage/plugins plugins && rmdir $stage' && echo PLUGINS_OK`n" +
+      "sudo gunzip -c $backupHostDb | sudo docker exec -i $dbC sh -c '$inDb; exec `$(command -v mariadb || command -v mysql) -uroot $dbName' && echo DB_OK"
+    $result = Invoke-SSH $cmd -PassThru
+    $pOk = $result -match 'PLUGINS_OK'; $dOk = $result -match 'DB_OK'
+    if ($pOk -and $dOk) {
+      Write-Host "  ROLLBACK: plugins folder + DB restored (failed code in container at $aside)."
+    } else {
+      Write-Warning ("  ROLLBACK incomplete: plugins={0} db={1}. Backups: {2} + {3}; failed code (if moved) at {4}; staging dir {5}. Output: {6}" -f `
+        $(if ($pOk) { 'restored' } else { 'NOT restored' }), $(if ($dOk) { 'restored' } else { 'NOT restored' }),
+        $backupHostDb, $backupHostPlugins, $aside, $stage, $result)
+    }
+    return
+  }
   if (-not $BackupPath -or -not (Test-Path $BackupPath)) {
     Write-Warning "No backup available for rollback."
     return
@@ -389,7 +437,7 @@ if ($batchMode) {
     Write-Host "HEALTH CHECK FAILED. Initiating rollback..."
     Invoke-Rollback -BackupPath $backupLocal
     $rollback = $true
-    throw "Batch update caused health-check failure. DB rolled back. Check plugin files manually."
+    throw "Batch update caused health-check failure. DB rolled back$(if ($backupHostDb) { ' (plugins folder too)' } else { '; check plugin files manually' })."
   }
 } else {
   # One-by-one update (wave1 / wave2 / explicit slugs)
@@ -422,7 +470,7 @@ if ($batchMode) {
       Invoke-Rollback -BackupPath $backupLocal
       $rollback = $true
       throw "Plugin '$($plugin.name)' caused health-check failure. DB rolled back. " +
-            "Manually revert the plugin file to the previous version or restore from: $backupLocal"
+            "Backup: $(if ($backupHostDb) { "$backupHostDb + $backupHostPlugins (plugins folder restored too)" } else { "$backupLocal -- revert the plugin files manually" })"
     }
   }
 }
@@ -442,7 +490,8 @@ $report = [pscustomobject]@{
   client                = $ClientSlug
   ran_at                = (Get-Date).ToString('o')
   plugins_group         = $Plugins
-  backup_path           = $backupLocal
+  backup_path           = $(if ($backupHostDb) { "host:$backupHostDb" } else { $backupLocal })
+  backup_plugins_path   = $(if ($backupHostPlugins) { "host:$backupHostPlugins" } else { $null })
   updated_count         = $updatedItems.Count
   skipped_license_count = $skippedItems.Count
   failed_count          = $failedItems.Count
@@ -451,7 +500,7 @@ $report = [pscustomobject]@{
   results               = $results
 }
 
-$suffix    = "${ClientSlug}-${pluginGroup}-${timestamp}"
+$suffix    = "${ClientSlug}-${fileGroup}-${timestamp}"
 $rptFile   = if ($ReportPath) { $ReportPath } else { Join-Path $reportsDir "wp-update-${suffix}.json" }
 $latestFile = Join-Path $reportsDir "wp-update-${ClientSlug}-LATEST.json"
 $report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $rptFile   -Encoding UTF8
@@ -460,11 +509,21 @@ $report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $latestFile -Encodi
 Write-Host "Report  : $rptFile"
 
 # ── Sync report to ops dashboard (non-fatal) ─────────────────────────────────
-# Reads OPS_PROXY_SHARED_SECRET from env (set via secrets-vault.ps1 sync-mcp-user-env).
+# OPS_PROXY_SHARED_SECRET: env (process / User) first, then the local vault -- until 2026-10-25 it was
+# env-only, nobody's shell had it, and the skip was Write-Verbose: the dashboard sat 169 days stale.
+# The dashboard org slug can differ from clientSlug ("soulful" vs "soulful-expression"): config orgSlug.
 # Server strips backup_path before storing. Failure here does NOT abort the run.
 $syncKey = $env:OPS_PROXY_SHARED_SECRET
+if (-not $syncKey) { $syncKey = [Environment]::GetEnvironmentVariable('OPS_PROXY_SHARED_SECRET', 'User') }
+if (-not $syncKey) {
+  try {
+    . (Join-Path $PSScriptRoot "_vault-helpers.ps1")
+    $syncKey = Get-VaultSecret -Store (Read-VaultStore (Resolve-VaultPath)) -Name 'OPS_PROXY_SHARED_SECRET'
+  } catch { $syncKey = $null }
+}
+$orgSlug = if ($config.PSObject.Properties['orgSlug']) { [string]$config.orgSlug } else { $ClientSlug }
 if ($syncKey) {
-  $dashboardUrl = "https://app.aware-wave.com/api/ops/clients/$ClientSlug/wp-report"
+  $dashboardUrl = "https://app.aware-wave.com/api/ops/clients/$orgSlug/wp-report"
   try {
     $syncBody = $report | ConvertTo-Json -Depth 5
     $syncResp = Invoke-RestMethod -Uri $dashboardUrl -Method POST `
@@ -480,7 +539,7 @@ if ($syncKey) {
     Write-Warning "Dashboard sync failed (non-fatal): $($_.Exception.Message)"
   }
 } else {
-  Write-Verbose "OPS_PROXY_SHARED_SECRET not set — skipping dashboard sync (set via secrets-vault.ps1)"
+  Write-Warning "OPS_PROXY_SHARED_SECRET not in env or vault: dashboard NOT updated (/client-status will show the previous run)"
 }
 Write-Host "`n=== SUMMARY ==="
 Write-Host ("Updated : {0}   Skipped(license): {1}   Failed: {2}   Rollback: {3}" -f `
