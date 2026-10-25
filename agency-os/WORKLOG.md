@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-25（續67）next-admin 手動部署 f706f5f0b → 6dfe5f8bf（操作者 go ahead：含其他 session 的 601749947、ae5e0675b）（Claude）
+
+- **內容**：next-admin／migrations 範圍內新 commit 只有 601749947（/ops/billing 左側帳戶列）、ae5e0675b（社群工具加 YouTube）、8c611cb27（0132，已於續60 套 prod）。部署時 main 已前進到 6dfe5f8bf，其餘為文件／主機腳本。
+- **部署前**：`check-deploy-drift.ps1` FAIL＝落後 12 commit（即本次要補）；composeVarDrift onlyInRepo=META_*（0d85eb44c 2026-10-21 起既有，f706f5f0b 以來 compose 未改，與本次無關，未處理）；無 DEPLOY_HOLD。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin → healthy after 15s、"smoke: all endpoints OK"、deployed commit 6dfe5f8bf | exit=0 | ms=600000
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell scripts/playwright-runner.ps1 -Mode smoke -SkipInstall → 26 passed／6 skipped | exit=0 | ms=33670
+- REVIEW_WAIVED: NA -- 部署動作，無程式改動；兩個 commit 由各自 session 審
+- BUGHUNT_WAIVED: NA -- 無程式改動
+- **rollback**：`sudo /root/lobster-phase1/scripts/rollback-phase1.sh restore next-admin`（sg-deploy 建置前已 save snapshot；`list` 看可用版本）。
 ## 2026-10-25（續66）全自動內容 P7.0：YouTube OAuth 用戶端裝進 postiz（操作者「要」）（Claude）
 
 - **做了什麼**：操作者在 Google Cloud 建兩組 OAuth 用戶端（AW、Soulful，`AWARE_WAVE_CREDENTIALS.md` §9.6.1）。Postiz 只吃一組全域 `YOUTUBE_CLIENT_ID/SECRET`，一組可連任何 Google 帳號的頻道 → 用 AW 那組；Soulful 那組未用。
