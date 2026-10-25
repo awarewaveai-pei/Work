@@ -104,6 +104,7 @@ export const STEPS = [
     ] },
   { n: 6, code: 'C6', group: 'E', title: '狀態報告改由主機產生', plain: '例：主機記憶體與硬碟用量報告，目前要等筆電執行開工報告才會更新。改由主機每天產生後，筆電未開機也能更新。',
     gate: '排程頁「筆電與雲端」區只保留需要筆電的項目。其餘報告由主機準時產生。', risk: 'High（正式主機）', model: 'Opus 5.5', status: 'not_started', depends: ['C5'],
+    before: '待決 4',
     what: '清點 ao-resume.ps1 讀的 9 份報告；SSH 讀主機者改主機 cron 產生寫 /var/lib/awarewave',
     files: ['scripts/ao-resume.ps1', 'HS/cron.d/awarewave-schedules'],
     items: [
@@ -135,4 +136,5 @@ export const OPEN = [
   { n: 1, what: '在 GitHub 建立只能讀取 Work repo 的 Actions 的密碼。將密碼存入主機設定。', before: 'C5', src: '計畫 §3 R5、C5.3' },
   { n: 2, what: '決定使用 Cloudflare 健康檢查或其他外部監控服務。選用 Cloudflare 前，需確認方案是否支援。', before: 'C8', src: '計畫 C8.1' },
   { n: 3, what: '閱讀決策記錄後，決定是否增設第二台主機。若要增設，再決定時間。', before: 'C8', src: '計畫 C8.2' },
+  { n: 4, what: '備份狀態同步要把結果推到 GitHub，但主機的金鑰只能讀取，從 9 月搬機後每天失敗。選一：給這把金鑰寫入權限（主機被入侵時可直接改 main）；或改成主機只把結果存在主機上，筆電來讀（併入「狀態報告改由主機產生」那張卡）。', before: 'C6', src: 'WORKLOG 2026-10-25 續64 M1' },
 ];
