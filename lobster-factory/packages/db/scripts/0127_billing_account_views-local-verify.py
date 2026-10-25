@@ -24,6 +24,8 @@ DROP_UP = DB / "migrations/0129_drop_billing_overview.sql"
 DROP_DOWN = DB / "migrations/0129_drop_billing_overview.down.sql"
 LEDGER_UP = DB / "migrations/0130_billing_ledger.sql"
 LEDGER_DOWN = DB / "migrations/0130_billing_ledger.down.sql"
+ORDER_UP = DB / "migrations/0131_billing_ledger_order_search.sql"
+ORDER_DOWN = DB / "migrations/0131_billing_ledger_order_search.down.sql"
 INTERNAL, EDD, SOULFUL = "39ad4149-5044-4077-8d9a-b6b916de0e21", "ecf4e311-4f38-4288-9396-e70fd7697aca", "2bf60452-3d4d-47c2-9970-b9046ed1a35a"
 CUST, BRAND = "00000000-0000-4000-8000-0000000000c1", "00000000-0000-4000-8000-0000000000b1"
 N = 3000
@@ -229,6 +231,21 @@ def main():
         query(LEDGER_DOWN.read_text(encoding="utf-8"))
         assert one("select to_regprocedure('public.billing_ledger(text,text,integer,integer)') is null and to_regprocedure('public.billing_attention(integer,integer)') is not null") == "t"
         query(LEDGER_UP.read_text(encoding="utf-8"))
+        # 0131: a second pack's order id lives only in its payment payload (the contract keeps the first order's ref).
+        query(f"""insert into payment_events(provider, event_id, kind, organization_id, payload) values
+          ('woo', 'woo-evt-555', 'credit_pack', '{acct(7)}', '{{"order_ref": "PO-999"}}'),
+          ('woo', 'woo-evt-556', 'subscription_paid', '{acct(8)}', '{{"external_ref": "SUB-4242"}}');""")
+        assert ledger("all", "po-999")["matching"] == 0
+        src_0130 = one("select md5(prosrc) from pg_proc where proname = 'billing_ledger'")
+        query(ORDER_UP.read_text(encoding="utf-8"))
+        for q, slug in (("po-999", "acct-00007"), ("sub-4242", "acct-00008"), ("woo-evt-555", "acct-00007")):
+            got = ledger("all", q)
+            assert got["matching"] == 1 and got["rows"][0]["slug"] == slug, (q, got["matching"])
+        query(ORDER_DOWN.read_text(encoding="utf-8"))
+        assert one("select md5(prosrc) from pg_proc where proname = 'billing_ledger'") == src_0130
+        assert one("select has_function_privilege('anon', 'public.billing_ledger(text,text,integer,integer)', 'execute')") == "f"
+        query(ORDER_UP.read_text(encoding="utf-8"))
+        print("OK 0131: search finds a payment's order_ref / external_ref; down restores 0130's body byte for byte")
         print(f"OK 0130 billing_ledger: totals {t['accounts']} accounts agree with 0127; 30-day sums skip older entries; filters {counts}; search by name, member email, payment id, contract ref (wildcards escaped); pages; row detail; down drops only it")
 
         for label, sql in (("billing_attention(50, 0)", "select public.billing_attention(50, 0)"),
@@ -249,7 +266,7 @@ def main():
         query(DROP_UP.read_text(encoding="utf-8"))
         assert one("select to_regprocedure('public.billing_overview(integer,integer)') is null") == "t"
         print("OK 0129 up, down, up: billing_overview dropped, 0127's reads unchanged; down restores 0120's text and grants")
-        print("PASS 0127 + 0129 + 0130")
+        print("PASS 0127 + 0129 + 0130 + 0131")
     finally:
         command(["docker", "rm", "-f", NAME], succeeds=False)
 

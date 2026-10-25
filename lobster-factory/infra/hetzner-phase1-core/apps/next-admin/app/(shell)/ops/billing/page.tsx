@@ -95,7 +95,7 @@ export default async function BillingPage({ searchParams }: { searchParams?: Pro
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
                 <h2 style={{ fontSize: 16, fontWeight: 800, color: "var(--text-primary)", margin: 0 }}>{detail.account?.name ?? "帳戶明細"}</h2>
                 <span style={{ fontSize: 13 }}>
-                  {detail.account ? <Link href={`/ops/clients/${encodeURIComponent(detail.account.slug)}`} style={{ ...link, marginRight: 16 }}>客戶頁</Link> : null}
+                  {detail.account ? <Link href={`/ops/clients/${encodeURIComponent(detail.account.slug)}?tab=${encodeURIComponent("帳務")}`} style={{ ...link, marginRight: 16 }}>客戶頁</Link> : null}
                   <Link href={href({ account: undefined })} style={link}>關閉</Link>
                 </span>
               </div>

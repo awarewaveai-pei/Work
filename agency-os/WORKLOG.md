@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-25（續56）0130 套 prod＋44dd16561 推 main（操作者 go）；Codex 審查帳務三個 commit：2 項屬實，0131＋客戶頁連結修正（0131 未套 prod）（Claude）
+
+**觸發**：操作者「套 0130 到正式庫並 push, 而且CODEX已有額度」。接續 55。
+- 0130：`apply-db-migration.mjs 0130` → APPLY_OK；prod 唯讀讀回：ledger 有 0130、anon／authenticated 不可執行、service_role 可；`billing_ledger('all')` totals accounts=3（＝舊 billing_overview 3 帳戶）、matching 3、搜「aware」1；`--status` applied 130。push `5bfc6fd1b..44dd16561`，無 DEPLOY_HOLD。
+- Codex（`oracle-quota -Action clear` 後；`codex-oracle.ps1 -DiffRef 5bdf7f9f9~1..44dd16561 -Path <帳務檔>`，artifact `agency-os/reports/oracle/2026-10-25-partialreview-720b881d.md`）2 項，皆已對原始碼核實：
+  - F1 同方案第二個點數包的訂單編號搜不到：訂單號只在帳本 `reference_id`（`0128_pack_usage_rights_open_ended.sql:180`）與付款 payload，合約沿用時 `source_ref` 不更新（同檔:205-208）。→ 0131 `create or replace billing_ledger`，付款子句加 `payload->>'order_ref'`／`'external_ref'`；同簽名同權限；down 逐字還原 0130 本體。
+  - F2 明細「客戶頁」連結沒帶 `?tab=帳務`（`ClientHubTabs.tsx:2642` 預設「維護」）。→ 已補。
+- REALTEST_EVIDENCE: tool=SSH | cmd=ssh ubuntu@ks-aw-01 sudo docker exec -i supabase-db psql（唯讀交易）讀回 0130 | exit=0 | ms=5474
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/packages/db/scripts/0127_billing_account_views-local-verify.py（加 0131：0130 下搜 PO-999 為 0；0131 後 PO-999／SUB-4242／woo-evt-555 各找到唯一帳戶；down 還原 0130 md5、權限不變）→ PASS 0127 + 0129 + 0130 + 0131 | exit=0 | ms=35721
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py --suite payments（schema 含 0131）→ 11 passed | exit=0 | ms=11247
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p .（0）＋ npx vitest run "app/(shell)/ops" lib/portal lib/entitlements → 29 files／263 passed | exit=0 | ms=20000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n（Codex CLI：F1、F2 屬實，皆已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=order_ref | hits=387（payload 的寫入端 0120／0128、wp-bridge 與 payments 程式、測試、日誌；讀取端只有 0131 一處新增，其餘搜尋入口無）
+
+**待操作者（High）**：套 0131 到 prod 後 push（未套前 03:00 部署被 migration 閘擋）。新版上線後收縮步刪 `billing_attention`。
 ## 2026-10-25（續55）/ops/billing 改成全部帳戶的總帳：搜尋（名稱／代號／成員 email／付款編號／合約來源）、篩選、同頁明細（0130 未套 prod）（Claude）
 
 **觸發**：操作者看 `/ops/billing`「為什麼沒看到任何名單? 這裡應該是總帳的地方, 不要叫我再點到"CLIENTS"一個一個看」＋「還要有搜尋名字或其他的方式」。
