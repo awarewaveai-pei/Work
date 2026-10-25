@@ -1,4 +1,23 @@
 # Worklog
+## 2026-10-25（續73）客戶頁「帳號」只列客戶已買且已開門的產品，每個帳號附各產品角色（去設定）；設定密碼連結不再指向未開門的產品（Claude）
+
+- **觸發**：操作者問客戶帳號頁要不要比照 `/ops/staff`；定案 B（「客戶會買的產品不一定是哪幾個」）。
+- **不變量**：帳號頁不存權限。買了什麼＝`organization_entitlements` 有效列；角色＝產品自己的成員表；能寄的門＝已開門（served）。
+- **根因**
+  - C1 `accounts/route.ts` GET 用 `nextAdminProducts()` 列全部 9 產品，不看客戶持有。
+  - C2 同類：`inviteProduct`（`client-invite.ts`）與 WordPress 買家 `inviteProductKey`（`wp-customers.ts`）可選 `door.enabled:false` 產品 → 主機 `middleware.ts:314` 回 404，設定密碼連結是死的。Soulful 原本 9 顆中 4 顆（內容行銷、AI 客服、資料蒐集器、行銷開發信）會寄死連結。
+  - m1 設定密碼完成鍵寫死「開啟社群發文」，任何產品的門都顯示 → 改「開始使用」。
+- **改動**（`e25ef5710`）
+  - `accounts/route.ts`：GET 產品＝served 門逐一問門口同一個 `holdsProduct`（`limit(1)`，非一次撈全部列：all-features 帳號 339 列、PostgREST 上限 1000 會靜默截斷）；`MEMBER_LISTS`（目前只有 social：`listMembers`＋`/tools/social?brand=<org>&view=settings`）；每帳號 `roles`。POST 非提供產品 → 400 `product_not_held`；讀授權失敗 → 503。
+  - `client-invite.ts`、`wp-customers.ts`：改 `servedNextAdminProducts()`。
+  - `AccountsCard.tsx`、`invite-copy.ts`：產品說明、無產品提示、每列「產品：角色 去設定／可使用」；步驟不再寫死社群發文，「去設定」步驟只在有角色表的產品時出現；載入失敗不再顯示「尚未購買」。
+  - m2 新文案（`invite-copy.ts` 檔頭列名）由 Claude 寫，未過 GPT inspect（Codex 額度擋到 22:36）；之後要過再跑 inspect 換字串。
+- REALTEST_EVIDENCE: tool=SSH | cmd=ssh ubuntu@ks-aw-01 sudo docker exec supabase-db psql（唯讀：各 client org 有效產品／成員數）→ soulful-expression、edd-research、awarewave-ops 持有全部 10 產品；3 個測試 org 0 產品；served 門＝社群發文、影片製作、塔羅製圖、商品設計工作室、設計編輯器 | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run accounts/route.test.ts door-holds.test.ts registry-code.test.ts woo-billing.test.ts payments/[provider]/route.test.ts → 56 passed；突變（held 過濾加 `|| true`）→ 3 案例紅，還原綠；jsdom 渲染 AccountsCard → 瀏覽器面板截圖確認 | exit=0 | ms=2820
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1M/4m（M1 一次撈全部列會被 1000 列上限截斷→改逐門 `holdsProduct`，`heldProductKeys` 刪除；m1 載入失敗誤顯示未購買→修；m4 角色步驟在無角色表產品時誤導→改條件顯示、檔頭標明作者；m2 成員表讀失敗整頁 503、m3 WordPress 方案若指向關門產品會退到第一個開門產品——現無此方案，皆不改）
+- ORACLE_WAIVED: Codex 額度擋到 22:36；critic 獨立審＋突變證據；無 auth／金流／migration
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=nextAdminProducts\(\)|選取「社群發文」|開啟社群發文|heldProductKeys | hits=5（剩 `staff-tools.ts:68` 員工側欄＝未開門也要預覽，正確；`social/reports.ts:149` 只取 social＝已開門；oracle 歷史報告不改）
+- **rollback**：`git revert e25ef5710`（無 migration、無主機變更；隔天 03:00 auto-deploy 上線）。
 ## 2026-10-25（續72）組織列只准控制面寫：0134 草稿（拿掉成員的 organizations UPDATE／DELETE 政策＋收回 anon／authenticated 寫入權）；拋棄式 DB 20/20 通過；未套 prod、migration 未 commit（Claude）
 
 - **觸發**：續68 critic 發現（續70 剩餘風險）：`organizations_update`／`organizations_delete`（`lobster-factory/packages/db/migrations/0010_clerk_org_mapping_and_rls_expansion.sql:526-534`）只要求 `user_has_org_access(id)`，Supabase 預設權限又給 authenticated 寫入 → 客戶成員帶自己 JWT 經 PostgREST 可改自己組織列任何欄（`kind`→internal＝後台免費；`parent_organization_id`／`org_level`＝改計費主體）或直接 DELETE。
