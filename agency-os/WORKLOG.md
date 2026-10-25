@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-25（續49）app.aware-wave.com 登入後 nginx 400：Cookie 標頭超限（Codex）
+
+- **根因**：乾淨 / 回 307，原 Chrome 分頁回 400 Request Header Or Cookie Too Large；合成 7168-byte Cookie 回 307、8192-byte 回 400。主機 nginx 1.24.0，回 400 的容器 lobster-nginx 是 1.30.4；流量經 nginx/system-sites/sg-stack.aware-wave.com.conf:37 → nginx/default.conf:231 → next-admin。middleware.ts:73-76 記錄 Supabase session 可分段；實際瀏覽器 Cookie 名稱/長度未讀取。
+- **修改**：lobster-factory/infra/hetzner-phase1-core/nginx/default.conf:238 只提高 app vhost 的單欄位請求標頭容量。正式檔修改前 SHA-256 50ce06d8... 與 repo HEAD 完全一致；已驗證的新檔 SHA-256 189b3bdc... 經 /root/lobster-phase1/scripts/safe-infra-patch.sh nginx 套用（backup → nginx -t → reload → /api/ops/summary 200），備份 /root/lobster-phase1/nginx/default.conf.bak.safe-patch-20261025-101608。新事故模式寫入 runbooks/NGINX-400-COOKIE-HEADER.md:1。
+- **驗證結果**：線上新檔 SHA-256 與本機草案一致，docker exec lobster-nginx nginx -T 已載入指令；8192-byte 合成 Cookie 由 400 變 307、/login 200；原本 400 的 Chrome 分頁重整後顯示 Dashboard，登入狀態仍在。16 KiB 合成 Cookie 的公開請求回 520、直達容器回 431；未宣稱超過已驗範圍的請求全可用。
+- **健康閘**：scripts/system-health-check.ps1 = 99.7%（319/320）。唯一 Critical FAIL 是 archive-lift-last.json：舊 AO-CLOSE archive 的「待決 6」tasks-ref 只接受 open - [ ]，但 agency-os/TASKS.md:332 已由後續 session 決定 A 並打勾；與 nginx 及站點健康無關，沒有改寫該歷史紀錄。
+- REALTEST_EVIDENCE: tool=SSH | cmd=safe-infra-patch.sh nginx default.conf + sha256sum + nginx -T | exit=0 | ms=6404
+- REALTEST_EVIDENCE: tool=curl | cmd=public app / with synthetic 8192-byte Cookie and /login | exit=0 | ms=7607
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- self-review checked app-only scope, live hash, syntax, rollback, browser result, and 16 KiB limit.
+- ORACLE_WAIVED: claude-oracle.ps1 could not start because claude CLI is not on PATH; used config-before/after 400→307 evidence and adversarial self-review.
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks,lobster-factory | grep=large_client_header_buffers | hits=3
+- **避免再發生**：按 runbooks/NGINX-400-COOKIE-HEADER.md:1 先比對無 Cookie 與合成 Cookie、確認拒絕的 nginx hop；設定只改 app server，並以故障瀏覽器實測。
+- **rollback**：把上述 safe-patch backup 經同一個 safe-infra-patch.sh nginx 套回，腳本再次執行語法與健康檢查；repo 設定用 git revert <本次 commit> 還原。
 ## 2026-10-25（續48）排程離開 Trigger C4.2／C4.3／C4.7：排程變紅／恢復各一則＋每日 09:00 一行（Telegram＋Slack）；兩個「先回答再做」的工作改報真實結果（Claude）
 
 - **觸發**：操作者「開始 C4」。監工台 https://claude.ai/artifact/QsgquXzuzi1oQ8FCVoRrAZ
