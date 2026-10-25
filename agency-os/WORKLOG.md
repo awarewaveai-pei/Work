@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-25（續46）next-admin 手動部署 5db9dd75b → cd42c9030（操作者：現在做所有還沒做的部署）（Claude）
+
+**範圍**：5db9dd75b..origin/main 只有 next-admin 有變（18 commit；node-api／video-service／renderer／remotion／meeting／r2-egress／whisper／wordpress 0 檔）；`docker-compose.yml`、nginx 沒變；migration 只有 0127，已於 續33 套 prod。origin/main 無 `DEPLOY_HOLD`。部署中途另一 session 推了 2 個 docs commit（ea968aca1、cd42c9030），一併上線。
+- 含本 session：c02816817（閘 ③）、c7feefe94（參考網址 SSRF＋線性去標籤）、62023ecc4（>2 MB 讀前段、http 提示）；他人：5bdf7f9f9 帳務新版（0127）等。
+
+**部署前**：`scripts/check-deploy-drift.ps1` → behind 18（FAIL 門檻 6，預期）；composeVarDrift onlyInRepo=META_*（8 個，本批 compose 沒變，既有落差，不影響本次）。
+
+**驗證**
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin（log /tmp/sg-deploy-62023ecc4.log）→ migration gate 過；npm test 387 files／3350 passed；healthy 16s；smoke /login、/api/ops/summary、wordpress、node-api、nginx/api 全 200；deployed commit cd42c9030 | exit=0 | ms=427262
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker ps --filter name=lobster-next-admin → `lobster-next-admin Up (healthy)`（無 hex 改名） | exit=0 | ms=1285
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/playwright-runner.ps1 -Mode smoke -SkipInstall → 26 passed／6 skipped | exit=0 | ms=25300
+- REVIEW_WAIVED: NA -- 部署既有 main，無新程式碼
+- BUGHUNT_WAIVED: NA -- 部署，無程式碼改動
+
+**rollback**：`sg-deploy.sh` 失敗自動還原；手動回 5db9dd75b 照 `agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md` §2.1。
 ## 2026-10-25（續45）排程離開 Trigger C2.1：新主機排程裝上 ks-aw-01（操作者：go ahead C2.1）——10 行 cron 生效，首輪全 exit 0（Claude）
 
 - **做了什麼**：主機 `git fetch` → `sync-host-scripts.sh`（`801a86c10`，裝 poke.sh／site-watch-tick.sh／trigger-task.sh＋cron.d）→ `install-host-schedules.sh --check`（只差 `awarewave-schedules`：1 行改、9 行加）→ 安裝。備份 `/root/lobster-phase1/.state/cron-backup-20261025T090337Z`（root.crontab 0 byte＝原本就空，無遺失；其餘 6 檔內容不變重裝）。主機舊 `schedules-run-due.sh` 保留（無 cron 引用）。
