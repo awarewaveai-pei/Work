@@ -13,7 +13,7 @@
   - `release-wp-bridge.sh` → https://github.com/awarewaveai-pei/aware-wave-wp-bridge/releases/tag/v0.18.3
   - `rollout-wp-bridge.ps1`：soulful-wp 與 lobster-wordpress 都 0.18.2→0.18.3，health `200 0.18.3`、home 200，備份 `*-pre-wpbridge-0.18.3-20261025T0830*`。
   - 安裝後的 PaymentEvents.php 有 `plan_key`、沒有 `PACK_PLAN_SEC`；soulful `opted_in=no`、aware-wave.com `yes`。
-- **發現（未修）**：`POST https://soulfulexpression.org/xmlrpc.php` 回 520（Cloudflare）。
+- **xmlrpc 520 = 設計如此（查證後更正）**：nginx `location = /xmlrpc.php { return 444; }`（`/etc/nginx/sites-available/soulfulexpression.org.conf:131`，暴力破解／pingback 放大防護，PHP 也刻意不裝 xmlrpc 模組），Cloudflare 把斷線顯示成 520；aware-wave.com 同規則（lobster-nginx `conf.d/default.conf:116`），`check-cloudflare-security.ps1` 記為 `xmlrpc=True`。不修。
 - REALTEST_EVIDENCE: tool=Bash | cmd=fix_clientcfg.py --apply 後 client-status.ps1 → saas/ks-aw-01、wordpress/ks-aw-01，soulful 無 ssh_host | exit=0 | ms=1500
 - REALTEST_EVIDENCE: tool=SSH | cmd=wp plugin delete hostinger → removed；/ /wp-login.php /shop/ 200；fatal 0 | exit=0 | ms=0（未計時）
 - REALTEST_EVIDENCE: tool=SSH | cmd=rollout-wp-bridge.ps1 -Version 0.18.3（2 站 OK）；playwright client soulful 7 passed | exit=0 | ms=31900
