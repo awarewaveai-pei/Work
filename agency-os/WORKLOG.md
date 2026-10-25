@@ -1,4 +1,12 @@
 # Worklog
+## 2026-10-25（續43）aware-wave.com 能寄信了：FluentSMTP → Resend SMTP（續24 M1 關閉）（Claude）
+
+- 操作者在 Resend 建了**只能寄信**的 key（限 aware-wave.com），自己貼進 FluentSMTP。原本那把 `mcp` 是完整權限，又被別處共用，所以不放進 WordPress。設定（續36 預填）：`smtp.resend.com:587 TLS`、`resend`、`AwareWave <noreply@aware-wave.com>`、密碼以 WP SALT 加密存 DB。
+- 驗證：FluentSMTP log id 3 `sent` 2026-10-25 17:01（Test Email），操作者 Gmail 收到。
+- 設 key 前寄失敗的兩封：16:39 密碼重設通知、15:51 登入失敗通知。補設後不會自動重寄。
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp eval 讀 fsmpt_email_logs → id 3 sent；password_saved=yes（只查有無） | exit=0 | ms=0（未計時）
+- REVIEW_WAIVED: NA -- 設定由操作者在後台完成，本 entry 只記錄結果
+- BUGHUNT_WAIVED: NA -- 沒有改任何程式或文件
 ## 2026-10-25（續42）其餘 6 處整表讀 organizations 收掉（integrations 頁＋API、repairs、Telegram /client_status、社群品牌、影片 reconcile）；d95ed0bee 的 org-search 路由多匯出常數（Next 不收）一併修（Claude）
 
 **觸發**：操作者「去處理好」（續39 同類未修的 7 處）。不變量同續39：頁面／API／排程成本不隨客戶數成長，`organizations` 讀取一律有鍵過濾／上限／分頁（`lib/__tests__/organizations-bounded.test.ts` 機械檢查）。
