@@ -165,18 +165,32 @@ export async function billingAccount(organizationId: string, client: SupabaseCli
 }
 
 export type AttentionReason = "frozen" | "overdrawn" | "past_due" | "suspended";
-/** /ops/billing (0127 billing_attention): totals over every root account, and one page of the accounts that need a person. */
-export interface BillingAttention {
-  totals: { unused_units: number; unused_accounts: number; attention: number } & Record<AttentionReason, number>;
-  rows: Array<{ organization_id: string; name: string; slug: string; kind: "internal" | "customer"; balance: number; frozen_since: string | null; reasons: AttentionReason[] }>;
+export const LEDGER_FILTERS = ["all", "attention", "balance", "contract", "internal"] as const;
+export type LedgerFilter = typeof LEDGER_FILTERS[number];
+/** /ops/billing (0130 billing_ledger): totals over every billing account, and one page of the accounts the filter and
+ *  query match, each with what the ledger shows without opening the account. */
+export interface BillingLedger {
+  totals: { accounts: number; unused_units: number; unused_accounts: number; granted_30d: number; spent_30d: number; attention: number }
+    & Record<AttentionReason, number>;
+  matching: number;
+  rows: Array<{
+    organization_id: string; name: string; slug: string; kind: "internal" | "customer";
+    balance: number; granted_30d: number; spent_30d: number; frozen_since: string | null; reasons: AttentionReason[];
+    contracts: Array<{ product_key: string; plan_key: string; status: string; current_period_end: string | null }>;
+    next_period_end: string | null;
+    last_payment: { at: string; kind: string; provider: string } | null;
+  }>;
 }
 
-export async function billingAttention(limit: number, offset: number, client: SupabaseClient | null = getSupabaseWriteClient()): Promise<BillingAttention> {
+export async function billingLedger(
+  opts: { filter: LedgerFilter; query: string; limit: number; offset: number },
+  client: SupabaseClient | null = getSupabaseWriteClient(),
+): Promise<BillingLedger> {
   if (!client) throw new Error("entitlements_db_unavailable");
-  const { data, error } = await client.rpc("billing_attention", { p_limit: limit, p_offset: offset });
+  const { data, error } = await client.rpc("billing_ledger", { p_filter: opts.filter, p_query: opts.query, p_limit: opts.limit, p_offset: opts.offset });
   if (error) throw new Error(error.message);
-  if (!data || !Array.isArray((data as BillingAttention).rows)) throw new Error("invalid_billing_attention");
-  return data as BillingAttention;
+  if (!data || !Array.isArray((data as BillingLedger).rows)) throw new Error("invalid_billing_ledger");
+  return data as BillingLedger;
 }
 
 const TRIAL_PAGE = 200;

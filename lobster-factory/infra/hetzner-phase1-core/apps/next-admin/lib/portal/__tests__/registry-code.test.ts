@@ -172,7 +172,7 @@ describe("registry claims match the code", () => {
   };
   // What a route reaches that is not its own data: the role check, the caller's own grant (who it is, what it may use,
   // and runtime.ts, the store can() reads for that subject), the AI call log. Other lib/entitlements files are data
-  // (tables.ts billingAttention: every organization's billing). collect's per-host politeness bucket (0082, keyed by host,
+  // (tables.ts billingLedger: every organization's billing). collect's per-host politeness bucket (0082, keyed by host,
   // no organization column) is the address-gated fetcher's, which every pasted URL goes through.
   const NOT_ROUTE_DATA = new Set(["lib/ops-role.ts", "lib/ai/log-ai-call.ts", "lib/collect/net/rate-limit.ts",
     ...["grant", "can", "subject", "runtime"].map((f) => `lib/entitlements/${f}.ts`)]);
@@ -223,7 +223,7 @@ describe("registry claims match the code", () => {
       expect(judged(`import { effectiveOrgId as orgOf } from "@/lib/tenant-guard"; ${db}`)).toBe(false);          // imported, never called
       expect(judged(`import { effectiveOrgId as orgOf } from "@/lib/tenant-guard"; ${db} orgOf(req, null);`)).toBe(true);
       expect(judged('import { createClient } from "@supabase/supabase-js"; import { withFeature } from "@/lib/entitlements/grant";')).toBe(false);
-      expect(judged('import { withFeature } from "@/lib/entitlements/grant"; import { billingAttention } from "@/lib/entitlements/tables";')).toBe(false);
+      expect(judged('import { withFeature } from "@/lib/entitlements/grant"; import { billingLedger } from "@/lib/entitlements/tables";')).toBe(false);
       // grant.ts -> subject.ts -> tenant-guard, and grant.ts reached through a library, decide nothing for the route
       expect(judged('import { requestActor } from "@/lib/entitlements/subject"; requestActor(req);')).toBe(false);
       expect(judged('import { prepareArticleGeneration } from "@/lib/content/article/generate-core"; prepareArticleGeneration({});')).toBe(false);

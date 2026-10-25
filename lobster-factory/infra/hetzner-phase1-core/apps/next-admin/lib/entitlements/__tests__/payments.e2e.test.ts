@@ -1,5 +1,5 @@
 // ADR 017 step 4a against a real Postgres + PostgREST: signed local payments through the real route, 0120's
-// billing_apply_payment_event, /ops/billing and the client hub 帳務 tab (0127). Run only by
+// billing_apply_payment_event, /ops/billing (0130 ledger) and the client hub 帳務 tab (0127). Run only by
 //   python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py --suite payments
 // (sets ENTITLEMENTS_REST); skipped otherwise (npm test, the deploy gate). Touches no production.
 import type http from "node:http";
@@ -182,16 +182,22 @@ describe.skipIf(!REST)("payments against a real database (ADR 017 step 4a)", () 
     expect(await balance()).toBe(50);
   });
 
-  it("/ops/billing shows the totals; the client's 帳務 tab shows the account: contract, grants, balance, ledger and payments", async () => {
+  it("/ops/billing lists every account with search and opens one on the page; the client's 帳務 tab shows the same detail", async () => {
     const { default: BillingPage } = await import("../../../app/(shell)/ops/billing/page");
-    const page = renderToStaticMarkup(await BillingPage({}));
-    expect(page).toContain("客戶未用點數");
-    expect(page).not.toContain("讀不到帳務資料");
+    const page = (sp: Record<string, string>) => BillingPage({ searchParams: Promise.resolve(sp) }).then(renderToStaticMarkup);
+    const list = await page({});
+    expect(list).toContain("客戶未用點數");
+    expect(list).toContain("Payments Customer");                      // listed without opening anything
+    expect(list).not.toContain("讀不到帳務資料");
+    expect(await page({ q: "e2e-payments-cust" })).toContain("Payments Customer");
+    expect(await page({ q: "no-such-account-xyz" })).toContain("沒有符合的帳戶");
+    const opened = await page({ account: CUSTOMER });
+    expect(opened).toContain("social_basic");
+    expect(opened).toContain("cb-001-cleared");
     const { billingAccount } = await import("../tables");
     const { BillingTab } = await import("../../../app/(shell)/ops/clients/[slug]/BillingTab");
     const account = await billingAccount(CUSTOMER);
     const tab = renderToStaticMarkup(createElement(BillingTab, { data: { account, error: null }, slug: account!.slug }));
-    expect(tab).toContain("social_basic");
     expect(tab).toContain("cb-001-cleared");
     expect(tab).not.toContain("讀不到帳務資料");
   });

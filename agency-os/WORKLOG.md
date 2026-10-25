@@ -1,4 +1,23 @@
 # Worklog
+## 2026-10-25（續55）/ops/billing 改成全部帳戶的總帳：搜尋（名稱／代號／成員 email／付款編號／合約來源）、篩選、同頁明細（0130 未套 prod）（Claude）
+
+**觸發**：操作者看 `/ops/billing`「為什麼沒看到任何名單? 這裡應該是總帳的地方, 不要叫我再點到"CLIENTS"一個一個看」＋「還要有搜尋名字或其他的方式」。
+**根因**：續32 把 `/ops/billing` 設計成只列需要處理的帳戶（`billing_attention`），明細只在客戶頁；總帳的需求是全部帳戶可直接看、可搜尋。
+**做法**
+- 0130（只加不刪）：`billing_ledger(filter, query, limit, offset)`＝全部有帳務資料的根帳戶合計（帳戶數、客戶未用點數、近 30 天加點／扣點、四種需要處理）＋符合數＋一頁帳戶（餘額、近 30 天、未取消合約、最近本期到、最後付款、狀況）。filter：all／attention／balance／contract／internal（其他值 raise `invalid_filter`）。query（LIKE 萬用字元跳脫）比對名稱、slug、成員 email（帳戶本身與其品牌的 `organization_memberships`→`profiles`）、付款 event_id、合約 source_ref。service_role only。`billing_attention` 保留到新版上線，之後收縮步刪。
+- `/ops/billing` 重寫：合計卡、篩選按鈕、GET 搜尋表單（保留篩選）、每頁 50、`?account=<uuid>` 同頁打開明細（共用 `BillingTab`，另有「客戶頁」連結）；重複參數取第一個；超過最後一頁給「到最後一頁」。
+- `tables.ts`：`billingAttention`→`billingLedger`；`BillingTab` export `CONTRACT`／`PAYMENT` 共用。
+**未改（理由）**：critic M1「沒勾帳務權限的員工仍可開 `/ops/billing`」＝全站觀察模式設計（`lib/staff-access.ts:4,11` 只有 `STAFF_TOOLS_MODE=enforce` 才擋；`middleware.ts:140`）；舊頁同樣看得到全部帳戶明細。單頁加檢查會與全站規則不一致；切 enforce 是操作者決定。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/packages/db/scripts/0127_billing_account_views-local-verify.py（同一支既有腳本加 0130：合計與 0127 一致、40 天前帳本不算進 30 天、四種篩選數、名稱／成員 email／品牌成員 email／付款編號／合約來源各搜到唯一帳戶、`%`／`_` 搜不到、合約篩選分頁各一次、列內容、錯誤篩選 raise、down 只刪 billing_ledger）→ PASS 0127 + 0129 + 0130 | exit=0 | ms=31755
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py --suite payments（schema 含 0130；帳務頁不點就列出 Payments Customer、`?q=` 搜得到／搜不到、`?account=` 同頁明細）→ 11 passed | exit=0 | ms=10414
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p .（0）＋ npx vitest run → 388 files／3360 passed | exit=0 | ms=25781
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/3n（critic subagent：m1 觀察模式下未勾權限仍可開頁→全站設計，未改，理由見上；n1 重複 `q` 當掉→已修；n2 超過最後一頁無路→已修；n3 email 搜不到品牌成員→已修並加測試）
+- ORACLE_WAIVED: codex quota blocked until 2026-10-25 19:40 (scripts/oracle-quota.ps1)；備援＝獨立 critic subagent。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=billingAttention | hits=50（皆非原始碼：next-admin `.next/` build 快取、`.claude/` 日誌與 file-history、本條 WORKLOG；app／lib 原始碼 0）
+
+**待操作者（High）**：①套 0130 到 prod ②push（0130 未套前 03:00 部署被 migration 閘擋）③新版上線後，新 migration 刪 `billing_attention`（收縮步）。
 ## 2026-10-25（續54）排程離開 Trigger C4.1／C4.4／C4.5：7 支主機腳本改走單一發送 `notify.sh`（設定只讀 `.env`、密碼不進 argv）（Claude）
 
 - **觸發**：操作者「做 C4.1/C4.4」。監工台 https://claude.ai/artifact/QsgquXzuzi1oQ8FCVoRrAZ

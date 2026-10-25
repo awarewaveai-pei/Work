@@ -1,6 +1,7 @@
-// 帳務 tab (ADR 017 step 4; 0127 billing_account): this client's contracts, grants, wallet, last ledger entries and last
-// payment events. Read-only; the page fetches it server-side only when the staff member may use ops/billing
-// (hub-tab-tools.ts). Payments are recorded through POST /api/webhooks/payments/<provider>.
+// One account's contracts, grants, wallet, last ledger entries and last payment events (ADR 017 step 4; 0127
+// billing_account): the 帳務 tab on the client hub and the account panel on /ops/billing. Read-only; both pages fetch it
+// server-side, the hub only when the staff member may use ops/billing (hub-tab-tools.ts). Payments are recorded
+// through POST /api/webhooks/payments/<provider>.
 import type { ReactNode } from "react";
 import type { BillingAccount } from "@/lib/entitlements/tables";
 import { Card, NoData, Tag } from "./hub-ui";
@@ -11,15 +12,15 @@ const th: React.CSSProperties = { textAlign: "left", padding: "6px 10px", fontSi
 const td: React.CSSProperties = { padding: "6px 10px", fontSize: 12, color: "var(--text-primary)", borderBottom: "1px solid var(--border-subtle)", verticalAlign: "top" };
 const muted: React.CSSProperties = { fontSize: 11, color: "var(--text-muted)" };
 
-const CONTRACT: Record<string, string> = { trial: "試用", active: "有效", past_due: "逾期", canceled: "已取消" };
+export const CONTRACT: Record<string, string> = { trial: "試用", active: "有效", past_due: "逾期", canceled: "已取消" };
 const GRANT: Record<string, string> = { active: "可用", suspended: "暫停（拒付審查中）", ended: "已到期，今晚標記" };
 const ENTRY: Record<string, string> = { grant: "加點", debit: "扣點", refund: "退點", adjustment: "調整" };
-const PAYMENT: Record<string, string> = {
+export const PAYMENT: Record<string, string> = {
   subscription_paid: "訂閱付款", subscription_canceled: "取消訂閱", credit_pack: "點數包", refund: "退款",
   chargeback: "拒付", chargeback_cleared: "拒付審查完成",
 };
 
-export const when = (iso: string | null) => iso
+const when = (iso: string | null) => iso
   ? new Date(iso).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false })
   : "—";
 

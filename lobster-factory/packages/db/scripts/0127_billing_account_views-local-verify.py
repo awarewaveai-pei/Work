@@ -5,7 +5,9 @@ service_role only; 3000 root accounts + 100 brands + 300k ledger rows: billing_a
 count (internal excluded, an overdrawn account never offsets another, brands are not roots), its pages cover every
 attention account exactly once, limits are clamped; billing_account resolves a brand to its root, caps the ledger at
 20 rows, returns null for an unknown id; and its execution time. Last, 0129 (the contract step): drops billing_overview,
-leaves 0127's reads answering; its down restores billing_overview byte for byte.
+leaves 0127's reads answering; its down restores billing_overview byte for byte. 0130 (billing_ledger, the ledger of every
+account): totals agree with 0127's, 30-day sums leave older entries out, each filter and the escaped search count
+right, pages cover every match once, a row carries its contracts and last payment; down drops only billing_ledger.
     python lobster-factory/packages/db/scripts/0127_billing_account_views-local-verify.py"""
 from pathlib import Path
 import json
@@ -20,6 +22,8 @@ UP = DB / "migrations/0127_billing_account_views.sql"
 DOWN = DB / "migrations/0127_billing_account_views.down.sql"
 DROP_UP = DB / "migrations/0129_drop_billing_overview.sql"
 DROP_DOWN = DB / "migrations/0129_drop_billing_overview.down.sql"
+LEDGER_UP = DB / "migrations/0130_billing_ledger.sql"
+LEDGER_DOWN = DB / "migrations/0130_billing_ledger.down.sql"
 INTERNAL, EDD, SOULFUL = "39ad4149-5044-4077-8d9a-b6b916de0e21", "ecf4e311-4f38-4288-9396-e70fd7697aca", "2bf60452-3d4d-47c2-9970-b9046ed1a35a"
 CUST, BRAND = "00000000-0000-4000-8000-0000000000c1", "00000000-0000-4000-8000-0000000000b1"
 N = 3000
@@ -58,6 +62,11 @@ def balance(i):
 def reasons(i):
     b = balance(i)
     return [r for r, hit in (("frozen", i % 50 == 0), ("overdrawn", b < 0), ("past_due", i % 40 == 0), ("suspended", i % 60 == 0)) if hit]
+
+
+def ledger(flt="all", q=None, limit=50, offset=0):
+    qs = "null" if q is None else "'" + q.replace("'", "''") + "'"
+    return json.loads(one(f"set role service_role; select public.billing_ledger('{flt}', {qs}, {limit}, {offset});"))
 
 
 def attention(limit, offset):
@@ -176,15 +185,63 @@ def main():
         assert one(f"set role service_role; select public.billing_account('{uuid.uuid4()}') is null;") == "t"
         print("OK billing_account: a brand resolves to its root; ledger capped at 20; hold, contract, grants, payments; unknown id -> null")
 
+        # 0130: an entry older than 30 days counts in the balance, not in the 30-day sums.
+        query(f"insert into media_credit_ledger(organization_id, units, entry_type, idempotency_key, created_at) values ('{acct(1)}', 7, 'grant', 'seed-old-1', now() - interval '40 days');")
+        query(LEDGER_UP.read_text(encoding="utf-8"))
+        assert one("select has_function_privilege('anon', 'public.billing_ledger(text,text,integer,integer)', 'execute') or has_function_privilege('authenticated', 'public.billing_ledger(text,text,integer,integer)', 'execute')") == "f"
+        bal = {i: balance(i) + (7 if i == 1 else 0) for i in range(1, N + 1)}
+        led = ledger()
+        roots_with_data = int(one(f"""select count(distinct o.id) from organizations o join (
+            select organization_id id from media_credit_ledger union select organization_id from organization_product_subscriptions
+            union select organization_id from organization_entitlements union select organization_id from payment_events) d on d.id = o.id
+          where o.parent_organization_id is null"""))
+        t = led["totals"]
+        assert t["accounts"] == roots_with_data >= N + 1, (t, roots_with_data)
+        assert t["unused_units"] == sum(b for b in bal.values() if b > 0) and t["unused_accounts"] == sum(1 for b in bal.values() if b > 0), t
+        assert {k: t[k] for k in ("frozen", "overdrawn", "past_due", "suspended", "attention")} == {k: expected[k] for k in ("frozen", "overdrawn", "past_due", "suspended", "attention")}
+        assert t["granted_30d"] == sum((100 if i % 3 == 0 else 0) + 50 for i in range(1, N + 1)) + 9000 + 0, t   # +7 is 40 days old; brands are not roots
+        assert t["spent_30d"] == sum((150 if i % 7 == 0 else 0) + 50 for i in range(1, N + 1)), t
+        assert led["matching"] == t["accounts"] and len(led["rows"]) == 50
+        counts = {f: ledger(f)["matching"] for f in ("attention", "balance", "contract", "internal")}
+        assert counts == {"attention": expected["attention"], "balance": sum(1 for b in bal.values() if b > 0) + 1,   # + the internal account's 9000
+                          "contract": N // 10, "internal": 1}, counts
+        assert ledger("all", "acct-0001")["matching"] == 10 and ledger("all", "%")["matching"] == 0 and ledger("all", "_")["matching"] == 0
+        query(f"""insert into profiles(id, email) values ('00000000-0000-4000-b000-000000000005', 'Buyer.Five@Example.com');
+          insert into organization_memberships(organization_id, user_id) values ('{acct(5)}', '00000000-0000-4000-b000-000000000005');
+          update organization_product_subscriptions set source_ref = 'local:TX-777' where organization_id = '{acct(10)}';""")
+        query(f"""insert into profiles(id, email) values ('00000000-0000-4000-b000-000000000006', 'brand.member@example.com');
+          insert into organization_memberships(organization_id, user_id) values ('{BRAND}', '00000000-0000-4000-b000-000000000006');
+          insert into media_credit_ledger(organization_id, units, entry_type, idempotency_key) values ('{CUST}', 1, 'grant', 'seed-cust-1');""")
+        for q, slug in (("buyer.five@example", "acct-00005"), ("cb-600", "acct-00600"), ("tx-777", "acct-00010"), ("brand.member@", "customer")):
+            got = ledger("all", q)
+            assert got["matching"] == 1 and got["rows"][0]["slug"] == slug, (q, got["matching"], [r["slug"] for r in got["rows"]])
+        seen = []
+        for offset in range(0, counts["contract"] + 50, 50):
+            seen += ledger("contract", None, 50, offset)["rows"]
+        assert [r["slug"] for r in seen] == [f"acct-{i:05d}" for i in range(10, N + 1, 10)], "contract pages: every match once, in name order"
+        row = next(r for r in ledger("all", "acct-00600")["rows"] if r["slug"] == "acct-00600")
+        assert row["balance"] == bal[600] and row["reasons"] == want[600], row
+        assert [(c["product_key"], c["plan_key"], c["status"]) for c in row["contracts"]] == [("social", "social_basic", "past_due")], row
+        assert row["last_payment"]["kind"] == "chargeback" and row["next_period_end"] is None, row
+        assert ledger("all", "acct-00001")["rows"][0]["granted_30d"] == 50 and ledger("all", "acct-00001")["rows"][0]["balance"] == 7
+        expect_error = query("set role service_role; select public.billing_ledger('bogus', null, 50, 0);", succeeds=False)
+        assert expect_error.returncode and "invalid_filter:bogus" in expect_error.stderr
+        query(LEDGER_DOWN.read_text(encoding="utf-8"))
+        assert one("select to_regprocedure('public.billing_ledger(text,text,integer,integer)') is null and to_regprocedure('public.billing_attention(integer,integer)') is not null") == "t"
+        query(LEDGER_UP.read_text(encoding="utf-8"))
+        print(f"OK 0130 billing_ledger: totals {t['accounts']} accounts agree with 0127; 30-day sums skip older entries; filters {counts}; search by name, member email, payment id, contract ref (wildcards escaped); pages; row detail; down drops only it")
+
         for label, sql in (("billing_attention(50, 0)", "select public.billing_attention(50, 0)"),
+                           ("billing_ledger('all', null, 50, 0)", "select public.billing_ledger('all', null, 50, 0)"),
                            (f"billing_account('{acct(600)}')", f"select public.billing_account('{acct(600)}')")):
             out = query(f"set role service_role; explain (analyze, format json) {sql};").stdout
             plan = json.loads(out[out.index("["):])
             print(f"OK {label}: {plan[0]['Execution Time']:.0f} ms execution")
 
+        before = attention(50, 0)["totals"]
         query(DROP_UP.read_text(encoding="utf-8"))
         assert one("select to_regprocedure('public.billing_overview(integer,integer)') is null") == "t"
-        assert attention(50, 0)["totals"] == expected
+        assert attention(50, 0)["totals"] == before
         query(DROP_DOWN.read_text(encoding="utf-8"))
         assert one("select md5(prosrc) from pg_proc where proname = 'billing_overview'") == overview_src
         assert one("select has_function_privilege('service_role', 'public.billing_overview(integer,integer)', 'execute')") == "t"
@@ -192,7 +249,7 @@ def main():
         query(DROP_UP.read_text(encoding="utf-8"))
         assert one("select to_regprocedure('public.billing_overview(integer,integer)') is null") == "t"
         print("OK 0129 up, down, up: billing_overview dropped, 0127's reads unchanged; down restores 0120's text and grants")
-        print("PASS 0127 + 0129")
+        print("PASS 0127 + 0129 + 0130")
     finally:
         command(["docker", "rm", "-f", NAME], succeeds=False)
 
