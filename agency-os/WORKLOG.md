@@ -1,4 +1,15 @@
 # Worklog
+## 2026-10-25（續24）wp-bridge 0.18.0 發版並裝上 aware-wave.com；WooCommerce 11.2.1 安裝；付款開關打開（操作者「你去處理」「打開」）（Claude）
+
+- **發版**：`scripts/release-wp-bridge.sh` 推 tag v0.18.0 到 `awarewaveai-pei/aware-wave-wp-bridge`；GitHub Actions 未啟動（job 註記：帳號付款失敗／支出上限，Release 與 CI 兩個 workflow 皆 3–4 秒失敗）→ 本機 `git archive` 從 tag `fa0dfb90c` 打包（同 release.yml 結構，82 檔、17 個 Billing 檔、正斜線），`gh release create v0.18.0 --verify-tag` 上傳。https://github.com/awarewaveai-pei/aware-wave-wp-bridge/releases/tag/v0.18.0
+- **實況與卡片假設不同**：aware-wave.com（`lobster-wordpress`）原本沒裝 wp-bridge、沒裝 WooCommerce（`APP_AWARE_WAVE_COMPLETE_REFERENCE.md:870`「已裝綠界一次付清外掛」已過時）；next-admin `PAYMENTS_PROVIDERS=local`，`PAYMENTS_WOO_SECRET`／`AUTH_WP_HANDOFF_SECRET` 未設。
+- **做了什麼**：①備份 `/root/backups/wordpress/aware-wave-pre-wpbridge-0.18.0-20261025T062440Z.sql`（5.7 MB，Dump completed）；②release repo 私有，伺服器下載 404 → zip 經 ssh stdin 上傳（sha256 前綴 d9ac1261894ccbbc 兩端一致）→ `wp plugin install --activate`；③`wp plugin install woocommerce --activate`（11.2.1）；④`wp option update aware_wave_payments_enabled 1`。
+- **未做（需操作者）**：WCS（US$279/年，要在 woocommerce.com 購買）；TapPay（要商家合約與金鑰，並先問業務 SaaS 訂閱能否過件）；兩把密鑰＋next-admin `PAYMENTS_PROVIDERS=local,woo`（WooCommerce 店面與金流就緒後一起做，High）。
+- **發現 M1**：aware-wave.com 寄不出任何信——容器無 sendmail binary（`sendmail_path=/usr/sbin/sendmail -t -i`）、無 SMTP 外掛，`phpmailer_init` 只有 WooCommerce multipart（`class-wc-email.php:369`）。開關已開 → 新會員驗證信會失敗（`wp_mail` 回 false，註冊不受影響）；有商品前必須接 SMTP（例如 Resend `noreply@aware-wave.com`），否則會員無法驗證、無法結帳。FluentCRM 寄信同受影響。
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp plugin list → aware-wave-wp-bridge active 0.18.0、woocommerce active 11.2.1；curl 127.0.0.1:8080/ 200、/my-account/ 200、/wp-json/aware-wave-bridge/v1/health version 0.18.0 crypto_ready true；https://aware-wave.com/ 200；docker logs 5 分鐘無 fatal | exit=0 | ms=0（未計時）
+- REVIEW_WAIVED: NA -- 安裝與設定操作，程式碼已於續10 審查
+- BUGHUNT_WAIVED: NA -- 無程式碼變更
+- **rollback**：`wp option update aware_wave_payments_enabled ''`；`wp plugin deactivate aware-wave-wp-bridge woocommerce`；資料庫還原上述備份。
 ## 2026-10-25（續23）排程頁：四個社群報表分頁合成一個「社群報告自動寄出」，裡面用週報／月報／季報／年報四顆按鈕切換（Claude）
 
 **觸發**：操作者截圖分頁列「改成"社群報告自動寄出", 4種報告都放在裡面, 不然太佔空間」。
