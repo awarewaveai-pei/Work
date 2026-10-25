@@ -27,7 +27,7 @@ export const COPY = {
 // 現在真的能不能用（2026-10-25 查）
 export const NOW = [
   { what: 'Trigger 正常運作。', state: 'yes', ev: '2026-10-25 清除停滯的工作後恢復正常。網站巡檢四項檢查皆通過。' },
-  { what: '社群發文、客服、訂單與網站巡檢可不經 Trigger 定時執行。', state: 'no', ev: '目前仍由 Trigger 啟動。Trigger 停滯時，這些定時工作也會全部停止（C1）。' },
+  { what: '社群發文、客服、訂單與網站巡檢可不經 Trigger 定時執行。', state: 'yes', ev: '2026-10-25 起由主機排程啟動，首輪全部成功。Trigger 上的同名定時工作仍在，C2.3 關閉。' },
   { what: '系統能自動偵測 Trigger 停滯。', state: 'no', ev: '這次停了 34 小時，直到查看網站巡檢報告才發現（C3）。' },
   { what: '任何排程太久未成功，手機都會收到通知。', state: 'no', ev: '目前只有網站回應、自動部署、雲端報告與影片補登會推播。其餘異常只在頁面標紅（C4）。' },
   { what: '每天會收到一行「全部正常」。', state: 'no', ev: 'C4。' },
@@ -37,6 +37,7 @@ export const NOW = [
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
 const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 const C1 = '72d15254c';
+const C21 = 'ea968aca1';
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '定時工作改由主機啟動', plain: '例：社群貼文每 5 分鐘發送一次，改由主機直接啟動。9 個定時工作維持原有頻率。另刪除 1 個重複工作。',
@@ -52,12 +53,12 @@ export const STEPS = [
       done('C1.5', '測試成功、密碼錯誤、對方回報失敗三種情況。確認腳本皆回報正確結果。', C1),
     ] },
   { n: 2, code: 'C2', group: 'B', title: '定時工作上線', plain: '例：先在正式主機裝好新排程。排程頁全為綠色後，才關閉 Trigger 上的定時工作。順序相反會讓社群發文等工作中斷。',
-    gate: '/ops/schedules 新增的工作全為綠色。Trigger 在 24 小時內未執行任何定時工作。文件不再寫「由 Trigger 叫醒」。', risk: 'High（正式主機）', model: '你＋Opus 5.5', status: 'not_started', depends: ['C1'],
-    before: '待決 2',
+    gate: '/ops/schedules 新增的工作全為綠色。Trigger 在 24 小時內未執行任何定時工作。文件不再寫「由 Trigger 叫醒」。', risk: 'High（正式主機）', model: '你＋Opus 5.5', status: 'in_progress', depends: ['C1'],
+    decided: '2026-10-25 同意在正式主機安裝。',
     what: 'sync-host-scripts → install-host-schedules.sh；WF 刪 10 個 schedules.task＋token 同步段 → push（＝Trigger 部署）；文件同步',
     files: ['/etc/cron.d/awarewave-schedules', 'WF/src/trigger/*.ts', 'scripts/lobster-trigger-deploy.ps1'],
     items: [
-      todo('C2.1', '經你同意後，在正式主機安裝新排程。'),
+      done('C2.1', '經你同意後，在正式主機安裝新排程。', C21),
       todo('C2.2', '等待 15 分鐘，確認排程頁新增的工作全為綠色。'),
       todo('C2.3', '刪除 Trigger 上的 10 個定時工作與專供它們同步密碼的程式，再部署 Trigger。'),
       todo('C2.4', '觀察 24 小時，確認 Trigger 沒有執行定時工作。'),
@@ -118,7 +119,7 @@ export const STEPS = [
     ] },
   { n: 8, code: 'C8', group: 'E', title: '從主機外監控網站', plain: '例：整台主機當機時，主機上的監控也會停止。手機不會收到通知，看起來與正常時相同。改由外部服務每 5 分鐘檢查網站。網站無法連線就通知。',
     gate: '關閉主機上的網站後，手機在 5 分鐘內收到通知。交付第二台主機的決策記錄。', risk: 'Low', model: 'Opus 5.5', status: 'not_started', depends: [],
-    before: '待決 3、待決 4',
+    before: '待決 2、待決 3',
     what: 'Cloudflare Health Checks 或外部監控；reports/decisions/ 第二台主機（成本、RPO／RTO、搬遷步驟）',
     files: ['agency-os/reports/decisions/'],
     items: [
@@ -130,7 +131,6 @@ export const STEPS = [
 // 操作者自己要決定或親手做的（agent 不能替她定）
 export const OPEN = [
   { n: 1, what: '在 GitHub 建立只能讀取 Work repo 的 Actions 的密碼。將密碼存入主機設定。', before: 'C5', src: '計畫 §3 R5、C5.3' },
-  { n: 2, what: '同意在正式主機安裝新排程。', before: 'C2', src: '計畫 C2.1' },
-  { n: 3, what: '決定使用 Cloudflare 健康檢查或其他外部監控服務。選用 Cloudflare 前，需確認方案是否支援。', before: 'C8', src: '計畫 C8.1' },
-  { n: 4, what: '閱讀決策記錄後，決定是否增設第二台主機。若要增設，再決定時間。', before: 'C8', src: '計畫 C8.2' },
+  { n: 2, what: '決定使用 Cloudflare 健康檢查或其他外部監控服務。選用 Cloudflare 前，需確認方案是否支援。', before: 'C8', src: '計畫 C8.1' },
+  { n: 3, what: '閱讀決策記錄後，決定是否增設第二台主機。若要增設，再決定時間。', before: 'C8', src: '計畫 C8.2' },
 ];

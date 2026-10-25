@@ -69,7 +69,7 @@ push `packages/workflows` 即觸發 Trigger 部署（`.claude/hooks/post-push-tr
 
 | 卡號 | 做什麼 |
 |---|---|
-| C2.1 | 主機：`sync-host-scripts.sh` 取 C1 → `install-host-schedules.sh --check` 目視差異 → 安裝（High，待決 2）；`.env` 確認 9 行所需 token 皆在 |
+| C2.1 | 主機：`sync-host-scripts.sh` 取 C1 → `install-host-schedules.sh --check` 目視差異 → 安裝（High，操作者 2026-10-25 同意）；`.env` 確認 9 行所需 token 皆在 |
 | C2.2 | 15 分後 `/ops/schedules` 9 列綠（NA 未部署前顯示為「未登記排程」＝預期） |
 | C2.3 | WF 刪 10 個 `schedules.task`：刪檔 social-dispatch／cs-inbound-sweep／pod-order-inbox-sweep／social-rotation／social-metrics／entitlements-expire／schedules-heartbeat／site-watch（含 `lib/siteWatch/post.ts`、`site-watch-run`）；`dispatch-action-run.ts`、`ao-infrastructure-check.ts` 只刪 schedule export；`NA/.../trigger-contract.test.ts` 與 `lobster-trigger-deploy.ps1` 對應 token 同步段移除；WF vitest 綠 → push（＝Trigger 部署） |
 | C2.4 | Trigger 排程列表為空；24h `list_runs` 無排程 run |
@@ -125,8 +125,8 @@ push `packages/workflows` 即觸發 Trigger 部署（`.claude/hooks/post-push-tr
 
 | 卡號 | 做什麼 |
 |---|---|
-| C8.1 | 主機外探針：每 5 分打 `app.aware-wave.com`，失敗推 Telegram（Cloudflare Health Checks 或外部服務，待決 3） |
-| C8.2 | 第二台主機決策記錄 `reports/decisions/`：成本、RPO／RTO、搬遷步驟（待決 4） |
+| C8.1 | 主機外探針：每 5 分打 `app.aware-wave.com`，失敗推 Telegram（Cloudflare Health Checks 或外部服務，待決 2） |
+| C8.2 | 第二台主機決策記錄 `reports/decisions/`：成本、RPO／RTO、搬遷步驟（待決 3） |
 
 ## 7. 驗證計畫（四動作）
 
