@@ -1,4 +1,30 @@
 # Worklog
+## 2026-10-25（續53）收費拆分上線：aware-wave-store 1.0.0 裝上 aware-wave.com、wp-bridge 0.19.0 升到所有網站，商店外掛無縫接手（Claude）
+
+- **發版**：
+  - wp-bridge 0.19.0 https://github.com/awarewaveai-pei/aware-wave-wp-bridge/releases/tag/v0.19.0 ：腳本先等 commit `78292cb` 的 CI 通過才打 tag。這是正本 CI 第一次跑真正出貨的測試。
+  - aware-wave-store 1.0.0 https://github.com/awarewaveai-pei/aware-wave-store/releases/tag/v1.0.0 ：**私有 repo 的 Actions 沒啟動**，job annotation：「recent account payments have failed or your spending limit needs to be increased」。發版腳本照設計在 CI 失敗時停下、沒打 tag。
+    - 改走備援流程：對已推上的 `27c3d45` 在本機跑 phpunit（15 tests）＋CI 的資安檢查（通過）；照 release.yml 相同內容在本機打 zip（20 檔、不含 tests）；`gh release create v1.0.0 --verify-tag`。
+    - 之後每次 store 發版都會卡在同一處，直到操作者處理 GitHub 帳單或花費上限。
+- **上線順序**：
+  1. `rollout -Plugin store -Install -Site lobster-wordpress`：none→1.0.0，備份 `lobster-wordpress-pre-awstore-1.0.0-20261025T103559Z.sql`。
+     - 確認待命：bridge 0.18.3、`legacyBridgeBillingLoaded=yes`、`awbridge_send_payment_event` 只有 1 個 callback（舊 bridge 的）。
+  2. `rollout`：soulful-wp 與 lobster-wordpress 都 0.18.3→0.19.0，備份 `*-pre-wpbridge-0.19.0-20261025T1036*/1037*`。
+- **驗證**：
+  - aware-wave.com：bridge 0.19.0、store 1.0.0、legacy=no、sender callback 1 個（store 的）、`includes/Billing` 已不存在、`aware_wave_payments_enabled`='1' 保留。
+  - 設定頁只掛在 `woocommerce` 選單下；target 用預設、兩把密鑰仍空、白名單 0 個，與上線前相同。
+  - 頁面：home 200、/my-account/ 200。
+  - soulful：bridge 0.19.0、沒有 store、沒有 sender、沒有 Billing 目錄；Playwright client 7 passed。兩站 fatal 0。
+- REALTEST_EVIDENCE: tool=SSH | cmd=rollout -Plugin store -Install -Site lobster-wordpress（OK none -> 1.0.0）＋ rollout（兩站 OK 0.18.3 -> 0.19.0） | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp eval 接手檢查（如上）＋ curl aware-wave.com / 與 /my-account/ 200 | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=playwright-runner.ps1 -Mode client -ClientSlug company-soulful-expression（7 passed） | exit=0 | ms=35500
+- REALTEST_EVIDENCE: tool=Bash | cmd=release 正本 clone 內 phpunit（aware-wave-store 15 tests/106 assertions）＋ CI 資安 grep | exit=0 | ms=400
+- REVIEW_WAIVED: NA -- 本 entry 只有發版與上線操作；程式碼已在續47 經 critic、續52 經 Codex 審查
+- BUGHUNT_WAIVED: NA -- 沒有改程式或文件
+- **rollback**：
+  - 先 `rollout -Version 0.18.3`（bridge 會帶回舊 Billing）。
+  - 再停用 aware-wave-store。若省略這步，商店外掛偵測到舊 Billing 也會自動待命。
+  - DB 用上述 `.sql`。
 ## 2026-10-25（續52）Codex 審查續47 拆分：4 項全修（發版要等 CI 綠、商店外掛只准裝在啟用收費的站、bridge 要等商店外掛「啟用中」才升級）（Claude）
 
 - Codex（`agency-os/reports/oracle/2026-10-25-partialreview-f4974ea6.md`）4 項，逐條對照程式碼：全部成立。
