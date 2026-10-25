@@ -78,12 +78,12 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
 <aside><div class="in">
   <h1>排程離開 Trigger 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-10-25</span></p>
-  <div class="bar" data-computed><i class="d" style="width:12.5%"></i><i class="g" style="width:25%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>1</span>／<span data-computed>8</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>4</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:25%"></i><i class="g" style="width:37.5%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>2</span>／<span data-computed>8</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>4</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
-<p class="sub">定時工作改由主機排程啟動。Trigger 只執行按鈕啟動的長流程。所有排程集中在 /ops/schedules。排程太久未成功會通知手機。每天另發一行「全部正常」。共 <span data-computed>8</span> 張卡、<span data-computed>33</span> 項工作，已完成 <span data-computed>12</span> 項。</p>
-<section id="now"><h2>現況</h2><p class="lead">目前已做到與還沒做到的事。</p><ul class="yn"><li class="yes"><b>可以</b><span>Trigger 正常運作。<small>2026-10-25 清除停滯的工作後恢復正常。網站巡檢四項檢查皆通過。</small></span></li><li class="yes"><b>可以</b><span>社群發文、客服、訂單與網站巡檢可不經 Trigger 定時執行。<small>2026-10-25 起由主機排程啟動，首輪全部成功。Trigger 上的同名定時工作仍在，C2.3 關閉。</small></span></li><li class="no"><b>還不行</b><span>系統能自動偵測 Trigger 停滯。<small>這次停了 34 小時，直到查看網站巡檢報告才發現（C3）。</small></span></li><li class="no"><b>還不行</b><span>任何排程太久未成功，手機都會收到通知。<small>目前只有網站回應、自動部署、雲端報告與影片補登會推播。其餘異常只在頁面標紅（C4）。</small></span></li><li class="no"><b>還不行</b><span>每天會收到一行「全部正常」。<small>C4。</small></span></li><li class="no"><b>還不行</b><span>/ops/schedules 可查看資料庫、n8n、GitHub 與雲端排程。<small>目前只顯示客戶與主機排程。資料庫清理工作在 2026-10-24 失敗，無人察覺（C5）。</small></span></li></ul></section>
+<p class="sub">定時工作改由主機排程啟動。Trigger 只執行按鈕啟動的長流程。所有排程集中在 /ops/schedules。排程太久未成功會通知手機。每天另發一行「全部正常」。共 <span data-computed>8</span> 張卡、<span data-computed>33</span> 項工作，已完成 <span data-computed>20</span> 項。</p>
+<section id="now"><h2>現況</h2><p class="lead">目前已做到與還沒做到的事。</p><ul class="yn"><li class="yes"><b>可以</b><span>Trigger 正常運作。<small>2026-10-25 清除停滯的工作後恢復正常。網站巡檢四項檢查皆通過。</small></span></li><li class="yes"><b>可以</b><span>社群發文、客服、訂單與網站巡檢可不經 Trigger 定時執行。<small>2026-10-25 起由主機排程啟動，首輪全部成功。Trigger 上的同名定時工作仍在，C2.3 關閉。</small></span></li><li class="yes"><b>可以</b><span>系統能自動偵測 Trigger 停滯。<small>2026-10-25 起每 10 分鐘檢查執行名額。名額被卡住 15 分鐘就標紅並推播（C3）。</small></span></li><li class="yes"><b>可以</b><span>任何排程太久未成功，手機都會收到通知。<small>2026-10-25 起排程頁任一列變紅就推播一次，恢復再推播一次。第一次就抓到網站備份同步壞了 55 天。</small></span></li><li class="no"><b>還不行</b><span>每天會收到一行「全部正常」。<small>已安裝。第一則在 2026-10-26 09:00 送出（C4.6⑦）。</small></span></li><li class="yes"><b>可以</b><span>/ops/schedules 可查看資料庫、n8n、GitHub 與雲端排程。<small>2026-10-25 起顯示資料庫、n8n、雲端報告與筆電報告。GitHub 要等待決 1 的密碼（C5.3）。</small></span></li></ul></section>
 
 <section id="steps"><h2>卡片與工作</h2><p class="lead">依編號進行。每張卡列出所有工作，勾選代表完成。同一組的卡修改不同檔案，可以同時進行。High 風險步驟經你同意才執行。</p><ol class="steps"><li class="step done" id="C1">
     <div class="n">1</div>
@@ -106,7 +106,7 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
       <p class="plain">例：先在正式主機裝好新排程。排程頁全為綠色後，才關閉 Trigger 上的定時工作。順序相反會讓社群發文等工作中斷。</p>
       <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-high">風險 High（正式主機）</span><span class="who">負責：你＋Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>/ops/schedules 新增的工作全為綠色。Trigger 在 24 小時內未執行任何定時工作。文件不再寫「由 Trigger 叫醒」。</p>
-      <ul class="items"><li class="done"><b>✓</b><span><code>C2.1</code> 經你同意後，在正式主機安裝新排程。 <small>完成於 <code>ea968aca1</code></small></span></li><li class="todo"><b>○</b><span><code>C2.2</code> 等待 15 分鐘，確認排程頁新增的工作全為綠色。（2026-10-25：6 個綠；3 個每天一次的工作要等第一次執行，最晚 10-26 09:00）</span></li><li class="todo"><b>○</b><span><code>C2.3</code> 刪除 Trigger 上的 10 個定時工作與專供它們同步密碼的程式，再部署 Trigger。</span></li><li class="todo"><b>○</b><span><code>C2.4</code> 觀察 24 小時，確認 Trigger 沒有執行定時工作。</span></li><li class="todo"><b>○</b><span><code>C2.5</code> 更新所有寫著「由 Trigger 叫醒」的文件。提供截圖。</span></li></ul>
+      <ul class="items"><li class="done"><b>✓</b><span><code>C2.1</code> 經你同意後，在正式主機安裝新排程。 <small>完成於 <code>ea968aca1</code></small></span></li><li class="todo"><b>○</b><span><code>C2.2</code> 等待 15 分鐘，確認排程頁新增的工作全為綠色。（2026-10-25：6 個綠；3 個每天一次的工作要等第一次執行，最晚 10-26 09:00）</span></li><li class="todo"><b>○</b><span><code>C2.3</code> 刪除 Trigger 上的 10 個定時工作與專供它們同步密碼的程式，再部署 Trigger。（程式已改好並測過，存成 C2.3.patch；C2.2 全綠後套用）</span></li><li class="todo"><b>○</b><span><code>C2.4</code> 觀察 24 小時，確認 Trigger 沒有執行定時工作。</span></li><li class="todo"><b>○</b><span><code>C2.5</code> 更新所有寫著「由 Trigger 叫醒」的文件。提供截圖。</span></li></ul>
       <details><summary>工程細節：C2 定時工作上線</summary>
         <p>sync-host-scripts → install-host-schedules.sh；WF 刪 10 個 schedules.task＋token 同步段 → push（＝Trigger 部署）；文件同步</p>
         <p><b>需先完成：</b><a href="#C1">C1</a></p>
@@ -114,18 +114,19 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
         <p><b>檔案：</b><code>/etc/cron.d/awarewave-schedules</code> <code>WF/src/trigger/*.ts</code> <code>scripts/lobster-trigger-deploy.ps1</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-25-schedules-off-trigger/R0-PLAN.md §6 C2</code></p>
       </details>
-    </div></li><li class="grp">可同時進行：<a href="#C3">C3</a>、<a href="#C4">C4</a></li><li class="step todo" id="C3">
+    </div></li><li class="grp">可同時進行：<a href="#C3">C3</a>、<a href="#C4">C4</a></li><li class="step done" id="C3">
     <div class="n">3</div>
     <div class="b">
       <p class="plain">例：工作已停止，卻仍占用執行名額。排程頁在 10 分鐘內標紅。手機會收到附有處理手冊的通知。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium（安裝需你同意）</span><span class="who">負責：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-done">已完成</span><span class="pill risk-med">風險 Medium（安裝需你同意）</span><span class="who">負責：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>模擬已停止但仍占用名額的工作，確認檢查回報失敗。正常執行的工作不會被誤報。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>C3.1</code> 比對 Trigger 記錄的名額與實際執行中的工作。工作已停止卻仍占用名額超過 15 分鐘，就回報失敗。</span></li><li class="todo"><b>○</b><span><code>C3.2</code> 每 10 分鐘檢查一次。檢查工作登記在排程頁。失敗訊息附上處理手冊。</span></li><li class="todo"><b>○</b><span><code>C3.3</code> 測試未占用名額、一個已停止的工作仍占用名額、一個工作正常執行三種情況。確認判斷皆正確。</span></li><li class="todo"><b>○</b><span><code>C3.4</code> 經你同意後安裝到正式主機。</span></li></ul>
+      <ul class="items"><li class="done"><b>✓</b><span><code>C3.1</code> 比對 Trigger 記錄的名額與實際執行中的工作。工作已停止卻仍占用名額超過 15 分鐘，就回報失敗。 <small>完成於 <code>ef5a9ccf6</code></small></span></li><li class="done"><b>✓</b><span><code>C3.2</code> 每 10 分鐘檢查一次。檢查工作登記在排程頁。失敗訊息附上處理手冊。 <small>完成於 <code>ef5a9ccf6</code></small></span></li><li class="done"><b>✓</b><span><code>C3.3</code> 測試未占用名額、一個已停止的工作仍占用名額、一個工作正常執行三種情況。確認判斷皆正確。 <small>完成於 <code>ef5a9ccf6</code></small></span></li><li class="done"><b>✓</b><span><code>C3.4</code> 經你同意後安裝到正式主機。（2026-10-25 已安裝，首次檢查 0 個名額被占用） <small>完成於 <code>ef5a9ccf6</code></small></span></li></ul>
       <details><summary>工程細節：C3 自動偵測 Trigger 停滯</summary>
         <p>HS/check-trigger-slots.sh：Redis currentConcurrency vs TaskRun.status；cron */10；host-jobs.ts 一列</p>
         <p><b>需先完成：</b><a href="#C2">C2</a></p>
         <p><b>檔案：</b><code>HS/check-trigger-slots.sh</code> <code>HS/cron.d/awarewave-schedules</code> <code>NA/lib/schedules/host-jobs.ts</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-25-schedules-off-trigger/R0-PLAN.md §6 C3</code></p>
+        <p><b>完成於：</b><code>ef5a9ccf6</code></p>
       </details>
     </div></li><li class="step doing" id="C4">
     <div class="n">4</div>
@@ -141,13 +142,13 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
         <p><b>檔案：</b><code>HS/notify.sh</code> <code>HS/report-host-schedules.py</code> <code>HS/endpoint-alert.sh</code> <code>HS/check-drift-and-alert.sh</code> <code>HS/auto-deploy-next-admin.sh</code> <code>HS/reconcile-videos.sh</code> <code>scripts/routine-output-watchdog.sh</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-25-schedules-off-trigger/R0-PLAN.md §6 C4</code></p>
       </details>
-    </div></li><li class="step todo" id="C5">
+    </div></li><li class="step doing" id="C5">
     <div class="n">5</div>
     <div class="b">
       <p class="plain">例：Supabase 每天凌晨清理舊紀錄的工作，在 2026-10-24 失敗卻無人察覺。之後這類失敗會在 /ops/schedules 標紅。頁面也會列出 n8n、GitHub 與雲端報告的排程。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">負責：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-med">風險 Medium</span><span class="who">負責：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>/ops/schedules 顯示資料庫、n8n、GitHub、雲端與筆電報告各區。資料庫排程顯示最近一次執行結果。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>C5.1</code> 資料庫內建排程每個工作各列一行。顯示最近一次執行成功或失敗。</span></li><li class="todo"><b>○</b><span><code>C5.2</code> 已啟用的 n8n 定時流程會自動列出。目前沒有這類流程。</span></li><li class="todo"><b>○</b><span><code>C5.3</code> GitHub 定時檢查會自動列出。顯示最近一次執行結果。</span></li><li class="todo"><b>○</b><span><code>C5.4</code> 筆電與雲端區顯示每份報告的產生時間。超過更新週期就標黃。報告標明由筆電產生。</span></li><li class="todo"><b>○</b><span><code>C5.5</code> 修改原本「不放筆電與雲端」的決定。頁面寫明：AwareWave 設定的每個排程都會列出。</span></li></ul>
+      <ul class="items"><li class="done"><b>✓</b><span><code>C5.1</code> 資料庫內建排程每個工作各列一行。顯示最近一次執行成功或失敗。 <small>完成於 <code>ef5a9ccf6</code></small></span></li><li class="done"><b>✓</b><span><code>C5.2</code> 已啟用的 n8n 定時流程會自動列出。目前沒有這類流程。 <small>完成於 <code>ef5a9ccf6</code></small></span></li><li class="todo"><b>○</b><span><code>C5.3</code> GitHub 定時檢查會自動列出。顯示最近一次執行結果。</span></li><li class="done"><b>✓</b><span><code>C5.4</code> 筆電與雲端區顯示每份報告的產生時間。超過更新週期就標黃。報告標明由筆電產生。 <small>完成於 <code>ef5a9ccf6</code></small></span></li><li class="done"><b>✓</b><span><code>C5.5</code> 修改原本「不放筆電與雲端」的決定。頁面寫明：AwareWave 設定的每個排程都會列出。 <small>完成於 <code>ef5a9ccf6</code></small></span></li></ul>
       <details><summary>工程細節：C5 補齊排程頁的工作清單</summary>
         <p>盤點加 pg_cron（cron.job_run_details）、n8n API、GitHub Actions API、repo 報告產生時間；SCHEDULES_PAGE_PLAN.md:50 改寫</p>
         <p><b>需先完成：</b><a href="#C4">C4</a>；待決 1</p>

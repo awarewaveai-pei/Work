@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-25（續80）排程離開 Trigger C3＋C5（操作者「整批做」，主機安裝與部署一次授權）：Trigger 名額卡住 10 分內標紅；排程頁補 pg_cron／n8n／雲端與筆電報告；C2.3 改好存 patch 待套用（Claude）
+
+- **C3**（`ef5a9ccf6`）：`HS/check-trigger-slots.sh` 每 10 分讀 Redis `engine:runqueue:*:env:*:currentConcurrency` 成員 → trigger-postgres TaskRun＋RuntimeEnvironment；非 EXECUTING／WAITING_TO_RESUME／RETRYING_AFTER_FAILURE 且 ≥15 分、或無 TaskRun 列 → exit 1；DEVELOPMENT／PREVIEW 只列不判；exit 2＝無 env concurrency key（key 版型變了）或查詢少列。log `/var/log/trigger-slots.log`；`host-jobs.ts` 列 `trigger_slots_check`。
+- **C5**（同 commit）：`report-host-schedules.py` 加 pg_cron（`cron.job`＋最新完成 `job_run_details`）、n8n（啟用、已發佈版本含時間觸發、最新 `mode=trigger` 執行）、repo 報告最後 commit（3 個雲端 routine＋`agency-os/reports/status` 筆電）。新分頁「資料庫與 n8n」「筆電與雲端」；家族列以 source 比對（主機 cron 的 `n8n_*` key 仍顯示未登記）；外部讀取失敗進 `external_errors`＝一列失敗、不把主機工作標過時；筆電組不推播、不算進每日一行（另列一行說明）。`SCHEDULES_PAGE_PLAN.md` §3.2-7 改寫。C5.3 GitHub 待決 1。
+- **C2.3**：改好（刪 8 個 task 檔＋測試、`postRunDue`／`postExpire`／`siteWatch/post`、兩個 schedule export、`trigger.config.ts` 5 個 token、`lobster-trigger-deploy.ps1` 對應段、NA `trigger-contract.test.ts`），在拋棄式 worktree 跑 WF typecheck＋vitest 132 綠，存 `agency-os/handoffs/2026-10-25-schedules-off-trigger/C2.3.patch`（`git apply --check` 對 main 通過）。**未 commit 程式**：push `packages/workflows`＝Trigger 部署，須等 C2.2 全綠。
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash tests/host-scripts/check-trigger-slots.test.sh → 11/11；突變（dev 不排除、smembers 改 process substitution）→ 指名案例 FAIL | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python tests/host-scripts/host-schedules.test.py → 18 OK；npx vitest run lib/schedules → 86 passed；tsc 乾淨；6 個守衛突變（安靜組、家族比對、stale_after_s、每日一行、source 比對、external_errors）→ 各自指名測試 FAIL | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=SSH | cmd=主機 sync-host-scripts（ef5a9ccf6）→ install-host-schedules（備份 .state/cron-backup-20261025T134705Z）→ cron-run trigger_slots_check "ok: 0 slots held" exit 0；host_schedules_report 43 entries errors=0 external_errors=0（pg_cron 1、報告 4、n8n 0＝啟用流程 0） | exit=0 | ms=8000
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo sg-deploy.sh next-admin 第一次 → npm test 1 failed（`lib/theme/__tests__/accent-not-text.test.ts`：他 session `e25ef5710` 的 `AccountsCard.tsx:208` `color: var(--accent)`，main 已紅＝今晚 03:00 自動部署也會停）→ 修成 `var(--accent-text)`（`0ba63a0b4`，本機 3381 passed）→ 重部署：3381 passed、healthy 11s、smoke all OK、deployed 0ba63a0b4 | exit=0 | ms=600000
+- REALTEST_EVIDENCE: tool=Bash | cmd=內建瀏覽器開 https://app.aware-wave.com/ops/schedules：分頁「資料庫與 n8n 1」（archive-stale-repair-runs 正常 10/25 10:00）、「筆電與雲端 4」全正常；其他分頁異常＝backup_status_sync 失敗（待決 4）＋6 列尚無資料（restore drill／schedule_digest／3 個每日工作／certbot，皆未到首跑） | exit=0 | ms=5000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/9m/4n（m1 每日一行濾安靜組、m2 smembers 失敗不再當 0、m3 log、m4 家族改 source、m5 external_errors、m6 n8n 已發佈版本＋mode=trigger、m7 skip 裝飾器歸位、m8 key 版型漂移 exit 2、m9 dev env 排除；n2 timeout、n3 列數檢查、n4 n8n id 不 slug 全修；n1 n8n 列不會過時——目前 0 列，未修）
+- ORACLE_WAIVED: critic Standard 獨立審＋8 個守衛突變證據；無 auth／金流／個資
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks,.claude | grep=trigger_slots_check | hits=6（cron.d、host-jobs.ts、本條 WORKLOG）
+- **剩餘**：C2.2（三個每日工作首跑，最晚 10-26 01:00Z）→ C2.3 套 patch＋push（＝Trigger 部署）→ C2.4 觀察 24h → C2.5 文件；C4.6⑦ 明早 09:00 截圖；C5.3 待決 1；m-n1。
+- **rollback**：主機 `install-host-schedules.sh --rollback /root/lobster-phase1/.state/cron-backup-20261025T134705Z`；next-admin `rollback-phase1.sh restore next-admin`；repo `git revert ef5a9ccf6`。
 ## 2026-10-25（續79）客戶模型現成方案第二輪：只查 WordPress 外掛（22 個深讀＋目錄掃描 20 個新候選）——能接手組織／席位與 API key 發放，代操稽核、預留結算錢包、離線授權檔無外掛提供（Claude）
 
 - **觸發**：操作者「啥小 我覺得你查的不透徹 我說的是 wordpress外掛」「wordpress 外掛有數千個 你要怎麼查?」→ 兩個研究員並行：深讀開發者文件；目錄掃描（四類別×搜尋詞×三來源，過濾安裝／更新／文件）。

@@ -28,10 +28,10 @@ export const COPY = {
 export const NOW = [
   { what: 'Trigger 正常運作。', state: 'yes', ev: '2026-10-25 清除停滯的工作後恢復正常。網站巡檢四項檢查皆通過。' },
   { what: '社群發文、客服、訂單與網站巡檢可不經 Trigger 定時執行。', state: 'yes', ev: '2026-10-25 起由主機排程啟動，首輪全部成功。Trigger 上的同名定時工作仍在，C2.3 關閉。' },
-  { what: '系統能自動偵測 Trigger 停滯。', state: 'no', ev: '這次停了 34 小時，直到查看網站巡檢報告才發現（C3）。' },
-  { what: '任何排程太久未成功，手機都會收到通知。', state: 'no', ev: '目前只有網站回應、自動部署、雲端報告與影片補登會推播。其餘異常只在頁面標紅（C4）。' },
-  { what: '每天會收到一行「全部正常」。', state: 'no', ev: 'C4。' },
-  { what: '/ops/schedules 可查看資料庫、n8n、GitHub 與雲端排程。', state: 'no', ev: '目前只顯示客戶與主機排程。資料庫清理工作在 2026-10-24 失敗，無人察覺（C5）。' },
+  { what: '系統能自動偵測 Trigger 停滯。', state: 'yes', ev: '2026-10-25 起每 10 分鐘檢查執行名額。名額被卡住 15 分鐘就標紅並推播（C3）。' },
+  { what: '任何排程太久未成功，手機都會收到通知。', state: 'yes', ev: '2026-10-25 起排程頁任一列變紅就推播一次，恢復再推播一次。第一次就抓到網站備份同步壞了 55 天。' },
+  { what: '每天會收到一行「全部正常」。', state: 'no', ev: '已安裝。第一則在 2026-10-26 09:00 送出（C4.6⑦）。' },
+  { what: '/ops/schedules 可查看資料庫、n8n、GitHub 與雲端排程。', state: 'yes', ev: '2026-10-25 起顯示資料庫、n8n、雲端報告與筆電報告。GitHub 要等待決 1 的密碼（C5.3）。' },
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
@@ -40,6 +40,7 @@ const C1 = '72d15254c';
 const C21 = 'ea968aca1';
 const C4 = '6b06e0743';
 const C44 = 'b9ab5a4f2';
+const C35 = 'ef5a9ccf6';
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '定時工作改由主機啟動', plain: '例：社群貼文每 5 分鐘發送一次，改由主機直接啟動。9 個定時工作維持原有頻率。另刪除 1 個重複工作。',
@@ -62,19 +63,19 @@ export const STEPS = [
     items: [
       done('C2.1', '經你同意後，在正式主機安裝新排程。', C21),
       todo('C2.2', '等待 15 分鐘，確認排程頁新增的工作全為綠色。（2026-10-25：6 個綠；3 個每天一次的工作要等第一次執行，最晚 10-26 09:00）'),
-      todo('C2.3', '刪除 Trigger 上的 10 個定時工作與專供它們同步密碼的程式，再部署 Trigger。'),
+      todo('C2.3', '刪除 Trigger 上的 10 個定時工作與專供它們同步密碼的程式，再部署 Trigger。（程式已改好並測過，存成 C2.3.patch；C2.2 全綠後套用）'),
       todo('C2.4', '觀察 24 小時，確認 Trigger 沒有執行定時工作。'),
       todo('C2.5', '更新所有寫著「由 Trigger 叫醒」的文件。提供截圖。'),
     ] },
   { n: 3, code: 'C3', group: 'C', title: '自動偵測 Trigger 停滯', plain: '例：工作已停止，卻仍占用執行名額。排程頁在 10 分鐘內標紅。手機會收到附有處理手冊的通知。',
-    gate: '模擬已停止但仍占用名額的工作，確認檢查回報失敗。正常執行的工作不會被誤報。', risk: 'Medium（安裝需你同意）', model: 'Opus 5.5', status: 'not_started', depends: ['C2'],
+    gate: '模擬已停止但仍占用名額的工作，確認檢查回報失敗。正常執行的工作不會被誤報。', risk: 'Medium（安裝需你同意）', model: 'Opus 5.5', status: 'done', commit: C35, depends: ['C2'],
     what: 'HS/check-trigger-slots.sh：Redis currentConcurrency vs TaskRun.status；cron */10；host-jobs.ts 一列',
     files: ['HS/check-trigger-slots.sh', 'HS/cron.d/awarewave-schedules', 'NA/lib/schedules/host-jobs.ts'],
     items: [
-      todo('C3.1', '比對 Trigger 記錄的名額與實際執行中的工作。工作已停止卻仍占用名額超過 15 分鐘，就回報失敗。'),
-      todo('C3.2', '每 10 分鐘檢查一次。檢查工作登記在排程頁。失敗訊息附上處理手冊。'),
-      todo('C3.3', '測試未占用名額、一個已停止的工作仍占用名額、一個工作正常執行三種情況。確認判斷皆正確。'),
-      todo('C3.4', '經你同意後安裝到正式主機。'),
+      done('C3.1', '比對 Trigger 記錄的名額與實際執行中的工作。工作已停止卻仍占用名額超過 15 分鐘，就回報失敗。', C35),
+      done('C3.2', '每 10 分鐘檢查一次。檢查工作登記在排程頁。失敗訊息附上處理手冊。', C35),
+      done('C3.3', '測試未占用名額、一個已停止的工作仍占用名額、一個工作正常執行三種情況。確認判斷皆正確。', C35),
+      done('C3.4', '經你同意後安裝到正式主機。（2026-10-25 已安裝，首次檢查 0 個名額被占用）', C35),
     ] },
   { n: 4, code: 'C4', group: 'C', title: '統一發送排程通知', plain: '例：社群發文 20 分鐘未成功，手機收到「社群貼文發送停了」。恢復後再通知一次。每天早上 9 點收到一行「全部正常」。未收到這行訊息，代表通知系統故障。',
     gate: '模擬排程停擺，確認標紅時通知一次。恢復時再通知一次。持續異常不重複通知。每日一行訊息準時送達。Telegram 與 Slack 都收到通知。', risk: 'Medium（上線需你同意）', model: 'Opus 5.5', status: 'in_progress', depends: [],
@@ -91,16 +92,16 @@ export const STEPS = [
       done('C4.7', '訂單重送與後台操作補派兩個工作，改成回報實際結果。目前收到要求就回報成功，實際失敗時排程頁仍會顯示綠色。', C4),
     ] },
   { n: 5, code: 'C5', group: 'D', title: '補齊排程頁的工作清單', plain: '例：Supabase 每天凌晨清理舊紀錄的工作，在 2026-10-24 失敗卻無人察覺。之後這類失敗會在 /ops/schedules 標紅。頁面也會列出 n8n、GitHub 與雲端報告的排程。',
-    gate: '/ops/schedules 顯示資料庫、n8n、GitHub、雲端與筆電報告各區。資料庫排程顯示最近一次執行結果。', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['C4'],
+    gate: '/ops/schedules 顯示資料庫、n8n、GitHub、雲端與筆電報告各區。資料庫排程顯示最近一次執行結果。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['C4'],
     before: '待決 1',
     what: '盤點加 pg_cron（cron.job_run_details）、n8n API、GitHub Actions API、repo 報告產生時間；SCHEDULES_PAGE_PLAN.md:50 改寫',
     files: ['HS/report-host-schedules.py', 'NA/lib/schedules/adapters/host-schedules.ts', 'agency-os/docs/operations/SCHEDULES_PAGE_PLAN.md'],
     items: [
-      todo('C5.1', '資料庫內建排程每個工作各列一行。顯示最近一次執行成功或失敗。'),
-      todo('C5.2', '已啟用的 n8n 定時流程會自動列出。目前沒有這類流程。'),
+      done('C5.1', '資料庫內建排程每個工作各列一行。顯示最近一次執行成功或失敗。', C35),
+      done('C5.2', '已啟用的 n8n 定時流程會自動列出。目前沒有這類流程。', C35),
       todo('C5.3', 'GitHub 定時檢查會自動列出。顯示最近一次執行結果。'),
-      todo('C5.4', '筆電與雲端區顯示每份報告的產生時間。超過更新週期就標黃。報告標明由筆電產生。'),
-      todo('C5.5', '修改原本「不放筆電與雲端」的決定。頁面寫明：AwareWave 設定的每個排程都會列出。'),
+      done('C5.4', '筆電與雲端區顯示每份報告的產生時間。超過更新週期就標黃。報告標明由筆電產生。', C35),
+      done('C5.5', '修改原本「不放筆電與雲端」的決定。頁面寫明：AwareWave 設定的每個排程都會列出。', C35),
     ] },
   { n: 6, code: 'C6', group: 'E', title: '狀態報告改由主機產生', plain: '例：主機記憶體與硬碟用量報告，目前要等筆電執行開工報告才會更新。改由主機每天產生後，筆電未開機也能更新。',
     gate: '排程頁「筆電與雲端」區只保留需要筆電的項目。其餘報告由主機準時產生。', risk: 'High（正式主機）', model: 'Opus 5.5', status: 'not_started', depends: ['C5'],
