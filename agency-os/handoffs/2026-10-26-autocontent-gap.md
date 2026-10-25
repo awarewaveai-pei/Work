@@ -38,6 +38,8 @@
 | 熱搜抓取本體 | `runTrending(geo, extraBlocks)`；額外來源 `loadDbSourceBlocks()` 讀 `content_sources`（route 內私有函式）。來源五種：Google News RSS、Reddit（地區版）、PTT 八卦（只 TW）、Serper「今日熱門新聞」（有 `SERPER_API_KEY` 才開，~0.001 美元／次）、營運自訂 RSS（env `CONTENT_TRENDING_FEEDS` 或 DB `content_sources`）。**全部只分地區、不分產業、不分客戶**（`content_sources` 沒有 organization 欄）；產業相關性靠提案 prompt 叫 AI 自己過濾（「挑和品牌受眾相關的」）＋知識庫資料夾名稱 | `NA/lib/content/trending-sources.ts:228-300,322-340,353-357`；`NA/app/api/content/sources/route.ts:15-18`；`NA/lib/content/topics/plan.ts:37-41` |
 | 熱搜存檔 | `saveTrends(sb, geo, items)`：`upsert onConflict (hash, fetched_on)`，一天一筆／項，保留 90 天；`recentTrends` 依出現天數排（所以要**每天**存才有意義） | `NA/lib/content/topics/trends.ts:54-66,68-69`；`0121_content_topics.sql:25-27` |
 | 支援的 geo | `TRENDING_GEOS = TW HK SG US GB JP AU` | `NA/lib/content/geos.ts:4` |
+| **活動行事曆** | 已有：`events` 表（節日／運動賽事／文化／大型活動，含 `marketing_window_start/end`、`country_codes`、`title_zh`），主機每月 `sync-events-monthly.sh` → `/api/internal/events/sync`；`/tools/events` 與 Studio「🗓️ 活動行事曆」都在讀。**提案 prompt 完全沒用到** | `NA/lib/events/types.ts:5-27`；`NA/lib/events/facets.ts:97,110`；`NA/app/api/tools/events/upcoming/route.ts:56-78`；`lobster-factory/infra/hetzner-phase1-core/scripts/sync-events-monthly.sh:17`；`plan.ts` grep `event` 0 筆 |
+| 社群平台熱門話題 | 來源裡**沒有** FB／IG／X／Threads／Snapchat／TikTok／YouTube／Google Trends。免費能抓的只有：Google Trends 每日 RSS（`trends.google.com/trending/rss?geo=XX`）、YouTube 熱門影片（Data API `videos.list chart=mostPopular`，免費額度，需 API key；專案目前沒有這把 key）。FB／IG／Threads 的 Graph API 沒有「熱門話題」端點；X API 要月費；Snapchat／TikTok 沒有公開 API | `trending-sources.ts` grep `threads\|instagram\|twitter\|tiktok\|trends.google` 0 筆；grep `YOUTUBE_API_KEY` 0 筆 |
 | 客戶的站 | `wp_sites(id, organization_id, active, content_defaults)`；排程頁用 `organization_id` 數站 | `NA/lib/schedules/view.ts:32-38`；`NA/lib/content/brand-voice-store.ts:16-26` |
 | 成本模型 | `content-plan` 一次提案的價格；`planCostTwd()` 已算 NT$ 版給按鈕 | `NA/lib/ai/cost-model.ts:151`；`NA/lib/content/topics/cost.ts:8` |
 | migration 範本 | `0125`：檔頭 `APPLY` 行、`begin; set local lock_timeout='5s'; … notify pgrst; commit;`，另有 `.down.sql` | `lobster-factory/packages/db/migrations/0125_client_schedules_daily_limit.sql` |
@@ -83,9 +85,13 @@
 
 ## 7. 卡片全文
 
-### P9.1　熱搜每天自動落地（卡 A；免費；Low）
+### P9.1　熱搜每天自動落地＋兩個免費來源（卡 A；免費；Low）
 
 **改哪些檔**
+0. `NA/lib/content/trending-sources.ts` 加兩個內建 block（寫法同 `:228-240` 的 Google News）：
+   - `search/google-trends`：`rssSearchBlock`，`url: (geo) => \`https://trends.google.com/trending/rss?geo=${geo}\``，`geos: "*"`，`source: "Google Trends"`，`limit: 20`；該 RSS 的 `<ht:approx_traffic>` 若 `makeRssBlock` 沒解析就只取 title（不為它改解析器）。
+   - `search/youtube-trending`：`searchBlock`，`enabled: !!process.env.YOUTUBE_API_KEY`（同 Serper 的寫法 `:293`），`run: (geo) => GET https://www.googleapis.com/youtube/v3/videos?part=snippet&chart=mostPopular&regionCode=${geo}&maxResults=20&key=…` → title 當 item，`source: "YouTube"`。沒 key＝不啟用，不報錯。key 之後由操作者放進 `mcp/user-env.ps1` 與主機 env（AGENTS §0 Secrets 規則），**本卡不等 key**。
+   - 兩個都是公開資料、不分客戶，照 B5 進 `content_trends`。
 1. 新檔 `NA/lib/content/topics/collect-trends.ts`：
    - `export async function collectTrends(sb, geo): Promise<{ items: TrendingItem[]; saved: number }>`：把 `trending/route.ts:82-96` 的 `loadDbSourceBlocks()` 與 `:99-108` 的 `runTrending(geo, extra)` ＋ `saveTrends(sb, geo, items)` 搬進來；`saveTrends` 失敗一樣只 `console.warn`、`saved=0`，不 throw（route 既有行為）。
    - `export async function collectTrendsIfDue(sb, geos: string[]): Promise<string[]>`：geo 去重；每個 geo `select id from content_trends where geo=G and fetched_on=<今天 UTC 'YYYY-MM-DD'> limit 1`；沒有列才 `collectTrends`；回傳實際抓了的 geo。查詢失敗 throw。
@@ -149,6 +155,10 @@
    ```
 5. `jobs.ts:110` cost 字串尾端加 `` 每個網站每月第一次提案另約 ${planCostUsd()} 美元。``；`cost.ts` 加 `export function planCostUsd(): number`（`planCostTwd` 的 USD 版：`Math.ceil(featureUnitCostUsd(f) * 100) / 100`）（B6）。
 6. 題目頁按鈕 API（`topics/plan/route.ts`）**不改**：人按鈕提的案自然成為 B1 守衛，排程不重提。
+7. **節日與活動進提案**（免費，DB 已有）：`plan.ts`
+   - `PlanContext` 加 `events: string[]`；`buildPlanPrompt` 在熱搜段**之前**加「本月在行銷窗口內的節日與活動（可提前佈局的題目）：」＋ `list(c.events)`，空就不印。
+   - `proposeMonth`：查 `events` 表 `is_active = true` 且 `marketing_window_start <= 月底` 且 `event_date >= 月初`（沿用 `upcoming/route.ts:56-78` 的條件與 `decorateEventFacets`），再用 `eventMatchesCountries(e, country ? [country] : [])`（`facets.ts:97`；`country = geoFor(targetCountry)`，null 時只留不限國家的事件，照該函式既有語意）過濾，依 `scoreEventOpportunity`（`facets.ts:110`）排序取前 15，格式 `MM-DD 名稱（title_zh）`。DB 錯誤 throw（與 `recentTrends` 一致）。
+   - 這段邏輯抽成 `NA/lib/events/for-month.ts` `eventsForMonth(sb, month, country)`，P9.3 的 ① 格與按鈕 API 共用。
 
 **驗收**
 - 新測 `NA/lib/content/topics/__tests__/plan-due.test.ts`（全部假 deps，`vi.fn`）：
@@ -161,6 +171,7 @@
   7. `now=2026-11-01T00:30:00Z`（台灣 11/1 08:30）與 `now=2026-10-31T17:00:00Z`（台灣 11/1 01:00）→ `hasProposal` 都收到 `"2026-11-01"`（台灣月）。
   8. `canPlan=false` → `claimAttempt`、`propose` 都不叫、回 `null`（B8）；`hasProposal` 全 true → `canPlan` 不叫（沒事做就不問權限）。
   9. 真實作 `planDueDeps(...).canPlan`：mock `grantFor` 丟 `EntitlementRequired` → `false`；丟一般 `Error` → reject（B8：只有權限拒絕算跳過）。
+- `plan.test.ts` 加：`events=[]` → prompt 沒有「節日與活動」段；`events=["12-25 Christmas（聖誕節）"]` → 有且在熱搜段之前。`NA/lib/events/__tests__/for-month.test.ts`（假 sb）：窗口跨月的事件被選到、`country="TW"` 時美國限定事件被濾掉、不限國家事件兩種 country 都留。
 - `content-pipeline-job.test.ts` 加兩條（mock `@/lib/content/topics/plan-due`）：`planIfDue` 回字串 → `tickTopics` 不叫、`run` 回那字串；回 `null` → `tickTopics` 叫（B3）。
 - 真 SQL 呼叫鏈各一條（`store.test.ts` 的假 sb 風格）：`hasProposal` 用 `.eq("site_id").eq("month").neq("source","manual")`；`claimAttempt` 的 `.or()` 字串含 `content_plan_attempted_at.is.null` 與 `.lt.`。
 - `/ops/schedules` 那格 cost 文字含提案費用（B6）；`/tools/content/sites` 看得到兩組按鈕，切題目閘後 PATCH 回應的 `contentDefaults.topicMode` 變、`publishMode` 不變（B4）。
@@ -176,7 +187,7 @@
 
 | 格 | 顯示 | 控制（沿用既有 API，B7） |
 |---|---|---|
-| ① 搜集熱搜 | 該站 geo 最後一次 `content_trends.fetched_on`、近 30 天筆數 | 無（P9.1 自動）；可放「立即抓一次」＝GET `/api/content/trending?type=trending&geo=..` |
+| ① 搜集熱搜 | 該站 geo 最後一次 `content_trends.fetched_on`、近 30 天筆數、有哪些來源在跑（Google News／Google Trends／Reddit／YouTube…）；本月行銷窗口內的節日與活動 N 個（`eventsForMonth`，P9.2 第 7 點） | 無（P9.1 自動）；可放「立即抓一次」＝GET `/api/content/trending?type=trending&geo=..` |
 | ② 提案題目 | 本月已提案幾題（`listTopics(sb, org, month)` 過濾 `site_id` 與 `source <> 'manual'`，`store.ts:91`）／尚未；上次嘗試 `wp_sites.content_plan_attempted_at`（在 `/api/content/sites` GET 的 select 加這欄）；失敗原因＝`/api/ops/schedules?slug=` 回的 `content_pipeline.lastError`；客戶 `content.plan` 未開通 → 顯示「未開通題目規劃，排程不會提案」（server 端用同一條 `can`／`grantFor` 判斷，B8）；站的市場無熱搜 → ① 顯示「此市場沒有熱搜來源，提案只靠品牌與知識庫」（B9） | 既有「AI 提案本月題目」按鈕（`TopicsBoard.tsx:179-221`，POST `/api/content/topics/plan`） |
 | ③ 挑題 | 待核准幾題；題目閘目前是人挑／AI 挑 | 重用 `<TopicModeButtons>`（P9.2）＋既有勾選核准／退回（`TopicsBoard.tsx:231-232`） |
 | ④ 製作 | 總開關開／關、每天最多開始 N 題、進行中幾題 | 讀 GET `/api/ops/schedules?slug=<客戶>`（`NA/app/(shell)/ops/schedules/ScheduleTable.tsx:140`）；寫 PATCH `/api/ops/clients/<slug>/schedules/content_pipeline`（`ScheduleTable.tsx:166`）。先例：客戶頁已嵌 `<ScheduleTable only={org.slug} />`（`NA/app/(shell)/ops/clients/[slug]/ClientHubTabs.tsx:697`）——加「只顯示 content_pipeline」的 prop 重用，或只抽那一格 |
@@ -218,6 +229,7 @@
 - 「AI 挑題的條件表單」（每月幾題、只要熱搜來源…）：先用品牌語氣當條件；要調的只有 `PLAN_TOPICS=28`（`plan.ts:16`），真有客戶要再開卡。
 - 品牌產業來源的**持久化**（存 30 天、算出現天數）：P9.4 只在提案當下抓最新文章進 prompt。要持久化得替 `content_sources`／`content_trends` 加可空 `organization_id`（RLS 同 0136 模式），等有客戶抱怨「只看當天不夠」再做。
 - 付費的「用品牌關鍵字搜新聞」（Serper，每站每天 ~0.001 美元）：要另一顆按鈕顯示成本後才開，不在 P9.4。
+- **FB／IG／X／Threads／Snapchat／TikTok 的熱門話題**（操作者 2026-10-26 問）：沒有免費公開 API（§2）。可行但要錢的路：X API Basic 約 200 美元／月；第三方彙整（Apify／Brandwatch 類）按量計費；Serper 搜 `site:threads.net` 等每次 ~0.001 美元。每一條都要操作者先決定預算、再加成一個 `searchBlock`（插口在 `trending-sources.ts:118`），不在 P9.1–P9.4。免費能拿到的社群訊號已在 P9.1：Reddit、YouTube 熱門、Google Trends。
 - 月中才開開關：提的是當月、含已過日期的題目，核准後 tick 依每日上限慢慢消化；不做「改提下個月」。
 - P5 Story Bible 提示片段（`storyBibleContextBlock`、角色 id 提示）仍由頁面組好再送出：另一件事。
 - 真跑一整輪需 staging WP＋測試社群品牌：操作者 10-24 說先不用。
@@ -234,3 +246,4 @@
 | 卡 A「每天跑一次」沒說守衛 | — | `(geo, fetched_on=今天)` 已有列就跳過（B5） |
 | §3 把不變量、實作、風險、部署混在一起；卡 B 邏輯寫在三處 | 讀者分不清哪句不能違反、哪句只是做法 | §3 只留不變量表；做法只在 §7 卡片；風險部署獨立 §4 |
 | 不變量只有工程面，沒有平台面（操作者 2026-10-26 問「適合這個工具平台嗎」） | 沒說錢記在誰頭上、點數用完怎麼辦（ADR 017 五種客戶方式）；不認識的國家拿台灣熱搜 | B8 權限拒絕＝跳過不當故障；B9 無市場熱搜＝不查，不退台灣 |
+| 提案只看熱搜＋知識庫（操作者問「為什麼沒有節日和社群熱門」） | `events` 表已每月同步卻沒餵給提案；來源沒有 Google Trends／YouTube | P9.2 第 7 點節日進 prompt；P9.1 第 0 點加兩個免費來源；付費社群來源列 §8 等預算 |
