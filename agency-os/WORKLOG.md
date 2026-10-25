@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-25（續78）0135 套 prod＋推 main（操作者 go）：profiles 只剩 profiles_select_self，anon／authenticated 只剩 SELECT 權（Claude）
+
+- **觸發**：操作者「go ahead：0135 先套 prod，讀回政策和權限，再 commit（0135 三檔＋ one-shot 腳本）推 main」「整批做完 不要一直停下來」。接續 77。
+- **套前改動**（critic 2m 皆採納）：m1 `lobster-factory/packages/db/scripts/apply-splinter-fixes-one-shot.sql:93` 加 revoke（腳本與 0135 不變量一致）；m2 down 檔頭註明還原用 0020 寫法、與 one-shot 的 `(select auth.uid())` 等價；副本 `cmp` 相同。
+- 套前唯讀快照：applied 134／missing 0135；政策 `profiles_{insert,select,update}_self`；authenticated 7 種權限；profiles 1 列。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -I scratchpad/verify_0135.py（改後重跑） | exit=0 | ms=25000（21/21 PASS）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`node scripts/apply-db-migration.mjs 0135` | exit=0 | ms=17000（APPLY_OK 1/1；`STATUS_OK {"applied":135}`；ledger 2026-10-25 13:52:35Z）
+- REALTEST_EVIDENCE: tool=SSH | cmd=唯讀讀回＋交易內 rollback 探測 | exit=0 | ms=2000（政策只剩 `profiles_select_self:SELECT`；authenticated／anon 只剩 SELECT；寫入權與欄位權 f；service_role t；profiles 1 列不變；`set local role authenticated` update／insert 皆 `permission denied for table profiles`；service_role update `UPDATE 0` 正常；next-admin Up healthy，5 分鐘 log 權限錯誤 0 筆）
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/2m→已修（另記：`0131_billing_ledger_order_search.sql:45` invoker 函式 join 他人 profiles.email，使用者身分呼叫時受 select_self 限制——既有，0135 未變）
+- ORACLE_WAIVED: codex 額度斷路器 BLOCKED 至 22:36（exit 3）；替代＝獨立 critic 全量重推導（寫入者盤點含 Python／PHP／n8n、SQL、down 對 0020、one-shot 腳本）＋突變證據（套前三招成功／套後 403／down 重現／再套關閉）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=profiles_(insert|update)_self | hits=33（同續77；one-shot 腳本已改為只 drop＋revoke）
+- **剩餘**：critic（0134）n1 `lib/supabase-server.ts:42` 缺 service key 退 anon、`provision-staging/route.ts:268` 不檢查 error——既有，未修。
+- **rollback**：手動 `lobster-factory/packages/db/migrations/0135_profiles_control_plane_writes_only.down.sql`（`sudo -n docker exec -i supabase-db psql -U supabase_admin`；還原 0020 兩政策與寫入權＝重開洞，自刪 ledger 列）；`git revert` 本 commit。
 ## 2026-10-25（續77）profiles 只准控制面寫：0135 草稿（拿掉 profiles_insert_self／update_self＋收回 anon／authenticated 寫入權）；拋棄式 DB 21/21；未套 prod、未 commit（Claude）
 
 - **觸發**：操作者「接著處理 profiles_update_self：先盤點使用者是否需要改自己的 profile，再提方案和 migration 草稿」。續75 剩餘 C1。

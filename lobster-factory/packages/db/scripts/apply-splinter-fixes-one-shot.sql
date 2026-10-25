@@ -87,16 +87,11 @@ create policy profiles_select_self on profiles
 for select
 using (id = (select auth.uid())::uuid);
 
+-- profiles_insert_self / profiles_update_self are gone since 0135 (profiles is written only by the control plane);
+-- recreating them here would reopen that hole.
 drop policy if exists profiles_insert_self on profiles;
-create policy profiles_insert_self on profiles
-for insert
-with check (id = (select auth.uid())::uuid);
-
 drop policy if exists profiles_update_self on profiles;
-create policy profiles_update_self on profiles
-for update
-using (id = (select auth.uid())::uuid)
-with check (id = (select auth.uid())::uuid);
+revoke insert, update, delete, truncate, references, trigger on public.profiles from anon, authenticated;
 
 drop policy if exists organization_memberships_select_self on organization_memberships;
 create policy organization_memberships_select_self on organization_memberships
@@ -249,15 +244,7 @@ $$;
 create policy profiles_select_self on profiles
 for select
 using (id = current_user_id());
-
-create policy profiles_insert_self on profiles
-for insert
-with check (id = current_user_id());
-
-create policy profiles_update_self on profiles
-for update
-using (id = current_user_id())
-with check (id = current_user_id());
+-- No profiles insert/update policy: 0135.
 
 create policy organization_memberships_select_self on organization_memberships
 for select
