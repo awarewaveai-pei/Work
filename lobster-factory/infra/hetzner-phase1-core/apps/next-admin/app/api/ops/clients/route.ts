@@ -1,5 +1,6 @@
-// GET /api/ops/clients — list all organizations with client_config + wp_update_latest; ?q= = name or slug contains q,
-// at most NAV_SEARCH_LIMIT rows (the client list's search box, ClientPanelNav.tsx).
+// GET /api/ops/clients — the first NAV_FIRST organizations (by created_at) with client_config + wp_update_latest, plus
+// `total`; never the whole table (every WordPress buyer is one). 客戶 only (staff-tools.ts): client_config holds SSH and
+// WordPress paths. Pickers search with GET /api/ops/org-search, which returns names only.
 // No RBAC required for read (same pattern as GET /api/ops/system-modes).
 // Data lives in organizations.metadata (JSONB). No extra table needed.
 //
@@ -10,7 +11,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "../../../../lib/supabase-server";
 import { resolveOpsRole, canModifyIncidentStatus } from "@/lib/ops-role";
 import type { ClusterId } from "@/lib/department-catalog";
-import { NAV_SEARCH_LIMIT } from "@/app/(shell)/ops/clients/nav-orgs";
+import { NAV_FIRST } from "@/app/(shell)/ops/clients/nav-orgs";
 
 export const dynamic = "force-dynamic";
 
@@ -115,9 +116,6 @@ export interface ClientRow {
   createdAt: string;
 }
 
-/** q as a PostgREST or() value: characters that end or wildcard a filter are dropped, then the value is quoted. */
-const clientSearchTerm =(q: string | null) => (q ?? "").replace(/[",()*%\\]/g, " ").trim().slice(0, 80);
-
 export async function GET(request: Request) {
   const resolved = resolveOpsRole(request);
   if (!canModifyIncidentStatus(resolved.role) || resolved.source === "default_viewer") {
@@ -129,16 +127,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "supabase_not_configured" }, { status: 503 });
   }
 
-  const rawQ = new URL(request.url).searchParams.get("q");
-  const q = clientSearchTerm(rawQ);
-  // A search never returns the whole table: a q of only stripped characters matches nothing.
-  if (rawQ !== null && !q) return NextResponse.json({ ok: true, clients: [], count: 0 });
-  let query = supabase
+  const { data, error, count } = await supabase
     .from("organizations")
-    .select("id,slug,name,type,status,metadata,created_at")
-    .order("created_at", { ascending: true });
-  if (q) query = query.or(`name.ilike."*${q}*",slug.ilike."*${q}*"`).limit(NAV_SEARCH_LIMIT);
-  const { data, error } = await query;
+    .select("id,slug,name,type,status,metadata,created_at", { count: "exact" })
+    .order("created_at", { ascending: true })
+    .limit(NAV_FIRST);
 
   if (error) {
     return NextResponse.json(
@@ -164,5 +157,5 @@ export async function GET(request: Request) {
     };
   });
 
-  return NextResponse.json({ ok: true, clients, count: clients.length });
+  return NextResponse.json({ ok: true, clients, count: clients.length, total: count ?? clients.length });
 }

@@ -137,7 +137,8 @@ describe("x-ops-tools header", () => {
 describe("staffDenial / staffMayUseTool", () => {
   it("owner short-circuits; any one owning tool suffices for a shared API", () => {
     expect(staffDenial({ role: "owner", tools: [] }, "/api/nothing-here")).toBeNull();
-    expect(staffDenial({ role: "operator", tools: ["design"] }, "/api/ops/clients")).toBeNull();
+    expect(staffDenial({ role: "operator", tools: ["design"] }, "/api/ops/org-search")).toBeNull();
+    expect(staffDenial({ role: "operator", tools: ["design"] }, "/api/ops/clients")).toMatchObject({ reason: "not_granted" });
     expect(staffDenial({ role: "operator", tools: ["design"] }, "/api/ops/clients/acme")).toMatchObject({ reason: "not_granted" });
     expect(staffDenial({ role: "operator", tools: null }, "/ops/clients")).toMatchObject({ reason: "not_configured" });
   });

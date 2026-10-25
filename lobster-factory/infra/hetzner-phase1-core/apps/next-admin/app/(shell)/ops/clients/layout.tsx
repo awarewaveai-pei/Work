@@ -4,7 +4,7 @@ import { ClientPanelNav } from "./ClientPanelNav";
 import type { OrgStub } from "./ClientPanelNav";
 import { NAV_FIRST, orgColor } from "./nav-orgs";
 
-// The first NAV_FIRST clients only; the rest are found with the nav's search (GET /api/ops/clients?q=).
+// The first NAV_FIRST clients only; the rest are found with the nav's search (GET /api/ops/org-search?q=).
 export default async function ClientsLayout({ children }: { children: ReactNode }) {
   const supabase = getSupabaseServerClient();
 

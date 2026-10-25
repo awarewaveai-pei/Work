@@ -5,27 +5,41 @@
 // a new source should be tried against sink/null before it is allowed to write into a customer's
 // knowledge base.
 //
-// The client list is rendered on the server; everything that changes lives in the client component
-// beside this file.
+// The first NAV_FIRST clients come from the server; the picker searches the rest (OrgPicker.tsx). Everything that
+// changes lives in the client component beside this file.
 
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { isResearchBridgesEnabled } from "@/lib/research-bridges";
+import { NAV_FIRST, toPickOrg, type PickOrg } from "../clients/nav-orgs";
+import { OrgUrlPicker } from "../clients/OrgPicker";
 import { CollectionSourcesPanel } from "./CollectionSourcesPanel";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-async function loadClients(): Promise<Array<{ slug: string; name: string }>> {
+const ORG_COLS = "id,slug,name,color:metadata->>color";
+
+/** The first NAV_FIRST clients, plus ?slug= first when it is a client outside them; selected = ?slug= if it exists.
+ *  lookupFailed: ?slug= could not be checked -- the page then opens no client rather than a different one. */
+async function loadClients(slug: string | undefined): Promise<{ clients: PickOrg[]; total: number; selected?: string; lookupFailed?: boolean }> {
   const sb = getSupabaseWriteClient();
-  if (!sb) return [];
-  const { data, error } = await sb.from("organizations").select("slug,name").order("name");
-  if (error || !data) return [];
-  return data.map((o) => ({ slug: o.slug as string, name: (o.name as string) ?? (o.slug as string) }));
+  if (!sb) return { clients: [], total: 0 };
+  const [firstPage, asked] = await Promise.all([
+    sb.from("organizations").select(ORG_COLS, { count: "exact" }).order("created_at", { ascending: true }).limit(NAV_FIRST),
+    slug ? sb.from("organizations").select(ORG_COLS).eq("slug", slug).maybeSingle() : Promise.resolve({ data: null, error: null }),
+  ]);
+  if (firstPage.error || !firstPage.data) return { clients: [], total: 0 };
+  const clients = firstPage.data.map(toPickOrg);
+  const one = asked.data ? toPickOrg(asked.data) : null;
+  if (one && !clients.some((c) => c.slug === one.slug)) clients.unshift(one);
+  const total = firstPage.count ?? clients.length;
+  if (asked.error) return { clients, total, lookupFailed: true };
+  return { clients, total, selected: one?.slug ?? clients[0]?.slug };
 }
 
 export default async function CollectPage({ searchParams }: { searchParams: Promise<{ slug?: string }> }) {
-  const [{ slug }, clients] = await Promise.all([searchParams, loadClients()]);
-  const selected = slug && clients.some((c) => c.slug === slug) ? slug : clients[0]?.slug;
+  const { slug } = await searchParams;
+  const { clients, total, selected, lookupFailed } = await loadClients(slug);
 
   return (
     <div style={{ padding: "24px 28px", maxWidth: 1100 }}>
@@ -40,25 +54,10 @@ export default async function CollectPage({ searchParams }: { searchParams: Prom
         <p style={{ color: "#b91c1c" }}>沒有讀到任何客戶（Supabase 未設定或 organizations 是空的）。</p>
       ) : (
         <>
-          <nav style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
-            {clients.map((c) => (
-              <a
-                key={c.slug}
-                href={`/ops/collect?slug=${encodeURIComponent(c.slug)}`}
-                style={{
-                  padding: "6px 12px",
-                  borderRadius: 999,
-                  border: "1px solid #e5e7eb",
-                  background: c.slug === selected ? "#111827" : "#fff",
-                  color: c.slug === selected ? "#fff" : "#374151",
-                  fontSize: 13,
-                  textDecoration: "none",
-                }}
-              >
-                {c.name}
-              </a>
-            ))}
+          <nav aria-label="選客戶" style={{ marginBottom: 20 }}>
+            <OrgUrlPicker orgs={clients} total={total} param="slug" by="slug" selected={selected ?? null} />
           </nav>
+          {lookupFailed ? <p style={{ color: "var(--red)" }}>讀不到客戶「{slug}」，請重新整理或從上面重選。</p> : null}
           {selected ? <CollectionSourcesPanel slug={selected} researchBridgesEnabled={isResearchBridgesEnabled()} /> : null}
         </>
       )}

@@ -1,8 +1,39 @@
-// Shared by layout.tsx (server, first page) and ClientPanelNav.tsx (browser, search results): a plain module, because
-// a server component cannot call a function exported from a "use client" file.
+// Shared by the server pages that render a first page of clients, GET /api/ops/org-search, and the browser pickers
+// that search the rest (ClientPanelNav.tsx, OrgPicker.tsx): a plain module, because a server component cannot call a
+// function exported from a "use client" file.
+/** Most rows a client list loads up front (the nav, the pickers, GET /api/ops/org-search and /api/ops/clients). */
 export const NAV_FIRST = 50;
-/** Most rows GET /api/ops/clients?q= returns. */
+/** Most rows GET /api/ops/org-search?q= returns. */
 export const NAV_SEARCH_LIMIT = 20;
+
+/** One client as every picker shows it; brandColors = the valid hex colours of metadata.client_config.brandColors. */
+export interface PickOrg {
+  id: string;
+  slug: string;
+  name: string;
+  color: string;
+  brandColors: string[];
+}
+
+const HEX = /^#[0-9a-fA-F]{6}$/;
+
+/** An organizations row selected as id, slug, name, color:metadata->>color[, brandColors:metadata->client_config->brandColors]. */
+export function toPickOrg(row: {
+  id: string;
+  slug: string;
+  name?: string | null;
+  color?: unknown;
+  brandColors?: unknown;   // jsonb: { primary?, secondary?, accent? } when set
+}): PickOrg {
+  const bc = row.brandColors && typeof row.brandColors === "object" ? (row.brandColors as Record<string, unknown>) : null;
+  return {
+    id: row.id,
+    slug: row.slug,
+    name: row.name || row.slug,
+    color: orgColor(row.slug, row.color),
+    brandColors: [bc?.primary, bc?.secondary, bc?.accent].filter((x): x is string => typeof x === "string" && HEX.test(x)),
+  };
+}
 
 const ORG_COLORS = [
   "#f87171", "#60a5fa", "#4ade80", "#a78bfa", "#fbbf24",

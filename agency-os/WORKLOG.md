@@ -19,6 +19,35 @@
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude,runbooks | grep=schedules-run-due\.sh|site_watch_heartbeat|hostStatusRows\( | hits=14（現行：view.ts／host-status.ts 已改；`SCHEDULES_PAGE_PLAN.md:12` 已改；其餘為 WORKLOG／已完成監工台／oracle 報告／`AUTO_CONTENT_EXECUTION_PLAN.md` 決策列＝歷史不回改；`.claude` 只有 log／file-history）
 - **剩餘**：cron 未安裝、Trigger 排程仍在（C2，High，待決 2）；C2.1 宜在台灣 03:00 自動部署前。ttl 參數在自架 Trigger v4.4.4 的實際生效於 C2.1 首跑驗證。
 - **rollback**：`git revert <本 commit>`；主機無變更。
+## 2026-10-25（續39）其餘整表載入 organizations 的客戶選單全改「前 50 個＋伺服器搜尋」（資料蒐集、開發信代操、橫幅品牌色、內容站台）；選單只拿名稱的 `/api/ops/org-search`；新測試擋新的整表讀取（Claude）
+
+**觸發**：續32 同類未修四處（主 session 派工）。不變量：選客戶的畫面成本不隨客戶數成長（每個 WordPress 買家都是一個 org，`lib/entitlements/wp-customers.ts:42`）；只有一套選客戶機制；選單的權限只看得到名稱。
+**做法**（next-admin）
+- 新 `app/api/ops/org-search/route.ts`：選單唯一資料源，只回 `PickOrg`（id／slug／name／color／brandColors），不選整個 `metadata`；無 q＝最早 `NAV_FIRST`＋`total`；`?q=`（引號 `or()` ilike，最多 `NAV_SEARCH_LIMIT`，q 只剩被刪字元回空）；`?brandColors=1`＝三色至少一個合法 hex（PostgREST `match`，無效色不列、不計入 total）。
+- `GET /api/ops/clients`：拿掉 `?q=`（搬到 org-search），改回最早 `NAV_FIRST`＋`total`，不再回整表；權限只剩 `ops/clients`（client_config 有 SSH host／user／key name、WordPress 路徑）。
+- 新 `app/(shell)/ops/clients/OrgPicker.tsx`：`useOrgSearch`（debounce 250 ms、abort）、`OrgPicker`（看得見的按鈕＋搜尋框，不用下拉）、`OrgUrlPicker`（選擇寫進網址參數，保留其他參數）。`ClientPanelNav.tsx` 改用同一個 hook（刪掉重複 fetch）。`nav-orgs.ts` 加 `PickOrg`／`toPickOrg`（伺服器與瀏覽器共用、hex 檢查）。
+- `ops/collect/page.tsx`：前 50 個（改依 created_at，與名單一致）＋`?slug=` 不在前 50 時單筆查回放最前；查詢失敗時顯示錯誤、不開任何客戶（舊行為會默默開第一個）。
+- `outreach/layout.tsx`＋`OrgSwitcher.tsx`：前 50 個；`<select>` 改 `OrgUrlPicker`（`?org=<uuid>`、「自用 / 未指定」按鈕）。
+- 橫幅：`BannerStaffApi.brandClients()` 改 `BrandPicker` 元件（`BannerStudioStaff.tsx`）；`BannerStudio.tsx` 只渲染插槽，design 門頁 import 鏈不含 org-search。
+- `api/content/sites/route.ts`：org_slug 改 FK 內嵌 `organizations(slug)`，不再整表讀 organizations。
+- `lib/portal/staff-tools.ts`：刪 `/api/ops/clients$`（ops/clients＋design）列；新 `/api/ops/org-search`：ops/clients、design、collect、outreach。design 從此看不到 client_config（5bdf7f9f9 前就有的曝光）。測試同步：`staff-tools.test.ts`、`middleware-staff-tools.test.ts`。
+- 新測試 `lib/__tests__/organizations-bounded.test.ts`：AST 掃 app／lib／components 的 `.from("organizations")` 讀取，要有鍵過濾／limit／range／single／只算數；分步組的查詢只算一定會跑的步驟（`if` 裡的 `.eq` 不算）。`KNOWN_UNBOUNDED` 列出現存整表讀取（只減不增，另一測試擋已修好卻沒刪的列）。
+- 新測試 `app/api/ops/org-search/route.test.ts`：不選整個 metadata、回應鍵＝PickOrg、三種上限。
+
+**行為變化**：outreach 用深連結 `?org=<uuid>` 開、且該客戶不在前 50 時，徽章顯示 id 前 8 碼；從搜尋選的會留在畫面上。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p .（next-admin） | exit=0 | ms=5517
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/portal lib/__tests__ app/api/content/sites app/api/ops app/(shell)/tools/content app/(shell)/ops/clients app/__tests__/sidebar-coverage.test.ts lib/entitlements/__tests__/import-boundary.test.ts lib/security app/api/outreach → 51 files／410 passed | exit=0 | ms=8036
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變三組：① staff-tools 權限拿掉 collect → staff-tools.test 紅（"collect: app/(shell)/ops/clients/OrgPicker.tsx calls /api/ops/clients"，當時的路由）② org-search 選欄加整個 `metadata` → route.test 紅 ③ outreach layout 拿掉 `.limit(NAV_FIRST)` → organizations-bounded 紅（`outreach/layout.tsx:17`）；全部還原 → 綠 | exit=0 | ms=30000
+- REALTEST_EVIDENCE: tool=curl | cmd=prod PostgREST 唯讀 GET（scratchpad probe-pickers.ps1／probe-brand.ps1）：wp_sites `organizations(slug)` 內嵌回物件（soulful-expression／awarewave-ops／e2e-verify）；hex `match` 品牌色過濾 4 個 org；品牌過濾＋名稱搜尋兩個 `or` 同時生效（soul→1、awarewave→0）；前 50 頁 count=6；postgrest-js `or()` 是 append（`node_modules/@supabase/postgrest-js/dist/index.cjs:3023`） | exit=0 | ms=4000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/2m/2n（critic subagent：M1 把 `/api/ops/clients` 開給 collect／outreach 會露出每個客戶的 SSH／WordPress 設定→改成只回名稱的 org-search＋權限收回；M2 還有整表讀取（integrations 頁＋API、repairs 頁、Telegram /client_status）→不在本卡，進 KNOWN_UNBOUNDED＋新測試擋新增；L1 collect `?slug=` 查詢失敗會開別的客戶→已修；L2 無效品牌色列入選單→伺服器 hex 過濾已修）
+- ORACLE_WAIVED: codex quota blocked until 2026-10-25 19:40 (scripts/oracle-quota.ps1)；備援＝獨立 critic subagent＋上列突變證據。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=api/ops/clients?q|api/ops/clients?brandColors|brandClients|OrgOption|clientSearchTerm | hits=2（`ClientPanelNav.tsx:4`、`clients/layout.tsx:7` 註解仍寫 `/api/ops/clients?q=`，已改成 org-search；WORKLOG／worklog-excerpt 歷史記錄不改）
+- 瀏覽器未實測（頁面要員工登入＋Supabase）；畫面邏輯由上列測試與 tsc 覆蓋。
+
+**同類未修（不是本卡的四處，已列 `organizations-bounded.test.ts` KNOWN_UNBOUNDED）**：`app/(shell)/ops/integrations/page.tsx:58`（每個 org 一張卡＋`IntegrationControls.tsx:92` 的 `<select>` 下拉列全部 org）、`app/api/ops/integrations/route.ts:54`、`app/(shell)/ops/repairs/page.tsx:69`（無 org 篩選時）、`lib/command-plane/handlers/clientStatus.ts:26`（Telegram 全列＋逐站 HEAD，數千個會逾時）、`lib/schedules/view.ts:22`（/ops/schedules 無 slug 時全列，再 `wp_sites.in(全部 id)`，網址隨客戶數變長）、`lib/social/store.ts:136`（listBrands(null)：員工看到每個 org 當品牌）、`lib/content/video/reconcile.ts:77`（只讀 id 做前綴對照，背景工作）。
+**rollback**：`git revert <本 commit>`（無 migration、無資料改動）。
 ## 2026-10-25（續38）全自動內容 P6.2：排程自己做影片、嵌回文章、附到社群草稿；P6.3 查核；P8.3 示範列（Claude）
 
 - **操作者**：「繼續完成阿 為什麼停下來」→ 取消 D3 的一週等待（prod `client_schedules` content_pipeline 1 列且 disabled、`content_topics` 0 列，SSH psql 唯讀查，上線不動任何東西）。

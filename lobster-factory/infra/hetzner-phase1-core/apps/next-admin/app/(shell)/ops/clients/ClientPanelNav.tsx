@@ -1,12 +1,12 @@
 "use client";
 
 // The layout hands over the first NAV_FIRST clients; typing searches every client on the server
-// (GET /api/ops/clients?q=), so the list never holds the whole organizations table.
+// (GET /api/ops/org-search?q=, OrgPicker.tsx useOrgSearch), so the list never holds the whole organizations table.
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
-import { roleHeader } from "@/lib/ops-role";
-import { NAV_FIRST, NAV_SEARCH_LIMIT, orgColor } from "./nav-orgs";
+import { useState } from "react";
+import { NAV_FIRST, NAV_SEARCH_LIMIT } from "./nav-orgs";
+import { useOrgSearch } from "./OrgPicker";
 
 export interface OrgStub {
   slug: string;
@@ -27,27 +27,8 @@ const NAV_STYLE: React.CSSProperties = {
 
 export function ClientPanelNav({ orgs, total }: { orgs: OrgStub[]; total: number }) {
   const [search, setSearch] = useState("");
-  const [found, setFound] = useState<OrgStub[] | null>(null);   // null = no search running; show the first page
-  const [failed, setFailed] = useState(false);
+  const { found, failed } = useOrgSearch(search);   // found = null: no search running; show the first page
   const pathname = usePathname();
-
-  useEffect(() => {
-    const q = search.trim();
-    if (!q) { setFound(null); setFailed(false); return; }
-    const ctrl = new AbortController();
-    const timer = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/ops/clients?q=${encodeURIComponent(q)}`, { headers: { ...roleHeader("operator") }, signal: ctrl.signal });
-        const json = await res.json();
-        if (!res.ok || json.ok !== true) throw new Error(String(json.error ?? res.status));
-        setFound((json.clients as Array<{ slug: string; name: string; color: string | null }>).map((c) => ({ slug: c.slug, name: c.name, color: orgColor(c.slug, c.color) })));
-        setFailed(false);
-      } catch {
-        if (!ctrl.signal.aborted) { setFound([]); setFailed(true); }
-      }
-    }, 250);
-    return () => { clearTimeout(timer); ctrl.abort(); };
-  }, [search]);
 
   const filtered = found ?? orgs;
 

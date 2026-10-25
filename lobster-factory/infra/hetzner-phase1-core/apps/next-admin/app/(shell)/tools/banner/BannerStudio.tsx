@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { roleHeader } from "@/lib/ops-role";
 import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
 import { STUDIO_MODEL_OPTIONS, modelSupportsRefs, modelCompositesProduct, type StudioModel } from "@/lib/studio/model-options";
@@ -992,7 +992,8 @@ export interface BannerStaffApi {
   /** The text model's streamed answer to `prompt` (the script-forge response). */
   /** One task of the server's banner module (lib/script-forge/modules.ts): the prompt is built there, not here. */
   scriptForge(task: "design" | "copy", fields: Record<string, unknown>): Promise<Response>;
-  brandClients(): Promise<{ slug: string; name: string; colors: string[] }[]>;
+  /** The brand picker (a client search over GET /api/ops/clients): onPick gets the picked client's brand colours. */
+  BrandPicker: ComponentType<{ onPick(colors: string[]): void }>;
 }
 
 export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
@@ -1009,7 +1010,6 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   // colour tools (not part of design State / undo history — derived/fetched data)
   const [palette, setPalette]     = useState<string[]>([]);
   const [selSwatch, setSelSwatch] = useState<string | null>(null);
-  const [brandClients, setBrandClients] = useState<{ slug: string; name: string; colors: string[] }[]>([]);
 
   const set = useCallback(<K extends keyof State>(key: K, val: State[K]) =>
     setS((prev) => ({ ...prev, [key]: val, saved: key === "saved" ? (val as boolean) : false, error: null }))
@@ -1113,16 +1113,6 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
       setS((prev) => ({ ...prev, designing: false, error: String(err) }));
     }
   }
-
-  // ── brand colours: clients that have brandColors set on /ops/clients (staff page only) ──
-  useEffect(() => {
-    if (!staff) return;
-    let cancelled = false;
-    staff.brandClients()
-      .then((list) => { if (!cancelled) setBrandClients(list); })
-      .catch(() => { /* clients endpoint unavailable — brand picker just stays empty */ });
-    return () => { cancelled = true; };
-  }, [staff]);
 
   // ── colour-tool handlers ──
   function handleColorRefUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1346,21 +1336,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
           display: "flex", flexDirection: "column", gap: 12 }}>
 
           <StepCard title="配色 / 品牌色" icon="🎨" order={1}>
-            {!staff ? null : brandClients.length > 0 ? (
-              <div className="form-row" style={{ marginTop: 12 }}>
-                <label className="form-label">品牌</label>
-                <select className="form-select" defaultValue=""
-                  onChange={(e) => {
-                    const c = brandClients.find((x) => x.slug === e.target.value);
-                    if (c) { setPalette(c.colors); setSelSwatch(c.colors[0] ?? null); }
-                  }}>
-                  <option value="">選擇品牌帶入配色…</option>
-                  {brandClients.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
-                </select>
-              </div>
-            ) : staff ? (
-              <p className="form-hint" style={{ marginTop: 12 }}>尚無品牌色。到 <a href="/ops/clients">客戶設定</a> 填入品牌色後即可在此選取帶入。</p>
-            ) : null}
+            {staff ? <staff.BrandPicker onPick={(colors) => { setPalette(colors); setSelSwatch(colors[0] ?? null); }} /> : null}
 
             <input ref={colorRefFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleColorRefUpload} />
             <button className="btn btn-ghost" style={{ fontSize: 12, marginTop: 8 }} onClick={() => colorRefFileRef.current?.click()}>

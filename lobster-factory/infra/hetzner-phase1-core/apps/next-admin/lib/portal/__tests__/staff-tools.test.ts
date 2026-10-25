@@ -202,7 +202,9 @@ describe("staff tools", () => {
   it("toolsFor matches dynamic segments, exact patterns and the platform", () => {
     expect(toolsFor("/")).toBe("platform");
     expect(toolsFor("/api/ops/build-id")).toBe("platform");
-    expect(toolsFor("/api/ops/clients")).toEqual(expect.arrayContaining(["ops/clients", "design"]));
+    // client_config (SSH, WordPress paths) is 客戶's alone; every picker's tool gets the names-only search
+    expect(toolsFor("/api/ops/clients")).toEqual(["ops/clients"]);
+    expect(toolsFor("/api/ops/org-search")).toEqual(expect.arrayContaining(["ops/clients", "design", "collect", "outreach"]));
     expect(toolsFor("/api/ops/clients/acme/credentials")).toEqual(["ops/clients"]);
     // the narrow row replaces the broad one: 客戶 alone does not reach AI 客服's knowledge base
     expect(toolsFor("/api/ops/clients/acme/cs-knowledge")).toEqual(["cs"]);
