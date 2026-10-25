@@ -1,7 +1,7 @@
 ---
 name: source-command-wp-bridge-release
 description: >-
-  Release a new aware-wave-wp-bridge plugin version — sync Work monorepo to the release repo, tag, and verify the GitHub Release + installable zip published.
+  Release a new aware-wave-wp-bridge (every site) or aware-wave-store (aware-wave.com only) plugin version — sync Work monorepo to the release repo, tag, and verify the GitHub Release + installable zip published.
 ---
 
 # source-command-wp-bridge-release

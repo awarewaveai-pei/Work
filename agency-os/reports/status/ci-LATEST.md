@@ -1,6 +1,6 @@
 # CI health (GitHub Actions, branch main)
 
-- Generated: 2026-10-23 14:39:16
+- Generated: 2026-10-26 03:06:50
 - Overall: **🟢 PASS**
 - Method: every workflow enumerated; last 20 run(s) of each inspected on `main`
 
@@ -14,9 +14,9 @@
 | Cognitive OS eval harness | success | - | - |
 | Cognitive OS full suite | success | - | - |
 | HCI-30 — Wave 1 cross-box restore drill (P0-10) | success | - | - |
+| Host liveness probe | success | - | - |
 | Lobster workflows package — validate (main) | success | - | - |
 | next-admin — TypeScript typecheck | success | - | - |
-| Perplexity Search-only guard | success | - | - |
 | Release Gate (main) | none | - | - |
 | SG Deploy (self-hosted runner) | success | - | - |
 | Shared asset gates (Claude + Codex) | success | - | - |

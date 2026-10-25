@@ -1,7 +1,7 @@
 {
     "overall":  "PASS",
     "measured":  12,
-    "generated_utc":  "2026-10-23T06:39:16Z",
+    "generated_utc":  "2026-10-25T19:06:50Z",
     "verdictLabel":  "PASS",
     "branch":  "main",
     "verdict":  "healthy",
@@ -33,7 +33,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38664005591"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/40207466095"
                       },
                       {
                           "name":  "Cognitive OS eval harness",
@@ -49,7 +49,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/39205541020"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/40093798619"
                       },
                       {
                           "name":  "HCI-30 — Wave 1 cross-box restore drill (P0-10)",
@@ -60,12 +60,20 @@
                           "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38024680051"
                       },
                       {
+                          "name":  "Host liveness probe",
+                          "latest":  "success",
+                          "consecutiveFailures":  0,
+                          "failingSinceUtc":  "",
+                          "failingDays":  0,
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/40221715528"
+                      },
+                      {
                           "name":  "Lobster workflows package — validate (main)",
                           "latest":  "success",
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/39576905996"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/40202222283"
                       },
                       {
                           "name":  "next-admin — TypeScript typecheck",
@@ -73,15 +81,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/39907872100"
-                      },
-                      {
-                          "name":  "Perplexity Search-only guard",
-                          "latest":  "success",
-                          "consecutiveFailures":  0,
-                          "failingSinceUtc":  "",
-                          "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/39911914378"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/40220776159"
                       },
                       {
                           "name":  "Release Gate (main)",
@@ -105,7 +105,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/39911914395"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/40222218591"
                       },
                       {
                           "name":  "Tenant staging SSOT",
@@ -121,7 +121,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38598733626"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/40202570786"
                       },
                       {
                           "name":  "Weekly workflows security audit",
@@ -141,5 +141,5 @@
                       }
                   ],
     "schemaVersion":  1,
-    "generatedAtUtc":  "2026-10-23T06:39:16.5691565Z"
+    "generatedAtUtc":  "2026-10-25T19:06:50.8257199Z"
 }

@@ -1,14 +1,14 @@
 ﻿{
     "overall":  "PASS",
     "measured":  1,
-    "generated_utc":  "2026-10-23T06:31:06Z",
-    "source":  "detector-contract-migration-check",
-    "sha":  "5f1912f3fefe4fb65d36edff031370bdad5ebdb7",
+    "generated_utc":  "2026-10-25T20:41:09Z",
+    "source":  "ao-close.ps1 (report skeleton commit)",
+    "sha":  "cce503cc66937815acc46e45019e0dc2c0e0a527",
     "brokenCount":  0,
     "broken":  [
 
                ],
     "error":  null,
     "ok":  true,
-    "generatedAtUtc":  "2026-10-23T06:31:06Z"
+    "generatedAtUtc":  "2026-10-25T20:41:08Z"
 }

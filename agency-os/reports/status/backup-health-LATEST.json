@@ -1,22 +1,22 @@
 {
     "overall":  "PASS",
     "measured":  4,
-    "generated_utc":  "2026-10-23T06:38:38Z",
+    "generated_utc":  "2026-10-25T19:06:15Z",
     "sg":  {
                "host":  "145.239.195.47",
                "ok":  true,
                "error":  "",
                "cron_status":  "present",
                "unverified_latest":  "no",
-               "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|0 2 * * * root /root/lobster-phase1/scripts/backup-phase1.sh \u003e\u003e /var/log/lobster-backup.log 2\u003e\u00261|30 2 * * * root /root/lobster-phase1/scripts/verify-backup.sh \u003e\u003e /var/log/lobster-backup.log 2\u003e\u00261",
+               "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin|0 2 * * * root /root/lobster-phase1/scripts/cron-run.sh lobster_backup \u0027/root/lobster-phase1/scripts/backup-phase1.sh \u003e\u003e /var/log/lobster-backup.log 2\u003e\u00261\u0027|30 2 * * * root /root/lobster-phase1/scripts/cron-run.sh lobster_backup_verify \u0027/root/lobster-phase1/scripts/verify-backup.sh \u003e\u003e /var/log/lobster-backup.log 2\u003e\u00261\u0027",
                "retention_days":  "7",
                "retention_source":  "static",
                "backup_size":  "1.6G",
-               "latest_time":  "2026-10-23 02:00:02",
-               "oldest_time":  "2026-10-16 02:00:02",
+               "latest_time":  "2026-10-25 02:00:02",
+               "oldest_time":  "2026-10-18 02:00:01",
                "backup_age_days":  "0",
                "verify_result":  "PASSED",
-               "verify_time":  "2026-10-23T02:30:04Z"
+               "verify_time":  "2026-10-25T02:30:04Z"
            },
     "eu":  {
                "host":  "145.239.195.47",
@@ -24,38 +24,38 @@
                "error":  "",
                "cron_status":  "present",
                "unverified_latest":  "no",
-               "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|30 2 * * * root BACKUP_DIR=/root/backups-stack /root/scripts/backup-eu-stack.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261|0 3 * * * root BACKUP_DIR=/root/backups-stack /root/scripts/verify-backup-eu.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261|17 2 * * * root COGNITIVE_DB_PASSWORD_FILE=/root/cognitive-db-password COGNITIVE_DB_BACKUP_DIR=/root/backups/cognitive-db COGNITIVE_DB_BACKUP_KEEP_DAYS=7 /opt/cognitive-os/Projects/internal/cognitive-engineering-os/ops/cognitive-db/backup-cognitive-db.sh \u003e\u003e/var/log/cognitive-db-backup.log 2\u003e\u00261",
+               "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin|30 2 * * * root /root/lobster-phase1/scripts/cron-run.sh stack_backup \u0027BACKUP_DIR=/root/backups-stack /root/scripts/backup-eu-stack.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261\u0027|0 3 * * * root /root/lobster-phase1/scripts/cron-run.sh stack_backup_verify \u0027BACKUP_DIR=/root/backups-stack /root/scripts/verify-backup-eu.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261\u0027|17 2 * * * root /root/lobster-phase1/scripts/cron-run.sh cognitive_db_backup \u0027COGNITIVE_DB_PASSWORD_FILE=/root/cognitive-db-password COGNITIVE_DB_BACKUP_DIR=/root/backups/cognitive-db COGNITIVE_DB_BACKUP_KEEP_DAYS=7 /opt/cognitive-os/Projects/internal/cognitive-engineering-os/ops/cognitive-db/backup-cognitive-db.sh \u003e\u003e/var/log/cognitive-db-backup.log 2\u003e\u00261\u0027",
                "retention_days":  "7",
                "retention_source":  "static",
-               "backup_size":  "8.9G",
-               "latest_time":  "2026-10-23 02:33:55",
-               "oldest_time":  "2026-10-16 02:33:49",
+               "backup_size":  "9.0G",
+               "latest_time":  "2026-10-25 02:33:54",
+               "oldest_time":  "2026-10-18 02:33:53",
                "backup_age_days":  "0",
                "verify_result":  "PASSED",
-               "verify_time":  "2026-10-23T03:00:37Z"
+               "verify_time":  "2026-10-25T03:00:37Z"
            },
-    "generatedAt":  "2026-10-23T06:38:18.9763990Z",
+    "generatedAt":  "2026-10-25T19:05:59.0586999Z",
     "ks_aw_01":  {
                      "host":  "145.239.195.47",
                      "ok":  true,
                      "error":  "",
                      "cron_status":  "present",
                      "unverified_latest":  "no",
-                     "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin|15 2 * * * root /root/scripts/backup-ks-aw-01.sh \u003e\u003e /var/log/ks-aw-01-backup.log 2\u003e\u00261|45 2 * * * root /root/scripts/verify-backup-ks-aw-01.sh \u003e\u003e /var/log/ks-aw-01-backup.log 2\u003e\u00261",
+                     "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin|15 2 * * * root /root/lobster-phase1/scripts/cron-run.sh ks_aw_01_backup \u0027/root/scripts/backup-ks-aw-01.sh \u003e\u003e /var/log/ks-aw-01-backup.log 2\u003e\u00261\u0027|45 2 * * * root /root/lobster-phase1/scripts/cron-run.sh ks_aw_01_backup_verify \u0027/root/scripts/verify-backup-ks-aw-01.sh \u003e\u003e /var/log/ks-aw-01-backup.log 2\u003e\u00261\u0027",
                      "retention_days":  "7",
                      "retention_source":  "static",
-                     "backup_size":  "6.8G",
-                     "latest_time":  "2026-10-23 02:17:46",
-                     "oldest_time":  "2026-10-15 02:17:26",
+                     "backup_size":  "7.9G",
+                     "latest_time":  "2026-10-25 02:17:45",
+                     "oldest_time":  "2026-10-17 02:17:30",
                      "backup_age_days":  "0",
                      "verify_result":  "PASSED",
-                     "verify_time":  "2026-10-23T02:45:20Z"
+                     "verify_time":  "2026-10-25T02:45:21Z"
                  },
     "fatal":  false,
     "coverage":  {
                      "ok":  true,
                      "problem":  "",
-                     "generated_at":  "2026-10-23T03:30:07Z",
+                     "generated_at":  "2026-10-25T03:30:06Z",
                      "overall":  "PASS",
                      "fails":  [
 

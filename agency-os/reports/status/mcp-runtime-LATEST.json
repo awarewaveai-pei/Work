@@ -1,13 +1,13 @@
 {
-    "overall":  "WARN",
+    "overall":  "PASS",
     "measured":  11,
-    "generated_utc":  "2026-10-23T06:53:07Z",
+    "generated_utc":  "2026-10-25T20:40:35Z",
     "note":  null,
     "servers":  [
                     {
                         "name":  "cloudflare",
-                        "state":  "needs_auth",
-                        "status":  "! Needs authentication"
+                        "state":  "connected",
+                        "status":  "✓ Connected"
                     },
                     {
                         "name":  "awarewave-ops",
@@ -62,6 +62,6 @@
                 ],
     "source":  "claude mcp list",
     "not_connected":  [
-                          "cloudflare=needs_auth"
+
                       ]
 }

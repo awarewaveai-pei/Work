@@ -26,8 +26,8 @@ R1 產品在 WordPress 外（自架 Next.js），WP 掛掉照跑；R2 組織×�
 ## 第二輪：只查 WordPress 外掛（操作者「我說的是 wordpress 外掛」）
 方法：手選 22 個逐一讀開發者文件（REST／hooks／函式）＋目錄掃描（wordpress.org API 四類別各搜尋詞前 20、woocommerce.com、2025–26 比較文；過濾：安裝 ≥2,000、12 個月內更新、有開發者文件）→ 新候選 20 個，值得追的 2 個已核對。主 agent 抽查 ✔：Teams 開發者文件、API Manager API 文件、Subaccounts 文件、SureCart 授權文件。
 
-| 部分 | 最接近的外掛 | 它能接手 | 仍要自寫 | 關鍵限制（來源） |
-|---|---|---|---|---|
+|      部分      | 最接近的外掛 | 它能接手 | 仍要自寫 | 關鍵限制（來源） |
+|------|------|------|------|---|
 | 組織（公司買、員工用） | **Memberships for Teams**（SkyVerge，$129/年） | owner／manager／member、席位、跟訂閱一起停 | 推到產品端的同步 | 無 REST、無「成員加入」hook，只有 `team_created`／`team_saved`／`invitation_created` ✔ woocommerce.com/document/teams-woocommerce-memberships-developer-documentation/ |
 | 誰能用哪個產品 | WooCommerce Memberships（$199/年） | 方案狀態機、`wc_memberships_user_membership_status_changed` | 產品端 `can()`、贈送來源、7 天寬限 | REST 路由無文件（只有 PHP 函式、Abilities 需 `manage_woocommerce`） |
 | 代操（誰替誰） | 無 | — | 全部 | Teams 的 owner＝付費者，不是替客戶操作的員工；Subaccounts（WebWizards）無任何 API 文件 ✔；Dokan／WCFM 是賣家模型 |

@@ -1,0 +1,20 @@
+﻿# claude-oracle review -- 2026-10-19 13:28:08 +08:00
+
+- mode: `review`
+- reviewer: `claude`
+- source: `claude -p` via scripts/claude-oracle.ps1 (/claude-review)
+- binding: bound to captured snapshot: C:\Users\user1115\AppData\Local\Temp\claude-oracle-20261019-132446\reviewed.diff
+- scope: -Path lobster-factory/packages/db/migrations/0110_plans_entitlements.sql, lobster-factory/packages/db/migrations/0110_plans_entitlements.down.sql, lobster-factory/packages/db/scripts/0110_plans_entitlements-local-verify.py, lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements, lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/entitlements, lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/portal/launcher/page.tsx, lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/video/billing/route.ts, lobster-factory/packages/contracts/fixtures/permit-v1, Projects/internal/cognitive-engineering-os/ai_lego/platform/entitlement/permit.py, Projects/internal/cognitive-engineering-os/tests/unit/test_permit_vectors.py, lobster-factory/packages/workflows/src/lib/entitlements, lobster-factory/packages/workflows/src/trigger/entitlements-expire.ts  <-- PARTIAL: does not satisfy the ORACLE gate
+- target: `working tree (staged + unstaged + untracked)`
+- context: ADR017 step2 core: DB entitlements, signed permits, portal service wrapper, and expiry task
+- files-reviewed: Projects/internal/cognitive-engineering-os/ai_lego/platform/entitlement/permit.py, Projects/internal/cognitive-engineering-os/tests/unit/test_permit_vectors.py, lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/entitlements/expire/route.ts, lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/video/billing/route.ts, lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/portal/launcher/page.tsx, lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/__tests__/expiry.test.ts, lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/__tests__/import-boundary.test.ts, lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/__tests__/permit.test.ts, lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/can.ts, lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/permit.ts, lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/tables.ts, lobster-factory/packages/contracts/fixtures/permit-v1/generate.py, lobster-factory/packages/contracts/fixtures/permit-v1/vectors.json, lobster-factory/packages/db/migrations/0110_plans_entitlements.down.sql, lobster-factory/packages/db/migrations/0110_plans_entitlements.sql, lobster-factory/packages/db/scripts/0110_plans_entitlements-local-verify.py, lobster-factory/packages/workflows/src/lib/entitlements/postExpire.test.ts, lobster-factory/packages/workflows/src/lib/entitlements/postExpire.ts, lobster-factory/packages/workflows/src/trigger/entitlements-expire.ts
+- deletions-reviewed: (none)
+- findings-count: 1
+
+> Claude output, NOT verified truth. R0 requires the
+> caller to confirm every `file:line` before acting on it. Archived so that SKIPPING
+> the oracle is visible -- not so that its findings are trusted.
+
+---
+
+{"verdict":"needs-attention","findings":[{"severity":"high","file":"lobster-factory/packages/workflows/src/trigger/index.ts","line":17,"title":"entitlementsExpire task not exported from Trigger.dev barrel file","detail":"Every other task in src/trigger/ is re-exported from index.ts (17 tasks as of this diff). The new entitlements-expire.ts defines and exports `entitlementsExpire` but index.ts has no corresponding export line. While Trigger.dev's `dirs: [\"./src/trigger\"]` in trigger.config.ts:13 will still discover the file by directory scan, every other task follows the barrel-export convention. Missing it breaks import paths for tests, manual invocation, and deploy verification scripts that may enumerate tasks from the barrel.","fix":"Add `export { entitlementsExpire } from \"./entitlements-expire\";` to lobster-factory/packages/workflows/src/trigger/index.ts."}]}

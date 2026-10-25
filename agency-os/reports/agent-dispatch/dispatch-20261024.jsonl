@@ -1,0 +1,39 @@
+{"ts":"2026-10-24T04:19:47.109Z","task_id":"dlg-20261024-041947-f530","agent":"onboarder","description":"","result_snippet":"{\"agent_id\":\"01a16c22-dd83-7512-9c53-d11afaa89409\",\"nickname\":\"Aquinas\"}"}
+{"ts":"2026-10-24T04:19:47.963Z","task_id":"dlg-20261024-041947-7017","agent":"critic","description":"","result_snippet":"{\"agent_id\":\"01a16c22-e0d6-7c73-9cc5-e1ec05d71de6\",\"nickname\":\"Franklin\"}"}
+{"ts":"2026-10-24T04:19:48.764Z","task_id":"dlg-20261024-041948-8200","agent":"critic","description":"","result_snippet":"{\"agent_id\":\"01a16c22-e424-75d3-a9cf-8fb59a31699f\",\"nickname\":\"Kant\"}"}
+{"ts":"2026-10-24T04:27:40.483Z","task_id":"dlg-20261024-042740-cb20","agent":"critic","description":"","result_snippet":"{\"agent_id\":\"01a16c2a-16c0-7283-bc2e-73d953f4d1e0\",\"nickname\":\"Halley\"}"}
+{"ts":"2026-10-24T04:34:21.113Z","task_id":"dlg-20261024-043421-e606","agent":"unknown","description":"","result_snippet":"{\"agent_id\":\"01a16c30-33af-7b81-b310-2963a1f98470\",\"nickname\":\"Archimedes\"}"}
+{"ts":"2026-10-24T04:40:13.293Z","task_id":"dlg-20261024-044013-fd87","agent":"unknown","description":"","result_snippet":"{\"agent_id\":\"01a16c35-9371-7d33-be32-8bf5f36a7656\",\"nickname\":\"Parfit\"}"}
+{"ts":"2026-10-24T05:35:17.821Z","task_id":"dlg-20261024-053517-ee41","agent":"critic","description":"Critic review of route auth fixes","result_snippet":""}
+{"ts":"2026-10-24T05:36:30.229Z","task_id":"dlg-20261024-053630-4eb3","agent":"unknown","description":"","result_snippet":"{\"agent_id\":\"01a16c69-1a5a-71e2-b844-5fc095b1d884\",\"nickname\":\"Kant\"}"}
+{"ts":"2026-10-24T05:36:31.112Z","task_id":"dlg-20261024-053631-9305","agent":"unknown","description":"","result_snippet":"{\"agent_id\":\"01a16c69-1dcf-7a02-ae99-72ab8eca49f0\",\"nickname\":\"Bernoulli\"}"}
+{"ts":"2026-10-24T05:36:31.999Z","task_id":"dlg-20261024-053631-d98f","agent":"unknown","description":"","result_snippet":"{\"agent_id\":\"01a16c69-2167-72c0-803b-83776ec698a6\",\"nickname\":\"Rawls\"}"}
+{"ts":"2026-10-24T05:38:59.543Z","task_id":"dlg-20261024-053859-8b6e","agent":"unknown","description":"","result_snippet":"{\"agent_id\":\"01a16c6b-606e-7b12-bf59-822d75506e4c\",\"nickname\":\"Halley\"}"}
+{"ts":"2026-10-24T06:13:39.829Z","task_id":"dlg-20261024-061339-178d","agent":"db-expert","description":"Review migration 0121 safety","result_snippet":""}
+{"ts":"2026-10-24T06:29:04.037Z","task_id":"dlg-20261024-062904-9f28","agent":"critic","description":"","result_snippet":"{\"agent_id\":\"01a16c99-3a20-7b12-8bdd-3fc11ea86dbf\",\"nickname\":\"Epicurus\"}"}
+{"ts":"2026-10-24T07:10:24.404Z","task_id":"dlg-20261024-071024-7026","agent":"critic","description":"Critic review host schedules change","result_snippet":""}
+{"ts":"2026-10-24T07:32:08.355Z","task_id":"dlg-20261024-073208-a1fa","agent":"db-expert","description":"Review migration 0122","result_snippet":""}
+{"ts":"2026-10-24T08:07:41.911Z","task_id":"dlg-20261024-080741-bdef","agent":"critic","description":"","result_snippet":"{\"agent_id\":\"01a16cf3-86d7-73d3-94f2-ea25383ff51e\",\"nickname\":\"Huygens\"}"}
+{"ts":"2026-10-24T08:07:42.687Z","task_id":"dlg-20261024-080742-90d1","agent":"explorer","description":"","result_snippet":"{\"agent_id\":\"01a16cf3-89ec-71d1-ae7b-aa39ab633e1a\",\"nickname\":\"Raman\"}"}
+{"ts":"2026-10-24T12:11:45.321Z","task_id":"dlg-20261024-121145-cbf5","agent":"critic","description":"","result_snippet":"{\"agent_id\":\"01a16dd2-f755-7991-a699-985e233e4b4d\",\"nickname\":\"Bernoulli\"}"}
+{"ts":"2026-10-24T12:42:58.181Z","task_id":"dlg-20261024-124258-7d3c","agent":"critic","description":"Critic review auto-publish gate","result_snippet":""}
+{"ts":"2026-10-24T12:54:49.945Z","task_id":"dlg-20261024-125449-2cb4","agent":"critic","description":"","result_snippet":"{\"agent_id\":\"01a16dfa-6770-77e3-a7d5-88280c70e0bf\",\"nickname\":\"Lagrange\"}"}
+{"ts":"2026-10-24T13:45:04.212Z","task_id":"dlg-20261024-134504-84a7","agent":"fullstack-engineer","description":"Migrate ScriptForge prompts to server","result_snippet":""}
+{"ts":"2026-10-24T13:54:36.612Z","task_id":"dlg-20261024-135436-2f43","agent":"critic","description":"","result_snippet":"{\"agent_id\":\"01a16e31-2207-79f3-8000-25489f4f7080\",\"nickname\":\"Aquinas\"}"}
+{"ts":"2026-10-24T14:10:27.565Z","task_id":"dlg-20261024-141027-ea08","agent":"explorer","description":"","result_snippet":"{\"agent_id\":\"01a16e3f-a4f1-72c2-a5b4-4f90cf812aa8\",\"nickname\":\"Franklin\"}"}
+{"ts":"2026-10-24T14:30:00.496Z","task_id":"dlg-20261024-143000-bac5","agent":"critic","description":"","result_snippet":"{\"agent_id\":\"01a16e51-8a73-7c22-8e99-22e9f4968b08\",\"nickname\":\"Beauvoir\"}"}
+{"ts":"2026-10-24T14:30:17.394Z","task_id":"dlg-20261024-143017-c72a","agent":"explorer","description":"","result_snippet":"{\"agent_id\":\"01a16e51-ccb8-7e01-8de4-0f0ac78eb697\",\"nickname\":\"Popper\"}"}
+{"ts":"2026-10-24T14:56:54.519Z","task_id":"dlg-20261024-145654-ac39","agent":"web-researcher","description":"Research Woo recurring billing in Taiwan","result_snippet":""}
+{"ts":"2026-10-24T14:57:55.848Z","task_id":"dlg-20261024-145755-cb32","agent":"db-expert","description":"Review migration 0123 safety","result_snippet":""}
+{"ts":"2026-10-24T15:08:12.016Z","task_id":"dlg-20261024-150812-cec9","agent":"explorer","description":"","result_snippet":"{\"agent_id\":\"01a16e74-81ad-7a82-a4e9-f45e85e808d5\",\"nickname\":\"Einstein\"}"}
+{"ts":"2026-10-24T15:08:12.849Z","task_id":"dlg-20261024-150812-eb35","agent":"critic","description":"","result_snippet":"{\"agent_id\":\"01a16e74-852b-7543-a2fc-6434cfdf18b9\",\"nickname\":\"Kant\"}"}
+{"ts":"2026-10-24T15:16:25.224Z","task_id":"dlg-20261024-151625-5489","agent":"critic","description":"","result_snippet":"{\"agent_id\":\"01a16e7c-086f-7d33-b23f-e37ee7307e27\",\"nickname\":\"Hubble\"}"}
+{"ts":"2026-10-24T17:25:38.394Z","task_id":"dlg-20261024-172538-7acd","agent":"fullstack-engineer","description":"P6.1 video finalize core","result_snippet":""}
+{"ts":"2026-10-24T17:31:07.507Z","task_id":"dlg-20261024-173107-4ac5","agent":"critic","description":"Critic review of P6.1 refactor","result_snippet":""}
+{"ts":"2026-10-24T17:34:45.546Z","task_id":"dlg-20261024-173445-c196","agent":"critic","description":"Security review of payments and WP login","result_snippet":""}
+{"ts":"2026-10-24T17:39:03.402Z","task_id":"dlg-20261024-173903-f2c2","agent":"critic","description":"Critic review of daily limit + topic time","result_snippet":""}
+{"ts":"2026-10-24T17:42:28.214Z","task_id":"dlg-20261024-174228-22b8","agent":"critic","description":"Second critic pass on payment/login fixes","result_snippet":""}
+{"ts":"2026-10-24T18:44:55.328Z","task_id":"dlg-20261024-184455-c934","agent":"critic","description":"Critic on can() credits change","result_snippet":""}
+{"ts":"2026-10-24T18:50:28.059Z","task_id":"dlg-20261024-185028-d8e9","agent":"critic","description":"Second critic on can() fixes","result_snippet":""}
+{"ts":"2026-10-24T18:55:52.547Z","task_id":"dlg-20261024-185552-61f9","agent":"critic","description":"Critic review theme palette files","result_snippet":""}
+{"ts":"2026-10-24T18:56:12.328Z","task_id":"dlg-20261024-185612-ddbd","agent":"critic","description":"Critic review of wp-bridge 4b-2","result_snippet":""}

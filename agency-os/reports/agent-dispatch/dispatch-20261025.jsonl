@@ -1,0 +1,24 @@
+{"ts":"2026-10-25T07:46:52.245Z","task_id":"dlg-20261025-074652-3179","agent":"critic","description":"Critic review of billing scaling change","result_snippet":""}
+{"ts":"2026-10-25T08:01:32.275Z","task_id":"dlg-20261025-080132-8a95","agent":"critic","description":"Critic review of update script diff","result_snippet":""}
+{"ts":"2026-10-25T08:10:22.423Z","task_id":"dlg-20261025-081022-d0e3","agent":"critic","description":"Critic review SSRF fix","result_snippet":""}
+{"ts":"2026-10-25T08:13:23.555Z","task_id":"dlg-20261025-081323-13ad","agent":"critic","description":"Review bounded org pickers diff","result_snippet":""}
+{"ts":"2026-10-25T08:14:06.156Z","task_id":"dlg-20261025-081406-c033","agent":"critic","description":"Critic review of P6.2 video pipeline","result_snippet":""}
+{"ts":"2026-10-25T08:15:08.922Z","task_id":"dlg-20261025-081508-3852","agent":"critic","description":"Critic review of C1 clock scripts","result_snippet":""}
+{"ts":"2026-10-25T08:46:14.577Z","task_id":"dlg-20261025-084614-db1b","agent":"critic","description":"Review bounded org reads round 2","result_snippet":""}
+{"ts":"2026-10-25T09:07:06.497Z","task_id":"dlg-20261025-090706-4946","agent":"critic","description":"Critic review prefix + http hint","result_snippet":""}
+{"ts":"2026-10-25T09:21:10.763Z","task_id":"dlg-20261025-092110-cd4e","agent":"critic","description":"Critic review of C4 schedule alerts","result_snippet":""}
+{"ts":"2026-10-25T09:23:41.562Z","task_id":"dlg-20261025-092341-d845","agent":"critic","description":"Critic review of store plugin split","result_snippet":""}
+{"ts":"2026-10-25T10:29:33.737Z","task_id":"dlg-20261025-102933-7f1c","agent":"critic","description":"Critic review of C4.1/C4.4 notify.sh","result_snippet":""}
+{"ts":"2026-10-25T10:34:45.139Z","task_id":"dlg-20261025-103445-98dd","agent":"critic","description":"Critic review of billing ledger page","result_snippet":""}
+{"ts":"2026-10-25T11:45:55.735Z","task_id":"dlg-20261025-114555-52ad","agent":"critic","description":"Critic review of P7 YouTube","result_snippet":""}
+{"ts":"2026-10-25T11:57:32.797Z","task_id":"dlg-20261025-115732-e011","agent":"critic","description":"Critic review billing sidebar","result_snippet":""}
+{"ts":"2026-10-25T12:23:05.672Z","task_id":"dlg-20261025-122305-7818","agent":"critic","description":"Critic review of seller fixes","result_snippet":""}
+{"ts":"2026-10-25T12:40:05.760Z","task_id":"dlg-20261025-124005-32b9","agent":"critic","description":"Review rewritten Slack sync script","result_snippet":""}
+{"ts":"2026-10-25T12:44:08.416Z","task_id":"dlg-20261025-124408-71fa","agent":"critic","description":"Critic review of accounts change","result_snippet":""}
+{"ts":"2026-10-25T13:09:38.207Z","task_id":"dlg-20261025-130938-b8d5","agent":"critic","description":"Critic review of 0134 RLS migration","result_snippet":""}
+{"ts":"2026-10-25T13:29:17.855Z","task_id":"dlg-20261025-132917-d3bc","agent":"web-researcher","description":"Research off-the-shelf billing/entitlement/licensing","result_snippet":""}
+{"ts":"2026-10-25T13:38:37.317Z","task_id":"dlg-20261025-133837-193b","agent":"critic","description":"Review C3 slot check and C5 inventory","result_snippet":""}
+{"ts":"2026-10-25T13:49:52.298Z","task_id":"dlg-20261025-134952-a34b","agent":"critic","description":"Critic review of 0135 profiles migration","result_snippet":""}
+{"ts":"2026-10-25T13:50:04.116Z","task_id":"dlg-20261025-135004-71db","agent":"web-researcher","description":"Deep research WordPress plugins for customer model","result_snippet":""}
+{"ts":"2026-10-25T13:52:29.140Z","task_id":"dlg-20261025-135229-c025","agent":"web-researcher","description":"Directory sweep for WP plugins by category","result_snippet":""}
+{"ts":"2026-10-25T14:42:49.080Z","task_id":"dlg-20261025-144249-b3f4","agent":"critic","description":"Review backup judge, GHA rows, probe","result_snippet":""}
