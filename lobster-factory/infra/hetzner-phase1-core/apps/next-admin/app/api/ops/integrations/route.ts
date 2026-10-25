@@ -40,11 +40,20 @@ export interface IntegrationRow {
   created_at: string;
 }
 
+// GET ?organization_id=<uuid> -- one client's assets and connections. Never every organization: every WordPress buyer is
+// one (the page reads the same way, app/(shell)/ops/integrations/page.tsx).
 export async function GET(req: Request) {
   const resolved = resolveOpsRole(req);
   if (!canWriteTenantConfig(resolved.role)) {
     return NextResponse.json({ ok: false, error: "forbidden", role: resolved.role }, { status: 403 });
   }
+
+  const organizationId = new URL(req.url).searchParams.get("organization_id") ?? "";
+  if (!UUID_RE.test(organizationId)) {
+    return NextResponse.json({ ok: false, error: "organization_id_required" }, { status: 400 });
+  }
+  try { assertOrgAccess(req, organizationId); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
   const supabase = getSupabaseServerClient();
   if (!supabase) {
@@ -54,7 +63,7 @@ export async function GET(req: Request) {
   const orgRes = await supabase
     .from("organizations")
     .select("id,slug,name,type,status,metadata,created_at")
-    .order("created_at", { ascending: true });
+    .eq("id", organizationId);
 
   if (orgRes.error) {
     return NextResponse.json(
@@ -67,10 +76,12 @@ export async function GET(req: Request) {
     supabase
       .from("assets")
       .select("id,organization_id,slug,name,asset_type,environment,primary_url,provider,status")
+      .eq("organization_id", organizationId)
       .order("created_at", { ascending: true }),
     supabase
       .from("tenant_integration_bindings")
       .select("id,organization_id,asset_id,provider,secret_ref,external_hint,api_metadata,provisioning_source,status,last_error,last_tested_at,last_seen_at,created_at")
+      .eq("organization_id", organizationId)
       .order("created_at", { ascending: true }),
   ]);
 

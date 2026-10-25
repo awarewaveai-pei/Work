@@ -10,16 +10,10 @@ import path from "node:path";
 
 const BOUNDS = new Set(["eq", "in", "match", "limit", "range", "single", "maybeSingle", "insert", "update", "upsert", "delete"]);
 
-// Known whole-table reads, not pickers (WORKLOG 2026-10-25, the org pickers entry, 同類未修). Shrink this list; never
-// grow it to quiet the test.
+// Known whole-table reads still to fix. Shrink this list; never grow it to quiet the test.
 const KNOWN_UNBOUNDED: Readonly<Record<string, string>> = {
-  "app/(shell)/ops/integrations/page.tsx": "one card per org plus a <select> over every org",
-  "app/api/ops/integrations/route.ts": "GET lists every org's integrations with metadata",
-  "app/(shell)/ops/repairs/page.tsx": "org name map when no org filter is set",
-  "lib/command-plane/handlers/clientStatus.ts": "Telegram /client_status lists every org and probes each site",
-  "lib/content/video/reconcile.ts": "id-prefix map for orphaned videos (ids only, background job)",
+  // left to the schedules-off-Trigger work, which is changing this module (WORKLOG 2026-10-25, org reads entry)
   "lib/schedules/view.ts": "/ops/schedules without ?slug= lists every org, then wp_sites .in(every id)",
-  "lib/social/store.ts": "listBrands(null): staff see every organization as a brand",
 };
 
 function enclosingFunction(n: ts.Node): ts.Node {

@@ -1,4 +1,34 @@
 # Worklog
+## 2026-10-25（續42）其餘 6 處整表讀 organizations 收掉（integrations 頁＋API、repairs、Telegram /client_status、社群品牌、影片 reconcile）；d95ed0bee 的 org-search 路由多匯出常數（Next 不收）一併修（Claude）
+
+**觸發**：操作者「去處理好」（續39 同類未修的 7 處）。不變量同續39：頁面／API／排程成本不隨客戶數成長，`organizations` 讀取一律有鍵過濾／上限／分頁（`lib/__tests__/organizations-bounded.test.ts` 機械檢查）。
+**做法**（next-admin）
+- `/ops/integrations`：一次一個客戶（`?org=<uuid>`，OrgUrlPicker 前 50＋搜尋；客戶登入只看自己）；三個總數改 count-only；「Action required」改共用 loader；建立面板只帶選中的客戶（刪掉列全部客戶的 `<select>`），`key=客戶 id`＝換客戶時表單重置（asset／secret ref 不帶到下一個客戶）；`?org=` 不是 uuid 或客戶不存在＝顯示找不到、不開任何客戶；三個 count 查詢錯誤會顯示，不再當成 0。`GET /api/ops/integrations` 改必帶 `?organization_id=`＋`assertOrgAccess`（repo 內無 GET 呼叫者）。
+- 新 `lib/repair-os/integration-blockers-load.ts`：只讀可能成為 blocker 的 binding（failed／有 last_error／last_health_check.ok=false，上限 200），org 名稱沿 FK 內嵌（0024，不再 `.in(id 清單)`，200 個 uuid 會逼近 8 KB 請求列）；`/ops/repairs` 與 `/ops/integrations` 共用。
+- Telegram `/client_status`：帶 slug＝伺服器名稱／slug 搜尋最多 10；不帶＝最早 30 個有 site_url 的客戶＋總數提示（舊行為：全部 org 逐站 HEAD，數千個會逾時）。
+- 影片 reconcile：只解析 R2 實際出現的 org 前綴；前綴＝uuid 第一段，用 uuid 範圍查詢 `limit 2`（2 筆＝撞碼→null，照舊 fail-closed）。
+- 社群品牌：`listBrands(ids)` 不再收 null；新 `searchBrands(q)`（員工：前 50 依名稱或搜尋 20）；`GET /api/social/brands` 員工可 `?q=`／`?id=`、回 `total`，客戶路徑不變（`?id=`／`?q=` 碰不到）；SocialManager 深連結 `?brand=` 不在第一頁時用 id 補查；TopBar 有更多品牌時出現搜尋框。
+- 新 `lib/org-search.ts`（`orgSearchTerm`／`orgNameFilter`）：org-search、/client_status、searchBrands 共用同一個引號 or() 過濾。
+- `app/api/ops/org-search/route.ts`：`ORG_SEARCH_COLUMNS` 改不匯出——d95ed0bee 匯出它，`app/__tests__/route-exports.test.ts` 紅（03:00 部署的 npm test 閘會擋下並回滾）；我上一輪只跑受影響子集，漏了這個測試。
+- `lib/portal/staff-tools.ts`：`/api/ops/org-search` 加 `ops/integrations`。
+- `organizations-bounded.test.ts` 的 KNOWN_UNBOUNDED 只剩 `lib/schedules/view.ts`。
+- 文件：`APP_AWARE_WAVE_COMPLETE_REFERENCE.md:628,754`（integrations GET 必帶 organization_id、建立面板用頁面選的客戶）；`/client_status` 的「全部客戶」說法改掉（`APP_AWARE_WAVE_COMPLETE_REFERENCE.md:933`、`COMMAND_PLANE_RUNBOOK.md:192`、`COMMAND_PLANE_RUNBOOK.zh-TW.md:192`、`TELEGRAM_OPERATOR_CHEATSHEET.md:77`、`scripts/configure-telegram-webhook.ps1:125`）。
+
+**行為變化**：員工在 /ops/integrations 一次看一個客戶（舊：每個客戶一張卡）；/client_status 不帶參數只探測有網站的前 30 個；loader 不會把「健康檢查 ok=true 但 summary 含 401／Missing credential」這種自相矛盾的列算成 blocker（prod 12 筆舊規則也是 0 個 blocker）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p .（next-admin，修完 critic 後重跑，0 錯） | exit=0 | ms=6935
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（next-admin 全套，修完 critic 後重跑）→ 387 files／3349 passed／34 skipped | exit=0 | ms=25344
+- REALTEST_EVIDENCE: tool=Bash | cmd=新測試 app/api/ops/integrations/route.test.ts（2）＋ app/api/social/__tests__/routes.test.ts brands（3）＋ reconcile-classify（9，fake 改成 uuid 範圍並照 limit 截斷；新增兩個 org 撞前綴案例）＋ organizations-bounded（3） | exit=0 | ms=8000
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變兩組：① social brands 把 `?id=` 分支移到客戶判斷之前 → routes.test 紅（客戶讀到 listBrands([B])）② reconcile 前綴查詢 `limit(2)`→`limit(1)` → 撞碼案例紅；皆還原 → 綠（cmp 與備份相同） | exit=0 | ms=30000
+- REALTEST_EVIDENCE: tool=curl | cmd=prod PostgREST 唯讀 GET（scratchpad probe-round2.ps1／probe-health.ps1）：blocker `or()` 200（0 筆）；全部 12 筆 binding 健康檢查皆 ok:true、摘要不含 401／Missing credential＝舊規則也是 0；uuid 範圍查詢回該前綴唯一 org（39ad4149→awarewave-ops）；site_url 過濾 3 筆；count 查詢 200；binding→organizations(slug,name) 內嵌回物件 | exit=0 | ms=5000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/5n（critic subagent：M1 reconcile 撞碼守衛沒測試→新增案例＋突變；L1 換客戶表單殘留→key；L2 非 uuid `?org=` 默默開第一個客戶→顯示找不到；L3 count 錯誤被吞→ErrorPanel；L4 `.in(200 個 uuid)` 逼近 URL 上限→FK 內嵌；L5 文件 GET 列過時→已改；全部已修）
+- ORACLE_WAIVED: codex quota blocked until 2026-10-25 19:40 (scripts/oracle-quota.ps1)；備援＝獨立 critic subagent＋上列突變證據。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=listBrands(null|organizations={|ORG_SEARCH_COLUMNS|searchTerm(|client_status | hits=5（`/client_status`「全部客戶」說法 5 處，已改；其餘 0 或為本次改動本身）
+- 瀏覽器未實測（員工登入＋Supabase）。
+
+**同類未修**：`lib/schedules/view.ts:22`（/ops/schedules 無 slug 時全列＋`wp_sites.in(全部 id)`）——schedules-off-Trigger session 正在改這個模組，留給它，KNOWN_UNBOUNDED 唯一一列。`scripts/client-status.ps1`（主機外的操作者腳本）仍整表讀，非 next-admin。
+**rollback**：`git revert <本 commit>`（無 migration、無資料改動）；只回 d95ed0bee 會讓 route-exports 測試紅。
 ## 2026-10-25（續41）soulful dashboard 設定不再指向 Hostinger 凍結副本；移除無用的 hostinger 外掛；wp-bridge 0.18.3 發版並升級兩站（Claude）
 
 - **dashboard 設定**（Supabase `organizations.metadata.client_config`）：

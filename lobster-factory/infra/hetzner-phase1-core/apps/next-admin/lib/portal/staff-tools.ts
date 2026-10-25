@@ -17,7 +17,7 @@ export interface StaffTool { key: string; name: string; group: StaffToolGroup; p
 /** Staff-only APIs (on no product door) and the tools whose pages call them. Door APIs come from the registry. */
 export const STAFF_API_OWNERS: Readonly<Record<string, readonly string[]>> = {
   "/api/ops/clients": ["ops/clients"],
-  "/api/ops/org-search": ["ops/clients", "design", "collect", "outreach"],   // names only: every client picker (OrgPicker.tsx)
+  "/api/ops/org-search": ["ops/clients", "design", "collect", "outreach", "ops/integrations"],   // names only: every client picker (OrgPicker.tsx)
   "/api/ops/clients/[slug]/collection-sources": ["collect"],
   "/api/ops/clients/[slug]/cognitive-os-import": ["collect"],
   "/api/ops/clients/[slug]/hci-import": ["collect"],

@@ -4,7 +4,10 @@ import type { CSSProperties } from "react";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { effectiveOrgId, OrgAccessError } from "@/lib/tenant-guard";
 import type { AssetRow, IntegrationRow } from "@/app/api/ops/integrations/route";
-import { buildIntegrationBlockers, readLastHealthCheck } from "@/lib/repair-os/integration-blockers";
+import { readLastHealthCheck } from "@/lib/repair-os/integration-blockers";
+import { BLOCKER_SCAN_LIMIT, loadIntegrationBlockers } from "@/lib/repair-os/integration-blockers-load";
+import { NAV_FIRST, toPickOrg, type PickOrg } from "../clients/nav-orgs";
+import { OrgUrlPicker } from "../clients/OrgPicker";
 import { IntegrationCreatePanel, IntegrationRowActions } from "./IntegrationControls";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +37,12 @@ interface OrganizationRow {
   metadata: Record<string, unknown> | null;
 }
 
-export default async function IntegrationsPage() {
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// One client at a time (?org=<uuid>): every WordPress buyer is an organization, so the page never reads every
+// organization, asset or binding. Totals are counts; "Action required" reads only rows that can block
+// (integration-blockers-load.ts).
+export default async function IntegrationsPage({ searchParams }: { searchParams: Promise<{ org?: string }> }) {
   const supabase = getSupabaseServerClient();
   if (!supabase) return <ErrorPanel message="Supabase not configured." />;
 
@@ -55,30 +63,51 @@ export default async function IntegrationsPage() {
     throw e;
   }
 
-  let orgQuery = supabase
-    .from("organizations")
-    .select("id,slug,name,type,status,metadata")
-    .order("created_at", { ascending: true });
-  if (orgFilter) orgQuery = orgQuery.eq("id", orgFilter);
-  const orgRes = await orgQuery;
+  const { org: asked } = await searchParams;
+  // staff pick a client; a client sees its own organization only
+  const askedId = orgFilter ?? (asked && UUID_RE.test(asked) ? asked : null);
+  // a link that names a client opens that client or none: a malformed ?org= never falls back to the first one
+  const askedBad = !orgFilter && !!asked && !askedId;
 
+  const countOf = (status: string) => {
+    let q = supabase.from("tenant_integration_bindings").select("id", { count: "exact", head: true }).eq("status", status);
+    if (orgFilter) q = q.eq("organization_id", orgFilter);
+    return q;
+  };
+  const [firstPage, blockerRes, activeRes, pendingRes, failedRes] = await Promise.all([
+    orgFilter
+      ? Promise.resolve({ data: [] as Array<{ id: string; slug: string; name: string; color: string | null }>, count: 0, error: null })
+      : supabase.from("organizations").select("id,slug,name,color:metadata->>color", { count: "exact" }).order("created_at", { ascending: true }).limit(NAV_FIRST),
+    loadIntegrationBlockers(supabase, orgFilter),
+    countOf("active"),
+    countOf("pending"),
+    countOf("failed"),
+  ]);
+  if (firstPage.error) return <ErrorPanel message={firstPage.error.message} />;
+
+  const selectedId = askedBad ? null : askedId ?? firstPage.data?.[0]?.id ?? null;
+  const orgRes = selectedId
+    ? await supabase.from("organizations").select("id,slug,name,type,status,metadata").eq("id", selectedId).maybeSingle()
+    : { data: null, error: null };
   if (orgRes.error) return <ErrorPanel message={orgRes.error.message} />;
+  const selected = (orgRes.data ?? null) as OrganizationRow | null;
 
-  let assetQuery = supabase
-    .from("assets")
-    .select("id,organization_id,slug,name,asset_type,environment,primary_url,provider,status")
-    .order("created_at", { ascending: true });
-  if (orgFilter) assetQuery = assetQuery.eq("organization_id", orgFilter);
+  const [assetRes, integrationRes] = selected
+    ? await Promise.all([
+        supabase
+          .from("assets")
+          .select("id,organization_id,slug,name,asset_type,environment,primary_url,provider,status")
+          .eq("organization_id", selected.id)
+          .order("created_at", { ascending: true }),
+        supabase
+          .from("tenant_integration_bindings")
+          .select("id,organization_id,asset_id,provider,secret_ref,external_hint,api_metadata,provisioning_source,status,last_error,last_tested_at,last_seen_at,created_at")
+          .eq("organization_id", selected.id)
+          .order("created_at", { ascending: true }),
+      ])
+    : [{ data: [], error: null }, { data: [], error: null }];
 
-  let integrationQuery = supabase
-    .from("tenant_integration_bindings")
-    .select("id,organization_id,asset_id,provider,secret_ref,external_hint,api_metadata,provisioning_source,status,last_error,last_tested_at,last_seen_at,created_at")
-    .order("created_at", { ascending: true });
-  if (orgFilter) integrationQuery = integrationQuery.eq("organization_id", orgFilter);
-
-  const [assetRes, integrationRes] = await Promise.all([assetQuery, integrationQuery]);
-
-  const organizations = (orgRes.data ?? []) as OrganizationRow[];
+  const organizations = selected ? [selected] : [];
   const assets = (assetRes.data ?? []) as AssetRow[];
   const integrations = (integrationRes.data ?? []) as IntegrationRow[];
   const assetsReady = !assetRes.error;
@@ -88,10 +117,17 @@ export default async function IntegrationsPage() {
   const assetsByOrg = groupBy(assets, (a) => a.organization_id);
   const integrationsByOrg = groupBy(integrations, (i) => i.organization_id);
 
-  const activeCount = integrations.filter((i) => i.status === "active").length;
-  const failedCount = integrations.filter((i) => i.status === "failed").length;
-  const pendingCount = integrations.filter((i) => i.status === "pending").length;
-  const actionItems = buildIntegrationBlockers(integrations, organizations);
+  const countError = activeRes.error ?? pendingRes.error ?? failedRes.error;
+  if (countError) return <ErrorPanel message={countError.message} />;
+  const activeCount = activeRes.count ?? 0;
+  const failedCount = failedRes.count ?? 0;
+  const pendingCount = pendingRes.count ?? 0;
+  const actionItems = blockerRes.blockers;
+
+  const pickOrgs: PickOrg[] = (firstPage.data ?? []).map(toPickOrg);
+  if (selected && !orgFilter && !pickOrgs.some((o) => o.id === selected.id)) {
+    pickOrgs.unshift(toPickOrg({ id: selected.id, slug: selected.slug, name: selected.name, color: selected.metadata?.color }));
+  }
 
   return (
     <div style={{ background: "var(--bg-canvas)", minHeight: "100vh", padding: "28px 32px" }}>
@@ -120,6 +156,10 @@ export default async function IntegrationsPage() {
         </div>
       )}
 
+      {blockerRes.error && (
+        <div style={{ marginBottom: 16 }}><ErrorPanel message={`Action required list unavailable: ${blockerRes.error}`} /></div>
+      )}
+
       {actionItems.length > 0 && (
         <section style={{ ...panelStyle, borderColor: "var(--red)", background: "var(--build-risk-medium-bg)", marginBottom: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", marginBottom: 10 }}>
@@ -127,6 +167,7 @@ export default async function IntegrationsPage() {
               <h2 style={{ fontSize: 14, fontWeight: 750, color: "var(--build-risk-medium-text)", margin: 0 }}>Action required</h2>
               <p style={{ fontSize: 12, color: "var(--severity-high)", lineHeight: 1.6, margin: "4px 0 0" }}>
                 These connections are visible to Repair Center but are not production-clean yet.
+                {blockerRes.capped ? ` Showing the first ${BLOCKER_SCAN_LIMIT} connections that can block.` : ""}
               </p>
             </div>
             <Metric label="blocked" value={actionItems.length} tone="danger" />
@@ -148,9 +189,19 @@ export default async function IntegrationsPage() {
         </section>
       )}
 
-      {assetsReady && integrationsReady && (
+      {!orgFilter && (
+        <section style={{ ...panelStyle, marginBottom: 16 }}>
+          <h2 style={{ ...sectionTitleStyle, marginBottom: 10 }}>Client</h2>
+          <OrgUrlPicker orgs={pickOrgs} total={firstPage.count ?? pickOrgs.length} param="org" by="id" selected={selected?.id ?? null} />
+        </section>
+      )}
+
+      {(askedBad || (askedId && !selected)) && <Empty text="This client does not exist (or was removed). Pick another one above." />}
+
+      {selected && assetsReady && integrationsReady && (
         <IntegrationCreatePanel
-          organizations={organizations.map((org) => ({ id: org.id, slug: org.slug, name: org.name }))}
+          key={selected.id}   // a fresh form per client: an asset, secret ref or hint never carries to the next one
+          organization={{ id: selected.id, slug: selected.slug, name: selected.name }}
           assets={assets}
           providers={PROVIDERS}
         />

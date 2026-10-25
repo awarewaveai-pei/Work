@@ -64,6 +64,7 @@ const param = (k: string) => (typeof window === "undefined" ? null : new URLSear
 
 export default function SocialManager({ slots = {}, route = { kind: "plan" }, go = (href, replace) => (replace ? window.location.replace(href) : window.location.assign(href)) }: { slots?: Slots; route?: SocialRoute; go?: Go }) {
   const [brands, setBrands] = useState<Brand[] | null>(null);
+  const [brandTotal, setBrandTotal] = useState(0);   // > brands.length: staff search the rest in the top bar
   const [brandId, setBrandId] = useState<string | null>(null);
   const brand = brands?.find((b) => b.id === brandId) ?? null;
   const tz = brand?.default_timezone ?? "UTC";
@@ -126,11 +127,18 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
   }, [route.kind, goTo, syncUrl]);
 
   useEffect(() => {
-    api.brands().then((r) => {
-      setBrands(r.brands);
+    api.brands().then(async (r) => {
       // a link that names a brand opens that brand or none: falling back to the first one would put the work in someone else's
       const wanted = param("brand");
-      const hit = wanted ? r.brands.find((b) => b.id === wanted) : undefined;
+      let list = r.brands;
+      let hit = wanted ? list.find((b) => b.id === wanted) : undefined;
+      // staff get only the first page of brands: a named brand outside it is fetched by id
+      if (wanted && !hit && r.total > list.length) {
+        hit = (await api.brands({ id: wanted }).catch(() => null))?.brands[0];
+        if (hit) list = [hit, ...list];
+      }
+      setBrands(list);
+      setBrandTotal(r.total ?? list.length);
       if (wanted && !hit) say("連結指定的品牌不存在，或你沒有這個品牌的權限。請選一個品牌。", true);
       setBrandId(wanted ? hit?.id ?? null : r.brands[0]?.id ?? null);
     }).catch((e) => say(e instanceof Error ? e.message : String(e), true));
@@ -305,8 +313,12 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
   };
   const statusLine = <span className={`sm-note ${note?.error ? "sm-err" : "sm-muted"}`} role="status">{note?.text}</span>;
   const top = (
-    <TopBar section={section} brands={brands ?? []} brand={brand}
-      onBrand={(id) => { if (route.kind === "compose") goTo({ kind: "plan" }, { brand: id }); else { pickBrand(id); setNote(null); } }}
+    <TopBar section={section} brands={brands ?? []} total={brandTotal} brand={brand}
+      onBrand={(id, found) => {
+        // a brand found by the top bar's search joins the list, so `brand` resolves
+        if (found) setBrands((l) => (l && !l.some((b) => b.id === found.id) ? [found, ...l] : l));
+        if (route.kind === "compose") goTo({ kind: "plan" }, { brand: id }); else { pickBrand(id); setNote(null); }
+      }}
       onSection={onSection} bell={ctx ? slots.headerExtra?.(ctx) : undefined} onSettings={brand ? () => setView("settings") : undefined} />
   );
 

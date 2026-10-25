@@ -74,15 +74,6 @@ export async function reconcileVideos(): Promise<ReconcileResult> {
   // 舊行為把每個孤兒都記到同一個預設 org：實測 EU prod 有 5 個 org、2 個有 media，
   // 所以那等於把 B 租戶的影片放進 A 租戶的媒體庫（A 看得到、B 永遠沒有自己的列）。
   // R2 key 本來就沒有租戶資訊 —— 這是 buildVideoOutName 要把 org 前綴寫進目錄名的原因。
-  const { data: orgRows, error: orgErr } = await supabase.from("organizations").select("id");
-  if (orgErr) return { ...emptyResult(), ok: false, error: "organizations 查詢失敗" };
-  // 前綴 → org id。撞碼時標記為 null，之後一律拒絕（寧可不補也不記到錯的租戶）。
-  const byPrefix = new Map<string, string | null>();
-  for (const row of (orgRows ?? []) as { id: string }[]) {
-    const pfx = row.id.replace(/-/g, "").slice(0, 8);
-    byPrefix.set(pfx, byPrefix.has(pfx) ? null : row.id);
-  }
-
   // 1) 列 R2 物件（分頁）
   const keys: string[] = [];
   let cursor: string | undefined;
@@ -114,6 +105,23 @@ export async function reconcileVideos(): Promise<ReconcileResult> {
     let g = groups.get(dir);
     if (!g) { g = {}; groups.set(dir, g); }
     g[fmt] = `${cfg.publicBase}/${k}`;
+  }
+
+  // 前綴 → org id，只查 R2 裡真的出現的前綴（每個 WordPress 買家都是一個 org，不整表讀）。
+  // 前綴＝uuid 第一段，所以「該前綴的 org」＝一段 uuid 範圍；limit 2 看撞碼：撞碼記 null，之後一律拒絕
+  // （寧可不補也不記到錯的租戶）。
+  const byPrefix = new Map<string, string | null>();
+  const prefixes = [...new Set([...groups.keys()].map(parseOrgPrefixFromDir).filter((x): x is string => !!x))];
+  for (let i = 0; i < prefixes.length; i += 10) {
+    const batch = await Promise.all(prefixes.slice(i, i + 10).map(async (pfx) => {
+      const { data, error } = await supabase.from("organizations").select("id")
+        .gte("id", `${pfx}-0000-0000-0000-000000000000`).lte("id", `${pfx}-ffff-ffff-ffff-ffffffffffff`).limit(2);
+      return { pfx, ids: ((data ?? []) as { id: string }[]).map((r) => r.id), error };
+    }));
+    for (const { pfx, ids, error } of batch) {
+      if (error) return { ...emptyResult(), ok: false, error: "organizations 查詢失敗" };
+      if (ids.length) byPrefix.set(pfx, ids.length === 1 ? ids[0] : null);
+    }
   }
 
   // 3) 逐組分類；缺 media_assets 且擁有者可判定者補上。

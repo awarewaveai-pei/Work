@@ -8,18 +8,16 @@ import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { resolveOpsRole, canModifyIncidentStatus } from "@/lib/ops-role";
 import { NAV_FIRST, NAV_SEARCH_LIMIT, toPickOrg } from "@/app/(shell)/ops/clients/nav-orgs";
+import { orgNameFilter, orgSearchTerm } from "@/lib/org-search";
 
 export const dynamic = "force-dynamic";
 
-/** Only these columns leave the table: never `metadata` whole (org-search.test.ts). */
-export const ORG_SEARCH_COLUMNS = "id,slug,name,color:metadata->>color,brandColors:metadata->client_config->brandColors";
+/** Only these columns leave the table: never `metadata` whole (route.test.ts). */
+const ORG_SEARCH_COLUMNS = "id,slug,name,color:metadata->>color,brandColors:metadata->client_config->brandColors";
 
 const BRAND = "metadata->client_config->brandColors";
 const HEX = `"^#[0-9a-fA-F]{6}$"`;
 const HAS_BRAND = ["primary", "secondary", "accent"].map((k) => `${BRAND}->>${k}.match.${HEX}`).join(",");
-
-/** q as a PostgREST or() value: characters that end or wildcard a filter are dropped, then the value is quoted. */
-const searchTerm = (q: string | null) => (q ?? "").replace(/[",()*%\\]/g, " ").trim().slice(0, 80);
 
 export async function GET(request: Request) {
   const resolved = resolveOpsRole(request);
@@ -34,7 +32,7 @@ export async function GET(request: Request) {
 
   const params = new URL(request.url).searchParams;
   const rawQ = params.get("q");
-  const q = searchTerm(rawQ);
+  const q = orgSearchTerm(rawQ);
   // A search never returns the whole table: a q of only stripped characters matches nothing.
   if (rawQ !== null && !q) return NextResponse.json({ ok: true, orgs: [], total: 0 });
 
@@ -44,7 +42,7 @@ export async function GET(request: Request) {
     .order("created_at", { ascending: true });
   if (params.get("brandColors") === "1") query = query.or(HAS_BRAND);
   // a second or() is ANDed with the first (postgrest-js appends the param)
-  query = q ? query.or(`name.ilike."*${q}*",slug.ilike."*${q}*"`).limit(NAV_SEARCH_LIMIT) : query.limit(NAV_FIRST);
+  query = q ? query.or(orgNameFilter(q)).limit(NAV_SEARCH_LIMIT) : query.limit(NAV_FIRST);
   const { data, error, count } = await query;
 
   if (error) {

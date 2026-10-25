@@ -83,7 +83,9 @@ export interface AdsInsight { spend: string | null; impressions: string | null; 
 export interface MetaAsset { id: string; kind: "facebook_page" | "instagram_account" | "ad_account"; externalId: string; pageExternalId: string | null; label: string | null; enabled: boolean }
 
 export const api = {
-  brands: () => call<{ brands: Brand[] }>("GET", "/api/social/brands"),
+  /** Staff get the first page (total = all); { q } searches, { id } fetches one brand (a link that names it). */
+  brands: (by: { q?: string; id?: string } = {}) =>
+    call<{ brands: Brand[]; total: number }>("GET", `/api/social/brands${by.q ? `?${q({ q: by.q })}` : by.id ? `?${q({ id: by.id })}` : ""}`),
   accounts: (brand: string) => call<{ accounts: Account[]; connecting: { id: string; platform: string; started_at: string } | null; justConnected: string | null; connectFailed: string | null }>("GET", `/api/social/accounts?${q({ brand })}`),
   inbox: (brand: string) => call<InboxData>("GET", `/api/social/inbox?${q({ brand })}`),
   adsAccounts: (brand: string) => call<{ accounts: AdsAccount[] }>("GET", `/api/social/ads?${q({ brand, view: "accounts" })}`),

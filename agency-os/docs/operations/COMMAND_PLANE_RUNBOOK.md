@@ -189,7 +189,7 @@ Data store: `organizations.metadata.client_config` + `organizations.metadata.wp_
 Risk: **low** (read-only). Available from Telegram at any time, any kill-switch mode except `emergency_stop` (and not while `system_modes` is unreadable -- fail closed).
 
 ```
-/client_status              # all clients — compact summary table
+/client_status              # earliest 30 clients with a site_url (total shown) — compact summary table
 /client_status soulful      # single client — full detail + wave assignments + last update results
 ```
 

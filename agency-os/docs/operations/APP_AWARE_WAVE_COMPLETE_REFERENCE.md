@@ -625,7 +625,7 @@ Server Component，啟動時並行 fetch：
 
 **IntegrationBlockers**：failed status 的 bindings → 顯示於頁面頂端橙色區塊 + Repair Center 安全閘門
 
-**IntegrationCreatePanel**：選 org + asset + provider + secret_ref → `POST /api/ops/integrations`
+**IntegrationCreatePanel**：頁面選中的客戶（`?org=`，OrgUrlPicker）+ asset + provider + secret_ref → `POST /api/ops/integrations`
 
 **IntegrationRowActions**：每列 validate 按鈕 → `POST /api/ops/integrations/[id]/validate`（呼叫 `checkIntegrationHealth`）
 
@@ -751,7 +751,7 @@ DepartmentSelector：選擇部門覆蓋率（20 個 clusters）
 | GET | `/api/ops/workflow-runs?limit=` | 無 | ops_action_runs 列表 |
 | GET/PATCH | `/api/ops/tenants/[id]/config` | PATCH→canWriteTenantConfig | Tenant config 讀寫 |
 | POST | `/api/ops/organizations` | canWriteTenantConfig | Upsert organization（Onboarding 用）|
-| GET | `/api/ops/integrations` | 無 | 整合列表 |
+| GET | `/api/ops/integrations?organization_id=<uuid>` | canWriteTenantConfig＋assertOrgAccess | 一個客戶的 assets＋bindings（不帶參數 400；不列全部客戶） |
 | POST | `/api/ops/integrations` | canWriteTenantConfig | 新增 binding |
 | POST | `/api/ops/ai-image-jobs` | canCreateAiImageJob | 建立 AI 生圖 job |
 | GET | `/api/ops/analytics-context` | 無 | PostHog super-properties role/source |
@@ -930,7 +930,7 @@ providers.tsx（PHProvider）：
 | `/daily_review` | low | 24h Claude Sonnet 4.6 AI 摘要（ANTHROPIC_API_KEY + prompt caching）|
 | `/weekly_review` | low | 7d Claude Sonnet 4.6 AI 摘要（計數為主，不 dump rows）|
 | `/list_failed_runs` | low | command_requests + workflow_runs 失敗記錄 |
-| `/client_status [slug]` | low | 單一/全部客戶健康 + WP 更新（parallel HEAD probe）|
+| `/client_status [slug]` | low | 符合 slug／名稱的客戶（最多 10）或最早 30 個有網站的客戶：健康 + WP 更新（parallel HEAD probe）|
 | `/emergency_stop` | medium | system_modes UPDATE → emergency_stop |
 | `/maintenance_mode` | medium | system_modes UPDATE → maintenance |
 | `/read_only_mode` | medium | system_modes UPDATE → read_only |

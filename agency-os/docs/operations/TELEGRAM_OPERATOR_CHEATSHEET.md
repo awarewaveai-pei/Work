@@ -74,7 +74,7 @@ Slack #ops-incidents 或 Telegram 推播警報
 | `/daily_review` | 24h AI 摘要（會花 ~10 秒）|
 | `/weekly_review` | 7 天 AI 摘要（會花 ~20 秒）|
 | `/list_failed_runs` | 最近失敗的 workflow runs |
-| `/client_status` | 全部客戶健康狀態 + WordPress 更新摘要 |
+| `/client_status` | 最早 30 個有網站的客戶健康狀態 + WordPress 更新摘要（顯示總數；看其他客戶用 `/client_status <slug>`） |
 | `/client_status soulful` | 單一客戶詳細狀態、plugin wave、最近更新結果 |
 
 ### 3.2 緊急鎖（中風險，但你只能鎖自己系統）🟡

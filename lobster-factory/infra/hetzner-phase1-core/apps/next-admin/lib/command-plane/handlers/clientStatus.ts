@@ -1,11 +1,17 @@
-// /client_status [slug] — show health + WP plugin update status for all clients (or one).
+// /client_status [slug] — show health + WP plugin update status for clients with a site (or the ones matching slug).
 // Low-risk: read-only, calls the same Supabase data that /ops/clients reads.
-// Optional arg: client slug (partial match). No arg = all clients.
+// Optional arg: client slug or name (partial match, searched on the server, at most STATUS_MATCH_LIMIT).
+// No arg = the earliest STATUS_PROBE_LIMIT clients that have a site_url: every WordPress buyer is an organization, so
+// probing them all would time out the command.
 //
 // Phase 2c — 2026-05-08
 
 import type { CommandHandler } from "../commandRouter";
 import type { ClientConfig, WpUpdateLatest } from "../../../app/api/ops/clients/route";
+import { orgNameFilter, orgSearchTerm } from "../../org-search";
+
+export const STATUS_PROBE_LIMIT = 30;
+export const STATUS_MATCH_LIMIT = 10;
 
 function relativeDay(isoStr: string | null | undefined): string {
   if (!isoStr) return "未執行";
@@ -23,10 +29,16 @@ export const clientStatusHandler: CommandHandler = async (request, { supabase })
   // Optional: first word of args as slug filter
   const slugFilter = (request.args?.slug ?? request.args?._ ?? "").toString().trim().toLowerCase();
 
-  const { data, error } = await supabase
+  const term = orgSearchTerm(slugFilter);
+  let query = supabase
     .from("organizations")
-    .select("id,slug,name,type,status,metadata")
+    .select("id,slug,name,type,status,metadata", term ? undefined : { count: "exact" })
     .order("created_at", { ascending: true });
+  query = term
+    ? query.or(orgNameFilter(term)).limit(STATUS_MATCH_LIMIT)
+    : query.not("metadata->client_config->>site_url", "is", null).limit(STATUS_PROBE_LIMIT);
+  // a filter of only stripped characters matches nothing (never every client)
+  const { data, error, count } = slugFilter && !term ? { data: [], error: null, count: 0 } : await query;
 
   if (error) {
     return {
@@ -35,16 +47,13 @@ export const clientStatusHandler: CommandHandler = async (request, { supabase })
     };
   }
 
-  const orgs = (data ?? []).filter((org) => {
-    if (!slugFilter) return true;
-    return org.slug.includes(slugFilter) || org.name.toLowerCase().includes(slugFilter);
-  });
+  const orgs = data ?? [];
 
   if (orgs.length === 0) {
     return {
       text: slugFilter
         ? `找不到 slug 包含「${slugFilter}」的客戶`
-        : "Supabase 中尚無客戶資料",
+        : "沒有設定網站網址的客戶",
       summary: { count: 0 },
     };
   }
@@ -163,6 +172,11 @@ export const clientStatusHandler: CommandHandler = async (request, { supabase })
       lines.push("");
     });
 
+    if (!slugFilter && (count ?? 0) > orgs.length) {
+      lines.push(`共 ${count} 個有網站的客戶，這裡只探測最早的 ${orgs.length} 個；其他請用 /client_status <slug>。`);
+    } else if (slugFilter && orgs.length >= STATUS_MATCH_LIMIT) {
+      lines.push(`只列前 ${STATUS_MATCH_LIMIT} 個符合的，請打得更完整。`);
+    }
     lines.push(`🔗 https://app.aware-wave.com/ops/clients`);
   }
 
@@ -170,6 +184,7 @@ export const clientStatusHandler: CommandHandler = async (request, { supabase })
     text: lines.join("\n"),
     summary: {
       total: orgs.length,
+      clientsWithSite: slugFilter ? null : count ?? orgs.length,
       healthy: upCount,
       filter: slugFilter || null,
     },

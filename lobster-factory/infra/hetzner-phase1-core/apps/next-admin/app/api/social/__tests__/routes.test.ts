@@ -3,7 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const store = vi.hoisted(() => ({
-  listBrands: vi.fn(), listAccounts: vi.fn(), resolveConnectAttempt: vi.fn(), startConnect: vi.fn(), unlinkAccount: vi.fn(), cancelConnect: vi.fn(),
+  listBrands: vi.fn(), searchBrands: vi.fn(), listAccounts: vi.fn(), resolveConnectAttempt: vi.fn(), startConnect: vi.fn(), unlinkAccount: vi.fn(), cancelConnect: vi.fn(),
   listPosts: vi.fn(), getPost: vi.fn(), getPostAt: vi.fn(), savePost: vi.fn(), setState: vi.fn(), accountPlatforms: vi.fn(),
   listLists: vi.fn(), saveList: vi.fn(), deleteList: vi.fn(), listMedia: vi.fn(), addImage: vi.fn(), addVideo: vi.fn(), listLog: vi.fn(), releasePost: vi.fn(),
   listTrash: vi.fn(), listDeletions: vi.fn(), listTags: vi.fn(), listTexts: vi.fn(), addText: vi.fn(), deleteText: vi.fn(),
@@ -61,6 +61,24 @@ describe("/api/social routes", () => {
     const res = await (await GET(req("GET", "/api/social/brands", { client: A }))).json();
     expect(store.listBrands).toHaveBeenCalledWith([A]);
     expect(res.brands).toEqual([expect.objectContaining({ id: A, role: "client" })]);
+  });
+
+  it("brands: a client's ?id= / ?q= never reach another brand; staff get a page, a search, or one brand by id", async () => {
+    const { GET } = await import("../brands/route");
+    store.listBrands.mockResolvedValue([{ id: A, slug: "a", name: "A", default_timezone: "UTC" }]);
+    await GET(req("GET", `/api/social/brands?id=${B}&q=b`, { client: A }));
+    expect(store.listBrands).toHaveBeenCalledWith([A]);
+    expect(store.searchBrands).not.toHaveBeenCalled();
+
+    store.searchBrands.mockResolvedValue({ brands: [{ id: B, slug: "b", name: "B", default_timezone: "UTC" }], total: 3000 });
+    const page = await (await GET(req("GET", "/api/social/brands"))).json();
+    expect(store.searchBrands).toHaveBeenLastCalledWith(null);
+    expect(page.total).toBe(3000);
+    await GET(req("GET", "/api/social/brands?q=bee"));
+    expect(store.searchBrands).toHaveBeenLastCalledWith("bee");
+    store.listBrands.mockClear();
+    await GET(req("GET", `/api/social/brands?id=${B}`));
+    expect(store.listBrands).toHaveBeenCalledWith([B]);
   });
 
   it("accounts: another brand's client is refused; a viewer may not start a connection; an editor may", async () => {

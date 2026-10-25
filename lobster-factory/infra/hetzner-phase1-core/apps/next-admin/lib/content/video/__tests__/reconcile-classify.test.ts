@@ -30,11 +30,20 @@ const BASE = "https://cdn.example";
 /** 記錄每次 media_assets 探測用到的 filter，讓測試能斷言 scope。 */
 let probes: Array<Record<string, string>> = [];
 
-function fakeSupabase(existingKeys: Set<string>, opts: { probeError?: boolean } = {}) {
+function fakeSupabase(existingKeys: Set<string>, opts: { probeError?: boolean; orgs?: string[] } = {}) {
   return {
     from(table: string) {
       if (table === "organizations") {
-        return { select: () => Promise.resolve({ data: [{ id: ORG }], error: null }) };
+        // reconcile asks per prefix for the uuid range [<pfx>-0000…, <pfx>-ffff…] (uuid order = lowercase hex order)
+        const range: { lo: string; hi: string } = { lo: "", hi: "" };
+        const oq = {
+          gte(_c: string, v: string) { range.lo = v; return oq; },
+          lte(_c: string, v: string) { range.hi = v; return oq; },
+          limit: (n: number) => Promise.resolve({
+            data: (opts.orgs ?? [ORG]).filter((id) => id >= range.lo && id <= range.hi).slice(0, n).map((id) => ({ id })), error: null,
+          }),
+        };
+        return { select: () => oq };
       }
       const filters: Record<string, string> = {};
       const q: Record<string, unknown> = {
@@ -128,6 +137,16 @@ describe("reconcileVideos — 分類", () => {
   it("前綴解得出但對不到 org → unattributableByUnresolvedPrefix，不猜", async () => {
     mockR2(["video/ffffffff_0123456789_他人的/16x9.mp4"]);
     getSupabaseWriteClient.mockReturnValue(fakeSupabase(new Set()));
+    const r = await run();
+    expect(r.unattributableByUnresolvedPrefix).toBe(1);
+    expect(recordVideoAsset).not.toHaveBeenCalled();
+    expectExhaustive(r);
+  });
+
+  it("兩個 org 共用前綴（撞碼）→ unattributableByUnresolvedPrefix，絕不記到其中一個", async () => {
+    const TWIN = "aaaaaaaa-0000-4000-8000-000000000001";   // same first segment as ORG
+    mockR2([`video/${ORG_PREFIX}_0123456789_撞碼片/16x9.mp4`]);
+    getSupabaseWriteClient.mockReturnValue(fakeSupabase(new Set(), { orgs: [TWIN, ORG] }));
     const r = await run();
     expect(r.unattributableByUnresolvedPrefix).toBe(1);
     expect(recordVideoAsset).not.toHaveBeenCalled();

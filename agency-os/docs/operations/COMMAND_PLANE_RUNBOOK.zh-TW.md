@@ -189,7 +189,7 @@ Data store：`organizations.metadata.client_config` + `organizations.metadata.wp
 Risk：**low**（read-only）。可隨時從 Telegram 使用；除了 `emergency_stop` 以外，任何 kill-switch mode 都可用（`system_modes` 讀不到時也會被擋下——fail closed）。
 
 ```
-/client_status              # all clients — compact summary table
+/client_status              # earliest 30 clients with a site_url (total shown) — compact summary table
 /client_status soulful      # single client — full detail + wave assignments + last update results
 ```
 

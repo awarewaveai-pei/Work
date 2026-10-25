@@ -3,7 +3,8 @@ import { headers } from "next/headers";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { canApproveCommand, readOpsRole } from "@/lib/ops-role";
 import { effectiveOrgId, OrgAccessError } from "@/lib/tenant-guard";
-import { buildIntegrationBlockers, type IntegrationBlocker } from "@/lib/repair-os/integration-blockers";
+import type { IntegrationBlocker } from "@/lib/repair-os/integration-blockers";
+import { loadIntegrationBlockers } from "@/lib/repair-os/integration-blockers-load";
 import { REPAIR_SOURCE_POLICIES, policyCatalogForSource, policyForIncident, repairPolicyLabel } from "@/lib/repair-center/policy";
 import { collapseStormChildren } from "@/lib/repair-center/correlate";
 import type { RepairIncident, RepairRun } from "@/lib/repair-center/types";
@@ -66,19 +67,7 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
     if (clientSlug) runQuery = runQuery.eq("client_slug", clientSlug);
     if (orgFilter) runQuery = runQuery.eq("organization_id", orgFilter);
 
-    let orgQuery = supabase
-        .from("organizations")
-        .select("id,slug,name")
-        .order("created_at", { ascending: true });
-    if (orgFilter) orgQuery = orgQuery.eq("id", orgFilter);
-
-    let integrationQuery = supabase
-        .from("tenant_integration_bindings")
-        .select("id,organization_id,provider,status,last_error,api_metadata")
-        .order("created_at", { ascending: true });
-    if (orgFilter) integrationQuery = integrationQuery.eq("organization_id", orgFilter);
-
-    const [incidentRes, runRes, modeRes, orgRes, integrationRes] = await Promise.all([
+    const [incidentRes, runRes, modeRes, blockerRes] = await Promise.all([
       incidentQuery,
       runQuery,
       // Deliberately NOT org-filtered (critic 2026-07-02): system_modes is the
@@ -91,24 +80,15 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
         .eq("scope_type", "global")
         .is("scope_id", null)
         .maybeSingle(),
-      orgQuery,
-      integrationQuery,
+      // only the bindings that can block, and only their organizations' names (every WordPress buyer is an organization)
+      loadIntegrationBlockers(supabase, orgFilter),
     ]);
     if (incidentRes.error) dbError = incidentRes.error.message;
     if (runRes.error) dbError = runRes.error.message;
-    if (orgRes.error) dbError = orgRes.error.message;
-    if (integrationRes.error) dbError = integrationRes.error.message;
+    if (blockerRes.error) dbError = blockerRes.error;
     incidents = ((incidentRes.data ?? []) as RepairIncident[]).filter((i) => i.environment === "production");
     runs = (runRes.data ?? []) as RepairRun[];
-    integrationBlockers = buildIntegrationBlockers(
-      (integrationRes.data ?? []).map((row) => ({
-        ...row,
-        api_metadata: typeof row.api_metadata === "object" && row.api_metadata && !Array.isArray(row.api_metadata)
-          ? row.api_metadata as Record<string, unknown>
-          : null,
-      })),
-      (orgRes.data ?? []) as { id: string; slug: string; name: string }[],
-    );
+    integrationBlockers = blockerRes.blockers;
     systemMode = String((modeRes.data as any)?.mode ?? "normal");
   }
 

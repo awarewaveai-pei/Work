@@ -122,7 +122,7 @@ $commands = @(
   @{ command = 'daily_review'     ; description = 'AI summary of last 24h activity' },
   @{ command = 'weekly_review'    ; description = 'AI summary of last 7 days activity' },
   @{ command = 'list_failed_runs' ; description = 'Recent failed command_requests + workflow_runs' },
-  @{ command = 'client_status'    ; description = 'Health + WP update status for all clients (or /client_status <slug>)' },
+  @{ command = 'client_status'    ; description = 'Health + WP update status for clients with a site (first 30), or /client_status <slug>' },
   @{ command = 'deploy_status'    ; description = 'SG deploy events + drift (read-only; deploy via GitHub app -> SG Deploy)' },
   # Kill-switch commands stay executable when typed manually, but are hidden
   # from Telegram's slash menu to reduce accidental taps.

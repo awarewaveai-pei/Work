@@ -26,17 +26,18 @@ const DEFAULT_PROVIDERS = [
   "cloudflare",
 ];
 
+/** Adds a connection to `organization`, the client picked on the page (?org=). */
 export function IntegrationCreatePanel({
-  organizations,
+  organization,
   assets,
   providers = DEFAULT_PROVIDERS,
 }: {
-  organizations: OrganizationOption[];
+  organization: OrganizationOption;
   assets: AssetRow[];
   providers?: string[];
 }) {
   const router = useRouter();
-  const [organizationId, setOrganizationId] = useState(organizations[0]?.id ?? "");
+  const organizationId = organization.id;
   const [assetId, setAssetId] = useState("");
   const [provider, setProvider] = useState(providers[0] ?? "sentry");
   const [secretRef, setSecretRef] = useState("");
@@ -89,14 +90,7 @@ export function IntegrationCreatePanel({
     <form onSubmit={submit} style={panelStyle}>
       <div style={{ display: "grid", gridTemplateColumns: "minmax(180px, 1fr) minmax(160px, 0.8fr) minmax(160px, 0.8fr)", gap: 10 }}>
         <Field label="Client">
-          <select value={organizationId} onChange={(event) => {
-            setOrganizationId(event.target.value);
-            setAssetId("");
-          }} style={inputStyle}>
-            {organizations.map((org) => (
-              <option key={org.id} value={org.id}>{org.name} ({org.slug})</option>
-            ))}
-          </select>
+          <div style={{ ...inputStyle, display: "flex", alignItems: "center" }}>{organization.name} ({organization.slug})</div>
         </Field>
 
         <Field label="Asset">

@@ -4,6 +4,8 @@
 // if a query forgot.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { NAV_FIRST, NAV_SEARCH_LIMIT } from "@/app/(shell)/ops/clients/nav-orgs";
+import { orgNameFilter, orgSearchTerm } from "@/lib/org-search";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { selectAll } from "@/lib/supabase-paging";
 import { ACCOUNT_COPY } from "@/lib/accounts/invite-copy";
@@ -130,14 +132,25 @@ export async function recordMetaAdsStatusChange(brandId: string, actor: string, 
 
 export interface Brand { id: string; slug: string; name: string; default_timezone: string }
 
-/** null = every brand (staff); otherwise only these ids (a client: its own organization and its member brands). */
-export async function listBrands(onlyIds: readonly string[] | null): Promise<Brand[]> {
-  if (onlyIds && onlyIds.length === 0) return [];
-  let q = db().from("organizations").select("id, slug, name, default_timezone").order("name");
-  if (onlyIds) q = q.in("id", [...onlyIds]);
-  const { data, error } = await q;
+/** Only these ids (a client: its own organization and its member brands; one brand by id). */
+export async function listBrands(onlyIds: readonly string[]): Promise<Brand[]> {
+  if (onlyIds.length === 0) return [];
+  const { data, error } = await db().from("organizations").select("id, slug, name, default_timezone").in("id", [...onlyIds]).order("name");
   if (error) fail(error, "brands");
   return (data ?? []) as Brand[];
+}
+
+/** Staff: every organization is a brand, and every WordPress buyer is an organization -- so the first NAV_FIRST by
+ *  name, or at most NAV_SEARCH_LIMIT whose name or slug contains q. total = every brand (no q) / the rows found. */
+export async function searchBrands(q: string | null): Promise<{ brands: Brand[]; total: number }> {
+  const term = orgSearchTerm(q);
+  if (q !== null && q.trim() && !term) return { brands: [], total: 0 };
+  let query = db().from("organizations").select("id, slug, name, default_timezone", term ? undefined : { count: "exact" }).order("name");
+  query = term ? query.or(orgNameFilter(term)).limit(NAV_SEARCH_LIMIT) : query.limit(NAV_FIRST);
+  const { data, error, count } = await query;
+  if (error) fail(error, "brands");
+  const brands = (data ?? []) as Brand[];
+  return { brands, total: term ? brands.length : count ?? brands.length };
 }
 
 /** This person's per-brand roles (social_brand_members, 0096). user_id = the auth user id middleware injects. */
