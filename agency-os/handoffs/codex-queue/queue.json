@@ -123,6 +123,19 @@
           "cmd": "npm test"
         }
       ]
+    },
+    {
+      "id": "06-rls-member-write-sweep",
+      "file": "cards/06-rls-member-write-sweep.md",
+      "gate": null,
+      "depends": [],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin",
+          "cmd": "npx tsc --noEmit"
+        }
+      ]
     }
   ]
 }
