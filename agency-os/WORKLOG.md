@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-25（續79）客戶模型現成方案第二輪：只查 WordPress 外掛（22 個深讀＋目錄掃描 20 個新候選）——能接手組織／席位與 API key 發放，代操稽核、預留結算錢包、離線授權檔無外掛提供（Claude）
+
+- **觸發**：操作者「啥小 我覺得你查的不透徹 我說的是 wordpress外掛」「wordpress 外掛有數千個 你要怎麼查?」→ 兩個研究員並行：深讀開發者文件；目錄掃描（四類別×搜尋詞×三來源，過濾安裝／更新／文件）。
+- **結果**：寫入 `reports/decisions/2026-10-25-customer-model-buy-vs-build.md` 新節「第二輪」。Memberships for Teams 可當組織模型（無 REST、無成員加入 hook）；API Manager／LMFWC 可發 API key（無離線簽章）；代操「誰替誰」、錢包預留結算、離線授權檔皆無外掛。
+- REALTEST_WAIVED: QUERY_ONLY -- 研究；主 agent WebFetch 抽查 4 份官方文件（Teams dev doc、API Manager API doc、Subaccounts doc、SureCart licensing）均與研究員一致
+- REVIEW_WAIVED: DOC_ONLY -- 決策報告增一節，無程式
+- BUGHUNT_WAIVED: DOC_ONLY
+- **剩餘**：各廠商所在國未逐一確認（研究員標「未確認」，不等於非中國）；是否為「組織／席位」把權利正本搬回 WP 屬操作者取捨。
+- **rollback**：`git revert <本 commit>`。
 ## 2026-10-25（續78）0135 套 prod＋推 main（操作者 go）：profiles 只剩 profiles_select_self，anon／authenticated 只剩 SELECT 權（Claude）
 
 - **觸發**：操作者「go ahead：0135 先套 prod，讀回政策和權限，再 commit（0135 三檔＋ one-shot 腳本）推 main」「整批做完 不要一直停下來」。接續 77。
