@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-25（續20）site-watch heartbeat 34.7h 沒來＝整個 Trigger prod 停擺：並發 10 格全被死 run 占住；取消 1462 個積壓 run 後恢復（Claude）
+
+- **觸發**：操作者貼 AO-RESUME `site-watch 🔴 心跳 34.7h 沒來`。
+- **C1 範圍**：不只 site-watch。Trigger prod 自 2026-10-23 18:05 UTC 起 0 個 run 完成，所有排程（social-dispatch、cs-inbound-sweep、pod-order-inbox-sweep、dispatch-action-run-schedule…）都卡 `queued`，積壓 1462 個。容器全 healthy，10-24 07:36 重啟過也沒好；supervisor 每 10s dequeue 都空手。
+- **C2 根因**：Redis `engine:runqueue:{org}…:env:env_ae34ebe5ed4b8ae2:currentConcurrency` = 10 = 上限（`concurrency` 5 × `concurrencyBurstFactor` 2）。10 個成員在 trigger-postgres 全不是 EXECUTING：4 個 `dispatch-action-run-schedule` 漏於 2026-06-11／06-27／08-22／08-27（名額已默默從 10 縮到 6），6 個漏於 10-23 18:05–18:07（snapshot 18:07:51 回到 QUEUED 但名額沒還）。10-23 18:07 名額為何沒還：證據不足，未查明。
+- **不變量**：被算進並發的 run 必須真的在跑。Trigger 不會自己回收漏掉的名額；本系統原本也沒有偵測器，site-watch 是唯一叫的。
+- **做了什麼（操作者 go ahead）**：外網 cancel API 被 Cloudflare 擋（1010），改在主機打 `127.0.0.1:8030/api/v2/runs/<id>/cancel`（token 走 stdin→600 暫存檔）。先取消 1 個驗證名額 10→9，再批次取消其餘 1461 個（全 200，136s）。走 engine 取消、未直接改 Redis。積壓只取消不補跑（6 月的舊 run 不該執行；巡檢下次排程會重做）。新增 `runbooks/TRIGGER-RUNS-STUCK-QUEUED.md`；`SITE_WATCH_MASTER_PLAN.md` §11 a 🔴 列指向它。
+- REALTEST_EVIDENCE: tool=SSH | cmd=redis-cli scard …:currentConcurrency（前 10、後 0）＋ Trigger list_runs from 04:44Z（site-watch-run ×4、ao-infrastructure-check ×4 completed）＋ powershell -File scripts/check-site-watch-health.ps1（a/b/c/d 全 PASS，heartbeat 0.0h） | exit=0 | ms=136000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（讀回 runbook 與 §11 改動；code-fence 成對）
+- ORACLE_WAIVED: 無 source 檔改動（runbook／治理文件 + prod 操作）
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks,lobster-factory/docs,.claude/commands | grep=TRIGGER-RUNS-STUCK-QUEUED|currentConcurrency | hits=5（全在新 runbook 與 §11 一列）
+- **剩餘**：① 沒有偵測「占名額但沒在跑」或「N 小時 0 個 run 完成」的探針——下次漏格還是只能靠 site-watch 叫；② 10-23 18:07 漏格的觸發原因未查；③ runbook 未登進 `TOOL_TRIGGER_MAP.md` 症狀表（AGENTS.md 有其他 session 未提交改動，`gen-trigger-index.mjs --write` 會碰到它，先不動）。
+- **rollback**：取消的 run 無法還原（都是排程巡檢，下次排程重做）；文件 `git revert <本 commit>`。
 ## 2026-10-25（續19）CI 3 個紅：2 個是 GitHub 帳單停跑，1 個是真紅——/account、/codex-do 的 Codex wrapper 沒進 git，本機 gate 讀磁碟所以看不到（Claude）
 
 - **觸發**：AO-RESUME `ci-LATEST.md` 🔴：next-admin typecheck／Perplexity guard／Shared asset gates。

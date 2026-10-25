@@ -232,7 +232,7 @@ Trigger.dev 每小時 heartbeat（`WF/src/trigger/site-watch.ts` `site-watch-hea
 | ✅ 已恢復 | episode 結束 | 不用動 |
 | （在 ops-inbox 把 site-watch incident 標 ignored） | 只靜音**這一次** episode；下一次連 2 敗會重開同一張 incident（`upsert_incident_atomic` 對 resolved／ignored 同等重開，0056） | 永久不想看某客戶 → 卡片開關關掉，不是 ignored |
 | ⏹ 巡檢已關閉／頁面已移出 | 你關了開關或改了網址，未結的告警在此收尾 | 不用動 |
-| AO-RESUME `site-watch` 🟡／🔴 | 監控者自己出問題（§6.1） | a 🔴 heartbeat 停或從未：看 Trigger dashboard `site-watch-heartbeat` 最近 run（output `{configured:false}` = token 沒同步到 worker → 跑 `scripts/lobster-trigger-deploy.ps1`）；b 🟡 target 逾期：看 Trigger `site-watch-run` 紅 run 的錯誤（多半 renderer，報告列出客戶 slug）；c 🟡 欠訊息 >3h：查 Telegram token／chat id（ops-inbox 既有告警多半也壞了）；d 🔴 已部署缺 0091：步 10b；⚪ `NOT_DEPLOYED` = 尚未上線，不用動 |
+| AO-RESUME `site-watch` 🟡／🔴 | 監控者自己出問題（§6.1） | a 🔴 heartbeat 停或從未：看 Trigger dashboard `site-watch-heartbeat` 最近 run（全部 `queued` 不動 = Trigger 並發名額被死 run 占滿 → `runbooks/TRIGGER-RUNS-STUCK-QUEUED.md`；output `{configured:false}` = token 沒同步到 worker → 跑 `scripts/lobster-trigger-deploy.ps1`）；b 🟡 target 逾期：看 Trigger `site-watch-run` 紅 run 的錯誤（多半 renderer，報告列出客戶 slug）；c 🟡 欠訊息 >3h：查 Telegram token／chat id（ops-inbox 既有告警多半也壞了）；d 🔴 已部署缺 0091：步 10b；⚪ `NOT_DEPLOYED` = 尚未上線，不用動 |
 | 同一時間很多客戶同一原因告警 | 多半是**監控端**壞（renderer egress／DNS），不是客戶全掛 | 先 `docker logs lobster-renderer --tail 50`、`docker exec lobster-renderer iptables -L OUTPUT -n`；確認後 `SITE_WATCH_ENABLED=false` 止血（§9） |
 | 想暫停某客戶 | — | 卡片開關關掉（開著的告警會收到 ⏹ 結束訊息） |
 | 想全部暫停 | — | `SITE_WATCH_ENABLED=false` 走 `safe-infra-patch.sh`（§9） |
