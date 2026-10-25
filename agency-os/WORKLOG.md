@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-25（續57）0131 套 prod＋b90f0e20b 推 main（操作者 go）：總帳搜尋含付款訂單編號（Claude）
+
+**觸發**：操作者「go ahead：套 0131 到正式庫，確認後 push main。」接續 56。
+- `apply-db-migration.mjs 0131` → APPLY_OK；`--status` applied 131（migration 閘今晚放行）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=ssh ubuntu@ks-aw-01 sudo docker exec -i supabase-db psql（唯讀交易）：ledger 有 0131、`billing_ledger` 本體含 order_ref 子句、anon／authenticated 不可執行、service_role 可、`billing_ledger('all')` matching 3、搜「aware」1 | exit=0 | ms=4007
+- REVIEW_WAIVED: NA -- 套續56 已審（Codex）的 0131＋push，無新程式碼
+- BUGHUNT_WAIVED: NA -- 無程式碼改動
+
+**待操作者**：新版上線後收縮步刪 `billing_attention`。
 ## 2026-10-25（續56）0130 套 prod＋44dd16561 推 main（操作者 go）；Codex 審查帳務三個 commit：2 項屬實，0131＋客戶頁連結修正（0131 未套 prod）（Claude）
 
 **觸發**：操作者「套 0130 到正式庫並 push, 而且CODEX已有額度」。接續 55。
