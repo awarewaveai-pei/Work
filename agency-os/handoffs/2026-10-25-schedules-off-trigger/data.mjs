@@ -38,6 +38,7 @@ const todo = (id, plain) => ({ id, plain, status: 'todo' });
 const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 const C1 = '72d15254c';
 const C21 = 'ea968aca1';
+const C4 = '6b06e0743';
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '定時工作改由主機啟動', plain: '例：社群貼文每 5 分鐘發送一次，改由主機直接啟動。9 個定時工作維持原有頻率。另刪除 1 個重複工作。',
@@ -75,18 +76,18 @@ export const STEPS = [
       todo('C3.4', '經你同意後安裝到正式主機。'),
     ] },
   { n: 4, code: 'C4', group: 'C', title: '統一發送排程通知', plain: '例：社群發文 20 分鐘未成功，手機收到「社群貼文發送停了」。恢復後再通知一次。每天早上 9 點收到一行「全部正常」。未收到這行訊息，代表通知系統故障。',
-    gate: '模擬排程停擺，確認標紅時通知一次。恢復時再通知一次。持續異常不重複通知。每日一行訊息準時送達。Telegram 與 Slack 都收到通知。', risk: 'Medium（上線需你同意）', model: 'Opus 5.5', status: 'not_started', depends: [],
+    gate: '模擬排程停擺，確認標紅時通知一次。恢復時再通知一次。持續異常不重複通知。每日一行訊息準時送達。Telegram 與 Slack 都收到通知。', risk: 'Medium（上線需你同意）', model: 'Opus 5.5', status: 'in_progress', depends: [],
     decided: '通知同時送到 Telegram 與 Slack。備份完整性與部署版本通知原本只送 Slack，也改為兩邊都送。',
     what: 'HS/notify.sh 統一變數名；report-host-schedules.py 狀態變化推播＋每日 01:00 UTC 摘要；5 支舊發送改用 notify.sh；.env 改名',
     files: ['HS/notify.sh', 'HS/report-host-schedules.py', 'HS/endpoint-alert.sh', 'HS/check-drift-and-alert.sh', 'HS/auto-deploy-next-admin.sh', 'HS/reconcile-videos.sh', 'scripts/routine-output-watchdog.sh'],
     items: [
       todo('C4.1', '共用一支腳本發送 Telegram 與 Slack 通知。統一設定名稱。'),
-      todo('C4.2', '排程標紅時通知一次。恢復時再通知一次。持續異常不重複通知。'),
-      todo('C4.3', '每天早上 9 點發送一行訊息：全部正常，或列出異常排程。'),
-      todo('C4.4', '原有的 5 支通知腳本改用共用通知腳本。備份完整性與部署版本通知都會送到 Telegram 與 Slack。'),
+      done('C4.2', '排程標紅時通知一次。恢復時再通知一次。持續異常不重複通知。', C4),
+      done('C4.3', '每天早上 9 點發送一行訊息：全部正常，或列出異常排程。', C4),
+      todo('C4.4', '主機上自己發通知的 8 支腳本改用共用通知腳本，其中 2 支先收進程式庫。這些腳本失敗時的通知，C4.2 已涵蓋。'),
       todo('C4.5', '測試標紅時通知一次。恢復時再通知一次。相同狀態不重複通知。'),
-      todo('C4.6', '經你同意後，正式主機的通知設定改用統一名稱。提供第一則每日通知的截圖。'),
-      todo('C4.7', '訂單重送與後台操作補派兩個工作，改成回報實際結果。目前收到要求就回報成功，實際失敗時排程頁仍會顯示綠色。'),
+      todo('C4.6', '經你同意後，在正式主機安裝通知與每日報告兩個排程；重複的通知設定檔退役。提供第一則每日通知的截圖。'),
+      done('C4.7', '訂單重送與後台操作補派兩個工作，改成回報實際結果。目前收到要求就回報成功，實際失敗時排程頁仍會顯示綠色。', C4),
     ] },
   { n: 5, code: 'C5', group: 'D', title: '補齊排程頁的工作清單', plain: '例：Supabase 每天凌晨清理舊紀錄的工作，在 2026-10-24 失敗卻無人察覺。之後這類失敗會在 /ops/schedules 標紅。頁面也會列出 n8n、GitHub 與雲端報告的排程。',
     gate: '/ops/schedules 顯示資料庫、n8n、GitHub、雲端與筆電報告各區。資料庫排程顯示最近一次執行結果。', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['C4'],
