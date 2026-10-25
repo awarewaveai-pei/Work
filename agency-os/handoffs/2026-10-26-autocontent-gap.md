@@ -43,7 +43,10 @@ headless 計費範例（排程內怎麼拿 grant）：`NA/lib/content/topics/mak
 - **不變量 B1（整類關掉）**：「開了 `content_pipeline` 的客戶，每個啟用中的 WP 站，**本月（台灣月）一定有一份提案；一個月最多一份**」。守衛＝該站該月已有 `source <> 'manual'` 的 `content_topics` 列（人按按鈕提的也算，不重提）。**不用**「1–3 號窗口」：那是補丁——開關中途打開、或 1–3 號主機剛好掛掉，整個月就沒題目。**不用** `source='plan'` 當守衛（§2：AI 可能 0 筆 plan）。
 - **不變量 B2（付費步驟冪等＋冷卻）**：同一站 24 小時內最多**嘗試**一次提案，不論成敗；嘗試記號在 `ask` **之前**寫下（中途當機也算嘗試）。狀態必須在 DB：`client_schedules.last_error` 下一次成功 tick 就被清（§2），in-memory 每晚 03:00 自動部署就重置——兩者都擋不住「付了錢但答案讀不出來 → 每 5 分鐘再付一次」。→ 加一欄 `wp_sites.content_plan_attempted_at timestamptz`（migration 0138 ＋ `.down.sql`），用 `update … where id=site and (content_plan_attempted_at is null or < now()-24h) returning id` 當 claim（同 `claimScheduleRun` 模式，`NA/lib/schedules/store.ts:165`）。
 - **不變量 B3（時間預算）**：一個 firing **要嘛提案、要嘛 tick**，不同時做；一個 firing 最多提一站（兩站客戶下個 5 分鐘提第二站）。提案 ≈ 90 秒 < tick 200 秒，不會擠爆 run-due 300 秒。
-- **核准**：站 `publishMode = ai_review_auto` 時，排程提的題目**直接 `move` 到 `approved`**（走 `store.ts` 轉移表，不另插 `approved`）；`human_review` 站停 `proposed` 等人。這是計畫 §3.1 已寫明的設計（`EXECUTION_PLAN.md:78`），只是沒做；不改 I5（發布＝`ai_review_auto` 且 `review.pass`）、I8（自動化開關只有 `content_pipeline` 格、每日上限）。**操作者要確認的一句**：「AI 審核後自動發布」的站＝連題目也不用人核准（一顆開關全自動）。若她要「我選題、AI 發」，才加第三種 publishMode，不在本卡。
+- **兩個閘、兩個獨立開關**（操作者 2026-10-26 定案的流程：搜尋 → 題目 → **人挑或 AI 挑** → 文章＋摘要＋影片 → **人審或 AI 審** → 社群＋YouTube）。每站兩個設定，各自兩顆按鈕，互不牽動：
+  - 題目閘 `topicMode ∈ {human_pick, ai_pick}`（**新**，存 `wp_sites.content_defaults` jsonb，同 `publishMode` 的寫法，不加欄位）。`ai_pick`：排程提完的題目**直接 `move` 到 `approved`**（走 `store.ts:16` 轉移表，不另插 `approved`）；`human_pick`（預設）停 `proposed` 等人。「AI 挑的條件」＝已經餵進提案 prompt 的品牌語氣／行銷簡報（`plan.ts:36`），不另做條件表單。
+  - 發布閘 `publishMode ∈ {human_review, ai_review_auto}`（既有，不改）。「AI 審的條件」＝I5 的規則審核 `review.pass`。
+  - 四種組合都合法（例：AI 挑題、人審文章）。`publishMode` 只決定「文章要不要人看」，**不再**兼管題目（計畫 §3.1 第 78 行的「ai_review_auto 自動核准」改寫成 `topicMode=ai_pick`）。不改 I5、I8。
 - **不另建 cron**：時鐘只有主機 `*/5` → `run-due`（計畫 P4.4 定案）。熱搜與提案都併進 `content_pipeline` 的 `run`，不新增 `CLIENT_JOBS` 項（I8）。
 - 熱搜是公開資料、無租戶（`trends.ts:1-3`）；一天一次守衛＝`content_trends` 已有 `(geo, fetched_on = 今天 UTC)` 列，**不另加狀態**。抓到 0 筆會在下個 5 分鐘重試（RSS 免費；Serper 最壞 288 × 0.001 ≈ 0.3 美元／天，可接受，卡裡寫明）。
 - 風險：Medium（排程內新增 AI 花費）→ 先寫計畫卡給操作者看，同意再實作。migration 0138 是加欄位、可 down、不鎖表；**apply 到 prod 那一步是 High**，等 go。
@@ -52,7 +55,7 @@ headless 計費範例（排程內怎麼拿 grant）：`NA/lib/content/topics/mak
 ## 4. 做法（照順序）
 
 1. **第一步**：整檔讀 `NA/lib/schedules/jobs.ts`、`NA/lib/content/topics/{plan,tick,make,trends,store}.ts`、`NA/lib/schedules/store.ts`、`NA/app/api/content/trending/route.ts`、`NA/app/api/content/topics/plan/route.ts`。確認 §2 行號仍對。
-2. 三張卡**全文已寫在 §8**（A、B 先做，C 等 A、B 完成）。照抄進 `agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md` §7（編號 P9.1／P9.2／P9.3，格式同 P6／P7），不要改寫。同步把 §3.1 資料流圖（`EXECUTION_PLAN.md:74-78`）三行改成實際行為：熱搜「排程每天一次」、提案「本月沒有就提，台灣月」、核准「ai_review_auto 自動核准（P9.2 起才成立）」。監工台 `agency-os/handoffs/2026-10-24-auto-content-supervisor/data.mjs` 加 P9 一組 → `node build.mjs && node check.mjs`。
+2. 三張卡**全文已寫在 §8**（A、B 先做，C 等 A、B 完成）。照抄進 `agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md` §7（編號 P9.1／P9.2／P9.3，格式同 P6／P7），不要改寫。同步把 §3.1 資料流圖（`EXECUTION_PLAN.md:74-78`）三行改成實際行為：熱搜「排程每天一次」、提案「本月沒有就提，台灣月」、核准「`topicMode=ai_pick` 自動核准，`publishMode` 只管發布（P9.2 起才成立）」。監工台 `agency-os/handoffs/2026-10-24-auto-content-supervisor/data.mjs` 加 P9 一組 → `node build.mjs && node check.mjs`。
    - **卡 A 熱搜定時落地**（免費）：新檔 `NA/lib/content/topics/collect-trends.ts`：
      - `collectTrends(sb, geo)` ＝ 把 route 的 `loadDbSourceBlocks` ＋ `runTrending` ＋ `saveTrends`（`trending/route.ts:82-108`）搬過來；route 改呼叫它（回應不變，既有 `trending/route.test.ts` 綠）。
      - `collectTrendsIfDue(sb, geos)`：每個 geo 查 `content_trends` 有無 `(geo, fetched_on = 今天 UTC)` 列，沒有才 `collectTrends`；回傳抓了哪些 geo。
@@ -63,27 +66,27 @@ headless 計費範例（排程內怎麼拿 grant）：`NA/lib/content/topics/mak
        1. month ＝ `taipeiParts(now).month` → `monthKey`。
        2. 該客戶啟用中的站逐站：有 `content_topics(site_id, month, source <> 'manual')` → 跳過（B1）。
        3. 第一個沒有的站：claim `content_plan_attempted_at`（B2）；claim 不到 → 跳過；claim 到 → `proposeMonth(sb, {organizationId, siteId, month, actor:"schedule:content_pipeline"}, planAsker(await grantFor("content.plan"), "lib/schedules/content_pipeline"))`。
-       4. 站 `autoPublishes(defaults)`（`brand-voice.ts:108`）→ 每題 `move(t, "approved")`（`store.ts:16` 允許）。
+       4. 站 `defaults.topicMode === "ai_pick"` → 每題 `move(t, "approved")`（`store.ts:16` 允許）；其他值一律當 `human_pick`（同 `autoPublishes` 的嚴格比對，`brand-voice.ts:107-110`）。
        5. 回傳摘要字串 `planned site=<id> month=<m> topics=<n> approved=<n>`；失敗就 throw（run-due 記 `last_error`＋開 incident，`run-due/route.ts:66-73`），24 小時後 B2 放行再試。
        6. 全部站都有提案 → 回傳 `null`。
      - `content_pipeline.run`：`collectTrendsIfDue` → `const planned = await planIfDue(...)` → **有就 return planned，沒有才 `tickTopics`**（B3）。
      - `jobs.ts:110` cost 文字加「每個網站每月提案一次約 X 美元」（X 由 `cost-model.ts:151` 算，不手打）。
-     - `PublishModeButtons.tsx:12` 的 `ai_review_auto` detail 加一句「排程提的題目也自動核准」；`human_review` detail 加「排程提的題目等人核准」。沒有第二份設定。
+     - 題目閘的設定（新）：`brand-voice.ts:20-24` 旁加 `TOPIC_MODES = ["human_pick","ai_pick"]`、`SiteContentDefaults.topicMode?`、`aiPicksTopics(d)`；`NA/app/api/content/sites/[id]/route.ts:48-59` 的 `publishMode` 分支照抄一份給 `topicMode`（staff only、白名單、同一次條件寫入）；`/tools/content/sites` 在 `PublishModeButtons` 旁加 `TopicModeButtons`（複製該檔改字，兩顆按鈕：「題目我自己挑」／「AI 挑好直接做」，掛在 `SiteManager.tsx:790` 旁）。`PublishModeButtons.tsx:11-12` 兩段 detail 各加一句「只管文章；題目誰挑看左邊」。
      - 題目頁按鈕 API（`topics/plan/route.ts`）**不改**：人按鈕提的案自然成為 B1 守衛，排程不重提。
    - **卡 C 自動內容總控頁**（A、B 做完才做；操作者 2026-10-26 要求「功能到處散放，要一個頁面管理」）：**不開新頁**，升級既有題目佇列 `NA/app/(shell)/tools/content/topics/`（`page.tsx`＋`TopicsBoard.tsx`）。頁頂加一條五格流程圖（一頁一張圖），每格＝狀態＋那一步的控制＋費用：
      | 格 | 顯示 | 控制（沿用既有 API，不新增第二份設定） |
      |---|---|---|
      | ① 搜集熱搜 | 該站 geo 最後一次 `content_trends.fetched_on`、近 30 天筆數 | 無（卡 A 自動）；可放「立即抓一次」＝GET `/api/content/trending?type=trending&geo=..` |
      | ② 提案題目 | 本月已提案幾題／尚未；上次嘗試 `content_plan_attempted_at`；失敗原因＝該客戶 `content_pipeline` 列的 `last_error` | 既有「AI 提案本月題目」按鈕（`TopicsBoard.tsx:179-221`，POST `/api/content/topics/plan`） |
-     | ③ 核准 | 待核准幾題；站是 `ai_review_auto` 時顯示「自動核准」 | 既有勾選核准／退回（`TopicsBoard.tsx:231-232`） |
+     | ③ 挑題 | 待核准幾題；題目閘目前是人挑／AI 挑 | 重用 `<TopicModeButtons>`（卡 B 新增）＋既有勾選核准／退回（`TopicsBoard.tsx:231-232`） |
      | ④ 製作 | 總開關開／關、每天最多開始 N 題、進行中幾題 | 讀 GET `/api/ops/schedules?slug=<客戶>`（`NA/app/(shell)/ops/schedules/ScheduleTable.tsx:140`）；寫 PATCH `/api/ops/clients/<slug>/schedules/content_pipeline`（`ScheduleTable.tsx:166`）。先例：客戶頁已嵌 `<ScheduleTable only={org.slug} />`（`NA/app/(shell)/ops/clients/[slug]/ClientHubTabs.tsx:697`）——可加「只顯示 content_pipeline」的 prop 重用，或只抽出那一格 |
-     | ⑤ 發布 | 人審／AI 審核自動發（＝也自動核准） | 直接重用 `<PublishModeButtons site onSaved />`（`PublishModeButtons.tsx:15`，PATCH `/api/content/sites/[id]` 的 `publishMode`，`NA/app/api/content/sites/[id]/route.ts:48-59`） |
+     | ⑤ 發布 | 人審／AI 審核自動發（只管文章） | 直接重用 `<PublishModeButtons site onSaved />`（`PublishModeButtons.tsx:15`，PATCH `/api/content/sites/[id]` 的 `publishMode`，`NA/app/api/content/sites/[id]/route.ts:48-59`） |
      - 範圍陷阱：①②③⑤ 跟著「網站」切換；④ 是「客戶」層（一客戶一格）。一客戶兩站時，切站 ④ 不變，畫面要寫明「這個開關管這個客戶的所有網站」。站→客戶：`wp_sites.organization_id`；要確認 `/api/content/sites` 回應有沒有帶客戶 slug，沒有就在那支 GET 加（不要前端猜）。
      - 權限：④ 的寫入沿用該 API 自己的角色檢查；角色不夠就把那格顯示成唯讀（`PublishModeButtons` 已有 `readOnly` prop），不要在頁面另寫權限判斷。
      - 側欄：`NA/app/sidebar-sections.ts:78` 的 `Topic Queue` 改 `Auto Content`（**label 只能英文**，`NA/app/__tests__/sidebar-coverage.test.ts:68-70` 會擋），中文放 `title`：「全自動內容：熱搜 → 題目 → 製作 → 發布，一頁管理」。頁面 `<h1>` 與 `metadata.title`（`topics/page.tsx:5,10`）改「自動內容」。網址不改（`/tools/content/topics`），避免舊連結壞。
      - UI 規則：不用 `<select>`／下拉（用按鈕）；細節放右欄；文案白話、不寫「我們」；顏色用主題 token。
      - 舊位置照常可用：`/ops/schedules`、`/tools/content/sites` 不刪不改行為，資料只有一份。
-3. 把三張卡貼給操作者看（繁中、白話、說每月多花多少錢、§3「核准」那一句請她確認），等同意；migration apply 到 prod 另等 go。
+3. 把三張卡貼給操作者看（繁中、白話、說每月多花多少錢），等同意；migration apply 到 prod 另等 go。流程與兩個閘的設計操作者 2026-10-26 已定案，不必再問。
 4. 實作 → `npx tsc --noEmit` 綠 → 指名的 vitest 綠 → 突變一次 → `/codex-review`（Claude 寫的）→ commit（pathspec）→ WORKLOG（用 `scripts/worklog-insert-entry.py`，經 `scripts/git-partial-worktree-commit.py stage`）。
 5. 完成後把 `agency-os/TASKS.md` 收件匣 AUTOCONTENT-GAP 那條打勾。
 
@@ -95,18 +98,18 @@ headless 計費範例（排程內怎麼拿 grant）：`NA/lib/content/topics/mak
   - 人按鈕先提過（`source='trending'`，無 `plan`）→ 不叫 ask（B1 用 `<> 'manual'`，不是 `= 'plan'`）。
   - ask 失敗 → throw；24 小時內再叫 → 不叫 ask（B2）；24 小時後 → 再叫。
   - 兩站客戶 → 一次 firing 只提一站（B3）。
-  - `ai_review_auto` 站 → 題目落 `approved`；`human_review` 站 → 停 `proposed`。
+  - `topicMode="ai_pick"` 站 → 題目落 `approved`；`human_pick`、未設、亂值 → 停 `proposed`；`publishMode` 不影響這題。
 - vitest `jobs` / run：提案的 firing **不**呼叫 `tickTopics`；沒得提的 firing 呼叫 `tickTopics`（B3）。
 - vitest `collect-trends.test.ts`：兩站同 geo → 當天只抓一次；今天已有列 → 不抓；route 回應與改動前一致（既有 `NA/app/api/content/trending/route.test.ts` 綠）。
 - 突變：拔掉 B1 守衛 → 「同站同月第二次」測試變紅 → 還原變綠（一個守衛一次）。
-- `/ops/schedules` 那格的成本文字有提到每站每月提案的費用；`/tools/content/sites` 兩顆按鈕的說明有寫到核准行為。
+- `/ops/schedules` 那格的成本文字有提到每站每月提案的費用；`/tools/content/sites` 看得到兩組按鈕（題目閘、發布閘），切題目閘後 PATCH 回應的 `contentDefaults.topicMode` 跟著變、`publishMode` 不變。
 - migration：`0138` apply 後 `\d wp_sites` 有欄位；`.down.sql` 跑過能還原（在本機 Postgres 驗，不碰 prod）。
 - 卡 C：在總控頁切開關／改每日上限／改發布模式後，到 `/ops/schedules` 與 `/tools/content/sites` 看得到同樣的值（證明只有一份資料）；`sidebar-coverage.test.ts` 綠；`/playwright` 截圖頁頂五格（雙站客戶切站時 ④ 不變）給操作者看。
 - 只跑卡片點名的測試，不跑全套（AGENTS §1「不做無效益測試」）。
 
 ## 6. 範圍外（別順手做）
 
-- 第三種 publishMode（「我選題、AI 發」）：操作者若在 §3 那一句說要，另開卡。
+- 「AI 挑題的條件表單」（每月幾題、只要熱搜來源…）：先用品牌語氣當條件；要調的只有 `PLAN_TOPICS=28`（`plan.ts:16`），真有客戶要再開卡。
 - 月中才開開關：提的是當月、含已過日期的題目，核准後 tick 依每日上限慢慢消化；不做「改提下個月」。
 - P5 Story Bible 提示片段（`storyBibleContextBlock`、角色 id 提示）仍由頁面組好再送出：另一件事。
 - 真跑一整輪需 staging WP＋測試社群品牌：操作者 10-24 說先不用。
@@ -119,7 +122,7 @@ headless 計費範例（排程內怎麼拿 grant）：`NA/lib/content/topics/mak
 | 「1–3 號窗口」 | 窗口內開關沒開或主機掛 → 整月無題；是補丁 | 不變量「本月一定有一份」（B1） |
 | 「附冷卻設計」沒說狀態放哪 | `last_error` 下次成功 run 被清（`schedules/store.ts:182`）；in-memory 每晚部署重置 | `wp_sites.content_plan_attempted_at` ＋ claim（B2） |
 | 提案「在 tickTopics 前」 | 90 s ＋ 200 s 擠 run-due 300 s | 提案 firing 獨占、一次一站（B3） |
-| 「提案後仍停 proposed 等人核准（或站設 AI 自動）」 | 自動核准根本沒程式（`[id]/route.ts:15` 是唯一入口）；不做它，「每月不用人按」不成立 | `ai_review_auto` 站自動 `approved`；請操作者確認耦合 |
+| 「提案後仍停 proposed 等人核准（或站設 AI 自動）」 | 自動核准根本沒程式（`[id]/route.ts:15` 是唯一入口）；不做它，「每月不用人按」不成立 | 新增獨立題目閘 `topicMode`（操作者 2026-10-26 定案：題目與發布各自選人或 AI，四種組合） |
 | 卡 A「排程每天跑一次」沒說守衛 | — | `(geo, fetched_on=今天)` 已有列就跳過，不加狀態 |
 
 ## 8. 卡片全文（執行者照抄進 EXECUTION_PLAN §7 與監工台；給任何 AI 都能照做）
@@ -152,7 +155,7 @@ headless 計費範例（排程內怎麼拿 grant）：`NA/lib/content/topics/mak
 
 **Rollback**：revert 該 commit；沒有資料庫改動。
 
-### P9.2　本月自動提案＋自動核准（卡 B；付費；Medium，migration apply 到 prod 為 High）
+### P9.2　本月自動提案＋題目閘（卡 B；付費；Medium，migration apply 到 prod 為 High）
 
 **改哪些檔**
 1. migration `lobster-factory/packages/db/migrations/0138_wp_sites_content_plan_attempted_at.sql`（格式照 `0125_client_schedules_daily_limit.sql`：檔頭 `-- APPLY: node scripts/apply-db-migration.mjs 0138`、`begin; set local lock_timeout='5s'; … notify pgrst,'reload schema'; commit;`）：
@@ -167,13 +170,13 @@ headless 計費範例（排程內怎麼拿 grant）：`NA/lib/content/topics/mak
      hasProposal(siteId: string, month: string): Promise<boolean>;                    // content_topics: site_id, month, source <> 'manual' 存在
      claimAttempt(siteId: string, now: Date): Promise<boolean>;                        // update wp_sites set content_plan_attempted_at=now where id=site and (is null or < now-24h) returning id → 1 列 = true
      propose(siteId: string, month: string): Promise<Topic[]>;                        // proposeMonth 包在 runForOrg + grantFor("content.plan")
-     approve(t: Topic): Promise<Topic | null>;                                         // store.move(sb, t, "approved")
+     approve(t: Topic): Promise<Topic | null>;                                         // store.move(sb, t, "approved")；只在 aiPicksTopics(defaults) 時叫
    }
    export const PLAN_RETRY_MS = 24 * 60 * 60 * 1000;
    /** 一個 firing 最多提一站；回傳摘要，沒得提回 null。 */
    export async function planIfDue(deps: PlanDueDeps, now: Date): Promise<string | null>
    ```
-   流程：`month = monthKey(taipeiParts(now.toISOString()).month)`（`store.ts:72,82`）→ 逐站 `hasProposal` 為 true 跳過 → 第一個 false 的站 `claimAttempt`，false 跳過（冷卻中或別的 firing 搶到）→ `propose` → 若 `autoPublishes(defaults)`（`brand-voice.ts:108`）每題 `approve` → 回 `planned site=<id> month=<m> topics=<n> approved=<n>`。`propose` throw 就讓它往上 throw（run-due 記 `last_error` 開 incident，`run-due/route.ts:66-73`）。
+   流程：`month = monthKey(taipeiParts(now.toISOString()).month)`（`store.ts:72,82`）→ 逐站 `hasProposal` 為 true 跳過 → 第一個 false 的站 `claimAttempt`，false 跳過（冷卻中或別的 firing 搶到）→ `propose` → 若 `aiPicksTopics(defaults)`（新，`brand-voice.ts`，嚴格等於 `"ai_pick"`）每題 `approve` → 回 `planned site=<id> month=<m> topics=<n> approved=<n>`。`propose` throw 就讓它往上 throw（run-due 記 `last_error` 開 incident，`run-due/route.ts:66-73`）。
    - `export function planDueDeps(sb, organizationId, actor): PlanDueDeps`：真實作。`propose` ＝ `runForOrg(organizationId, actor, async () => proposeMonth(sb, { organizationId, siteId, month, actor }, planAsker(await grantFor("content.plan"), "lib/schedules/content_pipeline")))`（`runForOrg`／`grantFor` 在 `NA/lib/entitlements/grant.ts:58,73`；先例 `make.ts:99,261`）。
 3. `NA/lib/schedules/jobs.ts` `content_pipeline.run`：P9.1 的 `collectTrendsIfDue` 之後：
    ```ts
@@ -182,7 +185,7 @@ headless 計費範例（排程內怎麼拿 grant）：`NA/lib/content/topics/mak
    return tickTopics(...);           // 原本那行
    ```
 4. `jobs.ts:110` cost 字串尾端加：`` 每個網站每月第一次提案另約 ${planCostUsd()} 美元。`` — 在 `NA/lib/content/topics/cost.ts` 加 `export function planCostUsd(): number`（同檔 `planCostTwd` 的 USD 版，`Math.ceil(featureUnitCostUsd(f) * 100) / 100`），不手打數字。
-5. `NA/app/(shell)/tools/content/sites/PublishModeButtons.tsx:11-12`：`human_review.detail` 尾端加「排程提出的題目等人核准。」；`ai_review_auto.detail` 尾端加「排程提出的題目也自動核准。」
+5. 題目閘（§4 卡 B 那一條的四個檔）：`brand-voice.ts` 加 `TOPIC_MODES`／`topicMode?`／`aiPicksTopics`；`sites/[id]/route.ts:48-59` 複製 `publishMode` 分支給 `topicMode`；新檔 `TopicModeButtons.tsx`（複製 `PublishModeButtons.tsx` 改字：「題目我自己挑」＝`human_pick`、「AI 挑好直接做」＝`ai_pick`，確認鈕文字「確定讓 AI 挑題」）；`SiteManager.tsx:790` 旁掛上；`PublishModeButtons.tsx:11-12` 兩段 detail 各加「只管文章；題目誰挑看旁邊的設定」。既有 `sites/[id]` 的 route 測試若有 publishMode 案例，複製一組給 topicMode（白名單 400、非 staff 403、競態 409）。
 6. `agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md:74-78` 三行改成實際行為（§4 步驟 2）。
 
 **驗收**
@@ -192,7 +195,7 @@ headless 計費範例（排程內怎麼拿 grant）：`NA/lib/content/topics/mak
   3. `claimAttempt=false` → `propose` 不叫（B2）。
   4. `propose` reject → `planIfDue` reject（錯誤往上）。
   5. 兩站都 `hasProposal=false` → `propose` 只叫一次（B3）。
-  6. `defaults.publishMode="ai_review_auto"` → `approve` 對每題各叫一次；`human_review` → 不叫。
+  6. `defaults.topicMode="ai_pick"` → `approve` 對每題各叫一次；`"human_pick"`、`undefined`、`"AI_PICK"` → 不叫；`publishMode="ai_review_auto"` 單獨存在 → 不叫。
   7. `now = 2026-11-01T00:30:00Z`（台灣 11/1 08:30）→ `hasProposal` 收到 `"2026-11-01"`；`now = 2026-10-31T17:00:00Z`（台灣 11/1 01:00）也收到 `"2026-11-01"`（台灣月）。
 - `content-pipeline-job.test.ts` 加兩條：`planIfDue` 回字串 → `tickTopics` 不叫、`run` 回那個字串；回 `null` → `tickTopics` 叫（mock `@/lib/content/topics/plan-due`）。
 - 真 SQL 守衛各一條（在 `store.test.ts` 的假 sb 風格下驗呼叫鏈）：`hasProposal` 用 `.eq("site_id").eq("month").neq("source","manual")`；`claimAttempt` 的 `.or()` 字串含 `content_plan_attempted_at.is.null` 與 `.lt.`。
