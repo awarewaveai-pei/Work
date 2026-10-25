@@ -27,8 +27,8 @@ export interface Published { artifacts: Record<string, unknown> }
 export class MakeError extends Error {
   constructor(message: string, readonly artifacts: Record<string, unknown>) { super(message); }
 }
-/** What the pipeline makes; a topic with only youtube waits for the YouTube phase (P7). */
-export const NOW_FORMATS: TopicFormat[] = ["article", "social", "video"];
+/** What the pipeline makes: every format (youtube = the video, posted on the brand's YouTube channels, P7). */
+export const NOW_FORMATS: TopicFormat[] = ["article", "social", "video", "youtube"];
 
 /** One look at a topic's video job (finalize.ts finalizeVideoJob behind it). */
 export type VideoPoll = { state: "running" } | { state: "error"; error: string } | { state: "done"; url: string };

@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-25（續62）全自動內容 P7.1／P7.2：社群工具加 YouTube、題目選 YouTube 自動排進頻道；P7.0 仍等 OAuth 用戶端（Claude）
+
+- **操作者**：「已得到 YouTube api」→ 查 `AWARE_WAVE_CREDENTIALS.md` §9.6（只看結構，值遮罩）：AW、Soulful、Graphic Design 三把都是 YouTube Data API **API Key**——只能讀，不能上傳（videos.insert 要 OAuth scope `youtube.upload` 等，developers.google.com/youtube/v3/docs/videos/insert）。postiz 容器沒有 `YOUTUBE_CLIENT_ID`／`YOUTUBE_CLIENT_SECRET`（`docker inspect` 只看變數名），`FRONTEND_URL=https://postiz.aware-wave.com`，provider 重新導向 `/integrations/social/youtube`（容器內 `youtube.provider.ts:32,306`）。測試狀態的 OAuth app refresh token 7 天過期（developers.google.com/identity/protocols/oauth2）。
+- **不變量**：YouTube 的標題／說明規則只有一份 `limits.ts youtubeParts`（標題 2–100 字＝Postiz `youtube.settings.dto.ts`、說明 5000 bytes、不可 < >），送出、存檔、撰寫頁同讀；標題＝貼文第一行（不加 DB 欄位）。
+- **改動**：`compose.ts` youtube 分支（一支影片、不帶留言、settings `{type:"public", title}`）；`limits.ts` `YOUTUBE_TITLE_MAX/MIN`、youtube 以 bytes 計；`write-posts.ts` youtube 規格＋`titleLine`（提示與 `overLength` 分開量標題）；`postiz.ts`、`model.ts`、`globals.css --p-yt`；`make.ts topicTargets`（YouTube 頻道只給選了 youtube 的題目）、只選 youtube 且沒連頻道 → blocker 退回不付費；`tick.ts NOW_FORMATS` 加 youtube；`cost.ts` youtube 計改寫＋影片；start route 收費閘。
+- **critic（Standard）**：warn 0c/1m/5n → M1 存檔與送出規則不一致（改一份規則三處讀）、n1 說明 bytes／< > 、n3 預覽顯示不會送出的留言、n5 沒頻道也付影片費——已修；n2 標題最短 2 字寫手不重試（審核擋下＝留草稿）、n4 選 social＋youtube 時影片也附到其他頻道＝刻意（同一支影片）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/content lib/social lib/schedules lib/portal app/api/content app/api/video app/api/social "app/(shell)/tools/social" "app/(shell)/tools/content"`（129 files，840 passed） | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（本改動檔 0 錯） | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：`topicTargets` 改成 social 或 youtube 一律給 → 「YouTube channel only when the topic chose youtube」紅；還原 4/4 | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/5n（1m＋3n 已修、2n 刻意）
+- ORACLE_WAIVED: Codex 不可用（model_not_found，見續2）；critic＋突變證據
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`youtubeParts|YOUTUBE_TITLE_MAX|topicTargets|SENDABLE_PLATFORMS` | hits=28
+- **剩**：P7.0 操作者建 OAuth 用戶端 → 憑證進 postiz 容器（High，safe-infra-patch）→ 社群工具連頻道。
+- **rollback**：`git revert <本 commit>`；沒有 YouTube 頻道時本改動不送任何東西。
 ## 2026-10-25（續61）排程離開 Trigger C4.6①：#infra-alerts 寫進主機 `.env`；`sync-slack-alert-webhooks.ps1` 會送錯頻道，修好前禁跑（Claude）
 
 - **觸發**：操作者 go ahead 跑 `sync-slack-alert-webhooks.ps1`；執行前比對發現不可跑，改經同意在主機上複製。

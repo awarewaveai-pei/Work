@@ -3,10 +3,11 @@
 // A platform's hard length lives only in BODY_LIMITS (limits.ts, what Postiz enforces); the prompt states it from
 // there, and every answer is measured with the same bodyLength before anyone may send it. The style lines below carry
 // tone and shape only, never a second length number.
-import { BODY_LIMITS, bodyLength } from "./limits";
+import { BODY_LIMITS, bodyLength, YOUTUBE_TITLE_MAX } from "./limits";
 
-/** How each writer platform is written; `limit` = its BODY_LIMITS key, `perLine` = the limit applies to each line. */
-interface WriterPlatform { style: string; video?: string; limit?: string; perLine?: boolean }
+/** How each writer platform is written; `limit` = its BODY_LIMITS key, `perLine` = the limit applies to each line,
+ *  `titleLine` = the first line is a title with its own limit (YouTube). */
+interface WriterPlatform { style: string; video?: string; limit?: string; perLine?: boolean; titleLine?: number }
 
 const PLATFORMS = {
   twitter_single: { limit: "x", style: "Twitter/X (single post): punchy, hook first. 2-3 relevant hashtags at the end.",
@@ -25,6 +26,8 @@ const PLATFORMS = {
     video: "Copy for a Pinterest video pin (4:5): inspirational tone, 3-5 keywords, end with a save CTA." },
   reddit: { limit: "reddit", style: "Reddit post: value-first, humble, no promotional language. Title on the first line (a curiosity-driven question or surprising insight), then 'BODY:' and a detailed body. No hashtags; a link only if it genuinely adds value.",
     video: "Copy for a Reddit video post: the title says what the video shows (no hype); the body gives brief context and why it matters." },
+  youtube: { limit: "youtube", titleLine: YOUTUBE_TITLE_MAX, style: "YouTube video: the FIRST LINE is the video title (short, curiosity or a clear benefit, no hashtags, no quotes); then a blank line and a description: 2-3 sentence summary, the key points as short lines, the article link placeholder [LINK], and 3-5 hashtags at the end.",
+    video: "YouTube video: the FIRST LINE is the video title (short, says what the viewer learns); then a blank line and a description that complements the video, with the article link placeholder [LINK]." },
   tiktok: { limit: "tiktok", style: "TikTok caption: ultra-short, high-energy, under 100 words. Hook in the first sentence ('POV:', 'Tell me why'). 3-5 trending hashtags; end with a challenge or duet prompt if it fits.",
     video: "Copy for a short vertical video (9:16): open with a hook word ('Watch:', 'POV:'); complement the video, do not describe it." },
   email: { style: "Email newsletter snippet, 150-250 words, formatted as:\nSUBJECT: [subject]\nPREVIEW: [preview text under 100 chars]\nBODY:\n[body]\nPersonal and conversational; end with CTA button text in [brackets]." },
@@ -38,7 +41,7 @@ export const isWriterKey = (k: string): k is WriterKey => k in PLATFORMS;
 const FOR_POSTIZ: Record<string, WriterKey> = {
   facebook: "facebook", instagram: "instagram", "instagram-standalone": "instagram", threads: "threads",
   linkedin: "linkedin", "linkedin-page": "linkedin", x: "twitter_single", bluesky: "twitter_single",
-  pinterest: "pinterest", tiktok: "tiktok", reddit: "reddit",
+  pinterest: "pinterest", tiktok: "tiktok", reddit: "reddit", youtube: "youtube",
 };
 
 /** The writer keys to ask for, given the channels' Postiz platforms (unsupported platforms are left out). */
@@ -62,6 +65,7 @@ function limitPhrase(p: WriterPlatform): string {
   if (!p.limit) return "";
   const n = BODY_LIMITS[p.limit];
   if (p.limit === "threads") return ` Hard limit: ${n} bytes in UTF-8 (about ${Math.floor(n / 3)} Chinese characters).`;
+  if (p.titleLine) return ` Hard limit: title line ${p.titleLine} characters; ${n} bytes in UTF-8 in all (about ${Math.floor(n / 3)} Chinese characters); no < or > anywhere.`;
   return p.perLine ? ` Hard limit: ${n} characters per post.` : ` Hard limit: ${n} characters including hashtags and links.`;
 }
 
@@ -70,6 +74,11 @@ export function overLength(key: WriterKey, text: string): { length: number; limi
   const p: WriterPlatform = PLATFORMS[key];
   if (!p.limit) return null;
   const limit = BODY_LIMITS[p.limit];
+  if (p.titleLine) {   // the title is measured on its own: the whole text may fit while the title does not
+    const title = text.split("\n").find((l) => l.trim())?.trim() ?? "";
+    const t = [...title].length;   // the title counts characters; the whole text bytes (bodyLength)
+    if (t > p.titleLine) return { length: t, limit: p.titleLine };
+  }
   const parts = p.perLine ? text.split("\n").map((l) => l.trim()).filter(Boolean) : [text];
   const length = Math.max(0, ...parts.map((s) => bodyLength(p.limit!, s)));
   return length > limit ? { length, limit } : null;

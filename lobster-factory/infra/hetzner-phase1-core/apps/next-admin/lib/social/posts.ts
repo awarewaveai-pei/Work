@@ -1,6 +1,6 @@
 // Post payloads for POST /api/social/posts and PUT /api/social/posts/[id]: what may be sent, and the body limits.
 import { BadRequest, uuid } from "./http";
-import { commentsOverLimit, overLimit } from "./limits";
+import { commentsOverLimit, overLimit, youtubeParts } from "./limits";
 import { accountPlatforms, type AutoMode, type CommentInput, type MediaInput, type PostChildren, type PostFields, type TargetInput } from "./store";
 import { commentTakesMedia, composeText, ComposeError } from "./compose";
 import { parseRepeat, RepeatError } from "./repeat-rule";
@@ -115,6 +115,11 @@ export async function assertWithinLimits(brandId: string, body: string, targets:
   };
   const problems = overLimit(body, targets.map((t) => { const platform = platforms.get(t.account_id) as string; return { accountId: t.account_id, platform, customBody: textOf(t, platform) }; }));
   if (problems.length) throw new BadRequest("text longer than the platform allows", { overLimit: problems });
+  for (const t of targets) {   // YouTube's title rule, checked where it is written, not first at send (compose.ts)
+    if (platforms.get(t.account_id) !== "youtube" || !(t.custom_body ?? body).trim()) continue;
+    const yt = youtubeParts(textOf(t, "youtube")).problem;
+    if (yt) throw new BadRequest(yt, { youtube: { accountId: t.account_id } });
+  }
   const inComments = commentsOverLimit(comments.map((c) => c.body), targets.map((t) => ({ accountId: t.account_id, platform: platforms.get(t.account_id) as string })));
   if (inComments.length) throw new BadRequest("a comment is longer than the platform allows", { commentOverLimit: inComments });
   const noImage = [...new Set(targets.map((t) => platforms.get(t.account_id) as string))].filter((p) => !commentTakesMedia(p));

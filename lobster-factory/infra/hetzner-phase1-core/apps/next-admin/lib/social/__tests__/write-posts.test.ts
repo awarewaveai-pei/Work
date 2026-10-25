@@ -1,7 +1,7 @@
 // The one social post writer: hard limits come only from BODY_LIMITS, every answer is measured before it may be sent,
 // an over-limit post gets one shorter rewrite, and the Postiz -> writer map is the only one.
 import { describe, expect, it, vi } from "vitest";
-import { BODY_LIMITS } from "../limits";
+import { BODY_LIMITS, YOUTUBE_TITLE_MAX } from "../limits";
 import { buildPrompt, overLength, textsForAccounts, writeSocialPosts, writerKeysFor, WRITER_KEYS } from "../write-posts";
 
 const answer = (o: Record<string, string>) => JSON.stringify(o);
@@ -104,5 +104,12 @@ describe("Postiz channels <-> writer keys (the only map)", () => {
       [{ id: "b", platform: "bluesky" }, { id: "f", platform: "facebook" }, { id: "l", platform: "linkedin" }, { id: "m", platform: "mastodon" }],
     );
     expect(texts).toEqual({ b: "short one" });
+  });
+});
+
+describe("youtube title line", () => {
+  it("a title over its own limit is over length even when the whole text fits", () => {
+    expect(overLength("youtube", `${"a".repeat(YOUTUBE_TITLE_MAX)}\n\nshort description`)).toBeNull();
+    expect(overLength("youtube", `${"a".repeat(YOUTUBE_TITLE_MAX + 1)}\n\nshort description`)).toEqual({ length: YOUTUBE_TITLE_MAX + 1, limit: YOUTUBE_TITLE_MAX });
   });
 });

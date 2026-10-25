@@ -68,3 +68,19 @@ describe("compose", () => {
     expect(() => compose({ ...base, linkUrl: "https://", linkUtm: true })).toThrow(ComposeError);
   });
 });
+
+// P7.1: YouTube (youtube.settings.dto.ts, v2.25.1): one video; the first line is the title (2-100), the rest the description.
+describe("compose youtube", () => {
+  const video = [{ postizMediaId: "v1", postizPath: "https://p/v.mp4", altText: null }];
+  it("the first line is the title, the rest the description, with the one video", () => {
+    const c = compose({ ...base, platform: "youtube", body: "\n  藝術治療入門  \n\n五分鐘看懂\n#art", media: video });
+    expect(c.settings).toEqual({ __type: "youtube", type: "public", title: "藝術治療入門" });
+    expect(c.values).toEqual([{ content: toPostizHtml("五分鐘看懂\n#art"), image: [{ id: "v1", path: "https://p/v.mp4" }] }]);
+  });
+  it("refused before Postiz: no video, or a title outside 2-100 characters", () => {
+    expect(() => compose({ ...base, platform: "youtube", body: "title\nbody" })).toThrow("exactly one video");
+    expect(() => compose({ ...base, platform: "youtube", body: "x\nbody", media: video })).toThrow(ComposeError);
+    expect(() => compose({ ...base, platform: "youtube", body: `${"題".repeat(101)}\nbody`, media: video })).toThrow("2–100");
+    expect(() => compose({ ...base, platform: "youtube", body: "AI <vs> 人類\nbody", media: video })).toThrow("< 或 >");
+  });
+});

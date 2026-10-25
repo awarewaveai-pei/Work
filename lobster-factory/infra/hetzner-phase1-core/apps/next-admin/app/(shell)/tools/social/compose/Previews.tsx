@@ -49,7 +49,7 @@ export default function Previews({ channels, tab, textFor, formats, images, medi
                     {images.slice(0, story ? 1 : 4).map((p, i) => mediaKinds?.[i] === "video" ? <video key={p} src={p} muted controls preload="metadata" /> : <img key={p} src={p} alt="" />)}
                   </div>
                 )}
-                {parts.length > 0 && !story && (
+                {parts.length > 0 && !story && a.platform !== "youtube" && (   /* compose.ts sends no comments to YouTube */
                   <div className="sm-cms">
                     <span className="sm-muted">貼文發出後，用你的帳號在下面留言</span>
                     {parts.map((c, i) => {

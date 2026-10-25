@@ -11,7 +11,8 @@ export type SocialPlatform =
   | "threads"
   | "tiktok"
   | "pinterest"
-  | "bluesky";
+  | "bluesky"
+  | "youtube";
 
 export type SocialChannel = {
   clientId: string;

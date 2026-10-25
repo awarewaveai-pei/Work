@@ -21,7 +21,7 @@ export function topicCostUsd(formats: readonly string[] = ["article", "social"])
   };
   const round = (usd: number) => Math.ceil(usd * 100) / 100;
   const article = formats.includes("article") ? unit("article") : 0;
-  const social = formats.includes("social") ? unit("syndicate") : 0;
+  const social = formats.includes("social") || formats.includes("youtube") ? unit("syndicate") : 0;   // youtube's text is written too
   const video = formats.includes("video") || formats.includes("youtube") ? articleVideoCostUsd() : 0;
   return { usual: round(article + social + video), max: round(article + social * MAX_WRITER_CALLS + video) };
 }

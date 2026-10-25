@@ -37,6 +37,7 @@ export const PLATFORMS: Record<string, { name: string; mark: string; token: stri
   "linkedin-page": { name: "LinkedIn", mark: "in", token: "--p-li" },
   bluesky: { name: "Bluesky", mark: "B", token: "--p-bs" },
   x: { name: "X", mark: "X", token: "--p-x" },
+  youtube: { name: "YouTube", mark: "YT", token: "--p-yt" },
   wordpress: { name: "WordPress", mark: "W", token: "--p-wp" },
 };
 export const platformOf = (p: string) => PLATFORMS[p] ?? { name: p, mark: p.slice(0, 2), token: "--status-ignored" };

@@ -22,10 +22,30 @@ export const BODY_LIMITS: Record<string, number> = {
   facebook: 63206,
 };
 
+/** YouTube's video title: the first line of a YouTube post (youtube.settings.dto.ts 2-100, counted as code points). */
+export const YOUTUBE_TITLE_MAX = 100;
+export const YOUTUBE_TITLE_MIN = 2;
+
+/** A YouTube post's text as YouTube takes it: the first non-empty line is the video title, the rest the description.
+ *  Data API: the title is 1-100 characters (Postiz asks 2), the description at most 5000 bytes (BODY_LIMITS, counted
+ *  in bytes by bodyLength), neither may contain < or >. The one rule save (posts.ts), the editor and send (compose.ts) read. */
+export function youtubeParts(text: string): { title: string; description: string; problem: string | null } {
+  const lines = text.split(/\r?\n/);
+  const i = lines.findIndex((l) => l.trim());
+  const title = i >= 0 ? lines[i].trim() : "";
+  const description = i >= 0 ? lines.slice(i + 1).join("\n").trim() : "";
+  const n = [...title].length;
+  const problem = n < YOUTUBE_TITLE_MIN || n > YOUTUBE_TITLE_MAX
+    ? `YouTube 的第一行是影片標題，要 ${YOUTUBE_TITLE_MIN}–${YOUTUBE_TITLE_MAX} 個字（現在 ${n} 個）`
+    : /[<>]/.test(text) ? "YouTube 的標題和說明不能有 < 或 > 符號" : null;
+  return { title, description, problem };
+}
+
 const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
 export function bodyLength(platform: string, body: string): number {
-  if (platform === "threads") return new TextEncoder().encode(body).length;   // TextEncoder: the editor counts in the browser too
+  // TextEncoder: the editor counts in the browser too. YouTube's description limit is in bytes (Data API videos.snippet).
+  if (platform === "threads" || platform === "youtube") return new TextEncoder().encode(body).length;
   let n = 0;
   for (const _ of segmenter.segment(body)) n++;
   return n;

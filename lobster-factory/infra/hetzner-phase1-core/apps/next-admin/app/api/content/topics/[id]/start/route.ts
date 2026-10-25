@@ -32,7 +32,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!t || !canAccessOrg(req, t.organization_id)) return NextResponse.json({ ok: false, error: "topic not found" }, { status: 404 });
   if (t.version !== version) return NextResponse.json({ ok: false, error: "changed elsewhere; reload", topic: t }, { status: 409 });
   if (!["proposed", "approved"].includes(t.status)) return NextResponse.json({ ok: false, error: `a ${t.status} topic cannot be started` }, { status: 409 });
-  if (!makesNow(t)) return NextResponse.json({ ok: false, error: "只選了 YouTube 的題目要等 YouTube 階段上線才能製作" }, { status: 409 });
+  if (!makesNow(t)) return NextResponse.json({ ok: false, error: "題目沒有選要做的格式" }, { status: 409 });
   // the button makes the drafts; the video is started, checked and attached only by the 5-minute schedule (tick.ts)
   if (waitsForVideo(t)) {
     const on = await listSchedules(t.organization_id).then((rows) => rows.some((r) => r.jobKey === "content_pipeline" && r.enabled),
@@ -64,6 +64,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // keys: the registry test reads them)
   const opts = { org: () => t.organization_id };
   if (t.formats.includes("article")) return withFeature("content.article", thenRun, opts)(req, run);
-  if (t.formats.includes("social")) return withFeature("content.syndicate", thenRun, opts)(req, run);
+  if (t.formats.includes("social") || t.formats.includes("youtube")) return withFeature("content.syndicate", thenRun, opts)(req, run);
   return withFeature("video.script", thenRun, opts)(req, run);
 }

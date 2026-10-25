@@ -6,7 +6,7 @@
 // who may do what is lib/social/state.ts RULES (the buttons only mirror it; the server decides).
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { commentTakesMedia, isVideo } from "@/lib/social/compose";
-import { commentsOverLimit, overLimit } from "@/lib/social/limits";
+import { commentsOverLimit, overLimit, youtubeParts } from "@/lib/social/limits";
 import type { RepeatRule } from "@/lib/social/repeat-rule";
 import type { PostState } from "@/lib/social/state";
 import { splitKeywords } from "@/lib/social/auto-rules";
@@ -225,6 +225,10 @@ export default function Editor(props: EditorProps) {
     if (imageOnly >= 0 && noCommentImage.length) return `第 ${imageOnly + 1} 則留言只有圖，${[...new Set(noCommentImage.map((a) => platformOf(a.platform).name))].join("、")} 的留言不能帶圖，請加上文字。`;
     if (kind !== "draft" && kind !== "keep") {
       if (channels.some((a) => a.platform.startsWith("instagram")) && !mediaList.length) return "Instagram 一定要有圖片或影片。";
+      const yt = channels.filter((a) => a.platform === "youtube");
+      if (yt.length && !(mediaList.length === 1 && isVideo(mediaPath(mediaList[0].media_id)))) return "YouTube 要剛好一支影片。";
+      const ytProblem = yt.map((a) => youtubeParts(textFor(a)).problem).find(Boolean);
+      if (ytProblem) return `${ytProblem}。`;
       // compose.ts: a Reel is a post with exactly one video (Codex 2026-10-18: do not refuse one that has it)
       if (channels.some((a) => formats[a.id] === "reel") && !(mediaList.length === 1 && isVideo(mediaPath(mediaList[0].media_id)))) return "Reel 要剛好一支影片。影片上傳還沒開放，先改成「貼文」或「限時動態」。";
     }

@@ -11,7 +11,7 @@ vi.mock("@/lib/content/video/embed-in-post", () => ({ embedVideoInPost }));
 const social = vi.hoisted(() => ({ getPost: vi.fn(), addVideo: vi.fn(), savePost: vi.fn(), listAccounts: vi.fn() }));
 vi.mock("@/lib/social/store", () => social);
 
-const { attachTopicVideo, pollTopicVideo, STALE_PREPARE_MS } = await import("../make");
+const { attachTopicVideo, pollTopicVideo, STALE_PREPARE_MS, topicTargets } = await import("../make");
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 const t = { id: "a", organization_id: ORG } as Topic;
@@ -50,5 +50,14 @@ describe("attachTopicVideo", () => {
     expect(embedVideoInPost.mock.calls[0][1]).toMatchObject({ siteId: "s1", postId: 9, videoUrl: URL, once: true });
     expect(social.addVideo).not.toHaveBeenCalled();
     expect(out.artifacts.video).toMatchObject({ media_id: "m0" });
+  });
+});
+
+describe("topicTargets (P7.2)", () => {
+  it("a YouTube channel only when the topic chose youtube; the other channels only when it chose social", () => {
+    expect(topicTargets(["article", "social", "video"], "youtube")).toBe(false);
+    expect(topicTargets(["article", "youtube"], "youtube")).toBe(true);
+    expect(topicTargets(["article", "youtube"], "facebook")).toBe(false);
+    expect(topicTargets(["social", "youtube"], "facebook")).toBe(true);
   });
 });

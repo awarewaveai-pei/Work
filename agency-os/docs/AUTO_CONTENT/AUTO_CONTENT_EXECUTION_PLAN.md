@@ -216,9 +216,9 @@
 
 | 卡 | 做 |
 |---|---|
-| P7.0 人工 | Google OAuth app（Postiz youtube provider）審核；Postiz 連頻道 |
-| P7.1 | `postiz.ts:5-15` 加 youtube；`compose.ts:50` SETTINGS youtube（title,type）；撰寫頁收 YouTube 標題；`write-posts` youtube 規格 |
-| P7.2 | formats 含 youtube → 社群貼文 target youtube（影片 16x9） |
+| P7.0 人工 | Google Cloud 建 OAuth 用戶端（網頁應用程式，重新導向 `https://postiz.aware-wave.com/integrations/social/youtube`，開 YouTube Data API v3）→ `YOUTUBE_CLIENT_ID`／`YOUTUBE_CLIENT_SECRET` 進 postiz 容器（`safe-infra-patch.sh compose`，High）→ 社群工具連頻道。API Key（`AIza…`）不能上傳。同意畫面停在「測試」＝授權 7 天過期要重連；長期用要送 Google 驗證 |
+| P7.1 | `postiz.ts` 加 youtube；`compose.ts` SETTINGS youtube（type public）＋一支影片；**標題＝貼文第一行**（不加 DB 欄位，2026-10-25 定）：規則只在 `limits.ts youtubeParts`（標題 2–100 字、說明 5000 bytes、不可有 < >），送出（compose）、存檔（`posts.ts assertWithinLimits`）、撰寫頁（`Editor.tsx validate`）都讀它；`write-posts` youtube 規格（`titleLine`） |
+| P7.2 | formats 含 youtube → 社群草稿 target 該品牌 YouTube 頻道（`make.ts topicTargets`；只選 video 不發 YouTube）＋P6 影片（16x9）；只選 youtube 且沒連頻道 → blocker 退回、不付費 |
 
 ### P8 治理收尾（隨階段，不留最後）
 

@@ -82,8 +82,13 @@ async function makeArticle(t: Topic, site: SiteBrand): Promise<NonNullable<Topic
   };
 }
 
+/** YouTube channels only for a topic that chose youtube (they need its video); the other channels only for social. */
+export const topicTargets = (formats: readonly string[], platform: string) =>
+  platform === "youtube" ? formats.includes("youtube") : formats.includes("social");
+
 async function makeSocial(t: Topic, site: SiteBrand, article: TopicArtifacts["article"], actor: string): Promise<NonNullable<TopicArtifacts["social"]>> {
-  const accounts = (await listAccounts(t.organization_id, { hydrateProfile: false })).filter((a) => a.status === "connected");
+  const accounts = (await listAccounts(t.organization_id, { hydrateProfile: false }))
+    .filter((a) => a.status === "connected" && topicTargets(t.formats, a.platform));
   const keys = writerKeysFor(accounts.map((a) => a.platform));
   const forbidden = forbiddenTerms(site.defaults);
   if (!keys.length) {
@@ -112,7 +117,7 @@ async function makeDrafts(sb: SupabaseClient, t: Topic, actor: string): Promise<
   const artifacts: TopicArtifacts = { ...(t.artifacts as TopicArtifacts) };
   try {
     if (t.formats.includes("article") && !artifacts.article) artifacts.article = await makeArticle(t, site);
-    if (t.formats.includes("social") && !artifacts.social) artifacts.social = await makeSocial(t, site, artifacts.article, actor);
+    if ((t.formats.includes("social") || t.formats.includes("youtube")) && !artifacts.social) artifacts.social = await makeSocial(t, site, artifacts.article, actor);
   } catch (e) {
     throw new MakeError(e instanceof Error ? e.message : String(e), artifacts as Record<string, unknown>);
   }
@@ -240,7 +245,16 @@ export function topicDeps(sb: SupabaseClient, organizationId: string, actor: str
     now: () => new Date(),
     due: (now) => dueApproved(sb, organizationId, now, NOW_FORMATS),
     inStatus: (statuses) => inStatus(sb, organizationId, statuses),
-    blocker: async (t) => { own(t); const s = await siteFor(sb, t); return typeof s === "string" ? s : null; },
+    blocker: async (t) => {
+      own(t);
+      const s = await siteFor(sb, t);
+      if (typeof s === "string") return s;
+      if (t.formats.every((f) => f === "youtube")) {   // its video would have nowhere to go
+        const yt = (await listAccounts(t.organization_id, { hydrateProfile: false })).some((a) => a.platform === "youtube" && a.status === "connected");
+        if (!yt) return "還沒連上 YouTube 頻道（社群工具 › 設定 › 連接 YouTube）";
+      }
+      return null;
+    },
     start: (t, day, cap) => startTopic(sb, t, day, cap),
     move: (t, to, patch) => move(sb, t, to, patch),
     claim: (t, patch) => { own(t); return claimTopic(sb, t, patch); },

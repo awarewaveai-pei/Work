@@ -3,6 +3,7 @@
 // read the same function, so what is previewed is what is sent.
 // Postiz content is HTML (sanitizePostContent keeps p/br/a/...; each provider turns it back into text): plain text is
 // escaped and every line becomes a <p>, or a "<" in a post would be eaten and line breaks lost.
+import { youtubeParts } from "./limits";
 
 /** A comment posted under the post by the same account (0105 social_post_comments, in position order). */
 export interface ComposeComment {
@@ -39,8 +40,8 @@ export class ComposeError extends Error {
 }
 
 /** Settings each provider's DTO requires (postiz-app v2.25.1 dtos/posts/providers-settings, read 2026-10-15).
- *  A platform not here needs fields this editor does not collect yet (Pinterest board, YouTube title, Reddit
- *  subreddit, TikTok privacy): sending it would only come back as a Postiz 400. */
+ *  A platform not here needs fields this editor does not collect yet (Pinterest board, Reddit subreddit, TikTok
+ *  privacy): sending it would only come back as a Postiz 400. YouTube's title comes from the text (compose()). */
 const SETTINGS: Record<string, (format: string) => Record<string, unknown>> = {
   bluesky: () => ({}),
   threads: () => ({}),
@@ -54,7 +55,10 @@ const SETTINGS: Record<string, (format: string) => Record<string, unknown>> = {
   instagram: (f) => ({ post_type: f === "story" ? "story" : "post" }),
   "instagram-standalone": (f) => ({ post_type: f === "story" ? "story" : "post" }),
   facebook: (f) => (f === "story" ? { post_type: "story" } : {}),
+  // youtube.settings.dto.ts (v2.25.1): title 2-100 and type public|private|unlisted are required; compose() adds the title
+  youtube: () => ({ type: "public" }),
 };
+
 
 export const isVideo = (path: string | null) => !!path && /\.mp4(?:$|\?)/i.test(path);
 
@@ -107,6 +111,12 @@ export function compose(input: ComposeInput): Composed {
   });
   if (!text.trim() && image.length === 0) throw new ComposeError("nothing to send: no text and no media");
   if (input.format === "reel" && !(image.length === 1 && isVideo(image[0].path))) throw new ComposeError("a Reel needs exactly one video");
+  if (input.platform === "youtube") {   // one video, a title, a description; YouTube posts carry no follow-up comments here
+    if (!(image.length === 1 && isVideo(image[0].path))) throw new ComposeError("a YouTube post needs exactly one video");
+    const { title, description, problem } = youtubeParts(text);
+    if (problem) throw new ComposeError(problem);
+    return { values: [{ content: toPostizHtml(description), image }], settings: { __type: "youtube", ...settingsOf(input.format), title }, text };
+  }
   const values: Composed["values"] = [{ content: toPostizHtml(text), image }];
   // a story shows no comments (the preview says the same)
   if (input.format !== "story") input.comments.forEach((c, i) => {
