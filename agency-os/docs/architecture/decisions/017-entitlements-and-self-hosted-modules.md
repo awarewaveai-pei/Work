@@ -37,7 +37,7 @@
 | 點數（共用錢包按次扣） | hosted | credits（ADR 015） | customer |
 | 賣人＝買斷 | self_hosted | perpetual＋`updates_until`；客人已有網站就接進來（§6） | customer；買維運時 staff |
 
-- **業界對照**（照抄的部分，不重新發明）：B 軸＝Stripe Billing 的 Customer→Subscription→Price→Entitlement，許可與價格分離（Stigg、LaunchDarkly 同）；`perpetual`＋`updates_until`＝JetBrains perpetual fallback；授權檔離線驗章＝GitLab self-managed／Atlassian Data Center；C 軸代操＝Shopify collaborator／Meta Business Manager partner／Google Ads 管理員帳戶（代理商員工用自己的帳號進客戶帳戶、用量記客戶、稽核記「誰替誰」、客戶可撤）；`api_key` actor＝OpenAI／Stripe API key（綁計費帳戶與 scope，用量計 credits）。
+- **業界對照**（照抄的部分，不重新發明）：B 軸＝Stripe Billing 的 Customer→Subscription→Price→Entitlement，許可與價格分離（Stigg、LaunchDarkly 同）；`perpetual`＋`updates_until`＝JetBrains perpetual fallback；授權檔離線驗章＝GitLab self-managed／Atlassian Data Center；C 軸代操＝Shopify collaborator／Meta Business Manager partner／Google Ads 管理員帳戶（代理商員工用自己的帳號進客戶帳戶、用量記客戶、稽核記「誰替誰」、客戶可撤）；`api_key` actor＝OpenAI／Stripe API key（綁計費帳戶與 scope，用量計 credits）。直接採用現成方案的評估（2026-10-25）：[reports/decisions/2026-10-25-customer-model-buy-vs-build.md](../../../reports/decisions/2026-10-25-customer-model-buy-vs-build.md)。
 - **已定義、還沒賣的值**（不是待補，是等第一個客戶）：`api_key` actor（順序第 6 步）；轉售＝授權檔 `max_tenants > 1`（順序第 7 步）。值存 text，不存 boolean，加值不改 schema。
 - System Foundry 問卷已能表達五種方式（都是既有答案的組合：自用＝員工使用要＋收費不要；代操＝員工要＋外部客戶不要＋收費要；訂閱／點數＝外部客戶要＋訂閱／預付點數要；買斷＝License 要）與根組織數（多家公司／分公司／集團／個人自用）；只缺一題「裝在客戶自己的主機」。藍圖末節「交付登記」推出五答案；子網域與 WordPress 登入來源是 AwareWave 實作值，由產生器補問（TASKS 2026-10-17 更正）。
 

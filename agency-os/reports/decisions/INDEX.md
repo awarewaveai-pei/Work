@@ -19,6 +19,7 @@ For each entry: open the linked file for the full report including debate transc
 | 2026-09-23 | 研究管線（/ops/collect → Cognitive OS／HCI → 報表）三條線為何不順、怎麼重建 | 缺件＝彙整層（原文→每句帶 [n] 的結構化發現，三個 schema）；研究案聚合根；Cognitive OS 降為結構化透鏡；**HCI 退出三條線**（原構想七個矛盾見 §10.1）；§10.5 四題待操作者裁決 | 直接決策（提案，§10 修正版） | [2026-09-23-research-pipeline-architecture.md](2026-09-23-research-pipeline-architecture.md) |
 | 2026-09-26 | 系統模式遇到外部進來的事件（Printful／Woo 訂單／Chatwoot）與建站派送怎麼處理 | 模式只擋我們發起的變更；客戶事件先落 DB 再延後或轉人工，永不回 423；操作者發起的 Printful 寫入與建站派送照常把關 | 直接決策（操作者全權委派） | [2026-09-26-system-mode-inbound-events.md](2026-09-26-system-mode-inbound-events.md) |
 | 2026-10-22 | 共用 checkout commit 繞路燒 token：worktree push 試點與撤回 | 撤回 worktree push；AO-RESUME parity 改為乾淨 3-way 帶過 dirty 檔、WORKLOG merge=union | 直接決策 | [2026-10-22-per-session-worktree-pilot.md](2026-10-22-per-session-worktree-pilot.md) |
+| 2026-10-25 | 客戶模型三軸五方式：現成方案能取代多少（直接決策，待操作者確認） | 訂閱維持 WCS＋TapPay；權利、錢包、代操維持自寫；買斷授權建議改用 Keygen CE | 中 | [2026-10-25-customer-model-buy-vs-build.md](2026-10-25-customer-model-buy-vs-build.md) |
 
 ---
 

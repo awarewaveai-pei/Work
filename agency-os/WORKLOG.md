@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-25（續76）客戶模型三軸五方式：現成方案評估——權利、錢包、代操維持自寫，買斷授權建議改用 Keygen CE（待操作者確認）（Claude）
+
+- **觸發**：操作者「查清楚 我們寫得要死要活得 還一堆漏洞」。ADR 017 `:40` 業界對照只照抄模型、未評估直接採用。
+- **結果**：`reports/decisions/2026-10-25-customer-model-buy-vs-build.md`（20 個候選 × R1–R8）；ADR 017 `:40` 加一行指標；`reports/decisions/INDEX.md` 一列。
+  - 無候選同時滿足「產品在 WP 外＋合約／贈送權利＋預留結算錢包」。
+  - 訂閱維持 WCS＋TapPay（Stripe 不收台灣商家）；錢包、權利、代操維持自寫。
+  - 買斷授權（第 ⑤ 步，未開工）建議 Keygen CE：Ed25519 離線授權檔、FCL 可嵌地端；待查欄位對應與法務。
+  - 漏洞多在接縫（WP→控制面）；對策＝step-4 卡 `:40`／`:148` 的端到端演練（prod `payment_events`＝0），非換套件。
+- REALTEST_WAIVED: QUERY_ONLY -- 研究；主 agent 以 WebFetch 抽查 Stripe 國家清單、Lago 錢包扣點時點、Keygen 授權檔簽章 3 項，均與研究員一致
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（讀回報告與 ADR 指標；`verify-governance-pointers.mjs` PASSED 161 pointers）
+- BUGHUNT_WAIVED: DOC_ONLY -- 新增決策報告與一行指標，未改程式
+- **rollback**：`git revert <本 commit>`。
 ## 2026-10-25（續75）0134 套 prod＋推 main（操作者 go）：organizations 只剩 SELECT 政策，anon／authenticated 只剩 SELECT 權（Claude）
 
 - **觸發**：操作者「go ahead：0134 先套 prod，讀回政策和權限，再 commit 推 main」。接續 72（盤點、方案、拋棄式驗證）。
