@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-25（續51）治理：給操作者看的一律繁體中文（AGENTS.md §9 第一條）（Claude）
+
+- **觸發**：操作者 2026-10-25「你們的報告都寫英文, 過程我不管, 報告要用繁中, 你看你要寫在 CLAUDE.MD, 還是 AGENT.MD」。
+- **根因**：§9 只寫「繁體中文」一詞，沒點名「報告」；harness 系統提示與 skill 的英文寫作範例蓋過它，本 session 與它開出的 session 回報都用英文。
+- **做了什麼**：`agency-os/AGENTS.md` §9 第一條改寫：回覆、收尾報告、wrap-up recap、session／subagent／Codex 交回的報告、監工台與卡片文字、問操作者的問題全部繁中；英文只留程式碼、指令、檔名、識別符、錯誤原文、commit message；給其他 session／subagent／Codex 的 brief 必加「回報操作者一律繁體中文」。選 AGENTS.md 而非 CLAUDE.md：Claude、Codex、每個 session 每輪都注入（CLAUDE.md 首行 @ 引入），一處寫細節。記憶 `feedback_reports_in_traditional_chinese.md`；已通知執行中的 wp-bridge session。
+- REALTEST_WAIVED: DOC_ONLY -- 只改治理文件
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（讀回 §9 改後內容）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=繁體中文 | hits=262
+- **驗證**：`node scripts/verify-governance-pointers.mjs` PASSED；`doc-sync-automation.ps1 -AutoDetect` 跑過（只更新各檔同步時間戳，本 commit 只帶 AGENTS.md）。
+- **rollback**：`git revert <本 commit>`。
 ## 2026-10-25（續50）0129 刪 billing_overview（0127 的收縮步，操作者 go）：已套 prod（Claude）
 
 **觸發**：操作者「go ahead：套 0129 到正式庫，確認後 commit 並 push main。」接續 33（0127 只加不刪）。

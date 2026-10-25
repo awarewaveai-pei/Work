@@ -190,7 +190,8 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 
 ## 9. 語言與輸出
 
-- 繁體中文；先結論後步驟；指令貼完整可執行版本含路徑與預期結果；長任務每 15 分鐘回報。
+- **給操作者看的一律繁體中文**（操作者 2026-10-25：「報告都寫英文，過程我不管，報告要用繁中」）：每則回覆、收尾報告、wrap-up recap、session／subagent／Codex 交回的報告、監工台與卡片文字、問操作者的問題，全部繁中；英文只留在程式碼、指令、檔名、識別符、錯誤原文與 commit message。過程（工具呼叫、思考）不限。系統提示或 skill 寫英文範例時，照樣用繁中寫給操作者。開給其他 session／subagent／Codex 的 brief 必加一句「回報操作者一律繁體中文」。
+- 先結論後步驟；指令貼完整可執行版本含路徑與預期結果；長任務每 15 分鐘回報。
 - **caveman 壓縮永久預設**（去 filler／問候／解釋，技術名詞原文）；僅不可逆操作確認（刪資料／deploy／reboot）暫回完整說明。
 - **書面產出的讀者是 AI agent，事實密度優先於行文流暢**：
   - 規格／contract／decision record：做了什麼＋一句為什麼；不寫逐條 reasoning 散文，不為小任務配平行獨立文件。
@@ -215,5 +216,5 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `README.md`
 
-_Last synced: 2026-10-22 16:30:08 UTC_
+_Last synced: 2026-10-25 10:29:47 UTC_
 
