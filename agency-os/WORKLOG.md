@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-25（續19）CI 3 個紅：2 個是 GitHub 帳單停跑，1 個是真紅——/account、/codex-do 的 Codex wrapper 沒進 git，本機 gate 讀磁碟所以看不到（Claude）
+
+- **觸發**：AO-RESUME `ci-LATEST.md` 🔴：next-admin typecheck／Perplexity guard／Shared asset gates。
+- **C1 帳單（不是程式）**：2026-10-24 ~17:30 UTC 起 GitHub-hosted job 全部 `steps=0`，annotation「recent account payments have failed or your spending limit needs to be increased」（run 40145255291）。三個 workflow 都中。只有操作者能在 GitHub Billing & plans 處理；處理前任何 commit 在 CI 都不會被檢查。
+- **C2 真紅（帳單前就紅）**：Shared asset gates 最後綠 2026-10-24 05:00（a44c90a24）；17:28 run 40116310728（同 commit 另兩個 workflow 綠）`verify-asset-parity.mjs` 報 `.agents/skills/source-command-{account,codex-do}/SKILL.md` 不存在。4987b173b 新增兩個 command 時 sync 腳本有生成 wrapper，但沒 `git add`。
+- **不變量**：gate 檢查的樹 = CI 看到的樹。原 gate 讀磁碟，untracked 檔讓本機綠、CI 紅（false green）。
+- **做了什麼**：`scripts/verify-asset-parity.mjs` 加 `listUntracked(counted)`：gate 實際數到的檔（command／agent／skill／wrapper SKILL.md／codex toml）逐一比對 `git ls-files -z`（index，含已 stage），不在就報；沒有 `.git` 回 null 不比對；git 執行失敗報一條問題（不當成乾淨）。`tests/hooks/asset-parity.test.mjs` 加 2 條合成樹測試。兩個 wrapper 進 git。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scripts/verify-asset-parity.mjs（stage 前 exit=1 指名兩個 untracked wrapper；stage 後 OK）＋ node --test tests/hooks/asset-parity.test.mjs（22 pass）；unstage account wrapper → gate exit=1 指名該檔 | exit=0 | ms=402
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：untracked 迴圈改空→「not in git」測試紅；git 失敗分支改 if(false)→「could not ask git」測試紅；各自還原 22 pass | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n（Codex，`agency-os/reports/oracle/2026-10-25-partialreview-314949ca.md`）：m1 `--exclude-standard` 讓被 ignore 但被數到的 wrapper 仍本機綠；m2 git 失敗被當成「不是 checkout」靜默跳過。兩條皆修（改為比對被數到的檔 vs index；git 失敗報錯），各有突變證據。第一版修 m1 改成不帶 exclude 的 `--others` 會把 `skills/synced` 快取 512 個報出來，所以改成只看被數到的檔。
+- ORACLE_WAIVED: Codex 審查是 -Path 範圍（partialreview，共享 worktree 有其他 session 大量未提交改動，整 repo 審會審到別人的東西），且早於修 m1/m2 的最後改動；修正以 2 個突變＋本機 unstage 實測代替第二輪。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,tests,mcp,.github | grep=verify-asset-parity | hits=6（呼叫端只有 shared-asset-gates.yml 與 asset-parity.test.mjs；其餘為文件／歷史紀錄）
+- **剩餘**：C1 帳單要操作者處理；處理後 push 這個 commit 才會在 CI 驗到綠。
+- **rollback**：`git revert <本 commit>`。
 ## 2026-10-25（續18）CI 三道閘「紅」＝GitHub 沒啟動 job（帳務），不是程式壞；check-ci-health 改成報出原因（Claude）
 
 - [觸發] AO-RESUME blockers：`next-admin — TypeScript typecheck` 連紅 12 次、`Perplexity Search-only guard`／`Shared asset gates` 各 20 次；操作者：先修 typecheck，趕今晚 03:00 自動部署。

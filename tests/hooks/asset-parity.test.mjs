@@ -47,6 +47,18 @@ test('a fully consistent tree reports nothing', () => {
   assert.deepEqual(real(checkParity(cleanTree())), []);
 });
 
+test('an asset file on disk that git does not track fails', () => {
+  const t = cleanTree();
+  t.untracked = ['.agents/skills/source-command-health/SKILL.md'];
+  assert.match(whats(checkParity(t)), /not in git/);
+});
+
+test('a git failure is reported instead of passing as clean', () => {
+  const t = cleanTree();
+  t.untracked = { error: 'fatal: detected dubious ownership' };
+  assert.match(whats(checkParity(t)), /could not ask git/);
+});
+
 test('a command with no Codex wrapper fails', () => {
   const t = cleanTree();
   t.wrappers.delete('source-command-health');
