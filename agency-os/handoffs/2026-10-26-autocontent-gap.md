@@ -1,4 +1,4 @@
-續接語：續做 AUTOCONTENT-GAP：只讀本檔 `agency-os/handoffs/2026-10-26-autocontent-gap.md`，從「§5 第一步」開始；完成＝三張卡（§7）驗收全綠且操作者看過計畫卡。建議模型：Opus 5.5 實作（卡已寫死每一步，Codex 照卡亦可）。回報操作者一律繁體中文。
+續接語：續做 AUTOCONTENT-GAP：只讀本檔 `agency-os/handoffs/2026-10-26-autocontent-gap.md`，從「§5 第一步」開始；完成＝四張卡（§7）驗收全綠且操作者看過計畫卡。建議模型：Opus 5.5 實作（卡已寫死每一步，Codex 照卡亦可）。回報操作者一律繁體中文。
 
 # AUTOCONTENT-GAP：全自動內容管線的前兩步沒接上排程，題目閘不存在
 
@@ -28,6 +28,7 @@
 | **題目閘** | 只有人挑：`proposed → approved` 唯一入口是人按 `/api/content/topics/[id]` approve。計畫 §3.1 寫的「ai_review_auto 自動核准」**沒有程式碼** | `NA/lib/content/topics/store.ts:16`；`NA/app/api/content/topics/[id]/route.ts:15`；`agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md:78` |
 | **產生題目** | `proposeMonth()` 唯一呼叫點＝題目頁按鈕 API；**排程從不呼叫** | 定義 `NA/lib/content/topics/plan.ts:108`；呼叫 `NA/app/api/content/topics/plan/route.ts:33` |
 | proposeMonth 做什麼 | 讀站品牌 → 近 30 天熱搜前 50（`recentTrends(sb, geoFor(targetCountry), 30, 50)`）＋知識庫資料夾前 30 → 一次 Opus（`PLAN_TOPICS=28`）→ `parsePlan` → `proposeTopics`（同月同關鍵字略過）→ 狀態 `proposed`。品牌語氣／行銷簡報已在 prompt 裡＝「AI 挑的條件」 | `NA/lib/content/topics/plan.ts:16,36,108-124` |
+| 提案用的模型與價格 | `CLAUDE_DEFAULT_MODEL = claude-opus-5-5`（專案預設，P3 沿用）。一次提案 1800 in／3500 out ≈ **0.08 美元**（Opus 4／20 per M）；Sonnet 4.6 ≈ 0.06、Haiku 5.5 ≈ 0.002。一站一月一次，錢不是重點；28 個不重複、可搜尋、符合品牌的關鍵字是判斷題，**維持 Opus**（操作者 2026-10-26 問過，決定不換）。真的要換只改 `planAsker` 的 model 與 `cost-model.ts:151` 那列 | `NA/lib/ai/claude-params.ts:21`；`NA/lib/ai/cost-model.ts:41-45,151`；`NA/lib/content/topics/plan.ts:86` |
 | 題目的 `source` | 由 **AI 自報** `trending`／`kb`／`plan`；人手加的才是 `manual`。一份提案可能 0 筆 `plan` | `NA/lib/content/topics/plan.ts:65`；`lobster-factory/packages/db/migrations/0121_content_topics.sql:38` |
 | 題目的月份 | 台灣月（`taipeiParts`／`monthKey`）；`scheduled_for` 09:00 台灣 | `NA/lib/content/topics/store.ts:72,82`；`NA/lib/content/topics/plan.ts:70` |
 | AI 呼叫注入 | `planAsker(grant, route, actorRole)`；檔頭註解已預告「排程用 `grantFor` 計同一個 feature `content.plan`」——設計有想到，但沒接 | `NA/lib/content/topics/plan.ts:1-5,80-95` |
@@ -58,17 +59,18 @@
 | B7 | 設定只有一份：總控頁（卡 C）讀寫的是 `/ops/schedules` 與 `/tools/content/sites` 同一份資料 | 兩份設定遲早不同步 |
 | B8 | 排程內每一筆 AI 花費記在**該客戶**（`runForOrg` ＋ `grantFor("content.plan")`）；客戶沒開通或點數不足（`EntitlementRequired`）＝**跳過、不當故障**：不寫嘗試記號、不開 incident、當次 firing 照常 tick；總控頁顯示「未開通」 | ADR 017：許可只問 `can(主體, feature, actor)`，五種客戶方式（訂閱／點數／買斷…）靠同一條；點數用完的客戶若每天收一張 incident 是噪音，不是故障（`can.ts:122-125`；`products.ts:75` 已登記 `content.plan`） |
 | B9 | 站的市場不在 `TRENDING_GEOS` 內 → **沒有熱搜**（提案只靠品牌＋知識庫），不是退回台灣的熱搜 | 平台是全球客戶；現行 `geoFor` 不認識的國家回 `"TW"`（`plan.ts:20-21`）會拿台灣熱搜替德國站規劃 |
+| B10 | 品牌自己填的產業來源（P9.4）只進**該品牌**的提案 prompt，**不寫進** `content_trends` 共用快取 | `content_trends` 無租戶欄（`trends.ts:1-3`）；寫進去＝客戶 A 的產業新聞變成同地區客戶 B 的「熱搜」 |
 
 ## 4. 風險與部署
 
-- 卡 A Low（免費、無 DB）。卡 B Medium（排程內新增 AI 花費）→ 三張卡先給操作者看，同意再動手。migration 0138 加一欄、可 down、不鎖表；**apply 到 prod 那一步是 High，等 go**。卡 C Low–Medium（UI）。
+- 卡 A Low（免費、無 DB）。卡 B Medium（排程內新增 AI 花費）→ 四張卡先給操作者看，同意再動手。migration 0138 加一欄、可 down、不鎖表；**apply 到 prod 那一步是 High，等 go**。卡 C Low–Medium（UI）。卡 D（P9.4）Low（免費、無 DB、只多一個選填欄位）。
 - 推上 main ＝當晚台灣 03:00 自動部署（AGENTS §0）。還不能上就放 `lobster-factory/infra/hetzner-phase1-core/DEPLOY_HOLD`（`reason=` 一行）。
 
 ## 5. 做法（照順序）
 
 1. 整檔讀 `NA/lib/schedules/jobs.ts`、`NA/lib/content/topics/{plan,tick,make,trends,store}.ts`、`NA/lib/schedules/store.ts`、`NA/app/api/content/trending/route.ts`、`NA/app/api/content/topics/plan/route.ts`、`NA/app/api/content/sites/[id]/route.ts`、`NA/lib/content/brand-voice.ts`。確認 §2 行號仍對。
-2. 把 §7 三張卡照抄進 `EXECUTION_PLAN.md` §7（編號 P9.1／P9.2／P9.3，格式同 P6／P7，不改寫）；§3.1 資料流圖（`EXECUTION_PLAN.md:74-78`）三行改成：熱搜「排程每天一次」、提案「本月沒有就提，台灣月」、核准「`topicMode=ai_pick` 自動核准；`publishMode` 只管發布」。監工台 `data.mjs` 加 P9 一組 `todo(...)` → `node build.mjs && node check.mjs`。
-3. 三張卡貼給操作者看（繁中、白話、說每月多花多少錢），等同意。流程與兩個閘的設計已定案（§1），不再問。
+2. 把 §7 四張卡照抄進 `EXECUTION_PLAN.md` §7（編號 P9.1／P9.2／P9.3／P9.4，格式同 P6／P7，不改寫）；§3.1 資料流圖（`EXECUTION_PLAN.md:74-78`）三行改成：熱搜「排程每天一次」、提案「本月沒有就提，台灣月」、核准「`topicMode=ai_pick` 自動核准；`publishMode` 只管發布」。監工台 `data.mjs` 加 P9 一組 `todo(...)` → `node build.mjs && node check.mjs`。
+3. 四張卡貼給操作者看（繁中、白話、說每月多花多少錢），等同意。流程與兩個閘的設計已定案（§1），不再問。
 4. 依 P9.1 → P9.2 → P9.3 實作；每張卡一個 commit（pathspec）；共同收尾見 §6。
 5. 完成後把 `agency-os/TASKS.md` 收件匣 AUTOCONTENT-GAP 那條打勾；`data.mjs` 的 `todo` 改 `done`。
 
@@ -189,10 +191,33 @@
 **驗收**：在總控頁切開關／改每日上限／改題目閘／改發布閘後，到 `/ops/schedules` 與 `/tools/content/sites` 看到同樣的值（B7）；`npx vitest run app/__tests__/sidebar-coverage.test.ts` 綠；`/playwright` 截圖頁頂五格（雙站客戶切站時 ④ 不變）給操作者看。
 **Rollback**：revert commit；無 DB 改動。
 
+### P9.4　品牌自己的產業來源（免費；Low；無 migration；A、B 之後任何時候）
+
+操作者 2026-10-26：「等有客戶需要，所以要有地方可以填」。共用熱搜只分地區（§2）；這張卡給每個網站一個欄位填自己產業的 RSS，提案時抓最新文章一起給 AI（B10：只進該品牌的 prompt，不進共用快取）。
+
+**改哪些檔**
+1. `NA/lib/content/brand-voice.ts:23-30` `SiteContentDefaults` 加 `trendFeeds?: string[]`（https 網址，最多 10 個），加常數 `MAX_TREND_FEEDS = 10`。
+2. `NA/app/api/content/sites/[id]/route.ts:63-66`：組好 `given` 之後正規化 `given.trendFeeds`：非陣列→刪掉；每項 `trim`、去重、`isSafePublicHttps`（已在 `NA/lib/content/public-https.ts`，`trending-sources.ts:4` 同一支）不過→ 400 `{ error: "trendFeeds: <那個網址> 不是公開 https 網址" }`；超過 10 個→ 400。既有 PATCH 全量覆寫路徑不變。
+3. `NA/app/(shell)/tools/content/sites/SiteManager.tsx:142` 附近加欄位「產業來源（選填）」：一列一個 `<input>`＋「移除」鈕，底下「＋新增來源」鈕（到 10 個隱藏）；說明文字「填你這個產業的新聞或部落格 RSS 網址，AI 規劃題目時會優先參考。沒填就只看地區熱搜。」不用下拉。
+4. `NA/lib/content/trending-sources.ts:353-360`：把 `runTrending` 內「對一組 blocks 跑 `Promise.allSettled` 收 items」抽成 `export async function runBlocks(blocks, geo)`，`runTrending` 改呼叫它（行為不變）。
+5. `NA/lib/content/topics/plan.ts`：
+   - `PlanContext` 加 `industry: string[]`；`buildPlanPrompt` 在「近 30 天的熱門話題」之前多一段「品牌自己的產業來源最新文章（優先參考）：」＋ `list(c.industry)`；`industry` 空就**不印這段**。
+   - `proposeMonth`：`feeds = site.defaults.trendFeeds ?? []` → `blocks = buildDbSearchBlocks(feeds.map((url, i) => ({ id: \`site-${site.siteId}-${i}\`, label: new URL(url).hostname, url, geos: "*", enabled: true })))`（`trending-sources.ts:181-195`，ephemeral、不 register）→ `items = await runBlocks(blocks, geo ?? "TW")`（只用來選語言參數，B9 的 null 不影響）→ `industry = items.slice(0, 30).map((it) => it.title)`。抓失敗＝空陣列，**不 throw**（`runBlocks` 已 allSettled）。**不呼叫 `saveTrends`**（B10）。
+6. P9.3 的 ① 格多一行：「產業來源：N 個（到網站設定改）」。
+
+**驗收**
+- route 測試（既有 `sites/[id]` 測試風格）：`trendFeeds: ["http://x"]` → 400；11 個 → 400；`[" https://a.example/feed ", "https://a.example/feed"]` → 存成 1 個、已 trim。
+- `plan.test.ts`：`industry=[]` → prompt 沒有「產業來源」字樣；`industry=["A","B"]` → 有且在熱搜段之前；`proposeMonth` 給 `trendFeeds` 兩個 → `runBlocks` 收到 2 個 block、`saveTrends` 從未被叫（B10）；`runBlocks` 全失敗 → 仍 `proposeTopics`。
+- 指令：`npx vitest run lib/content/topics/__tests__/plan.test.ts "app/api/content/sites/[id]/test"`。
+- 突變：拿掉 route 的 `isSafePublicHttps` 檢查 → `http://x` 那條變紅 → 還原變綠。
+
+**Rollback**：revert commit；已存在 `content_defaults.trendFeeds` 的 JSON 鍵舊程式會原樣保留、不讀，不必清。
+
 ## 8. 範圍外（別順手做）
 
 - 「AI 挑題的條件表單」（每月幾題、只要熱搜來源…）：先用品牌語氣當條件；要調的只有 `PLAN_TOPICS=28`（`plan.ts:16`），真有客戶要再開卡。
-- **品牌自己的趨勢來源（產業別）**：現有來源只分地區（§2）。操作者 2026-10-26 問「萬一產業不同」。要做時的形狀（LEGO，不改現有流程）：`content_sources` 與 `content_trends` 各加可空欄 `organization_id`（null＝共用，既有列不動；RLS 同 0136 控制面表模式）；`runTrending(geo, extraBlocks)` 的 `extraBlocks` 已能塞任何 block（`trending-sources.ts:353-357`），所以只是 `loadDbSourceBlocks()` 多撈該客戶自己的列、`saveTrends`／`recentTrends` 多帶 `organization_id`（共用＋自己的一起排）；客戶在 `/tools/content/sites` 填自己產業的 RSS（免費）。付費的「用品牌關鍵字搜新聞」（Serper，每站每天 ~0.001 美元）要另一顆按鈕顯示成本後才開。**是否現在做由操作者決定**；不做也不影響 P9.1–P9.3。
+- 品牌產業來源的**持久化**（存 30 天、算出現天數）：P9.4 只在提案當下抓最新文章進 prompt。要持久化得替 `content_sources`／`content_trends` 加可空 `organization_id`（RLS 同 0136 模式），等有客戶抱怨「只看當天不夠」再做。
+- 付費的「用品牌關鍵字搜新聞」（Serper，每站每天 ~0.001 美元）：要另一顆按鈕顯示成本後才開，不在 P9.4。
 - 月中才開開關：提的是當月、含已過日期的題目，核准後 tick 依每日上限慢慢消化；不做「改提下個月」。
 - P5 Story Bible 提示片段（`storyBibleContextBlock`、角色 id 提示）仍由頁面組好再送出：另一件事。
 - 真跑一整輪需 staging WP＋測試社群品牌：操作者 10-24 說先不用。
