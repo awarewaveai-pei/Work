@@ -1,4 +1,20 @@
 # Worklog
+## 2026-10-25（續35）next-admin 手動部署 5db9dd75b（操作者 go）：OpenAI 圖片改用 gpt-image-2 提前上線，公網與 Playwright 煙霧測試通過（Claude）
+
+**觸發**：操作者「Go ahead: deploy next-admin now with sg-deploy, then smoke test.」原因：gpt-image-1 已關閉，正式環境的 openai-low／medium／high 圖片選項全壞（續31 F1），不等 03:00。
+
+**部署前**：origin/main 沒有 `DEPLOY_HOLD`。3e069ee69..5db9dd75b 之間有 6 個 next-admin commit：5db9dd75b（本 session）、4df74a3e5／2cbea343c（payments session，0128 已套 prod）、9fb080c84／6cfcba142（Perplexity 退役）、39462a149（schedules 分頁），都已在 main，今晚 03:00 本來就會上。`apply-db-migration.mjs --status` 顯示 applied 127、missing 1，那一筆是 0127_billing_account_views：只存在另一個 session（色票主題配置）的工作目錄，還沒在 main 上，所以 sg-deploy 的 migration 閘不受影響。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin（主機 npm test 3329 passed → rollback 快照 `lobster-phase1-next-admin:rollback-20261025-080417` → build → healthy 10s → HTTP smoke 5/5；deployed commit 5db9dd75b） | exit=0 | ms=420000
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-next-admin grep /app/.next/server：build 內含 gpt-image-2，`model:"gpt-image-1"` 出現 0 次 | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=curl | cmd=公網：app `/login` 200、`/tools/tarot` 307；tarot、studio、video、design、social、portal 都 307 到 login；aware-wave.com 200；`/api/tools/tarot/generate` 401（要登入） | exit=0 | ms=10000
+- REALTEST_EVIDENCE: tool=Bash | cmd=scripts/playwright-runner.ps1 -Mode smoke -SkipInstall（26 passed／0 failed／6 skipped，證據在 `agency-os/reports/e2e/2026-10-25/smoke`） | exit=0 | ms=120000
+- 前一步已用正式 key 實測：gpt-image-2 的生成和 edits 都回 200（續31）。
+- REVIEW_WAIVED: NA -- 部署動作；程式審查見續31
+- BUGHUNT_WAIVED: NA -- 本條沒有程式改動
+
+**rollback**：照 `DEPLOY_ROLLBACK_RUNBOOK.md` §2.1，用快照 `rollback-20261025-080417` 或 sg-deploy 前一版 3e069ee69（注意：回退後 OpenAI 圖片又會壞）。
 ## 2026-10-25（續33）0127 套 prod＋5bdf7f9f9 推 main（操作者 go）：帳務新版今晚 03:00 自動部署（Claude）
 
 **觸發**：操作者「go ahead：套 0127 到正式庫，確認後 push main，讓今晚 03:00 自動部署。」設計與驗證見續32。
