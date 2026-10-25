@@ -4,7 +4,7 @@ import type { Grant } from "@/lib/entitlements/can";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { logAiCall } from "@/lib/ai/log-ai-call";
-import { fetchRemoteFile, RemoteFileError } from "@/lib/collect/net/remote-file";
+import { fetchRemotePageText, RemoteFileError } from "@/lib/collect/net/remote-file";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,23 +27,12 @@ const URL_REFUSED: Record<RemoteFileError["reason"], string> = {
   too_large: "頁面超過 2 MB", wrong_type: "網址不是網頁",
 };
 async function fetchUrlText(url: string): Promise<{ text: string } | { error: string }> {
-  let bytes: Uint8Array;
   try {
-    ({ bytes } = await fetchRemoteFile(url, {
-      maxBytes: 2_000_000, timeoutMs: 8000, accept: (t) => t.startsWith("text/") || t === "application/xhtml+xml",
-    }));
+    return { text: await fetchRemotePageText(url, { maxBytes: 2_000_000, timeoutMs: 8000, maxChars: 5000 }) };
   } catch (e) {
     if (e instanceof RemoteFileError) return { error: URL_REFUSED[e.reason] };
     throw e;
   }
-  const text = new TextDecoder().decode(bytes)
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s{2,}/g, " ")
-    .trim()
-    .slice(0, 5000);
-  return { text };
 }
 
 export const POST = withFeature("content.brand-voice", handlePost);

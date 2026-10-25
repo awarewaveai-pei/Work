@@ -1,7 +1,7 @@
 // A pasted media URL (lib/content/postiz.ts uploadMedia/uploadVideo): collect's address gate on every redirect hop,
 // the byte cap, and nothing internal in the error (review 2026-10-15 M2).
 import { describe, expect, it } from "vitest";
-import { fetchRemoteFile, RemoteFileError } from "@/lib/collect/net/remote-file";
+import { fetchRemoteFile, pageText, RemoteFileError } from "@/lib/collect/net/remote-file";
 
 const IMAGE = { maxBytes: 10, timeoutMs: 5_000, accept: (ct: string) => ct.startsWith("image/") };
 const publicDns = async () => ["93.184.216.34"];
@@ -30,6 +30,13 @@ describe("fetchRemoteFile", () => {
     const html = new Response("<html>", { headers: { "content-type": "text/html" } });
     expect(await reason(fetchRemoteFile("https://cdn.example/a.png", IMAGE, { resolver: publicDns, transport: transport(html) }))).toBe("wrong_type");
     expect(await reason(fetchRemoteFile("http://cdn.example/a.png", IMAGE, { resolver: publicDns }))).toBe("refused");
+  });
+
+  it("a page's text drops scripts, styles and tags, and a hostile body of unclosed tags takes linear time", () => {
+    expect(pageText('<p>a</p><SCRIPT>x<b></b></script><style>.c{}</style>b <img src="i"> c<script>never closed')).toBe("a b c");
+    const started = Date.now();
+    for (const body of ["<".repeat(200_000), "<script".repeat(30_000), "<script></script>".repeat(15_000), "a<style".repeat(30_000)]) pageText(body);
+    expect(Date.now() - started).toBeLessThan(1_000);   // the old regexes: ~11 s for the first body alone
   });
 
   it("a public image within the cap comes back with its type", async () => {

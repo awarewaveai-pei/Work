@@ -47,3 +47,37 @@ export async function fetchRemoteFile(
   if (!opts.accept(contentType)) throw new RemoteFileError("wrong_type");
   return { bytes: new Uint8Array(await res.arrayBuffer()), contentType };
 }
+
+/** A web page a person pasted, as plain text (scripts, styles and tags dropped), at most maxChars; same gate and errors. */
+export async function fetchRemotePageText(
+  url: string,
+  opts: { maxBytes: number; timeoutMs: number; maxChars: number },
+  deps: { resolver?: Resolver; transport?: typeof fetch } = {},
+): Promise<string> {
+  const { bytes } = await fetchRemoteFile(url, {
+    maxBytes: opts.maxBytes, timeoutMs: opts.timeoutMs, accept: (t) => t.startsWith("text/") || t === "application/xhtml+xml",
+  }, deps);
+  return pageText(new TextDecoder().decode(bytes)).slice(0, opts.maxChars);
+}
+
+/** Tags, scripts and styles dropped in linear time: the page is the stranger's, and `<[^>]+>` or a lazy
+ *  `<script[\s\S]*?</script>` over a body of unclosed `<` is quadratic (minutes of CPU at the 2 MB cap). */
+export function pageText(html: string): string {
+  const lower = html.replace(/[A-Z]/g, (c) => c.toLowerCase());   // ASCII only: indexes stay aligned with html
+  let out = "";
+  let i = 0;
+  let s = -2;
+  let t = -2;
+  for (;;) {
+    if (s !== -1 && s < i) s = lower.indexOf("<script", i);
+    if (t !== -1 && t < i) t = lower.indexOf("<style", i);
+    const start = s < 0 ? t : t < 0 ? s : Math.min(s, t);
+    if (start < 0) { out += html.slice(i); break; }
+    out += `${html.slice(i, start)} `;
+    const close = lower.indexOf(start === s ? "</script" : "</style", start);
+    const end = close < 0 ? -1 : lower.indexOf(">", close);
+    if (end < 0) break;                                            // never closed: the rest is script
+    i = end + 1;
+  }
+  return out.replace(/<[^<>]*>/g, " ").replace(/\s{2,}/g, " ").trim();
+}

@@ -172,8 +172,9 @@ describe("registry claims match the code", () => {
   };
   // What a route reaches that is not its own data: the role check, the caller's own grant (who it is, what it may use,
   // and runtime.ts, the store can() reads for that subject), the AI call log. Other lib/entitlements files are data
-  // (tables.ts billingAttention: every organization's billing).
-  const NOT_ROUTE_DATA = new Set(["lib/ops-role.ts", "lib/ai/log-ai-call.ts",
+  // (tables.ts billingAttention: every organization's billing). collect's per-host politeness bucket (0082, keyed by host,
+  // no organization column) is the address-gated fetcher's, which every pasted URL goes through.
+  const NOT_ROUTE_DATA = new Set(["lib/ops-role.ts", "lib/ai/log-ai-call.ts", "lib/collect/net/rate-limit.ts",
     ...["grant", "can", "subject", "runtime"].map((f) => `lib/entitlements/${f}.ts`)]);
   const readsDb = (r: string) => [...importClosure([r], NOT_ROUTE_DATA)].some((f) => !NOT_ROUTE_DATA.has(f) && FILES.get(f)!.db);
   const decidesItself = (r: string) => FILES.get(r)!.called.some((b) => {

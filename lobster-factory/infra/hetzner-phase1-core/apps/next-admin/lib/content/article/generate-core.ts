@@ -4,6 +4,7 @@ import { DEFAULT_AI_TEXT_MODEL, isAiTextModel, isOpenAiTextModel, type AiTextMod
 import { billedOrgId, logAiCall, openaiUsageTokens, type OpenAiUsageLike } from "../../ai/log-ai-call";
 import { claudeFallback, claudeParams } from "../../ai/gateway";
 import { textCallCostUsd, resolveTextRate } from "../../ai/cost-calculator";
+import { fetchRemotePageText } from "@/lib/collect/net/remote-file";
 
 // Output token budgets. Raised 2026-06-16: the old medium=4096 truncated rich articles
 // (tables + nested H3 + lists) mid-sentence, cutting off the trailing CONTENT_META block →
@@ -217,21 +218,15 @@ async function fetchRealSources(keyword: string, language: string): Promise<{ so
   }
 }
 
-async function fetchUrlText(url: string): Promise<string> {
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return "";
-    const html = await res.text();
-    return html
-      .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .replace(/<style[\s\S]*?<\/style>/gi, "")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s{2,}/g, " ")
-      .trim()
-      .slice(0, 3000);
-  } catch {
-    return "";
-  }
+/** The pasted reference pages (at most 3) as prompt context. They go through collect's address gate on every redirect
+ *  hop (lib/collect/net/remote-file.ts): a pasted URL must never reach an internal host and come back in the article.
+ *  https only; a refused or failed page is skipped. */
+export async function referenceContext(urls: readonly string[], deps: Parameters<typeof fetchRemotePageText>[2] = {}): Promise<string> {
+  const fetched = await Promise.all(urls.slice(0, 3).map(async (url) => {
+    const text = await fetchRemotePageText(url, { maxBytes: 2_000_000, timeoutMs: 8000, maxChars: 3000 }, deps).catch(() => "");
+    return text ? `--- Source: ${url} ---\n${text}` : "";
+  }));
+  return fetched.filter(Boolean).join("\n\n");
 }
 
 function buildUserPrompt(params: {
@@ -600,15 +595,7 @@ export async function prepareArticleGeneration(body: ArticleGenerateInput): Prom
 
   const maxTokens  = SIZE_TOKENS[str(body.articleSize, "medium")] ?? 4096;
   // Fetch reference URLs (Connect to Web)
-  const referenceUrls = sarr(body.referenceUrls).filter(u => /^https?:\/\//.test(u)).slice(0, 3);
-  let referenceContext = "";
-  if (referenceUrls.length > 0) {
-    const fetched = await Promise.all(referenceUrls.map(async (url) => {
-      const text = await fetchUrlText(url);
-      return text ? `--- Source: ${url} ---\n${text}` : "";
-    }));
-    referenceContext = fetched.filter(Boolean).join("\n\n");
-  }
+  const referenceText = await referenceContext(sarr(body.referenceUrls).filter(u => /^https?:\/\//.test(u)));
 
   // Internal links
   const internalLinks = sarr(body.internalLinks).filter(u => /^(https?:\/\/|\/)/.test(u.trim())).slice(0, 10);
@@ -659,7 +646,7 @@ export async function prepareArticleGeneration(body: ArticleGenerateInput): Prom
     externalLinks: userExternalLinks,
     realSources,
     internalLinks,
-    referenceContext,
+    referenceContext: referenceText,
     structure,
     introHookBrief: str(body.introHookBrief),
     introHookType:  str(body.introHookType),

@@ -15,6 +15,34 @@
 - BUGHUNT_WAIVED: NA -- 本條沒有程式改動
 
 **rollback**：照 `DEPLOY_ROLLBACK_RUNBOOK.md` §2.1，用快照 `rollback-20261025-080417` 或 sg-deploy 前一版 3e069ee69（注意：回退後 OpenAI 圖片又會壞）。
+## 2026-10-25（續34）文章產生的參考網址改走 collect 位址閘：貼上的網址不再能讓伺服器抓內部主機（SSRF）（Claude）
+
+**觸發**：操作者「你去看」續6 剩餘 n1。
+
+**根因**：`lib/content/article/generate-core.ts:220`（舊）`fetchUrlText` 對 `body.referenceUrls`（http/https 任意）直接 `fetch`，會跟 redirect，沒有位址檢查；抓回的文字（3000 字）進 prompt → 出現在文章裡＝讀內部服務（如 `127.0.0.1:8030`、容器服務名、`169.254.169.254`）再回傳給呼叫者。入口兩個：`app/api/content/generate/route.ts`（content 門已建、staff 工具）與 headless block `lib/content/blocks/article-generate.ts`（同一 `prepareArticleGeneration`）。
+- 同類掃描（server 端 `fetch(<變數>)` 53 處）：其他吃使用者網址的都已有守衛——studio/publish 的 designUrl 要在我們 bucket 下（`publish/route.ts:145-150` base+"/"）、`isUnderBase` 比 host（`lib/storage/r2.ts:65-75`）、tarot 參考圖 allowlist＋`redirect:"manual"`（`lib/tarot/image-gen.ts:348-354`）、proxy-image／designs/download 精確 host allowlist；brand-voice 已走 `fetchRemoteFile`。只有 generate-core 這處沒守。
+
+**修改**（next-admin）
+- `lib/collect/net/remote-file.ts`：新 `fetchRemotePageText`（`fetchRemoteFile` 的網頁版：同一位址閘、每跳檢查、連線釘在檢查過的位址、https only、位元上限）＋`pageText`（線性時間去 script/style/tag：`indexOf` 迴圈，未關的 script 丟掉其餘，標籤 `<[^<>]*>`）。舊的 `<[^>]+>`／lazy `<script[\s\S]*?</script>` 對未關的 `<` 是平方時間（critic M1：200k 個 `<` 舊 regex 11189 ms；2 MB 上限約十多分鐘卡住 event loop；舊 generate-core 連上限都沒有）。
+- `lib/content/article/generate-core.ts`：刪 `fetchUrlText`；匯出 `referenceContext(urls, deps)`（最多 3 個，失敗／被拒的略過）。
+- `app/api/content/brand-voice/route.ts`：改用 `fetchRemotePageText`（同一段 HTML→文字只留一份；錯誤訊息不變）。
+- `lib/portal/__tests__/registry-code.test.ts`：`NOT_ROUTE_DATA` 加 `lib/collect/net/rate-limit.ts`——fetcher 的每 host 禮貌桶（0082 表只有 `host` 主鍵、無組織欄；`fetcher.ts:180` 預設 MemoryRateLimitStore）；不加的話閘 ③ 因 import 鏈 `remote-file → fetcher → rate-limit → supabase-server` 判 content/generate「讀 DB」而紅。
+- 新測試 `lib/content/article/__tests__/reference-context.test.ts`：解析到 127.0.0.1 的網址與 `https://127.0.0.1:8030/` 在任何請求前被略過；公開頁面經注入的 transport 回純文字。`lib/collect/__tests__/remote-file.test.ts` 加 `pageText` 內容＋四種惡意 body 合計 < 1 s。
+
+**行為變化**：http（非 https）參考網址現在被略過（與 brand-voice 一致）；ContentStudio 前端 `ContentStudio.tsx:1263` 仍接受 http，使用者看不到提示。
+
+**驗證**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/content/article lib/collect/__tests__/remote-file.test.ts lib/collect/__tests__/collect-fetch.test.ts lib/portal（11 files，91 passed） | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：referenceContext 換回裸 fetch → reference-context.test.ts 2 failed；還原 → 2 passed；pageText 換回舊 regex → remote-file.test.ts 1 failed；還原 → 5 passed | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=pageText 2 MB 最壞四種 body（`<`×1999000、`<script`×285000、`<script></script>`×120000、`a<style`×285000）：12／3／11／4 ms；舊 regex 對 `<`×200000：11189 ms | exit=0 | ms=12
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit（next-admin） | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/4n（critic subagent：每跳位址閘、referenceContext 無繞道、brand-voice 錯誤對應不變、rate-limit 例外屬實；M1 平方時間 regex 已修；n4 測試網址被 https 檢查先擋已改；未改：n1 body 讀取逾時 `fetcher.ts:322-324` 在 try 外 → brand-voice 500（改前即如此）、n2 非 UTF-8 頁面亂碼（改前即如此）、n3 >2 MB 參考頁整頁略過；另 前端仍收 http 參考網址、被略過無提示）
+- ORACLE_WAIVED: 本機 Codex 模型設定今日不可用（同日 續5 四次 no final message）；守衛本體 fetchRemoteFile 已有私有 DNS／redirect 到 metadata／http 拒絕三條測試（`lib/collect/__tests__/remote-file.test.ts`），本次以突變證明新呼叫點真的經過它。
+- BUGHUNT_DONE: scope=agency-os/docs,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app | grep=fetchUrlText | hits=2（brand-voice 自己的同名本地函式，已改用 fetchRemotePageText）
+
+**避免再發生**：使用者貼的網址只走 `lib/collect/net/remote-file.ts`（檔案或網頁兩個入口）；固定 host 的才可直接 fetch＋allowlist。
+
+**同類已查、不改**：WordPress 站台網址（`app/api/content/sites/[id]/test/route.ts:36`、`lib/content/publish/wordpress-core.ts`）不過位址閘，但只有員工能寫（`lib/content/wp-sites.ts:171-174` `siteUrlWriteGate` → `staffOnly`），客戶摸不到。
 ## 2026-10-25（續33）0127 套 prod＋5bdf7f9f9 推 main（操作者 go）：帳務新版今晚 03:00 自動部署（Claude）
 
 **觸發**：操作者「go ahead：套 0127 到正式庫，確認後 push main，讓今晚 03:00 自動部署。」設計與驗證見續32。
