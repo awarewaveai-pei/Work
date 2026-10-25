@@ -137,6 +137,8 @@ services:
       - NEXT_PUBLIC_UPLOAD_DIRECTORY=/uploads
       - FACEBOOK_APP_ID=${FACEBOOK_APP_ID}
       - FACEBOOK_APP_SECRET=${FACEBOOK_APP_SECRET}
+      - YOUTUBE_CLIENT_ID=${YOUTUBE_CLIENT_ID}
+      - YOUTUBE_CLIENT_SECRET=${YOUTUBE_CLIENT_SECRET}
     # The image's own command, after Temporal's namespace answers (postiz-boot/wait-for-temporal.js says why).
     command: ["sh", "-c", "node /opt/postiz-boot/wait-for-temporal.js && nginx && pnpm run pm2"]
     # docker stop's default 10 s would kill a publish mid-call; Temporal retries it, the platform may see it twice.

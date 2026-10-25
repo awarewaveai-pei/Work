@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-25（續66）全自動內容 P7.0：YouTube OAuth 用戶端裝進 postiz（操作者「要」）（Claude）
+
+- **做了什麼**：操作者在 Google Cloud 建兩組 OAuth 用戶端（AW、Soulful，`AWARE_WAVE_CREDENTIALS.md` §9.6.1）。Postiz 只吃一組全域 `YOUTUBE_CLIENT_ID/SECRET`，一組可連任何 Google 帳號的頻道 → 用 AW 那組；Soulful 那組未用。
+  - `/root/postiz/.env` 追加兩行（先備份 `.env.bak-youtube-*`；值經 ssh stdin 傳、從未印出；檔案仍 600 root）。
+  - `/root/postiz/docker-compose.yml` postiz environment 加 `YOUTUBE_CLIENT_ID=${...}`、`YOUTUBE_CLIENT_SECRET=${...}`，走 `safe-infra-patch.sh compose`（備份 `docker-compose.yml.bak.safe-patch-20261025-121752`，healthy 42s）；repo 對照檔 `lobster-factory/infra/postiz/docker-compose.yml` 同步，與主機 diff 相同。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec postiz sh -c 'test -n "$YOUTUBE_CLIENT_ID"'`（及 SECRET、FACEBOOK_APP_ID）→ present ×3；`docker inspect postiz` healthy；`curl https://postiz.aware-wave.com/` 307（登入轉址） | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（主 session 讀回 diff：只多兩行 env；主機與 repo 檔 diff 為空）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`YOUTUBE_CLIENT_ID` | hits=4（檔數）
+- **剩（操作者）**：社群工具 › 設定 › 連接 YouTube，用各頻道自己的 Google 帳號登入同意。同意畫面若在「測試」，每個要連的 Google 帳號都要加進測試使用者，且授權 7 天過期要重連。
+- **rollback**：主機 `cp docker-compose.yml.bak.safe-patch-20261025-121752 docker-compose.yml`＋`.env.bak-youtube-*` → `docker compose up -d --no-build postiz`；repo `git revert`。
 ## 2026-10-25（續65）排程離開 Trigger C4.6③：開機通知改走 notify.sh，部署到 /usr/local/bin（操作者 go ahead）（Claude）
 
 - **做了什麼**：主機舊版（2026-10-14，sha `683c17b036`）仍自己讀 `/etc/default/awarewave-endpoint-alert*` 發 Telegram；repo 版（b9ab5a4f2，C4.4）改呼叫 `/root/lobster-phase1/scripts/notify.sh`。照檔頭：`git show origin/main:…/ks-aw-01-boot-health-notify.sh` → `bash -n` → 0755 → rename 到 `/usr/local/bin/`（sha `af99407fd9`＝origin/main）。`ks-aw-01-boot-notify.service` 與 repo 相同（diff 空），enabled，未動。
