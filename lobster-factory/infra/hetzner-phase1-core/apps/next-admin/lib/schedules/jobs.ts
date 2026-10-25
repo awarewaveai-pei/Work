@@ -42,6 +42,8 @@ const REPORT_COST = "免費（只讀已收集的數字，寄信用 Resend，不�
 function reportJob(kind: ReportKind, label: string, description: string, frequency: JobMeta["frequencies"][number], dayOfWeekUtc = 1): ClientJob {
   return {
     key: REPORT_JOBS[kind].job, label, description, cost: REPORT_COST, frequencies: [frequency],
+    // one tab for the four (operator 2026-10-25: 四個分頁太佔空間)
+    group: { key: "social_reports", label: "社群報告自動寄出", item: REPORT_JOBS[kind].noun },
     // 01:00 UTC = 09:00 Taipei; day_of_month is a Taipei day (0123)
     defaults: { frequency: frequency.value as Frequency, hourUtc: 1, dayOfWeekUtc, dayOfMonth: 1 },
     run: (organizationId) => runPeriodReport(kind, organizationId),

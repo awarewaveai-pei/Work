@@ -1,4 +1,25 @@
 # Worklog
+## 2026-10-25（續23）排程頁：四個社群報表分頁合成一個「社群報告自動寄出」，裡面用週報／月報／季報／年報四顆按鈕切換（Claude）
+
+**觸發**：操作者截圖分頁列「改成"社群報告自動寄出", 4種報告都放在裡面, 不然太佔空間」。
+**根因**：`ScheduleTable.tsx` 每個工作一個分頁，四個報表工作各占一個。
+**不變量**：分頁是「工作群組」；一個群組裡的工作共用一個分頁，用按鈕切換，一定有一個是選中的，不會出現要先點才有內容的狀態。
+**做法**（NA = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）：
+- `NA/lib/schedules/types.ts`：`JobMeta.group {key, label, item}`。
+- `jobs.ts`：`reportJob()` 加 `group: social_reports`，item 用 `REPORT_JOBS[kind].noun`。
+- `view.ts`：把 group 帶給頁面。
+- `ScheduleTable.tsx`：用 `tabJobs` 依群組合併分頁，分頁上的數字是組內加總；分頁裡面一顆按鈕對應一個工作，各自帶啟用數和失敗數；預設選第一個。
+- 單一客戶頁（`ClientJobs`）不變。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd NA && npx tsc --noEmit | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd NA && npx vitest run lib/schedules app/api/ops → 20 files / 180 passed | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=Bash | cmd=本機 next dev＋fetch mock：分頁列＝「自動爬取 0｜社群報告自動寄出 3｜自動內容管線 0」；進分頁先顯示週報（日期欄不出現，星期欄出現），按月報 → 表格換成月報，出現日期欄 | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- ORACLE_WAIVED: 只改分頁分組（同一個 JobTable，資料和寫入路徑都不變），已用真實渲染逐一切換驗證
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=社群週報自動寄出|tabJobs|group?.key | hits=6
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-25（續22）Perplexity 整條退役：driver／CLI／CI guard／deny／vault 全拆，不留死碼（Claude）
 
 **背景**：GitHub Actions 10 月額度用完，Perplexity guard workflow 約占 577 分鐘。操作者已手動停用該 workflow，也已在 Perplexity 後台刪除 key。repo 裡的 driver（`COLLECT_SEARCH_PROVIDER=perplexity`）、CLI、CI guard、MCP deny 都已成死碼。

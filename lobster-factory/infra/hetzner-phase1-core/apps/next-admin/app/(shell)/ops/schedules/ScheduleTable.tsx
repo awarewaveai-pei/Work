@@ -120,6 +120,8 @@ export function ScheduleTable({ only }: { only?: string }) {
   const [view, setView] = useState<SchedulesView | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [tab, setTab] = useState<TabKey | null>(null);
+  /** The job shown in each grouped tab (group key -> job key); none picked = the group's first job. */
+  const [groupPick, setGroupPick] = useState<Record<string, string>>({});
   const [query, setQuery] = useState("");
   const [jobFilter, setJobFilter] = useState<JobFilter>("all");
   const [serverBadOnly, setServerBadOnly] = useState(false);
@@ -207,10 +209,16 @@ export function ScheduleTable({ only }: { only?: string }) {
   const groups = only ? [] : HOST_GROUP_ORDER.filter((g) => view.system.some((r) => r.group === g));
   const jobCells = (jobKey: string) => view.cells.filter((c) => c.jobKey === jobKey);
 
+  // A tab per job, except jobs sharing a group: one tab for the group, its first job's place in the list.
+  const tabJobs = new Map<string, JobMeta[]>();
+  for (const j of only ? [] : view.jobs) {
+    const k = j.group?.key ?? j.key;
+    tabJobs.set(k, [...(tabJobs.get(k) ?? []), j]);
+  }
   const tabs: Array<SubTab<TabKey>> = [
-    ...(only ? [] : view.jobs).map((j) => {
-      const cs = jobCells(j.key);
-      return { key: `job:${j.key}` as TabKey, label: j.label, count: countText(cs.filter((c) => c.enabled).length, cs.filter((c) => c.lastError).length, T.tabFailed) };
+    ...[...tabJobs.entries()].map(([k, js]) => {
+      const cs = js.flatMap((j) => jobCells(j.key));
+      return { key: `job:${k}` as TabKey, label: js[0].group?.label ?? js[0].label, count: countText(cs.filter((c) => c.enabled).length, cs.filter((c) => c.lastError).length, T.tabFailed) };
     }),
     ...groups.map((g) => {
       const rs = view.system.filter((r) => r.group === g);
@@ -218,7 +226,8 @@ export function ScheduleTable({ only }: { only?: string }) {
     }),
   ];
   const active: TabKey | undefined = tabs.find((t) => t.key === tab)?.key ?? tabs[0]?.key;
-  const activeJob = active?.startsWith("job:") ? view.jobs.find((j) => `job:${j.key}` === active) : undefined;
+  const activeJobs = active?.startsWith("job:") ? tabJobs.get(active.slice(4)) : undefined;
+  const activeJob = activeJobs && (activeJobs.find((j) => j.key === groupPick[active!.slice(4)]) ?? activeJobs[0]);
   const activeGroup = active?.startsWith("group:") ? groups.find((g) => `group:${g}` === active) : undefined;
   const changeTab = (k: TabKey) => { setTab(k); setSelected(new Set()); setQuery(""); };
 
@@ -249,6 +258,21 @@ export function ScheduleTable({ only }: { only?: string }) {
 
       <div role="tabpanel" id={active ? `schedules-panel-${active}` : undefined} aria-labelledby={active ? `schedules-tab-${active}` : undefined}>
         {only && <ClientJobs jobs={view.jobs} cells={view.cells} saving={saving} savedKeys={savedKeys} save={(items) => void save(items)} />}
+        {activeJobs && activeJobs.length > 1 && activeJob && (
+          // a grouped tab: one chip per job, the picked one's table below (always one picked -- nothing waits for a click)
+          <div role="group" aria-label={activeJob.group?.label} style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+            {activeJobs.map((j) => {
+              const cs = jobCells(j.key);
+              const on = j.key === activeJob.key;
+              return (
+                <button key={j.key} type="button" style={chipStyle(on)} aria-pressed={on}
+                  onClick={() => { setGroupPick({ ...groupPick, [active!.slice(4)]: j.key }); setSelected(new Set()); }}>
+                  {j.group?.item ?? j.label} {countText(cs.filter((c) => c.enabled).length, cs.filter((c) => c.lastError).length, T.tabFailed)}
+                </button>
+              );
+            })}
+          </div>
+        )}
         {activeJob && (
           <JobTable
             job={activeJob} orgs={view.orgs} cells={jobCells(activeJob.key)}

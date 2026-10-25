@@ -21,6 +21,8 @@ export interface JobMeta {
   frequencies: FrequencyOption[];
   /** A per-client "at most N a day" the page lets staff set (content_pipeline); absent = the job has none. */
   dailyLimit?: { label: string; unit: string; options: number[]; default: number };
+  /** Jobs sharing a group key share one tab on /ops/schedules (label = the tab), switched by a chip per job (item). */
+  group?: { key: string; label: string; item: string };
 }
 
 /** One (job, client) cell of the schedules table. */
