@@ -52,7 +52,7 @@ headless 計費範例（排程內怎麼拿 grant）：`NA/lib/content/topics/mak
 ## 4. 做法（照順序）
 
 1. **第一步**：整檔讀 `NA/lib/schedules/jobs.ts`、`NA/lib/content/topics/{plan,tick,make,trends,store}.ts`、`NA/lib/schedules/store.ts`、`NA/app/api/content/trending/route.ts`、`NA/app/api/content/topics/plan/route.ts`。確認 §2 行號仍對。
-2. 寫三張卡（A、B 先做，C 等 A、B 完成），加進 `agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md` §7（新編號 P9.1／P9.2／P9.3），每張含：改哪些檔、做什麼、驗收指令、突變（拔哪個守衛 → 哪個測紅）、rollback。同步把 §3.1 資料流圖（`EXECUTION_PLAN.md:74-78`）三行改成實際行為：熱搜「排程每天一次」、提案「本月沒有就提，台灣月」、核准「ai_review_auto 自動核准（P9.2 起才成立）」。監工台 `agency-os/handoffs/2026-10-24-auto-content-supervisor/data.mjs` 加 P9 一組 → `node build.mjs && node check.mjs`。
+2. 三張卡**全文已寫在 §8**（A、B 先做，C 等 A、B 完成）。照抄進 `agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md` §7（編號 P9.1／P9.2／P9.3，格式同 P6／P7），不要改寫。同步把 §3.1 資料流圖（`EXECUTION_PLAN.md:74-78`）三行改成實際行為：熱搜「排程每天一次」、提案「本月沒有就提，台灣月」、核准「ai_review_auto 自動核准（P9.2 起才成立）」。監工台 `agency-os/handoffs/2026-10-24-auto-content-supervisor/data.mjs` 加 P9 一組 → `node build.mjs && node check.mjs`。
    - **卡 A 熱搜定時落地**（免費）：新檔 `NA/lib/content/topics/collect-trends.ts`：
      - `collectTrends(sb, geo)` ＝ 把 route 的 `loadDbSourceBlocks` ＋ `runTrending` ＋ `saveTrends`（`trending/route.ts:82-108`）搬過來；route 改呼叫它（回應不變，既有 `trending/route.test.ts` 綠）。
      - `collectTrendsIfDue(sb, geos)`：每個 geo 查 `content_trends` 有無 `(geo, fetched_on = 今天 UTC)` 列，沒有才 `collectTrends`；回傳抓了哪些 geo。
@@ -121,3 +121,91 @@ headless 計費範例（排程內怎麼拿 grant）：`NA/lib/content/topics/mak
 | 提案「在 tickTopics 前」 | 90 s ＋ 200 s 擠 run-due 300 s | 提案 firing 獨占、一次一站（B3） |
 | 「提案後仍停 proposed 等人核准（或站設 AI 自動）」 | 自動核准根本沒程式（`[id]/route.ts:15` 是唯一入口）；不做它，「每月不用人按」不成立 | `ai_review_auto` 站自動 `approved`；請操作者確認耦合 |
 | 卡 A「排程每天跑一次」沒說守衛 | — | `(geo, fetched_on=今天)` 已有列就跳過，不加狀態 |
+
+## 8. 卡片全文（執行者照抄進 EXECUTION_PLAN §7 與監工台；給任何 AI 都能照做）
+
+> 共同規則：每張卡一個 commit（pathspec），commit 前 `npx tsc --noEmit` 綠、卡內點名的 vitest 綠、突變一次；Claude 寫 → `/codex-review`，Codex 寫 → `/claude-review`。測試用假物件，**不連真 DB、不打真 Anthropic**。監工台卡片用 `todo('P9.x', '白話一句')`，做完改 `done('P9.x', '白話一句', '<commit>')`（`data.mjs:48-49`），再 `node build.mjs && node check.mjs`。回報操作者一律繁體中文。
+
+### P9.1　熱搜每天自動落地（卡 A；免費；Low；模型 Opus 5.5 或 Codex 照卡）
+
+**改哪些檔**
+1. 新檔 `NA/lib/content/topics/collect-trends.ts`：
+   - `export async function collectTrends(sb, geo): Promise<number>`：把 `NA/app/api/content/trending/route.ts:82-96` 的 `loadDbSourceBlocks()` 與 `:99-108` 的 `runTrending(geo, extra)` ＋ `saveTrends(sb, geo, items)` 搬進來，回傳 `saveTrends` 的筆數；`saveTrends` 失敗一樣只 `console.warn`，不 throw（route 既有行為）。同時回傳 `items` 給 route 用（例如回 `{ items, saved }`）。
+   - `export async function collectTrendsIfDue(sb, geos: string[]): Promise<string[]>`：對每個去重後的 geo，`select id from content_trends where geo = G and fetched_on = <今天 UTC 'YYYY-MM-DD'> limit 1`；沒有列才 `collectTrends`；回傳實際抓了的 geo。查詢失敗 throw（排程要知道）。
+   - 檔頭註解 1–3 行：為什麼一天一次（`recentTrends` 依出現天數排，`trends.ts:68-69`）、守衛是既有列不是新狀態。
+2. `NA/app/api/content/trending/route.ts`：`trendingResponse` 改成呼叫 `collectTrends`，回應 JSON 不變（`{ ok, items, geo }`）；刪掉搬走的私有函式。
+3. `NA/lib/schedules/jobs.ts:116-121` `content_pipeline.run` 開頭：
+   ```ts
+   const { data: sites, error } = await sb.from("wp_sites").select("id, content_defaults").eq("organization_id", organizationId).eq("active", true);
+   if (error) throw new Error(`content_pipeline:sites:${error.message}`);
+   const geos = [...new Set((sites ?? []).map((s) => geoFor((s.content_defaults as SiteContentDefaults | null)?.targetCountry)))];
+   await collectTrendsIfDue(sb, geos);
+   ```
+   `geoFor` 來自 `NA/lib/content/topics/plan.ts:21`；用動態 `import()` 跟既有 `tickTopics` 一樣的寫法（`jobs.ts:119`）。
+
+**驗收**
+- 新測 `NA/lib/content/topics/__tests__/collect-trends.test.ts`（假 sb 鏈式物件；mock `@/lib/content/trending-sources` 的 `runTrending`）：(a) 今天沒有列 → `runTrending` 被叫一次、`saveTrends` 被叫一次；(b) 今天已有列 → 都不叫；(c) `geos=["TW","TW","HK"]` → 最多叫兩次。
+- 既有 `NA/app/api/content/trending/route.test.ts` 不改內容就綠（回應 shape 沒變）。
+- 既有 `NA/lib/schedules/__tests__/content-pipeline-job.test.ts` 補 mock：`vi.mock("@/lib/content/topics/collect-trends", () => ({ collectTrendsIfDue: vi.fn(async () => []) }))`，且假 sb 要能回 `wp_sites` 空陣列；原本兩個斷言仍成立。
+- 指令：`npx vitest run lib/content/topics/__tests__/collect-trends.test.ts app/api/content/trending/route.test.ts lib/schedules/__tests__/content-pipeline-job.test.ts`。
+- 突變：把「今天已有列就跳過」的 `if` 拿掉 → 測 (b) 變紅 → 還原變綠。
+
+**Rollback**：revert 該 commit；沒有資料庫改動。
+
+### P9.2　本月自動提案＋自動核准（卡 B；付費；Medium，migration apply 到 prod 為 High）
+
+**改哪些檔**
+1. migration `lobster-factory/packages/db/migrations/0138_wp_sites_content_plan_attempted_at.sql`（格式照 `0125_client_schedules_daily_limit.sql`：檔頭 `-- APPLY: node scripts/apply-db-migration.mjs 0138`、`begin; set local lock_timeout='5s'; … notify pgrst,'reload schema'; commit;`）：
+   ```sql
+   alter table public.wp_sites add column if not exists content_plan_attempted_at timestamptz;
+   ```
+   `.down.sql`：`alter table public.wp_sites drop column if exists content_plan_attempted_at;`（欄位只是時間戳，不需備份表）。RLS 不動。**apply 到 prod 要操作者 go**；本機 Postgres 先 apply → down → apply 各一次證明可逆。
+2. 新檔 `NA/lib/content/topics/plan-due.ts`：
+   ```ts
+   export interface PlanDueDeps {
+     sites(): Promise<Array<{ id: string; defaults: SiteContentDefaults }>>;          // 該客戶 active 的 wp_sites
+     hasProposal(siteId: string, month: string): Promise<boolean>;                    // content_topics: site_id, month, source <> 'manual' 存在
+     claimAttempt(siteId: string, now: Date): Promise<boolean>;                        // update wp_sites set content_plan_attempted_at=now where id=site and (is null or < now-24h) returning id → 1 列 = true
+     propose(siteId: string, month: string): Promise<Topic[]>;                        // proposeMonth 包在 runForOrg + grantFor("content.plan")
+     approve(t: Topic): Promise<Topic | null>;                                         // store.move(sb, t, "approved")
+   }
+   export const PLAN_RETRY_MS = 24 * 60 * 60 * 1000;
+   /** 一個 firing 最多提一站；回傳摘要，沒得提回 null。 */
+   export async function planIfDue(deps: PlanDueDeps, now: Date): Promise<string | null>
+   ```
+   流程：`month = monthKey(taipeiParts(now.toISOString()).month)`（`store.ts:72,82`）→ 逐站 `hasProposal` 為 true 跳過 → 第一個 false 的站 `claimAttempt`，false 跳過（冷卻中或別的 firing 搶到）→ `propose` → 若 `autoPublishes(defaults)`（`brand-voice.ts:108`）每題 `approve` → 回 `planned site=<id> month=<m> topics=<n> approved=<n>`。`propose` throw 就讓它往上 throw（run-due 記 `last_error` 開 incident，`run-due/route.ts:66-73`）。
+   - `export function planDueDeps(sb, organizationId, actor): PlanDueDeps`：真實作。`propose` ＝ `runForOrg(organizationId, actor, async () => proposeMonth(sb, { organizationId, siteId, month, actor }, planAsker(await grantFor("content.plan"), "lib/schedules/content_pipeline")))`（`runForOrg`／`grantFor` 在 `NA/lib/entitlements/grant.ts:58,73`；先例 `make.ts:99,261`）。
+3. `NA/lib/schedules/jobs.ts` `content_pipeline.run`：P9.1 的 `collectTrendsIfDue` 之後：
+   ```ts
+   const planned = await planIfDue(planDueDeps(sb, organizationId, "schedule:content_pipeline"), new Date());
+   if (planned) return planned;      // B3：提案的 firing 不 tick
+   return tickTopics(...);           // 原本那行
+   ```
+4. `jobs.ts:110` cost 字串尾端加：`` 每個網站每月第一次提案另約 ${planCostUsd()} 美元。`` — 在 `NA/lib/content/topics/cost.ts` 加 `export function planCostUsd(): number`（同檔 `planCostTwd` 的 USD 版，`Math.ceil(featureUnitCostUsd(f) * 100) / 100`），不手打數字。
+5. `NA/app/(shell)/tools/content/sites/PublishModeButtons.tsx:11-12`：`human_review.detail` 尾端加「排程提出的題目等人核准。」；`ai_review_auto.detail` 尾端加「排程提出的題目也自動核准。」
+6. `agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md:74-78` 三行改成實際行為（§4 步驟 2）。
+
+**驗收**
+- 新測 `NA/lib/content/topics/__tests__/plan-due.test.ts`（全部假 deps，用 `vi.fn`）：
+  1. 一站、`hasProposal=false`、`claimAttempt=true` → `propose` 叫一次，且 `claimAttempt` 的呼叫順序在 `propose` 之前（`mock.invocationCallOrder`）。
+  2. `hasProposal=true` → `propose` 不叫、回 `null`（B1）。
+  3. `claimAttempt=false` → `propose` 不叫（B2）。
+  4. `propose` reject → `planIfDue` reject（錯誤往上）。
+  5. 兩站都 `hasProposal=false` → `propose` 只叫一次（B3）。
+  6. `defaults.publishMode="ai_review_auto"` → `approve` 對每題各叫一次；`human_review` → 不叫。
+  7. `now = 2026-11-01T00:30:00Z`（台灣 11/1 08:30）→ `hasProposal` 收到 `"2026-11-01"`；`now = 2026-10-31T17:00:00Z`（台灣 11/1 01:00）也收到 `"2026-11-01"`（台灣月）。
+- `content-pipeline-job.test.ts` 加兩條：`planIfDue` 回字串 → `tickTopics` 不叫、`run` 回那個字串；回 `null` → `tickTopics` 叫（mock `@/lib/content/topics/plan-due`）。
+- 真 SQL 守衛各一條（在 `store.test.ts` 的假 sb 風格下驗呼叫鏈）：`hasProposal` 用 `.eq("site_id").eq("month").neq("source","manual")`；`claimAttempt` 的 `.or()` 字串含 `content_plan_attempted_at.is.null` 與 `.lt.`。
+- 指令：`npx vitest run lib/content/topics/__tests__/plan-due.test.ts lib/schedules/__tests__/content-pipeline-job.test.ts`。
+- 突變：把 `hasProposal` 那個 `continue` 拿掉 → 測 2 變紅 → 還原變綠。
+- 部署後實測（操作者 go 之後）：在 staging／測試客戶把 `content_pipeline` 打開，看 run-due log 出現 `planned site=…`，題目頁出現本月題目；再等 5 分鐘 log 應是 tick 摘要而不是第二次 `planned`。
+
+**Rollback**：revert commit（app 先）→ `0138.down.sql`。已提出的題目留著（是資料，不是程式），不刪。
+
+### P9.3　自動內容總控頁（卡 C；Low–Medium；UI；模型 Opus 5.5）
+
+內容＝§4 卡 C 的表與五條規則，照抄；**另外**：
+- ② 的「本月已提案幾題」＝`listTopics(sb, org, month)` 過濾 `site_id` 與 `source <> 'manual'` 的筆數（`store.ts:91`）；「上次嘗試」讀 `wp_sites.content_plan_attempted_at`（要在 `/api/content/sites` GET 的 select 加這一欄）；「失敗原因」讀 `/api/ops/schedules?slug=` 回的 `content_pipeline.lastError`。
+- 五格資料由頁面一次 server 端組好傳給 client component，不要五格各自 fetch。
+- 驗收：§5 卡 C 那一條；另加 `npx vitest run app/__tests__/sidebar-coverage.test.ts`。
+- Rollback：revert commit；無資料庫改動。
