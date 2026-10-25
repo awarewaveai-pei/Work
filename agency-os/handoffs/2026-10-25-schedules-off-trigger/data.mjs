@@ -35,19 +35,21 @@ export const NOW = [
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
+const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
+const C1 = '72d15254c';
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '定時工作改由主機啟動', plain: '例：社群貼文每 5 分鐘發送一次，改由主機直接啟動。9 個定時工作維持原有頻率。另刪除 1 個重複工作。',
-    gate: '9 個定時工作的主機排程與排程頁登記完成。本機測試通過。', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: [],
+    gate: '9 個定時工作的主機排程與排程頁登記完成。本機測試通過。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: C1, depends: [],
     decided: '社群發文與客服維持每 5 分鐘執行。訂單維持每 10 分鐘執行。主機每次啟動工作的成本幾乎為零。改成每小時執行，貼文最多會延遲 50 分鐘。',
     what: 'HS/poke.sh 取代 schedules-run-due.sh；site-watch-tick.sh；cron.d 加 9 行；host-jobs.ts 9 列',
     files: ['HS/poke.sh', 'HS/site-watch-tick.sh', 'HS/cron.d/awarewave-schedules', 'NA/lib/schedules/host-jobs.ts'],
     items: [
-      todo('C1.1', '所有定時工作共用一支啟動腳本。刪除原有的同用途腳本。'),
-      todo('C1.2', '網站巡檢先確認哪些網站已到檢查時間。每次檢查兩個網站。完成後清理舊截圖。'),
-      todo('C1.3', '主機新增 9 個定時工作。執行頻率不變。'),
-      todo('C1.4', '在排程頁登記這 9 個工作的中文名稱與說明。'),
-      todo('C1.5', '測試成功、密碼錯誤、對方回報失敗三種情況。確認腳本皆回報正確結果。'),
+      done('C1.1', '所有定時工作共用一支啟動腳本。刪除原有的同用途腳本。', C1),
+      done('C1.2', '網站巡檢先確認哪些網站已到檢查時間。每次檢查兩個網站。完成後清理舊截圖。', C1),
+      done('C1.3', '主機新增 9 個定時工作。執行頻率不變。', C1),
+      done('C1.4', '在排程頁登記這 9 個工作的中文名稱與說明。', C1),
+      done('C1.5', '測試成功、密碼錯誤、對方回報失敗三種情況。確認腳本皆回報正確結果。', C1),
     ] },
   { n: 2, code: 'C2', group: 'B', title: '定時工作上線', plain: '例：先在正式主機裝好新排程。排程頁全為綠色後，才關閉 Trigger 上的定時工作。順序相反會讓社群發文等工作中斷。',
     gate: '/ops/schedules 新增的工作全為綠色。Trigger 在 24 小時內未執行任何定時工作。文件不再寫「由 Trigger 叫醒」。', risk: 'High（正式主機）', model: '你＋Opus 5.5', status: 'not_started', depends: ['C1'],

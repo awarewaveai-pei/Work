@@ -78,26 +78,27 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
 <aside><div class="in">
   <h1>排程離開 Trigger 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-10-25</span></p>
-  <div class="bar" data-computed><i class="d" style="width:0%"></i><i class="g" style="width:0%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>0</span>／<span data-computed>8</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>4</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:12.5%"></i><i class="g" style="width:0%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>1</span>／<span data-computed>8</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>4</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
-<p class="sub">定時工作改由主機排程啟動。Trigger 只執行按鈕啟動的長流程。所有排程集中在 /ops/schedules。排程太久未成功會通知手機。每天另發一行「全部正常」。共 <span data-computed>8</span> 張卡、<span data-computed>33</span> 項工作，已完成 <span data-computed>0</span> 項。</p>
+<p class="sub">定時工作改由主機排程啟動。Trigger 只執行按鈕啟動的長流程。所有排程集中在 /ops/schedules。排程太久未成功會通知手機。每天另發一行「全部正常」。共 <span data-computed>8</span> 張卡、<span data-computed>33</span> 項工作，已完成 <span data-computed>5</span> 項。</p>
 <section id="now"><h2>現況</h2><p class="lead">目前已做到與還沒做到的事。</p><ul class="yn"><li class="yes"><b>可以</b><span>Trigger 正常運作。<small>2026-10-25 清除停滯的工作後恢復正常。網站巡檢四項檢查皆通過。</small></span></li><li class="no"><b>還不行</b><span>社群發文、客服、訂單與網站巡檢可不經 Trigger 定時執行。<small>目前仍由 Trigger 啟動。Trigger 停滯時，這些定時工作也會全部停止（C1）。</small></span></li><li class="no"><b>還不行</b><span>系統能自動偵測 Trigger 停滯。<small>這次停了 34 小時，直到查看網站巡檢報告才發現（C3）。</small></span></li><li class="no"><b>還不行</b><span>任何排程太久未成功，手機都會收到通知。<small>目前只有網站回應、自動部署、雲端報告與影片補登會推播。其餘異常只在頁面標紅（C4）。</small></span></li><li class="no"><b>還不行</b><span>每天會收到一行「全部正常」。<small>C4。</small></span></li><li class="no"><b>還不行</b><span>/ops/schedules 可查看資料庫、n8n、GitHub 與雲端排程。<small>目前只顯示客戶與主機排程。資料庫清理工作在 2026-10-24 失敗，無人察覺（C5）。</small></span></li></ul></section>
 
-<section id="steps"><h2>卡片與工作</h2><p class="lead">依編號進行。每張卡列出所有工作，勾選代表完成。同一組的卡修改不同檔案，可以同時進行。High 風險步驟經你同意才執行。</p><ol class="steps"><li class="step todo" id="C1">
+<section id="steps"><h2>卡片與工作</h2><p class="lead">依編號進行。每張卡列出所有工作，勾選代表完成。同一組的卡修改不同檔案，可以同時進行。High 風險步驟經你同意才執行。</p><ol class="steps"><li class="step done" id="C1">
     <div class="n">1</div>
     <div class="b">
       <p class="plain">例：社群貼文每 5 分鐘發送一次，改由主機直接啟動。9 個定時工作維持原有頻率。另刪除 1 個重複工作。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">負責：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-done">已完成</span><span class="pill risk-med">風險 Medium</span><span class="who">負責：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>9 個定時工作的主機排程與排程頁登記完成。本機測試通過。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>C1.1</code> 所有定時工作共用一支啟動腳本。刪除原有的同用途腳本。</span></li><li class="todo"><b>○</b><span><code>C1.2</code> 網站巡檢先確認哪些網站已到檢查時間。每次檢查兩個網站。完成後清理舊截圖。</span></li><li class="todo"><b>○</b><span><code>C1.3</code> 主機新增 9 個定時工作。執行頻率不變。</span></li><li class="todo"><b>○</b><span><code>C1.4</code> 在排程頁登記這 9 個工作的中文名稱與說明。</span></li><li class="todo"><b>○</b><span><code>C1.5</code> 測試成功、密碼錯誤、對方回報失敗三種情況。確認腳本皆回報正確結果。</span></li></ul>
+      <ul class="items"><li class="done"><b>✓</b><span><code>C1.1</code> 所有定時工作共用一支啟動腳本。刪除原有的同用途腳本。 <small>完成於 <code>72d15254c</code></small></span></li><li class="done"><b>✓</b><span><code>C1.2</code> 網站巡檢先確認哪些網站已到檢查時間。每次檢查兩個網站。完成後清理舊截圖。 <small>完成於 <code>72d15254c</code></small></span></li><li class="done"><b>✓</b><span><code>C1.3</code> 主機新增 9 個定時工作。執行頻率不變。 <small>完成於 <code>72d15254c</code></small></span></li><li class="done"><b>✓</b><span><code>C1.4</code> 在排程頁登記這 9 個工作的中文名稱與說明。 <small>完成於 <code>72d15254c</code></small></span></li><li class="done"><b>✓</b><span><code>C1.5</code> 測試成功、密碼錯誤、對方回報失敗三種情況。確認腳本皆回報正確結果。 <small>完成於 <code>72d15254c</code></small></span></li></ul>
       <details><summary>工程細節：C1 定時工作改由主機啟動</summary>
         <p>HS/poke.sh 取代 schedules-run-due.sh；site-watch-tick.sh；cron.d 加 9 行；host-jobs.ts 9 列</p>
         <p><b>需先完成：</b>無</p>
         <p><b>你的決定：</b>社群發文與客服維持每 5 分鐘執行。訂單維持每 10 分鐘執行。主機每次啟動工作的成本幾乎為零。改成每小時執行，貼文最多會延遲 50 分鐘。</p>
         <p><b>檔案：</b><code>HS/poke.sh</code> <code>HS/site-watch-tick.sh</code> <code>HS/cron.d/awarewave-schedules</code> <code>NA/lib/schedules/host-jobs.ts</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-25-schedules-off-trigger/R0-PLAN.md §6 C1</code></p>
+        <p><b>完成於：</b><code>72d15254c</code></p>
       </details>
     </div></li><li class="step todo" id="C2">
     <div class="n">2</div>
