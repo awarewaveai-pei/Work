@@ -11,7 +11,7 @@
   - `accounts/route.ts`：GET 產品＝served 門逐一問門口同一個 `holdsProduct`（`limit(1)`，非一次撈全部列：all-features 帳號 339 列、PostgREST 上限 1000 會靜默截斷）；`MEMBER_LISTS`（目前只有 social：`listMembers`＋`/tools/social?brand=<org>&view=settings`）；每帳號 `roles`。POST 非提供產品 → 400 `product_not_held`；讀授權失敗 → 503。
   - `client-invite.ts`、`wp-customers.ts`：改 `servedNextAdminProducts()`。
   - `AccountsCard.tsx`、`invite-copy.ts`：產品說明、無產品提示、每列「產品：角色 去設定／可使用」；步驟不再寫死社群發文，「去設定」步驟只在有角色表的產品時出現；載入失敗不再顯示「尚未購買」。
-  - m2 新文案（`invite-copy.ts` 檔頭列名）由 Claude 寫，未過 GPT inspect（Codex 額度擋到 22:36）；之後要過再跑 inspect 換字串。
+  - m2 新文案（`invite-copy.ts` 檔頭列名）由 Claude 定稿，不走 GPT inspect（操作者「你自己處理 不要等codex」）：`17d218dcc`。
 - REALTEST_EVIDENCE: tool=SSH | cmd=ssh ubuntu@ks-aw-01 sudo docker exec supabase-db psql（唯讀：各 client org 有效產品／成員數）→ soulful-expression、edd-research、awarewave-ops 持有全部 10 產品；3 個測試 org 0 產品；served 門＝社群發文、影片製作、塔羅製圖、商品設計工作室、設計編輯器 | exit=0 | ms=3000
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run accounts/route.test.ts door-holds.test.ts registry-code.test.ts woo-billing.test.ts payments/[provider]/route.test.ts → 56 passed；突變（held 過濾加 `|| true`）→ 3 案例紅，還原綠；jsdom 渲染 AccountsCard → 瀏覽器面板截圖確認 | exit=0 | ms=2820
 - REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1M/4m（M1 一次撈全部列會被 1000 列上限截斷→改逐門 `holdsProduct`，`heldProductKeys` 刪除；m1 載入失敗誤顯示未購買→修；m4 角色步驟在無角色表產品時誤導→改條件顯示、檔頭標明作者；m2 成員表讀失敗整頁 503、m3 WordPress 方案若指向關門產品會退到第一個開門產品——現無此方案，皆不改）
