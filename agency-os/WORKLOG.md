@@ -1,4 +1,15 @@
 # Worklog
+## 2026-10-26（續9）AO-CLOSE：10/25–10/26 session window 收尾（Codex）
+
+- **窗口摘要**：上次 AO-CLOSE 2026-10-24T20:53:07Z 後，完成付款／點數包與 WooCommerce bridge、排程離開 Trigger、內容管線 P6/P8/P7 驗收、客戶模型與 RLS 收窄、告警與容量修正，以及 Social／video／portal 七入口 Cookie 400 修復。
+- **本次 nginx 事故**：repo 以 `large_client_header_buffers 4 32k;` 對齊 app、portal 與共享產品入口；靜態 regression red→green、公開 7-door cookie probe 全部 307／login 200、Chrome 實測 Social 與 video 恢復，portal 進入預期的客戶帳號限制頁；正式機透過 `safe-infra-patch.sh nginx` 套用，保留 rollback backup。
+- **本窗口重要交付**：WooCommerce Subscriptions＋TapPay 方向已定；credit pack 使用權無期末，0128／wp-bridge 0.18.3 已落地；C2/C4/C6 排程與告警工作推進；YouTube P7 以真實影片驗收；0133–0135 RLS migration 已依操作者 go 套 prod；auto-content gap 已改成自足 handoff，YouTube Data API key 留作操作者待辦。
+- **AUTO_TASK_DONE**: 待決 6：點數包帶的使用權多久
+- **REALTEST_EVIDENCE**: nginx static test 1 passed；7 個入口 public probe：normal=307、8KiB Cookie=307、login=200；Chrome Social／video 無 400。
+- **REVIEW_DONE**: 本次 nginx Deep adversarial self-review，0 critical／major／minor；Claude oracle 因 CLI 不在 PATH 以 `ORACLE_WAIVED` 記錄，未重試。
+- **BUGHUNT_DONE**: scope=agency-os,scripts,lobster-factory,runbooks,.claude | grep=large_client_header_buffers／Cookie 400／next-admin doors | hits=已核對 repo、runbook、test、production loaded config；無新增未處理命中。
+- **連動**：system-health-check 上次結果 99.7%，唯一既有失敗是舊 archive lift state；不把它誤報為 nginx 失敗。AO-CLOSE 本輪會重跑完整 health／build／doc-sync chain。
+- **rollback**：使用正式機 `default.conf.bak.safe-patch-20261025-153240`，重新交給同一個 `safe-infra-patch.sh nginx` wrapper。
 ## 2026-10-26（續8）0137 套 prod＋推 main（操作者定案佣金／歸屬）：partner_referrals 成員只剩 SELECT（Codex 寫，Claude 審）
 
 - **觸發**：操作者「partner_referrals 算佣金／歸屬：照 0136 關掉成員寫入，派 Codex 做完套 prod」。Codex 卡 08 寫完檔案後額度用完（driver exit 3），未自行 commit；Claude 審後複製進 main。
