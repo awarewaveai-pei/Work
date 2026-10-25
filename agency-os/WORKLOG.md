@@ -1,4 +1,12 @@
 # Worklog
+## 2026-10-25（續27）wp-bridge 0.18.1 發版並裝上 aware-wave.com（Claude）
+
+- **發版**：tag v0.18.1 已推；GitHub Actions 仍因帳號付款未啟動（操作者已處理，GitHub 尚未放行）→ 同續24，本機 `git archive` 打包、`gh release create --verify-tag`。https://github.com/awarewaveai-pei/aware-wave-wp-bridge/releases/tag/v0.18.1
+- **安裝**：備份 `/root/backups/wordpress/aware-wave-pre-wpbridge-0.18.1-20261025T065134Z.sql`（5.9 MB，Dump completed）→ zip 經 ssh 上傳（sha256 前綴 afa25b28e43bdcb0 兩端一致）→ `wp plugin install --force --activate`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp plugin list → aware-wave-wp-bridge active 0.18.1、woocommerce active 11.2.1；aware_wave_payments_enabled=1；aware_wave_payments_gateways 未設（＝全不勾，AwareWave 商品無法結帳）；home 200、/wp-json/aware-wave-bridge/v1/health version 0.18.1；https://aware-wave.com/ 200；3 分鐘 log 無 fatal | exit=0 | ms=0（未計時）
+- REVIEW_WAIVED: NA -- 安裝操作，程式碼已於續26 審查
+- BUGHUNT_WAIVED: NA -- 無程式碼變更
+- **rollback**：裝回 0.18.0 zip（Release v0.18.0）；或資料庫還原上述備份。
 ## 2026-10-25（續26）wp-bridge 0.18.1：只有白名單付款方式能開通 AwareWave 權利——貨到付款／超商取貨付款在收錢前就是「處理中」（Claude）
 
 - **根因**：WooCommerce 貨到付款下單即設 processing（`woocommerce/includes/gateways/cod/class-wc-gateway-cod.php:322-324`「payment won't be taken until delivery」），`maybe_set_date_paid` 也會填付款日；0.18.0 為接住手動標已付款把 processing／completed 當付款（續10 critic M2）→ 貨到付款買點數包＝沒收錢先開通。
