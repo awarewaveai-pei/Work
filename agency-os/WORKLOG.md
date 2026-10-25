@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-25（續77）profiles 只准控制面寫：0135 草稿（拿掉 profiles_insert_self／update_self＋收回 anon／authenticated 寫入權）；拋棄式 DB 21/21；未套 prod、未 commit（Claude）
+
+- **觸發**：操作者「接著處理 profiles_update_self：先盤點使用者是否需要改自己的 profile，再提方案和 migration 草稿」。續75 剩餘 C1。
+- **洞**（prod 唯讀查證）：政策 `profiles_{insert,select,update}_self`（`0020_splinter_duplicate_indexes_and_rls_stray_policies.sql:80-91`，roles=public），anon／authenticated 有全部 7 種表權限；GoTrue `GOTRUE_DISABLE_SIGNUP=true`（只有受邀／WordPress 換票的使用者有 JWT），auth.users 無觸發器；profiles 1 列。登入使用者可經 PostgREST 改自己列的 `default_organization_id`、`email`，或首次登入前自建一列帶任何組織 → `lib/entitlements/wp-customers.ts:60-62` 依 email 讀 `default_organization_id` 決定 WordPress 會員歸戶。
+- **盤點**（使用者是否需要改自己的 profile）：寫 profiles 只有 `lib/accounts/client-invite.ts:133,155,184,253`，呼叫端 `app/api/ops/clients/[slug]/accounts/route.ts:57,110,142` 用 `getSupabaseWriteClient`；`portal_complete_signup`（`0063:70`、`0110:119`）security definer；使用者端 client 唯一寫入是 `app/login/set-password/SetPasswordForm.tsx:83` `auth.updateUser({ password })`（GoTrue auth.users，不是 profiles）；next-admin 以外（Projects、packages、scripts）無 profiles 寫入。→ 使用者不需要改自己的 profile。
+- **方案**：A＝拿掉 insert／update 兩政策＋revoke insert/update/delete/truncate/references/trigger（採用，零呼叫端）；B＝只開 `display_name`／`avatar_url` 欄位權限（否決：無 UI 用，開沒人用的寫入路徑）。
+- **檔案（未 commit）**：`lobster-factory/packages/db/migrations/0135_profiles_control_plane_writes_only{.sql,.down.sql}`、`packages/db/scripts/0135_profiles_control_plane_writes_only_down.sql`（`cmp` 相同）；up 結尾斷言同 0134。
+- C1（同類，已修，未 commit）：`lobster-factory/packages/db/scripts/apply-splinter-fixes-one-shot.sql`（`npm run apply:supabase-splinter-fixes`，`scripts/apply-supabase-splinter-fixes.mjs:47`）重建 `profiles_insert_self/update_self`，0135 後重跑＝重開洞 → 兩處改為只 drop＋註明 0135。organizations 無同類重建腳本（grep 0 命中）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -I scratchpad/verify_0135.py（拋棄式 postgres 15.8＋postgrest v14.6；0001/0004＋0020 profiles 政策原文；使用者 JWT PATCH default_organization_id／email、無列使用者 POST 自建列、DELETE；anon；service_role PATCH/INSERT/DELETE；down 後再 up） | exit=0 | ms=25000（21/21 PASS：套前三招成功＝咬得到；套後 403 `42501 permission denied for table profiles`、列不變、SELECT 自己列照常；anon 401；service_role 照常；down 重現、再套關閉）
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（讀回 up/down/副本；down 對照 0020:84-91 原文）
+- ORACLE_WAIVED: 本條無 commit 的 source 檔；0135 commit 前（操作者核可後）跑 `/codex-review`（額度 22:36 後）或獨立 critic
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=profiles_(insert|update)_self | hits=33（0010/0018/0019/0020 歷史定義、0135 三檔、`apply-splinter-fixes-one-shot.sql`——已改）
+- **High（RLS）**：未套 prod。核可後：`node scripts/apply-db-migration.mjs 0135` → 讀回 pg_policies／權限 → commit（0135 三檔＋one-shot 腳本＋WORKLOG）推 main。
+- **rollback**：`0135_profiles_control_plane_writes_only.down.sql`（還原 0020 兩政策與寫入權，刪 ledger 列）。
 ## 2026-10-25（續76）客戶模型三軸五方式：現成方案評估——權利、錢包、代操維持自寫，買斷授權建議改用 Keygen CE（待操作者確認）（Claude）
 
 - **觸發**：操作者「查清楚 我們寫得要死要活得 還一堆漏洞」。ADR 017 `:40` 業界對照只照抄模型、未評估直接採用。
