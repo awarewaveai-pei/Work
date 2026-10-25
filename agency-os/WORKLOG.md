@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-26（續4）全自動內容 P7 閘通過：社群工具真發一支影片到 AW YouTube 頻道（操作者授權 2026-10-25／nginx go 2026-10-26）（Claude）
+
+- **根因**：`addVideo` 上傳 postiz 回 413——postiz vhost 無 `client_max_body_size`（nginx 預設 1MB）。Postiz 自身影片上限 1GB 不擋。
+- **nginx 改動**：`/etc/nginx/sites-available/postiz.aware-wave.com` server 區塊加 `client_max_body_size 500m;`（經 `safe-infra-patch.sh host-nginx`，17:12Z）。備份 `/root/lobster-phase1/safe-patch-backups/_etc_nginx_sites-available_postiz.aware-wave.com.safe-patch-20261025-171234`。rollback：`sudo cp -p <備份> /etc/nginx/sites-available/postiz.aware-wave.com && sudo nginx -t && sudo systemctl reload nginx`。
+- **發布**：社群工具 lib 路徑建貼文 `4858ee40-b935-4b22-8557-1c6f36b74175`（只 target AW YouTube 帳號 `fb22fdc5…`，影片 video_jobs `177a1109…` 14.3MB 16x9）。Postiz "Post" `cmvo3fa6q0004qs8ku79yh7fe` PUBLISHED 17:20Z；dispatch 輪詢後 `social_post_targets.state=published`、`release_url=https://www.youtube.com/watch?v=vAXUle_HI38`。
+- **YouTube 確認**：curl 該網址 200，`<title>` = 「Aware Wave｜差點放棄的那一夜，她重新拿起了畫筆 - YouTube」；oembed author=Aware Wave。
+- 監工台：P7.0 done、P7 done、待決 4 移除；`node build.mjs && node check.mjs` = ok（61 項 60 done，剩 P4.4）。
+- REALTEST_EVIDENCE: tool=curl | cmd=curl -s -o /dev/null -w %{http_code} https://www.youtube.com/watch?v=vAXUle_HI38 | exit=0 | ms=600
+- REVIEW_WAIVED: NA -- 無程式改動，只改主機 nginx 一行＋監工台資料
+- BUGHUNT_WAIVED: NA -- 無程式改動
+- ORACLE_WAIVED: 無 source 檔改動
+- 避免再發生：新 vhost 若要收大檔上傳須明設 `client_max_body_size`（預設 1MB 回 413）。dispatch 回寫 `social_post_targets` 比 Postiz PUBLISHED 晚約 3–4 分鐘（輪詢），驗證勿在 Postiz 剛發出時就判失敗。
 ## 2026-10-26（續3）next-admin 寫入路徑不得退回 anon client（Claude）
 
 - 根因：`lib/supabase-server.ts:42` `getSupabaseServerClient` 缺 service role key 時退回 anon；寫入路由用它會靜默失敗。

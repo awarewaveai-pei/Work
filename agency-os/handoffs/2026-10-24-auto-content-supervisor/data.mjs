@@ -127,12 +127,12 @@ export const STEPS = [
       done('P6.3', '文章頁舊社群面板和 Python 直連發布早已移除；三支舊社群 API 還有兩個畫面在用，先留著（記在社群管理平台的待辦）', '229b7f8f8'),
     ] },
   { n: 7, code: 'P7', group: 'F', plain: '影片可以直接發到 YouTube，和其他平台一起在社群工具排程。', title: 'YouTube',
-    gate: '在社群工具選 YouTube 頻道排程一支影片，YouTube 後台看得到', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['P6'],
-    before: '待決 4',
+    gate: '在社群工具選 YouTube 頻道排程一支影片，YouTube 後台看得到', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: '4425d4bf8', depends: ['P6'],
+    before: '',
     what: 'Postiz youtube provider；撰寫頁收 YouTube 標題；寫貼文核心加 youtube 規格',
     files: ['lib/content/postiz.ts', 'lib/social/compose.ts'],
     items: [
-      todo('P7.0', '到 Google 申請 YouTube 授權，在 Postiz 連上頻道（要你本人做）'),
+      done('P7.0', '在 Postiz 連上 YouTube 頻道並真發一支影片：Aware Wave 頻道已看得到（https://www.youtube.com/watch?v=vAXUle_HI38）；Postiz 上傳上限 1MB 改 500m', '4425d4bf8'),
       done('P7.1', '社群工具加 YouTube：貼文第一行就是影片標題；存檔、撰寫頁、送出用同一套規則', 'ae5e0675b'),
       done('P7.2', '選了 YouTube 的題目，影片自動排進 YouTube；沒連頻道就不開始、不花錢', 'ae5e0675b'),
     ] },
@@ -151,6 +151,5 @@ export const STEPS = [
 
 // 操作者自己要決定或親手做的（agent 不能替她定）
 export const OPEN = [
-  { n: 4, what: '到 Google Cloud 建「OAuth 用戶端 ID」（網頁應用程式，重新導向網址 https://postiz.aware-wave.com/integrations/social/youtube），把用戶端 ID 和密鑰存進憑證檔。你手上的是 API Key，只能讀、不能上傳影片', before: 'P7', src: '計畫 §7 P7.0' },
   { n: 7, what: '主機每 5 分鐘的排程時鐘從 2026-10-24 12:11Z 跑到現在都沒出錯（Trigger 停擺 34 小時期間也照跑）。停掉 Trigger 的每小時排程，併進「排程離開 Trigger」那件工作一起做，那邊會問你', before: 'P4', src: '計畫 P4.4；agency-os/handoffs/2026-10-25-schedules-off-trigger/R0-PLAN.md C1.5' },
 ];
