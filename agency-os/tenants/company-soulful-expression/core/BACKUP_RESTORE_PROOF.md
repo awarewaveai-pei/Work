@@ -15,7 +15,7 @@ restore_drills:
     note: "Drill #1 — EU 拋棄式容器；288 表還原、750 筆附件與磁碟零遺失。未含程式碼，故未驗「站能開起來」"
 # last_known_success_utc / last_known_success_task_id 同日移除：它們是 BACKUP_AUTO_STATUS.json 的手抄鏡像，
 # 全 repo 無任何消費端，實際已停在 2026-06-08 爛了 70 天。真值一律看下面那份 JSON。
-truth_source: agency-os/tenants/company-soulful-expression/core/BACKUP_AUTO_STATUS.json
+truth_source: ks-aw-01 /var/lib/awarewave/backup-status/company-soulful-expression.json  # repo BACKUP_AUTO_STATUS.json = static config (2026-10-25)
 ---
 
 # Backup and Restore Proof — Soulful Expression Art Therapy
@@ -23,8 +23,8 @@ truth_source: agency-os/tenants/company-soulful-expression/core/BACKUP_AUTO_STAT
 > 客觀證據；與 `ENVIRONMENT_REGISTRY` 欄位互相對齊更新。
 >
 > **2026-05-22 治理修訂**：本檔語意收斂為「**人類維護的里程碑**」（baseline backup、restore drills、災難復原演練）。
-> 「最近一次自動備份是否成功」這類週級資料**改由 `BACKUP_AUTO_STATUS.json` 承載**（truth source = MainWP DB）。
-> Phase 4 routine 同時讀兩份檔做 cross-truth check。詳見 `agency-os/automation/claude-routines/phase4-weekly.md`。
+> 「最近一次自動備份是否成功」這類週級資料由主機 `/var/lib/awarewave/backup-status/company-soulful-expression.json` 承載並在主機判斷（2026-10-25 起；truth source = MainWP DB；失敗即 `/ops/schedules` 列紅＋推播）。
+> repo 的 `BACKUP_AUTO_STATUS.json` 只剩靜態設定（mainwp_site_id 等）。詳見 `agency-os/automation/claude-routines/phase4-weekly.md`。
 
 ## Backup Record #1 — 2026-05-08（Day 1 基線備份）
 

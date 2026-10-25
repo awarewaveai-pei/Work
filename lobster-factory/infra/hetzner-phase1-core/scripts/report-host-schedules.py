@@ -15,7 +15,8 @@ Clocks that are not on this host's cron but that we set (handoffs/2026-10-25-sch
   - pg_cron jobs in supabase-db (key pg_cron_<job>, name = jobname; last finished run from cron.job_run_details);
   - active n8n workflows with a schedule/cron trigger node (key n8n_<id>, name = workflow name);
   - reports another machine commits to the repo (cloud routines, the laptop's status reports): last = the newest commit
-    of that path on /root/Work origin/main (fetched daily by other jobs), stale_after_s = how old it may get.
+    of that path on /root/Work origin/main (fetched daily by other jobs), stale_after_s = how old it may get;
+  - GitHub Actions workflows with a schedule (key gha_<file>; latest completed scheduled run, public API, no token).
 A collector that cannot read its source adds to external_errors (the page shows that as a failure), never an empty
 list; kept apart from errors, which means "this host's own schedules are only partly known".
 Writes OUT_FILE by rename (next-admin reads it at /host-status/host-schedules.json). Exit 0 written, 2 could not write.
@@ -28,11 +29,13 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.request
 
 OUT_FILE = os.environ.get("HOST_SCHEDULES_FILE", "/var/lib/awarewave/host-schedules.json")
 JOBS_DIR = os.environ.get("CRON_RUN_JOBS_DIR", "/var/lib/awarewave/jobs")
 REPO_CRON_DIR = os.environ.get("REPO_CRON_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "cron.d"))
 WORK_REPO = os.environ.get("WORK_REPO_DIR", "/root/Work")
+GITHUB_REPO = os.environ.get("GITHUB_REPO", "awarewaveai-pei/Work")
 DAY_S = 86400
 # (key, repo path, cadence, stale after days) -- the same contract as scripts/routine-output-watchdog.sh.
 REPO_REPORTS = [
@@ -152,6 +155,27 @@ def n8n_entries(tsv):
 def repo_report_entry(key, path, cadence, days, commit_epoch):
     return {"source": "repo:" + path, "schedule": cadence, "key": key, "records_result": True, "log": None,
             "stale_after_s": days * DAY_S, "last": done(iso(commit_epoch) if commit_epoch else None, True)}
+
+
+GHA_NAME = re.compile(r"^name:\s*['\"]?(.+?)['\"]?\s*$", re.M)
+GHA_CRON = re.compile(r"^\s*-\s*cron:\s*['\"]([^'\"]+)['\"]", re.M)
+
+
+def gha_workflow(file, text):
+    """A workflow file -> (file, name, first cron) when it runs on a schedule, else None."""
+    cron, name = GHA_CRON.search(text), GHA_NAME.search(text)
+    return (file, name.group(1) if name else file, cron.group(1)) if cron else None
+
+
+def gha_entry(file, name, cron, runs_json):
+    """GitHub's latest decided scheduled run of one workflow -> entry (no run yet = no record). A run GitHub cancelled
+    or skipped (a late schedule superseded by the next one, a job's if:) says nothing about the job: passed over."""
+    run = next((r for r in runs_json.get("workflow_runs") or [] if r.get("conclusion") not in ("cancelled", "skipped")), None)
+    return {"source": "github:" + file, "schedule": cron, "key": "gha_" + slug(file.rsplit(".", 1)[0]), "name": name,
+            "records_result": True, "log": run.get("html_url") if run else None,
+            "last": done(run.get("updated_at"), run.get("conclusion") == "success") if run else None,
+            # GitHub starts scheduled runs late and drops some under load: a sub-hourly schedule is late after 2 h.
+            **({"stale_after_s": 2 * 3600} if cron.split()[1:2] == ["*"] else {})}
 
 
 def build(lines, run_parts, timers, records, drift, skipped, errors, now, external=(), external_errors=()):
@@ -307,6 +331,27 @@ def collect_external(errors):
             out.append(repo_report_entry(key, path, cadence, days, int(ts) if ts.isdigit() else None))
         except (OSError, subprocess.SubprocessError) as e:
             errors.append(f"repo {path}: {e}"[:200])
+    # GitHub Actions schedules: the workflow files on origin/main, each one's latest completed scheduled run from the
+    # public API (the repo is public: no token; one call per scheduled workflow, every 10 min, under the 60/h limit).
+    try:
+        git = lambda *a: subprocess.run(["git", "-C", WORK_REPO, *a], capture_output=True, text=True,  # noqa: E731
+                                        check=True, timeout=30).stdout
+        files = [f for f in git("ls-tree", "--name-only", "origin/main", ".github/workflows/").split()
+                 if f.endswith((".yml", ".yaml"))]
+        flows = [w for w in (gha_workflow(os.path.basename(f), git("show", "origin/main:" + f)) for f in files) if w]
+    except (OSError, subprocess.SubprocessError) as e:
+        errors.append(f"github workflows: {e}"[:200])
+        flows = []
+    for file, name, cron in flows:
+        url = (f"https://api.github.com/repos/{GITHUB_REPO}/actions/workflows/{file}/runs"
+               "?event=schedule&status=completed&per_page=5")
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "awarewave-host-schedules",
+                                                       "Accept": "application/vnd.github+json"})
+            with urllib.request.urlopen(req, timeout=20) as r:
+                out.append(gha_entry(file, name, cron, json.loads(r.read().decode("utf-8"))))
+        except (OSError, ValueError) as e:
+            errors.append(f"github {file}: {e}"[:200])
     return out
 
 

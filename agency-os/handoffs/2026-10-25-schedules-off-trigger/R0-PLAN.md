@@ -38,7 +38,7 @@
 - R3 主機 `.env` 缺 token → poke 腳本 exit 1（不安靜略過），頁面紅＋推播。
 - R4 推播洗版：只在狀態變化發（state 檔），每日一行固定時間。
 - R5 GitHub token 外洩面：fine-grained、單 repo、Actions read-only。
-- R6 C7 動 auth（Medium）；C2、C3.4、C4.6、C6 動 prod 主機（High）。
+- R6 C2、C3.4、C4.6 動 prod 主機（High）。
 - R7 push `packages/workflows` ＝ Trigger 部署：刪 Trigger 排程只能在 cron 綠之後（C2.3）。
 
 ## 4. 方案比較
@@ -113,26 +113,19 @@ push `packages/workflows` 即觸發 Trigger 部署（`.claude/hooks/post-push-tr
 | 卡號 | 做什麼 |
 |---|---|
 | C6.1 | 清點 `scripts/ao-resume.ps1` 讀的 9 份報告各自產生者與資料來源（SSH 讀主機者＝可搬） |
-| C6.2 | 可搬者改主機 cron 產生，寫 `/var/lib/awarewave/*.json`；筆電改讀 |
-| C6.3 | 頁面「筆電與雲端」區只剩真正依賴筆電者 |
 
-### C7 內部 API 一把鑰匙
-
-| 卡號 | 做什麼 |
-|---|---|
-| C7.1 | `verifyInternalToken()` 一個函式、`INTERNAL_API_TOKEN` 一把；7 route 改用；舊名移除 |
-| C7.2 | compose、`.env.example`、`poke.sh` cron 行、測試同步；`/codex-review` 獨立審（auth） |
+C6.2／C6.3 不做（`reports/decisions/2026-10-25-schedules-off-trigger-open-items.md` #5）：主機事故已由排程列＋endpoint-alert＋Netdata Cloud 推播，筆電報告是摘要視圖。
 
 ### C8 主機外看守與第二台主機
 
 | 卡號 | 做什麼 |
 |---|---|
-| C8.1 | 主機外探針：每 5 分打 `app.aware-wave.com`，失敗推 Telegram（Cloudflare Health Checks 或外部服務，待決 2） |
-| C8.2 | 第二台主機決策記錄 `reports/decisions/`：成本、RPO／RTO、搬遷步驟（待決 3） |
+| C8.1 | 主機外探針 `.github/workflows/host-liveness-probe.yml`：每 5 分 TCP 58122＋直連 origin HTTPS（Cloudflare BFM 擋資料中心 IP，不可經 proxy）；失敗＝GitHub 失敗信，結果亦為 `/ops/schedules` GitHub 列（決定 #2） |
+| C8.2 | 第二台主機：決策記錄 `reports/decisions/2026-10-25-schedules-off-trigger-open-items.md` #3（此時不加，附回頭條件） |
 
 ## 7. 驗證計畫（四動作）
 
 - 實測：C1.5、C3.3、C4.5 本機；C2、C3.4、C4.6 prod 實跑；`/ops/schedules` 截圖。
-- Review：每卡 `/codex-review`；C7 加 critic Deep。
+- Review：每卡 critic（Standard）。
 - 抓蟲：grep 10 個排程 task id、7 個 token 名、5 種推播變數名，scope `agency-os,scripts,lobster-factory,.claude,runbooks`。
 - WORKLOG：每卡一條，四行機械證據。

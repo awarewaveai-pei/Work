@@ -107,7 +107,9 @@ describe("hostScheduleRowsFrom", () => {
     const rows = hostScheduleRowsFrom(doc([
       ent("pg_cron_archive", { started_at: null, finished_at: iso(H), exit_code: 1 }, { source: "pg_cron:supabase-db", schedule: "0 2 * * *", name: "archive" }),
       ent("n8n_abc", { started_at: null, finished_at: iso(H), exit_code: 0 }, { source: "n8n:abc", schedule: "@timer", name: "ping" }),
+      ent("gha_probe", { started_at: null, finished_at: iso(H), exit_code: 0 }, { source: "github:probe.yml", schedule: "*/5 * * * *", name: "Host liveness probe", stale_after_s: 7200 }),
     ]), NOW);
+    expect(row(rows, "gha_probe")).toMatchObject({ state: "ok", group: "external", label: "GitHub 定時檢查：Host liveness probe" });
     expect(row(rows, "pg_cron_archive")).toMatchObject({ state: "failed", group: "external", label: "資料庫排程：archive" });
     expect(row(rows, "n8n_abc")).toMatchObject({ state: "ok", group: "external", cadence: "依觸發器設定" });
     expect(rows.some((r) => r.state === "unregistered")).toBe(false);
@@ -119,10 +121,11 @@ describe("hostScheduleRowsFrom", () => {
   });
 
   it("an off-host source that cannot be read is its own failure and does not stale the host's jobs", () => {
-    const d = doc([], { external_errors: ["n8n: connection refused"] });
+    const d = doc([], { external_errors: ["n8n: connection refused", "github host-liveness-probe.yml: HTTP 503"] });
     d.entries = d.entries.filter((e) => e.key !== "lobster_backup");
     const rows = hostScheduleRowsFrom(d, NOW);
-    expect(row(rows, "external_inventory_errors")?.state).toBe("failed");
+    expect(row(rows, "external_inventory_errors:n8n")?.state).toBe("failed");
+    expect(row(rows, "external_inventory_errors:github")?.state).toBe("failed");
     expect(row(rows, "lobster_backup")?.state).toBe("missing");
   });
 

@@ -20,6 +20,7 @@ For each entry: open the linked file for the full report including debate transc
 | 2026-09-26 | 系統模式遇到外部進來的事件（Printful／Woo 訂單／Chatwoot）與建站派送怎麼處理 | 模式只擋我們發起的變更；客戶事件先落 DB 再延後或轉人工，永不回 423；操作者發起的 Printful 寫入與建站派送照常把關 | 直接決策（操作者全權委派） | [2026-09-26-system-mode-inbound-events.md](2026-09-26-system-mode-inbound-events.md) |
 | 2026-10-22 | 共用 checkout commit 繞路燒 token：worktree push 試點與撤回 | 撤回 worktree push；AO-RESUME parity 改為乾淨 3-way 帶過 dirty 檔、WORKLOG merge=union | 直接決策 | [2026-10-22-per-session-worktree-pilot.md](2026-10-22-per-session-worktree-pilot.md) |
 | 2026-10-25 | 客戶模型三軸五方式：現成方案能取代多少（直接決策，待操作者確認） | 訂閱維持 WCS＋TapPay；權利、錢包、代操維持自寫；買斷授權建議改用 Keygen CE | 中 | [2026-10-25-customer-model-buy-vs-build.md](2026-10-25-customer-model-buy-vs-build.md) |
+| 2026-10-25 | 排程離開 Trigger 待決 1–5 與 C7（直接決策，操作者「你決定」） | GitHub 公開 API 免 token；GHA 主機存活探針；不加第二台主機；備份狀態留主機判斷；狀態報告不搬；C7 不做 | 直接決策 | [2026-10-25-schedules-off-trigger-open-items.md](2026-10-25-schedules-off-trigger-open-items.md) |
 
 ---
 

@@ -105,6 +105,20 @@ class External(unittest.TestCase):
         doc = rhs.build([], [], [], {}, [], [], [], 0, ext)
         self.assertEqual([e["key"] for e in doc["entries"]], ["pg_cron_j"])
 
+    def test_github_workflow_and_run(self):
+        self.assertIsNone(rhs.gha_workflow("ci.yml", "\n".join(["name: CI", "on: push"])))
+        w = rhs.gha_workflow("host-liveness-probe.yml",
+                             "\n".join(["name: Host liveness probe", "on:", "  schedule:", '    - cron: "*/5 * * * *"']))
+        self.assertEqual(w, ("host-liveness-probe.yml", "Host liveness probe", "*/5 * * * *"))
+        e = rhs.gha_entry(*w, {"workflow_runs": [{"conclusion": "failure", "updated_at": "2026-10-25T14:00:00Z", "html_url": "u"}]})
+        self.assertEqual((e["key"], e["source"], e["last"]["exit_code"], e["stale_after_s"]), ("gha_host_liveness_probe", "github:host-liveness-probe.yml", 1, 7200))
+        runs = {"workflow_runs": [{"conclusion": "cancelled", "updated_at": "2026-10-25T14:05:00Z"},
+                                  {"conclusion": "success", "updated_at": "2026-10-25T14:00:00Z"}]}
+        self.assertEqual(rhs.gha_entry(*w, runs)["last"]["exit_code"], 0)  # a superseded run says nothing
+        weekly = rhs.gha_entry("a.yml", "A", "30 1 * * 1", {"workflow_runs": []})
+        self.assertIsNone(weekly["last"])
+        self.assertNotIn("stale_after_s", weekly)
+
     def test_external_errors_kept_apart(self):
         doc = rhs.build([], [], [], {}, [], [], [], 0, [], ["n8n: down"])
         self.assertEqual((doc["errors"], doc["external_errors"]), ([], ["n8n: down"]))

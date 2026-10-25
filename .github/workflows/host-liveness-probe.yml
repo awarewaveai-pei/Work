@@ -1,0 +1,41 @@
+# Host liveness probe from outside the host (handoffs/2026-10-25-schedules-off-trigger C8.1).
+#
+# Every monitor we run lives on ks-aw-01; if the whole host is down they all go silent with it. This job asks two
+# questions from GitHub's network: does sshd accept a TCP connection, and does the origin's HTTPS answer at all.
+# The origin is probed directly (--resolve), not through Cloudflare: Bot Fight Mode challenges datacenter IPs, so a
+# runner going through the proxy always gets 403 (lobster-factory/infra/netdata/README.md "OPS_INBOX_RESOLVE pin").
+# The origin itself answers non-Cloudflare clients with 403 -- any HTTP answer proves host + nginx are up; an app that
+# is down while the host is up is endpoint-alert's job on the host.
+# A failed run = GitHub's failed-workflow email to the account that last changed this schedule. The latest result is
+# also a row on /ops/schedules (report-host-schedules.py reads scheduled runs of this repo).
+# GitHub may start scheduled runs several minutes late; this is a "host gone" alarm, not a latency SLO.
+name: Host liveness probe
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      HOST_IP: 145.239.195.47
+      SSH_PORT: "58122"
+      HOSTNAME_FOR_TLS: app.aware-wave.com
+    steps:
+      - name: sshd accepts a TCP connection
+        run: |
+          for i in 1 2 3; do timeout 10 bash -c "</dev/tcp/$HOST_IP/$SSH_PORT" && exit 0; sleep 10; done
+          echo "::error::no TCP answer from $HOST_IP:$SSH_PORT after 3 tries"; exit 1
+      - name: origin HTTPS answers
+        run: |
+          for i in 1 2 3; do
+            code="$(curl -s -o /dev/null -m 20 -w '%{http_code}' --resolve "$HOSTNAME_FOR_TLS:443:$HOST_IP" "https://$HOSTNAME_FOR_TLS/" || true)"
+            [ "$code" != "000" ] && { echo "origin answered HTTP $code"; exit 0; }
+            sleep 10
+          done
+          echo "::error::no HTTPS answer from the origin $HOST_IP after 3 tries"; exit 1

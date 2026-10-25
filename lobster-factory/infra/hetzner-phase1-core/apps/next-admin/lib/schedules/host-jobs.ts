@@ -29,7 +29,7 @@ export const HOST_JOBS: Record<string, HostJob> = {
   stack_backup_verify: { label: "服務備份檢查", description: "每天檢查上一項服務備份是否完整，確保各項資料可供還原。", group: "backup" },
   cognitive_db_backup: { label: "Cognitive OS 備份", description: "每天備份 Cognitive OS 資料庫，保留最近 7 天的備份。", group: "backup" },
   hci_postgres_backup: { label: "HCI 資料庫備份", description: "每天備份 HCI 系統的正式資料庫，確保正式資料有備份。", group: "backup" },
-  backup_status_sync: { label: "網站備份狀態同步", description: "每天從 MainWP 讀取各客戶網站的備份狀態，更新程式庫紀錄。", group: "backup" },
+  backup_status_sync: { label: "網站備份狀態同步", description: "每天從 MainWP 讀取各客戶網站的備份狀態，存在主機並判斷：太久沒成功備份、最近一次失敗或資料停止更新時標示失敗。", group: "backup" },
   host_schedules_report: { label: "主機排程盤點", description: "每 10 分鐘盤點主機排程與最近結果，供本頁讀取；停止後狀態會過時。", group: "deploy" },
   awarewave_endpoint_alert: { label: "網站回應檢查", description: "每分鐘檢查對外網站是否正常回應，異常時通知並在恢復時再通知一次。", group: "deploy", fail: "檢查失敗時，Slack 與 Telegram 會收到通知；恢復時也會再通知一次。" },
   ops_probe_heartbeat: { label: "主機存活回報", description: "每 30 分鐘回報主機仍在運作，讓健康檢查確認主機排程正常執行。", group: "deploy" },
@@ -70,6 +70,7 @@ export const HOST_JOBS: Record<string, HostJob> = {
  * n8n_backup must still show as unregistered. */
 export const HOST_FAMILIES: Array<{ source: string; label: string; description: string; fail: string }> = [
   { source: "pg_cron:", label: "資料庫排程：{name}", description: "Supabase 資料庫內建排程（pg_cron）「{name}」，結果取自資料庫的執行紀錄。", fail: "最近一次執行失敗時，本列標示失敗並推播。" },
+  { source: "github:", label: "GitHub 定時檢查：{name}", description: "GitHub Actions 依排程執行的「{name}」，結果取自 GitHub 最近一次排程執行。", fail: "最近一次執行失敗時，本列標示失敗並推播；GitHub 也會寄信給你。" },
   { source: "n8n:", label: "n8n 流程：{name}", description: "n8n 中已啟用、由時間觸發的流程「{name}」，結果取自 n8n 的執行紀錄。", fail: "最近一次執行失敗時，本列標示失敗並推播。" },
 ];
 
@@ -77,7 +78,7 @@ export const HOST_UI = {
   group_backup: "備份",
   group_deploy: "部署與監控",
   group_site: "網站與服務維護",
-  group_external: "資料庫與 n8n",
+  group_external: "資料庫、n8n 與 GitHub",
   group_laptop: "筆電與雲端",
   state_ok: "正常",
   state_stale: "長時間未回報",

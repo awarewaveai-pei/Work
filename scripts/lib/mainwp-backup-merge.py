@@ -2,7 +2,7 @@
 """
 mainwp-backup-merge.py
 
-Companion to scripts/sync-backup-status-from-mainwp.sh (EU-side Phase 4 backup sync).
+Companion to scripts/sync-backup-status-from-mainwp.sh (host-side backup status; state in /var/lib/awarewave/backup-status/).
 Merges the parsed MainWP backup truth (from mainwp-report-parse.php) into a tenant's
 BACKUP_AUTO_STATUS.json, preserving all static metadata and rewriting only the dynamic
 backup fields.
@@ -102,7 +102,7 @@ def main() -> None:
         existing["last_failure"] = new_fail
     existing["synced_at_utc"] = now_utc
     existing["synced_by"] = (
-        "auto -- sync-backup-status-from-mainwp.sh (EU cron) "
+        "auto -- sync-backup-status-from-mainwp.sh (ks-aw-01 host cron) "
         "from MainWP DB report_addon truth source"
     )
     existing["backup_history_since_last_sync"] = history

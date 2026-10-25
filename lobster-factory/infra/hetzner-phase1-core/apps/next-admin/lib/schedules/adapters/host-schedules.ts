@@ -94,11 +94,17 @@ export function hostScheduleRowsFrom(doc: HostSchedulesDoc, now: number): System
       lastAt: doc.generated_at, state: "failed", detail: "", details: details(desc, "", null) });
   }
 
-  const extErrors = doc.external_errors ?? [];
-  if (extErrors.length) {
-    const desc = fill(HOST_UI.external_errors_desc, { errors: extErrors.join("；").slice(0, 300) });
-    rows.push({ key: "external_inventory_errors", label: HOST_UI.external_errors_label, description: desc, cadence: "",
-      lastAt: doc.generated_at, state: "failed", detail: "", details: details(desc, "", null) });
+  // One row per source (pg_cron, n8n, repo, github: the error's first word): a flaky source alerts and recovers on
+  // its own, never masking another source's failure behind one shared episode.
+  const bySource = new Map<string, string[]>();
+  for (const err of doc.external_errors ?? []) {
+    const src = err.split(/[\s:]/, 1)[0] || "external";
+    bySource.set(src, [...(bySource.get(src) ?? []), err]);
+  }
+  for (const [src, errs] of bySource) {
+    const desc = fill(HOST_UI.external_errors_desc, { errors: errs.join("；").slice(0, 300) });
+    rows.push({ key: `external_inventory_errors:${src}`, label: `${HOST_UI.external_errors_label}（${src}）`, description: desc,
+      cadence: "", lastAt: doc.generated_at, state: "failed", detail: "", details: details(desc, "", null) });
   }
 
   for (const e of doc.entries) {

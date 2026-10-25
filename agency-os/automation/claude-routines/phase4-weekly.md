@@ -94,16 +94,13 @@ STEPS:
                   3A = WARN "restore drill overdue (due ${restore_drill_due_after})"
               Else: 3A = PASS
 
-            Sub-check 3B (automated backup freshness — TRUTH SOURCE):
-              expected_json_path = same directory as the .md, file name BACKUP_AUTO_STATUS.json
-              If file missing: 3B = WARN "BACKUP_AUTO_STATUS.json missing — no truth source for last backup"
-              Else:
-                Parse JSON. Read .last_success.unix_utc.
-                age_days = (now_utc - unix_utc) / 86400, FLOORED.
-                If age_days > 8: 3B = WARN "last success ${age_days}d ago (${.last_success.iso_utc}); over 8d threshold"
-                Else: 3B = PASS
+            Sub-checks 3B-3D (automated backup freshness / last outcome / truth source moving):
+              NOT run here since 2026-10-25. The live status stays on the host (ks-aw-01 /var/lib/awarewave/backup-status/<slug>.json) and the
+              host judges it daily (scripts/sync-backup-status-from-mainwp.sh -> phase4-checks.py --judge-backup-json);
+              a warning turns /ops/schedules row backup_status_sync red and pushes. The repo BACKUP_AUTO_STATUS.json is
+              static config (mainwp_site_id), not status. Report the line "3B-3D: judged on the host".
 
-            tenant verdict = WARN if either 3A or 3B WARN, else PASS
+            tenant verdict = WARN if 3A WARN, else PASS
 
         - any other status value: tenant verdict = WARN "unknown status frontmatter value: ${status}"
 
@@ -395,7 +392,7 @@ STEP 7 file template adds: `- Check 4 VPS auto-reboot SSOT: ${CHECK4_STATUS}${CH
 
 ## Related
 
-- **CHECK 3 truth-source writer**: `scripts/sync-backup-status-from-mainwp.sh` (EU VPS, daily cron 01:11 UTC) keeps each active tenant's `BACKUP_AUTO_STATUS.json` (read by CHECK 3 sub-check 3B) in sync with the MainWP DB `report_addon`. Before this existed (pre-2026-06-08) the JSON was hand-synced and lagged, causing false "backup Nd stale" WARNs — always VBC-verify against the DB before treating a 3B WARN as a real backup outage.
+- **CHECK 3B-3D**: `scripts/sync-backup-status-from-mainwp.sh` (ks-aw-01 host cron `backup_status_sync`, 01:11 UTC) merges the MainWP DB `report_addon` into ks-aw-01 /var/lib/awarewave/backup-status/<slug>.json and judges it there (2026-10-25: the host cannot push, and status belongs where it is produced). Before this existed (pre-2026-06-08) the JSON was hand-synced and lagged, causing false "backup Nd stale" WARNs — always VBC-verify against the DB before treating a 3B WARN as a real backup outage.
 - Fallback (manual run): `scripts/phase4-weekly-check.ps1` — kept as belt-and-suspenders backup
 - Watchdog: `scripts/system-health-check.ps1` §11
 - VPS auto-reboot SSOT: `lobster-factory/infra/hetzner-phase1-core/auto-reboot/52awarewave-auto-reboot.conf`

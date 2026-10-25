@@ -6,67 +6,6 @@
   "backup_destination": "googledrive",
   "backup_destination_label": "Update_Backup",
   "backup_schedule_cron": "weekly (start_time 2026-05-09 11:05:16 UTC)",
-  "last_success": {
-    "task_id": "wpvivid-9e2edae30a3e5",
-    "unix_utc": 1787731927,
-    "iso_utc": "2026-08-26T08:12:07Z",
-    "iso_tpe": "2026-08-26T16:12:07+08:00",
-    "status": "Succeeded"
-  },
-  "last_failure": {
-    "task_id": "wpvivid-b37e0bbc181a9",
-    "unix_utc": 1787530510,
-    "iso_utc": "2026-08-24T00:15:10Z",
-    "status": "Failed",
-    "reason": "Failed,"
-  },
-  "synced_at_utc": "2026-08-27T01:11:03Z",
-  "synced_by": "auto -- sync-backup-status-from-mainwp.sh (EU cron) from MainWP DB report_addon truth source",
-  "truth_source": "mwp_mainwp_wpvividmeta WHERE site_id=2 AND option_name='report_addon' on EU VPS mainwp-web container",
-  "backup_history_since_last_sync": [
-    {
-      "iso_utc": "2026-08-26T08:12:07Z",
-      "status": "Succeeded"
-    },
-    {
-      "iso_utc": "2026-08-26T08:01:32Z",
-      "status": "Succeeded"
-    },
-    {
-      "iso_utc": "2026-08-26T07:51:40Z",
-      "status": "Succeeded"
-    },
-    {
-      "iso_utc": "2026-08-24T00:15:10Z",
-      "status": "Failed",
-      "reason": "Failed,"
-    },
-    {
-      "iso_utc": "2026-08-17T00:15:04Z",
-      "status": "Succeeded"
-    },
-    {
-      "iso_utc": "2026-08-10T00:15:04Z",
-      "status": "Failed",
-      "reason": "Failed,"
-    },
-    {
-      "iso_utc": "2026-08-03T00:15:04Z",
-      "status": "Failed",
-      "reason": "Failed,"
-    },
-    {
-      "iso_utc": "2026-07-27T00:15:11Z",
-      "status": "Succeeded"
-    },
-    {
-      "iso_utc": "2026-07-20T00:15:08Z",
-      "status": "Succeeded"
-    },
-    {
-      "iso_utc": "2026-07-13T00:15:04Z",
-      "status": "Succeeded"
-    }
-  ],
-  "automated_sync": "DONE 2026-06-08: scripts/sync-backup-status-from-mainwp.sh on EU VPS, daily cron 01:11 UTC, queries report_addon and rewrites this file only when the backup task changes. last_success/last_failure/synced_at_utc/synced_by/backup_history_since_last_sync are machine-owned; other fields stay human-editable. Manual fallback: edit by hand (the script preserves unlisted keys)."
+  "truth_source": "mwp_mainwp_wpvividmeta WHERE site_id=2 AND option_name='report_addon' (mainwp-db container on ks-aw-01)",
+  "automated_sync": "Static config only since 2026-10-25. Live status: ks-aw-01 /var/lib/awarewave/backup-status/company-soulful-expression.json, written and judged by scripts/sync-backup-status-from-mainwp.sh (host cron backup_status_sync, 01:11 UTC)."
 }

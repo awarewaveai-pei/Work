@@ -505,6 +505,13 @@ def check_truth_source_freshness(status_json, now_utc):
     return (PASS, "3D 真相來源", "%d 天前更新" % age_days)
 
 
+def judge_backup_status(status_json, now_utc):
+    """3B-3D on one tenant's backup status. Since 2026-10-25 the host runs it (sync-backup-status-from-mainwp.sh calls
+    --judge-backup-json; state in /var/lib/awarewave/backup-status/): the status lives there, not in the repo."""
+    return [check_backup_freshness(status_json, now_utc), check_last_backup_outcome(status_json),
+            check_truth_source_freshness(status_json, now_utc)]
+
+
 def check_tenant(repo, md_path, today, now_utc):
     slug = tenant_slug(repo, md_path)
     try:
@@ -524,18 +531,9 @@ def check_tenant(repo, md_path, today, now_utc):
 
     rows = list(check_restore_drills(fm, text, today))
 
-    json_path = os.path.join(os.path.dirname(md_path), "BACKUP_AUTO_STATUS.json")
-    if not os.path.isfile(json_path):
-        rows.append((WARNING, "3B 備份新鮮度", "BACKUP_AUTO_STATUS.json 不存在 —— 無真相來源"))
-    else:
-        try:
-            status_json = read_json(json_path)
-        except (OSError, ValueError) as exc:
-            rows.append((WARNING, "3B 備份新鮮度", "BACKUP_AUTO_STATUS.json 無法解析：%s" % exc))
-        else:
-            rows.append(check_backup_freshness(status_json, now_utc))
-            rows.append(check_last_backup_outcome(status_json))
-            rows.append(check_truth_source_freshness(status_json, now_utc))
+    # 3B-3D need the live backup status, which stays on the host (judge_backup_status): its failure turns the
+    # backup_status_sync row on /ops/schedules red and pushes. Restating it here would read a stale repo copy.
+    rows.append((PASS, "3B-3D 備份", "由主機 backup_status_sync 判斷（/ops/schedules，失敗即推播）"))
 
     verdict = WARNING if any(r[0] == WARNING for r in rows) else PASS
     return verdict, [(lvl, "%s %s" % (slug, label), detail) for lvl, label, detail in rows]
@@ -773,7 +771,7 @@ def selftest():
                               {"status": "Failed"}, {"status": "Succeeded"}, {"status": "Failed"}],
                           "synced_at_utc": recent_iso,
                       })
-        v, rows = verdict_of(md)
+        rows = judge_backup_status(read_json(os.path.join(os.path.dirname(md), "BACKUP_AUTO_STATUS.json")), now)
         expect("last attempt failed is WARNING",
                any(r[0] == WARNING and "3C" in r[1] for r in rows), str(rows))
 
@@ -783,7 +781,7 @@ def selftest():
                       "status: active\nrestore_drills:\n  - date: 2026-08-16\n    result: PASS\n",
                       status_json={"last_success": {"unix_utc": recent, "iso_utc": recent_iso},
                                    "synced_at_utc": stale_iso})
-        v, rows = verdict_of(md)
+        rows = judge_backup_status(read_json(os.path.join(os.path.dirname(md), "BACKUP_AUTO_STATUS.json")), now)
         expect("frozen truth source is WARNING",
                any(r[0] == WARNING and "3D" in r[1] for r in rows), str(rows))
 
@@ -792,15 +790,17 @@ def selftest():
                       "status: active\nrestore_drills:\n  - date: 2026-08-16\n    result: PASS\n",
                       status_json={"last_success": {"unix_utc": recent, "iso_utc": recent_iso},
                                    "synced_at_utc": quiet_iso})
-        v, rows = verdict_of(md)
+        rows = judge_backup_status(read_json(os.path.join(os.path.dirname(md), "BACKUP_AUTO_STATUS.json")), now)
         expect("a quiet healthy week must NOT warn (anti-churn nuance)",
                not any(r[0] == WARNING and "3D" in r[1] for r in rows), str(rows))
 
-        # 11. missing JSON -> WARNING, never a silent pass
+        # 11. an empty status -> WARNING on the host, never a silent pass; the repo tenant no longer reads it
+        expect("empty backup status is WARNING", any(r[0] == WARNING for r in judge_backup_status({}, now)), "")
         md = _fixture(tmp, "t-nojson",
-                      "status: active\nrestore_drills:\n  - date: 2026-08-16\n    result: PASS\n")
+                      "status: active\nrestore_drills:\n  - date: 2026-08-16\n    result: PASS\n",
+                      prose="| Drill date | 2026-08-16 |\n")
         v, rows = verdict_of(md)
-        expect("missing status JSON is WARNING", v == WARNING, str(rows))
+        expect("tenant check does not read a repo status copy", v == PASS, str(rows))
 
         # 12. broken frontmatter -> WARNING
         core = os.path.join(tmp, "agency-os", "tenants", "t-broken", "core")
@@ -862,10 +862,21 @@ def main(argv=None):
     ap.add_argument("--write", action="store_true",
                     help="write phase4-LATEST.md and phase4-<date>.md")
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--judge-backup-json", metavar="PATH",
+                    help="3B-3D on one backup status file; exit 1 on any WARNING (the host's backup_status_sync)")
     args = ap.parse_args(argv)
 
     if args.selftest:
         return selftest()
+    if args.judge_backup_json:
+        try:
+            rows = judge_backup_status(read_json(args.judge_backup_json), datetime.now(timezone.utc))
+        except (OSError, ValueError) as exc:
+            print("%s 3B 備份狀態無法讀取：%s" % (WARNING, exc))
+            return 1
+        for lvl, label, detail in rows:
+            print("%s %s %s" % (lvl, label, detail))
+        return 1 if any(r[0] == WARNING for r in rows) else 0
 
     repo = find_repo_root(args.repo)
     now_utc = datetime.now(timezone.utc)
