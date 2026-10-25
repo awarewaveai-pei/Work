@@ -1,7 +1,7 @@
 import { loadAnthropic, type Anthropic, providerUrl } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
 import { DEFAULT_AI_TEXT_MODEL, isAiTextModel, isOpenAiTextModel, type AiTextModel } from "../../ai/text-model-options";
-import { logAiCall, openaiUsageTokens, type OpenAiUsageLike } from "../../ai/log-ai-call";
+import { billedOrgId, logAiCall, openaiUsageTokens, type OpenAiUsageLike } from "../../ai/log-ai-call";
 import { claudeFallback, claudeParams } from "../../ai/gateway";
 import { textCallCostUsd, resolveTextRate } from "../../ai/cost-calculator";
 
@@ -695,7 +695,8 @@ export async function* streamArticleGeneration(
     yield* streamOpenAiGeneration(config, signal);
     return;
   }
-  const Anthropic = await loadAnthropic(await grantFor("content.article"));
+  const articleGrant = await grantFor("content.article");
+  const Anthropic = await loadAnthropic(articleGrant);
   const client = new Anthropic({ apiKey });
   let anthropicStream: ReturnType<typeof client.beta.messages.stream> | null = null;
   try {
@@ -726,7 +727,7 @@ export async function* streamArticleGeneration(
       const finalMsg = await anthropicStream.finalMessage().catch(() => null);
       // Cost ledger: record exact token usage from the completed stream (best-effort, never throws).
       if (finalMsg) {
-        void logAiCall({ route: "content/article-generate", response: finalMsg, jobId: config.jobId, tool: "content" });
+        void logAiCall({ route: "content/article-generate", response: finalMsg, jobId: config.jobId, tool: "content", organizationId: billedOrgId(articleGrant) });
         const costUsd = textCallCostUsd({ model: finalMsg.model, inputTokens: finalMsg.usage.input_tokens, outputTokens: finalMsg.usage.output_tokens, cacheReadTokens: finalMsg.usage.cache_read_input_tokens, cacheWriteTokens: finalMsg.usage.cache_creation_input_tokens });
         const { rate } = resolveTextRate(finalMsg.model);
         if (config.sourcesCostUsd) {
@@ -865,6 +866,7 @@ async function* streamOpenAiGeneration(
     if (!signal?.aborted && openaiUsage) {
       void logAiCall({
         route: "content/article-generate",
+        organizationId: billedOrgId(grant),
         model: config.model,
         ...openaiUsageTokens(openaiUsage),
         jobId: config.jobId,

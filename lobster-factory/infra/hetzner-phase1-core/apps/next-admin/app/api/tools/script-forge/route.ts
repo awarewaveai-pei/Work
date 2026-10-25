@@ -201,6 +201,7 @@ async function streamOpenAi(
   const dec = new TextDecoder();
   let buf = "";
   let usageFrame: OpenAiUsageLike | null = null;
+  try {
   while (true) {
     if (signal.aborted) break;
     const { done, value } = await reader.read();
@@ -230,7 +231,10 @@ async function streamOpenAi(
       } catch { /* skip partial/non-JSON keepalive frame */ }
     }
   }
-  if (usageFrame) {
-    void logAiCall({ route: "/api/tools/script-forge", model, ...openaiUsageTokens(usageFrame), organizationId: billedOrgId(grant), tool: "video" });
+  } finally {
+    // Also when the connection breaks after the final usage frame arrived: that usage was billed.
+    if (usageFrame) {
+      void logAiCall({ route: "/api/tools/script-forge", model, ...openaiUsageTokens(usageFrame), organizationId: billedOrgId(grant), tool: "video" });
+    }
   }
 }

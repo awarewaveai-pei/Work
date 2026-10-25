@@ -1,7 +1,7 @@
 // Server-side image generation for the tarot print-file tool.
 // Models (provider keys in app env), cheapest → priciest:
 //   flux-schnell/dev  → Replicate BFL (text2img; dev adds img2img)
-//   openai-low/med/hi → OpenAI gpt-image-1
+//   openai-low/med/hi → OpenAI images (OPENAI_IMAGE_MODEL in lib/ai/cost-model.ts)
 //   ideogram-*        → Ideogram via Replicate (v2a-turbo/v3-balanced/v4-turbo/v4-quality/character)
 //   nano-banana-2/pro → Google Gemini Image via Replicate
 //   imagen-4          → Google Imagen 4 via Replicate
@@ -14,8 +14,12 @@ import { MODEL_SPECS } from "./model-specs";
 import { providerUrl } from "@/lib/ai/gateway";
 import type { Grant } from "@/lib/entitlements/can";
 import { billedOrgId, logImageResult } from "@/lib/ai/log-ai-call";
+import { OPENAI_IMAGE_MODEL, OPENAI_IMAGE_TOKEN_RATES } from "@/lib/ai/cost-model";
 
 const GEN_TIMEOUT_MS = 58_000; // stay under the 60s nginx/route ceiling
+// Replicate holds a "Prefer: wait" request up to this many seconds, then answers with the running prediction: shorter
+// than GEN_TIMEOUT_MS so the prediction id is always in hand before our own deadline (cancel + log it, below).
+const REPLICATE_WAIT_S = 45;
 export const REPLICATE_POLL_MS = 2_500;
 // flux-dev guidance scale. BFL recommends 1.5–5; >5 oversaturates. Higher = closer prompt adherence
 // which pushes art style onto figures. flux-schnell dropped guidance entirely (sending it may 422).
@@ -294,9 +298,10 @@ export interface TarotGenParams {
 }
 
 export type TarotGenResult =
-  | { ok: true; image: string; seed: number | null }
+  /** costUsd: the exact charge when the provider reports usage (OpenAI images); otherwise the per-image price applies. */
+  | { ok: true; image: string; seed: number | null; costUsd?: number }
   /** billed: the provider finished (and charged) before the failure, so the caller still logs the cost. */
-  | { ok: false; error: string; billed?: boolean };
+  | { ok: false; error: string; billed?: boolean; costUsd?: number };
 
 function parseDataUrl(dataUrl: string): { mime: string; buffer: Buffer } | null {
   const m = /^data:(.+?);base64,(.+)$/.exec(dataUrl);
@@ -406,6 +411,30 @@ export async function fetchWithRetry429(url: string, options: RequestInit & { si
   return fetch(url, options);
 }
 
+interface Prediction { status: string; output?: string[] | string; error?: string; urls?: { get?: string; cancel?: string } }
+
+/** Polls a created prediction to its end. At our deadline it is cancelled and reported billed: Replicate charges for the
+ *  time it already ran, and without this the cost would vanish with the aborted request. */
+async function pollPrediction(start: Prediction, token: string, signal: AbortSignal): Promise<{ prediction: Prediction } | { failed: TarotGenResult }> {
+  let prediction = start;
+  try {
+    while (prediction.status === "starting" || prediction.status === "processing") {
+      if (!prediction.urls?.get) break;
+      await new Promise((r) => setTimeout(r, REPLICATE_POLL_MS));
+      if (signal.aborted) throw new Error("The operation was aborted.");
+      const pollRes = await fetch(prediction.urls.get, { headers: { Authorization: `Bearer ${token}` }, signal });
+      if (!pollRes.ok) return { failed: { ok: false, error: `replicate_poll_${pollRes.status}`, billed: true } };
+      prediction = await pollRes.json();
+    }
+    return { prediction };
+  } catch (e: unknown) {
+    if (!signal.aborted) throw e;
+    // Our own signal is spent: a fresh request, not awaited, so the response is not held up.
+    if (prediction.urls?.cancel) void fetch(prediction.urls.cancel, { method: "POST", headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
+    return { failed: { ok: false, error: "generation_timeout", billed: true } };
+  }
+}
+
 // ── FLUX (Replicate) — legacy path kept for backward compatibility ─────────────
 async function generateFlux(params: TarotGenParams, config: ModelConfig, signal: AbortSignal, grant: Grant): Promise<TarotGenResult> {
   const token = process.env.REPLICATE_API_TOKEN;
@@ -439,7 +468,7 @@ async function generateFlux(params: TarotGenParams, config: ModelConfig, signal:
   const headers = {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
-    Prefer: "wait",
+    Prefer: `wait=${REPLICATE_WAIT_S}`,
   };
 
   const createRes = await fetchWithRetry429(providerUrl(grant, "replicate", `/v1/models/${config.fluxModel}/predictions`), {
@@ -454,20 +483,9 @@ async function generateFlux(params: TarotGenParams, config: ModelConfig, signal:
     return { ok: false, error: `replicate_${createRes.status}` };
   }
 
-  let prediction = (await createRes.json()) as {
-    status: string;
-    output?: string[] | string;
-    error?: string;
-    urls?: { get?: string };
-  };
-
-  while (prediction.status === "starting" || prediction.status === "processing") {
-    if (!prediction.urls?.get) break;
-    await new Promise((r) => setTimeout(r, REPLICATE_POLL_MS));
-    const pollRes = await fetch(prediction.urls.get, { headers: { Authorization: `Bearer ${token}` }, signal });
-    if (!pollRes.ok) return { ok: false, error: `replicate_poll_${pollRes.status}` };
-    prediction = await pollRes.json();
-  }
+  const polled = await pollPrediction((await createRes.json()) as Prediction, token, signal);
+  if ("failed" in polled) return polled.failed;
+  const prediction = polled.prediction;
 
   if (prediction.status !== "succeeded") {
     console.error("[tarot] replicate not succeeded", prediction.status, prediction.error ?? "");
@@ -508,7 +526,7 @@ async function generateReplicate(params: TarotGenParams, config: ModelConfig, si
   const headers = {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
-    Prefer: "wait",
+    Prefer: `wait=${REPLICATE_WAIT_S}`,
   };
 
   const createRes = await fetchWithRetry429(providerUrl(grant, "replicate", `/v1/models/${config.slug}/predictions`), {
@@ -523,20 +541,9 @@ async function generateReplicate(params: TarotGenParams, config: ModelConfig, si
     return { ok: false, error: `replicate_${createRes.status}` };
   }
 
-  let prediction = (await createRes.json()) as {
-    status: string;
-    output?: string[] | string;
-    error?: string;
-    urls?: { get?: string };
-  };
-
-  while (prediction.status === "starting" || prediction.status === "processing") {
-    if (!prediction.urls?.get) break;
-    await new Promise((r) => setTimeout(r, REPLICATE_POLL_MS));
-    const pollRes = await fetch(prediction.urls.get, { headers: { Authorization: `Bearer ${token}` }, signal });
-    if (!pollRes.ok) return { ok: false, error: `replicate_poll_${pollRes.status}` };
-    prediction = await pollRes.json();
-  }
+  const polled = await pollPrediction((await createRes.json()) as Prediction, token, signal);
+  if ("failed" in polled) return polled.failed;
+  const prediction = polled.prediction;
 
   if (prediction.status !== "succeeded") {
     console.error(`[tarot] ${config.slug} not succeeded`, prediction.status, prediction.error ?? "");
@@ -548,12 +555,12 @@ async function generateReplicate(params: TarotGenParams, config: ModelConfig, si
   return fetchFinishedOutput(outUrl as string, signal, seed);
 }
 
-// ── OpenAI gpt-image-1 ──────────────────────────────────────────────────────────
+// ── OpenAI images (OPENAI_IMAGE_MODEL) ──────────────────────────────────────────
 async function generateOpenai(params: TarotGenParams, config: ModelConfig, signal: AbortSignal, grant: Grant): Promise<TarotGenResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return { ok: false, error: "missing_openai_api_key" };
 
-  // gpt-image-1 only supports three sizes; map unsupported ratios to nearest.
+  // The images API supports three sizes; map unsupported ratios to nearest.
   const sizeMap: Record<AspectRatio, string> = {
     "2:3": "1024x1536",
     "3:2": "1536x1024",
@@ -571,7 +578,7 @@ async function generateOpenai(params: TarotGenParams, config: ModelConfig, signa
   const refs = params.referenceImages ?? [];
   if (refs.length > 0) {
     const form = new FormData();
-    form.append("model", "gpt-image-1");
+    form.append("model", OPENAI_IMAGE_MODEL);
     form.append("prompt", params.prompt);
     form.append("size", SIZE);
     form.append("quality", quality);
@@ -596,7 +603,7 @@ async function generateOpenai(params: TarotGenParams, config: ModelConfig, signa
     res = await fetch(providerUrl(grant, "openai", "/v1/images/generations"), {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "gpt-image-1", prompt: params.prompt, size: SIZE, quality, n: 1 }),
+      body: JSON.stringify({ model: OPENAI_IMAGE_MODEL, prompt: params.prompt, size: SIZE, quality, n: 1 }),
       signal,
     });
   }
@@ -609,10 +616,23 @@ async function generateOpenai(params: TarotGenParams, config: ModelConfig, signa
     return { ok: false, error: code ? `openai_${code}` : `openai_${res.status}` };
   }
 
-  const json = (await res.json()) as { data?: { b64_json?: string }[] };
+  const json = (await res.json()) as { data?: { b64_json?: string }[]; usage?: OpenAiImageUsage };
+  const costUsd = openaiImageCostUsd(json.usage);
   const b64 = json.data?.[0]?.b64_json;
-  if (!b64) return { ok: false, error: "openai_empty_output", billed: true }; // a 200 from the images API is charged
-  return { ok: true, image: `data:image/png;base64,${b64}`, seed: null };
+  if (!b64) return { ok: false, error: "openai_empty_output", billed: true, costUsd }; // a 200 from the images API is charged
+  return { ok: true, image: `data:image/png;base64,${b64}`, seed: null, costUsd };
+}
+
+interface OpenAiImageUsage {
+  input_tokens_details?: { text_tokens?: number; image_tokens?: number };
+  output_tokens?: number;
+}
+/** The charge for one images-API response, from its own usage (undefined when it reports none). */
+function openaiImageCostUsd(u: OpenAiImageUsage | undefined): number | undefined {
+  if (!u) return undefined;
+  const r = OPENAI_IMAGE_TOKEN_RATES;
+  return ((u.input_tokens_details?.text_tokens ?? 0) * r.textInPerM + (u.input_tokens_details?.image_tokens ?? 0) * r.imageInPerM
+    + (u.output_tokens ?? 0) * r.imageOutPerM) / 1_000_000;
 }
 
 /** Shared by tarot, studio, content and video: the caller asks for its own product's feature (e.g. grantFor("studio.image")). */

@@ -65,4 +65,27 @@ describe("POST /api/tools/script-forge", () => {
     await res.text();
     expect(logged.calls).toEqual([expect.objectContaining({ route: "/api/tools/script-forge", response: { model: "claude-x", usage: { input_tokens: 7, output_tokens: 3 } } })]);
   });
+
+  it("OpenAI: usage from the final frame is logged even when the connection breaks after it (Codex F5)", async () => {
+    vi.stubEnv("OPENAI_API_KEY", "k");
+    const { OPENAI_TEXT_MODELS } = await import("@/lib/ai/text-model-options");
+    const enc = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      pull(c) {
+        if (!(this as { sent?: boolean }).sent) {
+          (this as { sent?: boolean }).sent = true;
+          c.enqueue(enc.encode(["data: " + JSON.stringify({ choices: [{ delta: { content: "hi" } }] }),
+            "data: " + JSON.stringify({ choices: [], usage: { prompt_tokens: 20, completion_tokens: 5 } }), ""].join(String.fromCharCode(10))));
+        } else c.error(new Error("connection reset"));
+      },
+    });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(body, { status: 200 })));
+    try {
+      const res = await post({ module: "hook", task: "hooks", fields: { topic: "x" }, siteId: "own", model: OPENAI_TEXT_MODELS[0] });
+      await res.text();
+      expect(logged.calls).toEqual([expect.objectContaining({ route: "/api/tools/script-forge", inputTokens: 20, outputTokens: 5 })]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

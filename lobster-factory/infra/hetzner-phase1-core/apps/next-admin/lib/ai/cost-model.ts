@@ -84,9 +84,11 @@ export const IMAGE_RATES: Record<string, { usd: number; label: string; vendor: s
   "nano-banana-2":       { usd: 0.067, label: "Nano Banana 2", vendor: "Google/Replicate" },
   "nano-banana-pro":     { usd: 0.15, label: "Nano Banana Pro", vendor: "Google/Replicate" },
   "imagen-4":            { usd: 0.04, label: "Imagen 4", vendor: "Google/Replicate" },
-  "openai-low":          { usd: 0.02, label: "GPT-Image-1 low", vendor: "OpenAI" },
-  "openai-medium":       { usd: 0.07, label: "GPT-Image-1 medium", vendor: "OpenAI" },
-  "openai-high":         { usd: 0.19, label: "GPT-Image-1 high", vendor: "OpenAI" },
+  // gpt-image-2 bills by token (OPENAI_IMAGE_TOKEN_RATES): the logged cost comes from each response's usage; these per-image
+  // figures are only the estimate shown before generating.
+  "openai-low":          { usd: 0.02, label: "GPT-Image-2 low", vendor: "OpenAI" },
+  "openai-medium":       { usd: 0.07, label: "GPT-Image-2 medium", vendor: "OpenAI" },
+  "openai-high":         { usd: 0.19, label: "GPT-Image-2 high", vendor: "OpenAI" },
 };
 
 /** Default image model the app uses for cheap drafts (lib/tarot/image-gen.ts default). */
@@ -184,3 +186,7 @@ export const INFRA_MONTHLY: InfraCost[] = [
   { key: "domains", label: "網域續約攤提 (aware-wave + weartheworld @CF; soulful @Hostinger，已於 8/28 切至 ks-aw-01)", usdPerMonth: 2.9, estimate: true, note: "2 CF 網域 at-cost ~$10.44/年×2=$20.88(可信)；soulful 舊 Hostinger 主機凍結當回滾，觀察期滿解約，估算沿用 ~$14/年直到正式退租" },
   { key: "saas-other", label: "其他 SaaS (Sentry/PostHog 等，若付費)", usdPerMonth: 0, estimate: true, note: "推測免費額度；有付費方案再加" },
 ];
+
+/** gpt-image-2, USD per 1M tokens (OpenAI pricing page, 2026-10-25): text input, image input, image output. */
+export const OPENAI_IMAGE_MODEL = "gpt-image-2";
+export const OPENAI_IMAGE_TOKEN_RATES = { textInPerM: 5, imageInPerM: 8, imageOutPerM: 30 } as const;

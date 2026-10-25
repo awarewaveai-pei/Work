@@ -33,4 +33,35 @@ describe("generateTarotImage logs its cost", () => {
     expect(r).toEqual({ ok: false, error: "replicate_422" });
     expect(m.logged).toHaveLength(1);
   });
+
+  it("an OpenAI image is costed from its own usage at the gpt-image-2 token rates (F1)", async () => {
+    vi.stubEnv("OPENAI_API_KEY", "k");
+    const fetchMock = vi.fn().mockResolvedValueOnce(json({ data: [{ b64_json: "aGk=" }],
+      usage: { input_tokens_details: { text_tokens: 100, image_tokens: 0 }, output_tokens: 1000 } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const r = await generateTarotImage({ model: "openai-low", prompt: "p" }, grant);
+    expect(JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body))).toMatchObject({ model: "gpt-image-2" });
+    expect(r).toMatchObject({ ok: true, costUsd: (100 * 5 + 1000 * 30) / 1_000_000 });
+  });
+
+  it("a prediction still running at our deadline is cancelled and logged as billed (F2)", async () => {
+    vi.useFakeTimers();
+    try {
+      const running = { status: "processing", urls: { get: "https://api.replicate.com/v1/predictions/p1", cancel: "https://api.replicate.com/v1/predictions/p1/cancel" } };
+      const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.endsWith("/cancel")) return json({ status: "canceled" });
+        if (init?.signal?.aborted) throw new Error("The operation was aborted.");
+        return json(running);
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      const pending = generateTarotImage({ model: "flux-schnell", prompt: "p" }, grant);
+      await vi.advanceTimersByTimeAsync(61_000);
+      const r = await pending;
+      expect(r).toMatchObject({ ok: false, error: "generation_timeout", billed: true });
+      expect(fetchMock.mock.calls.some(([u]) => String(u).endsWith("/cancel"))).toBe(true);
+      expect((fetchMock.mock.calls[0][1] as RequestInit).headers).toMatchObject({ Prefer: "wait=45" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

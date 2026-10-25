@@ -1,4 +1,4 @@
-import { logAiCall } from "./log-ai-call";
+import { billedOrgId, logAiCall, openaiUsageTokens } from "./log-ai-call";
 import { loadAnthropic, type Anthropic, providerUrl } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
 import { isAiTextModel, isOpenAiTextModel, normalizeAiTextModel, type AiTextModel } from "./text-model-options";
@@ -66,8 +66,9 @@ async function generateOpenAiJsonText(args: CheapJsonTextArgs & { model: AiTextM
     void logAiCall({
       route: args.route,
       model: json.model ?? args.model,
-      inputTokens: json.usage?.prompt_tokens ?? 0,
-      outputTokens: json.usage?.completion_tokens ?? 0,
+      ...openaiUsageTokens(json.usage),
+      // Back-office tooling bills the internal account even inside a customer's request: name it, not the scope's.
+      organizationId: billedOrgId(grant),
       metadata: args.metadata,
       tool: args.tool,
     });
@@ -83,7 +84,8 @@ async function generateAnthropicJsonText(args: CheapJsonTextArgs & { model: AiTe
   if (!apiKey) return { ok: false, status: 503, error: "ANTHROPIC_API_KEY not configured" };
 
   try {
-    const Anthropic = await loadAnthropic(await grantFor("ops.cheap-json"));
+    const grant = await grantFor("ops.cheap-json");
+    const Anthropic = await loadAnthropic(grant);
     const client = new Anthropic({ apiKey });
     const msg = await client.beta.messages.create({
       ...claudeParams(args.model, args.maxTokens, "low"),
@@ -97,6 +99,7 @@ async function generateAnthropicJsonText(args: CheapJsonTextArgs & { model: AiTe
       route: args.route,
       response: msg,
       fallbackModel: args.model,
+      organizationId: billedOrgId(grant),
       metadata: args.metadata,
       tool: args.tool,
     });

@@ -1,4 +1,28 @@
 # Worklog
+## 2026-10-25（續31）Codex 補審 12dd0e699 的 5 個發現全修：gpt-image-1 已關閉 → gpt-image-2 並照實際 token 計價；Replicate 逾時會取消並記帳；非 uuid 的 job id 不再弄丟整列；沒寫組織的花費記到 grant scope 的帳戶（Claude）
+
+**觸發**：操作者「請 Codex 補審 12dd0e699（圖片花費集中記帳那一輪），有問題就修。」Codex（gpt-6-astra）`agency-os/reports/oracle/2026-10-25-partialreview-36e26ad9.md`，5 個發現，逐條讀碼並實測，全部成立。
+
+**發現與修法**
+- F1 **正式環境壞了**：`gpt-image-1` 用我們的 key 和正式容器的 key 生成都回 400「The model 'gpt-image-1' does not exist」（model 清單裡仍列得出來，但不能用）；`gpt-image-2` 兩把 key 都能生成。所以 openai-low／medium／high 三個圖片選項目前全壞。→ `cost-model.ts` 新增 `OPENAI_IMAGE_MODEL = "gpt-image-2"`，生成與 edits 兩處都改用它。gpt-image-2 按 token 計費（OpenAI 價目頁：文字輸入 $5、圖片輸入 $8、圖片輸出 $30／1M），所以 `openaiImageCostUsd` 用每次回應的 usage 算出實際費用，`logImageResult` 優先用 `result.costUsd`，per-image 價目表只剩生成前的預估用途。
+- F2 Replicate 送 `Prefer: wait`（伺服器預設會等 60 秒），但我們 58 秒就中止，所以拿不到 prediction id，對方之後照樣收費卻沒有紀錄。→ 改送 `Prefer: wait=45`，回應一定在我們的期限之前到、一定拿得到 id。抽出共用的 `pollPrediction`：到期限還在跑的 prediction 會送 cancel，並回報 billed（Replicate 會收已跑的時間）；輪詢的 HTTP 失敗也標 billed。
+- F3 `ai_call_logs.job_id` 是 uuid 欄位（0046）。呼叫端傳 `"j1"` 或空字串時，Postgres 會拒絕整列，而 logger 又忽略了 insert 回傳的錯誤，花費就這樣不見了。→ 兩個 logger 都改成：非 uuid 的值寫 null，原值放進 `metadata.raw_job_id`；insert 失敗時 `console.warn`。
+- F4 文章生成記帳沒帶組織。進一步 grep：35 個記帳呼叫中有 21 個沒帶組織。→ 改在源頭處理：`grant.ts` 新增 `scopeBilledOrgId()`；logger 在 `organizationId` 是 undefined 時，改用外層 withFeature／runForOrg scope 的計費帳戶（明確傳 null 仍是 null）。generate-core 的 Anthropic 與 OpenAI 兩列都改成明確傳 `billedOrgId(grant)`。自審發現一個例外：`lib/ai/cheap-json.ts` 是 back-office 功能（`ops.cheap-json`），在客戶 scope 裡它的 grant 記的是內部帳戶，但 scope 指向客戶。→ 改成明確傳自己 grant 的帳戶，順便把 OpenAI 的快取 token 拆開計價。
+- F5 script-forge 的 OpenAI 分支：最後的 usage frame 已經收到、連線才斷，就不會記。→ 記帳改放在 `finally`。
+
+**修改**（next-admin）：`lib/ai/{log-ai-call,cost-model,cheap-json}.ts`、`lib/entitlements/grant.ts`（`scopeBilledOrgId`）、`lib/tarot/image-gen.ts`、`app/api/tools/script-forge/route.ts`（含測試）、`lib/content/article/generate-core.ts`、測試 `lib/ai/__tests__/billed-usage-log.test.ts`、`lib/tarot/__tests__/image-gen-cost-log.test.ts`。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=在 lobster-next-admin 容器內用正式 key 呼叫 images/generations：gpt-image-1 回 400 does not exist；gpt-image-2 回 200 有圖；`/images/edits` 用 gpt-image-2 加 1 張參考圖也回 200，usage 有 input／output token | exit=0 | ms=40000
+- REALTEST_EVIDENCE: tool=Bash | cmd=一次性探針（未 commit，跑完刪除）呼叫 `generateTarotImage({model:"openai-low", costLog:{jobId:"not-a-uuid"}})`：真的生成成功，costUsd 0.005945；正式 ai_call_logs 有 1 筆：openai-low、OpenAI、$0.005945、job_id 空、metadata `{"raw_job_id":"not-a-uuid"}`、organization 是 AwareWave Ops（grant 沒指定客戶，所以是內部帳戶，正確） | exit=0 | ms=40000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（382 files／3328 passed）＋ tsc（這次的檔 0 錯） | exit=0 | ms=120000
+- 突變：organization 的 scope fallback 改回 `?? null`，「a cost that names no organization…」變紅；逾時回傳拿掉 billed，「a prediction still running at our deadline…」變紅；script-forge 的 finally 改成出錯就 rethrow，「OpenAI: usage from the final frame…」變紅。三次都還原後變綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n -- Codex `agency-os/reports/oracle/2026-10-25-partialreview-36e26ad9.md`，5 個全部修好，見上。
+  - external oracle = Codex CLI (codex exec -s read-only), not self-description
+- ORACLE_WAIVED: 修正後的覆審沒辦法跑，Codex 額度斷路器被另一個 session 設到 19:40（usage limit）。改做書面對抗自審，針對 scope fallback 會不會記錯帳戶：逐一列出 21 個沒帶組織的記帳呼叫和它們的 feature key，只有 `cheap-json`（back-office）會在客戶 scope 裡和自己的 grant 不一致，已改成明確傳；AsyncLocalStorage 會跨 await 和 fire-and-forget 帶著 scope，所以請求結束後才寫的記錄仍然對；串流路徑（script-forge、generate-core）都明確傳組織。外加上面三個突變。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=gpt-image-1\|logAiCall\(\|logImageCost\( | hits=gpt-image-1 只剩 7 行註解（image-gen、model-options、model-specs、tarotStyles），呼叫點 0；35 個記帳呼叫已列出各自的組織來源
+
+**rollback**：`git revert <本 commit>`（沒有 migration）；revert 之後 OpenAI 圖片選項會回到 gpt-image-1，也就是會壞。
 ## 2026-10-25（續30）ADR 017 決定 6＝A：點數包的使用權不設期末——0128 讓帶 plan_key 的 credit_pack 同一交易寫無期末列（已套 prod）（Claude）
 
 - **任務**：操作者 2026-10-25「待決 6 選 A：點數包的使用權不設期末，改 0120 讓點數包事件寫無期末列（migration 做好先給我看再套 prod）」；看過後 go。

@@ -46,6 +46,13 @@ async function evaluate(featureKey: string, ctx: GrantContext, inherited: Scope 
   }
 }
 
+/** The account the enclosing withFeature / runForOrg scope bills (null outside one, or unresolved). The cost logger falls
+ *  back to it, so a call that does not name its organization is still recorded on the account it was billed to. */
+export function scopeBilledOrgId(): string | null {
+  const s = scope.getStore()?.subject;
+  return s && s.kind !== "unresolved" ? s.orgId : null;
+}
+
 /** For library call sites: inherits subject and actor from the enclosing `withFeature` request, else bills the internal
  *  account as `system`. Throws EntitlementRequired when refused (enforce mode only; shadow always allows). */
 export async function grantFor(featureKey: string, ctx: GrantContext = {}): Promise<Grant> {
