@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-26（續11）AO-CLOSE 補收尾：共享工作區清理與私有 index 復原
+
+- **窗口**：上次成功 AO-CLOSE `2026-10-25T20:41:21.0137290Z` 起；`git log --since` 已核對前次正式報告、證據、記憶提交與 `483679655`。
+- **根因／交付**：AO-CLOSE 依 session 歸屬保留未提交工作；操作者另行授權整理。109 份已完成文件／證據以 `483679655` 推至 main；未把無 owner 的程式當作已完成產品提交。
+- **本地事故／復原**：WORKLOG 私有 index 在 Git Bash 使用錯誤 Windows 路徑，建立 `cbb63162f` 大量刪除 commit；未推送。以可恢復 stash、mixed reset 與定點還原取回正常樹；復原後 main 與 origin/main 同為 `483679655`，各 9132 個追蹤檔。錯誤 commit 僅留本地 reflog。
+- **保存核對**：操作者確認 Claude 已處理；核對下方續10：18 項已逐一審查並 drop，內容為已過時／可重產資料與 10/19 已刪除的舊 client。Git 保留物件找回 `ef1b0f311424aaa47c9e0ef677ec3d680cc16685` 後曾補回 stash 索引，確認結案後撤掉這個重複索引；未套回工作區。兩個 recovery stash 保留。
+- **避免再發生**：私有 index 使用 helper 印出的正斜線絕對路徑與規定 commit 形式；提交前檢查 HEAD／index 樹檔數、刪除數與確切路徑，不自行轉成反斜線或 WSL 路徑。本次預檢 9134／9134、0 刪除、僅 3 個收尾檔。Claude 的 git 原生防大量刪檔檢查已提交 `d161d2ae9`／`7681287eb`，驗證見續10。
+- REALTEST_EVIDENCE: tool=Bash | cmd=git status --short --branch; git rev-parse HEAD origin/main; git ls-tree -r --name-only HEAD | exit=0 | ms=2700
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_WAIVED: DOC_ONLY -- 本次補寫清理與復原紀錄；不修改程式、權限、金流或正式機設定。
+- **本輪收尾**：補寫 CONVERSATION_MEMORY／daily，執行 ao-close.ps1 原生完整 gate，將實測結果與保存核對寫入正式四段 archive 後推送。
+- **收尾 gate 修復**：舊 archive 的 META 引用指向 TASKS 的子條目，不是 open 主行；改指唯一社群 V1 主項，保留原需求，`verify-archive-tasks-lift.ps1` 實測 6/6 pass。Claude 設定漂移經 ao-close 內建 backup-first merge 修復，sync-check pass。跨機 memory BOM audit 已備份補齊 64 檔，0 error。
+
 ## 2026-10-26（續10）空樹 commit 事故收尾＋git 原生 pre-commit 擋「一次刪掉大半個 repo」（操作者「照你的意思處理」）
 
 - 事故：05:13 本機 `cbb63162f` 是空樹（9132 檔全刪）。根因＝私有 index 路徑被當成相對檔名，git 建了一個新的空 index 再 commit（根目錄殘留 `C…git-partial-worktree-commit…02b0595d-1e15f70c.index`）。沒推上 origin；另一個 session 用 recovery stash 把 main 退回 `483679655`。
@@ -5688,6 +5701,30 @@
 - AUTO_TASK_DONE: ADR017 step1 done; supervisor 1/9, same private preview URL pending Claude republish.
 - rollback：git revert狀態commit；實作獨立revert 1ef1ee419。無prod部署。
 
+
+## 2026-10-26
+
+### Daily
+- 本次工作區清理、復原與保存核對見本日續10／續11；原有產品待辦未新增完工宣告。
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/verify-archive-tasks-lift.ps1 -WorkRoot D:\Work | exit=0 | ms=2300
+- REVIEW_WAIVED: DOC_ONLY -- 收尾僅含文件與自動產生報告；防大量刪檔程式的既有驗證見續10。
+- BUGHUNT_WAIVED: DOC_ONLY -- 既有任務主項與子項的引用已核對，沒有修改程式執行邏輯。
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:237e34c70dfe5c89f8c178aadacfade11c33f8ceacdc2015da9d7da3b40068d2 -->
+
+### Codex 2026-10-26 05:45
+
+- **完成（一句）**: 補收尾：109 份已完成文件已推送、18 項由 Claude 審查結案；本地誤提交已復原，完整紀錄見 WORKLOG 2026-10-26 續10／續11。
+- **變更路徑**:
+  - `agency-os/WORKLOG.md`
+  - `agency-os/memory/CONVERSATION_MEMORY.md`
+  - `agency-os/memory/daily/2026-10-26.md`
+  - `agency-os/reports/ao-close/2026-10-26-0441.md`
+- **Git**: `483679655`、`d161d2ae9`、`7681287eb`；本次文件補收尾由 ao-close.ps1 提交。
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: 原有產品待辦以 TASKS.md 為準，本次沒有新產品完工宣告。
 
 ## 2026-10-25
 

@@ -42,5 +42,5 @@
 - `docs/international/multi-currency-commercial-policy.md`
 - `docs/sales/service-packages-standard.md`
 
-_Last synced: 2026-03-20 04:57:15 UTC_
+_Last synced: 2026-10-25 21:42:01 UTC_
 

@@ -101,5 +101,5 @@ Agency OS 是一套給接案公司使用的營運系統，核心目標是把「�
 - `tenants/templates/tenant-template/01_COMMANDER_SYSTEM_GUIDE.md`
 - `tenants/templates/tenant-template/02_CLIENT_WORKSPACE_GUIDE.md`
 
-_Last synced: 2026-10-17 07:05:49 UTC_
+_Last synced: 2026-10-25 21:42:01 UTC_
 

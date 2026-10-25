@@ -108,7 +108,7 @@
 - `docs/operations/cursor-enterprise-rules-index.md`
 - `docs/operations/new-doc-linkage-checklist.md`
 
-_Last synced: 2026-10-25 10:29:47 UTC_
+_Last synced: 2026-10-25 21:42:01 UTC_
 
 # Maintenance note (2026-09-30): Cursor was retired on 2026-08-26. Historical
 # `.cursor/` and `Cursor  Rules for AI` paths remain below for traceability, but

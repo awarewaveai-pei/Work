@@ -1,9 +1,84 @@
 {
-    "overall":  "PASS",
-    "measured":  11,
-    "generated_utc":  "2026-10-25T20:40:35Z",
+    "overall":  "WARN",
+    "measured":  26,
+    "generated_utc":  "2026-10-25T21:46:31Z",
     "note":  null,
     "servers":  [
+                    {
+                        "name":  "claude.ai Claude Docs",
+                        "state":  "connected",
+                        "status":  "✓ Connected"
+                    },
+                    {
+                        "name":  "claude.ai Google Calendar",
+                        "state":  "needs_auth",
+                        "status":  "! Needs authentication"
+                    },
+                    {
+                        "name":  "claude.ai Gmail",
+                        "state":  "needs_auth",
+                        "status":  "! Needs authentication"
+                    },
+                    {
+                        "name":  "claude.ai Google Drive",
+                        "state":  "needs_auth",
+                        "status":  "! Needs authentication"
+                    },
+                    {
+                        "name":  "claude.ai Slack",
+                        "state":  "needs_auth",
+                        "status":  "! Needs authentication"
+                    },
+                    {
+                        "name":  "claude.ai Notion",
+                        "state":  "needs_auth",
+                        "status":  "! Needs authentication"
+                    },
+                    {
+                        "name":  "claude.ai monday.com",
+                        "state":  "needs_auth",
+                        "status":  "! Needs authentication"
+                    },
+                    {
+                        "name":  "claude.ai Linear",
+                        "state":  "needs_auth",
+                        "status":  "! Needs authentication"
+                    },
+                    {
+                        "name":  "claude.ai Intercom",
+                        "state":  "needs_auth",
+                        "status":  "! Needs authentication"
+                    },
+                    {
+                        "name":  "claude.ai HubSpot",
+                        "state":  "needs_auth",
+                        "status":  "! Needs authentication"
+                    },
+                    {
+                        "name":  "claude.ai Figma",
+                        "state":  "needs_auth",
+                        "status":  "! Needs authentication"
+                    },
+                    {
+                        "name":  "claude.ai Canva",
+                        "state":  "needs_auth",
+                        "status":  "! Needs authentication"
+                    },
+                    {
+                        "name":  "claude.ai Box",
+                        "state":  "needs_auth",
+                        "status":  "! Needs authentication"
+                    },
+                    {
+                        "name":  "claude.ai Atlassian",
+                        "state":  "needs_auth",
+                        "status":  "! Needs authentication"
+                    },
+                    {
+                        "name":  "claude.ai Asana",
+                        "state":  "needs_auth",
+                        "status":  "! Needs authentication"
+                    },
                     {
                         "name":  "cloudflare",
                         "state":  "connected",
@@ -62,6 +137,19 @@
                 ],
     "source":  "claude mcp list",
     "not_connected":  [
-
+                          "claude.ai Google Calendar=needs_auth",
+                          "claude.ai Gmail=needs_auth",
+                          "claude.ai Google Drive=needs_auth",
+                          "claude.ai Slack=needs_auth",
+                          "claude.ai Notion=needs_auth",
+                          "claude.ai monday.com=needs_auth",
+                          "claude.ai Linear=needs_auth",
+                          "claude.ai Intercom=needs_auth",
+                          "claude.ai HubSpot=needs_auth",
+                          "claude.ai Figma=needs_auth",
+                          "claude.ai Canva=needs_auth",
+                          "claude.ai Box=needs_auth",
+                          "claude.ai Atlassian=needs_auth",
+                          "claude.ai Asana=needs_auth"
                       ]
 }

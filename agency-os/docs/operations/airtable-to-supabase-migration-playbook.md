@@ -62,5 +62,5 @@
 - `docs/standards/n8n-workflow-architecture.md`
 - `WORKLOG.md`
 
-_Last synced: 2026-03-29 18:43:48 UTC_
+_Last synced: 2026-10-25 21:42:01 UTC_
 
