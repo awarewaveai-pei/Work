@@ -52,29 +52,6 @@ export default defineConfig({
         const awBase = process.env.AWAREWAVE_WEBHOOK_BASE_URL ?? "";
         if (awBase.trim()) out.AWAREWAVE_WEBHOOK_BASE_URL = awBase.trim().replace(/\/$/, "");
 
-        // schedules-heartbeat -> next-admin /api/internal/schedules/run-due.
-        // Dedicated token (never OPS_INBOX_INGEST_TOKEN) so a leak here cannot forge the other
-        // OPS_INBOX_INGEST_TOKEN-guarded endpoints, and vice versa.
-        const scheduleToken = process.env.SCHEDULE_INGEST_TOKEN ?? "";
-        if (scheduleToken.trim()) out.SCHEDULE_INGEST_TOKEN = scheduleToken.trim();
-
-        // site-watch-heartbeat / site-watch-run -> next-admin /api/internal/site-watch/*. Own token,
-        // same blast-radius rule as the collect one above.
-        const siteWatchToken = process.env.SITE_WATCH_INGEST_TOKEN ?? "";
-        if (siteWatchToken.trim()) out.SITE_WATCH_INGEST_TOKEN = siteWatchToken.trim();
-
-        // pod-order-inbox-sweep -> next-admin /api/internal/pod-orders/sweep. Own token, same rule.
-        const podSweepToken = process.env.POD_INBOX_SWEEP_TOKEN ?? "";
-        if (podSweepToken.trim()) out.POD_INBOX_SWEEP_TOKEN = podSweepToken.trim();
-
-        // cs-inbound-sweep -> next-admin /api/internal/cs/sweep. Own token, same rule.
-        const csSweepToken = process.env.CS_SWEEP_TOKEN ?? "";
-        if (csSweepToken.trim()) out.CS_SWEEP_TOKEN = csSweepToken.trim();
-
-        // social-dispatch -> next-admin /api/internal/social/dispatch. Own token, same rule.
-        const socialDispatchToken = process.env.SOCIAL_DISPATCH_TOKEN ?? "";
-        if (socialDispatchToken.trim()) out.SOCIAL_DISPATCH_TOKEN = socialDispatchToken.trim();
-
         // collect-research-run -> next-admin /api/internal/collect/runs/execute (RESEARCH_LINES_MASTER_PLAN
         // WC-P1-13). Own token, same rule.
         const researchExecuteToken = process.env.COLLECT_RESEARCH_EXECUTE_TOKEN ?? "";

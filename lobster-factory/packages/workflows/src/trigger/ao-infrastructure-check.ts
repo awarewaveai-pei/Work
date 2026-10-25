@@ -15,7 +15,7 @@
  *   7. RLS isolation smoke (no cross-tenant data leak)
  */
 
-import { task, logger, schedules, tasks } from "@trigger.dev/sdk";
+import { task, logger } from "@trigger.dev/sdk";
 import { z } from "zod";
 import { newUuid } from "../utils/uid";
 import { buildWorkflowRunRow, buildWorkflowRunInsertSql } from "../db/sql/workflowRunsSql";
@@ -74,20 +74,6 @@ async function pingUrl(
     };
   }
 }
-
-/**
- * Daily scheduled infrastructure check — 04:00 UTC (12:00 TPE).
- * Uses LOBSTER_AO_ORG_ID env var as the audit org; falls back to a sentinel UUID.
- * Results appear in the Trigger.dev Runs tab and in workflow_runs (if DB writes enabled).
- */
-export const aoInfrastructureCheckSchedule = schedules.task({
-  id: "ao-infrastructure-check-schedule",
-  cron: "0 4 * * *",
-  run: async () => {
-    const orgId = process.env.LOBSTER_AO_ORG_ID ?? "00000000-0000-0000-0000-000000000000";
-    return tasks.trigger("ao-infrastructure-check", { organizationId: orgId });
-  },
-});
 
 export const aoInfrastructureCheck = task({
   id: "ao-infrastructure-check",

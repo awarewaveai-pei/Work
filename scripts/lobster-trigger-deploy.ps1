@@ -69,21 +69,12 @@ if (-not $srk -or $srk.StartsWith("ssh:") -or $srk.Length -lt 20) {
 }
 Write-Host "[deploy] SERVICE_ROLE_KEY obtained (length=$($srk.Length))." -ForegroundColor Green
 
-Write-Host "[deploy] Reading SCHEDULE_INGEST_TOKEN from VPS..." -ForegroundColor Cyan
-$cst = (Invoke-WithUtf8Console { & ssh -o StrictHostKeyChecking=no -p 58122 -i $SshKey ubuntu@$VpsHost `
-    "sudo grep '^SCHEDULE_INGEST_TOKEN=' /root/lobster-phase1/.env | cut -d= -f2-" 2>&1 }).Trim()
-if (-not $cst -or $cst.StartsWith("ssh:") -or $cst.Length -lt 10) {
-    throw "Could not read SCHEDULE_INGEST_TOKEN from VPS /root/lobster-phase1/.env"
-}
-Write-Host "[deploy] SCHEDULE_INGEST_TOKEN obtained (length=$($cst.Length))." -ForegroundColor Green
-
 # ── 3. Build bash deploy script ────────────────────────────────────────────
 # PowerShell here-string: $pat/$srk/$phk/$oit/$AoOrgId are expanded by PS.
 # Bash variable refs in echo lines use backtick-escaped $: `$VAR → $VAR in output.
 $pat        = $env:TRIGGER_DEPLOY_PAT
 $phk        = $env:POSTHOG_API_KEY
 $oit        = $env:OPS_INBOX_INGEST_TOKEN
-$cstTok     = $cst
 # Optional — empty string is safe: syncEnvVars skips empty values
 $execSteps  = if ($env:LOBSTER_EXECUTE_MANIFEST_STEPS)  { $env:LOBSTER_EXECUTE_MANIFEST_STEPS }  else { "" }
 $wpSshKey   = if ($env:LOBSTER_WP_SSH_PRIVATE_KEY)      { $env:LOBSTER_WP_SSH_PRIVATE_KEY }      else { "" }
@@ -147,7 +138,6 @@ export POSTHOG_HOST=https://us.i.posthog.com
 # Webhooks
 export OPS_INBOX_INGEST_TOKEN='$oit'
 export AWAREWAVE_WEBHOOK_BASE_URL=https://app.aware-wave.com
-export SCHEDULE_INGEST_TOKEN='$cstTok'
 
 # wp-install-plugins: SSH execution gate + global SSH key
 export LOBSTER_EXECUTE_MANIFEST_STEPS='$execSteps'
@@ -159,17 +149,6 @@ for v in MAINWP_DASHBOARD_URL MAINWP_CONSUMER_KEY MAINWP_CONSUMER_SECRET; do
   export "`$v=`$(grep -m1 "^`$v=" /root/lobster-phase1/.env | cut -d= -f2-)"
 done
 
-# site-watch token. OPTIONAL (absent until SITE_WATCH_MASTER_PLAN.md step 10d; a required read would block
-# every unrelated deploy until then) and taken from the RUNNING next-admin, not .env: Trigger must only hold
-# a token next-admin accepts, or a half-applied 10d / rotation turns every hourly heartbeat into a red 401.
-# Empty = not synced; the heartbeat skips quietly and check-site-watch-health.ps1 reports it.
-export "SITE_WATCH_INGEST_TOKEN=`$(docker exec lobster-next-admin printenv SITE_WATCH_INGEST_TOKEN 2>/dev/null)"
-# pod-order-inbox-sweep token: same rule -- optional, from the RUNNING next-admin, empty = the schedule skips.
-export "POD_INBOX_SWEEP_TOKEN=`$(docker exec lobster-next-admin printenv POD_INBOX_SWEEP_TOKEN 2>/dev/null)"
-# cs-inbound-sweep token: same rule -- optional, from the RUNNING next-admin, empty = the schedule skips.
-export "CS_SWEEP_TOKEN=`$(docker exec lobster-next-admin printenv CS_SWEEP_TOKEN 2>/dev/null)"
-# social-dispatch token: same rule -- optional, from the RUNNING next-admin, empty = the schedule skips.
-export "SOCIAL_DISPATCH_TOKEN=`$(docker exec lobster-next-admin printenv SOCIAL_DISPATCH_TOKEN 2>/dev/null)"
 # collect-research-run token: same rule -- optional, from the RUNNING next-admin; empty = the relay task fails and
 # Cognitive OS reads the run as failed at its deadline.
 export "COLLECT_RESEARCH_EXECUTE_TOKEN=`$(docker exec lobster-next-admin printenv COLLECT_RESEARCH_EXECUTE_TOKEN 2>/dev/null)"
@@ -188,10 +167,6 @@ echo "  UPTIME_KUMA_URL:                `$UPTIME_KUMA_URL"
 echo "  LOBSTER_EXECUTE_MANIFEST_STEPS: `$LOBSTER_EXECUTE_MANIFEST_STEPS"
 if [ -n "`$LOBSTER_WP_SSH_PRIVATE_KEY" ]; then echo "  LOBSTER_WP_SSH_PRIVATE_KEY set: yes"; else echo "  LOBSTER_WP_SSH_PRIVATE_KEY set: no"; fi
 if [ -n "`$MAINWP_CONSUMER_SECRET" ]; then echo "  MAINWP_* set: yes (`$MAINWP_DASHBOARD_URL)"; else echo "  MAINWP_* set: no"; fi
-if [ -n "`$SITE_WATCH_INGEST_TOKEN" ]; then echo "  SITE_WATCH_INGEST_TOKEN set: yes (from running next-admin)"; else echo "  SITE_WATCH_INGEST_TOKEN set: no (next-admin has none; site-watch-heartbeat will skip)"; fi
-if [ -n "`$POD_INBOX_SWEEP_TOKEN" ]; then echo "  POD_INBOX_SWEEP_TOKEN set: yes (from running next-admin)"; else echo "  POD_INBOX_SWEEP_TOKEN set: no (next-admin has none; pod-order-inbox-sweep will skip)"; fi
-if [ -n "`$CS_SWEEP_TOKEN" ]; then echo "  CS_SWEEP_TOKEN set: yes (from running next-admin)"; else echo "  CS_SWEEP_TOKEN set: no (next-admin has none; cs-inbound-sweep will skip)"; fi
-if [ -n "`$SOCIAL_DISPATCH_TOKEN" ]; then echo "  SOCIAL_DISPATCH_TOKEN set: yes (from running next-admin)"; else echo "  SOCIAL_DISPATCH_TOKEN set: no (next-admin has none; social-dispatch will skip)"; fi
 if [ -n "`$COLLECT_RESEARCH_EXECUTE_TOKEN" ]; then echo "  COLLECT_RESEARCH_EXECUTE_TOKEN set: yes (from running next-admin)"; else echo "  COLLECT_RESEARCH_EXECUTE_TOKEN set: no (next-admin has none; collect-research-run will fail at the relay)"; fi
 if [ -n "`$BATCH_INTERNAL_SECRET" ]; then echo "  BATCH_INTERNAL_SECRET set: yes (from running next-admin)"; else echo "  BATCH_INTERNAL_SECRET set: no (next-admin has none; tarot-batch-generate will fail)"; fi
 
