@@ -147,7 +147,7 @@ billing_apply_payment_event(p_provider, p_event_id, p_event, + p_site_id)
 - Acceptance：本機 Postgres（`lib/entitlements/__tests__/` 既有真 DB e2e 套法，見 commit `4386b1580`）：up → `\d seller_sites`、`\d customer_identities` 顯示新鍵 → down → up 再一次（冪等）。SQL 層測試（`lib/entitlements/__tests__/contracts-seller.test.ts`，e2e 套法）名：`a plan owned by another seller is refused on this site`、`a payment from site B for a buyer sold by site A is refused`、`a local payment with no site still applies`、`a disabled site is refused`。
 - 套 prod：照 0120 套法（WORKLOG 2026-10-23 續51）；之後 `psql -c '\d seller_sites'`＋`select host, verify_alg, status from seller_sites;`＝一列 aware-wave.com／hmac-env／active。
 - Rollback：`.down.sql`。
-- **實作（2026-10-25，`0133_seller_sites.sql`，未套 prod）與上列不同處**：
+- **實作（2026-10-25，`0133_seller_sites.sql`，已套 prod：WORKLOG 續70）與上列不同處**：
   - 函式由腳本從 0128 原文產生，四處插入標 `0133`；參數變了＝新函式，所以先 `drop function …(text, text, jsonb)` 再建（`create or replace` 會留下兩個 overload）。
   - `woo` 沒帶 site＝aware-wave.com 那列（今天的外掛不帶 site，4c-2 前照常收錢）；`local` 帶 site 拒 `local_has_no_site`。buyer／seller 檢查對每種事件都做（不只首付）；`local` 不檢查（操作者登記轉帳）。
   - **網站送來的每個外部編號只在該站內唯一**（Codex 2026-10-25 `partialreview-20ba3e0c` 兩項：兩站各有訂單 7 時，外掛產生同一個 `wc:payment_complete:7:credit_pack`，帳本鍵也同為 `pack:woo:7`）：收件箱唯一鍵改 `(provider, site_id, event_id)`（`nulls not distinct`，local 為 null）＋check「local ⇔ 無 site」；0133 前的 woo 列補上 aware-wave.com（暫停 0120 只寫一次觸發器，只補這一欄）；帳本鍵、合約 `source_ref` 改用命名空間 `v_ns`＝aware-wave.com 用原本的 `woo`、其他站 `woo@<key_id>`（第一天鍵不變）；`key_id` 上限 24 字，組出的帳本鍵超過 128 字拒 `invalid_order_ref`。**4c-2 起任何由網站編號組成的新鍵都要帶 `v_ns`**。

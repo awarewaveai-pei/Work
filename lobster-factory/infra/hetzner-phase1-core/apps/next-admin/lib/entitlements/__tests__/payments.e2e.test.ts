@@ -201,4 +201,81 @@ describe.skipIf(!REST)("payments against a real database (ADR 017 step 4a)", () 
     expect(tab).toContain("cb-001-cleared");
     expect(tab).not.toContain("讀不到帳務資料");
   });
+
+  // 0133 (ADR 017 #12): the cash register is a seller_sites row. Called through the SQL function directly: which site
+  // sent a request is the route's job (4c-2); here only what the function does with a site id it is given.
+  describe("sellers (0133)", () => {
+    const SELLER = "00000000-0000-4000-8000-0000000000d1";
+    const BUYER_AW = "00000000-0000-4000-8000-0000000000d2";   // sold by AwareWave (sold_by null)
+    const BUYER_B = "00000000-0000-4000-8000-0000000000d3";    // sold by SELLER
+    const PEM = ["-----BEGIN PUBLIC KEY-----", "MCowBQYDK2VwAyEAGb9ECWmEzf6FQbrBZ9w7lshQhqowtrbLDFw4rXAxZuE=", "-----END PUBLIC KEY-----"].join("\n");
+    const site: Record<string, string> = {};
+    const apply = async (event: object, siteId: string | null) => {
+      const { data, error } = await db.rpc("billing_apply_payment_event", { p_provider: "woo", p_event_id: (event as { event_id: string }).event_id, p_event: event, p_site_id: siteId });
+      return error ? { error: error.message } : { data: data as Record<string, unknown> };
+    };
+    const sub = (id: string, org: string, plan: string) => ({ event_id: id, kind: "subscription_paid", organization_id: org, plan_key: plan, period_end: days(30) });
+
+    beforeAll(async () => {
+      for (const [table, value] of [
+        ["organizations", { id: SELLER, type: "client", name: "Reseller", slug: "e2e-seller", kind: "customer" }],
+        ["organizations", { id: BUYER_AW, type: "client", name: "AW Buyer", slug: "e2e-buyer-aw", kind: "customer" }],
+        ["organizations", { id: BUYER_B, type: "client", name: "Seller B Buyer", slug: "e2e-buyer-b", kind: "customer", sold_by_organization_id: SELLER }],
+        ["plans", { plan_key: "seller_plan", product_key: "social", kind: "base", features: ["social.rewrite"], limits: {}, owner_organization_id: SELLER }],
+        ["plans", { plan_key: "seller_video", product_key: "video", kind: "base", features: ["video.script"], limits: {}, owner_organization_id: SELLER }],
+        // the seller may sell social and content (staff-written licence rows); not video
+        ["organization_entitlements", [{ organization_id: SELLER, product_key: "social", feature_key: "social.resell", source: "comp", source_ref: "e2e-licence" },
+          { organization_id: SELLER, product_key: "content", feature_key: "content.resell", source: "comp", source_ref: "e2e-licence" }]],
+        ["seller_sites", { seller_organization_id: SELLER, host: "shop.seller.test", platform: "woo", key_id: "seller-b", verify_alg: "ed25519", public_key: PEM, status: "active" }],
+        ["seller_sites", { seller_organization_id: SELLER, host: "old.seller.test", platform: "woo", key_id: "seller-off", verify_alg: "ed25519", public_key: PEM, status: "disabled" }],
+      ] as const) {
+        const { error } = await db.from(table).insert(value);
+        if (error) throw new Error(`${table}: ${error.message}`);
+      }
+      for (const r of await rows("seller_sites", {})) site[r.key_id as string] = r.id as string;
+    });
+
+    it("a woo event with no site is the aware-wave.com site", async () => {
+      expect(await apply(sub("wc:legacy-1", BUYER_AW, "social_basic"), null)).toMatchObject({ data: { ok: true } });
+      expect((await rows("payment_events", { event_id: "wc:legacy-1" }))[0].site_id).toBe(site["aware-wave-com"]);
+    });
+
+    it("a payment from site B for a buyer sold by site A is refused", async () => {
+      expect(await apply(sub("wc:b-1", BUYER_AW, "social_basic"), site["seller-b"])).toEqual({ error: "payment_rejected:buyer_belongs_to_another_seller" });
+      expect(await apply(sub("wc:aw-1", BUYER_B, "social_basic"), null)).toEqual({ error: "payment_rejected:buyer_belongs_to_another_seller" });
+      expect(await rows("payment_events", { organization_id: BUYER_B })).toEqual([]);
+    });
+
+    it("a plan owned by another seller is refused on this site", async () => {
+      expect(await apply(sub("wc:aw-2", BUYER_AW, "seller_plan"), null)).toEqual({ error: "payment_rejected:plan_not_sellable_here" });
+      expect(await apply(sub("wc:b-2", BUYER_B, "seller_plan"), site["seller-b"])).toMatchObject({ data: { ok: true, plan_key: "seller_plan" } });
+    });
+
+    it("two sites may send the same event id and order number for different buyers", async () => {
+      // the store plugin builds both from the shop's own order number (PaymentEvents.php `wc:payment_complete:<order>:credit_pack`)
+      const pack = (org: string) => ({ event_id: "wc:payment_complete:7:credit_pack", kind: "credit_pack", organization_id: org, units: 10, order_ref: "7" });
+      expect(await apply(pack(BUYER_AW), null)).toMatchObject({ data: { ok: true, units: 10 } });
+      expect(await apply({ ...pack(BUYER_B), plan_key: "content_pack" }, site["seller-b"])).toMatchObject({ data: { ok: true, units: 10 } });
+      expect((await rows("media_credit_ledger", { organization_id: BUYER_B })).map((r) => r.idempotency_key)).toEqual(["pack:woo@seller-b:7"]);
+      expect((await rows("media_credit_ledger", { organization_id: BUYER_AW })).map((r) => r.idempotency_key)).toEqual(["pack:woo:7"]);   // aware-wave.com keys unchanged
+      expect(await apply({ ...pack(BUYER_B), plan_key: "content_pack" }, site["seller-b"])).toMatchObject({ data: { replayed: true } });
+    });
+
+    it("the operator may cancel a seller's plan by hand; another site may not", async () => {
+      const cancel = { event_id: "wc:cancel-b", kind: "subscription_canceled", organization_id: BUYER_B, plan_key: "seller_plan" };
+      expect(await apply(cancel, site["aware-wave-com"])).toEqual({ error: "payment_rejected:buyer_belongs_to_another_seller" });
+      expect(await send({ ...cancel, event_id: "bank-cancel-b" })).toMatchObject({ status: 200, body: { ok: true, kind: "subscription_canceled" } });
+    });
+
+    it("another seller's site takes money only for a product it is licensed to sell", async () => {
+      expect(await apply(sub("wc:b-video", BUYER_B, "seller_video"), site["seller-b"])).toEqual({ error: "payment_rejected:seller_not_licensed" });
+      const bare = { event_id: "wc:b-pack-bare", kind: "credit_pack", organization_id: BUYER_B, units: 5, order_ref: "8" };
+      expect(await apply(bare, site["seller-b"])).toEqual({ error: "payment_rejected:seller_pack_needs_plan" });
+      expect(await rows("payment_events", { event_id: "wc:b-video" })).toEqual([]);
+    });
+
+    it("a disabled site is refused", async () => {
+      expect(await apply(sub("wc:off-1", BUYER_B, "seller_plan"), site["seller-off"])).toEqual({ error: "payment_rejected:site_disabled" });
+    });
+  });
 });

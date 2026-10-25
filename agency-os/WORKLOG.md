@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-25（續70）0133 seller_sites 套 prod＋推 main（操作者 go）：aware-wave.com 一列 hmac-env／active，付款照舊（Claude）
+
+**觸發**：操作者「go ahead：0133 commit 推 main，並同日套到正式庫，套完確認 seller_sites 一列 aware-wave.com／hmac-env／active。」接續 68。
+
+**順序**：先套 prod、後推 main（main 上不出現「有 migration 未套」的空窗，`check-migrations-applied.sh` 不擋 03:00 自動部署）。
+- 套前唯讀快照（SSH `sudo -n docker exec supabase-db psql`）：`--status` applied 132／missing 0133；`billing_apply_payment_event` 1 個（3 參數）；orgs 6、internal 根 1（`39ad4149…`）；身分列 0、方案 0、付款事件 0（woo 0）、`pack:` 帳本鍵 0；0133 要刪的約束名 `payment_events_provider_event_id_key`、`customer_identities_provider_{external_id,user_id}_key`、`customer_identities_provider_check` 皆存在；`seller_sites` 不存在。
+- 套用：`node scripts/apply-db-migration.mjs 0133` → `APPLY_OK 1/1`。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=`node scripts/apply-db-migration.mjs 0133` | exit=0 | ms=18016（APPLY_OK 1/1；`--status` → `STATUS_OK {"applied":133}`）
+- REALTEST_EVIDENCE: tool=SSH | cmd=唯讀讀回 `seller_sites`／`pg_proc`／`pg_constraint`／`pg_trigger`／權限 | exit=0 | ms=3000（`seller_sites` 1 列：aware-wave.com／aware-wave-com／hmac-env／active，賣家＝internal；函式只剩 `(text, text, jsonb, uuid)`，anon 不可執行、service_role 可；`payment_events_site_event_key`、`payment_events_site_matches_provider`、`customer_identities_provider_matches_site`、`customer_identities_site_{external_id,user_id}_key` 在；身分列 `site_id` 預設＝aware-wave.com 列 `0e62ab80…`；`organizations_sold_by_{control_plane_only,is_root}` 觸發器與 `organizations_one_internal_root` 在；`payment_events_immutable` 已恢復（tgenabled=O）；`seller_sites` RLS on、anon／authenticated 不可讀、service_role 不可刪；`sold_by` 已設 0 列）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`select billing_apply_payment_event(p_provider => 'probe', p_event_id => 'probe-0133', p_event => '{}')` | exit=0 | ms=800（`payment_rejected:unknown_provider`，CONTEXT 為 4 參數版 → app 的 3 個具名參數呼叫 `contracts.ts:20` 照常解析；`probe-0133` 寫入 0 列）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker logs lobster-next-admin --since 5m \| grep -ciE 'billing\|payment\|seller'`；`docker ps` | exit=0 | ms=1500（0 筆；Up healthy）
+- REVIEW_WAIVED: NA -- 套用的是續68 已審（Codex 三輪＋critic）的同一檔，未改一字（ledger sha 由 apply 腳本記錄）
+- BUGHUNT_WAIVED: NA -- 續68 已跑；本條只套用與推送
+- WORKLOG: 本條目
+
+**剩餘風險**：4c-2（route 查表驗章、首付寫 `sold_by`、`/ops/sellers`、拿掉身分列過渡預設）未做；在那之前所有 woo 事件都算 aware-wave.com 的（與今天相同）。客戶改自己組織列的既有 RLS 洞在另一個 session 處理。
+
+**Rollback**：`node scripts/apply-db-migration.mjs` 不做 down；手動 `lobster-factory/packages/db/migrations/0133_seller_sites.down.sql`（經同一路徑 `sudo -n docker exec -i supabase-db psql`；有其他賣家資料或 aware-wave.com 停用時自動拒絕），並刪 `schema_migrations` 的 0133 列；`git revert` 本 commit。
 ## 2026-10-25（續69）排程離開 Trigger C4.6④：三通道演練通過（Telegram、#ops-incidents、#infra-alerts 各收一則）；演練腳本拿掉不存在的 Netdata 路徑（Claude）
 
 - **觸發**：操作者「go ahead C4.6④」。
