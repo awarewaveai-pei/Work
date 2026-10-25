@@ -155,6 +155,34 @@ if (-not $ghCmd) {
         return @{ ExitCode = $code; Output = $o }
     }
 
+    # Returns GitHub's failure annotation when a FAILED run's jobs all executed zero steps (GitHub
+    # refused to start it), else "". No annotation, a cancelled run (queued runs are cancelled by
+    # newer pushes, also with zero steps), or any lookup error returns "" - the run then stays a
+    # plain failure, the louder reading, never a quieter one.
+    function Get-NotStartedReason {
+        param([string]$RunId, [string]$Conclusion)
+        if (-not $RunId -or $Conclusion -ne "failure") { return "" }
+        $jr = Invoke-Gh -GhArgs @("run", "view", $RunId, "--json", "jobs")
+        if ($jr.ExitCode -ne 0) { return "" }
+        $jobs = $null
+        try { $jobs = @(($jr.Output | ConvertFrom-Json).jobs) } catch { return "" }
+        if ($jobs.Count -eq 0) { return "" }
+        foreach ($j in $jobs) { if (@($j.steps).Count -gt 0) { return "" } }
+        foreach ($j in $jobs) {
+            # Filter in PowerShell, not --jq: PS 5.1 strips quotes inside native arguments.
+            $ar = Invoke-Gh -GhArgs @("api", "repos/{owner}/{repo}/check-runs/$($j.databaseId)/annotations")
+            if ($ar.ExitCode -ne 0 -or -not $ar.Output) { continue }
+            try {
+                # foreach, not a pipeline: PS 5.1 ConvertFrom-Json emits a JSON array as ONE object.
+                $annots = $ar.Output | ConvertFrom-Json
+                foreach ($a in $annots) {
+                    if ([string]$a.annotation_level -eq "failure") { return (([string]$a.message) -split "`n")[0].Trim() }
+                }
+            } catch { continue }
+        }
+        return ""
+    }
+
     # --limit is a boundary, and a boundary you cannot see past is a blind spot. Raise it well
     # beyond any plausible repo, then CHECK whether the result came back at the limit: if it
     # did, more may exist and this run cannot claim to have seen everything. Round 3 removed
@@ -187,7 +215,7 @@ if (-not $ghCmd) {
                 # hide "someone turned the gate off", so they are surfaced below instead.
                 $wfName = [string]$wf.name
                 if (-not $wfName) { continue }
-                $runRes = Invoke-Gh -GhArgs @("run", "list", "--workflow", [string]$wf.id, "--branch", $defaultBranch, "--limit", "$RunsPerWorkflow", "--json", "conclusion,status,createdAt,url")
+                $runRes = Invoke-Gh -GhArgs @("run", "list", "--workflow", [string]$wf.id, "--branch", $defaultBranch, "--limit", "$RunsPerWorkflow", "--json", "conclusion,status,createdAt,url,databaseId")
                 if ($runRes.ExitCode -ne 0) {
                     Set-Worst "broken"
                     $reasons += "BLIND SPOT: could not read runs for '$wfName' (exit $($runRes.ExitCode)) - its state is unknown"
@@ -257,9 +285,18 @@ if (-not $ghCmd) {
                 }
 
                 if ($isFail) {
-                    # Entrenched failures rank above fresh ones: a workflow red for a week is a
-                    # gate that has been off for a week, which is what happened on 2026-08-15.
-                    if ($streak -ge $ENTRENCHED_RUNS -or $days -ge $ENTRENCHED_DAYS) {
+                    # A red run whose jobs ran zero steps never executed the gate; GitHub refused
+                    # to start it (2026-10-24: billing). Same verdict - nothing was checked - but the
+                    # fix is account-side, and "failing" alone sent the reader to the code.
+                    # Only the LATEST run is diagnosed; the streak may include runs that did execute.
+                    $notStarted = Get-NotStartedReason -RunId ([string]$latest.databaseId) -Conclusion ([string]$latest.conclusion)
+                    if ($notStarted) {
+                        $workflows[-1].latest = "not_started"
+                        if ($streak -ge $ENTRENCHED_RUNS -or $days -ge $ENTRENCHED_DAYS) { Set-Worst "broken" } else { Set-Worst "drift" }
+                        $reasons += "'$name' has been red for $streak consecutive run(s) over $days day(s); its latest run never started, so nothing was checked - fix the GitHub account first, not the code. GitHub says: $notStarted ($($latest.url))"
+                    } elseif ($streak -ge $ENTRENCHED_RUNS -or $days -ge $ENTRENCHED_DAYS) {
+                        # Entrenched failures rank above fresh ones: a workflow red for a week is a
+                        # gate that has been off for a week, which is what happened on 2026-08-15.
                         Set-Worst "broken"
                         $reasons += "'$name' has been failing for $streak consecutive run(s) over $days day(s) - this gate has been off that whole time: $($latest.url)"
                     } else {

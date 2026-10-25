@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-25（續18）CI 三道閘「紅」＝GitHub 沒啟動 job（帳務），不是程式壞；check-ci-health 改成報出原因（Claude）
+
+- [觸發] AO-RESUME blockers：`next-admin — TypeScript typecheck` 連紅 12 次、`Perplexity Search-only guard`／`Shared asset gates` 各 20 次；操作者：先修 typecheck，趕今晚 03:00 自動部署。
+- [根因] 三個 workflow 自 2026-10-24 17:35Z（`3a9439900`）起每次 run 的 job 都是 0 步，annotation：「The job was not started because recent account payments have failed or your spending limit needs to be increased」。程式沒壞：`103852367` 是最後一次綠。偵測器 `scripts/check-ci-health.ps1` 只看 conclusion，把「沒啟動」也寫成「has been failing」，讀的人會去修程式。
+- [修法] `check-ci-health.ps1` 新增 `Get-NotStartedReason`：最新一次紅的 run，若每個 job 都 0 步，就讀 check-run 的 failure annotation，表格 `latest=not_started`，finding 寫「its latest run never started … fix the GitHub account first, not the code. GitHub says: <原文>」。只有 conclusion=failure 且某個 job 有 failure annotation 才算；cancelled（被新 push 取消的排隊 run 也是 0 步）、沒 annotation、查詢失敗都照舊報 failing（比較大聲那邊）。等級不變（≥3 次仍 FAIL；閘確實沒在跑，不能變安靜）。連紅次數照原樣報，不改寫成「N 次都沒啟動」。
+- [不受影響] 今晚 03:00 自動部署：`sg-deploy.sh:214` 在主機自己跑 tsc＋vitest，不經 GitHub Actions；`SG Deploy (self-hosted runner)` 最新 success。
+- [待操作者] GitHub → Settings → Billing & plans 補付款或調高 spending limit（付款＝操作者自己做）。補好之前，這三道閘在 GitHub 上都沒有在保護 main。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p .（next-admin，HEAD 3b287fbcc，0 個 error TS） | exit=0 | ms=5261
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/check-ci-health.ps1（3 個 workflow 變 not_started，訊息只留 failure annotation 一行） | exit=0 | ms=27465
+- REALTEST_EVIDENCE: tool=Bash | cmd=scratchpad ns-test.ps1：Get-NotStartedReason 對 40116310724（8 步，真的跑過）回空、對 40130019935 回帳務原文、同 run 傳 -Conclusion cancelled 回空 | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=本機照兩個 workflow 的 8 條指令跑（check-perplexity-search-only ×2、settings-deny-parity、verify-asset-mcp-refs ×2、verify-asset-parity、verify-governance-pointers、hooks node --test） | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（Codex oracle `agency-os/reports/oracle/2026-10-25-partialreview-da028f40.md`：M1 cancelled 0 步被誤判帳務、M2 只看第一個 job 的 annotation、M3 連紅次數被改寫成「沒啟動」；三條逐條核對成立、全修；複測 ns-test 三案 ran8steps=空／notstarted=帳務原文／cancelled=空）
+- BUGHUNT_DONE: scope=agency-os,scripts,tests,.claude | grep=has been failing for|check-ci-health|ci-LATEST|not_started | hits=40（消費端只有 `scripts/lib/smoke-status-digest.ps1:182` 讀 findings／verdictLabel，不解析 latest 值；`tests/smoke-status-digest.test.ps1` 的 fixture 不依賴新字串）
+- **避免再發生**：偵測器回報「閘紅」時，要分清「檢查跑了沒過」和「檢查根本沒跑」，兩者的修法在不同地方。
+- **rollback**：`git revert <本 commit>`；只改偵測器文字與表格值，不影響任何閘的 verdict。
 ## 2026-10-25（續17）next-admin 手動部署 3e069ee69（操作者：做好直接部署）——側欄目前頁／分頁設定／字體上線（Claude）
 
 - **範圍**：prod 原為 `79f53f114`；帶上 `b00195d25`（側欄目前頁、區塊標題滑過、選中分頁背景、Theme Editor 分頁改共用元件）＋`3e069ee69`（字體選擇、字重行高字距接上畫面）；無 migration；DEPLOY_HOLD 不存在。
