@@ -12,7 +12,6 @@ import { startRestProxy } from "./real-db";
 const REST = process.env.ENTITLEMENTS_REST;
 const CUSTOMER = "00000000-0000-4000-8000-0000000000c7";
 const PACK_BUYER = "00000000-0000-4000-8000-0000000000c8";   // its own account: the pack tests do not depend on the order of the others
-const PACK_BUYER = "00000000-0000-4000-8000-0000000000c8";   // its own account: the pack tests do not depend on the order of the others
 const SECRET = "payments-e2e-secret-0123456789-0123456789";
 
 describe.skipIf(!REST)("payments against a real database (ADR 017 step 4a)", () => {
