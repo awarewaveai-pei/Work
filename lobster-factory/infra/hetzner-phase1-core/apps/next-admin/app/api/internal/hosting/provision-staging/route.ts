@@ -263,9 +263,11 @@ async function wireClientToContentTools(
 
     // 3. Activate the row with the real token + stamp client_config.site_url (用於健康探測與顯示；
     //    租戶歸屬看的是 organization_id，不是這個 URL。spread 保留 brandColors 等既有鍵）。
-    await supabase.from("wp_sites").update({ token: appPw, active: true }).eq("url", cleanUrl);
+    const { error: actErr } = await supabase.from("wp_sites").update({ token: appPw, active: true }).eq("url", cleanUrl);
+    if (actErr) return `wiring WARN: wp_sites activate failed (${actErr.message})`;
     meta.client_config = { ...cc, site_url: cleanUrl };
-    await supabase.from("organizations").update({ metadata: meta }).eq("id", organizationId);
+    const { error: metaErr } = await supabase.from("organizations").update({ metadata: meta }).eq("id", organizationId);
+    if (metaErr) return `wiring WARN: organizations metadata update failed (${metaErr.message})`;
     return "wired: site_url + wp_sites + app-password";
   } catch (e) {
     return `wiring error: ${e instanceof Error ? e.message : String(e)}`;

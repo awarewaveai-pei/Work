@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-26（續3）next-admin 寫入路徑不得退回 anon client（Claude）
+
+- 根因：`lib/supabase-server.ts:42` `getSupabaseServerClient` 缺 service role key 時退回 anon；寫入路由用它會靜默失敗。
+- 修：`app/api/ops/organizations/route.ts` upsert 改 `getSupabaseWriteClient`，缺鍵回 503 `supabase_write_not_configured`；`lib/theme/store.ts` `saveThemeConfig` 改 write client（缺鍵 throw → API 5xx）；`provision-staging/route.ts` wp_sites 啟用／organizations metadata update 檢查 error 回 WARN；`wp-update/route.ts` `writeFinalResult` 檢查 error 並 console.error。其餘 `getSupabaseServerClient` 用點皆讀取，未動；wp-report／integrations／system-modes／onboarding／repair-center 寫入本來就用 write client。
+- 新測試：`app/api/ops/organizations/route.test.ts`（無 write client → 503）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run app/api/ops/organizations app/api/ops/clients app/api/theme lib/theme app/api/ops/integrations | exit=0 | ms=1800
+- REVIEW_WAIVED: NA -- 小範圍機械修正，守衛由新測試覆蓋；tsc --noEmit 綠
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin | grep=getSupabaseServerClient | hits=41
+- 避免再發生：寫入一律 `getSupabaseWriteClient` + 503 `supabase_write_not_configured`；`getSupabaseServerClient` 只給讀取。
 ## 2026-10-26（續2）部署 next-admin 3dc138272：社群頻道認領（0984f865d）上線（Claude）
 
 - 授權：操作者明示現在部署。DEPLOY_HOLD 不存在（main 工作樹確認）。

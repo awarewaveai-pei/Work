@@ -5,7 +5,7 @@
 // SUPABASE_SERVICE_ROLE_KEY: without it the client degrades to anon (RLS-denied) → reads
 // fail-open to globals.css defaults, writes fail-closed (500). The key is set in this stack.
 import { unstable_cache, revalidateTag } from "next/cache";
-import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { getSupabaseServerClient, getSupabaseWriteClient } from "@/lib/supabase-server";
 import type { SavedLayout } from "@/lib/theme/tokens";
 
 export interface ThemeConfig {
@@ -75,7 +75,7 @@ export async function saveThemeConfig(
   tokens: Record<string, string>,
   layout: SavedLayout | null,
 ): Promise<void> {
-  const sb = getSupabaseServerClient();
+  const sb = getSupabaseWriteClient();
   if (!sb) throw new Error("supabase_unavailable");
   const { error } = await sb.from("app_theme").upsert({
     id: ROW_ID,

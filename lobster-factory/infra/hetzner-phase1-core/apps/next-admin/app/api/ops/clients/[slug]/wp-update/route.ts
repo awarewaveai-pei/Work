@@ -461,8 +461,9 @@ async function writeFinalResult(
     },
   };
 
-  await supabaseWrite
+  const { error } = await supabaseWrite
     .from("organizations")
     .update({ metadata: updatedMeta })
     .eq("id", orgId);
+  if (error) console.error(`wp-update writeFinalResult failed for ${slug}: ${error.message}`);
 }

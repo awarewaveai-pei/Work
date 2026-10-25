@@ -3,7 +3,7 @@
 // GET is handled by /api/ops/clients/route.ts (reads organizations table).
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseServerClient } from "../../../../lib/supabase-server";
+import { getSupabaseWriteClient } from "../../../../lib/supabase-server";
 import { resolveOpsRole, canWriteTenantConfig } from "../../../../lib/ops-role";
 
 export const dynamic = "force-dynamic";
@@ -22,9 +22,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
 
-  const supabase = getSupabaseServerClient();
+  const supabase = getSupabaseWriteClient();
   if (!supabase) {
-    return NextResponse.json({ ok: false, error: "supabase_not_configured" }, { status: 503 });
+    return NextResponse.json({ ok: false, error: "supabase_write_not_configured" }, { status: 503 });
   }
 
   let body: OrgCreateBody;
