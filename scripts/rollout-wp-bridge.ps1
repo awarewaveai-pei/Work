@@ -64,7 +64,7 @@ New-Item -ItemType Directory -Path $work | Out-Null
 try {
     $zip = Join-Path $work "$slug-v$Version.zip"
     if (-not $DryRun) {
-        # The store's release repo is private: the host cannot download it, so the zip travels with us.
+        # The host has no gh login; the zip travels with us from this machine.
         & gh release download "v$Version" -R $releaseRepo -p "$slug-v$Version.zip" -D $work --clobber
         if ($LASTEXITCODE -ne 0 -or -not (Test-Path $zip)) { throw "release v$Version zip not found on $releaseRepo (run scripts/release-wp-bridge.sh --plugin $Plugin first)" }
     }

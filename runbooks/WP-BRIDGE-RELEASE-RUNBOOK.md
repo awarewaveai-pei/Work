@@ -9,7 +9,7 @@
 | 外掛 | 裝在哪 | Work 開發副本 | 發佈正本 |
 |------|--------|---------------|----------|
 | `aware-wave-wp-bridge`（讓 AI 管 WordPress 的通道） | **每個**代管網站 | `lobster-factory/packages/wp-bridge-plugin/` | `awarewaveai-pei/aware-wave-wp-bridge`（公開） |
-| `aware-wave-store`（AW 自己的付款事件、會員驗證、進入按鈕） | **只有 aware-wave.com** | `lobster-factory/packages/aware-wave-store-plugin/` | `awarewaveai-pei/aware-wave-store`（私有） |
+| `aware-wave-store`（AW 自己的付款事件、會員驗證、進入按鈕） | **只有 aware-wave.com** | `lobster-factory/packages/aware-wave-store-plugin/` | `awarewaveai-pei/aware-wave-store`（公開） |
 
 push tag `v*` 到發佈正本 → Action 出 zip + Release。0.19.0 前收費程式在 wp-bridge 裡（`includes/Billing/`），2026-10-25 拆出（WORKLOG 當日）。
 

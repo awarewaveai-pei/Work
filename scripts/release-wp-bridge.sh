@@ -4,7 +4,7 @@
 #   --plugin bridge (default)  aware-wave-wp-bridge: the AI-to-WordPress channel, on EVERY managed site
 #                              Work copy lobster-factory/packages/wp-bridge-plugin -> awarewaveai-pei/aware-wave-wp-bridge
 #   --plugin store             aware-wave-store: AwareWave's own shop logic, aware-wave.com ONLY
-#                              Work copy lobster-factory/packages/aware-wave-store-plugin -> awarewaveai-pei/aware-wave-store (private)
+#                              Work copy lobster-factory/packages/aware-wave-store-plugin -> awarewaveai-pei/aware-wave-store (public)
 #
 # WHY THIS EXISTS: each plugin lives in TWO GitHub repos and that bit a session once. Pushing a tag v* to the
 # release repo fires its .github/workflows/release.yml, which builds the installable zip (<slug>.php + includes/ +

@@ -6,7 +6,7 @@ description: Release a new aware-wave-wp-bridge (every site) or aware-wave-store
 
 # /wp-bridge-release
 
-Ship a new plugin version end-to-end: `aware-wave-wp-bridge` (default; every managed site) or, with `--plugin store`, `aware-wave-store` (AwareWave's own payments / member checks; aware-wave.com only, private release repo `awarewaveai-pei/aware-wave-store`, Work copy `lobster-factory/packages/aware-wave-store-plugin/`, version `AWSTORE_VERSION`).
+Ship a new plugin version end-to-end: `aware-wave-wp-bridge` (default; every managed site) or, with `--plugin store`, `aware-wave-store` (AwareWave's own payments / member checks; aware-wave.com only, release repo `awarewaveai-pei/aware-wave-store`, Work copy `lobster-factory/packages/aware-wave-store-plugin/`, version `AWSTORE_VERSION`).
 
 ## 為什麼需要這個指令
 

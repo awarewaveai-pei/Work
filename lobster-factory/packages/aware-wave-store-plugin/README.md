@@ -13,6 +13,6 @@ of them breaks queued events, sent verification links, or stored settings.
 
 While wp-bridge <= 0.18.3 is installed (it still carries this code) the plugin stays dormant and says so in wp-admin.
 
-- Release: `bash scripts/release-wp-bridge.sh --plugin store` → private repo `awarewaveai-pei/aware-wave-store`.
+- Release: `bash scripts/release-wp-bridge.sh --plugin store` → release repo `awarewaveai-pei/aware-wave-store` (public: GitHub Actions run free only on public repos).
 - Install / upgrade: `scripts/rollout-wp-bridge.ps1 -Plugin store` (first install: `-Install -Site lobster-wordpress`).
 - Tests: `php -d extension=mbstring phpunit-9.6.phar` in this folder.
