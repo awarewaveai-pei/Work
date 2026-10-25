@@ -102,6 +102,27 @@
           "cmd": "npx tsc --noEmit"
         }
       ]
+    },
+    {
+      "id": "05-social-claim-postiz-channel",
+      "file": "cards/05-social-claim-postiz-channel.md",
+      "gate": null,
+      "depends": [],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin",
+          "cmd": "npx vitest run app/api/social/__tests__/claim.test.ts"
+        },
+        {
+          "cwd": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin",
+          "cmd": "npx tsc --noEmit"
+        },
+        {
+          "cwd": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin",
+          "cmd": "npm test"
+        }
+      ]
     }
   ]
 }
