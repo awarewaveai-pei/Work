@@ -64,7 +64,7 @@ export async function loadSchedulesView(sb: SupabaseClient, opts: { slug?: strin
     jobs: [...CLIENT_JOBS.map(({ key, label, description, cost, frequencies, dailyLimit, group }) => ({ key, label, description, cost, frequencies, ...(dailyLimit ? { dailyLimit } : {}), ...(group ? { group } : {}) })), SITE_WATCH_JOB],
     orgs: orgs.map((o) => ({ id: o.id, slug: o.slug, name: o.name ?? o.slug })),
     cells,
-    system: opts.slug ? [] : await hostStatusRows(sb, now.getTime()),
+    system: opts.slug ? [] : await hostStatusRows(now.getTime()),
     summary: {
       enabled: cells.filter((c) => c.enabled && !c.unavailable).length,
       ranToday: cells.filter((c) => c.lastRunAt?.slice(0, 10) === today).length,

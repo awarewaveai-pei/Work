@@ -1,15 +1,11 @@
 // The host-side schedules this app can actually observe, shown read-only (SCHEDULES_PAGE_PLAN.md §3.2-7):
-// backup coverage, the site-watch heartbeat, then every host cron/timer (adapters/host-schedules.ts).
+// backup coverage, then every host cron/timer (adapters/host-schedules.ts; site-watch is its site_watch_tick row).
 // Laptop tasks, cloud routines and GitHub Actions have no data path into the app and are not listed.
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { readBackupCoverage } from "@/lib/backup/coverage";
 import type { SystemRow } from "../types";
 import { hostScheduleRows, sortSystemRows } from "./host-schedules";
 
-/** Two missed hourly ticks (site-watch-heartbeat cron "5 * * * *", WF src/trigger/site-watch.ts). */
-const HEARTBEAT_STALE_MS = 2 * 60 * 60 * 1000;
-
-export async function hostStatusRows(sb: SupabaseClient | null, now = Date.now()): Promise<SystemRow[]> {
+export async function hostStatusRows(now = Date.now()): Promise<SystemRow[]> {
   const rows: SystemRow[] = [];
 
   // Cadence: scripts/cron.d/backup-coverage (30 3 * * * UTC = 11:30 Taipei).
@@ -41,33 +37,6 @@ export async function hostStatusRows(sb: SupabaseClient | null, now = Date.now()
   } else {
     rows.push({ ...backup, lastAt: null, state: "missing", detail: cov.reason });
   }
-
-  let heartbeat: string | null = null;
-  let heartbeatError: string | null = null;
-  if (sb) {
-    const m = await sb.from("site_watch_maintenance").select("last_heartbeat_at").eq("id", 1).maybeSingle();
-    if (m.error) heartbeatError = m.error.message;
-    else heartbeat = (m.data?.last_heartbeat_at as string | null) ?? null;
-  } else heartbeatError = "no_supabase_client";
-  rows.push({
-    key: "site_watch_heartbeat",
-    label: "巡檢心跳",
-    description: "每小時喚醒網站巡檢；心跳停止時，不會檢查任何網站。",
-    cadence: "每小時 :05",
-    group: "deploy",
-    // Facts: WF src/trigger/site-watch.ts, lib/site-watch/notify.ts, scripts/check-site-watch-health.ps1 (>2h WARN, >6h FAIL).
-    details: {
-      what: "每小時由 Trigger.dev 喚醒網站巡檢；各客戶網站依自己的排程檢查。",
-      when: "每小時 05 分執行。",
-      where: "各客戶的巡檢結果與截圖分開存放。",
-      look: "到客戶頁面的「維護」分頁，在「網站巡檢」卡片查看狀態、最近 10 次檢查和截圖。",
-      lookHref: "/ops/clients",
-      fail: "網站失敗時，Telegram 在事故發生及恢復時各通知一次。心跳停止後，「網站巡檢狀態」在 2 小時後警告、6 小時後失敗。",
-    },
-    lastAt: heartbeat,
-    state: !heartbeat ? "missing" : now - Date.parse(heartbeat) > HEARTBEAT_STALE_MS ? "stale" : "ok",
-    detail: heartbeatError ?? "",
-  });
 
   rows.push(...(await hostScheduleRows(undefined, now)));
   return sortSystemRows(rows);

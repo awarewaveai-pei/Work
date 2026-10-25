@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-25（續40）排程離開 Trigger C1：時鐘改主機 cron（poke.sh／site-watch-tick.sh／trigger-task.sh），9 列登記；cron 未安裝（C2，High）（Claude）
+
+- **觸發**：操作者「開始 C1」。監工台 `agency-os/handoffs/2026-10-25-schedules-off-trigger/`（https://claude.ai/artifact/QsgquXzuzi1oQ8FCVoRrAZ）；起因續20（Trigger 名額漏光停擺 34h）。
+- **不變量**：時鐘不與工人共用資源；排程頁的綠＝工作真的做了。
+- **做了什麼**：
+  - `HS/poke.sh <key> <path> <TOKEN_VAR>`：唯一叫醒 NA 的方式；token 讀 `.env`（sed，不 source）經 stdin 給 curl（不進 argv，同 `ops-probe-heartbeat.sh:3-11`）；非 2xx／`ok:false` → exit 1。取代 `schedules-run-due.sh`（刪；主機舊檔由 `sync-host-scripts.sh:15` 保留到 C2 重裝）。
+  - `HS/site-watch-tick.sh`：取代 Trigger `site-watch-heartbeat`＋`site-watch-run`：`/due` → target（只收 uuid、以參數傳入）`xargs -P 2` 逐一 `/run/<id>` → `/cleanup`；`renderer_unavailable`、任一步失敗、超過 55 分 → exit 1；flock 防重疊。
+  - `HS/trigger-task.sh <key> <task>`：本機 Trigger API 觸發（ttl 9m，停擺時 EXPIRED 不堆積）、等結果；非 COMPLETED 或 output `status:fail` → exit 1；flock 每 key。用於 `dispatch_action_run`（*/10）、`ao_infrastructure_check`（每日 04:00 UTC）。`ao-infrastructure-check.ts` `organizationId` 預設改在 task（同原 schedule 的 env／零 uuid 備援）。
+  - `cron.d/awarewave-schedules` 10 行（9 新＋`schedules_run_due` 改 poke），頻率＝原 Trigger cron。
+  - `host-jobs.ts` 9 列；`host-status.ts` 刪 DB 心跳列（＝`site_watch_tick` 列的重複證明），`hostStatusRows` 去掉未用的 `sb`。
+  - `host-loopback-callers.test.ts` 改為也掃 `cron.d` 的 poke 路徑（原只掃 `.sh`，搬完後 9 條路由不受守）。
+  - 監工台：上線改為 C2 緊接 C1（push `packages/workflows` ＝ Trigger 部署，`.claude/hooks/post-push-trigger-deploy.ps1`；刪 Trigger 排程須在 cron 綠之後）；C4.7 新增。
+- **C1 期間發現**：Trigger 上 `ao-infrastructure-check-schedule`、`dispatch-action-run-schedule` 非多餘（先前判斷錯），改由 cron 經 trigger-task 叫；只有 `schedules-heartbeat` 真重複。主機 5 支腳本各自發 Telegram／Slack、變數名 3 種寫法 → 併入 C4。
+- REALTEST_EVIDENCE: tool=SSH | cmd=主機 /tmp 對本機 stub（127.0.0.1:18077，不碰正式服務）跑 run.sh：poke 7 例、tick 5 例（含非 uuid 拒收）、trigger 6 例（含 ttl body、重疊）、惡意 .env（`$cd`、`$(touch)`）不執行 → 18/18 PASS | exit=0 | ms=45000
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin `npx vitest run lib/schedules lib/portal/__tests__/host-loopback-callers.test.ts`（73 pass）＋ workflows `npx vitest run`（154 pass）＋ `bash -n` 三支 | exit=0 | ms=4000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/3m/6n（critic agent）：M1 token 進 argv、M2 停擺時 run 堆積、L1 source .env、L2 loopback 測試漏掃、L3 註解誤稱 maxDuration 會被執行、L5 id 拼進 shell、L6 超時 tick 被覆寫成綠 → 皆修並各有 stub 例；M3（NA 03:00 先部署會讓 9 列顯示「主機上找不到」）以順序處理：C2.1 須在 03:00 前，否則該字面為真、C2.1 後恢復；L4 → C4.7。
+- ORACLE_WAIVED: codex-oracle 三次「no final message」（inspect×2、review×1，各重試一次；非額度訊息）→ 改 critic agent 獨立審＋上列 stub 負路徑證據；頁面 9 列中文未經 GPT 改寫（同原因），照既有列語氣自寫。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude,runbooks | grep=schedules-run-due\.sh|site_watch_heartbeat|hostStatusRows\( | hits=14（現行：view.ts／host-status.ts 已改；`SCHEDULES_PAGE_PLAN.md:12` 已改；其餘為 WORKLOG／已完成監工台／oracle 報告／`AUTO_CONTENT_EXECUTION_PLAN.md` 決策列＝歷史不回改；`.claude` 只有 log／file-history）
+- **剩餘**：cron 未安裝、Trigger 排程仍在（C2，High，待決 2）；C2.1 宜在台灣 03:00 自動部署前。ttl 參數在自架 Trigger v4.4.4 的實際生效於 C2.1 首跑驗證。
+- **rollback**：`git revert <本 commit>`；主機無變更。
 ## 2026-10-25（續38）全自動內容 P6.2：排程自己做影片、嵌回文章、附到社群草稿；P6.3 查核；P8.3 示範列（Claude）
 
 - **操作者**：「繼續完成阿 為什麼停下來」→ 取消 D3 的一週等待（prod `client_schedules` content_pipeline 1 列且 disabled、`content_topics` 0 列，SSH psql 唯讀查，上線不動任何東西）。

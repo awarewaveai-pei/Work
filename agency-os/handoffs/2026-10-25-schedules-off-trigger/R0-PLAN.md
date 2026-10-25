@@ -31,12 +31,13 @@
 
 ## 3. 風險清單
 
-- R1 切換重複執行：cron 與 Trigger 同時跑 → 各端點冪等（site-watch 租約＋bucket `SITE_WATCH_MASTER_PLAN.md` C2/C3；social 0100 每槽一次；run-due claim）吸收。順序：裝 cron → 綠 → 再刪 Trigger 排程。
+- R1 切換重複執行：cron 與 Trigger 同時跑（C2.1–C2.3 之間）→ 各端點冪等（site-watch 租約＋bucket `SITE_WATCH_MASTER_PLAN.md` C2/C3；social 0100 每槽一次；run-due claim）吸收。順序：裝 cron → 綠 → 再刪 Trigger 排程。
 - R2 site-watch 每 target 最長 300s（`run/[targetId]` `maxDuration=300`）：主機腳本 `xargs -P 2`、`curl -m 330`，整輪必須在下一次 :05 前結束；超時記 exit 1。
 - R3 主機 `.env` 缺 token → poke 腳本 exit 1（不安靜略過），頁面紅＋推播。
 - R4 推播洗版：只在狀態變化發（state 檔），每日一行固定時間。
 - R5 GitHub token 外洩面：fine-grained、單 repo、Actions read-only。
-- R6 C7 動 auth（Medium）、C5／C6 動 prod 主機（High）。
+- R6 C7 動 auth（Medium）；C2、C3.4、C4.6、C6 動 prod 主機（High）。
+- R7 push `packages/workflows` ＝ Trigger 部署：刪 Trigger 排程只能在 cron 綠之後（C2.3）。
 
 ## 4. 方案比較
 
@@ -56,49 +57,54 @@ B ＋ 單一推播出口 ＋ 頁面補齊外部時鐘。C6–C8 為同一不變�
 
 | 卡號 | 做什麼 |
 |---|---|
-| C1.1 | `HS/poke.sh <key> <url> <TOKEN_VAR> [body]`：讀 `/root/lobster-phase1/.env`、POST、回應非 2xx 或 NA 回 `"ok":false` → exit 1，只記失敗（樣式照 `schedules-run-due.sh`）；`schedules-run-due.sh` 刪除，其 cron 行改用 `poke.sh` |
+| C1.1 | `HS/poke.sh <key> <path> <TOKEN_VAR>`：讀 `/root/lobster-phase1/.env`、POST、非 2xx 或回 `"ok":false` → exit 1，只記失敗（樣式照 `schedules-run-due.sh`）；`schedules-run-due.sh` 刪除，其 cron 行改用 `poke.sh`（主機舊檔由 `sync-host-scripts.sh:15` 保留，C2 重裝前舊 cron 照跑） |
 | C1.2 | `HS/site-watch-tick.sh`：`/due` → targets 以 `xargs -P 2` 逐一 `/run/<id>`（`curl -m 330`）→ `/cleanup`；任一步失敗 exit 1 |
-| C1.3 | `HS/cron.d/awarewave-schedules` 加 9 行（表 §2 前 7 個 NA 端點＋`dispatch_action_run`、`ao_infrastructure_check` 打 Trigger `127.0.0.1:8030/api/v1/tasks/<id>/trigger`，token `TRIGGER_ACCESS_TOKEN`），頻率照原 cron |
+| C1.3 | `HS/cron.d/awarewave-schedules` 加 9 行（§2 表前 7 個 NA 端點＋`dispatch_action_run`、`ao_infrastructure_check` 經 `HS/trigger-task.sh`：本機 `127.0.0.1:8030` 觸發、ttl 9m、等結果，非 COMPLETED 或 output `status:fail` → exit 1；`ao-infrastructure-check` 的 org 預設移進 task），頻率照原 cron |
 | C1.4 | `NA/lib/schedules/host-jobs.ts` 登記 9 列（中文說明一次過 GPT）；`host-schedules.test.ts` 綠 |
-| C1.5 | WF 刪 10 個 `schedules.task`：刪檔 social-dispatch／cs-inbound-sweep／pod-order-inbox-sweep／social-rotation／social-metrics／entitlements-expire／schedules-heartbeat／site-watch（含 `lib/siteWatch/post.ts`、`site-watch-run`）；`dispatch-action-run.ts`、`ao-infrastructure-check.ts` 只刪 schedule export；`trigger-contract.test.ts` 與 sync token 段（`lobster-trigger-deploy.ps1` 的 SOCIAL／CS／POD／SITE_WATCH／SCHEDULE token）一併移除 |
-| C1.6 | 測試：WF vitest、NA `tsc`＋vitest、`bash -n` 兩支腳本；本機對假 NA（nc）跑 poke 成功／401／`ok:false` 三種 exit |
+| C1.5 | 測試：`bash -n`；本機對假 NA 跑 poke 成功／401／`ok:false` 三種 exit；site-watch-tick 0 target／2 target／一個失敗；NA `tsc`＋vitest |
 
-### C2 Trigger 名額檢查
+### C2 C1 上線
 
-| 卡號 | 做什麼 |
-|---|---|
-| C2.1 | `HS/check-trigger-slots.sh`：Redis env `currentConcurrency` 成員 vs trigger-postgres `TaskRun.status`；占格且非 EXECUTING 超過 15 分 → exit 1，輸出 run id 與 task |
-| C2.2 | cron `*/10`，`host-jobs.ts` 一列；失敗訊息指向 `runbooks/TRIGGER-RUNS-STUCK-QUEUED.md` |
-| C2.3 | 本機 redis＋postgres 容器假資料：0 格 ok、1 死格 fail、1 真執行中 ok |
-
-### C3 一個推播出口：停擺告警與每日一行
+push `packages/workflows` 即觸發 Trigger 部署（`.claude/hooks/post-push-trigger-deploy.ps1`），所以刪 Trigger 排程的程式碼在 cron 綠之後才寫、才 push。
 
 | 卡號 | 做什麼 |
 |---|---|
-| C3.1 | `HS/notify.sh <level> <text>`：Telegram＋Slack 兩邊送；變數統一 `TELEGRAM_BOT_TOKEN`、`TELEGRAM_CHAT_IDS`、`SLACK_WEBHOOK_URL`（`.env` 舊名一次改）；HTTP 非 200 → exit 1 |
-| C3.2 | `report-host-schedules.py`：每列判 stale（`staleAfterMs` 同 `cron-cadence.ts:77`）或 failed；與 state 檔比對，變紅／恢復各送一則 |
-| C3.3 | 每日 01:00 UTC（09:00 台北）一行：「N 個排程全部正常」或列出紅列；這行沒來＝告警壞了 |
-| C3.4 | 5 支舊發送改呼叫 `notify.sh`，刪各自 curl；備份完整性、部署版本因此兩邊都送 |
-| C3.5 | `slack-alert-drill.sh` 改演練 `notify.sh`；本機假 webhook 驗變紅一則、恢復一則、重複不送 |
+| C2.1 | 主機：`sync-host-scripts.sh` 取 C1 → `install-host-schedules.sh --check` 目視差異 → 安裝（High，待決 2）；`.env` 確認 9 行所需 token 皆在 |
+| C2.2 | 15 分後 `/ops/schedules` 9 列綠（NA 未部署前顯示為「未登記排程」＝預期） |
+| C2.3 | WF 刪 10 個 `schedules.task`：刪檔 social-dispatch／cs-inbound-sweep／pod-order-inbox-sweep／social-rotation／social-metrics／entitlements-expire／schedules-heartbeat／site-watch（含 `lib/siteWatch/post.ts`、`site-watch-run`）；`dispatch-action-run.ts`、`ao-infrastructure-check.ts` 只刪 schedule export；`NA/.../trigger-contract.test.ts` 與 `lobster-trigger-deploy.ps1` 對應 token 同步段移除；WF vitest 綠 → push（＝Trigger 部署） |
+| C2.4 | Trigger 排程列表為空；24h `list_runs` 無排程 run |
+| C2.5 | 文件：`SITE_WATCH_MASTER_PLAN.md`（heartbeat 改主機）、`check-site-watch-health.ps1` 文字、TASK_REFERENCE、RUNNABLE_DEMOS、runbook；截圖給操作者 |
 
-### C4 排程頁補齊外部時鐘
-
-| 卡號 | 做什麼 |
-|---|---|
-| C4.1 | 盤點加 pg_cron：`cron.job` ⨝ 最新 `cron.job_run_details` → 列（failed 即紅） |
-| C4.2 | 盤點加 n8n：API 列啟用且含 Schedule Trigger 的 workflow＋最後執行 → 列；目前 0 列 |
-| C4.3 | 盤點加 GitHub：Actions API 列含 `schedule:` 的 workflow＋最新 run conclusion → 列（需待決 1 token） |
-| C4.4 | 「筆電與雲端」區：主機讀 `git fetch` 後 repo 內 4 routine 報告與 `reports/status/*-LATEST.*` 的產生時間；超過週期 → 黃，標「由筆電產生」 |
-| C4.5 | `SCHEDULES_PAGE_PLAN.md:50` 舊決定改寫；頁面承諾一句：AwareWave 設定的每個時鐘一列 |
-
-### C5 上線
+### C3 Trigger 名額檢查
 
 | 卡號 | 做什麼 |
 |---|---|
-| C5.1 | 推 main（NA 03:00 自動部署）；主機 `.env` 變數改名＋補 `TRIGGER_ACCESS_TOKEN` 檢查 |
-| C5.2 | `install-host-schedules.sh` 裝 cron（High，待決 2）；15 分後 `/ops/schedules` 新列全綠 |
-| C5.3 | `lobster-trigger-deploy.ps1` 部署 WF → Trigger 排程列表為空；24h `list_runs` 無排程 run |
-| C5.4 | 文件：`SITE_WATCH_MASTER_PLAN.md`（heartbeat 改主機）、`check-site-watch-health.ps1` 文字、TASK_REFERENCE、RUNNABLE_DEMOS、runbook；截圖兩分頁＋第一則每日一行給操作者 |
+| C3.1 | `HS/check-trigger-slots.sh`：Redis env `currentConcurrency` 成員 vs trigger-postgres `TaskRun.status`；占格且非 EXECUTING 超過 15 分 → exit 1，輸出 run id 與 task |
+| C3.2 | cron `*/10`，`host-jobs.ts` 一列；失敗訊息指向 `runbooks/TRIGGER-RUNS-STUCK-QUEUED.md` |
+| C3.3 | 本機 redis＋postgres 容器假資料：0 格 ok、1 死格 fail、1 真執行中 ok |
+| C3.4 | 上線：`install-host-schedules.sh`（High） |
+
+### C4 一個推播出口：停擺告警與每日一行
+
+| 卡號 | 做什麼 |
+|---|---|
+| C4.1 | `HS/notify.sh <level> <text>`：Telegram＋Slack 兩邊送；變數統一 `TELEGRAM_BOT_TOKEN`、`TELEGRAM_CHAT_IDS`、`SLACK_WEBHOOK_URL`；HTTP 非 200 → exit 1 |
+| C4.2 | `report-host-schedules.py`：每列判 stale（`staleAfterMs` 同 `cron-cadence.ts:77`）或 failed；與 state 檔比對，變紅／恢復各送一則 |
+| C4.3 | 每日 01:00 UTC（09:00 台北）一行：「N 個排程全部正常」或列出紅列；這行沒來＝告警壞了 |
+| C4.4 | 5 支舊發送改呼叫 `notify.sh`，刪各自 curl；備份完整性、部署版本因此兩邊都送 |
+| C4.5 | `slack-alert-drill.sh` 改演練 `notify.sh`；本機假 webhook 驗變紅一則、恢復一則、重複不送 |
+| C4.6 | 上線：主機 `.env` 舊變數名改新名（High）；第一則每日一行截圖給操作者 |
+| C4.7 | 兩列「先回答再做」會綠而實際失敗（critic 2026-10-25 L4）：`pod-orders/sweep` 在 `after()` 才 drain（`route.ts:20-24`）；`dispatch-action-run` 失敗列記 `dispatch_failed` 但回傳無 `status`（`dispatch-action-run.ts:208,256`）→ 改回報真實結果 |
+
+### C5 排程頁補齊外部時鐘
+
+| 卡號 | 做什麼 |
+|---|---|
+| C5.1 | 盤點加 pg_cron：`cron.job` ⨝ 最新 `cron.job_run_details` → 列（failed 即紅） |
+| C5.2 | 盤點加 n8n：API 列啟用且含 Schedule Trigger 的 workflow＋最後執行 → 列；目前 0 列 |
+| C5.3 | 盤點加 GitHub：Actions API 列含 `schedule:` 的 workflow＋最新 run conclusion → 列（需待決 1 token） |
+| C5.4 | 「筆電與雲端」區：主機讀 `git fetch` 後 repo 內 4 routine 報告與 `reports/status/*-LATEST.*` 的產生時間；超過週期 → 黃，標「由筆電產生」 |
+| C5.5 | `SCHEDULES_PAGE_PLAN.md:50` 舊決定改寫；頁面承諾一句：AwareWave 設定的每個時鐘一列 |
 
 ### C6 狀態報告改在主機產生
 
@@ -124,7 +130,7 @@ B ＋ 單一推播出口 ＋ 頁面補齊外部時鐘。C6–C8 為同一不變�
 
 ## 7. 驗證計畫（四動作）
 
-- 實測：C1.6、C2.3、C3.5 本機；C5.2／C5.3 prod 實跑；`/ops/schedules` 截圖。
+- 實測：C1.5、C3.3、C4.5 本機；C2、C3.4、C4.6 prod 實跑；`/ops/schedules` 截圖。
 - Review：每卡 `/codex-review`；C7 加 critic Deep。
 - 抓蟲：grep 10 個排程 task id、7 個 token 名、5 種推播變數名，scope `agency-os,scripts,lobster-factory,.claude,runbooks`。
 - WORKLOG：每卡一條，四行機械證據。

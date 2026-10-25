@@ -43,6 +43,16 @@ export const HOST_JOBS: Record<string, HostJob> = {
   certbot_renew: { label: "SSL 憑證續期", description: "每週檢查網站 SSL 憑證，接近到期時自動續期，避免憑證失效。", group: "site" },
   supabase_weekly_restart: { label: "Supabase 定期重啟", description: "每週重新啟動 Supabase 管理介面與 API 閘道，降低長時間運作造成的記憶體累積。", group: "site" },
   docker_weekly_cleanup: { label: "Docker 閒置清理", description: "每週清理閒置超過 7 天的 Docker 映像檔與暫存，釋出空間且保留使用中項目。", group: "site" },
+  // Former Trigger.dev schedules, rung by the host clock since handoffs/2026-10-25-schedules-off-trigger C1.
+  site_watch_tick: { label: "客戶網站巡檢", description: "每小時找出到期的客戶網站並截圖比對，完成後清理舊截圖；停止時不會檢查任何網站。", group: "deploy", fail: "網站本身異常時，Telegram 在發生與恢復時各通知一次；巡檢工具故障時本列標示失敗。" },
+  ao_infrastructure_check: { label: "基礎服務檢查", description: "每天檢查資料庫、Trigger、n8n、監控、Sentry、PostHog 能否連線，並確認客戶資料彼此隔離。", group: "deploy" },
+  dispatch_action_run: { label: "後台操作補派", description: "每 10 分鐘把未送出的後台操作（例如建站）交給 Trigger 執行；平常按下按鈕就會立即送出。", group: "deploy" },
+  social_dispatch: { label: "社群貼文發送", description: "每 5 分鐘將到期的社群貼文送到 Postiz 發布，並取回發布結果。", group: "site" },
+  social_rotation: { label: "社群輪播排程", description: "每天將輪播清單展開成未來 7 天的排程貼文。", group: "site" },
+  social_metrics: { label: "社群數據快照", description: "每天記錄各社群帳號的數據，供數據分析使用。", group: "site" },
+  cs_inbound_sweep: { label: "客服漏接轉人工", description: "每 5 分鐘找出 AI 未完成回覆的客服訊息，轉交員工處理。", group: "site" },
+  pod_order_inbox_sweep: { label: "印製訂單重送", description: "每 10 分鐘重送已付款、但尚未送到 Printful 的訂單。", group: "site" },
+  entitlements_expire: { label: "方案到期處理", description: "每天關閉已到期的方案與試用，並為新功能補上預設權限。", group: "site" },
   run_parts_netdata_updater: { label: "Netdata 自動更新", description: "每天自動更新主機監控工具 Netdata，讓監控維持在最新版本。", group: "site" },
 };
 

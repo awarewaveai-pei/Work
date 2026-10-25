@@ -1,6 +1,6 @@
 // POST /api/internal/schedules/run-due
 //
-// Called every 5 minutes by the host cron (scripts/schedules-run-due.sh, cron.d/awarewave-schedules) and, until it is
+// Called every 5 minutes by the host cron (scripts/poke.sh, cron.d/awarewave-schedules) and, until it is
 // retired, by the Trigger.dev hourly heartbeat (packages/workflows/src/trigger/schedules-heartbeat.ts).
 // All scheduling logic lives here: which (client, job) rows are due (lib/schedules store + isDueNow) and
 // running them (the registry's run(), lib/schedules/jobs.ts). Own bearer token (SCHEDULE_INGEST_TOKEN),

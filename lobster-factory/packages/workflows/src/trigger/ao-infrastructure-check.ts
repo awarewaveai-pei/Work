@@ -25,7 +25,8 @@ import { captureWorkflowEvent } from "../observability/posthog";
 import { captureWorkflowException } from "../observability/sentry";
 
 const InputSchema = z.object({
-  organizationId: z.string().uuid(),
+  // Absent when the host clock starts the daily run (scripts/trigger-task.sh sends an empty payload).
+  organizationId: z.string().uuid().default(() => process.env.LOBSTER_AO_ORG_ID ?? "00000000-0000-0000-0000-000000000000"),
   domain: z.string().optional().default("aware-wave.com"),
   // optional service overrides
   supabaseUrl: z.string().optional(),
