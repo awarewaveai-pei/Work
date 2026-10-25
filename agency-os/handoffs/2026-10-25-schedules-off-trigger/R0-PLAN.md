@@ -2,7 +2,7 @@
 
 > 起因：2026-10-25 Trigger prod 停擺 34h（WORKLOG 2026-10-25 續20，`runbooks/TRIGGER-RUNS-STUCK-QUEUED.md`）。操作者要求：盡量不用 Trigger；所有依賴外部服務的排程在一處看完；懶得跑 AO-RESUME 也要知道。狀態只在 `data.mjs`。
 >
-> 續接語：續做排程離開 Trigger：讀 `agency-os/handoffs/2026-10-25-schedules-off-trigger/R0-PLAN.md` §6 C4.6⑦ 與 C2.2–C2.5（C4.6①–⑥ 已完成，WORKLOG 2026-10-25 續61–74），從「台灣 09:00 後截 Telegram／#ops-incidents 第一則『每日排程報告』給操作者（C4.6⑦），並 SSH 確認 social_metrics／social_rotation／entitlements_expire 各跑過一次且 /ops/schedules 9 列全綠（C2.2）」開始；C2.2 綠後 C2.3 直接 `git apply agency-os/handoffs/2026-10-25-schedules-off-trigger/C2.3.patch`（WF vitest 綠再 push＝Trigger 部署）；C3、C5（除 C5.3）已上線（WORKLOG 續80）。完成 = C4.6⑦ 與 C2.2–C2.5 全做完、監工台 data.mjs 更新。建議模型：Opus 5.5
+> 續接語：續做排程離開 Trigger：讀 `agency-os/handoffs/2026-10-25-schedules-off-trigger/R0-PLAN.md` §6 與監工台 `data.mjs`（C1–C4 完成、C3／C5 上線、C6.1 清點完，WORKLOG 2026-10-25 續80、續82），剩下的都卡在操作者決定：待決 1（GitHub 唯讀 token → C5.3）、待決 4（備份同步結果進 repo 的方式）、待決 5（C6.2 狀態報告搬主機的做法）、待決 2／3（C8）；C7 換正式環境密碼＝High。從「問操作者待決 4 與 5 各選哪個」開始；完成 = C5–C8 全做完、監工台 33 項全綠。建議模型：Opus 5.5
 
 ## 1. 任務理解
 
