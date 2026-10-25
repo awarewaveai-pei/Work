@@ -2,7 +2,7 @@
 
 > 起因：2026-10-25 Trigger prod 停擺 34h（WORKLOG 2026-10-25 續20，`runbooks/TRIGGER-RUNS-STUCK-QUEUED.md`）。操作者要求：盡量不用 Trigger；所有依賴外部服務的排程在一處看完；懶得跑 AO-RESUME 也要知道。狀態只在 `data.mjs`。
 >
-> 續接語：續做排程離開 Trigger：讀 `agency-os/handoffs/2026-10-25-schedules-off-trigger/R0-PLAN.md` §6 C4.6⑦ 與 C2.2–C2.5（C4.6①–⑥ 已完成，WORKLOG 2026-10-25 續61–74），從「台灣 09:00 後截 Telegram／#ops-incidents 第一則『每日排程報告』給操作者（C4.6⑦），並 SSH 確認 social_metrics／social_rotation／entitlements_expire 各跑過一次且 /ops/schedules 9 列全綠（C2.2）」開始；完成 = C4.6⑦ 與 C2.2–C2.5 全做完、監工台 data.mjs 更新。建議模型：Opus 5.5
+> 續接語：續做排程離開 Trigger：讀 `agency-os/handoffs/2026-10-25-schedules-off-trigger/R0-PLAN.md` §6 C4.6⑦ 與 C2.2–C2.5（C4.6①–⑥ 已完成，WORKLOG 2026-10-25 續61–74），從「台灣 09:00 後截 Telegram／#ops-incidents 第一則『每日排程報告』給操作者（C4.6⑦），並 SSH 確認 social_metrics／social_rotation／entitlements_expire 各跑過一次且 /ops/schedules 9 列全綠（C2.2）」開始；C2.2 綠後 C2.3 直接 `git apply agency-os/handoffs/2026-10-25-schedules-off-trigger/C2.3.patch`（WF vitest 綠再 push＝Trigger 部署）；C3、C5（除 C5.3）已上線（WORKLOG 續80）。完成 = C4.6⑦ 與 C2.2–C2.5 全做完、監工台 data.mjs 更新。建議模型：Opus 5.5
 
 ## 1. 任務理解
 
