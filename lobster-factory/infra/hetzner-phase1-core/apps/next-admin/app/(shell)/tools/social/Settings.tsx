@@ -3,15 +3,24 @@
 // authorisation in a new tab (Postiz's OAuth URL, POST /api/social/accounts); this view then asks GET accounts every
 // few seconds, which attaches the new channel to this brand (lib/social/store.ts resolveConnectAttempt). Team and roles
 // are C8; the time zone is the organisation's (organizations.default_timezone), shown, not edited here.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { SENDABLE_PLATFORMS } from "@/lib/social/compose";
-import { api, ApiError } from "./api";
+import { api, ApiError, type UnclaimedIntegration } from "./api";
 import { PfMark } from "./Calendar";
 import { platformOf, type Account, type Brand } from "./model";
 
 const POLL_MS = 4000;
 const STATUS: Record<Account["status"], string> = { connected: "已連接", expired: "連線失效", disabled: "已停用" };
 const STATUS_TOKEN: Record<Account["status"], string> = { connected: "--green", expired: "--red", disabled: "--status-ignored" };
+const claimMessage = (e: unknown) => {
+  if (e instanceof ApiError) {
+    if (e.status === 403) return "只有員工可以認領頻道。";
+    if (e.status === 404) return "Postiz 已找不到這個頻道，請重新載入清單。";
+    if (e.status === 409) return "頻道已綁到其他品牌，請重新載入清單。";
+    if (e.status === 502) return "暫時無法讀取 Postiz，請稍後再試。";
+  }
+  return e instanceof Error ? e.message : String(e);
+};
 // the ones the sender can send (compose.ts SETTINGS), each once: linkedin-page / instagram-standalone are other ways in
 const CONNECTABLE = SENDABLE_PLATFORMS.filter((p) => !["linkedin-page", "instagram-standalone", "mastodon", "telegram"].includes(p));
 
@@ -19,20 +28,29 @@ export default function Settings({ brand, accounts, onAccounts, team }: { brand:
   const canWrite = brand.role === "owner" || brand.role === "editor";
   const [connecting, setConnecting] = useState<{ id: string; platform: string } | null>(null);
   const [hint, setHint] = useState<{ text: string; error?: boolean } | null>(null);
+  const [unclaimed, setUnclaimed] = useState<UnclaimedIntegration[] | null>(null);
+  const [claimBusy, setClaimBusy] = useState(false);
+  const activeBrand = useRef(brand.id);
+  activeBrand.current = brand.id;
 
   const refresh = useCallback(async () => {
+    const brandId = brand.id;
     try {
-      const r = await api.accounts(brand.id);
+      const r = await api.accounts(brandId);
+      if (activeBrand.current !== brandId) return false;
       onAccounts(r.accounts);
       setConnecting(r.connecting);
       if (r.justConnected) setHint({ text: "帳號已連接。" });
       if (r.connectFailed) setHint({ text: `沒有連上：${r.connectFailed}`, error: true });
+      return true;
     } catch (e) {
-      setHint({ text: e instanceof Error ? e.message : String(e), error: true });
+      if (activeBrand.current === brandId) setHint({ text: e instanceof Error ? e.message : String(e), error: true });
+      return false;
     }
   }, [brand.id, onAccounts]);
 
   useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => { setUnclaimed(null); setClaimBusy(false); }, [brand.id]);
   useEffect(() => {
     if (!connecting) return;
     const t = setInterval(() => void refresh(), POLL_MS);
@@ -51,6 +69,36 @@ export default function Settings({ brand, accounts, onAccounts, team }: { brand:
     } catch (e) {
       tab?.close();
       setHint({ text: e instanceof ApiError ? e.message : String(e), error: true });
+    }
+  }
+
+  async function loadUnclaimed() {
+    const brandId = brand.id;
+    setClaimBusy(true);
+    setHint(null);
+    try {
+      const { integrations } = await api.unclaimedIntegrations();
+      if (activeBrand.current === brandId) setUnclaimed(integrations);
+    } catch (e) {
+      if (activeBrand.current === brandId) setHint({ text: claimMessage(e), error: true });
+    } finally {
+      if (activeBrand.current === brandId) setClaimBusy(false);
+    }
+  }
+
+  async function claim(integrationId: string) {
+    const brandId = brand.id;
+    setClaimBusy(true);
+    setHint(null);
+    try {
+      await api.claimIntegration(brandId, integrationId);
+      if (activeBrand.current !== brandId) return;
+      setUnclaimed((current) => current?.filter((i) => i.id !== integrationId) ?? null);
+      if (await refresh()) setHint({ text: "頻道已綁到這個品牌。" });
+    } catch (e) {
+      if (activeBrand.current === brandId) setHint({ text: claimMessage(e), error: true });
+    } finally {
+      if (activeBrand.current === brandId) setClaimBusy(false);
     }
   }
 
@@ -78,6 +126,23 @@ export default function Settings({ brand, accounts, onAccounts, team }: { brand:
           <div className="sm-row sm-chips"><span className="sm-lab">加帳號</span>
             {CONNECTABLE.map((p) => <button type="button" key={p} disabled={!!connecting} onClick={() => connect(p)}>＋ {platformOf(p).name}</button>)}
           </div>
+        )}
+        {canWrite && (
+          <>
+            <div className="sm-row sm-chips">
+              <button type="button" disabled={claimBusy} onClick={() => void loadUnclaimed()}>認領 Postiz 上的頻道</button>
+              <span className="sm-muted">僅限員工操作。</span>
+            </div>
+            {unclaimed !== null && (unclaimed.length === 0
+              ? <span className="sm-muted">目前沒有尚未綁定的頻道。</span>
+              : unclaimed.map((i) => (
+                <div className="sm-arow" key={i.id}>
+                  <PfMark platform={i.identifier} />
+                  <span className="sm-ellipsis">{platformOf(i.identifier).name} <small className="sm-muted">{i.name}</small>{i.disabled && <small className="sm-muted"> · 連線失效</small>}</span>
+                  <button type="button" disabled={claimBusy} onClick={() => void claim(i.id)}>綁到這個品牌</button>
+                </div>
+              )))}
+          </>
         )}
         {connecting && (
           <div className="sm-row">

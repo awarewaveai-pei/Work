@@ -81,12 +81,15 @@ export interface AdsAccount { id: string; name: string; account_status: number |
 export interface AdsCampaign { id: string; name: string; status: string | null; effective_status: string | null; objective: string | null; daily_budget: string | null; lifetime_budget: string | null; start_time: string | null; stop_time: string | null }
 export interface AdsInsight { spend: string | null; impressions: string | null; clicks: string | null; reach: string | null; actions: Array<{ action_type: string; value: string }> }
 export interface MetaAsset { id: string; kind: "facebook_page" | "instagram_account" | "ad_account"; externalId: string; pageExternalId: string | null; label: string | null; enabled: boolean }
+export interface UnclaimedIntegration { id: string; identifier: string; name: string; disabled: boolean }
 
 export const api = {
   /** Staff get the first page (total = all); { q } searches, { id } fetches one brand (a link that names it). */
   brands: (by: { q?: string; id?: string } = {}) =>
     call<{ brands: Brand[]; total: number }>("GET", `/api/social/brands${by.q ? `?${q({ q: by.q })}` : by.id ? `?${q({ id: by.id })}` : ""}`),
   accounts: (brand: string) => call<{ accounts: Account[]; connecting: { id: string; platform: string; started_at: string } | null; justConnected: string | null; connectFailed: string | null }>("GET", `/api/social/accounts?${q({ brand })}`),
+  unclaimedIntegrations: () => call<{ integrations: UnclaimedIntegration[] }>("GET", "/api/social/accounts/claim"),
+  claimIntegration: (brand: string, integrationId: string) => call<{ accountId: string }>("POST", "/api/social/accounts/claim", { brand, integration_id: integrationId }),
   inbox: (brand: string) => call<InboxData>("GET", `/api/social/inbox?${q({ brand })}`),
   adsAccounts: (brand: string) => call<{ accounts: AdsAccount[] }>("GET", `/api/social/ads?${q({ brand, view: "accounts" })}`),
   adsCampaigns: (brand: string, account: string) => call<{ account: string; campaigns: AdsCampaign[] }>("GET", `/api/social/ads?${q({ brand, view: "campaigns", account })}`),

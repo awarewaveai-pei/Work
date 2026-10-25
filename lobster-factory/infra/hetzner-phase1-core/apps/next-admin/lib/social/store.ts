@@ -217,6 +217,37 @@ const POSTIZ_INSTANCE = "ks-aw-01";        // 0096/0098 default: the one Postiz 
 
 const profileOf = (i: RawIntegration) => ({ picture: (i.picture ?? "").slice(0, 2048), handle: (i.profile ?? "").slice(0, 200) });
 
+export interface UnclaimedIntegration { id: string; identifier: string; name: string; disabled: boolean }
+
+export async function listUnclaimedIntegrations(): Promise<UnclaimedIntegration[]> {
+  const live = await listAllIntegrations();
+  if (live.length === 0) return [];
+  const { data: taken, error } = await db().from("social_accounts").select("postiz_integration_id")
+    .eq("postiz_instance", POSTIZ_INSTANCE).in("postiz_integration_id", live.map((i) => i.id));
+  if (error) fail(error, "accounts");
+  const owned = new Set((taken ?? []).map((row) => row.postiz_integration_id as string));
+  return live.filter((i) => !owned.has(i.id)).map(({ id, identifier, name, disabled }) => ({ id, identifier, name, disabled }));
+}
+
+export async function claimIntegration(brandId: string, integrationId: string, actor: string): Promise<string> {
+  const live = await listAllIntegrations();
+  const integration = live.find((i) => i.id === integrationId);
+  if (!integration) throw new SocialStoreError(404, "no such Postiz channel");
+  const sb = db();
+  const { data: taken, error: takenErr } = await sb.from("social_accounts").select("postiz_integration_id")
+    .eq("postiz_instance", POSTIZ_INSTANCE).in("postiz_integration_id", [integrationId]);
+  if (takenErr) fail(takenErr, "accounts");
+  if (taken?.length) throw new SocialStoreError(409, "that channel already belongs to a brand");
+  const { data: account, error: insertErr } = await sb.from("social_accounts")
+    .insert({ organization_id: brandId, postiz_integration_id: integration.id, platform: integration.identifier,
+      label: integration.name, status: integration.disabled ? "expired" : "connected", ...profileOf(integration) })
+    .select("id").single();
+  if (insertErr?.code === "23505") throw new SocialStoreError(409, "that channel already belongs to a brand");
+  if (insertErr) fail(insertErr, "claim channel");
+  await logAction(sb, brandId, actor, "connected", { account_id: account.id, platform: integration.identifier, claimed: true });
+  return account.id as string;
+}
+
 export async function listAccounts(brandId: string, options: { hydrateProfile?: boolean } = {}): Promise<Account[]> {
   const sb = db();
   const { data, error } = await sb.from("social_accounts").select("id, platform, label, status, postiz_integration_id, picture, handle, chatwoot_inbox_id")
