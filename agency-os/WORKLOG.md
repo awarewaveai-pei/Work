@@ -1,4 +1,25 @@
 # Worklog
+## 2026-10-25（續41）soulful dashboard 設定不再指向 Hostinger 凍結副本；移除無用的 hostinger 外掛；wp-bridge 0.18.3 發版並升級兩站（Claude）
+
+- **dashboard 設定**（Supabase `organizations.metadata.client_config`）：
+  - M1：soulful 的 `ssh_host=191.101.230.176`、`ssh_port`、`ssh_user`、`ssh_key_name=HOSTINGER_SOULFUL`、`wp_path` 都還指向 Hostinger。dashboard 的「更新外掛」按鈕（`ClientHubTabs.tsx:702`，有 `ssh_host` 就顯示；`wp-update/route.ts:208-295`）會 SSH 到凍結的回滾副本，next-admin 容器裡也確實有 `SSH_KEY_HOSTINGER_SOULFUL`。
+  - 修法：刪掉這五個欄位，按鈕就不顯示（route 只會 shared-ssh＋WP-CLI，不會操作容器）；`notes` 寫明正確工具 `update-client-wp-plugins.ps1`。
+  - `hosting_type` soulful `hostinger`→`ks-aw-01`、awarewave-ops `hetzner`→`ks-aw-01`。
+  - 寫入前備份兩列 metadata（scratchpad）。寫入後比對：除了這幾個欄位其餘全等（`rest unchanged = True`）。
+  - repo 沒有程式會把舊值寫回（`check-smoke-tests.ps1:355-375` 依 profile 選主機）。
+- **hostinger 外掛**：本來就停用，`hostinger_tools` 的 force_https／disable_xml_rpc／maintenance_mode 都是關的，HTTPS 轉址另有處理（http→https 實測）。
+  - 先備份 `/root/backups/wordpress/soulful-wp-plugin-hostinger-3.0.80-20261025T082827Z.tgz`，再 `wp plugin delete hostinger`；`wp-update-config.json` 的 wave3 拿掉它。
+- **wp-bridge 0.18.3**（續37 的點數包 `plan_key`）：
+  - `release-wp-bridge.sh` → https://github.com/awarewaveai-pei/aware-wave-wp-bridge/releases/tag/v0.18.3
+  - `rollout-wp-bridge.ps1`：soulful-wp 與 lobster-wordpress 都 0.18.2→0.18.3，health `200 0.18.3`、home 200，備份 `*-pre-wpbridge-0.18.3-20261025T0830*`。
+  - 安裝後的 PaymentEvents.php 有 `plan_key`、沒有 `PACK_PLAN_SEC`；soulful `opted_in=no`、aware-wave.com `yes`。
+- **發現（未修）**：`POST https://soulfulexpression.org/xmlrpc.php` 回 520（Cloudflare）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=fix_clientcfg.py --apply 後 client-status.ps1 → saas/ks-aw-01、wordpress/ks-aw-01，soulful 無 ssh_host | exit=0 | ms=1500
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp plugin delete hostinger → removed；/ /wp-login.php /shop/ 200；fatal 0 | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=SSH | cmd=rollout-wp-bridge.ps1 -Version 0.18.3（2 站 OK）；playwright client soulful 7 passed | exit=0 | ms=31900
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（資料改動以前後比對驗證；外掛刪除前讀過設定）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=HOSTINGER_SOULFUL | hits=13 -- 都是 Hostinger 回滾副本的金鑰名、compose 環境變數，或 onboarding 範例；沒有程式會寫回 client_config
+- **rollback**：metadata 用 scratchpad 的 `metadata-backup-<slug>.json` PATCH 回去；外掛把 tgz 解回 plugins；wp-bridge 用 `*-wpbridge-0.18.2-20261025T0830*.tgz`。
 ## 2026-10-25（續40）排程離開 Trigger C1：時鐘改主機 cron（poke.sh／site-watch-tick.sh／trigger-task.sh），9 列登記；cron 未安裝（C2，High）（Claude）
 
 - **觸發**：操作者「開始 C1」。監工台 `agency-os/handoffs/2026-10-25-schedules-off-trigger/`（https://claude.ai/artifact/QsgquXzuzi1oQ8FCVoRrAZ）；起因續20（Trigger 名額漏光停擺 34h）。
