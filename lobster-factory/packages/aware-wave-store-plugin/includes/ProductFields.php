@@ -4,10 +4,10 @@
  * _awarewave_plan_key (subscriptions and packs), _awarewave_credit_units (packs), _awarewave_product_key (which
  * door the My Account 「進入」 button opens). An invalid value is refused with an admin error, not saved.
  *
- * @package AwareWave\WpBridge\Billing
+ * @package AwareWave\Store
  */
 
-namespace AwareWave\WpBridge\Billing;
+namespace AwareWave\Store;
 
 final class ProductFields {
 

@@ -3,12 +3,12 @@
  * In-memory Shop / Members / Queue / HttpClient for the billing tests (no WordPress).
  */
 
-namespace AwareWave\WpBridge\Tests\Billing;
+namespace AwareWave\Store\Tests;
 
-use AwareWave\WpBridge\Billing\HttpClient;
-use AwareWave\WpBridge\Billing\Members;
-use AwareWave\WpBridge\Billing\Queue;
-use AwareWave\WpBridge\Billing\Shop;
+use AwareWave\Store\HttpClient;
+use AwareWave\Store\Members;
+use AwareWave\Store\Queue;
+use AwareWave\Store\Shop;
 
 final class FakeShop implements Shop {
 	/** @var array<int,array> */

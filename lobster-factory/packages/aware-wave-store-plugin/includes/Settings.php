@@ -4,10 +4,10 @@
  * checkout gate and the My Account door buttons. Secrets live only in wp_options, entered by an admin on
  * Products → AwareWave 付款; never in git.
  *
- * @package AwareWave\WpBridge\Billing
+ * @package AwareWave\Store
  */
 
-namespace AwareWave\WpBridge\Billing;
+namespace AwareWave\Store;
 
 final class Settings {
 

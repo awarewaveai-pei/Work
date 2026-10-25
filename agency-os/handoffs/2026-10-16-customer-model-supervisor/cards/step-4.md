@@ -116,6 +116,7 @@ A／B 都要會計師一句話確認「收款開發票＋合約負債」；C 另
 
 ### 4b-2　wp-bridge：付款事件（WCS 版；待決 1 選定後開工，選 D 刪 WCS 列）
 - Files：`lobster-factory/packages/wp-bridge-plugin/includes/Billing/PaymentEvents.php`（action → PaymentEvent → `as_enqueue_async_action` 排隊）、`includes/Billing/PaymentSender.php`（HMAC、POST、2xx 停、5xx／網路錯重試最多 20 次指數退避、4xx 停並寫訂單備註）、`includes/Admin/AdminPage.php` 加 secret 與目標 URL 欄位＋「送付款事件」開關（預設關）、商品編輯頁 `_awarewave_plan_key`／`_awarewave_credit_units` 兩個欄位、`tests/Billing/PaymentEventsTest.php`；`aware-wave-wp-bridge.php` `AWBRIDGE_VERSION` 升一版。
+- 2026-10-25 搬家：收費程式已拆到 `lobster-factory/packages/aware-wave-store-plugin/includes/`（外掛 `aware-wave-store`，只裝 aware-wave.com；wp-bridge 0.19.0 起不含收費）。下列路徑的 `wp-bridge-plugin/includes/Billing/` 讀作該處。
 - Acceptance：`composer test` 綠，測試名含 `a paid order with a plan product becomes subscription_paid with the subscription next payment as period_end`、`a credit pack order sums units by quantity`、`a full refund of a pack order becomes refund credit_pack`、`a guest order is dropped with an order note and never queued`、`the same action twice yields the same event_id`；`composer lint` 綠。發版：`bash scripts/release-wp-bridge.sh`（兩個 repo）；aware-wave.com 更新外掛（High）。
 - Rollback：關設定頁「送付款事件」開關。
 - **必做（critic 2026-10-25 第二輪 M）**：事件帶 `email_verified: true` 只在外掛已證明會員擁有該 email 之後（WooCommerce 不驗 email：註冊時寄驗證信，按連結才標記 `aware_wave_email_verified` user meta）；沒驗證的會員首次付款，控制面回 400 `email_unverified`、不建帳戶、開 ops incident，所以外掛要在結帳前就擋（未驗證不能結帳），否則錢收了帳戶卻開不起來。測試名加 `an unverified member cannot check out and no event carries email_verified true`。

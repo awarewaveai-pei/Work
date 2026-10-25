@@ -3,11 +3,11 @@
  * ADR 017 4b-2: signing and delivery of queued payment events to next-admin.
  */
 
-namespace AwareWave\WpBridge\Tests\Billing;
+namespace AwareWave\Store\Tests;
 
-use AwareWave\WpBridge\Billing\PaymentSender;
-use AwareWave\WpBridge\Billing\Settings;
-use AwareWave\WpBridge\Billing\Signature;
+use AwareWave\Store\PaymentSender;
+use AwareWave\Store\Settings;
+use AwareWave\Store\Signature;
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__ . '/BillingFakes.php';

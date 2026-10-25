@@ -3,10 +3,10 @@
  * Shop over WooCommerce + WooCommerce Subscriptions. Variations report their parent product id
  * (WC_Order_Item_Product::get_product_id), so plan meta lives on the parent product.
  *
- * @package AwareWave\WpBridge\Billing
+ * @package AwareWave\Store
  */
 
-namespace AwareWave\WpBridge\Billing;
+namespace AwareWave\Store;
 
 final class WooShop implements Shop {
 
@@ -88,7 +88,7 @@ final class WooShop implements Shop {
 		if ( $order ) {
 			$order->add_order_note( $note );
 		} else {
-			error_log( '[aware-wave-wp-bridge] ' . $note ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions
+			error_log( '[aware-wave-store] ' . $note ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions
 		}
 	}
 

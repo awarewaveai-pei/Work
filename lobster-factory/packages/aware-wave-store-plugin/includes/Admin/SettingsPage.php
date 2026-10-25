@@ -1,30 +1,32 @@
 <?php
 /**
- * AwareWave Bridge → 付款與會員 (ADR 017 4b-2): the one switch (default off), the next-admin base URL, the two
+ * WooCommerce → AwareWave 付款與會員 (ADR 017 4b-2): the one switch (default off), the next-admin base URL, the two
  * secrets (password fields; a stored secret is never printed back, blank = keep), and "resend verification".
  *
- * @package AwareWave\WpBridge\Admin
+ * @package AwareWave\Store\Admin
  */
 
-namespace AwareWave\WpBridge\Admin;
+namespace AwareWave\Store\Admin;
 
-use AwareWave\WpBridge\Billing\EmailVerification;
-use AwareWave\WpBridge\Billing\Settings;
+use AwareWave\Store\EmailVerification;
+use AwareWave\Store\Settings;
 
-final class BillingSettingsPage {
+final class SettingsPage {
 
+	// Same page slug as wp-bridge <= 0.18.3, so an old bookmark still opens it.
 	const SLUG = 'aware-wave-billing';
+	const CAP  = 'manage_options';
 
 	public function register(): void {
 		add_action( 'admin_menu', array( $this, 'menu' ), 20 );
 	}
 
 	public function menu(): void {
-		add_submenu_page( AdminPage::SLUG, 'AwareWave 付款與會員', '付款與會員', AdminPage::CAP, self::SLUG, array( $this, 'render' ) );
+		add_submenu_page( 'woocommerce', 'AwareWave 付款與會員', 'AwareWave 付款與會員', self::CAP, self::SLUG, array( $this, 'render' ) );
 	}
 
 	public function render(): void {
-		if ( ! current_user_can( AdminPage::CAP ) ) {
+		if ( ! current_user_can( self::CAP ) ) {
 			wp_die( 'Insufficient permissions.' );
 		}
 		$notices = $this->handle();
@@ -34,7 +36,7 @@ final class BillingSettingsPage {
 		foreach ( $notices as $n ) {
 			echo '<div class="notice notice-' . esc_attr( $n[0] ) . '"><p>' . esc_html( $n[1] ) . '</p></div>';
 		}
-		echo '<p>開關打開後：付款完成、續約、換方案、全額退款、取消／到期會送到 app.aware-wave.com；未確認信箱的會員不能結帳 AwareWave 商品；「我的帳號」出現產品「進入」按鈕；商品編輯頁出現 AwareWave 方案／點數／產品欄位。客戶網站不賣 AwareWave 方案就保持關閉。關掉＝全部停止（已排隊未送的事件會在訂單備註標示未送出）。</p>';
+		echo '<p>開關打開後：付款完成、續約、換方案、全額退款、取消／到期會送到 app.aware-wave.com；未確認信箱的會員不能結帳 AwareWave 商品；「我的帳號」出現產品「進入」按鈕；商品編輯頁出現 AwareWave 方案／點數／產品欄位。關掉＝全部停止（已排隊未送的事件會在訂單備註標示未送出）。</p>';
 		echo '<form method="post">';
 		wp_nonce_field( 'awbridge_billing_save' );
 		echo '<input type="hidden" name="awbridge_billing" value="save"><table class="form-table">';

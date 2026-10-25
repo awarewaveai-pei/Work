@@ -9,10 +9,10 @@
  * Link token = "<uid>.<expires>.<id>.<sig>", sig = base64url(HMAC-SHA256("uid|email|expires|id", site key)).
  * The id is kept in user meta (one outstanding link; a resend replaces it) and deleted on use.
  *
- * @package AwareWave\WpBridge\Billing
+ * @package AwareWave\Store
  */
 
-namespace AwareWave\WpBridge\Billing;
+namespace AwareWave\Store;
 
 final class EmailVerification {
 

@@ -7,10 +7,10 @@
  * member still holds the product is the server's call (403 product_not_held); the list here only picks buttons.
  * Contract: next-admin lib/auth/sources/awarewave-wp.ts.
  *
- * @package AwareWave\WpBridge\Billing
+ * @package AwareWave\Store
  */
 
-namespace AwareWave\WpBridge\Billing;
+namespace AwareWave\Store;
 
 final class MyAccountDoors {
 

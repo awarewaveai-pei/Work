@@ -2,10 +2,10 @@
 /**
  * Delivery queue for signed payment events. Production: ActionSchedulerQueue (WooCommerce's bundled Action Scheduler).
  *
- * @package AwareWave\WpBridge\Billing
+ * @package AwareWave\Store
  */
 
-namespace AwareWave\WpBridge\Billing;
+namespace AwareWave\Store;
 
 interface Queue {
 

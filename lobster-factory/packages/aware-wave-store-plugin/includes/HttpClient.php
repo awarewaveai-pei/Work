@@ -2,10 +2,10 @@
 /**
  * One JSON POST. Production: WpHttpClient (wp_remote_post).
  *
- * @package AwareWave\WpBridge\Billing
+ * @package AwareWave\Store
  */
 
-namespace AwareWave\WpBridge\Billing;
+namespace AwareWave\Store;
 
 interface HttpClient {
 

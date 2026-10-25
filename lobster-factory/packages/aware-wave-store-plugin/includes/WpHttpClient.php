@@ -2,10 +2,10 @@
 /**
  * HttpClient over wp_remote_post. No redirects: a signed body goes only to the configured URL.
  *
- * @package AwareWave\WpBridge\Billing
+ * @package AwareWave\Store
  */
 
-namespace AwareWave\WpBridge\Billing;
+namespace AwareWave\Store;
 
 final class WpHttpClient implements HttpClient {
 

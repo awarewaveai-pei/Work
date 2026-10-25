@@ -1,0 +1,29 @@
+{
+    "name": "awarewave/aware-wave-store-plugin",
+    "description": "aware-wave-store -- AwareWave's own shop on aware-wave.com: WooCommerce payment events, member email verification, My Account doors.",
+    "type": "wordpress-plugin",
+    "license": "proprietary",
+    "require": {
+        "php": ">=7.4"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "AwareWave\\Store\\": "includes/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "AwareWave\\Store\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit --colors=always",
+        "lint": "find includes -name '*.php' -print0 | xargs -0 -n1 php -l"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

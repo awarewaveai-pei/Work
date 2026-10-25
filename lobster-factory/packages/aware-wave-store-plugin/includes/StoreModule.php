@@ -1,26 +1,42 @@
 <?php
 /**
- * Wires ADR 017 4b-2 into WordPress. wp-bridge runs on every managed site (client sites too), so billing exists only
- * on a site opted in (the switch option exists): there the settings page is present, and the product fields and
- * everything that acts on members or money (payment events, email verification, the checkout gate, door buttons)
- * register only while the switch is on. Rollback = switch off.
+ * Wires ADR 017 4b-2 into WordPress on aware-wave.com. This plugin is installed only on AwareWave's own shop, so the
+ * settings page is always there; the product fields and everything that acts on members or money (payment events,
+ * email verification, the checkout gate, door buttons) register only while the switch is on. Rollback = switch off.
  *
- * @package AwareWave\WpBridge\Billing
+ * @package AwareWave\Store
  */
 
-namespace AwareWave\WpBridge\Billing;
+namespace AwareWave\Store;
 
-use AwareWave\WpBridge\Admin\BillingSettingsPage;
+use AwareWave\Store\Admin\SettingsPage;
 
-final class BillingModule {
+final class StoreModule {
+
+	/** wp-bridge <= 0.18.3 carried this same code; while it is still installed it owns the hooks. */
+	const LEGACY_BRIDGE_BILLING = 'AwareWave\\WpBridge\\Billing\\BillingModule';
+
+	/**
+	 * Both copies registering = every payment queued twice and every note written twice. Runs on plugins_loaded, so the
+	 * bridge's autoloader exists whatever order WordPress loaded the two plugins in.
+	 */
+	public static function legacyBridgeBillingLoaded(): bool {
+		return class_exists( self::LEGACY_BRIDGE_BILLING );
+	}
 
 	public function register(): void {
-		// A client site never sees AwareWave billing: nothing (not even the settings page) until the operator opts the
-		// site in once with `wp option add aware_wave_payments_enabled ''` (runbooks/WP-BRIDGE-RELEASE-RUNBOOK.md).
-		if ( get_option( Settings::OPT_ENABLED, false ) === false ) {
+		if ( self::legacyBridgeBillingLoaded() ) {
+			add_action(
+				'admin_notices',
+				function () {
+					if ( current_user_can( SettingsPage::CAP ) ) {
+						echo '<div class="notice notice-warning"><p>AwareWave 商店外掛待命中：AwareWave WP Bridge 仍是 0.18.x，付款與會員由它處理。把 wp-bridge 升到 0.19.0 以上，這個外掛就會自動接手。</p></div>';
+					}
+				}
+			);
 			return;
 		}
-		( new BillingSettingsPage() )->register();
+		( new SettingsPage() )->register();
 
 		$settings = Settings::fromOptions();
 		$shop     = new WooShop();

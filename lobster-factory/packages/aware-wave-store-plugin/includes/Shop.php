@@ -3,10 +3,10 @@
  * What PaymentEvents reads from WooCommerce / WooCommerce Subscriptions, as plain arrays, so the mapping is
  * unit-tested without WordPress. Production: WooShop.
  *
- * @package AwareWave\WpBridge\Billing
+ * @package AwareWave\Store
  */
 
-namespace AwareWave\WpBridge\Billing;
+namespace AwareWave\Store;
 
 interface Shop {
 

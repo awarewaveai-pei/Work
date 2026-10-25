@@ -6,10 +6,10 @@
  * (400/409/422…) is final: the order gets a note with the error code (the server raises an ops incident for the
  * refusals it parsed). A subscription_paid whose subscription has ended by send time is dropped (job subscription_id).
  *
- * @package AwareWave\WpBridge\Billing
+ * @package AwareWave\Store
  */
 
-namespace AwareWave\WpBridge\Billing;
+namespace AwareWave\Store;
 
 final class PaymentSender {
 

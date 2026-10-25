@@ -2,10 +2,10 @@
 /**
  * The WordPress member behind an order. Production: WpMembers.
  *
- * @package AwareWave\WpBridge\Billing
+ * @package AwareWave\Store
  */
 
-namespace AwareWave\WpBridge\Billing;
+namespace AwareWave\Store;
 
 interface Members {
 

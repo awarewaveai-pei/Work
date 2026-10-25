@@ -1,4 +1,42 @@
 # Worklog
+## 2026-10-25（續47）收費拆出 wp-bridge：新外掛 `aware-wave-store` 1.0.0（只裝 aware-wave.com），wp-bridge 0.19.0 不含收費；尚未發版、尚未上線（Claude）
+
+- **根因**（操作者：「這個外掛主要是讓所有的 ai 都可以進去管 wp，不是只有 AW 可以用」）：wp-bridge 是每個網站都裝的 AI 通道（每個 agent 一把金鑰，`includes/Auth/KeyRecord.php`）。AW 自己的收費（ADR 017 4b-2）卻放在它的 `includes/Billing/`。結果是收費出現在客戶站（0.18.0/0.18.1），之後每次升級都得靠開關、逐站檢查。
+- **不變量**：wp-bridge 不含任何 AW 生意邏輯；收費程式只存在 aware-wave.com 上；同一筆付款永遠不會由兩份程式各送一次；而且任何時刻都至少有一份在處理。
+- **做了什麼**：
+  - `lobster-factory/packages/aware-wave-store-plugin/`：16 個 class、設定頁（`includes/Admin/SettingsPage.php`，改掛 WooCommerce 選單）、3 份測試，從 wp-bridge 原樣搬來，只換 namespace（`AwareWave\Store`）。
+    - 所有存進網站的名字一律不改：`aware_wave_payments_*`、`_awarewave_*`、`aware_wave_email_verified*`、`awbridge_send_payment_event`、`awbridge_*` 參數、token salt、頁面 slug。
+    - 新增：`StoreModule.php`。舊 wp-bridge（0.18.x）的 `Billing\BillingModule` 還在就只顯示待命通知；新外掛裝了即生效（開關仍預設關）。`aware-wave-store.php` 宣告 HPOS／block checkout 相容，`plugins_loaded` 才註冊。
+    - 新增測試：`StoreModuleTest`（兩個獨立程序測試＋`tests/stubs/`）。
+  - wp-bridge 0.19.0：刪 `includes/Billing/`、`Admin/BillingSettingsPage.php`、`tests/Billing/`、註冊那一行。
+  - `scripts/release-wp-bridge.sh`：
+    - 加 `--plugin bridge|store`。
+    - 正本 repo 也鏡像 `tests/`、`phpunit.xml`、`composer.json`。原本正本的 CI 跑的是舊測試副本，從來沒測過 Billing。
+  - `scripts/rollout-wp-bridge.ps1`：
+    - 加 `-Plugin bridge|store`，以及 `-Install`（一定要配 `-Site`，否則拒絕）。
+    - bridge 升到 ≥0.19.0 時，若某站開了收費卻沒裝 store，就拒升該站。
+  - 新的私有 repo `awarewaveai-pei/aware-wave-store`（release.yml＋ci.yml）。
+  - 文件：runbook、`/wp-bridge-release`、step-4.md 4b-2 加搬家註記、記憶檔。
+  - `TOOL_TRIGGER_MAP.md`／`AGENTS.md` 有其他 session 未 commit 的改動，這次沒動。
+- **critic**（Codex 額度擋到 19:40）：1 Major 3 minor 全修。
+  - M1：rollout 把「讀不到版本」當成「沒安裝」→ 會漏掉備份並刪掉資料夾。改成看外掛檔案在不在（`HAD`）；有檔但讀不到版本就 FAIL、不動。
+  - m1：先升 bridge 會出現沒人處理收費的空窗 → rollout 拒升（見上）＋runbook 寫明順序。
+  - m2：`--plugin` 沒給值時靜默退出 → 改成明確錯誤。
+  - m3：`.phpunit.result.cache` 沒被忽略 → 兩個 package 都加 `.gitignore`。
+- **aware-wave.com 現況**：收費資料全空（0 個 `awbridge_send_payment_event`、0 位已驗證會員、0 筆 `_awarewave_*` 商品 meta），只有 `aware_wave_payments_enabled`。
+- **上線順序**（待操作者確認）：
+  1. Codex 審查。
+  2. `release-wp-bridge.sh --plugin store`，再發 bridge。
+  3. `rollout -Plugin store -Install -Site lobster-wordpress`（store 待命）。
+  4. `rollout`（bridge 0.19.0，全站）。
+  5. 驗證：設定頁在 WooCommerce 選單下、soulful 上沒有 store、Playwright。
+- REALTEST_EVIDENCE: tool=Bash | cmd=phpunit store 15 tests/106 assertions；bridge 103 tests/325 assertions（拆前 116/422；搬過去的 13 個測試 97 assertions，325+97=422） | exit=0 | ms=400
+- REALTEST_EVIDENCE: tool=SSH | cmd=rollout -DryRun（soulful would upgrade；lobster-wordpress FAIL billing enabled but store missing → exit 1）；-Plugin store -Install -Site lobster-wordpress -DryRun（would install）；-Plugin store -DryRun（no site, exit 1）；-Install 無 -Site → throw | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=release-wp-bridge.sh --plugin store --dry-run 與 bridge --dry-run（實質差異只有 Billing 刪除、主檔、BlockLibraryTest、新的 RankMathPowerWordsTest）；`--plugin` 無值 → exit 1 | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/3n（全修）
+- ORACLE_WAIVED: codex quota blocked until 2026-10-25 19:40 (scripts/oracle-quota.ps1)；上線前會補 Codex 審查
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks,.claude,lobster-factory | grep=WpBridge\Billing (git grep --untracked) | hits=1 -- 測試 stub `tests/stubs/legacy-bridge-billing.php:4`（故意）；`StoreModule.php:17` 的守門常數用跳脫寫法，不在這個 pattern 內
+- **rollback**：`git revert`；新 repo 可刪；網站上什麼都沒動。
 ## 2026-10-25（續46）next-admin 手動部署 5db9dd75b → cd42c9030（操作者：現在做所有還沒做的部署）（Claude）
 
 **範圍**：5db9dd75b..origin/main 只有 next-admin 有變（18 commit；node-api／video-service／renderer／remotion／meeting／r2-egress／whisper／wordpress 0 檔）；`docker-compose.yml`、nginx 沒變；migration 只有 0127，已於 續33 套 prod。origin/main 無 `DEPLOY_HOLD`。部署中途另一 session 推了 2 個 docs commit（ea968aca1、cd42c9030），一併上線。

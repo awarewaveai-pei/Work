@@ -4,11 +4,11 @@
  * provider.ts toPaymentEvent). Test names are the acceptance names in cards/step-4.md 4b-2.
  */
 
-namespace AwareWave\WpBridge\Tests\Billing;
+namespace AwareWave\Store\Tests;
 
-use AwareWave\WpBridge\Billing\CheckoutGate;
-use AwareWave\WpBridge\Billing\EmailVerification;
-use AwareWave\WpBridge\Billing\PaymentEvents;
+use AwareWave\Store\CheckoutGate;
+use AwareWave\Store\EmailVerification;
+use AwareWave\Store\PaymentEvents;
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__ . '/BillingFakes.php';

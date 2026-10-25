@@ -3,10 +3,10 @@
  * Members over WordPress users. The account email is user_email (what verification proves), not the order's
  * billing email.
  *
- * @package AwareWave\WpBridge\Billing
+ * @package AwareWave\Store
  */
 
-namespace AwareWave\WpBridge\Billing;
+namespace AwareWave\Store;
 
 final class WpMembers implements Members {
 

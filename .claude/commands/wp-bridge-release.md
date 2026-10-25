@@ -1,12 +1,12 @@
 ---
 name: wp-bridge-release
 disable-model-invocation: true
-description: Release a new aware-wave-wp-bridge plugin version — sync Work monorepo to the release repo, tag, and verify the GitHub Release + installable zip published.
+description: Release a new aware-wave-wp-bridge (every site) or aware-wave-store (aware-wave.com only) plugin version — sync Work monorepo to the release repo, tag, and verify the GitHub Release + installable zip published.
 ---
 
 # /wp-bridge-release
 
-Ship a new `aware-wave-wp-bridge` plugin version end-to-end.
+Ship a new plugin version end-to-end: `aware-wave-wp-bridge` (default; every managed site) or, with `--plugin store`, `aware-wave-store` (AwareWave's own payments / member checks; aware-wave.com only, private release repo `awarewaveai-pei/aware-wave-store`, Work copy `lobster-factory/packages/aware-wave-store-plugin/`, version `AWSTORE_VERSION`).
 
 ## 為什麼需要這個指令
 
@@ -29,18 +29,19 @@ Ship a new `aware-wave-wp-bridge` plugin version end-to-end.
 
 ```bash
 # 先 dry-run 看會同步什麼、不 push 不 tag
-bash scripts/release-wp-bridge.sh --dry-run
+bash scripts/release-wp-bridge.sh [--plugin store] --dry-run
 
 # 確認無誤後真的發版
-bash scripts/release-wp-bridge.sh
+bash scripts/release-wp-bridge.sh [--plugin store]
 ```
 
-腳本流程：版本解析+兩處一致檢查 → `php -l` gate → 防重複發版守門（tag 已存在則拒）→ clone 正本 → 鏡像 `aware-wave-wp-bridge.php` + `includes/` + `README.md` → commit/push main → tag `vX.Y.Z` + push tag → 輪詢驗證 Release + zip asset（~90s 內）。
+腳本流程：版本解析+兩處一致檢查 → `php -l` gate → 防重複發版守門（tag 已存在則拒）→ clone 正本 → 鏡像 `<slug>.php` + `includes/` + `README.md` + `tests/` + `phpunit.xml` + `composer.json`（正本 CI 測真正出貨的那份）→ commit/push main → tag `vX.Y.Z` + push tag → 輪詢驗證 Release + zip asset（~90s 內）。
 
 ## 完成後告訴操作者
 
 - Release URL：`https://github.com/awarewaveai-pei/aware-wave-wp-bridge/releases/tag/vX.Y.Z`
-- 接著 rollout 到**所有**裝了 wp-bridge 的網站（共用外掛）：`.\scripts\rollout-wp-bridge.ps1 -DryRun` → `.\scripts\rollout-wp-bridge.ps1`（High；流程與客戶站驗收見 `runbooks/WP-BRIDGE-RELEASE-RUNBOOK.md`「操作者端」）
+- wp-bridge：rollout 到**所有**裝了它的網站：`.\scripts\rollout-wp-bridge.ps1 -DryRun` → `.\scripts\rollout-wp-bridge.ps1`（High；流程與客戶站驗收見 `runbooks/WP-BRIDGE-RELEASE-RUNBOOK.md`「操作者端」）
+- store：只有 aware-wave.com：`.\scripts\rollout-wp-bridge.ps1 -Plugin store -DryRun` → 不帶 `-DryRun`（High）
 
 ## 失敗排查
 

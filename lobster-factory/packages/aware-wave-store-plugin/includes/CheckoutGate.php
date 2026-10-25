@@ -5,10 +5,10 @@
  * email_unverified, no account), so letting it through would take money for an account that never opens.
  * Other shop products (POD etc.) are not gated.
  *
- * @package AwareWave\WpBridge\Billing
+ * @package AwareWave\Store
  */
 
-namespace AwareWave\WpBridge\Billing;
+namespace AwareWave\Store;
 
 final class CheckoutGate {
 

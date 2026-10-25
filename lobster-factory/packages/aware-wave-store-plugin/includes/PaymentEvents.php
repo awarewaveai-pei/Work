@@ -8,10 +8,10 @@
  * event_id is deterministic per action, so a hook firing twice queues the same id and the server's inbox drops the
  * second. Subscription events carry plan_key in the id: WCS puts same-schedule products into ONE subscription.
  *
- * @package AwareWave\WpBridge\Billing
+ * @package AwareWave\Store
  */
 
-namespace AwareWave\WpBridge\Billing;
+namespace AwareWave\Store;
 
 final class PaymentEvents {
 

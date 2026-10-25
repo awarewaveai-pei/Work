@@ -2,10 +2,10 @@
 /**
  * Queue over Action Scheduler (bundled with WooCommerce). The job array is the action's single argument.
  *
- * @package AwareWave\WpBridge\Billing
+ * @package AwareWave\Store
  */
 
-namespace AwareWave\WpBridge\Billing;
+namespace AwareWave\Store;
 
 final class ActionSchedulerQueue implements Queue {
 

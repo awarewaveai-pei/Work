@@ -3,10 +3,10 @@
  * The one signature construction next-admin verifies for payment events and door handoffs
  * (lib/payments/hmac.ts signPayment): base64(HMAC-SHA256(raw body, secret)). Sign the exact bytes sent.
  *
- * @package AwareWave\WpBridge\Billing
+ * @package AwareWave\Store
  */
 
-namespace AwareWave\WpBridge\Billing;
+namespace AwareWave\Store;
 
 final class Signature {
 
