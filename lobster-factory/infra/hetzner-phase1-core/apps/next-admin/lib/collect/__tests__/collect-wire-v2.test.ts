@@ -82,7 +82,7 @@ const RESULTS: Record<string, Result[]> = {
   [`${CLAIM} 官方 公告 原文`]: [{ title: "環保局公告", link: "https://dep.example.gov.tw/notice/88" }],
 };
 
-const ENV_KEYS = ["SERPER_API_KEY", "BRAVE_SEARCH_API_KEY", "PERPLEXITY_API_KEY", "COLLECT_SEARCH_PROVIDER"] as const;
+const ENV_KEYS = ["SERPER_API_KEY", "BRAVE_SEARCH_API_KEY", "COLLECT_SEARCH_PROVIDER"] as const;
 let savedEnv: Record<string, string | undefined>;
 let sent: Array<Record<string, unknown>>;
 
@@ -90,9 +90,8 @@ beforeEach(() => {
   savedEnv = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
   process.env.SERPER_API_KEY = "test-serper";
   delete process.env.BRAVE_SEARCH_API_KEY;
-  // Both set on purpose: a claim must ignore them (Perplexity is never used for the platform).
-  process.env.PERPLEXITY_API_KEY = "test-perplexity";
-  process.env.COLLECT_SEARCH_PROVIDER = "perplexity";
+  // Set on purpose: a claim must ignore it and search only the engines it names.
+  process.env.COLLECT_SEARCH_PROVIDER = "other-engine";
   sent = [];
   research.ingestSources.mockReset();
   research.ingestSources.mockImplementation(async (_p: string, _r: string, _t: string, sources: Array<Record<string, unknown>>) => {
@@ -182,16 +181,16 @@ describe("the spec's seeds become the spec's ingest batch and completion", () =>
 
     expect(sent).toEqual(spec.ingest.sources);
     expect(sinkMod.completionOf(result.report)).toEqual({ aside: spec.complete.aside, channels: spec.complete.channels });
-    // two angles x two languages on the one engine with a key; brave has none, perplexity is never asked
+    // two angles x two languages on the one engine with a key; brave has none
     expect(calls.map((c) => c.provider)).toEqual(["serper", "serper", "serper", "serper"]);
     for (const source of sent) expect(relevanceProblems(source.relevance as Record<string, unknown>), String(source.canonical_url)).toEqual([]);
   });
 });
 
 describe("a claim's searches", () => {
-  it("never asks Perplexity, even when a seed names it and the key and the override are set", async () => {
+  it("never asks an engine outside CLAIM_PROVIDERS, even when a seed names it and the override is set", async () => {
     const calls: Call[] = [];
-    const out = await entityDossierCollector.run(claimTarget({ angles: ["news"], languages: ["en"], providers: ["perplexity", "serper"] }), ctxFor(engine({}, calls)));
+    const out = await entityDossierCollector.run(claimTarget({ angles: ["news"], languages: ["en"], providers: ["google", "serper"] }), ctxFor(engine({}, calls)));
     expect(calls.map((c) => c.provider)).toEqual(["serper"]);
     expect(out.channels).toEqual([{ provider: "serper", lang: "en", state: "ok", why: "" }]);
   });
@@ -390,7 +389,7 @@ describe("round 2: what the critic found, each closed for the whole class", () =
   const request = (seeds: unknown[]) =>
     parseResearchRunRequest({ grant_ref: "grantref-123", project_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6", run_id: "run_1", seeds });
 
-  it("a research run takes only the two seed shapes, each once, so no seed can reach a name search (Perplexity) or carry meta onto pages", () => {
+  it("a research run takes only the two seed shapes, each once, so no seed can reach a name search or carry meta onto pages", () => {
     expect(request(spec.seeds).ok).toBe(true);
     const claim = spec.seeds[0];
     const refused = [
@@ -398,7 +397,7 @@ describe("round 2: what the critic found, each closed for the whole class", () =
       [{ uri: "entity://Acme%20Ltd" }],
       [{ uri: "https://a.example/", meta: { pasted: true, searchQuery: "x" } }],
       [{ uri: "https://a.example/", meta: { maxDepth: 5 } }],
-      [{ ...claim, meta: { ...claim.meta, providers: ["perplexity"] } }],
+      [{ ...claim, meta: { ...claim.meta, providers: ["google"] } }],
       [{ ...claim, meta: { ...claim.meta, extra: 1 } }],
       [claim, claim],
       [{ uri: "http://a.example/" }],
@@ -408,7 +407,7 @@ describe("round 2: what the critic found, each closed for the whole class", () =
 
   it("relevance follows the one rule set: a key that breaks its rule is dropped, never sent (the engine refuses a whole batch)", () => {
     expect(sinkMod.RELEVANCE_RULES).toEqual(spec.relevance);
-    expect(sinkMod.relevanceOf({ searchProvider: "perplexity", searchAngle: "Bad Angle", searchLang: "fr", searchQuery: "q", imageUrl: "javascript:alert(1)", entityConfidence: 0.9 }))
+    expect(sinkMod.relevanceOf({ searchProvider: "google", searchAngle: "Bad Angle", searchLang: "fr", searchQuery: "q", imageUrl: "javascript:alert(1)", entityConfidence: 0.9 }))
       .toEqual({ searchQuery: "q", pasted: false });
     expect(sinkMod.relevanceOf({ pasted: true, searchProvider: "serper", searchQuery: "q", outlinks: ["a.example"] })).toEqual({ pasted: true, outlinks: ["a.example"] });
   });

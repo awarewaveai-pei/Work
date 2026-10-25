@@ -111,7 +111,7 @@ CONTENT_TRENDING_FEEDS='[{"id":"hn","title":"Hacker News","url":"https://hnrss.o
 | `search/google-news` | search | `registered` | `lib/content/trending-sources.ts` | 無（RSS） | Google News RSS 趨勢來源 |
 | `search/reddit` | search | `registered` | `lib/content/trending-sources.ts` | 無（Atom RSS，需描述性 UA） | Reddit 搜尋 / 趨勢來源 |
 | `search/ptt` | search | `registered` | `lib/content/trending-sources.ts` | 無（HTML scrape） | TW PTT 趨勢來源 |
-| `search/serper` | search | `registered` | `lib/content/trending-sources.ts` | `SERPER_API_KEY` | Serper 即時 Google News 趨勢來源（取代原 Perplexity 即時 block） |
+| `search/serper` | search | `registered` | `lib/content/trending-sources.ts` | `SERPER_API_KEY` | Serper 即時 Google News 趨勢來源 |
 | `search/<env feed>` | search | `registered` | `CONTENT_TRENDING_FEEDS` → `trending-sources.ts` | `CONTENT_TRENDING_FEEDS` | 營運設定的 RSS/Atom feed |
 | `search/db/<id>` | search | `route/action` | `buildDbSearchBlocks()` | DB row + safe URL | 由 UI/DB 暫時注入，傳給 `runTrending(..., extraBlocks)` |
 | `article/generate` | article | `registered` + `pipeline` | `lib/content/blocks/article-generate.ts` | `ANTHROPIC_API_KEY` | 長文 SEO/GEO/RankMath 文章生成，包 `generate-core.ts` |

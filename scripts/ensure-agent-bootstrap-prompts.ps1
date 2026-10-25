@@ -44,7 +44,7 @@ $promptPack = @(
     '',
     '## Purpose',
     '',
-    'Use this prompt pack for non-Cursor agents (Codex, Claude side sessions, Copilot CLI, Gemini CLI, Perplexity workflows) so they follow the same repo rules.',
+    'Use this prompt pack for non-Cursor agents (Codex, Claude side sessions, Copilot CLI, Gemini CLI) so they follow the same repo rules.',
     '',
     '## Core policy references (single source of truth)',
     '',
@@ -68,11 +68,6 @@ $promptPack = @(
     '',
     'If there is any conflict, follow the canonical files above and do not invent a second process.',
     '```',
-    '',
-    '## Perplexity note',
-    '',
-    'Perplexity is Search API only: use `scripts/perplexity-cli.ps1 search <query>`.',
-    'Never call Sonar chat / agent / deep-research models (per-token billing drained the account 2026-06-21 and 2026-09-12); the `llm-perplexity` plugin is intentionally not installed.',
     ''
 ) -join [Environment]::NewLine
 

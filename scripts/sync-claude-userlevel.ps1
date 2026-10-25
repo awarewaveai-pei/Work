@@ -506,7 +506,7 @@ function Resolve-HelperStatus {
 #
 # The INVARIANT it enforces did not retire with Cursor, only the file pair did:
 # %APPDATA%\Claude\claude_desktop_config.json is merged by Claude the same way, carries
-# 8 names that duplicate the repo .mcp.json, and 2 (perplexity, wordpress) that exist
+# names that duplicate the repo .mcp.json, and 1 (wordpress) that exists
 # nowhere else -- exactly the "prune the collisions, keep the escape hatch" shape, which
 # a blunt replace-json would destroy. Re-pointing it there is an open TASKS item and needs
 # operator sign-off first, because that file holds live plaintext credentials.

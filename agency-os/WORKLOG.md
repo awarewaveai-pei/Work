@@ -1,4 +1,29 @@
 # Worklog
+## 2026-10-25（續22）Perplexity 整條退役：driver／CLI／CI guard／deny／vault 全拆，不留死碼（Claude）
+
+**背景**：GitHub Actions 10 月額度用完，Perplexity guard workflow 約占 577 分鐘。操作者已手動停用該 workflow，也已在 Perplexity 後台刪除 key。repo 裡的 driver（`COLLECT_SEARCH_PROVIDER=perplexity`）、CLI、CI guard、MCP deny 都已成死碼。
+
+**根因**：Perplexity 是分好幾次退的（2026-06-21 換 Serper、2026-09-19 退 MCP、2026-09-20 改成只能明確 override）。每一輪都留了「保險」：driver、provider、deny 項、guard 腳本加 workflow。key 刪掉之後，這些保險就只剩維護成本和 CI 分鐘數。
+
+**修法（不變量：除了歷史紀錄，系統裡沒有東西會指向 Perplexity 或把它描述成能用）**：
+- C1 next-admin collect：刪 `SEARCH_DRIVERS.perplexity`、`SEARCH_LOCALES.perplexity`、`PROVIDERS.perplexity`、只有它在用的 `SearchResult.last_updated`（兩個 collector 的 `?? r.last_updated` 一起拿掉）。`COLLECT_SEARCH_PROVIDER=perplexity` 現在會走既有的 `unknown_search_provider_*` 501。prod compose 從來沒傳過這個值，也沒傳 key（repo compose 只改註解，prod 不用動）。
+- C2 `CollectionSourcesPanel.tsx` `explainReason`：key 名改由 `providerSpec(vendor).apiKeyEnv` 取，拿掉寫死的 perplexity 分支。順便修好 brave：舊的 `toUpperCase` 推出來是 `BRAVE_API_KEY`，實際是 `BRAVE_SEARCH_API_KEY`。
+- C3 `cost-model.ts`：刪 `"sonar"` 費率和 vendor 型別裡的 `"Perplexity"`（成本在記錄當下就寫進 costUsd，不會回查費率）。
+- C4 測試：原本用 perplexity 當預設 vendor 的通用測試改用 serper（`collect-web-search`）。「只開放 /search」的路徑鎖測試改驗 serper 的 `allowedPaths`。wire v2 和 COS 測試的拒收樣本改成 `google`，驗的是同一個 allowlist 不變量。
+- C5 刪除：`bin/perplexity.cmd`、`bin/pplx.cmd`、`scripts/perplexity-cli.ps1`、`scripts/check-perplexity-search-only.mjs`、`.github/workflows/perplexity-search-only-guard.yml`。另外移除 `settings.template.json`／`wire-remote-hooks.sh` 的 3 個 `mcp__perplexity__*` deny，以及 `settings-deny-parity.test.mjs` 裡的 Perplexity 段落（Workflow deny 保留）。
+- C6 設定與文件：`user-env.template.ps1`、`ensure-agent-bootstrap-prompts.ps1`（本機 `.agency-state` 提示包已重新產生）、`check-governance-docs-drift.ps1` 名單、`sync-claude-userlevel.ps1`／`mcp-add-server-quickstart.md`（desktop config 實測已沒有 perplexity，只剩 wordpress 是獨有的）、MODULE_MANIFEST＋Foundry catalog（`sync-foundry-catalog.mjs` 重新產生）、ADR 017、ROUTING_SPEC／inventory／runbook 的現況描述、`tool-expert.md` 那一列。
+- C7 本機（不進 git）：vault `-Action remove PERPLEXITY_API_KEY`、`mcp/user-env.ps1` 刪掉那一行、User 環境變數清掉（實測 before=True after=False）。
+- 刻意保留：`model-comparison.ts`／`AiModelsClient.tsx`（市場比較頁，同頁也列我們沒在用的 Tavily）、GEO／RankMath 等第三方文件、`verify-asset-mcp-refs` 的「已退役 server」測試樣本與 `shared-asset-gates.yml` 的歷史註解、WORKLOG／handoff／migration 0042／0043、TASKS 已結案項。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/collect lib/ai "app/(shell)/ops/collect" lib/portal/__tests__/products.test.ts (next-admin) | exit=0 | ms=8370 | 37+1 files, 492+11 tests passed, tsc --noEmit exit 0
+- REALTEST_EVIDENCE: tool=Bash | cmd=node --test tests/hooks/*.test.mjs | exit=0 | ms=0 | 409/409 pass；verify-asset-mcp-refs 0 unreachable；verify-governance-pointers PASS；sync-foundry-catalog --check PASS
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_collector_wire_v2 tests.unit.test_block_verify (COS) | exit=0 | ms=110162 | Ran 96 tests OK；`affected_tests.py --run` 因共用工作目錄其他 session 的 dirty 檔擴到 424 模組，commit 時仍在跑
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n（Codex oracle `agency-os/reports/oracle/2026-10-25-partialreview-44df18d5.md`；m1 已查證屬實：被刪的 workflow 最後一步也跑 `settings-deny-parity.test.mjs`（Workflow deny），已把這一步移進 `shared-asset-gates.yml`）
+- ORACLE gate: artifact 之後只改了 `shared-asset-gates.yml`，就是 m1 指定的修法
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory,Projects,mcp,tests,.github,bin | grep=perplexity|PERPLEXITY_API_KEY|pplx | hits=0 active code paths（剩下的都在上面「刻意保留」清單：歷史紀錄、市場比較頁、第三方文件、退役樣本）
+
+**避免再發生**：退役供應商的定義＝key 撤銷之後同一輪拆光（driver、provider、CLI、guard、deny、vault）。「保險」不留在程式碼裡，因為沒有 key，保險也擋不到任何東西。
 ## 2026-10-25（續21）capacity 偵測器 BLIND 修復：慢探針串行逾時 → 整台判「unreachable」，636 次 OOM 被藏住
 
 **症狀**：`capacity-LATEST.md` 報 ks-aw-01 Unreachable，錯誤欄卻印 `MEM_TOTAL_KB=131877056 / MEM_AVAIL_KB=114881388`；smoke digest = BLIND。

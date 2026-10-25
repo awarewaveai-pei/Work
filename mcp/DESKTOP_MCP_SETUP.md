@@ -108,7 +108,6 @@ OPENAI_API_KEY               = "sk-..."
 ANTHROPIC_API_KEY            = "sk-ant-..."
 GEMINI_API_KEY               = "AIza..."
 XAI_API_KEY                  = "xai-..."
-PERPLEXITY_API_KEY           = "pplx-..."
 
 AIRTABLE_API_KEY             = "pat_..."
 REPLICATE_API_TOKEN          = "r8_..."

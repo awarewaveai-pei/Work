@@ -158,7 +158,7 @@ export default function OpsToolsPage() {
               <input
                 value={newTool.name}
                 onChange={(e) => setNewTool((p) => ({ ...p, name: e.target.value }))}
-                placeholder="e.g. Perplexity"
+                placeholder="e.g. Serper"
                 style={inputStyle}
               />
             </Field>

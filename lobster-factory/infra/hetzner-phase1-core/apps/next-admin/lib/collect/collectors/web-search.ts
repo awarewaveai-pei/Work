@@ -148,7 +148,7 @@ export const webSearchCollector: CollectBlock = {
           searchProvider: providerId,
           // Kept for a human reading a run report, never stored as content.
           searchSnippet: typeof r.snippet === "string" ? r.snippet.slice(0, 300) : undefined,
-          searchDate: r.date ?? r.last_updated ?? undefined,
+          searchDate: r.date ?? undefined,
         },
       })),
     };

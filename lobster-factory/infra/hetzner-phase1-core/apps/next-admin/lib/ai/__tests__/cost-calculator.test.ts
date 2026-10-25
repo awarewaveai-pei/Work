@@ -57,7 +57,7 @@ describe("imageCostUsd / toolCostUsd", () => {
 });
 
 describe("featureUnitCostUsd", () => {
-  it("article includes the perplexity extraUsd", () => {
+  it("article includes the search extraUsd", () => {
     const article = TEXT_FEATURES.find((f) => f.key === "article")!;
     const base = textCallCostUsd({ model: article.model, inputTokens: article.inputTok, outputTokens: article.outputTok });
     expect(featureUnitCostUsd(article)).toBeCloseTo(base + (article.extraUsd ?? 0), 9);

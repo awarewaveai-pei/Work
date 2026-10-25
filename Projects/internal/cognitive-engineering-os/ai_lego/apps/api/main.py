@@ -3367,7 +3367,7 @@ class CollectionCompleteRequest(BaseModel):
         for item in channels:
             if set(item) != {"provider", "lang", "state", "why"}:
                 return "channels: each is {provider, lang, state, why}"
-            # Never Perplexity (the operator's decision after unexplained charges): a run that used it is refused.
+            # Only the spec's engines: a run that used any other is refused.
             if item["provider"] not in ("serper", "brave"):
                 return "channels: provider is serper or brave"
             if item["lang"] not in ("zh", "en") or item["state"] not in ("ok", "unreachable", "no_key") or not text(item["why"], 0, 300):
@@ -3385,8 +3385,8 @@ def get_collection_service() -> CollectionServiceClient | None:
 
 
 def _research_seeds(payload: CollectionRequest) -> list[dict[str, Any]]:
-    # Wire v2 (STEP2_SHARED_RULES §4.1): exactly two shapes -- a claim to search for (engines serper|brave only: never
-    # Perplexity, the operator's decision after unexplained charges), or an https URL with no meta or only `pasted`.
+    # Wire v2 (STEP2_SHARED_RULES §4.1): exactly two shapes -- a claim to search for (engines serper|brave only), or an
+    # https URL with no meta or only `pasted`.
     # Any other entity:// seed would reach the collector's name search, which honours its own engine setting.
     # = next-admin search/query-plan.ts CLAIM_ANGLES and app/api/internal/collect/runs/research-run-request.ts.
     claim_lists = {

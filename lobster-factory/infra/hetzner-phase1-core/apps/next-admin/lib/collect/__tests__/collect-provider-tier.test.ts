@@ -138,30 +138,24 @@ describe("createProviderCall", () => {
     await expect(call("firecrawl", { path: "/v1/scrape" })).rejects.toBeInstanceOf(ProviderCallError);
   });
 
-  it("allows Perplexity only on /search — chat/agent endpoints never leave the process", async () => {
+  it("a provider with allowedPaths sends nothing else out of the process", async () => {
     const hit: string[] = [];
     const call = createProviderCall({ grant: GRANT,
       budget: createBudget(),
-      env: { PERPLEXITY_API_KEY: "pplx-test" },
+      env: { SERPER_API_KEY: "serper-test" },
       transport: (async (u: string | URL) => {
         hit.push(String(u));
-        return new Response(JSON.stringify({ results: [] }), { status: 200 });
+        return new Response(JSON.stringify({ organic: [] }), { status: 200 });
       }) as unknown as typeof fetch,
     });
 
-    for (const path of ["/chat/completions", "/v1/sonar", "/v1/agent", "/v1/embeddings", "/search/../chat/completions", "/SEARCH"]) {
-      await expect(call("perplexity", { path })).rejects.toThrow(/path_not_allowed_perplexity/);
+    for (const path of ["/news", "/images", "/search/../news", "/SEARCH"]) {
+      await expect(call("serper", { path })).rejects.toThrow(/path_not_allowed_serper/);
     }
     expect(hit).toEqual([]);
 
-    await call("perplexity", { path: "/search", body: { query: "q" } });
-    expect(hit).toEqual(["https://api.perplexity.ai/search"]);
-  });
-
-  it("every provider pointing at perplexity.ai is locked to /search, under any id", () => {
-    const pplx = Object.values(PROVIDERS).filter((p) => new URL(p.origin).hostname.endsWith("perplexity.ai"));
-    expect(pplx.length).toBeGreaterThan(0);
-    for (const p of pplx) expect(p.allowedPaths, p.id).toEqual(["/search"]);
+    await call("serper", { path: "/search", body: { q: "q" } });
+    expect(hit).toEqual(["https://google.serper.dev/search"]);
   });
 });
 

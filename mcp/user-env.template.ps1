@@ -14,7 +14,6 @@ $vars = @{
     AIRTABLE_API_KEY             = "pat_xxx"
     REPLICATE_API_TOKEN          = "r8_xxx"
     REPLICATE_WEBHOOK_SIGNING_KEY = ""
-    PERPLEXITY_API_KEY           = "pplx_xxx"
     SERPER_API_KEY               = "xxx"
     BRAVE_SEARCH_API_KEY         = "xxx"
     RESEND_API_KEY               = "re_xxx"

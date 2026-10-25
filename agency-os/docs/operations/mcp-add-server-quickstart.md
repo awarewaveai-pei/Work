@@ -76,7 +76,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\sanitize-user-mcp-config.ps1
 
 > **這張表在 2026-08-28 少了一列，而且不是因為問題消失。** `~/.cursor/mcp.json`（`cursor-mcp` / `prune-duplicate-json`）隨 Cursor 退場移除：目標檔已刪，prune helper 對「目標不存在」回報 `clean`，那條等於一個永遠不會變紅的偵測器。
 >
-> **仍然沒有任何條目管的是 `%APPDATA%\Claude\claude_desktop_config.json`**——它被 Claude 與 repo `.mcp.json` 合併載入，有 8 個與 repo 同名的 server、2 個（`perplexity` / `wordpress`）只存在於該檔，且**目前持有 6 把明文 API key**。它曾繼承 `~/.cursor/mcp.json` 的角色卻沒有繼承治理。見 `TASKS.md`。
+> **仍然沒有任何條目管的是 `%APPDATA%\Claude\claude_desktop_config.json`**——它被 Claude 與 repo `.mcp.json` 合併載入，有與 repo 同名的 server、1 個（`wordpress`）只存在於該檔，且**持有明文 API key**。它曾繼承 `~/.cursor/mcp.json` 的角色卻沒有繼承治理。見 `TASKS.md`。
 
 > **2026-08-25 之前這裡是錯的。** 本腳本當時自帶三份寫入邏輯，與本文件上方 §路徑原則 直接牴觸：把兩個 server 寫進規定應為 `{}` 的 `~/.claude/mcp.json`；把 repo `.mcp.json` 整份複製進 user-level Cursor 設定，親手製造 §路徑原則 要求避免的重複；而清 `~/.claude.json` 的實作用了 PowerShell 6 才有的 `-AsHashtable`，在 PS 5.1 上**從未真的執行過**。根因是同一個檔案有多個寫入者、各自帶著沒被交叉檢查的意圖。詳見 `WORKLOG.md` 2026-08-25。
 

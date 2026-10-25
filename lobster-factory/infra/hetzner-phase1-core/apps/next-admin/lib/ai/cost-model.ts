@@ -8,7 +8,7 @@
  * the single numeric source — change a rate here and both the live page and the report follow.
  *
  * Sources (USD): Anthropic pricing (claude-api guide, 2026-05); Replicate per-image costUsd from
- * lib/tarot/model-comparison.ts; OpenAI image API; Perplexity Sonar; Gemini Flash-Lite. Currency:
+ * lib/tarot/model-comparison.ts; OpenAI image API; Gemini Flash-Lite. Currency:
  * NT$ via TWD_RATE (single source — mirrors app/tools/ai-models/page.tsx, keep in sync).
  *
  * INFRA: Hetzner figures are the ACTUAL billed price from the Hetzner console PRICE field
@@ -30,7 +30,7 @@ export interface TextRate {
   /** Cache-write multiplier vs input (Anthropic 5-min ≈ 1.25). */
   cacheWriteMult: number;
   label: string;
-  vendor: "Anthropic" | "OpenAI" | "Google" | "Perplexity" | "Serper";
+  vendor: "Anthropic" | "OpenAI" | "Google" | "Serper";
 }
 
 /**
@@ -55,8 +55,6 @@ export const TEXT_RATES: Record<string, TextRate> = {
   // outreach default (lib/outreach/ai-openai.ts) and the knowledge-base embedder (lib/kb/config.ts KB_EMBEDDING).
   "gpt-4o-mini":               { inputPerM: 0.15, outputPerM: 0.6, cacheReadMult: 0.5, cacheWriteMult: 1, label: "GPT-4o mini", vendor: "OpenAI" },
   "text-embedding-3-small":    { inputPerM: 0.02, outputPerM: 0, cacheReadMult: 1, cacheWriteMult: 1, label: "OpenAI text-embedding-3-small", vendor: "OpenAI" },
-  // Legacy Perplexity Sonar — kept for historical cost-log lookup; no longer called (replaced by Serper).
-  "sonar":                     { inputPerM: 1, outputPerM: 1, cacheReadMult: 1, cacheWriteMult: 1, label: "Perplexity Sonar (legacy)", vendor: "Perplexity" },
   // Gemini Flash-Lite: lib/ai/gemini-models.ts GEMINI_LITE_MODEL (ops-inbox diagnostics, cs fallback). Google list price
   // 2026-10-24: $0.30 / $2.50 per 1M, cache read $0.03. 2.0 is retired (404) and stays for older cost-log rows.
   "gemini-3.5-flash-lite":     { inputPerM: 0.3, outputPerM: 2.5, cacheReadMult: 0.1, cacheWriteMult: 1, label: "Gemini 3.5 Flash-Lite", vendor: "Google" },

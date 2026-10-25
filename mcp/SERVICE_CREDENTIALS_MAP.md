@@ -45,7 +45,6 @@
 | **OpenAI** | `api.openai.com` | API Key | `OPENAI_API_KEY` |
 | **Anthropic** | `api.anthropic.com` | API Key | `ANTHROPIC_API_KEY` |
 | **Gemini** | `generativelanguage.googleapis.com` | API Key | `GEMINI_API_KEY` |
-| **Perplexity** | `api.perplexity.ai` | API Key | `PERPLEXITY_API_KEY` |
 | **Replicate** | `api.replicate.com` | API Token | `REPLICATE_API_TOKEN` |
 | **Airtable** | `api.airtable.com` | API Key | `AIRTABLE_API_KEY` |
 | **Canva MCP** | `mcp.canva.com/mcp` | OAuth（無需 token） | — |
@@ -67,7 +66,6 @@
 | `trigger` | stdio | Trigger.dev |
 | `wordpress` | stdio | WordPress |
 | `airtable` | stdio | Airtable |
-| `perplexity` | stdio | Perplexity |
 | `replicate` | stdio | Replicate |
 | `copilot` | HTTP | GitHub Copilot |
 | `canva` | stdio | Canva |

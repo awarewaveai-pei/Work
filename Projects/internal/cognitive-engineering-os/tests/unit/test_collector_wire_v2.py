@@ -89,7 +89,7 @@ class SpecExamplesTests(WireV2Case):
 
     def test_v1_is_stored_in_the_v2_shape_keeping_only_what_v2_allows(self):
         self._start()
-        v1 = {"entityConfidence": "anchored", "searchQuery": "q", "searchProvider": "perplexity", "anything": [1], "pasted": True}
+        v1 = {"entityConfidence": "anchored", "searchQuery": "q", "searchProvider": "google", "anything": [1], "pasted": True}
         self.assertEqual(self._ingest([self._source(v1, schema_version="1")]).status_code, 200)
         self.assertEqual(self._rows()[0]["relevance"], {"entityConfidence": "anchored", "searchQuery": "q", "pasted": False})
 
@@ -211,7 +211,7 @@ class CompletionRuleTests(WireV2Case):
             "a channel with another key": ("channels: each is", {"channels": [{**channel, "count": 1}]}),
             "one channel reported twice": ("channels: each (provider, lang) once", {"channels": [channel, {**channel, "state": "ok", "why": ""}]}),
             "a provider that is not an id": ("channels: provider is", {"channels": [{**channel, "provider": "Serper API"}]}),
-            "perplexity as a channel": ("channels: provider is", {"channels": [{**channel, "provider": "perplexity", "state": "ok", "why": ""}]}),
+            "an engine outside the spec as a channel": ("channels: provider is", {"channels": [{**channel, "provider": "google", "state": "ok", "why": ""}]}),
             "aside items that are not pages": ("aside: a list of pages", {"aside": ["x"]}),
             "aside that is not a list": ("aside: a list of pages", {"aside": {"url": "https://a.example/"}}),
             "channels that are not a list": ("channels: a list", {"channels": "serper"}),
@@ -239,9 +239,9 @@ class ClaimSeedTests(WireV2Case):
         seed["meta"].update(meta)
         return seed
 
-    def test_perplexity_is_never_a_provider(self):
-        self.assert_refused(self.claim(providers=["perplexity"]))
-        self.assert_refused(self.claim(providers=["serper", "perplexity"]))
+    def test_an_engine_outside_the_spec_is_never_a_provider(self):
+        self.assert_refused(self.claim(providers=["google"]))
+        self.assert_refused(self.claim(providers=["serper", "google"]))
 
     def test_every_claim_angle_language_and_engine_in_the_spec_is_accepted(self):
         words = {"zh": SPEC["seeds"][0]["meta"]["entityName"], "en": SPEC["seeds"][2]["meta"]["entityName"]}
@@ -278,7 +278,7 @@ class ClaimSeedTests(WireV2Case):
 
     def test_only_the_two_seed_shapes_pass_never_a_name_search_and_never_extra_meta(self):
         cases = {
-            # a name seed reached the collector's name search, which honours COLLECT_SEARCH_PROVIDER (Perplexity)
+            # a name seed reached the collector's name search, which honours COLLECT_SEARCH_PROVIDER
             "a name seed": {"uri": "entity://Acme%20Ltd", "meta": {"entityKind": "organization"}},
             "a name seed without meta": {"uri": "entity://Acme%20Ltd"},
             # extra meta was copied onto every page and made the engine refuse the whole batch

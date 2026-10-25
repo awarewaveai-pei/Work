@@ -56,3 +56,6 @@ jobs:
 
       - name: Rule-level tests for the gates
         run: node --test tests/hooks/asset-mcp-refs.test.mjs tests/hooks/asset-parity.test.mjs tests/hooks/governance-pointers.test.mjs tests/hooks/trigger-index.test.mjs
+
+      - name: Deny-list parity (workstation template + remote-session mirror)
+        run: node --test tests/hooks/settings-deny-parity.test.mjs

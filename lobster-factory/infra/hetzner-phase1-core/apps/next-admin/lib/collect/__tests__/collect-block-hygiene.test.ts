@@ -140,7 +140,7 @@ describe("collection block hygiene", () => {
       expect([b.id, typeof schemes[i]]).toEqual([b.id, "string"]);
       // A key-gated block returns 0 when unconfigured, and correctly so. Asserting on match() in
       // whatever state the machine happens to be in makes this a test of the deployment: it passed
-      // on a laptop holding PERPLEXITY_API_KEY and failed the deploy gate on the server without it.
+      // on a laptop holding a vendor key and failed the deploy gate on the server without it.
       // The invariant is about ROUTING, so the required variables are supplied for the check.
       const saved = new Map<string, string | undefined>();
       for (const key of declaredEnvKeys(b.describe!)) {

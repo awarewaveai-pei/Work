@@ -19,7 +19,7 @@
 
 ## Risk Level
 - If API keys/tokens appear in plaintext config, treat as **potentially leaked**.
-- Rotate high-privilege tokens first (GitHub, Supabase, OpenAI/Anthropic/Gemini, n8n, WordPress, Replicate, Copilot, Perplexity). **Airtable** 已淘汰並遷移 **Supabase**：請 **revoke** 舊 `AIRTABLE_API_KEY`（若仍存在任何本機設定）。
+- Rotate high-privilege tokens first (GitHub, Supabase, OpenAI/Anthropic/Gemini, n8n, WordPress, Replicate, Copilot). **Airtable** 已淘汰並遷移 **Supabase**：請 **revoke** 舊 `AIRTABLE_API_KEY`（若仍存在任何本機設定）。
 
 ## Phase 1 - Immediate Containment
 1. Confirm `mcp.json` is **not** in git-tracked workspace files.

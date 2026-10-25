@@ -354,9 +354,10 @@ describe("research bridges frozen (the default since 2026-09-23)", () => {
 
 describe("a refusal is explained, not printed", () => {
   it("turns the exact string the operator hit into an instruction", () => {
-    // This is the real reason from a live run on 2026-09-11.
-    const said = explainReason("all_strategies_failed:ProviderCallError: provider_perplexity_http_401");
-    expect(said).toContain("PERPLEXITY_API_KEY");
+    // The shape of a real reason from a live run (2026-09-11). The key named is the registry's own:
+    // brave reads BRAVE_SEARCH_API_KEY, which the old vendor.toUpperCase() guess got wrong.
+    const said = explainReason("all_strategies_failed:ProviderCallError: provider_brave_http_401");
+    expect(said).toContain("BRAVE_SEARCH_API_KEY");
     expect(said).toContain("換一把");
   });
 

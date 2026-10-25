@@ -427,7 +427,7 @@ export const entityDossierCollector: CollectBlock = {
             // The title an aside entry shows when the page itself cannot be read.
             searchTitle: title || undefined,
             searchSnippet: typeof r.snippet === "string" ? r.snippet.slice(0, 300) : undefined,
-            searchDate: r.date ?? r.last_updated ?? undefined,
+            searchDate: r.date ?? undefined,
           },
         });
       }

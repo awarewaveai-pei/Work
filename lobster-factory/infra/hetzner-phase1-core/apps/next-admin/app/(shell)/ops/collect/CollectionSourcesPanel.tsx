@@ -9,6 +9,7 @@
 // refusing forty pages must not look like a quiet day).
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { providerSpec } from "@/lib/collect/net/providers";
 
 interface CatalogueEntry {
   id: string;
@@ -785,7 +786,8 @@ export function explainReason(reason: string): string | null {
   const provider = /provider_([a-z0-9-]+)_http_(\d{3})/.exec(reason);
   if (provider) {
     const [, vendor, status] = provider;
-    const key = vendor === "perplexity" ? "PERPLEXITY_API_KEY" : vendor === "firecrawl" ? "FIRECRAWL_API_KEY" : `${vendor.toUpperCase()}_API_KEY`;
+    // The provider registry's own key name (brave reads BRAVE_SEARCH_API_KEY, not BRAVE_API_KEY).
+    const key = providerSpec(vendor)?.apiKeyEnv ?? `${vendor.toUpperCase()}_API_KEY`;
     if (status === "401" || status === "403") return `${vendor} 拒絕了這把金鑰（${status}）。金鑰失效或沒有這個 API 的權限，需要換一把新的 ${key}。`;
     if (status === "402") return `${vendor} 回報餘額不足（402）。帳戶要儲值才能繼續用這個來源。`;
     if (status === "429") return `${vendor} 限流（429）。稍後再跑，或把「取回幾筆結果」調小。`;

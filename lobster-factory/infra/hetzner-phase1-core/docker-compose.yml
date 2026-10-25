@@ -375,12 +375,7 @@ services:
       COMMAND_PLANE_DEFAULT_WORKSPACE_ID: ${COMMAND_PLANE_DEFAULT_WORKSPACE_ID:-}
       # AI handlers (/daily_review, /weekly_review) — falls back to raw JSON if unset
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      # /ops/collect "搜尋全網" (lib/collect/collectors/web-search.ts): operator directive 2026-09-20 —
-      # Perplexity's chat/agent endpoints drained the account twice (2026-06-21, 2026-09-12), so
-      # PERPLEXITY_API_KEY is deliberately NOT passed through here. Its driver still exists in code
-      # for an explicit COLLECT_SEARCH_PROVIDER=perplexity override, but that override is now
-      # structurally unreachable in this container regardless — there is no key for it to read, so
-      # a stray override value alone cannot revive it. Serper is the default; Brave is the fallback.
+      # /ops/collect "搜尋全網" (lib/collect/collectors/web-search.ts): Serper is the default; Brave is the fallback.
       SERPER_API_KEY: ${SERPER_API_KEY:-}
       BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY:-}
       # Content Studio multi-provider: GPT article generation path reads this (lib/content/article/

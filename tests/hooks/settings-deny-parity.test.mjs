@@ -22,27 +22,11 @@ import { REPO_ROOT } from './helpers.mjs';
 const TEMPLATE = path.join(REPO_ROOT, 'mcp', 'claude-userlevel', 'settings.template.json');
 const WIRE = path.join(REPO_ROOT, 'scripts', 'wire-remote-hooks.sh');
 
-// Perplexity is Search-API only: these chat tools bill per token on sonar-pro / reasoning /
-// deep-research and drained the account on 2026-06-21 and 2026-09-12.
-const PERPLEXITY_CHAT_TOOLS = [
-  'mcp__perplexity__perplexity_ask',
-  'mcp__perplexity__perplexity_reason',
-  'mcp__perplexity__perplexity_research',
-];
-
 test('settings.template.json denies the Workflow tool', () => {
   const settings = JSON.parse(fs.readFileSync(TEMPLATE, 'utf8'));
   const deny = settings?.permissions?.deny;
   assert.ok(Array.isArray(deny), 'permissions.deny must be an array');
   assert.ok(deny.includes('Workflow'), 'permissions.deny must contain the bare tool name "Workflow"');
-});
-
-test('settings.template.json denies every Perplexity chat tool and allows none', () => {
-  const perm = JSON.parse(fs.readFileSync(TEMPLATE, 'utf8')).permissions;
-  for (const tool of PERPLEXITY_CHAT_TOOLS) {
-    assert.ok(perm.deny.includes(tool), `permissions.deny must contain ${tool}`);
-    assert.ok(!(perm.allow ?? []).includes(tool), `permissions.allow must not contain ${tool}`);
-  }
 });
 
 test('wire-remote-hooks.sh generates a settings.local.json that denies Workflow', (t) => {
@@ -61,9 +45,6 @@ test('wire-remote-hooks.sh generates a settings.local.json that denies Workflow'
   const out = JSON.parse(fs.readFileSync(path.join(tmp, '.claude', 'settings.local.json'), 'utf8'));
   assert.ok(Array.isArray(out?.permissions?.deny), 'generated permissions.deny must be an array');
   assert.ok(out.permissions.deny.includes('Workflow'), 'generated settings must deny "Workflow"');
-  for (const tool of PERPLEXITY_CHAT_TOOLS) {
-    assert.ok(out.permissions.deny.includes(tool), `generated settings must deny ${tool}`);
-  }
   assert.ok(out.hooks?.PreToolUse, 'hook wiring must survive the permissions addition');
   assert.deepEqual(underscoreKeys(out), [], 'generated settings must carry no comment keys');
   fs.rmSync(tmp, { recursive: true, force: true });

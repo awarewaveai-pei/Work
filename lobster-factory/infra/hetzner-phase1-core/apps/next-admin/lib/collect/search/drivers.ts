@@ -15,32 +15,18 @@ export function searchProviderId(env: Record<string, string | undefined> = proce
   const named = env.COLLECT_SEARCH_PROVIDER;
   if (named) return named;
   // No explicit choice: use whichever vendor actually has a key, rather than defaulting to one and
-  // making the source look broken because the OTHER key is the one that was set. Perplexity is
-  // deliberately excluded from this auto-detect (operator directive, 2026-09-20: two unexplained
-  // account drains, 2026-06-21 and 2026-09-12) — its driver and provider entry still exist so
-  // COLLECT_SEARCH_PROVIDER=perplexity keeps working as an explicit override, but a leftover
-  // PERPLEXITY_API_KEY alone must never be enough to make this source run again.
+  // making the source look broken because the OTHER key is the one that was set.
   if (env.SERPER_API_KEY) return "serper";
   if (env.BRAVE_SEARCH_API_KEY) return "brave";
   return "serper";
 }
 
-/**
- * Env vars that could make this source usable — the catalogue lists them so one can be chosen.
- *
- * Deliberately excludes PERPLEXITY_API_KEY, unlike searchProviderId's own auto-detect (same
- * exclusion, same reason). One known, accepted seam this creates: an operator who has already
- * approved this source and then sets COLLECT_SEARCH_PROVIDER=perplexity with only that key present
- * gets a catalogue that says "unavailable" while match()/run() would in fact call Perplexity — the
- * catalogue only gates NEW source setup (validateSourceConfig), not a re-run of one already approved.
- * Accepted because reaching that state requires a deliberate, explicit override; a leftover key
- * alone cannot.
- */
+/** Env vars that could make this source usable — the catalogue lists them so one can be chosen. */
 export const SEARCH_KEYS = ["SERPER_API_KEY", "BRAVE_SEARCH_API_KEY"] as const;
 
 /**
- * The engines a Cognitive OS claim may name (wire v2, = specs/wire/collector.v2.json `providers`). Perplexity is
- * not one of them and no setting can add it: COLLECT_SEARCH_PROVIDER never applies to a claim.
+ * The engines a Cognitive OS claim may name (wire v2, = specs/wire/collector.v2.json `providers`). No setting can
+ * add one: COLLECT_SEARCH_PROVIDER never applies to a claim.
  */
 export const CLAIM_PROVIDERS = ["serper", "brave"] as const;
 
@@ -54,7 +40,6 @@ export const CLAIM_PROVIDERS = ["serper", "brave"] as const;
  */
 export type SearchLocale = { lang: string; region?: string };
 export const SEARCH_LOCALES: Record<string, Record<string, SearchLocale>> = {
-  perplexity: { zh: { lang: "zh" }, en: { lang: "en" } }, // search_language_filter: ISO 639-1
   brave: { zh: { lang: "zh-hant", region: "TW" }, en: { lang: "en", region: "US" } }, // search_lang, country
   serper: { zh: { lang: "zh-tw", region: "tw" }, en: { lang: "en", region: "us" } }, // hl, gl
 };
@@ -72,14 +57,12 @@ interface SearchResult {
   url?: string;
   snippet?: string;
   date?: string | null;
-  last_updated?: string | null;
 }
 
 /**
  * Per-vendor request and response, and nothing else. Everything below this map is vendor-neutral:
  * adding a third search engine is one entry here (ADR 011 §決策 5).
  *
- *  - perplexity: POST /search, `{ results: [{title,url,snippet,date,last_updated}] }`
  *  - brave:      GET  /res/v1/web/search, `{ web: { results: [{title,url,description,age}] } }`
  *  - serper:     POST /search, `{ organic: [{title,link,snippet,date,position}] }` — shape confirmed
  *                against the live API, 2026-09-20. Recency uses Google's own tbs=qdr:{d,w,m,y}, since
@@ -92,21 +75,6 @@ export const SEARCH_DRIVERS: Record<
     parse(json: unknown): SearchResult[];
   }
 > = {
-  perplexity: {
-    request: (q) => ({
-      path: "/search",
-      method: "POST",
-      body: {
-        query: q.query,
-        max_results: q.maxResults,
-        ...(q.domains ? { search_domain_filter: q.domains } : {}),
-        ...(q.recency ? { search_recency_filter: q.recency } : {}),
-        ...(q.languages?.length ? { search_language_filter: q.languages.map((l) => searchLocale("perplexity", l).lang) } : {}),
-      },
-    }),
-    parse: (json) => ((json as { results?: SearchResult[] }).results ?? []),
-  },
-
   brave: {
     request: (q) => {
       const params = new URLSearchParams({ q: q.query, count: String(q.maxResults) });

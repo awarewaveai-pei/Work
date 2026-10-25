@@ -19,10 +19,6 @@ describe("search vendor language and region parameters", () => {
     expect(ask("serper", ["en"]).body).toEqual({ q: "民法 667", num: 5, hl: "en", gl: "us" });
   });
 
-  it("perplexity: ISO 639-1 list, every code mapped", () => {
-    expect(ask("perplexity", ["zh", "en"]).body).toEqual({ query: "民法 667", max_results: 5, search_language_filter: ["zh", "en"] });
-  });
-
   it("sends no language parameter when none was asked for", () => {
     expect(ask("brave").path).toBe("/res/v1/web/search?q=%E6%B0%91%E6%B3%95+667&count=5");
     expect(ask("serper").body).toEqual({ q: "民法 667", num: 5 });

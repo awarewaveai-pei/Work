@@ -34,7 +34,7 @@
 
 `powershell -ExecutionPolicy Bypass -File .\scripts\apply-shared-ai-governance.ps1`
 
-它會同步共享 MCP、初始化 closeout inbox，並產生可貼給 Codex/Copilot/Gemini/Perplexity 的提示包。
+它會同步共享 MCP、初始化 closeout inbox，並產生可貼給 Codex/Copilot/Gemini 的提示包。
 
 ---
 

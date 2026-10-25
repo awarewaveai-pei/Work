@@ -16,9 +16,6 @@
     ],
     "deny": [
       "Workflow",
-      "mcp__perplexity__perplexity_ask",
-      "mcp__perplexity__perplexity_reason",
-      "mcp__perplexity__perplexity_research",
       "Bash(git push --force *)",
       "Bash(git push -f *)",
       "Bash(gh pr merge *)",

@@ -131,7 +131,7 @@
     |---|---|---|
     | social | next-admin、supabase、trigger、postiz | 各社群平台授權（Meta 等）、`POSTIZ_API_BASE_URL`、`POSTIZ_API_KEY`（更正：無 `SMARTLINK_*` 變數，smart link 的訪客雜湊 salt 每個程序隨機，`lib/social/smartlink.ts:116`） |
     | cs | next-admin、supabase、chatwoot、trigger（客服排程工作 `applyChatwootBaseline` 由 `lib/schedules/jobs.ts:9` 引用，排程由 Trigger 的 `schedules-heartbeat.ts` 驅動） | `ANTHROPIC_API_KEY`（或 `GEMINI_API_KEY`）、Messenger／LINE 授權 |
-    | collect | next-admin、supabase、trigger、renderer | 搜尋與抓取供應商 key（`BRAVE_SEARCH_API_KEY`、`FIRECRAWL_API_KEY`、`PERPLEXITY_API_KEY`、`SERPER_API_KEY`、`OPENAI_API_KEY`，擇一即可）；內部 `RENDERER_URL`、`RENDERER_SHARED_SECRET` 由安裝產生 |
+    | collect | next-admin、supabase、trigger、renderer | 搜尋與抓取供應商 key（`BRAVE_SEARCH_API_KEY`、`FIRECRAWL_API_KEY`、`SERPER_API_KEY`、`OPENAI_API_KEY`，擇一即可）；內部 `RENDERER_URL`、`RENDERER_SHARED_SECRET` 由安裝產生 |
     | outreach | next-admin、supabase | 客戶自己的 Google OAuth（Gmail connector） |
     | content（video） | next-admin、supabase、postiz、video-service、remotion-service | `ANTHROPIC_API_KEY`、`OPENAI_API_KEY`、`PEXELS_API_KEY`、`R2_*`、`STRIPE_SECRET_KEY`（若客戶要收款）、`WP_API_URL`＋`WORDPRESS_JWT_TOKEN`（若客戶要發到 WordPress）；內部 `VIDEO_SERVICE_URL`、`REMOTION_SERVICE_URL` 由安裝產生 |
     | tarot | next-admin、supabase、trigger（78 張批次生成） | `REPLICATE_API_TOKEN`、`OPENAI_API_KEY`、`R2_API_TOKEN`、`R2_ACCOUNT_ID`、`R2_DESIGNS_BUCKET`、`R2_DESIGNS_PUBLIC_BASE` |

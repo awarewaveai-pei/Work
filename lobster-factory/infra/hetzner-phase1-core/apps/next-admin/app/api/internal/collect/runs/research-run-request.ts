@@ -14,7 +14,7 @@ import { CLAIM_ANGLES } from "@/lib/collect/search/query-plan";
  * Exactly the two seed shapes of the collector wire v2 (Projects/internal/cognitive-engineering-os/specs/wire/
  * collector.v2.json seed_shapes, = the engine's _research_seeds): a claim, or an https URL with no meta or only
  * `pasted`. A name seed would reach the dossier's name search, which honours COLLECT_SEARCH_PROVIDER; a claim never
- * does — so no research run can reach Perplexity. Extra meta would be copied onto every page.
+ * does — so a research run only ever searches the claim's own engines. Extra meta would be copied onto every page.
  */
 function seedError(seed: { uri: string; meta?: unknown }): string | null {
   const meta = seed.meta;

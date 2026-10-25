@@ -17,7 +17,7 @@
 |:---|:---|:---|:---|
 | **編排路由（強制）** | 誰能 orchestrate、核准、env | [`MCP_TOOL_ROUTING_SPEC.md`](../../../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md)、[`ROUTING_MATRIX.md`](../../../lobster-factory/docs/ROUTING_MATRIX.md) | [ADR 004](../architecture/decisions/004-trigger-vs-n8n-orchestration-boundary.md) |
 | **能力狀態與 P 階段** | 上線與否、何時建、證據 | **本檔**「平台能力總表」「工具建置順序」「任務到規格追溯」 | `TASKS.md` |
-| **Cursor MCP 全鍵** | IDE 外掛分工、與路由對照 | [`cursor-mcp-and-plugin-inventory.md`](cursor-mcp-and-plugin-inventory.md)、repo 根 `mcp.json` | §8「無 `task_type`」輔助鍵（replicate、perplexity、**work-global** 等） |
+| **Cursor MCP 全鍵** | IDE 外掛分工、與路由對照 | [`cursor-mcp-and-plugin-inventory.md`](cursor-mcp-and-plugin-inventory.md)、repo 根 `mcp.json` | §8「無 `task_type`」輔助鍵（replicate、**work-global** 等） |
 | **Supabase** | 結構化 SoR、RLS | [ADR 005](../architecture/decisions/005-supabase-sor-vs-wordpress-runtime-db.md)、[`supabase-self-hosted-cutover-checklist.md`](supabase-self-hosted-cutover-checklist.md) | [`PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md`](../edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md)（BFF 窄代理邊界） |
 | **WordPress** | 站內執行期、內容 | [`WORDPRESS_CLIENT_DELIVERY_MODELS.md`](WORDPRESS_CLIENT_DELIVERY_MODELS.md)、[`tools-and-integrations.md`](tools-and-integrations.md) | 同 API PLAN（與 apex `/api/` 關係） |
 | **n8n** | 黏着、webhook、輕流程 | [`n8n-workflow-architecture.md`](../standards/n8n-workflow-architecture.md) | [ADR 004](../architecture/decisions/004-trigger-vs-n8n-orchestration-boundary.md) |
@@ -32,7 +32,7 @@
 | **GitHub Actions** | CI、Trigger 部署等 | [`github-actions-trigger-prod-deploy.md`](github-actions-trigger-prod-deploy.md) | 本檔「平台能力總表」列為已上線能力 |
 | **Redis** | 快取、冪等、限流（預留） | [`hetzner-stack-rollout-index.md`](hetzner-stack-rollout-index.md) | API PLAN P2 |
 | **Replicate** | 推論／影像（API） | [`tools-and-integrations.md`](tools-and-integrations.md)、`cursor-mcp-and-plugin-inventory` **replicate** | 規格長文：`docs/spec/raw/LOBSTER_FACTORY_MASTER_SPEC_V1.md` §10.6 |
-| **Perplexity／work-global／各家 LLM MCP** | 草擬、搜尋、**不**寫入生產權威 | `cursor-mcp-and-plugin-inventory` §8 | — |
+| **work-global／各家 LLM MCP** | 草擬、搜尋、**不**寫入生產權威 | `cursor-mcp-and-plugin-inventory` §8 | — |
 | **DataForSEO** | SEO 資料 API | [`tools-and-integrations.md`](tools-and-integrations.md)（Expected env） | — |
 | **Secrets／輪替** | 憑證治理 | [`security-secrets-policy.md`](security-secrets-policy.md)、[`mcp-secrets-hardening-runbook.md`](mcp-secrets-hardening-runbook.md) | [`PLAN_30Y_STABILITY_HARDENING.md`](../governance-plans/PLAN_30Y_STABILITY_HARDENING.md) Phase 2 |
 | **全庫穩定化（觀測／DR／gate）** | 30 年級底座 | 本檔能力表＋[`PLAN_30Y_STABILITY_HARDENING.md`](../governance-plans/PLAN_30Y_STABILITY_HARDENING.md) | 同左 |

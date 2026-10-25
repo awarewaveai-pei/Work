@@ -947,7 +947,7 @@ class SearchTests(CollectionApiTestCase):
         claim = self.claim()
         plan = self.go(claim)
         self.assertEqual((plan.status_code, plan.json()["confirm_required"], self.service.calls), (200, True, []))
-        self.assertIn("VERIFY_SEARCH_ANGLES_INVALID", self.go(claim, angles=["perplexity"]).text)
+        self.assertIn("VERIFY_SEARCH_ANGLES_INVALID", self.go(claim, angles=["google"]).text)
         run_id, _ = self.start_run(claim)
         [seed] = self.service.calls[0]["seeds"]
         self.assertTrue(seed["uri"].startswith("entity://claim/"))

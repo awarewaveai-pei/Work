@@ -63,21 +63,9 @@ export const PROVIDERS: Record<string, ProviderSpec> = {
   // Open-web search: a query in, ranked result URLs out. Chosen for the index quality the operator
   // asked to match; nothing of its answer text is used, only the URLs (see collectors/web-search.ts
   // for why the snippet is never stored). Swapping vendors is one entry here plus a response parser
-  // — COLLECT_SEARCH_PROVIDER already selects between them.
-  // Search API only. Chat/agent endpoints bill per token by model (sonar-pro, reasoning, deep
-  // research) and drained the account twice (2026-06-21, 2026-09-12) — they must stay unreachable.
-  // Kept for an explicit COLLECT_SEARCH_PROVIDER=perplexity override only: collectors/web-search.ts's
-  // auto-detect no longer picks this vendor on its own (operator directive, 2026-09-20 — a leftover
-  // key must not be enough to bring it back).
-  perplexity: {
-    id: "perplexity",
-    origin: "https://api.perplexity.ai",
-    apiKeyEnv: "PERPLEXITY_API_KEY",
-    allowedPaths: ["/search"],
-  },
-
-  // The same job, a different vendor, so the search source is not one account away from useless.
-  // Its own header scheme rather than Bearer — which is exactly why authHeader exists.
+  // — COLLECT_SEARCH_PROVIDER already selects between them. Two vendors, so the search source is
+  // not one account away from useless. Brave has its own header scheme rather than Bearer — which
+  // is exactly why authHeader exists.
   brave: {
     id: "brave",
     origin: "https://api.search.brave.com",
@@ -85,11 +73,10 @@ export const PROVIDERS: Record<string, ProviderSpec> = {
     authHeader: (key) => ({ "x-subscription-token": key }),
   },
 
-  // A third vendor for the same job, and the operator's chosen default (2026-09-20, replacing
-  // perplexity above). Already paid for and proven elsewhere in this app — see
-  // lib/content/article/generate-core.ts and lib/content/trending-sources.ts — so this reuses a
-  // working account rather than opening a new one. Locked to /search, same as perplexity above —
-  // not because this vendor is known to have an expensive alternate mode (it does not appear to),
+  // The operator's chosen default (2026-09-20). Already paid for and proven elsewhere in this app —
+  // see lib/content/article/generate-core.ts and lib/content/trending-sources.ts — so this reuses a
+  // working account rather than opening a new one. Locked to /search — not because this vendor is
+  // known to have an expensive alternate mode (it does not appear to),
   // but because /search is the only endpoint collectors/web-search.ts's driver ever calls, and this
   // codebase has been burned once already by trusting an unverified assumption about a vendor's full
   // pricing surface. Widen this only alongside a caller that actually needs another path.

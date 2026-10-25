@@ -33,7 +33,6 @@
 | **trigger** | Trigger.dev MCP（本 repo 有啟動腳本範式） |
 | **cloudflare-*** | 外掛常見前綴；DNS／Workers 等輔助 |
 | **posthog** | 外掛；產品分析輔助 |
-| **perplexity** | 查證／網搜 MCP |
 | **canva** | 設計類 MCP（若 client 支援對應 server） |
 
 ### 0.3 終端「要通」的檢查順序（本機 vs SSH 後）

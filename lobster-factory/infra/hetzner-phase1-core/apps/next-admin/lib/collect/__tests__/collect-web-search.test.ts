@@ -1,20 +1,20 @@
 // collect/web-search — a query becomes result URLs, and nothing the vendor wrote becomes content.
 //
 // The provider call is stubbed: this is about what the block does with a response, not about
-// Perplexity being up. The response shape is the documented one (POST /search → results[] with
-// title / url / snippet / date / last_updated).
+// the vendor being up. The response shape is Serper's documented one (POST /search → organic[] with
+// title / link / snippet / date).
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { webSearchCollector, usableResults, domainFilter, searchProviderId, SEARCH_SCHEME } from "@/lib/collect/collectors/web-search";
 import type { CollectCtx, Target } from "@/lib/collect/types";
 
 const RESPONSE = {
-  results: [
-    { title: "退貨規定", url: "https://gov.example/consumer/returns", snippet: "七天鑑賞期…", date: "2026-01-02" },
-    { title: "重複", url: "https://gov.example/consumer/returns?utm_source=x", snippet: "同一頁", date: null },
+  organic: [
+    { title: "退貨規定", link: "https://gov.example/consumer/returns", snippet: "七天鑑賞期…", date: "2026-01-02" },
+    { title: "重複", link: "https://gov.example/consumer/returns?utm_source=x", snippet: "同一頁" },
     { title: "沒有網址", snippet: "vendor returned a row with no url" },
-    { title: "不是網頁", url: "ftp://files.example/doc.txt", snippet: "" },
-    { title: "另一個站", url: "https://who.example/policy", snippet: "…", last_updated: "2026-03-04" },
+    { title: "不是網頁", link: "ftp://files.example/doc.txt", snippet: "" },
+    { title: "另一個站", link: "https://who.example/policy", snippet: "…", date: "2026-03-04" },
   ],
 };
 
@@ -40,8 +40,8 @@ function ctx(): CollectCtx {
 beforeEach(() => {
   // Named explicitly so these generic tests stay valid regardless of which vendor auto-detect
   // would otherwise pick — they exercise the collector's own logic, not vendor selection.
-  vi.stubEnv("COLLECT_SEARCH_PROVIDER", "perplexity");
-  vi.stubEnv("PERPLEXITY_API_KEY", "test-key");
+  vi.stubEnv("COLLECT_SEARCH_PROVIDER", "serper");
+  vi.stubEnv("SERPER_API_KEY", "test-key");
   callProvider = vi.fn(async () => ({ json: async () => RESPONSE }) as unknown as Response);
 });
 
@@ -53,7 +53,7 @@ describe("routing", () => {
   });
 
   it("is inert without a key", () => {
-    vi.stubEnv("PERPLEXITY_API_KEY", "");
+    vi.stubEnv("SERPER_API_KEY", "");
     // Not an error, not a catalogue entry that disappears — just a block that never wins routing,
     // so a deployment without the key behaves exactly as it did before this file existed.
     expect(webSearchCollector.match(target("退貨"))).toBe(0);
@@ -92,17 +92,16 @@ describe("what comes back", () => {
       ctx(),
     );
     const body = callProvider.mock.calls[0][1].body;
-    expect(body.query).toBe("退貨");
-    expect(body.max_results).toBe(20); // asked for 50; the vendor's ceiling is 20
-    expect(body.search_domain_filter).toEqual(["gov.tw", "who.int"]); // scheme and path stripped
-    expect(body.search_recency_filter).toBe("month");
-    expect(body.search_language_filter).toEqual(["zh", "en"]);
+    expect(body.q).toBe("退貨 (site:gov.tw OR site:who.int)"); // scheme and path stripped
+    expect(body.num).toBe(20); // asked for 50; the vendor's ceiling is 20
+    expect(body.tbs).toBe("qdr:m");
+    expect([body.hl, body.gl]).toEqual(["zh-tw", "tw"]); // the first language asked for
   });
 
   it("omits filters that were left blank rather than sending empty ones", async () => {
     await webSearchCollector.run(target("退貨"), ctx());
     const body = callProvider.mock.calls[0][1].body;
-    expect(Object.keys(body).sort()).toEqual(["max_results", "query"]);
+    expect(Object.keys(body).sort()).toEqual(["num", "q"]);
   });
 
   it("refuses an empty query instead of searching for nothing", async () => {
@@ -112,7 +111,7 @@ describe("what comes back", () => {
 
 describe("result hygiene", () => {
   it("drops rows that are not fetchable pages, and duplicates of the same page", () => {
-    const kept = usableResults(RESPONSE.results);
+    const kept = usableResults(RESPONSE.organic.map(({ link, ...r }) => ({ ...r, url: link })));
     expect(kept.map((k) => k.url.hostname)).toEqual(["gov.example", "who.example"]);
   });
 
@@ -138,7 +137,7 @@ describe("a second search vendor", () => {
   };
 
   beforeEach(() => {
-    vi.stubEnv("PERPLEXITY_API_KEY", "");
+    vi.stubEnv("SERPER_API_KEY", "");
     vi.stubEnv("BRAVE_SEARCH_API_KEY", "test-key");
     vi.stubEnv("COLLECT_SEARCH_PROVIDER", "brave");
     callProvider = vi.fn(async () => ({ json: async () => BRAVE }) as unknown as Response);
@@ -176,13 +175,8 @@ describe("a second search vendor", () => {
     // vendor the operator did not choose.
     expect(searchProviderId({ BRAVE_SEARCH_API_KEY: "k" })).toBe("brave");
     expect(searchProviderId({ SERPER_API_KEY: "k" })).toBe("serper");
-    // Perplexity is excluded from auto-detect entirely (operator directive, 2026-09-20) — a leftover
-    // PERPLEXITY_API_KEY alone must not resurrect it, even with no other vendor key present.
-    expect(searchProviderId({ PERPLEXITY_API_KEY: "k" })).toBe("serper");
-    expect(searchProviderId({ SERPER_API_KEY: "k", PERPLEXITY_API_KEY: "k" })).toBe("serper");
-    expect(searchProviderId({ COLLECT_SEARCH_PROVIDER: "brave", PERPLEXITY_API_KEY: "k" })).toBe("brave");
-    // Only a deliberate, explicit override reaches perplexity now.
-    expect(searchProviderId({ COLLECT_SEARCH_PROVIDER: "perplexity", PERPLEXITY_API_KEY: "k" })).toBe("perplexity");
+    expect(searchProviderId({ SERPER_API_KEY: "k", BRAVE_SEARCH_API_KEY: "k" })).toBe("serper");
+    expect(searchProviderId({ COLLECT_SEARCH_PROVIDER: "brave", SERPER_API_KEY: "k" })).toBe("brave");
   });
 
   it("refuses a vendor it has no driver for instead of calling it blindly", async () => {
@@ -192,8 +186,8 @@ describe("a second search vendor", () => {
   });
 });
 
-describe("a third search vendor", () => {
-  // Serper answers the same job with its own shape: POST like Perplexity, but results nested under
+describe("the default search vendor", () => {
+  // Serper answers with its own shape: POST, results nested under
   // `organic`, `link` instead of `url`, and Google's own tbs=qdr:{d,w,m,y} recency vocabulary since
   // Serper proxies Google Search directly. Shape confirmed against the live API, 2026-09-20.
   const SERPER = {
@@ -204,7 +198,6 @@ describe("a third search vendor", () => {
   };
 
   beforeEach(() => {
-    vi.stubEnv("PERPLEXITY_API_KEY", "");
     vi.stubEnv("BRAVE_SEARCH_API_KEY", "");
     vi.stubEnv("SERPER_API_KEY", "test-key");
     vi.stubEnv("COLLECT_SEARCH_PROVIDER", "serper");
@@ -234,11 +227,6 @@ describe("a third search vendor", () => {
     const body = callProvider.mock.calls[0][1].body;
     expect(body.tbs).toBe("qdr:m");
   });
-
-  it("is chosen over a leftover Perplexity key — the exact scenario this switch exists for", () => {
-    vi.stubEnv("COLLECT_SEARCH_PROVIDER", "");
-    expect(searchProviderId({ SERPER_API_KEY: "k", PERPLEXITY_API_KEY: "k" })).toBe("serper");
-  });
 });
 
 describe("the catalogue tells the truth about interchangeable keys", () => {
@@ -255,11 +243,6 @@ describe("the catalogue tells the truth about interchangeable keys", () => {
     const withNeither = describeBlock(webSearchCollector, {})!;
     expect(withNeither.available).toBe(false);
     expect(withNeither.missing.sort()).toEqual(["BRAVE_SEARCH_API_KEY", "SERPER_API_KEY"]);
-
-    // Perplexity alone must NOT show as available — SEARCH_KEYS deliberately excludes it (operator
-    // directive, 2026-09-20), matching searchProviderId's own exclusion above.
-    const withPerplexityOnly = describeBlock(webSearchCollector, { PERPLEXITY_API_KEY: "k" })!;
-    expect(withPerplexityOnly.available).toBe(false);
   });
 
   it("still treats a single-vendor source as all-or-nothing", async () => {

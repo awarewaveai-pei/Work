@@ -172,7 +172,6 @@ All scripts live in this flat directory. Paths are hard-coded as `scripts\<name>
 | Script | Purpose |
 |--------|---------|
 | `grok-cli.ps1` | Grok CLI wrapper |
-| `perplexity-cli.ps1` | Perplexity CLI wrapper |
 | `posthog-api.ps1` | PostHog API wrapper |
 
 ## RAG

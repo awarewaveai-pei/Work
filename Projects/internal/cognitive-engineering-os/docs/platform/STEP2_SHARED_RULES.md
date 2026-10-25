@@ -183,7 +183,7 @@ an error that takes the evidence read down.
 - 「交還控制」 is the system's: `handback` returns the reason; the page shows the count and a button to go on anyway,
   which sends `context["go_on"] = true` (the handback function honours it).
 - Search engines: the platform's account is Serper (Google results; key on the host and in `user-env.ps1`; the operator
-  chose it 2026-09-20). Perplexity is never used (her decision after unexplained charges) — not in any seed, not as a
+  chose it 2026-09-20). Serper and Brave are the only engines — no other in any seed, none as a
   fallback. Brave has no key: it is a `no_key` channel, so a run today has one engine and the page says 「管道不足：只用了
   Serper 一家」; the person decides to go on (the card's stop, honoured). A second engine later = a key, no code change.
 - Languages: the collector searches 中文 and English only. A place whose language is neither is 「管道不足」 with that

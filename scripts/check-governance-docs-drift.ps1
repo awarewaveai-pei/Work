@@ -147,7 +147,7 @@ function Extract-McpNames {
     # Known canonical server names (kept narrow to avoid false positives from random backticks).
     $known = @(
         "n8n", "awarewave-ops", "supabase-awarewave-postgres", "cloudflare", "posthog",
-        "github", "resend", "trigger", "wordpress", "airtable", "perplexity", "replicate",
+        "github", "resend", "trigger", "wordpress", "airtable", "replicate",
         "server-ssh", "canva", "claude-fast", "claude-latest", "chatgpt-fast",
         "chatgpt-latest", "gemini-fast", "gemini-latest", "grok-fast", "grok-latest",
         "work-global"

@@ -284,7 +284,7 @@ searchBlock({
   },
 });
 
-// ④ Serper 即時 Google News（key 在才啟用；替換原 Perplexity 即時 block）
+// ④ Serper 即時 Google News（key 在才啟用）
 searchBlock({
   id: "search/serper",
   title: "Serper 即時",
