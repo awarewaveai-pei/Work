@@ -75,7 +75,7 @@ bash scripts/install-maintenance-crons.sh --host eu
 ### 手動觸發 Docker cleanup（立即執行）
 
 ```bash
-bash /usr/local/bin/docker-weekly-cleanup.sh
+bash /root/lobster-phase1/scripts/docker-weekly-cleanup.sh
 tail -50 /var/log/docker-weekly-cleanup.log
 ```
 

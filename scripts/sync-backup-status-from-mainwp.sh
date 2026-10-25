@@ -52,8 +52,10 @@ cd "$REPO" 2>/dev/null || { log "$REPO missing"; exit 1; }
 # dirty-tree guard below and wedge every future run (critic 2026-06-08 finding #2).
 rm -f agency-os/tenants/*/core/BACKUP_AUTO_STATUS.json.tmp.* 2>/dev/null
 
-# Never operate on a dirty tree -- would risk committing unrelated changes.
-if [ -n "$(git status --porcelain)" ]; then
+# Never operate on a dirty tree -- would risk committing unrelated changes. Untracked files are not that risk (only
+# the BACKUP_AUTO_STATUS.json paths are added) and a stray one wedged every run 2026-09-01..10-25; ff-only still
+# refuses to overwrite one.
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   log "working tree dirty -- aborting (needs manual intervention)"; exit 1
 fi
 

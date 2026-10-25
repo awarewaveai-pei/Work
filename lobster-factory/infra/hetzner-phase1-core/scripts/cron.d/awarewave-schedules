@@ -33,4 +33,4 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 11 1 * * * root /root/lobster-phase1/scripts/cron-run.sh backup_status_sync 'LC_ALL=C.UTF-8 bash /root/Work/scripts/sync-backup-status-from-mainwp.sh >> /var/log/backup-status-sync.log 2>&1'
 17 7 * * * root /root/lobster-phase1/scripts/cron-run.sh routine_watchdog 'LC_ALL=C.UTF-8 /root/Work/scripts/routine-output-watchdog.sh >> /var/log/routine-watchdog.log 2>&1'
 30 2 * * 1 root /root/lobster-phase1/scripts/cron-run.sh certbot_renew '/usr/bin/certbot renew >> /var/log/le-renew.log'
-30 3 * * 0 root /root/lobster-phase1/scripts/cron-run.sh docker_weekly_cleanup '/usr/local/bin/docker-weekly-cleanup.sh'
+30 3 * * 0 root /root/lobster-phase1/scripts/cron-run.sh docker_weekly_cleanup '/root/lobster-phase1/scripts/docker-weekly-cleanup.sh'

@@ -2,7 +2,7 @@
 # Idempotent maintenance installer for the host (rebuilds and re-runs).
 # Schedules are NOT written here any more: since 2026-10-24 every schedule we own lives in scripts/cron.d/*
 # and install-host-schedules.sh installs them (each line runs through cron-run.sh so /ops/schedules shows the
-# outcome). This script installs the helper binaries, the wp-cron-runner logrotate + dead-man registration,
+# outcome). This script installs the wp-cron-runner logrotate + dead-man registration,
 # then calls install-host-schedules.sh, then tightens .env / backup dir permissions.
 #
 # Usage (run as root on the host):
@@ -15,10 +15,6 @@ COMPOSE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 echo "=== install-maintenance-crons START $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
 echo "Compose root : ${COMPOSE_ROOT}"
 echo ""
-
-# cron.d/awarewave-schedules calls /usr/local/bin/docker-weekly-cleanup.sh.
-install -m 0755 "${SCRIPT_DIR}/docker-weekly-cleanup.sh" /usr/local/bin/docker-weekly-cleanup.sh
-echo "  Installed /usr/local/bin/docker-weekly-cleanup.sh"
 
 # Host schedules first: its backup must capture the cron files as they were before anything here rewrites them.
 echo ""

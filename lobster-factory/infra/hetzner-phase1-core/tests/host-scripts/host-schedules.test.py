@@ -113,7 +113,15 @@ class Installer(unittest.TestCase):
         with open(stub, "w", newline="\n") as f:  # crontab -l / -r / <file>, backed by $CT
             f.write('#!/bin/bash\ncase "$1" in -l) [ -s "$CT" ] && cat "$CT" || exit 1;; -r) : > "$CT";; *) cp "$1" "$CT";; esac\n')
         os.chmod(stub, 0o755)
-        self.env = {"CRON_D_DIR": self.dest, "CRON_BACKUP_ROOT": os.path.join(self.t, "bk"),
+        # Every script the cron lines run, as an empty file under CRON_SCRIPT_ROOT (the installer checks they exist).
+        self.root = os.path.join(self.t, "root")
+        for path in glob.glob(os.path.join(SCRIPTS, "cron.d", "*")):
+            for cmd in re.findall(r"cron-run\.sh [a-z0-9_]+ '(.*)'\s*$", open(path, encoding="utf-8").read(), re.M):
+                exe = next((t for t in cmd.split() if "=" not in t and t not in ("bash", "sh", "python3")), "")
+                if exe.startswith("/"):
+                    os.makedirs(os.path.dirname(self.root + exe), exist_ok=True)
+                    open(self.root + exe, "w").close()
+        self.env = {"CRON_D_DIR": self.dest, "CRON_BACKUP_ROOT": os.path.join(self.t, "bk"), "CRON_SCRIPT_ROOT": self.root,
                     "CRON_RUN_JOBS_DIR": os.path.join(self.t, "jobs"), "CT": self.ct,
                     "PATH": bindir + os.pathsep + os.environ["PATH"]}
 
@@ -134,6 +142,18 @@ class Installer(unittest.TestCase):
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         self.assertIn("CRON_TZ", r.stdout)
         self.assertIn("CRON_TZ", open(self.ct).read())
+
+    def test_refuses_a_line_whose_script_is_not_on_the_host(self):
+        open(self.ct, "w").write("")
+        os.remove(self.root + "/root/lobster-phase1/scripts/docker-weekly-cleanup.sh")
+        chk = self.run_inst("--check")
+        self.assertEqual(chk.returncode, 1, chk.stdout + chk.stderr)
+        self.assertIn("MISSING script", chk.stdout)
+        self.assertIn("docker-weekly-cleanup.sh", chk.stdout)
+        r = self.run_inst()
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertEqual(open(os.path.join(self.dest, "lobster-backup")).read(), "0 2 * * * root /old.sh\n")
+        self.assertFalse(os.path.exists(os.path.join(self.dest, "awarewave-schedules")))
 
     def test_install_then_rollback(self):
         root = "*/15 * * * * /root/lobster-phase1/scripts/reconcile-videos.sh\n"

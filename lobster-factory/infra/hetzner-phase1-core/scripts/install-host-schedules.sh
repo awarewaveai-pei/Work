@@ -2,7 +2,7 @@
 # install-host-schedules.sh -- install scripts/cron.d/* as /etc/cron.d/<name> (the repo copy is the SSOT for every
 # schedule we own on the host; report-host-schedules.py flags any /etc/cron.d file that differs from it).
 # Root's crontab is retired: its jobs live in cron.d/awarewave-schedules. Run as root from /root/lobster-phase1/scripts.
-#   --check            show what would change; exit 0 = in sync, 1 = differs. Changes nothing.
+#   --check            show what would change; exit 0 = in sync, 1 = differs or a line's script is missing. Changes nothing.
 #   (no flag)          back up, install, then empty root's crontab -- refused if a root crontab command is not in
 #                      cron.d/awarewave-schedules (it would be lost).
 #   --rollback <dir>   put back the cron files and root crontab saved in <dir> (printed by the install).
@@ -47,6 +47,20 @@ while IFS= read -r line; do
   [[ -n "$line" ]] && uncovered+=("$line (variable line: move it into cron.d/awarewave-schedules by hand)")
 done < <(crontab -l 2>/dev/null | grep -E '^[A-Za-z_][A-Za-z0-9_]*\s*=' || true)
 
+# Every script a line runs must exist on this host: a line pointing at a file nothing deploys fails every run
+# (docker_weekly_cleanup called /usr/local/bin/... -> exit 127 until 2026-10-25). CRON_SCRIPT_ROOT prefixes paths (tests).
+missing=()
+while IFS= read -r n; do
+  while IFS= read -r cmd; do
+    read -ra toks <<< "$cmd"
+    for t in "${toks[@]}"; do
+      [[ "$t" == *=* || "$t" == bash || "$t" == sh || "$t" == python3 ]] && continue
+      [[ "$t" == /* && ! -e "${CRON_SCRIPT_ROOT:-}$t" ]] && missing+=("$n: $t")
+      break
+    done
+  done < <(sed -nE "s/^[^#].*cron-run\.sh [a-z0-9_]+ '(.*)'[[:space:]]*$/\1/p" "$SRC/$n")
+done < <(names)
+
 changed=0
 while IFS= read -r n; do
   if ! cmp -s "$SRC/$n" "$DEST/$n"; then
@@ -61,9 +75,11 @@ while IFS= read -r n; do
 done < <(retired)
 if [[ -n "$(root_lines)" ]]; then changed=1; say "root crontab still has $(root_lines | wc -l) line(s)"; fi
 for l in "${uncovered[@]}"; do say "NOT in cron.d/awarewave-schedules: $l"; done
+for m in "${missing[@]}"; do changed=1; say "MISSING script (that line would fail every run): $m"; done
 
 if [[ "${1:-}" == "--check" ]]; then exit "$changed"; fi
 if (( ${#uncovered[@]} )); then say "ERROR: add the lines above to cron.d/awarewave-schedules first -- nothing installed"; exit 1; fi
+if (( ${#missing[@]} )); then say "ERROR: deploy the missing scripts or fix their paths first -- nothing installed"; exit 1; fi
 for f in "$HERE/cron-run.sh" "$HERE/report-host-schedules.py"; do
   [[ -f "$f" ]] || { say "ERROR: $f missing -- every line calls it; nothing installed"; exit 1; }
 done

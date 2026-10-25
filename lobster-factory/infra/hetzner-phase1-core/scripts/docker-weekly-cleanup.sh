@@ -4,7 +4,7 @@
 # Does NOT remove: running containers, images in use by them, named volumes,
 #                  or anything created in the last 7 days (rollback window).
 #
-# Deployed by: install-maintenance-crons.sh (idempotent)
+# Deployed by: sync-host-scripts.sh (cron.d/awarewave-schedules runs it from /root/lobster-phase1/scripts)
 # Log: /var/log/docker-weekly-cleanup.log (rotated at 5 MB, kept 4 files)
 # Schedule: Sunday 03:00–03:30 UTC (see install-maintenance-crons.sh for exact time per host)
 #
