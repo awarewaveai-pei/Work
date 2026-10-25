@@ -17,6 +17,7 @@ import { DEFAULT_IMAGE_MODEL, IMAGE_RATES } from "@/lib/ai/cost-model";
 import { AI_TEXT_MODEL_GROUPS as AI_MODEL_GROUPS, AI_TEXT_MODELS as AI_MODELS, DEFAULT_AI_TEXT_MODEL } from "@/lib/ai/text-model-options";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 import { useDoorHref, useOnDoor } from "@/app/DoorContext";
+import { ARTICLE_VIDEO_DEFAULTS, parseVoiceModel } from "@/lib/content/video/defaults";
 
 // ─── Video config constants (mirrors VideoStudio) ────────────────────────────
 
@@ -49,10 +50,6 @@ const VOICE_MODELS_VIDEO = [
   { id: "openai:tts-1:onyx",          label: "OpenAI onyx",        lang: "多語", badge: "$0.015/1M" },
   { id: "openai:tts-1-hd:nova",       label: "OpenAI nova HD",     lang: "多語", badge: "$0.030/1M" },
 ];
-function parseVoiceModel(id: string): { ttsProvider: string; ttsVoice: string } {
-  const [provider, ...rest] = id.split(":");
-  return { ttsProvider: provider, ttsVoice: rest.join(":") };
-}
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -622,15 +619,15 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
   useEffect(() => () => { if (videoPollRef.current) clearInterval(videoPollRef.current); }, []);
 
   // Video config (mirrors tools/video config panel)
-  const [videoTotalScenes,  setVideoTotalScenes]  = useState(6);
-  const [videoCustomScenes, setVideoCustomScenes] = useState(3);
-  const [videoImageModel,   setVideoImageModel]   = useState("pexels-all");
+  const [videoTotalScenes,  setVideoTotalScenes]  = useState<number>(ARTICLE_VIDEO_DEFAULTS.sceneCount);
+  const [videoCustomScenes, setVideoCustomScenes] = useState<number>(ARTICLE_VIDEO_DEFAULTS.customScenes);
+  const [videoImageModel,   setVideoImageModel]   = useState<string>(ARTICLE_VIDEO_DEFAULTS.imageModel);
   const [videoVoiceId,      setVideoVoiceId]      = useState(VOICE_MODELS_VIDEO[0].id);
   const [videoStyleZh,      setVideoStyleZh]      = useState("");
   const [videoStyleGroup,   setVideoStyleGroup]   = useState(VIDEO_STYLE_GROUPS[0] ?? "");
   const [videoConfigOpen,   setVideoConfigOpen]   = useState(false);
   // 輸出比例（勾選；預設只 16:9，WP 嵌入用；其他格式走社群發佈）。
-  const [videoFormats,      setVideoFormats]      = useState<Set<string>>(new Set(["16x9"]));
+  const [videoFormats,      setVideoFormats]      = useState<Set<string>>(new Set(ARTICLE_VIDEO_DEFAULTS.formats));
   // Output URLs keyed by format ("16x9"|"9x16"|"4x5") — populated after video generation polling completes.
   const [videoOutputUrls,   setVideoOutputUrls]   = useState<Record<string, string>>({});
 

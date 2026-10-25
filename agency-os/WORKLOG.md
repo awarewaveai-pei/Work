@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-25（續38）全自動內容 P6.2：排程自己做影片、嵌回文章、附到社群草稿；P6.3 查核；P8.3 示範列（Claude）
+
+- **操作者**：「繼續完成阿 為什麼停下來」→ 取消 D3 的一週等待（prod `client_schedules` content_pipeline 1 列且 disabled、`content_topics` 0 列，SSH psql 唯讀查，上線不動任何東西）。
+- **根因／不變量**：影片只在瀏覽器開著輪詢時才嵌回（I4）。現在 §3.2 drafted→waiting_video→embedded 全在 5 分鐘時鐘：
+  - 開始：`NA/lib/content/video/start.ts` `startVideoJob`（自 `app/api/video/generate/route.ts` 抽出，route 變殼）；`beforePrepare` 鉤子讓 tick 在**付費前**用 drafted→waiting_video move 記 `artifacts.video.job_id`，兩次 firing 只有 move 贏的那次 prepare（`tick.ts startVideo`）。
+  - 每次 firing 看一次（`checkVideo`）：讀不到（`job-store.ts readJob` 讀錯即 throw）＝留給下次；`VIDEO_TIMEOUT_MS` 1 小時＝failed；done → claim → `attachTopicVideo`（`make.ts`）URL／嵌入／社群附影片**每步存回列上**（`claimTopic` 帶 artifacts），且外部狀態再查一次（`embedVideoInPost once`：文章已有該 URL 不再寫；貼文已有 media 不再上傳）。
+  - 設定與成本一處：`NA/lib/content/video/defaults.ts`（文章頁預設 6 場景、Pexels 免費實拍、Edge 免費配音、只出 16x9；約 0.05 美元）；ContentStudio 初始值、`topics/cost.ts`、排程格 cost 句都讀它。
+  - 「核准並開始」：影片題目在 content_pipeline 格未開時 409（影片只靠時鐘做完）；收費閘依格式 article→content.article、social→content.syndicate、只影片→video.script。
+- **critic（Opus Deep）**：warn 0c/3m/4n → 全修：M1 attach 後當機重嵌／重傳（每步存＋once＋media 已有就略過）；M2 讀錯當成「工作不見」→ 失敗重付（readJob throw，checkVideo 留列）；M3 手動開始影片題目卡在 drafted（409＋video.script 閘）；m1 無逾時（1 小時）；m2 attach 守衛無測試（加 make-video.test）；m3 計畫 `artifacts.video_job_id` 漂移（改 §3.2）。m4 只影片的題目沒有檢查項→review.pass=false 停在 reviewed（影片在媒體庫）＝刻意，未改。
+- **P6.3**：面板已在 `43e4a50c2` 換成連到社群工具、`publisher.py` 已在 `3ff3f0cfc` 刪；`social-publish`／`social-admin`／`social-channels` 仍有 caller（`ReleaseDeliveryPanel.tsx:90`、`ClientHubTabs.tsx:1892-1972`）→ 照卡「無 caller 才刪」保留，搬遷寫進 TASKS「社群管理平台 V1」同一條。
+- **P8.3**：`RUNNABLE_DEMOS.md` 加 2026-10-25 列（操作者「繼續完成」＝接手 file-claim；對方 hunk 只是 Last synced 時間戳，未帶進本 commit）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/content lib/schedules lib/social lib/portal lib/system-modes lib/security lib/entitlements app/api/video app/api/content`（132 files，925 passed／17 skipped） | exit=0 | ms=9302
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（本改動檔 0 錯；BannerStudioStaff／content/sites／org-search 為他 session 進行中） | exit=0 | ms=3570
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變（各一次，紅→還原綠）：tick `return !!won.row`→true → 「two firings pay for one video」紅；make 拔 job org 檢查 → 「another organization's job」紅；embed 拔 once → once 測紅；make 拔 `!post.media.length` → attach 測紅；start route 拔 `!on` 409 → route 測紅；還原 19/19、27/27 | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/4n（3m＋3n 已修、m4 刻意）
+- ORACLE_WAIVED: Codex 不可用（`~/.codex/config.toml:2` model `gpt-6.1-sol` → model_not_found，見 2026-10-25 續2）；Opus critic 深審＋五個突變證據
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`startVideoJob|readJob|claimTopic|attachVideo|VIDEO_TIMEOUT_MS|ARTICLE_VIDEO_DEFAULTS|video_job_id` | hits=54（video_job_id 3 筆為 PHASE_1B_2 事件表另一概念，非本計畫）
+- **rollback**：`git revert <本 commit>`；無 migration、無設定。上線後要停：關 content_pipeline 格即停（預設關）。
 ## 2026-10-25（續37）wp-bridge 0.18.3：點數包改成一個 `credit_pack` 帶 `plan_key`，不再送 `subscription_paid`（ADR 017 決策 6 = A）（Claude）
 
 - **為什麼**：操作者決策 6 = A，點數包的使用權沒有到期日。舊規則多送一個 `subscription_paid`（`:pack-plan:<plan>`，period_end +1090 天）作廢。伺服器 `next-admin lib/payments/provider.ts:66` 已接受 `credit_pack.plan_key`（選填）；migration 0128 在同一 transaction 寫入方案。

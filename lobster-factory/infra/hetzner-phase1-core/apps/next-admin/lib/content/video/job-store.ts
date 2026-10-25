@@ -121,11 +121,18 @@ export async function createJob(organizationId: string | null): Promise<VideoJob
 }
 
 export async function getJob(id: string): Promise<VideoJob | undefined> {
+  try { return (await readJob(id)) ?? undefined; }
+  catch (e) { console.warn("[job-store] getJob failed:", e instanceof Error ? e.message : e); return undefined; }
+}
+
+/** Like getJob, but a read that failed throws: null = no such job. A sweep must not take "could not read" for "gone"
+ *  (the content pipeline would fail the topic and pay for a second video). */
+export async function readJob(id: string): Promise<VideoJob | null> {
   const supabase = getSupabaseWriteClient();
-  if (!supabase) return undefined;
+  if (!supabase) throw new Error("[job-store] no Supabase client");
   const { data, error } = await supabase.from(TABLE).select("*").eq("id", id).maybeSingle();
-  if (error) { console.warn("[job-store] getJob failed:", error.message); return undefined; }
-  return data ? rowToJob(data) : undefined;
+  if (error) throw new Error(`[job-store] read failed: ${error.message}`);
+  return data ? rowToJob(data) : null;
 }
 
 /** 更新進行中 job 的步驟描述（給 UI 顯示 "正在做什麼"）。best-effort。 */

@@ -59,4 +59,10 @@ describe("embedVideoInPost", () => {
     expect(res).toEqual({ ok: false, blockedMode: "emergency_stop" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
+  it("once: an article that already carries the video is not written again", async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ content: { raw: `intro\n\n${INPUT.videoUrl}\n` } }) });
+    const res = await embedVideoInPost(orgIdentity(ORG), { ...INPUT, once: true });
+    expect(res).toEqual({ ok: true, postId: 5, videoUrl: INPUT.videoUrl });
+    expect(fetchMock).toHaveBeenCalledTimes(1);   // the GET only
+  });
 });

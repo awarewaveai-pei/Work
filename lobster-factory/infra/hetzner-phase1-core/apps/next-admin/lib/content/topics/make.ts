@@ -15,14 +15,18 @@ import { autoPublishes, forbiddenTerms, renderBrandVoice, renderSiteVoice, type 
 import { updateWpPost } from "@/lib/content/publish/wp-post-core";
 import { runContentPipeline, type PipelineFailure } from "@/lib/content/pipeline";
 import { parseArticleMeta } from "@/lib/content/article/meta";
-import { getPost, listAccounts, savePost } from "@/lib/social/store";
+import { addVideo, getPost, listAccounts, savePost } from "@/lib/social/store";
 import { applyAction } from "@/lib/social/actions";
 import { requiresReview } from "@/lib/social/review";
 import { textsForAccounts, writerKeysFor, writeSocialPosts } from "@/lib/social/write-posts";
 import { claudeWriter } from "@/lib/social/write-posts-claude";
 import { articleChecks, reviewOf, socialChecks, type ReviewCheck } from "./review";
 import { claimTopic, dueApproved, inStatus, move, startTopic, type Topic } from "./store";
-import { MakeError, NOW_FORMATS, type Made, type Published, type TickDeps } from "./tick";
+import { startVideoJob } from "@/lib/content/video/start";
+import { finalizeVideoJob } from "@/lib/content/video/finalize";
+import { embedVideoInPost } from "@/lib/content/video/embed-in-post";
+import { ARTICLE_VIDEO_DEFAULTS, articleVideoVoice, parseVoiceModel } from "@/lib/content/video/defaults";
+import { MakeError, NOW_FORMATS, waitsForVideo, type Made, type Published, type TickDeps, type VideoArtifact, type VideoPoll } from "./tick";
 
 /** What content_topics.artifacts holds: one entry per made part; `published` / `sent` once auto publish put it out. */
 export interface TopicArtifacts {
@@ -32,6 +36,8 @@ export interface TopicArtifacts {
   };
   /** post_id null = no channel the writer can write for (the checks say so). */
   social?: { post_id: string | null; checks: ReviewCheck[]; sent?: { state: string; scheduled_at: string | null; at: string } };
+  /** The topic's video job; url once it finished, then when it went into the article and onto the social draft. */
+  video?: VideoArtifact & { embedded_at?: string; media_id?: string };
 }
 
 /** The social post is due this far ahead (state.ts schedule needs a future time; the sender looks 10 min ahead). */
@@ -88,7 +94,9 @@ async function makeSocial(t: Topic, site: SiteBrand, article: TopicArtifacts["ar
   const { ask } = await claudeWriter(await grantFor("content.syndicate"), apiKey, "lib/content/topics/make", null);
   const source = article?.source || [t.title, t.angle ?? ""].filter(Boolean).join("\n\n");
   // No link yet: the article is still a draft. The post gets its link when the article is published.
-  const w = await writeSocialPosts({ article: source, keys, mediaType: "text", voice: renderSiteVoice(site.defaults) }, ask);
+  // a topic with a video gets posts written for one (the video is attached to this draft once it is rendered)
+  const mediaType = waitsForVideo(t) ? "video" : "text";
+  const w = await writeSocialPosts({ article: source, keys, mediaType, voice: renderSiteVoice(site.defaults) }, ask);
   const custom = textsForAccounts(w, accounts);
   const saved = await savePost(t.organization_id, null, null, { body: article?.summary || t.title, notes: `自動內容管線：題目「${t.title}」` },
     accounts.map((a) => ({ account_id: a.id, custom_body: custom[a.id] ?? null })), null, actor);
@@ -151,6 +159,78 @@ async function publishDrafts(sb: SupabaseClient, t: Topic, actor: string): Promi
   return { artifacts: artifacts as Record<string, unknown> };
 }
 
+/** A video job row older than this with nothing submitted is a prepare that died (a prepare takes under ~100s). */
+export const STALE_PREPARE_MS = 15 * 60 * 1000;
+
+/** The topic's video, with the article page's default settings (lib/content/video/defaults.ts) and the site's voice. */
+async function startTopicVideo(sb: SupabaseClient, t: Topic, record: (jobId: string) => Promise<boolean>): Promise<void> {
+  const site = await siteFor(sb, t);
+  if (typeof site === "string") throw new Error(site);
+  await grantFor("video.script");   // what /api/video/generate's withFeature asks before its job row
+  const a = t.artifacts as TopicArtifacts;
+  const d = ARTICLE_VIDEO_DEFAULTS;
+  const started = await startVideoJob(t.organization_id, {
+    topic: t.title, articleTitle: t.title, articleContent: a.article?.source || t.angle || undefined,
+    language: site.defaults.language || "繁體中文", brandVoice: renderSiteVoice(site.defaults),
+    sceneCount: d.sceneCount, customScenes: d.customScenes, brollScenes: d.sceneCount - d.customScenes,
+    imageModel: d.imageModel, outputFormats: [...d.formats], ...parseVoiceModel(articleVideoVoice(site.defaults.language)),
+  }, { beforePrepare: record });
+  const failure = started.ok ? null : (started as Extract<typeof started, { ok: false }>).error;   // strict:false
+  if (failure && failure !== "taken") throw new Error(`影片無法開始：${failure}`);
+}
+
+export async function pollTopicVideo(t: Topic, jobId: string): Promise<VideoPoll> {
+  const { readJob } = await import("@/lib/content/video/job-store");
+  const job = await readJob(jobId);   // a failed read throws: the sweep looks again instead of failing the topic
+  if (!job) return { state: "error", error: "影片工作不見了（超過一小時或已清除），按重試會重做影片" };
+  if (job.organizationId !== t.organization_id) throw new Error("video job of another organization");
+  if (job.status === "running" && !job.euJobId && Date.now() - job.createdAt > STALE_PREPARE_MS) {
+    return { state: "error", error: "影片準備做到一半中斷了" };
+  }
+  const r = await finalizeVideoJob(job);
+  if (r.status === "running") return { state: "running" };
+  if (r.status === "wrong_poller") return { state: "error", error: "影片工作不是這條管線的類型" };
+  if (r.status === "error") return { state: "error", error: r.error ?? "影片渲染失敗" };
+  const { pickPrimaryOutput } = await import("@/lib/content/blocks/video-pipeline");
+  const url = pickPrimaryOutput(r.video?.outputs ?? {});
+  return url?.startsWith("https://") ? { state: "done", url } : { state: "error", error: "影片做好了但沒有可用的網址" };
+}
+
+/** The finished video into the article draft and onto the social draft, each once: every step is saved on the row as it
+ *  is done, and each write also checks the outside state (the article already has the URL, the post already has media),
+ *  so a restart between a write and its save does not do it twice. */
+export async function attachTopicVideo(t: Topic, url: string, actor: string, save: (a: Record<string, unknown>) => Promise<boolean>): Promise<Published> {
+  const prev = t.artifacts as TopicArtifacts;
+  const artifacts: TopicArtifacts = { ...prev, video: { ...(prev.video ?? { job_id: "" }), url } };
+  const video = artifacts.video!;
+  const step = async () => { if (!(await save(artifacts as Record<string, unknown>))) throw new Error("另一次排程接手了這個題目"); };
+  try {
+    if (prev.video?.url !== url) await step();   // the URL first: a retry attaches it instead of making another video
+    const a = artifacts.article;
+    if (a?.wp_post_id && t.site_id && !video.embedded_at) {
+      const r = await embedVideoInPost(orgIdentity(t.organization_id), { siteId: t.site_id, postId: a.wp_post_id, videoUrl: url, once: true });
+      if ("blockedMode" in r) throw new Error(`系統模式（${r.blockedMode}）不允許改網站，影片沒有嵌入`);
+      if (!r.ok) throw new Error(`影片嵌入文章失敗：${(r as Extract<typeof r, { ok: false; status: number }>).error}`);   // strict:false
+      video.embedded_at = new Date().toISOString();
+      await step();
+    }
+    const s = artifacts.social;
+    if (s?.post_id && !video.media_id) {
+      const post = await getPost(t.organization_id, s.post_id);
+      // scheduled, submitted or deleted by a person: theirs, left as it is; media already there: an earlier attempt's
+      if (post.state === "draft" && !post.media.length) {
+        const media = await addVideo(t.organization_id, url, `topic-${t.id}.mp4`, actor);
+        await savePost(t.organization_id, post.id, post.version, {}, null, [{ media_id: media.id, position: 0 }], actor);
+        video.media_id = media.id;
+      } else if (post.media.length) video.media_id = post.media[0].media_id;
+      if (video.media_id) await step();
+    }
+  } catch (e) {
+    throw new MakeError(e instanceof Error ? e.message : String(e), artifacts as Record<string, unknown>);
+  }
+  return { artifacts: artifacts as Record<string, unknown> };
+}
+
 /** The real store and makers behind tickTopics, bound to one organization and the actor the work is done as. */
 export function topicDeps(sb: SupabaseClient, organizationId: string, actor: string): TickDeps {
   const own = (t: Topic) => {
@@ -163,9 +243,12 @@ export function topicDeps(sb: SupabaseClient, organizationId: string, actor: str
     blocker: async (t) => { own(t); const s = await siteFor(sb, t); return typeof s === "string" ? s : null; },
     start: (t, day, cap) => startTopic(sb, t, day, cap),
     move: (t, to, patch) => move(sb, t, to, patch),
-    claim: (t) => { own(t); return claimTopic(sb, t); },
+    claim: (t, patch) => { own(t); return claimTopic(sb, t, patch); },
     make: (t) => { own(t); return runForOrg(organizationId, actor, () => makeDrafts(sb, t, actor)); },
     autoPublishes: async (t) => { own(t); const s = await siteFor(sb, t); return typeof s !== "string" && autoPublishes(s.defaults); },
     publish: (t) => { own(t); return publishDrafts(sb, t, actor); },
+    startVideo: (t, record) => { own(t); return runForOrg(organizationId, actor, () => startTopicVideo(sb, t, record)); },
+    pollVideo: (t, jobId) => { own(t); return pollTopicVideo(t, jobId); },
+    attachVideo: (t, url, save) => { own(t); return attachTopicVideo(t, url, actor, save); },
   };
 }

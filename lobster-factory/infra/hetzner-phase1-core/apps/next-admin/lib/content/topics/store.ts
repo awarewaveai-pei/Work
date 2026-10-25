@@ -134,9 +134,10 @@ export async function move(sb: SupabaseClient, t: Pick<Topic, "id" | "organizati
 
 /** Takes a row for a step that writes outside the database (auto publish): bumps the version it was read at, status
  *  unchanged. null = another caller took it first; only the winner goes on to the outside write. */
-export async function claimTopic(sb: SupabaseClient, t: Pick<Topic, "id" | "organization_id" | "status" | "version">): Promise<Topic | null> {
+export async function claimTopic(sb: SupabaseClient, t: Pick<Topic, "id" | "organization_id" | "status" | "version">,
+  patch: Partial<Pick<Topic, "artifacts">> = {}): Promise<Topic | null> {
   const { data, error } = await sb.from("content_topics")
-    .update({ version: t.version + 1, updated_at: new Date().toISOString() })
+    .update({ ...patch, version: t.version + 1, updated_at: new Date().toISOString() })
     .eq("id", t.id).eq("organization_id", t.organization_id).eq("status", t.status).eq("version", t.version)
     .select("*");
   if (error) fail("claim", error);

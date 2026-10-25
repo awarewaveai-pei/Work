@@ -92,8 +92,8 @@
 | proposed | approved | 人按核准（或 ai_review_auto 自動） | — |
 | approved | generating | `scheduled_for ≤ now` 且當日已啟動 < N | — |
 | generating | drafted | `runContentPipeline(stopBefore:"publish")` → publish 積木 draft（org 身分）→ `artifacts.wp_post_id`；formats 含 social → `writeSocialPosts` → `savePost` draft → `artifacts.social_post_ids` | failed + `last_error` |
-| drafted | waiting_video | formats 含 video：`video/pipeline` prepare → `artifacts.video_job_id` | failed |
-| waiting_video | embedded | `finalizeVideoJob` done → `embedVideoInPost` | error → failed |
+| drafted | waiting_video | formats 含 video：下一次 firing `startVideoJob`（`NA/lib/content/video/start.ts`）；job 列建好、**付費前**先以這次 move 記 `artifacts.video.job_id`（兩次 firing 只有贏的那次 prepare）；設定＝文章頁預設（`NA/lib/content/video/defaults.ts`，約 0.05 美元） | failed |
+| waiting_video | embedded | 每次 firing 看一次：`finalizeVideoJob` done → claim → URL、嵌入（`embedVideoInPost once`）、社群草稿附影片，每步存回列上；讀不到＝下次再看；超過 1 小時＝failed | error → failed |
 | drafted／embedded | reviewed | I5 規則閘（＋可選 Haiku）→ `review` jsonb | review.pass=false → 留 reviewed(草稿) |
 | reviewed | scheduled／published | 僅 `publishMode=ai_review_auto` 且 `review.pass`：排定日未到→scheduled（不送）；否則 WP publish＋社群帶連結 schedule（D9） | failed |
 | scheduled | published | 排定日到：重讀模式後同上發布（改回人審→failed，草稿保留） | failed |
@@ -210,7 +210,7 @@
 |---|---|---|---|
 | P6.1 | `status/route.ts`、`embed-to-wp/route.ts` → 新 `NA/lib/content/video/finalize.ts`＋`embed-in-post.ts`（分兩檔：嵌入不可碰到 video-pipeline 的付費功能） | I4：抽 `finalizeVideoJob(job)`（呼叫端先讀 job、先做自己的存取檢查）、`embedVideoInPost(identity, {siteId,postId,videoUrl,releaseId?,variant?})`；兩 route 變殼；行為不變（卡 `agency-os/handoffs/codex-queue/cards/04-video-finalize-core.md`） | 既有 status／embed 測試綠 |
 | P6.2 | `tick.ts` | §3.2 drafted→waiting_video→embedded：prepare 走 `byId("video/pipeline")`（org 身分）；每 firing `finalizeVideoJob`；done→embed＋社群影片貼文（media 經 social media 表，`uploadVideo` `postiz.ts:194` 由 dispatch 處理）；error→failed | 狀態機測；e2e 關分頁情境仍嵌回 |
-| P6.3 | 刪 `NA/app/api/content/social-publish|social-channels|social-admin`、ContentStudio Postiz 面板、Python `publisher.py` | grep 無 caller 才刪 | tsc 0；doors.test 綠；TASKS.md:131 打勾 |
+| P6.3 | 刪 `NA/app/api/content/social-publish|social-channels|social-admin`、ContentStudio Postiz 面板、Python `publisher.py` | grep 無 caller 才刪。2026-10-25 查：面板已在 `43e4a50c2` 換成連到社群工具、`publisher.py` 已在 `3ff3f0cfc` 刪；三支 route 仍有 caller（`ReleaseDeliveryPanel.tsx:90` social-publish、`ClientHubTabs.tsx:1892-1972` social-admin/channels）→ 保留，搬遷記在 TASKS「社群管理平台 V1」 | tsc 0；doors.test 綠 |
 
 ### P7 YouTube（人工＋Opus 5.5）
 

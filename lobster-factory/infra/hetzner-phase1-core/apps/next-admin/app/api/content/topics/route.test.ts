@@ -6,12 +6,13 @@ const m = vi.hoisted(() => ({
   site: null as null | { siteId: string; organizationId: string | null; name: string; defaults: object },
   topic: null as null | Record<string, unknown>,
   listTopics: vi.fn(), proposeTopics: vi.fn(), move: vi.fn(), setFormats: vi.fn(), proposeMonth: vi.fn(), listFolders: vi.fn(),
+  schedules: [] as Array<{ jobKey: string; enabled: boolean }>,
 }));
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => ({}) }));
 vi.mock("@/lib/content/brand-voice-store", () => ({ loadSiteBrand: async () => m.site }));
 vi.mock("@/lib/kb/folders", () => ({ listFolders: m.listFolders }));
 // the brand's daily limit set on /ops/schedules
-vi.mock("@/lib/schedules/store", () => ({ storedDailyLimit: async () => 3 }));
+vi.mock("@/lib/schedules/store", () => ({ storedDailyLimit: async () => 3, listSchedules: async () => m.schedules }));
 vi.mock("@/lib/entitlements/grant", () => ({ withFeature: (_k: string, h: (r: Request, g: unknown) => unknown) => (r: Request) => h(r, {}) }));
 vi.mock("@/lib/content/topics/plan", () => ({ proposeMonth: m.proposeMonth, planAsker: () => async () => "" }));
 vi.mock("@/lib/content/topics/store", async (orig) => ({
@@ -22,6 +23,7 @@ vi.mock("@/lib/content/topics/store", async (orig) => ({
 import { GET, POST } from "./route";
 import { PATCH } from "./[id]/route";
 import { POST as PLAN } from "./plan/route";
+import { POST as START } from "./[id]/start/route";
 
 const STAFF = { "x-ops-claims-role": "operator", "x-ops-user-kind": "staff" };
 const CLIENT_A = { "x-ops-user-kind": "client", "x-ops-org-id": "org-a" };
@@ -118,5 +120,16 @@ describe("POST /api/content/topics/plan", () => {
     const r = await PLAN(req("/api/content/topics/plan", STAFF, "POST", { siteId: "s1", month: "2026-11" }));
     expect(await r.json()).toMatchObject({ ok: true, added: 2 });
     expect(m.proposeMonth.mock.calls[0][1]).toMatchObject({ organizationId: "org-a", siteId: "s1", month: "2026-11" });
+  });
+});
+
+describe("POST /api/content/topics/[id]/start", () => {
+  it("a topic with video is refused while the brand's content pipeline schedule is off: only the schedule finishes a video", async () => {
+    m.topic = { id: "t1", organization_id: "org-a", status: "approved", version: 2, formats: ["article", "video"] };
+    m.schedules = [{ jobKey: "content_pipeline", enabled: false }];
+    const r = await START(req("/api/content/topics/t1/start", STAFF, "POST", { version: 2 }), idParams);
+    expect(r.status).toBe(409);
+    expect((await r.json()).error).toContain("自動內容管線");
+    expect(m.move).not.toHaveBeenCalled();
   });
 });

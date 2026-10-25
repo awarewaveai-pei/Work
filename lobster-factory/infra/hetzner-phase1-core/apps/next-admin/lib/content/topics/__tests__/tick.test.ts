@@ -2,7 +2,7 @@
 // the start under the per-day cap (0121 content_topics_start).
 import { describe, expect, it } from "vitest";
 import { NEXT, type Topic, type TopicStatus } from "../store";
-import { DAILY_START_CAP, MakeError, STALE_GENERATING_MS, tickTopics, type Made, type Published, type TickDeps } from "../tick";
+import { DAILY_START_CAP, MakeError, STALE_GENERATING_MS, VIDEO_TIMEOUT_MS, tickTopics, type Made, type Published, type TickDeps, type VideoPoll } from "../tick";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 const NOW = new Date("2026-11-03T02:00:00Z");
@@ -25,6 +25,10 @@ function queue(rows: Topic[], make: (t: Topic) => Promise<Made> = async () => ({
   let clock = NOW.getTime();
   const made: string[] = [];
   const published: string[] = [];
+  /** Video jobs: what prepare was paid for, what was closed empty, what each poll answers, what was attached. */
+  const video = { prepared: [] as string[], abandoned: [] as string[], polls: new Map<string, VideoPoll>(), attached: [] as string[],
+    attach: undefined as undefined | ((t: Topic, url: string, save: (a: Record<string, unknown>) => Promise<boolean>) => Promise<Published>) };
+  let jobs = 0;
   const write = (t: Topic, to: TopicStatus, patch: Partial<Topic> = {}) => {
     const cur = db.get(t.id);
     if (!cur || cur.status !== t.status || cur.version !== t.version) return null;
@@ -41,7 +45,7 @@ function queue(rows: Topic[], make: (t: Topic) => Promise<Made> = async () => ({
       if ([...db.values()].filter((r) => r.started_on === day).length >= cap) return null;
       return write(t, "generating", { started_on: day, last_error: null });
     },
-    claim: async (t) => write(t, t.status),
+    claim: async (t, patch) => write(t, t.status, patch ?? {}),
     move: async (t, to, patch) => {
       if (!NEXT[t.status].includes(to)) throw new Error(`${t.status} -> ${to}`);
       return write(t, to, patch);
@@ -49,14 +53,24 @@ function queue(rows: Topic[], make: (t: Topic) => Promise<Made> = async () => ({
     make: async (t) => { made.push(t.id); return make(t); },
     autoPublishes: async () => (typeof pub.auto === "function" ? pub.auto() : pub.auto === true),
     publish: async (t) => { published.push(t.id); return (pub.publish ?? (async () => ({ artifacts: { ...t.artifacts, live: true } })))(t); },
+    startVideo: async (t, record) => {
+      const jobId = `job${++jobs}`;
+      if (await record(jobId)) video.prepared.push(jobId); else video.abandoned.push(jobId);
+    },
+    pollVideo: async (_t, jobId) => video.polls.get(jobId) ?? { state: "running" },
+    attachVideo: async (t, url, save) => {
+      video.attached.push(t.id);
+      if (video.attach) return video.attach(t, url, save);
+      return { artifacts: { ...t.artifacts, video: { ...(t.artifacts.video as object), url, embedded_at: "now" } } };
+    },
   };
-  return { db, deps, made, published, advance: (ms: number) => { clock += ms; } };
+  return { db, deps, made, published, video, advance: (ms: number) => { clock += ms; } };
 }
 
 describe("tickTopics", () => {
   it("starts what is due, makes it and moves it to reviewed with its artifacts and review", async () => {
     const q = queue([topic("a")]);
-    expect(await tickTopics(q.deps)).toBe("interrupted=0 reviewed=1 started=1 drafted=0 failed=0 returned=0 published=0 scheduled=0");
+    expect(await tickTopics(q.deps)).toBe("interrupted=0 reviewed=1 started=1 drafted=0 failed=0 returned=0 published=0 scheduled=0 video_started=0");
     expect(q.db.get("a")).toMatchObject({ status: "reviewed", artifacts: { wp_post_id: 1 }, review, started_on: "2026-11-03" });
   });
 
@@ -103,14 +117,6 @@ describe("tickTopics", () => {
     expect(q.db.get("a")?.status).toBe("failed");
   });
 
-  it("a topic with video stays drafted for the video phase; a video-only topic is not started", async () => {
-    const q = queue([topic("a", { formats: ["article", "video"] }), topic("v", { formats: ["video"] })]);
-    expect(await tickTopics(q.deps)).toContain("drafted=1");
-    expect(q.db.get("a")?.status).toBe("drafted");
-    expect(q.db.get("v")?.status).toBe("approved");
-    await tickTopics(q.deps);
-    expect(q.db.get("a")?.status).toBe("drafted");
-  });
 
   it("a drafted topic left by an earlier firing is reviewed by the next", async () => {
     const q = queue([topic("a", { status: "drafted", review })]);
@@ -220,5 +226,56 @@ describe("auto publish (I5)", () => {
     await Promise.all([tickTopics(q.deps), tickTopics(q.deps)]);
     expect(q.published).toEqual(["a"]);
     expect(q.db.get("a")?.status).toBe("published");
+  });
+});
+
+// P6: drafted -> waiting_video -> embedded, one push per firing; the browser need not stay open.
+describe("video (P6)", () => {
+  const withVideo = (id: string, over: Partial<Topic> = {}) => topic(id, { formats: ["article", "social", "video"], ...over });
+
+  it("drafts first, the next firing starts the video, a later one attaches it when done and reviews the topic", async () => {
+    const q = queue([withVideo("a")]);
+    expect(await tickTopics(q.deps)).toContain("drafted=1");
+    expect(await tickTopics(q.deps)).toContain("video_started=1");
+    expect(q.db.get("a")).toMatchObject({ status: "waiting_video", artifacts: { wp_post_id: 1, video: { job_id: "job1" } } });
+    await tickTopics(q.deps);
+    expect(q.db.get("a")?.status).toBe("waiting_video");
+    q.video.polls.set("job1", { state: "done", url: "https://cdn.example/v.mp4" });
+    expect(await tickTopics(q.deps)).toContain("reviewed=1");
+    expect(q.db.get("a")).toMatchObject({ status: "reviewed", artifacts: { video: { job_id: "job1", url: "https://cdn.example/v.mp4" } } });
+    expect(q.video.attached).toEqual(["a"]);
+  });
+
+  it("two firings at once pay for one video; the other's job is closed empty", async () => {
+    const q = queue([withVideo("a", { status: "drafted", review })]);
+    await Promise.all([tickTopics(q.deps), tickTopics(q.deps)]);
+    expect(q.video.prepared).toHaveLength(1);
+    expect(q.video.abandoned).toHaveLength(1);
+  });
+
+  it("a failed render fails the topic and keeps its drafts", async () => {
+    const q = queue([withVideo("a", { status: "waiting_video", review, artifacts: { wp_post_id: 1, video: { job_id: "j" } } })]);
+    q.video.polls.set("j", { state: "error", error: "EU 500" });
+    expect(await tickTopics(q.deps)).toContain("failed=1");
+    expect(q.db.get("a")).toMatchObject({ status: "failed", last_error: "影片失敗：EU 500", artifacts: { wp_post_id: 1 } });
+    expect(q.video.attached).toEqual([]);
+  });
+
+  it("a retry whose video had finished attaches it without making another; a failed attach keeps what was done", async () => {
+    const url = "https://cdn.example/v.mp4";
+    const q = queue([withVideo("a", { status: "drafted", review, artifacts: { video: { job_id: "j", url } } })]);
+    q.video.attach = async (t) => { throw new MakeError("社群附影片失敗", { ...t.artifacts, video: { job_id: "j", url, embedded_at: "now" } }); };
+    await tickTopics(q.deps);
+    expect(q.video.prepared).toEqual([]);
+    expect(q.db.get("a")).toMatchObject({ status: "failed", last_error: "社群附影片失敗", artifacts: { video: { url, embedded_at: "now" } } });
+  });
+  it("a check that could not look leaves the row for the next firing; a video waiting over an hour fails", async () => {
+    const q = queue([withVideo("a", { status: "waiting_video", review, artifacts: { video: { job_id: "j" } } })]);
+    q.deps.pollVideo = async () => { throw new Error("[job-store] read failed: timeout"); };
+    await tickTopics(q.deps);
+    expect(q.db.get("a")?.status).toBe("waiting_video");
+    q.advance(VIDEO_TIMEOUT_MS);
+    await tickTopics(q.deps);
+    expect(q.db.get("a")).toMatchObject({ status: "failed", last_error: expect.stringContaining("超過一小時") });
   });
 });

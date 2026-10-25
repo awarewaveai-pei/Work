@@ -29,7 +29,7 @@ export type EmbedResult =
  */
 export async function embedVideoInPost(
   identity: Request | { headers: Headers },
-  input: { siteId: string; postId: number; videoUrl: string; releaseId?: string; variant?: string },
+  input: { siteId: string; postId: number; videoUrl: string; releaseId?: string; variant?: string; once?: boolean },
 ): Promise<EmbedResult> {
   // Normalized here, not only in the route: a blank siteId reaching resolveWpSite means "first accessible site".
   const siteId = input.siteId.trim();
@@ -118,6 +118,8 @@ export async function embedVideoInPost(
     return { ok: false, status: 502, error: "Failed to fetch post from WordPress" };
   }
 
+  // once: a caller that may repeat after a crash (the content pipeline) must not append the same video twice
+  if (input.once && currentContent.includes(videoUrl)) return { ok: true, postId, videoUrl };
   if (!currentContent.includes("<!-- VIDEO_PLACEHOLDER -->")) {
     // Placeholder not found — append video at end instead of failing
     currentContent = currentContent.trimEnd() + `\n\n${videoUrl}\n`;

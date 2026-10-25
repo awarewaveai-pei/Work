@@ -17,6 +17,8 @@ export const DAILY_START_CAP = 2;
 export const STALE_GENERATING_MS = 30 * 60 * 1000;
 /** run-due runs jobs one after another; this leaves room under the host cron's 5 minutes. */
 export const TICK_BUDGET_MS = 200_000;
+/** A video still not done this long after it was started has failed (renders take minutes; video_jobs rows live 1h). */
+export const VIDEO_TIMEOUT_MS = 60 * 60 * 1000;
 
 export interface Made { artifacts: Record<string, unknown>; review: TopicReview }
 /** What went out (the article's link, the social post's state), kept on the row. */
@@ -25,8 +27,11 @@ export interface Published { artifacts: Record<string, unknown> }
 export class MakeError extends Error {
   constructor(message: string, readonly artifacts: Record<string, unknown>) { super(message); }
 }
-/** What this phase makes; a topic with neither waits for the video phase (P6). */
-export const NOW_FORMATS: TopicFormat[] = ["article", "social"];
+/** What the pipeline makes; a topic with only youtube waits for the YouTube phase (P7). */
+export const NOW_FORMATS: TopicFormat[] = ["article", "social", "video"];
+
+/** One look at a topic's video job (finalize.ts finalizeVideoJob behind it). */
+export type VideoPoll = { state: "running" } | { state: "error"; error: string } | { state: "done"; url: string };
 
 export interface TickDeps {
   now(): Date;
@@ -36,8 +41,9 @@ export interface TickDeps {
   blocker(t: Topic): Promise<string | null>;
   start(t: Topic, day: string, cap: number): Promise<Topic | null>;
   move(t: Topic, to: TopicStatus, patch?: Partial<Pick<Topic, "artifacts" | "review" | "last_error">>): Promise<Topic | null>;
-  /** Takes the row (version bump, same status) before an outside write; null = someone else has it (store.ts claimTopic). */
-  claim(t: Topic): Promise<Topic | null>;
+  /** Takes the row (version bump, same status) before an outside write; null = someone else has it (store.ts claimTopic).
+   *  With artifacts: also records what an outside write just did, so a restart does not do it again. */
+  claim(t: Topic, patch?: { artifacts: Record<string, unknown> }): Promise<Topic | null>;
   /** The article draft and social drafts of one started topic, and their review. Throws when anything failed. */
   make(t: Topic): Promise<Made>;
   /** The topic's site is set to publish without a person (brand-voice.ts autoPublishes, read now). */
@@ -45,11 +51,21 @@ export interface TickDeps {
   /** Puts a topic's drafts out now (article live, then the social post with its link), re-reading the site's mode first.
    *  Throws when anything failed (a MakeError keeps what already went out, so a retry does not send it twice). */
   publish(t: Topic): Promise<Published>;
+  /** Starts the topic's video (start.ts startVideoJob): `record(jobId)` runs once the job row exists and before anything
+   *  is paid for; false = another firing has the topic, nothing is prepared. Throws when no job could be started. */
+  startVideo(t: Topic, record: (jobId: string) => Promise<boolean>): Promise<void>;
+  pollVideo(t: Topic, jobId: string): Promise<VideoPoll>;
+  /** The finished video into the article draft and onto the social draft. `save(artifacts)` records each step on the row
+   *  as it is done (false = the row was taken). Throws (a MakeError keeps what was done). */
+  attachVideo(t: Topic, url: string, save: (artifacts: Record<string, unknown>) => Promise<boolean>): Promise<Published>;
 }
+
+/** What content_topics.artifacts.video holds (make.ts writes the attach flags). */
+export interface VideoArtifact { job_id: string; url?: string }
 
 export const makesNow = (t: Pick<Topic, "formats">) => t.formats.some((f) => NOW_FORMATS.includes(f));
 /** Video is made after the drafts (P6): such a topic stays 'drafted' until then. */
-const waitsForVideo = (t: Pick<Topic, "formats">) => t.formats.includes("video") || t.formats.includes("youtube");
+export const waitsForVideo = (t: Pick<Topic, "formats">) => t.formats.includes("video") || t.formats.includes("youtube");
 
 const failedPatch = (e: unknown) => ({ last_error: e instanceof Error ? e.message : String(e), ...(e instanceof MakeError ? { artifacts: e.artifacts } : {}) });
 
@@ -91,7 +107,78 @@ export async function publishReviewed(deps: TickDeps, reviewed: Topic): Promise<
   return publishNow(deps, reviewed);
 }
 
-type Outcome = "reviewed" | "drafted" | "published" | "scheduled" | "failed" | "moved_elsewhere";
+type Outcome = "reviewed" | "drafted" | "published" | "scheduled" | "failed" | "moved_elsewhere" | "video_started";
+
+const videoOf = (t: Pick<Topic, "artifacts">) => (t.artifacts as { video?: VideoArtifact }).video;
+const failRow = async (deps: TickDeps, t: Topic, e: unknown): Promise<Outcome> =>
+  (await deps.move(t, "failed", failedPatch(e))) ? "failed" : "moved_elsewhere";
+
+/** embedded -> reviewed, then the same I5 gate as a topic without video. */
+async function reviewEmbedded(deps: TickDeps, embedded: Topic): Promise<Outcome> {
+  const reviewed = await deps.move(embedded, "reviewed");
+  return reviewed ? publishReviewed(deps, reviewed) : "moved_elsewhere";
+}
+
+/** waiting_video -> embedded with the finished video in the article and on the social draft. Claimed first: the
+ *  article's placeholder is replaced once, so two firings must not both write it. */
+async function attachFinished(deps: TickDeps, waiting: Topic, url: string): Promise<Outcome> {
+  const claimed = await deps.claim(waiting);
+  if (!claimed) return "moved_elsewhere";
+  const cur: { row: Topic } = { row: claimed };
+  const save = async (artifacts: Record<string, unknown>) => {
+    const r = await deps.claim(cur.row, { artifacts });
+    if (r) cur.row = r;
+    return !!r;
+  };
+  let out: Published;
+  try {
+    out = await deps.attachVideo(cur.row, url, save);
+  } catch (e) {
+    return failRow(deps, cur.row, e);
+  }
+  const embedded = await deps.move(cur.row, "embedded", { artifacts: out.artifacts });
+  return embedded ? reviewEmbedded(deps, embedded) : "moved_elsewhere";
+}
+
+/** drafted -> waiting_video. The job is recorded on the row (the move) before anything is paid for, so of two firings
+ *  only the one whose move won prepares; the other's job is closed empty. A retry whose video had finished
+ *  (artifacts.video.url) attaches that one instead of making another. */
+async function startVideo(deps: TickDeps, drafted: Topic): Promise<Outcome> {
+  const finished = videoOf(drafted)?.url;
+  if (finished) {
+    const waiting = await deps.move(drafted, "waiting_video");
+    return waiting ? attachFinished(deps, waiting, finished) : "moved_elsewhere";
+  }
+  const won: { row: Topic | null } = { row: null };
+  try {
+    await deps.startVideo(drafted, async (jobId) => {
+      won.row = await deps.move(drafted, "waiting_video", { artifacts: { ...drafted.artifacts, video: { job_id: jobId } } });
+      return !!won.row;
+    });
+  } catch (e) {
+    return failRow(deps, won.row ?? drafted, e);
+  }
+  return won.row ? "video_started" : "moved_elsewhere";
+}
+
+/** One look at a waiting video: still rendering = nothing; failed = the topic fails (its drafts kept); done = attach. */
+async function checkVideo(deps: TickDeps, waiting: Topic, now: Date): Promise<Outcome | null> {
+  const jobId = videoOf(waiting)?.job_id;
+  if (!jobId) return failRow(deps, waiting, new Error("沒有影片工作編號"));
+  if (now.getTime() - Date.parse(waiting.updated_at) >= VIDEO_TIMEOUT_MS) {
+    return failRow(deps, waiting, new Error("影片超過一小時沒有做好，按重試會重做影片"));
+  }
+  let poll: VideoPoll;
+  try {
+    poll = await deps.pollVideo(waiting, jobId);
+  } catch (e) {   // could not look (a read failed): not a failed video -- the next firing looks again, within the timeout
+    console.warn(`[content/topics] ${waiting.id} video check failed: ${e instanceof Error ? e.message : e}`);
+    return null;
+  }
+  if (poll.state === "running") return null;
+  if (poll.state === "error") return failRow(deps, waiting, new Error(`影片失敗：${poll.error}`));
+  return attachFinished(deps, waiting, poll.url);
+}
 
 /** Makes one started topic and moves it on. Never throws for the topic's own failure: that is the row's last_error. */
 export async function makeStarted(deps: TickDeps, started: Topic): Promise<Outcome> {
@@ -118,14 +205,23 @@ export async function tickTopics(deps: TickDeps, opts: { cap?: number; budgetMs?
   const cap = opts.cap ?? DAILY_START_CAP;
   const budget = opts.budgetMs ?? TICK_BUDGET_MS;
   const t0 = deps.now();
-  const n = { interrupted: 0, reviewed: 0, started: 0, drafted: 0, failed: 0, returned: 0, published: 0, scheduled: 0 };
+  const n = { interrupted: 0, reviewed: 0, started: 0, drafted: 0, failed: 0, returned: 0, published: 0, scheduled: 0,
+    video_started: 0 };
 
-  for (const t of await deps.inStatus(["generating", "drafted", "scheduled"])) {
+  for (const t of await deps.inStatus(["generating", "drafted", "waiting_video", "embedded", "scheduled"])) {
     if (t.status === "generating" && t0.getTime() - Date.parse(t.updated_at) >= STALE_GENERATING_MS) {
       if (await deps.move(t, "failed", { last_error: "做到一半中斷了（伺服器重新啟動），按重試會重新製作" })) n.interrupted++;
     } else if (t.status === "drafted" && !waitsForVideo(t)) {
       const reviewed = await deps.move(t, "reviewed");
       if (reviewed) count(n, await publishReviewed(deps, reviewed));
+    } else if (t.status === "drafted") {
+      // a prepare takes up to ~100s: started only while the firing has time for it, else by the next firing
+      if (deps.now().getTime() - t0.getTime() < budget) count(n, await startVideo(deps, t));
+    } else if (t.status === "waiting_video") {
+      const r = await checkVideo(deps, t, t0);
+      if (r) count(n, r);
+    } else if (t.status === "embedded") {   // the move to reviewed was lost (restart): same gate as above
+      count(n, await reviewEmbedded(deps, t));
     } else if (t.status === "scheduled" && !waitsForDay(t, t0)) {
       // its day came: publish re-reads the site's mode, so a switch back to human review wins (the row fails, drafts kept)
       count(n, await publishNow(deps, t));

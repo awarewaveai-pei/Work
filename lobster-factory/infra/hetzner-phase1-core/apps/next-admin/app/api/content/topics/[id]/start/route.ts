@@ -9,9 +9,9 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { thenRun, withFeature } from "@/lib/entitlements/grant";
 import { requestActor } from "@/lib/entitlements/subject";
 import { move, topicById } from "@/lib/content/topics/store";
-import { DAILY_START_CAP, makeStarted, makesNow } from "@/lib/content/topics/tick";
+import { DAILY_START_CAP, makeStarted, makesNow, waitsForVideo } from "@/lib/content/topics/tick";
 import { topicDeps } from "@/lib/content/topics/make";
-import { storedDailyLimit } from "@/lib/schedules/store";
+import { listSchedules, storedDailyLimit } from "@/lib/schedules/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,7 +32,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!t || !canAccessOrg(req, t.organization_id)) return NextResponse.json({ ok: false, error: "topic not found" }, { status: 404 });
   if (t.version !== version) return NextResponse.json({ ok: false, error: "changed elsewhere; reload", topic: t }, { status: 409 });
   if (!["proposed", "approved"].includes(t.status)) return NextResponse.json({ ok: false, error: `a ${t.status} topic cannot be started` }, { status: 409 });
-  if (!makesNow(t)) return NextResponse.json({ ok: false, error: "影片題目要等影片階段上線才能製作" }, { status: 409 });
+  if (!makesNow(t)) return NextResponse.json({ ok: false, error: "只選了 YouTube 的題目要等 YouTube 階段上線才能製作" }, { status: 409 });
+  // the button makes the drafts; the video is started, checked and attached only by the 5-minute schedule (tick.ts)
+  if (waitsForVideo(t)) {
+    const on = await listSchedules(t.organization_id).then((rows) => rows.some((r) => r.jobKey === "content_pipeline" && r.enabled),
+      (e) => { console.error("[content/topics/start] schedule read failed:", e); return null; });
+    if (on === null) return NextResponse.json({ ok: false, error: "schedule could not be read" }, { status: 500 });
+    if (!on) return NextResponse.json({ ok: false, error: "選了影片的題目要先在排程頁 Schedules 打開「自動內容管線」：影片做好、嵌進文章都靠它每 5 分鐘檢查" }, { status: 409 });
+  }
 
   const run = async (): Promise<Response> => {
     try {
@@ -53,10 +60,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ ok: false, error: "topic could not be started" }, { status: 500 });
     }
   };
-  // the paid part it starts: the article when it makes one, otherwise the social rewrite alone (literal keys: the
-  // registry test reads them)
+  // the paid part it starts: the article when it makes one, else the social rewrite, else the video's script (literal
+  // keys: the registry test reads them)
   const opts = { org: () => t.organization_id };
-  return t.formats.includes("article")
-    ? withFeature("content.article", thenRun, opts)(req, run)
-    : withFeature("content.syndicate", thenRun, opts)(req, run);
+  if (t.formats.includes("article")) return withFeature("content.article", thenRun, opts)(req, run);
+  if (t.formats.includes("social")) return withFeature("content.syndicate", thenRun, opts)(req, run);
+  return withFeature("video.script", thenRun, opts)(req, run);
 }
