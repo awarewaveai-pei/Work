@@ -26,6 +26,8 @@ LEDGER_UP = DB / "migrations/0130_billing_ledger.sql"
 LEDGER_DOWN = DB / "migrations/0130_billing_ledger.down.sql"
 ORDER_UP = DB / "migrations/0131_billing_ledger_order_search.sql"
 ORDER_DOWN = DB / "migrations/0131_billing_ledger_order_search.down.sql"
+ATT_UP = DB / "migrations/0132_drop_billing_attention.sql"
+ATT_DOWN = DB / "migrations/0132_drop_billing_attention.down.sql"
 INTERNAL, EDD, SOULFUL = "39ad4149-5044-4077-8d9a-b6b916de0e21", "ecf4e311-4f38-4288-9396-e70fd7697aca", "2bf60452-3d4d-47c2-9970-b9046ed1a35a"
 CUST, BRAND = "00000000-0000-4000-8000-0000000000c1", "00000000-0000-4000-8000-0000000000b1"
 N = 3000
@@ -266,7 +268,17 @@ def main():
         query(DROP_UP.read_text(encoding="utf-8"))
         assert one("select to_regprocedure('public.billing_overview(integer,integer)') is null") == "t"
         print("OK 0129 up, down, up: billing_overview dropped, 0127's reads unchanged; down restores 0120's text and grants")
-        print("PASS 0127 + 0129 + 0130 + 0131")
+        att_src = one("select md5(prosrc) from pg_proc where proname = 'billing_attention'")
+        ledger_before = ledger()["totals"]
+        query(ATT_UP.read_text(encoding="utf-8"))
+        assert one("select to_regprocedure('public.billing_attention(integer,integer)') is null") == "t"
+        assert ledger()["totals"] == ledger_before
+        query(ATT_DOWN.read_text(encoding="utf-8"))
+        assert one("select md5(prosrc) from pg_proc where proname = 'billing_attention'") == att_src
+        assert one("select has_function_privilege('service_role', 'public.billing_attention(integer,integer)', 'execute') and not has_function_privilege('anon', 'public.billing_attention(integer,integer)', 'execute')") == "t"
+        query(ATT_UP.read_text(encoding="utf-8"))
+        print("OK 0132 up, down, up: billing_attention dropped, billing_ledger unchanged; down restores 0127's text and grants")
+        print("PASS 0127 + 0129 + 0130 + 0131 + 0132")
     finally:
         command(["docker", "rm", "-f", NAME], succeeds=False)
 

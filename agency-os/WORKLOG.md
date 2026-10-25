@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-25（續60）next-admin 手動部署 f706f5f0b＋0132 刪 billing_attention（0130 的收縮步，操作者 go）：已套 prod（Claude）
+
+**觸發**：操作者「現在手動部署 next-admin，接著把 billing_attention 刪掉」。接續 57。
+- 部署：主機 `sg-deploy.sh next-admin`（migration 閘、tsc、npm test 閘、healthcheck、HTTP smoke）→ `.deployed-commit` cd42c9030 → f706f5f0b（含 44dd16561／b90f0e20b），`lobster-next-admin` Up (healthy)、無改名。
+- 前提：`git grep billing_attention f706f5f0b` 只剩 0127／0129／0130 migration、verify 腳本；`docker logs lobster-next-admin --since 5m` 無 billing 錯誤。
+- 0132：`drop function billing_attention(integer, integer)`；down 由 0127 原文逐字重建（含權限）；兩處 down。verify 加 0132 up→down→up；payments runner 加 0132。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin → "smoke: all endpoints OK"、deployed commit f706f5f0b | exit=0 | ms=520036
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell scripts/playwright-runner.ps1 -Mode smoke -SkipInstall → 26 passed／6 skipped | exit=0 | ms=33839
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/packages/db/scripts/0127_billing_account_views-local-verify.py（加 0132：刪後 billing_ledger 合計不變；down 還原 0127 md5 與 service_role／anon 權限）→ PASS 0127 + 0129 + 0130 + 0131 + 0132 | exit=0 | ms=37655
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py --suite payments（schema 含 0132）→ 11 passed | exit=0 | ms=10902
+- REALTEST_EVIDENCE: tool=SSH | cmd=`apply-db-migration.mjs 0132` → APPLY_OK；唯讀讀回：ledger 有 0132、billing_attention 不存在、剩 billing_account／billing_apply_payment_event／billing_ledger、`billing_ledger('all')` matching 3；`--status` applied 132；app log 3 分鐘內 0 筆 billing 錯誤 | exit=0 | ms=4552
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（自審：up 一行 drop；down＝0127 原文由腳本擷取，verify md5 對照）
+- ORACLE_WAIVED: 一行 drop＋逐字擷取的 down，由 verify md5 與權限斷言機械比對；0127 本體已經 Codex 審（續56 artifact 720b881d）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=billing_attention | hits=347（WORKLOG／.claude 日誌與 file-history、0127／0129／0130／0132 migration 與 verify 腳本；next-admin app／lib 程式碼 0，`git grep` 部署 commit f706f5f0b 同）
 ## 2026-10-25（續59）ADR 017 賣家 D1–D5 定案（全部照★）寫回 ADR／TASKS；4c 四張執行卡（Claude）
 
 **觸發**：操作者「D1–D5 全部照★建議（Ed25519 公鑰、目錄＋賣家自有方案、resell 權利列、月結報表、一站一帳戶）。寫回 TASKS／ADR 017，開 4c 執行卡。」接續 58。
