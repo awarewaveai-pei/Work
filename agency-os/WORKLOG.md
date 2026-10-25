@@ -1,4 +1,20 @@
 # Worklog
+## 2026-10-25（續71）排程離開 Trigger C4.6⑤：`sync-slack-alert-webhooks.ps1` 不再能把 #infra-alerts 改送別的頻道（讀 vault 新鍵、主機網址不同即停）；Grafana 同步同類錯鍵一併改（Claude）
+
+- **觸發**：操作者「go ahead C4.6⑤」。根因見續61（預設 vault 鍵 `AGENCY_OS_SLACK_WEBHOOK_URL`＝另一頻道）。
+- **改動**（`9e71b1c8c`）
+  - `scripts/sync-slack-alert-webhooks.ps1`：預設鍵 `SLACK_INFRA_ALERTS_WEBHOOK`；主機無值→寫、相同→不寫、不同→exit 3 不寫（`-ReplaceUrl` 才換）；只印 sha 前 10 碼；網址白名單 `^https://hooks\.slack\.com/services/[A-Za-z0-9/_-]+$`；讀回不符→由備份還原；備份留最新 3 份。刪：`/etc/default/awarewave-endpoint-alert` 改寫、Netdata `health_alarm_notify.conf`＋custom_sender、netdata／endpoint-alert 重啟、selftest。
+  - C1（同類）`scripts/sync-grafana-alerting-slack.ps1:2` 預設鍵同錯（其聯絡點＝#infra-alerts）→ 改 `SLACK_INFRA_ALERTS_WEBHOOK`。
+  - 文件：`OBSERVABILITY_P1_P2_ROLLOUT.md:11,121`、`slack-notification-routing.md`（Netdata 段改寫為 Netdata Cloud、invariant 改寫）、`ALERTING-PROVISIONING.md:17`。
+- M1 **操作者動作**：vault 尚無 `SLACK_INFRA_ALERTS_WEBHOOK`，兩個同步工具現在會在連主機前停下（fail-closed）。換網址或新機時：`scripts/secrets-vault.ps1 -Action set-prompt -Name SLACK_INFRA_ALERTS_WEBHOOK`（值＝#infra-alerts，主機 `.env` 同名行 sha `9810b9e962`）。
+- m1 本 session grep 範圍誤含 `mcp/user-env.ps1`，`AGENCY_OS_SLACK_WEBHOOK_URL` 實值印進對話工具輸出（未進 git、未外傳）。是否輪替由操作者決定。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scratchpad/test_slack_sync.py scripts/sync-slack-alert-webhooks.ps1（遠端區塊對假 .env：缺值寫入／相同不寫／不同 exit 3 且不印網址／-ReplaceUrl 換一行／空 .env 寫入／備份留 3）→ 6/6；突變（拔「不同即停」）→ different 案例 FAIL | exit=0 | ms=4000
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/sync-slack-alert-webhooks.ps1 → "Vault missing secret: SLACK_INFRA_ALERTS_WEBHOOK"，未連 ssh | exit=1 | ms=3000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/1m/3n（白名單、讀回失敗還原、grep -c exit 1、註解與備份保留——全修，加 2 測試案例）
+- ORACLE_WAIVED: critic 獨立審＋突變證據；改動為移除＋一個比對守衛，無 auth／金流
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks,.claude | grep=AGENCY_OS_SLACK_WEBHOOK_URL | hits=21（剩 `scripts/notify-ops.ps1:14` 自用、`system-health-check.ps1:410` 關鍵鍵清單、文件已註明「不是 #infra-alerts」、WORKLOG 歷史）；`netdata-ops-inbox-notify` 剩 `lobster-factory/infra/netdata/README.md:28,58`（EU 時期，併 ⑥）
+- **剩餘**：⑥ 舊設定退役（`/etc/default/awarewave-endpoint-alert*`、`slack-webhook-selftest.sh`、netdata README）；⑦ 明早 09:00 每日一行截圖。
+- **rollback**：`git revert 9e71b1c8c`（只動筆電端工具與文件，主機未變）。
 ## 2026-10-25（續70）0133 seller_sites 套 prod＋推 main（操作者 go）：aware-wave.com 一列 hmac-env／active，付款照舊（Claude）
 
 **觸發**：操作者「go ahead：0133 commit 推 main，並同日套到正式庫，套完確認 seller_sites 一列 aware-wave.com／hmac-env／active。」接續 68。
