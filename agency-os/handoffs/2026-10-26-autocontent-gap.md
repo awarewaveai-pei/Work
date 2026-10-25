@@ -34,7 +34,7 @@
 | 路由的權限 | `withFeature("content.plan", …)`＋`canCreateAiImageJob(role)`＋`canAccessOrg`；`maxDuration = 90`（Opus 寫 ~28 題） | `NA/app/api/content/topics/plan/route.ts:17-33` |
 | headless 計費先例 | `runForOrg(organizationId, actor, …)` 內 `grantFor("content.syndicate")` | `NA/lib/content/topics/make.ts:11,99,261`；`NA/lib/entitlements/grant.ts:58,73` |
 | **搜集熱搜** | 只有有人 GET `/api/content/trending?type=trending&geo=..`（文章頁 🔥 熱搜面板）才會 `saveTrends` 存進 `content_trends`；主機上沒有任何腳本／cron 打它 | `NA/app/api/content/trending/route.ts:99-108`；grep `content/trending\|content_trends` 在 `hetzner-phase1-core` 只命中 NA 內部檔 |
-| 熱搜抓取本體 | `runTrending(geo, extraBlocks)`；額外來源 `loadDbSourceBlocks()` 讀 `content_sources`（route 內私有函式）。來源＝Google News RSS（免費）＋ Serper news（有 `SERPER_API_KEY` 才開，~0.001 美元／次） | `NA/app/api/content/trending/route.ts:3,82-96,103`；`NA/lib/content/trending-sources.ts:289-302` |
+| 熱搜抓取本體 | `runTrending(geo, extraBlocks)`；額外來源 `loadDbSourceBlocks()` 讀 `content_sources`（route 內私有函式）。來源五種：Google News RSS、Reddit（地區版）、PTT 八卦（只 TW）、Serper「今日熱門新聞」（有 `SERPER_API_KEY` 才開，~0.001 美元／次）、營運自訂 RSS（env `CONTENT_TRENDING_FEEDS` 或 DB `content_sources`）。**全部只分地區、不分產業、不分客戶**（`content_sources` 沒有 organization 欄）；產業相關性靠提案 prompt 叫 AI 自己過濾（「挑和品牌受眾相關的」）＋知識庫資料夾名稱 | `NA/lib/content/trending-sources.ts:228-300,322-340,353-357`；`NA/app/api/content/sources/route.ts:15-18`；`NA/lib/content/topics/plan.ts:37-41` |
 | 熱搜存檔 | `saveTrends(sb, geo, items)`：`upsert onConflict (hash, fetched_on)`，一天一筆／項，保留 90 天；`recentTrends` 依出現天數排（所以要**每天**存才有意義） | `NA/lib/content/topics/trends.ts:54-66,68-69`；`0121_content_topics.sql:25-27` |
 | 支援的 geo | `TRENDING_GEOS = TW HK SG US GB JP AU` | `NA/lib/content/geos.ts:4` |
 | 客戶的站 | `wp_sites(id, organization_id, active, content_defaults)`；排程頁用 `organization_id` 數站 | `NA/lib/schedules/view.ts:32-38`；`NA/lib/content/brand-voice-store.ts:16-26` |
@@ -53,7 +53,7 @@
 | B2 | 付費步驟 24 小時內最多**嘗試**一次，記號寫在 DB、寫在 `ask` **之前** | 擋「付了錢但答案讀不出來 → 每 5 分鐘再付」；`last_error` 會被清（§2）、in-memory 每晚 03:00 部署重置，都不算 DB |
 | B3 | 一個 firing **要嘛提案、要嘛 tick**；一個 firing 最多提一站 | 提案 ≈ 90 秒、tick 200 秒、run-due 上限 300 秒且 job 依序跑（§2） |
 | B4 | 兩個閘獨立：`topicMode` 只管題目、`publishMode` 只管發布；兩者都嚴格比對值，缺值或亂值＝人 | 操作者定案（§1）；同 `autoPublishes` 的嚴格比對（`brand-voice.ts:107-110`） |
-| B5 | 熱搜每 geo **每天一次**，守衛＝`content_trends` 已有 `(geo, fetched_on=今天 UTC)` 列，不另加狀態 | `recentTrends` 依出現天數排（§2）；公開資料無租戶，兩客戶同 geo 只抓一次 |
+| B5 | 熱搜每 geo **每天一次**，守衛＝`content_trends` 已有 `(geo, fetched_on=今天 UTC)` 列，不另加狀態 | `recentTrends` 依出現天數排（§2）；現有來源全是地區級公開資料（§2 熱搜抓取本體），同地區客戶抓的是同一批，所以一天一次就夠。產業差異目前由提案 prompt 過濾；品牌自己的來源見 §8 |
 | B6 | 排程內每一筆 AI 花費都先出現在 `/ops/schedules` 那格的 `cost` 文字 | 操作者規則「AI 先顯示成本」；數字由 cost-model 算，不手打 |
 | B7 | 設定只有一份：總控頁（卡 C）讀寫的是 `/ops/schedules` 與 `/tools/content/sites` 同一份資料 | 兩份設定遲早不同步 |
 | B8 | 排程內每一筆 AI 花費記在**該客戶**（`runForOrg` ＋ `grantFor("content.plan")`）；客戶沒開通或點數不足（`EntitlementRequired`）＝**跳過、不當故障**：不寫嘗試記號、不開 incident、當次 firing 照常 tick；總控頁顯示「未開通」 | ADR 017：許可只問 `can(主體, feature, actor)`，五種客戶方式（訂閱／點數／買斷…）靠同一條；點數用完的客戶若每天收一張 incident 是噪音，不是故障（`can.ts:122-125`；`products.ts:75` 已登記 `content.plan`） |
@@ -192,6 +192,7 @@
 ## 8. 範圍外（別順手做）
 
 - 「AI 挑題的條件表單」（每月幾題、只要熱搜來源…）：先用品牌語氣當條件；要調的只有 `PLAN_TOPICS=28`（`plan.ts:16`），真有客戶要再開卡。
+- **品牌自己的趨勢來源（產業別）**：現有來源只分地區（§2）。操作者 2026-10-26 問「萬一產業不同」。要做時的形狀（LEGO，不改現有流程）：`content_sources` 與 `content_trends` 各加可空欄 `organization_id`（null＝共用，既有列不動；RLS 同 0136 控制面表模式）；`runTrending(geo, extraBlocks)` 的 `extraBlocks` 已能塞任何 block（`trending-sources.ts:353-357`），所以只是 `loadDbSourceBlocks()` 多撈該客戶自己的列、`saveTrends`／`recentTrends` 多帶 `organization_id`（共用＋自己的一起排）；客戶在 `/tools/content/sites` 填自己產業的 RSS（免費）。付費的「用品牌關鍵字搜新聞」（Serper，每站每天 ~0.001 美元）要另一顆按鈕顯示成本後才開。**是否現在做由操作者決定**；不做也不影響 P9.1–P9.3。
 - 月中才開開關：提的是當月、含已過日期的題目，核准後 tick 依每日上限慢慢消化；不做「改提下個月」。
 - P5 Story Bible 提示片段（`storyBibleContextBlock`、角色 id 提示）仍由頁面組好再送出：另一件事。
 - 真跑一整輪需 staging WP＋測試社群品牌：操作者 10-24 說先不用。
