@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-25（續69）排程離開 Trigger C4.6④：三通道演練通過（Telegram、#ops-incidents、#infra-alerts 各收一則）；演練腳本拿掉不存在的 Netdata 路徑（Claude）
+
+- **觸發**：操作者「go ahead C4.6④」。
+- **修正**（`51891f431`）：`slack-alert-drill.sh` 原第 2 步跑 `alarm-notify.sh test`，宣稱演練 Netdata → Slack／Ops Inbox；ks-aw-01 的 Netdata 走 Netdata Cloud email、主機無 `health_alarm_notify.conf`（續61 查證），演練的是沒人用的路徑 → 刪除並註明原因。
+- m1 `lobster-factory/infra/netdata/README.md:10,71` 仍描述 EU 時期的 custom_sender → Ops Inbox 路徑；未改，併入 C4.6⑥ 退役清點。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/slack-alert-drill.sh（sync 至 51891f431 後）→ `telegram:8286448653=200`、`slack:OPS_INBOX_SLACK_INCIDENTS_WEBHOOK=200`、`slack:SLACK_INFRA_ALERTS_WEBHOOK=200`、`ops_inbox_health_ok` | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=WebFetch | cmd=Slack MCP 讀頻道：#ops-incidents 與 #infra-alerts（C0AUQ7J5789）各有「[DRILL] 2026-10-25T12:34:42Z 主機通知演練…」20:34:43 | exit=0 | ms=2000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n（n1＝netdata README 過時，見 m1）
+- ORACLE_WAIVED: 只刪 2 行指令與改註解，無新邏輯
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks,.claude | grep=netdata_alarm_notify_test_invoked | hits=1（本條 WORKLOG；程式與文件 0）
+- **剩餘**：C4.6 ⑤ 修 `sync-slack-alert-webhooks.ps1`、⑥ 舊設定退役、⑦ 明早 09:00 每日一行截圖。
+- **rollback**：`git revert 51891f431` 後主機 `sync-host-scripts.sh`。
 ## 2026-10-25（續68）ADR 017 賣家 4c-4 commit＋4c-1 migration 0133 寫好待操作者看（不 commit、不套 prod）（Claude）
 
 **觸發**：操作者「開始做 4c-4 與 4c-1：migration 寫好先給我看，不要套 prod。」接續 59。
