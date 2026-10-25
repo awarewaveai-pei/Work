@@ -34,7 +34,13 @@ function nextAdminCallbackPaths(): { file: string; path: string }[] {
 
 describe("Trigger -> next-admin callbacks stay off the session gate", () => {
   it("the scan finds the callers (guards against a silently empty scan)", () => {
-    expect(nextAdminCallbackPaths().length).toBeGreaterThanOrEqual(10);
+    // Named, not counted: a count only tracked how many tasks existed (10 until the timer tasks left Trigger,
+    // handoffs/2026-10-25-schedules-off-trigger C2.3). These callers must be seen, or the scan is broken.
+    const files = nextAdminCallbackPaths().map((c) => c.file.replace(/\\/g, "/"));
+    expect(files).toEqual(expect.arrayContaining([
+      "trigger/tarot-batch-generate.ts", "lib/collection/postResearchRunExecute.ts",
+      "lib/tenant-provisioning/postTenantIntegrationWebhook.ts",
+    ]));
   });
 
   it("every callback path is excluded by the middleware matcher", () => {
