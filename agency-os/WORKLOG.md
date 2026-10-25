@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-25（續63）/ops/billing：客戶帳戶改成左側 sidebar（照 /ops/clients）（Claude）
+
+- **操作者**：「https://app.aware-wave.com/ops/billing 客戶要做成左邊的SIDEBAR」「/ops/clients 有」「顏色圓點 不用」。
+- **改動**：`app/(shell)/ops/billing/page.tsx` 帳戶表格 → 左欄 280px（樣式照 `ops/clients/ClientPanelNav.tsx`，無圓點）：篩選鈕、搜尋（GET 表單，仍是 billing_ledger 的 email／訂單編號搜尋，所以不共用 ClientPanelNav 的 org-search）、每列名稱＋餘額（負數紅）＋代號＋近 30 天 +加/−扣＋本期到＋處理標籤、底部分頁；右邊合計＋選中帳戶明細（BillingTab），沒選時提示。`?account=` 在篩選／搜尋／換頁時保留，只有「關閉」拿掉。合約方案／最後付款只在明細（BillingTab 本來就有）。
+- **critic（Deep，/verify-recent）**：0c/0M/2m/3n → m1 「錢包凍結」斷言被統計卡備註滿足（空斷言）＝改驗 `錢包凍結</span>`；m2 列上少了本期到＝加回；n1 大寫 UUID 列不反白＝`selected` 轉小寫＋測試；n2 兩個 `aria-current="page"`＝列改 `"true"`；n3 `BillingTab` 的 `CONTRACT`／`PAYMENT` export 現無外部引用＝不動（無害）。`billing_ledger` 的 contracts／last_payment 欄位仍算但頁面不用＝留著（下次 migration 再定，不為此開 migration）。
+- **Codex（scoped -Path）**：2m → m1 每帳戶近 30 天加扣點不見（明細只讀 20 筆帳本）＝已修，加回左欄每列；m2 測試沒驗選取保留＝已修，新 `app/(shell)/ops/billing/__tests__/page.sidebar.test.ts`（stub 兩個讀取，跑在 npm test／部署閘；payments.e2e.test.ts 被另一 session 佔用未動）。
+- **畫面**：stub 資料 renderToStaticMarkup → 本機 static server 看 635／1100 寬：左欄、選中高亮、右邊合計＋明細正常；正式站要登入，未看 prod。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py --suite payments`（15 passed，含 /ops/billing 測試，production_touched=false） | exit=0 | ms=11436
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run "app/(shell)/ops/billing/__tests__/page.sidebar.test.ts"`（3 passed，critic 修後） | exit=0 | ms=1639
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（0 行輸出） | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/3n（Codex 2m＋critic 2m 已修；n1 n2 已修、n3 不動）
+- ORACLE_WAIVED: 共用工作樹有其他 session 數十個未提交檔，全樹 review 會審到別人的改動；改用 `codex-oracle.ps1 -Path page.tsx` 範圍審查（`agency-os/reports/oracle/2026-10-25-partialreview-f92c34cf.md`，PARTIAL），兩個 finding 已修
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`billingLedger` | hits=67
+- **rollback**：`git revert <本 commit>`；純唯讀頁面版面，不動資料。
 ## 2026-10-25（續62）全自動內容 P7.1／P7.2：社群工具加 YouTube、題目選 YouTube 自動排進頻道；P7.0 仍等 OAuth 用戶端（Claude）
 
 - **操作者**：「已得到 YouTube api」→ 查 `AWARE_WAVE_CREDENTIALS.md` §9.6（只看結構，值遮罩）：AW、Soulful、Graphic Design 三把都是 YouTube Data API **API Key**——只能讀，不能上傳（videos.insert 要 OAuth scope `youtube.upload` 等，developers.google.com/youtube/v3/docs/videos/insert）。postiz 容器沒有 `YOUTUBE_CLIENT_ID`／`YOUTUBE_CLIENT_SECRET`（`docker inspect` 只看變數名），`FRONTEND_URL=https://postiz.aware-wave.com`，provider 重新導向 `/integrations/social/youtube`（容器內 `youtube.provider.ts:32,306`）。測試狀態的 OAuth app refresh token 7 天過期（developers.google.com/identity/protocols/oauth2）。
