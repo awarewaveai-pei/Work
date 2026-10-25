@@ -205,7 +205,7 @@ export function AccountsCard({ slug }: { slug: string }) {
                     <span key={p.key}>
                       {p.name}：{p.settings ? a.roles[p.key] ?? C.role_none : C.role_open}
                       {p.settings && (
-                        <a href={p.settings} style={{ marginLeft: 6, color: "var(--accent)" }}>{C.role_edit}</a>
+                        <a href={p.settings} style={{ marginLeft: 6, color: "var(--accent-text)" }}>{C.role_edit}</a>
                       )}
                     </span>
                   ))}
