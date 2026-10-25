@@ -38,7 +38,7 @@ case "$PLUGIN" in
 	bridge) SLUG=aware-wave-wp-bridge; PKG=wp-bridge-plugin;        VERSION_CONST=AWBRIDGE_VERSION
 	        NEXT="wp-bridge runs on every managed site -- roll it out: powershell -File scripts/rollout-wp-bridge.ps1 -DryRun, then without -DryRun (High)" ;;
 	store)  SLUG=aware-wave-store;     PKG=aware-wave-store-plugin; VERSION_CONST=AWSTORE_VERSION
-	        NEXT="aware-wave.com only -- powershell -File scripts/rollout-wp-bridge.ps1 -Plugin store -DryRun, then without -DryRun (High)" ;;
+	        NEXT="aware-wave.com only -- first time: powershell -File scripts/rollout-wp-bridge.ps1 -Plugin store -Install -Site lobster-wordpress -DryRun; later: -Plugin store -DryRun; then without -DryRun (High)" ;;
 	*) echo "[release-wp-bridge] ERROR: --plugin must be bridge or store" >&2; exit 1 ;;
 esac
 
@@ -93,23 +93,43 @@ done
 
 # 5. Anything to ship?
 cd "$TMP"
+SYNCED=1
 if [ -z "$(git status --porcelain)" ]; then
-	die "release repo already matches Work at $VER_DEFINE — nothing to sync (did you bump the version?)"
+	# Already mirrored but not tagged (e.g. a previous run stopped at the CI check): resume at the CI check.
+	SYNCED=0
+	say "release repo already matches Work at $VER_DEFINE and $TAG is not tagged yet -- resuming at the CI check"
+else
+	say "files changing in release repo:"
+	git status --short
 fi
-say "files changing in release repo:"
-git status --short
 
 if [ "$DRY_RUN" = "1" ]; then
-	say "DRY RUN — would: commit, push main, tag $TAG, push tag, verify release. Stopping."
+	say "DRY RUN — would: commit, push main, wait for CI to pass, tag $TAG, push tag, verify release. Stopping."
 	exit 0
 fi
 
-# 6. Commit, push main, tag, push tag -> fires release.yml.
-git add -A
-git commit -q -m "release($TAG): sync from Work monorepo
+# 6. Commit, push main, WAIT FOR CI ON THAT COMMIT, then tag -> fires release.yml. release.yml builds from the tag
+#    on its own, so without this wait a release could ship code whose tests fail (Codex 2026-10-25 F1).
+if [ "$SYNCED" = "1" ]; then
+	git add -A
+	git commit -q -m "release($TAG): sync from Work monorepo
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
-git push -q origin HEAD
+	git push -q origin HEAD
+fi
+SHA=$(git rev-parse HEAD)
+say "waiting for CI on $SHA ..."
+CI=""
+for i in $(seq 1 60); do
+	CI=$(gh run list -R "$REPO" --workflow=ci.yml --commit "$SHA" --json status,conclusion -q '.[0] | (.status + " " + (.conclusion // ""))' 2>/dev/null || true)
+	case "$CI" in
+		"completed success") break ;;
+		completed*) die "CI on $SHA ended '$CI' -- nothing tagged. Fix, then rerun (gh run list -R $REPO --workflow=ci.yml)" ;;
+	esac
+	sleep 10
+done
+[ "$CI" = "completed success" ] || die "CI on $SHA did not finish within 10 minutes ('$CI') -- nothing tagged; rerun later to resume"
+say "CI passed"
 git tag "$TAG"
 git push origin "$TAG"
 say "tag pushed — release.yml building zip..."

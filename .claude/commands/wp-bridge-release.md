@@ -41,7 +41,7 @@ bash scripts/release-wp-bridge.sh [--plugin store]
 
 - Release URL：`https://github.com/awarewaveai-pei/aware-wave-wp-bridge/releases/tag/vX.Y.Z`
 - wp-bridge：rollout 到**所有**裝了它的網站：`.\scripts\rollout-wp-bridge.ps1 -DryRun` → `.\scripts\rollout-wp-bridge.ps1`（High；流程與客戶站驗收見 `runbooks/WP-BRIDGE-RELEASE-RUNBOOK.md`「操作者端」）
-- store：只有 aware-wave.com：`.\scripts\rollout-wp-bridge.ps1 -Plugin store -DryRun` → 不帶 `-DryRun`（High）
+- store：只有 aware-wave.com。首次：`.\scripts\rollout-wp-bridge.ps1 -Plugin store -Install -Site lobster-wordpress -DryRun`；之後：`-Plugin store -DryRun`；確認後不帶 `-DryRun`（High）。商店外掛要**先**裝好並啟用，wp-bridge 才能升到 0.19.0+（rollout 會擋）。
 
 ## 失敗排查
 

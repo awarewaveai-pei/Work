@@ -1,4 +1,15 @@
 # Worklog
+## 2026-10-25（續52）Codex 審查續47 拆分：4 項全修（發版要等 CI 綠、商店外掛只准裝在啟用收費的站、bridge 要等商店外掛「啟用中」才升級）（Claude）
+
+- Codex（`agency-os/reports/oracle/2026-10-25-partialreview-f4974ea6.md`）4 項，逐條對照程式碼：全部成立。
+  - F1 `scripts/release-wp-bridge.sh`：推上 main 後馬上打 tag，而 release.yml 是看 tag 自己打包，不等 CI，所以測試沒過也能發版（舊版 wp-bridge 本來就這樣）。改成：先 push，再等**該 commit** 的 ci.yml `completed success` 才打 tag；CI 失敗或超過 10 分鐘就停，不打 tag。重跑時若正本已同步但還沒 tag，從等 CI 那步接著做。
+  - F2 `scripts/rollout-wp-bridge.ps1`：bridge 升到 ≥0.19.0 前，原本只檢查商店外掛檔案在不在；改成 `wp plugin is-active aware-wave-store`。只裝沒啟用＝沒人處理收費。
+  - F3 同檔：`-Install -Site <客戶站>` 會把收費程式裝到客戶站。改成：商店外掛只准用在有 `aware_wave_payments_enabled` 的站（aware-wave.com 開過收費的標記），客戶站一律拒絕。
+  - F4 `release-wp-bridge.sh`：store 發版後印出的下一步沒有首次安裝的指令 → 補上 `-Install -Site lobster-wordpress`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=rollout -Plugin store -Install -Site soulful-wp -DryRun → FAIL not an AwareWave billing site（exit 1）；-Site lobster-wordpress → would install（exit 0）；bridge -DryRun → lobster-wordpress FAIL not installed and active、soulful would upgrade | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n（Codex CLI；4 項全修）
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks,.claude | grep=rollout-wp-bridge.ps1 -Plugin store | hits=4 -- runbook、/wp-bridge-release、release 腳本的 NEXT、rollout 的 .EXAMPLE，都已含首次 `-Install -Site lobster-wordpress`
+- **rollback**：`git revert`。
 ## 2026-10-25（續51）治理：給操作者看的一律繁體中文（AGENTS.md §9 第一條）（Claude）
 
 - **觸發**：操作者 2026-10-25「你們的報告都寫英文, 過程我不管, 報告要用繁中, 你看你要寫在 CLAUDE.MD, 還是 AGENT.MD」。

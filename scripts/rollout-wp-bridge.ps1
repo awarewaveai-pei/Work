@@ -92,12 +92,18 @@ for C in $NAMES; do
   # An installed plugin whose version WP-CLI cannot read (DB hiccup, another plugin's fatal) is not "absent":
   # treating it as a fresh install would skip the folder backup and delete the folder on a failed check.
   if [ "$HAD" = "1" ] && [ -z "$CUR" ]; then echo "$C: FAIL cannot read the installed $SLUG version -- not touched"; fail=1; continue; fi
+  # The store plugin belongs only on a site the operator opted in to AwareWave billing (the option set once on
+  # aware-wave.com); naming a client site with -Site must not put billing there (Codex 2026-10-25 F3).
+  if [ "$SLUG" = "aware-wave-store" ] && ! wpc option get aware_wave_payments_enabled >/dev/null 2>&1; then
+    echo "$C: FAIL not an AwareWave billing site (no aware_wave_payments_enabled) -- aware-wave-store refused"; fail=1; continue
+  fi
   # wp-bridge >= 0.19.0 no longer carries AwareWave billing: a site opted in to billing must have aware-wave-store
   # first, or payments in between are never sent and unverified members can check out.
   if [ "$SLUG" = "aware-wave-wp-bridge" ] && [ "$(printf '%s\n' 0.19.0 "$V" | sort -V | head -1)" = "0.19.0" ] \
      && wpc option get aware_wave_payments_enabled >/dev/null 2>&1 \
-     && ! docker exec "$C" test -f "$PLUG/aware-wave-store/aware-wave-store.php"; then
-    echo "$C: FAIL billing is enabled here but aware-wave-store is not installed -- install it first (-Plugin store -Install -Site $C); not upgraded"
+     && ! wpc plugin is-active aware-wave-store >/dev/null 2>&1; then
+    # Active, not merely present: an inactive store registers nothing either (Codex 2026-10-25 F2).
+    echo "$C: FAIL billing is enabled here but aware-wave-store is not installed and active -- install/activate it first (-Plugin store -Install -Site $C); not upgraded"
     fail=1; continue
   fi
   if [ "$CUR" = "$V" ]; then echo "$C: up to date ($V)"; continue; fi
