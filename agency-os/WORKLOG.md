@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-26（續7）0136 套 prod＋推 main（操作者「直接處理好」）：21 張控制面表成員只剩 SELECT；`current_clerk_org_id_from_jwt` 不再信任 `user_metadata.org_id`（Codex 寫，Claude 審）
+
+- **觸發**：操作者「派 Codex 寫 0136…」「直接處理好 不用看草稿」。依據 `agency-os/reports/audits/2026-10-26-rls-member-write-sweep.md`（卡 06，bc75c667e）。
+- **作者**：Codex 卡 07（`D:/tmp/codex-do`，其 commit 閘因 session ID 擋下，檔案由 Claude 審後複製進 main）。
+- **改動**：`lobster-factory/packages/db/migrations/0136_control_plane_tables_writes_only.sql`（+down、+`packages/db/scripts/` 副本，`cmp` 相同）：21 表 drop `<t>_{insert,update,delete}`＋revoke 六權；函式拿掉 `user_metadata` 分支；結尾逐表斷言。測試 `lobster-factory/packages/db/tests/test_0136_control_plane_writes.py`。`partner_referrals`（待人判）、`sales_leads`（客戶資料）不動。
+- **審查**（Claude，抽查＋寫入點複查）：21 表 app 寫入全走 `getSupabaseWriteClient`；讀 client 僅 GET（`app/api/tools/presets/route.ts:74`）；無 anon-key REST／Python 寫入；套前 prod 63 個非 SELECT 政策名稱與 migration 完全吻合、0 缺表。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m pytest -q lobster-factory/packages/db/tests/test_0136_control_plane_writes.py | exit=0 | ms=16140（5 passed：成員 PATCH/DELETE 前成功後 403、SELECT 照常、service_role CRUD、user_metadata 攻擊前成功後失敗且 app_metadata 正例、down→up；Codex 突變：拿掉 environments drop/revoke → 斷言紅）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`node scripts/apply-db-migration.mjs 0136` | exit=0 | ms=17000（APPLY_OK 1/1；`STATUS_OK {"applied":136}`）
+- REALTEST_EVIDENCE: tool=SSH | cmd=唯讀讀回＋交易內 rollback 探測＋全容器 log 掃描 | exit=0 | ms=5000（21 表非 SELECT 政策 0、anon／authenticated 可寫表 0、service_role 可寫；函式無 user_metadata；authenticated update approvals／delete environments → permission denied；service_role update ops_audit_events 正常；next-admin healthy；全部容器 6 分鐘內 `permission denied for table` 0 筆）
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（Claude 審 Codex 產物；寫入點與 prod 政策名複查）
+- ORACLE_WAIVED: Codex 寫、Claude 審（反向 oracle 即本審查；操作者要求不花 Claude 訂閱，未另跑 claude-oracle.ps1）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=getSupabaseReadClient | hits=3（tenants config:36 GET、tools/designs、tools/presets:74 GET；無寫入）
+- C1（同類，已修）：`lobster-factory/packages/db/scripts/apply-splinter-fixes-one-shot.sql:25` 重建含 user_metadata 的函式 → 拿掉該行。
+- **剩餘**：`partner_referrals` 佣金語意待操作者判。
+- **rollback**：手動 `0136_control_plane_tables_writes_only.down.sql`（還原 63 政策、權限、函式原定義，刪 ledger 列）；`git revert` 本 commit。
 ## 2026-10-26（續6）Soulful 實發：P6 管線產一支 16x9 短片（51 秒）並經社群工具發到 Soulful YouTube（操作者 2026-10-26 授權，Claude）
 
 - **產片**：主機 `/root/lobster-phase1/apps/next-admin` 用 vitest 暫時腳本（容器環境變數，已刪）以 `runForOrg(Soulful 2bf60452…)`＋`grantFor("video.script")` 呼叫 `startVideoJob`（pexels-all 素材、edge 免費語音、4 場景、只 16x9）。video_jobs `ecbea9ce-577f-4f33-b8fb-cb9ec53021e8` done；R2 `…/video/2bf60452_418f06d87f_…/16x9.mp4` 9,502,689 bytes，1920x1080。費用：`ai_call_logs` 該組織該時段合計 US$0.0298（只有腳本；素材與語音免費）。

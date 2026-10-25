@@ -55,3 +55,11 @@ tables=27 holes=21 needs_human=1
 
 - 抽查 `0010:512`（environments_insert）、`0016:56`（ai_image_jobs_insert）、`0010:302`（sales_leads）屬實。
 - 追加 C1（潛伏）：`user_has_org_access`（`0018_rls_initplan_and_workflow_runs_index_dedupe.sql:45-54`）接受 `current_clerk_org_id_from_jwt()`，其來源含 `user_metadata.org_id`（`0018:19`）——GoTrue 讓登入者用 `auth.updateUser({data})` 自改 user_metadata。prod `clerk_organization_mappings` 0 列（2026-10-26 唯讀查證）→ 目前不可利用；一旦新增 mapping 即成跨組織存取。修法：拿掉 `user_metadata` 分支（只信 `app_metadata`／簽發端 claim）。
+
+## 0136 草稿（未套用）
+
+- 使用者 session 寫入盤點：`lib/supabase/route-client.ts:30` 的 `createSupabaseUserClient` 無非測試呼叫點；`lib/supabase/ssr.ts:27,56` 的 browser／middleware client 只用於 `app/login/LoginForm.tsx:29`、`app/portal/login/PortalLoginForm.tsx:35`、`app/login/wp/WpSignIn.tsx:40-57`、`app/login/set-password/SetPasswordForm.tsx:51-74`、`app/LogoutButton.tsx:16` 等 Auth 呼叫。跨正向 migrations 搜尋 21 表的 INSERT／UPDATE／DELETE（含跨行）無命中；SECURITY INVOKER 函式沒有寫這 21 表。伺服端寫入仍走 `lib/supabase-server.ts:29` 的 service role。
+- 納入（21）：`agent_runs`、`ai_image_jobs`、`approval_steps`、`approvals`、`cx_retention_runs`、`cx_upsell_opportunities`、`decision_recommendations`、`decision_scores`、`environments`、`error_events`、`incidents`、`marketing_campaigns`、`media_assets`、`merchandising_insights`、`ops_action_runs`、`ops_audit_events`、`package_install_runs`、`projects`、`sites`、`workflow_runs`、`workspaces`。政策來源逐表見上表 `逐表結果`；up 逐表撤三策／六權並斷言，down 還原 0010／0016 原政策、權限及 0018 函式。
+- 保留於 migration 外：`partner_referrals`（佣金語意待人判）、`sales_leads`（客戶業務資料），依上表判定；21 張控制面表沒有因 app session 或 SECURITY INVOKER 寫入而移出。
+- 測試：`python -m pytest -q lobster-factory/packages/db/tests/test_0136_control_plane_writes.py` → 5 passed（Postgres 15.8／PostgREST 14.6 拋棄式容器）；包含成員 PATCH/DELETE 前後、SELECT、service role CRUD、`user_metadata` 攻擊與 `app_metadata` 正例、down→up。fixture 為避開 `0038_media_assets_reconcile.sql:22` 記錄的 0007／0011 fresh-replay 欄位衝突，先套 0011 再套 0007，其餘相依 migration 照序。
+- 權限突變一次：測試載入 up 時移除 `environments` 的三個 DROP POLICY 與 REVOKE，`test_member_write_blocked_after_0136` 紅（up 的 do-block 報 `environments still has a non-SELECT policy`）；關閉突變後同一測試 1 passed。正式 up 檔無突變。

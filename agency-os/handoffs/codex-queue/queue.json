@@ -136,6 +136,19 @@
           "cmd": "npx tsc --noEmit"
         }
       ]
+    },
+    {
+      "id": "07-rls-0136-control-plane-tables",
+      "file": "cards/07-rls-0136-control-plane-tables.md",
+      "gate": null,
+      "depends": [],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": ".",
+          "cmd": "python -m pytest lobster-factory/packages/db/tests/test_0136_control_plane_writes.py"
+        }
+      ]
     }
   ]
 }

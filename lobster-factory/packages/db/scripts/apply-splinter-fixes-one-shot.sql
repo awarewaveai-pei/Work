@@ -21,8 +21,8 @@ as $$
   select coalesce(
     nullif(trim(j ->> 'org_id'), ''),
     nullif(trim(j ->> 'clerk_org_id'), ''),
-    nullif(trim(j -> 'app_metadata' ->> 'org_id'), ''),
-    nullif(trim(j -> 'user_metadata' ->> 'org_id'), '')
+    nullif(trim(j -> 'app_metadata' ->> 'org_id'), '')
+    -- no user_metadata: the signed-in user can rewrite it (0136)
   )
   from (select auth.jwt() as j) s;
 $$;
