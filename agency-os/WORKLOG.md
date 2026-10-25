@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-25（續64）排程離開 Trigger C4.6②：告警／每日一行兩行 cron 裝上；先修兩個長期紅的排程（docker 清理 127、備份同步 dirty）；備份同步推不上 GitHub＝待決（Claude）
+
+- **觸發**：操作者「先修 再go ahead」（續61 後：C2.2 驗收時發現兩列紅，裝告警後會立刻推播）。
+- **C2.2 實況**（12:03Z 前）：9 列中 social_dispatch／cs_inbound_sweep／pod_order_inbox_sweep／dispatch_action_run／site_watch_tick／ao_infrastructure_check exit 0 且未逾期；social_metrics（19:30Z）、social_rotation（00:05Z）、entitlements_expire（01:00Z）未到首跑＝「沒有紀錄」（`missing`，不在 `ALERT_STATES`，不推播）。線上 next-admin（11:04 部署）含 `/api/internal/schedules/alerts` 與 9 列登記（container chunk grep）。
+- **根因**
+  - C1 `docker_weekly_cleanup` exit 127：cron.d 呼叫 `/usr/local/bin/docker-weekly-cleanup.sh`，只有 `install-maintenance-crons.sh` 會放，ks-aw-01 從沒跑過。改呼叫 `sync-host-scripts.sh` 維護的 `/root/lobster-phase1/scripts/` 那份；刪 `/usr/local/bin` 安裝（第二條部署路徑）。
+  - C2 `backup_status_sync` exit 1 自 2026-09-01（log 55 行全 dirty）：主機 `/root/Work` 兩個未追蹤舊檔（2026-05 compose `.bak`、2026-09 `rollback.log`）觸發 `git status --porcelain`。腳本只 `git add` BACKUP_AUTO_STATUS.json，未追蹤檔不會混進 commit → 守衛改 `--untracked-files=no`（ff-only 仍拒覆蓋）。兩檔移至 `/root/lobster-phase1/.state/work-strays-20261025T1203*`（未刪）。
+  - C3（整類）：`install-host-schedules.sh` 列出腳本不存在的 cron 行（`--check` exit 1），安裝拒絕；`CRON_SCRIPT_ROOT` 供測試。
+  - M1 **待決**：備份同步過了 dirty 後 commit 成功、push 失敗——主機 `/root/.ssh/work_deploy` 是唯讀 deploy key（`Please make sure you have the correct access rights`）。搬機後從未成功過。主機本地 commit `3fbff0d98` 已 `git reset --keep origin/main` 退掉（內容下輪重產）。選項：給 deploy key 寫入權（主機被入侵＝可直推 main），或照 C6 改成主機寫 `/var/lib/awarewave/*.json`、筆電讀（不推 git）。
+- **上線**：push `c7ccfb239` → 主機 `sync-host-scripts.sh`（4 檔）→ `install-host-schedules.sh --check`（無 MISSING）→ 安裝，備份 `/root/lobster-phase1/.state/cron-backup-20261025T120342Z`。docker 清理手動跑一次 exit 0；report 重產 drift=[]。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/host-schedules.test.py → Ran 13 OK；突變（刪 `missing+=`）→ test_refuses_a_line_whose_script_is_not_on_the_host FAIL，還原綠 | exit=0 | ms=16720
+- REALTEST_EVIDENCE: tool=SSH | cmd=`/var/lib/awarewave/jobs/schedule_alerts.json` 12:10:01Z exit_code=0；`ops_incidents` source=schedule 只 1 列 `host-schedule:backup_status_sync|open|failed: 執行結束但失敗，結束代碼為 1。`（＝送出一則、記錄一則）；docker_weekly_cleanup exit 0 | exit=0 | ms=4000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（自審：解析只看 cron-run.sh 單引號內第一個非 VAR=/直譯器 token；`cd …` 行略過；主機實跑無誤報）
+- ORACLE_WAIVED: 18 行 bash 檢查＋一個 git flag；突變證據證明測試守住守衛，主機 `--check` 實跑無誤報
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks,.claude | grep=usr/local/bin/docker-weekly-cleanup | hits=4（改後全為歷史記錄：WORKLOG.md 本條×2、WORKLOG-archive/2026-06.md×2；改前另 4 處 cron.d、install-maintenance-crons.sh×2、MAINTENANCE_CALENDAR.md:78 已於 c7ccfb239 修）
+- **剩餘**：C4.6 ③–⑦；M1 待操作者選；C2.2 等三個每日工作首跑（最晚 10-26 01:00Z）。
+- **rollback**：`sudo /root/lobster-phase1/scripts/install-host-schedules.sh --rollback /root/lobster-phase1/.state/cron-backup-20261025T120342Z`；repo `git revert c7ccfb239`。
 ## 2026-10-25（續63）/ops/billing：客戶帳戶改成左側 sidebar（照 /ops/clients）（Claude）
 
 - **操作者**：「https://app.aware-wave.com/ops/billing 客戶要做成左邊的SIDEBAR」「/ops/clients 有」「顏色圓點 不用」。
