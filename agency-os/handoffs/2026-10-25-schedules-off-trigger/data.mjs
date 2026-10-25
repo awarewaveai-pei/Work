@@ -39,6 +39,7 @@ const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 const C1 = '72d15254c';
 const C21 = 'ea968aca1';
 const C4 = '6b06e0743';
+const C44 = 'b9ab5a4f2';
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '定時工作改由主機啟動', plain: '例：社群貼文每 5 分鐘發送一次，改由主機直接啟動。9 個定時工作維持原有頻率。另刪除 1 個重複工作。',
@@ -81,12 +82,12 @@ export const STEPS = [
     what: 'HS/notify.sh 統一變數名；report-host-schedules.py 狀態變化推播＋每日 01:00 UTC 摘要；5 支舊發送改用 notify.sh；.env 改名',
     files: ['HS/notify.sh', 'HS/report-host-schedules.py', 'HS/endpoint-alert.sh', 'HS/check-drift-and-alert.sh', 'HS/auto-deploy-next-admin.sh', 'HS/reconcile-videos.sh', 'scripts/routine-output-watchdog.sh'],
     items: [
-      todo('C4.1', '共用一支腳本發送 Telegram 與 Slack 通知。統一設定名稱。'),
+      done('C4.1', '共用一支腳本發送 Telegram 與 Slack 通知。統一設定名稱。', C44),
       done('C4.2', '排程標紅時通知一次。恢復時再通知一次。持續異常不重複通知。', C4),
       done('C4.3', '每天早上 9 點發送一行訊息：全部正常，或列出異常排程。', C4),
-      todo('C4.4', '主機上自己發通知的 8 支腳本改用共用通知腳本，其中 2 支先收進程式庫。這些腳本失敗時的通知，C4.2 已涵蓋。'),
-      todo('C4.5', '測試標紅時通知一次。恢復時再通知一次。相同狀態不重複通知。'),
-      todo('C4.6', '經你同意後，在正式主機安裝通知與每日報告兩個排程；重複的通知設定檔退役。提供第一則每日通知的截圖。'),
+      done('C4.4', '主機上自己發通知的 7 支腳本改用共用通知腳本，各自原本的 Slack 頻道保留。', C44),
+      done('C4.5', '測試標紅時通知一次。恢復時再通知一次。相同狀態不重複通知。', C44),
+      todo('C4.6', '經你同意後在正式主機上線：寫入 #infra-alerts 設定、安裝通知與每日報告兩個排程、更新開機通知、演練三個通道。提供第一則每日通知的截圖。'),
       done('C4.7', '訂單重送與後台操作補派兩個工作，改成回報實際結果。目前收到要求就回報成功，實際失敗時排程頁仍會顯示綠色。', C4),
     ] },
   { n: 5, code: 'C5', group: 'D', title: '補齊排程頁的工作清單', plain: '例：Supabase 每天凌晨清理舊紀錄的工作，在 2026-10-24 失敗卻無人察覺。之後這類失敗會在 /ops/schedules 標紅。頁面也會列出 n8n、GitHub 與雲端報告的排程。',
