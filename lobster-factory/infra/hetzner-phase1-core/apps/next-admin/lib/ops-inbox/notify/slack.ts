@@ -61,11 +61,22 @@ export class SlackNotifier implements Notifier {
       ],
     };
 
+    return this.post(body);
+  }
+
+  /** Pre-formatted text, same channel (the host-schedule alerts, lib/schedules/alerts.ts). */
+  async sendText(text: string): Promise<NotificationResult> {
+    if (!this.webhookUrl) return { status: "failed", error: "webhook_url_missing" };
+    return this.post({ text });
+  }
+
+  private async post(body: unknown): Promise<NotificationResult> {
     try {
       const r = await fetch(this.webhookUrl, {
         method: "POST",
         headers: { "content-type": "application/json; charset=utf-8" },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(10_000),
       });
       if (!r.ok) return { status: "failed", error: `slack_${r.status}` };
       return { status: "sent" };

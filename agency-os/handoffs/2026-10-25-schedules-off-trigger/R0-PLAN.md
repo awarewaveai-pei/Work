@@ -88,12 +88,12 @@ push `packages/workflows` 即觸發 Trigger 部署（`.claude/hooks/post-push-tr
 
 | 卡號 | 做什麼 |
 |---|---|
-| C4.1 | `HS/notify.sh <level> <text>`：Telegram＋Slack 兩邊送；變數統一 `TELEGRAM_BOT_TOKEN`、`TELEGRAM_CHAT_IDS`、`SLACK_WEBHOOK_URL`；HTTP 非 200 → exit 1 |
-| C4.2 | `report-host-schedules.py`：每列判 stale（`staleAfterMs` 同 `cron-cadence.ts:77`）或 failed；與 state 檔比對，變紅／恢復各送一則 |
-| C4.3 | 每日 01:00 UTC（09:00 台北）一行：「N 個排程全部正常」或列出紅列；這行沒來＝告警壞了 |
-| C4.4 | 5 支舊發送改呼叫 `notify.sh`，刪各自 curl；備份完整性、部署版本因此兩邊都送 |
+| C4.1 | `HS/notify.sh`：主機腳本唯一發送出口，讀 `.env` 的 NA 同名變數（`TELEGRAM_BOT_TOKEN`、`OPS_INBOX_TELEGRAM_CHAT_IDS`、`OPS_INBOX_TELEGRAM_NOTIFY_ENABLED`、`OPS_INBOX_SLACK_INCIDENTS_WEBHOOK`；不改名），token／webhook 不進 argv；任一已設通道失敗 → exit 1 |
+| C4.2 | 判斷只一處＝NA `hostStatusRows`（頁面同源，不在 Python 重寫）：`NA/lib/schedules/alerts.ts`＋`/api/internal/schedules/alerts`（cron `*/10` poke）；failed／stale 變紅一則、恢復一則、持續不重送；狀態＝`ops_incidents`（`host-schedule:<key>`，open＝已通知），先送後記；不經 inbox dispatcher（它每 15 分重送，`notify/rules.ts:53-61`） |
+| C4.3 | 同 route `?digest=1`，cron `0 1 * * *`（09:00 台北）：「N 個排程全部正常」或列出需注意；這行沒來＝告警壞了 |
+| C4.4 | 舊發送改呼叫 `notify.sh`，刪各自 curl：repo 內 6 支（`endpoint-alert.sh`、`auto-deploy-next-admin.sh`、`check-drift-and-alert.sh`、`reconcile-videos.sh`、`verify-backup.sh`、`scripts/routine-output-watchdog.sh`）＋主機上未進 repo 的 2 支（`/root/scripts/verify-backup-eu.sh`、`verify-backup-ks-aw-01.sh`，先收進 repo）。備份完整性／部署版本失敗的兩邊通知已由 C4.2 涵蓋（任一排程 exit≠0 即通知） |
 | C4.5 | `slack-alert-drill.sh` 改演練 `notify.sh`；本機假 webhook 驗變紅一則、恢復一則、重複不送 |
-| C4.6 | 上線：主機 `.env` 舊變數名改新名（High）；第一則每日一行截圖給操作者 |
+| C4.6 | 上線（High）：`install-host-schedules.sh` 裝 alerts／digest 兩行；`/etc/default/awarewave-endpoint-alert.telegram` 與 `.local` 中與 `.env` 相同的值退役（endpoint-alert 專屬 Slack 頻道 `WEBHOOK_URL` 移入 `.env`）；第一則每日一行截圖給操作者 |
 | C4.7 | 兩列「先回答再做」會綠而實際失敗（critic 2026-10-25 L4）：`pod-orders/sweep` 在 `after()` 才 drain（`route.ts:20-24`）；`dispatch-action-run` 失敗列記 `dispatch_failed` 但回傳無 `status`（`dispatch-action-run.ts:208,256`）→ 改回報真實結果 |
 
 ### C5 排程頁補齊外部時鐘

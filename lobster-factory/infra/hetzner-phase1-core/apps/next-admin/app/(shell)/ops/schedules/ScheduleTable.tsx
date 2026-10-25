@@ -55,7 +55,7 @@ const T = {
   errSave: "儲存失敗，錯誤代碼：",
   errLoad: "頁面載入失敗，錯誤代碼：",
   server: {
-    ok: "正常", stale: "長時間未回報", missing: "尚無資料", failed: "執行失敗",
+    ok: HOST_UI.state_ok, stale: HOST_UI.state_stale, missing: HOST_UI.state_missing, failed: HOST_UI.state_failed,
     unregistered: HOST_UI.state_unregistered, untracked: HOST_UI.state_untracked,
   } as Record<SystemRow["state"], string>,
   group: { backup: HOST_UI.group_backup, deploy: HOST_UI.group_deploy, site: HOST_UI.group_site } as Record<NonNullable<SystemRow["group"]>, string>,

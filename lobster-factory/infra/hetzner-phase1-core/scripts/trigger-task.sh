@@ -46,7 +46,7 @@ while (( $(date +%s) < deadline )); do
   case "$status" in
     COMPLETED)
       [[ "$(printf '%s' "$r" | jq -r '.output.status // empty')" == fail ]] \
-        && fail "$run completed with status fail: $(printf '%s' "$r" | jq -c '[.output.checks[]? | select(.status == "fail")]' | head -c 300)"
+        && fail "$run completed with status fail: $(printf '%s' "$r" | jq -c '.output | if .checks then [.checks[] | select(.status == "fail")] else . end' | head -c 300)"
       exit 0 ;;
     CANCELED|FAILED|CRASHED|SYSTEM_FAILURE|EXPIRED|TIMED_OUT|INTERRUPTED)
       fail "$run ended $status" ;;

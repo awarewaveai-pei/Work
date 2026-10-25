@@ -1,4 +1,23 @@
 # Worklog
+## 2026-10-25（續48）排程離開 Trigger C4.2／C4.3／C4.7：排程變紅／恢復各一則＋每日 09:00 一行（Telegram＋Slack）；兩個「先回答再做」的工作改報真實結果（Claude）
+
+- **觸發**：操作者「開始 C4」。監工台 https://claude.ai/artifact/QsgquXzuzi1oQ8FCVoRrAZ
+- **不變量**：任何主機排程變紅，一個週期內到手機；安靜可分辨「正常」與「告警壞了」；排程頁的綠＝工作真的成功。
+- **設計（相對計畫的改變，計畫 §6 C4 已同步）**：判斷只一處＝NA `hostStatusRows`（頁面同源），不在 `report-host-schedules.py` 用 Python 重寫；狀態用 `ops_incidents`（`host-schedule:<key>`，open／investigating／ignored＝已通知）；直接送，不經 inbox dispatcher（`notify/rules.ts:53-61` 每 15 分重送）。`.env` 變數不改名：主機與 NA 已共用 `TELEGRAM_BOT_TOKEN`／`OPS_INBOX_TELEGRAM_CHAT_IDS`／`OPS_INBOX_SLACK_INCIDENTS_WEBHOOK`（雜湊比對：`/etc/default/awarewave-endpoint-alert.telegram` 與 `.local` 的值和 `.env` 相同；只有 endpoint-alert 的 `WEBHOOK_URL` 是另一個 Slack 頻道）。
+- **做了什麼**：
+  - `NA/lib/schedules/alerts.ts`：`planAlerts`（純函式）、`formatChange`／`formatDigest`、`runScheduleAlerts`（先送後記；全未送達＝不記，下輪重試）、`runScheduleDigest`。恢復只認「仍列出且 ok／untracked」；回報器（`host_schedules`、`host_schedules_report`）壞時只通知它一則、其他不動。
+  - `NA/app/api/internal/schedules/alerts/route.ts`（`SCHEDULE_INGEST_TOKEN`；`?digest=1`）；Telegram uncertain 算送達不算完整。
+  - `SlackNotifier.sendText`＋10 秒逾時；頁面狀態字樣移到 `HOST_UI`（頁面與訊息同一份）。
+  - cron `schedule_alerts */10`、`schedule_digest 0 1 * * *`（09:00 台北）＋ `host-jobs.ts` 兩列。
+  - C4.7：`dispatch-action-run` 回傳 `status: fail`（只算無法派送；政策擋下＝pass），原本被擋也算 dispatched（測試寫死舊錯誤值，已改）；`pod-orders/sweep` 等 drain 完才回答，drain 錯 → 500。
+- **C4.1／C4.4 未做（範圍變大，待操作者）**：自發通知的主機腳本實為 8 支（repo 6 支＋主機 `/root/scripts/` 未進 repo 的 `verify-backup-eu.sh`、`verify-backup-ks-aw-01.sh`）；它們「失敗」已由 C4.2 涵蓋（exit≠0 即兩邊通知）。
+- **更正**：先前以 ubuntu 身分讀 `/root/lobster-phase1/.env` 得空結果、誤以為部署／drift 告警沒送；以 root 讀：變數在、log 有 `telegram sent: HTTP 200`（10-24）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin `npx vitest run lib/schedules lib/ops-inbox app/api/internal/pod-orders lib/portal/__tests__/host-loopback-callers.test.ts`（177 pass，含 schedule-alerts 10 例）＋ workflows `dispatch-action-run.test.ts`（5 pass，含 unknown action_key → fail）＋ `npx tsc --noEmit`（改動檔 0 error；其他 session 檔有既存錯誤）＋ `bash -n trigger-task.sh` | exit=0 | ms=3000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/2m/5n（critic agent）：M1 單一通道壞→本工作自我告警迴圈、M2 清單讀不到→全部誤報恢復、m1 忽略被下一輪推翻、m2 Telegram uncertain 每輪重送、m3 回報器停→一則 37 列、m4 字樣與頁面不一致、s1 Slack 無逾時、s3 log 欄位 → 皆修並補測試；m5（Trigger 舊 pod-sweep 30 秒逾時，C2.3 刪除前偶發紅 run）接受；s2（route 接線測試）不做：判斷邏輯已全測，route 只轉接。
+- ORACLE_WAIVED: codex-oracle 本日三次 no final message（續40）；改 critic agent 獨立審。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=scheduled: ?true|dispatched:|new SlackNotifier | hits=3（`pod-order-inbox-sweep.test.ts` 自帶 mock，C2.3 刪；`dispatcher.ts:13` send 行為不變；新 route）
+- **剩餘**：cron 兩行未安裝（C4.6，High）；NA 程式台灣 03:00 自動部署後生效；C4.1／C4.4 待決定。
+- **rollback**：`git revert <本 commit>`；主機無變更。
 ## 2026-10-25（續47）收費拆出 wp-bridge：新外掛 `aware-wave-store` 1.0.0（只裝 aware-wave.com），wp-bridge 0.19.0 不含收費；尚未發版、尚未上線（Claude）
 
 - **根因**（操作者：「這個外掛主要是讓所有的 ai 都可以進去管 wp，不是只有 AW 可以用」）：wp-bridge 是每個網站都裝的 AI 通道（每個 agent 一把金鑰，`includes/Auth/KeyRecord.php`）。AW 自己的收費（ADR 017 4b-2）卻放在它的 `includes/Billing/`。結果是收費出現在客戶站（0.18.0/0.18.1），之後每次升級都得靠開關、逐站檢查。

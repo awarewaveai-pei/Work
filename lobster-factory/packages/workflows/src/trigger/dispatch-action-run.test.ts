@@ -20,7 +20,7 @@ vi.mock("../observability/sentry", () => ({ captureWorkflowException: vi.fn() })
 const RUN_ID = "11111111-1111-4111-8111-111111111111";
 const ACTION_ID = "22222222-2222-4222-8222-222222222222";
 const ORG_ID = "33333333-3333-4333-8333-333333333333";
-type DispatchResult = { dispatched: number; total?: number };
+type DispatchResult = { status: string; dispatched: number; blocked: number; failed: number; skipped: number; total: number };
 
 function baseRun(overrides: Record<string, unknown> = {}) {
   return {
@@ -86,7 +86,8 @@ describe("dispatch-action-run -- system-mode gate", () => {
     const { dispatchActionRun } = await import("./dispatch-action-run");
     const result = await runMockedTask<DispatchResult>(dispatchActionRun, {});
 
-    expect(result).toEqual({ dispatched: 1, total: 1 });
+    // Blocked on purpose is not a fault: status pass, nothing counted as dispatched.
+    expect(result).toEqual({ status: "pass", dispatched: 0, blocked: 1, failed: 0, skipped: 0, total: 1 });
     expect(tasksTrigger).not.toHaveBeenCalled();
     const terminalPatch = patches.find((p) => p.body.status === "dispatch_failed");
     expect(terminalPatch?.body.error_summary).toContain("system_mode_blocks_change");
@@ -105,10 +106,24 @@ describe("dispatch-action-run -- system-mode gate", () => {
     const { dispatchActionRun } = await import("./dispatch-action-run");
     const result = await runMockedTask<DispatchResult>(dispatchActionRun, {});
 
-    expect(result).toEqual({ dispatched: 1, total: 1 });
+    expect(result).toEqual({ status: "pass", dispatched: 1, blocked: 0, failed: 0, skipped: 0, total: 1 });
     expect(tasksTrigger).toHaveBeenCalledWith("ao-infrastructure-check", expect.objectContaining({ _dispatchedFromActionRunId: RUN_ID }));
     expect(patches.some((p) => p.body.status === "running")).toBe(true);
     expect(patches.some((p) => p.body.status === "dispatched")).toBe(true);
+  });
+
+  it("an unknown action_key is a failure: status fail, so the host clock row turns red", async () => {
+    const { fetchMock, patches } = makeFetchMock({
+      pendingRuns: [baseRun({ metadata: { action_key: "ops.no-such-action" } })],
+      systemModeRows: [{ scope_type: "global", scope_id: null, mode: "normal" }],
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const { dispatchActionRun } = await import("./dispatch-action-run");
+    const result = await runMockedTask<DispatchResult>(dispatchActionRun, {});
+
+    expect(result).toEqual({ status: "fail", dispatched: 0, blocked: 0, failed: 1, skipped: 0, total: 1 });
+    expect(patches.find((p) => p.body.status === "dispatch_failed")?.body.error_summary).toContain("unknown action_key");
   });
 
   it("a system_modes read error also blocks (fail closed), same as emergency_stop", async () => {

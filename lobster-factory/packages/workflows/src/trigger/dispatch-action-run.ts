@@ -117,7 +117,10 @@ async function claimPendingRun(
 // ─────────────────────────────────────────────
 // Dispatch a single action run
 // ─────────────────────────────────────────────
-async function dispatchRun(creds: ReturnType<typeof getSupabaseCreds>, run: ActionRun) {
+/** blocked = a policy said no (approval, system mode) -- intended, not a fault; failed = could not dispatch. */
+type DispatchOutcome = "dispatched" | "blocked" | "failed" | "skipped";
+
+async function dispatchRun(creds: ReturnType<typeof getSupabaseCreds>, run: ActionRun): Promise<DispatchOutcome> {
   // Defence-in-depth: block approval-gated runs even if the DB filter somehow missed them.
   if (run.approval_required && run.approval_status !== "approved") {
     logger.warn("dispatcher: run blocked by approval gate", {
@@ -128,7 +131,7 @@ async function dispatchRun(creds: ReturnType<typeof getSupabaseCreds>, run: Acti
     await updateRunStatus(creds, run.id, "dispatch_failed", {
       error_summary: "approval_gate_blocked: run requires approval before dispatch",
     });
-    return;
+    return "blocked";
   }
 
   // Resolve action_key from metadata (set by Build Console) or look up from catalog
@@ -141,7 +144,7 @@ async function dispatchRun(creds: ReturnType<typeof getSupabaseCreds>, run: Acti
     await updateRunStatus(creds, run.id, "dispatch_failed", {
       error_summary: "could not resolve action_key from catalog",
     });
-    return;
+    return "failed";
   }
 
   const taskId = ACTION_KEY_TO_TASK_ID[actionKey];
@@ -150,7 +153,7 @@ async function dispatchRun(creds: ReturnType<typeof getSupabaseCreds>, run: Acti
     await updateRunStatus(creds, run.id, "dispatch_failed", {
       error_summary: `unknown action_key: ${actionKey}`,
     });
-    return;
+    return "failed";
   }
 
   // System-mode gate, re-checked here (not only at enqueue in NA/app/api/build/runs/route.ts):
@@ -164,7 +167,7 @@ async function dispatchRun(creds: ReturnType<typeof getSupabaseCreds>, run: Acti
     await updateRunStatus(creds, run.id, "dispatch_failed", {
       error_summary: `system_mode_blocks_change: ${gate.mode}`,
     });
-    return;
+    return "blocked";
   }
 
   // M10: atomic claim (pending → running) before triggering. If a concurrent
@@ -174,7 +177,7 @@ async function dispatchRun(creds: ReturnType<typeof getSupabaseCreds>, run: Acti
     logger.info("dispatcher: run already claimed by another dispatcher, skipping", {
       runId: run.id,
     });
-    return;
+    return "skipped";
   }
 
   // Build trigger payload: merge input_payload + dispatcher metadata
@@ -202,6 +205,7 @@ async function dispatchRun(creds: ReturnType<typeof getSupabaseCreds>, run: Acti
       taskId,
       triggerId: handle.id,
     });
+    return "dispatched";
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error("dispatcher: trigger failed", { runId: run.id, taskId, error: message });
@@ -214,6 +218,7 @@ async function dispatchRun(creds: ReturnType<typeof getSupabaseCreds>, run: Acti
       runId: run.id,
       taskId,
     });
+    return "failed";
   }
 }
 
@@ -242,18 +247,16 @@ export const dispatchActionRun = task({
 
     if (runs.length === 0) {
       logger.info("dispatcher: no pending action runs");
-      return { dispatched: 0 };
+      return { status: "pass", dispatched: 0, blocked: 0, failed: 0, skipped: 0, total: 0 };
     }
 
     logger.info(`dispatcher: found ${runs.length} pending run(s)`);
 
-    let dispatched = 0;
-    for (const run of runs) {
-      await dispatchRun(creds, run);
-      dispatched++;
-    }
+    const n: Record<DispatchOutcome, number> = { dispatched: 0, blocked: 0, failed: 0, skipped: 0 };
+    for (const run of runs) n[await dispatchRun(creds, run)]++;
 
-    return { dispatched, total: runs.length };
+    // status "fail" turns the host clock's row red (scripts/trigger-task.sh reads output.status).
+    return { status: n.failed ? "fail" : "pass", ...n, total: runs.length };
   },
 });
 
