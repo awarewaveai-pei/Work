@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-25（續45）排程離開 Trigger C2.1：新主機排程裝上 ks-aw-01（操作者：go ahead C2.1）——10 行 cron 生效，首輪全 exit 0（Claude）
+
+- **做了什麼**：主機 `git fetch` → `sync-host-scripts.sh`（`801a86c10`，裝 poke.sh／site-watch-tick.sh／trigger-task.sh＋cron.d）→ `install-host-schedules.sh --check`（只差 `awarewave-schedules`：1 行改、9 行加）→ 安裝。備份 `/root/lobster-phase1/.state/cron-backup-20261025T090337Z`（root.crontab 0 byte＝原本就空，無遺失；其餘 6 檔內容不變重裝）。主機舊 `schedules-run-due.sh` 保留（無 cron 引用）。
+- **首輪**：`site_watch_tick`、`ao_infrastructure_check` 經 `cron-run.sh` 手動跑一次；其後 cron 自動 09:05／09:10。Trigger 排程仍在（C2.3 才刪），兩邊並跑期間靠各端點冪等。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`/var/lib/awarewave/jobs/<key>.json`：schedules_run_due／social_dispatch／cs_inbound_sweep／pod_order_inbox_sweep／dispatch_action_run（09:10Z）、site_watch_tick（09:05Z）、ao_infrastructure_check（09:04Z）exit_code=0；poke／trigger-task／site-watch-tick 失敗 log 皆空；`report-host-schedules.py` 盤點 10 key 齊、`cron_files_drift=[]` | exit=0 | ms=10382
+- REALTEST_EVIDENCE: tool=curl | cmd=Trigger `get_run_details run_cmvnlpg3100s020s4mrufklhw`：v20261025.1、TTL 9m、Payload {}（org 預設生效）、output pass 7/7（含 rls_isolation_smoke）；`check-site-watch-health.ps1` heartbeat PASS 0.0h（主機 tick 寫入） | exit=0 | ms=2000
+- REVIEW_WAIVED: NA -- 本步無程式改動，只執行 C1（`72d15254c`，已審）的安裝
+- BUGHUNT_WAIVED: NA -- 無程式改動
+- **剩餘**：C2.2 排程頁 9 列需 next-admin 台灣 03:00 自動部署後才出現（之前顯示為「未登記排程」＝預期）；3 個每日工作首跑：social_metrics 19:30Z、social_rotation 00:05Z、entitlements_expire 01:00Z；C2.3 刪 Trigger 排程待 C2.2 確認且每日工作各跑過一次。
+- **rollback**：`sudo /root/lobster-phase1/scripts/install-host-schedules.sh --rollback /root/lobster-phase1/.state/cron-backup-20261025T090337Z`（還原舊 cron；Trigger 排程仍在，功能不中斷）。
 ## 2026-10-25（續44）參考網頁不再靜默消失：超過 2 MB 的頁面讀前段；http 網址在產文前就提示不會被讀（Claude）
 
 **觸發**：操作者「Fix both now」（續34 剩餘 n3＋http 行為變化）。
