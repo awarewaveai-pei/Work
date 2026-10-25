@@ -1,7 +1,7 @@
 {
-    "overall":  "PASS",
+    "overall":  "WARN",
     "measured":  1,
-    "generated_utc":  "2026-10-23T06:39:58Z",
+    "generated_utc":  "2026-10-25T04:59:56Z",
     "policy":  {
                    "SG":  {
                               "MemWarnUsedPct":  80,
@@ -27,35 +27,38 @@
                                    "host":  "145.239.195.47",
                                    "ok":  true,
                                    "error":  "",
+                                   "probe_error":  "",
                                    "mem_total_kb":  131877056,
-                                   "mem_avail_kb":  114728048,
-                                   "mem_used_kb":  17149008,
-                                   "mem_used_pct":  13,
-                                   "swap_used_pct":  19.3,
+                                   "mem_avail_kb":  114842880,
+                                   "mem_used_kb":  17034176,
+                                   "mem_used_pct":  12.9,
+                                   "swap_used_pct":  0.8,
                                    "psi_mem_some":  0,
                                    "psi_mem_full":  0,
                                    "psi_io_some":  0,
-                                   "psi_cpu_some":  8.35,
-                                   "oom_vmstat":  0,
-                                   "oom_journal":  0,
+                                   "psi_cpu_some":  9.05,
+                                   "oom_vmstat":  788,
+                                   "oom_journal":  636,
+                                   "oom_journal_24h":  0,
+                                   "oom_memcg":  "8e92dc13a6c0(453) a7994f18c195(156) f72bbd554a5c(22) 8711ba166f94(2) 0511099d0c2c(2)",
                                    "disk_total_kb":  981183088,
-                                   "disk_used_kb":  271143300,
+                                   "disk_used_kb":  278758508,
                                    "disk_pct":  30,
-                                   "inode_pct":  10,
+                                   "inode_pct":  11,
                                    "containers_running":  57,
                                    "containers_total":  61,
                                    "containers_unhealthy":  0,
-                                   "restarts":  "trigger-supervisor(1)",
+                                   "restarts":  "",
                                    "restarts_measured":  true,
                                    "docker_present":  true,
-                                   "top_mem":  "buildx_buildkit_trigger0=3.933GiB postiz=1.658GiB soulful-db=1.499GiB cognitive-os-api=1.061GiB trigger-clickhouse=1.025GiB soulful-wp=1009MiB",
-                                   "reclaimable":  "Images=54.38GB (50%),Containers=38.61MB (5%),Local Volumes=241MB (0%),Build Cache=10.62GB",
+                                   "top_mem":  "buildx_buildkit_trigger0=4.207GiB postiz=1.419GiB cognitive-os-api=1.06GiB trigger-webapp=793MiB soulful-wp=616.9MiB chatwoot-sidekiq=574.1MiB",
+                                   "reclaimable":  "Images=62.05GB (53%),Containers=38.61MB (8%),Local Volumes=241MB (0%),Build Cache=10.62GB",
                                    "cpu_cores":  32,
-                                   "load1":  1.68,
-                                   "uptime_days":  8
+                                   "load1":  3.57,
+                                   "uptime_days":  10
                                }
               },
-    "generatedAt":  "2026-10-23T06:39:17.0882448Z",
+    "generatedAt":  "2026-10-25T04:59:00.4151087Z",
     "fatal":  false,
     "blind_spots":  [
 
@@ -63,12 +66,12 @@
     "fatalReason":  "",
     "verdicts":  {
                      "ks-aw-01":  {
-                                      "level":  0,
+                                      "level":  1,
                                       "blind":  [
 
                                                 ],
                                       "reasons":  [
-
+                                                      "OOM kills in the last 7d, none in 24h: 636 (vmstat since boot=788); by container (7d): 8e92dc13a6c0(453) a7994f18c195(156) f72bbd554a5c(22) 8711ba166f94(2) 0511099d0c2c(2) -- check WORKLOG that the incident is closed"
                                                   ]
                                   }
                  },

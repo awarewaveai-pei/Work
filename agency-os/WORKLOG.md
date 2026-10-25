@@ -1,4 +1,29 @@
 # Worklog
+## 2026-10-25（續21）capacity 偵測器 BLIND 修復：慢探針串行逾時 → 整台判「unreachable」，636 次 OOM 被藏住
+
+**症狀**：`capacity-LATEST.md` 報 ks-aw-01 Unreachable，錯誤欄卻印 `MEM_TOTAL_KB=131877056 / MEM_AVAIL_KB=114881388`；smoke digest = BLIND。
+
+**根因**（實測 ks-aw-01）：
+- C1 遠端探針串行跑 `journalctl -k --since "7 days ago"`（43s，50 萬行 kernel log、journal 2.0G）＋ `docker system df`（18.5s）→ 超過整體 `timeout 60` → exit 124（重現：`RC=124`，總 63.9s）。
+- C2 `scripts/check-capacity-health.ps1` 舊 `:243`：exit≠0 或缺 `PROBE_OK` 就丟棄全部輸出，錯誤文字取輸出前 3 行 → 「unreachable」＋記憶體數字，原因（逾時）消失。
+- C3 被藏住的真訊號：journal 7d 636 次 memcg OOM kill（apache2 448／php 166），集中 2026-10-23 16:00 → 10-24 04:10 UTC = 已結案的 lobster-wordpress OOM thrash 事故（`77cd04ded`、`706e41f57`），24h 內 0 次。
+- C4 舊 OOM 判定取 `max(vmstat since boot, journal)` 直接 FAIL：已修好的事故會讓主機紅到下次重開機（vmstat 無法定時間）。
+
+**修法（關整類：一個慢的子探針只能讓自己那一欄變盲點，不能讓整台變盲）**：
+- 兩個慢探針背景並行、各自 `timeout`（journal 70s、system df 30s；docker stats 20s）；整體 timeout 85s、ssh deadline 105s。只有 rc=0 的 journal 才產計數（逾時空串流 `grep -c` 會印 0 = 假「量到無 OOM」）。
+- 部分輸出保留：有 `MEM_TOTAL_KB` 就解析，缺的欄位 → `$null` → 各自 blind spot，另加「probe incomplete (exit/timeout)」；完全無資料才 `ok=false`，錯誤寫明 exit code／逾時。文字 unreachable → not measured。
+- OOM：journal 24h 有 kill = FAIL；只有 7d 內 = WARN（附容器、提醒查 WORKLOG）；journal 盲 + vmstat>0 = WARN＋blind。新增 `OOM_MEMCG` 依容器歸戶（容器已刪則顯示 id）。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/check-capacity-health.ps1 -WorkRoot D:/Work | exit=1 | ms=57364 | result=overall=WARN measured=1 blind_spots=[]，mem 13%／disk 30%／57 containers／OOM 24h 0、7d 636
+- 部分輸出路徑：拋棄式副本（scratchpad，`timeout 5 bash`）實跑 → WARN，記憶體/PSI 保留，disk/inode/docker/restarts/OOM journal 各列為 blind spot，未出現假 0。
+- `tests/smoke-status-digest.test.ps1` → ALL PASS (19 cases, 1 mutation proof)；PS parser 0 errors。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（Codex oracle `agency-os/reports/oracle/2026-10-25-partialreview-16833373.md`，三項皆查證後修：m1 `journalctl -k` 隱含 `-b`，20:00 UTC 自動重開機會吃掉前一 boot 的 OOM → 改 `_TRANSPORT=kernel`（實測 47s、仍 636）；m2 journal 可讀但歷史被清時正的 vmstat 被忽略 → boot <7d 且 vmstat>journal = WARN＋blind；m3 `docker system df`／`docker stats` 逾時不成盲點 → 有容器而欄位空 = blind）。修後實跑：WARN、measured=1、blind_spots=[]、57.6s。
+- BUGHUNT_DONE: scope=scripts,agency-os,.claude,runbooks,lobster-factory | grep=OOM kills observed|host unreachable:|\(unreachable\)|oom_journal|OOM_JOURNAL | hits=0（check-capacity-health.ps1 本身以外無 consumer；smoke-status-digest 只讀 overall/verdicts/blind_spots）
+
+**避免再發生**：檔頭註解記下實測耗時與「慢子探針只盲自己」不變量；探針新增慢指令須進背景區塊並帶自己的 timeout。
+
+**剩餘**：OOM WARN 會持續到 2026-10-31 04:10 UTC（7d 窗口滑出）後自動回 PASS；探針仍每次花 ~45s 掃 journal（AO-RESUME hook 內）。
 ## 2026-10-25（續20）site-watch heartbeat 34.7h 沒來＝整個 Trigger prod 停擺：並發 10 格全被死 run 占住；取消 1462 個積壓 run 後恢復（Claude）
 
 - **觸發**：操作者貼 AO-RESUME `site-watch 🔴 心跳 34.7h 沒來`。

@@ -36,9 +36,10 @@
     allocated without swapping, and is the only number that means the same thing
     across kernels and cgroup versions.
 
-    OOM is read from BOTH /proc/vmstat and the kernel journal and the consumer takes
-    the max, because vmstat resets at boot and the journal can be rotated away. One
-    source going blind must not read as healthy.
+    OOM is read from BOTH /proc/vmstat and the kernel journal, because vmstat resets at
+    boot and the journal can be rotated away. One source going blind must not read as
+    healthy. Only the journal can be dated, so it alone decides FAIL (kills in 24h) vs
+    WARN (kills earlier in the 7-day window) -- see Get-HostVerdict.
 
     BLIND SPOTS
     -----------
@@ -131,7 +132,7 @@ function Invoke-Ssh {
     # a blocking UserPromptSubmit hook, so an unbounded call hangs the operator's first prompt of the day.
     # Timeout = ExitCode -1, which lands in the host-unreachable (BLIND) path. Benign ssh stderr notices
     # are captured by the helper, so none can raise NativeCommandError under the script-level 'Stop'.
-    $r = Invoke-SshWithDeadline -SshArgs $sshArgs -DeadlineSec 90 -ConnectTimeoutSec 15
+    $r = Invoke-SshWithDeadline -SshArgs $sshArgs -DeadlineSec 105 -ConnectTimeoutSec 15
     return @{
         ExitCode = $r.ExitCode
         Output   = $r.Output
@@ -185,6 +186,16 @@ function Get-HostCapacity {
     $parts = @(
         'set -uo pipefail',
         'kv(){ printf "%s=%s\n" "$1" "$2"; }',
+        # The two slow probes run in PARALLEL, each under its own timeout. Measured on ks-aw-01
+        # 2026-10-25: journalctl -k over 7 days = 43s (500k kernel lines, 2 GB journal),
+        # docker system df = 18.5s. Run serially they overran the whole-probe timeout, and the
+        # host was reported "unreachable" while 636 OOM kills sat unreported. A slow sub-probe
+        # must cost only its own field (empty -> blind spot), never the whole host.
+        'tmpd=$(mktemp -d); trap "rm -rf $tmpd" EXIT',
+        # _TRANSPORT=kernel, NOT -k: -k implies -b (current boot only), so an OOM before the
+        # 20:00 UTC unattended-upgrades reboot would vanish from both journal and vmstat (47s, measured).
+        '( timeout 70 journalctl _TRANSPORT=kernel --since "7 days ago" -o short-unix 2>/dev/null | grep -iE "out of memory: killed|oom-kill:" > "$tmpd/oom"; echo "${PIPESTATUS[0]}" > "$tmpd/oom.rc" ) &',
+        'if command -v docker >/dev/null 2>&1; then ( timeout 30 docker system df --format "{{.Type}}={{.Reclaimable}}" 2>/dev/null | tr "\n" "," | sed "s/,$//" > "$tmpd/df"; echo "${PIPESTATUS[0]}" > "$tmpd/df.rc" ) & fi',
         'mt=$(awk "/^MemTotal:/{print \$2}" /proc/meminfo 2>/dev/null || echo "")',
         'ma=$(awk "/^MemAvailable:/{print \$2}" /proc/meminfo 2>/dev/null || echo "")',
         'st=$(awk "/^SwapTotal:/{print \$2}" /proc/meminfo 2>/dev/null || echo "")',
@@ -196,7 +207,14 @@ function Get-HostCapacity {
         '  kv "PSI_$(echo $r | tr a-z A-Z)_FULL" "$(awk "/^full/{for(i=1;i<=NF;i++) if(\$i ~ /^avg60=/){sub(\"avg60=\",\"\",\$i); print \$i}}" "$f")";',
         'else kv "PSI_$(echo $r | tr a-z A-Z)_SOME" ""; kv "PSI_$(echo $r | tr a-z A-Z)_FULL" ""; fi; done',
         'kv OOM_VMSTAT "$(awk "/^oom_kill /{print \$2}" /proc/vmstat 2>/dev/null || echo "")"',
-        'kv OOM_JOURNAL "$(journalctl -k --since "7 days ago" 2>/dev/null | grep -ci "out of memory: killed" || true)"',
+        'wait',
+        # Only a journalctl that finished (rc 0) yields a count: grep -c on a timed-out, empty
+        # stream prints "0", which would read as "measured: no OOM kills".
+        'if [ "$(cat "$tmpd/oom.rc" 2>/dev/null)" = 0 ]; then',
+        '  kv OOM_JOURNAL "$(grep -ci "out of memory: killed" "$tmpd/oom" || true)"',
+        '  kv OOM_JOURNAL_24H "$(grep -i "out of memory: killed" "$tmpd/oom" | awk -v c="$(( $(date +%s) - 86400 ))" "int(\$1)>c{n++} END{print n+0}")"',
+        '  kv OOM_MEMCG "$(grep -o "task_memcg=/system.slice/docker-[0-9a-f]*" "$tmpd/oom" | sed "s#.*docker-##" | sort | uniq -c | sort -rn | head -5 | while read n id; do nm=$(docker inspect --format "{{.Name}}" "$id" 2>/dev/null | sed "s#^/##"); printf "%s(%s) " "${nm:-${id:0:12}}" "$n"; done)"',
+        'else kv OOM_JOURNAL ""; kv OOM_JOURNAL_24H ""; kv OOM_MEMCG ""; fi',
         'root_line=$(df -k --output=size,used,pcent,target 2>/dev/null | awk "\$4==\"/\"{print \$1\" \"\$2\" \"\$3; exit}")',
         'kv DISK_TOTAL_KB "$(printf "%s" "$root_line" | awk "{print \$1}")"',
         'kv DISK_USED_KB  "$(printf "%s" "$root_line" | awk "{print \$2}")"',
@@ -215,11 +233,11 @@ function Get-HostCapacity {
         # "Top memory" that listed 552.9MiB above 1.222GiB. A mislabelled field is worse
         # than no field: it sends whoever is chasing a yellow box after the wrong
         # container. (runbooks/ADD-PERIODIC-HEALTH-CHECK.md: "name what you measured".)
-        '  kv TOP_MEM "$(docker stats --no-stream --format "{{.Name}} {{.MemUsage}}" 2>/dev/null | awk "{v=\$2; u=v; sub(/[0-9.]+/,\"\",u); sub(/[A-Za-z]+/,\"\",v); m=v+0; if(u ~ /^GiB/) m=v*1024; else if(u ~ /^KiB/) m=v/1024; else if(u ~ /^B/) m=v/1048576; printf \"%.2f %s=%s\\n\", m, \$1, \$2}" | sort -rn | head -6 | cut -d" " -f2- | tr "\n" " ")"',
+        '  kv TOP_MEM "$(timeout 20 docker stats --no-stream --format "{{.Name}} {{.MemUsage}}" 2>/dev/null | awk "{v=\$2; u=v; sub(/[0-9.]+/,\"\",u); sub(/[A-Za-z]+/,\"\",v); m=v+0; if(u ~ /^GiB/) m=v*1024; else if(u ~ /^KiB/) m=v/1024; else if(u ~ /^B/) m=v/1048576; printf \"%.2f %s=%s\\n\", m, \$1, \$2}" | sort -rn | head -6 | cut -d" " -f2- | tr "\n" " ")"',
         # Labelled per type. The bare figures joined by "+" were unreadable, and the
         # split matters: 11 GB of reclaimable BUILD CACHE and 11 GB of real image layers
         # call for completely different responses.
-        '  kv RECLAIMABLE "$(docker system df --format "{{.Type}}={{.Reclaimable}}" 2>/dev/null | tr "\n" "," | sed "s/,$//")"',
+        '  kv RECLAIMABLE "$([ "$(cat "$tmpd/df.rc" 2>/dev/null)" = 0 ] && cat "$tmpd/df")"',
         'else',
         '  kv DOCKER_PRESENT 0; kv RESTARTS_MEASURED 0
   kv CONTAINERS_RUNNING ""; kv CONTAINERS_TOTAL ""; kv CONTAINERS_UNHEALTHY ""',
@@ -236,14 +254,24 @@ function Get-HostCapacity {
     # containers and docker system df all walk a lot of state and are individually unbounded.
     # A stall lands in the ExitCode -ne 0 path and degrades to WARN -- the correct verdict for
     # "could not measure".
-    $bashRunner = if ($UseSudo) { "sudo timeout 60 bash" } else { "timeout 60 bash" }
+    $remoteTimeoutSec = 85
+    $bashRunner = if ($UseSudo) { "sudo timeout $remoteTimeoutSec bash" } else { "timeout $remoteTimeoutSec bash" }
     $cmd = "echo $b64 | base64 -d | $bashRunner"
     $res = Invoke-Ssh -ServerHost $ServerHost -Command $cmd -User $User -Key $Key -Port $Port
 
+    # A probe that stalled part-way still measured everything printed before the stall. Keep it:
+    # missing fields parse to $null and become per-dimension blind spots. Only a probe that
+    # produced no memory line at all is "not measured" for the whole host.
+    $probeError = ""
     if ($res.ExitCode -ne 0 -or (Parse-ResultLine -Output $res.Output -Key "PROBE_OK") -ne "1") {
-        return [ordered]@{
-            host = $ServerHost; ok = $false
-            error = if ($res.Output) { ($res.Output -split "`n" | Select-Object -First 3) -join " / " } else { "no output" }
+        $probeError = if ($res.TimedOut) { "ssh deadline exceeded" }
+                      elseif ($res.ExitCode -eq 124) { "remote probe hit its " + $remoteTimeoutSec + "s timeout" }
+                      else { "remote probe exit " + $res.ExitCode }
+        if ((Parse-ResultLine -Output $res.Output -Key "MEM_TOTAL_KB") -eq "") {
+            return [ordered]@{
+                host = $ServerHost; ok = $false
+                error = $probeError + $(if ($res.Output) { ": " + (($res.Output -split "`n" | Select-Object -First 3) -join " / ") } else { ": no output" })
+            }
         }
     }
 
@@ -270,6 +298,7 @@ function Get-HostCapacity {
         host                = $ServerHost
         ok                  = $true
         error               = ""
+        probe_error         = $probeError
         mem_total_kb        = $memTotal
         mem_avail_kb        = $memAvail
         mem_used_kb         = $memUsedKb
@@ -281,6 +310,8 @@ function Get-HostCapacity {
         psi_cpu_some        = ConvertTo-NumOrNull (Parse-ResultLine -Output $res.Output -Key "PSI_CPU_SOME")
         oom_vmstat          = ConvertTo-NumOrNull (Parse-ResultLine -Output $res.Output -Key "OOM_VMSTAT")
         oom_journal         = ConvertTo-NumOrNull (Parse-ResultLine -Output $res.Output -Key "OOM_JOURNAL")
+        oom_journal_24h     = ConvertTo-NumOrNull (Parse-ResultLine -Output $res.Output -Key "OOM_JOURNAL_24H")
+        oom_memcg           = (Parse-ResultLine -Output $res.Output -Key "OOM_MEMCG").Trim()
         disk_total_kb       = ConvertTo-NumOrNull (Parse-ResultLine -Output $res.Output -Key "DISK_TOTAL_KB")
         disk_used_kb        = ConvertTo-NumOrNull (Parse-ResultLine -Output $res.Output -Key "DISK_USED_KB")
         disk_pct            = ConvertTo-NumOrNull (Parse-ResultLine -Output $res.Output -Key "DISK_PCT")
@@ -339,9 +370,10 @@ function Get-HostVerdict {
     }
 
     if (-not $Data.ok) {
-        [void]$blind.Add("host unreachable: " + $Data.error)
+        [void]$blind.Add("host not measured: " + $Data.error)
         return @{ level = 1; reasons = @(); blind = $blind.ToArray() }
     }
+    if ($Data.probe_error) { [void]$blind.Add("probe incomplete (" + $Data.probe_error + "); fields after the stall are missing") }
 
     # --- outcome: memory
     if ($null -eq $Data.mem_used_pct) { [void]$blind.Add("memory not measured") }
@@ -360,20 +392,37 @@ function Get-HostVerdict {
         $level = [math]::Max($level, 1); [void]$reasons.Add("memory pressure (PSI some avg60 " + $Data.psi_mem_some + "%)")
     }
 
-    # --- mechanism: OOM. Two sources, take the max; vmstat resets at boot and the
-    # journal can be rotated. An OOM kill is never acceptable, so it is FAIL not WARN.
+    # --- mechanism: OOM. FAIL = kills in the last 24h (happening now). Kills only earlier in
+    # the 7-day journal window = WARN with attribution: a fixed incident stays visible for a
+    # week but does not hold the host red. vmstat counts since boot and cannot be dated, so it
+    # alone never raises FAIL -- with max(vmstat, journal) the 2026-10-24 lobster-wordpress
+    # incident (fixed 77cd04ded) would have kept ks-aw-01 FAIL until the next reboot, and an
+    # always-red detector is an ignored one.
     # Outer @() is load-bearing: a Where-Object that filters everything out yields $null,
-    # not an empty array, and $null.Count THROWS under Set-StrictMode -Version Latest. Without
-    # it the "both OOM sources blind" branch below was unreachable dead code AND the state it
-    # was meant to report killed the whole run instead.
+    # not an empty array, and $null.Count THROWS under Set-StrictMode -Version Latest.
     $oomVals = @(@($Data.oom_vmstat, $Data.oom_journal) | Where-Object { $null -ne $_ })
+    $byCt = $(if ($Data.oom_memcg) { "; by container (7d): " + $Data.oom_memcg } else { "" })
     if ($oomVals.Count -eq 0) { [void]$blind.Add("OOM counters not readable from either source") }
-    else {
-        $oom = ($oomVals | Measure-Object -Maximum).Maximum
-        if ($oom -gt 0) {
-            $level = [math]::Max($level, 2)
-            [void]$reasons.Add("OOM kills observed: " + $oom + " (vmstat=" + $Data.oom_vmstat + ", journal=" + $Data.oom_journal + ")")
+    elseif ($null -eq $Data.oom_journal -or $null -eq $Data.oom_journal_24h) {
+        [void]$blind.Add("OOM journal not readable -- kills cannot be dated")
+        if ($Data.oom_vmstat -gt 0) {
+            $level = [math]::Max($level, 1); [void]$reasons.Add("OOM kills since boot (vmstat): " + $Data.oom_vmstat + " -- undated, journal blind")
         }
+    }
+    elseif ($Data.oom_journal_24h -gt 0) {
+        $level = [math]::Max($level, 2)
+        [void]$reasons.Add("OOM kills in the last 24h: " + $Data.oom_journal_24h + " (7d=" + $Data.oom_journal + ", vmstat since boot=" + $Data.oom_vmstat + ")" + $byCt)
+    }
+    elseif ($Data.oom_journal -gt 0) {
+        $level = [math]::Max($level, 1)
+        [void]$reasons.Add("OOM kills in the last 7d, none in 24h: " + $Data.oom_journal + " (vmstat since boot=" + $Data.oom_vmstat + ")" + $byCt + " -- check WORKLOG that the incident is closed")
+    }
+    # Booted inside the 7-day window, so the journal should hold every kill vmstat counted. More in
+    # vmstat = journal history lost (vacuumed/rotated): those kills are undated, so WARN, not PASS.
+    if ($null -ne $Data.oom_journal -and $null -ne $Data.oom_vmstat -and $null -ne $Data.uptime_days -and
+        $Data.uptime_days -lt 7 -and $Data.oom_vmstat -gt $Data.oom_journal) {
+        $level = [math]::Max($level, 1)
+        [void]$blind.Add("journal holds " + $Data.oom_journal + " OOM kills but vmstat counted " + $Data.oom_vmstat + " since a boot " + $Data.uptime_days + "d ago -- journal history incomplete, the rest are undated")
     }
 
     # --- mechanism: CPU. PSI is the primary signal; load average is only corroborating
@@ -435,6 +484,11 @@ function Get-HostVerdict {
     # "" means BOTH "nothing restarted" and "docker inspect returned nothing" (permission
     # denied, container removed mid-flight). Those must not share a verdict.
     if (-not $Data.restarts_measured) { [void]$blind.Add("container restart counts not measured") }
+    # Context fields, but a timed-out probe still has to show: empty with containers running = not measured.
+    if ($Data.docker_present -and $null -ne $Data.containers_running -and $Data.containers_running -gt 0) {
+        if (-not $Data.reclaimable) { [void]$blind.Add("docker reclaimable not measured (docker system df timed out or failed)") }
+        if (-not $Data.top_mem)     { [void]$blind.Add("container memory ranking not measured (docker stats timed out or failed)") }
+    }
     if ($Data.restarts) {
         $high = @()
         foreach ($m in [regex]::Matches($Data.restarts, '([A-Za-z0-9_.-]+)\((\d+)\)')) {
@@ -523,7 +577,7 @@ if ($fatal) {
     foreach ($name in $results.Keys) {
         $d = $results[$name]; $v = $verdicts[$name]
         if (-not $d.ok) {
-            [void]$body.AppendLine("| " + $name + " | " + $ICON[$v.level] + " WARN | (unreachable) | | | | |")
+            [void]$body.AppendLine("| " + $name + " | " + $ICON[$v.level] + " WARN | (not measured) | | | | |")
             continue
         }
         $memCell = "" + $d.mem_used_pct + "% of " + (Format-Gib $d.mem_total_kb)
@@ -538,14 +592,14 @@ if ($fatal) {
         $d = $results[$name]; $v = $verdicts[$name]
         [void]$body.AppendLine("## " + $name + " (" + $d.host + ") " + $ICON[$v.level])
         if (-not $d.ok) {
-            [void]$body.AppendLine("- **Unreachable**: " + $d.error)
-            [void]$body.AppendLine("- Treated as WARN, never PASS: an unreachable host is an unmeasured host.")
+            [void]$body.AppendLine("- **Not measured**: " + $d.error)
+            [void]$body.AppendLine("- Treated as WARN, never PASS: an unmeasured host is not a healthy one.")
             [void]$body.AppendLine("")
             continue
         }
         [void]$body.AppendLine("- Memory: " + $d.mem_used_pct + "% used (" + (Format-Gib $d.mem_used_kb) + " of " + (Format-Gib $d.mem_total_kb) + "), swap " + $d.swap_used_pct + "%")
         [void]$body.AppendLine("- PSI memory avg60: some " + $d.psi_mem_some + "%, full " + $d.psi_mem_full + "%  | io some " + $d.psi_io_some + "%")
-        [void]$body.AppendLine("- OOM kills: vmstat " + $d.oom_vmstat + ", journal(7d) " + $d.oom_journal)
+        [void]$body.AppendLine("- OOM kills: vmstat(since boot) " + $d.oom_vmstat + ", journal 24h " + $d.oom_journal_24h + " / 7d " + $d.oom_journal + $(if ($d.oom_memcg) { " -- by container: " + $d.oom_memcg } else { "" }))
         [void]$body.AppendLine("- Disk /: " + $d.disk_pct + "% (" + (Format-Gib $d.disk_used_kb) + " of " + (Format-Gib $d.disk_total_kb) + "), inodes " + $d.inode_pct + "%")
         if ($d.reclaimable) { [void]$body.AppendLine("- Docker reclaimable: " + $d.reclaimable) }
         [void]$body.AppendLine("- Containers: " + $d.containers_running + " running / " + $d.containers_total + " total, unhealthy " + $d.containers_unhealthy)
