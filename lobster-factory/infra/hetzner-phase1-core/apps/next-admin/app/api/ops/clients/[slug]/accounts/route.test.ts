@@ -1,7 +1,8 @@
 // /api/ops/clients/[slug]/accounts -- the named cases: only staff owner/admin create accounts; a new account is created
 // unverified and only the mailed link (token in the fragment) can verify it; the link never creates or reaches another
 // user; an email that belongs to staff or another client is never touched; delete only removes this client's accounts
-// that hold no brand role. "Unverified cannot be added": 0103 local-verify (DB) + lib/social/__tests__/members-store.test.ts.
+// that hold no brand role; only a product the client holds, on a served door, is offered or mailed, and each person's role
+// is read from that product's member list. "Unverified cannot be added": 0103 local-verify (DB) + lib/social/__tests__/members-store.test.ts.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const ORG = "2bf60452-3d4d-47c2-9970-b9046ed1a35a";
@@ -15,6 +16,9 @@ const state = vi.hoisted(() => ({
   user: null as null | FakeUser,
   memberRows: 0,
   otherOrgMemberships: 0,
+  membershipRows: [] as Array<{ user_id: string; profiles: { email: string } }>,
+  held: new Set<string>(),
+  members: [] as Array<{ user_id: string; role: string }>,
 }));
 const admin = vi.hoisted(() => ({
   createUser: vi.fn(),
@@ -29,6 +33,8 @@ const mail = vi.hoisted(() => vi.fn(async (_msg: { to: string; text: string }) =
 
 vi.mock("@/lib/ops-audit", () => ({ recordOpsAudit: audit }));
 vi.mock("@/lib/mail/resend", () => ({ sendMail: mail }));
+vi.mock("@/lib/entitlements/door-holds", () => ({ holdsProduct: async ({ productKey }: { productKey: string }) => state.held.has(productKey) }));
+vi.mock("@/lib/social/store", () => ({ listMembers: async () => state.members }));
 vi.mock("@/lib/supabase-server", () => ({
   getSupabaseUrl: () => process.env.SUPABASE_URL,
   getServiceRoleKey: () => process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -42,7 +48,8 @@ vi.mock("@/lib/supabase-server", () => ({
               ? { data: { id: ORG, name: "Soulful", type: "client" }, error: null }
               : { data: col === "id" ? state.profileById : state.profile, error: null };
           // head counts: social_brand_members (brand roles), organization_memberships .neq(this org)
-          return Object.assign(Promise.resolve({ count: state.memberRows, error: null }), {
+          const rows = table === "organization_memberships" ? state.membershipRows : null;
+          return Object.assign(Promise.resolve({ count: state.memberRows, data: rows, error: null }), {
             maybeSingle: async () => one,
             neq: async () => ({ count: state.otherOrgMemberships, error: null }),
           });
@@ -55,15 +62,17 @@ vi.mock("@/lib/supabase-server", () => ({
   }),
 }));
 
-const { POST, DELETE } = await import("./route");
+const { GET, POST, DELETE } = await import("./route");
 
 const ctx = () => ({ params: Promise.resolve({ slug: "soulful" }) });
-const post = (headers: Record<string, string>, email = "Staff.Person@Client.example") =>
+const post = (headers: Record<string, string>, email = "Staff.Person@Client.example", product = "social") =>
   new Request("http://localhost/api/ops/clients/soulful/accounts", {
     method: "POST",
     headers: { "content-type": "application/json", "x-ops-user-kind": "staff", ...headers },
-    body: JSON.stringify({ email, product: "social" }),
+    body: JSON.stringify({ email, product }),
   });
+const get = () =>
+  new Request("http://localhost/api/ops/clients/soulful/accounts", { headers: { "x-ops-user-kind": "staff", "x-ops-claims-role": "admin" } });
 const del = (userId: string) =>
   new Request(`http://localhost/api/ops/clients/soulful/accounts?userId=${userId}`, {
     method: "DELETE",
@@ -82,6 +91,9 @@ beforeEach(() => {
   state.user = null;
   state.memberRows = 0;
   state.otherOrgMemberships = 0;
+  state.membershipRows = [];
+  state.held = new Set(["social"]);
+  state.members = [];
   admin.createUser.mockImplementation(async (attrs: { email: string; app_metadata: Record<string, unknown> }) => ({
     data: { user: { id: NEW_USER, email: attrs.email, email_confirmed_at: null, app_metadata: attrs.app_metadata } },
     error: null,
@@ -90,7 +102,40 @@ beforeEach(() => {
   admin.generateLink.mockResolvedValue({ data: { properties: { hashed_token: "HASHED-TOKEN-abc" }, user: { id: NEW_USER } }, error: null });
 });
 
+describe("GET accounts -- products the client holds, roles from each product's own list", () => {
+  it("offers only held products on a served door, and reads each person's role from the member list", async () => {
+    state.held = new Set(["social", "tarot", "content"]); // content's door is closed (enabled: false)
+    state.membershipRows = [{ user_id: NEW_USER, profiles: { email: "a@client.example" } }, { user_id: OTHER, profiles: { email: "b@client.example" } }];
+    admin.getUserById.mockImplementation(async (id: string) => ({
+      data: { user: { id, email: id === NEW_USER ? "a@client.example" : "b@client.example", email_confirmed_at: null, app_metadata: { user_kind: "client", org_id: ORG } } },
+      error: null,
+    }));
+    state.members = [{ user_id: NEW_USER, role: "editor" }];
+    const body = await (await GET(get(), ctx())).json();
+    expect(body.products.map((p: { key: string }) => p.key)).toEqual(["social", "tarot"]);
+    expect(body.products[0].settings).toBe(`/tools/social?brand=${ORG}&view=settings`);
+    expect(body.products[1].settings).toBeNull();
+    expect(body.accounts.map((a: { roles: unknown }) => a.roles)).toEqual([{ social: "編輯" }, { social: null }]);
+  });
+
+  it("a client that holds nothing is offered nothing", async () => {
+    state.held = new Set();
+    expect((await (await GET(get(), ctx())).json()).products).toEqual([]);
+  });
+});
+
 describe("POST accounts", () => {
+  it("refuses a product the client does not hold, and a held product whose door is closed, before any account is touched", async () => {
+    state.held = new Set(["social", "content"]);
+    for (const product of ["tarot", "content"]) {
+      const res = await POST(post({ "x-ops-claims-role": "admin" }, "a@client.example", product), ctx());
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ error: "product_not_held" });
+    }
+    expect(admin.createUser).not.toHaveBeenCalled();
+    expect(mail).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["viewer", "staff"],
     ["operator", "staff"],

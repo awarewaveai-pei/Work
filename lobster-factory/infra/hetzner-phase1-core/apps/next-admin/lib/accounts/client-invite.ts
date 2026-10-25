@@ -13,7 +13,7 @@
 // failed press (a half-made account cannot sign in, and the next press completes it), so two presses cannot undo each
 // other.
 import type { SupabaseClient, User } from "@supabase/supabase-js";
-import { nextAdminProducts, productHost } from "@/lib/portal/doors";
+import { productHost, servedNextAdminProducts } from "@/lib/portal/doors";
 import { getServiceRoleKey, getSupabaseUrl } from "@/lib/supabase-server";
 import { sendMail } from "@/lib/mail/resend";
 import { inviteMail } from "./invite-copy";
@@ -39,9 +39,10 @@ export function normalizeEmail(raw: unknown): string | null {
   return EMAIL_RE.test(email) && email.length <= 254 ? email : null;
 }
 
-/** The door the person will sign in at; only next-admin product doors serve /login/set-password. */
+/** The door the person will sign in at: only a served next-admin door answers /login/set-password (a closed door's
+ *  host is 404, middleware.ts door "none"). */
 export function inviteProduct(key: unknown) {
-  return nextAdminProducts().find((p) => p.key === key) ?? null;
+  return servedNextAdminProducts().find((p) => p.key === key) ?? null;
 }
 
 export function setPasswordLink(host: string, hashedToken: string): string {

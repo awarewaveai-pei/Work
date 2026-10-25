@@ -2,13 +2,15 @@
 
 // 帳號 tab: the client's own people. Staff create an account by email; the person proves the email by opening the
 // mailed link (/login/set-password) before 社群發文 → 設定 → 成員 can add them (0103). API: /api/ops/clients/[slug]/accounts.
+// Products = what this client holds; each row shows the person's role per product, read from that product's own list.
 import { useCallback, useEffect, useState } from "react";
 import { roleHeader } from "@/lib/ops-role";
 import { ACCOUNT_COPY as C } from "@/lib/accounts/invite-copy";
 import { Card, ChipBtn, NoData, SubLabel, relativeTime } from "./hub-ui";
 
-type Account = { userId: string; email: string; verified: boolean; createdAt: string | null; lastSignInAt: string | null };
-type Product = { key: string; name: string };
+type Account = { userId: string; email: string; verified: boolean; createdAt: string | null; lastSignInAt: string | null; roles: Record<string, string | null> };
+/** settings: where staff change a person's role on this product; null = the product keeps no per-person role. */
+type Product = { key: string; name: string; settings: string | null };
 type Notice = { tone: "ok" | "error"; text: string };
 
 const ERRORS: Record<string, string> = {
@@ -16,6 +18,7 @@ const ERRORS: Record<string, string> = {
   invalid_email: C.err_invalid_email,
   mail_not_configured: C.err_mail_not_configured,
   forbidden_role: C.err_forbidden,
+  product_not_held: C.err_product_not_held,
 };
 function errorText(code: string | undefined, ctx: { email?: string; created?: boolean } = {}): string {
   if (code === "mail_not_configured" && !ctx.created) return C.err_mail_not_configured_existing;
@@ -25,7 +28,7 @@ function errorText(code: string | undefined, ctx: { email?: string; created?: bo
 
 export function AccountsCard({ slug }: { slug: string }) {
   const [accounts, setAccounts] = useState<Account[] | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[] | null>(null); // null = not loaded (or the load failed)
   const [product, setProduct] = useState("");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -38,16 +41,19 @@ export function AccountsCard({ slug }: { slug: string }) {
       const data = (await res.json()) as { ok?: boolean; error?: string; accounts?: Account[]; products?: Product[] };
       if (!res.ok || !data.ok) {
         setAccounts([]);
+        setProducts(null);
         return setNotice({ tone: "error", text: errorText(data.error) });
       }
       setAccounts(data.accounts ?? []);
       setProducts(data.products ?? []);
-      setProduct((p) => p || data.products?.[0]?.key || "");
+      setProduct((p) => (data.products?.some((x) => x.key === p) ? p : data.products?.[0]?.key ?? ""));
     } catch {
       setAccounts([]);
+      setProducts(null);
       setNotice({ tone: "error", text: C.err_generic });
     }
   }, [url]);
+  const offered = products ?? [];
 
   useEffect(() => {
     void load();
@@ -115,17 +121,24 @@ export function AccountsCard({ slug }: { slug: string }) {
 
       <SubLabel>{C.steps_title}</SubLabel>
       <ol style={{ margin: 0, paddingLeft: 20, fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.8 }}>
-        {C.steps.map((s) => (
+        {[...C.steps, ...(offered.some((p) => p.settings) ? [C.step_roles] : [])].map((s) => (
           <li key={s}>{s}</li>
         ))}
       </ol>
 
       <SubLabel>{C.product_label}</SubLabel>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {products.map((p) => (
-          <ChipBtn key={p.key} label={p.name} active={product === p.key} onClick={() => setProduct(p.key)} />
-        ))}
-      </div>
+      {products?.length === 0 ? (
+        <NoData>{C.no_products}</NoData>
+      ) : (
+        <>
+          <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginBottom: 6 }}>{C.product_hint}</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {offered.map((p) => (
+              <ChipBtn key={p.key} label={p.name} active={product === p.key} onClick={() => setProduct(p.key)} />
+            ))}
+          </div>
+        </>
+      )}
 
       <SubLabel>{C.email_label}</SubLabel>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -165,25 +178,39 @@ export function AccountsCard({ slug }: { slug: string }) {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {accounts.map((a) => (
-            <div key={a.userId} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12, flexWrap: "wrap" }}>
-              <span style={{ color: "var(--text-primary)", minWidth: 220 }}>{a.email}</span>
-              <span
-                style={{
-                  fontSize: 11, padding: "1px 8px", borderRadius: 20,
-                  background: a.verified ? "var(--badge-green-bg)" : "var(--bg-canvas)",
-                  color: a.verified ? "var(--badge-green-text)" : "var(--severity-medium)",
-                  border: `1px solid ${a.verified ? "var(--green)" : "var(--severity-medium)"}`,
-                }}
-              >
-                {a.verified ? C.status_verified : C.status_pending}
-              </span>
-              <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{relativeTime(a.lastSignInAt ?? a.createdAt)}</span>
-              <button type="button" style={smallBtn} disabled={busy !== null || !product} onClick={() => send(a.email)}>
-                {busy === a.email ? C.sending : a.verified ? C.reset_button : C.resend_button}
-              </button>
-              <button type="button" style={{ ...smallBtn, color: "var(--red)" }} disabled={busy !== null} onClick={() => remove(a)}>
-                {C.delete_button}
-              </button>
+            <div key={a.userId}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12, flexWrap: "wrap" }}>
+                <span style={{ color: "var(--text-primary)", minWidth: 220 }}>{a.email}</span>
+                <span
+                  style={{
+                    fontSize: 11, padding: "1px 8px", borderRadius: 20,
+                    background: a.verified ? "var(--badge-green-bg)" : "var(--bg-canvas)",
+                    color: a.verified ? "var(--badge-green-text)" : "var(--severity-medium)",
+                    border: `1px solid ${a.verified ? "var(--green)" : "var(--severity-medium)"}`,
+                  }}
+                >
+                  {a.verified ? C.status_verified : C.status_pending}
+                </span>
+                <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{relativeTime(a.lastSignInAt ?? a.createdAt)}</span>
+                <button type="button" style={smallBtn} disabled={busy !== null || !product} onClick={() => send(a.email)}>
+                  {busy === a.email ? C.sending : a.verified ? C.reset_button : C.resend_button}
+                </button>
+                <button type="button" style={{ ...smallBtn, color: "var(--red)" }} disabled={busy !== null} onClick={() => remove(a)}>
+                  {C.delete_button}
+                </button>
+              </div>
+              {offered.length > 0 && (
+                <div style={{ display: "flex", gap: "2px 16px", flexWrap: "wrap", fontSize: 11.5, color: "var(--text-secondary)", marginTop: 4 }}>
+                  {offered.map((p) => (
+                    <span key={p.key}>
+                      {p.name}：{p.settings ? a.roles[p.key] ?? C.role_none : C.role_open}
+                      {p.settings && (
+                        <a href={p.settings} style={{ marginLeft: 6, color: "var(--accent)" }}>{C.role_edit}</a>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>

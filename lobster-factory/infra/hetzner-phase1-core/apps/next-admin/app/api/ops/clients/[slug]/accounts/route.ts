@@ -1,7 +1,9 @@
 // GET/POST/DELETE /api/ops/clients/[slug]/accounts -- the client's own people (client hub → 帳號). Staff owner/admin
 // only: the list carries emails and POST creates sign-in identities.
-// GET     → { accounts: ClientAccount[], products: [{key,name}] }
-// POST    { email, product } → creates the account unverified (lib/accounts/client-invite.ts) and mails a set-password
+// GET     → { accounts: [ClientAccount + roles], products: [{key,name,settings}] }. products = the doors this client can be
+//         sent to; roles/settings only for a product that keeps a per-person role list (MEMBER_LISTS). Nothing here is stored:
+//         what is held is read from the entitlement rows, roles from that product's own member list.
+// POST    { email, product } (an offered product) → creates the account unverified (lib/accounts/client-invite.ts) and mails a set-password
 //         link (invite wording while unverified, reset wording after). Audited without the link.
 // DELETE  ?userId → removes an account of this client that holds no brand role (a mistyped email). Audited.
 
@@ -10,7 +12,10 @@ import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { resolveTenant } from "@/lib/tenant-guard";
 import { recordOpsAudit } from "@/lib/ops-audit";
-import { nextAdminProducts } from "@/lib/portal/doors";
+import { servedNextAdminProducts } from "@/lib/portal/doors";
+import { holdsProduct } from "@/lib/entitlements/door-holds";
+import { listMembers } from "@/lib/social/store";
+import { ROLE_NAMES } from "@/app/(shell)/tools/social/model";
 import { deleteClientAccount, inviteClientAccount, listClientAccounts, normalizeEmail } from "@/lib/accounts/client-invite";
 
 export const runtime = "nodejs";
@@ -19,6 +24,23 @@ export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ slug: string }> };
 type Org = { id: string; name: string };
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Products whose people each hold a role, read from the product's own list; staff change it at `settings`. */
+const MEMBER_LISTS: Readonly<Record<string, { roles: (orgId: string) => Promise<Map<string, string>>; settings: (orgId: string) => string }>> = {
+  social: {
+    roles: async (orgId) => new Map((await listMembers(orgId)).map((m) => [m.user_id, ROLE_NAMES[m.role] ?? m.role])),
+    settings: (orgId) => `/tools/social?brand=${orgId}&view=settings`,
+  },
+};
+
+/** Doors this client's people can be sent to: served (a closed door's host 404s) and held -- asked per door with the
+ *  door's own check, not one read of every row (an all-features account has hundreds, past PostgREST's row cap). */
+async function offeredProducts(orgId: string) {
+  const now = Math.floor(Date.now() / 1000);
+  const served = servedNextAdminProducts();
+  const held = await Promise.all(served.map((p) => holdsProduct({ organizationId: orgId, productKey: p.key, now })));
+  return served.filter((_, i) => held[i]);
+}
 
 /** owner/admin staff, else the 403 response. A client identity never reaches /api/ops (middleware), checked again here. */
 function staffAdmin(request: Request) {
@@ -49,8 +71,12 @@ export async function GET(request: Request, context: Ctx) {
   const org = await clientOrg(context);
   if (org instanceof Response) return org;
   try {
-    const accounts = await listClientAccounts(getSupabaseWriteClient()!, org.id);
-    const products = nextAdminProducts().map((p) => ({ key: p.key, name: p.name }));
+    const [list, offered] = await Promise.all([listClientAccounts(getSupabaseWriteClient()!, org.id), offeredProducts(org.id)]);
+    const withRoles = offered.filter((p) => p.key in MEMBER_LISTS);
+    const roleMaps = await Promise.all(withRoles.map((p) => MEMBER_LISTS[p.key].roles(org.id)));
+    const products = offered.map((p) => ({ key: p.key, name: p.name, settings: MEMBER_LISTS[p.key]?.settings(org.id) ?? null }));
+    // roles[product] = the role name, null = not on that product's list yet
+    const accounts = list.map((a) => ({ ...a, roles: Object.fromEntries(withRoles.map((p, i) => [p.key, roleMaps[i].get(a.userId) ?? null])) }));
     return NextResponse.json({ ok: true, accounts, products });
   } catch (e) {
     console.error("[accounts] list failed", { org: org.id, error: String(e) });
@@ -72,6 +98,14 @@ export async function POST(request: Request, context: Ctx) {
   if (!email) return NextResponse.json({ ok: false, error: "invalid_email" }, { status: 400 });
   const org = await clientOrg(context);
   if (org instanceof Response) return org;
+  let offered: Awaited<ReturnType<typeof offeredProducts>>;
+  try {
+    offered = await offeredProducts(org.id);
+  } catch (e) {
+    console.error("[accounts] entitlements read failed", { org: org.id, error: String(e) });
+    return NextResponse.json({ ok: false, error: "entitlements_unavailable" }, { status: 503 });
+  }
+  if (!offered.some((p) => p.key === body.product)) return NextResponse.json({ ok: false, error: "product_not_held" }, { status: 400 });
 
   const out = await inviteClientAccount(getSupabaseWriteClient()!, {
     orgId: org.id,

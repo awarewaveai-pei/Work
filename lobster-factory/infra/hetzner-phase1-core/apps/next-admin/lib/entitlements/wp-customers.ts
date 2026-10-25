@@ -6,7 +6,7 @@
 // repeat, so a half-made account is finished by the sender's retry. GoTrue and Postgres cannot share a transaction.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { findAuthUserByEmail, inviteClientAccount } from "@/lib/accounts/client-invite";
-import { nextAdminProducts } from "@/lib/portal/doors";
+import { servedNextAdminProducts } from "@/lib/portal/doors";
 import { findBillingAccount, linkIdentity, type Identity } from "./identities";
 
 /** emailVerified: WordPress (the wp-bridge plugin) proved this member owns the address. WooCommerce does not, so the
@@ -62,10 +62,10 @@ export async function emailOwner(db: SupabaseClient, email: string): Promise<{ u
   return data ? { userKind: "client", orgId: (data as { default_organization_id: string | null }).default_organization_id } : null;
 }
 
-/** The door the set-password mail points at: the plan's product when it has a door, else the first door. A plan that
+/** The door the set-password mail points at: the plan's product when its door is served, else the first served door. A plan that
  *  does not exist is refused here, before any account is made: the control plane would refuse the payment anyway. */
 async function inviteProductKey(db: SupabaseClient, planKey: string | undefined): Promise<string> {
-  const doors = nextAdminProducts();
+  const doors = servedNextAdminProducts();
   if (planKey) {
     const { data, error } = await db.from("plans").select("product_key").eq("plan_key", planKey).maybeSingle();
     if (error) throw new Error(error.message);

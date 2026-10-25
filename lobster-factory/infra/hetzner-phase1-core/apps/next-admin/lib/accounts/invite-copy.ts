@@ -1,6 +1,8 @@
 // Words for staff-created client accounts: the ops panel, the set-password page and the two emails. Written by GPT
 // (codex-oracle inspect, agency-os/reports/oracle/2026-10-16-inspect-b3200efc.md + -5bfe6007.md + -326d7dca.md + -60a98f86.md) to the operator's rule
 // 清楚易懂、不冗長, written for a first-time reader nobody guides.
+// product_hint, no_products, role_*, step_roles, err_product_not_held and the 2026-10-25 rewrites of card_intro, steps[0],
+// status_verified_hint, go_button: written by Claude (Codex out of quota), not yet passed through inspect.
 // Pure strings so client components and the server share one copy.
 // "24 小時" = GoTrue GOTRUE_MAILER_OTP_EXP, unset on prod = default 86400 s (checked 2026-10-16); change both together.
 
@@ -8,16 +10,17 @@ export const ACCOUNT_COPY = {
   card_title: "建立客戶帳號",
   steps_title: "怎麼建立帳號",
   steps: [
-    "選取「社群發文」，輸入客戶員工的電子郵件，然後按「建立帳號並寄送」。",
+    "選取一個產品，輸入客戶員工的電子郵件，然後按「建立帳號並寄送」。",
     "客戶員工開啟邀請信，並在 24 小時內設定密碼。",
     "完成後，這一列會顯示「已驗證」。",
-    "要讓客戶員工編輯或核准，請您到「社群發文」→「設定」→「成員」加入客戶員工。",
   ],
+  /** shown only when a held product keeps per-person roles (it then has a 去設定 link) */
+  step_roles: "要讓客戶員工編輯或核准，請按該產品旁的「去設定」，將客戶員工加入成員。",
   status_pending_hint: "「等待開啟郵件」表示客戶員工尚未開啟邀請信。您可以按「重新寄送」。重新寄送後，舊邀請連結會失效。",
-  status_verified_hint: "驗證後，客戶員工可以立即在「社群發文」查看此客戶的內容。要讓客戶員工編輯或核准，請您到「社群發文」→「設定」→「成員」加入客戶員工。",
+  status_verified_hint: "驗證後，客戶員工即可登入此客戶已購買的產品。",
   sent_next: "請客戶員工開啟邀請信，並在 24 小時內設定密碼。",
   card_intro:
-    "此頁可為客戶員工建立帳號，並寄送設定密碼的連結。帳號持有人設定密碼後，可立即查看此客戶在社群發文中的內容；如要編輯或審核，品牌擁有者需到「社群發文 → 設定 → 成員」新增帳號。",
+    "此頁可為客戶員工建立帳號，並寄送設定密碼的連結。帳號持有人設定密碼後，即可登入此客戶已購買的產品。每個帳號下方列出此人在各產品中的角色；要變更角色，請按「去設定」。",
   newest_only: "只有最新寄出的電子郵件連結有效。",
   delete_button: "刪除帳號",
   delete_confirm: "確定要刪除 {email} 的帳號嗎？刪除後，對方會被登出，帳號也會移除。",
@@ -30,6 +33,12 @@ export const ACCOUNT_COPY = {
   email_label: "電子郵件",
   email_placeholder: "請輸入電子郵件",
   product_label: "登入產品",
+  product_hint: "邀請信中的登入連結會指向您選取的產品。這裡只列出此客戶已購買、且已開放登入的產品。",
+  no_products: "此客戶尚未購買可登入的產品，因此無法建立帳號。",
+  role_none: "唯讀，尚未加入成員",
+  role_open: "可使用",
+  role_edit: "去設定",
+  err_product_not_held: "此客戶沒有購買這個產品，或這個產品尚未開放登入。請重新整理頁面後再選取。",
   send_button: "建立帳號並寄送",
   sending: "寄送中…",
   sent_new: "已建立帳號，邀請信已寄至 {email}。",
@@ -64,7 +73,7 @@ export const ACCOUNT_COPY = {
   err_no_token: "請從電子郵件中的連結開啟此頁面。",
   err_save_failed: "系統無法儲存密碼，請再試一次。",
   done: "密碼已儲存。您現在已登入。下次請前往 {login}，使用此電子郵件和密碼登入。",
-  go_button: "開啟社群發文",
+  go_button: "開始使用",
   members_hint: "對方必須先有電子郵件已驗證的帳號：AwareWave 在後台「Clients → 該客戶 → 帳號」建立，對方開啟電子郵件設定密碼後才能加入。",
   members_no_account_error: "此電子郵件沒有已驗證的帳號。請先建立帳號，並請對方開啟驗證信。",
 } as const;
