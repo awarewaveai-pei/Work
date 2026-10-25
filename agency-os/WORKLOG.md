@@ -1,4 +1,12 @@
 # Worklog
+## 2026-10-25（續65）排程離開 Trigger C4.6③：開機通知改走 notify.sh，部署到 /usr/local/bin（操作者 go ahead）（Claude）
+
+- **做了什麼**：主機舊版（2026-10-14，sha `683c17b036`）仍自己讀 `/etc/default/awarewave-endpoint-alert*` 發 Telegram；repo 版（b9ab5a4f2，C4.4）改呼叫 `/root/lobster-phase1/scripts/notify.sh`。照檔頭：`git show origin/main:…/ks-aw-01-boot-health-notify.sh` → `bash -n` → 0755 → rename 到 `/usr/local/bin/`（sha `af99407fd9`＝origin/main）。`ks-aw-01-boot-notify.service` 與 repo 相同（diff 空），enabled，未動。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`NOTIFY_SH=/bin/cat /usr/local/bin/ks-aw-01-boot-health-notify.sh`（乾跑：完整健康檢查，發送改 cat，不推播）→ journal「Boot OK… All endpoint checks + container health passed」＋「notified: …」 | exit=0 | ms=130000
+- REVIEW_WAIVED: NA -- 部署已審過的 b9ab5a4f2 版本（C4.4 已審），本步無程式改動
+- BUGHUNT_WAIVED: NA -- 無程式改動
+- **剩餘**：真實送達由 ④ `slack-alert-drill.sh` 演練 `notify.sh` 三通道涵蓋；下次真開機才會發真訊息。
+- **rollback**：`sudo cp -p /root/lobster-phase1/.state/boot-notify-20261025T121620Z/ks-aw-01-boot-health-notify.sh /usr/local/bin/`。
 ## 2026-10-25（續64）排程離開 Trigger C4.6②：告警／每日一行兩行 cron 裝上；先修兩個長期紅的排程（docker 清理 127、備份同步 dirty）；備份同步推不上 GitHub＝待決（Claude）
 
 - **觸發**：操作者「先修 再go ahead」（續61 後：C2.2 驗收時發現兩列紅，裝告警後會立刻推播）。
