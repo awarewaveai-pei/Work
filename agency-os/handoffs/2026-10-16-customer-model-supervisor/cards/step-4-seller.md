@@ -2,7 +2,7 @@
 
 **風險** High（金流、身分）　**模型** Fable 5.1 設計（本卡）→ Opus 5.5 實作　**前置** 4b 全部（0124、0128 已套 prod；aware-wave-store 1.0.0 已上線）　**正本** ADR 017 §0、§3、§6、順序 7；ADR 018 §3；TASKS.md 收件匣「續做 ADR 017「賣家」一軸」
 
-> 這張卡只給操作者看、只做決定。**不寫 migration、不改程式**；操作者勾完 §6 的選項後才開 4c 執行卡。
+> §1–§6 是設計（操作者 2026-10-25 已決）；§7 是 4c 執行卡，便宜模型照做，每張獨立 commit。**4c-1 套 prod 前先給操作者看（High）。**
 
 ## 1. 一句話
 
@@ -78,7 +78,7 @@ billing_apply_payment_event(p_provider, p_event_id, p_event, + p_site_id)
 
 **為什麼不是「每站密鑰雜湊」**（TASKS 條目原寫法）：HMAC 是對稱金鑰，驗章要原文，雜湊後驗不了；雜湊只適用 bearer token。要做到「DB 被倒出來也拿不到鑰匙」只有兩條路：對稱鑰匙加密存（再多一把主鑰在 env）或**非對稱**（網站持私鑰簽、我們只存公鑰）。見 §6 D1。
 
-## 6. 要操作者決定的取捨（勾一個；★＝建議）
+## 6. 取捨（**操作者 2026-10-25 定：D1–D5 全部照★**；寫入 ADR 017 產品決定 #12。表留作為什麼不選別的）
 
 ### D1　每站鑰匙怎麼做
 
@@ -122,14 +122,51 @@ billing_apply_payment_event(p_provider, p_event_id, p_event, + p_site_id)
 
 不是取捨，先知道：買家在賣家網站按「進入」→ 門仍是 `<產品>.aware-wave.com`（ADR 018 §1），登入來源 `customer-wp`（ADR 018 §3）、進門鑰匙＝該站 `handoff_public_key`。賣家想用自己的網址做門＝順序 9 白牌，另一張卡。
 
-## 7. 4c 執行卡會長什麼樣（給便宜模型；本卡不做）
+## 7. 4c 執行卡（便宜模型照做；順序 4c-4 → 4c-1 → 4c-2 → 4c-3；每張各自 Acceptance、各自 commit；`.ts/.tsx` 改動收尾前 `npx tsc --noEmit` 綠）
 
-- **4c-1 migration**（High；套 prod 前給操作者看）：§5 四步＋`.down.sql`；down 條件：`seller_sites` 只剩 aware-wave.com 一列、`sold_by`／`owner` 全 null 或 internal。
-- **4c-2 next-admin**：`lib/payments/sites.ts`（查鑰匙→網站→賣家，service role only，`import-boundary` 加路徑）；`hmac.ts`＋`woo-billing.ts` verify 改查表；`wp-customers.ts` 加 `siteId`、slug 改 `wp-member-<key_id>-<wp user id>`（aware-wave.com 舊列不動）、`metadata.site_id`；`identities.ts` 鍵加 `siteId`；`awarewave-wp.ts` handoff 查站鑰匙；`contracts.ts` 傳 `p_site_id`；`/ops/sellers` 頁（登記網站、顯示 key_id、停用）；0130 總帳加賣家欄與篩選。
-- **4c-3 外掛**：`aware-wave-store` 改名或加「本站是代理商收銀台」模式：產鑰匙、顯示公鑰、設定頁多 `key_id`；README 刪「只裝 aware-wave.com」。版號升、`release-wp-bridge.sh --plugin store`。
-- **測試名**（4c-2）：`a payment signed by site B for a buyer sold by site A is refused`、`the body may not name a seller or a site`、`a plan owned by another seller is refused on this site`、`two sites with the same wp user id make two accounts`、`the legacy aware-wave.com site still verifies with the env secret`、`a disabled site is refused before the body is read`。
-- **突變**（一個守衛一次）：拔掉「鑰匙→網站」查表、改讀 body 的 `site_id` → `the body may not name…` 紅，還原綠。
-- **Rollback**：4c-2 `git revert`（舊程式只認 env 鑰匙，aware-wave.com 列仍是 `hmac-env`，照常）；4c-1 down；外掛關「代理商模式」開關。
+通則：next-admin 路徑皆相對 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`；外掛路徑相對 `lobster-factory/packages/aware-wave-store-plugin/`。每張卡的 WORKLOG 證據行照 AGENTS.md §1 四動作。**不做無效益測試**：只寫下列點名的測試；突變只做在點名的守衛，一個守衛一次。
+
+### 4c-4　登記表：每產品一個 `resell` 功能（無依賴；先做，4c-2 要用）
+- Files：`lib/portal/products.ts`（`ProductFeature` 型別 `products.ts:12-18` 不動；每個 `door.app === "next-admin"` 產品的 `features` 加 `{ feature_key: "<key>.resell", name: "代理銷售", limitKind: "QUOTA", buyout: false, billing: "contract" }`，用一個 helper `resell(key)` 產生，放 `quota` helper（`:37`）旁）；`lib/entitlements/features.ts` 加常數 `RESELL_FEATURES`（每產品**字面**字串：`registry-code.test.ts:75` 的 asker 掃描只認字面，4c-2 的 `sites.ts` 用它 `grantFor`）；`lib/entitlements/__tests__/features.test.ts` 證明常數＝登記表。
+- 閘注意：`registry-code.test.ts:75`「every feature … is asked by a call site」在 4c-2 之前會紅 → 本卡與 4c-2 **同一天連做**，或先把 `resell` 列加進 `BACK_OFFICE_FEATURES` 豁免、4c-2 再移出（二擇一，WORKLOG 寫明）。`billing: "contract"` 所以 `:87` 計量閘不適用。
+- Acceptance：`npx vitest run lib/portal/__tests__ lib/entitlements/__tests__/features.test.ts` 綠；測試名 `every next-admin product declares exactly one resell feature`。
+- Rollback：`git revert`。
+
+### 4c-1　migration（High：套 prod 前給操作者看；下一個空號 `ls lobster-factory/packages/db/migrations | sort | tail`）
+- 開工第一句：`select count(*) from customer_identities; select count(*) from organizations where metadata->>'source'='awarewave-wp'; select count(*) from plans;` 記進 WORKLOG（回填筆數）。
+- Files：`lobster-factory/packages/db/migrations/<NNNN>_seller_sites.sql`＋`.down.sql`，照 0120／0124 樣式（`begin; set local lock_timeout='5s'; … notify pgrst,'reload schema'; commit;`；RLS 段照 0124 `do $$ … service_role` 迴圈）。
+- 內容（§5 四步，同一檔同一交易）：
+  1. `create table seller_sites(...)` 照 §5，另加 `handoff_env_var text`（aware-wave.com 過渡列用）；插 aware-wave.com 一列：`seller_organization_id = (select id from organizations where kind='internal' and parent_organization_id is null)`（0117:24 同法）、`host='aware-wave.com'`、`platform='woo'`、`key_id='aware-wave-com'`、`verify_alg='hmac-env'`、`env_var='PAYMENTS_WOO_SECRET'`、`handoff_env_var='AUTH_WP_HANDOFF_SECRET'`、`status='active'`。
+  2. `alter table customer_identities add column site_id uuid references seller_sites(id) on delete restrict; update … set site_id=(那一列); alter … alter column site_id set not null;` 刪 `(provider, external_id)`、`(provider, user_id)` 兩個 unique（實際 constraint 名以 `\d customer_identities` 為準），加 `unique (site_id, external_id)`、`unique (site_id, user_id)`；`provider` check 改 `in ('awarewave-wp','customer-wp')`。
+  3. `alter table organizations add column sold_by_organization_id uuid references organizations(id) on delete restrict, add constraint organizations_sold_by_not_self check (sold_by_organization_id is null or sold_by_organization_id <> id); update organizations set sold_by_organization_id=(internal id) where metadata->>'source'='awarewave-wp';`
+  4. `alter table plans add column owner_organization_id uuid references organizations(id) on delete restrict;`（全 null）
+  5. `alter table payment_events add column site_id uuid references seller_sites(id) on delete restrict;`（0120:99-102 的 immutable trigger 只擋 update/delete，加欄不衝突）
+  6. `create or replace function billing_apply_payment_event(p_provider text, p_event_id text, p_event jsonb, p_site_id uuid default null)`：整段複製最新定義（`grep -l billing_apply_payment_event lobster-factory/packages/db/migrations/*.sql | sort | tail -1`），只加三處：(a) `p_site_id` 非 null 時 `select * into v_site from seller_sites where id=p_site_id and status='active'`，無列 `raise 'payment_rejected:site_disabled'`；(b) 查到 `v_org` 後：`if p_site_id is not null and coalesce(o.sold_by_organization_id, <internal id>) <> v_site.seller_organization_id then raise 'payment_rejected:buyer_belongs_to_another_seller'`（首付新帳戶由 4c-2 在建 org 時寫 `sold_by`，函式只驗不寫）；(c) 查到 `v_plan` 後：`if v_plan.owner_organization_id is not null and (p_site_id is null or v_plan.owner_organization_id <> v_site.seller_organization_id) then raise 'payment_rejected:plan_not_sellable_here'`；insert `payment_events` 多寫 `site_id`。`p_site_id is null`＝`local`（轉帳登記）照舊。**`resell` 檢查不在 SQL**：由 4c-2 `sites.ts` 以 `can()` 問（§0 第 4 條），函式不重複判。
+  - down：`seller_sites` 只剩 aware-wave.com 一列、`sold_by` 只有 null／internal、`owner` 全 null、`payment_events.site_id` 全 null 或 aware-wave.com 才能 down，否則 `raise`；函式還原成前一版（複製前一個 migration 的定義）。
+- Acceptance：本機 Postgres（`lib/entitlements/__tests__/` 既有真 DB e2e 套法，見 commit `4386b1580`）：up → `\d seller_sites`、`\d customer_identities` 顯示新鍵 → down → up 再一次（冪等）。SQL 層測試（`lib/entitlements/__tests__/contracts-seller.test.ts`，e2e 套法）名：`a plan owned by another seller is refused on this site`、`a payment from site B for a buyer sold by site A is refused`、`a local payment with no site still applies`、`a disabled site is refused`。
+- 套 prod：照 0120 套法（WORKLOG 2026-10-23 續51）；之後 `psql -c '\d seller_sites'`＋`select host, verify_alg, status from seller_sites;`＝一列 aware-wave.com／hmac-env／active。
+- Rollback：`.down.sql`。
+
+### 4c-2　next-admin：鑰匙→網站→賣家；首付帳戶記賣家（依賴 4c-1、4c-4）
+- Files：
+  - 新 `lib/payments/sites.ts`：`findSiteByKeyId(db, keyId)`；`verifySiteSignature(site, rawBody, signature, env)`：`ed25519` → `crypto.verify(null, Buffer.from(rawBody,'utf8'), {key: publicKey, format:'pem', type:'spki'}, Buffer.from(sig,'base64'))`；`hmac-env` → 現成 `verifyPayment(rawBody, sig, env[site.envVar])`（`hmac.ts:13`）；`sellerMaySell(db, site, productKey)` → `grantFor({orgId: site.sellerOrganizationId, kind}, RESELL_FEATURES[productKey], 'site:<key_id>')`，internal 賣家直接放行（`can.ts:164` 同理）。只讀 `seller_sites`，表只准 `lib/entitlements/**`／`lib/payments/sites.ts`：`import-boundary.test.ts:11` `tableAllowed` 加此檔。
+  - `lib/payments/provider.ts:25`：`verify(headers, rawBody): boolean | Promise<boolean>`；route（`app/api/webhooks/payments/[provider]/route.ts:19`）`await`；`local.ts:14` 不改。
+  - `lib/payments/woo-billing.ts`：新 header `X-AwareWave-Site: <key_id>`（常數放 `hmac.ts` 旁）；`verify` → 無 header 時**只**接受 aware-wave.com 那列（`key_id='aware-wave-com'`，向後相容今天的外掛）；有 header → `findSiteByKeyId` → `verifySiteSignature`；`parse` 把 `site` 傳進 `ensureWpCustomer`，`rest` 出現 `site_id`／`seller_organization_id` 時拒 `seller_not_allowed`（`:66` 同法）；`parse` 末對該事件的方案呼叫 `sellerMaySell(site, plan.product_key)`，拒 `seller_not_licensed`；`ReceivedPayment` 加 `siteId`。
+  - `lib/entitlements/contracts.ts:20` rpc 加 `p_site_id: received.siteId ?? null`。
+  - `lib/entitlements/wp-customers.ts`：`WpMember` 加 `site: {id, keyId, sellerOrganizationId}`；`wpOrgSlug(site, wpUserId)`＝aware-wave.com 列維持 `wp-member-<id>`（舊帳戶不換名），其他站 `wp-member-<key_id>-<id>`；`findWpOrganization`（`:32`）多比 `metadata.site_id`；`ensureWpOrganization`（`:42`）insert 加 `sold_by_organization_id: site.sellerOrganizationId`、`metadata.site_id`；`emailOwner` 判斷（`:111`）改成「同站、同 email、同半成品帳戶才放行；不同站同 email → `email_taken_elsewhere`」（D5：一站一帳戶，拒而不合併）。
+  - `lib/entitlements/identities.ts`：`Identity` 加 `siteId`；查詢與 insert 帶 `site_id`；`provider` 由站決定（aware-wave.com＝`awarewave-wp`，其他＝`customer-wp`）。
+  - `lib/auth/sources/awarewave-wp.ts:45-63`：body 加 `key_id`（舊外掛沒帶＝aware-wave.com 列）；驗章改 `verifySiteSignature(site, …)` 用 `seller_sites.handoff_public_key`，aware-wave.com 列用 `handoff_env_var`；`find` 帶 `siteId`。
+  - `/ops/sellers`：`app/(shell)/ops/sellers/page.tsx`（唯讀表＋表單：新增網站（host、賣家帳戶、貼公鑰、貼進門公鑰）、停用／啟用；資料只經 `lib/payments/sites.ts`）；側欄登記照 `ops/billing` 的位置（grep `"/ops/billing"`）；`BACK_OFFICE` 清單加 `ops/sellers`（ADR 017 順序 1 反向登記閘）。
+  - 0130 總帳：新 migration `<NNNN+1>_billing_ledger_seller.sql`：`billing_ledger` 回傳加 `sold_by`（賣家名）；`p_filter`（`0130:21`）加 `'seller:<uuid>'`；`app/(shell)/ops/billing/page.tsx` 多一欄＋篩選＋每賣家本月合計（訂閱付款筆數、`credit_pack` 點數合計；D4 月結用）。
+- Acceptance：`npx vitest run lib/payments lib/entitlements app/api/webhooks/payments app/api/auth lib/portal/__tests__` 綠；測試名：`a request without a site header verifies against the aware-wave.com env key`、`a request naming a site verifies with that site's ed25519 public key`、`the body may not name a seller or a site`、`two sites with the same wp user id make two accounts`、`a seller without the resell row for the product is refused`、`a legacy wp-handoff without key_id still signs in`。本機 `curl -X POST localhost:3000/api/webhooks/payments/woo -H "X-AwareWave-Site: test-site" -H "X-AwareWave-Payment-Signature: <ed25519 sig>" -d @fixture` → `{"ok":true,…}`；同 body 換 header 指另一站 → 401。
+- 突變（一個守衛）：`sites.ts` 改成讀 body 的 `site_id` 決定網站 → `the body may not name a seller or a site` 紅；還原綠。
+- Rollback：`git revert`；舊程式只認 env 鑰匙，aware-wave.com 列是 `hmac-env`，照常。
+
+### 4c-3　外掛 `aware-wave-store`：代理商收銀台模式（依賴 4c-2 上線）
+- Files：`includes/Signature.php`（加 `signEd25519(rawBody, secretKey)`＝`base64_encode(sodium_crypto_sign_detached($rawBody, $sk))`；HMAC 保留給 aware-wave.com）；`includes/Settings.php`（新 option `aware_wave_site_key_id`、`aware_wave_site_keypair`（只存站內，`sodium_crypto_sign_keypair()` 首次啟用產生，不可匯出）、`aware_wave_handoff_keypair`；`OPT_PAYMENTS_SECRET`／`OPT_HANDOFF_SECRET` 保留：有 key_id 用 Ed25519，否則 HMAC）；`includes/Admin/SettingsPage.php:45` 旁加「代理商模式」區：顯示 key_id、兩把公鑰（PEM，貼到 `/ops/sellers`）、「重新產鑰」（舊鑰立刻失效，提示先到 `/ops/sellers` 換）；`includes/PaymentSender.php:59` 與 `includes/MyAccountDoors.php:18-23` 送出時加 header／欄位 `key_id`；`README.md:3` 改「aware-wave.com 或代理商收銀台」；`aware-wave-store.php` 版號升 1.1.0；`tests/`：`SignatureTest`（Ed25519 向量：固定 seed 的公鑰＋body＋期望簽章，同一組向量放 next-admin `lib/payments/__tests__/fixtures/ed25519-v1.json` 兩邊跑，照 ADR 017 §3 permit-v1 的做法）。
+- `scripts/rollout-wp-bridge.ps1 -Plugin store` 的「只有開過收費的網站才能裝」閘：改成「`seller_sites` 有該 host 的 active 列」（查法：next-admin 新唯讀 route `GET /api/internal/sellers/sites?host=`，Bearer `SCHEDULE_INGEST_TOKEN` 同法）。
+- Acceptance：`php -d extension=mbstring phpunit-9.6.phar` 綠；測試名 `an ed25519 signature over the exact bytes verifies against the fixture public key`、`a site with a key id sends it in the header and never sends an hmac`、`regenerating keys invalidates the previous signature`。發版 `bash scripts/release-wp-bridge.sh --plugin store`；aware-wave.com 升級（High）；第一個代理商站：`/ops/sellers` 登記 → 貼公鑰 → 外掛開「送付款事件」→ 0 元試用訂單 → `/ops/billing` 篩該賣家出現合約。
+- Rollback：關外掛「代理商模式」（回 HMAC，或關整個送事件開關）；`/ops/sellers` 停用該站列。
 
 ## 8. 風險清單
 

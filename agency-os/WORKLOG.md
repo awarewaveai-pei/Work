@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-25（續59）ADR 017 賣家 D1–D5 定案（全部照★）寫回 ADR／TASKS；4c 四張執行卡（Claude）
+
+**觸發**：操作者「D1–D5 全部照★建議（Ed25519 公鑰、目錄＋賣家自有方案、resell 權利列、月結報表、一站一帳戶）。寫回 TASKS／ADR 017，開 4c 執行卡。」接續 58。
+
+**改動**：
+- `agency-os/docs/architecture/decisions/017-entitlements-and-self-hosted-modules.md`：產品決定表加 #12（賣家＝B 軸另一方、計費帳戶一欄；`seller_sites`＋每站 Ed25519；`plans.owner_organization_id`；`<product>.resell`；月結；一站一帳戶；與順序 7 兩條路）；順序 4 末加「4c 賣家」一句。
+- `agency-os/TASKS.md` 收件匣條目改成「已決＋4c 下一步」（不新增待決行，監工台 OPEN 仍 2）。
+- `cards/step-4-seller.md` §6 標已決；§7 擴成 4c-4（登記表 `resell` feature）→ 4c-1（migration：`seller_sites`、identities 鍵換 `(site_id, …)`、`sold_by`、`owner`、`payment_events.site_id`、函式三個新拒絕；down 條件）→ 4c-2（`lib/payments/sites.ts` 鑰匙→網站→賣家、header `X-AwareWave-Site`、無 header 只認 aware-wave.com 列、`wp-customers` slug／`sold_by`／D5 拒不合併、handoff 站鑰匙、`/ops/sellers`、0130 賣家欄）→ 4c-3（外掛 Ed25519 keypair、代理商模式、rollout 閘改查 `seller_sites`）。每卡 Files（file:line）、測試名、一個突變、Rollback。
+- 閘注意寫進卡：`registry-code.test.ts:75` 要求每個 feature 有 asker → 4c-4 與 4c-2 同日連做或暫列 `BACK_OFFICE_FEATURES`；asker 掃描只認字面字串 → `RESELL_FEATURES` 常數逐產品字面。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node agency-os/handoffs/2026-10-16-customer-model-supervisor/check.mjs && node scripts/verify-governance-pointers.mjs` | exit=0 | ms=2500（`ok: 5 ways, 9 steps, 2 open, page fresh`；`Governance pointers PASSED`）
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（自審：卡中每個 file:line 於本 session grep 過原檔；設計文件無程式）
+- ORACLE_WAIVED: 純文件（ADR／TASKS／卡），無 source 檔 staged
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`step-4-seller|sold_by_organization_id|seller_sites|RESELL_FEATURES` | hits=0 程式／3 文件（ADR #12、TASKS 條目、卡本身；皆本 commit）
+- WORKLOG: 本條目
+
+**剩餘風險**：4c-1 migration 套 prod 是 High，卡上寫明先給操作者看；監工台 `data.mjs` NEXT ④ 文字尚未提 4c（下次 4c 卡完成時連同狀態一起改，避免重建 HTML 兩次）。
+
+**Rollback**：`git revert <this commit>`。
 ## 2026-10-25（續58）ADR 017「賣家」一軸設計卡：收銀台可裝在任何網站，只做決定、不改程式（Claude）
 
 **觸發**：操作者開場「續做 ADR 017「賣家」一軸…完成 = 設計卡 cards/step-4-seller.md 給操作者看（不寫 migration、不改程式）」（TASKS.md 收件匣條目，commit 711c40d47）。
