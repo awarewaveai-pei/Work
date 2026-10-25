@@ -56,6 +56,8 @@
 | B5 | 熱搜每 geo **每天一次**，守衛＝`content_trends` 已有 `(geo, fetched_on=今天 UTC)` 列，不另加狀態 | `recentTrends` 依出現天數排（§2）；公開資料無租戶，兩客戶同 geo 只抓一次 |
 | B6 | 排程內每一筆 AI 花費都先出現在 `/ops/schedules` 那格的 `cost` 文字 | 操作者規則「AI 先顯示成本」；數字由 cost-model 算，不手打 |
 | B7 | 設定只有一份：總控頁（卡 C）讀寫的是 `/ops/schedules` 與 `/tools/content/sites` 同一份資料 | 兩份設定遲早不同步 |
+| B8 | 排程內每一筆 AI 花費記在**該客戶**（`runForOrg` ＋ `grantFor("content.plan")`）；客戶沒開通或點數不足（`EntitlementRequired`）＝**跳過、不當故障**：不寫嘗試記號、不開 incident、當次 firing 照常 tick；總控頁顯示「未開通」 | ADR 017：許可只問 `can(主體, feature, actor)`，五種客戶方式（訂閱／點數／買斷…）靠同一條；點數用完的客戶若每天收一張 incident 是噪音，不是故障（`can.ts:122-125`；`products.ts:75` 已登記 `content.plan`） |
+| B9 | 站的市場不在 `TRENDING_GEOS` 內 → **沒有熱搜**（提案只靠品牌＋知識庫），不是退回台灣的熱搜 | 平台是全球客戶；現行 `geoFor` 不認識的國家回 `"TW"`（`plan.ts:20-21`）會拿台灣熱搜替德國站規劃 |
 
 ## 4. 風險與部署
 
@@ -95,8 +97,10 @@
    await collectTrendsIfDue(sb, geos);
    ```
    `geoFor` 在 `plan.ts:21`。
+4. B9：`plan.ts:21` `geoFor` 改回 `TrendingGeo | null`（不認識的國家＝`null`，不再預設 `"TW"`）；唯一呼叫點 `plan.ts:115` 改成 `geo ? recentTrends(sb, geo, 30, 50) : []`；第 3 點的 `geos` 過濾掉 `null`。`plan.test.ts:47-48` 現在斷言「全球（不指定）」與 `undefined` → `"TW"`，改成 → `null`（台灣客戶在文章工具預設就是「台灣」，不受影響）。
 
 **驗收**
+- `plan.test.ts`：`targetCountry="德國"` → `recentTrends` 不被叫、prompt 的熱搜段是「（無）」（B9）。
 - 新測 `NA/lib/content/topics/__tests__/collect-trends.test.ts`（假 sb 鏈式物件；mock `@/lib/content/trending-sources` 的 `runTrending`）：(a) 今天沒有列 → `runTrending`、`saveTrends` 各叫一次；(b) 今天已有列 → 都不叫；(c) `geos=["TW","TW","HK"]` → 最多叫兩次。
 - 既有 `trending/route.test.ts` 不改內容就綠。
 - `content-pipeline-job.test.ts` 補 `vi.mock("@/lib/content/topics/collect-trends", () => ({ collectTrendsIfDue: vi.fn(async () => []) }))`，假 sb 的 `wp_sites` 回空陣列；原兩個斷言仍成立。
@@ -122,6 +126,7 @@
 3. 新檔 `NA/lib/content/topics/plan-due.ts`：
    ```ts
    export interface PlanDueDeps {
+     canPlan(): Promise<boolean>;                                               // runForOrg 內 grantFor("content.plan")；EntitlementRequired → false，其他錯誤往上丟（B8）
      sites(): Promise<Array<{ id: string; defaults: SiteContentDefaults }>>;   // 該客戶 active 的 wp_sites
      hasProposal(siteId: string, month: string): Promise<boolean>;             // content_topics: site_id, month, source <> 'manual' 存在（B1）
      claimAttempt(siteId: string, now: Date): Promise<boolean>;                 // update wp_sites set content_plan_attempted_at=now where id=site and (is null or < now-24h) returning id → 1 列＝true（B2）
@@ -132,7 +137,7 @@
    /** 一個 firing 最多提一站（B3）；回傳摘要，沒得提回 null。 */
    export async function planIfDue(deps: PlanDueDeps, now: Date): Promise<string | null>
    ```
-   流程：`month = monthKey(taipeiParts(now.toISOString()).month)`（`store.ts:72,82`）→ 逐站 `hasProposal` 為 true 跳過 → 第一個 false 的站 `claimAttempt`，false 跳過 → `propose` → `aiPicksTopics(defaults)` 才每題 `approve` → 回 `planned site=<id> month=<m> topics=<n> approved=<n>`。`propose` throw 就往上 throw（run-due 記 `last_error`＋開 incident，`run-due/route.ts:66-73`；24 小時後 B2 放行再試）。
+   流程：`month = monthKey(taipeiParts(now.toISOString()).month)`（`store.ts:72,82`）→ 逐站 `hasProposal` 為 true 跳過 → 有站要提才 `canPlan()`，false → 回 `null`（B8：不 claim、不花錢，當次照常 tick）→ 第一個要提的站 `claimAttempt`，false 跳過 → `propose` → `aiPicksTopics(defaults)` 才每題 `approve` → 回 `planned site=<id> month=<m> topics=<n> approved=<n>`。`propose` throw 就往上 throw（run-due 記 `last_error`＋開 incident，`run-due/route.ts:66-73`；24 小時後 B2 放行再試）。
    `export function planDueDeps(sb, organizationId, actor): PlanDueDeps` 真實作；`propose` ＝ `runForOrg(organizationId, actor, async () => proposeMonth(sb, { organizationId, siteId, month, actor }, planAsker(await grantFor("content.plan"), "lib/schedules/content_pipeline")))`（先例 `make.ts:99,261`）。
 4. `jobs.ts` `content_pipeline.run`，P9.1 的 `collectTrendsIfDue` 之後：
    ```ts
@@ -152,6 +157,8 @@
   5. 兩站都 `hasProposal=false` → `propose` 只叫一次（B3）。
   6. `defaults.topicMode="ai_pick"` → `approve` 每題各叫一次；`"human_pick"`、`undefined`、`"AI_PICK"` → 不叫；只有 `publishMode="ai_review_auto"` → 不叫（B4）。
   7. `now=2026-11-01T00:30:00Z`（台灣 11/1 08:30）與 `now=2026-10-31T17:00:00Z`（台灣 11/1 01:00）→ `hasProposal` 都收到 `"2026-11-01"`（台灣月）。
+  8. `canPlan=false` → `claimAttempt`、`propose` 都不叫、回 `null`（B8）；`hasProposal` 全 true → `canPlan` 不叫（沒事做就不問權限）。
+  9. 真實作 `planDueDeps(...).canPlan`：mock `grantFor` 丟 `EntitlementRequired` → `false`；丟一般 `Error` → reject（B8：只有權限拒絕算跳過）。
 - `content-pipeline-job.test.ts` 加兩條（mock `@/lib/content/topics/plan-due`）：`planIfDue` 回字串 → `tickTopics` 不叫、`run` 回那字串；回 `null` → `tickTopics` 叫（B3）。
 - 真 SQL 呼叫鏈各一條（`store.test.ts` 的假 sb 風格）：`hasProposal` 用 `.eq("site_id").eq("month").neq("source","manual")`；`claimAttempt` 的 `.or()` 字串含 `content_plan_attempted_at.is.null` 與 `.lt.`。
 - `/ops/schedules` 那格 cost 文字含提案費用（B6）；`/tools/content/sites` 看得到兩組按鈕，切題目閘後 PATCH 回應的 `contentDefaults.topicMode` 變、`publishMode` 不變（B4）。
@@ -168,7 +175,7 @@
 | 格 | 顯示 | 控制（沿用既有 API，B7） |
 |---|---|---|
 | ① 搜集熱搜 | 該站 geo 最後一次 `content_trends.fetched_on`、近 30 天筆數 | 無（P9.1 自動）；可放「立即抓一次」＝GET `/api/content/trending?type=trending&geo=..` |
-| ② 提案題目 | 本月已提案幾題（`listTopics(sb, org, month)` 過濾 `site_id` 與 `source <> 'manual'`，`store.ts:91`）／尚未；上次嘗試 `wp_sites.content_plan_attempted_at`（在 `/api/content/sites` GET 的 select 加這欄）；失敗原因＝`/api/ops/schedules?slug=` 回的 `content_pipeline.lastError` | 既有「AI 提案本月題目」按鈕（`TopicsBoard.tsx:179-221`，POST `/api/content/topics/plan`） |
+| ② 提案題目 | 本月已提案幾題（`listTopics(sb, org, month)` 過濾 `site_id` 與 `source <> 'manual'`，`store.ts:91`）／尚未；上次嘗試 `wp_sites.content_plan_attempted_at`（在 `/api/content/sites` GET 的 select 加這欄）；失敗原因＝`/api/ops/schedules?slug=` 回的 `content_pipeline.lastError`；客戶 `content.plan` 未開通 → 顯示「未開通題目規劃，排程不會提案」（server 端用同一條 `can`／`grantFor` 判斷，B8）；站的市場無熱搜 → ① 顯示「此市場沒有熱搜來源，提案只靠品牌與知識庫」（B9） | 既有「AI 提案本月題目」按鈕（`TopicsBoard.tsx:179-221`，POST `/api/content/topics/plan`） |
 | ③ 挑題 | 待核准幾題；題目閘目前是人挑／AI 挑 | 重用 `<TopicModeButtons>`（P9.2）＋既有勾選核准／退回（`TopicsBoard.tsx:231-232`） |
 | ④ 製作 | 總開關開／關、每天最多開始 N 題、進行中幾題 | 讀 GET `/api/ops/schedules?slug=<客戶>`（`NA/app/(shell)/ops/schedules/ScheduleTable.tsx:140`）；寫 PATCH `/api/ops/clients/<slug>/schedules/content_pipeline`（`ScheduleTable.tsx:166`）。先例：客戶頁已嵌 `<ScheduleTable only={org.slug} />`（`NA/app/(shell)/ops/clients/[slug]/ClientHubTabs.tsx:697`）——加「只顯示 content_pipeline」的 prop 重用，或只抽那一格 |
 | ⑤ 發布 | 人審／AI 審核自動發（只管文章） | 重用 `<PublishModeButtons site onSaved />`（`PublishModeButtons.tsx:15`） |
@@ -200,3 +207,4 @@
 | 「提案後停 proposed 等人核准（或站設 AI 自動）」 | 自動核准沒程式（`[id]/route.ts:15` 唯一入口）；不做它「每月不用人按」不成立 | 獨立題目閘 `topicMode`（B4；操作者定案兩個閘各自選人或 AI） |
 | 卡 A「每天跑一次」沒說守衛 | — | `(geo, fetched_on=今天)` 已有列就跳過（B5） |
 | §3 把不變量、實作、風險、部署混在一起；卡 B 邏輯寫在三處 | 讀者分不清哪句不能違反、哪句只是做法 | §3 只留不變量表；做法只在 §7 卡片；風險部署獨立 §4 |
+| 不變量只有工程面，沒有平台面（操作者 2026-10-26 問「適合這個工具平台嗎」） | 沒說錢記在誰頭上、點數用完怎麼辦（ADR 017 五種客戶方式）；不認識的國家拿台灣熱搜 | B8 權限拒絕＝跳過不當故障；B9 無市場熱搜＝不查，不退台灣 |
