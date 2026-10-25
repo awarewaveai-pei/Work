@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-26（續6）Soulful 實發：P6 管線產一支 16x9 短片（51 秒）並經社群工具發到 Soulful YouTube（操作者 2026-10-26 授權，Claude）
+
+- **產片**：主機 `/root/lobster-phase1/apps/next-admin` 用 vitest 暫時腳本（容器環境變數，已刪）以 `runForOrg(Soulful 2bf60452…)`＋`grantFor("video.script")` 呼叫 `startVideoJob`（pexels-all 素材、edge 免費語音、4 場景、只 16x9）。video_jobs `ecbea9ce-577f-4f33-b8fb-cb9ec53021e8` done；R2 `…/video/2bf60452_418f06d87f_…/16x9.mp4` 9,502,689 bytes，1920x1080。費用：`ai_call_logs` 該組織該時段合計 US$0.0298（只有腳本；素材與語音免費）。
+- **驗能播**：curl HEAD 200 video/mp4；容器內 ffprobe＝h264 1920x1080＋aac，約 50.9 秒；抽格 3/12/25/40 秒平均亮度 74/32/94/125、5 張縮圖有畫面與字幕；`blackdetect` 0 段。render 自帶 `signal_qa` 報 `blackRatio=0.9987`（warned）與實際畫面不符，判為偵測器誤報，未處理，另記。
+- **發布**：`addVideo`（data URL，主機缺 undici 套件走不了遠端抓檔）→`savePost` 只 target Soulful YouTube 帳號 `64fd5f59…`→`applyAction publish_now`；貼文 `2c647e55-d349-4108-8801-eb1ca66eca9f`，標題「Soulful Expression｜新手學畫最常踩的三個坑」。Postiz Post PUBLISHED 18:10Z；`social_post_targets` 約 4 分鐘後 published，`release_url=https://www.youtube.com/watch?v=HKMc7sTumvI`。
+- **YouTube 確認**：oembed 200，title 如上，author_name=Soulful Expression（@SoulfulExpression-Art）；watch 頁 200。
+- 過程：第一次發布嘗試因 undici 替身缺 `close()`、遠端抓檔被擋而失敗（尚未建任何列），改 data URL 一次成功；無重複貼文。主機暫存檔與 `/dev/shm` 環境檔已刪（收尾複查：`/dev/shm` 空；`/tmp` 僅剩工人漏刪的 `sheet.jpg` 已刪）。
+- m1：影片 QA（`signal_qa`）對此片誤報——`picture.black_frames` blackRatio=0.9987、`picture.freeze` 11 件，但抽格與 `blackdetect` 皆非黑；video job `ecbea9ce-577f-4f33-b8fb-cb9ec53021e8`。不修，留待偵測器改動時以此片為回歸樣本。
+- 疏失：查環境變數時 sed 遮罩太短，印出一段 `SUPABASE_SERVICE_ROLE_KEY` 值到本 session 輸出——建議輪替該 key。
+- REALTEST_EVIDENCE: tool=curl | cmd=curl -s -o /dev/null -w %{http_code} https://www.youtube.com/watch?v=HKMc7sTumvI | exit=0 | ms=700
+- REVIEW_WAIVED: NA -- 無程式改動，只用既有 lib 發一支影片
+- BUGHUNT_WAIVED: NA -- 無程式改動
+- ORACLE_WAIVED: 無 source 檔改動
 ## 2026-10-26（續5）Soulful YouTube 實發驗證停在選影片：Soulful 唯一自有影片 R2 回 404；監工台 P7.0／P7 完成 commit 改 935c70364（Claude）
 
 - 唯讀確認：`social_accounts` 有 Soulful（組織 `2bf60452…` Soulful Expression Art Therapy）youtube／connected，label「Soulful Expression」，postiz_integration_id `cmvo2egkv0003qs8kx4xs0pjc`。
