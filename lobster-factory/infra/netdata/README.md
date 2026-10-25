@@ -1,5 +1,9 @@
 # Netdata alerting — shared config for SG + EU
 
+> **ks-aw-01 (2026-10-25)**: none of these files is deployed there -- no `health_alarm_notify.conf`, no
+> `netdata-ops-inbox-notify.sh`. Netdata alerts reach the operator through Netdata Cloud (claimed; email). Everything
+> below describes the retired SG/EU hosts; deploy it to ks-aw-01 only as a deliberate change.
+
 Both VPS run netdata via systemd (not a container). These files are the SSOT; the
 machines are deployed copies. Verify with `sha256sum` after any change.
 
