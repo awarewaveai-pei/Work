@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-26（續2）部署 next-admin 3dc138272：社群頻道認領（0984f865d）上線（Claude）
+
+- 授權：操作者明示現在部署。DEPLOY_HOLD 不存在（main 工作樹確認）。
+- 步驟：ubuntu@ks-aw-01 `sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin`（exit 0，418s）；test gate／healthcheck（15s healthy）／HTTP smoke 5 項全 200；`.deployed-commit` 2cf911d48 → 3dc138272。
+- 容器：`lobster-next-admin Up (healthy)`，名稱正常無 hex 重命名。
+- 驗證 `/api/social/accounts/claim` 未登入：public `POST/GET https://app.aware-wave.com/api/social/accounts/claim` → 401。
+- 限制：同一 host 對不存在路徑 `/api/social/accounts/zzz-nonexist` 也回 401（`middleware.ts` 對 /api 先擋未登入），故 401 不能單獨證明路由存在；存在證據 = 容器內 `.next/server/app/api/social/accounts/claim/route.js` 在。容器內用 127.0.0.1 Host 直打會 404（`middleware.ts:310-323` product door host 不符），帶 `Host: app.aware-wave.com` 則 401。
+- 四動作：
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin | exit=0 | ms=418070
+- REVIEW_WAIVED: NA -- 純部署已 review 的 commit（0984f865d／3dc138272 已 reviewed pass），無新程式碼
+- BUGHUNT_WAIVED: NA -- 無程式碼改動，只部署既有 main
+- Playwright smoke（`/sg-deploy` 後續步驟）未跑：操作者指定輸出僅部署／curl／commit，此項待操作者決定。
+- 避免再發生：驗證「路由存在」勿只看未登入 401（middleware 全 /api 先回 401）；用 build artifact 或登入後請求。
 ## 2026-10-26（續1）全自動內容 P7.0：postiz YouTube OAuth 用戶端換成「網頁應用程式」那組（操作者 2026-10-26「go」）（Claude）
 
 - **根因**：舊用戶端（`749365809116-99gkk…`）勾了 AI-agent 類型、沒有重新導向 URI 欄位 → Google 回 `redirect_uri_mismatch`（續66 的後續）。
