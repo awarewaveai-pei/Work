@@ -91,9 +91,9 @@ push `packages/workflows` 即觸發 Trigger 部署（`.claude/hooks/post-push-tr
 | C4.1 | `HS/notify.sh`：主機腳本唯一發送出口，讀 `.env` 的 NA 同名變數（`TELEGRAM_BOT_TOKEN`、`OPS_INBOX_TELEGRAM_CHAT_IDS`、`OPS_INBOX_TELEGRAM_NOTIFY_ENABLED`、`OPS_INBOX_SLACK_INCIDENTS_WEBHOOK`；不改名），token／webhook 不進 argv；任一已設通道失敗 → exit 1 |
 | C4.2 | 判斷只一處＝NA `hostStatusRows`（頁面同源，不在 Python 重寫）：`NA/lib/schedules/alerts.ts`＋`/api/internal/schedules/alerts`（cron `*/10` poke）；failed／stale 變紅一則、恢復一則、持續不重送；狀態＝`ops_incidents`（`host-schedule:<key>`，open＝已通知），先送後記；不經 inbox dispatcher（它每 15 分重送，`notify/rules.ts:53-61`） |
 | C4.3 | 同 route `?digest=1`，cron `0 1 * * *`（09:00 台北）：「N 個排程全部正常」或列出需注意；這行沒來＝告警壞了 |
-| C4.4 | 舊發送改呼叫 `notify.sh`，刪各自 curl：repo 內 6 支（`endpoint-alert.sh`、`auto-deploy-next-admin.sh`、`check-drift-and-alert.sh`、`reconcile-videos.sh`、`verify-backup.sh`、`scripts/routine-output-watchdog.sh`）＋主機上未進 repo 的 2 支（`/root/scripts/verify-backup-eu.sh`、`verify-backup-ks-aw-01.sh`，先收進 repo）。備份完整性／部署版本失敗的兩邊通知已由 C4.2 涵蓋（任一排程 exit≠0 即通知） |
+| C4.4 | 自發通知的主機腳本 7 支改呼叫 `notify.sh`、刪各自 curl：`endpoint-alert.sh`、`auto-deploy-next-admin.sh`、`check-drift-and-alert.sh`、`reconcile-videos.sh`、`verify-backup.sh`、`scripts/routine-output-watchdog.sh`、`auto-reboot/ks-aw-01-boot-health-notify.sh`；各自原頻道以 `--slack VAR` 保留（#infra-alerts＝`.env` `SLACK_INFRA_ALERTS_WEBHOOK`，由 `scripts/sync-slack-alert-webhooks.ps1` 寫入）。`verify-backup-eu.sh`／`verify-backup-ks-aw-01.sh` 已在 repo（`infra/eu-backup`、`infra/ks-aw-01-backup`，手動部署）且不自發通知（只 exit≠0，C4.2 涵蓋），不改 |
 | C4.5 | `slack-alert-drill.sh` 改演練 `notify.sh`；本機假 webhook 驗變紅一則、恢復一則、重複不送 |
-| C4.6 | 上線（High）：`install-host-schedules.sh` 裝 alerts／digest 兩行；`/etc/default/awarewave-endpoint-alert.telegram` 與 `.local` 中與 `.env` 相同的值退役（endpoint-alert 專屬 Slack 頻道 `WEBHOOK_URL` 移入 `.env`）；第一則每日一行截圖給操作者 |
+| C4.6 | 上線（High）：`sync-slack-alert-webhooks.ps1` 把 #infra-alerts 寫進 `.env`；`install-host-schedules.sh` 裝 alerts／digest 兩行；開機通知照其檔頭手動部署到 `/usr/local/bin`；`slack-alert-drill.sh` 演練三通道；`/etc/default/awarewave-endpoint-alert.telegram`／`.local` 的重複值確認無人讀後退役；第一則每日一行截圖給操作者 |
 | C4.7 | 兩列「先回答再做」會綠而實際失敗（critic 2026-10-25 L4）：`pod-orders/sweep` 在 `after()` 才 drain（`route.ts:20-24`）；`dispatch-action-run` 失敗列記 `dispatch_failed` 但回傳無 `status`（`dispatch-action-run.ts:208,256`）→ 改回報真實結果 |
 
 ### C5 排程頁補齊外部時鐘

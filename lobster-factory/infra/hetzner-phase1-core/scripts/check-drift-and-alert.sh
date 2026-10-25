@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# check-drift-and-alert.sh — daily SG deploy-drift detector with Slack alert.
+# check-drift-and-alert.sh — daily SG deploy-drift detector; alerts through notify.sh.
 #
 # Compares /root/lobster-phase1/.deployed-commit against /root/Work origin/main.
-# Posts to SLACK_WEBHOOK_URL (sourced from /root/lobster-phase1/.env) if drift.
+# On drift: scripts/notify.sh (Telegram + #ops-incidents + this script's SLACK_WEBHOOK_URL channel).
 #
 # Dedupe: only alerts once per (deployed_commit, origin_head) pair — avoids
 # spamming the channel every day if the user simply hasn't deployed yet.
@@ -41,12 +41,6 @@ fi
 if [[ ! -f "$ENV_FILE" ]]; then
   log "ERROR: $ENV_FILE missing"
   exit 1
-fi
-
-# 2. Source SLACK_WEBHOOK_URL from .env (only that var, no other side-effects)
-SLACK_WEBHOOK_URL=$(grep -E '^SLACK_WEBHOOK_URL=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
-if [[ -z "${SLACK_WEBHOOK_URL:-}" ]]; then
-  log "ERROR: SLACK_WEBHOOK_URL not set in $ENV_FILE — drift detection runs but alert skipped"
 fi
 
 # 3. Fetch latest origin/main (quiet)
@@ -136,7 +130,7 @@ fi
 SUBJECTS=$(git log --no-merges --format=' • %h %s' --max-count=3 "${DEPLOYED}..${ORIGIN_HEAD}" -- "${APP_PATHS[@]}" 2>/dev/null || true)
 
 MSG=$(cat <<MSG_EOF
-:warning: *伺服器程式碼落後，有 ${BEHIND} 個更新尚未部署 — SG next-admin*
+⚠️ 伺服器程式碼落後，有 ${BEHIND} 個更新尚未部署 — SG next-admin
 新程式碼已備好但還沒上線，請執行部署
 
 待部署更新：
@@ -147,64 +141,12 @@ ${SUBJECTS}
 MSG_EOF
 )
 
-# 9. Post to Slack (only if webhook is set)
-if [[ -n "${SLACK_WEBHOOK_URL:-}" ]]; then
-  PAYLOAD=$(jq -nc --arg t "$MSG" '{text: $t}' 2>/dev/null || printf '{"text":%s}' "$(echo "$MSG" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')")
-  HTTP=$(curl -sS -o /tmp/slack-resp -w "%{http_code}" -X POST -H 'Content-Type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK_URL" 2>>"$LOG_FILE" || echo "000")
-  if [[ "$HTTP" =~ ^2 ]]; then
-    log "alert sent: HTTP $HTTP, behind=$BEHIND"
-    echo "$CURR_KEY" > "$STATE_FILE"
-  else
-    log "alert FAILED: HTTP $HTTP, response: $(head -c 200 /tmp/slack-resp 2>/dev/null)"
-  fi
+# 9. One sender (notify.sh). The dedupe key advances only when every channel took it -- otherwise retry next run.
+if NOTIFY_OUT="$(printf '%s' "$MSG" | "$(dirname "$SELF_PATH")/notify.sh" --slack SLACK_WEBHOOK_URL 2>&1)"; then
+  log "alert sent: $(echo $NOTIFY_OUT), behind=$BEHIND"
+  echo "$CURR_KEY" > "$STATE_FILE"
 else
-  log "alert skipped: no webhook configured"
-fi
-
-# 9b. Also post to OPS_INBOX_SLACK_INCIDENTS_WEBHOOK (#ops-incidents — superset channel).
-#     Independent of primary Slack outcome; best-effort.
-OPS_INCIDENTS_WEBHOOK=$(grep -E '^OPS_INBOX_SLACK_INCIDENTS_WEBHOOK=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"'"'"' ')
-if [[ -n "${OPS_INCIDENTS_WEBHOOK:-}" ]]; then
-  OPS_PAYLOAD=$(jq -nc --arg t "$MSG" '{text: $t}' 2>/dev/null || printf '{"text":%s}' "$(echo "$MSG" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')")
-  OPS_HTTP=$(curl -sS -o /dev/null -w "%{http_code}" -X POST -H 'Content-Type: application/json' --data "$OPS_PAYLOAD" "$OPS_INCIDENTS_WEBHOOK" 2>>"$LOG_FILE" || echo "000")
-  if [[ "$OPS_HTTP" =~ ^2 ]]; then
-    log "ops-incidents alert sent: HTTP $OPS_HTTP"
-  else
-    log "ops-incidents alert FAILED: HTTP $OPS_HTTP"
-  fi
-else
-  log "ops-incidents alert skipped: OPS_INBOX_SLACK_INCIDENTS_WEBHOOK not set in $ENV_FILE"
-fi
-
-# 10. Also post to Telegram bot DM (independent of Slack; best-effort).
-#     Reuses existing TELEGRAM_BOT_TOKEN + first chat ID from TELEGRAM_ALLOWED_CHAT_IDS.
-#     Plain text. Failure here does not affect Slack outcome or STATE_FILE.
-#     Uses python3 (not jq) to avoid jq dependency on this server.
-TELEGRAM_BOT_TOKEN_VAL=$(grep -E '^TELEGRAM_BOT_TOKEN=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
-TELEGRAM_ALLOWED_CHAT_IDS_VAL=$(grep -E '^TELEGRAM_ALLOWED_CHAT_IDS=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
-TELEGRAM_PRIMARY_CHAT_ID=$(echo "$TELEGRAM_ALLOWED_CHAT_IDS_VAL" | cut -d',' -f1 | tr -d ' ')
-
-if [[ -n "${TELEGRAM_BOT_TOKEN_VAL:-}" && -n "${TELEGRAM_PRIMARY_CHAT_ID:-}" ]]; then
-  TG_MSG=$(cat <<TG_EOF
-⚠️ 伺服器程式碼落後，有 ${BEHIND} 個更新尚未部署 — SG next-admin
-新程式碼已備好但還沒上線，請執行部署
-
-待部署更新：
-${SUBJECTS}
-
-修復：SSH (Termius) -> /root/lobster-phase1/scripts/sg-deploy.sh next-admin
-（技術資訊：deploy drift, behind=${BEHIND}, deployed=${DEPLOYED:0:12}, origin=${ORIGIN_HEAD:0:12}）
-TG_EOF
-)
-  TG_PAYLOAD=$(TGCID="$TELEGRAM_PRIMARY_CHAT_ID" TGTEXT="$TG_MSG" python3 -c 'import json,os; print(json.dumps({"chat_id":os.environ["TGCID"],"text":os.environ["TGTEXT"],"disable_web_page_preview":True}))')
-  TG_HTTP=$(curl -sS -o /tmp/tg-resp -w "%{http_code}" -X POST -H 'Content-Type: application/json' --data "$TG_PAYLOAD" "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN_VAL}/sendMessage" 2>>"$LOG_FILE" || echo "000")
-  if [[ "$TG_HTTP" =~ ^2 ]]; then
-    log "telegram alert sent: HTTP $TG_HTTP, chat=$TELEGRAM_PRIMARY_CHAT_ID"
-  else
-    log "telegram alert FAILED: HTTP $TG_HTTP, response: $(head -c 200 /tmp/tg-resp 2>/dev/null)"
-  fi
-else
-  log "telegram alert skipped: bot_token or chat_id not configured in .env"
+  log "alert incomplete: $(echo $NOTIFY_OUT), behind=$BEHIND -- dedupe key not advanced"
 fi
 
 

@@ -9,8 +9,7 @@
 #   4. Offsite copy exists (if RCLONE_REMOTE configured)
 #
 # Alerting:
-#   Uses WEBHOOK_URL from /etc/default/awarewave-endpoint-alert (same Slack channel
-#   as endpoint alerts) — no extra config needed. Override with BACKUP_SLACK_WEBHOOK.
+#   scripts/notify.sh: Telegram + #ops-incidents + #infra-alerts (SLACK_INFRA_ALERTS_WEBHOOK, the endpoint-alert channel).
 #
 # Exit codes:
 #   0 = all checks pass
@@ -28,15 +27,8 @@ fi
 # shellcheck disable=SC1091
 set -a && source ./.env && set +a
 
-# Load Slack webhook from endpoint-alert env (reuse existing config)
-if [[ -f /etc/default/awarewave-endpoint-alert ]]; then
-  # shellcheck disable=SC1091
-  source /etc/default/awarewave-endpoint-alert
-fi
-
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
 RCLONE_REMOTE="${RCLONE_REMOTE:-}"
-SLACK_HOOK="${BACKUP_SLACK_WEBHOOK:-${WEBHOOK_URL:-}}"
 
 DATE="$(date +%Y%m%d)"
 DATE_DASH="$(date +%Y-%m-%d)"
@@ -48,6 +40,7 @@ log() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $1"; }
 fail() { log "FAIL: $1"; DETAILS+=("$1"); ERRORS=$((ERRORS + 1)); }
 warn() { log "WARN: $1"; DETAILS+=("(warn) $1"); WARNINGS=$((WARNINGS + 1)); }
 ok() { log "  OK: $1"; }
+alert() { printf '%s' "$1" | "$ROOT/scripts/notify.sh" --slack SLACK_INFRA_ALERTS_WEBHOOK || log "WARN: notify incomplete"; }
 
 log "=== verify-backup START ==="
 
@@ -62,13 +55,7 @@ if [[ -z "$TODAY_DIR" || ! -d "$TODAY_DIR" ]]; then
   fail "No backup directory found for today (${DATE}) in ${BACKUP_DIR}"
   # Cannot continue without a directory
   log "=== verify-backup FAILED: ${ERRORS} error(s) ==="
-  # alert
-  if [[ -n "$SLACK_HOOK" ]]; then
-    HOST="$(hostname)"
-    MSG=":x: [backup-verify FAILED] ${HOST} ${DATE_DASH} — No backup directory found"
-    PAYLOAD="$(python3 -c 'import json,sys; print(json.dumps({"text": sys.argv[1]}))' "${MSG}")"
-    curl -fsS -X POST -H "Content-Type: application/json" --data "${PAYLOAD}" "${SLACK_HOOK}" >/dev/null 2>&1 || true
-  fi
+  alert "❌ [backup-verify FAILED] $(hostname) ${DATE_DASH} — No backup directory found"
   exit 1
 fi
 
@@ -124,14 +111,7 @@ fi
 if [[ $ERRORS -gt 0 ]]; then
   log "=== verify-backup FAILED: ${ERRORS} error(s), ${WARNINGS} warning(s) ==="
 
-  # Slack alert
-  if [[ -n "$SLACK_HOOK" ]]; then
-    HOST="$(hostname)"
-    DETAIL_TEXT="$(printf '%s\n' "${DETAILS[@]}")"
-    MSG=":x: [backup-verify FAILED] ${HOST} ${DATE_DASH}\n${DETAIL_TEXT}"
-    PAYLOAD="$(python3 -c 'import json,sys; print(json.dumps({"text": sys.argv[1]}))' "${MSG}")"
-    curl -fsS -X POST -H "Content-Type: application/json" --data "${PAYLOAD}" "${SLACK_HOOK}" >/dev/null 2>&1 || true
-  fi
+  alert "$(printf '❌ [backup-verify FAILED] %s %s\n%s' "$(hostname)" "${DATE_DASH}" "$(printf '%s\n' "${DETAILS[@]}")")"
   exit 1
 else
   log "=== verify-backup PASSED: 0 errors, ${WARNINGS} warning(s) ==="

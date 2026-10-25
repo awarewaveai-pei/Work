@@ -59,11 +59,6 @@ if [[ ! -f "$ENV_FILE" ]]; then
     exit 1
 fi
 
-SLACK_WEBHOOK_URL=$(grep -E '^SLACK_WEBHOOK_URL=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
-OPS_INCIDENTS_WEBHOOK=$(grep -E '^OPS_INBOX_SLACK_INCIDENTS_WEBHOOK=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
-TELEGRAM_BOT_TOKEN_VAL=$(grep -E '^TELEGRAM_BOT_TOKEN=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
-TELEGRAM_ALLOWED_CHAT_IDS_VAL=$(grep -E '^TELEGRAM_ALLOWED_CHAT_IDS=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
-TELEGRAM_PRIMARY_CHAT_ID=$(echo "$TELEGRAM_ALLOWED_CHAT_IDS_VAL" | cut -d',' -f1 | tr -d ' ')
 OPS_INBOX_INGEST_TOKEN=$(grep -E '^OPS_INBOX_INGEST_TOKEN=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
 OPS_INBOX_BASE_URL=$(grep -E '^OPS_INBOX_BASE_URL=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
 if [[ -z "$OPS_INBOX_BASE_URL" ]]; then OPS_INBOX_BASE_URL="https://app.aware-wave.com"; fi
@@ -170,7 +165,7 @@ if bash "$DEPLOY_DIR/scripts/sg-deploy.sh" "$APP" >> "$LOG_FILE" 2>&1; then
     if [[ -f "$DEPLOY_DIR/.smoke-warn" ]]; then
         _sw=$(cat "$DEPLOY_DIR/.smoke-warn" 2>/dev/null || echo "?")
         _sw_count="${_sw%%|*}"; _sw_ts="${_sw##*|}"
-        SMOKE_WARN_SUFFIX="\n\n SMOKE_WARN: ${_sw_count} endpoint(s) non-2xx at ${_sw_ts}"
+        SMOKE_WARN_SUFFIX=$'\n\n'" SMOKE_WARN: ${_sw_count} endpoint(s) non-2xx at ${_sw_ts}"
         log "SMOKE_WARN flag detected: $_sw"
     fi
     post_to_ops_inbox "deploy_success"
@@ -188,9 +183,9 @@ else
     if [[ -f "$DEPLOY_DIR/.rollback-triggered" ]]; then
         _rb=$(cat "$DEPLOY_DIR/.rollback-triggered" 2>/dev/null || echo "?")
         if [[ "$_rb" == *"rollback_failures=0|"* ]]; then
-            ROLLBACK_SUFFIX="\n\n🔴 AUTO-ROLLBACK FIRED: ${_rb}\n(previous snapshot restored; new code reverted)"
+            ROLLBACK_SUFFIX=$'\n\n'"🔴 AUTO-ROLLBACK FIRED: ${_rb}"$'\n'"(previous snapshot restored; new code reverted)"
         else
-            ROLLBACK_SUFFIX="\n\n🔴 AUTO-ROLLBACK FIRED BUT RESTORE FAILED: ${_rb}\n(URGENT: prod may be running the failed build -- manual check)"
+            ROLLBACK_SUFFIX=$'\n\n'"🔴 AUTO-ROLLBACK FIRED BUT RESTORE FAILED: ${_rb}"$'\n'"(URGENT: prod may be running the failed build -- manual check)"
         fi
         log "ROLLBACK flag detected: $_rb"
     fi
@@ -199,9 +194,9 @@ else
         _mg_rc=$(head -n1 "$DEPLOY_DIR/.migration-gate-failed" 2>/dev/null || echo "rc=?")
         _mg=$(tail -n +2 "$DEPLOY_DIR/.migration-gate-failed" 2>/dev/null | head -c 800 || echo "?")
         if [[ "$_mg_rc" == "rc=1" ]]; then
-            ROLLBACK_SUFFIX="${ROLLBACK_SUFFIX}\n\n🟠 被 migration 閘擋下（程式需要的資料庫變更還沒套），手動部署也會一樣失敗：\n${_mg}\n處理：先在筆電跑 node scripts/apply-db-migration.mjs <號碼>，再部署；確定這版程式不需要它們才用 MIGRATION_GATE_OVERRIDE=1。"
+            ROLLBACK_SUFFIX="${ROLLBACK_SUFFIX}"$'\n\n'"🟠 被 migration 閘擋下（程式需要的資料庫變更還沒套），手動部署也會一樣失敗："$'\n'"${_mg}"$'\n'"處理：先在筆電跑 node scripts/apply-db-migration.mjs <號碼>，再部署；確定這版程式不需要它們才用 MIGRATION_GATE_OVERRIDE=1。"
         else
-            ROLLBACK_SUFFIX="${ROLLBACK_SUFFIX}\n\n🟠 migration 閘讀不到正式庫的 migration 帳本（${_mg_rc}），為了安全沒有部署：\n${_mg}\n處理：先查 supabase-db 容器是否正常，再部署。"
+            ROLLBACK_SUFFIX="${ROLLBACK_SUFFIX}"$'\n\n'"🟠 migration 閘讀不到正式庫的 migration 帳本（${_mg_rc}），為了安全沒有部署："$'\n'"${_mg}"$'\n'"處理：先查 supabase-db 容器是否正常，再部署。"
         fi
         log "MIGRATION GATE flag detected ($_mg_rc)"
     fi
@@ -211,41 +206,17 @@ fi
 SUBJECTS=$(cd "$WORK_DIR" && git log --no-merges --format=" - %h %s" --max-count=3 "${DEPLOYED}..${REMOTE_HEAD}" -- "${APP_PATHS[@]}" 2>/dev/null || true)
 
 if [[ "$DEPLOY_SUCCESS" -eq 1 ]]; then
-    SLACK_MSG=$(printf ':white_check_mark: *後台自動部署成功 — SG next-admin*\n新版程式碼已上線，共更新 *%s* 個提交\n（技術資訊：auto-deployed, was:`%s` now:`%s` head:`%s`）\n\n最新更新：\n%s' "$BEHIND" "${DEPLOYED:0:12}" "${NEW_COMMIT:0:12}" "${REMOTE_HEAD:0:12}" "$SUBJECTS")
     TG_MSG=$(printf '✅ 後台自動部署成功 — SG next-admin\n新版程式碼已上線，共更新 %s 個提交\n（技術資訊：auto-deployed, was:%s now:%s head:%s）\n\n最新更新：\n%s' "$BEHIND" "${DEPLOYED:0:12}" "${NEW_COMMIT:0:12}" "${REMOTE_HEAD:0:12}" "$SUBJECTS")
 else
-    SLACK_MSG=$(printf ':x: *後台自動部署失敗，需要手動處理 — SG next-admin*\n程式碼有 *%s* 個更新未能部署，請 SSH 進伺服器手動執行\n修復指令：`/root/lobster-phase1/scripts/sg-deploy.sh next-admin`\n（技術資訊：auto-deploy FAILED, drift=%s, deployed=%s, origin=%s）' "$BEHIND" "$BEHIND" "${DEPLOYED:0:12}" "${REMOTE_HEAD:0:12}")
     TG_MSG=$(printf '❌ 後台自動部署失敗，需要手動處理 — SG next-admin\n程式碼有 %s 個更新未能部署，請 SSH 進伺服器手動執行\n修復指令：/root/lobster-phase1/scripts/sg-deploy.sh next-admin\n（技術資訊：auto-deploy FAILED, drift=%s, deployed=%s, origin=%s）' "$BEHIND" "$BEHIND" "${DEPLOYED:0:12}" "${REMOTE_HEAD:0:12}")
 fi
 
-send_slack() {
-    local webhook=$1
-    local msg=$2
-    local tag=$3
-    if [[ -n "${webhook:-}" ]]; then
-        local payload
-        payload=$(TGTEXT="$msg" python3 -c 'import json,os; print(json.dumps({"text":os.environ["TGTEXT"]}))')
-        local http
-        http=$(curl -sS -o /tmp/slack-resp -w "%{http_code}" -X POST -H "Content-Type: application/json" --data "$payload" "$webhook" 2>>"$LOG_FILE" || echo "000")
-        if [[ "$http" =~ ^2 ]]; then log "$tag sent: HTTP $http"
-        else log "$tag FAILED: HTTP $http: $(head -c 200 /tmp/slack-resp 2>/dev/null)"; fi
-    else
-        log "$tag skipped: webhook not set"
-    fi
-}
-
-SLACK_MSG="${SLACK_MSG}${SMOKE_WARN_SUFFIX}${ROLLBACK_SUFFIX}"
-TG_MSG="${TG_MSG}${SMOKE_WARN_SUFFIX}${ROLLBACK_SUFFIX}"
-send_slack "${SLACK_WEBHOOK_URL:-}" "$SLACK_MSG" "slack"
-send_slack "${OPS_INCIDENTS_WEBHOOK:-}" "$SLACK_MSG" "ops-incidents-slack"
-
-if [[ -n "${TELEGRAM_BOT_TOKEN_VAL:-}" && -n "${TELEGRAM_PRIMARY_CHAT_ID:-}" ]]; then
-    TG_PAYLOAD=$(TGCID="$TELEGRAM_PRIMARY_CHAT_ID" TGTEXT="$TG_MSG" python3 -c 'import json,os; print(json.dumps({"chat_id":os.environ["TGCID"],"text":os.environ["TGTEXT"],"disable_web_page_preview":True}))')
-    TG_HTTP=$(curl -sS -o /tmp/tg-resp -w "%{http_code}" -X POST -H "Content-Type: application/json" --data "$TG_PAYLOAD" "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN_VAL}/sendMessage" 2>>"$LOG_FILE" || echo "000")
-    if [[ "$TG_HTTP" =~ ^2 ]]; then log "telegram sent: HTTP $TG_HTTP, chat=$TELEGRAM_PRIMARY_CHAT_ID"
-    else log "telegram FAILED: HTTP $TG_HTTP: $(head -c 200 /tmp/tg-resp 2>/dev/null)"; fi
+# One sender (notify.sh): Telegram + #ops-incidents + this script's own SLACK_WEBHOOK_URL channel; plain text everywhere.
+MSG="${TG_MSG}${SMOKE_WARN_SUFFIX}${ROLLBACK_SUFFIX}"
+if NOTIFY_OUT="$(printf '%s' "$MSG" | "$(dirname "$SELF_PATH")/notify.sh" --slack SLACK_WEBHOOK_URL 2>&1)"; then
+    log "notified: $(echo $NOTIFY_OUT)"
 else
-    log "telegram skipped: token or chat_id not set"
+    log "notify incomplete: $(echo $NOTIFY_OUT)"
 fi
 
 exit 0

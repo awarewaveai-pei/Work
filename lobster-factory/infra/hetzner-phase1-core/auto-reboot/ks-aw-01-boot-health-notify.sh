@@ -13,45 +13,22 @@
 # every boot (unattended-upgrades automatic reboot AND manual /ks-aw-01-reboot),
 # not just the ones someone remembered to watch.
 #
-# Reuses the SAME Telegram credentials as awarewave-endpoint-alert (no new secret,
-# no new bot) -- see /etc/default/awarewave-endpoint-alert(.local).
+# Sends through /root/lobster-phase1/scripts/notify.sh (the one host sender; Telegram + #ops-incidents, settings in
+# the host .env) -- no secret of its own.
 #
 # Design: best-effort, never blocks boot, never fails loudly if Telegram itself is
 # unreachable (falls back to syslog so the information isn't lost, just quieter).
 
 set -uo pipefail
 
-# Three drop-ins, same convention as endpoint-alert.sh itself: base config (Slack-
-# focused), .local override, and .telegram -- the purpose-built file carrying
-# TELEGRAM_NOTIFY_ENABLED/TELEGRAM_BOT_TOKEN/TELEGRAM_ALLOWED_CHAT_IDS that
-# endpoint-alert.sh's own send_telegram() reads. Verified present on ks-aw-01
-# 2026-08-30 -- do not assume it exists on a fresh box without checking first.
-ENV_FILE="/etc/default/awarewave-endpoint-alert"
-ENV_FILE_LOCAL="/etc/default/awarewave-endpoint-alert.local"
-ENV_FILE_TELEGRAM="/etc/default/awarewave-endpoint-alert.telegram"
-[ -f "$ENV_FILE" ] && . "$ENV_FILE"
-[ -f "$ENV_FILE_LOCAL" ] && . "$ENV_FILE_LOCAL"
-[ -f "$ENV_FILE_TELEGRAM" ] && . "$ENV_FILE_TELEGRAM"
-
 log() { logger -t ks-aw-01-boot-notify "$1"; }
 
-send_telegram() {
-  local text="$1"
-  local enabled
-  enabled="$(printf '%s' "${TELEGRAM_NOTIFY_ENABLED:-}" | tr '[:upper:]' '[:lower:]')"
-  [ "$enabled" = "true" ] || [ "$enabled" = "1" ] || [ "$enabled" = "yes" ] || { log "TELEGRAM_NOTIFY_ENABLED not true, skipping Telegram (see full message in syslog)"; log "$text"; return 0; }
-  [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_ALLOWED_CHAT_IDS:-}" ] || { log "TELEGRAM_BOT_TOKEN/TELEGRAM_ALLOWED_CHAT_IDS not set, skipping Telegram (see full message in syslog)"; log "$text"; return 0; }
-  local chat_id
-  for chat_id in ${TELEGRAM_ALLOWED_CHAT_IDS//,/ }; do
-    [ -z "$chat_id" ] && continue
-    curl -sS -o /dev/null -m 10 \
-      -X POST \
-      -H 'Content-Type: application/x-www-form-urlencoded' \
-      --data-urlencode "chat_id=${chat_id}" \
-      --data-urlencode "text=${text}" \
-      --data-urlencode "disable_web_page_preview=true" \
-      "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" 2>/dev/null || log "Telegram send failed (network?), message was: $text"
-  done
+# Telegram + #ops-incidents through the one host sender (lobster-phase1/scripts/notify.sh, synced from the repo;
+# settings in the host .env). A failed send is logged with the message, so the information is never only in flight.
+send_alert() {
+  local out
+  if out="$(printf '%s' "$1" | "${NOTIFY_SH:-/root/lobster-phase1/scripts/notify.sh}" 2>&1)"; then log "notified: $(echo $out)"
+  else log "notify incomplete: $(echo $out) -- message was: $1"; fi
 }
 
 # Give docker + all ~45 containers a real chance to come up before judging health --
@@ -106,4 +83,4 @@ else
 fi
 
 log "$MSG"
-send_telegram "$MSG"
+send_alert "$MSG"

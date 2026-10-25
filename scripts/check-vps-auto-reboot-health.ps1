@@ -134,7 +134,7 @@ function Get-AutoRebootHealth {
         'BOOT_NOTIFY_ENABLED=$(systemctl is-enabled ks-aw-01-boot-notify.service 2>/dev/null || echo "unknown")',
         'BOOT_NOTIFY_UNIT=$(test -f /etc/systemd/system/ks-aw-01-boot-notify.service && echo "present" || echo "missing")',
         'BOOT_NOTIFY_SCRIPT=$(test -x /usr/local/bin/ks-aw-01-boot-health-notify.sh && echo "present" || echo "missing")',
-        'BOOT_NOTIFY_TELEGRAM=$(sudo test -f /etc/default/awarewave-endpoint-alert.telegram && echo "present" || echo "missing")',
+        'BOOT_NOTIFY_TELEGRAM=$(sudo test -x /root/lobster-phase1/scripts/notify.sh && sudo grep -q notify.sh /usr/local/bin/ks-aw-01-boot-health-notify.sh && sudo grep -Eq "^TELEGRAM_BOT_TOKEN=[\"'']?[^\"'' ]" /root/lobster-phase1/.env && sudo grep -Eq "^OPS_INBOX_TELEGRAM_CHAT_IDS=[\"'']?[^\"'' ]" /root/lobster-phase1/.env && sudo grep -Eiq "^OPS_INBOX_TELEGRAM_NOTIFY_ENABLED=[\"'']?(true|1|yes|on)" /root/lobster-phase1/.env && echo "present" || echo "missing")',
         'if [ -f /var/run/reboot-required ]; then REBOOT_PENDING=1; REBOOT_PKGS=$(tr ''\n'' '','' < /var/run/reboot-required.pkgs 2>/dev/null | sed ''s/,$//'' || echo ""); else REBOOT_PENDING=0; REBOOT_PKGS=""; fi',
         'KERNEL=$(uname -r)',
         'LAST_REBOOT=$(last reboot 2>/dev/null | head -n1 | tr -s '' '' | cut -d'' '' -f5-9 || echo "unknown")',
@@ -219,7 +219,7 @@ function Compute-Verdict {
         $label = "broken"
     }
     if ($Snapshot.boot_notify_telegram -ne "present") {
-        $reasons.Add("boot-notify Telegram drop-in MISSING")
+        $reasons.Add("boot-notify cannot reach Telegram (old script, notify.sh, its .env keys or the switch MISSING)")
         $label = "broken"
     }
 

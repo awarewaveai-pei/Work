@@ -34,9 +34,7 @@ This avoids notification loops, duplicate fan-out, and ambiguous ownership.
 ### endpoint-alert
 
 - Checks the public URL set in `CHECK_URLS`.
-- Sends failure/recovery to `WEBHOOK_URL` (`#infra-alerts`).
-- Also sends the same failure/recovery to `OPS_INCIDENTS_WEBHOOK_URL` (`#ops-incidents`) when configured.
-- Also sends the same failure/recovery to Telegram when `/etc/default/awarewave-endpoint-alert.telegram` sets `TELEGRAM_NOTIFY_ENABLED=true`, `TELEGRAM_BOT_TOKEN`, and `TELEGRAM_ALLOWED_CHAT_IDS`.
+- Sends failure/recovery through `scripts/notify.sh` (2026-10-25): Telegram + `#ops-incidents` + `#infra-alerts` (`SLACK_INFRA_ALERTS_WEBHOOK`).
 - State lives under `/var/lib/awarewave-alert` to dedupe repeated identical failures.
 
 ### Netdata
@@ -65,9 +63,9 @@ This avoids notification loops, duplicate fan-out, and ambiguous ownership.
 
 ### SG deploy drift
 
-- Cron runs `/root/lobster-phase1/scripts/check-drift-and-alert.sh` daily at `01:00 UTC` (`09:00 Asia/Taipei`).
+- Cron runs `/root/lobster-phase1/scripts/check-drift-and-alert.sh` daily at `20:00 UTC` (`04:00 Asia/Taipei`), an hour after the nightly auto-deploy.
 - Alerts when production is at least one commit behind `origin/main`.
-- Posts to the primary Slack webhook, independently to `OPS_INBOX_SLACK_INCIDENTS_WEBHOOK`, and to Telegram when the Telegram bot env is present.
+- Sends through `scripts/notify.sh` (Telegram when switched on + `#ops-incidents` + its own `SLACK_WEBHOOK_URL` channel); the dedupe key advances only when every channel took it.
 
 ## Health Contract
 
@@ -106,6 +104,7 @@ Expected:
 - Never commit Slack webhook URLs or ingest tokens.
 - Never commit Telegram bot tokens or chat IDs.
 - Sync scripts must recreate both Netdata routes, not only the Slack route.
-- Keep `/etc/default/awarewave-endpoint-alert.local` as the operator override file for secondary webhook, custom `CHECK_URLS`, heartbeat, and renotify settings.
-- Keep `/etc/default/awarewave-endpoint-alert.telegram` as the host-local phone backup secret file.
+- Keep `/etc/default/awarewave-endpoint-alert.local` as the operator override file for custom `CHECK_URLS`, heartbeat, and renotify settings.
+- Every host script sends through `lobster-factory/infra/hetzner-phase1-core/scripts/notify.sh`: Telegram (`OPS_INBOX_TELEGRAM_CHAT_IDS`, when `OPS_INBOX_TELEGRAM_NOTIFY_ENABLED` is on) + `#ops-incidents` (`OPS_INBOX_SLACK_INCIDENTS_WEBHOOK`), plus a script's own channel by name. Settings live in `/root/lobster-phase1/.env` (same names next-admin uses). Only `slack-webhook-selftest.sh` still reads `WEBHOOK_URL` from `/etc/default`; that goes when `/etc/default` is retired.
+- Schedules on `/ops/schedules` that turn red or recover are announced by next-admin (`/api/internal/schedules/alerts`), plus a daily 09:00 Taipei line; no host script needs its own "I failed" message.
 - Treat `#infra-alerts` as raw signal durability and `#ops-incidents` as human triage quality.

@@ -4,8 +4,10 @@
   Sync the Slack webhook URL from local DPAPI vault to the production host.
 
 .DESCRIPTION
-  Writes /etc/default/awarewave-endpoint-alert (just WEBHOOK_URL +
-  TIMEOUT_SEC) and /etc/netdata/health_alarm_notify.conf, then restarts
+  Writes SLACK_INFRA_ALERTS_WEBHOOK into /root/lobster-phase1/.env (read by scripts/notify.sh, the one host
+  sender: endpoint-alert, verify-backup), WEBHOOK_URL + TIMEOUT_SEC into /etc/default/awarewave-endpoint-alert
+  (WEBHOOK_URL there only for slack-webhook-selftest.sh until /etc/default is retired), and
+  /etc/netdata/health_alarm_notify.conf, then restarts
   Netdata + the endpoint-alert oneshot. Netdata keeps the primary Slack route
   for #infra-alerts and also feeds Ops Inbox so #ops-incidents receives the
   same curated incident stream.
@@ -29,7 +31,7 @@
   Optional override for the vault file path.
 
 .NOTES
-  Risk tier: Medium (rewrites two prod env files, restarts netdata + alerter).
+  Risk tier: Medium (rewrites three prod env files incl. one line of the compose .env, restarts netdata + alerter).
   Idempotent: writes deterministic content, atomic where possible.
 #>
 
@@ -63,12 +65,28 @@ $remote = @'
 set -euo pipefail
 HOOK="$(printf '%s' "__HOOK_B64__" | base64 -d)"
 
-# /etc/default/awarewave-endpoint-alert: just WEBHOOK_URL + TIMEOUT_SEC.
+# #infra-alerts webhook: one line in the host .env (scripts/notify.sh reads it; endpoint-alert and verify-backup ask
+# for it by name). Replaced in place via a temp file in the same directory, other lines untouched.
+# Fail closed: a grep error (disk full, I/O) or a line count that is off installs nothing; the temp copy never outlives us.
+ENVF=/root/lobster-phase1/.env
+umask 077
+TMPF="$(mktemp "${ENVF}.sync.XXXXXX")"
+trap 'rm -f "$TMPF"' EXIT
+rc=0; grep -v '^SLACK_INFRA_ALERTS_WEBHOOK=' "$ENVF" > "$TMPF" || rc=$?
+[ "$rc" -le 1 ] || { echo "env rewrite: grep failed ($rc) -- .env untouched" >&2; exit 1; }
+printf '%s\n' "SLACK_INFRA_ALERTS_WEBHOOK=\"${HOOK}\"" >> "$TMPF"
+want=$(( $(grep -vc '^SLACK_INFRA_ALERTS_WEBHOOK=' "$ENVF") + 1 ))
+[ "$(wc -l < "$TMPF")" -eq "$want" ] || { echo "env rewrite: line count off -- .env untouched" >&2; exit 1; }
+chown --reference="$ENVF" "$TMPF"; chmod --reference="$ENVF" "$TMPF"
+mv -f "$TMPF" "$ENVF"
+trap - EXIT
+
+# /etc/default/awarewave-endpoint-alert: WEBHOOK_URL (read only by slack-webhook-selftest.sh until /etc/default is
+# retired) + TIMEOUT_SEC (the systemd unit requires the file).
 # CHECK_URLS comes from endpoint-alert.sh's hard-coded default (single source).
 # Operator extension keys (HEARTBEAT_URL, RENOTIFY_AFTER_SEC, custom CHECK_URLS
 # overrides) live in /etc/default/awarewave-endpoint-alert.local — managed by
 # scripts/sync-endpoint-alert-heartbeat.ps1 and survives this sync.
-umask 077
 {
   printf '%s\n' "WEBHOOK_URL=\"${HOOK}\""
   printf '%s\n' 'TIMEOUT_SEC=12'

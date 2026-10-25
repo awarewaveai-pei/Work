@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-25（續54）排程離開 Trigger C4.1／C4.4／C4.5：7 支主機腳本改走單一發送 `notify.sh`（設定只讀 `.env`、密碼不進 argv）（Claude）
+
+- **觸發**：操作者「做 C4.1/C4.4」。監工台 https://claude.ai/artifact/QsgquXzuzi1oQ8FCVoRrAZ
+- **不變量**：主機上每一則給操作者的訊息走同一個出口、讀同一份設定（`.env`，與 NA ops-inbox 同名變數），token／webhook 不出現在任何行程的 argv。
+- **範圍更正（兩次）**：①「2 支未進 repo」錯：`verify-backup-eu.sh`／`verify-backup-ks-aw-01.sh` 在 `infra/eu-backup`、`infra/ks-aw-01-backup`（手動部署，host 與 repo 內容相同），且不自發通知（`verify-backup-eu.sh:3`），失敗由 C4.2 涵蓋 → 不改。② 實際發送者 7 支：`endpoint-alert.sh`、`auto-deploy-next-admin.sh`、`check-drift-and-alert.sh`、`reconcile-videos.sh`、`verify-backup.sh`、`scripts/routine-output-watchdog.sh`、`auto-reboot/ks-aw-01-boot-health-notify.sh`。把 `/root/scripts/` 的備份腳本搬上自動同步會牽動 auto-repair 白名單（`aw-autorepair-gate.sh:49,55`）、`repair-center/backup.ts:169-170`、backup-inventory → 不在本卡。
+- **做了什麼**：
+  - `HS/scripts/notify.sh [--slack VAR]... < 訊息`：一律 Telegram（`OPS_INBOX_TELEGRAM_CHAT_IDS`，退回 `TELEGRAM_ALLOWED_CHAT_IDS`，受 `OPS_INBOX_TELEGRAM_NOTIFY_ENABLED`）＋ #ops-incidents；`--slack VAR` 保留各腳本原頻道；`.env` 純讀不 source；URL 經 `curl -K -` stdin；任意位元組→合法 UTF-8；Telegram 副本 >4000 字截斷；任一已設通道失敗／指名頻道未設／全未設 → exit 1。
+  - 7 支改呼叫 notify.sh、刪各自 curl 與讀設定碼；原「成功才前進」的狀態語意（drift dedupe key、watchdog state）保留。auto-deploy／drift 單一純文字訊息；auto-deploy 的 SMOKE／ROLLBACK／migration 閘後綴原本是字面 `\n`（舊錯）改真換行；verify-backup 原 `\n` 字面（舊錯）一併修。
+  - #infra-alerts（endpoint-alert 原 `WEBHOOK_URL`）改名 `SLACK_INFRA_ALERTS_WEBHOOK` 入 `.env`：`scripts/sync-slack-alert-webhooks.ps1` 改寫入（fail-closed：grep 錯或行數不符不安裝、temp 必清；`/etc/default` 的 `WEBHOOK_URL` 保留給 `slack-webhook-selftest.sh` 直到退役）。
+  - `slack-alert-drill.sh` 改演練 notify.sh 三通道；`check-vps-auto-reboot-health.ps1` 開機通知探針改驗 notify.sh＋新版腳本＋`.env` 值非空＋開關；`.env.example`、`awarewave-endpoint-alert.local.template`、`slack-notification-routing.md`、`KS-AW-01-HOST-SWITCH-RUNBOOK.md`、開機腳本檔頭同步。
+- REALTEST_EVIDENCE: tool=SSH | cmd=主機 /tmp 對本機假 Telegram／Slack（127.0.0.1:18078）跑 run.sh：notify 扇出（2 chat＋2 Slack、UTF-8）、TG 500、指名頻道未設、開關關、全未設、空訊息、壞參數、慢送時掃 `ps -eo args` 無 token／webhook、惡意 .env 不執行、非法 UTF-8、6000 字、chat 退回；endpoint-alert 端到端三通道且同失敗不重送；verify-backup 端到端；ps1 的 .env 改寫三例（取代、新增、讀不到→不動且無殘檔）→ 24/24 PASS | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash -n` 8 支＋PowerShell Parser 兩支 ps1（0 error）＋ auto-deploy 後綴實測 `od -c` 為真換行 | exit=0 | ms=2000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/2m/7n（critic agent）：M1 ps1 .env 改寫遇 grep 錯會裝上截斷檔且殘留 temp、M2 移除 `/etc/default` `WEBHOOK_URL` 會讓 selftest 每次失敗並與「退役另做」矛盾、N1 drift 在 cd 後用 `$0`、N2 mktemp 未檢、N3 非 UTF-8 全通道丟失、N4 缺 chat 退回、N5 開機探針可假綠、N6 6 處文件過時、N7 部署後綴字面 `\n` → 全修並各有測試或實測；建議三項（4096 截斷、測試須設 NOTIFY_ENV_FILE、輸出攤平）採前兩項。
+- ORACLE_WAIVED: codex-oracle 本日三次 no final message（續40）；改 critic agent 獨立審。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks,.claude | grep=WEBHOOK_URL|awarewave-endpoint-alert\.telegram|OPS_INCIDENTS_WEBHOOK_URL|BACKUP_SLACK_WEBHOOK|send_telegram|send_webhook | hits=11（皆已改或屬保留：`slack-webhook-selftest.sh`／ps1 的 `/etc/default` WEBHOOK_URL 待退役；`.claude` 0）
+- **剩餘**：上線 C4.6（High）：先跑 `sync-slack-alert-webhooks.ps1` 把 #infra-alerts 寫入 `.env`，否則腳本同步後 endpoint-alert／verify-backup 的 #infra-alerts 副本報 `not_configured`（Telegram＋#ops-incidents 照收）；開機腳本手動部署；`/etc/default` 退役另做。
+- **rollback**：`git revert <本 commit>` 後下一次 `sync-host-scripts.sh` 帶回舊腳本；`.env` 新增那一行無人讀即無害。
 ## 2026-10-25（續53）收費拆分上線：aware-wave-store 1.0.0 裝上 aware-wave.com、wp-bridge 0.19.0 升到所有網站，商店外掛無縫接手（Claude）
 
 - **發版**：

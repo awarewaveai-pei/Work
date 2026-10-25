@@ -21,9 +21,7 @@ STATE_DIR="${STATE_DIR:-/var/lib/awarewave-alert}"
 STATE_FILE="${STATE_DIR}/last_state"
 LAST_NOTIFY_FILE="${STATE_DIR}/last_notify_at"
 STREAK_FILE="${STATE_DIR}/fail_streak"
-WEBHOOK_WARN_STAMP="${STATE_DIR}/.warned_missing_webhook"
 
-WEBHOOK_URL="${WEBHOOK_URL:-}"
 # Built-in default = local SG services only. Cross-region canaries belong in
 # CHECK_URLS_SLOW (see below) — do NOT add them here, the 12s fast tier will false-positive
 # on routine network jitter. Operators add per-VPS extras via /etc/default/awarewave-endpoint-alert.local.
@@ -35,9 +33,6 @@ TIMEOUT_SEC="${TIMEOUT_SEC:-12}"
 CHECK_URLS_SLOW="${CHECK_URLS_SLOW:-}"
 TIMEOUT_SEC_SLOW="${TIMEOUT_SEC_SLOW:-20}"
 HEARTBEAT_URL="${HEARTBEAT_URL:-}"
-TELEGRAM_NOTIFY_ENABLED="${TELEGRAM_NOTIFY_ENABLED:-false}"
-TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
-TELEGRAM_ALLOWED_CHAT_IDS="${TELEGRAM_ALLOWED_CHAT_IDS:-}"
 
 # Optional: PagerDuty Events API v2 integration key.
 PAGERDUTY_ROUTING_KEY="${PAGERDUTY_ROUTING_KEY:-}"
@@ -69,15 +64,6 @@ esac
 
 mkdir -p "${STATE_DIR}"
 
-# Empty WEBHOOK_URL used to exit 1 every run -> systemd oneshot failures every minute and huge journal
-# growth. Prefer: still run HTTP checks; skip Slack notifications until configured.
-if [[ -z "${WEBHOOK_URL}" ]]; then
-  if [[ ! -f "${WEBHOOK_WARN_STAMP}" ]]; then
-    echo "endpoint-alert: WEBHOOK_URL is empty; Slack notifications disabled. Set WEBHOOK_URL in /etc/default/awarewave-endpoint-alert" >&2
-    : >"${WEBHOOK_WARN_STAMP}"
-  fi
-fi
-
 write_atomic() {
   # write_atomic <path> <content>
   local path="$1"
@@ -86,22 +72,10 @@ write_atomic() {
   mv -f "${path}.tmp" "${path}"
 }
 
-send_webhook() {
-  # Primary channel (e.g. #infra-alerts)
-  if [[ -n "${WEBHOOK_URL:-}" ]]; then
-    local text="$1"
-    local payload
-    payload=$(printf '{"text":%s}' "$(echo "$text" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')")
-    curl -sS -o /dev/null -w "" -X POST -H 'Content-Type: application/json' --data "$payload" "${WEBHOOK_URL}" 2>/dev/null || true
-  fi
-  # Secondary channel (#ops-incidents — superset of all alerts)
-  if [[ -n "${OPS_INCIDENTS_WEBHOOK_URL:-}" ]]; then
-    local text="$1"
-    local payload
-    payload=$(printf '{"text":%s}' "$(echo "$text" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')")
-    curl -sS -o /dev/null -w "" -X POST -H 'Content-Type: application/json' --data "$payload" "${OPS_INCIDENTS_WEBHOOK_URL}" 2>/dev/null || true
-  fi
-  return 0
+# Slack + Telegram go through the one host sender (notify.sh): Telegram and #ops-incidents, plus this alerter's own
+# #infra-alerts (SLACK_INFRA_ALERTS_WEBHOOK). Its result is logged, never fatal (design rule 1: state is already saved).
+send_alert() {
+  printf '%s' "$1" | "${NOTIFY_SH:-$(dirname "$0")/notify.sh}" --slack SLACK_INFRA_ALERTS_WEBHOOK >&2 || echo "endpoint-alert: notify incomplete (see lines above)" >&2
 }
 
 send_pagerduty() {
@@ -161,26 +135,6 @@ except urllib.error.HTTPError as e:
     print(f"endpoint-alert: PagerDuty HTTP {e.code}: {e.read()!r}", file=__import__("sys").stderr)
     raise
 PY
-}
-
-send_telegram() {
-  local text="$1"
-  local enabled
-  enabled="$(printf '%s' "${TELEGRAM_NOTIFY_ENABLED}" | tr '[:upper:]' '[:lower:]')"
-  [[ "${enabled}" == "true" || "${enabled}" == "1" || "${enabled}" == "yes" || "${enabled}" == "on" ]] || return 0
-  [[ -n "${TELEGRAM_BOT_TOKEN}" && -n "${TELEGRAM_ALLOWED_CHAT_IDS}" ]] || return 0
-
-  local chat_id
-  for chat_id in ${TELEGRAM_ALLOWED_CHAT_IDS//,/ }; do
-    [[ -z "${chat_id}" ]] && continue
-    curl -sS -o /dev/null -w "" \
-      -X POST \
-      -H 'Content-Type: application/x-www-form-urlencoded' \
-      --data-urlencode "chat_id=${chat_id}" \
-      --data-urlencode "text=${text}" \
-      --data-urlencode "disable_web_page_preview=true" \
-      "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" 2>/dev/null || true
-  done
 }
 
 # Heartbeat is observability for THIS alerter. Must NEVER take down the alerter.
@@ -338,8 +292,7 @@ if [[ "${notify}" == "true" ]]; then
   if [[ "${new_kind}" == "ok" ]]; then
     msg="✅ 網站服務恢復正常 — ${host}
 （技術資訊：endpoint recovered ${ts}）"
-    send_webhook "${msg}"
-    send_telegram "${msg}"
+    send_alert "${msg}"
     # `|| true`: a PagerDuty enqueue failure (HTTP error / connection timeout
     # re-raises in send_pagerduty) must NEVER abort the alerter under `set -e`
     # — same principle as the heartbeat (design rule #3). PagerDuty has its own
@@ -351,8 +304,7 @@ if [[ "${notify}" == "true" ]]; then
     fail_detail="$(printf '%s\n' "${fail_lines[@]}")"
     msg="$(printf '%s 網站端點或主機排程異常 — %s\n失敗項目：\n%s\n（技術資訊：%s endpoint alert %s）' "${prefix}" "${host}" "${fail_detail}" "${prefix}" "${ts}")"
     detail_text="$(printf '%s\n' "${fail_lines[@]}")"
-    send_webhook "${msg}"
-    send_telegram "${msg}"
+    send_alert "${msg}"
     # Reminders do not re-trigger PagerDuty (the incident is already open;
     # PagerDuty's own dedup_key would absorb it anyway).
     if [[ "${notify_kind}" != "alert-reminder" ]]; then

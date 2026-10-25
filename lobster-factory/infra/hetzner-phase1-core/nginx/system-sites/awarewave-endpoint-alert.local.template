@@ -31,7 +31,5 @@ CHECK_URLS_SLOW="https://uptime.aware-wave.com/api/entry-page"
 # TIMEOUT_SEC_SLOW defaults to 20s in endpoint-alert.sh; uncomment to override.
 # TIMEOUT_SEC_SLOW=20
 
-# OPS_INCIDENTS_WEBHOOK_URL: send all infra alerts to #ops-incidents (superset channel).
-# Real value lives in mcp/user-env.ps1 (OPS_INBOX_SLACK_INCIDENTS_WEBHOOK).
-# `secrets-vault.ps1 -Action get` prints a MASKED value - confirm-only, do not paste it here.
-OPS_INCIDENTS_WEBHOOK_URL="<from vault: OPS_INBOX_SLACK_INCIDENTS_WEBHOOK>"
+# Alert channels are not set here: endpoint-alert sends through scripts/notify.sh, which reads the host .env
+# (Telegram + #ops-incidents + SLACK_INFRA_ALERTS_WEBHOOK).

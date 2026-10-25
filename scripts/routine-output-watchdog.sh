@@ -31,7 +31,6 @@ WARN_B64="4pqg77iPIOaOkueoi+WBpeW6t+itpuWgsSAvIFJvdXRpbmUgaGVhbHRoIGFsZXJ0CgrkuK
 REC_B64="4pyFIOaOkueoi+W3suaBouW+qSAvIFJvdXRpbmVzIHJlY292ZXJlZAoK5Lit5paH77ya5YWI5YmN55Ww5bi455qE6Ieq5YuV5o6S56iL5bey5oGi5b6p77yM5aCx5ZGK5Y+I5q2j5bi45pu05paw5YiwIGF3YXJld2F2ZWFpLXBlaS9Xb3JrIOS6huOAggpFTjogVGhlIHByZXZpb3VzbHktZmFpbGluZyByb3V0aW5lKHMpIHJlY292ZXJlZCDigJQgcmVwb3J0cyBhcmUgbGFuZGluZyBpbiBhd2FyZXdhdmVhaS1wZWkvV29yayBhZ2Fpbi4="
 
 REPO=/root/Work
-ENVFILE=/root/lobster-phase1/.env
 STATE=/root/.routine-watchdog-state
 DRYRUN="${1:-}"
 
@@ -94,24 +93,10 @@ if [ "$DRYRUN" = "--dry-run" ]; then
   exit 0
 fi
 
-# Read creds locally on SG (never leaves the host). Strip surrounding quotes + CR.
-TOKEN=$(grep -E '^TELEGRAM_BOT_TOKEN=' "$ENVFILE" | head -1 | sed -E 's/^[^=]+=//; s/\r$//; s/^"//; s/"$//; s/^'\''//; s/'\''$//')
-CHATS=$(grep -E '^OPS_INBOX_TELEGRAM_CHAT_IDS=' "$ENVFILE" | head -1 | sed -E 's/^[^=]+=//; s/\r$//; s/^"//; s/"$//; s/^'\''//; s/'\''$//')
-if [ -z "$TOKEN" ] || [ -z "$CHATS" ]; then
-  echo "watchdog: missing TELEGRAM creds in $ENVFILE — not sending, state NOT advanced"
-  exit 1
-fi
-
-sent_ok=1
-for chat in $(echo "$CHATS" | tr ',' ' '); do
-  [ -z "$chat" ] && continue
-  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 12 \
-    "https://api.telegram.org/bot${TOKEN}/sendMessage" \
-    --data-urlencode "chat_id=${chat}" \
-    --data-urlencode "text@${MSGFILE}")
-  echo "watchdog: telegram chat=${chat} http=${code}"
-  [ "$code" = "200" ] || sent_ok=0
-done
+# One sender for every host alert (notify.sh, synced from lobster-factory/infra/hetzner-phase1-core/scripts):
+# Telegram + #ops-incidents, settings from the host .env. It prints one line per channel.
+sent_ok=0
+"${NOTIFY_SH:-/root/lobster-phase1/scripts/notify.sh}" < "$MSGFILE" && sent_ok=1
 
 # Only advance state if the alert actually went out — otherwise retry next run.
 if [ "$sent_ok" = "1" ]; then

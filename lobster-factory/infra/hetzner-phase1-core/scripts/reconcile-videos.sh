@@ -18,11 +18,7 @@
 set -euo pipefail
 
 ENV_FILE=/root/lobster-phase1/.env
-# Telegram 通道的 SSOT **不在** .env，而在這裡（endpoint-alert 的 systemd unit 也讀同一份，
-# 見 /etc/systemd/system/awarewave-endpoint-alert.service 的 EnvironmentFile 行）。
-# 2026-08-26 實測：.env 裡的 TELEGRAM_* 只存在於 .env.bak* 舊備份，現行值在 /etc/default。
-# 只讀 .env 的新告警會靜靜地永遠不發訊息 —— 這是加新告警最容易踩的第一個坑。
-TELEGRAM_ENV_FILE=/etc/default/awarewave-endpoint-alert.telegram
+# 通知走 notify.sh（Telegram＋#ops-incidents，設定讀 .env；2026-10-25 起取代原本讀 /etc/default 的 Telegram 直送）。
 STATE_DIR=/root/lobster-phase1/.state
 STATE_FILE="${STATE_DIR}/reconcile-videos-last-alert"
 LOG_FILE=/var/log/reconcile-videos.log
@@ -45,8 +41,6 @@ if [[ ! -r "${ENV_FILE}" ]]; then
   exit 1
 fi
 set -a; . "${ENV_FILE}"; set +a
-# 選用：不存在就走下面的 NOTIFY_SKIPPED 分支（會寫 log，不靜默）。
-[[ -r "${TELEGRAM_ENV_FILE}" ]] && { set -a; . "${TELEGRAM_ENV_FILE}"; set +a; }
 if [[ -z "${OPS_PROXY_SHARED_SECRET:-}" ]]; then
   echo "[${NOW_ISO}] ABORT: OPS_PROXY_SHARED_SECRET 未設定 — 本輪對帳與告警完全沒有執行" >> "${LOG_FILE}"
   exit 1
@@ -120,18 +114,11 @@ STAMP="${PREV_AT}"
 printf '%s|%s\n' "${STATE}" "${STAMP}" > "${STATE_FILE}"
 
 if [[ "${SHOULD_NOTIFY}" -eq 1 ]]; then
-  enabled="$(printf '%s' "${TELEGRAM_NOTIFY_ENABLED:-false}" | tr '[:upper:]' '[:lower:]')"
-  if [[ "${enabled}" == "true" && -n "${TELEGRAM_BOT_TOKEN:-}" && -n "${TELEGRAM_ALLOWED_CHAT_IDS:-}" ]]; then
-    for chat_id in ${TELEGRAM_ALLOWED_CHAT_IDS//,/ }; do
-      curl -s -m 15 -X POST \
-        -d "chat_id=${chat_id}" \
-        --data-urlencode "text=${MSG}" \
-        "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" >/dev/null 2>&1 || true
-    done
-    echo "[${NOW_ISO}] NOTIFIED state=${STATE}" >> "${LOG_FILE}"
+  # 沒有任何通道或有通道失敗 → 寫進 log，不靜默吞掉。
+  if NOTIFY_OUT="$(printf '%s' "${MSG}" | "$(dirname "$0")/notify.sh" 2>&1)"; then
+    echo "[${NOW_ISO}] NOTIFIED state=${STATE} $(echo ${NOTIFY_OUT})" >> "${LOG_FILE}"
   else
-    # 通道沒設定＝告警實際上不存在。寫進 log 讓它至少留下痕跡，而不是靜默吞掉。
-    echo "[${NOW_ISO}] NOTIFY_SKIPPED (telegram not configured) state=${STATE}" >> "${LOG_FILE}"
+    echo "[${NOW_ISO}] NOTIFY_INCOMPLETE state=${STATE} $(echo ${NOTIFY_OUT})" >> "${LOG_FILE}"
   fi
 fi
 
