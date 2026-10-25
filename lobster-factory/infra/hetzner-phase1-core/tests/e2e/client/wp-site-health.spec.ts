@@ -62,7 +62,7 @@ test.describe(`WordPress site — ${clientHostname()}`, () => {
     expect([200, 301, 302, 307]).toContain(res?.status());
     // Confirm it's not a "site not found" page
     const text = await page.textContent('body') ?? '';
-    expect(text).not.toContain('This site can't be reached');
+    expect(text).not.toContain("This site can't be reached");
   });
 
   test('screenshot homepage (delivery evidence)', async ({ page }) => {

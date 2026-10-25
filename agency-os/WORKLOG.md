@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-25（續29）wp-bridge 0.18.2 rollout 到主機上所有網站（aware-wave.com、soulful）；客戶站 Playwright 測試檔語法錯修好（Claude）
+
+- **發版**：`scripts/release-wp-bridge.sh` → GitHub Actions 已恢復，release.yml 自動出 zip。https://github.com/awarewaveai-pei/aware-wave-wp-bridge/releases/tag/v0.18.2
+- **rollout**：`scripts/rollout-wp-bridge.ps1`：soulful-wp 0.17.0→0.18.2、lobster-wordpress 0.18.1→0.18.2，兩站 health `200 0.18.2`、home 200；備份 `/root/backups/wordpress/soulful-wp-pre-wpbridge-0.18.2-20261025T071315Z.sql`＋`soulful-wp-wpbridge-0.17.0-20261025T071315Z.tgz`、`lobster-wordpress-pre-wpbridge-0.18.2-20261025T071342Z.sql`＋`lobster-wordpress-wpbridge-0.18.1-20261025T071342Z.tgz`。
+- **不變量查證**：soulful `opted_in=no settings_page_hooks=0 product_field_hooks=0`；aware-wave.com `opted_in=yes 1 1`；兩站外掛資料夾擁有者 www-data。
+- **順手修（擋客戶站 DoD）**：`lobster-factory/infra/hetzner-phase1-core/tests/e2e/client/wp-site-health.spec.ts:65` 單引號字串含 `can't` → 整個 client 專案 0 tests（"No tests found" 卻 exit 1）；改雙引號；同目錄 grep 同類 1 處。
+- **發現（未修，範圍外）**：`/client-status` skill 的 `GET /api/ops/clients` 未登入回 404（middleware），skill 寫的 Basic auth 已過時，改用直接檢查；soulful 有 FluentSMTP、aware-wave.com 沒有（續24 M1 的寄信問題可照 soulful 的設定）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=playwright-runner.ps1 -Mode client -ClientSlug company-soulful-expression（7 passed） | exit=0 | ms=38300
+- REALTEST_EVIDENCE: tool=curl | cmd=https://soulfulexpression.org/ 200（1.6 s）、/wp-login.php 200、/wp-json/aware-wave-bridge/v1/health version 0.18.2；soulful-wp 15 分鐘 log fatal 0 | exit=0 | ms=1615
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（spec 修正 1 行，讀回確認；rollout 程式已於續28 審查）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=can't be reached | hits=1
+- **rollback**：備份 tgz 解回 `wp-content/plugins/`；DB 用同名 `.sql`。
 ## 2026-10-25（續28）wp-bridge 是所有網站共用：0.18.2 客戶站看不到 AwareWave 收費功能；新 `scripts/rollout-wp-bridge.ps1` 一次升級主機上每個網站（Claude）
 
 - **根因**（操作者「wp-bridge 是所有網站通用的」「商品編輯頁也會多三個 AwareWave 欄位，客戶看到可能會疑惑」）：①發版流程只到 GitHub Release，安裝靠手動，只升了 aware-wave.com，soulful 停在 0.17.0；②0.18.0/0.18.1 的商品欄位與「付款與會員」頁在所有網站都出現（soulful 有 WooCommerce 10.7.0）。
