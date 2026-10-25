@@ -1,6 +1,8 @@
 # 排程離開 Trigger、所有時鐘一頁看完 — R0 七段
 
 > 起因：2026-10-25 Trigger prod 停擺 34h（WORKLOG 2026-10-25 續20，`runbooks/TRIGGER-RUNS-STUCK-QUEUED.md`）。操作者要求：盡量不用 Trigger；所有依賴外部服務的排程在一處看完；懶得跑 AO-RESUME 也要知道。狀態只在 `data.mjs`。
+>
+> 續接語：續做排程離開 Trigger：讀 `agency-os/handoffs/2026-10-25-schedules-off-trigger/R0-PLAN.md` §6 C4.6（①已完成）與 C2.2，從「SSH 驗 `/ops/schedules` 新列全綠（C2.2）＋確認 NA 已含 alerts route，再請操作者同意裝 alerts／digest 兩行（C4.6②）」開始；完成 = C4.6 ②–⑦ 與 C2.2–C2.5 全做完、監工台 data.mjs 更新、第一則每日一行截圖。建議模型：Opus 5.5
 
 ## 1. 任務理解
 
@@ -93,7 +95,7 @@ push `packages/workflows` 即觸發 Trigger 部署（`.claude/hooks/post-push-tr
 | C4.3 | 同 route `?digest=1`，cron `0 1 * * *`（09:00 台北）：「N 個排程全部正常」或列出需注意；這行沒來＝告警壞了 |
 | C4.4 | 自發通知的主機腳本 7 支改呼叫 `notify.sh`、刪各自 curl：`endpoint-alert.sh`、`auto-deploy-next-admin.sh`、`check-drift-and-alert.sh`、`reconcile-videos.sh`、`verify-backup.sh`、`scripts/routine-output-watchdog.sh`、`auto-reboot/ks-aw-01-boot-health-notify.sh`；各自原頻道以 `--slack VAR` 保留（#infra-alerts＝`.env` `SLACK_INFRA_ALERTS_WEBHOOK`，由 `scripts/sync-slack-alert-webhooks.ps1` 寫入）。`verify-backup-eu.sh`／`verify-backup-ks-aw-01.sh` 已在 repo（`infra/eu-backup`、`infra/ks-aw-01-backup`，手動部署）且不自發通知（只 exit≠0，C4.2 涵蓋），不改 |
 | C4.5 | `slack-alert-drill.sh` 改演練 `notify.sh`；本機假 webhook 驗變紅一則、恢復一則、重複不送 |
-| C4.6 | 上線（High）：`sync-slack-alert-webhooks.ps1` 把 #infra-alerts 寫進 `.env`；`install-host-schedules.sh` 裝 alerts／digest 兩行；開機通知照其檔頭手動部署到 `/usr/local/bin`；`slack-alert-drill.sh` 演練三通道；`/etc/default/awarewave-endpoint-alert.telegram`／`.local` 的重複值確認無人讀後退役；第一則每日一行截圖給操作者 |
+| C4.6 | 上線（High，每步經操作者同意）：① #infra-alerts 寫進 `.env` `SLACK_INFRA_ALERTS_WEBHOOK`（主機上自 `/etc/default/awarewave-endpoint-alert` `WEBHOOK_URL` 複製，值不離主機，sha `9810b9e962`）；② `install-host-schedules.sh` 裝 alerts／digest 兩行（先驗 NA 11:04 部署已含 `/api/internal/schedules/alerts`）；③ 開機通知照其檔頭手動部署到 `/usr/local/bin`；④ `slack-alert-drill.sh` 演練三通道；⑤ **修 `scripts/sync-slack-alert-webhooks.ps1`，修好前禁跑**：它讀的 vault `AGENCY_OS_SLACK_WEBHOOK_URL`＝主機 `.env` `SLACK_WEBHOOK_URL`（`0b88e958aa`），不是 #infra-alerts → 改讀 vault 新鍵 `SLACK_INFRA_ALERTS_WEBHOOK`、寫入前比雜湊不同即停（換網址需明示參數）、刪 netdata Slack 段（`:133`，netdata 走 Netdata Cloud email）與 selftest 呼叫（`:210`，主機無此檔）；⑥ `/etc/default/awarewave-endpoint-alert`（`WEBHOOK_URL` 與 Grafana 聯絡點同值）與 `.telegram`／`.local` 重複值確認無人讀後退役；⑦ 第一則每日一行截圖給操作者。雜湊只用 `printf %s "$v" \| sha256sum`；`tr` 不認 `\x27`（2026-10-25 因此算錯過一次） |
 | C4.7 | 兩列「先回答再做」會綠而實際失敗（critic 2026-10-25 L4）：`pod-orders/sweep` 在 `after()` 才 drain（`route.ts:20-24`）；`dispatch-action-run` 失敗列記 `dispatch_failed` 但回傳無 `status`（`dispatch-action-run.ts:208,256`）→ 改回報真實結果 |
 
 ### C5 排程頁補齊外部時鐘

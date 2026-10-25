@@ -1,4 +1,15 @@
 # Worklog
+## 2026-10-25（續61）排程離開 Trigger C4.6①：#infra-alerts 寫進主機 `.env`；`sync-slack-alert-webhooks.ps1` 會送錯頻道，修好前禁跑（Claude）
+
+- **觸發**：操作者 go ahead 跑 `sync-slack-alert-webhooks.ps1`；執行前比對發現不可跑，改經同意在主機上複製。
+- **事實（雜湊皆 `printf %s "$v" | sha256sum` 前 10 碼）**：vault `AGENCY_OS_SLACK_WEBHOOK_URL`＝主機 `.env` `SLACK_WEBHOOK_URL`＝`0b88e958aa`；vault `SLACK_WEBHOOK_URL`＝`.env` `OPS_INBOX_SLACK_INCIDENTS_WEBHOOK`＝`b0aaf13db6`（#ops-incidents）；#infra-alerts＝`/etc/default/awarewave-endpoint-alert` `WEBHOOK_URL`＝Grafana 聯絡點 url＝`9810b9e962`（Slack #infra-alerts 10-24 收到 endpoint-alert 訊息為證）。工具讀前者寫進 #infra-alerts → 送錯頻道。netdata 走 Netdata Cloud（`Claimed: Yes`，email 至 awarewaveai@gmail.com，10-24 有收），主機無 `health_alarm_notify.conf`，工具會新建 Slack 路由；`slack-webhook-selftest.sh` 主機不存在。
+- **更正**：本日回覆中曾兩度給錯雜湊／結論——`tr -d "...\x27..."` 時 GNU `tr` 不認 `\x27`，把 x、2、7 一併刪掉再算（`86a448d06d` 即此錯法下的同一值）；曾誤稱「Grafana 可能送錯頻道」「netdata 無人收警報」，皆查證不成立。
+- **做了什麼**：11:04 的 sg-deploy 已把 C4.4 腳本同步上主機（`notify.sh` mtime 11:04:08），故提前處理。主機上 fail-closed 複製：來源須為 Slack webhook 且雜湊吻合；先備份 `.env.bak-20261025T114319Z-infra-hook`；行數須 = 原 − 既有 + 1、其餘行逐行相同；權限沿用；讀回方式同 `notify.sh`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sudo bash -s < copy-infra-hook.sh` | exit=0 | ms=3000 | result=lines 269→270 existing=0, readback sha=9810b9e962, mode=600 root:root, no temp left
+- REVIEW_WAIVED: NA -- 主機一次性操作，腳本自帶 fail-closed 檢查與讀回驗證；repo 未改程式
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=AGENCY_OS_SLACK_WEBHOOK_URL|slack-webhook-selftest|health_alarm_notify | hits=30（讀者：`scripts/notify-ops.ps1:14`、`scripts/sync-grafana-alerting-slack.ps1:2`、`sync-slack-alert-webhooks.ps1:27,40,133,210`；其餘為歷史文件）
+- **剩餘**：C4.6 ②–⑦（`R0-PLAN.md` §6 C4.6）；⑤ 修同步工具前任何人不得執行它。
+- **rollback**：`cp -p /root/lobster-phase1/.env.bak-20261025T114319Z-infra-hook /root/lobster-phase1/.env`（只差這一行）。
 ## 2026-10-25（續60）next-admin 手動部署 f706f5f0b＋0132 刪 billing_attention（0130 的收縮步，操作者 go）：已套 prod（Claude）
 
 **觸發**：操作者「現在手動部署 next-admin，接著把 billing_attention 刪掉」。接續 57。
