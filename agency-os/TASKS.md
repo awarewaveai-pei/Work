@@ -492,7 +492,7 @@
 > `/tomo` 自動寫入此分類
 > **原名 `#### 待釐清 / 明日提醒`**（2026-08-26 更名並清空）。它原本裝了 86 條 —— 31 條開放項已歸入 A–H、55 條已完成項已移入歷程。
 > 此區**刻意允許未分類**：`/tomo` 交接包落地時還不知道卡在誰身上，下一次 AO-RESUME 或整理時再分派到 A–H。空著是正常狀態。
-- [ ] **續做全自動內容工具：P6–P8（P4 剩 P4.4 收尾）**：計畫 SSOT `agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md`（§0 決策含 D9、§3.2 狀態機、§7 卡）；進度只在 `agency-os/handoffs/2026-10-24-auto-content-supervisor/data.mjs`（改完 `node build.mjs && node check.mjs`，再發布同一網址 https://claude.ai/artifact/TUMBoFwaMCKbPgVmLVjEUZ）。已完成：P1–P3、P4（自動發布 `f985992a2`，續37）、P5 ScriptForge 獨立頁＋伺服器模組登記 `f233bd101`（續43）。**下一步**：① 2026-10-25 起問操作者是否停用 Trigger `schedules-heartbeat`（Trigger deploy＝High）→ P4.4 打勾。② P8.2–P8.5 隨階段補。③ P6 影片接管線（D3：P4 上線一週後，約 2026-10-31 起）→ P7 YouTube（等操作者 Google OAuth，待決 4）。④ P5 剩餘：Story Bible 的提示片段（`storyBibleContextBlock`、角色 id 提示）仍由頁面組好當欄位送，可在 P6 碰 Story Bible 時一併搬。⑤ 真跑一次自動發布需 staging WP＋測試社群品牌（操作者 10-24 說先不用）。建議模型：Opus 5.5。
+- [ ] **續做全自動內容工具：只剩 P7 YouTube（P4.4 併入排程離開 Trigger）**：計畫 SSOT `agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md`（§0 決策含 D9、§3.2 狀態機、§7 卡）；進度只在 `agency-os/handoffs/2026-10-24-auto-content-supervisor/data.mjs`（改完 `node build.mjs && node check.mjs`，再發布同一網址 https://claude.ai/artifact/TUMBoFwaMCKbPgVmLVjEUZ）。已完成：P1–P3、P4（自動發布 `f985992a2`，續37）、P5 ScriptForge 獨立頁＋伺服器模組登記 `f233bd101`（續43）、P6 排程自己做影片 `98f89a622`（續38，10-25）、P8 `229b7f8f8`。**下一步**：① P7 YouTube 等操作者本人申請 Google OAuth（待決 4），連好頻道後從計畫 §7 P7.1 開始。② P4.4 停 Trigger `schedules-heartbeat` 由 `agency-os/handoffs/2026-10-25-schedules-off-trigger/R0-PLAN.md` C1.5 做。③ P5 剩餘：Story Bible 提示片段（`storyBibleContextBlock`、角色 id 提示）仍由頁面組好送。④ 真跑一整輪需 staging WP＋測試社群品牌（操作者 10-24 說先不用）。建議模型：Opus 5.5。
 
 ## Next — 已完成歷程（查詢用）
 
