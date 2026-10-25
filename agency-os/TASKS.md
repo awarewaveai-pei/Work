@@ -127,7 +127,7 @@
 
 - [ ] **【Soulful 搬站後收尾｜無死線】網域轉 Cloudflare Registrar** — 網域付到 2028，無時壓；DKIM selector 是 `hostingermail1`，轉移時勿動 DNS。（付費外掛授權盤點：操作者 2026-10-23 說不用做。）
   - 出自：兩條 Soulful 搬站項（操作者 2026-10-23 確認搬站完成，已歸檔）；其餘收尾（origin lockdown、Hostinger 拉取用公鑰）隨 Hostinger 11/12 到期或已由 ks-aw-01 origin guard 取代。
-- [ ] **【產品｜社群管理平台 V1】照 ADR 016 與 SOCIAL_MANAGER_PLAN.md 做：G5 升級 Postiz，C3 起逐卡**（文章→社群自動排程已由 `AUTO_CONTENT_EXECUTION_PLAN.md` P2／P4 做完；舊 `/api/content/social-publish` 的刪除在該計畫 P6.3）
+- [ ] **【產品｜社群管理平台 V1】照 ADR 016 與 SOCIAL_MANAGER_PLAN.md 做：G5 升級 Postiz，C3 起逐卡**（文章→社群自動排程已由 `AUTO_CONTENT_EXECUTION_PLAN.md` P2／P4 做完。舊 `/api/content/social-publish`、`social-admin`、`social-channels` 還有 caller：影片 Release 面板 `ReleaseDeliveryPanel.tsx:90`、客戶中心社群頻道分頁 `ClientHubTabs.tsx:1892-1972`；兩處改走社群產品後才能刪三支 route，2026-10-25 查，計畫 P6.3）
   - `🟠 未開始` · `2026-10-14` · `G3 Meta 審核狀態（操作者）；G5 要 go-ahead`
   - **一句話**：Metricool 等級的統一發文＋行事曆，Postiz 只當送信員；先自己管多品牌，再開放訂閱
   - **現在到哪**：C1–C12 全部上線（social.aware-wave.com 可發文）。2026-10-16 操作者：「功能不齊全、UI/UX 非常醜」→ 對照 Postiz v2.25／Metricool 盤點完：13 項 UI 缺陷（U1–U13）、19 項功能缺口（F1–F19）、建版＝樣稿 1:1 所以是設計問題、手機版壞掉；順手修 B1（換貼文時編輯器留著上一則文字）。正本 `lobster-factory/docs/social/SOCIAL_MANAGER_GAP_REPORT.md`；render 腳本 `tests/e2e/social/render-views.mjs`
