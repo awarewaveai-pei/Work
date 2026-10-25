@@ -1,0 +1,17 @@
+#!/bin/sh
+# Refuses a commit that deletes more than half of HEAD's tracked files: that is never a real change, it is a wrong or
+# empty index (2026-10-26: a private index path that git read as a new relative file -> empty index -> cbb63162f
+# committed an empty tree, 9132 files). Lives in git itself so every committer passes it -- Claude, Codex, ao-close
+# scripts, a person -- not only commands typed into a Claude Bash tool. Installed by core.hooksPath=scripts/githooks.
+[ "${AW_ALLOW_MASS_DELETE:-}" = "1" ] && exit 0
+git rev-parse -q --verify HEAD >/dev/null || exit 0
+total=$(git ls-tree -r --name-only HEAD | wc -l)
+[ "$total" -ge 20 ] || exit 0
+deleted=$(git diff --cached --name-only --diff-filter=D HEAD | wc -l)
+if [ $((deleted * 2)) -gt "$total" ]; then
+  echo "pre-commit: refused -- this commit deletes $deleted of $total tracked files (index: ${GIT_INDEX_FILE:-.git/index})." >&2
+  echo "  Almost always an empty or wrong index (check the GIT_INDEX_FILE path): git diff --cached --stat HEAD | tail -1" >&2
+  echo "  A real mass deletion: AW_ALLOW_MASS_DELETE=1 git commit ..." >&2
+  exit 1
+fi
+exit 0

@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-26（續10）空樹 commit 事故收尾＋git 原生 pre-commit 擋「一次刪掉大半個 repo」（操作者「照你的意思處理」）
+
+- 事故：05:13 本機 `cbb63162f` 是空樹（9132 檔全刪）。根因＝私有 index 路徑被當成相對檔名，git 建了一個新的空 index 再 commit（根目錄殘留 `C…git-partial-worktree-commit…02b0595d-1e15f70c.index`）。沒推上 origin；另一個 session 用 recovery stash 把 main 退回 `483679655`。
+- 為什麼 Claude 閘沒擋：`git-commit-scope-guard.js` 只看 Claude Bash 裡打的指令。Codex、`ao-close.ps1` 這類腳本、手動 commit 都不經過它。repo 沒有任何 git 原生 hook（`.git/hooks` 只有 sample、`core.hooksPath` 未設）。
+- 不變量：任何 commit 不得刪掉超過 HEAD 一半的 tracked 檔（rename 不算刪）。放在 git 本身，所以每個 committer 都會經過。真要大刪：`AW_ALLOW_MASS_DELETE=1`。`--no-verify` 已由 `dangerous-bash.js:40` 擋。
+- 已修改：`scripts/githooks/pre-commit`（新）；`tests/hooks/mass-delete-pre-commit.test.mjs`（新，4 案）；`scripts/test-hooks.sh` 登記；`scripts/bootstrap-mcp-machine.ps1:79-82` 新機設 `core.hooksPath`；本機已 `git config core.hooksPath scripts/githooks`。
+- 收尾：quarantine stash `ef1b0f311` 的 18 檔逐一審過後 drop。內容是 doc-sync 時間戳、6–8 月舊 handoff 刪除、已完成的 Tarot 計畫、可重產的監工台 html、10-19 已刪的 `wp-bridge-client.ts`、skills `.trash`。junction 自修後 13 個 `.claude` tracked 檔用 `git show HEAD:f > f` 補回。
+- 剩餘風險：單機 `core.hooksPath` 是 repo 本機設定，不進 git。新機靠 bootstrap 設定。
+- rollback：revert 本 commit，並 `git config --unset core.hooksPath`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh | exit=0 | ms=108764
+- REALTEST_EVIDENCE: tool=Bash | cmd=GIT_INDEX_FILE=<new empty file> sh scripts/githooks/pre-commit (real D:\Work, 9132 of 9132 refused) | exit=1 | ms=900
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/1m/0n（m1：`--no-renames` 會把大量搬移當刪除，已拿掉並補測試）
+- ORACLE_WAIVED: codex quota blocked until 2026-10-26 07:35 (scripts/oracle-quota.ps1)；書面自審（amend／merge／rename／Windows sh／linked worktree）＋突變：拔 `deleted*2 > total` 判斷 → 事故案與過半案 2 紅 → 還原 4 綠
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,.claude,tests,CLAUDE.md | grep=hooksPath|scripts/githooks|AW_ALLOW_MASS_DELETE | hits=4
 ## 2026-10-26（續9）AO-CLOSE：10/25–10/26 session window 收尾（Codex）
 
 - **窗口摘要**：上次 AO-CLOSE 2026-10-24T20:53:07Z 後，完成付款／點數包與 WooCommerce bridge、排程離開 Trigger、內容管線 P6/P8/P7 驗收、客戶模型與 RLS 收窄、告警與容量修正，以及 Social／video／portal 七入口 Cookie 400 修復。

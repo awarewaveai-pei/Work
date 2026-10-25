@@ -76,6 +76,11 @@ if (-not (Test-Path -LiteralPath $claudeUserPath)) {
     }
 }
 
+# --- Git-native hooks (scripts/githooks): every committer passes them, not only Claude's Bash tool ---
+git -C $WorkspaceRoot config core.hooksPath scripts/githooks
+if ($LASTEXITCODE -ne 0) { throw "git config core.hooksPath failed; the mass-deletion pre-commit guard would be off." }
+Write-Host "Git hooks: core.hooksPath = scripts/githooks" -ForegroundColor Gray
+
 if (-not $SkipEnvLoad) {
     if (Test-Path -LiteralPath $EnvScriptPath) {
         Write-Host "Loading machine-local MCP environment: $EnvScriptPath" -ForegroundColor Green

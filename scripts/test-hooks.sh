@@ -25,6 +25,7 @@
 #   tests/hooks/file-claim-guard.test.mjs — one writing session per dirty file (claim, release by commit/TTL, Codex apply_patch)
 #   tests/hooks/read-sweep-to-codex-rule.test.mjs — the 20th distinct file read in a session reminds once to hand sweeping to Codex
 #   tests/hooks/suggest-compact-rule.test.mjs — context measured from the transcript on UserPromptSubmit (bands, window inference, tail read, silent nulls)
+#   tests/hooks/mass-delete-pre-commit.test.mjs — git-native pre-commit refuses a commit deleting more than half of HEAD (empty-index incident 2026-10-26)
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
@@ -43,4 +44,4 @@ fi
 # is not the place every new gate has to edit.
 "$NODE_BIN" --test tests/hooks/governance-pointers.test.mjs tests/hooks/trigger-index.test.mjs
 
-"$NODE_BIN" --test tests/hooks/runner-core.test.mjs tests/hooks/runner-parity.test.mjs tests/hooks/worktree-reparse-guard.test.mjs tests/hooks/maintenance-scripts.test.mjs tests/hooks/subagent-budget.test.mjs tests/hooks/normalize-claude-settings.test.mjs tests/hooks/subagent-charter-rule.test.mjs tests/hooks/settings-deny-parity.test.mjs tests/hooks/codex-adapter.test.mjs tests/hooks/asset-mcp-refs.test.mjs tests/hooks/asset-parity.test.mjs tests/hooks/shared-file-guard.test.mjs tests/hooks/linked-worktree-root.test.mjs tests/hooks/file-claim-guard.test.mjs tests/hooks/suggest-compact-rule.test.mjs tests/hooks/read-sweep-to-codex-rule.test.mjs
+"$NODE_BIN" --test tests/hooks/runner-core.test.mjs tests/hooks/runner-parity.test.mjs tests/hooks/worktree-reparse-guard.test.mjs tests/hooks/maintenance-scripts.test.mjs tests/hooks/subagent-budget.test.mjs tests/hooks/normalize-claude-settings.test.mjs tests/hooks/subagent-charter-rule.test.mjs tests/hooks/settings-deny-parity.test.mjs tests/hooks/codex-adapter.test.mjs tests/hooks/asset-mcp-refs.test.mjs tests/hooks/asset-parity.test.mjs tests/hooks/shared-file-guard.test.mjs tests/hooks/linked-worktree-root.test.mjs tests/hooks/file-claim-guard.test.mjs tests/hooks/suggest-compact-rule.test.mjs tests/hooks/read-sweep-to-codex-rule.test.mjs tests/hooks/mass-delete-pre-commit.test.mjs
