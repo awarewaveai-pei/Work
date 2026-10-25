@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-26（續1）全自動內容 P7.0：postiz YouTube OAuth 用戶端換成「網頁應用程式」那組（操作者 2026-10-26「go」）（Claude）
+
+- **根因**：舊用戶端（`749365809116-99gkk…`）勾了 AI-agent 類型、沒有重新導向 URI 欄位 → Google 回 `redirect_uri_mismatch`（續66 的後續）。
+- **步驟**：`/root/postiz/.env` 備份為 `.env.bak-youtube2-20261025-163933`（UTC；另有 safe-infra-patch 自動備份 `.env.bak.safe-patch-20261025-163933`）→ 經 ssh stdin 傳值、`safe-infra-patch.sh file` 只換 `YOUTUBE_CLIENT_ID`／`YOUTUBE_CLIENT_SECRET` 兩行（600 root 保持）→ `docker compose up -d --no-build postiz`，healthy。compose 與其他 env 未動；值未印出、未入 repo。
+- **驗證**：容器 `printenv` 與檔案相比 ID same／SECRET same，新 ID 前 16 字 `749365809116-55s`；`curl -sI https://postiz.aware-wave.com/` = HTTP/2 307（非 5xx）；Postiz API `GET /public/v1/social/youtube` 回的 Google 授權網址 `client_id` 前 16 字 `749365809116-55s`、`redirect_uri` = `https://postiz.aware-wave.com/integrations/social/youtube`（不變）。尚未由操作者實際走一次授權。
+- **rollback**：`sudo cp -p /root/postiz/.env.bak-youtube2-20261025-163933 /root/postiz/.env && cd /root/postiz && docker compose up -d --no-build postiz`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=ssh ubuntu@145.239.195.47 docker exec postiz printenv YOUTUBE_CLIENT_ID + curl /public/v1/social/youtube (client_id prefix 749365809116-55s) | exit=0 | ms=20000
+- REVIEW_WAIVED: NA -- 只換主機 env 兩個值，無程式改動；前後比對由容器 printenv 與 API 回傳驗證
+- BUGHUNT_WAIVED: NA -- 無程式改動
+- ORACLE_WAIVED: 無 source 檔改動，僅主機設定與 WORKLOG
 ## 2026-10-25（續84）排程離開 Trigger 結案：待決 1–5 與 C7 由我決定（操作者「你決定」）——備份狀態改在主機判斷、GitHub 排程上頁免 token、主機外存活探針；C6.2–6.3、C7 不做（Claude）
 
 - **決策紀錄**：`agency-os/reports/decisions/2026-10-25-schedules-off-trigger-open-items.md`（每項附 file:line／實測與回頭條件）；INDEX 一列。R0-PLAN §6 刪 C7、C6.2／C6.3，C8.1／C8.2 改寫為已決定的做法。
