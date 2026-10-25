@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { can, entitlementMode } from "../can";
+import { SELLER_LICENCES, can, entitlementMode, sellerLicenceKey, sellerMaySell, verdictOf } from "../can";
+import { registeredFeatures } from "../tables";
+import { PRODUCTS } from "@/lib/portal/products";
 import { grantFor, withFeature } from "../grant";
 import { resolveSubject, type OrgRow, type SubjectStore } from "../subject";
 import { CUSTOMER, INTERNAL, gateFixture } from "./gate-fixtures";
@@ -264,5 +266,48 @@ describe("withFeature / grantFor", () => {
 
   it("grantFor throws EntitlementRequired when enforce refuses", async () => {
     await expect(grantFor("content.title", { deps: gateFixture({ entitlement: null }).deps, subjects: store })).rejects.toMatchObject({ code: "no_entitlement" });
+  });
+});
+
+describe("seller licences (ADR 017 decision #12, D3)", () => {
+  const now = Math.floor(Date.now() / 1000);
+  const store = (row: Partial<import("../can").EntitlementRecord> | null) => {
+    const findActiveEntitlement = vi.fn(async () => row === null ? null
+      : { id: "lic-1", organizationId: CUSTOMER.orgId, productKey: "social", featureKey: sellerLicenceKey("social"), source: "comp" as const,
+        sourceRef: "staff", startsAt: now - 60, endsAt: null, status: "active", limits: {}, ...row });
+    return { findActiveEntitlement, getCreditBalance: async () => 0 };
+  };
+
+  it("every product has one seller licence and none is a product feature", () => {
+    expect([...SELLER_LICENCES.values()].sort()).toEqual(PRODUCTS.map((p) => p.key).sort());
+    const features = new Set(PRODUCTS.flatMap((p) => p.features.map((f) => f.feature_key)));
+    for (const key of SELLER_LICENCES.keys()) expect(features.has(key), key).toBe(false);
+    // so neither the door menu nor an all-features account (0118) ever reaches one
+    for (const f of registeredFeatures()) expect(SELLER_LICENCES.has(f.feature_key), f.feature_key).toBe(false);
+  });
+
+  it("a customer without the seller licence row cannot sell", async () => {
+    expect(await sellerMaySell(store(null), CUSTOMER, "social", now)).toBe(false);
+    // a row for another product's licence is not this one
+    expect(await sellerMaySell(store({ productKey: "video", featureKey: sellerLicenceKey("video") }), CUSTOMER, "social", now)).toBe(false);
+  });
+
+  it("a customer with a live seller licence row can sell; an ended one cannot", async () => {
+    expect(await sellerMaySell(store({}), CUSTOMER, "social", now)).toBe(true);
+    expect(await sellerMaySell(store({ endsAt: now - 1 }), CUSTOMER, "social", now)).toBe(false);
+  });
+
+  it("the internal account sells every product without a row", async () => {
+    const s = store(null);
+    for (const key of SELLER_LICENCES.values()) expect(await sellerMaySell(s, INTERNAL, key, now)).toBe(true);
+    expect(s.findActiveEntitlement).not.toHaveBeenCalled();
+  });
+
+  it("can() never answers a seller licence, in shadow or enforce", async () => {
+    for (const mode of ["shadow", "enforce"] as const) {
+      const { deps } = gateFixture({ mode, entitlement: { featureKey: sellerLicenceKey("social") } });
+      expect(await verdictOf(CUSTOMER, sellerLicenceKey("social"), ACTOR, deps)).toEqual({ allowed: false, reason: "unknown_feature" });
+      expect(await can(CUSTOMER, sellerLicenceKey("social"), ACTOR, deps)).toMatchObject({ allowed: false, reason: "seller_licence_not_a_feature" });
+    }
   });
 });

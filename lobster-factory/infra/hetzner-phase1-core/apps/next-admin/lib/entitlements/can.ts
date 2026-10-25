@@ -26,6 +26,14 @@ export interface CanDependencies {
 }
 export type CanResult = { allowed: true; payload: PermitPayload; permit: string } | { allowed: false; reason: string };
 
+/** The one active, current row of (account, product, feature) the store returns, re-checked here: the store is a
+ *  dependency, so a row for another account, product or feature, or outside its dates, counts as none. */
+async function liveRow(store: CanStore, organizationId: string, productKey: string, featureKey: string, now: number): Promise<EntitlementRecord | null> {
+  const found = await store.findActiveEntitlement({ organizationId, productKey, featureKey, now });
+  return found && found.status === "active" && found.organizationId === organizationId && found.productKey === productKey && found.featureKey === featureKey
+    && Number.isFinite(found.startsAt) && found.startsAt <= now && (found.endsAt === null || (Number.isFinite(found.endsAt) && Math.floor(found.endsAt) > now)) ? found : null;
+}
+
 /** Low-level signer (was `can` before ADR 017 step 3; callers use `can` below, which adds mode, subject and report). Store, policy and actor/tenant authorization are trusted server dependencies.
  * Callers resolve authenticated actor and billing tenant first; never expose this signer as a public HTTP endpoint.
  */
@@ -43,9 +51,7 @@ export async function issuePermit(request: PermitBinding, deps: CanDependencies)
   // add-on plan a credit pack grants) spends the wallet per use, only on a feature the registry bills in credits.
   // Opt-in on the row, not "every contract row on a credits feature": all-features contracts (0118, managed clients)
   // cover their use and must not start debiting when enforce is switched on.
-  const found = await deps.store.findActiveEntitlement({ organizationId: request.tenant, productKey: request.product_key, featureKey: request.feature_key, now });
-  const row = found && found.status === "active" && found.organizationId === request.tenant && found.productKey === request.product_key && found.featureKey === request.feature_key
-    && Number.isFinite(found.startsAt) && found.startsAt <= now && (found.endsAt === null || (Number.isFinite(found.endsAt) && Math.floor(found.endsAt) > now)) ? found : null;
+  const row = await liveRow(deps.store, request.tenant, request.product_key, request.feature_key, now);
   if (!row) return deny("no_active_entitlement");
   // Do not let a cached permit extend an entitlement's own deadline.
   expiresAt = Math.min(expiresAt, row.endsAt === null ? expiresAt : Math.floor(row.endsAt));
@@ -97,6 +103,21 @@ export interface GateDependencies {
 
 /** Staff tooling billed to the internal account; there is no product row to seed a comp entitlement on. */
 export const BACK_OFFICE_FEATURES: ReadonlySet<string> = new Set(["ops.inbox-ai", "ops.onboarding-spec", "ops.command-plane", "ops.cheap-json", "ops.staging-image"]);
+/** A seller's licence to take payments for a product on its own cash register (ADR 017 decision #12, D3). Not a product
+ *  feature, so it is not in products.ts: a door menu lists every feature there (app/ProductDoorShell.tsx) and an
+ *  all-features account (0118, lib/entitlements/tables.ts registeredFeatures) is granted every one, which would make a
+ *  managed client a reseller. A customer account holds one only through a row staff write; internal sells everything.
+ *  Answered by sellerMaySell, never by can(): a licence decides whether money is taken, so it must not pass in shadow
+ *  mode nor need the permit signing key (Codex 2026-10-25 partialreview-3da704b3); can() refuses one in every mode
+ *  (seller_licence_not_a_feature). The payment function checks the same row itself (migration 0133). */
+export const sellerLicenceKey = (productKey: string): string => `${productKey}.resell`;
+export const SELLER_LICENCES: ReadonlyMap<string, string> = new Map(PRODUCTS.map((p) => [sellerLicenceKey(p.key), p.key]));
+export async function sellerMaySell(store: CanStore, seller: Subject, productKey: string, now = Math.floor(Date.now() / 1000)): Promise<boolean> {
+  if (!SELLER_LICENCES.has(sellerLicenceKey(productKey))) return false;
+  if (seller.kind === "internal") return true;
+  if (seller.kind !== "customer") return false;
+  return (await liveRow(store, seller.orgId, productKey, sellerLicenceKey(productKey), now)) !== null;
+}
 
 export class EntitlementRequired extends Error {
   readonly status = 403;
@@ -212,6 +233,8 @@ export async function gateFailure(featureKey: string, actor: string, error: unkn
 
 export async function can(subject: Subject, featureKey: string, actor: string, deps?: GateDependencies): Promise<Grant> {
   const d = deps ?? (await import("./runtime")).runtimeGateDependencies();
+  // A seller licence is never a usage grant: refused in every mode, so shadow cannot wave a payment through (sellerMaySell).
+  if (SELLER_LICENCES.has(featureKey)) return mint(d, subject, featureKey, actor, { ok: false, reason: "seller_licence_not_a_feature" });
   let verdict: Verdict;
   try {
     verdict = await decide(subject, featureKey, actor, d);

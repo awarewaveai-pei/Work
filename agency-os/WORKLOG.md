@@ -1,4 +1,45 @@
 # Worklog
+## 2026-10-25（續68）ADR 017 賣家 4c-4 commit＋4c-1 migration 0133 寫好待操作者看（不 commit、不套 prod）（Claude）
+
+**觸發**：操作者「開始做 4c-4 與 4c-1：migration 寫好先給我看，不要套 prod。」接續 59。
+
+**設計修正（卡 4c-4 原寫法兩個洞）**：卡寫「`<key>.resell` 加進 `products.ts` features[]」。讀碼證明：①全功能補列 `lib/entitlements/tables.ts:9` `registeredFeatures`（0118）照每個 feature 發列 → Soulful（代操）、edd-research 自動成為每個產品的代理商；②門選單 `app/ProductDoorShell.tsx:41` 列出每個 feature → 客戶門出現「代理銷售」。卡上「暫列 `BACK_OFFICE_FEATURES`」也不可行（`registry-code.test.ts:79` 同樣要求有人問）。不變量：代理權是賣家帳戶的權利，不是買家用的功能，任何「全部功能」集合與使用許可管線都不得碰它。
+
+**4c-4（本 commit）**：`lib/entitlements/can.ts` `sellerLicenceKey()`／`SELLER_LICENCES`／`sellerMaySell(store, seller, productKey)`（internal 放行；customer 要一張活的 comp／contract 列；只讀列，不經許可、模式、簽章金鑰）；`can()` 收到代理權鍵任何模式都拒 `seller_licence_not_a_feature`；抽出 `liveRow()` 與 `issuePermit` 共用（行為不變）。測試 `can.test.ts` describe `seller licences` 5 個。
+
+**4c-1（未 commit，等操作者看）**：`lobster-factory/packages/db/migrations/0133_seller_sites.sql`＋`.down.sql`＋`packages/db/scripts/0133_seller_sites_down.sql`（同內容，慣例雙份）；`payments.e2e.test.ts` describe `sellers (0133)` 7 測試；`tests/e2e/entitlements/entitlements-real-db.py` payments 套件加 0124、0133。函式由產生腳本從 0128 原文產生，只多標 `0133` 的部分。
+- `seller_sites`（aware-wave.com 一列，hmac-env 指 `PAYMENTS_WOO_SECRET`／`AUTH_WP_HANDOFF_SECRET`）；`key_id`、`seller_organization_id` 觸發器鎖定；賣家／買家的賣家／方案擁有者必為根帳戶。
+- `customer_identities.site_id`（唯一鍵改 `(site_id, …)`；過渡預設＝aware-wave.com，4c-2 拿掉；check：`awarewave-wp` ⇔ aware-wave.com）。
+- `organizations.sold_by_organization_id`（只准控制面寫：`authenticated`／`anon` 改它拒絕）；`organizations_one_internal_root` 唯一索引。
+- `plans.owner_organization_id`；`plans_no_seller_licence`（方案不得含 `*.resell`）。
+- `payment_events.site_id`：收件箱鍵改 `(provider, site_id, event_id)` nulls not distinct；0133 前 woo 列補 aware-wave.com（暫停只寫一次觸發器）；check local ⇔ 無 site。
+- `billing_apply_payment_event(…, p_site_id default null)`：woo 不帶 site＝aware-wave.com；拒 `site_disabled`／`buyer_belongs_to_another_seller`／`plan_not_sellable_here`（只對網站事件；操作者 local 可取消／退款）／`local_has_no_site`／`seller_not_licensed`、`seller_pack_needs_plan`（只對其他賣家網站的收錢事件）；帳本鍵與合約 source_ref 以網站命名空間（aware-wave.com 仍 `woo`，他站 `woo@<key_id>`），組出鍵 >128 字拒 `invalid_order_ref`。
+- down：有第二網站／非 AwareWave 賣家資料／賣家方案／非 awarewave-wp 身分，或 aware-wave.com 非 active，一律拒；函式還原 0128 原文。
+- 正式庫唯讀查證（SSH `sudo docker exec supabase-db psql`，只有 select）：身分列 0、awarewave-wp 帳戶 0、方案 0、woo 收件列 0、internal 根帳戶 1、PG 15.8 → 回填量皆 0。
+
+**審查**（同一 reviewer 對同段連報，第三次修正前已寫不變量分析，見卡 §7）：
+- Codex 第一輪 `partialreview-20ba3e0c` 2m：event_id、訂單號跨站相撞（`PaymentEvents.php:104`、`0120:32`、`0066:22` 驗過）→ 整類：所有由網站編號組成的鍵帶網站。
+- Codex 第二輪 `partialreview-05afd543` 3m：身分列無 site 會擋新會員首付（`identities.ts:64-71`）、local 無法取消賣家方案、key_id 可改 → 過渡預設、擁有者檢查只對網站事件、鎖定 key_id。
+- Codex 第三輪 `partialreview-3da704b3` 3m：代理權經 `can()` 影子模式放行、需簽章金鑰（`runtime.ts:26-27`）；down 可重開已停用收銀台 → 代理權移出 `can()`；down 檢查 aware-wave.com 狀態。
+- Codex 第四輪：額度用完（`try again at 10:36 PM`），已 `oracle-quota.ps1 -Action set`；改派 critic subagent：1H/4M/2n 全屬實（H1 `0010:526-530` 政策＋正式庫 `has_table_privilege('authenticated','public.organizations','UPDATE')=true` 驗過）→ 全修。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py --suite payments` | exit=0 | ms=12000（18 passed＝原 11＋新 7；`production_touched: false`）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python <scratchpad>/updown0133.py`（拋棄式 postgres:15.8-alpine：0001…0132 → 0133 up → down → up） | exit=0 | ms=20000（舊 woo 列補站、重送 replayed、仍只寫一次；舊寫法身分列得 aware-wave.com；key_id 不可改；第二 internal 根拒；customer-wp 落 aware-wave.com 拒；方案含 .resell 拒；authenticated 改 sold_by 拒；aware-wave.com 停用時 down 拒；第二網站時 down 拒；子組織當賣家拒；down 後函式＝0128 原文）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit && npx vitest run lib/entitlements lib/portal lib/payments` | exit=0 | ms=20000（22 files，235 passed）
+- MUTATION: `sellerMaySell` 不看列 → 2 紅；拿掉 `can()` 拒代理權鍵 → `can() never answers a seller licence, in shadow or enforce` 紅；0133 拿掉 `buyer_belongs_to_another_seller` → `a payment from site B for a buyer sold by site A is refused` 紅；拿掉 sold_by 控制面守衛 → updown「authenticated cannot change sold_by」False。各自還原綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/13m/2n（Codex 三輪 8m＋critic 1H4M2n，全屬實全修；artifact `agency-os/reports/oracle/2026-10-25-partialreview-{20ba3e0c,05afd543,3da704b3}.md`）
+- ORACLE_WAIVED: codex quota blocked until 2026-10-25 22:36 (scripts/oracle-quota.ps1)；最後一版由 critic subagent（獨立讀碼）審過，修正後以突變證據補強
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`billing_apply_payment_event` | hits=11（next-admin 呼叫端 `contracts.ts:20` 用具名參數，新增有預設的 `p_site_id` 不破壞；其餘為 migration 歷史定義、`packages/db/scripts` down 副本與 0120 本機驗證腳本）
+- WORKLOG: 本條目
+
+**剩餘風險**：
+- 0133 未 commit、未套 prod：推上 main 而未套 prod 會讓部署閘（`check-migrations-applied.sh`）擋下每晚 03:00 自動部署 → 操作者看完後**同日** commit＋套 prod（High）。
+- **既有安全洞（0110 起，範圍外，未修）**：`organizations_update`（`0010:526-530`）讓客戶成員經 PostgREST 改自己組織任何欄位，含 `kind`（改成 internal → can() 視為 AwareWave 自用）、`parent_organization_id`、`status`。0133 的唯一索引擋得住「第二個 internal」，擋不住其他欄位。另開卡處理（RLS＝High）。
+- 4c-2 未做：在那之前所有 woo 事件都算 aware-wave.com 的。
+- 本 session 期間 hook 報告別的 session 的檔（`lib/social/*`、`lib/content/topics/make.ts`、`zz-billing-dump.scratch.test.ts`）被改動，非本 session 所為，未碰。
+
+**Rollback**：4c-4 `git revert`；0133 套後 `0133_seller_sites.down.sql`（有其他賣家資料或 aware-wave.com 停用時拒絕）。
 ## 2026-10-25（續67）next-admin 手動部署 f706f5f0b → 6dfe5f8bf（操作者 go ahead：含其他 session 的 601749947、ae5e0675b）（Claude）
 
 - **內容**：next-admin／migrations 範圍內新 commit 只有 601749947（/ops/billing 左側帳戶列）、ae5e0675b（社群工具加 YouTube）、8c611cb27（0132，已於續60 套 prod）。部署時 main 已前進到 6dfe5f8bf，其餘為文件／主機腳本。

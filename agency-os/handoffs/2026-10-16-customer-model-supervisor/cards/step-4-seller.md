@@ -131,6 +131,7 @@ billing_apply_payment_event(p_provider, p_event_id, p_event, + p_site_id)
 - 閘注意：`registry-code.test.ts:75`「every feature … is asked by a call site」在 4c-2 之前會紅 → 本卡與 4c-2 **同一天連做**，或先把 `resell` 列加進 `BACK_OFFICE_FEATURES` 豁免、4c-2 再移出（二擇一，WORKLOG 寫明）。`billing: "contract"` 所以 `:87` 計量閘不適用。
 - Acceptance：`npx vitest run lib/portal/__tests__ lib/entitlements/__tests__/features.test.ts` 綠；測試名 `every next-admin product declares exactly one resell feature`。
 - Rollback：`git revert`。
+- **實作（2026-10-25）與上列不同處**：代理權**不進** `products.ts` 的 `features[]`：門選單列出每個 feature（`app/ProductDoorShell.tsx:41`），全功能補列照每個 feature 發列（`lib/entitlements/tables.ts:9` `registeredFeatures`，0118）→ Soulful、edd-research 會變成每個產品的代理商。改照 `BACK_OFFICE_FEATURES` 做法：`lib/entitlements/can.ts` `sellerLicenceKey(productKey)`＝`<key>.resell`、`SELLER_LICENCES`（每個登記產品一把，含 external 門的 cognitive、hci）；判斷由 `sellerMaySell(store, seller, productKey)` 做：internal 直接放行、customer 要有一張活的 comp／contract 列（與 `issuePermit` 共用 `liveRow`）。**不經 `can()`**（Codex 第三輪 `partialreview-3da704b3`：經 `can()` 時影子模式會放行、且沒有許可簽章金鑰就答不出來）；`can()` 收到代理權鍵在任何模式都拒 `seller_licence_not_a_feature`。上面「暫列 `BACK_OFFICE_FEATURES`」也不可行（`registry-code.test.ts:79` 同樣要求有人問）。測試 `lib/entitlements/__tests__/can.test.ts` describe `seller licences`：`every product has one seller licence and none is a product feature`、`a customer without the seller licence row cannot sell`、`a customer with a live seller licence row can sell; an ended one cannot`、`the internal account sells every product without a row`、`can() never answers a seller licence, in shadow or enforce`。**4c-2 用 `sellerMaySell(createEntitlementStore(), …)`**，不用 `can`／`grantFor`／`verdictOf`。
 
 ### 4c-1　migration（High：套 prod 前給操作者看；下一個空號 `ls lobster-factory/packages/db/migrations | sort | tail`）
 - 開工第一句：`select count(*) from customer_identities; select count(*) from organizations where metadata->>'source'='awarewave-wp'; select count(*) from plans;` 記進 WORKLOG（回填筆數）。
@@ -146,6 +147,18 @@ billing_apply_payment_event(p_provider, p_event_id, p_event, + p_site_id)
 - Acceptance：本機 Postgres（`lib/entitlements/__tests__/` 既有真 DB e2e 套法，見 commit `4386b1580`）：up → `\d seller_sites`、`\d customer_identities` 顯示新鍵 → down → up 再一次（冪等）。SQL 層測試（`lib/entitlements/__tests__/contracts-seller.test.ts`，e2e 套法）名：`a plan owned by another seller is refused on this site`、`a payment from site B for a buyer sold by site A is refused`、`a local payment with no site still applies`、`a disabled site is refused`。
 - 套 prod：照 0120 套法（WORKLOG 2026-10-23 續51）；之後 `psql -c '\d seller_sites'`＋`select host, verify_alg, status from seller_sites;`＝一列 aware-wave.com／hmac-env／active。
 - Rollback：`.down.sql`。
+- **實作（2026-10-25，`0133_seller_sites.sql`，未套 prod）與上列不同處**：
+  - 函式由腳本從 0128 原文產生，四處插入標 `0133`；參數變了＝新函式，所以先 `drop function …(text, text, jsonb)` 再建（`create or replace` 會留下兩個 overload）。
+  - `woo` 沒帶 site＝aware-wave.com 那列（今天的外掛不帶 site，4c-2 前照常收錢）；`local` 帶 site 拒 `local_has_no_site`。buyer／seller 檢查對每種事件都做（不只首付）；`local` 不檢查（操作者登記轉帳）。
+  - **網站送來的每個外部編號只在該站內唯一**（Codex 2026-10-25 `partialreview-20ba3e0c` 兩項：兩站各有訂單 7 時，外掛產生同一個 `wc:payment_complete:7:credit_pack`，帳本鍵也同為 `pack:woo:7`）：收件箱唯一鍵改 `(provider, site_id, event_id)`（`nulls not distinct`，local 為 null）＋check「local ⇔ 無 site」；0133 前的 woo 列補上 aware-wave.com（暫停 0120 只寫一次觸發器，只補這一欄）；帳本鍵、合約 `source_ref` 改用命名空間 `v_ns`＝aware-wave.com 用原本的 `woo`、其他站 `woo@<key_id>`（第一天鍵不變）；`key_id` 上限 24 字，組出的帳本鍵超過 128 字拒 `invalid_order_ref`。**4c-2 起任何由網站編號組成的新鍵都要帶 `v_ns`**。
+  - critic（Codex 額度用完後的獨立審查）1H4M 全修：`sold_by` 只准控制面寫（`organizations_update` 政策 `0010:526-530` 讓會員能改自己組織列）；internal 根帳戶唯一索引，函式改由 aware-wave.com 列取得 AwareWave；`awarewave-wp` ⇔ aware-wave.com check；代理權也在 SQL 函式檢查（只對其他賣家網站的收錢事件：`seller_not_licensed`，無方案點數包 `seller_pack_needs_plan`）；方案不得含 `*.resell`。
+  - **0133 推 main 前必須同日套 prod**：部署閘 `check-migrations-applied.sh` 會擋下 03:00 自動部署。
+  - Codex 第三輪 `partialreview-3da704b3` 第 3 項：aware-wave.com 那列不是 active（例如鑰匙外洩後停用）時 down 拒絕，rollback 不得重開已關的收銀台。
+  - Codex 第二輪 `partialreview-05afd543` 三項（皆屬實）：①`customer_identities.site_id` 暫設預設＝aware-wave.com 那列（今天的 `identities.ts:64-71` 不帶 site，沒預設新會員首付會失敗）→ **4c-2 帶 site 並在其 migration `drop default`**；②擁有者檢查只對網站來的事件做，操作者 `local` 可取消／退款賣家方案；③`seller_sites.key_id`、`seller_organization_id` 由觸發器鎖定不可改（換鑰匙＝同列換公鑰；換賣家＝新列）。
+  - 賣家、買家的賣家、方案擁有者都必須是根計費帳戶：觸發器 `seller_root_account_check`（三張表共用）。
+  - `seller_sites` 不設 `activated_at`／`disabled_at`（`status` 已足）；鑰匙欄互斥 check：ed25519 只能有公鑰、hmac-env 只能有環境變數名。
+  - 測試放進既有 `payments.e2e.test.ts`（describe `sellers (0133)`，直接呼叫 SQL 函式），套件 `entitlements-real-db.py --suite payments` 加 0124、0133；「local 照舊」由同檔既有 11 個 local 測試涵蓋，不另寫。另加 `a woo event with no site is the aware-wave.com site`。
+  - up → down → up 與「有第二個網站時 down 拒絕」「子組織不能當賣家」：拋棄式 Postgres 跑過（WORKLOG 2026-10-25 續68）。
 
 ### 4c-2　next-admin：鑰匙→網站→賣家；首付帳戶記賣家（依賴 4c-1、4c-4）
 - Files：
