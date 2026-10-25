@@ -5,7 +5,7 @@
  * <kind>:<org>:<--ref>, so --ref (the transfer, refund or case reference) is required for every kind and must be new
  * for each real payment -- reusing one for a different payment is refused (event_id_reused), never silently skipped.
  *
- *   node scripts/record-payment.mjs credit_pack --org <billing account uuid> --units 500 --ref <transfer ref>
+ *   node scripts/record-payment.mjs credit_pack --org <billing account uuid> --units 500 --ref <transfer ref> [--plan <pack add-on plan>]
  *   node scripts/record-payment.mjs subscription_paid --org <uuid> --plan social_pro --until 2026-11-23 --ref <transfer ref>
  *   node scripts/record-payment.mjs subscription_canceled --org <uuid> --plan social_pro --ref <request ref>
  *   node scripts/record-payment.mjs refund --org <uuid> --ref <transfer ref of the pack>              (credit pack: only the unused part)
@@ -41,7 +41,7 @@ export function buildPayment(argv, secret) {
   if (!secret || secret.length < 32) throw new Error("PAYMENTS_LOCAL_SECRET is missing or shorter than 32 characters");
   const base = { kind, organization_id: f.org };
   let event;
-  if (kind === "credit_pack") event = { ...base, units: Number(f.units), order_ref: f.ref };
+  if (kind === "credit_pack") event = { ...base, units: Number(f.units), order_ref: f.ref, ...(f.plan ? { plan_key: f.plan } : {}) };
   else if (kind === "subscription_paid") {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(f.until ?? "")) throw new Error("--until YYYY-MM-DD is required (end of the paid period, Taipei)");
     event = { ...base, plan_key: f.plan, period_end: `${f.until}T23:59:59+08:00`, ...(f.ref ? { external_ref: f.ref } : {}) };

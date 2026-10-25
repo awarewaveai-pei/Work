@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-25（續30）ADR 017 決定 6＝A：點數包的使用權不設期末——0128 讓帶 plan_key 的 credit_pack 同一交易寫無期末列（已套 prod）（Claude）
+
+- **任務**：操作者 2026-10-25「待決 6 選 A：點數包的使用權不設期末，改 0120 讓點數包事件寫無期末列（migration 做好先給我看再套 prod）」；看過後 go。
+- **根因**：4b-5 後只有錢包打不開功能，點數包必須附使用權列；原做法（另送 subscription_paid、期末＋1090 天）會讓久未購買者的剩餘點數用不了卻仍在合約負債（critic 2026-10-25 M）。
+- **不變量**：點數不過期，用點數的權利也不過期；點數與使用權同一交易寫入（任一拒絕＝都不寫）；每帳戶每功能仍只一筆有效客戶列；方案必須是 addon 且每個功能 `pay: credits`。
+- **做了什麼**：
+  - `lobster-factory/packages/db/migrations/0128_pack_usage_rights_open_ended.sql`（＋down、`scripts/0128_…_down.sql`）：只 `create or replace billing_apply_payment_event`，在 credit_pack 分支後加：帶 `plan_key` → 查方案（不存在 `unknown_plan`、非 addon `pack_plan_not_addon`、有功能沒標 pay `pack_plan_not_credits`）；全功能帳戶跳過；每帳戶×方案一筆 `current_period_end null` 合約（原有期末的改成無期末）；列 `ends_at null`、limits＝方案；已有其他有效客戶列的功能跳過。其餘 0120 文字一字未改（函式 diff 只有 `create`→`create or replace` 一行被替換）。down 還原 0120 函式、不刪資料。
+  - next-admin：`lib/payments/provider.ts` credit_pack 可帶選用 `plan_key`；`scripts/record-payment.mjs credit_pack … --plan`；`lib/entitlements/__tests__/payments.e2e.test.ts` 兩個新測試＋獨立帳戶 PACK_BUYER＋content_pack 方案（只 commit 本 session 的 hunk）。
+  - 文件：ADR 017 #11、卡 step-4 4b-5、TASKS 待決 6 打勾、監工台移除待決 6。
+  - 外掛：已告知 4b-2 session 改為 credit_pack 帶 plan_key、不再另送 subscription_paid（0128 前送也無害：舊函式忽略該欄）。
+- **共用檔**：`tests/e2e/entitlements/entitlements-real-db.py` 的 payments `after` 行被 0127 session 與本 session 的修改合成一行（"0127","0128"），無法拆，本 commit 不含；已通知該 session 隨 0127 一起 commit。在那之前 main 上的 payments e2e 套件不套 0128，本條兩個新測試會紅（只有手動跑該腳本才會跑到）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=entitlements-real-db.py --suite payments（拋棄式 Postgres，0001…0120＋0127＋0128）：新兩測綠；11 中 10 綠，紅的是 0127 session 進行中的 /ops/billing 頁測試 | exit=1 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/payments lib/entitlements app/api/webhooks/payments（176 passed）＋npx tsc --noEmit（本次檔案 0 error）＋node --test scripts/__tests__/down-migration-copies.test.mjs（1 pass） | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=SSH | cmd=apply-db-migration.mjs 0128 → APPLY_OK 1/1；psql 唯讀：函式含 pack 分支且仍含 0120 各分支、EXECUTE 只有 service_role（＋owner）、schema_migrations 有 0128、payment_events 0 列 | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（書面對抗自審：交易原子性＝失敗整筆回滾含點數、一列不變量、全功能帳戶跳過、replay 走收件表、0120 文字 diff 驗證）
+- ORACLE_WAIVED: 本機 Codex 模型設定不被帳號支援（codex-oracle 四度無輸出）；以書面對抗自審＋真 Postgres 實測代替。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=billing_apply_payment_event|subscription_paid.*1090|pack-plan | hits=41
+- **rollback**：套 `0128_pack_usage_rights_open_ended.down.sql`（還原 0120 函式；已寫的點數包列保留，需人工處理）；`git revert <本 commit>`。
 ## 2026-10-25（續29）wp-bridge 0.18.2 rollout 到主機上所有網站（aware-wave.com、soulful）；客戶站 Playwright 測試檔語法錯修好（Claude）
 
 - **發版**：`scripts/release-wp-bridge.sh` → GitHub Actions 已恢復，release.yml 自動出 zip。https://github.com/awarewaveai-pei/aware-wave-wp-bridge/releases/tag/v0.18.2

@@ -9,7 +9,8 @@ export type PaymentProviderName = "local" | "woo";
 export type PaymentEvent =
   | { kind: "subscription_paid"; organization_id: string; plan_key: string; period_end: string; external_ref?: string }
   | { kind: "subscription_canceled"; organization_id: string; plan_key: string }
-  | { kind: "credit_pack"; organization_id: string; units: number; order_ref: string }
+  // plan_key (optional): the pack's add-on plan; 0128 writes its rows with no end date (ADR 017 decision 6).
+  | { kind: "credit_pack"; organization_id: string; units: number; order_ref: string; plan_key?: string }
   | { kind: "refund"; target: "subscription"; organization_id: string; plan_key: string }
   | { kind: "refund"; target: "credit_pack"; organization_id: string; order_ref: string }
   | { kind: "chargeback"; organization_id: string; ref?: string }
@@ -62,7 +63,7 @@ export function toPaymentEvent(value: unknown): PaymentEvent {
       return { kind: o.kind, organization_id, plan_key: text(o, "plan_key", KEY) };
     case "credit_pack": {
       if (!Number.isSafeInteger(o.units) || (o.units as number) < 1 || (o.units as number) > 10_000_000) throw new PaymentParseError("invalid_units");
-      return { kind: o.kind, organization_id, units: o.units as number, order_ref: text(o, "order_ref", REF) };
+      return { kind: o.kind, organization_id, units: o.units as number, order_ref: text(o, "order_ref", REF), ...optional(o, "plan_key", KEY) };
     }
     case "refund":
       if (o.target === "subscription") return { kind: "refund", target: "subscription", organization_id, plan_key: text(o, "plan_key", KEY) };

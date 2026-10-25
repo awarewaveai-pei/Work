@@ -130,7 +130,7 @@ export const STEPS = [
   { n: 3, card: 'cards/step-3.md', plain: '每項收費功能執行前都先確認權限；未購買時按鈕顯示停用。', title: '每個收費點只問 can(主體, feature_key, actor)', what: '社群、collect、認知平台的收費按鈕與 API 呼叫前問一次；認知平台 check_entitlement 改成 can() 薄接頭（加 actor、回 grant 物件），呼叫端 main.py 9 處同 commit。',
     files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/can.ts', 'Projects/internal/cognitive-engineering-os/ai_lego/platform/entitlement/check.py', 'Projects/internal/cognitive-engineering-os/ai_lego/apps/api/main.py'], gate: '測試：功能一定要有權利列，只有錢包一律拒；列寫 pay: credits 的點數功能才扣錢包、餘額不足即拒（2026-10-25 改，4b-5）；代操時從 on_behalf_of 扣點，稽核記 actor；沒有 active 權利列不簽許可；沒有登記列的產品拿不到 grant', risk: 'Medium', model: 'Opus 5.5', depends: [2], status: 'done', commit: 'e87de9225' },
   { n: 4, card: 'cards/step-4.md', plain: '客戶在 aware-wave.com 付款後，系統自動開通，不需人工處理。', title: 'Woo 付款通知 → 合約與權利；帳本泛化', what: 'Woo 原生 webhook（六種事件含退款與拒付）→ 收件表去重 → 同一交易寫合約、權利、帳本；media_ 帳本去前綴加 product_key（ADR 015 §4）。',
-    files: ['lobster-factory/packages/db/migrations/0120_payment_events.sql', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/payments/', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/contracts.ts', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/payments/', 'lobster-factory/packages/wp-bridge-plugin/'], gate: '測試：同一 event_id 重送不做事；退款只退未用點數；拒付凍結；假簽章 401', risk: 'High（金流）', model: 'Opus 5.5', depends: [3], status: 'in_progress', before: '扣款方式、點數條款、點數規則三題已定（2026-10-25，都選 A，寫進 ADR 017 產品決定 #3、#11 與 ADR 015 §待查）；點數包使用權期限（待決 6）',
+    files: ['lobster-factory/packages/db/migrations/0120_payment_events.sql', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/payments/', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/contracts.ts', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/payments/', 'lobster-factory/packages/wp-bridge-plugin/'], gate: '測試：同一 event_id 重送不做事；退款只退未用點數；拒付凍結；假簽章 401', risk: 'High（金流）', model: 'Opus 5.5', depends: [3], status: 'in_progress', before: '扣款方式、點數條款、點數規則三題已定（2026-10-25，都選 A，寫進 ADR 017 產品決定 #3、#11 與 ADR 015 §待查）；點數包使用權不設期末（2026-10-25 決定，0128 已套 prod）',
     items: [
       { id: '4a', plain: '人工付款入口：收件表、合約與權利同一交易、錢包入帳、/ops/billing', status: 'done', commit: 'f2139d35a' },
       { id: '4b-1', plain: 'WordPress 會員對應計費帳戶（0124 customer_identities，已套 prod 2026-10-25）', status: 'done', commit: '0eb785f1c' },
@@ -153,11 +153,6 @@ export const STEPS = [
 export const OPEN = [
   { n: 2, what: '買斷交付前請律師確認授權：Postiz（AGPL-3.0）、MinIO（AGPLv3，Trigger 內含）、Redis（Trigger 與核心用浮動 7-alpine，7.4 起授權改為 RSALv2／SSPL）。', before: 5, src: 'ADR 017 §5' },
   { n: 4, what: '客戶白牌網址的憑證走 Cloudflare for SaaS（客戶 CNAME 到 AwareWave）還是主機上自動簽發（on-demand ACME）？', before: 9, src: 'ADR 018 §2' },
-  { n: 6, what: '點數包帶的使用權多久：點數不會過期，但點數包的使用權有期末（目前購買日＋1090 天，再買就延長）。超過 3 年沒再買，剩下的點數就用不了、卻還記在合約負債。目前 prod 沒有任何錢包，現在不會發生。', before: 4, src: 'critic 2026-10-25（4b-5）', detail: '選項細節：TASKS 待決 6', options: [
-    { k: 'A', pick: true, t: '使用權不設期末：點數包的加購方案由點數包事件寫成沒有期末的列，點數用完前一直能用（要改 0120 的付款函式，migration High）' },
-    { k: 'B', t: '維持購買日＋1090 天，再買就延長；到期前 30 天寄信提醒' },
-    { k: 'C', t: '使用權到期時剩餘點數照比例退款：違反「點數不退」' },
-  ] },
 ];
 
 // 要一起改但不是順序步驟的

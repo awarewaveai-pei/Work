@@ -11,6 +11,8 @@ import { startRestProxy } from "./real-db";
 
 const REST = process.env.ENTITLEMENTS_REST;
 const CUSTOMER = "00000000-0000-4000-8000-0000000000c7";
+const PACK_BUYER = "00000000-0000-4000-8000-0000000000c8";   // its own account: the pack tests do not depend on the order of the others
+const PACK_BUYER = "00000000-0000-4000-8000-0000000000c8";   // its own account: the pack tests do not depend on the order of the others
 const SECRET = "payments-e2e-secret-0123456789-0123456789";
 
 describe.skipIf(!REST)("payments against a real database (ADR 017 step 4a)", () => {
@@ -47,10 +49,17 @@ describe.skipIf(!REST)("payments against a real database (ADR 017 step 4a)", () 
     Object.assign(process.env, { PAYMENTS_PROVIDERS: "local", PAYMENTS_LOCAL_SECRET: SECRET });
     db = createClient(process.env.SUPABASE_URL as string, process.env.SUPABASE_SERVICE_ROLE_KEY as string, { auth: { persistSession: false } });
     for (const [table, value] of [
-      ["organizations", { id: CUSTOMER, type: "client", name: "Payments Customer", slug: "e2e-payments-customer", kind: "customer" }],
+      ["organizations", [
+        { id: CUSTOMER, type: "client", name: "Payments Customer", slug: "e2e-payments-customer", kind: "customer" },
+        { id: PACK_BUYER, type: "client", name: "Pack Buyer", slug: "e2e-pack-buyer", kind: "customer" },
+      ]],
       ["plans", [
-        { plan_key: "social_pro", product_key: "social", kind: "base", features: ["social.rewrite", "social.dispatch", "social.ads"] },
-        { plan_key: "social_basic", product_key: "social", kind: "base", features: ["social.rewrite"] },
+        { plan_key: "social_pro", product_key: "social", kind: "base", features: ["social.rewrite", "social.dispatch", "social.ads"], limits: {} },
+        { plan_key: "social_basic", product_key: "social", kind: "base", features: ["social.rewrite"], limits: {} },
+        // 0128: a pack's add-on plan must mark every feature {"pay":"credits"}
+        { plan_key: "content_pack", product_key: "content", kind: "addon", features: ["content.title", "content.outline"],
+          limits: { "content.title": { pay: "credits" }, "content.outline": { pay: "credits" } } },
+        { plan_key: "content_pack_unmarked", product_key: "content", kind: "addon", features: ["content.title"], limits: { "content.title": {} } },
       ]],
     ] as const) {
       const { error } = await db.from(table).insert(value);
@@ -134,6 +143,32 @@ describe.skipIf(!REST)("payments against a real database (ADR 017 step 4a)", () 
       .toMatchObject({ ok: true, refunded_units: 70, granted_units: 100 });
     expect(await balance()).toBe(0);
   });
+  it("a pack that names its add-on plan grants that plan's rows with no end date, once (0128, decision 6)", async () => {
+    const pack = (n: string) => ({ event_id: `pack-plan-${n}`, kind: "credit_pack", organization_id: PACK_BUYER, units: 200, order_ref: `PO-${n}`, plan_key: "content_pack" });
+    const first = await send(pack("1"));
+    expect(first).toMatchObject({ status: 200, body: { ok: true, units: 200, plan_key: "content_pack", pack_rows: 2 } });
+    const grants = await rows("organization_entitlements", { organization_id: PACK_BUYER, status: "active" });
+    expect(grants.map((g) => [g.feature_key, g.ends_at, g.limits]).sort()).toEqual([
+      ["content.outline", null, { pay: "credits" }], ["content.title", null, { pay: "credits" }]]);
+    const contracts = await rows("organization_product_subscriptions", { organization_id: PACK_BUYER });
+    expect(contracts).toHaveLength(1);
+    expect(contracts[0]).toMatchObject({ plan_key: "content_pack", status: "active", current_period_end: null });
+    // the same event again is the inbox's replay; a second order adds credits, never a second contract or row
+    expect((await send(pack("1"))).body).toMatchObject({ ok: true, replayed: true });
+    expect((await send(pack("2"))).body).toMatchObject({ ok: true, units: 200, pack_rows: 0, contract: contracts[0].id });
+    expect(await rows("organization_entitlements", { organization_id: PACK_BUYER, status: "active" })).toHaveLength(2);
+    expect(await rows("organization_product_subscriptions", { organization_id: PACK_BUYER })).toHaveLength(1);
+  });
+
+  it("a pack naming a plan that is not an add-on with every feature on credits is refused and grants nothing", async () => {
+    const before = await rows("media_credit_ledger", { organization_id: PACK_BUYER });
+    for (const [plan_key, code] of [["content_pack_unmarked", "pack_plan_not_credits"], ["social_pro", "pack_plan_not_addon"], ["no_such_plan", "unknown_plan"]]) {
+      expect(await send({ event_id: `pack-bad-${plan_key}`, kind: "credit_pack", organization_id: PACK_BUYER, units: 10, order_ref: `PB-${plan_key}`, plan_key }))
+        .toEqual({ status: 422, body: { ok: false, error: code } });
+    }
+    expect(await rows("media_credit_ledger", { organization_id: PACK_BUYER })).toHaveLength(before.length);   // same transaction: no credits either
+  });
+
 
   it("a chargeback suspends entitlements and freezes the wallet", async () => {
     await send({ event_id: "pack-002", kind: "credit_pack", organization_id: CUSTOMER, units: 50, order_ref: "O-2" });
