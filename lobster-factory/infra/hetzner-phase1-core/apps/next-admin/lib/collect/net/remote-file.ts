@@ -21,14 +21,16 @@ export class RemoteFileError extends Error {
 
 export async function fetchRemoteFile(
   url: string,
-  opts: { maxBytes: number; timeoutMs: number; accept: (contentType: string) => boolean; log?: (msg: string) => void },
+  opts: { maxBytes: number; timeoutMs: number; accept: (contentType: string) => boolean; log?: (msg: string) => void;
+    /** Keep the first maxBytes of a longer body instead of refusing it (a page read for its opening text). */
+    keepPrefix?: boolean },
   deps: { resolver?: Resolver; transport?: typeof fetch } = {},
 ): Promise<RemoteFile> {
   if (!url.startsWith("https://")) throw new RemoteFileError("refused");
   const get = createCollectFetch({
     budget: createBudget({ fetches: 6 }),   // the file and up to five redirects
     robots: null,
-    maxBytes: opts.maxBytes,                // a longer body comes back truncated (x-collect-truncated) = too large
+    maxBytes: opts.maxBytes,                // a longer body comes back truncated (x-collect-truncated): too large, or the kept prefix
     timeoutMs: opts.timeoutMs,
     deadlineMs: opts.timeoutMs + 5_000,
     log: opts.log,
@@ -42,20 +44,21 @@ export async function fetchRemoteFile(
     throw e;
   }
   if (!res.ok) throw new RemoteFileError(res.status === 404 || res.status === 410 ? "not_found" : "unreachable");
-  if (res.headers.get("x-collect-truncated")) throw new RemoteFileError("too_large");
+  if (res.headers.get("x-collect-truncated") && !opts.keepPrefix) throw new RemoteFileError("too_large");
   const contentType = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
   if (!opts.accept(contentType)) throw new RemoteFileError("wrong_type");
   return { bytes: new Uint8Array(await res.arrayBuffer()), contentType };
 }
 
-/** A web page a person pasted, as plain text (scripts, styles and tags dropped), at most maxChars; same gate and errors. */
+/** A web page a person pasted, as plain text (scripts, styles and tags dropped), at most maxChars; same gate and errors.
+ *  A page longer than maxBytes is read from its first maxBytes: only the opening text is used. */
 export async function fetchRemotePageText(
   url: string,
   opts: { maxBytes: number; timeoutMs: number; maxChars: number },
   deps: { resolver?: Resolver; transport?: typeof fetch } = {},
 ): Promise<string> {
   const { bytes } = await fetchRemoteFile(url, {
-    maxBytes: opts.maxBytes, timeoutMs: opts.timeoutMs, accept: (t) => t.startsWith("text/") || t === "application/xhtml+xml",
+    maxBytes: opts.maxBytes, timeoutMs: opts.timeoutMs, accept: (t) => t.startsWith("text/") || t === "application/xhtml+xml", keepPrefix: true,
   }, deps);
   return pageText(new TextDecoder().decode(bytes)).slice(0, opts.maxChars);
 }
@@ -79,5 +82,7 @@ export function pageText(html: string): string {
     if (end < 0) break;                                            // never closed: the rest is script
     i = end + 1;
   }
+  const lt = out.lastIndexOf("<");
+  if (lt > out.lastIndexOf(">")) out = out.slice(0, lt);           // a kept prefix cut inside a tag (a data: URL) is not text
   return out.replace(/<[^<>]*>/g, " ").replace(/\s{2,}/g, " ").trim();
 }

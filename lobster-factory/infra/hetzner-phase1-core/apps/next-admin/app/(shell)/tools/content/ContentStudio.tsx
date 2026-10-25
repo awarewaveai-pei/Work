@@ -1257,7 +1257,7 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
     try {
       const externalLinks = form.externalLinks.split("\n").map(u => u.trim()).filter(u => /^https?:\/\//.test(u)).slice(0, 5);
       const userInternal  = form.internalLinks.split("\n").map(u => u.trim()).filter(u => /^(https?:\/\/|\/)/.test(u));
-      const referenceUrls = form.referenceUrls.split("\n").map(u => u.trim()).filter(u => /^https?:\/\//.test(u)).slice(0, 3);
+      const referenceUrls = form.referenceUrls.split("\n").map(u => u.trim()).filter(u => u.startsWith("https://")).slice(0, 3);
 
       // Auto-fetch REAL related posts from the target site so the model weaves genuine internal
       // links instead of fabricating fake URLs. Best-effort — failure just falls back to user links.
@@ -2746,7 +2746,16 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
             <textarea className="form-textarea" style={{ minHeight: "80px" }}
               value={form.referenceUrls} onChange={e => setF("referenceUrls", e.target.value)} disabled={isGenerating}
               placeholder={"https://en.wikipedia.org/wiki/Art_therapy\nhttps://example.com/research-paper"} />
-            <div className="form-hint">伺服器端抓取頁面文字注入提示詞（每個 URL 最多 3000 字元）。</div>
+            <div className="form-hint">伺服器端抓取頁面文字注入提示詞（每個 URL 最多 3000 字元）。只讀 https 網址。</div>
+            {(() => {
+              // the server reads only https (lib/collect/net/remote-file.ts); say so before the article runs without it
+              const plain = form.referenceUrls.split("\n").map(u => u.trim()).filter(u => u && !u.startsWith("https://"));
+              return plain.length > 0 && (
+                <div style={{ fontSize: "11px", color: "var(--yellow)", marginTop: 4 }}>
+                  這些不是 https:// 開頭的網址，不會被讀取：{plain.join("、")}
+                </div>
+              );
+            })()}
           </SectionToggle>
 
           {/* ── 外部連結 ── */}

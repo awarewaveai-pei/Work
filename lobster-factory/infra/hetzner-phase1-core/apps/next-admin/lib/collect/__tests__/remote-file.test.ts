@@ -1,7 +1,7 @@
 // A pasted media URL (lib/content/postiz.ts uploadMedia/uploadVideo): collect's address gate on every redirect hop,
 // the byte cap, and nothing internal in the error (review 2026-10-15 M2).
 import { describe, expect, it } from "vitest";
-import { fetchRemoteFile, pageText, RemoteFileError } from "@/lib/collect/net/remote-file";
+import { fetchRemoteFile, fetchRemotePageText, pageText, RemoteFileError } from "@/lib/collect/net/remote-file";
 
 const IMAGE = { maxBytes: 10, timeoutMs: 5_000, accept: (ct: string) => ct.startsWith("image/") };
 const publicDns = async () => ["93.184.216.34"];
@@ -34,9 +34,16 @@ describe("fetchRemoteFile", () => {
 
   it("a page's text drops scripts, styles and tags, and a hostile body of unclosed tags takes linear time", () => {
     expect(pageText('<p>a</p><SCRIPT>x<b></b></script><style>.c{}</style>b <img src="i"> c<script>never closed')).toBe("a b c");
+    expect(pageText('<p>hi</p><img src="data:image/png;base64,AAAA')).toBe("hi");   // a prefix cut inside a tag
     const started = Date.now();
     for (const body of ["<".repeat(200_000), "<script".repeat(30_000), "<script></script>".repeat(15_000), "a<style".repeat(30_000)]) pageText(body);
     expect(Date.now() - started).toBeLessThan(1_000);   // the old regexes: ~11 s for the first body alone
+  });
+
+  it("a page longer than the cap is read from its first bytes; a file longer than the cap is still refused", async () => {
+    const page = () => new Response(`<p>${"a".repeat(20)}</p>`, { headers: { "content-type": "text/html" } });
+    expect(await fetchRemotePageText("https://news.example/a", { maxBytes: 10, timeoutMs: 5_000, maxChars: 100 }, { resolver: publicDns, transport: transport(page()) })).toBe("aaaaaaa");
+    expect(await reason(fetchRemoteFile("https://news.example/a", { ...IMAGE, accept: () => true }, { resolver: publicDns, transport: transport(page()) }))).toBe("too_large");
   });
 
   it("a public image within the cap comes back with its type", async () => {

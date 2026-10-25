@@ -1,4 +1,27 @@
 # Worklog
+## 2026-10-25（續44）參考網頁不再靜默消失：超過 2 MB 的頁面讀前段；http 網址在產文前就提示不會被讀（Claude）
+
+**觸發**：操作者「Fix both now」（續34 剩餘 n3＋http 行為變化）。
+
+**根因**
+- `fetchRemotePageText` 沿用 `fetchRemoteFile` 的 `too_large`：超過 2 MB 的頁面整頁丟掉；`referenceContext` 的 `.catch(() => "")` 讓使用者看不到（續34 critic n3）。只用前 3000／5000 字，前段就夠。
+- 續34 起伺服器只讀 https（`lib/collect/net/remote-file.ts` `startsWith("https://")`），但 `ContentStudio.tsx` 仍收 http、沒提示 → 文章少了那份參考，使用者不知道。
+
+**修改**（next-admin）
+- `lib/collect/net/remote-file.ts`：`fetchRemoteFile` 加 `keepPrefix`（被截斷的 body 留前 `maxBytes`，不拋 `too_large`）；只有 `fetchRemotePageText` 開；媒體（`lib/content/postiz.ts`）照舊拒絕過大檔案。
+- `app/(shell)/tools/content/ContentStudio.tsx`：送出只帶 `startsWith("https://")`（與伺服器同一規則，大小寫一致）；textarea 下方黃字列出「這些不是 https:// 開頭的網址，不會被讀取：…」（任何非 `https://` 開頭的非空行，含沒寫 scheme 的），提示加「只讀 https 網址」。
+- `pageText`：結尾未關的 `<…` 先切掉（前段可能截在 `<img src="data:…` 中間）。
+- `lib/collect/__tests__/remote-file.test.ts`：頁面超過上限讀前段、媒體超過上限仍 `too_large`、截在標籤中間只留文字。
+- brand-voice 的 `URL_REFUSED.too_large` 對頁面已不會出現（型別要求保留）。
+
+**驗證**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/collect/__tests__/remote-file.test.ts lib/content/article lib/portal（10 files，72 passed） | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：刪 `&& !opts.keepPrefix` → remote-file.test.ts 1 failed；還原 → 6 passed；拔結尾未關標籤的切除 → 1 failed；還原 → 6 passed | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit（next-admin） | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Browser | cmd=preview next-admin-ui-3903 /tools/content，參考 URL 輸入 https、http、沒 scheme 各一 → 頁面文字「這些不是 https:// 開頭的網址，不會被讀取：http://example.com/old-page、www.example.com/no-scheme」（https 那條不列）；console 錯誤只有無 DB 預覽的 theme／503 | exit=0 | ms=0（未計時）
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/2n（critic subagent：keepPrefix 不外漏到媒體、UTF-8 截斷無害、客戶端與伺服器規則一致；n1 前段在標籤中間截斷（data: URL）會把半個標籤當文字 → `pageText` 先切掉結尾未關的 `<`；n2 沒有 scheme 的網址（`www.x.com/a`）也被靜默丟 → 黃字改列所有非 `https://` 開頭的行；兩條都已修）
+- ORACLE_WAIVED: 本機 Codex 模型設定今日不可用（同日 續5）；以 critic subagent＋突變代替。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app | grep=fetchRemoteFile | hits=18（呼叫點只有 remote-file.ts 本身與 `lib/content/postiz.ts`（不帶 keepPrefix，媒體仍拒過大）；其餘為測試與 WORKLOG）
 ## 2026-10-25（續43）aware-wave.com 能寄信了：FluentSMTP → Resend SMTP（續24 M1 關閉）（Claude）
 
 - 操作者在 Resend 建了**只能寄信**的 key（限 aware-wave.com），自己貼進 FluentSMTP。原本那把 `mcp` 是完整權限，又被別處共用，所以不放進 WordPress。設定（續36 預填）：`smtp.resend.com:587 TLS`、`resend`、`AwareWave <noreply@aware-wave.com>`、密碼以 WP SALT 加密存 DB。
