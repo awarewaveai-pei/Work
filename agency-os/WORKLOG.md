@@ -1,5 +1,5 @@
 # Worklog
-## 2026-10-26（續12）— Issue #32：workflows 套件安全修復（待正式部署）
+## 2026-10-26（續14）— Issue #32：workflows 套件安全修復（待正式部署）
 
 **根因／不變量**：2026-10-26 週掃描 run 40280913512 重現 15 項（high=11、moderate=4）；Zod <4.6.6 新公告涵蓋原 3.x，body-parser／fast-uri／ip-address override 下限亦失效。所有 shipped 相依不得含 high/critical；不能以新增接受或降級 SDK 消音。
 
@@ -17,6 +17,12 @@
 **正式環境／剩餘風險**：SSH 唯讀實測 trigger-webapp image=v4.4.4、healthy。新 CLI/SDK 4.8.1 與舊 server 的實機部署相容性尚未驗證；本機結果不能宣稱 prod 已修。buildImage.js:371 仍含部署腳本 sed 所需 `TRIGGER_API_URL=${apiUrl}`。核准後需以唯一部署入口進行 build/index/health 與安全無副作用任務驗證；如不相容，停下評估 server 升級，不自行升版。push packages/workflows 會觸發 post-push 部署，因此本次僅本機 checkpoint，不 push、不關 Issue #32。
 
 **rollback**：本機僅還原此提交的四個 workflows 檔（勿覆寫他人變更），再 npm ci；未改正式環境，無 prod rollback。部署時保留目前 production worker 版本，失敗不 promotion。
+## 2026-10-26（續12）remote-weekly-agent: weekly summary generated
+
+- 01:10 UTC : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-10-26.md
+- REALTEST_WAIVED: NA -- read-only report generation, no system changes
+- REVIEW_WAIVED: NA -- report generation only
+- BUGHUNT_WAIVED: NA -- no code changes
 ## 2026-10-26（續11）AO-CLOSE 補收尾：共享工作區清理與私有 index 復原
 
 - **窗口**：上次成功 AO-CLOSE `2026-10-25T20:41:21.0137290Z` 起；`git log --since` 已核對前次正式報告、證據、記憶提交與 `483679655`。
