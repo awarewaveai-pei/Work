@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-10-26（AO-CLOSE，05:47後窗口）**：workflows安全掃描15→0（`392d7fda8`，deepmerge8限定Prisma6、刪豁免、136測試）；Trigger正式20261026.3，真實任務7/7通過。同期完成watchdog exit126修復並套用、deny鏡像quote解析、部署鎖檔安裝；影片5錯誤與字幕環境已修／部署、D11依聲音來源定字幕；AUTO_CONTENT P9.1每日熱搜已做，P9.3/P9.5與影片V1–V7已拆卡。未完仍看TASKS／各計畫；影片監工台暫停。詳細證據僅WORKLOG同日續14–25。
 - **2026-10-26 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-10-26 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:237e34c70dfe5c89f8c178aadacfade11c33f8ceacdc2015da9d7da3b40068d2 -->
 - **2026-10-26（AO-CLOSE 補收尾，04:41 後）**：109 份已完成文件／證據以 `483679655` 推送；其餘 18 項由 Claude 逐項審查後結案（WORKLOG 續10，操作者確認）。錯誤私有 index commit `cbb63162f` 未推送且已復原；`d161d2ae9`／`7681287eb` 補 git 原生防大量刪檔檢查。詳見 WORKLOG 2026-10-26 續10／續11；原有產品待辦不因此視為完成。
 - **2026-10-25 (AO-CLOSE, 視窗 2026-10-22 17:41Z → 2026-10-25)** — 多 session 並行約 180 commits。(1) **外觀系統**（本 session）：37 組四色票做成 Theme Editor 預設（24 種排法、Shuffle、點色互換；色票只當底色，字一律灰階且對每種底色 ≥4.5:1，測 888 種）；`--accent-text`／`--btn-primary-*`／側欄目前頁 `.active`／`--tab-bg-active`／字體三選（Font Family）全部接上；守門「Colors＋Typography 每格都要被畫面讀到」；四次手動部署，prod 現為 `3e069ee69`。(2) **客戶模型 ADR 017 4b**：4b-1/2/3/4/5/7 完成（wp-bridge v0.18.0 付款事件、WP 會員進門、點數只付已持有功能），待決 1/3/5 選 A（WCS＋TapPay）。(3) **員工工具權限** C1–C5 上線（shadow），C6 待操作者翻 enforce（11-01 看 would_deny）。(4) **自動內容** P3–P8 多項完成（54/61），0121/0122/0125 套 prod。(5) **產品門**：影片、設計門上線；內容門頁面建好（enabled:false）。(6) 每個付費 AI 呼叫寫 ai_call_logs；gemini-2.0-flash-lite 退場；prod 15 個 compose 不變量。
@@ -522,7 +523,7 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-10-25 21:46:45 UTC_
+_Last synced: 2026-10-26 15:36:58 UTC_
 
 ## 2026-06-16 AO-CLOSE memory — session window 2026-06-11T05:07Z → 2026-06-16 afternoon
 

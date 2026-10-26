@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-26（續25）— AO-CLOSE：零漏洞部署與全窗口收尾
+
+- 窗口：前次close=2026-10-25T21:47:37Z起；git log全窗口20餘提交已查，TASKS所有open項已核對，未把部分產品進度誤勾完成。
+- 安全閉環：392d7fda8已推；唯一Trigger入口正式build成功，WorkerDeploymentPromotion current=20261026.3／DEPLOYED／2026-10-26T15:32:29.551Z，deployment 8j5p3syq。run_cmvpf2i5c013w20s4afohr5gf COMPLETED、version=20261026.3、pass、7/0/0；無須再做重複手動部署。回退版20261026.2保留。
+- 全窗口摘要：watchdog exit126修復及套用（47d663ceb/e537db306）；deny quote解析3ae7bf1c3；鎖檔安裝d41f11f06；影片黑畫面QA／原因顯示／重生比例／預覽／字幕環境與D11，V1–V7只拆卡；AUTO_CONTENT P9.1每日熱搜、新來源與P9.3/P9.5規劃。memory/daily同步，未改他人狀態快照。
+- REALTEST_EVIDENCE: tool=SSH | cmd=current WorkerDeploymentPromotion read; ao-infrastructure-check run_cmvpf2i5c013w20s4afohr5gf COMPLETED version20261026.3 passed7 failed0 skipped0 | exit=0 | ms=15000
+- REVIEW_WAIVED: DOC_ONLY -- 本條為部署與收尾紀錄；程式獨立審查見續24。
+- BUGHUNT_WAIVED: DOC_ONLY -- 續24版本／報告／實跑已讀回，舊待部署敘述保留歷史並由本條結案。
+- AUTO_TASK_DONE: workflows安全掃描0漏洞與正式部署20261026.3完成，AO-CLOSE記憶與每日紀錄已同步。
+
 ## 2026-10-26（續24）— workflows 建置工具漏洞歸零：Prisma6 限定相依修補
 
 - 根因：`package-lock.json:1196` Prisma6.19.3原始spec釘deepmerge7.1.5。最新Trigger4.8.1仍要求Prisma^6.10；先前只沿用豁免，未驗證可修性。
