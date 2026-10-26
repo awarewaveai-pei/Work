@@ -1,4 +1,10 @@
 # Worklog
+## 2026-10-26（續12）remote-weekly-agent: weekly summary generated
+
+- 01:10 UTC : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-10-26.md
+- REALTEST_WAIVED: NA -- read-only report generation, no system changes
+- REVIEW_WAIVED: NA -- report generation only
+- BUGHUNT_WAIVED: NA -- no code changes
 ## 2026-10-26（續11）AO-CLOSE 補收尾：共享工作區清理與私有 index 復原
 
 - **窗口**：上次成功 AO-CLOSE `2026-10-25T20:41:21.0137290Z` 起；`git log --since` 已核對前次正式報告、證據、記憶提交與 `483679655`。
