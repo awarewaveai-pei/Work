@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-26（續12）— Issue #32：workflows 套件安全修復（待正式部署）
+
+**根因／不變量**：2026-10-26 週掃描 run 40280913512 重現 15 項（high=11、moderate=4）；Zod <4.6.6 新公告涵蓋原 3.x，body-parser／fast-uri／ip-address override 下限亦失效。所有 shipped 相依不得含 high/critical；不能以新增接受或降級 SDK 消音。
+
+**修改**：`lobster-factory/packages/workflows/package.json:8` Trigger SDK/build/CLI 同步 4.8.1；Zod ^4.6.7 + `$zod` override 排除所有舊解析；vitest ^4.1.12、body-parser ^2.4.0、fast-uri ^3.1.9、ip-address ^10.7.5。重新產生 package-lock。`src/trigger/apply-manifest.ts:71`、`dispatch-action-run.ts:35` 共四處 record 改成顯式 string key，保留任意值與空物件預設。既有週掃描已會偵測失效 override，無需另建偵測器。
+
+**驗證**：`agency-os/reports/security/workflows-npm-audit-LATEST.json` verdict=pass、shippedHighCritical=0、critical=0、high=2、moderate=0；剩餘 @prisma/config→deepmerge-ts 是同一項 dev-only 公告，沿用原 2026-11-23 接受期限，未新增／展延。`npm ls --omit=dev deepmerge-ts @prisma/config` empty。@trigger.dev/build@4.8.1 仍要求 @prisma/config ^6.10.0（解析6.19.3→deepmerge7.1.5）；不能為追零數字強制換 Prisma 主要版本。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm ci --ignore-scripts (375 packages; lockfile reproduced); npm run typecheck (exit 0); npm test (19 files / 132 tests pass); npm audit --omit=dev --audit-level=moderate (0 vulnerabilities); real SDK task registration + Zod4 record/default smoke; trigger CLI --version=4.8.1 | exit=0 | ms=40000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/packages/workflows | grep=4\.5\.10|z\.record\(z\.unknown\(\)\) | hits=1
+- AUTO_TASK_DONE: Issue #32 本機修復與驗證完成；正式部署待操作者明示核准。
+
+**審查證據**：`agency-os/reports/oracle/2026-10-26-review-f46f87d6.md` 綁定四檔 123662-byte diff，Claude API 獨立審查 approve（USD0.339，未用訂閱）。BUGHUNT 唯一當前 source 命中是 trigger.config.ts:11 原版 SDK 的型別缺口註解；現在 typecheck 仍證實該缺口。其餘版本敘述是歷史紀錄。跨 Drive BOM audit CLEAN 139/139。已讀回差異、報告、oracle files-reviewed；git diff --check 通過。
+
+**正式環境／剩餘風險**：SSH 唯讀實測 trigger-webapp image=v4.4.4、healthy。新 CLI/SDK 4.8.1 與舊 server 的實機部署相容性尚未驗證；本機結果不能宣稱 prod 已修。buildImage.js:371 仍含部署腳本 sed 所需 `TRIGGER_API_URL=${apiUrl}`。核准後需以唯一部署入口進行 build/index/health 與安全無副作用任務驗證；如不相容，停下評估 server 升級，不自行升版。push packages/workflows 會觸發 post-push 部署，因此本次僅本機 checkpoint，不 push、不關 Issue #32。
+
+**rollback**：本機僅還原此提交的四個 workflows 檔（勿覆寫他人變更），再 npm ci；未改正式環境，無 prod rollback。部署時保留目前 production worker 版本，失敗不 promotion。
 ## 2026-10-26（續11）AO-CLOSE 補收尾：共享工作區清理與私有 index 復原
 
 - **窗口**：上次成功 AO-CLOSE `2026-10-25T20:41:21.0137290Z` 起；`git log --since` 已核對前次正式報告、證據、記憶提交與 `483679655`。

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAtUtc": "2026-10-10T04:47:37.472Z",
+  "generatedAtUtc": "2026-10-26T08:03:20.299Z",
   "runId": null,
   "runAttempt": null,
   "verdict": "pass",
@@ -9,19 +9,11 @@
     "info": 0,
     "low": 0,
     "moderate": 0,
-    "high": 6,
+    "high": 2,
     "critical": 0,
-    "total": 6
+    "total": 2
   },
   "advisories": [
-    {
-      "id": 1240992,
-      "ghsa": "GHSA-vfj7-8cjw-p6xm",
-      "package": "braces",
-      "range": "<=3.0.3",
-      "severity": "high",
-      "url": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm"
-    },
     {
       "id": 1145093,
       "ghsa": "GHSA-ggr8-5vv4-36mx",
@@ -32,15 +24,6 @@
     }
   ],
   "accepted": [
-    {
-      "id": 1240992,
-      "ghsa": "GHSA-vfj7-8cjw-p6xm",
-      "package": "braces",
-      "range": "<=3.0.3",
-      "severity": "high",
-      "url": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
-      "reviewBy": "2027-01-08"
-    },
     {
       "id": 1145093,
       "ghsa": "GHSA-ggr8-5vv4-36mx",

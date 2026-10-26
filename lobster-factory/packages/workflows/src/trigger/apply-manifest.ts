@@ -68,8 +68,8 @@ const ManifestSchema = z.object({
   dependencies: z.array(z.unknown()),
   conflicts: z.array(z.unknown()),
   steps: z.array(ManifestStepSchema).min(1),
-  postInstall: z.array(z.record(z.unknown())).optional(),
-  verification: z.array(z.record(z.unknown())).optional(),
+  postInstall: z.array(z.record(z.string(), z.unknown())).optional(),
+  verification: z.array(z.record(z.string(), z.unknown())).optional(),
   rollback: z
     .object({
       strategy: z.string(),

@@ -32,10 +32,10 @@ const ActionRunSchema = z.object({
   action_key:       z.string().optional(),   // joined from ops_action_catalog if needed
   action_id:        z.string().uuid(),
   organization_id:  z.string().uuid().nullish(),
-  input_payload:    z.record(z.unknown()).default({}),  // correct column name
+  input_payload:    z.record(z.string(), z.unknown()).default({}),  // correct column name
   status:           z.string(),
   trace_id:         z.string().nullish(),
-  metadata:         z.record(z.unknown()).default({}),
+  metadata:         z.record(z.string(), z.unknown()).default({}),
   approval_required: z.boolean().default(false),
   approval_status:   z.string().default("none"),
 });
