@@ -9,7 +9,7 @@ export const META = {
   req: 'agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_PIPELINE_REQUIREMENTS.md',
   worklog: 'agency-os/WORKLOG.md 2026-10-24、2026-10-25',
   self: 'agency-os/handoffs/2026-10-24-auto-content-supervisor/',
-  url: 'https://claude.ai/artifact/TUMBoFwaMCKbPgVmLVjEUZ',
+  url: 'https://claude.ai/artifact/62N7Y5mRDdV4rYq2k2Z5gj',
 };
 
 // 頁面上所有固定文字（不含資料列）。{x} 由 build.mjs 代入算出來的值。
