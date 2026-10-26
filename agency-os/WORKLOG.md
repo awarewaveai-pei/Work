@@ -1,4 +1,15 @@
 # Worklog
+## 2026-10-26（續15）— Issue #32：安全修復已推送並部署，真實任務通過
+
+- **授權／推送**：操作者明示「推送和部署」。`3c6e83cad` 安全修復與遠端週報 `e93b25e08` 在獨立 detached worktree 合併為 `7bfce4ab4`，已推 origin/main。並行工作區的 watchdog 修改與續13條目保留；原安全條目與週報碰撞續12，經 worklog-insert-entry 配發續14後合併。四個 workflows 檔與測試通過時完全相同，未重跑相同測試。
+- **部署**：唯一入口 `scripts/lobster-trigger-deploy.ps1`：環境同步閘6/6、npm install、Cloudflare indexer補丁、build/index/push、10 tasks註冊。自動部署產生20261026.1；為取得完整部署輸出再執行入口產生20261026.2，兩版 image digest 相同（非兩份不同程式）。current promotion 由 Trigger DB 實查為20261026.2，status=DEPLOYED，deployedAt=2026-10-26T08:22:07.170Z。
+- **映像證據**：`registry:5000/trigger/proj_6c4f24492a705729fc2c:20261026.2.production.941zglau@sha256:953c24d77b9b1a589b34504a3b114ed1be0470484c99c7f3174dde6fe33682e5`。隔離唯讀、無網路容器讀 build.json：cliPackageVersion=4.8.1、packageVersion=4.8.1；實際編譯 chunk-LCVMCV57.mjs 的 Zod version=4.6.7。此映像外部依賴只有 import-in-the-middle 3.3.3 與 ssh2 1.17.0；body-parser、fast-uri、ip-address、deepmerge-ts 未作為外部套件帶入。
+- **實跑**：`run_cmvozqilk012n20s4coagrgbb` 使用version=20261026.2，COMPLETED、output.status=pass、passed=7/failed=0/skipped=0（Supabase、Trigger API、n8n、Uptime、Sentry、PostHog、unknown-org查詢）。該既有診斷任務正常寫入一筆workflow_runs（82b8ad9c-13c9-4383-a4d3-bd83cf8802c1）；未執行客戶佈建／外掛安裝。trigger-webapp與supervisor維持v4.4.4 healthy，未升級伺服器。
+- REALTEST_EVIDENCE: tool=SSH | cmd=canonical Trigger deploy + current WorkerDeploymentPromotion read + isolated production image version inspection + ao-infrastructure-check run_cmvozqilk012n20s4coagrgbb | exit=0 | ms=180000
+- REVIEW_WAIVED: DOC_ONLY -- 本提交僅補部署證據；安全程式四檔沿用續14綁定的Claude API審查，內容未改。
+- BUGHUNT_WAIVED: DOC_ONLY -- 續14保留為部署前歷史，該條「待部署」以本條current promotion與實跑證據結案。
+- AUTO_TASK_DONE: Issue #32 安全修復已推送與正式部署20261026.2；實際映像Zod4.6.7，任務7/7通過。
+- **剩餘／rollback**：dev-only deepmerge-ts接受期限仍為2026-11-23，未展延。需回退時使用既有舊worker 20261025.3（r7lqlpl5）重新promotion；20261026.1和.2同digest，不能用.1當漏洞修復前的回退版。部署頁：https://trigger.aware-wave.com/projects/v3/proj_6c4f24492a705729fc2c/deployments/941zglau 。
 ## 2026-10-26（續14）— Issue #32：workflows 套件安全修復（待正式部署）
 
 **根因／不變量**：2026-10-26 週掃描 run 40280913512 重現 15 項（high=11、moderate=4）；Zod <4.6.6 新公告涵蓋原 3.x，body-parser／fast-uri／ip-address override 下限亦失效。所有 shipped 相依不得含 high/critical；不能以新增接受或降級 SDK 消音。
