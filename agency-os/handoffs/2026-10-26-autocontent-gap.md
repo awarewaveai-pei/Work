@@ -1,4 +1,4 @@
-續接語：續做 AUTOCONTENT-GAP：只讀本檔 `agency-os/handoffs/2026-10-26-autocontent-gap.md`，從「§5 第一步」開始；完成＝四張卡（§7）驗收全綠且操作者看過計畫卡。建議模型：Opus 5.5 實作（卡已寫死每一步，Codex 照卡亦可）。回報操作者一律繁體中文。
+續接語：續做 AUTOCONTENT-GAP：只讀本檔 `agency-os/handoffs/2026-10-26-autocontent-gap.md`，從「§5 第一步」開始；完成＝五張卡（§7，P9.1–P9.5）驗收全綠且操作者看過計畫卡。建議模型：Opus 5.5 實作（卡已寫死每一步，Codex 照卡亦可）。回報操作者一律繁體中文。
 
 # AUTOCONTENT-GAP：全自動內容管線的前兩步沒接上排程，題目閘不存在
 
@@ -62,18 +62,19 @@
 | B8 | 排程內每一筆 AI 花費記在**該客戶**（`runForOrg` ＋ `grantFor("content.plan")`）；客戶沒開通或點數不足（`EntitlementRequired`）＝**跳過、不當故障**：不寫嘗試記號、不開 incident、當次 firing 照常 tick；總控頁顯示「未開通」 | ADR 017：許可只問 `can(主體, feature, actor)`，五種客戶方式（訂閱／點數／買斷…）靠同一條；點數用完的客戶若每天收一張 incident 是噪音，不是故障（`can.ts:122-125`；`products.ts:75` 已登記 `content.plan`） |
 | B9 | 站的市場不在 `TRENDING_GEOS` 內 → **沒有熱搜**（提案只靠品牌＋知識庫），不是退回台灣的熱搜 | 平台是全球客戶；現行 `geoFor` 不認識的國家回 `"TW"`（`plan.ts:20-21`）會拿台灣熱搜替德國站規劃 |
 | B10 | 品牌自己填的產業來源（P9.4）只進**該品牌**的提案 prompt，**不寫進** `content_trends` 共用快取 | `content_trends` 無租戶欄（`trends.ts:1-3`）；寫進去＝客戶 A 的產業新聞變成同地區客戶 B 的「熱搜」 |
+| B11 | 一次做很多篇文章只有一條路：變成題目 → 排程在主機上做。瀏覽器裡**沒有**逐篇呼叫 `/api/content/generate` 的迴圈 | 文章頁「批量產文」走瀏覽器迴圈：關分頁就停、不讀站設定、不存檔、不記費用（P9.5 證據）；兩條路並存＝永遠有一條比較差 |
 
 ## 4. 風險與部署
 
-- 卡 A Low（免費、無 DB）。卡 B Medium（排程內新增 AI 花費）→ 四張卡先給操作者看，同意再動手。migration 0138 加一欄、可 down、不鎖表；**apply 到 prod 那一步是 High，等 go**。卡 C Low–Medium（UI）。卡 D（P9.4）Low（免費、無 DB、只多一個選填欄位）。
+- 卡 A Low（免費、無 DB）。卡 B Medium（排程內新增 AI 花費）→ 五張卡先給操作者看，同意再動手。migration 0138 加一欄、可 down、不鎖表；**apply 到 prod 那一步是 High，等 go**。卡 C Low–Medium（UI）。卡 D（P9.4）Low（免費、無 DB、只多一個選填欄位）。P9.5 Low（加題目免費、刪 UI、客戶入口還沒開放 `enabled: false`）。
 - 推上 main ＝當晚台灣 03:00 自動部署（AGENTS §0）。還不能上就放 `lobster-factory/infra/hetzner-phase1-core/DEPLOY_HOLD`（`reason=` 一行）。
 
 ## 5. 做法（照順序）
 
 1. 整檔讀 `NA/lib/schedules/jobs.ts`、`NA/lib/content/topics/{plan,tick,make,trends,store}.ts`、`NA/lib/schedules/store.ts`、`NA/app/api/content/trending/route.ts`、`NA/app/api/content/topics/plan/route.ts`、`NA/app/api/content/sites/[id]/route.ts`、`NA/lib/content/brand-voice.ts`。確認 §2 行號仍對。
-2. 把 §7 四張卡照抄進 `EXECUTION_PLAN.md` §7（編號 P9.1／P9.2／P9.3／P9.4，格式同 P6／P7，不改寫）；§3.1 資料流圖（`EXECUTION_PLAN.md:74-78`）三行改成：熱搜「排程每天一次」、提案「本月沒有就提，台灣月」、核准「`topicMode=ai_pick` 自動核准；`publishMode` 只管發布」。監工台 `data.mjs` 加 P9 一組 `todo(...)` → `node build.mjs && node check.mjs`。
-3. 四張卡貼給操作者看（繁中、白話、說每月多花多少錢），等同意。流程與兩個閘的設計已定案（§1），不再問。
-4. 依 P9.1 → P9.2 → P9.3 實作；每張卡一個 commit（pathspec）；共同收尾見 §6。
+2. （已做：`dc6600cd5`，P9.5 另補）把 §7 四張卡照抄進 `EXECUTION_PLAN.md` §7（編號 P9.1／P9.2／P9.3／P9.4，格式同 P6／P7，不改寫）；§3.1 資料流圖（`EXECUTION_PLAN.md:74-78`）三行改成：熱搜「排程每天一次」、提案「本月沒有就提，台灣月」、核准「`topicMode=ai_pick` 自動核准；`publishMode` 只管發布」。監工台 `data.mjs` 加 P9 一組 `todo(...)` → `node build.mjs && node check.mjs`。
+3. （已貼，2026-10-26 等同意）五張卡貼給操作者看（繁中、白話、說每月多花多少錢），等同意。流程與兩個閘的設計已定案（§1），不再問。
+4. 依 P9.1 → P9.2 → P9.3 實作（P9.4、P9.5 在 P9.1／P9.2 後任何時候；P9.5 先於 P9.3 做較省，總控頁的 ③ 直接含多題輸入）；每張卡一個 commit（pathspec）；共同收尾見 §6。
 5. 完成後把 `agency-os/TASKS.md` 收件匣 AUTOCONTENT-GAP 那條打勾；`data.mjs` 的 `todo` 改 `done`。
 
 ## 6. 每張卡共同的收尾（缺一不算完成）
@@ -223,6 +224,36 @@
 - 突變：拿掉 route 的 `isSafePublicHttps` 檢查 → `http://x` 那條變紅 → 還原變綠。
 
 **Rollback**：revert commit；已存在 `content_defaults.trendFeeds` 的 JSON 鍵舊程式會原樣保留、不讀，不必清。
+
+### P9.5　題目頁「一次加多題」＋刪文章頁「批量產文」＋客戶入口加題目頁（免費；Low；無 migration）
+
+操作者 2026-10-26 定案。文章頁 `/content`（＝`/tools/content`，同一個 `ContentStudio`）的「批量產文」頁籤和題目頁＋排程做同一件事、做得較差（B11）：
+
+| 問題 | 證據 |
+|---|---|
+| 瀏覽器迴圈逐篇呼叫，關分頁就停 | `NA/app/(shell)/tools/content/ContentStudio.tsx:1897-1931`；畫面「瀏覽器保持開啟」`:4229` |
+| 不讀站設定：預設寫死 English／Friendly | `:756-757`；站設定自動帶入只寫 `form`（`:1139-1150`），從不寫 `bulkSettings` |
+| 不存檔：只在 React state，「我的草稿」只收單篇 | `saveDraft` 只在 `:1367`、`:1525` |
+| 不記費用 | 單篇每步 `addCostLine`（例 `:892`），批量 0 次 |
+| 只有文章，推 WP 一篇一篇手按，無社群／影片／審核／排定日 | `handleBulkPublish` `:1936-1961` |
+
+**改哪些檔**
+1. `NA/lib/content/topics/store.ts`（`fromTaipei` `:87` 旁）加純函式 `export function spreadDays(month: string, n: number, fromDay: number): number[]`：`n` 個日期從 `fromDay` 到月底平均分布（`fromDay + Math.floor(i * (daysIn(month) - fromDay + 1) / n)`），`n` 大於剩餘天數時同一天可重複。
+2. `NA/app/api/content/topics/route.ts` POST（`:51-80`）：多收一種 body `{ siteId, month, keywords: string[], fromDay?, hour?, formats? }`（有 `keywords` 就走這條，否則照舊單題）。每行 `trim`、去空、去重；0 行或超過 `MAX_BULK_TOPICS = 30` → 400。每行一題：`title = keyword = 那一行`、`source = "manual"`、日期 `spreadDays(month, n, fromDay ?? 1)`、`hour` 與 `formats` 同單題規則。**一次** `proposeTopics`（同月同關鍵字略過，`store.ts:106`）→ `{ ok, added: n, skipped: [已排過的關鍵字] }`。權限、`siteOrg`、`canAccessOrg` 與單題同一段，不另寫。檔頭註解加這種 body 一行。
+3. `NA/app/(shell)/tools/content/topics/TopicsBoard.tsx` 加題目那張卡（`:244-265`）：上方兩顆按鈕「加一題／一次加多題」（不用下拉）。多題模式＝`<textarea>` 一行一個關鍵字（placeholder 舉 3 個例子）＋同一組格式 chips 與時段 `GridPicker`＋「從幾號開始」`GridPicker`＋按鈕「加 N 題」；底下一行「加題目免費；排程做的時候每題約 NT$<topicCostTwd(formats).usual>」（`cost.ts`，已 import `:7`）。送出後顯示「加了 N 題；已排過略過：…」。超過 30 行按鈕停用並寫原因。
+4. `ContentStudio.tsx` 刪「批量產文」：`Tab` 型別的 `"bulk"`（`:216`）、`BulkRow`（`:332`）、`BulkSettings`（`:347`）、bulk state 與 `bulkAbortRef`（`:751-772` 中 bulk 部分）、`handleBulkRun`／`handleBulkPublish`（`:1883-1961`）、頁籤按鈕（`:2272-2274` 陣列與文字）、頁籤畫面（`:4151` 起到「我的草稿頁籤」前）。`slugify`、`downloadMd`、`stripSlugHint`、`extractMeta` 單篇還在用，**不刪**（刪前 grep 確認剩餘呼叫 ≥1）。
+5. 客戶入口：`NA/lib/portal/products.ts:72-73` content 的 `door.nav` 加 `{ path: "topics", name: "題目", staff: "tools/content/topics" }`；新檔 `NA/app/content/topics/page.tsx` 照 `NA/app/content/calendar/page.tsx` 寫法（import staff 的 `TopicsBoard`，metadata title「題目」）。權限沿用題目 API 自己的 `canCreateAiImageJob`＋`canAccessOrg`（與行事曆 API 同一閘），頁面不另寫判斷。入口目前 `enabled: false`／`coming_soon`，上線前的客戶角色規則不在本卡。
+
+**驗收**
+- `route.test.ts`（既有檔，照它的假 sb 風格）：`keywords: ["a"," a ","b",""]` → `proposeTopics` 收 2 列、`source` 都是 `manual`；31 行 → 400；`[]` → 400；他客戶的站 → 404（與單題同）。
+- `store.test.ts`：`spreadDays("2026-11", 3, 1)` → `[1, 11, 21]`；`spreadDays("2026-11", 5, 29)` → 全部落在 29–30。
+- `lib/portal/__tests__/products.test.ts` 綠（door nav 每頁存在且對應 staff 頁，`:91-103`）。
+- `grep -rn "批量產文\|handleBulkRun\|bulkSettings" NA/app` = 0；`npx tsc --noEmit` 綠。
+- 指令：`npx vitest run app/api/content/topics/route.test.ts lib/content/topics/__tests__/store.test.ts lib/portal/__tests__/products.test.ts`
+- 突變：拿掉 `MAX_BULK_TOPICS` 檢查 → 31 行那條變紅 → 還原變綠。
+- 截圖：題目頁「一次加多題」貼 3 行 → 月曆出現 3 題；文章頁頁籤只剩「產文／人性化 / 改寫／我的草稿」。
+
+**Rollback**：revert commit；無 DB 改動。已加的題目是資料，留著。
 
 ## 8. 範圍外（別順手做）
 
