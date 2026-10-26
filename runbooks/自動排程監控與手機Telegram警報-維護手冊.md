@@ -37,12 +37,12 @@
 |---|---|---|---|
 | **① 開工 AO-RESUME** | 你開機開工時 | 本機 | `scripts/check-routine-freshness.ps1` → `agency-os/reports/status/routine-freshness-LATEST.md` |
 | **② 收工健檢 §11** | AO-CLOSE health gate | 本機 | `scripts/system-health-check.ps1` §11 |
-| **③ Telegram（always-on）** | 每天 07:17 UTC，狀態變化時推播 | **SG VPS（永遠在線）** | `scripts/routine-output-watchdog.sh` + SG cron |
+| **③ Telegram／Slack（always-on）** | 每天 07:17 UTC，狀態變化時推播 | **ks-aw-01（永遠在線）** | `scripts/routine-output-watchdog.sh` + 主機 cron |
 
-### Layer ③ 細節（SG always-on）
-- **Host**: SG `5.223.93.113`，因為它有 `TELEGRAM_BOT_TOKEN` + `OPS_INBOX_TELEGRAM_CHAT_IDS`（`/root/lobster-phase1/.env`）+ `/root/Work` repo checkout。
+### Layer ③ 細節（ks-aw-01 always-on）
+- **Host**: `ks-aw-01`（SSH `ubuntu@145.239.195.47 -p 58122`）；透過 `/root/lobster-phase1/scripts/notify.sh` 讀主機設定並通知 Telegram／Slack。
 - **腳本**: `/root/Work/scripts/routine-output-watchdog.sh`（在 repo，git pull 自動部署）。
-- **cron**: `17 7 * * * LC_ALL=C.UTF-8 /root/Work/scripts/routine-output-watchdog.sh >> /var/log/routine-watchdog.log 2>&1`
+- **cron**: 正本 `lobster-factory/infra/hetzner-phase1-core/scripts/cron.d/awarewave-schedules` 的 `routine_watchdog` 行；經 `cron-run.sh` 記錄結果，以 `LC_ALL=C.UTF-8 bash /root/Work/scripts/routine-output-watchdog.sh` 執行。Git 權限是 0644，不能依賴主機手動 chmod。
 - **偵測**: `git log -1 --format=%ct origin/main -- <報告路徑>` 讀報告最後更新日（純讀、不動 working tree）。逾期門檻：Phase4=8d、週報=9d、月報=35d。
 - **去重**: state 檔 `/root/.routine-watchdog-state`，只在「狀態變化」（壞掉 or 恢復）時推播，不每天洗版。送出 HTTP 200 才前進 state（失敗下次重試）。
 
@@ -73,11 +73,14 @@
 | watchdog 每天洗版 | state 檔邏輯壞 / 被刪 | 檢查 `/root/.routine-watchdog-state`；正常只在狀態變化時送 |
 | watchdog 沒送但報告確實舊 | cron 沒跑 / git fetch 失敗 / 缺 Telegram creds | `cat /var/log/routine-watchdog.log`；`grep watchdog /etc/cron.d/awarewave-schedules`（2026-10-24 起 root crontab 已併入此檔；`/ops/schedules` 也顯示上次結果）；確認 `/root/lobster-phase1/.env` 有 token |
 
-**手動測試（SG）**：
+**exit 126**：先查 `/var/log/routine-watchdog.log` 的 Permission denied 與腳本權限。直接執行 0644 腳本會失敗；應使用上列 bash 呼叫。安裝器的 `--check` 與實際安裝都會拒絕無執行權限的直接呼叫。正式套用需先批准，再走 `install-host-schedules.sh` 的備份／安裝／rollback 流程。
+
+**手動測試（ks-aw-01，需具備既有主機權限）**：
+
+2026-10-26：主機紀錄確認直接呼叫 watchdog 遇到 Permission denied／exit 126；本次 bash 修正尚未套用正式機。安裝前檢查涵蓋現有 `[VAR=value ...] [bash|sh|python3] /absolute/path` 寫法，不解析任意 shell 命令；主機套用後仍須實跑並核對 `/var/lib/awarewave/jobs/routine_watchdog.json`。
+
 ```bash
-cd /root/Work && chmod +x scripts/routine-output-watchdog.sh
-./scripts/routine-output-watchdog.sh --dry-run   # 印出會送什麼，不真送
-rm -f /root/.routine-watchdog-state && ./scripts/routine-output-watchdog.sh   # 真送一封
+LC_ALL=C.UTF-8 bash /root/Work/scripts/routine-output-watchdog.sh --dry-run
 ```
 
 ---

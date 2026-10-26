@@ -49,13 +49,21 @@ done < <(crontab -l 2>/dev/null | grep -E '^[A-Za-z_][A-Za-z0-9_]*\s*=' || true)
 
 # Every script a line runs must exist on this host: a line pointing at a file nothing deploys fails every run
 # (docker_weekly_cleanup called /usr/local/bin/... -> exit 127 until 2026-10-25). CRON_SCRIPT_ROOT prefixes paths (tests).
+# Checks the existing cron form: [VAR=value ...] [bash|sh|python3] /absolute/path, without interpreter options.
 missing=()
+not_executable=()
 while IFS= read -r n; do
   while IFS= read -r cmd; do
     read -ra toks <<< "$cmd"
+    interpreted=0
     for t in "${toks[@]}"; do
-      [[ "$t" == *=* || "$t" == bash || "$t" == sh || "$t" == python3 ]] && continue
-      [[ "$t" == /* && ! -e "${CRON_SCRIPT_ROOT:-}$t" ]] && missing+=("$n: $t")
+      [[ "$t" == *=* ]] && continue
+      if [[ "$t" == bash || "$t" == sh || "$t" == python3 ]]; then interpreted=1; continue; fi
+      if [[ "$t" == /* ]]; then
+        target="${CRON_SCRIPT_ROOT:-}$t"
+        if [[ ! -f "$target" ]]; then missing+=("$n: $t")
+        elif (( ! interpreted )) && [[ ! -x "$target" ]]; then not_executable+=("$n: $t"); fi
+      fi
       break
     done
   done < <(sed -nE "s/^[^#].*cron-run\.sh [a-z0-9_]+ '(.*)'[[:space:]]*$/\1/p" "$SRC/$n")
@@ -76,10 +84,12 @@ done < <(retired)
 if [[ -n "$(root_lines)" ]]; then changed=1; say "root crontab still has $(root_lines | wc -l) line(s)"; fi
 for l in "${uncovered[@]}"; do say "NOT in cron.d/awarewave-schedules: $l"; done
 for m in "${missing[@]}"; do changed=1; say "MISSING script (that line would fail every run): $m"; done
+for m in "${not_executable[@]}"; do changed=1; say "NOT EXECUTABLE (that line would exit 126): $m"; done
 
 if [[ "${1:-}" == "--check" ]]; then exit "$changed"; fi
 if (( ${#uncovered[@]} )); then say "ERROR: add the lines above to cron.d/awarewave-schedules first -- nothing installed"; exit 1; fi
 if (( ${#missing[@]} )); then say "ERROR: deploy the missing scripts or fix their paths first -- nothing installed"; exit 1; fi
+if (( ${#not_executable[@]} )); then say "ERROR: use an interpreter or deploy executable scripts first -- nothing installed"; exit 1; fi
 for f in "$HERE/cron-run.sh" "$HERE/report-host-schedules.py"; do
   [[ -f "$f" ]] || { say "ERROR: $f missing -- every line calls it; nothing installed"; exit 1; }
 done

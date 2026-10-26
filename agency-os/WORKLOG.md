@@ -10,6 +10,27 @@
 - BUGHUNT_WAIVED: DOC_ONLY -- 續14保留為部署前歷史，該條「待部署」以本條current promotion與實跑證據結案。
 - AUTO_TASK_DONE: Issue #32 安全修復已推送與正式部署20261026.2；實際映像Zod4.6.7，任務7/7通過。
 - **剩餘／rollback**：dev-only deepmerge-ts接受期限仍為2026-11-23，未展延。需回退時使用既有舊worker 20261025.3（r7lqlpl5）重新promotion；20261026.1和.2同digest，不能用.1當漏洞修復前的回退版。部署頁：https://trigger.aware-wave.com/projects/v3/proj_6c4f24492a705729fc2c/deployments/941zglau 。
+## 2026-10-26（續13）雲端排程報告檢查 exit 126：bash 啟動＋安裝前執行權限閘（Codex；尚未正式套用）
+
+- **根因**：2026-10-26 15:17 台灣時間，主機 `routine_watchdog.json` 記錄 exit 126；`/var/log/routine-watchdog.log` 同輪為 `/root/Work/scripts/routine-output-watchdog.sh: Permission denied`。線上 `/etc/cron.d/awarewave-schedules` 直接執行腳本；repo `git ls-files --stage scripts/routine-output-watchdog.sh` = 100644。先前安裝器只查存在，未查直接執行所需權限。
+- **修改**：`lobster-factory/infra/hetzner-phase1-core/scripts/cron.d/awarewave-schedules:36` 明確用 bash；`scripts/routine-output-watchdog.sh:100` 的通知腳本也經 bash（同類0644缺口）；`install-host-schedules.sh:53-94` 在任何排程檔寫入前拒絕非 executable 直接呼叫。parser 僅承諾現有 `[VAR=value ...] [bash|sh|python3] /absolute/path` 形式；不宣稱任意 shell AST 完整分析。既有主機腳本仍以實際主機權限驗證，不自動 chmod 全部檔案。
+- **測試／文件**：`tests/host-scripts/host-schedules.test.py` 補直接0644拒絕、bash讀0644放行、cron實際呼叫方式、通知函式0644真實shell執行。兩份既存 watchdog runbook 同步啟動方式、現役主機、診斷及尚未上線狀態；腳本 header 同步。BOM audit 139/139 clean。
+- **原始告警核對**：`fetch-external-signals.ps1 -From 2026-10-26 14:30 -To 2026-10-26 16:00`：ops-incidents 3則（14:37 安全掃描、14:50 GHA排程、15:30 watchdog），infra-alerts 0則；Telegram命令收件匣0則。GitHub run 40280913512 確認掃描完成、shipped high+critical=5，Issue #32；另一聊天 `01a17737-cbc5-78c3-a288-97b078ecb1a9` 已接手套件升級，本次未碰 package/lock/安全報告，未把其修改提交。
+- **審查處置**：第一輪 Claude API 指出通知腳本同類缺口，已補 bash 與失敗→通過測試；刪測試 no-op replace，明列 parser 與正式套用邊界。其他腳本 Git mode 的建議未擴張成全機改權限：新閘查主機實際狀態並在異常時拒絕安裝，此為預期行為，沒有證據顯示其他現役 cron 正在 exit126。最後審查結果另見本次 oracle artifact。
+- REALTEST_EVIDENCE: tool=SSH | cmd=ubuntu read-only tail /var/log/routine-watchdog.log; grep routine_watchdog /etc/cron.d/awarewave-schedules; cat /var/lib/awarewave/jobs/routine_watchdog.json | exit=0 | ms=5242
+- REALTEST_EVIDENCE: tool=Bash | cmd=wsl python3 TEMP/AwareWave-watchdog-20261026-0806/cron-repro.py (real cron-run.sh + repo cron command, isolated 0644 fixture: before126 after0 recorded0 WATCHDOG_STARTED) | exit=0 | ms=4890
+- REALTEST_EVIDENCE: tool=Bash | cmd=wsl python3 -W ignore::ResourceWarning lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/host-schedules.test.py (23 tests; actual installer check/install/rollback in temp dirs) | exit=0 | ms=3469
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks,lobster-factory | grep=routine-output-watchdog.sh|NOT EXECUTABLE | hits=32
+- **剩餘／批准點**：正式機未修改，exit126尚未解除。`permission-deny-mirror` 阻擋含 sudo 的 SSH 查詢（政策，不繞過）；改用一般帳號成功讀公開權限紀錄。正式套用另需 High go-ahead 及允許的管理權限路徑，再跑 install-host-schedules.sh --check → backup/install → cron-run.sh routine_watchdog → 核對 exit0／排程盤點／health。未宣稱正式修復或健康100%。
+- **前因：2026-05-07 的完全授權配套**：commit `7f18971b7` 明載為啟用 `bypassPermissions`、免逐次詢問，同時將 deny 從7項加強到20項；其中加入 `Bash(sudo *)`，正本仍在 `mcp/claude-userlevel/settings.template.json:33`。這是當時整組防護設定，未找到操作者另行指定「所有遠端 sudo 永久禁止」的證據，不能把每個細項都說成操作者親自決定。
+- **流程衝突**：現役主機維護規範要求 ubuntu 登入、管理操作用 sudo（`agency-os/docs/operations/AWAREWAVE_STACK_QUICKREF.md:5,96`）；Codex 的 `permission-deny-mirror.js:35-45` 又機械執行上述全面 deny，沒有針對唯讀查詢或已批准維修的例外。因此流程要求的正常提權方式被同一套治理禁止。原始排程故障是0644腳本被直接執行；sudo禁令是阻擋後續診斷與正式修復的第二層問題，不是原始exit126的成因。
+- **本次阻擋證據與影響**：SSH 中使用 `sudo tail`／`sudo stat` 等讀取紀錄時，PreToolUse 明確回覆 `matches Claude permissions.deny "Bash(sudo *)"` 並拒絕執行。改用 ubuntu 不提權後成功讀到紀錄，完成根因確認；但替換正式cron、執行受保護的安裝器與回滾仍需管理權限。本機23項測試、隔離環境126→0、Claude API審查通過，都不能替代正式機套用與驗收，所以才出現「本機已修好，線上還沒恢復」。尚未嘗試正式寫入命令；停在已確認的管理權限政策衝突，不應描述成安裝器已執行失敗。
+- **兩項告警的狀態分開記**：安全套件在另一聊天以 `3c6e83cad` 提交，正式依賴掃描0漏洞，但Trigger新版與主機v4.4.4的實機相容性／部署驗收仍待完成；本聊天的watchdog修改已測試與審查，仍在工作目錄，尚未提交、推送或正式套用。私有index提交先被命令形狀閘擋下，改用shell後因工具實際走WSL、Windows index路徑不相容而失敗；沒有產生本次watchdog修正commit，也沒有改寫正式機。
+- **後續必須解決的規則問題**：由操作者定案允許的管理操作範圍，再於Claude維護的規則正本修正並測試、同步；不繞過既有deny，也不直接取消所有安全防護。規則修復後，正式套用仍走安裝器的備份／檢查／安裝／實跑／結果核對，並保留rollback。
+- **rollback**：repo revert 本次 commit；正式套用後用 install-host-schedules.sh 印出的 backup 路徑執行 --rollback；不得刪通知 state 來製造恢復訊號。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0
+- **最終 oracle**：Claude SDK API（無訂閱），artifact `agency-os/reports/oracle/2026-10-26-review-d47238df.md`；六個 files-reviewed 與 capture 一致，approve／0 findings。
+
 ## 2026-10-26（續14）— Issue #32：workflows 套件安全修復（待正式部署）
 
 **根因／不變量**：2026-10-26 週掃描 run 40280913512 重現 15 項（high=11、moderate=4）；Zod <4.6.6 新公告涵蓋原 3.x，body-parser／fast-uri／ip-address override 下限亦失效。所有 shipped 相依不得含 high/critical；不能以新增接受或降級 SDK 消音。

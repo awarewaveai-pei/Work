@@ -14,8 +14,9 @@
 # working-tree mutation). Anti-spam: state file — only sends on a stale-set *transition*
 # (broke or recovered), never re-sends the same state.
 #
-# Cron (SG):  17 7 * * *  /root/Work/scripts/routine-output-watchdog.sh   # 07:17 UTC daily
-# Dry run:    /root/Work/scripts/routine-output-watchdog.sh --dry-run     # prints, never sends
+# Cron: scripts/cron.d/awarewave-schedules (07:17 UTC daily), via cron-run.sh + bash.
+# Git tracks this script as 0644; invoke bash explicitly instead of relying on chmod on the host.
+# Dry run:    bash /root/Work/scripts/routine-output-watchdog.sh --dry-run   # prints, never sends
 #
 # Rollback: remove the cron line + `rm /root/.routine-watchdog-state`. Script is in repo.
 
@@ -96,7 +97,7 @@ fi
 # One sender for every host alert (notify.sh, synced from lobster-factory/infra/hetzner-phase1-core/scripts):
 # Telegram + #ops-incidents, settings from the host .env. It prints one line per channel.
 sent_ok=0
-"${NOTIFY_SH:-/root/lobster-phase1/scripts/notify.sh}" < "$MSGFILE" && sent_ok=1
+bash "${NOTIFY_SH:-/root/lobster-phase1/scripts/notify.sh}" < "$MSGFILE" && sent_ok=1
 
 # Only advance state if the alert actually went out — otherwise retry next run.
 if [ "$sent_ok" = "1" ]; then

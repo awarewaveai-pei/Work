@@ -138,6 +138,23 @@ class CronRun(unittest.TestCase):
         r = bash([os.path.join(SCRIPTS, "cron-run.sh"), "Bad-Key", "true"], {"CRON_RUN_JOBS_DIR": tempfile.mkdtemp()})
         self.assertEqual(r.returncode, 64)
 
+    def test_watchdog_can_call_a_nonexecutable_sender(self):
+        with tempfile.TemporaryDirectory() as temp:
+            sender, message, delivered = [os.path.join(temp, name) for name in ("notify.sh", "message", "delivered")]
+            with open(sender, "w") as f:
+                f.write('#!/bin/bash\ncat > "$DELIVERED"\n')
+            os.chmod(sender, 0o644)
+            with open(message, "w") as f:
+                f.write("watchdog test\n")
+            watchdog = os.path.join(SCRIPTS, "../../../../scripts/routine-output-watchdog.sh")
+            with open(watchdog, encoding="utf-8") as f:
+                command = next(line for line in f if '"${NOTIFY_SH:-' in line)
+            result = bash(["-c", 'sent_ok=0\n' + command + '\ntest "$sent_ok" = 1'],
+                          {"NOTIFY_SH": sender, "MSGFILE": message, "DELIVERED": delivered})
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            with open(delivered) as f:
+                self.assertEqual(f.read(), "watchdog test\n")
+
 
 @unittest.skipUnless(BASH, "bash not found")
 class Installer(unittest.TestCase):
@@ -166,6 +183,7 @@ class Installer(unittest.TestCase):
                 if exe.startswith("/"):
                     os.makedirs(os.path.dirname(self.root + exe), exist_ok=True)
                     open(self.root + exe, "w").close()
+                    os.chmod(self.root + exe, 0o755)
         self.env = {"CRON_D_DIR": self.dest, "CRON_BACKUP_ROOT": os.path.join(self.t, "bk"), "CRON_SCRIPT_ROOT": self.root,
                     "CRON_RUN_JOBS_DIR": os.path.join(self.t, "jobs"), "CT": self.ct,
                     "PATH": bindir + os.pathsep + os.environ["PATH"]}
@@ -214,6 +232,27 @@ class Installer(unittest.TestCase):
         self.assertEqual(open(os.path.join(self.dest, "lobster-backup")).read(), "0 2 * * * root /old.sh\n")
         self.assertFalse(os.path.exists(os.path.join(self.dest, "awarewave-schedules")))
         self.assertEqual(open(self.ct).read(), root)
+
+    def test_refuses_a_direct_script_without_execute_permission(self):
+        open(self.ct, "w").write("")
+        target = self.root + "/root/lobster-phase1/scripts/docker-weekly-cleanup.sh"
+        os.chmod(target, 0o644)
+        chk = self.run_inst("--check")
+        self.assertEqual(chk.returncode, 1, chk.stdout + chk.stderr)
+        self.assertIn("NOT EXECUTABLE", chk.stdout)
+        result = self.run_inst()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.dest, "awarewave-schedules")))
+
+    def test_interpreter_can_run_a_readable_nonexecutable_script(self):
+        open(self.ct, "w").write("")
+        os.chmod(self.root + "/root/Work/scripts/routine-output-watchdog.sh", 0o644)
+        result = self.run_inst()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_watchdog_cron_uses_an_interpreter_for_the_git_checkout_script(self):
+        path = os.path.join(SCRIPTS, "cron.d", "awarewave-schedules")
+        self.assertIn("LC_ALL=C.UTF-8 bash /root/Work/scripts/routine-output-watchdog.sh", open(path).read())
 
     def test_a_file_removed_from_the_repo_is_removed_from_the_host(self):
         open(self.ct, "w").write("")
