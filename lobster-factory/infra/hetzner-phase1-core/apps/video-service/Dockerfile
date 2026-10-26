@@ -8,8 +8,10 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+# requirements.txt = ranges (input); requirements.lock = what installs. Regenerate inside this base image:
+#   docker run --rm -v "$PWD:/src" -w /src python:3.12-slim sh -c 'pip install uv && uv pip compile --generate-hashes -o requirements.lock requirements.txt'
+COPY requirements.lock ./
+RUN pip install --no-cache-dir --require-hashes -r requirements.lock
 COPY . .
 
 ENV VIDEO_SERVICE_HOST=0.0.0.0 \

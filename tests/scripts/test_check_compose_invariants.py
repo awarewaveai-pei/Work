@@ -81,6 +81,17 @@ class Invariants(unittest.TestCase):
         self.assertEqual(self.run_compose(no_hc, {"Dockerfile": df.replace("curl -fsS", "curl -fsS -m 4")}), [])
         self.assertEqual(self.run_compose(compose, {"Dockerfile": df}), [])   # compose healthcheck replaces it
 
+    def test_i7_installs_read_a_lock(self):
+        built = GOOD.replace("    image: nginx:1\n", "    build: .\n")
+        for bad in ["RUN npm ci 2>/dev/null || npm install", "RUN npm install --omit=dev", "RUN npm --prefix app install", "RUN python -m pip install -r r.txt","RUN pip install --no-cache-dir -r requirements.txt",
+                    "RUN pip install uv", "RUN pip install --no-deps somepkg", "RUN composer install --no-dev", "RUN composer update"]:
+            out = self.run_compose(built, {"Dockerfile": f"FROM x\n{bad}\n"})
+            self.assertTrue(any(x.startswith("I7") for x in out), (bad, out))
+        for ok in ["RUN npm ci --omit=dev", "RUN pip install --no-cache-dir --require-hashes -r requirements.lock",
+                   "RUN pip install --no-deps /app/pkg", "COPY composer.json composer.lock ./\nRUN composer install --no-dev",
+                   "# only app/ needs `npm install`\nRUN npm ci"]:
+            self.assertEqual(self.run_compose(built, {"Dockerfile": f"FROM x\n{ok}\n"}), [], ok)
+
     def test_unreadable_inputs_are_problems(self):
         out = self.run_compose(GOOD.replace("    image: nginx:1\n", "    build: ./absent\n"))
         self.assertTrue(any(x.startswith("Dockerfile not readable") for x in out), out)

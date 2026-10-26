@@ -1,5 +1,5 @@
 # 核心
-anthropic>=0.122.0   # beta fallbacks="default" + output_config
+anthropic>=0.122.0,<2   # beta fallbacks="default" + output_config; 2.x switches API version to 2026-10-21 (decide first)
 openai>=1.40.0
 requests>=2.31.0
 python-dotenv>=1.0.0

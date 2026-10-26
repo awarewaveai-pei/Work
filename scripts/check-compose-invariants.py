@@ -5,8 +5,11 @@ I1 memory limit set; I2 memswap_limit == memory (no swap); I3 pids limit set;
 I4 the healthcheck that runs (compose, else the image's Dockerfile HEALTHCHECK) is
    one command with a positive timeout: `timeout N`, curl -m, wget -T, AbortSignal.timeout(N), or pg_isready;
 I5 Apache-prefork WordPress: MaxRequestWorkers x worker_rss_mb + base_mb <= memory (both declared in the mpm conf);
-I6 init: true -- a PID 1 that does not reap fills the pids cap with zombie healthcheck processes.
-Why: WORKLOG 2026-10-24 (lobster-wordpress OOM-thrashed the host for 11 h; I6: lobster-redis hit pids 60/64).
+I6 init: true -- a PID 1 that does not reap fills the pids cap with zombie healthcheck processes;
+I7 a built image installs dependencies only from a committed lock: npm ci; pip --require-hashes (or --no-deps
+   of a local path); composer install with composer.lock copied in. Closed set: the three installers our images use.
+Why: WORKLOG 2026-10-24 (lobster-wordpress OOM-thrashed the host for 11 h; I6: lobster-redis hit pids 60/64);
+I7: 2026-10-26 video-service was running anthropic 1.15.0 / openai 3.31.0 from `>=` ranges, the repo said 0.122 / 1.40.
 
   python scripts/check-compose-invariants.py              ENFORCED files + every tracked compose file is listed below
   python scripts/check-compose-invariants.py <file>...    those files only (e.g. the live copies on the host)
@@ -114,6 +117,24 @@ def build_paths(base, svc):
     return ctx, os.path.join(ctx, "Dockerfile" if isinstance(b, str) else b.get("dockerfile", "Dockerfile"))
 
 
+def unlocked_installs(dockerfile):
+    """Each install command of a RUN that resolves versions at build time instead of reading a lock (I7)."""
+    has_composer_lock = re.search(r"^COPY\b.*\bcomposer\.lock\b", dockerfile, re.M)
+    out = []
+    for run in re.findall(r"^RUN\s+(.*)$", dockerfile.replace("\\\n", " "), re.M):
+        for cmd in re.split(r"&&|\|\||;", run):
+            w = cmd.split()
+            for i, tool in enumerate(w):
+                rest = set(w[i + 1:])   # any position: `npm --prefix app install` must not slip through
+                if (tool == "npm" and rest & {"install", "i", "add", "update"}) or (
+                        tool in ("pip", "pip3") and "install" in rest and "--require-hashes" not in w
+                        and not ("--no-deps" in w and w[-1].startswith(("/", ".")))) or (
+                        tool == "composer" and (rest & {"update", "require"} or ("install" in rest and not has_composer_lock))):
+                    out.append(cmd.strip())
+                    break
+    return out
+
+
 def limits(svc):
     lim = ((svc.get("deploy") or {}).get("resources") or {}).get("limits") or {}
     return lim, to_bytes(lim.get("memory", svc.get("mem_limit", ""))), lim.get("pids") or svc.get("pids_limit")
@@ -178,6 +199,7 @@ def check_service(path, svc):
         probes = [("Dockerfile HEALTHCHECK", m.group(1))
                   for m in re.finditer(r"^HEALTHCHECK\b.*?\bCMD\s+(.*)$", dockerfile.replace("\\\n", " "), re.M)]
     out += [f"I4 {where} does not bound itself: {cmd[:90]}" for where, cmd in probes if not bounded(cmd)]
+    out += [f"I7 dependency install without a lock: {cmd[:90]}" for cmd in unlocked_installs(dockerfile)]
 
     stages = re.findall(r"^FROM\s+(?:--\S+\s+)*(\S+)", dockerfile, re.M)   # the last stage is the runtime image
     tag = wordpress_tag(stages[-1] if stages else str(svc.get("image", "")))

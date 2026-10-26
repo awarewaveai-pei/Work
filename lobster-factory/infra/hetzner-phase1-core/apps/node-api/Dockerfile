@@ -1,8 +1,8 @@
 # Production image: small, non-root, no bind-mount required
 FROM node:20-alpine AS deps
 WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm ci 2>/dev/null || npm install --omit=dev
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 
 FROM node:20-alpine AS runner
 WORKDIR /app

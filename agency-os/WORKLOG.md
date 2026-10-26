@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-26（續19）— 正式映像只從鎖檔裝依賴（I7）；Claude API 2026-10-21 暫不遷移（Claude；操作者「你決定」）
+
+- **觸發**：外部警報「Claude API 2026-10-21 破壞性變更」。官方屬實（取樣參數移除、assistant document／user citations、Admin API 欄位、SDK 改送 `Authorization: Bearer`；API 兩種 header 皆收）。新 API 由 SDK Py≥2.0.0／TS≥1.0.0 預設送出。
+- **現況（實測）**：全部呼叫仍送 `2023-06-01`；Claude 路徑無 temperature/top_p/top_k（`next-admin/lib/ai/__tests__/claude-request.test.ts:50`、COS `ai_execution/gateway.py:133`）；無 document/citations/Admin API 用法。正式機：next-admin SDK 0.128.0＝repo；**video-service 實裝 anthropic 1.15.0／openai 3.31.0，repo 宣告 `>=0.122.0`／`>=1.40.0`**（映像 2026-10-16 建，下次重建會裝 anthropic 2.3.0＝靜默換 API 版本）。
+- **根因（一類）**：正式映像建置時解析版本而非讀鎖檔。7 處：video `pip -r requirements.txt`；remotion `npm install`×2（無鎖檔）；wordpress `composer install`（無 composer.lock）；next-admin／node-api／hci30 `npm ci 2>/dev/null || npm install`——退路藏錯：**node-api 鎖檔自 `83ddd278d`（Sentry）起不同步**，正式機每次建置都走 `npm install`。
+- **不變量**：同一份程式＝同一組依賴；API 版本只在決定時換。I7 寫進 `scripts/check-compose-invariants.py`（讀每個正式 compose 服務的 Dockerfile；`verify-build-gates.ps1:38` commit 前跑）：npm 只准 `npm ci`；pip 須 `--require-hashes`（或 `--no-deps` 本地路徑）；composer install 須 COPY composer.lock。封閉集＝我們映像用的三種。
+- **修改**：video `requirements.lock`（uv `--generate-hashes`，`-c` 正式機 `pip freeze`→68 套件＝正式機版本）＋`anthropic<2`＋Dockerfile 改裝 lock；wordpress `composer.lock` 取自正式容器 `/sentry-src`（composer.json md5 相同）；remotion 新 `package-lock.json`＋`npm ci`；node-api 鎖檔同步（+76 套件，僅 hasown 2.0.2→2.0.4；sentry 8.55.2 vs 正式 8.55.1）；next-admin／node-api／hci30 去退路；canvas-deps.test.ts 註解、memory pod 筆記同步。
+- REALTEST_EVIDENCE: tool=Bash | cmd=docker node:20-alpine npm ci：next-admin exit0（首跑 exit1＝並行下載網路逾時，重跑 0）、node-api 同步後 0、hci30 0；node:20-slim remotion npm ci 0＋npm test 3/3＋--omit=dev 0；python:3.12-slim video `pip --require-hashes -r requirements.lock` OK＋pytest 26 passed 3 skipped | exit=0 | ms=900000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/check-compose-invariants.py → 15 file(s), 0 problem(s)（加 I7 前紅 7 處）；python tests/scripts/test_check_compose_invariants.py OK | exit=0 | ms=300
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/1m/0n（自審 m1：`npm --prefix app install` 動詞不相鄰會漏→改看同命令後續全部 token，加測試）
+- ORACLE_WAIVED: codex usage limit until 2026-10-26 20:57（oracle-quota exit 3）。代替：書面自審＋突變＝`unlocked_installs` 換成回空→`test_i7_installs_read_a_lock` 紅；還原→綠。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,tests,.claude | grep=unlocked_installs|npm ci 2>/dev/null|package-lock.json\* | hits=2（皆本次新增；舊說法 canvas-deps.test.ts:12、memory 筆記已改）
+- **刻意不做**：升 SDK／API `2026-10-21`——無收益（已符合四項限制、`claude-opus-5-5` 本就只收預設取樣）。觸發條件＝需要新 SDK 才有的功能，或官方公布 `2023-06-01` 退場日；屆時逐服務、走 `/claude-api api-version`。
+- **生效**：next-admin 今晚 03:00 自動部署即走 `npm ci`；其餘服務下次部署／重建時生效（未手動部署）。
+- **rollback**：revert 本 commit；正式機未動。
 ## 2026-10-26（續18）— watchdog exit 126 正式機套用完成（Claude；操作者明示 go-ahead）
 
 - **授權**：操作者「Go ahead with production: sync host scripts, then --check, install, run the watchdog once and check exit 0; roll back on failure.」修正本體見續13（`47d663ceb`）；閘修正見續16（`3ae7bf1c3`），本次唯讀 `sudo` 檢查已不被 Codex 鏡像擋。

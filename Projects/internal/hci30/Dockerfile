@@ -6,11 +6,11 @@
 #   docker build -f Projects/internal/hci30/Dockerfile -t hci30-app Projects/internal/hci30
 #
 # packages/ and public-intelligence/ have zero npm dependencies of their own (verified via grep,
-# 2026-09-18: only node: builtins imported) -- only app/'s package.json needs `npm install`.
+# 2026-09-18: only node: builtins imported) -- only app/'s package.json has dependencies.
 FROM node:20-alpine AS deps
 WORKDIR /build/app
-COPY app/package.json app/package-lock.json* ./
-RUN npm ci 2>/dev/null || npm install --omit=dev
+COPY app/package.json app/package-lock.json ./
+RUN npm ci --omit=dev
 
 FROM node:20-alpine AS runner
 WORKDIR /app

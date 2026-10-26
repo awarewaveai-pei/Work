@@ -26,7 +26,8 @@ controller.py ── 逐題呼叫 ──▶ pipeline.run()
 | `controller.py` | 主控：抓佇列 + 抓熱門議題 + 通知 + 回寫狀態 |
 | `setup.sql` | Supabase 建表 |
 | `cron_setup.sh` | 設定每日排程 |
-| `requirements.txt` | Python 依賴（**moviepy 已鎖 <2.0**）|
+| `requirements.txt` | Python 依賴範圍（**moviepy 已鎖 <2.0**）；本機開發用 |
+| `requirements.lock` | 映像實際安裝的版本＋hash（Linux 解出；重產指令在 `Dockerfile`）|
 | `.env.example` | 設定範本 |
 
 ## 安裝

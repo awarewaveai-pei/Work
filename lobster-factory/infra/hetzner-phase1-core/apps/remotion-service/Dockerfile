@@ -6,8 +6,8 @@
 FROM node:20-slim AS builder
 
 WORKDIR /app
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 COPY . .
 RUN npx tsc -p tsconfig.server.json
 
@@ -15,8 +15,8 @@ RUN npx tsc -p tsconfig.server.json
 FROM node:20-slim AS deps
 
 WORKDIR /app
-COPY package.json ./
-RUN npm install --omit=dev
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 
 # ── Stage 3: runtime image ─────────────────────────────────────────────────────
 FROM node:20-slim

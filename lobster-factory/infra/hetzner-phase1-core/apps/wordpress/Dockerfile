@@ -4,7 +4,7 @@ FROM wordpress:php8.2-apache
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /sentry-src
-COPY composer.json ./
+COPY composer.json composer.lock ./
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
 COPY mu-plugins/sentry.php ./sentry.php

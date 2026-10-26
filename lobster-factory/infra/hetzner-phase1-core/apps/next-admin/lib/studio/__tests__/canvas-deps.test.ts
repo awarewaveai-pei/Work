@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
  * dropped from package.json, `npm ci` on deploy won't install it → tsc/next build fails →
  * /tools/canvas 404s. A parallel session removed it twice on 2026-06-13 citing "fabric
  * needs manual npm install on sg-deploy" — that reason is WRONG: next-admin Dockerfile
- * runs `RUN npm ci 2>/dev/null || npm install`, so a lockfile dep installs automatically.
+ * runs `RUN npm ci`, so a lockfile dep installs automatically.
  *
  * This test makes the removal trip the sg-deploy `npm test` gate (the very gate that
  * removal was trying to keep green), so fabric cannot silently disappear again.
