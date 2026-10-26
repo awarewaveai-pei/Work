@@ -48,6 +48,9 @@
         "proxy-addr": "^2.0.8",
         "source-map-js": "^1.2.2",
         "qs": "^6.15.4",
-        "zod": "$zod"
+        "zod": "$zod",
+        "@prisma/config@6": {
+            "deepmerge-ts": "^8.0.2"
+        }
     }
 }

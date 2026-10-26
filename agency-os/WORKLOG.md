@@ -1,4 +1,15 @@
 # Worklog
+## 2026-10-26（續24）— workflows 建置工具漏洞歸零：Prisma6 限定相依修補
+
+- 根因：`package-lock.json:1196` Prisma6.19.3原始spec釘deepmerge7.1.5。最新Trigger4.8.1仍要求Prisma^6.10；先前只沿用豁免，未驗證可修性。
+- 修改：`packages/workflows/package.json:52` 僅對`@prisma/config@6`覆寫deepmerge-ts ^8.0.2；鎖檔只換此套件。刪除GHSA-ggr8-5vv4-36mx接受紀錄。無Prisma7遷移／vendoring／第三方原始碼補丁；選擇器不影響未來Prisma7。
+- 相容性：實際消費端`@prisma/config/dist/index.js:894-917`只用公開deepmerge給c12。8.x的Map／into／型別變更未在此呼叫鏈使用；真實loader測試驗正常巢狀設定、缺檔預設、非法設定拒收。
+- REALTEST_EVIDENCE: tool=Bash | cmd=isolated Prisma consumer regression: 7.1.5 recursive graph RangeError (1 fail/3 pass); 8.0.2 npm ci + typecheck + npm test (20 files/136 pass); audit full+omit-dev total=0 accepted=[] | exit=0 | ms=25000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/packages/workflows | grep=deepmerge-ts|GHSA-ggr8-5vv4-36mx | hits=3
+- 審查：`reports/oracle/2026-10-26-review-3e4b6d81.md`含新測試、綁6866-byte四檔diff；Claude API USD0.187、無訂閱。BOM139/139 clean；`reports/security/workflows-npm-audit-LATEST.json` high/moderate/critical/total全0，無接受中的公告。
+- AUTO_TASK_DONE: workflows剩餘deepmerge-ts兩項連帶高危告警已實際修復，對應豁免刪除，掃描0漏洞。
+- rollback：還原本次package／lock／ack／test提交再npm ci；正式建置由已授權的唯一Trigger部署入口驗證，失敗保留20261026.2。
 ## 2026-10-26（續23）— 影片工具重新設計拆卡 V1–V7（Claude；操作者「開始做」，中途「先暫停並 commit」）
 
 - **做了**：`agency-os/docs/video_generator/VIDEO_TOOL_REDESIGN_2026-10-26.md` §7 改成 7 階段 25 張卡（檔案＋行號＋驗收）；§8 指向監工台。修正 §2：`media_assets.project_id` FK 舊 `projects`（`0038_media_assets_reconcile.sql:29`，prod 0/101 有值）→ 改加 `media_project_id`。

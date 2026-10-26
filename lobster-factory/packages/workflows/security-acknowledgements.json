@@ -21,31 +21,6 @@
   ],
   "advisories": [
     {
-      "id": 1145093,
-      "ghsa": "GHSA-ggr8-5vv4-36mx",
-      "package": "deepmerge-ts",
-      "range": "<8.0.0",
-      "severity": "high",
-      "scope": "dev-only",
-      "acknowledgedOn": "2026-08-25",
-      "reviewBy": "2026-11-23",
-      "reason": [
-        "Reachable only through the devDependency @trigger.dev/build -> @prisma/config -> deepmerge-ts@7.1.5,",
-        "i.e. the build/deploy toolchain, never the deployed worker.",
-        "No upstream remediation exists: @prisma/config@7.9.1 (latest) still pins deepmerge-ts to EXACTLY 7.1.5,",
-        "so npm's 'fixAvailable: true' means forcing a major override past an upstream exact pin, inside the",
-        "toolchain that deploys to the EU Trigger.dev instance. That trade - risking the deploy path to close a",
-        "build-time stack-exhaustion DoS with no production reach - is worse than the finding.",
-        "Re-evaluate when @prisma/config drops the exact pin, or sooner if the advisory range or severity changes."
-      ],
-      "evidence": [
-        "npm audit --omit=dev in lobster-factory/packages/workflows: found 0 vulnerabilities (2026-08-25).",
-        "npm ls --omit=dev @prisma/config: empty - not in the production dependency graph.",
-        "Deployed worker image on EU (registry:5000/trigger/proj_6c4f24492a705729fc2c:20260815.1.production.niakdddd)",
-        "scanned directly: deepmerge-ts=0 dirs, @prisma/config=0 dirs, esbuild=0 dirs. Measured, not inferred."
-      ]
-    },
-    {
       "id": 1240992,
       "ghsa": "GHSA-vfj7-8cjw-p6xm",
       "package": "braces",

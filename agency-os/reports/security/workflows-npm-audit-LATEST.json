@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAtUtc": "2026-10-26T08:03:20.299Z",
+  "generatedAtUtc": "2026-10-26T09:04:03.059Z",
   "runId": null,
   "runAttempt": null,
   "verdict": "pass",
@@ -9,31 +9,12 @@
     "info": 0,
     "low": 0,
     "moderate": 0,
-    "high": 2,
+    "high": 0,
     "critical": 0,
-    "total": 2
+    "total": 0
   },
-  "advisories": [
-    {
-      "id": 1145093,
-      "ghsa": "GHSA-ggr8-5vv4-36mx",
-      "package": "deepmerge-ts",
-      "range": "<8.0.0",
-      "severity": "high",
-      "url": "https://github.com/advisories/GHSA-ggr8-5vv4-36mx"
-    }
-  ],
-  "accepted": [
-    {
-      "id": 1145093,
-      "ghsa": "GHSA-ggr8-5vv4-36mx",
-      "package": "deepmerge-ts",
-      "range": "<8.0.0",
-      "severity": "high",
-      "url": "https://github.com/advisories/GHSA-ggr8-5vv4-36mx",
-      "reviewBy": "2026-11-23"
-    }
-  ],
+  "advisories": [],
+  "accepted": [],
   "expired": [],
   "unacknowledged": [],
   "acknowledgementFileError": null
