@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-26（續17）— script-forge 收合改到六個分區，共用 sidebar class（Claude）
+
+- **根因**：`f0132d96a` 把「收合」做在整個右側欄（縮成 emoji 窄條），操作者要的是「生成／工具／分析／設定／規劃／紀錄」各分區可收合，且樣式與主 sidebar 一致。
+- **修改**：`app/(shell)/tools/video/ScriptForge.tsx` 拿掉整欄收合（`navCollapsed`、`sf_nav_collapsed` localStorage、`.sf-collapsed`）；分區改用 `sidebar-section`／`sidebar-section-label sidebar-section-toggle`／`sidebar-chevron`，項目用 `sidebar-link`（active）＋`sidebar-icon`，行為照 `SidebarNav.tsx`：只開目前模組的分區，切模組自動展開其分區。`app/globals.css` 加 `button.sidebar-link` 重設（border／background／width），讓 button 型項目與 Link 同樣式（specificity 低於 `:hover`／`.active`）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (0) + npx vitest run "app/(shell)/tools/script-forge" 3/3 | exit=0 | ms=4000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/1m/0n（自審 m1：紀錄→「開始生成腳本」跳到收合分區時目前項目被藏，已補 useEffect＋測試）
+- ORACLE_WAIVED: codex usage limit until 2026-10-26 20:57（oracle-quota exit 3）。代替：書面自審＋突變證據＝拔「切模組展開分區」→新測試紅；拔 `isOpen&&` 折疊守衛→首測紅；還原→3/3 綠。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=sf_nav_collapsed|navCollapsed|sf-collapsed | hits=0
+- **rollback**：revert 本 commit（隔天 03:00 自動部署或手動 sg-deploy）。
 ## 2026-10-26（續15）— Issue #32：安全修復已推送並部署，真實任務通過
 
 - **授權／推送**：操作者明示「推送和部署」。`3c6e83cad` 安全修復與遠端週報 `e93b25e08` 在獨立 detached worktree 合併為 `7bfce4ab4`，已推 origin/main。並行工作區的 watchdog 修改與續13條目保留；原安全條目與週報碰撞續12，經 worklog-insert-entry 配發續14後合併。四個 workflows 檔與測試通過時完全相同，未重跑相同測試。

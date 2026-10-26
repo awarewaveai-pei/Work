@@ -371,6 +371,16 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-family-heading); }
   position: relative;
 }
 
+/* A <button> nav item (e.g. ScriptForge's side menu) wears the same look as a <Link>. */
+button.sidebar-link {
+  width: 100%;
+  border: none;
+  background: none;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+}
+
 .sidebar-link:hover {
   background: var(--sidebar-hover);   /* indigo color-block on hover */
   color: var(--sidebar-text-hover);

@@ -1043,10 +1043,12 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion, side
   const notUsable = SF_NOT_USABLE;
   const[nav,setNav]=useState("manual");
   const[siteId,setSiteId]=useState<string>(()=>{try{return localStorage.getItem("sf_site")||"";}catch{return "";}});
-  const[navCollapsed,setNavCollapsed]=useState(false);
-  useEffect(()=>{try{if(localStorage.getItem("sf_nav_collapsed")==="1")setNavCollapsed(true);}catch{}},[]);
-  function toggleNav(){const v=!navCollapsed;setNavCollapsed(v);try{localStorage.setItem("sf_nav_collapsed",v?"1":"0");}catch{}}
   const groups=["生成","工具","分析","設定","規劃","紀錄"];
+  // Side menu groups fold like the app sidebar (SidebarNav.tsx): only the current module's group starts open.
+  const[openGroups,setOpenGroups]=useState<Set<string>>(()=>new Set([FORGE_NAV.find(n=>n.id===nav)?.group??"生成"]));
+  // Switching module (e.g. 紀錄's 「開始生成腳本」) opens its group, so the current item is never hidden.
+  useEffect(()=>{const g=FORGE_NAV.find(n=>n.id===nav)?.group;if(g)setOpenGroups(prev=>prev.has(g)?prev:new Set(prev).add(g));},[nav]);
+  function toggleGroup(g:string){setOpenGroups(prev=>{const next=new Set(prev);if(next.has(g))next.delete(g);else next.add(g);return next;});}
   const gNavs=groups.map(g=>({group:g,items:NAVS.filter(n=>n.group===g)}));
   // ── 串接客戶：載入 內容工具›網站管理 的客戶 contentDefaults.marketing 當品牌語境（零新後端，GET 已回 marketing）──
   const[clients,setClients]=useState<any[]>([]);
@@ -1112,10 +1114,9 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion, side
         ::placeholder{color:${C.mid};}
         textarea,input,button{font-family:"DM Sans",sans-serif;}
         .sf-side{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:18px;align-items:start;max-width:1220px!important}
-        .sf-side.sf-collapsed{grid-template-columns:minmax(0,1fr) 52px}
         .sf-side>*{grid-column:1;min-width:0}
         .sf-side>aside{grid-column:2;grid-row:1}
-        @media (max-width:767px){.sf-side,.sf-side.sf-collapsed{grid-template-columns:minmax(0,1fr)}.sf-side>aside{grid-column:1;grid-row:auto;order:2;position:static!important}}
+        @media (max-width:767px){.sf-side{grid-template-columns:minmax(0,1fr)}.sf-side>aside{grid-column:1;grid-row:auto;order:2;position:static!important}}
         ::-webkit-scrollbar{width:3px;}
         ::-webkit-scrollbar-thumb{background:${C.border};border-radius:2px;}
       `}</style>
@@ -1169,10 +1170,16 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion, side
         </div>
       </div>
       {/* 場景總數與 AI/圖庫分配已回到前製腳本；影片生產只負責素材模式、模型、配音、輸出比例與渲染。 */}
-      <div className={sideMenu?(navCollapsed?"sf-side sf-collapsed":"sf-side"):undefined} style={{maxWidth:960,margin:"0 auto",padding:"22px 14px 80px",animation:"fadeUp .3s ease"}}>
-        {sideMenu&&<aside aria-label="ScriptForge 模組" style={{display:"grid",gap:10,position:"sticky",top:62}}>
-          <button type="button" onClick={toggleNav} aria-expanded={!navCollapsed} title={navCollapsed?"展開模組選單":"收合模組選單"} style={{padding:"6px 9px",borderRadius:8,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",textAlign:navCollapsed?"center":"left"}}>{navCollapsed?"◀":"▶ 收合"}</button>
-          {groups.map(g=><div key={g} style={{display:"grid",gap:3}}>{!navCollapsed&&<div style={{fontSize:10,color:C.mid,fontWeight:700,letterSpacing:.5}}>{g}</div>}{FORGE_NAV.filter(n=>n.group===g).map(n=><button key={n.id} type="button" title={navCollapsed?`${n.label}：${n.blurb}`:undefined} aria-label={navCollapsed?n.label:undefined} onClick={()=>setNav(n.id)} aria-current={nav===n.id?"page":undefined} style={{textAlign:navCollapsed?"center":"left",padding:navCollapsed?"7px 0":"7px 9px",borderRadius:8,border:`1.5px solid ${nav===n.id?C.coral:"transparent"}`,background:nav===n.id?C.corallt:"transparent",cursor:"pointer",display:"grid",gap:1}}>{navCollapsed?<span style={{fontSize:16,lineHeight:1.2}}>{n.icon}</span>:<><span style={{fontSize:12.5,fontWeight:700,color:nav===n.id?C.coral:C.ink}}>{n.icon} {n.label}</span><span style={{fontSize:11,color:C.mid,lineHeight:1.4}}>{n.blurb}</span></>}</button>)}</div>)}
+      <div className={sideMenu?"sf-side":undefined} style={{maxWidth:960,margin:"0 auto",padding:"22px 14px 80px",animation:"fadeUp .3s ease"}}>
+        {sideMenu&&<aside aria-label="ScriptForge 模組" style={{position:"sticky",top:62,background:"var(--sidebar-bg)",border:"1px solid var(--sidebar-border)",borderRadius:10,paddingBottom:8}}>
+          {groups.map(g=>{const isOpen=openGroups.has(g);return <div key={g} className="sidebar-section">
+            <button type="button" className="sidebar-section-label sidebar-section-toggle" aria-expanded={isOpen} onClick={()=>toggleGroup(g)}>
+              <span className="sidebar-chevron" aria-hidden>{isOpen?"▾":"▸"}</span>{g}
+            </button>
+            {isOpen&&FORGE_NAV.filter(n=>n.group===g).map(n=><button key={n.id} type="button" onClick={()=>setNav(n.id)} aria-current={nav===n.id?"page":undefined} className={nav===n.id?"sidebar-link active":"sidebar-link"}>
+              <span className="sidebar-icon">{n.icon}</span><span style={{display:"grid",gap:1}}><span>{n.label}</span><span style={{fontSize:11,color:"var(--sidebar-section-label)",lineHeight:1.4,fontWeight:"normal"}}>{n.blurb}</span></span>
+            </button>)}
+          </div>;})}
         </aside>}
         {nav==="story_bible"&&<StoryBibleWorkbench/>}
         {nav==="manual"&&<ManualModule brand={brand}/>}
