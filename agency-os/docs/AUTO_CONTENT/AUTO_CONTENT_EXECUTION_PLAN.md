@@ -70,12 +70,12 @@
 
 ### 3.1 資料流
 ```
-熱搜積木 ──每次 GET /api/content/trending──▶ content_trends（落地）
+熱搜積木 ──排程每 geo 每天一次（P9.1；GET /api/content/trending 照舊也存）──▶ content_trends（落地）
 蒐尋器 ──────────────────────────────────▶ KB folders（既有）
-                 │ 每月 1–3 號 proposeMonth（品牌 I1 ＋ 30 天計畫模組）
+                 │ 排程：本月（台灣月）該站沒有非 manual 題目就 proposeMonth（P9.2；品牌 I1 ＋ 節日活動 ＋ 30 天計畫模組）
                  ▼
           content_topics（狀態機，一列＝一題；formats ⊆ {article,social,video,youtube}）
-                 │ 人在 /tools/content/topics 核准（或 ai_review_auto 自動核准）
+                 │ 核准：站設 topicMode=ai_pick 自動核准，否則人在 /tools/content/topics 核准；publishMode 只管發布（P9.2）
                  ▼
    job content_pipeline（client_schedules 一格；主機 cron */5 → run-due → run()）
      每次 firing 在時間預算內：啟動到期題（每日 ≤N）→ 對每列推一步
@@ -149,7 +149,7 @@
 
 ## 7. 卡片
 
-格式：一卡＝一 commit；「驗」＝唯一完成判準；「突變」＝拔掉守衛→指名測試紅→還原綠。模型：卡上註明；未註＝Opus 5.5。依賴：P1→P2→(P3 ∥ P5)→P4→P6→P7；P8 隨階段。每階段末 Fable 閘審（讀 §10＋WORKLOG 證據行）。
+格式：一卡＝一 commit；「驗」＝唯一完成判準；「突變」＝拔掉守衛→指名測試紅→還原綠。模型：卡上註明；未註＝Opus 5.5。依賴：P1→P2→(P3 ∥ P5)→P4→P6→P7；P8 隨階段；P9.1→P9.2→P9.3，P9.4 在 P9.1／P9.2 後任何時候。每階段末 Fable 閘審（讀 §10＋WORKLOG 證據行）。
 
 ### P1 品牌聲音 SSOT
 
@@ -230,6 +230,17 @@
 | P8.4 | `node scripts/sync-foundry-catalog.mjs` 重產 |
 | P8.5 | TASKS.md「社群管理平台 V1」「Postiz Task 2 OAuth app 審核」「內容引擎積木化」三條收斂指本檔（行號會漂，用條目名）；`SCHEDULES_PAGE_PLAN.md` §0 記 every_5m 與 cron 時鐘 |
 
+### P9 熱搜與提案接上排程＋題目閘（2026-10-26；P9.2 migration apply 前 STOP）
+
+不變量 B1–B10、程式片段、驗收逐條全文在 `agency-os/handoffs/2026-10-26-autocontent-gap.md` §3、§7（自足）；本表只列卡。I8 不變：全部併進 `content_pipeline` 一格的 `run`，不新增 job、不另建 cron。
+
+| 卡 | 改 | 做 | 驗 | 突變 |
+|---|---|---|---|---|
+| P9.1 | `trending-sources.ts`（加 `search/google-trends` RSS、`search/youtube-trending`，後者有 `YOUTUBE_API_KEY` 才啟用）；新 `NA/lib/content/topics/collect-trends.ts`（`collectTrends`、`collectTrendsIfDue`）；`trending/route.ts` 改呼叫它、回應不變；`jobs.ts` `content_pipeline.run` 開頭依啟用站的 geo 呼叫 `collectTrendsIfDue`；`plan.ts` `geoFor` 不認識的國家回 `null`（B9） | B5：每 geo 每天一次，守衛＝`content_trends` 已有 `(geo, 今天 UTC)` 列；免費 | `npx vitest run lib/content/topics/__tests__/collect-trends.test.ts app/api/content/trending/route.test.ts lib/schedules/__tests__/content-pipeline-job.test.ts`；`plan.test.ts` 德國站不查熱搜 | 拔「今天已有列就跳過」→ collect-trends (b) 紅 |
+| P9.2 | migration `0138_wp_sites_content_plan_attempted_at`（＋down）；`brand-voice.ts` `TOPIC_MODES`／`aiPicksTopics`；`sites/[id]/route.ts` `topicMode` 分支（照 `publishMode`）；新 `TopicModeButtons.tsx`；新 `NA/lib/content/topics/plan-due.ts`（`planIfDue`＋`planDueDeps`）；`jobs.ts` run 先 `planIfDue` 有提案就不 tick、cost 字串加提案費（`cost.ts` `planCostUsd`）；`plan.ts` prompt 加節日活動（新 `NA/lib/events/for-month.ts`） | B1 本月恰一份（守衛 `source <> 'manual'`）；B2 claim 寫在 ask 前、24h 一次；B3 一 firing 提一站且不 tick；B4 兩閘獨立嚴格比對；B6 成本先顯示；B8 錢記該客戶、未開通＝跳過 | `npx vitest run lib/content/topics/__tests__/plan-due.test.ts lib/schedules/__tests__/content-pipeline-job.test.ts`（9 條＋2 條）；`plan.test.ts`、`lib/events/__tests__/for-month.test.ts`；本機 Postgres apply→down→apply | 拔 `hasProposal` 的 `continue` → plan-due 測 2 紅 |
+| P9.3 | `NA/app/(shell)/tools/content/topics/`（`page.tsx`＋`TopicsBoard.tsx`）；`sidebar-sections.ts:78` `Topic Queue`→`Auto Content`；`/api/content/sites` GET 加 `content_plan_attempted_at`、客戶 slug | 題目頁頁頂五格（搜集熱搜／提案題目／挑題／製作／發布），每格狀態＋控制＋費用，全用既有 API（B7）；④ 是客戶層；不開新頁、不用下拉 | `npx vitest run app/__tests__/sidebar-coverage.test.ts`；總控頁改設定後 `/ops/schedules`、`/tools/content/sites` 值相同；`/playwright` 截圖五格 | — |
+| P9.4 | `brand-voice.ts` `trendFeeds`（≤10）；`sites/[id]/route.ts` 正規化＋`isSafePublicHttps`；`SiteManager.tsx` 產業來源欄位；`trending-sources.ts` 抽 `runBlocks`；`plan.ts` prompt 加產業來源段 | B10：品牌自己的 RSS 只進該品牌 prompt、不寫 `content_trends`；免費、無 migration | `npx vitest run lib/content/topics/__tests__/plan.test.ts "app/api/content/sites/[id]/test"` | 拔 route `isSafePublicHttps` → `http://x` 那條紅 |
+
 ## 8. 驗證
 - 實測：`npx tsc --noEmit`；`npx vitest run <卡測試>`；P4／P6 在拋棄式 org（staging WP 站＋social 測試品牌）真跑一次 firing；`REALTEST_EVIDENCE` 行。
 - Review：每 commit `/codex-review`；P4.1（身分）、P4.6（審核閘）屬 auth 類 → 2 critic 逐 claim。
@@ -238,7 +249,7 @@
 - 階段閘：Fable 讀 §10＋WORKLOG，過才開下一階段。
 
 ## 9. Rollback
-每卡一 commit → revert；0121 `.down.sql`；job 無列＝關、刪 registry 筆＝消失；cron 一行刪除即回 Trigger 心跳；`publishMode` 回 human_review 即停自動發布；P5 新頁可刪，`/tools/video` 不受影響。
+每卡一 commit → revert；0121 `.down.sql`；job 無列＝關、刪 registry 筆＝消失；cron 一行刪除即回 Trigger 心跳；`publishMode` 回 human_review 即停自動發布；P5 新頁可刪，`/tools/video` 不受影響。P9：每卡 revert；`0138.down.sql`；`topicMode` 回 human_pick 即停自動核准；已提出的題目是資料，留著。
 
 ## 10. 進度
 
