@@ -77,7 +77,7 @@
 
 **手動測試（ks-aw-01，需具備既有主機權限）**：
 
-2026-10-26：主機紀錄確認直接呼叫 watchdog 遇到 Permission denied／exit 126；本次 bash 修正尚未套用正式機。安裝前檢查涵蓋現有 `[VAR=value ...] [bash|sh|python3] /absolute/path` 寫法，不解析任意 shell 命令；主機套用後仍須實跑並核對 `/var/lib/awarewave/jobs/routine_watchdog.json`。
+2026-10-26：主機紀錄確認直接呼叫 watchdog 遇到 Permission denied／exit 126；bash 修正已於 2026-10-26 09:43Z 套用正式機（備份 `/root/lobster-phase1/.state/cron-backup-20261026T094359Z`），經 cron-run.sh 實跑 `routine_watchdog.json` exit_code=0。安裝前檢查涵蓋現有 `[VAR=value ...] [bash|sh|python3] /absolute/path` 寫法，不解析任意 shell 命令。
 
 ```bash
 LC_ALL=C.UTF-8 bash /root/Work/scripts/routine-output-watchdog.sh --dry-run

@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-26（續18）— watchdog exit 126 正式機套用完成（Claude；操作者明示 go-ahead）
+
+- **授權**：操作者「Go ahead with production: sync host scripts, then --check, install, run the watchdog once and check exit 0; roll back on failure.」修正本體見續13（`47d663ceb`）；閘修正見續16（`3ae7bf1c3`），本次唯讀 `sudo` 檢查已不被 Codex 鏡像擋。
+- **步驟**：①`tar` 備份 `/root/lobster-phase1/scripts`→`.state/scripts-before-watchdog-20261026T094331Z.tgz`；②`git fetch` + `sync-host-scripts.sh`：已＝origin/main `3ae7bf1c3`（0 installed，週期同步先到）；③`install-host-schedules.sh --check` exit1，差異僅 `awarewave-schedules:36` 加 `bash`；④安裝 exit0（7 檔，備份 `/root/lobster-phase1/.state/cron-backup-20261026T094359Z`），複查 `--check` exit0；⑤經 `cron-run.sh routine_watchdog` 原 cron 命令實跑。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo cron-run.sh routine_watchdog 'LC_ALL=C.UTF-8 bash /root/Work/scripts/routine-output-watchdog.sh ...'; cat /var/lib/awarewave/jobs/routine_watchdog.json → exit_code=0 (09:44:11Z)；log 末行 "no state change (set='') — silent" | exit=0 | ms=1500
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell scripts/system-health-check.ps1 → Score 100% (320/320) | exit=0 | ms=120000
+- REVIEW_WAIVED: NA -- 本次無程式改動；程式審查見續13（oracle d47238df）與續16。runbook 兩檔僅改狀態句。
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks,lobster-factory | grep=尚未套用正式機 | hits=0
+- **待驗**：下次自然排程 2026-10-27 07:17Z（台灣 15:17）`routine_watchdog.json` 應為 exit_code=0；異常時先看 `/var/log/routine-watchdog.log`。
+- **rollback**：`sudo bash /root/lobster-phase1/scripts/install-host-schedules.sh --rollback /root/lobster-phase1/.state/cron-backup-20261026T094359Z`；腳本目錄可用上述 tgz 還原。
 ## 2026-10-26（續17）— script-forge 收合改到六個分區，共用 sidebar class（Claude）
 
 - **根因**：`f0132d96a` 把「收合」做在整個右側欄（縮成 emoji 窄條），操作者要的是「生成／工具／分析／設定／規劃／紀錄」各分區可收合，且樣式與主 sidebar 一致。
