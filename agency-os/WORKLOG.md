@@ -1,4 +1,12 @@
 # Worklog
+## 2026-10-26（續22）— 影片字幕來源定案（D11）＋配音時間點實測（Claude；操作者同意方向）
+
+- **決策**：操作者同意「快速影片和短劇用腳本法，實拍才用 Whisper」，問「怎麼區分」→ D11：依聲音來源（render 路徑）決定，`/render`＝腳本＋配音時間點、`/footage-render`＝Whisper；成片 metadata 記 `captionSource`。寫入 `agency-os/docs/video_generator/VIDEO_TOOL_REDESIGN_2026-10-26.md` §6。
+- **查證**：網站預設配音＝Edge（`VideoStudio.tsx` `VOICE_MODELS` 前 4 項免費），OpenAI 為付費選項。Edge 回傳每句／每詞時間、內建 `SubMaker`；現行 `apps/video-service/pipeline.py:237-238` `.save()` 丟掉時間點。OpenAI `audio.speech.create` 無時間點參數。
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-video-service python（edge-tts 7.3.1 Communicate boundary=SentenceBoundary/WordBoundary 念兩句中文 → 2 句、24 詞含 offset/duration；inspect openai 3.31.0 Speech.create 參數） | exit=0 | ms=5799
+- REVIEW_WAIVED: DOC_ONLY -- 只改設計文件
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=§6 Q1|D11 | hits=0（舊引用 `Q1` 已改 `D11`）
+- **rollback**：revert 本 commit。
 ## 2026-10-26（續21）— 影片：主機 compose 加字幕變數＋video-service 部署黑畫面修正（Claude；操作者明示 go-ahead）
 
 - **授權**：操作者「Go ahead：用 safe-infra-patch 把三個 MEDIA_TRANSCRIBE 變數加進主機 compose 的 next-admin，並部署 video-service（黑畫面修正），失敗就自動還原。」

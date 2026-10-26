@@ -53,13 +53,19 @@
 
 ## 5. 先決條件（不做這些，④ 後自動做不起來）
 
-1. QA 四項要能真的通過：黑畫面誤報（已修、2026-10-26 已部署）、D7 權利紀錄、D8 腳本入成片、字幕來源（§6 Q1）。
+1. QA 四項要能真的通過：黑畫面誤報（已修、2026-10-26 已部署）、D7 權利紀錄、D8 腳本入成片、字幕來源（§6 D11）。
 2. 一比例一成片（D6），QA／Release 逐成片。
 3. Release 的社群草稿改走社群產品（`TASKS.md` 社群 V1 條目、AUTO_CONTENT P6.3 尚存的 `ReleaseDeliveryPanel.tsx:89` 舊路徑）。
 
-## 6. 待操作者決定
+## 6. 已決定
 
-- **Q1 快速影片的字幕從哪來？** 建議：直接用腳本台詞＋配音的時間點產字幕，不必跑 Whisper（台詞本來就是我們寫的；Whisper 留給實拍影片，那才需要聽寫）。代價：要先查配音服務能不能回傳每句的時間點（未查證）。另一案：維持 Whisper，但筆電要常開（現在是隨開隨用，④ 後自動做不到）。
+- **D11 字幕來源由「聲音是誰產生的」決定，不讓人選**（操作者 2026-10-26 同意「快速影片和短劇用腳本法，實拍才用 Whisper」）：
+  - 走 video-service `/render`（快速影片、短劇；聲音＝我們用腳本台詞配音）→ 字幕＝腳本台詞＋配音時間點，渲染時一起產 SRT／VTT 與字幕 QA。
+  - 走 `/footage-render`（實拍；聲音＝上傳素材裡的真人錄音，`apps/video-service/server.py:396-440` 無配音）→ Whisper。
+  - 渲染時把 `captionSource: "script_tts" | "transcription"` 寫進成片 metadata；⑦ 讀它決定做法，不靠模式名稱猜。
+- **配音時間點（2026-10-26 在正式 video-service 容器實測）**：
+  - Edge（預設、免費；`NA/app/(shell)/tools/video/VideoStudio.tsx` `VOICE_MODELS` 前 4 項）：edge-tts 7.3.1 `Communicate(boundary=…)` 回傳每句（`SentenceBoundary`，例：第 1 句 0.10s 起、長 4.60s）與每詞（`WordBoundary`）時間；套件內建 `SubMaker.feed/get_srt`。現行 `pipeline.py:237-238` 用 `.save()` 把時間點丟掉，改成 `stream()` 收時間點即可。
+  - OpenAI（付費選項）：openai 3.31.0 `audio.speech.create` 參數只有 input/model/voice/instructions/response_format/speed/stream_format，**不回時間點**。維持現行「每場長度準、場內按字數分配」（`pipeline.py:351-366`）；要更準需另呼叫轉錄 API（`transcriptions.create` 有 `timestamp_granularities`，按分鐘計費），不預設做。
 
 ## 7. 分階段（之後拆卡）
 
@@ -67,7 +73,7 @@
 |---|---|---|
 | R1 專案骨架 | migration（§2）、腳本頁「送去做影片」建專案帶客戶、影片頁讀 `?project=`、各步刪掉自己的租戶選單 | 腳本頁送出 → 影片頁不再問客戶；關頁再開回到同一步 |
 | R2 結果頁 | §4 兩頁；③ 完成不再跳走，停在成片 | 做一支 → 清單看得到 → 點進去能播兩個比例 |
-| R3 QA 真能過 | D6、D7、D8、Q1 | 一支 AI 生圖影片四項全綠 |
+| R3 QA 真能過 | D6、D7、D8、D11 | 一支 AI 生圖影片四項全綠 |
 | R4 發布不填 JSON | §3 ⑤；走社群產品 | 勾 YouTube＋IG → 兩個草稿，各自正確比例 |
 | R5 ④ 後自動 | §1 第二列 | 按「生成並自動完成」→ 不用再點就到「已建草稿」，或停在沒過的那步並說原因 |
 | R6 全自動接專案 | 題目頁管線建專案列（D3） | 題目頁做的影片出現在結果頁 |
