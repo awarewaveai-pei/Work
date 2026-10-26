@@ -186,6 +186,23 @@
 
 操作者 2026-10-26：「功能到處散放，要一個頁面管理」。**不開新頁**，升級既有題目佇列 `NA/app/(shell)/tools/content/topics/`（`page.tsx`＋`TopicsBoard.tsx`）：頁頂一條五格流程圖（一頁一張圖），每格＝狀態＋那一步的控制＋費用。資料由頁面 server 端一次組好傳給 client component，不要五格各自 fetch。
 
+**第一層：全部客戶一覽**（操作者 2026-10-26 定案併進本卡，不另開卡）。頁面打開先看到這張表，一個網站一列；點一列進第二層（下面五格）。
+
+| 欄 | 來源（全部 server 端一次查完，不逐列 fetch） |
+|---|---|
+| 客戶、網站 | `wp_sites`（`active = true`）＋`organizations.name` |
+| 總開關、每天上限、最近錯誤 | `client_schedules` 該客戶的 `content_pipeline` 列（沒列＝關；`last_error`，`NA/lib/schedules/store.ts:177-182`） |
+| 題目閘、發布閘 | `content_defaults.topicMode`／`publishMode`，用 `aiPicksTopics`／`autoPublishes` 判斷（B4，缺值＝人） |
+| 本月提案了沒、上次嘗試 | 本月（台灣月）該站有沒有 `source <> 'manual'` 題目（B1 同一條件）；`content_plan_attempted_at` |
+| 待核准／進行中／失敗 | 本月 `content_topics` 一次 select `site_id, status, source`，在記憶體按站數 |
+| 未開通 | 該客戶 `content.plan` 用同一條 `can` 判斷（B8） |
+| 本月 AI 花費 | `ai_call_logs` 該客戶本月合計，與 `/ops/costs` 同一份算法（`NA/lib/ai/spend-loader.ts:22`、`NA/lib/ai/spend-report.ts:91,109` `byOrg`）。**欄名寫「本月 AI 花費（所有工具）」並連到 `/ops/costs`**：自動內容的呼叫和人手按的共用 route 標籤（例 `NA/lib/content/video/video-script-core.ts:218` `video/script`），今天分不出「只有自動內容」的錢，不可標成自動內容花費 |
+
+- 排序：有問題的在最上面（最近錯誤、失敗 > 0、未開通）→ 有待核准 → 其他；同級依客戶名。
+- 組表邏輯是純函式，新檔 `NA/lib/content/topics/overview.ts` `buildOverview(input): OverviewRow[]`（輸入＝上面各查詢的原始列，輸出＝排好序的列），頁面只負責查與畫。
+- 權限：員工看全部；客戶只看自己的（每列都過 `canAccessOrg`，不在前端過濾）。
+- 驗收追加：新測 `NA/lib/content/topics/__tests__/overview.test.ts`（假資料）：(a) 沒有 `content_pipeline` 列的客戶＝關；(b) 只有 `manual` 題目的站＝「本月未提案」；(c) 一站失敗 1 題排在另一站待核准 3 題之前；(d) `topicMode="AI_PICK"` 顯示人挑（B4）。突變：拿掉「有問題排最上面」→ (c) 變紅 → 還原變綠。
+
 | 格 | 顯示 | 控制（沿用既有 API，B7） |
 |---|---|---|
 | ① 搜集熱搜 | 該站 geo 最後一次 `content_trends.fetched_on`、近 30 天筆數、有哪些來源在跑（Google News／Google Trends／Reddit／YouTube…）；本月行銷窗口內的節日與活動 N 個（`eventsForMonth`，P9.2 第 7 點） | 無（P9.1 自動）；可放「立即抓一次」＝GET `/api/content/trending?type=trending&geo=..` |
@@ -200,7 +217,7 @@
 - UI 規則：不用 `<select>`／下拉；細節放右欄；文案白話、不寫「我們」；顏色用主題 token。
 - 舊位置照常可用：`/ops/schedules`、`/tools/content/sites` 不刪不改。
 
-**驗收**：在總控頁切開關／改每日上限／改題目閘／改發布閘後，到 `/ops/schedules` 與 `/tools/content/sites` 看到同樣的值（B7）；`npx vitest run app/__tests__/sidebar-coverage.test.ts` 綠；`/playwright` 截圖頁頂五格（雙站客戶切站時 ④ 不變）給操作者看。
+**驗收**：`npx vitest run lib/content/topics/__tests__/overview.test.ts app/__tests__/sidebar-coverage.test.ts`；在總控頁切開關／改每日上限／改題目閘／改發布閘後，到 `/ops/schedules` 與 `/tools/content/sites` 看到同樣的值（B7）；`npx vitest run app/__tests__/sidebar-coverage.test.ts` 綠；`/playwright` 截圖頁頂五格（雙站客戶切站時 ④ 不變）給操作者看。
 **Rollback**：revert commit；無 DB 改動。
 
 ### P9.4　品牌自己的產業來源（免費；Low；無 migration；A、B 之後任何時候）
@@ -262,6 +279,7 @@
 - 付費的「用品牌關鍵字搜新聞」（Serper，每站每天 ~0.001 美元）：要另一顆按鈕顯示成本後才開，不在 P9.4。
 - **FB／IG／X／Threads／Snapchat／TikTok 的熱門話題**（操作者 2026-10-26 問）：沒有免費公開 API（§2）。可行但要錢的路：X API Basic 約 200 美元／月；第三方彙整（Apify／Brandwatch 類）按量計費；Serper 搜 `site:threads.net` 等每次 ~0.001 美元。每一條都要操作者先決定預算、再加成一個 `searchBlock`（插口在 `trending-sources.ts:118`），不在 P9.1–P9.4。免費能拿到的社群訊號已在 P9.1：Reddit、YouTube 熱門、Google Trends。
 - 月中才開開關：提的是當月、含已過日期的題目，核准後 tick 依每日上限慢慢消化；不做「改提下個月」。
+- 「只有自動內容」的花費（P9.3 第一層那欄現在只能寫所有工具合計）：要在 `runForOrg` 的 AI 呼叫紀錄帶上排程 actor 再按它彙總，有需要再開卡。
 - P5 Story Bible 提示片段（`storyBibleContextBlock`、角色 id 提示）仍由頁面組好再送出：另一件事。
 - 真跑一整輪需 staging WP＋測試社群品牌：操作者 10-24 說先不用。
 
