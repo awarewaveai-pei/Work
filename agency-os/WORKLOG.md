@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-26（續21）— 影片：主機 compose 加字幕變數＋video-service 部署黑畫面修正（Claude；操作者明示 go-ahead）
+
+- **授權**：操作者「Go ahead：用 safe-infra-patch 把三個 MEDIA_TRANSCRIBE 變數加進主機 compose 的 next-admin，並部署 video-service（黑畫面修正），失敗就自動還原。」
+- **前置**：`video_jobs` 近 3 小時 0 筆（無進行中渲染）；主機 `/root/Work` ff 到 `f36673f10`（含 40d4cd4e1）。
+- **步驟**：①主機 compose 第 290 行（next-admin）後插三行 → `safe-infra-patch.sh compose /root/lobster-phase1/docker-compose.yml next-admin`（備份 `docker-compose.yml.bak.safe-patch-20261026-144727`，healthy 15s）；②`docker tag lobster-video-service:local :pre-20261026-blackdetect`（58cde5c8e40b）→ rsync（照 `DEPLOY_ROLLBACK_RUNBOOK.md:196`，另加 `--exclude='*.bak.safe-patch-*'`，否則 `--delete` 會刪 2026-10-24 的 compose 備份）→ `docker compose -f docker-compose.video.yml --env-file .env.video up -d --build`（新 c0f8097b15b9）。同批帶上 d41f11f06 的鎖檔安裝（Dockerfile／requirements.lock）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-next-admin printenv MEDIA_TRANSCRIBE_{WORKER_URL,WORKER_TOKEN,CALLBACK_BASE_URL}（3/3 exit 0，URL 皆 https）；curl app /login 200 | exit=0 | ms=2040
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec -w /app lobster-video-service python -m unittest tests.test_output_meta_qa tests.test_quality → 8 OK；/health ok=true；healthy restarts=0；next-admin→VIDEO_SERVICE_URL/health 200；RENDER_AUTH_TOKEN/R2_API_TOKEN/PEXELS_API_KEY present | exit=0 | ms=21769
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell scripts/system-health-check.ps1 → Score 100% (320/320) | exit=0 | ms=120000
+- REVIEW_WAIVED: NA -- 本次無新程式；程式審查見同日續20（oracle 6d1d3697、60341d3d）。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=video-service 待部署|MEDIA_TRANSCRIBE_WORKER_URL | hits=0（findings／redesign 兩檔狀態句已改）
+- **未完**：字幕要筆電 Whisper worker 開著（`video-whisper.aware-wave.com/health` 530）；設計 Q1 建議快速影片改用腳本＋配音時間點產字幕，待操作者。
+- **rollback**：compose：`sudo cp /root/lobster-phase1/docker-compose.yml.bak.safe-patch-20261026-144727 /root/lobster-phase1/docker-compose.yml` 後經 safe-infra-patch 重套；video-service：`docker tag lobster-video-service:pre-20261026-blackdetect lobster-video-service:local` → 同目錄 `docker compose -f docker-compose.video.yml --env-file .env.video up -d --no-build`。
 ## 2026-10-26（續20）— 影片工具：操作者實測 17 問題落檔＋5 個明確錯誤修正＋重新設計草案（Claude；實作派 cc.py Sonnet）
 
 - **觸發**：操作者實測 `/tools/video`、`/tools/script-forge` 回報一串問題，要求「先記下來」→「修剛剛發現的錯誤」＋「依專業角度設計」三種自動化程度／專案／結果頁／兩頁分工。
