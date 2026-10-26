@@ -8,6 +8,21 @@
 - ORACLE_WAIVED: codex usage limit until 2026-10-26 20:57（oracle-quota exit 3）。代替：書面自審＋突變證據＝拔「切模組展開分區」→新測試紅；拔 `isOpen&&` 折疊守衛→首測紅；還原→3/3 綠。
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=sf_nav_collapsed|navCollapsed|sf-collapsed | hits=0
 - **rollback**：revert 本 commit（隔天 03:00 自動部署或手動 sg-deploy）。
+## 2026-10-26（續16）— Codex deny mirror 與 Claude 判定對齊；主機排程安裝器列入 High 閘（Claude）
+
+- **根因**：`permission-deny-mirror.js` 用 `runner.js:99-108` `commandSegments()`，該函式不看引號就切 `&& || ; |`。續13被擋的實際命令（Codex rollout `01a17737-15dc…` 第69行）=`ssh … ubuntu@145.239.195.47 'sudo tail …; sudo stat …'`，引號內 `;` 被切出 `sudo stat` 段而命中 `Bash(sudo *)`。Claude 原生把引號參數當一個字，同命令放行（本 session 探測 `echo "parity-probe; sudo -V"` 未被 deny）。不是規則衝突，是 Codex/Claude 判定不一致。
+- **不變量**：同一條 deny，Codex 判定 = Claude 判定；本機 sudo 一律拒；閘看到的引號必須是 shell 也看到的引號。`Bash(sudo *)` 不動、不加豁免。
+- **修改**：`permission-deny-mirror.js:36-83` 本規則自有 `segments()`：逐行、bash 與 PowerShell 兩套文法各切一次取聯集，只在引號外切 `&& || ; |`；各用自己的跳脫（bash `\` 與 `$'..'`、pwsh 反引號與彎引號）；某行結尾仍在引號內→該行不看引號切（較嚴）。不改 runner 共用切段（另約20條規則依賴）。`high-risk-bash-warn.js:14` `DEPLOY_SCRIPT_RE` 加 `install-host-schedules`：正式機執行（含 `--check`）需 `# CONFIRMED-HIGH-RISK`。
+- **測試**：`tests/hooks/codex-adapter.test.mjs` 放行3（續13原命令、其 PowerShell 包裝、commit 訊息）＋拒絕8（引號外 `;`、`bash -c` 內、不成對、兩種跳脫假引號、註解撇號跨行、heredoc 撇號跨行、pwsh 彎引號）；`runner-parity.test.mjs` 安裝器 exec→2、grep→0。改前紅4、改後綠。
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh (33/33 + 393/393) | exit=0 | ms=90000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node D:/Work/mcp/claude-userlevel/hooks/runner.js PreToolUse --host=codex on 續13 blocked command (deny=0) and local `sudo tail` (deny) | exit=0 | ms=800
+- REALTEST_EVIDENCE: tool=Bash | cmd=scratch fuzz.js（真 bash／powershell 執行，sudo=印 HIT 的函式；原子含引號、跳脫、換行、#、彎引號）bash 3 seeds×2000 sudo_ran≈1050 bypass=0；ps 2×500 sudo_ran=74/79 bypass=0；舊單文法版 bash bypass=68、無跳脫版 bypass=14 | exit=0 | ms=900000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=2c/0m/1n
+- ORACLE_WAIVED: codex usage limit until 2026-10-26 20:57（oracle-quota set；codex-oracle.ps1 兩次無輸出，log codex-oracle-log-fca491b1.txt.err）。代替：C1 自審＝跳脫字元假引號藏 sudo；C2 cc.py API critic（session 7322da9d，US$0.24）＝`# it's` 註解撇號跨行藏 sudo→改逐行＋雙文法關整類（heredoc、pwsh 彎引號同類）；n1 雙引號內跳脫已由 bash 文法處理。突變＝fuzz 對兩個舊版各 68／14 漏擋，現版 0。
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks,mcp,.claude,tests | grep=permission-deny-mirror | hits=827（多為 reports/logs；行為敘述4處：AGENTS_APPENDIX.md:93、dual-ide-coexistence-strategy.md:48、sync-claude-to-codex.ps1:939、rules.manifest.json:7，修改後仍正確）
+- **其他同日**：watchdog 修正 `47d663ceb` 已推送（續13）；週安全掃描重跑 run 40297589195 success。
+- **剩餘**：鏡像既有缺口（非本次退化，Claude 原生行為未實測）：`$(sudo x)`、bash 反引號、`(sudo x)`、`then sudo x` 不在命令位置切段。正式機套用 watchdog 待操作者 High go-ahead。
+- **rollback**：revert 本 commit，再跑 `scripts/sync-claude-userlevel.ps1 -Mode merge`（Codex 直讀 repo 路徑，revert 即生效）。
 ## 2026-10-26（續15）— Issue #32：安全修復已推送並部署，真實任務通過
 
 - **授權／推送**：操作者明示「推送和部署」。`3c6e83cad` 安全修復與遠端週報 `e93b25e08` 在獨立 detached worktree 合併為 `7bfce4ab4`，已推 origin/main。並行工作區的 watchdog 修改與續13條目保留；原安全條目與週報碰撞續12，經 worklog-insert-entry 配發續14後合併。四個 workflows 檔與測試通過時完全相同，未重跑相同測試。

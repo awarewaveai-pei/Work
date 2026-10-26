@@ -583,6 +583,8 @@ const P4_1D_CASES = [
   ['read: interactive su (no -c)', `${KS} 'sudo su - root'`, 0],
   ['verb: docker compose restart unchanged', `${KS} 'cd /root/lobster-phase1 && sudo docker compose restart next-admin'`, 2],
   ['non-prod host not in scope', "ssh root@10.0.0.5 'sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin'", 0],
+  ['exec: host schedule installer', `${KS} 'sudo bash /root/lobster-phase1/scripts/install-host-schedules.sh'`, 2],
+  ['read: grep host schedule installer', `${KS} 'grep -n NOT /root/lobster-phase1/scripts/install-host-schedules.sh'`, 0],
   // codex round 3 (2026-09-23): quoted remote command spanning lines; script read upstream of a shell in a pipeline
   ['exec: multi-line remote if/then (codex r3)', "ssh ks-aw-01 'if test -f /root/flag\nthen /root/lobster-phase1/scripts/sg-deploy.sh next-admin\nfi'", 2],
   ['exec: cat < script | bash (codex r3)', "ssh ks-aw-01 'cat < /root/lobster-phase1/scripts/sg-deploy.sh | bash'", 2],

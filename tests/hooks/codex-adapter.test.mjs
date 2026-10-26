@@ -215,6 +215,33 @@ test('codex host: allowed git commands are not caught by the deny mirror', () =>
   }
 });
 
+// Claude's matcher treats a quoted argument as one word: these run ssh / git, not sudo.
+// The first is the command that blocked a read-only diagnosis on 2026-10-26.
+const REMOTE_SUDO_READ = "ssh -p 58122 ubuntu@145.239.195.47 'sudo tail -n 20 /var/log/routine-watchdog.log; sudo stat -c %a /root/Work/scripts/routine-output-watchdog.sh'";
+for (const [label, cmd] of [
+  ['remote sudo inside ssh quotes', REMOTE_SUDO_READ],
+  ['same, powershell-wrapped', `${PS} -Command '${REMOTE_SUDO_READ.replace(/'/g, "''")}'`],
+  ['commit message text', 'git commit -m "docs: never run; sudo here"'],
+]) {
+  test(`codex host: quoted sudo is an argument, not a command -> ${label}`, () => {
+    const r = codex('PreToolUse', { session_id: freshSid('cxquote'), tool_name: 'Bash', tool_input: { command: cmd } });
+    assert.doesNotMatch(r.stderr, /permission-deny-mirror/, cmd);
+  });
+}
+for (const cmd of [
+  "ssh host 'ls'; sudo tail /var/log/x", 'bash -c "ls; sudo tail /var/log/x"', "echo it's; sudo tail /var/log/x",
+  "echo \\' ; sudo tail /var/log/x ; echo \\'", "echo `' ; sudo tail /var/log/x ; echo `'", // escaped, not a quote
+  "echo hi # it's\nsudo tail /var/log/x\necho hi # don't", // comment quote must not span lines (critic C1)
+  "cat <<EOF\nit's\nEOF\nsudo tail /var/log/x\ncat <<EOF\ndon't\nEOF", // heredoc body likewise
+  "echo ‘a' ; sudo tail /var/log/x ; 'b’", // PowerShell curly quotes pair with '
+]) {
+  test(`codex host: sudo in command position still denied -> ${cmd}`, () => {
+    const r = codex('PreToolUse', { session_id: freshSid('cxquote'), tool_name: 'Bash', tool_input: { command: cmd } });
+    assertDenied(r, cmd);
+    assert.match(r.stderr, /permission-deny-mirror/);
+  });
+}
+
 test('claude host: deny mirror stays silent (Claude permission layer owns it)', () => {
   const r = runNode(RUNNER, { session_id: freshSid('cldeny'), tool_name: 'Bash', tool_input: { command: 'git checkout -b feature-x' } }, {
     args: ['PreToolUse'], cwd: NON_REPO, env: { CODEX_HOME: fs.mkdtempSync(path.join(os.tmpdir(), 'hooktest-codexhome-')) },

@@ -11,7 +11,7 @@
 // then / do, past sudo/nohup/exec/command/time/timeout N), then a prod host.
 const PROD_SSH_LINE_RE = /(?:^|&&|\|\||;|\||\(|\bthen\b|\bdo\b)\s*(?:(?:sudo|nohup|exec|command|time)\s+(?:-\S+\s+)*|timeout\s+(?:-\S+\s+)*\S+\s+)*ssh\b[^\n]*?(?:145\.239\.195\.47|ks-aw-01|5\.223\.93\.113|204\.168\.175\.41)/im;
 const PROD_MUTATING_VERB_RE = /systemctl\s+(?:restart|stop)|docker[\s-]+compose\s+(?:down|stop|restart)|\breboot\b|\bshutdown\b/i;
-const DEPLOY_SCRIPT_RE = /^(?:sg-deploy|rollback-phase1|auto-deploy-next-admin)(?:\.sh)?$/;
+const DEPLOY_SCRIPT_RE = /^(?:sg-deploy|rollback-phase1|auto-deploy-next-admin|install-host-schedules)(?:\.sh)?$/;
 const SCHEDULED_TASK_MUTATION_RE = /\b(?:Register|Unregister|Start|Stop|Enable|Disable)-ScheduledTask\b|\bschtasks(?:\.exe)?\s+\/(?:create|run|delete|change)\b|\b(?:REGISTER_SYSTEM_GUARD_TASKS|realtest-reg)\.ps1\b/i;
 // Words that run their operand as a command -> their options that take an argument.
 const EXEC_WRAPPERS = {

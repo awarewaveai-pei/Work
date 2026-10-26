@@ -4,7 +4,7 @@
 // Claude keeps enforcing it natively; running this for Claude would only
 // duplicate that layer's messages.
 //
-// `Bash(<glob>)` entries match each command position (ctx.commandSegments);
+// `Bash(<glob>)` entries match each command position (segments() below);
 // a trailing " *" also matches the bare command, so `Bash(git branch *)` blocks
 // `git branch` as well. Other entries are exact tool names.
 
@@ -33,10 +33,58 @@ function denyList() {
   return cache;
 }
 
+// Claude's matcher reads a quoted argument as one word: `ssh h 'a; sudo b'` runs
+// ssh, not sudo. So && || ; | split only outside quotes -- but a quote the
+// mirror sees and the shell does not would hide a real command, so:
+// - each line is lexed alone and must end outside quotes, else that line is
+//   split quote-blind (a `# it's` comment or heredoc body cannot carry a
+//   quote across lines and swallow the next command);
+// - the shell is unknown (Codex wraps PowerShell, payloads may be bash), so
+//   every line is lexed by BOTH grammars and the segments are unioned.
+// commandExpanded already carries bash -c / -Command payloads as own lines.
+const GRAMMARS = [
+  { single: "'", double: '"', esc: '\\', ansi: true }, // bash: $'..' takes \ escapes
+  { single: "'‘’‚‛", double: '"“”„', esc: '`' }, // PowerShell
+];
+const OPS = /&&|\|\||;|\|/;
+
+function splitLine(line, g) {
+  const segs = [];
+  let cur = '';
+  let quote = ''; // '', 'single', 'double', 'ansi'
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    const escapes = quote === 'double' || quote === 'ansi' || !quote;
+    if (escapes && c === g.esc) { cur += line.slice(i, i + 2); i++; continue; }
+    if (quote) {
+      if ((quote === 'double' ? g.double : g.single).includes(c)) quote = '';
+      cur += c;
+      continue;
+    }
+    if (g.ansi && c === '$' && line[i + 1] === "'") { quote = 'ansi'; cur += "$'"; i++; continue; }
+    if (g.single.includes(c)) { quote = 'single'; cur += c; continue; }
+    if (g.double.includes(c)) { quote = 'double'; cur += c; continue; }
+    const op = OPS.exec(line.slice(i, i + 2));
+    if (!op || op.index !== 0) { cur += c; continue; }
+    segs.push(cur);
+    cur = '';
+    i += op[0].length - 1;
+  }
+  if (quote) return line.split(OPS);
+  segs.push(cur);
+  return segs;
+}
+
+function segments(ctx) {
+  const lines = String(ctx.commandExpanded || '').split('\n');
+  return GRAMMARS.flatMap((g) => lines.flatMap((l) => splitLine(l, g)))
+    .map((s) => s.trim()).filter(Boolean);
+}
+
 module.exports = {
   check(ctx) {
     if (ctx.host !== 'codex') return null;
-    const segs = ctx.toolName === 'Bash' ? (ctx.commandSegments || []) : [];
+    const segs = ctx.toolName === 'Bash' ? segments(ctx) : [];
     for (const d of denyList()) {
       const hit = d.tool ? ctx.toolName === d.tool : segs.some((s) => d.bash.test(s));
       if (hit) {
