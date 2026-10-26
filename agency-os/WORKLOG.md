@@ -1,4 +1,12 @@
 # Worklog
+## 2026-10-26（續23）— 影片工具重新設計拆卡 V1–V7（Claude；操作者「開始做」，中途「先暫停並 commit」）
+
+- **做了**：`agency-os/docs/video_generator/VIDEO_TOOL_REDESIGN_2026-10-26.md` §7 改成 7 階段 25 張卡（檔案＋行號＋驗收）；§8 指向監工台。修正 §2：`media_assets.project_id` FK 舊 `projects`（`0038_media_assets_reconcile.sql:29`，prod 0/101 有值）→ 改加 `media_project_id`。
+- **未做（暫停）**：監工台 `agency-os/handoffs/2026-10-26-video-tool-supervisor/`（data／build／check 照 `scripts/supervisor-kit`；操作者：這次不用「每項先講例子、GPT 精簡」）。
+- REALTEST_WAIVED: DOC_ONLY -- 只改設計文件；行號以 grep／sed 實讀
+- REVIEW_WAIVED: DOC_ONLY -- 設計卡片，未改程式
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=R3|R1–R6 | hits=0（findings 檔 R3 改 V4.3）
+- **續接語**：續做影片工具監工台：讀 VIDEO_TOOL_REDESIGN_2026-10-26.md §7，照 agency-os/handoffs/2026-10-24-auto-content-supervisor 建 2026-10-26-video-tool-supervisor（check 綁 §7 V 卡號），發布 artifact。建議模型：Opus 5.5
 ## 2026-10-26（續22）— 影片字幕來源定案（D11）＋配音時間點實測（Claude；操作者同意方向）
 
 - **決策**：操作者同意「快速影片和短劇用腳本法，實拍才用 Whisper」，問「怎麼區分」→ D11：依聲音來源（render 路徑）決定，`/render`＝腳本＋配音時間點、`/footage-render`＝Whisper；成片 metadata 記 `captionSource`。寫入 `agency-os/docs/video_generator/VIDEO_TOOL_REDESIGN_2026-10-26.md` §6。
