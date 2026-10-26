@@ -507,6 +507,11 @@ services:
       # 影片孤兒對帳（/api/internal/video/reconcile）需列 R2 video bucket（與 EU 同 bucket/public base）
       R2_VIDEO_BUCKET: ${R2_VIDEO_BUCKET:-lobster-videos}
       R2_VIDEO_PUBLIC_BASE: ${R2_VIDEO_PUBLIC_BASE:-}
+      # ⑦ 字幕：GPU Whisper worker（agency-os/docs/video_generator/VIDEO_WHISPER_WORKER_DEPLOYMENT.md）。
+      # 值在主機 .env；少這三行 dispatch 一律 503 transcription_worker_not_configured（2026-10-26 實測）。
+      MEDIA_TRANSCRIBE_WORKER_URL: ${MEDIA_TRANSCRIBE_WORKER_URL:-}
+      MEDIA_TRANSCRIBE_WORKER_TOKEN: ${MEDIA_TRANSCRIBE_WORKER_TOKEN:-}
+      MEDIA_TRANSCRIBE_CALLBACK_BASE_URL: ${MEDIA_TRANSCRIBE_CALLBACK_BASE_URL:-}
       # PRINTFUL_API_KEY / STORE_ID / NATIVE_STORE_ID / POD_AUTO_FULFILL_ENABLED / WC_WEBHOOK_SECRET
       # 已在上方（line ~337）定義；此處原有重複定義已移除（YAML 重複鍵 → docker compose config 失敗）。
       # POD print track ([0-a-gs]): enable the Ghostscript PDF/X-1a OutputIntent pass.

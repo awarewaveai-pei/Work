@@ -21,7 +21,7 @@ export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCan
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [assets, setAssets] = useState<Array<{ id: string; object_url: string; checksum_sha256?: string; metadata?: { title?: string }; created_at: string; asset_domain: string }>>([]);
-  const [qaItems, setQaItems] = useState<Array<{ id: string; kind: string; status: string; candidateAssetId: string; candidateChecksum: string; profileId: string; profileVersion: string }>>([]);
+  const [qaItems, setQaItems] = useState<Array<{ id: string; kind: string; status: string; candidateAssetId: string; candidateChecksum: string; profileId: string; profileVersion: string; findings?: Array<{ rule: string; severity: string; message: string; format?: string }> }>>([]);
   const [loadingPickers, setLoadingPickers] = useState(false);
 
   useEffect(() => {

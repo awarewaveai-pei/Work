@@ -24,6 +24,8 @@ interface RegenBody {
   oldImageUrl?: string;
   /** draft 主格式（"16x9"|"9x16"|"4x5"）→ 重生圖的比例/取向與預覽一致。省略 = 16:9。 */
   format?: string;
+  /** false = 舊圖還被別的比例使用（例如上傳的素材），只拿來排除、不要刪。省略 = 刪。 */
+  deleteOld?: boolean;
   /** VideoPipeline wizard 帶入的租戶（同 render-draft）；未帶 = 預設租戶。 */
   organizationId?: string;
 }
@@ -67,6 +69,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         aspectRatio: spec.aspectRatio,
         orientation: spec.orientation,
         framing: spec.framing,
+        excludeAssets: typeof body.oldImageUrl === "string" && body.oldImageUrl ? [body.oldImageUrl] : undefined,
       },
     );
 
@@ -76,7 +79,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     }
 
     // 新圖成功後才清舊圖（避免新圖失敗卻已刪舊圖 → 兩頭空）。只刪 designs/ 格式的 R2 暫存物件。
-    if (typeof body.oldImageUrl === "string") {
+    if (typeof body.oldImageUrl === "string" && body.deleteOld !== false) {
       try {
         const path = new URL(body.oldImageUrl).pathname.replace(/^\//, "");
         if (/^designs\/\d{4}-\d{2}\/[0-9a-f-]+\.\w+$/i.test(path)) {

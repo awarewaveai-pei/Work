@@ -41,6 +41,9 @@ class OutputMetaQa(unittest.TestCase):
         self.assertEqual(item["checksumSha256"], hashlib.sha256(open(path, "rb").read()).hexdigest())
         for key in ("technical_qa", "signal_qa"):
             self.assertIn(item[key]["status"], ("passed", "warned"), key)
+        # pix_th is how dark a pixel must be, pic_th how much of the frame: pix_th=0.98 counted every normal frame as
+        # black (2026-10-26: a normal video reported blackRatio 0.83, so every technical QA warned).
+        self.assertLess(item["signal_qa"]["measurements"]["blackRatio"], 0.05)
 
     def test_a_black_output_is_warned(self):
         path = os.path.join(self.dir, "black.mp4")

@@ -211,7 +211,7 @@ def _signal_probe(path: str, duration: float) -> dict:
     """Collect black/freeze/loudness evidence with one bounded ffmpeg pass."""
     res = subprocess.run(
         ["ffmpeg", "-hide_banner", "-nostats", "-i", path,
-         "-vf", "blackdetect=d=0.5:pix_th=0.98,freezedetect=n=-60dB:d=0.5",
+         "-vf", "blackdetect=d=0.5:pic_th=0.98:pix_th=0.10,freezedetect=n=-60dB:d=0.5",
          "-af", "ebur128=framelog=verbose", "-f", "null", "-"],
         capture_output=True, text=True, timeout=60,
     )

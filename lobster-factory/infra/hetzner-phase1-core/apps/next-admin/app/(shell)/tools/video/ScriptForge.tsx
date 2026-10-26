@@ -332,16 +332,20 @@ function AnimatedPreview({script,onClose}){
   },[playing,currentScene]);
 
   function goTo(i){setPlaying(false);setCurrentScene(i);setCharIdx(0);setShowSubtitle(false);setShowVisual(false);}
+  useEffect(()=>{const onKey=(e:KeyboardEvent)=>{if(e.key==="Escape")onClose();};window.addEventListener("keydown",onKey);return()=>window.removeEventListener("keydown",onKey);},[onClose]);
   function togglePlay(){if(playing){setPlaying(false);clearInterval(intervalRef.current);}else{setPlaying(true);}}
 
   const bgColors=["#1a0a00","#0a001a","#001a0a","#1a1000","#001018","#180010"];
   const bg=bgColors[currentScene%bgColors.length];
 
   return(
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-      <div style={{width:"100%",maxWidth:440,background:C.white,borderRadius:20,overflow:"hidden",boxShadow:"0 24px 80px rgba(0,0,0,.4)"}}>
+    // A short window scrolls the overlay (margin:auto keeps it centered when it fits); the close button sits on the
+    // frame, so it is never pushed below the fold. Esc and a click on the backdrop close it too.
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:1000,display:"flex",padding:20,overflowY:"auto"}}>
+      <div onClick={e=>e.stopPropagation()} style={{margin:"auto",position:"relative",width:"100%",maxWidth:440,background:C.white,borderRadius:20,overflow:"hidden",boxShadow:"0 24px 80px rgba(0,0,0,.4)"}}>
+        <button type="button" onClick={onClose} aria-label="關閉預覽" title="關閉預覽（Esc）" style={{position:"absolute",top:10,right:10,zIndex:5,width:34,height:34,borderRadius:"50%",border:"1px solid rgba(255,255,255,.35)",background:"rgba(0,0,0,.55)",color:"#fff",fontSize:16,cursor:"pointer"}}>✕</button>
         {/* Phone frame */}
-        <div style={{background:bg,position:"relative",height:480,overflow:"hidden",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",transition:"background .5s"}}>
+        <div style={{background:bg,position:"relative",height:"min(480px, 52vh)",overflow:"hidden",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",transition:"background .5s"}}>
           {/* Animated bg shapes */}
           <div style={{position:"absolute",width:200,height:200,borderRadius:"50%",background:"rgba(255,255,255,.03)",top:-40,right:-40,animation:"float1 4s ease-in-out infinite"}}/>
           <div style={{position:"absolute",width:120,height:120,borderRadius:"50%",background:"rgba(255,255,255,.04)",bottom:-20,left:-20,animation:"float2 5s ease-in-out infinite"}}/>
@@ -351,7 +355,7 @@ function AnimatedPreview({script,onClose}){
 
           {/* Visual description pill */}
           {showVisual&&scene?.visual&&(
-            <div style={{position:"absolute",top:20,left:16,right:16,background:"rgba(255,255,255,.12)",borderRadius:10,padding:"8px 12px",backdropFilter:"blur(8px)",animation:"slideDown .4s ease",border:"1px solid rgba(255,255,255,.15)"}}>
+            <div style={{position:"absolute",top:20,left:16,right:56,background:"rgba(255,255,255,.12)",borderRadius:10,padding:"8px 12px",backdropFilter:"blur(8px)",animation:"slideDown .4s ease",border:"1px solid rgba(255,255,255,.15)"}}>
               <div style={{fontSize:9,color:"rgba(255,255,255,.5)",fontWeight:700,letterSpacing:1,marginBottom:3}}>🎬 畫面</div>
               <div style={{fontSize:11.5,color:"rgba(255,255,255,.85)",lineHeight:1.5}}>{scene.visual}</div>
             </div>

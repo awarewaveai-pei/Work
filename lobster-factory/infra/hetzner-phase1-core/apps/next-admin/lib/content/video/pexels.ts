@@ -39,8 +39,15 @@ interface PexelsVideoSearchResponse {
   videos?: PexelsVideo[];
 }
 
+/** 去掉 exclude 後隨機取一個；exclude 為空或全被排除分別回第一個／null。 */
+function pickExcluding(candidates: string[], exclude?: readonly string[]): string | null {
+  const left = exclude?.length ? candidates.filter((c) => !exclude.includes(c)) : candidates;
+  if (!left.length) return null;
+  return exclude?.length ? left[Math.floor(Math.random() * left.length)] : left[0];
+}
+
 /**
- * 以關鍵字搜尋 Pexels 照片，回傳第一張的 large2x URL（約 1280px 寬）。
+ * 以關鍵字搜尋 Pexels 照片，回傳第一張的 large2x URL（約 1280px 寬）；給 exclude（重新生成）時改從其餘結果隨機取。
  * @param keyword 英文搜尋關鍵字（建議 1–3 個單字）
  * @param apiKey  process.env.PEXELS_API_KEY
  * @param signal  可選的 AbortSignal（用於 timeout 控制）
@@ -50,9 +57,11 @@ export async function fetchBrollUrl(
   apiKey: string,
   signal?: AbortSignal,
   orientation: "landscape" | "portrait" = "landscape",
+  exclude?: readonly string[],
 ): Promise<string | null> {
   try {
-    const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(keyword)}&per_page=5&orientation=${orientation}`;
+    const perPage = exclude?.length ? 15 : 5;
+    const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(keyword)}&per_page=${perPage}&orientation=${orientation}`;
     const res = await fetch(url, {
       headers: { Authorization: apiKey },
       signal: signal ?? AbortSignal.timeout(8000),
@@ -63,12 +72,16 @@ export async function fetchBrollUrl(
     const data = (await res.json()) as PexelsPhotoSearchResponse;
     const photos = data.photos ?? [];
 
+    const candidates: string[] = [];
     for (const photo of photos) {
       const imgUrl = photo.src?.large2x || photo.src?.large;
-      if (imgUrl?.startsWith("https://") && new URL(imgUrl).hostname.endsWith(".pexels.com")) return imgUrl;
+      if (imgUrl?.startsWith("https://") && new URL(imgUrl).hostname.endsWith(".pexels.com")) {
+        if (!exclude?.length) return imgUrl;
+        candidates.push(imgUrl);
+      }
     }
 
-    return null;
+    return pickExcluding(candidates, exclude);
   } catch {
     // 網路錯誤、AbortError、JSON 解析失敗 — 一律 null，讓 Flux 接手
     return null;
@@ -87,9 +100,11 @@ export async function fetchBrollVideoUrl(
   apiKey: string,
   signal?: AbortSignal,
   orientation: "landscape" | "portrait" = "landscape",
+  exclude?: readonly string[],
 ): Promise<string | null> {
   try {
-    const url = `https://api.pexels.com/videos/search?query=${encodeURIComponent(keyword)}&per_page=5&orientation=${orientation}`;
+    const perPage = exclude?.length ? 15 : 5;
+    const url = `https://api.pexels.com/videos/search?query=${encodeURIComponent(keyword)}&per_page=${perPage}&orientation=${orientation}`;
     const res = await fetch(url, {
       headers: { Authorization: apiKey },
       signal: signal ?? AbortSignal.timeout(10000),
@@ -98,6 +113,7 @@ export async function fetchBrollVideoUrl(
 
     const data = (await res.json()) as PexelsVideoSearchResponse;
     const videos = data.videos ?? [];
+    const candidates: string[] = [];
 
     for (const video of videos) {
       const files = video.video_files ?? [];
@@ -120,9 +136,12 @@ export async function fetchBrollVideoUrl(
       ) ?? files.find(
         (f) => f.file_type === "video/mp4" && isAllowedVideoUrl(f.link),
       );
-      if (preferred?.link) return preferred.link;
+      if (preferred?.link) {
+        if (!exclude?.length) return preferred.link;
+        candidates.push(preferred.link);
+      }
     }
-    return null;
+    return pickExcluding(candidates, exclude);
   } catch {
     return null;
   }

@@ -1,4 +1,23 @@
 # Worklog
+## 2026-10-26（續20）— 影片工具：操作者實測 17 問題落檔＋5 個明確錯誤修正＋重新設計草案（Claude；實作派 cc.py Sonnet）
+
+- **觸發**：操作者實測 `/tools/video`、`/tools/script-forge` 回報一串問題，要求「先記下來」→「修剛剛發現的錯誤」＋「依專業角度設計」三種自動化程度／專案／結果頁／兩頁分工。
+- **落檔**：問題清單 `agency-os/docs/video_generator/VIDEO_TOOL_OPERATOR_FINDINGS_2026-10-26.md`（17 條，prod 唯讀實證：`media_releases`／`media_delivery_attempts`／`media_outcome_snapshots` 史上 0 筆）；設計 `VIDEO_TOOL_REDESIGN_2026-10-26.md`（D1–D10、R1–R6，待操作者看；全自動＝既有題目頁＋AUTO_CONTENT P6/P7，不另建）。
+- **根因與修正**（不變量各一句）：
+  - C1 黑畫面偵測永遠誤報：`apps/video-service/server.py:214` 用 `pix_th=0.98`（像素門檻）當畫面比例門檻 → 正常片 blackRatio 0.83、每支技術 QA 都 warned。改 `pic_th=0.98:pix_th=0.10`。不變量：好片 blackRatio<0.05 由測試釘住（舊測試接受 warned 才讓它溜過）。
+  - C2 QA 未通過被藏：`qa/reports/route.ts` 只回 passed/warned → 畫面顯示「尚無證據」。改回 failed＋只回 findings 摘要（`lib/content/video/qa-findings-summary.ts`，三種 report 形狀含字幕 `violations`）；`QaStep.tsx` 取最新一筆（原 Map 留最舊）、中文原因與四項說明。
+  - C3 重新生成同一張／只改一個比例：Pexels 永遠取第一筆 → `pexels.ts` 加 `exclude`（重生時排除舊的、從 15 筆隨機）；`VideoStudio.tsx` 重生與上傳改到每個比例；共用的舊圖以 `deleteOld:false` 只排除不刪（Codex 審查 F1）。
+  - C4 預覽視窗切頭尾、關閉鍵在畫面外：`ScriptForge.tsx` 覆蓋層可捲、框高 `min(480px,52vh)`、右上 ✕、Esc／點背景關閉。
+  - C5 字幕永遠 503：主機 `.env:214-216` 有值但 compose 未傳 → repo `docker-compose.yml` next-admin 加三個 `MEDIA_TRANSCRIBE_*`。主機 compose 未改（High，待操作者）；worker 筆電隨開隨用（tunnel 530）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=docker run vs-qa-test python -m unittest tests.test_output_meta_qa tests.test_quality（HEAD server.py → FAILED blackRatio 0.966667；新版 → 8 OK） | exit=0 | ms=1378
+- REALTEST_EVIDENCE: tool=SSH | cmd=ks-aw-01 ffmpeg signalstats 對操作者成片 b1730ab3 16x9（YAVG 54–153；pix_th=0.10 blackdetect 0 段）＋psql media_qa_reports／media_assets 唯讀 | exit=0 | ms=3299
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run qa-findings-summary.test.ts pexels-exclude.test.ts regenerate-image/route.test.ts customer-drill.test.ts（15+2+13 passed）；npx tsc --noEmit 0 error | exit=0 | ms=600
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：拔 regenerate-image/route.ts `&& body.deleteOld !== false` → route.test「keeps the old object」紅；還原 → 2 passed | exit=0 | ms=400
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n（Codex oracle 兩輪：`agency-os/reports/oracle/2026-10-26-partialreview-6d1d3697.md` 4m：F1 共用上傳素材被刪→已修＋突變；F2 主機 compose 不隨部署→已知、待 High；F3 技術 QA failed 不入庫→既有、記 findings 檔 R3；F4 字幕 violations 未摘要→已修。第二輪 `2026-10-26-partialreview-60341d3d.md` 2m＝F2、F3 重報，無新項）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=pix_th=0.98|回傳第一張|qa/reports|MEDIA_TRANSCRIBE_WORKER_URL | hits=2（`pix_th=0.98` 只剩測試註解與 findings 檔；`pexels.ts:50` 舊註解已改）
+- **未驗**：預覽視窗沒在瀏覽器看（本機 next dev 讀 `.env.local` 要登入，不代填密碼）；上線後操作者看。
+- **生效**：next-admin 2026-10-27 03:00 自動部署；video-service、主機 compose 需手動（High，未做）。
+- **rollback**：revert 本 commit；正式機未動。
 ## 2026-10-26（續19）— 正式映像只從鎖檔裝依賴（I7）；Claude API 2026-10-21 暫不遷移（Claude；操作者「你決定」）
 
 - **觸發**：外部警報「Claude API 2026-10-21 破壞性變更」。官方屬實（取樣參數移除、assistant document／user citations、Admin API 欄位、SDK 改送 `Authorization: Bearer`；API 兩種 header 皆收）。新 API 由 SDK Py≥2.0.0／TS≥1.0.0 預設送出。

@@ -162,6 +162,40 @@
           "cmd": "python -m pytest lobster-factory/packages/db/tests/test_0137_partner_referrals_writes.py"
         }
       ]
+    },
+    {
+      "id": "09-video-qa-show-failures",
+      "file": "cards/09-video-qa-show-failures.md",
+      "gate": null,
+      "depends": [],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin",
+          "cmd": "npx vitest run lib/content/video/__tests__/qa-findings-summary.test.ts"
+        },
+        {
+          "cwd": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin",
+          "cmd": "npx tsc --noEmit"
+        }
+      ]
+    },
+    {
+      "id": "10-video-regenerate-real",
+      "file": "cards/10-video-regenerate-real.md",
+      "gate": null,
+      "depends": [],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin",
+          "cmd": "npx vitest run lib/content/video/__tests__/pexels-exclude.test.ts"
+        },
+        {
+          "cwd": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin",
+          "cmd": "npx tsc --noEmit"
+        }
+      ]
     }
   ]
 }

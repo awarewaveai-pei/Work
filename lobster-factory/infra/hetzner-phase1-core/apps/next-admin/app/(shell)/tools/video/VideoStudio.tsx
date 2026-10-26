@@ -516,37 +516,51 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
     if (!scene || regenIds.has(sceneId)) return;
     const sceneIndex = draftScenes.findIndex((s) => s.id === sceneId);
     const activeFormat = draftPreviewFormat || draftFormats[0];
+    // 每個成片會用的比例各生一張；draftFormats 為空時退回只做正在看的比例。
+    const targets = draftFormats.length ? draftFormats : [activeFormat];
     setRegenIds((prev) => new Set(prev).add(sceneId));
     setGenError("");
     try {
-      const res = await fetch("/api/video/regenerate-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imagePrompt: scene.imagePrompt,
-          imageModel,
-          visualStyle: videoStyle ? resolveVideoStyle(videoStyle) : undefined,
-          brollKeyword: scene.brollKeyword,
-          visual: scene.visual,
-          oldImageUrl: scene.imageUrl,
-          format: activeFormat,
-          ...(embedded?.organizationId ? { organizationId: embedded.organizationId } : {}),
-        }),
-      });
-      const j = (await res.json()) as { ok: boolean; imageUrl?: string; error?: string };
-      if (j.ok && j.imageUrl) {
-        setDraftScenes((prev) => prev.map((s) => (s.id === sceneId ? { ...s, imageUrl: j.imageUrl! } : s)));
-        if (activeFormat && sceneIndex >= 0) {
-          setDraftFormatUrls((prev) => ({
-            ...prev,
-            [activeFormat]: (prev[activeFormat] ?? []).map((url, i) => (i === sceneIndex ? j.imageUrl! : url)),
-          }));
+      const oldOf = (fmt: string) => (fmt === activeFormat ? scene.imageUrl : draftFormatUrls[fmt]?.[sceneIndex]);
+      const results = await Promise.all(targets.map(async (fmt) => {
+        const oldImageUrl = oldOf(fmt);
+        // 同一張舊圖若還被別的比例用（上傳的素材會寫進每個比例），只排除不刪：某個比例重生失敗時它仍指著這張。
+        const shared = !!oldImageUrl && Object.keys(draftFormatUrls).some((f) => f !== fmt && (f === activeFormat ? scene.imageUrl : draftFormatUrls[f]?.[sceneIndex]) === oldImageUrl);
+        try {
+          const res = await fetch("/api/video/regenerate-image", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              imagePrompt: scene.imagePrompt,
+              imageModel,
+              visualStyle: videoStyle ? resolveVideoStyle(videoStyle) : undefined,
+              brollKeyword: scene.brollKeyword,
+              visual: scene.visual,
+              oldImageUrl,
+              ...(shared ? { deleteOld: false } : {}),
+              format: fmt,
+              ...(embedded?.organizationId ? { organizationId: embedded.organizationId } : {}),
+            }),
+          });
+          const j = (await res.json()) as { ok: boolean; imageUrl?: string; error?: string };
+          if (j.ok && j.imageUrl) return { fmt, imageUrl: j.imageUrl };
+          return { fmt, error: j.error ?? "圖片重新生成失敗" };
+        } catch (e: unknown) {
+          return { fmt, error: e instanceof Error ? e.message : "網路錯誤，重新生成失敗" };
         }
-      } else {
-        setGenError(j.error ?? "圖片重新生成失敗");
+      }));
+      const okResults = results.filter((r): r is { fmt: string; imageUrl: string } => "imageUrl" in r);
+      const failed = results.filter((r): r is { fmt: string; error: string } => "error" in r);
+      const activeOk = okResults.find((r) => r.fmt === activeFormat);
+      if (activeOk) setDraftScenes((prev) => prev.map((s) => (s.id === sceneId ? { ...s, imageUrl: activeOk.imageUrl } : s)));
+      if (sceneIndex >= 0 && okResults.length) {
+        setDraftFormatUrls((prev) => {
+          const next = { ...prev };
+          for (const r of okResults) next[r.fmt] = (prev[r.fmt] ?? []).map((url, i) => (i === sceneIndex ? r.imageUrl : url));
+          return next;
+        });
       }
-    } catch (e: unknown) {
-      setGenError(e instanceof Error ? e.message : "網路錯誤，重新生成失敗");
+      if (failed.length) setGenError(`比例 ${failed.map((f) => `${f.fmt}（${f.error}）`).join("、")} 重新生成失敗`);
     } finally {
       setRegenIds((prev) => { const n = new Set(prev); n.delete(sceneId); return n; });
     }
@@ -571,11 +585,15 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
       const j = (await res.json()) as { ok: boolean; imageUrl?: string; error?: string };
       if (j.ok && j.imageUrl) {
         setDraftScenes((prev) => prev.map((s) => (s.id === sceneId ? { ...s, imageUrl: j.imageUrl! } : s)));
-        if (activeFormat && sceneIndex >= 0) {
-          setDraftFormatUrls((prev) => ({
-            ...prev,
-            [activeFormat]: (prev[activeFormat] ?? []).map((url, i) => (i === sceneIndex ? j.imageUrl! : url)),
-          }));
+        if (sceneIndex >= 0) {
+          const uploaded = j.imageUrl;
+          // 上傳的素材改到成片會用的每一個比例（draftFormats 為空時只改正在看的比例）。
+          const targets = draftFormats.length ? draftFormats : activeFormat ? [activeFormat] : [];
+          setDraftFormatUrls((prev) => {
+            const next = { ...prev };
+            for (const fmt of targets) next[fmt] = (prev[fmt] ?? []).map((url, i) => (i === sceneIndex ? uploaded : url));
+            return next;
+          });
         }
       } else {
         setGenError(j.error ?? "上傳失敗");
@@ -1378,7 +1396,7 @@ function DraftEditor({
               </div>
               <button type="button" onClick={() => onRegenerate(scene.id)}
                 disabled={disabled || regenIds.has(scene.id)}
-                title="不喜歡這張圖？重新生成一張"
+                title={formats.length > 1 ? `重新生成這一場（${formats.length} 個比例各生一張，費用 ×${formats.length}）` : "不喜歡這張圖？重新生成一張"}
                 style={{
                   width: "100%", padding: "4px 0", borderRadius: 6, fontSize: 11, fontWeight: 600,
                   border: "1px solid var(--border-subtle)",

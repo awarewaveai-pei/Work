@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "@/lib/ops-role";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { summarizeQaFindings } from "@/lib/content/video/qa-findings-summary";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,9 +20,9 @@ export async function GET(req: Request): Promise<Response> {
   const db = getSupabaseWriteClient();
   if (!db) return NextResponse.json({ ok: false, error: "db unavailable" }, { status: 503 });
   let query = db.from("media_qa_reports")
-    .select("id, organization_id, candidate_asset_id, candidate_checksum, qa_kind, capability_id, capability_version, profile_id, profile_version, status, report_sha256, created_at")
+    .select("id, organization_id, candidate_asset_id, candidate_checksum, qa_kind, capability_id, capability_version, profile_id, profile_version, status, report_sha256, created_at, report_json")
     .eq("organization_id", organizationId)
-    .in("status", ["passed", "warned"])
+    .in("status", ["passed", "warned", "failed"])
     .order("created_at", { ascending: false })
     .limit(500);
   if (candidateAssetId) query = query.eq("candidate_asset_id", candidateAssetId);
@@ -39,6 +40,7 @@ export async function GET(req: Request): Promise<Response> {
     capabilityVersion: row.capability_version,
     reportSha256: row.report_sha256,
     createdAt: row.created_at,
+    findings: summarizeQaFindings(row.report_json),
   }));
   return NextResponse.json({ ok: true, items });
 }

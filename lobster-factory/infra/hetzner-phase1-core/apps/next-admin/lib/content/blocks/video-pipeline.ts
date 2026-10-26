@@ -315,6 +315,8 @@ export async function buildSceneAsset(
      * opts.imageModel/fluxModel 的一般選型，換取跨場景角色一致性。
      */
     referenceImageUrl?: string;
+    /** 重新生成時要避開的 Pexels 素材 URL（只影響 Pexels 路徑；AI 生圖同 prompt 本來就會出新圖）。 */
+    excludeAssets?: readonly string[];
   },
 ): Promise<AssetResult> {
   const pexelsKey = process.env.PEXELS_API_KEY as string | undefined;
@@ -326,17 +328,17 @@ export async function buildSceneAsset(
   // pexels-video 模式：抓 Pexels 影片片段（MP4 URL → EU stream_loop）
   if (forcePexelsVideo && pexelsKey) {
     const keyword = scene.broll_keyword || scene.image_prompt.split(" ").slice(0, 3).join(" ");
-    const videoUrl = await fetchBrollVideoUrl(keyword, pexelsKey, undefined, orientation);
+    const videoUrl = await fetchBrollVideoUrl(keyword, pexelsKey, undefined, orientation, opts.excludeAssets);
     if (videoUrl) return { ok: true, asset: videoUrl };
     // 影片抓失敗 → 降級 Pexels 照片（EU zoompan 仍可出片）
-    const photoUrl = await fetchBrollUrl(keyword, pexelsKey, undefined, orientation);
+    const photoUrl = await fetchBrollUrl(keyword, pexelsKey, undefined, orientation, opts.excludeAssets);
     if (photoUrl) return { ok: true, asset: photoUrl };
     return { ok: false, status: 502, error: `場景 ${scene.id} Pexels 影片與照片均搜尋失敗（keyword: ${keyword}）` };
   }
   // Pexels 照片路徑：明確選 pexels-all（全部場景），或 Claude 判定為 broll 場景
   if ((forcePexels || scene.visual === "broll") && pexelsKey) {
     const keyword = scene.broll_keyword || scene.image_prompt.split(" ").slice(0, 3).join(" ");
-    const brollUrl = await fetchBrollUrl(keyword, pexelsKey, undefined, orientation);
+    const brollUrl = await fetchBrollUrl(keyword, pexelsKey, undefined, orientation, opts.excludeAssets);
     if (brollUrl) return { ok: true, asset: brollUrl };
     // pexels-all 模式：Pexels 抓失敗 → 不 fallback Flux（避免非預期費用）
     if (forcePexels) return { ok: false, status: 502, error: `場景 ${scene.id} Pexels 搜圖失敗（keyword: ${keyword}）` };
