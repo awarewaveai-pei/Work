@@ -10,15 +10,17 @@ import type { Grant } from "@/lib/entitlements/can";
 import { renderSiteVoice } from "@/lib/content/brand-voice";
 import { loadSiteBrand } from "@/lib/content/brand-voice-store";
 import { listFolders } from "@/lib/kb/folders";
+import type { TrendingGeo } from "@/lib/content/geos";
 import { recentTrends } from "./trends";
 import { monthKey, proposeTopics, TOPIC_FORMATS, type NewTopic, type Topic, type TopicFormat } from "./store";
 
 export const PLAN_TOPICS = 28;
 const DEFAULT_FORMATS: TopicFormat[] = ["article", "social"];
 
-/** content_defaults.targetCountry (the article tool's list) -> trending geo; anything else plans from Taiwan's trends. */
-const GEO_FOR_COUNTRY: Record<string, string> = { 台灣: "TW", 香港: "HK", 新加坡: "SG", 美國: "US", 英國: "GB", 日本: "JP", 澳洲: "AU" };
-export const geoFor = (country: string | undefined) => GEO_FOR_COUNTRY[(country ?? "").trim()] ?? "TW";
+/** content_defaults.targetCountry (the article tool's list) -> trending geo. A market with no trending source (or
+ *  「全球」) is null: it plans from its brand and knowledge base only, never from another country's trends. */
+const GEO_FOR_COUNTRY: Record<string, TrendingGeo> = { 台灣: "TW", 香港: "HK", 新加坡: "SG", 美國: "US", 英國: "GB", 日本: "JP", 澳洲: "AU" };
+export const geoFor = (country: string | undefined): TrendingGeo | null => GEO_FOR_COUNTRY[(country ?? "").trim()] ?? null;
 
 export interface PlanContext {
   siteName: string;
@@ -111,8 +113,9 @@ export async function proposeMonth(sb: SupabaseClient, input: ProposeMonthInput,
   const month = monthKey(input.month);
   const [y, m] = month.split("-").map(Number);
   const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const geo = geoFor(site.defaults.targetCountry);
   const [trends, folders] = await Promise.all([
-    recentTrends(sb, geoFor(site.defaults.targetCountry), 30, 50),
+    geo ? recentTrends(sb, geo, 30, 50) : Promise.resolve([]),
     listFolders(input.organizationId),
   ]);
   const ctx: PlanContext = {

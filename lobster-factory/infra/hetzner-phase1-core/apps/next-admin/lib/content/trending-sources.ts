@@ -319,7 +319,41 @@ searchBlock({
   },
 });
 
-// ⑤ 營運自訂 feed（env，免改 code 增刪；未來 DB/UI 走同一條 register）
+// ⑤ Google Trends 每日熱搜 RSS（免費；<ht:approx_traffic> 不解析，只取 title）
+rssSearchBlock({
+  id: "search/google-trends",
+  title: "Google Trends",
+  icon: "📈",
+  geos: "*",
+  limit: 20,
+  source: "Google Trends",
+  url: (geo) => `https://trends.google.com/trending/rss?geo=${geo}`,
+});
+
+// ⑥ YouTube 熱門影片（Data API 免費額度；YOUTUBE_API_KEY 在才啟用，沒 key 不報錯）
+searchBlock({
+  id: "search/youtube-trending",
+  title: "YouTube 熱門",
+  icon: "▶️",
+  geos: "*",
+  enabled: !!process.env.YOUTUBE_API_KEY,
+  run: async (geo) => {
+    const apiKey = process.env.YOUTUBE_API_KEY;
+    if (!apiKey) return [];
+    const q = new URLSearchParams({ part: "snippet", chart: "mostPopular", regionCode: geo, maxResults: "20", key: apiKey });
+    try {
+      const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?${q}`, { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) return [];
+      const data = await res.json() as { items?: Array<{ snippet?: { title?: string } }> };
+      return (data.items ?? [])
+        .map((it) => it.snippet?.title?.trim() ?? "")
+        .filter((title) => title.length > 3)
+        .map((title) => ({ title, traffic: "", category: "", relatedQueries: [], source: "YouTube" }));
+    } catch { return []; }
+  },
+});
+
+// ⑦ 營運自訂 feed（env，免改 code 增刪；未來 DB/UI 走同一條 register）
 (function registerEnvCustomFeeds() {
   const raw = process.env.CONTENT_TRENDING_FEEDS;
   if (!raw) return;

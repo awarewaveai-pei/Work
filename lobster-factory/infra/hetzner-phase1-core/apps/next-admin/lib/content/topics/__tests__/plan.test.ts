@@ -42,10 +42,11 @@ describe("prompt and geo", () => {
     expect(p).toContain("- 藝術治療 202610");
   });
 
-  it("maps the article tool's countries to trending geos, Taiwan otherwise", () => {
+  it("maps the article tool's countries to trending geos; a market with no trending source is null, not Taiwan (B9)", () => {
     expect(geoFor("日本")).toBe("JP");
-    expect(geoFor("全球（不指定）")).toBe("TW");
-    expect(geoFor(undefined)).toBe("TW");
+    expect(geoFor("全球（不指定）")).toBeNull();
+    expect(geoFor("德國")).toBeNull();
+    expect(geoFor(undefined)).toBeNull();
   });
 });
 
@@ -64,5 +65,14 @@ describe("proposeMonth", () => {
     await proposeMonth({} as never, { organizationId: "org-a", siteId: "s", month: "2026-11-15", actor: "ops:owner:u" }, ask);
     expect(m.trends).toEqual(["HK"]);
     expect(m.proposed).toEqual([expect.objectContaining({ organization_id: "org-a", site_id: "s", created_by: "ops:owner:u", month: "2026-11-01", keyword: "k" })]);
+  });
+
+  it("a market with no trending source reads no trends and says so in the prompt (B9)", async () => {
+    m.site = { siteId: "s", organizationId: "org-a", name: "Berlin", defaults: { targetCountry: "德國" } };
+    m.trends = [];
+    const ask = vi.fn(async (_p: string) => JSON.stringify({ topics: [{ day: 2, title: "t", keyword: "k" }] }));
+    await proposeMonth({} as never, { organizationId: "org-a", siteId: "s", month: "2026-11", actor: "x" }, ask);
+    expect(m.trends).toEqual([]);
+    expect(ask.mock.calls[0][0]).toMatch(/近 30 天的熱門話題[^\n]*\n（無）/);
   });
 });
