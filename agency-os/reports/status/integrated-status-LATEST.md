@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-10-26 05:46:57
+- Generated: 2026-10-26 23:37:09
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -353,6 +353,8 @@
 
 ## Done today
 
+- 本收尾窗口自2026-10-25T21:47:37Z：workflows漏洞15→0、deepmerge豁免刪除、136測試與型別檢查通過；正式Trigger20261026.3及真實任務7/7。提交392d7fda8，詳細證據WORKLOG續24／25。
+- 同期提交：watchdog exit126修復與正式套用；deny鏡像quote解析、部署鎖檔安裝；影片5錯誤與字幕環境修復上線、D11字幕來源定案；AUTO_CONTENT P9.1每日熱搜與新來源、P9.3/P9.5卡片；影片V1–V7拆卡，監工台暫停。
 - 補收尾窗口自 2026-10-25T20:41:21Z（台灣 10/26 04:41）起：前次正式報告與證據已提交；109 份已完成文件／證據以 `483679655` 推送。私有 index 路徑錯誤造成的本地 commit `cbb63162f` 未推送且已復原；18 項 quarantine 已由 Claude 逐一審查後結案（WORKLOG 續10，操作者確認）。Claude 的 git 原生防大量刪檔檢查已提交 `d161d2ae9`／`7681287eb`。
 - 覆蓋本收尾窗口（上次 AO-CLOSE 2026-10-24T20:53:07Z 起）：完成 0128／wp-bridge credit pack 無期末、YouTube P7 真實影片、Trigger host cron／告警 C2–C6、0133–0137 控制面寫入收窄與多項 next-admin／billing／content 修正。
 - 修復 app、Social、video、portal 及共享產品入口的 nginx `Request Header Or Cookie Too Large`；safe-infra-patch、靜態測試、7-door public probe、Chrome 驗證均通過，正式備份可回滾。
@@ -360,6 +362,7 @@
 
 ## Current state
 
+- 套件安全掃描total/high/critical/moderate均0；Trigger正式20261026.3。下一輪以TASKS與執行計畫為準，影片與內容卡片尚未全部實作。
 - nginx 入口已恢復；portal 進入預期的客戶帳號限制流程，不是 nginx 400。
 - 05:29 檢查時 main 與 origin/main 同為 `483679655`，9132 個追蹤檔一致；其後已納入防大量刪檔檢查。收尾以本次實際 git 狀態為準，不把某一刻乾淨誤當成所有 session 永遠沒有新工作。
 - 仍有多項產品、法遵、瀏覽器驗證與操作者決策待辦，詳見 `agency-os/TASKS.md`。
@@ -389,7 +392,7 @@
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-10-26 04:40:50`
+- Time: `2026-10-26 23:37:01`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -399,8 +402,8 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20261026-044036.md`
-- Closeout: `reports/closeout/closeout-20261026-044050.md`
+- Health: `reports/health/health-20261026-233645.md`
+- Closeout: `reports/closeout/closeout-20261026-233700.md`
 
 ## Action
 - No blocking issue detected.
