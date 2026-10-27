@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-27（續6）— PHP2Shell 全部已知運行環境修補完成
+
+- 授權：操作者「去全部幫我處理好」；先前候選 cfd5fdf07 已獨立審查 PASS；合併每日 scaffold 後推送630e062e1，主站僅由 sg-deploy.sh wordpress 部署，exit0、5個HTTP smoke全過。MainWP/Soulful走safe-infra-patch compose，healthy分別15s/9s。
+- 實機結果（2026-10-27 01:13Z）：lobster-wordpress/mainwp-web/soulful-wp均PHP8.2.35、session.upload_progress.enabled=0、Apache php_module、healthy；MainWP對主站/Soulful重新網頁同步後phpversion皆8.2.35。Core維持主站/MainWP7.1.3、Soulful6.9.10；未更新外掛/DB。Soulful redis6.3.0/igbinary3.2.17RC1/msgpack3.0.1全保留。
+- 全域盤點：ks-aw-01先前57容器中3個PHP；MainWP3站＝主站/Soulful/同主站PHP的E2E測試子站；organizations僅2個正式URL（app SaaS、Soulful），另1失效E2E URL/3無URL，不把測試列當客戶正式站。舊Hostinger凍結副本另以原SSH與指定舊IP的HTTPS確認PHP8.2.35（x-powered-by），CLI upload_progress=false、郵件凍結guard仍在；未改其內容或排程。
+- 筆電：WinGet PHP8.4.19→8.4.27，再完整套官方Windows重建8.4.27-1（PHP source版本仍8.4.27），同一套件目錄與別名、保留php.ini；archive SHA256 dbae154a0a89791f36c3d48e68bae797878333e7d6cb5721e74617de59b63ab7與官方releases.json一致；實跑PHP8.4.27、upload_progress=0、cURL Brotli1.2.1。備份=C:/Users/user1115/AppData/Local/AwareWave/backups/php-security-20261027-091020/runtime（WinGet更新後、重建前8.4.27）；未改Windows應用程式控制政策，新版已可正常執行。
+- 備份：Soulful DB17M+完整volume762M=/root/backups/20261027-010559，gzip/tar驗證、R2分片上傳成功且.verify存在；主站DB928K+完整檔144M=/root/lobster-phase1/backups/20261027-011019（含staging DB），R2成功；MainWP全檔+DB=/root/php-security-20261027/mainwp-{files.tgz,db.sql.gz}，完整性與SHA256通過。舊migrate-to-vps.sh因source dotenv空白值失敗，改沿用backup-eu-stack.sh的容器環境dump方法完成，未修改.env。
+- 回滾保留：root sg-deploy本次snapshot（root-deploy.log有Saved tag）；Soulful image rollback-20261027與舊:local；MainWP wordpress:mainwp-rollback-20261027。各compose/Dockerfile/ini皆有safe-patch備份；回復compose也須走safe-infra-patch；舊版有已知漏洞，僅緊急回復用。
+- REALTEST_EVIDENCE: tool=SSH | cmd=MainWP backup SHA256 gate + safe-infra-patch compose + PHP version/setting assertion + HTTPS wp-login 200 | exit=0 | ms=20887
+- REALTEST_EVIDENCE: tool=SSH | cmd=Soulful full backup integrity + safe-infra-patch compose + PHP/PECL assertions + origin homepage/login/REST 200 | exit=0 | ms=27746
+- REALTEST_EVIDENCE: tool=SSH | cmd=existing check_service+check_running for wordpress/mainwp-web/soulful-wp:3services/0problems | exit=0 | ms=1659
+- 瀏覽器：三站client各7/7 PASS；系統smoke26 PASS/6原有skip/0FAIL，未宣稱涵蓋skip的登入後wizard。證據=agency-os/reports/e2e/2026-10-27/php-security/；命令與原始log=%TEMP%/aw-php-security-20261027/。部署後三PHP容器log無Fatal/Parse/Uncaught/segfault。
+- 邊界：整份live root compose掃描另報node-api/hci-app舊staging Dockerfile的2個I7 npm install無鎖；不是本次PHP服務，未更改或宣稱全stack I7通過。對本次3服務逐項套既有checker均0問題；其餘正式服務未重啟。
+- 文件：DEPLOY_ROLLBACK_RUNBOOK服務表與Soulful ENVIRONMENT_REGISTRY更新現況；舊部署與Discovery快照不追改。doc-sync完成、跨機BOM139/139；部署後 /health 100%（320/320），報告health-20261027-091925.md。本機Docker11個運行中映像為Trigger/COS資料庫與建置服務，未見PHP映像；無php/php-cgi/httpd行程或IIS服務。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+  - 兩份現況文件逐欄對照SSH/MainWP/備份證據，回滾不還原無改動的DB；本次只提交文件，先前7檔source審查artifact維持2026-10-27-review-be906f48.md。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=session\.upload_progress\.enabled（排除WORKLOG/JSON/log/node_modules/.next/vendor/.venv） | hits=6（5個source設定/斷言檔＋原oracle記錄，無漏修運行環境）
+- ORACLE_WAIVED: DOC_ONLY -- 本次僅部署證據、操作正本與環境表；source已於cfd5fdf07經Claude SDK API獨立審查，不重複審查未改動程式碼。
+- WORKLOG_DONE: 本條；保留平行session的TASKS、WORKLOG、source及狀態快照。
+
 ## 2026-10-27（續5）— aware-wave.com 恢復管理員 2FA，補準確登入稽核
 
 - 授權：操作者「去處理好」，並確認仍有原驗證器；不重設密碼、TOTP 或復原碼，不撤銷現存登入。風險：登入保護變更；回復＝個別停用外掛／移出 MU 串接，不整庫覆寫新訂單。

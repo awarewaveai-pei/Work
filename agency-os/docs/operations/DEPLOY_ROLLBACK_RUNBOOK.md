@@ -40,7 +40,8 @@
 | `nginx` | `nginx:stable`（upstream tag） | 改 compose image tag → `docker compose pull nginx && up -d nginx` |
 | `redis` | `redis:7-alpine`（upstream tag） | 同上 |
 | `wordpress-db` | `mariadb:11`（upstream tag） | **大版本升級需 DR drill**；非緊急不輕易回滾 |
-| `mainwp-web` (EU) | `wordpress:6.7-apache`（upstream tag） | `/root/mainwp/scripts/migrate-to-vps.sh backup` → 改 compose image tag → `docker compose up -d` → restore DB/files。Owner doc: `docs/wordpress_mainwp_plan.md` §25.4 |
+| `mainwp-web` | `wordpress:php8.2-apache`（PHP 8.2.35；digest 正本：`lobster-factory/infra/mainwp/docker-compose.yml`） | 備份沿用 `/root/scripts/backup-eu-stack.sh`（容器環境讀 DB 密碼）；`safe-infra-patch.sh compose /root/mainwp/docker-compose.yml mainwp-web` 套單站設定。回滾還原本次 compose 備份的 image tag/digest 與掛載，再走相同閘；資料未變更時不還原 DB。舊 `migrate-to-vps.sh` 會把 dotenv 當 shell 執行，現有值含空白時失敗，不作更新前備份入口 |
+| `soulful-wp` | `soulful-wordpress:php8.2.35-r1` | `/root/scripts/backup-ks-aw-01.sh` 備份並確認 R2；先建新 tag，保留舊 image，再由 `safe-infra-patch.sh compose /root/soulful/docker-compose.yml soulful-wp` 切換。回滾還原本次 compose 備份；Dockerfile／ini 各有 safe-patch 備份 |
 | `mainwp-db` (EU) | `mysql:8.0`（upstream tag） | mysqldump 備份優先；大版本升級需 DR drill |
 
 ---
