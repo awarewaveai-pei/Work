@@ -1,4 +1,20 @@
 # Worklog
+
+## 2026-10-27（續7）— staging 不覆蓋正式 site-watch 網址：next-admin 正式部署
+
+- [授權] 操作者明示允許推送並部署 next-admin；先前本機提交 `3d4b0811667b286036b7955f12f68c7b72c5a8de` 的 HEAD 獨立 typecheck 通過。`git push origin main` exit=0（僅推該提交）；deploy hold 不存在。
+- [部署] `sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin` 的 SSH MCP 呼叫在 300 秒工具期限屆滿，但主機程序繼續，從 `/root/lobster-phase1/logs/sg-deploy-20261027-055339.log` 讀到 2026-10-27T06:00:18Z `=== sg-deploy complete ===`；`.deployed-commit` 精確等於 `3d4b0811667b286036b7955f12f68c7b72c5a8de`。`lobster-next-admin` healthy，腳本 HTTP smoke 的 /login、/api/ops/summary、nginx/wordpress、node-api health、nginx/api 全部 200。
+- [業務驗收] `scripts/check-site-watch-health.ps1` exit=0：overall PASS、2 個 monitored targets、0 overdue、0 owed notifications；正式 `organizations.metadata.client_config.site_url`：awarewave-ops=`https://app.aware-wave.com`、soulful-expression=`https://soulfulexpression.org`，均未被 staging 網址覆寫。原 code 的兩種 URL 狀態回歸測試與 mutation 紅綠證據見 WORKLOG 2026-10-27（續4）。TASKS 將本項移入完成歷程。
+- [部署後 smoke] `scripts/playwright-runner.ps1 -Mode smoke -SkipInstall` 第一輪：JSON 25 pass／6 skip／1 fail（/ops/clients 導航 30 秒超時），PowerShell 另因 NO_COLOR/FORCE_COLOR 警告當 NativeCommandError 退出；單獨 HEAD /ops/clients 回 HTTP 200。移除 NO_COLOR 重試一次：25 pass／6 skip／1 fail，這次 root 頁面已渲染登入表單，但 Chromium `Page.captureScreenshot` 回 `Unable to capture screenshot`。失敗的 root 案單獨再跑 exit=0（1 pass）。全套 smoke **未全綠**，不能宣稱通過；證據 `agency-os/reports/e2e/2026-10-27/smoke/results.json`（第二輪）。
+- [剩餘漂移] `scripts/check-deploy-drift.ps1 -AppCodeOnly -SkipFetch`：next-admin app-code behind=0；composeVarDrift=8 個既有 Meta 變數只在 repo、伺服器未套用，sg-deploy 不同步 compose。本次不動此差異。
+- REALTEST_EVIDENCE: tool=SSH | cmd=讀 sg-deploy log、.deployed-commit、docker ps、Supabase 兩站正式 site_url | exit=0 | deployed SHA 相符、healthy、URL 正確
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell scripts/check-site-watch-health.ps1 | exit=0 | PASS，2 targets，0 overdue
+- REALTEST_EVIDENCE: tool=Bash | cmd=playwright-runner.ps1 -Mode smoke -SkipInstall（兩輪）及單獨 root 案 | exit=1,1,0 | 全套 25 pass／6 skip／1 fail；單案 1 pass
+- REVIEW_WAIVED: DOC_ONLY -- 本條只記錄已授權部署與驗收；source review、mutation、typecheck 見同日續4，部署腳本有健康及 HTTP smoke/自動回滾閘。
+- BUGHUNT_WAIVED: DOC_ONLY -- 本條未修改 source；核對正式 metadata、site-watch consumer 與部署版本已在業務驗收。
+- ORACLE_WAIVED: DOC_ONLY -- 本條無 source 修改；程式跨模型 CLI 不可用及替代驗證已於續4揭露。
+- [rollback] next-admin 如出現與此部署相關的正式故障，使用 `sg-deploy.sh` 既有回滾流程回到先前部署 commit `630e062e1450736d0676ca6f0112a4f1b359c515`；不要用全站 compose 回退或覆蓋其他 session 的變更。未執行回滾。
+
 ## 2026-10-27（續6）— PHP2Shell 全部已知運行環境修補完成
 
 - 授權：操作者「去全部幫我處理好」；先前候選 cfd5fdf07 已獨立審查 PASS；合併每日 scaffold 後推送630e062e1，主站僅由 sg-deploy.sh wordpress 部署，exit0、5個HTTP smoke全過。MainWP/Soulful走safe-infra-patch compose，healthy分別15s/9s。

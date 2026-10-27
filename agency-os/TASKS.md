@@ -212,7 +212,6 @@
 - [ ] **【未開始｜先預留】Composable AI Commerce OS** — 藍圖已吸收為參考素材（`agency-os/docs/Composable AI Commerce OS/`，含 Master Plan / Implementation Roadmap / LEGO Documentation Pack；absorbed via commit `97cdea3ed`）。操作者 2026-09-05 明示「之後要做，先預留」，**目前不動工**，勿主動排入排程；待操作者明示啟動再展開任務拆解。
 - [ ] **【2026-09-07 開，低優先，操作者決定】兩個未決**：① all-users Start Menu 捷徑（`%ProgramData%\...\Docker Desktop.lnk`）繞過守衛，需一次性 elevated session 手動 retarget（runbook 已附指令，非本次自動執行——腳本本身維持 unelevated）；② `run.socket-archive-*` 封存目錄保留政策（目前 rename-only 永不刪，已 5 個，各 0 bytes——維持或 14 天後清）。
   - 出自：**Cognitive OS Phase 5 落地後續（ADR-022 OPEN gates；2026-09-03 開；…（母項已完成，移至已完成歷程 2026-10-23）
-- [ ] **【site-watch｜客戶站】staging 佈建不得覆蓋正式巡檢網址** — 2026-10-27 已修 next-admin：staging 另存 `client_config.staging_url`，保留 `site_url`；兩種正式網址狀態的回歸測試與 typecheck 通過。待 High-STOP 正式部署及部署後 site-watch 驗收（見 WORKLOG 2026-10-27（續4））。
 
 #### C. 🔒 卡在外部（客戶／廠商／額度／買機）
 
@@ -493,6 +492,7 @@
 
 ### 2026-10-27 — AO-RESUME 舊待辦核銷
 
+- [x] staging 佈建覆蓋正式巡檢網址已修復並部署 `3d4b08116`；正式 `site_url` 保留、staging 另存 `staging_url`，site-watch 2 目標健康且無逾期（見 WORKLOG 2026-10-27（續7））。
 - [x] MainWP 外洩登入名稱已輪換；原管理員 ID、密碼雜湊、角色及 3 個子站保留，新登入名稱存於本機 vault `MAINWP_ADMIN_LOGIN`（見 WORKLOG 2026-10-27（續4））。
 - [x] COS 10/8 擦除資料遺失阻斷與步驟 2 待儲存切換敘述已過期：耐故障 erasure outbox 見 `Projects/internal/cognitive-engineering-os/docs/platform/STORAGE_SWITCH.md`；10/10 已完成 PostgreSQL 切換與上線，證據見 `GO_LIVE.md` 與 WORKLOG 2026-10-10（續1）。舊交接包留作歷史。
 
