@@ -199,12 +199,10 @@
   - 出自：危機訊息正式環境驗收（操作者 2026-10-23 打勾；本項是它內文「剩」的那一步）
 - [ ] 產品決定：知識庫內容／模型／prompt 變動要不要讓「考過」失效並自動重考（計畫 §5.2 CI 閘）。現況不失效；網站每週重爬，若失效又沒自動重考，自動回覆每週會退回草稿。見 WORKLOG 2026-10-16（續11）「沒涵蓋」。
   - 出自：**【✅ 2026-10-15】Messenger 雙粉專接通 + Chatwoot 4.6.0→4.18.0**：So…（母項已完成，移至已完成歷程 2026-10-23）
-- [ ] Soulful 常見問答的價格／時間／地點／報名是**測試值**（WORKLOG 2026-10-16（續22））：對外宣傳前操作者給真值，在客服分頁「常見問答」改 `pricing`／`schedule`／`location`（＋ -en）四條。
+- [ ] Soulful 常見問答正式資料待定：2026-10-27 已將正式環境價格／時間／地點／報名的中英測試值共 8 條撤下，改為「尚未定案、轉真人」；操作者確認正式資料後，再到客服分頁更新這 8 條（見 WORKLOG 2026-10-27（續4））。
   - 出自：**【✅ 2026-10-15】Messenger 雙粉專接通 + Chatwoot 4.6.0→4.18.0**：So…（母項已完成，移至已完成歷程 2026-10-23）
 - [ ] Chatwoot 基本設定（`lib/cs/chatwoot-baseline.ts`）：自動結案＋結案巨集已**自動套用**（存個人 token 時一次＋每日排程 `cs_chatwoot_baseline`，WORKLOG 2026-10-16（續29））。剩：①操作者到 `/ops/schedules` 勾 Soulful 這一格（預設關）②標籤、預設回覆、收件匣營業時間仍手動，有第二個客服客戶時再納入。
   - 出自：**【✅ 2026-10-15】Messenger 雙粉專接通 + Chatwoot 4.6.0→4.18.0**：So…（母項已完成，移至已完成歷程 2026-10-23）
-- [ ] **【從舊 EU-origin 項拆出，仍待辦】`awmainwp` 帳號名已外洩（320 次針對性嘗試），改名或加 2FA** — 需操作者在 MainWP 後台執行，與主機拓樸無關。
-  - 出自：**【✅ MOOT，2026-08-30 稽核確認】~~EU origin 仍未鎖 Cloudflare~~** — 本…（母項已完成，移至已完成歷程 2026-10-23）
 - [ ] **HCI-30 C6 真實登入串接計畫（2026-09-17 `planner` 產出，審閱中，未授權執行）** — 12 個 Task Prompt，Task 3/5/6/7/9 為 High-risk STOP。計畫：`Projects/internal/hci30/docs/HCI_C6_REAL_LOGIN_PLAN.md`。C6 仍為 DEFERRED，本項只記錄計畫已產出，不代表開工授權。**2026-09-18 補記（Task 10 critic 覆審 Major，未修，已追蹤）**：`app/server.mjs` 的既有「尚無 auth 層」缺口，因 Task 10 新增 `POST /api/hci/v1/seeds` 而具體化——該端點無 rate limit，由外部輸入 `targetUrl` 驅動後端對任意外部網址發真實 fetch，暴露前需先解決（rate limit 或本 C6 計畫其中之一）；目前僅本機單一受信任操作者使用，未對外暴露，非阻塞。詳見 WORKLOG 2026-09-18（續5）。
 - [ ] **【2026-08-26 開出｜營運｜搬站前必處理｜⚠️ 2026-08-30 稽核：疑似 MOOT，需操作者確認】soulful 週備份近 10 次有 5 次失敗，最新一次就是失敗** — 現況查證：`BACKUP_AUTO_STATUS.json` 最新 3 筆已全部 `Succeeded`（2026-08-26 起），`last_failure`（2026-08-24）已不是最新事件，本項描述的即時狀態已經過期。**更根本的是**：這條追的是 Hostinger 時代 WPvivid→Google Drive 那條備份鏈；Soulful 已於 2026-08-28 正式切換 Hostinger→ks-aw-01（`WORKLOG.md` "🎉 Soulful 正式切換完成"），現行備份走全新的 `ks-aw-01-backup` 管線（已實測 PASS，見 WORKLOG 2026-08-27）。舊 WPvivid 鏈的失敗模式**很可能隨舊主機一起結束**，但 WPvivid 外掛在新機上是否還在跑、是否該完全停用，本次稽核未查證，故列 MOOT 疑似而非直接關閉——需操作者確認新機上是否還留著這條舊備份路徑。
   - **這不是偵測器問題**Phase 4 Check 3 今天已經在正確地叫（3B「距上次成功 9 天」+ 3C「最新一次失敗」），是備份本身壞了。
@@ -214,9 +212,7 @@
 - [ ] **【未開始｜先預留】Composable AI Commerce OS** — 藍圖已吸收為參考素材（`agency-os/docs/Composable AI Commerce OS/`，含 Master Plan / Implementation Roadmap / LEGO Documentation Pack；absorbed via commit `97cdea3ed`）。操作者 2026-09-05 明示「之後要做，先預留」，**目前不動工**，勿主動排入排程；待操作者明示啟動再展開任務拆解。
 - [ ] **【2026-09-07 開，低優先，操作者決定】兩個未決**：① all-users Start Menu 捷徑（`%ProgramData%\...\Docker Desktop.lnk`）繞過守衛，需一次性 elevated session 手動 retarget（runbook 已附指令，非本次自動執行——腳本本身維持 unelevated）；② `run.socket-archive-*` 封存目錄保留政策（目前 rename-only 永不刪，已 5 個，各 0 bytes——維持或 14 天後清）。
   - 出自：**Cognitive OS Phase 5 落地後續（ADR-022 OPEN gates；2026-09-03 開；…（母項已完成，移至已完成歷程 2026-10-23）
-- [ ] **【site-watch｜客戶站】建 staging 會把客戶的正式網址蓋成 staging 網址 → site-watch 改巡 staging、正式站沒人看**
-  - `🟡 潛伏` · `2026-09-26 發現` · `待操作者決定修法（動 next-admin＋部署＝High）`
-  - `app/api/internal/hosting/provision-staging/route.ts:264-266` 接線時無條件寫 `client_config.site_url = cleanUrl`（staging 網址），蓋掉 `app/api/build/runs/route.ts:89-90` 先寫的正式網域；已上線客戶若再建 staging 也一樣。site-watch 每次依當下 `site_url` 算頁（`lib/site-watch/pages.ts:31-35`、`runner.ts:60,67`），換網址 = 舊頁退役、新頁重拍基準，不會報警。修法方向：已有 `site_url` 不覆寫，staging 另存欄位。
+- [ ] **【site-watch｜客戶站】staging 佈建不得覆蓋正式巡檢網址** — 2026-10-27 已修 next-admin：staging 另存 `client_config.staging_url`，保留 `site_url`；兩種正式網址狀態的回歸測試與 typecheck 通過。待 High-STOP 正式部署及部署後 site-watch 驗收（見 WORKLOG 2026-10-27（續4））。
 
 #### C. 🔒 卡在外部（客戶／廠商／額度／買機）
 
@@ -421,14 +417,11 @@
   - **⚠️ 禁止**：跳過 registry promotion 直接在 Workflow IR 引用 SearchContent id；為 gate 發明 threshold 數字；動 `MVP_VERTICAL_SLICE_PLAN.md`／`ADR-014`／任何母文件。
 - [ ] **【2026-09-06 HCI_CONFIDENCE_SPEC.md critic 覆審 C1 揭露；同日第八輪，操作者「你做最完美的決定」授權，兩問中的一問已解——「dimension 層 cross-method disagreement 該不該往上傳」仍 OPEN】disagreement flag 從 dimension 層傳到 domain 層的路徑** — 原文揭露兩個不同問題混在一起：①「domain 內兩個維度自己互相不同意」（inter-dimension spread）②「dimension 層的 cross-method disagreement 該不該往上傳」（`combineMethodFindings` 輸出的 `disagreement` 欄位餵進 `rollupTrustDomains` 會被靜默丟棄）。**①已解**：`rollupTrustDomains` 新增 `dimension_disagreement: boolean`（同日第八輪，`packages/intelligence/rollup-trust-domains.mjs`），比較該 domain 兩個已賦值維度自己的 rank spread（獨立命名常數 `DOMAIN_DIMENSION_SPREAD_THRESHOLD=2`，故意不跟 `combineMethodFindings` 共用同一常數——兩者比較的對象結構不同，`dimension-score.mjs` 已有「不強行共用巧合相似的比較」先例）；gate 4 白名單同步加欄位（第二次修訂 gate 4 契約，第一次是 `9888bd5d7` 的 ADR-0032 band 修正；`HCI_CONFIDENCE_SPEC.md` 原文預期的「不會再碰」已不成立，已在該檔更新揭露，同時修正該檔一處把此次誤算成「第三次」的筆誤）。coverage=PARTIAL（只有一個維度）時公式自然回傳 `false`，無需特判。**②仍 OPEN，未被①解答**：`dimension_disagreement` 純粹從兩個維度已賦值的**值**計算，對任一維度自己的值是否來自互相矛盾的 method findings零可見性——一個 `combineMethodFindings` 回傳 `disagreement=true` 的維度，仍可能 roll up 進一個 `dimension_disagreement=false` 的 domain（反之亦然）。真正的「flag 本身要不要往上傳」設計問題留給下一次真有 trust-read endpoint consumer 逼出決定時處理。驗證：154→161 Node assertion（詳見同日 WORKLOG），mutation-check-node-gates.ps1 24→27 全殺。
   - 出自：**Cognitive OS Phase 5 落地後續（ADR-022 OPEN gates；2026-09-03 開；…（母項已完成，移至已完成歷程 2026-10-23）
-- [ ] **認知主權平台：步驟 2 已併進 main（未 push）；接下來儲存切換 W1–W3（PostgreSQL 每區域一台）→ 步驟 3+4 → 才問上線；Codex 可照接手包接手** → handoffs/2026-10-04-1400-cos-step2-merged-storage-next.md
-  - `▶️ 可動工` · `2026-10-04 開` · `不上線，全部蓋完才問；上線動作皆 High-STOP`
 - [ ] **`decision.eisenhower_matrix` 內聯 provenance 正規化改呼叫共用函式**
   - `🟢 D 可直接做` · `2026-09-18 開出` · `無人卡`
   - **一句話**：`ai_lego/modules/decision/eisenhower_matrix.py:131-135` 為避免跨 session commit 順序耦合，自己內聯實作了 `{**provenance, "epistemic_type": "CALCULATED_RESULT"}` 正規化；`ai_lego/modules/research/gates.py::genuine_compute_provenance` 共用函式現已 commit，可改成呼叫它（含 critic 2026-09-18 加的 `locked: None` 修正）。
   - **完成定義**：該檔 import 加 `genuine_compute_provenance`，`generate_eisenhower_matrix_classification` 內聯正規化行換成呼叫共用函式，`tests/unit/test_eisenhower_matrix.py` 零修改全過。
   - **證據**：`agency-os/WORKLOG.md` 2026-09-18（續18）與（續19）。
-- [ ] **COS Codex→Claude 接手（未完成；主線勿合併）**：隔離樹 `D:/tmp/cos-codex` 的卡 51 已暫存未提交，`D:/tmp/cos-pg` 的 W1–W3 被實測擦除資料遺失擋住；全情見 `agency-os/handoffs/2026-10-08-cos-codex-to-claude.md`。根因/卡點：`ai_lego/platform/exports/render.py:153` 的固定字數換行裁切 PDF 中文；PG `ai_lego/data/repositories/project_source_repository.py:765` 先 unlink CAS 再 commit，故障注入得 `row_survives=True blob_survives=False`。已試：卡 51 局部測試 8+14+43+20+109 綠，5 突變紅；真 PG 重現資料遺失。**下一步**：① 讀交接包，核對兩樹 `git status` 與 queue 過期 `running` ② 修卡 51 排版/已讀/並發並完成私有索引提交、Claude review ③ 以可重試擦除流程修 PG P0 並做故障回歸，雙重審查和真 PG 過閘前不 merge／push／部署。
 
 #### G. ▶️ 可直接做 — 基礎建設與客戶站
 
@@ -497,6 +490,11 @@
 - [ ] **ADR 017「賣家」4c：收銀台可裝在任何網站**（操作者 2026-10-25 定方向；設計卡 `agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-4-seller.md`，commit 6726922eb）。**D1–D5 已決（操作者 2026-10-25，全部照★）**：每站 Ed25519 公鑰／AwareWave 目錄＋賣家自有方案／`<product>.resell` 權利列／月結報表人工發票／一站一帳戶；寫入 ADR 017 產品決定 #12 與順序 4「4c」。**4c-4 已推（38a8198fb）、4c-1 `0133_seller_sites` 已套 prod（WORKLOG 2026-10-25 續68、續70）。** **下一步**：4c-2 next-admin（`lib/payments/sites.ts`、`hmac.ts`／`woo-billing.ts` 查表驗章、`wp-customers.ts` 加 site、`awarewave-wp.ts` 站鑰匙、`/ops/sellers`、0130 總帳賣家欄）→ 4c-3 外掛代理商模式（Ed25519 產鑰、設定頁 key_id）。每張卡各自 commit、Acceptance 在卡上。回報操作者一律繁體中文。建議模型：Opus 5.5（卡寫死）→ 可派 `fullstack-engineer`／Codex。
 
 ## Next — 已完成歷程（查詢用）
+
+### 2026-10-27 — AO-RESUME 舊待辦核銷
+
+- [x] MainWP 外洩登入名稱已輪換；原管理員 ID、密碼雜湊、角色及 3 個子站保留，新登入名稱存於本機 vault `MAINWP_ADMIN_LOGIN`（見 WORKLOG 2026-10-27（續4））。
+- [x] COS 10/8 擦除資料遺失阻斷與步驟 2 待儲存切換敘述已過期：耐故障 erasure outbox 見 `Projects/internal/cognitive-engineering-os/docs/platform/STORAGE_SWITCH.md`；10/10 已完成 PostgreSQL 切換與上線，證據見 `GO_LIVE.md` 與 WORKLOG 2026-10-10（續1）。舊交接包留作歷史。
 
 ### 2026-10-23 — AO-CLOSE 自動歸檔
 
@@ -2056,5 +2054,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-10-25 21:42:01 UTC_
+_Last synced: 2026-10-27 00:56:10 UTC_
 

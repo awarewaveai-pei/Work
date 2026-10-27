@@ -209,8 +209,8 @@ async function seedContentFromSpec(conn: SshClient, slug: string, websiteSpecId:
 
 // Wire a newly-provisioned client into the content toolchain: create a WP Application Password,
 // register a wp_sites row carrying organization_id (so SEO Content / Video can target it), and
-// stamp client_config.site_url on the org. Without this the built client is invisible to the
-// content tools (connectivity audit 2026-06-27). Idempotent: skips if wp_sites row exists.
+// stamp client_config.staging_url on the org. The production site_url is the site-watch target;
+// staging must never replace it. Idempotent: skips if wp_sites row exists.
 // NOTE: 租戶歸屬走 wp_sites.organization_id，**不再是** client_config.site_url 的 hostname 比對
 // —— 那套猜測在 2026-08-26 (439499c7) 移除，因為所有 staging 站的 hostname 都相同。
 // Best-effort — a wiring failure must NOT fail the provision.
@@ -226,7 +226,7 @@ async function wireClientToContentTools(
   if (!supabase) return "wiring skipped: no DB client";
   const cleanUrl = siteUrl.replace(/\/$/, "");
   try {
-    // Read org metadata first (for the brand colour + to merge site_url later).
+    // Read org metadata first (for the brand colour + to merge staging_url later).
     const { data: org } = await supabase.from("organizations").select("metadata").eq("id", organizationId).single();
     const meta = (org?.metadata ?? {}) as Record<string, unknown>;
     const cc = (meta.client_config ?? {}) as Record<string, unknown>;
@@ -261,14 +261,14 @@ async function wireClientToContentTools(
       return `wiring WARN: app-password not created (code ${apRes.code})`;
     }
 
-    // 3. Activate the row with the real token + stamp client_config.site_url (用於健康探測與顯示；
-    //    租戶歸屬看的是 organization_id，不是這個 URL。spread 保留 brandColors 等既有鍵）。
+    // 3. Activate the row with the real token + stamp client_config.staging_url.
+    //    site_url belongs to the production site and must remain the site-watch target.
     const { error: actErr } = await supabase.from("wp_sites").update({ token: appPw, active: true }).eq("url", cleanUrl);
     if (actErr) return `wiring WARN: wp_sites activate failed (${actErr.message})`;
-    meta.client_config = { ...cc, site_url: cleanUrl };
+    meta.client_config = { ...cc, staging_url: cleanUrl };
     const { error: metaErr } = await supabase.from("organizations").update({ metadata: meta }).eq("id", organizationId);
     if (metaErr) return `wiring WARN: organizations metadata update failed (${metaErr.message})`;
-    return "wired: site_url + wp_sites + app-password";
+    return "wired: staging_url + wp_sites + app-password";
   } catch (e) {
     return `wiring error: ${e instanceof Error ? e.message : String(e)}`;
   }
@@ -523,7 +523,7 @@ export async function POST(request: Request) {
     // The id is a credential: request-only, never in the response, notes or error text.
     const mainwpNote = await prepareMainWpChild(conn, slug, body.mainwpChildUniqueId);
 
-    // Wire this client into the content toolchain (app-password + wp_sites + site_url) so SEO
+    // Wire this client into the content toolchain (app-password + wp_sites + staging_url) so SEO
     // Content / Video can target it. Synchronous (~2s) and best-effort — never fails the provision.
     const wiringNote = await wireClientToContentTools(conn, slug, organizationId, siteName, stagingSiteUrl);
 

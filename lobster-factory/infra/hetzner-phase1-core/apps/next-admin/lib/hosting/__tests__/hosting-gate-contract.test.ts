@@ -10,6 +10,11 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const calls = vi.hoisted(() => [] as { command: string; stdin?: string }[]);
 const bridge = vi.hoisted(() => ({ configured: true, reads: [] as unknown[][] }));
+const dbState = vi.hoisted(() => ({
+  orgMetadata: {} as Record<string, unknown>,
+  orgUpdates: [] as Record<string, unknown>[],
+  reserveWpSite: false,
+}));
 
 vi.mock("@/lib/repair-center/ssh", () => ({
   readSshTargetFromEnv: (...args: unknown[]) => {
@@ -21,7 +26,7 @@ vi.mock("@/lib/repair-center/ssh", () => ({
     calls.push({ command, stdin });
     if (command.startsWith("staging-prepare ")) return { code: 0, stdout: "AW_PREPARE_OK state=created\n", stderr: "" };
     if (stdin?.includes("core is-installed")) return { code: 1, stdout: "", stderr: "" };
-    if (stdin?.includes("application-password create")) return { code: 0, stdout: "abcd efgh ijkl mnop qrst uvwx\n", stderr: "" };
+    if (stdin?.includes("application-password create")) return { code: 0, stdout: "abcdefghijklmnopqrstuvwx\n", stderr: "" };
     if (stdin?.includes("AW_SEED_OK")) return { code: 0, stdout: "AW_SEED_OK home=5 pages=1\n", stderr: "" };
     return { code: 0, stdout: "", stderr: "" };
   },
@@ -39,11 +44,16 @@ const spec = { site_name: "S", sitemap: [{ slug: "about", title: "About" }], hom
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => fakeDb() }));
 vi.mock("../../supabase-server", () => ({ getSupabaseWriteClient: () => fakeDb() }));
 function fakeDb() {
-  const q = { select: () => q, eq: () => q, single: async () => ({ data: { spec_data: spec, metadata: {} }, error: null }),
-    // website_specs row for the seed org lookup (provision-staging resolveTargetOrg)
-    maybeSingle: async () => ({ data: { organization_id: ORG_ID, intake_form_id: null }, error: null }),
-    insert: async () => ({ error: { code: "23505", message: "dup" } }), update: () => q, delete: () => q };
-  return { from: () => q };
+  return { from: (table: string) => {
+    const q = { select: () => q, eq: () => q,
+      single: async () => ({ data: table === "organizations" ? { metadata: dbState.orgMetadata } : { spec_data: spec }, error: null }),
+      // website_specs row for the seed org lookup (provision-staging resolveTargetOrg)
+      maybeSingle: async () => ({ data: { organization_id: ORG_ID, intake_form_id: null }, error: null }),
+      insert: async () => ({ error: dbState.reserveWpSite ? null : { code: "23505", message: "dup" } }),
+      update: (payload: Record<string, unknown>) => { if (table === "organizations") dbState.orgUpdates.push(payload); return q; },
+      delete: () => q };
+    return q;
+  } };
 }
 vi.mock("@/lib/storage/r2", () => ({ isR2Configured: () => false }));
 vi.mock("../../storage/r2", () => ({ isR2Configured: () => false }));
@@ -82,9 +92,27 @@ async function post(body: unknown) {
 const savedToken = process.env.LOBSTER_HOSTING_API_TOKEN;
 process.env.LOBSTER_HOSTING_API_TOKEN = TOKEN;
 afterAll(() => { process.env.LOBSTER_HOSTING_API_TOKEN = savedToken; });
-beforeEach(() => { calls.length = 0; bridge.configured = true; bridge.reads.length = 0; });
+beforeEach(() => {
+  calls.length = 0; bridge.configured = true; bridge.reads.length = 0;
+  dbState.orgMetadata = {}; dbState.orgUpdates.length = 0; dbState.reserveWpSite = false;
+});
 
 describe("provision-staging → aw-hosting-gate contract", () => {
+  it.each([
+    ["an existing production URL", { site_url: "https://client.example", brandColors: { primary: "#123456" } }, "https://client.example"],
+    ["no production URL", { brandColors: { primary: "#123456" } }, undefined],
+  ])("staging wiring preserves %s and records a separate staging URL", async (_name, config, productionUrl) => {
+    dbState.orgMetadata = { client_config: config };
+    dbState.reserveWpSite = true;
+    const r = await post({ organizationId: ORG_ID, siteId: SITE_ID, siteName: "Client" });
+    expect(r.status, JSON.stringify(r.json)).toBe(200);
+    expect(dbState.orgUpdates, JSON.stringify(r.json)).toHaveLength(1);
+    const clientConfig = (dbState.orgUpdates[0].metadata as { client_config: Record<string, unknown> }).client_config;
+    expect(clientConfig.site_url).toBe(productionUrl);
+    expect(clientConfig.staging_url).toBe("https://aware-wave.com/staging/client-6f1e2d");
+    expect(clientConfig.brandColors).toEqual({ primary: "#123456" });
+  });
+
   it("every host command is a gate verb the gate accepts, and carries no secret or caller text", async () => {
     const r = await post({ organizationId: ORG_ID, siteId: SITE_ID, siteName: EVIL_NAME, pluginSlugs: ["fluent-crm"], mainwpChildUniqueId: UNIQUE_ID });
     expect(r.status, JSON.stringify(r.json)).toBe(200);

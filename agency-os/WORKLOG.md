@@ -19,6 +19,22 @@
 - 尚待操作者：已請保留舊分頁另開無痕登入，用原驗證碼確認；截至本條未收到結果，不宣稱真人登入已驗收。可在控制台Simple History看新事件；安裝前的完整成功登入歷史不能補回。
 - rollback：先將新MU檔移到webroot外；需要時wp plugin deactivate wp-2fa或simple-history（不uninstall、不刪meta）。回退後明示2FA未生效；repo revert只還原本次檔，不覆蓋別人修改。
 
+## 2026-10-27（續4）— AO-RESUME 五項追查：OOM／COS／staging／MainWP／Soulful FAQ
+
+- [現況] `agency-os/reports/status/capacity-LATEST.json:41-42,74`：7 日 journal OOM 636、近 24 小時 0、blind_spots=[]。與 `WORKLOG.md` 2026-10-25（續21）:1416 的 lobster-wordpress 2026-10-23 16:00–10-24 04:10 UTC 已結案事故一致；維持 WARN，預計 10/31 04:10 UTC 滑出七日窗後自動消退，沒有改偵測門檻。
+- [現況] `agency-os/handoffs/2026-10-08-cos-codex-to-claude.md` 的 `row_survives=True blob_survives=False` 是當日阻斷；`Projects/internal/cognitive-engineering-os/docs/platform/STORAGE_SWITCH.md:142-186` 已記載 10/8 耐故障 erasure outbox 與 fault-injection 測試，`GO_LIVE.md:3` 及 WORKLOG 2026-10-10（續1）記載 10/10 PostgreSQL 切換和步驟 3/4 正式上線。兩條舊 COS 待辦移入完成歷程；本輪未重新合併或部署 COS。
+- [已修改] `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/hosting/provision-staging/route.ts:268` 把 staging 寫入 `client_config.staging_url`，保留正式 `site_url` 作 site-watch 目標（`lib/site-watch/pages.ts:31`）；`lib/hosting/__tests__/hosting-gate-contract.test.ts` 增兩案：已有正式 URL 與沒有正式 URL。程式尚待 High-STOP 部署，TASKS 保留驗收項。
+- [已修改] MainWP 原 `awmainwp` 登入名稱輪換成密碼學隨機值並存本機 vault `MAINWP_ADMIN_LOGIN`；原 WordPress 使用者 ID=1、密碼雜湊、administrator 角色及 3 個子站不變。DB 交易後獨立驗證 `admin_count=1, old_login_exists=false, sites=3`；公開 `wp-login.php` HTTP 200。未把新登入名稱或密碼寫入 Git。
+- [已修改] Soulful 正式 `client_config.csFaq` 20 條中，`pricing`／`schedule`／`location`／`booking` 及各 `-en` 共 8 條測試答案已原子改為「未定、轉真人」，`handoff=true`；另外 12 條不變。操作者答「未定」，所以 TASKS 保留正式資料待辦。修改前 JSON 備份 `C:/Users/user1115/AppData/Local/AwareWave/backups/soulful-faq-20261027/csfaq-before.json`（9513 bytes，SHA256 複製相同）；SQL 後核對 8 條全 handoff、0 條仍含價格／時間／Google Meet／Taipei／LINE Pay 測試值；`client-status.ps1 -Slug soulful` HTTP 200。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/hosting/__tests__/hosting-gate-contract.test.ts -t "staging wiring" | exit=0 | 2 passed; old assignment mutation exit=1 (2 failed), source byte-exact restored, re-run 2 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin); git diff --check (two source files) | exit=0 | typecheck and diff check passed
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n -- 人工對抗審查保留正式網址、無正式網址、metadata 其餘鍵、wp_sites 租戶歸屬及 site-watch consumer；完整測試檔在 Windows 的三個既有 Bash/暫存目錄案例環境失敗，本輪兩個目標案例通過。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin,Projects/internal/cognitive-engineering-os | grep=client_config.site_url|client_config.staging_url|awmainwp|row_survives=True（排除 WORKLOG/TASKS；含歷史報告） | hits=46 files
+- ORACLE_WAIVED: `scripts/oracle-quota.ps1 -Action check -Tool critic` exit=0，但 `scripts/claude-oracle.ps1` exit=1（本機 `claude` CLI 不在 PATH）；以書面對抗審查及舊賦值突變紅／還原綠替代。本輪未碰另一 session 的 oracle artifact。
+- DOC_SYNC: `scripts/doc-sync-automation.ps1 -AutoDetect` exit=0，TASKS/WORKLOG metadata 已同步；`scripts/audit-cross-machine-bom.ps1` 139/139 通過。`verify-build-gates.ps1` 全過，system-health 320/320。verify-recent tracker 由 hook 記錄本 session 的 route.ts；完成 typecheck、實測、review、bughunt 後以該 session ID 執行 `verify-clear.ps1` 釋放。
+- [剩餘風險] staging 修正尚未正式部署；Soulful 正式資訊未定；MainWP 2FA 仍未設，已撤換遭針對的登入名稱。OOM WARN 保留至七日窗結束。COS 舊交接文件保留歷史，不再視為現行阻斷。
+- [rollback] staging 程式可 `git revert <本次提交>`；FAQ 有修改前 JSON 備份，可依 8 個 id 回填；MainWP 若需回退須以同一 WordPress 使用者 ID=1 交易式改名並獨立驗證，切勿重用已外洩舊登入名稱。沒有替 COS 或 OOM 更動正式服務。
+
 ## 2026-10-27（續3）— PHP2Shell 實機盤點與候選修補驗證（待正式部署批准）
 
 - 來源：OpenAI https://openai.com/index/coordinated-disclosure-of-critical-vulnerabilities/ 、PHP https://www.php.net/archive/2026.php 、官方 https://github.com/openai/php2shell-checker （server skill 已讀；未安裝技能、未送 exploit）。CVE-2026-109618/109619：PHP8.2 修補門檻8.2.35；10/23 補充 CVE-2026-115560 建議在解析請求前停用 session.upload_progress.enabled，僅升版不涵蓋此補充風險。
