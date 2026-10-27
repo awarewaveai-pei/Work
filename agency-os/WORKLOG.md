@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-27（續2）— cloudflared eMudhra 安全更新（筆電兩份）
+
+- 根因：Cloudflare 公告 2026-10-20 eMudhra 中繼憑證弱金鑰；筆電系統版與字幕 worker 專用版均為 2026.8.3，低於修補門檻 2026.10.2。操作者授權處理並完成 Windows UAC。
+- 已更新：系統版沿用 WinGet `Cloudflare.cloudflared` 升至 2026.10.4（安裝程式雜湊通過）；`lobster-factory/infra/hetzner-phase1-core/apps/video-whisper-worker/runtime/cloudflared.exe` 換成官方 2026.10.4 amd64 exe，SHA256 `411b16d40c8d872243efeb52c550053d00af0a8a97fbb32e730fb8aba429eaa8` 與 Cloudflare GitHub release 一致。二進位不進 Git。
+- 來源：https://blog.cloudflare.com/emudhra-certificate-compromise/；https://github.com/cloudflare/cloudflared/releases/tag/2026.10.4 。GitHub 公開 API 遇 IP rate limit，改用已連接 GitHub MCP 讀 release digest，未重試受限端點。
+- 狀態：Cloudflare API 帳號僅一條未刪除 Tunnel `video-whisper-worker`，down、無連線；來源 `http://127.0.0.1:8421`。桌面啟動器指向目前 checkout 的 start-worker.ps1。未啟動字幕服務，未變更憑證或 production。未測 Tunnel 連線；維持 README 隨用隨開。
+- 備份：`C:/Users/user1115/AppData/Local/AwareWave/backups/cloudflared-20261027-083301/` 內分別保留 system/worker 的 2026.8.3 exe；舊版僅供緊急診斷，恢復會重新引入已知風險，勿日常使用。來源檔和備份大小一致。
+- 避免再發生：每次更新需同查 WinGet 系統版與 worker runtime，僅升系統版不會覆蓋 worker 的獨立 exe。
+- REALTEST_EVIDENCE: tool=Bash | cmd=兩個完整路徑 cloudflared.exe --version；winget list --id Cloudflare.cloudflared --exact；Get-FileHash SHA256 | exit=0 | ms=356
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-whisper-worker | grep=cloudflared|2026\.8\.3|video-whisper-worker（排除 WORKLOG、每檔至多兩行） | hits=5
+- ORACLE_WAIVED: DOC_ONLY -- 僅安全套件操作紀錄，無 source code 改動；Quick 自審核對實測版本、官方 digest、桌面路徑與服務關閉狀態。
+- WORKLOG_DONE: 本條。跨機 BOM audit 139/139 通過。
+
 ## 2026-10-26（續25）— AO-CLOSE：零漏洞部署與全窗口收尾
 
 - 窗口：前次close=2026-10-25T21:47:37Z起；git log全窗口20餘提交已查，TASKS所有open項已核對，未把部分產品進度誤勾完成。
