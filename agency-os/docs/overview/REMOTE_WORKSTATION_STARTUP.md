@@ -1,4 +1,4 @@
-﻿# 他處電腦／公司機 — 開機與首次接線須知
+# 他處電腦／公司機 — 開機與首次接線須知
 
 > **目的**：在家 push 後，到**另一台電腦**（公司機、筆電、新機）能**最快、安全、可驗證**地續接，並把流程收斂為「可重複、可回復、可追蹤」。
 >
@@ -11,7 +11,7 @@
 
 - **Monorepo 根目錄**（含 `agency-os\`、`lobster-factory\`、根目錄 `scripts\`）：請整包 clone，不要只拷子資料夾。
 - **路徑可不同**（例如筆電 `D:\Work`、公司機 `C:\Users\USER\Work`），流程都用**相對路徑**執行，不綁磁碟代號。
-- **Claude Code / Codex**：請在 monorepo 根工作；現行 workflow SSOT 是 `CLAUDE.md` + `agency-os\AGENTS.md`，MCP 以根 `.mcp.json`、`mcp\registry.template.json` 與 Codex managed config 為準。桌機正式開工：在 monorepo 根跑 **`scripts/ao-resume.ps1`（預設）**＝**behind 時**才 `pull --ff-only`＋閘道＋依賴＋Strict 稽核；髒樹／衝突時腳本會非 0，須先整理（見 **2.5.1**），**不必**與「先手動 pull」綁死。
+- **Claude Code / Codex**：請在 monorepo 根工作；現行 workflow SSOT 是 `CLAUDE.md` + `agency-os\AGENTS.md`，MCP 以根 `.mcp.json`、`mcp\registry.template.json` 與 Codex managed config 為準。桌機正式開工：在 monorepo 根跑 **`scripts/ao-resume.ps1`（預設）**＝**behind 時**才 `pull --ff-only`＋閘道＋依賴＋Strict 稽核；未解衝突或真正的同步／驗證失敗時非 0；未提交工作保留（見 **2.5.1**），**不必**與「先手動 pull」綁死。
 
 ### 0.1 快速確認你在正確根目錄
 
@@ -225,7 +225,7 @@ npm run smoke:supabase-tunnel -- --sql
      **進階略過（非人類日常開工）**：**`-SkipStrictEnvironmentAudit`**（Autopilot 開機會加；並常搭配 **`-SkipVerify`**）；**不要**在桌機正式開工時隨意省略。  
      **做不到全自動的邊界**：`gh` 登入、DPAPI vault、`mcp.json` 等**不可進庫**，腳本只驗證「有／無」，缺了會 **Strict FAIL**——仍要你在該機做一次設定（見 **§1.5** 憑證段）。  
     - **人類掃一眼（可選）**：讀 `agency-os\LAST_SYSTEM_STATUS.md`、`agency-os\TASKS.md`、`agency-os\reports\status\integrated-status-LATEST.md` 後，在 Claude Code / Codex 送 **`AO-RESUME`** 即可（hook＋代理已銜接 **`ao-resume.ps1`**）。
-   > **重要**：`ao-resume`／`align-workstation` 會 `fetch`；**僅在落後 `origin/main`（behind>0）** 時 **`git pull --ff-only`**。**若落後且工作樹仍有未提交變更**，預設 **不**自動 stash（見 **2.5.1**）；Autopilot 路徑可鬆綁 stash（見 **AGENTS.md**）。
+   > **重要**：`ao-resume`／`align-workstation` 會 `fetch`；**僅在落後 `origin/main`（behind>0）** 時 **`git pull --ff-only`**。**若落後且工作樹仍有未提交變更**，預設 **不**自動 stash（見 **2.5.1**）；Autopilot 同樣不會因 `-AllowUnexpectedDirty` 而取得 stash 權限。
 
 ## 2.5 日內 Git 節奏（checkpoint 與收工）— **單一真相（人類可讀）**
 
@@ -246,16 +246,13 @@ npm run smoke:supabase-tunnel -- --sql
 ### 2.5.1 AO-RESUME／AO-CLOSE 與 GitHub 單一真相（腳本實際行為）
 
 - **`scripts/ao-resume.ps1`** 在 Git 同步通過後會呼叫 **`scripts/ensure-lobster-workflows-deps.ps1`**（除非 **`-SkipWorkflowsDeps`**）：在需要時自動執行 **`lobster-factory\packages\workflows`** 的 **`npm ci`**，並印出小白說明（見上文「`npm ci` 是什麼」）。通過後預設會呼叫 **`scripts/print-open-tasks.ps1`** 列出 **`agency-os/TASKS.md`** 所有未完成項（**`-SkipOpenTasksList`** 可略過），並**同步寫入** **`agency-os/.agency-state/open-tasks-snapshot.md`**（**gitignore**；內含 **Total open** 與依 **`##` 區塊**分段的 Markdown，供 **`AO-RESUME`** 代理 **Read** 後與聊天內「逐條全列」核對）。**預設**在列印 TASKS 後再跑 **`machine-environment-audit.ps1 -FetchOrigin -Strict`**，接著執行 **`scripts/check-backup-health.ps1`**（**warn-only**，寫入 **`agency-os/reports/status/backup-health-LATEST.md`**）；僅在傳 **`-SkipStrictEnvironmentAudit`** 時略過 Strict 稽核（例如 Autopilot 開機）。
-- **`scripts/ao-resume.ps1`**（對應關鍵字 **AO-RESUME**）會呼叫 **`check-three-way-sync.ps1 -AutoFix`**。**AutoFix 不會**對任何版本庫檔案做 **`git restore`**（避免未提交修正被靜默洗掉）；僅 **`agency-os/settings/local.permissions.json`** 可在未加 `-AllowUnexpectedDirty` 時仍視為可接受的本機差異。預設（桌機／正式雙機節奏）：
-  - **落後 `origin/main` 且工作樹仍有未提交變更**：**不**自動 stash；請先 **commit、捨棄或手動 `git stash`**，再跑 AO-RESUME，避免「以為已對齊、變其實在 stash」。
-  - **需要開機自動 pull 且可接受暫存**：筆電 **Autopilot** 已傳 **`-AllowUnexpectedDirty`**（會連帶啟用 `-AllowStashBeforePull`、`-AllowPendingStash`）。僅在手動確認時可自傳：  
-    `-AllowStashBeforePull`、`-AllowPendingStash`。
-  - **若在 pull 前替你建了 stash 且未允許擱置**：會 **FAIL**；依畫面指示執行 `git stash list`，再 `git stash pop` 或 `git stash drop` 後重跑。
-  - Pull 為 **`git pull --ff-only origin main`**；若失敗，代表與遠端 **非快轉關係**，請 `git status` 後 **rebase** 或依上文 **`reset --hard origin/main`**（以 GitHub 為準時）處理。
+- **開工 readiness（可安全續接）契約**：`ao-resume.ps1` 固定向 `check-three-way-sync.ps1 -AutoFix` 與 `machine-environment-audit.ps1 -FetchOrigin -Strict` 傳 `-AllowUnexpectedDirty`。未提交工作保留，不代表乾淨建置；未解合併衝突、Git 查詢／同步失敗、真實 correctness gate 與其他 Strict 警告仍失敗。兩個檢查共用 `Get-GitWorktreeState`。單獨執行環境稽核仍保留原嚴格預設。
+  - `-AllowUnexpectedDirty` 不再隱含 `-AllowStashBeforePull`／`-AllowPendingStash`；AO 的同名旗標僅供舊呼叫端相容。自動開工不會為通過檢查而 stash、提交或丟棄其他 session 的修改。
+  - `-FullMainlineParity` 先 fetch＋安全快轉；無法保留本機修改時回報失敗。其他入口落後且有修改時拒絕自動 stash；暫存只接受明確的 stash 旗標授權。
 - **`scripts/ao-close.ps1`**（**AO-CLOSE**）：預設先 **`print-today-closeout-recap`**；**`-SkipTodayRecap`** 可略過。在未加 **`-SkipPush`** 時，會先 **`git fetch`** 並檢查是否落後 **`origin/<同一分支>`**；若落後則 **中止**。僅在明示風險且必要時使用 **`-AllowPushWhileBehind`**。在 **`git add` 前**會執行 **`apply-closeout-task-checkmarks.ps1`**（自 **`WORKLOG` 當日 `## yyyy-MM-dd`** 區塊解析 **`- AUTO_TASK_DONE:`** 行，並合併選用之 **`pending-task-completions.txt`**；**`-SkipAutoTaskCheckmarks`** 可略過）。
 - **「整台電腦目錄」仍不可能與 GitHub 完全相同**：`node_modules`、本機 MCP／vault 等多為 **`.gitignore`**，兩台需各依 **1.5** 與 **6.2** 建置。
 - **主線對齊（預設 `main` 單一、不跑功能分支）+（可選、罕見）功能分支續作**：`reset --hard` **一次只能對一個 ref**；不要寫成 `origin/main,origin/fix/...`。Claude Code / Codex **送出 `AO-RESUME`** 時，**hook** 會跑 **`scripts/ao-resume.ps1 -FullMainlineParity`**（規則見 **`CLAUDE.md` / `agency-os\AGENTS.md`**）：預設走 **`Invoke-SharedWorktreeParity`**（`scripts/lib/git-safe-ops.ps1`；**`fetch` + `merge --ff-only`**，**不** stash／reset／checkout／push——同一 worktree 有多個 session，dirty 檔由 git 拒絕並回報於 §1），再跑**同一支** `ao-resume.ps1` 的 preflight／閘道／Strict。`git-align-main-aoresume-feature.ps1`（`checkout main` → **`reset --hard origin/main`**）只在顯式 **`-FullMainlineAllowStash`**／功能分支續作／**`-FullMainlineAllowResetAheadOfOrigin`** 時才走。hook 依 seen-session ledger **每個 session 只觸發一次**；**代理**讀 **`ao-resume-hook-last.json`**、**勿**再開終端重跑同一輪。僅在**你明確要**舊的「切回某功能分支再 `merge origin/main`」時：加 **`-FullMainlineFeature`** **且** **`-FullMainlineFeatureBranch <name>`**（**無預設分支名**），可搭配 **`-FullMainlinePushFeature`**、**`-FullMainlineAllowStash`**；**`-FullMainlineRequireFeatureBranch`** 僅在需硬失敗時。Autopilot（**`-SkipStrictEnvironmentAudit`**）**不**跑主線 hard reset。仍可直接執行 **`scripts/git-align-main-aoresume-feature.ps1`** 作獨立維運（**預設同樣只對齊 `main`**，除非加 **`-ContinueWithFeatureBranch -FeatureBranch <name>`**）。
-- **未推送的 `main` 不可被靜默沖掉**：在 **`reset --hard origin/main`** 前，若本機 **`main` 超前 `origin/main`**（有尚未 push 的 commits），**`git-align-main-aoresume-feature.ps1` 預設會中止**並提示先 **`git push origin main`**。僅在**明確接受捨棄**那些 commits 時使用 **`-AllowResetAheadOfOrigin`**（對齊腳本）或 **`ao-resume.ps1 -FullMainlineAllowResetAheadOfOrigin`**。**dirty 樹觸發自動 checkpoint** 後，`ao-resume` 會嘗試 **`git push`** 再第二次對齊，以降低孤兒本地 commit；若 push 失敗，請修好網路／權限／upstream 後手動 **`git push`** 再重跑 **`AO-RESUME`**。
+- **未推送的 `main` 不可被靜默沖掉**：在 **`reset --hard origin/main`** 前，若本機 **`main` 超前 `origin/main`**（有尚未 push 的 commits），**`git-align-main-aoresume-feature.ps1` 預設會中止**並提示先 **`git push origin main`**。僅在**明確接受捨棄**那些 commits 時使用 **`-AllowResetAheadOfOrigin`**（對齊腳本）或 **`ao-resume.ps1 -FullMainlineAllowResetAheadOfOrigin`**。自動開工不建立 checkpoint、不 push。
 
 ## 2.1 失敗處置（不要硬做）
 
@@ -308,7 +305,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1
 
 你會看到什麼（成功判斷）：
 - `ao-close`：會產生 closeout/health/guard 報告
-- `ao-resume.ps1`：preflight completed；`check-three-way-sync` 在條件允許時會 **`git pull --ff-only origin main`**（見 **2.5.1**）；通過後會跑 **workflows `npm ci`** 檢查（除非 `-SkipWorkflowsDeps`）；並列出 **`TASKS.md` 全部未完成項**與自上次以來 `agency-os/reports/{closeout,health,guard,status}` 增量。若工作樹髒／behind，請先依 **2.5.1** 整理再重跑，避免強依賴「先手動 pull」與腳本两套敘述。
+- `ao-resume.ps1`：preflight completed；`check-three-way-sync` 在條件允許時會 **`git pull --ff-only origin main`**（見 **2.5.1**）；通過後會跑 **workflows `npm ci`** 檢查（除非 `-SkipWorkflowsDeps`）；並列出 **`TASKS.md` 全部未完成項**與自上次以來 `agency-os/reports/{closeout,health,guard,status}` 增量。若未解衝突、仍落後或驗證失敗，依 **2.5.1** 處理；單純未提交修改不阻擋開工，避免強依賴「先手動 pull」與腳本两套敘述。
 
 ## 3) 兩份「綜合狀態」路徑別搞混
 
@@ -338,7 +335,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1
 1. **未落後** `origin/main`（behind=0；通常由 **`ao-resume.ps1`** 在 behind>0 時 ff-only pull 達成），且在正確分支；或手動 **`git pull --ff-only origin main`** 成功之等價狀態。  
 2. **`lobster-factory\packages\workflows` 已執行** `npm ci`（該處為目前唯一 lockfile；**`ao-resume.ps1`** 會在需要時代跑）；若有 `mcp-local-wrappers` 則一併 `npm ci`。  
 3. **`verify-build-gates.ps1` Critical Gate = PASS**（**`ao-resume.ps1` 預設**會跑）。  
-4. **`machine-environment-audit.ps1 -FetchOrigin -Strict` = PASS（無 WARN）**（**`ao-resume.ps1` 預設**會跑；Autopilot 略過不計入「正式開工」）。  
+4. **`machine-environment-audit.ps1 -FetchOrigin -Strict -AllowUnexpectedDirty` = PASS**（日常開工；共享目錄政策見 §2.5.1；Autopilot 略過不計入「正式開工」）。
 5. **`AO-RESUME` 在腳本 Exit 0 之後**（代理讀檔並回覆）：可清楚列出「已完成／目前進度／下一步」（含龍蝦 Milestone/DoD/風險，見 `AGENTS.md`）。**`LAST_SYSTEM_STATUS.md`／`integrated-status-LATEST.md` 為可選人類掃視**，不與 Exit 0 機器裁決互斥。
 
 ### 6.2 「完美」環境（建議標：可重現、雙機一致、與 CI 對齊）
@@ -379,5 +376,5 @@ powershell -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1
 - `RESUME_AFTER_REBOOT.md`
 - `TASKS.md`
 
-_Last synced: 2026-10-25 21:42:01 UTC_
+_Last synced: 2026-10-27 06:08:42 UTC_
 

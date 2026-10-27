@@ -350,7 +350,9 @@ try {
     # passes -WriteArchiveSkeleton, i.e. only for an explicit "AO-RESUME" prompt where the agent
     # will produce + archive a real report (Step 3). Auto-refresh on a new session does NOT pass it,
     # so non-interactive / new-session-without-AO-RESUME runs never leave orphan skeletons.
-    $skelArg = if ($isAoResume) { @('-WriteArchiveSkeleton') } else { @() }
+    # PS5.1 StrictMode splats a scalar string incorrectly into native -File parameters.
+    # Wrap the conditional result so zero/one argument always remains an array.
+    $skelArg = @(if ($isAoResume) { '-WriteArchiveSkeleton' })
     Push-Location -LiteralPath $root
     try {
         $savedEAP3 = $ErrorActionPreference; $ErrorActionPreference = "Continue"

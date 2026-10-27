@@ -3,6 +3,7 @@
     [switch]$SkipVerify,
     # Autopilot / 極速開機：略過結尾的 machine-environment-audit -Strict（仍可能已用 -SkipVerify 略過 verify-build-gates）。
     [switch]$SkipStrictEnvironmentAudit,
+    # Compatibility flag: AO-RESUME always preserves shared-worktree edits.
     [switch]$AllowUnexpectedDirty,
     [switch]$AllowStashBeforePull,
     [switch]$AllowPendingStash,
@@ -18,9 +19,9 @@
     [switch]$FullMainlineFeature,
     [switch]$FullMainlineAllowStash,
     # The ONLY switch that routes -FullMainlineParity through git-align (stash -> reset --hard -> pop);
-    # pass it only when no other session is editing this worktree. -AllowUnexpectedDirty /
-    # -AllowStashBeforePull never selected that path (the old line was a discarded expression); they
-    # only relax check-three-way-sync below. Default parity = fetch + ff-only (2026-09-23 WORKLOG 續113).
+    # pass it only when no other session is editing this worktree. -AllowStashBeforePull
+    # affects preflight only; -AllowUnexpectedDirty is compatibility-only (readiness already allows edits).
+    # Default parity = fetch + ff-only (2026-09-23 WORKLOG 續113).
     # Default: missing feature branch (no local, no origin) does not fail the whole AO-RESUME; use `-FullMainlineRequireFeatureBranch` for legacy hard-fail.
     [switch]$FullMainlineRequireFeatureBranch,
     # Destructive: passed to git-align as `-AllowResetAheadOfOrigin` — allows reset --hard to drop unpublished commits on main.
@@ -50,7 +51,7 @@ function Show-AoResumeQuickFix {
     Write-Host ("AO-RESUME quick fix ({0}, exit {1}):" -f $Step, $ExitCode) -ForegroundColor Yellow
     switch ($Step) {
         "preflight" {
-            Write-Host '  powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1 -AllowUnexpectedDirty'
+            Write-Host '  Inspect the failed sync/correctness item above; uncommitted work is already allowed.'
             Write-Host "  (If still failing, run: git status -sb)"
         }
         "workflows-deps" {
@@ -431,7 +432,7 @@ if ($FullMainlineParity) {
             $alignArgs += "-AllowStash"
             $alignExit = Invoke-FullMainlineAlignWithRetry -Root $WorkRoot -AlignArgs $alignArgs
             if ($alignExit -ne 0) {
-                Write-Error "ao-resume: FullMainlineParity git align failed (exit $alignExit). Fix dirty tree or pass -FullMainlineAllowStash / -AllowUnexpectedDirty."
+                Write-Error "ao-resume: FullMainlineParity git align failed (exit $alignExit). Resolve the error above; -FullMainlineAllowStash requires that no other session is editing this worktree."
                 exit $alignExit
             }
         }
@@ -551,14 +552,15 @@ $syncArgs = @(
     "-ExecutionPolicy", "Bypass",
     "-File", $checkScript,
     "-WorkRoot", $WorkRoot,
-    "-AutoFix"
+    "-AutoFix",
+    "-AllowUnexpectedDirty"
 )
 # 預設＝完整開工（含 verify-build-gates + 結尾 Strict 環境稽核）。只有加上 -SkipStrictEnvironmentAudit 才允許「只跑輕量 preflight」。
 if ($SkipVerify -and $script:StrictEnvAudit) { Write-Host "== AO-RESUME: 預設完整檢查 — 忽略 -SkipVerify（仍跑 verify-build-gates）==" -ForegroundColor DarkYellow }
 if ($SkipVerify -and -not $script:StrictEnvAudit) { $syncArgs += "-SkipVerify" }
-if ($AllowUnexpectedDirty) { $syncArgs += "-AllowUnexpectedDirty" }
-if ($AllowUnexpectedDirty -or $AllowStashBeforePull) { $syncArgs += "-AllowStashBeforePull" }
-if ($AllowUnexpectedDirty -or $AllowPendingStash) { $syncArgs += "-AllowPendingStash" }
+# Readiness permits edits, never implicit permission to stash another session's work.
+if ($AllowStashBeforePull) { $syncArgs += "-AllowStashBeforePull" }
+if ($AllowPendingStash) { $syncArgs += "-AllowPendingStash" }
 
 & powershell.exe @syncArgs
 if ($LASTEXITCODE -ne 0) {
@@ -589,7 +591,7 @@ if ($script:StrictEnvAudit) {
     } else {
         Write-Host ""
         Write-Host "== AO-RESUME: 預設完整檢查（machine-environment-audit -FetchOrigin -Strict）==" -ForegroundColor Cyan
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $auditScript -WorkRoot $WorkRoot -FetchOrigin -Strict
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $auditScript -WorkRoot $WorkRoot -FetchOrigin -Strict -AllowUnexpectedDirty
         if ($LASTEXITCODE -ne 0) {
             Show-AoResumeQuickFix -Step "strict-audit" -ExitCode $LASTEXITCODE
             Write-Host ("ao-resume: machine-environment-audit FAILED (exit {0}) — health issues noted; generating state files." -f $LASTEXITCODE) -ForegroundColor Red

@@ -216,5 +216,5 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `README.md`
 
-_Last synced: 2026-10-25 21:42:01 UTC_
+_Last synced: 2026-10-27 06:08:42 UTC_
 

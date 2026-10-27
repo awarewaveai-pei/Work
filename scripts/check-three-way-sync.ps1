@@ -89,8 +89,9 @@ try {
     )
 
     function Get-DirtyPaths {
-        $lines = @((Invoke-SafeGitCapture -GitArgs @('-c', 'core.quotepath=false', 'status', '--porcelain')).Output |
-            Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+        $state = Get-GitWorktreeState -WorkRoot $WorkRoot
+        if ($state.HasConflicts) { throw 'Git index has unresolved merge conflicts; resolve them before continuing.' }
+        $lines = @($state.StatusLines)
         $paths = @()
         foreach ($line in $lines) {
             if ($line.Length -ge 4) {
@@ -100,6 +101,8 @@ try {
         return $paths
     }
 
+    # Reject conflicts before any automatic pull/stash, even when dirty work is allowed.
+    $null = Get-DirtyPaths
     $stashCountAtStart = Get-GitStashCount
 
     Invoke-GitShown @("fetch","origin")

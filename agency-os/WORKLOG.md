@@ -1,5 +1,18 @@
 # Worklog
 
+## 2026-10-27（續8）— AO-RESUME：共享目錄 readiness 與 PS5.1 啟動修復（Codex）
+
+- 根因①：`check-three-way-sync.ps1` dirty fail 與 `machine-environment-audit.ps1 -Strict` dirty WARN→fail，與共享 worktree 政策衝突；AO 放行旗標還隱含 stash。② hook 的 if-expression 把單項 array 展開成 String，PS5.1 StrictMode native splat 造成 name 參數例外，本文未執行；對照實跑 Array 進入本文、String 必失敗。
+- 修：`git-safe-ops.ps1:310` 共用 Get-GitWorktreeState（查詢失敗 throw、unmerged 明確判斷、status 無 optional index write）；sync/audit 皆沿用；AO 固定允許保留修改、保留 Strict 與 correctness gates，移除 implicit stash；hook `@(if ...)` 保住零／單參數。對應操作契約更新 `docs/overview/REMOTE_WORKSTATION_STARTUP.md:249`，無第二套規則。
+- REALTEST_EVIDENCE: tool=Bash | cmd=真實 JSON stdin -> mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1 -HookHost codex -> ao-resume.ps1 -FullMainlineParity; hook meta exit_code=0 finished_utc=2026-10-27T06:10:02Z; elapsed.json under TEMP/ao-readiness-final-b5da8031b29a46f3a06088043180c158 | exit=0 | ms=311771
+- 驗證：readiness 31 assertions PASS（真 Git、真 audit/sync、真 PS5.1 hook 子程序；dirty/index/bytes/stash 保留、衝突與 query/build/Strict 真失敗仍拒絕）；Native Git Bash `scripts/test-hooks.sh` 393/393 PASS；health 100% 320/320 critical_gate PASS；sync-check Result: PASS；cross-Drive BOM CLEAN。最初誤用系統 WSL bash，環境缺命令 exit127，已換 Native Git Bash；診斷 fetch 卡住自身 auto-gc，終止自有程序樹，最終實跑僅暫停 auto-gc（process-only gc.auto=0），未改 repo config。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n
+- Claude SDK API 審查（非訂閱）：`reports/oracle/2026-10-27-review-860563dc.md`，六個 files-reviewed 含新測試；一條舊 remediation hint 已按審查改正，最終 scoped capture 23322 bytes approve／0 findings。未用 Codex 自審充當 oracle。
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp/claude-userlevel/hooks,.claude/commands | grep=Get-GitWorktreeState|AllowUnexpectedDirty|skelArg | hits=32
+- WORKLOG_DONE: 本條；續1的「原 name 未重現」為當時調查，已由本條真實 hook 重現與修復結案。原預設 standalone strict audit 不變；既有 OOM 歷史與 Docker 捷徑警告保留顯示，非開工 exit 失敗。
+- AUTO_TASK_DONE: AO-RESUME 未提交修改誤擋與 PS5.1 name 參數啟動失敗已修，真實 hook 完整執行 exit0。
+- rollback：回退本次限定提交；同步 `scripts/sync-claude-userlevel.ps1 -Mode merge`。不覆蓋其他 session 的原始碼或狀態快照。
+
 ## 2026-10-27（續7）— staging 不覆蓋正式 site-watch 網址：next-admin 正式部署
 
 - [授權] 操作者明示允許推送並部署 next-admin；先前本機提交 `3d4b0811667b286036b7955f12f68c7b72c5a8de` 的 HEAD 獨立 typecheck 通過。`git push origin main` exit=0（僅推該提交）；deploy hold 不存在。
@@ -99,6 +112,15 @@
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-whisper-worker | grep=cloudflared|2026\.8\.3|video-whisper-worker（排除 WORKLOG、每檔至多兩行） | hits=5
 - ORACLE_WAIVED: DOC_ONLY -- 僅安全套件操作紀錄，無 source code 改動；Quick 自審核對實測版本、官方 digest、桌面路徑與服務關閉狀態。
 - WORKLOG_DONE: 本條。跨機 BOM audit 139/139 通過。
+
+## 2026-10-27（續1）— AO-RESUME 原 name 錯誤排查與手動刷新（Codex）
+
+- 舊失敗：hook 2026-10-26T15:49:26Z 在任何子步驟輸出前回報 PSArgumentException/name。原腳本無改動，PS5.1 解析與參數 metadata 正常；直接實跑通過原失敗位置；-File 用不存在 WorkRoot 做安全啟動檢查，得到預期 Resolve-Path 錯誤，未見 name。根因尚未證實，不宣稱修復。
+- 本輪完整執行 ao-resume.ps1 -FullMainlineParity 至結尾，state files generated、exit=1；實際剩餘失敗＝既有 dirty 工作區令 preflight 與 Strict audit 失敗。未 stash／提交他人修改／降低門檻。最新 smoke 2026-10-26T16:05:31Z overall=WARN、blind_spots=[]、blockers 一筆歷史 OOM；57/57 containers、0 unhealthy，備份／重啟／ClickHouse／site-watch／CI／CF PASS。手動結果不覆寫舊 hook meta。
+- REALTEST_WAIVED: QUERY_ONLY -- 無程式修改；已真實執行 ao-resume.ps1 -FullMainlineParity 至結尾、exit=1，smoke 產物更新至 2026-10-26T16:05:31Z；未量測完整程序耗時，不填推估 ms。
+- REVIEW_WAIVED: DOC_ONLY -- 僅狀態刷新與排查紀錄，未改程式；讀回最新偵測器實際產物。
+- BUGHUNT_WAIVED: QUERY_ONLY -- 已核對 scripts/ao-resume.ps1、scripts/lib/git-safe-ops.ps1、mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1 與舊狀態；未重現原例外，無程式修補。
+- 記錄：reports/ao-resume/2026-10-27-0005.md。後續若原 hook 再現，需保留帶 InvocationInfo/ScriptStackTrace 的真實錯誤才能確認根因。
 
 ## 2026-10-26（續25）— AO-CLOSE：零漏洞部署與全窗口收尾
 
@@ -5975,6 +5997,15 @@
 - AUTO_TASK_DONE: ADR017 step1 done; supervisor 1/9, same private preview URL pending Claude republish.
 - rollback：git revert狀態commit；實作獨立revert 1ef1ee419。無prod部署。
 
+
+## 2026-10-27
+
+### Daily
+- AUTO_TASK_DONE: AO-RESUME readiness 與 PS5.1 啟動已修；細節、完整證據與回退見本日續8。
+- REALTEST_EVIDENCE: tool=Bash | cmd=JSON stdin -> ao-resume-on-prompt.ps1 -HookHost codex -> FullMainlineParity; hook finished_utc=2026-10-27T06:10:02Z exit_code=0 | exit=0 | ms=311771
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp/claude-userlevel/hooks,.claude/commands | grep=Get-GitWorktreeState|AllowUnexpectedDirty|skelArg | hits=32
+- WORKLOG_DONE: 本日續8；31 readiness assertions、393 hook tests、health 320/320，六檔 Claude API oracle approve。
 
 ## 2026-10-26
 

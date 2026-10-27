@@ -305,6 +305,24 @@ function Invoke-SafeGitCapture {
     }
 }
 
+# Dirty work is expected at AO-RESUME; an unreadable or unmerged index is not.
+# Keep this observation separate from each caller's clean-worktree policy.
+function Get-GitWorktreeState {
+    param([Parameter(Mandatory = $true)][string]$WorkRoot)
+
+    $status = Invoke-SafeGitCapture -GitArgs @('--no-optional-locks', '-c', 'core.quotepath=false', 'status', '--porcelain') -WorkRoot $WorkRoot
+    if ($status.ExitCode -ne 0) { throw "Cannot read Git worktree status: $($status.Text)" }
+    $unmerged = Invoke-SafeGitCapture -GitArgs @('ls-files', '--unmerged') -WorkRoot $WorkRoot
+    if ($unmerged.ExitCode -ne 0) { throw "Cannot read Git index conflicts: $($unmerged.Text)" }
+
+    $lines = @($status.Output | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    return [pscustomobject]@{
+        Dirty = $lines.Count -gt 0
+        HasConflicts = -not [string]::IsNullOrWhiteSpace($unmerged.Text)
+        StatusLines = $lines
+    }
+}
+
 # ---------------------------------------------------------------------------
 # Get-StaleSharedIndexPaths -- index != HEAD while worktree == HEAD
 # ---------------------------------------------------------------------------

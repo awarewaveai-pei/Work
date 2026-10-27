@@ -23,6 +23,9 @@
 .PARAMETER Strict
   將「建議」級別（Node 非 22、gh 未裝、vault 空等）視為失敗，exit 1。
 
+.PARAMETER AllowUnexpectedDirty
+  Shared-worktree readiness: preserve uncommitted work; unresolved conflicts still fail.
+
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1 -FetchOrigin
 
@@ -34,7 +37,8 @@ param(
     [string]$WorkRoot = "",
     [switch]$FetchOrigin,
     [switch]$RunVerifyGates,
-    [switch]$Strict
+    [switch]$Strict,
+    [switch]$AllowUnexpectedDirty
 )
 
 Set-StrictMode -Version Latest
@@ -95,8 +99,14 @@ if ((Invoke-SafeGitCapture -GitArgs @('rev-parse', '--is-inside-work-tree') -Wor
     exit 1
 }
 
-$statusShort = (Invoke-SafeGitCapture -GitArgs @('status', '--porcelain') -WorkRoot $WorkRoot).Text
-if ($statusShort) {
+$worktreeState = Get-GitWorktreeState -WorkRoot $WorkRoot
+if ($worktreeState.HasConflicts) {
+    Write-Audit -Level FAIL -Message 'Git index has unresolved merge conflicts; resolve them before continuing.'
+    exit 1
+}
+if ($worktreeState.Dirty -and $AllowUnexpectedDirty) {
+    Write-Audit -Level OK -Message 'Shared worktree has uncommitted changes; files preserved (not a clean-build claim).'
+} elseif ($worktreeState.Dirty) {
     Write-Audit -Level WARN -Message "Working tree is dirty (commit/stash before assuming reproducible env)."
     $warnCount++
 } else {
