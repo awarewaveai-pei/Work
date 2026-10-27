@@ -9,6 +9,7 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction
 
 COPY mu-plugins/sentry.php ./sentry.php
 COPY mu-plugins/posthog.php ./posthog.php
+COPY mu-plugins/aw-login-audit.php ./aw-login-audit.php
 
 COPY php-upload-limits.ini /usr/local/etc/php/conf.d/awarewave-upload-limits.ini
 RUN php -r 'exit(PHP_VERSION_ID >= 80235 && PHP_VERSION_ID < 80300 && ini_get("session.upload_progress.enabled") === "0" ? 0 : 1);'
@@ -19,6 +20,7 @@ COPY apache-mpm-prefork.conf /etc/apache2/mods-available/mpm_prefork.conf
 RUN mkdir -p /usr/src/wordpress/wp-content/mu-plugins
 COPY mu-plugins/sentry.php /usr/src/wordpress/wp-content/mu-plugins/sentry.php
 COPY mu-plugins/posthog.php /usr/src/wordpress/wp-content/mu-plugins/posthog.php
+COPY mu-plugins/aw-login-audit.php /usr/src/wordpress/wp-content/mu-plugins/aw-login-audit.php
 
 # CMD wrapper: runs after WordPress ENTRYPOINT init, overwrites mu-plugins in volume, then starts Apache.
 # WordPress image ENTRYPOINT = docker-entrypoint.sh; CMD replaces the default apache2-foreground.

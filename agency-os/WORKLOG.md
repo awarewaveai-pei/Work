@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-27（續5）— aware-wave.com 恢復管理員 2FA，補準確登入稽核
+
+- 授權：操作者「去處理好」，並確認仍有原驗證器；不重設密碼、TOTP 或復原碼，不撤銷現存登入。風險：登入保護變更；回復＝個別停用外掛／移出 MU 串接，不整庫覆寫新訂單。
+- 根因：WP 2FA 目錄不存在，但 2026-04-27 日記與管理員 meta 仍留已啟用設定；實際無 challenge callback。移除者／時間未知，未歸因攻擊者或 PHP 維修。103.47.145.23 自台灣10/25 08:15對 wp-login 發142 GET/POST，LLAR鎖至10/28 05:04；無該IP的現存session。前輪核心與LLAR checksum通過，只有原管理員；這些不能替代完整歷史入侵鑑識。
+- 選擇：僅補外掛可恢復2FA，但一般稽核會在密碼通過、2FA尚未過時假記成功；採官方WP 2FA 4.2.1＋Simple History 5.36.0＋MU公開hooks整合。未改官方外掛；保留LLAR，無geo/IP allowlist。
+- 備份：lobster-wordpress-db:/tmp/aw-wp-security-20261027-0058/before.sql，11406820 bytes、mode600；baseline在wordpress同名/tmp目錄，僅plugins與設定雜湊。10/26 10:00台灣每日DB+站檔備份、10:30完整性驗證exit0；WPvivid最近10/24 19:08記success，未宣稱本次做還原演練。
+- 備份持久化：/home/ubuntu/awarewave-security-backups/20261027-0058/before.sql，同為11406820 bytes、mode600，父目錄700；webroot外，容器重建不會刪除。
+- 已套用：兩官方外掛安裝／啟用並通過WordPress.org checksum。TOTP／backup-code雜湊前後相同；challenge priority20。MU pending filter延後完成登入至wp_2fa_user_authenticated；排除政策使用者仍保留一般稽核。正式檔SHA256=9db798d39986ec18b43ea80b9a19ba0c7be52dcff60e7fd69b9d7e4806c80f0d，與repo一致。
+- 套用：先以www-data寫root-owned mu-plugins失敗，未載入檔；改以容器管理身分寫同目錄.pending、PHP lint、atomic rename。檢查失敗會移出MU目錄保留官方2FA。Dockerfile/entrypoint只補持久化COPY/cp，未重建待核准的PHP映像、未重啟服務。
+- REALTEST_EVIDENCE: tool=SSH | cmd=正式WP runtime pending_second_factor=true, completion_hook=10, logger_ready=true, admin_excluded=false, audit_rows=24; home/login/shop HTTP200; deployed source sha256 equal | exit=0 | ms=9216
+- REALTEST_EVIDENCE: tool=SSH | cmd=MainWP site1 sync_website true; sync_errors empty; offline_check_result=0 (保留既有WP_DEBUG重複定義warning，不為此擴張修復) | exit=0 | ms=0（未量測整個同步耗時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=php wp-login-audit.test.php 11 checks pass; isolated mutation disabling pending guard fails expected255, restored guard passes; php -l valid; cross-machine BOM139/139 | exit=0 | ms=0（各檢查未完整計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=Git Bash syntax check docker-entrypoint-sentry.sh; actual wrapper execution in isolated temp src/mu fixture (only paths and final Apache replaced), copied3MU+vendor and source hash equal | exit=0 | ms=732
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0
+- 審查：Claude SDK API，無訂閱／subagent。第一輪指出政策排除會漏記，已修＋新增測試；第二輪approve，capture10830 bytes晚於最後source修改、早於第二輪審查；artifact reports/oracle/2026-10-27-review-bce164b4.md。已讀回4個source與runbook；WP Engine/Flywheel/MemberPress均非此站active plugins，不宣稱支援這些自動登入流程。
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks,lobster-factory/infra/hetzner-phase1-core/apps/wordpress,lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/wp-login-audit.test.php | grep=aw-login-audit|wp_2fa_user_authenticated|login_pending_second_factor | hits=16
+- WORKLOG_DONE: 本條；避免再發：runbooks/WORDPRESS-LOGIN-SECURITY.md明訂不能只看舊2FA設定，要核對active+callback+method；Simple History開始保留外掛啟停／刪除紀錄。主機每日備份與原LLAR維持。
+- 尚待操作者：已請保留舊分頁另開無痕登入，用原驗證碼確認；截至本條未收到結果，不宣稱真人登入已驗收。可在控制台Simple History看新事件；安裝前的完整成功登入歷史不能補回。
+- rollback：先將新MU檔移到webroot外；需要時wp plugin deactivate wp-2fa或simple-history（不uninstall、不刪meta）。回退後明示2FA未生效；repo revert只還原本次檔，不覆蓋別人修改。
+
 ## 2026-10-27（續3）— PHP2Shell 實機盤點與候選修補驗證（待正式部署批准）
 
 - 來源：OpenAI https://openai.com/index/coordinated-disclosure-of-critical-vulnerabilities/ 、PHP https://www.php.net/archive/2026.php 、官方 https://github.com/openai/php2shell-checker （server skill 已讀；未安裝技能、未送 exploit）。CVE-2026-109618/109619：PHP8.2 修補門檻8.2.35；10/23 補充 CVE-2026-115560 建議在解析請求前停用 session.upload_progress.enabled，僅升版不涵蓋此補充風險。
