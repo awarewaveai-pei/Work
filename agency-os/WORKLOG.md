@@ -1,5 +1,18 @@
 # Worklog
 
+## 2026-10-27（續9）— Playwright smoke 驗證限制後續處理
+
+- [根因與修復] 部署後兩輪全套各 25 pass／6 skip／1 fail：先是 `/ops/clients` 導航超時，後是 Chromium 截圖擷取錯誤。root 案單獨通過；12 次重複於桌面＋手機共 24/24 通過，全套以 1 worker 及 2 workers 重跑各 26 pass／6 skip／0 fail，故截圖偶發失敗未能重現，未宣稱已找到它的根因。另一個確定問題是 `scripts/playwright-runner.ps1:153,195` 在 Windows PowerShell 5.1 中將 Node stderr 警告升為 NativeCommandError，早於結果歸檔中止；已將安裝及測試的原生指令段暫時設成 Continue，仍以 `$LASTEXITCODE` 決定測試失敗並在 finally 還原偏好。
+- [正式驗收] 用 `NO_COLOR=1`、`FORCE_COLOR=1` 強制重現 Node 警告，Windows PowerShell 5.1 執行 `playwright-runner.ps1 -Mode smoke -SkipInstall` exit 0，完整 32 案＝26 pass／6 skip／0 fail；JSON/HTML/截圖已歸檔於 `agency-os/reports/e2e/2026-10-27/smoke/`。這是後續新一輪通過，原先失敗證據仍如續7所述。
+- [compose 漂移結案] 操作者明示授權套用；正式機 `.env` 原 8 鍵均未設定。以正式機現有 compose 為底，只新增 8 個 `META_*` 宣告（diff 8 add／0 delete），經 `safe-infra-patch.sh compose /root/lobster-phase1/docker-compose.yml next-admin` 自動備份、套用、15 秒 healthy；備份 `/root/lobster-phase1/docker-compose.yml.bak.safe-patch-20261027-064515`。容器 8 鍵皆存在、三個開關為 false，兩個 token 欄位與 app secret 為空；`check-deploy-drift.ps1 -AppCodeOnly -SkipFetch` exit 0、`composeVarDrift` 清空，HTTP `/login`、`/api/ops/summary`、`/api/ops/repairs/health` 均 200。全域 health 320/320（100%）；重建後 Playwright smoke 再跑 26 pass／6 skip／0 fail。IG comments Meta Advanced Access 與 IG DM live test 保留在 C27/C28 原待辦，未開啟功能。
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell.exe -NoProfile -File scripts/playwright-runner.ps1 -Mode smoke -SkipInstall（NO_COLOR=1/FORCE_COLOR=1） | exit=0 | ms=27904
+- REALTEST_EVIDENCE: tool=SSH | cmd=safe-infra-patch.sh compose docker-compose.yml next-admin；docker exec printenv（遮罩）；三個 HTTP probe | exit=0 | ms=24066
+- REALTEST_EVIDENCE: tool=Bash | cmd=check-deploy-drift.ps1 -AppCodeOnly -SkipFetch；system-health-check.ps1；重建後 playwright-runner.ps1 -Mode smoke -SkipInstall | exit=0 | health=320/320；smoke=26 pass/6 skip/0 fail
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=NativeCommandError | hits=49
+- ORACLE_WAIVED: Claude 訂閱不可用；已做獨立 critic 與 PS5.1 警告實跑。
+- WORKLOG_DONE: 本條；`TASKS.md` 將 8 個 compose 變數漂移標結案。rollback：程式腳本可回退本次兩處 ErrorActionPreference scope；正式機 compose 如因本次改動故障，以備份為輸入再走 `safe-infra-patch.sh compose`，不可直接編輯或強制重建。
+
 ## 2026-10-27（續8）— AO-RESUME：共享目錄 readiness 與 PS5.1 啟動修復（Codex）
 
 - 根因①：`check-three-way-sync.ps1` dirty fail 與 `machine-environment-audit.ps1 -Strict` dirty WARN→fail，與共享 worktree 政策衝突；AO 放行旗標還隱含 stash。② hook 的 if-expression 把單項 array 展開成 String，PS5.1 StrictMode native splat 造成 name 參數例外，本文未執行；對照實跑 Array 進入本文、String 必失敗。

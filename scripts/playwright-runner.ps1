@@ -138,7 +138,10 @@ function Resolve-ClientUrl {
 
 function Install-PlaywrightDeps {
     Push-Location $TestsDir
+    $previousErrorActionPreference = $ErrorActionPreference
     try {
+        # Native tools may write harmless warnings to stderr in Windows PowerShell 5.1.
+        $ErrorActionPreference = 'Continue'
         $nmPath = Join-Path $TestsDir 'node_modules'
         if ($SkipInstall -and (Test-Path $nmPath)) {
             Write-Ok 'node_modules present - skipping npm install'
@@ -155,6 +158,7 @@ function Install-PlaywrightDeps {
             Write-Warn 'Browser install returned non-zero - may need admin rights or --with-deps support'
         }
     } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
         Pop-Location
     }
 }
@@ -188,8 +192,17 @@ function Invoke-PlaywrightProject {
         Write-Step "playwright test $($Projects -join ', ')"
         # Use reporters from playwright.config.ts - do NOT pass --reporter on CLI
         # (CLI format differs from config format and breaks JSON output path)
-        & npx playwright test @projectArgs --config playwright.config.ts 2>&1 | Write-Host
-        $exitCode = $LASTEXITCODE
+        # Windows PowerShell 5.1 wraps native stderr warnings as ErrorRecord objects.
+        # Keep the test process exit code authoritative instead of letting a warning
+        # abort evidence archival under the script's normal Stop preference.
+        $previousErrorActionPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = 'Continue'
+            & npx playwright test @projectArgs --config playwright.config.ts 2>&1 | Write-Host
+            $exitCode = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
     } finally {
         Pop-Location
     }
