@@ -1,15 +1,12 @@
 # soulfulexpression.org — WordPress runtime for ks-aw-01
 #
-# Base is pinned to the minor tag because Docker Hub publishes no 6.9.7 patch tag.
-# That is acceptable here for one specific reason: the site's own WP core files come
-# from the migration backup and are pre-populated into the volume BEFORE this service
-# ever starts, so the image's bundled WordPress is never what serves traffic — the
-# image supplies PHP, Apache and the extensions. See
+# The PHP 8.2.35 base is pinned by digest (PHP2Shell, 2026-10-21). Existing WordPress
+# core files live in the pre-populated volume; the base supplies PHP/Apache/extensions.
+# See
 # tenants/company-soulful-expression/core/LIVE_RUNTIME_BASELINE_20260827.md.
-FROM wordpress:6.9-php8.2-apache
+FROM wordpress:php8.2-apache@sha256:4c0263fcef6cf083a927a4fb6ec9f9744710a333b583f9edd0ac1fa2e269cdff
 
-# Already compiled into the base image, verified with `php -m` on 6.9-php8.2-apache
-# (digest sha256:29a3af5d…) — do NOT rebuild these, it only lengthens the build:
+# Already compiled into the pinned base; verified against the live extension list:
 #   bcmath ctype curl dom exif fileinfo filter gd hash iconv imagick intl mbstring
 #   mysqli openssl pdo_sqlite Phar posix sodium sqlite3 zip zlib OPcache
 #
@@ -43,7 +40,7 @@ RUN set -eux; \
     docker-php-ext-install -j"$(nproc)" \
         gmp tidy xsl soap calendar ftp gettext pcntl shmop \
         sysvmsg sysvsem sysvshm; \
-    pecl install redis igbinary msgpack; \
+    pecl install redis-6.3.0 igbinary-3.2.17RC1 msgpack-3.0.1; \
     docker-php-ext-enable redis igbinary msgpack; \
     apt-get purge -y --auto-remove libgmp-dev libtidy-dev libxslt1-dev; \
     apt-get update; \
@@ -88,6 +85,7 @@ RUN set -eux; \
     wp --allow-root --version | grep -q "2.12.0" || { echo "FATAL: wp-cli did not install"; exit 1; }
 
 COPY php-limits.ini /usr/local/etc/php/conf.d/zz-soulful-limits.ini
+RUN php -r 'exit(PHP_VERSION_ID >= 80235 && PHP_VERSION_ID < 80300 && ini_get("session.upload_progress.enabled") === "0" ? 0 : 1);'
 # Apache worker count sized to the compose memory limit (docker-compose.yml soulful-wp).
 COPY apache-mpm-prefork.conf /etc/apache2/mods-available/mpm_prefork.conf
 

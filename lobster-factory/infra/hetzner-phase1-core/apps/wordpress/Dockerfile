@@ -1,4 +1,4 @@
-FROM wordpress:php8.2-apache
+FROM wordpress:php8.2-apache@sha256:4c0263fcef6cf083a927a4fb6ec9f9744710a333b583f9edd0ac1fa2e269cdff
 
 # Install Sentry PHP SDK via Composer at build time
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
@@ -11,6 +11,7 @@ COPY mu-plugins/sentry.php ./sentry.php
 COPY mu-plugins/posthog.php ./posthog.php
 
 COPY php-upload-limits.ini /usr/local/etc/php/conf.d/awarewave-upload-limits.ini
+RUN php -r 'exit(PHP_VERSION_ID >= 80235 && PHP_VERSION_ID < 80300 && ini_get("session.upload_progress.enabled") === "0" ? 0 : 1);'
 # Apache worker count sized to the compose memory limit (docker-compose.yml wordpress: deploy.resources.limits).
 COPY apache-mpm-prefork.conf /etc/apache2/mods-available/mpm_prefork.conf
 

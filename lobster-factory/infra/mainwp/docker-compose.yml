@@ -38,7 +38,7 @@ services:
 
   mainwp-web:
     init: true
-    image: wordpress:6.7-apache
+    image: wordpress:php8.2-apache@sha256:4c0263fcef6cf083a927a4fb6ec9f9744710a333b583f9edd0ac1fa2e269cdff
     container_name: mainwp-web
     restart: unless-stopped
     depends_on:
@@ -67,6 +67,7 @@ services:
     volumes:
       - mainwp_files:/var/www/html
       - ./apache-mpm-prefork.conf:/etc/apache2/mods-available/mpm_prefork.conf:ro
+      - ./php-security.ini:/usr/local/etc/php/conf.d/zz-php-security.ini:ro
     networks:
       - mainwp_internal
     memswap_limit: 512M

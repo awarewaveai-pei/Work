@@ -115,7 +115,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: soulful-wordpress:local
+    image: soulful-wordpress:php8.2.35-r1
     container_name: soulful-wp
     restart: unless-stopped
     depends_on:

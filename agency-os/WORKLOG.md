@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-27（續3）— PHP2Shell 實機盤點與候選修補驗證（待正式部署批准）
+
+- 來源：OpenAI https://openai.com/index/coordinated-disclosure-of-critical-vulnerabilities/ 、PHP https://www.php.net/archive/2026.php 、官方 https://github.com/openai/php2shell-checker （server skill 已讀；未安裝技能、未送 exploit）。CVE-2026-109618/109619：PHP8.2 修補門檻8.2.35；10/23 補充 CVE-2026-115560 建議在解析請求前停用 session.upload_progress.enabled，僅升版不涵蓋此補充風險。
+- 實機 ks-aw-01：soulful-wp=8.2.31、mainwp-web=8.2.28、lobster-wordpress=8.2.35；皆 Apache php_module、upload_progress=1、serialize_handler=php。三者 PHP 為 /usr/local 原始碼建置、不屬 dpkg 套件，不能套用 Debian 回補豁免。57個 running 容器中3個PHP、53個PATH無PHP、postgrest scratch無shell（不宣稱該項完成二進位掃描）；host PATH 無PHP。Windows PHP檔案8.4.19，執行受應用程式控制阻擋，僅讀版本資訊，未繞過。
+- 候選：三者固定官方 wordpress:php8.2-apache digest 4c0263fcef6cf083a927a4fb6ec9f9744710a333b583f9edd0ac1fa2e269cdff（隔離實跑8.2.35）；三份 conf.d ini 設0。root/Soulful build-time版本與設定斷言。Soulful PECL沿用實機 redis6.3.0/igbinary3.2.17RC1/msgpack3.0.1。WordPress核心維持既有volume（Soulful6.9.10，另兩個7.1.3）；未改DB/外掛。
+- 範圍：root apps/wordpress Dockerfile:1,14 + php-upload-limits.ini:5；soulful Dockerfile:7,43,88 + php-limits.ini:23 + docker-compose.yml:118；mainwp docker-compose.yml:41,70 + 新 php-security.ini:2。
+- 已通過：local Docker build root+Soulful、三者 Apache HTTP/session/multipart smoke（8.2.35/setting0）、CLI擴充41/41/56全數保留（Apache排除CLI-only readline）、兩份compose config。只測候選runtime，未接正式DB。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/check-compose-invariants.py 15files/0problems; git diff --check; mainwp final compose healthcheck + Apache/session/multipart smoke | exit=0 | ms=7002
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0
+  - Claude SDK API session d62254ee-5965-47df-ac6f-2b96422a58e7（API兩次合計$0.5838162）；artifact=agency-os/reports/oracle/2026-10-27-review-be906f48.md，7檔均覆蓋。原F1 mainwp複合healthcheck違反bounded規則已實測1problem→還原限時curl→0；F2 historical/current-live docs不是缺陷，部署成功才更新runbook:43。未測真實WP整合與exploit，不宣稱已上線。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=session\.upload_progress\.enabled（排除WORKLOG/node_modules/.next/vendor/.venv/JSON/log） | hits=5（3份ini、2份Dockerfile斷言，均已覆蓋）
+- 回滾：root維持:local以相容 rollback-phase1.sh:37,143；Soulful新tag php8.2.35-r1保留舊:local；MainWP回復舊compose image/bind。正式compose位置已由container labels確認 /root/lobster-phase1、/root/soulful、/root/mainwp；後兩者走safe-infra-patch compose，root走sg-deploy wordpress。先確認備份，再逐站部署及驗證實際Apache/設定/登入/上傳/站台健康；失敗回復映像及compose。
+- 狀態：僅本機候選修補與隔離測試完成；正式服務未切換、未重啟。主機僅下載候選image到cache。正式操作須AGENTS §3 High明示批准；屆時同步runbook實際image/回滾說明。證據暫存=%TEMP%/aw-php-security-20261027/（build、modules、smoke、捕獲diff、API原文）；planner API d3f4f5da-1024-48c7-9fab-11f7fdcf191a $0.213475。
+- WORKLOG_DONE: 本條；保留其他session的共享檔與狀態快照。
+
 ## 2026-10-27（續2）— cloudflared eMudhra 安全更新（筆電兩份）
 
 - 根因：Cloudflare 公告 2026-10-20 eMudhra 中繼憑證弱金鑰；筆電系統版與字幕 worker 專用版均為 2026.8.3，低於修補門檻 2026.10.2。操作者授權處理並完成 Windows UAC。
