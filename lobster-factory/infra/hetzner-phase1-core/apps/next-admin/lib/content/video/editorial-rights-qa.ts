@@ -91,6 +91,29 @@ export function runEditorialQa(input: EditorialQaInput): AutomatedQaReport {
   return report("editorial", "media.qa.editorial", findings);
 }
 
+/**
+ * D7: rights evidence from the sources recorded when each asset was acquired (asset-origin.ts RightsSource).
+ * Only a recorded origin can be "cleared"; `unknown` and an unticked upload stay not cleared, so the check fails.
+ */
+export function rightsAssetsFromSources(sources: unknown): RightsAssetEvidence[] {
+  if (!Array.isArray(sources)) return [];
+  return sources.map((raw, i) => {
+    const s = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+    const assetId = `source-${i + 1}`;
+    const url = text(s.url);
+    if (s.kind === "ai_generated" && text(s.model) && text(s.provider)) {
+      return { assetId, status: "cleared", licenseRef: "self-produced", sourceRef: `${text(s.provider)}/${text(s.model)}` };
+    }
+    if (s.kind === "pexels" && text(s.sourceRef)) {
+      return { assetId, status: "cleared", licenseRef: "Pexels License", sourceRef: text(s.sourceRef) };
+    }
+    if (s.kind === "upload" && s.rightsConfirmed === true && url) {
+      return { assetId, status: "cleared", licenseRef: "uploader-confirmed", sourceRef: url };
+    }
+    return { assetId, status: s.kind === "upload" ? "unconfirmed" : "unrecorded", licenseRef: "", sourceRef: url };
+  });
+}
+
 /** Check every referenced asset has explicit, non-expired rights evidence. */
 export function runRightsQa(input: RightsEvidenceInput): AutomatedQaReport {
   const findings: QaFinding[] = [];

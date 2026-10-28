@@ -9,6 +9,7 @@
  * Failure: { ok: false, error }
  */
 
+import { signOrigin } from "@/lib/content/video/asset-origin";
 import { NextRequest, NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
@@ -93,6 +94,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     ok?: boolean;
     scenes?: { id: number; narration: string; image_prompt: string; broll_keyword: string; visual: "custom" | "broll" }[];
     formatAssets?: Record<string, string[]>;
+    origins?: Record<string, import("@/lib/content/video/asset-origin").AssetOrigin>;
     formats?: string[];
     r2Keys?: string[];
     title?: string;
@@ -127,6 +129,8 @@ export async function POST(req: NextRequest): Promise<Response> {
       formats: result.formats,
       r2Keys: result.r2Keys ?? [],
       title: result.title ?? "",
+      // D7: signed origin per R2 asset, sent back with render-draft so the rights QA has the record.
+      assetOrigins: Object.fromEntries(Object.entries(result.origins ?? {}).flatMap(([url, o]) => { const s = signOrigin(url, o); return s ? [[url, s]] : []; })),
     });
   };
   // The first paid step asks: the script, or the scene images when the script was handed in; later steps inherit it.

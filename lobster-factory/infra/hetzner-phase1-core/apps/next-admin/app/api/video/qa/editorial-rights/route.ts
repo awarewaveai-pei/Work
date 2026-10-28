@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "@/lib/ops-role";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { runEditorialQa, runRightsQa, type AutomatedQaReport } from "@/lib/content/video/editorial-rights-qa";
+import { rightsAssetsFromSources, runEditorialQa, runRightsQa, type AutomatedQaReport } from "@/lib/content/video/editorial-rights-qa";
 import { automaticQaIssuance } from "@/lib/content/video/qa-issuance";
 
 export const runtime = "nodejs";
@@ -60,7 +60,9 @@ export async function POST(req: Request): Promise<Response> {
     metadata.source_asset_ids,
     provenance.sourceArtifactIds,
   ];
-  const evidenceIds = [candidateAssetId, ...referenceLists.flatMap((value) => Array.isArray(value) ? value : [])]
+  // D7: a video made by this tool carries the origin of every asset it used; its own row has no rights fields.
+  const recordedSources = Array.isArray(metadata.rightsSources) && metadata.rightsSources.length > 0 ? metadata.rightsSources : null;
+  const evidenceIds = [...(recordedSources ? [] : [candidateAssetId]), ...referenceLists.flatMap((value) => Array.isArray(value) ? value : [])]
     .filter((value): value is string => typeof value === "string" && UUID.test(value));
   const assetRows = await db.from("media_assets").select("id, organization_id, metadata").eq("organization_id", organizationId).in("id", [...new Set(evidenceIds)]);
   if (assetRows.error) return NextResponse.json({ ok: false, error: "rights_asset_lookup_failed" }, { status: 502 });
@@ -79,7 +81,7 @@ export async function POST(req: Request): Promise<Response> {
       expiresAt: assetMetadata.rights_expires_at ?? assetMetadata.rightsExpiresAt,
     };
   });
-  const rightsInput = { assets: storedRights };
+  const rightsInput = { assets: [...(recordedSources ? rightsAssetsFromSources(recordedSources) : []), ...storedRights] };
   const reports = [runEditorialQa(editorialInput), runRightsQa(rightsInput)];
   const persisted: Array<{ id: string; qaKind: string; status: string; reportSha256: string }> = [];
   for (const report of reports) {

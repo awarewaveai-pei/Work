@@ -46,25 +46,35 @@ export async function DELETE(
     return NextResponse.json({ ok: false, error: "asset_has_no_url" }, { status: 422 });
   }
 
+  // Per-ratio variant rows (V4.1) go with the primary row; each one passes the same embed guard.
+  const { data: variants } = await supabase
+    .from("media_assets").select("id, object_url")
+    .eq("organization_id", (asset as Record<string, unknown>).organization_id as string)
+    .eq("metadata->>variantOf", id);
+  const targets = [{ id, object_url: asset.object_url as string }, ...((variants ?? []) as { id: string; object_url: string | null }[]).filter((v) => v.object_url) as { id: string; object_url: string }[]];
+
   // Refuses while any WordPress post/page still embeds the video (r2-delete-guard.ts). On refusal or R2 failure
   // the DB row stays, so the gallery still shows the video and the caller can retry.
-  const r2Result = await deleteUnreferencedAsset(videoObjectKey(asset.object_url));
-  if ("error" in r2Result) {
-    console.error("[video/id] video delete refused:", r2Result.error);
-    const references = "references" in r2Result ? r2Result.references : undefined;
-    return NextResponse.json({ ok: false, error: r2Result.message, code: r2Result.error, references },
-      { status: r2Result.error === "asset_in_use" ? 409 : 502 });
-  }
-
-  // Delete DB record only after R2 succeeds (prevents orphan → reconcile re-insert loop).
-  const { error: dbErr } = await supabase.from("media_assets").delete().eq("id", id);
-  if (dbErr) {
-    return NextResponse.json({ ok: false, error: dbErr.message }, { status: 500 });
+  let r2Deleted = 0;
+  for (const t of targets) {
+    const r2Result = await deleteUnreferencedAsset(videoObjectKey(t.object_url));
+    if ("error" in r2Result) {
+      console.error("[video/id] video delete refused:", r2Result.error);
+      const references = "references" in r2Result ? r2Result.references : undefined;
+      return NextResponse.json({ ok: false, error: r2Result.message, code: r2Result.error, references },
+        { status: r2Result.error === "asset_in_use" ? 409 : 502 });
+    }
+    if (t.id === id) r2Deleted = r2Result.deleted;
+    // Delete DB record only after R2 succeeds (prevents orphan → reconcile re-insert loop).
+    const { error: dbErr } = await supabase.from("media_assets").delete().eq("id", t.id);
+    if (dbErr) {
+      return NextResponse.json({ ok: false, error: dbErr.message }, { status: 500 });
+    }
   }
 
   return NextResponse.json({
     ok: true,
     id,
-    r2_deleted: r2Result.deleted,
+    r2_deleted: r2Deleted,
   });
 }

@@ -16,6 +16,9 @@ const { recordVideoAsset, cleanupVideoInputKeys, pickPrimaryOutput } = vi.hoiste
 }));
 vi.mock("@/lib/content/blocks/video-pipeline", () => ({ recordVideoAsset, cleanupVideoInputKeys, pickPrimaryOutput }));
 
+const { persistAutomaticTechnicalQa } = vi.hoisted(() => ({ persistAutomaticTechnicalQa: vi.fn() }));
+vi.mock("@/lib/content/video/qa-persistence", () => ({ persistAutomaticTechnicalQa }));
+
 const ORG = "11111111-1111-1111-1111-111111111111";
 
 const { finalizeVideoJob } = await import("../finalize");
@@ -32,7 +35,7 @@ const runningJob = (over: Partial<VideoJob> = {}): VideoJob => ({
 const OUT = { "16x9": "https://cdn.example/16x9.mp4" };
 
 beforeEach(() => {
-  for (const m of [finishJob, pollRenderJob, recordVideoAsset, cleanupVideoInputKeys, pickPrimaryOutput]) m.mockReset();
+  for (const m of [persistAutomaticTechnicalQa, finishJob, pollRenderJob, recordVideoAsset, cleanupVideoInputKeys, pickPrimaryOutput]) m.mockReset();
   pickPrimaryOutput.mockReturnValue(OUT["16x9"]);
   recordVideoAsset.mockResolvedValue(null);
 });
@@ -66,5 +69,20 @@ describe("finalizeVideoJob", () => {
     pollRenderJob.mockResolvedValue({ status: "done", outputs: OUT, out_dir: "x", outputMeta: { "16x9": { width: 1920, height: 1080 } } });
     await finalizeVideoJob(runningJob({ recordParams: { title: "T", sceneCount: 2, organizationId: ORG, projectId: "p1" } }));
     expect(recordVideoAsset).toHaveBeenCalledWith(expect.objectContaining({ mediaProjectId: "p1" }));
+  });
+
+  it("two ratios: technical QA is persisted once per ratio row, against that row's checksum", async () => {
+    const out2 = { ...OUT, "9x16": "https://cdn.example/9x16.mp4" };
+    const meta = { "16x9": { width: 1920, height: 1080 }, "9x16": { width: 1080, height: 1920 } };
+    pollRenderJob.mockResolvedValue({ status: "done", outputs: out2, out_dir: "x", outputMeta: meta });
+    recordVideoAsset.mockResolvedValue({ id: "a1", checksumSha256: "c1", rows: [
+      { format: "16x9", id: "a1", url: out2["16x9"], checksumSha256: "c1" },
+      { format: "9x16", id: "a2", url: out2["9x16"], checksumSha256: "c2" },
+    ] });
+    await finalizeVideoJob(runningJob());
+    expect(persistAutomaticTechnicalQa).toHaveBeenCalledTimes(2);
+    expect(persistAutomaticTechnicalQa).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      candidateAssetId: "a2", candidateChecksum: "c2", outputs: { "9x16": out2["9x16"] }, outputMeta: { "9x16": meta["9x16"] },
+    }));
   });
 });

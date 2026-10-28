@@ -21,8 +21,11 @@ import type { VideoServiceCapability } from "@/lib/content/video/render-client";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { thenRun, withFeature } from "@/lib/entitlements/grant";
+import { rightsSourcesFor } from "@/lib/content/video/asset-origin";
 
 interface RenderDraftBody {
+  /** D7: signed origin per asset url (draft / regenerate-image / upload-asset responses). */
+  assetOrigins?: Record<string, unknown>;
   scenes?: { id: number; narration: string }[];
   /** 舊單組（向後相容）：每場景一張圖。 */
   imageUrls?: string[];
@@ -203,6 +206,8 @@ export async function POST(req: NextRequest): Promise<Response> {
         ? {
             title,
             sceneCount: scenes.length,
+            rightsSources: rightsSourcesFor(allUrls, body.assetOrigins),
+            script: scenes.map((s) => s.narration).join("\n"),
             organizationId: orgId,
             formats: useMulti ? bodyFormats : undefined,
             source: "draft",

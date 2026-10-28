@@ -59,6 +59,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     .eq("mime_type", "video/mp4")
     .eq("storage_backend", "r2")
     .eq("is_current", true)
+    .is("metadata->>variantOf", null)
     .order("created_at", { ascending: false })
     .limit(limit);
 

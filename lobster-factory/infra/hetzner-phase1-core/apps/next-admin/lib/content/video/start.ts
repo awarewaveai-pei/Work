@@ -30,6 +30,8 @@ interface PrepareResult {
   r2Keys?: string[];
   title?: string;
   sceneCount?: number;
+  script?: string;
+  rightsSources?: import("@/lib/content/video/asset-origin").RightsSource[];
   formats?: string[];
   visualBreakdown?: { custom: number; broll: number };
   serviceCapability?: VideoServiceCapability;
@@ -86,6 +88,8 @@ export async function startVideoJob(orgId: string | null, input: VideoStartInput
         ? {
             title: prep.title ?? "",
             sceneCount: prep.sceneCount ?? 0,
+            script: prep.script,
+            rightsSources: prep.rightsSources,
             organizationId: orgId,
             formats: prep.formats,
             visualBreakdown: prep.visualBreakdown,

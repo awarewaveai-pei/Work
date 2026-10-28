@@ -86,6 +86,8 @@ export async function finalizeVideoJob(job: VideoJob): Promise<FinalizeResult> {
             outputs: poll.outputs,
             title: job.recordParams.title,
             sceneCount: job.recordParams.sceneCount,
+            script: job.recordParams.script,
+            rightsSources: job.recordParams.rightsSources,
             formats: job.recordParams.formats,
             visualBreakdown: job.recordParams.visualBreakdown,
             imageModel: job.recordParams.imageModel,
@@ -100,13 +102,16 @@ export async function finalizeVideoJob(job: VideoJob): Promise<FinalizeResult> {
           });
           if (asset) {
             const { persistAutomaticTechnicalQa } = await import("@/lib/content/video/qa-persistence");
-            await persistAutomaticTechnicalQa({
-              organizationId: job.recordParams.organizationId,
-              candidateAssetId: asset.id,
-              candidateChecksum: asset.checksumSha256,
-              outputs: poll.outputs,
-              outputMeta: poll.outputMeta,
-            });
+            // D6: technical QA per delivered ratio, against that row's own checksum.
+            for (const r of asset.rows) {
+              await persistAutomaticTechnicalQa({
+                organizationId: job.recordParams.organizationId,
+                candidateAssetId: r.id,
+                candidateChecksum: r.checksumSha256,
+                outputs: { [r.format]: r.url },
+                outputMeta: poll.outputMeta?.[r.format] ? { [r.format]: poll.outputMeta[r.format] } : undefined,
+              });
+            }
             if (job.recordParams.captionCues) {
               const { persistAutomaticCaptionQa } = await import("@/lib/content/video/caption-qa-persistence");
               await persistAutomaticCaptionQa({

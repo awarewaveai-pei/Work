@@ -11,6 +11,7 @@
  * Failure: { ok: false, error }
  */
 
+import { signOrigin } from "@/lib/content/video/asset-origin";
 import { NextRequest, NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
@@ -119,6 +120,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
   }
 
+  // D7: the uploader says whether they may use the file; recorded now and signed so the rights QA can read it later.
+  const rightsConfirmed = form.get("rightsConfirmed") === "true";
+  const origin = signOrigin(put.publicUrl, { kind: "upload", rightsConfirmed });
+
   // FootageEditor supplies an organization ID to make the uploaded source a
   // durable tenant-owned media_assets row. Legacy callers omit it and retain
   // the original temporary-upload response.
@@ -137,14 +142,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       mime_type: mime,
       byte_size: buf.byteLength,
       checksum_sha256: createHash("sha256").update(buf).digest("hex"),
-      metadata: { source: "footage_editor", original_name: file.name },
+      metadata: { source: "footage_editor", original_name: file.name, ...(rightsConfirmed ? { rights_status: "cleared", license_ref: "uploader-confirmed", source_ref: put.publicUrl } : {}) },
     }).select("id, checksum_sha256").single();
     if (asset.error || !asset.data) {
       try { const { deleteDesignObject } = await import("@/lib/storage/r2"); await deleteDesignObject(key); } catch { /* best effort cleanup */ }
       return NextResponse.json({ ok: false, error: "asset registration failed" }, { status: 502 });
     }
-    return NextResponse.json({ ok: true, imageUrl: put.publicUrl, r2Key: key, kind: isVideo ? "video" : "image", assetId: asset.data.id, checksumSha256: asset.data.checksum_sha256 });
+    return NextResponse.json({ ok: true, imageUrl: put.publicUrl, r2Key: key, kind: isVideo ? "video" : "image", assetId: asset.data.id, checksumSha256: asset.data.checksum_sha256, ...(origin ? { origin } : {}) });
   }
 
-  return NextResponse.json({ ok: true, imageUrl: put.publicUrl, r2Key: key, kind: isVideo ? "video" : "image" });
+  return NextResponse.json({ ok: true, imageUrl: put.publicUrl, r2Key: key, kind: isVideo ? "video" : "image", ...(origin ? { origin } : {}) });
 }

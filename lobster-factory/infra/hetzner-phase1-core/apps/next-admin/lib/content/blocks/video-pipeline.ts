@@ -20,13 +20,14 @@ import {
   isR2Configured,
 } from "../../storage/r2";
 import { submitRender, type RenderOutputMeta, type RenderOutputs, type VideoServiceCapability } from "../video/render-client";
-import { generateTarotImage, isTarotModel } from "../../tarot/image-gen";
+import { generateTarotImage, isTarotModel, TAROT_MODELS } from "../../tarot/image-gen";
 import { generateVideoMotionBatch, isVideoMotionModel } from "../../tarot/video-motion-gen";
 import { grantFor } from "@/lib/entitlements/grant";
 import { VIDEO_MOTION_RATES } from "../../ai/cost-model";
 import { logImageCost } from "../../ai/log-ai-call";
 import { getSupabaseWriteClient } from "../../supabase-server";
 import { randomBytes, randomUUID } from "node:crypto";
+import { rightsSourcesFromOrigins, type AssetOrigin, type RightsSource } from "../video/asset-origin";
 
 /**
  * 輸出格式 → 生圖長寬比 + Pexels 取向 + 風格框景詞。
@@ -145,6 +146,13 @@ export function videoObjectKey(primaryUrl: string): string {
   }
 }
 
+/** One row per delivered aspect ratio (V4.1); `id`/`checksumSha256` = the primary row, `rows` = every ratio incl. the primary. */
+export interface RecordedVideoAsset {
+  id: string;
+  checksumSha256?: string;
+  rows: { format: string; id: string; url: string; checksumSha256?: string }[];
+}
+
 export async function recordVideoAsset(params: {
   organizationId: string;
   primaryUrl: string;
@@ -159,6 +167,10 @@ export async function recordVideoAsset(params: {
   outputMeta?: RenderOutputMeta;
   /** media_production_projects.id (already checked to belong to organizationId by the render route). */
   mediaProjectId?: string;
+  /** D8: the narration text the video was rendered from; editorial QA reads metadata.script. */
+  script?: string;
+  /** D7: origin of every asset the video used; the rights QA reads metadata.rightsSources. */
+  rightsSources?: RightsSource[];
   /**
    * True only for the caller that holds the REAL render metadata (/api/video/status,
    * which has recordParams: title, sceneCount, formats, visualBreakdown, imageModel).
@@ -172,7 +184,7 @@ export async function recordVideoAsset(params: {
    * directory name as the title and 0 scenes forever.
    */
   authoritative?: boolean;
-}): Promise<{ id: string; checksumSha256?: string } | null> {
+}): Promise<RecordedVideoAsset | null> {
   const supabase = getSupabaseWriteClient();
   if (!supabase) return null;
   const objectKey = videoObjectKey(params.primaryUrl);
@@ -218,6 +230,8 @@ export async function recordVideoAsset(params: {
         selectedFormats: params.formats ?? Object.keys(params.outputs),
         formatCount: Object.keys(params.outputs).length,
         sceneCount: params.sceneCount,
+        ...(params.script ? { script: params.script } : {}),
+        ...(params.rightsSources ? { rightsSources: params.rightsSources } : {}),
         visualBreakdown: params.visualBreakdown,
         imageModel: params.imageModel,
         source: params.source,
@@ -237,19 +251,59 @@ export async function recordVideoAsset(params: {
     console.warn("[video-pipeline] media_assets upsert failed (best-effort):", error.message);
     return null;
   }
-  const row = await supabase
+  const lookup = (key: string) => supabase
     .from("media_assets")
     .select("id, checksum_sha256")
     .eq("organization_id", params.organizationId)
     .eq("storage_backend", "r2")
-    .eq("object_key", objectKey)
+    .eq("object_key", key)
     .eq("version", 1)
     .maybeSingle();
+  const row = await lookup(objectKey);
   if (row.error || !row.data) {
     if (row.error) console.warn("[video-pipeline] media_assets lookup failed (best-effort):", row.error.message);
     return null;
   }
-  return { id: String(row.data.id), checksumSha256: row.data.checksum_sha256 ? String(row.data.checksum_sha256) : undefined };
+  const mainId = String(row.data.id);
+  const rows: RecordedVideoAsset["rows"] = [{ format: primaryFormat ?? "primary", id: mainId, url: params.primaryUrl, checksumSha256: row.data.checksum_sha256 ? String(row.data.checksum_sha256) : undefined }];
+
+  // D6 (VIDEO_TOOL_REDESIGN V4.1): one aspect ratio = one media_assets row with its own checksum. The primary row above
+  // keeps the old shape (all formats in metadata); every other format is a variant row pointing back at it. Lists
+  // skip rows with metadata.variantOf; deleting the primary deletes its variants (api/video/[id]).
+  for (const [format, url] of Object.entries(params.outputs)) {
+    if (url === params.primaryUrl || !url.startsWith("https://")) continue;
+    const meta = params.outputMeta?.[format];
+    const { error: vErr } = await supabase.from("media_assets").upsert(
+      {
+        organization_id: params.organizationId,
+        storage_backend: "r2",
+        asset_domain: "ai_generated",
+        object_key: videoObjectKey(url),
+        object_url: url,
+        mime_type: "video/mp4",
+        byte_size: meta?.byteSize ?? 0,
+        ...(meta?.checksumSha256 ? { checksum_sha256: meta.checksumSha256 } : {}),
+        is_current: true,
+        ...(params.mediaProjectId ? { media_project_id: params.mediaProjectId } : {}),
+        metadata: {
+          title: params.title,
+          variantOf: mainId,
+          format,
+          sceneCount: params.sceneCount,
+          ...(params.script ? { script: params.script } : {}),
+          ...(params.rightsSources ? { rightsSources: params.rightsSources } : {}),
+          source: params.source,
+          outputMeta: meta ? { [format]: meta } : undefined,
+          renderedAt: new Date().toISOString(),
+        },
+      },
+      { onConflict: "organization_id,storage_backend,object_key,version", ignoreDuplicates: !params.authoritative },
+    );
+    if (vErr) { console.warn(`[video-pipeline] media_assets variant ${format} upsert failed (best-effort):`, vErr.message); continue; }
+    const vRow = await lookup(videoObjectKey(url));
+    if (vRow.data) rows.push({ format, id: String(vRow.data.id), url, checksumSha256: vRow.data.checksum_sha256 ? String(vRow.data.checksum_sha256) : undefined });
+  }
+  return { id: mainId, checksumSha256: rows[0].checksumSha256, rows };
 }
 
 /** 刪除本輪上傳的 Flux 暫存物件（render 消費完後清，防 R2 累積）。永不拋。 */
@@ -271,6 +325,8 @@ export interface VideoPipelinePending {
   r2Keys: string[];
   title: string;
   sceneCount: number;
+  script?: string;
+  rightsSources?: RightsSource[];
   formats: string[];
   visualBreakdown: { custom: number; broll: number };
   imageModel?: string;
@@ -281,7 +337,7 @@ type VideoPipelineResult = VideoPipelinePending | { ok: false; status: number; e
 type AssetResult =
   // bytes/mime 只在 Flux/reference 生圖路徑填（Pexels 路徑無本地 buffer）；
   // 供 story-bibles/generate-portrait 直接註冊 media_assets，不必回抓 R2 算 checksum。
-  | { ok: true; asset: string; r2Key?: string; bytes?: Buffer; mime?: string }
+  | { ok: true; asset: string; r2Key?: string; bytes?: Buffer; mime?: string; origin?: AssetOrigin }
   | { ok: false; status: number; error: string };
 
 /** 草稿生成結果：腳本 + 每格式圖片 URL，不含渲染（供 /api/video/draft 使用）。 */
@@ -294,6 +350,8 @@ export interface PreparedScenes {
   formats: string[];
   r2Keys: string[];
   title: string;
+  /** D7: origin of every R2 asset this call made (url -> origin); Pexels is derived from the host. */
+  origins: Record<string, AssetOrigin>;
 }
 
 /**
@@ -372,7 +430,9 @@ export async function buildSceneAsset(
   if (!parsed || !key) return { ok: false, status: 502, error: `場景 ${scene.id} 圖片格式無法解析` };
   const put = await putDesignObject(key, parsed.buffer, parsed.mime);
   if (!put.ok) return { ok: false, status: 502, error: `場景 ${scene.id} 圖片上傳 R2 失敗：${"error" in put ? put.error : "r2_put_failed"}` };
-  return { ok: true, asset: put.publicUrl, r2Key: key, bytes: parsed.buffer, mime: parsed.mime };
+  // D7: the image is ours, made by this model; recorded now, not reconstructed at QA time.
+  const origin: AssetOrigin = { kind: "ai_generated", model: safeModel, provider: TAROT_MODELS[safeModel].provider };
+  return { ok: true, asset: put.publicUrl, r2Key: key, bytes: parsed.buffer, mime: parsed.mime, origin };
 }
 
 /**
@@ -567,6 +627,7 @@ export async function prepareScenes(
   // 撞 429）；AI 圖按 aspectRatio 原生生、B-roll 按 orientation 抓對應方向，皆非裁同一張。
   const formatAssets: Record<string, string[]> = {};
   const r2Keys: string[] = [];
+  const origins: Record<string, AssetOrigin> = {};
   for (const fmt of formats) {
     const spec = FORMAT_SPEC[fmt];
     const results = await Promise.all(
@@ -587,6 +648,7 @@ export async function prepareScenes(
       await cleanupVideoInputKeys(r2Keys); // 任一格式任一場景失敗 → 清掉本輪所有格式已上傳的暫存圖
       return failed;
     }
+    for (const r of results) if (r.ok && r.origin) origins[r.asset] = r.origin;
     formatAssets[fmt] = results.map((r) => (r as { ok: true; asset: string }).asset);
   }
 
@@ -599,9 +661,13 @@ export async function prepareScenes(
     );
     r2Keys.push(...motionResult.r2Keys);
     input.onProgress?.(`AI 影片動態：${motionResult.motionAppliedCount} 個場景套用成功`);
+    // Motion clips replace some still urls; they are model output too.
+    for (const url of Object.values(formatAssets).flat()) {
+      if (!origins[url] && !url.includes("pexels.com") && !url.includes("vimeo.com")) origins[url] = { kind: "ai_generated", model: input.videoMotionModel, provider: "video-motion" };
+    }
   }
 
-  return { ok: true, scenes, formatAssets, formats, r2Keys, title };
+  return { ok: true, scenes, formatAssets, formats, r2Keys, title, origins };
 }
 
 register({
@@ -638,7 +704,7 @@ register({
       anthropicKey,
     );
     if (!prep.ok) return prep as { ok: false; status: number; error: string };
-    const { scenes, formatAssets, formats, r2Keys, title } = prep;
+    const { scenes, formatAssets, formats, r2Keys, title, origins } = prep;
 
     // 3) 提交 EU（短請求，不等渲染）→ 回 euJobId。渲染在 EU thread 跑，由 /status 輪詢收尾。
     onProgress?.("提交合成任務（EU 伺服器）…");
@@ -681,6 +747,8 @@ register({
       r2Keys,
       title,
       sceneCount: scenes.length,
+      rightsSources: rightsSourcesFromOrigins(Object.values(formatAssets).flat(), origins),
+      script: scenes.map((s) => s.narration).filter(Boolean).join("\n"),
       formats,
       visualBreakdown,
       imageModel: ctx.imageModel as string | undefined,

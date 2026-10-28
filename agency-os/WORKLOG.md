@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-28（續13）— 影片 V4.1／V4.2／V4.4／V4.5：一比例一成片、逐比例技術 QA、腳本與素材來源入成片（Claude）
+
+- **根因**：下游只認一列成片（D6）；成片沒存腳本（D8）→ 編輯 QA 永遠缺腳本；素材取得時沒記來源（D7）→ 版權 QA 結構上不可能通過。
+- **做了**：V4.1 `recordVideoAsset` 每比例一列（非主列 `metadata.variantOf`＝主列 id、`metadata.format`），回傳 `rows`；`history`／`designs-list` 排除 variant；`api/video/[id]` DELETE 連 variant 一起走 embed 閘。V4.2 `finalize` 逐 `rows` 呼叫 `persistAutomaticTechnicalQa`（各自 checksum）。V4.4 `recordParams.script`（render-draft／pipeline）→ `metadata.script`。V4.5 新 `lib/content/video/asset-origin.ts`：AI 圖（模型＋供應商）、Pexels（host 推導）、上傳（`rightsConfirmed`）；手動流程來源以 HMAC（`OPS_PROXY_SHARED_SECRET`）簽章隨素材走（draft／regenerate／upload 回傳 → render-draft 驗），自動管線直接用 server 內來源；寫進 `metadata.rightsSources`；`editorial-rights` route 讀它（有來源就不再拿成片自己當權利證據）；上傳時 `window.confirm` 問有無權使用。無 migration、無 video-service 變更，可 push。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/content/video lib/content/blocks app/api/video`（next-admin）＋`npx tsc --noEmit` | exit=0 | ms=3000 | 52 files 222 passed
+- 突變（版權守衛）：`verifyOrigin` 改成不驗簽 → `asset-origin.test.ts` 偽造來源案例變紅；還原變綠。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n（n：Pexels 來源只看 host，不驗 URL 真屬該 license 頁；與 D7「Pexels License＋原始網址」一致）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=recordVideoAsset|variantOf|rightsSources | hits=24（讀者：history／designs-list／[id]／finalize／reconcile／remotion-job-status 皆已查；reconcile 只探主列 key，不受影響）
+- ORACLE_WAIVED: Codex 本輪不可用；書面自審：variant 刪除用同 org 查詢（跨租戶不會帶走）；無簽章／無 secret → `unknown` → 版權 QA failed（不假通過）；舊成片無 rightsSources 行為不變。
+- **已知落差**：驗收「兩比例 history 只回一列」只靠 query 條件（`.is("metadata->>variantOf", null)`），未有 DB 層測試；PostgREST 對 `->>` 的 is.null 以正式機首次渲染確認。
 ## 2026-10-28（續12）— 影片 V3.4：Remotion 從「模式」改成第 2 步加購片頭卡（Claude）
 
 - **根因**：Remotion 與快速影片搶同一個「模式」位置，但做的是 6–22 秒廣告卡（D9）。`ModeSelectStep` 刪 remotion 模式（剩 3 種）；第 2 步加「加片頭／廣告卡」勾選，存 `brief_json.introCard`（舊專案 `engine=remotion` 視為已勾）；第 3 步勾了就在主片下多一個 Remotion 面板＝另一支成片。`CostGateStep` 改依 introCard 顯示費用說明；`VideoStudio` tab／提示文字同步。無 migration、可直接 push。

@@ -261,6 +261,8 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
   const [draftFormats, setDraftFormats] = useState<string[]>([]);
   const [draftPreviewFormat, setDraftPreviewFormat] = useState("");
   const [draftR2Keys, setDraftR2Keys] = useState<string[]>([]);
+  // D7: signed origin per asset url (draft / regenerate / upload responses); sent back with render-draft for the rights QA.
+  const [assetOrigins, setAssetOrigins] = useState<Record<string, unknown>>({});
   const [draftTitle, setDraftTitle] = useState("");
   const [regenIds, setRegenIds] = useState<Set<number>>(new Set()); // 場景忙碌中的 id（單張重生 或 上傳中）
   const draftReady = draftScenes.length > 0;
@@ -395,6 +397,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
     setDraftFormats([]);
     setDraftPreviewFormat("");
     setDraftR2Keys([]);
+    setAssetOrigins({});
     setVisualConsistency(null);
     setGenError("");
     setGenResult(null);
@@ -426,6 +429,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
         formatImageUrls?: Record<string, string[]>;
         formats?: string[];
         r2Keys?: string[];
+        assetOrigins?: Record<string, unknown>;
         title?: string;
         error?: string;
       };
@@ -452,6 +456,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
       setDraftFormats(j.formats);
       setDraftPreviewFormat(primaryFmt);
       setDraftR2Keys(j.r2Keys ?? []);
+      setAssetOrigins(j.assetOrigins ?? {});
       setDraftTitle(j.title ?? topic.trim());
       // Automatic, not a button: an account without video.image just does not get the check (ADR 017 §4).
       if (canUse("video.image")) void runVisualConsistencyCheck(nextDraftScenes);
@@ -523,8 +528,8 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
               ...(embedded?.organizationId ? { organizationId: embedded.organizationId } : {}),
             }),
           });
-          const j = (await res.json()) as { ok: boolean; imageUrl?: string; error?: string };
-          if (j.ok && j.imageUrl) return { fmt, imageUrl: j.imageUrl };
+          const j = (await res.json()) as { ok: boolean; imageUrl?: string; origin?: unknown; error?: string };
+          if (j.ok && j.imageUrl) { if (j.origin) setAssetOrigins((prev) => ({ ...prev, [j.imageUrl!]: j.origin })); return { fmt, imageUrl: j.imageUrl }; }
           return { fmt, error: j.error ?? "圖片重新生成失敗" };
         } catch (e: unknown) {
           return { fmt, error: e instanceof Error ? e.message : "網路錯誤，重新生成失敗" };
@@ -562,9 +567,12 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
       const fd = new FormData();
       fd.append("file", file);
       fd.append("oldImageUrl", scene.imageUrl);
+      // D7: rights are recorded at upload. OK = "I may use this"; Cancel still uploads, but the rights check will fail.
+      fd.append("rightsConfirmed", String(window.confirm("這個素材是你自己的，或你有權使用嗎？\n按「確定」＝有權使用；按「取消」＝仍會上傳，但版權檢查會顯示未通過。")));
       const res = await fetch("/api/video/upload-asset", { method: "POST", body: fd });
-      const j = (await res.json()) as { ok: boolean; imageUrl?: string; error?: string };
+      const j = (await res.json()) as { ok: boolean; imageUrl?: string; origin?: unknown; error?: string };
       if (j.ok && j.imageUrl) {
+        if (j.origin) setAssetOrigins((prev) => ({ ...prev, [j.imageUrl!]: j.origin }));
         setDraftScenes((prev) => prev.map((s) => (s.id === sceneId ? { ...s, imageUrl: j.imageUrl! } : s)));
         if (sceneIndex >= 0) {
           const uploaded = j.imageUrl;
@@ -607,6 +615,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
           formatImageUrls,
           formats: draftFormats,
           r2Keys: draftR2Keys,
+          assetOrigins,
           title: draftTitle,
           ...(embedded?.organizationId ? { organizationId: embedded.organizationId } : {}),
           ...(embedded?.projectId ? { projectId: embedded.projectId } : {}),

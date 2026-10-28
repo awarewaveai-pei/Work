@@ -10,6 +10,7 @@
  * Failure: { ok: false, error }
  */
 
+import { signOrigin } from "@/lib/content/video/asset-origin";
 import { NextRequest, NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
@@ -93,7 +94,8 @@ export async function POST(req: NextRequest): Promise<Response> {
 
     // 註：此處不驗 imageUrl host —— buildSceneAsset 只會回 R2 designs / Pexels / Vimeo URL，且
     // 送渲染時 render-draft 會再用 ALLOWED_HOSTS 把關（host 正確性的單一守門點在那）。
-    return NextResponse.json({ ok: true, imageUrl: result.asset, r2Key: result.r2Key ?? null });
+    const origin = result.origin ? signOrigin(result.asset, result.origin) : null;
+    return NextResponse.json({ ok: true, imageUrl: result.asset, r2Key: result.r2Key ?? null, ...(origin ? { origin } : {}) });
   };
   // Billed to the draft's org (ADR 017 §0 代操); buildSceneAsset's image call inherits it.
   return withFeature("video.image", thenRun, { org: () => orgId })(req, run);

@@ -41,6 +41,10 @@ export interface VideoJob {
   recordParams?: {
     title: string;
     sceneCount: number;
+    /** D8: narration text; recordVideoAsset stores it in metadata.script for editorial QA. */
+    script?: string;
+    /** D7: per-asset origins (asset-origin.ts) -> metadata.rightsSources. */
+    rightsSources?: import("@/lib/content/video/asset-origin").RightsSource[];
     organizationId: string;
     formats?: string[];
     visualBreakdown?: { custom: number; broll: number };

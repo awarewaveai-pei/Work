@@ -111,7 +111,8 @@ function applyFilters(q: Query, f: DesignListFilters, now: Date, omit?: FacetDim
     .eq("storage_backend", "r2")
     .eq("asset_domain", "ai_generated")
     .like("mime_type", f.mimePrefix)
-    .eq("is_current", true);
+    .eq("is_current", true)
+    .is("metadata->>variantOf", null); // per-ratio video rows (V4.1) show under their primary row
   // Visibility guard: every list AND count query goes through here.
   if (f.organizationId) q = q.eq("organization_id", f.organizationId);
 
