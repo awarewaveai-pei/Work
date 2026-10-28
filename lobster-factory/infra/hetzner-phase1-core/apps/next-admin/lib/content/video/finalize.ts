@@ -90,8 +90,9 @@ export async function finalizeVideoJob(job: VideoJob): Promise<FinalizeResult> {
             rightsSources: job.recordParams.rightsSources,
             // D11: our own voice (script_tts) vs real footage audio (transcription); anything else records nothing.
             captions: poll.captions
-              ? { source: "script_tts", srt: poll.captions.srt, vtt: poll.captions.vtt }
+              ? { source: "script_tts", srt: poll.captions.srt, vtt: poll.captions.vtt, cues: poll.captions.cues }
               : job.recordParams.rendererKind === "footage" ? { source: "transcription" } : undefined,
+            cleanOutputs: poll.cleanOutputs,
             formats: job.recordParams.formats,
             visualBreakdown: job.recordParams.visualBreakdown,
             imageModel: job.recordParams.imageModel,

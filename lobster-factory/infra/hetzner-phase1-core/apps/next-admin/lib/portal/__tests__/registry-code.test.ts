@@ -261,6 +261,7 @@ describe("registry claims match the code", () => {
     "app/api/video/status/route.ts": "polls our own video-service and records the finished asset; no paid step",
     "app/api/video/remotion-render/route.ts": "submits to our own Remotion renderer (resolveOrgId only)",
     "app/api/video/remotion-job-status/route.ts": "polls our own Remotion renderer and records the asset",
+    "app/api/video/captions/reburn/route.ts": "submitCaptionReburn burns edited captions with our own ffmpeg service and asks no feature (lib/content/video/render-client.ts)",
     "app/api/video/footage/render/route.ts": "submitFootageRender sends existing footage to our own ffmpeg renderer and asks no feature (lib/content/video/render-client.ts)",
     "app/api/internal/video/reconcile/route.ts": "records orphaned finished videos (lib/content/video/reconcile.ts); no paid step",
   };

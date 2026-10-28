@@ -46,6 +46,16 @@ def assemble(scene_cues: list, scene_audio_s: list, intro_s: float = 0.0) -> lis
     return out
 
 
+def burn_cues(cues: list, splitter) -> list:
+    """Cues -> the start_ms/end_ms shape the burner takes. A cue wider than one screen line (splitter returns >1 part)
+    is spread over its own time by character count, so a long edited sentence never runs off the frame."""
+    out = []
+    for c in cues:
+        for p in proportional_cues(splitter(c["text"]), c["endMs"] - c["startMs"]):
+            out.append({"start_ms": c["startMs"] + p["startMs"], "end_ms": c["startMs"] + p["endMs"], "text": p["text"]})
+    return out
+
+
 def _ts(ms: int, sep: str) -> str:
     h, rem = divmod(ms, 3_600_000)
     m, rem = divmod(rem, 60_000)

@@ -2,11 +2,56 @@
 
 import { useEffect, useRef, useState } from "react";
 
-type Asset = { id: string; object_url: string; checksum_sha256?: string; metadata?: { title?: string; captionSource?: "script_tts" | "transcription"; captionSrt?: string; captionVtt?: string }; created_at: string; asset_domain: string; mime_type?: string };
+type Cue = { startMs: number; endMs: number; text: string };
+type Asset = { id: string; object_url: string; checksum_sha256?: string; metadata?: { title?: string; variantOf?: string; cleanUrl?: string; captionSource?: "script_tts" | "transcription"; captionSrt?: string; captionVtt?: string; captionCues?: Cue[] }; created_at: string; asset_domain: string; mime_type?: string };
 type JobStatus = "idle" | "dispatched" | "polling" | "completed" | "failed";
 
 const card: React.CSSProperties = { background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 10, padding: 14 };
 const field: React.CSSProperties = { width: "100%", boxSizing: "border-box", padding: 8, borderRadius: 6, border: "1px solid var(--border-subtle)", background: "var(--card-bg)", color: "var(--text-primary)", fontSize: 12 };
+
+/** V4.8: edit the script captions of one video and burn them again onto the caption-less video kept at render time. */
+function CueEditor({ assetId, cues: initial }: { assetId: string; cues: Cue[] }) {
+  const [texts, setTexts] = useState(initial.map((c) => c.text));
+  const [state, setState] = useState<"idle" | "running" | "done" | "failed">("idle");
+  const [msg, setMsg] = useState("");
+  const changed = texts.some((t, i) => t !== initial[i].text);
+
+  async function reburn() {
+    setState("running"); setMsg("");
+    try {
+      const res = await fetch("/api/video/captions/reburn", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assetId, cues: initial.map((c, i) => ({ ...c, text: texts[i].trim() })) }) });
+      const j = await res.json() as { ok: boolean; jobs?: { assetId: string; jobId: string }[]; error?: string };
+      if (!res.ok || !j.ok || !j.jobs) throw new Error(j.error ?? "重燒提交失敗");
+      const pending = new Set(j.jobs.map((x) => x.jobId));
+      while (pending.size) {
+        await new Promise((r) => setTimeout(r, 4000));
+        for (const job of j.jobs) {
+          if (!pending.has(job.jobId)) continue;
+          const r = await fetch("/api/video/captions/reburn", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assetId: job.assetId, jobId: job.jobId }) });
+          const p = await r.json() as { ok: boolean; status?: string; error?: string };
+          if (!r.ok || !p.ok || p.status === "error") throw new Error(p.error ?? "重燒失敗");
+          if (p.status === "done") pending.delete(job.jobId);
+        }
+      }
+      setState("done");
+    } catch (e) { setState("failed"); setMsg(e instanceof Error ? e.message : "重燒失敗"); }
+  }
+
+  return (
+    <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>逐句改字幕；改完按「重燒字幕」，每個比例都會重做（時間點不變）。</div>
+      {initial.map((c, i) => (
+        <input key={i} value={texts[i]} onChange={(e) => setTexts((t) => t.map((x, k) => (k === i ? e.target.value : x)))} disabled={state === "running"} style={field} aria-label={`字幕第 ${i + 1} 句`} />
+      ))}
+      <button type="button" disabled={!changed || state === "running" || texts.some((t) => !t.trim())} onClick={() => void reburn()}
+        style={{ padding: "9px 14px", border: 0, borderRadius: 7, background: "var(--accent)", color: "var(--btn-primary-text)", fontWeight: 700, width: 160, cursor: changed && state !== "running" ? "pointer" : "not-allowed" }}>
+        {state === "running" ? "重燒中…" : "重燒字幕"}
+      </button>
+      {state === "done" && <div style={{ fontSize: 12, color: "var(--text-primary)" }}>字幕已重燒，品質檢查已用新影片重跑。</div>}
+      {state === "failed" && <div style={{ fontSize: 12, color: "var(--badge-red-text)" }}>{msg}</div>}
+    </div>
+  );
+}
 
 /**
  * ⑦ 配音與 Whisper 字幕。配音已經在④生成時做完（TTS 烤進影片）；這步只做「選擇性」字幕：
@@ -34,7 +79,7 @@ export default function CaptionsStep({ organizationId, onContinue }: { organizat
     let cancelled = false;
     fetch(`/api/video/assets?organizationId=${encodeURIComponent(org)}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((j: { items?: Asset[] }) => { if (!cancelled) setAssets((j.items ?? []).filter((a) => !a.mime_type || a.mime_type.startsWith("video/") || a.mime_type.startsWith("audio/"))); })
+      .then((j: { items?: Asset[] }) => { if (!cancelled) setAssets((j.items ?? []).filter((a) => !a.metadata?.variantOf && (!a.mime_type || a.mime_type.startsWith("video/") || a.mime_type.startsWith("audio/")))); })
       .catch(() => { if (!cancelled) setAssets([]); });
     return () => { cancelled = true; };
   }, [organizationId]);
@@ -102,6 +147,7 @@ export default function CaptionsStep({ organizationId, onContinue }: { organizat
               {scriptCaptions.captionSrt && <a href={dl(scriptCaptions.captionSrt)} download="captions.srt" style={{ color: "var(--accent-text)" }}>下載 SRT</a>}
               {scriptCaptions.captionVtt && <a href={dl(scriptCaptions.captionVtt)} download="captions.vtt" style={{ color: "var(--accent-text)" }}>下載 VTT</a>}
             </div>
+            {scriptCaptions.captionCues?.length && scriptCaptions.cleanUrl ? <CueEditor key={assetId} assetId={assetId} cues={scriptCaptions.captionCues} /> : null}
           </div>
         )}
         <button type="button" disabled={!assetId || status !== "idle" || !!scriptCaptions} onClick={() => void dispatch()}

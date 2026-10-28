@@ -91,10 +91,10 @@ describe("finalizeVideoJob", () => {
 
   it("script captions from the renderer: recorded as captionSource script_tts and caption QA runs per ratio", async () => {
     const captions = { source: "script_tts", cues: [{ startMs: 0, endMs: 900, text: "hi" }], srt: "1\n", vtt: "WEBVTT\n" };
-    pollRenderJob.mockResolvedValue({ status: "done", outputs: OUT, out_dir: "x", outputMeta: { "16x9": { width: 1920, height: 1080 } }, captions });
+    pollRenderJob.mockResolvedValue({ status: "done", outputs: OUT, out_dir: "x", outputMeta: { "16x9": { width: 1920, height: 1080 } }, captions, cleanOutputs: { "16x9": "https://v/videoclean/x/16x9.mp4" } });
     recordVideoAsset.mockResolvedValue({ id: "a1", checksumSha256: "c1", rows: [{ format: "16x9", id: "a1", url: OUT["16x9"], checksumSha256: "c1" }] });
     await finalizeVideoJob(runningJob());
-    expect(recordVideoAsset).toHaveBeenCalledWith(expect.objectContaining({ captions: { source: "script_tts", srt: "1\n", vtt: "WEBVTT\n" } }));
+    expect(recordVideoAsset).toHaveBeenCalledWith(expect.objectContaining({ captions: { source: "script_tts", srt: "1\n", vtt: "WEBVTT\n", cues: captions.cues }, cleanOutputs: { "16x9": "https://v/videoclean/x/16x9.mp4" } }));
     expect(persistAutomaticCaptionQa).toHaveBeenCalledWith(expect.objectContaining({ candidateAssetId: "a1", captions: captions.cues }));
   });
 

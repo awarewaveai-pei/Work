@@ -270,7 +270,7 @@ export interface RenderCaptions {
 
 export type RenderPoll =
   | { status: "running" }
-  | { status: "done"; outputs: RenderOutputs; out_dir: string; outputMeta?: RenderOutputMeta; storage?: string; captions?: RenderCaptions }
+  | { status: "done"; outputs: RenderOutputs; out_dir: string; outputMeta?: RenderOutputMeta; storage?: string; captions?: RenderCaptions; cleanOutputs?: RenderOutputs }
   | { status: "error"; error: string };
 
 /** 查一次 EU /job 狀態（單一短請求，給 /status 每輪呼叫；不阻塞、不輪詢）。 */
@@ -290,6 +290,7 @@ export async function pollRenderJob(jobId: string, baseUrl?: string): Promise<Re
       out_dir?: string;
       output_meta?: RenderOutputMeta;
       storage?: string;
+      clean_outputs?: RenderOutputs;
       caption_source?: string;
       caption_cues?: RenderCaptions["cues"];
       caption_srt?: string;
@@ -301,11 +302,37 @@ export async function pollRenderJob(jobId: string, baseUrl?: string): Promise<Re
       const captions = job.caption_source === "script_tts" && Array.isArray(job.caption_cues) && job.caption_cues.length > 0
         ? { source: "script_tts" as const, cues: job.caption_cues, srt: job.caption_srt ?? "", vtt: job.caption_vtt ?? "" }
         : undefined;
-      return { status: "done", outputs: job.outputs, out_dir: job.out_dir, outputMeta: job.output_meta, storage: job.storage, ...(captions ? { captions } : {}) };
+      return { status: "done", outputs: job.outputs, out_dir: job.out_dir, outputMeta: job.output_meta, storage: job.storage, ...(captions ? { captions } : {}), ...(job.clean_outputs ? { cleanOutputs: job.clean_outputs } : {}) };
     }
     if (job.status === "error") return { status: "error", error: job.error ?? "render 失敗" };
     return { status: "running" };
   } catch {
     return { status: "running" }; // 暫時性網路錯 → 視為仍進行，下輪再查
+  }
+}
+
+/** V4.8: burn edited captions onto the caption-less video kept at render time; polled with pollRenderJob (same /job shape). */
+export async function submitCaptionReburn(
+  params: { cleanUrl: string; format: string; objectKey: string; cues: RenderCaptions["cues"] },
+  baseUrl?: string,
+): Promise<{ ok: true; jobId: string } | { ok: false; status: number; error: string }> {
+  const base = svcBase(baseUrl);
+  const auth = resolveRendererAuth("quick");
+  if (auth.ok === false) return { ok: false, status: 503, error: "renderer authentication is not configured" };
+  try {
+    const h = await fetch(`${base}/health`, { headers: svcHeaders(false), signal: AbortSignal.timeout(5_000) });
+    const hb = (await h.json().catch(() => ({}))) as { capabilities?: { caption_reburn?: boolean } };
+    if (!hb.capabilities?.caption_reburn) return { ok: false, status: 503, error: "video-service 尚未部署字幕重燒（需 /health 回報 caption_reburn）。" };
+    const res = await fetch(`${base}/reburn-captions`, {
+      method: "POST",
+      headers: { ...auth.headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ clean_url: params.cleanUrl, format: params.format, object_key: params.objectKey, cues: params.cues }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    const body = (await res.json().catch(() => ({}))) as { jobId?: string; error?: string };
+    if (!res.ok || !body.jobId) return { ok: false, status: res.status || 502, error: body.error ?? `提交字幕重燒失敗（HTTP ${res.status}）` };
+    return { ok: true, jobId: body.jobId };
+  } catch (e: unknown) {
+    return { ok: false, status: 503, error: `無法連線到 video-service（${base}）：${e instanceof Error ? e.message : String(e)}` };
   }
 }

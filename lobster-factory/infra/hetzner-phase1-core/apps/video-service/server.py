@@ -18,6 +18,11 @@ next-admin `video/pipeline` 積木負責：生腳本(Claude) + 生圖(Flux) + �
     → 202 { "jobId": "..." }
     實拍素材剪輯（trim+concat），非 TTS 驅動；輪詢沿用 GET /job。
 
+  POST /reburn-captions   body JSON:
+    { "clean_url": "<R2 public>/videoclean/<dir>/<fmt>.mp4", "format": "16x9", "object_key": "video/<dir>/16x9.mp4",
+      "cues": [{"startMs":0,"endMs":2000,"text":"..."}] }
+    → 202 { "jobId": "..." }；字幕改完後在無字幕底片重燒並覆寫 object_key，輪詢沿用 GET /job。
+
   POST /generate-job   body JSON:
     { "topic": "主題", "language": "繁體中文", "scene_count": 6,
       "tts_voice": "zh-TW-HsiaoChenNeural", "intro_title": "", "intro_duration": 3.0 }
@@ -52,6 +57,7 @@ import requests
 from auth_policy import authentication_required
 import config
 import pipeline
+import captions as caption_utils
 from quality import evaluate_probe, evaluate_signal_quality
 
 HOST = os.getenv("VIDEO_SERVICE_HOST", "127.0.0.1")
@@ -274,6 +280,7 @@ def _do_render(scenes, assets, out_name, tts_provider="edge", tts_voice="",
     multiformat=True：assets 為 {fmt:[urls]}，每格式各 materialize 後走 render_video_multiformat
     （原生比例、無 pad）；False：assets 為單組，走舊 render_video（base+pad export）。"""
     caption_sink: dict = {}
+    clean_sink: dict = {}  # fmt -> caption-less video (V4.8), filled only for script-caption multiformat renders
     with _render_lock:  # 序列化：materialize(下載)+render 全程獨佔 TEMP_DIR（防並行撞檔）
         try:
             if multiformat:
@@ -290,6 +297,7 @@ def _do_render(scenes, assets, out_name, tts_provider="edge", tts_voice="",
                     scenes, format_files, out_name,
                     tts_provider=tts_provider, tts_voice=tts_voice,
                     intro_title=intro_title, intro_duration=intro_duration, caption_sink=caption_sink,
+                    clean_sink=clean_sink,
                 )
             else:
                 visual_files = [_materialize_asset(a, i) for i, a in enumerate(assets)]
@@ -313,12 +321,23 @@ def _do_render(scenes, assets, out_name, tts_provider="edge", tts_voice="",
                             f"{base_key}/{fmt}.mp4", fh.read(), "video/mp4",
                             R2_VIDEO_BUCKET, R2_VIDEO_PUBLIC_BASE,
                         )
-                return {"outputs": urls, "out_dir": str(out_dir), "storage": "r2", "output_meta": output_meta, **caption_fields}
+                # Clean videos live under videoclean/, not video/: next-admin's reconcile sweep reads every video/<dir>/<x>.mp4
+                # as a delivered ratio and would record the clean copy as a second video.
+                clean_urls = {}
+                for fmt, path in clean_sink.items():
+                    with open(path, "rb") as fh:
+                        clean_urls[fmt] = _r2_put(
+                            f"videoclean/{os.path.basename(str(out_dir))}/{fmt}.mp4", fh.read(), "video/mp4",
+                            R2_VIDEO_BUCKET, R2_VIDEO_PUBLIC_BASE,
+                        )
+                return {"outputs": urls, "out_dir": str(out_dir), "storage": "r2", "output_meta": output_meta,
+                        **({"clean_outputs": clean_urls} if clean_urls else {}), **caption_fields}
             return {
                 "outputs": {k: str(v) for k, v in outputs.items()},
                 "out_dir": str(out_dir),
                 "storage": "local",
                 "output_meta": output_meta,
+                **({"clean_outputs": {k: str(v) for k, v in clean_sink.items()}} if clean_sink else {}),
                 **caption_fields,
             }
         finally:
@@ -526,6 +545,76 @@ def submit_render_footage(payload: dict) -> str:
     return job_id
 
 
+# ── /reburn-captions：改完字幕後，在無字幕底片上重燒（V4.8）──────────────────────
+
+MAX_REBURN_CUES = int(os.getenv("RENDER_MAX_REBURN_CUES", "400"))
+
+
+def _validate_reburn(payload: dict):
+    """回 (clean_url, cues, fmt, object_key)。底片只收自家 videoclean/、輸出只寫自家 video/<dir>/<fmt>.mp4
+    （服務握有 R2 寫入權，呼叫端不能指定任意 key 或任意來源）。"""
+    if not _r2_video_configured():
+        raise ValueError("R2 未設定，無法重燒")
+    fmt = payload.get("format")
+    if fmt not in config.FORMATS:
+        raise ValueError(f"未知格式 {fmt}（合法：{list(config.FORMATS)}）")
+    clean_url = payload.get("clean_url")
+    if not isinstance(clean_url, str) or not clean_url.startswith(f"{R2_VIDEO_PUBLIC_BASE}/videoclean/"):
+        raise ValueError("clean_url 必須是本服務的 videoclean/ 底片")
+    object_key = payload.get("object_key")
+    if not isinstance(object_key, str) or not re.fullmatch(rf"video/[\w一-鿿]{{1,40}}/{re.escape(fmt)}\.mp4", object_key):
+        raise ValueError("object_key 必須是 video/<dir>/<format>.mp4")
+    cues = payload.get("cues")
+    if not isinstance(cues, list) or not cues or len(cues) > MAX_REBURN_CUES:
+        raise ValueError(f"cues 必須是 1–{MAX_REBURN_CUES} 句")
+    for i, c in enumerate(cues):
+        if not isinstance(c, dict) or not _finite_number(c.get("startMs")) or not _finite_number(c.get("endMs")) or c["endMs"] <= c["startMs"] or c["startMs"] < 0:
+            raise ValueError(f"cues[{i}] 必須有遞增的非負 startMs/endMs")
+        if not isinstance(c.get("text"), str) or not c["text"].strip() or len(c["text"]) > 500:
+            raise ValueError(f"cues[{i}].text 必須是 1–500 字的字串")
+    cues = sorted(({"startMs": int(c["startMs"]), "endMs": int(c["endMs"]), "text": c["text"].strip()} for c in cues), key=lambda c: c["startMs"])
+    if any(a["endMs"] > b["startMs"] for a, b in zip(cues, cues[1:])):
+        raise ValueError("cues 時間不可重疊")
+    return clean_url, cues, fmt, object_key
+
+
+def _do_reburn(clean_url: str, cues: list, fmt: str, object_key: str) -> dict:
+    with _render_lock:
+        try:
+            clean = _materialize_asset(clean_url, 0)
+            out_path = str(config.TEMP_DIR / f"reburn_{fmt}.mp4")
+            pipeline.burn_script_captions(clean, cues, out_path, config.FORMATS[fmt][1])
+            output_meta = _build_output_meta({fmt: out_path})
+            with open(out_path, "rb") as fh:
+                url = _r2_put(object_key, fh.read(), "video/mp4", R2_VIDEO_BUCKET, R2_VIDEO_PUBLIC_BASE)
+            return {"outputs": {fmt: url}, "out_dir": os.path.dirname(object_key), "storage": "r2", "output_meta": output_meta,
+                    "caption_source": "script_tts", "caption_cues": cues,
+                    "caption_srt": caption_utils.to_srt(cues), "caption_vtt": caption_utils.to_vtt(cues)}
+        finally:
+            pipeline.cleanup()
+
+
+def _run_reburn_job(job_id: str, clean_url, cues, fmt, object_key):
+    try:
+        result = _do_reburn(clean_url, cues, fmt, object_key)
+        with _jobs_lock:
+            _JOBS[job_id] = {"status": "done", **result, "ts": time.time()}
+    except Exception as e:  # noqa: BLE001
+        with _jobs_lock:
+            _JOBS[job_id] = {"status": "error", "error": str(e), "ts": time.time()}
+
+
+def submit_reburn(payload: dict) -> str:
+    """驗證後建 job + 起背景 thread；輪詢沿用 GET /job（結果形狀同 /render：outputs/output_meta/caption_*）。"""
+    clean_url, cues, fmt, object_key = _validate_reburn(payload)
+    job_id = uuid.uuid4().hex
+    with _jobs_lock:
+        _prune_jobs()
+        _JOBS[job_id] = {"status": "running", "ts": time.time()}
+    threading.Thread(target=_run_reburn_job, args=(job_id, clean_url, cues, fmt, object_key), daemon=True).start()
+    return job_id
+
+
 # ── /generate-job：全自動管道（Claude 腳本 → Pexels B-roll → render）──────────────
 
 def _claude_generate_script(topic: str, language: str, scene_count: int) -> tuple:
@@ -646,6 +735,7 @@ class _Handler(BaseHTTPRequestHandler):
                     "output_dimensions": True,
                     "openai_tts": bool(config.OPENAI_API_KEY),
                     "footage_render": True,
+                    "caption_reburn": True,
                 },
                 "formats": list(config.FORMATS.keys()),
             })  # healthcheck 免認證
@@ -665,7 +755,7 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?")[0]
-        if path not in ("/render", "/generate-job", "/render-footage"):
+        if path not in ("/render", "/generate-job", "/render-footage", "/reburn-captions"):
             self._json(404, {"error": "not found"})
             return
         if not _authed(self):
@@ -712,6 +802,8 @@ class _Handler(BaseHTTPRequestHandler):
             elif path == "/render-footage":
                 job_id = submit_render_footage(payload)
                 self._json(202, {"jobId": job_id})
+            elif path == "/reburn-captions":
+                self._json(202, {"jobId": submit_reburn(payload)})
             else:
                 # /render — existing behaviour
                 job_id = submit_render(payload)

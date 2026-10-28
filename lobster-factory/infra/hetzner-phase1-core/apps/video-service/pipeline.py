@@ -355,7 +355,7 @@ def _audio_duration(audio_path: str) -> float:
         a.close()
 
 
-def _render_scene_ffmpeg(asset_path, narration, audio_path, duration, out_path, w, h, fps, scene_id=0):
+def _render_scene_ffmpeg(asset_path, narration, audio_path, duration, out_path, w, h, fps, scene_id=0, burn_captions=True):
     """單場景 → 統一參數 mp4。字幕改用 drawtext+textfile（timed per segment，取代 PIL PNG overlay）。"""
     # Find CJK-capable font
     font_path = ""
@@ -442,9 +442,12 @@ def _render_scene_ffmpeg(asset_path, narration, audio_path, duration, out_path, 
         )
         dt_filters.append(dt)
 
-    final_v_tag = f"[bg{n}]"
-    subtitle_chain = ";".join(dt_filters)
-    filter_complex = f"{vchain};{subtitle_chain};[1:a]apad[aud]"
+    if burn_captions:
+        final_v_tag = f"[bg{n}]"
+        filter_complex = f"{vchain};{';'.join(dt_filters)};[1:a]apad[aud]"
+    else:  # caption-less clean scene (V4.8); captions are burned onto the joined video afterwards
+        final_v_tag = "[bg0]"
+        filter_complex = f"{vchain};[1:a]apad[aud]"
 
     cmd = [
         "ffmpeg", "-y", *inputs,
@@ -508,7 +511,7 @@ def _render_intro_scene(title: str, duration: float, out_path: str, w: int, h: i
 
 def compose_base_video(scenes: list, visual_files: list, audio_files: list, out_name: str,
                        w: "int | None" = None, h: "int | None" = None, fps: "int | None" = None,
-                       intro_title: str = "", intro_duration: float = 3.0) -> str:
+                       intro_title: str = "", intro_duration: float = 3.0, burn_captions: bool = True) -> str:
     """純 ffmpeg 合成：每場景獨立 render 成統一參數 mp4，再 concat demuxer (-c copy) 秒級合併。
     靜圖走 zoompan Ken Burns、實拍走 cover-fit；混合由 _render_scene_ffmpeg 依副檔名派發。
     w/h/fps 省略 → config 預設（BASE_WIDTH/HEIGHT/FPS）= 舊單格式行為；多格式入口傳各格式尺寸，
@@ -529,7 +532,7 @@ def compose_base_video(scenes: list, visual_files: list, audio_files: list, out_
     for i, (scene, asset_path, audio_path) in enumerate(zip(scenes, visual_files, audio_files)):
         duration = _audio_duration(audio_path)
         sp = str(config.TEMP_DIR / f"scene_{i:03d}.mp4")
-        _render_scene_ffmpeg(asset_path, scene["narration"], audio_path, duration, sp, w, h, fps, scene_id=i)
+        _render_scene_ffmpeg(asset_path, scene["narration"], audio_path, duration, sp, w, h, fps, scene_id=i, burn_captions=burn_captions)
         scene_paths.append(sp)
         print(f"   scene {scene.get('id', i)} ({duration:.1f}s)")
 
@@ -751,7 +754,8 @@ def render_video(scenes: list, visual_files: list, out_name: str,
 
 def render_video_multiformat(scenes: list, format_assets: dict, out_name: str,
                              tts_provider: str = "edge", tts_voice: str = "",
-                             intro_title: str = "", intro_duration: float = 3.0, caption_sink: "dict | None" = None):
+                             intro_title: str = "", intro_duration: float = 3.0, caption_sink: "dict | None" = None,
+                             clean_sink: "dict | None" = None):
     """多格式「原生」輸出：每個比例用『自己那組視覺素材』+『自己的目標尺寸』各跑一次 compose
     （per-scene cover-fit/zoompan 直接填滿目標比例）→ 無 export_all_formats 的 pad letterbox、無黑邊。
 
@@ -778,6 +782,9 @@ def render_video_multiformat(scenes: list, format_assets: dict, out_name: str,
     audio_files = generate_audio(scenes, tts_provider=tts_provider, tts_voice=tts_voice, cues_out=scene_cues)
     _caption_result(caption_sink, scene_cues, audio_files, intro_title, intro_duration)
 
+    # V4.8: with script captions and a clean_sink, keep the caption-less video per ratio ({fmt}.clean.mp4) and burn the
+    # cues onto a copy, so an edited caption can be burned again (burn_script_captions) without re-rendering.
+    keep_clean = clean_sink is not None and bool(caption_sink and caption_sink.get("cues"))
     outputs = {}
     for fmt in formats:
         w, h = config.FORMATS[fmt]
@@ -786,11 +793,17 @@ def render_video_multiformat(scenes: list, format_assets: dict, out_name: str,
         # 產出並搬出）；out_name 帶 fmt 後綴使各格式 base 檔名互不衝突。並行化會 silently 損毀輸出。
         base_video = compose_base_video(
             scenes, format_assets[fmt], audio_files, f"{safe_name}_{fmt}", w, h, config.FPS,
-            intro_title=intro_title, intro_duration=intro_duration,
+            intro_title=intro_title, intro_duration=intro_duration, burn_captions=not keep_clean,
         )
         out_path = str(out_dir / f"{fmt}.mp4")
-        # base_video 已是目標尺寸 + 統一編碼（per-scene 已 crf 21 / yuv420p）→ 直接搬，免二次轉碼。
-        shutil.move(base_video, out_path)
+        if keep_clean:
+            clean_path = str(out_dir / f"{fmt}.clean.mp4")
+            shutil.move(base_video, clean_path)
+            burn_script_captions(clean_path, caption_sink["cues"], out_path, h)
+            clean_sink[fmt] = clean_path
+        else:
+            # base_video 已是目標尺寸 + 統一編碼（per-scene 已 crf 21 / yuv420p）→ 直接搬，免二次轉碼。
+            shutil.move(base_video, out_path)
         outputs[fmt] = out_path
         print(f"   {fmt} ({w}x{h}) 原生輸出 ✓")
     return outputs, out_dir
@@ -925,6 +938,16 @@ def _burn_captions_ffmpeg(in_path: str, cues: list, out_path: str, h: int) -> No
         out_path,
     ]
     _run_ffmpeg(cmd, "caption burn failed")
+
+
+def burn_script_captions(clean_path: str, cues: list, out_path: str, h: int) -> None:
+    """Burn script/voice-timed cues [{startMs,endMs,text}] onto a caption-less video. No cues = a plain copy."""
+    burn = caption_utils.burn_cues(cues, _split_narration)
+    if not burn:
+        import shutil
+        shutil.copyfile(clean_path, out_path)
+        return
+    _burn_captions_ffmpeg(clean_path, burn, out_path, h)
 
 
 def render_footage_multiformat(clips: list, formats: list, out_name: str,

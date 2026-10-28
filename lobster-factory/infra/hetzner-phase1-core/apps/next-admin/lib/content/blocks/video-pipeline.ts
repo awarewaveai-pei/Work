@@ -172,7 +172,9 @@ export async function recordVideoAsset(params: {
   /** D7: origin of every asset the video used; the rights QA reads metadata.rightsSources. */
   rightsSources?: RightsSource[];
   /** D11: how the captions were made, with the SRT/VTT of script captions; the review step reads metadata.captionSource. */
-  captions?: { source: "script_tts" | "transcription"; srt?: string; vtt?: string };
+  captions?: { source: "script_tts" | "transcription"; srt?: string; vtt?: string; cues?: { startMs: number; endMs: number; text: string }[] };
+  /** V4.8: caption-less video per ratio (videoclean/…); with captions.cues it lets the review step edit captions and burn them again. */
+  cleanOutputs?: Record<string, string>;
   /**
    * True only for the caller that holds the REAL render metadata (/api/video/status,
    * which has recordParams: title, sceneCount, formats, visualBreakdown, imageModel).
@@ -234,7 +236,8 @@ export async function recordVideoAsset(params: {
         sceneCount: params.sceneCount,
         ...(params.script ? { script: params.script } : {}),
         ...(params.rightsSources ? { rightsSources: params.rightsSources } : {}),
-        ...(params.captions ? { captionSource: params.captions.source, captionSrt: params.captions.srt, captionVtt: params.captions.vtt } : {}),
+        ...(params.captions ? { captionSource: params.captions.source, captionSrt: params.captions.srt, captionVtt: params.captions.vtt, ...(params.captions.cues ? { captionCues: params.captions.cues } : {}) } : {}),
+        ...(params.cleanOutputs?.[primaryFormat ?? ""] ? { cleanUrl: params.cleanOutputs[primaryFormat ?? ""] } : {}),
         visualBreakdown: params.visualBreakdown,
         imageModel: params.imageModel,
         source: params.source,
@@ -295,6 +298,8 @@ export async function recordVideoAsset(params: {
           sceneCount: params.sceneCount,
           ...(params.script ? { script: params.script } : {}),
           ...(params.rightsSources ? { rightsSources: params.rightsSources } : {}),
+          ...(params.captions?.cues ? { captionSource: params.captions.source, captionCues: params.captions.cues } : {}),
+          ...(params.cleanOutputs?.[format] ? { cleanUrl: params.cleanOutputs[format] } : {}),
           source: params.source,
           outputMeta: meta ? { [format]: meta } : undefined,
           renderedAt: new Date().toISOString(),

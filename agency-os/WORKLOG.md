@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-28（續26）— 影片 V4.8：改字幕後重燒（保留無字幕底片＋video-service 重燒端點）（Claude）— 待操作者 go-ahead 部署 video-service，未 push
+
+- **根因**：V4.7 只能看／下載字幕；快速影片的字幕是渲染時逐場景 `drawtext` 烤進片裡，改字幕等於整支重做。
+- **做了**：video-service：`_render_scene_ffmpeg` 加 `burn_captions` 旗標；`render_video_multiformat` 在有腳本字幕時改成「先做無字幕底片 `{fmt}.clean.mp4` → `burn_script_captions` 把 Edge 句時間 cue 燒上去」（新 `captions.burn_cues`：過長的句子在自己的時間內按字數切短，不超出畫面）；底片上傳 R2 `videoclean/<dir>/<fmt>.mp4`（**不放 `video/`**：對帳掃描把 `video/<dir>/<x>.mp4` 都當成品比例）；新 `POST /reburn-captions`（底片只收自家 `videoclean/`、輸出只寫 `video/<dir>/<fmt>.mp4`、cue 驗證，輪詢沿用 `/job`；`/health` 回報 `caption_reburn`）。next-admin：`recordVideoAsset` 每比例列存 `metadata.cleanUrl`／`captionCues`；新 `POST /api/video/captions/reburn`（`{assetId,cues}` 開每比例一個 job；`{assetId,jobId}` 收尾：覆寫同一 key → 該列 checksum／size／字幕更新，技術 QA 與字幕 QA 對新 checksum 重跑；**已建 Release 的影片 409**，Release 釘 checksum；收尾也走 POST，因 GET 不得有副作用＝`get-no-side-effects` 測試守）；`CaptionsStep` 逐句改字幕＋「重燒字幕」。`registry-code.test` 為新 route 登記無付費步驟。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run`（next-admin 全套）＋`npx tsc --noEmit`＋`python run_vs_tests.py tests.test_caption_reburn tests.test_captions tests.test_footage_render tests.test_output_meta_qa`（video-service，本機 stub moviepy／edge_tts／google／anthropic／openai） | exit=0 | ms=27724 | next-admin 411 files 3496 passed；video-service 29 OK（3 skipped）
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/1n（m：ffmpeg `drawtext` 重燒與「無字幕底片」濾鏡本機沒有 ffmpeg，未實跑；`drawtext` 段與既有實拍字幕同一函式（正式機已驗）。n：刪影片時 `videoclean/` 底片不會一起刪，之後掛 R2 生命週期或補清理）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=burn_captions|clean_sink|cleanUrl|reburn | hits=19（reconcile 的 `video/(.+)/([^/]+)\.mp4` 不會掃到 `videoclean/`；`api/video/[id]` DELETE 未處理底片＝已記 n）
+- ORACLE_WAIVED: Codex 本輪不可用；書面自審：服務握 R2 寫入權，故來源／輸出 key 都白名單；跨租戶 403、有 Release 409、job 結果必須是這列自己的檔（否則 409）都有測試；重燒覆寫同 key，CDN 若快取舊檔需等過期（`Cache-Control` 未設，部署後實測）。
+- **待操作者 go-ahead**：video-service 部署到 ks-aw-01（`pipeline.py`／`server.py`／`captions.py`）；部署前 next-admin 先上也安全（`/health` 無 `caption_reburn` → 重燒回 503「尚未部署」；沒有底片的舊影片回 422），本 commit 照指示未 push。部署後在容器內跑 `python tests/test_caption_reburn.py`、`test_captions.py`，做一支 Edge 配音快速影片 → ⑦ 改一句 → 重燒 → 看片、看新 checksum 的 QA。
+- **Rollback**：`git revert <此 commit>`；無 migration。
 ## 2026-10-28（續25）— 影片 V7.1：題目頁做的影片也建成專案，出現在同一個結果頁（Claude）
 
 - **根因**：題目管線（P6／P7）開影片時只建 `video_jobs`，不建專案，成片記不到 `media_project_id` → 結果頁（V2）看不到自動做的影片（D3）。
