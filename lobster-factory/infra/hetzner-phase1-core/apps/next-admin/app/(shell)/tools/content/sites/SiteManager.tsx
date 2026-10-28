@@ -629,7 +629,7 @@ export default function SiteManager() {
   // (siteUrlWriteGate, lib/content/wp-sites.ts): those controls do not show there.
   const onDoor = useOnDoor();
   const studioHref = useDoorHref("/tools/content");
-  const calendarHref = useDoorHref("/tools/content/calendar");
+  const scheduleHref = useDoorHref("/tools/social");
   const [sites, setSites] = useState<ManagedSite[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -859,8 +859,8 @@ export default function SiteManager() {
         {studioHref && <a href={studioHref} style={{ color: "var(--accent-text)", fontSize: 13, textDecoration: "none" }}>
           ← 返回 Content Studio
         </a>}
-        {calendarHref && <a href={calendarHref} style={{ color: "var(--accent-text)", fontSize: 13, textDecoration: "none" }}>
-          內容行事曆 →
+        {scheduleHref && <a href={scheduleHref} style={{ color: "var(--accent-text)", fontSize: 13, textDecoration: "none" }}>
+          社群日曆（文章何時發）→
         </a>}
       </div>
     </div>

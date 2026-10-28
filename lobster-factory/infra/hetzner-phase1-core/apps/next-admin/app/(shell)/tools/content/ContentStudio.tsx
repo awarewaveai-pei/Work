@@ -469,7 +469,7 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
   // On the content door (app/content): staff links go through useDoorHref (null = no door page, hide); the newsletter
   // (our own FluentCRM) and trending-source management are staff-only (step-8 card §5 C-R3/C-R4).
   const onDoor = useOnDoor();
-  const calendarHref = useDoorHref("/tools/content/calendar");
+  const scheduleHref = useDoorHref("/tools/social");
   const sitesHref = useDoorHref("/tools/content/sites");
   const clientsHref = useDoorHref("/ops/clients");
   const socialHref = useDoorHref("/tools/social");
@@ -1952,11 +1952,11 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
               </select>
             </div>
           )}
-          {calendarHref && <a href={calendarHref}
+          {scheduleHref && <a href={scheduleHref}
             style={{ fontSize: "12px", padding: "5px 12px", border: "1px solid var(--card-border)",
               borderRadius: "6px", color: "var(--text-muted)", textDecoration: "none",
               background: "var(--bg-card)", display: "flex", alignItems: "center", gap: "5px" }}>
-            📅 內容行事曆
+            📅 社群日曆（文章何時發）
           </a>}
           {clientsHref && <a href={clientsHref}
             style={{ fontSize: "12px", padding: "5px 12px", border: "1px solid var(--card-border)",

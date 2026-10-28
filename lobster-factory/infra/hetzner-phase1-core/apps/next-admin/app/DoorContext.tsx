@@ -14,7 +14,7 @@ export const useOnDoor = () => useContext(Door) !== null;
 
 export const useDoorNav = (): readonly DoorNavItem[] => useContext(Door) ?? [];
 
-/** A staff link (e.g. "/tools/content/calendar?d=1") as this page renders it: unchanged on a staff page; on a door, the
+/** A staff link (e.g. "/tools/content/topics?d=1") as this page renders it: unchanged on a staff page; on a door, the
  *  door page registered (door.nav `staff`) for that staff page, or null when the door has none -- hide the link. */
 export function useDoorHref(staffHref: string): string | null {
   return doorHref(useContext(Door), staffHref);

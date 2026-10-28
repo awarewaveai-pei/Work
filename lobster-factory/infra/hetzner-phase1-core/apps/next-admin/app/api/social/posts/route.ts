@@ -6,6 +6,8 @@
 //   POST { brand, fields, targets?, media?, comments?, tags? } -> a new draft (lib/social/posts.ts says what may be sent)
 import { listAccessibleWpSites } from "@/lib/content/wp-sites";
 import { fetchSitePosts } from "@/lib/content/wp-calendar";
+import { canReschedule, topicsByWpPost } from "@/lib/content/topics/store";
+import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { ANY_ROLE, WRITE_ROLES, actorForViewer, actorOf, requireBrandRole } from "@/lib/social/authz";
 import { BadRequest, handle, jsonBody, uuid } from "@/lib/social/http";
 import { assertWithinLimits, parsePostPayload } from "@/lib/social/posts";
@@ -45,8 +47,18 @@ export async function GET(req: Request): Promise<Response> {
     // the caller's sites (same rule as the content calendar), narrowed to this brand's
     const { sites, tokens, usernames } = await listAccessibleWpSites(req);
     const brandSites = sites.filter((s) => s.organizationId === brand);
-    const wordpress = (await Promise.all(brandSites.map((s) =>
+    const wpPosts = (await Promise.all(brandSites.map((s) =>
       fetchSitePosts(s, tokens[s.id] ?? "", usernames[s.id] ?? "", ["draft", "future", "publish"], start, end)))).flat();
+    // B12: an article a topic made keeps its date in the topic; without this the screen would offer WordPress edits on it.
+    // A failed lookup throws rather than return posts without it.
+    const sb = getSupabaseWriteClient();
+    if (!sb) throw new Error("content_topics: Supabase not configured");
+    const topics = await topicsByWpPost(sb, brand, brandSites.map((s) => s.id), wpPosts.map((p) => p.id));
+    const now = new Date();
+    const wordpress = wpPosts.map((p) => {
+      const t = topics.get(`${p.siteId}:${p.id}`);
+      return t ? { ...p, topic: { id: t.id, status: t.status, version: t.version, scheduledFor: t.scheduled_for, canReschedule: canReschedule(t, now) } } : p;
+    });
     return { posts, undatedTruncated, tags, wordpress };
   });
 }

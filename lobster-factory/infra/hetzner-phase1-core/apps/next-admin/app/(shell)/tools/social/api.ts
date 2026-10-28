@@ -48,7 +48,9 @@ export interface AutoRule {
 }
 export interface StateInput { action: string; scheduledAt?: string; listId?: string; listPosition?: number; reason?: string; confirmPublishNow?: boolean }
 /** lib/content/wp-calendar.ts CalendarPost: date is the site's wall clock, no zone */
-export interface WpPost { siteId: string; siteName: string; id: number; title: string; status: "draft" | "future" | "publish"; date: string; viewUrl?: string }
+/** topic = the topic that made this article (posts route wp=1): its date lives there, not in WordPress (AUTO_CONTENT B12) */
+export interface WpPostTopic { id: string; status: string; version: number; scheduledFor: string | null; canReschedule: boolean }
+export interface WpPost { siteId: string; siteName: string; id: number; title: string; status: "draft" | "future" | "publish"; date: string; viewUrl?: string; topic?: WpPostTopic }
 /** slots = the weekday x time grid (0105); weekdays / send_time follow it until C23 */
 export interface ListRow {
   id: string; name: string; weekdays: number[]; send_time: string; active: boolean; cursor: number; accounts: Array<{ account_id: string }>;

@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-28（續18）
+
+### AUTO_CONTENT P9.6：文章行事曆併進社群日曆（cc.py 實作，主 session 驗收）
+
+- 社群日曆文章卡：手寫文章＝改日期／立即發布／移到垃圾桶；題目文章＝只改日期（走題目 `schedule`，B12）＋到題目頁。`topicsByWpPost`（store.ts，org＋site 範圍）；`/api/social/posts` `wp=1` 掛 `topic`，查詢失敗 throw。
+- 刪 `tools/content/calendar/`、`app/content/calendar/`、`api/content/calendar/`、側欄 `Content Calendar`、內容入口「行事曆」；連結改指 `/tools/social`。
+- m1 卡上「右欄」不存在：面板放在文章撰寫頁頂端；直接網址開撰寫頁時沒有面板（不會誤給 WP 直改）。
+- m2 `ClientHubTabs.tsx:558`「內容行事曆」連結本來就指 `/tools/content`，標籤過時，未改。cc.py 0.72 美元。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run app/api/social/__tests__/routes.test.ts lib/content/__tests__/wp-calendar.test.ts lib/portal/__tests__/products.test.ts app/__tests__/sidebar-coverage.test.ts lib/content/topics/__tests__/store.test.ts | exit=0 | ms=2639（66/66）
+- 突變：拿掉 route 掛 `topic` → 1 紅 → 還原綠（cc.py 報告）。tsc 自有檔 0 錯。
+- ORACLE_WAIVED: Codex 不可用；主 session 讀 topicsByWpPost 與 route 的 org 範圍
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/2n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=tools/content/calendar|ContentCalendar|api/content/calendar | hits=0
 ## 2026-10-28（續17）
 
 ### AUTO_CONTENT P9.3＋P9.4（cc.py 實作，主 session 驗收）

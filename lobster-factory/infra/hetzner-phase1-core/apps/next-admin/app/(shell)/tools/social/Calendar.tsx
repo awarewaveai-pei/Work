@@ -12,8 +12,9 @@ import {
 } from "./model";
 import type { MediaItem, WpPost } from "./api";
 
-/** A WordPress article's place on the calendar: its date is already the site's wall clock (wp-calendar.ts). */
-const articleAt = (a: WpPost) => ({ date: a.date.slice(0, 10), time: a.date.slice(11, 16) });
+/** A WordPress article's place on the calendar: its date is already the site's wall clock (wp-calendar.ts); one a topic
+ *  made sits on the topic's day (B12), shown in the brand's zone. */
+const articleAt = (a: WpPost, tz: string) => a.topic?.scheduledFor ? zoned(a.topic.scheduledFor, tz) : { date: a.date.slice(0, 10), time: a.date.slice(11, 16) };
 
 const MOVABLE: readonly PostState[] = ["scheduled", "error", "queued"];
 
@@ -146,7 +147,7 @@ export function WeekView(props: ViewProps & {
       <div className="sm-week">
         {days.map((d, i) => {
         const ps = posts.filter((p) => p.scheduled_at && zoned(p.scheduled_at, tz).date === d).sort(byTime);
-        const arts = (props.articles ?? []).filter((a) => articleAt(a).date === d);
+        const arts = (props.articles ?? []).filter((a) => articleAt(a, tz).date === d);
         const best = props.bestTimes && d >= today ? props.bestTimes(d) : [];
         const card = (p: CalPost) => <Card key={p.id} post={p} accounts={accounts} media={props.media} tags={props.tags} tz={tz} canWrite={canWrite}
           onOpen={props.onOpen} onCopy={props.onCopy} onDelete={props.onDelete} />;
@@ -170,7 +171,7 @@ export function WeekView(props: ViewProps & {
               )}
               {arts.map((a) => (
                 <button type="button" key={`${a.siteId}:${a.id}`} className="sm-post sm-article" onClick={(e) => { e.stopPropagation(); props.onArticle?.(a); }} title={`文章：${a.title}`}>
-                  <div className="sm-cmeta"><span>{articleAt(a).time}</span><PfMark platform="wordpress" /><span className="sm-ellipsis">WordPress</span></div>
+                  <div className="sm-cmeta"><span>{articleAt(a, tz).time}</span><PfMark platform="wordpress" /><span className="sm-ellipsis">{a.topic ? "題目排程" : "WordPress"}</span></div>
                   <div className="sm-ctext">文章：{a.title}</div>
                 </button>
               ))}
@@ -199,7 +200,7 @@ export function MonthView(props: ViewProps & { anchor: string; onPickWeek: (date
       <div className="sm-mgrid">
         {cells.map((d) => {
           const ps = posts.filter((p) => p.scheduled_at && zoned(p.scheduled_at, tz).date === d).sort(byTime);
-          const arts = (props.articles ?? []).filter((a) => articleAt(a).date === d);
+          const arts = (props.articles ?? []).filter((a) => articleAt(a, tz).date === d);
           return (
             <button type="button" key={d} className={`sm-mday${d === today ? " sm-today" : ""}${d.startsWith(month) ? "" : " sm-out"}`} data-date={d} onClick={() => props.onPickWeek(d)}>
               <div className="sm-n">{Number(d.slice(8))}</div>

@@ -88,8 +88,8 @@ describe("sidebar coverage", () => {
     expect(activeSectionId(DEFAULT_SECTIONS, "/")).toBe("overview");
     expect(activeSectionId(DEFAULT_SECTIONS, "/outreach/leads")).toBe("cold-outreach");
     expect(activeSectionId(DEFAULT_SECTIONS, "/tools/social/ads")).toBe("marketing");
-    // the longer href wins: /tools/content/calendar is Marketing, though /tools/content is Content Tools
-    expect(activeSectionId(DEFAULT_SECTIONS, "/tools/content/calendar")).toBe("marketing");
+    // the longer href wins: /tools/content/topics is Marketing, though /tools/content is Content Tools
+    expect(activeSectionId(DEFAULT_SECTIONS, "/tools/content/topics")).toBe("marketing");
     expect(activeSectionId(DEFAULT_SECTIONS, "/tools/content")).toBe("content-tools");
     expect(activeSectionId(DEFAULT_SECTIONS, "/tools/contentx")).toBeNull();
   });

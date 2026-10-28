@@ -6,6 +6,7 @@
 // Views by card: 自動發布清單 C7 (Lists), 貼文素材庫 C9/C31 (library/), 紀錄 C11 (LogView), 審核 C8, 文章 C10.
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, ApiError, type MediaItem, type WpPost } from "./api";
+import ArticleSchedule from "./ArticleSchedule";
 import ArticleSource, { type Prefill } from "./ArticleSource";
 import ChannelList from "./ChannelList";
 import { copyInput } from "./compose/draft";
@@ -198,10 +199,10 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
       setComposeSeed(carriedComposeSeed);
       openCompose(s.date, s.time);
     }
-    else if (s.kind === "article") openCompose(undefined, undefined, { site: s.article.siteId, article: String(s.article.id), title: s.article.title, day: s.article.date.slice(0, 10) });
+    else if (s.kind === "article") openCompose(undefined, undefined, { site: s.article.siteId, article: String(s.article.id), title: s.article.title, day: (s.article.topic?.scheduledFor ? zoned(s.article.topic.scheduledFor, tz).date : s.article.date.slice(0, 10)) });
     else if (s.kind === "list") { setListId(s.id); if (view !== "lists") setView("lists"); }
     else setListId(undefined);
-  }, [goTo, openCompose, view, setView]);
+  }, [goTo, openCompose, view, setView, tz]);
 
   // a series' computed occurrences join the real posts (model.ts occurrences); a deleted-after-published template still makes children
   const calPosts = useMemo<CalPost[]>(() => {
@@ -364,8 +365,15 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
                 prefill={articleFor && prefill?.for === articleFor ? prefill : null}
                 reviewBar={editorPost ? <ReviewBar brand={brand} post={editorPost} onDone={async (_id, msg) => { say(msg); setPostKey((k) => k + 1); }} /> : undefined}
                 source={article && !postId && canWrite ? (
-                  <ArticleSource brand={brand} accounts={accounts} siteId={article.siteId} postId={article.id} title={article.title}
-                    onPrefill={(p) => setPrefill((cur) => ({ ...p, n: (cur?.n ?? 0) + 1 }))} />
+                  <>
+                    {/* the article row comes from the calendar just left; a page opened straight on this address has none (no WordPress edit offered without knowing the topic, B12) */}
+                    {articles.find((x) => x.siteId === article.siteId && x.id === article.id) && (
+                      <ArticleSchedule key={articleFor} article={articles.find((x) => x.siteId === article.siteId && x.id === article.id) as WpPost}
+                        onChanged={async () => { await reload(); goTo({ kind: "plan" }); }} />
+                    )}
+                    <ArticleSource brand={brand} accounts={accounts} siteId={article.siteId} postId={article.id} title={article.title}
+                      onPrefill={(p) => setPrefill((cur) => ({ ...p, n: (cur?.n ?? 0) + 1 }))} />
+                  </>
                 ) : undefined}
                 onMediaAdded={(m) => setMedia((list) => [m, ...list])}
                 onSaved={(id, msg, plan) => {

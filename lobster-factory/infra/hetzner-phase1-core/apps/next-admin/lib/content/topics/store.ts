@@ -110,6 +110,21 @@ export async function topicById(sb: SupabaseClient, id: string): Promise<Topic |
   return (data as Topic | null) ?? null;
 }
 
+/** The topic a WordPress post was made from, keyed `siteId:postId`. The calendar uses it to route a made article's date change
+ *  through the topic (B12: its date lives in scheduled_for, not in WordPress). */
+export async function topicsByWpPost(sb: SupabaseClient, orgId: string, siteIds: string[], postIds: number[]): Promise<Map<string, Topic>> {
+  const out = new Map<string, Topic>();
+  if (!siteIds.length || !postIds.length) return out;
+  const { data, error } = await sb.from("content_topics").select("*").eq("organization_id", orgId).in("site_id", siteIds)
+    .in("artifacts->article->>wp_post_id", postIds.map(String));
+  if (error) fail("by_wp_post", error);
+  for (const t of (data ?? []) as Topic[]) {
+    const id = (t.artifacts as { article?: { wp_post_id?: number | null } }).article?.wp_post_id;
+    if (t.site_id && id) out.set(`${t.site_id}:${id}`, t);
+  }
+  return out;
+}
+
 /** Inserts new topics; a keyword the brand already has that month is skipped, not an error. Returns what was added. */
 export async function proposeTopics(sb: SupabaseClient, rows: NewTopic[]): Promise<Topic[]> {
   if (!rows.length) return [];

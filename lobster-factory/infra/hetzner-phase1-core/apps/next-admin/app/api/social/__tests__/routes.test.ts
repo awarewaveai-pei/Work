@@ -20,6 +20,10 @@ vi.mock("@/lib/social/store", async (orig) => ({ ...(await orig<typeof import("@
 const wp = vi.hoisted(() => ({ listAccessibleWpSites: vi.fn(async () => ({ sites: [] as unknown[], tokens: {} as Record<string, string>, usernames: {} as Record<string, string> })) }));
 vi.mock("@/lib/content/wp-sites", async (orig) => ({ ...(await orig<typeof import("@/lib/content/wp-sites")>()), ...wp }));
 
+const topics = vi.hoisted(() => ({ topicsByWpPost: vi.fn(async () => new Map()) }));
+vi.mock("@/lib/content/topics/store", async (orig) => ({ ...(await orig<typeof import("@/lib/content/topics/store")>()), ...topics }));
+vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => ({}) }));
+
 const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
 const P = "33333333-3333-4333-8333-333333333333";
@@ -171,6 +175,23 @@ describe("/api/social routes", () => {
     const url = `/api/social/posts?brand=${A}&start=2026-10-01T00:00:00Z&end=2026-11-01T00:00:00Z&wp=1`;
     expect((await GET(req("GET", url, { role: "viewer" }))).status).toBe(403);
     expect((await GET(req("GET", url, { role: "operator" }))).status).toBe(200);
+  });
+
+  it("posts GET wp=1: an article a topic made carries its topic (B12); one it did not does not; a failed topic lookup is an error", async () => {
+    const { GET } = await import("../posts/route");
+    store.listPosts.mockResolvedValue({ posts: [], undatedTruncated: false });
+    const site = { id: "s1", name: "S", color: "#fff", url: "https://x.test", organizationId: A };
+    wp.listAccessibleWpSites.mockResolvedValue({ sites: [site], tokens: { s1: "t" }, usernames: { s1: "u" } });
+    const wpPost = (id: number) => ({ id, title: { rendered: `p${id}` }, status: "draft", date: "2026-10-05T10:00:00", link: "" });
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify([wpPost(7), wpPost(8)]), { status: 200 }));
+    topics.topicsByWpPost.mockResolvedValueOnce(new Map([["s1:7", { id: "T1", status: "approved", version: 2, scheduled_for: "2026-10-09T02:00:00Z" }]]));
+    const url = `/api/social/posts?brand=${A}&start=2026-10-01T00:00:00Z&end=2026-11-01T00:00:00Z&wp=1`;
+    const body = await (await GET(req("GET", url, { role: "owner" }))).json() as { wordpress: Array<{ id: number; topic?: Record<string, unknown> }> };
+    expect(body.wordpress.find((p) => p.id === 7)?.topic).toEqual({ id: "T1", status: "approved", version: 2, scheduledFor: "2026-10-09T02:00:00Z", canReschedule: true });
+    expect(body.wordpress.find((p) => p.id === 8)?.topic).toBeUndefined();
+    topics.topicsByWpPost.mockRejectedValueOnce(new Error("content_topics:by_wp_post:down"));
+    expect((await GET(req("GET", url, { role: "owner" }))).status).toBeGreaterThanOrEqual(500);
+    fetchSpy.mockRestore();
   });
 
   it("accounts DELETE ?attempt gives up the open connection", async () => {
