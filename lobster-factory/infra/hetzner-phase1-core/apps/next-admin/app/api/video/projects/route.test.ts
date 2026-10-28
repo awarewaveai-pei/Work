@@ -16,7 +16,7 @@ function fakeDb(rows: Record<string, unknown>) {
   const insert = vi.fn();
   const chain = (table: string): Record<string, unknown> => {
     const q: Record<string, unknown> = {};
-    for (const m of ["select", "eq", "neq", "order", "limit"]) q[m] = () => q;
+    for (const m of ["select", "eq", "neq", "in", "order", "limit"]) q[m] = () => q;
     q.maybeSingle = async () => ({ data: rows[table] ?? null, error: null });
     q.single = async () => ({ data: rows[table] ?? null, error: null });
     q.then = (resolve: (v: unknown) => void) => resolve({ data: [], error: null });

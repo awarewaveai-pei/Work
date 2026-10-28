@@ -122,11 +122,17 @@ export default function VideoPipeline() {
       )}
 
       {step === 3 && mode === "footage_edit" && (
-        <FootageEditor initialOrganizationId={org} projectId={project.id} onRenderComplete={() => goto(4)} />
+        <>
+          <FootageEditor initialOrganizationId={org} projectId={project.id} onRenderComplete={() => setRenderDone(true)} />
+          {renderDone && <RenderedBar projectId={project.id} note="實拍渲染已送出，完成後在專案頁看得到。" onNext={() => goto(4)} />}
+        </>
       )}
       {step === 3 && (mode === "quick_video" || mode === "short_drama") && (
         <VideoStudio initial={brief.production}
-          embedded={{ lockTab: "generate", organizationId: org, projectId: project.id, onRenderComplete: () => { if (!renderDone) { setRenderDone(true); goto(4); } } }} />
+          embedded={{ lockTab: "generate", organizationId: org, projectId: project.id, onRenderComplete: () => setRenderDone(true) }} />
+      )}
+      {step === 3 && (mode === "quick_video" || mode === "short_drama") && renderDone && (
+        <RenderedBar projectId={project.id} note="成片完成，就在上面。" onNext={() => goto(4)} />
       )}
       {step === 3 && mode === "remotion" && (
         <>
@@ -142,6 +148,17 @@ export default function VideoPipeline() {
         <ReleaseDeliveryPanel organizationLocked initialOrganizationId={org} initialCandidateAssetId={candidateAssetId}
           onReleaseCreated={() => void patch({ lifecycleStage: "measure" })} />
       )}
+    </div>
+  );
+}
+
+/** After a render: stay on the result (V2.3); the next step is the operator's click, the project page always has the video. */
+function RenderedBar({ projectId, note, onNext }: { projectId: string; note: string; onNext: () => void }) {
+  return (
+    <div style={{ padding: "0 28px 24px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+      <span style={{ fontSize: 13, color: "var(--text-primary)" }}>✅ {note}</span>
+      <a href={`/tools/video/projects/${projectId}`} style={{ fontSize: 13, color: "var(--text-secondary)" }}>在專案頁看成片</a>
+      <button type="button" onClick={onNext} style={primary(true)}>下一步：審片 →</button>
     </div>
   );
 }

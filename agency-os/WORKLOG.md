@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-28（續9）— 影片工具 V2 結果頁（Claude Opus；V2.1／V2.2 派 Sonnet fullstack-engineer）
+
+- **卡**：`agency-os/docs/video_generator/VIDEO_TOOL_REDESIGN_2026-10-26.md` §7 V2.1–V2.3。
+- **改動**：
+  - API：`NA/app/api/video/projects/route.ts` GET `?id=` 加 `releases`（該專案成片的 media_releases）與 `deliveries`（media_delivery_attempts），皆限專案 org；沿用既有 org 閘（續6 已突變驗證）。
+  - V2.1 `NA/app/(shell)/tools/video/projects/page.tsx`＋`ProjectsList.tsx`：客戶篩選、狀態（`project-status.ts`：last_error→需要處理，其餘照 lifecycle_stage）；側欄 `NA/app/sidebar-sections.ts:61` 加 Video Projects。
+  - V2.2 `projects/[id]/page.tsx`＋`ProjectDetail.tsx`：每比例 `<video>`＋下載、QA 四項中文原因、Release 與發佈紀錄、腳本。QA 標籤搬到 `V/qa-labels.ts`（QaStep 改 import，不另抄）。QA 讀取失敗顯示「讀取失敗」（小幫手原寫成「尚未檢查」＝藏錯，已改）。費用欄不做：無資料來源。
+  - V2.3 `V/VideoPipeline.tsx`：渲染完不自動跳步，停在成片＋`RenderedBar`（專案頁連結、下一步）；實拍同樣。`V/VideoStudio.tsx` 進度卡「可以關閉頁面」有專案時指專案頁。`V/page.tsx` topbar 改 5 步。進階頁「生成記錄」tab 保留（無專案的舊影片只在那與 My Designs），卡片文字已同步。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit 0 error；npx vitest run "app/(shell)/tools" app/api/video app/__tests__ lib/content/video → 63 files, 292 passed（含 staff-nav「每個側欄連結都屬於某個工具」） | exit=0 | ms=120000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/1m/0n（逐檔讀小幫手產出；m1 QA 失敗被顯示成「尚未檢查」→已改）
+- ORACLE_WAIVED: Codex 不可用（`~/.codex/config.toml:2` gpt-6.1-sol model_not_found，見同日續6）；本次只加唯讀查詢與畫面，權限守衛未新增（沿用已突變驗證的 org 閘）。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=生成記錄|QA_LABELS|FINDING_LABELS|video/projects | hits=0（QA 常數只剩 qa-labels.ts 一份；生成記錄只剩進階頁 tab 與無專案時的文字）
+- **未驗**：瀏覽器未實操（本機需登入）；2026-10-29 03:00 上線後看 `/tools/video/projects`。
+- **rollback**：revert 本 commit（無資料庫改動）。
 ## 2026-10-28（續8）
 
 ### AUTO_CONTENT P9.1 修正：「全球」網站看所有地區的熱搜（修 P9.1 M1）

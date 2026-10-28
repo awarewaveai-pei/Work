@@ -48,7 +48,20 @@ export async function GET(req: Request): Promise<Response> {
     const assets = await db.from("media_assets").select("id, object_url, mime_type, byte_size, checksum_sha256, metadata, created_at")
       .eq("media_project_id", id).eq("organization_id", project.data.organization_id).eq("is_current", true).order("created_at", { ascending: false });
     if (assets.error) return NextResponse.json({ ok: false, error: assets.error.message }, { status: 500 });
-    return NextResponse.json({ ok: true, item: project.data, assets: assets.data ?? [] });
+    // Where the project went: Releases of its assets and their delivery attempts (result page V2.2).
+    const assetIds = (assets.data ?? []).map((a) => a.id);
+    const releases = assetIds.length
+      ? await db.from("media_releases").select("id, candidate_asset_id, status, created_at, approved_at, withdrawn_at")
+        .eq("organization_id", project.data.organization_id).in("candidate_asset_id", assetIds).order("created_at", { ascending: false })
+      : { data: [], error: null };
+    if (releases.error) return NextResponse.json({ ok: false, error: releases.error.message }, { status: 500 });
+    const releaseIds = (releases.data ?? []).map((r) => r.id);
+    const deliveries = releaseIds.length
+      ? await db.from("media_delivery_attempts").select("id, release_id, destination, variant, status, external_id, created_at")
+        .eq("organization_id", project.data.organization_id).in("release_id", releaseIds).order("created_at", { ascending: false })
+      : { data: [], error: null };
+    if (deliveries.error) return NextResponse.json({ ok: false, error: deliveries.error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, item: project.data, assets: assets.data ?? [], releases: releases.data ?? [], deliveries: deliveries.data ?? [] });
   }
   let organizationId: string | null;
   try { organizationId = effectiveOrgId(req, url.searchParams.get("organizationId")?.trim() || null); } catch (error) { return denied(error) ?? bad("invalid_organization"); }

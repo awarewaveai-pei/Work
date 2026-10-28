@@ -727,7 +727,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
           )}
 
           {/* ── Phase: rendering (progress) ── */}
-          {isLoading && <ProgressTracker step={genStep} />}
+          {isLoading && <ProgressTracker step={genStep} projectId={embedded?.projectId} />}
 
           {/* ── Phase: draft review ── */}
           {draftReady && !isLoading && genStatus !== "done" && (
@@ -1456,7 +1456,7 @@ function DraftEditor({
 
 // ─── ProgressTracker ──────────────────────────────────────────────────────────
 
-function ProgressTracker({ step }: { step: string }) {
+function ProgressTracker({ step, projectId }: { step: string; projectId?: string }) {
   const currentIdx = getCurrentStepIndex(step);
   return (
     <div style={{ background: "var(--ai-bg)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 16px" }}>
@@ -1492,7 +1492,9 @@ function ProgressTracker({ step }: { step: string }) {
         })}
       </div>
       <div style={{ marginTop: 10, fontSize: 11, color: "var(--accent-text)" }}>
-        可以關閉頁面，完成後影片會出現在「📋 生成記錄」。
+        {projectId
+          ? <>可以關閉頁面，完成後在 <a href={`/tools/video/projects/${projectId}`} style={{ color: "var(--accent-text)" }}>這個影片專案</a> 看得到成片。</>
+          : "可以關閉頁面，完成後影片會出現在「📋 生成記錄」。"}
       </div>
     </div>
   );

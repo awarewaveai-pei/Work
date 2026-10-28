@@ -85,7 +85,7 @@
 |---|---|---|---|
 | V2.1 | 新 `NA/app/(shell)/tools/video/projects/page.tsx`；`NA/app/sidebar-sections.ts` | 專案清單（§4）；側欄加入口 | 瀏覽器：清單看得到剛做的專案 |
 | V2.2 | 新 `NA/app/(shell)/tools/video/projects/[id]/page.tsx` | 每比例播放器＋下載、腳本、QA（共用 `qa-findings-summary.ts`）、Release、費用、「繼續編輯」 | 瀏覽器：兩個比例都能播 |
-| V2.3 | `V/VideoPipeline.tsx:157`、`V/VideoStudio.tsx:1495` | 渲染完不自動跳步，停在成片＋「下一步」；「可以關閉頁面」文字改指專案頁；進階頁「生成記錄」tab（`V/VideoStudio.tsx:167`）改連專案清單 | 瀏覽器：完成後畫面停在成片 |
+| V2.3 | `V/VideoPipeline.tsx:157`、`V/VideoStudio.tsx:1495` | 渲染完不自動跳步，停在成片＋「下一步」；「可以關閉頁面」文字改指專案頁；進階頁「生成記錄」tab 保留（沒有專案的舊影片只在那裡與 My Designs 看得到） | 瀏覽器：完成後畫面停在成片 |
 
 ### V3 腳本頁（依賴：無；與 V1 改不同檔，可並行，V3.4 除外）
 | 卡 | 檔案 | 做什麼 | 驗收 |
