@@ -377,6 +377,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       # /ops/collect "搜尋全網" (lib/collect/collectors/web-search.ts): Serper is the default; Brave is the fallback.
       SERPER_API_KEY: ${SERPER_API_KEY:-}
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}   # trending block search/youtube-trending (AUTO_CONTENT P9.1)
       BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY:-}
       # Content Studio multi-provider: GPT article generation path reads this (lib/content/article/
       # generate-core.ts streamOpenAiGeneration). Empty = GPT models unavailable; Claude path unaffected.

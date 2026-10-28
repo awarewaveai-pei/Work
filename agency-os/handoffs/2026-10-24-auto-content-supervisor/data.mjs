@@ -36,7 +36,7 @@ export const NOW = [
   { what: 'ScriptForge 獨立頁，每個模組有自己的角色', state: 'yes', ev: '程式已推上 main（f233bd101），今晚台灣 03:00 部署後在側欄 Content Tools → ScriptForge；提示全部改在伺服器組，品牌讀客戶網站設定' },
   { what: '關掉分頁後影片仍會嵌回文章', state: 'yes', ev: '程式已推上 main（98f89a622），今晚台灣 03:00 部署後生效：題目勾了影片，排程每 5 分鐘自己做影片、嵌進文章、附到社群草稿；每支約 0.05 美元；要先在排程頁打開「自動內容管線」' },
   { what: '發到 YouTube', state: 'yes', ev: 'Aware Wave 頻道已真發一支（P7.0，935c70364）；題目選 YouTube 會自動排進頻道' },
-  { what: '每天抓熱搜、每月自動提題目、AI 挑題', state: 'yes', ev: '已上線（cb976618e）；AwareWave 首輪已抓到各地區熱搜並提出本月題目。YouTube 熱門來源要你申請免費金鑰才開' },
+  { what: '每天抓熱搜、每月自動提題目、AI 挑題', state: 'yes', ev: '已上線（cb976618e）；AwareWave 首輪已抓到各地區熱搜並提出本月題目；YouTube 熱門來源已接上' },
 ];
 
 const P1 = '7d8d618a4';

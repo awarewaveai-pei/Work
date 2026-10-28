@@ -15,6 +15,7 @@ $vars = @{
     REPLICATE_API_TOKEN          = "r8_xxx"
     REPLICATE_WEBHOOK_SIGNING_KEY = ""
     SERPER_API_KEY               = "xxx"
+    YOUTUBE_API_KEY              = "xxx"
     BRAVE_SEARCH_API_KEY         = "xxx"
     RESEND_API_KEY               = "re_xxx"
     RESEND_SENDER_EMAIL_ADDRESS  = "ops@example.com"
