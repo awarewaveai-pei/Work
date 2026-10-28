@@ -1,4 +1,12 @@
 # Worklog
+## 2026-10-28（續32）— video-service 部署 3f6bc9ac8（重燒寫 videorev/，不覆寫）（Claude；操作者「趕快做好」）
+
+- 步驟：push → 主機 ff → `docker tag … :pre-20261028-rev` → rsync → `up -d --build`（running jobs 0）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec -w /app lobster-video-service python -m unittest discover -s tests → 39 OK（真 ffmpeg，非 stub）；healthy restarts=0 | exit=0 | ms=34692
+- REVIEW_WAIVED: NA -- 程式見續28–31
+- BUGHUNT_WAIVED: NA -- 部署
+- 已知：同支影片兩比例同時重燒時 primary metadata.formats 讀改寫可能互蓋（UI 逐一輪詢不會觸發）。
+- rollback：`docker tag lobster-video-service:pre-20261028-rev lobster-video-service:local` → `up -d --no-build`。
 ## 2026-10-28（續31）— 影片收尾 C＋D：腳本頁兩處平台說明（m4）、findings／redesign 過時句更新（Claude）
 
 - **C 根因**：findings m4——頂部「目標平台」與底部「多平台轉換」畫面沒說差異。**做法**：`ScriptForge.tsx` `PlatGrid`（所有模組共用的主平台選擇）加一行「寫這支腳本時的主平台…寫完後可用結果頁的『多平台轉換』」；`ScriptResult` 的「🔄 多平台轉換」標題下加一行「另改成其他平台版本（原版保留…點選的那版用來送出）」。改共用元件＝每個模組一次到位，不逐模組補。
