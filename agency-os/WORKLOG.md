@@ -1,4 +1,11 @@
 # Worklog
+## 2026-10-28（續12）— 影片 V3.4：Remotion 從「模式」改成第 2 步加購片頭卡（Claude）
+
+- **根因**：Remotion 與快速影片搶同一個「模式」位置，但做的是 6–22 秒廣告卡（D9）。`ModeSelectStep` 刪 remotion 模式（剩 3 種）；第 2 步加「加片頭／廣告卡」勾選，存 `brief_json.introCard`（舊專案 `engine=remotion` 視為已勾）；第 3 步勾了就在主片下多一個 Remotion 面板＝另一支成片。`CostGateStep` 改依 introCard 顯示費用說明；`VideoStudio` tab／提示文字同步。無 migration、可直接 push。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin） | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（讀回 diff；瀏覽器驗收「模式剩 3 種、勾片頭卡多一支成片」未跑，待開站看）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=ProductionMode|"remotion" | hits=14（僅 VideoStudio 內部 tab id／Remotion 元件，非模式；無其他讀者）
+- ORACLE_WAIVED: Codex 本輪不可用；書面自審：舊專案 engine=remotion 不丟（introOf 後備）、模式 PATCH 不再寫 production_mode=remotion（DB check 本來就不收）。
 ## 2026-10-28（續11）— codex-oracle 失敗講出真因＋DB 通道多行程／多來源收尾（Claude＋Opus agent）
 
 - **根因 C1**：`codex exec -o` 時 stdout 為空、錯誤在 stderr；`scripts/codex-oracle.ps1` 報錯只指 stdout 檔（0 bytes），真因（`~/.codex/config.toml:2` `gpt-6.1-sol` → 400 model_not_found）藏在 `.err`；確定性 4xx 也照樣重試。設定檔由 Codex App 寫回（同時改了 effort 與 runtime 路徑），由「舊版 GPT 模型停止支援」session 處理，本條不動。

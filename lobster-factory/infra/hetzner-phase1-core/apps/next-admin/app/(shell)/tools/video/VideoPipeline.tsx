@@ -13,10 +13,10 @@ import { handoffFromScript, type VideoHandoff } from "./video-handoff";
 
 // 影片專案 stepper（VIDEO_TOOL_REDESIGN_2026-10-26.md D1/D5、V1.4）：5 步；客戶、腳本、模式、做到哪一步都存在
 // 專案列（/tools/video?project=<id>），重整或關頁後回來接著做。客戶只在建專案時選一次。
-// Remotion 還不是 DB 的 production_mode（0071 check；D9 在 V3.4 改成加購片頭卡），在那之前記在 brief.engine。
+// Remotion = 加購片頭／廣告卡（D9、V3.4）：brief.introCard，不是 production_mode。舊專案 brief.engine==="remotion" 視為勾了片頭卡。
 
 type Step = 1 | 2 | 3 | 4 | 5;
-type Brief = VideoHandoff & { engine?: "remotion" };
+type Brief = VideoHandoff & { introCard?: boolean; engine?: "remotion" };
 interface Project {
   id: string; organization_id: string; title: string;
   production_mode: "quick_video" | "short_drama" | "footage_edit";
@@ -38,7 +38,8 @@ function stepOf(p: Project): Step {
   if (p.lifecycle_stage === "release" || p.lifecycle_stage === "measure") return 5;
   return p.brief_json?.production || p.brief_json?.remotion ? 2 : 1;
 }
-const modeOf = (p: Project): ProductionMode => (p.brief_json?.engine === "remotion" ? "remotion" : p.production_mode);
+const modeOf = (p: Project): ProductionMode => p.production_mode;
+const introOf = (p: Project): boolean => p.brief_json?.introCard ?? p.brief_json?.engine === "remotion";
 
 const card: React.CSSProperties = { background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 10, padding: 14 };
 const field: React.CSSProperties = { width: "100%", boxSizing: "border-box", padding: 8, borderRadius: 6, border: "1px solid var(--border-subtle)", background: "var(--card-bg)", color: "var(--text-primary)", fontSize: 13 };
@@ -94,6 +95,7 @@ export default function VideoPipeline() {
 
   const brief = project.brief_json ?? { title: project.title };
   const mode = modeOf(project);
+  const introCard = introOf(project);
   const org = project.organization_id;
   return (
     <div ref={topRef} style={{ background: "var(--bg-canvas)", minHeight: "100vh" }}>
@@ -110,14 +112,14 @@ export default function VideoPipeline() {
       </div>
       {loadError && <div style={{ padding: "8px 28px", color: "var(--red)", fontSize: 12 }}>{loadError}</div>}
 
-      {step === 1 && <ScriptStep brief={brief} onPick={(h) => void patch({ brief: { ...h, engine: brief.engine } })} onNext={() => goto(2)} />}
+      {step === 1 && <ScriptStep brief={brief} onPick={(h) => void patch({ brief: { ...h, introCard, engine: undefined } })} onNext={() => goto(2)} />}
 
       {step === 2 && (
         <>
-          <ModeSelectStep value={mode} onSelect={(m) => void patch(m === "remotion"
-            ? { brief: { ...brief, engine: "remotion" } }
-            : { productionMode: m, brief: { ...brief, engine: undefined } })} />
-          <CostGateStep mode={mode} onConfirm={() => goto(3)} />
+          <ModeSelectStep value={mode} introCard={introCard}
+            onSelect={(m) => void patch({ productionMode: m })}
+            onIntroCard={(on) => void patch({ brief: { ...brief, introCard: on, engine: undefined } })} />
+          <CostGateStep mode={mode} introCard={introCard} onConfirm={() => goto(3)} />
         </>
       )}
 
@@ -134,11 +136,11 @@ export default function VideoPipeline() {
       {step === 3 && (mode === "quick_video" || mode === "short_drama") && renderDone && (
         <RenderedBar projectId={project.id} note="成片完成，就在上面。" onNext={() => goto(4)} />
       )}
-      {step === 3 && mode === "remotion" && (
-        <>
+      {step === 3 && introCard && (
+        <div style={{ borderTop: "1px solid var(--border-subtle)", marginTop: 12 }}>
+          <div style={{ padding: "16px 28px 0", fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>片頭／廣告卡（另一支成片，6–22 秒）</div>
           <VideoStudio remotionInitial={brief.remotion} embedded={{ lockTab: "remotion", organizationId: org, projectId: project.id }} />
-          <div style={{ padding: "0 28px 24px" }}><button type="button" onClick={() => goto(4)} style={primary(true)}>Remotion 渲染已送出，繼續 →</button></div>
-        </>
+        </div>
       )}
 
       {step === 4 && review === "captions" && <CaptionsStep organizationId={org} onContinue={() => setReview("qa")} />}

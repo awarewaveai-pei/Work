@@ -1,12 +1,11 @@
 "use client";
 
-export type ProductionMode = "quick_video" | "remotion" | "short_drama" | "footage_edit";
+export type ProductionMode = "quick_video" | "short_drama" | "footage_edit";
 
 const card: React.CSSProperties = { background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 10, padding: 14 };
 
 const MODES: { id: ProductionMode; label: string; desc: string; badge: string }[] = [
   { id: "quick_video", label: "快速影片", desc: "腳本 → AI 生圖／Pexels → 配音 → ffmpeg 合成。最快、最常用。", badge: "$0 起" },
-  { id: "remotion", label: "Remotion 模板", desc: "手動套版型模板，Remotion 渲染。單一模板單支影片。", badge: "手動模板" },
   { id: "short_drama", label: "短劇", desc: "跟快速影片同一條生產線，但套用你在上一步建立的 Story Bible（角色/場景/連續性規則）。", badge: "需先建 Bible" },
   { id: "footage_edit", label: "實拍剪輯", desc: "上傳自己的影片素材，剪切點＋輸出時間軸，Timeline 合成。", badge: "$0" },
 ];
@@ -14,9 +13,13 @@ const MODES: { id: ProductionMode; label: string; desc: string; badge: string }[
 export default function ModeSelectStep({
   value,
   onSelect,
+  introCard,
+  onIntroCard,
 }: {
   value: ProductionMode | null;
   onSelect: (mode: ProductionMode) => void;
+  introCard: boolean;
+  onIntroCard: (on: boolean) => void;
 }) {
   return (
     <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 14 }}>
@@ -53,6 +56,15 @@ export default function ModeSelectStep({
           );
         })}
       </div>
+      <label style={{ ...card, display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer" }}>
+        <input type="checkbox" checked={introCard} onChange={(e) => onIntroCard(e.target.checked)} style={{ marginTop: 3 }} />
+        <span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>加片頭／廣告卡（6–22 秒）</span>
+          <span style={{ display: "block", fontSize: 11.5, color: "var(--text-secondary)", lineHeight: 1.6, marginTop: 2 }}>
+            套 Remotion 模板另外做一支短卡片，和主片是兩支獨立成片；費用依 render service 實際用量計，送出後才知道金額。
+          </span>
+        </span>
+      </label>
     </div>
   );
 }

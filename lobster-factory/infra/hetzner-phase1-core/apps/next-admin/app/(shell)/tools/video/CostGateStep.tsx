@@ -13,7 +13,7 @@ const NT = (usd: number) => `NT$${usdToNtd(usd).toLocaleString("zh-TW", { maximu
  * 那步的既有表單（素材模式/生圖模型/配音/比例）會依實際設定即時重算精確金額。這裡的目的
  * 只是讓使用者在填任何細節之前，先知道這條路線大概要花多少錢再決定要不要繼續。
  */
-export default function CostGateStep({ mode, onConfirm }: { mode: ProductionMode; onConfirm: () => void }) {
+export default function CostGateStep({ mode, introCard, onConfirm }: { mode: ProductionMode; introCard: boolean; onConfirm: () => void }) {
   const estimate =
     mode === "quick_video" || mode === "short_drama"
       ? computeVideoCost({ totalScenes: 6, customScenes: 3, brollScenes: 3, ttsProvider: "edge", ttsChars: 600 })
@@ -50,9 +50,9 @@ export default function CostGateStep({ mode, onConfirm }: { mode: ProductionMode
         </div>
       )}
 
-      {mode === "remotion" && (
+      {introCard && (
         <div style={{ ...card, color: "var(--text-secondary)" }}>
-          Remotion 手動模板目前沒有自動試算——費用依 EU render service 實際用量計，送出渲染後才會知道確切金額。
+          片頭／廣告卡（Remotion）沒有自動試算——費用依 render service 實際用量計，送出渲染後才會知道確切金額。
         </div>
       )}
 

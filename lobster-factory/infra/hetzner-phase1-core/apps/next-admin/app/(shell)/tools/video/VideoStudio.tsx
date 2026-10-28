@@ -157,7 +157,7 @@ type StudioTabId = "generate" | "remotion" | "footage" | "release" | "timeline" 
 const STUDIO_TAB_GROUPS: { group: string; items: { id: StudioTabId; label: string }[] }[] = [
   { group: "製作", items: [
     { id: "generate", label: "生成影片" },
-    { id: "remotion", label: "Remotion 模板" },
+    { id: "remotion", label: "片頭／廣告卡" },
     { id: "footage",  label: "實拍剪輯" },
   ]},
   { group: "審片與交付", items: [
@@ -2110,7 +2110,7 @@ function RemotionStudio({ scriptPrefill, organizationId }: { scriptPrefill?: Scr
                         <button type="button"
                           onClick={() => void generateImageForField(f.key)}
                           disabled={busy || aiLoading || !aiPrompt}
-                          title={aiPrompt ? `AI 生圖：${aiPrompt.slice(0, 40)}…` : "需先從前製腳本帶入（✨ 送去 Remotion 模板）才能 AI 生圖"}
+                          title={aiPrompt ? `AI 生圖：${aiPrompt.slice(0, 40)}…` : "需先從腳本工具「送去做影片」帶入腳本才能 AI 生圖"}
                           style={{
                             padding: "0 10px", height: 36, borderRadius: 7, flexShrink: 0,
                             border: "1px solid var(--border-subtle)", fontSize: 11, fontWeight: 700,
