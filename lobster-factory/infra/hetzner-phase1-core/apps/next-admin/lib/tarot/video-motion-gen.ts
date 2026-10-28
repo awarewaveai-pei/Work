@@ -8,6 +8,8 @@
  * 皆走 Replicate（2026-09-12 直接查 API schema + 頁面定價確認，非猜測）；slug 登錄在 lib/ai/cost-model.ts MEDIA_MODELS：
  *   - Runway Gen-4 Turbo：input_image 欄位叫 "image"
  *   - （Luma Ray 2 / Flash 2 已從 Replicate 下架，2026-10-28 移除）
+ *   - Luma Ray 3.2（2026-10-28 查 schema）：起始圖叫 "start_image"，有 start_image 時只准 5s，
+ *     aspect_ratio 被忽略（比例跟起始圖走）；resolution 釘 720p，價格表按解析度×秒數計支
  *   - Google Veo 3.1 / 3.1 Fast：叫 "image"（另有 generate_audio，關掉——旁白配音另外做，
  *     Veo 自己生的音軌用不到只會浪費且可能跟 TTS 對不上嘴形時間軸）
  */
@@ -39,10 +41,11 @@ async function runWithConcurrency<T>(limit: number, tasks: (() => Promise<T>)[])
 export type VideoMotionModel =
   | "runway-gen4-turbo"
   | "veo-3-1-fast"
-  | "veo-3-1";
+  | "veo-3-1"
+  | "luma-ray-3-2";
 
 export function isVideoMotionModel(v: unknown): v is VideoMotionModel {
-  return v === "runway-gen4-turbo" || v === "veo-3-1-fast" || v === "veo-3-1";
+  return v === "runway-gen4-turbo" || v === "veo-3-1-fast" || v === "veo-3-1" || v === "luma-ray-3-2";
 }
 
 interface MotionConfig {
@@ -71,6 +74,13 @@ const MOTION_MODELS: Record<VideoMotionModel, MotionConfig> = {
     defaultDurationSec: 8,
     buildInput: ({ imageUrl, prompt, aspectRatio, durationSec }) => ({
       image: imageUrl, prompt, aspect_ratio: aspectRatio, duration: durationSec, generate_audio: false,
+    }),
+  },
+  "luma-ray-3-2": {
+    slug: "luma/ray-3.2",
+    defaultDurationSec: 5,
+    buildInput: ({ imageUrl, prompt, aspectRatio, durationSec }) => ({
+      start_image: imageUrl, prompt, aspect_ratio: aspectRatio, duration: durationSec, resolution: "720p",
     }),
   },
 };

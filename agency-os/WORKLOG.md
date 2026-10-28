@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-28（續19）video-service 部署核對 + Luma Ray 3.2 動態選項
+
+- **根因**：續10（7288581b3）移除 Luma Ray 2／Flash 2（Replicate 下架）後，影片動態只剩 Runway／Veo 三家；Luma 後繼 `luma/ray-3.2` 未登錄。video-service 部署待操作者批准。
+- **A video-service 部署**：主機 `/root/Work` 已含 7288581b3（`git merge-base --is-ancestor` = HAS）；`lobster-video-service` 容器 2026-10-28T02:12:29Z 已重建，容器內每個 `.py` 與 git 逐檔 `cmp` 無差異；`config.IMAGE_MODEL,IMAGE_SIZE` = `gpt-image-2 1536x1024`；health=healthy，`/health` `{"ok": true,...}`。同時主機有 next-admin sg-deploy（05:48 起）在跑 → 不重跑 sg-deploy video-service（同碼重建＋並行衝突，無效益）。02:12 那次重建不在 `logs/sg-deploy-20261028-*.log`（今天兩份都只部署 next-admin），來源未查明。
+- **B Ray 3.2**：schema（`GET /v1/models/luma/ray-3.2`，latest_version 6e0a5501…）：起始圖 `start_image`（只准 5s）、`duration` ∈ {5,10}、`aspect_ratio` 有 start_image 時忽略、`resolution` 540p/720p/1080p。價格（replicate.com/luma/ray-3.2 內嵌 JSON）：按支計，720p SDR 5s = $0.30 → `usdPerSec 0.06`（只在 5s 成立）。改 `lib/tarot/video-motion-gen.ts`（type、isVideoMotionModel、MOTION_MODELS，resolution 釘 720p）、`lib/ai/cost-model.ts`（MEDIA_MODELS active 列、VIDEO_MOTION_RATES）。VideoStudio 選單／draft 路由守衛／扣帳／成本頁都從這兩處推導，不必另改。
+- **真打**：Grant 只能由權限閘鑄造，腳本無法建 → 用與 buildInput 相同 payload 直打 Replicate（prediction `54n7egnvbdrmr0d1g47vk26nt8`）：succeeded、87.7s、video/mp4 4,873,949 bytes，metrics `720p sdr 5s ×1` = **US$0.30**。
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File D:/tmp/ray32-real.ps1 (luma/ray-3.2 start_image 5s 720p) | exit=0 | ms=87703
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/ai (8 files 69 passed) ; node scripts/probe-models.mjs (luma/ray-3.2 ok) | exit=0 | ms=60000
+- tsc：`npx tsc --noEmit` exit 2，3 錯全在 `.next/types/validator.ts` 指向 5a66a212d 已刪的 calendar 頁（舊建置殘留），原始碼 0 錯。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n（n1：usdPerSec 0.06 只對 5s 正確；目前 defaultDurationSec 固定 5、start_image 也只准 5s）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=runway-gen4-turbo|veo-3-1-fast | hits=2
+- ORACLE_WAIVED: Codex 無額度（操作者 brief 指定）；改動為兩檔資料列＋一個 buildInput，已真打驗證
+- **避免再發生**：新增動態模型照本條：先抓 schema 欄位＋頁面內嵌價格 JSON，再加兩檔，`probe-models.mjs` 會擋下架 slug。
 ## 2026-10-28（續18）
 
 ### AUTO_CONTENT P9.6：文章行事曆併進社群日曆（cc.py 實作，主 session 驗收）

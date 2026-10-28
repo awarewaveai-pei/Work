@@ -144,6 +144,7 @@ export const MEDIA_MODELS: Record<string, MediaModel> = {
   // Luma Ray 2 / Flash 2 left Replicate (404 on 2026-10-28; only luma/ray-3.2 is listed), so they left the motion picker.
   "luma/ray-flash-2-720p":             { vendor: "Replicate", kind: "video", status: "retired" },
   "luma/ray-2-720p":                   { vendor: "Replicate", kind: "video", status: "retired" },
+  "luma/ray-3.2":                      { vendor: "Replicate", kind: "video", status: "active", verifiedAt: "2026-10-28" },
   "851-labs/background-remover":       { vendor: "Replicate", kind: "tool", status: "active", version: "a029dff38972b5fda4ec5d75d7d1cd25aeff621d2cf4946a41055d7db66b80bc", verifiedAt: "2026-10-28" },
   "black-forest-labs/flux-fill-pro":   { vendor: "Replicate", kind: "tool", status: "active", version: "41c767bcbfffe54ef8f05eb4d0100f9314790f7fc43a7b88d73ec06839deddb9", verifiedAt: "2026-10-28" },
   "bria/eraser":                       { vendor: "Replicate", kind: "tool", status: "active", version: "2757d1ac2f1291af219f5f10e8ecba15e92e7c05253e2841295f3ba6bff6adc4", verifiedAt: "2026-10-28" },
@@ -162,6 +163,8 @@ export const VIDEO_MOTION_RATES: Record<import("../tarot/video-motion-gen").Vide
   "runway-gen4-turbo":  { usdPerSec: 0.05, label: "Runway Gen-4 Turbo", vendor: "Runway/Replicate", defaultDurationSec: 5 },
   "veo-3-1-fast":       { usdPerSec: 0.10, label: "Google Veo 3.1 Fast",vendor: "Google/Replicate", defaultDurationSec: 8 },
   "veo-3-1":            { usdPerSec: 0.20, label: "Google Veo 3.1",     vendor: "Google/Replicate", defaultDurationSec: 8 },
+  // Billed per video, not per second: 720p SDR 5s = $0.30 (replicate.com/luma/ray-3.2, 2026-10-28) -> 0.06/s at 5s only.
+  "luma-ray-3-2":       { usdPerSec: 0.06, label: "Luma Ray 3.2",       vendor: "Luma/Replicate",   defaultDurationSec: 5 },
 };
 
 /**
