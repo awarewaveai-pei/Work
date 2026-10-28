@@ -68,7 +68,13 @@ describe("/api/video/captions/reburn", () => {
     pollRenderJob.mockResolvedValue(done(newUrl));
     expect((await get()).status).toBe(200);
     // The row's file moves to the new versioned URL; the old URL is never rewritten.
-    expect(update.mock.calls[0][0]).toMatchObject({ object_url: newUrl, checksum_sha256: "a".repeat(64), metadata: { captionCues: cues } });
+    expect(update.mock.calls[0][0]).toMatchObject({ object_url: newUrl, checksum_sha256: "a".repeat(64), metadata: { captionCues: cues, formats: { "16x9": newUrl } } });
+    // A ratio (variant) row also rewrites its entry in the primary row's formats map.
+    const variant = { ...row(org), metadata: { variantOf: "main-id", formats: undefined } };
+    const v = fakeDb({ media_assets: { ...variant, metadata: { variantOf: "main-id", formats: { "16x9": url, "9x16": "keep" } } } });
+    getSupabaseWriteClient.mockReturnValue(v.db);
+    expect((await get()).status).toBe(200);
+    expect(v.update.mock.calls[1][0]).toMatchObject({ metadata: { formats: { "16x9": newUrl, "9x16": "keep" } } });
     expect(persistTech).toHaveBeenCalledWith(expect.objectContaining({ candidateChecksum: "a".repeat(64) }));
     expect(persistCaption).toHaveBeenCalledWith(expect.objectContaining({ candidateChecksum: "a".repeat(64), captions: cues }));
   });

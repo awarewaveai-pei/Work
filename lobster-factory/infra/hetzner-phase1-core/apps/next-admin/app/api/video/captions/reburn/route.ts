@@ -98,9 +98,20 @@ async function finish(req: NextRequest, assetId: string, jobId: string): Promise
       captionVtt: poll.captions.vtt,
       outputMeta: { ...((old.outputMeta as Record<string, unknown> | undefined) ?? {}), [format]: meta },
       captionsReburnedAt: new Date().toISOString(),
+      // The primary row also lists every ratio's URL (project page, history, gallery read it); a stale entry would show the old captions.
+      ...(old.variantOf ? {} : { formats: { ...((old.formats as Record<string, string> | undefined) ?? {}), [format]: newUrl } }),
     },
   }).eq("id", row.id).eq("organization_id", row.organization_id);
   if (error) return deny(`row update failed: ${error.message}`, 502);
+  if (typeof old.variantOf === "string") {
+    const { data: main } = await db.from("media_assets").select("metadata").eq("id", old.variantOf).eq("organization_id", row.organization_id).maybeSingle();
+    const mm = (main?.metadata ?? null) as Record<string, unknown> | null;
+    if (mm) {
+      const { error: fe } = await db.from("media_assets").update({ metadata: { ...mm, formats: { ...((mm.formats as Record<string, string> | undefined) ?? {}), [format]: newUrl } } })
+        .eq("id", old.variantOf).eq("organization_id", row.organization_id);
+      if (fe) return deny(`formats update failed: ${fe.message}`, 502);
+    }
+  }
 
   // QA reports are pinned to the checksum, so the new bytes get their own reports.
   const { persistAutomaticTechnicalQa } = await import("@/lib/content/video/qa-persistence");

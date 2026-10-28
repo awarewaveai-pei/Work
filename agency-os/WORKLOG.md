@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-28（續29）— 影片 V4.8 收尾 A2：重燒後同步主列 `metadata.formats`，專案頁才看得到新字幕（Claude）
+
+- **根因**：續28 只換了該列 `object_url`；專案頁（`ProjectDetail.tsx:89`）、歷史（`api/video/history/route.ts:92`）、畫廊（`DesignsGallery.tsx:996`）讀的是**主列** `metadata.formats[ratio]`，仍是舊網址 → 重燒後還是舊字幕。**不變量**：一份位元組只對應一個網址，主列 formats 與各列 object_url 同步。
+- **做法**：`captions/reburn/route.ts` finish：主列同一次 update 帶新 `formats[format]`；比例列（variantOf）另讀主列 metadata 合併寫回（客戶端逐 job 序列輪詢，不並發）。測試：主列／比例列兩條。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run app/api/video/captions（3 passed，含 formats 斷言）＋`npx tsc --noEmit` 非 .next 錯誤 0 | exit=0 | ms=40000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n（n：比例列 finish 為讀後寫，同主列兩個 job 並發完成會互蓋一個比例；UI 序列輪詢不會發生）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=metadata?.formats | hits=4（ProjectDetail／history／DesignsGallery／VideoStudio 皆讀主列 formats，已由本修同步）
+- ORACLE_WAIVED: Codex 本輪不可用；書面自審：寫入皆帶 organization_id；只改 formats 一個鍵；newUrl 已過 `videoObjectKey===row.object_key` 驗證才寫。
+- **Rollback**：`git revert <此 commit>`。
 ## 2026-10-28（續28）— 影片 V4.8 收尾 A：重燒字幕改寫新網址，不再覆寫同一個檔（Claude）— video-service 部分待操作者 go-ahead，未 push
 
 - **根因**：重燒覆寫 `video/<dir>/<fmt>.mp4`（續26 已知 CDN 風險）→ CDN／瀏覽器拿舊檔；已嵌進文章的舊網址也會被悄悄換內容。**不變量**：一個網址＝一份位元組，永不改。
