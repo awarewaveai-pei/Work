@@ -138,6 +138,29 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
       return summary;
     },
   },
+  {
+    key: "video_project_advance",
+    label: "影片做完自動完成",
+    description: "把你按了「生成並自動完成」的影片專案往下推：影片做好 → 字幕與品質檢查 → 核准發布 → 依比例存成社群草稿（都是草稿，不會直接上線）。任何一項沒通過就停在那一步、寫下原因並通知，不硬推。",
+    cost: "影片本身在你按「生成並自動完成」時已算費用；這個排程只多一次社群文案（Claude Haiku），每支影片約 0.01 美元，沒連社群頻道就免費。",
+    frequencies: [{ value: "every_5m", label: "每 5 分鐘", usesHour: false, usesDay: false }],
+    defaults: { frequency: "every_5m", hourUtc: 0, dayOfWeekUtc: 1, dayOfMonth: 1 },
+    async run(organizationId) {
+      const sb = getSupabaseWriteClient();
+      if (!sb) throw new Error("video_project_advance:no_supabase_client");
+      const [{ advanceProject }, { advanceDeps }] = await Promise.all([import("@/lib/content/video/project-advance"), import("@/lib/content/video/project-advance-deps")]);
+      const { data, error } = await sb.from("media_production_projects").select("id, title, updated_at").eq("organization_id", organizationId)
+        .eq("autonomy", "auto_after_render").in("lifecycle_stage", ["create", "produce", "review", "release"]).order("updated_at").limit(3);
+      if (error) throw new Error(`video_project_advance:${error.message}`);
+      const deps = advanceDeps(sb, organizationId, "schedule:video_project_advance");
+      const outcomes = [];
+      for (const p of data ?? []) outcomes.push(await advanceProject(deps, { id: String(p.id), organizationId, title: String(p.title), updatedAtMs: Date.parse(String(p.updated_at)) }));
+      // a stopped project is already recorded on the project; raising it here is how the operator hears about it
+      const stopped = outcomes.filter((o) => o.result === "stopped");
+      if (stopped.length) throw new Error(`video_project_advance: ${stopped.map((o) => `${o.projectId} ${o.note}`).join(" | ")}`);
+      return outcomes.length ? outcomes.map((o) => `${o.projectId.slice(0, 8)} ${o.result}`).join(", ") : "no projects";
+    },
+  },
 ];
 
 export function clientJob(key: string): ClientJob | undefined {

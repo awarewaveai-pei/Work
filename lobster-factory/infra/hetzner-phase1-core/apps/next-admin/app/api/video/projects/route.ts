@@ -24,7 +24,7 @@ function editable(body: Record<string, unknown>): Record<string, unknown> | stri
   if (body.title !== undefined) { const t = typeof body.title === "string" ? body.title.trim() : ""; if (!t || t.length > 180) return "invalid title"; out.title = t; }
   if (body.lifecycleStage !== undefined) { if (!STAGES.has(String(body.lifecycleStage))) return "invalid lifecycleStage"; out.lifecycle_stage = body.lifecycleStage; }
   if (body.productionMode !== undefined) { if (!MODES.has(String(body.productionMode))) return "invalid productionMode"; out.production_mode = body.productionMode; }
-  if (body.autonomy !== undefined) { if (!AUTONOMY.has(String(body.autonomy))) return "invalid autonomy"; out.autonomy = body.autonomy; }
+  if (body.autonomy !== undefined) { if (!AUTONOMY.has(String(body.autonomy))) return "invalid autonomy"; out.autonomy = body.autonomy; out.last_error = null; }   // a new run clears the old stop reason
   if (body.formats !== undefined) {
     const f = Array.isArray(body.formats) ? [...new Set(body.formats.map(String))] : [];
     if (!f.length || !f.every((x) => FORMATS.has(x))) return "invalid formats"; out.formats = f;

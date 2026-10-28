@@ -596,7 +596,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
   }
 
   // ── Render draft handler ──
-  async function handleRenderDraft() {
+  async function handleRenderDraft(autonomy: "guided" | "auto_after_render" = "guided") {
     if (isRenderingRef.current) return; // sync guard — prevents double-submit before React re-renders
     isRenderingRef.current = true;
     if (pollRef.current) clearTimeout(pollRef.current);
@@ -625,6 +625,10 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
       });
       const j = (await res.json()) as { ok: boolean; jobId?: string; error?: string };
       if (!j.ok || !j.jobId) { isRenderingRef.current = false; setGenStatus("error"); setGenError(j.error ?? "提交渲染失敗"); return; }
+      // V6.2: the project remembers how far it runs on its own; written only after the render was accepted.
+      if (embedded?.projectId) {
+        await fetch("/api/video/projects", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: embedded.projectId, autonomy, lifecycleStage: "produce" }) }).catch(() => undefined);
+      }
       startPolling(j.jobId);
     } catch (e: unknown) {
       isRenderingRef.current = false;
@@ -777,6 +781,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
                 }
                 onBack={() => { isRenderingRef.current = false; setDraftScenes([]); setGenError(""); setGenStatus("idle"); }}
                 onRender={handleRenderDraft}
+                canAutoFinish={!!embedded?.projectId}
                 onRegenerate={handleRegenerateImage}
                 onUpload={handleUploadAsset}
                 regenIds={regenIds}
@@ -1324,7 +1329,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
 // ─── DraftEditor ──────────────────────────────────────────────────────────────
 
 function DraftEditor({
-  scenes, title, formats, activeFormat, onChangeFormat, onChangeScene, onBack, onRender, onRegenerate, onUpload, regenIds, disabled, errorMsg,
+  scenes, title, formats, activeFormat, onChangeFormat, onChangeScene, onBack, onRender, canAutoFinish, onRegenerate, onUpload, regenIds, disabled, errorMsg,
 }: {
   scenes: DraftScene[];
   title: string;
@@ -1333,7 +1338,9 @@ function DraftEditor({
   onChangeFormat: (fmt: string) => void;
   onChangeScene: (id: number, narration: string) => void;
   onBack: () => void;
-  onRender: () => void;
+  onRender: (autonomy: "guided" | "auto_after_render") => void;
+  /** Only a video project can run on its own after the render (V6.2). */
+  canAutoFinish: boolean;
   onRegenerate: (id: number) => void;
   onUpload: (id: number, file: File) => void;
   regenIds: Set<number>;
@@ -1452,7 +1459,7 @@ function DraftEditor({
           }}>
           ← 返回重生
         </button>
-        <button onClick={onRender} disabled={flowBlocked}
+        <button onClick={() => onRender("guided")} disabled={flowBlocked}
           style={{
             flex: 1, padding: "10px 16px", borderRadius: 8, border: "none",
             cursor: flowBlocked ? "not-allowed" : "pointer",
@@ -1460,9 +1467,26 @@ function DraftEditor({
             color: flowBlocked ? "var(--text-muted)" : "var(--btn-primary-text)",
             fontSize: 13, fontWeight: 700,
           }}>
-          {regenIds.size > 0 ? "⏳ 圖片生成中…" : disabled ? "⏳ 處理中…" : "🎬 確認送出渲染"}
+          {regenIds.size > 0 ? "⏳ 圖片生成中…" : disabled ? "⏳ 處理中…" : canAutoFinish ? "🎬 生成，我要逐步審" : "🎬 確認送出渲染"}
         </button>
+        {canAutoFinish && (
+          <button onClick={() => onRender("auto_after_render")} disabled={flowBlocked}
+            style={{
+              flex: 1, padding: "10px 16px", borderRadius: 8, border: "none",
+              cursor: flowBlocked ? "not-allowed" : "pointer",
+              background: flowBlocked ? "var(--border-subtle)" : "var(--accent)",
+              color: flowBlocked ? "var(--text-muted)" : "var(--btn-primary-text)",
+              fontSize: 13, fontWeight: 700,
+            }}>
+            ⚡ 生成並自動完成
+          </button>
+        )}
       </div>
+      {canAutoFinish && (
+        <div style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>
+          「自動完成」：影片做好後由排程接手——字幕與品質檢查、核准發布、存成社群草稿（都是草稿）。任何一項沒過就停下並通知你。要先到「排程」頁打開這個客戶的「影片做完自動完成」（預設關）；沒打開時，影片做完會停在這裡等你。
+        </div>
+      )}
     </div>
   );
 }

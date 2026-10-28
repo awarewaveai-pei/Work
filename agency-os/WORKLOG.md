@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-28（續24）— 影片 V6.1／V6.2：④ 後自動完成（排程 job 預設關＋生成鍵分兩顆）（Claude）
+
+- **根因**：自動化程度（D2）只存在設計裡；按生成後沒有東西把影片往下推（字幕／QA／Release／社群草稿都要人點）。
+- **做了**：V6.1 `lib/content/video/project-advance.ts`（狀態機，純函式）：render 做完 → 每比例跑編輯／版權 QA 並讀四項 → 全過才逐比例建 Release → 依比例存社群草稿；**任一項沒過 = 停**（`autonomy` 回 `guided`、`lifecycle_stage=review`、`last_error` 寫中文原因，run 丟錯＝排程框架開 incident 通知），不硬推；狀態每次從 DB 讀，半途死掉下次重跑；2 小時找不到成片也停。`project-advance-deps.ts` 接真服務（`finalizeVideoJob`、QA、Release、`saveVideoSocialDrafts`、`writeSocialPosts` 於 `runForOrg`）。新 job `video_project_advance`（`jobs.ts`，`every_5m`，**預設關＝排程格不勾**，每次最多 3 個專案）。為不重寫，把編輯／版權 QA 寫入抽成 `editorial-rights-persist.ts`、Release 建立抽成 `release-create.ts`、社群草稿依賴抽成 `social-drafts-deps.ts`，原 route 改成薄殼。V6.2 `VideoStudio` 草稿審核（有專案時）兩顆鍵「生成，我要逐步審」「生成並自動完成」，送出渲染成功後 PATCH 專案 `autonomy`（PATCH autonomy 同時清舊 `last_error`）；鍵下說明「要先到排程頁打開這個客戶的『影片做完自動完成』」。`SCHEDULES_PAGE_PLAN.md` 補一行。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run`（next-admin 全套）＋`npx tsc --noEmit` | exit=0 | ms=40509 | 408 files 3491 passed（唯一紅＝`get-no-side-effects` 抓到 V4.8 的 GET 會寫，已改 POST，不在本 commit）；tsc 本卡檔案 0 錯。真實 DB／video-service 狀態機（`renderState`、finalize、drafts 的 AI 與 Postiz）本機沒跑，只跑了純狀態機測試。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/1n（m：`renderState` 的 `video_jobs` 以 `record_params->>projectId` 找，依賴 V1.5 寫入 projectId；prepare 期間 record_params 空，故「還沒有成片」會等到 2 小時才停；n：drafts 的 marker 在 brief_json，與 PATCH brief 寫入同欄有覆寫競態，窗口小）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=persistEditorialRightsQa|createApprovedRelease|draftDeps|video_project_advance | hits=14（舊 route 兩支已改呼叫共用函式、route.test 通過；docs 補一行）
+- ORACLE_WAIVED: Codex 本輪不可用；書面自審：自動只建 Release 與 draft（紅線 draft-first）；排程格預設關；失敗一律 stop 不重試（autonomy→guided 後不再被撈到，不會每 5 分鐘重發 incident）；drafts 以 `brief_json.autoDrafts` 防重複建；社群文案超過上限 → stop，不送。
+- **待操作者**：到客戶的排程頁打開「影片做完自動完成」才會動；正式上線前建議用一支測試影片走一遍（需 V1 migration 0138 已在正式庫，已套用）。
+- **Rollback**：`git revert <此 commit>`；排程格預設關，未打開前無行為；無 migration。
 ## 2026-10-28（續23）— 影片 V5.1／V5.2／V5.3：發布不填 JSON（一比例一核准、社群草稿、WordPress 選文章）（Claude）
 
 - **根因**：發布頁要手填 SHA／UUID／JSON；Release 只對一支候選；社群草稿走舊 `/api/content/social-publish` 且只認 16:9；WordPress 要手填 Site／Post ID 與影片網址。
