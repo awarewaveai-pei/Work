@@ -40,6 +40,8 @@ const todo = (id, plain) => ({ id, plain, status: 'todo' });
 const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 const V1 = '8e8f30c27';
 const V2 = '3459e3b32';
+const V34 = '9f6015039';
+const V4A = '1a67f0052';
 
 export const STEPS = [
   { n: 1, code: 'V1', group: 'A', title: '專案骨架', plain: '每支影片存成一個專案，客戶、腳本、比例都跟著走；腳本頁一顆鍵送去做影片。',
@@ -65,25 +67,25 @@ export const STEPS = [
       done('V2.3', '影片做完停在成片畫面；「可以關閉頁面」改指專案頁；進階頁的生成記錄改連清單', V2),
     ] },
   { n: 3, code: 'V3', group: 'A', title: '腳本頁整理', plain: '多平台版本並存可選、照各平台規則改寫、送社群帶 hashtag；Remotion 改成加購片頭卡。',
-    gate: '轉兩個平台後切回原版，送出的是原版；送社群草稿含 #', risk: 'Medium', model: 'Sonnet 5.5（卡已寫死）', status: 'in_progress', depends: [],
+    gate: '轉兩個平台後切回原版，送出的是原版；送社群草稿含 #', risk: 'Medium', model: 'Sonnet 5.5（卡已寫死）', status: 'done', commit: V34, depends: [],
     what: 'ScriptForge 版本並存；modules.ts 讀 limits.ts；Remotion 從模式移到第 2 步選項',
     files: ['app/(shell)/tools/video/ScriptForge.tsx', 'lib/script-forge/modules.ts', 'app/(shell)/tools/video/ModeSelectStep.tsx'],
     items: [
       done('V3.1', '原版和各平台版本並存，選一版當送出用，每版可複製', V1),
       done('V3.2', '平台改寫照各平台字數上限，並產出 hashtag', V1),
       done('V3.3', '送社群帶上 hashtag', V1),
-      todo('V3.4', 'Remotion 不再是製作模式，改成第 2 步「加片頭卡（6–22 秒）」（要先完成 V1.4）'),
+      done('V3.4', 'Remotion 不再是製作模式，改成第 2 步「加片頭卡（6–22 秒）」', V34),
     ] },
   { n: 4, code: 'V4', group: 'B', title: 'QA 真能通過', plain: '每個比例各算一支成片；腳本、素材授權、字幕在做影片當下記好，四項 QA 才有可能全過。',
-    gate: '一支 AI 生圖影片 QA 四項全綠', risk: 'Medium（含 video-service 部署）', model: 'Opus 5.5', status: 'not_started', depends: ['V1'],
+    gate: '一支 AI 生圖影片 QA 四項全綠', risk: 'Medium（含 video-service 部署）', model: 'Opus 5.5', status: 'in_progress', depends: ['V1'],
     what: '一比例一列 media_assets；技術 QA 逐比例、failed 也入庫；metadata 記腳本與素材來源；Edge 配音時間點產字幕',
     files: ['lib/content/blocks/video-pipeline.ts', 'lib/content/video/qa-persistence.ts', 'apps/video-service/pipeline.py', 'apps/video-service/server.py', 'app/api/video/qa/editorial-rights/route.ts'],
     items: [
-      todo('V4.1', '每個比例存成一筆影片紀錄，清單只顯示一支；刪除時一起處理'),
-      todo('V4.2', '技術 QA 每個比例各一份'),
+      done('V4.1', '每個比例存成一筆影片紀錄，清單只顯示一支；刪除時一起處理', V4A),
+      done('V4.2', '技術 QA 每個比例各一份', V4A),
       todo('V4.3', '技術 QA 沒過時也保留影片和原因，不整支丟掉'),
-      todo('V4.4', '做影片時把腳本存進紀錄，編輯 QA 才找得到'),
-      todo('V4.5', '取得素材當下記來源：AI 生圖、圖庫、自己上傳（上傳要勾「有權使用」）'),
+      done('V4.4', '做影片時把腳本存進紀錄，編輯 QA 才找得到', V4A),
+      done('V4.5', '取得素材當下記來源：AI 生圖、圖庫、自己上傳（上傳要勾「有權使用」）', V4A),
       todo('V4.6', '快速影片字幕用腳本＋配音時間點產生，不用筆電'),
       todo('V4.7', '字幕步驟依影片種類自動選做法；快速影片可直接改字幕'),
     ] },
