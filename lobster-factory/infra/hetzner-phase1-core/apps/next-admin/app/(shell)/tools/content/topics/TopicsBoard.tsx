@@ -3,7 +3,7 @@
 // Buttons and checkboxes only, no dropdowns (memory feedback_no_dropdowns_multiselect). Every change goes through
 // /api/content/topics*, which checks the site's organization; a stale page gets 409 and reloads.
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { NEXT, TOPIC_FORMATS, canReschedule, daysIn, taipeiParts, type Topic, type TopicFormat, type TopicStatus } from "@/lib/content/topics/store";
+import { MAX_BULK_TOPICS, NEXT, TOPIC_FORMATS, canReschedule, daysIn, taipeiParts, type Topic, type TopicFormat, type TopicStatus } from "@/lib/content/topics/store";
 import { planCostTwd, topicCostTwd } from "@/lib/content/topics/cost";
 import { DAILY_START_CAP, makesNow } from "@/lib/content/topics/tick";
 import { GridPicker } from "@/components/tools/GridPicker";
@@ -19,7 +19,16 @@ const T = {
   rejectSel: "退回所選",
   empty: "這個月還沒有題目。按「AI 提案本月題目」，或在下面自己加一題。",
   pick: "點左邊一個題目，這裡會顯示細節。",
-  add: "加一個題目",
+  add: "加題目",
+  addOneMode: "加一題",
+  addManyMode: "一次加多題",
+  manyHint: "一行一個關鍵字",
+  manyPlaceholder: "例：藝術治療是什麼\n焦慮時怎麼自我安撫\n親子溝通三個小技巧",
+  fromDay: "從幾號開始",
+  tooMany: `一次最多 ${MAX_BULK_TOPICS} 題，請刪掉幾行。`,
+  addMany: (n: number) => `加 ${n} 題`,
+  manyCost: (twd: number) => `加題目免費；排程做的時候每題約 NT$${twd}`,
+  manyDone: (n: number, skipped: string[]) => `加了 ${n} 題${skipped.length ? `；已排過略過：${skipped.join("、")}` : ""}。`,
   addBtn: "加入",
   title: "標題",
   keyword: "搜尋關鍵字",
@@ -99,6 +108,8 @@ export function TopicsBoard() {
   /** The selected topic's time being edited (Taipei); null = unchanged. */
   const [draftWhen, setDraftWhen] = useState<{ month: string; day: number; hour: number } | null>(null);
   const [dailyCap, setDailyCap] = useState(DAILY_START_CAP);
+  const [many, setMany] = useState(false);
+  const [lines, setLines] = useState("");
   const [fromFolder, setFromFolder] = useState<{ id: string; name: string } | null>(null);
   const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([]);
 
@@ -197,6 +208,20 @@ export function TopicsBoard() {
     } finally { await load(); setBusy(false); }
   }
 
+  const keywords = [...new Set(lines.split("\n").map((l) => l.trim()).filter(Boolean))];
+
+  async function addMany() {
+    if (!keywords.length || keywords.length > MAX_BULK_TOPICS) return;
+    setBusy(true); setNote("");
+    try {
+      const r = await fetch("/api/content/topics", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ siteId, month, keywords, fromDay: Math.min(add.day, daysIn(month)), hour: add.hour, formats: add.formats }) });
+      const j = await r.json() as { ok: boolean; added?: number; skipped?: string[]; error?: string };
+      if (j.ok) { setNote(T.manyDone(j.added ?? 0, j.skipped ?? [])); setLines(""); }
+      else setNote(j.error ?? `失敗（${r.status}）`);
+    } finally { await load(); setBusy(false); }
+  }
+
   if (!sites) return <p style={{ color: "var(--text-muted)" }}>…</p>;
   if (!sites.length) return <p style={{ color: "var(--text-muted)" }}>{T.noSites}</p>;
   const editable = sel && ["proposed", "approved"].includes(sel.status);
@@ -252,6 +277,29 @@ export function TopicsBoard() {
 
           <div style={{ ...card, display: "grid", gap: 8 }}>
             <div className="section-title" style={{ margin: 0 }}>{T.add}</div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button type="button" style={chip(!many)} onClick={() => setMany(false)}>{T.addOneMode}</button>
+              <button type="button" style={chip(many)} onClick={() => setMany(true)}>{T.addManyMode}</button>
+            </div>
+            {many && (
+              <>
+                <div style={{ fontSize: "var(--font-size-sm)", color: "var(--text-muted)" }}>{T.manyHint}</div>
+                <textarea id="topic-add-many" rows={6} placeholder={T.manyPlaceholder} value={lines} onChange={(e) => setLines(e.target.value)} />
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <span style={{ fontSize: "var(--font-size-sm)" }}>{T.fromDay}</span>
+                  <GridPicker value={Math.min(add.day, daysIn(month))} options={daysOf(month)} format={dayText} label={T.pickDay} columns={7} disabled={busy} onChange={(d) => setAdd({ ...add, day: d })} />
+                  <GridPicker value={add.hour} options={HOURS} format={hh} label={T.pickHour} disabled={busy} onChange={(h) => setAdd({ ...add, hour: h })} />
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                  {TOPIC_FORMATS.map((f) => <button key={f} type="button" style={chip(add.formats.includes(f))}
+                    onClick={() => setAdd({ ...add, formats: toggle(add.formats, f).length ? toggle(add.formats, f) : add.formats })}>{FORMAT[f]}</button>)}
+                  <button type="button" className="btn btn-secondary" disabled={busy || !keywords.length || keywords.length > MAX_BULK_TOPICS} onClick={() => void addMany()}>{T.addMany(keywords.length)}</button>
+                </div>
+                {keywords.length > MAX_BULK_TOPICS && <p style={{ margin: 0, color: "var(--yellow)", fontSize: "var(--font-size-sm)" }}>{T.tooMany}</p>}
+                <p style={{ margin: 0, fontSize: "var(--font-size-xs)", color: "var(--text-muted)" }}>{T.manyCost(topicCostTwd(add.formats).usual)}</p>
+              </>
+            )}
+            {!many && <>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <GridPicker value={Math.min(add.day, daysIn(month))} options={daysOf(month)} format={dayText} label={T.pickDay} columns={7} disabled={busy} onChange={(d) => setAdd({ ...add, day: d })} />
               <GridPicker value={add.hour} options={HOURS} format={hh} label={T.pickHour} disabled={busy} onChange={(h) => setAdd({ ...add, hour: h })} />
@@ -274,6 +322,7 @@ export function TopicsBoard() {
                 </div>
               </div>
             )}
+            </>}
           </div>
         </div>
 

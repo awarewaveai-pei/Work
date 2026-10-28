@@ -3,6 +3,8 @@
 //                                         offered as topic sources on the page)
 //   POST { siteId, month, title, keyword, angle?, day?, hour?, formats?, source?: "manual"|"kb", sourceRef? }  one proposed
 //        topic; day and hour are Taipei time (hour default 9)
+//   POST { siteId, month, keywords: string[], fromDay?, hour?, formats? }  one manual topic per line (max MAX_BULK_TOPICS),
+//        dates spread from fromDay to month end; answers { added, skipped: keywords already planned that month }
 //   GET also answers dailyCap: how many topics the brand may start a day (its content_pipeline limit on /ops/schedules)
 // The site decides the organization; the caller must be allowed on it (canAccessOrg), or the answer is 404.
 import { NextResponse } from "next/server";
@@ -12,7 +14,7 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { requestActor } from "@/lib/entitlements/subject";
 import { loadSiteBrand } from "@/lib/content/brand-voice-store";
 import { listFolders } from "@/lib/kb/folders";
-import { daysIn, fromTaipei, isMonth, listTopics, monthKey, proposeTopics, TOPIC_FORMATS, type TopicFormat } from "@/lib/content/topics/store";
+import { daysIn, fromTaipei, isMonth, listTopics, MAX_BULK_TOPICS, monthKey, proposeTopics, spreadDays, TOPIC_FORMATS, type TopicFormat } from "@/lib/content/topics/store";
 import { DAILY_START_CAP } from "@/lib/content/topics/tick";
 import { storedDailyLimit } from "@/lib/schedules/store";
 
@@ -55,12 +57,35 @@ export async function POST(req: Request): Promise<Response> {
   try { b = await req.json(); } catch { return new NextResponse("invalid json", { status: 400 }); }
   const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
   const month = str(b.month, 7);
+  const hour = b.hour === undefined ? 9 : Math.min(23, Math.max(0, Math.round(Number(b.hour) || 0)));
+  const formats = Array.isArray(b.formats) ? [...new Set(b.formats.filter((f): f is TopicFormat => (TOPIC_FORMATS as readonly string[]).includes(f as string)))] : [];
+  if (Array.isArray(b.keywords)) {
+    if (!isMonth(month)) return NextResponse.json({ ok: false, error: "month (YYYY-MM) required" }, { status: 400 });
+    const keywords = [...new Set(b.keywords.map((k) => str(k, 200)).filter(Boolean))];
+    if (!keywords.length || keywords.length > MAX_BULK_TOPICS) {
+      return NextResponse.json({ ok: false, error: `1 to ${MAX_BULK_TOPICS} keywords required` }, { status: 400 });
+    }
+    const fromDay = Math.min(daysIn(month), Math.max(1, Math.round(Number(b.fromDay) || 1)));
+    const days = spreadDays(month, keywords.length, fromDay);
+    try {
+      const s = await siteOrg(req, str(b.siteId, 64));
+      if ("res" in s) return s.res;
+      const added = await proposeTopics(s.sb, keywords.map((k, i) => ({
+        organization_id: s.org, site_id: str(b.siteId, 64), title: k, keyword: k, angle: null, source: "manual" as const, source_ref: {},
+        month: monthKey(month), scheduled_for: fromTaipei(month, days[i], hour),
+        formats: formats.length ? formats : ["article", "social"], created_by: requestActor(req),
+      })));
+      const made = new Set(added.map((t) => t.keyword));
+      return NextResponse.json({ ok: true, added: added.length, skipped: keywords.filter((k) => !made.has(k)) });
+    } catch (e) {
+      console.error("[content/topics] bulk add failed:", e);
+      return NextResponse.json({ ok: false, error: "topics could not be saved" }, { status: 500 });
+    }
+  }
   const title = str(b.title, 300);
   const keyword = str(b.keyword, 200);
   if (!isMonth(month) || !title || !keyword) return NextResponse.json({ ok: false, error: "month (YYYY-MM), title and keyword required" }, { status: 400 });
   const day = Math.min(daysIn(month), Math.max(1, Math.round(Number(b.day) || 1)));
-  const hour = b.hour === undefined ? 9 : Math.min(23, Math.max(0, Math.round(Number(b.hour) || 0)));
-  const formats = Array.isArray(b.formats) ? [...new Set(b.formats.filter((f): f is TopicFormat => (TOPIC_FORMATS as readonly string[]).includes(f as string)))] : [];
   const source = b.source === "kb" ? "kb" : "manual";
   const sourceRef = b.sourceRef && typeof b.sourceRef === "object" && !Array.isArray(b.sourceRef) ? b.sourceRef as Record<string, unknown> : {};
   try {

@@ -213,7 +213,7 @@ const LAYOUT_OPTIONS = [
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type Tab       = "generate" | "humanize" | "bulk" | "drafts";
+type Tab       = "generate" | "humanize" | "drafts";
 type GenStatus = "idle" | "streaming" | "done" | "error";
 type PubStatus = "idle" | "publishing" | "done" | "error";
 type SynStatus = "idle" | "generating" | "done" | "error";
@@ -328,23 +328,6 @@ interface DraftListItem {
   createdAt: string;
   updatedAt: string;
 }
-
-interface BulkRow {
-  id: number;
-  keyword: string;
-  status: "idle" | "running" | "done" | "error";
-  article: string;
-  error: string;
-  pubStatus: "idle" | "publishing" | "done" | "error";
-  pubUrl: string;
-  pubError?: string;
-  seoTitle?: string;
-  metaDesc?: string;
-  focusKeyword?: string;
-  truncated?: boolean;
-}
-
-type BulkSettings = Omit<GenerateForm, "keyword" | "title" | "scheduleDate" | "nlpKeywords" | "outline" | "internalLinks" | "referenceUrls">;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -748,28 +731,9 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
   const [humStatus,  setHumStatus]  = useState<HumStatus>("idle");
   const [humError,   setHumError]   = useState("");
 
-  // Bulk
-  const [bulkKeywords, setBulkKeywords] = useState("");
-  const [bulkRows,     setBulkRows]     = useState<BulkRow[]>([]);
-  const [bulkRunning,  setBulkRunning]  = useState(false);
-  const [bulkSettings, setBulkSettings] = useState<BulkSettings>({
-    language: "English", targetCountry: "全球（不指定）", articleType: "Pillar Article",
-    articleSize: "medium", tone: "Friendly", pointOfView: "none",
-    readability: "8th grade (recommended)", removeAiWords: "none", model: DEFAULT_AI_TEXT_MODEL,
-    details: "", externalLinks: "",
-    structure: { ...DEFAULT_STRUCTURE },
-    introHookBrief: "", introHookType: "",
-    media: { ...DEFAULT_MEDIA },
-    marketing: { ...DEFAULT_MARKETING },
-    generateMeta: false,
-    wpCategories: "", wpTags: "",
-    patternCount: 0,
-  });
-
   // Abort refs
   const abortRef     = useRef<AbortController | null>(null);
   const humAbortRef  = useRef<AbortController | null>(null);
-  const bulkAbortRef = useRef<AbortController | null>(null);
   const seoRunRef    = useRef(0);
   const imgRunRef    = useRef(0);
 
@@ -1880,87 +1844,6 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
     }
   }
 
-  // ─── Bulk generation ────────────────────────────────────────────────────
-
-  async function handleBulkRun() {
-    if (bulkRunning) { bulkAbortRef.current?.abort(); setBulkRunning(false); return; }
-    const kws = bulkKeywords.split("\n").map(k => k.trim()).filter(Boolean).slice(0, 10);
-    if (kws.length === 0) return;
-
-    const rows: BulkRow[] = kws.map((kw, i) => ({ id: i, keyword: kw, status: "idle", article: "", error: "", pubStatus: "idle", pubUrl: "" }));
-    setBulkRows(rows);
-    setBulkRunning(true);
-    const ac = new AbortController();
-    bulkAbortRef.current = ac;
-
-    for (let i = 0; i < rows.length; i++) {
-      if (ac.signal.aborted) break;
-      setBulkRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: "running" } : r));
-      try {
-        const res = await fetch("/api/content/generate", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...bulkSettings, keyword: rows[i].keyword }),
-          signal: ac.signal,
-        });
-        if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
-
-        const reader = res.body.getReader();
-        const dec    = new TextDecoder();
-        let text = "";
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          text += dec.decode(value, { stream: true });
-          setBulkRows(prev => prev.map((r, idx) => idx === i ? { ...r, article: text } : r));
-        }
-        text += dec.decode();
-        // Strip BOTH server markers before they reach the published post body (critic Major).
-        const bulkTruncated = /<!--\s*GENERATION_TRUNCATED:/.test(text);
-        const bulkClean = text.replace(/\n*<!--\s*GENERATION_(?:TRUNCATED|ERROR):[^>]*-->/g, "");
-        const bulkMeta  = extractMeta(bulkClean);
-        const finalText = stripSlugHint(stripMeta(bulkClean));
-        setBulkRows(prev => prev.map((r, idx) => idx === i ? {
-          ...r, status: "done", article: finalText, truncated: bulkTruncated,
-          seoTitle:     bulkMeta?.seoTitle,
-          metaDesc:     bulkMeta?.metaDesc,
-          focusKeyword: bulkMeta?.focusKeyword || rows[i].keyword,
-        } : r));
-      } catch (err) {
-        if ((err as Error).name === "AbortError") break;
-        setBulkRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: "error", error: String(err) } : r));
-      }
-    }
-    setBulkRunning(false);
-  }
-
-  async function handleBulkPublish(rowId: number) {
-    const row = bulkRows.find(r => r.id === rowId);
-    if (!row || !row.article.trim()) return;
-    setBulkRows(prev => prev.map(r => r.id === rowId ? { ...r, pubStatus: "publishing" } : r));
-    try {
-      const cats = bulkSettings.wpCategories.split(",").map(s => s.trim()).filter(Boolean);
-      const tags = bulkSettings.wpTags.split(",").map(s => s.trim()).filter(Boolean);
-      const res  = await fetch("/api/content/publish", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          markdown:        row.article,
-          slug:            slugify(row.keyword),
-          siteId:          selectedSiteId || undefined,
-          seoTitle:        row.seoTitle   || undefined,
-          metaDescription: row.metaDesc   || undefined,
-          focusKeyword:    row.focusKeyword || row.keyword,
-          categories:      cats.length ? cats : undefined,
-          tags:            tags.length ? tags : undefined,
-        }),
-      });
-      const json = await res.json().catch(() => ({ ok: false })) as { ok: boolean; edit_url?: string; error?: string };
-      if (json.ok) setBulkRows(prev => prev.map(r => r.id === rowId ? { ...r, pubStatus: "done", pubUrl: json.edit_url ?? "", pubError: undefined } : r));
-      else         setBulkRows(prev => prev.map(r => r.id === rowId ? { ...r, pubStatus: "error", pubError: json.error || `HTTP ${res.status}` } : r));
-    } catch {
-      setBulkRows(prev => prev.map(r => r.id === rowId ? { ...r, pubStatus: "error", pubError: "連線失敗" } : r));
-    }
-  }
-
   // ─── Computed ─────────────────────────────────────────────────────────────
 
   const isGenerating = genStatus === "streaming";
@@ -2269,9 +2152,9 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
 
       {/* ── Tab bar ── */}
       <div style={{ display: "flex", borderBottom: "1px solid var(--card-border)", marginBottom: "24px" }}>
-        {(["generate", "humanize", "bulk", "drafts"] as Tab[]).map(t => (
+        {(["generate", "humanize", "drafts"] as Tab[]).map(t => (
           <button key={t} style={tabStyle(activeTab === t)} onClick={() => setActiveTab(t)}>
-            {t === "generate" ? "產文" : t === "humanize" ? "人性化 / 改寫" : t === "bulk" ? "批量產文" : "📁 我的草稿"}
+            {t === "generate" ? "產文" : t === "humanize" ? "人性化 / 改寫" : "📁 我的草稿"}
           </button>
         ))}
       </div>
@@ -4145,149 +4028,6 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
                 placeholder="處理後文字將在此顯示…" />
             </div>
           )}
-        </div>
-      )}
-
-      {/* ══════════════ 批量產文頁籤 ══════════════ */}
-      {activeTab === "bulk" && (
-        <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: "20px" }}>
-
-          {/* 左：設定面板 */}
-          <div>
-            <div className="form-block" style={{ marginBottom: "16px" }}>
-              <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "10px", color: "var(--text-primary)" }}>
-                關鍵字列表
-                <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>（每行一個，最多 10 篇）</span>
-              </div>
-              <textarea className="form-textarea" style={{ minHeight: "180px" }}
-                value={bulkKeywords} onChange={e => setBulkKeywords(e.target.value)} disabled={bulkRunning}
-                placeholder={"藝術療癒\n表達藝術工作坊\n正念繪畫\n創意自我探索\n藝術與心理健康"} />
-            </div>
-
-            <div className="form-block" style={{ marginBottom: "16px" }}>
-              <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "10px", color: "var(--text-primary)" }}>共用設定</div>
-              {([
-                ["語言",       "language",    LANGUAGES.map(v => ({ value: v, label: v }))],
-                ["文章類型",   "articleType", ARTICLE_TYPES],
-                ["文章長度",   "articleSize", SIZES],
-                ["語氣風格",   "tone",        TONES],
-                ["AI 模型",    "model",       AI_MODELS],
-                ["AI 用詞清理","removeAiWords",[
-                  { value: "none", label: "關閉" },
-                  { value: "basic", label: "基本" },
-                  { value: "extended", label: "加強" },
-                ]],
-              ] as [string, string, {value: string; label: string}[]][]).map(([label, key, opts]) => (
-                <div key={key} style={{ marginBottom: "8px" }}>
-                  <label className="form-label">{label}</label>
-                  <select className="form-select"
-                    value={(bulkSettings as unknown as Record<string, string>)[key]}
-                    onChange={e => setBulkSettings(prev => ({ ...prev, [key]: e.target.value }))}
-                    disabled={bulkRunning}>
-                    {opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                </div>
-              ))}
-              <div style={{ marginBottom: "8px" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", cursor: "pointer", userSelect: "none" }}>
-                  <input type="checkbox"
-                    checked={bulkSettings.generateMeta}
-                    onChange={e => setBulkSettings(prev => ({ ...prev, generateMeta: e.target.checked }))}
-                    disabled={bulkRunning} />
-                  產生 SEO Meta（標題 / 摘要 / 關鍵字）
-                </label>
-                <div className="form-hint">開啟後批量發布時自動帶入 SEO 欄位</div>
-              </div>
-            </div>
-
-            <div className="form-block" style={{ marginBottom: "16px" }}>
-              <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "10px", color: "var(--text-primary)" }}>發布設定</div>
-              <div style={{ marginBottom: "8px" }}>
-                <label className="form-label">WP 分類（逗號分隔）</label>
-                <input className="form-input"
-                  value={bulkSettings.wpCategories}
-                  onChange={e => setBulkSettings(prev => ({ ...prev, wpCategories: e.target.value }))}
-                  disabled={bulkRunning}
-                  placeholder="療癒, 工作坊, 心理健康" />
-              </div>
-              <div>
-                <label className="form-label">WP 標籤（逗號分隔）</label>
-                <input className="form-input"
-                  value={bulkSettings.wpTags}
-                  onChange={e => setBulkSettings(prev => ({ ...prev, wpTags: e.target.value }))}
-                  disabled={bulkRunning}
-                  placeholder="藝術療癒, 正念, 自我成長" />
-              </div>
-            </div>
-
-            <button className="btn-primary" onClick={handleBulkRun}
-              disabled={!bulkKeywords.trim() && !bulkRunning}
-              style={{ width: "100%", padding: "10px", fontSize: "14px" }}>
-              {bulkRunning ? "⏹ 停止批量" : "▶ 開始批量產文"}
-            </button>
-            <div className="form-hint" style={{ marginTop: "6px", textAlign: "center" }}>逐篇串流，瀏覽器保持開啟</div>
-          </div>
-
-          {/* 右：進度面板 */}
-          <div>
-            {bulkRows.length === 0 && (
-              <div style={{ padding: "60px 40px", textAlign: "center", color: "var(--text-muted)", border: "1px dashed var(--card-border)", borderRadius: "8px" }}>
-                輸入關鍵字後按「開始批量產文」
-              </div>
-            )}
-            {bulkRows.length > 0 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                {bulkRows.map(row => (
-                  <div key={row.id} style={{ border: "1px solid var(--card-border)", borderRadius: "8px", overflow: "hidden" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
-                      padding: "10px 14px", background: "var(--bg-card, #fff)",
-                      borderBottom: row.article ? "1px solid var(--card-border)" : "none" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <span style={{
-                          fontSize: "11px", padding: "2px 8px", borderRadius: "20px", fontWeight: 600,
-                          background: row.status === "done" ? "#dcfce7" : row.status === "running" ? "#fef9c3" : row.status === "error" ? "#fee2e2" : "var(--bg-page, #f5f5f5)",
-                          color: row.status === "done" ? "#166534" : row.status === "running" ? "#713f12" : row.status === "error" ? "#991b1b" : "var(--text-muted)",
-                        }}>
-                          {row.status === "idle" ? "待處理" : row.status === "running" ? "產文中…" : row.status === "done" ? "✓ 完成" : "✗ 失敗"}
-                        </span>
-                        <span style={{ fontWeight: 500, fontSize: "13px" }}>{row.keyword}</span>
-                        {row.status === "done" && row.truncated && (
-                          <span title="文章可能被截斷，建議改短篇或拆主題重生成" style={{ fontSize: "11px", color: "#f59e0b", fontWeight: 500 }}>⚠ 截斷</span>
-                        )}
-                      </div>
-                      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                        {row.status === "done" && (
-                          <>
-                            <button className="btn-secondary" style={{ fontSize: "11px", padding: "3px 8px" }} onClick={() => void navigator.clipboard.writeText(row.article)}>複製</button>
-                            <button className="btn-secondary" style={{ fontSize: "11px", padding: "3px 8px" }} onClick={() => downloadMd(row.article, `${slugify(row.keyword)}.md`)}>↓ .md</button>
-                            {row.pubStatus === "idle" && (
-                              <button className="btn-primary" style={{ fontSize: "11px", padding: "3px 8px" }} onClick={() => void handleBulkPublish(row.id)}>推送 WP</button>
-                            )}
-                            {row.pubStatus === "publishing" && <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>推送中…</span>}
-                            {row.pubStatus === "done" && row.pubUrl && (
-                              <a href={row.pubUrl} target="_blank" rel="noreferrer" style={{ fontSize: "11px", color: "#22c55e" }}>✓ 草稿 ↗</a>
-                            )}
-                            {row.pubStatus === "error" && <span style={{ fontSize: "11px", color: "var(--color-error, #ef4444)" }}>推送失敗{row.pubError ? `：${row.pubError}` : ""}</span>}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    {row.article && (
-                      <textarea readOnly value={row.article}
-                        style={{ width: "100%", height: "180px", fontFamily: "monospace", fontSize: "11px",
-                          lineHeight: 1.5, padding: "10px", border: "none",
-                          background: "var(--bg-page, #f8f9fc)", resize: "vertical", boxSizing: "border-box", color: "var(--text-primary)" }} />
-                    )}
-                    {row.status === "error" && row.error && (
-                      <div style={{ padding: "8px 14px", fontSize: "12px", color: "var(--color-error, #ef4444)", borderTop: "1px solid var(--card-border)" }}>
-                        錯誤：{row.error}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
       )}
 

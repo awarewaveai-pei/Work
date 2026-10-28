@@ -76,6 +76,29 @@ describe("POST /api/content/topics", () => {
     expect((await POST(req("/api/content/topics", CLIENT_B, "POST", { siteId: "s1", month: "2026-11", title: "t", keyword: "k" }))).status).toBe(404);
     expect(m.proposeTopics).not.toHaveBeenCalled();
   });
+
+  it("keywords: trimmed, blanks and repeats dropped, one manual topic per line in one write; planned ones are reported skipped", async () => {
+    m.proposeTopics.mockResolvedValueOnce([{ keyword: "a" }]);
+    const r = await POST(req("/api/content/topics", STAFF, "POST", { siteId: "s1", month: "2026-11", keywords: ["a", " a ", "b", ""] }));
+    expect(await r.json()).toEqual({ ok: true, added: 1, skipped: ["b"] });
+    expect(m.proposeTopics).toHaveBeenCalledTimes(1);
+    const rows = m.proposeTopics.mock.calls[0][1];
+    expect(rows).toHaveLength(2);
+    expect(rows.map((x: { source: string }) => x.source)).toEqual(["manual", "manual"]);
+    expect(rows[0]).toMatchObject({ organization_id: "org-a", site_id: "s1", title: "a", keyword: "a", formats: ["article", "social"] });
+  });
+
+  it("0 or 31 keywords is 400 and nothing is written", async () => {
+    for (const keywords of [[], ["", " "], Array.from({ length: 31 }, (_, i) => `k${i}`)]) {
+      expect((await POST(req("/api/content/topics", STAFF, "POST", { siteId: "s1", month: "2026-11", keywords }))).status).toBe(400);
+    }
+    expect(m.proposeTopics).not.toHaveBeenCalled();
+  });
+
+  it("keywords for another organization's site are 404", async () => {
+    expect((await POST(req("/api/content/topics", CLIENT_B, "POST", { siteId: "s1", month: "2026-11", keywords: ["a"] }))).status).toBe(404);
+    expect(m.proposeTopics).not.toHaveBeenCalled();
+  });
 });
 
 describe("PATCH /api/content/topics/[id]", () => {

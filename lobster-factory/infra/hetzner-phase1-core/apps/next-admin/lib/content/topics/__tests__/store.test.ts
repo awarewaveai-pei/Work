@@ -1,6 +1,6 @@
 // content_topics store: moves only along NEXT, guarded by the status and version read; DB errors throw.
 import { describe, expect, it, vi } from "vitest";
-import { NEXT, TOPIC_STATUSES, TopicMoveRefused, canReschedule, fromTaipei, monthKey, move, proposeTopics, reschedule, startTopic, startedOn, taipeiParts } from "../store";
+import { NEXT, TOPIC_STATUSES, TopicMoveRefused, canReschedule, fromTaipei, monthKey, move, proposeTopics, reschedule, spreadDays, startTopic, startedOn, taipeiParts } from "../store";
 
 /** A query builder that records every filter and answers with `result`. */
 function fakeSb(result: { data?: unknown; error?: { message: string } | null; count?: number }) {
@@ -122,5 +122,14 @@ describe("proposeTopics / startedOn / monthKey", () => {
     expect(() => monthKey("nope")).toThrow();
     expect(() => monthKey("2026-13")).toThrow();          // a month that does not exist
     expect(() => monthKey("2026-00-10")).toThrow();
+  });
+});
+
+describe("spreadDays", () => {
+  it("n days from the start day to the month's end; past the end, days repeat", () => {
+    expect(spreadDays("2026-11", 3, 1)).toEqual([1, 11, 21]);
+    const late = spreadDays("2026-11", 5, 29);
+    expect(late).toHaveLength(5);
+    expect(late.every((d) => d >= 29 && d <= 30)).toBe(true);
   });
 });

@@ -88,6 +88,14 @@ export function fromTaipei(month: string, day: number, hour: number): string {
   return new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, day, hour) - TAIPEI_MS).toISOString();
 }
 
+/** Most keywords one "add many" call takes (POST /api/content/topics { keywords }). */
+export const MAX_BULK_TOPICS = 30;
+/** `n` days spread evenly from `fromDay` to the month's end; more topics than remaining days share a day. */
+export function spreadDays(month: string, n: number, fromDay: number): number[] {
+  const span = daysIn(month) - fromDay + 1;
+  return Array.from({ length: n }, (_, i) => fromDay + Math.floor((i * span) / n));
+}
+
 export async function listTopics(sb: SupabaseClient, organizationId: string, month: string): Promise<Topic[]> {
   const { data, error } = await sb.from("content_topics").select("*")
     .eq("organization_id", organizationId).eq("month", monthKey(month)).order("scheduled_for", { ascending: true, nullsFirst: false });
