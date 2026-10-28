@@ -16,7 +16,7 @@ Clocks that are not on this host's cron but that we set (handoffs/2026-10-25-sch
   - active n8n workflows with a schedule/cron trigger node (key n8n_<id>, name = workflow name);
   - reports another machine commits to the repo (cloud routines, the laptop's status reports): last = the newest commit
     of that path on /root/Work origin/main (fetched daily by other jobs), stale_after_s = how old it may get;
-  - GitHub Actions workflows with a schedule (key gha_<file>; latest completed scheduled run, public API, no token).
+  - GitHub Actions workflows with a schedule (key gha_<file>; latest scheduled/manual main-branch result).
 A collector that cannot read its source adds to external_errors (the page shows that as a failure), never an empty
 list; kept apart from errors, which means "this host's own schedules are only partly known".
 Writes OUT_FILE by rename (next-admin reads it at /host-status/host-schedules.json). Exit 0 written, 2 could not write.
@@ -167,15 +167,49 @@ def gha_workflow(file, text):
     return (file, name.group(1) if name else file, cron.group(1)) if cron else None
 
 
+def gha_decided_runs(runs):
+    """Only operational main-branch runs count. Creation order prevents an old rerun replacing a newer execution."""
+    return sorted((r for r in runs if r.get("event") in ("schedule", "workflow_dispatch")
+                   and r.get("head_branch") == "main" and r.get("status") == "completed"
+                   and r.get("conclusion") and r["conclusion"] not in ("cancelled", "skipped")),
+                  key=lambda r: (r.get("created_at", ""), r.get("id", 0)), reverse=True)
+
+
 def gha_entry(file, name, cron, runs_json):
-    """GitHub's latest decided scheduled run of one workflow -> entry (no run yet = no record). A run GitHub cancelled
-    or skipped (a late schedule superseded by the next one, a job's if:) says nothing about the job: passed over."""
-    run = next((r for r in runs_json.get("workflow_runs") or [] if r.get("conclusion") not in ("cancelled", "skipped")), None)
+    """Latest operational result; scheduled timestamps remain separate so a manual run cannot repair the clock."""
+    runs = gha_decided_runs(runs_json.get("workflow_runs") or [])
+    run = runs[0] if runs else None
+    scheduled = [r for r in runs if r["event"] == "schedule"]
     return {"source": "github:" + file, "schedule": cron, "key": "gha_" + slug(file.rsplit(".", 1)[0]), "name": name,
             "records_result": True, "log": run.get("html_url") if run else None,
             "last": done(run.get("updated_at"), run.get("conclusion") == "success") if run else None,
             # GitHub starts scheduled runs late and drops some under load: a sub-hourly schedule is late after 2 h.
-            **({"stale_after_s": 2 * 3600} if cron.split()[1:2] == ["*"] else {})}
+            # A manual rerun keeps event=schedule but updates updated_at; only creation proves the clock fired.
+            **({"stale_after_s": 2 * 3600,
+                "latest_scheduled_at": scheduled[0].get("created_at") if scheduled else None,
+                "previous_scheduled_at": scheduled[1].get("created_at") if len(scheduled) > 1 else None}
+               if cron.split()[1:2] == ["*"] else {})}
+
+
+def collect_gha_runs(file):
+    """Query events separately: unrelated push/PR runs cannot crowd operational results out of the first page."""
+    runs = []
+    for event, needed in (("schedule", 2), ("workflow_dispatch", 1)):
+        found = []
+        for page in range(1, 11):  # GitHub caps filtered searches at 1,000 results.
+            url = (f"https://api.github.com/repos/{GITHUB_REPO}/actions/workflows/{file}/runs"
+                   f"?event={event}&branch=main&status=completed&per_page=100&page={page}")
+            req = urllib.request.Request(url, headers={"User-Agent": "awarewave-host-schedules",
+                                                       "Accept": "application/vnd.github+json"})
+            with urllib.request.urlopen(req, timeout=20) as response:
+                batch = json.loads(response.read().decode("utf-8"))["workflow_runs"]
+            found.extend(gha_decided_runs(batch))
+            if len(found) >= needed or len(batch) < 100:
+                break
+        else:
+            raise ValueError(f"{event}: no decided result within GitHub's 1,000-run search limit")
+        runs.extend(found)
+    return {"workflow_runs": runs}
 
 
 def build(lines, run_parts, timers, records, drift, skipped, errors, now, external=(), external_errors=()):
@@ -331,8 +365,7 @@ def collect_external(errors):
             out.append(repo_report_entry(key, path, cadence, days, int(ts) if ts.isdigit() else None))
         except (OSError, subprocess.SubprocessError) as e:
             errors.append(f"repo {path}: {e}"[:200])
-    # GitHub Actions schedules: the workflow files on origin/main, each one's latest completed scheduled run from the
-    # public API (the repo is public: no token; one call per scheduled workflow, every 10 min, under the 60/h limit).
+    # Public API: normally two calls per workflow every 10 min (schedule + manual), under 60/h for this inventory.
     try:
         git = lambda *a: subprocess.run(["git", "-C", WORK_REPO, *a], capture_output=True, text=True,  # noqa: E731
                                         check=True, timeout=30).stdout
@@ -343,14 +376,9 @@ def collect_external(errors):
         errors.append(f"github workflows: {e}"[:200])
         flows = []
     for file, name, cron in flows:
-        url = (f"https://api.github.com/repos/{GITHUB_REPO}/actions/workflows/{file}/runs"
-               "?event=schedule&status=completed&per_page=5")
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "awarewave-host-schedules",
-                                                       "Accept": "application/vnd.github+json"})
-            with urllib.request.urlopen(req, timeout=20) as r:
-                out.append(gha_entry(file, name, cron, json.loads(r.read().decode("utf-8"))))
-        except (OSError, ValueError) as e:
+            out.append(gha_entry(file, name, cron, collect_gha_runs(file)))
+        except (OSError, ValueError, KeyError) as e:
             errors.append(f"github {file}: {e}"[:200])
     return out
 

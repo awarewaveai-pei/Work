@@ -1,5 +1,17 @@
 # Worklog
+## 2026-10-28（續5）— 排程通知翻轉修正（Codex）
 
+- 根因：`report-host-schedules.py:170-215` 僅採定時結果，漏掉安全掃描手動成功；GitHub probe 實際間隔4–6h，`host-schedules.ts:67` 單次遲到成功即恢復，產生紅綠翻轉。
+- 修正：結果採main有效schedule/manual；時鐘獨立採最近兩次schedule created_at（rerun不能刷新）；既有2h容忍不變，未連續準時維持同一stale事件。刪舊schedule-only API與過時token待辦；契約見 `docs/operations/SCHEDULES_PAGE_PLAN.md:53`。
+- 備份根因：Soulful WPvivid共用Drive OAuth專案quota，15次重試3秒無backoff；10/26 error log:1101–1125。每日主機R2備份/驗證正常。不改vendor或secret。
+- 補跑：`wpvivid-5fe96fdefa75a` 00:51:44Z Succeeded；Drive API獨立核對5/5分片、847003794B、size=manifest、MD5齊全；舊兩份仍在。MainWP官方同步後，cron-run backup_status_sync 00:53:33Z exit0、3B/3C/3D PASS。證據：soulful-wp `wp-content/wpvividbackups/wpvivid_log/wpvivid-5fe96fdefa75a_backup_log.txt:384-417`。
+- 邊界：free WPvivid無自有Drive OAuth入口，s3compat無R2獨立region；host R2為REST token非S3 key，不能直接移交。供應商quota仍可再發；每日R2獨立保護維持，未冒稱永久修好上游。
+- AUTO_TASK_DONE: schedule-clock-recovery — collector + shared page/alert judge + regression tests + contract
+- REALTEST_EVIDENCE: tool=Bash | cmd=真實GitHub API→collect_gha_runs→hostScheduleRowsFrom（安全掃描ok、probe維持stale）；tsc exit0；vitest Git Bash PATH maxWorkers4 3423pass/41skip/2todo；Python scoped17pass；verify-build-gates LobsterOnly pass | exit=0 | ms=56671
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n
+- 審查：`reports/oracle/2026-10-28-review-5916c97c.md`；Claude SDK API USD0.654，修正rerun更新updated_at問題後approve。首次全測因Windows bash shim/並行timeout失敗，改正執行環境後全綠，未改測試門檻。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=latest_scheduled_at|previous_scheduled_at|event=schedule&status=completed | hits=5 files
+- 編碼：cross-Drive BOM clean；diff --check pass。Rollback：revert本次source＋正常sg-deploy；沒有DB/cron/secret變更。
 ## 2026-10-28（續4）— supabase-awarewave-postgres MCP 自己開 SSH 通道（Claude）
 
 - **根因**：DSN 指 `127.0.0.1:5432`＝通往 ks-aw-01 的 SSH 通道，但沒有任何程式會開它（只有文件叫人手動跑 `open-supabase-ssh-tunnel.ps1`）；筆電睡眠也會斷。症狀 `ECONNREFUSED 127.0.0.1:5432`。另：通道腳本固定轉 5432/3000/8000＋`ExitOnForwardFailure`，本機 dev server 佔 3000 就整條失敗。
@@ -6078,6 +6090,15 @@
 - AUTO_TASK_DONE: ADR017 step1 done; supervisor 1/9, same private preview URL pending Claude republish.
 - rollback：git revert狀態commit；實作獨立revert 1ef1ee419。無prod部署。
 
+
+## 2026-10-28
+
+### Daily
+- AUTO_TASK_DONE: schedule-clock-recovery；細節與備份證據見本日續5。
+- REALTEST_EVIDENCE: tool=Bash | cmd=GitHub API→collector→page judge；tsc；3423 vitest pass；17 Python pass；Lobster build gates pass | exit=0 | ms=56671
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=latest_scheduled_at|previous_scheduled_at|event=schedule&status=completed | hits=5 files
+- WORKLOG_DONE: 續5；oracle 2026-10-28-review-5916c97c.md。
 
 ## 2026-10-27
 

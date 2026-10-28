@@ -21,6 +21,9 @@ interface HostEntry {
   name?: string;
   /** Overrides the cadence's staleness (a report that may be N days old). */
   stale_after_s?: number;
+  /** Scheduled clock evidence, separate from a manual retry's result. */
+  latest_scheduled_at?: string | null;
+  previous_scheduled_at?: string | null;
   last: { started_at: string | null; finished_at: string | null; exit_code: number | null } | null;
 }
 
@@ -64,6 +67,15 @@ function judge(e: HostEntry, intervalMs: number | null, now: number): Pick<Syste
   if (!e.last || !at || Number.isNaN(Date.parse(at))) return { state: "missing", detail: HOST_UI.detail_no_record, lastAt: null };
   if (e.last.exit_code !== 0) return { state: "failed", detail: fill(HOST_UI.detail_exit, { code: e.last.exit_code ?? "?" }), lastAt: at };
   const staleMs = e.stale_after_s ? e.stale_after_s * 1000 : intervalMs !== null ? staleAfterMs(intervalMs) : null;
+  // A lone late run proves execution, not a healthy clock. Require a timely pair before recovery.
+  if (e.source.startsWith("github:") && staleMs !== null && "latest_scheduled_at" in e) {
+    const latest = Date.parse(e.latest_scheduled_at ?? "");
+    const previous = Date.parse(e.previous_scheduled_at ?? "");
+    if (!Number.isFinite(latest) || !Number.isFinite(previous) || latest > now || previous >= latest ||
+        now - latest > staleMs || latest - previous > staleMs) {
+      return { state: "stale", detail: HOST_UI.detail_github_clock, lastAt: at };
+    }
+  }
   if (staleMs !== null && now - Date.parse(at) > staleMs) return { state: "stale", detail: "", lastAt: at };
   return { state: "ok", detail: "", lastAt: at };
 }

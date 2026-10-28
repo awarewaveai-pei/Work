@@ -70,7 +70,7 @@ export const HOST_JOBS: Record<string, HostJob> = {
  * n8n_backup must still show as unregistered. */
 export const HOST_FAMILIES: Array<{ source: string; label: string; description: string; fail: string }> = [
   { source: "pg_cron:", label: "資料庫排程：{name}", description: "Supabase 資料庫內建排程（pg_cron）「{name}」，結果取自資料庫的執行紀錄。", fail: "最近一次執行失敗時，本列標示失敗並推播。" },
-  { source: "github:", label: "GitHub 定時檢查：{name}", description: "GitHub Actions 依排程執行的「{name}」，結果取自 GitHub 最近一次排程執行。", fail: "最近一次執行失敗時，本列標示失敗並推播；GitHub 也會寄信給你。" },
+  { source: "github:", label: "GitHub 定時檢查：{name}", description: "GitHub Actions 的「{name}」，結果取自主要分支最近一次定時或手動執行；手動成功不代表定時執行已恢復。", fail: "工作失敗或定時執行延遲時推播；延遲代表檢查沒有按時執行，不能據此判定主機故障。" },
   { source: "n8n:", label: "n8n 流程：{name}", description: "n8n 中已啟用、由時間觸發的流程「{name}」，結果取自 n8n 的執行紀錄。", fail: "最近一次執行失敗時，本列標示失敗並推播。" },
 ];
 
@@ -108,6 +108,7 @@ export const HOST_UI = {
   external_errors_desc: "以下來源暫時無法讀取，這些來源的排程狀態未知：{errors}",
   digest_quiet: "ℹ️ 筆電與雲端有 {n} 項過時（筆電關機時屬正常，不推播）",
   detail_timer_stopped: "主機上的計時器已停止，這個排程不會再執行。",
+  detail_github_clock: "GitHub 尚未連續按時執行檢查；這代表探測排程不穩定，不能據此判定主機故障。",
   detail_exit_always_zero: "這個工作失敗時不會回報，本頁只能確認它有按時執行。",
   fail_default: "執行失敗時，本頁會標示「執行失敗」。",
 } as const;

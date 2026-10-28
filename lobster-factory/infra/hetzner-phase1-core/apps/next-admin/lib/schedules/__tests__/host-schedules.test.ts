@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { cronCadence } from "../cron-cadence";
 import { HOST_JOBS } from "../host-jobs";
+import { planAlerts } from "../alerts";
 import { hostScheduleRows, hostScheduleRowsFrom, type HostSchedulesDoc } from "../adapters/host-schedules";
 
 const NOW = Date.parse("2026-10-24T12:00:00Z");
@@ -118,6 +119,40 @@ describe("hostScheduleRowsFrom", () => {
   it("a host cron line keyed like a family is still unregistered", () => {
     const rows = hostScheduleRowsFrom(doc([ent("n8n_backup", { started_at: iso(H), finished_at: iso(H), exit_code: 0 })]), NOW);
     expect(rows.find((r) => r.key.includes("n8n_backup"))?.state).toBe("unregistered");
+  });
+
+  it("isolated late GitHub runs do not repeatedly announce clock recovery", () => {
+    const key = "gha_host_liveness_probe";
+    const episode = [{ id: "incident", key, title: "GitHub 定時檢查：Host liveness probe" }];
+    // Actual 2026-10-27 gaps: 5h55m, 5h35m, 4h04m; all probes succeeded.
+    for (const gap of [5.92, 5.58, 4.07]) {
+      const rows = hostScheduleRowsFrom(doc([ent(key, { started_at: null, finished_at: iso(60_000), exit_code: 0 }, {
+        source: "github:host-liveness-probe.yml", schedule: "*/5 * * * *", stale_after_s: 7200,
+        latest_scheduled_at: iso(60_000), previous_scheduled_at: iso(60_000 + gap * H),
+      })]), NOW);
+      expect(row(rows, key)).toMatchObject({ state: "stale", detail: expect.stringContaining("GitHub") });
+      expect(planAlerts(rows, episode)).toEqual({ red: [], recovered: [] });
+    }
+  });
+
+  it("a manual success does not make a stalled GitHub clock healthy", () => {
+    const rows = hostScheduleRowsFrom(doc([ent("gha_probe", { started_at: null, finished_at: iso(1000), exit_code: 0 }, {
+      source: "github:probe.yml", schedule: "*/5 * * * *", stale_after_s: 7200,
+      latest_scheduled_at: iso(3 * H), previous_scheduled_at: iso(3 * H + 300_000),
+    })]), NOW);
+    expect(row(rows, "gha_probe")?.state).toBe("stale");
+  });
+
+  it("two timely GitHub runs recover the clock, but a failed probe stays failed", () => {
+    const key = "gha_probe";
+    const entry = (exit_code: number) => ent(key, { started_at: null, finished_at: iso(60_000), exit_code }, {
+      source: "github:probe.yml", schedule: "*/5 * * * *", stale_after_s: 7200,
+      latest_scheduled_at: iso(60_000), previous_scheduled_at: iso(360_000),
+    });
+    const rows = hostScheduleRowsFrom(doc([entry(0)]), NOW);
+    expect(row(rows, key)?.state).toBe("ok");
+    expect(planAlerts(rows, [{ id: "incident", key, title: "probe" }]).recovered).toHaveLength(1);
+    expect(row(hostScheduleRowsFrom(doc([entry(1)]), NOW), key)?.state).toBe("failed");
   });
 
   it("an off-host source that cannot be read is its own failure and does not stale the host's jobs", () => {

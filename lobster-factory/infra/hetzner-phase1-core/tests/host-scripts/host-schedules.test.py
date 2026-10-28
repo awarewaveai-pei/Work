@@ -4,6 +4,7 @@ repo root:
 SRC=<report-host-schedules.py> tests a mutated copy."""
 import glob
 import importlib.util
+import io
 import json
 import re
 import os
@@ -11,6 +12,8 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
+from urllib.parse import parse_qs, urlparse
 
 SCRIPTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "scripts")
 SRC = os.environ.get("SRC") or os.path.join(SCRIPTS, "report-host-schedules.py")
@@ -82,6 +85,11 @@ class Reporter(unittest.TestCase):
 class External(unittest.TestCase):
     """Clocks off this host's cron (C5): every one becomes an entry the page can judge, with its last outcome."""
 
+    @staticmethod
+    def gha_run(at, conclusion="success", **extra):
+        return {"event": "schedule", "head_branch": "main", "status": "completed", "conclusion": conclusion,
+                "created_at": at, "updated_at": at, **extra}
+
     def test_pg_cron_rows(self):
         got = rhs.pg_cron_entries("archive-stale-repair-runs\t0 2 * * *\tfailed\t2026-10-24T02:00:13Z\nnew job\t*/5 * * * *\t\t\n")
         self.assertEqual([(e["key"], e["name"], e["schedule"]) for e in got],
@@ -110,14 +118,67 @@ class External(unittest.TestCase):
         w = rhs.gha_workflow("host-liveness-probe.yml",
                              "\n".join(["name: Host liveness probe", "on:", "  schedule:", '    - cron: "*/5 * * * *"']))
         self.assertEqual(w, ("host-liveness-probe.yml", "Host liveness probe", "*/5 * * * *"))
-        e = rhs.gha_entry(*w, {"workflow_runs": [{"conclusion": "failure", "updated_at": "2026-10-25T14:00:00Z", "html_url": "u"}]})
+        e = rhs.gha_entry(*w, {"workflow_runs": [self.gha_run("2026-10-25T14:00:00Z", "failure", html_url="u")]})
         self.assertEqual((e["key"], e["source"], e["last"]["exit_code"], e["stale_after_s"]), ("gha_host_liveness_probe", "github:host-liveness-probe.yml", 1, 7200))
-        runs = {"workflow_runs": [{"conclusion": "cancelled", "updated_at": "2026-10-25T14:05:00Z"},
-                                  {"conclusion": "success", "updated_at": "2026-10-25T14:00:00Z"}]}
+        runs = {"workflow_runs": [self.gha_run("2026-10-25T14:05:00Z", "cancelled"),
+                                  self.gha_run("2026-10-25T14:00:00Z")]}
         self.assertEqual(rhs.gha_entry(*w, runs)["last"]["exit_code"], 0)  # a superseded run says nothing
         weekly = rhs.gha_entry("a.yml", "A", "30 1 * * 1", {"workflow_runs": []})
         self.assertIsNone(weekly["last"])
         self.assertNotIn("stale_after_s", weekly)
+
+    def test_manual_result_does_not_refresh_scheduled_clock(self):
+        runs = [self.gha_run("2026-10-26T01:00:00Z", "failure"), self.gha_run("2026-10-25T20:00:00Z"),
+                self.gha_run("2026-10-26T09:11:00Z", event="workflow_dispatch", html_url="manual")]
+        e = rhs.gha_entry("probe.yml", "Probe", "*/5 * * * *", {"workflow_runs": runs})
+        self.assertEqual((e["last"]["exit_code"], e["last"]["finished_at"], e["log"]),
+                         (0, "2026-10-26T09:11:00Z", "manual"))
+        self.assertEqual((e["latest_scheduled_at"], e["previous_scheduled_at"]),
+                         ("2026-10-26T01:00:00Z", "2026-10-25T20:00:00Z"))
+
+    def test_only_latest_completed_operational_main_run_replaces_result(self):
+        older = self.gha_run("2026-10-25T01:00:00Z", updated_at="2026-10-27T01:00:00Z")
+        latest = self.gha_run("2026-10-26T01:00:00Z", "failure")
+        ignored = [self.gha_run("2026-10-28T01:00:00Z", **fields) for fields in (
+            {"event": "push"}, {"event": "pull_request"}, {"head_branch": "fix"},
+            {"status": "in_progress", "conclusion": None}, {"conclusion": "cancelled"}, {"conclusion": "skipped"})]
+        e = rhs.gha_entry("a.yml", "A", "30 1 * * 1", {"workflow_runs": [older, *ignored, latest]})
+        self.assertEqual(e["last"], rhs.done("2026-10-26T01:00:00Z", False))
+
+    def test_rerun_does_not_refresh_scheduled_clock(self):
+        runs = [self.gha_run("2026-10-26T01:00:00Z", updated_at="2026-10-26T09:00:00Z"),
+                self.gha_run("2026-10-26T05:00:00Z", updated_at="2026-10-26T09:01:00Z")]
+        e = rhs.gha_entry("probe.yml", "Probe", "*/5 * * * *", {"workflow_runs": runs})
+        self.assertEqual((e["latest_scheduled_at"], e["previous_scheduled_at"]),
+                         ("2026-10-26T05:00:00Z", "2026-10-26T01:00:00Z"))
+        self.assertEqual(e["last"]["finished_at"], "2026-10-26T09:01:00Z")
+
+    def test_github_queries_events_separately_and_pages_past_cancelled_runs(self):
+        requested = []
+
+        def fetch(req, timeout):
+            q = parse_qs(urlparse(req.full_url).query)
+            requested.append(q)
+            self.assertEqual((q["branch"], q["status"], q["per_page"]), (["main"], ["completed"], ["100"]))
+            if q["event"] == ["workflow_dispatch"]:
+                runs = [self.gha_run("2026-10-26T09:00:00Z", event="workflow_dispatch")]
+            elif q["page"] == ["1"]:
+                runs = [self.gha_run("2026-10-27T01:00:00Z", "cancelled")] * 100
+            else:
+                runs = [self.gha_run("2026-10-26T01:00:00Z", "failure"), self.gha_run("2026-10-25T01:00:00Z")]
+            return io.BytesIO(json.dumps({"workflow_runs": runs}).encode())
+
+        with patch.object(rhs.urllib.request, "urlopen", side_effect=fetch):
+            result = rhs.collect_gha_runs("a.yml")
+        self.assertEqual([(q["event"][0], q["page"][0]) for q in requested],
+                         [("schedule", "1"), ("schedule", "2"), ("workflow_dispatch", "1")])
+        self.assertEqual(len(result["workflow_runs"]), 3)
+
+    def test_github_search_limit_is_unknown_instead_of_missing(self):
+        batch = {"workflow_runs": [self.gha_run("2026-10-27T01:00:00Z", "cancelled")] * 100}
+        with patch.object(rhs.urllib.request, "urlopen", side_effect=lambda *a, **k: io.BytesIO(json.dumps(batch).encode())):
+            with self.assertRaisesRegex(ValueError, "1,000-run search limit"):
+                rhs.collect_gha_runs("a.yml")
 
     def test_external_errors_kept_apart(self):
         doc = rhs.build([], [], [], {}, [], [], [], 0, [], ["n8n: down"])
