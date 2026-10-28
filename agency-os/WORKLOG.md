@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-28（續27）— video-service 部署 V4.8；刪影片連 videoclean/ 底片一起刪（Claude；操作者「全部做好」）
+
+- 部署：push 988197b20 → 主機 ff → `docker tag lobster-video-service:local :pre-20261028-v48` → rsync → `up -d --build`（running jobs 0）。
+- 補洞：`NA/lib/storage/r2.ts` `deleteVideoObjects` 列舉 `video/<dir>/` 與 `videoclean/<dir>/` 兩個前綴後全刪（不變量：一支影片＝兩個前綴；V4.8 工人回報刪片留底片孤兒）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec -w /app lobster-video-service python -m unittest discover -s tests → 38 OK（含 test_caption_reburn）；healthy restarts=0；next-admin→/health capabilities.caption_reburn=true | exit=0 | ms=23731
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run r2-delete-guard.test.ts get-no-side-effects.test.ts → 21 passed；tsc 本檔 0（另有 .next/types 指向他 session 刪除的 calendar 頁，非本次） | exit=0 | ms=300000
+- REVIEW_WAIVED: NA -- 兩行迴圈包裝，讀回確認；V4.8 程式見續26
+- ORACLE_WAIVED: Codex 不可用（同日續6）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=videoclean | hits=4（video-service 寫入／重燒驗證、video-pipeline 註解、r2.ts 刪除，皆一致）
+- rollback：`docker tag lobster-video-service:pre-20261028-v48 lobster-video-service:local` → `up -d --no-build`；程式 revert。
 ## 2026-10-28（續26）— 影片 V4.8：改字幕後重燒（保留無字幕底片＋video-service 重燒端點）（Claude）— 待操作者 go-ahead 部署 video-service，未 push
 
 - **根因**：V4.7 只能看／下載字幕；快速影片的字幕是渲染時逐場景 `drawtext` 烤進片裡，改字幕等於整支重做。

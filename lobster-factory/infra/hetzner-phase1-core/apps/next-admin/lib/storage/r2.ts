@@ -299,13 +299,15 @@ export async function deleteVideoObjects(
   const base = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucket}`;
   const headers = { Authorization: `Bearer ${apiToken}` };
 
-  // 1) List all objects under video/<dir>/ (authoritative, immune to format-name drift).
+  // 1) List all objects under video/<dir>/ and its caption-less copies videoclean/<dir>/ (V4.8): one video = both
+  //    prefixes, so a delete never leaves the clean copy behind. Listing is authoritative, immune to format-name drift.
   const keys: string[] = [];
+  for (const prefix of [`video/${dir}/`, `videoclean/${dir}/`]) {
   let cursor: string | undefined;
   do {
     const u = new URL(`${base}/objects`);
     u.searchParams.set("per_page", "100");
-    u.searchParams.set("prefix", `video/${dir}/`);
+    u.searchParams.set("prefix", prefix);
     if (cursor) u.searchParams.set("cursor", cursor);
     let listRes: Response;
     try {
@@ -318,6 +320,7 @@ export async function deleteVideoObjects(
     for (const o of j.result ?? []) keys.push(o.key);
     cursor = j.result_info?.is_truncated ? j.result_info.cursor : undefined;
   } while (cursor);
+  }
 
   // 2) Delete each object found (idempotent — 404 treated as success).
   let deleted = 0;
