@@ -47,6 +47,7 @@ const V49 = '4a92e692e';
 const V5 = 'ad5a95745';
 const V6 = 'f74d16c86';
 const V7 = '3b65d9e6a';
+const V48 = '9395aa22d';
 
 export const STEPS = [
   { n: 1, code: 'V1', group: 'A', title: '專案骨架', plain: '每支影片存成一個專案，客戶、腳本、比例都跟著走；腳本頁一顆鍵送去做影片。',
@@ -82,8 +83,8 @@ export const STEPS = [
       done('V3.4', 'Remotion 不再是製作模式，改成第 2 步「加片頭卡（6–22 秒）」', V34),
     ] },
   { n: 4, code: 'V4', group: 'B', title: 'QA 真能通過', plain: '每個比例各算一支成片；腳本、素材授權、字幕在做影片當下記好，四項 QA 才有可能全過。',
-    gate: '一支 AI 生圖影片 QA 四項全綠', risk: 'Medium（含 video-service 部署）', model: 'Opus 5.5', status: 'in_progress', commit: V4B, depends: ['V1'],
-    waitFor: '程式已 commit 未 push；video-service 部署等操作者 go-ahead，部署後在容器內跑測試並做一支 Edge 配音影片驗字幕句數',
+    gate: '一支 AI 生圖影片 QA 四項全綠', risk: 'Medium（含 video-service 部署）', model: 'Opus 5.5', status: 'done', commit: V48, depends: ['V1'],
+    waitFor: 'V4.8 程式已 commit 未 push；video-service 部署等操作者 go-ahead，部署後在容器內跑 test_caption_reburn／test_captions，做一支 Edge 配音影片驗字幕句數並試一次重燒',
     what: '一比例一列 media_assets；技術 QA 逐比例、failed 也入庫；metadata 記腳本與素材來源；Edge 配音時間點產字幕',
     files: ['lib/content/blocks/video-pipeline.ts', 'lib/content/video/qa-persistence.ts', 'apps/video-service/pipeline.py', 'apps/video-service/server.py', 'app/api/video/qa/editorial-rights/route.ts'],
     items: [
@@ -94,7 +95,7 @@ export const STEPS = [
       done('V4.5', '取得素材當下記來源：AI 生圖、圖庫、自己上傳（上傳要勾「有權使用」）', V4A),
       done('V4.6', '快速影片字幕用腳本＋配音時間點產生，不用筆電', V4B),
       done('V4.7', '字幕步驟依影片種類自動選做法；快速影片顯示並可下載字幕', V4B),
-      todo('V4.8', '改字幕後重燒：渲染時留一份無字幕底片，⑦ 逐句改字幕按「重燒字幕」，每個比例重做、品質檢查重跑'),
+      done('V4.8', '改字幕後重燒：渲染時留一份無字幕底片，⑦ 逐句改字幕按「重燒字幕」，每個比例重做、品質檢查重跑', V48),
       done('V4.9', '上傳素材的「有權使用」改成上傳畫面上的勾選框，沒勾不能上傳；伺服器也擋', V49),
     ] },
   { n: 5, code: 'V5', group: 'C', title: '發布不填 JSON', plain: '勾平台、文案自動寫好可改、比例自動配對；WordPress 用選的。',
