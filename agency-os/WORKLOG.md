@@ -1,4 +1,25 @@
 # Worklog
+## 2026-10-28（續10）— 圖片／影片／修圖工具模型納入登錄表；抓到 dall-e-3 與 Luma Ray 2 已下架（Claude）
+
+- **根因**：續3 的登錄表只管文字模型。圖片、影片、修圖工具的模型名稱（Replicate owner/name、釘死的 version、OpenAI 圖片模型）沒有登錄，也沒人實測。實測後發現三個已經壞掉、沒人察覺：
+  - C1 `video-service/config.py:31` 預設 `dall-e-3` → OpenAI 404 "does not exist"。`pipeline.py` generate_scene_image 把例外吞掉改畫純色背景，所以模式 A 影片的場景圖默默變成色塊。主機 `lobster-video-service` 沒設 IMAGE_MODEL（`docker exec printenv` exit 1），確實在用預設。
+  - C2 `lib/tarot/video-motion-gen.ts` 的 `luma/ray-flash-2-720p`、`luma/ray-2-720p` → Replicate 404。Replicate 上 Luma 只剩 `luma/ray-3.2`。
+- **做了**（NA＝next-admin）：
+  - `NA/lib/ai/cost-model.ts` 新增 `MEDIA_MODELS`：以供應商看到的名稱為鍵（vendor／kind／status active|retired／version／verifiedAt），共 25 列，每列一行（探針以文字解析）。價格仍留在 IMAGE_RATES／VIDEO_MOTION_RATES／TOOL_RATES。VIDEO_MOTION_RATES 移除兩個 Luma。
+  - `NA/lib/tarot/video-motion-gen.ts`：VideoMotionModel 與 MOTION_MODELS 移除 Luma。影片工具選單由 VIDEO_MOTION_RATES 產生，所以跟著消失；舊請求帶 Luma 時，`isVideoMotionModel` 回 false → 不套動態（原本會 404）。
+  - `video-service/config.py`、`pipeline.py`：預設改 `gpt-image-2`、1536x1024、quality low，讀 `b64_json`（gpt-image 不回 url）；純色備援改用 IMAGE_SIZE；成本估算鍵 `dalle3_images`→`scene_images`（全 repo 無讀取者）。
+  - `NA/scripts/probe-models.mjs`：解析 MEDIA_MODELS，每列打一次免費 metadata GET（Replicate `/v1/models/<slug>[/versions/<v>]`、OpenAI `/v1/models/<id>`），不生圖。金鑰加 `REPLICATE_API_TOKEN`（主機容器已有）。
+  - `NA/lib/ai/__tests__/model-registry.test.ts`：(d) slug／fluxModel／`/v1/models/` 的 Replicate 名稱必須是 active 列；(e) 64 位 hex 釘版必須是 active 列的 version；(f) dall-e-*／gpt-image-* 必須是 active 列；解析器一致性加 MEDIA_MODELS。文字守衛的允許清單移除 gpt-image-2（改由 MEDIA_MODELS 承認）。
+  - 文件：`video-service/README.md` 兩處 DALL-E；`NA/lib/ai/model-comparison.ts` Luma 列註明下架；`auto-deploy-next-admin.sh` 警報文字補「retired（圖片／影片）」。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scripts/probe-models.mjs --include-legacy --write-verified（cc.py 金鑰來源）→ failures=[]；media 21 active 全 200、dall-e-3 404、兩個 Luma 404；gemini-flash-latest 逾時（Google 503 高需求，fallback ok）；21 列蓋 verifiedAt | exit=0 | ms=60875
+- REALTEST_EVIDENCE: tool=Bash | cmd=video-service .venv 以 config.py 設定真打 images.generate(gpt-image-2, 1536x1024, low) → b64 1,199,937 bytes、PIL (1536,1024)、圖已目視 | exit=0 | ms=11914
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/ai lib/content/blocks/__tests__/image-style-design-workbench.test.ts → 9 files 72 passed；ai-cost-logged 4 passed；npx tsc --noEmit exit 0；video-service unittest 29 OK（3 skipped）；py_compile pipeline/config/server ok；bash -n ok | exit=0 | ms=9000
+- 突變：video-service config.py 預設改回 dall-e-3 → (f) 紅（`..\video-service\config.py: dall-e-3`，1 failed/6 passed）→ 備份還原 → 7/7 綠。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/2n（書面自審 n1：(d) 只認 slug／fluxModel／`/v1/models/` 寫法，新模組若用別的屬性名放 owner/name 會漏；n2：場景圖 quality low 比 dall-e standard 便宜一半但細節較少）
+- ORACLE_WAIVED: codex-oracle.ps1 本 session 兩次 no final message（raw log 0 bytes，續3），同日另一 session 同症狀；依 §5 同法兩敗即停，改書面自審＋上列突變紅→綠。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=luma-ray|luma/ray-(flash-)?2|dall-e-3|dalle3_images|DALL-E | hits=17（agency-os/docs/video_generator 舊稿與 _archive、CONTENT_PIPELINE_BLOCKS_MASTER_PLAN 歷史決策＝不回改；video-service README 2 處與 model-comparison Luma 列已修；cost-model 與 probe 註解為登錄本身）
+- **剩餘風險**：①Luma 下架後沒有補新的動態模型；`luma/ray-3.2` 的價格與 input schema 沒查，要不要加由操作者決定。②video-service 改動要等該服務下次部署才生效（`sg-deploy.sh video-service`，High，不在本次）。③next-admin 部分今晚 03:00 自動部署。
+- **rollback**：`git revert <本 commit>`。
 ## 2026-10-28（續9）— 影片工具 V2 結果頁（Claude Opus；V2.1／V2.2 派 Sonnet fullstack-engineer）
 
 - **卡**：`agency-os/docs/video_generator/VIDEO_TOOL_REDESIGN_2026-10-26.md` §7 V2.1–V2.3。

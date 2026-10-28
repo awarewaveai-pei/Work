@@ -1,14 +1,15 @@
 #!/usr/bin/env node
-// probe-models.mjs -- one minimal real request per active text model in lib/ai/cost-model.ts TEXT_RATES, so a
-// vendor retiring an id (gemini-2.0-flash-lite, 404 since 2026-10-24, nobody noticed) fails loudly.
+// probe-models.mjs -- one minimal real request per active text model in lib/ai/cost-model.ts TEXT_RATES, and one free
+// metadata GET per active image/video/tool model in MEDIA_MODELS (no image is generated), so a vendor retiring an id
+// (gemini-2.0-flash-lite 2026-10-24; dall-e-3 and Luma Ray 2 found 2026-10-28) fails loudly.
 //
 //   node scripts/probe-models.mjs                    JSON report on stdout
 //   node scripts/probe-models.mjs --include-legacy   also probe legacy/retired rows (they never set the exit code)
 //   node scripts/probe-models.mjs --write-verified   stamp verifiedAt=today on rows that answered (laptop only)
 //   node scripts/probe-models.mjs --registry <file>  read TEXT_RATES from another copy of cost-model.ts
 //
-// Exit 1 = some active id AND its fallback both failed (an active id without a fallback fails alone).
-// Keys come from ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY only and are never printed.
+// Exit 1 = some active id AND its fallback both failed (an active id without a fallback -- every media row -- fails alone).
+// Keys come from ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY / REPLICATE_API_TOKEN only and are never printed.
 // Plain Node >= 20, no dependencies: the production image has no tsx, so the registry is read as text;
 // lib/ai/__tests__/model-registry.test.ts keeps this parser equal to the TS object.
 import { readFileSync, writeFileSync } from "node:fs";
@@ -18,22 +19,28 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_REGISTRY = path.join(HERE, "..", "lib", "ai", "cost-model.ts");
 const ROW = /^\s*"([^"]+)":\s*\{(.*)\},?\s*$/;
-const KEY_ENV = { Anthropic: "ANTHROPIC_API_KEY", OpenAI: "OPENAI_API_KEY", Google: "GEMINI_API_KEY" };
+const KEY_ENV = { Anthropic: "ANTHROPIC_API_KEY", OpenAI: "OPENAI_API_KEY", Google: "GEMINI_API_KEY", Replicate: "REPLICATE_API_TOKEN" };
 // Smallest output budget first; the next one only when the vendor rejects the budget itself.
 const BUDGETS = [1, 16, 64];
 const TIMEOUT_MS = 60_000;
 
-/** TEXT_RATES rows as { id, vendor, status, fallback, verifiedAt }; one row per `"id": { ... },` line. */
-export function parseTextRates(src) {
-  const start = src.indexOf("export const TEXT_RATES");
-  if (start < 0) throw new Error("TEXT_RATES not found in registry source");
+/** TEXT_RATES rows as { id, vendor, status, fallback, verifiedAt }. */
+export const parseTextRates = (src) => parseTable(src, "TEXT_RATES", ["vendor", "status", "fallback", "verifiedAt"]);
+/** MEDIA_MODELS rows as { id, vendor, kind, status, version, verifiedAt }. */
+export const parseMediaModels = (src) => parseTable(src, "MEDIA_MODELS", ["vendor", "kind", "status", "version", "verifiedAt"]);
+
+/** Rows of `export const <name>` as { id, ...fields }; one row per `"id": { ... },` line. */
+function parseTable(src, name, fields) {
+  const start = src.indexOf(`export const ${name}`);
+  if (start < 0) throw new Error(`${name} not found in registry source`);
   const end = src.indexOf("\n};", start);
   const rows = [];
   for (const line of src.slice(start, end).split("\n").slice(1)) {
     const m = ROW.exec(line.replace(/\r$/, ""));
     if (!m) continue;
-    const field = (name) => new RegExp(`\\b${name}: "([^"]*)"`).exec(m[2])?.[1];
-    rows.push({ id: m[1], vendor: field("vendor"), status: field("status"), fallback: field("fallback"), verifiedAt: field("verifiedAt") });
+    const row = { id: m[1] };
+    for (const f of fields) row[f] = new RegExp(`\\b${f}: "([^"]*)"`).exec(m[2])?.[1];
+    rows.push(row);
   }
   return rows;
 }
@@ -58,6 +65,25 @@ function request(vendor, id, budget, key) {
     headers: { "x-goog-api-key": key },
     body: { contents: [{ parts: [{ text: "hi" }] }], generationConfig: { maxOutputTokens: budget } },
   }];
+}
+
+/** Media rows: does the vendor still list this model (and the pinned version)? Free GET, nothing generated. */
+async function probeMedia(row) {
+  const envName = KEY_ENV[row.vendor];
+  const key = envName ? process.env[envName]?.trim() : "";
+  const base = { id: row.id, vendor: row.vendor, status: row.status };
+  if (!key) return { ...base, ok: false, http: 0, ms: 0, budget: null, error: `${envName ?? "key"} not set` };
+  const url = row.vendor === "OpenAI"
+    ? `https://api.openai.com/v1/models/${encodeURIComponent(row.id)}`
+    : `https://api.replicate.com/v1/models/${row.id}${row.version ? `/versions/${row.version}` : ""}`;
+  const t0 = Date.now();
+  try {
+    const resp = await fetch(url, { headers: { authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    const text = await resp.text();
+    return { ...base, ok: resp.ok, http: resp.status, ms: Date.now() - t0, budget: null, error: resp.ok ? null : text.split(key).join("***").slice(0, 200) };
+  } catch (err) {
+    return { ...base, ok: false, http: 0, ms: Date.now() - t0, budget: null, error: String(err?.message ?? err).slice(0, 200) };
+  }
 }
 
 async function probe(row) {
@@ -108,10 +134,13 @@ async function main(argv) {
   const flag = (name) => argv.includes(name);
   const regIdx = argv.indexOf("--registry");
   const file = regIdx >= 0 ? path.resolve(argv[regIdx + 1]) : DEFAULT_REGISTRY;
-  const rows = parseTextRates(readFileSync(file, "utf8"));
-  const targets = rows.filter((r) => r.vendor !== "Serper" && (r.status === "active" || flag("--include-legacy")));
-  const results = await Promise.all(targets.map(probe));
-  const failures = hardFailures(rows, results);
+  const src = readFileSync(file, "utf8");
+  const rows = parseTextRates(src);
+  const media = parseMediaModels(src);
+  const wanted = (r) => r.status === "active" || flag("--include-legacy");
+  const targets = rows.filter((r) => r.vendor !== "Serper" && wanted(r));
+  const results = [...await Promise.all(targets.map(probe)), ...await Promise.all(media.filter(wanted).map(probeMedia))];
+  const failures = hardFailures([...rows, ...media], results);
   const day = new Date().toISOString().slice(0, 10);
   if (flag("--write-verified")) writeVerified(file, results.filter((r) => r.ok).map((r) => r.id), day);
   process.stdout.write(`${JSON.stringify({ probedAt: new Date().toISOString(), registry: file, failures, results }, null, 2)}\n`);

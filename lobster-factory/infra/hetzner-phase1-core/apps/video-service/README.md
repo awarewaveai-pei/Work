@@ -10,7 +10,7 @@
                     ▼
 controller.py ── 逐題呼叫 ──▶ pipeline.run()
                                   │
-   Claude 生成文章+腳本 ──▶ DALL-E 卡通圖 ──▶ Edge TTS 配音
+   Claude 生成文章+腳本 ──▶ gpt-image-2 卡通圖 ──▶ Edge TTS 配音
         ──▶ MoviePy 合成(Ken Burns+字幕) ──▶ FFmpeg 多尺寸輸出
         ──▶ 上傳 YouTube ──▶ 發佈 WordPress(內嵌影片)
                                   │
@@ -78,7 +78,7 @@ insert into topics (topic, mode, priority) values ('2026 AI 趨勢', 'A', 1);
 | 項目 | 成本 |
 |------|------|
 | Claude 腳本 | ~$0.02–0.05 |
-| DALL-E 3 圖（6–8 張）| ~$0.24–0.32 |
+| gpt-image-2 low 圖（6–8 張）| ~$0.12–0.16 |
 | Edge TTS 配音 | 免費 |
 | **合計** | **約 $0.3–0.4 / 支** |
 

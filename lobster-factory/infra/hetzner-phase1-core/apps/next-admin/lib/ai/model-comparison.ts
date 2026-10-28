@@ -269,7 +269,7 @@ export const VIDEO_MODEL_COMPARISONS: readonly VideoModelComparison[] = [
     speed: "快",
     speedRank: 2,
     strengths: "美西團隊、速度快、成本低；支援圖生影片",
-    tradeoffs: "解析度偏低；複雜物理場景不如 Gen-4",
+    tradeoffs: "解析度偏低；複雜物理場景不如 Gen-4。Ray 2 系列 2026-10-28 已從 Replicate 下架（MEDIA_MODELS retired），新的是 luma/ray-3.2",
     sourceKeys: ["lumaReplicate"],
   },
   {

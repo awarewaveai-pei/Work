@@ -19,6 +19,7 @@ pipeline.py — 文章 → 卡通影片 → 多尺寸輸出 → YouTube + WordPr
 import os
 import re
 import json
+import base64
 import asyncio
 import requests
 import textwrap
@@ -121,7 +122,7 @@ def generate_from_topic(topic: str) -> dict:
       {{
         "id": 1,
         "narration": "口語化旁白（約35字）",
-        "image_prompt": "詳細的英文圖片描述，用於 DALL-E 生成卡通場景圖",
+        "image_prompt": "詳細的英文圖片描述，用於生成卡通場景圖",
         "duration": 8
       }}
     ]
@@ -170,7 +171,7 @@ def generate_from_existing(article_title: str, article_content: str) -> dict:
       {{
         "id": 1,
         "narration": "根據文章改寫的口語化旁白（約35字）",
-        "image_prompt": "詳細的英文圖片描述，用於 DALL-E 生成卡通場景圖",
+        "image_prompt": "詳細的英文圖片描述，用於生成卡通場景圖",
         "duration": 8
       }}
     ]
@@ -198,7 +199,7 @@ def _parse_json(raw: str) -> dict:
 
 
 # ═══════════════════════════════════════════
-# STEP 2：DALL-E 3 生成卡通場景圖
+# STEP 2：gpt-image-2 生成卡通場景圖
 # ═══════════════════════════════════════════
 def generate_scene_image(prompt: str, scene_id: int) -> str:
     full_prompt = config.CARTOON_STYLE + prompt
@@ -208,22 +209,22 @@ def generate_scene_image(prompt: str, scene_id: int) -> str:
             model=config.IMAGE_MODEL,
             prompt=full_prompt,
             size=config.IMAGE_SIZE,
-            quality="standard",
+            quality="low",
             n=1,
         )
-        image_url = response.data[0].url
-        img_data = requests.get(image_url, timeout=30).content
+        # gpt-image models return base64 only (no url).
         with open(path, "wb") as f:
-            f.write(img_data)
+            f.write(base64.b64decode(response.data[0].b64_json))
         return path
     except Exception as e:
-        print(f"   [warn] DALL-E 失敗 scene {scene_id}: {e}，改用純色背景")
-        Image.new("RGB", (1792, 1024), (30, 40, 80)).save(path)
+        print(f"   [warn] {config.IMAGE_MODEL} 失敗 scene {scene_id}: {e}，改用純色背景")
+        w, h = (int(x) for x in config.IMAGE_SIZE.split("x"))
+        Image.new("RGB", (w, h), (30, 40, 80)).save(path)
         return path
 
 
 def generate_all_images(scenes: list) -> list:
-    print("\n[2/6] DALL-E 3 生成卡通場景圖...")
+    print(f"\n[2/6] {config.IMAGE_MODEL} 生成卡通場景圖...")
     image_files = []
     for scene in scenes:
         print(f"   scene {scene['id']}: {scene['image_prompt'][:50]}...")
@@ -992,9 +993,9 @@ def run(mode: str, topic: str = "", article_title: str = "", article_content: st
             "wp_url": wp_url,
             "outputs": {k: str(v) for k, v in output_files.items()},
             "cost_estimate": {
-                "dalle3_images": f"${n * 0.04:.2f}",
+                "scene_images": f"${n * 0.02:.2f}",  # gpt-image-2 low ≈ $0.02 (IMAGE_RATES openai-low)
                 "claude_api": "$0.05" if mode == "A" else "$0.02",
-                "total": f"${n * 0.04 + (0.05 if mode == 'A' else 0.02):.2f}",
+                "total": f"${n * 0.02 + (0.05 if mode == 'A' else 0.02):.2f}",
             },
         }
         with open(out_dir / "result.json", "w", encoding="utf-8") as f:

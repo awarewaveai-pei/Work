@@ -107,6 +107,50 @@ export const IMAGE_RATES: Record<string, { usd: number; label: string; vendor: s
 export const DEFAULT_IMAGE_MODEL = "flux-schnell";
 
 /**
+ * Image / video / editing-tool registry, keyed by what the VENDOR sees (Replicate owner/name, OpenAI image model id) --
+ * prices stay keyed by app id in IMAGE_RATES / VIDEO_MOTION_RATES / TOOL_RATES. scripts/probe-models.mjs checks each row
+ * with a free metadata GET (no image is generated); model-registry.test.ts fails on a slug, pinned version or OpenAI
+ * image id in code that is missing here, and on code still calling a retired row. One row per line: the probe parses it.
+ */
+export interface MediaModel {
+  vendor: "Replicate" | "OpenAI";
+  kind: "image" | "video" | "tool";
+  status: "active" | "retired";
+  /** Pinned Replicate version the code sends (probe checks this version, not just the model). */
+  version?: string;
+  verifiedAt?: string;
+}
+
+export const MEDIA_MODELS: Record<string, MediaModel> = {
+  "black-forest-labs/flux-schnell":    { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
+  "black-forest-labs/flux-dev":        { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
+  "black-forest-labs/flux-kontext-dev": { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
+  "black-forest-labs/flux-kontext-pro": { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
+  "black-forest-labs/flux-2-max":      { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
+  "ideogram-ai/ideogram-v2a-turbo":    { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
+  "ideogram-ai/ideogram-v3-balanced":  { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
+  "ideogram-ai/ideogram-v4-turbo":     { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
+  "ideogram-ai/ideogram-v4-quality":   { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
+  "ideogram-ai/ideogram-character":    { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
+  "google/nano-banana-2":              { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
+  "google/nano-banana-pro":            { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
+  "google/imagen-4":                   { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
+  "gpt-image-2":                       { vendor: "OpenAI", kind: "image", status: "active", verifiedAt: "2026-10-28" },
+  // video-service default until 2026-10-28; OpenAI: "The model 'dall-e-3' does not exist".
+  "dall-e-3":                          { vendor: "OpenAI", kind: "image", status: "retired" },
+  "runwayml/gen4-turbo":               { vendor: "Replicate", kind: "video", status: "active", verifiedAt: "2026-10-28" },
+  "google/veo-3.1-fast":               { vendor: "Replicate", kind: "video", status: "active", verifiedAt: "2026-10-28" },
+  "google/veo-3.1":                    { vendor: "Replicate", kind: "video", status: "active", verifiedAt: "2026-10-28" },
+  // Luma Ray 2 / Flash 2 left Replicate (404 on 2026-10-28; only luma/ray-3.2 is listed), so they left the motion picker.
+  "luma/ray-flash-2-720p":             { vendor: "Replicate", kind: "video", status: "retired" },
+  "luma/ray-2-720p":                   { vendor: "Replicate", kind: "video", status: "retired" },
+  "851-labs/background-remover":       { vendor: "Replicate", kind: "tool", status: "active", version: "a029dff38972b5fda4ec5d75d7d1cd25aeff621d2cf4946a41055d7db66b80bc", verifiedAt: "2026-10-28" },
+  "black-forest-labs/flux-fill-pro":   { vendor: "Replicate", kind: "tool", status: "active", version: "41c767bcbfffe54ef8f05eb4d0100f9314790f7fc43a7b88d73ec06839deddb9", verifiedAt: "2026-10-28" },
+  "bria/eraser":                       { vendor: "Replicate", kind: "tool", status: "active", version: "2757d1ac2f1291af219f5f10e8ecba15e92e7c05253e2841295f3ba6bff6adc4", verifiedAt: "2026-10-28" },
+  "nightmareai/real-esrgan":           { vendor: "Replicate", kind: "tool", status: "active", version: "b3ef194191d13140337468c916c2c5b96dd0cb06dffc032a022a31807f6a5ea8", verifiedAt: "2026-10-28" },
+};
+
+/**
  * AI 影片動態（image-to-video）每秒 USD 價格。keys = lib/tarot/video-motion-gen.ts VIDEO_MOTION_MODELS。
  * 價格來源：2026-09-12 直接讀 replicate.com/<slug> 頁面內嵌 JSON 的 "or N seconds for $X" 換算，
  * 非猜測（Runway/Luma/Google 官方直連 API 定價與 Replicate 轉售價不同，此表只適用走 Replicate）。
@@ -116,8 +160,6 @@ export const DEFAULT_IMAGE_MODEL = "flux-schnell";
 // 沒有這層保護，critic 2026-09-12 建議這張新的、金額較大的表從一開始就收緊）。
 export const VIDEO_MOTION_RATES: Record<import("../tarot/video-motion-gen").VideoMotionModel, { usdPerSec: number; label: string; vendor: string; defaultDurationSec: number }> = {
   "runway-gen4-turbo":  { usdPerSec: 0.05, label: "Runway Gen-4 Turbo", vendor: "Runway/Replicate", defaultDurationSec: 5 },
-  "luma-ray-flash-2":   { usdPerSec: 0.06, label: "Luma Ray Flash 2",   vendor: "Luma/Replicate",   defaultDurationSec: 5 },
-  "luma-ray-2":         { usdPerSec: 0.18, label: "Luma Ray 2",         vendor: "Luma/Replicate",   defaultDurationSec: 5 },
   "veo-3-1-fast":       { usdPerSec: 0.10, label: "Google Veo 3.1 Fast",vendor: "Google/Replicate", defaultDurationSec: 8 },
   "veo-3-1":            { usdPerSec: 0.20, label: "Google Veo 3.1",     vendor: "Google/Replicate", defaultDurationSec: 8 },
 };

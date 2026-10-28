@@ -5,9 +5,9 @@
  * 且生成時間量級不同（image-gen.ts 的 58s 逾時打底是給圖片用；影片生成常態 30s-3min，
  * 需要更長的逾時預算，硬塞同一個 GEN_TIMEOUT_MS 會誤殺正常在跑的影片工作）。
  *
- * 三個 vendor 皆走 Replicate（2026-09-12 直接查 API schema + 頁面定價確認，非猜測）：
+ * 皆走 Replicate（2026-09-12 直接查 API schema + 頁面定價確認，非猜測）；slug 登錄在 lib/ai/cost-model.ts MEDIA_MODELS：
  *   - Runway Gen-4 Turbo：input_image 欄位叫 "image"
- *   - Luma Ray 2 / Ray Flash 2：叫 "start_image"
+ *   - （Luma Ray 2 / Flash 2 已從 Replicate 下架，2026-10-28 移除）
  *   - Google Veo 3.1 / 3.1 Fast：叫 "image"（另有 generate_audio，關掉——旁白配音另外做，
  *     Veo 自己生的音軌用不到只會浪費且可能跟 TTS 對不上嘴形時間軸）
  */
@@ -38,13 +38,11 @@ async function runWithConcurrency<T>(limit: number, tasks: (() => Promise<T>)[])
 
 export type VideoMotionModel =
   | "runway-gen4-turbo"
-  | "luma-ray-flash-2"
-  | "luma-ray-2"
   | "veo-3-1-fast"
   | "veo-3-1";
 
 export function isVideoMotionModel(v: unknown): v is VideoMotionModel {
-  return v === "runway-gen4-turbo" || v === "luma-ray-flash-2" || v === "luma-ray-2" || v === "veo-3-1-fast" || v === "veo-3-1";
+  return v === "runway-gen4-turbo" || v === "veo-3-1-fast" || v === "veo-3-1";
 }
 
 interface MotionConfig {
@@ -59,20 +57,6 @@ const MOTION_MODELS: Record<VideoMotionModel, MotionConfig> = {
     defaultDurationSec: 5,
     buildInput: ({ imageUrl, prompt, aspectRatio, durationSec }) => ({
       image: imageUrl, prompt, aspect_ratio: aspectRatio, duration: durationSec,
-    }),
-  },
-  "luma-ray-flash-2": {
-    slug: "luma/ray-flash-2-720p",
-    defaultDurationSec: 5,
-    buildInput: ({ imageUrl, prompt, aspectRatio, durationSec }) => ({
-      start_image: imageUrl, prompt, aspect_ratio: aspectRatio, duration: durationSec,
-    }),
-  },
-  "luma-ray-2": {
-    slug: "luma/ray-2-720p",
-    defaultDurationSec: 5,
-    buildInput: ({ imageUrl, prompt, aspectRatio, durationSec }) => ({
-      start_image: imageUrl, prompt, aspect_ratio: aspectRatio, duration: durationSec,
     }),
   },
   "veo-3-1-fast": {

@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
-import { TEXT_RATES } from "../cost-model";
+import { MEDIA_MODELS, TEXT_RATES } from "../cost-model";
 import { AI_TEXT_MODELS } from "../text-model-options";
 
 const ROOT = path.resolve(__dirname, "../../..");
@@ -15,7 +15,6 @@ const MODEL_LITERAL = /["'`]((?:claude|gpt|gemini)-[A-Za-z0-9._-]*[A-Za-z0-9])["
 const NOT_TEXT_MODELS: Record<string, string> = {
   "gemini-cli": "terminal tool id (ops/tools page, inbox copy button), not an API model",
   "gemini-web": "web tool id (ops/tools page), not an API model",
-  "gpt-image-2": "image model, priced by OPENAI_IMAGE_TOKEN_RATES; TEXT_RATES covers text models only",
   "claude-haiku-5": "family prefix for a startswith() thinking switch (video-service server.py), not an id",
 };
 
@@ -31,8 +30,16 @@ function codeFiles(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-/** Model-id string literals outside comments, as `file -> id`. */
-function modelLiterals(): Array<{ file: string; id: string }> {
+// Media ids as the vendor sees them: Replicate owner/name in a slug/fluxModel field or a /v1/models/ path, a pinned
+// 64-hex Replicate version, an OpenAI image model id.
+const REPLICATE_SLUG = /(?:\b(?:slug|fluxModel):\s*|\/v1\/models\/)["'`]?([a-z0-9-]+\/[a-z0-9._-]+)["'`]/g;
+const PINNED_VERSION = /["'`]([0-9a-f]{64})["'`]/g;
+const OPENAI_IMAGE = /["'`]((?:dall-e|gpt-image)-[A-Za-z0-9._-]*[A-Za-z0-9])["'`]/g;
+// The registry file spells retired ids as its own keys; every other file is a caller.
+const REGISTRY_FILE = path.join("lib", "ai", "cost-model.ts");
+
+/** Matches of `re` outside comments in lib, app, scripts and video-service, as `file -> id`. */
+function codeLiterals(re: RegExp): Array<{ file: string; id: string }> {
   const files = [
     ...["lib", "app", "scripts"].flatMap((d) => codeFiles(path.join(ROOT, d))),
     ...readdirSync(VIDEO_SERVICE).filter((n) => n.endsWith(".py")).map((n) => path.join(VIDEO_SERVICE, n)),
@@ -43,17 +50,21 @@ function modelLiterals(): Array<{ file: string; id: string }> {
     src = file.endsWith(".py")
       ? src.replace(/#.*$/gm, "")
       : src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
-    for (const m of src.matchAll(MODEL_LITERAL)) found.push({ file: path.relative(ROOT, file), id: m[1] });
+    for (const m of src.matchAll(re)) found.push({ file: path.relative(ROOT, file), id: m[1] });
   }
   return found;
 }
+const modelLiterals = () => codeLiterals(MODEL_LITERAL);
+const callers = (re: RegExp) => codeLiterals(re).filter(({ file }) => file !== REGISTRY_FILE);
+const notActiveMedia = (hits: Array<{ file: string; id: string }>) =>
+  hits.filter(({ id }) => MEDIA_MODELS[id]?.status !== "active").map(({ file, id }) => `${file}: ${id}`);
 
 describe("text-model registry (TEXT_RATES)", () => {
   it("(a) every claude-/gpt-/gemini- literal in lib, app, scripts and video-service is a TEXT_RATES key", () => {
     const literals = modelLiterals();
     expect(literals.length).toBeGreaterThan(10);
     const unregistered = literals
-      .filter(({ id }) => !Object.hasOwn(TEXT_RATES, id) && !Object.hasOwn(NOT_TEXT_MODELS, id))
+      .filter(({ id }) => !Object.hasOwn(TEXT_RATES, id) && !Object.hasOwn(MEDIA_MODELS, id) && !Object.hasOwn(NOT_TEXT_MODELS, id))
       .map(({ file, id }) => `${file}: ${id}`);
     expect(unregistered).toEqual([]);
   });
@@ -71,9 +82,32 @@ describe("text-model registry (TEXT_RATES)", () => {
   });
 
   it("probe-models.mjs reads the same rows as the TS object (it parses the source: no tsx in the image)", async () => {
-    const { parseTextRates } = await import("../../../scripts/probe-models.mjs");
-    const parsed = parseTextRates(readFileSync(path.join(ROOT, "lib/ai/cost-model.ts"), "utf8"));
+    const { parseTextRates, parseMediaModels } = await import("../../../scripts/probe-models.mjs");
+    const src = readFileSync(path.join(ROOT, "lib/ai/cost-model.ts"), "utf8");
     const expected = Object.entries(TEXT_RATES).map(([id, r]) => ({ id, vendor: r.vendor, status: r.status, fallback: r.fallback, verifiedAt: r.verifiedAt }));
-    expect(parsed).toEqual(expected);
+    expect(parseTextRates(src)).toEqual(expected);
+    const expectedMedia = Object.entries(MEDIA_MODELS).map(([id, r]) => ({ id, vendor: r.vendor, kind: r.kind, status: r.status, version: r.version, verifiedAt: r.verifiedAt }));
+    expect(parseMediaModels(src)).toEqual(expectedMedia);
+  });
+});
+
+describe("media-model registry (MEDIA_MODELS)", () => {
+  it("(d) every Replicate slug the code sends is an active MEDIA_MODELS key", () => {
+    const hits = callers(REPLICATE_SLUG);
+    expect(hits.length).toBeGreaterThan(10);
+    expect(notActiveMedia(hits)).toEqual([]);
+  });
+
+  it("(e) every pinned Replicate version is the version of an active MEDIA_MODELS row", () => {
+    const pinned = new Set(Object.values(MEDIA_MODELS).filter((m) => m.status === "active" && m.version).map((m) => m.version));
+    const hits = callers(PINNED_VERSION);
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits.filter(({ id }) => !pinned.has(id)).map(({ file, id }) => `${file}: ${id}`)).toEqual([]);
+  });
+
+  it("(f) every OpenAI image model id in code is an active MEDIA_MODELS key", () => {
+    const hits = callers(OPENAI_IMAGE);
+    expect(hits.length).toBeGreaterThan(0);
+    expect(notActiveMedia(hits)).toEqual([]);
   });
 });

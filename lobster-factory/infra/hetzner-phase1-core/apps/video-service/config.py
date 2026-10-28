@@ -27,9 +27,11 @@ def _bool(name: str, default: str = "false") -> bool:
 # ─────────────────────────────────────────
 CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY", "")
 CLAUDE_MODEL   = os.getenv("CLAUDE_MODEL", "claude-opus-5-5")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")   # DALL-E 3 圖片生成
-IMAGE_MODEL    = os.getenv("IMAGE_MODEL", "dall-e-3")
-IMAGE_SIZE     = os.getenv("IMAGE_SIZE", "1792x1024")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")   # 場景圖生成
+# Must be an active MEDIA_MODELS key (next-admin lib/ai/cost-model.ts). dall-e-3 is gone (404 on 2026-10-28) and
+# generate_scene_image swallowed that into plain-colour frames. gpt-image-2 sizes: 1024x1024 / 1536x1024 / 1024x1536.
+IMAGE_MODEL    = os.getenv("IMAGE_MODEL", "gpt-image-2")
+IMAGE_SIZE     = os.getenv("IMAGE_SIZE", "1536x1024")
 
 # ─────────────────────────────────────────
 # WordPress

@@ -174,7 +174,7 @@ print("主力與備援同時失敗：" + (", ".join(j["failures"]) or "（無）
 for r in [r for r in j["results"] if not r["ok"]][:8]:
     print("- %s：HTTP %s %s" % (r["id"], r["http"], (r["error"] or "")[:120].replace("\n", " ")))
 ' 2>/dev/null || printf '%s' "${out:0:300}")"
-    msg=$(printf '⚠️ AI 模型實測失敗 — next-admin 部署後檢查\n有模型 ID 呼叫不到，而且它的備援也一起失敗（部署本身成功，沒有回滾）。\n%s\n\n處理：在 lib/ai/cost-model.ts 把失敗的 ID 標 legacy，改用實測通過的 ID；筆電跑 node scripts/probe-models.mjs 確認。\n（技術資訊：probe exit=%s, commit=%s）' "$summary" "$rc" "${NEW_COMMIT:0:12}")
+    msg=$(printf '⚠️ AI 模型實測失敗 — next-admin 部署後檢查\n有模型 ID 呼叫不到，而且它的備援也一起失敗（部署本身成功，沒有回滾）。\n%s\n\n處理：在 lib/ai/cost-model.ts 把失敗的 ID 標 legacy（文字）或 retired（圖片／影片），改用實測通過的 ID；筆電跑 node scripts/probe-models.mjs 確認。\n（技術資訊：probe exit=%s, commit=%s）' "$summary" "$rc" "${NEW_COMMIT:0:12}")
     printf '%s' "$msg" | "$(dirname "$SELF_PATH")/notify.sh" --slack SLACK_WEBHOOK_URL >/dev/null 2>&1 \
         || log "model probe alert: notify incomplete"
     return 0
