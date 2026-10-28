@@ -30,7 +30,7 @@ export const NOW = [
   { what: '動態預覽可捲動、有關閉鍵', state: 'yes', ev: '同上；尚待你在正式站看一眼' },
   { what: '字幕（Whisper）', state: 'no', ev: '主機設定已加（d62a2eee5），但字幕服務在筆電上，筆電沒開就不能用；快速影片改用腳本產字幕是 V4.6' },
   { what: '客戶只選一次、關頁不丟', state: 'yes', ev: 'V1 已推上 main（8e8f30c27），2026-10-29 台灣 03:00 自動部署後生效；資料庫 0138 已套用' },
-  { what: '看成片的結果頁', state: 'no', ev: 'V2' },
+  { what: '看成片的結果頁', state: 'yes', ev: 'V2 已推上 main（3459e3b32）：側欄 Video Projects；2026-10-29 台灣 03:00 部署後生效' },
   { what: 'QA 四項能全部通過、能建 Release', state: 'no', ev: 'V4；正式庫 Release 史上 0 筆' },
   { what: '發布不用填 JSON', state: 'no', ev: 'V5' },
   { what: '④ 後自動完成', state: 'no', ev: 'V6' },
@@ -39,6 +39,7 @@ export const NOW = [
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
 const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 const V1 = '8e8f30c27';
+const V2 = '3459e3b32';
 
 export const STEPS = [
   { n: 1, code: 'V1', group: 'A', title: '專案骨架', plain: '每支影片存成一個專案，客戶、腳本、比例都跟著走；腳本頁一顆鍵送去做影片。',
@@ -54,13 +55,14 @@ export const STEPS = [
       done('V1.5', '做出來的影片記到它的專案', V1),
     ] },
   { n: 2, code: 'V2', group: 'B', title: '結果頁', plain: '所有影片（手動和題目頁自動）列在一頁，點進去能播每個比例、看 QA 和發到哪裡。',
-    gate: '做一支影片後清單看得到，點進去兩個比例都能播', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['V1'],
+    gate: '做一支影片後清單看得到，點進去兩個比例都能播', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: V2, depends: ['V1'],
+    waitFor: '2026-10-29 台灣 03:00 自動部署後在正式站生效',
     what: '/tools/video/projects 清單與 /tools/video/projects/[id]；渲染完不自動跳步',
     files: ['app/(shell)/tools/video/projects/', 'app/sidebar-sections.ts', 'app/(shell)/tools/video/VideoPipeline.tsx'],
     items: [
-      todo('V2.1', '影片專案清單頁，側欄加入口'),
-      todo('V2.2', '單一專案頁：播放、下載、腳本、QA、Release、費用、繼續編輯'),
-      todo('V2.3', '影片做完停在成片畫面；「可以關閉頁面」改指專案頁；進階頁的生成記錄改連清單'),
+      done('V2.1', '影片專案清單頁，側欄加入口', V2),
+      done('V2.2', '單一專案頁：播放、下載、腳本、QA、Release、費用、繼續編輯', V2),
+      done('V2.3', '影片做完停在成片畫面；「可以關閉頁面」改指專案頁；進階頁的生成記錄改連清單', V2),
     ] },
   { n: 3, code: 'V3', group: 'A', title: '腳本頁整理', plain: '多平台版本並存可選、照各平台規則改寫、送社群帶 hashtag；Remotion 改成加購片頭卡。',
     gate: '轉兩個平台後切回原版，送出的是原版；送社群草稿含 #', risk: 'Medium', model: 'Sonnet 5.5（卡已寫死）', status: 'in_progress', depends: [],
