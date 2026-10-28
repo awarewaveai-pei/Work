@@ -76,7 +76,7 @@ export const DEFAULT_SECTIONS: NavSection[] = [
     id: 'marketing',
     label: 'Marketing',
     items: [
-      { type: 'link', href: '/tools/content/topics',   icon: '🧭', label: 'Topic Queue',      title: '每月要做的文章、社群貼文和影片題目' },
+      { type: 'link', href: '/tools/content/topics',   icon: '🧭', label: 'Auto Content',     title: '全自動內容：熱搜 → 題目 → 製作 → 發布，一頁管理' },
       { type: 'link', href: '/tools/content/calendar', icon: '🗓', label: 'Content Calendar', title: '文章排程與發布日曆' },
       { type: 'link', href: '/tools/events',           icon: '🌍', label: 'Events Calendar',  title: '全球活動行事曆：運動賽事、國家與文化節慶，找內容題材' },
       { type: 'link', href: '/tools/social',           icon: '📣', label: 'Social Posts',     title: '多品牌社群排程（ADR 016）' },

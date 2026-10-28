@@ -1,5 +1,5 @@
 "use client";
-// One site, one month: the topic list on the left, the clicked topic on the right (same layout as /ops/schedules).
+// Control page body: all-sites table, the picked site's five steps, then one month's topic list on the left, the clicked topic on the right (same layout as /ops/schedules).
 // Buttons and checkboxes only, no dropdowns (memory feedback_no_dropdowns_multiselect). Every change goes through
 // /api/content/topics*, which checks the site's organization; a stale page gets 409 and reloads.
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -10,6 +10,9 @@ import { GridPicker } from "@/components/tools/GridPicker";
 import type { TopicReview } from "@/lib/content/topics/review";
 import type { TopicArtifacts } from "@/lib/content/topics/make";
 import { autoPublishes, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import type { ManagedSite } from "@/app/api/content/sites/route";
+import type { OverviewData } from "@/lib/content/topics/overview-load";
+import { FlowCells, OverviewTable } from "./AutoContentOverview";
 
 const T = {
   noSites: "還沒有可用的客戶網站，先到 WordPress Sites 加一個。",
@@ -71,7 +74,7 @@ const ACTION_FOR: Partial<Record<TopicStatus, Array<[string, string]>>> = {
   failed: [["retry", "重試"]],
 };
 
-interface Site { id: string; name: string; organization_id?: string | null; contentDefaults?: SiteContentDefaults }
+type Site = ManagedSite;
 const card: React.CSSProperties = { background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 10, padding: 12 };
 const chip = (on: boolean): React.CSSProperties => ({
   padding: "4px 10px", borderRadius: 999, border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`, cursor: "pointer",
@@ -94,9 +97,10 @@ const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
 const dayText = (d: number) => `${d} 日`;
 const daysOf = (month: string) => Array.from({ length: daysIn(month) }, (_, i) => i + 1);
 
-export function TopicsBoard() {
+export function TopicsBoard({ overview }: { overview: OverviewData }) {
   const [sites, setSites] = useState<Site[] | null>(null);
-  const [siteId, setSiteId] = useState("");
+  // the table is sorted problems first, so the first row is the site that most needs a look
+  const [siteId, setSiteId] = useState(overview.rows[0]?.siteId ?? "");
   const [month, setMonth] = useState(thisMonth());
   const [topics, setTopics] = useState<Topic[]>([]);
   const [checked, setChecked] = useState<Set<string>>(new Set());
@@ -119,7 +123,6 @@ export function TopicsBoard() {
         const j = await (await fetch("/api/content/sites")).json() as { ok: boolean; sites?: Site[] };
         const list = (j.sites ?? []).filter((s) => s.organization_id);
         setSites(list);
-        if (list[0]) setSiteId((cur) => cur || list[0].id);
       } catch { setSites([]); }
     })();
   }, []);
@@ -222,28 +225,34 @@ export function TopicsBoard() {
     } finally { await load(); setBusy(false); }
   }
 
+  if (!overview.rows.length) return <p style={{ color: "var(--text-muted)" }}>{T.noSites}</p>;
   if (!sites) return <p style={{ color: "var(--text-muted)" }}>…</p>;
-  if (!sites.length) return <p style={{ color: "var(--text-muted)" }}>{T.noSites}</p>;
   const editable = sel && ["proposed", "approved"].includes(sel.status);
   const selWhen = sel?.scheduled_for ? taipeiParts(sel.scheduled_for) : { month, day: 1, hour: 9 };
   const when = draftWhen ?? selWhen;
   // a day past the end of the month just switched to (31 -> November) becomes its last day
   const setWhen = (w: { month: string; day: number; hour: number }) => setDraftWhen({ ...w, day: Math.min(w.day, daysIn(w.month)) });
   const formats = draftFormats ?? sel?.formats ?? [];
+  const site = sites.find((x) => x.id === siteId);
+  const siteRow = overview.rows.find((r) => r.siteId === siteId);
+  const planButton = (
+    <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void plan()} style={{ whiteSpace: "normal" }}>
+      {busy ? T.planning : `${T.plan}（約 NT$${planCostTwd()}）`}
+    </button>
+  );
   const toggle = (list: TopicFormat[], f: TopicFormat) => (list.includes(f) ? list.filter((x) => x !== f) : [...list, f]);
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 16 }}>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-        {sites.map((s) => <button key={s.id} type="button" style={chip(s.id === siteId)} onClick={() => setSiteId(s.id)}>{s.name}</button>)}
-      </div>
+      <OverviewTable rows={overview.rows} selected={siteId} onPick={setSiteId} note={overview.spendNote} />
+      {siteRow && site && (
+        <FlowCells site={site} row={siteRow} cell={overview.cells[siteId]} topics={topics} month={month}
+          planButton={planButton} onSiteSaved={(u) => setSites((l) => (l ?? []).map((x) => (x.id === u.id ? u : x)))} />
+      )}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
         <button type="button" className="btn btn-secondary" onClick={() => setMonth(shiftMonth(month, -1))}>‹ 上個月</button>
         <strong style={{ fontVariantNumeric: "tabular-nums" }}>{month}</strong>
         <button type="button" className="btn btn-secondary" onClick={() => setMonth(shiftMonth(month, 1))}>下個月 ›</button>
-        <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void plan()} style={{ whiteSpace: "normal" }}>
-          {busy ? T.planning : `${T.plan}（約 NT$${planCostTwd()}）`}
-        </button>
       </div>
       <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "var(--font-size-sm)" }}>
         {(Object.keys(STATUS) as TopicStatus[]).filter((s) => counts[s]).map((s) => `${STATUS[s][0]} ${counts[s]}`).join(" · ") || "—"}
@@ -382,7 +391,7 @@ export function TopicsBoard() {
                   <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void start()} style={{ whiteSpace: "normal" }}>
                     {T.start}（約 NT${topicCostTwd(sel.formats).usual}{topicCostTwd(sel.formats).max > topicCostTwd(sel.formats).usual ? `，最多 NT$${topicCostTwd(sel.formats).max}` : ""}）
                   </button>
-                  <span style={{ fontSize: "var(--font-size-xs)", color: "var(--text-muted)" }}>{T.startHint(sel.formats, autoPublishes(sites.find((s) => s.id === siteId)?.contentDefaults), dailyCap)}</span>
+                  <span style={{ fontSize: "var(--font-size-xs)", color: "var(--text-muted)" }}>{T.startHint(sel.formats, autoPublishes(site?.contentDefaults), dailyCap)}</span>
                 </div>
               )}
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

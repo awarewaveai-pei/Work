@@ -2,7 +2,7 @@
 
 // The schedules page body (agency-os/docs/operations/SCHEDULES_PAGE_PLAN.md §3.2-3/4). One component for
 // /ops/schedules (every client) and the client page's 維護 tab (`only` = that client's slug): one data
-// source, so the two views cannot disagree.
+// source, so the two views cannot disagree. `jobOnly` = one job's row (the auto-content page's step 4).
 // Layout (operator 2026-10-24): tabs = jobs (a fixed, small set) + server groups, never clients -- clients grow
 // without bound, so they are rows: searchable, filterable, failures first, bulk-editable. Every setting sits on
 // its row; nothing waits for a click to appear.
@@ -116,7 +116,7 @@ type TabKey = `job:${string}` | `group:${NonNullable<SystemRow["group"]>}`;
 type Patch = Partial<Pick<ScheduleCell, "enabled" | "frequency" | "hourUtc" | "dayOfWeekUtc" | "dayOfMonth" | "dailyLimit">>;
 type JobFilter = "all" | "failed" | "on" | "off";
 
-export function ScheduleTable({ only }: { only?: string }) {
+export function ScheduleTable({ only, jobOnly }: { only?: string; jobOnly?: string }) {
   const [view, setView] = useState<SchedulesView | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [tab, setTab] = useState<TabKey | null>(null);
@@ -257,7 +257,7 @@ export function ScheduleTable({ only }: { only?: string }) {
       {notice && <p style={{ color: "var(--red)", fontSize: "var(--font-size-sm)", margin: "0 0 12px" }}>{notice}</p>}
 
       <div role="tabpanel" id={active ? `schedules-panel-${active}` : undefined} aria-labelledby={active ? `schedules-tab-${active}` : undefined}>
-        {only && <ClientJobs jobs={view.jobs} cells={view.cells} saving={saving} savedKeys={savedKeys} save={(items) => void save(items)} />}
+        {only && <ClientJobs jobs={jobOnly ? view.jobs.filter((j) => j.key === jobOnly) : view.jobs} cells={view.cells} saving={saving} savedKeys={savedKeys} save={(items) => void save(items)} />}
         {activeJobs && activeJobs.length > 1 && activeJob && (
           // a grouped tab: one chip per job, the picked one's table below (always one picked -- nothing waits for a click)
           <div role="group" aria-label={activeJob.group?.label} style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>

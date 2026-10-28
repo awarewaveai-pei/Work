@@ -8,7 +8,7 @@ import type { ManagedSite } from "@/app/api/content/sites/route";
 import { aiPicksTopics, type TopicMode } from "@/lib/content/brand-voice";
 
 const MODES: Array<{ value: TopicMode; label: string; detail: string }> = [
-  { value: "human_pick", label: "題目我自己挑", detail: "每月自動提出題目，留在題目佇列等人勾選核准才會做。只管題目；文章怎麼發布看旁邊的設定。" },
+  { value: "human_pick", label: "題目我自己挑", detail: "每月自動提出題目，留在「自動內容」頁等人勾選核准才會做。只管題目；文章怎麼發布看旁邊的設定。" },
   { value: "ai_pick", label: "AI 挑好直接做", detail: "每月提出的題目由 AI 自動核准，到排定日就開始做。只管題目；文章怎麼發布看旁邊的設定。" },
 ];
 
