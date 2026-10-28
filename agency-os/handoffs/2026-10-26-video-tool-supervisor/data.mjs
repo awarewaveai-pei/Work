@@ -29,7 +29,7 @@ export const NOW = [
   { what: '重新生成真的換圖、每個比例都換', state: 'yes', ev: '同上；圖庫素材會排除舊的那張' },
   { what: '動態預覽可捲動、有關閉鍵', state: 'yes', ev: '同上；尚待你在正式站看一眼' },
   { what: '字幕（Whisper）', state: 'no', ev: '主機設定已加（d62a2eee5），但字幕服務在筆電上，筆電沒開就不能用；快速影片改用腳本產字幕是 V4.6' },
-  { what: '客戶只選一次、關頁不丟', state: 'no', ev: 'V1' },
+  { what: '客戶只選一次、關頁不丟', state: 'yes', ev: 'V1 已推上 main（8e8f30c27），2026-10-29 台灣 03:00 自動部署後生效；資料庫 0138 已套用' },
   { what: '看成片的結果頁', state: 'no', ev: 'V2' },
   { what: 'QA 四項能全部通過、能建 Release', state: 'no', ev: 'V4；正式庫 Release 史上 0 筆' },
   { what: '發布不用填 JSON', state: 'no', ev: 'V5' },
@@ -37,18 +37,21 @@ export const NOW = [
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
+const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
+const V1 = '8e8f30c27';
 
 export const STEPS = [
   { n: 1, code: 'V1', group: 'A', title: '專案骨架', plain: '每支影片存成一個專案，客戶、腳本、比例都跟著走；腳本頁一顆鍵送去做影片。',
-    gate: '腳本頁送出後影片頁不再問客戶；重整頁面停在同一步', risk: 'High（資料庫新欄位）', model: 'Opus 5.5', status: 'not_started', depends: [],
+    gate: '腳本頁送出後影片頁不再問客戶；重整頁面停在同一步', risk: 'High（資料庫新欄位）', model: 'Opus 5.5', status: 'done', commit: V1, depends: [],
+    waitFor: '程式 2026-10-29 台灣 03:00 自動部署後在正式站生效；資料庫已套用',
     what: 'migration 加專案欄位與 media_assets.media_project_id；projects API；腳本頁建專案；影片頁讀 ?project= 改 5 步',
     files: ['packages/db/migrations/', 'app/api/video/projects/route.ts', 'app/(shell)/tools/video/VideoPipeline.tsx', 'app/(shell)/tools/script-forge/ScriptForgePage.tsx'],
     items: [
-      todo('V1.1', '資料庫加專案欄位（自動化程度、來源、比例、錯誤原因），影片紀錄連到專案；舊的 4 筆測試資料封存'),
-      todo('V1.2', '專案 API 可查單一專案與它的影片，可存腳本、比例、自動化程度'),
-      todo('V1.3', '腳本頁兩顆送影片鍵併成一顆，送出就建專案並帶客戶；沒選客戶時按不了'),
-      todo('V1.4', '影片頁改 5 步、客戶只從專案來；第 1 步改成「腳本從哪來」，不再重複放 24 個模組'),
-      todo('V1.5', '做出來的影片記到它的專案'),
+      done('V1.1', '資料庫加專案欄位（自動化程度、來源、比例、錯誤原因），影片紀錄連到專案；舊的 4 筆測試資料封存', V1),
+      done('V1.2', '專案 API 可查單一專案與它的影片，可存腳本、比例、自動化程度', V1),
+      done('V1.3', '腳本頁兩顆送影片鍵併成一顆，送出就建專案並帶客戶；沒選客戶時按不了', V1),
+      done('V1.4', '影片頁改 5 步、客戶只從專案來；第 1 步改成「腳本從哪來」，不再重複放 24 個模組', V1),
+      done('V1.5', '做出來的影片記到它的專案', V1),
     ] },
   { n: 2, code: 'V2', group: 'B', title: '結果頁', plain: '所有影片（手動和題目頁自動）列在一頁，點進去能播每個比例、看 QA 和發到哪裡。',
     gate: '做一支影片後清單看得到，點進去兩個比例都能播', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['V1'],
@@ -60,13 +63,13 @@ export const STEPS = [
       todo('V2.3', '影片做完停在成片畫面；「可以關閉頁面」改指專案頁；進階頁的生成記錄改連清單'),
     ] },
   { n: 3, code: 'V3', group: 'A', title: '腳本頁整理', plain: '多平台版本並存可選、照各平台規則改寫、送社群帶 hashtag；Remotion 改成加購片頭卡。',
-    gate: '轉兩個平台後切回原版，送出的是原版；送社群草稿含 #', risk: 'Medium', model: 'Sonnet 5.5（卡已寫死）', status: 'not_started', depends: [],
+    gate: '轉兩個平台後切回原版，送出的是原版；送社群草稿含 #', risk: 'Medium', model: 'Sonnet 5.5（卡已寫死）', status: 'in_progress', depends: [],
     what: 'ScriptForge 版本並存；modules.ts 讀 limits.ts；Remotion 從模式移到第 2 步選項',
     files: ['app/(shell)/tools/video/ScriptForge.tsx', 'lib/script-forge/modules.ts', 'app/(shell)/tools/video/ModeSelectStep.tsx'],
     items: [
-      todo('V3.1', '原版和各平台版本並存，選一版當送出用，每版可複製'),
-      todo('V3.2', '平台改寫照各平台字數上限，並產出 hashtag'),
-      todo('V3.3', '送社群帶上 hashtag'),
+      done('V3.1', '原版和各平台版本並存，選一版當送出用，每版可複製', V1),
+      done('V3.2', '平台改寫照各平台字數上限，並產出 hashtag', V1),
+      done('V3.3', '送社群帶上 hashtag', V1),
       todo('V3.4', 'Remotion 不再是製作模式，改成第 2 步「加片頭卡（6–22 秒）」（要先完成 V1.4）'),
     ] },
   { n: 4, code: 'V4', group: 'B', title: 'QA 真能通過', plain: '每個比例各算一支成片；腳本、素材授權、字幕在做影片當下記好，四項 QA 才有可能全過。',
