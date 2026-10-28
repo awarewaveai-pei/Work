@@ -1,4 +1,30 @@
 # Worklog
+## 2026-10-28（續7）
+
+### AUTO_CONTENT P9.1 補收尾：熱搜每天自動落地（728f21a35，已於 10-27 03:00 隨 main 部署）
+
+**根因**：熱搜只在有人打開文章頁 🔥 面板時才存（`app/api/content/trending/route.ts` 舊 `trendingResponse`），排程從不抓；不認識的市場一律拿台灣熱搜（舊 `plan.ts:21` `?? "TW"`）。卡片 `agency-os/handoffs/2026-10-26-autocontent-gap.md` §7 P9.1。
+
+**步驟**：新 `lib/content/topics/collect-trends.ts`（`collectTrends` route 與排程共用；`collectTrendsIfDue` 守衛＝`content_trends` 已有 `(geo, 今天 UTC)` 列，B5）；`lib/schedules/jobs.ts` `content_pipeline.run` 先依客戶啟用站的 geo 收熱搜再 tick；`trending-sources.ts` 加 `search/google-trends`（RSS）、`search/youtube-trending`（`YOUTUBE_API_KEY` 在才開）；`plan.ts` `geoFor` 不認識的市場回 `null`（B9）。
+
+**過程異常**：操作者 10-26 指示「先不推」，此 commit 於 10-26 23:05 被別的 session 的 push 一起帶上 origin/main（`git reflog show origin/main` → `eb143c029 ... 2026-10-26 23:05:28 update by push`），10-27 03:00 自動部署。上線前未過外部審查與 WORKLOG，本條補。
+
+**發現（需操作者裁決，未修）**
+- M1 正式庫三個站沒有一個設市場：`wp_sites.content_defaults->>'targetCountry'` AwareWave=null、E2E-Verify-0704=null、Soulful Expression=「全球（不指定）」（10-28 唯讀查詢）。B9 之後三站 `geoFor`=null → 排程不收熱搜、手按「AI 提案本月題目」也不帶熱搜；舊碼會帶台灣熱搜。交接檔 §7 P9.1 第 4 點「台灣客戶在文章工具預設就是台灣」不成立（文章工具預設 `全球（不指定）`，`ContentStudio.tsx:756`）。三站 `content_pipeline` 皆未開，排程面無影響；手按提案已受影響。
+- m1 `content_pipeline.run` 中熱搜的 `wp_sites`／`content_trends` 讀取失敗會 throw，該次 firing 不 tick（卡片指定 throw；DB 同時故障時 tick 也會失敗，接受）。
+- m2 `YOUTUBE_API_KEY` 已被 video-service 使用（`apps/video-service/config.py:99`），next-admin 容器沒有；交接檔「grep 0 筆」只限 trending-sources。
+- m3 Codex oracle 不可用：`codex-oracle.ps1 -Mode review -DiffRef 728f21a35` 兩次皆 400 `The 'gpt-6.1-sol' model is not supported when using Codex with a ChatGPT account`（`$TEMP/codex-oracle-log-29ba6a17.txt.err`）；是 Codex 設定，非額度，未改。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/content/topics/__tests__/collect-trends.test.ts app/api/content/trending/route.test.ts lib/schedules/__tests__/content-pipeline-job.test.ts lib/content/topics/__tests__/plan.test.ts | exit=0 | ms=2470
+- 突變：`collect-trends.ts` 拿掉 `if (data && data.length) continue;` → `collect-trends.test.ts` (b) 紅 1／5 → 還原 5／5 綠；`npx tsc --noEmit` exit 0。
+- ORACLE_WAIVED: Codex 設定模型 gpt-6.1-sol 在 ChatGPT 帳號不支援（400，兩次），改書面對抗自審＋突變證據
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/3n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=geoFor|collectTrendsIfDue|collectTrends|loadDbSourceBlocks|search/google-trends|search/youtube-trending|YOUTUBE_API_KEY | hits=21
+
+[避免再發生]
+- 「先不推」的本機 commit 在共用 main 上擋不住別人的 push（AGENTS §8 禁自建 branch）。之後要停在本機的改動：不 commit，或放 `DEPLOY_HOLD`。
+- 交接檔裡「某預設值是 X」的主張，寫卡時要查正式資料，不只看程式。
 ## 2026-10-28（續6）— 影片工具 V1 專案骨架＋V3.1–V3.3；0138 套正式庫（Claude Opus；V3 派 cc.py Sonnet；操作者 go-ahead）
 
 - **卡**：`agency-os/docs/video_generator/VIDEO_TOOL_REDESIGN_2026-10-26.md` §7 V1.1–V1.5、V3.1–V3.3（監工台 `agency-os/handoffs/2026-10-26-video-tool-supervisor/`）。

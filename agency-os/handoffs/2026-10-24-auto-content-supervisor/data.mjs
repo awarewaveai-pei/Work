@@ -148,12 +148,11 @@ export const STEPS = [
       done('P8.5', '待辦清單和排程頁計畫改指這份計畫', '2a926449d'),
     ] },
   { n: 9, code: 'P9', group: 'H', plain: '最前面兩步也自動：每天自己抓熱搜、每月自己提題目；題目可以設成 AI 直接挑。選了「AI 挑」加「AI 審」的網站，整個月不用按任何鍵。', title: '熱搜與提案自動＋題目閘',
-    gate: '打開排程後不用按鈕：題目頁自己出現本月題目；網站設「AI 挑」的題目自動核准；德國這種沒有熱搜來源的市場不會拿台灣熱搜', risk: 'Medium（資料庫加一欄要你同意）', model: 'Opus 5.5', status: 'not_started', depends: ['P4'],
-    before: '待決 1、待決 2',
+    gate: '打開排程後不用按鈕：題目頁自己出現本月題目；網站設「AI 挑」的題目自動核准；德國這種沒有熱搜來源的市場不會拿台灣熱搜', risk: 'Medium（資料庫加一欄要你同意）', model: 'Opus 5.5', status: 'in_progress', depends: ['P4'],
     what: '排程每天抓一次熱搜（加 Google Trends、YouTube 兩個免費來源）；本月沒提案就提一次；題目閘 topicMode；題目頁升級成一頁總控；網站可填自己產業的 RSS',
     files: ['lib/content/topics/collect-trends.ts', 'lib/content/topics/plan-due.ts', 'lib/schedules/jobs.ts', 'app/(shell)/tools/content/topics/'],
     items: [
-      todo('P9.1', '每天自動抓一次熱搜存下來，多兩個免費來源：Google Trends、YouTube 熱門（YouTube 要你申請免費金鑰才開）；沒有熱搜來源的國家不再拿台灣的'),
+      done('P9.1', '每天自動抓一次熱搜存下來，多兩個免費來源：Google Trends、YouTube 熱門（YouTube 要你申請免費金鑰才開）；沒有熱搜來源的國家不再拿台灣的', '728f21a35'),
       todo('P9.2', '每個網站每月自動提一次題目（約 0.08 美元／站／月），提案也參考本月節日和活動；網站多一組按鈕「題目我自己挑／AI 挑好直接做」'),
       todo('P9.3', '題目頁變成一頁總控：先看到所有公司一覽（一個網站一列，有問題的排最上面），點一列進那個網站的五格：熱搜、提案、挑題、製作、發布，每格看得到狀態、能直接改設定和看到費用'),
       todo('P9.4', '網站設定可以填自己產業的新聞 RSS，提題目時優先參考；只給這個網站用，不分享給別的客戶'),
@@ -164,6 +163,4 @@ export const STEPS = [
 
 // 操作者自己要決定或親手做的（agent 不能替她定）
 export const OPEN = [
-  { n: 1, what: '同意 P9 六張卡（每個網站每月提案約 0.08 美元；熱搜、加題目免費）', before: 'P9', src: 'agency-os/handoffs/2026-10-26-autocontent-gap.md §7' },
-  { n: 2, what: '同意資料庫 wp_sites 加一欄「上次提案嘗試時間」（可退回，不鎖表）', before: 'P9', src: 'agency-os/handoffs/2026-10-26-autocontent-gap.md §4' },
 ];

@@ -67,7 +67,7 @@
 
 ## 4. 風險與部署
 
-- 卡 A Low（免費、無 DB）。卡 B Medium（排程內新增 AI 花費）→ 五張卡先給操作者看，同意再動手。migration 0138 加一欄、可 down、不鎖表；**apply 到 prod 那一步是 High，等 go**。卡 C Low–Medium（UI）。卡 D（P9.4）Low（免費、無 DB、只多一個選填欄位）。P9.5 Low（加題目免費、刪 UI、客戶入口還沒開放 `enabled: false`）。P9.6 Low–Medium（刪一頁；文章改日期／發布／丟垃圾桶的入口搬家，沿用既有 API）。
+- 卡 A Low（免費、無 DB）。卡 B Medium（排程內新增 AI 花費）→ 五張卡先給操作者看，同意再動手。migration 0139（0138 已被 `0138_media_projects_v2` 用掉）加一欄、可 down、不鎖表；**apply 到 prod 那一步是 High，等 go**。卡 C Low–Medium（UI）。卡 D（P9.4）Low（免費、無 DB、只多一個選填欄位）。P9.5 Low（加題目免費、刪 UI、客戶入口還沒開放 `enabled: false`）。P9.6 Low–Medium（刪一頁；文章改日期／發布／丟垃圾桶的入口搬家，沿用既有 API）。
 - 推上 main ＝當晚台灣 03:00 自動部署（AGENTS §0）。還不能上就放 `lobster-factory/infra/hetzner-phase1-core/DEPLOY_HOLD`（`reason=` 一行）。
 
 ## 5. 做法（照順序）
@@ -123,11 +123,11 @@
 ### P9.2　本月自動提案＋題目閘（卡 B；付費；Medium；migration apply 為 High）
 
 **改哪些檔**
-1. migration `lobster-factory/packages/db/migrations/0138_wp_sites_content_plan_attempted_at.sql`（格式照 `0125`）：
+1. migration `lobster-factory/packages/db/migrations/0139_wp_sites_content_plan_attempted_at.sql`（格式照 `0125`）：
    ```sql
    alter table public.wp_sites add column if not exists content_plan_attempted_at timestamptz;
    ```
-   `.down.sql`：`alter table public.wp_sites drop column if exists content_plan_attempted_at;`（只是時間戳，不需備份表）。RLS 不動。本機 Postgres apply → down → apply 各一次證明可逆；prod 等 go（`node scripts/apply-db-migration.mjs 0138`）。
+   `.down.sql`：`alter table public.wp_sites drop column if exists content_plan_attempted_at;`（只是時間戳，不需備份表）。RLS 不動。本機 Postgres apply → down → apply 各一次證明可逆；prod 等 go（`node scripts/apply-db-migration.mjs 0139`）。
 2. 題目閘（B4）：
    - `NA/lib/content/brand-voice.ts:17-30` 旁：`export const TOPIC_MODES = ["human_pick","ai_pick"] as const`、`SiteContentDefaults.topicMode?: TopicMode`、`export const aiPicksTopics = (d) => d?.topicMode === "ai_pick"`（註解同 `autoPublishes`）。
    - `NA/app/api/content/sites/[id]/route.ts:48-59` 的 `publishMode` 分支照抄一份給 `topicMode`（staff only、白名單 400、同一次條件寫入 409）。既有 route 測試若有 publishMode 案例，複製一組給 topicMode。
@@ -181,7 +181,7 @@
 - 突變：拿掉 `hasProposal` 那個 `continue` → 測 2 變紅 → 還原變綠。
 - 部署後實測（go 之後）：測試客戶打開 `content_pipeline`，run-due log 出現 `planned site=…`，題目頁出現本月題目；再 5 分鐘 log 是 tick 摘要而不是第二次 `planned`。
 
-**Rollback**：revert commit（app 先）→ `0138.down.sql`。已提出的題目是資料，留著。
+**Rollback**：revert commit（app 先）→ `0139.down.sql`。已提出的題目是資料，留著。
 
 ### P9.3　自動內容總控頁（卡 C；Low–Medium；A、B 做完才做）
 
