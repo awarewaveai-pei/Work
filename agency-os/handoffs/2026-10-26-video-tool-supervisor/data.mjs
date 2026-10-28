@@ -6,7 +6,7 @@ export const META = {
   updated: '2026-10-28',
   plan: 'agency-os/docs/video_generator/VIDEO_TOOL_REDESIGN_2026-10-26.md',
   req: 'agency-os/docs/video_generator/VIDEO_TOOL_OPERATOR_FINDINGS_2026-10-26.md',
-  worklog: 'agency-os/WORKLOG.md 2026-10-26 續20–續23',
+  worklog: 'agency-os/WORKLOG.md 2026-10-28 續21–續25',
   self: 'agency-os/handoffs/2026-10-26-video-tool-supervisor/',
   url: 'https://claude.ai/artifact/ChAU93JZVbgkuptRpVYRdf',
 };
@@ -31,9 +31,9 @@ export const NOW = [
   { what: '字幕（Whisper）', state: 'no', ev: '主機設定已加（d62a2eee5），但字幕服務在筆電上，筆電沒開就不能用；快速影片改用腳本產字幕是 V4.6' },
   { what: '客戶只選一次、關頁不丟', state: 'yes', ev: 'V1 已推上 main（8e8f30c27），2026-10-29 台灣 03:00 自動部署後生效；資料庫 0138 已套用' },
   { what: '看成片的結果頁', state: 'yes', ev: 'V2 已推上 main（3459e3b32）：側欄 Video Projects；2026-10-29 台灣 03:00 部署後生效' },
-  { what: 'QA 四項能全部通過、能建 Release', state: 'no', ev: 'V4；正式庫 Release 史上 0 筆' },
-  { what: '發布不用填 JSON', state: 'no', ev: 'V5' },
-  { what: '④ 後自動完成', state: 'no', ev: 'V6' },
+  { what: 'QA 四項能全部通過、能建 Release', state: 'no', ev: 'V4 程式都在，但要做一支真實影片才知道；正式庫 Release 史上 0 筆' },
+  { what: '發布不用填 JSON', state: 'yes', ev: 'V5 已推上 main（ad5a95745），2026-10-29 台灣 03:00 部署後生效；互動流程尚待你在正式站看一眼' },
+  { what: '④ 後自動完成', state: 'yes', ev: 'V6 已推上 main（f74d16c86）；排程格預設關，要到客戶排程頁打開；尚未用真實影片走過一遍' },
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
@@ -43,6 +43,10 @@ const V2 = '3459e3b32';
 const V34 = '9f6015039';
 const V4A = '1a67f0052';
 const V4B = '9fff275e6';
+const V49 = '4a92e692e';
+const V5 = 'ad5a95745';
+const V6 = 'f74d16c86';
+const V7 = '3b65d9e6a';
 
 export const STEPS = [
   { n: 1, code: 'V1', group: 'A', title: '專案骨架', plain: '每支影片存成一個專案，客戶、腳本、比例都跟著走；腳本頁一顆鍵送去做影片。',
@@ -91,31 +95,34 @@ export const STEPS = [
       done('V4.6', '快速影片字幕用腳本＋配音時間點產生，不用筆電', V4B),
       done('V4.7', '字幕步驟依影片種類自動選做法；快速影片顯示並可下載字幕', V4B),
       todo('V4.8', '改字幕後重燒：渲染時留一份無字幕底片，⑦ 逐句改字幕按「重燒字幕」，每個比例重做、品質檢查重跑'),
-      todo('V4.9', '上傳素材的「有權使用」改成上傳畫面上的勾選框，沒勾不能上傳；伺服器也擋'),
+      done('V4.9', '上傳素材的「有權使用」改成上傳畫面上的勾選框，沒勾不能上傳；伺服器也擋', V49),
     ] },
   { n: 5, code: 'V5', group: 'C', title: '發布不填 JSON', plain: '勾平台、文案自動寫好可改、比例自動配對；WordPress 用選的。',
-    gate: '勾 YouTube＋IG 得到兩個草稿，各自是 16:9 和 4:5', risk: 'Medium（外部寫入一律先成草稿）', model: 'Opus 5.5', status: 'not_started', depends: ['V4'],
+    gate: '勾 YouTube＋IG 得到兩個草稿，各自是 16:9 和 4:5', risk: 'Medium（外部寫入一律先成草稿）', model: 'Opus 5.5', status: 'done', commit: V5, depends: ['V4'],
+    waitFor: '2026-10-29 台灣 03:00 自動部署後在正式站生效；沒有 migration',
     what: 'ReleaseDeliveryPanel 改結構化；社群走 savePost；WordPress 走 embedVideoInPost',
     files: ['app/(shell)/tools/video/ReleaseDeliveryPanel.tsx', 'lib/social/store.ts', 'lib/content/video/embed-in-post.ts'],
     items: [
-      todo('V5.1', 'QA 全過的比例一鍵建 Release，畫面不出現 SHA 或 UUID'),
-      todo('V5.2', '社群：勾已連的頻道，文案自動寫、可改，比例自動配平台，存成社群草稿'),
-      todo('V5.3', 'WordPress：選網站、選文章，嵌入影片'),
+      done('V5.1', 'QA 全過的比例一鍵建 Release，畫面不出現 SHA 或 UUID', V5),
+      done('V5.2', '社群：勾已連的頻道，文案自動寫、可改，比例自動配平台，存成社群草稿', V5),
+      done('V5.3', 'WordPress：選網站、選文章，嵌入影片', V5),
     ] },
   { n: 6, code: 'V6', group: 'C', title: '④ 後自動', plain: '按「生成並自動完成」後，字幕、QA、Release、社群草稿自己跑完；哪一步沒過就停下並寫原因。',
-    gate: '按自動完成後關頁，回專案頁看到草稿，或看到停在哪一步和原因', risk: 'High（自動化，預設關）', model: 'Opus 5.5', status: 'not_started', depends: ['V4', 'V5'],
+    gate: '按自動完成後關頁，回專案頁看到草稿，或看到停在哪一步和原因', risk: 'High（自動化，預設關）', model: 'Opus 5.5', status: 'done', commit: V6, depends: ['V4', 'V5'],
+    waitFor: '部署後，到客戶的排程頁打開「影片做完自動完成」（預設關）才會動；先用一支測試影片走一遍',
     what: '排程器新 job video_project_advance（同一個每 5 分鐘時鐘）；生成鍵分兩顆',
     files: ['lib/schedules/jobs.ts', 'app/(shell)/tools/video/VideoStudio.tsx'],
     items: [
-      todo('V6.1', '排程每 5 分鐘把設成自動的專案往下推一步，沒過就停下記原因'),
-      todo('V6.2', '生成鍵分成「我要逐步審」和「生成並自動完成」'),
+      done('V6.1', '排程每 5 分鐘把設成自動的專案往下推一步，沒過就停下記原因（排程格預設關）', V6),
+      done('V6.2', '生成鍵分成「我要逐步審」和「生成並自動完成」', V6),
     ] },
   { n: 7, code: 'V7', group: 'B', title: '全自動接專案', plain: '題目頁自動做的影片也建成專案，出現在同一個結果頁。',
-    gate: '題目頁做的影片出現在結果頁', risk: 'Medium', model: 'Sonnet 5.5（卡已寫死）', status: 'not_started', depends: ['V1', 'V2'],
+    gate: '題目頁做的影片出現在結果頁', risk: 'Medium', model: 'Sonnet 5.5（卡已寫死）', status: 'done', commit: V7, depends: ['V1', 'V2'],
+    waitFor: '2026-10-29 台灣 03:00 自動部署後生效；下一支題目做影片時就會出現在結果頁',
     what: 'start.ts 開影片時建專案（source content_topic）',
     files: ['lib/content/video/start.ts', 'lib/content/topics/tick.ts'],
     items: [
-      todo('V7.1', '題目開始做影片時建一個專案，影片記到它'),
+      done('V7.1', '題目開始做影片時建一個專案，影片記到它', V7),
     ] },
 ];
 
