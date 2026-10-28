@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-28（續15）— video-service 部署 V4.3／V4.6／V4.7（9fff275e6）（Claude；操作者 go-ahead）
+
+- 前置：`video_jobs` running 0；main 推至 1ebaa2771；主機 `/root/Work` ff。
+- 步驟：`docker tag lobster-video-service:local :pre-20261028-v4` → rsync（`DEPLOY_ROLLBACK_RUNBOOK.md:196`＋`--exclude='*.bak.safe-patch-*'`）→ `docker compose -f docker-compose.video.yml --env-file .env.video up -d --build`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec -w /app lobster-video-service python -m unittest tests.test_captions tests.test_output_meta_qa tests.test_quality → 12 OK（0 skipped，含真 edge-tts）；healthy restarts=0；next-admin→VIDEO_SERVICE_URL/health 200 | exit=0 | ms=23853
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell scripts/system-health-check.ps1 → 319/320，重跑無 FAIL 行（並行 session 改檔中） | exit=0 | ms=120000
+- REVIEW_WAIVED: NA -- 程式審查見同日 V4 commits（cc.py 工人書面自審）
+- BUGHUNT_WAIVED: NA -- 部署，無程式改動
+- rollback：`docker tag lobster-video-service:pre-20261028-v4 lobster-video-service:local` → 同目錄 `up -d --no-build`。
 ## 2026-10-28（續14）— 影片 V4.3／V4.6／V4.7：QA failed 不丟片、腳本字幕、字幕步驟依來源（Claude）— 待操作者 go-ahead 部署 video-service，未 push
 
 - **根因**：V4.3 `server.py` `_build_output_meta` 在 QA failed 時 raise，整支已付費的片被丟；V4.6 `pipeline._tts` 用 `.save()` 丟掉 Edge 的 `SentenceBoundary` 時間點 → 快速影片只能靠 Whisper（筆電）；V4.7 字幕步驟一律要 Whisper。
