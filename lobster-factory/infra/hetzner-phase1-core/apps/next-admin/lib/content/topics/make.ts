@@ -23,6 +23,8 @@ import { claudeWriter } from "@/lib/social/write-posts-claude";
 import { articleChecks, reviewOf, socialChecks, type ReviewCheck } from "./review";
 import { claimTopic, dueApproved, inStatus, move, startTopic, type Topic } from "./store";
 import { startVideoJob } from "@/lib/content/video/start";
+import { ensureTopicProject, updateTopicProject } from "@/lib/content/video/topic-project";
+import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { finalizeVideoJob } from "@/lib/content/video/finalize";
 import { embedVideoInPost } from "@/lib/content/video/embed-in-post";
 import { ARTICLE_VIDEO_DEFAULTS, articleVideoVoice, parseVoiceModel } from "@/lib/content/video/defaults";
@@ -179,7 +181,7 @@ async function startTopicVideo(sb: SupabaseClient, t: Topic, record: (jobId: str
     language: site.defaults.language || "繁體中文", brandVoice: renderSiteVoice(site.defaults),
     sceneCount: d.sceneCount, customScenes: d.customScenes, brollScenes: d.sceneCount - d.customScenes,
     imageModel: d.imageModel, outputFormats: [...d.formats], ...parseVoiceModel(articleVideoVoice(site.defaults.language)),
-  }, { beforePrepare: record });
+  }, { beforePrepare: record, projectFor: () => ensureTopicProject(sb, t, d.formats) });
   const failure = started.ok ? null : (started as Extract<typeof started, { ok: false }>).error;   // strict:false
   if (failure && failure !== "taken") throw new Error(`影片無法開始：${failure}`);
 }
@@ -195,7 +197,10 @@ export async function pollTopicVideo(t: Topic, jobId: string): Promise<VideoPoll
   const r = await finalizeVideoJob(job);
   if (r.status === "running") return { state: "running" };
   if (r.status === "wrong_poller") return { state: "error", error: "影片工作不是這條管線的類型" };
-  if (r.status === "error") return { state: "error", error: r.error ?? "影片渲染失敗" };
+  if (r.status === "error") {
+    await updateTopicProject(getSupabaseWriteClient(), t.organization_id, t.id, { last_error: r.error ?? "影片渲染失敗" });
+    return { state: "error", error: r.error ?? "影片渲染失敗" };
+  }
   const { pickPrimaryOutput } = await import("@/lib/content/blocks/video-pipeline");
   const url = pickPrimaryOutput(r.video?.outputs ?? {});
   return url?.startsWith("https://") ? { state: "done", url } : { state: "error", error: "影片做好了但沒有可用的網址" };
@@ -233,6 +238,7 @@ export async function attachTopicVideo(t: Topic, url: string, actor: string, sav
   } catch (e) {
     throw new MakeError(e instanceof Error ? e.message : String(e), artifacts as Record<string, unknown>);
   }
+  await updateTopicProject(getSupabaseWriteClient(), t.organization_id, t.id, { lifecycle_stage: "review", last_error: null });   // V7.1
   return { artifacts: artifacts as Record<string, unknown> };
 }
 

@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-28（續25）— 影片 V7.1：題目頁做的影片也建成專案，出現在同一個結果頁（Claude）
+
+- **根因**：題目管線（P6／P7）開影片時只建 `video_jobs`，不建專案，成片記不到 `media_project_id` → 結果頁（V2）看不到自動做的影片（D3）。
+- **做了**：新 `lib/content/video/topic-project.ts`：`ensureTopicProject`（每題一個專案：`source=content_topic`、`source_ref`＝題目 id、`autonomy=full_auto`、`quick_video`、`formats` 取文章影片預設；以 `source_ref` 找回，重試不重複建）、`updateTopicProject`（影片進文章／社群草稿後 `review`；渲染失敗寫 `last_error`；best-effort 不讓紀錄害題目失敗）。`start.ts` 的 `startVideoJob` 加 `opts.projectFor`（`beforePrepare` 通過後才建，兩個排程不會各建一個）→ `recordParams.projectId` → 既有 `finalize` 寫 `media_project_id`（V1.5）。`make.ts` 的 `startTopicVideo` 接上；`pollTopicVideo`／`attachTopicVideo` 更新專案狀態。專案建失敗只記 warn、影片照做（專案只是清單，影片才是工作）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run`（next-admin 全套，部署閘等價）＋`npx tsc --noEmit` | exit=0 | ms=27889 | 411 files 3496 passed；tsc 本卡檔案 0 錯。新測試：`topic-project.test.ts`（一題一專案、重試找回）、`start-project.test.ts`（projectId 進 recordParams；建專案失敗不擋影片）。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n（n：卡片寫「tick 測試」，實際測在 `ensureTopicProject`／`startVideoJob` 兩個接縫，`tick.ts` 的 deps 介面沒變；真實 DB 的建專案與 finalize 記 `media_project_id` 要等排程跑一支題目影片才驗得到）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=startVideoJob|projectFor|content_topic | hits=11（`startVideoJob` 呼叫端只有 generate route 與 make.ts；`source` check 約束含 content_topic，0138 已套）
+- ORACLE_WAIVED: Codex 本輪不可用；書面自審：專案 org＝題目 org，recordParams.projectId 由伺服器端產生不收外部輸入；`beforePrepare` 失敗者不會建專案；`autonomy=full_auto` 不會被 `video_project_advance` 撈到（只撈 `auto_after_render`）。
+- **Rollback**：`git revert <此 commit>`；無 migration。
 ## 2026-10-28（續24）— 影片 V6.1／V6.2：④ 後自動完成（排程 job 預設關＋生成鍵分兩顆）（Claude）
 
 - **根因**：自動化程度（D2）只存在設計裡；按生成後沒有東西把影片往下推（字幕／QA／Release／社群草稿都要人點）。

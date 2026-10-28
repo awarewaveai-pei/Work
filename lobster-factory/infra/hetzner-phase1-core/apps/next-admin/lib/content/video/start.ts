@@ -44,9 +44,11 @@ export type VideoStart = { ok: true; jobId: string } | { ok: false; error: strin
 /**
  * `beforePrepare(jobId)` runs after the job row exists and before anything is paid for; false = do not prepare (the
  * job is closed as an error). The pipeline uses it to record the job on its topic first, so two sweeps never both pay.
+ * `projectFor()` (V7.1) makes the video project the render is recorded to; asked only after `beforePrepare` passed. A failure
+ * to make it is logged, not fatal: the project is a listing, the video is the work.
  */
 export async function startVideoJob(orgId: string | null, input: VideoStartInput,
-  opts: { beforePrepare?: (jobId: string) => Promise<boolean> } = {}): Promise<VideoStart> {
+  opts: { beforePrepare?: (jobId: string) => Promise<boolean>; projectFor?: () => Promise<string> } = {}): Promise<VideoStart> {
   await import("@/lib/content/blocks/register-all");
   const { byId } = await import("@/lib/content/blocks/registry");
   const pipeline = byId("video/pipeline");
@@ -65,6 +67,12 @@ export async function startVideoJob(orgId: string | null, input: VideoStartInput
   if (opts.beforePrepare && !(await opts.beforePrepare(job.id))) {
     await finishJob(job.id, { status: "error", error: "已由另一次排程接手", statusCode: 409 });
     return { ok: false, error: "taken" };
+  }
+
+  let projectId: string | undefined;
+  if (opts.projectFor) {
+    try { projectId = await opts.projectFor(); }
+    catch (e) { console.warn("[video/start] project not made, the video is recorded without one:", e instanceof Error ? e.message : e); }
   }
 
   // 供積木組出帶租戶身分的 R2 目錄名（buildVideoOutName）；讀不到就退回無租戶前綴，不是崩潰。
@@ -96,6 +104,7 @@ export async function startVideoJob(orgId: string | null, input: VideoStartInput
             imageModel: input.imageModel,
             source: "generate",
             serviceCapability: prep.serviceCapability,
+            ...(projectId ? { projectId } : {}),
           }
         : undefined,
     });
