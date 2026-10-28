@@ -1,5 +1,13 @@
 # Worklog
 
+## 2026-10-28（續2）— Anthropic User Profiles：決定延後接，開工條件寫進 ADR 017（Claude）
+
+- **決定**：現在不接。官方：沒帶 profile 的請求＝我們自己的用量。正式 `ops_audit_events` 近 60 天 `entitlement.usage`：anthropic 只有 awarewave-ops 11 筆、soulful-expression 1 筆（actor `agent:p7-soulful-video`），沒有客戶本人呼叫。customer org 5 個（含 3 個 onboarding_portal 測試 org）。
+- **做了**：`agency-os/docs/architecture/decisions/017-entitlements-and-self-hosted-modules.md:104` 加一條：開工條件＝第一筆 actor 是客戶本人的 Claude 請求；做法 ①另開 org ②`uprof_` 存 DB＋唯一約束 ③只改 `lib/ai/gateway.ts:17` `loadAnthropic` ④webhook＋不重試。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo docker exec supabase-db psql -c "select ... from ops_audit_events where event_type='entitlement.usage' and created_at > now()-interval '60 days' group by kind,slug,provider" | exit=0 | ms=1326
+- REVIEW_WAIVED: DOC_ONLY -- ADR 加一條決定，無 source 修改
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=user_profile_id|anthropic-user-profile | hits=1（只有新加的 ADR 017 那條）
+- **注意**：本機 `supabase-awarewave-postgres` MCP `ECONNREFUSED 127.0.0.1:5432`（通道沒開），改走 SSH `ubuntu@` docker exec 唯讀查詢。
 ## 2026-10-28（續1）— 影片工具重新設計監工台上線（Claude）
 
 - **做了**：`agency-os/handoffs/2026-10-26-video-tool-supervisor/`（data／build／check，沿用 `scripts/supervisor-kit`）；check 綁 `VIDEO_TOOL_REDESIGN_2026-10-26.md` §7 的 V 卡號（7 階段 25 卡）。操作者：這次不做「每項先講例子、GPT 精簡」。發布 https://claude.ai/artifact/ChAU93JZVbgkuptRpVYRdf 。
