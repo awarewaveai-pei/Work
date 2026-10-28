@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-28（續16）
+
+### AUTO_CONTENT P9.2＋P9.5（cc.py 實作，主 session 驗收）
+
+- P9.2：排程每站每台灣月提案一次（`plan-due.ts`，B1–B4、B8）；題目閘 `topicMode`；節日進提案（`lib/events/for-month.ts`）。0139 已套正式庫（`apply-db-migration.mjs 0139` APPLY_OK；`information_schema` 查到 `content_plan_attempted_at timestamptz`）；down 兩處（migrations／scripts）。
+- P9.5：題目頁一次加多題（≤30，`spreadDays`）；刪 ContentStudio 批量產文；內容入口選單加題目頁。
+- m1 全球站與沒來源國家的節日不過濾國家（`eventMatchesCountries([])` 全留，`facets.ts:97-99`），接受。
+- cc.py 花費 1.18＋0.60 美元；worker 把檔轉成 CRLF，已改回 LF。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run (P9.2+P9.5 named files, 9 files) | exit=0 | ms=3038
+- 突變：P9.2 拿掉 hasProposal continue → 2 紅；P9.5 拿掉 MAX_BULK_TOPICS → 1 紅；皆還原綠（cc.py 報告）。tsc：自有檔 0 錯。
+- ORACLE_WAIVED: Codex 額度／設定不可用；主 session 讀 plan-due.ts、jobs.ts diff
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=批量產文|handleBulkRun|bulkSettings | hits=0
 ## 2026-10-28（續15）— video-service 部署 V4.3／V4.6／V4.7（9fff275e6）（Claude；操作者 go-ahead）
 
 - 前置：`video_jobs` running 0；main 推至 1ebaa2771；主機 `/root/Work` ff。
