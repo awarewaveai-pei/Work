@@ -485,7 +485,7 @@
 > `/tomo` 自動寫入此分類
 > **原名 `#### 待釐清 / 明日提醒`**（2026-08-26 更名並清空）。它原本裝了 86 條 —— 31 條開放項已歸入 A–H、55 條已完成項已移入歷程。
 > 此區**刻意允許未分類**：`/tomo` 交接包落地時還不知道卡在誰身上，下一次 AO-RESUME 或整理時再分派到 A–H。空著是正常狀態。
-- [x] **AUTOCONTENT-GAP 全自動內容管線缺口：「搜集熱搜」與「提案題目」兩步沒接上排程（2026-10-26 查證）**：交接全文（自足、只讀這一檔）`agency-os/handoffs/2026-10-26-autocontent-gap.md`。**下一步**：照該檔 §5 第一步開始（卡片全文在 §7）。建議模型：Opus 5.5 實作。**操作者待辦**：申請 YouTube Data API key（免費額度）放進 `mcp/user-env.ps1` 與主機 env `YOUTUBE_API_KEY`，P9.1 的 YouTube 熱門來源才會啟用；沒 key 不擋其他卡。 **完成 2026-10-28**：P9.1–P9.6 全上 main（監工台 67/67）；0139 已套正式庫。 **剩**：內容門（content.<domain>）的題目頁先拿掉，門頁不得讀 service-role；上門前要一支走門身分的總控頁 API（WORKLOG 2026-10-28 部署閘）。
+- [x] **AUTOCONTENT-GAP 全自動內容管線缺口：「搜集熱搜」與「提案題目」兩步沒接上排程（2026-10-26 查證）**：交接全文（自足、只讀這一檔）`agency-os/handoffs/2026-10-26-autocontent-gap.md`。**下一步**：照該檔 §5 第一步開始（卡片全文在 §7）。建議模型：Opus 5.5 實作。**操作者待辦**：申請 YouTube Data API key（免費額度）放進 `mcp/user-env.ps1` 與主機 env `YOUTUBE_API_KEY`，P9.1 的 YouTube 熱門來源才會啟用；沒 key 不擋其他卡。 **完成 2026-10-28**：P9.1–P9.6 全上 main（監工台 67/67）；0139 已套正式庫。 內容門題目頁已補（門身分 API，cb976618e）。
 - [ ] **ADR 017「賣家」4c：收銀台可裝在任何網站**（操作者 2026-10-25 定方向；設計卡 `agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-4-seller.md`，commit 6726922eb）。**D1–D5 已決（操作者 2026-10-25，全部照★）**：每站 Ed25519 公鑰／AwareWave 目錄＋賣家自有方案／`<product>.resell` 權利列／月結報表人工發票／一站一帳戶；寫入 ADR 017 產品決定 #12 與順序 4「4c」。**4c-4 已推（38a8198fb）、4c-1 `0133_seller_sites` 已套 prod（WORKLOG 2026-10-25 續68、續70）。** **下一步**：4c-2 next-admin（`lib/payments/sites.ts`、`hmac.ts`／`woo-billing.ts` 查表驗章、`wp-customers.ts` 加 site、`awarewave-wp.ts` 站鑰匙、`/ops/sellers`、0130 總帳賣家欄）→ 4c-3 外掛代理商模式（Ed25519 產鑰、設定頁 key_id）。每張卡各自 commit、Acceptance 在卡上。回報操作者一律繁體中文。建議模型：Opus 5.5（卡寫死）→ 可派 `fullstack-engineer`／Codex。
 
 ## Next — 已完成歷程（查詢用）

@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-28（續22）
+
+### 內容門題目頁補回（門身分 API）＋P9 全部上線
+
+- 內容門 `/topics` 改讀 `GET /api/content/topics/overview`（`canAccessOrg` 每站）；`loadOverview(sb, mayRead)`；排程開關只在員工包裝 `StaffTopicsBoard`。cb976618e 已部署（sg-deploy exit 0，3480 測試，容器 healthy）。
+- AwareWave 管線已開（人挑人審）：首輪 285 則熱搜／7 地區、10 月 28 題、無錯（psql 查 client_schedules/content_trends/content_topics）。
+- 未完成：YouTube 金鑰主機與 user-env 都沒有，需操作者申請；Codex config 已是 `gpt-5.6-luna`（非本 session 改），未驗證。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin (cb976618e) | exit=0 | ms=12000
+- REVIEW_WAIVED: NA -- 改動依 registry-code/staff-tools 不變量測試驗收，全套綠
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=loadOverview | hits=5
 ## 2026-10-28（續21）— 影片 V4.9：上傳素材「有權使用」改成勾選框，沒勾不能上傳（Claude）
 
 - **根因**：D7 的權利聲明靠 `window.confirm`，按「取消」仍會上傳（只是版權 QA 之後變紅），聲明不是上傳的條件；FootageEditor 的上傳根本不送聲明。
