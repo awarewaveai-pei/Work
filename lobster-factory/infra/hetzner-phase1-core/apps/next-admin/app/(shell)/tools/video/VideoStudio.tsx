@@ -13,6 +13,7 @@ import FootageEditor from "./FootageEditor";
 import ReleaseDeliveryPanel from "./ReleaseDeliveryPanel";
 import MediaOperationsPanel from "./MediaOperationsPanel";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
+import type { ProductionInput, RemotionInput } from "./video-handoff";
 
 // 影片專屬攝影風格 preset（放最前 = 預設組）。值為英文 prompt，直接送 Flux。
 const VIDEO_STYLE_PRESETS: { zh: string; group: string; prompt: string }[] = [
@@ -171,31 +172,9 @@ const STUDIO_TAB_GROUPS: { group: string; items: { id: StudioTabId; label: strin
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-interface VideoStudioInitial {
-  topic?: string;
-  articleTitle?: string;
-  articleContent?: string;
-  /** 深層接力：前製腳本場景（台詞→旁白、畫面→生圖提示）→ 直接出片，不重生。 */
-  scenes?: { narration: string; imagePrompt: string; visual?: "custom" | "broll"; brollKeyword?: string; referenceImageUrl?: string }[];
-  /** 前製腳本帶入的素材模式（pexels-video / pexels-all / __ai__） */
-  mediaMode?: string;
-  /** 前製腳本帶入的目標時長（分鐘） */
-  duration?: number;
-  /** 前製腳本帶入的 AI 生圖場景數 */
-  customScenes?: number;
-}
-
-interface ScriptRemotionPrefill {
-  topic: string;
-  headline?: string;
-  tagline?: string;
-  cta?: string;
-  imageHint?: string;
-  scenes?: { visual: string; dialogue: string }[];
-  mediaMode?: string;
-  duration?: number;
-  customScenes?: number;
-}
+// Script inputs: one definition shared with ScriptForge / VideoPipeline / VideoTabs (video-handoff.ts).
+type VideoStudioInitial = ProductionInput;
+type ScriptRemotionPrefill = RemotionInput;
 
 interface VideoStudioEmbedded {
   /** 鎖定顯示單一內層 tab、隱藏自己的 tab bar chrome——供 VideoPipeline 當「④ 生成或選取素材」步驟內容嵌入。 */
@@ -208,6 +187,8 @@ interface VideoStudioEmbedded {
    * 渲染好的素材（真實跑過一次才發現：wizard 選 E2E-Verify-0704，影片卻記在 AwareWave Ops）。
    */
   organizationId?: string;
+  /** 影片專案（V1.5）：render-draft 驗它屬於 organizationId，成片記到該專案。 */
+  projectId?: string;
 }
 
 export default function VideoStudio({ initial, remotionInitial, embedded }: { initial?: VideoStudioInitial; remotionInitial?: ScriptRemotionPrefill; embedded?: VideoStudioEmbedded } = {}) {
@@ -628,6 +609,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
           r2Keys: draftR2Keys,
           title: draftTitle,
           ...(embedded?.organizationId ? { organizationId: embedded.organizationId } : {}),
+          ...(embedded?.projectId ? { projectId: embedded.projectId } : {}),
           ...parseVoiceModel(voiceModelId),
         }),
       });

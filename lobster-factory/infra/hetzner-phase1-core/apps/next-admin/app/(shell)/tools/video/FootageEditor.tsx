@@ -18,7 +18,8 @@ const card: React.CSSProperties = { background: "var(--card-bg)", border: "1px s
 const input: React.CSSProperties = { border: "1px solid var(--border-subtle)", borderRadius: 6, padding: "7px 8px", background: "var(--bg-subtle)", color: "var(--text-primary)", fontSize: 12 };
 
 /** First-class real-footage editing surface. Uploads are isolated to the existing R2 asset route. */
-export default function FootageEditor({ initialOrganizationId, onRenderComplete }: { initialOrganizationId?: string; onRenderComplete?: (jobId: string) => void } = {}) {
+// projectId given = the video project owns the organization: no picker, and the render is recorded under that project.
+export default function FootageEditor({ initialOrganizationId, projectId, onRenderComplete }: { initialOrganizationId?: string; projectId?: string; onRenderComplete?: (jobId: string) => void } = {}) {
   const [clips, setClips] = useState<Clip[]>([]);
   const [organizationId, setOrganizationId] = useState(initialOrganizationId ?? "");
   const [busy, setBusy] = useState(false);
@@ -78,7 +79,7 @@ export default function FootageEditor({ initialOrganizationId, onRenderComplete 
     setBusy(true); setError(""); setRenderJobId("");
     try {
       if (!compiledTimeline) throw new Error("請先編譯 Timeline");
-      const res = await fetch("/api/video/footage/render", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ timeline: compiledTimeline }) });
+      const res = await fetch("/api/video/footage/render", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ timeline: compiledTimeline, ...(projectId ? { projectId } : {}) }) });
       const json = await res.json() as { ok: boolean; jobId?: string; error?: string };
       if (!res.ok || !json.ok || !json.jobId) throw new Error(json.error ?? "實拍渲染提交失敗");
       setRenderJobId(json.jobId);
@@ -93,7 +94,7 @@ export default function FootageEditor({ initialOrganizationId, onRenderComplete 
       <p style={{ margin: "4px 0", fontSize: 12, color: "var(--text-secondary)" }}>上傳短片、調整切點與輸出時間，產生可版本化的 Edit Decision Plan 草稿。</p>
     </div>
     <div style={{ ...card, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-      <label style={{ fontSize: 12, color: "var(--text-secondary)", flex: "1 1 280px" }}>租戶<div style={{ marginTop: 5 }}><OrganizationPicker value={organizationId} onChange={(id) => { setOrganizationId(id); setCompiledTimeline(null); }} /></div></label>
+      {!projectId && <label style={{ fontSize: 12, color: "var(--text-secondary)", flex: "1 1 280px" }}>租戶<div style={{ marginTop: 5 }}><OrganizationPicker value={organizationId} onChange={(id) => { setOrganizationId(id); setCompiledTimeline(null); }} /></div></label>}
       <label style={{ padding: "8px 12px", borderRadius: 7, background: "var(--accent)", color: "var(--btn-primary-text)", fontSize: 12, fontWeight: 700, cursor: busy ? "wait" : "pointer" }}>
         {busy ? "上傳中…" : "＋ 匯入 MP4"}
         <input type="file" accept="video/mp4" hidden disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.currentTarget.value = ""; }} />

@@ -92,6 +92,7 @@ export async function finalizeVideoJob(job: VideoJob): Promise<FinalizeResult> {
             source: job.recordParams.source,
             serviceCapability: job.recordParams.serviceCapability,
             outputMeta: poll.outputMeta,
+            mediaProjectId: job.recordParams.projectId,
             // This path owns the real render metadata; the reconcile sweep only has
             // placeholders. Merge on conflict so a sweep that got there first is
             // enriched rather than freezing `title: <dir>` / `sceneCount: 0`.

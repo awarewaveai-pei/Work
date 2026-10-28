@@ -3,6 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { BODY_LIMITS } from "../../social/limits";
 import { FORGE_MODULES, FORGE_NAV, forgePrompt, languageLine, type ForgeCtx } from "../modules";
 
 const ctx: ForgeCtx = { lang: "繁體中文", sceneCount: 6, customScenes: 3, brand: null };
@@ -17,7 +18,7 @@ const FIXTURES: Record<string, unknown> = {
   "manual.script": { title: "t", hook: "h", scenes: [{ time: "0-3秒", visual: "v", dialogue: "d", subtitle: "s", shoot_tip: "", edit_tip: "" }], cta: "追蹤" },
   "result.score": { scores: { hook: 8, rhythm: 7, clarity: 8, emotion: 6, shootability: 8, conversion: 7 }, overall: 7.5, optimized_hook: "", optimized_cta: "" },
   "result.score_short": { scores: { hook: 8, rhythm: 7, clarity: 8, emotion: 6, shootability: 8, conversion: 7 }, overall: 7.5 },
-  "result.platform": { title: "t", hook: "h", scenes: [{ time: "0-3秒", dialogue: "d" }], key_changes: "" },
+  "result.platform": { title: "t", hook: "h", scenes: [{ time: "0-3秒", dialogue: "d" }], hashtags: ["x"], key_changes: "" },
   "brand_story.gen": { title: "t", hook: "h", story_arc: { opening: "o" }, scenes: [] },
   "sales.gen": { title: "t", opening: "o", pain_discovery: ["q"], objection_handlers: [{ objection: "貴", response: "r", follow_up: "f" }], close_lines: ["c"], full_script: "s" },
   "speech.gen": { title: "t", tagline: "g", hook: "h", structure: { opening: "o" }, full_script: "s" },
@@ -99,6 +100,15 @@ describe("ScriptForge module registry", () => {
     expect(out?.system).toContain("絕對不要使用這些說法：治癒");
     expect(out?.prompt.startsWith(languageLine(ctx))).toBe(true);
     expect(out?.prompt).toContain("針對「失眠」生成10種");
+  });
+
+  it("the platform rewrite prompt carries that platform's BODY_LIMITS cap and asks for hashtags; no mapped platform = no cap", () => {
+    const tt = forgePrompt("result", "platform", { plat: "TikTok", platformId: "tiktok" }, ctx);
+    expect(tt?.prompt).toContain(`不得超過 ${BODY_LIMITS.tiktok} 字`);
+    expect(tt?.prompt).toContain('"hashtags"');
+    const yt = forgePrompt("result", "platform", { plat: "YT Shorts", platformId: "shorts" }, ctx);
+    expect(yt?.prompt).toContain(`不得超過 ${BODY_LIMITS.youtube} 字`);
+    expect(forgePrompt("result", "platform", { plat: "Podcast", platformId: "podcast" }, ctx)?.prompt).not.toContain("不得超過");
   });
 
   it("a missing field prints nothing, never undefined", () => {

@@ -5,6 +5,7 @@ import { AI_TEXT_MODELS, DEFAULT_AI_TEXT_MODEL } from "@/lib/ai/text-model-optio
 import { chipStyle } from "@/components/tools/panel-primitives";
 import StoryBibleWorkbench from "./StoryBibleWorkbench";
 import OrganizationPicker from "./OrganizationPicker";
+import { clampCustomScenes, handoffFromScript, type VideoHandoff } from "./video-handoff";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 import { renderSiteVoice } from "@/lib/content/brand-voice";
 import { FORGE_NAV } from "@/lib/script-forge/nav";
@@ -80,16 +81,24 @@ async function forge(module: string, task: string, fields: Record<string, unknow
   return full;
 }
 
-/* ── 送去生產影片 bridge：ScriptResult 經 context 取得回呼，免穿過 24 個 module（傳 null = 非整合模式）── */
-type ProductionScene = { narration: string; imagePrompt: string; visual?: "custom" | "broll"; brollKeyword?: string; referenceImageUrl?: string };
-type SendToProduction = (p: { topic: string; articleTitle: string; articleContent: string; scenes?: ProductionScene[]; mediaMode?: string; duration?: number; customScenes?: number }) => void;
-const ProductionBridge = createContext<SendToProduction | null>(null);
-type SendToRemotion = (p: { topic: string; headline?: string; tagline?: string; cta?: string; imageHint?: string; scenes?: { visual: string; dialogue: string }[]; mediaMode?: string; duration?: number; customScenes?: number }) => void;
-const RemotionBridge = createContext<SendToRemotion | null>(null);
+/* ── 送去做影片 bridge：一顆鍵、一個交接形狀（video-handoff.ts），經 context 給每個會出影片的模組（null = 不整合）── */
+type SendToVideo = (h: VideoHandoff, organizationId: string) => void;
+const VideoBridge = createContext<{ send: SendToVideo; needsClient: boolean } | null>(null);
+
+/** 「🎬 送去做影片」: needsClient (the standalone page) means the project is created for the loaded client. */
+function SendToVideoButton({ build, label = "🎬 送去做影片" }: { build: () => VideoHandoff; label?: string }){
+  const bridge=useContext(VideoBridge);
+  const[sent,setSent]=useState(false);
+  if(!bridge)return null;
+  if(bridge.needsClient&&!SF_BRAND_ORG)return <div style={{fontSize:11.5,color:C.mid}}>🎬 要送去做影片，先在上方「載入客戶」選一個客戶。</div>;
+  return <PBtn ch={sent?"✅ 已送出":label} onClick={()=>{bridge.send(build(),SF_BRAND_ORG);setSent(true);}} full/>;
+}
 // 場景總數與 AI 生圖分配屬於前製腳本：它們會改變腳本內容量與每場 visual_type。
 // VideoStudio 只負責素材模式、模型、配音、輸出比例與渲染。
 const ScriptSettingsCtx = createContext<{ sceneCount: number; customScenes: number }>({ sceneCount: 6, customScenes: 3 });
 function pj(raw){return JSON.parse(raw.replace(/```json|```/g,"").trim());}
+/** `#tag #tag`: space separated, a leading # in the data is not doubled. */
+function hashtagLine(tags:string[]){return (tags||[]).map(h=>String(h).trim().replace(/^#+/,"")).filter(Boolean).map(h=>`#${h}`).join(" ");}
 
 /* ── 短劇 Story Bible 套用（2026-09-11）── 這是「手動生成」腳本生成的唯一接線點；其餘 23 個
    模組（廣告A/B/C、產業模板…）刻意不加，避免同一顆選擇器複製 10 份卻多半用不到——短劇連續性
@@ -119,7 +128,7 @@ function storyBibleContextBlock(doc: StoryBibleDoc): string {
 
 type ContinuityCheck = { loading?: boolean; ok?: boolean | null; violations?: { rule: string; sceneIndex: number; reason: string }[]; error?: boolean };
 
-/** 生成完成後跑一次連續性檢查：不擋「送去生產影片」，只是誠實列出可能的違反供人判斷——
+/** 生成完成後跑一次連續性檢查：不擋「送去做影片」，只是誠實列出可能的違反供人判斷——
    這是輔助審核，不是自動裁決（腳本品質判斷仍是人的工作）。 */
 async function checkStoryBibleContinuity(script: any, doc: StoryBibleDoc): Promise<ContinuityCheck> {
   const forbid = doc.continuity?.prohibitions || [];
@@ -188,48 +197,6 @@ function buildCharacterRefMap(doc: StoryBibleDoc | undefined, assets: ReferenceA
   return map;
 }
 
-function clampCustomScenes(n: number, sceneCount: number) {
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(0, Math.min(sceneCount, Math.round(n)));
-}
-
-// dialogue 直接送進 TTS——Claude 偶爾會把舞台指示/標籤寫進這個欄位（如「(旁白/字幕)」「(無台詞，
-// 輕嘆氣聲)」），字面被唸出來變成怪聲音（2026-09-12 操作者實測抓到）。已在 prompt 加了明確禁止，
-// 這裡是第二道防線：不論 prompt 有沒有生效都結構性濾掉整段全形/半形括號內容，不只靠 AI 聽話。
-function stripStageDirections(text: string): string {
-  return text.replace(/[（(][^）)]*[）)]/g, "").replace(/\s+/g, " ").trim();
-}
-
-function productionSceneFromScriptScene(s: any, characterRefs?: Record<string, string>): ProductionScene | null {
-  const narration = stripStageDirections(String(s?.dialogue ?? s?.narration ?? s?.marked_text ?? ""));
-  if (!narration) return null;
-  const imagePrompt = String(s?.visual ?? s?.imagePrompt ?? s?.image_prompt ?? "").trim();
-  const brollKeyword = String(s?.broll_keyword ?? s?.brollKeyword ?? "").trim();
-  const rawVisual = String(s?.visual_type ?? s?.asset_type ?? s?.visualMode ?? "").toLowerCase();
-  const visual: "custom" | "broll" = rawVisual === "broll" || brollKeyword ? "broll" : "custom";
-  const characterId = typeof s?.character_id === "string" ? s.character_id : "";
-  const referenceImageUrl = characterId ? characterRefs?.[characterId] : undefined;
-  return { narration, imagePrompt, visual, brollKeyword, referenceImageUrl };
-}
-
-function enforceProductionVisualSplit(scenes: ProductionScene[], customScenes: number): ProductionScene[] {
-  const target = clampCustomScenes(customScenes, scenes.length);
-  let customCount = scenes.filter((s) => s.visual !== "broll").length;
-  const next = scenes.map((s) => ({ ...s, visual: s.visual ?? "custom" }));
-  for (let i = next.length - 1; i >= 0 && customCount > target; i--) {
-    if (next[i].visual !== "broll") {
-      next[i].visual = "broll";
-      customCount--;
-    }
-  }
-  for (let i = 0; i < next.length && customCount < target; i++) {
-    if (next[i].visual === "broll") {
-      next[i].visual = "custom";
-      customCount++;
-    }
-  }
-  return next;
-}
 
 /* ── INDUSTRY DATA ── */
 const INDUSTRIES={
@@ -431,31 +398,36 @@ function AnimatedPreview({script,onClose}){
 
 /* ── SCRIPT RESULT ── */
 function ScriptResult({script,score,onReset,extraTop,autoSaveTag,sbCharacterRefs}: any){
-  const[copied,setCopied]=useState(false);
-  const[repPlatform,setRepPlatform]=useState("");
   const[repLoading,setRepLoading]=useState(false);
-  const[repurposed,setRepurposed]=useState(null);
+  // Versions side by side: the original stays; each platform's rewrite is kept under its id. `sel` = the version that is sent and copied.
+  const[versions,setVersions]=useState<Record<string,any>>({});
+  const[sel,setSel]=useState("original");
+  const[copiedId,setCopiedId]=useState("");
+  const orig=script;
+  const cur=sel==="original"?orig:(versions[sel]||orig);
   const[showPreview,setShowPreview]=useState(false);
-  const sendToProduction=useContext(ProductionBridge);
   const { customScenes }=useContext(ScriptSettingsCtx);
-  const[sent,setSent]=useState(false);
-  const sendToRemotion=useContext(RemotionBridge);
-  const[remotionSent,setRemotionSent]=useState(false);
 
   useEffect(()=>{if(script&&autoSaveTag)saveHistory({tag:autoSaveTag,title:script.title,hook:script.hook,script});},[script]);
+  useEffect(()=>{setVersions({});setSel("original");},[script]);
 
-  function copyScript(){
-    if(!script)return;
-    let t=`# ${script.title}\n\n開頭鉤子：${script.hook}\n\n`;
-    script.scenes?.forEach(s=>{t+=`【${s.time}】\n畫面：${s.visual}\n台詞：${s.dialogue}\n字幕：${s.subtitle}\n拍攝：${s.shoot_tip}\n剪輯：${s.edit_tip}\n\n`;});
-    t+=`CTA：${script.cta}\n\n標題：\n${script.titles?.join("\n")}\n\nHashtags：${script.hashtags?.map(h=>`#${h.replace(/^#/,"")}`).join(" ")}`;
-    navigator.clipboard.writeText(t);setCopied(true);setTimeout(()=>setCopied(false),2000);
+  function copyVersion(id){
+    const v=id==="original"?orig:versions[id];
+    if(!v)return;
+    let t=`# ${v.title}\n\n開頭鉤子：${v.hook}\n\n`;
+    v.scenes?.forEach(s=>{t+=`【${s.time}】\n畫面：${s.visual||""}\n台詞：${s.dialogue}\n字幕：${s.subtitle||""}\n拍攝：${s.shoot_tip||""}\n剪輯：${s.edit_tip||""}\n\n`;});
+    t+=`CTA：${v.cta||""}`;
+    if(v.titles?.length)t+=`\n\n標題：\n${v.titles.join("\n")}`;
+    if(v.hashtags?.length)t+=`\n\nHashtags：${hashtagLine(v.hashtags)}`;
+    navigator.clipboard.writeText(t);setCopiedId(id);setTimeout(()=>setCopiedId(""),2000);
   }
 
-  async function doRep(pid){
-    setRepPlatform(pid);setRepLoading(true);setRepurposed(null);
+  // forceNew = 「重新轉換」; a platform already converted just switches to its version, no AI call.
+  async function doRep(pid,forceNew=false){
+    if(versions[pid]&&!forceNew){setSel(pid);return;}
+    setRepLoading(true);
     const plat=PLATFORMS.find(p=>p.id===pid)?.label||pid;
-    try{const raw=await forge("result","platform",{plat,title:script.title,hook:script.hook,dialogues:script.scenes?.map(s=>s.dialogue),cta:script.cta});setRepurposed(pj(raw));}catch{}
+    try{const raw=await forge("result","platform",{plat,platformId:pid,title:orig.title,hook:orig.hook,dialogues:orig.scenes?.map(s=>s.dialogue),cta:orig.cta});setVersions(v=>({...v,[pid]:pj(raw)}));setSel(pid);}catch{}
     setRepLoading(false);
   }
 
@@ -491,12 +463,11 @@ function ScriptResult({script,score,onReset,extraTop,autoSaveTag,sbCharacterRefs
 
       {score&&<Card style={{background:C.paper}}><div style={{display:"flex",alignItems:"center",gap:18}}><div style={{textAlign:"center",flexShrink:0}}><div style={{fontSize:48,fontWeight:900,color:C.coral,lineHeight:1,fontFamily:"DM Serif Display,serif"}}>{score.overall}</div><div style={{fontSize:10,color:C.mid}}>綜合評分/10</div></div><div style={{flex:1}}>{score.scores&&[["🪝 Hook",score.scores.hook,C.coral],["🎵 節奏",score.scores.rhythm,C.violet],["💡 清晰",score.scores.clarity,C.gold],["❤️ 情緒",score.scores.emotion,C.rose],["📷 拍攝",score.scores.shootability,C.jade],["🎯 轉換",score.scores.conversion,C.sky]].map(([l,v,a])=>v!==undefined&&<SBar key={l} label={l} val={v} accent={a}/>)}</div></div>{score.optimized_hook&&<div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${C.border}`}}><SL ch="✨ AI優化"/><div style={{fontSize:12.5,color:C.coral,fontStyle:"italic"}}>鉤子：「{score.optimized_hook}」</div>{score.optimized_cta&&<div style={{fontSize:12.5,color:C.violet,fontStyle:"italic",marginTop:3}}>CTA：「{score.optimized_cta}」</div>}</div>}</Card>}
 
-      <Card><SL ch="🔄 多平台轉換"/><div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:repLoading||repurposed?12:0}}>{PLATFORMS.map(p=><button key={p.id} onClick={()=>doRep(p.id)} style={{padding:"6px 12px",borderRadius:999,border:`1.5px solid ${repPlatform===p.id?C.violet:C.border}`,background:repPlatform===p.id?C.violetl:C.white,color:repPlatform===p.id?C.violet:C.ink,fontSize:11.5,fontWeight:repPlatform===p.id?700:400,cursor:"pointer",transition:"all .15s",fontFamily:"inherit"}}>{p.icon} {p.label}</button>)}</div>{repLoading&&<div style={{textAlign:"center",padding:"12px 0",color:C.mid,fontSize:12.5}}>轉換中...</div>}{repurposed&&<div style={{background:C.violetl,borderRadius:9,padding:12}}><div style={{fontSize:13.5,fontWeight:800,color:C.violet,marginBottom:3}}>{repurposed.title}</div><div style={{fontSize:12.5,color:C.violet,fontStyle:"italic",marginBottom:7}}>「{repurposed.hook}」</div>{repurposed.scenes?.map((s,i)=><div key={i} style={{fontSize:11.5,color:C.ink,padding:"4px 0",borderBottom:`1px solid rgba(124,92,252,.1)`}}><b style={{color:C.violet}}>【{s.time}】</b> {s.dialogue}</div>)}{repurposed.key_changes&&<div style={{marginTop:7,fontSize:11.5,color:C.mid,background:C.white,borderRadius:6,padding:"6px 9px"}}><b>與原版差異：</b>{repurposed.key_changes}</div>}</div>}</Card>
+      <Card><SL ch="🔄 多平台轉換"/><div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:6}}>{PLATFORMS.map(p=><button key={p.id} disabled={repLoading} onClick={()=>doRep(p.id)} style={{padding:"6px 12px",borderRadius:999,border:`1.5px solid ${versions[p.id]?C.violet:C.border}`,background:sel===p.id?C.violetl:C.white,color:versions[p.id]?C.violet:C.ink,fontSize:11.5,fontWeight:versions[p.id]?700:400,cursor:"pointer",transition:"all .15s",fontFamily:"inherit"}}>{p.icon} {p.label}{versions[p.id]?" ✓":""}</button>)}</div>{repLoading&&<div style={{textAlign:"center",padding:"12px 0",color:C.mid,fontSize:12.5}}>轉換中...</div>}{Object.keys(versions).length>0&&<><SL ch="版本（選中的那版 = 送出／複製用）"/><div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>{["original",...Object.keys(versions)].map(id=><button key={id} onClick={()=>setSel(id)} style={{padding:"6px 12px",borderRadius:8,border:`1.5px solid ${sel===id?C.violet:C.border}`,background:sel===id?C.violet:C.white,color:sel===id?C.white:C.ink,fontSize:11.5,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{id==="original"?"原版":PLATFORMS.find(p=>p.id===id)?.label||id}</button>)}</div></>}{sel!=="original"&&versions[sel]&&<div style={{background:C.violetl,borderRadius:9,padding:12}}><div style={{fontSize:13.5,fontWeight:800,color:C.violet,marginBottom:3}}>{versions[sel].title}</div><div style={{fontSize:12.5,color:C.violet,fontStyle:"italic",marginBottom:7}}>「{versions[sel].hook}」</div>{versions[sel].scenes?.map((s,i)=><div key={i} style={{fontSize:11.5,color:C.ink,padding:"4px 0",borderBottom:`1px solid rgba(124,92,252,.1)`}}><b style={{color:C.violet}}>【{s.time}】</b> {s.dialogue}</div>)}{versions[sel].hashtags?.length>0&&<div style={{marginTop:7,fontSize:11.5,color:C.violet}}>{hashtagLine(versions[sel].hashtags)}</div>}{versions[sel].key_changes&&<div style={{marginTop:7,fontSize:11.5,color:C.mid,background:C.white,borderRadius:6,padding:"6px 9px"}}><b>與原版差異：</b>{versions[sel].key_changes}</div>}<div style={{display:"flex",gap:8,marginTop:9}}><GBtn ch="🔁 重新轉換" onClick={()=>doRep(sel,true)} style={{padding:"7px 12px"}}/></div></div>}{Object.keys(versions).length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:10}}>{["original",...Object.keys(versions)].map(id=><GBtn key={id} ch={copiedId===id?"✅ 已複製":`📋 複製${id==="original"?"原版":(PLATFORMS.find(p=>p.id===id)?.label||id)}`} onClick={()=>copyVersion(id)} style={{padding:"7px 12px"}}/>)}</div>}</Card>
 
-      {sendToProduction&&script?.scenes?.length>0&&<PBtn ch={sent?"✅ 已送到下方 🎬 影片生產區（已自動捲動過去）":"🎬 送去生產影片（用此腳本直接生影片）"} onClick={()=>{const dlg=(script.scenes||[]).map(s=>s.dialogue).filter(Boolean).join("\n");const rawScenes=(script.scenes||[]).map(s=>productionSceneFromScriptScene(s,sbCharacterRefs)).filter(Boolean) as ProductionScene[];const sc=enforceProductionVisualSplit(rawScenes,customScenes);sendToProduction({topic:script.title||"",articleTitle:script.title||"",articleContent:`${script.hook?`開場鉤子：${script.hook}\n\n`:""}${dlg}${script.cta?`\n\n結尾 CTA：${script.cta}`:""}`,scenes:sc.length>0?sc:undefined,customScenes:sc.length>0?clampCustomScenes(customScenes,sc.length):undefined});setSent(true);}} full/>}
-      {sendToRemotion&&script&&<PBtn ch={remotionSent?"✅ 已送到下方 🎬 影片生產（Remotion 模板，已自動捲動過去）":"✨ 送去 Remotion 模板（精緻動效影片）"} onClick={()=>{sendToRemotion({topic:script.title||"",headline:script.title||"",tagline:script.hook||"",cta:script.cta||"",imageHint:script.scenes?.[0]?.visual||"",scenes:(script.scenes||[]).map(s=>({visual:s.visual||"",dialogue:s.dialogue||""})),customScenes:clampCustomScenes(customScenes,script.scenes?.length||0)});setRemotionSent(true);}} full/>}
-      <SendToSocial title={script?.title||"腳本"} text={[script?.title,script?.hook,...(script?.scenes||[]).map(sc=>sc.dialogue).filter(Boolean),script?.cta].filter(Boolean).join("\n")}/>
-      <div style={{display:"flex",gap:9}}><GBtn ch={copied?"✅ 已複製":"📋 複製腳本"} onClick={copyScript} style={{flex:1,padding:"11px"}}/><PBtn ch="重新開始 →" onClick={onReset} full style={{flex:1}}/></div>
+      <SendToVideoButton build={()=>handoffFromScript(cur,{customScenes,characterRefs:sbCharacterRefs})}/>
+      <SendToSocial title={cur?.title||"腳本"} text={[cur?.title,cur?.hook,...(cur?.scenes||[]).map(sc=>sc.dialogue).filter(Boolean),cur?.cta,hashtagLine(cur?.hashtags||[])].filter(Boolean).join("\n")}/>
+      <div style={{display:"flex",gap:9}}><GBtn ch={copiedId===sel?"✅ 已複製":"📋 複製腳本"} onClick={()=>copyVersion(sel)} style={{flex:1,padding:"11px"}}/><PBtn ch="重新開始 →" onClick={onReset} full style={{flex:1}}/></div>
     </div>
   );
 }
@@ -762,6 +733,8 @@ function ManualModule({brand}){
   // 短劇 Story Bible（選填）：org 選了才去查已核准的 bible 清單；沒選 bible → sbDoc 是 undefined，
   // 下面 prompt 注入與連續性檢查全部原樣跳過，行為與這功能存在之前完全一致（fail-closed，非預設開）。
   const[sbOrgId,setSbOrgId]=useState("");const[sbSeriesId,setSbSeriesId]=useState("");const[continuityCheck,setContinuityCheck]=useState<ContinuityCheck|null>(null);
+  // The loaded client (載入客戶) is the Story Bible's organization; the picker shows only when no client is loaded.
+  useEffect(()=>{if(SF_BRAND_ORG&&sbOrgId!==SF_BRAND_ORG){setSbOrgId(SF_BRAND_ORG);setSbSeriesId("");}});
   const{bibles:sbBibles,status:sbStatus}=useStoryBibles(sbOrgId);
   const sbDoc=sbBibles.find(b=>b.series_id===sbSeriesId)?.document_json;
   const sbBlock=sbDoc?storyBibleContextBlock(sbDoc):"";
@@ -820,14 +793,14 @@ function ManualModule({brand}){
   }
   async function doScript(angle){setSt("script");setScript(null);setScore(null);setContinuityCheck(null);setPortraitStatus(null);setLoading(true);try{const raw=await forge("manual","script",{...briefFields,angleName:angle.name,angleHook:angle.hook,characterIdHint,sceneCharacterField});const s=pj(raw);setScript(s);const sr=await forge("result","score",{hook:s.hook,scenes:s.scenes?.length,cta:s.cta});setScore(pj(sr));if(sbDoc){setContinuityCheck({loading:true});checkStoryBibleContinuity(s,sbDoc).then(setContinuityCheck);void autoGeneratePortraits(s.scenes||[],sbOrgId,sbDoc);}}catch{}setLoading(false);}
   function reset(){setSt("brief");setAngles(null);setScript(null);setScore(null);setContinuityCheck(null);setPortraitStatus(null);setBrief({topic:"",platform:"",duration:"",goal:"",tone:"",cta:"",audience:""});}
-  const storyBiblePicker=(<Card style={{borderColor:sbDoc?C.violet:C.border,background:sbDoc?C.violetl:C.white}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><SL ch="📖 套用短劇 Story Bible（選填，加強角色／場景連續性）"/></div><div style={{fontSize:11,color:C.mid,lineHeight:1.6,marginBottom:sbOrgId?8:0}}>選了之後：腳本會自動套用角色設定＋跑連續性檢查；角色沒有定裝照時系統會自動生一張存回 Bible；送去生產影片後，有定裝照的角色場景會自動維持長相一致，並在草稿頁多一個比對面板。完整流程說明見「📖 短劇 Story Bible」分頁。</div><div style={{maxWidth:340,marginBottom:sbOrgId?8:0}}><OrganizationPicker value={sbOrgId} onChange={(v)=>{setSbOrgId(v);setSbSeriesId("");}} disabled={portraitStatus?.loading}/></div>{sbOrgId&&sbStatus==="loading"&&<div style={{fontSize:11.5,color:C.mid}}>載入 Story Bible 清單…</div>}{sbOrgId&&sbStatus==="ready"&&sbBibles.length===0&&<div style={{fontSize:11.5,color:C.mid}}>此租戶還沒有已核准的 Story Bible——可到上方「📖 短劇 Story Bible」分頁建立。</div>}{sbOrgId&&sbBibles.length>0&&<select value={sbSeriesId} onChange={e=>setSbSeriesId(e.target.value)} disabled={portraitStatus?.loading} style={{width:"100%",padding:"7px 9px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:12,fontFamily:"inherit"}}><option value="">不套用 Story Bible</option>{sbBibles.map(b=><option key={b.id} value={b.series_id}>{b.series_id}（r{b.revision}，{b.document_json?.episode?.episodeId}）</option>)}</select>}{portraitStatus?.loading&&<div style={{fontSize:10.5,color:C.mid,marginTop:4}}>🎨 定裝照生成中，暫時鎖定租戶/Bible 切換避免跨租戶誤用…</div>}{sbDoc&&<div style={{marginTop:8,fontSize:11.5,color:C.ink,lineHeight:1.6}}><div><b>角色：</b>{(sbDoc.characters||[]).map(c=>c.name).join("、")||"（無）"}</div><div><b>場景：</b>{(sbDoc.locations||[]).map(l=>l.name).join("、")||"（無）"}</div>{(sbDoc.continuity?.prohibitions||[]).length>0&&<div style={{color:C.rose}}><b>不可違反：</b>{sbDoc.continuity.prohibitions.join("；")}</div>}</div>}</Card>);
+  const storyBiblePicker=(<Card style={{borderColor:sbDoc?C.violet:C.border,background:sbDoc?C.violetl:C.white}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><SL ch="📖 套用短劇 Story Bible（選填，加強角色／場景連續性）"/></div><div style={{fontSize:11,color:C.mid,lineHeight:1.6,marginBottom:sbOrgId?8:0}}>選了之後：腳本會自動套用角色設定＋跑連續性檢查；角色沒有定裝照時系統會自動生一張存回 Bible；送去做影片後，有定裝照的角色場景會自動維持長相一致，並在草稿頁多一個比對面板。完整流程說明見「📖 短劇 Story Bible」分頁。</div>{!SF_BRAND_ORG&&<div style={{maxWidth:340,marginBottom:sbOrgId?8:0}}><OrganizationPicker value={sbOrgId} onChange={(v)=>{setSbOrgId(v);setSbSeriesId("");}} disabled={portraitStatus?.loading}/></div>}{sbOrgId&&sbStatus==="loading"&&<div style={{fontSize:11.5,color:C.mid}}>載入 Story Bible 清單…</div>}{sbOrgId&&sbStatus==="ready"&&sbBibles.length===0&&<div style={{fontSize:11.5,color:C.mid}}>此租戶還沒有已核准的 Story Bible——可到上方「📖 短劇 Story Bible」分頁建立。</div>}{sbOrgId&&sbBibles.length>0&&<select value={sbSeriesId} onChange={e=>setSbSeriesId(e.target.value)} disabled={portraitStatus?.loading} style={{width:"100%",padding:"7px 9px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:12,fontFamily:"inherit"}}><option value="">不套用 Story Bible</option>{sbBibles.map(b=><option key={b.id} value={b.series_id}>{b.series_id}（r{b.revision}，{b.document_json?.episode?.episodeId}）</option>)}</select>}{portraitStatus?.loading&&<div style={{fontSize:10.5,color:C.mid,marginTop:4}}>🎨 定裝照生成中，暫時鎖定租戶/Bible 切換避免跨租戶誤用…</div>}{sbDoc&&<div style={{marginTop:8,fontSize:11.5,color:C.ink,lineHeight:1.6}}><div><b>角色：</b>{(sbDoc.characters||[]).map(c=>c.name).join("、")||"（無）"}</div><div><b>場景：</b>{(sbDoc.locations||[]).map(l=>l.name).join("、")||"（無）"}</div>{(sbDoc.continuity?.prohibitions||[]).length>0&&<div style={{color:C.rose}}><b>不可違反：</b>{sbDoc.continuity.prohibitions.join("；")}</div>}</div>}</Card>);
   if(st==="brief")return(<div style={{display:"grid",gap:18}}><div><h2 style={{fontSize:19,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",marginBottom:3}}>手動生成腳本</h2><p style={{fontSize:12.5,color:C.mid}}>填入需求，AI完成策略、分鏡、評分</p>{brand?.voice&&<div style={{marginTop:6,padding:"5px 11px",background:C.jadelt,borderRadius:6,fontSize:11.5,color:C.jade,fontWeight:700,display:"inline-block"}}>✅ 已套用品牌語氣：{brand.name||"我的品牌"}</div>}</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}><span style={{fontSize:11,color:C.mid,alignSelf:"center"}}>範例：</span>{EXAMPLES.map((ex,i)=><button key={i} onClick={()=>setBrief(ex)} style={{padding:"4px 10px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:11.5,cursor:"pointer",fontFamily:"inherit"}} onMouseEnter={e=>e.currentTarget.style.borderColor=C.coral} onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>{ex.topic.slice(0,12)}...</button>)}</div><div><SL ch="主題 *"/><TA value={brief.topic} onChange={e=>setBrief({...brief,topic:e.target.value})} placeholder="例如：新手如何開始學畫畫..." rows={2}/></div><div><SL ch="平台 *"/><PlatGrid value={brief.platform} onChange={v=>setBrief({...brief,platform:v})}/></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>{[["影片長度","duration",DURATIONS],["內容目的","goal",GOALS],["語氣風格","tone",TONES],["觀眾行動","cta",CTAS]].map(([l,k,opts]: any)=><div key={k}><SL ch={l}/><div style={{display:"flex",flexWrap:"wrap",gap:5}}>{opts.map(o=><Pill key={o} label={o} active={brief[k]===o} onClick={()=>setBrief({...brief,[k]:o})}/>)}</div></div>)}</div><div><SL ch="目標受眾"/><AudiencePicker value={brief.audience} onChange={(v)=>setBrief({...brief,audience:v})}/></div>{storyBiblePicker}{err&&<div style={{padding:"7px 11px",background:C.roselt,border:`1.5px solid ${C.rose}`,borderRadius:7,fontSize:12.5,color:C.rose,fontWeight:600}}>{err}</div>}<PBtn ch="產生腳本角度 →" onClick={doAngles} disabled={!brief.topic||!brief.platform} full/></div>);
   if(st==="angles")return(<div><div style={{display:"flex",alignItems:"center",gap:9,marginBottom:18}}><GBtn ch="← 返回" onClick={()=>setSt("brief")}/><h2 style={{fontSize:17,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",margin:0}}>選擇腳本角度</h2></div>{loading&&!angles&&<Spin label="AI 正在生成角度..."/>}{angles&&<div style={{display:"grid",gap:11}}>{angles.map(a=><div key={a.id} onClick={()=>doScript(a)} style={{background:C.white,border:`2px solid ${C.border}`,borderRadius:13,overflow:"hidden",cursor:"pointer",transition:"all .2s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=C.coral;e.currentTarget.style.boxShadow="0 3px 14px color-mix(in srgb, var(--accent) 16%, transparent)";}} onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.boxShadow="none";}}><div style={{padding:"10px 15px",borderBottom:`1.5px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{display:"flex",alignItems:"center",gap:7}}><Tag ch={a.type} c={C.violet} bg={C.violetl}/><span style={{fontSize:13.5,fontWeight:800,color:C.black,fontFamily:"DM Serif Display,serif"}}>{a.name}</span></div><div style={{fontSize:15,fontWeight:900,color:C.coral}}>{a.score}<span style={{fontSize:9,color:C.mid}}>/10</span></div></div><div style={{padding:"12px 15px"}}><div style={{background:C.violetl,borderRadius:8,padding:"8px 11px",marginBottom:9}}><div style={{fontSize:9,color:C.violet,fontWeight:700,letterSpacing:1,marginBottom:3}}>開頭鉤子</div><div style={{fontSize:13,color:C.violet,fontStyle:"italic",fontFamily:"DM Serif Display,serif"}}>「{a.hook}」</div></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><div><div style={{fontSize:9.5,color:C.mid,marginBottom:1}}>核心概念</div><div style={{fontSize:12,color:C.ink}}>{a.core}</div></div><div><div style={{fontSize:9.5,color:C.mid,marginBottom:1}}>為什麼有效</div><div style={{fontSize:12,color:C.ink}}>{a.why}</div></div></div><div style={{marginTop:9,paddingTop:8,borderTop:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}><Tag ch={`⚠ ${a.risk}`} c={C.rose} bg={C.roselt} small/><span style={{fontSize:11.5,color:C.coral,fontWeight:700}}>選擇此角度 →</span></div></div></div>)}</div>}</div>);
   if(st==="script"){
     const ccPanel=continuityCheck&&(
       continuityCheck.loading?<Card style={{borderColor:C.violet,background:C.violetl}}><SL ch="📖 Story Bible 連續性檢查中..."/></Card>:
       continuityCheck.error?<Card style={{borderColor:C.mid}}><SL ch="📖 Story Bible 連續性檢查"/><div style={{fontSize:12,color:C.mid}}>檢查失敗（AI 回應格式錯誤），未影響腳本本身——請自行覆核連續性。</div></Card>:
-      continuityCheck.ok===false&&(continuityCheck.violations?.length??0)>0?<Card style={{borderColor:C.rose,background:C.roselt}}><SL ch={`⚠️ Story Bible 連續性檢查：發現 ${continuityCheck.violations!.length} 個可能違反`}/><div style={{display:"grid",gap:5,marginTop:6}}>{continuityCheck.violations!.map((v,i)=><div key={i} style={{fontSize:12,color:C.ink}}>{v.sceneIndex>=0?`場景${v.sceneIndex+1}：`:""}<b style={{color:C.rose}}>{v.rule}</b> — {v.reason}</div>)}</div><div style={{fontSize:11,color:C.mid,marginTop:6}}>這是輔助提醒，不會阻擋送去生產影片——請自行判斷是否需要調整。</div></Card>:
+      continuityCheck.ok===false&&(continuityCheck.violations?.length??0)>0?<Card style={{borderColor:C.rose,background:C.roselt}}><SL ch={`⚠️ Story Bible 連續性檢查：發現 ${continuityCheck.violations!.length} 個可能違反`}/><div style={{display:"grid",gap:5,marginTop:6}}>{continuityCheck.violations!.map((v,i)=><div key={i} style={{fontSize:12,color:C.ink}}>{v.sceneIndex>=0?`場景${v.sceneIndex+1}：`:""}<b style={{color:C.rose}}>{v.rule}</b> — {v.reason}</div>)}</div><div style={{fontSize:11,color:C.mid,marginTop:6}}>這是輔助提醒，不會阻擋送去做影片——請自行判斷是否需要調整。</div></Card>:
       <Card style={{borderColor:C.jade,background:C.jadelt}}><SL ch="✅ Story Bible 連續性檢查通過"/></Card>
     );
     const portraitPanel=portraitStatus&&(
@@ -867,11 +840,11 @@ function IndustryModule({saveVoice,brand}){
 }
 
 function ABModule({brand}){
-  const[product,setProduct]=useState("");const[platform,setPlatform]=useState("");const[duration,setDuration]=useState("30秒");const[loading,setLoading]=useState(false);const[ads,setAds]=useState(null);const[activeTab,setActiveTab]=useState(0);const[err,setErr]=useState("");const[sentVer,setSentVer]=useState("");const sendToProduction=useContext(ProductionBridge);
+  const[product,setProduct]=useState("");const[platform,setPlatform]=useState("");const[duration,setDuration]=useState("30秒");const[loading,setLoading]=useState(false);const[ads,setAds]=useState(null);const[activeTab,setActiveTab]=useState(0);const[err,setErr]=useState("");
   const vC=[C.coral,C.violet,C.jade];const vL=[C.corallt,C.violetl,C.jadelt];
   async function doGen(){if(!product||!platform)return;setLoading(true);setAds(null);setErr("");const plat=PLATFORMS.find(p=>p.id===platform)?.label||"";try{const raw=await forge("ab","gen",{plat,duration,product});setAds(pj(raw));}catch{setErr("生成失敗，請再試一次（可能是 AI 回應逾時或格式問題）");}setLoading(false);}
   if(!ads)return(<div style={{display:"grid",gap:18}}><div><h2 style={{fontSize:19,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",marginBottom:3}}>廣告腳本 A/B/C 版本</h2><p style={{fontSize:12.5,color:C.mid}}>同一產品，三個不同角度廣告腳本</p></div><div><SL ch="產品/服務 *"/><TA value={product} onChange={e=>setProduct(e.target.value)} placeholder="詳細描述產品或服務..." rows={4}/></div><div><SL ch="廣告平台 *"/><PlatGrid value={platform} onChange={setPlatform}/></div><div><SL ch="廣告長度"/><div style={{display:"flex",gap:5}}>{["15秒","30秒","60秒"].map(d=><Pill key={d} label={d} active={duration===d} onClick={()=>setDuration(d)}/>)}</div></div>{err&&<div style={{padding:"7px 11px",background:C.roselt,border:`1.5px solid ${C.rose}`,borderRadius:7,fontSize:12.5,color:C.rose,fontWeight:600}}>{err}</div>}{loading&&<Spin label="AI 正在生成三個版本..."/>}{!loading&&<PBtn ch="🎯 生成A/B/C三版本 →" onClick={doGen} disabled={!product||!platform} full/>}</div>);
-  return(<div style={{display:"grid",gap:14}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><h2 style={{fontSize:17,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",margin:0}}>三版本廣告腳本</h2><GBtn ch="重新生成" onClick={()=>{setAds(null);setSentVer("");}}/></div>{ads.recommendation&&<Card style={{background:C.goldlt,borderColor:C.gold}}><SL ch="💡 AI建議先測試"/><div style={{fontSize:12.5,color:C.ink,lineHeight:1.6}}>{ads.recommendation}</div></Card>}<div style={{display:"flex",gap:6,borderBottom:`1.5px solid ${C.border}`}}>{ads.versions?.map((v,i)=><button key={i} onClick={()=>setActiveTab(i)} style={{padding:"9px 16px",border:"none",borderBottom:`3px solid ${activeTab===i?vC[i]:"transparent"}`,background:"transparent",color:activeTab===i?vC[i]:C.mid,fontWeight:activeTab===i?800:400,fontSize:12.5,cursor:"pointer",fontFamily:"inherit"}}>版本{v.version}：{v.type}</button>)}</div>{ads.versions?.map((v,i)=>activeTab===i&&<div key={i} style={{display:"grid",gap:10}}><Card style={{background:vL[i],borderColor:vC[i]}}><div style={{fontSize:15,fontWeight:800,color:vC[i],marginBottom:3,fontFamily:"DM Serif Display,serif"}}>{v.title}</div><div style={{fontSize:12.5,color:vC[i],fontStyle:"italic",marginBottom:7}}>「{v.hook}」</div><div style={{fontSize:11.5,color:C.ink,background:C.white,borderRadius:7,padding:"7px 10px"}}><b>適合：</b>{v.strength}</div></Card><div style={{display:"grid",gap:7}}>{v.scenes?.map((s,j)=><div key={j} style={{border:`1.5px solid ${C.border}`,borderRadius:10,overflow:"hidden"}}><div style={{background:C.black,padding:"5px 11px",display:"flex",alignItems:"center",gap:7}}><div style={{background:vC[i],color:C.white,width:19,height:19,borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:800}}>{String(j+1).padStart(2,"0")}</div><span style={{fontSize:10.5,color:"#ccc"}}>{s.time}</span>{s.subtitle&&<span style={{marginLeft:"auto",fontSize:9.5,color:"rgba(255,255,255,.7)"}}>「{s.subtitle}」</span>}</div><div style={{padding:"9px 13px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}><div><div style={{fontSize:8.5,color:C.mid,fontWeight:700,letterSpacing:1,marginBottom:1}}>畫面</div><div style={{fontSize:11.5,color:C.ink}}>{s.visual}</div></div><div><div style={{fontSize:8.5,color:C.mid,fontWeight:700,letterSpacing:1,marginBottom:1}}>台詞</div><div style={{fontSize:11.5,color:vC[i],fontStyle:"italic"}}>{s.dialogue}</div></div></div></div>)}</div><Card style={{borderColor:vC[i],background:vL[i]}}><SL ch="CTA"/><div style={{fontSize:13.5,color:vC[i],fontStyle:"italic",fontFamily:"DM Serif Display,serif"}}>「{v.cta}」</div></Card>{sendToProduction&&v.scenes?.length>0&&<PBtn ch={sentVer===v.version?"✅ 已送到下方 🎬 影片生產區（已自動捲動過去）":`🎬 送去生產影片（用版本${v.version}生影片）`} onClick={()=>{const sc=(v.scenes||[]).map(s=>({narration:(s.dialogue||"").trim(),imagePrompt:(s.visual||"").trim()})).filter(s=>s.narration);sendToProduction({topic:v.title||product||"",articleTitle:v.title||"",articleContent:`${v.hook?`開場鉤子：${v.hook}\n\n`:""}${sc.map(s=>s.narration).join("\n")}${v.cta?`\n\n結尾 CTA：${v.cta}`:""}`,scenes:sc.length>0?sc:undefined});setSentVer(v.version);}} full/>}</div>)}</div>);
+  return(<div style={{display:"grid",gap:14}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><h2 style={{fontSize:17,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",margin:0}}>三版本廣告腳本</h2><GBtn ch="重新生成" onClick={()=>setAds(null)}/></div>{ads.recommendation&&<Card style={{background:C.goldlt,borderColor:C.gold}}><SL ch="💡 AI建議先測試"/><div style={{fontSize:12.5,color:C.ink,lineHeight:1.6}}>{ads.recommendation}</div></Card>}<div style={{display:"flex",gap:6,borderBottom:`1.5px solid ${C.border}`}}>{ads.versions?.map((v,i)=><button key={i} onClick={()=>setActiveTab(i)} style={{padding:"9px 16px",border:"none",borderBottom:`3px solid ${activeTab===i?vC[i]:"transparent"}`,background:"transparent",color:activeTab===i?vC[i]:C.mid,fontWeight:activeTab===i?800:400,fontSize:12.5,cursor:"pointer",fontFamily:"inherit"}}>版本{v.version}：{v.type}</button>)}</div>{ads.versions?.map((v,i)=>activeTab===i&&<div key={i} style={{display:"grid",gap:10}}><Card style={{background:vL[i],borderColor:vC[i]}}><div style={{fontSize:15,fontWeight:800,color:vC[i],marginBottom:3,fontFamily:"DM Serif Display,serif"}}>{v.title}</div><div style={{fontSize:12.5,color:vC[i],fontStyle:"italic",marginBottom:7}}>「{v.hook}」</div><div style={{fontSize:11.5,color:C.ink,background:C.white,borderRadius:7,padding:"7px 10px"}}><b>適合：</b>{v.strength}</div></Card><div style={{display:"grid",gap:7}}>{v.scenes?.map((s,j)=><div key={j} style={{border:`1.5px solid ${C.border}`,borderRadius:10,overflow:"hidden"}}><div style={{background:C.black,padding:"5px 11px",display:"flex",alignItems:"center",gap:7}}><div style={{background:vC[i],color:C.white,width:19,height:19,borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:800}}>{String(j+1).padStart(2,"0")}</div><span style={{fontSize:10.5,color:"#ccc"}}>{s.time}</span>{s.subtitle&&<span style={{marginLeft:"auto",fontSize:9.5,color:"rgba(255,255,255,.7)"}}>「{s.subtitle}」</span>}</div><div style={{padding:"9px 13px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}><div><div style={{fontSize:8.5,color:C.mid,fontWeight:700,letterSpacing:1,marginBottom:1}}>畫面</div><div style={{fontSize:11.5,color:C.ink}}>{s.visual}</div></div><div><div style={{fontSize:8.5,color:C.mid,fontWeight:700,letterSpacing:1,marginBottom:1}}>台詞</div><div style={{fontSize:11.5,color:vC[i],fontStyle:"italic"}}>{s.dialogue}</div></div></div></div>)}</div><Card style={{borderColor:vC[i],background:vL[i]}}><SL ch="CTA"/><div style={{fontSize:13.5,color:vC[i],fontStyle:"italic",fontFamily:"DM Serif Display,serif"}}>「{v.cta}」</div></Card>{v.scenes?.length>0&&<SendToVideoButton label={`🎬 送去做影片（版本${v.version}）`} build={()=>{const sc=(v.scenes||[]).map(s=>({narration:(s.dialogue||"").trim(),imagePrompt:(s.visual||"").trim()})).filter(s=>s.narration);return{title:v.title||product||"",script:v,production:{topic:v.title||product||"",articleTitle:v.title||"",articleContent:`${v.hook?`開場鉤子：${v.hook}\n\n`:""}${sc.map(s=>s.narration).join("\n")}${v.cta?`\n\n結尾 CTA：${v.cta}`:""}`,scenes:sc.length>0?sc:undefined}};}}/>}</div>)}</div>);
 }
 
 /* ── 主持人稿標記 SSOT：標記說明 legend 與 文稿內標記上色 共用同一份 → 顏色永遠一致；新增標記只需改這裡（修「文稿沒上色／顏色對不上說明／缺【放慢】【降調】」）。 ── */
@@ -935,11 +908,11 @@ function HostMarkedText({ text }: { text?: string }) {
 }
 
 function HostModule(){
-  const[topic,setTopic]=useState("");const[style,setStyle]=useState("");const[duration,setDuration]=useState("60秒");const[loading,setLoading]=useState(false);const[result,setResult]=useState(null);const[copied,setCopied]=useState(false);const[err,setErr]=useState("");const[sent,setSent]=useState(false);const sendToProduction=useContext(ProductionBridge);
+  const[topic,setTopic]=useState("");const[style,setStyle]=useState("");const[duration,setDuration]=useState("60秒");const[loading,setLoading]=useState(false);const[result,setResult]=useState(null);const[copied,setCopied]=useState(false);const[err,setErr]=useState("");
   const hostStyles=["親切朋友型","專業老師型","熱情分享型","冷靜分析型","幽默主持型"];
   async function doGen(){if(!topic)return;setLoading(true);setResult(null);setErr("");try{const raw=await forge("host","gen",{topic,style,duration});setResult(pj(raw));}catch{setErr("生成失敗，請再試一次（可能是 AI 回應逾時或格式問題）");}setLoading(false);}
   if(!result)return(<div style={{display:"grid",gap:18}}><div><h2 style={{fontSize:19,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",marginBottom:3}}>AI 主持人稿</h2><p style={{fontSize:12.5,color:C.mid}}>生成適合真人說話的腳本，含停頓、語氣、換氣、肢體動作標記</p></div><div><SL ch="影片主題 *"/><IN value={topic} onChange={e=>setTopic(e.target.value)} placeholder="例如：新手學畫畫的三個誤區"/></div><div><SL ch="主持風格"/><div style={{display:"flex",flexWrap:"wrap",gap:5}}>{hostStyles.map(s=><Pill key={s} label={s} active={style===s} onClick={()=>setStyle(s)}/>)}</div></div><div><SL ch="長度"/><div style={{display:"flex",gap:5}}>{DURATIONS.map(d=><Pill key={d} label={d} active={duration===d} onClick={()=>setDuration(d)}/>)}</div></div>{err&&<div style={{padding:"7px 11px",background:C.roselt,border:`1.5px solid ${C.rose}`,borderRadius:7,fontSize:12.5,color:C.rose,fontWeight:600}}>{err}</div>}{loading&&<Spin label="AI 正在撰寫主持人稿..."/>}{!loading&&<PBtn ch="🤖 生成主持人稿 →" onClick={doGen} disabled={!topic} full/>}</div>);
-  return(<div style={{display:"grid",gap:12}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><h2 style={{fontSize:17,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",margin:0}}>{result.title}</h2><div style={{display:"flex",gap:7}}><GBtn ch={copied?"✅ 已複製":"📋 複製全稿"} onClick={()=>{const t=result.segments?.map(s=>`【${s.duration}】\n${s.marked_text}\n（${s.action_notes}）`).join("\n\n");navigator.clipboard.writeText(t);setCopied(true);setTimeout(()=>setCopied(false),2000);}}/><GBtn ch="重新生成" onClick={()=>{setResult(null);setSent(false);}}/></div></div><Card style={{background:C.corallt,borderColor:C.coral}}><SL ch="標記說明"/><div style={{display:"flex",flexWrap:"wrap",gap:5}}>{HOST_MARKERS.map((mk)=><div key={mk.k} style={{padding:"3px 9px",background:C.white,borderRadius:6,border:`1px solid ${C.border}`}}><span style={{fontSize:10.5,fontWeight:700,color:mk.c}}>【{mk.k}】</span><span style={{fontSize:9.5,color:C.mid,marginLeft:3}}>{mk.d}</span></div>)}</div></Card>{result.segments?.map((seg,i)=><Card key={i}><div style={{display:"flex",alignItems:"center",gap:7,marginBottom:9}}><div style={{background:C.coral,color:C.white,width:21,height:21,borderRadius:5,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800}}>{i+1}</div><span style={{fontSize:11.5,fontWeight:700,color:C.ink}}>{seg.duration}</span></div><div style={{background:"#FEFEF9",border:`1.5px solid ${C.border}`,borderRadius:9,padding:"12px 14px",marginBottom:9}}><HostMarkedText text={seg.marked_text}/></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>{seg.action_notes&&<div style={{background:C.roselt,borderRadius:7,padding:"7px 9px"}}><div style={{fontSize:9.5,color:C.rose,fontWeight:700,marginBottom:2}}>肢體</div><div style={{fontSize:11.5,color:C.ink}}>{seg.action_notes}</div></div>}{seg.breathing_notes&&<div style={{background:C.skylt,borderRadius:7,padding:"7px 9px"}}><div style={{fontSize:9.5,color:C.sky,fontWeight:700,marginBottom:2}}>換氣</div><div style={{fontSize:11.5,color:C.ink}}>{seg.breathing_notes}</div></div>}</div></Card>)}{result.delivery_tips&&<Card style={{borderColor:C.jade,background:C.jadelt}}><SL ch="🎭 表演建議"/>{result.delivery_tips.map((t,i)=><div key={i} style={{fontSize:12.5,color:C.ink,padding:"4px 0",borderBottom:i<result.delivery_tips.length-1?`1px solid rgba(0,168,120,.15)`:"none"}}>{t}</div>)}</Card>}{sendToProduction&&result.segments?.length>0&&<PBtn ch={sent?"✅ 已送到下方 🎬 影片生產區（已自動捲動過去）":"🎬 送去生產影片（用此主持人稿生影片）"} onClick={()=>{const sc=(result.segments||[]).map(s=>({narration:(s.marked_text||"").replace(/【[^】]*】/g,"").replace(/（[^）]*）/g,"").replace(/\([^)]*\)/g,"").replace(/\s+/g," ").trim(),imagePrompt:""})).filter(s=>s.narration);sendToProduction({topic:result.title||topic||"",articleTitle:result.title||"",articleContent:sc.map(s=>s.narration).join("\n\n"),scenes:sc.length>0?sc:undefined});setSent(true);}} full/>}</div>);
+  return(<div style={{display:"grid",gap:12}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><h2 style={{fontSize:17,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",margin:0}}>{result.title}</h2><div style={{display:"flex",gap:7}}><GBtn ch={copied?"✅ 已複製":"📋 複製全稿"} onClick={()=>{const t=result.segments?.map(s=>`【${s.duration}】\n${s.marked_text}\n（${s.action_notes}）`).join("\n\n");navigator.clipboard.writeText(t);setCopied(true);setTimeout(()=>setCopied(false),2000);}}/><GBtn ch="重新生成" onClick={()=>setResult(null)}/></div></div><Card style={{background:C.corallt,borderColor:C.coral}}><SL ch="標記說明"/><div style={{display:"flex",flexWrap:"wrap",gap:5}}>{HOST_MARKERS.map((mk)=><div key={mk.k} style={{padding:"3px 9px",background:C.white,borderRadius:6,border:`1px solid ${C.border}`}}><span style={{fontSize:10.5,fontWeight:700,color:mk.c}}>【{mk.k}】</span><span style={{fontSize:9.5,color:C.mid,marginLeft:3}}>{mk.d}</span></div>)}</div></Card>{result.segments?.map((seg,i)=><Card key={i}><div style={{display:"flex",alignItems:"center",gap:7,marginBottom:9}}><div style={{background:C.coral,color:C.white,width:21,height:21,borderRadius:5,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800}}>{i+1}</div><span style={{fontSize:11.5,fontWeight:700,color:C.ink}}>{seg.duration}</span></div><div style={{background:"#FEFEF9",border:`1.5px solid ${C.border}`,borderRadius:9,padding:"12px 14px",marginBottom:9}}><HostMarkedText text={seg.marked_text}/></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>{seg.action_notes&&<div style={{background:C.roselt,borderRadius:7,padding:"7px 9px"}}><div style={{fontSize:9.5,color:C.rose,fontWeight:700,marginBottom:2}}>肢體</div><div style={{fontSize:11.5,color:C.ink}}>{seg.action_notes}</div></div>}{seg.breathing_notes&&<div style={{background:C.skylt,borderRadius:7,padding:"7px 9px"}}><div style={{fontSize:9.5,color:C.sky,fontWeight:700,marginBottom:2}}>換氣</div><div style={{fontSize:11.5,color:C.ink}}>{seg.breathing_notes}</div></div>}</div></Card>)}{result.delivery_tips&&<Card style={{borderColor:C.jade,background:C.jadelt}}><SL ch="🎭 表演建議"/>{result.delivery_tips.map((t,i)=><div key={i} style={{fontSize:12.5,color:C.ink,padding:"4px 0",borderBottom:i<result.delivery_tips.length-1?`1px solid rgba(0,168,120,.15)`:"none"}}>{t}</div>)}</Card>}{result.segments?.length>0&&<SendToVideoButton label="🎬 送去做影片（主持人稿）" build={()=>{const sc=(result.segments||[]).map(s=>({narration:(s.marked_text||"").replace(/【[^】]*】/g,"").replace(/（[^）]*）/g,"").replace(/\([^)]*\)/g,"").replace(/\s+/g," ").trim(),imagePrompt:""})).filter(s=>s.narration);return{title:result.title||topic||"",script:result,production:{topic:result.title||topic||"",articleTitle:result.title||"",articleContent:sc.map(s=>s.narration).join("\n\n"),scenes:sc.length>0?sc:undefined}};}}/>}</div>);
 }
 
 function HookModule(){
@@ -1041,7 +1014,7 @@ function HistoryModule({setNav}){
 }
 
 /* ═══ ROOT ═══ */
-export default function ScriptForge({ onSendToProduction, onSendToRemotion, sideMenu = false, saveSocialDraft }: { onSendToProduction?: SendToProduction; onSendToRemotion?: SendToRemotion; /** the standalone page: modules in a left column with their one-line blurbs */ sideMenu?: boolean; saveSocialDraft?: SaveSocialDraft } = {}){
+export default function ScriptForge({ onSendToVideo, videoNeedsClient = false, sideMenu = false, saveSocialDraft }: { onSendToVideo?: SendToVideo; /** the standalone page: a video project is created for the loaded client */ videoNeedsClient?: boolean; /** the standalone page: modules in a left column with their one-line blurbs */ sideMenu?: boolean; saveSocialDraft?: SaveSocialDraft } = {}){
   const { why } = usePaidFeatures();
   SF_NOT_USABLE = why("video.script");
   const notUsable = SF_NOT_USABLE;
@@ -1100,8 +1073,7 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion, side
   }
   return(
     <ScriptSettingsCtx.Provider value={{ sceneCount, customScenes }}>
-    <ProductionBridge.Provider value={onSendToProduction ?? null}>
-    <RemotionBridge.Provider value={onSendToRemotion ?? null}>
+    <VideoBridge.Provider value={onSendToVideo ? { send: onSendToVideo, needsClient: videoNeedsClient } : null}>
     <SocialDraftBridge.Provider value={saveSocialDraft ?? null}>
     <div style={{minHeight:"100vh",background:C.paper,fontFamily:"DM Sans,sans-serif"}}>
     {notUsable&&<div role="status" style={{padding:"10px 16px",background:C.corallt,color:C.coral,fontSize:13,fontWeight:600}}>腳本生成：{notUsable}，按鈕會直接回報這個原因。</div>}
@@ -1145,7 +1117,7 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion, side
       <div style={{background:C.white,borderBottom:`1.5px solid ${C.border}`}}>
         <div style={{maxWidth:960,margin:"0 auto",padding:"9px 14px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
           <span style={{fontSize:11.5,color:C.mid,lineHeight:1.5}}>
-            <b style={{color:C.ink}}>怎麼用：</b>① {sideMenu?"左邊":"上方"}選功能（預設「手動生成」）→ ② 填主題、按生成 → ③ 結果頁按「<b style={{color:C.coral}}>🎬 送去生產影片</b>」轉成影片
+            <b style={{color:C.ink}}>怎麼用：</b>① {sideMenu?"左邊":"上方"}選功能（預設「手動生成」）→ ② 填主題、按生成 → ③ 結果頁按「<b style={{color:C.coral}}>🎬 送去做影片</b>」轉成影片
           </span>
           <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
             <label style={{fontSize:11,color:C.mid,fontWeight:700,whiteSpace:"nowrap"}}>🌐 語言</label>
@@ -1212,8 +1184,7 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion, side
       </div>
     </div>
     </SocialDraftBridge.Provider>
-    </RemotionBridge.Provider>
-    </ProductionBridge.Provider>
+    </VideoBridge.Provider>
     </ScriptSettingsCtx.Provider>
   );
 }

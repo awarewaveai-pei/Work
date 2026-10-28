@@ -157,6 +157,8 @@ export async function recordVideoAsset(params: {
   source?: "generate" | "draft" | "footage";
   serviceCapability?: VideoServiceCapability;
   outputMeta?: RenderOutputMeta;
+  /** media_production_projects.id (already checked to belong to organizationId by the render route). */
+  mediaProjectId?: string;
   /**
    * True only for the caller that holds the REAL render metadata (/api/video/status,
    * which has recordParams: title, sceneCount, formats, visualBreakdown, imageModel).
@@ -209,6 +211,7 @@ export async function recordVideoAsset(params: {
       byte_size: primaryMeta?.byteSize ?? 0,
       ...(checksumSha256 ? { checksum_sha256: checksumSha256 } : {}),
       is_current: true,
+      ...(params.mediaProjectId ? { media_project_id: params.mediaProjectId } : {}),
       metadata: {
         title: params.title,
         formats: params.outputs,

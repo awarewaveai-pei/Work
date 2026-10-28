@@ -20,14 +20,19 @@ const PROFILE_TO_FORMAT: Record<string, string> = {
 export async function POST(req: NextRequest): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
-  let body: { timeline?: unknown; outputProfile?: unknown };
-  try { body = await req.json() as { timeline?: unknown; outputProfile?: unknown }; }
+  let body: { timeline?: unknown; outputProfile?: unknown; projectId?: unknown };
+  try { body = await req.json() as { timeline?: unknown; outputProfile?: unknown; projectId?: unknown }; }
   catch { return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 }); }
   const validation = validateMediaTimelineV1(body.timeline);
   if (validation.ok === false) return NextResponse.json({ ok: false, error: "Timeline 無法編譯", errors: validation.errors }, { status: 422 });
   const timeline: MediaTimelineV1 = validation.value;
   try { assertOrgAccess(req, timeline.organizationId); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+  const projectId = body.projectId === undefined ? undefined : String(body.projectId);
+  if (projectId !== undefined) {
+    const { projectBelongsTo } = await import("@/lib/content/video/projects");
+    if (!(await projectBelongsTo(projectId, timeline.organizationId))) return NextResponse.json({ ok: false, error: "project_not_in_organization" }, { status: 403 });
+  }
   const profile = typeof body.outputProfile === "string" ? body.outputProfile : timeline.outputProfiles[0];
   const format = PROFILE_TO_FORMAT[profile];
   if (!format) return NextResponse.json({ ok: false, error: "實拍 renderer 僅支援 landscape_16_9、vertical_9_16、square_4_5" }, { status: 422 });
@@ -118,6 +123,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       timelineId: timeline.timelineId,
       outputProfile: profile,
       captionCues: captions.map((cue) => ({ startMs: cue.start_ms, endMs: cue.end_ms, text: cue.text })),
+      ...(projectId ? { projectId } : {}),
     },
   });
   return NextResponse.json({ ok: true, jobId: job.id, outputProfile: profile, format }, { status: 202 });

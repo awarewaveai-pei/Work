@@ -3,6 +3,11 @@
 // only { module, task, fields }; the system text and the prompt are built here, so no prompt text lives in the page.
 // Server only: the page's names and blurbs are nav.ts; no client file imports this one (prompts stay off the bundle).
 
+import { BODY_LIMITS } from "../social/limits";
+
+/** ScriptForge platform id -> Postiz providerIdentifier (the key of BODY_LIMITS); an id not listed has no limit. */
+const PLATFORM_PROVIDER: Record<string, string> = { reels: "instagram", tiktok: "tiktok", shorts: "youtube", youtube: "youtube" };
+
 /** What every prompt gets besides its fields: the output language and scene split the toolbar set, and the brand. */
 export interface ForgeCtx {
   lang: string;
@@ -285,8 +290,12 @@ export const FORGE_MODULES: ForgeModule[] = [
         build: (f) => `評估腳本。鉤子：${s(f.hook)}|場景：${s(f.scenes)}|CTA：${s(f.cta)}\n純JSON：{"scores":{"hook":0,"rhythm":0,"clarity":0,"emotion":0,"shootability":0,"conversion":0},"overall":0,"optimized_hook":"","optimized_cta":""}`,
       },
       platform: {
-        shape: ["title", "hook", "scenes"],
-        build: (f) => `將以下腳本改寫成「${s(f.plat)}」版本。原版：標題:${s(f.title)} 鉤子:${s(f.hook)} 台詞:${arr(f.dialogues).join("；")} CTA:${s(f.cta)}\n純JSON：{"platform":"${s(f.plat)}","title":"","hook":"","scenes":[{"time":"","visual":"","dialogue":"","subtitle":"","shoot_tip":"","edit_tip":""}],"cta":"","key_changes":"3個主要差異"}`,
+        shape: ["title", "hook", "scenes", "hashtags"],
+        build: (f) => {
+          const limit = BODY_LIMITS[PLATFORM_PROVIDER[s(f.platformId)] ?? ""];
+          const rule = limit ? `貼文文字（標題、鉤子、台詞、CTA 合計）不得超過 ${limit} 字；` : "";
+          return `將以下腳本改寫成「${s(f.plat)}」版本，${rule}依該平台的慣例調整語氣、節奏與長度，並給 5-10 個適合該平台的 hashtags（不含 #）。原版：標題:${s(f.title)} 鉤子:${s(f.hook)} 台詞:${arr(f.dialogues).join("；")} CTA:${s(f.cta)}\n純JSON：{"platform":"${s(f.plat)}","title":"","hook":"","scenes":[{"time":"","visual":"","dialogue":"","subtitle":"","shoot_tip":"","edit_tip":""}],"cta":"","hashtags":["tag"],"key_changes":"3個主要差異"}`;
+        },
       },
     } }),
 ];

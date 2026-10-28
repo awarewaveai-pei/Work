@@ -61,4 +61,10 @@ describe("finalizeVideoJob", () => {
     expect(finishJob).toHaveBeenCalledWith("j1", expect.objectContaining({ status: "done", recorded: true }));
     expect(cleanupVideoInputKeys).toHaveBeenCalledWith(job.r2Keys);
   });
+
+  it("a render of a project records the asset under that project", async () => {
+    pollRenderJob.mockResolvedValue({ status: "done", outputs: OUT, out_dir: "x", outputMeta: { "16x9": { width: 1920, height: 1080 } } });
+    await finalizeVideoJob(runningJob({ recordParams: { title: "T", sceneCount: 2, organizationId: ORG, projectId: "p1" } }));
+    expect(recordVideoAsset).toHaveBeenCalledWith(expect.objectContaining({ mediaProjectId: "p1" }));
+  });
 });

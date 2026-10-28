@@ -38,6 +38,28 @@ describe("standalone ScriptForge page", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "生成", expanded: true })).toBeTruthy());
   });
 
+  it("a finished script has one 「送去做影片」 that needs a loaded client and then creates a project for it (V1.3)", async () => {
+    const script = { title: "T", hook: "H", cta: "C", scenes: [{ time: "0-3s", visual: "v", dialogue: "d" }] };
+    const site = { id: "s1", organization_id: "org-1", name: "Client A", contentDefaults: {} };
+    const posts: { url: string; body: string }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === "/api/tools/script-forge") return new Response(JSON.stringify(script));
+      if (url === "/api/video/projects") { posts.push({ url, body: String(init?.body) }); return new Response(JSON.stringify({ ok: true, item: { id: "p1" } }), { status: 201 }); }
+      return new Response(JSON.stringify({ ok: true, sites: [site] }));
+    }));
+    vi.stubGlobal("location", { ...window.location, assign: vi.fn() });
+    render(<ScriptForgePage />);
+    fireEvent.click(screen.getByRole("button", { name: /品牌故事/ }));
+    fireEvent.change(await screen.findByPlaceholderText("例如：小林手工蠟燭"), { target: { value: "X" } });
+    fireEvent.click(screen.getByRole("button", { name: /生成品牌故事腳本/ }));
+    expect(await screen.findByText(/要送去做影片，先在上方「載入客戶」選一個客戶/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /送去做影片/ })).toBeNull();
+    fireEvent.change(await screen.findByDisplayValue("👤 載入客戶…"), { target: { value: "s1" } });
+    fireEvent.click(await screen.findByRole("button", { name: "🎬 送去做影片" }));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    expect(JSON.parse(posts[0].body)).toMatchObject({ organizationId: "org-1", source: "script_forge", brief: { title: "T" } });
+  });
+
   it("the pipeline's ScriptForge has no side column", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ok: true, sites: [] }))));
     render(<ScriptForge />);

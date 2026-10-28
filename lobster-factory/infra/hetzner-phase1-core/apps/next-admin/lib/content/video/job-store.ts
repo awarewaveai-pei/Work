@@ -53,6 +53,8 @@ export interface VideoJob {
     timelineId?: string;
     outputProfile?: string;
     captionCues?: { startMs: number; endMs: number; text: string }[];
+    /** media_production_projects.id the render belongs to; checked against organizationId before it is stored. */
+    projectId?: string;
   };
   recorded?: boolean;           // media_assets 已記錄（只記一次）
 }

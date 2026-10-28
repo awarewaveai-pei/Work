@@ -1,57 +1,48 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import ScriptForge from "./ScriptForge";
-import { takeForVideo } from "./script-handoff";
 import VideoStudio from "./VideoStudio";
 import FootageEditor from "./FootageEditor";
 import ReleaseDeliveryPanel from "./ReleaseDeliveryPanel";
-import MediaOperationsPanel from "./MediaOperationsPanel";
 import OrganizationPicker from "./OrganizationPicker";
 import ModeSelectStep, { type ProductionMode } from "./ModeSelectStep";
 import CostGateStep from "./CostGateStep";
-import TimelineGateStep from "./TimelineGateStep";
 import CaptionsStep from "./CaptionsStep";
 import QaStep from "./QaStep";
+import { handoffFromScript, type VideoHandoff } from "./video-handoff";
 
-// ── 2026-09-10 重做：把「重分 tab 組」換成真正的 10 步驟 pipeline ──────────────
-// 上一輪只把 VideoStudio 內層 5 個平級 tab 重分成 3 組，仍然是使用者可任意跳點的
-// 導覽列，不是操作者畫的 A→B→C→…→L 依序推進、上一步完成才能進下一步的流程。這裡
-// 重做成真正的 stepper：currentStep 從 1 走到 9（見下方 STEP 6 附註），每步做完
-// 才能繼續，狀態往下傳。VideoTabs.tsx／VideoStudio 3 分組 tab bar 不刪，改標
-// 「進階」入口保留給需要繞過流程直接操作單一引擎的人。
-//
-// 誠實揭露一個沒有假裝解決的現實限制：她的步驟④「生成或選取素材」跟⑥「渲染」在
-// 現有三個引擎（Quick Engine ffmpeg／FootageEditor／RemotionStudio）裡都是同一顆按
-// 鈕觸發的同一段後端邏輯（VideoStudio 的「生成草稿」本身就包含渲染；FootageEditor
-// 的「送實拍渲染」同一畫面）。要真正拆成兩個獨立可分別重試的步驟，需要重寫這三個
-// 引擎的 render pipeline 本身，不是重排 UI 能做到的——這裡誠實地把④⑥合併成一個
-// stepper 節點，而不是做一個沒有對應真實後端閘的假步驟。
+// 影片專案 stepper（VIDEO_TOOL_REDESIGN_2026-10-26.md D1/D5、V1.4）：5 步；客戶、腳本、模式、做到哪一步都存在
+// 專案列（/tools/video?project=<id>），重整或關頁後回來接著做。客戶只在建專案時選一次。
+// Remotion 還不是 DB 的 production_mode（0071 check；D9 在 V3.4 改成加購片頭卡），在那之前記在 brief.engine。
 
-type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
-
-interface ScriptPrefill {
-  topic: string; articleTitle: string; articleContent: string;
-  scenes?: { narration: string; imagePrompt: string; visual?: "custom" | "broll"; brollKeyword?: string; referenceImageUrl?: string }[];
-  mediaMode?: string; duration?: number; customScenes?: number;
-}
-interface RemotionPrefill {
-  topic: string; headline?: string; tagline?: string; cta?: string; imageHint?: string;
-  scenes?: { visual: string; dialogue: string }[]; mediaMode?: string; duration?: number; customScenes?: number;
+type Step = 1 | 2 | 3 | 4 | 5;
+type Brief = VideoHandoff & { engine?: "remotion" };
+interface Project {
+  id: string; organization_id: string; title: string;
+  production_mode: "quick_video" | "short_drama" | "footage_edit";
+  lifecycle_stage: string; brief_json: Brief;
 }
 
 const STEP_LABELS: { step: Step; label: string }[] = [
-  { step: 1, label: "① 建立腳本" },
-  { step: 2, label: "② 選擇模式" },
-  { step: 3, label: "③ 費用確認" },
-  { step: 4, label: "④⑥ 生成／渲染" },
-  { step: 5, label: "⑤ Timeline 驗證" },
-  { step: 6, label: "⑦ 字幕" },
-  { step: 7, label: "⑧ QA" },
-  { step: 8, label: "⑨ Release" },
-  { step: 9, label: "⑩ 營運" },
+  { step: 1, label: "① 腳本" },
+  { step: 2, label: "② 設定與費用" },
+  { step: 3, label: "③ 生成與修圖" },
+  { step: 4, label: "④ 審片" },
+  { step: 5, label: "⑤ 發布" },
 ];
+const STAGE_OF: Record<Step, string> = { 1: "create", 2: "create", 3: "produce", 4: "review", 5: "release" };
 
+function stepOf(p: Project): Step {
+  if (p.lifecycle_stage === "produce") return 3;
+  if (p.lifecycle_stage === "review") return 4;
+  if (p.lifecycle_stage === "release" || p.lifecycle_stage === "measure") return 5;
+  return p.brief_json?.production || p.brief_json?.remotion ? 2 : 1;
+}
+const modeOf = (p: Project): ProductionMode => (p.brief_json?.engine === "remotion" ? "remotion" : p.production_mode);
+
+const card: React.CSSProperties = { background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 10, padding: 14 };
+const field: React.CSSProperties = { width: "100%", boxSizing: "border-box", padding: 8, borderRadius: 6, border: "1px solid var(--border-subtle)", background: "var(--card-bg)", color: "var(--text-primary)", fontSize: 13 };
+const primary = (on: boolean): React.CSSProperties => ({ padding: "12px 24px", borderRadius: 8, border: "none", background: on ? "var(--accent)" : "var(--border-subtle)", color: on ? "var(--btn-primary-text)" : "var(--text-muted)", fontWeight: 700, fontSize: 14, cursor: on ? "pointer" : "not-allowed" });
 const barBtn = (state: "done" | "active" | "todo"): React.CSSProperties => ({
   padding: "7px 12px", borderRadius: 999, border: "1px solid " + (state === "active" ? "var(--accent)" : "var(--border-subtle)"),
   background: state === "active" ? "var(--accent)" : state === "done" ? "var(--badge-green-bg)" : "var(--bg-subtle)",
@@ -59,158 +50,149 @@ const barBtn = (state: "done" | "active" | "todo"): React.CSSProperties => ({
   fontSize: 12, fontWeight: state === "todo" ? 500 : 700, whiteSpace: "nowrap",
 });
 
+async function api(method: "GET" | "POST" | "PATCH", body?: object, id?: string): Promise<{ item?: Project; error?: string }> {
+  const res = await fetch(`/api/video/projects${id ? `?id=${id}` : ""}`, { method, headers: { "Content-Type": "application/json" }, ...(body ? { body: JSON.stringify(body) } : {}) });
+  const json = await res.json().catch(() => ({})) as { item?: Project; error?: string };
+  return res.ok ? json : { error: json.error ?? `HTTP ${res.status}` };
+}
+
+/** sf_history (ScriptForge, browser-local per AUTO_CONTENT D2): pick a saved script as this project's script. */
+function readHistory(): { id: number; title?: string; ts?: string; script?: unknown }[] {
+  try { return JSON.parse(localStorage.getItem("sf_history") || "[]"); } catch { return []; }
+}
+
 export default function VideoPipeline() {
+  const [project, setProject] = useState<Project | null>(null);
   const [step, setStep] = useState<Step>(1);
-  const [maxReached, setMaxReached] = useState<Step>(1);
-  const [organizationId, setOrganizationId] = useState("");
-  const [mode, setMode] = useState<ProductionMode | null>(null);
-  const [scriptPrefill, setScriptPrefill] = useState<ScriptPrefill | undefined>(undefined);
-  const [remotionPrefill, setRemotionPrefill] = useState<RemotionPrefill | undefined>(undefined);
-  const [footageOrgSeed, setFootageOrgSeed] = useState("");
-  const [footageJobId, setFootageJobId] = useState("");
-  const [quickRenderDone, setQuickRenderDone] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [review, setReview] = useState<"captions" | "qa">("captions");
   const [candidateAssetId, setCandidateAssetId] = useState("");
-  const [candidateChecksum, setCandidateChecksum] = useState("");
-  const [releaseId, setReleaseId] = useState("");
-  const [genKey, setGenKey] = useState(0);
+  const [renderDone, setRenderDone] = useState(false);
   const topRef = useRef<HTMLDivElement>(null);
 
-  function goto(next: Step) {
-    setStep(next);
-    setMaxReached((prev) => (next > prev ? next : prev));
-    requestAnimationFrame(() => topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
-  }
-
-  // A script sent from the standalone ScriptForge page arrives like the in-page 「送去生產影片」 (script-handoff.ts).
   useEffect(() => {
-    const h = takeForVideo();
-    if (!h) return;
-    if (h.kind === "remotion") { setRemotionPrefill(h.payload as unknown as RemotionPrefill); setMode("remotion"); }
-    else { setScriptPrefill(h.payload as unknown as ScriptPrefill); setMode("quick_video"); }
-    goto(2);
+    const id = new URLSearchParams(window.location.search).get("project");
+    if (!id) return;
+    void api("GET", undefined, id).then((r) => {
+      if (r.item) { setProject(r.item); setStep(stepOf(r.item)); } else setLoadError(r.error ?? "讀不到專案");
+    });
   }, []);
 
-  function reset() {
-    setStep(1); setMaxReached(1); setMode(null); setScriptPrefill(undefined); setRemotionPrefill(undefined);
-    setFootageOrgSeed(organizationId); setFootageJobId(""); setQuickRenderDone(false);
-    setCandidateAssetId(""); setCandidateChecksum(""); setReleaseId(""); setGenKey((k) => k + 1);
+  async function patch(fields: Record<string, unknown>) {
+    if (!project) return;
+    const r = await api("PATCH", { id: project.id, ...fields });
+    if (r.item) setProject(r.item); else setLoadError(r.error ?? "存檔失敗");
   }
+  function goto(next: Step) {
+    setStep(next);
+    if (project && STAGE_OF[next] !== project.lifecycle_stage) void patch({ lifecycleStage: STAGE_OF[next] });
+    requestAnimationFrame(() => topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+  const maxStep: Step = project ? Math.max(step, stepOf(project)) as Step : 1;
 
+  if (!project) return <NewProject loadError={loadError} onCreated={(p) => { window.history.replaceState(null, "", `?project=${p.id}`); setProject(p); setStep(1); }} />;
+
+  const brief = project.brief_json ?? { title: project.title };
+  const mode = modeOf(project);
+  const org = project.organization_id;
   return (
     <div ref={topRef} style={{ background: "var(--bg-canvas)", minHeight: "100vh" }}>
-      {/* ── Stepper bar ── */}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", padding: "12px 28px", borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-canvas)", position: "sticky", top: 0, zIndex: 10 }}>
         {STEP_LABELS.map(({ step: s, label }) => (
-          <button key={s} type="button" disabled={s > maxReached}
-            onClick={() => s <= maxReached && goto(s)}
-            style={{ ...barBtn(s === step ? "active" : s < step ? "done" : "todo"), cursor: s <= maxReached ? "pointer" : "not-allowed", border: "1px solid var(--border-subtle)" }}>
-            {label}
-          </button>
+          <button key={s} type="button" disabled={s > maxStep} onClick={() => goto(s)}
+            style={{ ...barBtn(s === step ? "active" : s < step ? "done" : "todo"), cursor: s <= maxStep ? "pointer" : "not-allowed" }}>{label}</button>
         ))}
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
-          {step > 1 && <span style={{ fontSize: 11, color: "var(--text-muted)" }}>租戶：{organizationId ? organizationId.slice(0, 8) + "…" : "未選"}</span>}
-          <a href="?advanced=1" style={{ fontSize: 11, color: "var(--text-secondary)", textDecoration: "underline" }}>進階（跳過流程，直接操作單一引擎）</a>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, fontSize: 11, color: "var(--text-muted)" }}>
+          <span>{project.title}</span>
+          <a href="/tools/video" style={{ color: "var(--text-secondary)", textDecoration: "underline" }}>＋ 新影片</a>
+          <a href="?advanced=1" style={{ color: "var(--text-secondary)", textDecoration: "underline" }}>進階</a>
         </div>
       </div>
+      {loadError && <div style={{ padding: "8px 28px", color: "var(--red)", fontSize: 12 }}>{loadError}</div>}
 
-      {/* ── Step 1：建立腳本（含短劇 Story Bible 入口）── */}
-      {step === 1 && (
-        <ScriptForge
-          onSendToProduction={(p) => { setScriptPrefill(p); setRemotionPrefill(undefined); if (!mode) setMode("quick_video"); goto(2); }}
-          onSendToRemotion={(p) => { setRemotionPrefill(p); setScriptPrefill(undefined); setMode("remotion"); goto(2); }}
-        />
-      )}
+      {step === 1 && <ScriptStep brief={brief} onPick={(h) => void patch({ brief: { ...h, engine: brief.engine } })} onNext={() => goto(2)} />}
 
-      {/* ── Step 2：選擇製作模式 ── */}
       {step === 2 && (
         <>
-          <div style={{ padding: "14px 28px 0" }}>
-            <label style={{ fontSize: 12, color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 8, maxWidth: 420 }}>
-              租戶<div style={{ flex: 1 }}><OrganizationPicker value={organizationId} onChange={setOrganizationId} /></div>
-            </label>
-          </div>
-          <ModeSelectStep value={mode} onSelect={(m) => setMode(m)} />
-          <div style={{ padding: "0 28px 24px" }}>
-            <button type="button" disabled={!mode} onClick={() => goto(3)}
-              style={{ padding: "12px 24px", borderRadius: 8, border: "none", background: mode ? "var(--accent)" : "var(--border-subtle)", color: mode ? "var(--btn-primary-text)" : "var(--text-muted)", fontWeight: 700, fontSize: 14, cursor: mode ? "pointer" : "not-allowed" }}>
-              下一步 →
-            </button>
-          </div>
+          <ModeSelectStep value={mode} onSelect={(m) => void patch(m === "remotion"
+            ? { brief: { ...brief, engine: "remotion" } }
+            : { productionMode: m, brief: { ...brief, engine: undefined } })} />
+          <CostGateStep mode={mode} onConfirm={() => goto(3)} />
         </>
       )}
 
-      {/* ── Step 3：費用預覽與確認 ── */}
-      {step === 3 && mode && <CostGateStep mode={mode} onConfirm={() => goto(4)} />}
-
-      {/* ── Step 4（含⑥渲染）：生成或選取素材 ── */}
-      {step === 4 && mode === "footage_edit" && (
-        <FootageEditor
-          key={genKey}
-          initialOrganizationId={organizationId || footageOrgSeed}
-          onRenderComplete={(jobId) => { setFootageJobId(jobId); goto(5); }}
-        />
+      {step === 3 && mode === "footage_edit" && (
+        <FootageEditor initialOrganizationId={org} projectId={project.id} onRenderComplete={() => goto(4)} />
       )}
-      {step === 4 && (mode === "quick_video" || mode === "short_drama") && (
-        <VideoStudio
-          key={genKey}
-          initial={scriptPrefill}
-          embedded={{ lockTab: "generate", organizationId: organizationId || undefined, onRenderComplete: () => { if (!quickRenderDone) { setQuickRenderDone(true); goto(5); } } }}
-        />
+      {step === 3 && (mode === "quick_video" || mode === "short_drama") && (
+        <VideoStudio initial={brief.production}
+          embedded={{ lockTab: "generate", organizationId: org, projectId: project.id, onRenderComplete: () => { if (!renderDone) { setRenderDone(true); goto(4); } } }} />
       )}
-      {step === 4 && mode === "remotion" && (
-        <VideoStudio key={genKey} remotionInitial={remotionPrefill} embedded={{ lockTab: "remotion", organizationId: organizationId || undefined }} />
-      )}
-      {step === 4 && mode === "remotion" && (
-        <div style={{ padding: "0 28px 24px" }}>
-          <button type="button" onClick={() => goto(5)}
-            style={{ padding: "10px 20px", borderRadius: 8, border: "1px solid var(--border-subtle)", background: "var(--bg-subtle)", color: "var(--text-primary)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
-            Remotion 渲染已送出，繼續 →
-          </button>
-        </div>
-      )}
-
-      {/* ── Step 5：Timeline 背景驗證 ── */}
-      {step === 5 && mode && (
-        <TimelineGateStep mode={mode} onPass={() => goto(6)} />
-      )}
-
-      {/* ── Step 6：配音與 Whisper 字幕 ── */}
-      {step === 6 && <CaptionsStep organizationId={organizationId} onContinue={() => goto(7)} />}
-
-      {/* ── Step 7：技術 QA + 編輯 QA ── */}
-      {step === 7 && (
-        <QaStep organizationId={organizationId} onContinue={(assetId, checksum) => { setCandidateAssetId(assetId); setCandidateChecksum(checksum); goto(8); }} />
-      )}
-
-      {/* ── Step 8：Release 交付到網站與社群 ── */}
-      {step === 8 && (
-        <ReleaseDeliveryPanel
-          initialOrganizationId={organizationId}
-          initialCandidateAssetId={candidateAssetId}
-          onReleaseCreated={(id) => { setReleaseId(id); }}
-        />
-      )}
-      {step === 8 && (
-        <div style={{ padding: "0 28px 24px" }}>
-          <button type="button" onClick={() => goto(9)}
-            style={{ padding: "10px 20px", borderRadius: 8, border: "1px solid var(--border-subtle)", background: "var(--bg-subtle)", color: "var(--text-primary)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
-            {releaseId ? "Release 完成，查看營運成效 →" : "略過（先看營運頁）→"}
-          </button>
-        </div>
-      )}
-
-      {/* ── Step 9：營運成效 + 歷史/成本 ── */}
-      {step === 9 && (
+      {step === 3 && mode === "remotion" && (
         <>
-          <MediaOperationsPanel />
-          <div style={{ padding: "0 28px 24px" }}>
-            <button type="button" onClick={reset}
-              style={{ padding: "10px 20px", borderRadius: 8, border: "1px solid var(--border-subtle)", background: "var(--accent)", color: "var(--btn-primary-text)", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-              ＋ 開始新影片
-            </button>
-          </div>
+          <VideoStudio remotionInitial={brief.remotion} embedded={{ lockTab: "remotion", organizationId: org, projectId: project.id }} />
+          <div style={{ padding: "0 28px 24px" }}><button type="button" onClick={() => goto(4)} style={primary(true)}>Remotion 渲染已送出，繼續 →</button></div>
         </>
       )}
+
+      {step === 4 && review === "captions" && <CaptionsStep organizationId={org} onContinue={() => setReview("qa")} />}
+      {step === 4 && review === "qa" && <QaStep organizationId={org} onContinue={(assetId) => { setCandidateAssetId(assetId); goto(5); }} />}
+
+      {step === 5 && (
+        <ReleaseDeliveryPanel organizationLocked initialOrganizationId={org} initialCandidateAssetId={candidateAssetId}
+          onReleaseCreated={() => void patch({ lifecycleStage: "measure" })} />
+      )}
+    </div>
+  );
+}
+
+function NewProject({ loadError, onCreated }: { loadError: string; onCreated: (p: Project) => void }) {
+  const [org, setOrg] = useState("");
+  const [title, setTitle] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(loadError);
+  const ready = !!org && !!title.trim() && !busy;
+  async function create() {
+    setBusy(true); setError("");
+    const r = await api("POST", { organizationId: org, title: title.trim(), productionMode: "quick_video" });
+    setBusy(false);
+    if (r.item) onCreated(r.item); else setError(r.error ?? "建立失敗");
+  }
+  return (
+    <div style={{ padding: "24px 28px", display: "grid", gap: 14, maxWidth: 520 }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>新影片</div>
+      <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>客戶只在這裡選一次；之後每一步都用這個客戶。也可以先在 <a href="/tools/script-forge" style={{ color: "var(--text-secondary)" }}>腳本工具</a> 寫好腳本，按「送去做影片」直接建專案。</div>
+      <div style={card}><label style={{ fontSize: 12, color: "var(--text-secondary)" }}>客戶<div style={{ marginTop: 5 }}><OrganizationPicker value={org} onChange={setOrg} /></div></label></div>
+      <div style={card}><label htmlFor="vp-title" style={{ fontSize: 12, color: "var(--text-secondary)" }}>影片標題</label><input id="vp-title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={180} style={{ ...field, marginTop: 5 }} /></div>
+      {error && <div style={{ color: "var(--red)", fontSize: 12 }}>{error}</div>}
+      <button type="button" disabled={!ready} onClick={() => void create()} style={primary(ready)}>{busy ? "建立中…" : "建立專案 →"}</button>
+    </div>
+  );
+}
+
+function ScriptStep({ brief, onPick, onNext }: { brief: Brief; onPick: (h: VideoHandoff) => void; onNext: () => void }) {
+  const [history, setHistory] = useState<ReturnType<typeof readHistory>>([]);
+  useEffect(() => setHistory(readHistory().filter((h) => h.script)), []);
+  const has = !!(brief.production || brief.remotion);
+  const sceneCount = brief.production?.scenes?.length ?? brief.remotion?.scenes?.length ?? 0;
+  return (
+    <div style={{ padding: "24px 28px", display: "grid", gap: 14, maxWidth: 640 }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>① 腳本</div>
+      {has
+        ? <div style={card}><div style={{ fontSize: 13, fontWeight: 700 }}>{brief.title || "（未命名）"}</div><div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>{sceneCount} 場</div></div>
+        : <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>這個專案還沒有腳本。從下面挑一份，或到 <a href="/tools/script-forge" style={{ color: "var(--text-secondary)" }}>腳本工具</a> 寫一份再按「送去做影片」。</div>}
+      {history.length > 0 && (
+        <details style={card} open={!has}>
+          <summary style={{ fontSize: 12, cursor: "pointer" }}>{has ? "改用腳本歷史裡的另一份" : "從腳本歷史挑一份"}（只存在這台電腦的瀏覽器）</summary>
+          <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
+            {history.slice(0, 20).map((h) => (
+              <button key={h.id} type="button" onClick={() => onPick(handoffFromScript(h.script, { customScenes: 3 }))}
+                style={{ ...field, textAlign: "left", cursor: "pointer" }}>{h.title || "（未命名）"} <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{h.ts}</span></button>
+            ))}
+          </div>
+        </details>
+      )}
+      <button type="button" disabled={!has} onClick={onNext} style={primary(has)}>下一步 →</button>
     </div>
   );
 }

@@ -1,4 +1,25 @@
 # Worklog
+## 2026-10-28（續6）— 影片工具 V1 專案骨架＋V3.1–V3.3；0138 套正式庫（Claude Opus；V3 派 cc.py Sonnet；操作者 go-ahead）
+
+- **卡**：`agency-os/docs/video_generator/VIDEO_TOOL_REDESIGN_2026-10-26.md` §7 V1.1–V1.5、V3.1–V3.3（監工台 `agency-os/handoffs/2026-10-26-video-tool-supervisor/`）。
+- **不變量**：專案是客戶、腳本、模式、步驟的唯一來源；任何寫入連到專案前先過 `projectBelongsTo`（`NA/lib/content/video/projects.ts`）。腳本→影片交接只有一個形狀與轉換函式（`V/video-handoff.ts`），原本 4 檔各一份型別。
+- **改動**：
+  - V1.1 `DB/migrations/0138_media_projects_v2.sql`（＋down 兩份同 byte）：專案加 autonomy／source／source_ref／formats／last_error＋check；`media_assets.media_project_id`（舊 `project_id` FK 舊 `projects`，`0038:29`）；4 列 smoke 封存。
+  - V1.2 `NA/app/api/video/projects/route.ts`：`?id=` 回專案＋assets（org 閘）；欄位驗證 400；列表排除 archived。
+  - V1.3 ScriptForge 三處送影片鍵（一般腳本／廣告 A/B/C／主持人稿）→ 單一 `SendToVideoButton`；獨立頁建專案帶載入客戶（`ScriptForgePage.tsx`），無客戶顯示提示；Story Bible 用載入客戶。刪 `V/script-handoff.ts`（sessionStorage 交接）。
+  - V1.4 `V/VideoPipeline.tsx` 重寫：5 步、狀態在專案列、客戶只在建專案選一次；兩引擎輸入同存 brief → 換模式不丟資料（findings 問題 2）；刪 `V/TimelineGateStep.tsx`（舊 `VideoPipeline.tsx:174` 從未傳 timelineJson＝每模式空放行）。FootageEditor／ReleaseDeliveryPanel 有專案時不顯示租戶選單。
+  - V1.5 render-draft、footage/render 收 `projectId`（驗屬同 org，否則 403）→ `recordParams.projectId` → `recordVideoAsset` 寫 `media_project_id`。
+  - V3（cc.py Sonnet，US$0.42，逐行驗收）：多平台版本並存可選；改寫 prompt 讀 `limits.ts BODY_LIMITS`＋hashtags；送社群帶 hashtags。
+- **正式機**：備份 `/root/lobster-phase1/backups/video-schema/pre-0138-20261028-005955.sql.gz`（sha256 057ac3c6…0708，兩表）→ `node scripts/apply-db-migration.mjs 0138` → APPLY_OK；驗：5 欄＋3 check＋`media_assets.media_project_id uuid`＋4 列 archived＋ledger 列。程式隨 2026-10-29 03:00 自動部署（migration 閘已滿足）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m pytest lobster-factory/packages/db/tests/test_0138_media_projects_v2.py（拋棄式 Postgres：up／約束／FK restrict／down 還原 stage／重跑冪等）→ 2 passed | exit=0 | ms=9600
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（next-admin 全套）→ 397 files, 3423 passed, 0 failed；npx tsc --noEmit 0 error | exit=0 | ms=600000
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：拔 projects/route.ts GET by id 的 assertOrgAccess → route.test「refuses another organization's project」紅；拔 projects.ts `&& data.organization_id === orgId` → projects.test 紅；還原皆綠 | exit=0 | ms=800
+- REALTEST_EVIDENCE: tool=SSH | cmd=apply-db-migration 0138 後 psql 查 information_schema／pg_constraint／media_production_projects／schema_migrations | exit=0 | ms=2005
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/2n（書面對抗自審：migration 加欄 fast default、FK 欄全 null 無驗證成本、check 對既有列成立；upsert 只在權威寫入帶 media_project_id、reconcile 不覆寫；舊程式 select 明列欄位不受新欄影響。n1 brief_json 無大小上限（僅員工／自家客戶可寫）；n2 從腳本歷史挑的腳本不帶 Story Bible 定裝照對照）
+- ORACLE_WAIVED: Codex 不可用——`~/.codex/config.toml:2` 2026-10-28 08:23 又被改回 `gpt-6.1-sol`（ChatGPT 帳號 400 model_not_found，同 2026-10-25）；`codex-oracle.ps1` 兩次無輸出；全域設定不動（「舊版 GPT 模型停止支援」session 在處理）。代替：上列書面自審＋兩個擁有權守衛突變。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=onSendToProduction|onSendToRemotion|script-handoff|TimelineGateStep|stashForVideo|送去生產影片 | hits=0（程式內 5 處畫面文字已改「送去做影片」；WORKLOG／TASKS／舊審查文件為歷史不改）
+- **未驗**：瀏覽器端未實操（本機需登入）；03:00 上線後在正式站走一次「腳本頁送出→影片頁不問客戶→重整停同一步」。
+- **rollback**：程式 revert 本 commit；資料庫 `node scripts/apply-db-migration.mjs` 不含 down → 主機 `docker exec -i supabase-db psql -U postgres -d postgres < lobster-factory/packages/db/scripts/0138_media_projects_v2_down.sql`（刪 ledger 列、欄位、還原 4 列 stage）。
 ## 2026-10-28（續5）— 排程通知翻轉修正（Codex）
 
 - 根因：`report-host-schedules.py:170-215` 僅採定時結果，漏掉安全掃描手動成功；GitHub probe 實際間隔4–6h，`host-schedules.ts:67` 單次遲到成功即恢復，產生紅綠翻轉。

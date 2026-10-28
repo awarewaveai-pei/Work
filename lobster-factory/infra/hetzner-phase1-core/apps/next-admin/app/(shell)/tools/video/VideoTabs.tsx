@@ -3,37 +3,16 @@
 import { useRef, useState } from "react";
 import VideoStudio from "./VideoStudio";
 import ScriptForge from "./ScriptForge";
+import type { ProductionInput, RemotionInput } from "./video-handoff";
 
 // /tools/video 單頁雙區（原本是分頁，2026-06-26 整合為上下兩 section）：
 //   Section 1（上）：📝 前製腳本（ScriptForge）— 用 AI 寫台詞、分鏡、字幕、標題
 //   Section 2（下）：🎬 影片生產（VideoStudio）— 腳本 → AI 生圖 → 配音 → MP4
-// 接力：ScriptForge「送去生產影片」→ onSendToProduction(prefill) → 更新 prefill + bump productionKey
+// 接力：ScriptForge「送去做影片」→ onSendToVideo(handoff) → 兩個引擎的 prefill 一起更新 + bump productionKey
 //   → VideoStudio 以新 key 重新掛載、用 initial 重新 seed useState（VideoStudio 內部 seed 邏輯零改動）
 //   → 平滑捲動到生產區。
 // 為何用 key remount：VideoStudio 的 prefill 全走 useState 初始化（只在 mount 讀一次，見 VideoStudio.tsx:164/175/183/194-196）；
 //   兩區常駐時不會自動 re-seed，換 key 強制 remount = 等同原本切分頁的重掛載行為。
-
-interface ProductionPrefill {
-  topic: string;
-  articleTitle: string;
-  articleContent: string;
-  scenes?: { narration: string; imagePrompt: string; visual?: "custom" | "broll"; brollKeyword?: string; referenceImageUrl?: string }[];
-  mediaMode?: string;
-  duration?: number;
-  customScenes?: number;
-}
-
-interface RemotionPrefill {
-  topic: string;
-  headline?: string;
-  tagline?: string;
-  cta?: string;
-  imageHint?: string;
-  scenes?: { visual: string; dialogue: string }[];
-  mediaMode?: string;
-  duration?: number;
-  customScenes?: number;
-}
 
 const SECTION_HEADER: React.CSSProperties = {
   display: "flex",
@@ -45,8 +24,8 @@ const SECTION_HEADER: React.CSSProperties = {
 };
 
 export default function VideoTabs() {
-  const [prefill, setPrefill] = useState<ProductionPrefill | undefined>(undefined);
-  const [remotionPrefill, setRemotionPrefill] = useState<RemotionPrefill | undefined>(undefined);
+  const [prefill, setPrefill] = useState<ProductionInput | undefined>(undefined);
+  const [remotionPrefill, setRemotionPrefill] = useState<RemotionInput | undefined>(undefined);
   // 每次接力 +1 → 當作 VideoStudio 的 React key → 強制 remount 重新 seed prefill。
   const [productionKey, setProductionKey] = useState(0);
   const produceRef = useRef<HTMLDivElement>(null);
@@ -70,14 +49,9 @@ export default function VideoTabs() {
           </span>
         </div>
         <ScriptForge
-          onSendToProduction={(p) => {
-            setPrefill(p);
-            setRemotionPrefill(undefined);
-            goProduce();
-          }}
-          onSendToRemotion={(p) => {
-            setRemotionPrefill(p);
-            setPrefill(undefined);
+          onSendToVideo={(h) => {
+            setPrefill(h.production);
+            setRemotionPrefill(h.remotion);
             goProduce();
           }}
         />

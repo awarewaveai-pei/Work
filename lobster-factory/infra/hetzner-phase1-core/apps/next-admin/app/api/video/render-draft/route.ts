@@ -38,6 +38,8 @@ interface RenderDraftBody {
   introDuration?: number;
   /** VideoPipeline wizard 帶入的租戶（② 選租戶那步）。未帶時退回既有預設租戶解析，行為不變。 */
   organizationId?: string;
+  /** 影片專案（V1.5）：必須屬於上面解析出的租戶，否則 403。 */
+  projectId?: string;
 }
 
 export async function POST(req: NextRequest): Promise<Response> {
@@ -72,6 +74,11 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   if (!Array.isArray(scenes) || scenes.length === 0) {
     return NextResponse.json({ ok: false, error: "scenes 為必填非空陣列" }, { status: 400 });
+  }
+  const projectId = body.projectId === undefined ? undefined : String(body.projectId);
+  if (projectId !== undefined) {
+    const { projectBelongsTo } = await import("@/lib/content/video/projects");
+    if (!orgId || !(await projectBelongsTo(projectId, orgId))) return NextResponse.json({ ok: false, error: "project_not_in_organization" }, { status: 403 });
   }
 
   // 多格式（formatImageUrls + formats）vs 舊單組（imageUrls）。urlGroups 統一後續驗證/重導/傳遞。
@@ -200,6 +207,7 @@ export async function POST(req: NextRequest): Promise<Response> {
             formats: useMulti ? bodyFormats : undefined,
             source: "draft",
             serviceCapability: sub.serviceCapability,
+            ...(projectId ? { projectId } : {}),
           }
         : undefined,
     });
