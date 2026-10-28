@@ -21,7 +21,7 @@ next-admin `video/pipeline` 積木負責：生腳本(Claude) + 生圖(Flux) + �
   POST /reburn-captions   body JSON:
     { "clean_url": "<R2 public>/videoclean/<dir>/<fmt>.mp4", "format": "16x9", "object_key": "video/<dir>/16x9.mp4",
       "cues": [{"startMs":0,"endMs":2000,"text":"..."}] }
-    → 202 { "jobId": "..." }；字幕改完後在無字幕底片重燒並覆寫 object_key，輪詢沿用 GET /job。
+    → 202 { "jobId": "..." }；字幕改完後在無字幕底片重燒並寫到新 key videorev/<dir>/<rev>/<fmt>.mp4（不覆寫 object_key），輪詢沿用 GET /job。
 
   POST /generate-job   body JSON:
     { "topic": "主題", "language": "繁體中文", "scene_count": 6,
@@ -578,6 +578,11 @@ def _validate_reburn(payload: dict):
     return clean_url, cues, fmt, object_key
 
 
+def _reburn_key(object_key: str, fmt: str) -> str:
+    """video/<dir>/<fmt>.mp4 -> videorev/<dir>/<8 hex>/<fmt>.mp4 (next-admin videoObjectKey maps it back; reconcile ignores it)."""
+    return f"videorev/{object_key.split('/')[1]}/{uuid.uuid4().hex[:8]}/{fmt}.mp4"
+
+
 def _do_reburn(clean_url: str, cues: list, fmt: str, object_key: str) -> dict:
     with _render_lock:
         try:
@@ -585,9 +590,11 @@ def _do_reburn(clean_url: str, cues: list, fmt: str, object_key: str) -> dict:
             out_path = str(config.TEMP_DIR / f"reburn_{fmt}.mp4")
             pipeline.burn_script_captions(clean, cues, out_path, config.FORMATS[fmt][1])
             output_meta = _build_output_meta({fmt: out_path})
+            # New key per burn: overwriting object_key would leave CDN/browsers (and posts that embed the old URL) on the old bytes.
+            out_key = _reburn_key(object_key, fmt)
             with open(out_path, "rb") as fh:
-                url = _r2_put(object_key, fh.read(), "video/mp4", R2_VIDEO_BUCKET, R2_VIDEO_PUBLIC_BASE)
-            return {"outputs": {fmt: url}, "out_dir": os.path.dirname(object_key), "storage": "r2", "output_meta": output_meta,
+                url = _r2_put(out_key, fh.read(), "video/mp4", R2_VIDEO_BUCKET, R2_VIDEO_PUBLIC_BASE)
+            return {"outputs": {fmt: url}, "out_dir": os.path.dirname(out_key), "storage": "r2", "output_meta": output_meta,
                     "caption_source": "script_tts", "caption_cues": cues,
                     "caption_srt": caption_utils.to_srt(cues), "caption_vtt": caption_utils.to_vtt(cues)}
         finally:

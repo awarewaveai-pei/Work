@@ -37,6 +37,11 @@ class ReburnValidation(unittest.TestCase):
         self.assertEqual((fmt, key), ("16x9", GOOD["object_key"]))
         self.assertEqual(cues[0]["text"], "hi")
 
+    def test_reburn_never_overwrites_the_original_key(self):
+        a, b = server._reburn_key(GOOD["object_key"], "16x9"), server._reburn_key(GOOD["object_key"], "16x9")
+        self.assertRegex(a, r"^videorev/abc12345_0123456789_t/[0-9a-f]{8}/16x9\.mp4$")
+        self.assertNotEqual(a, b)
+
     def test_foreign_clean_source_rejected(self):
         with self.assertRaisesRegex(ValueError, "videoclean"):
             server._validate_reburn({**GOOD, "clean_url": "https://evil.example.com/videoclean/x/16x9.mp4"})
