@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-28（續23）— 影片 V5.1／V5.2／V5.3：發布不填 JSON（一比例一核准、社群草稿、WordPress 選文章）（Claude）
+
+- **根因**：發布頁要手填 SHA／UUID／JSON；Release 只對一支候選；社群草稿走舊 `/api/content/social-publish` 且只認 16:9；WordPress 要手填 Site／Post ID 與影片網址。
+- **做了**：V5.1 `ReleaseDeliveryPanel` 重寫：影片用按鈕選，每個比例一列＋四項 QA（中文原因，沿用 `qa-labels`），全過才出「核准這個比例發布」，畫面無 SHA／UUID／輸入框；`release` route 加 GET（讀已核准 Release，checksum 與現行成片相符才算）。V5.2 新 `platform-ratio.ts`（平台→比例偏好：YouTube 16:9、IG 4:5、TikTok 9:16…，缺比例往下退）＋`social-drafts.ts`（每勾一個頻道一張草稿、各自比例與文案、先驗所有文字上限才上傳／存檔）＋`/api/video/social-drafts`（走 `addVideo`＋`savePost`，草稿）＋`/api/video/social-channels`（影片門只服務 `/api/video`，不能直接打 `/api/social`）；文案用既有 `/api/content/syndicate`（`writeSocialPosts`，按鈕上標價）可改。V5.3 新 `/api/video/wp-posts`（列文章）＋沿用 `embed-to-wp`（帶 releaseId，文章狀態不變）。舊 `/api/content/social-publish` route 未刪（`ClientHubTabs.tsx` 還在用，TASKS 社群 V1 追蹤）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/portal lib/content/video app/api/video "app/(shell)/tools/video"`（next-admin）＋`npx tsc --noEmit` | exit=0 | ms=4000 | 57 files 260 passed；tsc 本卡檔案 0 錯
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n（n：V5.1／V5.3 的「瀏覽器無手填欄位」只有 SSR 靜態檢查，互動流程尚待操作者在正式站看一眼）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=ReleaseDeliveryPanel|social-publish|embed-to-wp | hits=9（呼叫端：VideoPipeline 步驟 5、VideoStudio 進階頁籤；`social-publish` 仍被 ClientHubTabs 使用）
+- ORACLE_WAIVED: Codex 本輪不可用；書面自審：草稿一律 `savePost`（draft）；每個頻道須屬該客戶且連線有效；Release 的 checksum 與現行檔不符（重燒字幕後）不採用；文字超限在任何上傳前就擋；嵌入不改文章狀態。
+- **Rollback**：`git revert <此 commit>`；無 migration、無服務部署。
 ## 2026-10-28（續22）
 
 ### 內容門題目頁補回（門身分 API）＋P9 全部上線
