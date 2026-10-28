@@ -42,6 +42,7 @@ const V1 = '8e8f30c27';
 const V2 = '3459e3b32';
 const V34 = '9f6015039';
 const V4A = '1a67f0052';
+const V4B = '9fff275e6';
 
 export const STEPS = [
   { n: 1, code: 'V1', group: 'A', title: '專案骨架', plain: '每支影片存成一個專案，客戶、腳本、比例都跟著走；腳本頁一顆鍵送去做影片。',
@@ -77,17 +78,18 @@ export const STEPS = [
       done('V3.4', 'Remotion 不再是製作模式，改成第 2 步「加片頭卡（6–22 秒）」', V34),
     ] },
   { n: 4, code: 'V4', group: 'B', title: 'QA 真能通過', plain: '每個比例各算一支成片；腳本、素材授權、字幕在做影片當下記好，四項 QA 才有可能全過。',
-    gate: '一支 AI 生圖影片 QA 四項全綠', risk: 'Medium（含 video-service 部署）', model: 'Opus 5.5', status: 'in_progress', depends: ['V1'],
+    gate: '一支 AI 生圖影片 QA 四項全綠', risk: 'Medium（含 video-service 部署）', model: 'Opus 5.5', status: 'done', commit: V4B, depends: ['V1'],
+    waitFor: '程式已 commit 未 push；video-service 部署等操作者 go-ahead，部署後在容器內跑測試並做一支 Edge 配音影片驗字幕句數',
     what: '一比例一列 media_assets；技術 QA 逐比例、failed 也入庫；metadata 記腳本與素材來源；Edge 配音時間點產字幕',
     files: ['lib/content/blocks/video-pipeline.ts', 'lib/content/video/qa-persistence.ts', 'apps/video-service/pipeline.py', 'apps/video-service/server.py', 'app/api/video/qa/editorial-rights/route.ts'],
     items: [
       done('V4.1', '每個比例存成一筆影片紀錄，清單只顯示一支；刪除時一起處理', V4A),
       done('V4.2', '技術 QA 每個比例各一份', V4A),
-      todo('V4.3', '技術 QA 沒過時也保留影片和原因，不整支丟掉'),
+      done('V4.3', '技術 QA 沒過時也保留影片和原因，不整支丟掉', V4B),
       done('V4.4', '做影片時把腳本存進紀錄，編輯 QA 才找得到', V4A),
       done('V4.5', '取得素材當下記來源：AI 生圖、圖庫、自己上傳（上傳要勾「有權使用」）', V4A),
-      todo('V4.6', '快速影片字幕用腳本＋配音時間點產生，不用筆電'),
-      todo('V4.7', '字幕步驟依影片種類自動選做法；快速影片可直接改字幕'),
+      done('V4.6', '快速影片字幕用腳本＋配音時間點產生，不用筆電', V4B),
+      done('V4.7', '字幕步驟依影片種類自動選做法；快速影片顯示並可下載字幕（改字幕後重燒尚未做，需另開卡）', V4B),
     ] },
   { n: 5, code: 'V5', group: 'C', title: '發布不填 JSON', plain: '勾平台、文案自動寫好可改、比例自動配對；WordPress 用選的。',
     gate: '勾 YouTube＋IG 得到兩個草稿，各自是 16:9 和 4:5', risk: 'Medium（外部寫入一律先成草稿）', model: 'Opus 5.5', status: 'not_started', depends: ['V4'],
