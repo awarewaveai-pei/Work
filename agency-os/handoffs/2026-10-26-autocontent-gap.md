@@ -1,4 +1,4 @@
-續接語：續做 AUTOCONTENT-GAP：只讀本檔 `agency-os/handoffs/2026-10-26-autocontent-gap.md`，從「§5 第一步」開始；完成＝五張卡（§7，P9.1–P9.5）驗收全綠且操作者看過計畫卡。建議模型：Opus 5.5 實作（卡已寫死每一步，Codex 照卡亦可）。回報操作者一律繁體中文。
+續接語：續做 AUTOCONTENT-GAP：只讀本檔 `agency-os/handoffs/2026-10-26-autocontent-gap.md`，從「§5 第一步」開始；完成＝六張卡（§7，P9.1–P9.6）驗收全綠且操作者看過計畫卡。建議模型：Opus 5.5 實作（卡已寫死每一步，Codex 照卡亦可）。回報操作者一律繁體中文。
 
 # AUTOCONTENT-GAP：全自動內容管線的前兩步沒接上排程，題目閘不存在
 
@@ -62,11 +62,12 @@
 | B8 | 排程內每一筆 AI 花費記在**該客戶**（`runForOrg` ＋ `grantFor("content.plan")`）；客戶沒開通或點數不足（`EntitlementRequired`）＝**跳過、不當故障**：不寫嘗試記號、不開 incident、當次 firing 照常 tick；總控頁顯示「未開通」 | ADR 017：許可只問 `can(主體, feature, actor)`，五種客戶方式（訂閱／點數／買斷…）靠同一條；點數用完的客戶若每天收一張 incident 是噪音，不是故障（`can.ts:122-125`；`products.ts:75` 已登記 `content.plan`） |
 | B9 | 站的市場不在 `TRENDING_GEOS` 內 → **沒有熱搜**（提案只靠品牌＋知識庫），不是退回台灣的熱搜 | 平台是全球客戶；現行 `geoFor` 不認識的國家回 `"TW"`（`plan.ts:20-21`）會拿台灣熱搜替德國站規劃 |
 | B10 | 品牌自己填的產業來源（P9.4）只進**該品牌**的提案 prompt，**不寫進** `content_trends` 共用快取 | `content_trends` 無租戶欄（`trends.ts:1-3`）；寫進去＝客戶 A 的產業新聞變成同地區客戶 B 的「熱搜」 |
+| B12 | 題目做出來的文章，日期只存一處＝題目的 `scheduled_for`；日曆上對它的改日期走題目的 `schedule` 動作，不直接改 WordPress 日期；這種文章在日曆上不給「立即發布／移到垃圾桶」 | 排程做的 WordPress 是草稿（`make.ts:71` `publishStatus: "draft"`），到題目的日子才 `updateWpPost(...{ status: "publish" })`（`make.ts:155`；等待＝`tick.ts:73` `waitsForDay`）。直接改 WP 日期 → 題目照舊在原日發布；丟垃圾桶 → 題目到日發布失敗 |
 | B11 | 一次做很多篇文章只有一條路：變成題目 → 排程在主機上做。瀏覽器裡**沒有**逐篇呼叫 `/api/content/generate` 的迴圈 | 文章頁「批量產文」走瀏覽器迴圈：關分頁就停、不讀站設定、不存檔、不記費用（P9.5 證據）；兩條路並存＝永遠有一條比較差 |
 
 ## 4. 風險與部署
 
-- 卡 A Low（免費、無 DB）。卡 B Medium（排程內新增 AI 花費）→ 五張卡先給操作者看，同意再動手。migration 0138 加一欄、可 down、不鎖表；**apply 到 prod 那一步是 High，等 go**。卡 C Low–Medium（UI）。卡 D（P9.4）Low（免費、無 DB、只多一個選填欄位）。P9.5 Low（加題目免費、刪 UI、客戶入口還沒開放 `enabled: false`）。
+- 卡 A Low（免費、無 DB）。卡 B Medium（排程內新增 AI 花費）→ 五張卡先給操作者看，同意再動手。migration 0138 加一欄、可 down、不鎖表；**apply 到 prod 那一步是 High，等 go**。卡 C Low–Medium（UI）。卡 D（P9.4）Low（免費、無 DB、只多一個選填欄位）。P9.5 Low（加題目免費、刪 UI、客戶入口還沒開放 `enabled: false`）。P9.6 Low–Medium（刪一頁；文章改日期／發布／丟垃圾桶的入口搬家，沿用既有 API）。
 - 推上 main ＝當晚台灣 03:00 自動部署（AGENTS §0）。還不能上就放 `lobster-factory/infra/hetzner-phase1-core/DEPLOY_HOLD`（`reason=` 一行）。
 
 ## 5. 做法（照順序）
@@ -74,7 +75,7 @@
 1. 整檔讀 `NA/lib/schedules/jobs.ts`、`NA/lib/content/topics/{plan,tick,make,trends,store}.ts`、`NA/lib/schedules/store.ts`、`NA/app/api/content/trending/route.ts`、`NA/app/api/content/topics/plan/route.ts`、`NA/app/api/content/sites/[id]/route.ts`、`NA/lib/content/brand-voice.ts`。確認 §2 行號仍對。
 2. （已做：`dc6600cd5`，P9.5 另補）把 §7 四張卡照抄進 `EXECUTION_PLAN.md` §7（編號 P9.1／P9.2／P9.3／P9.4，格式同 P6／P7，不改寫）；§3.1 資料流圖（`EXECUTION_PLAN.md:74-78`）三行改成：熱搜「排程每天一次」、提案「本月沒有就提，台灣月」、核准「`topicMode=ai_pick` 自動核准；`publishMode` 只管發布」。監工台 `data.mjs` 加 P9 一組 `todo(...)` → `node build.mjs && node check.mjs`。
 3. （已貼，2026-10-26 等同意）五張卡貼給操作者看（繁中、白話、說每月多花多少錢），等同意。流程與兩個閘的設計已定案（§1），不再問。
-4. 依 P9.1 → P9.2 → P9.3 實作（P9.4、P9.5 在 P9.1／P9.2 後任何時候；P9.5 先於 P9.3 做較省，總控頁的 ③ 直接含多題輸入）；每張卡一個 commit（pathspec）；共同收尾見 §6。
+4. 依 P9.1 → P9.2 → P9.3 實作（P9.4、P9.5、P9.6 在 P9.1／P9.2 後任何時候；P9.5 先於 P9.3 做較省，總控頁的 ③ 直接含多題輸入）；每張卡一個 commit（pathspec）；共同收尾見 §6。
 5. 完成後把 `agency-os/TASKS.md` 收件匣 AUTOCONTENT-GAP 那條打勾；`data.mjs` 的 `todo` 改 `done`。
 
 ## 6. 每張卡共同的收尾（缺一不算完成）
@@ -271,6 +272,33 @@
 - 截圖：題目頁「一次加多題」貼 3 行 → 月曆出現 3 題；文章頁頁籤只剩「產文／人性化 / 改寫／我的草稿」。
 
 **Rollback**：revert commit；無 DB 改動。已加的題目是資料，留著。
+
+### P9.6　文章行事曆併進社群日曆（免費；Low–Medium；無 migration）
+
+操作者 2026-10-28 定案。`/tools/content/calendar`（`ContentCalendar.tsx`）和社群日曆讀同一份 WordPress 文章（`lib/content/wp-calendar.ts` `fetchSitePosts`：`app/api/content/calendar/route.ts:28`、`app/api/social/posts/route.ts:49`）。社群日曆已把文章畫成虛線卡（`app/(shell)/tools/social/Calendar.tsx:149,172`），點了拿它開貼文（`SocialManager.tsx:407`）。文章行事曆只多三個動作，都打 `/api/content/wp-post`（`ContentCalendar.tsx:91` 改日期、`:105` 立即發布、`:119` 移到 WordPress 垃圾桶，`wp-post/route.ts:52`）。分工改成：題目頁＝要做什麼；社群日曆＝什麼時候發出去（文章＋社群貼文）。
+
+**改哪些檔**
+1. `NA/app/api/social/posts/route.ts:44-50`（`wp=1` 分支）：取到 `wordpress` 後，一次查 `content_topics`（`organization_id = brand`、`site_id in 這些站`、`artifacts->article->>wp_post_id` 在這些文章 id 內），把題目掛到文章上：`topic?: { id, status, version, scheduledFor, canReschedule }`（`canReschedule` 用 `store.ts:166` 同一個函式算，不在前端重寫）。DB 錯誤 throw（不回一份沒有題目資訊的列表，否則畫面會對題目文章給出 WP 直改按鈕，違反 B12）。
+2. `NA/app/(shell)/tools/social/api.ts:51` `WpPost` 加 `topic?` 欄位（同上形狀）。
+3. `Calendar.tsx`：有 `topic` 的文章卡畫在 `topic.scheduledFor` 那天（不是 WP 草稿的建立日），並標「題目排程」。
+4. 點文章卡的右欄（`SocialManager.tsx` `kind: "article"` 那條）加「文章」一段：
+   - 沒有 `topic`：三顆按鈕「改日期」「立即發布」「移到垃圾桶」（後兩顆要再確認一次），呼叫 `/api/content/wp-post` PATCH／DELETE，body 同 `ContentCalendar.tsx:91-121`；`canWrite`（`SocialManager.tsx:190`）為否時不顯示。時間處理沿用 `ContentCalendar.tsx` 的 `toDatetimeLocal`／`fromDatetimeLocal`（站的牆上時間，不轉時區）——搬到 `NA/lib/content/wp-calendar.ts` 匯出，兩處同一份。
+   - 有 `topic`：只給「改日期」＝PATCH `/api/content/topics/[id]` `{ action: "schedule", version, month, day, hour }`（台灣時間，`[id]/route.ts:1-2`）；`canReschedule=false` 時按鈕停用並寫原因（例「已經做好、等審核，日期不能改」）。另附「到題目頁」連結。不給立即發布／垃圾桶（B12）。
+   - 原本的「用這篇開貼文」照留。
+5. 刪除：`NA/app/(shell)/tools/content/calendar/`（`page.tsx`＋`ContentCalendar.tsx`）、`NA/app/content/calendar/page.tsx`、`NA/app/api/content/calendar/route.ts`（刪前 grep 確認沒有別的呼叫端）；`NA/app/sidebar-sections.ts:79` 的 `Content Calendar`；`NA/lib/portal/products.ts:72` content `door.nav` 的 `calendar` 那筆。
+6. 改連結：`ContentStudio.tsx:489`、`SiteManager.tsx:604` 的 `calendarHref` 改指社群日曆（`useDoorHref("/tools/social")`；`social` 產品的 staffPaths `tools/social`，`products.ts:50`）。在內容入口上若社群門沒有對應頁，`useDoorHref` 回 null＝連結不顯示（`ContentStudio.tsx:486-487` 既有語意）。
+7. 客戶入口：內容入口少了「行事曆」；只買內容的客戶看「什麼時候發」改在題目頁（P9.5 已把題目頁加進內容入口選單）。入口仍 `enabled: false`。
+
+**驗收**
+- `app/api/social/__tests__/routes.test.ts`（既有檔的假物件風格）加：`wp=1` 時，`artifacts.article.wp_post_id` 對得上的文章帶 `topic`（含 `canReschedule`）、對不上的沒有；`content_topics` 查詢錯 → 回錯誤而不是沒有 `topic` 的列表。
+- 新測 `NA/lib/content/__tests__/wp-calendar.test.ts`：`toDatetimeLocal("2026-06-13T14:00:00")` → `"2026-06-13T14:00"`、`fromDatetimeLocal` 反向，不受執行環境時區影響（`TZ=America/New_York` 下同結果）。
+- `npx vitest run lib/portal/__tests__/products.test.ts app/__tests__/sidebar-coverage.test.ts` 綠（門選單與側欄每項都對得上存在的頁）。
+- `grep -rn "tools/content/calendar\|ContentCalendar\|api/content/calendar" NA/app NA/lib` = 0；`npx tsc --noEmit` 綠。
+- 指令：`npx vitest run app/api/social/__tests__/routes.test.ts lib/content/__tests__/wp-calendar.test.ts lib/portal/__tests__/products.test.ts app/__tests__/sidebar-coverage.test.ts`
+- 突變：route 裡拿掉「題目文章掛上 `topic`」→ 對得上的那條變紅 → 還原變綠（B12 的守衛：沒有它，畫面會對題目文章給 WP 直改）。
+- 截圖：社群日曆點一篇手寫文章 → 三顆按鈕；點一篇題目文章 → 只有改日期（走題目）＋到題目頁。
+
+**Rollback**：revert commit；無 DB 改動。
 
 ## 8. 範圍外（別順手做）
 

@@ -149,7 +149,7 @@
 
 ## 7. 卡片
 
-格式：一卡＝一 commit；「驗」＝唯一完成判準；「突變」＝拔掉守衛→指名測試紅→還原綠。模型：卡上註明；未註＝Opus 5.5。依賴：P1→P2→(P3 ∥ P5)→P4→P6→P7；P8 隨階段；P9.1→P9.2→P9.3，P9.4、P9.5 在 P9.1／P9.2 後任何時候（P9.5 先於 P9.3 較省）。每階段末 Fable 閘審（讀 §10＋WORKLOG 證據行）。
+格式：一卡＝一 commit；「驗」＝唯一完成判準；「突變」＝拔掉守衛→指名測試紅→還原綠。模型：卡上註明；未註＝Opus 5.5。依賴：P1→P2→(P3 ∥ P5)→P4→P6→P7；P8 隨階段；P9.1→P9.2→P9.3，P9.4、P9.5、P9.6 在 P9.1／P9.2 後任何時候（P9.5 先於 P9.3 較省）。每階段末 Fable 閘審（讀 §10＋WORKLOG 證據行）。
 
 ### P1 品牌聲音 SSOT
 
@@ -232,7 +232,7 @@
 
 ### P9 熱搜與提案接上排程＋題目閘（2026-10-26；P9.2 migration apply 前 STOP）
 
-不變量 B1–B11、程式片段、驗收逐條全文在 `agency-os/handoffs/2026-10-26-autocontent-gap.md` §3、§7（自足）；本表只列卡。I8 不變：全部併進 `content_pipeline` 一格的 `run`，不新增 job、不另建 cron。
+不變量 B1–B12、程式片段、驗收逐條全文在 `agency-os/handoffs/2026-10-26-autocontent-gap.md` §3、§7（自足）；本表只列卡。I8 不變：全部併進 `content_pipeline` 一格的 `run`，不新增 job、不另建 cron。
 
 | 卡 | 改 | 做 | 驗 | 突變 |
 |---|---|---|---|---|
@@ -241,6 +241,7 @@
 | P9.3 | `NA/app/(shell)/tools/content/topics/`（`page.tsx`＋`TopicsBoard.tsx`）；`sidebar-sections.ts:78` `Topic Queue`→`Auto Content`；`/api/content/sites` GET 加 `content_plan_attempted_at`、客戶 slug | 兩層：第一層全部客戶一覽（一網站一列：開關、兩閘、本月提案、待核准／進行中／失敗、未開通、本月 AI 花費（所有工具）；有問題排最上面；純函式新 `NA/lib/content/topics/overview.ts`）；點一列進第二層該站五格（搜集熱搜／提案題目／挑題／製作／發布），每格狀態＋控制＋費用，全用既有 API（B7）；④ 是客戶層；不開新頁、不用下拉 | `npx vitest run lib/content/topics/__tests__/overview.test.ts app/__tests__/sidebar-coverage.test.ts`；總控頁改設定後 `/ops/schedules`、`/tools/content/sites` 值相同；`/playwright` 截圖一覽與五格 | 拿掉「有問題排最上面」→ overview (c) 紅 |
 | P9.4 | `brand-voice.ts` `trendFeeds`（≤10）；`sites/[id]/route.ts` 正規化＋`isSafePublicHttps`；`SiteManager.tsx` 產業來源欄位；`trending-sources.ts` 抽 `runBlocks`；`plan.ts` prompt 加產業來源段 | B10：品牌自己的 RSS 只進該品牌 prompt、不寫 `content_trends`；免費、無 migration | `npx vitest run lib/content/topics/__tests__/plan.test.ts "app/api/content/sites/[id]/test"` | 拔 route `isSafePublicHttps` → `http://x` 那條紅 |
 | P9.5 | `store.ts` 純函式 `spreadDays`；`topics/route.ts` POST 多收 `keywords[]`（≤30，一次 `proposeTopics`）；`TopicsBoard.tsx`「加一題／一次加多題」；`ContentStudio.tsx` 刪批量產文頁籤與其 state／handler／型別；`products.ts` content `door.nav` 加 `topics`＋新 `NA/app/content/topics/page.tsx` | B11：多篇只走題目→排程，瀏覽器不跑產文迴圈；加題目免費，費用照每題價格寫在按鈕旁 | `npx vitest run app/api/content/topics/route.test.ts lib/content/topics/__tests__/store.test.ts lib/portal/__tests__/products.test.ts`；grep `批量產文` 在 `NA/app` = 0 | 拔 `MAX_BULK_TOPICS` → 31 行那條紅 |
+| P9.6 | `app/api/social/posts/route.ts`（`wp=1` 時文章掛上所屬題目 `topic`）；`social/api.ts` `WpPost.topic`；`social/Calendar.tsx`＋`SocialManager.tsx` 文章右欄加改日期／立即發布／移到垃圾桶；`wp-calendar.ts` 匯出時間轉換；刪 `tools/content/calendar/`、`app/content/calendar/`、`api/content/calendar/`、側欄 `Content Calendar`、內容入口選單 `calendar`；`ContentStudio.tsx`／`SiteManager.tsx` 連結改指社群日曆 | 一個日曆管「什麼時候發」；B12：題目做的文章日期只在題目，日曆改日期走題目 `schedule`，不給 WP 直接發布／垃圾桶 | `npx vitest run app/api/social/__tests__/routes.test.ts lib/content/__tests__/wp-calendar.test.ts lib/portal/__tests__/products.test.ts app/__tests__/sidebar-coverage.test.ts`；grep `tools/content/calendar` = 0 | 拿掉文章掛 `topic` → routes 那條紅 |
 
 ## 8. 驗證
 - 實測：`npx tsc --noEmit`；`npx vitest run <卡測試>`；P4／P6 在拋棄式 org（staging WP 站＋social 測試品牌）真跑一次 firing；`REALTEST_EVIDENCE` 行。
