@@ -54,9 +54,10 @@ param(
     [string]$RepoRoot = '',
     [int]$TimeoutSec = 900,
 
-    # Overrides `model` in ~/.codex/config.toml for this call only (`codex exec -m`).
-    # Empty = use the config. Needed when the config names a model the ChatGPT account rejects.
-    [string]$Model = '',
+    # Overrides `model` in ~/.codex/config.toml for this call only (`codex exec -m`). Pinned because the config keeps being
+    # changed by other tools: gpt-6-sol answered on this ChatGPT account (WORKLOG 2026-10-25 test; gpt-6.1-sol 400s, gpt-6-astra
+    # costs too much per operator 2026-10-28). Empty string = use the config.
+    [string]$Model = 'gpt-6-sol',
 
     # Keep the noisy transcript for debugging the wrapper itself.
     [switch]$Raw
