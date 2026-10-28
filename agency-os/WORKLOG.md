@@ -1,4 +1,20 @@
 # Worklog
+## 2026-10-28（續17）
+
+### AUTO_CONTENT P9.3＋P9.4（cc.py 實作，主 session 驗收）
+
+- P9.3（8eeb8cda5）：題目頁＝「自動內容」總控頁；第一層全部客戶一覽（`overview.ts` 純函式、`overview-load.ts` 一次查完、每站 `canAccessOrg`），第二層五格；側欄 `Auto Content`。花費欄＝所有工具本月合計（同 `/ops/costs`）。
+- P9.4（8f7599ef6）：網站可填產業 RSS（≤10、公開 https），提案 prompt 優先參考；不寫 `content_trends`（B10）。
+- m1 總控頁對未開通 `content.plan` 的客戶每次開頁會寫一筆 `entitlement.would_deny` 稽核（`can.ts:222`），不扣點；接受。
+- m2 `overview-load.ts` 查詢無單元測試（卡未要求）；未開瀏覽器截圖。
+- 文案「題目佇列」改「自動內容」（`jobs.ts:109`、`TopicModeButtons.tsx:11`）。cc.py 0.95＋0.61 美元。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/content/topics/__tests__/overview.test.ts app/__tests__/sidebar-coverage.test.ts lib/portal/__tests__/products.test.ts lib/content/topics/__tests__/plan.test.ts app/api/content/sites | exit=0 | ms=2012（61/61）
+- 突變：P9.3 拿掉「有問題排最上面」→ 2 紅；P9.4 拿掉 isSafePublicHttps → 1 紅；皆還原綠（cc.py 報告）。tsc 自有檔 0 錯。
+- ORACLE_WAIVED: Codex 不可用；主 session 讀 overview-load.ts 存取控制與 grantFor 是否扣點（`grant.ts:28-48`、`can.ts:151-175`）
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/2n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=題目佇列 | hits=3（計畫／需求／積木藍圖的歷史敘述，舊檔不回改；程式 0）
 ## 2026-10-28（續16）
 
 ### AUTO_CONTENT P9.2＋P9.5（cc.py 實作，主 session 驗收）
