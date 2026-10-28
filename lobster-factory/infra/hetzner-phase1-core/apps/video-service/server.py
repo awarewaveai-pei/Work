@@ -77,6 +77,8 @@ _render_lock = threading.Lock()
 # /generate-job 全自動管道憑證
 CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY", "")
 PEXELS_API_KEY = os.getenv("PEXELS_API_KEY", "")
+# Script writer for /generate-job. Must be a TEXT_RATES key (next-admin lib/ai/cost-model.ts; model-registry.test.ts scans this file).
+VIDEO_SCRIPT_MODEL = os.getenv("VIDEO_SCRIPT_MODEL", "claude-haiku-5-5").strip() or "claude-haiku-5-5"
 
 
 def _r2_video_configured() -> bool:
@@ -538,15 +540,18 @@ def _claude_generate_script(topic: str, language: str, scene_count: int) -> tupl
             "content-type": "application/json",
         },
         json={
-            "model": "claude-haiku-4-5-20251001",
+            "model": VIDEO_SCRIPT_MODEL,
             "max_tokens": 2048,
             "messages": [{"role": "user", "content": prompt}],
+            # Haiku 5.x thinks by default and the thinking eats this small budget; it accepts "disabled" (always-think models 400 on it).
+            **({"thinking": {"type": "disabled"}} if VIDEO_SCRIPT_MODEL.startswith("claude-haiku-5") else {}),
         },
         timeout=60,
     )
     if not r.ok:
         raise RuntimeError(f"Claude API {r.status_code}: {r.text[:300]}")
-    text = r.json()["content"][0]["text"]
+    # By block type: 5-generation models may open with a thinking block, so content[0] is not always the text.
+    text = next((b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text"), "")
     # Strip markdown fence
     m = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
     if m:

@@ -152,6 +152,34 @@ post_to_ops_inbox() {
     return 0
 }
 
+# Text-model probe (apps/next-admin/scripts/probe-models.mjs): one minimal real call per active id in lib/ai/cost-model.ts
+# TEXT_RATES, inside the container just deployed, so it tests that build's registry with the keys the container really has.
+# Alert-only -- never changes the deploy result. The image is Next standalone (no scripts/, no tsx): copy both files in.
+probe_models_after_deploy() {
+    local src="$DEPLOY_DIR/apps/$APP" ctr="lobster-$APP" dir="/tmp/probe-models" out="" rc="" summary msg
+    docker exec "$ctr" mkdir -p "$dir" \
+        && docker cp "$src/scripts/probe-models.mjs" "$ctr:$dir/probe-models.mjs" \
+        && docker cp "$src/lib/ai/cost-model.ts" "$ctr:$dir/cost-model.ts" \
+        || { rc=2; out="could not copy probe-models.mjs / cost-model.ts into $ctr"; }
+    if [[ -z "$rc" ]]; then
+        if out="$(timeout 180 docker exec "$ctr" node "$dir/probe-models.mjs" --registry "$dir/cost-model.ts" 2>&1)"; then rc=0; else rc=$?; fi
+    fi
+    printf '%s\n' "$out" >> "$LOG_FILE"
+    if [[ "$rc" -eq 0 ]]; then log "model probe OK"; return 0; fi
+    log "WARN: model probe exit=$rc"
+    summary="$(printf '%s' "$out" | python3 -c '
+import json, sys
+j = json.load(sys.stdin)
+print("主力與備援同時失敗：" + (", ".join(j["failures"]) or "（無）"))
+for r in [r for r in j["results"] if not r["ok"]][:8]:
+    print("- %s：HTTP %s %s" % (r["id"], r["http"], (r["error"] or "")[:120].replace("\n", " ")))
+' 2>/dev/null || printf '%s' "${out:0:300}")"
+    msg=$(printf '⚠️ AI 模型實測失敗 — next-admin 部署後檢查\n有模型 ID 呼叫不到，而且它的備援也一起失敗（部署本身成功，沒有回滾）。\n%s\n\n處理：在 lib/ai/cost-model.ts 把失敗的 ID 標 legacy，改用實測通過的 ID；筆電跑 node scripts/probe-models.mjs 確認。\n（技術資訊：probe exit=%s, commit=%s）' "$summary" "$rc" "${NEW_COMMIT:0:12}")
+    printf '%s' "$msg" | "$(dirname "$SELF_PATH")/notify.sh" --slack SLACK_WEBHOOK_URL >/dev/null 2>&1 \
+        || log "model probe alert: notify incomplete"
+    return 0
+}
+
 DEPLOY_SUCCESS=0
 SMOKE_WARN_SUFFIX=""
 ROLLBACK_SUFFIX=""
@@ -169,6 +197,7 @@ if bash "$DEPLOY_DIR/scripts/sg-deploy.sh" "$APP" >> "$LOG_FILE" 2>&1; then
         log "SMOKE_WARN flag detected: $_sw"
     fi
     post_to_ops_inbox "deploy_success"
+    probe_models_after_deploy || true
 else
     _deploy_rc=$?
     # 75 = sg-deploy refused on purpose (DEPLOY_HOLD pushed after the check above, or another deploy

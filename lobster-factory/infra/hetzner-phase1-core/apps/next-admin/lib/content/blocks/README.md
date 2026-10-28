@@ -164,12 +164,7 @@ AI prompt 是獨立積木，不併進 `image/style-design-workbench`。改圖流
 |---|---|---|---|---|
 | `ai/image-edit-prompt` | `registered` + `route/action` + 共用 UI | `lib/content/blocks/ai-image-edit-prompt.ts`、`lib/studio/image-edit-prompt.ts`、`app/api/tools/studio/edit-prompt/route.ts`、`components/tools/ImageEditPromptPanel.tsx` | `ANTHROPIC_API_KEY` 或 `OPENAI_API_KEY` | 已生成圖片 + 修改意圖 → Claude/OpenAI 寫英文 edit prompt；共用 UI 已接 Tarot / Studio / Mockup，輸出可接 img2img / inpaint / genfill |
 
-文字 AI 工具組與 SEO Content Studio 共用 `lib/ai/text-model-options.ts`，目前分組如下：
-
-| group | model ids |
-|---|---|
-| Claude | `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`, `claude-opus-4-8`, `claude-fable-5` |
-| OpenAI | `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`, `gpt-4o` |
+文字 AI 工具組與 SEO Content Studio 共用 `lib/ai/text-model-options.ts` 的選單；選單只放 `lib/ai/cost-model.ts` `TEXT_RATES` 中 `status: "active"` 的 ID（`lib/ai/__tests__/model-registry.test.ts` 守），清單以該檔為準，這裡不重抄。
 
 #### `image/style-design-workbench` 詳細
 

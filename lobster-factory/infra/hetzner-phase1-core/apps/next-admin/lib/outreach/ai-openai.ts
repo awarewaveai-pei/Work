@@ -10,7 +10,7 @@ export interface OpenAIResult {
 }
 
 export const DEFAULT_OPENAI_MODEL =
-  process.env.OPENAI_OUTREACH_MODEL?.trim() || "gpt-4o-mini";
+  process.env.OPENAI_OUTREACH_MODEL?.trim() || "gpt-5.4-mini";
 
 export async function generateWithOpenAI(
   grant: Grant,
@@ -26,7 +26,8 @@ export async function generateWithOpenAI(
     },
     body: JSON.stringify({
       model,
-      max_tokens: 1024,
+      // gpt-5 family: max_completion_tokens (max_tokens is a 400) and it covers reasoning tokens too.
+      max_completion_tokens: 1024,
       messages: [{ role: "user", content: prompt }],
     }),
   });

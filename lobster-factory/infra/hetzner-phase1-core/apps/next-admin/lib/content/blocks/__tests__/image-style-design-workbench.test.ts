@@ -71,7 +71,7 @@ describe("image/style-design-workbench block", () => {
     expect(block).toBeDefined();
 
     const result = await block!.run({
-      aiModel: "gpt-4o",
+      aiModel: "gpt-5.4-mini",
       imageModel: "flux-dev",
       editInstruction: "背景改成日出，人物和風格不要變",
       currentPrompt: "moody watercolor portrait",
@@ -83,7 +83,7 @@ describe("image/style-design-workbench block", () => {
     expect(result).toMatchObject({
       ok: true,
       editPlan: {
-        aiModel: "gpt-4o",
+        aiModel: "gpt-5.4-mini",
         aiModelGroup: "OpenAI",
         editInstruction: "背景改成日出，人物和風格不要變",
         sourceImage: "data:image/png;base64,abc",

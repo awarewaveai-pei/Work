@@ -1,6 +1,6 @@
 import { loadAnthropic, type Anthropic, providerUrl } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
-import { DEFAULT_AI_TEXT_MODEL, isAiTextModel, isOpenAiTextModel, type AiTextModel } from "../../ai/text-model-options";
+import { DEFAULT_AI_TEXT_MODEL, isOpenAiTextModel, normalizeAiTextModel, type AiTextModel } from "../../ai/text-model-options";
 import { billedOrgId, logAiCall, openaiUsageTokens, type OpenAiUsageLike } from "../../ai/log-ai-call";
 import { claudeFallback, claudeParams } from "../../ai/gateway";
 import { textCallCostUsd, resolveTextRate } from "../../ai/cost-calculator";
@@ -608,7 +608,7 @@ export async function prepareArticleGeneration(body: ArticleGenerateInput): Prom
 
   // Model selection (default: sonnet)
   const requestedModel = str(body.model, DEFAULT_AI_TEXT_MODEL);
-  const model: AiTextModel = isAiTextModel(requestedModel) ? requestedModel : DEFAULT_AI_TEXT_MODEL;
+  const model: AiTextModel = normalizeAiTextModel(requestedModel);
 
   // #3 / #5 / #6 inputs — all best-effort: the UI fetches existing categories + patterns and runs the
   // market analysis up-front, then forwards them here. Missing/empty just disables that enhancement.

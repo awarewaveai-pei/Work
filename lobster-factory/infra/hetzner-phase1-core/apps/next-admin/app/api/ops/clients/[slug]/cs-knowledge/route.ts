@@ -36,7 +36,7 @@ import { NextResponse } from "next/server";
 import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { buildFolderDossier } from "@/lib/dossier/folder";
-import { isAiTextModel } from "@/lib/ai/text-model-options";
+import { resolveSavedAiTextModel } from "@/lib/ai/text-model-options";
 import { recordOpsAudit } from "@/lib/ops-audit";
 import { thenRun, withFeature } from "@/lib/entitlements/grant";
 import {
@@ -221,7 +221,7 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
       const result = await buildFolderDossier({
         organizationId: orgIdForDossier,
         folderId,
-        model: isAiTextModel(body.model) ? body.model : undefined,
+        model: resolveSavedAiTextModel(body.model),
         preview: body.preview === true,
       });
       if (!result.ok) {

@@ -7,8 +7,9 @@
  * (text) and a numeric costUsd in tarot/model-comparison.ts (image). Neither is summable. This is
  * the single numeric source — change a rate here and both the live page and the report follow.
  *
- * Sources (USD): Anthropic pricing (claude-api guide, 2026-05); Replicate per-image costUsd from
- * lib/tarot/model-comparison.ts; OpenAI image API; Gemini Flash-Lite. Currency:
+ * Sources (USD): text rows -- each row's `verifiedAt` is the last day scripts/probe-models.mjs got a real
+ * answer from that id (prices: vendor list pages); Replicate per-image costUsd from
+ * lib/tarot/model-comparison.ts; OpenAI image API. Currency:
  * NT$ via TWD_RATE (single source — mirrors app/tools/ai-models/page.tsx, keep in sync).
  *
  * INFRA: Hetzner figures are the ACTUAL billed price from the Hetzner console PRICE field
@@ -31,6 +32,15 @@ export interface TextRate {
   cacheWriteMult: number;
   label: string;
   vendor: "Anthropic" | "OpenAI" | "Google" | "Serper";
+  /** active = may be picked / sent; legacy = kept only to price old cost-log rows and remap saved picks; retired = vendor 404s it. */
+  status: "active" | "legacy" | "retired";
+  /** YYYY-MM-DD of the last successful real call by scripts/probe-models.mjs (`--write-verified`); absent = never probed OK. */
+  verifiedAt?: string;
+  /**
+   * An active key. Active rows: another vendor where one exists (an outage of one vendor must not take both out).
+   * Legacy/retired rows: the same-vendor successor -- normalizeAiTextModel remaps a saved pick of this id to it.
+   */
+  fallback?: string;
 }
 
 /**
@@ -38,30 +48,32 @@ export interface TextRate {
  * Anthropic ids per generate-core.ts ALLOWED_MODELS; OpenAI per OPENAI_MODELS; Gemini per ops-inbox.
  */
 export const TEXT_RATES: Record<string, TextRate> = {
-  "claude-haiku-5-5":          { inputPerM: 0.1, outputPerM: 0.5, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Haiku 5.5", vendor: "Anthropic" },
-  "claude-haiku-4-5-20251001": { inputPerM: 1, outputPerM: 5, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Haiku 4.5", vendor: "Anthropic" },
-  "claude-haiku-4-5":          { inputPerM: 1, outputPerM: 5, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Haiku 4.5", vendor: "Anthropic" },
-  "claude-sonnet-4-6":         { inputPerM: 3, outputPerM: 15, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Sonnet 4.6", vendor: "Anthropic" },
-  "claude-opus-5-5":           { inputPerM: 4, outputPerM: 20, cacheReadMult: 0.05, cacheWriteMult: 1.25, label: "Claude Opus 5.5", vendor: "Anthropic" },
+  "claude-haiku-5-5":          { inputPerM: 0.1, outputPerM: 0.5, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Haiku 5.5", vendor: "Anthropic", status: "active", fallback: "gpt-5.4-nano", verifiedAt: "2026-10-28" },
+  "claude-haiku-4-5-20251001": { inputPerM: 1, outputPerM: 5, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Haiku 4.5", vendor: "Anthropic", status: "legacy", fallback: "claude-haiku-5-5", verifiedAt: "2026-10-28" },
+  "claude-haiku-4-5":          { inputPerM: 1, outputPerM: 5, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Haiku 4.5", vendor: "Anthropic", status: "legacy", fallback: "claude-haiku-5-5", verifiedAt: "2026-10-28" },
+  "claude-sonnet-4-6":         { inputPerM: 3, outputPerM: 15, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Sonnet 4.6", vendor: "Anthropic", status: "legacy", fallback: "claude-opus-5-5", verifiedAt: "2026-10-28" },
+  "claude-opus-5-5":           { inputPerM: 4, outputPerM: 20, cacheReadMult: 0.05, cacheWriteMult: 1.25, label: "Claude Opus 5.5", vendor: "Anthropic", status: "active", fallback: "gpt-5.5", verifiedAt: "2026-10-28" },
   // Opus 5 = a classifier-fallback target of Opus 5.5 (lib/ai/gateway.ts); priced so a rescued call is not mispriced.
-  "claude-opus-5":             { inputPerM: 5, outputPerM: 25, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Opus 5", vendor: "Anthropic" },
-  "claude-opus-4-8":           { inputPerM: 5, outputPerM: 25, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Opus 4.8", vendor: "Anthropic" },
-  "claude-fable-5":            { inputPerM: 10, outputPerM: 50, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Fable 5", vendor: "Anthropic" },
-  "gpt-5.5":                   { inputPerM: 5, outputPerM: 30, cacheReadMult: 0.1, cacheWriteMult: 1, label: "GPT-5.5", vendor: "OpenAI" },
-  "gpt-5.4":                   { inputPerM: 2.5, outputPerM: 15, cacheReadMult: 0.1, cacheWriteMult: 1, label: "GPT-5.4", vendor: "OpenAI" },
-  "gpt-5.4-mini":              { inputPerM: 0.75, outputPerM: 4.5, cacheReadMult: 0.1, cacheWriteMult: 1, label: "GPT-5.4 mini", vendor: "OpenAI" },
-  "gpt-5.4-nano":              { inputPerM: 0.2, outputPerM: 1.25, cacheReadMult: 0.1, cacheWriteMult: 1, label: "GPT-5.4 nano", vendor: "OpenAI" },
-  "gpt-4o":                    { inputPerM: 2.5, outputPerM: 10, cacheReadMult: 0.5, cacheWriteMult: 1, label: "GPT-4o", vendor: "OpenAI" },
-  // outreach default (lib/outreach/ai-openai.ts) and the knowledge-base embedder (lib/kb/config.ts KB_EMBEDDING).
-  "gpt-4o-mini":               { inputPerM: 0.15, outputPerM: 0.6, cacheReadMult: 0.5, cacheWriteMult: 1, label: "GPT-4o mini", vendor: "OpenAI" },
-  "text-embedding-3-small":    { inputPerM: 0.02, outputPerM: 0, cacheReadMult: 1, cacheWriteMult: 1, label: "OpenAI text-embedding-3-small", vendor: "OpenAI" },
+  "claude-opus-5":             { inputPerM: 5, outputPerM: 25, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Opus 5", vendor: "Anthropic", status: "legacy", fallback: "claude-opus-5-5", verifiedAt: "2026-10-28" },
+  "claude-opus-4-8":           { inputPerM: 5, outputPerM: 25, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Opus 4.8", vendor: "Anthropic", status: "legacy", fallback: "claude-opus-5-5", verifiedAt: "2026-10-28" },
+  "claude-fable-5-1":          { inputPerM: 10, outputPerM: 50, cacheReadMult: 0.025, cacheWriteMult: 1.25, label: "Claude Fable 5.1", vendor: "Anthropic", status: "active", fallback: "gpt-5.5", verifiedAt: "2026-10-28" },
+  "claude-fable-5":            { inputPerM: 10, outputPerM: 50, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Fable 5", vendor: "Anthropic", status: "legacy", fallback: "claude-fable-5-1", verifiedAt: "2026-10-28" },
+  "gpt-5.5":                   { inputPerM: 5, outputPerM: 30, cacheReadMult: 0.1, cacheWriteMult: 1, label: "GPT-5.5", vendor: "OpenAI", status: "active", fallback: "claude-opus-5-5", verifiedAt: "2026-10-28" },
+  "gpt-5.4":                   { inputPerM: 2.5, outputPerM: 15, cacheReadMult: 0.1, cacheWriteMult: 1, label: "GPT-5.4", vendor: "OpenAI", status: "active", fallback: "claude-opus-5-5", verifiedAt: "2026-10-28" },
+  "gpt-5.4-mini":              { inputPerM: 0.75, outputPerM: 4.5, cacheReadMult: 0.1, cacheWriteMult: 1, label: "GPT-5.4 mini", vendor: "OpenAI", status: "active", fallback: "claude-haiku-5-5", verifiedAt: "2026-10-28" },
+  "gpt-5.4-nano":              { inputPerM: 0.2, outputPerM: 1.25, cacheReadMult: 0.1, cacheWriteMult: 1, label: "GPT-5.4 nano", vendor: "OpenAI", status: "active", fallback: "claude-haiku-5-5", verifiedAt: "2026-10-28" },
+  "gpt-4o":                    { inputPerM: 2.5, outputPerM: 10, cacheReadMult: 0.5, cacheWriteMult: 1, label: "GPT-4o", vendor: "OpenAI", status: "legacy", fallback: "gpt-5.4", verifiedAt: "2026-10-28" },
+  // Former outreach default (lib/outreach/ai-openai.ts); kept for older cost-log rows.
+  "gpt-4o-mini":               { inputPerM: 0.15, outputPerM: 0.6, cacheReadMult: 0.5, cacheWriteMult: 1, label: "GPT-4o mini", vendor: "OpenAI", status: "legacy", fallback: "gpt-5.4-mini", verifiedAt: "2026-10-28" },
+  // lib/kb/config.ts KB_EMBEDDING. No fallback: stored vectors are bound to this model's 1536 dims.
+  "text-embedding-3-small":    { inputPerM: 0.02, outputPerM: 0, cacheReadMult: 1, cacheWriteMult: 1, label: "OpenAI text-embedding-3-small", vendor: "OpenAI", status: "active", verifiedAt: "2026-10-28" },
   // Gemini Flash-Lite: lib/ai/gemini-models.ts GEMINI_LITE_MODEL (ops-inbox diagnostics, cs fallback). Google list price
   // 2026-10-24: $0.30 / $2.50 per 1M, cache read $0.03. 2.0 is retired (404) and stays for older cost-log rows.
-  "gemini-3.5-flash-lite":     { inputPerM: 0.3, outputPerM: 2.5, cacheReadMult: 0.1, cacheWriteMult: 1, label: "Gemini 3.5 Flash-Lite", vendor: "Google" },
+  "gemini-3.5-flash-lite":     { inputPerM: 0.3, outputPerM: 2.5, cacheReadMult: 0.1, cacheWriteMult: 1, label: "Gemini 3.5 Flash-Lite", vendor: "Google", status: "active", fallback: "claude-haiku-5-5", verifiedAt: "2026-10-28" },
   // Outreach default (lib/outreach/ai-gemini.ts) is the alias, whose target Google does not publish: priced as the newest
   // Flash on the list (3.8 Flash, $0.75 / $3.75, cache $0.075, through 2026-12-31; it doubles on 2027-01-01).
-  "gemini-flash-latest":       { inputPerM: 0.75, outputPerM: 3.75, cacheReadMult: 0.1, cacheWriteMult: 1, label: "Gemini Flash (latest alias, est.)", vendor: "Google" },
-  "gemini-2.0-flash-lite":     { inputPerM: 0.1, outputPerM: 0.4, cacheReadMult: 0.25, cacheWriteMult: 1, label: "Gemini 2.0 Flash-Lite (retired)", vendor: "Google" },
+  "gemini-flash-latest":       { inputPerM: 0.75, outputPerM: 3.75, cacheReadMult: 0.1, cacheWriteMult: 1, label: "Gemini Flash (latest alias, est.)", vendor: "Google", status: "active", fallback: "claude-haiku-5-5" },
+  "gemini-2.0-flash-lite":     { inputPerM: 0.1, outputPerM: 0.4, cacheReadMult: 0.25, cacheWriteMult: 1, label: "Gemini 2.0 Flash-Lite (retired)", vendor: "Google", status: "retired", fallback: "gemini-3.5-flash-lite" },
 };
 
 /** Fallback when an unknown text model id is logged — the app default model's rate. */

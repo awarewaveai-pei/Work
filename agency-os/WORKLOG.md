@@ -8,6 +8,49 @@
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/1m/0n（自審 m1：DSN 非 5432 時會轉錯埠 → 改為只在本機 5432 自動開，已修並重測）
 - ORACLE_WAIVED: codex-oracle 兩次 no final message（log 0 bytes，非額度錯誤）；改書面對抗自審（stdout 汙染、grandchild 佔 pipe→等 exit、並發、spawn 無 shell、埠對應）。另：`powershell -File` 傳 `-Path a,b` 會變單一字串＝0 檔，要用 `-Command "& ... -Path @(...)"`。
 - BUGHUNT_DONE: scope=agency-os,scripts,mcp,mcp-local-wrappers,lobster-factory,.claude | grep=tunnelPort|open-supabase-ssh-tunnel.ps1 positional | hits=0
+## 2026-10-28（續3）— AI 文字模型登錄表 + 實測探針 + 未登記 ID 守衛（方案 B，Claude）
+
+- **根因**：模型 ID 散在各檔；`lib/ai/cost-model.ts` TEXT_RATES 只有價格，沒有狀態、驗證日、備援，也沒有東西會真的打一次 API。gemini-2.0-flash-lite 2026-10-24 起 404 無人察覺。另外 `claude-fable-5-1` 被 `lib/ai/claude-params.ts:33`、`video-service/pipeline.py:68` 使用，卻不在登錄表裡（計費會落到預設費率）。
+- **做了**（next-admin＝NA）：
+  - C1 `NA/lib/ai/cost-model.ts`：`TextRate` 加 `status`／`verifiedAt?`／`fallback?`。每列填 status 與 fallback：active 列優先跨 vendor，legacy 列指同 vendor 後繼。補 `claude-fable-5-1`（$10/$50，cache read 0.025×）。檔頭來源改指向每列 verifiedAt。
+  - C2 `NA/scripts/probe-models.mjs`：Node 20、無依賴，以文字解析 TEXT_RATES（image 沒有 tsx），每個 active key 打一次最小請求。預算依序試 1→16→64，只有供應商拒絕預算本身才往上加；OpenAI gpt-5 系列要 16。旗標 `--include-legacy`／`--write-verified`／`--registry`。exit 1＝active 與其 fallback 同時失敗。
+  - C3 `NA/lib/ai/text-model-options.ts`：選單移除 haiku-4-5-20251001／sonnet-4-6／opus-4-8／gpt-4o，fable-5 換成 fable-5-1。新增 `resolveSavedAiTextModel`：legacy／retired id 走登錄表 fallback；`normalizeAiTextModel` 改用它。`generate-core.ts:611`、`cs-knowledge/route.ts:224` 原本直接用 `isAiTextModel`（舊 id 會被默默換成預設），改走同一路徑。
+  - C4 寫死 ID：`NA/lib/outreach/ai-openai.ts:13` gpt-4o-mini→gpt-5.4-mini，並把 `max_tokens` 改成 `max_completion_tokens`（gpt-5 系列不收 max_tokens）。`video-service/server.py` 改讀 `VIDEO_SCRIPT_MODEL`（預設 claude-haiku-5-5）、Haiku 5.x 送 `thinking: disabled`，回應改依 block type 取 text（原本 `content[0]` 在 5 代模型會讀到 thinking）。compose 未動。
+  - C5 `NA/lib/ai/__tests__/model-registry.test.ts` (a)(b)(c)，外加一條解析器與 TS 物件一致性檢查（探針是文字解析，沒有這條會靜默漏列）。允許清單：gemini-cli、gemini-web、gpt-image-2、claude-haiku-5（前綴）。
+  - C6 `hetzner-phase1-core/scripts/auto-deploy-next-admin.sh` `probe_models_after_deploy`：部署成功後 `docker cp` 探針與 cost-model.ts 進 `lobster-next-admin` 的 /tmp，用容器內 node 與金鑰跑；失敗走 `notify.sh` 發中文警報，整段 `|| true`。image 是 standalone、沒有 `scripts/`，所以用複製而不改 Dockerfile。
+  - 測試配合：`image-style-design-workbench.test.ts` 的 aiModel gpt-4o→gpt-5.4-mini（gpt-4o 已不在選單，現在會被 remap）。
+- **已存偏好查證**：`supabase/migrations`（`lobster-factory/packages/db/migrations`）只有 `0034_intake_forms.sql:25` `generated_by DEFAULT 'claude-sonnet-4-6'`（產生者標籤，不是選擇）與 `0043_ai_call_logs.sql:17`（歷史計費）。NA 沒有 localStorage 存模型，選擇只來自 request body；remap 統一放在 resolveSavedAiTextModel。
+- **實測輸出**（`$env:TEMP\probe-models-20261028-2176.json`，`--include-legacy`，exit=0，failures=[]）：
+  - claude-haiku-5-5 | active | ok | 200 | 669ms | budget=1
+  - claude-haiku-4-5-20251001 | legacy | ok | 200 | 593ms
+  - claude-haiku-4-5 | legacy | ok | 200 | 551ms
+  - claude-sonnet-4-6 | legacy | ok | 200 | 1668ms
+  - claude-opus-5-5 | active | ok | 200 | 898ms
+  - claude-opus-5 | legacy | ok | 200 | 648ms
+  - claude-opus-4-8 | legacy | ok | 200 | 670ms
+  - claude-fable-5-1 | active | ok | 200 | 518ms
+  - claude-fable-5 | legacy | ok | 200 | 1655ms
+  - gpt-5.5 | active | ok | 200 | 3026ms | budget=16
+  - gpt-5.4 | active | ok | 200 | 2979ms | budget=16
+  - gpt-5.4-mini | active | ok | 200 | 3330ms | budget=16
+  - gpt-5.4-nano | active | ok | 200 | 2674ms | budget=16
+  - gpt-4o | legacy | ok | 200 | 2344ms
+  - gpt-4o-mini | legacy | ok | 200 | 2095ms
+  - text-embedding-3-small | active | ok | 200 | 3817ms
+  - gemini-3.5-flash-lite | active | ok | 200 | 4829ms
+  - gemini-flash-latest | active | FAIL | 503 | 3436ms | "This model is currently experiencing high demand…"（第二輪 `--write-verified` 仍 503；fallback claude-haiku-5-5 ok，所以 exit 0）
+  - gemini-2.0-flash-lite | retired | FAIL | 404 | 453ms | "no longer available"
+  - 第二輪 `--include-legacy --write-verified`：exit=0、ms=4037，17 列蓋上 verifiedAt 2026-10-28（gemini-flash-latest 與 gemini-2.0-flash-lite 沒蓋）。
+- **突變**：在 `lib/ai/gemini-models.ts` 加 `"gpt-9-unregistered"` → (a) 紅（`lib\ai\gemini-models.ts: gpt-9-unregistered`，1 failed/3 passed）→ 從備份還原（git diff 乾淨）→ 4/4 綠。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scripts/probe-models.mjs --include-legacy | exit=0 | ms=4977
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/ai lib/content/blocks/__tests__/image-style-design-workbench.test.ts → 9 files / 69 tests passed；鄰近 reference-context／registry-code／outreach messages route／script-forge route + lib/dossier → 40 passed 1 skipped | exit=0 | ms=2592
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=11780（改完當下）；收尾重跑 exit=2，錯誤全在 `app/(shell)/tools/video/ScriptForge.tsx`（另一 session 編輯中），非該檔錯誤 0
+- REALTEST_EVIDENCE: tool=Bash | cmd=替身 docker/notify 跑 probe_models_after_deploy：複製失敗分支與探針失敗分支（把 text-embedding-3-small 改壞）都發中文警報、函式回 0；bash -n OK；真打 Haiku 5.5 thinking:disabled → 200 只有 text block；gpt-5.4-mini max_completion_tokens 1024 → 200、495 字 | exit=0 | ms=1742
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（書面對抗自審：探針 exit 語意、writeVerified 正則、註解剝除只會漏報不會誤報、cost-model 無 import 且已被 3 個 client component 載入、bash set -e 下各分支）
+- ORACLE_WAIVED: codex-oracle.ps1 -Mode review -Path <本卡 10 檔> 連續兩次「no final message (exit=0)」，raw log 0 bytes；依 §5 同法兩敗即停，改書面自審＋上述突變紅→綠。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=claude-haiku-4-5-20251001|claude-sonnet-4-6|claude-opus-4-8|"claude-fable-5" | hits=7（3 個 agency-os/docs/video_generator/__pycache__ 舊 .pyc、cost-calculator.ts:32 與 intake-form.ts:167 註解、migrations 0034 標籤預設與 0043 註解；程式碼呼叫點 0）
+- **剩餘風險**：①主機 `.env` 若設了 `OPENAI_OUTREACH_MODEL=gpt-4o-mini` 會蓋過新預設（沒 SSH 查）；gpt-4o-mini 今天仍可用。②gemini-flash-latest（outreach Gemini 預設）連兩輪 503；如果 03:00 也失敗，fallback 正常就不會發警報。③探針只在有部署的那晚跑；沒有部署的日子不測。④圖片模型不在本卡：video-service `config.py:31` IMAGE_MODEL 預設 dall-e-3、`OPENAI_IMAGE_MODEL=gpt-image-2`、studio/tarot 圖片 ID 未納入守衛。
+- **rollback**：`git revert <本 commit>`；主機端隨 sync-host-scripts 自動還原 auto-deploy 腳本。
 ## 2026-10-28（續2）— Anthropic User Profiles：決定延後接，開工條件寫進 ADR 017（Claude）
 
 - **決定**：現在不接。官方：沒帶 profile 的請求＝我們自己的用量。正式 `ops_audit_events` 近 60 天 `entitlement.usage`：anthropic 只有 awarewave-ops 11 筆、soulful-expression 1 筆（actor `agent:p7-soulful-video`），沒有客戶本人呼叫。customer org 5 個（含 3 個 onboarding_portal 測試 org）。
