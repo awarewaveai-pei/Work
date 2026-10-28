@@ -1,5 +1,14 @@
 # Worklog
 
+## 2026-10-28（續1）— 影片工具重新設計監工台上線（Claude）
+
+- **做了**：`agency-os/handoffs/2026-10-26-video-tool-supervisor/`（data／build／check，沿用 `scripts/supervisor-kit`）；check 綁 `VIDEO_TOOL_REDESIGN_2026-10-26.md` §7 的 V 卡號（7 階段 25 卡）。操作者：這次不做「每項先講例子、GPT 精簡」。發布 https://claude.ai/artifact/ChAU93JZVbgkuptRpVYRdf 。
+- **現況列查證**：next-admin 2026-10-27 06:45Z 重啟、容器 `.next/server` 含 `summarizeQaFindings`；`printenv MEDIA_TRANSCRIBE_WORKER_URL` 仍在。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node build.mjs && node check.mjs → ok: 7 phases, 25 items bound to plan §7 (0 done), 0 open, page fresh | exit=0 | ms=300
+- REVIEW_WAIVED: DOC_ONLY -- 監工台資料與產生頁
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=2026-10-26-video-tool-supervisor | hits=2（計畫 §8 與本頁 META.self，皆正確）
+- **下一步**：V1（High：migration 套 prod 前停）或 V3（可並行，卡已寫死）。建議模型：V1 Opus 5.5；V3 派 Sonnet。
+
 ## 2026-10-27（續9）— Playwright smoke 驗證限制後續處理
 
 - [根因與修復] 部署後兩輪全套各 25 pass／6 skip／1 fail：先是 `/ops/clients` 導航超時，後是 Chromium 截圖擷取錯誤。root 案單獨通過；12 次重複於桌面＋手機共 24/24 通過，全套以 1 worker 及 2 workers 重跑各 26 pass／6 skip／0 fail，故截圖偶發失敗未能重現，未宣稱已找到它的根因。另一個確定問題是 `scripts/playwright-runner.ps1:153,195` 在 Windows PowerShell 5.1 中將 Node stderr 警告升為 NativeCommandError，早於結果歸檔中止；已將安裝及測試的原生指令段暫時設成 Continue，仍以 `$LASTEXITCODE` 決定測試失敗並在 finally 還原偏好。
