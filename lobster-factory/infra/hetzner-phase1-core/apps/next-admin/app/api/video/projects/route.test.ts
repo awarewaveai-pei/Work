@@ -12,14 +12,14 @@ const other = "123e4567-e89b-42d3-a456-426614174009";
 const projectId = "123e4567-e89b-42d3-a456-426614174002";
 
 // Thenable query chain: every filter returns the chain; maybeSingle/single/await resolve to the table's row(s).
-function fakeDb(rows: Record<string, unknown>) {
+function fakeDb(rows: Record<string, unknown>, lists: Record<string, unknown[]> = {}) {
   const insert = vi.fn();
   const chain = (table: string): Record<string, unknown> => {
     const q: Record<string, unknown> = {};
     for (const m of ["select", "eq", "neq", "in", "order", "limit"]) q[m] = () => q;
     q.maybeSingle = async () => ({ data: rows[table] ?? null, error: null });
     q.single = async () => ({ data: rows[table] ?? null, error: null });
-    q.then = (resolve: (v: unknown) => void) => resolve({ data: [], error: null });
+    q.then = (resolve: (v: unknown) => void) => resolve({ data: lists[table] ?? [], error: null });
     q.insert = (v: unknown) => { insert(v); return q; };
     return q;
   };
@@ -42,6 +42,16 @@ describe("/api/video/projects", () => {
     getSupabaseWriteClient.mockReturnValue(fakeDb({ media_production_projects: { id: projectId, organization_id: org } }).db);
     const res = await GET(asClient(`http://localhost/api/video/projects?id=${projectId}`));
     expect(res.status).toBe(200);
+  });
+
+  it("GET ?id= returns the outcome snapshots of the project's releases, empty when none were published", async () => {
+    const project = { media_production_projects: { id: projectId, organization_id: org } };
+    const get = async () => (await GET(asClient(`http://localhost/api/video/projects?id=${projectId}`))).json() as Promise<{ outcomes: unknown[] }>;
+    getSupabaseWriteClient.mockReturnValue(fakeDb(project).db);
+    expect((await get()).outcomes).toEqual([]);
+    const snap = { id: "s1", release_id: "r1", platform: "youtube", maturity: "7d", observed_at: "2026-10-28T00:00:00Z", metrics: { views: 10 } };
+    getSupabaseWriteClient.mockReturnValue(fakeDb(project, { media_assets: [{ id: "a1" }], media_releases: [{ id: "r1" }], media_outcome_snapshots: [snap] }).db);
+    expect((await get()).outcomes).toEqual([snap]);
   });
 
   it("POST rejects an unknown autonomy or format with 400 and writes nothing", async () => {

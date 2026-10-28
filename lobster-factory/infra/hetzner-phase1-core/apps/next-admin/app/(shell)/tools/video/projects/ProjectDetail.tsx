@@ -10,7 +10,17 @@ type Asset = { id: string; object_url: string; created_at: string; metadata?: { 
 type Release = { id: string; candidate_asset_id: string; status: string; created_at: string; approved_at: string | null; withdrawn_at: string | null };
 type Delivery = { id: string; release_id: string; destination: string; variant: string | null; status: string; created_at: string };
 type QaItem = { kind: string; status: string; findings?: { rule: string; message: string; format?: string }[] };
-type Detail = { item: Project; assets: Asset[]; releases: Release[]; deliveries: Delivery[] };
+type Outcome = { id: string; release_id: string; platform: string; maturity: string; observed_at: string; metrics: Record<string, unknown> | null };
+type Detail = { item: Project; assets: Asset[]; releases: Release[]; deliveries: Delivery[]; outcomes?: Outcome[] };
+
+const METRIC_LABEL: Record<string, string> = { views: "觀看", impressions: "曝光", reach: "觸及", likes: "讚", comments: "留言", shares: "分享", saves: "收藏", clicks: "點擊", completion_rate: "完成率 %" };
+const MATURITY_LABEL: Record<string, string> = { "24h": "24 小時", "7d": "7 天", "30d": "30 天" };
+
+/** Newest snapshot per platform and maturity (rows arrive newest first). */
+function latestOutcomes(rows: Outcome[]): Outcome[] {
+  const seen = new Set<string>();
+  return rows.filter((o) => { const k = `${o.platform}/${o.maturity}`; if (seen.has(k)) return false; seen.add(k); return true; });
+}
 
 const card: React.CSSProperties = { background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 10, padding: 14 };
 const muted: React.CSSProperties = { fontSize: 12, color: "var(--text-secondary)" };
@@ -69,6 +79,7 @@ export default function ProjectDetail({ id }: { id: string }) {
   if (!data) return <div style={{ padding: "24px 28px", ...muted }}>載入中…</div>;
 
   const { item, assets, releases, deliveries } = data;
+  const outcomes = latestOutcomes(data.outcomes ?? []);
   const st = projectStatus(item.lifecycle_stage, item.last_error);
   const scenes = item.brief_json?.production?.scenes ?? [];
   const editLink = <a href={`/tools/video?project=${item.id}`} style={{ color: "var(--accent-text)", fontSize: 12, fontWeight: 700 }}>繼續編輯 →</a>;
@@ -117,6 +128,18 @@ export default function ProjectDetail({ id }: { id: string }) {
           </div>
         );
       })}
+
+      {outcomes.length > 0 && (
+        <div style={{ ...card, display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>成效</div>
+          {outcomes.map((o) => (
+            <div key={o.id} style={muted}>
+              {o.platform}（發布後 {MATURITY_LABEL[o.maturity] ?? o.maturity}，{new Date(o.observed_at).toLocaleDateString()}）：
+              {Object.entries(o.metrics ?? {}).filter(([, v]) => typeof v === "number").map(([k, v]) => `${METRIC_LABEL[k] ?? k} ${v}`).join("　") || "尚無數字"}
+            </div>
+          ))}
+        </div>
+      )}
 
       <details style={card}>
         <summary style={{ fontSize: 12, fontWeight: 700, cursor: "pointer", color: "var(--text-primary)" }}>腳本：{item.brief_json?.title || "（未命名）"}（{scenes.length} 場）</summary>

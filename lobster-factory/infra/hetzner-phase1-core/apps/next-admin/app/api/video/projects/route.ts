@@ -61,7 +61,13 @@ export async function GET(req: Request): Promise<Response> {
         .eq("organization_id", project.data.organization_id).in("release_id", releaseIds).order("created_at", { ascending: false })
       : { data: [], error: null };
     if (deliveries.error) return NextResponse.json({ ok: false, error: deliveries.error.message }, { status: 500 });
-    return NextResponse.json({ ok: true, item: project.data, assets: assets.data ?? [], releases: releases.data ?? [], deliveries: deliveries.data ?? [] });
+    // What the published video did (V8 / D5: operations is not a step, it is this section; the page shows it only when rows exist).
+    const outcomes = releaseIds.length
+      ? await db.from("media_outcome_snapshots").select("id, release_id, platform, maturity, observed_at, metrics")
+        .eq("organization_id", project.data.organization_id).in("release_id", releaseIds).order("observed_at", { ascending: false }).limit(200)
+      : { data: [], error: null };
+    if (outcomes.error) return NextResponse.json({ ok: false, error: outcomes.error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, item: project.data, assets: assets.data ?? [], releases: releases.data ?? [], deliveries: deliveries.data ?? [], outcomes: outcomes.data ?? [] });
   }
   let organizationId: string | null;
   try { organizationId = effectiveOrgId(req, url.searchParams.get("organizationId")?.trim() || null); } catch (error) { return denied(error) ?? bad("invalid_organization"); }

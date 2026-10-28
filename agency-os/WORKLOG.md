@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-28（續30）— 影片收尾 B：專案頁加「成效」區，有資料才顯示（Claude）
+
+- **根因**：D5 定「營運不再是步驟」，但成效（`media_outcome_snapshots`，webhook `api/webhooks/video-outcome` 寫入）只有 `api/video/outcomes` 一支儀表板 API，專案頁看不到。
+- **做法**：`api/video/projects/route.ts` GET ?id 多回 `outcomes`（該專案各 Release 的快照，按 `organization_id` ＋ `release_id` 篩，新到舊 200 筆）；`ProjectDetail.tsx` 每個「平台＋成熟度」顯示最新一筆，數字用中文標籤；`outcomes` 為空整區不出現。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run app/api/video/projects（3 passed，新增有／無快照）＋`npx tsc --noEmit` 非 .next 錯誤 0 | exit=0 | ms=40000。UI 未目視：本機無快照資料，條件為空時不渲染，只驗 API 形狀與型別。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=media_outcome_snapshots | hits=5（migration、webhook 寫入、outcomes route、本 route、down 腳本；查詢皆帶 organization_id）
+- ORACLE_WAIVED: Codex 本輪不可用；書面自審：讀取已先過 `assertOrgAccess`（專案所屬 org）、查詢再帶該 org；只讀不寫；metrics 只顯示數值型欄位。
+- **Rollback**：`git revert <此 commit>`；無 migration。
 ## 2026-10-28（續29）— 影片 V4.8 收尾 A2：重燒後同步主列 `metadata.formats`，專案頁才看得到新字幕（Claude）
 
 - **根因**：續28 只換了該列 `object_url`；專案頁（`ProjectDetail.tsx:89`）、歷史（`api/video/history/route.ts:92`）、畫廊（`DesignsGallery.tsx:996`）讀的是**主列** `metadata.formats[ratio]`，仍是舊網址 → 重燒後還是舊字幕。**不變量**：一份位元組只對應一個網址，主列 formats 與各列 object_url 同步。
