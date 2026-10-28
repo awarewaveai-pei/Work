@@ -71,7 +71,7 @@ export default function ProjectDetail({ id }: { id: string }) {
   const { item, assets, releases, deliveries } = data;
   const st = projectStatus(item.lifecycle_stage, item.last_error);
   const scenes = item.brief_json?.production?.scenes ?? [];
-  const editLink = <a href={`/tools/video?project=${item.id}`} style={{ color: "var(--accent)", fontSize: 12, fontWeight: 700 }}>繼續編輯 →</a>;
+  const editLink = <a href={`/tools/video?project=${item.id}`} style={{ color: "var(--accent-text)", fontSize: 12, fontWeight: 700 }}>繼續編輯 →</a>;
 
   return (
     <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 14, maxWidth: 960 }}>
@@ -97,7 +97,7 @@ export default function ProjectDetail({ id }: { id: string }) {
                   <video controls preload="metadata" src={url} style={{ width: "100%", borderRadius: 6, background: "#000" }} />
                   <div style={{ ...muted, display: "flex", justifyContent: "space-between" }}>
                     <span>{fmt}</span>
-                    <a href={url} target="_blank" rel="noopener" style={{ color: "var(--accent)" }}>下載</a>
+                    <a href={url} target="_blank" rel="noopener" style={{ color: "var(--accent-text)" }}>下載</a>
                   </div>
                 </div>
               ))}

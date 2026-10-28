@@ -137,7 +137,7 @@ export function ScheduleTable({ only, jobOnly }: { only?: string; jobOnly?: stri
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/ops/schedules${only ? `?slug=${encodeURIComponent(only)}` : ""}`, { headers: { ...roleHeader("admin") }, cache: "no-store" });
+      const res = await fetch(only ? `/api/ops/schedules?slug=${encodeURIComponent(only)}` : "/api/ops/schedules", { headers: { ...roleHeader("admin") }, cache: "no-store" });
       const body = await res.json().catch(() => null);
       if (!res.ok || !body?.ok) return setLoadError(String(body?.error ?? `HTTP ${res.status}`));
       setLoadError(null);

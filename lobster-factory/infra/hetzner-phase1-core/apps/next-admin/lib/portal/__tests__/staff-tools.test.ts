@@ -16,6 +16,10 @@ import { HUB_TAB_TOOL } from "../../../app/(shell)/ops/clients/[slug]/hub-tab-to
 // hub embeds other products' tabs; C3 hides each one when its product is not ticked.
 const NEEDS_OTHER_TOOL: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   studio: { "/api/content/seo-fix": "上架頁的 SEO 修正按鈕用內容行銷的功能" },
+  content: {
+    "/api/ops/schedules": "自動內容頁的「製作」步驟內嵌排程表，沒有排程工具的人看不到",
+    "/api/ops/clients/[x]/schedules": "自動內容頁的「製作」步驟內嵌排程表，沒有排程工具的人看不到",
+  },
   tarot: { "/api/tools/studio/edit-prompt": "修圖提示詞面板用商品設計工作室的功能" },
   video: { "/api/social/posts": "ScriptForge 的「送社群」用社群發文的功能" },
   "ops/clients": {

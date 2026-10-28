@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fromDatetimeLocal, toDatetimeLocal } from "../wp-calendar";
+import { fromDatetimeLocal, toDatetimeLocal } from "../datetime-local";
 
 // WP dates are the site's wall clock with no zone: the helpers must never go through Date (TZ=America/New_York gives the same).
 describe("wp-calendar datetime-local helpers", () => {

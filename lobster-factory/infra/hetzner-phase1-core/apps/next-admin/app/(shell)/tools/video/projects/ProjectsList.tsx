@@ -41,7 +41,7 @@ export default function ProjectsList() {
       {!error && items === null && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>載入中…</div>}
       {items && items.length === 0 && (
         <div style={{ ...card, fontSize: 12, color: "var(--text-secondary)" }}>
-          還沒有影片專案。<a href="/tools/video" style={{ color: "var(--accent)" }}>開新影片</a>
+          還沒有影片專案。<a href="/tools/video" style={{ color: "var(--accent-text)" }}>開新影片</a>
         </div>
       )}
       {items?.map((p) => {

@@ -2,7 +2,7 @@
 // 文章的日期與發布（AUTO_CONTENT P9.6; was the content calendar's edit box). A topic's article keeps its date in the topic
 // (B12): the only move is the topic's own schedule action, never WordPress, and it has no publish-now or trash here.
 import { useState } from "react";
-import { fromDatetimeLocal, toDatetimeLocal } from "@/lib/content/wp-calendar";
+import { fromDatetimeLocal, toDatetimeLocal } from "@/lib/content/datetime-local";
 import { useDoorHref } from "@/app/DoorContext";
 import { zoned } from "./model";
 import type { WpPost } from "./api";

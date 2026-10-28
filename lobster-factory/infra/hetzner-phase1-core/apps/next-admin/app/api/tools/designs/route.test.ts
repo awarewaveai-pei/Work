@@ -74,6 +74,7 @@ function makeQuery(columns: string, opts?: { count?: string; head?: boolean }) {
     gte: (c: string, v: string) => (preds.push(leaf(c, "gte", v)), q),
     gt: (c: string, v: string) => (preds.push(leaf(c, "gt", v)), q),
     neq: (c: string, v: string) => (preds.push(leaf(c, "neq", v)), q),
+    is: (c: string, v: unknown) => (preds.push(leaf(c, "is", v)), q),
     not: (c: string, op: string, v: unknown) => { const p = leaf(c, op, v); preds.push((r) => !p(r)); return q; },
     or: (expr: string) => (preds.push(parseTree(`or(${expr})`)), q),
     order: (c: string, o: { ascending: boolean }) => (orders.push({ c, asc: o.ascending }), q),

@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-28（續20）
+
+### next-admin 部署閘：9 條失敗測試修好（P9 造成 4、別人 5）
+
+- 根因：P9.6 社群工具呼叫內容 API 未宣告、社群門頁經 wp-calendar 引入 service-role；P9.3 題目頁內嵌排程表；P9.5/P9.3 內容門題目頁讀 service-role；video projects（3459e3b32）用 `var(--accent)` 當字色；designs route 測試假物件缺 `.is()`。
+- 修法：social `optional: ["content"]`＋文章面板依工具可用與否顯示（`ArticleScheduleSlot`/`StaffArticleSchedule`）；時間轉換搬 `lib/content/datetime-local.ts`（無 import）；排程表只給持排程工具者看（`NEEDS_OTHER_TOOL` content 兩列）；video 連結改 `var(--accent-text)`；designs 測試假物件補 `is`。
+- **內容門的題目頁先拿掉**（`app/content/topics/page.tsx` 刪、products.ts door nav 去 topics）：門頁不得讀 service-role，總控頁要一支走門身分的 API 才能上門；門仍 `enabled:false`。上門前要補（TASKS AUTOCONTENT-GAP 條目）。
+- 實作 cc.py（API 額度 11-01 前用完，中途停）＋主 session 收尾。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test (next-admin 全套，部署閘等價) | exit=0 | ms=20760（404 檔、3480 測試）
+- `npx tsc --noEmit` 0 錯（除 `.next/` 舊建置檔）。
+- REVIEW_WAIVED: NA -- 測試修正以全套綠為準；NEEDS_OTHER_TOOL 為既有機制且 UI 已依工具隱藏（`TopicsPageContent.tsx` canSchedule）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=app/content/topics|var(--accent)" | hits=0
 ## 2026-10-28（續19）video-service 部署核對 + Luma Ray 3.2 動態選項
 
 - **根因**：續10（7288581b3）移除 Luma Ray 2／Flash 2（Replicate 下架）後，影片動態只剩 Runway／Veo 三家；Luma 後繼 `luma/ray-3.2` 未登錄。video-service 部署待操作者批准。

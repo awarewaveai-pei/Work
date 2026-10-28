@@ -4,9 +4,9 @@
 // tabs with the channel list on the left and one toolbar row; the composer is its own page (compose/new, compose/<id>).
 // Every read and write goes through /api/social (C4); this file holds only what is on screen.
 // Views by card: 自動發布清單 C7 (Lists), 貼文素材庫 C9/C31 (library/), 紀錄 C11 (LogView), 審核 C8, 文章 C10.
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, ApiError, type MediaItem, type WpPost } from "./api";
-import ArticleSchedule from "./ArticleSchedule";
+import { ArticleScheduleContext } from "./ArticleScheduleSlot";
 import ArticleSource, { type Prefill } from "./ArticleSource";
 import ChannelList from "./ChannelList";
 import { copyInput } from "./compose/draft";
@@ -64,6 +64,7 @@ let carriedComposeSeed: { body: string; mediaIds: string[]; n: number } | null =
 const param = (k: string) => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get(k));
 
 export default function SocialManager({ slots = {}, route = { kind: "plan" }, go = (href, replace) => (replace ? window.location.replace(href) : window.location.assign(href)) }: { slots?: Slots; route?: SocialRoute; go?: Go }) {
+  const ArticleSchedule = useContext(ArticleScheduleContext);   // null on a product door (no /api/content there)
   const [brands, setBrands] = useState<Brand[] | null>(null);
   const [brandTotal, setBrandTotal] = useState(0);   // > brands.length: staff search the rest in the top bar
   const [brandId, setBrandId] = useState<string | null>(null);
@@ -367,7 +368,7 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
                 source={article && !postId && canWrite ? (
                   <>
                     {/* the article row comes from the calendar just left; a page opened straight on this address has none (no WordPress edit offered without knowing the topic, B12) */}
-                    {articles.find((x) => x.siteId === article.siteId && x.id === article.id) && (
+                    {ArticleSchedule && articles.find((x) => x.siteId === article.siteId && x.id === article.id) && (
                       <ArticleSchedule key={articleFor} article={articles.find((x) => x.siteId === article.siteId && x.id === article.id) as WpPost}
                         onChanged={async () => { await reload(); goTo({ kind: "plan" }); }} />
                     )}

@@ -97,7 +97,7 @@ const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
 const dayText = (d: number) => `${d} 日`;
 const daysOf = (month: string) => Array.from({ length: daysIn(month) }, (_, i) => i + 1);
 
-export function TopicsBoard({ overview }: { overview: OverviewData }) {
+export function TopicsBoard({ overview, canSchedule }: { overview: OverviewData; canSchedule: boolean }) {
   const [sites, setSites] = useState<Site[] | null>(null);
   // the table is sorted problems first, so the first row is the site that most needs a look
   const [siteId, setSiteId] = useState(overview.rows[0]?.siteId ?? "");
@@ -246,7 +246,7 @@ export function TopicsBoard({ overview }: { overview: OverviewData }) {
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 16 }}>
       <OverviewTable rows={overview.rows} selected={siteId} onPick={setSiteId} note={overview.spendNote} />
       {siteRow && site && (
-        <FlowCells site={site} row={siteRow} cell={overview.cells[siteId]} topics={topics} month={month}
+        <FlowCells site={site} row={siteRow} cell={overview.cells[siteId]} topics={topics} month={month} canSchedule={canSchedule}
           planButton={planButton} onSiteSaved={(u) => setSites((l) => (l ?? []).map((x) => (x.id === u.id ? u : x)))} />
       )}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
