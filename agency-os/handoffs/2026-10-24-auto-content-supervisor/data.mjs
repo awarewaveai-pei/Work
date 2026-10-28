@@ -4,7 +4,7 @@
 
 export const META = {
   title: '全自動內容 監工台',
-  updated: '2026-10-26',
+  updated: '2026-10-28',
   plan: 'agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md',
   req: 'agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_PIPELINE_REQUIREMENTS.md',
   worklog: 'agency-os/WORKLOG.md 2026-10-24、2026-10-25',
@@ -148,7 +148,7 @@ export const STEPS = [
       done('P8.5', '待辦清單和排程頁計畫改指這份計畫', '2a926449d'),
     ] },
   { n: 9, code: 'P9', group: 'H', plain: '最前面兩步也自動：每天自己抓熱搜、每月自己提題目；題目可以設成 AI 直接挑。選了「AI 挑」加「AI 審」的網站，整個月不用按任何鍵。', title: '熱搜與提案自動＋題目閘',
-    gate: '打開排程後不用按鈕：題目頁自己出現本月題目；網站設「AI 挑」的題目自動核准；德國這種沒有熱搜來源的市場不會拿台灣熱搜', risk: 'Medium（資料庫加一欄要你同意）', model: 'Opus 5.5', status: 'in_progress', depends: ['P4'],
+    gate: '打開排程後不用按鈕：題目頁自己出現本月題目；網站設「AI 挑」的題目自動核准；德國這種沒有熱搜來源的市場不會拿台灣熱搜', risk: 'Medium（資料庫加一欄要你同意）', model: 'Opus 5.5', status: 'done', commit: '5a66a212d', depends: ['P4'],
     what: '排程每天抓一次熱搜（加 Google Trends、YouTube 兩個免費來源）；本月沒提案就提一次；題目閘 topicMode；題目頁升級成一頁總控；網站可填自己產業的 RSS',
     files: ['lib/content/topics/collect-trends.ts', 'lib/content/topics/plan-due.ts', 'lib/schedules/jobs.ts', 'app/(shell)/tools/content/topics/'],
     items: [
@@ -157,7 +157,7 @@ export const STEPS = [
       done('P9.3', '題目頁變成一頁總控：先看到所有公司一覽（一個網站一列，有問題的排最上面），點一列進那個網站的五格：熱搜、提案、挑題、製作、發布，每格看得到狀態、能直接改設定和看到費用', '8eeb8cda5'),
       done('P9.4', '網站設定可以填自己產業的新聞 RSS，提題目時優先參考；只給這個網站用，不分享給別的客戶', '8f7599ef6'),
       done('P9.5', '題目頁可以一次貼很多個關鍵字變成題目，由排程在主機上做；文章頁的「批量產文」刪掉（它要開著瀏覽器、不讀網站設定、不存檔、不顯示費用）；客戶入口的選單加題目頁', '034146cd4'),
-      todo('P9.6', '文章行事曆併進社群日曆：一個日曆看文章和社群貼文什麼時候發；手寫文章在日曆上改日期、立即發布、移到垃圾桶；排程做的文章改日期會改到題目上，不會兩邊打架'),
+      done('P9.6', '文章行事曆併進社群日曆：一個日曆看文章和社群貼文什麼時候發；手寫文章在日曆上改日期、立即發布、移到垃圾桶；排程做的文章改日期會改到題目上，不會兩邊打架', '5a66a212d'),
     ] },
 ];
 
