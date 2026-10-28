@@ -1,7 +1,7 @@
 // A site's publish mode (AUTO_CONTENT plan D1, I5) changes only through its own PATCH field, staff only: a whole-defaults
 // save from a page opened before the mode changed keeps the stored mode, and a save that races a mode switch is refused.
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { autoPublishes } from "@/lib/content/brand-voice";
+import { aiPicksTopics, autoPublishes } from "@/lib/content/brand-voice";
 
 const ORG = vi.hoisted(() => "11111111-1111-4111-8111-111111111111");
 const db = vi.hoisted(() => ({ stored: {} as Record<string, unknown>, updated: [] as Record<string, unknown>[], filters: [] as unknown[][], raced: false }));
@@ -66,6 +66,37 @@ describe("site publish mode", () => {
   it("refuses any other value and writes nothing", async () => {
     expect((await edit({ publishMode: "auto" })).status).toBe(400);
     expect(db.updated).toEqual([]);
+  });
+});
+
+describe("site topic mode (P9.2, B4)", () => {
+  it("is its own field: switching it leaves publishMode alone, and the write is conditional on both", async () => {
+    expect((await edit({ topicMode: "ai_pick" })).status).toBe(200);
+    expect(written()).toEqual({ tone: "Warm", publishMode: "human_review", topicMode: "ai_pick" });
+    expect(db.filters).toContainEqual(["is", "content_defaults->>topicMode", null]);
+    expect((await edit({ publishMode: "ai_review_auto" })).status).toBe(200);
+    expect(written()).toEqual({ tone: "Warm", publishMode: "ai_review_auto" });
+  });
+
+  it("a whole-defaults save from a stale page keeps the stored topic mode", async () => {
+    db.stored = { tone: "Warm", topicMode: "human_pick" };
+    await edit({ contentDefaults: { tone: "Bold", topicMode: "ai_pick" } });
+    expect(written()).toEqual({ tone: "Bold", topicMode: "human_pick" });
+  });
+
+  it("a customer cannot set it; another value is refused and writes nothing", async () => {
+    expect((await edit({ topicMode: "ai_pick" }, client)).status).toBe(403);
+    expect((await edit({ topicMode: "auto" })).status).toBe(400);
+    expect(db.updated).toEqual([]);
+  });
+});
+
+describe("aiPicksTopics", () => {
+  it("only the exact stored value lets the schedule approve", () => {
+    expect(aiPicksTopics({ topicMode: "ai_pick" })).toBe(true);
+    for (const v of [undefined, "human_pick", "AI_PICK", "ai_pick ", true]) expect(aiPicksTopics({ topicMode: v as never })).toBe(false);
+    expect(aiPicksTopics({ publishMode: "ai_review_auto" })).toBe(false);
+    expect(aiPicksTopics(undefined)).toBe(false);
   });
 });
 

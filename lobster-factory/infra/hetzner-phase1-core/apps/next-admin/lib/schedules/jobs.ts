@@ -9,7 +9,7 @@ import { loadCis } from "@/lib/cs/cis";
 import { applyChatwootBaseline } from "@/lib/cs/chatwoot-baseline";
 import { REPORT_JOBS, runPeriodReport, type ReportKind } from "@/lib/social/reports";
 import { DAILY_START_CAP } from "@/lib/content/topics/tick";
-import { topicCostUsd } from "@/lib/content/topics/cost";
+import { planCostUsd, topicCostUsd } from "@/lib/content/topics/cost";
 import type { SiteContentDefaults } from "@/lib/content/brand-voice";
 import type { JobMeta } from "./types";
 import type { Frequency } from "./schedule";
@@ -108,7 +108,7 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
     label: "自動內容管線",
     description: "隨時檢查題目佇列：已核准的題目到了排定時間，就依它選的格式做成 WordPress 草稿和社群草稿；選了影片的，影片做好後自動嵌進文章、附到社群貼文，再跑規則審核。網站設成「AI 審核後自動發布」且審核全部通過才會發布，其餘留在草稿。題目和排定時間在「內容 › 題目佇列」設定。",
     // Prices: lib/ai/cost-model.ts TEXT_FEATURES article + syndicate (lib/content/topics/cost.ts).
-    cost: `每題約 ${topicCostUsd().usual} 美元（文章＋社群改寫；社群太長要重寫時最多 ${topicCostUsd().max} 美元），選了影片的題目再加約 ${topicCostUsd(["video"]).usual} 美元（腳本；畫面用免費實拍、配音免費）。一天最多花到「每天最多開始」的題數。沒有到期題目時免費。`,
+    cost: `每題約 ${topicCostUsd().usual} 美元（文章＋社群改寫；社群太長要重寫時最多 ${topicCostUsd().max} 美元），選了影片的題目再加約 ${topicCostUsd(["video"]).usual} 美元（腳本；畫面用免費實拍、配音免費）。一天最多花到「每天最多開始」的題數。每個網站每月第一次提案另約 ${planCostUsd()} 美元。沒有到期題目時免費。`,
     // every_5m is how often it looks, not a choice: the page shows no frequency for a job with one fixed cadence
     frequencies: [{ value: "every_5m", label: "每 5 分鐘", usesHour: false, usesDay: false }],
     dailyLimit: { label: "每天最多開始", unit: "題", options: Array.from({ length: 10 }, (_, i) => i + 1), default: DAILY_START_CAP },
@@ -117,8 +117,9 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
     async run(organizationId, _runKey, schedule) {
       const sb = getSupabaseWriteClient();
       if (!sb) throw new Error("content_pipeline:no_supabase_client");
-      const [{ tickTopics }, { topicDeps }, { collectTrendsIfDue }, { trendGeosFor }] = await Promise.all([import("@/lib/content/topics/tick"),
-        import("@/lib/content/topics/make"), import("@/lib/content/topics/collect-trends"), import("@/lib/content/topics/plan")]);
+      const [{ tickTopics }, { topicDeps }, { collectTrendsIfDue }, { trendGeosFor }, { planIfDue, planDueDeps }] = await Promise.all([import("@/lib/content/topics/tick"),
+        import("@/lib/content/topics/make"), import("@/lib/content/topics/collect-trends"), import("@/lib/content/topics/plan"),
+        import("@/lib/content/topics/plan-due")]);
       // Trends first, once per geo per day (B5): the month's proposal reads what was stored. A trends failure must not
       // stop topics already approved, so the tick runs anyway and the failure is thrown after it (recorded + incident).
       let trendsError = "";
@@ -129,7 +130,10 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
       } catch (e) {
         trendsError = e instanceof Error ? e.message : String(e);
       }
-      const summary = await tickTopics(topicDeps(sb, organizationId, "schedule:content_pipeline"), { cap: schedule?.dailyLimit ?? DAILY_START_CAP });
+      // B3: a firing that plans a site's month does not tick (plan ~90 s + tick 200 s would pass run-due's 300 s); the next
+      // firing, 5 minutes on, finds the month planned and ticks. A plan failure propagates: no tick, recorded + incident.
+      const summary = (await planIfDue(planDueDeps(sb, organizationId, "schedule:content_pipeline"), new Date()))
+        ?? await tickTopics(topicDeps(sb, organizationId, "schedule:content_pipeline"), { cap: schedule?.dailyLimit ?? DAILY_START_CAP });
       if (trendsError) throw new Error(`${summary}; content_pipeline:trends:${trendsError}`);
       return summary;
     },

@@ -1,7 +1,8 @@
 // The monthly topic plan: answer checks (unique keywords, days in the month, known formats/sources) and the tenant rule.
 import { describe, expect, it, vi } from "vitest";
 
-const m = vi.hoisted(() => ({ site: null as unknown, trends: [] as unknown[], folders: [] as unknown[], proposed: [] as unknown[], byGeo: {} as Record<string, unknown[]> }));
+const m = vi.hoisted(() => ({ site: null as unknown, trends: [] as unknown[], folders: [] as unknown[], proposed: [] as unknown[], byGeo: {} as Record<string, unknown[]>, eventArgs: [] as unknown[], events: [] as string[] }));
+vi.mock("@/lib/events/for-month", () => ({ eventsForMonth: async (_sb: unknown, month: string, country: string | null) => { m.eventArgs = [month, country]; return m.events; } }));
 vi.mock("@/lib/content/brand-voice-store", () => ({ loadSiteBrand: async () => m.site }));
 vi.mock("@/lib/kb/folders", () => ({ listFolders: async () => m.folders }));
 vi.mock("../trends", async (orig) => ({ ...(await orig<typeof import("../trends")>()),
@@ -36,11 +37,20 @@ describe("parsePlan", () => {
 
 describe("prompt and geo", () => {
   it("carries the voice, trends and folders, and the target count", () => {
-    const p = buildPlanPrompt({ siteName: "Soulful", voice: "語氣: 溫暖", month: "2026-11-01", daysInMonth: 30, trends: ["感恩日記（Google News）"], folders: ["藝術治療 202610"] });
+    const p = buildPlanPrompt({ siteName: "Soulful", voice: "語氣: 溫暖", month: "2026-11-01", daysInMonth: 30, events: [], trends: ["感恩日記（Google News）"], folders: ["藝術治療 202610"] });
     expect(p).toContain("共 28 個，分散在 1 到 30 日");
     expect(p).toContain("語氣: 溫暖");
     expect(p).toContain("- 感恩日記（Google News）");
     expect(p).toContain("- 藝術治療 202610");
+  });
+
+  it("events section: absent when empty, otherwise present and before the trends section (P9.2)", () => {
+    const base = { siteName: "S", voice: "", month: "2026-12-01", daysInMonth: 31, trends: ["t"], folders: [] };
+    expect(buildPlanPrompt({ ...base, events: [] })).not.toContain("節日與活動");
+    const p = buildPlanPrompt({ ...base, events: ["12-25 Christmas（聖誕節）"] });
+    expect(p).toContain("節日與活動");
+    expect(p).toContain("- 12-25 Christmas（聖誕節）");
+    expect(p.indexOf("節日與活動")).toBeLessThan(p.indexOf("近 30 天的熱門話題"));
   });
 
   it("maps the article tool's countries to trending geos: global = every geo, a country with no source = none (B9)", () => {
@@ -75,6 +85,21 @@ describe("proposeMonth", () => {
     await proposeMonth({} as never, { organizationId: "org-a", siteId: "s", month: "2026-11", actor: "x" }, ask);
     expect(m.trends).toEqual([]);
     expect(ask.mock.calls[0][0]).toMatch(/近 30 天的熱門話題[^\n]*\n（無）/);
+  });
+
+  it("events are fetched for the one market's country; global or a market with no source asks with no country", async () => {
+    const run = async (targetCountry: string) => {
+      m.site = { siteId: "s", organizationId: "org-a", name: "S", defaults: { targetCountry } };
+      m.events = ["12-25 Christmas（聖誕節）"];
+      const ask = vi.fn(async (_p: string) => JSON.stringify({ topics: [{ day: 2, title: "t", keyword: "k" }] }));
+      await proposeMonth({} as never, { organizationId: "org-a", siteId: "s", month: "2026-12", actor: "x" }, ask);
+      return { args: m.eventArgs, prompt: ask.mock.calls[0][0] };
+    };
+    const tw = await run("台灣");
+    expect(tw.args).toEqual(["2026-12-01", "TW"]);
+    expect(tw.prompt).toContain("- 12-25 Christmas（聖誕節）");
+    expect((await run("全球（不指定）")).args).toEqual(["2026-12-01", null]);
+    expect((await run("德國")).args).toEqual(["2026-12-01", null]);
   });
 
   it("a global site plans from every geo's trends", async () => {

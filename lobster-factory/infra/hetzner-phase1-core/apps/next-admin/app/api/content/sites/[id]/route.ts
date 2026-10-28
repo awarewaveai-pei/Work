@@ -4,7 +4,12 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { siteRowGate, siteUrlWriteGate } from "@/lib/content/wp-sites";
 import { staffOnly } from "@/lib/tenant-guard";
 import type { ManagedSite } from "@/app/api/content/sites/route";
-import { PUBLISH_MODES, type PublishMode, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { PUBLISH_MODES, TOPIC_MODES, type SiteContentDefaults } from "@/lib/content/brand-voice";
+
+const GATE_MODES = [
+  { field: "publishMode", allowed: PUBLISH_MODES },
+  { field: "topicMode", allowed: TOPIC_MODES },
+] as const;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,40 +50,46 @@ export async function PATCH(
   if (typeof body.username === "string" && body.username.trim()) patch.username = body.username.trim();
   // Token/AppPassword only updated when explicitly provided and non-empty
   if (typeof body.token    === "string" && body.token.trim()) patch.token = body.token.trim();
-  // Content Studio per-site defaults (full replace — caller sends complete object), except publishMode: it is set only
-  // by its own field, staff only (auto publish sends to the customer's site and social channels without a person), and
-  // the write is conditional on the mode read here -- a save racing a mode switch gets 409 instead of undoing it.
+  // Content Studio per-site defaults (full replace -- caller sends complete object), except the two gate modes: each is set
+  // only by its own field, staff only (publishMode sends to the customer's site and social channels without a person;
+  // topicMode spends the customer's money without one), and the write is conditional on the modes read here -- a save
+  // racing a mode switch gets 409 instead of undoing it. The gates are independent (B4): switching one never moves the other.
   const defaultsGiven = typeof body.contentDefaults === "object" && body.contentDefaults !== null && !Array.isArray(body.contentDefaults);
-  if (body.publishMode !== undefined) {
+  for (const g of GATE_MODES) {
+    if (body[g.field] === undefined) continue;
     const modeDenied = staffOnly(req);
     if (modeDenied) return modeDenied;
-    if (!(PUBLISH_MODES as readonly unknown[]).includes(body.publishMode))
-      return NextResponse.json({ ok: false, error: `publishMode must be one of ${PUBLISH_MODES.join(", ")}` }, { status: 400 });
+    if (!(g.allowed as readonly unknown[]).includes(body[g.field]))
+      return NextResponse.json({ ok: false, error: `${g.field} must be one of ${g.allowed.join(", ")}` }, { status: 400 });
   }
-  let modeRead: string | null | undefined;   // undefined = content_defaults not written
-  if (defaultsGiven || body.publishMode !== undefined) {
+  let modesRead: Array<[string, string | null]> | undefined;   // undefined = content_defaults not written
+  if (defaultsGiven || GATE_MODES.some((g) => body[g.field] !== undefined)) {
     const { data: current, error: readError } = await supabase.from("wp_sites").select("content_defaults").eq("id", id).maybeSingle();
     if (readError) return NextResponse.json({ ok: false, error: readError.message }, { status: 500 });
     const stored = ((current as { content_defaults: SiteContentDefaults | null } | null)?.content_defaults) ?? {};
-    const given: SiteContentDefaults = { ...((defaultsGiven ? body.contentDefaults : stored) as SiteContentDefaults) };
-    delete given.publishMode;
-    const mode = (body.publishMode ?? stored.publishMode) as PublishMode | undefined;
-    patch.content_defaults = mode ? { ...given, publishMode: mode } : given;
-    // as `content_defaults->>publishMode` renders it, so even a malformed stored value (true, 1) can be overwritten
-    const raw = (stored as Record<string, unknown>).publishMode;
-    modeRead = raw === undefined || raw === null ? null : typeof raw === "string" ? raw : JSON.stringify(raw);
+    const next: Record<string, unknown> = { ...((defaultsGiven ? body.contentDefaults : stored) as SiteContentDefaults) };
+    modesRead = [];
+    for (const g of GATE_MODES) {
+      delete next[g.field];
+      const mode = body[g.field] ?? (stored as Record<string, unknown>)[g.field];
+      if (mode) next[g.field] = mode;
+      // as `content_defaults->>field` renders it, so even a malformed stored value (true, 1) can be overwritten
+      const raw = (stored as Record<string, unknown>)[g.field];
+      modesRead.push([g.field, raw === undefined || raw === null ? null : typeof raw === "string" ? raw : JSON.stringify(raw)]);
+    }
+    patch.content_defaults = next;
   }
 
   let update = supabase.from("wp_sites").update(patch).eq("id", id);
-  if (modeRead !== undefined) {
-    update = modeRead === null ? update.is("content_defaults->>publishMode", null) : update.eq("content_defaults->>publishMode", modeRead);
+  for (const [field, read] of modesRead ?? []) {
+    update = read === null ? update.is(`content_defaults->>${field}`, null) : update.eq(`content_defaults->>${field}`, read);
   }
   const { data, error } = await update
     .select("id, name, url, color, active, note, created_at, token, username, content_defaults")
     .single();
 
   if (error) {
-    if (error.code === "PGRST116" && modeRead !== undefined) {
+    if (error.code === "PGRST116" && modesRead !== undefined) {
       return NextResponse.json({ ok: false, error: "網站設定剛被別人改過，請重新整理後再存一次" }, { status: 409 });
     }
     const status = error.code === "PGRST116" ? 404 : 500;

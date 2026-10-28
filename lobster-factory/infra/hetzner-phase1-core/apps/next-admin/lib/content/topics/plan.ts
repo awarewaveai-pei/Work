@@ -10,6 +10,7 @@ import type { Grant } from "@/lib/entitlements/can";
 import { renderSiteVoice } from "@/lib/content/brand-voice";
 import { loadSiteBrand } from "@/lib/content/brand-voice-store";
 import { listFolders } from "@/lib/kb/folders";
+import { eventsForMonth } from "@/lib/events/for-month";
 import { isGlobalMarket, TRENDING_GEOS, type TrendingGeo } from "@/lib/content/geos";
 import { norm, recentTrends } from "./trends";
 import { monthKey, proposeTopics, TOPIC_FORMATS, type NewTopic, type Topic, type TopicFormat } from "./store";
@@ -49,6 +50,7 @@ export interface PlanContext {
   voice: string;
   month: string;               // YYYY-MM-01
   daysInMonth: number;
+  events: string[];            // holidays/events whose marketing window touches the month (P9.2)
   trends: string[];
   folders: string[];
 }
@@ -58,6 +60,10 @@ export function buildPlanPrompt(c: PlanContext, n = PLAN_TOPICS): string {
   return `為品牌「${c.siteName}」規劃 ${c.month.slice(0, 7)} 一整個月的內容題目，共 ${n} 個，分散在 1 到 ${c.daysInMonth} 日。
 每個題目要能寫成一篇 SEO 文章，並改寫成社群貼文；適合拍成短影片的題目，formats 加上 "video"。
 ${c.voice ? `\n品牌語氣與行銷簡報（題目要符合；不得違反禁用聲明）：\n${c.voice}\n` : ""}
+${c.events.length ? `
+本月在行銷窗口內的節日與活動（可提前佈局的題目）：
+${list(c.events)}
+` : ""}
 近 30 天的熱門話題（挑和品牌受眾相關的，不相關就不用）：
 ${list(c.trends)}
 
@@ -135,12 +141,15 @@ export async function proposeMonth(sb: SupabaseClient, input: ProposeMonthInput,
   const month = monthKey(input.month);
   const [y, m] = month.split("-").map(Number);
   const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  const [trends, folders] = await Promise.all([
-    trendsFor(sb, trendGeosFor(site.defaults.targetCountry)),
+  // one market = its country's events (+ worldwide); global (every geo) or a market with no source = no country filter
+  const geos = trendGeosFor(site.defaults.targetCountry);
+  const [trends, folders, events] = await Promise.all([
+    trendsFor(sb, geos),
     listFolders(input.organizationId),
+    eventsForMonth(sb, month, geos.length === 1 ? geos[0] : null),
   ]);
   const ctx: PlanContext = {
-    siteName: site.name, voice: renderSiteVoice(site.defaults), month, daysInMonth,
+    siteName: site.name, voice: renderSiteVoice(site.defaults), month, daysInMonth, events,
     trends: trends.map((t) => `${t.title}（${t.source}）`), folders: folders.slice(0, 30).map((f) => f.name),
   };
   const rows = parsePlan(await ask(buildPlanPrompt(ctx)), ctx);

@@ -8,8 +8,8 @@ import type { ManagedSite } from "@/app/api/content/sites/route";
 import { autoPublishes, type PublishMode } from "@/lib/content/brand-voice";
 
 const MODES: Array<{ value: PublishMode; label: string; detail: string }> = [
-  { value: "human_review", label: "人工審核", detail: "排程做好的文章和社群貼文都留在草稿，由人看過再發布。" },
-  { value: "ai_review_auto", label: "AI 審核後自動發布", detail: "規則檢查全部通過才自動發布；沒通過的留在草稿。" },
+  { value: "human_review", label: "人工審核", detail: "排程做好的文章和社群貼文都留在草稿，由人看過再發布。只管文章；題目誰挑看旁邊的設定。" },
+  { value: "ai_review_auto", label: "AI 審核後自動發布", detail: "規則檢查全部通過才自動發布；沒通過的留在草稿。只管文章；題目誰挑看旁邊的設定。" },
 ];
 
 export default function PublishModeButtons({ site, onSaved, readOnly = false }: { site: ManagedSite; onSaved: (updated: ManagedSite) => void; readOnly?: boolean }) {

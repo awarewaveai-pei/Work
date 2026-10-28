@@ -5,6 +5,7 @@ import type { ManagedSite } from "@/app/api/content/sites/route";
 import { useDoorHref, useOnDoor } from "@/app/DoorContext";
 import { FUNNEL_STAGES, PRICE_POSITIONS, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import PublishModeButtons from "./PublishModeButtons";
+import TopicModeButtons from "./TopicModeButtons";
 
 const MKT_PRESETS: Record<string, string[]> = {
   audience: ["台灣 30-45 歲女性", "有焦慮/壓力的上班族", "正在尋找自我療癒的成人", "對心理健康有興趣的父母", "藝術愛好者（非專業）", "身心科/諮商後進階探索者"],
@@ -788,6 +789,11 @@ export default function SiteManager() {
           {/* Content Studio defaults always visible regardless of edit state */}
           <div style={{ background: "var(--bg-card)", border: "1px solid var(--card-border)", borderTop: "none", borderRadius: "0 0 8px 8px", padding: "0 16px 10px" }}>
             <PublishModeButtons
+              site={sites.find(x => x.id === site.id) ?? site}
+              onSaved={updated => setSites(s => s.map(x => x.id === updated.id ? updated : x))}
+              readOnly={onDoor}
+            />
+            <TopicModeButtons
               site={sites.find(x => x.id === site.id) ?? site}
               onSaved={updated => setSites(s => s.map(x => x.id === updated.id ? updated : x))}
               readOnly={onDoor}

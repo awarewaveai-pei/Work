@@ -20,8 +20,14 @@ export interface MarketingBrief {
 export const PUBLISH_MODES = ["human_review", "ai_review_auto"] as const;
 export type PublishMode = (typeof PUBLISH_MODES)[number];
 
+/** Who picks the month's topics (AUTO_CONTENT P9.2, B4): human_pick = a person approves; ai_pick = the schedule approves
+ *  what it just proposed. Independent of PublishMode (that one only governs publishing). Set the same way: its own PATCH field. */
+export const TOPIC_MODES = ["human_pick", "ai_pick"] as const;
+export type TopicMode = (typeof TOPIC_MODES)[number];
+
 export interface SiteContentDefaults {
   publishMode?: PublishMode;
+  topicMode?: TopicMode;
   language?: string;
   targetCountry?: string;
   imageModel?: string;
@@ -107,4 +113,9 @@ export function forbiddenTerms(d: SiteContentDefaults | undefined): string[] {
 /** Only the exact stored value turns auto publish on: missing, misspelt or any other value = human review. */
 export function autoPublishes(d: SiteContentDefaults | undefined): boolean {
   return d?.publishMode === "ai_review_auto";
+}
+
+/** Only the exact stored value lets the schedule approve its own proposals: missing, misspelt or any other value = a person picks. */
+export function aiPicksTopics(d: SiteContentDefaults | undefined): boolean {
+  return d?.topicMode === "ai_pick";
 }
