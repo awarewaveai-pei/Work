@@ -53,6 +53,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 import config
+import captions as caption_utils
 
 config.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 config.TEMP_DIR.mkdir(parents=True, exist_ok=True)
@@ -235,8 +236,19 @@ def generate_all_images(scenes: list) -> list:
 # ═══════════════════════════════════════════
 # STEP 3：Edge TTS 配音
 # ═══════════════════════════════════════════
-async def _tts(text: str, path: str, voice: str = ""):
-    await edge_tts.Communicate(text, voice or config.TTS_VOICE).save(path)
+async def _tts(text: str, path: str, voice: str = "") -> list:
+    """Edge TTS to `path`; returns sentence cues [{startMs,endMs,text}] relative to this clip (D11: script_tts).
+    stream() instead of save(): save() drops the SentenceBoundary events that carry the voice's own timing."""
+    comm = edge_tts.Communicate(text, voice or config.TTS_VOICE, boundary="SentenceBoundary")
+    cues = []
+    with open(path, "wb") as f:
+        async for chunk in comm.stream():
+            if chunk["type"] == "audio":
+                f.write(chunk["data"])
+            elif chunk["type"] == "SentenceBoundary":
+                start = chunk["offset"] // 10_000  # 100 ns ticks -> ms
+                cues.append({"startMs": start, "endMs": start + chunk["duration"] // 10_000, "text": chunk["text"]})
+    return cues
 
 
 def _tts_openai(text: str, path: str, model: str = "tts-1", voice: str = "alloy") -> None:
@@ -247,7 +259,9 @@ def _tts_openai(text: str, path: str, model: str = "tts-1", voice: str = "alloy"
         f.write(resp.content)
 
 
-def generate_audio(scenes: list, tts_provider: str = "edge", tts_voice: str = "") -> list:
+def generate_audio(scenes: list, tts_provider: str = "edge", tts_voice: str = "", cues_out: "list | None" = None) -> list:
+    """Returns the audio files. cues_out, when given, receives one cue list per scene (ms from the scene audio start):
+    Edge = the voice's own sentence times; OpenAI returns none, so cues are spread over the clip by character count."""
     print(f"\n[3/6] {tts_provider.upper()} TTS 生成配音...")
     # OpenAI TTS requested but OPENAI_API_KEY not set → graceful fallback to Edge TTS.
     if tts_provider == "openai" and not config.OPENAI_API_KEY:
@@ -263,8 +277,13 @@ def generate_audio(scenes: list, tts_provider: str = "edge", tts_voice: str = ""
             else:
                 model, voice_name = "tts-1", tts_voice or "alloy"
             _tts_openai(scene["narration"], path, model=model, voice=voice_name)
+            scene_cues = []
         else:
-            asyncio.run(_tts(scene["narration"], path, voice=tts_voice))
+            scene_cues = asyncio.run(_tts(scene["narration"], path, voice=tts_voice))
+        if cues_out is not None:
+            if not scene_cues:
+                scene_cues = caption_utils.proportional_cues(_split_narration(scene["narration"]), round(_audio_duration(path) * 1000))
+            cues_out.append(scene_cues)
         audio_files.append(path)
         print(f"   scene {scene['id']} done")
     return audio_files
@@ -696,9 +715,17 @@ def cleanup():
 # ═══════════════════════════════════════════
 # Render-only 入口（給 next-admin video/pipeline 積木呼叫）
 # ═══════════════════════════════════════════
+def _caption_result(sink: "dict | None", scene_cues: list, audio_files: list, intro_title: str, intro_duration: float) -> None:
+    """Fill sink with absolute cues + SRT/VTT for the finished video (same timeline in every ratio)."""
+    if sink is None:
+        return
+    cues = caption_utils.assemble(scene_cues, [_audio_duration(a) - 0.5 for a in audio_files], intro_duration if intro_title else 0.0)
+    sink.update({"cues": cues, "srt": caption_utils.to_srt(cues), "vtt": caption_utils.to_vtt(cues)})
+
+
 def render_video(scenes: list, visual_files: list, out_name: str,
                  tts_provider: str = "edge", tts_voice: str = "",
-                 intro_title: str = "", intro_duration: float = 3.0):
+                 intro_title: str = "", intro_duration: float = 3.0, caption_sink: "dict | None" = None):
     """只做合成：scenes(含 narration) + 已備妥的視覺素材 → 配音 → 合成 → 多尺寸輸出。
 
     visual_files 每項可為「靜圖（Flux）」或「實拍影片片段（Pexels B-roll）」，
@@ -713,7 +740,9 @@ def render_video(scenes: list, visual_files: list, out_name: str,
     out_dir = config.OUTPUT_DIR / safe_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    audio_files = generate_audio(scenes, tts_provider=tts_provider, tts_voice=tts_voice)
+    scene_cues = []
+    audio_files = generate_audio(scenes, tts_provider=tts_provider, tts_voice=tts_voice, cues_out=scene_cues)
+    _caption_result(caption_sink, scene_cues, audio_files, intro_title, intro_duration)
     base_video = compose_base_video(scenes, visual_files, audio_files, safe_name,
                                     intro_title=intro_title, intro_duration=intro_duration)
     output_files = export_all_formats(base_video, out_dir)
@@ -722,7 +751,7 @@ def render_video(scenes: list, visual_files: list, out_name: str,
 
 def render_video_multiformat(scenes: list, format_assets: dict, out_name: str,
                              tts_provider: str = "edge", tts_voice: str = "",
-                             intro_title: str = "", intro_duration: float = 3.0):
+                             intro_title: str = "", intro_duration: float = 3.0, caption_sink: "dict | None" = None):
     """多格式「原生」輸出：每個比例用『自己那組視覺素材』+『自己的目標尺寸』各跑一次 compose
     （per-scene cover-fit/zoompan 直接填滿目標比例）→ 無 export_all_formats 的 pad letterbox、無黑邊。
 
@@ -745,7 +774,9 @@ def render_video_multiformat(scenes: list, format_assets: dict, out_name: str,
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # 配音與比例無關 → 只生一次，三格式共用。
-    audio_files = generate_audio(scenes, tts_provider=tts_provider, tts_voice=tts_voice)
+    scene_cues = []
+    audio_files = generate_audio(scenes, tts_provider=tts_provider, tts_voice=tts_voice, cues_out=scene_cues)
+    _caption_result(caption_sink, scene_cues, audio_files, intro_title, intro_duration)
 
     outputs = {}
     for fmt in formats:

@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-28（續14）— 影片 V4.3／V4.6／V4.7：QA failed 不丟片、腳本字幕、字幕步驟依來源（Claude）— 待操作者 go-ahead 部署 video-service，未 push
+
+- **根因**：V4.3 `server.py` `_build_output_meta` 在 QA failed 時 raise，整支已付費的片被丟；V4.6 `pipeline._tts` 用 `.save()` 丟掉 Edge 的 `SentenceBoundary` 時間點 → 快速影片只能靠 Whisper（筆電）；V4.7 字幕步驟一律要 Whisper。
+- **做了**：V4.3 不再 raise（尺寸不符仍 raise＝壞片）；服務回片＋failed 報告，`finalize` 照記（新增測試）。V4.6 新 `captions.py`（純函式：assemble／proportional／SRT／VTT）；`_tts` 改 `stream()` 收句時間；OpenAI 無時間點 → 依字數分配；`render_video(_multiformat)` 新 `caption_sink`；`_do_render` 回 `caption_source=script_tts`＋`caption_cues`／`caption_srt`／`caption_vtt`；next-admin `render-client` 解析、`finalize` 逐比例列跑字幕 QA、`recordVideoAsset` 記 `metadata.captionSource／captionSrt／captionVtt`（實拍記 `transcription`）。V4.7 `CaptionsStep`：成片 `captionSource=script_tts` → 顯示 SRT／VTT 下載、不再要 Whisper。
+- **待操作者 go-ahead**：video-service 部署到 ks-aw-01（`pipeline.py`／`server.py`／新 `captions.py`）；部署前 next-admin 先上也安全（無 `caption_cues` 時行為不變），本 commit 仍照指示未 push。部署後在容器內跑 `python tests/test_output_meta_qa.py`、`tests/test_captions.py`，並做一支 Edge 配音快速影片確認 cues 數＝句數（本機 edge-tts 7.2.8 連線 403、無 ffmpeg／moviepy，跑不了）。
+- **未做（誠實）**：V4.7「字幕改完重燒」——燒字用 drawtext 已在渲染時烤進片，重燒需保留無字幕底片＋新 video-service 端點，超出卡片檔案範圍，建議另開卡；目前只能看／下載。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/content/video lib/content/blocks app/api/video`（next-admin）＋`npx tsc --noEmit`＋`python tests/test_captions.py` | exit=0 | ms=3000 | 52 files 224 passed；captions 4 OK
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/0n（m：video-service 的 ffmpeg 測試與 Edge 句時間本機未實跑，已列待部署後驗證）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=_build_output_meta|caption_sink|captionSource | hits=14（呼叫端 server.py footage 路徑不傳 sink，行為不變）
+- ORACLE_WAIVED: Codex 本輪不可用；書面自審：舊服務無 caption 欄位 → `poll.captions` undefined → 舊行為；Edge 無句邊界事件 → 依字數 fallback；cue 夾在場景長度內且遞增（captions 測試守）。
 ## 2026-10-28（續13）— 影片 V4.1／V4.2／V4.4／V4.5：一比例一成片、逐比例技術 QA、腳本與素材來源入成片（Claude）
 
 - **根因**：下游只認一列成片（D6）；成片沒存腳本（D8）→ 編輯 QA 永遠缺腳本；素材取得時沒記來源（D7）→ 版權 QA 結構上不可能通過。

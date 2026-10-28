@@ -260,9 +260,17 @@ export async function submitFootageRender(
   }
 }
 
+/** D11: present when the voice was produced from the script (captionSource "script_tts"); absent = no script captions. */
+export interface RenderCaptions {
+  source: "script_tts";
+  cues: { startMs: number; endMs: number; text: string }[];
+  srt: string;
+  vtt: string;
+}
+
 export type RenderPoll =
   | { status: "running" }
-  | { status: "done"; outputs: RenderOutputs; out_dir: string; outputMeta?: RenderOutputMeta; storage?: string }
+  | { status: "done"; outputs: RenderOutputs; out_dir: string; outputMeta?: RenderOutputMeta; storage?: string; captions?: RenderCaptions }
   | { status: "error"; error: string };
 
 /** 查一次 EU /job 狀態（單一短請求，給 /status 每輪呼叫；不阻塞、不輪詢）。 */
@@ -282,11 +290,18 @@ export async function pollRenderJob(jobId: string, baseUrl?: string): Promise<Re
       out_dir?: string;
       output_meta?: RenderOutputMeta;
       storage?: string;
+      caption_source?: string;
+      caption_cues?: RenderCaptions["cues"];
+      caption_srt?: string;
+      caption_vtt?: string;
       error?: string;
     };
     if (job.status === "done") {
       if (!job.outputs || typeof job.out_dir !== "string") return { status: "error", error: "render done 但缺 outputs/out_dir" };
-      return { status: "done", outputs: job.outputs, out_dir: job.out_dir, outputMeta: job.output_meta, storage: job.storage };
+      const captions = job.caption_source === "script_tts" && Array.isArray(job.caption_cues) && job.caption_cues.length > 0
+        ? { source: "script_tts" as const, cues: job.caption_cues, srt: job.caption_srt ?? "", vtt: job.caption_vtt ?? "" }
+        : undefined;
+      return { status: "done", outputs: job.outputs, out_dir: job.out_dir, outputMeta: job.output_meta, storage: job.storage, ...(captions ? { captions } : {}) };
     }
     if (job.status === "error") return { status: "error", error: job.error ?? "render 失敗" };
     return { status: "running" };

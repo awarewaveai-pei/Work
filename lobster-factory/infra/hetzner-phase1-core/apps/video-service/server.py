@@ -262,8 +262,8 @@ def _build_output_meta(outputs: dict) -> dict:
         item["technical_qa"] = qa
         signal_qa = evaluate_signal_quality(probe, _signal_probe(str(path), float((probe.get("format") or {}).get("duration") or 0)))
         item["signal_qa"] = signal_qa
-        if qa["status"] == "failed" or signal_qa["status"] == "failed":
-            raise RuntimeError(f"technical QA failed for output {fmt}")
+        # A failed QA report is returned with the video (next-admin records both and shows why); throwing here
+        # discarded a finished, paid-for render. Dimension mismatch above stays an exception: that is a broken render.
         meta[fmt] = item
     return meta
 
@@ -273,6 +273,7 @@ def _do_render(scenes, assets, out_name, tts_provider="edge", tts_voice="",
     """重活：序列化 materialize+render+R2 上傳。回 {outputs,out_dir,storage}。
     multiformat=True：assets 為 {fmt:[urls]}，每格式各 materialize 後走 render_video_multiformat
     （原生比例、無 pad）；False：assets 為單組，走舊 render_video（base+pad export）。"""
+    caption_sink: dict = {}
     with _render_lock:  # 序列化：materialize(下載)+render 全程獨佔 TEMP_DIR（防並行撞檔）
         try:
             if multiformat:
@@ -288,16 +289,20 @@ def _do_render(scenes, assets, out_name, tts_provider="edge", tts_voice="",
                 outputs, out_dir = pipeline.render_video_multiformat(
                     scenes, format_files, out_name,
                     tts_provider=tts_provider, tts_voice=tts_voice,
-                    intro_title=intro_title, intro_duration=intro_duration,
+                    intro_title=intro_title, intro_duration=intro_duration, caption_sink=caption_sink,
                 )
             else:
                 visual_files = [_materialize_asset(a, i) for i, a in enumerate(assets)]
                 outputs, _base, out_dir = pipeline.render_video(
                     scenes, visual_files, out_name,
                     tts_provider=tts_provider, tts_voice=tts_voice,
-                    intro_title=intro_title, intro_duration=intro_duration,
+                    intro_title=intro_title, intro_duration=intro_duration, caption_sink=caption_sink,
                 )
             output_meta = _build_output_meta(outputs)
+            # D11: the voice is ours (script TTS), so captions come from the script + voice timing, not Whisper.
+            caption_fields = ({"caption_source": "script_tts", "caption_cues": caption_sink["cues"],
+                               "caption_srt": caption_sink["srt"], "caption_vtt": caption_sink["vtt"]}
+                              if caption_sink.get("cues") else {})
             # 跨機：產出上傳 R2 → 回 public URL。未設 R2 = 本機路徑（dev）。
             if _r2_video_configured():
                 base_key = "video/" + os.path.basename(str(out_dir))
@@ -308,12 +313,13 @@ def _do_render(scenes, assets, out_name, tts_provider="edge", tts_voice="",
                             f"{base_key}/{fmt}.mp4", fh.read(), "video/mp4",
                             R2_VIDEO_BUCKET, R2_VIDEO_PUBLIC_BASE,
                         )
-                return {"outputs": urls, "out_dir": str(out_dir), "storage": "r2", "output_meta": output_meta}
+                return {"outputs": urls, "out_dir": str(out_dir), "storage": "r2", "output_meta": output_meta, **caption_fields}
             return {
                 "outputs": {k: str(v) for k, v in outputs.items()},
                 "out_dir": str(out_dir),
                 "storage": "local",
                 "output_meta": output_meta,
+                **caption_fields,
             }
         finally:
             pipeline.cleanup()

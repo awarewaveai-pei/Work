@@ -88,6 +88,10 @@ export async function finalizeVideoJob(job: VideoJob): Promise<FinalizeResult> {
             sceneCount: job.recordParams.sceneCount,
             script: job.recordParams.script,
             rightsSources: job.recordParams.rightsSources,
+            // D11: our own voice (script_tts) vs real footage audio (transcription); anything else records nothing.
+            captions: poll.captions
+              ? { source: "script_tts", srt: poll.captions.srt, vtt: poll.captions.vtt }
+              : job.recordParams.rendererKind === "footage" ? { source: "transcription" } : undefined,
             formats: job.recordParams.formats,
             visualBreakdown: job.recordParams.visualBreakdown,
             imageModel: job.recordParams.imageModel,
@@ -112,14 +116,19 @@ export async function finalizeVideoJob(job: VideoJob): Promise<FinalizeResult> {
                 outputMeta: poll.outputMeta?.[r.format] ? { [r.format]: poll.outputMeta[r.format] } : undefined,
               });
             }
-            if (job.recordParams.captionCues) {
+            // D11: script_tts renders bring their own cues (script + voice timing); the same timeline is on every ratio.
+            const captionCues = poll.captions?.cues ?? job.recordParams.captionCues;
+            if (captionCues) {
               const { persistAutomaticCaptionQa } = await import("@/lib/content/video/caption-qa-persistence");
-              await persistAutomaticCaptionQa({
-                organizationId: job.recordParams.organizationId,
-                candidateAssetId: asset.id,
-                candidateChecksum: asset.checksumSha256,
-                captions: job.recordParams.captionCues,
-              });
+              for (const r of asset.rows) {
+                if (!r.checksumSha256) continue;
+                await persistAutomaticCaptionQa({
+                  organizationId: job.recordParams.organizationId,
+                  candidateAssetId: r.id,
+                  candidateChecksum: r.checksumSha256,
+                  captions: captionCues,
+                });
+              }
             }
           }
         } catch (e) {

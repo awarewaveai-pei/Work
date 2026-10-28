@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-type Asset = { id: string; object_url: string; checksum_sha256?: string; metadata?: { title?: string }; created_at: string; asset_domain: string; mime_type?: string };
+type Asset = { id: string; object_url: string; checksum_sha256?: string; metadata?: { title?: string; captionSource?: "script_tts" | "transcription"; captionSrt?: string; captionVtt?: string }; created_at: string; asset_domain: string; mime_type?: string };
 type JobStatus = "idle" | "dispatched" | "polling" | "completed" | "failed";
 
 const card: React.CSSProperties = { background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 10, padding: 14 };
@@ -73,6 +73,12 @@ export default function CaptionsStep({ organizationId, onContinue }: { organizat
     }
   }
 
+  // D11: the voice of a quick video / short drama is ours, so its captions already come from the script + voice timing
+  // (burned into the video, SRT/VTT stored with it). Whisper is only for footage whose audio is a real recording.
+  const picked = assets.find((a) => a.id === assetId);
+  const scriptCaptions = picked?.metadata?.captionSource === "script_tts" ? picked.metadata : null;
+  const dl = (text: string) => `data:text/plain;charset=utf-8,${encodeURIComponent(text)}`;
+
   return (
     <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 14, maxWidth: 640 }}>
       <div>
@@ -89,8 +95,17 @@ export default function CaptionsStep({ organizationId, onContinue }: { organizat
             {assets.map((a) => <option key={a.id} value={a.id}>{a.metadata?.title ?? a.asset_domain} · {new Date(a.created_at).toLocaleString()} · {a.id.slice(0, 8)}</option>)}
           </select>
         </label>
-        <button type="button" disabled={!assetId || status !== "idle"} onClick={() => void dispatch()}
-          style={{ marginTop: 10, padding: "9px 14px", border: 0, borderRadius: 7, background: "var(--accent)", color: "var(--btn-primary-text)", fontWeight: 700, cursor: assetId && status === "idle" ? "pointer" : "not-allowed" }}>
+        {scriptCaptions && (
+          <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-primary)" }}>
+            <b>這支影片的字幕來自腳本和配音時間，已經燒在影片裡，不需要 Whisper。</b>
+            <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+              {scriptCaptions.captionSrt && <a href={dl(scriptCaptions.captionSrt)} download="captions.srt" style={{ color: "var(--accent-text)" }}>下載 SRT</a>}
+              {scriptCaptions.captionVtt && <a href={dl(scriptCaptions.captionVtt)} download="captions.vtt" style={{ color: "var(--accent-text)" }}>下載 VTT</a>}
+            </div>
+          </div>
+        )}
+        <button type="button" disabled={!assetId || status !== "idle" || !!scriptCaptions} onClick={() => void dispatch()}
+          style={{ marginTop: 10, padding: "9px 14px", border: 0, borderRadius: 7, background: "var(--accent)", color: "var(--btn-primary-text)", fontWeight: 700, cursor: assetId && status === "idle" && !scriptCaptions ? "pointer" : "not-allowed" }}>
           產生字幕（Whisper）
         </button>
       </div>

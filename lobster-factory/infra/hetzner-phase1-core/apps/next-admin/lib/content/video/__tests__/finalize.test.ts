@@ -19,6 +19,9 @@ vi.mock("@/lib/content/blocks/video-pipeline", () => ({ recordVideoAsset, cleanu
 const { persistAutomaticTechnicalQa } = vi.hoisted(() => ({ persistAutomaticTechnicalQa: vi.fn() }));
 vi.mock("@/lib/content/video/qa-persistence", () => ({ persistAutomaticTechnicalQa }));
 
+const { persistAutomaticCaptionQa } = vi.hoisted(() => ({ persistAutomaticCaptionQa: vi.fn() }));
+vi.mock("@/lib/content/video/caption-qa-persistence", () => ({ persistAutomaticCaptionQa }));
+
 const ORG = "11111111-1111-1111-1111-111111111111";
 
 const { finalizeVideoJob } = await import("../finalize");
@@ -35,7 +38,7 @@ const runningJob = (over: Partial<VideoJob> = {}): VideoJob => ({
 const OUT = { "16x9": "https://cdn.example/16x9.mp4" };
 
 beforeEach(() => {
-  for (const m of [persistAutomaticTechnicalQa, finishJob, pollRenderJob, recordVideoAsset, cleanupVideoInputKeys, pickPrimaryOutput]) m.mockReset();
+  for (const m of [persistAutomaticCaptionQa, persistAutomaticTechnicalQa, finishJob, pollRenderJob, recordVideoAsset, cleanupVideoInputKeys, pickPrimaryOutput]) m.mockReset();
   pickPrimaryOutput.mockReturnValue(OUT["16x9"]);
   recordVideoAsset.mockResolvedValue(null);
 });
@@ -84,5 +87,24 @@ describe("finalizeVideoJob", () => {
     expect(persistAutomaticTechnicalQa).toHaveBeenNthCalledWith(2, expect.objectContaining({
       candidateAssetId: "a2", candidateChecksum: "c2", outputs: { "9x16": out2["9x16"] }, outputMeta: { "9x16": meta["9x16"] },
     }));
+  });
+
+  it("script captions from the renderer: recorded as captionSource script_tts and caption QA runs per ratio", async () => {
+    const captions = { source: "script_tts", cues: [{ startMs: 0, endMs: 900, text: "hi" }], srt: "1\n", vtt: "WEBVTT\n" };
+    pollRenderJob.mockResolvedValue({ status: "done", outputs: OUT, out_dir: "x", outputMeta: { "16x9": { width: 1920, height: 1080 } }, captions });
+    recordVideoAsset.mockResolvedValue({ id: "a1", checksumSha256: "c1", rows: [{ format: "16x9", id: "a1", url: OUT["16x9"], checksumSha256: "c1" }] });
+    await finalizeVideoJob(runningJob());
+    expect(recordVideoAsset).toHaveBeenCalledWith(expect.objectContaining({ captions: { source: "script_tts", srt: "1\n", vtt: "WEBVTT\n" } }));
+    expect(persistAutomaticCaptionQa).toHaveBeenCalledWith(expect.objectContaining({ candidateAssetId: "a1", captions: captions.cues }));
+  });
+
+  it("a render whose technical QA failed is still recorded, with its failed report", async () => {
+    const meta = { "16x9": { width: 1920, height: 1080, technical_qa: { status: "failed" }, signal_qa: { status: "failed" } } };
+    pollRenderJob.mockResolvedValue({ status: "done", outputs: OUT, out_dir: "x", outputMeta: meta });
+    recordVideoAsset.mockResolvedValue({ id: "a1", checksumSha256: "c1", rows: [{ format: "16x9", id: "a1", url: OUT["16x9"], checksumSha256: "c1" }] });
+    const res = await finalizeVideoJob(runningJob());
+    expect(res).toMatchObject({ status: "done" });
+    expect(recordVideoAsset).toHaveBeenCalled();
+    expect(persistAutomaticTechnicalQa).toHaveBeenCalledWith(expect.objectContaining({ outputMeta: meta }));
   });
 });

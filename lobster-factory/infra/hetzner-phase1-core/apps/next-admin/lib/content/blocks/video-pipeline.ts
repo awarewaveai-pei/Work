@@ -171,6 +171,8 @@ export async function recordVideoAsset(params: {
   script?: string;
   /** D7: origin of every asset the video used; the rights QA reads metadata.rightsSources. */
   rightsSources?: RightsSource[];
+  /** D11: how the captions were made, with the SRT/VTT of script captions; the review step reads metadata.captionSource. */
+  captions?: { source: "script_tts" | "transcription"; srt?: string; vtt?: string };
   /**
    * True only for the caller that holds the REAL render metadata (/api/video/status,
    * which has recordParams: title, sceneCount, formats, visualBreakdown, imageModel).
@@ -232,6 +234,7 @@ export async function recordVideoAsset(params: {
         sceneCount: params.sceneCount,
         ...(params.script ? { script: params.script } : {}),
         ...(params.rightsSources ? { rightsSources: params.rightsSources } : {}),
+        ...(params.captions ? { captionSource: params.captions.source, captionSrt: params.captions.srt, captionVtt: params.captions.vtt } : {}),
         visualBreakdown: params.visualBreakdown,
         imageModel: params.imageModel,
         source: params.source,

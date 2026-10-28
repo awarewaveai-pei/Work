@@ -51,11 +51,12 @@ class OutputMetaQa(unittest.TestCase):
         qa = server._build_output_meta({self.fmt: path})[self.fmt]["signal_qa"]
         self.assertEqual(qa["status"], "warned")
 
-    def test_a_silent_output_is_refused(self):
+    def test_a_silent_output_is_reported_failed_not_raised(self):
         path = os.path.join(self.dir, "silent.mp4")
         _clip(path, self.w, self.h, "testsrc2", audio="anullsrc=r=48000:cl=stereo")
-        with self.assertRaises(RuntimeError):
-            server._build_output_meta({self.fmt: path})
+        item = server._build_output_meta({self.fmt: path})[self.fmt]
+        self.assertEqual(item["signal_qa"]["status"], "failed")
+        self.assertEqual(item["checksumSha256"], hashlib.sha256(open(path, "rb").read()).hexdigest())
 
 
 if __name__ == "__main__":
