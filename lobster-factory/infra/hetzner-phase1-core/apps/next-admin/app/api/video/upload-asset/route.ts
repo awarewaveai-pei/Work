@@ -5,7 +5,7 @@
  * 回傳的 URL 落在 render-draft 的 ALLOWED_HOSTS（R2 designs base），渲染時可直接用；
  * 並比照 Flux 暫存圖，於 EU 渲染完成後由 /status cleanupVideoInputKeys 清掉（designs/ 格式）。
  *
- * Form fields: file (File, 必填), oldImageUrl? (string — 替換時清舊圖)
+ * Form fields: file (File, 必填), rightsConfirmed ("true", 必填 — 沒勾「有權使用」回 400), oldImageUrl? (string — 替換時清舊圖)
  * 允許型別: image/png, image/jpeg, image/webp, video/mp4
  * Success: { ok: true, imageUrl, r2Key, kind: "image" | "video" }
  * Failure: { ok: false, error }
@@ -79,6 +79,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: `不支援的型別：${mime || "未知"}（僅 PNG/JPEG/WebP/MP4）` }, { status: 415 });
   }
 
+  // D7: no upload without the uploader stating they may use the file (the upload screen's checkbox sends this).
+  const rightsConfirmed = form.get("rightsConfirmed") === "true";
+  if (!rightsConfirmed) {
+    return NextResponse.json({ ok: false, error: "請先勾選「我有權使用這個素材」才能上傳" }, { status: 400 });
+  }
+
   const isVideo = mime === "video/mp4";
   const cap = isVideo ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
   if (file.size > cap) {
@@ -120,8 +126,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
   }
 
-  // D7: the uploader says whether they may use the file; recorded now and signed so the rights QA can read it later.
-  const rightsConfirmed = form.get("rightsConfirmed") === "true";
+  // D7: the statement is recorded now and signed so the rights QA can read it later.
   const origin = signOrigin(put.publicUrl, { kind: "upload", rightsConfirmed });
 
   // FootageEditor supplies an organization ID to make the uploaded source a
@@ -142,7 +147,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       mime_type: mime,
       byte_size: buf.byteLength,
       checksum_sha256: createHash("sha256").update(buf).digest("hex"),
-      metadata: { source: "footage_editor", original_name: file.name, ...(rightsConfirmed ? { rights_status: "cleared", license_ref: "uploader-confirmed", source_ref: put.publicUrl } : {}) },
+      metadata: { source: "footage_editor", original_name: file.name, rights_status: "cleared", license_ref: "uploader-confirmed", source_ref: put.publicUrl },
     }).select("id, checksum_sha256").single();
     if (asset.error || !asset.data) {
       try { const { deleteDesignObject } = await import("@/lib/storage/r2"); await deleteDesignObject(key); } catch { /* best effort cleanup */ }

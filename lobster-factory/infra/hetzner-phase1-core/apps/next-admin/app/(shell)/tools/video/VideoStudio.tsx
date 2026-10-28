@@ -10,6 +10,7 @@ import { resolveStylePrompt } from "@/app/(shell)/tools/tarot/cards";
 import { tabStyle, chipStyle } from "@/components/tools/panel-primitives";
 import TimelineValidationPanel from "./TimelineValidationPanel";
 import FootageEditor from "./FootageEditor";
+import RightsCheckbox from "./RightsCheckbox";
 import ReleaseDeliveryPanel from "./ReleaseDeliveryPanel";
 import MediaOperationsPanel from "./MediaOperationsPanel";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
@@ -567,8 +568,8 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
       const fd = new FormData();
       fd.append("file", file);
       fd.append("oldImageUrl", scene.imageUrl);
-      // D7: rights are recorded at upload. OK = "I may use this"; Cancel still uploads, but the rights check will fail.
-      fd.append("rightsConfirmed", String(window.confirm("這個素材是你自己的，或你有權使用嗎？\n按「確定」＝有權使用；按「取消」＝仍會上傳，但版權檢查會顯示未通過。")));
+      // D7: the upload buttons are enabled only after the rights checkbox is ticked (DraftEditor); the server refuses without it.
+      fd.append("rightsConfirmed", "true");
       const res = await fetch("/api/video/upload-asset", { method: "POST", body: fd });
       const j = (await res.json()) as { ok: boolean; imageUrl?: string; origin?: unknown; error?: string };
       if (j.ok && j.imageUrl) {
@@ -1341,6 +1342,7 @@ function DraftEditor({
 }) {
   // 有任何單張重生進行中 → 鎖住「返回 / 送出渲染」，避免送出時用到尚未更新的舊圖（per-scene 重生鈕仍各自獨立）。
   const flowBlocked = disabled || regenIds.size > 0;
+  const [rightsOk, setRightsOk] = useState(false);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -1364,6 +1366,8 @@ function DraftEditor({
           })}
         </div>
       )}
+
+      <RightsCheckbox checked={rightsOk} onChange={setRightsOk} />
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 520, overflowY: "auto" }}>
         {scenes.map((scene, idx) => (
@@ -1397,17 +1401,17 @@ function DraftEditor({
                 }}>
                 {regenIds.has(scene.id) ? "⏳ 生成中" : "🔄 重新生成"}
               </button>
-              <label title="上傳自己的圖片或影片（PNG / JPEG / WebP / MP4）"
+              <label title={rightsOk ? "上傳自己的圖片或影片（PNG / JPEG / WebP / MP4）" : "先勾選上方「有權使用」才能上傳"}
                 style={{
                   width: "100%", padding: "4px 0", borderRadius: 6, fontSize: 11, fontWeight: 600, textAlign: "center",
                   boxSizing: "border-box", border: "1px solid var(--border-subtle)",
-                  background: (disabled || regenIds.has(scene.id)) ? "var(--border-subtle)" : "var(--bg-canvas)",
-                  color: (disabled || regenIds.has(scene.id)) ? "var(--text-muted)" : "var(--text-secondary)",
-                  cursor: (disabled || regenIds.has(scene.id)) ? "not-allowed" : "pointer",
+                  background: (disabled || regenIds.has(scene.id) || !rightsOk) ? "var(--border-subtle)" : "var(--bg-canvas)",
+                  color: (disabled || regenIds.has(scene.id) || !rightsOk) ? "var(--text-muted)" : "var(--text-secondary)",
+                  cursor: (disabled || regenIds.has(scene.id) || !rightsOk) ? "not-allowed" : "pointer",
                 }}>
                 ⬆️ 上傳
                 <input type="file" accept="image/png,image/jpeg,image/webp,video/mp4"
-                  disabled={disabled || regenIds.has(scene.id)} style={{ display: "none" }}
+                  disabled={disabled || regenIds.has(scene.id) || !rightsOk} style={{ display: "none" }}
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(scene.id, f); e.target.value = ""; }} />
               </label>
             </div>

@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-28（續21）— 影片 V4.9：上傳素材「有權使用」改成勾選框，沒勾不能上傳（Claude）
+
+- **根因**：D7 的權利聲明靠 `window.confirm`，按「取消」仍會上傳（只是版權 QA 之後變紅），聲明不是上傳的條件；FootageEditor 的上傳根本不送聲明。
+- **做了**：新 `RightsCheckbox.tsx`；草稿審核（`VideoStudio` DraftEditor）與 FootageEditor 沒勾時上傳鍵停用、送 `rightsConfirmed=true`；`upload-asset` 伺服器沒收到 `rightsConfirmed=true` 回 400、不寫 R2（守衛在讀檔之前），metadata 一律記 `rights_status: cleared`。同時加 §7 V4.8／V4.9 卡與監工台項目。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run app/api/video lib/content/video "app/(shell)/tools/video" lib/content/blocks`（next-admin）＋`npx tsc --noEmit` | exit=0 | ms=3586 | 54 files 229 passed；tsc 本卡檔案 0 錯（`.next/types` 的 calendar 缺檔為別 session 的既有錯）
+- 突變（同意守衛，一次）：`upload-asset/route.ts` 的 `if (!rightsConfirmed)` 改成 `if (false && …)` → `upload-asset/route.test.ts`「沒勾不上傳」變紅（1 failed）；還原變綠（2 passed）。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=rightsConfirmed | hits=8（呼叫端只有 VideoStudio 與 FootageEditor，皆已送；`asset-origin`／`editorial-rights-qa` 讀簽章來源不受影響）
+- ORACLE_WAIVED: Codex 本輪不可用；書面自審：守衛在任何 R2 寫入之前；舊前端（不送欄位）會得到 400 而非靜默通過——兩個呼叫端同 commit 更新，無其他呼叫者。
+- **Rollback**：`git revert <此 commit>`。
 ## 2026-10-28（續20）
 
 ### next-admin 部署閘：9 條失敗測試修好（P9 造成 4、別人 5）

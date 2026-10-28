@@ -105,6 +105,8 @@
 | V4.5 | `NA/lib/content/blocks/video-pipeline.ts:300-370`、`NA/app/api/video/upload-asset/route.ts:131`、`NA/app/api/video/qa/editorial-rights/route.ts:57-82`、`NA/lib/content/video/editorial-rights-qa.ts` | D7：取得素材當下記來源（AI＝模型＋供應商、Pexels＝License＋原網址、上傳＝上傳者勾「有權使用」）；版權 QA 讀它 | 測試：三種來源各一 → passed；上傳未勾 → failed |
 | V4.6 | `apps/video-service/pipeline.py:237-238,351-366`；`NA/lib/content/video/finalize.ts:101-108` | D11：Edge 用 `stream()`＋`SubMaker` 產每句時間；OpenAI 用每場比例時間；回傳 `captionCues`＋SRT/VTT；沿用 `persistAutomaticCaptionQa`；metadata 記 `captionSource` | video-service 測試：Edge 回 cues 數＝句數；字幕 QA passed |
 | V4.7 | `V/CaptionsStep.tsx` | ⑦ 讀 `captionSource`：script_tts＝顯示並可改字幕（改完重燒）；transcription＝Whisper | 瀏覽器：快速影片不再要 Whisper |
+| V4.8 | `apps/video-service/pipeline.py`（`render_video_multiformat`、`burn_script_captions`）、`server.py`（`/reburn-captions`）、`NA/app/api/video/captions/reburn/route.ts`、`V/CaptionsStep.tsx`、`NA/lib/content/video/render-client.ts` | 渲染時保留無字幕底片（R2 `videoclean/`，不放 `video/`＝對帳掃描不會當成第二支）；⑦ 逐句改字幕→重燒每個比例，覆寫同一 key、重算 checksum、字幕／技術 QA 對新 checksum 重跑；已建 Release 的影片不給重燒（Release 釘 checksum）。video-service 部署後才能用 | `test_caption_reburn.py`（底片來源與輸出 key 只收自家路徑）、`captions/reburn/route.test.ts`（跨租戶 403、有 Release 409、done 後 QA 釘新 checksum） |
+| V4.9 | `NA/app/api/video/upload-asset/route.ts`、`V/VideoStudio.tsx`（草稿審核）、`V/FootageEditor.tsx`、新 `V/RightsCheckbox.tsx` | D7：「有權使用」改成上傳畫面上的勾選框，沒勾不能上傳（取代 `window.confirm`）；伺服器沒收到 `rightsConfirmed=true` 一律 400、不寫 R2 | `upload-asset/route.test.ts`；突變：拔伺服器守衛→測試紅→還原綠 |
 
 ### V5 發布（依賴：V4）
 | 卡 | 檔案 | 做什麼 | 驗收 |

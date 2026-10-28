@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import OrganizationPicker from "./OrganizationPicker";
+import RightsCheckbox from "./RightsCheckbox";
 
 type Clip = {
   id: string;
@@ -23,6 +24,7 @@ export default function FootageEditor({ initialOrganizationId, projectId, onRend
   const [clips, setClips] = useState<Clip[]>([]);
   const [organizationId, setOrganizationId] = useState(initialOrganizationId ?? "");
   const [busy, setBusy] = useState(false);
+  const [rightsOk, setRightsOk] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [compiledTimeline, setCompiledTimeline] = useState<Record<string, unknown> | null>(null);
@@ -42,7 +44,7 @@ export default function FootageEditor({ initialOrganizationId, projectId, onRend
     setBusy(true); setError("");
     try {
       if (!organizationId.trim()) throw new Error("請先填入 organization UUID，素材才會登錄到正式資產庫");
-      const fd = new FormData(); fd.append("file", file); if (organizationId.trim()) fd.append("organizationId", organizationId.trim());
+      const fd = new FormData(); fd.append("file", file); fd.append("rightsConfirmed", "true"); if (organizationId.trim()) fd.append("organizationId", organizationId.trim());
       const res = await fetch("/api/video/upload-asset", { method: "POST", body: fd });
       const json = await res.json() as { ok: boolean; imageUrl?: string; r2Key?: string; assetId?: string; error?: string };
       if (!res.ok || !json.ok || !json.imageUrl || !json.r2Key) throw new Error(json.error ?? "素材上傳失敗");
@@ -95,9 +97,10 @@ export default function FootageEditor({ initialOrganizationId, projectId, onRend
     </div>
     <div style={{ ...card, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
       {!projectId && <label style={{ fontSize: 12, color: "var(--text-secondary)", flex: "1 1 280px" }}>租戶<div style={{ marginTop: 5 }}><OrganizationPicker value={organizationId} onChange={(id) => { setOrganizationId(id); setCompiledTimeline(null); }} /></div></label>}
-      <label style={{ padding: "8px 12px", borderRadius: 7, background: "var(--accent)", color: "var(--btn-primary-text)", fontSize: 12, fontWeight: 700, cursor: busy ? "wait" : "pointer" }}>
+      <RightsCheckbox checked={rightsOk} onChange={setRightsOk} />
+      <label style={{ padding: "8px 12px", borderRadius: 7, background: "var(--accent)", color: "var(--btn-primary-text)", fontSize: 12, fontWeight: 700, cursor: busy ? "wait" : rightsOk ? "pointer" : "not-allowed", opacity: rightsOk ? 1 : 0.5 }}>
         {busy ? "上傳中…" : "＋ 匯入 MP4"}
-        <input type="file" accept="video/mp4" hidden disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.currentTarget.value = ""; }} />
+        <input type="file" accept="video/mp4" hidden disabled={busy || !rightsOk} onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.currentTarget.value = ""; }} />
       </label>
       <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Frame rate <input type="number" min={1} max={120} value={frameRate} onChange={(e) => setFrameRate(Math.min(120, Math.max(1, Number(e.target.value) || 30)))} style={{ ...input, width: 64, marginLeft: 5 }} /></label>
     </div>

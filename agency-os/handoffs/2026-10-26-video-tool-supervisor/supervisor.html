@@ -78,11 +78,11 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
 <aside><div class="in">
   <h1>影片工具重新設計 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-10-28</span></p>
-  <div class="bar" data-computed><i class="d" style="width:57.14285714285714%"></i><i class="g" style="width:0%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>階段與卡片</span><small><span data-computed>4</span>／<span data-computed>7</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:42.857142857142854%"></i><i class="g" style="width:14.285714285714285%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>階段與卡片</span><small><span data-computed>3</span>／<span data-computed>7</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
-<p class="sub">一支影片＝一個專案：客戶只選一次、關頁不丟、做完有結果頁，可選每步參與、④後自動或題目頁全自動。共 <span data-computed>7</span> 個階段、<span data-computed>25</span> 張卡，已完成 <span data-computed>19</span> 張。</p>
+<p class="sub">一支影片＝一個專案：客戶只選一次、關頁不丟、做完有結果頁，可選每步參與、④後自動或題目頁全自動。共 <span data-computed>7</span> 個階段、<span data-computed>27</span> 張卡，已完成 <span data-computed>19</span> 張。</p>
 <section id="now"><h2>現況</h2><p class="lead">已上線的修正，和還不能用的。</p><ul class="yn"><li class="yes"><b>可以</b><span>技術 QA 不再把正常影片判成黑畫面<small>video-service 2026-10-26 已部署（40d4cd4e1）；正式容器內測試 8 OK</small></span></li><li class="yes"><b>可以</b><span>QA 沒通過會顯示中文原因<small>next-admin 2026-10-27 自動部署（40d4cd4e1）</small></span></li><li class="yes"><b>可以</b><span>重新生成真的換圖、每個比例都換<small>同上；圖庫素材會排除舊的那張</small></span></li><li class="yes"><b>可以</b><span>動態預覽可捲動、有關閉鍵<small>同上；尚待你在正式站看一眼</small></span></li><li class="no"><b>還不行</b><span>字幕（Whisper）<small>主機設定已加（d62a2eee5），但字幕服務在筆電上，筆電沒開就不能用；快速影片改用腳本產字幕是 V4.6</small></span></li><li class="yes"><b>可以</b><span>客戶只選一次、關頁不丟<small>V1 已推上 main（8e8f30c27），2026-10-29 台灣 03:00 自動部署後生效；資料庫 0138 已套用</small></span></li><li class="yes"><b>可以</b><span>看成片的結果頁<small>V2 已推上 main（3459e3b32）：側欄 Video Projects；2026-10-29 台灣 03:00 部署後生效</small></span></li><li class="no"><b>還不行</b><span>QA 四項能全部通過、能建 Release<small>V4；正式庫 Release 史上 0 筆</small></span></li><li class="no"><b>還不行</b><span>發布不用填 JSON<small>V5</small></span></li><li class="no"><b>還不行</b><span>④ 後自動完成<small>V6</small></span></li></ul></section>
 
 <section id="steps"><h2>階段與卡片</h2><p class="lead">依編號做；同組的階段改不同檔案，可同時做。風險 High 的卡套正式機前停下等你點頭。</p><ol class="steps"><li class="grp">可同時做：<a href="#V1">V1</a>、<a href="#V3">V3</a></li><li class="step done" id="V1">
@@ -127,13 +127,13 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
         <p><b>做法：</b><code>agency-os/docs/video_generator/VIDEO_TOOL_REDESIGN_2026-10-26.md §7 V2</code></p>
         <p><b>完成於：</b><code>3459e3b32</code></p>
       </details>
-    </div></li><li class="step done" id="V4">
+    </div></li><li class="step doing" id="V4">
     <div class="n">4</div>
     <div class="b">
       <p class="plain">每個比例各算一支成片；腳本、素材授權、字幕在做影片當下記好，四項 QA 才有可能全過。</p>
-      <p class="meta"><span class="pill st-done">已完成</span><span class="pill risk-med">風險 Medium（含 video-service 部署）</span><span class="who">建議模型：Opus 5.5</span><span class="who wait">程式已 commit 未 push；video-service 部署等操作者 go-ahead，部署後在容器內跑測試並做一支 Edge 配音影片驗字幕句數</span></p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-med">風險 Medium（含 video-service 部署）</span><span class="who">建議模型：Opus 5.5</span><span class="who wait">程式已 commit 未 push；video-service 部署等操作者 go-ahead，部署後在容器內跑測試並做一支 Edge 配音影片驗字幕句數</span></p>
       <p class="donewhen"><b>完成的樣子：</b>一支 AI 生圖影片 QA 四項全綠</p>
-      <ul class="items"><li class="done"><b>✓</b><span><code>V4.1</code> 每個比例存成一筆影片紀錄，清單只顯示一支；刪除時一起處理 <small>完成於 <code>1a67f0052</code></small></span></li><li class="done"><b>✓</b><span><code>V4.2</code> 技術 QA 每個比例各一份 <small>完成於 <code>1a67f0052</code></small></span></li><li class="done"><b>✓</b><span><code>V4.3</code> 技術 QA 沒過時也保留影片和原因，不整支丟掉 <small>完成於 <code>9fff275e6</code></small></span></li><li class="done"><b>✓</b><span><code>V4.4</code> 做影片時把腳本存進紀錄，編輯 QA 才找得到 <small>完成於 <code>1a67f0052</code></small></span></li><li class="done"><b>✓</b><span><code>V4.5</code> 取得素材當下記來源：AI 生圖、圖庫、自己上傳（上傳要勾「有權使用」） <small>完成於 <code>1a67f0052</code></small></span></li><li class="done"><b>✓</b><span><code>V4.6</code> 快速影片字幕用腳本＋配音時間點產生，不用筆電 <small>完成於 <code>9fff275e6</code></small></span></li><li class="done"><b>✓</b><span><code>V4.7</code> 字幕步驟依影片種類自動選做法；快速影片顯示並可下載字幕（改字幕後重燒尚未做，需另開卡） <small>完成於 <code>9fff275e6</code></small></span></li></ul>
+      <ul class="items"><li class="done"><b>✓</b><span><code>V4.1</code> 每個比例存成一筆影片紀錄，清單只顯示一支；刪除時一起處理 <small>完成於 <code>1a67f0052</code></small></span></li><li class="done"><b>✓</b><span><code>V4.2</code> 技術 QA 每個比例各一份 <small>完成於 <code>1a67f0052</code></small></span></li><li class="done"><b>✓</b><span><code>V4.3</code> 技術 QA 沒過時也保留影片和原因，不整支丟掉 <small>完成於 <code>9fff275e6</code></small></span></li><li class="done"><b>✓</b><span><code>V4.4</code> 做影片時把腳本存進紀錄，編輯 QA 才找得到 <small>完成於 <code>1a67f0052</code></small></span></li><li class="done"><b>✓</b><span><code>V4.5</code> 取得素材當下記來源：AI 生圖、圖庫、自己上傳（上傳要勾「有權使用」） <small>完成於 <code>1a67f0052</code></small></span></li><li class="done"><b>✓</b><span><code>V4.6</code> 快速影片字幕用腳本＋配音時間點產生，不用筆電 <small>完成於 <code>9fff275e6</code></small></span></li><li class="done"><b>✓</b><span><code>V4.7</code> 字幕步驟依影片種類自動選做法；快速影片顯示並可下載字幕 <small>完成於 <code>9fff275e6</code></small></span></li><li class="todo"><b>○</b><span><code>V4.8</code> 改字幕後重燒：渲染時留一份無字幕底片，⑦ 逐句改字幕按「重燒字幕」，每個比例重做、品質檢查重跑</span></li><li class="todo"><b>○</b><span><code>V4.9</code> 上傳素材的「有權使用」改成上傳畫面上的勾選框，沒勾不能上傳；伺服器也擋</span></li></ul>
       <details><summary>工程細節：V4 QA 真能通過</summary>
         <p>一比例一列 media_assets；技術 QA 逐比例、failed 也入庫；metadata 記腳本與素材來源；Edge 配音時間點產字幕</p>
         <p><b>要先完成：</b><a href="#V1">V1</a></p>
