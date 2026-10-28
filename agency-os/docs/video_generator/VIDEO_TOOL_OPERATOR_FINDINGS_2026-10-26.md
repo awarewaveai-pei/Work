@@ -56,8 +56,7 @@
 
 - 已修（repo）：S14 黑畫面參數、M1 預覽視窗、S12 QA 未通過顯示原因（含字幕 QA `violations`）、M7／M8 重新生成與上傳改到每個比例、S11 compose 傳入 `MEDIA_TRANSCRIBE_*`。
 - 上線：video-service（黑畫面）與主機 compose（`MEDIA_TRANSCRIBE_*`）2026-10-26 14:47–14:52Z 已套用（操作者 go-ahead，WORKLOG 同日續21）；next-admin 程式隨 2026-10-27 03:00 自動部署；Whisper worker 仍需筆電開著（tunnel 530＝未開）。
-- 新發現、未修：技術 QA 判 `failed`（如音量 −35 LUFS，`apps/video-service/quality.py:83-84`）時 worker 在 `server.py:263` 拋錯，`NA/lib/content/video/finalize.ts:101-108` 只在成功時寫 QA → 失敗原因不會進 QA 頁（Codex 審查 2026-10-26）。歸 [`VIDEO_TOOL_REDESIGN_2026-10-26.md`](VIDEO_TOOL_REDESIGN_2026-10-26.md) V4.3。
-- 其餘（S5、S6、M9、M10、S13、S16、M17、腳本頁問題）＝重新設計範圍，見 [`VIDEO_TOOL_REDESIGN_2026-10-26.md`](VIDEO_TOOL_REDESIGN_2026-10-26.md)。
+- 2026-10-28 現況：重新設計 §7 的 27 張卡全數完成（[`VIDEO_TOOL_REDESIGN_2026-10-26.md`](VIDEO_TOOL_REDESIGN_2026-10-26.md)，含 V4.3 技術 QA failed 不再丟掉成片）；S5、S6、M9、M10、S13、S16、M17（成效改在專案頁，有資料才顯示）、m4（腳本頁兩處加說明）均已處理。唯一未上線：video-service 重燒改寫新網址（本機 commit，待操作者 go-ahead 部署）。
 
 ## 操作者已表態的需求（討論輸入，未定案）
 1. 每步可參與很好，但要「真的能編輯」；④ 要能選「接下來我參與」或「全自動到底」。

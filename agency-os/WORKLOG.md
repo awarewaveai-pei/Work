@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-28（續31）— 影片收尾 C＋D：腳本頁兩處平台說明（m4）、findings／redesign 過時句更新（Claude）
+
+- **C 根因**：findings m4——頂部「目標平台」與底部「多平台轉換」畫面沒說差異。**做法**：`ScriptForge.tsx` `PlatGrid`（所有模組共用的主平台選擇）加一行「寫這支腳本時的主平台…寫完後可用結果頁的『多平台轉換』」；`ScriptResult` 的「🔄 多平台轉換」標題下加一行「另改成其他平台版本（原版保留…點選的那版用來送出）」。改共用元件＝每個模組一次到位，不逐模組補。
+- **D**：findings「處理狀態」改成 2026-10-28 現況一行；redesign 檔三處過時句（狀態行「設計草案」、D5 成效分頁、V4.8 覆寫同 key）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run script-forge ScriptForge＋`npx tsc --noEmit`（非 .next 錯誤 0） | exit=0 | ms=40000。畫面未目視（純文字一行，無新邏輯）。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=目標平台 | hits=8（ScriptForge 內 PlatGrid 呼叫處皆走同一元件；ContentStudio 的「目標平台 / 尺寸」是另一頁，不在 m4 範圍）
+- ORACLE_WAIVED: Codex 本輪不可用；文案與文件，無資料路徑。
+- **Rollback**：`git revert <此 commit>`。
 ## 2026-10-28（續30）— 影片收尾 B：專案頁加「成效」區，有資料才顯示（Claude）
 
 - **根因**：D5 定「營運不再是步驟」，但成效（`media_outcome_snapshots`，webhook `api/webhooks/video-outcome` 寫入）只有 `api/video/outcomes` 一支儀表板 API，專案頁看不到。

@@ -1,6 +1,6 @@
 # 影片工具重新設計 — 2026-10-26
 
-狀態：**設計草案，待操作者看過**。問題清單＝[`VIDEO_TOOL_OPERATOR_FINDINGS_2026-10-26.md`](VIDEO_TOOL_OPERATOR_FINDINGS_2026-10-26.md)；本檔＝怎麼改。前案 [`VIDEO_WORKBENCH_UX_RECONCILIATION_AUDIT_2026-09-10.md`](VIDEO_WORKBENCH_UX_RECONCILIATION_AUDIT_2026-09-10.md) 的「Required IA」與驗收閘照收，本檔把它落到操作者 2026-10-26 的三種自動化程度。
+狀態：**§7 27 卡已完成（2026-10-28）**；video-service 重燒新網址待部署。問題清單＝[`VIDEO_TOOL_OPERATOR_FINDINGS_2026-10-26.md`](VIDEO_TOOL_OPERATOR_FINDINGS_2026-10-26.md)；本檔＝怎麼改。前案 [`VIDEO_WORKBENCH_UX_RECONCILIATION_AUDIT_2026-09-10.md`](VIDEO_WORKBENCH_UX_RECONCILIATION_AUDIT_2026-09-10.md) 的「Required IA」與驗收閘照收，本檔把它落到操作者 2026-10-26 的三種自動化程度。
 路徑縮寫：`NA/` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`，`DB/` = `lobster-factory/packages/db/`。
 
 ## 0. 決策
@@ -11,7 +11,7 @@
 | D2 | **三種自動化程度＝專案的一個欄位** `autonomy`：`guided`（每步參與）／`auto_after_render`（④ 之後自動）／`full_auto`（題目頁批量） | 操作者 2026-10-26 定義的三級 |
 | D3 | **全自動不另建**：就是既有題目頁 `/tools/content/topics`（formats 勾 🎬）＋排程管線（AUTO_CONTENT P6／P7 已上線：`NA/lib/content/video/start.ts`、`finalize.ts`）。唯一新增：管線開影片時同時建專案列，讓手動與自動的影片在同一個清單看得到 | 零重工；`AUTO_CONTENT_EXECUTION_PLAN.md` I3／I4 已定一個時鐘、一個 finalize |
 | D4 | **頁面分工**：`/tools/script-forge`＝寫（24 模組，唯一一份）；`/tools/video`＝做（專案）。影片頁第 1 步不再內嵌 24 模組，改「腳本從哪來」：腳本頁送來／腳本歷史／題目或文章／去腳本頁寫 | 兩頁不重複；寫跟做是兩種工作 |
-| D5 | **使用者看到 5 步**：① 腳本 → ② 設定與費用 → ③ 生成與修圖 → ④ 審片（字幕＋QA 同一頁）→ ⑤ 發布。Timeline 驗證、營運不再是步驟：Timeline 進「進階證據」；成效進專案頁的分頁，有資料才顯示 | 現在 10 步裡 3 步是空殼或假步驟（⑤ 自動放行、⑦ 永遠 503、⑩ 0 筆） |
+| D5 | **使用者看到 5 步**：① 腳本 → ② 設定與費用 → ③ 生成與修圖 → ④ 審片（字幕＋QA 同一頁）→ ⑤ 發布。Timeline 驗證、營運不再是步驟：Timeline 進「進階證據」；成效進專案頁的「成效」區，有資料才顯示（已做） | 現在 10 步裡 3 步是空殼或假步驟（⑤ 自動放行、⑦ 永遠 503、⑩ 0 筆） |
 | D6 | **一個比例＝一個成片**（一列 `media_assets`、各自 checksum）；QA、Release、交付都以「成片」為單位；平台自動對比例：9:16→Reels／TikTok／Shorts，4:5→IG／FB 動態，16:9→YouTube／網站 | 現在兩比例都有做出來，但下游只認 16:9（findings M9） |
 | D7 | **權利在取得素材當下記錄，不事後補**：AI 生圖＝自產（記模型與供應商）、Pexels＝Pexels License＋原始網址、使用者上傳＝上傳時勾「我有權使用」。版權 QA 讀這些紀錄 | 版權 QA 現在結構上不可能通過；也不能為了通過而假標 cleared（偵測器閉嘴＝最惡樣態） |
 | D8 | **編輯 QA 讀專案的腳本**（渲染時腳本寫進成片 metadata） | 現在成片沒存腳本 → 永遠「缺腳本」 |
@@ -105,7 +105,7 @@
 | V4.5 | `NA/lib/content/blocks/video-pipeline.ts:300-370`、`NA/app/api/video/upload-asset/route.ts:131`、`NA/app/api/video/qa/editorial-rights/route.ts:57-82`、`NA/lib/content/video/editorial-rights-qa.ts` | D7：取得素材當下記來源（AI＝模型＋供應商、Pexels＝License＋原網址、上傳＝上傳者勾「有權使用」）；版權 QA 讀它 | 測試：三種來源各一 → passed；上傳未勾 → failed |
 | V4.6 | `apps/video-service/pipeline.py:237-238,351-366`；`NA/lib/content/video/finalize.ts:101-108` | D11：Edge 用 `stream()`＋`SubMaker` 產每句時間；OpenAI 用每場比例時間；回傳 `captionCues`＋SRT/VTT；沿用 `persistAutomaticCaptionQa`；metadata 記 `captionSource` | video-service 測試：Edge 回 cues 數＝句數；字幕 QA passed |
 | V4.7 | `V/CaptionsStep.tsx` | ⑦ 讀 `captionSource`：script_tts＝顯示並可改字幕（改完重燒）；transcription＝Whisper | 瀏覽器：快速影片不再要 Whisper |
-| V4.8 | `apps/video-service/pipeline.py`（`render_video_multiformat`、`burn_script_captions`）、`server.py`（`/reburn-captions`）、`NA/app/api/video/captions/reburn/route.ts`、`V/CaptionsStep.tsx`、`NA/lib/content/video/render-client.ts` | 渲染時保留無字幕底片（R2 `videoclean/`，不放 `video/`＝對帳掃描不會當成第二支）；⑦ 逐句改字幕→重燒每個比例，覆寫同一 key、重算 checksum、字幕／技術 QA 對新 checksum 重跑；已建 Release 的影片不給重燒（Release 釘 checksum）。video-service 部署後才能用 | `test_caption_reburn.py`（底片來源與輸出 key 只收自家路徑）、`captions/reburn/route.test.ts`（跨租戶 403、有 Release 409、done 後 QA 釘新 checksum） |
+| V4.8 | `apps/video-service/pipeline.py`（`render_video_multiformat`、`burn_script_captions`）、`server.py`（`/reburn-captions`）、`NA/app/api/video/captions/reburn/route.ts`、`V/CaptionsStep.tsx`、`NA/lib/content/video/render-client.ts` | 渲染時保留無字幕底片（R2 `videoclean/`，不放 `video/`＝對帳掃描不會當成第二支）；⑦ 逐句改字幕→重燒每個比例，寫到新網址 `videorev/<dir>/<rev>/<fmt>.mp4`（舊檔不動；列的 object_key 不變、只換 object_url 與主列 formats）、重算 checksum、字幕／技術 QA 對新 checksum 重跑；已建 Release 的影片不給重燒（Release 釘 checksum）。video-service 部署後才能用 | `test_caption_reburn.py`（底片來源與輸出 key 只收自家路徑）、`captions/reburn/route.test.ts`（跨租戶 403、有 Release 409、done 後 QA 釘新 checksum） |
 | V4.9 | `NA/app/api/video/upload-asset/route.ts`、`V/VideoStudio.tsx`（草稿審核）、`V/FootageEditor.tsx`、新 `V/RightsCheckbox.tsx` | D7：「有權使用」改成上傳畫面上的勾選框，沒勾不能上傳（取代 `window.confirm`）；伺服器沒收到 `rightsConfirmed=true` 一律 400、不寫 R2 | `upload-asset/route.test.ts`；突變：拔伺服器守衛→測試紅→還原綠 |
 
 ### V5 發布（依賴：V4）
