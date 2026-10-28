@@ -389,6 +389,11 @@ export async function runTrending(geo: string, extraBlocks: ContentBlock<Trendin
     ...byKind<TrendingItem[]>("search"),
     ...extraBlocks.filter(b => b.enabled !== false),
   ].filter(b => geoMatch(b, geo));
+  return runBlocks(blocks, geo);
+}
+
+/** Runs these blocks for one geo; a block that throws or returns a non-array adds nothing. */
+export async function runBlocks(blocks: ContentBlock<TrendingItem[]>[], geo: string): Promise<TrendingItem[]> {
   const settled = await Promise.allSettled(blocks.map(b => b.run({ geo })));
   const items: TrendingItem[] = [];
   for (const r of settled) {

@@ -1,11 +1,16 @@
 // The monthly topic plan: answer checks (unique keywords, days in the month, known formats/sources) and the tenant rule.
 import { describe, expect, it, vi } from "vitest";
 
+const feed = vi.hoisted(() => ({ blocks: [] as unknown[], items: [] as unknown[], fail: false, saved: 0 }));
+vi.mock("@/lib/content/trending-sources", () => ({
+  buildDbSearchBlocks: (rows: unknown[]) => rows,
+  runBlocks: async (blocks: unknown[]) => { feed.blocks = blocks; return feed.items; },
+}));
 const m = vi.hoisted(() => ({ site: null as unknown, trends: [] as unknown[], folders: [] as unknown[], proposed: [] as unknown[], byGeo: {} as Record<string, unknown[]>, eventArgs: [] as unknown[], events: [] as string[] }));
 vi.mock("@/lib/events/for-month", () => ({ eventsForMonth: async (_sb: unknown, month: string, country: string | null) => { m.eventArgs = [month, country]; return m.events; } }));
 vi.mock("@/lib/content/brand-voice-store", () => ({ loadSiteBrand: async () => m.site }));
 vi.mock("@/lib/kb/folders", () => ({ listFolders: async () => m.folders }));
-vi.mock("../trends", async (orig) => ({ ...(await orig<typeof import("../trends")>()),
+vi.mock("../trends", async (orig) => ({ ...(await orig<typeof import("../trends")>()), saveTrends: async () => { feed.saved++; return 0; },
   recentTrends: async (_sb: unknown, geo: string) => { m.trends.push(geo); return m.byGeo[geo] ?? [{ title: "感恩日記", source: "Google News", days: 1 }]; } }));
 vi.mock("../store", async (orig) => ({ ...(await orig<typeof import("../store")>()), proposeTopics: async (_sb: unknown, rows: unknown[]) => { m.proposed = rows; return rows; } }));
 
@@ -37,7 +42,7 @@ describe("parsePlan", () => {
 
 describe("prompt and geo", () => {
   it("carries the voice, trends and folders, and the target count", () => {
-    const p = buildPlanPrompt({ siteName: "Soulful", voice: "語氣: 溫暖", month: "2026-11-01", daysInMonth: 30, events: [], trends: ["感恩日記（Google News）"], folders: ["藝術治療 202610"] });
+    const p = buildPlanPrompt({ siteName: "Soulful", voice: "語氣: 溫暖", month: "2026-11-01", daysInMonth: 30, events: [], industry: [], trends: ["感恩日記（Google News）"], folders: ["藝術治療 202610"] });
     expect(p).toContain("共 28 個，分散在 1 到 30 日");
     expect(p).toContain("語氣: 溫暖");
     expect(p).toContain("- 感恩日記（Google News）");
@@ -45,12 +50,21 @@ describe("prompt and geo", () => {
   });
 
   it("events section: absent when empty, otherwise present and before the trends section (P9.2)", () => {
-    const base = { siteName: "S", voice: "", month: "2026-12-01", daysInMonth: 31, trends: ["t"], folders: [] };
+    const base = { siteName: "S", voice: "", month: "2026-12-01", daysInMonth: 31, trends: ["t"], folders: [], industry: [] };
     expect(buildPlanPrompt({ ...base, events: [] })).not.toContain("節日與活動");
     const p = buildPlanPrompt({ ...base, events: ["12-25 Christmas（聖誕節）"] });
     expect(p).toContain("節日與活動");
     expect(p).toContain("- 12-25 Christmas（聖誕節）");
     expect(p.indexOf("節日與活動")).toBeLessThan(p.indexOf("近 30 天的熱門話題"));
+  });
+
+  it("industry section: absent when empty, otherwise present and before the trends section (P9.4)", () => {
+    const base = { siteName: "S", voice: "", month: "2026-12-01", daysInMonth: 31, trends: ["t"], folders: [], events: [] };
+    expect(buildPlanPrompt({ ...base, industry: [] })).not.toContain("產業來源");
+    const p = buildPlanPrompt({ ...base, industry: ["A", "B"] });
+    expect(p).toContain("產業來源");
+    expect(p).toContain("- A\n- B");
+    expect(p.indexOf("產業來源")).toBeLessThan(p.indexOf("近 30 天的熱門話題"));
   });
 
   it("maps the article tool's countries to trending geos: global = every geo, a country with no source = none (B9)", () => {
@@ -100,6 +114,27 @@ describe("proposeMonth", () => {
     expect(tw.prompt).toContain("- 12-25 Christmas（聖誕節）");
     expect((await run("全球（不指定）")).args).toEqual(["2026-12-01", null]);
     expect((await run("德國")).args).toEqual(["2026-12-01", null]);
+  });
+
+  it("the site's own feeds become ephemeral blocks, reach only its prompt, and are never saved as shared trends (B10)", async () => {
+    m.site = { siteId: "s", organizationId: "org-a", name: "S", defaults: { targetCountry: "台灣", trendFeeds: ["https://a.example/feed", "https://b.example/rss", "http://bad"] } };
+    feed.blocks = []; feed.saved = 0; feed.items = [{ title: "產業新聞一" }, { title: "產業新聞二" }];
+    const ask = vi.fn(async (_p: string) => JSON.stringify({ topics: [{ day: 2, title: "t", keyword: "k" }] }));
+    await proposeMonth({} as never, { organizationId: "org-a", siteId: "s", month: "2026-11", actor: "x" }, ask);
+    expect(feed.blocks).toHaveLength(2);
+    expect(feed.blocks[0]).toMatchObject({ id: "site-s-0", label: "a.example", url: "https://a.example/feed" });
+    expect(ask.mock.calls[0][0]).toContain("- 產業新聞一\n- 產業新聞二");
+    expect(feed.saved).toBe(0);
+    feed.items = [];
+  });
+
+  it("feeds that all fail still plan (empty industry, no section)", async () => {
+    m.site = { siteId: "s", organizationId: "org-a", name: "S", defaults: { trendFeeds: ["https://a.example/feed"] } };
+    feed.items = [];
+    const ask = vi.fn(async (_p: string) => JSON.stringify({ topics: [{ day: 2, title: "t", keyword: "k" }] }));
+    await proposeMonth({} as never, { organizationId: "org-a", siteId: "s", month: "2026-11", actor: "x" }, ask);
+    expect(ask.mock.calls[0][0]).not.toContain("產業來源");
+    expect(m.proposed).toHaveLength(1);
   });
 
   it("a global site plans from every geo's trends", async () => {

@@ -25,9 +25,13 @@ export type PublishMode = (typeof PUBLISH_MODES)[number];
 export const TOPIC_MODES = ["human_pick", "ai_pick"] as const;
 export type TopicMode = (typeof TOPIC_MODES)[number];
 
+/** The brand's own industry RSS feeds (AUTO_CONTENT P9.4): https URLs, read at planning time into that brand's prompt only. */
+export const MAX_TREND_FEEDS = 10;
+
 export interface SiteContentDefaults {
   publishMode?: PublishMode;
   topicMode?: TopicMode;
+  trendFeeds?: string[];
   language?: string;
   targetCountry?: string;
   imageModel?: string;

@@ -4,7 +4,8 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { siteRowGate, siteUrlWriteGate } from "@/lib/content/wp-sites";
 import { staffOnly } from "@/lib/tenant-guard";
 import type { ManagedSite } from "@/app/api/content/sites/route";
-import { PUBLISH_MODES, TOPIC_MODES, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { MAX_TREND_FEEDS, PUBLISH_MODES, TOPIC_MODES, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { isSafePublicHttps } from "@/lib/content/public-https";
 
 const GATE_MODES = [
   { field: "publishMode", allowed: PUBLISH_MODES },
@@ -68,6 +69,16 @@ export async function PATCH(
     if (readError) return NextResponse.json({ ok: false, error: readError.message }, { status: 500 });
     const stored = ((current as { content_defaults: SiteContentDefaults | null } | null)?.content_defaults) ?? {};
     const next: Record<string, unknown> = { ...((defaultsGiven ? body.contentDefaults : stored) as SiteContentDefaults) };
+    if (defaultsGiven && "trendFeeds" in next) {
+      if (!Array.isArray(next.trendFeeds)) delete next.trendFeeds;
+      else {
+        const feeds = [...new Set(next.trendFeeds.map((u) => (typeof u === "string" ? u.trim() : "")).filter(Boolean))];
+        const bad = feeds.find((u) => !isSafePublicHttps(u));
+        if (bad) return NextResponse.json({ ok: false, error: `trendFeeds: ${bad} 不是公開 https 網址` }, { status: 400 });
+        if (feeds.length > MAX_TREND_FEEDS) return NextResponse.json({ ok: false, error: `trendFeeds: 最多 ${MAX_TREND_FEEDS} 個` }, { status: 400 });
+        next.trendFeeds = feeds;
+      }
+    }
     modesRead = [];
     for (const g of GATE_MODES) {
       delete next[g.field];

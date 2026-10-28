@@ -12,6 +12,8 @@ import { loadSiteBrand } from "@/lib/content/brand-voice-store";
 import { listFolders } from "@/lib/kb/folders";
 import { eventsForMonth } from "@/lib/events/for-month";
 import { isGlobalMarket, TRENDING_GEOS, type TrendingGeo } from "@/lib/content/geos";
+import { isSafePublicHttps } from "@/lib/content/public-https";
+import { buildDbSearchBlocks, runBlocks } from "@/lib/content/trending-sources";
 import { norm, recentTrends } from "./trends";
 import { monthKey, proposeTopics, TOPIC_FORMATS, type NewTopic, type Topic, type TopicFormat } from "./store";
 
@@ -45,12 +47,22 @@ async function trendsFor(sb: SupabaseClient, geos: TrendingGeo[], limit = 50) {
   return out;
 }
 
+/** Newest titles of the brand's own feeds, at most 30. Ephemeral blocks, nothing saved (B10: content_trends is shared
+ *  across customers). A failing feed adds nothing; `geo` only picks the fetch's language parameter. */
+async function industryTitles(siteId: string, feeds: string[] | undefined, geo: TrendingGeo): Promise<string[]> {
+  const urls = (Array.isArray(feeds) ? feeds : []).filter((u) => typeof u === "string" && isSafePublicHttps(u));
+  if (!urls.length) return [];
+  const blocks = buildDbSearchBlocks(urls.map((url, i) => ({ id: `site-${siteId}-${i}`, label: new URL(url).hostname, url, geos: "*", enabled: true })));
+  return (await runBlocks(blocks, geo)).slice(0, 30).map((it) => it.title);
+}
+
 export interface PlanContext {
   siteName: string;
   voice: string;
   month: string;               // YYYY-MM-01
   daysInMonth: number;
   events: string[];            // holidays/events whose marketing window touches the month (P9.2)
+  industry: string[];          // newest titles from the brand's own feeds (P9.4); this brand's prompt only, never stored
   trends: string[];
   folders: string[];
 }
@@ -64,7 +76,10 @@ ${c.events.length ? `
 本月在行銷窗口內的節日與活動（可提前佈局的題目）：
 ${list(c.events)}
 ` : ""}
-近 30 天的熱門話題（挑和品牌受眾相關的，不相關就不用）：
+${c.industry.length ? `品牌自己的產業來源最新文章（優先參考）：
+${list(c.industry)}
+
+` : ""}近 30 天的熱門話題（挑和品牌受眾相關的，不相關就不用）：
 ${list(c.trends)}
 
 品牌知識庫的資料夾（代表品牌已蒐集過的主題）：
@@ -143,13 +158,14 @@ export async function proposeMonth(sb: SupabaseClient, input: ProposeMonthInput,
   const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
   // one market = its country's events (+ worldwide); global (every geo) or a market with no source = no country filter
   const geos = trendGeosFor(site.defaults.targetCountry);
-  const [trends, folders, events] = await Promise.all([
+  const [trends, folders, events, industry] = await Promise.all([
     trendsFor(sb, geos),
     listFolders(input.organizationId),
     eventsForMonth(sb, month, geos.length === 1 ? geos[0] : null),
+    industryTitles(site.siteId, site.defaults.trendFeeds, geos[0] ?? "TW"),
   ]);
   const ctx: PlanContext = {
-    siteName: site.name, voice: renderSiteVoice(site.defaults), month, daysInMonth, events,
+    siteName: site.name, voice: renderSiteVoice(site.defaults), month, daysInMonth, events, industry,
     trends: trends.map((t) => `${t.title}（${t.source}）`), folders: folders.slice(0, 30).map((f) => f.name),
   };
   const rows = parsePlan(await ask(buildPlanPrompt(ctx)), ctx);

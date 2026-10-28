@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { ManagedSite } from "@/app/api/content/sites/route";
 import { useDoorHref, useOnDoor } from "@/app/DoorContext";
-import { FUNNEL_STAGES, PRICE_POSITIONS, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { FUNNEL_STAGES, MAX_TREND_FEEDS, PRICE_POSITIONS, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import PublishModeButtons from "./PublishModeButtons";
 import TopicModeButtons from "./TopicModeButtons";
 
@@ -69,6 +69,7 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
   const [d, setD]           = useState<SiteContentDefaults>(() => ({ ...EMPTY_DEFAULTS, ...site.contentDefaults, marketing: { ...EMPTY_DEFAULTS.marketing, ...(site.contentDefaults?.marketing ?? {}) } }));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved]   = useState(false);
+  const [err, setErr]       = useState("");
 
   function setM(k: keyof NonNullable<SiteContentDefaults["marketing"]>, v: string) {
     setD(p => ({ ...p, marketing: { ...p.marketing, [k]: v } }));
@@ -76,14 +77,15 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
   }
 
   async function handleSave() {
-    setSaving(true); setSaved(false);
+    setSaving(true); setSaved(false); setErr("");
     try {
       const res  = await fetch(`/api/content/sites/${site.id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contentDefaults: d }),
       });
-      const json = await res.json() as { ok: boolean; site?: ManagedSite };
-      if (json.ok && json.site) { onSaved(json.site); setSaved(true); }
+      const json = await res.json() as { ok: boolean; site?: ManagedSite; error?: string };
+      if (json.ok && json.site) { onSaved(json.site); setSaved(true); setD(p => ({ ...p, trendFeeds: json.site?.contentDefaults?.trendFeeds ?? p.trendFeeds })); }
+      else setErr(json.error ?? "儲存失敗");
     } finally { setSaving(false); }
   }
 
@@ -149,6 +151,30 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
                 {IMAGE_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
               </select>
             </label>
+          </div>
+
+          {/* Industry feeds (P9.4): read when the month is planned, this brand's prompt only */}
+          <div>
+            <span style={lbl}>產業來源（選填）</span>
+            <div style={{ color: "var(--text-muted)", fontSize: 11, marginBottom: 6 }}>填你這個產業的新聞或部落格 RSS 網址，AI 規劃題目時會優先參考。沒填就只看地區熱搜。</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {(d.trendFeeds ?? []).map((u, i) => (
+                <div key={i} style={{ display: "flex", gap: 6 }}>
+                  <input style={inp} value={u} placeholder="https://example.com/feed"
+                    onChange={e => { const v = e.target.value; setD(p => ({ ...p, trendFeeds: (p.trendFeeds ?? []).map((x, j) => j === i ? v : x) })); setSaved(false); }} />
+                  <button type="button" onClick={() => { setD(p => ({ ...p, trendFeeds: (p.trendFeeds ?? []).filter((_, j) => j !== i) })); setSaved(false); }}
+                    style={{ padding: "1px 10px", borderRadius: 5, border: "1px solid var(--card-border)", fontSize: 12, cursor: "pointer", background: "var(--bg-card)", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                    移除
+                  </button>
+                </div>
+              ))}
+              {(d.trendFeeds ?? []).length < MAX_TREND_FEEDS && (
+                <button type="button" onClick={() => { setD(p => ({ ...p, trendFeeds: [...(p.trendFeeds ?? []), ""] })); setSaved(false); }}
+                  style={{ alignSelf: "flex-start", padding: "2px 10px", borderRadius: 5, border: "1px solid var(--card-border)", fontSize: 12, cursor: "pointer", background: "var(--bg-card)", color: "var(--accent-text)" }}>
+                  ＋新增來源
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Row 1b: featured image overlay settings */}
@@ -267,6 +293,7 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
               {saving ? "儲存中…" : "儲存預設"}
             </button>
             {saved && <span style={{ color: "var(--green)", fontSize: 12 }}>✓ 已儲存，下次選此站台會自動帶入</span>}
+            {err && <span style={{ color: "var(--red)", fontSize: 12 }}>{err}</span>}
           </div>
         </div>
       )}
