@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-28（續8）
+
+### AUTO_CONTENT P9.1 修正：「全球」網站看所有地區的熱搜（修 P9.1 M1）
+
+**根因**：728f21a35 的 `geoFor` 把沒設市場與「全球（不指定）」都當成「沒有熱搜來源」→ 回 null。正式庫三站都是這兩種，P9.1 上線後手按「AI 提案本月題目」不再帶熱搜（WORKLOG 2026-10-28 P9.1 M1）。操作者 2026-10-28 確認 Soulful、AwareWave 是「全球」。
+
+**步驟**：`plan.ts` `geoFor` → `trendGeosFor(country): TrendingGeo[]`：沒設／`Global`／「全球（不指定）」＝全部 `TRENDING_GEOS`（判斷同 `generate-core.ts:273`）、有來源的國家＝一個、沒來源的國家＝[]；新 `trendsFor` 每地區平均分 50 筆、依出現天數排、標題去重。`jobs.ts` 用 `flatMap(trendGeosFor)`。`collect-trends.ts` `collectTrendsIfDue` 各地區平行（全球站一次 7 個地區，每來源最多等 8 秒；firing 上限 300 秒、tick 200 秒）。卡片 B9（交接檔 §3）、P9.2 第 7 點、計畫 §7 P9.1 列同步改。
+
+**critic 子代理（Sonnet）審查後修正**：m1 一次最多抓 3 個地區（`COLLECT_CONCURRENCY`，`collect-trends.ts`），全部同時抓會撞 Reddit／Google 限流，而當天守衛不會重試；m2 熱搜讀取失敗不再擋 tick，先 tick 再把錯誤連同 tick 摘要丟出（`jobs.ts` content_pipeline.run）；m3 全球站各地區輪流挑、用快取同一條標題鍵 `norm`（`trends.ts` 改 export）去重；m4 補平行上限、輪流去重、失敗仍 tick 三條測試；m5 全球判斷抽成 `isGlobalMarket`（`lib/content/geos.ts`），`generate-core.ts:273` 與 `plan.ts` 共用。
+
+**成本**：全球站每天抓 7 個地區。RSS 免費；Serper 有金鑰時每地區每天約 0.001 美元（7 地區約 0.007 美元／天）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/content/topics/__tests__/collect-trends.test.ts app/api/content/trending/route.test.ts lib/schedules/__tests__/content-pipeline-job.test.ts lib/content/topics/__tests__/plan.test.ts | exit=0 | ms=2541（25/25）
+- `npx tsc --noEmit`：我的檔 0 錯；唯一 1 錯在別的 session 未提交的 `app/(shell)/tools/video/projects/[id]/page.tsx`。`generate-core` 相關 2 檔 14/14 綠。突變略：改的是地區對照，不是隱私／可見範圍／擦除／同意／擁有權守衛（AGENTS §1）。
+- ORACLE_WAIVED: Codex 設定模型 gpt-6.1-sol 在 ChatGPT 帳號不支援（同日 P9.1 m3），改 critic 子代理
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/0m/5n（5 條全修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=geoFor|isGlobalAudience|全球（不指定） | hits=5（全在交接檔 §2 現況表與已完成的 P9.1 卡原文＝歷史敘述；程式 0）
 ## 2026-10-28（續7）
 
 ### AUTO_CONTENT P9.1 補收尾：熱搜每天自動落地（728f21a35，已於 10-27 03:00 隨 main 部署）

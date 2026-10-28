@@ -6,7 +6,7 @@ const saveTrends = vi.hoisted(() => vi.fn(async () => 1));
 vi.mock("@/lib/content/trending-sources", () => ({ runTrending, buildDbSearchBlocks: () => [] }));
 vi.mock("../trends", () => ({ saveTrends }));
 
-import { collectTrends, collectTrendsIfDue } from "../collect-trends";
+import { collectTrends, collectTrendsIfDue, COLLECT_CONCURRENCY } from "../collect-trends";
 
 /** content_trends today-rows per geo; content_sources returns none. Records each due-check filter. */
 function fakeSb(storedToday: Set<string>) {
@@ -48,6 +48,16 @@ describe("collectTrendsIfDue", () => {
     const { sb } = fakeSb(new Set());
     await expect(collectTrendsIfDue(sb, ["TW", "TW", "HK"])).resolves.toEqual(["TW", "HK"]);
     expect(runTrending).toHaveBeenCalledTimes(2);
+  });
+
+  it("fetches at most COLLECT_CONCURRENCY geos at a time", async () => {
+    let live = 0, peak = 0;
+    runTrending.mockImplementation(async () => { live++; peak = Math.max(peak, live); await new Promise((r) => setTimeout(r, 5)); live--; return []; });
+    const { sb } = fakeSb(new Set());
+    await expect(collectTrendsIfDue(sb, ["TW", "HK", "SG", "US", "GB", "JP", "AU"])).resolves.toHaveLength(7);
+    expect(peak).toBe(COLLECT_CONCURRENCY);
+    runTrending.mockReset();
+    runTrending.mockImplementation(async () => [{ title: "t", traffic: "", category: "", relatedQueries: [], source: "Google News" }]);
   });
 
   it("a failed due-check throws (the sweep records it)", async () => {

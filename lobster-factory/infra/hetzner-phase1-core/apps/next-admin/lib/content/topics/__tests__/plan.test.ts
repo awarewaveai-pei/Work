@@ -1,13 +1,14 @@
 // The monthly topic plan: answer checks (unique keywords, days in the month, known formats/sources) and the tenant rule.
 import { describe, expect, it, vi } from "vitest";
 
-const m = vi.hoisted(() => ({ site: null as unknown, trends: [] as unknown[], folders: [] as unknown[], proposed: [] as unknown[] }));
+const m = vi.hoisted(() => ({ site: null as unknown, trends: [] as unknown[], folders: [] as unknown[], proposed: [] as unknown[], byGeo: {} as Record<string, unknown[]> }));
 vi.mock("@/lib/content/brand-voice-store", () => ({ loadSiteBrand: async () => m.site }));
 vi.mock("@/lib/kb/folders", () => ({ listFolders: async () => m.folders }));
-vi.mock("../trends", () => ({ recentTrends: async (_sb: unknown, geo: string) => { m.trends.push(geo); return [{ title: "感恩日記", source: "Google News", fetched_on: "2026-10-20" }]; } }));
+vi.mock("../trends", async (orig) => ({ ...(await orig<typeof import("../trends")>()),
+  recentTrends: async (_sb: unknown, geo: string) => { m.trends.push(geo); return m.byGeo[geo] ?? [{ title: "感恩日記", source: "Google News", days: 1 }]; } }));
 vi.mock("../store", async (orig) => ({ ...(await orig<typeof import("../store")>()), proposeTopics: async (_sb: unknown, rows: unknown[]) => { m.proposed = rows; return rows; } }));
 
-import { buildPlanPrompt, geoFor, parsePlan, proposeMonth } from "../plan";
+import { buildPlanPrompt, parsePlan, proposeMonth, trendGeosFor } from "../plan";
 
 const ctx = { month: "2026-02-01", daysInMonth: 28 };
 
@@ -42,11 +43,11 @@ describe("prompt and geo", () => {
     expect(p).toContain("- 藝術治療 202610");
   });
 
-  it("maps the article tool's countries to trending geos; a market with no trending source is null, not Taiwan (B9)", () => {
-    expect(geoFor("日本")).toBe("JP");
-    expect(geoFor("全球（不指定）")).toBeNull();
-    expect(geoFor("德國")).toBeNull();
-    expect(geoFor(undefined)).toBeNull();
+  it("maps the article tool's countries to trending geos: global = every geo, a country with no source = none (B9)", () => {
+    expect(trendGeosFor("日本")).toEqual(["JP"]);
+    expect(trendGeosFor("全球（不指定）")).toEqual(["TW", "HK", "SG", "US", "GB", "JP", "AU"]);
+    expect(trendGeosFor(undefined)).toEqual(["TW", "HK", "SG", "US", "GB", "JP", "AU"]);
+    expect(trendGeosFor("德國")).toEqual([]);
   });
 });
 
@@ -74,5 +75,24 @@ describe("proposeMonth", () => {
     await proposeMonth({} as never, { organizationId: "org-a", siteId: "s", month: "2026-11", actor: "x" }, ask);
     expect(m.trends).toEqual([]);
     expect(ask.mock.calls[0][0]).toMatch(/近 30 天的熱門話題[^\n]*\n（無）/);
+  });
+
+  it("a global site plans from every geo's trends", async () => {
+    m.site = { siteId: "s", organizationId: "org-a", name: "Global", defaults: { targetCountry: "全球（不指定）" } };
+    m.trends = [];
+    const ask = vi.fn(async (_p: string) => JSON.stringify({ topics: [{ day: 2, title: "t", keyword: "k" }] }));
+    await proposeMonth({} as never, { organizationId: "org-a", siteId: "s", month: "2026-11", actor: "x" }, ask);
+    expect(m.trends).toEqual(["TW", "HK", "SG", "US", "GB", "JP", "AU"]);
+  });
+
+  it("takes each geo's trends in turns and counts a shared headline once, case- and spacing-blind", async () => {
+    m.site = { siteId: "s", organizationId: "org-a", name: "Global", defaults: {} };
+    m.byGeo = { TW: [{ title: "A", source: "s", days: 9 }, { title: "shared", source: "s", days: 8 }],
+      HK: [{ title: "SHARED ", source: "s", days: 3 }, { title: "C", source: "s", days: 2 }] };
+    for (const g of ["SG", "US", "GB", "JP", "AU"]) m.byGeo[g] = [];
+    const ask = vi.fn(async (_p: string) => JSON.stringify({ topics: [{ day: 2, title: "t", keyword: "k" }] }));
+    await proposeMonth({} as never, { organizationId: "org-a", siteId: "s", month: "2026-11", actor: "x" }, ask);
+    m.byGeo = {};
+    expect(ask.mock.calls[0][0]).toContain("- A（s）\n- SHARED （s）\n- C（s）\n\n");
   });
 });

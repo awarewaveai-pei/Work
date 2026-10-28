@@ -28,8 +28,17 @@ describe("content_pipeline job", () => {
   });
 
   it("collects trends for the geos of the client's active sites, skipping a market with no trending source", async () => {
-    sites.rows = [{ id: "a", content_defaults: { targetCountry: "台灣" } }, { id: "b", content_defaults: { targetCountry: "德國" } }, { id: "c", content_defaults: null }];
+    sites.rows = [{ id: "a", content_defaults: { targetCountry: "台灣" } }, { id: "b", content_defaults: { targetCountry: "德國" } }];
     await job.run("o", "rk", { dailyLimit: 2 } as never);
     expect(collectTrendsIfDue).toHaveBeenCalledWith(sb, ["TW"]);
+    sites.rows = [{ id: "c", content_defaults: null }];
+    await job.run("o", "rk", { dailyLimit: 2 } as never);
+    expect(collectTrendsIfDue).toHaveBeenLastCalledWith(sb, ["TW", "HK", "SG", "US", "GB", "JP", "AU"]);
+  });
+
+  it("a trends failure still ticks, then reports both the tick summary and the failure", async () => {
+    collectTrendsIfDue.mockRejectedValueOnce(new Error("content_trends:due:boom"));
+    await expect(job.run("o", "rk", { dailyLimit: 2 } as never)).rejects.toThrow("started=0; content_pipeline:trends:content_trends:due:boom");
+    expect(tickTopics).toHaveBeenCalledTimes(1);
   });
 });

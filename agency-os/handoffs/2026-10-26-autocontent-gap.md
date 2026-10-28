@@ -60,7 +60,7 @@
 | B6 | 排程內每一筆 AI 花費都先出現在 `/ops/schedules` 那格的 `cost` 文字 | 操作者規則「AI 先顯示成本」；數字由 cost-model 算，不手打 |
 | B7 | 設定只有一份：總控頁（卡 C）讀寫的是 `/ops/schedules` 與 `/tools/content/sites` 同一份資料 | 兩份設定遲早不同步 |
 | B8 | 排程內每一筆 AI 花費記在**該客戶**（`runForOrg` ＋ `grantFor("content.plan")`）；客戶沒開通或點數不足（`EntitlementRequired`）＝**跳過、不當故障**：不寫嘗試記號、不開 incident、當次 firing 照常 tick；總控頁顯示「未開通」 | ADR 017：許可只問 `can(主體, feature, actor)`，五種客戶方式（訂閱／點數／買斷…）靠同一條；點數用完的客戶若每天收一張 incident 是噪音，不是故障（`can.ts:122-125`；`products.ts:75` 已登記 `content.plan`） |
-| B9 | 站的市場不在 `TRENDING_GEOS` 內 → **沒有熱搜**（提案只靠品牌＋知識庫），不是退回台灣的熱搜 | 平台是全球客戶；現行 `geoFor` 不認識的國家回 `"TW"`（`plan.ts:20-21`）會拿台灣熱搜替德國站規劃 |
+| B9 | 站的熱搜地區由 `trendGeosFor(targetCountry)`（`plan.ts`）決定：沒設或「全球（不指定）」＝**全部** `TRENDING_GEOS`（每地區平均分 50 筆）；指名的國家有來源＝那一地區；指名的國家沒來源（例德國）＝**沒有熱搜**，不退回台灣 | 平台是全球客戶；舊 `geoFor` 不認識就回 `"TW"`。操作者 2026-10-28：Soulful、AwareWave 是「全球」（正式庫三站都是沒設或全球，見 WORKLOG 2026-10-28 P9.1 M1）；全球的判斷與 `generate-core.ts:273` 同一條 |
 | B10 | 品牌自己填的產業來源（P9.4）只進**該品牌**的提案 prompt，**不寫進** `content_trends` 共用快取 | `content_trends` 無租戶欄（`trends.ts:1-3`）；寫進去＝客戶 A 的產業新聞變成同地區客戶 B 的「熱搜」 |
 | B12 | 題目做出來的文章，日期只存一處＝題目的 `scheduled_for`；日曆上對它的改日期走題目的 `schedule` 動作，不直接改 WordPress 日期；這種文章在日曆上不給「立即發布／移到垃圾桶」 | 排程做的 WordPress 是草稿（`make.ts:71` `publishStatus: "draft"`），到題目的日子才 `updateWpPost(...{ status: "publish" })`（`make.ts:155`；等待＝`tick.ts:73` `waitsForDay`）。直接改 WP 日期 → 題目照舊在原日發布；丟垃圾桶 → 題目到日發布失敗 |
 | B11 | 一次做很多篇文章只有一條路：變成題目 → 排程在主機上做。瀏覽器裡**沒有**逐篇呼叫 `/api/content/generate` 的迴圈 | 文章頁「批量產文」走瀏覽器迴圈：關分頁就停、不讀站設定、不存檔、不記費用（P9.5 證據）；兩條路並存＝永遠有一條比較差 |
@@ -159,7 +159,7 @@
 6. 題目頁按鈕 API（`topics/plan/route.ts`）**不改**：人按鈕提的案自然成為 B1 守衛，排程不重提。
 7. **節日與活動進提案**（免費，DB 已有）：`plan.ts`
    - `PlanContext` 加 `events: string[]`；`buildPlanPrompt` 在熱搜段**之前**加「本月在行銷窗口內的節日與活動（可提前佈局的題目）：」＋ `list(c.events)`，空就不印。
-   - `proposeMonth`：查 `events` 表 `is_active = true` 且 `marketing_window_start <= 月底` 且 `event_date >= 月初`（沿用 `upcoming/route.ts:56-78` 的條件與 `decorateEventFacets`），再用 `eventMatchesCountries(e, country ? [country] : [])`（`facets.ts:97`；`country = geoFor(targetCountry)`，null 時只留不限國家的事件，照該函式既有語意）過濾，依 `scoreEventOpportunity`（`facets.ts:110`）排序取前 15，格式 `MM-DD 名稱（title_zh）`。DB 錯誤 throw（與 `recentTrends` 一致）。
+   - `proposeMonth`：查 `events` 表 `is_active = true` 且 `marketing_window_start <= 月底` 且 `event_date >= 月初`（沿用 `upcoming/route.ts:56-78` 的條件與 `decorateEventFacets`），再用 `eventMatchesCountries(e, country ? [country] : [])`（`facets.ts:97`；`trendGeosFor(targetCountry)` 只有一個地區時用它，全球或沒有來源時傳 `[]`＝只留不限國家的事件，照該函式既有語意）過濾，依 `scoreEventOpportunity`（`facets.ts:110`）排序取前 15，格式 `MM-DD 名稱（title_zh）`。DB 錯誤 throw（與 `recentTrends` 一致）。
    - 這段邏輯抽成 `NA/lib/events/for-month.ts` `eventsForMonth(sb, month, country)`，P9.3 的 ① 格與按鈕 API 共用。
 
 **驗收**

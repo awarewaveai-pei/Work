@@ -10,17 +10,39 @@ import type { Grant } from "@/lib/entitlements/can";
 import { renderSiteVoice } from "@/lib/content/brand-voice";
 import { loadSiteBrand } from "@/lib/content/brand-voice-store";
 import { listFolders } from "@/lib/kb/folders";
-import type { TrendingGeo } from "@/lib/content/geos";
-import { recentTrends } from "./trends";
+import { isGlobalMarket, TRENDING_GEOS, type TrendingGeo } from "@/lib/content/geos";
+import { norm, recentTrends } from "./trends";
 import { monthKey, proposeTopics, TOPIC_FORMATS, type NewTopic, type Topic, type TopicFormat } from "./store";
 
 export const PLAN_TOPICS = 28;
 const DEFAULT_FORMATS: TopicFormat[] = ["article", "social"];
 
-/** content_defaults.targetCountry (the article tool's list) -> trending geo. A market with no trending source (or
- *  「全球」) is null: it plans from its brand and knowledge base only, never from another country's trends. */
+/** content_defaults.targetCountry (the article tool's list) -> the trending geos a site plans from. A global site
+ *  (isGlobalMarket) gets every geo; a named country with no trending source gets none -- it plans from its brand and
+ *  knowledge base, never from another country's trends. */
 const GEO_FOR_COUNTRY: Record<string, TrendingGeo> = { 台灣: "TW", 香港: "HK", 新加坡: "SG", 美國: "US", 英國: "GB", 日本: "JP", 澳洲: "AU" };
-export const geoFor = (country: string | undefined): TrendingGeo | null => GEO_FOR_COUNTRY[(country ?? "").trim()] ?? null;
+export function trendGeosFor(country: string | undefined): TrendingGeo[] {
+  if (isGlobalMarket(country)) return [...TRENDING_GEOS];
+  const geo = GEO_FOR_COUNTRY[(country ?? "").trim()];
+  return geo ? [geo] : [];
+}
+
+/** Last 30 days of trends for these geos, at most `limit`: taken in turns (each geo's next-hottest), so every geo gets
+ *  its share and a headline several geos share (Reddit worldnews) counts once. */
+async function trendsFor(sb: SupabaseClient, geos: TrendingGeo[], limit = 50) {
+  const lists = await Promise.all(geos.map((g) => recentTrends(sb, g, 30, limit)));
+  const seen = new Set<string>();
+  const out: Awaited<ReturnType<typeof recentTrends>> = [];
+  for (let i = 0; out.length < limit && lists.some((l) => i < l.length); i++) {
+    for (const l of lists) {
+      const t = l[i];
+      if (!t || out.length >= limit || seen.has(norm(t.title))) continue;
+      seen.add(norm(t.title));
+      out.push(t);
+    }
+  }
+  return out;
+}
 
 export interface PlanContext {
   siteName: string;
@@ -113,9 +135,8 @@ export async function proposeMonth(sb: SupabaseClient, input: ProposeMonthInput,
   const month = monthKey(input.month);
   const [y, m] = month.split("-").map(Number);
   const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  const geo = geoFor(site.defaults.targetCountry);
   const [trends, folders] = await Promise.all([
-    geo ? recentTrends(sb, geo, 30, 50) : Promise.resolve([]),
+    trendsFor(sb, trendGeosFor(site.defaults.targetCountry)),
     listFolders(input.organizationId),
   ]);
   const ctx: PlanContext = {

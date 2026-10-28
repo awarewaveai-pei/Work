@@ -4,3 +4,10 @@
 export const TRENDING_GEOS = ["TW", "HK", "SG", "US", "GB", "JP", "AU"] as const;
 export type TrendingGeo = (typeof TRENDING_GEOS)[number];
 export const isTrendingGeo = (g: string): g is TrendingGeo => (TRENDING_GEOS as readonly string[]).includes(g);
+
+/** A site's targetCountry that means "no one country": unset, "Global" or the article tool's 「全球（不指定）」.
+ *  The article writer (generate-core.ts) and the topic plan's trending geos (topics/plan.ts) both read it. */
+export function isGlobalMarket(country: string | undefined | null): boolean {
+  const c = (country ?? "").trim();
+  return !c || c === "Global" || c === "全球（不指定）";
+}

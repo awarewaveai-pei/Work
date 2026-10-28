@@ -11,7 +11,6 @@ import { REPORT_JOBS, runPeriodReport, type ReportKind } from "@/lib/social/repo
 import { DAILY_START_CAP } from "@/lib/content/topics/tick";
 import { topicCostUsd } from "@/lib/content/topics/cost";
 import type { SiteContentDefaults } from "@/lib/content/brand-voice";
-import type { TrendingGeo } from "@/lib/content/geos";
 import type { JobMeta } from "./types";
 import type { Frequency } from "./schedule";
 import type { StoredSchedule } from "./store";
@@ -118,14 +117,21 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
     async run(organizationId, _runKey, schedule) {
       const sb = getSupabaseWriteClient();
       if (!sb) throw new Error("content_pipeline:no_supabase_client");
-      const [{ tickTopics }, { topicDeps }, { collectTrendsIfDue }, { geoFor }] = await Promise.all([import("@/lib/content/topics/tick"),
+      const [{ tickTopics }, { topicDeps }, { collectTrendsIfDue }, { trendGeosFor }] = await Promise.all([import("@/lib/content/topics/tick"),
         import("@/lib/content/topics/make"), import("@/lib/content/topics/collect-trends"), import("@/lib/content/topics/plan")]);
-      // Trends first, once per geo per day (B5): the month's proposal reads what was stored
-      const { data: sites, error } = await sb.from("wp_sites").select("id, content_defaults").eq("organization_id", organizationId).eq("active", true);
-      if (error) throw new Error(`content_pipeline:sites:${error.message}`);
-      const geos = (sites ?? []).map((s) => geoFor((s.content_defaults as SiteContentDefaults | null)?.targetCountry)).filter((g): g is TrendingGeo => !!g);
-      await collectTrendsIfDue(sb, geos);
-      return tickTopics(topicDeps(sb, organizationId, "schedule:content_pipeline"), { cap: schedule?.dailyLimit ?? DAILY_START_CAP });
+      // Trends first, once per geo per day (B5): the month's proposal reads what was stored. A trends failure must not
+      // stop topics already approved, so the tick runs anyway and the failure is thrown after it (recorded + incident).
+      let trendsError = "";
+      try {
+        const { data: sites, error } = await sb.from("wp_sites").select("id, content_defaults").eq("organization_id", organizationId).eq("active", true);
+        if (error) throw new Error(`content_pipeline:sites:${error.message}`);
+        await collectTrendsIfDue(sb, (sites ?? []).flatMap((s) => trendGeosFor((s.content_defaults as SiteContentDefaults | null)?.targetCountry)));
+      } catch (e) {
+        trendsError = e instanceof Error ? e.message : String(e);
+      }
+      const summary = await tickTopics(topicDeps(sb, organizationId, "schedule:content_pipeline"), { cap: schedule?.dailyLimit ?? DAILY_START_CAP });
+      if (trendsError) throw new Error(`${summary}; content_pipeline:trends:${trendsError}`);
+      return summary;
     },
   },
 ];

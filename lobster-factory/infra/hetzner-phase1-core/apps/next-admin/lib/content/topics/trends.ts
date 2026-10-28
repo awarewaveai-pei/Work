@@ -6,7 +6,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TrendingItem } from "@/lib/content/trending-sources";
 import { isTrendingGeo } from "@/lib/content/geos";
 
-const norm = (s: string) => s.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
+/** Case- and spacing-blind title key: the cache hash and the plan's de-duplication use this one rule. */
+export const norm = (s: string) => s.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
 
 /** The day key of an item: same geo, source and title (ignoring case and spacing) = same item. */
 export function trendHash(geo: string, source: string, title: string): string {

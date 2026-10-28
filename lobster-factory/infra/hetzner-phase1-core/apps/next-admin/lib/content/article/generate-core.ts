@@ -5,6 +5,7 @@ import { billedOrgId, logAiCall, openaiUsageTokens, type OpenAiUsageLike } from 
 import { claudeFallback, claudeParams } from "../../ai/gateway";
 import { textCallCostUsd, resolveTextRate } from "../../ai/cost-calculator";
 import { fetchRemotePageText } from "@/lib/collect/net/remote-file";
+import { isGlobalMarket } from "@/lib/content/geos";
 
 // Output token budgets. Raised 2026-06-16: the old medium=4096 truncated rich articles
 // (tables + nested H3 + lists) mid-sentence, cutting off the trailing CONTENT_META block →
@@ -270,7 +271,7 @@ function buildUserPrompt(params: {
   lines.push(`Primary keyword: ${params.keyword}`);
   if (params.title.trim()) lines.push(`Article title: ${params.title.trim()}`);
   lines.push(`Language: ${params.language}`);
-  const isGlobalAudience = !params.targetCountry || params.targetCountry === "Global" || params.targetCountry === "全球（不指定）";
+  const isGlobalAudience = isGlobalMarket(params.targetCountry);
   if (!isGlobalAudience) {
     lines.push(`Target country/audience: ${params.targetCountry}`);
   }
