@@ -59,6 +59,9 @@
 - 審查：`reports/oracle/2026-10-28-review-5916c97c.md`；Claude SDK API USD0.654，修正rerun更新updated_at問題後approve。首次全測因Windows bash shim/並行timeout失敗，改正執行環境後全綠，未改測試門檻。
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=latest_scheduled_at|previous_scheduled_at|event=schedule&status=completed | hits=5 files
 - 編碼：cross-Drive BOM clean；diff --check pass。Rollback：revert本次source＋正常sg-deploy；沒有DB/cron/secret變更。
+- 補驗：`80c2329c1` isolated HEAD tsc PASS、deps467 in-sync；WSL Ubuntu完整host-schedules測試28/28 PASS（12.522s，含Installer/CronRun）。提交工具選到WSL導致Windows index路徑不相容，改原生Git Bash；同一canonical command經SSOT runner PreToolUse→實際commit→PostToolUse，未停用閘。
+- 上線：sg-deploy next-admin於01:08:00Z完成，deployed=`80c2329c1`、前版=`3d4b08116`；healthy15s、5個HTTP smoke200。主機盤點01:06:10Z external_errors=[]。登入Chrome實頁：security audit正常（manual40297589195）、backup_status_sync正常（08:53台北）、probe stale附GitHub時鐘說明；還原演練仍如實尚無排程紀錄（11/1首跑）。
+- 驗收：Playwright smoke26pass/0fail/6skip（35s）；證據 `reports/e2e/2026-10-28/smoke/`。部署log=`/root/lobster-phase1/logs/sg-deploy-20261028-010052.log`；回退沿用sg-deploy已存映像，不需DB回退。
 ## 2026-10-28（續4）— supabase-awarewave-postgres MCP 自己開 SSH 通道（Claude）
 
 - **根因**：DSN 指 `127.0.0.1:5432`＝通往 ks-aw-01 的 SSH 通道，但沒有任何程式會開它（只有文件叫人手動跑 `open-supabase-ssh-tunnel.ps1`）；筆電睡眠也會斷。症狀 `ECONNREFUSED 127.0.0.1:5432`。另：通道腳本固定轉 5432/3000/8000＋`ExitOnForwardFailure`，本機 dev server 佔 3000 就整條失敗。
