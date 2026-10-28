@@ -1,5 +1,13 @@
 # Worklog
 
+## 2026-10-28（續4）— supabase-awarewave-postgres MCP 自己開 SSH 通道（Claude）
+
+- **根因**：DSN 指 `127.0.0.1:5432`＝通往 ks-aw-01 的 SSH 通道，但沒有任何程式會開它（只有文件叫人手動跑 `open-supabase-ssh-tunnel.ps1`）；筆電睡眠也會斷。症狀 `ECONNREFUSED 127.0.0.1:5432`。另：通道腳本固定轉 5432/3000/8000＋`ExitOnForwardFailure`，本機 dev server 佔 3000 就整條失敗。
+- **修**：`mcp-local-wrappers/postgres-full-access-mcp.mjs` `connect()`：Windows＋DSN 指本機 5432 時，`ECONNREFUSED` → 跑通道腳本 `-Background -Ports 5432`（共用一個 in-flight promise）→ 重試一次；失敗訊息帶腳本輸出尾段。`scripts/open-supabase-ssh-tunnel.ps1` 加 `-Ports`（預設三個不變）。文件：`SUPABASE_SELF_HOSTED_RUNBOOK.md` §4.2、`mcp/DESKTOP_MCP_SETUP.md`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=kill 5432 listener → node mcp-probe.mjs postgres-full-access-mcp.mjs（stdio initialize＋tools/call select count(*) from organizations）→ OK orgs=6；之後只有 ssh 聽 5432 | exit=0 | ms=15444
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/1m/0n（自審 m1：DSN 非 5432 時會轉錯埠 → 改為只在本機 5432 自動開，已修並重測）
+- ORACLE_WAIVED: codex-oracle 兩次 no final message（log 0 bytes，非額度錯誤）；改書面對抗自審（stdout 汙染、grandchild 佔 pipe→等 exit、並發、spawn 無 shell、埠對應）。另：`powershell -File` 傳 `-Path a,b` 會變單一字串＝0 檔，要用 `-Command "& ... -Path @(...)"`。
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,mcp-local-wrappers,lobster-factory,.claude | grep=tunnelPort|open-supabase-ssh-tunnel.ps1 positional | hits=0
 ## 2026-10-28（續2）— Anthropic User Profiles：決定延後接，開工條件寫進 ADR 017（Claude）
 
 - **決定**：現在不接。官方：沒帶 profile 的請求＝我們自己的用量。正式 `ops_audit_events` 近 60 天 `entitlement.usage`：anthropic 只有 awarewave-ops 11 筆、soulful-expression 1 筆（actor `agent:p7-soulful-video`），沒有客戶本人呼叫。customer org 5 個（含 3 個 onboarding_portal 測試 org）。

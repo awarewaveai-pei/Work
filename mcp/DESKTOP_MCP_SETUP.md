@@ -174,7 +174,7 @@ MCP sync complete.
 # Grafana（開後 localhost:3009 可用）
 .\scripts\open-grafana-ssh-tunnel.ps1 -Background
 
-# Supabase Postgres（開後 localhost:5432 可用）
+# Supabase Postgres（開後 localhost:5432 可用；supabase-awarewave-postgres MCP 連不上時會自己開，只有 psql／Studio 要手動）
 .\scripts\open-supabase-ssh-tunnel.ps1 -Background
 ```
 

@@ -29,6 +29,9 @@ param(
     [string]$SshHost = "",
     [string]$SshUser = "",
     [string]$PrivateKeyPath = "",
+    # Same port on both ends. ExitOnForwardFailure drops the whole tunnel if any local port is taken (a dev server on 3000),
+    # so callers that need only Postgres pass -Ports 5432 (mcp-local-wrappers/postgres-full-access-mcp.mjs does).
+    [int[]]$Ports = @(5432, 3000, 8000),
     [switch]$Background
 )
 
@@ -45,17 +48,11 @@ if ([string]::IsNullOrWhiteSpace($PrivateKeyPath)) {
     $PrivateKeyPath = if ($env:SUPABASE_EU_SSH_KEY) { $env:SUPABASE_EU_SSH_KEY } else { "$env:USERPROFILE\.ssh\id_ed25519" }
 }
 
-$tunnels = @(
-    "127.0.0.1:5432:127.0.0.1:5432",   # PostgreSQL
-    "127.0.0.1:3000:127.0.0.1:3000",   # Studio
-    "127.0.0.1:8000:127.0.0.1:8000"    # Kong API
-)
+$tunnels = @($Ports | ForEach-Object { "127.0.0.1:${_}:127.0.0.1:${_}" })
 
 $sshTarget = "$SshUser@$SshHost"
-Write-Host "Supabase SSH tunnels via $sshTarget" -ForegroundColor Cyan
-Write-Host "  localhost:5432  -> Supabase PostgreSQL" -ForegroundColor DarkGray
-Write-Host "  localhost:3000  -> Supabase Studio (http://localhost:3000)" -ForegroundColor DarkGray
-Write-Host "  localhost:8000  -> Supabase Kong API" -ForegroundColor DarkGray
+Write-Host "Supabase SSH tunnels via $sshTarget (5432 PostgreSQL, 3000 Studio, 8000 Kong)" -ForegroundColor Cyan
+foreach ($p in $Ports) { Write-Host "  localhost:$p" -ForegroundColor DarkGray }
 Write-Host ""
 Write-Host "Postgres (local end of tunnel):" -ForegroundColor Yellow
 Write-Host "  postgresql://postgres:<password>@localhost:5432/postgres  (password from vault / Supabase host only)" -ForegroundColor DarkGray
@@ -87,8 +84,7 @@ foreach ($t in $tunnels) { $args += @("-L", $t) }
 $args += $sshTarget
 
 function Test-SupabaseTunnelPorts {
-    $ok5432 = (Test-NetConnection -ComputerName 127.0.0.1 -Port 5432 -WarningAction SilentlyContinue).TcpTestSucceeded
-    return $ok5432
+    return (Test-NetConnection -ComputerName 127.0.0.1 -Port $Ports[0] -WarningAction SilentlyContinue).TcpTestSucceeded
 }
 
 if ($Background) {
@@ -119,12 +115,12 @@ if ($Background) {
     }
 
     if (Test-SupabaseTunnelPorts) {
-        Write-Host "Tunnel up - postgres reachable at localhost:5432" -ForegroundColor Green
+        Write-Host "Tunnel up - localhost:$($Ports[0]) reachable" -ForegroundColor Green
         Write-Host "Smoke: npm run smoke:supabase-tunnel   (add -- --sql if DSN env is set)" -ForegroundColor DarkGray
         exit 0
     }
 
-    Write-Host "Tunnel probe failed - port 5432 not accepting. Check key, firewall, or whether another process holds the local port." -ForegroundColor Red
+    Write-Host "Tunnel probe failed - port $($Ports[0]) not accepting. Check key, firewall, or whether another process holds the local port." -ForegroundColor Red
     if (Test-Path -LiteralPath $stderrFile) {
         $errTail = Get-Content -LiteralPath $stderrFile -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
         if ($errTail) {

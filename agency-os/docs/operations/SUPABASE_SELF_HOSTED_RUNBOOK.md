@@ -220,7 +220,7 @@ This path does not require the SSH tunnel.
 
 Standard SQL path:
 
-1. Start tunnel: `.\scripts\open-supabase-ssh-tunnel.ps1 -Background`
+1. Tunnel: the MCP wrapper opens it itself on a refused connect (`-Ports 5432`, `mcp-local-wrappers/postgres-full-access-mcp.mjs`); psql / Studio still need `.\scripts\open-supabase-ssh-tunnel.ps1 -Background`
 2. Use MCP server: `supabase-awarewave-postgres`
 3. Wrapper script: `scripts/run-postgres-mcp.ps1`
 4. DSN env: `SUPABASE_AWAREWAVE_POSTGRES_DSN`

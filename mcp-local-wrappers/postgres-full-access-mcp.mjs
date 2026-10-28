@@ -15,6 +15,8 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import pg from "pg";
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 function readEnv(name, fallback = "") {
   const value = process.env[name];
@@ -43,10 +45,54 @@ const readonly =
     .toLowerCase() === "true" ||
   String(process.env.POSTGRES_MCP_READ_ONLY || "").trim() === "1";
 
+const dsn = resolveDsn();
 const pool = new pg.Pool({
-  connectionString: resolveDsn(),
+  connectionString: dsn,
   max: 4,
 });
+
+// A loopback DSN is the SSH tunnel to ks-aw-01 (scripts/open-supabase-ssh-tunnel.ps1). Nothing else keeps it open and
+// laptop sleep drops it, so a refused connect opens it (Postgres port only) and retries once.
+// The script forwards each port to the same port on the host, where Postgres listens on 5432.
+const dsnUrl = new URL(dsn);
+const tunnelled =
+  process.platform === "win32" &&
+  ["127.0.0.1", "localhost"].includes(dsnUrl.hostname) &&
+  (dsnUrl.port || "5432") === "5432";
+const TUNNEL_SCRIPT = fileURLToPath(new URL("../scripts/open-supabase-ssh-tunnel.ps1", import.meta.url));
+let tunnelOpening = null;
+
+function openTunnel() {
+  tunnelOpening ??= new Promise((resolve) => {
+    let output = "";
+    // Wait for "exit", not "close": the detached ssh it starts can inherit the pipes and hold them open.
+    const child = spawn(
+      "powershell",
+      ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", TUNNEL_SCRIPT, "-Background", "-Ports", "5432"],
+      { stdio: ["ignore", "pipe", "pipe"], windowsHide: true },
+    );
+    child.stdout.on("data", (d) => (output += d));
+    child.stderr.on("data", (d) => (output += d));
+    child.on("error", (e) => resolve({ ok: false, output: String(e) }));
+    child.on("exit", (code) => resolve({ ok: code === 0, output }));
+  }).finally(() => {
+    tunnelOpening = null;
+  });
+  return tunnelOpening;
+}
+
+async function connect() {
+  try {
+    return await pool.connect();
+  } catch (err) {
+    if (!tunnelled || err?.code !== "ECONNREFUSED") throw err;
+    const tunnel = await openTunnel();
+    if (!tunnel.ok) {
+      throw new Error(`${err.message}; opening the SSH tunnel failed: ${tunnel.output.trim().slice(-800)}`);
+    }
+    return pool.connect();
+  }
+}
 
 const server = new Server(
   {
@@ -91,7 +137,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
 
-  const client = await pool.connect();
+  const client = await connect();
   try {
     if (readonly) {
       await client.query("BEGIN TRANSACTION READ ONLY");
