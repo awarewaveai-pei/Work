@@ -2053,7 +2053,7 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
             )}
             {trendTab === "trending" && trendingItems.length === 0 && !trendLoading && (
               <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                點擊「搜尋」載入今日熱搜（內建：Google News / Reddit / PTT / Serper{onDoor ? "" : "，外加你在「⚙️ 管理來源」新增的自訂 RSS 來源"}）
+                點擊「搜尋」載入這個地區今日的熱搜（內建新聞、社群與搜尋趨勢來源{onDoor ? "" : "，加上你在「⚙️ 管理來源」新增的 RSS"}）
               </div>
             )}
 

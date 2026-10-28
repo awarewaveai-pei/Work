@@ -35,7 +35,8 @@ export const NOW = [
   { what: 'AI 審核通過後自動發布', state: 'yes', ev: '程式已推上 main（f985992a2），今晚台灣 03:00 部署後生效；網站預設「人工審核」，要由員工在網站設定按「AI 審核後自動發布」並再確認一次才會開' },
   { what: 'ScriptForge 獨立頁，每個模組有自己的角色', state: 'yes', ev: '程式已推上 main（f233bd101），今晚台灣 03:00 部署後在側欄 Content Tools → ScriptForge；提示全部改在伺服器組，品牌讀客戶網站設定' },
   { what: '關掉分頁後影片仍會嵌回文章', state: 'yes', ev: '程式已推上 main（98f89a622），今晚台灣 03:00 部署後生效：題目勾了影片，排程每 5 分鐘自己做影片、嵌進文章、附到社群草稿；每支約 0.05 美元；要先在排程頁打開「自動內容管線」' },
-  { what: '發到 YouTube', state: 'no', ev: '程式已推上 main（ae5e0675b）：社群工具能發 YouTube（貼文第一行＝影片標題），題目選 YouTube 會自動排進頻道。還差你建 Google OAuth 用戶端（API Key 不能上傳）' },
+  { what: '發到 YouTube', state: 'yes', ev: 'Aware Wave 頻道已真發一支（P7.0，935c70364）；題目選 YouTube 會自動排進頻道' },
+  { what: '每天抓熱搜、每月自動提題目、AI 挑題', state: 'yes', ev: '已上線（cb976618e）；AwareWave 首輪已抓到各地區熱搜並提出本月題目。YouTube 熱門來源要你申請免費金鑰才開' },
 ];
 
 const P1 = '7d8d618a4';
