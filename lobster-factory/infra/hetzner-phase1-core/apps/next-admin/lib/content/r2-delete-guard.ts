@@ -48,7 +48,8 @@ export function assetTarget(objectKey: string): AssetTarget | null {
     const dir = dec(v[1]);
     if (!dir) return null;
     const dirs = [...new Set([dir, encodeURIComponent(dir)])];
-    return { bucket: "video", prefixDelete: true, search: dirs, match: dirs.map((d) => `video/${d}/`) };
+    // videorev/<dir>/: caption-reburn versions (V4.8) of the same folder; a post may embed one of those URLs.
+    return { bucket: "video", prefixDelete: true, search: dirs, match: dirs.flatMap((d) => [`video/${d}/`, `videorev/${d}/`]) };
   }
   const key = dec(objectKey);
   const prefix = key?.split("/")[0] ?? "";

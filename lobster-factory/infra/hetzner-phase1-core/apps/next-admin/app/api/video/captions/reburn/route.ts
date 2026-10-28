@@ -3,6 +3,7 @@ import { canCreateAiImageJob, resolveOpsRole } from "@/lib/ops-role";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { pollRenderJob, submitCaptionReburn } from "@/lib/content/video/render-client";
+import { videoObjectKey } from "@/lib/content/blocks/video-pipeline";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -78,12 +79,15 @@ async function finish(req: NextRequest, assetId: string, jobId: string): Promise
   if (poll.status === "running") return NextResponse.json({ ok: true, status: "running" });
   if (poll.status === "error") return NextResponse.json({ ok: true, status: "error", error: poll.error });
   const meta = format ? poll.outputMeta?.[format] : undefined;
-  // The job must have written this row's own file; a jobId from some other video is refused.
-  if (!format || !meta?.checksumSha256 || poll.outputs[format] !== row.object_url || !poll.captions) return deny("job result does not match this video", 409);
+  // The job must have written a version of this row's own file (videoObjectKey maps videorev/… back to the row's key); a jobId from some other video is refused.
+  const newUrl = format ? poll.outputs[format] : undefined;
+  if (!format || !newUrl || !meta?.checksumSha256 || videoObjectKey(newUrl) !== row.object_key || !poll.captions) return deny("job result does not match this video", 409);
 
   const db = getSupabaseWriteClient()!;
   const old = row.metadata ?? {};
+  // New bytes = new URL: the old URL (maybe already embedded in a post) keeps its old bytes, and no CDN/browser cache can serve stale captions.
   const { error } = await db.from("media_assets").update({
+    object_url: newUrl,
     checksum_sha256: meta.checksumSha256,
     byte_size: meta.byteSize ?? 0,
     metadata: {

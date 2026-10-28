@@ -140,7 +140,8 @@ export function resolveOrgId(ctxOrgId?: string): string | null {
 /** 由 primaryUrl 推導 media_assets.object_key（存與查共用此單一邏輯 → idempotent，不會因編碼不一致重複）。 */
 export function videoObjectKey(primaryUrl: string): string {
   try {
-    return new URL(primaryUrl).pathname.replace(/^\//, "") || primaryUrl;
+    // A caption reburn (V4.8) writes videorev/<dir>/<rev>/<fmt>.mp4 so the old URL keeps its bytes; the row's identity stays video/<dir>/<fmt>.mp4.
+    return (new URL(primaryUrl).pathname.replace(/^\//, "") || primaryUrl).replace(/^videorev\/(.+)\/[0-9a-f]{8}\/([^/]+\.mp4)$/, "video/$1/$2");
   } catch {
     return primaryUrl;
   }

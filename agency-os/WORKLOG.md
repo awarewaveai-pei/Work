@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-28（續28）— 影片 V4.8 收尾 A：重燒字幕改寫新網址，不再覆寫同一個檔（Claude）— video-service 部分待操作者 go-ahead，未 push
+
+- **根因**：重燒覆寫 `video/<dir>/<fmt>.mp4`（續26 已知 CDN 風險）→ CDN／瀏覽器拿舊檔；已嵌進文章的舊網址也會被悄悄換內容。**不變量**：一個網址＝一份位元組，永不改。
+- **做法**：video-service `_reburn_key` 寫 `videorev/<dir>/<8hex>/<fmt>.mp4`（舊檔不動）；`media_assets.object_key` 維持 `video/<dir>/<fmt>.mp4`（身分），只換 `object_url`＋checksum。單一接縫 `videoObjectKey`（`video-pipeline.ts`）把 `videorev/…` 對回 `video/…` → 刪除／cleanup／reconcile 全吃同一把 key。
+- 各處核對：reconcile 只掃 `^video/`，不會把 `videorev/` 當第二支影片（`reconcile.ts:98`）；`deleteVideoObjects` 增列 `videorev/<dir>/` 前綴（`r2.ts`）；`assetTarget.match` 增 `videorev/<dir>/`，文章嵌新網址也擋刪（`r2-delete-guard.ts`）；`finish` 以 `videoObjectKey(新網址)===row.object_key` 驗 job 屬於這列；QA 以新 checksum 重跑（沿用）；ratio 由 URL 末段讀（`/16x9.mp4`）不受影響，故用資料夾而非檔名加尾碼。
+- 相容：舊 video-service（未部署）仍覆寫同 key → 同樣通過驗證，行為＝舊行為，故 next-admin 可先上。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run r2-delete-guard.test.ts captions/reburn（14 passed）；python 6 OK（stub pipeline）；`npx tsc --noEmit` 非 .next 錯誤 0 | exit=0 | ms=60000
+- 守衛突變一次：拿掉 `assetTarget.match` 的 `videorev/` → 新測試紅（1 failed）→ 還原綠（11 passed）。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n（n：舊 rev 檔每次重燒累積在 `videorev/<dir>/`，隨影片刪除一併清；單支影片重燒次數有限，不另做回收）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=videorev | hits=8
+- ORACLE_WAIVED: Codex 本輪不可用；書面自審：新 key 由服務端 uuid 產生、輸入 object_key 仍受白名單 regex；`finish` 的 key 比對防跨列；Release 鎖維持；舊網址位元組不變。
+- **待操作者 go-ahead**：video-service commit（`server.py`＋測試）本機未 push；部署前重燒行為同舊。
+- **Rollback**：`git revert`；已重燒的列 object_url 指向 `videorev/`，revert 後 `videoObjectKey` 不再還原 → 先確認無列指向 `videorev/` 再 revert。
 ## 2026-10-28（續27）— video-service 部署 V4.8；刪影片連 videoclean/ 底片一起刪（Claude；操作者「全部做好」）
 
 - 部署：push 988197b20 → 主機 ff → `docker tag lobster-video-service:local :pre-20261028-v48` → rsync → `up -d --build`（running jobs 0）。

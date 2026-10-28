@@ -10,6 +10,7 @@ vi.mock("@/lib/storage/r2", () => ({ deleteVideoObjects, deleteDesignObject, r2D
 vi.mock("@/lib/content/wp-sites", () => ({ getWpSites, wpAuthHeader: () => "Basic x" }));
 
 const { deleteUnreferencedAsset, assetTarget } = await import("../r2-delete-guard");
+const { videoObjectKey } = await import("../blocks/video-pipeline");
 
 const SITE = { id: "s1", name: "Soulful", url: "https://soulful.example", color: "", username: "u", organizationId: null };
 const KEY = "video/感恩日記_改變人生/16x9.mp4";
@@ -48,6 +49,14 @@ describe("deleteUnreferencedAsset", () => {
     const encoded = `video/${encodeURIComponent("感恩日記_改變人生")}/9x16.mp4`;
     rowsFor = (u) => (route(u) === "/wp/v2/pages" ? [row(12, `<video src="https://pub.r2.dev/${encoded.toLowerCase()}">`)] : []);
     expect(await deleteUnreferencedAsset(KEY)).toMatchObject({ ok: false, error: "asset_in_use", references: [{ type: "page", id: 12 }] });
+  });
+
+  it("a caption-reburn version URL (videorev/) maps to the same video and still counts as a reference", async () => {
+    const rev = "https://pub.r2.dev/videorev/感恩日記_改變人生/0a1b2c3d/16x9.mp4";
+    expect(videoObjectKey(rev)).toBe(`video/${encodeURIComponent("感恩日記_改變人生")}/16x9.mp4`);
+    rowsFor = (u) => (route(u) === "/wp/v2/posts" ? [row(31, `<video src="${rev}">`)] : []);
+    expect(await deleteUnreferencedAsset(videoObjectKey(rev))).toMatchObject({ ok: false, error: "asset_in_use", references: [{ id: 31 }] });
+    expect(nothingDeleted()).toBe(true);
   });
 
   it("searches every status, both types, through ?rest_route=, and every page of results", async () => {

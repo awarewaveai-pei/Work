@@ -64,9 +64,11 @@ describe("/api/video/captions/reburn", () => {
     pollRenderJob.mockResolvedValue(done("https://v.example.com/video/other/16x9.mp4"));
     expect((await get()).status).toBe(409);
     expect(update).not.toHaveBeenCalled();
-    pollRenderJob.mockResolvedValue(done(url));
+    const newUrl = "https://v.example.com/videorev/dir/0a1b2c3d/16x9.mp4";
+    pollRenderJob.mockResolvedValue(done(newUrl));
     expect((await get()).status).toBe(200);
-    expect(update.mock.calls[0][0]).toMatchObject({ checksum_sha256: "a".repeat(64), metadata: { captionCues: cues } });
+    // The row's file moves to the new versioned URL; the old URL is never rewritten.
+    expect(update.mock.calls[0][0]).toMatchObject({ object_url: newUrl, checksum_sha256: "a".repeat(64), metadata: { captionCues: cues } });
     expect(persistTech).toHaveBeenCalledWith(expect.objectContaining({ candidateChecksum: "a".repeat(64) }));
     expect(persistCaption).toHaveBeenCalledWith(expect.objectContaining({ candidateChecksum: "a".repeat(64), captions: cues }));
   });

@@ -299,10 +299,11 @@ export async function deleteVideoObjects(
   const base = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucket}`;
   const headers = { Authorization: `Bearer ${apiToken}` };
 
-  // 1) List all objects under video/<dir>/ and its caption-less copies videoclean/<dir>/ (V4.8): one video = both
-  //    prefixes, so a delete never leaves the clean copy behind. Listing is authoritative, immune to format-name drift.
+  // 1) List all objects under video/<dir>/, its caption-less copies videoclean/<dir>/ and its caption-reburn versions
+  //    videorev/<dir>/ (V4.8): one video = all three prefixes, so a delete never leaves a copy behind. Listing is authoritative,
+  //    immune to format-name drift.
   const keys: string[] = [];
-  for (const prefix of [`video/${dir}/`, `videoclean/${dir}/`]) {
+  for (const prefix of [`video/${dir}/`, `videoclean/${dir}/`, `videorev/${dir}/`]) {
   let cursor: string | undefined;
   do {
     const u = new URL(`${base}/objects`);
