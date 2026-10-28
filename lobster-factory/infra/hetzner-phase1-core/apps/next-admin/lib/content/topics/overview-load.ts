@@ -1,8 +1,7 @@
 // Server-side loader for the auto-content control page (AUTO_CONTENT P9.3): every query runs once here, none per row or per
-// cell, and the client only draws. A client sees only their own sites (canAccessOrg on every site, not a front-end filter).
+// cell, and the client only draws. A client sees only their own sites (the caller's mayRead on every site, not a front-end filter).
 // A failed query throws: a table built from a half-read set would show "nothing wrong" for a site it never read.
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { canAccessOrg } from "@/lib/tenant-guard";
 import type { SiteContentDefaults } from "@/lib/content/brand-voice";
 import { eventsForMonth } from "@/lib/events/for-month";
 import { loadSpendRows } from "@/lib/ai/spend-loader";
@@ -41,7 +40,9 @@ async function geoStat(sb: SupabaseClient, geo: string, sinceDay: string) {
   return { lastFetchedOn, count30: n.count ?? 0, sources };
 }
 
-export async function loadOverview(sb: SupabaseClient, req: Request | { headers: Headers }, now = new Date()): Promise<OverviewData> {
+/** `mayRead(orgId)` is the caller's authorization (the page or route passes canAccessOrg for its request): only those
+ *  organizations' sites are read further. */
+export async function loadOverview(sb: SupabaseClient, mayRead: (organizationId: string) => boolean, now = new Date()): Promise<OverviewData> {
   const month = monthKey(taipeiParts(now.toISOString()).month);
 
   const siteRes = await sb.from("wp_sites").select("id, name, organization_id, content_defaults, content_plan_attempted_at, organizations(name)").eq("active", true).not("organization_id", "is", null);
@@ -50,7 +51,7 @@ export async function loadOverview(sb: SupabaseClient, req: Request | { headers:
     id: string; name: string; organization_id: string; content_defaults: SiteContentDefaults | null; content_plan_attempted_at: string | null;
     // many-to-one = one object at runtime; the untyped client infers an array
     organizations: { name: string } | { name: string }[] | null;
-  }>).filter((s) => canAccessOrg(req, s.organization_id));
+  }>).filter((s) => mayRead(s.organization_id));
   const orgIds = [...new Set(sites.map((s) => s.organization_id))];
   const siteIds = sites.map((s) => s.id);
   if (!sites.length) return { month, rows: [], cells: {}, spendNote: null };

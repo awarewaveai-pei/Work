@@ -242,6 +242,7 @@ describe("registry claims match the code", () => {
     "app/api/webhooks/chatwoot/route.ts": "cs asks name the conversation's org (lib/cs/generate.ts, intent.ts, orchestrator.ts); retrieval embeds for it (lib/kb/rag.ts defaultEmbedder(ctx.viewer))",
     "app/api/webhooks/meta/route.ts": "auto-reply asks can() for the page asset's org (lib/social/meta-auto-reply.ts)",
     "app/api/internal/social/dispatch/route.ts": "dispatch-store asks social.dispatch for each post's org (lib/social/dispatch-store.ts)",
+    "app/api/content/topics/overview/route.ts": "asks content.plan for each visible site's org only to show 未開通 (grantFor never debits, can.ts:151); the caller is authorized by canAccessOrg per site",
     "app/api/internal/schedules/run-due/route.ts": "each due job runs for its client org (lib/schedules/jobs.ts runCollection({ organizationId })); KB ingest embeds for that org",
     "app/api/internal/collect/runs/execute/route.ts": "Cognitive OS research run for a project, no client org on the request: collect.fetch bills internal (lib/collect/run.ts runResearchCollection)",
     // reach paid code only through an import; the handler runs no paid call

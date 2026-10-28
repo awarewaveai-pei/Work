@@ -1,10 +1,11 @@
-// The control page's server half (AUTO_CONTENT P9.3), shared by staff /tools/content/topics and the content door's /topics:
-// loads every number once, scoped to the caller (a client sees only their own sites), and hands it to the board.
+// The staff control page's server half (AUTO_CONTENT P9.3): loads every number once and hands it to the board. The content
+// door reads the same overview through GET /api/content/topics/overview (a door page never reads with the service role).
 import { headers } from "next/headers";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { loadOverview } from "@/lib/content/topics/overview-load";
+import { canAccessOrg } from "@/lib/tenant-guard";
 import { staffGrantOf, staffMayUseTool, staffUnrestricted } from "@/lib/staff-access";
-import { TopicsBoard } from "./TopicsBoard";
+import { StaffTopicsBoard } from "./StaffTopicsBoard";
 
 export async function TopicsPageContent() {
   const sb = getSupabaseWriteClient();
@@ -13,5 +14,6 @@ export async function TopicsPageContent() {
   // step ④ embeds the 排程 tool's table (/api/ops/schedules): shown only to a person who holds that tool (staff-tools.test.ts NEEDS_OTHER_TOOL)
   const grant = staffGrantOf(h);
   const canSchedule = staffUnrestricted(grant) || staffMayUseTool(grant!, "ops/schedules");
-  return <TopicsBoard overview={await loadOverview(sb, new Request("http://localhost", { headers: h }))} canSchedule={canSchedule} />;
+  const req = new Request("http://localhost", { headers: h });
+  return <StaffTopicsBoard overview={await loadOverview(sb, (org) => canAccessOrg(req, org))} canSchedule={canSchedule} />;
 }

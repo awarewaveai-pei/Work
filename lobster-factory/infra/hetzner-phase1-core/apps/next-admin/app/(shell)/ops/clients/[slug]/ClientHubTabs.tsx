@@ -555,7 +555,7 @@ function ContentTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cfg
             href={siteId ? `/tools/content?siteId=${siteId}` : "/tools/content"}
             style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 6, border: "1px solid var(--card-border)", background: "var(--bg-card)", color: "var(--text-primary)", fontSize: 12, textDecoration: "none" }}
           >
-            📅 內容行事曆
+            📝 內容編輯
           </Link>
         </div>
       </Card>

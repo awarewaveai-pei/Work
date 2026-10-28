@@ -6,7 +6,6 @@
 import type { ReactNode } from "react";
 import type { ManagedSite } from "@/app/api/content/sites/route";
 import { useOnDoor } from "@/app/DoorContext";
-import { ScheduleTable } from "@/app/(shell)/ops/schedules/ScheduleTable";
 import type { OverviewRow } from "@/lib/content/topics/overview";
 import type { TrendCell } from "@/lib/content/topics/overview-load";
 import type { Topic } from "@/lib/content/topics/store";
@@ -82,8 +81,10 @@ function Step({ n, title, children }: { n: string; title: string; children: Reac
   );
 }
 
-export function FlowCells({ site, row, cell, topics, month, canSchedule, planButton, onSiteSaved }: {
-  site: ManagedSite; row: OverviewRow; cell: TrendCell | undefined; topics: Topic[]; month: string; canSchedule: boolean; planButton: ReactNode; onSiteSaved: (s: ManagedSite) => void;
+export function FlowCells({ site, row, cell, topics, month, schedule, planButton, onSiteSaved }: {
+  site: ManagedSite; row: OverviewRow; cell: TrendCell | undefined; topics: Topic[]; month: string;
+  /** Step ④'s switch, given only by the staff page (StaffTopicsBoard); a door renders none and imports no /api/ops caller. */
+  schedule?: ReactNode; planButton: ReactNode; onSiteSaved: (s: ManagedSite) => void;
 }) {
   const onDoor = useOnDoor();
   const proposedN = topics.filter((t) => t.source !== "manual").length;
@@ -115,7 +116,7 @@ export function FlowCells({ site, row, cell, topics, month, canSchedule, planBut
         <Step n="④" title="製作">
           <p style={{ margin: 0, fontSize: "var(--font-size-sm)" }}>總開關{row.enabled ? "開" : "關"}；每天最多開始 {row.dailyLimit ?? DAILY_START_CAP} 題；進行中 {row.inProgress} 題。</p>
           <span style={muted}>這個開關管這個客戶的所有網站。</span>
-          {!onDoor && canSchedule && site.org_slug && <ScheduleTable only={site.org_slug} jobOnly="content_pipeline" />}
+          {!onDoor && schedule}
         </Step>
         <Step n="⑤" title="發布">
           <p style={{ margin: 0, fontSize: "var(--font-size-sm)" }}>{row.publishGate === "auto" ? "AI 審核後自動發布" : "人工審核後發布"}（只管文章）。</p>
