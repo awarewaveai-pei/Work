@@ -54,12 +54,29 @@ param(
     [string]$RepoRoot = '',
     [int]$TimeoutSec = 900,
 
+    # Overrides `model` in ~/.codex/config.toml for this call only (`codex exec -m`).
+    # Empty = use the config. Needed when the config names a model the ChatGPT account rejects.
+    [string]$Model = '',
+
     # Keep the noisy transcript for debugging the wrapper itself.
     [switch]$Raw
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+# Under EAP=Stop a bare Write-Error ends the script with exit 1 before any `exit N` after it runs;
+# every failure goes through here so callers see the documented code (2 = usage/git, 3 = codex).
+function Stop-Oracle {
+    param([int]$Code, [string]$Message)
+    $ErrorActionPreference = 'Continue'
+    Write-Error $Message
+    exit $Code
+}
+
+# `powershell -File ... -Path a,b` arrives as ONE string "a,b" (-File never builds arrays);
+# same split as write-oracle-artifact.ps1 so -File and -Command callers get the same scope.
+$Path = @($Path | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 
 # git output may carry CJK (commit subjects, diff bodies). Capturing it unwrapped on a
 # Big5 console is the CP950 trap that audit-cp950-traps.ps1 exists to catch.
@@ -128,10 +145,38 @@ function Resolve-CodexExe {
     return $null
 }
 
+function Get-CodexFailure {
+    <#
+      `codex exec -o` keeps stdout empty; progress AND the API error (`ERROR: {...status...}`)
+      go to stderr. Reading only stdout made a deterministic 400 look like "no final message".
+      Returns @{ Lines; Retryable; Hint }. Retryable only when no ERROR line names an HTTP
+      4xx / usage limit -- those repeat identically, a stream drop does not.
+    #>
+    param([string]$ErrPath)
+    $text = ''
+    if (Test-Path -LiteralPath $ErrPath) {
+        $text = [string](Get-Content -LiteralPath $ErrPath -Raw -Encoding UTF8 -ErrorAction SilentlyContinue)
+    }
+    $lines = @($text -split "`r?`n" | Where-Object { $_ -match '^\s*ERROR[:\s]' } | Select-Object -Unique)
+    $joined = $lines -join "`n"
+    $hint = ''
+    $retryable = $true
+    if ($joined -match '"status"\s*:\s*429|usage limit|rate limit|try again at') {
+        $retryable = $false
+        $hint = 'Quota: run scripts/oracle-quota.ps1 -Action set -Tool codex (AGENTS.md section 4), then fall back.'
+    } elseif ($joined -match 'model_not_found|model is not supported') {
+        $retryable = $false
+        $hint = 'Model rejected: ~/.codex/config.toml `model` is not available to this account. Pass -Model <supported model> or fix the config.'
+    } elseif ($joined -match '"status"\s*:\s*4\d\d') {
+        $retryable = $false
+        $hint = 'Request rejected by the API (4xx); retrying will not change it.'
+    }
+    return @{ Lines = $lines; Retryable = $retryable; Hint = $hint }
+}
+
 $codexExe = Resolve-CodexExe
 if (-not $codexExe) {
-    Write-Error "codex CLI not found on PATH. Install with: npm install -g @openai/codex"
-    exit 2
+    Stop-Oracle 2 "codex CLI not found on PATH. Install with: npm install -g @openai/codex"
 }
 
 $root = Resolve-RepoRoot -Given $RepoRoot
@@ -139,8 +184,7 @@ $root = Resolve-RepoRoot -Given $RepoRoot
 # ---- Assemble the question -------------------------------------------------
 if ($PromptFile) {
     if (-not (Test-Path -LiteralPath $PromptFile)) {
-        Write-Error "PromptFile not found: $PromptFile"
-        exit 2
+        Stop-Oracle 2 "PromptFile not found: $PromptFile"
     }
     $Prompt = Get-Content -LiteralPath $PromptFile -Raw -Encoding UTF8
 }
@@ -204,8 +248,7 @@ if ($Mode -eq 'review') {
         # stderr is folded into the text, so without an exit-code check a typo'd ref would
         # be handed to the oracle AS the diff and it would dutifully review git's error.
         if ($r.Exit -ne 0) {
-            Write-Error "git $($diffArgs -join ' ') failed (exit=$($r.Exit)): $($diffText.Trim())"
-            exit 2
+            Stop-Oracle 2 "git $($diffArgs -join ' ') failed (exit=$($r.Exit)): $($diffText.Trim())"
         }
 
         if (-not $DiffRef) {
@@ -216,8 +259,7 @@ if ($Mode -eq 'review') {
             else                   { $stagedArgs += @('--', '.') + $excludeArtifacts }
             $rs = Invoke-Git -GitArgs $stagedArgs -Root $root
             if ($rs.Exit -ne 0) {
-                Write-Error "git diff --cached failed (exit=$($rs.Exit)): $($rs.Text.Trim())"
-                exit 2
+                Stop-Oracle 2 "git diff --cached failed (exit=$($rs.Exit)): $($rs.Text.Trim())"
             }
             $diffText = ($rs.Text + "`n" + $diffText).Trim()
         }
@@ -292,11 +334,10 @@ if ($Mode -eq 'review') {
 
         if (-not $diffText.Trim()) {
             if ($looksLikeAutoCommitted) {
-                Write-Error "Nothing to review -- AND recent commit(s) at HEAD are automated ones ([claude] checkpoint / AO-CLOSE sync), so this is likely because the work already landed there, not because nothing changed. Re-run with -DiffRef <commit before the checkpoints> to review it."
+                Stop-Oracle 2 "Nothing to review -- AND recent commit(s) at HEAD are automated ones ([claude] checkpoint / AO-CLOSE sync), so this is likely because the work already landed there, not because nothing changed. Re-run with -DiffRef <commit before the checkpoints> to review it."
             } else {
-                Write-Error "Nothing to review: no diff for the given ref/paths. Pass -DiffRef <commit> to review an existing commit."
+                Stop-Oracle 2 "Nothing to review: no diff for the given ref/paths. Pass -DiffRef <commit> to review an existing commit."
             }
-            exit 2
         }
 
         if ($looksLikeAutoCommitted) {
@@ -351,8 +392,7 @@ if ($Mode -eq 'review') {
         $reviewedPathsList = (@($reviewedPaths) | Select-Object -Unique) -join ', '
         $deletedPathsList  = (@($deletedPaths) | Select-Object -Unique) -join ', '
     } catch {
-        Write-Error "Failed to collect diff: $($_.Exception.Message)"
-        exit 2
+        Stop-Oracle 2 "Failed to collect diff: $($_.Exception.Message)"
     }
 
     [void]$sb.AppendLine('# ROLE')
@@ -407,8 +447,7 @@ if ($Mode -eq 'review') {
 }
 else {
     if (-not $Prompt) {
-        Write-Error "inspect mode needs -Prompt (or -PromptFile): the question to answer about the repo."
-        exit 2
+        Stop-Oracle 2 "inspect mode needs -Prompt (or -PromptFile): the question to answer about the repo."
     }
     [void]$sb.AppendLine('# ROLE')
     [void]$sb.AppendLine()
@@ -449,9 +488,10 @@ $codexArgs = @(
     '-s', 'read-only',
     '--ephemeral',
     '-c', 'mcp_servers={}',
-    '-o', $outFile,
-    '-'
+    '-o', $outFile
 )
+if ($Model) { $codexArgs += @('-m', $Model) }
+$codexArgs += '-'
 
 $sw    = [Diagnostics.Stopwatch]::StartNew()
 $exit  = 0
@@ -468,8 +508,7 @@ while ($tries -lt 2) {
 
     if (-not $proc.WaitForExit($TimeoutSec * 1000)) {
         try { $proc.Kill() } catch { }
-        Write-Error "codex timed out after ${TimeoutSec}s. Raw log: $logFile"
-        exit 3
+        Stop-Oracle 3 "codex timed out after ${TimeoutSec}s. stdout: $logFile stderr: $errFile"
     }
     # The WaitForExit(ms) overload returning true does not guarantee ExitCode is
     # populated; the parameterless call flushes the handle first. Without it $exit comes
@@ -480,22 +519,33 @@ while ($tries -lt 2) {
 
     if (Test-Path -LiteralPath $outFile) { break }
 
+    $failure = Get-CodexFailure -ErrPath $errFile
+    if (-not $failure.Retryable) { break }
     if ($tries -lt 2) {
         Write-Host "codex-oracle: no final message (exit=$exit) — retrying once" -ForegroundColor DarkYellow
         Start-Sleep -Seconds 5
     }
 }
 
-if (-not (Test-Path -LiteralPath $outFile)) {
+function Stop-CodexFailed {
+    param([string]$Summary)
     # Never fall through as success: an empty review must not be mistaken for a clean one.
-    Write-Error "codex produced no final message after $tries attempt(s) (exit=$exit). Raw log: $logFile"
-    exit 3
+    # The cause lives in stderr ($errFile), so it is quoted here instead of only pointed at.
+    $f = Get-CodexFailure -ErrPath $errFile
+    $msg = "$Summary stdout: $logFile stderr: $errFile"
+    if ($f.Lines.Count -gt 0) { $msg += "`ncodex stderr errors:`n" + ($f.Lines -join "`n") }
+    else                      { $msg += "`n(no ERROR line in stderr; read the stderr file)" }
+    if ($f.Hint) { $msg += "`n$($f.Hint)" }
+    Stop-Oracle 3 $msg
+}
+
+if (-not (Test-Path -LiteralPath $outFile)) {
+    Stop-CodexFailed "codex produced no final message after $tries attempt(s) (exit=$exit)."
 }
 
 $answer = (Get-Content -LiteralPath $outFile -Raw -Encoding UTF8)
 if ($exit -ne 0 -or -not $answer.Trim()) {
-    Write-Error "codex produced an empty or failed final message (exit=$exit). Raw log: $logFile"
-    exit 3
+    Stop-CodexFailed "codex produced an empty or failed final message (exit=$exit)."
 }
 Write-Host ""
 Write-Host $answer

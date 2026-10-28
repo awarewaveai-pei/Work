@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-28（續11）— codex-oracle 失敗講出真因＋DB 通道多行程／多來源收尾（Claude＋Opus agent）
+
+- **根因 C1**：`codex exec -o` 時 stdout 為空、錯誤在 stderr；`scripts/codex-oracle.ps1` 報錯只指 stdout 檔（0 bytes），真因（`~/.codex/config.toml:2` `gpt-6.1-sol` → 400 model_not_found）藏在 `.err`；確定性 4xx 也照樣重試。設定檔由 Codex App 寫回（同時改了 effort 與 runtime 路徑），由「舊版 GPT 模型停止支援」session 處理，本條不動。
+- **修（codex-oracle.ps1）**：`Get-CodexFailure` 讀 stderr `ERROR:` 分類（429／usage limit、model_not_found、其他 4xx → 不重試＋提示）；`-Model` 單次覆寫；`-Path` 在 `-File` 下收到 "a,b" 拆開（同 `write-oracle-artifact.ps1:85`）；`Stop-Oracle` 統一 9 處 Write-Error＋exit（EAP=Stop 下原本全變 exit 1）。
+- **修（通道，Codex＋critic finding）**：`open-supabase-ssh-tunnel.ps1` 已由「連 `$SshHost`、同一個 `-L`」的 ssh 監聽的埠沿用不重綁，其他佔用照樣失敗；`postgres-full-access-mcp.mjs` 開通道失敗後仍先重連一次（另一行程搶先開好）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=kill 5432 → 兩個 MCP stdio probe 同時跑 → 兩個 OK orgs=6（16.9s／10.4s）；tunnel 腳本 5432 被佔時只開 3000/8000 exit 0、重跑 no-op exit 0；codex-oracle -Mode inspect 無 prompt exit=2；model_not_found 與 429 皆 1 次即停並印原文 | exit=0 | ms=16928
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/0m/3n（Opus critic；3 條 Minor 全修並重測：exit code 同類 8 處、跨行程搶埠、任意 ssh 誤判已轉發）
+- ORACLE_WAIVED: Codex 額度至 13:37（`oracle-quota.ps1 -Action set` 已記）；之前 `-Model gpt-6-astra -DiffRef 6581ee127` 一輪見 `agency-os/reports/oracle/2026-10-28-partialreview-8546ec0f.md`（1 finding，已修）；最終版改由 Opus critic。
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,mcp-local-wrappers,.claude | grep=Write-Error.*\n.*exit|Stop-CodexFailed|open-supabase-ssh-tunnel | hits=0（codex-oracle 內已無裸 Write-Error＋exit；其他呼叫端只有文件）
+- **坑**：在 Bash 用管線接 tunnel 腳本 `-Background` 會卡住（背景 ssh 繼承管線），測試要導到檔案並 `</dev/null`。
 ## 2026-10-28（續10）— 圖片／影片／修圖工具模型納入登錄表；抓到 dall-e-3 與 Luma Ray 2 已下架（Claude）
 
 - **根因**：續3 的登錄表只管文字模型。圖片、影片、修圖工具的模型名稱（Replicate owner/name、釘死的 version、OpenAI 圖片模型）沒有登錄，也沒人實測。實測後發現三個已經壞掉、沒人察覺：

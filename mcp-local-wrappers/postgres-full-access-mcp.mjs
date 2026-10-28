@@ -87,10 +87,13 @@ async function connect() {
   } catch (err) {
     if (!tunnelled || err?.code !== "ECONNREFUSED") throw err;
     const tunnel = await openTunnel();
-    if (!tunnel.ok) {
-      throw new Error(`${err.message}; opening the SSH tunnel failed: ${tunnel.output.trim().slice(-800)}`);
+    try {
+      return await pool.connect();
+    } catch (retryErr) {
+      // A failed open can mean another process won the race for 5432; only the retry tells, so report both.
+      if (tunnel.ok) throw retryErr;
+      throw new Error(`${retryErr.message}; opening the SSH tunnel failed: ${tunnel.output.trim().slice(-800)}`);
     }
-    return pool.connect();
   }
 }
 

@@ -48,6 +48,20 @@ if ([string]::IsNullOrWhiteSpace($PrivateKeyPath)) {
     $PrivateKeyPath = if ($env:SUPABASE_EU_SSH_KEY) { $env:SUPABASE_EU_SSH_KEY } else { "$env:USERPROFILE\.ssh\id_ed25519" }
 }
 
+# A port this same tunnel already forwards (an ssh to $SshHost with this -L, e.g. the MCP wrapper's 5432) is reused:
+# re-binding it would trip ExitOnForwardFailure and drop the new tunnel. Any other holder still fails loudly below.
+$Ports = @($Ports | Where-Object {
+    $spec = "127.0.0.1:${_}:127.0.0.1:${_}"
+    $owners = @(Get-NetTCPConnection -LocalPort $_ -State Listen -ErrorAction SilentlyContinue | ForEach-Object OwningProcess)
+    -not ($owners | Where-Object {
+        $cmd = [string](Get-CimInstance Win32_Process -Filter "ProcessId=$_" -ErrorAction SilentlyContinue).CommandLine
+        $cmd.Contains($spec) -and $cmd.Contains("@$SshHost")
+    })
+})
+if ($Ports.Count -eq 0) {
+    Write-Host "Every requested port is already forwarded by ssh; nothing to open." -ForegroundColor Green
+    exit 0
+}
 $tunnels = @($Ports | ForEach-Object { "127.0.0.1:${_}:127.0.0.1:${_}" })
 
 $sshTarget = "$SshUser@$SshHost"
