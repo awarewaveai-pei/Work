@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-29（續7）— 影片字幕兩條路：主機 Whisper（免費）＋OpenAI（快、付費、失敗自動退主機）（Claude）
+
+- 根因：Whisper worker 只在筆電（`apps/video-whisper-worker/app.py` 寫死 `device="cuda"`），筆電關機 → 正式站 530，⑦ 只有一顆按了會失敗的鍵。
+- 做法（操作者選 1+3，參考 meeting-service「預設免費、API 選用標價、API 失敗退回」）：
+  - worker：`VIDEO_WHISPER_DEVICE` auto/cuda/cpu（CUDA 探針同 meeting `pick_device`）、一次一個 job、`VIDEO_WHISPER_CALLBACK_BASE` 回呼白名單、中文音檔加繁中 prompt、`av==18.1.0` pin（av 19 拿掉 `metadata_errors`）、`requirements.lock`（I7）、Dockerfile＋`docker-compose.whisper.yml`（lobster-net、無 host port、8 CPU／6G）。
+  - next-admin：`lib/content/video/transcription.ts`（OpenAI whisper-1、checksum 比對、失敗同 job 改派主機、`completeTranscriptionJob` 兩條路共用、`JOB_DEADLINE_MS` 逾時判失敗）；dispatch 收 `engine`，客戶 `client_config.audioExternalAiAllowed=false` 伺服器端 403；`/options` GET/PATCH（含 audit）；status 可用 `sourceAssetId` 接回；⑦ 兩顆並排鍵＋時間／價格＋客戶勾選框。
+  - cost-model：`TRANSCRIBE_RATES`、`MEDIA_MODELS["whisper-1"]`；成本走 `logImageCost` → ai_call_logs。
+- 實測（主機 ks-aw-01，同一支 28.6s 影片）：large-v3-turbo 1.86x 但錯字（退黑／調按）；large-v3 1.13x 正確 → 選 large-v3。新 image 實跑繁中正確，含首次載模型 51.6s。OpenAI 實呼 200、5.6s、8 段、繁中正確。
+- Codex 3 findings 全成立已修：①next-admin／worker 重開 job 永遠 dispatched → status 逾時判失敗（兩條路同一類）②OpenAI 路沒比 checksum ③接回已完成 job 後影片選單被鎖。
+- 尚未做（High，等操作者）：主機啟動 worker＋改 next-admin `.env` 四個 `MEDIA_TRANSCRIBE_*`；之後關筆電 tunnel。步驟 `agency-os/docs/video_generator/VIDEO_WHISPER_WORKER_DEPLOYMENT.md`。在那之前主機鍵仍連筆電，OpenAI 鍵 03:00 自動部署後即可用。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker build lobster-video-whisper:test && docker run ... python worker-real.py`（backend=cpu/int8 x8 lang=zh audio=28.6s total=51.6s 繁中正確） | exit=0 | ms=51600
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl https://api.openai.com/v1/audio/transcriptions model=whisper-1 verbose_json`（HTTP 200、8 segments、繁中） | exit=0 | ms=5616
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run app/api/video/transcription lib/content/video/__tests__/transcription.test.ts app/(shell)/tools/video/__tests__/CaptionsStep.render.test.tsx lib/ai/__tests__/model-registry.test.ts lib/ai/__tests__/ai-cost-logged.test.ts` 30 passed；`npx tsc --noEmit` 0；突變：拿掉 dispatch 的 externalAudioAllowed 檢查 → 「refuses OpenAI…」紅、還原綠；`check-compose-invariants` 16 files 0 problems | exit=0 | ms=4000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+  - external oracle = Codex CLI（`agency-os/reports/oracle/2026-10-29-partialreview-5d7cd9f5.md`），3 項皆修
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=產生字幕（Whisper）|GPU worker 轉錄中|Whisper 轉錄失敗 | hits=1
+  - 唯一命中 `VIDEO_TOOL_IA_REORG_2026-09-10.md:60` 為歷史紀錄，不回改
+- Rollback：`git revert`；主機未動。
 ## 2026-10-29（續6）— next-admin 部署 0ac589d03（腳本結果頁可編輯／重新生成）（Claude；操作者「部署」）
 
 - `sg-deploy.sh next-admin`：deployed-commit 4ee3a1db0 → 0ac589d03；healthy 11s；HTTP smoke 5/5 OK；容器名正常。

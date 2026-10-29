@@ -136,6 +136,7 @@ export const MEDIA_MODELS: Record<string, MediaModel> = {
   "google/nano-banana-pro":            { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
   "google/imagen-4":                   { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
   "gpt-image-2":                       { vendor: "OpenAI", kind: "image", status: "active", verifiedAt: "2026-10-28" },
+  "whisper-1":                         { vendor: "OpenAI", kind: "tool", status: "active", verifiedAt: "2026-10-29" },
   // video-service default until 2026-10-28; OpenAI: "The model 'dall-e-3' does not exist".
   "dall-e-3":                          { vendor: "OpenAI", kind: "image", status: "retired" },
   "runwayml/gen4-turbo":               { vendor: "Replicate", kind: "video", status: "active", verifiedAt: "2026-10-28" },
@@ -171,6 +172,11 @@ export const VIDEO_MOTION_RATES: Record<import("../tarot/video-motion-gen").Vide
  * Per-run prices for the studio editing tools (Replicate compute-billed; values are typical-run
  * estimates — Replicate bills by GPU-seconds so actual varies). upscale runs up to 2 passes.
  */
+/** Speech-to-text, USD per audio minute (openai.com/api/pricing, whisper-1 $0.006/min). Used by video captions. */
+export const TRANSCRIBE_RATES: Record<"whisper-1", { usdPerMin: number; label: string; vendor: string }> = {
+  "whisper-1": { usdPerMin: 0.006, label: "OpenAI Whisper", vendor: "OpenAI" },
+};
+
 export const TOOL_RATES: Record<string, { usd: number; label: string; vendor: string; estimate: boolean }> = {
   "bg-remove":   { usd: 0.011, label: "去背 (851-labs)", vendor: "Replicate", estimate: true },
   "upscale":     { usd: 0.005, label: "升頻 (real-esrgan, 每 pass)", vendor: "Replicate", estimate: true },

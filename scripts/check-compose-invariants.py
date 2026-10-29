@@ -40,6 +40,7 @@ ENFORCED = [
     "lobster-factory/infra/hetzner-phase1-core/docker-compose.observability.yml",
     "lobster-factory/infra/hetzner-phase1-core/apps/video-service/docker-compose.video.yml",
     "lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/docker-compose.remotion.yml",
+    "lobster-factory/infra/hetzner-phase1-core/apps/video-whisper-worker/docker-compose.whisper.yml",
     "Projects/internal/cognitive-engineering-os/docker-compose.yml",
     "Projects/internal/cognitive-engineering-os/ops/cognitive-db/docker-compose.cognitive-db.yml",
     "Projects/internal/ziwei-doushu/docker-compose.yml",   # prod: oracle-web at /opt/oracle (was listed as local dev)

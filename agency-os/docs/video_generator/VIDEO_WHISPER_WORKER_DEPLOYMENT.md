@@ -1,34 +1,28 @@
-# Dedicated Video Whisper Worker — deployment contract
+# Video Whisper Worker — deployment contract
 
-Scope: `apps/video-whisper-worker` on RTX laptop only. Never reuse or alter `meeting-service`.
+`apps/video-whisper-worker`. Never reuse or alter `meeting-service`. Since 2026-10-29 it runs on ks-aw-01 (CPU int8,
+large-v3, 1.13x realtime measured); the RTX laptop + Cloudflare Tunnel path is retired once the host is live.
 
-## Required vault values
+## Engines (next-admin `lib/content/video/transcription.ts`)
 
-- `VIDEO_WHISPER_WORKER_TOKEN`: random 32+ byte token, shared only by next-admin and worker.
-- `MEDIA_TRANSCRIBE_WORKER_URL`: HTTPS Cloudflare Tunnel URL ending without `/`.
-- `MEDIA_TRANSCRIBE_CALLBACK_BASE_URL=https://app.aware-wave.com`.
-- `MEDIA_TRANSCRIBE_WORKER_TOKEN`: same worker token in ks-aw-01 next-admin environment.
+- `host`: this worker, free. `openai`: whisper-1, US$0.006/min, ≤25MB, falls back to `host` on failure.
+- A client with `client_config.audioExternalAiAllowed=false` is refused `openai` server-side (dispatch route 403).
 
-## Laptop process
+## Host install (High: new service)
 
-```powershell
-Set-Location D:\Work\_video_release_guard2\lobster-factory\infra\hetzner-phase1-core\apps\video-whisper-worker
-python -m pip install -r requirements.txt
-$env:VIDEO_WHISPER_WORKER_TOKEN = '<vault-value>'
-python -m uvicorn app:app --host 127.0.0.1 --port 8421
+```bash
+cd /root/lobster-phase1/apps/video-whisper-worker
+docker compose -f docker-compose.whisper.yml --env-file .env.whisper up -d --build
+docker inspect -f '{{.State.Health.Status}}' lobster-video-whisper   # healthy
 ```
 
-Expected: `GET http://127.0.0.1:8421/health` returns `{"ok":true,"service":"video-whisper-worker"}`.
+- `.env.whisper`: `VIDEO_WHISPER_WORKER_TOKEN` (not committed).
+- next-admin `.env`: `MEDIA_TRANSCRIBE_WORKER_URL=http://video-whisper-worker:8421`, `MEDIA_TRANSCRIBE_WORKER_TOKEN` (same token),
+  `MEDIA_TRANSCRIBE_CALLBACK_BASE_URL=http://next-admin:3000`, `MEDIA_TRANSCRIBE_MODEL=large-v3`; then recreate next-admin.
+- Verify: `docker exec lobster-next-admin wget -qO- http://video-whisper-worker:8421/health`; one real job from ⑦ completes.
+- No host port. The worker accepts only callbacks starting with `VIDEO_WHISPER_CALLBACK_BASE` and one job at a time.
 
-## Network boundary
+## Rollback
 
-Cloudflare Tunnel exposes the worker HTTPS hostname. The worker only accepts bearer-authenticated `POST /v1/jobs`, accepts public HTTPS R2 sources, validates SHA-256 before Whisper, and calls the fixed app callback with a per-job secret. It has no meeting endpoints, public docs, browser UI, database credential, or general inbound proxy.
-
-## Release order
-
-1. Backup and apply `packages/db/migrations/0069_media_transcription_jobs.sql`.
-2. Deploy next-admin with callback base and worker URL/token still empty: dispatch remains fail-closed (`503`).
-3. Start laptop worker and Tunnel. Set the three vault-backed production variables. Redeploy next-admin.
-4. Submit one checksummed tenant R2 asset. Verify job `completed`, JSON/SRT/VTT assets, caption QA row, then use caption track in an existing footage render.
-
-Rollback: clear `MEDIA_TRANSCRIBE_*`, redeploy next-admin; submitted jobs remain auditable and no existing render or meeting path changes.
+`docker compose -f docker-compose.whisper.yml down`; set `MEDIA_TRANSCRIBE_WORKER_URL` back to the tunnel URL (or empty =
+host engine 503, OpenAI still works); recreate next-admin. Submitted jobs stay auditable in `media_transcription_jobs`.

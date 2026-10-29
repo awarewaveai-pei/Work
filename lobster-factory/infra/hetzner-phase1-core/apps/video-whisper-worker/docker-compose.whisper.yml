@@ -1,0 +1,43 @@
+# video-whisper-worker on ks-aw-01 (CPU int8). Own deploy unit like video-service; never touches the main compose.
+# Reachable only on lobster-net (next-admin -> http://video-whisper-worker:8421); no host port.
+#   docker compose -f docker-compose.whisper.yml --env-file .env.whisper up -d --build
+# .env.whisper: VIDEO_WHISPER_WORKER_TOKEN (= next-admin MEDIA_TRANSCRIBE_WORKER_TOKEN). Not committed.
+services:
+  video-whisper-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: lobster-video-whisper:local
+    container_name: lobster-video-whisper
+    restart: unless-stopped
+    environment:
+      VIDEO_WHISPER_WORKER_TOKEN: ${VIDEO_WHISPER_WORKER_TOKEN:?VIDEO_WHISPER_WORKER_TOKEN is required}
+      VIDEO_WHISPER_DEVICE: cpu
+      VIDEO_WHISPER_CPU_THREADS: "8"
+      VIDEO_WHISPER_CALLBACK_BASE: http://next-admin:3000
+    volumes:
+      - whisper-models:/models
+    networks:
+      - lobster-net
+    deploy:
+      resources:
+        limits:
+          memory: 6G
+          cpus: "8.00"
+          pids: 256
+    logging:
+      driver: json-file
+      options:
+        max-size: "25m"
+        max-file: "3"
+    memswap_limit: 6G
+    init: true
+
+volumes:
+  whisper-models:
+    name: lobster-whisper-models
+
+networks:
+  lobster-net:
+    external: true
+    name: lobster-net

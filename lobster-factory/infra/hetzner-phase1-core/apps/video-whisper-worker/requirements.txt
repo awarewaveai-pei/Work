@@ -1,4 +1,6 @@
 fastapi==0.137.0
 uvicorn==0.49.0
 faster-whisper==1.2.1
+# faster-whisper 1.2.1 calls av.open(metadata_errors=...), which av 19 removed (2026-10-29 host install failed).
+av==18.1.0
 httpx==0.28.1

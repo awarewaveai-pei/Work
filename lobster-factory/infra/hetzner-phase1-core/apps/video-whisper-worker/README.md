@@ -1,18 +1,15 @@
 # Video Whisper Worker
 
-Independent RTX-only process for Video LEGO. It does not import, start, proxy,
+Independent faster-whisper process for Video LEGO captions. It does not import, start, proxy,
 or expose `meeting-service`.
 
-Run on the RTX laptop only:
+Production: ks-aw-01, `docker-compose.whisper.yml` (CPU int8, large-v3, one job at a time, lobster-net only).
+Install, env and rollback: `agency-os/docs/video_generator/VIDEO_WHISPER_WORKER_DEPLOYMENT.md`.
 
-```powershell
-python -m pip install -r requirements.txt
-$env:VIDEO_WHISPER_WORKER_TOKEN = '<vault-provided-token>'
-python -m uvicorn app:app --host 127.0.0.1 --port 8421
-```
+- `VIDEO_WHISPER_DEVICE` auto|cuda|cpu (auto = CUDA probe, else CPU), `VIDEO_WHISPER_CPU_THREADS` (default 8).
+- `VIDEO_WHISPER_CALLBACK_BASE` set = callbacks must start with it (host: `http://next-admin:3000`); unset = public https only.
+- Chinese audio gets a Traditional-Chinese prompt; without it Whisper writes Simplified.
+- Dependencies install from `requirements.lock` (hashes); `av` is pinned because av 19 breaks faster-whisper 1.2.1.
 
-Cloudflare Tunnel may expose only `/v1/jobs` and `/health` from this process.
-The worker accepts HTTPS source/callback URLs, verifies the source SHA-256, and
-returns results only to the per-job callback secret supplied by next-admin.
-
-Recovery: `start-worker.ps1` reads only `VIDEO_WHISPER_WORKER_TOKEN` and `VIDEO_WHISPER_TUNNEL_TOKEN` from the user-owned staging secret file. `runtime/` is local-only. Run `start-worker.ps1` or the Desktop launcher `啟動影片字幕服務.cmd` only when subtitles are needed; stop the two dedicated processes after use.
+Laptop fallback (RTX, until the host is live): `start-worker.ps1` reads `VIDEO_WHISPER_WORKER_TOKEN` and
+`VIDEO_WHISPER_TUNNEL_TOKEN` from the user-owned staging secret file and starts the worker + Cloudflare Tunnel.

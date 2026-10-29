@@ -1,7 +1,8 @@
 """Dedicated Video LEGO Whisper worker.
 
-Runs only on the RTX workstation.  It intentionally has no meeting routes,
-browser UI, generic downloads, or unauthenticated status endpoint.
+Runs on ks-aw-01 (CPU int8, docker-compose.whisper.yml) or an RTX workstation (CUDA).
+It intentionally has no meeting routes, browser UI, generic downloads, or
+unauthenticated status endpoint.
 """
 from __future__ import annotations
 
@@ -19,11 +20,19 @@ from urllib.parse import urlparse
 import httpx
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
-from faster_whisper import WhisperModel
+from faster_whisper import WhisperModel, decode_audio
 
 app = FastAPI(title="Video Whisper Worker", docs_url=None, redoc_url=None)
 MAX_BYTES = 500 * 1024 * 1024
-_model: WhisperModel | None = None
+# A host install sets this to next-admin's internal address; the callback must then start with it.
+CALLBACK_BASE = os.environ.get("VIDEO_WHISPER_CALLBACK_BASE", "").rstrip("/")
+DEVICE = os.environ.get("VIDEO_WHISPER_DEVICE", "auto")  # auto | cuda | cpu
+CPU_THREADS = int(os.environ.get("VIDEO_WHISPER_CPU_THREADS", "8"))
+ZH_HANT_PROMPT = "以下是繁體中文的影片旁白，請以臺灣用語的繁體中文輸出。"
+_models: dict[str, tuple[WhisperModel, str]] = {}
+_model_lock = threading.Lock()
+# One job at a time: two CPU transcriptions in parallel each take twice as long and double the memory.
+_job_slot = threading.Semaphore(1)
 
 
 class Job(BaseModel):
@@ -54,14 +63,42 @@ def public_https(value: str) -> None:
         raise HTTPException(422, "non-public URL forbidden") from None
 
 
-def get_model(name: str) -> WhisperModel:
-    global _model
-    if _model is None:
-        _model = WhisperModel(name, device="cuda", compute_type="float16")
-    return _model
+def check_callback(value: str) -> None:
+    if CALLBACK_BASE:
+        if not value.startswith(CALLBACK_BASE + "/"):
+            raise HTTPException(422, "callback outside the configured base")
+        return
+    public_https(value)
+
+
+def get_model(name: str) -> tuple[WhisperModel, str]:
+    """Model + backend label. auto: a model that builds can still fail on the first encode when
+    cuBLAS/cuDNN is missing, so a one-second probe decides (same as meeting-service pick_device)."""
+    with _model_lock:
+        if name in _models:
+            return _models[name]
+        loaded: tuple[WhisperModel, str] | None = None
+        if DEVICE in ("auto", "cuda"):
+            try:
+                import numpy as np
+                model = WhisperModel(name, device="cuda", compute_type="float16")
+                list(model.transcribe(np.zeros(16000, dtype=np.float32), vad_filter=False)[0])
+                loaded = (model, "cuda/float16")
+            except Exception:
+                if DEVICE == "cuda":
+                    raise
+        if loaded is None:
+            loaded = (WhisperModel(name, device="cpu", compute_type="int8", cpu_threads=CPU_THREADS), f"cpu/int8 x{CPU_THREADS}")
+        _models[name] = loaded
+        return loaded
 
 
 def execute(job: Job) -> None:
+    with _job_slot:
+        _execute(job)
+
+
+def _execute(job: Job) -> None:
     result: dict[str, object]
     path: Path | None = None
     try:
@@ -79,9 +116,16 @@ def execute(job: Job) -> None:
                     out.write(chunk)
         if not hmac.compare_digest(digest.hexdigest(), job.source_checksum_sha256):
             raise ValueError("source checksum mismatch")
-        segments, info = get_model(job.model).transcribe(str(path), word_timestamps=True)
+        model, backend = get_model(job.model)
+        audio = decode_audio(str(path))
+        # Without a Traditional-Chinese prompt Whisper writes Mandarin in Simplified (2026-10-29 host test);
+        # the prompt goes in only for Chinese audio so it cannot bias other languages.
+        language, _, _ = model.detect_language(audio)
+        prompt = ZH_HANT_PROMPT if language == "zh" else None
+        # beam_size=1 + VAD: meeting-service measured beam 5 -> 1 as 29% faster with no visible loss.
+        segments, info = model.transcribe(audio, language=language, initial_prompt=prompt, word_timestamps=True, vad_filter=True, beam_size=1)
         result = {"ok": True, "jobId": job.job_id, "transcript": {
-            "model": job.model, "backend": "cuda/float16", "language": info.language,
+            "model": job.model, "backend": backend, "language": info.language,
             "language_probability": info.language_probability, "audio_duration_sec": info.duration,
             "segments": [{"id": index, "start": segment.start, "end": segment.end, "text": segment.text,
                           "avg_logprob": segment.avg_logprob, "no_speech_prob": segment.no_speech_prob}
@@ -112,6 +156,6 @@ def health():
 def submit(job: Job, authorization: str = Header(default="")):
     require_token(authorization)
     public_https(job.source_url)
-    public_https(job.callback_url)
+    check_callback(job.callback_url)
     threading.Thread(target=execute, args=(job,), daemon=True).start()
     return {"ok": True, "jobId": job.job_id, "status": "accepted"}

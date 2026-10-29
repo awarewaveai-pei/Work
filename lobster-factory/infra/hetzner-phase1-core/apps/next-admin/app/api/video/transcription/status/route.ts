@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "@/lib/ops-role";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
+import { JOB_DEADLINE_MS } from "@/lib/content/video/transcription";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,29 +20,41 @@ export async function GET(req: NextRequest): Promise<Response> {
 
   const { searchParams } = new URL(req.url);
   const jobId = (searchParams.get("jobId") ?? "").trim();
-  if (!UUID_RE.test(jobId)) return NextResponse.json({ ok: false, error: "invalid_job_id" }, { status: 400 });
+  // ?sourceAssetId= : the latest job of one video, so a reopened page picks up a job that kept running.
+  const sourceAssetId = (searchParams.get("sourceAssetId") ?? "").trim();
+  if (!UUID_RE.test(jobId) && !UUID_RE.test(sourceAssetId)) return NextResponse.json({ ok: false, error: "invalid_job_id" }, { status: 400 });
 
   const { getSupabaseWriteClient } = await import("@/lib/supabase-server");
   const db = getSupabaseWriteClient();
   if (!db) return NextResponse.json({ ok: false, error: "media_database_unavailable" }, { status: 503 });
 
-  const { data: job, error } = await db
-    .from("media_transcription_jobs")
-    .select("id, organization_id, source_asset_id, status, model, result_json, error_code, created_at, completed_at")
-    .eq("id", jobId)
-    .maybeSingle();
+  const base = db.from("media_transcription_jobs").select("id, organization_id, source_asset_id, status, model, result_json, error_code, created_at, completed_at");
+  const { data: job, error } = UUID_RE.test(jobId)
+    ? await base.eq("id", jobId).maybeSingle()
+    : await base.eq("source_asset_id", sourceAssetId).order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (error) return NextResponse.json({ ok: false, error: "job_lookup_failed" }, { status: 502 });
   if (!job) return NextResponse.json({ ok: false, error: "job_not_found" }, { status: 404 });
   try { assertOrgAccess(req, job.organization_id as string); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
+  const result = (job.result_json ?? {}) as Record<string, unknown>;
+  const engine = result.engine === "openai" ? "openai" : "host";
+  if (job.status === "dispatched" && Date.now() - new Date(job.created_at as string).getTime() > JOB_DEADLINE_MS[engine]) {
+    // Nothing will ever finish it (next-admin or the worker restarted mid-job); fail it so the page stops waiting.
+    const now = new Date().toISOString();
+    await db.from("media_transcription_jobs").update({ status: "failed", error_code: "job_timed_out", completed_at: now }).eq("id", job.id).eq("status", "dispatched");
+    job.status = "failed"; job.error_code = "job_timed_out"; job.completed_at = now;
+  }
   return NextResponse.json({
     ok: true,
     jobId: job.id,
     status: job.status,
     model: job.model,
+    engine,
+    fallbackFrom: result.fallbackFrom ?? null,
+    costUsd: typeof result.costUsd === "number" ? result.costUsd : 0,
     sourceAssetId: job.source_asset_id,
-    artifacts: (job.result_json as Record<string, unknown> | null)?.artifacts ?? null,
+    artifacts: result.artifacts ?? null,
     errorCode: job.error_code,
     createdAt: job.created_at,
     completedAt: job.completed_at,
