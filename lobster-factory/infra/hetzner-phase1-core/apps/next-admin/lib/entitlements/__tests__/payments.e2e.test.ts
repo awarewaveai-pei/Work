@@ -7,7 +7,10 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createPrivateKey, sign } from "node:crypto";
+import { PAYMENT_SITE_HEADER } from "@/lib/payments/hmac";
 import { LOCAL_SIGNATURE_HEADER, signLocalPayment } from "@/lib/payments/local";
+import fixture from "@/lib/payments/__tests__/fixtures/ed25519-v1.json";
 import { startRestProxy } from "./real-db";
 
 const REST = process.env.ENTITLEMENTS_REST;
@@ -224,8 +227,9 @@ describe.skipIf(!REST)("payments against a real database (ADR 017 step 4a)", () 
         ["plans", { plan_key: "seller_plan", product_key: "social", kind: "base", features: ["social.rewrite"], limits: {}, owner_organization_id: SELLER }],
         ["plans", { plan_key: "seller_video", product_key: "video", kind: "base", features: ["video.script"], limits: {}, owner_organization_id: SELLER }],
         // the seller may sell social and content (staff-written licence rows); not video
-        ["organization_entitlements", [{ organization_id: SELLER, product_key: "social", feature_key: "social.resell", source: "comp", source_ref: "e2e-licence" },
-          { organization_id: SELLER, product_key: "content", feature_key: "content.resell", source: "comp", source_ref: "e2e-licence" }]],
+        // started a day ago, as staff write them: the app compares whole seconds (can.ts liveRow), a row from this very second is not yet live
+        ["organization_entitlements", [{ organization_id: SELLER, product_key: "social", feature_key: "social.resell", source: "comp", source_ref: "e2e-licence", starts_at: days(-1) },
+          { organization_id: SELLER, product_key: "content", feature_key: "content.resell", source: "comp", source_ref: "e2e-licence", starts_at: days(-1) }]],
         ["seller_sites", { seller_organization_id: SELLER, host: "shop.seller.test", platform: "woo", key_id: "seller-b", verify_alg: "ed25519", public_key: PEM, status: "active" }],
         ["seller_sites", { seller_organization_id: SELLER, host: "old.seller.test", platform: "woo", key_id: "seller-off", verify_alg: "ed25519", public_key: PEM, status: "disabled" }],
       ] as const) {
@@ -276,6 +280,44 @@ describe.skipIf(!REST)("payments against a real database (ADR 017 step 4a)", () 
 
     it("a disabled site is refused", async () => {
       expect(await apply(sub("wc:off-1", BUYER_B, "seller_plan"), site["seller-off"])).toEqual({ error: "payment_rejected:site_disabled" });
+    });
+
+    it("a seller's site signs a woo payment with its ed25519 key through the route (4c-2)", async () => {
+      // the shared vector's key (fixtures/ed25519-v1.json); a member already known at that site, so no invite mail is sent
+      const { registerSite } = await import("@/lib/payments/sites");
+      const made = await registerSite(db, { host: "fixture.seller.test", keyId: "seller-fx", sellerOrganizationId: SELLER, publicKey: fixture.public_key_pem });
+      if (made.ok === false) throw new Error(made.error);
+      const USER = "00000000-0000-4000-8000-0000000000d4";
+      for (const [table, value] of [
+        ["profiles", { id: USER, email: "fx-member@seller.test", default_organization_id: BUYER_B }],
+        ["customer_identities", { provider: "customer-wp", site_id: made.site.id, external_id: "7", user_id: USER, organization_id: BUYER_B }],
+      ] as const) {
+        const { error } = await db.from(table).insert(value);
+        if (error) throw new Error(`${table}: ${error.message}`);
+      }
+      Object.assign(process.env, { PAYMENTS_PROVIDERS: "local,woo" });
+      const key = createPrivateKey({ key: Buffer.concat([Buffer.from("302e020100300506032b657004220420", "hex"), Buffer.from(fixture.seed_hex, "hex")]), format: "der", type: "pkcs8" });
+      const body = JSON.stringify({ event_id: "wc:payment_complete:7:subscription", wp_user_id: 7, email: "fx-member@seller.test", email_verified: true,
+        kind: "subscription_paid", plan_key: "seller_plan", period_end: days(30), external_ref: "7" });
+      const post = async (siteKey: string) => {
+        const { POST } = await import("../../../app/api/webhooks/payments/[provider]/route");
+        const res = await POST(new Request("http://app.test/api/webhooks/payments/woo", { method: "POST", headers: { "content-type": "application/json",
+          [PAYMENT_SITE_HEADER]: siteKey, "x-awarewave-payment-signature": sign(null, Buffer.from(body, "utf8"), key).toString("base64") }, body }),
+          { params: Promise.resolve({ provider: "woo" }) });
+        return { status: res.status, body: await res.json() };
+      };
+      // the same bytes and signature naming another site are not that site's request
+      expect(await post("seller-b")).toEqual({ status: 401, body: { ok: false, error: "invalid_signature" } });
+      expect(await post("seller-fx")).toMatchObject({ status: 200, body: { ok: true, kind: "subscription_paid" } });
+      const [ev] = await rows("payment_events", { event_id: "wc:payment_complete:7:subscription" });
+      expect([ev.site_id, ev.organization_id]).toEqual([made.site.id, BUYER_B]);
+      // the contract reference carries the site's namespace (0133 v_ns): another shop's order 7 is another contract
+      expect((await rows("organization_product_subscriptions", { organization_id: BUYER_B, plan_key: "seller_plan" })).map((r) => r.source_ref)).toEqual(["woo@seller-fx:7"]);
+      // D4's monthly report counts what the seller's own sites took (wc:b-2, this one, pack order 7); the operator's
+      // local entry for the seller's buyer (bank-cancel-b) and refused events are nobody's sale (critic 2026-10-29 M3)
+      const { billingSellerMonth, taipeiMonthStart } = await import("@/lib/entitlements/tables");
+      expect((await billingSellerMonth(taipeiMonthStart(), db)).rows.find((r) => r.seller_id === SELLER))
+        .toMatchObject({ subscription_payments: 2, credit_pack_orders: 1, credit_pack_units: 10 });
     });
   });
 });

@@ -1,7 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+/** A member of one cash-register site (0133: an outside id is unique only within its site). provider follows the
+ *  site: aware-wave.com = awarewave-wp, every other site = customer-wp (lib/payments/sites.ts siteIdentityProvider). */
 export interface Identity {
-  provider: "awarewave-wp";
+  provider: "awarewave-wp" | "customer-wp";
+  siteId: string;
   externalId: string;
 }
 
@@ -28,6 +31,7 @@ export async function findBillingAccount(
     .from("customer_identities")
     .select("external_id, organization_id, user_id")
     .eq("provider", id.provider)
+    .eq("site_id", id.siteId)
     .eq("external_id", id.externalId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -41,7 +45,7 @@ async function findExistingIdentity(
   const byExternalId = await db
     .from("customer_identities")
     .select("external_id, organization_id, user_id")
-    .eq("provider", input.provider)
+    .eq("site_id", input.siteId)
     .eq("external_id", input.externalId)
     .maybeSingle();
   if (byExternalId.error) throw new Error(byExternalId.error.message);
@@ -50,7 +54,7 @@ async function findExistingIdentity(
   const byUserId = await db
     .from("customer_identities")
     .select("external_id, organization_id, user_id")
-    .eq("provider", input.provider)
+    .eq("site_id", input.siteId)
     .eq("user_id", input.userId)
     .maybeSingle();
   if (byUserId.error) throw new Error(byUserId.error.message);
@@ -65,6 +69,7 @@ export async function linkIdentity(
     .from("customer_identities")
     .insert({
       provider: input.provider,
+      site_id: input.siteId,
       external_id: input.externalId,
       user_id: input.userId,
       organization_id: input.organizationId,

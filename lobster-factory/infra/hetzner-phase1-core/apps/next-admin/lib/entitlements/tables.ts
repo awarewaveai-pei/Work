@@ -167,8 +167,9 @@ export async function billingAccount(organizationId: string, client: SupabaseCli
 export type AttentionReason = "frozen" | "overdrawn" | "past_due" | "suspended";
 export const LEDGER_FILTERS = ["all", "attention", "balance", "contract", "internal"] as const;
 export type LedgerFilter = typeof LEDGER_FILTERS[number];
-/** /ops/billing (0130 billing_ledger): totals over every billing account, and one page of the accounts the filter and
- *  query match, each with what the ledger shows without opening the account. */
+/** /ops/billing (0130 billing_ledger, seller since 0141): totals over every billing account, and one page of the accounts
+ *  the filter and query match, each with what the ledger shows without opening the account and who sold it (sold_by =
+ *  the seller's name; an account sold by AwareWave, sold_by_organization_id null, names the internal account). */
 export interface BillingLedger {
   totals: { accounts: number; unused_units: number; unused_accounts: number; granted_30d: number; spent_30d: number; attention: number }
     & Record<AttentionReason, number>;
@@ -179,18 +180,40 @@ export interface BillingLedger {
     contracts: Array<{ product_key: string; plan_key: string; status: string; current_period_end: string | null }>;
     next_period_end: string | null;
     last_payment: { at: string; kind: string; provider: string } | null;
+    sold_by_id: string; sold_by: string | null;
   }>;
 }
 
+/** seller = an organization id: only the accounts that seller sold (0141 'seller:<uuid>'), in place of the filter. */
 export async function billingLedger(
-  opts: { filter: LedgerFilter; query: string; limit: number; offset: number },
+  opts: { filter: LedgerFilter; seller?: string; query: string; limit: number; offset: number },
   client: SupabaseClient | null = getSupabaseWriteClient(),
 ): Promise<BillingLedger> {
   if (!client) throw new Error("entitlements_db_unavailable");
-  const { data, error } = await client.rpc("billing_ledger", { p_filter: opts.filter, p_query: opts.query, p_limit: opts.limit, p_offset: opts.offset });
+  const { data, error } = await client.rpc("billing_ledger", {
+    p_filter: opts.seller ? `seller:${opts.seller}` : opts.filter, p_query: opts.query, p_limit: opts.limit, p_offset: opts.offset,
+  });
   if (error) throw new Error(error.message);
   if (!data || !Array.isArray((data as BillingLedger).rows)) throw new Error("invalid_billing_ledger");
   return data as BillingLedger;
+}
+
+/** ADR 017 #12 D4: what each seller sold in one Asia/Taipei month, for the invoice staff send outside the control plane. */
+export interface SellerMonth {
+  month: string;
+  rows: Array<{ seller_id: string; seller: string; subscription_payments: number; credit_pack_orders: number; credit_pack_units: number }>;
+}
+
+/** The Asia/Taipei calendar month a date falls in, as its first day (the month 0141 billing_seller_month sums by). */
+export const taipeiMonthStart = (now: Date = new Date()): string =>
+  `${now.toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" }).slice(0, 7)}-01`;
+
+export async function billingSellerMonth(month: string, client: SupabaseClient | null = getSupabaseWriteClient()): Promise<SellerMonth> {
+  if (!client) throw new Error("entitlements_db_unavailable");
+  const { data, error } = await client.rpc("billing_seller_month", { p_month: month });
+  if (error) throw new Error(error.message);
+  if (!data || !Array.isArray((data as SellerMonth).rows)) throw new Error("invalid_billing_seller_month");
+  return data as SellerMonth;
 }
 
 const TRIAL_PAGE = 200;

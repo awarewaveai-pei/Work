@@ -7,6 +7,10 @@ const refusedIncident = vi.fn(async (..._args: unknown[]) => ({ id: "i1", error:
 vi.mock("@/lib/ops-inbox/ingest", () => ({ ingestIncident: (_db: unknown, draft: { raw: { event_id: string; code: string } }) => refusedIncident(_db, draft.raw.event_id, draft.raw.code, draft) }));
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => ({}) }));
 vi.mock("@/lib/entitlements/wp-customers", async (orig) => ({ ...(await orig<object>()), ensureWpCustomer: async () => ({ organizationId: "00000000-0000-4000-8000-0000000000c1", created: false }) }));
+// aware-wave.com's row (0133), hmac-env on PAYMENTS_WOO_SECRET; selling is allowed (the site rules are sites.test.ts)
+vi.mock("@/lib/payments/sites", async (orig) => ({ ...(await orig<object>()), siteMaySellPlan: async () => null,
+  findSiteByKeyId: async (_db: unknown, keyId: string) => (keyId === "aware-wave-com" ? { id: "site-awc", host: "aware-wave.com", keyId, sellerOrganizationId: "org-internal",
+    sellerKind: "internal", verifyAlg: "hmac-env", publicKey: null, envVar: "PAYMENTS_WOO_SECRET", handoffPublicKey: null, handoffEnvVar: null, status: "active" } : null) }));
 
 const SECRET = "local-payments-test-secret-0123456789";
 const ORG = "00000000-0000-4000-8000-0000000000c1";

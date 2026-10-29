@@ -4,6 +4,8 @@
 // billing_apply_payment_event (migration 0120) reads, so the event is passed through without a second mapping.
 // Which providers answer is configuration: lib/payments/index.ts.
 
+import type { SellerSite } from "./sites";
+
 export type PaymentProviderName = "local" | "woo";
 
 export type PaymentEvent =
@@ -16,24 +18,32 @@ export type PaymentEvent =
   | { kind: "chargeback"; organization_id: string; ref?: string }
   | { kind: "chargeback_cleared"; organization_id: string; note?: string };
 
-/** event_id is the provider's own id for this notification: the inbox key, so a resend is a no-op. */
-export interface ReceivedPayment { eventId: string; event: PaymentEvent }
+/** event_id is the provider's own id for this notification: the inbox key (per site), so a resend is a no-op.
+ *  siteId = the seller_sites row that signed it (woo); null/absent = `local`, which has no site (0133). */
+export interface ReceivedPayment { eventId: string; event: PaymentEvent; siteId?: string | null }
+
+/** What verify() proved about the sender. `site` = the seller_sites row whose own key signed the request (woo); parse
+ *  and refused receive this same object, so the site that bills is always the site that signed (4c-2). */
+export interface VerifiedSender { site?: SellerSite }
 
 export interface PaymentProvider {
   name: PaymentProviderName;
-  /** true only for a request this provider sent: a signature over the exact raw body. */
-  verify(headers: Headers, rawBody: string): boolean;
+  /** Non-null only for a request this provider sent: a signature over the exact raw body. Async when the key is looked
+   *  up (woo: the site's row); a lookup outage rejects, and the route answers "not recorded" so the sender retries. */
+  verify(headers: Headers, rawBody: string): VerifiedSender | null | Promise<VerifiedSender | null>;
   /** Throws (or rejects with) PaymentParseError for anything that is not one well-formed event. A provider whose events
    *  name the payer by an outside id (woo: the WordPress member) resolves the billing account here, so it is async. */
-  parse(rawBody: string): ReceivedPayment | Promise<ReceivedPayment>;
+  parse(rawBody: string, sender: VerifiedSender): ReceivedPayment | Promise<ReceivedPayment>;
   /** Called by the route for every final refusal of a request that passed verify(): a parse refusal or a control-plane
    *  rejection. A provider whose sender cannot be told (woo: the shop already took the money) alerts the operator here.
    *  Must not throw. */
-  refused?(rawBody: string, code: string): Promise<void>;
+  refused?(rawBody: string, code: string, sender: VerifiedSender): Promise<void>;
 }
 
+/** code = what the sender is told; detail = what the operator's incident says, when the sender must not learn it (a
+ *  seller's site must not learn whether an email is staff's or another seller's customer, critic 2026-10-29 M1). */
 export class PaymentParseError extends Error {
-  constructor(readonly code: string) { super(`payment_parse:${code}`); this.name = "PaymentParseError"; }
+  constructor(readonly code: string, readonly detail?: string) { super(`payment_parse:${code}`); this.name = "PaymentParseError"; }
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

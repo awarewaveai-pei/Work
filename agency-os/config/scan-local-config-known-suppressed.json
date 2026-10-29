@@ -158,6 +158,12 @@
       "pattern": "GitHub PAT (classic)",
       "sourceKey": "GH_TOKEN",
       "reason": "Known local Claude runtime config; gitignored; value governed through local machine secret hygiene."
+    },
+    {
+      "file": "mcp/user-env.ps1",
+      "pattern": "Google API key",
+      "sourceKey": "YOUTUBE_API_KEY",
+      "reason": "Known local MCP env registry entry; gitignored; value in the local vault (imported 2026-10-29, ADR 017 4c-2 session)."
     }
   ]
 }

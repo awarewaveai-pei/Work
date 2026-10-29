@@ -20,21 +20,21 @@ describe("local payment provider (ADR 017 step 4a)", () => {
 
   it("a forged request is refused: wrong secret, edited body, no header, or a secret too short to trust", () => {
     const raw = body({ kind: "credit_pack", organization_id: ORG, units: 500, order_ref: "TX-1" });
-    expect(local().verify(headers(raw), raw)).toBe(true);
-    expect(local().verify(headers(raw, SECRET + "x"), raw)).toBe(false);
-    expect(local().verify(headers(raw), raw.replace("500", "5000"))).toBe(false);
-    expect(local().verify(new Headers(), raw)).toBe(false);
+    expect(local().verify(headers(raw), raw)).toEqual({});   // verified, and no site: a transfer has none (0133)
+    expect(local().verify(headers(raw, SECRET + "x"), raw)).toBeNull();
+    expect(local().verify(headers(raw), raw.replace("500", "5000"))).toBeNull();
+    expect(local().verify(new Headers(), raw)).toBeNull();
     const short = paymentProvider("local", { PAYMENTS_PROVIDERS: "local", PAYMENTS_LOCAL_SECRET: "short" })!;
-    expect(short.verify(headers(raw, "short"), raw)).toBe(false);
+    expect(short.verify(headers(raw, "short"), raw)).toBeNull();
   });
 
   it("parses each event kind into the control plane's PaymentEvent and nothing else", async () => {
     const p = local();
-    expect(await p.parse(body({ kind: "subscription_paid", organization_id: ORG, plan_key: "social_pro", period_end: "2026-11-23T00:00:00Z", external_ref: "TX-9", extra: 1 })))
+    expect(await p.parse(body({ kind: "subscription_paid", organization_id: ORG, plan_key: "social_pro", period_end: "2026-11-23T00:00:00Z", external_ref: "TX-9", extra: 1 }), {}))
       .toEqual({ eventId: "bank-2026-10-23-001", event: { kind: "subscription_paid", organization_id: ORG, plan_key: "social_pro", period_end: "2026-11-23T00:00:00Z", external_ref: "TX-9" } });
-    expect((await p.parse(body({ kind: "credit_pack", organization_id: ORG, units: 500, order_ref: "TX-1" }))).event).toEqual({ kind: "credit_pack", organization_id: ORG, units: 500, order_ref: "TX-1" });
-    expect((await p.parse(body({ kind: "refund", target: "credit_pack", organization_id: ORG, order_ref: "TX-1" }))).event.kind).toBe("refund");
-    expect((await p.parse(body({ kind: "chargeback_cleared", organization_id: ORG, note: "bank confirmed" }))).event).toEqual({ kind: "chargeback_cleared", organization_id: ORG, note: "bank confirmed" });
+    expect((await p.parse(body({ kind: "credit_pack", organization_id: ORG, units: 500, order_ref: "TX-1" }), {})).event).toEqual({ kind: "credit_pack", organization_id: ORG, units: 500, order_ref: "TX-1" });
+    expect((await p.parse(body({ kind: "refund", target: "credit_pack", organization_id: ORG, order_ref: "TX-1" }), {})).event.kind).toBe("refund");
+    expect((await p.parse(body({ kind: "chargeback_cleared", organization_id: ORG, note: "bank confirmed" }), {})).event).toEqual({ kind: "chargeback_cleared", organization_id: ORG, note: "bank confirmed" });
   });
 
   it("what the operator's scripts/record-payment.mjs signs is exactly what the local provider accepts", async () => {
@@ -46,8 +46,8 @@ describe("local payment provider (ADR 017 step 4a)", () => {
       ["chargeback_cleared", "--org", ORG, "--ref", "CASE-7", "--note", "bank confirmed", "--url", "http://localhost:3000/"],
     ]) {
       const p = buildPayment(argv, SECRET);
-      expect(local().verify(new Headers({ [LOCAL_SIGNATURE_HEADER]: p.signature }), p.body)).toBe(true);
-      expect((await local().parse(p.body)).event.kind).toBe(argv[0]);
+      expect(local().verify(new Headers({ [LOCAL_SIGNATURE_HEADER]: p.signature }), p.body)).toEqual({});
+      expect((await local().parse(p.body, {})).event.kind).toBe(argv[0]);
       expect(p.url).toMatch(/\/api\/webhooks\/payments\/local$/);
     }
     expect(buildPayment(["credit_pack", "--org", ORG, "--units", "5", "--ref", "TX-9"], SECRET).body).toContain(`"event_id":"credit_pack:${ORG}:TX-9"`);
@@ -59,7 +59,7 @@ describe("local payment provider (ADR 017 step 4a)", () => {
   });
 
   it("refuses malformed events before they reach the database", () => {
-    const code = (o: unknown) => { try { local().parse(typeof o === "string" ? o : JSON.stringify(o)); return "parsed"; } catch (e) { return (e as { code?: string }).code; } };
+    const code = (o: unknown) => { try { local().parse(typeof o === "string" ? o : JSON.stringify(o), {}); return "parsed"; } catch (e) { return (e as { code?: string }).code; } };
     expect(code("{")).toBe("invalid_json");
     expect(code({ kind: "credit_pack", organization_id: ORG, units: 1, order_ref: "x" })).toBe("invalid_event_id");
     expect(code({ event_id: "e1", kind: "credit_pack", organization_id: "acme", units: 1, order_ref: "x" })).toBe("invalid_organization_id");

@@ -13,7 +13,7 @@ describe("applyPaymentEvent: carries one PaymentEvent to 0120 and names the outc
   it("sends provider, event id and event to billing_apply_payment_event", async () => {
     const { rpc, db } = client({ data: { ok: true, event: "e", kind: "credit_pack", units: 500 } });
     await expect(applyPaymentEvent("local", received, db)).resolves.toMatchObject({ ok: true, units: 500 });
-    expect(rpc).toHaveBeenCalledWith("billing_apply_payment_event", { p_provider: "local", p_event_id: "bank-1", p_event: received.event });
+    expect(rpc).toHaveBeenCalledWith("billing_apply_payment_event", { p_provider: "local", p_event_id: "bank-1", p_event: received.event, p_site_id: null });
   });
 
   it("a business rejection is a 422 (409 for a reused id or a frozen account); an infrastructure error throws", async () => {

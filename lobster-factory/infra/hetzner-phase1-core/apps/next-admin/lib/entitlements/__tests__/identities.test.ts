@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it, vi } from "vitest";
 import { findBillingAccount, linkIdentity } from "../identities";
 
-const IDENTITY = { provider: "awarewave-wp" as const, externalId: "wp-user-17" };
+const IDENTITY = { provider: "awarewave-wp" as const, siteId: "site-awc", externalId: "wp-user-17" };
 const ACCOUNT = { userId: "user-1", organizationId: "org-1" };
 const row = (overrides: Partial<{ external_id: string; user_id: string; organization_id: string }> = {}) => ({
   external_id: IDENTITY.externalId,
@@ -82,8 +82,8 @@ describe("customer identity store", () => {
     await expect(linkIdentity(db, { ...IDENTITY, userId: ACCOUNT.userId, organizationId: "org-2" }))
       .rejects.toThrow("identity_conflict");
     expect(selectFilters).toEqual([
-      [["provider", "awarewave-wp"], ["external_id", IDENTITY.externalId]],
-      [["provider", "awarewave-wp"], ["user_id", ACCOUNT.userId]],
+      [["site_id", IDENTITY.siteId], ["external_id", IDENTITY.externalId]],
+      [["site_id", IDENTITY.siteId], ["user_id", ACCOUNT.userId]],
     ]);
 
     const sameAccount = fakeSb({

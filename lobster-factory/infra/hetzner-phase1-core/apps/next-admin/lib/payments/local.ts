@@ -11,7 +11,8 @@ export const signLocalPayment = signPayment;
 export function localProvider(env: Record<string, string | undefined>): PaymentProvider {
   return {
     name: "local",
-    verify: (headers, rawBody) => verifyPayment(rawBody, headers.get(LOCAL_SIGNATURE_HEADER), env.PAYMENTS_LOCAL_SECRET),
+    // No site: an operator-recorded transfer (0133 local_has_no_site).
+    verify: (headers, rawBody) => (verifyPayment(rawBody, headers.get(LOCAL_SIGNATURE_HEADER), env.PAYMENTS_LOCAL_SECRET) ? {} : null),
     parse(rawBody) {
       let body: unknown;
       try { body = JSON.parse(rawBody); } catch { throw new PaymentParseError("invalid_json"); }

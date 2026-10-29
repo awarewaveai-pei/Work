@@ -5,6 +5,8 @@ import { createHmac } from "node:crypto";
 import { timingSafeEqual } from "@/lib/security/timingSafeEqual";
 
 export const PAYMENT_SIGNATURE_HEADER = "x-awarewave-payment-signature";
+/** The cash-register site's key id (seller_sites.key_id, 4c-2); absent = aware-wave.com, the plugin before 1.1.0. */
+export const PAYMENT_SITE_HEADER = "x-awarewave-site";
 export const MIN_PAYMENT_SECRET = 32;
 
 export const signPayment = (rawBody: string, secret: string): string =>

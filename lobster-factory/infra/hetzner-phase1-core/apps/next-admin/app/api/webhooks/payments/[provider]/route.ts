@@ -16,13 +16,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
   const body = await readWebhookBody(req);
   if (body.ok === false) return NextResponse.json({ ok: false, error: body.status === 413 ? "body_too_large" : "invalid_json" }, { status: body.status });
   const raw = body.raw;
-  if (!provider.verify(req.headers, raw)) return NextResponse.json({ ok: false, error: "invalid_signature" }, { status: 401 });
+  let sender;
+  try {
+    sender = await provider.verify(req.headers, raw);
+  } catch (error) {
+    // woo looks the signing site up; an outage there is "not recorded", and the sender retries the same event.
+    console.error("[payments] verify failed", provider.name, String(error).slice(0, 200));
+    return NextResponse.json({ ok: false, error: "payment_not_recorded" }, { status: 500 });
+  }
+  if (!sender) return NextResponse.json({ ok: false, error: "invalid_signature" }, { status: 401 });
   let received;
   try {
-    received = await provider.parse(raw);
+    received = await provider.parse(raw, sender);
   } catch (error) {
     if (error instanceof PaymentParseError) {
-      await provider.refused?.(raw, error.code);
+      await provider.refused?.(raw, error.detail ?? error.code, sender);
       return NextResponse.json({ ok: false, error: error.code }, { status: 400 });
     }
     // woo resolves the payer while parsing; an outage there is "not recorded", and the sender retries the same event.
@@ -32,7 +40,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
   try {
     const outcome = await applyPaymentEvent(provider.name, received);
     if (outcome.ok === false) {
-      await provider.refused?.(raw, outcome.code);
+      await provider.refused?.(raw, outcome.code, sender);
       return NextResponse.json({ ok: false, error: outcome.code }, { status: outcome.status });
     }
     return NextResponse.json(outcome);

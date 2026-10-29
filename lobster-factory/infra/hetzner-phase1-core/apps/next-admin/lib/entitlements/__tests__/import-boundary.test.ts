@@ -5,10 +5,11 @@ import { describe, expect, it } from "vitest";
 
 const ROOT = path.resolve(__dirname, "../../..");
 const SDK = /^(?:@anthropic-ai\/sdk|openai|replicate|@fal-ai(?:\/[^/]+)?|@google\/(?:genai|generative-ai))(?:\/|$)/;
-const TABLES = new Set(["plans", "organization_entitlements", "organization_product_subscriptions", "media_credit_ledger", "payment_events", "credit_wallet_holds", "customer_identities"]);
+const TABLES = new Set(["plans", "organization_entitlements", "organization_product_subscriptions", "media_credit_ledger", "payment_events", "credit_wallet_holds", "customer_identities", "seller_sites"]);
 // These are separate boundaries: portal pages may read subscription state, but may not import SDKs.
 const sdkAllowed = (file: string) => file === "lib/ai/gateway.ts" || file.startsWith("lib/entitlements/");
-const tableAllowed = (file: string) => file.startsWith("lib/entitlements/") || file.startsWith("app/portal/");
+// lib/payments/sites.ts: the one reader of seller_sites, and of a plan's product and owner for a site's right to sell it (4c-2).
+const tableAllowed = (file: string) => file.startsWith("lib/entitlements/") || file.startsWith("app/portal/") || file === "lib/payments/sites.ts";
 // Raw HTTP to a paid model provider: the origin may only be spelled in the gateway (providerUrl asserts the grant).
 const PROVIDER_HOST = /(?:api\.openai\.com|api\.anthropic\.com|generativelanguage\.googleapis\.com|api\.replicate\.com)/i;   // hosts are case-insensitive
 const PROVIDER_ADAPTERS = new Set(["lib/payments/woo.ts", "lib/payments/woo-billing.ts", "lib/auth/sources/awarewave-wp.ts", "lib/crm/fluentcrm.ts"]);

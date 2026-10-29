@@ -2,6 +2,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resetHandoffNonces, signHandoff, wpHandoff, type HandoffDeps } from "../sources/awarewave-wp";
 import { readWpToken } from "@/app/login/wp/WpSignIn";
+import { createPrivateKey, sign } from "node:crypto";
+import fixture from "@/lib/payments/__tests__/fixtures/ed25519-v1.json";
+import type { SellerSite } from "@/lib/payments/sites";
+
+const AWC: SellerSite = { id: "site-awc", host: "aware-wave.com", keyId: "aware-wave-com", sellerOrganizationId: "org-internal", sellerKind: "internal",
+  verifyAlg: "hmac-env", publicKey: null, envVar: "PAYMENTS_WOO_SECRET", handoffPublicKey: null, handoffEnvVar: "AUTH_WP_HANDOFF_SECRET", status: "active" };
 
 const SECRET = "wp-handoff-test-secret-0123456789abcdef";
 const ENV = { AUTH_WP_HANDOFF_SECRET: SECRET, PUBLIC_BASE_DOMAIN: "aware-wave.com" };
@@ -16,12 +22,18 @@ function deps(over: { account?: typeof ACCOUNT | null; holds?: boolean; linkUser
   const getUserById = vi.fn(async () => ({ data: { user: over.email === null ? null : user }, error: null }));
   const d: HandoffDeps = {
     db: { auth: { admin: { generateLink, getUserById } } } as unknown as SupabaseClient,
+    site: vi.fn(async (_db: SupabaseClient, keyId: string) => [AWC, SHOP].find((x) => x.keyId === keyId) ?? null),
     find: vi.fn(async () => (over.account === undefined ? ACCOUNT : over.account)),
     holds: vi.fn(async () => over.holds ?? true),
     now: () => NOW,
   };
   return { d, generateLink };
 }
+// a reseller's site: its hand-off key is the shared ed25519 vector (fixtures/ed25519-v1.json)
+const SHOP: SellerSite = { ...AWC, id: "site-shop", host: "shop.example", keyId: "shop-b", sellerOrganizationId: "org-reseller", sellerKind: "customer",
+  verifyAlg: "ed25519", publicKey: "-----BEGIN PUBLIC KEY-----\nunused\n-----END PUBLIC KEY-----", envVar: null, handoffPublicKey: fixture.public_key_pem, handoffEnvVar: null };
+const shopKey = createPrivateKey({ key: Buffer.concat([Buffer.from("302e020100300506032b657004220420", "hex"), Buffer.from(fixture.seed_hex, "hex")]), format: "der", type: "pkcs8" });
+const signShop = (raw: string) => sign(null, Buffer.from(raw, "utf8"), shopKey).toString("base64");
 const call = (body: string, d: HandoffDeps, sig: string | null = signHandoff(body, SECRET), env: Record<string, string | undefined> = ENV) => wpHandoff(body, sig, env, d);
 
 describe("WordPress one-time sign-in into a product door (ADR 015 order 1, 4b-4)", () => {
@@ -31,7 +43,30 @@ describe("WordPress one-time sign-in into a product door (ADR 015 order 1, 4b-4)
     const { d, generateLink } = deps();
     await expect(call(req(), d)).resolves.toEqual({ ok: true, url: "https://tarot.aware-wave.com/login/wp#token_hash=tok%2F%2B%3D&type=recovery" });
     expect(generateLink).toHaveBeenCalledWith({ type: "recovery", email: "a@b.tw" });
-    expect(d.find).toHaveBeenCalledWith(d.db, { provider: "awarewave-wp", externalId: "57" });
+    expect(d.find).toHaveBeenCalledWith(d.db, { provider: "awarewave-wp", siteId: "site-awc", externalId: "57" });
+  });
+
+  it("a legacy wp-handoff without key_id still signs in", async () => {
+    // the plugin before 1.1.0 sends no key_id: it is aware-wave.com, on AUTH_WP_HANDOFF_SECRET as before 4c-2
+    const { d } = deps();
+    await expect(call(req(), d)).resolves.toMatchObject({ ok: true });
+    expect(d.site).toHaveBeenCalledWith(d.db, "aware-wave-com");
+    // a key id no active site has is a source that is off, and one that is not a key id is malformed
+    await expect(call(req({ key_id: "shop-x", nonce: "n-d-0123456789abcdef" }), d)).resolves.toMatchObject({ status: 404, error: "source_disabled" });
+    await expect(call(req({ key_id: "Not A Key", nonce: "n-e-0123456789abcdef" }), d)).resolves.toMatchObject({ status: 400, error: "invalid_key_id" });
+  });
+
+  it("a seller's member opens only a door that takes customer-wp sign-ins", async () => {
+    const { d } = deps();
+    const social = req({ key_id: "shop-b", product_key: "social" });
+    await expect(call(social, d, signShop(social))).resolves.toMatchObject({ ok: true });
+    expect(d.find).toHaveBeenCalledWith(d.db, { provider: "customer-wp", siteId: "site-shop", externalId: "57" });
+    // tarot lists only "local": the seller's member is refused there, signature and all
+    const tarot = req({ key_id: "shop-b", nonce: "n-f-0123456789abcdef" });
+    await expect(call(tarot, d, signShop(tarot))).resolves.toMatchObject({ status: 403, error: "login_source_not_allowed" });
+    // aware-wave.com's HMAC key never signs for the seller's site
+    const forged = req({ key_id: "shop-b", product_key: "social", nonce: "n-g-0123456789abcdef" });
+    await expect(call(forged, d, signHandoff(forged, SECRET))).resolves.toMatchObject({ status: 401, error: "invalid_signature" });
   });
 
   it("is off until its own secret is set", async () => {
@@ -40,7 +75,7 @@ describe("WordPress one-time sign-in into a product door (ADR 015 order 1, 4b-4)
     await expect(call(req(), d, signHandoff(req(), "short"), { AUTH_WP_HANDOFF_SECRET: "short" })).resolves.toMatchObject({ status: 404 });
   });
 
-  it("a forged or edited request is refused before anything is looked up", async () => {
+  it("a forged or edited request is refused before any account is looked up", async () => {
     const { d } = deps();
     for (const sig of [null, "", signHandoff(req(), SECRET + "x"), signHandoff(req({ wp_user_id: 58 }), SECRET)]) {
       await expect(call(req(), d, sig)).resolves.toMatchObject({ status: 401, error: "invalid_signature" });

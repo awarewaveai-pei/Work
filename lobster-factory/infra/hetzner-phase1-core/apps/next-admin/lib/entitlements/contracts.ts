@@ -18,7 +18,7 @@ export async function applyPaymentEvent(provider: PaymentProviderName, received:
   client: SupabaseClient | null = getSupabaseWriteClient()): Promise<PaymentOutcome> {
   if (!client) throw new Error("payments_db_unavailable");
   const { data, error } = await client.rpc("billing_apply_payment_event", {
-    p_provider: provider, p_event_id: received.eventId, p_event: received.event,
+    p_provider: provider, p_event_id: received.eventId, p_event: received.event, p_site_id: received.siteId ?? null,
   });
   if (error) {
     const code = /payment_rejected:([a-z_]+)/.exec(error.message)?.[1];
