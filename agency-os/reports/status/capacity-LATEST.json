@@ -1,7 +1,7 @@
 {
     "overall":  "WARN",
     "measured":  1,
-    "generated_utc":  "2026-10-25T19:07:44Z",
+    "generated_utc":  "2026-10-29T02:18:58Z",
     "policy":  {
                    "SG":  {
                               "MemWarnUsedPct":  80,
@@ -29,21 +29,21 @@
                                    "error":  "",
                                    "probe_error":  "",
                                    "mem_total_kb":  131877056,
-                                   "mem_avail_kb":  113484660,
-                                   "mem_used_kb":  18392396,
-                                   "mem_used_pct":  13.9,
-                                   "swap_used_pct":  1.4,
+                                   "mem_avail_kb":  114044008,
+                                   "mem_used_kb":  17833048,
+                                   "mem_used_pct":  13.5,
+                                   "swap_used_pct":  3.9,
                                    "psi_mem_some":  0,
                                    "psi_mem_full":  0,
-                                   "psi_io_some":  0.01,
-                                   "psi_cpu_some":  8.91,
+                                   "psi_io_some":  0,
+                                   "psi_cpu_some":  8.96,
                                    "oom_vmstat":  788,
                                    "oom_journal":  636,
                                    "oom_journal_24h":  0,
                                    "oom_memcg":  "8e92dc13a6c0(453) a7994f18c195(156) f72bbd554a5c(22) 8711ba166f94(2) 0511099d0c2c(2)",
                                    "disk_total_kb":  981183088,
-                                   "disk_used_kb":  224293500,
-                                   "disk_pct":  25,
+                                   "disk_used_kb":  232874344,
+                                   "disk_pct":  26,
                                    "inode_pct":  8,
                                    "containers_running":  57,
                                    "containers_total":  57,
@@ -51,14 +51,14 @@
                                    "restarts":  "",
                                    "restarts_measured":  true,
                                    "docker_present":  true,
-                                   "top_mem":  "buildx_buildkit_trigger0=4.217GiB postiz=1.797GiB cognitive-os-api=1.061GiB trigger-webapp=788.9MiB soulful-wp=632.5MiB chatwoot-sidekiq=576.1MiB",
-                                   "reclaimable":  "Images=14.5GB (23%),Containers=0B (0%),Local Volumes=248.4MB (0%),Build Cache=17.47GB",
+                                   "top_mem":  "buildx_buildkit_trigger0=4.594GiB postiz=1.783GiB cognitive-os-api=1.061GiB soulful-db=1.017GiB soulful-wp=908.2MiB trigger-webapp=808.3MiB",
+                                   "reclaimable":  "Images=22.81GB (32%),Containers=0B (0%),Local Volumes=248.4MB (0%),Build Cache=17.44GB",
                                    "cpu_cores":  32,
-                                   "load1":  3.17,
-                                   "uptime_days":  10
+                                   "load1":  2.23,
+                                   "uptime_days":  14
                                }
               },
-    "generatedAt":  "2026-10-25T19:06:51.3352537Z",
+    "generatedAt":  "2026-10-29T02:18:13.3381725Z",
     "fatal":  false,
     "blind_spots":  [
 

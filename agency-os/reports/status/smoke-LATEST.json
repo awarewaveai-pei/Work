@@ -1,7 +1,7 @@
 ﻿{
     "overall":  "WARN",
     "measured":  11,
-    "generated_utc":  "2026-10-25T19:09:10Z",
+    "generated_utc":  "2026-10-29T02:20:20Z",
     "checks":  {
                    "docker_watchdog":  "warn:shortcut_unguarded",
                    "deploy_hold":  "ok:none",
@@ -15,7 +15,7 @@
                                                   "stuckPending":  0,
                                                   "capped":  false
                                               },
-                   "client_mail":  "ok:no_failures_7d_last_send_0d",
+                   "client_mail":  "ok:no_failures_7d_last_send_1d",
                    "nightly_health":  "warn:fail_[FAIL]_Nightly_health:_AO-CLOSE_archive_items_not_lifted_to_TASKS.md_(see_archive-lift-last.json)",
                    "codex_parity":  "ok:parity",
                    "n8n_failures":  "ok:none_24h",
@@ -53,7 +53,7 @@
                      "[FAIL] Nightly health: AO-CLOSE archive items not lifted to TASKS.md (see archive-lift-last.json)",
                      "[WARN] Capacity: ks-aw-01: OOM kills in the last 7d, none in 24h: 636 (vmstat since boot=788); by container (7d): 8e92dc13a6c0(453) a7994f18c195(156) f72bbd554a5c(22) 8711ba166f94(2) 0511099d0c2c(2) -- check WORKLOG that the incident is closed"
                  ],
-    "generated":  "2026-10-26 03:09:10",
+    "generated":  "2026-10-29 10:20:20",
     "blind_spots":  [
 
                     ]

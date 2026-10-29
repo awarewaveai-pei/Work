@@ -1,14 +1,14 @@
 ﻿{
     "overall":  "PASS",
     "measured":  1,
-    "generated_utc":  "2026-10-25T21:47:25Z",
+    "generated_utc":  "2026-10-26T15:37:28Z",
     "source":  "ao-close.ps1 (report skeleton commit)",
-    "sha":  "50317b0631366f0e2f118b842403ae276190fea7",
+    "sha":  "a6f4ba9be21ed363a60588d586970c530f91ab31",
     "brokenCount":  0,
     "broken":  [
 
                ],
     "error":  null,
     "ok":  true,
-    "generatedAtUtc":  "2026-10-25T21:47:25Z"
+    "generatedAtUtc":  "2026-10-26T15:37:28Z"
 }

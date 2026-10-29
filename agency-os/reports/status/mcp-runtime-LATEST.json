@@ -1,28 +1,28 @@
 {
     "overall":  "WARN",
     "measured":  26,
-    "generated_utc":  "2026-10-25T21:46:31Z",
+    "generated_utc":  "2026-10-29T02:16:51Z",
     "note":  null,
     "servers":  [
                     {
                         "name":  "claude.ai Claude Docs",
                         "state":  "connected",
-                        "status":  "✓ Connected"
+                        "status":  "✔ Connected"
                     },
                     {
                         "name":  "claude.ai Google Calendar",
-                        "state":  "needs_auth",
-                        "status":  "! Needs authentication"
+                        "state":  "connected",
+                        "status":  "✔ Connected"
                     },
                     {
                         "name":  "claude.ai Gmail",
-                        "state":  "needs_auth",
-                        "status":  "! Needs authentication"
+                        "state":  "connected",
+                        "status":  "✔ Connected"
                     },
                     {
                         "name":  "claude.ai Google Drive",
-                        "state":  "needs_auth",
-                        "status":  "! Needs authentication"
+                        "state":  "connected",
+                        "status":  "✔ Connected"
                     },
                     {
                         "name":  "claude.ai Slack",
@@ -82,64 +82,61 @@
                     {
                         "name":  "cloudflare",
                         "state":  "connected",
-                        "status":  "✓ Connected"
+                        "status":  "✔ Connected"
                     },
                     {
                         "name":  "awarewave-ops",
                         "state":  "connected",
-                        "status":  "✓ Connected"
+                        "status":  "✔ Connected"
                     },
                     {
                         "name":  "server-ssh",
                         "state":  "connected",
-                        "status":  "✓ Connected"
+                        "status":  "✔ Connected"
                     },
                     {
                         "name":  "trigger",
                         "state":  "connected",
-                        "status":  "✓ Connected"
+                        "status":  "✔ Connected"
                     },
                     {
                         "name":  "n8n",
                         "state":  "connected",
-                        "status":  "✓ Connected"
+                        "status":  "✔ Connected"
                     },
                     {
                         "name":  "github",
                         "state":  "connected",
-                        "status":  "✓ Connected"
+                        "status":  "✔ Connected"
                     },
                     {
                         "name":  "posthog",
                         "state":  "connected",
-                        "status":  "✓ Connected"
+                        "status":  "✔ Connected"
                     },
                     {
                         "name":  "replicate",
                         "state":  "connected",
-                        "status":  "✓ Connected"
+                        "status":  "✔ Connected"
                     },
                     {
                         "name":  "airtable",
                         "state":  "connected",
-                        "status":  "✓ Connected"
+                        "status":  "✔ Connected"
                     },
                     {
                         "name":  "supabase-awarewave-postgres",
                         "state":  "connected",
-                        "status":  "✓ Connected"
+                        "status":  "✔ Connected"
                     },
                     {
                         "name":  "resend",
                         "state":  "connected",
-                        "status":  "✓ Connected"
+                        "status":  "✔ Connected"
                     }
                 ],
     "source":  "claude mcp list",
     "not_connected":  [
-                          "claude.ai Google Calendar=needs_auth",
-                          "claude.ai Gmail=needs_auth",
-                          "claude.ai Google Drive=needs_auth",
                           "claude.ai Slack=needs_auth",
                           "claude.ai Notion=needs_auth",
                           "claude.ai monday.com=needs_auth",
