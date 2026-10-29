@@ -1,4 +1,12 @@
 # Worklog
+## 2026-10-29（續1）— 影片正式站實測 F1–F3／F5–F7 修復（Claude 接手；前一工人中斷）
+
+- **根因／修法**：F1 `finalize.ts` 記成片後專案仍 produce → 伺服器端同處把 create/produce 改 review（org＋stage 限定）。F2 `VideoPipeline` 已有成片先顯示成片＋RenderedBar（可重做）；`assets` route 加 `projectId` 過濾，QaStep／CaptionsStep 只列本專案主列並預選。F3 `ProjectDetail` 以主列分組，variant 併入、QA 逐比例。F5 DB object_key 為網址編碼，抽 `decodeVideoObjectKey`（r2.ts）供 reburn route 與 deleteVideoObjects 共用；CaptionsStep 重燒失敗顯示原因。F6 captionSource=script_tts 不再寫 Whisper。F7 ScriptForge 全部模組 catch 改顯示 `ErrBox`（含 pj 解析失敗、腳本成功但評分失敗也顯示）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（非 .next 錯誤 0）＋`npx vitest run lib/content/video app/api/video "app/(shell)/tools/video" lib/storage` 56 檔 219 測試綠 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/2n（Codex 3 項：ScriptForge 評分失敗錯誤被藏＝屬實已修；reconcile 無 projectId＝不成立；QaStep 只列主列＝F2 指定的設計）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=variantOf | hits=17（讀成片處：history／[id] route、ReleaseDeliveryPanel 等已確認各自處理 variant）
+- 未目視正式站畫面；F1 需 03:00 自動部署後以專案實測。
+- **Rollback**：`git revert` 對應 commit。
 ## 2026-10-28（續32）— video-service 部署 3f6bc9ac8（重燒寫 videorev/，不覆寫）（Claude；操作者「趕快做好」）
 
 - 步驟：push → 主機 ff → `docker tag … :pre-20261028-rev` → rsync → `up -d --build`（running jobs 0）。

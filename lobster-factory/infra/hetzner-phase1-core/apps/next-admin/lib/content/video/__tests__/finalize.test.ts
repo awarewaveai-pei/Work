@@ -22,6 +22,9 @@ vi.mock("@/lib/content/video/qa-persistence", () => ({ persistAutomaticTechnical
 const { persistAutomaticCaptionQa } = vi.hoisted(() => ({ persistAutomaticCaptionQa: vi.fn() }));
 vi.mock("@/lib/content/video/caption-qa-persistence", () => ({ persistAutomaticCaptionQa }));
 
+const { getSupabaseWriteClient } = vi.hoisted(() => ({ getSupabaseWriteClient: vi.fn() }));
+vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient }));
+
 const ORG = "11111111-1111-1111-1111-111111111111";
 
 const { finalizeVideoJob } = await import("../finalize");
@@ -106,5 +109,20 @@ describe("finalizeVideoJob", () => {
     expect(res).toMatchObject({ status: "done" });
     expect(recordVideoAsset).toHaveBeenCalled();
     expect(persistAutomaticTechnicalQa).toHaveBeenCalledWith(expect.objectContaining({ outputMeta: meta }));
+  });
+
+  it("a recorded project video moves the project from create/produce to review, scoped to its org", async () => {
+    pollRenderJob.mockResolvedValue({ status: "done", outputs: OUT, out_dir: "x", outputMeta: { "16x9": { width: 1920, height: 1080 } } });
+    recordVideoAsset.mockResolvedValue({ id: "a1", checksumSha256: "c1", rows: [{ format: "16x9", id: "a1", url: OUT["16x9"], checksumSha256: "c1" }] });
+    const calls: unknown[][] = [];
+    const chain: Record<string, unknown> = {};
+    for (const k of ["update", "eq", "in"]) chain[k] = (...a: unknown[]) => { calls.push([k, ...a]); return k === "in" ? Promise.resolve({ error: null }) : chain; };
+    getSupabaseWriteClient.mockReturnValue({ from: (t: string) => { calls.push(["from", t]); return chain; } });
+    await finalizeVideoJob(runningJob({ recordParams: { title: "T", sceneCount: 2, organizationId: ORG, projectId: "p1" } }));
+    expect(calls).toContainEqual(["from", "media_production_projects"]);
+    expect(calls).toContainEqual(["update", expect.objectContaining({ lifecycle_stage: "review" })]);
+    expect(calls).toContainEqual(["eq", "id", "p1"]);
+    expect(calls).toContainEqual(["eq", "organization_id", ORG]);
+    expect(calls).toContainEqual(["in", "lifecycle_stage", ["create", "produce"]]);
   });
 });

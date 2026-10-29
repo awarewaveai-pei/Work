@@ -106,6 +106,13 @@ export async function finalizeVideoJob(job: VideoJob): Promise<FinalizeResult> {
             authoritative: true,
           });
           if (asset) {
+            // A recorded video is what moves a project to review; the browser may be closed by now (stuck on "produce").
+            if (job.recordParams.projectId) {
+              const sb = (await import("@/lib/supabase-server")).getSupabaseWriteClient();
+              const { error: stageErr } = sb ? await sb.from("media_production_projects").update({ lifecycle_stage: "review", updated_at: new Date().toISOString() })
+                .eq("id", job.recordParams.projectId).eq("organization_id", job.recordParams.organizationId).in("lifecycle_stage", ["create", "produce"]) : { error: null };
+              if (stageErr) console.warn("[video/status] project -> review failed (best-effort):", stageErr.message);
+            }
             const { persistAutomaticTechnicalQa } = await import("@/lib/content/video/qa-persistence");
             // D6: technical QA per delivered ratio, against that row's own checksum.
             for (const r of asset.rows) {
