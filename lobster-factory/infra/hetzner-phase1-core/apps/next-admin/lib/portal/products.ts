@@ -68,7 +68,7 @@ const PRODUCT_DEFINITIONS = [
     // Paid image operations belong to studio above; Fabric editing itself calls no paid model.
     features: [quota("design.edit", "畫布與向量編輯", "contract")], accessChannels: ["ui"],
     modules: { dependsOn: ["studio"], optional: ["video"], manifest: "lib/design/MODULE_MANIFEST.json" }, staffPaths: ["tools/canvas", "tools/designs", "tools/mockup", "tools/banner", "tools/vector-editor"] },
-  { key: "content", name: "內容行銷", description: "產生文章、搜尋素材並安排內容發布。", subdomain: "content", door: { app: "next-admin", page: "/content", enabled: false, api: ["/api/content"],
+  { key: "content", name: "內容行銷", description: "產生文章、搜尋素材並安排內容發布。", subdomain: "content", door: { app: "next-admin", page: "/content", api: ["/api/content"],
       nav: [{ path: "", name: "內容編輯", staff: "tools/content" },
         { path: "topics", name: "題目", staff: "tools/content/topics" }, { path: "sites", name: "網站", staff: "tools/content/sites" }, { path: "events", name: "節日", staff: "tools/events" }] },
     loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,
