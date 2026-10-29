@@ -55,6 +55,14 @@ describe("/api/video/captions/reburn", () => {
     expect(submitCaptionReburn).toHaveBeenCalledWith({ cleanUrl: "https://v.example.com/videoclean/dir/16x9.mp4", format: "16x9", objectKey: "video/dir/16x9.mp4", cues });
   });
 
+  it("POST sends the raw (decoded) object key: DB keys are percent-encoded for CJK dirs", async () => {
+    const encoded = { ...row(org), object_key: "video/abc_123_%E9%BE%8D%E8%9D%A6/16x9.mp4" };
+    getSupabaseWriteClient.mockReturnValue(fakeDb({ media_assets: encoded, media_releases: [] }).db);
+    submitCaptionReburn.mockResolvedValue({ ok: true, jobId: "j1" });
+    expect((await post()).status).toBe(202);
+    expect(submitCaptionReburn).toHaveBeenCalledWith(expect.objectContaining({ objectKey: "video/abc_123_龍蝦/16x9.mp4" }));
+  });
+
   it("finish (jobId): row takes the new checksum and both QA kinds run on it; another video's job is refused", async () => {
     const { db, update } = fakeDb({ media_assets: row(org) });
     getSupabaseWriteClient.mockReturnValue(db);

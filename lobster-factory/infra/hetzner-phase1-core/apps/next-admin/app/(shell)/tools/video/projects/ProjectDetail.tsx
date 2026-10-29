@@ -6,7 +6,7 @@ import { projectStatus } from "./project-status";
 
 type Scene = { narration?: string };
 type Project = { id: string; organization_id: string; title: string; lifecycle_stage: string; last_error: string | null; brief_json: { title?: string; production?: { scenes?: Scene[] } } | null };
-type Asset = { id: string; object_url: string; created_at: string; metadata?: { title?: string; formats?: Record<string, string> } };
+type Asset = { id: string; object_url: string; created_at: string; metadata?: { title?: string; formats?: Record<string, string>; variantOf?: string; format?: string } };
 type Release = { id: string; candidate_asset_id: string; status: string; created_at: string; approved_at: string | null; withdrawn_at: string | null };
 type Delivery = { id: string; release_id: string; destination: string; variant: string | null; status: string; created_at: string };
 type QaItem = { kind: string; status: string; findings?: { rule: string; message: string; format?: string }[] };
@@ -79,6 +79,8 @@ export default function ProjectDetail({ id }: { id: string }) {
   if (!data) return <div style={{ padding: "24px 28px", ...muted }}>載入中…</div>;
 
   const { item, assets, releases, deliveries } = data;
+  const known = new Set(assets.map((a) => a.id));
+  const primaries = assets.filter((a) => !a.metadata?.variantOf || !known.has(a.metadata.variantOf));
   const outcomes = latestOutcomes(data.outcomes ?? []);
   const st = projectStatus(item.lifecycle_stage, item.last_error);
   const scenes = item.brief_json?.production?.scenes ?? [];
@@ -96,9 +98,13 @@ export default function ProjectDetail({ id }: { id: string }) {
       </div>
 
       {assets.length === 0 && <div style={{ ...card, ...muted }}>還沒有成片。{editLink}</div>}
-      {assets.map((a) => {
+      {primaries.map((a) => {
+        const vs = assets.filter((v) => v.metadata?.variantOf === a.id);
+        const group = [a, ...vs];
         const formats = Object.entries(a.metadata?.formats ?? {});
-        const rels = releases.filter((r) => r.candidate_asset_id === a.id);
+        // V4.1: one row per ratio. The primary row's own ratio is the format whose url is its object_url; variants name theirs.
+        const rowOf = (fmt: string, url: string) => vs.find((v) => v.metadata?.format === fmt) ?? (url === a.object_url ? a : undefined);
+        const rels = releases.filter((r) => group.some((g) => g.id === r.candidate_asset_id));
         return (
           <div key={a.id} style={{ ...card, display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>{a.metadata?.title ?? "成片"} <span style={{ ...muted, fontWeight: 400 }}>{new Date(a.created_at).toLocaleString()}</span></div>
@@ -114,7 +120,14 @@ export default function ProjectDetail({ id }: { id: string }) {
               ))}
               {formats.length === 0 && <div style={muted}>這筆成片沒有記錄各比例的影片網址。</div>}
             </div>
-            <Qa organizationId={item.organization_id} assetId={a.id} />
+            {vs.length === 0
+              ? <Qa organizationId={item.organization_id} assetId={a.id} />
+              : formats.map(([fmt, url]) => { const row = rowOf(fmt, url); return row && (
+                <div key={fmt} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{ ...muted, fontWeight: 700 }}>{fmt} QA</div>
+                  <Qa organizationId={item.organization_id} assetId={row.id} />
+                </div>
+              ); })}
             <div style={muted}>
               {rels.length === 0 ? "尚未發布" : rels.map((r) => (
                 <div key={r.id} style={{ marginBottom: 4 }}>

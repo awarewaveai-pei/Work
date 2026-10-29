@@ -69,6 +69,9 @@ export default function VideoPipeline() {
   const [review, setReview] = useState<"captions" | "qa">("captions");
   const [candidateAssetId, setCandidateAssetId] = useState("");
   const [renderDone, setRenderDone] = useState(false);
+  // Videos this project already has (undefined = still loading): ③ shows them first instead of an empty generate form.
+  const [existing, setExisting] = useState<{ title?: string; formats: Record<string, string> } | null | undefined>(undefined);
+  const [redo, setRedo] = useState(false);
   const topRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -78,6 +81,21 @@ export default function VideoPipeline() {
       if (r.item) { setProject(r.item); setStep(stepOf(r.item)); } else setLoadError(r.error ?? "讀不到專案");
     });
   }, []);
+
+  const projectId = project?.id;
+  const projectOrg = project?.organization_id;
+  useEffect(() => {
+    if (!projectId || !projectOrg) return;
+    let cancelled = false;
+    fetch(`/api/video/assets?organizationId=${encodeURIComponent(projectOrg)}&projectId=${encodeURIComponent(projectId)}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((j: { items?: { object_url: string; metadata?: { title?: string; formats?: Record<string, string>; variantOf?: string } }[] }) => {
+        const main = (j.items ?? []).find((a) => !a.metadata?.variantOf && a.metadata?.formats && Object.keys(a.metadata.formats).length);
+        if (!cancelled) setExisting(main ? { title: main.metadata?.title, formats: main.metadata!.formats! } : null);
+      })
+      .catch(() => { if (!cancelled) setExisting(null); });
+    return () => { cancelled = true; };
+  }, [projectId, projectOrg]);
 
   async function patch(fields: Record<string, unknown>) {
     if (!project) return;
@@ -123,13 +141,29 @@ export default function VideoPipeline() {
         </>
       )}
 
-      {step === 3 && mode === "footage_edit" && (
+      {step === 3 && existing && !redo && !renderDone && (
+        <div style={{ padding: "24px 28px", display: "grid", gap: 12 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>③ 已有成片{existing.title ? `：${existing.title}` : ""}</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+            {Object.entries(existing.formats).map(([fmt, url]) => (
+              <div key={fmt} style={{ maxWidth: 280, fontSize: 12, color: "var(--text-secondary)" }}>
+                <video controls preload="metadata" src={url} style={{ width: "100%", borderRadius: 6, background: "#000" }} />
+                {fmt}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {step === 3 && existing && !redo && !renderDone && (
+        <RenderedBar projectId={project.id} note="這個專案已經有成片。" onNext={() => goto(4)} onRedo={() => setRedo(true)} />
+      )}
+      {step === 3 && existing !== undefined && (!existing || redo || renderDone) && mode === "footage_edit" && (
         <>
           <FootageEditor initialOrganizationId={org} projectId={project.id} onRenderComplete={() => setRenderDone(true)} />
           {renderDone && <RenderedBar projectId={project.id} note="實拍渲染已送出，完成後在專案頁看得到。" onNext={() => goto(4)} />}
         </>
       )}
-      {step === 3 && (mode === "quick_video" || mode === "short_drama") && (
+      {step === 3 && existing !== undefined && (!existing || redo || renderDone) && (mode === "quick_video" || mode === "short_drama") && (
         <VideoStudio initial={brief.production}
           embedded={{ lockTab: "generate", organizationId: org, projectId: project.id, onRenderComplete: () => setRenderDone(true) }} />
       )}
@@ -143,8 +177,8 @@ export default function VideoPipeline() {
         </div>
       )}
 
-      {step === 4 && review === "captions" && <CaptionsStep organizationId={org} onContinue={() => setReview("qa")} />}
-      {step === 4 && review === "qa" && <QaStep organizationId={org} onContinue={(assetId) => { setCandidateAssetId(assetId); goto(5); }} />}
+      {step === 4 && review === "captions" && <CaptionsStep organizationId={org} projectId={project.id} onContinue={() => setReview("qa")} />}
+      {step === 4 && review === "qa" && <QaStep organizationId={org} projectId={project.id} onContinue={(assetId) => { setCandidateAssetId(assetId); goto(5); }} />}
 
       {step === 5 && (
         <ReleaseDeliveryPanel organizationLocked initialOrganizationId={org} initialCandidateAssetId={candidateAssetId}
@@ -155,11 +189,12 @@ export default function VideoPipeline() {
 }
 
 /** After a render: stay on the result (V2.3); the next step is the operator's click, the project page always has the video. */
-function RenderedBar({ projectId, note, onNext }: { projectId: string; note: string; onNext: () => void }) {
+function RenderedBar({ projectId, note, onNext, onRedo }: { projectId: string; note: string; onNext: () => void; onRedo?: () => void }) {
   return (
     <div style={{ padding: "0 28px 24px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
       <span style={{ fontSize: 13, color: "var(--text-primary)" }}>✅ {note}</span>
       <a href={`/tools/video/projects/${projectId}`} style={{ fontSize: 13, color: "var(--text-secondary)" }}>在專案頁看成片</a>
+      {onRedo && <button type="button" onClick={onRedo} style={{ ...primary(true), background: "var(--bg-subtle)", color: "var(--text-primary)", border: "1px solid var(--border-subtle)" }}>重做這支影片</button>}
       <button type="button" onClick={onNext} style={primary(true)}>下一步：審片 →</button>
     </div>
   );

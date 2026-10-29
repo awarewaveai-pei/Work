@@ -268,6 +268,15 @@ export async function deleteDesignObject(
 }
 
 /**
+ * media_assets.object_key for a video is `video/<dir>/<format>.mp4` percent-encoded (videoObjectKey uses URL.pathname, so CJK
+ * becomes %E9…). Anything that hands the key to R2 or video-service needs the raw form; null = not a video key.
+ */
+export function decodeVideoObjectKey(objectKey: string): string | null {
+  if (!/^video\/.+\/[^/]+\.mp4$/.test(objectKey)) return null;
+  try { return decodeURIComponent(objectKey); } catch { return null; }
+}
+
+/**
  * Delete all objects under the video/<dir>/ prefix in R2_VIDEO_BUCKET ("lobster-videos").
  * Uses LIST-then-delete rather than a hardcoded format list so it is immune to format drift
  * between r2.ts, reconcile.ts, and the EU video-service FORMATS SSOT.
@@ -291,9 +300,9 @@ export async function deleteVideoObjects(
   // URLSearchParams.set() encodes the raw UTF-8 once — matching Cloudflare's raw key.
   // Double-encoding (%25E9…) would cause LIST to return 0 results and silently succeed
   // while leaving the files in the bucket (orphan → reconcile re-inserts every ~15 min).
-  const m = /^video\/(.+)\/[^/]+\.mp4$/.exec(objectKey);
-  if (!m) return { ok: false, error: "invalid_video_object_key" };
-  const dir = decodeURIComponent(m[1]);
+  const decoded = decodeVideoObjectKey(objectKey);
+  if (!decoded) return { ok: false, error: "invalid_video_object_key" };
+  const dir = /^video\/(.+)\/[^/]+\.mp4$/.exec(decoded)![1];
 
   const bucket = process.env.R2_VIDEO_BUCKET ?? "lobster-videos";
   const base = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucket}`;

@@ -4,6 +4,7 @@ import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tena
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { pollRenderJob, submitCaptionReburn } from "@/lib/content/video/render-client";
 import { videoObjectKey } from "@/lib/content/blocks/video-pipeline";
+import { decodeVideoObjectKey } from "@/lib/storage/r2";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,8 +60,9 @@ export async function POST(req: NextRequest): Promise<Response> {
   for (const row of rows) {
     const cleanUrl = typeof row.metadata?.cleanUrl === "string" ? row.metadata.cleanUrl : "";
     const format = FORMAT_RE.exec(row.object_key ?? "")?.[1];
-    if (!cleanUrl || !format || !row.object_key) continue;
-    const sub = await submitCaptionReburn({ cleanUrl, format, objectKey: row.object_key, cues });
+    const objectKey = row.object_key ? decodeVideoObjectKey(row.object_key) : null;
+    if (!cleanUrl || !format || !objectKey) continue;
+    const sub = await submitCaptionReburn({ cleanUrl, format, objectKey, cues });
     if (sub.ok === false) return deny(sub.error, sub.status);
     jobs.push({ assetId: row.id, jobId: sub.jobId });
   }

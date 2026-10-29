@@ -16,14 +16,16 @@ export async function GET(req: Request): Promise<Response> {
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   const db = getSupabaseWriteClient();
   if (!db) return NextResponse.json({ ok: false, error: "db unavailable" }, { status: 503 });
-  const { data, error } = await db.from("media_assets")
+  // projectId narrows to one project's videos; the org filter stays, so another tenant's project id returns nothing.
+  const projectId = new URL(req.url).searchParams.get("projectId")?.trim() ?? "";
+  let q = db.from("media_assets")
     .select("id, organization_id, asset_domain, object_url, object_key, mime_type, byte_size, checksum_sha256, metadata, created_at")
     .eq("organization_id", organizationId)
     .eq("is_current", true)
     .in("asset_domain", ["ai_generated", "real_footage"])
-    .in("mime_type", ["video/mp4", "video/quicktime", "video/webm"])
-    .order("created_at", { ascending: false })
-    .limit(200);
+    .in("mime_type", ["video/mp4", "video/quicktime", "video/webm"]);
+  if (projectId) q = q.eq("media_project_id", projectId);
+  const { data, error } = await q.order("created_at", { ascending: false }).limit(200);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, items: data ?? [] });
 }

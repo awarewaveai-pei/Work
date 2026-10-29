@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { QA_LABELS, QA_HINTS, STATUS_TEXT, findingLabel } from "./qa-labels";
 
-type Asset = { id: string; object_url: string; checksum_sha256?: string; metadata?: { title?: string }; created_at: string; asset_domain: string };
+type Asset = { id: string; object_url: string; checksum_sha256?: string; metadata?: { title?: string; variantOf?: string }; created_at: string; asset_domain: string };
 type QaFinding = { rule: string; severity: string; message: string; format?: string };
 type QaItem = { id: string; kind: string; status: string; candidateAssetId: string; candidateChecksum: string; profileId: string; profileVersion: string; findings?: QaFinding[] };
 
@@ -15,7 +15,7 @@ const field: React.CSSProperties = { width: "100%", boxSizing: "border-box", pad
  * 現在拉出來當自己的可見步驟。不在這裡硬擋下一步：Release（⑨）本身在 API 層對每個
  * candidate 都會重新驗證同一份證據，這裡重複硬擋只是同一個檢查做兩次、還可能不同步。
  */
-export default function QaStep({ organizationId, onContinue }: { organizationId: string; onContinue: (candidateAssetId: string, candidateChecksum: string) => void }) {
+export default function QaStep({ organizationId, projectId, onContinue }: { organizationId: string; projectId?: string; onContinue: (candidateAssetId: string, candidateChecksum: string) => void }) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [assetId, setAssetId] = useState("");
   const [checksum, setChecksum] = useState("");
@@ -26,16 +26,23 @@ export default function QaStep({ organizationId, onContinue }: { organizationId:
     const org = organizationId.trim();
     if (!org) { setAssets([]); return; }
     let cancelled = false;
-    fetch(`/api/video/assets?organizationId=${encodeURIComponent(org)}`)
+    // Only this project's videos (main row per video; ratio rows are read through it), newest first, the first one preselected.
+    fetch(`/api/video/assets?organizationId=${encodeURIComponent(org)}${projectId ? `&projectId=${encodeURIComponent(projectId)}` : ""}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((j: { items?: Asset[] }) => { if (!cancelled) setAssets(j.items ?? []); })
+      .then((j: { items?: Asset[] }) => {
+        if (cancelled) return;
+        const list = (j.items ?? []).filter((a) => !a.metadata?.variantOf);
+        setAssets(list);
+        if (projectId && list[0]) void pick(list[0].id, list);
+      })
       .catch(() => { if (!cancelled) setAssets([]); });
     return () => { cancelled = true; };
-  }, [organizationId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationId, projectId]);
 
-  async function pick(id: string) {
+  async function pick(id: string, list: Asset[] = assets) {
     setAssetId(id);
-    const asset = assets.find((a) => a.id === id);
+    const asset = list.find((a) => a.id === id);
     const cs = asset?.checksum_sha256 ?? "";
     setChecksum(cs);
     setQaItems([]);

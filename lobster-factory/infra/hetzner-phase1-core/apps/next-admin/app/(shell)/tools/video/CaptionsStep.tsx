@@ -20,16 +20,16 @@ function CueEditor({ assetId, cues: initial }: { assetId: string; cues: Cue[] })
     setState("running"); setMsg("");
     try {
       const res = await fetch("/api/video/captions/reburn", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assetId, cues: initial.map((c, i) => ({ ...c, text: texts[i].trim() })) }) });
-      const j = await res.json() as { ok: boolean; jobs?: { assetId: string; jobId: string }[]; error?: string };
-      if (!res.ok || !j.ok || !j.jobs) throw new Error(j.error ?? "重燒提交失敗");
+      const j = await res.json().catch(() => ({})) as { ok?: boolean; jobs?: { assetId: string; jobId: string }[]; error?: string };
+      if (!res.ok || !j.ok || !j.jobs) throw new Error(j.error ?? `重燒提交失敗（HTTP ${res.status}）`);
       const pending = new Set(j.jobs.map((x) => x.jobId));
       while (pending.size) {
         await new Promise((r) => setTimeout(r, 4000));
         for (const job of j.jobs) {
           if (!pending.has(job.jobId)) continue;
           const r = await fetch("/api/video/captions/reburn", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assetId: job.assetId, jobId: job.jobId }) });
-          const p = await r.json() as { ok: boolean; status?: string; error?: string };
-          if (!r.ok || !p.ok || p.status === "error") throw new Error(p.error ?? "重燒失敗");
+          const p = await r.json().catch(() => ({})) as { ok?: boolean; status?: string; error?: string };
+          if (!r.ok || !p.ok || p.status === "error") throw new Error(p.error ?? `重燒失敗（HTTP ${r.status}）`);
           if (p.status === "done") pending.delete(job.jobId);
         }
       }
@@ -48,7 +48,7 @@ function CueEditor({ assetId, cues: initial }: { assetId: string; cues: Cue[] })
         {state === "running" ? "重燒中…" : "重燒字幕"}
       </button>
       {state === "done" && <div style={{ fontSize: 12, color: "var(--text-primary)" }}>字幕已重燒，品質檢查已用新影片重跑。</div>}
-      {state === "failed" && <div style={{ fontSize: 12, color: "var(--badge-red-text)" }}>{msg}</div>}
+      {state === "failed" && <div role="alert" style={{ border: "1px solid var(--red)", background: "var(--badge-red-bg)", borderRadius: 8, padding: 10, fontSize: 12, color: "var(--badge-red-text)" }}>重燒字幕失敗：{msg}</div>}
     </div>
   );
 }
@@ -59,7 +59,7 @@ function CueEditor({ assetId, cues: initial }: { assetId: string; cues: Cue[] })
  * /api/video/transcription/status（今天新增，之前完全沒有讀取路徑）→ 完成後給 SRT/VTT 連結。
  * 可略過——不是每支影片都要字幕。
  */
-export default function CaptionsStep({ organizationId, onContinue }: { organizationId: string; onContinue: () => void }) {
+export default function CaptionsStep({ organizationId, projectId, onContinue }: { organizationId: string; projectId?: string; onContinue: () => void }) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [assetId, setAssetId] = useState("");
   const [status, setStatus] = useState<JobStatus>("idle");
@@ -77,12 +77,17 @@ export default function CaptionsStep({ organizationId, onContinue }: { organizat
     const org = organizationId.trim();
     if (!org) { setAssets([]); return; }
     let cancelled = false;
-    fetch(`/api/video/assets?organizationId=${encodeURIComponent(org)}`)
+    fetch(`/api/video/assets?organizationId=${encodeURIComponent(org)}${projectId ? `&projectId=${encodeURIComponent(projectId)}` : ""}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((j: { items?: Asset[] }) => { if (!cancelled) setAssets((j.items ?? []).filter((a) => !a.metadata?.variantOf && (!a.mime_type || a.mime_type.startsWith("video/") || a.mime_type.startsWith("audio/")))); })
+      .then((j: { items?: Asset[] }) => {
+        if (cancelled) return;
+        const list = (j.items ?? []).filter((a) => !a.metadata?.variantOf && (!a.mime_type || a.mime_type.startsWith("video/") || a.mime_type.startsWith("audio/")));
+        setAssets(list);
+        if (projectId && list[0]) setAssetId(list[0].id);
+      })
       .catch(() => { if (!cancelled) setAssets([]); });
     return () => { cancelled = true; };
-  }, [organizationId]);
+  }, [organizationId, projectId]);
 
   useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current); }, []);
 
@@ -127,9 +132,11 @@ export default function CaptionsStep({ organizationId, onContinue }: { organizat
   return (
     <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 14, maxWidth: 640 }}>
       <div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>⑦ 配音與 Whisper 字幕</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>{scriptCaptions ? "⑦ 配音與字幕" : "⑦ 配音與 Whisper 字幕"}</div>
         <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>
-          配音已經在生成階段做完、烤進影片了。這步是選擇性的 Whisper 字幕（SRT／VTT）——可以略過。
+          {scriptCaptions
+            ? "配音和字幕都已經在生成階段做完、烤進影片了。下面可以逐句改字幕，或直接繼續。"
+            : "配音已經在生成階段做完、烤進影片了。這步是選擇性的 Whisper 字幕（SRT／VTT）——可以略過。"}
         </div>
       </div>
 
@@ -150,10 +157,12 @@ export default function CaptionsStep({ organizationId, onContinue }: { organizat
             {scriptCaptions.captionCues?.length && scriptCaptions.cleanUrl ? <CueEditor key={assetId} assetId={assetId} cues={scriptCaptions.captionCues} /> : null}
           </div>
         )}
-        <button type="button" disabled={!assetId || status !== "idle" || !!scriptCaptions} onClick={() => void dispatch()}
-          style={{ marginTop: 10, padding: "9px 14px", border: 0, borderRadius: 7, background: "var(--accent)", color: "var(--btn-primary-text)", fontWeight: 700, cursor: assetId && status === "idle" && !scriptCaptions ? "pointer" : "not-allowed" }}>
-          產生字幕（Whisper）
-        </button>
+        {!scriptCaptions && (
+          <button type="button" disabled={!assetId || status !== "idle"} onClick={() => void dispatch()}
+            style={{ marginTop: 10, padding: "9px 14px", border: 0, borderRadius: 7, background: "var(--accent)", color: "var(--btn-primary-text)", fontWeight: 700, cursor: assetId && status === "idle" ? "pointer" : "not-allowed" }}>
+            產生字幕（Whisper）
+          </button>
+        )}
       </div>
 
       {(status === "dispatched" || status === "polling") && (
@@ -179,7 +188,7 @@ export default function CaptionsStep({ organizationId, onContinue }: { organizat
       <div style={{ display: "flex", gap: 10 }}>
         <button type="button" onClick={onContinue}
           style={{ padding: "12px 0", borderRadius: 8, border: "none", background: "var(--accent)", color: "var(--btn-primary-text)", fontWeight: 700, fontSize: 14, cursor: "pointer", width: 160 }}>
-          {status === "completed" ? "繼續 →" : "略過，繼續 →"}
+          {status === "completed" || scriptCaptions ? "繼續 →" : "略過，繼續 →"}
         </button>
       </div>
     </div>
