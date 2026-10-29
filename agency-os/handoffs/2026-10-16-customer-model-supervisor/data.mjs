@@ -49,7 +49,7 @@ export const PRIORITY = [
 export const NEXT = [
   { h: '① 翻強制模式（等 10/31，不占工時）', t: '權利已就位（2026-10-23 部署）；客戶本人操作時已一律強制，翻的只影響員工。10/31 自動檢查 7 天「若強制就拒」歸零或都已解釋後，請你同意再翻（High）。', steps: [3] },
   { h: '② 用量計量與門上線阻擋項', t: '已做（2026-10-23）：每道付費縫記用量（自用與合約列只記不扣；單價待你定）、studio 精選免費路徑在付費閘前且門上藏 AI 按鈕。tarot 批次也已記操作者（0119 已套 prod，2026-10-23）。剩：員工路由在 withFeature 範圍外的付費工作仍記在自用帳戶（TASKS「員工路由用量歸屬」）。', steps: [3, 8] },
-  { h: '③ 門逐個上線', t: 'tarot、studio（2026-10-23）、video、design（2026-10-24）已上線，共用一個 nginx 門區塊。每個功能分開買或贈送（你 2026-10-24 定）：客戶帳戶持有該產品才進得了門，否則只看到「尚未開通」；每扇門左邊選單列功能，沒持有的灰掉（做好待部署）。下一個 content，逐門任務在 cards/step-8-doors-video-design-content.md；cs（等 Chatwoot）、collect、outreach（員工路由要先搬）最後。每個門上線 High。第一個自助客戶不等 Woo：員工邀請（本機帳號登入已能用）＋人工寫合約列，與 Soulful 同一條路。', steps: [8] },
+  { h: '③ 門逐個上線', t: 'tarot、studio（2026-10-23）、video、design（2026-10-24）、content（2026-10-30）已上線，共用一個 nginx 門區塊。每個功能分開買或贈送（你 2026-10-24 定）：客戶帳戶持有該產品才進得了門，否則只看到「尚未開通」；每扇門左邊選單列功能，沒持有的灰掉（做好待部署）。逐門任務在 cards/step-8-doors-video-design-content.md；剩 cs（等 Chatwoot）、collect、outreach（員工路由要先搬）最後。每個門上線 High。第一個自助客戶不等 Woo：員工邀請（本機帳號登入已能用）＋人工寫合約列，與 Soulful 同一條路。', steps: [8] },
   { h: '④ 收錢分兩段', t: '4a 已上線（2026-10-23；0120 已套 prod，程式 10/24 03:00 部署）：付款接頭、收件表、合約與權利同一交易寫入、錢包入帳與只退未用點數、拒付凍結、/ops/billing；付款來源「人工」（轉帳後用 scripts/record-payment.mjs 登記）。訂閱付款前還要你定第一個方案（plans 0 筆）。4b 設計與八張小卡已寫（2026-10-24，cards/step-4.md §4b）：付款事件由 wp-bridge 外掛用官方 PHP action 送（不用 Woo 原生 webhook：沒有續約事件、失敗 5 次就停用）；WordPress 會員對應計費帳戶一張表（0124）；第一次付款的會員自動建帳戶並寄設定密碼信；WordPress 一次性碼進產品門（ADR 015 順序 1）。4b-1～4b-5、4b-7 已完成（0124、0126 已套 prod；收費外掛 aware-wave-store 1.0.0 已裝 aware-wave.com，2026-10-25）；扣款、點數條款、點數規則三題已定（都選 A）。4b-6 由你在 WordPress 後台做（裝 WooCommerce Subscriptions 與 TapPay、結帳必登入、條款勾選），TapPay 開通定期扣款要先問業務；也要你定第一個方案。收第一筆真錢前做 4b-9 真實付款演練：各段單獨有測試，但 WordPress→控制面整條沒跑過（prod payment_events 0 筆）。4c 賣家（收銀台可裝在任何網站，ADR 017 決定 #12，2026-10-25 你定 D1–D5）：代理權、收銀台登記表、各站鑰匙驗章與 /ops/sellers 已完成（0133、0140、0141 已套 prod；4c-2 已部署 2026-10-29），aware-wave.com 照舊；外掛代理商模式已發版並升級 aware-wave.com（1.2.0，月結依買家付款月份，0142）；剩第一個代理商網站實測。設計與執行卡在 cards/step-4-seller.md。', steps: [4] },
   { h: '⑤ 買斷安裝', t: '收錢兩段完成、待決 2 律師回覆後開工。授權檔改由自架 Keygen CE 簽發，不自寫簽章（現成方案評估 2026-10-25）。', steps: [5] },
   { h: '⑥ 等客戶出現', t: '只串 API、代理商、白牌網址：出現第一個這類客戶才做。', steps: [6, 7, 9] },
@@ -118,7 +118,7 @@ export const NOW = [
   { what: '代操用量按客戶計', state: 'no', ev: '程式已接（2026-10-23）：每道付費縫 grant.recordUse() 每個 grant 記一列 entitlement.usage（lib/ai/gateway.ts、collect、video.tts），閘擋「credits 功能走不到 recordUse」；2026-10-24 03:00 自動部署後生效。扣點仍 0（每功能單價待你定）；錢包入帳只經付款事件（0120 billing_apply_payment_event，4a，2026-10-23）' },
   { what: '買斷', state: 'no', ev: '授權檔與模組清單未建；provision/ 只有一鍵架站（provisionClient.ts）' },
   { what: '許可判斷', state: 'yes', ev: '每個收費點只問 can()（e87de9225），影子模式（ENTITLEMENT_MODE 未設，can.ts:63）：照算判決並記錄，一律放行、不扣點。點數功能先認權利列（b3df190e9）；自用、EdD 免費與 Soulful 全產品合約每天自動補齊（0118），已部署；翻強制待 10/31 自動檢查與你同意；每功能扣幾點待你定價' },
-  { what: '產品自己的門', state: 'yes', ev: 'social、tarot、studio、video、design 已上線（video／design 2026-10-24：DNS、憑證 15 SAN、兩層 nginx、部署 51a84b203，公網與 Playwright 煙霧測試通過）；門只讓持有該產品的帳戶進（lib/portal/door-access.ts）；其餘 6 個未開，content 有逐門任務卡。開門規則與機械閘見 ADR 018 §2；登記表 11 個產品仍是 coming_soon（開放販售另做）' },
+  { what: '產品自己的門', state: 'yes', ev: 'social、tarot、studio、video、design、content 已上線（video／design 2026-10-24：DNS、憑證 15 SAN、兩層 nginx、部署 51a84b203；content 2026-10-30：憑證 16 SAN、部署 3f9bb4273；公網與 Playwright 煙霧測試通過）；門只讓持有該產品的帳戶進門頁（lib/portal/door-access.ts；API 層尚未查持有，見 TASKS 產品門條目）；其餘 5 個未開。開門規則與機械閘見 ADR 018 §2；登記表 11 個產品仍是 coming_soon（開放販售另做）' },
 ];
 
 // ADR 017「順序」。status: not_started | in_progress | done；done 必填 commit。

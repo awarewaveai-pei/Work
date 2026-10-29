@@ -1,4 +1,33 @@
 # Worklog
+## 2026-10-30（續1）content 門上線：content.aware-wave.com（卡 step-8 C6；e62dc2fcd＋3f9bb4273 部署）（Claude）
+
+**觸發**：操作者 2026-10-30「快去做」＝ content 門上線（High：DNS、nginx、憑證、部署）。照 2026-10-24 續36／續39（video、design）的做法。手動提前部署。
+
+**上線步驟（prod）**
+- 漂移檢查：主機 `sg-stack.aware-wave.com` md5 293e2ff8、lobster-nginx `default.conf` md5 a8f3a181，都等於 repo HEAD。
+- Cloudflare：`content` A → 145.239.195.47 proxied，id `88a1babfbf0ffbc6a6c73f6b5dd1a3d7`；上線前記錄不存在（EXISTING=0）。
+- repo：`nginx/default.conf` 共用門區塊、`nginx/system-sites/sg-stack.aware-wave.com.conf` 80／443 `server_name` 加 content；`apps/next-admin/lib/portal/products.ts` content 拿掉 `enabled: false`。
+- 主機 nginx：`safe-infra-patch.sh host-nginx … app.aware-wave.com` OK，備份 `/root/lobster-phase1/safe-patch-backups/_etc_nginx_sites-available_sg-stack.aware-wave.com.safe-patch-20261029-163418`；之後 md5 a8678a80＝repo。
+- 憑證：`certbot certonly --cert-name aware-wave.com --nginx --expand`，16 SAN 含 content，notAfter 2027-01-27；`00-default-placeholder` 前後 md5 都是 fde8a78a；`nginx -t` OK 後 reload。
+- lobster-nginx：`safe-infra-patch.sh nginx` OK，備份 `/root/lobster-phase1/nginx/default.conf.bak.safe-patch-20261029-163459`；容器內 md5 7411f8c4＝repo。
+- 部署前公網：content `/` 404（門未開、TLS 正常）；app `/login` 200；social、video `/` 307。
+- 第一次 `sg-deploy.sh next-admin`（e62dc2fcd）被 npm test 閘擋，自動中止，prod 留在 fd664c14d：`app/api/ops/clients/[slug]/accounts/route.test.ts` 拿 content 當「門還關著的產品」範例，開門後 POST 回 200 不是 400（2 個測試）。改用 cs（仍 `enabled:false`），3f9bb4273；本機完整 vitest 綠後再部署。我先前只跑 lib/portal、lib/entitlements、middleware，沒涵蓋 app/api——門開關會影響引用「關著的門」的測試，部署前該跑完整套件。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p .（0 行）＋ npx vitest run lib/portal lib/entitlements middleware（24 files，292 passed，含 registry-code 閘 3／4／5、door-access、door-holds） | exit=0 | ms=135366
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（next-admin 完整：422 files，3553 passed，0 failed） | exit=0 | ms=37000
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin（第二次：healthy 15s、HTTP smoke 5/5；`.deployed-commit` fd664c14d → 3f9bb4273） | exit=0 | ms=413000
+- REALTEST_EVIDENCE: tool=curl | cmd=公網 `--path-as-is` content：`/`、`/topics`、`/sites`、`/events` 都 307 到 `/login?next=…`；`/login?next=%2F` 200；`/api/ops/summary`、`/api/social/brands`、`/portal/launcher`、`/api/internal/x`、`/intake`、`/video`、`/design` 都 404；`/a%2Fb` 400；`/api/content/drafts`、`/api/tools/designs`、`/api/entitlements/features` 都 401；回歸 app `/login` 200、social／tarot／studio／video／design `/` 307、aware-wave.com 200、app `/content` 404；全部 ssl_verify=0 | exit=0 | ms=34000
+- REALTEST_EVIDENCE: tool=Bash | cmd=scripts/playwright-runner.ps1 -Mode smoke -SkipInstall（26 passed／0 failed／6 skipped，`agency-os/reports/e2e/2026-10-30/smoke`） | exit=0 | ms=33000
+- 突變：卡上 C5 已做過（續34），不重做。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n -- Codex `agency-os/reports/oracle/2026-10-30-partialreview-6b2ae78d.md`。三條都查證成立，但都不是本次造成：`doorApis()`（`lib/portal/doors.ts:59-73`）帶入 dependsOn 的 API，video 門（dependsOn content，已上線）早就服務 `/api/content`，design 門（dependsOn studio）早就服務 `/api/tools/studio`；開 content 門沒有新增可達的 API。F2 持有只擋門頁（`ProductDoorShell`），API 不查；F1 `/api/tools/studio/mockup` 只查角色；F3 `GET /api/content/trending` 重抓並寫全域 `content_trends`。記進 TASKS 第 8 項產品門條目（不變量：門服務的每條 API 都經 `doorAccess`）。
+  - external oracle = Codex CLI (codex exec -s read-only), not self-description
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=content.aware-wave.com\|enabled: false\|door is closed | hits=12（content.aware-wave.com 7 行：兩份 nginx 3 行＋4 個 `app/api/content` 測試拿它當門主機，完整套件綠；`enabled: false` 只剩 cs、collect、outreach 3 行；「door is closed」2 行＝accounts 測試，已改 cs）
+
+**未驗**：登入後的畫面要有人用瀏覽器登入看（客戶在 content 網址看到四頁；沒持有的看到「尚未開通」）。本機沒有帳號密碼，不代為輸入。
+**旁註**：第一次部署那條 SSH 指令期間，hook 報 `patch_director_generation.ps1` 被改；那是 codex session 01a18807 的未追蹤檔，本 session 沒碰。
+
+**rollback**：程式用 `DEPLOY_ROLLBACK_RUNBOOK.md` §2.1 回 fd664c14d，或 revert 3f9bb4273＋e62dc2fcd；lobster-nginx 用 `default.conf.bak.safe-patch-20261029-163459`＋`safe-infra-patch.sh nginx`；主機 nginx 用上列備份＋`safe-infra-patch.sh host-nginx`；DNS 刪 `88a1babfbf0ffbc6a6c73f6b5dd1a3d7`；憑證不必回退（多一個 SAN 無害）。
 ## 2026-10-29（續17）部署 paid_at（24c1d9973）與 4b-10（66b612ead）、aware-wave-store 1.2.0 發版並升級 aware-wave.com（操作者「其他的一路做完」）（Claude）
 
 - **順序**：控制面先認得 `paid_at` 再讓外掛送（舊控制面只會丟掉這個欄位，不會拒）。0142 已套（續14）、0143 已套（4b-10 session）。
