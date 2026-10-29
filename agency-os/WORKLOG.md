@@ -1,4 +1,20 @@
 # Worklog
+## 2026-10-29（續4）— 影片 F1–F7 部署＋正式站端對端實測全過（Claude）
+
+- 部署：video-service 還原點 `lobster-video-service:pre-20261029-kb` → tar 同步 → `up -d --build`；容器內 `unittest discover` 41 OK（含 test_ken_burns freezedetect 真跑）。next-admin 由另一 session `sg-deploy` 上 `4ee3a1db0`（含 e66e3b86d／91d9248e4／1889b6a94）。
+- 實測（專案 8bad63c6，AwareWave Ops，照片動畫＋Edge，16:9＋4:5，4 場、AI 生圖 0）：
+  - F4：兩比例 freezeEvents 0、blackRatio 0、technical/signal QA passed。
+  - F1：渲染完成 → lifecycle_stage=review。
+  - F2／F6：重開直接到 ④ 字幕步驟，選單只列本專案主列；字幕來源寫腳本＋配音，無 Whisper 鍵。
+  - F5：重燒字幕 `/api/video/captions/reburn` 全 200，畫面「字幕已重燒」。
+  - F3：舊專案 bf5d4ff3 一支影片一張卡，兩比例併入。
+  - QA 四項通過 → Release 核准 16:9 → 社群草稿 1 個（facebook，未發布）→ stage=measure。
+  - F7：未在正式站製造網路中斷，僅 `script-forge-errors.test` 覆蓋。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-video-service python -m unittest discover -s tests` | exit=0 | ms=11731
+- REVIEW_WAIVED: NA -- 本 entry 只有部署與實測，無新程式碼（程式審查見續1／續3）
+- BUGHUNT_WAIVED: NA -- 無程式改動
+- 殘留測試資料：空專案 1e02b8f8（無腳本，可刪）；8bad63c6 為實測專案。
+- Rollback：video-service `docker tag lobster-video-service:pre-20261029-kb lobster-video-service:local` 後 `up -d --no-build`；next-admin `rollback-phase1.sh restore next-admin`。
 ## 2026-10-29（續3）— 影片 F4：圖片場景 Ken Burns 縮放分配到整場（Claude；video-service 未部署）
 
 - **根因**：`pipeline.py` zoompan `min(1+0.0009*on,1.12)` 約 4.4 秒到頂，後半場定格 → 技術 QA freezeEvents 6。**修法**：`_ken_burns_zoom(frames,out)` 依幀數線性分配（每幀步長不低於舊值 0.0009，總幅上限 0.45），不動偵測器門檻。
