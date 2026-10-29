@@ -18,6 +18,8 @@ const FIXTURES: Record<string, unknown> = {
   "manual.script": { title: "t", hook: "h", scenes: [{ time: "0-3秒", visual: "v", dialogue: "d", subtitle: "s", shoot_tip: "", edit_tip: "" }], cta: "追蹤" },
   "result.score": { scores: { hook: 8, rhythm: 7, clarity: 8, emotion: 6, shootability: 8, conversion: 7 }, overall: 7.5, optimized_hook: "", optimized_cta: "" },
   "result.score_short": { scores: { hook: 8, rhythm: 7, clarity: 8, emotion: 6, shootability: 8, conversion: 7 }, overall: 7.5 },
+  "result.rewrite": { title: "t", hook: "h", scenes: [{ time: "0-3秒", visual: "v", dialogue: "d", subtitle: "s" }], cta: "c" },
+  "result.scenes": { scenes: [{ index: 2, time: "3-8秒", visual: "v", dialogue: "d", subtitle: "s" }] },
   "result.platform": { title: "t", hook: "h", scenes: [{ time: "0-3秒", dialogue: "d" }], hashtags: ["x"], key_changes: "" },
   "brand_story.gen": { title: "t", hook: "h", story_arc: { opening: "o" }, scenes: [] },
   "sales.gen": { title: "t", opening: "o", pain_discovery: ["q"], objection_handlers: [{ objection: "貴", response: "r", follow_up: "f" }], close_lines: ["c"], full_script: "s" },
@@ -109,6 +111,17 @@ describe("ScriptForge module registry", () => {
     const yt = forgePrompt("result", "platform", { plat: "YT Shorts", platformId: "shorts" }, ctx);
     expect(yt?.prompt).toContain(`不得超過 ${BODY_LIMITS.youtube} 字`);
     expect(forgePrompt("result", "platform", { plat: "Podcast", platformId: "podcast" }, ctx)?.prompt).not.toContain("不得超過");
+  });
+
+  it("result-card rewrites count scenes from the script, not the toolbar, and put the script after the output format", () => {
+    const script = { title: "t", hook: "h", cta: "c", scenes: [1, 2, 3].map((n) => ({ time: `${n}`, dialogue: `d${n}`, character_id: "x" })) };
+    const one = forgePrompt("result", "scenes", { script, indices: [2] }, ctx)!.prompt;
+    expect(one).toContain("scenes 只放這 1 個");
+    expect(one.indexOf("純JSON")).toBeLessThan(one.indexOf("整支腳本："));
+    expect(one).not.toContain("character_id");
+    const all = forgePrompt("result", "rewrite", { script }, ctx)!.prompt;
+    expect(all).toContain("剛好 3 個 scene");
+    expect(all.indexOf("純JSON")).toBeLessThan(all.indexOf("原版："));
   });
 
   it("a missing field prints nothing, never undefined", () => {

@@ -53,6 +53,20 @@ const brandForbidden = (ctx: ForgeCtx): string => (ctx.brand?.voice ? `\n品牌�
 /** Output rules every module shares (was the single system text of the old route). */
 export const OUTPUT_RULES = "輸出必須是純JSON，不加任何markdown包裹或前言後記。台詞口語自然；畫面指令具體；字幕最多12字。";
 
+/** dialogue goes straight to TTS: every task that writes scenes repeats this. */
+const DIALOGUE_RULE = `dialogue 欄位會直接送進 TTS 唸出來，只能寫真的要被唸出的口語文字；不可寫舞台指示或標籤（如「(旁白/字幕)」「(無台詞，輕嘆氣聲)」），這類文字會被逐字唸出變成怪聲音。純視覺無台詞的場景直接把 dialogue 設為空字串 ""；旁白/字幕型場景 dialogue 只放要唸的內容本身，不要加「(旁白)」這種前綴標籤。`;
+
+/** The result card's current script, trimmed to what a rewrite reads (keeps the prompt short; page-only keys dropped). */
+function scriptForPrompt(v: unknown): { title: string; hook: string; cta: string; scenes: Record<string, string>[] } {
+  const o = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+  const keys = ["time", "visual", "dialogue", "subtitle", "shoot_tip", "edit_tip"];
+  const scenes = arr(o.scenes).map((x) => {
+    const sc = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
+    return Object.fromEntries(keys.map((k) => [k, s(sc[k])]));
+  });
+  return { title: s(o.title), hook: s(o.hook), cta: s(o.cta), scenes };
+}
+
 /** The default-language and scene-split instruction the page used to prepend to every prompt. */
 export function languageLine(ctx: ForgeCtx): string {
   const broll = Math.max(0, ctx.sceneCount - ctx.customScenes);
@@ -76,7 +90,7 @@ export const FORGE_MODULES: ForgeModule[] = [
     tasks: {
       script: {
         shape: ["title", "hook", "scenes", "cta"],
-        build: (f, ctx) => `生成完整影片腳本。主題：${s(f.topic)}|平台：${s(f.plat)}|長度：${s(f.duration) || "60秒"}|受眾：${s(f.audience) || "一般觀眾"}|目的：${s(f.goal) || "吸粉"}|語氣：${s(f.tone) || "專業"}|CTA：${s(f.cta) || "追蹤"}|角度：${s(f.angleName)}|鉤子：${s(f.angleHook)}${brandForbidden(ctx)}${s(f.sbBlock)}${s(f.characterIdHint)}\ndialogue 欄位會直接送進 TTS 唸出來，只能寫真的要被唸出的口語文字；不可寫舞台指示或標籤（如「(旁白/字幕)」「(無台詞，輕嘆氣聲)」），這類文字會被逐字唸出變成怪聲音。純視覺無台詞的場景直接把 dialogue 設為空字串 ""；旁白/字幕型場景 dialogue 只放要唸的內容本身，不要加「(旁白)」這種前綴標籤。\n純JSON：{"title":"","hook":"","core_idea":"","scenes":[{"time":"","visual":"","dialogue":"","subtitle":"(≤12字)","shoot_tip":"","edit_tip":""${s(f.sceneCharacterField)}}],"cta":"","alt_hooks":["","",""],"titles":["","","","",""],"hashtags":["","","","",""],"shoot_checklist":["","",""],"edit_notes":""}\nscenes安排${ctx.sceneCount}個場景。`,
+        build: (f, ctx) => `生成完整影片腳本。主題：${s(f.topic)}|平台：${s(f.plat)}|長度：${s(f.duration) || "60秒"}|受眾：${s(f.audience) || "一般觀眾"}|目的：${s(f.goal) || "吸粉"}|語氣：${s(f.tone) || "專業"}|CTA：${s(f.cta) || "追蹤"}|角度：${s(f.angleName)}|鉤子：${s(f.angleHook)}${brandForbidden(ctx)}${s(f.sbBlock)}${s(f.characterIdHint)}\n${DIALOGUE_RULE}\n純JSON：{"title":"","hook":"","core_idea":"","scenes":[{"time":"","visual":"","dialogue":"","subtitle":"(≤12字)","shoot_tip":"","edit_tip":""${s(f.sceneCharacterField)}}],"cta":"","alt_hooks":["","",""],"titles":["","","","",""],"hashtags":["","","","",""],"shoot_checklist":["","",""],"edit_notes":""}\nscenes安排${ctx.sceneCount}個場景。`,
       },
       angles: {
         shape: ["angles"],
@@ -288,6 +302,29 @@ export const FORGE_MODULES: ForgeModule[] = [
       score: {
         shape: ["scores", "overall"],
         build: (f) => `評估腳本。鉤子：${s(f.hook)}|場景：${s(f.scenes)}|CTA：${s(f.cta)}\n純JSON：{"scores":{"hook":0,"rhythm":0,"clarity":0,"emotion":0,"shootability":0,"conversion":0},"overall":0,"optimized_hook":"","optimized_cta":""}`,
+      },
+      // 結果頁「全部重新生成」：f.script = 目前（可能已被人改過）的腳本；場景數跟這支腳本走，不跟頂列。
+      // 腳本放在提示詞最後：路由只留前 24k 字（route.ts MAX_PROMPT_CHARS），超長時被切的是腳本尾，不是輸出格式。
+      rewrite: {
+        shape: ["title", "hook", "scenes", "cta"],
+        build: (f) => {
+          const sc = scriptForPrompt(f.script);
+          return `依修改要求重寫整支腳本。修改要求：${s(f.note) || "整體寫得更好：鉤子更抓人、節奏更緊、台詞更口語"}
+本次輸出剛好 ${sc.scenes.length} 個 scene（以這裡為準，不照上面預設場景數）。${DIALOGUE_RULE}
+純JSON：{"title":"","hook":"","scenes":[{"time":"","visual":"","dialogue":"","subtitle":"(≤12字)","shoot_tip":"","edit_tip":""}],"cta":"","alt_hooks":["","",""],"titles":["","","","",""],"hashtags":["","","","",""]}
+原版：${JSON.stringify(sc)}`;
+        },
+      },
+      // 結果頁「重寫勾選的場景」：只重寫 f.indices（從 1 起算）那幾場，整支腳本一起給才接得上前後文。
+      scenes: {
+        shape: ["scenes"],
+        build: (f) => {
+          const idx = arr(f.indices).map(s).filter(Boolean);
+          return `只重寫這支腳本的第 ${idx.join("、")} 場，其他場不要動也不要輸出：scenes 只放這 ${idx.length} 個（以這裡為準，不照上面預設場景數），每個帶 index（場次，從 1 起算）。修改要求：${s(f.note) || "寫得更好、和前後場接得更順"}
+${DIALOGUE_RULE}
+純JSON：{"scenes":[{"index":1,"time":"","visual":"","dialogue":"","subtitle":"(≤12字)","shoot_tip":"","edit_tip":""}]}
+整支腳本：${JSON.stringify(scriptForPrompt(f.script))}`;
+        },
       },
       platform: {
         shape: ["title", "hook", "scenes", "hashtags"],

@@ -1,4 +1,34 @@
 # Worklog
+## 2026-10-29（續5）— 腳本結果頁：可改內容、全部／勾選場景重新生成（Claude；操作者「照做」）
+
+- **需求**：AI 寫完腳本只能看；重寫要退回重選角度；不能只重寫幾場。
+- **做法**：只改共用結果卡 `ScriptForge.tsx` `ScriptResult`，所以每個出 {title,hook,scenes,cta} 的模組都一起有。改法：
+  - 結果卡持有 `draft`。複製、多平台轉換、送去做影片、動態預覽一律用 draft。
+  - 「✏️ 編輯內容」可改標題／鉤子／CTA／每場五欄。
+  - 「🔄 全部重新生成」走新 task `result.rewrite`。
+  - 「🔁 重寫勾選的 N 場」走新 task `result.scenes`，依 index 合併；AI 沒回的欄位（如 character_id）沿用原值。
+  - 改過後分數標「修改前」，另有「重新評分」鍵。
+  - `modules.ts` 抽 `DIALOGUE_RULE`（台詞會被 TTS 唸）共用；新增 `scriptForPrompt` 精簡腳本。
+- **Codex 審 5 項全修**（`agency-os/reports/oracle/2026-10-29-partialreview-b1464826.md`）：
+  - F1：共用 languageLine 要「剛好 N 場」，與只重寫勾選場衝突。修法：prompt 明寫以本次數量為準。
+  - F2：路由截前 24k 字。修法：輸出格式放腳本前，腳本精簡後放最後。
+  - F3：重新評分原本只送場景數。修法：改送每場畫面＋台詞。
+  - F4：進行中的平台轉換回來會蓋掉改後版本。修法：`draftGen` 世代號，舊回應丟棄。
+  - F5：手改的稿沒進歷史。修法：「完成編輯」或卡片卸載時存。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/script-forge "app/(shell)/tools/video" "app/(shell)/tools/script-forge"（17 測試，含新 prompt 測試）＋`npx tsc --noEmit` 非 .next 錯誤 0 | exit=0 | ms=2861
+- 本機 UI 實測（dev server 3902、無 Supabase、AI 回應以頁內 fetch mock 代替）：
+  - 手改標題與第 2 場 → 送出的 draft 帶改後內容。
+  - 勾 2、4 場重寫 → 只換這兩場，1、3 場不變。
+  - 全部重新生成 → note 有送出，character_id 保留。
+  - 重新評分 → 「修改前」標記消失。
+  - F4：轉換進行中改稿 → 舊版不出現。
+  - F5：沒按完成就切到歷史 → 歷史第一筆是改後標題。
+  - **未驗**：真 AI 對新 prompt 的回應品質（正式站部署後手動試一次）。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n
+  - external oracle = Codex CLI gpt-6-sol，artifact `agency-os/reports/oracle/2026-10-29-partialreview-b1464826.md`
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=DIALOGUE_RULE | hits=4（定義＋manual.script＋rewrite＋scenes）
+- 影片教材 Playwright 任務：操作者喊停，腳本 `tests/e2e/tutorial/video-walkthrough.mjs` 與截圖未 commit。正式站專案 97bd571b 停在渲染已送出。
+- **Rollback**：`git revert <此 commit>`。上線＝當晚 03:00 自動部署。
 ## 2026-10-29（續4）— 影片 F1–F7 部署＋正式站端對端實測全過（Claude）
 
 - 部署：video-service 還原點 `lobster-video-service:pre-20261029-kb` → tar 同步 → `up -d --build`；容器內 `unittest discover` 41 OK（含 test_ken_burns freezedetect 真跑）。next-admin 由另一 session `sg-deploy` 上 `4ee3a1db0`（含 e66e3b86d／91d9248e4／1889b6a94）。

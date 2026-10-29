@@ -258,6 +258,8 @@ const ErrBox=({e}: any)=><div role="alert" style={{padding:"7px 11px",background
 const Spin=({label})=><div style={{textAlign:"center",padding:"56px 0"}}><div style={{display:"inline-flex",gap:6,marginBottom:10}}>{[0,1,2].map(i=><div key={i} style={{width:7,height:7,borderRadius:"50%",background:C.coral,animation:`bonce .8s ease-in-out ${i*.15}s infinite alternate`}}/>)}</div><div style={{fontSize:13.5,color:C.ink,fontWeight:600}}>{label}</div><div style={{fontSize:11.5,color:C.mid,marginTop:3}}>AI正在思考中...</div></div>;
 const SBar=({label,val,accent})=><div style={{marginBottom:9}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}><span style={{fontSize:12,color:C.ink}}>{label}</span><span style={{fontSize:12,fontWeight:800,color:accent}}>{val}<span style={{fontSize:9,color:C.mid}}>/10</span></span></div><div style={{height:4,borderRadius:99,background:C.fog,overflow:"hidden"}}><div style={{width:`${(val/10)*100}%`,height:"100%",background:accent,borderRadius:99,transition:"width 1.2s cubic-bezier(.4,0,.2,1)"}}/></div></div>;
 
+/** 結果頁的可改欄位：label 在上、可拉高的 textarea；onChange 直接拿字串。 */
+const EF=({label,value,onChange,placeholder=""}: any)=><label style={{display:"grid",gap:3,fontSize:10.5,color:C.mid,fontWeight:700}}>{label}<textarea value={value??""} onChange={(e)=>onChange(e.target.value)} placeholder={placeholder} rows={2} style={{width:"100%",boxSizing:"border-box",padding:"7px 9px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:12.5,fontWeight:400,fontFamily:"inherit",resize:"vertical"}}/></label>;
 function TA({value,onChange,placeholder,rows=4}){const[f,sf]=useState(false);return<textarea value={value} onChange={onChange} placeholder={placeholder} rows={rows} onFocus={()=>sf(true)} onBlur={()=>sf(false)} style={{width:"100%",padding:"11px 13px",background:C.white,border:`2px solid ${f?C.coral:C.border}`,borderRadius:10,fontSize:13.5,color:C.black,resize:"vertical",outline:"none",lineHeight:1.6,fontFamily:"inherit",transition:"border-color .2s",boxSizing:"border-box"}}/>;}
 function IN({value,onChange,placeholder,onKeyDown}: any){const[f,sf]=useState(false);return<input value={value} onChange={onChange} placeholder={placeholder} onKeyDown={onKeyDown} onFocus={()=>sf(true)} onBlur={()=>sf(false)} style={{width:"100%",padding:"10px 13px",background:C.white,border:`2px solid ${f?C.coral:C.border}`,borderRadius:10,fontSize:13.5,color:C.black,outline:"none",fontFamily:"inherit",transition:"border-color .2s",boxSizing:"border-box"}}/>;}
 function PlatGrid({value,onChange}){return<div><div style={{fontSize:11,color:C.mid,marginBottom:6}}>寫這支腳本時的主平台（決定字數、節奏、語氣）。寫完後可用結果頁的「多平台轉換」另產其他平台版本。</div><div style={{display:"flex",flexWrap:"wrap",gap:7}}>{PLATFORMS.map(p=><button key={p.id} onClick={()=>onChange(p.id)} style={{padding:"10px 8px",borderRadius:10,border:`2px solid ${value===p.id?C.coral:C.border}`,background:value===p.id?C.corallt:C.white,cursor:"pointer",textAlign:"center",flex:"1 1 70px",fontFamily:"inherit",transition:"all .15s"}}><div style={{fontSize:14,marginBottom:2,color:value===p.id?C.coral:C.mid}}>{p.icon}</div><div style={{fontSize:9.5,fontWeight:value===p.id?700:400,color:value===p.id?C.coral:C.ink,lineHeight:1.2}}>{p.label}</div></button>)}</div></div>;}
@@ -405,13 +407,63 @@ function ScriptResult({script,score,onReset,extraTop,autoSaveTag,sbCharacterRefs
   const[versions,setVersions]=useState<Record<string,any>>({});
   const[sel,setSel]=useState("original");
   const[copiedId,setCopiedId]=useState("");
-  const orig=script;
+  // 人改過或 AI 重寫過的版本 = 之後複製、轉平台、送影片用的原版；父層換一支新 script 進來才重置。
+  const[draft,setDraft]=useState(script);
+  const[scoreNow,setScoreNow]=useState(score);const[scoreStale,setScoreStale]=useState(false);
+  const[editing,setEditing]=useState(false);const[picked,setPicked]=useState<number[]>([]);const[note,setNote]=useState("");
+  const[busy,setBusy]=useState("");const[regenErr,setRegenErr]=useState("");
+  const orig=draft;
   const cur=sel==="original"?orig:(versions[sel]||orig);
   const[showPreview,setShowPreview]=useState(false);
   const { customScenes }=useContext(ScriptSettingsCtx);
 
   useEffect(()=>{if(script&&autoSaveTag)saveHistory({tag:autoSaveTag,title:script.title,hook:script.hook,script});},[script]);
-  useEffect(()=>{setVersions({});setSel("original");},[script]);
+  useEffect(()=>{setVersions({});setSel("original");setDraft(script);setPicked([]);setEditing(false);setScoreStale(false);setRegenErr("");},[script]);
+  useEffect(()=>{setScoreNow(score);setScoreStale(false);},[score]);
+
+  // 原版一改，舊的平台版本與分數就不再對應它。
+  // draftGen：原稿每改一次就加一；進行中的平台轉換回來時原稿已變，就丟掉不收。
+  const draftGen=useRef(0);
+  function changed(next){draftGen.current++;setDraft(next);setVersions({});setSel("original");setScoreStale(true);}
+  // 手改的稿：按「完成編輯」存進歷史；沒按就切走（卡片卸載）也存，免得改的東西不見。
+  const unsaved=useRef<any>(null);
+  const saveDraft=(d)=>{unsaved.current=null;if(autoSaveTag)saveHistory({tag:autoSaveTag,title:d.title,hook:d.hook,script:d});};
+  useEffect(()=>()=>{if(unsaved.current)saveDraft(unsaved.current);},[]);
+  const edit=(next)=>{unsaved.current=next;changed(next);};
+  const editField=(k,v)=>edit({...draft,[k]:v});
+  const editScene=(i,k,v)=>edit({...draft,scenes:draft.scenes.map((sc,j)=>j===i?{...sc,[k]:v}:sc)});
+  async function regenAll(){
+    setBusy("all");setRegenErr("");
+    try{
+      const next=pj(await forge("result","rewrite",{script:draft,note}));
+      if(!Array.isArray(next.scenes)||next.scenes.length===0)throw new Error("AI 回應沒有場景，請再試一次");
+      // 場景上 AI 沒回的欄位（如 Story Bible 的 character_id）沿用原值。
+      const merged={...draft,...next,scenes:next.scenes.map((sc,i)=>({...draft.scenes?.[i],...sc}))};
+      changed(merged);setPicked([]);saveDraft(merged);
+    }catch(e){setRegenErr(errText(e));}
+    setBusy("");
+  }
+  async function regenPicked(){
+    const want=[...picked].sort((x,y)=>x-y);
+    setBusy("scenes");setRegenErr("");
+    try{
+      const got=pj(await forge("result","scenes",{script:draft,indices:want.map(i=>i+1),note})).scenes;
+      if(!Array.isArray(got))throw new Error("AI 回應格式不正確，請再試一次");
+      const byIdx=new Map<number,any>(got.map(sc=>[Number(sc?.index)-1,sc]));
+      const missing=want.filter(i=>!byIdx.has(i));
+      if(missing.length===want.length)throw new Error("AI 沒有回傳要重寫的場景，請再試一次");
+      const nextDraft={...draft,scenes:draft.scenes.map((sc,i)=>{if(!want.includes(i))return sc;const{index:_i,...rest}=byIdx.get(i)??{};return{...sc,...rest};})};
+      changed(nextDraft);
+      setPicked(missing);saveDraft(nextDraft);
+      if(missing.length)setRegenErr(`第 ${missing.map(i=>i+1).join("、")} 場 AI 沒有回傳，保留原文，可以再按一次。`);
+    }catch(e){setRegenErr(errText(e));}
+    setBusy("");
+  }
+  async function rescore(){
+    setBusy("score");setRegenErr("");
+    try{setScoreNow(pj(await forge("result","score",{hook:draft.hook,scenes:(draft.scenes||[]).map((sc,i)=>`${i+1}. 畫面：${sc.visual||""} 台詞：${sc.dialogue||""}`).join("；"),cta:draft.cta})));setScoreStale(false);}catch(e){setRegenErr(errText(e));}
+    setBusy("");
+  }
 
   function copyVersion(id){
     const v=id==="original"?orig:versions[id];
@@ -427,24 +479,24 @@ function ScriptResult({script,score,onReset,extraTop,autoSaveTag,sbCharacterRefs
   // forceNew = 「重新轉換」; a platform already converted just switches to its version, no AI call.
   async function doRep(pid,forceNew=false){
     if(versions[pid]&&!forceNew){setSel(pid);return;}
-    setRepLoading(true);setRepErr("");
+    setRepLoading(true);setRepErr("");const gen=draftGen.current;
     const plat=PLATFORMS.find(p=>p.id===pid)?.label||pid;
-    try{const raw=await forge("result","platform",{plat,platformId:pid,title:orig.title,hook:orig.hook,dialogues:orig.scenes?.map(s=>s.dialogue),cta:orig.cta});setVersions(v=>({...v,[pid]:pj(raw)}));setSel(pid);}catch(e){setRepErr(errText(e));}
+    try{const raw=await forge("result","platform",{plat,platformId:pid,title:orig.title,hook:orig.hook,dialogues:orig.scenes?.map(s=>s.dialogue),cta:orig.cta});if(gen===draftGen.current){setVersions(v=>({...v,[pid]:pj(raw)}));setSel(pid);}}catch(e){if(gen===draftGen.current)setRepErr(errText(e));}
     setRepLoading(false);
   }
 
   return(
     <div style={{display:"grid",gap:16}}>
-      {showPreview&&<AnimatedPreview script={script} onClose={()=>setShowPreview(false)}/>}
+      {showPreview&&<AnimatedPreview script={draft} onClose={()=>setShowPreview(false)}/>}
       {extraTop}
       {/* Hero */}
       <div style={{background:C.coral,borderRadius:14,padding:22,position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",right:-16,top:-16,width:80,height:80,borderRadius:"50%",background:"rgba(255,255,255,.08)"}}/>
         <SL ch="腳本標題"/>
-        <div style={{fontSize:19,fontWeight:900,color:C.white,lineHeight:1.25,letterSpacing:"-.4px",marginBottom:10,fontFamily:"DM Serif Display,serif"}}>{script.title}</div>
+        <div style={{fontSize:19,fontWeight:900,color:C.white,lineHeight:1.25,letterSpacing:"-.4px",marginBottom:10,fontFamily:"DM Serif Display,serif"}}>{draft.title}</div>
         <div style={{background:"rgba(255,255,255,.15)",borderRadius:9,padding:"9px 13px",marginBottom:10}}>
           <SL ch="開頭鉤子"/>
-          <div style={{fontSize:14,color:C.white,fontStyle:"italic",lineHeight:1.5,fontFamily:"DM Serif Display,serif"}}>「{script.hook}」</div>
+          <div style={{fontSize:14,color:C.white,fontStyle:"italic",lineHeight:1.5,fontFamily:"DM Serif Display,serif"}}>「{draft.hook}」</div>
         </div>
         {/* Animated Preview Button */}
         <button onClick={()=>setShowPreview(true)} style={{background:"rgba(255,255,255,.2)",border:"1.5px solid rgba(255,255,255,.4)",color:C.white,padding:"8px 18px",borderRadius:8,fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,backdropFilter:"blur(4px)",transition:"all .2s"}} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,.3)"} onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,.2)"}>
@@ -453,17 +505,32 @@ function ScriptResult({script,score,onReset,extraTop,autoSaveTag,sbCharacterRefs
       </div>
 
       {/* Scenes */}
-      <div><SL ch="📽 分鏡腳本"/><div style={{display:"grid",gap:9}}>{script.scenes?.map((s,i)=><SceneCard key={i} scene={s} idx={i}/>)}</div></div>
+      <Card style={{display:"grid",gap:9}}>
+        <SL ch="✏️ 修改與重新生成"/>
+        <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+          <GBtn ch={editing?"✅ 完成編輯":"✏️ 編輯內容"} onClick={()=>{if(busy)return;if(editing&&unsaved.current)saveDraft(unsaved.current);setEditing(!editing);}}/>
+          <GBtn ch={busy==="all"?"⏳ 重新生成中…":"🔄 全部重新生成"} onClick={()=>!busy&&void regenAll()}/>
+          <GBtn ch={busy==="scenes"?"⏳ 重寫中…":picked.length?`🔁 重寫勾選的 ${picked.length} 場`:"🔁 重寫勾選的場景（先在下面勾）"} onClick={()=>!busy&&picked.length>0&&void regenPicked()} style={{opacity:picked.length?1:.55}}/>
+        </div>
+        <EF label="想怎麼改（選填，重新生成時給 AI 看）" value={note} onChange={setNote} placeholder="例如：語氣輕鬆一點、第一場更有衝突"/>
+        {editing&&<>{[["腳本標題","title"],["開頭鉤子","hook"],["CTA","cta"]].map(([l,k])=><EF key={k} label={l} value={draft[k]} onChange={(v)=>editField(k,v)}/>)}</>}
+        {regenErr&&<ErrBox e={regenErr}/>}
+      </Card>
 
-      {script.cta&&<Card style={{borderColor:C.violet,background:C.violetl}}><SL ch="🎯 CTA"/><div style={{fontSize:14,color:C.violet,fontStyle:"italic",fontFamily:"DM Serif Display,serif"}}>「{script.cta}」</div></Card>}
+      <div><SL ch="📽 分鏡腳本"/><div style={{display:"grid",gap:9}}>{draft.scenes?.map((s,i)=><div key={i} style={{display:"grid",gap:4}}>
+        <label style={{display:"flex",gap:6,alignItems:"center",fontSize:11.5,color:C.mid,cursor:"pointer"}}><input type="checkbox" checked={picked.includes(i)} disabled={!!busy} onChange={(e)=>setPicked(p=>e.target.checked?[...p,i]:p.filter(x=>x!==i))}/>勾選重寫第 {i+1} 場</label>
+        {editing?<Card style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,padding:12}}>{[["🖼 畫面","visual"],["🎙 台詞（會被唸出來）","dialogue"],["💬 字幕（12 字內）","subtitle"],["📷 拍攝","shoot_tip"],["✂️ 剪輯","edit_tip"]].map(([l,k])=><EF key={k} label={l} value={s[k]} onChange={(v)=>editScene(i,k,v)}/>)}</Card>:<SceneCard scene={s} idx={i}/>}
+      </div>)}</div></div>
+
+      {draft.cta&&<Card style={{borderColor:C.violet,background:C.violetl}}><SL ch="🎯 CTA"/><div style={{fontSize:14,color:C.violet,fontStyle:"italic",fontFamily:"DM Serif Display,serif"}}>「{draft.cta}」</div></Card>}
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-        {[["備用鉤子",script.alt_hooks,C.gold],["標題建議",script.titles,C.jade]].map(([l,items,col])=>items&&<Card key={l} style={{borderColor:col}}><SL ch={l}/>{items.map((item,i)=><div key={i} style={{fontSize:12.5,color:C.ink,padding:"5px 0",borderBottom:i<items.length-1?`1px solid ${C.border}`:"none",lineHeight:1.4}}><span style={{color:C.mid,fontWeight:700,marginRight:5}}>{i+1}.</span>{item}</div>)}</Card>)}
+        {[["備用鉤子",draft.alt_hooks,C.gold],["標題建議",draft.titles,C.jade]].map(([l,items,col])=>items&&<Card key={l} style={{borderColor:col}}><SL ch={l}/>{items.map((item,i)=><div key={i} style={{fontSize:12.5,color:C.ink,padding:"5px 0",borderBottom:i<items.length-1?`1px solid ${C.border}`:"none",lineHeight:1.4}}><span style={{color:C.mid,fontWeight:700,marginRight:5}}>{i+1}.</span>{item}</div>)}</Card>)}
       </div>
 
-      {script.hashtags&&<div style={{display:"flex",flexWrap:"wrap",gap:5}}>{script.hashtags.map((h,i)=><span key={i} style={{background:C.violetl,color:C.violet,padding:"4px 11px",borderRadius:999,fontSize:11.5,fontWeight:600}}>#{h.replace(/^#/,"")}</span>)}</div>}
+      {draft.hashtags&&<div style={{display:"flex",flexWrap:"wrap",gap:5}}>{draft.hashtags.map((h,i)=><span key={i} style={{background:C.violetl,color:C.violet,padding:"4px 11px",borderRadius:999,fontSize:11.5,fontWeight:600}}>#{h.replace(/^#/,"")}</span>)}</div>}
 
-      {score&&<Card style={{background:C.paper}}><div style={{display:"flex",alignItems:"center",gap:18}}><div style={{textAlign:"center",flexShrink:0}}><div style={{fontSize:48,fontWeight:900,color:C.coral,lineHeight:1,fontFamily:"DM Serif Display,serif"}}>{score.overall}</div><div style={{fontSize:10,color:C.mid}}>綜合評分/10</div></div><div style={{flex:1}}>{score.scores&&[["🪝 Hook",score.scores.hook,C.coral],["🎵 節奏",score.scores.rhythm,C.violet],["💡 清晰",score.scores.clarity,C.gold],["❤️ 情緒",score.scores.emotion,C.rose],["📷 拍攝",score.scores.shootability,C.jade],["🎯 轉換",score.scores.conversion,C.sky]].map(([l,v,a])=>v!==undefined&&<SBar key={l} label={l} val={v} accent={a}/>)}</div></div>{score.optimized_hook&&<div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${C.border}`}}><SL ch="✨ AI優化"/><div style={{fontSize:12.5,color:C.coral,fontStyle:"italic"}}>鉤子：「{score.optimized_hook}」</div>{score.optimized_cta&&<div style={{fontSize:12.5,color:C.violet,fontStyle:"italic",marginTop:3}}>CTA：「{score.optimized_cta}」</div>}</div>}</Card>}
+      {scoreNow&&<Card style={{background:C.paper}}>{scoreStale&&<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,fontSize:12,color:C.mid}}>這是修改前的分數。<GBtn ch={busy==="score"?"⏳ 評分中…":"重新評分"} onClick={()=>!busy&&void rescore()} style={{padding:"5px 10px"}}/></div>}<div style={{display:"flex",alignItems:"center",gap:18}}><div style={{textAlign:"center",flexShrink:0}}><div style={{fontSize:48,fontWeight:900,color:C.coral,lineHeight:1,fontFamily:"DM Serif Display,serif"}}>{scoreNow.overall}</div><div style={{fontSize:10,color:C.mid}}>綜合評分/10</div></div><div style={{flex:1}}>{scoreNow.scores&&[["🪝 Hook",scoreNow.scores.hook,C.coral],["🎵 節奏",scoreNow.scores.rhythm,C.violet],["💡 清晰",scoreNow.scores.clarity,C.gold],["❤️ 情緒",scoreNow.scores.emotion,C.rose],["📷 拍攝",scoreNow.scores.shootability,C.jade],["🎯 轉換",scoreNow.scores.conversion,C.sky]].map(([l,v,a])=>v!==undefined&&<SBar key={l} label={l} val={v} accent={a}/>)}</div></div>{scoreNow.optimized_hook&&<div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${C.border}`}}><SL ch="✨ AI優化"/><div style={{fontSize:12.5,color:C.coral,fontStyle:"italic"}}>鉤子：「{scoreNow.optimized_hook}」</div>{scoreNow.optimized_cta&&<div style={{fontSize:12.5,color:C.violet,fontStyle:"italic",marginTop:3}}>CTA：「{scoreNow.optimized_cta}」</div>}</div>}</Card>}
 
       <Card><SL ch="🔄 多平台轉換"/><div style={{fontSize:11,color:C.mid,marginBottom:6}}>把寫好的這支腳本另改成其他平台版本（原版保留，不改上面選的主平台）；點選的那版會用來送出。</div><div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:6}}>{PLATFORMS.map(p=><button key={p.id} disabled={repLoading} onClick={()=>doRep(p.id)} style={{padding:"6px 12px",borderRadius:999,border:`1.5px solid ${versions[p.id]?C.violet:C.border}`,background:sel===p.id?C.violetl:C.white,color:versions[p.id]?C.violet:C.ink,fontSize:11.5,fontWeight:versions[p.id]?700:400,cursor:"pointer",transition:"all .15s",fontFamily:"inherit"}}>{p.icon} {p.label}{versions[p.id]?" ✓":""}</button>)}</div>{repLoading&&<div style={{textAlign:"center",padding:"12px 0",color:C.mid,fontSize:12.5}}>轉換中...</div>}{repErr&&<ErrBox e={repErr}/>}{Object.keys(versions).length>0&&<><SL ch="版本（選中的那版 = 送出／複製用）"/><div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>{["original",...Object.keys(versions)].map(id=><button key={id} onClick={()=>setSel(id)} style={{padding:"6px 12px",borderRadius:8,border:`1.5px solid ${sel===id?C.violet:C.border}`,background:sel===id?C.violet:C.white,color:sel===id?C.white:C.ink,fontSize:11.5,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{id==="original"?"原版":PLATFORMS.find(p=>p.id===id)?.label||id}</button>)}</div></>}{sel!=="original"&&versions[sel]&&<div style={{background:C.violetl,borderRadius:9,padding:12}}><div style={{fontSize:13.5,fontWeight:800,color:C.violet,marginBottom:3}}>{versions[sel].title}</div><div style={{fontSize:12.5,color:C.violet,fontStyle:"italic",marginBottom:7}}>「{versions[sel].hook}」</div>{versions[sel].scenes?.map((s,i)=><div key={i} style={{fontSize:11.5,color:C.ink,padding:"4px 0",borderBottom:`1px solid rgba(124,92,252,.1)`}}><b style={{color:C.violet}}>【{s.time}】</b> {s.dialogue}</div>)}{versions[sel].hashtags?.length>0&&<div style={{marginTop:7,fontSize:11.5,color:C.violet}}>{hashtagLine(versions[sel].hashtags)}</div>}{versions[sel].key_changes&&<div style={{marginTop:7,fontSize:11.5,color:C.mid,background:C.white,borderRadius:6,padding:"6px 9px"}}><b>與原版差異：</b>{versions[sel].key_changes}</div>}<div style={{display:"flex",gap:8,marginTop:9}}><GBtn ch="🔁 重新轉換" onClick={()=>doRep(sel,true)} style={{padding:"7px 12px"}}/></div></div>}{Object.keys(versions).length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:10}}>{["original",...Object.keys(versions)].map(id=><GBtn key={id} ch={copiedId===id?"✅ 已複製":`📋 複製${id==="original"?"原版":(PLATFORMS.find(p=>p.id===id)?.label||id)}`} onClick={()=>copyVersion(id)} style={{padding:"7px 12px"}}/>)}</div>}</Card>
 
