@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-29（續13）4c-2 提前部署＋aware-wave-store 1.1.0 發版並升級 aware-wave.com（操作者 go）（Claude）
+
+- **觸發**：操作者「現在」（發版 4c-3）＋「現在部署」（不等 03:00）。接續續12。
+- **部署**：`sg-deploy.sh next-admin` → `.deployed-commit` 77fd74a72（前 35c5ff2c2，含 4c-2 b22ce2277）；healthy 15s；HTTP smoke 5/5；容器名 `lobster-next-admin` 正常。
+- **新 route 實測（prod 容器內）**：`/api/internal/sellers/sites?host=aware-wave.com` → 200 `{"active":true}`；`host=nobody.example` → `false`；不帶 token → 401。
+- **發版**：發布 repo 差異只看內容＝7 檔 +168/−22（其餘「M」是暫存 clone 的 CRLF 假象）；`release-wp-bridge.sh --plugin store` → CI 綠、tag v1.1.0、`aware-wave-store-v1.1.0.zip`（https://github.com/awarewaveai-pei/aware-wave-store/releases/tag/v1.1.0）。
+- **升級**：`rollout-wp-bridge.ps1 -Plugin store -DryRun` 只有 lobster-wordpress 1.0.0→1.1.0；正式跑 → OK（health 200 1.1.0、home 200；備份 `/root/backups/wordpress/lobster-wordpress-pre-awstore-1.1.0-20261029T144522Z.sql`＋舊外掛 tgz）；新安裝閘（seller_sites active）放行。外部 curl：首頁 200、`/my-account/` 200；`aware_wave_site_key_id` 不存在 → aware-wave.com 仍 HMAC。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin | exit=0 | ms=240000
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/playwright-runner.ps1 -Mode smoke -SkipInstall | exit=0 | ms=50200（26 passed、6 skipped）
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/rollout-wp-bridge.ps1 -Plugin store | exit=0 | ms=60000
+- REVIEW_WAIVED: NA -- 部署與發版，程式碼審查在續12（critic Deep＋Codex 兩輪）
+- BUGHUNT_WAIVED: NA -- 無程式碼改動
+- **剩餘**：4c-3 最後一步＝第一個代理商站：該站裝 1.1.0、設定頁產鑰匙 → `/ops/sellers` 登記公鑰 → 0 元試用訂單 → `/ops/billing` 篩該賣家看到合約。開 woo（`PAYMENTS_PROVIDERS` 加 woo）現在已無部署窗口風險（續12 剩餘⑥解除）。
+- **rollback**：next-admin：`sg-deploy.sh` 自動回滾機制／重部署 35c5ff2c2；外掛：`rollout-wp-bridge.ps1` 的備份 tgz 還原舊版 1.0.0 資料夾。
 ## 2026-10-29（續12）ADR 017 賣家 4c-2：付款與「進入」都由簽章網站自己的鑰匙驗、網站決定賣家、代理權在開帳戶前查；0140 拿掉 site_id 過渡預設、0141 總帳加賣家（Claude）
 
 - **觸發**：操作者「續做 ADR 017「賣家」4c-2」（卡 `agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-4-seller.md` §7 4c-2）；4c-3 外掛另開 session 平行做（Sonnet）。
