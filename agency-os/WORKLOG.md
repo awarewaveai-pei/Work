@@ -47,7 +47,8 @@
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（讀回 diff：只有本次 18+/10− 行；腳本 CRLF+BOM 保留；內建瀏覽器開 wp-login 出現 CF 真人驗證框，依規定不代勾）
 - ORACLE_WAIVED: 腳本只加一個布林判斷與報表文字，判斷式已用四種假資料逐一驗證；主要改動是 CF 規則與 WP 欄位，已用 curl 對正式環境實測
 - BUGHUNT_DONE: scope=agency-os,scripts,runbooks,.claude | grep=fail2ban | hits=6（腳本 2、CLOUDFLARE-WAF-SETUP 2 已改正；AO_RESUME_BEGINNER_MAP 名詞解釋正確；APP_AWARE_WAVE_COMPLETE_REFERENCE:86 為舊 SG/EU 時期歷史文件，不回改）
-- **剩餘**：真人登入最後一步須操作者自己在瀏覽器過一次 CF 檢查＋2FA；若巡檢 `tests/e2e/client/wp-site-health.spec.ts` 指向 aware-wave.com 會看到 challenge。
+- **操作者實測（2026-10-30）**：「登入正常」——瀏覽器過 CF 檢查＋2FA 完成登入。
+- **剩餘**：若巡檢 `tests/e2e/client/wp-site-health.spec.ts` 指向 aware-wave.com 會看到 challenge。
 - **rollback**：CF Dashboard 停用 rule `cedbaa68…`（或 API DELETE）；`wp user update 1 --user_nicename=<登入名稱> --display_name=<登入名稱> --nickname=<登入名稱>`；repo `git revert`。
 ## 2026-10-29（續14）月結依買家付款時間分月：外掛 1.2.0 送 `paid_at`（取 Woo 訂單自己的付款時間）、0142 只在收到前 7 天內採信（Claude）
 
