@@ -3,7 +3,7 @@
 
 export const META = {
   title: '影片工具重新設計 監工台',
-  updated: '2026-10-28',
+  updated: '2026-10-29',
   plan: 'agency-os/docs/video_generator/VIDEO_TOOL_REDESIGN_2026-10-26.md',
   req: 'agency-os/docs/video_generator/VIDEO_TOOL_OPERATOR_FINDINGS_2026-10-26.md',
   worklog: 'agency-os/WORKLOG.md 2026-10-28 續21–續25',
@@ -22,16 +22,16 @@ export const COPY = {
   label: { yes: '可以', no: '還不行', todo: '未開始', doing: '進行中', done: '已完成', risk: '風險', who: '建議模型', evidence: '完成的樣子', details: '工程細節', depends: '要先完成', none: '無', files: '檔案', card: '做法', doneAt: '完成於', decided: '你的決定', group: '可同時做：' },
 };
 
-// 現在真的能不能用（2026-10-28 查：正式機容器內有新程式、printenv 有字幕變數）
+// 現在真的能不能用（2026-10-29 查：正式站實測專案 8bad63c6；media_releases 1 筆）
 export const NOW = [
   { what: '技術 QA 不再把正常影片判成黑畫面', state: 'yes', ev: 'video-service 2026-10-26 已部署（40d4cd4e1）；正式容器內測試 8 OK' },
   { what: 'QA 沒通過會顯示中文原因', state: 'yes', ev: 'next-admin 2026-10-27 自動部署（40d4cd4e1）' },
   { what: '重新生成真的換圖、每個比例都換', state: 'yes', ev: '同上；圖庫素材會排除舊的那張' },
   { what: '動態預覽可捲動、有關閉鍵', state: 'yes', ev: '同上；尚待你在正式站看一眼' },
-  { what: '字幕（Whisper）', state: 'no', ev: '主機設定已加（d62a2eee5），但字幕服務在筆電上，筆電沒開就不能用；快速影片改用腳本產字幕是 V4.6' },
+  { what: '字幕', state: 'yes', ev: '改由腳本＋配音產生，不再靠筆電上的 Whisper；2026-10-29 正式站實測專案 8bad63c6 字幕正常、重燒字幕成功' },
   { what: '客戶只選一次、關頁不丟', state: 'yes', ev: 'V1 已推上 main（8e8f30c27），2026-10-29 台灣 03:00 自動部署後生效；資料庫 0138 已套用' },
   { what: '看成片的結果頁', state: 'yes', ev: 'V2 已推上 main（3459e3b32）：側欄 Video Projects；2026-10-29 台灣 03:00 部署後生效' },
-  { what: 'QA 四項能全部通過、能建 Release', state: 'no', ev: 'V4 程式都在，但要做一支真實影片才知道；正式庫 Release 史上 0 筆' },
+  { what: 'QA 四項能全部通過、能建 Release', state: 'yes', ev: '2026-10-29 正式站實測專案 8bad63c6：兩個比例 QA 四項全過，核准 16:9 建出第 1 筆 Release，建 1 個 Facebook 草稿（未發布）' },
   { what: '發布不用填 JSON', state: 'yes', ev: 'V5 已推上 main（ad5a95745），2026-10-29 台灣 03:00 部署後生效；互動流程尚待你在正式站看一眼' },
   { what: '④ 後自動完成', state: 'yes', ev: 'V6 已推上 main（f74d16c86）；排程格預設關，要到客戶排程頁打開；尚未用真實影片走過一遍' },
 ];
