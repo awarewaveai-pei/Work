@@ -1,4 +1,12 @@
 # Worklog
+## 2026-10-29（續3）— 影片 F4：圖片場景 Ken Burns 縮放分配到整場（Claude；video-service 未部署）
+
+- **根因**：`pipeline.py` zoompan `min(1+0.0009*on,1.12)` 約 4.4 秒到頂，後半場定格 → 技術 QA freezeEvents 6。**修法**：`_ken_burns_zoom(frames,out)` 依幀數線性分配（每幀步長不低於舊值 0.0009，總幅上限 0.45），不動偵測器門檻。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`.venv/Scripts/python.exe -m unittest tests.test_ken_burns`（表達式測試過；ffmpeg freezedetect 測試本機無 ffmpeg 已 skip，需在容器跑） | exit=0 | ms=300
+- REVIEW_WAIVED: NA -- 小幅單檔；ORACLE_WAIVED: 同輪 Codex 已審整批，F4 無資料路徑；書面自審：每幀步長 ≥0.0009 沿用已驗證不被判凍結的速度。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=0.0009 | hits=1（僅 pipeline.py helper）
+- **未驗**：容器內 freezedetect 真跑；部署後 `docker exec … python -m unittest tests.test_ken_burns`。commit 不 push，待操作者部署 video-service。
+- **Rollback**：`git revert <此 commit>`。
 ## 2026-10-29（續2）
 
 ### AUTO_CONTENT P9 Codex 補審（gpt-6-sol）3 條：修 2、不修 1

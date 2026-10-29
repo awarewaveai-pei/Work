@@ -355,6 +355,16 @@ def _audio_duration(audio_path: str) -> float:
         a.close()
 
 
+def _ken_burns_zoom(frames: int, out: bool) -> str:
+    """zoompan z expression spread over the WHOLE scene (a fixed per-frame step capped at 1.12 froze the picture after ~4.4s;
+    freezedetect then reports it). Per-frame step never drops below the old 0.0009 (which was proven not to read as a freeze)
+    until the total zoom reaches 1.45, i.e. scenes up to ~20s at 24fps move to the last frame."""
+    total = min(max(0.0009 * frames, 0.12), 0.45)
+    if out:
+        return f"{1 + total:.4f}-{total:.4f}*on/{frames}"
+    return f"1+{total:.4f}*on/{frames}"
+
+
 def _render_scene_ffmpeg(asset_path, narration, audio_path, duration, out_path, w, h, fps, scene_id=0, burn_captions=True):
     """單場景 → 統一參數 mp4。字幕改用 drawtext+textfile（timed per segment，取代 PIL PNG overlay）。"""
     # Find CJK-capable font
@@ -385,13 +395,15 @@ def _render_scene_ffmpeg(asset_path, narration, audio_path, duration, out_path, 
         times.append((t, t + seg_dur))
         t += seg_dur
 
+    frames = max(1, int(round(duration * fps)))
     # 5 Ken Burns variants (rotated per scene_id): zoom-in from 4 corners + zoom-out center
+    zin, zout = _ken_burns_zoom(frames, out=False), _ken_burns_zoom(frames, out=True)
     _KB = [
-        ("min(1+0.0009*on,1.12)", "iw/2-(iw/zoom/2)", "ih/2-(ih/zoom/2)"),   # zoom-in center
-        ("min(1+0.0009*on,1.12)", "0",                 "0"),                   # zoom-in top-left
-        ("min(1+0.0009*on,1.12)", "iw-(iw/zoom)",      "0"),                   # zoom-in top-right
-        ("min(1+0.0009*on,1.12)", "0",                 "ih-(ih/zoom)"),        # zoom-in bottom-left
-        ("max(1.12-0.0009*on,1.0)", "iw/2-(iw/zoom/2)", "ih/2-(ih/zoom/2)"),  # zoom-out center
+        (zin,  "iw/2-(iw/zoom/2)", "ih/2-(ih/zoom/2)"),   # zoom-in center
+        (zin,  "0",                 "0"),                   # zoom-in top-left
+        (zin,  "iw-(iw/zoom)",      "0"),                   # zoom-in top-right
+        (zin,  "0",                 "ih-(ih/zoom)"),        # zoom-in bottom-left
+        (zout, "iw/2-(iw/zoom/2)", "ih/2-(ih/zoom/2)"),  # zoom-out center
     ]
     kb_z, kb_x, kb_y = _KB[scene_id % len(_KB)]
     fade_dur = min(0.3, duration * 0.15)  # cap at 15% of scene duration
@@ -405,7 +417,6 @@ def _render_scene_ffmpeg(asset_path, narration, audio_path, duration, out_path, 
                   f"fade=t=in:st=0:d={fade_dur:.3f},"
                   f"fade=t=out:st={fade_out_st:.3f}:d={fade_dur:.3f}[bg0]")
     else:
-        frames = max(1, int(round(duration * fps)))
         inputs = ["-loop", "1", "-i", asset_path, "-i", audio_path]
         vchain = (f"[0:v]scale={w * 2}:{h * 2}:force_original_aspect_ratio=increase,crop={w * 2}:{h * 2},"
                   f"zoompan=z='{kb_z}':d={frames}:"
