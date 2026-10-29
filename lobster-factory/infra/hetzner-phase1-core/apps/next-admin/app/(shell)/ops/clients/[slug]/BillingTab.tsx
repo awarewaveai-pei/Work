@@ -1,12 +1,15 @@
 // One account's contracts, grants, wallet, last ledger entries and last payment events (ADR 017 step 4; 0127
 // billing_account): the 帳務 tab on the client hub and the account panel on /ops/billing. Read-only; both pages fetch it
 // server-side, the hub only when the staff member may use ops/billing (hub-tab-tools.ts). Payments are recorded
-// through POST /api/webhooks/payments/<provider>.
+// through POST /api/webhooks/payments/<provider>; the hub's 給／收產品 card (StaffGrantsCard.tsx) is the one write here.
 import type { ReactNode } from "react";
 import type { BillingAccount } from "@/lib/entitlements/tables";
 import { Card, NoData, Tag } from "./hub-ui";
+import { StaffGrantsCard, type StaffGrantNotice, type StaffGrantsData } from "./StaffGrantsCard";
 
-export type BillingTabData = { account: BillingAccount | null; error: string | null };
+/** staff: the 給／收產品 card (StaffGrantsCard.tsx), null on an internal account or before the account is read;
+ *  notice: the last save's result from the redirect query. */
+export type BillingTabData = { account: BillingAccount | null; error: string | null; staff?: StaffGrantsData | null; notice?: StaffGrantNotice | null };
 
 const th: React.CSSProperties = { textAlign: "left", padding: "6px 10px", fontSize: 11, fontWeight: 700, color: "var(--text-secondary)", borderBottom: "1px solid var(--border-subtle)", whiteSpace: "nowrap" };
 const td: React.CSSProperties = { padding: "6px 10px", fontSize: 12, color: "var(--text-primary)", borderBottom: "1px solid var(--border-subtle)", verticalAlign: "top" };
@@ -64,6 +67,8 @@ export function BillingTab({ data, slug }: { data: BillingTabData; slug: string 
         ])} />
         {a.expired_grants ? <div style={{ ...muted, marginTop: 6 }}>另有 {a.expired_grants} 列已結束（保留作紀錄）。</div> : null}
       </Card>
+
+      {data.staff ? <StaffGrantsCard slug={slug} data={data.staff} notice={data.notice ?? null} allFeatures={!!a.all_features} /> : null}
 
       <Card title="點數帳本" badge="最近 20 筆">
         <Table head={["時間", "種類", "點數", "原因"]} rows={a.ledger.map((l) => [

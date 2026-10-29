@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-29（續16）4b-10 員工後台給／收產品：客戶頁「帳務」分頁勾選贈送產品與代理權；0143 已套 prod（Claude，side session）
+
+- [任務理解] 給客戶產品只能改 DB 或跑 `record-payment.mjs`；要一個 owner／admin 能在畫面上給／收、每次留稽核、寫進同一張 `organization_entitlements` 的區塊；代理權 `<產品>.resell` 要分開。
+- [現況分析] 讀 0110（表）、0118（all-features）、0120（付款狀態機 `0120_payment_events.sql:217-377`）、0133（代理權 `:243-254`、per-account 鎖 `:216`）、`lib/entitlements/tables.ts`、`can.ts:105-120`、`app/(shell)/ops/sellers/actions.ts`；git log 已看。prod 唯讀：`plans` 0 列，權利列只有 3 個 all-features 帳戶（339 列×3）。
+- [風險／取捨] **只開 comp，不開 contract**：手寫 contract 列（source_ref 不是 0120 的合約 id）會讓客戶之後自己付款被拒（`0120_payment_events.sql:239-244` `payment_rejected:feature_in_another_contract`），任何拒付也會暫停它（`:348-350`）。comp 列在客戶付費後由 0120 自動結束（`:246-249`），語意正確。「照具名方案展開」（ADR 017 §3）目前不可行（prod 無方案），改照 products.ts 登記表展開每功能一列，`limits` 空。
+- [做法] migration `0143_entitlement_staff_grants`：`entitlement_staff_grant/revoke`（service_role；與付款函式同一把 `pg_advisory_xact_lock(hashtextextended(org,0))`；`ops_audit_events` 同交易寫，`source_ref = staff:<trace>` 對到稽核列；只給根 customer 帳戶；all-features 帳戶拒 use 贈送；use 與 resell 互不混）＋部分唯一索引「每帳戶×產品×功能只一列有效 staff 列」。`lib/entitlements/staff-grants.ts`（寫入集中於此，import-boundary 綠）；`app/(shell)/ops/clients/[slug]/`：`StaffGrantsCard.tsx`（checkbox、繁中）、`entitlement-actions.ts`（`"use server"` 只匯出 `saveStaffGrants`）、`staff-grant-outcome.ts`（判斷放在非 server 模組：它收 headers 參數，若放 `"use server"` 會成為客戶端可呼叫、可偽造 headers 的端點）。表單帶回頁面顯示的贈送 `source_ref`，只寫有變動的格子，收回只結束那幾次贈送。
+- Codex（gpt-6-sol，`agency-os/reports/oracle/2026-10-29-partialreview-fc4c5069.md`）2 個 m，Grep 驗證皆成立已修：
+  - m1 `0143…sql:61` 判斷「已有」沒看 `starts_at`，明天才生效的列會讓今天的贈送跳過 → 加 `e.starts_at <= now()`（回歸測試 `a row that starts later…`）。
+  - m2 `0143…sql:89` 舊頁面取消勾選會收回別人後來重送的那組 → revoke 改收 `p_source_refs`（回歸測試 `a stale page's untick…`；突變：改回 `like 'staff:%'` → 該測試紅，還原綠）。
+- 未做：e2e 檔未加進 `tests/e2e/entitlements/entitlements-real-db.py` SUITES（主 session 正改該檔）；用 scratch harness 匯入其 helper 跑（交接見 side-session notes `4b-10-staff-grants-note.md`）。新功能加進 products.ts 後，已送的產品不會自動補新功能（收回再送即可）。
+- [rollback] `git revert <commit>`；DB：`lobster-factory/packages/db/scripts/0143_entitlement_staff_grants_down.sql`（只刪函式與索引，已寫的列保留）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scratchpad/verify_0143.py（拋棄式 postgres:15.8 + PostgREST v14.6；0143 up→down→up、SQL 拒絕 6 項、staff-grants.e2e.test.ts 6/6）| exit=0 | ms=13966
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scripts/apply-db-migration.mjs 0143 → APPLY_OK 1/1；ssh psql 讀回 3 函式＋`organization_entitlements_staff_live_uniq`；--status STATUS_OK {"applied":143} | exit=0 | ms=9000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit（0 錯）；npx vitest run lib/entitlements "app/(shell)/ops" → 25 files / 223 passed | exit=0 | ms=60000
+- 突變（權限守衛）：拔 `staff-grant-outcome.ts` 的 `!canWriteTenantConfig(role) ||` → `refuses anyone but owner or admin and writes nothing` 紅；還原 7/7 綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=entitlement_staff_(grant|revoke) | hits=6
 ## 2026-10-29（續15）aware-wave.com 登入失敗通知信不停：分散式暴力破解 + 管理員登入名稱公開外洩；CF Managed Challenge 擋在邊緣、公開名稱與登入名稱分開（Claude）
 
 - **觸發**：操作者「我一直收到這個」（LLAR 通知信：144.91.79.41 失敗 12 次、3 次鎖定）→「去幫我處理好」。

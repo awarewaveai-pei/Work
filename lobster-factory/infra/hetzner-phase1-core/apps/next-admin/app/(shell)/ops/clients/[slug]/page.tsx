@@ -18,6 +18,8 @@ import { HUB_TAB_TOOL } from "./hub-tab-tools";
 import { headers } from "next/headers";
 import { staffGrantOf, staffMayUseTool, staffUnrestricted } from "@/lib/staff-access";
 import { billingAccount } from "@/lib/entitlements/tables";
+import { staffGrantView } from "@/lib/entitlements/staff-grants";
+import { canWriteTenantConfig, readOpsRole } from "@/lib/ops-role";
 import type { BillingTabData } from "./BillingTab";
 
 export const dynamic = "force-dynamic";
@@ -40,10 +42,10 @@ export default async function ClientDetailPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; r?: string; g?: string; t?: string; s?: string; p?: string }>;
 }) {
   const { slug } = await params;
-  const { tab } = await searchParams;
+  const { tab, r: savedCode, g: savedGiven, t: savedTaken, s: savedSkipped, p: savedStop } = await searchParams;
 
   const supabase = getSupabaseServerClient();
   if (!supabase) {
@@ -170,6 +172,13 @@ export default async function ClientDetailPage({
   const hiddenTabs = staffUnrestricted(grant) ? [] : Object.entries(HUB_TAB_TOOL).filter(([, key]) => !staffMayUseTool(grant!, key)).map(([t]) => t);
   const billing: BillingTabData = hiddenTabs.includes("帳務") ? { account: null, error: null }
     : await billingAccount(org.id).then((account) => ({ account, error: null }), (e: unknown) => ({ account: null, error: e instanceof Error ? e.message : String(e) }));
+  // 給／收產品 (ADR 017 4b-10): on the billing account, never on the internal one (it has and sells everything).
+  if (billing.account && billing.account.kind === "customer") {
+    const canEdit = canWriteTenantConfig(readOpsRole(new Request("http://localhost", { headers: await headers() })));
+    billing.staff = await staffGrantView(billing.account.organization_id).then(
+      (products) => ({ products, error: null, canEdit }), (e: unknown) => ({ products: null, error: e instanceof Error ? e.message : String(e), canEdit }));
+    billing.notice = savedCode ? { r: savedCode, g: Number(savedGiven) || 0, t: Number(savedTaken) || 0, s: Number(savedSkipped) || 0, p: savedStop ?? null } : null;
+  }
 
   return (
     <ClientHubTabs

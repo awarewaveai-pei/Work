@@ -162,6 +162,7 @@ A／B 都要會計師一句話確認「收款開發票＋合約負債」；C 另
 ### 4b-10　員工後台給／收產品（無依賴；High：權限）
 - 為什麼：2026-10-25 查，給某客戶產品只有三條路——付款事件、`organization_all_features`（0118，SQL）、`scripts/record-payment.mjs`（`apps/next-admin/scripts/`）；`/ops/billing` 只讀（`page.tsx:5`）。代操、贈送、「只開部分產品」都要員工能在畫面上做。
 - 範圍（開工前先出七段計畫給操作者批准）：客戶頁一個區塊，勾產品＝寫一筆 comp 或 contract 權利列（同一張 `organization_entitlements`，頁面不另存）；收回＝把列設 expired；每次寫稽核；只有 owner／admin。
+- 實作（2026-10-29，WORKLOG 同日 4b-10 條）與上列不同處：**只開 comp**——手寫 contract 列會讓客戶自己付款被 0120 拒（`feature_in_another_contract`），拒付也會連帶暫停；合約仍走付款事件或 `record-payment.mjs`。0143 `entitlement_staff_grant/revoke`（與付款函式同一把帳戶鎖、稽核同交易）；代理權 `<產品>.resell` 是另一列勾選；收回只結束頁面當時顯示的那幾次贈送（`source_ref`）。區塊在客戶頁「帳務」分頁。
 
 ### 順序與依賴
 `4b-1`（現在，Codex）→ `4b-3`（Codex，依賴 4b-1）→ 待決 1 定 → `4b-2` → 待決 3 定 → `4b-6`、`4b-7` → `4b-4`（門上線 High）→ 待決 5 定 → `4b-5`（High）。`4b-8` 不排。`4b-9` 在 4b-6 與第一個方案之後、收第一筆真錢之前；`4b-10` 獨立。每張 done 時在 `data.mjs` `STEPS[3]` 的 `items` 打勾（id＝4b-N）；本卡不寫狀態。
