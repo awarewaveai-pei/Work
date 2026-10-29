@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-29（續9）— 影片字幕主機 Whisper 上線（操作者「上線」）＋部署閘修正（Claude）
+
+- 第一次 sg-deploy 被 npm test 閘擋（740a07a03 未上線）：①import-boundary：`api.openai.com` 寫在 `lib/content/video/transcription.ts`，付費呼叫須經 `lib/ai/gateway.ts providerUrl`；②get-no-side-effects：status GET 會 update 逾時 job。本機只跑了指名測試沒跑全套 = 漏抓。
+- 修（acc52b5de）：新功能鍵 `video.transcribe`（route-features＋video 產品）；dispatch 的 OpenAI 分支包 `withFeature`、計到素材的 org；付費碼拆到 `transcription-openai.ts` 只被 dispatch import（registry-code 第三個紅）；status 逾時只回報 failed 不寫庫。授權被拒＝跟 OpenAI 失敗一樣改走主機。
+- 主機：`/root/lobster-phase1/apps/video-whisper-worker`＋`.env.whisper`（新 token，600）；模型快取預熱進 volume `lobster-whisper-models`（large-v3 已在）；`up -d --build` healthy；next-admin `.env` 備份 `.env.bak.whisper-20261029` 後改三個 `MEDIA_TRANSCRIBE_*`（worker `http://video-whisper-worker:8421`、callback `http://next-admin:3000`、同 token）；sg-deploy acc52b5de。
+- 筆電 worker（PID 16428）與 cloudflared（PID 23564）已停；`video-whisper.aware-wave.com` 回 502（正式站已不指向它）。主機 bench 殘留（/root/whisper-bench 4.4G、測試 image）已刪。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin`（deployed acc52b5de, healthy 11s, smoke 5/5） | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=SSH | cmd=`printenv MEDIA_TRANSCRIBE_*` in lobster-next-admin＋e2e job 5dd7060a（worker→callback http://next-admin:3000→import→completed 61s；SRT 繁中正確；media_qa_reports caption passed） | exit=0 | ms=61000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run`（next-admin 全套 418 files / 3523 passed）＋`verify-head-typecheck` acc52b5de OK | exit=0 | ms=25000
+- REVIEW_WAIVED: NA -- 修正為部署閘既有測試指名的兩條不變量（付費邊界、GET 無副作用），由該兩測試＋registry-code 驗證；功能審查見續7 Codex
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=api.openai.com/v1/audio | hits=1
+  - 唯一命中為本檔續7 實測紀錄的 curl 指令，程式碼內 0 處
+- Rollback：主機 `cd apps/video-whisper-worker && docker compose -f docker-compose.whisper.yml down`；`.env` 換回 `.env.bak.whisper-20261029` 後 sg-deploy next-admin（主機鍵改連筆電 tunnel，需再開筆電 `start-worker.ps1`）。
 ## 2026-10-29（續8）
 
 ### AUTO_CONTENT 第一次真跑（AwareWave 10/29 題）暴露 3 缺陷：語言、假圖、空日期
