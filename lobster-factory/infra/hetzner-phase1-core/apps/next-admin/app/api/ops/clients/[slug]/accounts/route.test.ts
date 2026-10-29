@@ -104,7 +104,7 @@ beforeEach(() => {
 
 describe("GET accounts -- products the client holds, roles from each product's own list", () => {
   it("offers only held products on a served door, and reads each person's role from the member list", async () => {
-    state.held = new Set(["social", "tarot", "content"]); // content's door is closed (enabled: false)
+    state.held = new Set(["social", "tarot", "cs"]); // cs's door is closed (enabled: false)
     state.membershipRows = [{ user_id: NEW_USER, profiles: { email: "a@client.example" } }, { user_id: OTHER, profiles: { email: "b@client.example" } }];
     admin.getUserById.mockImplementation(async (id: string) => ({
       data: { user: { id, email: id === NEW_USER ? "a@client.example" : "b@client.example", email_confirmed_at: null, app_metadata: { user_kind: "client", org_id: ORG } } },
@@ -126,8 +126,8 @@ describe("GET accounts -- products the client holds, roles from each product's o
 
 describe("POST accounts", () => {
   it("refuses a product the client does not hold, and a held product whose door is closed, before any account is touched", async () => {
-    state.held = new Set(["social", "content"]);
-    for (const product of ["tarot", "content"]) {
+    state.held = new Set(["social", "cs"]);
+    for (const product of ["tarot", "cs"]) {
       const res = await POST(post({ "x-ops-claims-role": "admin" }, "a@client.example", product), ctx());
       expect(res.status).toBe(400);
       expect(await res.json()).toMatchObject({ error: "product_not_held" });
