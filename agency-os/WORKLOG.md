@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-29（續17）部署 paid_at（24c1d9973）與 4b-10（66b612ead）、aware-wave-store 1.2.0 發版並升級 aware-wave.com（操作者「其他的一路做完」）（Claude）
+
+- **順序**：控制面先認得 `paid_at` 再讓外掛送（舊控制面只會丟掉這個欄位，不會拒）。0142 已套（續14）、0143 已套（4b-10 session）。
+- **部署 1**：`sg-deploy.sh next-admin` → 24c1d9973（前 77fd74a72）healthy 16s、HTTP smoke 5/5；Playwright smoke 26 passed、6 skipped。
+- **發版**：`release-wp-bridge.sh --plugin store` → 發布 repo CI（完整 phpunit，含新測試）綠、tag v1.2.0、`aware-wave-store-v1.2.0.zip`（https://github.com/awarewaveai-pei/aware-wave-store/releases/tag/v1.2.0）。
+- **升級**：`rollout-wp-bridge.ps1 -Plugin store -DryRun` 只 lobster-wordpress 1.1.0→1.2.0；正式 → OK（health 200 1.2.0、home 200；備份 `/root/backups/wordpress/lobster-wordpress-pre-awstore-1.2.0-20261029T152732Z.sql`、`…-awstore-1.1.0-20261029T152732Z.tgz`）；外部 curl 首頁、`/my-account/` 200。
+- **4b-10 驗收（VBC）**：`66b612ead` 15 檔只在 `ops/clients/[slug]/`、`lib/entitlements/staff-grants.ts`、0143；權限守衛 `staff-grant-outcome.ts:24-27`（owner／admin＋帳務工具，否則 `forbidden`）；在現 main 重跑 `npx vitest run lib/entitlements "app/(shell)/ops"` 25 檔 223 綠、tsc 0。
+- **部署 2**：`sg-deploy.sh next-admin` → fd664c14d（含 4b-10）healthy 15s、HTTP smoke 5/5；Playwright smoke（部署 2 後）6 skipped 26 passed (36.6s)。
+- m1 **他方工作遺失警示**：部署 1 時 hook 報 `patch_template_wall.ps1`（codex 01a18807 未 commit）被還原回 HEAD；本 session 該指令只有 SSH，`git stash list` 無對應紀錄。已告知操作者，未動該檔。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin（兩次：24c1d9973、fd664c14d） | exit=0 | ms=240000
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/rollout-wp-bridge.ps1 -Plugin store | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/playwright-runner.ps1 -Mode smoke -SkipInstall（部署 1 後） | exit=0 | ms=42000（26 passed、6 skipped）
+- REVIEW_WAIVED: NA -- 部署與發版；程式審查見續14（Codex 三輪）與 4b-10 session 條目
+- BUGHUNT_WAIVED: NA -- 無程式碼改動
+- m2 **4b-10 的真 DB 測試從未跑過**（session 回報「e2e 尚未接進 harness」）：`tests/e2e/entitlements/entitlements-real-db.py` 加 `staff-grants` 套件（payments schema＋`0011_ops_console`（稽核表 `ops_audit_events`，第一次跑 6/6 紅於此）＋0143）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py --suite staff-grants | exit=0 | ms=15000（6/6：贈送每功能一列＋一筆稽核、重送不加；代理權與產品分開；收回只動本頁的列、合約列不動；之後才開始的列不算有；舊頁面取消只結束它顯示的那筆；非 owner／admin、品牌子組織、全功能帳戶的使用贈送被拒）
+- **剩餘**：4c-3 只剩第一個代理商網站實測（需要真的代理商站）。
+- **rollback**：next-admin 映像 `lobster-phase1-next-admin:rollback-20261029-153021`／重部署 77fd74a72；外掛用上面的 tgz 還原 1.1.0。
 ## 2026-10-29（續16）4b-10 員工後台給／收產品：客戶頁「帳務」分頁勾選贈送產品與代理權；0143 已套 prod（Claude，side session）
 
 - [任務理解] 給客戶產品只能改 DB 或跑 `record-payment.mjs`；要一個 owner／admin 能在畫面上給／收、每次留稽核、寫進同一張 `organization_entitlements` 的區塊；代理權 `<產品>.resell` 要分開。

@@ -9,6 +9,7 @@ Last, the cognitive engine's Python check_entitlement verifies that issued permi
     python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py
 --suite payments (ADR 017 step 4a) adds 0092/0117/0118 (with the three accounts 0118 seeds), 0120, 0124 0127-0133, 0140-0142, then drives
 POST /api/webhooks/payments/local, /ops/billing and the client hub 帳務 tab through lib/entitlements/__tests__/payments.e2e.test.ts.
+--suite staff-grants (ADR 017 4b-10) is the payments schema plus 0143, driving lib/entitlements/__tests__/staff-grants.e2e.test.ts.
     python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py --suite payments
 """
 from __future__ import annotations
@@ -70,6 +71,9 @@ SUITES = {
     "entitlements": {"migrations": ("0062", "0063", "0066", "0077", "0092", "0110", "0117"), "after": ("0118",), "test": "lib/entitlements/__tests__/entitlements.e2e.test.ts"},
     "payments": {"migrations": ("0062", "0063", "0066", "0077", "0092", "0110", "0117"), "after": ("0118", "0120", "0124", "0127", "0128", "0129", "0130", "0131", "0132", "0133", "0140", "0141", "0142"),
                  "test": "lib/entitlements/__tests__/payments.e2e.test.ts"},
+    # ADR 017 4b-10: staff give / take a product and a seller licence (0143 over the payments schema).
+    "staff-grants": {"migrations": ("0011_ops_console", "0062", "0063", "0066", "0077", "0092", "0110", "0117"), "after": ("0118", "0120", "0124", "0127", "0128", "0129", "0130", "0131", "0132", "0133", "0140", "0141", "0142", "0143"),
+                     "test": "lib/entitlements/__tests__/staff-grants.e2e.test.ts"},
 }
 
 
