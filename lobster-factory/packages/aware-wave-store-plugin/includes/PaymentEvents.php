@@ -64,7 +64,7 @@ final class PaymentEvents {
 			$sub = $this->shop->subscription( (int) $subId );
 			if ( $sub ) {
 				foreach ( $this->planKeys( $sub['lines'] ) as $plan ) {
-					$this->paidEvent( 'payment_complete', $sub, $plan, $orderId, '', $orderId );
+					$this->paidEvent( 'payment_complete', $sub, $plan, $orderId, '', $orderId, $order['date_paid'] ?? 0 );
 				}
 			}
 		}
@@ -92,7 +92,7 @@ final class PaymentEvents {
 			}
 			// A wallet alone opens nothing (can.ts, 4b-5): plan_key names the add-on plan that grants the right to spend
 			// it; the server writes that right with no end date in the same transaction as the credits (migration 0128).
-			$pack = array( 'kind' => 'credit_pack', 'units' => $units, 'order_ref' => (string) $orderId );
+			$pack = array( 'kind' => 'credit_pack', 'units' => $units, 'order_ref' => (string) $orderId ) + self::paidAt( $order['date_paid'] ?? 0 );
 			if ( count( $packPlans ) === 1 ) {
 				$pack['plan_key'] = (string) array_keys( $packPlans )[0];
 			} elseif ( count( $packPlans ) > 1 ) {
@@ -125,7 +125,7 @@ final class PaymentEvents {
 			return;
 		}
 		foreach ( $this->planKeys( $sub['lines'] ) as $plan ) {
-			$this->paidEvent( 'subscription_renewal_payment_complete', $sub, $plan, $subscriptionId, '', $renewal ? $renewalOrderId : 0 );
+			$this->paidEvent( 'subscription_renewal_payment_complete', $sub, $plan, $subscriptionId, '', $renewal ? $renewalOrderId : 0, $renewal ? ( $renewal['date_paid'] ?? 0 ) : 0 );
 		}
 	}
 
@@ -204,8 +204,19 @@ final class PaymentEvents {
 		}
 	}
 
+	/**
+	 * paid_at: when the money was taken, from the order WooCommerce recorded it on -- never this plugin's clock: the
+	 * same hook firing twice must send the same bytes (the server rejects one event id with two bodies), and a retry
+	 * days later must still say when the buyer paid (the monthly seller report goes by it, migration 0142).
+	 *
+	 * @return array{paid_at?:string}
+	 */
+	private static function paidAt( int $datePaid ): array {
+		return $datePaid > 0 ? array( 'paid_at' => gmdate( 'Y-m-d\TH:i:s\Z', $datePaid ) ) : array();
+	}
+
 	/** @param array{id:int,customer_id:int,next_payment:int,end:int} $sub */
-	private function paidEvent( string $action, array $sub, string $plan, int $noteId, string $extra, int $grantOrderId ): void {
+	private function paidEvent( string $action, array $sub, string $plan, int $noteId, string $extra, int $grantOrderId, int $datePaid = 0 ): void {
 		$now = (int) call_user_func( $this->clock );
 		$end = $sub['next_payment'] > 0 ? $sub['next_payment'] : $sub['end'];
 		if ( $end <= $now || $end > $now + self::MAX_PERIOD_SEC ) {
@@ -221,7 +232,7 @@ final class PaymentEvents {
 				'plan_key'     => $plan,
 				'period_end'   => gmdate( 'Y-m-d\TH:i:s\Z', $end ),
 				'external_ref' => (string) $sub['id'],
-			),
+			) + self::paidAt( $datePaid ),
 			$sub['id'],
 			$grantOrderId
 		);

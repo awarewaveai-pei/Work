@@ -10,7 +10,7 @@ namespace AwareWave\Store;
 
 interface Shop {
 
-	/** @return array{id:int,customer_id:int,payment_method:string,total:float,total_refunded:float,lines:list<array{product_id:int,qty:int}>}|null */
+	/** date_paid: unix seconds WooCommerce recorded the payment, 0 = not recorded. @return array{id:int,customer_id:int,payment_method:string,total:float,total_refunded:float,date_paid:int,lines:list<array{product_id:int,qty:int}>}|null */
 	public function order( int $orderId ): ?array;
 
 	/**

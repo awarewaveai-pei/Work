@@ -6,7 +6,7 @@
 // accounts, and the monthly table per seller is the wholesale report (0141, ADR 017 #12 D4). Nothing here writes.
 import Link from "next/link";
 import {
-  billingAccount, billingLedger, billingSellerMonth, LEDGER_FILTERS, taipeiMonthStart,
+  billingAccount, billingLedger, billingSellerMonth, LEDGER_FILTERS, previousMonthStart, sellerMonthFinalFrom, taipeiMonthStart,
   type AttentionReason, type BillingAccount, type BillingLedger, type LedgerFilter, type SellerMonth,
 } from "@/lib/entitlements/tables";
 import { BillingTab } from "../clients/[slug]/BillingTab";
@@ -63,6 +63,7 @@ export default async function BillingPage({ searchParams }: { searchParams?: Pro
   let data: BillingLedger | null = null;
   let failure: string | null = null;
   let month: SellerMonth | null = null;
+  let lastMonth: SellerMonth | null = null;
   let monthFailure: string | null = null;
   let detail: { account: BillingAccount | null; error: string | null } | null = null;
   try {
@@ -71,7 +72,10 @@ export default async function BillingPage({ searchParams }: { searchParams?: Pro
     failure = String(error instanceof Error ? error.message : error);
   }
   try {
-    month = await billingSellerMonth(taipeiMonthStart());
+    // Last month too: invoices go out after a month closes, and a sale paid on the 30th that arrived on the 2nd counts
+    // in the month it was paid (0142), which "this month" alone would never show (Codex 2026-10-29 partialreview-5c89e1db).
+    const thisMonthStart = taipeiMonthStart();
+    [month, lastMonth] = await Promise.all([billingSellerMonth(thisMonthStart), billingSellerMonth(previousMonthStart(thisMonthStart))]);
   } catch (error) {
     monthFailure = String(error instanceof Error ? error.message : error);
   }
@@ -189,12 +193,22 @@ export default async function BillingPage({ searchParams }: { searchParams?: Pro
         )}
 
         <div style={{ ...card, marginBottom: 20 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 800, color: "var(--text-primary)", margin: "0 0 4px" }}>本月各賣家合計{month ? `（${month.month}）` : ""}</h2>
+          <h2 style={{ fontSize: 16, fontWeight: 800, color: "var(--text-primary)", margin: "0 0 4px" }}>各賣家每月合計</h2>
           <div style={{ ...muted, marginBottom: 8 }}>
-            月結用：每個賣家這個月（台北時間）收到的訂閱付款筆數與賣出的點數包。批發款在控制面外開發票，這裡不收款；退款沒有扣掉。
-            月份看的是我們收到付款通知的時間，不是買家付款的時間：網站送不到時會重試最多約 3.5 天，所以月底最後幾天的付款可能算進下個月，開發票前請對一下網站的訂單日期。
+            月結用：每個賣家上個月與這個月（台北時間）的訂閱付款筆數與賣出的點數包。上個月要到這個月 8 日才定案（付款通知最晚可晚 7 天才到，會補回付款當月），定案後再用它開發票。批發款在控制面外開發票，這裡不收款；退款沒有扣掉。
+            月份看的是買家付款的時間（網站外掛 1.2.0 起會送）；沒有送、或跟我們收到的時間差超過 7 天，就改看收到通知的時間。切換方案沒有訂單，一律看收到的時間。
           </div>
-          {monthFailure || !month ? <div style={{ fontSize: 13, color: "var(--text-primary)" }}>讀不到賣家月合計：{monthFailure}</div> : (
+          {monthFailure || !month || !lastMonth ? <div style={{ fontSize: 13, color: "var(--text-primary)" }}>讀不到賣家月合計：{monthFailure}</div> : [lastMonth, month].map((m, i) => (
+            <div key={m.month} style={{ marginTop: i ? 12 : 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", margin: "4px 0" }}>
+              {i ? "這個月" : "上個月"}（{m.month}）
+              {i ? null : (() => {
+                const finalFrom = sellerMonthFinalFrom(`${m.month}-01`);
+                // today in Asia/Taipei as YYYY-MM-DD, compared as text (the same calendar as the month itself)
+                const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
+                return <span style={{ fontWeight: 400, marginLeft: 8 }}>{today >= finalFrom ? "已定案，可開發票" : `還在變動，${finalFrom} 起才定案`}</span>;
+              })()}
+            </div>
             <table style={{ borderCollapse: "collapse", fontSize: 13, color: "var(--text-primary)" }}>
               <thead>
                 <tr style={{ ...muted, textAlign: "left" }}>
@@ -203,7 +217,7 @@ export default async function BillingPage({ searchParams }: { searchParams?: Pro
                 </tr>
               </thead>
               <tbody>
-                {month.rows.map((s) => (
+                {m.rows.map((s) => (
                   <tr key={s.seller_id}>
                     <td style={{ padding: "4px 16px 4px 0" }}><Link href={href({ seller: s.seller_id, f: undefined, page: undefined })} style={link}>{s.seller}</Link></td>
                     <td style={{ padding: "4px 16px" }}>{n(s.subscription_payments)}</td>
@@ -213,7 +227,8 @@ export default async function BillingPage({ searchParams }: { searchParams?: Pro
                 ))}
               </tbody>
             </table>
-          )}
+            </div>
+          ))}
         </div>
 
         {detail ? (

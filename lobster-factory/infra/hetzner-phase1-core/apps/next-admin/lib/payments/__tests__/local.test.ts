@@ -68,5 +68,12 @@ describe("local payment provider (ADR 017 step 4a)", () => {
     expect(code({ event_id: "e1", kind: "subscription_paid", organization_id: ORG, plan_key: "p", period_end: "next month" })).toBe("invalid_period_end");
     expect(code({ event_id: "e1", kind: "refund", target: "everything", organization_id: ORG })).toBe("invalid_target");
     expect(code({ event_id: "e1", kind: "teleport", organization_id: ORG })).toBe("unknown_kind");
+    // paid_at (when the shop recorded the payment) rides along on money-in events, and must be a real instant
+    expect(local().parse(body({ kind: "credit_pack", organization_id: ORG, units: 5, order_ref: "x", paid_at: "2026-09-30T15:00:00Z" }), {}))
+      .toMatchObject({ event: { paid_at: "2026-09-30T15:00:00Z" } });
+    expect(code({ event_id: "e1", kind: "credit_pack", organization_id: ORG, units: 5, order_ref: "x", paid_at: "yesterday" })).toBe("invalid_paid_at");
+    // a date that does not exist is refused, not rolled over to March 3 (Date.parse would accept it)
+    expect(code({ event_id: "e1", kind: "credit_pack", organization_id: ORG, units: 5, order_ref: "x", paid_at: "2026-02-31T12:00:00Z" })).toBe("invalid_paid_at");
+    expect(code({ event_id: "e1", kind: "subscription_paid", organization_id: ORG, plan_key: "p", period_end: "2026-02-31T00:00:00Z" })).toBe("invalid_period_end");
   });
 });

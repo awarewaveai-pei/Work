@@ -26,6 +26,7 @@ final class WooShop implements Shop {
 			'payment_method' => (string) $order->get_payment_method(),
 			'total'          => (float) $order->get_total(),
 			'total_refunded' => (float) $order->get_total_refunded(),
+			'date_paid'      => $order->get_date_paid() ? (int) $order->get_date_paid()->getTimestamp() : 0,
 			'lines'          => $this->lines( $order ),
 		);
 	}

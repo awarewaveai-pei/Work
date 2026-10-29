@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-29（續14）月結依買家付款時間分月：外掛 1.2.0 送 `paid_at`（取 Woo 訂單自己的付款時間）、0142 只在收到前 7 天內採信（Claude）
+
+- **觸發**：操作者「其他的一路做完」；續12 剩餘①／Codex `2026-10-29-partialreview-41670a16`：月結以 `received_at` 分月，外掛重試約 3.5 天 → 月底付款算進下月。
+- **不變量**：①一筆業績的月份＝買家付款時間；②賣家網站不能藉填日期把業績挪月（只在 `[received_at−7天, received_at]` 內採信）；③同一 hook 觸發兩次送出相同位元組（`0133:223` 同 event id 不同 body 拒 `event_id_reused`）→ `paid_at` 取 WooCommerce 訂單的 `date_paid`，**不取外掛時鐘**（寫測試時發現：取時鐘會讓 Woo 重複觸發的 payment_complete 被當成重用事件編號）。
+- **改動**：外掛 `includes/Shop.php`（order 加 `date_paid`）、`WooShop.php`（`get_date_paid()`）、`PaymentEvents.php`（`paidAt()`；首付、點數包、續約帶；切換方案無訂單不帶）、版號 1.2.0、`tests/PaymentEventsTest.php` 一測試；next-admin `lib/payments/provider.ts` `toPaymentEvent` 兩種收錢事件接受可選 `paid_at`（ISO＋必須可解析，否則 `invalid_paid_at`）；`0142_billing_seller_month_paid_at`（＋down＋scripts 副本）：`billing_try_timestamptz`（不合法或不存在的日期回 null，報表不會因一筆壞值壞掉）＋ `billing_seller_month` 以 0141 原文為底只換月份歸屬；e2e payments 套件加 0142。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scratchpad/test0142.py（拋棄式 postgres 15.8：9/30 23:00 付、10/1 收 → 9 月；30 天前、2026-02-31、晚於收到 → 10 月；0141 時 0/5、0142 後 1/4、down 0/5、再 up 1/4；authenticated 不能呼叫 helper） | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py --suite payments（含 0142） | exit=0 | ms=15000（19/19）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/ops/billing" lib/payments lib/entitlements | exit=0 | ms=20000（18 檔 189 綠；含 paid_at 保留、`invalid_paid_at`、2026-02-31 拒、兩個月與定案標示）；`npx tsc --noEmit` 0；外掛 `php -l` 5 檔無誤，phpunit 由發布 repo CI 跑（本機無 phar）
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/4m/0n（Codex 三輪 `agency-os/reports/oracle/2026-10-29-partialreview-dce49ed8.md`、`-5c89e1db.md`、`-714a3a73.md`）：m1 切換方案無訂單、不帶 paid_at → 列剩餘；m2 `Date.parse` 接受 2026-02-31（JS 進位成 3/3）→ `instant()` 檢查日期存在，`period_end` 同類一併關；m3 跨月送達的付款歸上月但頁面只顯示本月 → 同時顯示上個月與這個月；m4 上個月月初尚未定案卻叫人開發票 → 不變量「一個月到下月 8 日（台北）才定案」，`sellerMonthFinalFrom`＋頁面標「已定案／還在變動，YYYY-MM-08 起才定案」
+- ORACLE_WAIVED: m4 修正（標示文字＋下月 8 日小函式）後未送第四輪：同段程式已三輪，邊界自查（9/30 23:59 台北付 → 最晚 10/7 23:59 收 → 10/8 起定案）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=billing_seller_month | hits=24（0141 定義、0142 up/down、tables.ts 呼叫、billing 頁、e2e）
+- **High（操作者「其他的一路做完」）**：`node scripts/apply-db-migration.mjs 0142` → `APPLY_OK 1/1`；讀回 helper 存在、authenticated 不能呼叫、`billing_seller_month` 用 helper、呼叫正常。部署與外掛發版見下一條。
+- **剩餘**：切換方案（`subscriptions_switched_item`）沒有訂單，不帶 `paid_at`，月份仍依收到時間（重試期間跨月才有差）；本機沒有 phpunit phar（外掛測試只在發布 repo CI 跑）。
+- **rollback**：`0142_billing_seller_month_paid_at.down.sql`（只還原函式，無資料）；外掛回 1.1.0（rollout 備份）；next-admin `git revert`（舊版會忽略 `paid_at`，不會拒）。
 ## 2026-10-29（續13）4c-2 提前部署＋aware-wave-store 1.1.0 發版並升級 aware-wave.com（操作者 go）（Claude）
 
 - **觸發**：操作者「現在」（發版 4c-3）＋「現在部署」（不等 03:00）。接續續12。

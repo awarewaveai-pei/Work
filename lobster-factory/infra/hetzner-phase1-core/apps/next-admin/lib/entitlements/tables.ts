@@ -208,6 +208,19 @@ export interface SellerMonth {
 export const taipeiMonthStart = (now: Date = new Date()): string =>
   `${now.toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" }).slice(0, 7)}-01`;
 
+/** The first day of the month before a month start ('2026-01-01' -> '2025-12-01'). */
+export const previousMonthStart = (monthStart: string): string => {
+  const [y, m] = monthStart.split("-").map(Number);
+  return m === 1 ? `${y - 1}-12-01` : `${y}-${String(m - 1).padStart(2, "0")}-01`;
+};
+
+/** A month's seller totals stop changing once the 7-day paid_at window after it has passed (0142): on the 8th of the
+ *  next month, Asia/Taipei. Returns that day ('2026-10-08' for '2026-09-01'); before it, no invoice from that month. */
+export const sellerMonthFinalFrom = (monthStart: string): string => {
+  const [y, m] = monthStart.split("-").map(Number);
+  return m === 12 ? `${y + 1}-01-08` : `${y}-${String(m + 1).padStart(2, "0")}-08`;
+};
+
 export async function billingSellerMonth(month: string, client: SupabaseClient | null = getSupabaseWriteClient()): Promise<SellerMonth> {
   if (!client) throw new Error("entitlements_db_unavailable");
   const { data, error } = await client.rpc("billing_seller_month", { p_month: month });

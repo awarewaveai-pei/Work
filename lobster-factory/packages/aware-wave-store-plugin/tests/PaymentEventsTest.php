@@ -74,6 +74,27 @@ final class PaymentEventsTest extends TestCase {
 		$this->assertSame( gmdate( 'Y-m-d\TH:i:s\Z', self::NOW + 400 * 86400 ), $this->body()['period_end'] );
 	}
 
+	public function test_a_paid_event_says_when_the_order_was_paid_and_a_second_fire_sends_the_same_bytes(): void {
+		$paid = self::NOW - 3 * 86400;   // the hook fires (or is retried) days after the buyer paid
+		$this->order( 300, 7, array( array( 'product_id' => 10, 'qty' => 1 ), array( 'product_id' => 20, 'qty' => 1 ) ) );
+		$this->shop->orders[300]['date_paid'] = $paid;
+		$this->shop->relations[300]['parent'] = array( 301 );
+		$this->shop->subscriptions[301] = array( 'id' => 301, 'customer_id' => 7, 'status' => 'active', 'payment_method' => 'tappay', 'next_payment' => self::NOW + 86400, 'end' => 0, 'lines' => array( array( 'product_id' => 10, 'qty' => 1 ) ) );
+
+		$this->events->onPaymentComplete( 300 );
+		$this->events->onPaymentComplete( 300 );
+
+		$this->assertSame( gmdate( 'Y-m-d\TH:i:s\Z', $paid ), $this->body( 0 )['paid_at'] );
+		$this->assertSame( gmdate( 'Y-m-d\TH:i:s\Z', $paid ), $this->body( 1 )['paid_at'] );
+		$this->assertSame( $this->queue->jobs[0]['body'], $this->queue->jobs[2]['body'] );
+		$this->assertSame( $this->queue->jobs[1]['body'], $this->queue->jobs[3]['body'] );
+		// an order with no recorded payment time sends none: the server then goes by when it received the event
+		$this->queue->jobs = array();
+		$this->shop->orders[300]['date_paid'] = 0;
+		$this->events->onPaymentComplete( 300 );
+		$this->assertArrayNotHasKey( 'paid_at', $this->body( 0 ) );
+	}
+
 	public function test_a_credit_pack_order_sums_units_by_quantity(): void {
 		$this->shop->products[21] = array( 'plan_key' => 'credits-50', 'credit_units' => 50 );
 		$this->order( 200, 7, array( array( 'product_id' => 20, 'qty' => 2 ), array( 'product_id' => 21, 'qty' => 3 ), array( 'product_id' => 30, 'qty' => 5 ) ) );

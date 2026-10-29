@@ -9,10 +9,12 @@ import type { SellerSite } from "./sites";
 export type PaymentProviderName = "local" | "woo";
 
 export type PaymentEvent =
-  | { kind: "subscription_paid"; organization_id: string; plan_key: string; period_end: string; external_ref?: string }
+  // paid_at (optional, both money-in kinds): when the shop recorded the payment; the monthly seller report goes by it
+  // within 7 days of receipt (migration 0142), else by when the event arrived.
+  | { kind: "subscription_paid"; organization_id: string; plan_key: string; period_end: string; external_ref?: string; paid_at?: string }
   | { kind: "subscription_canceled"; organization_id: string; plan_key: string }
   // plan_key (optional): the pack's add-on plan; 0128 writes its rows with no end date (ADR 017 decision 6).
-  | { kind: "credit_pack"; organization_id: string; units: number; order_ref: string; plan_key?: string }
+  | { kind: "credit_pack"; organization_id: string; units: number; order_ref: string; plan_key?: string; paid_at?: string }
   | { kind: "refund"; target: "subscription"; organization_id: string; plan_key: string }
   | { kind: "refund"; target: "credit_pack"; organization_id: string; order_ref: string }
   | { kind: "chargeback"; organization_id: string; ref?: string }
@@ -49,6 +51,20 @@ export class PaymentParseError extends Error {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const REF = /^[\w.:\-/#]{1,100}$/;
 const KEY = /^[a-z0-9][a-z0-9_.-]{0,99}$/;
+const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
+/** An ISO instant whose date exists: Date.parse rolls 2026-02-31 over to March 3, so the day is checked itself
+ *  (Codex 2026-10-29 partialreview-dce49ed8; the SQL side casts and would refuse or skip it). */
+function instant(o: Record<string, unknown>, k: string): string {
+  const v = text(o, k, ISO_TIME);
+  const [y, m, d] = v.slice(0, 10).split("-").map(Number);
+  const day = new Date(Date.UTC(y, m - 1, d));
+  if (day.getUTCFullYear() !== y || day.getUTCMonth() !== m - 1 || day.getUTCDate() !== d || !Number.isFinite(Date.parse(v))) {
+    throw new PaymentParseError(`invalid_${k}`);
+  }
+  return v;
+}
+const optionalTime = (o: Record<string, unknown>, k: string): Record<string, string> =>
+  (o[k] === undefined || o[k] === null ? {} : { [k]: instant(o, k) });
 
 const text = (o: Record<string, unknown>, k: string, re: RegExp): string => {
   const v = o[k];
@@ -65,15 +81,14 @@ export function toPaymentEvent(value: unknown): PaymentEvent {
   const organization_id = text(o, "organization_id", UUID);
   switch (o.kind) {
     case "subscription_paid": {
-      const period_end = text(o, "period_end", /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/);
-      if (!Number.isFinite(Date.parse(period_end))) throw new PaymentParseError("invalid_period_end");
-      return { kind: o.kind, organization_id, plan_key: text(o, "plan_key", KEY), period_end, ...optional(o, "external_ref", REF) };
+      const period_end = instant(o, "period_end");
+      return { kind: o.kind, organization_id, plan_key: text(o, "plan_key", KEY), period_end, ...optional(o, "external_ref", REF), ...optionalTime(o, "paid_at") };
     }
     case "subscription_canceled":
       return { kind: o.kind, organization_id, plan_key: text(o, "plan_key", KEY) };
     case "credit_pack": {
       if (!Number.isSafeInteger(o.units) || (o.units as number) < 1 || (o.units as number) > 10_000_000) throw new PaymentParseError("invalid_units");
-      return { kind: o.kind, organization_id, units: o.units as number, order_ref: text(o, "order_ref", REF), ...optional(o, "plan_key", KEY) };
+      return { kind: o.kind, organization_id, units: o.units as number, order_ref: text(o, "order_ref", REF), ...optional(o, "plan_key", KEY), ...optionalTime(o, "paid_at") };
     }
     case "refund":
       if (o.target === "subscription") return { kind: "refund", target: "subscription", organization_id, plan_key: text(o, "plan_key", KEY) };

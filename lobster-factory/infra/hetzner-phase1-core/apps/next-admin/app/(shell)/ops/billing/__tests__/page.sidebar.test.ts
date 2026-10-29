@@ -15,13 +15,15 @@ vi.mock("@/lib/entitlements/tables", () => ({
   LEDGER_FILTERS: ["all", "attention", "balance", "contract", "internal"],
   billingAccount: async () => null,
   taipeiMonthStart: () => "2026-10-01",
+  previousMonthStart: () => "2026-09-01",
+  sellerMonthFinalFrom: () => "2026-10-08",
   billingLedger: async () => ({
     totals: { accounts: 120, unused_units: 0, unused_accounts: 0, granted_30d: 0, spent_30d: 0, attention: 1, frozen: 1, overdrawn: 0, past_due: 0, suspended: 0 },
     matching: 120,
     rows: [row(OPEN, "Alpha", { next_period_end: "2026-11-30T16:00:00Z" }), row("22222222-2222-4222-8222-222222222222", "Beta", { balance: -5, reasons: ["frozen"], sold_by_id: RESELLER, sold_by: "Reseller Co" })],
   }),
-  billingSellerMonth: async () => ({
-    month: "2026-10",
+  billingSellerMonth: async (start: string) => ({
+    month: start.slice(0, 7),
     rows: [
       { seller_id: AW, seller: "AwareWave", subscription_payments: 3, credit_pack_orders: 1, credit_pack_units: 500 },
       { seller_id: RESELLER, seller: "Reseller Co", subscription_payments: 2, credit_pack_orders: 0, credit_pack_units: 0 },
@@ -60,7 +62,10 @@ describe("/ops/billing sidebar", () => {
   it("shows who sold each account, the per-seller month table, and a seller filter that replaces the status filter", async () => {
     const html = await render({ f: "attention", seller: RESELLER, account: OPEN });
     expect(html).toContain("賣家：Reseller Co");
-    expect(html).toContain("本月各賣家合計（2026-10）");
+    expect(html).toContain("上個月（2026-09）");
+    // last month is not final until the 8th: the page says which, so nobody invoices from a month still filling in
+    expect(html).toMatch(/已定案，可開發票|還在變動，2026-10-08 起才定案/);
+    expect(html).toContain("這個月（2026-10）");
     expect(html).toContain(`/ops/billing?seller=${AW}&amp;account=${OPEN}`);   // another seller replaces this one, keeps the open account
     expect(html).toContain(`/ops/billing?account=${OPEN}"`);   // 所有狀態 chip drops the seller
     expect(html).not.toContain(`name="f"`);
