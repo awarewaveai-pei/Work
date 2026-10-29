@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-29（續10）
+
+### AUTO_CONTENT 人審閘「退回重做」
+- 起因：操作者要 10/29 舊版草稿（WP 34 英文假圖）退回重做；狀態機 reviewed 只能往 scheduled/published/failed，人審沒有退回路徑。
+- 做法：`store.ts` NEXT 加 reviewed→approved；`lib/content/topics/redo.ts` `redoTopic`：claim → 讀 WP 文章實際狀態（`wp-post-core.ts` `readWpPost`）→ 只有 draft/pending 移到 WP 垃圾桶（`trashWpPost`，DELETE 不 force，可救回）、已 publish/future = 拒絕、WP 回 rest_post_invalid_id 或 trash = 視為已無 → 社群貼文仍是 draft 才丟社群垃圾桶（404 = 已無，其他錯誤停）→ move approved、artifacts 清空。PATCH `/api/content/topics/[id]` action `redo`；題目頁人審列加「退回重做」。
+- redo 獨立成檔不放 make.ts：它不付費，route import make.ts 會被 registry-code.test 判為碰付費功能（正確）。
+- `WpPostUpdate` 失敗帶 WordPress 自己的 `code`，分得出「沒這篇」與「站找不到」（兩者都 404）。
+- Codex（gpt-6-sol）4 條：修 3（社群讀錯不得當不存在、站找不到不得當已刪、人已發布的文章不得丟垃圾桶）；不修 1：退回後當天上限仍計這題——上限是花費上限，重做是真花費，到上限就等隔天是對的。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run (next-admin 全套) | exit=0 | ms=60000（419 files passed，含 redo.test.ts 6）
+- 突變：拿掉 reviewed 狀態守衛 → redo.test 紅；拿掉「已發布拒絕」分支 → 紅；還原綠。tsc 0 錯。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n
+  - external oracle = Codex CLI gpt-6-sol，artifact `agency-os/reports/oracle/2026-10-29-partialreview-45e3b446.md`
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=WpPostUpdate | hits=1（只有定義檔 wp-post-core.ts，無其他使用者）
 ## 2026-10-29（續9）— 影片字幕主機 Whisper 上線（操作者「上線」）＋部署閘修正（Claude）
 
 - 第一次 sg-deploy 被 npm test 閘擋（740a07a03 未上線）：①import-boundary：`api.openai.com` 寫在 `lib/content/video/transcription.ts`，付費呼叫須經 `lib/ai/gateway.ts providerUrl`；②get-no-side-effects：status GET 會 update 逾時 job。本機只跑了指名測試沒跑全套 = 漏抓。

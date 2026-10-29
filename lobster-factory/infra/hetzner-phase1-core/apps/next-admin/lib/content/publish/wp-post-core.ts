@@ -20,9 +20,10 @@ export interface WpPostPatch {
 
 export type WpPostUpdate =
   | { ok: true; post: { id: number; status: string; date: string; link: string } }
-  | { ok: false; status: number; error: string; mode?: undefined }
+  /** code = WordPress's own error code when WordPress answered (rest_post_invalid_id = no such post); absent for our refusals. */
+  | { ok: false; status: number; error: string; code?: string; mode?: undefined }
   /** The system mode blocked the write: the HTTP shell answers with the shared 423 contract (blockedChangeResponse). */
-  | { ok: false; mode: string; error: string; status?: undefined };
+  | { ok: false; mode: string; error: string; status?: undefined; code?: undefined };
 
 /** The patch fields of a request body, coerced as the calendar sends them; unknown or empty values are left out. */
 export function wpPostPatch(body: Record<string, unknown>): WpPostPatch {
@@ -43,27 +44,45 @@ export async function updateWpPost(identity: Request | { headers: Headers }, sit
   if (patch.title) wp.title = patch.title;
   if (patch.content) wp.content = patch.content;
   if (!Object.keys(wp).length) return { ok: false, status: 400, error: "No fields to update" };
+  return writePost(identity, siteId, postId, "POST", wp);
+}
 
+/** The post as WordPress has it now (status draft / publish / future / trash ...). */
+export async function readWpPost(identity: Request | { headers: Headers }, siteId: string, postId: number): Promise<WpPostUpdate> {
+  return writePost(identity, siteId, postId, "GET");
+}
+
+/** Moves a post to WordPress's trash (DELETE without force: it can still be restored there). */
+export async function trashWpPost(identity: Request | { headers: Headers }, siteId: string, postId: number): Promise<WpPostUpdate> {
+  return writePost(identity, siteId, postId, "DELETE");
+}
+
+async function writePost(identity: Request | { headers: Headers }, siteId: string, postId: number, method: "GET" | "POST" | "DELETE", wp?: Record<string, unknown>): Promise<WpPostUpdate> {
   const site = await resolveWpSite(identity, siteId);
   if (!site || !site.token) return { ok: false, status: 404, error: "Site not found or token missing" };
 
-  const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), site.site.organizationId);
-  if (!gate.allowed) return { ok: false, error: blockedChangeMessage(gate.mode), mode: gate.mode };
+  if (method !== "GET") {
+    const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), site.site.organizationId);
+    if (!gate.allowed) return { ok: false, error: blockedChangeMessage(gate.mode), mode: gate.mode };
+  }
 
   let res: Response;
   try {
-    res = await fetch(`${site.site.url}/wp-json/wp/v2/posts/${postId}`, {
-      method: "POST",   // WP REST updates with POST (+ the override header some proxies need)
-      headers: { "Content-Type": "application/json", Authorization: site.authHeader, "X-HTTP-Method-Override": "PUT" },
-      body: JSON.stringify(wp),
-      signal: AbortSignal.timeout(12000),
-    });
+    res = await fetch(`${site.site.url}/wp-json/wp/v2/posts/${postId}${method === "GET" ? "?context=edit" : ""}`, method !== "POST"
+      ? { method, headers: { Authorization: site.authHeader }, signal: AbortSignal.timeout(12000) }
+      : {
+        method: "POST",   // WP REST updates with POST (+ the override header some proxies need)
+        headers: { "Content-Type": "application/json", Authorization: site.authHeader, "X-HTTP-Method-Override": "PUT" },
+        body: JSON.stringify(wp),
+        signal: AbortSignal.timeout(12000),
+      });
   } catch {
     return { ok: false, status: 502, error: "WordPress connection failed" };
   }
   const json = await res.json().catch(() => ({})) as Record<string, unknown>;
   if (!res.ok) {
-    return { ok: false, status: res.status, error: typeof json.message === "string" ? json.message.slice(0, 200) : `WP error ${res.status}` };
+    return { ok: false, status: res.status, error: typeof json.message === "string" ? json.message.slice(0, 200) : `WP error ${res.status}`,
+      ...(typeof json.code === "string" ? { code: json.code } : {}) };
   }
   return { ok: true, post: { id: json.id as number, status: json.status as string, date: json.date as string, link: json.link as string } };
 }

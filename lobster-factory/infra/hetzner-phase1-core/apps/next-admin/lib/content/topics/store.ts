@@ -20,7 +20,7 @@ export const NEXT: Readonly<Record<TopicStatus, readonly TopicStatus[]>> = {
   drafted: ["waiting_video", "reviewed", "failed"],
   waiting_video: ["embedded", "failed"],
   embedded: ["reviewed", "failed"],
-  reviewed: ["scheduled", "published", "failed"],
+  reviewed: ["approved", "scheduled", "published", "failed"],   // approved = a person sends it back to be made again (redo.ts)
   scheduled: ["published", "failed"],
   published: [],
   failed: ["approved"],

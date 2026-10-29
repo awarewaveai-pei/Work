@@ -72,6 +72,7 @@ const ACTION_FOR: Partial<Record<TopicStatus, Array<[string, string]>>> = {
   approved: [["reopen", "改回提案"]],
   rejected: [["reopen", "重新提案"]],
   failed: [["retry", "重試"]],
+  reviewed: [["redo", "退回重做"]],
 };
 
 type Site = ManagedSite;
