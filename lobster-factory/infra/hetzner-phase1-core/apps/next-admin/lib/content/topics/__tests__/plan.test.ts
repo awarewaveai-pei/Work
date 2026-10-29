@@ -43,7 +43,7 @@ describe("parsePlan", () => {
 
 describe("prompt and geo", () => {
   it("carries the voice, trends and folders, and the target count", () => {
-    const p = buildPlanPrompt({ siteName: "Soulful", voice: "語氣: 溫暖", month: "2026-11-01", daysInMonth: 30, events: [], industry: [], trends: ["感恩日記（Google News）"], folders: ["藝術治療 202610"], taken: [] });
+    const p = buildPlanPrompt({ siteName: "Soulful", language: "繁體中文", voice: "語氣: 溫暖", month: "2026-11-01", daysInMonth: 30, events: [], industry: [], trends: ["感恩日記（Google News）"], folders: ["藝術治療 202610"], taken: [] });
     expect(p).toContain("共 28 個，分散在 1 到 30 日");
     expect(p).toContain("語氣: 溫暖");
     expect(p).toContain("- 感恩日記（Google News）");
@@ -51,7 +51,7 @@ describe("prompt and geo", () => {
   });
 
   it("events section: absent when empty, otherwise present and before the trends section (P9.2)", () => {
-    const base = { siteName: "S", voice: "", month: "2026-12-01", daysInMonth: 31, trends: ["t"], folders: [], industry: [], taken: [] };
+    const base = { siteName: "S", language: "繁體中文", voice: "", month: "2026-12-01", daysInMonth: 31, trends: ["t"], folders: [], industry: [], taken: [] };
     expect(buildPlanPrompt({ ...base, events: [] })).not.toContain("節日與活動");
     const p = buildPlanPrompt({ ...base, events: ["12-25 Christmas（聖誕節）"] });
     expect(p).toContain("節日與活動");
@@ -60,7 +60,7 @@ describe("prompt and geo", () => {
   });
 
   it("industry section: absent when empty, otherwise present and before the trends section (P9.4)", () => {
-    const base = { siteName: "S", voice: "", month: "2026-12-01", daysInMonth: 31, trends: ["t"], folders: [], events: [], taken: [] };
+    const base = { siteName: "S", language: "繁體中文", voice: "", month: "2026-12-01", daysInMonth: 31, trends: ["t"], folders: [], events: [], taken: [] };
     expect(buildPlanPrompt({ ...base, industry: [] })).not.toContain("產業來源");
     const p = buildPlanPrompt({ ...base, industry: ["A", "B"] });
     expect(p).toContain("產業來源");
@@ -77,6 +77,13 @@ describe("prompt and geo", () => {
 });
 
 describe("proposeMonth", () => {
+  it("a site with no language set plans its topics in the one site language (brand-voice siteLanguage)", async () => {
+    m.site = { siteId: "s", organizationId: "org-a", name: "AwareWave", defaults: {} };
+    const ask = vi.fn(async (_p: string) => JSON.stringify({ topics: [{ day: 2, title: "t", keyword: "k" }] }));
+    await proposeMonth({} as never, { organizationId: "org-a", siteId: "s", month: "2026-11", actor: "x" }, ask);
+    expect(ask.mock.calls[0][0]).toContain("title、keyword、angle 一律用繁體中文");
+  });
+
   it("asks the AI to avoid keywords this organization already planned this month (topics are unique per org+month+keyword)", async () => {
     m.site = { siteId: "s2", organizationId: "org-a", name: "Second", defaults: { targetCountry: "台灣" } };
     m.taken = ["感恩日記", "藝術治療"];

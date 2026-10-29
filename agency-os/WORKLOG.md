@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-29（續8）
+
+### AUTO_CONTENT 第一次真跑（AwareWave 10/29 題）暴露 3 缺陷：語言、假圖、空日期
+- 操作者授權核准 AwareWave 10/29–10/31 三題（自動內容頁勾選核准）。10/29 題 06:52 UTC drafted，WP post 34、社群草稿 1 則；但文章英文夾中文關鍵字、`example.com` 假圖、`*Published: <!-- PUBLISH_DATE -->*`。
+- C1 語言：站未設 language 時文章走 generate-core 預設 English、影片走 make.ts 自帶「繁體中文」、題目提案 prompt 是中文。不變量：一站一語言一處解析 → `brand-voice.ts` `siteLanguage()`（預設繁體中文），make.ts 文章/影片與 plan.ts 提案（prompt 要求 title/keyword/angle 用該語言）全讀它。
+- C2 假圖：SYSTEM_PROMPT 無條件要 4 張圖 placeholder（`![alt](url)`），沒人替換 → 模型編網址。不變量：發布端只收得下真圖 → 圖片規則只在要求配圖時給；不要求時明令不寫圖。自動管線改為真配圖：產圖碼從 `app/api/content/image/route.ts` 抽到 `lib/content/image/make-image.ts` `makeContentImage`（route 與管線共用）；make.ts `fillArticleImages` 逐張填，失敗或未存進 R2（data URL WordPress 收不到）就刪該佔位；首張當精選圖；無 `content.image` 權限 = 文章照出、不配圖（`optionalImageGrant`）；無 R2 = 不付費產圖。flux-schnell 3 張 ≈ US$0.01/篇。
+- C3 日期：`<!-- PUBLISH_DATE -->` 宣稱 CMS 會換，全 repo 無人換 → 刪該指示（佈景主題顯示發布日、Rank Math 出 datePublished）。
+- Codex（gpt-6-sol）3 輪 8 條：修 7（來源搜尋地區依語言 zh→tw/ja→jp/ko→kr、沒圖 SEO 分降 → 改真配圖、圖片權限、R2 未存、日文地區、無 R2 付費、Replicate burst 改逐張）；不修 1：非 bridge 站 REST 路徑不吃 featuredImageUrl（手動工具同樣既有限制）。
+- 不變量分析（Codex 同段連報 ≥2 次）：(a) 一事實一解析點；(b) 管線產出由發布端可接受的形式定義（https 圖、無未解佔位）；(c) 加購能力缺席 = 降級不中斷，必要能力缺席 = 停。
+- 未處理：post 34 是舊版產出的草稿（人審模式，未公開）；題目狀態機 drafted 無重做路徑，留給操作者退回/刪草稿。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run (next-admin 全套) | exit=0 | ms=60000（418 files passed，含新 make-images.test.ts 6、images-prompt.test.ts 3）
+- 突變 4 次皆紅→還原綠：articleInput 語言改回 d.language；拿掉「IMAGES: none」；失敗圖留佔位；optionalImageGrant 不吞 EntitlementRequired。來源地區改回舊 regex 亦紅。tsc 0 錯。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/8m/0n
+  - external oracle = Codex CLI gpt-6-sol，artifacts `agency-os/reports/oracle/2026-10-29-partialreview-9c92b717.md`、`-597dd03e.md`、`-728ac7cf.md`
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=PUBLISH_DATE | hits=3（2 個 oracle 報告引用、1 個測試斷言不存在；程式內原 3 處已刪）
 ## 2026-10-29（續7）— 影片字幕兩條路：主機 Whisper（免費）＋OpenAI（快、付費、失敗自動退主機）（Claude）
 
 - 根因：Whisper worker 只在筆電（`apps/video-whisper-worker/app.py` 寫死 `device="cuda"`），筆電關機 → 正式站 530，⑦ 只有一顆按了會失敗的鍵。

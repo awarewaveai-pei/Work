@@ -7,7 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText, loadAnthropic } from "@/lib/ai/gateway";
 import { logAiCall } from "@/lib/ai/log-ai-call";
 import type { Grant } from "@/lib/entitlements/can";
-import { renderSiteVoice } from "@/lib/content/brand-voice";
+import { renderSiteVoice, siteLanguage } from "@/lib/content/brand-voice";
 import { loadSiteBrand } from "@/lib/content/brand-voice-store";
 import { listFolders } from "@/lib/kb/folders";
 import { eventsForMonth } from "@/lib/events/for-month";
@@ -58,6 +58,7 @@ async function industryTitles(siteId: string, feeds: string[] | undefined, geo: 
 
 export interface PlanContext {
   siteName: string;
+  language: string;            // the site's content language (brand-voice siteLanguage); keywords are searched in it
   voice: string;
   month: string;               // YYYY-MM-01
   daysInMonth: number;
@@ -89,7 +90,7 @@ ${list(c.folders)}
 ${c.taken.length ? `這個客戶本月已排的關鍵字（不得再用）：
 ${list(c.taken)}
 
-` : ""}規則：keyword 是一個人會拿去搜尋的短詞，彼此不得重複；title 是文章標題；angle 一句話說明切入角度；
+` : ""}規則：title、keyword、angle 一律用${c.language}；keyword 是一個人會拿去搜尋的短詞，彼此不得重複；title 是文章標題；angle 一句話說明切入角度；
 source 寫題目來自 "trending"（上面的熱門話題）、"kb"（知識庫資料夾）或 "plan"（自行規劃），ref 寫來源那一行的原文（plan 留空）。
 
 只回傳 JSON，不要其他文字：
@@ -170,7 +171,7 @@ export async function proposeMonth(sb: SupabaseClient, input: ProposeMonthInput,
     listTopics(sb, input.organizationId, month),
   ]);
   const ctx: PlanContext = {
-    siteName: site.name, voice: renderSiteVoice(site.defaults), month, daysInMonth, events, industry,
+    siteName: site.name, language: siteLanguage(site.defaults), voice: renderSiteVoice(site.defaults), month, daysInMonth, events, industry,
     trends: trends.map((t) => `${t.title}（${t.source}）`), folders: folders.slice(0, 30).map((f) => f.name),
     taken: planned.map((t) => t.keyword),
   };

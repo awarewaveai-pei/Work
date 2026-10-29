@@ -105,24 +105,13 @@ BASIC SEO — 7 tests:
 
 ADDITIONAL SEO — 10 tests:
 - At least 1 external link with DOFOLLOW (standard href link, no rel="nofollow"); cite as "[Source Name] ([Year])"
-- Primary keyword must appear in at least one image's ALT text in the article body
 - Emit <!-- SLUG_HINT: primary-keyword-slug --> at end of article — CMS uses this as URL slug (must contain keyword; ideally ≤75 total URL characters)
 
 CONTENT READABILITY — 3 tests:
 - Do NOT write a manual Table of Contents. The WordPress theme (Kadence) auto-generates the TOC from the heading structure; a hand-written list would duplicate it. Just produce a clean, well-ordered H2/H3 outline so the automatic TOC is correct.
 - All paragraphs strictly < 120 words — split any long passage into multiple shorter paragraphs, no exceptions
-- Media: include at least 4 image placeholder blocks throughout the article body (1 image passes the test; 4+ earns 100% for this test)
-
-IMAGE PLACEHOLDERS (when images are requested):
-- Alt text rule: describe the image content concisely + include the primary keyword ONCE where it fits naturally; NEVER keyword-stuff alt text
-- First image alt text: must include the primary keyword (e.g. "instructor guiding a small-group creative expression session using watercolour")
-- Filename format (add as a comment): <!-- filename: descriptive-words-with-hyphens.jpg --> — max 5 words, hyphens ONLY (no underscores, no spaces), all lowercase, naturally includes primary keyword ONCE
-- Google Discover optimisation: recommend 16:9 format at 1280×720 px minimum (>300k total pixels); avoid images with heavy text overlays
-- Use descriptive alt text for accessibility: describe what is literally shown, not what you want it to say
-- NEVER use CSS background for SEO-critical images — always use the ![alt](url) Markdown img format
 
 STRUCTURED DATA HINTS (for the CMS to apply):
-- Include a visible date placeholder (do NOT guess a date): emit exactly <!-- PUBLISH_DATE --> where the byline date should appear — the CMS will replace it with the real publish date to keep it consistent with datePublished in the Article schema
 - For Article/BlogPosting schema: the CMS datePublished and dateModified must match visible dates — so never emit a literal month/year in the article body
 - For topic pages: include clear who/what/where/when entity signals that structured data can reinforce
 - URL slug hint: emit <!-- SLUG_HINT: primary-keyword-slug --> at the very end of the article (after the last section) — use lowercase, hyphens only, no stop words; total URL including domain must be ≤75 characters
@@ -146,7 +135,6 @@ SCHEMA MARKUP HINTS（CMS 會自動產生 JSON-LD，以下信號決定品質）�
 - BreadcrumbList：確保 ## 段落標題能清楚描述所屬子分類（breadcrumb 從 H2 推斷）
 - HowToStep（操作指南類型）：如果文章是 How-to，每個步驟段落必須含明確動詞開頭（「安裝…」「打開…」「設定…」）
 - Article.author：若 instructions 有作者名，第一段必須自然帶入作者姓名與一句資歷描述
-- Article.datePublished：由 <!-- PUBLISH_DATE --> 替換（上方已說明，勿重複寫日期）
 
 READING EASE — 3 額外通過條件（RankMath Readability 評分）：
 - 被動語態 < 10%：用主動語態。錯誤：「方法被用來…」；正確：「你可以用這個方法…」
@@ -194,12 +182,20 @@ interface MediaHub {
 // article generation, and image prompt tools share one Claude/OpenAI menu.
 
 /** Call Serper (Google Search) to get 3–5 authoritative external source URLs for the keyword. */
+/** The CJK test (RankMath CJK rules, Chinese source search); the site setting is a native name such as 繁體中文,
+ *  so English-only names miss it. */
+function isCjkLanguage(language: string): boolean {
+  return /chinese|taiwanese|mandarin|cantonese|japanese|korean|zh-tw|zh-cn|zh-hk|zh-mo|ja-jp|ko-kr|中文|繁體|繁体|简体|簡體|漢語|汉语|粵語|廣東話|國語|国语|台語|台语|日本|日語|日语|한국|韓國|韩国|국어/i.test(language);
+}
+
 async function fetchRealSources(keyword: string, language: string): Promise<{ sources: string[]; costUsd: number }> {
   const apiKey = process.env.SERPER_API_KEY;
   if (!apiKey) return { sources: [], costUsd: 0 };
-  const isCjk = /chinese|taiwanese|japanese|korean/i.test(language);
-  const q = isCjk ? `${keyword} 權威來源` : `${keyword} authoritative source site:gov OR site:edu OR site:org`;
-  const gl = isCjk ? "tw" : "us";
+  const { gl, suffix } = /japanese|日本|日語|日语/i.test(language) ? { gl: "jp", suffix: "公的機関 情報源" }
+    : /korean|한국|韓國|韩国|국어/i.test(language) ? { gl: "kr", suffix: "공식 출처" }
+    : isCjkLanguage(language) ? { gl: "tw", suffix: "權威來源" }
+    : { gl: "us", suffix: "authoritative source site:gov OR site:edu OR site:org" };
+  const q = `${keyword} ${suffix}`;
   try {
     const res = await fetch("https://google.serper.dev/search", {
       method: "POST",
@@ -284,7 +280,7 @@ function buildUserPrompt(params: {
   // CJK RankMath compliance — RankMath cannot tokenize Chinese/Japanese/Korean, so its
   // English power-word list, sentiment list, and density % all misfire. Emit a targeted,
   // language-aware reinforcement block when the article language is CJK.
-  const isCJK = /chinese|mandarin|cantonese|japanese|korean|zh-tw|zh-cn|zh-hk|zh-mo|ja-jp|ko-kr|中文|繁體|繁体|简体|簡體|漢語|汉语|粵語|廣東話|國語|国语|台語|台语|日本|日語|日语|한국|韓國|韩国|국어/i.test(params.language);
+  const isCJK = isCjkLanguage(params.language);
   if (isCJK) {
     lines.push("");
     lines.push("=== CJK RANKMATH COMPLIANCE (this article is in a CJK language — follow strictly) ===");
@@ -420,8 +416,12 @@ function buildUserPrompt(params: {
     lines.push("Internal links: NONE provided. Do NOT add any internal links, and NEVER invent, guess, or fabricate internal/relative URLs (e.g. /related-article, /some-page). The site auto-links internally via a plugin — leave internal linking entirely to it. An article with zero internal links is correct here; a fabricated internal link is a serious error.");
   }
 
-  // Media instructions
+  // Media instructions. Without requested images nothing fills an image URL later, so the model must write none.
   const m = params.media;
+  if (!m?.aiImages || m.aiImages === "none") {
+    lines.push("");
+    lines.push("IMAGES: none. Do NOT write any image Markdown, image URL or filename comment.");
+  }
   if (m) {
     if (m.aiImages && m.aiImages !== "none") {
       const count = m.imageCount ?? 3;

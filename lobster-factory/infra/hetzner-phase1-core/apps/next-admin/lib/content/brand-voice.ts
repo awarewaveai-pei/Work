@@ -119,6 +119,11 @@ export function autoPublishes(d: SiteContentDefaults | undefined): boolean {
   return d?.publishMode === "ai_review_auto";
 }
 
+/** The site's content language: topics, article and video all read it here, so an unset site cannot mix languages. */
+export function siteLanguage(d: SiteContentDefaults | undefined): string {
+  return t(d?.language) || "繁體中文";
+}
+
 /** Only the exact stored value lets the schedule approve its own proposals: missing, misspelt or any other value = a person picks. */
 export function aiPicksTopics(d: SiteContentDefaults | undefined): boolean {
   return d?.topicMode === "ai_pick";

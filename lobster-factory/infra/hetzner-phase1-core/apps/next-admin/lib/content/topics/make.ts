@@ -9,12 +9,15 @@
 // auto publish (sites/[id] route), so acting as editor here is that staff decision, not the starting person's role.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { grantFor, runForOrg } from "@/lib/entitlements/grant";
+import { EntitlementRequired, type Grant } from "@/lib/entitlements/can";
 import { orgIdentity } from "@/lib/tenant-guard";
 import { loadSiteBrand, type SiteBrand } from "@/lib/content/brand-voice-store";
-import { autoPublishes, forbiddenTerms, renderBrandVoice, renderSiteVoice, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { autoPublishes, forbiddenTerms, renderBrandVoice, renderSiteVoice, siteLanguage, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import { updateWpPost } from "@/lib/content/publish/wp-post-core";
 import { runContentPipeline, type PipelineFailure } from "@/lib/content/pipeline";
 import { parseArticleMeta } from "@/lib/content/article/meta";
+import { makeContentImage } from "@/lib/content/image/make-image";
+import { isR2Configured } from "@/lib/storage/r2";
 import { addVideo, getPost, listAccounts, savePost } from "@/lib/social/store";
 import { applyAction } from "@/lib/social/actions";
 import { requiresReview } from "@/lib/social/review";
@@ -45,12 +48,38 @@ export interface TopicArtifacts {
 /** The social post is due this far ahead (state.ts schedule needs a future time; the sender looks 10 min ahead). */
 export const SOCIAL_NOW_LEAD_MS = 2 * 60_000;
 
-/** The article generator's input: the topic, and the site's stored defaults the article tool's form starts from. */
-export function articleInput(t: Pick<Topic, "keyword" | "title" | "angle">, d: SiteContentDefaults): Record<string, unknown> {
+/** Images per automatic article (the cheapest model, ~US$0.003 each): the article writes this many placeholders. */
+export const TOPIC_ARTICLE_IMAGES = 3;
+const IMAGE_PLACEHOLDER = /!\[([^\]]*)\]\(IMAGE_PLACEHOLDER_\d+\)/g;
+
+/** Each image placeholder becomes a stored image (alt text = its prompt) or is removed; nothing unresolved reaches WordPress. */
+export async function fillArticleImages(markdown: string, make: (prompt: string) => Promise<string | null>): Promise<{ markdown: string; images: string[] }> {
+  const urls: Array<string | null> = [];
+  for (const m of markdown.matchAll(IMAGE_PLACEHOLDER)) urls.push(await make(m[1].trim()).catch(() => null));   // one at a time: Replicate's low-balance burst limit is 1
+  const images: string[] = [];
+  let i = 0;
+  const filled = markdown.replace(IMAGE_PLACEHOLDER, (_all, alt: string) => {
+    const url = urls[i++];
+    if (!url) return "";
+    images.push(url);
+    return `![${alt}](${url})`;
+  });
+  return { markdown: filled, images };
+}
+
+/** Images are an add-on: an organization without content.image still gets its article, without images (null). */
+export async function optionalImageGrant(ask: () => Promise<Grant> = () => grantFor("content.image")): Promise<Grant | null> {
+  return ask().catch((e) => { if (e instanceof EntitlementRequired) return null; throw e; });
+}
+
+/** The article generator's input: the topic, and the site's stored defaults the article tool's form starts from.
+ *  images = how many placeholders to ask for (0 when the organization has no content.image). */
+export function articleInput(t: Pick<Topic, "keyword" | "title" | "angle">, d: SiteContentDefaults, images = 0): Record<string, unknown> {
   const details = [renderBrandVoice(d.marketing, d.brandVoiceInstructions), t.angle ? `切入角度：${t.angle}` : ""].filter(Boolean).join("\n\n");
   return {
-    keyword: t.keyword, title: t.title, language: d.language, targetCountry: d.targetCountry, tone: d.tone,
+    keyword: t.keyword, title: t.title, language: siteLanguage(d), targetCountry: d.targetCountry, tone: d.tone,
     articleType: d.articleType, readability: d.readability, pointOfView: d.pointOfView, details, generateMeta: true,
+    media: images > 0 ? { aiImages: "flux-schnell", imageCount: images, imageSize: "16:9" } : { aiImages: "none" },
   };
 }
 
@@ -64,13 +93,21 @@ async function siteFor(sb: SupabaseClient, t: Topic): Promise<SiteBrand | string
 }
 
 async function makeArticle(t: Topic, site: SiteBrand): Promise<NonNullable<TopicArtifacts["article"]>> {
-  const a = await runContentPipeline(articleInput(t, site.defaults), { stages: ["article"] });
+  // no R2 = nowhere to keep an image WordPress can fetch, so none is paid for
+  const imageGrant = isR2Configured() ? await optionalImageGrant() : null;
+  const a = await runContentPipeline(articleInput(t, site.defaults, imageGrant ? TOPIC_ARTICLE_IMAGES : 0), { stages: ["article"] });
   if (!a.ok) throw new Error(`文章生成失敗：${(a as PipelineFailure).error}`);   // strict:false: !ok does not narrow
-  const markdown = a.markdown ?? "";
+  const { markdown, images } = await fillArticleImages(a.markdown ?? "", async (prompt) => {
+    if (!imageGrant) return null;
+    const img = await makeContentImage({ model: "flux-schnell", prompt: prompt || t.title, aspectRatio: "16:9", seed: null,
+      costLog: { route: "content/topics", tool: "content", jobId: t.id } }, imageGrant);
+    // WordPress takes only http(s) images: an unstored (data URL) image would vanish at publish
+    return img.ok && (img as { stored: boolean }).stored ? (img as { imageUrl: string }).imageUrl : null;
+  });
   const meta = parseArticleMeta(markdown);
   const p = await runContentPipeline({
     markdown, focusKeyword: meta?.focusKeyword || t.keyword, seoTitle: meta?.seoTitle, metaDescription: meta?.metaDesc,
-    categories: meta?.categories, tags: meta?.tags, slug: meta?.slug, siteId: t.site_id, publishStatus: "draft",
+    categories: meta?.categories, tags: meta?.tags, slug: meta?.slug, siteId: t.site_id, publishStatus: "draft", featuredImageUrl: images[0],
     request: orgIdentity(t.organization_id),
   }, { stages: ["quality", "publish"] });
   if (!p.ok) throw new Error(`WordPress 草稿失敗（${(p as PipelineFailure).failedStage}）：${(p as PipelineFailure).error}`);
@@ -178,9 +215,9 @@ async function startTopicVideo(sb: SupabaseClient, t: Topic, record: (jobId: str
   const d = ARTICLE_VIDEO_DEFAULTS;
   const started = await startVideoJob(t.organization_id, {
     topic: t.title, articleTitle: t.title, articleContent: a.article?.source || t.angle || undefined,
-    language: site.defaults.language || "繁體中文", brandVoice: renderSiteVoice(site.defaults),
+    language: siteLanguage(site.defaults), brandVoice: renderSiteVoice(site.defaults),
     sceneCount: d.sceneCount, customScenes: d.customScenes, brollScenes: d.sceneCount - d.customScenes,
-    imageModel: d.imageModel, outputFormats: [...d.formats], ...parseVoiceModel(articleVideoVoice(site.defaults.language)),
+    imageModel: d.imageModel, outputFormats: [...d.formats], ...parseVoiceModel(articleVideoVoice(siteLanguage(site.defaults))),
   }, { beforePrepare: record, projectFor: () => ensureTopicProject(sb, t, d.formats) });
   const failure = started.ok ? null : (started as Extract<typeof started, { ok: false }>).error;   // strict:false
   if (failure && failure !== "taken") throw new Error(`影片無法開始：${failure}`);

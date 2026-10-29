@@ -1,109 +1,15 @@
-import sharp from "sharp";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { withFeature } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
 import {
-  generateTarotImage,
   isTarotModel,
   isAspectRatio,
   type TarotModel,
   type AspectRatio,
 } from "@/lib/tarot/image-gen";
-import {
-  isR2Configured,
-  buildDesignKey,
-  putDesignObject,
-} from "@/lib/storage/r2";
+import { makeContentImage } from "@/lib/content/image/make-image";
 import { imageCostUsd } from "@/lib/ai/cost-calculator";
-
-/** Parse a data URL → { buffer, mime }. Returns null on malformed input. */
-function parseDataUrl(dataUrl: string): { buffer: Buffer; mime: string } | null {
-  const m = dataUrl.match(/^data:(image\/[a-z0-9+.\-]+);base64,([\s\S]+)$/);
-  if (!m) return null;
-  try {
-    return { mime: m[1], buffer: Buffer.from(m[2], "base64") };
-  } catch {
-    return null;
-  }
-}
-
-/** Build SVG overlay for title text. Handles both "bottom" (gradient bar) and "center" positions. */
-function buildTitleSvg(W: number, H: number, fontSize: number, fontFamily: string, escapedText: string, position: string): string {
-  if (position === "center") {
-    return `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
-  <rect x="0" y="0" width="${W}" height="${H}" fill="rgba(0,0,0,0.45)" />
-  <text x="${W / 2}" y="${H / 2}"
-    font-family="${fontFamily}" font-size="${fontSize}" font-weight="700"
-    fill="white" text-anchor="middle" dominant-baseline="middle"
-    filter="drop-shadow(0px 1px 3px rgba(0,0,0,0.6))"
-  >${escapedText}</text>
-</svg>`;
-  }
-  const barH = Math.round(H * 0.28);
-  return `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="rgba(0,0,0,0)" />
-      <stop offset="100%" stop-color="rgba(0,0,0,0.72)" />
-    </linearGradient>
-  </defs>
-  <rect x="0" y="${H - barH}" width="${W}" height="${barH}" fill="url(#g)" />
-  <text x="${W / 2}" y="${H - Math.round(barH * 0.28)}"
-    font-family="${fontFamily}" font-size="${fontSize}" font-weight="700"
-    fill="white" text-anchor="middle" dominant-baseline="middle"
-    filter="drop-shadow(0px 1px 3px rgba(0,0,0,0.6))"
-  >${escapedText}</text>
-</svg>`;
-}
-
-/**
- * Compress any image buffer to WebP ≤200KB @ 1200px wide.
- * Falls back gracefully: if sharp errors, returns the original PNG buffer + mime unchanged.
- * fontStyle: "sans" | "serif" | "none" — "none" skips overlay entirely.
- * titlePosition: "bottom" (gradient bar) | "center" (semi-transparent full cover).
- */
-async function toWebP(
-  buf: Buffer,
-  titleText?: string,
-  fontStyle?: string,
-  titlePosition?: string,
-): Promise<{ buffer: Buffer; mime: string }> {
-  try {
-    const showOverlay = !!(titleText && titleText.trim() && fontStyle !== "none");
-    let overlayBuf: Buffer | undefined;
-
-    if (showOverlay) {
-      const meta     = await sharp(buf).resize({ width: 1200, withoutEnlargement: true }).metadata();
-      const W        = meta.width  ?? 1200;
-      const H        = meta.height ?? 675;
-      const fontSize = Math.max(24, Math.min(48, Math.round(W / 22)));
-      // CJK characters occupy ~1.0em width; Latin ~0.65em
-      const hasCJK   = /[一-鿿぀-ヿ가-힯]/.test(titleText!);
-      const maxChars = Math.max(1, Math.floor(W / (fontSize * (hasCJK ? 1.0 : 0.65))));
-      const text     = titleText!.length > maxChars ? titleText!.slice(0, maxChars - 1) + "…" : titleText!;
-      const escaped  = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-      const fontFamily = fontStyle === "serif"
-        ? "'Noto Serif TC','Noto Serif SC','Noto Serif CJK TC',serif"
-        : "'Noto Sans TC','Noto Sans SC','Noto Sans CJK TC',sans-serif";
-      overlayBuf = Buffer.from(buildTitleSvg(W, H, fontSize, fontFamily, escaped, titlePosition ?? "bottom"));
-    }
-
-    const composite = (b: Buffer) => {
-      const base = sharp(b).resize({ width: 1200, withoutEnlargement: true });
-      return overlayBuf ? base.composite([{ input: overlayBuf, top: 0, left: 0 }]) : base;
-    };
-
-    let webp = await composite(buf).webp({ quality: 80 }).toBuffer();
-    if (webp.length > 200_000) {
-      webp = await composite(buf).webp({ quality: 62 }).toBuffer();
-    }
-    return { buffer: webp, mime: "image/webp" };
-  } catch (err) {
-    console.warn("[image/route] sharp compression failed, returning original:", err);
-    return { buffer: buf, mime: "image/png" };
-  }
-}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -216,46 +122,19 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
     if (refs.length > 0) referenceImages = refs;
   }
 
-  // Style modifier (already resolved to an English style prompt by the client from STYLE_CATALOG).
-  // When present, let the art style drive; otherwise keep the original social-graphic enhancement so
-  // existing no-style behaviour is unchanged.
-  // Bound the style modifier — it's an English style prompt resolved client-side from STYLE_CATALOG,
-  // but a hostile / buggy caller could send arbitrary length; 600 chars is far above any real preset.
-  const styleMod = (typeof body.imageStyle === "string" ? body.imageStyle.trim() : "").slice(0, 600);
-  const finalPrompt = styleMod
-    ? `${prompt}, ${styleMod}`
-    : `${prompt}, professional social media graphic, high quality, clean composition, no text overlay`;
-
-  const result = await generateTarotImage({ model, prompt: finalPrompt, aspectRatio, seed, referenceImages,
-    costLog: { route: "content/image", tool: "content", jobId: typeof body._jobId === "string" ? body._jobId : null } }, grant);
-
+  const result = await makeContentImage({
+    model, prompt, aspectRatio, seed, referenceImages,
+    imageStyle: typeof body.imageStyle === "string" ? body.imageStyle : "",
+    titleText: typeof body.titleText === "string" ? body.titleText.trim() : "",
+    featuredImageFont: typeof body.featuredImageFont === "string" ? body.featuredImageFont.trim() : "sans",
+    featuredImageTitlePosition: typeof body.featuredImageTitlePosition === "string" ? body.featuredImageTitlePosition.trim() : "bottom",
+    costLog: { route: "content/image", tool: "content", jobId: typeof body._jobId === "string" ? body._jobId : null },
+  }, grant);
   if (!result.ok) {
-    const code = (result as { ok: false; error: string }).error;
+    const code = (result as { ok: false; code: string }).code;
     return NextResponse.json({ ok: false, error: friendlyError(code), code }, { status: 200 });
   }
-
-  // Optional title overlay on hero/featured images. fontStyle "none" skips overlay entirely.
-  const titleText           = typeof body.titleText                   === "string" ? body.titleText.trim()                   : "";
-  const featuredImageFont   = typeof body.featuredImageFont           === "string" ? body.featuredImageFont.trim()           : "sans";
-  const featuredImagePos    = typeof body.featuredImageTitlePosition  === "string" ? body.featuredImageTitlePosition.trim()  : "bottom";
-
-  // Parse the generated image → compress to WebP ~150KB @ 1200px wide (+ optional title overlay).
-  const parsed = parseDataUrl(result.image);
-
-  // Persist to R2 → stable public https URL. Fall back to data URL when R2 isn't configured.
-  let imageUrl = result.image;
-  if (isR2Configured() && parsed) {
-    const { buffer: webpBuf, mime: webpMime } = await toWebP(parsed.buffer, titleText || undefined, featuredImageFont, featuredImagePos);
-    const key = buildDesignKey(webpMime);
-    if (key) {
-      const put = await putDesignObject(key, webpBuf, webpMime);
-      if (put.ok) imageUrl = put.publicUrl;
-    }
-  } else if (parsed) {
-    // No R2: return WebP data URL (always compress, overlay applied when titleText set + font ≠ "none")
-    const { buffer: webpBuf, mime: webpMime } = await toWebP(parsed.buffer, titleText || undefined, featuredImageFont, featuredImagePos);
-    imageUrl = `data:${webpMime};base64,${webpBuf.toString("base64")}`;
-  }
+  const imageUrl = result.imageUrl;
 
   const costUsd = imageCostUsd(model);
 
