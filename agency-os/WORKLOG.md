@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-29（續6）— next-admin 部署 0ac589d03（腳本結果頁可編輯／重新生成）（Claude；操作者「部署」）
+
+- `sg-deploy.sh next-admin`：deployed-commit 4ee3a1db0 → 0ac589d03；healthy 11s；HTTP smoke 5/5 OK；容器名正常。
+- 容器內 `.next/server` 含新程式（`scriptForPrompt`、「重寫勾選的」）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo bash /root/lobster-phase1/scripts/sg-deploy.sh next-admin | exit=0 | ms=407840
+- Playwright smoke：26 passed／6 skipped，證據 `agency-os/reports/e2e/2026-10-29/smoke/`。
+- REVIEW_WAIVED: NA -- 部署紀錄；程式審查見續5
+- BUGHUNT_WAIVED: NA -- 無程式改動
+- **未驗**：正式站以真 AI 按一次「全部重新生成」與「重寫勾選的場景」。
+- Rollback：主機 `rollback-phase1.sh restore next-admin`。
 ## 2026-10-29（續5）— 腳本結果頁：可改內容、全部／勾選場景重新生成（Claude；操作者「照做」）
 
 - **需求**：AI 寫完腳本只能看；重寫要退回重選角度；不能只重寫幾場。
