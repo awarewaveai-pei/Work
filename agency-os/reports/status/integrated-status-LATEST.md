@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-10-30 01:27:53
+- Generated: 2026-10-30 02:00:57
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -353,14 +353,18 @@
 - content.aware-wave.com 產品門上線（`e62dc2fcd`、`3f9bb4273`；2026-10-30 續1）。
 - `/verify` 紅閘兩個：YOUTUBE_API_KEY 匯入 vault＋登記掃描基準；AUTOCONTENT-GAP 過期歸檔參照改 archive-only。
 - 其他 session：影片 V1–V7、Whisper 自架、字幕雙引擎；自動內容 P9 完成、退回重做；wp-login Cloudflare challenge。
+- **第二次 AO-CLOSE（01:28 → 02:00）**：金流改雙軌（綠界個人會員＋PayPal，取代 WCS＋TapPay；操作者無統編；`92a5b5dd2`，WORKLOG 續2）；Concat、VoiceStudio 評估不用；POD 衣服站＝第一個收真錢站（之後做）。
 
 ## Current state
 - 正式機 next-admin `3f9bb4273`；migration 已套到 0143；aware-wave.com 外掛 aware-wave-store 1.2.0（HMAC，無 site key id）。
-- 監工台 https://claude.ai/artifact/Htm4xqe362YM987Fo8YLCr 第 47 版。
+- 監工台 https://claude.ai/artifact/Htm4xqe362YM987Fo8YLCr 第 49 版（金流雙軌已反映）。
 
 ## Next steps
-- 操作者：4b-6（WCS＋TapPay）、定第一個方案 → 4b-9 真實付款演練；第一個代理商網站（4c-3 收尾）；決定 aware-wave.com 是否照 `loginSources` 限門。
+- 操作者：4b-6（WCS＋綠界個人會員＋PayPal 雙軌；10-30 改，無統編申請不了 TapPay）、定第一個方案 → 4b-9 真實付款演練；第一個代理商網站（4c-3 收尾）；決定 aware-wave.com 是否照 `loginSources` 限門。
 - content 門登入後四頁用真實帳號看一次（瀏覽器未驗）。
+- 操作者：申請綠界個人會員（身分證、存摺、網站已上線）與 PayPal（連玉山全球通）；開通時確認綠界個人會員的定期定額。
+- 未驗證：綠界 WooCommerce 定期定額外掛（官方 vs cloudwp）——TASKS 待決 1 未驗證段。
+- POD 衣服站（之後做）：開站 → 金流 → Printful store＋A2 → 一鍵上架 → NT$1 真單對帳；順序記在 Claude memory `project_pod_clothes_site_first_real_payments`。
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
