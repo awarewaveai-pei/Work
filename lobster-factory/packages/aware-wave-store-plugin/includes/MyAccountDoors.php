@@ -3,7 +3,7 @@
  * My Account 「進入」 buttons (ADR 017 4b-4, WordPress side): one per product the member bought (product meta
  * _awarewave_product_key). A press asks next-admin, server to server, POST <target>/api/auth/wp-handoff with
  * {wp_user_id, product_key, ts, nonce} signed by X-AwareWave-Handoff-Signature (its own secret,
- * aware_wave_handoff_secret), and on {ok:true,url} sends the browser to that one-time door link. Whether the
+ * aware_wave_handoff_secret; a reseller site adds key_id to the body and signs Ed25519 with aware_wave_handoff_keypair), and on {ok:true,url} sends the browser to that one-time door link. Whether the
  * member still holds the product is the server's call (403 product_not_held); the list here only picks buttons.
  * Contract: next-admin lib/auth/sources/awarewave-wp.ts.
  *
@@ -18,9 +18,13 @@ final class MyAccountDoors {
 	const PATH   = '/api/auth/wp-handoff';
 	const KEY    = '/^[a-z0-9][a-z0-9_.-]{0,99}$/';
 
-	/** @return array{wp_user_id:int,product_key:string,ts:int,nonce:string} */
-	public static function body( int $userId, string $productKey, int $ts, string $nonce ): array {
-		return array( 'wp_user_id' => $userId, 'product_key' => $productKey, 'ts' => $ts, 'nonce' => $nonce );
+	/** @return array{wp_user_id:int,product_key:string,ts:int,nonce:string,key_id?:string} key_id only on a reseller site. */
+	public static function body( int $userId, string $productKey, int $ts, string $nonce, string $keyId = '' ): array {
+		$body = array( 'wp_user_id' => $userId, 'product_key' => $productKey, 'ts' => $ts, 'nonce' => $nonce );
+		if ( $keyId !== '' ) {
+			$body['key_id'] = $keyId;
+		}
+		return $body;
 	}
 
 	public static function message( string $code ): string {
@@ -89,7 +93,7 @@ final class MyAccountDoors {
 
 	public function render(): void {
 		$uid = get_current_user_id();
-		if ( $uid < 1 || ! Settings::secretUsable( $this->settings->handoffSecret ) ) {
+		if ( $uid < 1 || ! $this->settings->handoffReady() ) {
 			return;
 		}
 		$held = $this->heldProducts( $uid );
@@ -115,13 +119,13 @@ final class MyAccountDoors {
 			exit;
 		}
 		$key = sanitize_text_field( wp_unslash( $_POST['product_key'] ?? '' ) );
-		if ( ! Settings::secretUsable( $this->settings->handoffSecret ) || ! isset( $this->heldProducts( $uid )[ $key ] ) ) {
+		if ( ! $this->settings->handoffReady() || ! isset( $this->heldProducts( $uid )[ $key ] ) ) {
 			$this->fail( 'not_offered', $back );
 		}
-		$body = (string) json_encode( self::body( $uid, $key, time(), bin2hex( random_bytes( 16 ) ) ), JSON_UNESCAPED_SLASHES );
+		$body = (string) json_encode( self::body( $uid, $key, time(), bin2hex( random_bytes( 16 ) ), $this->settings->keyId ), JSON_UNESCAPED_SLASHES );
 		$res  = $this->http->post(
 			$this->settings->target . self::PATH,
-			array( 'Content-Type' => 'application/json', Signature::HANDOFF_HEADER => Signature::sign( $body, $this->settings->handoffSecret ) ),
+			array( 'Content-Type' => 'application/json', Signature::HANDOFF_HEADER => $this->settings->handoffSignature( $body ) ),
 			$body
 		);
 		$json = json_decode( $res['body'], true );

@@ -1,6 +1,6 @@
 # aware-wave-store
 
-AwareWave's own shop plugin. **Install only on aware-wave.com**, never on a client site.
+AwareWave's shop plugin. Installs on **aware-wave.com** (HMAC, shared secrets) or on a **reseller's checkout site** (ADR 017 4c-3: set a site key id in the settings page; the site then signs payment events and door handoffs with its own Ed25519 keys, header `X-AwareWave-Site: <key_id>`, and next-admin holds only the public keys on `/ops/sellers`). Never on a site that is not registered in `seller_sites`: `scripts/rollout-wp-bridge.ps1 -Plugin store` refuses it.
 
 - WooCommerce / Subscriptions payments → signed events to `<target>/api/webhooks/payments/woo` (Action Scheduler queue, retries).
 - Members confirm their email before checking out AwareWave products; My Account 「進入」 door buttons (`/api/auth/wp-handoff`).

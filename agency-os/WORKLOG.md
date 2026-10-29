@@ -1,4 +1,33 @@
 # Worklog
+## 2026-10-29（續11）— ADR 017 賣家 4c-3：外掛 aware-wave-store 1.1.0 代理商收銀台模式（Claude）
+
+### [已修改]
+- `includes/Signature.php`：加 `X-AwareWave-Site`、`signEd25519`、`newKeypair`、`signWithKeypair`、`publicKeyPem`（SPKI PEM）；HMAC `sign` 不動。
+- `includes/Settings.php`：新 option `aware_wave_site_key_id`／`aware_wave_site_keypair`／`aware_wave_handoff_keypair`；`paymentsReady`／`handoffReady`／`paymentHeaders`／`handoffSignature`。**有 key_id 只送 Ed25519、絕不送 HMAC；無 key_id 照舊 HMAC（aware-wave.com 零改變）。**
+- `PaymentSender.php`、`MyAccountDoors.php`：改走上面方法；進門 body 有 key_id 才加 `key_id`，用 handoff 那把另一把鑰匙。
+- `Admin/SettingsPage.php`：站台代號欄、兩把公鑰（PEM，唯讀）、「重新產鑰」（舊鑰立刻失效，有確認提示）；填代號首次儲存自動產鑰；私鑰不印出。
+- `aware-wave-store.php` 1.1.0；`README.md`；`tests/SignatureTest.php`（3 個點名測試）＋`tests/fixtures/ed25519-v1.json`（複製自 next-admin 同名檔）。
+- `scripts/rollout-wp-bridge.ps1 -Plugin store`：安裝閘改為在 host 上經 `lobster-next-admin` 容器內 node 以 `SCHEDULE_INGEST_TOKEN` 查 `GET /api/internal/sellers/sites?host=<home host>`，回 `{"host","active":true}` 才放行，其餘（路由未部署、401、逾時）一律拒＝fail closed。
+
+### [驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`php phpunit-9.6.phar`（mbstring+sodium；store 外掛全套 18 tests、119 assertions，含 fixture 公鑰/簽章逐位元組吻合 RFC 8032 向量） | exit=0 | ms=526
+- 閘腳本：`bash -n` 抽出的遠端腳本通過、PowerShell Parser 0 錯誤；容器內 node 查詢片段對本機假伺服器實測：active host→yes、非 active→no、錯 token→no。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（Codex gpt-6-sol，`agency-os/reports/oracle/2026-10-29-partialreview-c3143b9c.md`，範圍＝外掛目錄＋rollout 腳本；全為跨 session 項目，外掛本身無缺陷）。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/packages | grep=MyAccountDoors::body\|Signature::sign(\|PAYMENT_HEADER\|aware_wave_payments_enabled | hits=6（檔；皆已核對，舊呼叫點無遺漏）
+- ORACLE_WAIVED: 本輪 Codex 以 -Path 僅審本 session 檔（共用工作目錄含主 session 的 next-admin 改動，不屬本 commit）；artifact 為 partial，已逐項處理如下。
+
+### Codex 三項（皆屬實，但在外掛範圍外，交主 session／操作者）
+1. 首次安裝雞生蛋：`/ops/sellers` 登記要先貼公鑰，公鑰由外掛產生；rollout 閘卻要先登記才准裝。代理商站在自己主機自行安裝外掛（rollout 只管我們的主機），不受影響；要在我們主機裝時，順序＝先手動登記（公鑰先在別處產或先 pending 列）。4c-2 的 `/ops/sellers` 若要支援「先登記 pending、後貼公鑰」需主 session 決定。
+2. 「重新產鑰」後 `/ops/sellers` 目前只有新增與切換狀態，沒有「換公鑰」操作（`seller_sites` 觸發器 0133 允許同列換公鑰，key_id 不變）→ 需主 session 在 4c-2 補，否則重新產鑰=該站被拒。
+3. `GET /api/internal/sellers/sites` 路由尚未部署（主 session 4c-2）；部署前 `-Plugin store` 一律拒（含 aware-wave.com 升級），屬預期的 fail closed。
+
+### [剩餘風險]
+- **待 4c-2 上線後發版**（`bash scripts/release-wp-bridge.sh --plugin store`）並升級 aware-wave.com 上的外掛：兩步屬 High，留給操作者，本輪未做。
+- 本機沒跑真 WordPress；設定頁 HTML 僅 `php -l`＋人工讀回，未在瀏覽器渲染。
+- 私鑰存 wp_options（autoload=false），DB 被讀走即可簽假付款：與設計一致（只此站受害，控制面可停用該列）。
+
+### [rollback]
+- 關代理商模式：清空站台代號即回 HMAC；或 `git revert` 本 commit；`/ops/sellers` 停用該站列。
 ## 2026-10-29（續10）
 
 ### AUTO_CONTENT 人審閘「退回重做」

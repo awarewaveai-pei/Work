@@ -1,7 +1,7 @@
 <?php
 /**
  * Delivers one queued payment event to next-admin POST <target>/api/webhooks/payments/woo, signed with
- * X-AwareWave-Payment-Signature. 2xx = done (order note). 404 (provider not switched on yet), 408, 429, 5xx and
+ * X-AwareWave-Payment-Signature (a reseller site with a key id adds X-AwareWave-Site and signs Ed25519, never HMAC). 2xx = done (order note). 404 (provider not switched on yet), 408, 429, 5xx and
  * 401 and network errors = retry with exponential backoff, at most MAX_ATTEMPTS sends. Any other 4xx
  * (400/409/422…) is final: the order gets a note with the error code (the server raises an ops incident for the
  * refusals it parsed). A subscription_paid whose subscription has ended by send time is dropped (job subscription_id).
@@ -60,7 +60,7 @@ final class PaymentSender {
 		$eventId = (string) ( $job['event_id'] ?? '' );
 		$noteId  = (int) ( $job['note_id'] ?? 0 );
 		$attempt = (int) ( $job['attempt'] ?? 0 );
-		if ( ! $settings->enabled || ! Settings::secretUsable( $settings->paymentsSecret ) ) {
+		if ( ! $settings->enabled || ! $settings->paymentsReady() ) {
 			$this->shop->addNote( $noteId, 'AwareWave：付款事件開關已關或密鑰未設，事件 ' . $eventId . ' 未送出；請人工對帳。' );
 			return 'disabled';
 		}
@@ -76,10 +76,7 @@ final class PaymentSender {
 		$body = (string) $job['body'];
 		$res  = $this->http->post(
 			$settings->target . self::PATH,
-			array(
-				'Content-Type'           => 'application/json',
-				Signature::PAYMENT_HEADER => Signature::sign( $body, $settings->paymentsSecret ),
-			),
+			$settings->paymentHeaders( $body ),
 			$body
 		);
 		$status  = $res['status'];

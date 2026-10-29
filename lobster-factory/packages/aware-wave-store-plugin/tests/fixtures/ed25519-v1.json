@@ -1,0 +1,9 @@
+{
+  "version": "ed25519-v1",
+  "note": "Shared by next-admin lib/payments/__tests__ and the aware-wave-store plugin tests. Seed = RFC 8032 section 7.1 test 1; never a real site key.",
+  "seed_hex": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+  "public_key_raw_hex": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+  "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo=\n-----END PUBLIC KEY-----\n",
+  "body": "{\"kind\":\"subscription_paid\",\"wp_user_id\":7,\"plan_key\":\"social.pro\",\"period_end\":\"2026-12-01T00:00:00Z\",\"external_ref\":\"wc:7\"}",
+  "signature_base64": "gPuKzmo27O0+y0NsGMnXWFd2MtKxMs0h5ekCxoCVzio4DGAgkYPYENPeLFEv27tPzNxqsfcKtVs9puORijRfCg=="
+}

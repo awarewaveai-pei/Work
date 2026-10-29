@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   -Plugin bridge (default): aware-wave-wp-bridge, shared by all managed sites (aware-wave.com, client sites such as
-  soulful). -Plugin store: aware-wave-store, aware-wave.com only. A release (scripts/release-wp-bridge.sh) only
+  soulful). -Plugin store: aware-wave-store, registered seller sites only (aware-wave.com is the first). A release (scripts/release-wp-bridge.sh) only
   publishes the zip; this script is the rollout, so no site is left behind.
   Per site, on the host: DB dump -> copy of the current plugin folder -> wp plugin install --force (active stays
   active) -> owner fixed to the plugins folder's owner -> checks (plugin version; bridge: REST /health 200 with the
@@ -12,7 +12,7 @@
   -Install is removed again) and the script exits 1.
   Sites are discovered, not listed: every running container with /var/www/html/wp-config.php and the plugin
   folder, so an upgrade never installs a plugin where it was not. -Install is the one exception and needs -Site:
-  the store plugin is installed only on a site named on purpose.
+  the store plugin is installed only on a site named on purpose and registered as an active seller site.
   Backups: /root/backups/wordpress/<container>-pre-<wpbridge|awstore>-<version>-<UTC>.{sql,tgz}.
   HIGH-RISK (production and client sites): run -DryRun first; client sites then get /client-status and
   /playwright client <slug> (AGENTS.md §7 DoD "Client site").
@@ -92,10 +92,16 @@ for C in $NAMES; do
   # An installed plugin whose version WP-CLI cannot read (DB hiccup, another plugin's fatal) is not "absent":
   # treating it as a fresh install would skip the folder backup and delete the folder on a failed check.
   if [ "$HAD" = "1" ] && [ -z "$CUR" ]; then echo "$C: FAIL cannot read the installed $SLUG version -- not touched"; fail=1; continue; fi
-  # The store plugin belongs only on a site the operator opted in to AwareWave billing (the option set once on
-  # aware-wave.com); naming a client site with -Site must not put billing there (Codex 2026-10-25 F3).
-  if [ "$SLUG" = "aware-wave-store" ] && ! wpc option get aware_wave_payments_enabled >/dev/null 2>&1; then
-    echo "$C: FAIL not an AwareWave billing site (no aware_wave_payments_enabled) -- aware-wave-store refused"; fail=1; continue
+  # The store plugin belongs only on a site registered as a seller site (ADR 017 4c-3): next-admin's
+  # GET /api/internal/sellers/sites?host=<host> answers {"host":..,"active":true|false}; only active=true installs.
+  # Asked from inside the next-admin container with its own SCHEDULE_INGEST_TOKEN (the token never leaves the host).
+  # Any other answer (route not deployed yet, 401, timeout) is a refusal: fail closed.
+  if [ "$SLUG" = "aware-wave-store" ]; then
+    SHOST=$(wpc option get home 2>/dev/null | sed -E 's#^[a-z]+://##; s#[/:].*$##' | tr 'A-Z' 'a-z')
+    SACTIVE=$(docker exec -e SHOST="$SHOST" lobster-next-admin node -e "const t=process.env.SCHEDULE_INGEST_TOKEN||'';if(!t||!process.env.SHOST){console.log('no');process.exit(0);}fetch('http://127.0.0.1:3000/api/internal/sellers/sites?host='+encodeURIComponent(process.env.SHOST),{headers:{authorization:'Bearer '+t},signal:AbortSignal.timeout(20000)}).then(async r=>{const j=r.ok?await r.json():{};console.log(j&&j.active===true&&j.host===process.env.SHOST?'yes':'no');}).catch(()=>console.log('no'));" 2>/dev/null | tail -1)
+    if [ -z "$SHOST" ] || [ "$SACTIVE" != "yes" ]; then
+      echo "$C: FAIL '${SHOST:-?}' is not an active seller site (seller_sites) -- aware-wave-store refused"; fail=1; continue
+    fi
   fi
   # wp-bridge >= 0.19.0 no longer carries AwareWave billing: a site opted in to billing must have aware-wave-store
   # first, or payments in between are never sent and unverified members can check out.

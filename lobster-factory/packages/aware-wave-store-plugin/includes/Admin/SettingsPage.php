@@ -10,6 +10,7 @@ namespace AwareWave\Store\Admin;
 
 use AwareWave\Store\EmailVerification;
 use AwareWave\Store\Settings;
+use AwareWave\Store\Signature;
 
 final class SettingsPage {
 
@@ -42,12 +43,14 @@ final class SettingsPage {
 		echo '<input type="hidden" name="awbridge_billing" value="save"><table class="form-table">';
 		echo '<tr><th>啟用</th><td><label><input type="checkbox" name="enabled" value="1"' . checked( $s->enabled, true, false ) . '> 送付款事件、結帳前驗證信箱、進入按鈕</label></td></tr>';
 		echo '<tr><th>控制面網址</th><td><input name="target" class="regular-text" value="' . esc_attr( $s->target ) . '"><p class="description">預設 ' . esc_html( Settings::DEFAULT_TARGET ) . '；只接受 https。</p></td></tr>';
+		echo '<tr><th>站台代號（代理商模式）</th><td><input name="site_key_id" class="regular-text" value="' . esc_attr( $s->keyId ) . '" pattern="[a-z0-9][a-z0-9-]{1,23}"><p class="description">aware-wave.com 留空（用下面兩把共用密鑰）。代理商收銀台填 /ops/sellers 登記的 key_id：填了之後付款事件與進入按鈕只用本站自己的 Ed25519 鑰匙簽章，下面兩把共用密鑰不再使用。</p></td></tr>';
 		$this->secretRow( 'payments_secret', '付款事件密鑰', $s->paymentsSecret, 'next-admin 的 PAYMENTS_WOO_SECRET，同一值。' );
 		$this->gatewayRow( $s->allowedGateways );
 		$this->secretRow( 'handoff_secret', '進入按鈕密鑰', $s->handoffSecret, 'next-admin 的 AUTH_WP_HANDOFF_SECRET，同一值；不要與付款密鑰相同。' );
 		echo '</table>';
 		submit_button( '儲存' );
 		echo '</form>';
+		$this->resellerSection( $s );
 
 		echo '<h2>重寄信箱確認信</h2><form method="post">';
 		wp_nonce_field( 'awbridge_billing_resend' );
@@ -55,6 +58,33 @@ final class SettingsPage {
 		echo '<input name="member" class="regular-text" placeholder="會員 email 或 ID"> ';
 		submit_button( '重寄', 'secondary', 'submit', false );
 		echo '</form></div>';
+	}
+
+	/** Public keys only; the private halves stay in wp_options and are never printed. */
+	private function resellerSection( Settings $s ): void {
+		echo '<h2>代理商模式：本站鑰匙</h2>';
+		if ( ! $s->isReseller() ) {
+			echo '<p>未啟用（站台代號為空）。填站台代號並儲存後，這裡會產生並顯示兩把公鑰。</p>';
+			return;
+		}
+		echo '<p>站台代號 <code>' . esc_html( $s->keyId ) . '</code>。把下面兩把公鑰貼到控制面 /ops/sellers 這個網站的「付款公鑰」「進入公鑰」。私鑰只存在本站、不會顯示。</p>';
+		$keys = array(
+			array( 'payments', '付款公鑰', $s->siteKeypair ),
+			array( 'handoff', '進入公鑰', $s->handoffKeypair ),
+		);
+		foreach ( $keys as $k ) {
+			echo '<h3>' . esc_html( $k[1] ) . '</h3>';
+			if ( Signature::keypairUsable( $k[2] ) ) {
+				echo '<textarea readonly rows="4" class="large-text code" onclick="this.select()">' . esc_textarea( Signature::publicKeyPem( $k[2] ) ) . '</textarea>';
+			} else {
+				echo '<p>尚未產生（按下方「重新產鑰」）。</p>';
+			}
+			echo '<form method="post" onsubmit="return confirm(&quot;重新產鑰後舊鑰立刻失效。請先到 /ops/sellers 準備換上新公鑰，否則這個網站的付款或進入會被拒絕。繼續？&quot;)">';
+			wp_nonce_field( 'awbridge_billing_regen' );
+			echo '<input type="hidden" name="awbridge_billing" value="regen"><input type="hidden" name="which" value="' . esc_attr( $k[0] ) . '">';
+			submit_button( '重新產鑰', 'secondary', 'submit', false );
+			echo '</form>';
+		}
 	}
 
 	/** @param list<string> $allowed */
@@ -85,6 +115,10 @@ final class SettingsPage {
 			check_admin_referer( 'awbridge_billing_save' );
 			return $this->save();
 		}
+		if ( $action === 'regen' ) {
+			check_admin_referer( 'awbridge_billing_regen' );
+			return array( $this->regenerate() );
+		}
 		if ( $action === 'resend' ) {
 			check_admin_referer( 'awbridge_billing_resend' );
 			return array( $this->resend() );
@@ -100,6 +134,20 @@ final class SettingsPage {
 			$out[] = array( 'error', '控制面網址須為 https 網址，未變更。' );
 		} else {
 			update_option( Settings::OPT_TARGET, $target, false );
+		}
+		$keyId = isset( $_POST['site_key_id'] ) ? strtolower( trim( (string) wp_unslash( $_POST['site_key_id'] ) ) ) : '';
+		if ( $keyId === '' ) {
+			delete_option( Settings::OPT_SITE_KEY_ID );
+		} elseif ( Settings::keyIdUsable( $keyId ) ) {
+			update_option( Settings::OPT_SITE_KEY_ID, $keyId, true );
+			// First time in reseller mode: make the keys now so the public halves can be pasted into /ops/sellers.
+			foreach ( array( Settings::OPT_SITE_KEYPAIR, Settings::OPT_HANDOFF_KEYPAIR ) as $opt ) {
+				if ( ! Signature::keypairUsable( (string) get_option( $opt, '' ) ) ) {
+					update_option( $opt, Signature::newKeypair(), false );
+				}
+			}
+		} else {
+			$out[] = array( 'error', '站台代號須為 2–24 字的小寫英數與連字號，未變更。' );
 		}
 		$secrets = array(
 			'payments_secret' => Settings::OPT_PAYMENTS_SECRET,
@@ -129,6 +177,20 @@ final class SettingsPage {
 		update_option( Settings::OPT_ENABLED, empty( $_POST['enabled'] ) ? '' : '1', true );
 		$out[] = array( 'success', '已儲存。' );
 		return $out;
+	}
+
+	/** @return array{0:string,1:string} */
+	private function regenerate(): array {
+		$which = isset( $_POST['which'] ) ? sanitize_key( wp_unslash( $_POST['which'] ) ) : '';
+		$map   = array(
+			'payments' => Settings::OPT_SITE_KEYPAIR,
+			'handoff'  => Settings::OPT_HANDOFF_KEYPAIR,
+		);
+		if ( ! isset( $map[ $which ] ) ) {
+			return array( 'error', '未知的鑰匙。' );
+		}
+		update_option( $map[ $which ], Signature::newKeypair(), false );
+		return array( 'success', '已重新產鑰，舊鑰立刻失效；請把新公鑰貼到 /ops/sellers。' );
 	}
 
 	/** @return array{0:string,1:string} */
