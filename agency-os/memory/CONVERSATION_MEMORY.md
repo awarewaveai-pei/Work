@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-10-30（AO-CLOSE，視窗 2026-10-26 15:37Z → 2026-10-30）** — 多 session 並行約 100 commits。(1) **ADR 017 賣家**（本 session）：4c-2 每個收銀台網站用自己的鑰匙驗付款與「進入」（`b22ce2277`，0140／0141 套 prod，提前部署）；4c-3 外掛 aware-wave-store 1.1.0→1.2.0 發版並升級 aware-wave.com（仍用 HMAC）；月結依買家付款月份（`paid_at` 取 Woo 訂單 date_paid，0142 只在收到前 7 天內採信，`24c1d9973`）；4b-10 員工客戶頁給／收產品與代理權（只開贈送不開手寫合約，`66b612ead`，0143）；content.aware-wave.com 門上線（`e62dc2fcd`／`3f9bb4273`）。正式機現跑 `3f9bb4273`。(2) **影片工具重構** V1–V7、Whisper 自架上線、字幕雙引擎（其他 session）。(3) **自動內容** P9.1–P9.6 完成、AI 審核退回重做（其他 session）。(4) 資安：aware-wave.com wp-login 加 Cloudflare challenge、管理員登入名不再外洩（`1932438e5`）。**待操作者**：4b-6（買 WCS、簽 TapPay）、第一個方案（plans 0 筆）、aware-wave.com 是否照 `loginSources` 限門、第一個代理商網站；`patch_*.ps1`（Codex SeedStar 一次性腳本）其中 `patch_template_wall.ps1` 未 commit 內容在 10-29 被還原、stash 無紀錄。
 - **2026-10-26（AO-CLOSE，05:47後窗口）**：workflows安全掃描15→0（`392d7fda8`，deepmerge8限定Prisma6、刪豁免、136測試）；Trigger正式20261026.3，真實任務7/7通過。同期完成watchdog exit126修復並套用、deny鏡像quote解析、部署鎖檔安裝；影片5錯誤與字幕環境已修／部署、D11依聲音來源定字幕；AUTO_CONTENT P9.1每日熱搜已做，P9.3/P9.5與影片V1–V7已拆卡。未完仍看TASKS／各計畫；影片監工台暫停。詳細證據僅WORKLOG同日續14–25。
 - **2026-10-26 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-10-26 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:237e34c70dfe5c89f8c178aadacfade11c33f8ceacdc2015da9d7da3b40068d2 -->
 - **2026-10-26（AO-CLOSE 補收尾，04:41 後）**：109 份已完成文件／證據以 `483679655` 推送；其餘 18 項由 Claude 逐項審查後結案（WORKLOG 續10，操作者確認）。錯誤私有 index commit `cbb63162f` 未推送且已復原；`d161d2ae9`／`7681287eb` 補 git 原生防大量刪檔檢查。詳見 WORKLOG 2026-10-26 續10／續11；原有產品待辦不因此視為完成。
@@ -523,7 +524,7 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-10-27 06:08:42 UTC_
+_Last synced: 2026-10-29 17:19:08 UTC_
 
 ## 2026-06-16 AO-CLOSE memory — session window 2026-06-11T05:07Z → 2026-06-16 afternoon
 
@@ -632,7 +633,7 @@ _Last synced: 2026-10-27 06:08:42 UTC_
 
 ## 2026-10-26 AO-CLOSE memory — 10/25–10/26 session window
 
-- 付款／客戶模型：WooCommerce Subscriptions＋TapPay 方向已定；credit pack 使用權採無期末，0128／wp-bridge 0.18.3 已落地；ADR 017 seller 4c 方向與 0133–0137 控制面寫入收窄已記錄／依操作者授權套用。
+- 付款／客戶模型：WooCommerce Subscriptions＋TapPay 方向已定（2026-10-30 金流改綠界個人會員＋PayPal 雙軌：操作者無統編申請不了 TapPay；月收 NT$5 萬須稅籍登記後再評估）；credit pack 使用權採無期末，0128／wp-bridge 0.18.3 已落地；ADR 017 seller 4c 方向與 0133–0137 控制面寫入收窄已記錄／依操作者授權套用。
 - 排程／內容／營運：Trigger timers 改由 ks-aw-01 host cron；C4 告警與日誌路徑完成多階段修正；P6 影片管線、P7 YouTube 實片與 P8 驗收完成；AUTOCONTENT-GAP 留自足 handoff，YouTube Data API key 是操作者待辦。
 - 事故修復：app、Social、video、portal 與共享產品入口的 nginx auth header buffer 對齊為 `large_client_header_buffers 4 32k;`；正式機經 safe-infra-patch 套用並保留 backup。公開 7-door probe 與 Chrome 驗證已恢復，無再見 Cookie 400；portal 顯示預期的客戶帳號限制頁。
 - 收尾約束：健康檢查曾有舊 archive-lift state 的文件引用失敗，並非 nginx 失敗；本次 AO-CLOSE 需以最新 archive、WORKLOG、daily note、health/build/doc-sync chain 收斂，並保留其他 session 的 dirty work。
