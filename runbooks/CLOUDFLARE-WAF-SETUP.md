@@ -35,10 +35,17 @@ Expression: (http.request.uri.path contains "/xmlrpc.php")
 Action: Block
 ```
 
-### Rule 2：wp-login 保護（DEPRECATED — 勿套用）
-> **⚠️ 已棄用**：geo/country 規則會封鎖出國中的操作者。
-> wp-login 保護改由伺服器端 LLAR（Limit Login Attempts Reloaded）+ nginx 負責。
-> 見 `§注意事項` 與 `§Origin Lockdown SOP`。
+### Rule 2：wp-login 保護
+> geo/country 版本已棄用（會封鎖出國中的操作者），勿重建。
+> 2026-10-29 起改用 **Managed Challenge**（不看國家，出國照樣能登入）：
+```
+Rule ID: cedbaa68b28a486392e789753094f86c（ruleset f290fd58b69c4cedb7a0688ca959034f）
+Expression: (http.request.uri.path contains "/wp-login.php")
+Action: Managed Challenge
+```
+> 原因：暴力破解來自 900+ 個 IP，每個只試幾次，LLAR 與 nginx 的單一 IP 限制擋不住。
+> `scripts/check-cloudflare-security.ps1` 缺這條即 WARN。回復：Dashboard 停用此 rule，或 `DELETE /zones/<zone>/rulesets/<ruleset>/rules/<rule id>`。
+> 細節見 `runbooks/WORDPRESS-LOGIN-SECURITY.md`。
 
 ### Rule 3：保護 n8n webhook（限速）
 Dashboard → Security → WAF → Rate limiting rules
@@ -97,7 +104,7 @@ curl -sSI https://aware-wave.com/xmlrpc.php | grep "HTTP"
 | Rate Limit Rule（>50 req/10s） | `b8ffa72df8d44ea78a09bd0ababf8abb` |
 
 > **注意**：`74c0e70b...`（舊 scanner-paths rule）已於 2026-06-04 隨 ruleset 清空時刪除。`8202ff33...` 為 2026-06-12 重建的新 rule。
-> wp-login/xmlrpc 改用伺服器端 LLAR + nginx 防護（操作者常出國，CF geo rule 會自己封自己）。
+> wp-login：CF Managed Challenge（`cedbaa68…`，2026-10-29）+ 伺服器端 LLAR + nginx；不用 geo rule（操作者常出國）。
 
 ### 查現有規則
 
@@ -243,7 +250,7 @@ IPv6（7 段）：2400:cb00::/32 等
 
 - **操作者出國無影響**：lockdown 是 IP-based（CF 出口 IP），非 geo rule，不會封自己
 - **SSH 22 不受影響**：lockdown 只動 80/443
-- **fail2ban 仍在**：lockdown 後 fail2ban 對直打 origin 的 IP 無作用（因 iptables DROP 更早），但 CF-proxied 流量的 real-IP banning 仍靠 nginx real_ip module
+- **fail2ban 只有 sshd jail**（2026-10-29 實查）：不保護 wp-login。經 CF 進來的連線 TCP 來源是 CF edge，iptables／nftables 封真實 IP 本來就擋不到；真實 IP 只在 nginx real_ip 之後才看得到，供 LLAR 與 nginx limit_req 使用
 - **IPv6**：ip6tables 同步鎖定，ufw 在此 server 未安裝
 - **Script**：`lobster-factory/infra/hetzner-phase1-core/scripts/cf-origin-lockdown.sh`
 
@@ -262,6 +269,6 @@ Required carve-outs:
   `/.aws/`, `/.ssh/`, or `/xmlrpc.php`.
 
 Server-side defense remains:
-- `wp-login.php`: LLAR + host Nginx `wp_login` rate limit + fail2ban.
+- `wp-login.php`: CF Managed Challenge rule `cedbaa68b28a486392e789753094f86c` + LLAR + host Nginx `wp_login` rate limit (fail2ban has only an sshd jail).
 - scanner paths: Cloudflare custom WAF + host Nginx `scanner-block.inc`.
 - origin bypass: SG Origin Lockdown on ports 80/443.

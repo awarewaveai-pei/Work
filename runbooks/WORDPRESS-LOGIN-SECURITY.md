@@ -9,6 +9,27 @@
 - LLAR 保留失敗鎖定；不以國家或操作者固定 IP 限制登入。
 - Simple History 的成功登入必須在第二步通過後才記錄。
 - MainWP 同步須成功；MainWP 一鍵登入是另一個受信任管理入口，不以它驗證一般密碼登入的 2FA。
+- 登入名稱不得出現在任何公開頁面：管理員的 `user_nicename`（作者網址、REST slug、使用者 sitemap）與 `display_name`（REST name、RSS 作者）都必須不同於 `user_login`。
+- `/wp-login.php` 在 Cloudflare 前先過 Managed Challenge（不看國家）；每 IP 計次的 LLAR 與 nginx 擋不住分散式暴力破解。
+
+## 分散式暴力破解與 LLAR 通知信（2026-10-29）
+
+症狀：LLAR 每天寄「登入嘗試已失敗」信。實查 14 天：903 個 IP 對 wp-login 送密碼，每天 150–740 次；最常猜的是真正的管理員登入名稱，因為它從作者頁、`?rest_route=/wp/v2/users`、`wp-sitemap-users-1.xml`、RSS 公開漏出。nginx 只擋了 `/wp-json/wp/v2/users` 一條路。
+
+處置：
+- Cloudflare 自訂規則 `cedbaa68b28a486392e789753094f86c`：路徑含 `/wp-login.php` → Managed Challenge。真人瀏覽器過一次檢查就能登入；腳本與機器人拿到 403。
+- 管理員 `user_nicename=aware-wave-team`、`display_name`／`nickname`=`AwareWave`；登入名稱與密碼不變。原值三者皆為登入名稱。
+- 不關 LLAR 通知：機器人被擋在 CF 後，仍收到的信才代表需要看。
+
+驗證：
+```bash
+curl -s -o /dev/null -w '%{http_code}
+' -d 'log=x&pwd=y' https://aware-wave.com/wp-login.php   # 預期 403（cf-mitigated: challenge）
+curl -s 'https://aware-wave.com/?rest_route=/wp/v2/users' | grep -c '<登入名稱>'                    # 預期 0；另查 /?author=1、/wp-sitemap-users-1.xml、/feed/
+```
+`scripts/check-cloudflare-security.ps1` 每次檢查這條規則，缺了就 WARN。
+
+回復：Dashboard 停用該 rule；公開名稱用 `wp user update 1 --user_nicename=... --display_name=...` 改回（舊作者網址目前 404，屬預期）。
 
 ## 已查證狀態（2026-10-27）
 

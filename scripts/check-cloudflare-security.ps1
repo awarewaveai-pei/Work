@@ -11,15 +11,18 @@
   Checks:
     1. Bot Fight Mode (bot_management.fight_mode = true)
     2. WAF firewall rules count + xmlrpc.php block rule (informational under server-side mode)
+       + wp-login managed-challenge rule (required: PASS needs it, see below)
   Requires: CLOUDFLARE_API_TOKEN (vault or User registry)
             CLOUDFLARE_ZONE_ID (vault/env, default: f21b1919632fee2221647908a94fdcac)
 
   PASS criteria depend on -WpLoginProtectedByServerSide:
     $true  (default, current architecture since 2026-06-04): wp-login/xmlrpc are defended
-           server-side (LLAR + nginx rate-limit + fail2ban). CF WAF rules are intentionally
-           empty — operator travels globally and CF geo rules would self-lock her out.
-           PASS requires only Bot Fight Mode = ON. WAF rule count is informational, NOT a
-           health signal. (See WORKLOG 2026-06-04 + memory feedback_global_traveler.)
+           server-side (LLAR + host nginx wp_login rate limit; fail2ban has only an sshd jail
+           and cannot ban CF-proxied clients anyway). No geo rules — operator travels globally.
+           Since 2026-10-29 a CF managed-challenge rule on /wp-login.php is REQUIRED: the
+           brute force is distributed (900+ IPs, a few tries each), which per-IP limits
+           cannot stop. PASS requires Bot Fight Mode = ON AND that rule enabled.
+           (WORKLOG 2026-10-29; runbooks/WORDPRESS-LOGIN-SECURITY.md.)
     $false (legacy): CF WAF is the wp-login/xmlrpc defense — PASS requires bot=ON AND
            rules>=3 AND xmlrpc block present. Set this only if reverting to CF-WAF defense.
 
@@ -83,6 +86,7 @@ $overall    = "WARN"
 $botMode    = "unknown"
 $ruleCount  = 0
 $xmlrpcOk   = $false
+$wpLoginChallengeOk = $false
 $rateLimitRuleStatus = "unknown"
 $rateLimitAdminCarveout = "unknown"
 $errorMsg   = ""
@@ -148,6 +152,8 @@ if (-not $token) {
         $rules = @(if ($wr -and $wr.result -and $wr.result.rules) { $wr.result.rules } else { @() })
         $ruleCount = $rules.Count
         $xmlrpcOk  = [bool]($rules | Where-Object { $_.expression -match "xmlrpc" -or $_.description -match "xmlrpc" })
+        # Enabled challenge rule whose expression names wp-login.php (any challenge flavour).
+        $wpLoginChallengeOk = [bool]($rules | Where-Object { $_.enabled -and $_.action -in @('managed_challenge','challenge','js_challenge') -and $_.expression -match 'wp-login\.php' })
     } catch {
         $code = $null
         try { $code = [int]$_.Exception.Response.StatusCode } catch {}
@@ -162,6 +168,7 @@ if (-not $token) {
             # always fires" anti-pattern this whole migration exists to eliminate, just relocated.
             $ruleCount = 0
             $xmlrpcOk  = $false
+            $wpLoginChallengeOk = $false
         } else {
             $blindChecks += @{ name = "WAF firewall rules"; code = $code }
             if (-not $errorMsg) { $errorMsg = "firewall ruleset API: $($_.Exception.Message)" }
@@ -279,9 +286,9 @@ if (-not $token) {
     }
 
     if ($WpLoginProtectedByServerSide) {
-        # wp-login/xmlrpc defended server-side (LLAR + nginx + fail2ban) since 2026-06-04.
-        # CF wp-login geo rules are intentionally absent; scanner/path rules may exist.
-        if ($botMode -eq "ON" -and $rateLimitAdminCarveout -ne "missing") {
+        # wp-login: LLAR + nginx per-IP limits server-side, plus the CF challenge rule that stops
+        # the distributed brute force at the edge (2026-10-29). No geo rules.
+        if ($botMode -eq "ON" -and $rateLimitAdminCarveout -ne "missing" -and $wpLoginChallengeOk) {
             $overall = "PASS"
         } else {
             # bot=OFF or error → genuine CF posture issue, still WARN.
@@ -357,6 +364,7 @@ $lines = @(
     "|-------|--------|",
     "| Bot Fight Mode | $botMode |",
     "| WAF firewall rules count | $ruleCount$(if ($WpLoginProtectedByServerSide) { ' (informational; wp-login is server-side)' }) |",
+    "| wp-login managed-challenge rule | $(if ($wpLoginChallengeOk) { 'present' } else { 'MISSING' }) |",
     "| xmlrpc.php block rule | $(if ($xmlrpcOk) { 'present' } elseif ($WpLoginProtectedByServerSide) { 'server-side (nginx/LLAR)' } else { 'MISSING' }) |",
     "| Scanner flood rate-limit rule | $rateLimitRuleStatus |",
     "| WP admin rate-limit carve-outs | $rateLimitAdminCarveout |",
@@ -368,9 +376,9 @@ $lines = @(
 if ($WpLoginProtectedByServerSide) {
     $lines += ""
     $lines += "## wp-login / xmlrpc protection"
-    $lines += "- Mode: **server-side** (LLAR + nginx rate-limit + fail2ban) -- architecture decision 2026-06-04."
+    $lines += "- Edge: CF managed-challenge rule on /wp-login.php (required since 2026-10-29; distributed brute force from 900+ IPs defeats per-IP limits)."
+    $lines += "- Server-side: LLAR lockouts + host nginx wp_login rate limit. fail2ban has only an sshd jail."
     $lines += "- CF WAF wp-login geo rules are intentionally absent: operator travels globally; CF geo rules would self-lock."
-    $lines += "- CF WAF scanner/path rules may exist, but wp-login health is judged by the server-side layer."
     $lines += "- This check verifies CF posture plus Origin Lockdown; WordPress plugin protection is verified separately (client-status / WP plugin checks)."
 }
 $lines += ""
@@ -407,5 +415,5 @@ if ($errorMsg) { $lines += ""; $lines += "## Errors"; $lines += "- $errorMsg" }
 Set-Content -Path (Join-Path $reportDir "cf-security-LATEST.md") -Value ($lines -join "`r`n") -Encoding UTF8
 
 $colour = if ($overall -eq "PASS") { "Green" } elseif ($overall -eq "SKIP") { "DarkGray" } elseif ($overall -eq "BLIND") { "Red" } else { "Yellow" }
-Write-Host "== Cloudflare security: $overall (bot=$botMode, rules=$ruleCount, xmlrpc=$xmlrpcOk, lockdown=$lockdownStatus) ==" -ForegroundColor $colour
+Write-Host "== Cloudflare security: $overall (bot=$botMode, rules=$ruleCount, xmlrpc=$xmlrpcOk, wplogin_challenge=$wpLoginChallengeOk, lockdown=$lockdownStatus) ==" -ForegroundColor $colour
 exit 0

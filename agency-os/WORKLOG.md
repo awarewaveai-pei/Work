@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-29（續15）aware-wave.com 登入失敗通知信不停：分散式暴力破解 + 管理員登入名稱公開外洩；CF Managed Challenge 擋在邊緣、公開名稱與登入名稱分開（Claude）
+
+- **觸發**：操作者「我一直收到這個」（LLAR 通知信：144.91.79.41 失敗 12 次、3 次鎖定）→「去幫我處理好」。
+- **根因**：C1 分散式：14 天 903 個 IP POST wp-login，每天 150–740 次，每 IP 只試幾次；LLAR 與 nginx `wp_login` 5r/m 都按單一 IP 計，擋不住整類。C2 外洩：最常猜的是真正的登入名稱（594 次，`admin` 只 29 次且不存在）；`user_nicename`／`display_name` 都等於 `user_login`，經 `/?rest_route=/wp/v2/users`、`/?author=1`、`wp-sitemap-users-1.xml`、RSS 公開；nginx 只擋 `/wp-json/wp/v2/users` 一條（補丁式）。C3 文件不實：runbook 與 `check-cloudflare-security.ps1` 說 wp-login 有 fail2ban，實查只有 sshd jail，且經 CF 的連線 iptables 封不到真實 IP。
+- **不變量**：①登入頁在邊緣先分辨真人（不看國家）；②登入名稱不出現在任何公開輸出；③偵測器要驗證①仍在。2FA（TOTP）已啟用，未被登入。
+- **改動（prod）**：CF custom rule `cedbaa68b28a486392e789753094f86c`（ruleset f290fd58…，v23）：`(http.request.uri.path contains "/wp-login.php")` → managed_challenge。WP user 1：`user_nicename` <登入名稱>→aware-wave-team、`display_name`／`nickname`→AwareWave；登入名稱、密碼未動。
+- **改動（repo）**：`scripts/check-cloudflare-security.ps1` 新增 wp-login challenge 檢查（缺 = WARN）並改正 fail2ban 說法；`runbooks/CLOUDFLARE-WAF-SETUP.md` Rule 2 改為 Managed Challenge、fail2ban 段改正；`runbooks/WORDPRESS-LOGIN-SECURITY.md` 加兩條不變量與本次處置／驗證／回復。不關 LLAR 通知（會讓偵測器閉嘴）。
+- REALTEST_EVIDENCE: tool=curl | cmd=curl -d 'log=x&pwd=y' https://aware-wave.com/wp-login.php（前 200 → 後 403 cf-mitigated: challenge；www 同；/、/shop/、/my-account/ 仍 200） | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=curl | cmd=curl /?rest_route=/wp/v2/users、/?author=1、/wp-sitemap-users-1.xml、/feed/、/、/shop/ grep -c <登入名稱>（全部 0；slug aware-wave-team、name AwareWave；舊作者網址 404） | exit=0 | ms=8000
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/check-cloudflare-security.ps1（PASS，wplogin_challenge=True）；假資料測判斷式 present/disabled/block/none → True/False/False/False | exit=0 | ms=15000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（讀回 diff：只有本次 18+/10− 行；腳本 CRLF+BOM 保留；內建瀏覽器開 wp-login 出現 CF 真人驗證框，依規定不代勾）
+- ORACLE_WAIVED: 腳本只加一個布林判斷與報表文字，判斷式已用四種假資料逐一驗證；主要改動是 CF 規則與 WP 欄位，已用 curl 對正式環境實測
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks,.claude | grep=fail2ban | hits=6（腳本 2、CLOUDFLARE-WAF-SETUP 2 已改正；AO_RESUME_BEGINNER_MAP 名詞解釋正確；APP_AWARE_WAVE_COMPLETE_REFERENCE:86 為舊 SG/EU 時期歷史文件，不回改）
+- **剩餘**：真人登入最後一步須操作者自己在瀏覽器過一次 CF 檢查＋2FA；若巡檢 `tests/e2e/client/wp-site-health.spec.ts` 指向 aware-wave.com 會看到 challenge。
+- **rollback**：CF Dashboard 停用 rule `cedbaa68…`（或 API DELETE）；`wp user update 1 --user_nicename=<登入名稱> --display_name=<登入名稱> --nickname=<登入名稱>`；repo `git revert`。
 ## 2026-10-29（續14）月結依買家付款時間分月：外掛 1.2.0 送 `paid_at`（取 Woo 訂單自己的付款時間）、0142 只在收到前 7 天內採信（Claude）
 
 - **觸發**：操作者「其他的一路做完」；續12 剩餘①／Codex `2026-10-29-partialreview-41670a16`：月結以 `received_at` 分月，外掛重試約 3.5 天 → 月底付款算進下月。
