@@ -23,7 +23,9 @@ export async function fetchRemoteFile(
   url: string,
   opts: { maxBytes: number; timeoutMs: number; accept: (contentType: string) => boolean; log?: (msg: string) => void;
     /** Keep the first maxBytes of a longer body instead of refusing it (a page read for its opening text). */
-    keepPrefix?: boolean },
+    keepPrefix?: boolean;
+    /** Extra request headers (the fetcher drops user-agent, cookie and authorization). */
+    headers?: Record<string, string> },
   deps: { resolver?: Resolver; transport?: typeof fetch } = {},
 ): Promise<RemoteFile> {
   if (!url.startsWith("https://")) throw new RemoteFileError("refused");
@@ -38,7 +40,7 @@ export async function fetchRemoteFile(
   });
   let res: Response;
   try {
-    res = await get(url, { headers: { accept: "image/*,video/*;q=0.9,*/*;q=0.1" } });
+    res = await get(url, { headers: { accept: "image/*,video/*;q=0.9,*/*;q=0.1", ...opts.headers } });
   } catch (e) {
     if (e instanceof CollectFetchError) throw new RemoteFileError(e.kind === "blocked" ? "refused" : "unreachable");
     throw e;

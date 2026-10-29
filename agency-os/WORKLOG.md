@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-29（續2）
+
+### AUTO_CONTENT P9 Codex 補審（gpt-6-sol）3 條：修 2、不修 1
+
+- F1 SSRF：站自填 RSS 經 302 可打內部服務（舊 `safeFetchText` 跟隨轉址，`public-https.ts:2` 已註明客戶網址要走 remote-file）。修：所有 RSS 走 `fetchFeedText` → `fetchRemoteFile`（每跳位址閘＋固定連線）；`fetchRemoteFile` 加可選 `headers`。
+- F2 花錢：同客戶第二站的提案關鍵字撞到 org 唯一鍵（`0121:54`）→ 0 題、24h 後再付費。修：提案 prompt 帶本月本客戶已排關鍵字（`plan.ts` `taken`）。
+- F3 不修：單一來源當天暫時失敗不重試；只缺一天一來源，隔天補；修需新狀態表，效益不足。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/content/topics lib/collect lib/content/__tests__ app/api/content | exit=0 | ms=4207（702 測試）
+- 突變：`trending-sources.ts` 改回 `safeFetchText` → `trending-feed-fetch.test.ts` 紅 → 還原綠。tsc 0 錯。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+  - external oracle = Codex CLI gpt-6-sol，artifact `agency-os/reports/oracle/2026-10-29-partialreview-a7bbad32.md`
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=safeFetchText | hits=5（PTT 寫死網址與函式本身，非 RSS 路徑）
 ## 2026-10-29（續1）— 影片正式站實測 F1–F3／F5–F7 修復（Claude 接手；前一工人中斷）
 
 - **根因／修法**：F1 `finalize.ts` 記成片後專案仍 produce → 伺服器端同處把 create/produce 改 review（org＋stage 限定）。F2 `VideoPipeline` 已有成片先顯示成片＋RenderedBar（可重做）；`assets` route 加 `projectId` 過濾，QaStep／CaptionsStep 只列本專案主列並預選。F3 `ProjectDetail` 以主列分組，variant 併入、QA 逐比例。F5 DB object_key 為網址編碼，抽 `decodeVideoObjectKey`（r2.ts）供 reburn route 與 deleteVideoObjects 共用；CaptionsStep 重燒失敗顯示原因。F6 captionSource=script_tts 不再寫 Whisper。F7 ScriptForge 全部模組 catch 改顯示 `ErrBox`（含 pj 解析失敗、腳本成功但評分失敗也顯示）。

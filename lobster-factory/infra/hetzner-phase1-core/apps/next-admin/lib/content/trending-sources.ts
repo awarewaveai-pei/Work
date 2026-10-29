@@ -2,6 +2,7 @@ import { CLAUDE_FAST_MODEL, claudeParams, loadAnthropic } from "@/lib/ai/gateway
 import { grantFor } from "@/lib/entitlements/grant";
 import { billedOrgId, logAiCall } from "@/lib/ai/log-ai-call";
 import { isSafePublicHttps } from "./public-https";
+import { fetchRemoteFile } from "@/lib/collect/net/remote-file";
 /**
  * trending-sources.ts — 搜尋積木家族（kind:"search"）
  *
@@ -68,6 +69,13 @@ function decodeEntities(s: string): string {
 }
 
 const MAX_FEED_BYTES = 2_000_000;
+
+/** Every RSS/Atom feed goes out through collect's fetcher: the address gate on every redirect hop and a pinned connection.
+ *  A feed URL can be a customer's (a site's own feeds, P9.4), so the literal-host check alone is not enough. */
+async function fetchFeedText(url: string, headers: Record<string, string> = {}): Promise<string> {
+  const f = await fetchRemoteFile(url, { maxBytes: MAX_FEED_BYTES, timeoutMs: 8000, keepPrefix: true, accept: () => true, headers });
+  return new TextDecoder().decode(f.bytes);
+}
 
 async function safeFetchText(url: string, timeoutMs = 8000, headers: Record<string, string> = {}): Promise<string> {
   const res = await fetch(url, {
@@ -154,7 +162,7 @@ function makeRssBlock(opts: RssBlockDef): ContentBlock<TrendingItem[]> {
       const url = typeof opts.url === "function" ? opts.url(geo) : opts.url;
       if (!isSafePublicHttps(url)) return [];
       try {
-        const xml = await safeFetchText(url, 8000, opts.headers);
+        const xml = await fetchFeedText(url, opts.headers);
         return extractFeedItems(xml, {
           limit: opts.limit ?? 20,
           source: opts.source ?? opts.title,

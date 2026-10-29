@@ -15,7 +15,7 @@ import { isGlobalMarket, TRENDING_GEOS, type TrendingGeo } from "@/lib/content/g
 import { isSafePublicHttps } from "@/lib/content/public-https";
 import { buildDbSearchBlocks, runBlocks } from "@/lib/content/trending-sources";
 import { norm, recentTrends } from "./trends";
-import { monthKey, proposeTopics, TOPIC_FORMATS, type NewTopic, type Topic, type TopicFormat } from "./store";
+import { listTopics, monthKey, proposeTopics, TOPIC_FORMATS, type NewTopic, type Topic, type TopicFormat } from "./store";
 
 export const PLAN_TOPICS = 28;
 const DEFAULT_FORMATS: TopicFormat[] = ["article", "social"];
@@ -65,6 +65,7 @@ export interface PlanContext {
   industry: string[];          // newest titles from the brand's own feeds (P9.4); this brand's prompt only, never stored
   trends: string[];
   folders: string[];
+  taken: string[];             // keywords this organization already planned this month (unique per org+month+keyword, 0121)
 }
 
 export function buildPlanPrompt(c: PlanContext, n = PLAN_TOPICS): string {
@@ -85,7 +86,10 @@ ${list(c.trends)}
 品牌知識庫的資料夾（代表品牌已蒐集過的主題）：
 ${list(c.folders)}
 
-規則：keyword 是一個人會拿去搜尋的短詞，彼此不得重複；title 是文章標題；angle 一句話說明切入角度；
+${c.taken.length ? `這個客戶本月已排的關鍵字（不得再用）：
+${list(c.taken)}
+
+` : ""}規則：keyword 是一個人會拿去搜尋的短詞，彼此不得重複；title 是文章標題；angle 一句話說明切入角度；
 source 寫題目來自 "trending"（上面的熱門話題）、"kb"（知識庫資料夾）或 "plan"（自行規劃），ref 寫來源那一行的原文（plan 留空）。
 
 只回傳 JSON，不要其他文字：
@@ -158,15 +162,17 @@ export async function proposeMonth(sb: SupabaseClient, input: ProposeMonthInput,
   const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
   // one market = its country's events (+ worldwide); global (every geo) or a market with no source = no country filter
   const geos = trendGeosFor(site.defaults.targetCountry);
-  const [trends, folders, events, industry] = await Promise.all([
+  const [trends, folders, events, industry, planned] = await Promise.all([
     trendsFor(sb, geos),
     listFolders(input.organizationId),
     eventsForMonth(sb, month, geos.length === 1 ? geos[0] : null),
     industryTitles(site.siteId, site.defaults.trendFeeds, geos[0] ?? "TW"),
+    listTopics(sb, input.organizationId, month),
   ]);
   const ctx: PlanContext = {
     siteName: site.name, voice: renderSiteVoice(site.defaults), month, daysInMonth, events, industry,
     trends: trends.map((t) => `${t.title}（${t.source}）`), folders: folders.slice(0, 30).map((f) => f.name),
+    taken: planned.map((t) => t.keyword),
   };
   const rows = parsePlan(await ask(buildPlanPrompt(ctx)), ctx);
   return proposeTopics(sb, rows.map((r) => ({ ...r, organization_id: input.organizationId, site_id: input.siteId, created_by: input.actor })));

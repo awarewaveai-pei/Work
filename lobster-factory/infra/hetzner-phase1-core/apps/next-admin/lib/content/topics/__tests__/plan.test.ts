@@ -6,13 +6,14 @@ vi.mock("@/lib/content/trending-sources", () => ({
   buildDbSearchBlocks: (rows: unknown[]) => rows,
   runBlocks: async (blocks: unknown[]) => { feed.blocks = blocks; return feed.items; },
 }));
-const m = vi.hoisted(() => ({ site: null as unknown, trends: [] as unknown[], folders: [] as unknown[], proposed: [] as unknown[], byGeo: {} as Record<string, unknown[]>, eventArgs: [] as unknown[], events: [] as string[] }));
+const m = vi.hoisted(() => ({ site: null as unknown, trends: [] as unknown[], folders: [] as unknown[], proposed: [] as unknown[], byGeo: {} as Record<string, unknown[]>, eventArgs: [] as unknown[], events: [] as string[], taken: [] as string[] }));
 vi.mock("@/lib/events/for-month", () => ({ eventsForMonth: async (_sb: unknown, month: string, country: string | null) => { m.eventArgs = [month, country]; return m.events; } }));
 vi.mock("@/lib/content/brand-voice-store", () => ({ loadSiteBrand: async () => m.site }));
 vi.mock("@/lib/kb/folders", () => ({ listFolders: async () => m.folders }));
 vi.mock("../trends", async (orig) => ({ ...(await orig<typeof import("../trends")>()), saveTrends: async () => { feed.saved++; return 0; },
   recentTrends: async (_sb: unknown, geo: string) => { m.trends.push(geo); return m.byGeo[geo] ?? [{ title: "感恩日記", source: "Google News", days: 1 }]; } }));
-vi.mock("../store", async (orig) => ({ ...(await orig<typeof import("../store")>()), proposeTopics: async (_sb: unknown, rows: unknown[]) => { m.proposed = rows; return rows; } }));
+vi.mock("../store", async (orig) => ({ ...(await orig<typeof import("../store")>()), proposeTopics: async (_sb: unknown, rows: unknown[]) => { m.proposed = rows; return rows; },
+  listTopics: async () => m.taken.map((keyword) => ({ keyword })) }));
 
 import { buildPlanPrompt, parsePlan, proposeMonth, trendGeosFor } from "../plan";
 
@@ -42,7 +43,7 @@ describe("parsePlan", () => {
 
 describe("prompt and geo", () => {
   it("carries the voice, trends and folders, and the target count", () => {
-    const p = buildPlanPrompt({ siteName: "Soulful", voice: "語氣: 溫暖", month: "2026-11-01", daysInMonth: 30, events: [], industry: [], trends: ["感恩日記（Google News）"], folders: ["藝術治療 202610"] });
+    const p = buildPlanPrompt({ siteName: "Soulful", voice: "語氣: 溫暖", month: "2026-11-01", daysInMonth: 30, events: [], industry: [], trends: ["感恩日記（Google News）"], folders: ["藝術治療 202610"], taken: [] });
     expect(p).toContain("共 28 個，分散在 1 到 30 日");
     expect(p).toContain("語氣: 溫暖");
     expect(p).toContain("- 感恩日記（Google News）");
@@ -50,7 +51,7 @@ describe("prompt and geo", () => {
   });
 
   it("events section: absent when empty, otherwise present and before the trends section (P9.2)", () => {
-    const base = { siteName: "S", voice: "", month: "2026-12-01", daysInMonth: 31, trends: ["t"], folders: [], industry: [] };
+    const base = { siteName: "S", voice: "", month: "2026-12-01", daysInMonth: 31, trends: ["t"], folders: [], industry: [], taken: [] };
     expect(buildPlanPrompt({ ...base, events: [] })).not.toContain("節日與活動");
     const p = buildPlanPrompt({ ...base, events: ["12-25 Christmas（聖誕節）"] });
     expect(p).toContain("節日與活動");
@@ -59,7 +60,7 @@ describe("prompt and geo", () => {
   });
 
   it("industry section: absent when empty, otherwise present and before the trends section (P9.4)", () => {
-    const base = { siteName: "S", voice: "", month: "2026-12-01", daysInMonth: 31, trends: ["t"], folders: [], events: [] };
+    const base = { siteName: "S", voice: "", month: "2026-12-01", daysInMonth: 31, trends: ["t"], folders: [], events: [], taken: [] };
     expect(buildPlanPrompt({ ...base, industry: [] })).not.toContain("產業來源");
     const p = buildPlanPrompt({ ...base, industry: ["A", "B"] });
     expect(p).toContain("產業來源");
@@ -76,6 +77,15 @@ describe("prompt and geo", () => {
 });
 
 describe("proposeMonth", () => {
+  it("asks the AI to avoid keywords this organization already planned this month (topics are unique per org+month+keyword)", async () => {
+    m.site = { siteId: "s2", organizationId: "org-a", name: "Second", defaults: { targetCountry: "台灣" } };
+    m.taken = ["感恩日記", "藝術治療"];
+    const ask = vi.fn(async (_p: string) => JSON.stringify({ topics: [{ day: 2, title: "t", keyword: "k" }] }));
+    await proposeMonth({} as never, { organizationId: "org-a", siteId: "s2", month: "2026-11", actor: "x" }, ask);
+    m.taken = [];
+    expect(ask.mock.calls[0][0]).toContain("這個客戶本月已排的關鍵字（不得再用）：\n- 感恩日記\n- 藝術治療");
+  });
+
   it("refuses a site of another organization before any AI call", async () => {
     m.site = { siteId: "s", organizationId: "org-b", name: "B", defaults: {} };
     const ask = vi.fn();
