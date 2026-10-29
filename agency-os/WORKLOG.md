@@ -1,4 +1,31 @@
 # Worklog
+## 2026-10-30（續2）金流改雙軌：綠界個人會員（台灣卡）＋PayPal（海外卡），取代 10-25 的 WCS＋TapPay；操作者是個人、無統編（Claude）
+
+**觸發**：操作者問「線上刷卡只有 TapPay 嗎？只能用公司名義嗎？我個人沒有統編」→「國內外都要刷的怎麼辦？」→ 選「綠界＋PayPal 雙軌」。
+
+**根因**：2026-10-25 決定 A（WCS＋TapPay，ADR 017 產品決定 #3）以公司身分為前提，沒確認操作者的法律身分。TapPay 網站刷卡的特約商店＝與收單銀行簽約（其服務條款定義），銀行收單要統編；App Store「TapPay 收款吧」個人可申請，但那是 iPhone 感應實體收款。
+
+**查證（web，2026-10-30）**：
+- 綠界個人會員：官方「準備資料」頁清單只要身分證正反面、同名存摺、已上線網站（中文、台幣、非 marketplace）、3 張環境照，無統編項（support.ecpay.com.tw/4862）；台灣卡 2.75%、每月上限 30 萬（第三方整理）；2023-01-01 起個人／商務會員不收海外卡，海外卡限特約（官方費率表 ecpay.com.tw/Business/payment_fees；特約設定費 5,000＋年費 13,000/年起，海外卡 3.5–3.8% 未稅，公告 nID=5250）。定期定額對個人是否開放：官方頁沒寫、第三方說含，開通時確認。
+- PayPal 台灣：個人可收海外款；台灣帳戶之間禁止交易；提領經玉山全球通，台幣提領免手續費（esunbank.com FAQ、paypal.com/tw help394）。
+- 稅：財政部稅務入口網——個人網路銷售月銷售額達起徵點須稅籍登記並在銷售頁揭露統編；2025-01-01 起門檻貨物 10 萬／勞務 5 萬（etax.nat.gov.tw press/3EYDDZV）。SaaS／代操＝勞務＝5 萬。
+- Stripe 台灣直接開不了；Lemon Squeezy／Paddle 是海外代理商（merchant of record），不是 WooCommerce 閘道，會換掉 aware-wave.com 收錢那扇門，排除。
+
+**決定 E（操作者）**：WCS＋綠界個人會員（台灣卡，信用卡＋定期定額）＋PayPal（海外卡，WooCommerce PayPal Payments，訂閱走 vault）；點數包走同一兩軌；結帳頁依客人分流。絆線：月收 NT$5 萬 → 稅籍登記拿統編 → TapPay 可申請、綠界可升特約，再評估收攏單軌。程式不改：4b-2 掛的是 WCS PHP action，與金流商無關；4b-6 改裝綠界＋PayPal；綠界退款只能在綠界後台做，Woo 訂單手動標退款或 `record-payment.mjs` 登記 `local` refund（同原選項 C）。
+
+**改了什麼**：
+- `agency-os/docs/architecture/decisions/017-entitlements-and-self-hosted-modules.md:198` 產品決定 #3 改雙軌＋絆線，aware-wave-store 外掛（原 wp-bridge）。
+- `agency-os/TASKS.md:322` 待決 1：A 劃掉，改決定 E＋下一步（4b-6 操作者後台）＋未驗證（綠界 WCS 外掛選擇、退款流程、外掛設定頁例子字串 `SettingsPage.php:101` 下次發版改）。
+- `agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-4.md` §待決 1 加 E 列＋決定說明；4b-9 演練步驟改綠界測試卡＋PayPal sandbox。
+- 同目錄 `data.mjs`（④ 段、4b-2、4b-6、現成方案評估列）→ `node build.mjs`＋`node check.mjs` ok → 監工台重新發布（artifact Htm4xqe362YM987Fo8YLCr v48、v49）。
+- `agency-os/reports/decisions/2026-10-25-customer-model-buy-vs-build.md:5` 加一行「已改」指標（表格不回改）。
+- `agency-os/memory/CONVERSATION_MEMORY.md:636`、`memory/daily/2026-10-30.md:17` 補註——**另一 session（8c395ba2）同時在改這兩檔，本 commit 不含，留 AO-CLOSE 一起進**。
+
+**驗證**：
+- REALTEST_WAIVED: DOC_ONLY -- 純文件與監工台資料；`node check.mjs` exit 0（5 ways, 9 steps, 2 open, page fresh）
+- REVIEW_WAIVED: DOC_ONLY -- 改後逐檔 sed 讀回；code-fence 無新增
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/docs,lobster-factory/packages | grep=TapPay | hits=17（扣 WORKLOG、reports/ao-close、reports/status、Composable 文件；17 筆皆為歷史列、本次新註、或已登記待改的 `SettingsPage.php:101`；`.claude/` 另 grep，只有 session 記錄）
+- 避免再發生：金流／法律身分類決定在 ADR 產品決定表寫明前提（「以公司身分為前提」這種前提要寫出來），前提變了整列重做，不補丁。
 ## 2026-10-30（續1）content 門上線：content.aware-wave.com（卡 step-8 C6；e62dc2fcd＋3f9bb4273 部署）（Claude）
 
 **觸發**：操作者 2026-10-30「快去做」＝ content 門上線（High：DNS、nginx、憑證、部署）。照 2026-10-24 續36／續39（video、design）的做法。手動提前部署。

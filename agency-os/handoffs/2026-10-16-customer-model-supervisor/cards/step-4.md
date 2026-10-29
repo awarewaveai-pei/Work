@@ -59,6 +59,10 @@ webhook route 下架（回 410）；`0105` 的 down 只在 view 過渡期內可�
 | C | WCS ＋ 綠界定期定額（cloudwp） | 外掛 NT$399/月且三年沒更新；退款要到綠界後台（退款事件改由操作者在 /ops/billing 人工登記 `local` refund） | 4b-2 退款 hook 不做，改 runbook 一行 |
 | D | 不買訂閱外掛：賣「12 個月預付」一次性商品，到期前 30 天寄信請客戶再買 | 零外掛費；沒有自動扣款，流失率高；`period_end`＝付款日＋12 個月 | 4b-2 只做 `woocommerce_payment_complete`；`subscription_canceled` 不會自動發生（客戶不續＝到期）；WCS 列全刪 |
 
+| **E（2026-10-30 決定）** | WCS ＋ 綠界個人會員（台灣卡，信用卡＋定期定額）＋ PayPal（海外卡，WooCommerce PayPal Payments，訂閱走 vault）；點數包走同一兩軌 | 綠界個人會員免設定費年費、台灣卡 2.75%；PayPal 跨境約 4.4%＋固定費、提領經玉山全球通；兩套訂閱引擎、兩個付款事件來源；台灣客人只能走綠界（PayPal 禁台灣帳戶互轉）；綠界退款要到綠界後台（同 C） | 4b-2 已做（WCS action，金流無關）不改；4b-6 改裝綠界＋PayPal；退款同 C 改 runbook 一行 |
+
+**2026-10-30 操作者決定 E**，取代 10-25 的 A：操作者是個人、無統編。TapPay 網站刷卡＝與收單銀行簽約的特約商店（服務條款定義），銀行收單要統編；App Store「TapPay 收款吧」個人可申請但那是 iPhone 感應實體收款。綠界 2023-01-01 起個人／商務會員不收海外卡，海外卡限特約（設定費 5,000＋年費 13,000/年起，海外卡 3.5–3.8% 未稅）。絆線：服務月銷售額達 NT$50,000 須稅籍登記拿統編（財政部 2025-01-01 起門檻貨物 10 萬／勞務 5 萬），屆時 TapPay 可申請、綠界可升特約，再評估收攏單軌。研究來源：WORKLOG 2026-10-30「金流改雙軌」。
+
 決定後第一件事：去金流商開定期定額／Token 扣款（審核 3–5 工作天起），**不卡程式**：4b-1、4b-3、4b-4 不等它。
 
 ### 待決 3　點數條款與預收會計
@@ -155,7 +159,7 @@ A／B 都要會計師一句話確認「收款開發票＋合約負債」；C 另
 
 ### 4b-9　真實付款演練（依賴 4b-6、第一個方案；收第一筆真錢前必做）
 - 為什麼：外掛（`aware-wave-store-plugin/tests/`，15 測試）與控制面（`lib/payments`、`lib/entitlements`）各自有測試，但 WordPress→控制面整條沒跑過；2026-10-25 prod `payment_events`＝0。
-- 步驟：aware-wave.com 建私密測試商品（訂閱 0 元試用＋NT$1 點數包，`_awarewave_plan_key`／`_awarewave_credit_units` 填好）→ 測試會員（email 已驗證）各下一筆，TapPay 用沙盒卡號 → 逐段看：Woo 訂單備註「已送 AwareWave event wc:…」、`payment_events` 有列、`/ops/billing` 出現合約、`organization_entitlements` active 列、錢包加點、首購自動建帳戶與設定密碼信到信箱、我的帳號「進入」一鍵進門、門內用一次付費功能後 `entitlement.usage` 有列 → 全額退款點數包只退未用 → 取消訂閱後寬限 7 天到期 → WCS 後台手動觸發一次續扣，續約事件到達。
+- 步驟：aware-wave.com 建私密測試商品（訂閱 0 元試用＋NT$1 點數包，`_awarewave_plan_key`／`_awarewave_credit_units` 填好）→ 測試會員（email 已驗證）各下一筆，綠界用測試環境卡號、PayPal 用 sandbox 帳號各一筆 → 逐段看：Woo 訂單備註「已送 AwareWave event wc:…」、`payment_events` 有列、`/ops/billing` 出現合約、`organization_entitlements` active 列、錢包加點、首購自動建帳戶與設定密碼信到信箱、我的帳號「進入」一鍵進門、門內用一次付費功能後 `entitlement.usage` 有列 → 全額退款點數包只退未用 → 取消訂閱後寬限 7 天到期 → WCS 後台手動觸發一次續扣，續約事件到達。
 - 驗收：每段一行實際輸出寫進 WORKLOG（REALTEST）；任一段不符 → 開修，修完整條重跑。
 - Rollback：外掛設定頁關「送付款事件」；測試帳戶與列用 `record-payment.mjs` 反向登記，不刪列。
 

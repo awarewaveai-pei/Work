@@ -2,6 +2,8 @@
 
 Mode: 直接決策（非 /decide 面板）。操作者「查清楚 我們寫得要死要活得 還一堆漏洞」。待操作者確認。
 
+> 2026-10-30：下表「訂閱收款 WCS＋TapPay」的金流已改為綠界個人會員（台灣卡）＋PayPal（海外卡）雙軌——操作者是個人、無統編，TapPay 網站刷卡要經收單銀行；WCS 不變。正本 ADR 017 產品決定 #3、TASKS 待決 1。
+
 ## 問題
 ADR 017 §0「業界對照」（`docs/architecture/decisions/017-entitlements-and-self-hosted-modules.md:40`）只照抄成熟產品的模型，沒評估直接採用。現有自寫量（2026-10-25 量）：`lib/entitlements` 1,243 行＋測試 1,795、`lib/payments` 519＋244、`lib/accounts` 525、`aware-wave-store` PHP 1,614；10/16 起相關 WORKLOG 44 則。
 
