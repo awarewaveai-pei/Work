@@ -141,7 +141,7 @@ export const STEPS = [
       { id: '4b-4', plain: 'WordPress 一次性碼進產品門：next-admin 端做好（只給 email 已證明的帳戶、防登入固定），按鈕在外掛 4b-2；設密鑰才開', status: 'done', commit: '125cdad43' },
       { id: '4b-5', plain: '點數只付已持有功能（改 can() 點數分支，High）', status: 'done', commit: '81f81cf03' },
       { id: '4b-9', plain: '真實付款演練：0 元試用與沙盒卡號各一筆，從 WordPress 結帳一路驗到開通、加點、一鍵進門、扣點、退款與取消（等 4b-6 與第一個方案）', status: 'todo' },
-      { id: '4b-10', plain: '員工後台給／收某客戶的產品（贈送、只開部分產品）：現在只能改資料庫或 record-payment.mjs，沒有頁面', status: 'todo' },
+      { id: '4b-10', plain: '員工後台給／收某客戶的產品：客戶頁「帳務」分頁勾選＝贈送整個產品、取消＝收回，代理權（能不能賣）分開勾；只有擁有者／管理員，每次留稽核；只開贈送，合約仍走付款（0143 已套 prod 2026-10-29）', status: 'done', commit: '66b612ead' },
       { id: '4c-4', plain: '賣家：代理權（<產品>.resell）只看賣家帳戶的權利列，不經 can()（ADR 017 決定 #12）', status: 'done', commit: '38a8198fb' },
       { id: '4c-1', plain: '賣家：收銀台登記表 seller_sites（0133，已套 prod 2026-10-25）；aware-wave.com 是第一列，付款照舊', status: 'done', commit: '830dd301e' },
       { id: '4c-2', plain: '賣家：付款與「進入」按鈕都用該網站自己的鑰匙驗章，網站決定賣家，沒代理權的網站開不了帳戶；員工頁 /ops/sellers、總帳多「賣家」欄與每月各賣家合計（0140、0141 已套 prod 2026-10-29）', status: 'done', commit: 'b22ce2277' },
