@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-10-26 23:37:09
+- Generated: 2026-10-30 01:27:53
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -32,14 +32,12 @@
 - [ ] Soulful 課程類開 AI 自動回覆：考試閘已寫好（只有考過的意圖能開自動，見 WORKLOG 2026-10-16（續11））。剩：部署 → 匯入 `agency-os/tenants/company-soulful-expression/core/cs-eval-courses_services.json`（30 題，操作者看過）→ 客服分頁「開始考試」→ 過了操作者自己按「自動」；沒過看逐題結果決定（價格／時間題預期會失敗：AI 說「沒有資料」不算轉真人）。
 - [ ] **危機訊息：真人接手中也回一句（0104）上線後實測** — 部署後 John Doe 在真人接手中的對話傳「我想死」→ 預期 Telegram 一則＋客人收到三行專線句；30 分鐘內再傳 → 只有 Telegram。程式＋`0104_cs_crisis_holding_replies` 已上正式（2026-10-17）。建議模型：Opus 5.5
 - [ ] 產品決定：知識庫內容／模型／prompt 變動要不要讓「考過」失效並自動重考（計畫 §5.2 CI 閘）。現況不失效；網站每週重爬，若失效又沒自動重考，自動回覆每週會退回草稿。見 WORKLOG 2026-10-16（續11）「沒涵蓋」。
-- [ ] Soulful 常見問答的價格／時間／地點／報名是**測試值**（WORKLOG 2026-10-16（續22））：對外宣傳前操作者給真值，在客服分頁「常見問答」改 `pricing`／`schedule`／`location`（＋ -en）四條。
+- [ ] Soulful 常見問答正式資料待定：2026-10-27 已將正式環境價格／時間／地點／報名的中英測試值共 8 條撤下，改為「尚未定案、轉真人」；操作者確認正式資料後，再到客服分頁更新這 8 條（見 WORKLOG 2026-10-27（續4））。
 - [ ] Chatwoot 基本設定（`lib/cs/chatwoot-baseline.ts`）：自動結案＋結案巨集已**自動套用**（存個人 token 時一次＋每日排程 `cs_chatwoot_baseline`，WORKLOG 2026-10-16（續29））。剩：①操作者到 `/ops/schedules` 勾 Soulful 這一格（預設關）②標籤、預設回覆、收件匣營業時間仍手動，有第二個客服客戶時再納入。
-- [ ] **【從舊 EU-origin 項拆出，仍待辦】`awmainwp` 帳號名已外洩（320 次針對性嘗試），改名或加 2FA** — 需操作者在 MainWP 後台執行，與主機拓樸無關。
 - [ ] **HCI-30 C6 真實登入串接計畫（2026-09-17 `planner` 產出，審閱中，未授權執行）** — 12 個 Task Prompt，Task 3/5/6/7/9 為 High-risk STOP。計畫：`Projects/internal/hci30/docs/HCI_C6_REAL_LOGIN_PLAN.md`。C6 仍為 DEFERRED，本項只記錄計畫已產出，不代表開工授權。**2026-09-18 補記（Task 10 critic 覆審 Major，未修，已追蹤）**：`app/server.mjs` 的既有「尚無 auth 層」缺口，因 Task 10 新增 `POST /api/hci/v1/seeds` 而具體化——該端點無 rate limit，由外部輸入 `targetUrl` 驅動後端對任意外部網址發真實 fetch，暴露前需先解決（rate limit 或本 C6 計畫其中之一）；目前僅本機單一受信任操作者使用，未對外暴露，非阻塞。詳見 WORKLOG 2026-09-18（續5）。
 - [ ] **【2026-08-26 開出｜營運｜搬站前必處理｜⚠️ 2026-08-30 稽核：疑似 MOOT，需操作者確認】soulful 週備份近 10 次有 5 次失敗，最新一次就是失敗** — 現況查證：`BACKUP_AUTO_STATUS.json` 最新 3 筆已全部 `Succeeded`（2026-08-26 起），`last_failure`（2026-08-24）已不是最新事件，本項描述的即時狀態已經過期。**更根本的是**：這條追的是 Hostinger 時代 WPvivid→Google Drive 那條備份鏈；Soulful 已於 2026-08-28 正式切換 Hostinger→ks-aw-01（`WORKLOG.md` "🎉 Soulful 正式切換完成"），現行備份走全新的 `ks-aw-01-backup` 管線（已實測 PASS，見 WORKLOG 2026-08-27）。舊 WPvivid 鏈的失敗模式**很可能隨舊主機一起結束**，但 WPvivid 外掛在新機上是否還在跑、是否該完全停用，本次稽核未查證，故列 MOOT 疑似而非直接關閉——需操作者確認新機上是否還留著這條舊備份路徑。
 - [ ] **【未開始｜先預留】Composable AI Commerce OS** — 藍圖已吸收為參考素材（`agency-os/docs/Composable AI Commerce OS/`，含 Master Plan / Implementation Roadmap / LEGO Documentation Pack；absorbed via commit `97cdea3ed`）。操作者 2026-09-05 明示「之後要做，先預留」，**目前不動工**，勿主動排入排程；待操作者明示啟動再展開任務拆解。
 - [ ] **【2026-09-07 開，低優先，操作者決定】兩個未決**：① all-users Start Menu 捷徑（`%ProgramData%\...\Docker Desktop.lnk`）繞過守衛，需一次性 elevated session 手動 retarget（runbook 已附指令，非本次自動執行——腳本本身維持 unelevated）；② `run.socket-archive-*` 封存目錄保留政策（目前 rename-only 永不刪，已 5 個，各 0 bytes——維持或 14 天後清）。
-- [ ] **【site-watch｜客戶站】建 staging 會把客戶的正式網址蓋成 staging 網址 → site-watch 改巡 staging、正式站沒人看**
 - [ ] 客人最後訊息 >24h 後無法回覆（`ENABLE_MESSENGER_CHANNEL_HUMAN_AGENT`=false）；要開需 Meta App Review `HUMAN_AGENT`＋等上游 PR #15932 釋出（現版開了會連 bot 回覆都標 tag）。
 - [ ] **客戶自助登記 WordPress 站（現在只限員工寫網址）的前置：站別網址的每個使用端都要能承受客戶給的網址**
 - [ ] **Codex 佇列的驗收 check 在沙箱外跑 Codex 寫的程式**
@@ -74,7 +72,6 @@
 - [ ] **【2026-09-05 開出｜P0/P1｜Media Production LEGO Platform】統一影片、短劇、字幕、實拍 QA 與網站／社群交付** — 正本：[`docs/video_generator/MEDIA_PRODUCTION_LEGO_PLATFORM_PLAN.md`](docs/video_generator/MEDIA_PRODUCTION_LEGO_PLATFORM_PLAN.md)。
 - [ ] **【進行中｜軟體先行·U0–U5 + widget U4 完成並 prod live，剩 U6 gated】全自動客服系統**
 - [ ] **【進行中｜POD 一鍵自動上架】設計圖 → Woo + Printful 多款多色全自動** — 計畫 SSOT = `lobster-factory/docs/PLAN-pod-one-click-auto-publish-design-to-woo-printful.md`（5 階段）。目標：操作者**只做設計圖**、一鍵自動 合成商品圖(白背/2模特/平拍,分長短袖,<100KB) + 建 3 款 Woo 草稿(Gildan 2400 **長袖** id57 / Stanley-Stella STTU169 id456 / Gildan 5000 id438，各 4 色 × S-2XL) + Printful native 建品綁設計稿。
-- [ ] **【進行中｜內容引擎積木化】搜尋積木 registry 已 live，剩來源/UI/第二批** — **2026-10-25：管線部分（舊 §0.5 B 段 P5／P6／P9）由 `agency-os/docs/AUTO_CONTENT/AUTO_CONTENT_EXECUTION_PLAN.md` 接手，進度看那邊的監工台；本條只剩積木來源／UI。Perplexity 積木已於 2026-10-25 退役（`6cfcba142`，操作者不再使用），即時搜尋改 `search/serper`（`lib/content/trending-sources.ts:289`）；下文 perplexity 字樣是 06-16 當時的紀錄。** ✅ **已完成並部署（2026-06-16，commit `e336d5da`）**：後端積木註冊骨架 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/content/blocks/registry.ts`（`register/byKind/listAll/geoMatch` + `ContentBlock` 契約，前端 `AB.registerBlock` 後端鏡像）+ 搜尋家族 5 source 自註冊 `lib/content/trending-sources.ts`（google-news/reddit/ptt/perplexity/env-custom-rss）+ 契約 SSOT `lib/content/blocks/README.md`（修好 `public/vector-editor.html:902` 斷裂參照）。
 - [ ] **wp-bridge plugin 補 `/product` dry_run 支援**：現只有 /option 有（RestController:167）；2026-06-11 一鍵上架測試因此真建了 draft #7164。plugin 端改 → bump AWBRIDGE_VERSION → release flow（WP-BRIDGE-RELEASE-RUNBOOK）。
 - [ ] **wp-bridge 續做 operation：featured image** / update-existing-post / product update+delete（v0.7.0 只做 product CREATE，其餘端點仍待補）。
 - [ ] **【POD Studio 自建動工】** plan=`.claude/plans/pod-studio-p2a-p4-execution-PLAN.md`；藍本=`lobster-factory/docs/POD_STUDIO_ROADMAP.md`。✅
@@ -87,9 +84,7 @@
 - [ ] **【2026-06-05 開出】塔羅牌工具 → MEGA → WooCommerce 三階段路線圖**（操作者 2026-06-06 確認方向） — 終點：全部接 WooCommerce 賣貨（參考同事 jonjonesai 的 MEGA「Mass E-commerce Generator & Automator」Streamlit 工具：Research→Idea→Generate(多模型並行)→Select→Process(去背 removal.ai/Tinify)→Mockup(Printful)→Published(WooCommerce+Claude 文案+定價)）。
 - [ ] **SearchContent vertical SC-Phase 1（Domain Foundation）：把 122 筆 PROPOSED registry 記錄逐一寫成 contract 並升入全域 registry**
 - [ ] **【2026-09-06 HCI_CONFIDENCE_SPEC.md critic 覆審 C1 揭露；同日第八輪，操作者「你做最完美的決定」授權，兩問中的一問已解——「dimension 層 cross-method disagreement 該不該往上傳」仍 OPEN】disagreement flag 從 dimension 層傳到 domain 層的路徑** — 原文揭露兩個不同問題混在一起：①「domain 內兩個維度自己互相不同意」（inter-dimension spread）②「dimension 層的 cross-method disagreement 該不該往上傳」（`combineMethodFindings` 輸出的 `disagreement` 欄位餵進 `rollupTrustDomains` 會被靜默丟棄）。**①已解**：`rollupTrustDomains` 新增 `dimension_disagreement: boolean`（同日第八輪，`packages/intelligence/rollup-trust-domains.mjs`），比較該 domain 兩個已賦值維度自己的 rank spread（獨立命名常數 `DOMAIN_DIMENSION_SPREAD_THRESHOLD=2`，故意不跟 `combineMethodFindings` 共用同一常數——兩者比較的對象結構不同，`dimension-score.mjs` 已有「不強行共用巧合相似的比較」先例）；gate 4 白名單同步加欄位（第二次修訂 gate 4 契約，第一次是 `9888bd5d7` 的 ADR-0032 band 修正；`HCI_CONFIDENCE_SPEC.md` 原文預期的「不會再碰」已不成立，已在該檔更新揭露，同時修正該檔一處把此次誤算成「第三次」的筆誤）。coverage=PARTIAL（只有一個維度）時公式自然回傳 `false`，無需特判。**②仍 OPEN，未被①解答**：`dimension_disagreement` 純粹從兩個維度已賦值的**值**計算，對任一維度自己的值是否來自互相矛盾的 method findings零可見性——一個 `combineMethodFindings` 回傳 `disagreement=true` 的維度，仍可能 roll up 進一個 `dimension_disagreement=false` 的 domain（反之亦然）。真正的「flag 本身要不要往上傳」設計問題留給下一次真有 trust-read endpoint consumer 逼出決定時處理。驗證：154→161 Node assertion（詳見同日 WORKLOG），mutation-check-node-gates.ps1 24→27 全殺。
-- [ ] **認知主權平台：步驟 2 已併進 main（未 push）；接下來儲存切換 W1–W3（PostgreSQL 每區域一台）→ 步驟 3+4 → 才問上線；Codex 可照接手包接手** → handoffs/2026-10-04-1400-cos-step2-merged-storage-next.md
 - [ ] **`decision.eisenhower_matrix` 內聯 provenance 正規化改呼叫共用函式**
-- [ ] **COS Codex→Claude 接手（未完成；主線勿合併）**：隔離樹 `D:/tmp/cos-codex` 的卡 51 已暫存未提交，`D:/tmp/cos-pg` 的 W1–W3 被實測擦除資料遺失擋住；全情見 `agency-os/handoffs/2026-10-08-cos-codex-to-claude.md`。根因/卡點：`ai_lego/platform/exports/render.py:153` 的固定字數換行裁切 PDF 中文；PG `ai_lego/data/repositories/project_source_repository.py:765` 先 unlink CAS 再 commit，故障注入得 `row_survives=True blob_survives=False`。已試：卡 51 局部測試 8+14+43+20+109 綠，5 突變紅；真 PG 重現資料遺失。**下一步**：① 讀交接包，核對兩樹 `git status` 與 queue 過期 `running` ② 修卡 51 排版/已讀/並發並完成私有索引提交、Claude review ③ 以可重試擦除流程修 PG P0 並做故障回歸，雙重審查和真 PG 過閘前不 merge／push／部署。
 - [ ] **【基礎設施｜小】主機 nginx 有 repo 沒有的 `hci.aware-wave.com` server 區塊（漂移）** — `/root/lobster-phase1/nginx/default.conf` 含 hci 區塊，repo `lobster-factory/infra/hetzner-phase1-core/nginx/default.conf` 沒有；任何人以 repo 檔覆蓋主機檔會讓 hci 站下線。修：把該區塊收進 repo（先比對主機現值）。2026-09-26 PI-b 分流時發現，詳 WORKLOG 2026-09-26（續34）。
 - [ ] **【MainWP】建站自動接上 MainWP：bridge 已修好（2026-09-24），剩 next-admin 部署（DEPLOY_HOLD）＋真建站 E2E**
 - [ ] **【2026-09-11 開出｜KB K1】per-model partial HNSW 是否真的被用到，未經 EXPLAIN 證實** — 0072 加了 `idx_cs_chunks_hnsw_te3s`（`WHERE embed_model = 'text-embedding-3-small'`），0051 的全表 `idx_cs_chunks_embedding` 仍在，兩個 HNSW 同時維護 = 雙倍寫入成本；而 `p_model` 是 bind parameter，partial index 未必會被選中。塞 ~2000 列跑 `EXPLAIN (ANALYZE)` 確認後再決定刪哪一個。順帶：0051 的 `bm25_tsv` 欄與 `idx_cs_chunks_bm25` 至今無人寫也無人讀（死欄位＋死索引），一併處置。
@@ -105,8 +100,7 @@
 - [ ] app.aware-wave onboarding/provisioning IA 重整 — Phase 1 退役 ops-console（已規劃、Q1-Q3 已決、未動 code）+ verify intake 觸發建站 + Phase 2/3 → handoffs/2026-06-05-2028-onboarding-ia-consolidation.md
 - [ ] **【🟠 Major M2-M4/M7-M10 + 🟡 Minor m2-m6/m8-m11】**
 - [ ] **【2026-08-29 開出｜未開始】`status.aware-wave.com` = 現有 `uptime.aware-wave.com`（Uptime Kuma）對外開放 view** — 不重建，SSOT：`docs/edge-and-domains/PRODUCT_DOMAIN_IA_PLAN.md` §2。做法二選一：(a) Kuma 內建 public status page 功能開一個 group，另建 CNAME `status`→同一 Kuma；(b) 直接讓 `uptime.aware-wave.com` 兼公開用（需確認現有 dashboard 沒有機敏資訊外露）。
-- [ ] **AUTOCONTENT-GAP 全自動內容管線缺口：「搜集熱搜」與「提案題目」兩步沒接上排程（2026-10-26 查證）**：交接全文（自足、只讀這一檔）`agency-os/handoffs/2026-10-26-autocontent-gap.md`。**下一步**：照該檔 §5 第一步開始（卡片全文在 §7）。建議模型：Opus 5.5 實作。**操作者待辦**：申請 YouTube Data API key（免費額度）放進 `mcp/user-env.ps1` 與主機 env `YOUTUBE_API_KEY`，P9.1 的 YouTube 熱門來源才會啟用；沒 key 不擋其他卡。
-- [ ] **ADR 017「賣家」4c：收銀台可裝在任何網站**（操作者 2026-10-25 定方向；設計卡 `agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-4-seller.md`，commit 6726922eb）。**D1–D5 已決（操作者 2026-10-25，全部照★）**：每站 Ed25519 公鑰／AwareWave 目錄＋賣家自有方案／`<product>.resell` 權利列／月結報表人工發票／一站一帳戶；寫入 ADR 017 產品決定 #12 與順序 4「4c」。**4c-4 已推（38a8198fb）、4c-1 `0133_seller_sites` 已套 prod（WORKLOG 2026-10-25 續68、續70）。** **下一步**：4c-2 next-admin（`lib/payments/sites.ts`、`hmac.ts`／`woo-billing.ts` 查表驗章、`wp-customers.ts` 加 site、`awarewave-wp.ts` 站鑰匙、`/ops/sellers`、0130 總帳賣家欄）→ 4c-3 外掛代理商模式（Ed25519 產鑰、設定頁 key_id）。每張卡各自 commit、Acceptance 在卡上。回報操作者一律繁體中文。建議模型：Opus 5.5（卡寫死）→ 可派 `fullstack-engineer`／Codex。
+- [ ] **ADR 017「賣家」4c：收銀台可裝在任何網站**（操作者 2026-10-25 定方向；設計卡 `agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-4-seller.md`，commit 6726922eb）。**D1–D5 已決（操作者 2026-10-25，全部照★）**：每站 Ed25519 公鑰／AwareWave 目錄＋賣家自有方案／`<product>.resell` 權利列／月結報表人工發票／一站一帳戶；寫入 ADR 017 產品決定 #12 與順序 4「4c」。**4c-4 已推（38a8198fb）、4c-1 `0133_seller_sites` 已套 prod（WORKLOG 2026-10-25 續68、續70）；4c-2 已推（b22ce2277，0140／0141 已套 prod，WORKLOG 2026-10-29 續12）；4c-3 外掛 1.1.0 已發版並升級 aware-wave.com（2026-10-29，WORKLOG 續13）；4c-2 已部署（77fd74a72）。** **下一步**：第一個代理商站裝 1.1.0、設定頁產鑰匙 → `/ops/sellers` 登記公鑰 → 0 元試用訂單驗到 `/ops/billing`。待操作者裁決：aware-wave.com 是否也照 `loginSources` 限門（續12 C2）；月結改依付款時間需事件帶 `paid_at`（續12 剩餘①）。每張卡各自 commit、Acceptance 在卡上。回報操作者一律繁體中文。建議模型：Opus 5.5（卡寫死）→ 可派 `fullstack-engineer`／Codex。
 - [ ] **排程頁收尾＋社群成員修正上線（schedules-page-closeout）**：排程頁已上線 prod `38102e22f`（費用、伺服器詳細、修改紀錄修正 `7b5381d80`）；社群「成員」結果改在區塊內顯示 `888de6aad` 已推未部署。卡點：今晚 03:00 自動部署的測試閘會被 `lib/system-modes/__tests__/production-change-coverage.test.ts` 擋——`app/api/ops/clients/[slug]/cs-config/chatwoot-token/route.ts`（CS session `2abb9acd5`）沒呼叫 `checkProductionChangeAllowed`。**下一步**：① 操作者在 https://app.aware-wave.com/ops/schedules 改一格後跑 `ssh -p 58122 ubuntu@145.239.195.47 "sudo docker exec supabase-db psql -U supabase_admin -d postgres -tA -c \"select event_type, created_at from ops_audit_events where event_type='client_schedule_updated' order by created_at desc limit 3\""`，有列＝修改紀錄修正生效 ② 把 `agency-os/docs/operations/SCHEDULES_PAGE_PLAN.md` §0 與本檔「app.aware-wave.com 排程頁」條目改完成、移到已完成歷程（共享檔走 `scripts/git-partial-worktree-commit.py stage`）③ 確認 CS session 修好 chatwoot-token 的 gate 測試後，部署帶上 `888de6aad`，操作者在 social 設定→成員用 awarewaveai@gmail.com 加入再移除驗收 ④ 開帳號功能在 session local_108dbe7d 進行中，不重做。證據：WORKLOG 2026-10-16 續3、續6。建議模型：Opus 5.5
 - [ ] **Soulful 客服：課程類考試第 3 次 25/30 沒過（危險誤答 0、該轉真人 10/10）**：剩 5 題＝檢索排序 4＋分類 1，逐題見 WORKLOG 2026-10-17（續20）。**下一步**：等網站內容做好 → 做下一條「每段加一句說明」→ 重考；#26「五生理論是誰提出」分到 other，可在 courses_services 說明加「課程背後的理論與由來」（操作者決定）。另：操作者在 `/ops/schedules` 勾 Soulful「Chatwoot 基本設定檢查」（自動結案目前關）。建議模型：Opus 5.5
 - [ ] **（等 Soulful 網站內容做好才開工）知識庫：每段加一句說明後重建索引**：**原因**＝客人問「適合誰」「要用什麼材料」這種籠統問題時，系統在長頁面裡找不到對的那一段（例：五生頁 91 段，「適合對象」段排第 16，AI 只拿前 4 段，就回答「資料沒寫」）；課程類考試 #3 有 4 題因此失敗。**目的**＝讓 AI 找得到答案所在的段落，課程類考試過 95%，AI 才能直接回答客人，不必每題都轉真人。觸發＝操作者說網站內容做好、重新匯入之後。做法＝匯入時 Haiku 替每段寫「哪一頁、哪一節、講什麼」存 `contextual_prefix`，嵌入用「說明＋原文」，要給 `lib/cs/llm.ts` 加 prompt caching；Soulful 一次約 1 USD。完成＝程式＋測試、部署前問操作者、量考試 #3 那 4 題排名、重考逐題回報、確認保險／證照仍轉真人。細節 WORKLOG 2026-10-17（續20、續21）。建議模型：Opus 5.5
@@ -348,51 +342,31 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-10-26.md
-# Daily Note - 2026-10-26
+## 5) memory/daily/2026-10-30.md
+# Daily Note - 2026-10-30
 
-## Done today
-
-- 本收尾窗口自2026-10-25T21:47:37Z：workflows漏洞15→0、deepmerge豁免刪除、136測試與型別檢查通過；正式Trigger20261026.3及真實任務7/7。提交392d7fda8，詳細證據WORKLOG續24／25。
-- 同期提交：watchdog exit126修復與正式套用；deny鏡像quote解析、部署鎖檔安裝；影片5錯誤與字幕環境修復上線、D11字幕來源定案；AUTO_CONTENT P9.1每日熱搜與新來源、P9.3/P9.5卡片；影片V1–V7拆卡，監工台暫停。
-- 補收尾窗口自 2026-10-25T20:41:21Z（台灣 10/26 04:41）起：前次正式報告與證據已提交；109 份已完成文件／證據以 `483679655` 推送。私有 index 路徑錯誤造成的本地 commit `cbb63162f` 未推送且已復原；18 項 quarantine 已由 Claude 逐一審查後結案（WORKLOG 續10，操作者確認）。Claude 的 git 原生防大量刪檔檢查已提交 `d161d2ae9`／`7681287eb`。
-- 覆蓋本收尾窗口（上次 AO-CLOSE 2026-10-24T20:53:07Z 起）：完成 0128／wp-bridge credit pack 無期末、YouTube P7 真實影片、Trigger host cron／告警 C2–C6、0133–0137 控制面寫入收窄與多項 next-admin／billing／content 修正。
-- 修復 app、Social、video、portal 及共享產品入口的 nginx `Request Header Or Cookie Too Large`；safe-infra-patch、靜態測試、7-door public probe、Chrome 驗證均通過，正式備份可回滾。
-- 建立 AUTOCONTENT-GAP 自足 handoff；YouTube Data API key 留為操作者待辦。完成本輪 WORKLOG、memory 與 archive 收尾資料準備。
+## Done today（視窗 2026-10-26 15:37Z → 2026-10-30，AO-CLOSE）
+- ADR 017 賣家 4c-2：付款與 wp-handoff 由簽章網站自己的鑰匙驗（`lib/payments/sites.ts`）、網站決定賣家、代理權在開帳戶前查、網站編號鍵帶命名空間；0140 拿掉 `customer_identities.site_id` 預設、0141 總帳加賣家；critic 3M、Codex 兩輪修完；`b22ce2277`，提前部署 `77fd74a72`（WORKLOG 2026-10-29 續12、續13）。
+- 4c-3 外掛 aware-wave-store 代理商模式（`9dc896e3d`，另一 session）→ 1.1.0 發版、升級 aware-wave.com；1.2.0 送 `paid_at`。
+- 月結依買家付款月份：0142（`billing_try_timestamptz`＋7 天窗）、`/ops/billing` 同時顯示上個月／這個月並標「8 日起定案」；Codex 三輪 4 項（`24c1d9973`，續14、續17）。
+- 4b-10 員工客戶頁給／收產品與代理權（`66b612ead`，0143）；真 DB 測試接進 harness `--suite staff-grants` 6/6（`1b1e18f7e`）。
+- content.aware-wave.com 產品門上線（`e62dc2fcd`、`3f9bb4273`；2026-10-30 續1）。
+- `/verify` 紅閘兩個：YOUTUBE_API_KEY 匯入 vault＋登記掃描基準；AUTOCONTENT-GAP 過期歸檔參照改 archive-only。
+- 其他 session：影片 V1–V7、Whisper 自架、字幕雙引擎；自動內容 P9 完成、退回重做；wp-login Cloudflare challenge。
 
 ## Current state
-
-- 套件安全掃描total/high/critical/moderate均0；Trigger正式20261026.3。下一輪以TASKS與執行計畫為準，影片與內容卡片尚未全部實作。
-- nginx 入口已恢復；portal 進入預期的客戶帳號限制流程，不是 nginx 400。
-- 05:29 檢查時 main 與 origin/main 同為 `483679655`，9132 個追蹤檔一致；其後已納入防大量刪檔檢查。收尾以本次實際 git 狀態為準，不把某一刻乾淨誤當成所有 session 永遠沒有新工作。
-- 仍有多項產品、法遵、瀏覽器驗證與操作者決策待辦，詳見 `agency-os/TASKS.md`。
+- 正式機 next-admin `3f9bb4273`；migration 已套到 0143；aware-wave.com 外掛 aware-wave-store 1.2.0（HMAC，無 site key id）。
+- 監工台 https://claude.ai/artifact/Htm4xqe362YM987Fo8YLCr 第 47 版。
 
 ## Next steps
-
-- 依 `agency-os/TASKS.md`：員工逐工具權限 11-01 檢查、DMARC 第三階段、社群 V1／Meta 審核、ADR 017 4b 對帳與 seller 4c-2。
-- 操作者申請 YouTube Data API key，依 `agency-os/handoffs/2026-10-26-autocontent-gap.md` 接續 P9.1；不因缺 key 阻擋其他來源。
-- 重新整理原本入口分頁；若再見 400，保留 request path 與時間，不要貼 Cookie 值。
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:237e34c70dfe5c89f8c178aadacfade11c33f8ceacdc2015da9d7da3b40068d2 -->
-
-### Codex 2026-10-26 05:45
-
-- **完成（一句）**: 補收尾：109 份已完成文件已推送、18 項由 Claude 審查結案；本地誤提交已復原，完整紀錄見 WORKLOG 2026-10-26 續10／續11。
-- **變更路徑**:
-  - `agency-os/WORKLOG.md`
-  - `agency-os/memory/CONVERSATION_MEMORY.md`
-  - `agency-os/memory/daily/2026-10-26.md`
-  - `agency-os/reports/ao-close/2026-10-26-0441.md`
-- **Git**: `483679655`、`d161d2ae9`、`7681287eb`；本次文件補收尾由 ao-close.ps1 提交。
-- **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**: 原有產品待辦以 TASKS.md 為準，本次沒有新產品完工宣告。
+- 操作者：4b-6（WCS＋TapPay）、定第一個方案 → 4b-9 真實付款演練；第一個代理商網站（4c-3 收尾）；決定 aware-wave.com 是否照 `loginSources` 限門。
+- content 門登入後四頁用真實帳號看一次（瀏覽器未驗）。
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-10-26 23:37:01`
+- Time: `2026-10-30 01:19:17`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -402,8 +376,8 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20261026-233645.md`
-- Closeout: `reports/closeout/closeout-20261026-233700.md`
+- Health: `reports/health/health-20261030-011854.md`
+- Closeout: `reports/closeout/closeout-20261030-011916.md`
 
 ## Action
 - No blocking issue detected.
