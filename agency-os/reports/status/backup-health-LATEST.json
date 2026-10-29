@@ -1,7 +1,7 @@
 {
     "overall":  "PASS",
     "measured":  4,
-    "generated_utc":  "2026-10-29T02:17:36Z",
+    "generated_utc":  "2026-10-29T16:29:36Z",
     "sg":  {
                "host":  "145.239.195.47",
                "ok":  true,
@@ -16,7 +16,7 @@
                "oldest_time":  "2026-10-22 02:00:02",
                "backup_age_days":  "0",
                "verify_result":  "PASSED",
-               "verify_time":  "2026-10-28T02:30:05Z"
+               "verify_time":  "2026-10-29T02:30:05Z"
            },
     "eu":  {
                "host":  "145.239.195.47",
@@ -27,14 +27,14 @@
                "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin|30 2 * * * root /root/lobster-phase1/scripts/cron-run.sh stack_backup \u0027BACKUP_DIR=/root/backups-stack /root/scripts/backup-eu-stack.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261\u0027|0 3 * * * root /root/lobster-phase1/scripts/cron-run.sh stack_backup_verify \u0027BACKUP_DIR=/root/backups-stack /root/scripts/verify-backup-eu.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261\u0027|17 2 * * * root /root/lobster-phase1/scripts/cron-run.sh cognitive_db_backup \u0027COGNITIVE_DB_PASSWORD_FILE=/root/cognitive-db-password COGNITIVE_DB_BACKUP_DIR=/root/backups/cognitive-db COGNITIVE_DB_BACKUP_KEEP_DAYS=7 /opt/cognitive-os/Projects/internal/cognitive-engineering-os/ops/cognitive-db/backup-cognitive-db.sh \u003e\u003e/var/log/cognitive-db-backup.log 2\u003e\u00261\u0027",
                "retention_days":  "7",
                "retention_source":  "static",
-               "backup_size":  "9.1G",
-               "latest_time":  "2026-10-28 02:33:58",
-               "oldest_time":  "2026-10-21 02:33:54",
+               "backup_size":  "9.2G",
+               "latest_time":  "2026-10-29 02:33:58",
+               "oldest_time":  "2026-10-22 02:33:56",
                "backup_age_days":  "0",
                "verify_result":  "PASSED",
-               "verify_time":  "2026-10-28T03:00:37Z"
+               "verify_time":  "2026-10-29T03:00:37Z"
            },
-    "generatedAt":  "2026-10-29T02:17:18.6934176Z",
+    "generatedAt":  "2026-10-29T16:29:19.5152407Z",
     "ks_aw_01":  {
                      "host":  "145.239.195.47",
                      "ok":  true,
@@ -45,17 +45,17 @@
                      "retention_days":  "7",
                      "retention_source":  "static",
                      "backup_size":  "8.7G",
-                     "latest_time":  "2026-10-29 02:16:05",
+                     "latest_time":  "2026-10-29 02:17:41",
                      "oldest_time":  "2026-10-21 02:17:33",
                      "backup_age_days":  "0",
                      "verify_result":  "PASSED",
-                     "verify_time":  "2026-10-28T02:45:21Z"
+                     "verify_time":  "2026-10-29T02:45:21Z"
                  },
     "fatal":  false,
     "coverage":  {
                      "ok":  true,
                      "problem":  "",
-                     "generated_at":  "2026-10-28T03:30:07Z",
+                     "generated_at":  "2026-10-29T03:30:05Z",
                      "overall":  "PASS",
                      "fails":  [
 

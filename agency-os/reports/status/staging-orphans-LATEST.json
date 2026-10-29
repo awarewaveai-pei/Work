@@ -1,13 +1,13 @@
 ﻿{
     "overall":  "OK",
     "measured":  2,
-    "generated_utc":  "2026-10-29T02:19:13Z",
+    "generated_utc":  "2026-10-29T14:55:12Z",
     "findings":  [
                      {
                          "slug":  "e2e-verify-0704-6e2b91",
                          "class":  "complete",
                          "dir":  true,
-                         "sizeKb":  256404,
+                         "sizeKb":  256436,
                          "db":  "wp_s_6e2b917e2efc46b89cdbcb",
                          "dbPresent":  true,
                          "row":  true,

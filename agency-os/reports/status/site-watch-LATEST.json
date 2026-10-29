@@ -1,7 +1,7 @@
 {
     "overall":  "PASS",
     "measured":  4,
-    "generated_utc":  "2026-10-29T02:19:03Z",
+    "generated_utc":  "2026-10-29T16:31:11Z",
     "probes":  {
                    "migration":  {
                                      "verdict":  "PASS",
@@ -9,11 +9,11 @@
                                  },
                    "heartbeat":  {
                                      "verdict":  "PASS",
-                                     "detail":  "last heartbeat 0.2h ago"
+                                     "detail":  "last heartbeat 0.4h ago"
                                  },
                    "executor":  {
                                     "verdict":  "PASS",
-                                    "detail":  "2 monitored target(s), none overdue; newest result: 4.2h ago"
+                                    "detail":  "2 monitored target(s), none overdue; newest result: 18.4h ago"
                                 },
                    "notifications":  {
                                          "verdict":  "PASS",
@@ -21,15 +21,15 @@
                                      }
                },
     "raw":  {
-                "hb_age_s":  "840",
+                "hb_age_s":  "1569",
                 "overdue_targets":  "0",
                 "stuck_notifications":  "0",
-                "enabled_hb_age_s":  "840",
+                "enabled_hb_age_s":  "1569",
                 "overdue_slugs":  "",
                 "monitored_targets":  "2",
                 "applied":  "true",
                 "oldest_owed_s":  "none",
-                "last_result_age_s":  "15230",
+                "last_result_age_s":  "66358",
                 "owed_notifications":  "0"
             },
     "route_status":  null,
@@ -41,7 +41,7 @@
                        "overdue_slack_h":  2,
                        "notify_stuck_h":  3
                    },
-    "generatedAt":  "2026-10-29T02:18:59.3457062Z",
+    "generatedAt":  "2026-10-29T16:31:06.9459572Z",
     "blind_spots":  [
 
                     ],
