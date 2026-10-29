@@ -2,7 +2,9 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "@/lib/ops-role";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
-import { dispatchToHost, externalAudioAllowed, hostWorkerConfig, OPENAI_TRANSCRIBE_MAX_BYTES, OPENAI_TRANSCRIBE_MODEL, runOpenAiJob } from "@/lib/content/video/transcription";
+import { thenRun, withFeature } from "@/lib/entitlements/grant";
+import { dispatchToHost, externalAudioAllowed, hostWorkerConfig, OPENAI_TRANSCRIBE_MAX_BYTES, OPENAI_TRANSCRIBE_MODEL } from "@/lib/content/video/transcription";
+import { runOpenAiJob } from "@/lib/content/video/transcription-openai";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,13 +52,17 @@ export async function POST(req: NextRequest): Promise<Response> {
   const jobId = randomUUID(); const callbackSecret = randomBytes(32).toString("base64url"); const callbackSecretHash = createHash("sha256").update(callbackSecret).digest("hex");
   const model = engine === "openai" ? OPENAI_TRANSCRIBE_MODEL : host!.model;
   const resultJson = { engine };
-  const inserted = await db.from("media_transcription_jobs").insert({ id: jobId, organization_id: source.organization_id, source_asset_id: source.id, source_checksum_sha256: source.checksum_sha256, callback_secret_sha256: callbackSecretHash, status: "dispatched", model, result_json: resultJson }).select("id").single();
-  if (inserted.error) return NextResponse.json({ ok: false, error: "transcription_job_create_failed" }, { status: 502 });
+  const createJob = async () => (await db.from("media_transcription_jobs").insert({ id: jobId, organization_id: source.organization_id, source_asset_id: source.id, source_checksum_sha256: source.checksum_sha256, callback_secret_sha256: callbackSecretHash, status: "dispatched", model, result_json: resultJson }).select("id").single()).error;
   if (engine === "openai") {
-    // Not awaited: the browser polls /status, and a closed page does not stop the job.
-    void runOpenAiJob(db, { id: jobId, organization_id: source.organization_id, source_asset_id: source.id, source_checksum_sha256: source.checksum_sha256, result_json: resultJson, sourceUrl, callbackSecret }, apiKey, req.url);
-    return NextResponse.json({ ok: true, jobId, status: "dispatched", engine }, { status: 202 });
+    // Paid: asked and billed to the asset's org (ADR 017 §0 代操); runOpenAiJob's grantFor inherits this scope.
+    return withFeature("video.transcribe", thenRun, { org: () => source.organization_id })(req, async () => {
+      if (await createJob()) return NextResponse.json({ ok: false, error: "transcription_job_create_failed" }, { status: 502 });
+      // Not awaited: the browser polls /status, and a closed page does not stop the job.
+      void runOpenAiJob(db, { id: jobId, organization_id: source.organization_id, source_asset_id: source.id, source_checksum_sha256: source.checksum_sha256, result_json: resultJson, sourceUrl, callbackSecret }, apiKey, req.url);
+      return NextResponse.json({ ok: true, jobId, status: "dispatched", engine }, { status: 202 });
+    });
   }
+  if (await createJob()) return NextResponse.json({ ok: false, error: "transcription_job_create_failed" }, { status: 502 });
   if (!await dispatchToHost({ jobId, sourceUrl, checksum: source.checksum_sha256, callbackSecret })) {
     await db.from("media_transcription_jobs").update({ status: "failed", error_code: "worker_dispatch_failed", completed_at: new Date().toISOString() }).eq("id", jobId).eq("status", "dispatched");
     return NextResponse.json({ ok: false, error: "transcription_worker_unreachable" }, { status: 502 });

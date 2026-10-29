@@ -5,8 +5,11 @@ const completeImport = vi.hoisted(() => vi.fn());
 vi.mock("@/app/api/video/transcription/import/route", () => ({ POST: completeImport }));
 vi.mock("../caption-qa-persistence", () => ({ persistAutomaticCaptionQa: vi.fn() }));
 vi.mock("@/lib/ai/log-ai-call", () => ({ logImageCost: vi.fn() }));
+vi.mock("@/lib/entitlements/grant", () => ({ grantFor: vi.fn(async () => ({})) }));
+vi.mock("@/lib/ai/gateway", () => ({ providerUrl: (_g: unknown, _p: string, path: string) => `https://provider.test${path}` }));
 
-import { openAiToTranscript, runOpenAiJob, workerBaseUrl } from "../transcription";
+import { workerBaseUrl } from "../transcription";
+import { openAiToTranscript, runOpenAiJob } from "../transcription-openai";
 
 describe("openAiToTranscript", () => {
   it("drops empty segments and clamps overlap and overrun, which the import route rejects", () => {
@@ -45,7 +48,7 @@ describe("runOpenAiJob", () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string, init?: { body?: string }) => {
       calls.push(url);
       if (url.startsWith("https://pub.example")) return new Response(new Uint8Array(10), { status: 200 });
-      if (url.includes("api.openai.com")) return new Response("{}", { status: 429 });
+      if (url.includes("provider.test")) return new Response("{}", { status: 429 });
       expect(JSON.parse(init!.body!)).toMatchObject({ job_id: "j1", callback_secret: job.callbackSecret });
       return new Response("{}", { status: 200 });
     }));
@@ -58,12 +61,12 @@ describe("runOpenAiJob", () => {
     const calls: string[] = [];
     vi.stubGlobal("fetch", vi.fn(async (url: string) => { calls.push(url); return new Response(new Uint8Array(11), { status: 200 }); }));
     await runOpenAiJob(db as never, job, "sk", "http://localhost/x");
-    expect(calls.some((u) => u.includes("api.openai.com"))).toBe(false);
+    expect(calls.some((u) => u.includes("provider.test"))).toBe(false);
     expect(updates.at(-1)).toMatchObject({ result_json: { openAiError: "source_checksum_mismatch" } });
   });
 
   it("marks the job failed when OpenAI fails and no host worker is configured", async () => {
-    vi.stubGlobal("fetch", vi.fn(async (url: string) => url.includes("api.openai.com") ? new Response("{}", { status: 500 }) : new Response(new Uint8Array(10), { status: 200 })));
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => url.includes("provider.test") ? new Response("{}", { status: 500 }) : new Response(new Uint8Array(10), { status: 200 })));
     await runOpenAiJob(db as never, job, "sk", "http://localhost/x");
     expect(updates.at(-1)).toMatchObject({ status: "failed", error_code: "openai_failed_no_fallback" });
   });

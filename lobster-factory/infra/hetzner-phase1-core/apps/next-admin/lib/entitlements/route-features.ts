@@ -39,6 +39,7 @@ export const ROUTE_FEATURES: Readonly<Record<string, string | readonly string[]>
   "/api/video/generate": "video.script",
   "/api/video/regenerate-image": "video.image",
   "/api/video/render-draft": "video.tts",
+  "/api/video/transcription/dispatch": "video.transcribe",
   "/api/video/story-bibles/generate-portrait": "video.image",
   "/api/video/story-bibles/visual-consistency-check": "video.image",
 };

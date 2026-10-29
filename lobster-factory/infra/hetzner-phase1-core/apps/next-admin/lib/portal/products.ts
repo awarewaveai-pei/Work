@@ -50,7 +50,7 @@ const PRODUCT_DEFINITIONS = [
     modules: { dependsOn: [], optional: ["content"], manifest: "lib/social/MODULE_MANIFEST.json" }, staffPaths: ["tools/social"] },
   { key: "video", name: "影片製作", description: "生成腳本、場景、動態與旁白影片。", subdomain: "video", door: { app: "next-admin", page: "/video", api: ["/api/video", "/api/tools/script-forge"] },
     loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,
-    features: [quota("video.script", "腳本生成"), quota("video.image", "場景圖生成"), quota("video.motion", "影片動態"), quota("video.tts", "付費旁白")],
+    features: [quota("video.script", "腳本生成"), quota("video.image", "場景圖生成"), quota("video.motion", "影片動態"), quota("video.tts", "付費旁白"), quota("video.transcribe", "語音轉字幕")],
     accessChannels: ["ui"], modules: { dependsOn: ["content"], optional: ["social"], manifest: "lib/video/MODULE_MANIFEST.json" }, staffPaths: ["tools/video", "tools/script-forge"] },
   { key: "tarot", name: "塔羅製圖", description: "生成塔羅圖片、提示詞與動態。", subdomain: "tarot", door: { app: "next-admin", page: "/tarot", api: ["/api/tools/tarot"] },
     loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,

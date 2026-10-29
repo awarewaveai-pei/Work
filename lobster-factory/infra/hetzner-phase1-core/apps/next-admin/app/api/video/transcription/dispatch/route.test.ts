@@ -9,7 +9,11 @@ const getSupabaseWriteClient = vi.hoisted(() => vi.fn());
 const runOpenAiJob = vi.hoisted(() => vi.fn());
 const dispatchToHost = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient }));
-vi.mock("@/lib/content/video/transcription", async (orig) => ({ ...(await orig<object>()), runOpenAiJob, dispatchToHost }));
+// Grant plumbing is lib/entitlements' own tests; here the paid branch just has to run inside withFeature.
+const withFeature = vi.hoisted(() => vi.fn((_key: string, handler: (req: Request, grant: unknown, run: unknown) => Promise<Response>) => (req: Request, run: unknown) => handler(req, {}, run)));
+vi.mock("@/lib/entitlements/grant", () => ({ withFeature, thenRun: (_r: Request, _g: unknown, run: () => Promise<Response>) => run() }));
+vi.mock("@/lib/content/video/transcription", async (orig) => ({ ...(await orig<object>()), dispatchToHost }));
+vi.mock("@/lib/content/video/transcription-openai", () => ({ runOpenAiJob }));
 
 import { POST } from "./route";
 
@@ -65,6 +69,7 @@ describe("transcription dispatch", () => {
     const res = await POST(request("openai"));
     expect(res.status).toBe(202);
     expect(runOpenAiJob).toHaveBeenCalledOnce();
+    expect(withFeature).toHaveBeenCalledWith("video.transcribe", expect.anything(), expect.anything());
     expect(inserted[0]).toMatchObject({ model: "whisper-1", result_json: { engine: "openai" } });
   });
 

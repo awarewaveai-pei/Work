@@ -39,11 +39,10 @@ export async function GET(req: NextRequest): Promise<Response> {
 
   const result = (job.result_json ?? {}) as Record<string, unknown>;
   const engine = result.engine === "openai" ? "openai" : "host";
+  // Past its deadline nothing will finish it (next-admin or the worker restarted mid-job): report it failed so the page
+  // stops waiting. GET stays read-only (get-no-side-effects); a late callback can still complete the row.
   if (job.status === "dispatched" && Date.now() - new Date(job.created_at as string).getTime() > JOB_DEADLINE_MS[engine]) {
-    // Nothing will ever finish it (next-admin or the worker restarted mid-job); fail it so the page stops waiting.
-    const now = new Date().toISOString();
-    await db.from("media_transcription_jobs").update({ status: "failed", error_code: "job_timed_out", completed_at: now }).eq("id", job.id).eq("status", "dispatched");
-    job.status = "failed"; job.error_code = "job_timed_out"; job.completed_at = now;
+    job.status = "failed"; job.error_code = "job_timed_out";
   }
   return NextResponse.json({
     ok: true,
