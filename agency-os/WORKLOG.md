@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-30（續32）操作者實測 Google 註冊：WP 端成功，app 端依設計拒收（email 是員工帳號）；1.3.4 去掉 Google 會員的「暫時密碼」提示（Claude）
+
+- 操作者以 Google 註冊 → WP 會員 #4（信箱已驗證）、註冊禮訂單 #42、「我的帳號」出現註冊禮 50 點與工作區。
+- app：`wc:payment_complete:42:credit_pack` HTTP 400 `email_taken`（訂單備註 15:19:01），ops 事件已開。原因：該 gmail 在 auth.users 為 staff（viewer、未開通）；員工 email 永不轉客戶帳號（`wp-customers.ts` emailOwner／adoptableClient 只接 client）＝設計行為，非故障。
+- 「暫時密碼」提示：WooCommerce 為新會員產生密碼並設 `default_password_nag`（`wc-user-functions.php:182`，顯示於 `class-wc-shortcode-my-account.php:127`）。1.3.4（607628232）`GoogleSignup::onRegister` 刪該旗標；會員 #4 手動清除。發版 CI 綠、rollout 1.3.3→1.3.4。
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp eval（user 4：nag=false verified=1 gift_order=42）＋ 訂單 #42 備註 email_taken ＋ psql auth.users（staff/viewer/未確認） | exit=0 | ms=4000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 自審：只刪 Google 註冊者的 nag，密碼註冊者照常
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=default_password_nag | hits=1（GoogleSignup.php）
+- 待操作者決定：用非員工的 Google 帳號重測；或若該員工帳號不需要，先在 /ops/staff 移除再重送訂單 #42 事件。
 ## 2026-10-30（續31）Google 註冊兩個阻擋：Nextend 跟著 WP 註冊開關、wp-login 5r/m 連 GET 都擋（操作者「我才註冊一次」就 429）（Claude）
 
 - **根因 1**：Nextend `allow_register=-1`（預設）＝跟 WP `users_can_register`（0）→ Google 新會員導到 `wp-login.php?registration=disabled`（`nextend-social-login.php:354`、`:1566-1577`）。修：`NextendSocialLogin::$settings->update(['allow_register'=>1])`（不打開 WP 原生無驗證碼的 wp-login 註冊頁）。Google provider tested=1 enabled=1。
