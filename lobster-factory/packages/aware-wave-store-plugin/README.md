@@ -14,6 +14,7 @@ of them breaks queued events, sent verification links, or stored settings.
 
 While wp-bridge <= 0.18.3 is installed (it still carries this code) the plugin stays dormant and says so in wp-admin.
 
+- Daily reconciliation (1.3.1, `Reconcile`): signed read-only `GET /wp-json/aware-wave-store/v1/reconcile` lists the paid AwareWave orders of a window for next-admin `/ops/billing` (lib/payments/woo-reconcile.ts); signed with the payment secret under its own label.
 - Several plans on one pack (`plan_keys`, 1.3.0) need next-admin with migration 0146 live first: an older next-admin keeps the credits and drops the plans without an error. Rollback in the reverse order (plugin first).
 - Release: `bash scripts/release-wp-bridge.sh --plugin store` → release repo `awarewaveai-pei/aware-wave-store` (public: GitHub Actions run free only on public repos).
 - Install / upgrade: `scripts/rollout-wp-bridge.ps1 -Plugin store` (first install: `-Install -Site lobster-wordpress`).
