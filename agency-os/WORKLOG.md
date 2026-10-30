@@ -1,4 +1,12 @@
 # Worklog
+## 2026-10-30（續28）測試收尾：E2E-Verify-0704 塔羅已收回；測試帳號保留（Fable）
+
+- 操作者「全部去處理好」→ 在內建瀏覽器（操作者員工 session）「帳務 → 給／收產品」取消 `use:tarot`、原因「測試完成，收回 content 門「尚未開通」驗收用的塔羅」→「已存。送出 0 項、收回 1 項。」
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql organization_entitlements（E2E-Verify）→ tarot.image／tarot.prompt `status=expired`、`ends_at` 06:29Z | exit=0 | ms=3000
+- 測試帳號 `peijingartstudio+test@gmail.com`（client，綁 E2E-Verify）**保留**當固定測試帳號（收回後無任何產品＝看得到「尚未開通」與「去了解」）；操作者按「刪除帳號」兩次無反應，未查明（`AccountsCard.tsx:88` 先 `window.confirm`，被瀏覽器擋下即無請求；刪除資料不代按）。
+- REVIEW_WAIVED: NA -- 無程式改動
+- BUGHUNT_WAIVED: NA -- 無程式改動
+- 旁註：內建瀏覽器窄視窗（278px）時側欄覆蓋內容區，ref 點擊會落到側欄連結（兩次跳到 `/ops/integrations`）；`resize_window 1280` 後正常。
 ## 2026-10-30（續27）每日 Woo 對帳第一次在正式環境實比：註冊禮訂單 #41 對上；監工台「現況」兩列依 prod 更正（Claude）
 
 - 註冊 session 接上 Woo 付款通道後（`PAYMENTS_PROVIDERS=local,woo`），`/api/internal/billing/reconcile` 從「未啟用」轉為真比對。
