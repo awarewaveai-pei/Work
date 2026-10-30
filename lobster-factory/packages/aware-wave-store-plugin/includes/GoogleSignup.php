@@ -56,6 +56,9 @@ final class GoogleSignup {
 		if ( ! $user || ! is_object( $provider ) || ! method_exists( $provider, 'getAuthUserData' ) ) {
 			return;
 		}
+		// WooCommerce generated a password for the new customer and flags it (wc-user-functions.php default_password_nag),
+		// so My Account says "temporary password". This member signs in with Google and has no password to change.
+		delete_user_option( $uid, 'default_password_nag', true );
 		if ( ! self::provenByGoogle( (string) $provider->getAuthUserData( 'email' ), (string) $user->user_email ) ) {
 			return;
 		}
