@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-30（續35）進門修正上線（3acb55811，含 step-12 一次性連結 da0804a30）；監工台「客戶可自行登入」改有（Claude）
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin → deployed 3acb55811、healthy 16s、HTTP smoke 5/5 | exit=0 | ms=240000
+- REALTEST_EVIDENCE: tool=curl | cmd=curl https://{social,video,tarot,content,studio}.aware-wave.com/login → 「從 aware-wave.com 進入」×5；app.aware-wave.com/login → 「Admin Console 登入」；POST https://portal.aware-wave.com/api/door 未登入 → 401 | exit=0 | ms=4000
+- REALTEST_EVIDENCE: tool=Bash | cmd=playwright-runner.ps1 -Mode smoke → 26 passed／0 failed／6 skipped | exit=0 | ms=40000
+- 監工台 v54：「客戶可自行登入」no→yes（操作者真人走完，證據見續34）；現況導言改為「已能自行註冊、收真錢等 4b-6」。https://claude.ai/artifact/Htm4xqe362YM987Fo8YLCr
+- REVIEW_WAIVED: NA -- 上線與監工台資料；程式審查在續34
+- BUGHUNT_WAIVED: DOC_ONLY -- 無新程式
+- **沒驗到**：帶真 session 從 portal 按「開啟」進各門（要操作者的瀏覽器）；請操作者重試一次。
 ## 2026-10-30（續34）操作者真人走完註冊：註冊與註冊禮都成，進門那段四個問題修掉並部署（Claude）
 
 - **操作者實走**（soulfulexpression01@gmail.com）：WP 會員 → 驗證 → 註冊禮訂單 #46 → app 帳號 client、新帳戶「Soulful Expression Art Therapy」`ee33a23c…`（不是 Soulful 代操那個帳戶）、5 個 *_credits、錢包 50 → studio 生圖兩次扣 1＋7＝42。兩筆都走 0148 預扣→結算（credit_call_holds 2 列 kept=units、ai_call_logs credits_held=charged）。
