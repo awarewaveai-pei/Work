@@ -1,4 +1,12 @@
 # Worklog
+## 2026-10-30（續22）step-10／step-11 已提前上線（他 session 部署 c09ccb177、外掛 1.3.1），正式站驗證（Fable）
+
+- 註冊 session 部署 7b7920f25、「01 客戶怎麼來」session 部署 c09ccb177 並發 aware-wave-store v1.3.1（CI phpunit 含 `MyAccountDoorsTest` 綠）裝上 aware-wave.com；兩者皆含 61f9f261c（工作區）與 4632004bb（WP 入口）→ 不必等 03:00。
+- REALTEST_EVIDENCE: tool=SSH | cmd=cat /root/lobster-phase1/.deployed-commit → c09ccb177；`git merge-base --is-ancestor 4632004bb c09ccb177` 真 | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=curl | cmd=portal `/login/wp` 200；tarot／studio／video `/works` 307→`/login?next=%2Fworks`（頁存在、受登入保護）；app `/portal/login/wp` 404（非 portal 主機） | exit=0 | ms=3000
+- REVIEW_WAIVED: NA -- 驗證，無程式改動
+- BUGHUNT_WAIVED: NA -- 無程式改動
+- 待操作者：登入後實看 `tarot.aware-wave.com/works`、portal launcher 的「我的作品」、aware-wave.com「我的帳號」的「我的工作區」；收回測試帳號與 E2E-Verify 塔羅；決定工作區→產品門的一次性換證（WORKLOG 續18 剩餘①）。
 ## 2026-10-30（續21）ADR 017 收錢後續四件上線：0148 套 prod、next-admin 部署 c09ccb177、aware-wave-store 1.3.1 裝上 aware-wave.com、監工台 v51（Claude）
 
 - 順序：`apply-db-migration.mjs 0148`（套前 --status applied 147／missing 0148）→ 推 main → `sg-deploy.sh next-admin`（另一 session 剛部署 7b7920f25，等其結束後再跑）→ `release-wp-bridge.sh --plugin store`（HEAD c09ccb177 拋棄式 worktree，CI 綠，tag v1.3.1）→ `rollout-wp-bridge.ps1 -Plugin store`（先 DryRun）。
