@@ -1,4 +1,20 @@
 # Worklog
+## 2026-10-30（續11）「我的產品」頁（portal launcher）改用門自己的判斷：已開通／尚未開通／即將推出（操作者「修吧」）（Claude）
+
+- **根因**（續10 C1）：`app/portal/launcher/page.tsx` 舊版以 registry `status`（每個產品都是 `coming_soon`，`lib/portal/products.ts:42-86`）＋舊表 `organization_product_subscriptions`（prod 0 列）判斷，門用 `organization_entitlements`（`lib/entitlements/door-holds.ts:10`）→ 所有客戶全部「即將推出」，「尚未開通」頁的「回到我的產品」是死路。
+- **不變量**：「客戶能不能用某產品」只有一個答案＝門自己的 `holdsProduct`；任何列出門的畫面都經同一函式。
+- **改動**：
+  - 新 `lib/portal/held-doors.ts` `heldDoors(orgId)`＝`servedNextAdminProducts()` × `holdsProduct`（由 `app/api/ops/clients/[slug]/accounts/route.ts` 私有 `offeredProducts` 搬出；route 直接用 `heldDoors`）。不放 `door-access.ts`：每個門頁都 import 它，`lib/portal/__tests__/registry-code.test.ts` 會把 `doors.ts` 的 `/api` 字串算進門頁可達 API（第一次放那裡就紅）。
+  - launcher：held→「已開通」＋開啟；已上線未持有→「尚未開通」；門未上線（含 external 的 cognitive／hci、`enabled:false` 的 cs／collect／outreach）→「即將推出」；讀取失敗→錯誤訊息、無任何連結。拿掉「試用中」（試用授權本就寫進 entitlements，`0110_plans_entitlements.sql:122-124`，仍顯示已開通；註冊未開放，等開放時以 grant 判斷補標示）。
+  - `lib/entitlements/tables.ts` 刪除無人呼叫的 `getSubscriptionStatuses`＋`SUBSCRIPTION_STATUS_PRIORITY`；`payments.e2e.test.ts:203` 過時註解改正；`PORTAL_AWARE_WAVE_DESIGN_PROPOSAL.md:91` 加 2026-10-30 註記。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p .（0）＋ npx vitest run（next-admin 完整 425 files／3560 passed／0 failed） | exit=0 | ms=120000
+- REALTEST_EVIDENCE: tool=Bash | cmd=暫時測試以 prod entitlements 實畫 launcher（跑完即刪）：Soulful 社群／影片／塔羅／商品設計／設計編輯器／內容行銷「已開通」，cognitive／hci／cs／collect／outreach「即將推出」；E2E-Verify 塔羅「已開通」、內容行銷「尚未開通」 | exit=0 | ms=3000
+- 突變（可見範圍守衛）：`held-doors.ts` 改用 `nextAdminProducts()`（不濾上線）→ `app/portal/launcher/__tests__/page.test.tsx` 第 1 例紅；還原綠。第一次突變頁面上的 `served.has` 未紅＝多餘條件，已刪。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/2n -- 獨立 critic subagent：試用流程、刪除函式呼叫者、external 門、無持有給連結四項皆無問題；n1 過時註解、n2 route 多一層別名，皆已修
+- ORACLE_WAIVED: codex quota blocked until 2026-10-30 13:06 (scripts/oracle-quota.ps1)；以獨立 critic＋突變證據替代
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=getSubscriptionStatuses|SUBSCRIPTION_STATUS_PRIORITY | hits=0（launcher 讀訂閱表的文件說法只有 PORTAL 提案 :91，已註記）
+- **上線**：推 main → 今晚 03:00 自動部署。**rollback**：revert 本 commit。
+- **之後**：上線後用 `peijingartstudio+test@gmail.com` 開 portal 確認塔羅「已開通」；再刪該帳號、收回 E2E-Verify 塔羅。
 ## 2026-10-30（續10）content 門「尚未開通」真人走完；發現「我的產品」頁對所有客戶都顯示「即將推出」（Claude）
 
 - **補續6 的缺口**：操作者在 E2E-Verify-0704（測試帳戶）「帳務 → 給／收產品」送塔羅（`organization_entitlements` tarot 2 列 comp，`source_ref=staff:fa15f6bd-…`，稽核原因必填），「帳號 → 建立客戶帳號」邀請 `peijingartstudio+test@gmail.com`（Gmail 別名，client、`org_id=9e6e0993-…`，03:39 UTC 設密碼並登入）。操作者用該帳號開 content.aware-wave.com → 看到「「內容行銷」尚未開通」，按「回到我的產品」到 `portal.aware-wave.com/portal/launcher`。content 門驗收完成。

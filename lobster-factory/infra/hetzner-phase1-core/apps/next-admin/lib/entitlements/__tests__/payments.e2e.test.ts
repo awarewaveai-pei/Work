@@ -200,7 +200,7 @@ describe.skipIf(!REST)("payments against a real database (ADR 017 step 4a)", () 
     const sub = (await send({ ...paid, event_id: "bank-004", external_ref: "TX-004" })).body.contract;
     expect((await send({ event_id: "cb-001", kind: "chargeback", organization_id: CUSTOMER, ref: "O-2" })).body).toMatchObject({ entitlements_suspended: 3, wallet_frozen: true });
     expect(await live()).toEqual([]);
-    expect((await rows("organization_product_subscriptions", { id: sub }))[0].status).toBe("past_due");   // the launcher closes it too
+    expect((await rows("organization_product_subscriptions", { id: sub }))[0].status).toBe("past_due");   // bookkeeping only: doors and the launcher close via the suspended entitlements above
     expect(await balance()).toBe(0);
     expect(await send({ event_id: "pack-003", kind: "credit_pack", organization_id: CUSTOMER, units: 50, order_ref: "O-3" })).toEqual({ status: 409, body: { ok: false, error: "account_frozen" } });
     expect((await send({ event_id: "cb-001-cleared", kind: "chargeback_cleared", organization_id: CUSTOMER, note: "bank confirmed" })).body).toMatchObject({ entitlements_restored: 3 });

@@ -8,17 +8,6 @@ import type { CanStore, EntitlementRecord } from "./can";
 export const registeredFeatures = (products: typeof PRODUCTS = PRODUCTS) =>
   products.flatMap((p) => p.features.map((f) => ({ product_key: p.key, feature_key: f.feature_key })));
 
-// A product can have more than one non-canceled plan (the migration's unique
-// key includes plan_key). Keep the launcher state deterministic when a base
-// plan and an add-on coexist, and prefer the state that grants access.
-const SUBSCRIPTION_STATUS_PRIORITY: Record<string, number> = {
-  active: 4,
-  trial: 3,
-  past_due: 2,
-  suspended: 1,
-  canceled: 0,
-};
-
 /** Control-plane access only: never give a browser a service-role client. */
 type EntitlementRow = { id: string; organization_id: string; product_key: string; feature_key: string; source: "contract" | "comp";
   source_ref: string | null; starts_at: string; ends_at: string | null; status: string; limits: Record<string, JsonValue> };
@@ -39,7 +28,6 @@ export function createEntitlementStore(client: SupabaseClient | null = getSupaba
   expireEntitlements(now?: Date): Promise<number>;
   endLapsedTrials(now?: Date): Promise<number>;
   ensureAllFeatures(): Promise<number>;
-  getSubscriptionStatuses(organizationId: string): Promise<Map<string, string>>;
 } {
   if (!client) throw new Error("entitlements_db_unavailable");
   const db = client;
@@ -69,20 +57,6 @@ export function createEntitlementStore(client: SupabaseClient | null = getSupaba
       const balance = Number(data);
       if (data === null || !Number.isFinite(balance)) throw new Error("invalid_credit_balance");
       return balance;
-    },
-    async getSubscriptionStatuses(organizationId) {
-      const { data, error } = await db.from("organization_product_subscriptions")
-        .select("product_key, status, plan_key").eq("organization_id", organizationId)
-        .order("product_key").order("plan_key");
-      if (error) throw new Error(error.message);
-      const byProduct = new Map<string, string>();
-      for (const row of data ?? []) {
-        const current = byProduct.get(row.product_key);
-        if (!current || (SUBSCRIPTION_STATUS_PRIORITY[row.status] ?? -1) > (SUBSCRIPTION_STATUS_PRIORITY[current] ?? -1)) {
-          byProduct.set(row.product_key, row.status);
-        }
-      }
-      return byProduct;
     },
     async ensureAllFeatures() {
       const { data, error } = await db.rpc("entitlement_ensure_all_features", { p_features: registeredFeatures() });

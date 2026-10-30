@@ -12,8 +12,7 @@ import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { resolveTenant } from "@/lib/tenant-guard";
 import { recordOpsAudit } from "@/lib/ops-audit";
-import { servedNextAdminProducts } from "@/lib/portal/doors";
-import { holdsProduct } from "@/lib/entitlements/door-holds";
+import { heldDoors } from "@/lib/portal/held-doors";
 import { listMembers } from "@/lib/social/store";
 import { ROLE_NAMES } from "@/app/(shell)/tools/social/model";
 import { deleteClientAccount, inviteClientAccount, listClientAccounts, normalizeEmail } from "@/lib/accounts/client-invite";
@@ -32,15 +31,6 @@ const MEMBER_LISTS: Readonly<Record<string, { roles: (orgId: string) => Promise<
     settings: (orgId) => `/tools/social?brand=${orgId}&view=settings`,
   },
 };
-
-/** Doors this client's people can be sent to: served (a closed door's host 404s) and held -- asked per door with the
- *  door's own check, not one read of every row (an all-features account has hundreds, past PostgREST's row cap). */
-async function offeredProducts(orgId: string) {
-  const now = Math.floor(Date.now() / 1000);
-  const served = servedNextAdminProducts();
-  const held = await Promise.all(served.map((p) => holdsProduct({ organizationId: orgId, productKey: p.key, now })));
-  return served.filter((_, i) => held[i]);
-}
 
 /** owner/admin staff, else the 403 response. A client identity never reaches /api/ops (middleware), checked again here. */
 function staffAdmin(request: Request) {
@@ -71,7 +61,7 @@ export async function GET(request: Request, context: Ctx) {
   const org = await clientOrg(context);
   if (org instanceof Response) return org;
   try {
-    const [list, offered] = await Promise.all([listClientAccounts(getSupabaseWriteClient()!, org.id), offeredProducts(org.id)]);
+    const [list, offered] = await Promise.all([listClientAccounts(getSupabaseWriteClient()!, org.id), heldDoors(org.id)]);
     const withRoles = offered.filter((p) => p.key in MEMBER_LISTS);
     const roleMaps = await Promise.all(withRoles.map((p) => MEMBER_LISTS[p.key].roles(org.id)));
     const products = offered.map((p) => ({ key: p.key, name: p.name, settings: MEMBER_LISTS[p.key]?.settings(org.id) ?? null }));
@@ -98,9 +88,9 @@ export async function POST(request: Request, context: Ctx) {
   if (!email) return NextResponse.json({ ok: false, error: "invalid_email" }, { status: 400 });
   const org = await clientOrg(context);
   if (org instanceof Response) return org;
-  let offered: Awaited<ReturnType<typeof offeredProducts>>;
+  let offered: Awaited<ReturnType<typeof heldDoors>>;
   try {
-    offered = await offeredProducts(org.id);
+    offered = await heldDoors(org.id);
   } catch (e) {
     console.error("[accounts] entitlements read failed", { org: org.id, error: String(e) });
     return NextResponse.json({ ok: false, error: "entitlements_unavailable" }, { status: 503 });

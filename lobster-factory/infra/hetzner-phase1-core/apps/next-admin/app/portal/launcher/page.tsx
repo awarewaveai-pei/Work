@@ -1,8 +1,8 @@
 import { headers } from "next/headers";
 import { requireClientOrg, PortalAccessError } from "@/lib/tenant-guard";
 import { PRODUCTS } from "@/lib/portal/products";
-import { productHost } from "@/lib/portal/doors";
-import { createEntitlementStore } from "@/lib/entitlements/tables";
+import { productHost, servedNextAdminProducts } from "@/lib/portal/doors";
+import { heldDoors } from "@/lib/portal/held-doors";
 
 export const dynamic = "force-dynamic";
 
@@ -12,15 +12,15 @@ export const dynamic = "force-dynamic";
 // it fails closed if the authenticated identity isn't a bound client (e.g. a staff member's
 // session) -- see PORTAL_AWARE_WAVE_DESIGN_PROPOSAL.md §9 RISK 3.
 
-async function getSubscriptionStatus(organizationId: string): Promise<{ byProduct: Map<string, string>; failed: boolean }> {
+// A card's state comes from the doors themselves (heldDoors = the check each door makes), never from the registry's sales
+// `status` or the legacy organization_product_subscriptions table: both said "coming soon" for every product while doors
+// were open (2026-10-30), so the not-enabled page's "回到我的產品" led to a dead end.
+async function getHeld(organizationId: string): Promise<{ held: Set<string>; failed: boolean }> {
   try {
-    // requireClientOrg() above is the user/session and client-org boundary. The table itself
-    // is service-role-only after ADR017/0110, so all subscription reads go through this wrapper.
-    const byProduct = await createEntitlementStore().getSubscriptionStatuses(organizationId);
-    return { byProduct, failed: false };
+    return { held: new Set((await heldDoors(organizationId)).map((p) => p.key)), failed: false };
   } catch (error) {
-    console.error("[portal/launcher] subscription read failed", { organizationId, error: error instanceof Error ? error.message : String(error) });
-    return { byProduct: new Map(), failed: true };
+    console.error("[portal/launcher] entitlement read failed", { organizationId, error: error instanceof Error ? error.message : String(error) });
+    return { held: new Set(), failed: true };
   }
 }
 
@@ -45,7 +45,8 @@ export default async function PortalLauncherPage() {
     throw e;
   }
 
-  const { byProduct, failed } = await getSubscriptionStatus(orgId);
+  const { held, failed } = await getHeld(orgId);
+  const served = new Set(servedNextAdminProducts().map((p) => p.key));
 
   return (
     <div style={{ maxWidth: 720, margin: "60px auto", padding: 24 }}>
@@ -56,29 +57,22 @@ export default async function PortalLauncherPage() {
         </p>
       ) : (
         <p style={{ fontSize: 13.5, color: "var(--text-muted)", marginBottom: 24 }}>
-          選擇要開啟的產品。尚未開通的產品會標示「即將推出」。
+          選擇要開啟的產品。還沒買的產品標示「尚未開通」，還在準備的標示「即將推出」。
         </p>
       )}
       <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}>
         {PRODUCTS.map((product) => {
-          const subStatus = byProduct.get(product.key);
-          // "coming_soon" from the registry means the product has no provisioning API yet --
-          // this overrides subStatus even if a subscription row exists (V1 boundary, see
-          // PORTAL_AWARE_WAVE_DESIGN_PROPOSAL.md §5 "不做": never fake a provisioned state).
-          // A trial opens the product like a paid plan; the expiry sweep turns it canceled when its grants end.
-          const isTrial = subStatus === "trial";
-          const isReady = product.status !== "coming_soon" && (subStatus === "active" || isTrial);
+          const isOpen = held.has(product.key); // heldDoors returns served doors only
+          const label = isOpen ? "已開通" : served.has(product.key) ? "尚未開通" : "即將推出";
           return (
             <div key={product.key} className="card" style={{ padding: 20 }}>
               <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>{product.name}</h2>
-              <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12 }}>
-                {isReady ? (isTrial ? "試用中" : "已開通") : "即將推出"}
-              </p>
-              {isReady ? (
+              <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12 }}>{failed ? "—" : label}</p>
+              {isOpen ? (
                 <a href={`https://${productHost(product)}`} className="btn-primary">開啟</a>
               ) : (
                 <button className="btn-primary" disabled style={{ opacity: 0.5, cursor: "not-allowed" }}>
-                  即將推出
+                  {failed ? "無法確認" : label}
                 </button>
               )}
             </div>

@@ -89,6 +89,7 @@ v1 設計「portal 自己開一個 `portal` schema（`customers`/`subscriptions`
 - **Signup 流程**（portal 第一個真實 consumer）：建立 `organizations` row（`type='client'`）→ 建立 Supabase Auth user（`app_metadata={user_kind:'client', org_id:<新 org id>}`）→ 建立 `profiles` row → 建立 `organization_memberships` row（`status='active'`，簽署人為首個成員）→ 建立 `organization_product_subscriptions` row（`status='trial'`）。
 - **登入頁**（`portal.aware-wave.com/login`）：沿用 `@supabase/ssr`，**不新增 claims 命名空間**——`user_kind`/`org_id` 已是既有欄位。
 - **Launcher 頁**：讀 `lib/portal/products.ts`（product registry，見 §6.2）+ `organization_product_subscriptions`，`active` 給連結，其餘顯示「即將推出」。
+  - **2026-10-30 已改**：launcher 改用門自己的判斷 `lib/portal/held-doors.ts` `heldDoors`（已上線的門 × `organization_entitlements`）：已開通／尚未開通／即將推出；不再讀訂閱表（該表 prod 0 列，舊做法讓全部客戶看到「即將推出」）。見 WORKLOG 2026-10-30。
 
 **不做（明確排除）**：
 - ❌ Stripe/金流
