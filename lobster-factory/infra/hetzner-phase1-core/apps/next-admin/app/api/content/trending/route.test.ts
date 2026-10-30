@@ -21,12 +21,14 @@ vi.mock("@/lib/content/trending-sources", () => ({
   buildDbSearchBlocks: () => [],
 }));
 
-vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => null }));
+const db = vi.hoisted(() => ({ client: null as unknown }));
+vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => db.client }));
 
 const { GET, POST } = await import("./route");
 
 const originalFetch = global.fetch;
 beforeEach(() => {
+  db.client = null;
   runTrending.mockClear();
   aiChat.mockClear();
   global.fetch = vi.fn(async () => { throw new Error("no network in this test"); }) as unknown as typeof fetch;
@@ -87,5 +89,24 @@ describe("POST /api/content/trending -- suggest/questions (may spend money)", ()
     const res = await post("type=suggest");
     expect(res.status).toBe(400);
     expect(aiChat).not.toHaveBeenCalled();
+  });
+});
+
+describe("type=trending -- the shared content_trends cache is filled once per geo per day", () => {
+  it("today's stored rows are served: no refetch, no write", async () => {
+    const writes: string[] = [];
+    const chain = { select: () => chain, eq: () => chain, order: () => chain, limit: async () => ({ data: [{ title: "stored", source: "s", traffic: null, category: null, related_queries: null }], error: null }),
+      upsert: async () => { writes.push("upsert"); return { error: null }; }, delete: () => { writes.push("delete"); return chain; } };
+    db.client = { from: () => chain };
+    const res = await get("type=trending&geo=tw");
+    await expect(res.json()).resolves.toMatchObject({ ok: true, geo: "TW", items: [{ title: "stored", relatedQueries: [] }] });
+    expect(runTrending).not.toHaveBeenCalled();
+    expect(writes).toEqual([]);
+  });
+
+  it("a geo outside the supported list is refused before any fetch", async () => {
+    const res = await get("type=trending&geo=XX");
+    expect(res.status).toBe(400);
+    expect(runTrending).not.toHaveBeenCalled();
   });
 });

@@ -3,7 +3,11 @@ import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { runTrending, aiChat, parseJsonStrings } from "@/lib/content/trending-sources";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { withFeature } from "@/lib/entitlements/grant";
-import { collectTrends } from "@/lib/content/topics/collect-trends";
+import { collectTrends, todaysTrends } from "@/lib/content/topics/collect-trends";
+import { isTrendingGeo } from "@/lib/content/geos";
+import { userKindOf } from "@/lib/tenant-guard";
+
+const isClientRequest = (req: Request) => userKindOf(req.headers) === "client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -79,12 +83,27 @@ async function fetchRelatedQuestions(keyword: string, hl: string): Promise<strin
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
-async function trendingResponse(geo: string): Promise<Response> {
-  // Built-in blocks + operator DB sources, stored for the monthly topic plan (lib/content/topics/collect-trends.ts);
-  // a failed write never changes this answer. No DB client = built-ins only, nothing stored.
+// A collect that found nothing stores nothing; without this every request would fetch every source again (and keep
+// hitting a source that is rate-limiting us). Per process, per geo.
+const EMPTY_RETRY_MS = 10 * 60_000;
+const emptyUntil = new Map<string, number>();
+
+async function trendingResponse(geoRaw: string, refresh = false): Promise<Response> {
+  // content_trends is shared by every tenant and filled once per geo per UTC day (collect-trends.ts): a request serves
+  // today's stored rows and fetches + stores only when today has none, so callers cannot make it refetch or rewrite.
+  // refresh = a staff member asked for a new collect (POST only). No DB client = built-ins only, nothing stored.
+  const geo = geoRaw.trim().toUpperCase();
+  if (!isTrendingGeo(geo)) return NextResponse.json({ ok: false, error: "unsupported_geo" }, { status: 400 });
   const sb = getSupabaseWriteClient();
-  const items = sb ? (await collectTrends(sb, geo)).items : await runTrending(geo);
-  return NextResponse.json({ ok: true, items, geo });
+  if (!sb) return NextResponse.json({ ok: true, items: await runTrending(geo), geo });
+  if (!refresh) {
+    const stored = await todaysTrends(sb, geo);
+    if (stored.length || (emptyUntil.get(geo) ?? 0) > Date.now()) return NextResponse.json({ ok: true, items: stored, geo });
+  }
+  const { items } = await collectTrends(sb, geo);
+  if (items.length) emptyUntil.delete(geo);
+  else emptyUntil.set(geo, Date.now() + EMPTY_RETRY_MS);
+  return NextResponse.json({ ok: true, items: refresh ? items : await todaysTrends(sb, geo).then((s) => (s.length ? s : items)), geo });
 }
 
 // GET serves only type=trending (external/DB reads). suggest/questions fall back to a paid aiChat
@@ -112,7 +131,7 @@ async function handlePost(req: Request): Promise<Response> {
   const query = url.searchParams.get("q") ?? "";
   const hl    = url.searchParams.get("hl") ?? (geo === "TW" || geo === "HK" ? "zh-TW" : "en");
 
-  if (type === "trending") return trendingResponse(geo);
+  if (type === "trending") return trendingResponse(geo, url.searchParams.get("refresh") === "1" && !isClientRequest(req));
 
   if (type === "suggest") {
     if (!query) return NextResponse.json({ ok: false, error: "q required" }, { status: 400 });

@@ -5,7 +5,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildDbSearchBlocks, runTrending, type TrendingItem } from "@/lib/content/trending-sources";
 import { saveTrends } from "./trends";
 
-/** Operator-managed sources (0042), built per call so a deletion in the UI applies at once; a DB miss = built-ins only. */
+/** Operator-managed sources (0042), read on every collect: a change in the UI applies at the next collect (the next UTC
+ *  day, or a staff refresh, app/api/content/trending POST refresh=1). A collect only adds rows, so a deleted source's
+ *  rows already stored today stay until tomorrow. A DB miss = built-ins only. */
 async function dbSourceBlocks(sb: SupabaseClient) {
   try {
     const { data, error } = await sb.from("content_sources").select("id, label, url, geos, enabled").eq("enabled", true);
@@ -27,6 +29,16 @@ export async function collectTrends(sb: SupabaseClient, geo: string): Promise<{ 
 }
 
 const utcToday = () => new Date().toISOString().slice(0, 10);
+
+/** The geo's rows stored today (UTC), in the shape runTrending returns; a failed read is [] (the caller then collects). */
+export async function todaysTrends(sb: SupabaseClient, geo: string): Promise<TrendingItem[]> {
+  // One collect is one insert (same created_at): source then title keeps the list stable between requests.
+  const { data, error } = await sb.from("content_trends").select("title, source, traffic, category, related_queries")
+    .eq("geo", geo).eq("fetched_on", utcToday()).order("created_at").order("source").order("title").limit(200);
+  if (error || !data) return [];
+  return (data as Array<{ title: string; source: string; traffic: string | null; category: string | null; related_queries: string[] | null }>)
+    .map((r) => ({ title: r.title, source: r.source, traffic: r.traffic ?? "", category: r.category ?? "", relatedQueries: r.related_queries ?? [] }));
+}
 
 /** Collects each geo that has no content_trends row for today (UTC); returns the geos it collected. A failed read throws. */
 /** Geos fetched at once. A global site names all seven and every geo hits the same hosts (Reddit worldnews, Google):

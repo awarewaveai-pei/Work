@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseMiddlewareClient, isSupabaseAuthConfigured, type RefreshedCookie } from "@/lib/supabase/ssr";
 import { getFreshCachedRole, consumeStaleCachedRole, cacheValidatedRole, type CachedIdentity } from "@/lib/supabase/session-cache";
 import type { OpsRole } from "@/lib/ops-contracts";
+import { doorApiDenial } from "@/lib/portal/door-access";
 import { doorForHost, isAnonymousPath, isProductPath, portalHost, productPageOwner, routeOnProductDoor, staffHosts, type Door } from "@/lib/portal/doors";
 import { TOOLS_HEADER, encodeToolsHeader, logStaffVerdict, parseStaffTools, staffDenial, staffToolsMode } from "@/lib/staff-access";
 
@@ -229,6 +230,16 @@ export function isClientOutsideDoor(pathname: string, userKind: string, door: Do
   return door.kind === "product" ? !isProductPath(pathname, door.product) : !isPortalPath(pathname);
 }
 
+/** A customer calls a product door's APIs only while its account holds that product (lib/portal/door-access.ts). */
+async function productApiDenial(pathname: string, door: Door, headers: Headers, cookiesToCopy: RefreshedCookie[] = []): Promise<NextResponse | null> {
+  if (door.kind !== "product" || !isApiPath(pathname)) return null;
+  const denied = await doorApiDenial(headers, door.product.key);
+  if (!denied) return null;
+  const res = NextResponse.json({ error: denied.error }, { status: denied.status });
+  for (const cookie of cookiesToCopy) res.cookies.set(cookie.name, cookie.value, cookie.options);
+  return res;
+}
+
 function clientForbiddenResponse(request: NextRequest, cookiesToCopy: RefreshedCookie[] = []): NextResponse {
   const { pathname } = request.nextUrl;
   if (isApiPath(pathname)) {
@@ -395,6 +406,8 @@ export async function middleware(request: NextRequest) {
       const denied = staffToolDenial(request, pathname, door, fresh);
       if (denied) return denied;
       applyIdentityHeaders(baseHeaders, fresh);
+      const notHeld = await productApiDenial(pathname, door, baseHeaders);
+      if (notHeld) return notHeld;
       return forward(baseHeaders);
     }
   }
@@ -433,6 +446,8 @@ export async function middleware(request: NextRequest) {
   if (denied) return denied;
 
   applyIdentityHeaders(baseHeaders, identity);
+  const notHeld = await productApiDenial(pathname, door, baseHeaders, refreshedCookies);
+  if (notHeld) return notHeld;
 
   const finalResponse = forward(baseHeaders);
   // Apply any refreshed-session cookies (see M-1 fix in lib/supabase/ssr.ts for why this is a
