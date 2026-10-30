@@ -1,4 +1,12 @@
 # Worklog
+## 2026-10-30（續14）aware-wave-store v1.3.0 發版並裝上 aware-wave.com；註冊禮與註冊等 03:00 部署後開（Claude）
+
+- 發版：從 HEAD `420233a4c` 的拋棄式 worktree 跑 `release-wp-bridge.sh --plugin store`（工作目錄有另一 session 未提交的 Reconcile.php，不帶）→ CI 綠、tag v1.3.0、asset 在。
+- 安裝：`rollout-wp-bridge.ps1 -Plugin store`（先 DryRun）→ lobster-wordpress 1.2.1→1.3.0，備份 `/root/backups/wordpress/lobster-wordpress-pre-awstore-1.3.0-20261030T051849Z.sql`＋`...-awstore-1.2.1-...tgz`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp plugin get aware-wave-store（active 1.3.0）＋ curl aware-wave.com／my-account（200／200）＋ option aware_wave_welcome_product_id 未設（註冊禮關） | exit=0 | ms=3000
+- REVIEW_WAIVED: NA -- 發版與安裝，程式已在 續13 審過
+- BUGHUNT_WAIVED: NA -- 無程式改動
+- **待做（03:00 部署後）**：決策文件「上線狀態」段 ①–④＋Google 段。rollback：`rollout-wp-bridge.ps1` 用上列備份還原 1.2.1。
 ## 2026-10-30（續13）客戶自助註冊：只在 aware-wave.com（WP 驗證／Google），註冊送 50 點開 5 個產品；點數包可帶多方案；/ops/plans 方案管理頁；portal 註冊刪除；沒 user_kind 一律 403（操作者「你全部處理好」）（Claude）
 
 - **決策**：[`reports/decisions/2026-10-30-customer-self-signup-email-google.md`](reports/decisions/2026-10-30-customer-self-signup-email-google.md)「定案」表（操作者五題答覆逐條對應實作）。

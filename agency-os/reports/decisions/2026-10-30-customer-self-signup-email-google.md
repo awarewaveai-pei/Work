@@ -14,6 +14,10 @@ Mode: 直接決策（非 /decide 面板）。**已定案（操作者 2026-10-30�
 
 註冊禮範圍（操作者「全部處理好」＋要管理頁）：開 5 個已上線且有點數功能的產品。0145 每產品一個 `<product>_credits` 加購方案（登記表 billing=credits 的全部功能）；0146 一筆點數包可帶 `plan_keys`（1–20，舊 `plan_key` 照收）；外掛點數包商品的方案欄可填多個（空白隔開）。design 只有訂閱功能、cs／collect／outreach 門未開，不在內。方案之後在 `/ops/plans` 管（0147）。
 
+上線狀態（2026-10-30 13:20）：next-admin `420233a4c` 推 main（03:00 自動部署）；0145–0147 已套正式庫；aware-wave-store v1.3.0 已裝 aware-wave.com（註冊禮商品 ID 未設＝不送、Woo 註冊仍關）。
+**03:00 部署後才做**（外掛先於 0146 上線會靜默丟 `plan_keys`，README）：①確認 next-admin 跑 ≥`420233a4c`；②建 Woo 商品「註冊禮」：私人、0 元、虛擬、點數 50、方案 `content_credits social_credits studio_credits tarot_credits video_credits`、產品 studio，把 ID 填進「AwareWave 付款與會員 → 註冊禮商品」；③WooCommerce 開「我的帳號頁允許註冊」；④另一信箱實走 註冊→點驗證信→註冊禮訂單→「進入」studio（點數 50、5 產品權利列）。
+**Google**：裝 Nextend Social Login（免費）；Client ID／Secret 由操作者在 Google Cloud Console 建（redirect 網址照 Nextend 設定頁顯示的填）後填入；**同 email 既有會員的自動連結要關**：攻擊者可先用受害者 email 建 WP 帳號（知道密碼），受害者用 Google 登入被連進該帳號後驗證信箱 → 雙方共用帳號。
+
 I6 落地：aware-wave.com（`sellerKind=internal`）的會員帳號直接建成已驗證、不寄設定密碼信（`client-invite.ts` `verifiedClientAccount`）；轉售站照舊寄信。
 
 前提（操作者 2026-10-30 定案）：註冊入口放 aware-wave.com。原話：「我之後想把產品放在aware-wave.com, 是wordpress, 因為我用使用外他的woo commerce, 會員和一些東西」。所以：WordPress／WooCommerce 會員是註冊與帳號的起點，email 驗證與 Google 登入都在 WP 端做；app 帳號在客人第一次從 WP 進產品時建立或連結，沿用 `wp-handoff` 與 4c-2 站點簽章登入；**不開第二個註冊入口**。
