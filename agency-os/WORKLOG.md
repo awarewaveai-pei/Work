@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-30（續31）Google 註冊兩個阻擋：Nextend 跟著 WP 註冊開關、wp-login 5r/m 連 GET 都擋（操作者「我才註冊一次」就 429）（Claude）
+
+- **根因 1**：Nextend `allow_register=-1`（預設）＝跟 WP `users_can_register`（0）→ Google 新會員導到 `wp-login.php?registration=disabled`（`nextend-social-login.php:354`、`:1566-1577`）。修：`NextendSocialLogin::$settings->update(['allow_register'=>1])`（不打開 WP 原生無驗證碼的 wp-login 註冊頁）。Google provider tested=1 enabled=1。
+- **根因 2**：lobster-nginx `zone=wplogin rate=5r/m burst=2` 以 IP 計所有方法；一次 Google 登入經 wp-login.php GET 3–4 次＋Verify Settings 數次 → 07:12:15 `limiting requests … zone "wplogin" client 220.128.133.123 GET /wp-login.php?registration=disabled`。修：`map $request_method $wplogin_key { POST $binary_remote_addr; default ""; }`，wplogin 只計密碼 POST；同 location 另套 `zone=public burst=60`。repo `nginx/default.conf` 與 prod 原本相同，`safe-infra-patch.sh nginx`（備份 `default.conf.bak.safe-patch-20261030-071438`，nginx -t＋reload OK）。
+- 取捨：舊規則也限了 GET 掃描（10/28 SQLi 探測 7974 筆紀錄中的 wplogin 項）；現改受 public 30r/s。前面另有 Cloudflare 對 wp-login 的 managed challenge（curl→403 `Cf-Mitigated: challenge`），密碼 POST 仍 5r/m＋limit-login-attempts＋wp-2fa。
+- REALTEST_EVIDENCE: tool=SSH | cmd=safe-infra-patch nginx success ＋ error.log 重載後 0 筆 limiting ＋ curl my-account（loginSocial=google 2 處＝登入／註冊表單各一）＋ Nextend allow_register=1 google_enabled=1 | exit=0 | ms=5000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 自審：空 key 不限流為 nginx 文件行為；POST 仍原 5r/m
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=zone=wplogin | hits=2（nginx/default.conf zone 與 location）
+- rollback：還原上列 .bak 後 `nginx -s reload`；Nextend allow_register 改 -1。
 ## 2026-10-30（續30）Google 會員登入金鑰寫入 vault 與 Nextend；1.3.3 把按鈕放進 Woo 表單；待操作者後台驗證＋啟用（Claude）
 
 - 操作者建 Google Cloud 專案 `AwareWave-Login`：External、In production、範圍只有 openid／userinfo.email／userinfo.profile（機密／受限皆空）、Web client，redirect `https://aware-wave.com/wp-login.php?loginSocial=google`；值記於 `AWARE_WAVE_CREDENTIALS.md:1295-1300`。
