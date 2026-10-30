@@ -45,7 +45,7 @@ from ai_lego.errors import InvariantViolation, case_gone
 from ai_lego.platform.ai_gate import AiRefused, Prepared, actions, prepare_ai
 from ai_lego.platform.ai_gateway.provider import BACKGROUND_TIMEOUT_SECONDS, AnthropicProvider
 from ai_lego.platform.identity.store import IdentityStore
-from ai_lego.platform.workflow.run_lock import RunLock, acquire_run_lock, run_lock_state, run_lock_tag
+from ai_lego.platform.workflow.run_lock import RunLock, acquire_fresh_run_lock, run_lock_state, run_lock_tag
 
 router = APIRouter()
 _log = logging.getLogger(__name__)
@@ -110,7 +110,7 @@ class _Waiter:
 
 
 def _lock_path(tenant_id: str, turn_id: str) -> Path:
-    """The turn's run lock (plan P-k; one per turn, never deleted -- as an interpretation's)."""
+    """The turn's run lock (plan P-k; one per turn, single-use: swept by acquire_fresh_run_lock once free and stale)."""
     tenant_key = hashlib.sha256(tenant_id.encode("utf-8")).hexdigest()[:32]
     turn_key = hashlib.sha256(turn_id.encode("utf-8")).hexdigest()[:32]
     return PRODUCT_ROOT / ".runtime" / "ai-turn" / tenant_key / f"{turn_key}.lock"
@@ -158,7 +158,7 @@ def _launch_turn(**kwargs: Any) -> None:
 def _background(prepared: Prepared, provider: Any, response: Response) -> dict[str, Any]:
     tenant_id, action = prepared.tenant_id, prepared.action
     turn_id = str(uuid4())
-    lock = acquire_run_lock(_lock_path(tenant_id, turn_id), tag=turn_id)
+    lock = acquire_fresh_run_lock(_lock_path(tenant_id, turn_id), tag=turn_id, stale_after_seconds=2 * BACKGROUND_TIMEOUT_SECONDS)
     if lock is None:   # a fresh id's lock is only ever held by a status probe, for an instant
         raise HTTPException(status_code=409, detail="AI_TURN_IN_FLIGHT: the AI could not start this instant; ask again")
     waiter = _Waiter()

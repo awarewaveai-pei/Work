@@ -12,7 +12,8 @@
 
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import type { CollectIssue, RunReport, SinkReport } from "@/lib/collect/types";
-import type { IncidentSource } from "@/lib/ops-inbox/types";
+import { ingestIncident } from "@/lib/ops-inbox/ingest";
+import type { IncidentDraft, IncidentEnvironment, IncidentSource } from "@/lib/ops-inbox/types";
 
 export interface PersistArgs {
   organizationId: string;
@@ -149,7 +150,7 @@ export async function persistRunReport(args: PersistArgs): Promise<PersistResult
  * must be one incident with a rising occurrence count, not twenty-four alerts a day — which is how
  * an alert channel becomes something people mute.
  */
-async function raiseCollectionIncident(args: {
+export async function raiseCollectionIncident(args: {
   organizationId: string;
   runKey: string;
   runId: string | null;
@@ -161,35 +162,40 @@ async function raiseCollectionIncident(args: {
   if (!sb) return { ok: false, error: "no_supabase_client" };
 
   const shape = args.report.quarantined.length > 0 ? "quarantined" : args.sink.written === 0 ? "stored_nothing" : "refusals";
-  const fingerprint = `collection:${args.organizationId}:${shape}`;
+  // ops_incidents has two unique keys, (fingerprint, environment) and (source, external_id); the RPC
+  // only arbitrates the first, so environment must also be in external_id or dev and prod collide on
+  // the second.
+  const environment: IncidentEnvironment = process.env.NODE_ENV === "production" ? "production" : "development";
+  const fingerprint = `collection:${args.organizationId}:${shape}:${environment}`;
   const sample = [...args.report.quarantined, ...args.report.dirty].slice(0, 3);
+  const { data: org } = await sb.from("organizations").select("slug").eq("id", args.organizationId).maybeSingle();
 
-  const { error } = await sb.from("ops_incidents").upsert(
-    {
-      organization_id: args.organizationId,
-      source: "collection" satisfies IncidentSource,
-      external_id: fingerprint,
-      fingerprint,
-      signal_type: "business",
-      severity: args.severity,
-      service: "collection",
-      environment: process.env.NODE_ENV === "production" ? "production" : "development",
-      title:
-        shape === "quarantined"
-          ? "Collection quarantined a page carrying planted instructions"
-          : shape === "stored_nothing"
-            ? "Collection run stored nothing while refusing pages"
-            : "Collection refused a large share of a site",
-      message: [
-        `run=${args.runKey} (${args.runId ?? "unsaved"})`,
-        `stored=${args.sink.written} refused=${args.report.dirty.length} quarantined=${args.report.quarantined.length}`,
-        `disallowed=${args.report.disallowed.length} offEntity=${args.report.offEntity.length} gone=${args.report.gone.length} stoppedBy=${args.report.stoppedBy}`,
-        ...sample.map((i) => `- ${i.uri} :: ${i.reason}`),
-      ].join("\n"),
-      last_seen_at: new Date().toISOString(),
-    },
-    { onConflict: "source,external_id" },
-  );
+  const draft: IncidentDraft & { fingerprint: string } = {
+    source: "collection" satisfies IncidentSource,
+    external_id: fingerprint,
+    fingerprint,
+    signal_type: "business",
+    severity: args.severity,
+    service: "collection",
+    environment,
+    title:
+      shape === "quarantined"
+        ? "Collection quarantined a page carrying planted instructions"
+        : shape === "stored_nothing"
+          ? "Collection run stored nothing while refusing pages"
+          : "Collection refused a large share of a site",
+    message: [
+      `run=${args.runKey} (${args.runId ?? "unsaved"})`,
+      `stored=${args.sink.written} refused=${args.report.dirty.length} quarantined=${args.report.quarantined.length}`,
+      `disallowed=${args.report.disallowed.length} offEntity=${args.report.offEntity.length} gone=${args.report.gone.length} stoppedBy=${args.report.stoppedBy}`,
+      ...sample.map((i) => `- ${i.uri} :: ${i.reason}`),
+    ].join("\n"),
+    raw: { organization_id: args.organizationId, shape },
+    tags: { shape },
+    // The slug is what scopes storm correlation and sets organization_id inside the standard path.
+    client_slug: (org?.slug as string | undefined) ?? null,
+  };
 
-  return error ? { ok: false, error: error.message } : { ok: true };
+  const r = await ingestIncident(sb, draft);
+  return r.id ? { ok: true } : { ok: false, error: r.error ?? "empty" };
 }

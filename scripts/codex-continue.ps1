@@ -15,7 +15,8 @@
       work_ref (refs/codex/work for COS) in the main repository (a ref, not a branch). Nothing is merged into main, pushed or deployed by this script:
       a Claude session clears agency-os/reports/review-debt.md first (a reviewer must not be the author);
     - a card is DONE only when this script saw: at least one new commit, a clean worktree, the commit touching
-      review-debt.md, and every `check` command of the card exiting 0 (run here, outside Codex);
+      review-debt.md, and every `check` command of the card exiting 0 (run here, outside Codex, with an allow-list
+      environment: no inherited secret variable; see $checkEnvAllow);
     - mcp_servers={} keeps the per-token LLM proxy servers of ~/.codex/config.toml out of every run.
   State (outside git): $StateDir\state.json, logs per attempt: $StateDir\logs\.
 
@@ -84,7 +85,8 @@ function Invoke-LoggedProcess {
         [string]$InputFile,
         [string]$OutputFile,
         [string]$ErrorFile,
-        [int]$TimeoutSec
+        [int]$TimeoutSec,
+        [hashtable]$Environment = $null   # non-null = the child gets exactly these variables, nothing inherited
     )
     $start = New-Object System.Diagnostics.ProcessStartInfo
     $start.FileName = $FileName
@@ -98,6 +100,10 @@ function Invoke-LoggedProcess {
     $start.RedirectStandardInput = $true
     $start.RedirectStandardOutput = $true
     $start.RedirectStandardError = $true
+    if ($null -ne $Environment) {
+        $start.EnvironmentVariables.Clear()
+        foreach ($k in $Environment.Keys) { $start.EnvironmentVariables[$k] = [string]$Environment[$k] }
+    }
     $p = New-Object System.Diagnostics.Process
     $p.StartInfo = $start
     $timedOut = $false
@@ -127,8 +133,30 @@ function Invoke-LoggedProcess {
     } finally { $p.Dispose() }
 }
 
+# Card checks run code Codex wrote (tests, package.json pretest...) before any review, as the operator. Invariant: that
+# code gets no secret from the environment (mcp/user-env.ps1 puts every key into User env vars). So the check gets an
+# ALLOW-list environment, never the inherited one minus some names. A check that needs a new variable adds its NAME here.
+# Not covered (Windows, same user): files on disk and HKCU\Environment stay readable, and the network is open.
+$checkEnvAllow = @(
+    'SystemRoot', 'windir', 'SystemDrive', 'ComSpec', 'PATH', 'PATHEXT', 'TEMP', 'TMP',
+    'USERPROFILE', 'HOMEDRIVE', 'HOMEPATH', 'APPDATA', 'LOCALAPPDATA', 'ProgramData', 'ALLUSERSPROFILE', 'PUBLIC',
+    'ProgramFiles', 'ProgramFiles(x86)', 'ProgramW6432', 'CommonProgramFiles', 'CommonProgramFiles(x86)', 'CommonProgramW6432',
+    'NUMBER_OF_PROCESSORS', 'PROCESSOR_ARCHITECTURE', 'OS', 'USERNAME', 'USERDOMAIN', 'COMPUTERNAME'
+)
+# Values THIS script created (throwaway test PostgreSQL); never taken from the inherited environment, which may point elsewhere.
+$checkEnvOwn = @{}
+function New-CheckEnvironment {
+    $envMap = @{}
+    foreach ($name in $checkEnvAllow) {
+        $value = [Environment]::GetEnvironmentVariable($name, 'Process')
+        if ($null -ne $value) { $envMap[$name] = $value }
+    }
+    foreach ($k in $checkEnvOwn.Keys) { $envMap[$k] = $checkEnvOwn[$k] }
+    return $envMap
+}
+
 function Run-Command([string]$CmdLine, [string]$Dir, [string]$LogFile, [int]$TimeoutSec) {
-    $result = Invoke-LoggedProcess 'cmd.exe' @('/d', '/s', '/c', $CmdLine) $Dir $null $LogFile ($LogFile + '.err') $TimeoutSec
+    $result = Invoke-LoggedProcess 'cmd.exe' @('/d', '/s', '/c', $CmdLine) $Dir $null $LogFile ($LogFile + '.err') $TimeoutSec (New-CheckEnvironment)
     return [int]$result.Exit
 }
 
@@ -221,6 +249,7 @@ if ($usePostgres -and -not $DryRun) {
         if ($LASTEXITCODE -eq 0) {
             $startedPg = $true
             $env:COGNITIVE_OS_TEST_DATABASE_URL = "postgresql://postgres:$pw@127.0.0.1:55432/postgres"
+            $checkEnvOwn['COGNITIVE_OS_TEST_DATABASE_URL'] = $env:COGNITIVE_OS_TEST_DATABASE_URL
             for ($i = 0; $i -lt 60; $i++) { Invoke-WithUtf8Console { & docker exec $pgName pg_isready -U postgres 2>$null } | Out-Null; if ($LASTEXITCODE -eq 0) { break }; Start-Sleep -Seconds 1 }
             Say 'PostgreSQL test server up on 127.0.0.1:55432'
         } else { Say 'docker is not available: PostgreSQL tests will skip (loudly)' 'Yellow' }
@@ -234,7 +263,7 @@ $previousRequirePostgres = [Environment]::GetEnvironmentVariable('COGNITIVE_OS_R
 try {
     # postgres:false must not inherit a parent shell's PostgreSQL flag or URL (restored in finally)
     $previousTestDbUrl = [Environment]::GetEnvironmentVariable('COGNITIVE_OS_TEST_DATABASE_URL', 'Process')
-    if ($usePostgres) { $env:COGNITIVE_OS_REQUIRE_POSTGRES = '1' } else {
+    if ($usePostgres) { $env:COGNITIVE_OS_REQUIRE_POSTGRES = '1'; $checkEnvOwn['COGNITIVE_OS_REQUIRE_POSTGRES'] = '1' } else {
         Remove-Item Env:COGNITIVE_OS_REQUIRE_POSTGRES, Env:COGNITIVE_OS_TEST_DATABASE_URL -ErrorAction SilentlyContinue
     }
     foreach ($card in $queue.cards) {

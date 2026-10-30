@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -10,7 +11,7 @@ import time
 import unittest
 from pathlib import Path
 
-from ai_lego.platform.workflow.run_lock import acquire_run_lock, lock_path_for, run_lock_state, run_lock_tag
+from ai_lego.platform.workflow.run_lock import acquire_fresh_run_lock, acquire_run_lock, lock_path_for, run_lock_state, run_lock_tag
 from tests.unit.thread_testkit import HANG_GUARD_S, join_all
 
 COS_ROOT = Path(__file__).resolve().parents[2]
@@ -58,6 +59,24 @@ class RunLockTests(unittest.TestCase):
         self.assertEqual(run_lock_tag(self.path), "r2", "readable while held; a shorter tag leaves no tail")
         held.release()
         self.assertEqual(run_lock_tag(Path(self._tmp.name) / "never.lock"), "")
+
+    def test_fresh_lock_sweeps_only_free_and_stale_siblings(self):
+        old_free, old_held, young_free = (self.path.parent / f"{name}.lock" for name in ("old-free", "old-held", "young-free"))
+        for path in (old_free, old_held, young_free):
+            acquire_run_lock(path).release()
+        holder = acquire_run_lock(old_held)
+        long_ago = time.time() - 1000
+        for path in (old_free, old_held):
+            os.utime(path, (long_ago, long_ago))
+        fresh = acquire_fresh_run_lock(self.path, tag="t", stale_after_seconds=600)
+        try:
+            self.assertIsNotNone(fresh)
+            self.assertFalse(old_free.exists(), "free and stale: swept")
+            self.assertEqual(run_lock_state(old_held), "held", "stale but held: kept")
+            self.assertTrue(young_free.exists(), "free but not yet stale: kept")
+        finally:
+            fresh.release()
+            holder.release()
 
     def test_release_is_idempotent(self):
         lock = acquire_run_lock(self.path)

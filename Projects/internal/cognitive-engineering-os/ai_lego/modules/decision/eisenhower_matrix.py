@@ -40,7 +40,7 @@ from ai_lego.compute.eisenhower_matrix.classification import (
 )
 from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
-from ai_lego.modules.research.gates import evaluate_statistical_gate
+from ai_lego.modules.research.gates import evaluate_statistical_gate, genuine_compute_provenance
 
 METHOD_ID = "decision.eisenhower_matrix"
 RECORD_ID_PREFIX = "EISENHOWER-"
@@ -118,19 +118,8 @@ def generate_eisenhower_matrix_classification(
 
     classified_tasks = classify_tasks(tasks, urgency_scale, importance_scale, urgency_threshold, importance_threshold)
 
-    # This record's quadrant is ALWAYS a deterministic recomputation (evaluate_genuine_compute_gate
-    # demands epistemic_type == "CALCULATED_RESULT", ai_lego/modules/research/gates.py:94) --
-    # never a caller choice, regardless of what epistemic_type the caller's own provenance carries.
-    # Normalizing it here (authorship_state passes through unchanged -- that dimension IS a real
-    # caller/API-layer choice) fixes a real, verified bug in the sibling decision.impact_effort,
-    # which embeds the caller-supplied provenance verbatim: main.py's own /methods/{id}/invoke
-    # defaults an un-supplied provenance to epistemic_type=AI_INFERENCE (main.py:784), which
-    # genuine_compute then FAILS every single time -- reproduced directly via dispatch.invoke_builder
-    # with that exact default, 2026-09-18. Not fixed in impact_effort itself here (would touch
-    # already-shipped, tested code outside this task's scope) -- flagged to the operator separately.
-    if not isinstance(provenance, dict):
-        raise InvariantViolation(f"EISENHOWER_INVALID_PROVENANCE: provenance must be an object, got {_shallow_describe(provenance)}")
-    normalized_provenance = {**provenance, "epistemic_type": "CALCULATED_RESULT"}
+    # Quadrant is always a deterministic recompute (gate demands CALCULATED_RESULT); see genuine_compute_provenance.
+    normalized_provenance = genuine_compute_provenance(provenance)
     if not provenance_is_valid(normalized_provenance):
         raise InvariantViolation(f"EISENHOWER_INVALID_PROVENANCE: provenance failed schema validation after normalizing epistemic_type, got {_shallow_describe(provenance)}")
 

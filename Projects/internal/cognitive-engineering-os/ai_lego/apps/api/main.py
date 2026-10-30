@@ -79,7 +79,7 @@ from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog,
 from ai_lego.platform.entitlement.check import PERMIT_HEADER, Grant, check_entitlement, current_permit
 from ai_lego.platform.ai_gateway.draft import AI_DRAFT_CAPABILITY, MAX_BRIEF_CHARS, MAX_LABELS_PER_REQUEST, AiDraftProviderError, draft_method_kwargs, draft_recipe_source, recipe_draft_plan
 from ai_lego.platform.ai_gateway.pricing import cost_twd
-from ai_lego.platform.ai_gateway.provider import (DEFAULT_MODEL, SCOPE_PERSON, SCOPE_TENANT, AiProvider, AnthropicProvider, ProviderCallError, budget_exceeded, daily_person_budget,
+from ai_lego.platform.ai_gateway.provider import (BACKGROUND_TIMEOUT_SECONDS, DEFAULT_MODEL, SCOPE_PERSON, SCOPE_TENANT, AiProvider, AnthropicProvider, ProviderCallError, budget_exceeded, daily_person_budget,
                                                   daily_token_budget, fits_budget, provider_from_env)
 from ai_lego.platform.catalog.display_catalog import catalog_payload, load_catalog, registry_fingerprint
 from ai_lego.platform.identity.store import IdentityStore
@@ -102,7 +102,7 @@ from ai_lego.platform.workflow.capability_adapters import CapabilityAdapterRegis
 from ai_lego.platform.workflow.journal_protection import CasJournalContextProtector, LocalDevJournalKeyProvider, ResolverJournalKeyProvider
 from ai_lego.platform.workflow.executor import execute_workflow_ir, missing_workflow_input_paths, _atomic_write_journal, _journal_record
 from ai_lego.platform.workflow.human_required import load_human_required, missing_human_required
-from ai_lego.platform.workflow.run_lock import RunLock, acquire_run_lock, lock_path_for, run_lock_state, run_lock_tag
+from ai_lego.platform.workflow.run_lock import RunLock, acquire_fresh_run_lock, acquire_run_lock, lock_path_for, run_lock_state, run_lock_tag
 from ai_lego.platform.workflow.workflow_gates import WorkflowGateRegistry
 from ai_lego.apps.recipe_runtime import build_method_components, build_registered_capability_adapters, build_registered_workflow_gate_registry, wrap_capability_handlers_with_artifact_persistence
 from ai_lego.data.object.json_artifact_store import JsonArtifactStore
@@ -1909,7 +1909,7 @@ RUNNER_LOST = "INTERPRETATION_RUNNER_LOST: the analysis stopped before it finish
 
 
 def _interpretation_lock_path(tenant_id: str, interpretation_id: str) -> Path:
-    """Its runner's lock (plan P-k; one per run, like a workflow run's ``<run_id>.lock``, never deleted)."""
+    """Its runner's lock (plan P-k; one per run, single-use: swept by acquire_fresh_run_lock once free and stale)."""
     tenant_key = hashlib.sha256(tenant_id.encode("utf-8")).hexdigest()[:32]
     run_key = hashlib.sha256(interpretation_id.encode("utf-8")).hexdigest()[:32]
     return PRODUCT_ROOT / ".runtime" / "interpretation" / tenant_key / f"{run_key}.lock"
@@ -1989,7 +1989,8 @@ def interpret_method(
         raise HTTPException(status_code=500, detail="METHOD_CONTRACT_INVALID")
     interpretation_id = f"INTERP-{uuid.uuid4().hex.upper()}"
     sources = repo.list_sources(session["tenant_id"], project_id)
-    lock = acquire_run_lock(_interpretation_lock_path(session["tenant_id"], interpretation_id), tag=interpretation_id)
+    lock = acquire_fresh_run_lock(_interpretation_lock_path(session["tenant_id"], interpretation_id), tag=interpretation_id,
+                                  stale_after_seconds=2 * BACKGROUND_TIMEOUT_SECONDS)
     if lock is None:   # a fresh id's lock is only ever held by a status probe, for an instant
         raise HTTPException(status_code=409, detail="INTERPRETATION_IN_FLIGHT: the analysis could not start this instant; retry")
     try:

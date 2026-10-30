@@ -1,4 +1,28 @@
 # Worklog
+## 2026-10-30（續4）四件小修：collection 事故走標準 ingest／Codex 佇列 check 白名單環境／COS 單次 lock 清理／eisenhower 共用 provenance（Claude＋subagent）
+
+**觸發**：操作者「你決定前 5 件」。共用目錄已有 2 個 session（`local_0a51d7fc` ADR 017 主線），依 AGENTS §5 不再開 session，改派 subagent（Opus×1、Sonnet×3、Haiku×1），避開 ADR 017 檔案。
+
+**改了什麼**
+- C1 `next-admin/lib/collect/report-store.ts:153-200`：直接 `upsert` → `ingestIncident`（transition→atomic upsert→notify）；查 org slug 填 `client_slug`（同 `lib/social/review.ts:77`）；fingerprint／external_id 帶 environment（`ops_incidents` 兩個 unique，`0013:54-55`）。測試 `lib/collect/__tests__/collect-incident-atomic.test.ts`。舊 fingerprint 列不再命中，open 的要人工 resolve（未動 prod 資料）。
+- C2 `scripts/codex-continue.ps1:136-162`：card check 子程序只拿白名單系統變數＋`$checkEnvOwn`（本腳本自建的 test PG URL／flag，`:253`、`:268`）；不繼承任何秘密。未關：同使用者讀檔／HKCU／外網；`~/.codex/config.toml:1` Codex 本身 disk-full-read＋network → 待操作者（TASKS 該條）。
+- C3 COS `ai_lego/platform/workflow/run_lock.py`：`acquire_fresh_run_lock` 取新 id 前清同目錄 free 且 >2×`BACKGROUND_TIMEOUT_SECONDS` 的 lock；只用在單次 id（`main.py:1992`、`api/blocks/ai.py:161`）。這兩處讀狀態只問 `== "held"`（`main.py:1920`、`ai.py:121`），刪檔＝absent 不誤判；重用 id 的 synthesis／erase／workflow 不變。
+- C4 COS `ai_lego/modules/decision/eisenhower_matrix.py:121-123` 改呼叫 `genuine_compute_provenance`（`research/gates.py:102`）；同類掃描：impact_effort 早已修（`e745221a5`），monte_carlo（SIMULATED_RESULT）、wsjf／topsis／expected_value／batna 刻意不同。impact_effort 加一條 AI_INFERENCE 預設測試（還原舊碼紅、現碼綠）。
+- VBC：TASKS 兩條已做完未關：考試先 FAQ（`lib/cs/eval.ts:65-75`，`32a58d565`）、hci nginx 已入 repo（`nginx/default.conf:572`，`622f7b342`）。
+- stash 盤點（Haiku，唯讀）：66 個＝已包含 5／自動產物 11／無法自動判 50（行級比對高估），不清。
+
+**驗證**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit ＋ npx vitest run lib/collect lib/ops-inbox（38 files，505 passed） | exit=0 | ms=10500
+- REALTEST_EVIDENCE: tool=Bash | cmd=probe-checkenv.ps1（AST 載入 New-CheckEnvironment；繼承 URL absent、GITHUB_PERSONAL_ACCESS_TOKEN absent、自建 URL present）＋ subagent 修前 npm pretest 讀秘密 present→修後 absent | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/affected_tests.py --run（COS，3765 tests OK，含 run_lock 新測試） | exit=0 | ms=2525000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_eisenhower_matrix tests.unit.test_impact_effort（119 OK，eisenhower 測試零修改） | exit=0 | ms=20000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n -- Codex `agency-os/reports/oracle/2026-10-30-partialreview-8d34e659.md`，4 條皆查證成立並已修：F1/F2/F4 改走 `ingestIncident`＋slug（不再自補 org、correlation 有 tenant scope、會 notify）；F3 check 的 test DB URL 只取本腳本自建值。修後未再跑第二輪 oracle（修法＝照既有 social 模式，tsc＋505 測試綠）。
+  - external oracle = Codex CLI (codex exec -s read-only), not self-description
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory,Projects/internal/cognitive-engineering-os | grep=raiseCollectionIncident|acquire_fresh_run_lock|checkEnvOwn|New-CheckEnvironment | hits=26（皆本次定義／呼叫／測試／TASKS 註；`.claude/commands/codex-do.md` 無 check 環境主張）
+- 同類未修（記 TASKS）：`lib/site-watch/messages.ts:7`、`lib/social/review.ts:77`、`lib/social/dispatch-store.ts:107` fingerprint 不帶 environment；治本＝`ops_incidents` unique(source,external_id) 加 environment（migration，High）。
+- 避免再發生：in-app 事故一律 `ingestIncident`，不直接呼叫 `upsertIncidentAtomic`／`upsert`。
+
+**rollback**：revert 本 commit（無 migration、無部署；next-admin 今晚 03:00 自動部署會帶上 C1）。
 ## 2026-10-30（續3）第一個方案 0144 `studio_basic`＋點數跨產品＋台灣卡訂閱改 WCS 手動續訂（操作者「你決定」）（Claude）
 
 **觸發**：續做 ADR 017 客戶怎麼買 4b-6／第一個方案；操作者問「點數要用在其他產品怎麼做」→「你決定」。

@@ -12,6 +12,8 @@ advisory lock on ``<run_id>.lock`` next to the journal, held for the whole run:
 - the file exists only for an ACCEPTED run (callers refuse before acquiring) and is never deleted, not by
   retention or erasure either: unlinking it lets a second opener lock a fresh inode while the first still
   holds the old one. Bytes from offset 1 carry a tag (the recipe id) so status can tell whose run it is.
+  The one exception is a SINGLE-USE id (a fresh uuid acquired exactly once, never again): ``acquire_fresh_run_lock``
+  sweeps such files once they are free and stale, since nothing can ever open that name for acquiring again.
 
 Limits: advisory and host-local (a network filesystem shared by several hosts is out of scope; multi-host =
 swap this module for a session-bound DB lock, same three functions). A runner stuck inside a step holds the
@@ -24,6 +26,7 @@ get a 409 -- never a second runner.
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 from typing import Literal
 
@@ -97,6 +100,42 @@ def acquire_run_lock(path: Path, *, tag: str = "") -> RunLock | None:
         _unlock_and_close(fd)
         raise
     return RunLock(path, fd)
+
+
+def _sweep_stale(directory: Path, stale_after_seconds: float) -> None:
+    """Delete ``*.lock`` files in ``directory`` that are free and untouched for ``stale_after_seconds``. Only for
+    directories whose ids are single-use. The exclusive try-lock is held while the age is read, so a held file is
+    skipped and cannot be taken mid-check; a status probe that opened the file before the unlink merely sees an
+    orphan inode (reads "free"), and on Windows an open file refuses the unlink (skipped, retried next sweep)."""
+    now = time.time()
+    try:
+        names = [entry for entry in directory.iterdir() if entry.suffix == ".lock"]
+    except OSError:
+        return
+    for entry in names:
+        try:
+            fd = os.open(entry, os.O_RDWR)
+        except OSError:
+            continue
+        stale = False
+        try:
+            if _try_lock(fd):
+                stale = now - os.fstat(fd).st_mtime > stale_after_seconds
+        finally:
+            _unlock_and_close(fd)
+        if stale:
+            try:
+                entry.unlink()
+            except OSError:
+                pass
+
+
+def acquire_fresh_run_lock(path: Path, *, tag: str, stale_after_seconds: float) -> RunLock | None:
+    """``acquire_run_lock`` for a single-use id (a fresh uuid, acquired once): first sweeps the sibling lock files of
+    finished runs older than ``stale_after_seconds``, so the directory stays bounded. Never use it for an id that is
+    acquired again (a workflow run, a project's synthesis): deleting its file reopens the two-inode race."""
+    _sweep_stale(path.parent, stale_after_seconds)
+    return acquire_run_lock(path, tag=tag)
 
 
 def run_lock_state(path: Path) -> Literal["held", "free", "absent"]:

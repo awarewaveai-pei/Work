@@ -417,6 +417,11 @@ class SpecConformanceTests(unittest.TestCase):
         record = _build_with_provenance(prov)
         self.assertIs(record["provenance"], prov)
 
+    def test_default_ai_inference_provenance_still_passes_genuine_compute(self):
+        record = _build_with_provenance(make_provenance("AI_INFERENCE", "AI_GENERATED"))
+        self.assertEqual(record["provenance"]["epistemic_type"], "CALCULATED_RESULT")
+        self.assertEqual(evaluate_genuine_compute_gate(record, "v", "2026-10-30T00:00:00Z")["status"], "PASS")
+
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
         live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
