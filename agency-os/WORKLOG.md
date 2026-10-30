@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-30（續26）aware-wave.com 開放會員註冊＋Turnstile 驗證碼（操作者「裝並開放」）（Claude）
+
+- 外掛：wordpress.org Simple Cloudflare Turnstile 1.44.3（RelyWP）。沿用既有 widget「aware-wave.com intake form」（domains app.aware-wave.com、aware-wave.com，managed）；site key 與 secret 從 next-admin 容器 `NEXT_PUBLIC_TURNSTILE_SITE_KEY`／`TURNSTILE_SECRET_KEY` 經 stdin 寫入 `cfturnstile_key`／`cfturnstile_secret`。只開 `cfturnstile_woo_register`／`woo_login`／`woo_reset`；`wp-login.php` 不開（驗證碼故障時的後台入口，該處已有 wp-2fa＋limit-login）。
+- **坑**：外掛只在 `cfturnstile_tested` 空或 `yes` 時載入整合（`simple-cloudflare-turnstile.php:217`），寫金鑰時被設 `no` → 驗證碼沒掛上、機器人 POST 註冊成功（探測會員 #3 `bot-probe-…@example.com`，未驗證、無註冊禮，留給操作者刪）。當下關註冊 → 設 `cfturnstile_tested=yes`（金鑰為正式使用中，wp-login 未接故無鎖死風險）→ 重開。
+- REALTEST_EVIDENCE: tool=curl | cmd=GET aware-wave.com/my-account/（register form 1、cf-turnstile 4、sitekey 尾 iE0h8Y）＋ 無驗證碼 POST 註冊 → wp user get 探測信箱＝Invalid user（未建帳號） | exit=0 | ms=3000
+- REVIEW_WAIVED: NA -- WP 外掛設定，無程式改動
+- BUGHUNT_WAIVED: NA -- 無程式改動
+- `woocommerce_enable_myaccount_registration=yes`、`aware_wave_welcome_product_id=40`。rollback：註冊改 no、停用 simple-cloudflare-turnstile。
+- 剩：真人在註冊頁解驗證碼走一次（操作者另一信箱）；Google（Nextend＋操作者建 OAuth client，關同 email 自動連結）。
 ## 2026-10-30（續25）第 12 項：工作區→產品門一次性換證（操作者「做換證」；Fable 設計／Sonnet 實作／Codex＋critic 審）
 
 - **根因**：auth cookie host-only（`lib/supabase/auth-cookie-options.ts:4`），WP 註冊會員無 app 密碼，launcher「開啟」是 `<a>` 到門主機 → 撞 `/login`（WORKLOG 續18 剩餘①）。
