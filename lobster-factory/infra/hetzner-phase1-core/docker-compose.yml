@@ -304,6 +304,8 @@ services:
       SCHEDULE_INGEST_TOKEN: ${SCHEDULE_INGEST_TOKEN:-}
       PAYMENTS_PROVIDERS: ${PAYMENTS_PROVIDERS:-}
       PAYMENTS_LOCAL_SECRET: ${PAYMENTS_LOCAL_SECRET:-}
+      PAYMENTS_WOO_SECRET: ${PAYMENTS_WOO_SECRET:-}
+      AUTH_WP_HANDOFF_SECRET: ${AUTH_WP_HANDOFF_SECRET:-}
       # ADR 017 permits (lib/entitlements/runtime.ts): Ed25519 PKCS8/SPKI base64 bodies; PUBLIC_KEYS = "kid:spki;kid2:spki".
       # Empty in shadow mode = every paid call is logged as infra_error and allowed; enforce mode refuses.
       ENTITLEMENT_SIGNING_KEY: ${ENTITLEMENT_SIGNING_KEY:-}

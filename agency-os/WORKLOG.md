@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-30（續23）prod 接通 aware-wave.com→app 付款通道（woo）；註冊禮正式環境全程實走通過（操作者「現在接上」）（Claude）
+
+- **根因**（續20 斷點）：next-admin `PAYMENTS_PROVIDERS=local`，`PAYMENTS_WOO_SECRET`／`AUTH_WP_HANDOFF_SECRET` 既不在 `.env` 也未在 compose 宣告；WP 兩個密鑰選項空。
+- **改動（prod，值只在主機產生與搬移，從未印出）**：
+  - `/root/lobster-phase1/.env`：`safe-infra-patch.sh file`（備份 `.env.bak.safe-patch-20261030-060513`）加兩把 48 字元隨機密鑰、`PAYMENTS_PROVIDERS=local,woo`。
+  - `/root/lobster-phase1/docker-compose.yml`：`safe-infra-patch.sh compose ... next-admin`（備份 `docker-compose.yml.bak.safe-patch-20261030-060532`）在 next-admin 宣告兩變數 → healthy 15s。repo compose 同步兩行（`/check-drift` composeVarDrift 空）。
+  - WP：`aware_wave_payments_secret`／`aware_wave_handoff_secret` 由 `.env` 經 stdin 寫入；`aware_wave_welcome_product_id=40`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-next-admin printenv（PAYMENTS_PROVIDERS=local,woo；兩密鑰 len=48）＋ WP option 與容器 env 逐一比對相等、兩把互異 | exit=0 | ms=5000
+- REALTEST_EVIDENCE: tool=SSH | cmd=do_action woocommerce_payment_complete 41 → 訂單備註「已送付款事件 wc:payment_complete:41:credit_pack（HTTP 200）」→ psql：payment_events processed、units 50、plans 5；組織 wp-member-2（customer／awarewave-wp）；錢包 50；5 個 `*_credits` 合約 active、無到期；權利列 content13／social1／studio7／tarot2／video5；auth 使用者 client、confirmed、customer_identities awarewave-wp/2 | exit=0 | ms=4000
+- REALTEST_EVIDENCE: tool=SSH | cmd=簽 HMAC 的 hand-off（wp_user_id 2、studio）POST app.aware-wave.com/api/auth/wp-handoff → 200 ok、door studio.aware-wave.com /login/wp（token 未印） | exit=0 | ms=1500
+- REVIEW_WAIVED: NA -- 設定接線，無程式改動（repo compose 兩行為宣告同步）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=PAYMENTS_WOO_SECRET|AUTH_WP_HANDOFF_SECRET | hits=程式讀取點 lib/payments/woo-billing.ts、lib/auth/sources/awarewave-wp.ts 與既有測試；compose 兩邊皆已宣告
+- **rollback**：兩個 `.bak.safe-patch-*` 還原後 `docker compose up -d --no-build next-admin`；WP 兩選項清空、`aware_wave_welcome_product_id=0`。
+- **仍未開**：WooCommerce「我的帳號允許註冊」=no（網站無防機器人驗證碼，開前需裝 Turnstile 類外掛）；Google（Nextend＋操作者建 OAuth client）；付費結帳的允許付款方式（4b-6 綠界／PayPal）。測試會員 #2／訂單 #41／組織 wp-member-2 為實測資料。
 ## 2026-10-30（續22）step-10／step-11 已提前上線（他 session 部署 c09ccb177、外掛 1.3.1），正式站驗證（Fable）
 
 - 註冊 session 部署 7b7920f25、「01 客戶怎麼來」session 部署 c09ccb177 並發 aware-wave-store v1.3.1（CI phpunit 含 `MyAccountDoorsTest` 綠）裝上 aware-wave.com；兩者皆含 61f9f261c（工作區）與 4632004bb（WP 入口）→ 不必等 03:00。
