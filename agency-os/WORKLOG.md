@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-30（續7）aware-wave-store 1.2.1 發版並升級 aware-wave.com（續3 的外掛改動；操作者「都你決定」）（Claude）
+
+- 內容（a29eadfb0）：刪「點數包未設定使用方案：買家無法使用點數」備註（點數包不帶方案＝只加值，ADR 017 #11）；設定頁例子 TapPay→綠界信用卡、PayPal。
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/release-wp-bridge.sh --plugin store（發布 repo CI 完整 phpunit 綠、tag v1.2.1、asset aware-wave-store-v1.2.1.zip，https://github.com/awarewaveai-pei/aware-wave-store/releases/tag/v1.2.1） | exit=0 | ms=43703
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/rollout-wp-bridge.ps1 -Plugin store（DryRun 只 lobster-wordpress 1.2.0→1.2.1；正式 health '200 1.2.1'、home 200；aware-wave.com 公網 200） | exit=0 | ms=46234
+- REVIEW_WAIVED: NA -- 程式已在續3 經 Codex partialreview-ecb5c9b1 審過，本條只發版
+- BUGHUNT_WAIVED: NA -- 只發版，無新改動
+- rollback：`/root/backups/wordpress/lobster-wordpress-awstore-1.2.0-20261030T022355Z.tgz` 放回外掛資料夾（DB 備份 `…-pre-awstore-1.2.1-20261030T022355Z.sql`）。
+- 4b-9 現在只等 4b-6（操作者後台：綠界個人會員、PayPal 商業帳戶、WCS＋綠界官方外掛＋PayPal Payments、商品 meta）。
 ## 2026-10-30（續6）content 門驗收：補完續1「未驗」——員工四頁＋客戶開／不開兩條路都用正式資料驗過（Claude）
 
 - **觸發**：操作者「續做 content 門驗收…完成＝有開通的帳號看到四頁、沒開通的看到「尚未開通」」；之後「我還沒有設其他登入帳號…你去處理好」。
