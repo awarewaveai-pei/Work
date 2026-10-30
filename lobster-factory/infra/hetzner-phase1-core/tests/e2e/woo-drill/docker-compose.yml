@@ -1,0 +1,33 @@
+# ADR 017 4b-9 local drill: a real WordPress + WooCommerce + aware-wave-store sends payment events to the real payment
+# route and database (entitlements-real-db.py --suite woo-drill starts this from woo-drill.e2e.test.ts). Local only.
+# The plugin posts over http only to localhost (Settings::normalizeTarget), so WordPress shares the relay's network:
+# its localhost:<receiver port> is the relay, which forwards to the receiver on the host.
+name: awarewave-woo-drill
+services:
+  relay:
+    image: alpine/socat:1.8.0.1
+    command: TCP-LISTEN:${DRILL_RECEIVER_PORT},fork,reuseaddr,bind=127.0.0.1 TCP:host.docker.internal:${DRILL_RECEIVER_PORT}
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    labels: { awarewave.test: woo-drill }
+  db:
+    image: mariadb:11.4
+    environment: { MARIADB_DATABASE: wp, MARIADB_USER: wp, MARIADB_PASSWORD: wp, MARIADB_RANDOM_ROOT_PASSWORD: "1" }
+    labels: { awarewave.test: woo-drill }
+  wp:
+    image: wordpress:php8.3-apache
+    network_mode: service:relay
+    environment: &wpenv { WORDPRESS_DB_HOST: db, WORDPRESS_DB_USER: wp, WORDPRESS_DB_PASSWORD: wp, WORDPRESS_DB_NAME: wp }
+    volumes: &wpvol
+      - wp:/var/www/html
+      - ../../../../../packages/aware-wave-store-plugin:/var/www/html/wp-content/plugins/aware-wave-store:ro
+    labels: { awarewave.test: woo-drill }
+  cli:
+    image: wordpress:cli-php8.3
+    network_mode: service:relay
+    user: "33:33"
+    environment: *wpenv
+    volumes: *wpvol
+    entrypoint: ["sleep", "infinity"]
+    labels: { awarewave.test: woo-drill }
+volumes:
+  wp: {}

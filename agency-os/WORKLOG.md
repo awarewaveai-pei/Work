@@ -1,4 +1,29 @@
 # Worklog
+## 2026-10-30（續9）4b-9 本機演練：真 WordPress＋WooCommerce＋aware-wave-store → 真付款路由 → 真資料庫（操作者：還沒要開綠界）（Claude）
+
+**觸發**：操作者「我還沒有要去訂閱 ECpay 怎麼辦?」→ 不等金流帳號，先把 WordPress→控制面整條在本機跑通（4b-9 的「從沒跑過」那段）。
+
+**做了什麼**
+- `lobster-factory/infra/hetzner-phase1-core/tests/e2e/woo-drill/docker-compose.yml`：MariaDB＋WordPress＋WP-CLI＋socat relay；外掛只准 http 打 localhost（`Settings.php:111-125` normalizeTarget），WP 共用 relay 網路，localhost:39123 轉到本機收件端；不對外開埠。
+- `tests/e2e/woo-drill/drill.php`（`wp eval-file`）：setup（開關、目標、密鑰、白名單 `drill`、點數包商品 100 點、已驗證 email 會員）、order（`payment_complete()`，同真閘道）、refund、notes。白名單只比對字串（`PaymentEvents.php:236-241`），不必註冊假閘道。
+- `apps/next-admin/lib/entitlements/__tests__/woo-drill.e2e.test.ts`：收件端＝正式路由 handler＋真 Postgres/PostgREST；會員對應先建（建帳要 GoTrue，harness 沒有，另有測試）；以外掛自己的「已送付款事件…（HTTP 200）」備註為完成訊號。
+- `tests/e2e/entitlements/entitlements-real-db.py` 加 `--suite woo-drill`（payments schema＋0144）。
+- 卡 step-4 4b-9 加「本機半 done」與正式演練剩項；`RUNNABLE_DEMOS.md` 一列。
+
+**途中發現**
+- 測試端 bug（非產品）：`execFileSync` 呼叫 `wp` 時擋住 Node 事件迴圈，WP 等收件端回覆 15 s 逾時→外掛記「重試」不寫備註，回覆在 exec 結束後才送出。改 async exec（測試檔註解一行）。
+- 外掛每張訂單排兩個相同 event_id 的工作（`payment_complete`＋`order_status_processing` 兩個 hook，`StoreModule.php:62-71` 設計如此），路由第二次回 `replayed:true`、收件表一列：符合設計。
+- `wp action-scheduler run --group=aware-wave-payments` 報 group 不存在；改 `--hooks=awbridge_send_payment_event`。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py --suite woo-drill（1 passed：WP 7.1.4、WooCommerce 11.2.1、aware-wave-store 1.2.1；訂單 processing→備註 HTTP 200→payment_events 一列 credit_pack、錢包 100→退款 refunded→refund 事件、錢包 0） | exit=0 | ms=51090
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p .（next-admin） | exit=0 | ms=60000
+- 突變：外掛設錯密鑰 → 路由兩次 `401 invalid_signature` → 演練紅；還原綠。測試後 `awarewave.test=woo-drill`／`entitlements-e2e` 容器 0。
+- ORACLE_WAIVED: Codex 額度用完（usage limit，至 13:06，已 `oracle-quota.ps1 -Action set`）；書面對抗自審如下＋上列突變。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/3n -- 書面自審：n1 路由 handler 直接呼叫，Next middleware／nginx 未經過（正式機 smoke 與公網 401 測試另證）；n2 用 `drill` 方法而非真閘道，真閘道若自設狀態走 status hook（外掛已掛）留正式演練；n3 映像與 WooCommerce 未釘版本、每次從 wordpress.org 下載（演練用，壞了會紅不會假綠）；收件端綁 0.0.0.0:39123 約 1 分鐘、測試密鑰，風險可忽略。
+- BUGHUNT_WAIVED: NA -- 新增測試與測試環境，未改產品程式
+
+**rollback**：刪 `tests/e2e/woo-drill/`、測試檔、harness 一段；無正式機影響。
 ## 2026-10-30（續8）提前部署 next-admin 4af222dfc（含 4b-11 扣點、0144 方案、另一 session f0a5d5859）；操作者「去把事情處理完美」（Claude）
 
 - 部署前：`check-deploy-drift.ps1` FAIL behind 16（app 碼 3：33afaf874、a29eadfb0、f0a5d5859；compose 無漂移、無 workflows）；`apply-db-migration.mjs --status` applied 144（0144 已套）。

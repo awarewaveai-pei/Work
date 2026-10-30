@@ -164,6 +164,7 @@ A／B 都要會計師一句話確認「收款開發票＋合約負債」；C 另
 - 步驟：aware-wave.com 建私密測試商品（訂閱 0 元試用＋NT$1 點數包，`_awarewave_plan_key`／`_awarewave_credit_units` 填好）→ 測試會員（email 已驗證）各下一筆，綠界用測試環境卡號、PayPal 用 sandbox 帳號各一筆 → 逐段看：Woo 訂單備註「已送 AwareWave event wc:…」、`payment_events` 有列、`/ops/billing` 出現合約、`organization_entitlements` active 列、錢包加點、首購自動建帳戶與設定密碼信到信箱、我的帳號「進入」一鍵進門、門內用一次付費功能後 `entitlement.usage` 有列 → 全額退款點數包只退未用 → 取消訂閱後寬限 7 天到期 → WCS 後台手動觸發一次續扣，續約事件到達。
 - 驗收：每段一行實際輸出寫進 WORKLOG（REALTEST）；任一段不符 → 開修，修完整條重跑。
 - Rollback：外掛設定頁關「送付款事件」；測試帳戶與列用 `record-payment.mjs` 反向登記，不刪列。
+- 本機半（2026-10-30 done）：`entitlements-real-db.py --suite woo-drill`（`tests/e2e/woo-drill/`）＝真 WP＋Woo＋外掛→真路由→真 DB：點數包付款入帳、全額退款歸零。正式演練剩：首購建帳戶＋設定密碼信、我的帳號「進入」、訂閱（WCS）、綠界／PayPal 真閘道。
 
 ### 4b-10　員工後台給／收產品（無依賴；High：權限）
 - 為什麼：2026-10-25 查，給某客戶產品只有三條路——付款事件、`organization_all_features`（0118，SQL）、`scripts/record-payment.mjs`（`apps/next-admin/scripts/`）；`/ops/billing` 只讀（`page.tsx:5`）。代操、贈送、「只開部分產品」都要員工能在畫面上做。
