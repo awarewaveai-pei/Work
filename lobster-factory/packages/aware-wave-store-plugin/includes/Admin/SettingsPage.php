@@ -98,7 +98,7 @@ final class SettingsPage {
 			echo '<label style="display:block"><input type="checkbox" name="gateways[]" value="' . esc_attr( $id ) . '"' . checked( in_array( $id, $allowed, true ), true, false ) . '> '
 				. esc_html( wp_strip_all_tags( (string) $gw->get_title() ) ) . ' <code>' . esc_html( $id ) . '</code></label>';
 		}
-		echo '<p class="description">只勾「付款完成才把訂單變成處理中」的線上付款（例如 TapPay 刷卡）。<b>不要勾</b>貨到付款、超商取貨付款、銀行轉帳、支票：它們在收到錢之前訂單就會是處理中。購物車有 AwareWave 商品時，結帳頁只顯示勾選的方式；一個都不勾＝AwareWave 商品無法結帳。</p></td></tr>';
+		echo '<p class="description">只勾「付款完成才把訂單變成處理中」的線上付款（例如綠界信用卡、PayPal）。<b>不要勾</b>貨到付款、超商取貨付款、銀行轉帳、支票：它們在收到錢之前訂單就會是處理中。購物車有 AwareWave 商品時，結帳頁只顯示勾選的方式；一個都不勾＝AwareWave 商品無法結帳。</p></td></tr>';
 	}
 
 	private function secretRow( string $name, string $label, string $current, string $help ): void {

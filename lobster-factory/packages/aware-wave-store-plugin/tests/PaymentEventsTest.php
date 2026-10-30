@@ -215,7 +215,7 @@ final class PaymentEventsTest extends TestCase {
 		$this->assertSame( 'wc:payment_complete:700:credit_pack', $pack['event_id'] );
 		$this->assertCount( 0, $this->shop->notes );
 
-		// A pack without a plan key: points only, and the shop owner is told the buyer cannot spend them.
+		// A pack without a plan key only tops up the wallet: the buyer spends it on features its plans mark pay=credits.
 		$this->queue->jobs        = array();
 		$this->shop->products[22] = array( 'credit_units' => 100 );
 		$this->order( 701, 7, array( array( 'product_id' => 22, 'qty' => 1 ) ) );
@@ -223,7 +223,7 @@ final class PaymentEventsTest extends TestCase {
 		$this->assertCount( 1, $this->queue->jobs );
 		$this->assertSame( 'credit_pack', $this->body()['kind'] );
 		$this->assertArrayNotHasKey( 'plan_key', $this->body() );
-		$this->assertSame( array( 701, '點數包未設定使用方案：買家無法使用點數' ), $this->shop->notes[0] );
+		$this->assertCount( 0, $this->shop->notes );
 	}
 
 	public function test_a_cash_on_delivery_order_in_processing_sends_no_event_and_checkout_offers_only_allowed_methods(): void {

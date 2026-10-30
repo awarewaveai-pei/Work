@@ -147,6 +147,8 @@ A／B 都要會計師一句話確認「收款開發票＋合約負債」；C 另
 - 實作（2026-10-25）與上列不同處：扣錢包改為**列上明示**——列的 limits `pay: "credits"` 且功能 `billing: credits` 才扣（點數包的加購方案在 `plans.limits` 標）；照字面「contract 列＋點數功能就扣」會讓 0118 全功能合約（Soulful 代操）在翻 enforce 後開始扣點，突變證明（拿掉明示→Soulful 演練紅）。permit 格式不變（credits 仍 `entitlement_id: null`，列的合約放 `source_ref`）。點數包要附加購方案：外掛在 `credit_pack` 帶 `plan_key`，0128 同一交易寫無期末的使用權列（決定 6＝A，2026-10-25；原「另送 subscription_paid、期末＋1090 天」作廢）。
 
 ### 4b-6　Woo 店面設定（操作者在 WordPress 後台做；卡只列清單）
+- 外掛（2026-10-30 定）：WooCommerce Subscriptions（設定勾「接受手動續訂」）；綠界官方 `ecpay-ecommerce-for-woocommerce`（只開信用卡一次付清：個人會員開不了定期定額）；WooCommerce PayPal Payments（訂閱自動續扣）。aware-wave-store 設定頁付款方式白名單只勾這兩個。
+- 商品：訂閱 `_awarewave_plan_key=studio_basic`＋`_awarewave_product_key=studio`（後者才有「我的帳號」的「進入」按鈕，`MyAccountDoors.php:85`；0144，價格與試用天數在 Woo 設）；點數包只填 `_awarewave_credit_units`、不填 plan_key＝只加值錢包（ADR 017 #11）。
 - 結帳必須登入（WooCommerce → 設定 → 帳號與隱私：關閉訪客結帳）；結帳頁條款勾選（WooCommerce 內建「條款與條件」頁＝待決 3 條款全文，勾選才能下單）；每個點數包與訂閱商品的「簡短說明」第一行貼待決 3 的一句告知；商品 meta `_awarewave_plan_key`／`_awarewave_credit_units`（4b-2 的欄位）。
 - 會員 email 驗證：外掛 4b-2 的驗證信必須開（設定頁開關），未驗證的會員看不到結帳按鈕。
 - 驗證：以測試會員下單一筆 0 元試用 → `/ops/billing` 出現合約；Woo 訂單備註有「已送 AwareWave event wc:…」。

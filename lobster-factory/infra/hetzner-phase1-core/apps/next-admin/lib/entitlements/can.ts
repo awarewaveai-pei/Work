@@ -48,7 +48,7 @@ export async function issuePermit(request: PermitBinding, deps: CanDependencies)
   // The right to use a feature always comes from one active row (ADR 017 product decision #11, operator 2026-10-25):
   // a wallet alone opens nothing, the same rule as the door (lib/portal/door-access.ts). The row also says who pays:
   // by default its comp or contract covers the use (never debits); a row whose limits say `pay: "credits"` (the
-  // add-on plan a credit pack grants) spends the wallet per use, only on a feature the registry bills in credits.
+  // add-on plan a credit pack grants, or a product plan such as 0144 studio_basic) spends the wallet per use, only on a feature the registry bills in credits.
   // Opt-in on the row, not "every contract row on a credits feature": all-features contracts (0118, managed clients)
   // cover their use and must not start debiting when enforce is switched on.
   const row = await liveRow(deps.store, request.tenant, request.product_key, request.feature_key, now);

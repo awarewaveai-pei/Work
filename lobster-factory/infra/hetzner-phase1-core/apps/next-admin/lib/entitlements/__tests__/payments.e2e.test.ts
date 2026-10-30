@@ -11,6 +11,7 @@ import { createPrivateKey, sign } from "node:crypto";
 import { PAYMENT_SITE_HEADER } from "@/lib/payments/hmac";
 import { LOCAL_SIGNATURE_HEADER, signLocalPayment } from "@/lib/payments/local";
 import fixture from "@/lib/payments/__tests__/fixtures/ed25519-v1.json";
+import { PRODUCTS } from "@/lib/portal/products";
 import { startRestProxy } from "./real-db";
 
 const REST = process.env.ENTITLEMENTS_REST;
@@ -171,6 +172,21 @@ describe.skipIf(!REST)("payments against a real database (ADR 017 step 4a)", () 
         .toEqual({ status: 422, body: { ok: false, error: code } });
     }
     expect(await rows("media_credit_ledger", { organization_id: PACK_BUYER })).toHaveLength(before.length);   // same transaction: no credits either
+  });
+
+  it("the seeded studio_basic plan (0144) opens only registered credits features, each paid from the shared wallet", async () => {
+    const org = "00000000-0000-4000-8000-0000000000c9";
+    const { error } = await db.from("organizations").insert({ id: org, type: "client", name: "Studio Buyer", slug: "e2e-studio-buyer", kind: "customer" });
+    if (error) throw new Error(error.message);
+    expect((await send({ event_id: "studio-1", kind: "subscription_paid", organization_id: org, plan_key: "studio_basic", period_end: days(30), external_ref: "S-1" })).status).toBe(200);
+    expect((await send({ event_id: "studio-pack-1", kind: "credit_pack", organization_id: org, units: 100, order_ref: "SP-1" })).status).toBe(200);
+    const grants = await rows("organization_entitlements", { organization_id: org, status: "active" });
+    const studio = PRODUCTS.find((p) => p.key === "studio")!.features;
+    expect(grants.length).toBeGreaterThan(0);
+    for (const g of grants) {
+      expect(g.limits).toEqual({ pay: "credits" });   // can.ts: no marker = the contract covers unlimited use
+      expect(studio.find((f) => f.feature_key === g.feature_key)?.billing).toBe("credits");
+    }
   });
 
   it("a chargeback suspends entitlements and freezes the wallet", async () => {

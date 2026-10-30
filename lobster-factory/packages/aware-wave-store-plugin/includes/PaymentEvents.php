@@ -70,28 +70,23 @@ final class PaymentEvents {
 		}
 		$units     = 0;
 		$packPlans = array();
-		$noPlan    = false;
 		foreach ( $order['lines'] as $line ) {
 			$meta = $this->shop->productMeta( (int) $line['product_id'] );
 			if ( $meta['credit_units'] > 0 ) {
 				$units += $meta['credit_units'] * max( 0, (int) $line['qty'] );
 				if ( preg_match( self::KEY, $meta['plan_key'] ) ) {
 					$packPlans[ $meta['plan_key'] ] = true;
-				} else {
-					$noPlan = true;
 				}
 			}
-		}
-		if ( $noPlan ) {
-			$this->shop->addNote( $orderId, '點數包未設定使用方案：買家無法使用點數' );
 		}
 		if ( $units > 0 ) {
 			if ( $units > self::MAX_UNITS ) {
 				$this->shop->addNote( $orderId, 'AwareWave：點數 ' . $units . ' 超過單筆上限 ' . self::MAX_UNITS . '，未送出；請人工登記。' );
 				return;
 			}
-			// A wallet alone opens nothing (can.ts, 4b-5): plan_key names the add-on plan that grants the right to spend
-			// it; the server writes that right with no end date in the same transaction as the credits (migration 0128).
+			// One wallet per account, spent by any row marked pay=credits (can.ts, 4b-5): a pack without plan_key only tops it
+			// up (each product's plan marks its credit features, 0144); with plan_key the server also writes that add-on
+			// plan's rows with no end date, in the same transaction as the credits (0128).
 			$pack = array( 'kind' => 'credit_pack', 'units' => $units, 'order_ref' => (string) $orderId ) + self::paidAt( $order['date_paid'] ?? 0 );
 			if ( count( $packPlans ) === 1 ) {
 				$pack['plan_key'] = (string) array_keys( $packPlans )[0];

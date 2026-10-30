@@ -1,4 +1,31 @@
 # Worklog
+## 2026-10-30（續3）第一個方案 0144 `studio_basic`＋點數跨產品＋台灣卡訂閱改 WCS 手動續訂（操作者「你決定」）（Claude）
+
+**觸發**：續做 ADR 017 客戶怎麼買 4b-6／第一個方案；操作者問「點數要用在其他產品怎麼做」→「你決定」。
+
+**決定（Claude，操作者授權）**
+- D1 點數跨產品＝做法 1：一帳戶一錢包（`media_credit_ledger` 無 product_key）；各產品方案自己標點數功能 `{"pay":"credits"}`；點數包可不帶 `plan_key`＝只加值（0128 `if p_event ? 'plan_key'`）。不選「一包開多產品」：plans 一列一產品（0110:9），要改外掛＋migration。ADR 017 #11。
+- D2 第一個方案＝0144 `studio_basic`（base，studio 7 功能全標 pay:credits）。不標＝contract 列免費（`can.ts:60-73`）。種子進 migration 同 0118 前例。
+- D3 台灣卡訂閱＝WCS 手動續訂＋綠界官方外掛一次付清。根因：綠界個人會員開不了定期定額（support.ecpay.com.tw/25120：個人／商務只開一次付清與紅利）；外掛續期依續訂單付款方式送事件（`PaymentEvents.php:113-128`），付款頁有閘（`CheckoutGate.php:66`）＝不改程式。ADR 017 #3、卡 step-4 4b-6 清單。查證來源：web-researcher（綠界 developers 5631／16470／2868、wordpress.org ecpay-ecommerce-for-woocommerce 1.1.2610151）。
+
+**改了什麼**
+- `lobster-factory/packages/db/migrations/0144_plan_studio_basic.sql`(+down)；`tests/e2e/entitlements/entitlements-real-db.py` payments 套件加 0144；`payments.e2e.test.ts` 加一條（訂閱＋無方案點數包 → 每列 pay:credits 且功能在登記表為 credits）。
+- aware-wave-store 1.2.1（未發版）：刪「點數包未設定使用方案：買家無法使用點數」備註（做法 1 下為誤導）；設定頁例子 TapPay→綠界／PayPal；測試改。
+- `can.ts:51` 註解；ADR 017 #3／#11；卡 step-4 4b-6；TASKS 待決 1、第一個方案列。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py --suite payments（20 passed，含新條） | exit=0 | ms=34111
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p .（next-admin） | exit=0 | ms=12990
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scripts/apply-db-migration.mjs 0144（操作者「go 套 0144」；套前 --status applied 143／missing 0144）→ APPLY_OK 1/1 | exit=0 | ms=23024
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec supabase-db psql：plans → `studio_basic|studio|base|7|7|t`（7 功能、7 個 pay=credits、AwareWave 擁有）；studio_basic 合約 0 | exit=0 | ms=11947
+- 外掛：`php -l` 3 檔 OK；本機無 phpunit，完整 phpunit 由發版 CI 跑（`release-wp-bridge.sh --plugin store`），dry-run OK。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n -- `agency-os/reports/oracle/2026-10-30-partialreview-ecb5c9b1.md`，兩條皆查證成立已處理：F1 付費縫 `recordUse()` 報 0 點（`grant.ts:151`）→ 扣點要 `units>0`，有 1 點＝無限用；本次不造成（無標記同樣免費），但收第一筆真錢前必先定價，TASKS 第一個方案列已寫為擋點、0144 註解改正。F2 商品還要 `_awarewave_product_key=studio` 才有「進入」（`MyAccountDoors.php:85`）→ 4b-6 清單補。`can.ts` 註解在 oracle 後改（僅註解）。
+  - external oracle = Codex CLI (codex exec -s read-only), not self-description
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=無法使用點數\|沒設方案的點數包\|wallet alone opens nothing\|without plan_key | hits=12（WORKLOG 3 歷史；`wallet alone opens nothing` 6 處仍成立＝仍需權利列；其餘為本次新寫）
+
+- 下行 copy：`packages/db/scripts/0144_plan_studio_basic_down.sql`（`down-migration-copies.test.mjs` 擋）。
+**未完／擋點**：1.2.1 發版＋升級 aware-wave.com（等 go）；定價（每功能扣幾點）；4b-6 後台（操作者：綠界個人會員、PayPal 商業帳戶、裝外掛）；4b-9 等以上全部。
+**rollback**：0144 down（有人買過會被 FK 擋，先結束合約）；revert 本 commit。
 ## 2026-10-30（續2）金流改雙軌：綠界個人會員（台灣卡）＋PayPal（海外卡），取代 10-25 的 WCS＋TapPay；操作者是個人、無統編（Claude）
 
 **觸發**：操作者問「線上刷卡只有 TapPay 嗎？只能用公司名義嗎？我個人沒有統編」→「國內外都要刷的怎麼辦？」→ 選「綠界＋PayPal 雙軌」。
