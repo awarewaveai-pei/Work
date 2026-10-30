@@ -57,6 +57,8 @@ final class StoreModule {
 		}
 
 		( new ProductFields() )->register();
+		// Daily reconciliation read (next-admin lib/payments/woo-reconcile.ts); signed, read-only.
+		Reconcile::register( $shop, $settings );
 
 		$events = new PaymentEvents( $shop, new WpMembers(), $queue, $settings->allowedGateways );
 		// woocommerce_payment_complete fires only when a gateway calls payment_complete(); an admin marking an order paid,

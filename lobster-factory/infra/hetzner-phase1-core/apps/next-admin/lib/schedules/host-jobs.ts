@@ -56,6 +56,7 @@ export const HOST_JOBS: Record<string, HostJob> = {
   cs_inbound_sweep: { label: "客服漏接轉人工", description: "每 5 分鐘找出 AI 未完成回覆的客服訊息，轉交員工處理。", group: "site" },
   pod_order_inbox_sweep: { label: "印製訂單重送", description: "每 10 分鐘重送已付款、但尚未送到 Printful 的訂單。", group: "site" },
   entitlements_expire: { label: "方案到期處理", description: "每天關閉已到期的方案與試用，並為新功能補上預設權限。", group: "site" },
+  billing_reconcile: { label: "WooCommerce 對帳", description: "每天比對 aware-wave.com 近 7 天已付款的 AwareWave 訂單與收到的付款事件，對不上就開事件通知；/ops/billing 看同一份結果。", group: "site" },
   // Clocks off this host's cron, inventoried by report-host-schedules.py (handoffs/2026-10-25-schedules-off-trigger C5).
   // pg_cron_<job> and n8n_<id> rows are named from HOST_FAMILIES below; these are the fixed ones.
   cloud_phase4_weekly: { label: "修復中心週檢報告", description: "雲端 Claude routine 每週產生修復中心週檢報告並存進程式庫；超過 8 天沒有新報告時標示過時。", group: "laptop", fail: "過時時，「雲端排程報告檢查」會發 Telegram 通知。" },

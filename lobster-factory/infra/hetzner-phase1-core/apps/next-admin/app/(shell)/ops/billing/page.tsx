@@ -10,6 +10,8 @@ import {
   type AttentionReason, type BillingAccount, type BillingLedger, type LedgerFilter, type SellerMonth,
 } from "@/lib/entitlements/tables";
 import { BillingTab } from "../clients/[slug]/BillingTab";
+import { recentWooReconciliation, RECONCILE_DAYS, type Reconciliation } from "@/lib/payments/woo-reconcile";
+import { getSupabaseWriteClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "帳務 · Ops" };
@@ -78,6 +80,16 @@ export default async function BillingPage({ searchParams }: { searchParams?: Pro
     [month, lastMonth] = await Promise.all([billingSellerMonth(thisMonthStart), billingSellerMonth(previousMonthStart(thisMonthStart))]);
   } catch (error) {
     monthFailure = String(error instanceof Error ? error.message : error);
+  }
+  // aware-wave.com's paid orders against payment_events, live (the daily route opens an incident on the same result).
+  let recon: Reconciliation | { enabled: false } | null = null;
+  let reconFailure: string | null = null;
+  try {
+    const db = getSupabaseWriteClient();
+    if (!db) throw new Error("db_unavailable");
+    recon = (await recentWooReconciliation(db)).value;
+  } catch (error) {
+    reconFailure = String(error instanceof Error ? error.message : error);
   }
   if (sp.account) {
     detail = selected
@@ -192,6 +204,8 @@ export default async function BillingPage({ searchParams }: { searchParams?: Pro
           </>
         )}
 
+        <ReconcileCard recon={recon} failure={reconFailure} />
+
         <div style={{ ...card, marginBottom: 20 }}>
           <h2 style={{ fontSize: 16, fontWeight: 800, color: "var(--text-primary)", margin: "0 0 4px" }}>各賣家每月合計</h2>
           <div style={{ ...muted, marginBottom: 8 }}>
@@ -246,6 +260,45 @@ export default async function BillingPage({ searchParams }: { searchParams?: Pro
           <div style={{ ...card, ...muted, fontSize: 13 }}>點左邊的帳戶，明細會在這裡打開。</div>
         )}
       </div>
+    </div>
+  );
+}
+
+const when = (unix: number) => new Date(unix * 1000).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", hour12: false });
+
+function ReconcileCard({ recon: result, failure }: { recon: Reconciliation | { enabled: false } | null; failure: string | null }) {
+  const off = result !== null && "enabled" in result;
+  const recon = result && !("enabled" in result) ? result : null;
+  const ok = recon && !recon.missing.length && !recon.extra.length;
+  return (
+    <div style={{ ...card, marginBottom: 20, ...(recon && !ok ? { border: "1px solid var(--red)" } : {}) }}>
+      <h2 style={{ fontSize: 16, fontWeight: 800, color: "var(--text-primary)", margin: "0 0 4px" }}>WooCommerce 對帳（近 {RECONCILE_DAYS} 天）</h2>
+      <div style={{ ...muted, marginBottom: 8 }}>
+        aware-wave.com 已付款、含 AwareWave 商品、付款方式在自動開通名單的訂單，逐筆對照我們收到的付款事件。最近 15 分鐘的付款還在路上，不算。每天自動對一次，對不上會開事件通知；這裡顯示最多 10 分鐘前的結果。
+      </div>
+      {off ? (
+        <div style={{ fontSize: 13, color: "var(--text-muted)" }}>WooCommerce 付款尚未開啟（PAYMENTS_PROVIDERS 沒有 woo），開啟後每天自動對帳。</div>
+      ) : failure || !recon ? (
+        <div style={{ fontSize: 13, color: "var(--badge-red-text)" }}>讀不到對帳資料：{failure}</div>
+      ) : (
+        <>
+          <div style={{ fontSize: 13, color: "var(--text-primary)", marginBottom: 6 }}>
+            {when(recon.from)} 到 {when(recon.to)}：對上 {n(recon.matched)} 筆、漏送 {n(recon.missing.length)} 筆、多送 {n(recon.extra.length)} 筆、需人工登記 {n(recon.manual.length)} 筆
+          </div>
+          {recon.missing.length ? (
+            <div style={{ fontSize: 13, marginBottom: 6 }}><b>漏送</b>（已付款，沒有開通紀錄）：
+              <ul style={{ margin: "4px 0 0 18px" }}>{recon.missing.map((m) => <li key={`${m.orderId}-${m.expected}`}>訂單 #{m.orderId}：{m.expected}</li>)}</ul></div>
+          ) : null}
+          {recon.extra.length ? (
+            <div style={{ fontSize: 13, marginBottom: 6 }}><b>多送</b>（有開通紀錄，找不到對應的已付款訂單）：
+              <ul style={{ margin: "4px 0 0 18px" }}>{recon.extra.map((e) => <li key={e.eventId}><code>{e.eventId}</code></li>)}</ul></div>
+          ) : null}
+          {recon.manual.length ? (
+            <div style={{ fontSize: 13 }}><b>需人工登記</b>（外掛不會自動送，收到款後用 record-payment.mjs 登記）：
+              <ul style={{ margin: "4px 0 0 18px" }}>{recon.manual.map((o) => <li key={o.id}>訂單 #{o.id}（{o.paymentMethod || "無付款方式"}{o.reason ? `，${o.reason}` : ""}）</li>)}</ul></div>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }

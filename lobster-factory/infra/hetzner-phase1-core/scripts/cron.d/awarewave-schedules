@@ -9,6 +9,7 @@
 # waits for its verdict; site-watch-tick.sh is the hourly site-watch round. Frequencies are the old Trigger crons.
 # schedule_alerts / schedule_digest: one Telegram+Slack message when a row on /ops/schedules turns red or recovers, and a
 # daily 09:00 Taipei line (C4; lib/schedules/alerts.ts) -- if that line does not arrive, the alerting itself is down.
+# billing_reconcile: 09:20 Taipei, aware-wave.com paid orders vs payment_events (lib/payments/woo-reconcile.ts).
 # trigger_slots_check: a Trigger.dev concurrency slot held by a run that is not running (C3; the 2026-10-23 outage).
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -22,6 +23,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 5 0 * * * root /root/lobster-phase1/scripts/cron-run.sh social_rotation '/root/lobster-phase1/scripts/poke.sh social_rotation /api/internal/social/rotation SOCIAL_DISPATCH_TOKEN'
 30 19 * * * root /root/lobster-phase1/scripts/cron-run.sh social_metrics '/root/lobster-phase1/scripts/poke.sh social_metrics /api/internal/social/metrics SOCIAL_DISPATCH_TOKEN'
 0 1 * * * root /root/lobster-phase1/scripts/cron-run.sh entitlements_expire '/root/lobster-phase1/scripts/poke.sh entitlements_expire /api/internal/entitlements/expire SCHEDULE_INGEST_TOKEN'
+20 1 * * * root /root/lobster-phase1/scripts/cron-run.sh billing_reconcile '/root/lobster-phase1/scripts/poke.sh billing_reconcile /api/internal/billing/reconcile SCHEDULE_INGEST_TOKEN'
 5 * * * * root /root/lobster-phase1/scripts/cron-run.sh site_watch_tick '/root/lobster-phase1/scripts/site-watch-tick.sh'
 */10 * * * * root /root/lobster-phase1/scripts/cron-run.sh dispatch_action_run '/root/lobster-phase1/scripts/trigger-task.sh dispatch_action_run dispatch-action-run'
 0 4 * * * root /root/lobster-phase1/scripts/cron-run.sh ao_infrastructure_check '/root/lobster-phase1/scripts/trigger-task.sh ao_infrastructure_check ao-infrastructure-check'
