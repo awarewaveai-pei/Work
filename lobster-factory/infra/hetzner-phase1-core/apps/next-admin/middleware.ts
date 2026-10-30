@@ -272,7 +272,9 @@ function clientForbiddenResponse(request: NextRequest, cookiesToCopy: RefreshedC
 // nginx steps for portal.aware-wave.com (design doc §7 steps 5-7) have happened yet. This check
 // is the single choke point that closes that regardless of nginx config on either host.
 // Portal signup was deleted 2026-10-30: customers register on aware-wave.com (decision 2026-10-30-customer-self-signup-email-google).
-const PORTAL_PUBLIC_PATHS = new Set<string>(["/portal/login"]);
+// /portal/login/wp: where aware-wave.com sends a member who pressed 「進入我的工作區」 (lib/auth/sources/awarewave-wp.ts
+// WORKSPACE_KEY); nginx prefixes the portal host's /login/wp with /portal, so the page lives here as well as under /login.
+const PORTAL_PUBLIC_PATHS = new Set<string>(["/portal/login", "/portal/login/wp"]);
 
 export function isWrongHostForPortal(request: NextRequest): boolean {
   if (!isPortalPath(request.nextUrl.pathname)) return false;

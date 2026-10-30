@@ -31,6 +31,8 @@ describe("product registry", () => {
     for (const p of PRODUCTS) {
       expect(p.subdomain, p.key).toMatch(/^[a-z][a-z0-9-]{0,30}$/);
       expect(RESERVED_SUBDOMAINS, p.key).not.toContain(p.subdomain);
+      // "portal" is also the wp-handoff key for the member's workspace (lib/auth/sources/awarewave-wp.ts WORKSPACE_KEY)
+      expect(RESERVED_SUBDOMAINS, p.key).not.toContain(p.key);
       expect(typeof p.standalone, p.key).toBe("boolean");
       expect(p.loginSources.length, p.key).toBeGreaterThan(0);
       expect(p.loginSources, p.key).toContain("local");

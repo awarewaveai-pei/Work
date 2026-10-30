@@ -1,5 +1,5 @@
 // Login source `awarewave-wp` (ADR 015 §2, ADR 018 §1; cards/step-4.md 4b-4): a member on aware-wave.com presses
-// 「進入」 for a product they hold; the WordPress server (wp-bridge plugin) asks here, server to server, for a one-time
+// 「進入」 for a product they hold, or for their workspace (WORKSPACE_KEY, the portal launcher); the WordPress server (wp-bridge plugin) asks here, server to server, for a one-time
 // sign-in link, and sends the browser to it. Nothing about WordPress leaves this file.
 //
 // Request: POST /api/auth/wp-handoff, body {wp_user_id, product_key, ts, nonce, key_id?}, header
@@ -19,7 +19,12 @@ import { signPayment as signBody } from "@/lib/payments/hmac";
 import { AWARE_WAVE_KEY_ID, SITE_KEY_ID, findSiteByKeyId, siteIdentityProvider, siteSigns, verifySiteSignature } from "@/lib/payments/sites";
 import { findBillingAccount } from "@/lib/entitlements/identities";
 import { holdsProduct } from "@/lib/entitlements/door-holds";
-import { productHost, servedNextAdminProducts } from "@/lib/portal/doors";
+import { portalHost, productHost, servedNextAdminProducts } from "@/lib/portal/doors";
+
+/** product_key for the member's workspace (the portal launcher: every product, held or not): no product can take this
+ *  key (RESERVED_SUBDOMAINS), and only aware-wave.com members have a workspace here -- a seller's members buy from the
+ *  seller. */
+export const WORKSPACE_KEY = "portal";
 
 export const HANDOFF_SIGNATURE_HEADER = "x-awarewave-handoff-signature";
 export const signHandoff = signBody;
@@ -63,12 +68,13 @@ export async function wpHandoff(rawBody: string, signature: string | null, env: 
   if (typeof nonce !== "string" || !NONCE.test(nonce)) return { ok: false, status: 400, error: "invalid_nonce" };
   const now = deps.now();
   if (!Number.isSafeInteger(ts) || Math.abs(now - (ts as number)) > WINDOW_SECONDS) return { ok: false, status: 401, error: "stale_request" };
-  const product = servedNextAdminProducts().find((p) => p.key === productKey);
-  if (!product) return { ok: false, status: 400, error: "unknown_product" };
+  const workspace = productKey === WORKSPACE_KEY;
+  const product = workspace ? null : servedNextAdminProducts().find((p) => p.key === productKey);
+  if (!workspace && !product) return { ok: false, status: 400, error: "unknown_product" };
   // A seller's WordPress (customer-wp) opens only the doors that list it (products.ts loginSources, ADR 018 §3).
   // aware-wave.com is not held to the list: 4b-4 opened every served door to it while most list only "local" -- which
   // of the two is right is the operator's call (WORKLOG 2026-10-29), and closing those doors here would be that call.
-  if (siteIdentityProvider(site) === "customer-wp" && !product.loginSources.includes("customer-wp")) {
+  if (siteIdentityProvider(site) === "customer-wp" && (workspace || !product!.loginSources.includes("customer-wp"))) {
     return { ok: false, status: 403, error: "login_source_not_allowed" };
   }
   // The nonce is spent only by a request that passed the signature and the clock: an attacker cannot burn nonces.
@@ -76,7 +82,7 @@ export async function wpHandoff(rawBody: string, signature: string | null, env: 
 
   const account = await deps.find(deps.db, { provider: siteIdentityProvider(site), siteId: site.id, externalId: String(wpUserId) });
   if (!account) return { ok: false, status: 404, error: "not_a_member" };
-  if (!(await deps.holds({ organizationId: account.organizationId, productKey: product.key, now }))) {
+  if (product && !(await deps.holds({ organizationId: account.organizationId, productKey: product.key, now }))) {
     return { ok: false, status: 403, error: "product_not_held" };
   }
   const { data: got, error: getErr } = await deps.db.auth.admin.getUserById(account.userId);
@@ -95,5 +101,6 @@ export async function wpHandoff(rawBody: string, signature: string | null, env: 
   const hashed = link?.properties?.hashed_token;
   // generateLink goes by email; it must have resolved the same account (an email changed in between is not this member).
   if (linkErr || !hashed || link.user?.id !== account.userId) return { ok: false, status: 503, error: "link_failed" };
-  return { ok: true, url: `https://${productHost(product, env)}/login/wp#token_hash=${encodeURIComponent(hashed)}&type=recovery` };
+  const host = product ? productHost(product, env) : portalHost(env);
+  return { ok: true, url: `https://${host}/login/wp#token_hash=${encodeURIComponent(hashed)}&type=recovery` };
 }

@@ -1,4 +1,15 @@
 # Worklog
+## 2026-10-30（續18）第 11 項：aware-wave.com「我的帳號」→「我的工作區」；wp-handoff 認 `portal`；未驗證 email 擋在 WP 端（Fable）
+
+- **根因**：WP 註冊的會員沒有 app 密碼，「我的帳號」的「進入」一顆開一個產品，沒有路通到 portal launcher（持有／可買／作品）。
+- **改動**：`lib/auth/sources/awarewave-wp.ts` `WORKSPACE_KEY="portal"`（不查持有；只限 aware-wave.com，`customer-wp` 賣家會員 403 `login_source_not_allowed`；帳號／`user_kind`／`org_id`／`email_confirmed_at`／`generateLink` 同帳號照舊），連結落 `https://<portalHost>/login/wp`；nginx 把 portal 主機 `/login/wp` 改寫成 `/portal/login/wp`（`nginx/default.conf:412`）→ 新 `app/portal/login/wp/page.tsx`（re-export 門的 `WpSignIn` 頁）＋ `middleware.ts` `PORTAL_PUBLIC_PATHS` 加該路徑；launcher 加 `LogoutButton`（portal 原本無登出，共用電腦換不了帳號）；`products.test.ts` 加「產品 key 不得為保留字」。外掛 `MyAccountDoors.php`：`doors($held,$reseller)`＝工作區在前（賣家站無）＋已買產品（`portal` 永遠不是商品）、render 與 handle 共用；`refusal($emailVerified,$doors,$key)`：WP 當前 email 未驗證先擋（`EmailVerification::isUserVerified`；註冊 session 轉來 Codex 查實：改 email 未點確認信仍能進 app），render 時改顯示「重寄確認信」；`not_a_member` 專屬訊息。版本不動，由 1.3.1（01 session）帶上。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p .（0）；npx vitest run app/portal/launcher lib/auth lib/__tests__/middleware-portal-guards.test.ts lib/portal/__tests__/products.test.ts（新：workspace 連結、賣家拒、未驗證拒；portal 主機 `/portal/login/wp` 200、app 主機 404；保留字） | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=php -l 兩檔＋ php scratchpad/doors_realrun.php（真呼叫 `doors()`／`refusal()` 8 情境；本機無 phpunit，完整 phpunit 由發版 CI 跑） | exit=0 | ms=1000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（完整；紅 2 檔皆為他 session 未追蹤的 `app/(shell)/tools/seedstar/`，main 不含） | exit=1 | ms=180000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n -- Codex `agency-os/reports/oracle/2026-10-30-partialreview-1598a678.md`：F2（賣家站商品 key=portal 死按鈕＋測試斷言錯）已修（`unset($held[portal])`＋測試）；F1（驗證過、無訂單且註冊禮關閉的會員按工作區得 `not_a_member`）＝剩餘風險，訊息已說明「開通中／聯絡我們」。另兩位獨立 critic（auth Deep 0c/1m/3n、plugin Standard 0c/2m/2n）之 M／n 皆已修：賣家站不列工作區、未驗證不顯示按鈕、`not_a_member` 訊息、保留字測試、檔頭、`dynamic` 改 `export const`、launcher 登出。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=offered(|WORKSPACE_KEY|PORTAL_PUBLIC_PATHS | hits=6（`offered(` 已無殘留；其餘皆本次新增處）
+- **剩餘／待決**：① session cookie host-only（`auth-cookie-options.ts`）→ WP 會員從工作區「開啟」產品門會撞 `/login`；要嘛 launcher「開啟」改走 portal→門的一次性換證（新流程），要嘛 WP 會員只用「我的帳號」各產品「進入」。方向待操作者。② Codex F1。③ n：`ProductFields` 存檔不擋保留字（商品 key 可填 portal）。
+- **rollback**：revert 本 commit；外掛 1.3.1 若已發，回退到 1.3.0。
 ## 2026-10-30（續17）ADR 017 收錢後續四件：門 API 查持有、扣點預扣→結算（0148）、每日 Woo 對帳、監工台現況（Claude）
 
 - **① 門 API 查持有**：根因＝只有門頁問 `doorAccess`（`app/ProductDoorShell.tsx`），門的 API 沒問 → 過期客戶仍可打自己 org 的 `/api/content/*`、`/api/tools/studio/mockup`（只查角色）。不變量＝客戶在產品門打的每條 API 都經 `doorAccess`，在 `middleware.ts` `productApiDenial` 問一次（快取與 getUser 兩條路）。`lib/portal/door-access.ts` 加快取（持有 60s／未持有 10s／失敗 5s）＋同時到達共用一次查詢（避 06-14 限流）。trending GET：只讀當天 `content_trends`、當天沒有才收集一次；空結果 10 分鐘不重抓；geo 白名單外 400；員工 POST `refresh=1` 強制重抓；排序 created_at/source/title。

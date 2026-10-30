@@ -98,6 +98,19 @@ describe("WordPress one-time sign-in into a product door (ADR 015 order 1, 4b-4)
     await expect(call(req({ nonce: "n-other-0123456789ab" }), d)).resolves.toMatchObject({ ok: true });
   });
 
+  it("the workspace (product_key portal) opens the portal launcher for an aware-wave.com member, held products or not", async () => {
+    const { d, generateLink } = deps({ holds: false });
+    await expect(call(req({ product_key: "portal" }), d)).resolves.toEqual({ ok: true, url: "https://portal.aware-wave.com/login/wp#token_hash=tok%2F%2B%3D&type=recovery" });
+    expect(d.holds).not.toHaveBeenCalled();
+    expect(generateLink).toHaveBeenCalledTimes(1);
+    // a seller's member has no workspace here: they buy from the seller
+    const shop = req({ key_id: "shop-b", product_key: "portal", nonce: "n-w-0123456789abcdef" });
+    await expect(call(shop, d, signShop(shop))).resolves.toMatchObject({ status: 403, error: "login_source_not_allowed" });
+    // the account checks still apply: no billing account, unverified email
+    await expect(call(req({ product_key: "portal", nonce: "n-x-0123456789abcdef" }), deps({ account: null }).d)).resolves.toMatchObject({ status: 404, error: "not_a_member" });
+    await expect(call(req({ product_key: "portal", nonce: "n-y-0123456789abcdef" }), deps({ confirmed: null }).d)).resolves.toMatchObject({ status: 403, error: "email_unverified" });
+  });
+
   it("a handoff for a product the account does not hold is refused", async () => {
     const { d, generateLink } = deps({ holds: false });
     await expect(call(req(), d)).resolves.toMatchObject({ status: 403, error: "product_not_held" });

@@ -7,6 +7,7 @@ const state = vi.hoisted(() => ({ held: new Set<string>(), fail: false }));
 vi.mock("next/headers", () => ({
   headers: async () => new Headers({ "x-ops-user-kind": "client", "x-ops-org-id": "org-1" }),
 }));
+vi.mock("@/app/LogoutButton", () => ({ LogoutButton: () => <button>登出</button> }));
 vi.mock("@/lib/entitlements/door-holds", () => ({
   holdsProduct: async ({ productKey }: { productKey: string }) => {
     if (state.fail) throw new Error("db down");

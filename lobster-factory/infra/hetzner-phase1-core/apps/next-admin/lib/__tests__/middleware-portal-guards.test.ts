@@ -143,6 +143,9 @@ describe("product door (ADR 018): its page prefix answers only on its own host, 
     ["https://social.aware-wave.com/api/ops/clients", 404],
     ["https://social.aware-wave.com/portal/login", 404],
     ["https://app.aware-wave.com/social", 404],
+    // the workspace's one-time WordPress sign-in: public on the portal host only (PORTAL_PUBLIC_PATHS)
+    ["https://portal.aware-wave.com/portal/login/wp", 200],
+    ["https://app.aware-wave.com/portal/login/wp", 404],
   ])("%s -> %s", async (url, status) => {
     const res = await middleware(hostReq(url));
     expect(res.status).toBe(status);

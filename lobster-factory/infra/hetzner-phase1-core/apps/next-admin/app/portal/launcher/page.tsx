@@ -5,6 +5,7 @@ import { productHost, servedNextAdminProducts } from "@/lib/portal/doors";
 import { shopUrl } from "@/lib/portal/hosts";
 import { doorHref } from "@/lib/portal/door-href";
 import { heldDoors } from "@/lib/portal/held-doors";
+import { LogoutButton } from "@/app/LogoutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -89,6 +90,8 @@ export default async function PortalLauncherPage() {
           );
         })}
       </div>
+      {/* the portal has no other sign-out: a shared computer must be able to change account (critic 2026-10-30) */}
+      <div className="door-foot"><LogoutButton /></div>
     </div>
   );
 }

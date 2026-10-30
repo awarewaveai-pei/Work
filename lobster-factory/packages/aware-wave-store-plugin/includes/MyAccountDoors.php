@@ -1,10 +1,12 @@
 <?php
 /**
- * My Account 「進入」 buttons (ADR 017 4b-4, WordPress side): one per product the member bought (product meta
- * _awarewave_product_key). A press asks next-admin, server to server, POST <target>/api/auth/wp-handoff with
+ * My Account 「進入」 buttons (ADR 017 4b-4, WordPress side): the member's workspace (next-admin's portal launcher, key
+ * "portal": what they hold, what they can still buy, every product's works -- aware-wave.com members only, a seller's
+ * members buy from the seller) and one per product the member bought (product meta _awarewave_product_key). A press asks next-admin, server to server, POST <target>/api/auth/wp-handoff with
  * {wp_user_id, product_key, ts, nonce} signed by X-AwareWave-Handoff-Signature (its own secret,
  * aware_wave_handoff_secret; a reseller site adds key_id to the body and signs Ed25519 with aware_wave_handoff_keypair), and on {ok:true,url} sends the browser to that one-time door link. Whether the
- * member still holds the product is the server's call (403 product_not_held); the list here only picks buttons.
+ * member still holds the product is the server's call (403 product_not_held; the workspace needs no product); the list
+ * here only picks buttons, and only for a member whose current email is the verified one (EmailVerification).
  * Contract: next-admin lib/auth/sources/awarewave-wp.ts.
  *
  * @package AwareWave\Store
@@ -15,6 +17,8 @@ namespace AwareWave\Store;
 final class MyAccountDoors {
 
 	const ACTION = 'awbridge_door';
+	/** next-admin WORKSPACE_KEY: the member's workspace (portal launcher: every product, held or not). */
+	const WORKSPACE = 'portal';
 	const PATH   = '/api/auth/wp-handoff';
 	const KEY    = '/^[a-z0-9][a-z0-9_.-]{0,99}$/';
 
@@ -27,12 +31,38 @@ final class MyAccountDoors {
 		return $body;
 	}
 
+	/**
+	 * The 「進入」 buttons, in order: the workspace first (aware-wave.com only: a seller's members have none here, the
+	 * server refuses them), then each held product. render() and handle() read this one list. A product whose key was
+	 * set to the reserved "portal" is never a door (next-admin reads that key as the workspace).
+	 *
+	 * @param array<string,string> $held product_key => name
+	 * @return array<string,string>
+	 */
+	public static function doors( array $held, bool $reseller ): array {
+		unset( $held[ self::WORKSPACE ] );
+		return $reseller ? $held : array( self::WORKSPACE => '我的工作區' ) + $held;
+	}
+
+	/** Why a press is refused before any request is sent, or null. The member's CURRENT email must be the verified one
+	 *  (EmailVerification): next-admin only knows the email it verified, so a member who changed it here and skipped the
+	 *  confirmation mail would otherwise still enter (Codex 2026-10-30). */
+	public static function refusal( bool $emailVerified, array $doors, string $key ): ?string {
+		if ( ! $emailVerified ) {
+			return 'email_unverified';
+		}
+		return isset( $doors[ $key ] ) ? null : 'not_offered';
+	}
+
 	public static function message( string $code ): string {
 		if ( $code === 'email_unverified' ) {
-			return '請先到信箱完成帳號設定';
+			return '請先到信箱確認你的 email（我的帳號頁可重寄確認信）';
 		}
 		if ( $code === 'product_not_held' ) {
 			return '尚未開通這個產品';
+		}
+		if ( $code === 'not_a_member' ) {
+			return '你的工作區還在開通中：剛完成 email 確認請過幾分鐘再試；一直無法進入請聯絡我們';
 		}
 		return '暫時無法進入，請稍後再試';
 	}
@@ -96,12 +126,13 @@ final class MyAccountDoors {
 		if ( $uid < 1 || ! $this->settings->handoffReady() ) {
 			return;
 		}
-		$held = $this->heldProducts( $uid );
-		if ( ! $held ) {
+		if ( ! EmailVerification::isUserVerified( $uid ) ) {
+			echo '<p class="awbridge-doors">' . esc_html( self::message( 'email_unverified' ) ) . ' <a href="' . esc_url( EmailVerification::resendUrl() ) . '">重寄確認信</a></p>';
 			return;
 		}
 		echo '<h3>我的 AwareWave 產品</h3><ul class="awbridge-doors" style="list-style:none;margin:0;padding:0">';
-		foreach ( $held as $key => $name ) {
+		// also for a member with nothing yet: the workspace shows what they can still get
+		foreach ( self::doors( $this->heldProducts( $uid ), $this->settings->isReseller() ) as $key => $name ) {
 			echo '<li style="margin:0 0 8px"><form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
 			wp_nonce_field( self::ACTION );
 			echo '<input type="hidden" name="action" value="' . esc_attr( self::ACTION ) . '">';
@@ -119,8 +150,11 @@ final class MyAccountDoors {
 			exit;
 		}
 		$key = sanitize_text_field( wp_unslash( $_POST['product_key'] ?? '' ) );
-		if ( ! $this->settings->handoffReady() || ! isset( $this->heldProducts( $uid )[ $key ] ) ) {
-			$this->fail( 'not_offered', $back );
+		// the workspace needs no order lookup (up to 200 orders); a product key does
+		$doors = self::doors( $key === self::WORKSPACE ? array() : $this->heldProducts( $uid ), $this->settings->isReseller() );
+		$why   = $this->settings->handoffReady() ? self::refusal( EmailVerification::isUserVerified( $uid ), $doors, $key ) : 'not_offered';
+		if ( $why !== null ) {
+			$this->fail( $why, $back );
 		}
 		$body = (string) json_encode( self::body( $uid, $key, time(), bin2hex( random_bytes( 16 ) ), $this->settings->keyId ), JSON_UNESCAPED_SLASHES );
 		$res  = $this->http->post(
