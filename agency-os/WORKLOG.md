@@ -1,4 +1,11 @@
 # Worklog
+## 2026-10-30（續15）客戶自助註冊 420233a4c 補 Codex 審查：1 個中低 finding，交 MyAccountDoors.php 的 owner 修（Claude）
+
+- 操作者告知 Codex 有額度 → `oracle-quota.ps1 -Action clear`；`codex-oracle.ps1 -Mode review -DiffRef 61f9f261c..420233a4c`，files-reviewed 涵蓋全部 65 檔＋4 個刪除，artifact `reports/oracle/2026-10-30-partialreview-98809ffc.md`。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n -- external oracle = Codex CLI；F1 已驗證：`aware-wave-store-plugin/includes/MyAccountDoors.php:118-130` `handle()` 不看會員目前 email 是否已驗證，已連結的會員改 WP email 未驗證仍能進 app（`awarewave-wp.ts:93` 只看 app 舊 `email_confirmed_at`）。影響：app 帳號 email 仍是已證明的舊址，不洩帳號；違反「WP 未驗證不得進」。
+- 修法交主線 session（正在改同檔，避免兩個 writer）：`handle()` 前置 `EmailVerification::isUserVerified` → `email_unverified`，工作區入口同閘，附測試；隨下一版外掛（1.3.1）發。
+- REALTEST_WAIVED: NA -- 審查紀錄，無程式改動
+- BUGHUNT_WAIVED: NA -- 無程式改動
 ## 2026-10-30（續14）aware-wave-store v1.3.0 發版並裝上 aware-wave.com；註冊禮與註冊等 03:00 部署後開（Claude）
 
 - 發版：從 HEAD `420233a4c` 的拋棄式 worktree 跑 `release-wp-bridge.sh --plugin store`（工作目錄有另一 session 未提交的 Reconcile.php，不帶）→ CI 綠、tag v1.3.0、asset 在。
