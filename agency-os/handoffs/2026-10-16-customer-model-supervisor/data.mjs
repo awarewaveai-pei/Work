@@ -114,7 +114,7 @@ export const WAYS = [
 // 現在真的在跑的（2026-10-23 查：prod docker exec printenv、psql 唯讀）
 export const NOW = [
   { what: '客戶可自行登入', state: 'no', ev: '2026-10-30 定案：註冊只在 aware-wave.com（WordPress 會員＋信箱驗證／Google），驗證後送 50 點註冊禮並自動建 app 帳號；portal 註冊已刪（reports/decisions/2026-10-30-customer-self-signup-email-google.md）。實走一次註冊→進入後改 yes' },
-  { what: '已有付費客戶', state: 'no', ev: 'Soulful 代操合約已登記（全產品，0118）；自助付費 0（2026-10-30 prod 查：方案 5 個＝0145 各產品 *_credits，錢包帳本 0 筆、付款事件 0 筆）；Woo 付款未開（PAYMENTS_PROVIDERS 只有 local，等 4b-6）' },
+  { what: '已有付費客戶', state: 'no', ev: 'Soulful 代操合約已登記（全產品，0118）；自助付費 0（2026-10-30 prod：方案 5 個＝0145 各產品 *_credits；Woo 付款通道已接上，唯一一筆付款事件＝註冊禮 0 元訂單 #41，每日對帳對上 1 筆、漏送 0、多送 0）；收真錢等 4b-6（綠界／PayPal／WCS）' },
   { what: '代操用量按客戶計', state: 'yes', ev: '已運作（2026-10-30 prod 查近 7 天 entitlement.usage：Soulful 4 筆、E2E-Verify 16 筆、自用 54 筆，各記在自己帳戶）。程式已接（2026-10-23）：每道付費縫 grant.recordUse() 每個 grant 記一列 entitlement.usage（lib/ai/gateway.ts、collect、video.tts），閘擋「credits 功能走不到 recordUse」；2026-10-24 03:00 自動部署後生效。扣點已上線（4b-11，33afaf874，prod 4af222dfc）：1 點＝NT$1，每次交付成功的供應商呼叫扣 ceil(成本美元×32×3)，只有 pay=credits 的權利列（0145 各產品 *_credits 加購方案）扣錢包、影子模式不扣；錢包入帳只經付款事件（0120 billing_apply_payment_event，4a，2026-10-23）' },
   { what: '買斷', state: 'no', ev: '授權檔與模組清單未建；provision/ 只有一鍵架站（provisionClient.ts）' },
   { what: '許可判斷', state: 'yes', ev: '每個收費點只問 can()（e87de9225），影子模式（ENTITLEMENT_MODE 未設，can.ts:63）：照算判決並記錄，一律放行、不扣點。點數功能先認權利列（b3df190e9）；自用、EdD 免費與 Soulful 全產品合約每天自動補齊（0118），已部署；翻強制待 10/31 自動檢查與你同意；扣幾點已定＝依實際成本（4b-11，同上列）' },

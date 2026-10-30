@@ -1,4 +1,12 @@
 # Worklog
+## 2026-10-30（續27）每日 Woo 對帳第一次在正式環境實比：註冊禮訂單 #41 對上；監工台「現況」兩列依 prod 更正（Claude）
+
+- 註冊 session 接上 Woo 付款通道後（`PAYMENTS_PROVIDERS=local,woo`），`/api/internal/billing/reconcile` 從「未啟用」轉為真比對。
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl POST 127.0.0.1:3002/api/internal/billing/reconcile → {"ok":true,"matched":1,"missing":0,"extra":0,"manual":0}；payment_events 唯一一筆 wc:payment_complete:41:credit_pack paid_at 2026-10-30T05:40:39Z | exit=0 | ms=3000
+- 監工台：「代操用量按客戶計」no→yes（prod 近 7 天 entitlement.usage：Soulful 4、E2E-Verify 16、自用 54）；「已有付費客戶」仍 no，說明改為 Woo 已接上、只有註冊禮、收真錢等 4b-6；v53 https://claude.ai/artifact/Htm4xqe362YM987Fo8YLCr
+- REVIEW_WAIVED: DOC_ONLY -- 監工台資料與 WORKLOG
+- BUGHUNT_WAIVED: DOC_ONLY -- 無程式改動
+- **待操作者**：用另一個信箱在 aware-wave.com 真人走一次註冊（含驗證碼）→ 驗證信 → 進入 studio；走完我把「客戶可自行登入」改 yes。註冊 session 探測留下的假會員 #3（bot-probe-…@example.com，未驗證、無註冊禮）待操作者刪。
 ## 2026-10-30（續26）aware-wave.com 開放會員註冊＋Turnstile 驗證碼（操作者「裝並開放」）（Claude）
 
 - 外掛：wordpress.org Simple Cloudflare Turnstile 1.44.3（RelyWP）。沿用既有 widget「aware-wave.com intake form」（domains app.aware-wave.com、aware-wave.com，managed）；site key 與 secret 從 next-admin 容器 `NEXT_PUBLIC_TURNSTILE_SITE_KEY`／`TURNSTILE_SECRET_KEY` 經 stdin 寫入 `cfturnstile_key`／`cfturnstile_secret`。只開 `cfturnstile_woo_register`／`woo_login`／`woo_reset`；`wp-login.php` 不開（驗證碼故障時的後台入口，該處已有 wp-2fa＋limit-login）。
