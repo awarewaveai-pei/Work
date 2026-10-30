@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-30（續29）Google 登入：Nextend 3.1.26 已裝、aware-wave-store 1.3.2 擋自動連結搶帳號；金鑰待操作者建（Claude）
+
+- Nextend Social Login 3.1.26 裝並啟用（無 Google 金鑰＝不顯示按鈕）。redirect URI（`NextendSocialLogin::$providers['google']->getRedirectUriForAuthFlow()`）＝`https://aware-wave.com/wp-login.php?loginSocial=google`。
+- **漏洞類**：Nextend 免費版同 email 預設自動連結既有會員（`includes/user.php:722-744`，filter `nsl_google_auto_link_allowed`），且 Google email 一律視為已驗證（`providers/google/google.php:324-328`）→ 先用他人 email 註冊（持密碼）者可與真主人共用帳號。修：`GoogleSignup::autoLinkAllowed` 僅在該會員 `EmailVerification::isUserVerified` 時放行。1.3.2（1cc831dd5）發版、rollout 1.3.1→1.3.2（備份 `lobster-wordpress-pre-awstore-1.3.2-20261030T063211Z.sql`）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=php phpunit-9.6.phar（31 tests OK）＋ release CI passed v1.3.2 ＋ rollout health '200 1.3.2' | exit=0 | ms=600000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 自審：filter 簽名與 Nextend 呼叫一致（$allowed, $provider, $user_id）；未驗證會員改走「用密碼登入後手動連結」
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=nsl_google_auto_link_allowed | hits=1（GoogleSignup.php）
+- 現有 Google OAuth client（`AWARE_WAVE_CREDENTIALS.md` §9.7，冷信 Gmail）不適用：同意畫面 Testing（限 100 測試者）、含 gmail.compose 敏感 scope（公開需審核）、redirect 非 aware-wave.com。需另建只含 openid/email/profile 的 Web client。
+- **事故**：查金鑰檔時 grep 遮罩不足，對話中露出 Gemini API key（:898）、Printful App secret（:1019）、Meta App secret 前段（:625）→ 已告知操作者建議換發。避免再發：金鑰檔只用不印值的方式查（名稱與行號）。
 ## 2026-10-30（續28）測試收尾：E2E-Verify-0704 塔羅已收回；測試帳號保留（Fable）
 
 - 操作者「全部去處理好」→ 在內建瀏覽器（操作者員工 session）「帳務 → 給／收產品」取消 `use:tarot`、原因「測試完成，收回 content 門「尚未開通」驗收用的塔羅」→「已存。送出 0 項、收回 1 項。」
