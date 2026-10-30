@@ -20,7 +20,7 @@ export const COPY = {
   updated: '更新於 {date}',
   nav: { rules: '規則', now: '現況', ways: '五種客戶', priority: '先後與定價', steps: '待建項目', open: '待你決定', doors: '入口', paths: '檔案' },
   rules: { h: '每個系統都要過的規則', lead: '這三條寫在 ADR 017 §0b，測試會擋，不靠記憶。' },
-  now: { h: '現況', lead: '客戶已能在 aware-wave.com 自行註冊並用註冊禮點數使用產品；收真錢還沒開（等綠界／PayPal／WCS，4b-6）。' },
+  now: { h: '現況', lead: '2026-10-30 起 aware-wave.com 只留 WordPress，與 app 無關：客戶不能自行註冊、不收錢；現在只有自用與代操。' },
   drill: { h: '實際帳戶演練（2026-10-23）', lead: '每個帳戶跑一次真正的判斷（can()、帳戶歸屬、用量記錄），資料照 prod 現況；標「加的」的帳戶 prod 沒有，是為了補齊缺的方式。來源：lib/entitlements/__tests__/customer-drill.test.ts。' },
   ways: { h: '五種客戶', lead: '每種客戶由三個答案決定：裝在哪、錢從哪來、誰操作。答案屬於客戶帳戶與每次請求，不屬於產品，所以每個產品五種都有、不用選。新增客戶類型只需增加一列，不必修改程式。', count: '共 {total} 種，{live} 種已運作' },
   priority: { h: '先後與定價', lead: '依你 2026-10-17 的決定排序；賣斷的收費結構是預設值，數字可改。', next: '接下來依序做（2026-10-23 依現況排）', nextLead: '先門、後收錢。三個答案互不等待：門是「客戶本人操作」的唯一前提，純內部工程、沒有待決；收錢的外部部分（金流商、會計師）卡兩個待決，內部部分（用量計量、人工付款入口）不等待決先做；登入目前的本機帳號已能用，WordPress 一鍵登入只在付款發生在 WordPress 時才有價值，所以跟 Woo 同一包。', pricing: '賣斷怎麼收錢' },
@@ -113,8 +113,8 @@ export const WAYS = [
 
 // 現在真的在跑的（2026-10-23 查：prod docker exec printenv、psql 唯讀）
 export const NOW = [
-  { what: '客戶可自行登入', state: 'yes', ev: '2026-10-30 操作者真人走完：aware-wave.com 註冊（驗證碼＋驗證信）→ 註冊禮 0 元訂單 #46 → app 帳號自動建立、50 點、5 個產品 → 進入 studio 生圖兩次（扣 1＋7 點，先預扣再結算）。進門問題（要密碼、同人被要求登出、員工登入頁）已修並部署 3acb55811。決策 reports/decisions/2026-10-30-customer-self-signup-email-google.md' },
-  { what: '已有付費客戶', state: 'no', ev: 'Soulful 代操合約已登記（全產品，0118）；自助付費 0（2026-10-30 prod：方案 5 個＝0145 各產品 *_credits；Woo 付款通道已接上，唯一一筆付款事件＝註冊禮 0 元訂單 #41，每日對帳對上 1 筆、漏送 0、多送 0）；收真錢等 4b-6（綠界／PayPal／WCS）' },
+  { what: '客戶可自行登入', state: 'no', ev: '2026-10-30 操作者決定 aware-wave.com 只留 WordPress、與 app 完全無關：aware-wave-store 與 aware-wave-wp-bridge 外掛停用、註冊與註冊禮關閉、app 端 PAYMENTS_PROVIDERS=local、兩把密鑰清空、收銀台 aware-wave-com 停用、已送出的點數與產品收回（兩個測試帳戶）。註冊流程本身在當天真人走通過；要重開＝反向這些步驟（WORKLOG 2026-10-30 停用條目）' },
+  { what: '已有付費客戶', state: 'no', ev: 'Soulful 代操合約已登記（全產品，0118）；自助付費 0。aware-wave.com 收錢通道 2026-10-30 依操作者決定停用（只收人工登記付款，scripts/record-payment.mjs）' },
   { what: '代操用量按客戶計', state: 'yes', ev: '已運作（2026-10-30 prod 查近 7 天 entitlement.usage：Soulful 4 筆、E2E-Verify 16 筆、自用 54 筆，各記在自己帳戶）。程式已接（2026-10-23）：每道付費縫 grant.recordUse() 每個 grant 記一列 entitlement.usage（lib/ai/gateway.ts、collect、video.tts），閘擋「credits 功能走不到 recordUse」；2026-10-24 03:00 自動部署後生效。扣點已上線（4b-11，33afaf874，prod 4af222dfc）：1 點＝NT$1，每次交付成功的供應商呼叫扣 ceil(成本美元×32×3)，只有 pay=credits 的權利列（0145 各產品 *_credits 加購方案）扣錢包、影子模式不扣；錢包入帳只經付款事件（0120 billing_apply_payment_event，4a，2026-10-23）' },
   { what: '買斷', state: 'no', ev: '授權檔與模組清單未建；provision/ 只有一鍵架站（provisionClient.ts）' },
   { what: '許可判斷', state: 'yes', ev: '每個收費點只問 can()（e87de9225），影子模式（ENTITLEMENT_MODE 未設，can.ts:63）：照算判決並記錄，一律放行、不扣點。點數功能先認權利列（b3df190e9）；自用、EdD 免費與 Soulful 全產品合約每天自動補齊（0118），已部署；翻強制待 10/31 自動檢查與你同意；扣幾點已定＝依實際成本（4b-11，同上列）' },

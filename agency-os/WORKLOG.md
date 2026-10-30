@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-30（續36）停用：aware-wave.com 只留 WordPress，與 app 完全無關；註冊禮送出的點數與產品收回（操作者決定）（Claude）
+
+- **決定**（操作者原話）：「先把 aware-wave.com 上之前設的點數和使用 11產品取消」→ 選「全部停掉」→「讓他完全跟 app.aware-wave.com 無關」→「aware-wave.com 只留和 wordpress 相關的東西」。起因：真人註冊後進門一連串問題（續34），先只自用。
+- **WordPress（lobster-wordpress）**：`aware-wave-store`、`aware-wave-wp-bridge` 停用（未刪）；刪 `aware_wave_welcome_product_id`、`aware_wave_handoff_secret`、`aware_wave_payments_secret`；`aware_wave_payments_enabled=0`；`woocommerce_enable_myaccount_registration=no`。Nextend、Turnstile 等 WP 外掛不動。備份：`/root/backups/wordpress/awstore-options-before-stop-20261030T120657Z.txt`（5 項，600）、`plugins-before-stop-20261030T120854Z.txt`。
+- **app**：`/root/lobster-phase1/.env` 經 `safe-infra-patch.sh file`：`PAYMENTS_PROVIDERS=local`、`PAYMENTS_WOO_SECRET=`、`AUTH_WP_HANDOFF_SECRET=`（備份 `.env.bak.safe-patch-20261030-120916`）→ `safe-infra-patch.sh compose … next-admin` 重建 healthy 15s（備份 `docker-compose.yml.bak.safe-patch-20261030-120917`，內容未改）。`seller_sites aware-wave-com → disabled`。
+- **收回**（單一交易）：註冊禮帳戶 Gift Walk 1030（09dcda3d…）與 Soulful Expression Art Therapy（ee33a23c…，操作者測試，非代操帳戶）：權利 56 列 → expired、合約 10 → canceled、錢包各 `adjustment` 歸 0（key `operator-stop-aware-wave-com:<org>`）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp plugin list（兩外掛 inactive）；curl aware-wave.com / my-account / shop / wp-login → 200×4；reconcile 路由 404 | exit=0 | ms=5000
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-next-admin printenv（PAYMENTS_PROVIDERS=local；兩密鑰 len 0）；curl POST /api/internal/billing/reconcile → enabled:false；/api/auth/wp-handoff → source_disabled；/api/webhooks/payments/woo → payment_provider_disabled；psql 兩帳戶 錢包 0／權利 0／合約 0、seller_sites disabled | exit=0 | ms=6000
+- REVIEW_WAIVED: NA -- 設定與資料操作，無程式改動；每步有備份、交易內前後對照
+- BUGHUNT_WAIVED: NA -- 無程式改動
+- 監工台 v55：「客戶可自行登入」回 no（理由＝本決定）、「已有付費客戶」說明、現況導言。記憶 `project_awarewave_com_wordpress_only`。
+- **rollback（要重開時）**：WP 用上列備份檔還原 5 個選項＋`wp plugin activate aware-wave-store aware-wave-wp-bridge`＋註冊 yes；app `.env` 用備份還原後 `safe-infra-patch compose` 重建；`seller_sites` 改回 active。收回的點數／權利不自動還原。
 ## 2026-10-30（續35）進門修正上線（3acb55811，含 step-12 一次性連結 da0804a30）；監工台「客戶可自行登入」改有（Claude）
 
 - REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin → deployed 3acb55811、healthy 16s、HTTP smoke 5/5 | exit=0 | ms=240000
