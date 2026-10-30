@@ -49,7 +49,7 @@ function AccessDenied() {
     <div style={{ maxWidth: 480, margin: "80px auto", padding: 24, textAlign: "center" }}>
       <h1 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>需要客戶帳號登入</h1>
       <p style={{ fontSize: 13.5, color: "var(--text-muted)", marginBottom: 16 }}>
-        這個頁面只開放給 AwareWave 客戶帳號。若妳是內部同仁，請使用 app.aware-wave.com。
+        這個頁面只開放給 AwareWave 客戶帳號。若你是內部同仁，請使用 app.aware-wave.com。
       </p>
       <a href="/login" className="btn-primary">前往客戶登入</a>
     </div>
@@ -71,7 +71,7 @@ export default async function PortalLauncherPage({ searchParams }: { searchParam
 
   return (
     <div style={{ maxWidth: 720, margin: "60px auto", padding: 24 }}>
-      <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>妳的產品</h1>
+      <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>你的產品</h1>
       {door && (
         <p style={{ fontSize: 13.5, color: "var(--badge-red-text)", marginBottom: 8 }}>
           {Object.prototype.hasOwnProperty.call(DOOR_NOTICE, door) ? DOOR_NOTICE[door] : DOOR_NOTICE_DEFAULT}
@@ -114,7 +114,7 @@ export default async function PortalLauncherPage({ searchParams }: { searchParam
         })}
       </div>
       {/* the portal has no other sign-out: a shared computer must be able to change account (critic 2026-10-30) */}
-      <div className="door-foot"><LogoutButton /></div>
+      <div className="door-foot"><LogoutButton variant="page" /></div>
     </div>
   );
 }

@@ -1,4 +1,6 @@
 import { Suspense } from "react";
+import { headers } from "next/headers";
+import { loginDoor } from "@/lib/portal/login-door";
 import { LoginForm } from "./LoginForm";
 
 // /login is a top-level route outside the (shell) route group, so it renders with no
@@ -6,7 +8,9 @@ import { LoginForm } from "./LoginForm";
 // See middleware.ts matcher — /login is excluded from the session gate.
 export const dynamic = "force-dynamic";
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  const h = await headers();
+  const door = loginDoor(h.get("x-forwarded-host") ?? h.get("host") ?? "");
   return (
     <div
       style={{
@@ -21,7 +25,7 @@ export default function LoginPage() {
       }}
     >
       <Suspense fallback={null}>
-        <LoginForm />
+        <LoginForm door={door} />
       </Suspense>
     </div>
   );

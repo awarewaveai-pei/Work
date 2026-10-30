@@ -6,7 +6,8 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/ssr";
 
 // Sidebar logout. Uses the browser client (which owns the session cookies) so signOut()
 // clears them, then bounces to /login. Kept tiny + dependency-free on purpose.
-export function LogoutButton() {
+/** `page`: on a page background (portal, door foot), where the sidebar's light text would be invisible on white. */
+export function LogoutButton({ variant = "sidebar" }: { variant?: "sidebar" | "page" } = {}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
@@ -27,14 +28,14 @@ export function LogoutButton() {
       onClick={logout}
       disabled={busy}
       style={{
-        background: "#fff",
-        border: "1px solid var(--sidebar-border)",
+        background: variant === "page" ? "var(--card-bg)" : "#fff",
+        border: variant === "page" ? "1px solid var(--card-border)" : "1px solid var(--sidebar-border)",
         borderRadius: 6,
-        color: "var(--sidebar-text)",
+        color: variant === "page" ? "var(--text-primary)" : "var(--sidebar-text)",
         fontSize: 11,
         padding: "5px 10px",
         cursor: "pointer",
-        width: "100%",
+        width: variant === "page" ? "auto" : "100%",
         marginTop: 8,
       }}
     >

@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-30（續34）操作者真人走完註冊：註冊與註冊禮都成，進門那段四個問題修掉並部署（Claude）
+
+- **操作者實走**（soulfulexpression01@gmail.com）：WP 會員 → 驗證 → 註冊禮訂單 #46 → app 帳號 client、新帳戶「Soulful Expression Art Therapy」`ee33a23c…`（不是 Soulful 代操那個帳戶）、5 個 *_credits、錢包 50 → studio 生圖兩次扣 1＋7＝42。兩筆都走 0148 預扣→結算（credit_call_holds 2 列 kept=units、ai_call_logs credits_held=charged）。
+- **問題與根因**：
+  - C1 portal「開啟」→ social／video／tarot／content 都跳到員工登入頁：登入 cookie 只在單一主機（ADR 018 §1）。`da0804a30`（step-12，一次性連結開門）已修好但**沒部署**——prod 仍是 c09ccb177，TASKS／d778352c9 寫「live」不實。
+  - C2 aware-wave.com「進入」→「你已經登入…請先登出」：同一個人也被擋。`WpSignIn` 只要門上已有 session 就問。改：連結帶帳號 id（`door-link.ts` `uid`，不帶 email），門上 session 是同一帳號就直接進；不同才問，並多一顆「登出」。
+  - C3 產品門 /login 顯示員工的「Lobster Factory / Admin Console 登入」與密碼框，客戶沒有密碼。改：門的登入頁顯示產品名＋「從 aware-wave.com 進入」（`lib/portal/login-door.ts`），表單保留給邀請過的帳號；員工主機不變。
+  - C4 「妳的產品」→「你的產品」（launcher 兩處）；launcher 底部空白框＝登出按鈕用側欄白字畫在白底 → `LogoutButton variant="page"`（launcher、門頁腳）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit（0）＋ npx vitest run app/login lib/auth app/portal lib/portal（114 passed；2 failed＝他人新建 tools/seedstar 未登記） | exit=0 | ms=40000
+- 突變：`sameAccount` 改成「有 session 就放行」→ `WpSignIn.test.ts` 新例紅，還原綠。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 書面自審：uid 只用來決定「是否略過提問」，略過時用的是門上原本的 session（與按「用目前的帳號繼續」相同），token 不交換，登入固定（login fixation）防線不變；偽造 uid 只會讓本人 session 繼續或照舊提問
+- ORACLE_WAIVED: codex quota blocked until 2026-10-30 17:58（scripts/oracle-quota.ps1）；以書面自審＋突變替代
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=妳|login/wp#token_hash|LogoutButton | hits=妳 客戶頁 2 處已改；login/wp 連結格式測試 4 處已改；LogoutButton 3 處使用（側欄維持）
+- **上線**：見下一條。
 ## 2026-10-30（續32）操作者實測 Google 註冊：WP 端成功，app 端依設計拒收（email 是員工帳號）；1.3.4 去掉 Google 會員的「暫時密碼」提示（Claude）
 
 - 操作者以 Google 註冊 → WP 會員 #4（信箱已驗證）、註冊禮訂單 #42、「我的帳號」出現註冊禮 50 點與工作區。

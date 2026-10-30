@@ -29,7 +29,7 @@ export async function ProductDoorShell({ productKey, children }: { productKey: P
           ) : (
             <p style={{ fontSize: 13.5, color: "var(--badge-red-text)" }}>暫時無法確認開通狀態，請重新整理頁面再試一次。</p>
           )}
-          <div className="door-foot"><LogoutButton /></div>
+          <div className="door-foot"><LogoutButton variant="page" /></div>
         </div></div>
       </div>
     );
@@ -41,7 +41,7 @@ export async function ProductDoorShell({ productKey, children }: { productKey: P
           <DoorNav page={door.page} name={product!.name} features={product!.features.map((f) => ({ key: f.feature_key, name: f.name }))} />
           <div className="door-content">
             {children}
-            <div className="door-foot"><LogoutButton /></div>
+            <div className="door-foot"><LogoutButton variant="page" /></div>
           </div>
         </DoorProvider>
       </div>

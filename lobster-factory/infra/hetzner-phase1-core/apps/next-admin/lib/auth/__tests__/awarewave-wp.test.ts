@@ -41,7 +41,7 @@ describe("WordPress one-time sign-in into a product door (ADR 015 order 1, 4b-4)
 
   it("a member holding the product gets a one-time recovery link on that product's door", async () => {
     const { d, generateLink } = deps();
-    await expect(call(req(), d)).resolves.toEqual({ ok: true, url: "https://tarot.aware-wave.com/login/wp#token_hash=tok%2F%2B%3D&type=recovery" });
+    await expect(call(req(), d)).resolves.toEqual({ ok: true, url: "https://tarot.aware-wave.com/login/wp#token_hash=tok%2F%2B%3D&type=recovery&uid=user-1" });
     expect(generateLink).toHaveBeenCalledWith({ type: "recovery", email: "a@b.tw" });
     expect(d.find).toHaveBeenCalledWith(d.db, { provider: "awarewave-wp", siteId: "site-awc", externalId: "57" });
   });
@@ -100,7 +100,7 @@ describe("WordPress one-time sign-in into a product door (ADR 015 order 1, 4b-4)
 
   it("the workspace (product_key portal) opens the portal launcher for an aware-wave.com member, held products or not", async () => {
     const { d, generateLink } = deps({ holds: false });
-    await expect(call(req({ product_key: "portal" }), d)).resolves.toEqual({ ok: true, url: "https://portal.aware-wave.com/login/wp#token_hash=tok%2F%2B%3D&type=recovery" });
+    await expect(call(req({ product_key: "portal" }), d)).resolves.toEqual({ ok: true, url: "https://portal.aware-wave.com/login/wp#token_hash=tok%2F%2B%3D&type=recovery&uid=user-1" });
     expect(d.holds).not.toHaveBeenCalled();
     expect(generateLink).toHaveBeenCalledTimes(1);
     // a seller's member has no workspace here: they buy from the seller

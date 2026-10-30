@@ -12,7 +12,11 @@ function safeNext(raw: string | null): string {
   return "/";
 }
 
-export function LoginForm() {
+/** Staff host: the admin console heading. A product door: the product's own name and, first, the way its customers come
+ *  in -- from aware-wave.com, with no app password (lib/auth/door-link.ts); the form stays for accounts staff invited. */
+import type { LoginDoor } from "@/lib/portal/login-door";
+
+export function LoginForm({ door = null }: { door?: LoginDoor } = {}) {
   const searchParams = useSearchParams();
   const next = safeNext(searchParams.get("next"));
 
@@ -50,10 +54,18 @@ export function LoginForm() {
     <form className="form-block" style={{ maxWidth: 380, width: "100%" }} onSubmit={onSubmit}>
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em", marginBottom: 4 }}>
-          Lobster Factory
+          {door ? door.product : "Lobster Factory"}
         </h1>
-        <p style={{ fontSize: 13, color: "var(--text-muted)" }}>Admin Console 登入</p>
+        <p style={{ fontSize: 13, color: "var(--text-muted)" }}>{door ? "登入" : "Admin Console 登入"}</p>
       </div>
+      {door ? (
+        <div style={{ marginBottom: 20 }}>
+          <a href={door.memberHref} className="btn-primary" style={{ display: "block", textAlign: "center" }}>從 aware-wave.com 進入</a>
+          <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 8 }}>
+            在 aware-wave.com 註冊或登入後，到「我的帳號」按這個產品的「進入」，不需要另外的密碼。下面的表單只給收到邀請信、設過密碼的帳號使用。
+          </p>
+        </div>
+      ) : null}
 
       <div className="form-row">
         <label className="form-label" htmlFor="login-email">Email</label>

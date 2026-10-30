@@ -19,13 +19,13 @@ function db(over: { user?: object | null; getErr?: object | null; linkUser?: str
 describe("mintDoorLink (the one place a door sign-in link is minted)", () => {
   it("mints a recovery link onto the door's /login/wp, token url-encoded", async () => {
     const { client, generateLink } = db();
-    expect(await mintDoorLink(client, ACCOUNT, "tarot.aware-wave.com")).toEqual({ ok: true, url: "https://tarot.aware-wave.com/login/wp#token_hash=tok%2F%2B%3D&type=recovery" });
+    expect(await mintDoorLink(client, ACCOUNT, "tarot.aware-wave.com")).toEqual({ ok: true, url: "https://tarot.aware-wave.com/login/wp#token_hash=tok%2F%2B%3D&type=recovery&uid=user-1" });
     expect(generateLink).toHaveBeenCalledWith({ type: "recovery", email: "a@b.tw" });
   });
 
   it("next is appended encoded; absent next adds nothing", async () => {
     expect(await mintDoorLink(db().client, ACCOUNT, "tarot.aware-wave.com", "/works")).toEqual(
-      { ok: true, url: "https://tarot.aware-wave.com/login/wp#token_hash=tok%2F%2B%3D&type=recovery&next=%2Fworks" });
+      { ok: true, url: "https://tarot.aware-wave.com/login/wp#token_hash=tok%2F%2B%3D&type=recovery&uid=user-1&next=%2Fworks" });
     const plain = await mintDoorLink(db().client, ACCOUNT, "tarot.aware-wave.com");
     expect(plain.ok && plain.url).not.toContain("next=");
   });

@@ -8,7 +8,7 @@
 // body, AUTH_WP_HANDOFF_SECRET)). Its own key, not the payments one: a leaked login key must not record payments and
 // the other way round. A site with no hand-off key (or the env secret under 32 characters) = the source is off for it.
 // key_id is read before the signature is checked only to choose which key checks it.
-// Answer: {ok:true, url:"https://<door>/login/wp#token_hash=…&type=recovery"}. The token is GoTrue's own one-time
+// Answer: {ok:true, url:"https://<door>/login/wp#token_hash=…&type=recovery&uid=…"}. The token is GoTrue's own one-time
 // recovery token (the type every invite link uses, lib/accounts/client-invite.ts header: "recovery" never creates a
 // user; each new link replaces the account's outstanding one, mailed set-password link included, and lives for GoTrue's
 // OTP expiry -- the 60 s below bound the request, not the link). Replay: ts within ±60 s and each nonce once. The nonce memory is this process's (one next-admin container,

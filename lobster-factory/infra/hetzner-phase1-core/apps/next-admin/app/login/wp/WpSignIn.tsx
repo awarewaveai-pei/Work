@@ -4,7 +4,8 @@
 // (access logs, Referer) and is cleared before anything else reads the address bar.
 // Login fixation (critic 2026-10-25 M): a member could copy their own link and send it to someone else, who would then
 // work inside the sender's account. So: an open session on this door is never replaced, the exchange waits for a button
-// press, and the account it signed in to is shown with 「不是我的帳號」 before the door opens.
+// press, and the account it signed in to is shown with 「不是我的帳號」 before the door opens. A door already signed in to
+// the very account the link is for (uid) just continues: same person, nothing to choose.
 import { useEffect, useRef, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/ssr";
 
@@ -18,6 +19,17 @@ export function readWpToken(hash: string): string | null {
 export function readWpNext(hash: string): string {
   const next = new URLSearchParams(hash.replace(/^#/, "")).get("next") ?? "";
   return next.startsWith("/") && !next.startsWith("//") && /^\/[a-z0-9\-\/]*$/.test(next) ? next : "/";
+}
+
+/** The account the link signs in to (door-link.ts); "" when the link names none. */
+export function readWpUid(hash: string): string {
+  const uid = new URLSearchParams(hash.replace(/^#/, "")).get("uid") ?? "";
+  return /^[0-9a-f-]{36}$/i.test(uid) ? uid.toLowerCase() : "";
+}
+
+/** An open session on this door goes on without a question only when it is the account the link was minted for. */
+export function sameAccount(sessionUserId: string | undefined, linkUid: string): boolean {
+  return !!linkUid && !!sessionUserId && sessionUserId.toLowerCase() === linkUid;
 }
 
 type State =
@@ -43,10 +55,12 @@ export function WpSignIn() {
     started.current = true;
     const token = readWpToken(window.location.hash);
     const next = readWpNext(window.location.hash);
+    const uid = readWpUid(window.location.hash);
     window.history.replaceState(null, "", window.location.pathname);
     createSupabaseBrowserClient().auth.getUser()
       .then(({ data }) => {
-        if (data.user) setState({ kind: "alreadyIn", email: data.user.email ?? "", next });
+        if (data.user && sameAccount(data.user.id, uid)) window.location.replace(next);
+        else if (data.user) setState({ kind: "alreadyIn", email: data.user.email ?? "", next });
         else setState(token ? { kind: "ready", token, next } : { kind: "failed" });
       })
       .catch(() => setState(token ? { kind: "ready", token, next } : { kind: "failed" }));
@@ -87,8 +101,9 @@ export function WpSignIn() {
       {state.kind === "alreadyIn" ? (
         <>
           <p style={{ margin: 0, fontWeight: 700 }}>你已經登入：{state.email}</p>
-          <p style={note}>要改用 aware-wave.com 的帳號，請先在這扇門登出，再回 aware-wave.com 按一次「進入」。</p>
+          <p style={note}>這扇門目前登入的是另一個帳號。要改用你剛才按「進入」的帳號，請先登出，再回去按一次「進入」。</p>
           <button type="button" style={btn} onClick={() => window.location.replace(state.next)}>用目前的帳號繼續</button>
+          <button type="button" style={ghost} disabled={busy} onClick={notMe}>登出</button>
         </>
       ) : null}
       {state.kind === "failed" ? (

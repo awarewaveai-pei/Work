@@ -27,5 +27,6 @@ export async function mintDoorLink(db: SupabaseClient, account: { userId: string
   // generateLink goes by email; it must have resolved the same account (an email changed in between is not this member).
   if (linkErr || !hashed || link.user?.id !== account.userId) return { ok: false, status: 503, error: "link_failed" };
   const target = next ? `&next=${encodeURIComponent(next)}` : "";
-  return { ok: true, url: `https://${host}/login/wp#token_hash=${encodeURIComponent(hashed)}&type=recovery${target}` };
+  // uid: the account the link signs in to, so a door already signed in to that same account just continues (WpSignIn).
+  return { ok: true, url: `https://${host}/login/wp#token_hash=${encodeURIComponent(hashed)}&type=recovery&uid=${encodeURIComponent(account.userId)}${target}` };
 }
