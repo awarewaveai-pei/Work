@@ -3,7 +3,7 @@ import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role
 import { withFeature } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
 import { removeBackground } from "../../../../../lib/studio/bg-remover";
-import { logImageCost } from "../../../../../lib/ai/log-ai-call";
+import { holdCost, logImageCost, releaseHold } from "../../../../../lib/ai/log-ai-call";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -41,14 +41,16 @@ async function handlePost(request: Request, grant: Grant) {
     );
   }
 
-  const result = await removeBackground(body.image);
+  // Credits held before the provider runs (Grant.hold); every delivered call is charged, with or without a _jobId.
+  const hold = await holdCost(grant, 0.002);
+  if (!hold) return NextResponse.json({ ok: false, error: "no_credits" });
+  const result = await removeBackground(body.image).catch((e) => { releaseHold(hold, "tools/studio/remove-bg"); throw e; });
   if (result.ok) {
     const jobId = typeof body._jobId === "string" ? body._jobId : null;
-    if (jobId) {
-      void logImageCost({ route: "tools/studio/remove-bg", model: "rembg", vendor: "Replicate", costUsd: 0.002, jobId, tool: "studio", grant });
-    }
+    void logImageCost({ route: "tools/studio/remove-bg", model: "rembg", vendor: "Replicate", costUsd: 0.002, jobId, tool: "studio", grant, hold });
     return NextResponse.json(result);
   }
+  releaseHold(hold, "tools/studio/remove-bg");
   // HTTP 200 with ok:false — same nginx error_page rationale as the generate routes.
   return NextResponse.json(result);
 }

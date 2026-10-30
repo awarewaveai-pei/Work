@@ -3,7 +3,7 @@ import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role
 import { withFeature } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
 import { generativeFill, OUTPAINT_PRESETS, type OutpaintPreset } from "../../../../../lib/studio/generative-fill";
-import { logImageCost } from "../../../../../lib/ai/log-ai-call";
+import { holdCost, logImageCost, releaseHold } from "../../../../../lib/ai/log-ai-call";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -51,18 +51,18 @@ async function handlePost(request: Request, grant: Grant) {
     return NextResponse.json({ ok: false, error: "invalid outpaint preset" }, { status: 400 });
   }
 
+  // Credits held before the provider runs (Grant.hold); every delivered call is charged, with or without a _jobId.
+  const hold = await holdCost(grant, 0.05);
+  if (!hold) return NextResponse.json({ ok: false, error: "no_credits" });
   const result = await generativeFill({
     image: body.image,
     prompt: body.prompt,
     mask: hasOutpaint ? undefined : body.mask, // outpaint ignores the mask
     outpaint: hasOutpaint ? (body.outpaint as OutpaintPreset) : undefined,
-  });
-  if (result.ok) {
-    const jobId = typeof body._jobId === "string" ? body._jobId : null;
-    if (jobId) {
-      void logImageCost({ route: "tools/studio/genfill", model: "flux-fill-pro", vendor: "Replicate", costUsd: 0.05, jobId, tool: "canvas", grant });
-    }
-  }
+  }).catch((e) => { releaseHold(hold, "tools/studio/genfill"); throw e; });
+  const jobId = typeof body._jobId === "string" ? body._jobId : null;
+  if (result.ok) void logImageCost({ route: "tools/studio/genfill", model: "flux-fill-pro", vendor: "Replicate", costUsd: 0.05, jobId, tool: "canvas", grant, hold });
+  else releaseHold(hold, "tools/studio/genfill");
   // HTTP 200 with ok:false on failure — same nginx error_page rationale as the other studio routes.
   return NextResponse.json(result);
 }

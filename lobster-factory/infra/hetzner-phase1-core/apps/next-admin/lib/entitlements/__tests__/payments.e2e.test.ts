@@ -12,7 +12,7 @@ import { PAYMENT_SITE_HEADER } from "@/lib/payments/hmac";
 import { LOCAL_SIGNATURE_HEADER, signLocalPayment } from "@/lib/payments/local";
 import fixture from "@/lib/payments/__tests__/fixtures/ed25519-v1.json";
 import { PRODUCTS } from "@/lib/portal/products";
-import { debitCredits } from "@/lib/entitlements/ledger";
+import { debitCredits, expireCreditHolds, holdCredits, settleHoldCredits } from "@/lib/entitlements/ledger";
 import { startRestProxy } from "./real-db";
 
 const REST = process.env.ENTITLEMENTS_REST;
@@ -209,6 +209,37 @@ describe.skipIf(!REST)("payments against a real database (ADR 017 step 4a)", () 
     expect(await debit(30, "ai-call:e2e-1")).toEqual({ ok: true, balance: 70 });
     expect(await debit(30, "ai-call:e2e-1")).toEqual({ ok: true, balance: 70 });   // same key: charged once
     expect(await debit(200, "ai-call:e2e-2")).toEqual({ ok: false, balance: 70 });
+    // 4b-12 (0148): a hold debits and leaves a row; settling keeps part and gives the rest back once; more than the hold
+    // cannot be kept; a hold nobody settled goes back whole in the sweep (aged by hand: the sweep's floor is 30 minutes).
+    const hold = (units: number, key: string) => holdCredits(db, { orgId: org, units, idempotencyKey: key, featureKey: "studio.image" });
+    expect(await hold(30, "ai-call:e2e-h1")).toEqual({ ok: true, balance: 40 });
+    expect(await hold(50, "ai-call:e2e-h2")).toEqual({ ok: false, balance: 40 });
+    await expect(settleHoldCredits(db, { idempotencyKey: "ai-call:e2e-h1", kept: 31 })).rejects.toThrow("hold_invalid_kept");
+    await settleHoldCredits(db, { idempotencyKey: "ai-call:e2e-h1", kept: 10 });
+    await settleHoldCredits(db, { idempotencyKey: "ai-call:e2e-h1", kept: 10 });
+    expect(await debit(60, "ai-call:e2e-3")).toEqual({ ok: true, balance: 0 });   // 40 + 20 given back, once
+    await expect(hold(5, "ai-call:e2e-h1")).rejects.toThrow("hold_key_reused");   // a closed key runs no second call free
+    const { error: reopen } = await db.from("credit_call_holds").update({ settled_at: null, kept: null }).eq("idempotency_key", "ai-call:e2e-h1");
+    expect(reopen?.message).toContain("changes only by being closed once");
+    expect(await hold(1, "ai-call:e2e-h3")).toEqual({ ok: false, balance: 0 });   // an empty wallet starts nothing
+    expect((await send({ event_id: "studio-pack-2", kind: "credit_pack", organization_id: org, units: 10, order_ref: "SP-2" })).status).toBe(200);
+    // a hold whose call was lost 3 hours ago: its debit plus its row (a hold row cannot be edited, so it is written aged)
+    expect(await debit(4, "ai-call:e2e-h4")).toEqual({ ok: true, balance: 6 });
+    const { error: aged } = await db.from("credit_call_holds").insert({ idempotency_key: "ai-call:e2e-h4", organization_id: org, feature_key: "studio.image",
+      units: 4, opened_at: new Date(Date.now() - 3 * 3600_000).toISOString() });
+    if (aged) throw new Error(aged.message);
+    expect(await expireCreditHolds(db)).toBe(1);
+    expect(await debit(10, "ai-call:e2e-5")).toEqual({ ok: true, balance: 0 });
+    const releases = await rows("media_credit_ledger", { organization_id: org, reference_type: "hold_release" });
+    expect(releases.map((r) => r.units).sort()).toEqual([20, 4]);
+    // a pack refunded while a hold on it is open: the hold counts as unspent, so the later give-back cannot leave the
+    // customer both the money and the credits (critic 2026-10-30 H1)
+    expect((await send({ event_id: "studio-pack-3", kind: "credit_pack", organization_id: org, units: 20, order_ref: "SP-3" })).status).toBe(200);
+    expect(await hold(20, "ai-call:e2e-h5")).toEqual({ ok: true, balance: 0 });
+    expect((await send({ event_id: "studio-refund-3", kind: "refund", target: "credit_pack", organization_id: org, order_ref: "SP-3" })).body)
+      .toMatchObject({ ok: true, refunded_units: 20 });
+    await settleHoldCredits(db, { idempotencyKey: "ai-call:e2e-h5", kept: 0 });
+    expect(await debit(1, "ai-call:e2e-6")).toEqual({ ok: false, balance: 0 });
   });
 
   it("a chargeback suspends entitlements and freezes the wallet", async () => {

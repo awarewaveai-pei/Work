@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { PRODUCTS } from "@/lib/portal/products";
 import { signPermit, verifyPermit, type JsonValue, type PermitBinding, type PermitKey, type PermitPayload } from "./permit";
 export { verifyPermit } from "./permit";
@@ -100,6 +101,19 @@ export interface GateDependencies {
   audit: (event: GateEvent) => Promise<void>;
   /** balance = the wallet after this debit; on a refusal, the wallet as it is (0066 media_credit_reserve). */
   debit: (input: { orgId: string; units: number; idempotencyKey: string; featureKey: string }) => Promise<{ ok: boolean; balance: number }>;
+  /** Grant.hold's debit: the same as `debit` plus a hold row (0148), so a hold the app loses is given back by the sweep. */
+  hold: (input: { orgId: string; units: number; idempotencyKey: string; featureKey: string }) => Promise<{ ok: boolean; balance: number }>;
+  /** Keeps `kept` of a hold and gives the rest back; idempotent. Returns the units given back (all of them when the
+   *  daily sweep closed the hold first). */
+  settleHold: (input: { idempotencyKey: string; kept: number }) => Promise<number>;
+}
+
+/** Credits a priced call took before it started (Grant.hold). settle() once, with what the delivered work costs (0 = nothing
+ *  delivered): the difference is given back or charged. `id` is the call's ai_call_logs row id. */
+export interface Hold {
+  readonly id: string;
+  readonly units: number;
+  settle(owedUnits: number, meta?: Record<string, JsonValue>): Promise<{ charged: number; shortfall: number }>;
 }
 
 /** Staff tooling billed to the internal account; there is no product row to seed a comp entitlement on. */
@@ -172,15 +186,7 @@ export class Grant {
       // Shadow never debits, including an allowed verdict (ADR 017 §4): only enforce moves money.
       if (this.info.source === "credits" && modeFor(this.deps, this.actor) === "enforce" && owed > 0) {
         if (!usage.idempotencyKey) throw new EntitlementRequired("idempotency_key_required");
-        const take = (units: number, idempotencyKey: string) =>
-          this.deps.debit({ orgId: this.subject.orgId, units, idempotencyKey, featureKey: this.featureKey });
-        const want = Math.min(owed, this.info.maxSpend ?? owed);
-        const first = await take(want, usage.idempotencyKey);
-        if (first.ok) charged = want;
-        else if (first.balance > 0) {
-          const rest = Math.min(want, first.balance);
-          if ((await take(rest, `${usage.idempotencyKey}:rest`)).ok) charged = rest;
-        }
+        charged = await takeCredits(this, this.deps, Math.min(owed, this.info.maxSpend ?? owed), usage.idempotencyKey);
         shortfall = owed - charged;
         if (shortfall > 0) EXHAUSTED.add(this);
       }
@@ -193,6 +199,58 @@ export class Grant {
       payload: { units: charged, ...(owed > 0 ? { owed } : {}), source: this.info.source, shadow: this.shadow, ...(usage.meta ?? {}) } });
     return { charged, shortfall };
   }
+  /** A call whose price is known before it runs (an image, a video scene) holds its credits first (ADR 017 4b-12): calls
+   *  side by side on one wallet (a video's scenes, two tabs) each take theirs up front, so a wallet that runs dry stops
+   *  the next call instead of leaving calls already running unpaid. null = the wallet cannot cover the whole price, or
+   *  the price is above this permit's max_spend: do not start the call. The hold is a row (0148), so one the app loses
+   *  is given back by the daily sweep. A grant that does not pay in credits (or shadow) holds nothing; its settle() is
+   *  report(). A failed hold throws. */
+  async hold(units: number, id: string = randomUUID()): Promise<Hold | null> {
+    const paying = this.info.source === "credits" && modeFor(this.deps, this.actor) === "enforce";
+    const want = paying ? Math.max(0, Math.ceil(units)) : 0;
+    if (paying && want > 0) {
+      if (!this.allowed || want > (this.info.maxSpend ?? Infinity)) return null;
+      const taken = await this.deps.hold({ orgId: this.subject.orgId, units: want, idempotencyKey: `ai-call:${id}`, featureKey: this.featureKey });
+      if (!taken.ok) return null;
+    }
+    let settled = false;
+    return {
+      id, units: want,
+      settle: async (owedUnits, meta = {}) => {
+        if (settled) throw new Error("hold_already_settled");
+        settled = true;
+        const owed = Math.max(0, Math.ceil(owedUnits));
+        if (!paying) return this.report({ units: owed, idempotencyKey: `ai-call:${id}`, meta });
+        return settlePaid(this, this.deps, want, id, owed, meta);
+      },
+    };
+  }
+}
+
+// The charge rule both report() and Hold.settle() follow: at most max_spend per call; a wallet short of it is drained to 0
+// and the rest is shortfall. Never retry with the same key (a top-up between tries would charge want + rest).
+async function takeCredits(grant: Grant, deps: GateDependencies, units: number, key: string): Promise<number> {
+  if (units <= 0) return 0;
+  const take = (n: number, k: string) => deps.debit({ orgId: grant.subject.orgId, units: n, idempotencyKey: k, featureKey: grant.featureKey });
+  const first = await take(units, key);
+  if (first.ok) return units;
+  if (first.balance <= 0) return 0;
+  const rest = Math.min(units, first.balance);
+  return (await take(rest, `${key}:rest`)).ok ? rest : 0;
+}
+
+/** Hold.settle for a paying grant: keep what was owed, give back the rest of the hold, charge what the hold did not cover. */
+async function settlePaid(grant: Grant, deps: GateDependencies, held: number, id: string, owed: number, meta: Record<string, JsonValue>): Promise<{ charged: number; shortfall: number }> {
+  const due = Math.min(owed, grant.maxSpend ?? owed);   // held never exceeds max_spend
+  const asked = Math.min(due, held);
+  // What the ledger really kept: a hold the sweep already gave back whole keeps nothing.
+  const kept = held > 0 ? held - await deps.settleHold({ idempotencyKey: `ai-call:${id}`, kept: asked }) : 0;
+  const charged = kept + await takeCredits(grant, deps, due - kept, `ai-call:${id}:extra`);
+  const shortfall = owed - charged;
+  if (shortfall > 0) EXHAUSTED.add(grant);
+  await safeAudit(deps, { event: "entitlement.usage", subject: grant.subject, featureKey: grant.featureKey, actor: grant.actor,
+    payload: { units: charged, ...(owed > 0 ? { owed } : {}), held, source: "credits", shadow: grant.shadow, ...meta } });
+  return { charged, shortfall };
 }
 
 const REASONS: Record<string, string> = { no_active_entitlement: "no_entitlement", insufficient_credits: "no_credits" };

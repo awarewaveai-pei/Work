@@ -22,3 +22,33 @@ export async function debitCredits(db: SupabaseClient, input: { orgId: string; u
   const row = Array.isArray(data) ? data[0] : data;
   return { ok: row?.allowed === true, balance: Number(row?.balance ?? 0) };
 }
+
+/** Holds a priced call's credits (0148 media_credit_hold): the 0066 debit and a credit_call_holds row in one transaction,
+ *  idempotent on the key. balance = the wallet after it (unchanged when refused). */
+export async function holdCredits(db: SupabaseClient, input: { orgId: string; units: number; idempotencyKey: string; featureKey: string }): Promise<{ ok: boolean; balance: number }> {
+  if (!Number.isInteger(input.units) || input.units <= 0) throw new Error("invalid_hold_units");
+  const { data, error } = await db.rpc("media_credit_hold", {
+    p_organization_id: input.orgId, p_units: input.units, p_idempotency_key: input.idempotencyKey, p_feature_key: input.featureKey,
+  });
+  if (error) throw new Error(error.message);
+  const row = Array.isArray(data) ? data[0] : data;
+  return { ok: row?.allowed === true, balance: Number(row?.balance ?? 0) };
+}
+
+/** Keeps `kept` of a hold and gives the rest back (0148 media_credit_settle_hold); a replay changes nothing. Returns the
+ *  units given back -- all of them when the sweep had already closed the hold. */
+export async function settleHoldCredits(db: SupabaseClient, input: { idempotencyKey: string; kept: number }): Promise<number> {
+  const { data, error } = await db.rpc("media_credit_settle_hold", { p_idempotency_key: input.idempotencyKey, p_kept: input.kept });
+  if (error) throw new Error(error.message);
+  const back = Number(data);
+  if (!Number.isInteger(back) || back < 0) throw new Error("settle_bad_answer");
+  return back;
+}
+
+/** Holds the app never settled (timeout, restart) go back whole once older than HOLD_EXPIRY (daily sweep). */
+export const HOLD_EXPIRY = "2 hours";
+export async function expireCreditHolds(db: SupabaseClient): Promise<number> {
+  const { data, error } = await db.rpc("media_credit_expire_holds", { p_older_than: HOLD_EXPIRY });
+  if (error) throw new Error(error.message);
+  return Number(data ?? 0);
+}

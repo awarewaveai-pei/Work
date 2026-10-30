@@ -19,7 +19,7 @@ import { randomUUID } from "node:crypto";
 import { getSupabaseWriteClient } from "../supabase-server";
 import { textCallCostUsd, resolveTextRate, imageCostUsd } from "./cost-calculator";
 import { IMAGE_RATES, DEFAULT_IMAGE_MODEL } from "./cost-model";
-import type { Grant } from "../entitlements/can";
+import type { Grant, Hold } from "../entitlements/can";
 import { creditsForCost } from "../entitlements/ledger";
 
 // ai_call_logs.job_id is a uuid (0046): any other value would make Postgres refuse the whole row, losing the cost.
@@ -193,6 +193,28 @@ async function chargeCall(grant: Grant, costUsd: number, id: string, route: stri
   }
 }
 
+/** Takes a priced call's credits before it starts (Grant.hold, ADR 017 4b-12). null = do not start the call: the wallet
+ *  cannot cover it, or the hold could not be written. Pass the hold to logImageCost/logImageResult, which settle it. */
+export async function holdCost(grant: Grant, costUsd: number): Promise<Hold | null> {
+  try {
+    return await grant.hold(creditsForCost(costUsd));
+  } catch (e) {
+    console.warn(`[ai-cost] hold failed: ${String(e).slice(0, 200)}`);
+    return null;
+  }
+}
+
+/** Settles a hold with the delivered call's price (0 when nothing was delivered); never throws. */
+async function settleCall(hold: Hold, units: number, route: string): Promise<Record<string, number | boolean>> {
+  try {
+    const { charged, shortfall } = await hold.settle(units, { ai_call_id: hold.id });
+    return { credits_held: hold.units, credits_charged: charged, ...(shortfall > 0 ? { credits_shortfall: shortfall } : {}) };
+  } catch (e) {
+    console.error(`[ai-cost] ${route} hold ${hold.id} not settled: ${String(e).slice(0, 200)}`);
+    return { credits_held: hold.units, credits_settle_failed: true };
+  }
+}
+
 export interface LogImageCostArgs {
   route: string;
   model: string;
@@ -205,6 +227,8 @@ export interface LogImageCostArgs {
   grant: Grant;
   /** false = the provider charged but the customer got nothing (logImageResult): our cost, recorded, not charged. */
   delivered?: boolean;
+  /** The credits holdCost took before the call: settled here (the row id is the hold's). */
+  hold?: Hold;
 }
 
 /** Best-effort per-call cost logger for image/video — one ai_call_logs row. Never throws. */
@@ -212,8 +236,10 @@ export async function logImageCost(args: LogImageCostArgs): Promise<void> {
   try {
     const supabase = getSupabaseWriteClient();
     if (!supabase) return;
-    const id = randomUUID();
-    const charge = args.delivered === false ? {} : await chargeCall(args.grant, args.costUsd, id, args.route);
+    const id = args.hold?.id ?? randomUUID();
+    const delivered = args.delivered !== false;
+    const charge = args.hold ? await settleCall(args.hold, delivered ? creditsForCost(args.costUsd) : 0, args.route)
+      : delivered ? await chargeCall(args.grant, args.costUsd, id, args.route) : {};
     const job = jobColumns(args.jobId);
     const { error } = await supabase.from("ai_call_logs").insert({
       id,
@@ -236,10 +262,15 @@ export async function logImageCost(args: LogImageCostArgs): Promise<void> {
   } catch { /* never break the caller */ }
 }
 
+/** A held call that never reached the provider's bill (refused, failed before work): the whole hold goes back. */
+export function releaseHold(hold: Hold | null | undefined, route: string): void {
+  if (hold) void settleCall(hold, 0, route);
+}
+
 /** One lib/tarot/image-gen.ts result. Logged when the provider charged: on success, and on a failure after the provider
  *  finished (`billed`, e.g. the download of a finished image failed). Vendor and price come from IMAGE_RATES. */
-export function logImageResult(result: { ok: boolean; billed?: boolean; costUsd?: number }, args: { route: string; model: string; jobId?: string | null; tool?: string | null; grant: Grant }): void {
-  if (!result.ok && !result.billed) return;
+export function logImageResult(result: { ok: boolean; billed?: boolean; costUsd?: number }, args: { route: string; model: string; jobId?: string | null; tool?: string | null; grant: Grant; hold?: Hold }): void {
+  if (!result.ok && !result.billed) return releaseHold(args.hold, args.route);
   const rate = IMAGE_RATES[args.model] ?? IMAGE_RATES[DEFAULT_IMAGE_MODEL];
   // A provider that reports usage (OpenAI images bill by token) gives the exact cost; others use the per-image price.
   void logImageCost({ ...args, vendor: rate.vendor, costUsd: result.costUsd ?? imageCostUsd(args.model), delivered: result.ok });

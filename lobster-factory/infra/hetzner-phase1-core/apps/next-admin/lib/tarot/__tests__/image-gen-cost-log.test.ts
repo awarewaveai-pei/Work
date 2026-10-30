@@ -7,6 +7,7 @@ vi.mock("@/lib/ai/gateway", () => ({ providerUrl: (_g: unknown, _p: string, path
 vi.mock("@/lib/ai/log-ai-call", () => ({
   billedOrgId: (g: { subject?: { orgId: string } }) => g.subject?.orgId ?? null,
   logImageResult: (result: unknown, args: Record<string, unknown>) => { m.logged.push({ result, args }); },
+  holdCost: async () => ({ id: "hold-1", units: 0, settle: async () => ({ charged: 0, shortfall: 0 }) }), releaseHold: () => undefined,
 }));
 
 import { generateTarotImage } from "../image-gen";

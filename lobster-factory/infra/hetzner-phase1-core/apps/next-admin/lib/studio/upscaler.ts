@@ -13,7 +13,7 @@ import { randomUUID } from "node:crypto";
 import { providerUrl } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
-import { logImageCost } from "@/lib/ai/log-ai-call";
+import { holdCost, logImageCost, releaseHold } from "@/lib/ai/log-ai-call";
 import { toolCostUsd } from "@/lib/ai/cost-calculator";
 
 const REALESRGAN_VERSION_DEFAULT =
@@ -142,6 +142,9 @@ export async function upscaleToPrintFile(
   if (!token) return { ok: false, error: "missing_replicate" };
   const version = process.env.REALESRGAN_VERSION ?? REALESRGAN_VERSION_DEFAULT;
   const grant = await grantFor("studio.upscale");
+  // Held for the most passes that can run; the settle charges the passes that ran (Grant.hold).
+  const hold = await holdCost(grant, toolCostUsd("upscale") * MAX_PASSES);
+  if (!hold) return { ok: false, error: "no_credits" };
 
   const controller = new AbortController();
   const killer = setTimeout(() => controller.abort(), TOTAL_TIMEOUT_MS);
@@ -209,6 +212,7 @@ export async function upscaleToPrintFile(
   } finally {
     clearTimeout(killer);
     // Replicate billed every pass that ran; the customer pays only for a print file it received.
-    if (passes > 0) void logImageCost({ route: "studio/upscale", model: "real-esrgan", vendor: "Replicate", costUsd: toolCostUsd("upscale") * passes, tool: "studio", grant, delivered });
+    if (passes > 0) void logImageCost({ route: "studio/upscale", model: "real-esrgan", vendor: "Replicate", costUsd: toolCostUsd("upscale") * passes, tool: "studio", grant, delivered, hold });
+    else releaseHold(hold, "studio/upscale");
   }
 }

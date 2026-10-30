@@ -2,7 +2,7 @@ import { createPublicKey, createPrivateKey, type KeyObject } from "node:crypto";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { recordOpsAudit } from "@/lib/ops-audit";
 import { entitlementMode, type GateDependencies } from "./can";
-import { creditPolicy, debitCredits } from "./ledger";
+import { creditPolicy, debitCredits, holdCredits, settleHoldCredits } from "./ledger";
 import { createEntitlementStore } from "./tables";
 
 // ENTITLEMENT_PUBLIC_KEYS = "kid:PEM;kid2:PEM" (";" separates, "\n" escapes allowed); signing kid = ENTITLEMENT_SIGNING_KID
@@ -48,6 +48,16 @@ export function runtimeGateDependencies(): GateDependencies {
       const db = getSupabaseWriteClient();
       if (!db) throw new Error("entitlements_db_unavailable");
       return debitCredits(db, input);
+    },
+    async hold(input) {
+      const db = getSupabaseWriteClient();
+      if (!db) throw new Error("entitlements_db_unavailable");
+      return holdCredits(db, input);
+    },
+    async settleHold(input) {
+      const db = getSupabaseWriteClient();
+      if (!db) throw new Error("entitlements_db_unavailable");
+      return settleHoldCredits(db, input);
     },
   };
 }

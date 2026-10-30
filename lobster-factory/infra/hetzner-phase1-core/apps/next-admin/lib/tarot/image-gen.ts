@@ -13,7 +13,8 @@ import { getDesignsPublicBase } from "../storage/r2";
 import { MODEL_SPECS } from "./model-specs";
 import { providerUrl } from "@/lib/ai/gateway";
 import type { Grant } from "@/lib/entitlements/can";
-import { logImageResult } from "@/lib/ai/log-ai-call";
+import { holdCost, logImageResult } from "@/lib/ai/log-ai-call";
+import { imageCostUsd } from "@/lib/ai/cost-calculator";
 import { OPENAI_IMAGE_MODEL, OPENAI_IMAGE_TOKEN_RATES } from "@/lib/ai/cost-model";
 
 const GEN_TIMEOUT_MS = 58_000; // stay under the 60s nginx/route ceiling
@@ -637,11 +638,14 @@ function openaiImageCostUsd(u: OpenAiImageUsage | undefined): number | undefined
 
 /** Shared by tarot, studio, content and video: the caller asks for its own product's feature (e.g. grantFor("studio.image")). */
 export async function generateTarotImage(params: TarotGenParams, grant: Grant): Promise<TarotGenResult> {
+  // Credits are held at the per-image price before the provider runs (Grant.hold); the settle uses the reported cost.
+  const hold = await holdCost(grant, imageCostUsd(params.model));
+  if (!hold) return { ok: false, error: "no_credits" };
   const result = await runGeneration(params, grant);
   // The one place an image's cost is logged: only here are all of its facts known -- whether the provider charged
   // (ok, or billed after a failed download), the model that ran, and the account the grant bills. Callers pass costLog.
   logImageResult(result, { route: params.costLog?.route ?? "tarot/image-gen", model: params.model, tool: params.costLog?.tool ?? "image",
-    jobId: params.costLog?.jobId ?? null, grant });
+    jobId: params.costLog?.jobId ?? null, grant, hold });
   return result;
 }
 

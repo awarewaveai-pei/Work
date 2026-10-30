@@ -24,7 +24,7 @@ import { generateTarotImage, isTarotModel, TAROT_MODELS } from "../../tarot/imag
 import { generateVideoMotionBatch, isVideoMotionModel } from "../../tarot/video-motion-gen";
 import { grantFor } from "@/lib/entitlements/grant";
 import { VIDEO_MOTION_RATES } from "../../ai/cost-model";
-import { logImageCost } from "../../ai/log-ai-call";
+import { holdCost, logImageCost, releaseHold } from "../../ai/log-ai-call";
 import { getSupabaseWriteClient } from "../../supabase-server";
 import { randomBytes, randomUUID } from "node:crypto";
 import { rightsSourcesFromOrigins, type AssetOrigin, type RightsSource } from "../video/asset-origin";
@@ -470,10 +470,23 @@ export async function applyVideoMotionToPrimaryFormat(
   const assets = formatAssets[primaryFormat];
   if (!assets) return { motionAppliedCount: 0, r2Keys: [] };
 
-  const eligible = scenes
+  const candidates = scenes
     .map((s, i) => ({ s, i }))
     .filter(({ s, i }) => s.visual !== "broll" && assets[i]) // broll 場景走真實影片，不需要也不該套 AI 動態
     .slice(0, MAX_MOTION_SCENES);
+  if (candidates.length === 0) return { motionAppliedCount: 0, r2Keys: [] };
+
+  // Each scene holds its credits before the batch starts (Grant.hold, ADR 017 4b-12): the scenes run side by side on one
+  // grant, so a wallet that covers two scenes runs two and the third keeps its static image instead of running unpaid.
+  const rate = VIDEO_MOTION_RATES[motionModel];
+  const motionGrant = await grantFor("video.motion");
+  const eligible: Array<{ s: (typeof candidates)[number]["s"]; i: number; hold?: Awaited<ReturnType<typeof holdCost>> }> = [];
+  for (const c of candidates) {
+    if (!rate) { eligible.push(c); continue; }   // no price: logged below as cost NOT logged, as before
+    const hold = await holdCost(motionGrant, rate.usdPerSec * rate.defaultDurationSec);
+    if (hold) eligible.push({ ...c, hold });
+    else console.warn(`[video-pipeline] scene ${c.s.id} motion skipped: credits not held, keeping static image`);
+  }
   if (eligible.length === 0) return { motionAppliedCount: 0, r2Keys: [] };
 
   const jobs = eligible.map(({ s, i }) => ({
@@ -484,8 +497,13 @@ export async function applyVideoMotionToPrimaryFormat(
     motionPrompt: `${s.image_prompt}. The subject moves naturally and visibly (gesture, expression, or action) — not just a slow camera drift. Cinematic camera movement.`,
     aspectRatio: primaryAspectRatio as "16:9" | "9:16",
   }));
-  const motionGrant = await grantFor("video.motion");
-  const results = await generateVideoMotionBatch(motionGrant, motionModel, jobs);
+  let results: Awaited<ReturnType<typeof generateVideoMotionBatch>>;
+  try {
+    results = await generateVideoMotionBatch(motionGrant, motionModel, jobs);
+  } catch (e) {
+    for (const e2 of eligible) releaseHold(e2.hold, "video/motion");
+    throw e;
+  }
 
   // 這批（同一支影片、最多 MAX_MOTION_SCENES 個場景）共用一個關聯 id，讓 /ops/costs「⑤ 流水帳」
   // 能把同一支影片的多筆動態收費歸成一組，而非各自散落、事後對不回是哪支影片花的（critic 2026-09-12）。
@@ -500,18 +518,18 @@ export async function applyVideoMotionToPrimaryFormat(
   let motionAppliedCount = 0;
   for (let k = 0; k < results.length; k++) {
     const r = results[k];
-    const { i } = eligible[k];
+    const { i, hold } = eligible[k];
     if (!r.ok) {
       console.error(`[video-pipeline] scene ${scenes[i].id} motion generation failed, keeping static image:`, "error" in r ? r.error : "unknown_error");
+      releaseHold(hold, "video/motion");
       continue;
     }
     // Replicate 在 r.ok 那刻就收費：之後 mime 或 R2 失敗也要記一筆真實花費（critic 2026-09-12），但客人沒拿到
     // 動態片就不扣點（delivered:false，ADR 017 4b-11）。prepareScenes 每支影片只跑一次＝記帳次數＝收費次數。
-    const rate = VIDEO_MOTION_RATES[motionModel];
     const logMotion = (delivered: boolean) => {
       if (rate) {
         void logImageCost({ route: "video/motion", model: motionModel, vendor: rate.vendor, costUsd: rate.usdPerSec * rate.defaultDurationSec,
-          jobId: motionBatchJobId, tool: "video", kind: "video", grant: motionGrant, delivered });
+          jobId: motionBatchJobId, tool: "video", kind: "video", grant: motionGrant, delivered, hold });
       } else {
         console.error(`[video-pipeline] scene ${scenes[i].id} motion billed but no VIDEO_MOTION_RATES entry for "${motionModel}" — cost NOT logged`);
       }

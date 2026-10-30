@@ -3,7 +3,7 @@ import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role
 import { withFeature } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
 import { removeObject } from "../../../../../lib/studio/inpaint";
-import { logImageCost } from "../../../../../lib/ai/log-ai-call";
+import { holdCost, logImageCost, releaseHold } from "../../../../../lib/ai/log-ai-call";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -39,13 +39,13 @@ async function handlePost(request: Request, grant: Grant) {
     return NextResponse.json({ ok: false, error: "image/mask must be png/jpeg/webp base64 data URLs" }, { status: 400 });
   }
 
-  const result = await removeObject(body.image, body.mask);
-  if (result.ok) {
-    const jobId = typeof body._jobId === "string" ? body._jobId : null;
-    if (jobId) {
-      void logImageCost({ route: "tools/studio/inpaint", model: "bria-eraser", vendor: "Replicate", costUsd: 0.003, jobId, tool: "canvas", grant });
-    }
-  }
+  // Credits held before the provider runs (Grant.hold); every delivered call is charged, with or without a _jobId.
+  const hold = await holdCost(grant, 0.003);
+  if (!hold) return NextResponse.json({ ok: false, error: "no_credits" });
+  const result = await removeObject(body.image, body.mask).catch((e) => { releaseHold(hold, "tools/studio/inpaint"); throw e; });
+  const jobId = typeof body._jobId === "string" ? body._jobId : null;
+  if (result.ok) void logImageCost({ route: "tools/studio/inpaint", model: "bria-eraser", vendor: "Replicate", costUsd: 0.003, jobId, tool: "canvas", grant, hold });
+  else releaseHold(hold, "tools/studio/inpaint");
   // HTTP 200 with ok:false on failure — same nginx error_page rationale as the other studio routes.
   return NextResponse.json(result);
 }

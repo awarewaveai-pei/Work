@@ -74,7 +74,7 @@ describe("global entitlement expiry", () => {
       method: "POST", headers: { Authorization: "Bearer expiry-test-token" },
     });
     mocks.client.mockReturnValue(database({ error: null, count: 1501 }).client);
-    expect(await (await POST(request())).json()).toEqual({ ok: true, expired: 1501, trials_ended: 0, all_features_added: 0 });
+    expect(await (await POST(request())).json()).toEqual({ ok: true, expired: 1501, trials_ended: 0, all_features_added: 0, holds_released: 0 });
     mocks.client.mockReturnValue(database({ error: { message: "unavailable" }, count: null }).client);
     expect((await POST(request())).status).toBe(500);
     mocks.client.mockReturnValue(database({ error: null, count: null }).client);

@@ -3,13 +3,14 @@
  * imports this file, so routes that merely read jobs never reach a paid ask.
  */
 import { createHash } from "node:crypto";
-import { logImageCost } from "@/lib/ai/log-ai-call";
+import { holdCost, logImageCost, releaseHold } from "@/lib/ai/log-ai-call";
 import { providerUrl } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
 import type { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { completeTranscriptionJob, dispatchToHost, hostWorkerConfig, OPENAI_TRANSCRIBE_MAX_BYTES, OPENAI_TRANSCRIBE_MODEL, openAiTranscribeUsd, ZH_HANT_PROMPT, type JobRow } from "./transcription";
 
 type Db = NonNullable<ReturnType<typeof getSupabaseWriteClient>>;
+const TRANSCRIBE_HOLD_SEC = 600;
 type OpenAiSegment = { id?: number; start?: number; end?: number; text?: string; avg_logprob?: number; no_speech_prob?: number };
 
 /** whisper-1 verbose_json -> the worker's transcript shape. Segments are clamped to be ordered and inside the
@@ -52,9 +53,13 @@ export async function transcribeWithOpenAi(sourceUrl: string, expectedSha256: st
 export async function runOpenAiJob(db: Db, job: JobRow & { sourceUrl: string; callbackSecret: string }, apiKey: string, baseUrl: string): Promise<void> {
   try {
     const grant = await grantFor("video.transcribe");
-    const transcript = await transcribeWithOpenAi(job.sourceUrl, job.source_checksum_sha256, apiKey, providerUrl(grant, "openai", "/v1/audio/transcriptions"));
+    // Held for TRANSCRIBE_HOLD_SEC of audio before the call (Grant.hold); the settle charges the real duration.
+    const hold = await holdCost(grant, openAiTranscribeUsd(TRANSCRIBE_HOLD_SEC));
+    if (!hold) throw new Error("no_credits");
+    const transcript = await transcribeWithOpenAi(job.sourceUrl, job.source_checksum_sha256, apiKey, providerUrl(grant, "openai", "/v1/audio/transcriptions"))
+      .catch((e) => { releaseHold(hold, "/api/video/transcription/dispatch"); throw e; });
     const costUsd = Number(openAiTranscribeUsd(transcript.audio_duration_sec).toFixed(6));
-    void logImageCost({ route: "/api/video/transcription/dispatch", model: OPENAI_TRANSCRIBE_MODEL, vendor: "OpenAI", costUsd, jobId: job.id, tool: "video-transcribe", kind: "video", grant });
+    void logImageCost({ route: "/api/video/transcription/dispatch", model: OPENAI_TRANSCRIBE_MODEL, vendor: "OpenAI", costUsd, jobId: job.id, tool: "video-transcribe", kind: "video", grant, hold });
     await db.from("media_transcription_jobs").update({ result_json: { engine: "openai", costUsd } }).eq("id", job.id).eq("status", "dispatched");
     await completeTranscriptionJob(db, { ...job, result_json: { engine: "openai", costUsd } }, transcript, baseUrl);
   } catch (error) {

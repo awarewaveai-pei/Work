@@ -19,6 +19,8 @@ export function gateFixture(opts: {
     source: "contract" as const, sourceRef: "c-1", startsAt: now - 60, endsAt: now + 3600, status: "active", limits: {}, ...opts.entitlement };
   const audit = vi.fn().mockResolvedValue(undefined);
   const debit = vi.fn(async (_: { orgId: string; units: number; idempotencyKey: string; featureKey: string }) => ({ ok: opts.debitAllowed ?? true, balance: opts.balance ?? 0 }));
+  const hold = vi.fn(async (_: { orgId: string; units: number; idempotencyKey: string; featureKey: string }) => ({ ok: opts.debitAllowed ?? true, balance: opts.balance ?? 0 }));
+  const settleHold = vi.fn(async (_: { idempotencyKey: string; kept: number }) => 0);
   const findActiveEntitlement = vi.fn(async (q: { organizationId: string; productKey: string; featureKey: string }) => {
     if (opts.storeError) throw opts.storeError;
     // a pack plan lists only credits features (ADR 017 #11); other features keep the fixture row
@@ -34,7 +36,7 @@ export function gateFixture(opts: {
     }),
     publicKeys: () => ({ k1: pair.publicKey }),
     mode: () => opts.mode ?? "enforce",
-    audit, debit,
+    audit, debit, hold, settleHold,
   };
-  return { deps, audit, debit, findActiveEntitlement };
+  return { deps, audit, debit, hold, settleHold, findActiveEntitlement };
 }

@@ -67,7 +67,7 @@ function deps(mode: EntitlementMode) {
     }),
     publicKeys: () => ({ k1: pair.publicKey }),
     mode: () => mode,
-    audit, debit,
+    audit, debit, hold: vi.fn(async () => ({ ok: true, balance: 0 })), settleHold: vi.fn(async () => 0),
   };
   return { d, audit, debit };
 }

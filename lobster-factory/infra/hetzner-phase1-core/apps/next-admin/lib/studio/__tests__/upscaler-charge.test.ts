@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const m = vi.hoisted(() => ({ logged: [] as Record<string, unknown>[], put: { ok: true, publicUrl: "https://cdn/x.png", byteSize: 1 } as Record<string, unknown> }));
-vi.mock("@/lib/ai/log-ai-call", () => ({ logImageCost: vi.fn(async (a: Record<string, unknown>) => { m.logged.push(a); }) }));
+vi.mock("@/lib/ai/log-ai-call", () => ({ holdCost: async () => ({ id: "hold-1", units: 0, settle: async () => ({ charged: 0, shortfall: 0 }) }), releaseHold: () => undefined, logImageCost: vi.fn(async (a: Record<string, unknown>) => { m.logged.push(a); }) }));
 vi.mock("@/lib/ai/gateway", () => ({ providerUrl: (_g: unknown, _p: string, path: string) => `https://api.replicate.com${path}` }));
 vi.mock("@/lib/entitlements/grant", () => ({ grantFor: async () => ({ tag: "upscale-grant" }) }));
 vi.mock("../../storage/r2", () => ({ putDesignObject: async () => m.put }));

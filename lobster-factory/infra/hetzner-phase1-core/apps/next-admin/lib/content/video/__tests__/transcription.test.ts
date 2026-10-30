@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const completeImport = vi.hoisted(() => vi.fn());
 vi.mock("@/app/api/video/transcription/import/route", () => ({ POST: completeImport }));
 vi.mock("../caption-qa-persistence", () => ({ persistAutomaticCaptionQa: vi.fn() }));
-vi.mock("@/lib/ai/log-ai-call", () => ({ logImageCost: vi.fn() }));
+vi.mock("@/lib/ai/log-ai-call", () => ({ logImageCost: vi.fn(), holdCost: async () => ({ id: "hold-1", units: 0, settle: async () => ({ charged: 0, shortfall: 0 }) }), releaseHold: () => undefined }));
 vi.mock("@/lib/entitlements/grant", () => ({ grantFor: vi.fn(async () => ({})) }));
 vi.mock("@/lib/ai/gateway", () => ({ providerUrl: (_g: unknown, _p: string, path: string) => `https://provider.test${path}` }));
 

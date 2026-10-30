@@ -1,4 +1,23 @@
 # Worklog
+## 2026-10-30（續17）ADR 017 收錢後續四件：門 API 查持有、扣點預扣→結算（0148）、每日 Woo 對帳、監工台現況（Claude）
+
+- **① 門 API 查持有**：根因＝只有門頁問 `doorAccess`（`app/ProductDoorShell.tsx`），門的 API 沒問 → 過期客戶仍可打自己 org 的 `/api/content/*`、`/api/tools/studio/mockup`（只查角色）。不變量＝客戶在產品門打的每條 API 都經 `doorAccess`，在 `middleware.ts` `productApiDenial` 問一次（快取與 getUser 兩條路）。`lib/portal/door-access.ts` 加快取（持有 60s／未持有 10s／失敗 5s）＋同時到達共用一次查詢（避 06-14 限流）。trending GET：只讀當天 `content_trends`、當天沒有才收集一次；空結果 10 分鐘不重抓；geo 白名單外 400；員工 POST `refresh=1` 強制重抓；排序 created_at/source/title。
+- **④ 預扣→結算**：根因＝只在交付後扣（`Grant.report`），同一 grant 併發中的呼叫在錢包見底後免費跑完；genfill／inpaint／remove-bg 沒帶 `_jobId` 就不扣。0148：`credit_call_holds`＋`media_credit_hold`（扣款＋預扣列同交易；已結清的 key 拒用）＋`media_credit_settle_hold`（先帳戶鎖後列鎖；保留≤預扣；退回＝`refund`/`hold_release`；重送回傳已退量）＋`media_credit_expire_holds`（每日、>2h 全退、每次 500 筆、逐筆子交易）＋只能結清一次的 trigger＋`billing_ledger` 30 天數字扣掉 hold_release。`can.ts` `Grant.hold` 價格 > max_spend 直接拒；`settlePaid` 以帳本實際保留量記帳、差額補扣。接上：image-gen、影片動態 3 場景、upscale、genfill、inpaint、remove-bg、轉錄。清理在 `/api/internal/entitlements/expire` 獨立一步。
+- **③ 每日對帳**（外掛 1.3.1）：外掛 `includes/Reconcile.php` 簽章唯讀 GET（HMAC 標籤 `awarewave-reconcile-v1`、300s、31 天上限）；next-admin `lib/payments/woo-reconcile.ts` 比對（點數包看事件 id、訂閱看 external_ref＋paid_at）列漏送／多送／需人工登記；`/api/internal/billing/reconcile`（cron `billing_reconcile` 01:20 UTC）不符開 ops incident；`/ops/billing` 同一份即時結果。`PAYMENTS_PROVIDERS` 沒有 woo（prod 現為 local、`PAYMENTS_WOO_SECRET` 未設，等 4b-6）＝回報「未啟用」不報紅。
+- **② 監工台**：data.mjs「扣點仍 0」「每功能扣幾點待你定」「單價待你定」「扣點仍待定價」改為 4b-11 已上線事實；studio_basic（0145 已刪）改 0145 `*_credits`；4b-12、對帳列入 4b 項目；「API 層尚未查持有」改已做。build＋check＋重發 https://claude.ai/artifact/Htm4xqe362YM987Fo8YLCr 。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit（0，排除他人刪檔留下的 .next 舊型別）＋ npx vitest run lib/portal lib/entitlements lib/ai lib/payments lib/studio lib/tarot lib/content lib/schedules app/api/content app/api/tools/studio app/api/internal ops/billing middleware-*（1254 passed；2 failed＝別的 session 新建 tools/seedstar 未登記） | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python tests/e2e/entitlements/entitlements-real-db.py --suite payments（真 Postgres＋PostgREST，0001..0148，21 passed：預扣、錢包不足拒、保留超過預扣拒、重送只退一次、key 重用拒、結清列不可改回、逾時預扣清理全退） | exit=0 | ms=90000
+- REALTEST_EVIDENCE: tool=Bash | cmd=php 載入 tests/ReconcileTest.php（3 tests／11 assertions；HMAC 向量與 TS 相同）；另一 session 以 phpunit 跑 store 全套 29 tests 綠 | exit=0 | ms=400
+- REALTEST_EVIDENCE: tool=Bash | cmd=暫用腳本：payments 套件 schema（0001..0148）→ 套 0148 down（表消失、`billing_apply_payment_event` 不再提 credit_call_holds）→ 再套 0148 | exit=0 | ms=60000
+- 突變（守衛各一次，拔→紅→還原綠）：① middleware 持有檢查 → `door-api-holds.test.ts` 3 紅；② `hold()` 不先扣 → `hold.test.ts` 3 紅；③ SQL `p_kept > h.units` 守衛 → 真 DB 套件 1 紅；④ 0148 退款時把開著的預扣算回 → 真 DB「預扣中退款」1 紅。
+- REVIEW_DONE: critic=Deep | verdict=fail→fixed | findings=0c/3h+1m→0/5n -- critic（①④）H1 預扣只在記憶體／H2 每請求查 DB／H3 價格被壓成上限／M1 退款繞過 RPC → 0148＋快取＋拒絕；複審 warn（H2-R 併發共用、L-a..L-d）→ 全修；db-expert（0148）warn：M1 鎖順序、M2 清理後晚到結算、M3 30 天數字、L1–L4 → 全修；critic（③＋0148 delta）warn：H1 點數包退款把未結算預扣當已花（→0148 重述 0146 `billing_apply_payment_event`，開著的預扣算未花）、M1 每訂閱×方案一筆、M2 改看 granted 標記、M3 頁面 10 分鐘快取、M4 容器實打 aware-wave.com 可達、M5 全額退款也對帳、L3 筆數上限即拒、L4 指紋按不符集合、L6 密鑰取 seller_sites.env_var、L8 預扣列綁定實際扣款、L10 WooCommerce 未啟用回 503 → 全修
+- ORACLE_WAIVED: codex quota blocked until 2026-10-30 17:58 (scripts/oracle-quota.ps1)；以三輪獨立 critic＋db-expert＋3 個突變替代
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=refundCredits|deps.refund|settleHoldCredits|holdCost|releaseHold|doorApiDenial|todaysTrends|studio_basic | hits=refundCredits/deps.refund 0；studio_basic 監工台 2 處已改
+- **上線**：見下一條（套 0148、推 main、部署、外掛 1.3.1）。
+- **rollback**：next-admin revert 三個 commit（先）→ 0148 down（有預扣列即拒，之後只能往前修）；外掛 `rollout-wp-bridge.ps1` 用安裝前備份還原 1.3.0。
+- **剩**：③ 真比對要等 4b-6（設 `PAYMENTS_WOO_SECRET` 兩邊、`PAYMENTS_PROVIDERS=local,woo`）；文字類 LLM 呼叫（價格事後才知）仍是交付後扣，單次成本低，未預扣。L4：沒點數的轉錄改走自家 host worker（既有設計，無供應商成本）。
+- **避免再發生**：門 API 持有閘在 middleware 單點＋突變測試；扣點以資料庫預扣列為準＋每日清理。
+
 ## 2026-10-30（續15）客戶自助註冊 420233a4c 補 Codex 審查：1 個中低 finding，交 MyAccountDoors.php 的 owner 修（Claude）
 
 - 操作者告知 Codex 有額度 → `oracle-quota.ps1 -Action clear`；`codex-oracle.ps1 -Mode review -DiffRef 61f9f261c..420233a4c`，files-reviewed 涵蓋全部 65 檔＋4 個刪除，artifact `reports/oracle/2026-10-30-partialreview-98809ffc.md`。
