@@ -12,6 +12,34 @@
 - BUGHUNT_WAIVED: NA -- 無程式碼改動
 - **沒驗到的一段**：真客戶在瀏覽器輸入帳密那一步（middleware 從登入身分取 org_id）未由真人走過；該段由既有 middleware 測試涵蓋，且其他門（video、design）已用同一機制上線。若要真人走一次：員工後台邀請一個客戶帳號綁到沒開通的帳戶，再用該帳號登入。
 - **缺口（不阻擋）**：repo 沒有測試畫 `ProductDoorShell` 的「尚未開通」分支（`app/__tests__/door-nav.test.tsx` 只測功能變灰）；本次用暫時測試補驗，未留檔。
+## 2026-10-30（續5）4b-11 依實際成本扣點：成本記錄器經 grant 扣點、單一扣點路徑、刪 cs 舊預扣（操作者「都你決定」）（Claude）
+
+**觸發**：續3 的擋點「付費縫報 0 點＝有 1 點就無限用」（Codex partialreview-ecb5c9b1 F1）；操作者授權定價與實作。
+
+**決定**：1 點＝NT$1；交付成功的供應商呼叫扣 `ceil(cost_usd×32×3)`，成本 >0 最少 1（`lib/entitlements/ledger.ts` `creditsForCost`、`CREDIT_MARKUP`）。不用每功能固定價：同功能可選模型、單價差 100 倍（`lib/ai/cost-model.ts:51,59`）。卡 step-4 4b-11、ADR 017 #11。
+
+**改了什麼（next-admin）**
+- `lib/entitlements/can.ts` `Grant.report`＝唯一扣點路徑：上限 `max_spend`、錢包不足以 `<key>:rest` 扣光、回 `{charged, shortfall}`、audit `units`＝實扣＋`owed`；`GateDependencies.debit` 回 `{ok, balance}`（0066：成功＝扣後、拒絕＝現值）。`ledger.ts` 同。
+- `lib/ai/log-ai-call.ts`：`grant` 必填（tsc 強制 45 呼叫點）、刪 `organizationId`（帳戶＝`billedOrgId(grant)`）、列 id 先產生＝冪等鍵 `ai-call:<id>`、metadata `credits_charged`／`credits_shortfall`／`credits_charge_failed`；`logImageResult` billed 失敗只記不扣（`delivered:false`）。`grant.ts` 刪 `scopeBilledOrgId`。
+- 45 呼叫點傳 seam 用的同一個 grant（fullstack-engineer，主 session 抽查 video-pipeline／upscaler）；`lib/cs/llm.ts` 等刪已無用的 `organizationId`。
+- 刪 `lib/cs/billing.ts`＋`app/api/webhooks/chatwoot/route.ts` 預扣（第二條扣點路徑：每則訊息 1 點，與記錄器重複扣；Codex c9327c19 F1）；拒絕改由 `grantFor` 丟錯 → `lib/cs/orchestrator.ts:96` 轉真人。
+- `app/api/tools/studio/mockup/route.ts`：刪 Printful $0 成本列（免費、非 AI 呼叫，無 grant 可掛）及其 `_jobId` 管線（含 `StudioWorkbench.tsx` 傳送端）。
+- `lib/studio/upscaler.ts`：成本列移到 `finally`，只在列印檔存好才 `delivered`（Codex c9327c19 F2）；`lib/content/blocks/video-pipeline.ts` 動態片同理（critic M2）。
+- `can.ts`：扣不足的 grant 標為用盡（`EXHAUSTED`）→ `allowed=false`，seam 全拒（critic M1：一個請求共用一個 grant，扣光後其餘呼叫原本免費）。
+- `lib/cs/MODULE_MANIFEST.json` 依賴說明；`node scripts/sync-foundry-catalog.mjs` 重產兩檔（含先前 content 門開啟的既有漂移）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p .（next-admin） | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（next-admin 完整：424 files，3558 passed） | exit=0 | ms=33318
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py --suite payments（20 passed；真 0066：扣後餘額、同鍵不重扣、超額拒回現值） | exit=0 | ms=14547
+- 突變（金流守衛）：拿掉 `report` 的 `source === "credits"` → `billed-usage-log.test.ts`「a comp or contract grant covers its use」紅；拿掉 `EXHAUSTED.add` → `can.test.ts`「drained to 0」紅；皆還原綠。
+- 第二 critic（金流 ≥2，Claude `critic`）：0C/0H/1M/2Med/3L。M1 grant 扣光後續免費 → 用盡標記；M2 video/motion 未交付仍扣 → 交付後扣；M3 推 main＝當晚上線收錢 → prod 現 0 帳戶有 `pay:credits` 列、0 錢包，照常部署；6b 刪 cs 舊預扣影響 → prod `media_billing_accounts` 0 列、`cs_reply` 帳本 0 筆（ssh psql）；L1 每列最少 1 點（cs 一則 3–5 點）寫進卡；L2 Claude 空回再換 Gemini 各扣、L3 shortfall 不成欠款：不改（成本真實發生／見底即停）。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n -- `agency-os/reports/oracle/2026-10-30-partialreview-c9327c19.md`（第一次 107KB 全改動送審 Codex「model at capacity」兩次無回答，改送金流核心 10 檔）：F1 cs 雙重扣點 → 刪舊路徑；F2 放大圖未交付仍扣 → finally＋`upscaler-charge.test.ts`；F3 扣點成功但成本列寫失敗 → 不改：錢正確、`entitlement.usage` audit 帶 `ai_call_id`＋units 可對帳，列寫失敗在任何順序都會失去該列。
+  - external oracle = Codex CLI (codex exec -s read-only), not self-description
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=scopeBilledOrgId\|reserveCsCredit\|cs/billing\|units stay 0\|PLACEHOLDER policy | hits=7（程式 0；WORKLOG 歷史 4、handoff 2026-10-19 1 為歷史；`customer-drill.test.ts:176` 註解、TASKS:313 已改；`.claude/` 僅 session 記錄）
+
+**未完**：部署走今晚 03:00 自動部署（main）；4b-6 後台（操作者）；4b-9。
+**rollback**：revert 本 commit（程式；無 migration、無資料改動）；已扣的點用 `record-payment.mjs` 反向登記。
 ## 2026-10-30（續4）四件小修：collection 事故走標準 ingest／Codex 佇列 check 白名單環境／COS 單次 lock 清理／eisenhower 共用 provenance（Claude＋subagent）
 
 **觸發**：操作者「你決定前 5 件」。共用目錄已有 2 個 session（`local_0a51d7fc` ADR 017 主線），依 AGENTS §5 不再開 session，改派 subagent（Opus×1、Sonnet×3、Haiku×1），避開 ADR 017 檔案。

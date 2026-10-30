@@ -170,5 +170,16 @@ A／B 都要會計師一句話確認「收款開發票＋合約負債」；C 另
 - 範圍（開工前先出七段計畫給操作者批准）：客戶頁一個區塊，勾產品＝寫一筆 comp 或 contract 權利列（同一張 `organization_entitlements`，頁面不另存）；收回＝把列設 expired；每次寫稽核；只有 owner／admin。
 - 實作（2026-10-29，WORKLOG 同日 4b-10 條）與上列不同處：**只開 comp**——手寫 contract 列會讓客戶自己付款被 0120 拒（`feature_in_another_contract`），拒付也會連帶暫停；合約仍走付款事件或 `record-payment.mjs`。0143 `entitlement_staff_grant/revoke`（與付款函式同一把帳戶鎖、稽核同交易）；代理權 `<產品>.resell` 是另一列勾選；收回只結束頁面當時顯示的那幾次贈送（`source_ref`）。區塊在客戶頁「帳務」分頁。
 
+### 4b-11　依實際成本扣點（2026-10-30 Claude 定並實作，操作者授權；High：金流）
+- 為什麼：付費縫 `recordUse()` 報 0 點（`lib/entitlements/can.ts:152-155`），`report()` 扣點要 `units>0`（`:164`）→ 有 1 點＝無限用（Codex partialreview-ecb5c9b1 F1）。
+- Decision：1 點＝NT$1；每次**交付成功**的供應商呼叫扣 `creditsForCost`＝`ceil(cost_usd × TWD_RATE × 3)` 點，成本 >0 最少 1、0 不扣（`lib/entitlements/ledger.ts`；`TWD_RATE` 與單價唯一來源 `lib/ai/cost-model.ts`）。不用「每功能固定價」：同一功能模型可選，單價差 100 倍（`cost-model.ts` Haiku 5.5 $0.1/M vs Fable 5.1 $10/M 輸入），固定價必虧或多收，且成第二個價目來源。
+- 掛點：成本記錄器是每次呼叫唯一已算出成本的地方（`lib/ai/log-ai-call.ts` `logAiCall`／`logImageCost`／`logImageResult`，47 處呼叫、38 檔）。參數加**必填** `grant: Grant`（型別強制，漏一處 tsc 紅＝關掉整類）；記錄器先產生列 id，`grant.report({ units, idempotencyKey: "ai-call:" + id })`＝唯一扣點路徑（shadow／員工不扣、上限 `max_spend`、冪等）。`organizationId` 參數刪除，帳戶＝`billedOrgId(grant)`；`scopeBilledOrgId` 刪除。
+- 不扣：`logImageResult` 的 `billed` 失敗（供應商收錢但客人沒拿到）＝我們的成本，只記不扣；`source !== "credits"` 的 grant（comp／合約含用量）不扣。
+- 餘額不足（併發時，can() 只查 ≥1 點）：結果照交付；`debit` 回 `{ok, balance}`（0066 拒絕時回現有餘額），以 `<key>:rest` 扣光剩餘；列寫 `metadata.credits_charged`／`credits_shortfall`；該 grant 標為用盡（`allowed=false`，每個 seam 的 `assertGrant` 拒；一個請求的所有呼叫共用一個 grant），下一次 can() 因餘額 <1 拒。損失上限＝錢包見底時同一 grant 已在途的呼叫（如影片 3 場景併發）＋同時通過 can() 的請求；要更緊需「預留→結算」（呼叫前不知成本，未做）。每列最少 1 點：cs 一則訊息約 3–5 列（分類／檢索／生成／監督）＝3–5 點。
+- Files：`lib/ai/log-ai-call.ts`；38 個呼叫檔（`grep -rln "logAiCall(\|logImageCost(\|logImageResult(" app lib`）；測試：`lib/ai/__tests__/billed-usage-log.test.ts`（單價、扣一次鍵＝列 id、comp 不扣、扣光＋短少、billed 失敗不扣）；`can.test.ts`（上限、`:rest`）；`payments.e2e.test.ts` 真 DB（回傳餘額、同鍵不重扣、超額拒）。
+- 突變（金流守衛）：拿掉 `source==="credits"` 條件 → comp 帳戶被扣、e2e 紅；還原綠。
+- Rollback：`git revert`；已扣的點用 `record-payment.mjs` 反向登記，不刪帳本列。
+- 旁註：`media_credit_reserve` 的 `hard_credit_limit` 透支分支是死碼（0066：先查 `-hard_limit`、下一行 `current_balance < p_units` 仍拒），本卡不用透支，不動。
+
 ### 順序與依賴
-`4b-1`（現在，Codex）→ `4b-3`（Codex，依賴 4b-1）→ 待決 1 定 → `4b-2` → 待決 3 定 → `4b-6`、`4b-7` → `4b-4`（門上線 High）→ 待決 5 定 → `4b-5`（High）。`4b-8` 不排。`4b-9` 在 4b-6 與第一個方案之後、收第一筆真錢之前；`4b-10` 獨立。每張 done 時在 `data.mjs` `STEPS[3]` 的 `items` 打勾（id＝4b-N）；本卡不寫狀態。
+`4b-1`（現在，Codex）→ `4b-3`（Codex，依賴 4b-1）→ 待決 1 定 → `4b-2` → 待決 3 定 → `4b-6`、`4b-7` → `4b-4`（門上線 High）→ 待決 5 定 → `4b-5`（High）。`4b-8` 不排。`4b-9` 在 4b-6、第一個方案、4b-11 之後、收第一筆真錢之前；`4b-10` 獨立。每張 done 時在 `data.mjs` `STEPS[3]` 的 `items` 打勾（id＝4b-N）；本卡不寫狀態。

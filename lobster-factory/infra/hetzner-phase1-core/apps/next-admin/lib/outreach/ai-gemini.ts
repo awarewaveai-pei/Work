@@ -3,7 +3,7 @@
 // Errors surface the HTTP status + response body (which does not contain the key).
 import { providerUrl } from "@/lib/ai/gateway";
 import type { Grant } from "@/lib/entitlements/can";
-import { billedOrgId, geminiUsageTokens, logAiCall, type GeminiUsageLike } from "@/lib/ai/log-ai-call";
+import { geminiUsageTokens, logAiCall, type GeminiUsageLike } from "@/lib/ai/log-ai-call";
 
 export interface GeminiResult {
   text: string;
@@ -38,7 +38,7 @@ export async function generateWithGemini(
   }
   const j: unknown = await resp.json();
   void logAiCall({ route: "outreach/generate", model, ...geminiUsageTokens((j as { usageMetadata?: GeminiUsageLike }).usageMetadata),
-    organizationId: billedOrgId(grant), tool: "outreach" });
+    grant, tool: "outreach" });
   const parts = (j as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> })?.candidates?.[0]?.content?.parts;
   const text = (parts ?? []).map((p) => p.text ?? "").join("").trim();
   if (!text) throw new Error("gemini: empty response");

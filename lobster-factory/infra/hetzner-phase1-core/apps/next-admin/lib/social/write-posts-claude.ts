@@ -14,7 +14,7 @@ export async function claudeWriter(grant: Grant, apiKey: string, route: string, 
       ...claudeParams(CLAUDE_FAST_MODEL, 2000, "medium", { thinking: "off" }),
       messages: [{ role: "user", content: prompt }],
     });
-    void logAiCall({ route, response: msg, actorRole });
+    void logAiCall({ route, response: msg, actorRole, grant });
     spent.model = msg.model;
     spent.usd += textCallCostUsd({ model: msg.model, inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens, cacheReadTokens: msg.usage.cache_read_input_tokens, cacheWriteTokens: msg.usage.cache_creation_input_tokens });
     return msg.content[0]?.type === "text" ? msg.content[0].text.trim() : "{}";

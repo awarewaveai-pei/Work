@@ -1,6 +1,6 @@
 import { CLAUDE_FAST_MODEL, claudeParams, loadAnthropic } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
-import { billedOrgId, logAiCall } from "@/lib/ai/log-ai-call";
+import { logAiCall } from "@/lib/ai/log-ai-call";
 import { isSafePublicHttps } from "./public-https";
 import { fetchRemoteFile } from "@/lib/collect/net/remote-file";
 /**
@@ -41,7 +41,7 @@ export async function aiChat(prompt: string, _timeoutMs = 10000): Promise<string
       ...claudeParams(CLAUDE_FAST_MODEL, 512, "medium", { thinking: "off" }),
       messages: [{ role: "user", content: prompt }],
     });
-    void logAiCall({ route: "content/trending-ai", response: msg, organizationId: billedOrgId(grant), tool: "content" });
+    void logAiCall({ route: "content/trending-ai", response: msg, grant, tool: "content" });
     return msg.content[0]?.type === "text" ? msg.content[0].text : "";
   } catch { return ""; }
 }

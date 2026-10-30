@@ -18,7 +18,7 @@ export function gateFixture(opts: {
   const entitlement = opts.entitlement === null ? null : { id: "ent-1", organizationId: CUSTOMER.orgId, productKey: "social", featureKey: "social.dispatch",
     source: "contract" as const, sourceRef: "c-1", startsAt: now - 60, endsAt: now + 3600, status: "active", limits: {}, ...opts.entitlement };
   const audit = vi.fn().mockResolvedValue(undefined);
-  const debit = vi.fn().mockResolvedValue(opts.debitAllowed ?? true);
+  const debit = vi.fn(async (_: { orgId: string; units: number; idempotencyKey: string; featureKey: string }) => ({ ok: opts.debitAllowed ?? true, balance: opts.balance ?? 0 }));
   const findActiveEntitlement = vi.fn(async (q: { organizationId: string; productKey: string; featureKey: string }) => {
     if (opts.storeError) throw opts.storeError;
     // a pack plan lists only credits features (ADR 017 #11); other features keep the fixture row

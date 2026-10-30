@@ -173,7 +173,7 @@ describe("drill: our accounts on the three axes", () => {
     const r = await ask(ACCOUNTS.creditsBuyer, "content.title", client(ACCOUNTS.creditsBuyer));
     expect(r.grant).toMatchObject({ allowed: true, maxSpend: 50, info: { source: "credits", entitlementId: null } });
     await r.grant.recordUse({ provider: "anthropic" });
-    expect(r.debit).not.toHaveBeenCalled(); // units stay 0 until the operator sets per-feature prices
+    expect(r.debit).not.toHaveBeenCalled(); // recordUse meters only; the price is charged by the cost logger (4b-11)
     expect((await ask(ACCOUNTS.creditsBuyer, "social.dispatch", client(ACCOUNTS.creditsBuyer))).grant).toMatchObject({ allowed: false, reason: "no_entitlement" });
     // a credits feature of a product the pack does not cover: the wallet does not open it
     expect((await ask(ACCOUNTS.creditsBuyer, "tarot.image", client(ACCOUNTS.creditsBuyer))).grant).toMatchObject({ allowed: false, reason: "no_entitlement" });

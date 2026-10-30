@@ -113,15 +113,27 @@ describe("can() — enforce", () => {
     expect(debit).not.toHaveBeenCalled();
     vi.spyOn(console, "warn").mockImplementation(() => {});
     audit.mockRejectedValue(new Error("db down"));
-    await expect(grant.report({ units: 1, idempotencyKey: "idem-key-0003" })).resolves.toBeUndefined();
+    await expect(grant.report({ units: 1, idempotencyKey: "idem-key-0003" })).resolves.toEqual({ charged: 1, shortfall: 0 });
     expect(debit).toHaveBeenCalledTimes(1);
   });
 
-  it("refuses spend above max_spend and an unfunded debit", async () => {
-    const grant = await can(CUSTOMER, "social.rewrite", ACTOR, gateFixture({ credits: true, balance: 10 }).deps);
-    await expect(grant.report({ units: 11 })).rejects.toThrow("exceeds_max_spend");
-    const broke = await can(CUSTOMER, "social.rewrite", ACTOR, gateFixture({ credits: true, balance: 10, debitAllowed: false }).deps);
-    await expect(broke.report({ units: 1, idempotencyKey: "idem-key-0002" })).rejects.toThrow("no_credits");
+  it("a delivered call is charged at most max_spend, and a wallet short of the price is drained to 0", async () => {
+    const capped = gateFixture({ credits: true, balance: 10 });
+    const grant = await can(CUSTOMER, "social.rewrite", ACTOR, capped.deps);
+    expect(await grant.report({ units: 11, idempotencyKey: "idem-key-0002" })).toEqual({ charged: 10, shortfall: 1 });
+    expect(capped.debit).toHaveBeenCalledWith(expect.objectContaining({ units: 10, idempotencyKey: "idem-key-0002" }));
+    // another call spent the wallet between can() and this charge: take what is left under its own key
+    const raced = gateFixture({ credits: true, balance: 10 });
+    raced.debit.mockResolvedValueOnce({ ok: false, balance: 2 }).mockResolvedValueOnce({ ok: true, balance: 2 });
+    const short = await can(CUSTOMER, "social.rewrite", ACTOR, raced.deps);
+    expect(await short.report({ units: 3, idempotencyKey: "idem-key-0007" })).toEqual({ charged: 2, shortfall: 1 });
+    expect(raced.debit).toHaveBeenLastCalledWith(expect.objectContaining({ units: 2, idempotencyKey: "idem-key-0007:rest" }));
+    // a request reuses one grant for all its calls: once drained it is refused at every seam (assertGrant reads allowed)
+    expect(short).toMatchObject({ allowed: false, reason: "no_credits" });
+    expect(grant).toMatchObject({ allowed: false, reason: "no_credits" });
+    const paid = await can(CUSTOMER, "social.rewrite", ACTOR, gateFixture({ credits: true, balance: 10 }).deps);
+    await paid.report({ units: 3, idempotencyKey: "idem-key-0008" });
+    expect(paid.allowed).toBe(true);
   });
 
   it("an infrastructure error refuses the call", async () => {
@@ -173,7 +185,7 @@ describe("can() — shadow mode (ADR 017 §4)", () => {
     noAudit.audit.mockRejectedValue(new Error("db down"));
     const grant = await can(CUSTOMER, "social.dispatch", ACTOR, noAudit.deps);
     expect(grant.allowed).toBe(true);
-    await expect(grant.report({ units: 1 })).resolves.toBeUndefined();
+    await expect(grant.report({ units: 1 })).resolves.toEqual({ charged: 0, shortfall: 0 });
   });
 
   it("a customer acting for itself gets the real verdict, the debit and a refused infrastructure error; staff stay shadowed", async () => {

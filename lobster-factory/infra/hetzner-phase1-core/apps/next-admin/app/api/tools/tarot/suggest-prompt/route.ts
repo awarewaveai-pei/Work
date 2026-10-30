@@ -62,7 +62,7 @@ async function handlePost(request: Request, grant: Grant) {
       messages: [{ role: "user", content: userMessage }],
     });
 
-    void logAiCall({ route: "/api/tools/tarot/suggest-prompt", response: msg, actorRole: resolved.role });
+    void logAiCall({ route: "/api/tools/tarot/suggest-prompt", response: msg, actorRole: resolved.role, grant });
 
     const text = msg.content
       .filter((b) => b.type === "text")

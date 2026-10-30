@@ -1,4 +1,4 @@
-import { billedOrgId, logAiCall, openaiUsageTokens } from "./log-ai-call";
+import { logAiCall, openaiUsageTokens } from "./log-ai-call";
 import { loadAnthropic, type Anthropic, providerUrl } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
 import { isAiTextModel, isOpenAiTextModel, normalizeAiTextModel, type AiTextModel } from "./text-model-options";
@@ -67,8 +67,7 @@ async function generateOpenAiJsonText(args: CheapJsonTextArgs & { model: AiTextM
       route: args.route,
       model: json.model ?? args.model,
       ...openaiUsageTokens(json.usage),
-      // Back-office tooling bills the internal account even inside a customer's request: name it, not the scope's.
-      organizationId: billedOrgId(grant),
+      grant,
       metadata: args.metadata,
       tool: args.tool,
     });
@@ -99,7 +98,7 @@ async function generateAnthropicJsonText(args: CheapJsonTextArgs & { model: AiTe
       route: args.route,
       response: msg,
       fallbackModel: args.model,
-      organizationId: billedOrgId(grant),
+      grant,
       metadata: args.metadata,
       tool: args.tool,
     });

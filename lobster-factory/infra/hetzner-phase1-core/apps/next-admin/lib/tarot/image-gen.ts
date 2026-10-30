@@ -13,7 +13,7 @@ import { getDesignsPublicBase } from "../storage/r2";
 import { MODEL_SPECS } from "./model-specs";
 import { providerUrl } from "@/lib/ai/gateway";
 import type { Grant } from "@/lib/entitlements/can";
-import { billedOrgId, logImageResult } from "@/lib/ai/log-ai-call";
+import { logImageResult } from "@/lib/ai/log-ai-call";
 import { OPENAI_IMAGE_MODEL, OPENAI_IMAGE_TOKEN_RATES } from "@/lib/ai/cost-model";
 
 const GEN_TIMEOUT_MS = 58_000; // stay under the 60s nginx/route ceiling
@@ -641,7 +641,7 @@ export async function generateTarotImage(params: TarotGenParams, grant: Grant): 
   // The one place an image's cost is logged: only here are all of its facts known -- whether the provider charged
   // (ok, or billed after a failed download), the model that ran, and the account the grant bills. Callers pass costLog.
   logImageResult(result, { route: params.costLog?.route ?? "tarot/image-gen", model: params.model, tool: params.costLog?.tool ?? "image",
-    jobId: params.costLog?.jobId ?? null, organizationId: billedOrgId(grant) });
+    jobId: params.costLog?.jobId ?? null, grant });
   return result;
 }
 

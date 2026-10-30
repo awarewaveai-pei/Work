@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { loadAnthropic, type Anthropic, providerUrl } from "@/lib/ai/gateway";
 import { withFeature } from "@/lib/entitlements/grant";
-import { billedOrgId, logAiCall, openaiUsageTokens, type OpenAiUsageLike } from "@/lib/ai/log-ai-call";
+import { logAiCall, openaiUsageTokens, type OpenAiUsageLike } from "@/lib/ai/log-ai-call";
 import type { Grant } from "@/lib/entitlements/can";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { normalizeAiTextModel, isOpenAiTextModel, type AiTextModel } from "@/lib/ai/text-model-options";
@@ -162,7 +162,7 @@ async function streamAnthropic(
     }
   } finally {
     const billed = stream.currentMessage ?? (await stream.finalMessage().catch(() => undefined));
-    if (billed) void logAiCall({ route: "/api/tools/script-forge", response: billed, organizationId: billedOrgId(grant), tool: "video" });
+    if (billed) void logAiCall({ route: "/api/tools/script-forge", response: billed, grant, tool: "video" });
   }
 }
 
@@ -234,7 +234,7 @@ async function streamOpenAi(
   } finally {
     // Also when the connection breaks after the final usage frame arrived: that usage was billed.
     if (usageFrame) {
-      void logAiCall({ route: "/api/tools/script-forge", model, ...openaiUsageTokens(usageFrame), organizationId: billedOrgId(grant), tool: "video" });
+      void logAiCall({ route: "/api/tools/script-forge", model, ...openaiUsageTokens(usageFrame), grant, tool: "video" });
     }
   }
 }

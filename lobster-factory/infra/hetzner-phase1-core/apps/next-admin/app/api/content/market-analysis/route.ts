@@ -78,7 +78,7 @@ Output ONLY the JSON, no markdown fences, no explanation.`;
       ...claudeFallback(CLAUDE_DEFAULT_MODEL),
       messages: [{ role: "user", content: prompt }],
     });
-    void logAiCall({ route: "/api/content/market-analysis", response: msg, fallbackModel: CLAUDE_DEFAULT_MODEL, actorRole: role });
+    void logAiCall({ route: "/api/content/market-analysis", response: msg, fallbackModel: CLAUDE_DEFAULT_MODEL, actorRole: role, grant });
     if (claudeIncomplete(msg) === "output_truncated") {
       return NextResponse.json({ ok: false, error: "Response truncated — retry with a simpler keyword" }, { status: 502 });
     }

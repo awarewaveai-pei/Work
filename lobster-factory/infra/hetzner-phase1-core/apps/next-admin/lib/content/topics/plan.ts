@@ -137,7 +137,7 @@ export function planAsker(grant: Grant, route: string, actorRole?: string): (pro
       ...claudeFallback(CLAUDE_DEFAULT_MODEL),
       messages: [{ role: "user", content: prompt }],
     });
-    void logAiCall({ route, response: msg, fallbackModel: CLAUDE_DEFAULT_MODEL, actorRole });
+    void logAiCall({ route, response: msg, fallbackModel: CLAUDE_DEFAULT_MODEL, actorRole, grant });
     const incomplete = claudeIncomplete(msg);
     if (incomplete) throw new Error(`content_plan:${incomplete}`);
     return claudeText(msg);

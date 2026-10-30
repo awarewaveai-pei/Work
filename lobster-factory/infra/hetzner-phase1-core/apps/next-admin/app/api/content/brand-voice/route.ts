@@ -87,7 +87,7 @@ Output ONLY the JSON, no markdown, no explanation.`,
     }],
   });
 
-  void logAiCall({ route: "/api/content/brand-voice", response: msg, actorRole: role });
+  void logAiCall({ route: "/api/content/brand-voice", response: msg, actorRole: role, grant });
 
   const text = msg.content[0]?.type === "text" ? msg.content[0].text.trim() : "{}";
   try {

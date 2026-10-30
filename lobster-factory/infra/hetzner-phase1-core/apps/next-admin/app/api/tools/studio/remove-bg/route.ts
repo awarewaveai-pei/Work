@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
 import { withFeature } from "@/lib/entitlements/grant";
+import type { Grant } from "@/lib/entitlements/can";
 import { removeBackground } from "../../../../../lib/studio/bg-remover";
 import { logImageCost } from "../../../../../lib/ai/log-ai-call";
 
@@ -12,7 +13,7 @@ const MAX_IMAGE_CHARS = 12_000_000; // ~9 MB base64, same ceiling as designs sav
 // Library grantFor calls inherit this request's billing account and actor (ADR 018 §2 開門規則 2).
 export const POST = withFeature("studio.remove-bg", handlePost);
 
-async function handlePost(request: Request) {
+async function handlePost(request: Request, grant: Grant) {
   if (process.env.POD_DESIGNS_ENABLED !== "true") {
     return NextResponse.json({ ok: false, error: "pod_designs_disabled" }, { status: 503 });
   }
@@ -44,7 +45,7 @@ async function handlePost(request: Request) {
   if (result.ok) {
     const jobId = typeof body._jobId === "string" ? body._jobId : null;
     if (jobId) {
-      void logImageCost({ route: "tools/studio/remove-bg", model: "rembg", vendor: "Replicate", costUsd: 0.002, jobId, tool: "studio" });
+      void logImageCost({ route: "tools/studio/remove-bg", model: "rembg", vendor: "Replicate", costUsd: 0.002, jobId, tool: "studio", grant });
     }
     return NextResponse.json(result);
   }

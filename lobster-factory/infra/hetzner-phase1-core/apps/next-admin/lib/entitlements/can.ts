@@ -98,7 +98,8 @@ export interface GateDependencies {
   publicKeys: () => Record<string, PermitKey>;
   mode: () => EntitlementMode;
   audit: (event: GateEvent) => Promise<void>;
-  debit: (input: { orgId: string; units: number; idempotencyKey: string; featureKey: string }) => Promise<boolean>;
+  /** balance = the wallet after this debit; on a refusal, the wallet as it is (0066 media_credit_reserve). */
+  debit: (input: { orgId: string; units: number; idempotencyKey: string; featureKey: string }) => Promise<{ ok: boolean; balance: number }>;
 }
 
 /** Staff tooling billed to the internal account; there is no product row to seed a comp entitlement on. */
@@ -126,6 +127,8 @@ export class EntitlementRequired extends Error {
 
 const MINT = Symbol("grant");
 const USED = new WeakSet<object>();
+/** Grants whose wallet ran dry on a charge: every seam refuses them from then on (assertGrant reads `allowed`). */
+const EXHAUSTED = new WeakSet<object>();
 /** Only `can` mints one (the symbol is not exported), so a gateway parameter of this type cannot be faked in code. */
 export class Grant {
   constructor(mint: typeof MINT, readonly info: {
@@ -138,9 +141,9 @@ export class Grant {
     (info as { subject: Subject }).subject = Object.freeze({ ...info.subject });
     Object.freeze(info.limits); Object.freeze(info); Object.freeze(this);
   }
-  get allowed() { return this.info.allowed; }
+  get allowed() { return this.info.allowed && !EXHAUSTED.has(this); }
   get shadow() { return this.info.shadow; }
-  get reason() { return this.info.reason; }
+  get reason() { return EXHAUSTED.has(this) ? "no_credits" : this.info.reason; }
   get featureKey() { return this.info.featureKey; }
   get subject() { return this.info.subject; }
   get actor() { return this.info.actor; }
@@ -148,31 +151,47 @@ export class Grant {
   get maxSpend() { return this.info.maxSpend; }
   /** Usage metering (ADR 017 §4): every paid seam calls this when the grant reaches paid work; only the first call per
    *  grant records (one entitlement.usage row), so a request's libraries and a job's polls sharing a grant count once.
-   *  Never debits and never rejects: units stay 0 until per-feature prices exist (operator decision). */
-  recordUse(meta: Record<string, JsonValue> = {}): Promise<void> {
-    if (USED.has(this)) return Promise.resolve();
+   *  Never debits and never rejects: the price is charged by the cost logger once the call delivered (report). */
+  async recordUse(meta: Record<string, JsonValue> = {}): Promise<void> {
+    if (USED.has(this)) return;
     USED.add(this);
-    return this.report({ meta });
+    await this.report({ meta });
   }
-  /** Credits are debited from the billing account (on_behalf_of); the audit row always names the actor. A debit needs
-   *  the caller's idempotencyKey: a retry with a fresh random key would charge twice. Only the debit may throw; once it
-   *  succeeded an audit failure is logged, never thrown (the caller would retry a charge that already happened). */
-  async report(usage: Usage = {}): Promise<void> {
-    const units = usage.units ?? 0;
+  /** `units` = what work already delivered costs (lib/ai/log-ai-call.ts). Credits are debited from the billing account
+   *  (on_behalf_of); the audit row always names the actor. A debit needs the caller's idempotencyKey: a retry with a fresh
+   *  random key would charge twice. The charge is capped by the permit's max_spend; a wallet short of it is drained to 0
+   *  (the result is already out, and can() refuses the next call below minimumCharge) and the rest comes back as
+   *  shortfall, and the grant is spent: a request reuses one grant for all its calls, so without that the calls after it
+   *  would run free. Never retry with the same key (a top-up between tries would charge want + rest). Only the debit may
+   *  throw; once it succeeded an audit failure is logged, never thrown. */
+  async report(usage: Usage = {}): Promise<{ charged: number; shortfall: number }> {
+    const owed = usage.units ?? 0;
+    let charged = 0;
+    let shortfall = 0;
     try {
       // Shadow never debits, including an allowed verdict (ADR 017 §4): only enforce moves money.
-      if (this.info.source === "credits" && modeFor(this.deps, this.actor) === "enforce" && units > 0) {
-        if (this.info.maxSpend !== null && units > this.info.maxSpend) throw new EntitlementRequired("exceeds_max_spend");
+      if (this.info.source === "credits" && modeFor(this.deps, this.actor) === "enforce" && owed > 0) {
         if (!usage.idempotencyKey) throw new EntitlementRequired("idempotency_key_required");
-        const ok = await this.deps.debit({ orgId: this.subject.orgId, units, idempotencyKey: usage.idempotencyKey, featureKey: this.featureKey });
-        if (!ok) throw new EntitlementRequired("no_credits");
+        const take = (units: number, idempotencyKey: string) =>
+          this.deps.debit({ orgId: this.subject.orgId, units, idempotencyKey, featureKey: this.featureKey });
+        const want = Math.min(owed, this.info.maxSpend ?? owed);
+        const first = await take(want, usage.idempotencyKey);
+        if (first.ok) charged = want;
+        else if (first.balance > 0) {
+          const rest = Math.min(want, first.balance);
+          if ((await take(rest, `${usage.idempotencyKey}:rest`)).ok) charged = rest;
+        }
+        shortfall = owed - charged;
+        if (shortfall > 0) EXHAUSTED.add(this);
       }
     } catch (e) {
       // Shadow never breaks the caller; enforce surfaces a failed debit.
       if (modeFor(this.deps, this.actor) === "enforce") throw e;
       console.warn(`[entitlement] report failed (shadow): ${String(e)}`);
     }
-    await safeAudit(this.deps, { event: "entitlement.usage", subject: this.subject, featureKey: this.featureKey, actor: this.actor, payload: { units, source: this.info.source, shadow: this.shadow, ...(usage.meta ?? {}) } });
+    await safeAudit(this.deps, { event: "entitlement.usage", subject: this.subject, featureKey: this.featureKey, actor: this.actor,
+      payload: { units: charged, ...(owed > 0 ? { owed } : {}), source: this.info.source, shadow: this.shadow, ...(usage.meta ?? {}) } });
+    return { charged, shortfall };
   }
 }
 

@@ -29,17 +29,18 @@ describe("Gemini calls are metered", () => {
       .toEqual({ inputTokens: 100, outputTokens: 12, cacheReadTokens: 20 });
   });
 
-  it("the cs fallback logs one row with the Gemini model and the caller's org", async () => {
+  it("the cs fallback logs one row with the Gemini model under the caller's grant", async () => {
     const { generateText } = await import("@/lib/cs/llm");
-    const r = await generateText({ system: "s", user: "u", route: "cs/test", organizationId: "org-1", grant: {} as never });
+    const grant = {} as never;
+    const r = await generateText({ system: "s", user: "u", route: "cs/test", grant });
     expect(r.provider).toBe("gemini");
-    expect(m.logged).toEqual([expect.objectContaining({ route: "cs/test", model: GEMINI_LITE_MODEL, organizationId: "org-1", inputTokens: 100, outputTokens: 12 })]);
+    expect(m.logged).toEqual([expect.objectContaining({ route: "cs/test", model: GEMINI_LITE_MODEL, grant, inputTokens: 100, outputTokens: 12 })]);
   });
 
   it("the inbox classifier logs its Gemini call", async () => {
     const { summarizeIncidentWithGemini } = await import("@/lib/ops-inbox/ai/gemini");
     await summarizeIncidentWithGemini({ id: "i", organization_id: "org-2", source: "uptime-kuma", severity: "low", service: null, environment: "staging",
       title: "t", message: null, occurrence_count: 1, raw: {} } as never);
-    expect(m.logged).toEqual([expect.objectContaining({ route: "ops-inbox/classify", model: GEMINI_LITE_MODEL, organizationId: "org-2" })]);
+    expect(m.logged).toEqual([expect.objectContaining({ route: "ops-inbox/classify", model: GEMINI_LITE_MODEL, grant: expect.anything() })]);
   });
 });

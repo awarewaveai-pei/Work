@@ -9,7 +9,8 @@ export async function summarizeIncidentWithClaude(incident: Incident, evidenceTe
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("missing ANTHROPIC_API_KEY");
 
-  const Anthropic = await loadAnthropic(await grantFor("ops.inbox-ai"));
+  const grant = await grantFor("ops.inbox-ai");
+  const Anthropic = await loadAnthropic(grant);
   const client = new Anthropic({ apiKey });
 
   const userMessage = [
@@ -40,7 +41,7 @@ export async function summarizeIncidentWithClaude(incident: Incident, evidenceTe
       },
       { signal: controller.signal },
     );
-    void logAiCall({ route: "ops-inbox/classify", response, organizationId: incident.organization_id ?? null, tool: "ops-inbox" });
+    void logAiCall({ route: "ops-inbox/classify", response, grant, tool: "ops-inbox" });
 
     const block = response.content[0];
     if (block.type !== "text") throw new Error("unexpected response type");

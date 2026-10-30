@@ -32,7 +32,6 @@ export async function generateReply(opts: {
     model: CS_MODELS.generate,
     maxTokens: 800,
     route: "/cs/generate",
-    organizationId: opts.cis.organizationId,
     grant: await grantFor("cs.answer", { orgId: opts.cis.organizationId }),
     timeoutMs: CS_TIMEOUTS.generateMs,
   });
@@ -76,7 +75,6 @@ export async function superviseReply(opts: {
       model: CS_MODELS.supervisor,
       maxTokens: 200,
       route: "/cs/supervise",
-      organizationId: opts.organizationId,
       grant: await grantFor("cs.answer", { orgId: opts.organizationId }),
       timeoutMs: CS_TIMEOUTS.supervisorMs,
     });
@@ -128,7 +126,6 @@ export async function runAgenticTurn(opts: {
       maxTokens: 800,
       tools: anthropicTools,
       route: "/cs/agentic",
-      organizationId: opts.cis.organizationId,
       grant: await grantFor("cs.answer", { orgId: opts.cis.organizationId }),
       timeoutMs: CS_TIMEOUTS.generateMs,
     });

@@ -45,7 +45,7 @@ async function handlePost(request: Request, grant: Grant) {
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: text }],
     });
-    void logAiCall({ route: "/api/tools/tarot/translate", response: msg, actorRole: resolved.role });
+    void logAiCall({ route: "/api/tools/tarot/translate", response: msg, actorRole: resolved.role, grant });
     const english = msg.content
       .filter((b) => b.type === "text")
       .map((b) => (b as { type: "text"; text: string }).text)

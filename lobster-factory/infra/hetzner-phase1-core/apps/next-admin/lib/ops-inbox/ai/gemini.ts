@@ -10,7 +10,8 @@ export async function summarizeIncidentWithGemini(incident: Incident, evidenceTe
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("missing GEMINI_API_KEY");
 
-  const GoogleGenerativeAI = await loadGoogleGenerativeAI(await grantFor("ops.inbox-ai"));
+  const grant = await grantFor("ops.inbox-ai");
+  const GoogleGenerativeAI = await loadGoogleGenerativeAI(grant);
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: GEMINI_LITE_MODEL });
   const prompt = [
@@ -40,7 +41,7 @@ export async function summarizeIncidentWithGemini(incident: Incident, evidenceTe
 
   const result = await withTimeout(model.generateContent(prompt), GEMINI_TIMEOUT_MS);
   void logAiCall({ route: "ops-inbox/classify", model: GEMINI_LITE_MODEL, ...geminiUsageTokens(result.response.usageMetadata),
-    organizationId: incident.organization_id ?? null, tool: "ops-inbox" });
+    grant, tool: "ops-inbox" });
   const text = result.response.text().trim();
   return text || "Gemini 未回傳內容";
 }

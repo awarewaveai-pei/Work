@@ -37,7 +37,6 @@ export async function judgeCovers(opts: {
     model: CS_MODELS.classify, // cheap judge
     maxTokens: 200,
     route: "/cs/eval/judge",
-    organizationId: opts.organizationId,
     grant: await grantFor("cs.eval", { orgId: opts.organizationId }),
   });
   const v = parseJsonObject<{ covered?: boolean; reason?: string }>(text);

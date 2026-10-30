@@ -301,7 +301,6 @@ async function translateForRetrieval(organizationId: string, text: string, title
       model: CS_MODELS.classify,
       maxTokens: 200,
       route: "/cs/translate",
-      organizationId,
       grant: await grantFor("cs.translate", { orgId: organizationId }),
       timeoutMs: CS_TIMEOUTS.classifyMs,
     });

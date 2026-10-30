@@ -10,7 +10,7 @@
 
 import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
-import { billedOrgId, logAiCall } from "@/lib/ai/log-ai-call";
+import { logAiCall } from "@/lib/ai/log-ai-call";
 import * as Sentry from "@sentry/nextjs";
 import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "@/lib/ai/gateway";
 
@@ -68,7 +68,7 @@ export async function generateSummary(input: AnthropicSummaryInput): Promise<str
       ],
     });
 
-    void logAiCall({ route: "command-plane/summary", response, organizationId: billedOrgId(grant), tool: "command-plane" });
+    void logAiCall({ route: "command-plane/summary", response, grant, tool: "command-plane" });
     const incomplete = claudeIncomplete(response);
     if (incomplete) return `_AI summary unavailable (${incomplete})._\n${rawFallback(input.payload)}`;
     const text = claudeText(response);

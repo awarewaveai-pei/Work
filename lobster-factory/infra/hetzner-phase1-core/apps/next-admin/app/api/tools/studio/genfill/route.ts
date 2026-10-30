@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
 import { withFeature } from "@/lib/entitlements/grant";
+import type { Grant } from "@/lib/entitlements/can";
 import { generativeFill, OUTPAINT_PRESETS, type OutpaintPreset } from "../../../../../lib/studio/generative-fill";
 import { logImageCost } from "../../../../../lib/ai/log-ai-call";
 
@@ -13,7 +14,7 @@ const DATA_URL_RE = /^data:image\/(png|jpe?g|webp);base64,/;
 // Library grantFor calls inherit this request's billing account and actor (ADR 018 §2 開門規則 2).
 export const POST = withFeature("studio.fill", handlePost);
 
-async function handlePost(request: Request) {
+async function handlePost(request: Request, grant: Grant) {
   if (process.env.POD_DESIGNS_ENABLED !== "true") {
     return NextResponse.json({ ok: false, error: "pod_designs_disabled" }, { status: 503 });
   }
@@ -59,7 +60,7 @@ async function handlePost(request: Request) {
   if (result.ok) {
     const jobId = typeof body._jobId === "string" ? body._jobId : null;
     if (jobId) {
-      void logImageCost({ route: "tools/studio/genfill", model: "flux-fill-pro", vendor: "Replicate", costUsd: 0.05, jobId, tool: "canvas" });
+      void logImageCost({ route: "tools/studio/genfill", model: "flux-fill-pro", vendor: "Replicate", costUsd: 0.05, jobId, tool: "canvas", grant });
     }
   }
   // HTTP 200 with ok:false on failure — same nginx error_page rationale as the other studio routes.

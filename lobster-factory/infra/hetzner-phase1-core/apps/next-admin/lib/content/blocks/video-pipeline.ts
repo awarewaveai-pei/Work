@@ -484,7 +484,8 @@ export async function applyVideoMotionToPrimaryFormat(
     motionPrompt: `${s.image_prompt}. The subject moves naturally and visibly (gesture, expression, or action) — not just a slow camera drift. Cinematic camera movement.`,
     aspectRatio: primaryAspectRatio as "16:9" | "9:16",
   }));
-  const results = await generateVideoMotionBatch(await grantFor("video.motion"), motionModel, jobs);
+  const motionGrant = await grantFor("video.motion");
+  const results = await generateVideoMotionBatch(motionGrant, motionModel, jobs);
 
   // 這批（同一支影片、最多 MAX_MOTION_SCENES 個場景）共用一個關聯 id，讓 /ops/costs「⑤ 流水帳」
   // 能把同一支影片的多筆動態收費歸成一組，而非各自散落、事後對不回是哪支影片花的（critic 2026-09-12）。
@@ -504,39 +505,30 @@ export async function applyVideoMotionToPrimaryFormat(
       console.error(`[video-pipeline] scene ${scenes[i].id} motion generation failed, keeping static image:`, "error" in r ? r.error : "unknown_error");
       continue;
     }
-    // 記真實花費到 ai_call_logs（/ops/costs 讀這張表）——沿用 tarot/studio 既有的單一慣例
-    // （每筆真實付費呼叫成功後 fire-and-forget 記一筆，見 log-ai-call.ts 呼叫端清單)。
-    // 刻意放在 r.ok 確認的當下就記，不等後面 buildDesignKey/putDesignObject 的結果：Replicate
-    // 在 r.ok===true 那刻就已經收費，之後 mime 辨識失敗或 R2 上傳失敗都只是「片子沒留住」，
-    // 不代表「沒被收費」——放在那些 continue 分支之後會讓真實花費在 infra 不穩時悄悄漏記
-    // （critic 2026-09-12 抓到：漏記剛好發生在最該被看見的時候）。
-    // 本函式只在 prepareScenes 呼叫一次、prepareScenes 本身每支影片的草稿→渲染流程只會跑一次
-    // （見 render-draft 直接吃已生成的 formatImageUrls、不重跑 prepareScenes）——log 呼叫次數
-    // = 真實收費次數，不會多記也不會漏記。
+    // Replicate 在 r.ok 那刻就收費：之後 mime 或 R2 失敗也要記一筆真實花費（critic 2026-09-12），但客人沒拿到
+    // 動態片就不扣點（delivered:false，ADR 017 4b-11）。prepareScenes 每支影片只跑一次＝記帳次數＝收費次數。
     const rate = VIDEO_MOTION_RATES[motionModel];
-    if (rate) {
-      void logImageCost({
-        route: "video/motion",
-        model: motionModel,
-        vendor: rate.vendor,
-        costUsd: rate.usdPerSec * rate.defaultDurationSec,
-        jobId: motionBatchJobId,
-        tool: "video",
-        kind: "video",
-      });
-    } else {
-      console.error(`[video-pipeline] scene ${scenes[i].id} motion billed but no VIDEO_MOTION_RATES entry for "${motionModel}" — cost NOT logged`);
-    }
+    const logMotion = (delivered: boolean) => {
+      if (rate) {
+        void logImageCost({ route: "video/motion", model: motionModel, vendor: rate.vendor, costUsd: rate.usdPerSec * rate.defaultDurationSec,
+          jobId: motionBatchJobId, tool: "video", kind: "video", grant: motionGrant, delivered });
+      } else {
+        console.error(`[video-pipeline] scene ${scenes[i].id} motion billed but no VIDEO_MOTION_RATES entry for "${motionModel}" — cost NOT logged`);
+      }
+    };
     const videoKey = buildDesignKey(r.mime);
     if (!videoKey) {
       console.error(`[video-pipeline] scene ${scenes[i].id} motion output has unrecognized mime, keeping static image:`, r.mime);
+      logMotion(false);
       continue;
     }
     const put = await putDesignObject(videoKey, r.buffer, r.mime);
     if (!put.ok) {
       console.error(`[video-pipeline] scene ${scenes[i].id} motion R2 upload failed, keeping static image:`, "error" in put ? put.error : "r2_put_failed");
+      logMotion(false);
       continue;
     }
+    logMotion(true);
     assets[i] = put.publicUrl;
     r2Keys.push(videoKey);
     motionAppliedCount++;

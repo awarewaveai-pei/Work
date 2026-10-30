@@ -90,7 +90,7 @@ Please output the COMPLETE improved article. Fix ONLY the listed failed checks â
       messages: [{ role: "user", content: userPrompt }],
     });
 
-    void logAiCall({ route: "/api/content/seo-fix", response: msg, actorRole: role });
+    void logAiCall({ route: "/api/content/seo-fix", response: msg, actorRole: role, grant });
     const { rate: seoRate } = resolveTextRate(msg.model);
     const _cost = { usd: textCallCostUsd({ model: msg.model, inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens, cacheReadTokens: msg.usage.cache_read_input_tokens, cacheWriteTokens: msg.usage.cache_creation_input_tokens }), model: msg.model, vendor: seoRate.vendor };
 

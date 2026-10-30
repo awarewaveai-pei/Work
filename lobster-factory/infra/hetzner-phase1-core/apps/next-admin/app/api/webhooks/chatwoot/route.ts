@@ -10,7 +10,6 @@ import { hitsCrisis, hitsThreat } from "@/lib/cs/autonomy";
 import { alertOperatorOfCrisis } from "@/lib/cs/crisis-alert";
 import { buildOperatorTelegramNotifier } from "@/lib/ops-inbox/notify/telegram";
 import { tenantFaqAnswer } from "@/lib/cs/faq";
-import { reserveCsCredit } from "@/lib/cs/billing";
 import { readWebhookBody } from "@/lib/ops-inbox/readRequestBody";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
@@ -106,8 +105,8 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   // Same silence rule handleInbound applies internally (orchestrator.ts) — computed here, from the
-  // raw payload, and checked BEFORE claimMessage/reserveCsCredit, not after, so a silenced message
-  // writes no audit row and debits no credit.
+  // raw payload, and checked BEFORE claimMessage, not after, so a silenced message writes no audit
+  // row and makes no model call.
   // Operator rules 2026-10-17 (WORKLOG 續16): the AI is silent only while a staff member is talking --
   // a public reply in this conversation within CS_STAFF_ACTIVE_WINDOW_SECONDS. A conversation handed
   // to a human that nobody has answered yet is answered as usual (FAQ -> AI -> human). Unknown (the
@@ -230,18 +229,8 @@ async function runPipeline(inbound: InboundMessage, contact: ContactRef, custome
     return;
   }
 
-  // Opt-in metering (lib/cs/billing.ts) — unmetered orgs (no billing account row) always proceed.
-  const credit = await reserveCsCredit(organizationId, messageId);
-  if (credit.metered && !credit.allowed) {
-    await recordReply({ ...claim, action: "handoff", retrievedChunkIds: [] });
-    if (cis.chatwoot) {
-      await handoffToHuman(organizationId, cis.chatwoot, conversationId);
-      await acknowledgeHandoff(cis, cis.chatwoot, conversationId, contact, customerMessageId, inbound.text, hitsCrisis(inbound.text));
-    }
-    await completeClaim(claim);
-    return;
-  }
-
+  // Credits are charged per model call under the cs.* grants (lib/ai/log-ai-call.ts); a refused grant throws inside
+  // handleInbound, which hands the conversation to a human (lib/cs/orchestrator.ts catch).
   // handleInbound records its decision (recordReply) on every path, failures included.
   const decision = await handleInbound(inbound);
   // The classifier's crisis and threat intents catch what the keywords cannot; they are known only

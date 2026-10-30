@@ -6,7 +6,7 @@
  */
 import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
-import { billedOrgId, logAiCall } from "@/lib/ai/log-ai-call";
+import { logAiCall } from "@/lib/ai/log-ai-call";
 import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "../../ai/gateway";
 
 /** 與 Python pipeline.py CLAUDE_MODEL 對齊（影片生成共用同一模型 ID）。 */
@@ -215,7 +215,7 @@ export async function generateVideoScript(
       ...claudeFallback(CLAUDE_MODEL),
       messages: [{ role: "user", content: `${systemPrompt}\n\n${userContent}` }],
     });
-    void logAiCall({ route: "video/script", response, organizationId: billedOrgId(grant), tool: "video" });
+    void logAiCall({ route: "video/script", response, grant, tool: "video" });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, status: 502, error: `Claude API 呼叫失敗：${msg}` };

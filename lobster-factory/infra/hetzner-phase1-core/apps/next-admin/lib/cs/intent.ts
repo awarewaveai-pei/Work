@@ -33,7 +33,6 @@ export async function classifyIntent(opts: {
       model: CS_MODELS.classify,
       maxTokens: 120,
       route: "/cs/classify",
-      organizationId,
       grant: await grantFor("cs.intent", { orgId: organizationId }),
       timeoutMs: CS_TIMEOUTS.classifyMs,
     });

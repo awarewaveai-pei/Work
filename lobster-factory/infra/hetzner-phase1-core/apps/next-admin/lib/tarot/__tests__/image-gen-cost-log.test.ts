@@ -24,7 +24,7 @@ describe("generateTarotImage logs its cost", () => {
       .mockResolvedValueOnce(new Response("down", { status: 503 })));
     const r = await generateTarotImage({ model: "flux-schnell", prompt: "p", costLog: { route: "tools/tarot/generate", tool: "tarot", jobId: "j1" } }, grant);
     expect(r).toMatchObject({ ok: false, billed: true });
-    expect(m.logged).toEqual([{ result: r, args: expect.objectContaining({ route: "tools/tarot/generate", model: "flux-schnell", jobId: "j1", organizationId: "parent-org" }) }]);
+    expect(m.logged).toEqual([{ result: r, args: expect.objectContaining({ route: "tools/tarot/generate", model: "flux-schnell", jobId: "j1", grant }) }]);
   });
 
   it("a refused request is handed to the logger as not billed", async () => {

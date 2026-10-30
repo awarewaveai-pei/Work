@@ -67,8 +67,6 @@ vi.mock("@/lib/cs/chatwoot-client", () => ({
   loadWebhookSecret,
 }));
 
-const reserveCsCredit = vi.hoisted(() => vi.fn(async () => ({ metered: false, allowed: true })));
-vi.mock("@/lib/cs/billing", () => ({ reserveCsCredit }));
 
 const checkProductionChangeAllowed = vi.hoisted(() =>
   vi.fn(async (): Promise<{ allowed: boolean; mode: string; reason?: string }> => ({ allowed: true, mode: "normal" })),
@@ -144,8 +142,6 @@ beforeEach(() => {
   verifyWebhookToken.mockReturnValue(true);
   loadWebhookSecret.mockClear();
   loadWebhookSecret.mockResolvedValue("secret");
-  reserveCsCredit.mockReset();
-  reserveCsCredit.mockResolvedValue({ metered: false, allowed: true });
   checkProductionChangeAllowed.mockClear();
   checkProductionChangeAllowed.mockResolvedValue({ allowed: true, mode: "normal" });
   getSupabaseWriteClient.mockClear();
@@ -222,25 +218,14 @@ describe("POST /api/webhooks/chatwoot -- answer first, pipeline after", () => {
     expect(sendReply).not.toHaveBeenCalled();
     expect(completeClaim).toHaveBeenCalledWith(CLAIM);
   });
-
-  it("credit exhausted: handoff + the claim is recorded as finished", async () => {
-    reserveCsCredit.mockResolvedValueOnce({ metered: true, allowed: false });
-    await post(makePayload());
-    await runAfter();
-    expect(handleInbound).not.toHaveBeenCalled();
-    expect(handoffToHuman).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, "999");
-    expect(recordReply).toHaveBeenCalledWith(HANDOFF_RECORD);
-    expect(completeClaim).toHaveBeenCalledWith(CLAIM);
-  });
 });
 
 describe("POST /api/webhooks/chatwoot -- system-mode gate (T27)", () => {
-  it("blocked: no handleInbound, no credit reserved, one private note + handoff, finished claim", async () => {
+  it("blocked: no handleInbound, one private note + handoff, finished claim", async () => {
     checkProductionChangeAllowed.mockResolvedValueOnce({ allowed: false, mode: "emergency_stop" });
     expect((await post(makePayload())).status).toBe(200);
     await runAfter();
     expect(handleInbound).not.toHaveBeenCalled();
-    expect(reserveCsCredit).not.toHaveBeenCalled();
     expect(sendPrivateDraft).toHaveBeenCalledTimes(1);
     expect(sendPrivateDraft).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, "999", expect.stringContaining("emergency_stop"));
     expect(handoffToHuman).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, "999");
@@ -355,13 +340,6 @@ describe("POST /api/webhooks/chatwoot -- handoff acknowledgement + name question
     await post(makePayload({ sender: JOHN }));
     await runAfter();
     expect(sendReply).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, "999", QUESTION);
-  });
-
-  it("credit-exhausted handoff acknowledges too", async () => {
-    reserveCsCredit.mockResolvedValueOnce({ metered: true, allowed: false });
-    await post(makePayload({ sender: JOHN }));
-    await runAfter();
-    expect(sendReply).toHaveBeenCalledTimes(1);
   });
 
   it("system mode blocked: no acknowledgement (T27: no automatic reply)", async () => {
@@ -529,7 +507,6 @@ describe("POST /api/webhooks/chatwoot -- crisis message", () => {
       expect(sendReply.mock.invocationCallOrder[0]).toBeLessThan(confirmCrisisHolding.mock.invocationCallOrder[0]);
       expect(sendReply.mock.calls[0][3]).not.toContain("看到");
       expect(handleInbound).not.toHaveBeenCalled();
-      expect(reserveCsCredit).not.toHaveBeenCalled();
       expect(claimMessage).not.toHaveBeenCalled();
     });
 
@@ -749,14 +726,13 @@ describe("POST /api/webhooks/chatwoot -- free FAQ answers (no AI, no credit)", (
   const FAQ = [{ id: "courses", keywords: ["課程"], answer: "我們有四個療癒模組" }];
   const withFaq = () => loadCis.mockResolvedValue({ organizationId: ORG_ID, chatwoot: CHATWOOT_CONFIG, csEnabled: false, csFaq: FAQ });
 
-  it("a matching message gets the written answer; no credit, no AI, no handoff", async () => {
+  it("a matching message gets the written answer; no AI, no handoff", async () => {
     withFaq();
     await post(makePayload({ content: "請問有哪些課程？" }));
     await runAfter();
     expect(sendReply).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, "999", "我們有四個療癒模組");
     expect(recordReply).toHaveBeenCalledWith({ ...CLAIM, action: "auto_sent", intentKey: "faq:courses", retrievedChunkIds: [] });
     expect(completeClaim).toHaveBeenCalledWith(CLAIM);
-    expect(reserveCsCredit).not.toHaveBeenCalled();
     expect(handleInbound).not.toHaveBeenCalled();
     expect(handoffToHuman).not.toHaveBeenCalled();
   });
@@ -776,7 +752,6 @@ describe("POST /api/webhooks/chatwoot -- free FAQ answers (no AI, no credit)", (
     handleInbound.mockResolvedValueOnce({ ...DEFAULT_DECISION, action: "handoff", replyText: undefined });
     await post(makePayload({ content: "你好" }));
     await runAfter();
-    expect(reserveCsCredit).toHaveBeenCalledTimes(1);
     expect(handleInbound).toHaveBeenCalledTimes(1);
     expect(handoffToHuman).toHaveBeenCalledTimes(1);
   });

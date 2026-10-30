@@ -19,7 +19,6 @@ export interface ClaudeTurnInput {
   /** Turn thinking off on models that allow it (Haiku 5.x); ignored on always-think models. */
   thinking?: "off";
   route: string;
-  organizationId?: string | null;
   /** The caller's own feature (cs.answer, cs.intent, cs.eval, cs.translate), asked with the conversation's org. */
   grant: Grant;
 }
@@ -47,7 +46,7 @@ export async function claudeTurn(input: ClaudeTurnInput): Promise<Anthropic.Mess
     void logAiCall({
       route: input.route,
       response: res,
-      organizationId: input.organizationId ?? null,
+      grant: input.grant,
       tool: "cs",
     });
     return res;
@@ -76,15 +75,15 @@ const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T> => {
 };
 
 /** Gemini text completion — the failover path. Throws if GEMINI_API_KEY missing. Metered like claudeTurn. */
-async function geminiText(prompt: string, timeoutMs: number, grant: Grant, log: { route: string; organizationId?: string | null }): Promise<string> {
+async function geminiText(prompt: string, timeoutMs: number, grant: Grant, route: string): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("missing GEMINI_API_KEY");
   const GoogleGenerativeAI = await loadGoogleGenerativeAI(grant);
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: CS_MODELS.geminiFallback });
   const result = await withTimeout(model.generateContent(prompt), timeoutMs);
-  void logAiCall({ route: log.route, model: CS_MODELS.geminiFallback, ...geminiUsageTokens(result.response.usageMetadata),
-    organizationId: log.organizationId ?? null, tool: "cs" });
+  void logAiCall({ route, model: CS_MODELS.geminiFallback, ...geminiUsageTokens(result.response.usageMetadata),
+    grant, tool: "cs" });
   return result.response.text().trim();
 }
 
@@ -94,7 +93,6 @@ export interface GenerateTextInput {
   model?: string;
   maxTokens?: number;
   route: string;
-  organizationId?: string | null;
   timeoutMs?: number;
   grant: Grant;
 }
@@ -118,7 +116,6 @@ export async function generateText(opts: GenerateTextInput): Promise<GenerateTex
       messages: [{ role: "user", content: opts.user }],
       maxTokens: opts.maxTokens ?? 1024,
       route: opts.route,
-      organizationId: opts.organizationId,
       timeoutMs,
       thinking: "off", // no-tool replies, supervisor, classification: no reasoning step wanted
       grant: opts.grant,
@@ -128,7 +125,7 @@ export async function generateText(opts: GenerateTextInput): Promise<GenerateTex
     throw new Error("empty_claude_response");
   } catch {
     // Failover. If Gemini also fails, let it throw — orchestrator catches and routes to a human.
-    const text = await geminiText(`${opts.system}\n\n${opts.user}`, timeoutMs, opts.grant, { route: opts.route, organizationId: opts.organizationId });
+    const text = await geminiText(`${opts.system}\n\n${opts.user}`, timeoutMs, opts.grant, opts.route);
     return { text, provider: "gemini" };
   }
 }

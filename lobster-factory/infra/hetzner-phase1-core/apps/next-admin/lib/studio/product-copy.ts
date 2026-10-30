@@ -192,7 +192,8 @@ export async function generateProductCopy(input: ProductCopyInput): Promise<Prod
     : "";
   const userContent = `Product design brief:\n${JSON.stringify(brief, null, 2)}${directive}${fixBlock}`;
 
-  const Anthropic = await loadAnthropic(await grantFor("studio.product-copy"));
+  const grant = await grantFor("studio.product-copy");
+  const Anthropic = await loadAnthropic(grant);
   const client = new Anthropic({ apiKey });
   let text: string;
   try {
@@ -206,7 +207,7 @@ export async function generateProductCopy(input: ProductCopyInput): Promise<Prod
     if (incomplete) return { ok: false, error: incomplete };
     text = claudeText(response);
     if (!text) return { ok: false, error: "empty_response" };
-    void logAiCall({ route: "lib/studio/product-copy", response });
+    void logAiCall({ route: "lib/studio/product-copy", response, grant });
   } catch (err) {
     if (err instanceof Anthropic.APIError) {
       if (err.status === 401 || err.status === 403) return { ok: false, error: "anthropic_auth_error" };

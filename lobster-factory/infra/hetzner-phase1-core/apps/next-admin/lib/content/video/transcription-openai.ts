@@ -54,7 +54,7 @@ export async function runOpenAiJob(db: Db, job: JobRow & { sourceUrl: string; ca
     const grant = await grantFor("video.transcribe");
     const transcript = await transcribeWithOpenAi(job.sourceUrl, job.source_checksum_sha256, apiKey, providerUrl(grant, "openai", "/v1/audio/transcriptions"));
     const costUsd = Number(openAiTranscribeUsd(transcript.audio_duration_sec).toFixed(6));
-    void logImageCost({ route: "/api/video/transcription/dispatch", model: OPENAI_TRANSCRIBE_MODEL, vendor: "OpenAI", costUsd, jobId: job.id, tool: "video-transcribe", kind: "video", organizationId: job.organization_id });
+    void logImageCost({ route: "/api/video/transcription/dispatch", model: OPENAI_TRANSCRIBE_MODEL, vendor: "OpenAI", costUsd, jobId: job.id, tool: "video-transcribe", kind: "video", grant });
     await db.from("media_transcription_jobs").update({ result_json: { engine: "openai", costUsd } }).eq("id", job.id).eq("status", "dispatched");
     await completeTranscriptionJob(db, { ...job, result_json: { engine: "openai", costUsd } }, transcript, baseUrl);
   } catch (error) {

@@ -2175,7 +2175,6 @@
       "door": {
         "app": "next-admin",
         "page": "/content",
-        "enabled": false,
         "api": [
           "/api/content"
         ],
@@ -2186,9 +2185,9 @@
             "staff": "tools/content"
           },
           {
-            "path": "calendar",
-            "name": "行事曆",
-            "staff": "tools/content/calendar"
+            "path": "topics",
+            "name": "題目",
+            "staff": "tools/content/topics"
           },
           {
             "path": "sites",
@@ -2586,6 +2585,9 @@
       ],
       "modules": {
         "dependsOn": [],
+        "optional": [
+          "content"
+        ],
         "manifest": "lib/social/MODULE_MANIFEST.json"
       },
       "staffPaths": [
@@ -2762,6 +2764,13 @@
         {
           "feature_key": "video.tts",
           "name": "付費旁白",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "video.transcribe",
+          "name": "語音轉字幕",
           "limitKind": "QUOTA",
           "buyout": true,
           "billing": "credits"

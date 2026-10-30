@@ -103,7 +103,7 @@ Output ONLY the rewritten content in Markdown format, no preamble or explanation
           const fm = await anthropicStream.finalMessage().catch(() => null);
           if (fm && claudeIncomplete(fm)) controller.enqueue(encoder.encode("\n\n<!-- HUMANIZE_ERROR -->"));
           if (fm) {
-            void logAiCall({ route: "/api/content/humanize", response: fm, actorRole: role });
+            void logAiCall({ route: "/api/content/humanize", response: fm, actorRole: role, grant });
             const costUsd = textCallCostUsd({ model: fm.model, inputTokens: fm.usage.input_tokens, outputTokens: fm.usage.output_tokens, cacheReadTokens: fm.usage.cache_read_input_tokens, cacheWriteTokens: fm.usage.cache_creation_input_tokens });
             const { rate: hmRate } = resolveTextRate(fm.model);
             controller.enqueue(encoder.encode(`\n[COST_JSON]${JSON.stringify({ usd: costUsd, model: fm.model, vendor: hmRate.vendor, route: "content/humanize" })}`));

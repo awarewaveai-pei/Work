@@ -2,7 +2,7 @@
 // SECURITY: API key is passed in; NEVER log it.
 import { providerUrl } from "@/lib/ai/gateway";
 import type { Grant } from "@/lib/entitlements/can";
-import { billedOrgId, logAiCall, openaiUsageTokens, type OpenAiUsageLike } from "@/lib/ai/log-ai-call";
+import { logAiCall, openaiUsageTokens, type OpenAiUsageLike } from "@/lib/ai/log-ai-call";
 
 export interface OpenAIResult {
   text: string;
@@ -40,7 +40,7 @@ export async function generateWithOpenAI(
     model?: string;
     usage?: OpenAiUsageLike;
   };
-  void logAiCall({ route: "outreach/generate", model: j.model ?? model, ...openaiUsageTokens(j.usage), organizationId: billedOrgId(grant), tool: "outreach" });
+  void logAiCall({ route: "outreach/generate", model: j.model ?? model, ...openaiUsageTokens(j.usage), grant, tool: "outreach" });
   const text = j.choices?.[0]?.message?.content?.trim() ?? "";
   if (!text) throw new Error("openai: empty response");
   return { text, model: j.model ?? model };

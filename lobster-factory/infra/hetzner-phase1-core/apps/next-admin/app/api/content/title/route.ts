@@ -88,7 +88,7 @@ Example: ["Title One Here", "Title Two Here", "Title Three Here", "Title Four He
     }],
   });
 
-  void logAiCall({ route: "/api/content/title", response: msg, actorRole: role });
+  void logAiCall({ route: "/api/content/title", response: msg, actorRole: role, grant });
   const { rate } = resolveTextRate(msg.model);
   const _cost = { usd: textCallCostUsd({ model: msg.model, inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens, cacheReadTokens: msg.usage.cache_read_input_tokens, cacheWriteTokens: msg.usage.cache_creation_input_tokens }), model: msg.model, vendor: rate.vendor };
 

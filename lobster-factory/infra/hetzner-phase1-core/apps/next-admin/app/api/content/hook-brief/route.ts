@@ -82,7 +82,7 @@ Example: {"Question": "...", "Statistical or Fact": "..."}`;
     messages: [{ role: "user", content: prompt }],
   });
 
-  void logAiCall({ route: "/api/content/hook-brief", response: msg, actorRole: role });
+  void logAiCall({ route: "/api/content/hook-brief", response: msg, actorRole: role, grant });
 
   const text         = msg.content[0]?.type === "text" ? msg.content[0].text.trim() : "{}";
   const { rate }     = resolveTextRate(msg.model);

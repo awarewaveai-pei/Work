@@ -107,7 +107,8 @@ async function generateWithAnthropic(model: AiTextModel, userMessage: string, ac
   if (!apiKey) return { ok: false, status: 503, error: "missing_anthropic_api_key" };
 
   try {
-    const Anthropic = await loadAnthropic(await grantFor("studio.edit-prompt"));
+    const grant = await grantFor("studio.edit-prompt");
+    const Anthropic = await loadAnthropic(grant);
     const client = new Anthropic({ apiKey });
     const msg = await client.beta.messages.create({
       ...claudeParams(model, 350, "low"),
@@ -115,7 +116,7 @@ async function generateWithAnthropic(model: AiTextModel, userMessage: string, ac
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userMessage }],
     });
-    void logAiCall({ route: "/api/tools/studio/edit-prompt", response: msg, actorRole });
+    void logAiCall({ route: "/api/tools/studio/edit-prompt", response: msg, actorRole, grant });
 
     const incomplete = claudeIncomplete(msg);
     if (incomplete) return { ok: false, status: 502, error: incomplete };
@@ -163,6 +164,7 @@ async function generateWithOpenAi(model: AiTextModel, userMessage: string, actor
       inputTokens: json.usage?.prompt_tokens ?? 0,
       outputTokens: json.usage?.completion_tokens ?? 0,
       actorRole,
+      grant,
     });
     return { ok: true, prompt };
   } catch (err) {

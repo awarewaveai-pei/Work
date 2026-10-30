@@ -12,6 +12,7 @@ import { putDesignObject } from "../storage/r2";
 import { randomUUID } from "node:crypto";
 import { providerUrl } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
+import type { Grant } from "@/lib/entitlements/can";
 import { logImageCost } from "@/lib/ai/log-ai-call";
 import { toolCostUsd } from "@/lib/ai/cost-calculator";
 
@@ -76,13 +77,13 @@ function imageLongEdge(buffer: Buffer): number | null {
 }
 
 async function runOnePass(
+  grant: Grant,
   token: string,
   version: string,
   imageUrl: string,
   scale: number,
   signal: AbortSignal,
 ): Promise<{ ok: true; outputUrl: string } | { ok: false; error: string }> {
-  const grant = await grantFor("studio.upscale");
   let res: Response;
   try {
     res = await fetch(providerUrl(grant, "replicate", "/v1/predictions"), {
@@ -140,9 +141,12 @@ export async function upscaleToPrintFile(
   const token = process.env.REPLICATE_API_TOKEN;
   if (!token) return { ok: false, error: "missing_replicate" };
   const version = process.env.REALESRGAN_VERSION ?? REALESRGAN_VERSION_DEFAULT;
+  const grant = await grantFor("studio.upscale");
 
   const controller = new AbortController();
   const killer = setTimeout(() => controller.abort(), TOTAL_TIMEOUT_MS);
+  let passes = 0;
+  let delivered = false;
   try {
     // Probe the actual input — never trust hints for the scale decision.
     let inputBuffer: Buffer;
@@ -157,11 +161,10 @@ export async function upscaleToPrintFile(
 
     let currentUrl = imageUrl;
     let currentEdge = inputLongEdgePx;
-    let passes = 0;
     while (passes < MAX_PASSES && (currentEdge === null ? passes < 1 : currentEdge < targetLongEdge)) {
       const known = currentEdge ?? 2048;
       const scale = Math.max(2, Math.min(4, Math.ceil(targetLongEdge / known)));
-      const pass = await runOnePass(token, version, currentUrl, scale, controller.signal);
+      const pass = await runOnePass(grant, token, version, currentUrl, scale, controller.signal);
       if (!pass.ok) {
         // First pass failing is fatal; a failed second pass falls back to pass-1 output.
         if (passes === 0) return { ok: false, error: (pass as { ok: false; error: string }).error };
@@ -173,8 +176,6 @@ export async function upscaleToPrintFile(
       if (currentEdge !== null && currentEdge >= targetLongEdge) break;
     }
     if (passes === 0) return { ok: false, error: "upscale_no_pass_ran" };
-    void logImageCost({ route: "studio/upscale", model: "real-esrgan", vendor: "Replicate", costUsd: toolCostUsd("upscale") * passes, tool: "studio" });
-
     let buffer: Buffer;
     try {
       const dl = await fetch(currentUrl, { signal: controller.signal });
@@ -195,6 +196,7 @@ export async function upscaleToPrintFile(
     if (!put.ok) {
       return { ok: false, error: (put as { ok: false; error: string }).error };
     }
+    delivered = true;
     return {
       ok: true,
       printFileUrl: put.publicUrl,
@@ -206,5 +208,7 @@ export async function upscaleToPrintFile(
     };
   } finally {
     clearTimeout(killer);
+    // Replicate billed every pass that ran; the customer pays only for a print file it received.
+    if (passes > 0) void logImageCost({ route: "studio/upscale", model: "real-esrgan", vendor: "Replicate", costUsd: toolCostUsd("upscale") * passes, tool: "studio", grant, delivered });
   }
 }

@@ -1,6 +1,6 @@
 import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
-import { billedOrgId, logAiCall } from "@/lib/ai/log-ai-call";
+import { logAiCall } from "@/lib/ai/log-ai-call";
 import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "../ai/gateway";
 import { selectPackage } from "./package-selector";
 import type { IntakeForm, WebsiteSpec } from "./intake-form";
@@ -114,7 +114,7 @@ export async function generateWebsiteSpec(
       { signal: controller.signal }
     );
 
-    void logAiCall({ route: "onboarding/spec", response: message, organizationId: billedOrgId(grant), tool: "onboarding" });
+    void logAiCall({ route: "onboarding/spec", response: message, grant, tool: "onboarding" });
     const incomplete = claudeIncomplete(message);
     if (incomplete) return { ok: false, error: incomplete };
     raw = claudeText(message).trim();

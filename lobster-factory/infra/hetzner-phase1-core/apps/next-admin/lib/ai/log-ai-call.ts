@@ -7,23 +7,25 @@
  * (Supabase down, table missing) must be invisible to the feature — hence the swallow-everything
  * try/catch and the null-client early return.
  *
+ * Charging (ADR 017 4b-11): every row names the grant its call ran under (required, so a call site cannot skip it); the
+ * row is billed to that grant's account and the delivered call's cost is charged through grant.report (creditsForCost;
+ * only a credits grant in enforce debits). The row id is the idempotency key, so the call is charged once.
+ *
  * Usage (non-streaming): after `const msg = await client.messages.create(...)`, call
- *   void logAiCall({ route: "/api/content/outline", response: msg });
+ *   void logAiCall({ route: "/api/content/outline", response: msg, grant });
  * The Anthropic SDK response carries `.usage` (input_tokens, output_tokens, cache_*); we read it.
  */
+import { randomUUID } from "node:crypto";
 import { getSupabaseWriteClient } from "../supabase-server";
 import { textCallCostUsd, resolveTextRate, imageCostUsd } from "./cost-calculator";
 import { IMAGE_RATES, DEFAULT_IMAGE_MODEL } from "./cost-model";
 import type { Grant } from "../entitlements/can";
-import { scopeBilledOrgId } from "../entitlements/grant";
+import { creditsForCost } from "../entitlements/ledger";
 
 // ai_call_logs.job_id is a uuid (0046): any other value would make Postgres refuse the whole row, losing the cost.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const jobColumns = (jobId: string | null | undefined) =>
   jobId && !UUID_RE.test(jobId) ? { job_id: null, rawJobId: jobId } : { job_id: jobId ?? null, rawJobId: null };
-/** Not named by the caller -> the account the enclosing grant scope bills. */
-const orgOrScope = (organizationId: string | null | undefined) => (organizationId === undefined ? scopeBilledOrgId() : organizationId);
-
 /** The organization a grant bills (null when it could not be resolved): a library call logs its cost there. Like the
  *  logger itself it never throws -- reading the account must not break the call being logged. */
 export const billedOrgId = (grant: Grant): string | null => {
@@ -46,7 +48,7 @@ export interface LogAiCallArgs {
   outputTokens: number;
   cacheReadTokens?: number;
   cacheWriteTokens?: number;
-  organizationId?: string | null;
+  grant: Grant;
   actorRole?: string | null;
   metadata?: Record<string, unknown>;
   jobId?: string | null;
@@ -62,7 +64,7 @@ export interface LogAiCallFromResponse {
   route: string;
   response: { model?: string; usage?: AnthropicUsageLike | null };
   fallbackModel?: string;
-  organizationId?: string | null;
+  grant: Grant;
   actorRole?: string | null;
   metadata?: Record<string, unknown>;
   jobId?: string | null;
@@ -110,7 +112,6 @@ export async function logAiCall(args: LogAiCallArgs | LogAiCallFromResponse): Pr
     let cacheReadTokens: number;
     let cacheWriteTokens: number;
     let route: string;
-    let organizationId: string | null | undefined;
     let actorRole: string | null | undefined;
     let metadata: Record<string, unknown> | undefined;
     let jobId: string | null | undefined;
@@ -124,7 +125,6 @@ export async function logAiCall(args: LogAiCallArgs | LogAiCallFromResponse): Pr
       outputTokens = u.output_tokens ?? 0;
       cacheReadTokens = u.cache_read_input_tokens ?? 0;
       cacheWriteTokens = u.cache_creation_input_tokens ?? 0;
-      organizationId = args.organizationId;
       actorRole = args.actorRole;
       metadata = args.metadata;
       jobId = args.jobId;
@@ -136,7 +136,6 @@ export async function logAiCall(args: LogAiCallArgs | LogAiCallFromResponse): Pr
       outputTokens = args.outputTokens;
       cacheReadTokens = args.cacheReadTokens ?? 0;
       cacheWriteTokens = args.cacheWriteTokens ?? 0;
-      organizationId = args.organizationId;
       actorRole = args.actorRole;
       metadata = args.metadata;
       jobId = args.jobId;
@@ -154,9 +153,12 @@ export async function logAiCall(args: LogAiCallArgs | LogAiCallFromResponse): Pr
     // even when the API echoes a dated id. rate_fallback surfaces mispriced models instead of hiding them.
     const resolved = resolveTextRate(model);
 
+    const id = randomUUID();
+    const charge = await chargeCall(args.grant, costUsd, id, route);
     const job = jobColumns(jobId);
     const { error } = await supabase.from("ai_call_logs").insert({
-      organization_id: orgOrScope(organizationId),
+      id,
+      organization_id: billedOrgId(args.grant),
       route,
       model,
       vendor: resolved.rate.vendor,
@@ -169,12 +171,25 @@ export async function logAiCall(args: LogAiCallArgs | LogAiCallFromResponse): Pr
       job_id: job.job_id,
       tool: tool ?? null,
       kind: "text",
-      metadata: { ...(metadata ?? {}), ...(job.rawJobId ? { raw_job_id: job.rawJobId } : {}),
+      metadata: { ...(metadata ?? {}), ...(job.rawJobId ? { raw_job_id: job.rawJobId } : {}), ...charge,
         ...(resolved.fallback ? { rate_fallback: true, matched_rate: resolved.matchedKey } : {}) },
     });
     if (error) console.warn(`[ai-cost] ${route} not recorded: ${error.message}`);
   } catch {
     // Swallow — observability must never break the feature it observes.
+  }
+}
+
+/** Charges one delivered call; never throws (a failed debit is logged and the row records it). */
+async function chargeCall(grant: Grant, costUsd: number, id: string, route: string): Promise<Record<string, number | boolean>> {
+  const units = creditsForCost(costUsd);
+  if (units === 0) return {};
+  try {
+    const { charged, shortfall } = await grant.report({ units, idempotencyKey: `ai-call:${id}`, meta: { ai_call_id: id } });
+    return { credits_charged: charged, ...(shortfall > 0 ? { credits_shortfall: shortfall } : {}) };
+  } catch (e) {
+    console.warn(`[ai-cost] ${route} charge failed: ${String(e).slice(0, 200)}`);
+    return { credits_charge_failed: true };
   }
 }
 
@@ -187,8 +202,9 @@ export interface LogImageCostArgs {
   tool?: string | null;
   /** "video" for per-scene video motion; defaults to "image". */
   kind?: "image" | "video";
-  /** The billing account the image was made for (billedOrgId(grant)); null when not known. */
-  organizationId?: string | null;
+  grant: Grant;
+  /** false = the provider charged but the customer got nothing (logImageResult): our cost, recorded, not charged. */
+  delivered?: boolean;
 }
 
 /** Best-effort per-call cost logger for image/video — one ai_call_logs row. Never throws. */
@@ -196,9 +212,12 @@ export async function logImageCost(args: LogImageCostArgs): Promise<void> {
   try {
     const supabase = getSupabaseWriteClient();
     if (!supabase) return;
+    const id = randomUUID();
+    const charge = args.delivered === false ? {} : await chargeCall(args.grant, args.costUsd, id, args.route);
     const job = jobColumns(args.jobId);
     const { error } = await supabase.from("ai_call_logs").insert({
-      organization_id: orgOrScope(args.organizationId),
+      id,
+      organization_id: billedOrgId(args.grant),
       route: args.route,
       model: args.model,
       vendor: args.vendor,
@@ -211,7 +230,7 @@ export async function logImageCost(args: LogImageCostArgs): Promise<void> {
       job_id: job.job_id,
       tool: args.tool ?? null,
       kind: args.kind ?? "image",
-      metadata: job.rawJobId ? { raw_job_id: job.rawJobId } : {},
+      metadata: { ...(job.rawJobId ? { raw_job_id: job.rawJobId } : {}), ...charge },
     });
     if (error) console.warn(`[ai-cost] ${args.route} image cost not recorded: ${error.message}`);
   } catch { /* never break the caller */ }
@@ -219,9 +238,9 @@ export async function logImageCost(args: LogImageCostArgs): Promise<void> {
 
 /** One lib/tarot/image-gen.ts result. Logged when the provider charged: on success, and on a failure after the provider
  *  finished (`billed`, e.g. the download of a finished image failed). Vendor and price come from IMAGE_RATES. */
-export function logImageResult(result: { ok: boolean; billed?: boolean; costUsd?: number }, args: { route: string; model: string; jobId?: string | null; tool?: string | null; organizationId?: string | null }): void {
+export function logImageResult(result: { ok: boolean; billed?: boolean; costUsd?: number }, args: { route: string; model: string; jobId?: string | null; tool?: string | null; grant: Grant }): void {
   if (!result.ok && !result.billed) return;
   const rate = IMAGE_RATES[args.model] ?? IMAGE_RATES[DEFAULT_IMAGE_MODEL];
   // A provider that reports usage (OpenAI images bill by token) gives the exact cost; others use the per-image price.
-  void logImageCost({ ...args, vendor: rate.vendor, costUsd: result.costUsd ?? imageCostUsd(args.model) });
+  void logImageCost({ ...args, vendor: rate.vendor, costUsd: result.costUsd ?? imageCostUsd(args.model), delivered: result.ok });
 }

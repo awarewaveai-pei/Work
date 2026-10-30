@@ -12,6 +12,7 @@ import { PAYMENT_SITE_HEADER } from "@/lib/payments/hmac";
 import { LOCAL_SIGNATURE_HEADER, signLocalPayment } from "@/lib/payments/local";
 import fixture from "@/lib/payments/__tests__/fixtures/ed25519-v1.json";
 import { PRODUCTS } from "@/lib/portal/products";
+import { debitCredits } from "@/lib/entitlements/ledger";
 import { startRestProxy } from "./real-db";
 
 const REST = process.env.ENTITLEMENTS_REST;
@@ -187,6 +188,11 @@ describe.skipIf(!REST)("payments against a real database (ADR 017 step 4a)", () 
       expect(g.limits).toEqual({ pay: "credits" });   // can.ts: no marker = the contract covers unlimited use
       expect(studio.find((f) => f.feature_key === g.feature_key)?.billing).toBe("credits");
     }
+    // 4b-11: the reserve RPC reports the wallet on a refusal too, so a short wallet can be drained to 0
+    const debit = (units: number, key: string) => debitCredits(db, { orgId: org, units, idempotencyKey: key, featureKey: "studio.image" });
+    expect(await debit(30, "ai-call:e2e-1")).toEqual({ ok: true, balance: 70 });
+    expect(await debit(30, "ai-call:e2e-1")).toEqual({ ok: true, balance: 70 });   // same key: charged once
+    expect(await debit(200, "ai-call:e2e-2")).toEqual({ ok: false, balance: 70 });
   });
 
   it("a chargeback suspends entitlements and freezes the wallet", async () => {
