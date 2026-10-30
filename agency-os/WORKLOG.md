@@ -1,4 +1,12 @@
 # Worklog
+## 2026-10-30（續10）content 門「尚未開通」真人走完；發現「我的產品」頁對所有客戶都顯示「即將推出」（Claude）
+
+- **補續6 的缺口**：操作者在 E2E-Verify-0704（測試帳戶）「帳務 → 給／收產品」送塔羅（`organization_entitlements` tarot 2 列 comp，`source_ref=staff:fa15f6bd-…`，稽核原因必填），「帳號 → 建立客戶帳號」邀請 `peijingartstudio+test@gmail.com`（Gmail 別名，client、`org_id=9e6e0993-…`，03:39 UTC 設密碼並登入）。操作者用該帳號開 content.aware-wave.com → 看到「「內容行銷」尚未開通」，按「回到我的產品」到 `portal.aware-wave.com/portal/launcher`。content 門驗收完成。
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec supabase-db psql：auth.users 該帳號 client／org E2E-Verify／confirmed／last_sign_in 03:39；entitlements E2E-Verify 只有 tarot | exit=0 | ms=3000
+- REVIEW_WAIVED: NA -- 驗收，未改程式
+- BUGHUNT_WAIVED: NA -- 無程式碼改動
+- **新發現 C1（未修，待操作者同意）**：launcher 全部產品顯示「即將推出」，連有持有的塔羅也是。根因：`app/portal/launcher/page.tsx:72` 以 `product.status !== "coming_soon"` 且讀舊表 `organization_product_subscriptions`（`lib/entitlements/tables.ts:74`）判斷；prod 該表 0 列，且 `lib/portal/products.ts:42-86` 每個產品都是 `status: "coming_soon"`。門用的是 `organization_entitlements`（`lib/entitlements/door-holds.ts:10`）。兩個「有沒有產品」的依據不一致 → 所有客戶（含 Soulful）從「尚未開通」頁按「回到我的產品」都進死路。修法提案：launcher 改用 `servedNextAdminProducts()`＋`holdsProduct`，同一判斷。
+- **測完收尾（待做）**：刪 `peijingartstudio+test@gmail.com` 帳號、收回 E2E-Verify 的塔羅。
 ## 2026-10-30（續9）4b-9 本機演練：真 WordPress＋WooCommerce＋aware-wave-store → 真付款路由 → 真資料庫（操作者：還沒要開綠界）（Claude）
 
 **觸發**：操作者「我還沒有要去訂閱 ECpay 怎麼辦?」→ 不等金流帳號，先把 WordPress→控制面整條在本機跑通（4b-9 的「從沒跑過」那段）。
