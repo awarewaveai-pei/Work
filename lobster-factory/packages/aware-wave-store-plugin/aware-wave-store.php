@@ -3,7 +3,7 @@
  * Plugin Name:          AwareWave Store
  * Plugin URI:           https://aware-wave.com
  * Description:          AwareWave's own shop only (aware-wave.com): WooCommerce / Subscriptions payments become signed events to app.aware-wave.com, members confirm their email before checkout, and My Account gets the product 「進入」 buttons. Not for client sites.
- * Version:              1.3.1
+ * Version:              1.3.2
  * Requires at least:    6.0
  * Requires PHP:         7.4
  * Requires Plugins:     woocommerce
@@ -25,7 +25,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'AWSTORE_VERSION', '1.3.1' );
+define( 'AWSTORE_VERSION', '1.3.2' );
 define( 'AWSTORE_DIR', plugin_dir_path( __FILE__ ) );
 
 /** Minimal PSR-4 autoloader for AwareWave\Store\* -> includes/ (same mapping as the test bootstrap). */

@@ -6,7 +6,12 @@
  * verification mail (EmailVerification, sent on user_register) like anyone else. Decision
  * agency-os/reports/decisions/2026-10-30-customer-self-signup-email-google.md §6.
  *
- * Hook: nsl_google_register_new_user( $user_id, $provider ) -- social-login.nextendweb.com/documentation/for-developers/hooks/
+ * Hooks: nsl_google_register_new_user( $user_id, $provider ) -- social-login.nextendweb.com/documentation/for-developers/hooks/
+ * nsl_google_auto_link_allowed( $allowed, $provider, $user_id ): Nextend links a Google login to an existing member with the
+ * same email by default (includes/user.php autoLink; Google's email counts as verified, providers/google/google.php).
+ * Allowed only when that member proved the mailbox here too: otherwise whoever registered the address first (and holds
+ * its password) would share the account the real owner signs into with Google. Refused = Nextend asks to log in with
+ * the password and link Google from the account page.
  *
  * @package AwareWave\Store
  */
@@ -27,6 +32,11 @@ final class GoogleSignup {
 
 	public function register(): void {
 		add_action( 'nsl_google_register_new_user', array( $this, 'onRegister' ), 10, 2 );
+		add_filter( 'nsl_google_auto_link_allowed', array( $this, 'autoLinkAllowed' ), 10, 3 );
+	}
+
+	public function autoLinkAllowed( $allowed, $provider, $userId ): bool {
+		return (bool) $allowed && EmailVerification::isUserVerified( (int) $userId );
 	}
 
 	public function onRegister( $userId, $provider ): void {
