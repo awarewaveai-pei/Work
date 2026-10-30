@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-30（續6）content 門驗收：補完續1「未驗」——員工四頁＋客戶開／不開兩條路都用正式資料驗過（Claude）
+
+- **觸發**：操作者「續做 content 門驗收…完成＝有開通的帳號看到四頁、沒開通的看到「尚未開通」」；之後「我還沒有設其他登入帳號…你去處理好」。
+- **現況**：門判斷 `lib/portal/door-access.ts:12` 員工一律 open；客戶看 `x-ops-org-id`（middleware 取 `app_metadata.org_id`，`middleware.ts:115-118`）在 `organization_entitlements` 有無有效列（`lib/entitlements/door-holds.ts:9-12`）。prod 唯讀：客戶帳號只有 1 個（綁 soulful-expression，content 13 列）；沒開通的 3 個客戶帳戶（e2e-verify-0704、mongolia-03、test-wp-webhook-co）都沒有登入帳號 → 真人瀏覽器無法看到「尚未開通」，不代建帳號、不代輸密碼。
+- **員工（瀏覽器實看）**：內建瀏覽器已登入 owner 帳號，content.aware-wave.com 的 `/`、`/topics`、`/sites`、`/events` 都載入完成且有資料（題目頁 25 題待核准、網站頁 3 站、節日頁 584 筆）；頁內連結全是門內相對路徑（`/`、`/topics`、`/sites`、`/events`）。
+- **客戶（真程式×prod 資料，無登入）**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsx scratchpad/door-real.mts（真 `doorAccess`＋`holdsProduct`，SUPABASE_URL=supabase.aware-wave.com，client 身分逐一帳戶）→ soulful=open、edd-research=open、e2e-verify=not_held、mongolia=not_held、test-wp-webhook=not_held、無 org=not_held、staff=open；與 DB content 列數一致 | exit=0 | ms=8000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run 暫時檔 app/__tests__/zz-tmp-door-real-84e20c8b.test.tsx（真 `ProductDoorShell`，只 mock next/headers、DoorNav、LogoutButton，prod entitlements）→ e2e-verify 畫出「「內容行銷」尚未開通」＋「回到我的產品」且不畫頁面內容；soulful 畫出門選單＋頁面內容；2/2 綠，跑完即刪 | exit=0 | ms=2000
+- REALTEST_EVIDENCE: tool=curl | cmd=prod `printenv PORTAL_HOST` 空 → 按鈕指 `portal.aware-wave.com/launcher`；curl 該網址 307 → `/login?next=%2Fportal%2Flauncher`（可用） | exit=0 | ms=2000
+- REVIEW_WAIVED: NA -- 只驗收，未改 repo 程式
+- BUGHUNT_WAIVED: NA -- 無程式碼改動
+- **沒驗到的一段**：真客戶在瀏覽器輸入帳密那一步（middleware 從登入身分取 org_id）未由真人走過；該段由既有 middleware 測試涵蓋，且其他門（video、design）已用同一機制上線。若要真人走一次：員工後台邀請一個客戶帳號綁到沒開通的帳戶，再用該帳號登入。
+- **缺口（不阻擋）**：repo 沒有測試畫 `ProductDoorShell` 的「尚未開通」分支（`app/__tests__/door-nav.test.tsx` 只測功能變灰）；本次用暫時測試補驗，未留檔。
 ## 2026-10-30（續4）四件小修：collection 事故走標準 ingest／Codex 佇列 check 白名單環境／COS 單次 lock 清理／eisenhower 共用 provenance（Claude＋subagent）
 
 **觸發**：操作者「你決定前 5 件」。共用目錄已有 2 個 session（`local_0a51d7fc` ADR 017 主線），依 AGENTS §5 不再開 session，改派 subagent（Opus×1、Sonnet×3、Haiku×1），避開 ADR 017 檔案。
