@@ -18,6 +18,11 @@ export function staffHosts(env: Env = process.env): string[] {
   return (env.STAFF_HOSTS ?? `app.${baseDomain(env)}`).split(",").map(cleanHost).filter(Boolean);
 }
 
+/** Where a not-yet-bought product is explained and sold: the WordPress shop (SHOP_URL overrides). */
+export function shopUrl(env: Env = process.env): string {
+  return (env.SHOP_URL ?? "").trim() || `https://${baseDomain(env)}/shop/`;
+}
+
 export function productHost(p: PortalProduct, env: Env = process.env): string {
   return cleanHost(env[`PRODUCT_HOST_${p.key.toUpperCase()}`]) || `${p.subdomain}.${baseDomain(env)}`;
 }

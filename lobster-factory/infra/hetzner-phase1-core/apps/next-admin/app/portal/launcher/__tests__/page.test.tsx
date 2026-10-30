@@ -16,6 +16,7 @@ vi.mock("@/lib/entitlements/door-holds", () => ({
 
 import PortalLauncherPage from "../page";
 import { PRODUCTS } from "@/lib/portal/products";
+import { shopUrl } from "@/lib/portal/hosts";
 
 const card = (html: string, name: string) => html.split('<div class="card"').find((c) => c.includes(`>${name}</h2>`)) ?? "";
 const name = (key: string) => PRODUCTS.find((p) => p.key === key)!.name;
@@ -35,11 +36,26 @@ describe("portal launcher", () => {
     expect(card(html, name("cs"))).not.toContain("開啟");
   });
 
+  it("a held door with a works page links to it; one without does not; a door not held points to the shop", async () => {
+    state.held = new Set(["tarot", "content", "design"]);
+    const html = renderToStaticMarkup(await PortalLauncherPage());
+    expect(card(html, name("tarot"))).toMatch(/href="https:\/\/tarot\.[^"]+\/works"[^>]*>我的作品</);
+    expect(card(html, name("content"))).toContain("已開通");
+    expect(card(html, name("content"))).not.toContain("我的作品");
+    // the design door's home is the works library: one 開啟 button, no second link to the same page
+    expect(card(html, name("design"))).toMatch(/href="https:\/\/design\.[^"]+"[^>]*>開啟</);
+    expect(card(html, name("design"))).not.toContain("我的作品");
+    expect(card(html, name("studio"))).not.toContain("我的作品");
+    expect(card(html, name("studio"))).toContain(`href="${shopUrl()}"`);
+    expect(card(html, name("studio"))).toContain(">去了解<");
+    expect(card(html, name("cs"))).not.toContain("去了解");
+  });
+
   it("a failed entitlement read shows the error and opens nothing", async () => {
     state.held = new Set(["tarot"]);
     state.fail = true;
     const html = renderToStaticMarkup(await PortalLauncherPage());
     expect(html).toContain("讀取產品清單時發生錯誤");
-    expect(html).not.toContain("開啟</a>");
+    expect(html).not.toContain("href=");
   });
 });

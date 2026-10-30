@@ -256,11 +256,11 @@ function Chips({
   );
 }
 
-export default function DesignsGallery() {
+export default function DesignsGallery({ initialTab = "designs" }: { initialTab?: ActiveTab }) {
   const canvasHref = useDoorHref(CANVAS_STAFF_HREF);
   const publishHref = useDoorHref("/tools/publish");
   /* ── tab ── */
-  const [activeTab, setActiveTab] = useState<ActiveTab>("designs");
+  const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab);
 
   /* ── images state ── */
   const [assets, setAssets] = useState<DesignAsset[]>([]);
@@ -552,8 +552,9 @@ export default function DesignsGallery() {
     setEditBusy(true);
     setEditError(null);
     try {
-      // Same-origin proxy → no canvas taint for the cross-origin R2 image.
-      const proxied = `/api/tools/studio/proxy-image?url=${encodeURIComponent(editAsset.object_url)}`;
+      // Same-origin route → no canvas taint for the cross-origin R2 image. The platform download route, not studio's
+      // proxy-image: this gallery is a PLATFORM_PAGE (lib/portal/doors.ts), so it may call only PLATFORM_APIS.
+      const proxied = bucketDownloadHref(editAsset.object_url);
       const res = await applyEdgeMask(proxied, styleId, { amount: editAmount, seed: 7 });
       if (res.ok) {
         setEditResult(res.image);

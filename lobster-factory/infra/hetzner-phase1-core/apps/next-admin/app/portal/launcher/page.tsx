@@ -2,6 +2,8 @@ import { headers } from "next/headers";
 import { requireClientOrg, PortalAccessError } from "@/lib/tenant-guard";
 import { PRODUCTS } from "@/lib/portal/products";
 import { productHost, servedNextAdminProducts } from "@/lib/portal/doors";
+import { shopUrl } from "@/lib/portal/hosts";
+import { doorHref } from "@/lib/portal/door-href";
 import { heldDoors } from "@/lib/portal/held-doors";
 
 export const dynamic = "force-dynamic";
@@ -57,19 +59,27 @@ export default async function PortalLauncherPage() {
         </p>
       ) : (
         <p style={{ fontSize: 13.5, color: "var(--text-muted)", marginBottom: 24 }}>
-          選擇要開啟的產品。還沒買的產品標示「尚未開通」，還在準備的標示「即將推出」。
+          選擇要開啟的產品。還沒買的產品可按「去了解」，還在準備的標示「即將推出」。
         </p>
       )}
       <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}>
         {PRODUCTS.map((product) => {
           const isOpen = held.has(product.key); // heldDoors returns served doors only
           const label = isOpen ? "已開通" : served.has(product.key) ? "尚未開通" : "即將推出";
+          // the door page showing the shared works library; the design door IS that page, so 開啟 already goes there
+          const works = isOpen && product.door.app === "next-admin" ? doorHref(product.door.nav ?? [], "/tools/designs") : null;
+          const worksPath = works && works !== "/" ? works : null;
           return (
             <div key={product.key} className="card" style={{ padding: 20 }}>
               <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>{product.name}</h2>
               <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12 }}>{failed ? "—" : label}</p>
               {isOpen ? (
-                <a href={`https://${productHost(product)}`} className="btn-primary">開啟</a>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <a href={`https://${productHost(product)}`} className="btn-primary">開啟</a>
+                  {worksPath && <a href={`https://${productHost(product)}${worksPath}`} className="btn-primary">我的作品</a>}
+                </div>
+              ) : served.has(product.key) && !failed ? (
+                <a href={shopUrl()} className="btn-primary">去了解</a>
               ) : (
                 <button className="btn-primary" disabled style={{ opacity: 0.5, cursor: "not-allowed" }}>
                   {failed ? "無法確認" : label}

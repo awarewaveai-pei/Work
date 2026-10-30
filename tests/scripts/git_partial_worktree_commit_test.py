@@ -191,6 +191,22 @@ class PartialWorktreeCommitTest(unittest.TestCase):
         self.assertEqual(self.mod.main(["stage", "shared.md", "--range", "10", "--range", "30-30"]), 0)
         self.assertEqual(self.private("shared.md", self.index_path()), self.expect_mine())
 
+    def test_drop_re_keeps_only_my_lines_of_a_shared_hunk(self):
+        """line 20 (mine) and line 21 (foreign) both replaced -> one -U0 hunk; --drop-re keeps HEAD's line 21."""
+        lines = self.base.splitlines(keepends=True)
+        lines[19] = "MINE twenty\n"
+        lines[20] = "FOREIGN twenty-one\n"
+        write("shared.md", "".join(lines))
+        self.assertEqual(self.mod.main(["stage", "shared.md", "--keep-re", "^\\+MINE", "--drop-re", "^[-+].*(FOREIGN|line 021)"]), 0)
+        expect = self.base.replace("line 020\n", "MINE twenty\n")
+        self.assertEqual(self.private("shared.md", self.index_path()), expect)
+        self.assertEqual(self.mod.main(["drop", "--index", self.index_path()]), 0)
+        # foreign line between two of mine: the kept `-` lines would be non-contiguous -> refused, nothing staged
+        lines[21] = "MINE twenty-two\n"
+        write("shared.md", "".join(lines))
+        self.assertEqual(self.mod.main(["stage", "shared.md", "--keep-re", "^\\+MINE", "--drop-re", "^[-+].*(FOREIGN|line 021)"]), 2)
+        self.assertEqual([f for f in os.listdir(self.scratch) if f.endswith(".index")], [])
+
     def test_stale_shared_index_does_not_shift_hunks(self):
         # another session staged an older edit (a line at the top) and never committed it
         stale = "STALE top\n" + self.base

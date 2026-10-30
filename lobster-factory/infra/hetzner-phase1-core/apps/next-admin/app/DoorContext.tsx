@@ -3,6 +3,7 @@
 // leave it unset. A shared component's link to a staff page goes through useDoorHref: staff pages 404 on a door.
 import { createContext, useContext, type ReactNode } from "react";
 import type { DoorNavItem } from "@/lib/portal/products";
+import { doorHref } from "@/lib/portal/door-href";
 
 const Door = createContext<readonly DoorNavItem[] | null>(null);
 
@@ -18,11 +19,4 @@ export const useDoorNav = (): readonly DoorNavItem[] => useContext(Door) ?? [];
  *  door page registered (door.nav `staff`) for that staff page, or null when the door has none -- hide the link. */
 export function useDoorHref(staffHref: string): string | null {
   return doorHref(useContext(Door), staffHref);
-}
-
-export function doorHref(nav: readonly DoorNavItem[] | null, staffHref: string): string | null {
-  if (nav === null) return staffHref;
-  const [, pathname, rest] = /^([^?#]*)(.*)$/.exec(staffHref)!;
-  const hit = nav.find((n) => `/${n.staff}` === pathname.replace(/(.)\/$/, "$1"));
-  return hit ? `/${hit.path}${rest}` : null;
 }

@@ -54,6 +54,9 @@ export function isAnonymousPath(pathname: string, product: NextAdminProduct): bo
 // image/process: the export bar (components/tools/OutputTrackBar) every image studio shows -- WebP / print file from the
 // request image, no database, no paid model.
 export const PLATFORM_APIS: readonly string[] = ["/api/tools/designs", "/api/entitlements/features", "/api/tools/events/upcoming", "/api/tools/image/process"];
+/** Shared staff pages any door may list in door.nav (ADR 018 §2 rule 3); each reads only PLATFORM_APIS. tools/designs:
+ *  the saved-works library every image and video studio writes to (media_assets), so a door's "我的作品" is this page. */
+export const PLATFORM_PAGES: readonly string[] = ["tools/designs"];
 
 /** The APIs a product door serves: its own, those of the products installed with it (dependsOn, transitively), and
  *  the platform's. An optional product's APIs are not served: its buttons hide on the door. */

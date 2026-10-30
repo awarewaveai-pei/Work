@@ -10,7 +10,7 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import { BACK_OFFICE_FEATURES } from "../../entitlements/can";
 import { ROUTE_FEATURES } from "../../entitlements/route-features";
-import { PLATFORM_APIS, doorApis, nextAdminProducts, type NextAdminProduct } from "../doors";
+import { PLATFORM_APIS, PLATFORM_PAGES, doorApis, nextAdminProducts, type NextAdminProduct } from "../doors";
 import { PRODUCTS, type PortalProduct } from "../products";
 import { ROOT, under, sources, scan, FILES, resolve, isRoute, importClosure } from "./code-scan";
 
@@ -129,6 +129,17 @@ describe("registry claims match the code", () => {
     }
   });
 
+  // doors.ts PLATFORM_PAGES: a page any door may mirror reads only PLATFORM_APIS -- every /api literal in its import
+  // closure, not just direct calls (DesignsGallery once built studio's proxy-image URL into a variable; tarot's door 404ed it).
+  it("a platform page reaches only platform APIs", () => {
+    for (const page of PLATFORM_PAGES) {
+      const files = importClosure([`app/(shell)/${page}/page.tsx`]);
+      expect(files.size, page).toBeGreaterThan(1);
+      const outside = [...files].flatMap((f) => FILES.get(f)!.apis.filter((u) => !PLATFORM_APIS.some((a) => under(u, a))).map((u) => `${f}: ${u}`));
+      expect(outside, page).toEqual([]);
+    }
+  });
+
   // A signed-in customer on a product door sees only brands they belong to (ADR 018 §1): its pages read through
   // brand-scoped routes, never with the service-role client staff pages use. No-login pages (door.anonymous) are
   // public by declaration and serve published data only, so they are not in scope here.
@@ -186,7 +197,6 @@ describe("registry claims match the code", () => {
   const ORG_FREE_ROUTES: Readonly<Record<string, string>> = {
     "app/api/tools/events/upcoming/route.ts": "shared holiday table `events`, no organization column",
     "app/api/tools/image/process/route.ts": "converts the base64 image in the request body (sharp / Ghostscript); no database, no fetch, no paid model",
-    "app/api/tools/studio/proxy-image/route.ts": "streams only public designs-bucket objects (exact-host allowlist)",
     "app/api/tools/designs/download/route.ts": "streams only public designs- and video-bucket objects as a download (exact-host allowlist); no database",
     "app/api/tools/studio/mockup/route.ts": "Printful mockup (free) from the request image and the public catalog; uploads that image to the shared public designs bucket and shares the Printful store quota",
     "app/api/content/seo-check/route.ts": "scores the article in the request body (lib/content/quality/seo-check-core.ts); no database, no stored data",

@@ -11,7 +11,7 @@ syncs the shared index entries of the committed paths to HEAD (`git reset -q -- 
 deletes index + marker.
 
   python scripts/git-partial-worktree-commit.py stage <shared-file> (--worklog-entry N [--date D] | --range A-B ... | --keep-re REGEX)
-                                                     [--index PATH] [-- <own files>...]
+                                                     [--drop-re REGEX] [--index PATH] [-- <own files>...]
       first call creates <scratch>/<roottag>-<rand>.index (+ .json marker); later calls pass --index to add to it.
       <own files> are added whole from the worktree (git add under the private index; untracked is fine; a tracked
       file missing from the worktree is staged as a deletion and listed as "own deletions staged").
@@ -21,8 +21,10 @@ deletes index + marker.
 
 Selection: --worklog-entry N = the block `## <date>（續N）` .. next `## ` header, taken from the worktree and inserted
 into HEAD before the next header that also exists in HEAD (after `# Worklog` when none); --range = OLD-side start
-lines of hunks (git diff -U0 HEAD); --keep-re = regex on hunk-body lines (bytes, e.g. ^\\+MINE). A file with a mode change
-is refused. Line endings follow HEAD's copy of the file. Scratch dir: $PARTIAL_COMMIT_SCRATCH or
+lines of hunks (git diff -U0 HEAD); --keep-re = regex on hunk-body lines (bytes, e.g. ^\\+MINE).; --drop-re = lines of a selected hunk that are NOT
+yours (another session edited the neighbouring line, so git merged both edits into one hunk): a matching `-` line keeps its
+HEAD text, a matching `+` line is not added; the kept `-` lines must stay contiguous and one must remain. A file with a
+mode change is refused. Line endings follow HEAD's copy of the file. Scratch dir: $PARTIAL_COMMIT_SCRATCH or
 $TEMP/git-partial-worktree-commit (the hooks read the same variable).
 """
 import argparse
@@ -67,6 +69,24 @@ def parse(diff: bytes):
         elif cur is not None and line != b"":
             cur["body"].append(line)
     return header, hunks
+
+
+def drop_lines(h, drop_re):
+    """The hunk without the lines drop_re matches (another session's edit sharing this hunk): a dropped `-` line keeps
+    its HEAD text, a dropped `+` line is not added. None = nothing of mine left; False = refused (reason printed)."""
+    minus = [l for l in h["body"] if l.startswith(b"-")]
+    kept_minus = [i for i, l in enumerate(minus) if not drop_re.search(l)]
+    body = [l for l in h["body"] if not drop_re.search(l)]
+    if any(l.startswith(b" ") for l in body):
+        print(f"hunk at {h['old_start']} has context lines; --drop-re expects -U0 hunks"); return False
+    if minus and not kept_minus and any(l.startswith(b"+") for l in body):
+        print(f"--drop-re drops every `-` line of the hunk at {h['old_start']}: where its `+` lines go is ambiguous; narrow the regex"); return False
+    if kept_minus and kept_minus != list(range(kept_minus[0], kept_minus[-1] + 1)):
+        print(f"--drop-re leaves non-contiguous `-` lines in the hunk at {h['old_start']}; split it with --range instead"); return False
+    if not body:
+        return None
+    return {**h, "old_start": h["old_start"] + (kept_minus[0] if kept_minus else 0), "old_len": len(kept_minus),
+            "new_len": sum(1 for l in body if l.startswith(b"+")), "body": body}
 
 
 def delta(h):
@@ -219,6 +239,13 @@ def stage(args):
         mine = [h for h in hunks if any(lo <= h["old_start"] <= hi for lo, hi in ranges) or (keep_re is not None and any(keep_re.search(l) for l in h["body"]))]
         if not mine:
             print(f"no hunk of yours in {rel} (ranges={ranges}, keep-re={args.keep_re!r})"); return 2
+        if args.drop_re:
+            dropped = [drop_lines(h, re.compile(args.drop_re.encode("utf-8"))) for h in mine]
+            if any(d is False for d in dropped):
+                return 2
+            mine = [d for d in dropped if d is not None]
+            if not mine:
+                print(f"--drop-re {args.drop_re!r} leaves no line of yours in {rel}"); return 2
 
     index_path = args.index or new_index(root)
     marker = marker or load_marker(index_path)
@@ -300,6 +327,7 @@ def main(argv=None):
     s.add_argument("--date", default=datetime.date.today().isoformat())
     s.add_argument("--range", action="append")
     s.add_argument("--keep-re")
+    s.add_argument("--drop-re")
     s.add_argument("--index")
     s.add_argument("own", nargs="*")
     w = sub.add_parser("show"); w.add_argument("--index", required=True)

@@ -36,7 +36,7 @@
 - **開門規則**（2026-10-23，ADR 017 順序 8；機械閘在 `lib/portal/__tests__/registry-code.test.ts`、`products.test.ts`，只檢查 `enabled` 的門）：
   1. 門上能呼叫的 API＝本產品 `door.api`＋`dependsOn` 閉包產品的 `door.api`＋`PLATFORM_APIS`（`doors.ts`，`doorApis()` 一處定義，`routeOnProductDoor` 與閘共用）。平台 API 只收依組織授權的路由（import `lib/tenant-guard`）。`optional` 產品的 API 不開，呼叫它的按鈕在門上隱藏。
   2. 門上資料以組織為界（`tenant-guard`：客戶綁定單一組織），social 另有品牌層（`lib/social/authz.ts`）。登入後的門頁不直接用 service role 讀資料；門能呼叫的每個路由都 import `lib/tenant-guard` 或 `lib/social/authz`。員工頁在伺服器端讀全客戶資料的，拆成依組織授權的路由＋兩扇門共用的元件。`door.anonymous` 公開頁只回已發布的公開欄位。閘只證明「有引入授權」；每開一個門，逐條核對路由的資料路徑並記在該門的 WORKLOG。
-  3. 多頁產品在登記表宣告 `door.nav`（路徑＋名稱），共用外框 `app/ProductDoorShell.tsx` 渲染；門的子頁沿用員工頁同一元件；員工頁不得與任何門頁同路徑。
+  3. 多頁產品在登記表宣告 `door.nav`（路徑＋名稱），共用外框 `app/ProductDoorShell.tsx` 渲染；門的子頁沿用員工頁同一元件（自己的員工頁，或平台頁 `lib/portal/doors.ts` `PLATFORM_PAGES`，如每個門的「我的作品」＝`tools/designs`，2026-10-30 第 10 項）；員工頁不得與任何門頁同路徑。
 
 ### 3. 一種身分，登入來源可以換
 

@@ -10,6 +10,8 @@
  * sessionStorage, then the flag → IndexedDB. Tiny standalone module so importers don't pull
  * in either component.
  */
+
+import { bucketDownloadHref } from "@/lib/storage/download-href";
 export const CANVAS_SOURCE_KEY = "canvas:source-image";
 /** Base filename (no extension) the editor uses for its 下載 PNG button. */
 export const CANVAS_NAME_KEY = "canvas:source-name";
@@ -151,15 +153,15 @@ export async function readCanvasSource(): Promise<string | null> {
  * data:/blob:/relative URLs are already same-origin → load + export fine. A remote http(s)
  * URL (e.g. a My Designs R2 public URL, pub-*.r2.dev — a DIFFERENT origin) taints the canvas
  * (SecurityError on toDataURL/export) unless the bucket sends CORS headers, which R2 public
- * buckets don't. Route those through the same-origin image proxy — the exact fix the gallery's
- * edge-mask editor already uses (DesignsGallery.tsx → /api/tools/studio/proxy-image). The proxy
- * fails closed for non-allowlisted URLs (HTTP 400), so a stray URL just doesn't load (= today's
- * behaviour, no regression). Only the gallery hands off a remote URL; every other caller
- * (Banner/Studio/Tarot/OutputTrackBar) passes a base64 data URL and is untouched.
+ * buckets don't. Route those through the platform download route (same-origin re-stream of our own
+ * bucket, lib/storage/download-href.ts): the gallery is a PLATFORM_PAGE (lib/portal/doors.ts) and may
+ * call only PLATFORM_APIS, which studio's former proxy-image was not. The route fails closed for
+ * non-allowlisted URLs, so a stray URL just doesn't load. Only the gallery hands off a remote URL;
+ * every other caller (Banner/Studio/Tarot/OutputTrackBar) passes a base64 data URL and is untouched.
  */
 export function toCanvasSrc(raw: string): string {
   if (/^https?:\/\//i.test(raw)) {
-    return `/api/tools/studio/proxy-image?url=${encodeURIComponent(raw)}`;
+    return bucketDownloadHref(raw);
   }
   return raw;
 }

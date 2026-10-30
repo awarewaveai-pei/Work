@@ -3,7 +3,7 @@ import path from "node:path";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import { MIGRATIONS_DIR, migrationFiles } from "../../kb/__tests__/migration-source";
-import { RESERVED_SUBDOMAINS, nextAdminProducts } from "../doors";
+import { PLATFORM_PAGES, RESERVED_SUBDOMAINS, nextAdminProducts } from "../doors";
 import { STAFF_PLATFORM, covers } from "../staff-tools";
 import { BACK_OFFICE, STAFF_UTILITIES, DEFAULT_SIGNUP_PRODUCT, LOGIN_SOURCES, PRODUCTS, SELF_SIGNUP_PRODUCTS, isSelfSignupProductKey } from "../products";
 
@@ -100,7 +100,7 @@ describe("product registry", () => {
         expect(n.path, p.key).toMatch(/^(?:[a-z][a-z0-9-]*(?:\/[a-z][a-z0-9-]*)*)?$/);
         expect(n.name.trim(), `${p.key} nav ${n.path}`).not.toBe("");
         expect(existsSync(path.join(APP_DIR, p.door.page.slice(1), ...n.path.split("/").filter(Boolean), "page.tsx")), `${p.key} nav ${n.path}: no page`).toBe(true);
-        expect(p.staffPaths.some((s) => under(n.staff, s)), `${p.key} nav ${n.path}: ${n.staff} is not its staff path`).toBe(true);
+        expect(p.staffPaths.some((s) => under(n.staff, s)) || PLATFORM_PAGES.includes(n.staff), `${p.key} nav ${n.path}: ${n.staff} is neither its staff path nor a platform page`).toBe(true);
         expect(staffUrls.has(`/${n.staff}`), `${p.key} nav ${n.path}: no staff page ${n.staff}`).toBe(true);
       }
       const doorDir = path.join(APP_DIR, p.door.page.slice(1));

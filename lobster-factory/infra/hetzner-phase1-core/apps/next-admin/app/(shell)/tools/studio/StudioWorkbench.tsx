@@ -25,7 +25,7 @@ import { tabStyle, chipStyle, actionPill, ghostBtn } from "@/components/tools/pa
 import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
 import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
-import { useDoorHref, useOnDoor } from "@/app/DoorContext";
+import { useDoorHref } from "@/app/DoorContext";
 import { buildSemanticFilename, buildSemanticBase, type SemanticFileMeta } from "@/lib/studio/semantic-filename";
 import type { MockupView } from "@/lib/studio/printful-mockup";
 import {
@@ -388,8 +388,8 @@ export default function StudioWorkbench() {
   // free curated culture lists and never sees a button that would only answer 403.
   const liveAi = usePaidFeatures().canUse("ops.cheap-json");
   // My Designs and the canvas editor are the design product's staff pages; on the studio door they would 404.
-  const onDoor = useOnDoor();
   const canvasHref = useDoorHref(CANVAS_STAFF_HREF);
+  const designsHref = useDoorHref("/tools/designs");
   const [selectedModels, setSelectedModels] = useState<Set<StudioModel>>(new Set<StudioModel>(["flux-schnell"]));
   const [productType, setProductType] = useState("tshirt");
   const [theme, setTheme] = useState("");
@@ -1627,7 +1627,7 @@ export default function StudioWorkbench() {
                 <button className="btn-secondary" onClick={() => downloadImage(img, m)}>PNG下載</button>
                 <button className="btn-secondary" onClick={() => downloadImageWebP(img, m)}>WebP下載</button>
                 {activeResult.seed != null && <span style={{ fontSize: 12, opacity: 0.6 }}>seed {activeResult.seed}</span>}
-                {saveState === "saved" && !onDoor && <a href="/tools/designs" style={{ fontSize: 12 }}>查看 My Designs</a>}
+                {saveState === "saved" && designsHref && <a href={designsHref} style={{ fontSize: 12 }}>查看 My Designs</a>}
                 {saveState === "error" && <span style={{ color: "var(--red)", fontSize: 12 }}>存入失敗</span>}
               </div>
 
@@ -1830,7 +1830,7 @@ export default function StudioWorkbench() {
                       <button className="btn-secondary" onClick={() => downloadImage(img, m)}>PNG下載</button>
                       <button className="btn-secondary" onClick={() => downloadImageWebP(img, m)}>WebP下載</button>
                       {activeResult.seed != null && <span style={{ fontSize: 12, opacity: 0.6 }}>seed {activeResult.seed}</span>}
-                      {saveState === "saved" && !onDoor && <a href="/tools/designs" style={{ fontSize: 12 }}>查看 My Designs →</a>}
+                      {saveState === "saved" && designsHref && <a href={designsHref} style={{ fontSize: 12 }}>查看 My Designs →</a>}
                       {saveState === "error" && <span style={{ color: "var(--red)", fontSize: 12 }}>儲存失敗</span>}
                     </>
                   );
