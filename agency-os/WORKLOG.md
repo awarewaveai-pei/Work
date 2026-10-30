@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-30（續20）next-admin 提前部署 7b7920f25；註冊禮實走到 0 元訂單，卡在 prod 付款通道未接（PAYMENTS_WOO_SECRET 未設）→ 註冊禮關回 0（操作者「你現在全部去處理好」）（Claude）
+
+- 部署：`/check-drift`（只落後 9 commit、compose 變數無漂移）→ `sg-deploy.sh next-admin` → `7b7920f25` healthy 15s、HTTP smoke 5/5 OK。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin（deployed 7b7920f2563f，smoke all endpoints OK） | exit=0 | ms=300000
+- WP：建私人 0 元虛擬商品 #40「註冊禮：50 點」（點數 50、方案 5 個 `*_credits`、產品 studio），`aware_wave_welcome_product_id=40`。
+- 實走：wp-cli 建測試會員 #2 → 改 email 為 `awarewaveai+giftwalk@gmail.com`（改 email 自動重寄驗證信）→ Gmail 收信 → 開連結 302 → `aware_wave_email_verified` 寫入、註冊禮訂單 #41（processing、0.00、`awarewave_welcome`）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp user meta get 2 aware_wave_welcome_order（41）＋ wc shop_order get 41（processing／0.00／awarewave_welcome） | exit=0 | ms=3000
+- **斷點**：訂單備註「付款事件開關已關或密鑰未設，wc:payment_complete:41:credit_pack 未送出」。prod：next-admin `PAYMENTS_PROVIDERS=local`、`PAYMENTS_WOO_SECRET`／`AUTH_WP_HANDOFF_SECRET` 不存在（printenv exit 1）；WP `aware_wave_payments_secret`／`aware_wave_handoff_secret` 空。＝ADR 017 4b-6 店面設定未做，所有 Woo 付款都一樣，非本改動造成。
+- 處置：`aware_wave_welcome_product_id` 改回 0（WC 註冊仍 no）。測試會員 #2、訂單 #41、`awarewaveai` 信箱的註冊禮領取列留作證據（該信箱之後不能再領）。
+- REVIEW_WAIVED: NA -- 部署與實測，無程式改動
+- BUGHUNT_WAIVED: NA -- 無程式改動
+- **待做**：接通付款通道（兩把共用密鑰：next-admin env 經 `safe-infra-patch.sh compose`＋`PAYMENTS_PROVIDERS=local,woo`；WP 設定頁填同值）→ 註冊禮設回 40 → 另一信箱重走到 app 帳號／50 點／5 產品權利列。WC 註冊另需防機器人（目前無驗證碼）。
+
 ## 2026-10-30（續18）第 11 項：aware-wave.com「我的帳號」→「我的工作區」；wp-handoff 認 `portal`；未驗證 email 擋在 WP 端（Fable）
 
 - **根因**：WP 註冊的會員沒有 app 密碼，「我的帳號」的「進入」一顆開一個產品，沒有路通到 portal launcher（持有／可買／作品）。

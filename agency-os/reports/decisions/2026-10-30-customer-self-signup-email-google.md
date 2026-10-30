@@ -14,6 +14,8 @@ Mode: 直接決策（非 /decide 面板）。**已定案（操作者 2026-10-30�
 
 註冊禮範圍（操作者「全部處理好」＋要管理頁）：開 5 個已上線且有點數功能的產品。0145 每產品一個 `<product>_credits` 加購方案（登記表 billing=credits 的全部功能）；0146 一筆點數包可帶 `plan_keys`（1–20，舊 `plan_key` 照收）；外掛點數包商品的方案欄可填多個（空白隔開）。design 只有訂閱功能、cs／collect／outreach 門未開，不在內。方案之後在 `/ops/plans` 管（0147）。
 
+**2026-10-30 13:45 實測**：next-admin 已提前部署 7b7920f25；註冊禮實走到 0 元訂單 #41，卡在 prod 付款通道未接（4b-6：兩邊密鑰都沒設、`PAYMENTS_PROVIDERS=local`），註冊禮已關回 0。下方 ②–④ 等通道接上再做。
+
 上線狀態（2026-10-30 13:20）：next-admin `420233a4c` 推 main（03:00 自動部署）；0145–0147 已套正式庫；aware-wave-store v1.3.0 已裝 aware-wave.com（註冊禮商品 ID 未設＝不送、Woo 註冊仍關）。
 **03:00 部署後才做**（外掛先於 0146 上線會靜默丟 `plan_keys`，README）：①確認 next-admin 跑 ≥`420233a4c`；②建 Woo 商品「註冊禮」：私人、0 元、虛擬、點數 50、方案 `content_credits social_credits studio_credits tarot_credits video_credits`、產品 studio，把 ID 填進「AwareWave 付款與會員 → 註冊禮商品」；③WooCommerce 開「我的帳號頁允許註冊」；④另一信箱實走 註冊→點驗證信→註冊禮訂單→「進入」studio（點數 50、5 產品權利列）。
 **Google**：裝 Nextend Social Login（免費）；Client ID／Secret 由操作者在 Google Cloud Console 建（redirect 網址照 Nextend 設定頁顯示的填）後填入；**同 email 既有會員的自動連結要關**：攻擊者可先用受害者 email 建 WP 帳號（知道密碼），受害者用 Google 登入被連進該帳號後驗證信箱 → 雙方共用帳號。
