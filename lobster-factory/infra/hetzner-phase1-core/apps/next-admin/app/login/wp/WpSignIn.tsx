@@ -14,11 +14,17 @@ export function readWpToken(hash: string): string | null {
   return token && params.get("type") === "recovery" ? token : null;
 }
 
+/** Where to land after the exchange (the portal launcher's 我的作品): a path on this door only. Anything else is "/". */
+export function readWpNext(hash: string): string {
+  const next = new URLSearchParams(hash.replace(/^#/, "")).get("next") ?? "";
+  return next.startsWith("/") && !next.startsWith("//") && /^\/[a-z0-9\-\/]*$/.test(next) ? next : "/";
+}
+
 type State =
   | { kind: "loading" }
-  | { kind: "ready"; token: string }
-  | { kind: "signedIn"; email: string }
-  | { kind: "alreadyIn"; email: string }
+  | { kind: "ready"; token: string; next: string }
+  | { kind: "signedIn"; email: string; next: string }
+  | { kind: "alreadyIn"; email: string; next: string }
   | { kind: "failed" }
   | { kind: "signedOut" };
 
@@ -36,20 +42,21 @@ export function WpSignIn() {
     if (started.current) return; // once: React StrictMode runs effects twice in dev
     started.current = true;
     const token = readWpToken(window.location.hash);
+    const next = readWpNext(window.location.hash);
     window.history.replaceState(null, "", window.location.pathname);
     createSupabaseBrowserClient().auth.getUser()
       .then(({ data }) => {
-        if (data.user) setState({ kind: "alreadyIn", email: data.user.email ?? "" });
-        else setState(token ? { kind: "ready", token } : { kind: "failed" });
+        if (data.user) setState({ kind: "alreadyIn", email: data.user.email ?? "", next });
+        else setState(token ? { kind: "ready", token, next } : { kind: "failed" });
       })
-      .catch(() => setState(token ? { kind: "ready", token } : { kind: "failed" }));
+      .catch(() => setState(token ? { kind: "ready", token, next } : { kind: "failed" }));
   }, []);
 
-  async function enter(token: string) {
+  async function enter(token: string, next: string) {
     setBusy(true);
     const { data, error } = await createSupabaseBrowserClient().auth.verifyOtp({ type: "recovery", token_hash: token });
     setBusy(false);
-    setState(error || !data.user ? { kind: "failed" } : { kind: "signedIn", email: data.user.email ?? "" });
+    setState(error || !data.user ? { kind: "failed" } : { kind: "signedIn", email: data.user.email ?? "", next });
   }
 
   async function notMe() {
@@ -64,16 +71,16 @@ export function WpSignIn() {
       {state.kind === "loading" ? <p style={{ margin: 0 }}>讀取中…</p> : null}
       {state.kind === "ready" ? (
         <>
-          <p style={{ margin: 0, fontWeight: 700 }}>從 aware-wave.com 進入</p>
-          <p style={note}>按下「進入」後，會用你在 aware-wave.com 的帳號登入這扇門。</p>
-          <button type="button" style={btn} disabled={busy} onClick={() => enter(state.token)}>{busy ? "登入中…" : "進入"}</button>
+          <p style={{ margin: 0, fontWeight: 700 }}>進入這扇門</p>
+          <p style={note}>按下「進入」後，會用你的 AwareWave 帳號登入這扇門。</p>
+          <button type="button" style={btn} disabled={busy} onClick={() => enter(state.token, state.next)}>{busy ? "登入中…" : "進入"}</button>
         </>
       ) : null}
       {state.kind === "signedIn" ? (
         <>
           <p style={{ margin: 0, fontWeight: 700 }}>已登入：{state.email}</p>
           <p style={note}>這不是你的帳號，請按「不是我的帳號」，不要繼續使用。</p>
-          <button type="button" style={btn} onClick={() => window.location.replace("/")}>繼續</button>
+          <button type="button" style={btn} onClick={() => window.location.replace(state.next)}>繼續</button>
           <button type="button" style={ghost} disabled={busy} onClick={notMe}>不是我的帳號</button>
         </>
       ) : null}
@@ -81,16 +88,16 @@ export function WpSignIn() {
         <>
           <p style={{ margin: 0, fontWeight: 700 }}>你已經登入：{state.email}</p>
           <p style={note}>要改用 aware-wave.com 的帳號，請先在這扇門登出，再回 aware-wave.com 按一次「進入」。</p>
-          <button type="button" style={btn} onClick={() => window.location.replace("/")}>用目前的帳號繼續</button>
+          <button type="button" style={btn} onClick={() => window.location.replace(state.next)}>用目前的帳號繼續</button>
         </>
       ) : null}
       {state.kind === "failed" ? (
         <>
           <p style={{ margin: 0, fontWeight: 700 }}>這個登入連結已經失效</p>
-          <p style={note}>連結只能用一次。請回到 aware-wave.com 的「我的帳號」再按一次「進入」，或改用 <a href="/login" style={{ color: "var(--accent-text)" }}>這扇門的登入頁</a>。</p>
+          <p style={note}>連結只能用一次。請回到你按「進入」的那一頁（aware-wave.com 的「我的帳號」或「我的產品」）再按一次，或改用 <a href="/login" style={{ color: "var(--accent-text)" }}>這扇門的登入頁</a>。</p>
         </>
       ) : null}
-      {state.kind === "signedOut" ? <p style={{ margin: 0 }}>已登出。請用自己的帳號從 aware-wave.com 或 <a href="/login" style={{ color: "var(--accent-text)" }}>這扇門的登入頁</a> 登入。</p> : null}
+      {state.kind === "signedOut" ? <p style={{ margin: 0 }}>已登出。請用自己的帳號從「我的帳號」、「我的產品」或 <a href="/login" style={{ color: "var(--accent-text)" }}>這扇門的登入頁</a> 登入。</p> : null}
     </div>
   );
 }

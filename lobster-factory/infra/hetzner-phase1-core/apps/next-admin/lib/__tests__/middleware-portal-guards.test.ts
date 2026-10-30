@@ -125,6 +125,12 @@ describe("blockedResponse — loop invariant (critic finding C-A)", () => {
     const res = blockedResponse(req("https://portal.aware-wave.com/portal/api/launcher"));
     expect(res.status).toBe(401);
   });
+
+  it("the launcher's door POST (/portal/api/door) signed out -> 401 JSON, not a login redirect", () => {
+    const res = blockedResponse(req("https://portal.aware-wave.com/portal/api/door"));
+    expect(res.status).toBe(401);
+    expect(res.headers.get("location")).toBeNull();
+  });
 });
 
 function hostReq(url: string, method = "GET"): NextRequest {

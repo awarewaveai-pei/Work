@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-30（續25）第 12 項：工作區→產品門一次性換證（操作者「做換證」；Fable 設計／Sonnet 實作／Codex＋critic 審）
+
+- **根因**：auth cookie host-only（`lib/supabase/auth-cookie-options.ts:4`），WP 註冊會員無 app 密碼，launcher「開啟」是 `<a>` 到門主機 → 撞 `/login`（WORKLOG 續18 剩餘①）。
+- **不變量**：鑄造一扇門的一次性登入連結只有一條路＝新 `lib/auth/door-link.ts` `mintDoorLink`（原 `awarewave-wp.ts:88-105` 原樣搬出；證明方式兩種：WP 站簽章＝wp-handoff、本人 portal session＝本項；之後檢查相同：組織的 client、`email_confirmed_at`、`generateLink` 解析同一 user）。
+- **改動**（卡 `handoffs/2026-10-16-customer-model-supervisor/cards/step-12.md`）：新 `app/portal/api/door/route.ts` POST（`requireClientOrg`＋`x-ops-user-id`→served＋`holdsProduct`→`next` 白名單＝`/`＋該產品 `door.nav`→303 門連結；拒絕 303 `/portal/launcher?door=<code>`）；`WpSignIn` `readWpNext`（同源路徑白名單）＋兩顆「繼續」落 `next`，文案中性化（critic n1）；launcher「開啟」「我的作品」改 POST form，`?door=` 一行訊息（`hasOwnProperty` 查表）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p .（0；`.next/types` 3 筆舊產物錯＝他 session 刪的頁，非本次）＋ npx vitest run lib/auth app/portal app/login lib/__tests__/middleware-portal-guards.test.ts（6 files／87 passed；`awarewave-wp.test.ts` 未改仍 14 綠） | exit=0 | ms=60000
+- 突變：① `door-link.ts` 拿掉 `link.user.id` 比對 → door-link＋awarewave-wp 測試紅；② route 拿掉 `holdsProduct` → 3 route 測試紅；③ `readWpNext` 拿掉 `//` 檢查 → 2 測試紅（卡片原例 `//evil.com` 被 regex 先擋，engineer 補 `//evil`）；各還原綠。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/4n -- Codex `agency-os/reports/oracle/2026-10-30-partialreview-fb0053c4.md` NO FINDINGS（files-reviewed 含四個關鍵檔）；獨立 critic（auth Deep）逐題推導：CSRF 由 `middleware.ts:305-324` `isCrossSiteWrite`（只放行 `sec-fetch-site: same-origin`）＋cookie SameSite=Lax 封死；header 偽造不可能（`:353-355` 先剝 `x-ops-*` 再注入）；staff → `not_a_client`；open redirect 無（host 只來自 `productHost`、`next` 雙層白名單）；303 帶 fragment 瀏覽器保留；token 一次性、GoTrue 每 user 每 type 只留一個。n1 文案已修；n2 session 過期的表單 POST 看到原始 JSON（既有行為）；n3 每按一次 `generateLink` 會蓋掉未用的忘記密碼信（與 wp-handoff 同語意）；n4 `.next/types` 舊產物。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=mintDoorLink\|readWpNext\|/portal/api/door | hits=本次新增處（無外部引用）
+- **上線**：推 main → 03:00 自動部署（或他 session 提前）。**rollback**：revert；無 DB／nginx。
+- **上線後操作者實看**：測試客戶帳號登入 portal → 塔羅「我的作品」→ 落 `tarot.aware-wave.com/works` 不經密碼。
+
 ## 2026-10-30（續23）prod 接通 aware-wave.com→app 付款通道（woo）；註冊禮正式環境全程實走通過（操作者「現在接上」）（Claude）
 
 - **根因**（續20 斷點）：next-admin `PAYMENTS_PROVIDERS=local`，`PAYMENTS_WOO_SECRET`／`AUTH_WP_HANDOFF_SECRET` 既不在 `.env` 也未在 compose 宣告；WP 兩個密鑰選項空。

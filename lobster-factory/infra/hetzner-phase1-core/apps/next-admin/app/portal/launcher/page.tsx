@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { requireClientOrg, PortalAccessError } from "@/lib/tenant-guard";
 import { PRODUCTS } from "@/lib/portal/products";
-import { productHost, servedNextAdminProducts } from "@/lib/portal/doors";
+import { servedNextAdminProducts } from "@/lib/portal/doors";
 import { shopUrl } from "@/lib/portal/hosts";
 import { doorHref } from "@/lib/portal/door-href";
 import { heldDoors } from "@/lib/portal/held-doors";
@@ -27,6 +27,23 @@ async function getHeld(organizationId: string): Promise<{ held: Set<string>; fai
   }
 }
 
+// ?door=<code> from POST /portal/api/door (app/portal/api/door/route.ts): why 開啟 / 我的作品 did not open the door
+const DOOR_NOTICE: Record<string, string> = {
+  product_not_held: "尚未開通這個產品",
+  email_unverified: "請先完成 email 確認再進入",
+};
+const DOOR_NOTICE_DEFAULT = "暫時無法進入，請稍後再試";
+
+function DoorForm({ productKey, next, label }: { productKey: string; next?: string; label: string }) {
+  return (
+    <form method="post" action="/portal/api/door">
+      <input type="hidden" name="product_key" value={productKey} />
+      {next && <input type="hidden" name="next" value={next} />}
+      <button className="btn-primary">{label}</button>
+    </form>
+  );
+}
+
 function AccessDenied() {
   return (
     <div style={{ maxWidth: 480, margin: "80px auto", padding: 24, textAlign: "center" }}>
@@ -39,7 +56,7 @@ function AccessDenied() {
   );
 }
 
-export default async function PortalLauncherPage() {
+export default async function PortalLauncherPage({ searchParams }: { searchParams: Promise<{ door?: string }> }) {
   let orgId: string;
   try {
     ({ orgId } = requireClientOrg({ headers: await headers() }));
@@ -48,12 +65,18 @@ export default async function PortalLauncherPage() {
     throw e;
   }
 
+  const { door } = await searchParams;
   const { held, failed } = await getHeld(orgId);
   const served = new Set(servedNextAdminProducts().map((p) => p.key));
 
   return (
     <div style={{ maxWidth: 720, margin: "60px auto", padding: 24 }}>
       <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>妳的產品</h1>
+      {door && (
+        <p style={{ fontSize: 13.5, color: "var(--badge-red-text)", marginBottom: 8 }}>
+          {Object.prototype.hasOwnProperty.call(DOOR_NOTICE, door) ? DOOR_NOTICE[door] : DOOR_NOTICE_DEFAULT}
+        </p>
+      )}
       {failed ? (
         <p style={{ fontSize: 13.5, color: "var(--badge-red-text)", marginBottom: 24 }}>
           讀取產品清單時發生錯誤，請重新整理頁面再試一次。
@@ -76,8 +99,8 @@ export default async function PortalLauncherPage() {
               <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12 }}>{failed ? "—" : label}</p>
               {isOpen ? (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <a href={`https://${productHost(product)}`} className="btn-primary">開啟</a>
-                  {worksPath && <a href={`https://${productHost(product)}${worksPath}`} className="btn-primary">我的作品</a>}
+                  <DoorForm productKey={product.key} label="開啟" />
+                  {worksPath && <DoorForm productKey={product.key} next={worksPath} label="我的作品" />}
                 </div>
               ) : served.has(product.key) && !failed ? (
                 <a href={shopUrl()} className="btn-primary">去了解</a>
