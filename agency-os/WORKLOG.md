@@ -1,4 +1,15 @@
 # Worklog
+## 2026-10-30（續30）Google 會員登入金鑰寫入 vault 與 Nextend；1.3.3 把按鈕放進 Woo 表單；待操作者後台驗證＋啟用（Claude）
+
+- 操作者建 Google Cloud 專案 `AwareWave-Login`：External、In production、範圍只有 openid／userinfo.email／userinfo.profile（機密／受限皆空）、Web client，redirect `https://aware-wave.com/wp-login.php?loginSocial=google`；值記於 `AWARE_WAVE_CREDENTIALS.md:1295-1300`。
+- 寫入（值不經對話）：vault `NEXTEND_GOOGLE_CLIENT_ID`（72）／`NEXTEND_GOOGLE_CLIENT_SECRET`（35）；Nextend `NextendSocialLogin::$providers['google']->settings->update()` 經 ssh stdin。
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp eval（Nextend google：client_id_len=72 secret_len=35 id_match=yes secret_match=yes tested=0 enabled=0 redirect=…loginSocial=google） | exit=0 | ms=3000
+- Nextend 免費版不放 WooCommerce 表單按鈕（`admin/templates/settings/woocommerce.php:4-8` 非 Pro 停用）→ aware-wave-store 1.3.3（0b381bcaf）`GoogleSignup::button` 在 `woocommerce_login_form_end`／`woocommerce_register_form_end` 印 `[nextend_social_login provider="google"]`（Google 未啟用前不輸出）。發版 CI 綠、rollout 1.3.2→1.3.3（備份 `…pre-awstore-1.3.3-20261030T070405Z.sql`）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=php phpunit-9.6.phar（31 OK）＋ rollout health '200 1.3.3' | exit=0 | ms=600000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 自審：shortcode_exists 防 Nextend 停用時印出原文
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=nextend_social_login | hits=1（GoogleSignup.php）
+- **事故 2**：讀 `AWARE_WAVE_CREDENTIALS.md:1285-1301` 時遮罩未含 `+`／`/`，ADR 017 permit signing key 離線備份（:1290-1291，kid k2026-10）片段露出於對話 → 建議操作者輪換簽章金鑰。之後金鑰檔一律程式抓值直寫目的地，不輸出任何內容行。
+- 待操作者：WP 後台 Nextend → Google →「Verify Settings」（以 Google 登入一次）→「Enable」。
 ## 2026-10-30（續29）Google 登入：Nextend 3.1.26 已裝、aware-wave-store 1.3.2 擋自動連結搶帳號；金鑰待操作者建（Claude）
 
 - Nextend Social Login 3.1.26 裝並啟用（無 Google 金鑰＝不顯示按鈕）。redirect URI（`NextendSocialLogin::$providers['google']->getRedirectUriForAuthFlow()`）＝`https://aware-wave.com/wp-login.php?loginSocial=google`。
