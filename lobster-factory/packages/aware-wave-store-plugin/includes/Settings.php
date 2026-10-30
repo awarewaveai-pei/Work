@@ -20,6 +20,8 @@ final class Settings {
 	const OPT_SITE_KEY_ID     = 'aware_wave_site_key_id';
 	const OPT_SITE_KEYPAIR    = 'aware_wave_site_keypair';
 	const OPT_HANDOFF_KEYPAIR = 'aware_wave_handoff_keypair';
+	// Sign-up gift (WelcomeGift): the WooCommerce product id given once to each verified member; 0 = no gift.
+	const OPT_WELCOME_PRODUCT = 'aware_wave_welcome_product_id';
 	const DEFAULT_TARGET      = 'https://app.aware-wave.com';
 
 	/** @var bool */
@@ -38,9 +40,11 @@ final class Settings {
 	public $siteKeypair;
 	/** @var string base64 sodium keypair for door handoffs (a different key on purpose) */
 	public $handoffKeypair;
+	/** @var int sign-up gift product id; 0 = none */
+	public $welcomeProductId;
 
 	/** @param list<string> $allowedGateways */
-	public function __construct( bool $enabled, string $target, string $paymentsSecret, string $handoffSecret, array $allowedGateways = array(), string $keyId = '', string $siteKeypair = '', string $handoffKeypair = '' ) {
+	public function __construct( bool $enabled, string $target, string $paymentsSecret, string $handoffSecret, array $allowedGateways = array(), string $keyId = '', string $siteKeypair = '', string $handoffKeypair = '', int $welcomeProductId = 0 ) {
 		$this->enabled         = $enabled;
 		$this->target          = rtrim( $target, '/' );
 		$this->paymentsSecret  = $paymentsSecret;
@@ -49,6 +53,7 @@ final class Settings {
 		$this->keyId           = $keyId;
 		$this->siteKeypair     = $siteKeypair;
 		$this->handoffKeypair  = $handoffKeypair;
+		$this->welcomeProductId = max( 0, $welcomeProductId );
 	}
 
 	public function isReseller(): bool {
@@ -95,7 +100,8 @@ final class Settings {
 			(array) get_option( self::OPT_GATEWAYS, array() ),
 			(string) get_option( self::OPT_SITE_KEY_ID, '' ),
 			(string) get_option( self::OPT_SITE_KEYPAIR, '' ),
-			(string) get_option( self::OPT_HANDOFF_KEYPAIR, '' )
+			(string) get_option( self::OPT_HANDOFF_KEYPAIR, '' ),
+			(int) get_option( self::OPT_WELCOME_PRODUCT, 0 )
 		);
 	}
 

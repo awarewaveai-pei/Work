@@ -17,7 +17,7 @@ import { CUSTOMER, gateFixture } from "@/lib/entitlements/__tests__/gate-fixture
 
 beforeEach(() => { m.rows = []; vi.spyOn(console, "warn").mockImplementation(() => {}); });
 const ACTOR = "ops:owner:u";
-/** studio.image billed in credits (a pack or studio_basic row) on a wallet of `balance`. */
+/** studio.image billed in credits (a credit-plan row, 0145 studio_credits) on a wallet of `balance`. */
 const creditsGrant = async (balance = 500) => { const f = gateFixture({ credits: true, balance }); return { f, grant: await can(CUSTOMER, "studio.image", ACTOR, f.deps) }; };
 const settle = () => new Promise((r) => setTimeout(r, 0));
 

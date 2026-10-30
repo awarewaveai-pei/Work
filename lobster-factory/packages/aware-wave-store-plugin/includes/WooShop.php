@@ -93,11 +93,11 @@ final class WooShop implements Shop {
 		}
 	}
 
-	/** @return list<array{product_id:int,qty:int}> */
+	/** @return list<array{product_id:int,qty:int,total:float}> */
 	private function lines( $order ): array {
 		$lines = array();
 		foreach ( $order->get_items( 'line_item' ) as $item ) {
-			$lines[] = array( 'product_id' => (int) $item->get_product_id(), 'qty' => (int) $item->get_quantity() );
+			$lines[] = array( 'product_id' => (int) $item->get_product_id(), 'qty' => (int) $item->get_quantity(), 'total' => (float) $item->get_total() );
 		}
 		return $lines;
 	}

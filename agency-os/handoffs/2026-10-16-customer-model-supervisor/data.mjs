@@ -113,7 +113,7 @@ export const WAYS = [
 
 // 現在真的在跑的（2026-10-23 查：prod docker exec printenv、psql 唯讀）
 export const NOW = [
-  { what: '客戶可自行登入', state: 'no', ev: '員工替客戶開帳號、寄設定密碼信；prod 已設 RESEND_API_KEY，但公開註冊由程式關閉（portal/api/signup/route.ts:9、:99），要先做確認信流程' },
+  { what: '客戶可自行登入', state: 'no', ev: '2026-10-30 定案：註冊只在 aware-wave.com（WordPress 會員＋信箱驗證／Google），驗證後送 50 點註冊禮並自動建 app 帳號；portal 註冊已刪（reports/decisions/2026-10-30-customer-self-signup-email-google.md）。實走一次註冊→進入後改 yes' },
   { what: '已有付費客戶', state: 'no', ev: 'Soulful 代操合約已登記（全產品，0118）；自助付費 0：plans、錢包帳本皆 0 筆，Woo 尚未販售' },
   { what: '代操用量按客戶計', state: 'no', ev: '程式已接（2026-10-23）：每道付費縫 grant.recordUse() 每個 grant 記一列 entitlement.usage（lib/ai/gateway.ts、collect、video.tts），閘擋「credits 功能走不到 recordUse」；2026-10-24 03:00 自動部署後生效。扣點仍 0（每功能單價待你定）；錢包入帳只經付款事件（0120 billing_apply_payment_event，4a，2026-10-23）' },
   { what: '買斷', state: 'no', ev: '授權檔與模組清單未建；provision/ 只有一鍵架站（provisionClient.ts）' },

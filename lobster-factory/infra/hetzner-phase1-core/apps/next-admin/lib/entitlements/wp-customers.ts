@@ -1,12 +1,15 @@
 // A WordPress member of one cash-register site -> its billing account (ADR 017 step 4b, cards/step-4.md 4b-3; per site
 // since 4c-2, cards/step-4-seller.md: one site, one account -- D5). The account records its seller (the site's). The first
-// payment of a member who has none creates it: organization, client account with a set-password mail, identity row.
+// payment of a member who has none creates it: organization, client account, identity row. On aware-wave.com (our own
+// site: its key id, never "any site AwareWave sells on" -- critic 2026-10-30 M3) the plugin's email verification is the proof, so the account is made verified and no mail
+// is sent; a reseller's site keeps the set-password mail (decision 2026-10-30-customer-self-signup-email-google I6).
+// A client staff invited earlier with the same email is linked, not refused, on aware-wave.com only (same decision §5).
 // Invariant: one member, one organization. The organization's slug is derived from the WordPress user id and is unique,
 // so a retry or two events racing for the same new member land on the same row instead of making a second one; the
 // identity row (0124, unique per member and per user) is written last and is the "done" mark. Every step is safe to
 // repeat, so a half-made account is finished by the sender's retry. GoTrue and Postgres cannot share a transaction.
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { findAuthUserByEmail, inviteClientAccount } from "@/lib/accounts/client-invite";
+import { findAuthUserByEmail, inviteClientAccount, verifiedClientAccount } from "@/lib/accounts/client-invite";
 import { servedNextAdminProducts } from "@/lib/portal/doors";
 import { AWARE_WAVE_KEY_ID, siteIdentityProvider, type SellerSite } from "@/lib/payments/sites";
 import { findBillingAccount, linkIdentity, type Identity } from "./identities";
@@ -62,7 +65,12 @@ export async function ensureWpOrganization(db: SupabaseClient, member: WpMember)
   return found;
 }
 
-export interface EmailOwner { userKind: string; orgId: unknown; orgMetadata?: Record<string, unknown> | null }
+/** userId / emailConfirmed: only when GoTrue holds the account (a profile-only owner has neither). orgRootCustomer: the
+ *  owner's organization can be billed (0120 billing_apply_payment_event takes only a root customer account). */
+export interface EmailOwner {
+  userKind: string; orgId: unknown; userId?: string; emailConfirmed?: boolean;
+  orgMetadata?: Record<string, unknown> | null; orgRootCustomer?: boolean;
+}
 
 /** Who already owns this email, by both places inviteClientAccount reads (GoTrue, then profiles -- a profile can outlive
  *  its auth user and still name another organization, client-invite.ts readyAccount): null = nobody. orgMetadata = the
@@ -73,16 +81,18 @@ export async function emailOwner(db: SupabaseClient, email: string): Promise<Ema
   let owner: EmailOwner | null = null;
   if (user) {
     const meta = (user.app_metadata ?? {}) as Record<string, unknown>;
-    owner = { userKind: String(meta.user_kind ?? "").toLowerCase(), orgId: meta.org_id };
+    owner = { userKind: String(meta.user_kind ?? "").toLowerCase(), orgId: meta.org_id, userId: user.id, emailConfirmed: Boolean(user.email_confirmed_at) };
   } else {
     const { data, error } = await db.from("profiles").select("default_organization_id").eq("email", email).maybeSingle();
     if (error) throw new Error(error.message);
     if (data) owner = { userKind: "client", orgId: (data as { default_organization_id: string | null }).default_organization_id };
   }
   if (owner?.userKind === "client" && typeof owner.orgId === "string") {
-    const org = await db.from("organizations").select("metadata").eq("id", owner.orgId).maybeSingle();
+    const org = await db.from("organizations").select("metadata, kind, parent_organization_id").eq("id", owner.orgId).maybeSingle();
     if (org.error) throw new Error(org.error.message);
-    owner.orgMetadata = (org.data as { metadata: Record<string, unknown> | null } | null)?.metadata ?? null;
+    const row = org.data as { metadata: Record<string, unknown> | null; kind: string; parent_organization_id: string | null } | null;
+    owner.orgMetadata = row?.metadata ?? null;
+    owner.orgRootCustomer = row?.kind === "customer" && row.parent_organization_id === null;
   }
   return owner;
 }
@@ -102,19 +112,50 @@ async function inviteProductKey(db: SupabaseClient, planKey: string | undefined)
   return doors[0].key;
 }
 
+/** The account of a client staff invited (or any client account no site member holds yet) that this member may take
+ *  over: same email, proven on both sides -- the site's verification now, so a never-opened invite is confirmed here.
+ *  null = not linkable (staff, a site-made organization, one that cannot be billed, or a user or organization some member
+ *  already holds: two members on one account would cancel each other's plans -- critic 2026-10-30 L1). */
+export async function adoptableClient(db: SupabaseClient, owner: EmailOwner): Promise<{ userId: string; organizationId: string } | null> {
+  if (owner.userKind !== "client" || !owner.userId || typeof owner.orgId !== "string") return null;
+  if (owner.orgMetadata?.wp_user_id !== undefined || owner.orgRootCustomer !== true) return null;
+  const held = await db.from("customer_identities").select("user_id").eq("user_id", owner.userId).limit(1);
+  if (held.error) throw new Error(held.error.message);
+  if ((held.data ?? []).length > 0) return null;
+  const orgHeld = await db.from("customer_identities").select("organization_id").eq("organization_id", owner.orgId).limit(1);
+  if (orgHeld.error) throw new Error(orgHeld.error.message);
+  if ((orgHeld.data ?? []).length > 0) return null;
+  if (!owner.emailConfirmed) {
+    const { error } = await db.auth.admin.updateUserById(owner.userId, { email_confirm: true });
+    if (error) throw new Error(`confirm_failed: ${error.message}`);
+  }
+  return { userId: owner.userId, organizationId: owner.orgId };
+}
+
 export interface WpCustomerDeps {
   find: typeof findBillingAccount;
   link: typeof linkIdentity;
   existingOrganization: typeof findWpOrganization;
   organization: typeof ensureWpOrganization;
   emailOwner: typeof emailOwner;
+  adoptable: typeof adoptableClient;
   invite: typeof inviteClientAccount;
+  verified: typeof verifiedClientAccount;
   productKey: (db: SupabaseClient, planKey: string | undefined) => Promise<string>;
 }
 const DEFAULT_DEPS: WpCustomerDeps = {
   find: findBillingAccount, link: linkIdentity, existingOrganization: findWpOrganization, organization: ensureWpOrganization,
-  emailOwner, invite: inviteClientAccount, productKey: inviteProductKey,
+  emailOwner, adoptable: adoptableClient, invite: inviteClientAccount, verified: verifiedClientAccount, productKey: inviteProductKey,
 };
+
+async function linkOrRefuse(db: SupabaseClient, deps: WpCustomerDeps, identity: Identity, userId: string, organizationId: string): Promise<void> {
+  try {
+    await deps.link(db, { ...identity, userId, organizationId });
+  } catch (error) {
+    if (error instanceof Error && error.message === "identity_conflict") throw new WpCustomerRefused("identity_conflict");
+    throw error;
+  }
+}
 
 /** The member's billing account id. `create` = this event is a payment (subscription_paid, credit_pack): only a payment
  *  may make an account; a refund, cancel or chargeback for an unknown member is a refusal (critic 2026-10-25 M).
@@ -127,19 +168,35 @@ export async function ensureWpCustomer(db: SupabaseClient, member: WpMember, pla
   if (known) return { organizationId: known.organizationId, created: false };
   if (!create) throw new WpCustomerRefused("unknown_member");
   if (member.emailVerified !== true) throw new WpCustomerRefused("email_unverified");
-  const productKey = await deps.productKey(db, planKey);
+  const trusted = member.site.keyId === AWARE_WAVE_KEY_ID;
+  // the door a set-password mail points at; aware-wave.com sends none (the plan was already checked: woo-billing maySell)
+  const productKey = trusted ? "" : await deps.productKey(db, planKey);
 
   // The email must be free, or already this member's half-made account, before anything is written: staff's or another
   // organization's email would otherwise leave an orphan organization behind (critic 2026-10-25 M).
   const earlier = await deps.existingOrganization(db, member.site, member.wpUserId);
   const owner = await deps.emailOwner(db, member.email);
   if (owner && !(owner.userKind === "client" && earlier && owner.orgId === earlier.id)) {
+    const adopted = trusted && !earlier ? await deps.adoptable(db, owner) : null;
+    if (adopted) {
+      await linkOrRefuse(db, deps, identity, adopted.userId, adopted.organizationId);
+      return { organizationId: adopted.organizationId, created: false };
+    }
     // D5: one site, one account. The same person at another site is refused, never merged (an email can change).
     const otherSite = owner.userKind === "client" && owner.orgMetadata?.wp_user_id !== undefined && !orgSiteMatches(owner.orgMetadata ?? null, member.site);
     throw new WpCustomerRefused(otherSite ? "email_taken_elsewhere" : "email_taken");
   }
 
   const org = earlier ?? await deps.organization(db, member);
+  if (trusted) {
+    // No mail: a failure is retried by the sender (every step is idempotent), never linked half-confirmed -- a linked
+    // unconfirmed account would answer the member's 「進入」 with "check your mail" for a mail that never comes.
+    const made = await deps.verified(db, { orgId: org.id, email: member.email });
+    if (made.ok === false && (made.status === 409 || made.status === 400)) throw new WpCustomerRefused(made.error);
+    if (made.ok === false) throw new Error(`wp customer account failed: ${made.error}`);
+    await linkOrRefuse(db, deps, identity, made.userId, org.id);
+    return { organizationId: org.id, created: true };
+  }
   const invited = await deps.invite(db, { orgId: org.id, orgName: org.name, email: member.email, productKey });
   // A refusal (409/400) is final even when it names a user (client-invite.ts returns one when generateLink resolved
   // someone else): that user is not this member's. A failed mail after the account exists still links it: the payment
@@ -147,11 +204,6 @@ export async function ensureWpCustomer(db: SupabaseClient, member: WpMember, pla
   if (invited.ok === false && (invited.status === 409 || invited.status === 400)) throw new WpCustomerRefused(invited.error);
   if (invited.ok === false && !invited.userId) throw new Error(`wp customer invite failed: ${invited.error}`);
   if (invited.ok === false) console.warn(`[wp-customer] wp_user_id=${member.wpUserId} account made, mail failed: ${invited.error}`);
-  try {
-    await deps.link(db, { ...identity, userId: invited.userId as string, organizationId: org.id });
-  } catch (error) {
-    if (error instanceof Error && error.message === "identity_conflict") throw new WpCustomerRefused("identity_conflict");
-    throw error;
-  }
+  await linkOrRefuse(db, deps, identity, invited.userId as string, org.id);
   return { organizationId: org.id, created: true };
 }

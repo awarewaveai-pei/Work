@@ -19,7 +19,8 @@ import { middleware } from "../../middleware";
 import { decodeToolsHeader, staffDenial, staffMayUseTool } from "../staff-access";
 
 let n = 0;
-function as(meta: Record<string, unknown>) { user.current = { id: `u-${++n}`, app_metadata: meta }; return `sb-test-auth-token=${n}`; }
+// staff unless the case names a kind; `bare` = exactly this app_metadata (the no-kind case)
+function as(meta: Record<string, unknown>, bare = false) { user.current = { id: `u-${++n}`, app_metadata: bare ? meta : { user_kind: "staff", ...meta } }; return `sb-test-auth-token=${n}`; }
 const call = (cookie: string, path: string, headers: Record<string, string> = {}) =>
   middleware(new NextRequest(`https://app.aware-wave.com${path}`, { headers: { host: "app.aware-wave.com", cookie, ...headers } }));
 const passed = (res: Response) => res.headers.get("x-middleware-next") === "1";
@@ -103,6 +104,19 @@ describe("staff tool gate: enforce", () => {
     const res = await call(c, "/ops/clients");
     expect(new URL(res.headers.get("location")!).pathname).toBe("/launcher");
     expect(warned("deny")).toBe(false);
+  });
+});
+
+describe("an account with no user kind (decision 2026-10-30 I7)", () => {
+  it("reaches nothing: pages and APIs answer 403, never a staff header, even as ops_role owner", async () => {
+    for (const meta of [{ ops_role: "owner" }, { ops_role: "owner", user_kind: "admin" }, {}]) {
+      for (const p of ["/", "/ops/clients", "/api/ops/clients"]) {
+        const res = await call(as(meta, true), p);
+        expect(passed(res), `${JSON.stringify(meta)} ${p}`).toBe(false);
+        expect(res.status).toBe(403);
+        expect(res.headers.get("x-middleware-request-x-ops-user-kind")).toBeNull();
+      }
+    }
   });
 });
 

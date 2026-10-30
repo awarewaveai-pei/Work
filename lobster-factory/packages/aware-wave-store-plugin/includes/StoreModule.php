@@ -105,6 +105,8 @@ final class StoreModule {
 		}
 
 		( new EmailVerification() )->register();
+		( new GoogleSignup() )->register();
+		( new WelcomeGift( $settings->welcomeProductId, $shop ) )->register();
 		( new CheckoutGate( $shop, $settings ) )->register();
 		( new MyAccountDoors( $settings, $shop, $http ) )->register();
 	}

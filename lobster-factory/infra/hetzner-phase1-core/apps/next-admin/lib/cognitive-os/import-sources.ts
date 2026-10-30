@@ -177,8 +177,8 @@ async function storeProjectId(organizationId: string, projectId: string): Promis
  * Identity for "this organization's Cognitive OS Project" is ALWAYS `organizationId` -- never
  * `preferredName` alone. Critic finding, 2026-09-18: an earlier version of this fix matched on the
  * human-readable organization name to solve "Knowledge Import: <uuid> tells me nothing" -- but
- * `organizations.name` has no uniqueness constraint and is settable by the public product-signup
- * form (app/portal/api/signup/route.ts) with only a length check, so two organizations that happen
+ * `organizations.name` has no uniqueness constraint and is set by customers (their WordPress display
+ * name, lib/entitlements/wp-customers.ts) with only a length check, so two organizations that happen
  * to share a display name would have silently merged into the same Project (every subsequent import
  * for either one landing in the other's knowledge base, permanently, with no error). Resolution
  * order, every step keyed on organizationId, never on what a human named anything:

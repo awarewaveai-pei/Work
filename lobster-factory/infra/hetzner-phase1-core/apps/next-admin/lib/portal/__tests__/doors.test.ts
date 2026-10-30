@@ -49,7 +49,7 @@ describe("routeOnProductDoor", () => {
     ["/smartlinkx", { action: "rewrite", pathname: "/social/smartlinkx" }],
     ["/api/ops/clients", { action: "not_found" }],
     ["/api/content/syndicate", { action: "not_found" }],
-    ["/portal/api/signup", { action: "not_found" }],
+    ["/portal/api/anything", { action: "not_found" }],
     ["/api/tools/designs", { action: "pass" }],
     ["/api/tools/designsx", { action: "not_found" }],
   ])("%s -> %j", (path, expected) => {

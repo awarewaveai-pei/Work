@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { PortalLoginForm } from "./PortalLoginForm";
+import { baseDomain } from "@/lib/portal/hosts";
 
 // Reached as portal.aware-wave.com/login, rewritten by nginx to /portal/login (idempotent
 // rewrite — see PORTAL_AWARE_WAVE_DESIGN_PROPOSAL.md §7). Session-gate-exempt via
@@ -23,7 +24,7 @@ export default function PortalLoginPage() {
       }}
     >
       <Suspense fallback={null}>
-        <PortalLoginForm />
+        <PortalLoginForm signupUrl={`https://${baseDomain()}/my-account/`} />
       </Suspense>
     </div>
   );

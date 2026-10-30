@@ -13,7 +13,7 @@ import { ingestIncident } from "@/lib/ops-inbox/ingest";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { ensureWpCustomer, WpCustomerRefused } from "@/lib/entitlements/wp-customers";
 import { PAYMENT_SIGNATURE_HEADER, PAYMENT_SITE_HEADER } from "./hmac";
-import { PaymentParseError, toPaymentEvent, type PaymentProvider, type ReceivedPayment, type VerifiedSender } from "./provider";
+import { eventPlanKeys, PaymentParseError, toPaymentEvent, type PaymentProvider, type ReceivedPayment, type VerifiedSender } from "./provider";
 import { AWARE_WAVE_KEY_ID, findSiteByKeyId, siteMaySellPlan, siteNamespace, verifySiteSignature, type SellerSite } from "./sites";
 
 /** A signed event we refuse for good: the shop has usually taken the money, and the sender will not retry, so the
@@ -106,13 +106,16 @@ async function parseWoo(rawBody: string, site: SellerSite, deps: WooBillingDeps)
   toPaymentEvent({ ...rest, organization_id: "00000000-0000-4000-8000-000000000000" });
   const db = deps.db();
   if (!db) throw new Error("payments_db_unavailable");
-  const planKey = typeof rest.plan_key === "string" ? rest.plan_key : undefined;
+  const plans = eventPlanKeys(rest);
+  const planKey = plans[0];   // the door a set-password mail names (wp-customers.ts inviteProductKey)
   const isPayment = PAYMENT_KINDS.has(String(rest.kind));
-  // Taking money needs the site's right to sell this plan, before any account is made (a refund or cancel never does:
-  // money already taken must still be returnable after a licence ends).
+  // Taking money needs the site's right to sell every plan it opens, before any account is made (a refund or cancel never
+  // does: money already taken must still be returnable after a licence ends). A bare pack is asked once with no plan.
   if (isPayment) {
-    const refusal = await deps.maySell(db, site, planKey);
-    if (refusal) throw new PaymentParseError(refusal);
+    for (const plan of plans.length ? plans : [undefined]) {
+      const refusal = await deps.maySell(db, site, plan);
+      if (refusal) throw new PaymentParseError(refusal);
+    }
   }
   let organizationId: string;
   try {

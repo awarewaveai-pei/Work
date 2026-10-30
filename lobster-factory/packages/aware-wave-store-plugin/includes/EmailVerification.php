@@ -135,6 +135,7 @@ final class EmailVerification {
 		if ( $res['ok'] ) {
 			update_user_meta( $uid, self::META_VERIFIED, self::normalizeEmail( (string) $user->user_email ) );
 			delete_user_meta( $uid, self::META_PENDING );
+			do_action( WelcomeGift::VERIFIED, $uid ); // the sign-up gift, if one is set (WelcomeGift)
 			$this->notice( '信箱已確認，可以購買了。', 'success' );
 		} else {
 			$this->notice( '這個確認連結已失效（過期、已用過，或信箱已更改）。請登入後在「我的帳號」重寄確認信。', 'error' );

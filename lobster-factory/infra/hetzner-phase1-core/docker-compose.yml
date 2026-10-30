@@ -529,17 +529,9 @@ services:
       # Cloudflare Turnstile: sitekey baked at build time (NEXT_PUBLIC_*); secret verified server-side
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-}
       TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
-      # portal.aware-wave.com signup kill switch — independent of TURNSTILE_SECRET_KEY (critic
-      # finding C3, 2026-08-29): must be "true" in every environment including production, or
-      # /portal/api/signup stays 503. Do NOT reuse TURNSTILE_SECRET_KEY as this route's gate —
-      # that secret is shared with /intake and turning that form on must not silently open portal
-      # signup too.
+      # Read by nothing since 2026-10-30: portal signup was deleted (customers register on aware-wave.com). Kept so
+      # this file still matches the host's compose (/check-drift); drop both from both with the next compose patch.
       PORTAL_SIGNUP_ENABLED: ${PORTAL_SIGNUP_ENABLED:-}
-      # Salts the per-caller rate-limit hash (app/portal/api/signup/route.ts rateLimitKey()) so
-      # it isn't reversible via an IPv4 rainbow table. Critic finding (2026-08-29, minor): this
-      # var was never wired here, so the route silently fell back to the source-code default
-      # constant in every deploy -- generate a real random value and set it once via the vault,
-      # never reuse the fallback in production.
       PORTAL_SIGNUP_RATE_LIMIT_SALT: ${PORTAL_SIGNUP_RATE_LIMIT_SALT:-}
       # Cognitive OS bridge (lib/cognitive-os/) -- next-admin's cs_knowledge_sources -> Cognitive OS
       # Project Source Import, over the shared lobster-net docker network (never a public domain).

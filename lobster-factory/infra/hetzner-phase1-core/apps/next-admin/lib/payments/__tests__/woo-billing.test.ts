@@ -11,6 +11,7 @@ import { wooBillingProvider } from "../woo-billing";
 
 const SECRET = "woo-payments-test-secret-0123456789abcd";
 const ORG = "00000000-0000-4000-8000-0000000000d1";
+const INVITED_ORG = "00000000-0000-4000-8000-0000000000e1";
 const DB = {} as SupabaseClient;
 const AWC: SellerSite = { id: "site-awc", host: "aware-wave.com", keyId: "aware-wave-com", sellerOrganizationId: "org-internal", sellerKind: "internal",
   verifyAlg: "hmac-env", publicKey: null, envVar: "PAYMENTS_WOO_SECRET", handoffPublicKey: null, handoffEnvVar: "AUTH_WP_HANDOFF_SECRET", status: "active" };
@@ -24,7 +25,8 @@ const body = (o: object = {}) => JSON.stringify({ event_id: "wc:woocommerce_paym
 
 /** ensureWpCustomer with every outside step recorded in call order; `state` is what a retry finds. */
 function customerDeps(state: { identity?: string; orgCalls?: number; orgMade?: boolean; inviteUserId?: string | null; inviteOk?: boolean; inviteStatus?: number; inviteError?: string;
-  owner?: { userKind: string; orgId: unknown } | null } = {}) {
+  owner?: { userKind: string; orgId: unknown } | null; verifiedOk?: boolean; verifiedStatus?: number; verifiedError?: string;
+  adopt?: { userId: string; organizationId: string } | null } = {}) {
   const calls: string[] = [];
   const deps: WpCustomerDeps = {
     find: vi.fn(async () => { calls.push("find"); return state.identity ? { organizationId: state.identity, userId: "u1" } : null; }),
@@ -38,6 +40,13 @@ function customerDeps(state: { identity?: string; orgCalls?: number; orgMade?: b
       if (!state.owner) state.owner = { userKind: "client", orgId: ORG }; // the account now exists for this org
       return { ok: true as const, userId: state.inviteUserId ?? "u1", kind: "invite" as const, created: true };
     }),
+    verified: vi.fn(async () => {
+      calls.push("verified");
+      if (state.verifiedOk === false) return { ok: false as const, status: (state.verifiedStatus ?? 502) as 502, error: state.verifiedError ?? "confirm_failed", userId: "u1" };
+      if (!state.owner) state.owner = { userKind: "client", orgId: ORG };
+      return { ok: true as const, userId: "u1", created: true };
+    }),
+    adoptable: vi.fn(async () => state.adopt ?? null),
     link: vi.fn(async (_db, input) => { calls.push("link"); state.identity = input.organizationId; return { organizationId: input.organizationId, userId: input.userId, created: true }; }),
   };
   return { deps, calls, state };
@@ -135,6 +144,14 @@ describe("woo payment provider (ADR 017 step 4b-3; sites 4c-2)", () => {
       .resolves.toMatchObject({ siteId: "site-shop" });
   });
 
+  it("a pack opening several products needs the site's right to sell each of them", async () => {
+    const asked: Array<string | undefined> = [];
+    const { deps } = customerDeps({ identity: ORG });
+    const p = provider(deps, (_site, plan) => { asked.push(plan); return plan === "video_credits" ? "seller_not_licensed" : null; });
+    await expect(p.parse(body({ plan_keys: ["studio_credits", "video_credits"] }), { site: SHOP })).rejects.toMatchObject({ code: "seller_not_licensed" });
+    expect(asked).toEqual(["studio_credits", "video_credits"]);
+  });
+
   it("a known wp member resolves to its billing account", async () => {
     const { deps, calls } = customerDeps({ identity: ORG });
     await expect(provider(deps).parse(body(), AT_AWC)).resolves.toEqual({
@@ -145,13 +162,57 @@ describe("woo payment provider (ADR 017 step 4b-3; sites 4c-2)", () => {
     expect(calls).toEqual(["find"]);
   });
 
-  it("a first-time payer gets an organization, an invite and an identity in that order", async () => {
+  it("a reseller's first-time payer gets an organization, an invite (the mailed proof) and an identity in that order", async () => {
     const { deps, calls } = customerDeps();
-    const got = await provider(deps).parse(body({ kind: "subscription_paid", plan_key: "social_pro", period_end: "2026-11-25T00:00:00Z", units: undefined, order_ref: undefined }), AT_AWC);
+    const got = await provider(deps).parse(body({ kind: "subscription_paid", plan_key: "social_pro", period_end: "2026-11-25T00:00:00Z", units: undefined, order_ref: undefined }), { site: SHOP });
     expect(got.event).toEqual({ kind: "subscription_paid", organization_id: ORG, plan_key: "social_pro", period_end: "2026-11-25T00:00:00Z" });
     expect(calls).toEqual(["find", "organization", "invite", "link"]);
     expect(deps.invite).toHaveBeenCalledWith(DB, { orgId: ORG, orgName: "A B", email: "a@b.tw", productKey: "social" });
+    expect(deps.verified).not.toHaveBeenCalled();
+    expect(deps.link).toHaveBeenCalledWith(DB, { provider: "customer-wp", siteId: "site-shop", externalId: "57", userId: "u1", organizationId: ORG });
+  });
+
+  it("aware-wave.com's first-time member gets a verified account and no mail: our plugin's verification is the proof", async () => {
+    const { deps, calls } = customerDeps();
+    const got = await provider(deps).parse(body(), AT_AWC);
+    expect(got.event).toMatchObject({ kind: "credit_pack", organization_id: ORG });
+    expect(calls).toEqual(["find", "organization", "verified", "link"]);
+    expect(deps.verified).toHaveBeenCalledWith(DB, { orgId: ORG, email: "a@b.tw" });
+    expect(deps.invite).not.toHaveBeenCalled();
+    expect(deps.productKey).not.toHaveBeenCalled();
     expect(deps.link).toHaveBeenCalledWith(DB, { provider: "awarewave-wp", siteId: "site-awc", externalId: "57", userId: "u1", organizationId: ORG });
+  });
+
+  it("only aware-wave.com itself is trusted: another site AwareWave sells on still mails the proof (critic 2026-10-30 M3)", async () => {
+    const staging: SellerSite = { ...SHOP, id: "site-stg", keyId: "aw-staging", sellerOrganizationId: "org-internal", sellerKind: "internal" };
+    const { deps, calls } = customerDeps({ owner: null });
+    await provider(deps).parse(body(), { site: staging });
+    expect(calls).toEqual(["find", "organization", "invite", "link"]);
+    expect(deps.verified).not.toHaveBeenCalled();
+    const invited = customerDeps({ owner: { userKind: "client", orgId: INVITED_ORG }, adopt: { userId: "u-invited", organizationId: INVITED_ORG } });
+    await expect(provider(invited.deps).parse(body(), { site: staging })).rejects.toMatchObject({ code: "email_taken" });
+    expect(invited.deps.adoptable).not.toHaveBeenCalled();
+  });
+
+  it("aware-wave.com: an account made but not confirmed is retried, never linked; a taken email is a final refusal", async () => {
+    const down = customerDeps({ verifiedOk: false, verifiedStatus: 502, verifiedError: "confirm_failed" });
+    await expect(provider(down.deps).parse(body(), AT_AWC)).rejects.not.toBeInstanceOf(PaymentParseError);
+    expect(down.calls).not.toContain("link");
+    const taken = customerDeps({ verifiedOk: false, verifiedStatus: 409, verifiedError: "email_taken" });
+    await expect(provider(taken.deps).parse(body(), AT_AWC)).rejects.toMatchObject({ code: "email_taken" });
+    expect(taken.calls).not.toContain("link");
+  });
+
+  it("aware-wave.com: a client staff invited with the same email is linked to that account, not refused (decision 2026-10-30 §5)", async () => {
+    const owner = { userKind: "client", orgId: INVITED_ORG };
+    const { deps, calls } = customerDeps({ owner, adopt: { userId: "u-invited", organizationId: INVITED_ORG } });
+    await expect(provider(deps).parse(body(), AT_AWC)).resolves.toMatchObject({ event: { organization_id: INVITED_ORG } });
+    expect(calls).toEqual(["find", "link"]);
+    expect(deps.link).toHaveBeenCalledWith(DB, { provider: "awarewave-wp", siteId: "site-awc", externalId: "57", userId: "u-invited", organizationId: INVITED_ORG });
+    // a reseller's site never takes over an account: it is not ours to trust
+    const shop = customerDeps({ owner, adopt: { userId: "u-invited", organizationId: INVITED_ORG } });
+    await expect(provider(shop.deps).parse(body(), { site: SHOP })).rejects.toMatchObject({ code: "customer_refused", detail: "email_taken" });
+    expect(shop.deps.adoptable).not.toHaveBeenCalled();
   });
 
   it("a retry after a half-made account does not create a second organization", async () => {
@@ -230,7 +291,7 @@ describe("woo payment provider (ADR 017 step 4b-3; sites 4c-2)", () => {
   it("an unknown plan is refused before any account is made", async () => {
     const { deps, calls } = customerDeps();
     (deps.productKey as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new WpCustomerRefused("unknown_plan"));
-    await expect(provider(deps).parse(body({ kind: "subscription_paid", plan_key: "gone", period_end: "2026-11-25T00:00:00Z", units: undefined, order_ref: undefined }), AT_AWC))
+    await expect(provider(deps).parse(body({ kind: "subscription_paid", plan_key: "gone", period_end: "2026-11-25T00:00:00Z", units: undefined, order_ref: undefined }), { site: SHOP }))
       .rejects.toMatchObject({ code: "unknown_plan" });
     expect(calls).toEqual(["find"]);
   });
@@ -238,15 +299,15 @@ describe("woo payment provider (ADR 017 step 4b-3; sites 4c-2)", () => {
   it("an invite refused after the email check is a final refusal; a failed mail still links the account", async () => {
     for (const inviteUserId of [null, "someone-else"]) {
       const taken = customerDeps({ inviteOk: false, inviteStatus: 409, inviteError: "email_taken", inviteUserId });
-      await expect(provider(taken.deps).parse(body(), AT_AWC)).rejects.toMatchObject({ code: "email_taken" });
+      await expect(provider(taken.deps).parse(body(), { site: SHOP })).rejects.toMatchObject({ code: "customer_refused", detail: "email_taken" });
       expect(taken.calls).not.toContain("link");
     }
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const noMail = customerDeps({ inviteOk: false, inviteStatus: 503, inviteError: "mail_not_configured", inviteUserId: "u9" });
-    await expect(provider(noMail.deps).parse(body(), AT_AWC)).resolves.toMatchObject({ event: { organization_id: ORG } });
+    await expect(provider(noMail.deps).parse(body(), { site: SHOP })).resolves.toMatchObject({ event: { organization_id: ORG } });
     expect(noMail.deps.link).toHaveBeenCalledWith(DB, expect.objectContaining({ userId: "u9" }));
     const down = customerDeps({ inviteOk: false, inviteStatus: 503, inviteError: "auth_lookup_failed", inviteUserId: null });
-    await expect(provider(down.deps).parse(body(), AT_AWC)).rejects.not.toBeInstanceOf(PaymentParseError);
+    await expect(provider(down.deps).parse(body(), { site: SHOP })).rejects.not.toBeInstanceOf(PaymentParseError);
   });
 
   it("an identity conflict is a final refusal", async () => {

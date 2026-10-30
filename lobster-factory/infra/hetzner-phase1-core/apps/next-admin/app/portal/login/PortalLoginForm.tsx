@@ -18,7 +18,8 @@ function safeNext(raw: string | null): string {
   return "/launcher";
 }
 
-export function PortalLoginForm() {
+/** signupUrl: where an account is made -- aware-wave.com's member page (WordPress), the only registration door. */
+export function PortalLoginForm({ signupUrl }: { signupUrl: string }) {
   const searchParams = useSearchParams();
   const next = safeNext(searchParams.get("next"));
 
@@ -99,7 +100,7 @@ export function PortalLoginForm() {
       </button>
 
       <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 16, textAlign: "center" }}>
-        還沒有帳號？<a href="/signup">建立帳號</a>
+        還沒有帳號？<a href={signupUrl}>到 aware-wave.com 註冊</a>
       </p>
     </form>
   );

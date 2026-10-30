@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { describe, expect, it } from "vitest";
-import { ensureWpOrganization, findWpOrganization, wpOrgSlug } from "../wp-customers";
+import { describe, expect, it, vi } from "vitest";
+import { adoptableClient, ensureWpOrganization, findWpOrganization, wpOrgSlug, type EmailOwner } from "../wp-customers";
 
 const AWC = { id: "site-awc", keyId: "aware-wave-com", sellerOrganizationId: "org-internal" };
 const SHOP = { id: "site-shop", keyId: "shop-b", sellerOrganizationId: "org-reseller" };
@@ -67,5 +67,48 @@ describe("a WordPress member's organization", () => {
   it("an outage is thrown, not read as taken", async () => {
     const { db } = fakeDb({ data: null, error: { code: "08006", message: "connection failure" } });
     await expect(ensureWpOrganization(db, MEMBER)).rejects.toThrow("connection failure");
+  });
+});
+
+describe("an account a member may take over (decision 2026-10-30 §5)", () => {
+  /** held = identity rows on this user; orgHeld = rows on its organization (another member already linked there). */
+  function idDb(held: unknown[], confirmErr: unknown = null, orgHeld: unknown[] = []) {
+    const confirm = vi.fn(async () => ({ data: {}, error: confirmErr }));
+    const db = {
+      from: (table: string) => {
+        if (table !== "customer_identities") throw new Error(`unexpected table ${table}`);
+        return { select: () => ({ eq: (col: string) => ({ limit: async () => ({ data: col === "user_id" ? held : orgHeld, error: null }) }) }) };
+      },
+      auth: { admin: { updateUserById: confirm } },
+    } as unknown as SupabaseClient;
+    return { db, confirm };
+  }
+  const INVITED: EmailOwner = { userKind: "client", orgId: "org-inv", userId: "u-inv", emailConfirmed: true, orgMetadata: { source: "ops" }, orgRootCustomer: true };
+
+  it("a client staff invited, billable and held by no member: linked as is", async () => {
+    const { db, confirm } = idDb([]);
+    await expect(adoptableClient(db, INVITED)).resolves.toEqual({ userId: "u-inv", organizationId: "org-inv" });
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it("an invite never opened is confirmed by the site's verification", async () => {
+    const { db, confirm } = idDb([]);
+    await expect(adoptableClient(db, { ...INVITED, emailConfirmed: false })).resolves.toMatchObject({ userId: "u-inv" });
+    expect(confirm).toHaveBeenCalledWith("u-inv", { email_confirm: true });
+    await expect(adoptableClient(idDb([], { message: "down" }).db, { ...INVITED, emailConfirmed: false })).rejects.toThrow("confirm_failed");
+  });
+
+  it("never: staff, a profile-only owner, a site-made or unbillable organization, or a user some member holds", async () => {
+    const { db, confirm } = idDb([]);
+    for (const owner of [
+      { ...INVITED, userKind: "staff" },
+      { ...INVITED, userId: undefined },
+      { ...INVITED, orgMetadata: { source: "awarewave-wp", wp_user_id: 9 } },
+      { ...INVITED, orgRootCustomer: false },
+    ]) await expect(adoptableClient(db, owner), JSON.stringify(owner)).resolves.toBeNull();
+    await expect(adoptableClient(idDb([{ user_id: "u-inv" }]).db, INVITED)).resolves.toBeNull();
+    // a colleague in the same organization already linked a member: two members on one account is refused (L1)
+    await expect(adoptableClient(idDb([], null, [{ organization_id: "org-inv" }]).db, INVITED)).resolves.toBeNull();
+    expect(confirm).not.toHaveBeenCalled();
   });
 });

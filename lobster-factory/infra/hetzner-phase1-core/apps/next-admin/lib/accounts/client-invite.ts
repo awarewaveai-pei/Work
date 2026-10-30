@@ -5,7 +5,7 @@
 // Link: our own page with the hashed token in the URL fragment (never sent to a server, so not in access logs or
 // Referer), verified only on a button press so mail scanners that open links do not use it up.
 // Every link is GoTrue type "recovery", also for a first invite: generateLink("invite"/"magiclink") CREATES a missing
-// user without app_metadata.user_kind, which middleware.ts reads as staff; "recovery" answers 404 instead, and its
+// user without app_metadata.user_kind (middleware.ts refuses such an account since 2026-10-30, it used to read it as staff); "recovery" answers 404 instead, and its
 // verify confirms an unconfirmed email (supabase/auth verify.go recoverVerify), which is the proof 0103 needs.
 // Self-repair: an account an earlier press left half-made (auth user without profile, or a profile whose auth user is
 // gone) is finished or cleared by pressing again -- nobody has to open Supabase. Invariant for every repair step: it
@@ -228,6 +228,25 @@ export async function inviteClientAccount(
   // the account stays: pressing again sends a fresh link to the same account
   if ("error" in sent) return { ok: false, status: sent.error === "mail_not_configured" ? 503 : 502, error: sent.error, userId, created };
   return { ok: true, userId, kind, created };
+}
+
+/**
+ * A client account whose email the caller already proved: aware-wave.com's own WordPress verification (the
+ * aware-wave-store plugin, ours) -- decision 2026-10-30-customer-self-signup-email-google I6. Made or repaired exactly as
+ * an invite, then marked verified, and no mail: its owner signs in only through the site's 「進入」 (wp-handoff). A
+ * reseller's site is not ours to trust and keeps the mailed link (inviteClientAccount).
+ */
+export async function verifiedClientAccount(
+  sb: SupabaseClient,
+  args: { orgId: string; email: string },
+): Promise<{ ok: true; userId: string; created: boolean } | Fail> {
+  const ready = await readyAccount(sb, args.orgId, args.email);
+  if ("ok" in ready) return ready;
+  if (!ready.verified) {
+    const { error } = await sb.auth.admin.updateUserById(ready.userId, { email_confirm: true });
+    if (error) return { ok: false, status: 502, error: "confirm_failed", userId: ready.userId, created: ready.created };
+  }
+  return { ok: true, userId: ready.userId, created: ready.created };
 }
 
 export type DeleteOutcome = { ok: true; email: string } | { ok: false; status: 404 | 409 | 502 | 503; error: string };

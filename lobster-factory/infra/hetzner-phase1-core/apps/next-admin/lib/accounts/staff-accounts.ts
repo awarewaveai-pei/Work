@@ -25,7 +25,7 @@ const ROLES: readonly OpsRole[] = ["owner", "admin", "operator", "viewer"];
 export const isOpsRole = (v: unknown): v is OpsRole => typeof v === "string" && (ROLES as readonly string[]).includes(v);
 
 const meta = (u: User) => (u.app_metadata ?? {}) as Record<string, unknown>;
-const isStaff = (u: User) => String(meta(u).user_kind ?? "").toLowerCase() !== "client";
+const isStaff = (u: User) => String(meta(u).user_kind ?? "").toLowerCase() === "staff";   // no kind = nobody (middleware.ts resolveTenantFromMeta)
 // same reading as middleware.ts resolveRoleFromUser: anything else is viewer
 const roleOf = (u: User): OpsRole => {
   const raw = String(meta(u).ops_role ?? "").trim().toLowerCase();

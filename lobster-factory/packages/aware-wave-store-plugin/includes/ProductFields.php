@@ -25,7 +25,7 @@ final class ProductFields {
 				'id'          => WooShop::META_PLAN,
 				'label'       => 'AwareWave 方案代碼',
 				'desc_tip'    => true,
-				'description' => '訂閱商品與點數包都填；小寫英數與 _ . -，與 app.aware-wave.com 的 plan_key 相同。留空＝不是 AwareWave 商品。',
+				'description' => '訂閱商品填一個；點數包可填多個（空白隔開，一個方案開一個產品，例：studio_credits tarot_credits）。小寫英數與 _ . -，與 app.aware-wave.com /ops/plans 的方案代碼相同。留空＝不是 AwareWave 商品。',
 			)
 		);
 		woocommerce_wp_text_input(
@@ -55,14 +55,16 @@ final class ProductFields {
 		$units = trim( sanitize_text_field( wp_unslash( $_POST[ WooShop::META_UNITS ] ?? '' ) ) );
 		$door  = strtolower( trim( sanitize_text_field( wp_unslash( $_POST[ WooShop::META_PRODUCT ] ?? '' ) ) ) );
 
-		if ( $plan === '' || preg_match( PaymentEvents::KEY, $plan ) ) {
-			$product->update_meta_data( WooShop::META_PLAN, $plan );
+		$plans  = PaymentEvents::packPlanKeys( $plan );
+		$isPack = ctype_digit( $units ) && (int) $units >= 1 && (int) $units <= PaymentEvents::MAX_UNITS;
+		if ( $plan === '' || ( count( $plans ) === 1 && preg_match( PaymentEvents::KEY, $plan ) ) || ( $plans && $isPack ) ) {
+			$product->update_meta_data( WooShop::META_PLAN, implode( ' ', $plans ) );
 		} else {
-			$this->error( 'AwareWave 方案代碼格式不符，未儲存。' );
+			$this->error( 'AwareWave 方案代碼格式不符（訂閱商品只能填一個；多個只限點數包，空白隔開、不可重複、最多 ' . PaymentEvents::MAX_PACK_PLANS . ' 個），未儲存。' );
 		}
 		if ( $units === '' ) {
 			$product->delete_meta_data( WooShop::META_UNITS );
-		} elseif ( ctype_digit( $units ) && (int) $units >= 1 && (int) $units <= PaymentEvents::MAX_UNITS ) {
+		} elseif ( $isPack ) {
 			$product->update_meta_data( WooShop::META_UNITS, (string) (int) $units );
 		} else {
 			$this->error( 'AwareWave 點數須為 1 到 ' . PaymentEvents::MAX_UNITS . ' 的整數，未儲存。' );

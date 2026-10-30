@@ -71,7 +71,7 @@ describe("isWrongHostForPortal", () => {
     expect(isWrongHostForPortal(req("https://app.aware-wave.com/ops"))).toBe(false);
   });
   it("portal path on app.aware-wave.com -> true (must be rejected)", () => {
-    expect(isWrongHostForPortal(req("https://app.aware-wave.com/portal/api/signup"))).toBe(true);
+    expect(isWrongHostForPortal(req("https://app.aware-wave.com/portal/login"))).toBe(true);
   });
   it("portal path on portal.aware-wave.com -> false", () => {
     const request = req("https://portal.aware-wave.com/portal/launcher");
@@ -122,7 +122,7 @@ describe("blockedResponse — loop invariant (critic finding C-A)", () => {
   });
 
   it("portal api path -> 401 JSON (isApiPath covers /portal/api/* too)", () => {
-    const res = blockedResponse(req("https://portal.aware-wave.com/portal/api/signup"));
+    const res = blockedResponse(req("https://portal.aware-wave.com/portal/api/launcher"));
     expect(res.status).toBe(401);
   });
 });
@@ -141,7 +141,7 @@ describe("product door (ADR 018): its page prefix answers only on its own host, 
 
   it.each([
     ["https://social.aware-wave.com/api/ops/clients", 404],
-    ["https://social.aware-wave.com/portal/api/signup", 404],
+    ["https://social.aware-wave.com/portal/login", 404],
     ["https://app.aware-wave.com/social", 404],
   ])("%s -> %s", async (url, status) => {
     const res = await middleware(hostReq(url));

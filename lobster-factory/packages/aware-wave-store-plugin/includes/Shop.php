@@ -10,7 +10,7 @@ namespace AwareWave\Store;
 
 interface Shop {
 
-	/** date_paid: unix seconds WooCommerce recorded the payment, 0 = not recorded. @return array{id:int,customer_id:int,payment_method:string,total:float,total_refunded:float,date_paid:int,lines:list<array{product_id:int,qty:int}>}|null */
+	/** date_paid: unix seconds WooCommerce recorded the payment, 0 = not recorded. A line's total = what was paid for it after discounts (tax excluded). @return array{id:int,customer_id:int,payment_method:string,total:float,total_refunded:float,date_paid:int,lines:list<array{product_id:int,qty:int,total?:float}>}|null */
 	public function order( int $orderId ): ?array;
 
 	/**
@@ -21,7 +21,7 @@ interface Shop {
 	 */
 	public function subscriptionIdsForOrder( int $orderId, array $types ): array;
 
-	/** next_payment / end: unix seconds, 0 = none; status without the wc- prefix. @return array{id:int,customer_id:int,status:string,payment_method:string,next_payment:int,end:int,lines:list<array{product_id:int,qty:int}>}|null */
+	/** next_payment / end: unix seconds, 0 = none; status without the wc- prefix. @return array{id:int,customer_id:int,status:string,payment_method:string,next_payment:int,end:int,lines:list<array{product_id:int,qty:int,total?:float}>}|null */
 	public function subscription( int $subscriptionId ): ?array;
 
 	/** @return array{plan_key:string,credit_units:int,product_key:string} */

@@ -7,7 +7,7 @@ a fresh Ed25519 key pair; then lib/entitlements/__tests__/entitlements.e2e.test.
   a wallet grant makes both usable; the cognitive permit issuer refuses without an entitlement row and issues with one.
 Last, the cognitive engine's Python check_entitlement verifies that issued permit (cross-language, enforce).
     python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py
---suite payments (ADR 017 step 4a) adds 0092/0117/0118 (with the three accounts 0118 seeds), 0120, 0124 0127-0133, 0140-0142, 0144, then drives
+--suite payments (ADR 017 step 4a) adds 0092/0117/0118 (with the three accounts 0118 seeds), 0120, 0124 0127-0133, 0140-0142, 0144-0146, then drives
 POST /api/webhooks/payments/local, /ops/billing and the client hub 帳務 tab through lib/entitlements/__tests__/payments.e2e.test.ts.
 --suite woo-drill (ADR 017 4b-9 local) is the payments schema; a real WordPress + WooCommerce + aware-wave-store
 (tests/e2e/woo-drill, Docker) pays an order and its event goes through the real route, driving woo-drill.e2e.test.ts.
@@ -71,7 +71,7 @@ SEED_0118 = """insert into organizations(id, type, name, slug, kind) values
   ('00000000-0000-4000-8000-0000000000f1', 'client', 'Soulful', 'soulful-expression', 'customer');"""
 SUITES = {
     "entitlements": {"migrations": ("0062", "0063", "0066", "0077", "0092", "0110", "0117"), "after": ("0118",), "test": "lib/entitlements/__tests__/entitlements.e2e.test.ts"},
-    "payments": {"migrations": ("0062", "0063", "0066", "0077", "0092", "0110", "0117"), "after": ("0118", "0120", "0124", "0127", "0128", "0129", "0130", "0131", "0132", "0133", "0140", "0141", "0142", "0144"),
+    "payments": {"migrations": ("0062", "0063", "0066", "0077", "0092", "0110", "0117"), "after": ("0118", "0120", "0124", "0127", "0128", "0129", "0130", "0131", "0132", "0133", "0140", "0141", "0142", "0144", "0145", "0146", "0148"),
                  "test": "lib/entitlements/__tests__/payments.e2e.test.ts"},
     # ADR 017 4b-9 local: real WordPress + WooCommerce + aware-wave-store (tests/e2e/woo-drill, Docker) into the payment route.
     "woo-drill": {"migrations": ("0062", "0063", "0066", "0077", "0092", "0110", "0117"), "after": ("0118", "0120", "0124", "0127", "0128", "0129", "0130", "0131", "0132", "0133", "0140", "0141", "0142", "0144"),
@@ -79,6 +79,9 @@ SUITES = {
     # ADR 017 4b-10: staff give / take a product and a seller licence (0143 over the payments schema).
     "staff-grants": {"migrations": ("0011_ops_console", "0062", "0063", "0066", "0077", "0092", "0110", "0117"), "after": ("0118", "0120", "0124", "0127", "0128", "0129", "0130", "0131", "0132", "0133", "0140", "0141", "0142", "0143"),
                      "test": "lib/entitlements/__tests__/staff-grants.e2e.test.ts"},
+    # /ops/plans: staff create / change / delete AwareWave's plans (0147 over the payments schema).
+    "plan-admin": {"migrations": ("0011_ops_console", "0062", "0063", "0066", "0077", "0092", "0110", "0117"), "after": ("0118", "0120", "0124", "0127", "0128", "0129", "0130", "0131", "0132", "0133", "0140", "0141", "0142", "0144", "0145", "0147"),
+                   "test": "lib/entitlements/__tests__/plan-admin.e2e.test.ts"},
 }
 
 

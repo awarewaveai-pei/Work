@@ -93,7 +93,7 @@ export async function createProduct(options) {
   const declarations = Object.fromEntries(DECLARATIONS.map((k) => [k, delivery?.declarations[k] ?? 'TODO']));
   const product = { key, name, description: delivery?.description ?? name, subdomain: options.subdomain,
     door: { app: 'next-admin', page, api: ['/api/' + key], enabled: false }, loginSources: [...new Set(loginSources)], standalone,
-    status: 'coming_soon', selfSignup: false, features, accessChannels: ['ui'],
+    status: 'coming_soon', features, accessChannels: ['ui'],
     modules: { dependsOn: from?.plan.modules ?? [], manifest: `lib/${key}/MODULE_MANIFEST.json` }, staffPaths: [] };
   const manifest = { schema_version: 1, module_id: key, declarations,
     configuration: { PUBLIC_BASE_DOMAIN: 'installation base domain', [`PRODUCT_HOST_${key.toUpperCase()}`]: 'optional product host', loginSources: product.loginSources, apiKeys: options.config ?? 'TODO: customer-owned provider keys from installation environment' } };

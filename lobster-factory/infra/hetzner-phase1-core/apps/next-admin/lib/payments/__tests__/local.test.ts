@@ -76,4 +76,15 @@ describe("local payment provider (ADR 017 step 4a)", () => {
     expect(code({ event_id: "e1", kind: "credit_pack", organization_id: ORG, units: 5, order_ref: "x", paid_at: "2026-02-31T12:00:00Z" })).toBe("invalid_paid_at");
     expect(code({ event_id: "e1", kind: "subscription_paid", organization_id: ORG, plan_key: "p", period_end: "2026-02-31T00:00:00Z" })).toBe("invalid_period_end");
   });
+
+  it("a pack names its plans in plan_keys (0146) or the older plan_key, never both; passed through as sent", () => {
+    const code = (o: object) => { try { local().parse(body(o), {}); return "parsed"; } catch (e) { return (e as { code?: string }).code; } };
+    const pack = { kind: "credit_pack", organization_id: ORG, units: 50, order_ref: "G-1" };
+    expect(local().parse(body({ ...pack, plan_keys: ["tarot_credits", "studio_credits"] }), {})).toMatchObject({ event: { plan_keys: ["tarot_credits", "studio_credits"] } });
+    expect(local().parse(body({ ...pack, plan_key: "studio_credits" }), {})).toMatchObject({ event: { plan_key: "studio_credits" } });
+    expect(code({ ...pack, plan_key: "a", plan_keys: ["b"] })).toBe("plan_key_and_plan_keys");
+    for (const plan_keys of [[], ["a", "a"], ["Bad Key"], [1], "a", Array.from({ length: 21 }, (_, i) => `p${i}`)]) {
+      expect(code({ ...pack, plan_keys }), JSON.stringify(plan_keys)).toBe("invalid_plan_keys");
+    }
+  });
 });

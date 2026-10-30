@@ -21,6 +21,7 @@ For each entry: open the linked file for the full report including debate transc
 | 2026-10-22 | 共用 checkout commit 繞路燒 token：worktree push 試點與撤回 | 撤回 worktree push；AO-RESUME parity 改為乾淨 3-way 帶過 dirty 檔、WORKLOG merge=union | 直接決策 | [2026-10-22-per-session-worktree-pilot.md](2026-10-22-per-session-worktree-pilot.md) |
 | 2026-10-25 | 客戶模型三軸五方式：現成方案能取代多少（直接決策，待操作者確認） | 訂閱維持 WCS＋TapPay；權利、錢包、代操維持自寫；買斷授權建議改用 Keygen CE | 中 | [2026-10-25-customer-model-buy-vs-build.md](2026-10-25-customer-model-buy-vs-build.md) |
 | 2026-10-25 | 排程離開 Trigger 待決 1–5 與 C7（直接決策，操作者「你決定」） | GitHub 公開 API 免 token；GHA 主機存活探針；不加第二台主機；備份狀態留主機判斷；狀態報告不搬；C7 不做 | 直接決策 | [2026-10-25-schedules-off-trigger-open-items.md](2026-10-25-schedules-off-trigger-open-items.md) |
+| 2026-10-30 | 客戶自助註冊（email＋Google），入口＝aware-wave.com WordPress（直接決策，操作者定案並實作） | WP 會員是帳號真相來源；驗證後送 0 元註冊禮訂單（50 點＋5 個產品點數方案）走既有付款管線建帳號；方案在 /ops/plans 管；aware-wave.com 會員帳號直接已驗證；員工邀請過的客戶自動連結；Google＝Nextend（gmail 才算已驗證）；portal 註冊刪除；沒 user_kind 一律 403 | 中 | [2026-10-30-customer-self-signup-email-google.md](2026-10-30-customer-self-signup-email-google.md) |
 
 ---
 

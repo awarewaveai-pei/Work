@@ -65,6 +65,7 @@ describe.skipIf(!REST)("payments against a real database (ADR 017 step 4a)", () 
         { plan_key: "content_pack", product_key: "content", kind: "addon", features: ["content.title", "content.outline"],
           limits: { "content.title": { pay: "credits" }, "content.outline": { pay: "credits" } } },
         { plan_key: "content_pack_unmarked", product_key: "content", kind: "addon", features: ["content.title"], limits: { "content.title": {} } },
+        { plan_key: "tarot_pack", product_key: "tarot", kind: "addon", features: ["tarot.image"], limits: { "tarot.image": { pay: "credits" } } },
       ]],
     ] as const) {
       const { error } = await db.from(table).insert(value);
@@ -152,7 +153,7 @@ describe.skipIf(!REST)("payments against a real database (ADR 017 step 4a)", () 
   it("a pack that names its add-on plan grants that plan's rows with no end date, once (0128, decision 6)", async () => {
     const pack = (n: string) => ({ event_id: `pack-plan-${n}`, kind: "credit_pack", organization_id: PACK_BUYER, units: 200, order_ref: `PO-${n}`, plan_key: "content_pack" });
     const first = await send(pack("1"));
-    expect(first).toMatchObject({ status: 200, body: { ok: true, units: 200, plan_key: "content_pack", pack_rows: 2 } });
+    expect(first).toMatchObject({ status: 200, body: { ok: true, units: 200, plans: [{ plan_key: "content_pack", pack_rows: 2 }] } });
     const grants = await rows("organization_entitlements", { organization_id: PACK_BUYER, status: "active" });
     expect(grants.map((g) => [g.feature_key, g.ends_at, g.limits]).sort()).toEqual([
       ["content.outline", null, { pay: "credits" }], ["content.title", null, { pay: "credits" }]]);
@@ -161,9 +162,25 @@ describe.skipIf(!REST)("payments against a real database (ADR 017 step 4a)", () 
     expect(contracts[0]).toMatchObject({ plan_key: "content_pack", status: "active", current_period_end: null });
     // the same event again is the inbox's replay; a second order adds credits, never a second contract or row
     expect((await send(pack("1"))).body).toMatchObject({ ok: true, replayed: true });
-    expect((await send(pack("2"))).body).toMatchObject({ ok: true, units: 200, pack_rows: 0, contract: contracts[0].id });
+    expect((await send(pack("2"))).body).toMatchObject({ ok: true, units: 200, plans: [{ pack_rows: 0, contract: contracts[0].id }] });
     expect(await rows("organization_entitlements", { organization_id: PACK_BUYER, status: "active" })).toHaveLength(2);
     expect(await rows("organization_product_subscriptions", { organization_id: PACK_BUYER })).toHaveLength(1);
+  });
+
+  it("one pack naming several plans (0146) grants one ledger entry and each plan's rows; a bad plan refuses the whole pack", async () => {
+    const org = "00000000-0000-4000-8000-0000000000ca";
+    const { error } = await db.from("organizations").insert({ id: org, type: "client", name: "Gift Member", slug: "e2e-gift-member", kind: "customer" });
+    if (error) throw new Error(error.message);
+    const gift = { kind: "credit_pack", organization_id: org, units: 50, order_ref: "GIFT-1" };
+    const bad = await send({ ...gift, event_id: "gift-bad", order_ref: "GIFT-0", plan_keys: ["tarot_pack", "content_pack_unmarked"] });
+    expect(bad).toEqual({ status: 422, body: { ok: false, error: "pack_plan_not_credits" } });
+    expect(await rows("media_credit_ledger", { organization_id: org })).toHaveLength(0);   // same transaction: nothing granted
+    const ok = await send({ ...gift, event_id: "gift-1", plan_keys: ["tarot_pack", "content_pack"] });
+    expect(ok).toMatchObject({ status: 200, body: { ok: true, units: 50, plans: [{ plan_key: "content_pack", pack_rows: 2 }, { plan_key: "tarot_pack", pack_rows: 1 }] } });
+    expect(await rows("media_credit_ledger", { organization_id: org })).toHaveLength(1);
+    expect((await rows("organization_product_subscriptions", { organization_id: org })).map((c) => c.plan_key).sort()).toEqual(["content_pack", "tarot_pack"]);
+    expect((await rows("organization_entitlements", { organization_id: org, status: "active" })).map((g) => g.feature_key).sort())
+      .toEqual(["content.outline", "content.title", "tarot.image"]);
   });
 
   it("a pack naming a plan that is not an add-on with every feature on credits is refused and grants nothing", async () => {
@@ -175,12 +192,11 @@ describe.skipIf(!REST)("payments against a real database (ADR 017 step 4a)", () 
     expect(await rows("media_credit_ledger", { organization_id: PACK_BUYER })).toHaveLength(before.length);   // same transaction: no credits either
   });
 
-  it("the seeded studio_basic plan (0144) opens only registered credits features, each paid from the shared wallet", async () => {
+  it("the seeded studio_credits plan (0145) opens only registered credits features, each paid from the shared wallet", async () => {
     const org = "00000000-0000-4000-8000-0000000000c9";
     const { error } = await db.from("organizations").insert({ id: org, type: "client", name: "Studio Buyer", slug: "e2e-studio-buyer", kind: "customer" });
     if (error) throw new Error(error.message);
-    expect((await send({ event_id: "studio-1", kind: "subscription_paid", organization_id: org, plan_key: "studio_basic", period_end: days(30), external_ref: "S-1" })).status).toBe(200);
-    expect((await send({ event_id: "studio-pack-1", kind: "credit_pack", organization_id: org, units: 100, order_ref: "SP-1" })).status).toBe(200);
+    expect((await send({ event_id: "studio-pack-1", kind: "credit_pack", organization_id: org, units: 100, order_ref: "SP-1", plan_key: "studio_credits" })).status).toBe(200);
     const grants = await rows("organization_entitlements", { organization_id: org, status: "active" });
     const studio = PRODUCTS.find((p) => p.key === "studio")!.features;
     expect(grants.length).toBeGreaterThan(0);

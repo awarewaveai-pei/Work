@@ -39,7 +39,14 @@ final class PaymentEventsTest extends TestCase {
 		$this->members->members[7] = array( 'email' => 'Mei@Example.com', 'display_name' => '小美', 'verified_email' => 'mei@example.com' );
 	}
 
+	/** A line without a total was paid for (50 each); a test about free lines sets 'total' => 0.0 itself. */
 	private function order( int $id, int $customer, array $lines, float $total = 100.0, float $refunded = 0.0 ): void {
+		$lines = array_map(
+			function ( $l ) {
+				return $l + array( 'total' => 50.0 );
+			},
+			$lines
+		);
 		$this->shop->orders[ $id ] = array( 'id' => $id, 'customer_id' => $customer, 'payment_method' => 'tappay', 'total' => $total, 'total_refunded' => $refunded, 'lines' => $lines );
 	}
 
@@ -106,9 +113,18 @@ final class PaymentEventsTest extends TestCase {
 		$this->assertSame( 'credit_pack', $b['kind'] );
 		$this->assertSame( 750, $b['units'] );
 		$this->assertSame( '200', $b['order_ref'] );
-		// Two different pack plans cannot ride one event: credits go in, the plan is left to a person.
+		// Two pack plans ride one event as plan_keys, sorted (next-admin 0146); nothing is left to a person.
 		$this->assertArrayNotHasKey( 'plan_key', $b );
-		$this->assertSame( array( 200, '點數包使用方案不一致（credits-300、credits-50）：點數已入帳，使用方案請人工登記' ), $this->shop->notes[0] );
+		$this->assertSame( array( 'credits-300', 'credits-50' ), $b['plan_keys'] );
+		$this->assertSame( array(), $this->shop->notes );
+	}
+
+	public function test_a_pack_plan_field_holds_one_key_or_several_and_anything_malformed_is_none(): void {
+		$this->assertSame( array( 'studio_credits' ), PaymentEvents::packPlanKeys( ' studio_credits ' ) );
+		$this->assertSame( array( 'studio_credits', 'tarot_credits' ), PaymentEvents::packPlanKeys( "studio_credits  tarot_credits" ) );
+		foreach ( array( '', 'a a', 'Bad', 'a b,', implode( ' ', array_map( function ( $i ) { return 'p' . $i; }, range( 1, 21 ) ) ) ) as $bad ) {
+			$this->assertSame( array(), PaymentEvents::packPlanKeys( $bad ), $bad );
+		}
 	}
 
 	public function test_an_order_with_a_subscription_and_a_pack_is_two_events_with_two_ids(): void {

@@ -98,10 +98,4 @@ describe("middleware(): the CSRF refusal sits after the token pass-throughs, bef
     expect(res.status).not.toBe(403);
   });
 
-  it("portal signup (a pre-session public path) is not subject to the check", async () => {
-    const res = await middleware(req("https://portal.aware-wave.com/portal/api/signup", "POST", {
-      "sec-fetch-site": "same-site", host: "portal.aware-wave.com",
-    }));
-    expect(res.status).not.toBe(403);
-  });
 });

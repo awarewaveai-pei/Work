@@ -47,6 +47,7 @@ final class SettingsPage {
 		$this->secretRow( 'payments_secret', '付款事件密鑰', $s->paymentsSecret, 'next-admin 的 PAYMENTS_WOO_SECRET，同一值。' );
 		$this->gatewayRow( $s->allowedGateways );
 		$this->secretRow( 'handoff_secret', '進入按鈕密鑰', $s->handoffSecret, 'next-admin 的 AUTH_WP_HANDOFF_SECRET，同一值；不要與付款密鑰相同。' );
+		echo '<tr><th>註冊禮商品</th><td><input type="number" min="0" name="welcome_product_id" value="' . esc_attr( (string) $s->welcomeProductId ) . '"><p class="description">會員信箱確認後自動送一次的商品 ID（0＝不送）。商品須為 0 元、狀態「私人」（客人買不到）、AwareWave 點數欄位大於 0；方案欄填註冊禮方案、產品欄填要出現「進入」的產品。</p></td></tr>';
 		echo '</table>';
 		submit_button( '儲存' );
 		echo '</form>';
@@ -174,6 +175,7 @@ final class SettingsPage {
 		$installed = function_exists( 'WC' ) && WC()->payment_gateways() ? array_keys( WC()->payment_gateways()->payment_gateways() ) : array();
 		$picked    = isset( $_POST['gateways'] ) && is_array( $_POST['gateways'] ) ? array_map( 'sanitize_key', wp_unslash( $_POST['gateways'] ) ) : array();
 		update_option( Settings::OPT_GATEWAYS, array_values( array_intersect( $installed, $picked ) ), true );
+		update_option( Settings::OPT_WELCOME_PRODUCT, max( 0, (int) ( $_POST['welcome_product_id'] ?? 0 ) ), true );
 		update_option( Settings::OPT_ENABLED, empty( $_POST['enabled'] ) ? '' : '1', true );
 		$out[] = array( 'success', '已儲存。' );
 		return $out;

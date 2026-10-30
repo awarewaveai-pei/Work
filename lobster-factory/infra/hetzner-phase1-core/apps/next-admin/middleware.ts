@@ -111,11 +111,20 @@ function resolveRoleFromUser(appMetadata: Record<string, unknown> | undefined): 
   return "viewer";
 }
 
-/** Extract tenant identity from app_metadata (server-controlled, not user-tamperable). */
-function resolveTenantFromMeta(meta: Record<string, unknown> | undefined): Pick<CachedIdentity, "userKind" | "orgId"> {
-  const userKind = String(meta?.user_kind ?? "").toLowerCase() === "client" ? "client" : "staff";
+/** Extract tenant identity from app_metadata (server-controlled, not user-tamperable). null = the account names no kind:
+ *  it reaches nothing. It used to read as staff, so any account GoTrue or a magiclink/invite link made by itself was a
+ *  staff viewer (decision 2026-10-30-customer-self-signup-email-google §3 I7; prod had one, the owner, fixed first). */
+export function resolveTenantFromMeta(meta: Record<string, unknown> | undefined): Pick<CachedIdentity, "userKind" | "orgId"> | null {
+  const kind = String(meta?.user_kind ?? "").toLowerCase();
+  if (kind !== "client" && kind !== "staff") return null;
   const orgId = typeof meta?.org_id === "string" ? meta.org_id.trim() : "";
-  return { userKind, orgId };
+  return { userKind: kind, orgId };
+}
+
+/** A signed-in account with no user kind: not the login page (it is signed in, /login would send it back), a dead end. */
+function unknownKindResponse(request: NextRequest): NextResponse {
+  if (isApiPath(request.nextUrl.pathname)) return NextResponse.json({ error: "account_kind_unknown" }, { status: 403 });
+  return new NextResponse("這個帳號尚未設定身分，暫時無法使用。", { status: 403, headers: { "content-type": "text/plain; charset=utf-8" } });
 }
 
 /** Inject identity headers. Centralised so fresh-cache, network, and stale paths all stay in sync. */
@@ -251,7 +260,8 @@ function clientForbiddenResponse(request: NextRequest, cookiesToCopy: RefreshedC
 // signup on the admin console's own public domain, independent of whether the "gated" DNS/cert/
 // nginx steps for portal.aware-wave.com (design doc §7 steps 5-7) have happened yet. This check
 // is the single choke point that closes that regardless of nginx config on either host.
-const PORTAL_PUBLIC_PATHS = new Set<string>(["/portal/login", "/portal/signup", "/portal/api/signup"]);
+// Portal signup was deleted 2026-10-30: customers register on aware-wave.com (decision 2026-10-30-customer-self-signup-email-google).
+const PORTAL_PUBLIC_PATHS = new Set<string>(["/portal/login"]);
 
 export function isWrongHostForPortal(request: NextRequest): boolean {
   if (!isPortalPath(request.nextUrl.pathname)) return false;
@@ -397,8 +407,9 @@ export async function middleware(request: NextRequest) {
     if (!error && data.user) {
       const meta = data.user.app_metadata as Record<string, unknown> | undefined;
       const role = resolveRoleFromUser(meta);
-      const { userKind, orgId } = resolveTenantFromMeta(meta);
-      identity = { role, userKind, orgId, userId: data.user.id, tools: parseStaffTools(meta?.staff_tools) };
+      const tenant = resolveTenantFromMeta(meta);
+      if (!tenant) return unknownKindResponse(request);
+      identity = { role, userKind: tenant.userKind, orgId: tenant.orgId, userId: data.user.id, tools: parseStaffTools(meta?.staff_tools) };
       if (sessionKey) cacheValidatedRole(sessionKey, identity);
     } else if (error && sessionKey && isTransientAuthError(error)) {
       // Auth server unreachable / throttled — don't punish a logged-in user. Trust the last

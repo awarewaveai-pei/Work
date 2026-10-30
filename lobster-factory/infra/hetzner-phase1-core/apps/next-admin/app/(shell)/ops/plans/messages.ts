@@ -1,0 +1,22 @@
+// /ops/plans result codes (the redirect's ?r=) -> what staff read. validatePlan's codes (lib/entitlements/plans-admin.ts),
+// 0147's plan_admin:<code> refusals, and this page's own.
+export const PLAN_MESSAGES: Record<string, { ok: boolean; text: string }> = {
+  saved: { ok: true, text: "已存。" },
+  forbidden: { ok: false, text: "只有擁有者或管理員能改方案。" },
+  db_unavailable: { ok: false, text: "資料庫連不上，沒有改動。" },
+  invalid_plan_key: { ok: false, text: "方案代號只能用小寫英文、數字與 _ . -，第一個字要是英文或數字，最多 100 字。" },
+  invalid_product: { ok: false, text: "請選一個產品。" },
+  invalid_kind: { ok: false, text: "請選方案種類。" },
+  no_features: { ok: false, text: "至少要勾一個功能。" },
+  feature_not_in_product: { ok: false, text: "勾到了不屬於所選產品的功能；只能勾所選產品自己的功能。" },
+  invalid_limits: { ok: false, text: "功能的限制格式不對，沒有改動。" },
+  pay_on_contract_feature: { ok: false, text: "「用點數付」只能勾在以點數計費的功能上；合約計費的功能由訂閱涵蓋。" },
+  addon_needs_credits: { ok: false, text: "點數包方案的每個功能都必須勾「用點數付」。" },
+  plan_exists: { ok: false, text: "這個方案代號已經有了。" },
+  not_found: { ok: false, text: "找不到這個方案。" },
+  not_editable: { ok: false, text: "這是轉售商自己的方案，這裡只能看。" },
+  overlaps_plan: { ok: false, text: "同一個產品裡，點數包方案的功能不能和其他方案重複（訂閱方案與點數包方案也不能共用功能），否則付款會被拒收。" },
+  invalid_features: { ok: false, text: "功能清單格式不對，沒有改動。" },
+  invalid_actor: { ok: false, text: "查不到操作者身分，沒有改動。" },
+  audit_account_missing: { ok: false, text: "找不到記錄用的自用帳戶（awarewave-ops），沒有改動。" },
+};

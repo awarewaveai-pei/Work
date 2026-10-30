@@ -3,7 +3,8 @@
 //
 // Two user kinds:
 //   staff  — agency employees (owner/admin/operator/viewer). Full access to all orgs.
-//            Fallback for any account without explicit user_kind (backwards-compatible).
+//            An ACCOUNT without user_kind never gets here: middleware.ts answers it 403 (resolveTenantFromMeta).
+//            A missing HEADER (a route outside the middleware matcher) still reads as staff below.
 //   client — end-client self-service. Bound to exactly one org (x-ops-org-id).
 //
 // Usage pattern (S2 route migration):

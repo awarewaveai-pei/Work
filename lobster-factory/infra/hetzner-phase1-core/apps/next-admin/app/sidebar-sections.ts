@@ -143,6 +143,7 @@ export const DEFAULT_SECTIONS: NavSection[] = [
       { type: 'link', href: '/ops/costs',       icon: '$', label: 'AI Costs',          title: 'LLM 呼叫花費帳本' },
       { type: 'link', href: '/ops/billing',     icon: '¤', label: 'Billing',           title: '全部帳戶的合計與需要處理的帳戶；單一客戶看客戶頁的帳務分頁（唯讀）' },
       { type: 'link', href: '/ops/sellers',     icon: '⇄', label: 'Sellers',           title: '收銀台網站：登記、停用，每個網站一把鑰匙，由鑰匙查出賣家' },
+      { type: 'link', href: '/ops/plans',       icon: '☰', label: 'Plans',             title: '方案：每個方案開通哪些功能、哪些用點數付（價格在 WooCommerce）' },
       { type: 'link', href: '/tools/ai-models', icon: '⚖', label: 'AI Models',         title: '模型比較（價格、速度、用途）＋圖片模型規格（能讀多長、參考圖、改寫）兩個分頁' },
       { type: 'link', href: '/ops/tools',       icon: '🧰', label: 'AI Tools & Alerts', title: '外部 AI 工具清單 + 事件通知管道' },
     ],

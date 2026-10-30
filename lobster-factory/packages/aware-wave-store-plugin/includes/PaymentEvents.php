@@ -18,6 +18,7 @@ final class PaymentEvents {
 	const EVENT_ID       = '/^[\w.:\-\/#]{1,200}$/';
 	const KEY            = '/^[a-z0-9][a-z0-9_.-]{0,99}$/';
 	const MAX_UNITS      = 10000000;
+	const MAX_PACK_PLANS = 20; // next-admin 0146 plan_keys limit
 	const MAX_PERIOD_SEC = 94608000; // 3 years
 
 	/** @var Shop */
@@ -57,7 +58,8 @@ final class PaymentEvents {
 			return;
 		}
 		// "processing" means paid only for methods that take the money first; cash on delivery / pay at pickup reach it unpaid.
-		if ( ! $this->paidByAllowedMethod( $order['payment_method'], $orderId ) ) {
+		// The sign-up gift is the one unpaid order that counts: its own method at no charge (WelcomeGift::isGiftOrder).
+		if ( ! WelcomeGift::isGiftOrder( $order ) && ! $this->paidByAllowedMethod( $order['payment_method'], $orderId ) ) {
 			return;
 		}
 		foreach ( $parents as $subId ) {
@@ -70,28 +72,45 @@ final class PaymentEvents {
 		}
 		$units     = 0;
 		$packPlans = array();
+		$gift      = WelcomeGift::isGiftOrder( $order );
+		$unpaid    = 0;
 		foreach ( $order['lines'] as $line ) {
 			$meta = $this->shop->productMeta( (int) $line['product_id'] );
 			if ( $meta['credit_units'] > 0 ) {
+				// Credits come only from a line someone paid for, or the sign-up gift order itself. A free line in a paid
+				// order (the gift product added to a cart, a 100% coupon on a pack) adds none (critic 2026-10-30 C1).
+				if ( ! $gift && (float) ( $line['total'] ?? 0 ) <= 0 ) {
+					++$unpaid;
+					continue;
+				}
 				$units += $meta['credit_units'] * max( 0, (int) $line['qty'] );
-				if ( preg_match( self::KEY, $meta['plan_key'] ) ) {
-					$packPlans[ $meta['plan_key'] ] = true;
+				foreach ( self::packPlanKeys( $meta['plan_key'] ) as $plan ) {
+					$packPlans[ $plan ] = true;
 				}
 			}
+		}
+		if ( $unpaid > 0 ) {
+			$this->shop->addNote( $orderId, 'AwareWave：' . $unpaid . ' 個點數品項金額為 0（免費或全額折扣），不送點數；要送請人工登記。' );
 		}
 		if ( $units > 0 ) {
 			if ( $units > self::MAX_UNITS ) {
 				$this->shop->addNote( $orderId, 'AwareWave：點數 ' . $units . ' 超過單筆上限 ' . self::MAX_UNITS . '，未送出；請人工登記。' );
 				return;
 			}
-			// One wallet per account, spent by any row marked pay=credits (can.ts, 4b-5): a pack without plan_key only tops it
-			// up (each product's plan marks its credit features, 0144); with plan_key the server also writes that add-on
-			// plan's rows with no end date, in the same transaction as the credits (0128).
-			$pack = array( 'kind' => 'credit_pack', 'units' => $units, 'order_ref' => (string) $orderId ) + self::paidAt( $order['date_paid'] ?? 0 );
-			if ( count( $packPlans ) === 1 ) {
-				$pack['plan_key'] = (string) array_keys( $packPlans )[0];
-			} elseif ( count( $packPlans ) > 1 ) {
-				$this->shop->addNote( $orderId, '點數包使用方案不一致（' . implode( '、', array_keys( $packPlans ) ) . '）：點數已入帳，使用方案請人工登記' );
+			// One wallet per account, spent by any row marked pay=credits (can.ts, 4b-5): a pack without plans only tops it
+			// up; with plans the server also writes each add-on plan's rows with no end date, in the same transaction as the
+			// credits (0128, several plans 0146). One plan keeps the plan_key form every next-admin version reads.
+			$pack  = array( 'kind' => 'credit_pack', 'units' => $units, 'order_ref' => (string) $orderId ) + self::paidAt( $order['date_paid'] ?? 0 );
+			$plans = array_keys( $packPlans );
+			sort( $plans );
+			if ( count( $plans ) > self::MAX_PACK_PLANS ) {
+				$this->shop->addNote( $orderId, 'AwareWave：點數包方案超過 ' . self::MAX_PACK_PLANS . ' 個，未送出；請人工登記。' );
+				return;
+			}
+			if ( count( $plans ) === 1 ) {
+				$pack['plan_key'] = $plans[0];
+			} elseif ( $plans ) {
+				$pack['plan_keys'] = $plans;
 			}
 			$this->emit(
 				$order['customer_id'],
@@ -241,7 +260,7 @@ final class PaymentEvents {
 		return false;
 	}
 
-	/** @param list<array{product_id:int,qty:int}> $lines */
+	/** @param list<array{product_id:int,qty:int,total?:float}> $lines */
 	private function hasBillingLine( array $lines ): bool {
 		foreach ( $lines as $line ) {
 			if ( CheckoutGate::isBillingProduct( $this->shop->productMeta( (int) $line['product_id'] ) ) ) {
@@ -252,9 +271,29 @@ final class PaymentEvents {
 	}
 
 	/**
+	 * A pack product's plans: its plan field holds one key or several separated by spaces (a pack that opens several
+	 * products, e.g. the sign-up gift). Any malformed key, a repeat or more than MAX_PACK_PLANS = [] (nothing granted
+	 * is safer than a guess; ProductFields refuses to save such a value).
+	 *
+	 * @return list<string>
+	 */
+	public static function packPlanKeys( string $value ): array {
+		$keys = preg_split( '/\s+/', trim( $value ), -1, PREG_SPLIT_NO_EMPTY );
+		if ( ! $keys || count( $keys ) > self::MAX_PACK_PLANS || count( array_unique( $keys ) ) !== count( $keys ) ) {
+			return array();
+		}
+		foreach ( $keys as $k ) {
+			if ( ! preg_match( self::KEY, $k ) ) {
+				return array();
+			}
+		}
+		return $keys;
+	}
+
+	/**
 	 * Distinct valid plan keys of subscription lines; credit-pack products are never a plan.
 	 *
-	 * @param list<array{product_id:int,qty:int}> $lines
+	 * @param list<array{product_id:int,qty:int,total?:float}> $lines
 	 * @return list<string>
 	 */
 	private function planKeys( array $lines ): array {

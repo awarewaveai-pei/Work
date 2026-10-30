@@ -7,6 +7,7 @@ const OWNER = "11111111-1111-4111-8111-111111111111";
 const OWNER2 = "22222222-2222-4222-8222-222222222222";
 const AMY = "33333333-3333-4333-8333-333333333333";
 const CLIENT = "44444444-4444-4444-8444-444444444444";
+const NOKIND = "66666666-6666-4666-8666-666666666666";
 
 type FakeUser = { id: string; email: string; email_confirmed_at: string | null; app_metadata: Record<string, unknown> };
 const users = vi.hoisted(() => new Map<string, FakeUser>());
@@ -59,9 +60,10 @@ const user = (id: string, email: string, meta: Record<string, unknown>): FakeUse
 
 beforeEach(() => {
   users.clear();
-  users.set(OWNER, user(OWNER, "pei@x.test", { ops_role: "owner" }));
-  users.set(AMY, user(AMY, "amy@x.test", { ops_role: "operator", provider: "email", staff_tools: ["social"] }));
+  users.set(OWNER, user(OWNER, "pei@x.test", { user_kind: "staff", ops_role: "owner" }));
+  users.set(AMY, user(AMY, "amy@x.test", { user_kind: "staff", ops_role: "operator", provider: "email", staff_tools: ["social"] }));
   users.set(CLIENT, user(CLIENT, "c@x.test", { user_kind: "client", org_id: "o1" }));
+  users.set(NOKIND, user(NOKIND, "nokind@x.test", { ops_role: "owner" }));   // no user_kind = nobody, not staff
   inserts.mockClear();
   mail.mockClear();
   org.row = { id: "org-internal" };
@@ -87,7 +89,7 @@ describe("/api/ops/staff", () => {
   it("the owner sets tools and role; the rest of app_metadata stays; the change is audited", async () => {
     const res = await PATCH(req("PATCH", "owner", { userId: AMY, role: "viewer", tools: ["content", "ops/clients"] }));
     expect(res.status).toBe(200);
-    expect(users.get(AMY)!.app_metadata).toEqual({ ops_role: "viewer", provider: "email", staff_tools: ["content", "ops/clients"] });
+    expect(users.get(AMY)!.app_metadata).toEqual({ user_kind: "staff", ops_role: "viewer", provider: "email", staff_tools: ["content", "ops/clients"] });
     const [table, row] = inserts.mock.calls[0];
     expect(table).toBe("ops_audit_events");
     expect(row).toMatchObject({ organization_id: "org-internal", event_type: "staff.access_updated", target_id: AMY });
@@ -106,13 +108,13 @@ describe("/api/ops/staff", () => {
     const last = await PATCH(req("PATCH", "owner", { userId: OWNER, role: "admin" }));
     expect([last.status, (await last.json()).error]).toEqual([409, "last_owner"]);
     expect(users.get(OWNER)!.app_metadata.ops_role).toBe("owner");
-    users.set(OWNER2, user(OWNER2, "o2@x.test", { ops_role: "owner" }));
+    users.set(OWNER2, user(OWNER2, "o2@x.test", { user_kind: "staff", ops_role: "owner" }));
     expect((await PATCH(req("PATCH", "owner", { userId: OWNER, role: "admin" }))).status).toBe(200);
     // two demotions at once: the writes run one at a time, so the second sees one owner left
-    users.set(OWNER, user(OWNER, "pei@x.test", { ops_role: "owner" }));
+    users.set(OWNER, user(OWNER, "pei@x.test", { user_kind: "staff", ops_role: "owner" }));
     const both = await Promise.all([OWNER, OWNER2].map((id) => PATCH(req("PATCH", "owner", { userId: id, role: "admin" }))));
     expect(both.map((r) => r.status).sort()).toEqual([200, 409]);
-    expect([...users.values()].filter((u) => u.app_metadata.ops_role === "owner")).toHaveLength(1);
+    expect([...users.values()].filter((u) => u.app_metadata.user_kind === "staff" && u.app_metadata.ops_role === "owner")).toHaveLength(1);
   });
 
   it("no internal organization to audit under: nothing is changed (503)", async () => {

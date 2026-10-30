@@ -13,8 +13,9 @@ export type PaymentEvent =
   // within 7 days of receipt (migration 0142), else by when the event arrived.
   | { kind: "subscription_paid"; organization_id: string; plan_key: string; period_end: string; external_ref?: string; paid_at?: string }
   | { kind: "subscription_canceled"; organization_id: string; plan_key: string }
-  // plan_key (optional): the pack's add-on plan; 0128 writes its rows with no end date (ADR 017 decision 6).
-  | { kind: "credit_pack"; organization_id: string; units: number; order_ref: string; plan_key?: string; paid_at?: string }
+  // plan_keys (optional; 1-20 distinct): the pack's add-on plans, one per product it opens; 0128/0146 write their rows with
+  // no end date (ADR 017 decision 6). plan_key = the single-plan form senders used before 0146; never both.
+  | { kind: "credit_pack"; organization_id: string; units: number; order_ref: string; plan_key?: string; plan_keys?: string[]; paid_at?: string }
   | { kind: "refund"; target: "subscription"; organization_id: string; plan_key: string }
   | { kind: "refund"; target: "credit_pack"; organization_id: string; order_ref: string }
   | { kind: "chargeback"; organization_id: string; ref?: string }
@@ -74,6 +75,24 @@ const text = (o: Record<string, unknown>, k: string, re: RegExp): string => {
 const optional = (o: Record<string, unknown>, k: string, re: RegExp): Record<string, string> =>
   o[k] === undefined || o[k] === null ? {} : { [k]: text(o, k, re) };
 
+/** A pack's plans as sent: plan_key or plan_keys (1-20 distinct keys), never both; passed through unchanged, because the
+ *  inbox compares a resent event byte for byte with the stored one (0120 event_id_reused). */
+function packPlans(o: Record<string, unknown>): { plan_key?: string; plan_keys?: string[] } {
+  const keys = o.plan_keys;
+  if (keys === undefined || keys === null) return optional(o, "plan_key", KEY);
+  if (o.plan_key !== undefined && o.plan_key !== null) throw new PaymentParseError("plan_key_and_plan_keys");
+  if (!Array.isArray(keys) || keys.length < 1 || keys.length > 20 || keys.some((k) => typeof k !== "string" || !KEY.test(k)) || new Set(keys).size !== keys.length) {
+    throw new PaymentParseError("invalid_plan_keys");
+  }
+  return { plan_keys: keys as string[] };
+}
+
+/** Every plan a parsed event names (a subscription's one, a pack's plan_key or plan_keys); [] = a bare pack. */
+export function eventPlanKeys(o: Record<string, unknown>): string[] {
+  if (Array.isArray(o.plan_keys)) return o.plan_keys as string[];
+  return typeof o.plan_key === "string" ? [o.plan_key] : [];
+}
+
 /** The shape every provider's parse() must end in; the SQL function re-checks every business rule. */
 export function toPaymentEvent(value: unknown): PaymentEvent {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new PaymentParseError("not_an_object");
@@ -88,7 +107,7 @@ export function toPaymentEvent(value: unknown): PaymentEvent {
       return { kind: o.kind, organization_id, plan_key: text(o, "plan_key", KEY) };
     case "credit_pack": {
       if (!Number.isSafeInteger(o.units) || (o.units as number) < 1 || (o.units as number) > 10_000_000) throw new PaymentParseError("invalid_units");
-      return { kind: o.kind, organization_id, units: o.units as number, order_ref: text(o, "order_ref", REF), ...optional(o, "plan_key", KEY), ...optionalTime(o, "paid_at") };
+      return { kind: o.kind, organization_id, units: o.units as number, order_ref: text(o, "order_ref", REF), ...packPlans(o), ...optionalTime(o, "paid_at") };
     }
     case "refund":
       if (o.target === "subscription") return { kind: "refund", target: "subscription", organization_id, plan_key: text(o, "plan_key", KEY) };
