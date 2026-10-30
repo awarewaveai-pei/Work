@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-30（續8）提前部署 next-admin 4af222dfc（含 4b-11 扣點、0144 方案、另一 session f0a5d5859）；操作者「去把事情處理完美」（Claude）
+
+- 部署前：`check-deploy-drift.ps1` FAIL behind 16（app 碼 3：33afaf874、a29eadfb0、f0a5d5859；compose 無漂移、無 workflows）；`apply-db-migration.mjs --status` applied 144（0144 已套）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin（npm test 閘過、healthy 15s、HTTP smoke 5/5；.deployed-commit 3f9bb4273 → 4af222dfc） | exit=0 | ms=440102
+- REALTEST_EVIDENCE: tool=curl | cmd=公網 app /login 200；studio／content／video／tarot／design／social `/` 307；aware-wave.com 200 | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=Bash | cmd=scripts/playwright-runner.ps1 -Mode smoke -SkipInstall（26 passed／0 failed／6 skipped，`agency-os/reports/e2e/2026-10-30/smoke`） | exit=0 | ms=32291
+- REALTEST_EVIDENCE: tool=SSH | cmd=容器 `/app/.next/server` grep：`credits_charged` 2 檔、`ai-call:` 2 檔、`reserveCsCredit` 0；部署後 docker logs error/exception 0；ai_call_logs 部署後 0 列（尚無流量） | exit=0 | ms=5000
+- 部署後 drift PASS behind 0。
+- REVIEW_WAIVED: NA -- 只部署；程式審查見續3、續5
+- BUGHUNT_WAIVED: NA -- 只部署
+- 未驗：第一筆部署後的真實成本列（metadata `credits_charged`）要等自然流量；prod 目前 0 帳戶有 `pay:credits` 列，不會有人被扣。
+- rollback：`DEPLOY_ROLLBACK_RUNBOOK.md` §2.1 回 3f9bb4273。
 ## 2026-10-30（續7）aware-wave-store 1.2.1 發版並升級 aware-wave.com（續3 的外掛改動；操作者「都你決定」）（Claude）
 
 - 內容（a29eadfb0）：刪「點數包未設定使用方案：買家無法使用點數」備註（點數包不帶方案＝只加值，ADR 017 #11）；設定頁例子 TapPay→綠界信用卡、PayPal。
