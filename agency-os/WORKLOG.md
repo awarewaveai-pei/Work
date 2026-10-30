@@ -1,4 +1,15 @@
 # Worklog
+## 2026-10-30（續21）ADR 017 收錢後續四件上線：0148 套 prod、next-admin 部署 c09ccb177、aware-wave-store 1.3.1 裝上 aware-wave.com、監工台 v51（Claude）
+
+- 順序：`apply-db-migration.mjs 0148`（套前 --status applied 147／missing 0148）→ 推 main → `sg-deploy.sh next-admin`（另一 session 剛部署 7b7920f25，等其結束後再跑）→ `release-wp-bridge.sh --plugin store`（HEAD c09ccb177 拋棄式 worktree，CI 綠，tag v1.3.1）→ `rollout-wp-bridge.ps1 -Plugin store`（先 DryRun）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=node scripts/apply-db-migration.mjs 0148 → APPLY_OK 1/1；psql：credit_call_holds 存在、3 個函式、billing_apply_payment_event 含 credit_call_holds、billing_ledger 含 hold_release | exit=0 | ms=30000
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin → deployed c09ccb177、healthy 16s、HTTP smoke 5/5 OK；middleware.js 含 product_not_held | exit=0 | ms=240000
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl 127.0.0.1:3002 POST /api/internal/billing/reconcile → {"ok":true,"enabled":false}（PAYMENTS_PROVIDERS=local）；POST /api/internal/entitlements/expire → holds_released 0；next-admin 容器 fetch https://aware-wave.com/wp-json/aware-wave-store/v1/reconcile 未簽 → 401 unauthorized（端點已註冊、容器打得到） | exit=0 | ms=5000
+- REALTEST_EVIDENCE: tool=Bash | cmd=rollout-wp-bridge.ps1 -Plugin store → lobster-wordpress 1.3.0→1.3.1（health 200、home 200；備份 /root/backups/wordpress/lobster-wordpress-pre-awstore-1.3.1-20261030T054505Z.sql＋awstore-1.3.0 tgz）；playwright smoke 26 passed／0 failed／6 skipped | exit=0 | ms=300000
+- REVIEW_WAIVED: NA -- 上線步驟；程式審查在續17
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=扣點仍 0|待你定價|單價待你定|扣點仍待定價|API 層尚未查持有 | hits=0（監工台 data.mjs／step-8 卡已改，重發 v51 https://claude.ai/artifact/Htm4xqe362YM987Fo8YLCr；TASKS 三條勾掉）
+- **沒驗到**：真實客戶在門上被 403（沒有過期客戶帳號可用，靠 door-api-holds 測試＋突變）；prod 真實預扣（目前沒有 pay=credits 的客戶呼叫）；Woo 真比對（等 4b-6）。
+- **rollback**：外掛用上列備份還原 1.3.0；next-admin `sg-deploy` 回 7b7920f25；0148 down 在第一筆預扣前可退。
 ## 2026-10-30（續20）next-admin 提前部署 7b7920f25；註冊禮實走到 0 元訂單，卡在 prod 付款通道未接（PAYMENTS_WOO_SECRET 未設）→ 註冊禮關回 0（操作者「你現在全部去處理好」）（Claude）
 
 - 部署：`/check-drift`（只落後 9 commit、compose 變數無漂移）→ `sg-deploy.sh next-admin` → `7b7920f25` healthy 15s、HTTP smoke 5/5 OK。

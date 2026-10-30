@@ -48,7 +48,7 @@ export const PRIORITY = [
 // 接下來的實際順序（2026-10-23 依 prod 現況排；證據在 NOW 與各卡）。steps＝相關步驟；每個未完成步驟至少出現一次（check 擋）。
 export const NEXT = [
   { h: '① 翻強制模式（等 10/31，不占工時）', t: '權利已就位（2026-10-23 部署）；客戶本人操作時已一律強制，翻的只影響員工。10/31 自動檢查 7 天「若強制就拒」歸零或都已解釋後，請你同意再翻（High）。', steps: [3] },
-  { h: '② 用量計量與門上線阻擋項', t: '已做（2026-10-23）：每道付費縫記用量（自用與合約列只記不扣；單價待你定）、studio 精選免費路徑在付費閘前且門上藏 AI 按鈕。tarot 批次也已記操作者（0119 已套 prod，2026-10-23）。剩：員工路由在 withFeature 範圍外的付費工作仍記在自用帳戶（TASKS「員工路由用量歸屬」）。', steps: [3, 8] },
+  { h: '② 用量計量與門上線阻擋項', t: '已做（2026-10-23）：每道付費縫記用量（自用與合約列只記不扣；點數列依實際成本扣，4b-11）、studio 精選免費路徑在付費閘前且門上藏 AI 按鈕。tarot 批次也已記操作者（0119 已套 prod，2026-10-23）。剩：員工路由在 withFeature 範圍外的付費工作仍記在自用帳戶（TASKS「員工路由用量歸屬」）。', steps: [3, 8] },
   { h: '③ 門逐個上線', t: 'tarot、studio（2026-10-23）、video、design（2026-10-24）、content（2026-10-30）已上線，共用一個 nginx 門區塊。每個功能分開買或贈送（你 2026-10-24 定）：客戶帳戶持有該產品才進得了門，否則只看到「尚未開通」；每扇門左邊選單列功能，沒持有的灰掉（做好待部署）。逐門任務在 cards/step-8-doors-video-design-content.md；剩 cs（等 Chatwoot）、collect、outreach（員工路由要先搬）最後。每個門上線 High。第一個自助客戶不等 Woo：員工邀請（本機帳號登入已能用）＋人工寫合約列，與 Soulful 同一條路。', steps: [8] },
   { h: '④ 收錢分兩段', t: '4a 已上線（2026-10-23；0120 已套 prod，程式 10/24 03:00 部署）：付款接頭、收件表、合約與權利同一交易寫入、錢包入帳與只退未用點數、拒付凍結、/ops/billing；付款來源「人工」（轉帳後用 scripts/record-payment.mjs 登記）。訂閱付款前還要你定第一個方案（plans 0 筆）。4b 設計與八張小卡已寫（2026-10-24，cards/step-4.md §4b）：付款事件由 wp-bridge 外掛用官方 PHP action 送（不用 Woo 原生 webhook：沒有續約事件、失敗 5 次就停用）；WordPress 會員對應計費帳戶一張表（0124）；第一次付款的會員自動建帳戶並寄設定密碼信；WordPress 一次性碼進產品門（ADR 015 順序 1）。4b-1～4b-5、4b-7 已完成（0124、0126 已套 prod；收費外掛 aware-wave-store 1.0.0 已裝 aware-wave.com，2026-10-25）；扣款、點數條款、點數規則三題已定（都選 A）。4b-6 由你在 WordPress 後台做（裝 WooCommerce Subscriptions、綠界個人會員收台灣卡、PayPal 收海外卡、結帳必登入、條款勾選；2026-10-30 改：你是個人、無統編，申請不了 TapPay，月收 5 萬須稅籍登記後再評估收攏單軌），綠界要開通信用卡與定期定額、PayPal 要連玉山全球通；也要你定第一個方案。收第一筆真錢前做 4b-9 真實付款演練：各段單獨有測試，但 WordPress→控制面整條沒跑過（prod payment_events 0 筆）。4c 賣家（收銀台可裝在任何網站，ADR 017 決定 #12，2026-10-25 你定 D1–D5）：代理權、收銀台登記表、各站鑰匙驗章與 /ops/sellers 已完成（0133、0140、0141 已套 prod；4c-2 已部署 2026-10-29），aware-wave.com 照舊；外掛代理商模式已發版並升級 aware-wave.com（1.2.0，月結依買家付款月份，0142）；剩第一個代理商網站實測。設計與執行卡在 cards/step-4-seller.md。', steps: [4] },
   { h: '⑤ 買斷安裝', t: '收錢兩段完成、待決 2 律師回覆後開工。授權檔改由自架 Keygen CE 簽發，不自寫簽章（現成方案評估 2026-10-25）。', steps: [5] },
@@ -62,7 +62,7 @@ export const DRILL = [
   { way: '自用', who: 'edd-research（你的研究，贈送）', axes: 'hosted／comp／staff 或 customer', result: '全產品免費可用。' },
   { way: '訂閱', who: 'mongolia-03（等刷卡）', axes: 'hosted／（尚無）／customer', result: '客戶本人全部拒絕；員工替它做在影子模式放行但記「若強制就拒」，強制後拒絕。' },
   { way: '訂閱', who: 'e2e-verify-0704、test-wp-webhook-co（測試）', axes: 'hosted／（尚無）／customer', result: '同未付款客戶，全部拒絕。' },
-  { way: '點數', who: 'drill-credits（加的，content 點數包加購列＋錢包 50 點）', axes: 'hosted／credits／customer', result: '包含的點數功能用錢包付（單次上限 50）；包以外的功能與合約功能拒絕；目前不扣點（單價待你定）。' },
+  { way: '點數', who: 'drill-credits（加的，content 點數包加購列＋錢包 50 點）', axes: 'hosted／credits／customer', result: '包含的點數功能用錢包付（單次上限 50）；包以外的功能與合約功能拒絕；依實際成本扣點（4b-11，已上線）。' },
   { way: '點數', who: 'drill-wallet-only（加的，只有錢包 500 點、沒有列）', axes: 'hosted／credits／customer', result: '全部拒絕：只有錢包打不開任何功能（2026-10-25 決定 A）。' },
   { way: '訂閱', who: 'drill-social-subscriber（加的，只訂社群）', axes: 'hosted／contract／customer', result: '社群可用，其他產品拒絕。' },
   { way: '賣人＝買斷', who: '（未建）', axes: 'self_hosted／perpetual／customer', result: '授權檔與離線驗章還沒做（順序 5），演練標為待建。' },
@@ -115,10 +115,10 @@ export const WAYS = [
 export const NOW = [
   { what: '客戶可自行登入', state: 'no', ev: '2026-10-30 定案：註冊只在 aware-wave.com（WordPress 會員＋信箱驗證／Google），驗證後送 50 點註冊禮並自動建 app 帳號；portal 註冊已刪（reports/decisions/2026-10-30-customer-self-signup-email-google.md）。實走一次註冊→進入後改 yes' },
   { what: '已有付費客戶', state: 'no', ev: 'Soulful 代操合約已登記（全產品，0118）；自助付費 0：plans、錢包帳本皆 0 筆，Woo 尚未販售' },
-  { what: '代操用量按客戶計', state: 'no', ev: '程式已接（2026-10-23）：每道付費縫 grant.recordUse() 每個 grant 記一列 entitlement.usage（lib/ai/gateway.ts、collect、video.tts），閘擋「credits 功能走不到 recordUse」；2026-10-24 03:00 自動部署後生效。扣點仍 0（每功能單價待你定）；錢包入帳只經付款事件（0120 billing_apply_payment_event，4a，2026-10-23）' },
+  { what: '代操用量按客戶計', state: 'no', ev: '程式已接（2026-10-23）：每道付費縫 grant.recordUse() 每個 grant 記一列 entitlement.usage（lib/ai/gateway.ts、collect、video.tts），閘擋「credits 功能走不到 recordUse」；2026-10-24 03:00 自動部署後生效。扣點已上線（4b-11，33afaf874，prod 4af222dfc）：1 點＝NT$1，每次交付成功的供應商呼叫扣 ceil(成本美元×32×3)，只有 pay=credits 的權利列（0145 各產品 *_credits 加購方案）扣錢包、影子模式不扣；錢包入帳只經付款事件（0120 billing_apply_payment_event，4a，2026-10-23）' },
   { what: '買斷', state: 'no', ev: '授權檔與模組清單未建；provision/ 只有一鍵架站（provisionClient.ts）' },
-  { what: '許可判斷', state: 'yes', ev: '每個收費點只問 can()（e87de9225），影子模式（ENTITLEMENT_MODE 未設，can.ts:63）：照算判決並記錄，一律放行、不扣點。點數功能先認權利列（b3df190e9）；自用、EdD 免費與 Soulful 全產品合約每天自動補齊（0118），已部署；翻強制待 10/31 自動檢查與你同意；每功能扣幾點待你定價' },
-  { what: '產品自己的門', state: 'yes', ev: 'social、tarot、studio、video、design、content 已上線（video／design 2026-10-24：DNS、憑證 15 SAN、兩層 nginx、部署 51a84b203；content 2026-10-30：憑證 16 SAN、部署 3f9bb4273；公網與 Playwright 煙霧測試通過）；門只讓持有該產品的帳戶進門頁（lib/portal/door-access.ts；API 層尚未查持有，見 TASKS 產品門條目）；其餘 5 個未開。開門規則與機械閘見 ADR 018 §2；登記表 11 個產品仍是 coming_soon（開放販售另做）' },
+  { what: '許可判斷', state: 'yes', ev: '每個收費點只問 can()（e87de9225），影子模式（ENTITLEMENT_MODE 未設，can.ts:63）：照算判決並記錄，一律放行、不扣點。點數功能先認權利列（b3df190e9）；自用、EdD 免費與 Soulful 全產品合約每天自動補齊（0118），已部署；翻強制待 10/31 自動檢查與你同意；扣幾點已定＝依實際成本（4b-11，同上列）' },
+  { what: '產品自己的門', state: 'yes', ev: 'social、tarot、studio、video、design、content 已上線（video／design 2026-10-24：DNS、憑證 15 SAN、兩層 nginx、部署 51a84b203；content 2026-10-30：憑證 16 SAN、部署 3f9bb4273；公網與 Playwright 煙霧測試通過）；門與門的 API 都只讓持有該產品的帳戶進（lib/portal/door-access.ts；API 由 middleware 統一查，8e20474b7）；其餘 5 個未開。開門規則與機械閘見 ADR 018 §2；登記表 11 個產品仍是 coming_soon（開放販售另做）' },
 ];
 
 // ADR 017「順序」。status: not_started | in_progress | done；done 必填 commit。
@@ -141,7 +141,9 @@ export const STEPS = [
       { id: '4b-4', plain: 'WordPress 一次性碼進產品門：next-admin 端做好（只給 email 已證明的帳戶、防登入固定），按鈕在外掛 4b-2；設密鑰才開', status: 'done', commit: '125cdad43' },
       { id: '4b-5', plain: '點數只付已持有功能（改 can() 點數分支，High）', status: 'done', commit: '81f81cf03' },
       { id: '4b-11', plain: '定價與扣點：1 點＝NT$1，每次交付成功的 AI 呼叫扣實際成本×3；錢包扣光就停；舊的客服每則 1 點預扣刪掉', status: 'done', commit: '33afaf874' },
-      { id: '4b-9', plain: '真實付款演練：0 元試用與沙盒卡號各一筆，從 WordPress 結帳一路驗到開通、加點、一鍵進門、扣點、退款與取消（第一個方案 studio_basic 與定價 4b-11 已好；只等 4b-6）', status: 'todo' },
+      { id: '4b-12', plain: '先預扣再結算：圖片、影片場景、放大、修圖、轉錄開跑前先扣價格，交付後多退少補；錢包不夠的那一個不開跑；遺失的預扣每天自動全退（0148 已套 prod）', status: 'done', commit: '944012b9d' },
+      { id: '4b-13', plain: '每日對帳：aware-wave.com 已付款的 AwareWave 訂單 vs 收到的付款事件，/ops/billing 列漏送／多送／需人工登記，對不上開事件；外掛 1.3.1 已裝。Woo 付款開啟（4b-6）後才實際比對', status: 'done', commit: 'f40dca26c' },
+      { id: '4b-9', plain: '真實付款演練：0 元試用與沙盒卡號各一筆，從 WordPress 結帳一路驗到開通、加點、一鍵進門、扣點、退款與取消（方案 0145 各產品 *_credits 與定價 4b-11 已好；只等 4b-6）', status: 'todo' },
       { id: '4b-10', plain: '員工後台給／收某客戶的產品：客戶頁「帳務」分頁勾選＝贈送整個產品、取消＝收回，代理權（能不能賣）分開勾；只有擁有者／管理員，每次留稽核；只開贈送，合約仍走付款（0143 已套 prod 2026-10-29）', status: 'done', commit: '66b612ead' },
       { id: '4c-4', plain: '賣家：代理權（<產品>.resell）只看賣家帳戶的權利列，不經 can()（ADR 017 決定 #12）', status: 'done', commit: '38a8198fb' },
       { id: '4c-1', plain: '賣家：收銀台登記表 seller_sites（0133，已套 prod 2026-10-25）；aware-wave.com 是第一列，付款照舊', status: 'done', commit: '830dd301e' },
