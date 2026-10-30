@@ -12,6 +12,8 @@
  * Allowed only when that member proved the mailbox here too: otherwise whoever registered the address first (and holds
  * its password) would share the account the real owner signs into with Google. Refused = Nextend asks to log in with
  * the password and link Google from the account page.
+ * The button: Nextend free places none on WooCommerce forms (that is Pro), so its [nextend_social_login] shortcode is put at
+ * the end of the My Account login and register forms; it prints nothing until Google is verified and enabled in Nextend.
  *
  * @package AwareWave\Store
  */
@@ -33,6 +35,15 @@ final class GoogleSignup {
 	public function register(): void {
 		add_action( 'nsl_google_register_new_user', array( $this, 'onRegister' ), 10, 2 );
 		add_filter( 'nsl_google_auto_link_allowed', array( $this, 'autoLinkAllowed' ), 10, 3 );
+		foreach ( array( 'woocommerce_login_form_end', 'woocommerce_register_form_end' ) as $form ) {
+			add_action( $form, array( $this, 'button' ) );
+		}
+	}
+
+	public function button(): void {
+		if ( shortcode_exists( 'nextend_social_login' ) ) {
+			echo do_shortcode( '[nextend_social_login provider="google"]' );
+		}
 	}
 
 	public function autoLinkAllowed( $allowed, $provider, $userId ): bool {
