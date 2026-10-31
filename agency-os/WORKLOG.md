@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-31（續1）Outbound OS v2：GPT 草案重寫成可執行規格＋監工台 C1–C10
+
+**觸發**：操作者丟 GPT「Multi-Brand Outbound OS」v1.0 草案（自述未讀 repo）＋兩份補充（研究引擎、企業版 12 模組），要求「優化升級、不得畫蛇添足」，討論附件／畫布／開信追蹤／n8n／連結五題後：「寫一個完整的 plan 和監工台」。
+
+**根因**：冷信工具只做中段（評分、寫信、審核、建草稿）。頭：研究沒有，`co_leads.observation` 一格人工填。尾：Replies／首頁／Drafts 是 stub；草稿只存 draft id（`gmail-draft/route.ts:186`）；不重查拒收（`:65`）；追蹤只有日期（`followups/route.ts:6-8`）；wp-bridge 無 contact 端點（`RestController.php:42-105`）。信本身：主旨 null（`messages/route.ts:209`）、定位讀了沒用（`:123`）、一封一版（`:48-66`）。GPT 草案另提 brand_id／job queue＋Worker／CRM 六表／ai-router／改名表／NestJS／BullMQ／S3，全部與 ADR 017 三軸、2026-10-25 時鐘決策、`lib/ai/gateway.ts`、12 張 `co_*` 表相撞。
+
+**決策**（與操作者逐題討論後定，SPEC §2 D1–D15）：brand＝organization；不建 queue／CRM／ai-router；研究＝`lib/collect` entity-dossier＋一個新 sink；`co_sender_accounts.send_mode` draft｜auto（預設 draft，翻 auto 每帳號 High）；序列固定形狀不做畫布（唯一條件「有回信？」，I4 禁追蹤故無開信／點擊可分岔）；回信後＝Replies 頁分類＋按鈕，不是序列分岔；冷信零追蹤、暖信統計看 FluentCRM；n8n 不在路徑（live 查 5 條 workflow 全 `active:false`）；訂正兩個既有說法：`gmail.compose` 允許 `drafts.send`（`MODULE_MANIFEST.json:22` 寫反，C1.1 改）；冷信不買專用網域（deliverability §11，收回我前一則）。
+
+**已修改**：`26bce3452` 資料夾 `docs/cold_email` → `docs/Outbound_OS_Engineering_Spec`＋GPT 原稿入庫＋`ops-role.ts:120`、`outreach/db.ts:2` 註解路徑；`0ce78d7a5` TASKS.md:1162 兩個連結（私有 index）；`52bf1c188` v2 規格（取代草案，≤300 行，12 節）＋`handoffs/2026-10-31-outbound-os/`（R0-PLAN 七段＋§6 C1–C10 共 43 項、data.mjs、build／check 照 supervisor-kit、supervisor.html）；`2ff439519` merge daily scaffold；已 push。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=python verify_paths.py（規格＋計畫反引號路徑逐一 os.path.exists：95 條、0 缺、16 條標「新檔」跳過）; node build.mjs && node check.mjs（10 cards／43 items 綁定計畫 §6、5 open、page fresh、無「我們」） | exit=0 | ms=231
+- 附：`npx tsc --noEmit` exit=2，3 錯全在 `.next/types/validator.ts`（2026-10-29 建置殘留）指向 `420233a4c` 後已搬的 `portal/signup`、`studio/proxy-image`；本次只改 2 行註解，原始碼 0 錯（同 WORKLOG 先例 :922）。
+- REVIEW_WAIVED: NA -- 操作者電量將盡，`/codex-review` 延至下個 session（C1 開工前補）；本 session 自審：D1–D15 每條附 file:line，GPT 12 模組逐列對照
+- ORACLE_WAIVED: 同上，codex-oracle review artifact 下個 session 補
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=docs/cold_email | hits=1（`lobster-factory/packages/db/migrations/0048_co_outreach_core.sql:2-3` 已套用 migration 的檔頭註解，不回改；其餘命中為 `.next` cache、`.claude` 對話紀錄、WORKLOG 歷史）
+
+**剩餘**：① 發布 supervisor.html 為 artifact → `data.mjs` META.url；② Codex 審規格；③ C1 開工。建議模型：Opus 5.5（C1 可派 Codex）。續接語在 R0-PLAN.md 第一行。
 ## 2026-10-30（續36）停用：aware-wave.com 只留 WordPress，與 app 完全無關；註冊禮送出的點數與產品收回（操作者決定）（Claude）
 
 - **決定**（操作者原話）：「先把 aware-wave.com 上之前設的點數和使用 11產品取消」→ 選「全部停掉」→「讓他完全跟 app.aware-wave.com 無關」→「aware-wave.com 只留和 wordpress 相關的東西」。起因：真人註冊後進門一連串問題（續34），先只自用。
