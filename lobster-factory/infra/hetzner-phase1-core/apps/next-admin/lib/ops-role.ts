@@ -117,7 +117,7 @@ export function canSyncWpReport(role: OpsRole): boolean {
   return role === "owner" || role === "admin" || role === "operator";
 }
 
-// === Cold Outreach Workbench (agency-os/docs/cold_email §B0.1) ===
+// === Cold Outreach Workbench (agency-os/docs/Outbound_OS_Engineering_Spec §B0.1) ===
 // owner/admin/operator may manage outreach (import leads, generate/approve copy, sync warm);
 // viewer is read-only. This is the agency-internal ops-console access model — NOT per-tenant
 // login isolation (which is deferred to Phase 5). organization_id stays a client-scoping filter.

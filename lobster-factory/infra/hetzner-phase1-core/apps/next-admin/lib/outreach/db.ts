@@ -1,5 +1,5 @@
 // Cold Outreach Workbench — server-side data layer (Phase 1 shell).
-// SSOT: agency-os/docs/cold_email/COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md (§B0.1)
+// SSOT: agency-os/docs/Outbound_OS_Engineering_Spec/COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md (§B0.1)
 //
 // Access model (verified reality, §B0.1): this is an agency-internal ops console. DB access goes
 // through the service-role client (lib/supabase-server.ts); RLS on co_* tables is service-role-only
