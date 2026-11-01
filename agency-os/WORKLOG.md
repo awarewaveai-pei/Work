@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-01（續6）Outbound OS v2：對照大牌後補兩個頭端缺口——C3.7 抓 email、C1.5 MX 查核
+
+**觸發**：操作者問「我的規劃有沒有包含 Apollo／Hunter／Instantly／HubSpot 的主要功能」→ 逐類對照，兩類刻意低（寄信規模、CRM）、一類高（證據鎖個人化）、兩類真缺口 → 操作者「補進卡片」。
+
+**缺口與證據**：匯入無 email／電話／社群即 `no_contact`（`NA/app/api/outreach/inbox/route.ts:37`），而沒有任何程式抓網站 email → 找名單的產出寄不出去；`scoreContactability` 早留 `emailVerified`（`scoring.ts:62`）、`co_verified_emails`（`0048:295`）0 呼叫點、`mx_syntax` 槽位只有名字（`router.ts:28`）。
+
+**已修改**（`e62fa5ac3`）：SPEC 加 D19、§3 第 03 列、§5.1；R0-PLAN 加 C1.5（`verify-email.ts` MX＋快取＋評分＋建草稿擋 invalid）、C3.7（sink 純程式抓 email，`mailto:`／內文、同網域優先、空才填、timeline `email_found`），sink 改名 `outreach-research`（一個 sink 兩種純輸出），C10.1 註記無 email 由 C3.7 補；data.mjs NOW 加一列、C1／C3 各加一項。未加：成交金額欄（等第一筆成交）、「做一張圖給你」卡（C3 之後）。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=python verify_paths.py（0 缺）; node build.mjs && node check.mjs（10 cards／45 items 綁定 §6、0 open、page fresh） | exit=0 | ms=128
+- REVIEW_WAIVED: DOC_ONLY -- 計畫增項；每條附 file:line
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=outreach-evidence | hits=0（改名後三檔皆清）
+
+**下一步**：C1（含 C1.5）。建議模型：Opus 5.5（可派 Codex）。
 ## 2026-11-01（續5）Outbound OS v2：Fable 5.1 複審五項決定——D12／D16／D17 改正，D13／D18 維持
 
 **觸發**：操作者「用 Fable 5.1 再檢視一次並做決定」。
