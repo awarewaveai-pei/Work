@@ -140,7 +140,7 @@ export const STEPS = [
     ] },
   { n: 10, code: 'C10', group: 'C', title: '名單發現', plain: '例：你輸入「台中 咖啡廳」，系統用現有的 Serper 帳號查地圖，找出 20 家，連網站與電話一起放進待處理名單。',
     gate: '一次真查回 20 筆進待處理名單，每筆有名稱、網站或電話、來源網址。費用在畫面上。', risk: 'Low', model: 'Codex', status: 'not_started', depends: [],
-    decided: '用已經在付費使用的 Serper 查地圖，不另外申請 Google Places，不用綁新的信用卡。（規格 D18）',
+    decided: '用已經在付費使用的 Serper 查地圖。不用 Google Places API：它的條款不准把查到的店名、網站、電話存進自己的資料庫，而名單庫就是要存這些；資料也比較貴、要開帳單帳戶。它多出來的營業時間與評論，由研究那一步從店家網站取得。（規格 D18）',
     what: 'serper allowedPaths 加 /places；discover.ts 經 createProviderCall（預算＋限速）→ co_lead_inbox → 既有 normalize／dedup／suppression；Inbox 頁找名單表單',
     files: ['NA/lib/collect/net/providers.ts', 'NA/lib/outreach/discover.ts', 'NA/lib/outreach/connectors/router.ts', 'NA/app/api/outreach/inbox/route.ts'],
     items: [

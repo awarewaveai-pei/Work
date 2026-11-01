@@ -74,7 +74,7 @@
 | D15 | 不加依賴：JSON 守衛手寫（repo 無 zod） | `NA/package.json` 無 zod；`cheap-json.ts:29` 已有 `extractJsonArray` 慣例 |
 | D16 | FluentCRM 目標＝該 org `active` 的 `wp_sites` 列，不寫死網域。C6 parked：今天沒有任何回信；AwareWave 沒有目標站（aware-wave.com 只留 WordPress，app 連線 2026-10-30 依操作者指示全斷，不得重接） | `DB/migrations/0039_wp_sites.sql:11`（`active`）、`DB/migrations/0061_wp_sites_add_org.sql:36`（`organization_id`）；讀法 `NA/lib/content/topics/plan-due.ts:61`；回頭條件：某品牌有回信的 lead，且該品牌的站裝了 wp-bridge＋FluentCRM |
 | D17 | 先不開任何帳號的 `auto`；C8 parked | 沒有寄送資料可判斷帳號健康。回頭條件：該帳號草稿模式寄滿 50 封、退信率 < 2%、0 投訴、回覆同步上線滿 2 週（C7 成效頁可讀） |
-| D18 | 名單發現用 Serper `/places`（既有 `SERPER_API_KEY`），不申請 Google Places key | Serper 已是 collect 預設搜尋供應商（`NA/lib/collect/net/providers.ts:76-89`），只鎖 `/search` 是因為沒有別的呼叫者（同段註解）；C10 就是那個呼叫者。新供應商、新信用卡、新金鑰都省掉 |
+| D18 | 名單發現用 Serper `/places`（既有 `SERPER_API_KEY`），不用 Google Places API | 決定性原因是條款：Google Places 政策「不得預先抓取、快取或儲存 Places 內容，例外只有 place ID」（developers.google.com/maps/documentation/places/web-service/policies），名單庫要存名稱、網站、電話，等於違反；且需啟用帳單帳戶、含電話／網站的 SKU＝Text Search Enterprise $35／千次（免費 1,000／月）。Serper 回 title／address／phoneNumber／website／rating／cid，沒有營業時間與評論——那是研究（C3 爬網站）的事，不是找名單的事。Serper 已是 collect 預設供應商（`NA/lib/collect/net/providers.ts:76-89`），只鎖 `/search` 是因為沒有別的呼叫者；C10 就是那個呼叫者。換供應商＝`providers.ts` 一個 entry＋一個 parser（`:63-66` 註解） |
 
 ## 3. GPT 企業版 12 模組對照
 

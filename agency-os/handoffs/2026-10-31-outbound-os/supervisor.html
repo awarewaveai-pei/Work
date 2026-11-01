@@ -135,7 +135,7 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
       <details><summary>工程細節：C10 名單發現</summary>
         <p>serper allowedPaths 加 /places；discover.ts 經 createProviderCall（預算＋限速）→ co_lead_inbox → 既有 normalize／dedup／suppression；Inbox 頁找名單表單</p>
         <p><b>需先完成：</b>無</p>
-        <p><b>決定：</b>用已經在付費使用的 Serper 查地圖，不另外申請 Google Places，不用綁新的信用卡。（規格 D18）</p>
+        <p><b>決定：</b>用已經在付費使用的 Serper 查地圖。不用 Google Places API：它的條款不准把查到的店名、網站、電話存進自己的資料庫，而名單庫就是要存這些；資料也比較貴、要開帳單帳戶。它多出來的營業時間與評論，由研究那一步從店家網站取得。（規格 D18）</p>
         <p><b>檔案：</b><code>NA/lib/collect/net/providers.ts</code> <code>NA/lib/outreach/discover.ts</code> <code>NA/lib/outreach/connectors/router.ts</code> <code>NA/app/api/outreach/inbox/route.ts</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C10</code></p>
       </details>
