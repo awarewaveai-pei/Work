@@ -1,0 +1,57 @@
+@import url("/awarewave/theme.css");
+@import url("/awarewave/forms.css");
+
+html[data-awarewave-embedded] .app { display: flex; flex-direction: column; }
+html[data-awarewave-embedded] .sidebar { display: flex; flex: 0 0 auto; flex-wrap: wrap; align-items: center; align-content: flex-start; gap: 4px; width: auto; height: auto; min-height: 0; overflow: visible; border: 0; border-bottom: 1px solid var(--sidebar-border); padding: 8px; }
+html[data-awarewave-embedded] .sidebar .nav { width: auto; margin: 0; }
+html[data-awarewave-embedded] .section-title { display: none; }
+html[data-awarewave-embedded] .app > main { flex: 1; height: auto; min-height: 0; overflow-y: auto; }
+.service-error {
+  position: fixed;
+  inset: auto 16px 16px;
+  z-index: 1000;
+  padding: 16px;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  background: var(--card-bg);
+  border: 1px solid var(--red);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+}
+.service-error button {
+  background: var(--btn-secondary-bg);
+  color: var(--btn-secondary-text);
+  border: 1px solid var(--btn-secondary-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.job-view {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--body-bg);
+  color: var(--text-primary);
+  padding: 32px;
+  overflow: auto;
+  font-size: var(--font-size-base);
+}
+.job-view progress {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.job-view img,
+.job-view video {
+  max-width: 100%;
+  max-height: 70vh;
+}
+.job-view button {
+  margin: 12px 8px 0 0;
+  padding: 10px 16px;
+  background: var(--btn-secondary-bg);
+  border: 1px solid var(--btn-secondary-border);
+  color: var(--btn-secondary-text);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}

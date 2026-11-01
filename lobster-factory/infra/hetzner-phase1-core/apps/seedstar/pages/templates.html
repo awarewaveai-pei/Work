@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>模板牆</title>
+    <link rel="stylesheet" href="../styles/theme.css" />
+    <link rel="stylesheet" href="../styles/templates.css" />
+    <link rel="stylesheet" href="../styles/workspaces.css" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <input id="upload" type="file" accept="image/*,video/*" hidden />
+    <div class="modal" id="overlay" hidden>
+      <div class="dialog" id="dialogContent"></div>
+    </div>
+    <div class="floating" id="toast" hidden></div>
+    <script src="../config.js"></script>
+    <script src="../shared/models.js"></script>
+    <script src="../shared/adapters.js"></script>
+    <script src="../shared/purify.js"></script>
+    <script src="../shared/runtime.js"></script>
+    <script src="../shared/security.js"></script>
+    <script src="../shared/theme.js"></script>
+    <script src="../shared/jobs-view.js"></script>
+    <script src="../shared/workflows.js"></script>
+    <script src="../shared/assets-ui.js"></script>
+    <script src="../scripts/templates-boot.js"></script>
+  </body>
+</html>

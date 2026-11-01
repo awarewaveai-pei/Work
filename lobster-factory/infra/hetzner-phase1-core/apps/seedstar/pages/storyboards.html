@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>分鏡靈感 — 商業廣告與人文生活</title>
+    <link rel="stylesheet" href="../styles/theme.css" />
+    <link rel="stylesheet" href="../styles/storyboards.css" />
+    <link rel="stylesheet" href="../styles/workspaces.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="head">
+        <div>
+          <div class="tiny">SEEDSTAR · 分鏡靈感</div>
+          <h1>分鏡靈感 <span class="cnt" id="total"></span></h1>
+          <p class="sub">
+            指定分類：商業廣告、人文生活 · 內嵌資料直接在本頁瀏覽
+          </p>
+        </div>
+        <div>
+          <button class="btn" id="importBtn">＋ 加入更多分鏡資料</button>
+          <button class="btn" id="exportBtn">匯出分鏡 JSON</button>
+          <button
+            class="btn primary"
+            id="saveHtmlBtn"
+            title="把目前已匯入的分鏡、編輯的提示詞一起寫進 HTML"
+          >
+            ⬇ 匯出分鏡備份
+          </button>
+        </div>
+      </header>
+      <div class="notice">
+        <strong>資料完整度：</strong
+        ><span id="sourceStats"></span>。已逐頁讀取商業廣告 5 頁、人文生活 3
+        頁，共 172 筆作品、172 張圖片、兩種原文 Prompt
+        與鏡頭拆解。擷取日期：2026-10-29（台北時間）。圖片以每張不超過 60 KB 的
+        WebP 內嵌；部分圖片縮小尺寸，無須連線。
+      </div>
+      <div class="bar">
+        <label class="search"
+          >⌕
+          <input
+            id="q"
+            placeholder="搜尋分鏡名稱、風格、鏡頭或標籤…"
+            autocomplete="off" /></label
+        ><select class="select" id="sort">
+          <option value="default">精選排序</option>
+          <option value="views">最多觀看</option>
+          <option value="name">標題排序</option></select
+        ><select class="select" id="grid">
+          <option value="all">全部格數</option>
+          <option value="9-Grid">9-Grid</option>
+          <option value="6-Grid">6-Grid</option>
+          <option value="8-Grid">8-Grid</option>
+          <option value="12-Grid">12-Grid</option>
+          <option value="16-Grid">16-Grid</option>
+          <option value="4-Grid">4-Grid</option>
+          <option value="other">製作表與台紙</option></select
+        ><button class="btn" id="favoriteBtn">☆ 我的最愛</button
+        ><span class="countline" id="num"></span>
+      </div>
+      <div class="tags" id="categories"></div>
+      <div class="gallery" id="gallery"></div>
+      <div id="empty" class="empty" hidden>沒有符合條件的分鏡</div>
+      <p class="footnote">
+        收錄本次 Cloud Browser
+        可存取的兩類全部作品。網站的變體各自保留，不合併、不補寫。分鏡表與
+        Prompt
+        保留網站「原文」內容；來源欄位的「-」依原樣保留。所有圖片已內嵌，外部來源連結僅供查證。未取得內容會標註「未取得」。
+      </p>
+    </div>
+    <div class="modal" id="modal" hidden role="dialog" aria-modal="true">
+      <div class="dialog">
+        <div class="dialogHead">
+          <button class="detail-back" id="close" aria-label="返回分鏡靈感">
+            ← 返回分鏡靈感</button
+          ><span style="color: #edb0d5">▣</span>
+          <h2 id="modalTitle">分鏡詳情</h2>
+          <span id="modalType" class="badge"></span>
+          <div class="detail-head-spacer"></div>
+        </div>
+        <div class="detailLayout">
+          <aside class="detailVisual">
+            <img id="largeImage" class="banner" alt="分鏡圖" />
+          </aside>
+          <main class="detailContent">
+            <div class="toolbar2">
+              <button class="btn" id="bringImage">▧ 帶入生圖</button
+              ><button class="btn primary" id="bringReference">
+                ✧ 帶到全能參考</button
+              ><button class="btn" id="star">☆ 收藏</button
+              ><button class="btn" id="pickImageBtn">嵌入本機圖片</button
+              ><input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                id="pickImage"
+                hidden
+              /><span class="badge" id="views">瀏覽</span>
+            </div>
+            <div class="language-switch" role="group" aria-label="顯示語言\">
+              <span>顯示語言</span
+              ><button class="btn" id="languageZh" aria-pressed="true">
+                繁體中文</button
+              ><button class="btn" id="languageEn" aria-pressed="false">
+                English
+              </button>
+              <p id="languageNote">
+                中文為依英文原文製作的翻譯；帶入生成一律使用原文提示詞。
+              </p>
+            </div>
+            <nav class="detailTabs" role="tablist" aria-label="分鏡詳情內容">
+              <button
+                type="button"
+                class="detailTab active"
+                data-detail-tab="shots"
+                role="tab"
+                aria-selected="true"
+              >
+                鏡頭拆解</button
+              ><button
+                type="button"
+                class="detailTab"
+                data-detail-tab="info"
+                role="tab"
+                aria-selected="false"
+              >
+                作品資訊</button
+              ><button
+                type="button"
+                class="detailTab"
+                data-detail-tab="image"
+                role="tab"
+                aria-selected="false"
+              >
+                生圖提示詞</button
+              ><button
+                type="button"
+                class="detailTab"
+                data-detail-tab="video"
+                role="tab"
+                aria-selected="false"
+              >
+                運鏡提示詞
+              </button>
+            </nav>
+            <section
+              class="detailPanel active"
+              data-detail-panel="shots"
+              role="tabpanel"
+            >
+              <div class="panel">
+                <h3>▤ 鏡頭清單與分鏡拆解</h3>
+                <div id="shotTable"></div>
+              </div>
+            </section>
+            <section
+              class="detailPanel"
+              data-detail-panel="info"
+              role="tabpanel"
+            >
+              <div class="panel">
+                <h3>▦ 分鏡規格資訊</h3>
+                <div class="specs" id="specs"></div>
+                <div class="source" id="source"></div>
+              </div>
+            </section>
+            <section
+              class="detailPanel"
+              data-detail-panel="image"
+              role="tabpanel"
+            >
+              <div class="prompt-block">
+                <div class="prompt-row">
+                  <h3 class="prompt-title">
+                    <span class="glyph">▧</span> 生圖提示詞 (Image Generation
+                    Prompt)
+                  </h3>
+                  <button class="prompt-copy" id="copyImagePrompt">
+                    ▢ 複製生圖提示詞
+                  </button>
+                </div>
+                <pre id="imagePromptText" class="prompt-code missing">
+尚未取得這張作品的官方原始生圖提示詞。</pre>
+                <p class="prompt-provenance" id="imagePromptProvenance"></p>
+              </div>
+              <div class="prompt-tools">
+                <button class="btn" id="showPromptSample">
+                  查看你提供的提示詞截圖範例</button
+                ><button class="btn" id="editPromptBtn">
+                  ✎ 編輯此卡的提示詞
+                </button>
+              </div>
+              <div id="promptEditor" class="prompt-edit" hidden>
+                <label for="editImage">生圖提示詞</label
+                ><textarea
+                  id="editImage"
+                  placeholder="貼上這張分鏡的實際生圖 Prompt"
+                ></textarea
+                ><label for="editVideo">運鏡提示詞</label
+                ><textarea
+                  id="editVideo"
+                  placeholder="貼上這張分鏡的實際運鏡 Prompt"
+                ></textarea
+                ><small
+                  >先儲存於這個頁面。按上方「儲存完整離線
+                  HTML」，就能把提示詞與分鏡資料永久內嵌於下載的檔案。</small
+                >
+                <div class="toolbar2">
+                  <button class="btn" id="cancelPromptEdit">取消</button
+                  ><button class="btn primary" id="savePromptEdit">
+                    儲存到本機
+                  </button>
+                </div>
+              </div>
+              <div class="lang">
+                僅提供繁體中文與
+                English；中文為原文翻譯。複製使用目前顯示語言；帶入生圖或全能參考一律使用原文。
+              </div>
+            </section>
+            <section
+              class="detailPanel"
+              data-detail-panel="video"
+              role="tabpanel"
+            >
+              <div class="prompt-block">
+                <div class="prompt-row">
+                  <h3 class="prompt-title">
+                    <span class="glyph">▷</span> 運鏡提示詞 (Video Motion
+                    Prompt)
+                  </h3>
+                  <button class="prompt-copy" id="copyVideoPrompt">
+                    ▢ 複製運鏡提示詞
+                  </button>
+                </div>
+                <pre id="videoPromptText" class="prompt-code missing">
+尚未取得這張作品的官方原始運鏡提示詞。</pre>
+                <p class="prompt-provenance" id="videoPromptProvenance"></p>
+              </div>
+              <div class="lang">
+                運鏡提示詞會依目前選取的語言顯示；帶入生成時一律使用原文。
+              </div>
+            </section>
+          </main>
+        </div>
+      </div>
+    </div>
+    <input type="file" id="importFile" accept=".json,application/json" hidden />
+    <div class="toast" id="toast" hidden></div>
+    <script type="application/json" id="aw-storyboard-state"></script>
+    <script src="../config.js"></script>
+    <script src="../shared/models.js"></script>
+    <script src="../shared/adapters.js"></script>
+    <script src="../shared/purify.js"></script>
+    <script src="../shared/runtime.js"></script>
+    <script src="../shared/security.js"></script>
+    <script src="../shared/theme.js"></script>
+    <script src="../shared/jobs-view.js"></script>
+    <script src="../shared/workflows.js"></script>
+    <script src="../shared/assets-ui.js"></script>
+    <script src="../scripts/storyboards-boot.js"></script>
+  </body>
+</html>

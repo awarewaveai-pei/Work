@@ -1,0 +1,124 @@
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright"),
+  assert = require("node:assert/strict"),
+  fs = require("node:fs");
+process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
+  require("node:path").join(require("node:os").tmpdir(), "seedstar-services-"),
+);
+(async () => {
+  const b = await chromium.launch({ channel: "msedge" }),
+    p = await b.newPage();
+  let db = {
+      version: 1,
+      characters: [],
+      projects: [],
+      assets: [],
+      jobs: [],
+      preferences: {},
+      selection: {},
+    },
+    requests = [],
+    job = { id: "remote-job", type: "image", status: "queued", progress: 0 },
+    fail = false;
+  await p.route("**/config.js", (r) =>
+    r.fulfill({
+      contentType: "text/javascript",
+      body: `window.SEEDSTAR_CONFIG={mode:'http',apiBaseUrl:'/api/seedstar',timeoutMs:1000}`,
+    }),
+  );
+  await p.route("**/api/seedstar/**", async (r) => {
+    const req = r.request(),
+      url = new URL(req.url()).pathname;
+    requests.push({
+      method: req.method(),
+      url,
+      body: req.postData() ? req.postDataJSON() : null,
+    });
+    if (url.endsWith("/state")) {
+      if (req.method() === "PUT") db = req.postDataJSON();
+      return r.fulfill({ json: db });
+    }
+    if (fail) return r.fulfill({ status: 503, json: { error: "unavailable" } });
+    if (url.endsWith("/cancel")) {
+      job = { ...job, status: "cancelled" };
+      return r.fulfill({ json: job });
+    }
+    return r.fulfill({ json: job });
+  });
+  await p.goto("http://127.0.0.1:4178");
+  await p.waitForFunction(() => window.SeedStar?.showJob);
+  await p.evaluate(async () => {
+    await SeedStar.ready;
+    await SeedStar.characters.save({ id: "c1", name: "API 角色" });
+    await SeedStar.assets.save({
+      id: "a1",
+      name: "API 素材",
+      kind: "image",
+      url: "/assets/image-1.webp",
+    });
+  });
+  assert.equal(db.characters[0].name, "API 角色");
+  assert.equal(db.assets[0].id, "a1");
+  console.log("PASS HTTP 資料保存");
+  await p.locator("[data-mode=image]").click();
+  await p.evaluate(() =>
+    SeedStar.generator.import({
+      target: "image",
+      title: "Reference",
+      image: "/assets/image-1.webp",
+      imagePrompt: "Reference test",
+    }),
+  );
+  await p.locator("#send").click();
+  await p.locator(".job-view").waitFor();
+  assert.equal(
+    requests.find((r) => r.method === "POST" && r.url.endsWith("/generations"))
+      .body.references.images[0].url,
+    "/assets/image-1.webp",
+  );
+  assert.match(await p.locator(".job-view").innerText(), /queued/);
+  await p.locator(".job-view button").filter({ hasText: "取消任務" }).click();
+  await p.waitForFunction(() =>
+    document.querySelector(".job-view").textContent.includes("cancelled"),
+  );
+  assert(requests.some((r) => r.url.endsWith("/cancel")));
+  await p.locator(".job-view button").filter({ hasText: "關閉" }).click();
+  console.log("PASS HTTP 任務建立與取消");
+  job = { id: "remote-2", type: "image", status: "queued", progress: 0 };
+  await p.locator("#send").click();
+  await p.locator(".job-view").waitFor();
+  job = {
+    ...job,
+    status: "succeeded",
+    progress: 100,
+    result: { url: "/assets/image-1.webp" },
+  };
+  await p.locator(".job-view img").waitFor({ timeout: 5000 });
+  assert(
+    requests.some(
+      (r) => r.method === "GET" && r.url.endsWith("/generations/remote-2"),
+    ),
+  );
+  await p.locator(".job-view button").filter({ hasText: "關閉" }).click();
+  console.log("PASS 任務狀態從後端更新");
+  fail = true;
+  await p.locator("#send").click();
+  await p.locator("#service-error").waitFor();
+  assert.match(await p.locator("#service-error").innerText(), /503/);
+  assert.equal(await p.locator(".job-view").count(), 0);
+  console.log("PASS HTTP 錯誤不會偽裝成功");
+  const sanitized = await p.evaluate(() =>
+    SeedStar.sanitize(
+      '<img src="javascript:alert(1)" onerror="alert(1)"><svg onload="alert(1)"></svg><div style="background:url(javascript:alert(1))">x</div><iframe srcdoc="evil"></iframe>',
+    ),
+  );
+  assert(!/onerror|onload|javascript|srcdoc|<svg|<iframe/.test(sanitized));
+  console.log("PASS 注入內容與不安全網址移除");
+  fs.writeFileSync(
+    process.env.EVIDENCE_DIR + "/services.json",
+    JSON.stringify({ passed: 5, requests }, null, 2),
+  );
+  await b.close();
+})().catch((e) => {
+  console.error(e);
+  process.exitCode = 1;
+});

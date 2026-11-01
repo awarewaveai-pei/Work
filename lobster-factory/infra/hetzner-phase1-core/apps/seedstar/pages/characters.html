@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>星角色 · 角色管理</title>
+    <link rel="stylesheet" href="../styles/theme.css" />
+    <link rel="stylesheet" href="../styles/characters.css" />
+    <link rel="stylesheet" href="../styles/workspaces.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div>SEEDSTAR · <strong>星角色</strong></div>
+      <div>◎ 繁　♧　 <button>✦ 90 PTS</button>　<button>使用者 ▾</button></div>
+    </header>
+    <main>
+      <div class="pagehead">
+        <div>
+          <h1>角色</h1>
+          <p class="sub">建立你的專屬角色，上傳參考圖或用 AI 生成，隨處引用</p>
+        </div>
+        <div class="tabs" id="topTabs">
+          <button data-tab="mine">我的角色</button
+          ><button data-tab="library" class="active">SeedStar 角色庫</button
+          ><button data-tab="license">授權角色</button>
+        </div>
+      </div>
+      <div id="libraryNotice">
+        <p class="smalltext">
+          SeedStar
+          原創角色：每位都有形象照、專屬聲音與台詞。加入素材庫後，在生成影片時可以直接當作角色參考。
+        </p>
+        <div class="notice">
+          此區為示範角色與示意圖。實際生成請使用自己的 PNG、JPEG 或 WebP 參考圖；模型能否接受仍由供應商判斷。
+        </div>
+      </div>
+      <div class="toolbar">
+        <input
+          class="input search"
+          id="search"
+          placeholder="搜尋名字、性別、國籍、年齡、職業…"
+        />
+        <div id="filters">
+          <select id="gender">
+            <option value="">所有性別</option>
+            <option>男</option>
+            <option>女</option>
+          </select>
+          <select id="age">
+            <option value="">所有年齡層</option>
+            <option value="child">兒童</option>
+            <option value="teen">青少年</option>
+            <option value="adult">成人</option>
+          </select>
+          <select id="country">
+            <option value="">所有國籍</option>
+            <option>日本</option>
+          </select>
+          <button class="btn" id="favorite">☆ 只看收藏</button>
+          <button class="btn" id="clear">清除篩選</button>
+        </div>
+        <button class="btn primary hidden" id="createBtn">＋ 建立角色</button
+        ><span class="count" id="count">28 位</span>
+      </div>
+      <div id="gallery" class="gallery"></div>
+      <div id="empty" class="empty hidden">
+        <div style="font-size: 30px">♙</div>
+        <h2>還沒有角色</h2>
+        <p>
+          建立你的第一個角色：描述一句話讓 AI
+          生成，或上傳參考圖，日後可在生成與任何專案引用。
+        </p>
+        <button class="btn primary" id="emptyCreate">＋ 建立角色</button>
+      </div>
+    </main>
+    <div class="modal-back" id="back">
+      <div class="modal" id="modal">
+        <div class="modal-h">
+          <h2 id="modalTitle">建立角色</h2>
+          <button class="x" id="close">×</button>
+        </div>
+        <div id="modalInner" class="modal-body"></div>
+        <div class="modal-f" id="modalFoot"></div>
+      </div>
+    </div>
+    <input type="file" id="filePick" accept="image/*" multiple hidden />
+    <div class="toast" id="toast"></div>
+    <script src="../config.js"></script>
+    <script src="../shared/models.js"></script>
+    <script src="../shared/adapters.js"></script>
+    <script src="../shared/purify.js"></script>
+    <script src="../shared/runtime.js"></script>
+    <script src="../shared/security.js"></script>
+    <script src="../shared/theme.js"></script>
+    <script src="../shared/jobs-view.js"></script>
+    <script src="../shared/workflows.js"></script>
+    <script src="../shared/assets-ui.js"></script>
+    <script src="../scripts/characters-boot.js"></script>
+  </body>
+</html>

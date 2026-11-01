@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-Hant" data-seedstar-root>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AwareWave 影音工作台</title>
+    <link rel="stylesheet" href="styles/theme.css" />
+    <link rel="stylesheet" href="styles/index.css" />
+    <link rel="stylesheet" href="styles/workspaces.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <button class="nav active" id="generatorNav" type="button">
+          ✧　生成影片</button
+        ><button class="nav" id="directorNav" type="button">▱　AI 導演</button
+        ><button class="nav" id="toolsNav" type="button">⚒　應用工具</button
+        ><button class="nav" id="projectsNav" type="button">⊞　專案</button
+        ><button class="nav" id="storyboardsNav" type="button">
+          ▣　分鏡靈感</button
+        ><button class="nav" id="templatesNav" type="button">✧　模板牆</button
+        ><button class="nav" id="workflowsNav">▤　工作流</button>
+        <div class="section-title">資產</div>
+        <button class="nav" id="charactersNav" type="button">▧　星角色</button
+        ><button class="nav" id="skillsNav">✦　我的技能</button
+        ><button class="nav" id="assetsNav">▱　素材庫</button
+        ><button class="nav" id="historyNav">◷　歷史紀錄</button>
+      </aside>
+      <main>
+        <div id="generatorView">
+          <div class="workspace-actions">
+            <button id="saveGeneratorDraft" class="minor">
+              儲存對話／生成草稿</button
+            ><span id="draftStatus" role="status"></span>
+          </div>
+          <h1 class="heading">想生成什麼？</h1>
+          <p class="hint-top">
+            挑一種生成方式，下方會帶出對應的素材欄位 — 補上素材與描述即可生成。
+          </p>
+          <div class="board">
+            <div id="tabs" class="tabs" role="tablist" aria-label="生成方式"></div>
+            <div class="content" id="content"></div>
+            <div class="dock">
+              <button class="pill" data-panel="model" id="modelBtn">
+                ✦ SeedStar V3⌄</button
+              ><button class="pill" data-panel="settings" id="outputBtn">
+                ▱ 16:9 · 720p · 8s⌄</button
+              ><button class="pill" data-panel="skill" id="skillBtn">
+                ✧ 不套用技能⌄</button
+              ><button class="pill" data-panel="subtitle" id="subtitleBtn">
+                ▣ 字幕：開⌄</button
+              ><button class="pill" data-panel="presets">▤ 儲存設定</button>
+              <div class="spacer"></div>
+              <div class="credits">
+                <strong id="credits">API</strong> · 依實際用量
+              </div>
+              <button class="send" id="send" title="提交">開始生成</button>
+            </div>
+          </div>
+          <p class="info" id="providerStatus">
+            正在檢查本機生成服務。API 費用依供應商用量計算，本機版不扣平台點數。
+          </p>
+        </div>
+        <section id="directorArea" hidden aria-label="AI 導演對話">
+          <div class="aw-director-head">
+            <div>
+              <h1>AI 導演</h1>
+              <p>回到先前的對話繼續，或開一個新的。</p>
+            </div>
+            <button type="button" class="aw-director-start">＋ 開新對話</button>
+          </div>
+          <div id="directorSessions" class="workspace-page"></div>
+        </section>
+        <section id="toolsArea" hidden>
+          <iframe
+            id="toolsFrame"
+            title="應用工具 · 15 項"
+            loading="eager"
+            referrerpolicy="no-referrer"
+          ></iframe>
+        </section>
+        <section id="charactersArea" hidden>
+          <iframe
+            id="charactersFrame"
+            title="星角色 · 角色管理"
+            loading="eager"
+          ></iframe>
+        </section>
+        <section id="templatesArea" hidden>
+          <iframe id="templatesFrame" title="模板牆" loading="eager"></iframe>
+        </section>
+        <section id="projectsArea" hidden>
+          <iframe
+            id="projectsFrame"
+            title="專案 · 製作聖經與分集"
+            loading="eager"
+          ></iframe>
+        </section>
+        <section id="storyboardsArea" hidden>
+          <iframe
+            id="storyboardsFrame"
+            title="分鏡靈感 · 分鏡資料與鏡頭拆解"
+            loading="eager"
+          ></iframe>
+        </section>
+        <section id="workspaceArea" hidden></section>
+      </main>
+    </div>
+    <div class="popover hidden" id="popover"></div>
+    <div class="modal hidden" id="modal">
+      <div class="modalbox">
+        <div class="flexend">
+          <button class="minor" id="closeModal">關閉 ✕</button>
+        </div>
+        <div id="modalContent"></div>
+      </div>
+    </div>
+    <input type="file" id="file" class="sr" multiple />
+
+    <script src="scripts/app-entry.js"></script>
+  </body>
+</html>

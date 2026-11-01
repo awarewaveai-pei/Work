@@ -1,0 +1,8 @@
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict'),{spawnSync}=require('node:child_process'),ffmpeg=require('ffmpeg-static'),{media}=require('../backend/media.cjs');
+const dir=fs.mkdtempSync(path.join(os.tmpdir(),'follow-rotation-'));
+function run(args){const r=spawnSync(ffmpeg,['-y','-hide_banner',...args],{encoding:null,windowsHide:true,timeout:30000});assert.equal(r.status,0,r.stderr?.toString());return r.stdout;}
+(async()=>{run(['-f','lavfi','-i','testsrc2=s=960x540:r=30:d=5','-c:v','libx264','-preset','ultrafast',path.join(dir,'source.mp4')]);run(['-display_rotation','90','-i',path.join(dir,'source.mp4'),'-c','copy',path.join(dir,'rotated.mp4')]);
+ const info=await require('../backend/media-inspect.cjs').inspectMedia(path.join(dir,'rotated.mp4'));assert.equal(info.width,960);assert.equal(info.displayWidth,540);assert.equal(info.displayHeight,960);
+ const result=await media({operation:'follow-track',references:{src:{url:'rotated.mp4'}},settings:{start:0,end:5,points:[{time:0,x:.5,y:.5},{time:5,x:.5,y:.5}]}},{file:url=>path.join(dir,url),output:ext=>{const name=crypto.randomUUID()+'.'+ext;return {file:path.join(dir,name),url:name};}});
+ const decode=file=>run(['-i',file,'-frames:v','1','-vf','scale=72:128','-pix_fmt','rgb24','-f','rawvideo','pipe:1']);const expected=decode(path.join(dir,'rotated.mp4')),actual=decode(path.join(dir,result.url));assert.equal(actual.length,expected.length);let error=0;for(let i=0;i<actual.length;i++)error+=Math.abs(actual[i]-expected[i]);assert(error/actual.length<8,'旋轉影片應保持正確方向與比例，不能壓扁');console.log('PASS 手機旋轉中繼資料：正確顯示尺寸、720×1280 動態裁切輸出，與原片自動旋轉影格比對未變形');
+})().catch(e=>{console.error(e);process.exitCode=1;});
