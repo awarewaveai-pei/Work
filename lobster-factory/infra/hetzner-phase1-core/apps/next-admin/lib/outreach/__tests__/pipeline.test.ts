@@ -17,9 +17,10 @@ describe("normalize", () => {
     expect(domainOf(null)).toBeNull();
   });
 
-  it("dedupKey prefers email > domain > name", () => {
-    expect(dedupKey(normalizeLead({ email: "a@b.com", website: "x.com", name: "X" }))).toBe("email:a@b.com");
-    expect(dedupKey(normalizeLead({ website: "https://x.com", name: "X" }))).toBe("domain:x.com");
+  it("dedupKey prefers email > domain > name; a platform's host is no one's domain", () => {
+    expect(dedupKey(normalizeLead({ email: "a@b.com", website: "acme.tw", name: "X" }))).toBe("email:a@b.com");
+    expect(dedupKey(normalizeLead({ website: "https://acme.tw", name: "X" }))).toBe("domain:acme.tw");
+    expect(dedupKey(normalizeLead({ website: "https://www.instagram.com/cafe", name: "X" }))).toBe("name:x");
     expect(dedupKey(normalizeLead({ name: "X Co" }))).toBe("name:x co");
     expect(dedupKey(normalizeLead({}))).toBeNull();
   });

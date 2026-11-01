@@ -24,16 +24,6 @@ const flat = (s: string): string => s.replace(/\s+/g, " ").trim();
 /** The one test of "this excerpt is on this page": used to keep a new fact and to retire an old one. */
 export const excerptOnPage = (excerpt: string, pageText: string): boolean => flat(pageText).includes(flat(excerpt));
 
-/** Social networks, link pages and marketplaces: a page there is the platform's, not the business's own site, and
- *  SPEC D20 forbids reading social pages at all. A lead whose website is one of these is not researched. */
-export const PLATFORM_HOSTS = ["facebook.com", "fb.com", "instagram.com", "threads.net", "linkedin.com", "x.com", "twitter.com", "tiktok.com",
-  "youtube.com", "line.me", "lin.ee", "linktr.ee", "portaly.cc", "shopee.tw", "shopee.com", "pinkoi.com", "momoshop.com.tw",
-  "ruten.com.tw", "pchome.com.tw", "google.com", "goo.gl", "g.page", "maps.app.goo.gl", "sites.google.com"];
-
-export function isPlatformHost(host: string): boolean {
-  return PLATFORM_HOSTS.some((p) => host === p || host.endsWith(`.${p}`));
-}
-
 /** The share of the claim's character pairs found in its excerpt (CJK) or of its words (Latin): how far the excerpt
  *  supports the claim, 0..1. Paraphrase scores high; a claim the excerpt does not say scores near 0. */
 const normText = (s: string) => s.toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, " ").trim();

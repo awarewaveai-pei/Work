@@ -75,17 +75,16 @@ export const PROVIDERS: Record<string, ProviderSpec> = {
 
   // The operator's chosen default (2026-09-20). Already paid for and proven elsewhere in this app —
   // see lib/content/article/generate-core.ts and lib/content/trending-sources.ts — so this reuses a
-  // working account rather than opening a new one. Locked to /search — not because this vendor is
-  // known to have an expensive alternate mode (it does not appear to),
-  // but because /search is the only endpoint collectors/web-search.ts's driver ever calls, and this
-  // codebase has been burned once already by trusting an unverified assumption about a vendor's full
-  // pricing surface. Widen this only alongside a caller that actually needs another path.
+  // working account rather than opening a new one. Locked to the paths a caller actually uses, because
+  // this codebase has been burned once already by trusting an unverified assumption about a vendor's
+  // full pricing surface: /search = collectors/web-search.ts; /places = lib/outreach/discover.ts (1
+  // credit per page of 10, checked live 2026-11-01). Widen this only alongside a caller that needs it.
   serper: {
     id: "serper",
     origin: "https://google.serper.dev",
     apiKeyEnv: "SERPER_API_KEY",
     authHeader: (key) => ({ "x-api-key": key }),
-    allowedPaths: ["/search"],
+    allowedPaths: ["/search", "/places"],
   },
 };
 

@@ -6,10 +6,19 @@ import { normalizeLead, flagDuplicatesInBatch, type RawLead, type NormalizedLead
 import { findSuppressed } from "@/lib/outreach/suppression";
 import { scoreLeadQuality, scoreContactability } from "@/lib/outreach/scoring";
 import { verifyEmails, type EmailStatus } from "@/lib/outreach/verify-email";
+import { findExisting } from "@/lib/outreach/existing-leads";
+import { discoverInput, discoverPlaces, creditsTwd, creditsUsd, DISCOVER_MAX_USD, LocationNotRecognized, MAX_PAGES } from "@/lib/outreach/discover";
+import { holdCost } from "@/lib/ai/log-ai-call";
+import { creditsForCost } from "@/lib/entitlements/ledger";
+import { billedTo } from "@/lib/outreach/billing";
+import { grantFor } from "@/lib/entitlements/grant";
+import { EntitlementRequired } from "@/lib/entitlements/can";
+import { createBudget, createProviderCall, ProviderCallError } from "@/lib/collect";
 
 // Cold Outreach — Lead Inbox import (task T5). Table: co_lead_inbox (migration 0048).
-// Pipeline: normalize → dedup (within batch) → suppression check → MX check (cached) → mechanical scoring → classify.
-// Writes ops-role gated; GET authed-only.
+// Pipeline: normalize → dedup (within batch, and against this org's existing inbox + leads) → suppression check →
+// MX check (cached) → mechanical scoring → classify. `discover` (card C10) fills the batch from a Serper map search
+// first, under the org's outreach.discover grant. Writes ops-role gated; GET authed-only.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -57,6 +66,8 @@ export async function GET(req: Request): Promise<Response> {
 }
 
 // POST — import one or many. Body: { organizationId?, orgSlug?, leads: RawLead[] }  OR  { ..., lead: RawLead }
+//   OR  { ..., discover: { query, location } } — ≤ 20 contactable businesses from a map search; the answer adds
+//   discovery { credits, twd, skipped }.
 export async function POST(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
@@ -79,11 +90,47 @@ export async function POST(req: Request): Promise<Response> {
   let organizationId: string | null;
   try { organizationId = effectiveOrgId(req, rawBodyOrgId); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
-  const rawList: RawLead[] = Array.isArray(body.leads)
+  let rawList: RawLead[] = Array.isArray(body.leads)
     ? (body.leads as RawLead[])
     : body.lead && typeof body.lead === "object"
       ? [body.lead as RawLead]
       : [];
+
+  let discovery: { credits: number; twd: number; skipped: number } | null = null;
+  if (body.discover !== undefined) {
+    const input = discoverInput(body.discover);
+    if (!input) return NextResponse.json({ ok: false, error: "discover.query and discover.location required (≤ 100 chars)" }, { status: 400 });
+    let grant;
+    try { grant = await grantFor("outreach.discover", await billedTo(req, organizationId)); }
+    catch (e) { if (e instanceof EntitlementRequired) return NextResponse.json({ ok: false, error: e.code }, { status: e.status }); throw e; }
+    // Priced like every paid call (ADR 017 4b-12): the ceiling is held before the first request, the credits Serper
+    // reported are kept when it answers. A paying wallet that cannot cover the ceiling starts nothing.
+    const hold = await holdCost(grant, DISCOVER_MAX_USD);
+    if (!hold) return NextResponse.json({ ok: false, error: "no_credits" }, { status: 402 });
+    let used = 0;
+    const settle = async () => {
+      try { await hold.settle(creditsForCost(creditsUsd(used)), { provider: "serper", serper_credits: used }); }
+      catch (e) { console.warn(`[outreach-discover] settle failed: ${String(e).slice(0, 200)}`); }
+    };
+    try {
+      const found = await discoverPlaces(createProviderCall({ budget: createBudget({ fetches: MAX_PAGES, ms: 30_000 }), grant, timeoutMs: 20_000 }), input);
+      used = found.credits;
+      await settle();
+      rawList = found.leads;
+      discovery = { credits: found.credits, twd: creditsTwd(found.credits), skipped: found.skipped };
+    } catch (e) {
+      if (e instanceof LocationNotRecognized) used = e.credits;
+      await settle();
+      if (e instanceof LocationNotRecognized) {
+        return NextResponse.json({ ok: false, error: "location_not_recognized", location: e.location,
+          detail: "看不懂這個地區：請填縣市（例：台中市）或英文地名（例：Xinyi District, Taipei City, Taiwan）",
+          discovery: { credits: e.credits, twd: creditsTwd(e.credits), skipped: 0 } }, { status: 422 });
+      }
+      if (!(e instanceof ProviderCallError)) throw e;
+      return NextResponse.json({ ok: false, error: e.message }, { status: e.kind === "unconfigured" ? 503 : 502 });
+    }
+    if (rawList.length === 0) return NextResponse.json({ ok: true, imported: 0, summary: {}, discovery });
+  }
 
   if (rawList.length === 0) return NextResponse.json({ ok: false, error: "leads[] or lead required" }, { status: 400 });
   if (rawList.length > MAX_BATCH) return NextResponse.json({ ok: false, error: `max ${MAX_BATCH} leads per import` }, { status: 413 });
@@ -91,8 +138,10 @@ export async function POST(req: Request): Promise<Response> {
   const normalized = rawList.map(normalizeLead);
   const dupFlags = flagDuplicatesInBatch(normalized);
   let suppressedFlags: boolean[];
+  let existingFlags: boolean[];
   try {
     suppressedFlags = await findSuppressed(supabase, organizationId, normalized.map((n) => ({ email: n.email, website: n.website, name: n.normalized_name })));
+    existingFlags = await findExisting(supabase, organizationId, normalized);
   } catch (e) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "suppression read failed" }, { status: 500 });
   }
@@ -100,7 +149,7 @@ export async function POST(req: Request): Promise<Response> {
   const verified = await verifyEmails(supabase, organizationId, normalized.flatMap((n) => (n.email ? [n.email] : [])));
 
   const rows = normalized.map((n, i) => {
-    const isDup = dupFlags[i];
+    const isDup = dupFlags[i] || existingFlags[i];
     const suppressed = suppressedFlags[i];
     const emailStatus = n.email ? (verified.get(n.email) ?? "unknown") : null;
     const scorable = {
@@ -134,7 +183,8 @@ export async function POST(req: Request): Promise<Response> {
       contactability_score: contactability,
       duplicate_score: isDup ? 100 : 0,
       inbox_status,
-      ai_notes: suppressed ? "suppression hit — do not contact" : emailStatus === "invalid" ? "email domain has no mail server (MX) — treated as no email" : null,
+      ai_notes: suppressed ? "suppression hit — do not contact" : emailStatus === "invalid" ? "email domain has no mail server (MX) — treated as no email"
+        : existingFlags[i] ? "already in this organization's inbox or leads (same email, website or source)" : null,
     };
   });
 
@@ -146,7 +196,7 @@ export async function POST(req: Request): Promise<Response> {
     const s = (r as { inbox_status: string }).inbox_status;
     summary[s] = (summary[s] ?? 0) + 1;
   }
-  return NextResponse.json({ ok: true, imported: data?.length ?? 0, summary }, { status: 201 });
+  return NextResponse.json({ ok: true, imported: data?.length ?? 0, summary, ...(discovery ? { discovery } : {}) }, { status: 201 });
 }
 
 export async function DELETE(req: Request): Promise<Response> {

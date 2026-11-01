@@ -7,7 +7,8 @@ import type { Grant } from "@/lib/entitlements/can";
 import type { GrantContext } from "@/lib/entitlements/grant";
 import { runLeadResearch } from "@/lib/collect/run";
 import { createOutreachResearchSink } from "@/lib/collect/sinks/outreach-research";
-import { autoEligible, bestEmail, hostOf, isPlatformHost } from "./research-extract";
+import { autoEligible, bestEmail, hostOf } from "./research-extract";
+import { isPlatformHost } from "./normalize";
 import { LEAD_RESEARCH_BUDGET } from "@/lib/collect/run";
 
 /** Fetch budget plus time for the last pages to be read by the model; past it no page goes to the model. */

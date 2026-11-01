@@ -49,6 +49,23 @@ export function domainOf(urlOrEmail: string | null): string | null {
   return host || null;
 }
 
+/** Social networks, link pages and marketplaces: a page there is the platform's, not the business's own site, and
+ *  SPEC D20 forbids reading social pages at all. A lead whose website is one of these is not researched, and its host
+ *  is shared by thousands of businesses, so it never identifies one (dedupKey, existing-leads.ts). */
+export const PLATFORM_HOSTS = ["facebook.com", "fb.com", "instagram.com", "threads.net", "linkedin.com", "x.com", "twitter.com", "tiktok.com",
+  "youtube.com", "line.me", "lin.ee", "linktr.ee", "portaly.cc", "shopee.tw", "shopee.com", "pinkoi.com", "momoshop.com.tw",
+  "ruten.com.tw", "pchome.com.tw", "google.com", "goo.gl", "g.page", "maps.app.goo.gl", "sites.google.com"];
+
+export function isPlatformHost(host: string): boolean {
+  return PLATFORM_HOSTS.some((p) => host === p || host.endsWith(`.${p}`));
+}
+
+/** The website host that identifies one business: null for none or a platform host. */
+export function ownHostOf(website: string | null): string | null {
+  const host = domainOf(website)?.split(":")[0] ?? null;
+  return host && !isPlatformHost(host) ? host : null;
+}
+
 export function normalizeLead(raw: RawLead): NormalizedLead {
   const email = clean(raw.email)?.toLowerCase() ?? null;
   return {
@@ -68,12 +85,12 @@ export function normalizeLead(raw: RawLead): NormalizedLead {
 }
 
 /**
- * Stable dedup key, in priority order: email > website domain > lowercased name.
+ * Stable dedup key, in priority order: email > website domain (not a platform's) > lowercased name.
  * Returns null when there's nothing to dedup on (caller treats as always-unique).
  */
 export function dedupKey(n: NormalizedLead): string | null {
   if (n.email) return `email:${n.email}`;
-  const dom = domainOf(n.website);
+  const dom = ownHostOf(n.website);
   if (dom) return `domain:${dom}`;
   if (n.normalized_name) return `name:${n.normalized_name.toLowerCase()}`;
   return null;

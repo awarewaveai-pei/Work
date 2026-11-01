@@ -7,7 +7,8 @@
 //
 // Phase-1 active connectors: gemini (AI, free BYO) + hunter (verify).
 // Upgrade connectors (claude / openai) are declared and usable once the org enables them.
-// snov / apify / places / brevo / gmail / fluentsmtp are forward-compat stubs.
+// snov / apify / brevo / gmail / fluentsmtp are forward-compat stubs; places = Serper /places, called directly by the
+// Inbox discover import (lib/outreach/discover.ts), not through this ladder.
 
 import type { ConnectorNeed, FallbackStep, RouterContext, ResolvedLadder } from "./types";
 
@@ -31,7 +32,7 @@ export const LADDERS: Record<ConnectorNeed, FallbackStep[]> = {
   lead_scraping: [
     // Cost-first: manual is preferred so paid credit is reserved for high-value leads (PART H §H3).
     { provider: "manual",            kind: "manual",                         requiresConnector: false, note: "手動 / Google Maps 目視（最先用）" },
-    { provider: "places",            kind: "free", connectorName: "places",  requiresConnector: true,  note: "Google Places API free credit（Phase 3）" },
+    { provider: "places",            kind: "free", connectorName: "places",  requiresConnector: true,  note: "Serper /places（agency 既有帳號，每頁 10 家 1 credit；Inbox「找名單」，lib/outreach/discover.ts，SPEC D18）" },
     { provider: "apify",             kind: "byo",  connectorName: "apify",   requiresConnector: true,  note: "客戶 BYO Apify $5（只抓高價值，Phase 3）" },
     { provider: "mark_needs_manual", kind: "manual",                         requiresConnector: false, note: "標 needs_manual" },
   ],

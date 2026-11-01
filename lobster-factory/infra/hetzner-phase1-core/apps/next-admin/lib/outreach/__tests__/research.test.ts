@@ -1,7 +1,8 @@
 // Card C3.6 / C3.7 (SPEC §5.1): a fact is kept only when its excerpt is on the page; evidence from the lead's own site
 // is approved, other sources wait; mailto before text, the site's own domain first; a lead's email is never replaced.
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { autoApproves, bestEmail, claimSupport, isPlatformHost, pageEmails, pageEmailsOf, verifiedClaims, hostOf } from "../research-extract";
+import { autoApproves, bestEmail, claimSupport, pageEmails, pageEmailsOf, verifiedClaims, hostOf } from "../research-extract";
+import { isPlatformHost } from "../normalize";
 import { researchUrl } from "../research";
 
 const m = vi.hoisted(() => ({

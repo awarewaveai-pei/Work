@@ -1,12 +1,16 @@
 'use client';
 import { useCallback, useEffect, useState } from "react";
 import { useActiveOrg, withOrg } from "@/lib/outreach/use-active-org";
+import { DISCOVER_COST_TWD, MAX_DISCOVER } from "@/lib/outreach/discover";
 
 interface InboxItem {
   id: string;
   normalized_name: string | null;
   email: string | null;
   website: string | null;
+  social_url: string | null;
+  phone: string | null;
+  region: string | null;
   normalized_industry: string | null;
   quality_score: number;
   contactability_score: number;
@@ -26,6 +30,9 @@ interface FormState {
 const EMPTY: FormState = { name: "", email: "", website: "", industry: "", sourceUrl: "", observation: "" };
 const INBOX_API = "/api/outreach/inbox";
 const LEADS_API = "/api/outreach/leads";
+// Only http(s) becomes a link: website and source_url are imported text, and a javascript: URL in href runs on click.
+const httpUrl = (v: string | null) => (v && /^https?:\/\//i.test(v.trim()) ? v.trim() : null);
+const twd = (v: number) => `NT$${v < 1 ? v.toFixed(2) : Math.ceil(v)}`;
 
 function badge(status: string): string {
   if (status === "high_quality") return "badge-green";
@@ -41,6 +48,7 @@ export default function InboxClient() {
   const [msg, setMsg] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY);
   const [bulk, setBulk] = useState("");
+  const [find, setFind] = useState({ query: "", location: "" });
 
   const org = useActiveOrg();
 
@@ -126,6 +134,31 @@ export default function InboxClient() {
     }
   }
 
+  async function discover(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setErr(null);
+    setMsg(null);
+    try {
+      const r = await fetch(INBOX_API, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ discover: find, organizationId: org }),
+      });
+      const j = await r.json();
+      const cost = j.discovery ? `（用了 ${j.discovery.credits} 次查詢，約 ${twd(j.discovery.twd)}）` : "";
+      if (!j.ok) throw new Error(`${j.detail || j.error || "查詢失敗"}${cost}`);
+      const dup = j.summary?.suspected_dup ?? 0;
+      const skipped = j.discovery?.skipped ? `；${j.discovery.skipped} 家沒有網站也沒有電話，沒放進來` : "";
+      setMsg(`${j.imported ? `找到 ${j.imported} 家，已放進收件匣${dup ? `，其中 ${dup} 家已在名單或收件匣裡（標成 suspected_dup）` : ""}` : "沒有找到可聯絡的店家"}${skipped}${cost}`);
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function approve(id: string) {
     setErr(null);
     try {
@@ -136,6 +169,7 @@ export default function InboxClient() {
       });
       const j = await r.json();
       if (!j.ok) throw new Error(j.error || "approve failed");
+      if (j.existing) setMsg(`「${j.lead?.name ?? ""}」已經在名單裡，沒有再建一筆`);
       await load();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -158,6 +192,17 @@ export default function InboxClient() {
     <div style={{ padding: 16, display: "grid", gap: 16 }}>
       {err && <div className="card-badge badge-red" role="alert">{err}</div>}
       {msg && <div className="card-badge badge-green">{msg}</div>}
+
+      <form className="card" onSubmit={discover} style={{ display: "grid", gap: 8 }}>
+        <div className="card-header"><span className="card-label">找名單（地圖上的店家）</span></div>
+        <p className="card-sub">一次最多 {MAX_DISCOVER} 家，連網站與電話放進收件匣；沒有網站也沒有電話的店家不放。已經在名單或收件匣裡的會標成 suspected_dup。沒有 email 的，核准後按「研究這家」補。</p>
+        <input placeholder="找什麼（例：咖啡廳、瑜珈教室）" value={find.query} onChange={(e) => setFind((f) => ({ ...f, query: e.target.value }))} />
+        <input placeholder="地區（例：台中市；更細用英文：Xinyi District, Taipei City, Taiwan）" value={find.location}
+          onChange={(e) => setFind((f) => ({ ...f, location: e.target.value }))} />
+        <button type="submit" className="btn-primary" disabled={busy || !find.query.trim() || !find.location.trim()}>
+          {busy ? "處理中…" : `找名單（每次最多約 ${twd(DISCOVER_COST_TWD)}）`}
+        </button>
+      </form>
 
       <form className="card" onSubmit={addOne} style={{ display: "grid", gap: 8 }}>
         <div className="card-header"><span className="card-label">手動新增一筆</span></div>
@@ -196,6 +241,10 @@ export default function InboxClient() {
                 <span>
                   <strong>{it.normalized_name ?? it.email ?? "(未命名)"}</strong>
                   {it.normalized_industry ? <span className="card-sub"> · {it.normalized_industry}</span> : null}
+                  {it.phone ? <span className="card-sub"> · {it.phone}</span> : null}
+                  {httpUrl(it.website) ? <span className="card-sub"> · <a href={httpUrl(it.website)!} target="_blank" rel="noreferrer">網站</a></span>
+                    : httpUrl(it.social_url) ? <span className="card-sub"> · <a href={httpUrl(it.social_url)!} target="_blank" rel="noreferrer">社群頁</a></span> : null}
+                  {httpUrl(it.source_url) ? <span className="card-sub"> · <a href={httpUrl(it.source_url)!} target="_blank" rel="noreferrer">來源</a></span> : null}
                   <span className="card-sub"> · Q{it.quality_score}/C{it.contactability_score}</span>
                   <span className={`card-badge ${badge(it.inbox_status)}`} style={{ marginLeft: 8 }}>{it.inbox_status}</span>
                 </span>

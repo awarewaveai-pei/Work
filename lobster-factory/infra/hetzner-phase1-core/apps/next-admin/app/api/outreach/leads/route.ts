@@ -3,9 +3,12 @@ import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
 import { outreachDb } from "@/lib/outreach/db-client";
 import { scoreLead } from "@/lib/outreach/scoring";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
+import { findExistingLead } from "@/lib/outreach/existing-leads";
 
 // Cold Outreach — Leads CRUD + Approve-to-Leads (task T7). Table: co_leads (migration 0048).
-// Approve flow: read a co_lead_inbox row → mechanical score → insert co_leads → mark inbox approved.
+// Approve flow: read a co_lead_inbox row → the same business already a lead? (existing-leads.ts) that one : mechanical
+// score → insert co_leads (a concurrent approve of the same email loses on 0149's unique index and gets the winner's
+// lead) → mark inbox approved. Approving twice never makes two leads.
 // Writes ops-role gated; GET authed-only.
 
 export const runtime = "nodejs";
@@ -123,6 +126,21 @@ export async function POST(req: Request): Promise<Response> {
       observation: null,
       source_url: row.source_url as string | null,
     };
+    const orgOfRow = (row.organization_id as string | null) ?? null;
+    const identity = { email: lead.email, website: lead.website, source_url: lead.source_url, name: lead.name, phone: lead.phone };
+    const markApproved = () => supabase.from("co_lead_inbox").update({ inbox_status: "approved", updated_at: new Date().toISOString() }).eq("id", fromInboxId);
+    const existingLead = async (): Promise<Response | null> => {
+      let found;
+      try { found = await findExistingLead(supabase, orgOfRow, identity); }
+      catch (e) { return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 }); }
+      if (!found) return null;
+      const { data: full, error: readErr } = await supabase.from(TABLE).select("*").eq("id", found.id).maybeSingle();
+      if (readErr) return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });
+      await markApproved();
+      return NextResponse.json({ ok: true, lead: full, existing: true });
+    };
+    const before = await existingLead();
+    if (before) return before;
     const scores = scoreLead(lead, { isDuplicate: false, doNotContact: false });
 
     const { data: created, error: createErr } = await supabase
@@ -147,9 +165,13 @@ export async function POST(req: Request): Promise<Response> {
       })
       .select("*")
       .single();
+    if (createErr?.code === "23505") {
+      const winner = await existingLead();
+      if (winner) return winner;
+    }
     if (createErr) return leadWriteError(createErr);
 
-    await supabase.from("co_lead_inbox").update({ inbox_status: "approved", updated_at: new Date().toISOString() }).eq("id", fromInboxId);
+    await markApproved();
     return NextResponse.json({ ok: true, lead: created }, { status: 201 });
   }
 
