@@ -56,6 +56,17 @@ describe("POST /api/tools/studio/fabric-print", () => {
     expect(gate.asked).toBe(1);
   });
 
+  it("ai: the caller picks the model among those that take two reference images; a one-reference model is refused unspent", async () => {
+    m.get.mockResolvedValue({ ok: true, body: await png(80, 120, { r: 250, g: 250, b: 250 }), contentType: "image/png" });
+    await post({ photo: PHOTO, design: DESIGN, model: "nano-banana-2" });
+    expect(m.gen.mock.calls[0][0]).toMatchObject({ model: "nano-banana-2", referenceImages: [PHOTO, DESIGN] });
+    m.gen.mockClear();
+    for (const model of ["flux-kontext-pro", "flux-schnell", "not-a-model"]) {
+      expect((await post({ photo: PHOTO, design: DESIGN, model })).status, model).toBe(400);
+    }
+    expect(m.gen).not.toHaveBeenCalled();
+  });
+
   it("ai: a design must be an upload or our own asset; a failed generation reaches the browser as ok:false", async () => {
     expect((await post({ photo: PHOTO, design: "https://evil.example/d.png" })).status).toBe(400);
     m.get.mockResolvedValue({ ok: true, body: await png(80, 120, { r: 250, g: 250, b: 250 }), contentType: "image/png" });

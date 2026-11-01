@@ -65,6 +65,23 @@ describe("主頁 模特: 模特兒圖 + design → product mockups", () => {
     expect(screen.queryByText(/Unexpected token/)).toBeNull();
   });
 
+  it("the model buttons list only models that take two references, and the picked one is sent; results enlarge on click", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true, image: "data:image/jpeg;base64,AA==" })));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ModelMockupPanel designRef={DESIGN} photos={library} onOpenLibrary={() => {}} />);
+    expect(screen.queryByRole("button", { name: /FLUX/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Imagen/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /^Nano Banana 2（/ }));
+    fireEvent.click(screen.getAllByRole("checkbox")[0]);
+    fireEvent.click(screen.getByRole("button", { name: /合成（1 張，約 NT\$2）/ }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(bodies(fetchMock)[0].model).toBe("nano-banana-2");
+    fireEvent.click(await screen.findByAltText("商品 Mockup"));
+    expect(screen.getByRole("dialog", { name: "放大檢視" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("dialog"));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
   it("an empty library points to 【模特兒印製】", () => {
     const open = vi.fn();
     render(<ModelMockupPanel designRef={DESIGN} photos={[]} onOpenLibrary={open} />);
@@ -100,6 +117,12 @@ describe("【模特兒印製】: settings → 模特兒圖 → library", () => {
     expect(second.referenceImages).toEqual(["data:image/png;base64,P1"]);
     expect(second.prompt).toContain("ALL reference images show the SAME person");
     await waitFor(() => expect(screen.getAllByRole("checkbox")).toHaveLength(2));
+    // A generated 模特兒圖 opens full size on click; that click does not drop it from the save.
+    fireEvent.click(screen.getByAltText("standing"));
+    expect(screen.getByRole("dialog", { name: "放大檢視" })).toBeTruthy();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect((screen.getAllByRole("checkbox") as HTMLInputElement[]).every((c) => c.checked)).toBe(true);
 
     fetchMock.mockClear();
     fireEvent.change(screen.getByPlaceholderText(/新模特兒名字/), { target: { value: "Leo" } });

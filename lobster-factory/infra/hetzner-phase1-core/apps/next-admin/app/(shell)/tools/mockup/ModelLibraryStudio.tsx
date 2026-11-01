@@ -25,6 +25,7 @@ import {
 import { STUDIO_MODEL_OPTIONS, type AspectRatio } from "@/lib/studio/model-options";
 import { isPrintBox, type Point, type PrintBox } from "@/lib/studio/fabric-print";
 import { COLOR_LABEL, GENDER_LABEL, failureText, groupModels, inPairs, readJson, type LibraryPhoto, type Shot } from "./modelLibrary";
+import ImageLightbox from "./ImageLightbox";
 
 // nano-banana-2 takes up to 14 reference images (lib/studio/model-options.ts), enough for a model's whole library.
 const GEN_MODEL = "nano-banana-2";
@@ -103,6 +104,7 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
   const models = useMemo(() => groupModels(photos), [photos]);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [zoom, setZoom] = useState<string | null>(null);
 
   // ── Who: a new person from the description, or an existing model (its photos are the face) ──
   const [pickedSubject, setSubject] = useState<"new" | string>("new");
@@ -262,6 +264,7 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {msg && <div style={{ color: "var(--red)", fontSize: 13 }}>{msg}</div>}
+      <ImageLightbox src={zoom} onClose={() => setZoom(null)} />
 
       {/* ── 1. Generate 模特兒圖 ── */}
       <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -319,19 +322,21 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {shots.map((s, i) => (
-                <label key={i} style={{ position: "relative", cursor: "pointer", width: 160 }}>
+                <div key={i} style={{ position: "relative", width: 160 }}>
                   {s.shot.status === "done"
                     // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={s.shot.image} alt={s.pose} style={{ width: 160, borderRadius: 6, display: "block", border: s.keep ? "2px solid var(--accent)" : "2px solid transparent" }} />
+                    ? <img src={s.shot.image} alt={s.pose} title="點一下放大" onClick={() => setZoom(s.shot.status === "done" ? s.shot.image : null)}
+                        style={{ width: 160, borderRadius: 6, display: "block", cursor: "zoom-in", border: s.keep ? "2px solid var(--accent)" : "2px solid transparent" }} />
                     : <div style={{ ...thumb, width: 160, height: 240, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, padding: 6, textAlign: "center", color: s.shot.status === "error" ? "var(--red)" : undefined }}>
                         {s.shot.status === "error" ? `✗ ${s.shot.error}` : "生成中…"}
                       </div>}
                   {s.shot.status === "done" && (
-                    <input type="checkbox" checked={s.keep} style={{ position: "absolute", top: 4, left: 4 }}
+                    <input type="checkbox" checked={s.keep} aria-label={`保留 ${MODEL_POSES.find((p) => p.value === s.pose)?.label ?? ""}`}
+                      style={{ position: "absolute", top: 4, left: 4, width: 18, height: 18, cursor: "pointer" }}
                       onChange={() => setShots((prev) => prev.map((x, k) => (k === i ? { ...x, keep: !x.keep } : x)))} />
                   )}
                   <div style={{ fontSize: 10, textAlign: "center" }}>{MODEL_POSES.find((p) => p.value === s.pose)?.label}</div>
-                </label>
+                </div>
               ))}
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>

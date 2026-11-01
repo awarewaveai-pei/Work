@@ -64,6 +64,13 @@ export const STUDIO_MODEL_OPTIONS: readonly StudioModelOption[] = [
   { value: "openai-25-edit", label: "GPT-Image-2.5 修圖", group: "OpenAI", costNt: 2, maxRefs: 5 },
 ];
 
+/** Models that can print a design onto a photo: the call carries TWO reference images (the photo, then the design),
+ *  so a model that takes 0 or 1 cannot see both. GPT-Image-2.5 first: it bent the print with the folds best (2026-11-01). */
+export const PHOTO_PRINT_MODELS: readonly StudioModelOption[] = [
+  ...STUDIO_MODEL_OPTIONS.filter((m) => m.value === "openai-25-edit"),
+  ...STUDIO_MODEL_OPTIONS.filter((m) => m.value !== "openai-25-edit" && m.maxRefs >= 2),
+];
+
 export function isStudioModel(v: unknown): v is StudioModel {
   return typeof v === "string" && STUDIO_MODEL_OPTIONS.some((m) => m.value === v);
 }

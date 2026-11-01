@@ -1,4 +1,21 @@
 # Worklog
+## 2026-11-02（續6）Mockup：模特兒圖可放大；主頁模特合成可選模型（限可吃 2 張參考圖）；平拍拿掉不吃參考圖的模型
+
+**操作者**：「模特兒印製>>生成模特兒圖>>要可以點開放大看」；「模特>>模特兒和設計圖合成的生圖模型，除了【⚠ 此模型不吃參考圖…】之外的模型，都要在選單讓我選擇」；「平拍>>【⚠ 此模型不吃參考圖…】的模型取消，不要出現，因為沒意義」。
+
+**做了**：
+- `ImageLightbox.tsx`（新）：點圖全螢幕放大，點任意處或 Esc 關閉。接到【模特兒印製】生成結果（原本整格是 label，點圖會切換保留；改成點圖放大、只有勾選框切換保留）與主頁模特合成結果。
+- `lib/studio/model-options.ts PHOTO_PRINT_MODELS`：合成要同時送照片＋設計圖兩張參考圖，只列 maxRefs ≥ 2（GPT-Image-2.5 修圖、Nano Banana 2／Pro、GPT-Image-1 低／中／高；GPT-Image-2.5 排第一）。只吃 1 張的（FLUX dev／Kontext、Ideogram Character）看不到設計圖，不列——與操作者「除了不吃參考圖之外都要」的差異已在回覆說明。
+- `fabric-print` 路由 ai 引擎收 `model`（預設 openai-25-edit），不在 `PHOTO_PRINT_MODELS` 的回 400、不扣點；成功回應帶 `model`；存 My Designs 的 `modelName` 用實際模型。
+- 主頁模特 `ModelMockupPanel`：模型按鈕（含每張價格），合成按鈕估價隨模型。
+- 平拍 `MockupStudio`：模型下拉只列 maxRefs > 0，移除「此模型不吃參考圖」警告與 ⟳／○ 標記。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（整套）→ 全綠除他 session 未提交 seedstar 2 敗；新增：路由 nano-banana-2 透傳、flux-kontext-pro／flux-schnell／未知模型 400 且未呼叫生成；面板無 FLUX／Imagen 按鈕、選 Nano Banana 2 送出 model、結果點擊放大／點擊關閉；生成圖點擊放大、Esc 關閉、保留勾選不變 | exit=1 | ms=200000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（自審：模型白名單單一來源 PHOTO_PRINT_MODELS，前後端共用）
+- BUGHUNT_DONE: scope=agency-os/docs,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib | grep=PHOTO_PRINT_MODELS | hits=8
+- ORACLE_WAIVED: 前端選項＋路由白名單；整套測試綠。
+- `npx tsc --noEmit` 乾淨。未部署（今晚 03:00 自動，與 e3d2b4d9b 一起）。
 ## 2026-11-02（續5）SeedStar 影音工作台原始碼搬進 repo：`apps/seedstar`；第三方擷取素材與使用者資料留本機
 
 **操作者**：要先做好功能頁，再和 video.aware-wave.com 整合；選「搬進去」。

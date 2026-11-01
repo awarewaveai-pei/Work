@@ -5,10 +5,10 @@
 // photo's saved print box). The photos themselves are made in 【模特兒印製】 (ModelLibraryStudio).
 import { useMemo, useState } from "react";
 import { GARMENT_PLACEMENT } from "@/lib/studio/mockup-prompt";
-import { STUDIO_MODEL_OPTIONS } from "@/lib/studio/model-options";
+import { PHOTO_PRINT_MODELS, type StudioModel } from "@/lib/studio/model-options";
+import ImageLightbox from "./ImageLightbox";
 import { COLOR_LABEL, GENDER_LABEL, failureText, groupModels, inPairs, readJson, type LibraryPhoto, type Shot } from "./modelLibrary";
 
-const PRINT_COST_NT = STUDIO_MODEL_OPTIONS.find((m) => m.value === "openai-25-edit")?.costNt ?? 2;
 
 export default function ModelMockupPanel({ designRef, photos, onOpenLibrary }: {
   designRef: string | null;
@@ -20,8 +20,11 @@ export default function ModelMockupPanel({ designRef, photos, onOpenLibrary }: {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [placement, setPlacement] = useState("center-chest");
   const [designScale, setDesignScale] = useState(100);
-  const [results, setResults] = useState<{ photo: LibraryPhoto; engine: "ai" | "code"; shot: Shot; saved?: "saving" | "saved" | "error" }[]>([]);
+  const [results, setResults] = useState<{ photo: LibraryPhoto; engine: "ai" | "code"; model: StudioModel; shot: Shot; saved?: "saving" | "saved" | "error" }[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
+  const [model, setModel] = useState<StudioModel>(PHOTO_PRINT_MODELS[0].value);
+  const costNt = PHOTO_PRINT_MODELS.find((m) => m.value === model)?.costNt ?? 2;
+  const [zoom, setZoom] = useState<string | null>(null);
 
   // A photo deleted in 【模特兒印製】 drops out of the pick on its own.
   const pickedPhotos = photos.filter((p) => picked.has(p.id) && p.object_url);
@@ -36,7 +39,7 @@ export default function ModelMockupPanel({ designRef, photos, onOpenLibrary }: {
     const targets = engine === "code" ? boxedPicked : pickedPhotos;
     if (targets.length === 0) { setMsg(engine === "code" ? "免費預覽只能用已框好印花位置的模特兒圖" : "請先勾選模特兒圖"); return; }
     setMsg(null);
-    setResults(targets.map((photo) => ({ photo, engine, shot: { status: "generating" } })));
+    setResults(targets.map((photo) => ({ photo, engine, model, shot: { status: "generating" } })));
     await inPairs(targets, async (photo, i) => {
       let shot: Shot;
       try {
@@ -44,7 +47,7 @@ export default function ModelMockupPanel({ designRef, photos, onOpenLibrary }: {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            engine, photo: photo.object_url, design: designRef, designScale: designScale / 100, placement,
+            engine, model, photo: photo.object_url, design: designRef, designScale: designScale / 100, placement,
             garmentColor: photo.metadata?.garment_color,
             ...(engine === "code" ? { box: photo.metadata!.print_box } : {}),
           }),
@@ -65,7 +68,7 @@ export default function ModelMockupPanel({ designRef, photos, onOpenLibrary }: {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ image: item.shot.image, prompt: `[mockup:model] ${item.photo.metadata?.preset_name ?? ""}`,
-        modelName: item.engine === "ai" ? "openai-25-edit" : "fabric-print", source: "mockup" }),
+        modelName: item.engine === "ai" ? item.model : "fabric-print", source: "mockup" }),
     }).catch(() => null);
     const ok = res ? ((await res.json().catch(() => ({}))) as { ok?: boolean }).ok === true : false;
     mark(ok ? "saved" : "error");
@@ -84,6 +87,7 @@ export default function ModelMockupPanel({ designRef, photos, onOpenLibrary }: {
         </div>
       </div>
       {msg && <div style={{ color: "var(--red)", fontSize: 13 }}>{msg}</div>}
+      <ImageLightbox src={zoom} alt="商品 Mockup" onClose={() => setZoom(null)} />
 
       {models.length === 0 ? (
         <div style={{ fontSize: 13, opacity: 0.8 }}>
@@ -126,13 +130,23 @@ export default function ModelMockupPanel({ designRef, photos, onOpenLibrary }: {
               <button key={o.value} className={chip(placement === o.value)} style={{ fontSize: 11, padding: "2px 8px" }} onClick={() => setPlacement(o.value)}>{o.label}</button>
             ))}
           </div>
+          <div style={{ marginTop: 8 }}>
+            合成用的 AI 模型（只列能同時看照片和設計圖的）
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+              {PHOTO_PRINT_MODELS.map((m) => (
+                <button key={m.value} className={chip(model === m.value)} style={{ fontSize: 11, padding: "2px 8px" }} onClick={() => setModel(m.value)}>
+                  {m.label}（~NT${m.costNt}）
+                </button>
+              ))}
+            </div>
+          </div>
           <label style={{ display: "block", marginTop: 8, fontSize: 12 }}>
             設計大小 {designScale}%
             <input type="range" min={40} max={100} step={5} value={designScale} onChange={(e) => setDesignScale(Number(e.target.value))} style={{ width: 180, marginLeft: 6, verticalAlign: "middle" }} />
           </label>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
             <button className="btn-primary" disabled={pickedPhotos.length === 0 || !designRef || running} onClick={() => void composite("ai")}>
-              合成（{pickedPhotos.length} 張，約 NT${Math.round(pickedPhotos.length * PRINT_COST_NT)}）
+              合成（{pickedPhotos.length} 張，約 NT${Math.round(pickedPhotos.length * costNt)}）
             </button>
             <button className="btn-secondary" disabled={boxedPicked.length === 0 || !designRef || running} onClick={() => void composite("code")}
               title="不用 AI、不扣點；只用已在【模特兒印製】框好印花位置的圖">
@@ -158,7 +172,8 @@ export default function ModelMockupPanel({ designRef, photos, onOpenLibrary }: {
                 {r.shot.status === "done" && (
                   <>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={r.shot.image} alt="商品 Mockup" style={{ width: 240, borderRadius: 6, display: "block" }} />
+                    <img src={r.shot.image} alt="商品 Mockup" title="點一下放大" onClick={() => setZoom(r.shot.status === "done" ? r.shot.image : null)}
+                      style={{ width: 240, borderRadius: 6, display: "block", cursor: "zoom-in" }} />
                     <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
                       <button className="btn-secondary" style={{ fontSize: 11 }} disabled={r.saved === "saving" || r.saved === "saved"} onClick={() => void save(r.photo.id)}>
                         {r.saved === "saved" ? "已存 ✓" : r.saved === "saving" ? "儲存中…" : "存入 My Designs"}

@@ -5,7 +5,7 @@ import { withFeature } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
 import { getDesignObjectByUrl, isDesignsAsset, parseImageDataUrl } from "@/lib/storage/r2";
 import { generateImage } from "@/lib/studio/image-provider";
-import { nearestAspectRatio } from "@/lib/studio/model-options";
+import { PHOTO_PRINT_MODELS, nearestAspectRatio, type StudioModel } from "@/lib/studio/model-options";
 import { compositeOnFabric, isPrintBox, printCorners } from "@/lib/studio/fabric-print";
 import { buildPrintOntoPhotoPrompt } from "@/lib/studio/mockup-prompt";
 import { friendlyImageError } from "@/lib/studio/image-errors";
@@ -53,6 +53,8 @@ interface Body {
   box?: unknown;
   designScale?: unknown;
   engine?: unknown;
+  /** engine ai: one of PHOTO_PRINT_MODELS (default openai-25-edit) */
+  model?: unknown;
   placement?: unknown;
   garmentColor?: unknown;
 }
@@ -85,6 +87,10 @@ export async function POST(request: Request): Promise<Response> {
 
 async function handleAi(_request: Request, grant: Grant, { body, scale }: Parsed): Promise<Response> {
   {
+    const model = (body.model ?? "openai-25-edit") as StudioModel;
+    if (!PHOTO_PRINT_MODELS.some((m) => m.value === model)) {
+      return NextResponse.json({ ok: false, error: "這個模型不能同時看照片和設計圖，請改選可吃 2 張以上參考圖的模型" }, { status: 400 });
+    }
     const photo = body.photo;
     if (!isDesignsAsset(photo)) return NextResponse.json({ ok: false, error: "photo 須為已存的姿勢照網址" }, { status: 400 });
     const design = typeof body.design === "string" ? body.design : "";
@@ -103,7 +109,7 @@ async function handleAi(_request: Request, grant: Grant, { body, scale }: Parsed
     const rotated = (meta.orientation ?? 1) >= 5;
     const aspectRatio = nearestAspectRatio(rotated ? meta.height : meta.width, rotated ? meta.width : meta.height);
     const result = await generateImage({
-      model: "openai-25-edit",
+      model,
       prompt: buildPrintOntoPhotoPrompt({
         designScale: scale,
         placement: typeof body.placement === "string" ? body.placement : undefined,
@@ -113,7 +119,7 @@ async function handleAi(_request: Request, grant: Grant, { body, scale }: Parsed
       aspectRatio,
       costLog: { route: "tools/studio/fabric-print", tool: "mockup" },
     }, grant);
-    if (result.ok) return NextResponse.json({ ok: true, image: result.image, engine: "ai" });
+    if (result.ok) return NextResponse.json({ ok: true, image: result.image, engine: "ai", model });
     const code = (result as { ok: false; error: string }).error;
     // HTTP 200 with ok:false so the JSON reaches the browser (same convention as /api/tools/studio/generate).
     return NextResponse.json({ ok: false, error: friendlyImageError(code), code });

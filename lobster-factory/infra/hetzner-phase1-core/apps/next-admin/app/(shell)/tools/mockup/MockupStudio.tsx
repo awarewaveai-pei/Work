@@ -28,7 +28,8 @@ import {
 } from "@/lib/studio/mockup-prompt";
 
 
-const MOCKUP_MODELS = STUDIO_MODEL_OPTIONS;
+// 平拍 sends the design as a reference image: a model that takes none would ignore it (operator, 2026-11-02).
+const MOCKUP_MODELS = STUDIO_MODEL_OPTIONS.filter((m) => m.maxRefs > 0);
 
 export interface CatalogProduct {
   id: number;
@@ -757,17 +758,14 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
         {aiMode && (
           <>
             <label style={{ fontSize: 13 }}>
-              模型（⟳ = 吃設計圖；首選 Nano Banana 2）
+              模型（只列會讀設計圖的；首選 Nano Banana 2）
               <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={model} onChange={(e) => setModel(e.target.value as StudioModel)}>
                 {MOCKUP_MODELS.map((m) => (
                   <option key={m.value} value={m.value}>
-                    {m.maxRefs > 0 ? "⟳ " : "○ "}{m.group} · {m.label} (~NT${m.costNt})
+                    {m.group} · {m.label} (~NT${m.costNt})
                   </option>
                 ))}
               </select>
-              {MOCKUP_MODELS.find((m) => m.value === model)?.maxRefs === 0 && (
-                <span style={{ color: "var(--yellow)", fontSize: 12 }}>⚠ 此模型不吃參考圖，設計不會印上衣服</span>
-              )}
             </label>
 
             <label style={{ fontSize: 13 }}>
