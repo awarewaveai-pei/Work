@@ -1,4 +1,35 @@
 # Worklog
+## 2026-11-01（續11）outreach 產品門開門：outreach.aware-wave.com 頁面（door.nav 7 頁）、員工頁移 /tools/outreach、開門前關掉兩個跨租戶洞＋一個密鑰洞
+
+**操作者**：「做產品門頁面」（子網域 DNS／憑證／nginx 已在續10）。
+
+**根因（開門前逐條核對資料路徑，ADR 018 §2 規則 2）**：
+- 每條 outreach route 以請求的 `orgSlug` 選資料庫（`getOrgSupabaseWriteClient(body/query slug)`），客戶帶別家 slug＝寫進別家 Supabase。
+- gmail-draft：客戶 org 沒 Gmail 時退回代理商（organization_id NULL）信箱。
+- connectors POST 接受呼叫者給的 `credentials_ref`，messages AI 階梯 `getSecret(row.credentials_ref)` → 客戶可指名 `org:<別家>:supabase_key` 讓伺服器讀出並送給 AI 廠商（critic Deep M2）。
+- OAuth callback 在 app 網域走 session 閘，門上客戶在 app 沒有 cookie（ADR 018 §3）→ 401，連不上信箱（critic M1）；authorize 與 callback 讀不同資料庫（m1）。
+
+**做了**：
+- 員工頁 `git mv app/(shell)/outreach → app/(shell)/tools/outreach`；側欄、設定連結、OAuth 回跳、測試改指向。
+- `lib/portal/products.ts` outreach：門開啟、`door.nav` 7 頁（名單、匯入名單、審核信件、追蹤、信箱與連線、服務設定、拒收名單）、`staffPaths: ["tools/outreach"]`；門頁 `app/outreach/*` 只引用員工頁的 Client 元件。
+- `lib/outreach/db-client.ts` `outreachSlug`／`outreachDb`：客戶一律用自己 org 的資料庫（忽略請求 slug）；10 條 route 改用它。
+- gmail-draft：客戶不退回代理商信箱。AI 階梯：保留代理商 key（經 `outreach.draft` 點數計費；AI key 非身分）。
+- `credentials_ref` 由伺服器決定：connectors 拒收 body `credentialsRef`；讀取一律 `connectorSecretRef(id)`（prod 既有 2 列皆已是此格式，唯讀查證）。
+- OAuth：簽章 state 帶 `from`（門／員工）與 `slug`；callback 先驗 state 再決定回哪頁、開同一個資料庫；callback 列入 `PUBLIC_API_PATHS`（只信 HMAC state）；`registry-code.test.ts` AUTHORIZERS 加 `verifyState`。
+- service profile 讀取加 org 篩選。MODULE_MANIFEST、SPEC §1 門列、R0-PLAN／data.mjs 路徑、Foundry catalog 同步。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（全套）→ 3658 passed，2 failed＝他 session 未追蹤的 tools/seedstar（不在 HEAD） | exit=1 | ms=200000
+- REALTEST_EVIDENCE: tool=Bash | cmd=middleware() 實跑：outreach host `/`、`/inbox`、`/connectors`→307 登入；`/api/outreach/leads`→401；`/api/ops/summary`、`/api/social/brands`、`/api/content/syndicate`→404；app host `/outreach`→404；無 cookie callback→passthrough | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變各一次：outreachDb 客戶分支、代理商信箱守衛、credentialsRef 拒收、callback 公開路徑 → 各自測試紅，還原綠 | exit=0 | ms=120000
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql 唯讀 co_connector_accounts：gemini／gmail 2 列 credentials_ref = 'co_connector:'||id | exit=0 | ms=3000
+- REVIEW_DONE: critic=Deep | verdict=fail→fixed | findings=0c/2m/5n（M1 callback 401、M2 密鑰名由呼叫者決定、m1 兩端不同 DB、m2 拒絕授權回員工頁、m4 manifest 全修；m3 代理商 AI key 決定保留並註解；m5 以私有 index commit）；第二輪 critic=Deep（逐條重推）verdict=pass findings=0c/0m/2n（兩個過時註解已改）
+- ORACLE_WAIVED: codex 額度至 16:18（oracle-quota 已設）；auth 類以兩輪 critic（第二輪逐條重新推導）＋突變證據替代
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=(shell)/outreach\|getOrgSupabaseWriteClient\|credentials_ref\|credentialsRef\|/outreach/connectors | hits=24（route 只剩 callback 用 getOrgSupabaseWriteClient(state.slug)；credentials_ref 寫入只剩 secret route 與 callback；舊員工路徑殘留 0，.next 產物除外）
+
+**剩**：正式站驗證等今晚 03:00 自動部署（登入後門頁、客戶開通需該 org 持有 outreach）；員工舊書籤 `/outreach/*` 在 app 回 404（未加轉址）。
+
+**rollback**：`git revert <door commit>`（門頁、移檔、守衛一起回）；子網域維持 DNS 但門 `enabled:false` 即回 404。
 ## 2026-11-01（續10）外聯系統 v2 卡 C1：守衛與事實訂正（C1.1–C1.5 完成、C1.6 程式完成待操作者發布）；outreach.aware-wave.com DNS／憑證／nginx；lobster-nginx reload 靜默失敗兩天的根因與修補腳本加固
 
 **根因**：

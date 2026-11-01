@@ -12,11 +12,11 @@ export default function OutreachSettingsPage() {
       </div>
 
       <div className="card-grid" style={{ marginTop: 16 }}>
-        <Link href="/outreach/settings/service-profiles" className="card" style={{ textDecoration: "none" }}>
+        <Link href="/tools/outreach/settings/service-profiles" className="card" style={{ textDecoration: "none" }}>
           <div className="card-label">Service Profiles ✅</div>
           <div className="card-sub">服務設定檔 + 禁用詞護欄（已可用）</div>
         </Link>
-        <Link href="/outreach/settings/suppression" className="card" style={{ textDecoration: "none" }}>
+        <Link href="/tools/outreach/settings/suppression" className="card" style={{ textDecoration: "none" }}>
           <div className="card-label">Suppression List ✅</div>
           <div className="card-sub">禁寄清單（寄送前必查；退訂/投訴/退信）</div>
         </Link>

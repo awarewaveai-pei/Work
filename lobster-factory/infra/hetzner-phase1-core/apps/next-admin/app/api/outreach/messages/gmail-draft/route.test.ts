@@ -12,21 +12,29 @@ vi.mock("@/lib/org-client", () => {
       : table === "co_suppression_list" ? { data: state.suppression, error: null }
       : table === "co_verified_emails" ? { data: state.verified, error: null }
       : { data: null, error: null };
+    // the agency's own Gmail connector exists (organization_id IS NULL); the lead's org has none
+    const agency = table === "co_connector_accounts" ? { data: { id: "agency-gmail", organization_id: null, credentials_ref: "ref", is_enabled: true }, error: null } : null;
+    let orgNull = false;
     const q: Record<string, unknown> = {};
     let paged = false;   // a keyset page after the first (.gt) is empty
-    for (const k of ["select", "eq", "is", "in", "not", "limit", "gte", "order", "insert", "update", "upsert"]) q[k] = () => q;
+    for (const k of ["select", "eq", "in", "not", "limit", "gte", "order", "insert", "update", "upsert"]) q[k] = () => q;
+    q.is = (col: string) => { if (col === "organization_id") orgNull = true; return q; };
     q.gt = () => { paged = true; return q; };
-    q.maybeSingle = async () => result;
+    q.maybeSingle = async () => (agency && orgNull ? agency : result);
     q.then = (ok: (v: unknown) => unknown) => Promise.resolve(paged ? { data: [], error: null } : result).then(ok);
     return q;
   };
   return { getOrgSupabaseWriteClient: async () => ({ from: query }) };
 });
+// a customer's own organization slug (lib/outreach/db-client.ts)
+vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => ({ from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { slug: "org-c1" }, error: null }) }) }) }) }) }));
 vi.mock("@/lib/secret-vault", () => ({ getSecret: vi.fn(async () => { throw new Error("vault must not be reached when the lead is blocked"); }), connectorSecretRef: (id: string) => id }));
 
 const { POST } = await import("./route");
-const call = () => POST(new Request("http://app.test/api/outreach/messages/gmail-draft", { method: "POST",
-  headers: { "x-ops-user-kind": "staff", "x-ops-claims-role": "owner", "x-ops-user-id": "u-1", "content-type": "application/json" },
+const STAFF = { "x-ops-user-kind": "staff", "x-ops-claims-role": "owner", "x-ops-user-id": "u-1" };
+const CLIENT = { "x-ops-user-kind": "client", "x-ops-org-id": MSG.organization_id, "x-ops-user-id": "c-1" };
+const call = (who: Record<string, string> = STAFF) => POST(new Request("http://app.test/api/outreach/messages/gmail-draft", { method: "POST",
+  headers: { ...who, "content-type": "application/json" },
   body: JSON.stringify({ messageId: MSG.id }) }));
 const lead = (extra: Record<string, unknown> = {}) => ({ id: "lead-1", organization_id: MSG.organization_id, name: "Shop", email: "x@blocked.example", website: null, do_not_contact: false, ...extra });
 
@@ -62,5 +70,12 @@ describe("POST /api/outreach/messages/gmail-draft re-checks the lead before draf
     const res = await call();
     expect(res.status).toBe(409);
     expect((await res.json()).reason).toBe("email_invalid");
+  });
+  it("a customer never drafts in the agency's mailbox; staff may (self-use before a client connects)", async () => {
+    state.lead = lead(); state.suppression = []; state.verified = [{ email: "x@blocked.example", status: "unknown" }];
+    const client = await (await call(CLIENT)).json();
+    expect(client.error).toMatch(/no connected Gmail connector/);
+    const staff = await (await call()).json();
+    expect(staff.error).not.toMatch(/no connected Gmail connector/);
   });
 });

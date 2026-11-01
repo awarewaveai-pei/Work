@@ -62,7 +62,7 @@ export const STEPS = [
     gate: '對一個測試名單真產一次，資料庫出現 4 列：兩封第一封（各有主旨）、兩封追蹤信（各有等幾天）。內文以署名結尾；需要告知的名單信尾有告知行，沒有就被擋。審核頁可並排核准；抽查模式只在該服務核准滿 50 封後能開。', risk: 'Medium（migration 套正式站 High）', model: 'Opus 5.5', status: 'not_started', depends: ['C1'],
     decided: 'AwareWave 的冷信從自有的次網域信箱池寄出；主網域 aware-wave.com 永遠不寄冷信，也不要在 Gmail 設「以 @aware-wave.com 寄出」，網域設定會把那種信當假冒隔離。代操客戶有 Google 信箱就連它；沒有（Soulful 在 Hostinger）就用池裡掛給它的信箱。已連線的 awarewaveai@gmail.com 只在暖機期間試寫。署名預設是寄件人名稱加品牌名稱，網站那行你填一次。人工把關改成政策：每個服務先逐封核准 50 封，之後只抽查 10%，檢查有警告的一律人工，被擋的永遠不寄。（規格 D12、D23）',
     what: 'migration 0149 expand（署名、追蹤天數、檢查結果、privacy_url、review_mode、review_sample_pct）；brand-context.ts（含個資告知行）；generation-schema.ts（手寫守衛，無 zod）；messages/route.ts 寫 2＋N 列＋依政策核准；Connectors 署名欄；Review A/B；profile 設定頁；刪 drafts stub',
-    files: ['DB/migrations/0149_outbound_v2_expand.sql', 'NA/lib/outreach/brand-context.ts', 'NA/lib/outreach/generation-schema.ts', 'NA/app/api/outreach/messages/route.ts', 'NA/app/(shell)/outreach/review/ReviewClient.tsx'],
+    files: ['DB/migrations/0149_outbound_v2_expand.sql', 'NA/lib/outreach/brand-context.ts', 'NA/lib/outreach/generation-schema.ts', 'NA/app/api/outreach/messages/route.ts', 'NA/app/(shell)/tools/outreach/review/ReviewClient.tsx'],
     items: [
       todo('C2.1', '資料表加欄位：寄件帳號的署名、追蹤信等幾天、品質檢查結果、服務的隱私頁網址與審核模式；同一品牌同一 email 只能有一筆名單；同一名單同時只能有一版首封在寄送路上。'),
       todo('C2.2', '品牌脈絡組裝：定位、賣點、語氣、署名、已核准的證據、必要時的個資告知行，依固定順序組成給 AI 的指示。'),
@@ -107,7 +107,7 @@ export const STEPS = [
   { n: 6, code: 'C4', group: 'D', title: '回覆同步與 Replies 頁', plain: '例：你在 Gmail 按下寄出，10 分鐘內系統逐封確認寄了；對方回信，系統抓回內文分類成「問價」，名單狀態變「已回覆」，追蹤信自動停。退訂與退信也自動處理。同步停了幾天再恢復，可以補掃。',
     gate: '你寄 1 封給自己另一個信箱並回覆，10 分鐘內 Replies 頁出現該列含內文、名單狀態變已回覆、追蹤日期清空。第一封已寄而追蹤草稿未寄時，追蹤信不會被誤標為已寄。同一封回信重掃不會重複建事件或拒收。退信與退訂會進拒收名單。', risk: 'Medium（主機排程安裝 High）', model: 'Opus 5.5', status: 'not_started', depends: ['C2'],
     what: 'migration 0151 co_replies；存 threadId／messageId／draftId；gmail-sync.ts（逐封 message id 判已寄；收件匣以游標掃、先插入 co_replies 再做副作用、取 full 內文）；分類＋停追蹤＋拒收；internal route＋cron */10＋host-jobs；補掃按鈕；Replies 頁按鈕',
-    files: ['DB/migrations/0151_co_replies.sql', 'NA/lib/outreach/google-oauth.ts', 'NA/lib/outreach/gmail-sync.ts', 'NA/app/api/internal/outreach/gmail-sync/route.ts', 'HS/cron.d/awarewave-schedules', 'NA/app/(shell)/outreach/replies/page.tsx'],
+    files: ['DB/migrations/0151_co_replies.sql', 'NA/lib/outreach/google-oauth.ts', 'NA/lib/outreach/gmail-sync.ts', 'NA/app/api/internal/outreach/gmail-sync/route.ts', 'HS/cron.d/awarewave-schedules', 'NA/app/(shell)/tools/outreach/replies/page.tsx'],
     items: [
       todo('C4.1', '新資料表：回信。'),
       todo('C4.2', '建草稿時記下對話串、訊息與草稿三個 id。'),
@@ -132,7 +132,7 @@ export const STEPS = [
   { n: 8, code: 'C5', group: 'E', title: '追蹤信與人工步驟', plain: '例：第一封寄出 3 個工作天後沒回信，系統自動把寫好的追蹤信建在 Gmail 原本那串對話裡並寄出（自動寄的信箱）；草稿模式的信箱則在追蹤頁等你按。電話或 IG 私訊的步驟顯示成待辦，做完打勾。',
     gate: '到期的名單出現在追蹤頁並附內容。建的草稿在 Gmail 原對話串中。最後一封過期沒回信，名單標為無回應。', risk: 'Low', model: 'Codex', status: 'not_started', depends: ['C8'],
     what: 'followups 頁列到期 lead＋下一封；gmail-draft 支援 In-Reply-To／References＋threadId；no_reply 判定；非 email 步驟待辦；管線 tick 自動建草稿',
-    files: ['NA/app/(shell)/outreach/followups/page.tsx', 'NA/app/api/outreach/messages/gmail-draft/route.ts', 'NA/lib/outreach/gmail-sync.ts'],
+    files: ['NA/app/(shell)/tools/outreach/followups/page.tsx', 'NA/app/api/outreach/messages/gmail-draft/route.ts', 'NA/lib/outreach/gmail-sync.ts'],
     items: [
       todo('C5.1', '追蹤頁列出到期名單與寫好的下一封。'),
       todo('C5.2', '追蹤信草稿建在原對話串裡。'),
@@ -144,7 +144,7 @@ export const STEPS = [
     gate: '種 20 個有網站的名單，服務設成抽查模式，跑 3 個 tick，沒有任何人工點擊就出現至少 15 封已建草稿、2 封在佇列等你看。逐封模式的服務不會自動核准。暖名單永遠不會進管線。', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['C5'],
     decided: '300 封一天不可能一筆一筆按：證據來自對方自家網站的自動核准；每個服務先逐封核准 50 封，之後抽查 10%，檢查有警告的一律人工，被擋的永遠不寄；管線照這套政策自動前進。（規格 D23）',
     what: 'pipeline.ts runPipelineTick（研究→產信→政策核准→建草稿→追蹤到期，各步每 tick 上限）；佇列頁含鍵盤操作；每 org 每日管線預算；成效頁顯示每日數',
-    files: ['NA/lib/outreach/pipeline.ts', 'NA/app/(shell)/outreach/review/ReviewClient.tsx', 'NA/lib/outreach/gmail-sync.ts'],
+    files: ['NA/lib/outreach/pipeline.ts', 'NA/app/(shell)/tools/outreach/review/ReviewClient.tsx', 'NA/lib/outreach/gmail-sync.ts'],
     items: [
       todo('C15.1', '管線 tick：每 10 分鐘把名單往前推一步——研究、產信、依政策核准（每名單只一版、主張有證據才過）、建草稿、追蹤到期，每步有上限。'),
       todo('C15.2', '佇列頁：抽到的信、有警告的信、第三方證據集中在一頁，鍵盤核准或退回。'),
@@ -154,7 +154,7 @@ export const STEPS = [
   { n: 10, code: 'C7', group: 'E', title: '成效頁', plain: '例：外聯首頁一張表：每個品牌、每種切角、A 版 B 版各寄了幾封、幾封回、幾封正向、約到幾個會議、成交幾個；每個信箱的退信率與今日用量；每天研究、產信、寄出幾封。沒有開信率，因為那個數字不可信。',
     gate: '種 3 筆走到已回覆的名單，表上的數字正確。可下載 CSV。', risk: 'Low', model: 'Codex', status: 'not_started', depends: ['C4'],
     what: 'stats route（SQL 聚合四張表）；首頁取代 stub；CSV；每信箱健康列；每日管線數',
-    files: ['NA/app/api/outreach/stats/route.ts', 'NA/app/(shell)/outreach/page.tsx'],
+    files: ['NA/app/api/outreach/stats/route.ts', 'NA/app/(shell)/tools/outreach/page.tsx'],
     items: [
       todo('C7.1', '統計的後端：依品牌、切角、版本算寄出、退信、回覆、正向、會議、成交。'),
       todo('C7.2', '首頁取代空殼，顯示那張表與 CSV 下載。'),

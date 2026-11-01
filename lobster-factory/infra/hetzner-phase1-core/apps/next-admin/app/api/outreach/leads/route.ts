@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
-import { getOrgSupabaseWriteClient } from "@/lib/org-client";
+import { outreachDb } from "@/lib/outreach/db-client";
 import { scoreLead } from "@/lib/outreach/scoring";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
@@ -34,7 +34,7 @@ interface ScoreInput {
 
 export async function GET(req: Request): Promise<Response> {
   const url = new URL(req.url);
-  const supabase = await getOrgSupabaseWriteClient(url.searchParams.get("orgSlug"));
+  const supabase = await outreachDb(req, url.searchParams.get("orgSlug"));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   const id = url.searchParams.get("id");
@@ -74,7 +74,7 @@ export async function POST(req: Request): Promise<Response> {
     return new NextResponse("invalid json", { status: 400 });
   }
 
-  const supabase = await getOrgSupabaseWriteClient(str(body.orgSlug));
+  const supabase = await outreachDb(req, str(body.orgSlug));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   // Pre-resolve org for the manual create/update path (approve path resolves its own org from inbox row).
@@ -203,7 +203,7 @@ export async function DELETE(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
   const params = new URL(req.url).searchParams;
-  const supabase = await getOrgSupabaseWriteClient(params.get("orgSlug"));
+  const supabase = await outreachDb(req, params.get("orgSlug"));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const id = params.get("id");
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });

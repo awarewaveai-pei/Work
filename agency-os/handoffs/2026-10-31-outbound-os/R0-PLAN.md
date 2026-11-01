@@ -62,7 +62,7 @@ B。**第 0 天**操作者啟動 C11.1 採購（網域、Workspace 次網域、�
 | C2.2 | 新檔 `NA/lib/outreach/brand-context.ts`：純函式 `buildBrandContext({profile, sender, evidence, goal})` 依 SPEC §5.3 順序組 prompt 段落；證據以 SOURCE_QUOTATION 包裹；單元測試：缺署名 throw、證據段只含 approved |
 | C2.3 | 新檔 `NA/lib/outreach/generation-schema.ts`：`parseGenerationOutput(raw)` 手寫型別守衛（repo 無 zod，不加依賴）：`subjects[2]`、`bodies[2]{label,text,evidence_ids}`、`followups[]{step,delay_days,text}`；壞 JSON 允許 1 次修復重試（把錯誤回給模型），再失敗走既有 `manual_prompt` |
 | C2.4 | `NA/app/api/outreach/messages/route.ts`：`buildPrompt` 改呼叫 brand-context；輸出經 generation-schema → 寫 2 列 `cold_email`（`variant_label` A／B、`subject`、`version=1`）＋ N 列 `followup`（`version=step`、`followup_delay_days`、`subject=null`）；每列 `lintMessage`＋主旨 lint（≤25 字、無 `HARD_CTA`、無「免費」「限時」）→ `safety_score`、`quality_gate_status`、`gate_snapshot={gate_version,findings}`、`evidence_snapshot={evidence_ids}`；lead `consent_source` 不是 `self_published:` 開頭時 brand-context 固定加一行個資告知（資料來源、蒐集者、目的、`privacy_url`；SPEC D20），lint 缺告知行＝block；核准依 profile `review_mode`（SPEC D23）：`manual` 逐封，人選 A 或 B（另一版 `skipped`）；`sampled` 時①依 lead id 雜湊奇偶選一版、另一版 `skipped`，②lint `pass`，③新檔 `NA/lib/outreach/claim-check.ts`（`generateCheapJsonText`，grant `outreach.qa`，`NA/lib/portal/products.ts:88` 加 `quota("outreach.qa", "事實核對")`）判斷信中每個關於對方的主張是否被 approved evidence 支持 → `supported` 才自動 `approved`，結果存 `gate_snapshot.claim_check` 並寫 `gate_snapshot.auto=true`；抽樣（`review_sample_pct`）、warn、`unsupported` 進佇列。「前 50 封」＝該 profile `approved_at` 非空且 `gate_snapshot.auto` 不為 true 的 `cold_email` 列數。PATCH 核准撞首封唯一索引（C2.1）→ 409 `variant_already_approved` |
-| C2.5 | UI：Connectors 頁寄件帳號加「署名」多行欄，預設＝`display_name`＋org 名稱，網站那行操作者填一次（SPEC D12），空白不能存；Review 頁 A／B 並排＋主旨，核准一版（另一版 `skipped`）；service profile 設定頁加 `privacy_url`（儲存時 GET 一次須 200，旁邊列 SPEC D20 的隱私頁清單讓操作者逐項勾完才能存）、`review_mode`（manual／sampled 兩顆按鈕；sampled 只在該 profile 人工核准 ≥ 50 封時可按）、`review_sample_pct`；`NA/app/(shell)/outreach/drafts/page.tsx` stub 刪除、側欄移除（Review 已涵蓋） |
+| C2.5 | UI：Connectors 頁寄件帳號加「署名」多行欄，預設＝`display_name`＋org 名稱，網站那行操作者填一次（SPEC D12），空白不能存；Review 頁 A／B 並排＋主旨，核准一版（另一版 `skipped`）；service profile 設定頁加 `privacy_url`（儲存時 GET 一次須 200，旁邊列 SPEC D20 的隱私頁清單讓操作者逐項勾完才能存）、`review_mode`（manual／sampled 兩顆按鈕；sampled 只在該 profile 人工核准 ≥ 50 封時可按）、`review_sample_pct`；`NA/app/(shell)/tools/outreach/drafts/page.tsx` stub 刪除、側欄移除（Review 已涵蓋） |
 | C2.6 | 測試：`npx tsc --noEmit`、vitest（brand-context、generation-schema、route 寫列數）；REALTEST：本機 dev 對一個測試 lead 用 BYO key 真產一次 → `co_messages` 4 列、主旨非空、內文以署名結尾 |
 
 ### C3 研究 → 證據
@@ -102,7 +102,7 @@ B。**第 0 天**操作者啟動 C11.1 採購（網域、Workspace 次網域、�
 | C4.3 | 新檔 `NA/lib/outreach/gmail-sync.ts`，每個啟用 connector 兩段（SPEC §5.6）：①**已寄偵測，逐封不看 thread**：`co_messages.status ∈ {drafted, sending}` → `messages.get(<事件 messageId>)?format=minimal`，`labelIds` 含 `SENT` 且無 `DRAFT` → `sent`、`sent_at`、事件 `sent`、lead `status='sent'`、`last_contact_date`、`next_followup_date`；404 → `threads.get` 中 `SENT` 且 `internalDate` 晚於草稿建立且未對應他列者補對；草稿也 404 → `needs_edit`＋timeline。②**來信比對**（SPEC §5.6）：游標＝`co_connector_accounts.settings.gmail_sync.history_id`（`0048:195` jsonb；初次 `users.getProfile` 取並以 `messages.list?q=in:inbox after:<連線時間−1 天> -from:me` 翻完所有分頁全掃）→ 每 tick `users.history.list?startHistoryId&labelId=INBOX&historyTypes=messageAdded` 翻完分頁；404 → 日期全掃 → 每封 `INSERT co_replies(gmail_message_id, processed_at=NULL)`（衝突＝已認領，跳過）→ `messages.get?format=full`：From、Subject、In-Reply-To、X-Failed-Recipients、`text/plain` part（base64url 解碼；無則去 HTML 標籤）截 4,000 字存 `reply_text` → 比對同 org `co_leads.email`（小寫，不論 lead 狀態）→ C4.4 分類與副作用 → 全部成功才寫 `processed_at`；失敗 `process_attempts+1`，下一 tick 先重處理 `processed_at IS NULL ∧ attempts<5`；第 5 次仍失敗 → `reply_type='unprocessed'`、`processed_at=now()`、timeline `reply_processing_failed`＋推播（`NA/lib/schedules/alerts.ts` 出口）；**游標只在整輪分頁耗盡且無未處理列時前進**。`From` 含 `mailer-daemon` → 以 `X-Failed-Recipients` 找 lead → 事件 `hard_bounced`＋suppression `hard_bounce`＋`do_not_contact` |
 | C4.4 | 分類（C4.3 認領後的處理段，可重試，完成才 `processed_at`）：主旨為 `unsubscribe`（`List-Unsubscribe` mailto，C1.3）直接記 `unsubscribe` 不叫 AI；其餘 `generateCheapJsonText({ grant: grantFor("outreach.classify", …) })` 以 `reply_text` 分類 `reply_type`（v1 九種）＋`suggested_response`；`NA/lib/portal/products.ts:88` 加 `quota("outreach.classify", "回信分類")`。lead：`status='replied'`、`next_followup_date=null`、`consent_status` 由 `unknown`／`legitimate_interest` 升為 `replied`（不降 `opted_in`／`form_submitted`／`customer`）；`unsubscribe` → `consent_status='unsubscribed'`＋suppression `unsubscribe`＋`do_not_contact`；`reject` → `consent_status='do_not_contact'`＋suppression `manual_opt_out`＋`do_not_contact`；全部寫 `co_timeline_events` |
 | C4.5 | 新路由 `NA/app/api/internal/outreach/gmail-sync/route.ts`（Bearer `OUTREACH_SYNC_TOKEN`，照 `NA/app/api/internal/schedules/alerts/route.ts:21-25`）；`HS/cron.d/awarewave-schedules` 加 `*/10` 一行經 `poke.sh`；`NA/lib/schedules/host-jobs.ts` 登記 `outreach_gmail_sync`；Connectors 頁每個信箱「補掃 N 天」按鈕（游標回撥後下一 tick 補掃）；安裝主機 cron（High） |
-| C4.6 | `NA/app/(shell)/outreach/replies/page.tsx` 取代 stub：全 org 列表（時間、lead、分類、`reply_text` 摘要）；按鈕：產報價摘要（`output_type=proposal_summary`）、問正確窗口、加入拒收、同步 FluentCRM（C6 後啟用）、約到會議、成交、失去（各改 `co_leads.status`）；`unprocessed` 列紅色附「重試」（`process_attempts=0`、`processed_at=NULL`） |
+| C4.6 | `NA/app/(shell)/tools/outreach/replies/page.tsx` 取代 stub：全 org 列表（時間、lead、分類、`reply_text` 摘要）；按鈕：產報價摘要（`output_type=proposal_summary`）、問正確窗口、加入拒收、同步 FluentCRM（C6 後啟用）、約到會議、成交、失去（各改 `co_leads.status`）；`unprocessed` 列紅色附「重試」（`process_attempts=0`、`processed_at=NULL`） |
 | C4.7 | 測試：假回應情境——首封已寄而追蹤草稿未寄（追蹤不得標 sent）、同串回信、新開一封的退訂信、`no_reply` 後回信、退信、同一 `gmail_message_id` 跑兩次只一列且事件與拒收只一筆、分類失敗後下一 tick 重處理成功、history 404 回退全掃、兩頁分頁都處理完游標才前進；REALTEST（部署後）：操作者寄 1 封給自己的另一信箱並回覆 → 10 分內 Replies 出現該列含內文、lead 狀態 replied、follow-up 日期清空 |
 
 ### C8 自動寄與輪流寄（量產）
@@ -119,7 +119,7 @@ B。**第 0 天**操作者啟動 C11.1 採購（網域、Workspace 次網域、�
 
 | 卡號 | 做什麼 |
 |---|---|
-| C5.1 | `NA/app/(shell)/outreach/followups/page.tsx`：列出 `next_followup_date ≤ 今天` 且 `status='sent'` 的 lead，顯示下一封 followup 列（最小未寄 `version`）；「建草稿（回同一串）」按鈕 |
+| C5.1 | `NA/app/(shell)/tools/outreach/followups/page.tsx`：列出 `next_followup_date ≤ 今天` 且 `status='sent'` 的 lead，顯示下一封 followup 列（最小未寄 `version`）；「建草稿（回同一串）」按鈕 |
 | C5.2 | `NA/app/api/outreach/messages/gmail-draft/route.ts` 接受 followup 列：MIME 加 `In-Reply-To`／`References`＝本方上一封的 `Message-ID`（`threads.get` headers），`drafts.create` 帶 `threadId`；事件照常 |
 | C5.3 | 最後一封寄出後經其 `followup_delay_days` 無回信 → lead `status='no_reply'`（在 gmail-sync tick 判）；`no_reply` 不是同步終點，之後來信由 C4.3 ② 照常改成 `replied` |
 | C5.4 | `channel≠email` 的步驟（`co_messages.channel` ig_dm／linkedin／phone）在同頁顯示為待辦＋「完成」按鈕（寫 timeline，推進 `next_followup_date`）；本卡只顯示與完成，不產生這類步驟（SPEC §2 D9） |
@@ -130,7 +130,7 @@ B。**第 0 天**操作者啟動 C11.1 採購（網域、Workspace 次網域、�
 | 卡號 | 做什麼 |
 |---|---|
 | C15.1 | 新檔 `NA/lib/outreach/pipeline.ts` `runPipelineTick(orgId)`，在 gmail-sync 同一 tick、send-adapter 之前跑，每步各有每 tick 上限：①`co_leads.status='qualified'` 且無 `co_evidence` 且有 `website` → C3.3 批次研究（grant `outreach.research`，每 tick ≤ 20）；②有 approved evidence 且無 `co_messages` → C2.4 產信（每 tick ≤ 20）；③`co_messages.status='draft'` 依 profile `review_mode`（SPEC D23）：`manual` 留佇列；`sampled` → 每 lead 選一版（雜湊奇偶，另一版 `skipped`）→ lint `pass` ∧ `claim-check` `supported` → `approved`，抽樣、`warn`、`unsupported` → 佇列；④`approved` 且無 `drafted` 事件 → C8.2 建草稿（只對 auto 信箱）；⑤追蹤到期 → C5.2 建草稿（C5 已在前）。全部只處理 `do_not_contact=false` 且非 warm 的 lead |
-| C15.2 | 佇列頁 `NA/app/(shell)/outreach/review/`：顯示待人工的證據（第三方）、訊息（manual／抽樣／warn）；鍵盤 a 核准、r 退回、j 下一筆；每筆顯示證據來源與告知行 |
+| C15.2 | 佇列頁 `NA/app/(shell)/tools/outreach/review/`：顯示待人工的證據（第三方）、訊息（manual／抽樣／warn）；鍵盤 a 核准、r 退回、j 下一筆；每筆顯示證據來源與告知行 |
 | C15.3 | 每 org 每日管線預算：研究與產信各 ≤ 寄信目標 × 1.5（`co_sender_accounts` 該 org 上限總和 × 1.5），超過等明天；費用記 `ai_call_logs`，成效頁（C7）顯示每日研究／產信／寄出數 |
 | C15.4 | 測試：每步上限、manual 不自動核准、sampled 抽樣比例、同 lead 只一版進草稿（並行第二版撞索引）、`unsupported` 進佇列、自動核准列 `gate_snapshot.auto=true` 不計入 50、warm lead 永不進入；REALTEST：本機種 20 個有 `website` 的 qualified lead，`sampled` profile，跑 3 個 tick → 無人工點擊下出現 ≥ 15 封 `drafted`、抽樣 2 封在佇列 |
 
@@ -139,7 +139,7 @@ B。**第 0 天**操作者啟動 C11.1 採購（網域、Workspace 次網域、�
 | 卡號 | 做什麼 |
 |---|---|
 | C7.1 | 新路由 `NA/app/api/outreach/stats/route.ts`（GET `?organizationId&from&to`）：依 service_profile × variant_label × angle 計 generated／drafted／sent／bounced／replied／positive／meeting_booked／customer／lost（SPEC §5.9；SQL 聚合 `co_messages`、`co_sending_events`、`co_replies`、`co_leads`） |
-| C7.2 | `NA/app/(shell)/outreach/page.tsx` 取代 stub：一張表＋回覆率、正向回覆率；無開信率欄位；CSV 下載 |
+| C7.2 | `NA/app/(shell)/tools/outreach/page.tsx` 取代 stub：一張表＋回覆率、正向回覆率；無開信率欄位；CSV 下載 |
 | C7.3 | 測試：聚合對假資料的計數；REALTEST：本機種 3 筆 lead 走到 replied → 表數字正確 |
 
 ### C12 名單來源：公司行號（商工登記開放資料）

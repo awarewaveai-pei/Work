@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
-import { getOrgSupabaseWriteClient } from "@/lib/org-client";
+import { outreachDb } from "@/lib/outreach/db-client";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
 // Cold Outreach — Suppression list (task T12). Table: co_suppression_list (migration 0048).
@@ -24,7 +24,7 @@ const APPLIES = new Set(["cold", "marketing", "transactional", "all"]);
 
 export async function GET(req: Request): Promise<Response> {
   const params = new URL(req.url).searchParams;
-  const supabase = await getOrgSupabaseWriteClient(params.get("orgSlug"));
+  const supabase = await outreachDb(req, params.get("orgSlug"));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const rawOrgId = params.get("organizationId");
   if (rawOrgId && !UUID_RE.test(rawOrgId)) return NextResponse.json({ ok: false, error: "organizationId must be a uuid" }, { status: 400 });
@@ -49,7 +49,7 @@ export async function POST(req: Request): Promise<Response> {
     return new NextResponse("invalid json", { status: 400 });
   }
 
-  const supabase = await getOrgSupabaseWriteClient(str(body.orgSlug));
+  const supabase = await outreachDb(req, str(body.orgSlug));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   const email = str(body.email)?.toLowerCase() ?? null;
@@ -101,7 +101,7 @@ export async function DELETE(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
   const params = new URL(req.url).searchParams;
-  const supabase = await getOrgSupabaseWriteClient(params.get("orgSlug"));
+  const supabase = await outreachDb(req, params.get("orgSlug"));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const id = params.get("id");
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });

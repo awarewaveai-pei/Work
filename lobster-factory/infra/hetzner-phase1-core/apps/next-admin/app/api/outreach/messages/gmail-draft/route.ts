@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
-import { getOrgSupabaseWriteClient } from "@/lib/org-client";
-import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
+import { outreachDb } from "@/lib/outreach/db-client";
+import { assertOrgAccess, OrgAccessError, toOrgAccessResponse, userKindOf } from "@/lib/tenant-guard";
 import { getSecret, connectorSecretRef } from "@/lib/secret-vault";
 import { buildRfc2822Message, createGmailDraft, refreshAccessToken, toBase64Url } from "@/lib/outreach/google-oauth";
 import { contactBlock } from "@/lib/outreach/contact-guard";
@@ -48,7 +48,7 @@ export async function POST(req: Request): Promise<Response> {
   if (!messageId) return NextResponse.json({ ok: false, error: "messageId required" }, { status: 400 });
   if (!UUID_RE.test(messageId)) return NextResponse.json({ ok: false, error: "messageId must be a uuid" }, { status: 400 });
 
-  const supabase = await getOrgSupabaseWriteClient(str(body.orgSlug));
+  const supabase = await outreachDb(req, str(body.orgSlug));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   const { data: msgData, error: msgErr } = await supabase
@@ -89,7 +89,9 @@ export async function POST(req: Request): Promise<Response> {
 
   // Connector lookup mirrors the AI-provider ladder in messages/route.ts POST: org-scoped row
   // first (client's own connected Gmail), else the agency's own (organization_id IS NULL) — the
-  // self-use / "先用測試帳號" path before any client has connected theirs.
+  // self-use / "先用測試帳號" path before any client has connected theirs. A customer never drafts in the agency's mailbox:
+  // its own connector or nothing.
+  const agencyFallback = userKindOf(req.headers) !== "client";
   const pickConnector = async (): Promise<ConnectorRow | null> => {
     if (message.organization_id) {
       const { data } = await supabase
@@ -103,6 +105,7 @@ export async function POST(req: Request): Promise<Response> {
         .maybeSingle();
       if (data) return data as ConnectorRow;
     }
+    if (!agencyFallback) return null;
     const { data } = await supabase
       .from("co_connector_accounts")
       .select("id, organization_id, credentials_ref, is_enabled")

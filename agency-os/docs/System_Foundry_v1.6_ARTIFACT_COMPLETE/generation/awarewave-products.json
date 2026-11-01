@@ -2483,9 +2483,45 @@
       "door": {
         "app": "next-admin",
         "page": "/outreach",
-        "enabled": false,
         "api": [
           "/api/outreach"
+        ],
+        "nav": [
+          {
+            "path": "",
+            "name": "名單",
+            "staff": "tools/outreach/leads"
+          },
+          {
+            "path": "inbox",
+            "name": "匯入名單",
+            "staff": "tools/outreach/inbox"
+          },
+          {
+            "path": "review",
+            "name": "審核信件",
+            "staff": "tools/outreach/review"
+          },
+          {
+            "path": "followups",
+            "name": "追蹤",
+            "staff": "tools/outreach/followups"
+          },
+          {
+            "path": "connectors",
+            "name": "信箱與連線",
+            "staff": "tools/outreach/connectors"
+          },
+          {
+            "path": "profiles",
+            "name": "服務設定",
+            "staff": "tools/outreach/settings/service-profiles"
+          },
+          {
+            "path": "suppression",
+            "name": "拒收名單",
+            "staff": "tools/outreach/settings/suppression"
+          }
         ]
       },
       "loginSources": [
@@ -2510,7 +2546,7 @@
         "manifest": "lib/outreach/MODULE_MANIFEST.json"
       },
       "staffPaths": [
-        "outreach"
+        "tools/outreach"
       ]
     },
     {

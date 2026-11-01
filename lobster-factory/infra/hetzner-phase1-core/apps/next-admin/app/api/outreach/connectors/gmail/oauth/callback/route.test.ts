@@ -8,7 +8,7 @@ describe("GET gmail oauth callback — redirect target", () => {
   it("redirects to the public app host even when the request arrives on the container bind address", async () => {
     const res = await GET(new NextRequest("http://0.0.0.0:3000/api/outreach/connectors/gmail/oauth/callback?error=access_denied"));
     const location = res.headers.get("location") ?? "";
-    expect(location.startsWith("https://app.aware-wave.com/outreach/connectors?")).toBe(true);
+    expect(location.startsWith("https://app.aware-wave.com/tools/outreach/connectors?")).toBe(true);
     expect(location).not.toContain("0.0.0.0");
   });
 });

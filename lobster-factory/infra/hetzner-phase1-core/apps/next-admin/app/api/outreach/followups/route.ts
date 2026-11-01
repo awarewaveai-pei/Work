@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
-import { getOrgSupabaseWriteClient } from "@/lib/org-client";
+import { outreachDb } from "@/lib/outreach/db-client";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
 // Cold Outreach — Follow-up scheduling (task T11). Mutates co_leads.next_followup_date /
@@ -38,7 +38,7 @@ export async function POST(req: Request): Promise<Response> {
     return new NextResponse("invalid json", { status: 400 });
   }
 
-  const supabase = await getOrgSupabaseWriteClient(str(body.orgSlug));
+  const supabase = await outreachDb(req, str(body.orgSlug));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   const leadId = str(body.leadId);

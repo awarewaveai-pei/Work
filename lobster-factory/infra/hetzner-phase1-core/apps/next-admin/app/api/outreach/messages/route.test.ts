@@ -14,15 +14,15 @@ vi.mock("@/lib/social/authz", () => ({ actorFor: m.actorFor }));
 vi.mock("@/lib/outreach/ai-claude", () => ({ generateWithClaude: m.claude }));
 vi.mock("@/lib/outreach/ai-openai", () => ({ generateWithOpenAI: vi.fn() }));
 vi.mock("@/lib/outreach/ai-gemini", () => ({ generateWithGemini: vi.fn() }));
-vi.mock("@/lib/secret-vault", () => ({ getSecret: async () => "key" }));
+vi.mock("@/lib/secret-vault", () => ({ getSecret: async () => "key", connectorSecretRef: (id: string) => `co_connector:${id}` }));
 vi.mock("@/lib/outreach/cold-gate", () => ({ checkColdGate: () => ({ status: "pass", blockers: [] }), buildEvidenceSnapshot: () => ({}), lintMessage: () => [] }));
 vi.mock("@/lib/org-client", () => {
   // Every query resolves: the lead for co_leads, a credentials ref for co_connector_accounts, an inserted row otherwise.
   const query = (table: string) => {
     const result = table === "co_leads" ? { data: LEAD, error: null }
-      : table === "co_connector_accounts" ? { data: { credentials_ref: "ref" }, error: null } : { data: { id: "msg" }, error: null };
+      : table === "co_connector_accounts" ? { data: { id: "conn-1" }, error: null } : { data: { id: "msg" }, error: null };
     const q: Record<string, unknown> = {};
-    for (const k of ["select", "eq", "is", "not", "limit", "insert", "update", "order"]) q[k] = () => q;
+    for (const k of ["select", "eq", "is", "not", "limit", "insert", "update", "order", "match"]) q[k] = () => q;
     q.maybeSingle = async () => result;
     q.single = async () => result;
     q.then = (ok: (v: unknown) => unknown) => Promise.resolve(result).then(ok);

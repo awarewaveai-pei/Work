@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
+import { outreachSlug } from "@/lib/outreach/db-client";
 import { getOrgSupabaseWriteClient } from "@/lib/org-client";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { buildAuthorizeUrl, gmailOAuthRedirectUri, signState } from "@/lib/outreach/google-oauth";
 import crypto from "node:crypto";
+import { doorForHost } from "@/lib/portal/doors";
 
 // Cold Outreach — Gmail OAuth step 1 (task T10). Redirects the operator to Google's consent
 // screen for the connector row already created via ../route.ts's normal "新增 Connector" flow.
@@ -31,7 +33,8 @@ export async function GET(req: Request): Promise<Response> {
     return NextResponse.json({ ok: false, error: "GOOGLE_OAUTH_CLIENT_ID/SECRET not configured" }, { status: 503 });
   }
 
-  const supabase = await getOrgSupabaseWriteClient(url.searchParams.get("orgSlug"));
+  const slug = await outreachSlug(req, url.searchParams.get("orgSlug"));
+  const supabase = slug === undefined ? null : await getOrgSupabaseWriteClient(slug);
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   const { data: connector, error } = await supabase
@@ -54,7 +57,10 @@ export async function GET(req: Request): Promise<Response> {
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
   const redirectUri = gmailOAuthRedirectUri();
-  const state = signState({ connectorId, nonce: crypto.randomBytes(12).toString("hex"), ts: Date.now() }, clientSecret);
+  // Same host reading as middleware.ts: a consent started on the outreach door returns there after Google.
+  const door = doorForHost(req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "");
+  const from = door.kind === "product" && door.product.key === "outreach" ? "door" : "staff";
+  const state = signState({ connectorId, nonce: crypto.randomBytes(12).toString("hex"), ts: Date.now(), from, ...(slug ? { slug } : {}) }, clientSecret);
   const authorizeUrl = buildAuthorizeUrl({ clientId, redirectUri, state });
 
   return NextResponse.redirect(authorizeUrl);

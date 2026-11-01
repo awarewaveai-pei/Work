@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
-import { getOrgSupabaseWriteClient } from "@/lib/org-client";
+import { outreachDb } from "@/lib/outreach/db-client";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { putSecret, deleteSecret, connectorSecretRef } from "@/lib/secret-vault";
 
 // Cold Outreach — connector secret submission (task T4/Phase-B). The ONLY path that accepts a raw
 // API key: it writes the key to the Supabase Vault (migration 0049) and stores only the ref in
 // co_connector_accounts.credentials_ref. The key bytes NEVER touch a normal table and are never
-// returned. The metadata route (../route.ts) still rejects key-looking values as defense-in-depth.
+// returned. The ref is always connectorSecretRef(id); the metadata route (../route.ts) refuses any caller-supplied one.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +31,7 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const orgSlug = typeof body.orgSlug === "string" && body.orgSlug.trim() ? body.orgSlug.trim() : null;
-  const supabase = await getOrgSupabaseWriteClient(orgSlug);
+  const supabase = await outreachDb(req, orgSlug);
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   const connectorId = str(body.connectorId);
@@ -78,7 +78,7 @@ export async function DELETE(req: Request): Promise<Response> {
   if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
 
   const params = new URL(req.url).searchParams;
-  const supabase = await getOrgSupabaseWriteClient(params.get("orgSlug"));
+  const supabase = await outreachDb(req, params.get("orgSlug"));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   const connectorId = params.get("connectorId");

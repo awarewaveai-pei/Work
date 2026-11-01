@@ -31,6 +31,12 @@ describe("signState / verifyState", () => {
     expect(verifyState("a.b.c", secret)).toBeNull();
   });
 
+  it("carries the signed return target, and refuses one it does not know", () => {
+    expect(verifyState(signState({ connectorId, nonce: "n", ts: Date.now(), from: "door" }, secret), secret)?.from).toBe("door");
+    const forged = signState({ connectorId, nonce: "n", ts: Date.now(), from: "evil" as never }, secret);
+    expect(verifyState(forged, secret)).toBeNull();
+  });
+
   it("rejects an expired state (older than 10 minutes)", () => {
     const elevenMinAgo = Date.now() - 11 * 60 * 1000;
     const signed = signState({ connectorId, nonce: "abc123", ts: elevenMinAgo }, secret);

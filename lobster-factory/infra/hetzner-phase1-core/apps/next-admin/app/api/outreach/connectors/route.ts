@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
-import { getOrgSupabaseWriteClient } from "@/lib/org-client";
+import { outreachDb } from "@/lib/outreach/db-client";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
 // Cold Outreach — Connector account CRUD (task T4). Table: co_connector_accounts (migration 0048).
 //
-// SECURITY RED LINE (PART H §H2): this stores connector METADATA only. `credentials_ref` is the
-// NAME of a vault entry, NEVER the secret value. The actual BYO API-key bytes live in a runtime
-// secret store (Supabase Vault — separate gated decision), not in this table. We actively REJECT a
-// credentials_ref that looks like a real secret to stop an operator pasting a key by mistake.
+// SECURITY RED LINE (PART H §H2): this stores connector METADATA only. `credentials_ref` is never taken from a request:
+// only connectors/secret (API keys) and the Gmail OAuth callback set it, always to connectorSecretRef(id). A caller-named
+// vault entry would let one tenant have the server read another tenant's secret (critic 2026-11-01, door opening).
 //
 // Writes are ops-role gated (canManageOutreach). GET is authed-only (middleware) for viewer read.
 
@@ -25,19 +24,9 @@ const str = (v: unknown): string | null =>
 // (same pattern as suppression/route.ts critic #1).
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Heuristic guard: does this string look like an actual API key/secret rather than a vault NAME?
-// Common provider prefixes + long opaque high-entropy tokens. Vault names are short slugs.
-function looksLikeSecret(s: string): boolean {
-  const v = s.trim();
-  if (/^(sk-|re_|tr_|AIza|ghp_|gho_|xox[baprs]-|pat-|key-|Bearer\s)/i.test(v)) return true;
-  // long, no spaces, mixed alnum/-/_ → almost certainly a token, not a slug name
-  if (v.length >= 40 && !/\s/.test(v) && /[A-Za-z]/.test(v) && /[0-9]/.test(v)) return true;
-  return false;
-}
-
 export async function GET(req: Request): Promise<Response> {
   const url = new URL(req.url);
-  const supabase = await getOrgSupabaseWriteClient(url.searchParams.get("orgSlug"));
+  const supabase = await outreachDb(req, url.searchParams.get("orgSlug"));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   const rawOrgId = url.searchParams.get("organizationId");
@@ -67,7 +56,7 @@ export async function POST(req: Request): Promise<Response> {
     return new NextResponse("invalid json", { status: 400 });
   }
 
-  const supabase = await getOrgSupabaseWriteClient(str(body.orgSlug));
+  const supabase = await outreachDb(req, str(body.orgSlug));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   const id = str(body.id);
@@ -77,12 +66,8 @@ export async function POST(req: Request): Promise<Response> {
   if (!connector_name) return NextResponse.json({ ok: false, error: "connectorName required" }, { status: 400 });
   if (!connector_type) return NextResponse.json({ ok: false, error: "connectorType required" }, { status: 400 });
 
-  const credentials_ref = str(body.credentialsRef);
-  if (credentials_ref && looksLikeSecret(credentials_ref)) {
-    return NextResponse.json(
-      { ok: false, error: "credentials_ref must be a VAULT KEY NAME, not the secret value. Never paste a real API key here." },
-      { status: 400 },
-    );
+  if (body.credentialsRef !== undefined) {
+    return NextResponse.json({ ok: false, error: "credentialsRef is set by the server: store a key through /api/outreach/connectors/secret" }, { status: 400 });
   }
 
   const is_enabled = typeof body.isEnabled === "boolean" ? body.isEnabled : true;
@@ -106,7 +91,6 @@ export async function POST(req: Request): Promise<Response> {
       settings,
       updated_at: new Date().toISOString(),
     };
-    if (body.credentialsRef !== undefined) patch.credentials_ref = credentials_ref;
     if (body.organizationId !== undefined) {
       // effectiveOrgId: staff may re-assign; client is pinned to own org (prevents IDOR re-assignment).
       const rawReassignOrgId = str(body.organizationId);
@@ -133,7 +117,7 @@ export async function POST(req: Request): Promise<Response> {
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   const { data, error } = await supabase
     .from(TABLE)
-    .insert({ organization_id: insertOrgId, connector_name, connector_type, is_enabled, credentials_ref, settings })
+    .insert({ organization_id: insertOrgId, connector_name, connector_type, is_enabled, settings })
     .select("*")
     .single();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
@@ -145,7 +129,7 @@ export async function DELETE(req: Request): Promise<Response> {
   if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
 
   const params = new URL(req.url).searchParams;
-  const supabase = await getOrgSupabaseWriteClient(params.get("orgSlug"));
+  const supabase = await outreachDb(req, params.get("orgSlug"));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   const id = params.get("id");

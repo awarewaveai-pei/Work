@@ -110,7 +110,7 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
         <p>migration 0149 expand（署名、追蹤天數、檢查結果、privacy_url、review_mode、review_sample_pct）；brand-context.ts（含個資告知行）；generation-schema.ts（手寫守衛，無 zod）；messages/route.ts 寫 2＋N 列＋依政策核准；Connectors 署名欄；Review A/B；profile 設定頁；刪 drafts stub</p>
         <p><b>需先完成：</b><a href="#C1">C1</a></p>
         <p><b>決定：</b>AwareWave 的冷信從自有的次網域信箱池寄出；主網域 aware-wave.com 永遠不寄冷信，也不要在 Gmail 設「以 @aware-wave.com 寄出」，網域設定會把那種信當假冒隔離。代操客戶有 Google 信箱就連它；沒有（Soulful 在 Hostinger）就用池裡掛給它的信箱。已連線的 awarewaveai@gmail.com 只在暖機期間試寫。署名預設是寄件人名稱加品牌名稱，網站那行你填一次。人工把關改成政策：每個服務先逐封核准 50 封，之後只抽查 10%，檢查有警告的一律人工，被擋的永遠不寄。（規格 D12、D23）</p>
-        <p><b>檔案：</b><code>DB/migrations/0149_outbound_v2_expand.sql</code> <code>NA/lib/outreach/brand-context.ts</code> <code>NA/lib/outreach/generation-schema.ts</code> <code>NA/app/api/outreach/messages/route.ts</code> <code>NA/app/(shell)/outreach/review/ReviewClient.tsx</code></p>
+        <p><b>檔案：</b><code>DB/migrations/0149_outbound_v2_expand.sql</code> <code>NA/lib/outreach/brand-context.ts</code> <code>NA/lib/outreach/generation-schema.ts</code> <code>NA/app/api/outreach/messages/route.ts</code> <code>NA/app/(shell)/tools/outreach/review/ReviewClient.tsx</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C2</code></p>
       </details>
     </div></li><li class="grp">可同時進行：<a href="#C3">C3</a>、<a href="#C10">C10</a>、<a href="#C11">C11</a></li><li class="step todo" id="C3">
@@ -164,7 +164,7 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
       <details><summary>工程細節：C4 回覆同步與 Replies 頁</summary>
         <p>migration 0151 co_replies；存 threadId／messageId／draftId；gmail-sync.ts（逐封 message id 判已寄；收件匣以游標掃、先插入 co_replies 再做副作用、取 full 內文）；分類＋停追蹤＋拒收；internal route＋cron */10＋host-jobs；補掃按鈕；Replies 頁按鈕</p>
         <p><b>需先完成：</b><a href="#C2">C2</a></p>
-        <p><b>檔案：</b><code>DB/migrations/0151_co_replies.sql</code> <code>NA/lib/outreach/google-oauth.ts</code> <code>NA/lib/outreach/gmail-sync.ts</code> <code>NA/app/api/internal/outreach/gmail-sync/route.ts</code> <code>HS/cron.d/awarewave-schedules</code> <code>NA/app/(shell)/outreach/replies/page.tsx</code></p>
+        <p><b>檔案：</b><code>DB/migrations/0151_co_replies.sql</code> <code>NA/lib/outreach/google-oauth.ts</code> <code>NA/lib/outreach/gmail-sync.ts</code> <code>NA/app/api/internal/outreach/gmail-sync/route.ts</code> <code>HS/cron.d/awarewave-schedules</code> <code>NA/app/(shell)/tools/outreach/replies/page.tsx</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C4</code></p>
       </details>
     </div></li><li class="grp">可同時進行：<a href="#C8">C8</a>、<a href="#C15">C15</a></li><li class="step todo" id="C8">
@@ -192,7 +192,7 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
         <p>pipeline.ts runPipelineTick（研究→產信→政策核准→建草稿→追蹤到期，各步每 tick 上限）；佇列頁含鍵盤操作；每 org 每日管線預算；成效頁顯示每日數</p>
         <p><b>需先完成：</b><a href="#C5">C5</a></p>
         <p><b>決定：</b>300 封一天不可能一筆一筆按：證據來自對方自家網站的自動核准；每個服務先逐封核准 50 封，之後抽查 10%，檢查有警告的一律人工，被擋的永遠不寄；管線照這套政策自動前進。（規格 D23）</p>
-        <p><b>檔案：</b><code>NA/lib/outreach/pipeline.ts</code> <code>NA/app/(shell)/outreach/review/ReviewClient.tsx</code> <code>NA/lib/outreach/gmail-sync.ts</code></p>
+        <p><b>檔案：</b><code>NA/lib/outreach/pipeline.ts</code> <code>NA/app/(shell)/tools/outreach/review/ReviewClient.tsx</code> <code>NA/lib/outreach/gmail-sync.ts</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C15</code></p>
       </details>
     </div></li><li class="grp">可同時進行：<a href="#C5">C5</a>、<a href="#C7">C7</a></li><li class="step todo" id="C5">
@@ -205,7 +205,7 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
       <details><summary>工程細節：C5 追蹤信與人工步驟</summary>
         <p>followups 頁列到期 lead＋下一封；gmail-draft 支援 In-Reply-To／References＋threadId；no_reply 判定；非 email 步驟待辦；管線 tick 自動建草稿</p>
         <p><b>需先完成：</b><a href="#C8">C8</a></p>
-        <p><b>檔案：</b><code>NA/app/(shell)/outreach/followups/page.tsx</code> <code>NA/app/api/outreach/messages/gmail-draft/route.ts</code> <code>NA/lib/outreach/gmail-sync.ts</code></p>
+        <p><b>檔案：</b><code>NA/app/(shell)/tools/outreach/followups/page.tsx</code> <code>NA/app/api/outreach/messages/gmail-draft/route.ts</code> <code>NA/lib/outreach/gmail-sync.ts</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C5</code></p>
       </details>
     </div></li><li class="step todo" id="C7">
@@ -218,7 +218,7 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
       <details><summary>工程細節：C7 成效頁</summary>
         <p>stats route（SQL 聚合四張表）；首頁取代 stub；CSV；每信箱健康列；每日管線數</p>
         <p><b>需先完成：</b><a href="#C4">C4</a></p>
-        <p><b>檔案：</b><code>NA/app/api/outreach/stats/route.ts</code> <code>NA/app/(shell)/outreach/page.tsx</code></p>
+        <p><b>檔案：</b><code>NA/app/api/outreach/stats/route.ts</code> <code>NA/app/(shell)/tools/outreach/page.tsx</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C7</code></p>
       </details>
     </div></li><li class="grp">可同時進行：<a href="#C12">C12</a>、<a href="#C13">C13</a></li><li class="step todo" id="C12">

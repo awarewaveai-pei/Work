@@ -9,6 +9,8 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 const maybeSingle = vi.hoisted(() => vi.fn());
 const from = vi.hoisted(() => vi.fn(() => ({ select: () => ({ eq: () => ({ maybeSingle }) }) })));
 vi.mock("@/lib/org-client", () => ({ getOrgSupabaseWriteClient: async () => ({ from }) }));
+// a customer's own organization slug (lib/outreach/db-client.ts reads it from the main database)
+vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => ({ from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { slug: "org-a" }, error: null }) }) }) }) }) }));
 
 import { GET } from "./route";
 

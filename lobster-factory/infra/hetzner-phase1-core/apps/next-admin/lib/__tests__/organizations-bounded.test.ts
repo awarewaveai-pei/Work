@@ -106,7 +106,7 @@ describe("organizations reads are bounded", () => {
 
   // the known list above proves the scanner sees whole-table reads; these are the pickers it guards
   it("the client pickers read a bounded page", () => {
-    expect(found["app/(shell)/outreach/layout.tsx"]).toBeUndefined();
+    expect(found["app/(shell)/tools/outreach/layout.tsx"]).toBeUndefined();
     expect(found["app/(shell)/ops/collect/page.tsx"]).toBeUndefined();
     expect(found["app/api/ops/org-search/route.ts"]).toBeUndefined();
     expect(found["app/api/content/sites/route.ts"]).toBeUndefined();

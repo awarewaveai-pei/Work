@@ -15,9 +15,21 @@ describe("host visibility boundary", () => {
     expect((await post("/api/tools/image/process")).status).toBe(401);   // reaches the session gate (was 404 before 2026-10-24)
     expect((await post("/api/tools/studio/edit-prompt")).status).toBe(404);
   });
+  it("the outreach door serves its pages and API only on its own host; staff keep /tools/outreach", async () => {
+    const get = (url: string) => middleware(new NextRequest(url, { headers: { host: new URL(url).host } }));
+    for (const p of ["/", "/inbox", "/connectors"]) expect((await get(`https://outreach.aware-wave.com${p}`)).status, p).toBe(307);   // login gate, not 404
+    expect((await get("https://outreach.aware-wave.com/api/outreach/leads")).status).toBe(401);
+    for (const p of ["/api/ops/summary", "/api/social/brands", "/api/content/syndicate"]) expect((await get(`https://outreach.aware-wave.com${p}`)).status, p).toBe(404);
+    expect((await get("https://app.aware-wave.com/outreach")).status).toBe(404);
+    expect(productPageOwner("/outreach/inbox")?.key).toBe("outreach");
+    expect(productPageOwner("/tools/outreach/inbox")).toBeNull();
+    // Google's redirect lands on the app host with no session for a door customer: the callback is reached, not 401
+    const cb = await get("https://app.aware-wave.com/api/outreach/connectors/gmail/oauth/callback?state=x&code=y");
+    expect(cb.headers.get("x-middleware-next")).toBe("1");
+  });
   it("a reserved product door leaves its existing staff route available", () => {
-    expect(productPageOwner("/outreach")).toBeNull();
-    expect(productPageOwner("/outreach/campaigns")).toBeNull();
+    expect(productPageOwner("/cs")).toBeNull();
+    expect(productPageOwner("/collect/runs")).toBeNull();
   });
   it("a product's no-login path passes only on its own door, with no identity header", async () => {
     const get = (url: string) => middleware(new NextRequest(url, { headers: { host: new URL(url).host, "x-ops-claims-role": "owner", "x-ops-user-kind": "staff" } }));

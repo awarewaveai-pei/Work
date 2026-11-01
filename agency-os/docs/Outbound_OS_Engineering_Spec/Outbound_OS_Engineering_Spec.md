@@ -31,15 +31,16 @@
 | 1 匯入 | `inbox` | 可用 | `NA/app/api/outreach/inbox/route.ts`：normalize → dedup → suppression → 機械評分 |
 | 2 評分 | `leads` | 可用，純機械 | `NA/lib/outreach/scoring.ts:1-6` |
 | 3 產冷信 | （Review 頁） | 可用但偏 | 主旨固定 null（`NA/app/api/outreach/messages/route.ts:209`）；無署名；`positioning` 讀了未用（`:123`）；一封一版（`buildPrompt :48-66`）；AI 階梯 claude→openai→gemini→gemini_agency→manual（`:131-164`） |
-| 4 審核 | `review` | 可用 | `NA/app/(shell)/outreach/review/ReviewClient.tsx` |
+| 4 審核 | `review` | 可用 | `NA/app/(shell)/tools/outreach/review/ReviewClient.tsx` |
 | 5 Gmail 草稿 | `review` | 可用 | `NA/app/api/outreach/messages/gmail-draft/route.ts`：只存 `draft.id`（`:186`）；只檢查 `status==='approved'`（`:65`），不重查拒收；2026-10-14 正式站建 1 封 |
 | 6 追蹤 | `followups` | 只有日期 | `NA/app/api/outreach/followups/route.ts:6-8` |
-| 7 回覆 | `replies` | stub | `NA/app/(shell)/outreach/replies/page.tsx` |
-| 8 成效 | `/outreach` | stub | `NA/app/(shell)/outreach/page.tsx` |
+| 7 回覆 | `replies` | stub | `NA/app/(shell)/tools/outreach/replies/page.tsx` |
+| 8 成效 | `/outreach` | stub | `NA/app/(shell)/tools/outreach/page.tsx` |
 | — 研究 | 無 | 人工填 | `co_leads.observation`、`source_url` 各一格（`0048:95-96`） |
 | — 暖名單 | 無 | wp-bridge 無 contact 端點 | `WPB/includes/Http/RestController.php:42-105`：只有 health／option／post／product／woo／newsletter／blocks |
 | — 信箱池 | `connectors` | 只有 1 個消費者 Gmail | `co_sender_accounts.daily_sent_count`／`weekly_sent_count`／`warmup_stage`（`0048:242-244`）存在、0 呼叫點；無次網域、無輪流 |
 | — Gmail 連線 | `connectors` | Testing 模式 | scope `gmail.compose`（`NA/lib/outreach/google-oauth.ts:11`）；restricted scope 在 Testing 狀態 refresh token 7 天到期（C1.4 查） |
+| — 產品門 | outreach.aware-wave.com | 頁面已建，2026-11-01 | 門頁 `NA/app/outreach/*`＝`door.nav`（`NA/lib/portal/products.ts` outreach 列），員工同元件在 `/tools/outreach`；客戶只碰自己 org：資料庫 `NA/lib/outreach/db-client.ts` 忽略請求的 slug、`effectiveOrgId`／`assertOrgAccess` 每個 handler、草稿不落到代理商信箱、OAuth 回門頁（簽章 state `from`）；開通＝該 org 持有 outreach（ADR 018） |
 | — 未用的表 | — | 0 呼叫點 | `co_timeline_events`、`co_connector_usage`、`co_verified_emails`（`NA/lib/outreach/MODULE_MANIFEST.json` state_ownership） |
 
 **GPT 草案 vs 已有資產**（草案換名字再做一次的部分）：

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
-import { getOrgSupabaseWriteClient } from "@/lib/org-client";
+import { outreachDb } from "@/lib/outreach/db-client";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 
 // Cold Outreach — Service Profile CRUD (task T3). Table: co_service_profiles (migration 0048).
@@ -38,7 +38,7 @@ const arr = (v: unknown): string[] | null => {
 // GET ...?organizationId=<uuid>                 → scope to one client
 export async function GET(req: Request): Promise<Response> {
   const params = new URL(req.url).searchParams;
-  const supabase = await getOrgSupabaseWriteClient(params.get("orgSlug"));
+  const supabase = await outreachDb(req, params.get("orgSlug"));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   const id = params.get("id");
@@ -76,7 +76,7 @@ export async function POST(req: Request): Promise<Response> {
     return new NextResponse("invalid json", { status: 400 });
   }
 
-  const supabase = await getOrgSupabaseWriteClient(str(body.orgSlug));
+  const supabase = await outreachDb(req, str(body.orgSlug));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   const id = str(body.id);
@@ -141,7 +141,7 @@ export async function DELETE(req: Request): Promise<Response> {
   if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
 
   const params = new URL(req.url).searchParams;
-  const supabase = await getOrgSupabaseWriteClient(params.get("orgSlug"));
+  const supabase = await outreachDb(req, params.get("orgSlug"));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   const id = params.get("id");

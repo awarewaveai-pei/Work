@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Suspense } from "react";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
-import { NAV_FIRST, toPickOrg, type PickOrg } from "../ops/clients/nav-orgs";
+import { NAV_FIRST, toPickOrg, type PickOrg } from "../../ops/clients/nav-orgs";
 import { OrgSwitcher } from "./OrgSwitcher";
 
 // Outreach module shell: loads the first NAV_FIRST clients (same source and order as the /ops/clients nav; the

@@ -1,7 +1,7 @@
 'use client';
 import { useSearchParams } from "next/navigation";
-import type { PickOrg } from "../ops/clients/nav-orgs";
-import { OrgUrlPicker } from "../ops/clients/OrgPicker";
+import type { PickOrg } from "../../ops/clients/nav-orgs";
+import { OrgUrlPicker } from "../../ops/clients/OrgPicker";
 
 // 代操 client switcher. Writes ?org=<uuid> into the URL; all outreach pages read it via useActiveOrg.
 // orgs = the first NAV_FIRST clients (layout.tsx); the picker searches the rest.

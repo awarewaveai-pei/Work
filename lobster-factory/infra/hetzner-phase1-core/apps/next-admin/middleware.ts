@@ -47,6 +47,9 @@ export const PUBLIC_API_PATHS = new Set<string>([
   // Browser-origin public intake (no bearer token; rate-limited by global submit count).
   // Powers the public form at /intake — same data pipeline as intake-public.
   "/api/onboarding/intake-browser",
+  // Google's OAuth redirect: a customer who started on the outreach door has no session on the app host (cookies are per
+  // host, ADR 018 §3). The route trusts only the HMAC-signed state the authorize route minted after assertOrgAccess.
+  "/api/outreach/connectors/gmail/oauth/callback",
 ]);
 
 function isDevelopment(): boolean {

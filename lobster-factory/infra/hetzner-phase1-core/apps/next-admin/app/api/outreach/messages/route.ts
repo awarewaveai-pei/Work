@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
-import { getOrgSupabaseWriteClient } from "@/lib/org-client";
-import { getSecret } from "@/lib/secret-vault";
+import { outreachDb } from "@/lib/outreach/db-client";
+import { getSecret, connectorSecretRef } from "@/lib/secret-vault";
 import { checkColdGate, buildEvidenceSnapshot, lintMessage } from "@/lib/outreach/cold-gate";
 import { generateWithGemini } from "@/lib/outreach/ai-gemini";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
@@ -67,7 +67,7 @@ function buildPrompt(lead: LeadRow, sp: ProfileRow | null, forbidden: string[]):
 
 export async function GET(req: Request): Promise<Response> {
   const params = new URL(req.url).searchParams;
-  const supabase = await getOrgSupabaseWriteClient(params.get("orgSlug"));
+  const supabase = await outreachDb(req, params.get("orgSlug"));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const leadId = params.get("leadId");
   if (leadId && !UUID_RE.test(leadId)) return NextResponse.json({ ok: false, error: "leadId must be a uuid" }, { status: 400 });
@@ -96,7 +96,7 @@ export async function POST(req: Request): Promise<Response> {
     return new NextResponse("invalid json", { status: 400 });
   }
 
-  const supabase = await getOrgSupabaseWriteClient(str(body.orgSlug));
+  const supabase = await outreachDb(req, str(body.orgSlug));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const leadId = str(body.leadId);
   if (!leadId) return NextResponse.json({ ok: false, error: "leadId required" }, { status: 400 });
@@ -122,6 +122,7 @@ export async function POST(req: Request): Promise<Response> {
       .from("co_service_profiles")
       .select("service_name, positioning, usp, tone, forbidden_words")
       .eq("id", lead.service_profile_id)
+      .match(lead.organization_id ? { organization_id: lead.organization_id } : {})
       .maybeSingle();
     sp = (data as ProfileRow) ?? null;
   }
@@ -140,7 +141,7 @@ export async function POST(req: Request): Promise<Response> {
     const pickRef = async (orgFilter: "client" | "agency"): Promise<string | null> => {
       let q = supabase
         .from("co_connector_accounts")
-        .select("credentials_ref")
+        .select("id")
         .eq("connector_name", provider)
         .eq("is_enabled", true)
         .not("credentials_ref", "is", null)
@@ -149,7 +150,11 @@ export async function POST(req: Request): Promise<Response> {
         ? q.eq("organization_id", lead.organization_id)
         : q.is("organization_id", null);
       const { data } = await q.maybeSingle();
-      return (data as { credentials_ref?: string | null } | null)?.credentials_ref ?? null;
+      // The vault name is derived from the row (connectorSecretRef), never read from it: a stored name could point at
+      // another tenant's secret. Agency keys (organization_id IS NULL) serve a customer without its own key, billed through
+      // outreach.draft credits (grantFor below); unlike Gmail, an AI key is not the customer's identity.
+      const id = (data as { id?: string } | null)?.id;
+      return id ? connectorSecretRef(id) : null;
     };
     const ref = (lead.organization_id ? await pickRef("client") : null) ?? (await pickRef("agency"));
     if (!ref) continue;
@@ -240,7 +245,7 @@ export async function PATCH(req: Request): Promise<Response> {
     return new NextResponse("invalid json", { status: 400 });
   }
 
-  const supabase = await getOrgSupabaseWriteClient(str(body.orgSlug));
+  const supabase = await outreachDb(req, str(body.orgSlug));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const id = str(body.id);
   const status = str(body.status);
@@ -271,7 +276,7 @@ export async function DELETE(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
   const params = new URL(req.url).searchParams;
-  const supabase = await getOrgSupabaseWriteClient(params.get("orgSlug"));
+  const supabase = await outreachDb(req, params.get("orgSlug"));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const id = params.get("id");
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });

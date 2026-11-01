@@ -8,8 +8,8 @@ import { DEFAULT_SECTIONS, activeSectionId, applyLayout, itemKey } from "../Side
 const REACHED_ELSEWHERE: Record<string, string> = {
   "/no-access": "middleware sends a page refused by staff tool grants here (lib/staff-access.ts)",
   "/ops/ai-models": "redirects to /tools/ai-models?tab=image-specs",
-  "/outreach/settings/service-profiles": "tab of /outreach/settings",
-  "/outreach/settings/suppression": "tab of /outreach/settings",
+  "/tools/outreach/settings/service-profiles": "tab of /tools/outreach/settings",
+  "/tools/outreach/settings/suppression": "tab of /tools/outreach/settings",
   "/tools/social/ads": "social app side nav (tools/social/routes.ts)",
   "/tools/social/analytics": "social app side nav (tools/social/routes.ts)",
   "/tools/social/compose/new": "social app compose button",
@@ -86,7 +86,7 @@ describe("sidebar coverage", () => {
 
   it("the section of the current page is the one that starts open", () => {
     expect(activeSectionId(DEFAULT_SECTIONS, "/")).toBe("overview");
-    expect(activeSectionId(DEFAULT_SECTIONS, "/outreach/leads")).toBe("cold-outreach");
+    expect(activeSectionId(DEFAULT_SECTIONS, "/tools/outreach/leads")).toBe("cold-outreach");
     expect(activeSectionId(DEFAULT_SECTIONS, "/tools/social/ads")).toBe("marketing");
     // the longer href wins: /tools/content/topics is Marketing, though /tools/content is Content Tools
     expect(activeSectionId(DEFAULT_SECTIONS, "/tools/content/topics")).toBe("marketing");

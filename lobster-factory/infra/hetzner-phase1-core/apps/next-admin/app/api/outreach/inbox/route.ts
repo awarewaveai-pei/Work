@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
-import { getOrgSupabaseWriteClient } from "@/lib/org-client";
+import { outreachDb } from "@/lib/outreach/db-client";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { normalizeLead, flagDuplicatesInBatch, type RawLead, type NormalizedLead } from "@/lib/outreach/normalize";
 import { findSuppressed } from "@/lib/outreach/suppression";
@@ -40,7 +40,7 @@ function classify(
 
 export async function GET(req: Request): Promise<Response> {
   const url = new URL(req.url);
-  const supabase = await getOrgSupabaseWriteClient(url.searchParams.get("orgSlug"));
+  const supabase = await outreachDb(req, url.searchParams.get("orgSlug"));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const rawOrgId = url.searchParams.get("organizationId");
   if (rawOrgId && !UUID_RE.test(rawOrgId)) return NextResponse.json({ ok: false, error: "organizationId must be a uuid" }, { status: 400 });
@@ -69,7 +69,7 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const orgSlug = typeof body.orgSlug === "string" && body.orgSlug.trim() ? body.orgSlug.trim() : null;
-  const supabase = await getOrgSupabaseWriteClient(orgSlug);
+  const supabase = await outreachDb(req, orgSlug);
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   const rawBodyOrgId = typeof body.organizationId === "string" && body.organizationId.trim() ? body.organizationId.trim() : null;
@@ -153,7 +153,7 @@ export async function DELETE(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
   const params = new URL(req.url).searchParams;
-  const supabase = await getOrgSupabaseWriteClient(params.get("orgSlug"));
+  const supabase = await outreachDb(req, params.get("orgSlug"));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const id = params.get("id");
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });

@@ -83,9 +83,13 @@ const PRODUCT_DEFINITIONS = [
   { key: "collect", name: "資料蒐集器", description: "搜尋並蒐集外部網站與研究資料。", subdomain: "collect", door: { app: "next-admin", page: "/collect", enabled: false, api: [] },
     loginSources: ["local"], standalone: false, status: "coming_soon",
     features: [quota("collect.fetch", "資料蒐集")], accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/collect/MODULE_MANIFEST.json" }, staffPaths: ["ops/collect"] },
-  { key: "outreach", name: "行銷開發信", description: "產生開發信並管理寄送名單。", subdomain: "outreach", door: { app: "next-admin", page: "/outreach", enabled: false, api: ["/api/outreach"] },
+  { key: "outreach", name: "行銷開發信", description: "產生開發信並管理寄送名單。", subdomain: "outreach", door: { app: "next-admin", page: "/outreach", api: ["/api/outreach"],
+      nav: [{ path: "", name: "名單", staff: "tools/outreach/leads" }, { path: "inbox", name: "匯入名單", staff: "tools/outreach/inbox" },
+        { path: "review", name: "審核信件", staff: "tools/outreach/review" }, { path: "followups", name: "追蹤", staff: "tools/outreach/followups" },
+        { path: "connectors", name: "信箱與連線", staff: "tools/outreach/connectors" },
+        { path: "profiles", name: "服務設定", staff: "tools/outreach/settings/service-profiles" }, { path: "suppression", name: "拒收名單", staff: "tools/outreach/settings/suppression" }] },
     loginSources: ["local"], standalone: false, status: "coming_soon",
-    features: [quota("outreach.draft", "AI 開發信")], accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/outreach/MODULE_MANIFEST.json" }, staffPaths: ["outreach"] },
+    features: [quota("outreach.draft", "AI 開發信")], accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/outreach/MODULE_MANIFEST.json" }, staffPaths: ["tools/outreach"] },
   // NEW_PRODUCT_ROWS: scripts/new-product.mjs inserts before this marker.
 ] as const satisfies readonly ProductDefinition[];
 export type ProductKey = (typeof PRODUCT_DEFINITIONS)[number]["key"];

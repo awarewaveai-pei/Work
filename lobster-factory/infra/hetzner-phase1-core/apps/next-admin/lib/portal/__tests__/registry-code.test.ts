@@ -180,6 +180,9 @@ describe("registry claims match the code", () => {
     "lib/content/video/embed-in-post.ts": ["embedVideoInPost"],               // resolveWpSite before any read or write
     "lib/content/syndicate.ts": ["syndicateHandler"],                         // its one read, siteVoiceFor, checks the site's organization
     "lib/content/video/timeline-remotion-request.ts": ["prepareTimelineRemotionRequest"], // assertOrgAccess, then reads that org's assets
+    // Google's redirect carries no session: the OAuth callback acts only on the connector named in a state HMAC-signed by
+    // the authorize route, which minted it after assertOrgAccess on that connector's organization.
+    "lib/outreach/google-oauth.ts": ["verifyState"],
   };
   // What a route reaches that is not its own data: the role check, the caller's own grant (who it is, what it may use,
   // and runtime.ts, the store can() reads for that subject), the AI call log. Other lib/entitlements files are data

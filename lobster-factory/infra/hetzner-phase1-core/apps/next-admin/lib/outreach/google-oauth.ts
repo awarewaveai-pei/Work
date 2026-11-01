@@ -26,6 +26,12 @@ export interface OAuthState {
   connectorId: string;
   nonce: string;
   ts: number;
+  /** "door" = the consent started on the outreach product door: the callback (always on the app host, the registered
+   *  redirect URI) sends the browser back there instead of to the staff page. Signed with the rest. */
+  from?: "door" | "staff";
+  /** The org slug whose database the authorize route read the connector from (db-client.ts outreachSlug); the callback
+   *  opens the same one. Signed, so a caller cannot redirect the write. Absent = the main database. */
+  slug?: string;
 }
 
 const STATE_MAX_AGE_MS = 10 * 60 * 1000; // 10 minutes — long enough for a human to click through consent
@@ -49,6 +55,8 @@ export function verifyState(signed: string, secret: string): OAuthState | null {
   try {
     const state = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as OAuthState;
     if (typeof state.connectorId !== "string" || typeof state.ts !== "number") return null;
+    if (state.from !== undefined && state.from !== "door" && state.from !== "staff") return null;
+    if (state.slug !== undefined && typeof state.slug !== "string") return null;
     if (Date.now() - state.ts > STATE_MAX_AGE_MS) return null;
     return state;
   } catch {
