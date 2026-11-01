@@ -1,4 +1,4 @@
-// Cold Outreach — Cold Gate + message lint + evidence snapshot (task T8, spec §C2/§C3/§D2). Pure.
+// Cold Outreach — Cold Gate + message lint (task T8, spec §C2/§C3/§D2; v2 gateMessage below). Pure.
 //
 // Two gates:
 //  1. checkColdGate(): PRE-generation — refuse to generate a cold email without a concrete observation
@@ -33,22 +33,6 @@ export function checkColdGate(lead: ColdGateLead): ColdGateResult {
   if (!has(lead.observation)) blockers.push("缺 observation：冷信必須有具體觀察點（反罐頭/反幻覺）");
   if (!has(lead.source_url)) blockers.push("缺 source_url：冷信必須有公開來源依據");
   return { status: blockers.length === 0 ? "pass" : "block", blockers };
-}
-
-export interface EvidenceSnapshot {
-  used_observation: string | null;
-  used_pain_guess: string | null;
-  source_url: string | null;
-  unsupported_claims: string[];
-}
-
-export function buildEvidenceSnapshot(lead: ColdGateLead): EvidenceSnapshot {
-  return {
-    used_observation: has(lead.observation) ? lead.observation!.trim() : null,
-    used_pain_guess: has(lead.pain_guess) ? lead.pain_guess!.trim() : null,
-    source_url: has(lead.source_url) ? lead.source_url!.trim() : null,
-    unsupported_claims: [],
-  };
 }
 
 export interface MessageLint {
@@ -96,4 +80,37 @@ export function lintMessage(body: string, forbiddenWords: string[] = []): Messag
   score = Math.max(0, Math.min(100, score));
   const quality_gate_status = forbidden_hits.length > 0 || len === 0 ? "block" : findings.length > 0 ? "warn" : "pass";
   return { safety_score: score, quality_gate_status, findings, forbidden_hits };
+}
+
+// v2 (SPEC §5.3): the subject is gated, and the parts code appends (signature, personal-data notice) must still be
+// there -- an edited body is re-gated the same way (messages/route.ts PATCH), so a person cannot remove them unnoticed.
+export const GATE_VERSION = "v2";
+const SUBJECT_MAX = 25;
+const SUBJECT_BANNED = ["免費", "限時"];
+
+export function lintSubject(subject: string): string[] {
+  const s = (subject ?? "").trim();
+  const findings: string[] = [];
+  if (!s) findings.push("主旨空白");
+  if ([...s].length > SUBJECT_MAX) findings.push(`主旨過長（${[...s].length} 字，上限 ${SUBJECT_MAX}）`);
+  const hits = Array.from(new Set([...HARD_CTA, ...SUBJECT_BANNED])).filter((w) => s.includes(w));
+  if (hits.length) findings.push(`主旨含高壓字：${hits.join(", ")}`);
+  return findings;
+}
+
+export interface RequiredParts { signature: string; notice: string | null }
+
+export interface MessageGate extends MessageLint { gate_version: string }
+
+/** One gate for every stored email: body lint + subject (first emails) + required parts. Any finding here blocks. */
+export function gateMessage(args: { subject: string | null; body: string; forbidden: string[]; required: RequiredParts }): MessageGate {
+  const lint = lintMessage(args.body, args.forbidden);
+  const blocking: string[] = [];
+  if (args.subject !== null) blocking.push(...lintSubject(args.subject));
+  const body = (args.body ?? "").trim();
+  if (!body.endsWith(args.required.signature.trim())) blocking.push("內文沒有以署名結尾");
+  if (args.required.notice && !body.includes(args.required.notice)) blocking.push("缺個資告知行");
+  const findings = [...lint.findings, ...blocking];
+  const status = blocking.length ? "block" : lint.quality_gate_status;
+  return { ...lint, findings, quality_gate_status: status, safety_score: blocking.length ? 0 : lint.safety_score, gate_version: GATE_VERSION };
 }

@@ -183,15 +183,32 @@ export function toBase64Url(s: string): string {
   return Buffer.from(s, "utf8").toString("base64url");
 }
 
+/** created: "no" = Gmail refused the request (4xx), nothing exists; "unknown" = the request may have gone through
+ *  (network error, 5xx, unreadable reply) and a draft may exist. A caller retries only a "no". */
+export class GmailDraftError extends Error {
+  constructor(message: string, readonly created: "no" | "unknown") { super(message); this.name = "GmailDraftError"; }
+}
+
 export async function createGmailDraft(accessToken: string, raw: string): Promise<{ id: string }> {
-  const resp = await fetch(`${GMAIL_API_BASE}/drafts`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
-    body: JSON.stringify({ message: { raw } }),
-  });
+  let resp: Response;
+  try {
+    resp = await fetch(`${GMAIL_API_BASE}/drafts`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ message: { raw } }),
+    });
+  } catch (e) {
+    throw new GmailDraftError(`gmail drafts.create: ${e instanceof Error ? e.message : "network error"}`, "unknown");
+  }
   if (!resp.ok) {
     const detail = await resp.text().catch(() => "");
-    throw new Error(`gmail drafts.create ${resp.status}: ${detail.slice(0, 300)}`);
+    throw new GmailDraftError(`gmail drafts.create ${resp.status}: ${detail.slice(0, 300)}`, resp.status >= 400 && resp.status < 500 ? "no" : "unknown");
   }
-  return (await resp.json()) as { id: string };
+  try {
+    const j = (await resp.json()) as { id?: string };
+    if (!j.id) throw new Error("no draft id in the reply");
+    return { id: j.id };
+  } catch (e) {
+    throw new GmailDraftError(`gmail drafts.create: ${e instanceof Error ? e.message : "unreadable reply"}`, "unknown");
+  }
 }

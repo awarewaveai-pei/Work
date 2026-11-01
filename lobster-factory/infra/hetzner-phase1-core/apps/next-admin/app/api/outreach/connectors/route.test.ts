@@ -15,4 +15,9 @@ describe("POST /api/outreach/connectors", () => {
     expect(res.status).toBe(400);
     expect(insert).not.toHaveBeenCalled();
   });
+  it("refuses caller-supplied settings: the mailbox a Gmail token belongs to is written only by the OAuth callback", async () => {
+    const res = await post({ connectorName: "gmail", connectorType: "email_send", settings: { email: "other@x.example" } });
+    expect(res.status).toBe(400);
+    expect(insert).not.toHaveBeenCalled();
+  });
 });

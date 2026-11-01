@@ -1,6 +1,7 @@
 // Claude API client for cold outreach message generation.
 // SECURITY: API key is passed in; NEVER log it.
 import { CLAUDE_FAST_MODEL, claudeParams, providerUrl } from "@/lib/ai/gateway";
+import { OUTREACH_MAX_TOKENS } from "./generation-schema";
 import type { Grant } from "@/lib/entitlements/can";
 import { logAiCall } from "@/lib/ai/log-ai-call";
 
@@ -26,7 +27,7 @@ export async function generateWithClaude(
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      ...claudeParams(model, 1024, "medium", { thinking: "off" }),
+      ...claudeParams(model, OUTREACH_MAX_TOKENS, "medium", { thinking: "off" }),
       messages: [{ role: "user", content: prompt }],
     }),
   });

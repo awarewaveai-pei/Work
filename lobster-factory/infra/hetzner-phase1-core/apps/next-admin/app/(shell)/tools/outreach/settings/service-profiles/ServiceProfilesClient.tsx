@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from "react";
 import { useActiveOrg, withOrg } from "@/lib/outreach/use-active-org";
+import ProfilePolicy from "./ProfilePolicy";
 
 interface Profile {
   id: string;
@@ -40,6 +41,7 @@ export default function ServiceProfilesClient() {
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [open, setOpen] = useState<string | null>(null);
   const org = useActiveOrg();
 
   const load = useCallback(async () => {
@@ -133,7 +135,8 @@ export default function ServiceProfilesClient() {
         ) : (
           <ul style={{ display: "grid", gap: 8, listStyle: "none", padding: 0 }}>
             {profiles.map((p) => (
-              <li key={p.id} className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+              <li key={p.id} className="card" style={{ display: "grid", gap: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
                 <span>
                   <strong>{p.service_name}</strong>
                   {p.industry ? <span className="card-sub"> · {p.industry}</span> : null}
@@ -141,9 +144,16 @@ export default function ServiceProfilesClient() {
                     <span className="card-sub"> · 禁用詞 {p.forbidden_words.length}</span>
                   ) : null}
                 </span>
-                <button type="button" className="btn-secondary" onClick={() => void remove(p.id)}>
-                  刪除
-                </button>
+                <span style={{ display: "flex", gap: 8 }}>
+                  <button type="button" className="btn-secondary" onClick={() => setOpen(open === p.id ? null : p.id)}>
+                    {open === p.id ? "收起" : "審核與隱私"}
+                  </button>
+                  <button type="button" className="btn-secondary" onClick={() => void remove(p.id)}>
+                    刪除
+                  </button>
+                </span>
+                </div>
+                {open === p.id && <ProfilePolicy id={p.id} />}
               </li>
             ))}
           </ul>

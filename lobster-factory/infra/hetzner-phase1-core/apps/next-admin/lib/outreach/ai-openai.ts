@@ -1,6 +1,7 @@
 // OpenAI API client for cold outreach message generation.
 // SECURITY: API key is passed in; NEVER log it.
 import { providerUrl } from "@/lib/ai/gateway";
+import { OUTREACH_MAX_TOKENS } from "./generation-schema";
 import type { Grant } from "@/lib/entitlements/can";
 import { logAiCall, openaiUsageTokens, type OpenAiUsageLike } from "@/lib/ai/log-ai-call";
 
@@ -27,7 +28,7 @@ export async function generateWithOpenAI(
     body: JSON.stringify({
       model,
       // gpt-5 family: max_completion_tokens (max_tokens is a 400) and it covers reasoning tokens too.
-      max_completion_tokens: 1024,
+      max_completion_tokens: OUTREACH_MAX_TOKENS,
       messages: [{ role: "user", content: prompt }],
     }),
   });

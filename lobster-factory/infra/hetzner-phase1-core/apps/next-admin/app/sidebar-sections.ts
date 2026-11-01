@@ -89,7 +89,6 @@ export const DEFAULT_SECTIONS: NavSection[] = [
       { type: 'link', href: '/tools/outreach/inbox',      icon: '📥', label: 'Lead Inbox',         title: '名單收件匣（去重 + suppression）' },
       { type: 'link', href: '/tools/outreach/leads',      icon: '🎯', label: 'Leads',              title: '冷名單庫（三分數 + 優先級）' },
       { type: 'link', href: '/tools/outreach/review',     icon: '📝', label: 'Message Review',     title: '文案審核中心（Cold Gate + Evidence）' },
-      { type: 'link', href: '/tools/outreach/drafts',     icon: '🗒', label: 'Draft Queue',        title: '草稿審核佇列' },
       { type: 'link', href: '/tools/outreach/followups',  icon: '⏰', label: 'Follow-ups',         title: '跟進任務（不漏）' },
       { type: 'link', href: '/tools/outreach/replies',    icon: '💬', label: 'Replies',            title: '回覆處理（Reply Copilot）' },
       { type: 'link', href: '/tools/outreach/connectors', icon: '🔌', label: 'Connectors',         title: '免費工具 + 客戶 BYO-key' },

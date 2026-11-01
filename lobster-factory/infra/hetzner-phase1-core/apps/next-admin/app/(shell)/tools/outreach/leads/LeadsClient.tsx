@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from "react";
-import { useActiveOrg } from "@/lib/outreach/use-active-org";
+import { useActiveOrg, withOrg } from "@/lib/outreach/use-active-org";
 
 interface Lead {
   id: string;
@@ -13,7 +13,10 @@ interface Lead {
   score: number;
   priority: string | null;
   status: string;
+  service_profile_id: string | null;
+  organization_id: string | null;
 }
+interface Profile { id: string; service_name: string; organization_id: string | null }
 
 const API = "/api/outreach/leads";
 
@@ -29,6 +32,7 @@ export default function LeadsClient() {
   const [err, setErr] = useState<string | null>(null);
   const [priority, setPriority] = useState("");
   const [status, setStatus] = useState("");
+  const [profiles, setProfiles] = useState<Profile[]>([]);
 
   const org = useActiveOrg();
 
@@ -54,6 +58,24 @@ export default function LeadsClient() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Which service profile a lead's emails use (positioning, privacy page, review policy).
+  useEffect(() => {
+    // every profile the caller may see; each row shows only those of its own lead's organization
+    void fetch(withOrg("/api/outreach/service-profiles", org)).then((r) => r.json()).then((j) => { if (j.ok) setProfiles(j.profiles as Profile[]); });
+  }, [org]);
+
+  async function assignProfile(id: string, serviceProfileId: string | null) {
+    setErr(null);
+    try {
+      const r = await fetch(API, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, serviceProfileId }) });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "assign failed");
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  }
 
   async function remove(id: string) {
     if (!window.confirm("刪除這個 lead？")) return;
@@ -106,6 +128,7 @@ export default function LeadsClient() {
                 <th className="card-sub">總分</th>
                 <th className="card-sub">優先級</th>
                 <th className="card-sub">狀態</th>
+                <th className="card-sub">服務</th>
                 <th className="card-sub"></th>
               </tr>
             </thead>
@@ -118,6 +141,14 @@ export default function LeadsClient() {
                   <td><strong>{l.score}</strong></td>
                   <td><span className={`card-badge ${prioBadge(l.priority)}`}>{l.priority ?? "—"}</span></td>
                   <td className="card-sub">{l.status}</td>
+                  <td style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                    {profiles.filter((p) => p.organization_id === l.organization_id).map((p) => (
+                      <button key={p.id} type="button" className={l.service_profile_id === p.id ? "btn-primary" : "btn-secondary"}
+                        aria-pressed={l.service_profile_id === p.id}
+                        onClick={() => void assignProfile(l.id, l.service_profile_id === p.id ? null : p.id)}>{p.service_name}</button>
+                    ))}
+                    {!profiles.some((p) => p.organization_id === l.organization_id) && <span className="card-sub">這個組織還沒有服務設定</span>}
+                  </td>
                   <td><button type="button" className="btn-secondary" onClick={() => void remove(l.id)}>刪除</button></td>
                 </tr>
               ))}

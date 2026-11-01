@@ -18,6 +18,25 @@ const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? 
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const uuid = (v: unknown): string | null => { const s = str(v); return s && UUID_RE.test(s) ? s : null; };
+// The service profile whose positioning, privacy page and review policy a lead's emails use (SPEC §5.3, D23): only
+// one of the lead's own organization.
+async function checkProfile(db: NonNullable<Awaited<ReturnType<typeof outreachDb>>>, profileId: string | null, orgId: string | null): Promise<Response | null> {
+  if (!profileId) return null;
+  if (!UUID_RE.test(profileId)) return NextResponse.json({ ok: false, error: "serviceProfileId must be a uuid" }, { status: 400 });
+  let q = db.from("co_service_profiles").select("id").eq("id", profileId);
+  q = orgId ? q.eq("organization_id", orgId) : q.is("organization_id", null);
+  const { data, error } = await q.maybeSingle();
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  return data ? null : NextResponse.json({ ok: false, error: "service profile not found in this organization" }, { status: 404 });
+}
+
+// One lead per email per organization (migration 0149 co_leads_org_email_uniq): a second one is a 409, not a 500.
+function leadWriteError(e: { code?: string; message: string }): Response {
+  if (e.code === "23505") return NextResponse.json({ ok: false, error: "duplicate_email", detail: "這個 email 已經有一筆名單" }, { status: 409 });
+  // 0149 trigger co_leads_profile_same_org: a lead's service profile is one of its own organization
+  if (e.code === "P0149") return NextResponse.json({ ok: false, error: "profile_other_org" }, { status: 409 });
+  return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
+}
 
 interface ScoreInput {
   name?: string | null;
@@ -99,7 +118,7 @@ export async function POST(req: Request): Promise<Response> {
       industry: row.normalized_industry as string | null,
       website: row.website as string | null,
       social_url: row.social_url as string | null,
-      email: row.email as string | null,
+      email: str(row.email),
       phone: row.phone as string | null,
       observation: null,
       source_url: row.source_url as string | null,
@@ -128,7 +147,7 @@ export async function POST(req: Request): Promise<Response> {
       })
       .select("*")
       .single();
-    if (createErr) return NextResponse.json({ ok: false, error: createErr.message }, { status: 500 });
+    if (createErr) return leadWriteError(createErr);
 
     await supabase.from("co_lead_inbox").update({ inbox_status: "approved", updated_at: new Date().toISOString() }).eq("id", fromInboxId);
     return NextResponse.json({ ok: true, lead: created }, { status: 201 });
@@ -154,8 +173,14 @@ export async function POST(req: Request): Promise<Response> {
   };
   const scores = scoreLead(base, { isDuplicate: false, doNotContact: false });
 
+  const profileId = str(body.serviceProfileId);
+  const badProfile = await checkProfile(supabase, profileId, orgId);
+  if (badProfile) return badProfile;
+
   const fields = {
     organization_id: orgId,
+    // only when sent: an update without it keeps the lead's profile
+    ...("serviceProfileId" in body ? { service_profile_id: profileId } : {}),
     name,
     industry: base.industry,
     website: base.website,
@@ -177,26 +202,54 @@ export async function POST(req: Request): Promise<Response> {
 
   if (id) {
     // Verify caller owns this lead before overwriting.
-    const { data: cur, error: curErr } = await supabase.from(TABLE).select("organization_id").eq("id", id).maybeSingle();
+    const { data: cur, error: curErr } = await supabase.from(TABLE).select("organization_id, service_profile_id").eq("id", id).maybeSingle();
     if (curErr) return NextResponse.json({ ok: false, error: curErr.message }, { status: 500 });
     if (!cur) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
-    try { assertOrgAccess(req, (cur as Record<string, unknown>).organization_id as string | null); }
+    const prev = cur as { organization_id: string | null; service_profile_id: string | null };
+    try { assertOrgAccess(req, prev.organization_id); }
     catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+    // A lead moved to another organization cannot keep the old one's profile (0149 trigger refuses it).
+    const keepsProfile = "serviceProfileId" in body || !prev.service_profile_id || prev.organization_id === orgId;
 
     const { data, error } = await supabase
       .from(TABLE)
-      .update({ ...fields, updated_at: new Date().toISOString() })
+      .update({ ...fields, ...(keepsProfile ? {} : { service_profile_id: null }), updated_at: new Date().toISOString() })
       .eq("id", id)
       .select("*")
       .maybeSingle();
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    if (error) return leadWriteError(error);
     if (!data) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
     return NextResponse.json({ ok: true, lead: data });
   }
 
   const { data, error } = await supabase.from(TABLE).insert({ ...fields, status: "new" }).select("*").single();
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return leadWriteError(error);
   return NextResponse.json({ ok: true, lead: data }, { status: 201 });
+}
+
+// PATCH { id, serviceProfileId: uuid | null, orgSlug? } — assign (or clear) a lead's service profile, nothing else.
+export async function PATCH(req: Request): Promise<Response> {
+  const { role } = resolveOpsRole(req);
+  if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
+  let body: Record<string, unknown>;
+  try { body = await req.json(); } catch { return new NextResponse("invalid json", { status: 400 }); }
+  const supabase = await outreachDb(req, str(body.orgSlug));
+  if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
+  const id = uuid(body.id);
+  if (!id) return NextResponse.json({ ok: false, error: "id must be a uuid" }, { status: 400 });
+  const { data: cur, error: curErr } = await supabase.from(TABLE).select("organization_id").eq("id", id).maybeSingle();
+  if (curErr) return NextResponse.json({ ok: false, error: curErr.message }, { status: 500 });
+  if (!cur) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
+  const orgId = (cur as { organization_id: string | null }).organization_id;
+  try { assertOrgAccess(req, orgId); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+  const profileId = str(body.serviceProfileId);
+  const badProfile = await checkProfile(supabase, profileId, orgId);
+  if (badProfile) return badProfile;
+  const { data, error } = await supabase.from(TABLE).update({ service_profile_id: profileId, updated_at: new Date().toISOString() })
+    .eq("id", id).select("*").maybeSingle();
+  if (error) return leadWriteError(error);
+  return NextResponse.json({ ok: true, lead: data });
 }
 
 export async function DELETE(req: Request): Promise<Response> {

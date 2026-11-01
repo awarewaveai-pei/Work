@@ -69,9 +69,13 @@ export async function POST(req: Request): Promise<Response> {
   if (body.credentialsRef !== undefined) {
     return NextResponse.json({ ok: false, error: "credentialsRef is set by the server: store a key through /api/outreach/connectors/secret" }, { status: 400 });
   }
+  // settings is server-owned too: the OAuth callback writes the mailbox the token belongs to (settings.email), and
+  // gmail-draft picks the token by it -- a caller-written value would draft in one mailbox under another's signature.
+  if (body.settings !== undefined) {
+    return NextResponse.json({ ok: false, error: "settings is set by the server (Gmail OAuth)" }, { status: 400 });
+  }
 
   const is_enabled = typeof body.isEnabled === "boolean" ? body.isEnabled : true;
-  const settings = (body.settings ?? null) as object | null;
 
   if (id) {
     // Verify caller owns this connector before patching.
@@ -88,7 +92,6 @@ export async function POST(req: Request): Promise<Response> {
       connector_name,
       connector_type,
       is_enabled,
-      settings,
       updated_at: new Date().toISOString(),
     };
     if (body.organizationId !== undefined) {
@@ -117,7 +120,7 @@ export async function POST(req: Request): Promise<Response> {
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   const { data, error } = await supabase
     .from(TABLE)
-    .insert({ organization_id: insertOrgId, connector_name, connector_type, is_enabled, settings })
+    .insert({ organization_id: insertOrgId, connector_name, connector_type, is_enabled })
     .select("*")
     .single();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });

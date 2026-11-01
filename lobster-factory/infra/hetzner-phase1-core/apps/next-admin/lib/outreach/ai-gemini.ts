@@ -2,6 +2,7 @@
 // SECURITY: the API key goes in the query string per Google's API; NEVER log the url or the key.
 // Errors surface the HTTP status + response body (which does not contain the key).
 import { providerUrl } from "@/lib/ai/gateway";
+import { OUTREACH_MAX_TOKENS } from "./generation-schema";
 import type { Grant } from "@/lib/entitlements/can";
 import { geminiUsageTokens, logAiCall, type GeminiUsageLike } from "@/lib/ai/log-ai-call";
 
@@ -29,7 +30,7 @@ export async function generateWithGemini(
       contents: [{ parts: [{ text: prompt }] }],
       // gemini-2.5/flash-latest are thinking models — reasoning consumes maxOutputTokens and truncates
       // the actual answer. Disable thinking (cold-email copy needs none) + give the output room.
-      generationConfig: { temperature: 0.7, maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } },
+      generationConfig: { temperature: 0.7, maxOutputTokens: OUTREACH_MAX_TOKENS, thinkingConfig: { thinkingBudget: 0 } },
     }),
   });
   if (!resp.ok) {

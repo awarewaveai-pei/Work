@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkColdGate, buildEvidenceSnapshot, lintMessage, DEFAULT_FORBIDDEN } from "../cold-gate";
+import { checkColdGate, lintMessage, DEFAULT_FORBIDDEN } from "../cold-gate";
 
 describe("checkColdGate (pre-generation)", () => {
   it("passes with observation + source_url", () => {
@@ -19,16 +19,6 @@ describe("checkColdGate (pre-generation)", () => {
     const r = checkColdGate({ observation: "o", source_url: "s", do_not_contact: true });
     expect(r.status).toBe("block");
     expect(r.blockers.some((b) => b.includes("do_not_contact"))).toBe(true);
-  });
-});
-
-describe("buildEvidenceSnapshot", () => {
-  it("captures only present evidence fields, empty unsupported_claims", () => {
-    const e = buildEvidenceSnapshot({ observation: " obs ", source_url: "https://x", pain_guess: "" });
-    expect(e.used_observation).toBe("obs");
-    expect(e.source_url).toBe("https://x");
-    expect(e.used_pain_guess).toBeNull();
-    expect(e.unsupported_claims).toEqual([]);
   });
 });
 

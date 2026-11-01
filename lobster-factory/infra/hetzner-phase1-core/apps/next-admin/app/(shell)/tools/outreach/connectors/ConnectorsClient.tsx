@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { LADDERS } from "@/lib/outreach/connectors/router";
 import type { ConnectorNeed } from "@/lib/outreach/connectors/types";
 import { useActiveOrg, withOrg } from "@/lib/outreach/use-active-org";
+import SendersCard from "./SendersCard";
 
 interface Connector {
   id: string;
@@ -237,6 +238,8 @@ export default function ConnectorsClient() {
           </ul>
         )}
       </div>
+
+      <SendersCard org={org} />
 
       <div className="card">
         <div className="card-header"><span className="card-label">Free-Plan Router — fallback ladders</span></div>

@@ -12,14 +12,14 @@
 
 | # | 不變量 | 守在哪 |
 |---|---|---|
-| I1 | 品牌＝organization；沒有第二個租戶軸 | ADR 017 §0 三軸；`NA/lib/outreach/use-active-org.ts:4-6`；每條路由 `assertOrgAccess`（`NA/app/api/outreach/messages/route.ts:109`） |
+| I1 | 品牌＝organization；沒有第二個租戶軸 | ADR 017 §0 三軸；`NA/lib/outreach/use-active-org.ts:4-6`；每條路由 `assertOrgAccess`（`NA/app/api/outreach/messages/route.ts:104`） |
 | I2 | 冷信每個具體主張對得到一條 approved 證據；沒有證據不生成 | `co_evidence`（§4）；`NA/lib/outreach/cold-gate.ts` `checkColdGate` |
 | I3 | `send_mode='draft'` 時程式不呼叫任何 send 端點。scope `gmail.compose` 本身允許 `drafts.send`，守衛是程式與測試，不是 scope | C1.1 `never-sends.test.ts`；唯一白名單 `send-adapter.ts`（C8） |
 | I4 | 冷信純文字、無圖、無附件、無追蹤像素、≤1 連結、有拒收句；開信率不是指標 | deliverability §6.2（`cold_email_deliverability_compliance_v3_final.md:247-284`）；`lintMessage`（`cold-gate.ts:63-99`） |
 | I5 | 回信、退訂、退信、拒絕、人工停止 → 該 lead 所有後續步驟立即停（`next_followup_date=null`） | `gmail-sync.ts`（C4） |
 | I6 | 建草稿與寄出前重查：拒收名單、`do_not_contact`、每日上限 | `NA/app/api/outreach/messages/gmail-draft/route.ts`（C1.2）；`send-adapter.ts`（C8） |
 | I7 | 抓到的網頁永遠是 SOURCE_QUOTATION，進 prompt 前包裹，不當指令 | `NA/lib/collect/provenance.ts:1-20`；`brand-context.ts`（C2.2） |
-| I8 | 付費 AI 只經 `NA/lib/ai/gateway.ts` 與 `can()` grant；金鑰只在 vault | ADR 017 §4；`NA/app/api/outreach/messages/route.ts:139-164`；migration 0049 |
+| I8 | 付費 AI 只經 `NA/lib/ai/gateway.ts` 與 `can()` grant；金鑰只在 vault | ADR 017 §4；`NA/app/api/outreach/messages/route.ts:155-190`；migration 0049 |
 | I9 | 幾秒的工作＝next-admin route；幾分鐘＝Trigger.dev 任務；定時＝主機 cron；n8n 不在路徑上 | §6；`agency-os/handoffs/2026-10-25-schedules-off-trigger/R0-PLAN.md:9` |
 | I10 | 量只從信箱數來：單信箱日上限＝暖機表，絕不靠調高一個信箱的上限換量；主網域 aware-wave.com 永不寄冷信 | `co_sender_accounts.daily_limit`／`warmup_stage`（`0048:241-244`）；D12、D21 |
 
@@ -63,7 +63,7 @@
 | D1 | 品牌＝organization | ADR 017 §0 只有三軸；加軸＝「新方式不改程式」被破 |
 | D2 | 不建 queue／Worker | `agency-os/handoffs/2026-10-25-schedules-off-trigger/R0-PLAN.md:47`「時鐘搬主機 cron，Trigger 只當工人」；新服務要齊 7 項（AGENTS.md §0） |
 | D3 | 不建 CRM 表 | `co_leads.status` 已含 replied→proposal_sent→meeting_booked→warm→customer／lost |
-| D4 | 不建 ai-router；研究／分類走 `generateCheapJsonText`，草稿走既有階梯 | `NA/lib/ai/cheap-json.ts:33`；`NA/app/api/outreach/messages/route.ts:131-164` |
+| D4 | 不建 ai-router；研究／分類走 `generateCheapJsonText`，草稿走既有階梯 | `NA/lib/ai/cheap-json.ts:33`；`NA/app/api/outreach/messages/route.ts:155-190` |
 | D5 | 沿用 `co_sending_events`／`co_sender_accounts`／`co_suppression_list`，不改名 | 改名＝重工零收益 |
 | D6 | 研究＝collect 的 entity-dossier 來源＋新 sink | `entity-dossier.ts:1`「給一間公司把背景資料收齊」；耦合只在 sink（`NA/lib/collect/index.ts:3-7`） |
 | D7 | API 路徑不變 | `use-active-org.ts:16-20` |
