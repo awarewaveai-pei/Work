@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-01（續24）sg-deploy next-admin 成功：ff3b374c1 上線（模特兒印製 AI 印＋ outreach C1–C17.7 共 14 個 app commit）
+
+**操作者**：「COMMIT PUSH 部署」。
+
+**做了**：第二次 `sg-deploy.sh next-admin`（續23 修正後）。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin → npm test 綠 → build → up -d → healthy 16 s → HTTP smoke 5/5 OK；`.deployed-commit` = ff3b374c1（previous 72bfde142）；`docker ps` lobster-next-admin Up (healthy) | exit=0 | ms=400000
+- REALTEST_EVIDENCE: tool=Bash | cmd=scripts/playwright-runner.ps1 -Mode smoke -SkipInstall → Passed 26 / Failed 0 / Skipped 6（`agency-os/reports/e2e/2026-11-01/smoke`）；curl POST /api/tools/studio/fabric-print 與 /api/tools/presets → 401（登入閘，非 404／500）；容器內 `.next/server/.../fabric-print/route.js` 含 `openai-25-edit` | exit=0 | ms=40000
+- REVIEW_WAIVED: NA -- 純部署，無程式改動
+- BUGHUNT_WAIVED: NA -- 純部署
+- 未驗證：登入後畫面（操作者明日實測）；AI 印第一張在 prod 的實際扣點列（`ai_call` 表，route `tools/studio/fabric-print`）。
 ## 2026-11-01（續23）sg-deploy next-admin 被 npm test 閘擋下：續20 兩處違反既有不變量；修正後重部署
 
 **操作者**：「COMMIT PUSH 部署」。`check-deploy-drift -AppCodeOnly`：prod 落後 14 個 app commit（72bfde142..4d050e8da），無 compose 變數漂移；migration 0149／0150／0151 帳本皆已套。
