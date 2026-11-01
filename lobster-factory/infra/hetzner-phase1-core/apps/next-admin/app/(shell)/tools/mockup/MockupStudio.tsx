@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
-import ModelLibraryStudio, { groupModels, type LibraryPhoto } from "./ModelLibraryStudio";
+import ModelLibraryStudio from "./ModelLibraryStudio";
+import ModelMockupPanel from "./ModelMockupPanel";
+import type { LibraryPhoto } from "./modelLibrary";
 import {
   STUDIO_MODEL_OPTIONS,
   type AspectRatio,
@@ -14,26 +16,11 @@ import {
   FLAT_ARRANGEMENTS,
   FLAT_LIGHTING,
   FLAT_PROPS,
-  MODEL_SCENES,
-  MODEL_PROPS,
-  MODEL_POSES,
-  MODEL_LIGHTING,
-  MODEL_ETHNICITIES,
-  MODEL_GENDERS,
-  MODEL_AGES,
-  MODEL_BODY_TYPES,
-  MODEL_MAKEUP,
-  MODEL_ACCESSORIES,
-  MODEL_FRAMING,
-  MODEL_EMOTIONS,
   GARMENT_PLACEMENT,
   CATEGORY_OPTIONS,
   REFERENCE_KIND_OPTIONS,
   productCategoryFromType,
   buildFlatMockupPrompt,
-  buildModelMockupPrompt,
-  withIdentityReference,
-  isChestOccludingPose,
   type GarmentColor,
   type MockupMode,
   type ProductCategory,
@@ -66,7 +53,7 @@ interface DesignAsset {
   metadata: { prompt?: string | null } | null;
 }
 
-// One shape for every saved preset row, so the 模特兒印製 library and the single-photo fixed model share one list.
+// Every saved preset row: model photos (模特兒圖, used by the 模特 tab and 【模特兒印製】) and product presets.
 type PresetAsset = LibraryPhoto;
 
 interface MockupView {
@@ -252,15 +239,14 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
   const [designThumb, setDesignThumb] = useState<string | null>(null);
   // mode + shared
   const [mode, setMode] = useState<MockupMode | "printful" | "library">("model");
-  const aiMode = mode === "model" || mode === "flat";
+  // Only 平拍 still composites in one AI call; 模特 prints onto saved 模特兒圖 (ModelMockupPanel), 2026-11-02.
+  const aiMode = mode === "flat";
   const [color, setColor] = useState<GarmentColor>("white");
   const [model, setModel] = useState<StudioModel>("nano-banana-2");
   const [aspect, setAspect] = useState<AspectRatio>("2:3");
   // printful catalog (shared across all tabs)
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
-  // model tab product selection
-  const [selectedModelProductIds, setSelectedModelProductIds] = useState<Set<number>>(new Set());
   // flat tab product selection
   const [selectedFlatProductIds, setSelectedFlatProductIds] = useState<Set<number>>(new Set());
   // printful tab product selection
@@ -273,22 +259,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
   const [flatArrangement, setFlatArrangement] = useState(FLAT_ARRANGEMENTS[0].value);
   const [flatLighting, setFlatLighting] = useState(FLAT_LIGHTING[0].value);
   const [flatProps, setFlatProps] = useState<Set<string>>(new Set());
-  // model controls — descriptor dropdowns
-  const [ageGroup, setAgeGroup] = useState<"adult" | "youth">("adult");
-  const [mEthnicity, setMEthnicity] = useState("");
-  const [mGender, setMGender] = useState("");
-  const [mAge, setMAge] = useState("");
-  const [mBody, setMBody] = useState("");
-  const [mMakeup, setMMakeup] = useState("");
-  const [mAccessories, setMAccessories] = useState("");
-  const [modelDescManual, setModelDescManual] = useState("");
-  const [pose, setPose] = useState(MODEL_POSES[0].value);
-  const [modelScene, setModelScene] = useState(MODEL_SCENES[0].value);
-  const [modelLighting, setModelLighting] = useState(MODEL_LIGHTING[0].value);
-  const [modelFraming, setModelFraming] = useState("three-quarter");
-  const [modelEmotion, setModelEmotion] = useState("");
   const [flatCornerDecor, setFlatCornerDecor] = useState(false);
-  const [modelProps, setModelProps] = useState<Set<string>>(new Set());
   // reference-image kind (design to print vs photo of a finished product) + manual category
   // override — both let the user mock up THEIR OWN products (not just the Printful catalog).
   const [referenceKind, setReferenceKind] = useState<ReferenceKind>("design");
@@ -314,11 +285,6 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
   const [modelPresets, setModelPresets] = useState<PresetAsset[]>([]);
   const [productPresets, setProductPresets] = useState<PresetAsset[]>([]);
   const [presetsOpen, setPresetsOpen] = useState(false);
-  const [presetsTab, setPresetsTab] = useState<"model" | "product">("model");
-  // The saved model whose photo rides along as the second reference image so every composite shows the same person.
-  const [fixedModel, setFixedModel] = useState<PresetAsset | null>(null);
-  const [modelSaving, setModelSaving] = useState(false);
-  const [modelSaveError, setModelSaveError] = useState<string | null>(null);
   const [productUploadFile, setProductUploadFile] = useState<File | null>(null);
 
   useEffect(() => {
@@ -349,11 +315,6 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
     })();
   }, [loadCatalog]);
 
-  const modelDesc = useMemo(() => {
-    if (modelDescManual.trim()) return modelDescManual.trim();
-    return [mEthnicity, mGender, mAge, mBody, mMakeup, mAccessories].filter(Boolean).join(", ");
-  }, [mEthnicity, mGender, mAge, mBody, mMakeup, mAccessories, modelDescManual]);
-
   /** Derive garment phrase from selected catalog products for model/flat tabs. */
   const garmentPhraseFor = useCallback((selectedIds: Set<number>) => {
     if (selectedIds.size === 0) return GARMENTS.tshirt.phrase;
@@ -363,15 +324,6 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
     // Use clean product title as phrase
     return prd.title.replace(/\s*\|.*$/, "").toLowerCase();
   }, [catalog]);
-
-  /** Model-interaction category (apparel→wear / mug→hold / jewelry→wear-accessory) derived
-   *  from the first selected product's Printful type, so the model prompt adapts automatically. */
-  const modelCategory = useMemo<ProductCategory>(() => {
-    if (categoryOverride) return categoryOverride;
-    const first = [...selectedModelProductIds][0];
-    const prd = first != null ? catalog.find((c) => c.id === first) : undefined;
-    return productCategoryFromType(prd?.typeName);
-  }, [categoryOverride, selectedModelProductIds, catalog]);
 
   /** Same derivation for the flat tab — non-apparel 3-D products shoot upright (立拍). */
   const flatCategory = useMemo<ProductCategory>(() => {
@@ -383,8 +335,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
 
   const prompt = useMemo(() => {
     if (!aiMode) return "";
-    if (mode === "flat") {
-      return buildFlatMockupPrompt({
+    return buildFlatMockupPrompt({
         garmentPhrase: garmentPhraseFor(selectedFlatProductIds),
         color,
         surface: flatSurface,
@@ -397,29 +348,8 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
         cornerDecor: flatCornerDecor,
         placement,
       });
-    }
-    return buildModelMockupPrompt({
-      garmentPhrase: garmentPhraseFor(selectedModelProductIds),
-      color,
-      ageGroup,
-      // A fixed model's look comes from its photo; the dropdown description could contradict it.
-      modelDescription: fixedModel ? "" : modelDesc,
-      pose,
-      scene: modelScene,
-      lighting: modelLighting,
-      props: [...modelProps].map((v) => MODEL_PROPS.find((p) => p.value === v)?.label ?? v),
-      designSizePct,
-      framing: modelFraming,
-      productCategory: modelCategory,
-      referenceKind,
-      emotion: modelEmotion,
-      placement,
-    });
-  }, [aiMode, mode, color, flatSurface, flatArrangement, flatLighting, flatProps,
-      selectedFlatProductIds, selectedModelProductIds, garmentPhraseFor,
-      ageGroup, modelDesc, pose, modelScene, modelLighting, modelProps,
-      designSizePct, modelFraming, modelCategory, flatCategory, referenceKind,
-      modelEmotion, flatCornerDecor, placement, fixedModel]);
+  }, [aiMode, color, flatSurface, flatArrangement, flatLighting, flatProps, selectedFlatProductIds, garmentPhraseFor,
+      designSizePct, flatCategory, referenceKind, flatCornerDecor, placement]);
 
   const effectivePrompt = promptOverride ?? prompt;
 
@@ -435,11 +365,6 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
   const generate = useCallback(async () => {
     if (inFlight.current) return;
     if (!designRef) { setGen({ status: "error", error: "請先選一張設計圖（My Designs 點選或上傳）" }); return; }
-    const modelRefUrl = mode === "model" ? fixedModel?.object_url ?? null : null;
-    if (modelRefUrl && (STUDIO_MODEL_OPTIONS.find((m) => m.value === model)?.maxRefs ?? 0) < 2) {
-      setGen({ status: "error", error: "這個 AI 模型只吃一張參考圖，無法固定模特兒；請換能吃 2 張以上參考圖的模型（例如 Nano Banana 2），或取消固定模特兒" });
-      return;
-    }
     jobIdRef.current = crypto.randomUUID();
     inFlight.current = true;
     setGen({ status: "generating" });
@@ -449,13 +374,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
       const res = await fetch("/api/tools/studio/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model,
-          prompt: modelRefUrl ? withIdentityReference(effectivePrompt) : effectivePrompt,
-          referenceImages: modelRefUrl ? [processedRef, modelRefUrl] : [processedRef],
-          aspectRatio: aspect,
-          _jobId: jobIdRef.current,
-        }),
+        body: JSON.stringify({ model, prompt: effectivePrompt, referenceImages: [processedRef], aspectRatio: aspect, _jobId: jobIdRef.current }),
       });
       const json = (await res.json()) as { ok: boolean; image?: string; error?: string };
       if (!json.ok || !json.image) { setGen({ status: "error", error: json.error ?? `HTTP ${res.status}` }); return; }
@@ -463,7 +382,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
     } catch (err) {
       setGen({ status: "error", error: err instanceof Error ? err.message : String(err) });
     } finally { inFlight.current = false; }
-  }, [designRef, model, effectivePrompt, aspect, designOpacity, mode, fixedModel]);
+  }, [designRef, model, effectivePrompt, aspect, designOpacity]);
 
   const generatePrintful = useCallback(async () => {
     if (!designRef) {
@@ -581,48 +500,6 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
     } catch { setSaveState("error"); }
   }, [gen, mode, color, effectivePrompt, model]);
 
-  /** Saves a photo as a named model and selects it, so the next composite already uses it. */
-  const saveModel = useCallback(async (image: string, settings: Record<string, string>) => {
-    const name = window.prompt("模特兒名字：");
-    if (!name || !name.trim()) return;
-    setModelSaving(true);
-    setModelSaveError(null);
-    try {
-      const res = await fetch("/api/tools/presets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image, presetType: "model", presetName: name.trim(), presetSettings: settings }),
-      });
-      const json = (await res.json()) as { ok: boolean; preset?: PresetAsset; error?: string };
-      if (json.ok && json.preset) {
-        setModelPresets((prev) => [json.preset!, ...prev]);
-        setFixedModel(json.preset);
-      } else {
-        setModelSaveError(json.error ?? `HTTP ${res.status}`);
-      }
-    } catch (err) {
-      setModelSaveError(err instanceof Error ? err.message : String(err));
-    } finally { setModelSaving(false); }
-  }, []);
-
-  const saveModelPreset = useCallback(async () => {
-    if (gen.status !== "done" || !gen.image) return;
-    await saveModel(gen.image, {
-      mEthnicity, mGender, mAge, mBody, mMakeup, mAccessories,
-      pose, modelScene, modelLighting,
-      modelProps: JSON.stringify([...modelProps]),
-      color, ageGroup,
-    });
-  }, [gen, saveModel, mEthnicity, mGender, mAge, mBody, mMakeup, mAccessories,
-      pose, modelScene, modelLighting, modelProps, color, ageGroup]);
-
-  const onUploadModelPhoto = useCallback(async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    let dataUrl: string;
-    try { dataUrl = await readFileAsDataUrl(files[0]); } catch { setModelSaveError("讀不到這張照片"); return; }
-    await saveModel(dataUrl, {});
-  }, [saveModel]);
-
   const saveProductPreset = useCallback(async () => {
     if (!productUploadFile) return;
     const name = window.prompt("產品預設名稱：");
@@ -639,31 +516,11 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
     } catch { /* silent */ }
   }, [productUploadFile]);
 
-  // Picking a model fixes the person only: the design, garment colour, pose, scene and lighting stay as chosen.
-  // (Before 2026-11-01 this replaced the selected design with the model's photo.) Picking it again un-fixes it.
-  const selectModel = useCallback((preset: PresetAsset) => {
-    if (fixedModel?.id === preset.id) { setFixedModel(null); return; }
-    setFixedModel(preset);
-    setMode("model");
-    const s = preset.metadata?.preset_settings;
-    if (!s) return;
-    if (s.mEthnicity !== undefined) setMEthnicity(s.mEthnicity);
-    if (s.mGender !== undefined) setMGender(s.mGender);
-    if (s.mAge !== undefined) setMAge(s.mAge);
-    if (s.mBody !== undefined) setMBody(s.mBody);
-    if (s.mMakeup !== undefined) setMMakeup(s.mMakeup);
-    if (s.mAccessories !== undefined) setMAccessories(s.mAccessories);
-    if (s.ageGroup !== undefined) setAgeGroup(s.ageGroup as "adult" | "youth");
-  }, [fixedModel]);
-
-  const deletePreset = useCallback(async (id: string, domain: "mockup_model_preset" | "mockup_product_preset") => {
+  // Model photos are deleted in 【模特兒印製】; this is the product presets' delete.
+  const deleteProductPreset = useCallback(async (id: string) => {
     const res = await fetch(`/api/tools/presets?id=${id}`, { method: "DELETE" }).catch(() => null);
     if (!res?.ok) { window.alert("刪除失敗，請重試"); return; }
-    if (domain === "mockup_model_preset") {
-      setModelPresets((prev) => prev.filter((p) => p.id !== id));
-      setFixedModel((m) => (m?.id === id ? null : m));
-    }
-    else setProductPresets((prev) => prev.filter((p) => p.id !== id));
+    setProductPresets((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
   const toggleCatalogProduct = useCallback((setter: React.Dispatch<React.SetStateAction<Set<number>>>, id: number) => {
@@ -675,38 +532,6 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
     borderRadius: 6,
     cursor: "pointer",
   });
-
-  // One model list, shown in the model controls and in the preset library's model tab.
-  const modelList = (
-    <div>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        <button className={fixedModel ? "btn-secondary" : "btn-primary"} style={{ width: 64, height: 80, fontSize: 11 }} onClick={() => setFixedModel(null)}>
-          不固定
-        </button>
-        {/* One tile per model: a library model's front angle stands for it (its photos are managed in 模特兒印製). */}
-        {groupModels(modelPresets).map((m) => {
-          const p = m.photos.find((x) => x.metadata?.photo_role === "face-front") ?? m.photos[0];
-          const grouped = !!p.metadata?.model_key;
-          const on = !!fixedModel && m.photos.some((x) => x.id === fixedModel.id);
-          return (
-            <div key={p.id} style={{ position: "relative", cursor: "pointer" }} onClick={() => selectModel(p)} title={on ? "再點一次取消" : "固定這位模特兒"}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.object_url!} alt={p.metadata?.preset_name ?? p.id} style={{ width: 64, height: 80, objectFit: "cover", borderRadius: 4, background: "#111", ...selectStyle(on) }} />
-              <div style={{ fontSize: 10, textAlign: "center", maxWidth: 64, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: on ? 700 : 400 }}>{p.metadata?.preset_name ?? "模特兒"}</div>
-              {!grouped && <button style={{ position: "absolute", top: 0, right: 0, fontSize: 9, background: "var(--red)", color: "var(--btn-primary-text)", border: "none", borderRadius: 2, cursor: "pointer", padding: "1px 3px" }} onClick={(e) => { e.stopPropagation(); if (window.confirm(`刪除模特兒「${p.metadata?.preset_name ?? ""}」？`)) void deletePreset(p.id, p.asset_domain); }}>✕</button>}
-            </div>
-          );
-        })}
-      </div>
-      <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
-        新增：上傳一張人像，或合成後按「儲存為模特兒」。
-      </div>
-      <input type="file" accept="image/png,image/jpeg,image/webp" disabled={modelSaving} style={{ fontSize: 11, marginTop: 4, width: "100%" }}
-        onChange={(e) => { void onUploadModelPhoto(e.target.files); e.target.value = ""; }} />
-      {modelSaving && <div style={{ fontSize: 11, opacity: 0.7 }}>儲存中…</div>}
-      {modelSaveError && <div style={{ fontSize: 11, color: "var(--red)" }}>模特兒儲存失敗：{modelSaveError}</div>}
-    </div>
-  );
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 16, padding: 16, alignItems: "start" }}>
@@ -720,16 +545,10 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
             style={{ width: "100%", textAlign: "left", padding: "6px 10px", borderRadius: 6 }}
             onClick={() => setPresetsOpen((v) => !v)}
           >
-            {presetsOpen ? "[-]" : "[+]"} 預設庫 (Preset Library)
+            {presetsOpen ? "[-]" : "[+]"} 產品預設庫
           </button>
           {presetsOpen && (
             <div style={{ padding: "8px 10px" }}>
-              <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-                <button className={presetsTab === "model" ? "btn-primary" : "btn-secondary"} style={{ fontSize: 12 }} onClick={() => setPresetsTab("model")}>模特預設</button>
-                <button className={presetsTab === "product" ? "btn-primary" : "btn-secondary"} style={{ fontSize: 12 }} onClick={() => setPresetsTab("product")}>產品預設</button>
-              </div>
-              {presetsTab === "model" && modelList}
-              {presetsTab === "product" && (
                 <div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
                     {productPresets.length === 0 && <p style={{ fontSize: 12, opacity: 0.5 }}>尚無產品預設</p>}
@@ -738,7 +557,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={p.object_url!} alt={p.metadata?.preset_name ?? p.id} style={{ width: 64, height: 80, objectFit: "cover", borderRadius: 4, background: "#111" }} />
                         <div style={{ fontSize: 10, textAlign: "center", maxWidth: 64, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.metadata?.preset_name ?? "預設"}</div>
-                        <button style={{ position: "absolute", top: 0, right: 0, fontSize: 9, background: "var(--red)", color: "var(--btn-primary-text)", border: "none", borderRadius: 2, cursor: "pointer", padding: "1px 3px" }} onClick={(e) => { e.stopPropagation(); void deletePreset(p.id, p.asset_domain); }}>✕</button>
+                        <button style={{ position: "absolute", top: 0, right: 0, fontSize: 9, background: "var(--red)", color: "var(--btn-primary-text)", border: "none", borderRadius: 2, cursor: "pointer", padding: "1px 3px" }} onClick={(e) => { e.stopPropagation(); void deleteProductPreset(p.id); }}>✕</button>
                       </div>
                     ))}
                   </div>
@@ -746,7 +565,6 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
                   <input type="file" accept="image/png,image/jpeg,image/webp" style={{ fontSize: 11, marginBottom: 4 }} onChange={(e) => setProductUploadFile(e.target.files?.[0] ?? null)} />
                   {productUploadFile && <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => void saveProductPreset()}>存為產品預設</button>}
                 </div>
-              )}
             </div>
           )}
         </div>
@@ -781,9 +599,9 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
         </div>
 
         {/* ── Shared shirt colour (all tabs). On Printful it picks the real White/Grey/Black
-              variant from Printful's data; on AI tabs it sets the garment colour in the prompt. The library's photos
-              carry their own colour, so it has none here. ── */}
-        {mode !== "library" && <div style={{ fontSize: 13 }}>
+              variant from Printful's data; on 平拍 it sets the garment colour in the prompt. 模特兒圖 carry their own
+              colour, so 模特 and 【模特兒印製】 have none here. ── */}
+        {(mode === "flat" || mode === "printful") && <div style={{ fontSize: 13 }}>
           顏色
           <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
             <button className={color === "white" ? "btn-primary" : "btn-secondary"} onClick={() => setColor("white")}>白</button>
@@ -832,185 +650,6 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
                 ? `合成中（${[...productResults.values()].filter((r) => r.status === "generating").length} 產品剩餘）…`
                 : `生成 Mockup（${selectedProductIds.size} 產品）`}
             </button>
-          </>
-        )}
-
-        {/* ═══════════════════ MODEL TAB ═══════════════════════ */}
-        {mode === "model" && (
-          <>
-            <label style={{ fontSize: 13 }}>
-              參考圖類型
-              <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={referenceKind} onChange={(e) => setReferenceKind(e.target.value as ReferenceKind)}>
-                {REFERENCE_KIND_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-              <span style={{ fontSize: 11, opacity: 0.5, display: "block", marginTop: 2 }}>
-                {REFERENCE_KIND_OPTIONS.find((o) => o.value === referenceKind)?.hint}
-              </span>
-            </label>
-
-            <label style={{ fontSize: 13 }}>
-              產品類型
-              <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={categoryOverride} onChange={(e) => setCategoryOverride(e.target.value as "" | ProductCategory)}>
-                {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-              <span style={{ fontSize: 11, opacity: 0.5, display: "block", marginTop: 2 }}>
-                自己的產品（不在 Printful，如珠寶）在這裡指定類型。
-              </span>
-            </label>
-
-            {modelCategory === "apparel" && (
-              <label style={{ fontSize: 13 }}>
-                圖案位置 Placement
-                <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={placement} onChange={(e) => setPlacement(e.target.value)}>
-                  {GARMENT_PLACEMENT.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-              </label>
-            )}
-
-            <label style={{ fontSize: 13 }}>
-              設計大小（{designSizePct}% {modelCategory === "apparel" ? "胸前範圍" : "印刷範圍"}）
-              <input type="range" min={40} max={100} step={5} value={designSizePct}
-                onChange={(e) => setDesignSizePct(Number(e.target.value))}
-                style={{ width: "100%", marginTop: 4 }} />
-            </label>
-
-            <label style={{ fontSize: 13 }}>
-              圖案透明度 {designOpacity}%
-              <span style={{ fontSize: 11, opacity: 0.5, marginLeft: 6 }}>（褪色／復古效果，<b>不是</b>融合；僅對上傳圖有效，圖庫選的不生效）</span>
-              <input type="range" min={60} max={100} step={5} value={designOpacity}
-                onChange={(e) => setDesignOpacity(Number(e.target.value))}
-                style={{ width: "100%", marginTop: 4 }} />
-            </label>
-
-            <CatalogGrid
-              catalog={catalog} catalogLoading={catalogLoading}
-              selectedIds={selectedModelProductIds}
-              onToggle={(id) => toggleCatalogProduct(setSelectedModelProductIds, id)}
-              onSelectAll={() => setSelectedModelProductIds(new Set(catalog.map((c) => c.id)))}
-              onClearAll={() => setSelectedModelProductIds(new Set())}
-            />
-
-            <div style={{ fontSize: 13 }}>
-              固定模特兒{fixedModel && <span style={{ marginLeft: 8, color: "var(--accent-text)", fontSize: 12 }}>已選：{fixedModel.metadata?.preset_name ?? "模特兒"}</span>}
-              <div style={{ fontSize: 11, opacity: 0.6, margin: "2px 0 6px" }}>選了之後，每次合成都用同一個人的長相（很接近，不保證百分之百一樣）。</div>
-              {modelList}
-            </div>
-
-            <div style={{ fontSize: 13 }}>
-              年齡層
-              <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-                <button className={ageGroup === "adult" ? "btn-primary" : "btn-secondary"} onClick={() => setAgeGroup("adult")}>Adult</button>
-                <button className={ageGroup === "youth" ? "btn-primary" : "btn-secondary"} onClick={() => setAgeGroup("youth")}>Youth</button>
-              </div>
-            </div>
-
-            <div style={{ fontSize: 13 }}>
-              模特描述
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginTop: 4 }}>
-                <div>
-                  <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 2 }}>族裔／膚色</div>
-                  <select className="btn-secondary" style={{ width: "100%" }} value={mEthnicity} onChange={(e) => setMEthnicity(e.target.value)}>
-                    {MODEL_ETHNICITIES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 2 }}>性別</div>
-                  <select className="btn-secondary" style={{ width: "100%" }} value={mGender} onChange={(e) => setMGender(e.target.value)}>
-                    {MODEL_GENDERS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 2 }}>年齡</div>
-                  <select className="btn-secondary" style={{ width: "100%" }} value={mAge} onChange={(e) => setMAge(e.target.value)}>
-                    {MODEL_AGES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 2 }}>體型</div>
-                  <select className="btn-secondary" style={{ width: "100%" }} value={mBody} onChange={(e) => setMBody(e.target.value)}>
-                    {MODEL_BODY_TYPES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 2 }}>妝造</div>
-                  <select className="btn-secondary" style={{ width: "100%" }} value={mMakeup} onChange={(e) => setMMakeup(e.target.value)}>
-                    {MODEL_MAKEUP.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 2 }}>飾品</div>
-                  <select className="btn-secondary" style={{ width: "100%" }} value={mAccessories} onChange={(e) => setMAccessories(e.target.value)}>
-                    {MODEL_ACCESSORIES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                </div>
-              </div>
-              {modelDesc && !modelDescManual && <div style={{ fontSize: 11, opacity: 0.55, marginTop: 4 }}>→ {modelDesc}</div>}
-              <input className="btn-secondary" style={{ width: "100%", marginTop: 6 }} value={modelDescManual}
-                onChange={(e) => setModelDescManual(e.target.value)}
-                placeholder="手動描述（覆蓋上方，例：blonde Asian woman, 20s）" />
-            </div>
-
-            <label style={{ fontSize: 13 }}>
-              姿勢
-              <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={pose} onChange={(e) => setPose(e.target.value)}>
-                {MODEL_POSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
-              {isChestOccludingPose(pose) && <span style={{ color: "var(--yellow)", fontSize: 12 }}>⚠ 此姿勢會遮住胸前設計</span>}
-            </label>
-
-            <label style={{ fontSize: 13 }}>
-              場景 Scene
-              <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={modelScene} onChange={(e) => setModelScene(e.target.value)}>
-                {MODEL_SCENES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
-            </label>
-
-            <label style={{ fontSize: 13 }}>
-              光線 Lighting
-              <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={modelLighting} onChange={(e) => setModelLighting(e.target.value)}>
-                {MODEL_LIGHTING.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
-            </label>
-
-            <label style={{ fontSize: 13 }}>
-              框景 Framing
-              <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={modelFraming} onChange={(e) => setModelFraming(e.target.value)}>
-                {MODEL_FRAMING.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
-              {modelFraming === "full-body" && !["4:5", "9:16"].includes(aspect) && (
-                <span style={{ fontSize: 11, color: "var(--yellow)", display: "block", marginTop: 4, lineHeight: 1.4 }}>
-                  ⚠ 全身框景建議搭配 <strong>4:5</strong> 或 <strong>9:16</strong> 比例（畫面更高，頭腳不易裁切）。目前比例：{aspect}
-                </span>
-              )}
-              <span style={{ fontSize: 11, opacity: 0.5, display: "block", marginTop: 2 }}>
-                全身會露出整個人；模特的頭一律不裁切。
-              </span>
-            </label>
-
-            <label style={{ fontSize: 13 }}>
-              模特情緒 Emotion
-              <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={modelEmotion} onChange={(e) => setModelEmotion(e.target.value)}>
-                {MODEL_EMOTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
-              <span style={{ fontSize: 11, opacity: 0.5, display: "block", marginTop: 2 }}>
-                有情緒的表情更能提升產品吸引力。
-              </span>
-            </label>
-
-            {modelCategory !== "apparel" && (
-              <div style={{ fontSize: 12, padding: "6px 10px", borderRadius: 6, background: "var(--ai-bg)", color: "var(--ai-text)" }}>
-                偵測到非服飾產品（{modelCategory}）→ 模特會以「{modelCategory === "drinkware" ? "手持杯子" : modelCategory === "jewelry" ? "配戴飾品特寫" : modelCategory === "wall-art" ? "手持展示" : modelCategory === "bag" ? "揹／拿著包" : modelCategory === "phone" ? "手持手機" : modelCategory === "pillow" ? "抱著抱枕" : "展示"}」方式入鏡，而非穿在身上。
-              </div>
-            )}
-
-            <div style={{ fontSize: 13 }}>
-              場景道具（可複選）
-              <PropChips
-                options={MODEL_PROPS}
-                selected={modelProps}
-                onToggle={(v) => setModelProps((prev) => { const next = new Set(prev); if (next.has(v)) next.delete(v); else next.add(v); return next; })}
-              />
-            </div>
           </>
         )}
 
@@ -1114,7 +753,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
           </>
         )}
 
-        {/* ── AI model + aspect (model + flat tabs) ── */}
+        {/* ── AI model + aspect (平拍) ── */}
         {aiMode && (
           <>
             <label style={{ fontSize: 13 }}>
@@ -1187,7 +826,6 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
                 </button>
                 <a className="btn-secondary" href={gen.image} download={`mockup-${mode}-${color}.png`}>下載合成圖</a>
                 <button className="btn-secondary" onClick={() => void generate()}>再合成一張</button>
-                {mode === "model" && <button className="btn-secondary" disabled={modelSaving} onClick={() => void saveModelPreset()}>儲存為模特兒</button>}
                 {saveState === "error" && <span style={{ color: "var(--red)", fontSize: 12 }}>儲存失敗</span>}
               </div>
             )}
@@ -1212,10 +850,13 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
           </>
         )}
 
-        {mode === "library" && (
-          <ModelLibraryStudio designRef={designRef} photos={modelPresets} setPhotos={setModelPresets}
-            onDeleted={(id) => setFixedModel((m) => (m?.id === id ? null : m))} />
-        )}
+        {/* Hidden, not unmounted: their unsaved results were paid for and survive a tab switch. */}
+        <div style={{ display: mode === "model" ? "block" : "none" }}>
+          <ModelMockupPanel designRef={designRef} photos={modelPresets} onOpenLibrary={() => setMode("library")} />
+        </div>
+        <div style={{ display: mode === "library" ? "block" : "none" }}>
+          <ModelLibraryStudio photos={modelPresets} setPhotos={setModelPresets} />
+        </div>
 
         {mode === "printful" && (
           <>

@@ -4,11 +4,8 @@ import {
   buildModelMockupPrompt,
   isChestOccludingPose,
   productCategoryFromType,
-  withIdentityReference,
-  buildModelSheetPrompt,
-  buildPlainPosePrompt,
   buildPrintOntoPhotoPrompt,
-  MODEL_SHEET_ANGLES,
+  buildModelPhotoPrompt,
 } from "../mockup-prompt";
 
 describe("buildModelMockupPrompt", () => {
@@ -20,15 +17,6 @@ describe("buildModelMockupPrompt", () => {
     scene: "coffee-shop",
     lighting: "window",
   };
-
-  it("names the second reference image as the same person only when a saved model travels with it", () => {
-    const plain = buildModelMockupPrompt({ ...base, color: "white" });
-    expect(plain).not.toContain("SECOND reference image");
-    const fixed = withIdentityReference(plain);
-    expect(fixed.startsWith("REFERENCE IMAGES: the FIRST reference image is the design")).toBe(true);
-    expect(fixed).toContain("SAME person");
-    expect(fixed.endsWith(plain)).toBe(true);
-  });
 
   it("locks colors on black garments (iron rule #1)", () => {
     const black = buildModelMockupPrompt({ ...base, color: "black" });
@@ -299,25 +287,28 @@ describe("mockup quality + appeal upgrades", () => {
   });
 });
 
-describe("model library prompts (plain garments for code printing)", () => {
-  it("each sheet angle asks for its own angle on a blank garment", () => {
-    const prompts = MODEL_SHEET_ANGLES.map((a) =>
-      buildModelSheetPrompt({ role: a.role, modelDescription: "East Asian woman, 20s", ageGroup: "adult", color: "white" }));
-    expect(new Set(prompts).size).toBe(4);
-    for (const [i, p] of prompts.entries()) {
-      expect(p).toContain(MODEL_SHEET_ANGLES[i].phrase);
-      expect(p).toContain("NO print");
-      expect(p).toContain("East Asian woman, 20s");
-    }
-  });
+describe("模特兒圖 and print prompts", () => {
+  const base = { pose: "leaning", scene: "studio-white", lighting: "window", color: "black" as const };
 
-  it("a pose prompt leads with the pose, names every reference as the same person and never asks for a print", () => {
-    const p = buildPlainPosePrompt({ pose: "leaning", scene: "studio-white", lighting: "window", color: "black" });
+  it("a new person: led by the pose, described by the settings, a blank garment, no reference clause", () => {
+    const p = buildModelPhotoPrompt({ ...base, ageGroup: "adult", modelDescription: "White, man, in their 30s", emotion: "warm-smile",
+      props: ["咖啡杯"], sameAsReferences: false });
     expect(p.startsWith("POSE (most important")).toBe(true);
     expect(p).toContain("leaning casually against a wall");
-    expect(p).toContain("ALL reference images show the SAME person");
+    expect(p).toContain("an adult (White, man, in their 30s)");
     expect(p).toContain("a plain black");
+    expect(p).toContain("a warm, genuine smile");
+    expect(p).toContain("Visible in the scene: 咖啡杯.");
+    expect(p).not.toContain("REFERENCE IMAGES");
     expect(p).not.toContain("printed");
+  });
+
+  it("the same person as the references: the description is not sent, sunglasses only when asked", () => {
+    const p = buildModelPhotoPrompt({ ...base, modelDescription: "ignored", sameAsReferences: true });
+    expect(p).toContain("ALL reference images show the SAME person");
+    expect(p).not.toContain("ignored");
+    expect(p).toContain("No sunglasses.");
+    expect(buildModelPhotoPrompt({ ...base, props: ["墨鏡"], sameAsReferences: true })).not.toContain("No sunglasses.");
   });
 
   it("the print-onto-photo edit names both images, the size from designScale, and locks colour on dark fabric", () => {

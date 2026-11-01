@@ -395,20 +395,6 @@ export interface ModelMockupParams {
   placement?: string;
 }
 
-/** Two reference images make "the reference image" ambiguous; this names which one is which. */
-export const IDENTITY_REFERENCE_CLAUSE =
-  "REFERENCE IMAGES: the FIRST reference image is the design/product; every mention of " +
-  "\"the reference image\" below means that first image. The SECOND reference image shows the model. " +
-  "The person in this photo is that SAME person: identical face, facial features, hairstyle, " +
-  "hair colour, skin tone and body build. Take only the person's identity from the second image " +
-  "— ignore its clothing, pose, background and lighting.";
-
-/** Applied at SEND time by whoever attaches the model photo, never stored in the editable prompt: the clause and the
- *  second image then follow one condition, whatever the operator typed into the prompt box. */
-export function withIdentityReference(prompt: string): string {
-  return `${IDENTITY_REFERENCE_CLAUSE} ${prompt}`;
-}
-
 /** Shared print-fidelity block. The dark-fabric lock is iron rule #1.
  *  Defaults describe an apparel chest print so flat-lay + apparel callers are unchanged;
  *  non-apparel products pass a different `surface` (where the print sits) and `behavior`
@@ -722,19 +708,9 @@ export function buildModelMockupPrompt(p: ModelMockupParams): string {
   );
 }
 
-// ── Model library: photos made to be printed on in code (lib/studio/fabric-print.ts) ──────────────────────────────
-// Every photo here shows a PLAIN garment: code prints the design later, so the AI must never draw one.
+// ── 模特兒圖: a person, pose and scene in a PLAIN garment; the design is printed on later (buildPrintOntoPhotoPrompt) ──
 
-/** The four angles a new model is generated in; they are its identity references from then on. */
-export const MODEL_SHEET_ANGLES = [
-  { role: "face-front", label: "正面", phrase: "facing the camera straight on, shoulders square to the lens" },
-  { role: "face-left", label: "左斜側", phrase: "body and face turned about 45 degrees towards the camera's left" },
-  { role: "face-right", label: "右斜側", phrase: "body and face turned about 45 degrees towards the camera's right" },
-  { role: "face-profile", label: "側面", phrase: "in full side profile, facing the camera's left" },
-] as const;
-export type ModelSheetRole = (typeof MODEL_SHEET_ANGLES)[number]["role"];
-
-/** Sent with every request whose reference images are all photos of the model (no design among them). */
+/** Sent when every reference image is a photo of the model: the new photo shows that same person. */
 export const SAME_PERSON_REFERENCES_CLAUSE =
   "REFERENCE IMAGES: ALL reference images show the SAME person. Reproduce that exact person: identical face, " +
   "facial features, hairstyle, hair colour, skin tone and body build. Take only the person's identity from the " +
@@ -745,45 +721,44 @@ function plainGarment(color: GarmentColor, garmentPhrase: string): string {
     "fabric with natural cotton texture and realistic folds; the chest stays visible and the arms do not cover it";
 }
 
-/** One angle of a new model's identity sheet: neutral, evenly lit, plain garment, nothing to distract. */
-export function buildModelSheetPrompt(p: {
-  role: ModelSheetRole;
-  modelDescription: string;
-  ageGroup: "adult" | "youth";
-  color: GarmentColor;
-  garmentPhrase?: string;
-}): string {
-  const angle = MODEL_SHEET_ANGLES.find((a) => a.role === p.role) ?? MODEL_SHEET_ANGLES[0];
-  const who = p.ageGroup === "youth" ? "A young person" : "An adult";
-  const desc = p.modelDescription.trim() ? ` (${p.modelDescription.trim()})` : "";
-  return (
-    `Model reference photo. ${who}${desc}, standing upright with a calm neutral expression, ${angle.phrase}. ` +
-    "Framed from the top of the head to the mid-thigh with breathing room above the head; the full face is visible. " +
-    `They wear ${plainGarment(p.color, p.garmentPhrase ?? "unisex crewneck t-shirt")}. ` +
-    "Plain light-grey seamless studio backdrop, soft even studio lighting, no props, no sunglasses, no hat." +
-    PRO_QUALITY
-  );
-}
-
-/** A new pose of a saved model, plain garment. The pose leads the prompt: placed later, the 2026-11-01 trial ignored it. */
-export function buildPlainPosePrompt(p: {
+/** One 模特兒圖 for the library. The pose leads the prompt: placed later, the 2026-11-01 trial ignored it.
+ *  `sameAsReferences` = the reference images are this model (an existing model, or the batch's first photo of a new
+ *  one); without it the description defines a new person. */
+export function buildModelPhotoPrompt(p: {
   pose: string;
   scene: string;
   lighting: string;
   framing?: string;
+  emotion?: string;
+  /** prop labels (MODEL_PROPS) visible in the scene */
+  props?: string[];
   color: GarmentColor;
   garmentPhrase?: string;
+  ageGroup?: "adult" | "youth";
+  modelDescription?: string;
+  sameAsReferences: boolean;
 }): string {
   const pose = find(MODEL_POSES, p.pose);
   const scene = find(MODEL_SCENES, p.scene);
   const lighting = find(MODEL_LIGHTING, p.lighting);
   const framing = find(MODEL_FRAMING, p.framing ?? "three-quarter");
+  const emotion = find(MODEL_EMOTIONS, p.emotion ?? "");
+  const who = p.sameAsReferences
+    ? SAME_PERSON_REFERENCES_CLAUSE
+    : `The person: ${p.ageGroup === "youth" ? "a young person" : "an adult"}` +
+      (p.modelDescription?.trim() ? ` (${p.modelDescription.trim()})` : "") + ".";
+  const props = p.props && p.props.length > 0 ? ` Visible in the scene: ${p.props.join(", ")}.` : "";
+  const wantsSunglasses = (p.props ?? []).some((x) => /墨鏡|sunglasses/i.test(x)) || /sunglasses/i.test(p.modelDescription ?? "");
   return (
     `POSE (most important, follow it exactly): the person is ${pose.phrase}. Do not default to a straight, ` +
     "camera-facing stance unless that is the pose. " +
-    `${SAME_PERSON_REFERENCES_CLAUSE} ${framing.phrase} ` +
+    `${who} ${framing.phrase} ` +
     `Photorealistic lifestyle photo in ${scene.phrase}, ${lighting.phrase}. ` +
-    `They wear ${plainGarment(p.color, p.garmentPhrase ?? "unisex crewneck t-shirt")}. No sunglasses.` +
+    `They wear ${plainGarment(p.color, p.garmentPhrase ?? "unisex crewneck t-shirt")}.` +
+    (emotion.phrase ? ` Their facial expression shows ${emotion.phrase}.` : "") +
+    props +
+    (wantsSunglasses ? "" : " No sunglasses.") +
+    " The model's full head and face are clearly visible and must NOT be cropped out of frame." +
     PRO_QUALITY
   );
 }

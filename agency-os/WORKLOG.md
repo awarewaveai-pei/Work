@@ -1,4 +1,22 @@
 # Worklog
+## 2026-11-02（續1）Mockup Studio 模特流程拆兩頁：【模特兒印製】生成含背景模特兒圖；主頁「模特」勾多張模特兒圖＋設計圖合成商品 Mockup
+
+**操作者**：截圖主頁模特設定（年齡層、族裔、性別、年齡、體型、妝造、飾品、姿勢、場景、光線、取景、情緒、道具、模型、比例）→「這些內容應該要移到【模特兒印製】, 然後直接生出 模特兒圖(含背景), 再回到主頁挑選 模特兒圖(含背景)多張+設計圖>>生成多張產品圖」；「主頁是真正生成合成 商品Mockup (模特兒身著設計圖衣服)」。
+
+**做了**：
+- 【模特兒印製】`app/(shell)/tools/mockup/ModelLibraryStudio.tsx`（重寫）：人物＝「新的人（照描述）」或圖庫既有模特兒；全部設定改為按鈕（不用下拉）；姿勢、道具可複選，一個姿勢一張；nano-banana-2。新的人：第一張只靠描述，其餘以第一張為長相參考（整批同一人）；既有模特兒：他的照片（≤14）為參考。結果勾選後存成新模特兒（取名）或存進既有模特兒；之後自動切到該人物。圖庫管理（上傳、刪照片／整位、四角印花框）同頁。
+- 主頁「模特」`ModelMockupPanel.tsx`（新）：圖庫照片按模特兒分組、可跨模特兒勾選＋全選；圖案位置按鈕、設計大小；「合成」＝ fabric-print engine ai（gpt-image-2.5），「免費預覽」＝ engine code（只用已框照片）；結果逐張／全部存入 My Designs、下載；空圖庫顯示「到【模特兒印製】生成」。
+- 共用 `modelLibrary.ts`（LibraryPhoto、groupModels、inPairs、failureText、標籤）。
+- `MockupStudio.tsx`：移除模特 tab 的描述控制、舊一次生成路徑、固定模特兒（fixedModel／selectModel／saveModel／modelList）、預設庫的模特分頁（只剩產品預設）；`aiMode` 只剩平拍；顏色列只在平拍／Printful。1276 → 917 行。
+- `lib/studio/mockup-prompt.ts`：`buildModelPhotoPrompt`（姿勢在前；新的人用描述、或「所有參考圖同一人」；情緒、道具、素色衣服；要墨鏡才不寫 No sunglasses）取代 `buildModelSheetPrompt`／`MODEL_SHEET_ANGLES`／`buildPlainPosePrompt`；刪 `withIdentityReference`／`IDENTITY_REFERENCE_CLAUSE`（唯一呼叫者已移除）。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（整套）→ 3813 passed；2 failed 皆為他 session 未提交 `app/(shell)/tools/seedstar/`（HEAD 中 0 檔） | exit=1 | ms=200000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run app/(shell)/tools/mockup/__tests__/model-flow.render.test.tsx → 7 passed（首張失敗其餘不生成、跨模特兒勾選＋全選、AI／免費預覽請求內容、空圖庫導向、新的人首張無參考其餘參考首張、既有模特兒以其照片為參考、四角框存檔） | exit=0 | ms=620
+- REVIEW_DONE: critic=Quick | verdict=warn→fixed | findings=0c/2m/12n（M1 主頁結果改用 photo.id 對應、儲存中不可開新批；M2 批次記住生成當下的衣色／場景／人物設定，存檔只讀批次；m：既有模特兒不送隱藏描述、存檔設定 target 判斷、模特兒被刪時退回新的人、參考圖 face-* 優先、遮胸姿勢警告、免費預覽 modelName=fabric-print、圖案位置標示只對 AI、兩個模特面板切頁不卸載（未存付費圖不丟）、刪死碼；未修：重新生成會蓋掉未存的圖（舊行為））
+- BUGHUNT_DONE: scope=agency-os/docs,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib | grep=buildPlainPosePrompt | hits=0
+- ORACLE_WAIVED: Codex 額度不足（操作者 2026-11-01「若不夠就自我審查」）；critic Quick＋整套測試替代。
+- `npx tsc --noEmit` 乾淨。畫面需操作者登入實測。
 ## 2026-11-01（續25）外聯系統 v2 卡 C11.2–C11.4：寄件池 migration 0152（名額表＋兩個鎖名單的交易函式）、池信箱 OAuth 連線、每日信箱健康檢查
 
 **操作者**：「續做 外聯系統 v2 卡 C11 … 從 C11.2 開始 … 完成＝C11.2–C11.4 全部做完並 commit」；指定坑：免費信箱收件人要用完整 email 當鍵，清單與 `FREE_MAIL` 一致並加測試。
