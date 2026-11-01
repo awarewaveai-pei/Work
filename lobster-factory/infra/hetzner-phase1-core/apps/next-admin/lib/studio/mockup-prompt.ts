@@ -395,6 +395,20 @@ export interface ModelMockupParams {
   placement?: string;
 }
 
+/** Two reference images make "the reference image" ambiguous; this names which one is which. */
+export const IDENTITY_REFERENCE_CLAUSE =
+  "REFERENCE IMAGES: the FIRST reference image is the design/product; every mention of " +
+  "\"the reference image\" below means that first image. The SECOND reference image shows the model. " +
+  "The person in this photo is that SAME person: identical face, facial features, hairstyle, " +
+  "hair colour, skin tone and body build. Take only the person's identity from the second image " +
+  "— ignore its clothing, pose, background and lighting.";
+
+/** Applied at SEND time by whoever attaches the model photo, never stored in the editable prompt: the clause and the
+ *  second image then follow one condition, whatever the operator typed into the prompt box. */
+export function withIdentityReference(prompt: string): string {
+  return `${IDENTITY_REFERENCE_CLAUSE} ${prompt}`;
+}
+
 /** Shared print-fidelity block. The dark-fabric lock is iron rule #1.
  *  Defaults describe an apparel chest print so flat-lay + apparel callers are unchanged;
  *  non-apparel products pass a different `surface` (where the print sits) and `behavior`

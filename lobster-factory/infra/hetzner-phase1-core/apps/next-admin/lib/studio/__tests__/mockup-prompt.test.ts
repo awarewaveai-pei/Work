@@ -4,6 +4,7 @@ import {
   buildModelMockupPrompt,
   isChestOccludingPose,
   productCategoryFromType,
+  withIdentityReference,
 } from "../mockup-prompt";
 
 describe("buildModelMockupPrompt", () => {
@@ -15,6 +16,15 @@ describe("buildModelMockupPrompt", () => {
     scene: "coffee-shop",
     lighting: "window",
   };
+
+  it("names the second reference image as the same person only when a saved model travels with it", () => {
+    const plain = buildModelMockupPrompt({ ...base, color: "white" });
+    expect(plain).not.toContain("SECOND reference image");
+    const fixed = withIdentityReference(plain);
+    expect(fixed.startsWith("REFERENCE IMAGES: the FIRST reference image is the design")).toBe(true);
+    expect(fixed).toContain("SAME person");
+    expect(fixed.endsWith(plain)).toBe(true);
+  });
 
   it("locks colors on black garments (iron rule #1)", () => {
     const black = buildModelMockupPrompt({ ...base, color: "black" });

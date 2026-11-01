@@ -1,4 +1,31 @@
 # Worklog
+## 2026-11-01（續15）Mockup Studio 固定模特兒：選一位已存模特兒，合成時照片當第二張參考圖，每張同一個人
+
+**操作者**：「可否做模特兒清單，讓我之後可以固定選模特兒合成？」→「照做」。
+
+**根因（舊「模特預設」做不到）**：
+- 只存文字設定（族裔／性別／年齡…），AI 每次畫新的人。
+- `applyModelPreset` 把設計圖換成預設照片（舊 `MockupStudio.tsx:624` `setDesignRef(preset.object_url)`）。
+
+**做了**：
+- `lib/studio/mockup-prompt.ts`：`IDENTITY_REFERENCE_CLAUSE`＋`withIdentityReference()`（第一張＝設計、第二張＝同一個人，只取長相）。
+- `MockupStudio.tsx`：
+  - `fixedModel` 狀態；`modelList` 照片按鈕（「不固定」＋各模特兒，再點取消），模特模式設定區與預設庫兩處共用。
+  - 新增模特兒：上傳人像，或合成後「儲存為模特兒」；存完自動選上；失敗顯示錯誤。
+  - `generate`：模特模式且有固定模特兒 → `referenceImages=[設計, 模特兒照]`，prompt 於**送出時**加前綴（critic M1：放在可編輯 prompt 會與手改內容／圖數不一致）；AI 模型 `maxRefs<2` 先擋。`inFlight` 檢查移最前（critic m1）。
+  - 固定模特兒時不送下拉選單的外貌描述（critic m3：上傳照片沒有設定，舊描述會和照片矛盾）。
+  - `selectModel` 只套外貌與年齡層，不動設計圖／顏色／姿勢／場景。刪除先確認伺服器 `res.ok` 再拿掉（critic m4）。
+- 儲存沿用 `/api/tools/presets`（`media_assets.asset_domain=mockup_model_preset`），無 migration；舊模特預設照常出現在清單。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=Replicate google/nano-banana-2 prediction cz19qwnkj9rmy0d1jtysa3hwv4, image_input=[設計 R2, 模特兒照 R2], prompt=withIdentityReference(buildModelMockupPrompt(黑衣, loft)) | exit=0 | ms=18270
+  - 結果：與模特兒照同一人、黑衣、閣樓場景、設計圖完整；對照圖 `D:\tmp\mockup-2026-11-01\compare.jpg`。測試用 R2 物件兩個已刪（DELETE 200）。
+- `npx vitest run lib/studio/__tests__/mockup-prompt.test.ts` 26 passed；tsc 本檔零錯誤。
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/5n（M1、m1、m2、m3、m4 已修；m5 上游非常見 mime 會 400 但有錯誤訊息，未改）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib | grep=applyModelPreset | hits=0
+- ORACLE_WAIVED: 前端 UI＋prompt 前綴；無權限／資料庫／金流改動；critic Standard 已審且全部修正。
+
+**剩餘**：畫面需操作者登入實測（今晚 03:00 自動部署）。長相「很接近」非百分之百。
 ## 2026-11-01（續14）Mockup Studio 真正的壞掉時間點：2026-06-23 checkpoint 拿掉合成圖＋改圖面板；改圖面板放回
 
 **操作者**：「為什麼突然壞掉？以前沒問題」。

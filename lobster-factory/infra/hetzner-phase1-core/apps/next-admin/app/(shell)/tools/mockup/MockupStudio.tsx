@@ -31,6 +31,7 @@ import {
   productCategoryFromType,
   buildFlatMockupPrompt,
   buildModelMockupPrompt,
+  withIdentityReference,
   isChestOccludingPose,
   type GarmentColor,
   type MockupMode,
@@ -319,6 +320,10 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
   const [productPresets, setProductPresets] = useState<PresetAsset[]>([]);
   const [presetsOpen, setPresetsOpen] = useState(false);
   const [presetsTab, setPresetsTab] = useState<"model" | "product">("model");
+  // The saved model whose photo rides along as the second reference image so every composite shows the same person.
+  const [fixedModel, setFixedModel] = useState<PresetAsset | null>(null);
+  const [modelSaving, setModelSaving] = useState(false);
+  const [modelSaveError, setModelSaveError] = useState<string | null>(null);
   const [productUploadFile, setProductUploadFile] = useState<File | null>(null);
 
   useEffect(() => {
@@ -402,7 +407,8 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
       garmentPhrase: garmentPhraseFor(selectedModelProductIds),
       color,
       ageGroup,
-      modelDescription: modelDesc,
+      // A fixed model's look comes from its photo; the dropdown description could contradict it.
+      modelDescription: fixedModel ? "" : modelDesc,
       pose,
       scene: modelScene,
       lighting: modelLighting,
@@ -418,7 +424,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
       selectedFlatProductIds, selectedModelProductIds, garmentPhraseFor,
       ageGroup, modelDesc, pose, modelScene, modelLighting, modelProps,
       designSizePct, modelFraming, modelCategory, flatCategory, referenceKind,
-      modelEmotion, flatCornerDecor, placement]);
+      modelEmotion, flatCornerDecor, placement, fixedModel]);
 
   const effectivePrompt = promptOverride ?? prompt;
 
@@ -432,8 +438,13 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
   }, []);
 
   const generate = useCallback(async () => {
-    if (!designRef) { setGen({ status: "error", error: "請先選一張設計圖（My Designs 點選或上傳）" }); return; }
     if (inFlight.current) return;
+    if (!designRef) { setGen({ status: "error", error: "請先選一張設計圖（My Designs 點選或上傳）" }); return; }
+    const modelRefUrl = mode === "model" ? fixedModel?.object_url ?? null : null;
+    if (modelRefUrl && (STUDIO_MODEL_OPTIONS.find((m) => m.value === model)?.maxRefs ?? 0) < 2) {
+      setGen({ status: "error", error: "這個 AI 模型只吃一張參考圖，無法固定模特兒；請換能吃 2 張以上參考圖的模型（例如 Nano Banana 2），或取消固定模特兒" });
+      return;
+    }
     jobIdRef.current = crypto.randomUUID();
     inFlight.current = true;
     setGen({ status: "generating" });
@@ -443,7 +454,13 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
       const res = await fetch("/api/tools/studio/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model, prompt: effectivePrompt, referenceImages: [processedRef], aspectRatio: aspect, _jobId: jobIdRef.current }),
+        body: JSON.stringify({
+          model,
+          prompt: modelRefUrl ? withIdentityReference(effectivePrompt) : effectivePrompt,
+          referenceImages: modelRefUrl ? [processedRef, modelRefUrl] : [processedRef],
+          aspectRatio: aspect,
+          _jobId: jobIdRef.current,
+        }),
       });
       const json = (await res.json()) as { ok: boolean; image?: string; error?: string };
       if (!json.ok || !json.image) { setGen({ status: "error", error: json.error ?? `HTTP ${res.status}` }); return; }
@@ -451,7 +468,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
     } catch (err) {
       setGen({ status: "error", error: err instanceof Error ? err.message : String(err) });
     } finally { inFlight.current = false; }
-  }, [designRef, model, effectivePrompt, aspect, designOpacity]);
+  }, [designRef, model, effectivePrompt, aspect, designOpacity, mode, fixedModel]);
 
   const generatePrintful = useCallback(async () => {
     if (!designRef) {
@@ -569,31 +586,47 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
     } catch { setSaveState("error"); }
   }, [gen, mode, color, effectivePrompt, model]);
 
-  const saveModelPreset = useCallback(async () => {
-    if (gen.status !== "done" || !gen.image) return;
-    const name = window.prompt("預設名稱：");
+  /** Saves a photo as a named model and selects it, so the next composite already uses it. */
+  const saveModel = useCallback(async (image: string, settings: Record<string, string>) => {
+    const name = window.prompt("模特兒名字：");
     if (!name || !name.trim()) return;
+    setModelSaving(true);
+    setModelSaveError(null);
     try {
       const res = await fetch("/api/tools/presets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image: gen.image,
-          presetType: "model",
-          presetName: name.trim(),
-          presetSettings: {
-            mEthnicity, mGender, mAge, mBody, mMakeup, mAccessories,
-            pose, modelScene, modelLighting,
-            modelProps: JSON.stringify([...modelProps]),
-            color, ageGroup,
-          },
-        }),
+        body: JSON.stringify({ image, presetType: "model", presetName: name.trim(), presetSettings: settings }),
       });
-      const json = (await res.json()) as { ok: boolean; preset?: PresetAsset };
-      if (json.ok && json.preset) setModelPresets((prev) => [json.preset!, ...prev]);
-    } catch { /* silent */ }
-  }, [gen, mEthnicity, mGender, mAge, mBody, mMakeup, mAccessories,
+      const json = (await res.json()) as { ok: boolean; preset?: PresetAsset; error?: string };
+      if (json.ok && json.preset) {
+        setModelPresets((prev) => [json.preset!, ...prev]);
+        setFixedModel(json.preset);
+      } else {
+        setModelSaveError(json.error ?? `HTTP ${res.status}`);
+      }
+    } catch (err) {
+      setModelSaveError(err instanceof Error ? err.message : String(err));
+    } finally { setModelSaving(false); }
+  }, []);
+
+  const saveModelPreset = useCallback(async () => {
+    if (gen.status !== "done" || !gen.image) return;
+    await saveModel(gen.image, {
+      mEthnicity, mGender, mAge, mBody, mMakeup, mAccessories,
+      pose, modelScene, modelLighting,
+      modelProps: JSON.stringify([...modelProps]),
+      color, ageGroup,
+    });
+  }, [gen, saveModel, mEthnicity, mGender, mAge, mBody, mMakeup, mAccessories,
       pose, modelScene, modelLighting, modelProps, color, ageGroup]);
+
+  const onUploadModelPhoto = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    let dataUrl: string;
+    try { dataUrl = await readFileAsDataUrl(files[0]); } catch { setModelSaveError("讀不到這張照片"); return; }
+    await saveModel(dataUrl, {});
+  }, [saveModel]);
 
   const saveProductPreset = useCallback(async () => {
     if (!productUploadFile) return;
@@ -611,8 +644,12 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
     } catch { /* silent */ }
   }, [productUploadFile]);
 
-  const applyModelPreset = useCallback((preset: PresetAsset) => {
-    if (preset.object_url) { setDesignRef(preset.object_url); setDesignThumb(preset.object_url); }
+  // Picking a model fixes the person only: the design, garment colour, pose, scene and lighting stay as chosen.
+  // (Before 2026-11-01 this replaced the selected design with the model's photo.) Picking it again un-fixes it.
+  const selectModel = useCallback((preset: PresetAsset) => {
+    if (fixedModel?.id === preset.id) { setFixedModel(null); return; }
+    setFixedModel(preset);
+    setMode("model");
     const s = preset.metadata?.preset_settings;
     if (!s) return;
     if (s.mEthnicity !== undefined) setMEthnicity(s.mEthnicity);
@@ -621,17 +658,16 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
     if (s.mBody !== undefined) setMBody(s.mBody);
     if (s.mMakeup !== undefined) setMMakeup(s.mMakeup);
     if (s.mAccessories !== undefined) setMAccessories(s.mAccessories);
-    if (s.pose !== undefined) setPose(s.pose);
-    if (s.modelScene !== undefined) setModelScene(s.modelScene);
-    if (s.modelLighting !== undefined) setModelLighting(s.modelLighting);
-    if (s.modelProps) { try { setModelProps(new Set(JSON.parse(s.modelProps) as string[])); } catch { /* ignore */ } }
-    if (s.color !== undefined) setColor(s.color as GarmentColor);
     if (s.ageGroup !== undefined) setAgeGroup(s.ageGroup as "adult" | "youth");
-  }, []);
+  }, [fixedModel]);
 
   const deletePreset = useCallback(async (id: string, domain: "mockup_model_preset" | "mockup_product_preset") => {
-    await fetch(`/api/tools/presets?id=${id}`, { method: "DELETE" });
-    if (domain === "mockup_model_preset") setModelPresets((prev) => prev.filter((p) => p.id !== id));
+    const res = await fetch(`/api/tools/presets?id=${id}`, { method: "DELETE" }).catch(() => null);
+    if (!res?.ok) { window.alert("刪除失敗，請重試"); return; }
+    if (domain === "mockup_model_preset") {
+      setModelPresets((prev) => prev.filter((p) => p.id !== id));
+      setFixedModel((m) => (m?.id === id ? null : m));
+    }
     else setProductPresets((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
@@ -644,6 +680,35 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
     borderRadius: 6,
     cursor: "pointer",
   });
+
+  // One model list, shown in the model controls and in the preset library's model tab.
+  const modelList = (
+    <div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <button className={fixedModel ? "btn-secondary" : "btn-primary"} style={{ width: 64, height: 80, fontSize: 11 }} onClick={() => setFixedModel(null)}>
+          不固定
+        </button>
+        {modelPresets.map((p) => {
+          const on = fixedModel?.id === p.id;
+          return (
+            <div key={p.id} style={{ position: "relative", cursor: "pointer" }} onClick={() => selectModel(p)} title={on ? "再點一次取消" : "固定這位模特兒"}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={p.object_url!} alt={p.metadata?.preset_name ?? p.id} style={{ width: 64, height: 80, objectFit: "cover", borderRadius: 4, background: "#111", ...selectStyle(on) }} />
+              <div style={{ fontSize: 10, textAlign: "center", maxWidth: 64, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: on ? 700 : 400 }}>{p.metadata?.preset_name ?? "模特兒"}</div>
+              <button style={{ position: "absolute", top: 0, right: 0, fontSize: 9, background: "var(--red)", color: "var(--btn-primary-text)", border: "none", borderRadius: 2, cursor: "pointer", padding: "1px 3px" }} onClick={(e) => { e.stopPropagation(); if (window.confirm(`刪除模特兒「${p.metadata?.preset_name ?? ""}」？`)) void deletePreset(p.id, p.asset_domain); }}>✕</button>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
+        新增：上傳一張人像，或合成後按「儲存為模特兒」。
+      </div>
+      <input type="file" accept="image/png,image/jpeg,image/webp" disabled={modelSaving} style={{ fontSize: 11, marginTop: 4, width: "100%" }}
+        onChange={(e) => { void onUploadModelPhoto(e.target.files); e.target.value = ""; }} />
+      {modelSaving && <div style={{ fontSize: 11, opacity: 0.7 }}>儲存中…</div>}
+      {modelSaveError && <div style={{ fontSize: 11, color: "var(--red)" }}>模特兒儲存失敗：{modelSaveError}</div>}
+    </div>
+  );
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 16, padding: 16, alignItems: "start" }}>
@@ -665,19 +730,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
                 <button className={presetsTab === "model" ? "btn-primary" : "btn-secondary"} style={{ fontSize: 12 }} onClick={() => setPresetsTab("model")}>模特預設</button>
                 <button className={presetsTab === "product" ? "btn-primary" : "btn-secondary"} style={{ fontSize: 12 }} onClick={() => setPresetsTab("product")}>產品預設</button>
               </div>
-              {presetsTab === "model" && (
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {modelPresets.length === 0 && <p style={{ fontSize: 12, opacity: 0.5 }}>尚無模特預設</p>}
-                  {modelPresets.map((p) => (
-                    <div key={p.id} style={{ position: "relative", cursor: "pointer" }} onClick={() => applyModelPreset(p)}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={p.object_url!} alt={p.metadata?.preset_name ?? p.id} style={{ width: 64, height: 80, objectFit: "cover", borderRadius: 4, background: "#111" }} />
-                      <div style={{ fontSize: 10, textAlign: "center", maxWidth: 64, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.metadata?.preset_name ?? "預設"}</div>
-                      <button style={{ position: "absolute", top: 0, right: 0, fontSize: 9, background: "var(--red)", color: "var(--btn-primary-text)", border: "none", borderRadius: 2, cursor: "pointer", padding: "1px 3px" }} onClick={(e) => { e.stopPropagation(); void deletePreset(p.id, p.asset_domain); }}>✕</button>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {presetsTab === "model" && modelList}
               {presetsTab === "product" && (
                 <div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
@@ -836,6 +889,12 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
               onSelectAll={() => setSelectedModelProductIds(new Set(catalog.map((c) => c.id)))}
               onClearAll={() => setSelectedModelProductIds(new Set())}
             />
+
+            <div style={{ fontSize: 13 }}>
+              固定模特兒{fixedModel && <span style={{ marginLeft: 8, color: "var(--accent-text)", fontSize: 12 }}>已選：{fixedModel.metadata?.preset_name ?? "模特兒"}</span>}
+              <div style={{ fontSize: 11, opacity: 0.6, margin: "2px 0 6px" }}>選了之後，每次合成都用同一個人的長相（很接近，不保證百分之百一樣）。</div>
+              {modelList}
+            </div>
 
             <div style={{ fontSize: 13 }}>
               年齡層
@@ -1128,7 +1187,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
                 </button>
                 <a className="btn-secondary" href={gen.image} download={`mockup-${mode}-${color}.png`}>下載合成圖</a>
                 <button className="btn-secondary" onClick={() => void generate()}>再合成一張</button>
-                {mode === "model" && <button className="btn-secondary" onClick={() => void saveModelPreset()}>儲存為模特預設</button>}
+                {mode === "model" && <button className="btn-secondary" disabled={modelSaving} onClick={() => void saveModelPreset()}>儲存為模特兒</button>}
                 {saveState === "error" && <span style={{ color: "var(--red)", fontSize: 12 }}>儲存失敗</span>}
               </div>
             )}
