@@ -9,6 +9,7 @@
 - D16 FluentCRM 目標＝org 的 active `wp_sites` 列（`0039_wp_sites.sql:11`、`0061_wp_sites_add_org.sql:36`）；C6 parked（0 回信；aware-wave.com 只留 WordPress，操作者 10-30）。
 - D17 不開 auto；C8 parked 至：草稿模式 50 封、退信 < 2%、0 投訴、回信同步 2 週。
 - D18 名單發現＝Serper `/places`（既有 `SERPER_API_KEY`）；`providers.ts:88` 只放 `/search` 是因為沒別的呼叫者（`:76-82` 註解）。C10 解鎖、改與 C3 並行。
+  - 操作者追問「Google Places 比較好嗎」→ web-fetch 讀官方頁：政策「不得預先抓取、快取或儲存 Places 內容，例外只有 place ID」（places/web-service/policies）＝名單庫不能用；Text Search Enterprise（含電話／網站）$35／千次、免費 1,000／月、須啟用帳單（billing-and-pricing/pricing）；Serper `/places` 欄位 title／address／phoneNumber／website／rating／cid，範例中 phoneNumber 偶爾是地址 → C10.1 加電話格式驗證（`d`）。D18 維持，理由改為條款。
 
 **驗證**：
 - REALTEST_EVIDENCE: tool=Bash | cmd=python verify_paths.py（108 條、0 缺）; node build.mjs && node check.mjs（10 cards／43 items 綁定 §6、0 open、page fresh） | exit=0 | ms=88
