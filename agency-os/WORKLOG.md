@@ -1,4 +1,20 @@
 # Worklog
+## 2026-11-01（續8）Outbound OS v2：D22 個人消費者走 Meta 名單型廣告→FluentCRM，卡 C14
+
+**觸發**：操作者「所以我就沒辦法抓特定族群的 email 了？」→ 分店家／公司／公司裡的人（冷信，已有卡）與個人消費者（不走冷信）→ 操作者「加」。
+
+**決策 D22**：B2C 不走冷信；Meta 名單型廣告由操作者在廣告管理員建，系統只收名單、存同意（`form_submitted`、`meta_lead_ad:<form_id>`、`consent_at`）、同步 FluentCRM；`status='warm'` 永不進冷信序列；不買名單。
+
+**重用**：Meta webhook 端點含簽章驗證（`NA/app/api/webhooks/meta/route.ts:27-40`）、頁面 token `META_PAGE_TOKEN_<pageId>`（`lib/social/meta-webhook.ts:70-71`）、`findEnabledMetaAsset`（`lib/social/store.ts:85`）、`co_leads` consent 欄（`0048:115-119`）、C6 `upsertContact`。缺口：核准進 `co_leads` 不帶 consent（`leads/route.ts:110-126`）→ C14.1 補。
+
+**已修改**（`f735a2aa9`）：SPEC D22、§3 B2C 列、§5.10、§6 webhook 列、§7、§9（加買名單、對個人寄冷信）、§10、§11；R0-PLAN C14（3 項，parked，depends C6）、§5、§7；data.mjs C14 步驟、C6 waitFor 加「或開始跑名單型廣告」。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=python verify_paths.py（144 條、0 缺）; node build.mjs && node check.mjs（14 cards／59 items 綁定 §6、0 open、page fresh） | exit=0 | ms=86
+- REVIEW_WAIVED: DOC_ONLY -- 計畫增項；重用點逐一讀過原檔
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=leadgen | hits=0（repo 內無既有 leadgen 處理，C14.2 為首個；社群模組 parser 只認 feed／comments，不會誤吃）
+
+**下一步**：C1。建議模型：Opus 5.5（可派 Codex）。
 ## 2026-11-01（續7）Outbound OS v2：量產模型 300 封／天（信箱池、暖機、輪流、自動寄）＋名單擴到公司與個人
 
 **觸發**：操作者「一天 20 封太少」「為什麼刻意低」「要個人 email 與公司行號」→ 說明量從信箱數來、刻意低＝等觸發條件 → 操作者定 300／天、改計畫。
