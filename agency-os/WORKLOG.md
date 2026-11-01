@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-02（續2）migration 0152 sender_pool 套上正式庫（外聯系統 v2 卡 C11，程式 3eea12c73）
+
+**操作者**：「套 0152」。
+
+**做了**：先唯讀查正式庫（寄件信箱 1 列 `warmup_stage=new`、Gmail 連線 1 個、同組織同 email 無重複、`co_messages` 只有 1 封 drafted、PG 15.8＝測試版本），再 `node scripts/apply-db-migration.mjs 0152`。今晚 03:00 自動部署的 migration 閘不再擋這版。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=node scripts/apply-db-migration.mjs 0152 → APPLY_OK 1/1 | exit=0 | ms=16830
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql 查：awarewaveai@gmail.com 回填 full／draft／已連 connector；5 欄、co_send_claims＋6 索引、connector 唯一索引、3 函式、status CHECK 含 sending、anon 無 execute、co_recipient_cap_key('A@Gmail.com')=a@gmail.com／('x@acme.com.tw')=acme.com.tw、帳本有 0152 | exit=0 | ms=4595
+- REVIEW_WAIVED: NA -- 套用既有已審查的 migration（審查見 2026-11-01 續25），本次無程式改動
+- BUGHUNT_WAIVED: NA -- 無程式改動
+
+**剩**：正式機 `.env` 的 `OUTREACH_SYNC_TOKEN`＋`safe-infra-patch.sh compose` 套到 next-admin、`install-host-schedules.sh` 裝每日排程（皆 High）；C11.4 對真實次網域實跑等 C11.1。
+
+**rollback**：手動跑 `lobster-factory/packages/db/migrations/0152_sender_pool.down.sql`（先 revert next-admin；有 sending 中的信會拒絕）。
 ## 2026-11-02（續1）Mockup Studio 模特流程拆兩頁：【模特兒印製】生成含背景模特兒圖；主頁「模特」勾多張模特兒圖＋設計圖合成商品 Mockup
 
 **操作者**：截圖主頁模特設定（年齡層、族裔、性別、年齡、體型、妝造、飾品、姿勢、場景、光線、取景、情緒、道具、模型、比例）→「這些內容應該要移到【模特兒印製】, 然後直接生出 模特兒圖(含背景), 再回到主頁挑選 模特兒圖(含背景)多張+設計圖>>生成多張產品圖」；「主頁是真正生成合成 商品Mockup (模特兒身著設計圖衣服)」。
