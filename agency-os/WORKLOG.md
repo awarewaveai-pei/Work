@@ -1,4 +1,21 @@
 # Worklog
+## 2026-11-01（續14）Mockup Studio 真正的壞掉時間點：2026-06-23 checkpoint 拿掉合成圖＋改圖面板；改圖面板放回
+
+**操作者**：「為什麼突然壞掉？以前沒問題」。
+
+**訂正續13**：續13 寫「檔案建立時就如此」是錯的。`git log --all -S'src={gen.image'` → `ab72acb06`（2026-06-23 23:31，`[claude] checkpoint: auto-save dirty tree before AO-RESUME hook`，舊路徑 `app/tools/mockup/MockupStudio.tsx`）：加「設計圖永遠顯示」時，同一 hunk 刪掉 `<img src={gen.image}>` 與 `ImageEditPromptPanel`（用文字改合成圖）。之前可用，之後一直壞。
+
+**根因類別**：自動 checkpoint 把某 session 未審的半成品改動直接提交，沒有 commit message 說明、沒人審，功能被刪也看不出來。
+
+**做了**：`MockupStudio.tsx` 放回 `ImageEditPromptPanel`（done 時顯示，props 依現行介面；改圖結果取代 `gen.image`）。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/portal/__tests__/ app/api/tools/studio | exit=1 | ms=22390
+  - 68 過、2 敗；2 敗皆為他 session 未提交的 `app/(shell)/tools/seedstar/`（`??`）未登記產品，與本改動無關；door API 掃描（含 `/api/tools/studio/edit-prompt`）通過。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（自審：與 ab72acb06 刪除前的區塊逐行對照，只換 `prompt`→`effectivePrompt`）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/components | grep=ImageEditPromptPanel | hits=6
+- ORACLE_WAIVED: 放回 2026-06-23 前已上線的同一段 UI，無權限／資料面改動。
+- tsc：MockupStudio 零錯誤。
 ## 2026-11-01（續13）Mockup Studio「合成 Mockup」看似壞掉：成功的合成圖從未顯示在畫面上
 
 **操作者**：「https://app.aware-wave.com/tools/mockup 工具壞掉，無法生成 MOCKUP 圖片」。

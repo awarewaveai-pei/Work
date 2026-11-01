@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
 import {
   STUDIO_MODEL_OPTIONS,
   type AspectRatio,
@@ -1129,6 +1130,24 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
                 <button className="btn-secondary" onClick={() => void generate()}>再合成一張</button>
                 {mode === "model" && <button className="btn-secondary" onClick={() => void saveModelPreset()}>儲存為模特預設</button>}
                 {saveState === "error" && <span style={{ color: "var(--red)", fontSize: 12 }}>儲存失敗</span>}
+              </div>
+            )}
+            {/* Restored 2026-11-01: checkpoint ab72acb06 (2026-06-23) dropped this panel together with the result image. */}
+            {gen.status === "done" && gen.image && (
+              <div style={{ marginTop: 14 }}>
+                <ImageEditPromptPanel
+                  sourceImage={gen.image}
+                  currentPrompt={effectivePrompt}
+                  imageModel={model}
+                  target="mockup"
+                  aspectRatio={aspect}
+                  styleAnchor={{ model, mode: "image", stylePrompt: effectivePrompt, subject: `${mode} ${color}`, refs: designRef ? 1 : 0, target: "mockup" }}
+                  onEditedImage={(image, meta) => {
+                    setModel(meta.model);
+                    setGen({ status: "done", image });
+                    setSaveState("idle");
+                  }}
+                />
               </div>
             )}
           </>
