@@ -141,8 +141,23 @@ function bucketBase(accountId: string, bucket: string): string {
   return `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucket}`;
 }
 
-/** Keys keep their "/" separators; everything else is percent-encoded once. */
-function objectUrl(accountId: string, bucket: string, objectKey: string): string {
+/**
+ * A key the R2 API reaches only inside its own bucket. Keys keep their "/" separators in the request path, so a "." or
+ * ".." segment would be resolved by URL parsing into ANOTHER bucket of the account (2026-11-01: a designs-bucket url
+ * ending in ../../<private-bucket>/objects/<key> read the private site-watch bucket). Every get/put/delete checks this.
+ */
+export function isSafeObjectKey(objectKey: string): boolean {
+  if (!objectKey || objectKey.length > 1024) return false;
+  for (let i = 0; i < objectKey.length; i++) {
+    const c = objectKey.charCodeAt(i);
+    if (c < 32 || c === 92) return false; // control characters, backslash
+  }
+  return objectKey.split("/").every((seg) => seg !== "" && seg !== "." && seg !== "..");
+}
+
+/** Keys keep their "/" separators; everything else is percent-encoded once. null = unsafe key (isSafeObjectKey). */
+function objectUrl(accountId: string, bucket: string, objectKey: string): string | null {
+  if (!isSafeObjectKey(objectKey)) return null;
   return `${bucketBase(accountId, bucket)}/objects/${encodeURIComponent(objectKey).replace(/%2F/g, "/")}`;
 }
 
@@ -155,9 +170,11 @@ export async function r2PutObject(
 ): Promise<{ ok: true } | R2Fail> {
   const cred = r2Credentials();
   if (!cred) return { ok: false, error: "r2_not_configured" };
+  const url = objectUrl(cred.accountId, bucket, objectKey);
+  if (!url) return { ok: false, error: "r2_bad_key" };
   let res: Response;
   try {
-    res = await fetch(objectUrl(cred.accountId, bucket, objectKey), {
+    res = await fetch(url, {
       method: "PUT",
       headers: { Authorization: `Bearer ${cred.apiToken}`, "Content-Type": contentType },
       body: new Uint8Array(body),
@@ -176,9 +193,11 @@ export async function r2GetObject(
 ): Promise<{ ok: true; body: Buffer; contentType: string } | R2Fail> {
   const cred = r2Credentials();
   if (!cred) return { ok: false, error: "r2_not_configured" };
+  const url = objectUrl(cred.accountId, bucket, objectKey);
+  if (!url) return { ok: false, error: "r2_bad_key" };
   let res: Response;
   try {
-    res = await fetch(objectUrl(cred.accountId, bucket, objectKey), {
+    res = await fetch(url, {
       headers: { Authorization: `Bearer ${cred.apiToken}` },
       signal: AbortSignal.timeout(opts.timeoutMs ?? 30_000),
     });
@@ -199,9 +218,11 @@ export async function r2DeleteObject(
 ): Promise<{ ok: true } | R2Fail> {
   const cred = r2Credentials();
   if (!cred) return { ok: false, error: "r2_not_configured" };
+  const url = objectUrl(cred.accountId, bucket, objectKey);
+  if (!url) return { ok: false, error: "r2_bad_key" };
   let res: Response;
   try {
-    res = await fetch(objectUrl(cred.accountId, bucket, objectKey), {
+    res = await fetch(url, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${cred.apiToken}` },
       signal: opts.timeoutMs ? AbortSignal.timeout(opts.timeoutMs) : undefined,
@@ -255,6 +276,24 @@ export async function r2ListObjects(
     cursor = j.result_info?.is_truncated ? j.result_info.cursor : undefined;
   } while (cursor);
   return { ok: true, objects };
+}
+
+const DESIGN_KEY_RE = /^(designs|web)\/\d{4}-\d{2}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(png|jpg|jpeg|webp)$/;
+
+/** Read one designs-bucket object named by its PUBLIC url, through the R2 API (no outbound fetch of a caller-given
+ *  url: the url only names a key after isDesignsAsset proves it is ours). */
+export async function getDesignObjectByUrl(
+  url: unknown,
+  maxBytes: number,
+): Promise<{ ok: true; body: Buffer; contentType: string } | { ok: false; error: string }> {
+  if (!isDesignsAsset(url)) return { ok: false, error: "not_a_designs_asset" };
+  const config = getR2Config();
+  if (!config) return { ok: false, error: "r2_not_configured" };
+  // Only the key shapes buildDesignKey / buildWebImageKey mint: nothing else of the bucket is addressable this way.
+  const objectKey = url.slice(config.publicBase.length + 1).split(/[?#]/)[0];
+  if (!DESIGN_KEY_RE.test(objectKey)) return { ok: false, error: "not_a_designs_asset" };
+  const r = await r2GetObject(config.bucket, objectKey, { maxBytes });
+  return "error" in r ? { ok: false, error: r.error } : r;
 }
 
 /** Delete one object from the designs bucket. Returns ok:true on success or 404 (already gone). */

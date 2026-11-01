@@ -5,6 +5,9 @@ import {
   isChestOccludingPose,
   productCategoryFromType,
   withIdentityReference,
+  buildModelSheetPrompt,
+  buildPlainPosePrompt,
+  MODEL_SHEET_ANGLES,
 } from "../mockup-prompt";
 
 describe("buildModelMockupPrompt", () => {
@@ -292,5 +295,27 @@ describe("mockup quality + appeal upgrades", () => {
     const happy = buildModelMockupPrompt({ ...modelBase, emotion: "big-laugh" });
     expect(happy).toContain("facial expression shows");
     expect(happy).toContain("laughing");
+  });
+});
+
+describe("model library prompts (plain garments for code printing)", () => {
+  it("each sheet angle asks for its own angle on a blank garment", () => {
+    const prompts = MODEL_SHEET_ANGLES.map((a) =>
+      buildModelSheetPrompt({ role: a.role, modelDescription: "East Asian woman, 20s", ageGroup: "adult", color: "white" }));
+    expect(new Set(prompts).size).toBe(4);
+    for (const [i, p] of prompts.entries()) {
+      expect(p).toContain(MODEL_SHEET_ANGLES[i].phrase);
+      expect(p).toContain("NO print");
+      expect(p).toContain("East Asian woman, 20s");
+    }
+  });
+
+  it("a pose prompt leads with the pose, names every reference as the same person and never asks for a print", () => {
+    const p = buildPlainPosePrompt({ pose: "leaning", scene: "studio-white", lighting: "window", color: "black" });
+    expect(p.startsWith("POSE (most important")).toBe(true);
+    expect(p).toContain("leaning casually against a wall");
+    expect(p).toContain("ALL reference images show the SAME person");
+    expect(p).toContain("a plain black");
+    expect(p).not.toContain("printed");
   });
 });

@@ -721,3 +721,69 @@ export function buildModelMockupPrompt(p: ModelMockupParams): string {
     PRO_QUALITY
   );
 }
+
+// ── Model library: photos made to be printed on in code (lib/studio/fabric-print.ts) ──────────────────────────────
+// Every photo here shows a PLAIN garment: code prints the design later, so the AI must never draw one.
+
+/** The four angles a new model is generated in; they are its identity references from then on. */
+export const MODEL_SHEET_ANGLES = [
+  { role: "face-front", label: "正面", phrase: "facing the camera straight on, shoulders square to the lens" },
+  { role: "face-left", label: "左斜側", phrase: "body and face turned about 45 degrees towards the camera's left" },
+  { role: "face-right", label: "右斜側", phrase: "body and face turned about 45 degrees towards the camera's right" },
+  { role: "face-profile", label: "側面", phrase: "in full side profile, facing the camera's left" },
+] as const;
+export type ModelSheetRole = (typeof MODEL_SHEET_ANGLES)[number]["role"];
+
+/** Sent with every request whose reference images are all photos of the model (no design among them). */
+export const SAME_PERSON_REFERENCES_CLAUSE =
+  "REFERENCE IMAGES: ALL reference images show the SAME person. Reproduce that exact person: identical face, " +
+  "facial features, hairstyle, hair colour, skin tone and body build. Take only the person's identity from the " +
+  "references — ignore their clothing, prints, accessories, pose, background and lighting.";
+
+function plainGarment(color: GarmentColor, garmentPhrase: string): string {
+  return `a plain ${color} ${garmentPhrase} with NO print, NO graphic, NO text and NO logo — completely blank ` +
+    "fabric with natural cotton texture and realistic folds; the chest stays visible and the arms do not cover it";
+}
+
+/** One angle of a new model's identity sheet: neutral, evenly lit, plain garment, nothing to distract. */
+export function buildModelSheetPrompt(p: {
+  role: ModelSheetRole;
+  modelDescription: string;
+  ageGroup: "adult" | "youth";
+  color: GarmentColor;
+  garmentPhrase?: string;
+}): string {
+  const angle = MODEL_SHEET_ANGLES.find((a) => a.role === p.role) ?? MODEL_SHEET_ANGLES[0];
+  const who = p.ageGroup === "youth" ? "A young person" : "An adult";
+  const desc = p.modelDescription.trim() ? ` (${p.modelDescription.trim()})` : "";
+  return (
+    `Model reference photo. ${who}${desc}, standing upright with a calm neutral expression, ${angle.phrase}. ` +
+    "Framed from the top of the head to the mid-thigh with breathing room above the head; the full face is visible. " +
+    `They wear ${plainGarment(p.color, p.garmentPhrase ?? "unisex crewneck t-shirt")}. ` +
+    "Plain light-grey seamless studio backdrop, soft even studio lighting, no props, no sunglasses, no hat." +
+    PRO_QUALITY
+  );
+}
+
+/** A new pose of a saved model, plain garment. The pose leads the prompt: placed later, the 2026-11-01 trial ignored it. */
+export function buildPlainPosePrompt(p: {
+  pose: string;
+  scene: string;
+  lighting: string;
+  framing?: string;
+  color: GarmentColor;
+  garmentPhrase?: string;
+}): string {
+  const pose = find(MODEL_POSES, p.pose);
+  const scene = find(MODEL_SCENES, p.scene);
+  const lighting = find(MODEL_LIGHTING, p.lighting);
+  const framing = find(MODEL_FRAMING, p.framing ?? "three-quarter");
+  return (
+    `POSE (most important, follow it exactly): the person is ${pose.phrase}. Do not default to a straight, ` +
+    "camera-facing stance unless that is the pose. " +
+    `${SAME_PERSON_REFERENCES_CLAUSE} ${framing.phrase} ` +
+    `Photorealistic lifestyle photo in ${scene.phrase}, ${lighting.phrase}. ` +
+    `They wear ${plainGarment(p.color, p.garmentPhrase ?? "unisex crewneck t-shirt")}. No sunglasses.` +
+    PRO_QUALITY
+  );
+}

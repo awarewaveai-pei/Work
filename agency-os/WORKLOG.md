@@ -1,4 +1,36 @@
 # Worklog
+## 2026-11-01（續18）Mockup Studio「模特兒印製」：模特兒圖庫（AI 建一次）＋程式把設計印到素色姿勢照（免費、隨皺褶）；migration 0151 補回 preset domain；R2 跨 bucket 路徑穿越關閉
+
+**操作者**：要固定模特兒、男女多位、不同姿勢＋同一設計圖合成；看完試驗後「圖案都沒有隨衣服的皺褶 這是最大的敗筆」→「改用程式印」。計畫 `agency-os/docs/operations/MOCKUP_FIXED_MODEL_PLAN.md`（頂端「與下文不同處」為準）。
+
+**根因／發現**：
+- C1 正式庫 `media_assets_asset_domain_check` 缺 `mockup_model_preset`／`mockup_product_preset`：`0067_media_assets_real_footage.sql:3-19` 重建 CHECK 時漏掉 0045 的值 → 自 2026-09 起所有 preset 儲存 `insert_failed`（psql：preset 0 列）；且 R2 先上傳後寫表，每次失敗留孤兒物件。
+- C2 AI 印花不隨皺褶：nano-banana-2／pro 試印皆平貼方塊（`D:/tmp/mockup-2026-11-01/fold-3way.jpg`）；程式置換貼圖有效。
+- C3（critic 抓到，未上線前修掉）`getDesignObjectByUrl` 由公開 URL 推 key，`../` 經 `objectUrl` 保留 `/` 後被 URL 解析成**其他 bucket**（可讀私有 site-watch 截圖，客戶 operator 可觸發）。
+
+**做了**：
+- `packages/db/migrations/0151_media_assets_presets_restore.sql`（＋`.down.sql`、`scripts/…_down.sql`，down 先 `lock table` 再檢查 preset 列）：CHECK = 0067 四值＋兩個 preset 值，`not valid`。已套正式庫。
+- `lib/db/__tests__/asset-domain-check.test.ts`：程式提到的 domain（曾被允許的字面值＋`asset_domain:` 直接寫入值）必須在最新 CHECK；突變對照：去掉 0151 會紅。
+- `lib/storage/r2.ts`：`isSafeObjectKey`（拒 `.`／`..`／空段／控制字元／反斜線）由 `objectUrl` 套到所有 get/put/delete；`getDesignObjectByUrl` 只收 `buildDesignKey`／`buildWebImageKey` 產生的 key 形狀。
+- `lib/studio/fabric-print.ts`：`layoutPrint`、`compositeOnFabric`（褶皺梯度置換＋布料明暗相乘＋紗紋；模糊用三遍 box blur，O(1)/px）。
+- `POST /api/tools/studio/fabric-print`：照片限已存 designs 物件；`limitInputPixels 25M`；最長邊 2048、印花區 ≤1.5M px；行程內一次一張；設計圖依 EXIF 轉正。登記 `registry-code.test.ts` ORG_FREE_ROUTES（只讀公開 bucket、無 DB）。studio 門已含 `/api/tools/studio` 前綴，`products.ts` 未改。
+- `/api/tools/presets`：`modelKey`／`photoRole`／`garmentColor`／`printBox` 白名單寫入 metadata；`PATCH ?id=` 改印花框（同 org、客戶只改自己的）；寫表失敗刪已上傳物件；`LIST_LIMIT` 50→500。
+- `lib/studio/mockup-prompt.ts`：`MODEL_SHEET_ANGLES`、`buildModelSheetPrompt`（4 角度素色）、`buildPlainPosePrompt`（姿勢放最前、所有參考圖同一人、無印花）。
+- 畫面：新模式「模特兒印製」`app/(shell)/tools/mockup/ModelLibraryStudio.tsx`（跨模特兒勾選照片→印上設計→存 My Designs；管理：拖框印花位置、AI 加姿勢照多選、上傳自拍照、整位刪除；建立新模特兒 4 角度）。`MockupStudio.tsx`：`aiMode` 旗標取代 `mode !== "printful"`（三舊模式行為不變）、舊固定模特兒清單改一位一格、圖庫刪照片同步清 `fixedModel`。
+- 文件：`MEDIA_STORAGE_BOUNDARY_CONTRACT.md`、`lib/design/MODULE_MANIFEST.json`、`designs/route.ts` 過時註解。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=node scripts/apply-db-migration.mjs 0151 → APPLY_OK；psql 查 CHECK 含 6 值、schema_migrations 有 0151 | exit=0 | ms=15000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsx compositeOnFabric 於真實照片 casual-plain.png（0.5 s，與 Python 原型一致）；最壞 1.5 Mpx 印花 405 ms | exit=0 | ms=405
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/db/__tests__/asset-domain-check.test.ts lib/storage app/api/tools/presets app/api/tools/studio lib/studio lib/portal/__tests__ → 256 passed，2 failed 皆為他 session 未提交 `app/(shell)/tools/seedstar/`（`??`） | exit=1 | ms=60000
+- 突變：PATCH 擁有權守衛、key 形狀守衛、dot-segment 守衛各拔一次 → 指名測試變紅，還原變綠。
+- REVIEW_DONE: critic=Standard | verdict=fail→fixed | findings=1c/2m/8n（C、M1 CPU、M2 像素上限、m 框貼邊、m 存檔失敗圖保留、m fixedModel 同步、m decode 例外、m 設計圖 EXIF、m domain 測試涵蓋新值、m designScale 皆修；未修：PATCH 讀後寫競態（單一 UI 呼叫）、500 上限 model/product 共用）
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（db-expert 審 0151：可套用；down 檢查空窗已修）
+- BUGHUNT_DONE: scope=agency-os/docs,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib,lobster-factory/packages/db,lobster-factory/docs | grep=asset_domain | hits=92
+- ORACLE_WAIVED: Codex 額度 1%（操作者：「若不夠就自我審查」）；以 critic Standard 審查＋三道守衛突變證據替代。
+- `npx tsc --noEmit` 乾淨。畫面需操作者登入實測（今晚 03:00 自動部署）。試驗花費約 NT$15（Replicate 7 張）；試驗用 R2 物件已全刪。
+
+**剩餘風險**：長相一致性靠參考圖，非 100%；印花外框仍是直線（內部隨皺褶）；需操作者每張照片框一次印花位置。
 ## 2026-11-01（續17）外聯系統 v2 卡 C10：找名單（Serper 地圖一次 ≤20 家進收件匣）、跨收件匣＋名單去重複、核准不重建
 
 **操作者**：「外聯系統 v2 卡 C10 … 完成＝C10.1–C10.2 全 done、真查一次、commit」。

@@ -20,10 +20,13 @@
 
 ## Required invariants
 - `media_assets.storage_backend` only allows `r2` or `wp_uploads`.
-- `media_assets.asset_domain` only allows:
+- `media_assets.asset_domain` only allows (latest CHECK: migration 0151):
   - `ai_generated`
   - `wp_product`
   - `wp_blog`
+  - `real_footage` (0067)
+  - `mockup_model_preset`, `mockup_product_preset` (0045; dropped by 0067, restored by 0151)
+  - A migration that rebuilds this CHECK must start from this list; `next-admin/lib/db/__tests__/asset-domain-check.test.ts` fails when a value the code names is missing.
 - Every write operation must include `trace_id` and actor context.
 
 ## Operational checks

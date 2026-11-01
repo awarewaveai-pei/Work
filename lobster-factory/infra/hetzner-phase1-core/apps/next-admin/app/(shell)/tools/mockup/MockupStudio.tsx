@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
+import ModelLibraryStudio, { groupModels, type LibraryPhoto } from "./ModelLibraryStudio";
 import {
   STUDIO_MODEL_OPTIONS,
   type AspectRatio,
@@ -65,15 +66,8 @@ interface DesignAsset {
   metadata: { prompt?: string | null } | null;
 }
 
-interface PresetAsset {
-  id: string;
-  object_url: string | null;
-  asset_domain: "mockup_model_preset" | "mockup_product_preset";
-  metadata: {
-    preset_name?: string | null;
-    preset_settings?: Record<string, string> | null;
-  } | null;
-}
+// One shape for every saved preset row, so the 模特兒印製 library and the single-photo fixed model share one list.
+type PresetAsset = LibraryPhoto;
 
 interface MockupView {
   url: string;
@@ -257,7 +251,8 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
   const [designRef, setDesignRef] = useState<string | null>(null);
   const [designThumb, setDesignThumb] = useState<string | null>(null);
   // mode + shared
-  const [mode, setMode] = useState<MockupMode | "printful">("model");
+  const [mode, setMode] = useState<MockupMode | "printful" | "library">("model");
+  const aiMode = mode === "model" || mode === "flat";
   const [color, setColor] = useState<GarmentColor>("white");
   const [model, setModel] = useState<StudioModel>("nano-banana-2");
   const [aspect, setAspect] = useState<AspectRatio>("2:3");
@@ -387,7 +382,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
   }, [categoryOverride, selectedFlatProductIds, catalog]);
 
   const prompt = useMemo(() => {
-    if (mode === "printful") return "";
+    if (!aiMode) return "";
     if (mode === "flat") {
       return buildFlatMockupPrompt({
         garmentPhrase: garmentPhraseFor(selectedFlatProductIds),
@@ -420,7 +415,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
       emotion: modelEmotion,
       placement,
     });
-  }, [mode, color, flatSurface, flatArrangement, flatLighting, flatProps,
+  }, [aiMode, mode, color, flatSurface, flatArrangement, flatLighting, flatProps,
       selectedFlatProductIds, selectedModelProductIds, garmentPhraseFor,
       ageGroup, modelDesc, pose, modelScene, modelLighting, modelProps,
       designSizePct, modelFraming, modelCategory, flatCategory, referenceKind,
@@ -688,14 +683,17 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
         <button className={fixedModel ? "btn-secondary" : "btn-primary"} style={{ width: 64, height: 80, fontSize: 11 }} onClick={() => setFixedModel(null)}>
           不固定
         </button>
-        {modelPresets.map((p) => {
-          const on = fixedModel?.id === p.id;
+        {/* One tile per model: a library model's front angle stands for it (its photos are managed in 模特兒印製). */}
+        {groupModels(modelPresets).map((m) => {
+          const p = m.photos.find((x) => x.metadata?.photo_role === "face-front") ?? m.photos[0];
+          const grouped = !!p.metadata?.model_key;
+          const on = !!fixedModel && m.photos.some((x) => x.id === fixedModel.id);
           return (
             <div key={p.id} style={{ position: "relative", cursor: "pointer" }} onClick={() => selectModel(p)} title={on ? "再點一次取消" : "固定這位模特兒"}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={p.object_url!} alt={p.metadata?.preset_name ?? p.id} style={{ width: 64, height: 80, objectFit: "cover", borderRadius: 4, background: "#111", ...selectStyle(on) }} />
               <div style={{ fontSize: 10, textAlign: "center", maxWidth: 64, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: on ? 700 : 400 }}>{p.metadata?.preset_name ?? "模特兒"}</div>
-              <button style={{ position: "absolute", top: 0, right: 0, fontSize: 9, background: "var(--red)", color: "var(--btn-primary-text)", border: "none", borderRadius: 2, cursor: "pointer", padding: "1px 3px" }} onClick={(e) => { e.stopPropagation(); if (window.confirm(`刪除模特兒「${p.metadata?.preset_name ?? ""}」？`)) void deletePreset(p.id, p.asset_domain); }}>✕</button>
+              {!grouped && <button style={{ position: "absolute", top: 0, right: 0, fontSize: 9, background: "var(--red)", color: "var(--btn-primary-text)", border: "none", borderRadius: 2, cursor: "pointer", padding: "1px 3px" }} onClick={(e) => { e.stopPropagation(); if (window.confirm(`刪除模特兒「${p.metadata?.preset_name ?? ""}」？`)) void deletePreset(p.id, p.asset_domain); }}>✕</button>}
             </div>
           );
         })}
@@ -779,11 +777,13 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
           <button className={mode === "model" ? "btn-primary" : "btn-secondary"} onClick={() => setMode("model")}>模特</button>
           <button className={mode === "flat" ? "btn-primary" : "btn-secondary"} onClick={() => setMode("flat")}>平拍</button>
           <button className={mode === "printful" ? "btn-primary" : "btn-secondary"} onClick={() => setMode("printful")}>Printful</button>
+          <button className={mode === "library" ? "btn-primary" : "btn-secondary"} onClick={() => setMode("library")}>模特兒印製</button>
         </div>
 
         {/* ── Shared shirt colour (all tabs). On Printful it picks the real White/Grey/Black
-              variant from Printful's data; on AI tabs it sets the garment colour in the prompt. ── */}
-        <div style={{ fontSize: 13 }}>
+              variant from Printful's data; on AI tabs it sets the garment colour in the prompt. The library's photos
+              carry their own colour, so it has none here. ── */}
+        {mode !== "library" && <div style={{ fontSize: 13 }}>
           顏色
           <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
             <button className={color === "white" ? "btn-primary" : "btn-secondary"} onClick={() => setColor("white")}>白</button>
@@ -795,7 +795,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
               對應 Printful 真實 variant（白=White、灰=Athletic Heather、黑=Black）
             </span>
           )}
-        </div>
+        </div>}
 
         {/* ═══════════════════ PRINTFUL TAB ═══════════════════ */}
         {mode === "printful" && (
@@ -1115,7 +1115,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
         )}
 
         {/* ── AI model + aspect (model + flat tabs) ── */}
-        {mode !== "printful" && (
+        {aiMode && (
           <>
             <label style={{ fontSize: 13 }}>
               模型（⟳ = 吃設計圖；首選 Nano Banana 2）
@@ -1149,7 +1149,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
 
       {/* ── Preview (left column, large) ─────────────────────── */}
       <div className="build-panel" style={{ gridColumn: 1, gridRow: 1, padding: 14 }}>
-        {mode !== "printful" && (
+        {aiMode && (
           <div style={{ marginBottom: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
               <span style={{ fontSize: 12, opacity: 0.6 }}>Prompt</span>
@@ -1166,7 +1166,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
           </div>
         )}
 
-        {mode !== "printful" && (
+        {aiMode && (
           <>
             {/* The composite takes the large slot once it exists; before that the selected design does.
                 Until 2026-11-01 the composite was never rendered at all, so a successful run looked broken. */}
@@ -1210,6 +1210,11 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
               </div>
             )}
           </>
+        )}
+
+        {mode === "library" && (
+          <ModelLibraryStudio designRef={designRef} photos={modelPresets} setPhotos={setModelPresets}
+            onDeleted={(id) => setFixedModel((m) => (m?.id === id ? null : m))} />
         )}
 
         {mode === "printful" && (

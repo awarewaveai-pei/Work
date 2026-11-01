@@ -409,7 +409,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "organizationId must be a uuid" }, { status: 400 });
   }
 
-  // 影片與圖片同屬 asset_domain="ai_generated"（DB CHECK 僅允許 ai_generated/wp_product/wp_blog），
+  // 影片與圖片同屬 asset_domain="ai_generated"（DB CHECK 見 0151，此路由只寫 ai_generated），
   // 用 mime_type 區分：?domain=ai_video → video/*；default → image/*。避免動 prod schema。
   const wantVideo = url.searchParams.get("domain") === "ai_video";
   const mimePrefix = wantVideo ? ("video/%" as const) : ("image/%" as const);
