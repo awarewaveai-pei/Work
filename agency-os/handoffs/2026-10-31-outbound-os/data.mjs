@@ -33,8 +33,9 @@ export const NOW = [
   { what: '一天寄得到 300 封而不傷主網域。', state: 'no', ev: '只有 1 個消費者 Gmail 信箱連線，上限 20 封。次網域、信箱池、暖機、輪流寄、自動寄都沒有；相關欄位存在但零呼叫點（0048:242-244）。' },
   { what: '研究、產信、建草稿不用你一筆一筆按。', state: 'no', ev: '三個動作都是按鈕觸發（ReviewClient.tsx:19-20）；300 封一天等於 600 次點擊。' },
   { what: '對方回信會進系統，後續信自動停。', state: 'no', ev: 'Replies 頁是空殼；草稿只存 draft id，沒存對話串 id（gmail-draft/route.ts:186）。' },
-  { what: '能從公司登記、徵才頁、公開簡介找到公司和人的 email。', state: 'no', ev: '只有手動匯入。店家搜尋（C10）、公司登記（C12）、人員搜尋與 email 推斷（C13）都還沒做。' },
-  { what: '找到店家後拿得到它的 email，寄之前知道對方網域收不收信。', state: 'yes', ev: '2026-11-01 C3：研究時從對方網站自動填 email（對方網域、mailto 或網站結構化資料裡的商家信箱），先查網域收不收信才填；別家的地址只列成候選給你看。實測自動填入 info@soulfulexpression.org。找店家本身（C10）還沒做。' },
+  { what: '輸入「找什麼＋地區」就自動找到一批店家放進名單。', state: 'yes', ev: '2026-11-01 C10：Inbox 頁「找名單」用 Serper 查地圖，一次最多 20 家（網站或社群頁、電話、地圖來源），沒網站也沒電話的不放；已在名單或收件匣裡的標成重複，同一家核准兩次只有一筆。每次最多約 NT$0.1。正式庫實測「瑜珈教室／台中市」兩次：第一次 20 家，第二次 17 家標重複。' },
+  { what: '能從公司登記、徵才頁、公開簡介找到公司和人的 email。', state: 'no', ev: '店家搜尋已有（C10），但多數店家沒 email，要再按「研究這家」從網站找。公司登記（C12）、人員搜尋與 email 推斷（C13）都還沒做。' },
+  { what: '找到店家後拿得到它的 email，寄之前知道對方網域收不收信。', state: 'yes', ev: '2026-11-01 C3：研究時從對方網站自動填 email（對方網域、mailto 或網站結構化資料裡的商家信箱），先查網域收不收信才填；別家的地址只列成候選給你看。實測自動填入 info@soulfulexpression.org。' },
   { what: '暖名單同步到 FluentCRM。', state: 'no', ev: 'wp-bridge 沒有 contact 端點（RestController.php:42-105），只能建電子報草稿。' },
   { what: '看得到回覆率、會議數、成交數。', state: 'no', ev: '外聯首頁是空殼。' },
   { what: 'Gmail 連線不會自己斷。', state: 'no', ev: '已經斷了：2026-11-01 對 Google 續期，回「已過期或被撤銷」（invalid_grant）。Google 專案仍在測試模式，授權每 7 天失效。你在 Google Cloud Console 按「發布應用程式」並在 Connectors 頁重連後才會恢復（C1.6）。' },
@@ -45,6 +46,7 @@ const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 const C1 = '306277bf2';
 const C2 = '766df3df3';
 const C3 = '25858b8b8';
+const C10 = '6397234f7';
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '守衛與事實訂正', plain: '例：名單上某人剛退訂，系統仍替他建草稿。改成建草稿前重查拒收名單。同時把「scope 不能寄信」這句不對的說法改正，用測試守住程式不呼叫寄信；順便把 Google 授權改成正式發布、加上讀信權限，之後 6 個新信箱只要授權一次。',
@@ -89,13 +91,13 @@ export const STEPS = [
       done('C3.7', '研究時順手從店家網站抓 email，填進名單並查核，不用 AI。', C3),
     ] },
   { n: 4, code: 'C10', group: 'C', title: '名單來源：店家', plain: '例：你輸入「台中 咖啡廳」，系統用現有的 Serper 帳號查地圖，找出 20 家，連網站與電話一起放進待處理名單；同一地區查第二次，已經在名單裡的會被標成重複。',
-    gate: '一次真查回 20 筆進待處理名單，每筆有名稱、網站或電話、來源網址。費用在畫面上。同一查詢跑兩次不會建出兩份名單。沒有 email 的，核准後由研究那步補。', risk: 'Low', model: 'Codex', status: 'not_started', depends: [],
+    gate: '一次真查回 20 筆進待處理名單，每筆有名稱、網站或電話、來源網址。費用在畫面上。同一查詢跑兩次不會建出兩份名單。沒有 email 的，核准後由研究那步補。', risk: 'Low', model: 'Codex', status: 'done', commit: C10, depends: [],
     decided: '用已經在付費使用的 Serper 查地圖。不用 Google Places API：它的條款不准把查到的店名、網站、電話存進自己的資料庫，而名單庫就是要存這些；資料也比較貴、要開帳單帳戶。它多出來的營業時間與評論，由研究那一步從店家網站取得。（規格 D18）',
     what: 'serper allowedPaths 加 /places；discover.ts 經 createProviderCall（預算＋限速）→ co_lead_inbox → normalize／suppression；dedup 改跨既有 inbox＋leads；核准改 upsert；Inbox 頁找名單表單',
     files: ['NA/lib/collect/net/providers.ts', 'NA/lib/outreach/discover.ts', 'NA/lib/outreach/connectors/router.ts', 'NA/app/api/outreach/inbox/route.ts', 'NA/app/api/outreach/leads/route.ts'],
     items: [
-      todo('C10.1', '用 Serper 查地圖，結果接進名單匯入；去重複改成跟既有名單比，核准時不重建。'),
-      todo('C10.2', 'Inbox 頁加找名單表單；測試與真查一次。'),
+      done('C10.1', '用 Serper 查地圖，結果接進名單匯入；去重複改成跟既有名單比，核准時不重建。', C10),
+      done('C10.2', 'Inbox 頁加找名單表單；測試與真查一次。', C10),
     ] },
   { n: 5, code: 'C11', group: 'C', title: '寄件信箱池：次網域、DNS、暖機', plain: '例：你買 3 個像品牌的次網域，每個開 2 個 Workspace 信箱，共 6 個，連上時確認它們屬於寄件池：系統自動寄、每天上限 50。系統每天檢查每個網域的 SPF、DKIM、DMARC，缺一就標黃並通知；新信箱照暖機階慢慢加量，要真的寄滿才升階，退信太多就自動暫停。',
     gate: '6 個信箱都連上系統並標為寄件池，每個網域三項 DNS 設定全綠。故意拿掉一項設定，隔天那個信箱標黃並收到通知，連兩天就暫停。一個信箱連續 5 天寄滿七成才升到下一階；退信率超過 3% 自動暫停，按「重新檢查並恢復」要兩項都過才恢復。兩個同網域信箱同時搶最後一個名額只有一個成功。', risk: 'High（C11.1 外部資產；migration 套正式站）', model: '你＋Codex', status: 'not_started', depends: ['C1'],

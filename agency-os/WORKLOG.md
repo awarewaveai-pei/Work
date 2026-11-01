@@ -1,4 +1,35 @@
 # Worklog
+## 2026-11-01（續17）外聯系統 v2 卡 C10：找名單（Serper 地圖一次 ≤20 家進收件匣）、跨收件匣＋名單去重複、核准不重建
+
+**操作者**：「外聯系統 v2 卡 C10 … 完成＝C10.1–C10.2 全 done、真查一次、commit」。
+
+**根因**：名單只能手動匯入；去重只比同一批（`NA/lib/outreach/normalize.ts` `flagDuplicatesInBatch`），核准一律 insert（`NA/app/api/outreach/leads/route.ts` 舊 :109）→ 同一家找到兩次＝兩列、核准兩次＝兩筆名單或 23505；平台網址（instagram.com/…）被當成「網域」去重鍵，所有用 IG 當網站的店互相誤判重複。
+
+**做了**：
+- C10.1 `NA/lib/collect/net/providers.ts` serper `allowedPaths` 加 `/places`；新檔 `NA/lib/outreach/discover.ts`（經 `createProviderCall`＋`outreach.discover` grant＋預算 3 次）：中文縣市→Google 英文地名；回應沒有 `uule`＝Google 沒定位地區（實測「台中市」「Taichung」都沒 uule、結果混到桃園）→ 422 `location_not_recognized`；電話只收像電話的值（Serper 會把評分 `4.6(8726)` 放在 phoneNumber）；平台網址進 `social_url`；沒網站、沒社群頁、沒電話的店跳過；最多 3 頁補滿 20。
+- C10.1 新檔 `NA/lib/outreach/existing-leads.ts`：`findExisting`（匯入：同 org 的 `co_lead_inbox`＋`co_leads` 以 email（不分大小寫）、自有網站 host、`source_url` 查，只查這些值不讀全表）、`findExistingLead`（核准：email → source_url → 名稱＋host → 名稱＋電話）。`inbox/route.ts` 每次匯入都標 `suspected_dup`；`leads/route.ts` 核准：已有→200 `existing:true` 不 insert；0149 email 唯一索引搶輸（23505）→回贏家那筆。
+- `normalize.ts`：`PLATFORM_HOSTS`／`isPlatformHost` 從 `research-extract.ts` 搬來（純函式、避免循環 import）、`ownHostOf`；`dedupKey` 不用平台 host。`products.ts` `quota("outreach.discover","找名單")`；`connectors/router.ts` places 槽位註解＝Serper；SPEC D18 記地區規則；outreach `MODULE_MANIFEST.json` 依賴。
+- C10.2 Inbox 頁「找名單」表單（找什麼、地區兩格），按鈕顯示每次最多約 NT$；完成後顯示用了幾次查詢、費用、跳過幾家；每列顯示電話、網站或社群頁、來源（只連 http(s)）。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsx c10-e2e.mts（真 inbox／leads route＋正式庫＋代理商 Serper key）「瑜珈教室／台中市」兩次：第 1 次 201 imported=20（跳過 3 家無聯絡方式、3 credits、NT$0.096），第 2 次 20 筆中 17 筆 suspected_dup（Google 排序會變，3 家新店）；非重複列無同一家兩筆；每列有名稱＋聯絡方式＋maps cid 來源；同一家兩次核准 → 201 後 200 existing、1 筆名單；測試列刪除後 0 殘留 | exit=0 | ms=58504
+- REALTEST_EVIDENCE: tool=Bash | cmd=node probe*.mjs 直打 Serper /places：每頁 10 家 1 credit、page 參數有效、position 每頁重算；「台中市」「Taichung」無 uule 且混入桃園結果；「Taipei City, Taiwan」「Xinyi District, Taipei City, Taiwan」「Hsinchu County, Taiwan」有 uule | exit=0 | ms=6000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit；npx vitest run app/api/outreach lib/outreach lib/collect lib/portal lib/entitlements lib/ai → outreach＋collect 182 綠（新：inbox discover 5、approve 3、existing-leads 2、pipeline 平台 host 1）；2 failed＝他 session 未追蹤 tools/seedstar（products registry） | exit=1 | ms=120000
+- REALTEST_EVIDENCE: tool=Bash | cmd=修正後重跑 c10-e2e.mts：第 1 次 20 筆、第 2 次 20/20 suspected_dup、核准兩次 1 筆名單、扣點紀錄 entitlement.usage owed=1 serper_credits=3（本機 shadow 不實扣）、0 殘留 | exit=0 | ms=60454
+- REALTEST_EVIDENCE: tool=Bash | cmd=c10-mutate.py 突變 8 守衛（分頁讀到底、含逗號 source_url 逐筆查、先預扣、查完結算、跨庫去重、核准回既有、23505 回贏家、平台 host 不當網域）各自紅→還原綠；verify-build-gates ALL PASSED | exit=0 | ms=27086
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/3m/0n（Codex gpt-6-sol `agency-os/reports/oracle/2026-11-01-partialreview-e5d2890b.md`：查既有名單受 PostgREST 1000 列上限截斷→keyset 分頁；含逗號的 source_url 被跳過→逐筆 eq；Serper 有記使用沒扣點→照 AI／圖片走 Grant.hold 預扣、依 Serper 回報 credits 結算；全修）
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n（修正部分書面自審，操作者 2026-11-01「CODEX 只剩1%, 若不夠 就自我審查」不跑第二輪：shadow／內部只記帳、錢包不足 402 不打 Serper、Serper 報錯退全額、地區拒絕扣已花 1 credit；n1 回應非 JSON 會少收一頁約 NT$0.03，接受）
+- ORACLE_WAIVED: 修正輪不送 Codex（操作者指示額度剩 1%）；第 1 輪 artifact 為 -Path 局部審查（工作目錄混有他 session 未提交檔），C10 全部檔案在範圍內＋8 項突變證據
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=isPlatformHost\|PLATFORM_HOSTS\|只鎖 `/search`\|Google Places API free credit | hits=1（SPEC D18「只鎖 /search」→ 改寫；isPlatformHost 呼叫點 research.ts、research.test.ts 改 import；舊 router 註解 0 殘留）
+
+**剩**：
+- 正式站畫面等今晚 03:00 自動部署。
+- 約一半店家（第一次真查 20 家有 11 家）網站是 FB／IG：研究不讀社群頁（D20），這些店沒有 email 來源，要等公司登記（C12）或人工。
+- Google 對同一查詢的排序會變，重查會帶進少量新店（不是重複）。
+
+- 監工台 C10 done（`data.mjs`，`node check.mjs` ok 20 done）。
+
+**rollback**：`git revert 6397234f7`；無 migration。
 ## 2026-11-01（續16）外聯系統 v2 卡 C3：研究 → 證據（只讀對方自家網站、原文逐字驗、事實數字否定星期要一致才自動核准、email 只取屬於對方的）、migration 0150 已套正式站、C16 自動化調校排入計畫
 
 **操作者**：「做 C3」；中途「好自動化系統 依你說的做, 安排進入PLAN 和監工台」→ C16＋SPEC D24（commit `56763eb65`）。
