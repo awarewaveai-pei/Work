@@ -225,14 +225,29 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
     if (p) setPhotos((prev) => [p, ...prev]);
   }
 
+  // Deletes are permanent (the R2 file and its row). Each goes through the server's WordPress reference check; its
+  // refusal reason is shown as is -- "刪除失敗，請重試" hid that a site could not be checked (2026-11-02).
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
   async function deletePhotos(list: LibraryPhoto[]): Promise<boolean> {
+    setDeleting(true); setMsg(null);
+    let failed = 0;
+    let reason = "";
     for (const p of list) {
       const res = await fetch(`/api/tools/presets?id=${p.id}`, { method: "DELETE" }).catch(() => null);
-      if (!res?.ok) { setMsg("刪除失敗，請重試"); return false; }
+      if (!res?.ok) {
+        failed++;
+        if (!reason) reason = res ? failureText(res, await readJson<{ error?: string }>(res)) : "網路錯誤";
+        continue;
+      }
       setPhotos((prev) => prev.filter((x) => x.id !== p.id));
+      setSelected((prev) => { const n = new Set(prev); n.delete(p.id); return n; });
     }
-    return true;
+    setDeleting(false);
+    if (failed) setMsg(`有 ${failed} 張沒有刪除：${reason}`);
+    return failed === 0;
   }
+  const selectedPhotos = photos.filter((p) => selected.has(p.id));
 
   // Print outline for the 主頁's free preview (the AI composite places the design itself).
   const [boxPhoto, setBoxPhoto] = useState<LibraryPhoto | null>(null);
@@ -356,8 +371,17 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
       <section style={section}>
         <div>
           <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>模特兒圖庫</h3>
-          <div style={{ fontSize: 12, opacity: 0.7 }}>點照片可框印花位置（只有主頁的「免費預覽」需要；AI 合成會自己找位置）。</div>
+          <div style={{ fontSize: 12, opacity: 0.7 }}>勾選照片可一次刪除；點照片可框印花位置（只有主頁的「免費預覽」需要；AI 合成會自己找位置）。</div>
         </div>
+        {selected.size > 0 && (
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button className="btn-secondary" style={{ color: "var(--red)" }} disabled={deleting}
+              onClick={() => { if (window.confirm(`永久刪除勾選的 ${selectedPhotos.length} 張照片？刪除後無法復原。`)) void deletePhotos(selectedPhotos); }}>
+              {deleting ? "刪除中…" : `永久刪除勾選的 ${selectedPhotos.length} 張`}
+            </button>
+            <button className="btn-secondary" disabled={deleting} onClick={() => setSelected(new Set())}>取消勾選</button>
+          </div>
+        )}
         {models.length === 0 && <p style={{ fontSize: 13, opacity: 0.6 }}>還沒有模特兒圖，先在上面生成。</p>}
         {models.map((m) => (
           <div key={m.key}>
@@ -366,9 +390,18 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
               {GENDER_LABEL[m.gender] && <span style={{ fontSize: 11, opacity: 0.7 }}>{GENDER_LABEL[m.gender]}</span>}
               <span style={{ fontSize: 11, opacity: 0.5 }}>{m.photos.length} 張</span>
               <button className="btn-secondary" style={{ fontSize: 11, padding: "1px 8px" }} onClick={() => { setUploadFor(m.key); uploadRef.current?.click(); }}>上傳照片</button>
-              <button className="btn-secondary" style={{ fontSize: 11, padding: "1px 8px", color: "var(--red)" }}
-                onClick={() => { if (window.confirm(`刪除模特兒「${m.name}」和他的 ${m.photos.length} 張照片？`)) void deletePhotos(m.photos); }}>
-                刪除
+              <button className="btn-secondary" style={{ fontSize: 11, padding: "1px 8px" }} disabled={deleting}
+                onClick={() => setSelected((prev) => {
+                  const n = new Set(prev);
+                  const all = m.photos.every((p) => n.has(p.id));
+                  for (const p of m.photos) { if (all) n.delete(p.id); else n.add(p.id); }
+                  return n;
+                })}>
+                {m.photos.every((p) => selected.has(p.id)) ? "取消全選" : "全選"}
+              </button>
+              <button className="btn-secondary" style={{ fontSize: 11, padding: "1px 8px", color: "var(--red)" }} disabled={deleting}
+                onClick={() => { if (window.confirm(`永久刪除模特兒「${m.name}」和他的 ${m.photos.length} 張照片？刪除後無法復原。`)) void deletePhotos(m.photos); }}>
+                刪除整位
               </button>
             </div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -376,8 +409,12 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
                 <div key={p.id} style={{ position: "relative", cursor: "pointer" }} onClick={() => { setBoxPhoto(p); setDraft(quadOf(p.metadata?.print_box ?? DEFAULT_BOX)); }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={p.object_url!} alt={m.name} style={{ ...thumb, border: boxPhoto?.id === p.id ? "2px solid var(--accent)" : "2px solid transparent" }} />
+                  <input type="checkbox" aria-label="勾選刪除" checked={selected.has(p.id)} disabled={deleting}
+                    style={{ position: "absolute", top: 4, left: 4, width: 18, height: 18, cursor: "pointer" }}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={() => setSelected((prev) => { const n = new Set(prev); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n; })} />
                   <button style={{ position: "absolute", top: 0, right: 0, fontSize: 9, background: "var(--red)", color: "var(--btn-primary-text)", border: "none", borderRadius: 2, cursor: "pointer", padding: "1px 3px" }}
-                    onClick={(e) => { e.stopPropagation(); if (window.confirm("刪除這張照片？")) void deletePhotos([p]); }}>✕</button>
+                    disabled={deleting} onClick={(e) => { e.stopPropagation(); if (window.confirm("永久刪除這張照片？刪除後無法復原。")) void deletePhotos([p]); }}>✕</button>
                   <div style={{ fontSize: 10, textAlign: "center" }}>
                     {p.metadata?.garment_color ? `${COLOR_LABEL[p.metadata.garment_color]}衣` : "照片"}{p.metadata?.print_box ? "・已框" : ""}
                   </div>

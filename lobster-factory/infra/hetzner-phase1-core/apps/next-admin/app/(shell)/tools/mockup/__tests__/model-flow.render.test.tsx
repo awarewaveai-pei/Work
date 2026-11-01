@@ -157,6 +157,22 @@ describe("【模特兒印製】: settings → 模特兒圖 → library", () => {
     expect(b.prompt).toContain("SAME person");
   });
 
+  it("several photos are deleted in one go; a refused delete shows the server's reason and keeps that photo", async () => {
+    const fetchMock = vi.fn(async (url: string) => url.endsWith("leo2")
+      ? new Response(JSON.stringify({ ok: false, error: "無法確認檔案是否仍被文章使用，未刪除（reference_scan_http_400:Soulful Expression）" }), { status: 502 })
+      : new Response(JSON.stringify({ ok: true })));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<Library initial={library} />);
+    for (const c of screen.getAllByRole("checkbox", { name: "勾選刪除" })) fireEvent.click(c);
+    fireEvent.click(screen.getByRole("button", { name: "永久刪除勾選的 3 張" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    expect(urls(fetchMock).every((u) => u.startsWith("/api/tools/presets?id=") && true)).toBe(true);
+    expect(fetchMock.mock.calls.every((c) => (c as unknown as [string, RequestInit])[1].method === "DELETE")).toBe(true);
+    await waitFor(() => expect(screen.getByText(/有 1 張沒有刪除：.*Soulful Expression/)).toBeTruthy());
+    expect(screen.getAllByRole("checkbox", { name: "勾選刪除" })).toHaveLength(1); // leo2 stays
+  });
+
   it("dragging a corner of a photo's outline saves a tilted quad with its bounding rectangle", async () => {
     const fetchMock = vi.fn(async (_u: string, init?: RequestInit) =>
       new Response(JSON.stringify({ ok: true, preset: { ...library[0], metadata: { ...library[0].metadata, print_box: JSON.parse(String(init?.body)).printBox } } })));

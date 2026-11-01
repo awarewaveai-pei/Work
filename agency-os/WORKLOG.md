@@ -1,4 +1,26 @@
 # Worklog
+## 2026-11-02（續7）模特兒圖庫刪不掉：Soulful 的 Wordfence 停用了應用程式密碼 → 刪除前的 WordPress 引用檢查失敗；圖庫改多選永久刪除；平拍拿掉 Ideogram Character
+
+**操作者**：截圖模特兒圖庫「無法刪除, 也要多選, 永久刪除」；「把Ideogram Character從平拍的選單也拿掉」。
+
+**根因（全部唯讀查證）**：
+- prod access.log：`DELETE /api/tools/presets?id=…` 17:25–17:26 共 4 次 502；app log `[presets] delete refused: reference_scan_http_400:Soulful Expression`。`lib/content/r2-delete-guard.ts:77-117` 刪任何已存圖前搜每個 active `wp_sites` 的 posts／pages（`status=any&context=edit`），查不到就拒刪（設計如此，fail-closed）。
+- 重現（容器內 node，憑證不印）：Soulful posts／pages → 400 `rest_forbidden_status`（不帶 status → 401 `rest_forbidden_context`）；AwareWave、E2E-Verify-0704 皆 200。`/wp/v2/users/me` → 401 `rest_not_logged_in`；REST index `authentication: []`。
+- `soulful-wp` 容器：`wp_is_application_passwords_available()` = 0（即使 X-Forwarded-Proto=https、is_ssl=1）；唯一掛在該 filter 的是 `__return_false`，來源 `wp-content/plugins/wordfence/lib/wordfenceClass.php:1329-1330`，條件 `wfConfig::get('loginSec_disableApplicationPasswords')` = `'1'`。站上仍存 8 組應用程式密碼，但 Wordfence 讓 WordPress 全部不認。
+- 影響面：所有經 `deleteUnreferencedAsset` 的刪除（模特兒圖、My Designs、影片）全數失敗；系統以 API 對 Soulful 發文／改文同樣不能登入。
+- **未修**：關掉 Wordfence「停用應用程式密碼」＝改客戶網站安全設定，交操作者決定（未動）。
+
+**做了**：
+- 【模特兒印製】圖庫：每張照片勾選框＋每位模特兒「全選」＋「永久刪除勾選的 N 張」；確認框明寫無法復原；刪除失敗顯示伺服器原因（如上 Soulful 訊息），不再只寫「請重試」；部分失敗時其餘照常刪、失敗的留下。
+- 平拍模型清單另排除 `ideogram-character`（它把唯一參考圖當角色臉，不是商品）。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=容器內 node 重現引用掃描（3 站×posts/pages×有無 status）＋ users/me＋REST index；soulful-wp php 讀 wp_is_application_passwords_available、$wp_filter 來源、wfConfig loginSec_disableApplicationPasswords | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（整套）→ 全綠除他 session 未提交 seedstar 2 敗；新測試：勾 3 張一次刪、1 張被拒時顯示「有 1 張沒有刪除：…Soulful Expression」且該張留下 | exit=1 | ms=200000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（自審：刪除仍走同一 API 與伺服器守衛，前端只改選取與訊息）
+- BUGHUNT_DONE: scope=agency-os/docs,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib | grep=reference_scan_http | hits=3
+- ORACLE_WAIVED: 前端選取＋訊息；伺服器守衛未改。
+- 未部署（今晚 03:00 自動）。Soulful 設定未改前，刪除仍會被拒（會顯示原因）。
 ## 2026-11-02（續6）Mockup：模特兒圖可放大；主頁模特合成可選模型（限可吃 2 張參考圖）；平拍拿掉不吃參考圖的模型
 
 **操作者**：「模特兒印製>>生成模特兒圖>>要可以點開放大看」；「模特>>模特兒和設計圖合成的生圖模型，除了【⚠ 此模型不吃參考圖…】之外的模型，都要在選單讓我選擇」；「平拍>>【⚠ 此模型不吃參考圖…】的模型取消，不要出現，因為沒意義」。

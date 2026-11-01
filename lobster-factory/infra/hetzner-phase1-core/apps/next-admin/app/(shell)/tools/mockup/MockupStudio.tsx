@@ -28,8 +28,9 @@ import {
 } from "@/lib/studio/mockup-prompt";
 
 
-// 平拍 sends the design as a reference image: a model that takes none would ignore it (operator, 2026-11-02).
-const MOCKUP_MODELS = STUDIO_MODEL_OPTIONS.filter((m) => m.maxRefs > 0);
+// 平拍 sends the design as a reference image: a model that takes none would ignore it, and Ideogram Character reads
+// its one reference as a character's face, not a product (operator, 2026-11-02).
+const MOCKUP_MODELS = STUDIO_MODEL_OPTIONS.filter((m) => m.maxRefs > 0 && m.value !== "ideogram-character");
 
 export interface CatalogProduct {
   id: number;
