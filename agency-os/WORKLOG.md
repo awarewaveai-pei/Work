@@ -1,4 +1,24 @@
 # Worklog
+## 2026-11-02（續3）外聯系統 v2 卡 C11：正式機裝 `OUTREACH_SYNC_TOKEN` 與每日寄件信箱健康檢查排程
+
+**操作者**：「裝 token 和排程」。
+
+**做了**：
+- 主機 `/root/lobster-phase1/.env` 追加 `OUTREACH_SYNC_TOKEN`（主機上 `openssl rand -hex 32` 產生，值未離開主機、未印出；原檔備份 `.env.bak-0152-*`）。
+- 主機 compose 的 next-admin `environment:` 加 `OUTREACH_SYNC_TOKEN: ${OUTREACH_SYNC_TOKEN:-}`（與 repo 3eea12c73 同一行），經 `safe-infra-patch.sh compose … next-admin` 套用：備份 `docker-compose.yml.bak.safe-patch-20261101-163257`、15 秒 healthy。
+- `install-host-schedules.sh` 裝 `/etc/cron.d/awarewave-schedules`：新增 `outreach_sender_health`（00:30 UTC），同時裝上 repo 早已提交、主機一直沒裝的 `billing_reconcile`（`PAYMENTS_WOO_SECRET` 未設時 route 回 `ok:true, enabled:false`，`app/api/internal/billing/reconcile/route.ts:24`，無副作用）。
+- route 本身要今晚 03:00 自動部署 3eea12c73 後才存在（現在 POST 回 404）；排程第一次在台灣 08:30，晚於部署。若部署失敗，該列會在排程頁變紅並經 schedule_alerts 通知。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=safe-infra-patch.sh compose /root/lobster-phase1/docker-compose.yml next-admin → PASS (15s) success | exit=0 | ms=32921
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-next-admin printenv OUTREACH_SYNC_TOKEN | wc -c → 64 | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=SSH | cmd=install-host-schedules.sh → installed 7, retired 0；--check → exit 0（in sync）；/etc/cron.d 含 outreach_sender_health＋billing_reconcile | exit=0 | ms=4233
+- REVIEW_WAIVED: NA -- 套用既有已審查的設定行（審查見 2026-11-01 續25），無程式改動
+- BUGHUNT_WAIVED: NA -- 無程式改動
+
+**剩**：明早確認 `/ops/schedules` 的「寄件信箱健康檢查」為綠（寄件池目前 0 個信箱，跑完 checked=0）；C11.4 真實次網域實跑等 C11.1。
+
+**rollback**：排程 `install-host-schedules.sh --rollback /root/lobster-phase1/.state/cron-backup-20261101T163438Z`；compose 用上述 `.bak.safe-patch-*` 經 safe-infra-patch 還原；`.env` 刪掉該行即可（route 未設 token 時一律 401）。
 ## 2026-11-02（續2）migration 0152 sender_pool 套上正式庫（外聯系統 v2 卡 C11，程式 3eea12c73）
 
 **操作者**：「套 0152」。
