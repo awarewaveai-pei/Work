@@ -80,6 +80,7 @@
 | D18 | 名單發現用 Serper `/places`（既有 `SERPER_API_KEY`），不用 Google Places API | 決定性原因是條款：Google Places 政策「不得預先抓取、快取或儲存 Places 內容，例外只有 place ID」（developers.google.com/maps/documentation/places/web-service/policies），名單庫要存名稱、網站、電話，等於違反；且需啟用帳單帳戶、含電話／網站的 SKU＝Text Search Enterprise $35／千次（免費 1,000／月）。Serper 回 title／address／phoneNumber／website／rating／cid，沒有營業時間與評論——那是研究（C3 爬網站）的事，不是找名單的事。Serper 已是 collect 預設供應商（`NA/lib/collect/net/providers.ts:76-89`），只鎖 `/search` 是因為沒有別的呼叫者；C10 就是那個呼叫者。換供應商＝`providers.ts` 一個 entry＋一個 parser（`:63-66` 註解） |
 | D20 | 名單對象三種：公司行號（經濟部商工登記開放資料）、公司裡的人（公司網站、徵才頁、搜尋引擎公開摘要＋email 推斷＋付費驗證）、個人（搜尋引擎已索引的公開簡介、對方自己的網站、操作者手動貼）。**不寫任何爬 IG／Facebook／LinkedIn 頁面的程式**。個人 email 蒐集依據＝個資法 §19 第 1 項第 7 款（一般可得之來源）；首次行銷附免費拒絕方式（§20 第 3 項）＝拒收句＋`List-Unsubscribe`；當事人拒絕即停（§20 第 2 項）＝suppression；資料來源告知（§9 第 1 項）由 Cold Gate 的 observation＋source_url 結構保證，當事人自行公開者免告知（§9 第 2 項第 2 款） | 商工登記 API `https://data.gcis.nat.gov.tw/od/data/api/<id>?$format=json&$filter=…&$top≤1000`：營業項目代碼表 `FCB90AB1-E382-45CE-8D4F-394861851E28`（依 `Business_Item` 列公司）→ 應用一 `5F64D864-61CB-4D0D-8AD9-492047CC1EA6`（`Company_Name`、`Business_Accounting_NO`、`Responsible_Name`、`Company_Location`、`Capital_Stock_Amount`）→ 應用三 `236EE382-4942-41A9-BD03-CA0709025E7C`（`Cmp_Business`）；來源 IP 白名單需申請、每日次數有上限但未公布數字（/od/rule）；政府資料開放授權第 1 版、須顯名（/main/terms）；個資法條文 law.moj.gov.tw pcode=I0050021（2026-11-01 讀）；平台條款禁爬＝違者連接器被封、整條線停 |
 | D21 | 第一階段目標 **300 封／天**（操作者 2026-11-01 定）＝3 個次網域 × 2 信箱 × 50。暖機表每信箱：第 1 週 10、第 2 週 20、第 3 週 35、第 4 週起 50（不超過 `daily_limit`）；不用暖機服務（假互動抬信譽，Google 寄件者規範反對）；全部信箱同一視窗台北 09–18 週一至五，tick 內平均分配加抖動；追蹤信固定用首封的信箱（同一對話串） | 回覆率 1–5% → 每天 3–15 封回信，Replies 頁一人可消化；300 以上＝再加網域與信箱，不改程式（I10） |
+| D22 | 個人消費者（B2C）不走冷信：他們自己留 email——Meta **名單型廣告**（操作者在廣告管理員建立、圈定族群；對方在 IG／FB 一鍵送出）→ 系統只做三件事：收名單（webhook 或 CSV）、存同意（`consent_status='form_submitted'`、`consent_source='meta_lead_ad:<form_id>'`、`consent_at`）、同步 FluentCRM 培養（C6 的 `upsertContact`）。這些 lead `status='warm'`，永不進冷信序列。不買名單 | 冷信寄陌生個人＝投訴率最高、回覆率最低；個資直接向當事人蒐集（§8 告知由 Meta 表單承擔）。既有資產：Meta webhook 端點含簽章驗證（`NA/app/api/webhooks/meta/route.ts:27-40`，`META_APP_SECRET`、`META_WEBHOOK_VERIFY_TOKEN`）、頁面 token `META_PAGE_TOKEN_<pageId>`（`NA/lib/social/meta-webhook.ts:70-71`）、頁面資產查找（`NA/lib/social/store.ts:85`）；`co_leads` 已有 `consent_status`／`consent_source`／`consent_at`（`0048:115-119`）與 `status='warm'`（`:106`）。需 App 權限 `leads_retrieval`＋頁面訂閱 `leadgen` 欄位；代操客戶的頁面若非操作者管理，要 App Review |
 
 ## 3. GPT 企業版 12 模組對照
 
@@ -96,6 +97,7 @@
 | 09 CRM & pipeline | 有 | `co_leads.status`＋timeline；不做 HubSpot |
 | 10 Analytics | 卡 C7 | 自己的表；無開信率 |
 | 11 Compliance & deliverability | 有＋卡 C1 | suppression、`List-Unsubscribe`、每日上限、寄前重查 |
+| — 個人消費者名單（B2C） | 卡 C14（parked） | Meta 名單型廣告 → `co_leads`（warm、form_submitted）→ FluentCRM（D22）；不走冷信 |
 | 12 API & automation | 有 | internal route＋cron；對外 REST 等「賣」模式 |
 
 ## 4. 資料模型增量（只列 delta；全表定義見 v1 §B）
@@ -156,6 +158,9 @@ Follow-ups 頁＝`next_followup_date ≤ 今天` ∧ `status='sent'` 的 lead＋
 ### 5.9 成效（C7）
 依 org × service_profile × `variant_label` × `angle`：generated（`co_messages`）、drafted、sent、bounced（`co_sending_events`）、replied、positive（`reply_type ∈ interested／pricing／more_info／case_study`）、meeting_booked、customer、lost（`co_leads.status`）。回覆率＝replied／sent；正向率＝positive／sent。無開信率。
 
+### 5.10 Meta 名單型廣告（C14）
+路徑一（先做，零 Meta 權限）：廣告管理員下載名單 CSV → Inbox「匯入 Meta 名單」：欄位對應（email、full_name、phone、created_time、form 名）寫入 `co_lead_inbox.raw_payload.consent={status:'form_submitted', source:'meta_lead_ad_csv:<form>', at}`；核准進 `co_leads` 時帶上三個 consent 欄與 `status='warm'`（`NA/app/api/outreach/leads/route.ts:110-126` 今天不帶 consent）。路徑二（自動）：既有 `/api/webhooks/meta` 的 POST 在簽章驗證後，把 `entry[].changes[].field==='leadgen'` 交給 `lib/outreach/meta-leads.ts`，其餘照舊給社群模組；`GET /<leadgen_id>?fields=field_data,created_time,form_id,ad_id,campaign_id`（頁面 token 由 `page_id` → `findEnabledMetaAsset('facebook_page', page_id)` → `META_PAGE_TOKEN_<pageId>`）→ `co_leads` upsert（冪等鍵 `source_url='meta:leadgen/<leadgen_id>'`）→ C6 `upsertContact`（tag `meta-lead-ad`、list 依品牌）→ timeline `lead_captured`。兩條路都不經 Cold Gate、不產冷信。
+
 ## 6. 排程與執行
 
 | 工作 | 頻率 | 跑在哪 | 登記 |
@@ -165,6 +170,7 @@ Follow-ups 頁＝`next_followup_date ≤ 今天` ∧ `status='sent'` 的 lead＋
 | 信箱池 DNS 與健康 | 每日 1 次 | cron → `/api/internal/outreach/sender-health`（§5.5；同 token 模式） | 同上；`outreach_sender_health` |
 | 追蹤到期 | 頁面讀時算 | — | — |
 | 成效 | 頁面讀時算 | — | — |
+| Meta 名單 webhook | 事件 | 既有 `/api/webhooks/meta`（簽章驗證）→ `lib/outreach/meta-leads.ts`（§5.10） | — |
 | n8n | — | 不在路徑 | — |
 
 ## 7. 安全與合規
@@ -176,7 +182,8 @@ Follow-ups 頁＝`next_followup_date ≤ 今天` ∧ `status='sent'` 的 lead＋
 - 同意：冷信＝`legitimate_interest`；只有 §5.8 四種 consent 才進 FluentCRM。
 - 退訂：內文拒收句＋`List-Unsubscribe` mailto；一鍵退訂（RFC 8058）要 HTTPS 端點，冷信人工低量用不到，不做。
 - 速率：每信箱暖機表（D21）、台北 09–18 視窗、任一信箱 `paused`／`blocked` 只停該信箱；Gmail API 拒收事件自動 `paused`＋推播。
-- 個資與平台條款：D20——只用搜尋引擎已索引、對方自有網站、商工登記、操作者手動貼的資料；不爬社群頁面；首信必含來源與免費拒絕方式。
+- 個資與平台條款：D20——只用搜尋引擎已索引、對方自有網站、商工登記、操作者手動貼的資料；不爬社群頁面；首信必含來源與免費拒絕方式。個人消費者只走 D22（Meta 表單自留、FluentCRM 培養）。
+- Meta 名單 webhook：沿用 `verifyMetaSignature`（`X-Hub-Signature-256`）；leadgen 事件只讀不回覆；頁面 token 只在環境變數。
 - 資料：`co_evidence`、`co_replies` 隨 lead cascade 刪除；無軟刪。
 
 ## 8. KPI
@@ -193,12 +200,12 @@ Follow-ups 頁＝`next_followup_date ≤ 今天` ∧ `status='sent'` 的 lead＋
 
 ## 9. 不做
 
-`brand_id`；job queue／Worker；CRM 六表；HubSpot；Microsoft Graph；NestJS；Redis／BullMQ；S3；視覺化流程編輯器；開信／點擊追蹤；LinkedIn／IG 自動化；Resend 寄冷信；SES；Apollo 級資料庫；PostHog 接外聯；n8n；ops-role 之外的角色；暖機服務（假互動）；爬 IG／Facebook／LinkedIn 頁面；調高單信箱上限換量；用 aware-wave.com 寄冷信。
+`brand_id`；job queue／Worker；CRM 六表；HubSpot；Microsoft Graph；NestJS；Redis／BullMQ；S3；視覺化流程編輯器；開信／點擊追蹤；LinkedIn／IG 自動化；Resend 寄冷信；SES；Apollo 級資料庫；PostHog 接外聯；n8n；ops-role 之外的角色；暖機服務（假互動）；爬 IG／Facebook／LinkedIn 頁面；調高單信箱上限換量；用 aware-wave.com 寄冷信；買名單；對個人消費者寄冷信。
 
 ## 10. 卡片與順序
 
-[R0-PLAN.md §6](../../handoffs/2026-10-31-outbound-os/R0-PLAN.md)：C1 守衛 → C2 信本身 → C3 研究＋C10 店家＋C11 信箱池（並行；C11.1 操作者先買網域、開 Workspace）→ C4 回信 → C8 自動寄＋輪流 → C12 公司登記＋C13 人員搜尋（並行）→ C5 追蹤＋C7 成效（並行）。Parked 附回頭條件：C6 暖名單（D16）、C9 舊欄位退場。
+[R0-PLAN.md §6](../../handoffs/2026-10-31-outbound-os/R0-PLAN.md)：C1 守衛 → C2 信本身 → C3 研究＋C10 店家＋C11 信箱池（並行；C11.1 操作者先買網域、開 Workspace）→ C4 回信 → C8 自動寄＋輪流 → C12 公司登記＋C13 人員搜尋（並行）→ C5 追蹤＋C7 成效（並行）。Parked 附回頭條件：C6 暖名單（D16）、C14 Meta 名單→FluentCRM（D22，等第一個名單型廣告）、C9 舊欄位退場。
 
 ## 11. 決定
 
-五項原待決已由規劃者決定（操作者 2026-11-01 授權）：D12 寄件信箱與署名、D13 Google 發布、D16 FluentCRM 目標、D17 auto、D18 名單來源；同日操作者定量產目標 300 封／天 → D21，名單擴到公司與個人 → D20。監工台 OPEN 為空；操作者要動手的事在卡片 C4.2、C11.1、C12.3。
+五項原待決已由規劃者決定（操作者 2026-11-01 授權）：D12 寄件信箱與署名、D13 Google 發布、D16 FluentCRM 目標、D17 auto、D18 名單來源；同日操作者定量產目標 300 封／天 → D21，名單擴到公司與個人 → D20；個人消費者改走 Meta 名單型廣告→FluentCRM → D22。監工台 OPEN 為空；操作者要動手的事在卡片 C4.2、C11.1、C12.3。

@@ -38,7 +38,7 @@
 
 ## 5. 建議方案
 
-B。順序：C1（守衛）→ C2（信本身）→ C3＋C10＋C11 並行（研究／店家／信箱池）→ C4（回信）→ C8（自動寄＋輪流）→ C12＋C13 並行（公司登記／人員搜尋）→ C5＋C7 並行（追蹤／成效）。C6、C9 parked，回頭條件在 SPEC D16 與 data.mjs `waitFor`。每張卡完成就能單獨上線，不等整套。
+B。順序：C1（守衛）→ C2（信本身）→ C3＋C10＋C11 並行（研究／店家／信箱池）→ C4（回信）→ C8（自動寄＋輪流）→ C12＋C13 並行（公司登記／人員搜尋）→ C5＋C7 並行（追蹤／成效）。C6、C14、C9 parked，回頭條件在 SPEC D16、D22 與 data.mjs `waitFor`。每張卡完成就能單獨上線，不等整套。
 
 ## 6. 實作計畫
 
@@ -156,6 +156,14 @@ B。順序：C1（守衛）→ C2（信本身）→ C3＋C10＋C11 並行（研�
 | C6.3 | 新路由 `NA/app/api/outreach/leads/sync-fluentcrm/route.ts`（POST `{leadId}`）：資格＝`consent_status ∈ {replied, opted_in, form_submitted, customer}` ∧ 非 suppression（marketing／all）；`NA/lib/crm/fluentcrm.ts` 加 `upsertContact(spec, {clientId})`（走 `bridgePost`，照 `createNewsletter` 寫法）；`clientId`＝該 org active `wp_sites.url` 的 host 對上 `NA/lib/payments/woo.ts:75-82` `rawBridgeEnv` 各站 base URL，對不到 422 `no_bridge`（SPEC D16）；成功寫 `fluentcrm_contact_id`、`fluentcrm_sync_status='synced'`、`fluentcrm_last_synced_at`、timeline；不合格 422 `not_eligible` |
 | C6.4 | Replies 頁「同步 FluentCRM」按鈕接上；測試：資格判斷四種 consent 與 suppression；REALTEST：對 staging WP 同步 1 個測試 lead → FluentCRM 出現 contact |
 
+### C14 個人消費者：Meta 名單型廣告 → FluentCRM
+
+| 卡號 | 做什麼 |
+|---|---|
+| C14.1 | Inbox 頁「匯入 Meta 名單 CSV」：欄位對應 email／full_name／phone／created_time／表單名 → `co_lead_inbox`（`source_type='meta_lead_ad_csv'`、`raw_payload.consent={status:'form_submitted', source:'meta_lead_ad_csv:<表單名>', at}`）；`NA/app/api/outreach/leads/route.ts:110-126` 核准進 `co_leads` 時帶 `consent_status`／`consent_source`／`consent_at`（讀 `raw_payload.consent`，沒有就維持今天的預設）與 `status='warm'`；走既有 normalize／dedup／suppression |
+| C14.2 | 新檔 `NA/lib/outreach/meta-leads.ts`：`handleLeadgenChanges(payload)` 取 `entry[].changes[]` 中 `field==='leadgen'`（`leadgen_id`、`page_id`、`form_id`、`created_time`）→ `findEnabledMetaAsset('facebook_page', page_id)`（`NA/lib/social/store.ts:85`）取品牌→org 與 `META_PAGE_TOKEN_<pageId>`（`NA/lib/social/meta-webhook.ts:70-71`）→ `GET /<leadgen_id>?fields=field_data,created_time,form_id,ad_id,campaign_id` → `co_leads` upsert（冪等鍵 `source_url='meta:leadgen/<leadgen_id>'`；`status='warm'`、三個 consent 欄）→ C6 `upsertContact`（tag `meta-lead-ad`）→ timeline `lead_captured`。`NA/app/api/webhooks/meta/route.ts:27-40` POST 在簽章驗證後先呼叫它，再把 payload 照舊交給 `processMetaWebhook`；社群模組既有測試 `route.test.ts` 必須不變 |
+| C14.3 | 操作者（High，外部設定）：App 加 `leads_retrieval` 權限；每個品牌頁面 `POST /<page_id>/subscribed_apps?subscribed_fields=leadgen`；代操客戶頁面非操作者管理時走 App Review。測試：假 leadgen payload → 一列 warm lead＋consent，重送同一 `leadgen_id` 不重複；REALTEST：Meta「名單廣告測試工具」送一筆 → 10 秒內 `co_leads` 出現且 FluentCRM 有該聯絡人 |
+
 ### C9 舊欄位退場（contract）
 
 | 卡號 | 做什麼 |
@@ -165,7 +173,7 @@ B。順序：C1（守衛）→ C2（信本身）→ C3＋C10＋C11 並行（研�
 
 ## 7. 驗證計畫（四動作）
 
-- 實測：每卡最後一項是 REALTEST（本機 dev 或部署後真跑）；C8、C11 用暖機中的真實次網域信箱；C12 等 GCIS 白名單核准；`.ts` 改動前 `npx tsc --noEmit`；migration 先本機 Supabase 套用再走 prod 閘。
+- 實測：每卡最後一項是 REALTEST（本機 dev 或部署後真跑）；C8、C11 用暖機中的真實次網域信箱；C12 等 GCIS 白名單核准；C14 用 Meta 名單廣告測試工具；`.ts` 改動前 `npx tsc --noEmit`；migration 先本機 Supabase 套用再走 prod 閘。
 - Review：Claude 寫的卡 `/codex-review`（每 commit 1 個，Standard）；Codex 寫的卡 `/claude-review`；auth／scope 改動（C4.2、C8）Deep。
 - 抓蟲：grep `observation`、`source_url`、`GMAIL_SCOPE`、`draft_created`、`next_followup_date`、`fluentcrm_sync_status` 的 call sites，scope `agency-os,scripts,lobster-factory,.claude`。
 - WORKLOG：每卡一條，四行機械證據；監工台 `data.mjs` 改狀態＋commit → `node build.mjs && node check.mjs` → 重新發布同一網址。

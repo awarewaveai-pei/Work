@@ -79,10 +79,10 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
   <h1>外聯系統 v2 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-11-01</span></p>
   <div class="bar" data-computed><i class="d" style="width:0%"></i><i class="g" style="width:0%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>0</span>／<span data-computed>13</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>0</span>／<span data-computed>14</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
-<p class="sub">冷信系統從「幫你把信寫出來」升級成「替你找到客戶」：AI 自己查對方並留下證據、信有主旨與署名、每封有兩個版本與追蹤信、多個次網域信箱輪流自動寄到一天 300 封、回信自動進系統並停止後續、名單來自店家、公司登記與公開簡介、看得到回覆與成交。共 <span data-computed>13</span> 張卡、<span data-computed>56</span> 項工作，已完成 <span data-computed>0</span> 項。</p>
+<p class="sub">冷信系統從「幫你把信寫出來」升級成「替你找到客戶」：AI 自己查對方並留下證據、信有主旨與署名、每封有兩個版本與追蹤信、多個次網域信箱輪流自動寄到一天 300 封、回信自動進系統並停止後續、名單來自店家、公司登記與公開簡介、看得到回覆與成交。共 <span data-computed>14</span> 張卡、<span data-computed>59</span> 項工作，已完成 <span data-computed>0</span> 項。</p>
 <section id="now"><h2>現況</h2><p class="lead">目前已做到與還沒做到的事（2026-11-01 查）。</p><ul class="yn"><li class="yes"><b>可以</b><span>匯入名單、打分數、產冷信、人工審核、在 Gmail 建草稿。<small>2026-10-14 在正式站建了 1 封繁中草稿，沒有寄出（WORKLOG 2026-10-14 續28）。</small></span></li><li class="no"><b>還不行</b><span>AI 自己去看對方的網站並留下有來源的證據。<small>觀察要人工填，只有一格（co_leads.observation）。研究引擎沒有接上。</small></span></li><li class="no"><b>還不行</b><span>信有主旨、有署名、用到品牌定位。<small>主旨固定是空的（messages/route.ts:209）；定位讀了沒用（:123）；沒有署名。</small></span></li><li class="no"><b>還不行</b><span>每封信有兩個版本可比、追蹤信有內容。<small>一次只寫一封（buildPrompt :48-66）；追蹤只存日期（followups/route.ts:6-8）。</small></span></li><li class="no"><b>還不行</b><span>一天寄得到 300 封而不傷主網域。<small>只有 1 個消費者 Gmail 信箱連線，上限 20 封。次網域、信箱池、暖機、輪流寄、自動寄都沒有；相關欄位存在但零呼叫點（0048:242-244）。</small></span></li><li class="no"><b>還不行</b><span>對方回信會進系統，後續信自動停。<small>Replies 頁是空殼；草稿只存 draft id，沒存對話串 id（gmail-draft/route.ts:186）。</small></span></li><li class="no"><b>還不行</b><span>能從公司登記、徵才頁、公開簡介找到公司和人的 email。<small>只有手動匯入。店家搜尋（C10）、公司登記（C12）、人員搜尋與 email 推斷（C13）都還沒做。</small></span></li><li class="no"><b>還不行</b><span>找到店家後拿得到它的 email，寄之前知道信箱存不存在。<small>沒有程式抓網站上的 email；匯入沒有 email、電話、社群就標無法聯絡（inbox/route.ts:37）；MX 查核只有名字沒程式；co_verified_emails 表零呼叫點。</small></span></li><li class="no"><b>還不行</b><span>暖名單同步到 FluentCRM。<small>wp-bridge 沒有 contact 端點（RestController.php:42-105），只能建電子報草稿。</small></span></li><li class="no"><b>還不行</b><span>看得到回覆率、會議數、成交數。<small>外聯首頁是空殼。</small></span></li><li class="no"><b>還不行</b><span>Gmail 連線不會自己斷。<small>Google 專案在測試模式，restricted scope 的 refresh token 每 7 天到期；10-14 連的是否仍活著，C1.4 查。</small></span></li></ul></section>
 
 <section id="steps"><h2>卡片與工作</h2><p class="lead">依編號進行。每張卡列出所有工作，勾選代表完成。同一組的卡修改不同檔案，可以同時進行。High 風險步驟經你同意才執行。</p><ol class="steps"><li class="step todo" id="C1">
@@ -235,11 +235,11 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
         <p><b>檔案：</b><code>NA/app/api/outreach/stats/route.ts</code> <code>NA/app/(shell)/outreach/page.tsx</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C7</code></p>
       </details>
-    </div></li><li class="grp">可同時進行：<a href="#C6">C6</a>、<a href="#C9">C9</a></li><li class="step todo" id="C6">
+    </div></li><li class="grp">可同時進行：<a href="#C6">C6</a>、<a href="#C14">C14</a>、<a href="#C9">C9</a></li><li class="step todo" id="C6">
     <div class="n">12</div>
     <div class="b">
       <p class="plain">例：對方回了信，你在 Replies 頁按「同步 FluentCRM」，他出現在該品牌 WordPress 的 FluentCRM 裡並掛上標籤。沒回過信、沒同意過的人按了也不會同步。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（客戶站外掛更新）</span><span class="who">負責：Opus 5.5</span><span class="who wait">等某個品牌有人回信，而且它的網站裝了 wp-bridge 和 FluentCRM</span></p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（客戶站外掛更新）</span><span class="who">負責：Opus 5.5</span><span class="who wait">等某個品牌有人回信或開始跑名單型廣告，而且它的網站裝了 wp-bridge 和 FluentCRM</span></p>
       <p class="donewhen"><b>完成的樣子：</b>對測試站同步 1 個測試名單，FluentCRM 出現該聯絡人與標籤。沒有同意依據的名單回 422。</p>
       <ul class="items"><li class="todo"><b>○</b><span><code>C6.1</code> wp-bridge 外掛加一個「新增／更新聯絡人」端點，只做這件事。</span></li><li class="todo"><b>○</b><span><code>C6.2</code> 外掛升版並發布到站上。</span></li><li class="todo"><b>○</b><span><code>C6.3</code> 同步的後端：先驗資格（回過信、填過表單、同意過、是客戶之一，且不在拒收名單），再呼叫外掛。</span></li><li class="todo"><b>○</b><span><code>C6.4</code> Replies 頁按鈕接上；測試與對測試站同步一次。</span></li></ul>
       <details><summary>工程細節：C6 暖名單進 FluentCRM</summary>
@@ -249,8 +249,22 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
         <p><b>檔案：</b><code>WPB/includes/Http/RestController.php</code> <code>WPB/includes/Crm/ContactUpserter.php</code> <code>NA/lib/crm/fluentcrm.ts</code> <code>NA/app/api/outreach/leads/sync-fluentcrm/route.ts</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C6</code></p>
       </details>
-    </div></li><li class="step todo" id="C9">
+    </div></li><li class="step todo" id="C14">
     <div class="n">13</div>
+    <div class="b">
+      <p class="plain">例：你在廣告管理員圈「台灣、對塔羅有興趣」投名單型廣告，對方在 IG 上一鍵留 email。系統收到後存成暖名單並記下同意依據，自動進該品牌的 FluentCRM 培養。這些人永遠不會收到冷信。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium（C14.3 外部設定）</span><span class="who">負責：Opus 5.5</span><span class="who wait">等你在 Meta 廣告管理員建立第一個名單型廣告</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>用 Meta 的名單廣告測試工具送一筆，10 秒內名單出現、帶同意依據，FluentCRM 也有這個聯絡人；同一筆重送不會重複。下載 CSV 匯入也能得到同樣結果。</p>
+      <ul class="items"><li class="todo"><b>○</b><span><code>C14.1</code> 匯入廣告管理員下載的名單 CSV，連同意依據一起存；核准後進名單時標為暖名單。</span></li><li class="todo"><b>○</b><span><code>C14.2</code> 自動接收：Meta 送來的名單事件經既有的簽章驗證後，抓回資料、存成暖名單、同步 FluentCRM；同一筆不重複。</span></li><li class="todo"><b>○</b><span><code>C14.3</code> 你動手：App 加名單權限、每個品牌頁面訂閱名單事件。測試與用 Meta 測試工具送一筆。</span></li></ul>
+      <details><summary>工程細節：C14 個人消費者：Meta 名單型廣告 → FluentCRM</summary>
+        <p>Inbox CSV 匯入帶 consent 進 raw_payload、核准時帶進 co_leads；meta-leads.ts 接既有 /api/webhooks/meta 的 leadgen 事件 → Graph 取 lead → co_leads warm → upsertContact → timeline</p>
+        <p><b>需先完成：</b><a href="#C6">C6</a></p>
+        <p><b>決定：</b>個人消費者不走冷信，讓他們自己留 email：Meta 名單型廣告由你在廣告管理員建立，系統只收名單、存同意、同步 FluentCRM。先做 CSV 匯入（不用 Meta 權限），再做自動接收。不買名單。（規格 D22）</p>
+        <p><b>檔案：</b><code>NA/app/api/outreach/leads/route.ts</code> <code>NA/lib/outreach/meta-leads.ts</code> <code>NA/app/api/webhooks/meta/route.ts</code></p>
+        <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C14</code></p>
+      </details>
+    </div></li><li class="step todo" id="C9">
+    <div class="n">14</div>
     <div class="b">
       <p class="plain">例：舊名單還是用那一格觀察。回填成證據列後，產信與評分只看證據，舊欄位不再寫入。</p>
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">負責：Codex</span><span class="who wait">等 100 個名單走過研究流程</span></p>
