@@ -1,14 +1,18 @@
 // Gmail per-org OAuth (task T10) — authorize URL, code↔token exchange, access-token refresh,
-// and draft creation via the Gmail REST API. Scope is gmail.compose ONLY (never gmail.send —
-// Phase 1 never auto-sends, see spec Cold Gate). Refresh tokens are the only thing persisted
-// (via lib/secret-vault.ts, keyed by connectorSecretRef(connectorAccountId)); access tokens are
-// always re-derived at call time, never cached — one fewer expiry-tracking bug class to own.
+// and draft creation via the Gmail REST API. Scopes: gmail.compose (drafts) + gmail.readonly (reply
+// sync, SPEC §5.6). gmail.compose itself permits drafts.send, so "nothing is sent while
+// send_mode='draft'" is guarded by code, not by scope: __tests__/never-sends.test.ts fails on any
+// send endpoint outside lib/outreach/send-adapter.ts (SPEC I3). Refresh tokens are the only thing
+// persisted (via lib/secret-vault.ts, keyed by connectorSecretRef(connectorAccountId)); access tokens
+// are always re-derived at call time, never cached — one fewer expiry-tracking bug class to own.
 import crypto from "node:crypto";
 
 const AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const GMAIL_API_BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
-export const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.compose";
+export const GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.compose", "https://www.googleapis.com/auth/gmail.readonly"] as const;
+/** The `scope` request parameter: space-separated per RFC 6749 §3.3. */
+export const GMAIL_SCOPE = GMAIL_SCOPES.join(" ");
 
 export interface GoogleTokens {
   access_token: string;
@@ -147,6 +151,9 @@ function wrapBase64(b64: string): string {
 export function buildRfc2822Message(opts: {
   from: string; to: string; subject: string | null; bodyText: string;
 }): string {
+  // RFC 2369 List-Unsubscribe: a free way to refuse further mail (個資法 §20 第 3 項), read by Gmail/Outlook
+  // as an unsubscribe affordance; the reply-sync (SPEC §5.6) treats a mail with subject "unsubscribe" as opt-out.
+  const fromAddress = /<([^>]+)>/.exec(opts.from)?.[1] ?? opts.from;
   const headers = [
     `From: ${opts.from}`,
     `To: ${opts.to}`,
@@ -154,6 +161,7 @@ export function buildRfc2822Message(opts: {
     `MIME-Version: 1.0`,
     `Content-Type: text/plain; charset="UTF-8"`,
     `Content-Transfer-Encoding: base64`,
+    `List-Unsubscribe: <mailto:${fromAddress}?subject=unsubscribe>`,
   ];
   if (opts.subject) {
     // RFC 2047 encode non-ASCII subjects (Traditional Chinese cold-email subjects are common here).

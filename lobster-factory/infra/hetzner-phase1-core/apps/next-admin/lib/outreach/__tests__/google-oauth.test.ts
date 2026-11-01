@@ -45,7 +45,7 @@ describe("signState / verifyState", () => {
 });
 
 describe("buildAuthorizeUrl", () => {
-  it("includes gmail.compose scope, offline access, and forced consent (so refresh_token is always issued)", () => {
+  it("includes the compose + readonly scopes, offline access, and forced consent (so refresh_token is always issued)", () => {
     const url = buildAuthorizeUrl({ clientId: "cid", redirectUri: "https://app.aware-wave.com/x", state: "s1" });
     const parsed = new URL(url);
     expect(parsed.origin + parsed.pathname).toBe("https://accounts.google.com/o/oauth2/v2/auth");
@@ -57,10 +57,13 @@ describe("buildAuthorizeUrl", () => {
     expect(parsed.searchParams.get("state")).toBe("s1");
   });
 
-  it("never requests gmail.send or any broader scope than compose", () => {
+  it("requests exactly gmail.compose and gmail.readonly (SPEC §5.6), nothing that could send or alter mail", () => {
     const url = buildAuthorizeUrl({ clientId: "cid", redirectUri: "https://x", state: "s" });
+    const scopes = new URL(url).searchParams.get("scope")!.split(" ").sort();
+    expect(scopes).toEqual(["https://www.googleapis.com/auth/gmail.compose", "https://www.googleapis.com/auth/gmail.readonly"]);
     expect(url).not.toContain("gmail.send");
     expect(url).not.toContain("gmail.modify");
+    expect(url).not.toContain("mail.google.com");
   });
 });
 
@@ -106,6 +109,14 @@ describe("buildRfc2822Message", () => {
   it("includes a Date header (RFC 5322 required field)", () => {
     const msg = buildRfc2822Message({ from: "a@x.com", to: "b@y.com", subject: null, bodyText: "hi" });
     expect(msg).toMatch(/^Date: /m);
+  });
+
+  it("carries an RFC 2369 List-Unsubscribe mailto that points at the From address", () => {
+    const plain = buildRfc2822Message({ from: "a@x.com", to: "b@y.com", subject: null, bodyText: "hi" });
+    expect(plain).toMatch(/^List-Unsubscribe: <mailto:a@x\.com\?subject=unsubscribe>$/m);
+    const named = buildRfc2822Message({ from: "Pei <pei@x.com>", to: "b@y.com", subject: null, bodyText: "hi" });
+    expect(named).toMatch(/^List-Unsubscribe: <mailto:pei@x\.com\?subject=unsubscribe>$/m);
+    expect(named.split("\r\n\r\n")[0]).not.toContain("Pei <pei@x.com>?subject");
   });
 });
 

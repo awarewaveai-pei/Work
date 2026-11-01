@@ -16,7 +16,6 @@
       ],
       "standalone": true,
       "status": "coming_soon",
-      "selfSignup": true,
       "features": [
         {
           "feature_key": "ai.draft_record",
@@ -2146,7 +2145,6 @@
       ],
       "standalone": false,
       "status": "coming_soon",
-      "selfSignup": false,
       "features": [
         {
           "feature_key": "collect.fetch",
@@ -2206,7 +2204,6 @@
       ],
       "standalone": false,
       "status": "coming_soon",
-      "selfSignup": false,
       "features": [
         {
           "feature_key": "content.article",
@@ -2335,7 +2332,6 @@
       ],
       "standalone": false,
       "status": "coming_soon",
-      "selfSignup": false,
       "features": [
         {
           "feature_key": "cs.intent",
@@ -2426,7 +2422,6 @@
       ],
       "standalone": false,
       "status": "coming_soon",
-      "selfSignup": false,
       "features": [
         {
           "feature_key": "design.edit",
@@ -2470,7 +2465,6 @@
       ],
       "standalone": true,
       "status": "coming_soon",
-      "selfSignup": true,
       "features": [],
       "accessChannels": [
         "ui"
@@ -2499,7 +2493,6 @@
       ],
       "standalone": false,
       "status": "coming_soon",
-      "selfSignup": false,
       "features": [
         {
           "feature_key": "outreach.draft",
@@ -2542,7 +2535,6 @@
       ],
       "standalone": true,
       "status": "coming_soon",
-      "selfSignup": false,
       "features": [
         {
           "feature_key": "social.rewrite",
@@ -2604,6 +2596,18 @@
         "page": "/studio",
         "api": [
           "/api/tools/studio"
+        ],
+        "nav": [
+          {
+            "path": "",
+            "name": "設計工作台",
+            "staff": "tools/studio"
+          },
+          {
+            "path": "works",
+            "name": "我的作品",
+            "staff": "tools/designs"
+          }
         ]
       },
       "loginSources": [
@@ -2611,7 +2615,6 @@
       ],
       "standalone": false,
       "status": "coming_soon",
-      "selfSignup": false,
       "features": [
         {
           "feature_key": "studio.image",
@@ -2685,6 +2688,18 @@
         "page": "/tarot",
         "api": [
           "/api/tools/tarot"
+        ],
+        "nav": [
+          {
+            "path": "",
+            "name": "塔羅工作台",
+            "staff": "tools/tarot"
+          },
+          {
+            "path": "works",
+            "name": "我的作品",
+            "staff": "tools/designs"
+          }
         ]
       },
       "loginSources": [
@@ -2692,7 +2707,6 @@
       ],
       "standalone": false,
       "status": "coming_soon",
-      "selfSignup": false,
       "features": [
         {
           "feature_key": "tarot.image",
@@ -2731,6 +2745,18 @@
         "api": [
           "/api/video",
           "/api/tools/script-forge"
+        ],
+        "nav": [
+          {
+            "path": "",
+            "name": "影片工作台",
+            "staff": "tools/video"
+          },
+          {
+            "path": "works",
+            "name": "我的作品",
+            "staff": "tools/designs"
+          }
         ]
       },
       "loginSources": [
@@ -2738,7 +2764,6 @@
       ],
       "standalone": false,
       "status": "coming_soon",
-      "selfSignup": false,
       "features": [
         {
           "feature_key": "video.script",

@@ -4,6 +4,7 @@ import { getOrgSupabaseWriteClient } from "@/lib/org-client";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { getSecret, connectorSecretRef } from "@/lib/secret-vault";
 import { buildRfc2822Message, createGmailDraft, refreshAccessToken, toBase64Url } from "@/lib/outreach/google-oauth";
+import { contactBlock } from "@/lib/outreach/contact-guard";
 
 // Cold Outreach — Gmail draft creation (task T10, acceptance: real draft via REALTEST, daily
 // limit enforced, draft-only — never sends). A dedicated route rather than messages/route.ts's
@@ -27,7 +28,7 @@ function todayStartUtcIso(): string {
   return new Date(`${dateStr}T00:00:00+08:00`).toISOString();
 }
 
-interface LeadRow { id: string; organization_id: string | null; email: string | null; }
+interface LeadRow { id: string; organization_id: string | null; name: string | null; email: string | null; website: string | null; do_not_contact: boolean; }
 interface MessageRow { id: string; organization_id: string | null; lead_id: string; subject: string | null; body: string; status: string; }
 interface ConnectorRow { id: string; organization_id: string | null; credentials_ref: string | null; is_enabled: boolean; }
 interface SenderRow { id: string; email: string; daily_limit: number; is_active: boolean; }
@@ -68,13 +69,23 @@ export async function POST(req: Request): Promise<Response> {
 
   const { data: leadData, error: leadErr } = await supabase
     .from("co_leads")
-    .select("id, organization_id, email")
+    .select("id, organization_id, name, email, website, do_not_contact")
     .eq("id", message.lead_id)
     .maybeSingle();
   if (leadErr) return NextResponse.json({ ok: false, error: leadErr.message }, { status: 500 });
   if (!leadData) return NextResponse.json({ ok: false, error: "lead not found" }, { status: 404 });
   const lead = leadData as LeadRow;
   if (!lead.email) return NextResponse.json({ ok: false, error: "lead has no email address" }, { status: 400 });
+
+  // SPEC I6: the lead was contactable when the message was generated; it may not be any more (opt-out, suppression,
+  // MX check since). Decided here, before any token work, by the same guard the auto-send path uses.
+  let blocked: Awaited<ReturnType<typeof contactBlock>>;
+  try {
+    blocked = await contactBlock(supabase, lead);
+  } catch (e) {
+    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "contact guard failed" }, { status: 500 });
+  }
+  if (blocked) return NextResponse.json({ ok: false, blocked: true, reason: blocked }, { status: 409 });
 
   // Connector lookup mirrors the AI-provider ladder in messages/route.ts POST: org-scoped row
   // first (client's own connected Gmail), else the agency's own (organization_id IS NULL) — the
@@ -163,7 +174,7 @@ export async function POST(req: Request): Promise<Response> {
 
   const raw = toBase64Url(buildRfc2822Message({
     from: sender.email,
-    to: lead.email,
+    to: lead.email.trim(),
     subject: message.subject,
     bodyText: message.body,
   }));

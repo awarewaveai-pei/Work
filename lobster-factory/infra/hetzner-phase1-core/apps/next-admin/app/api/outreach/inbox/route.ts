@@ -2,18 +2,13 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
 import { getOrgSupabaseWriteClient } from "@/lib/org-client";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
-import {
-  normalizeLead,
-  flagDuplicatesInBatch,
-  isSuppressed,
-  type RawLead,
-  type SuppressionRow,
-  type NormalizedLead,
-} from "@/lib/outreach/normalize";
+import { normalizeLead, flagDuplicatesInBatch, type RawLead, type NormalizedLead } from "@/lib/outreach/normalize";
+import { findSuppressed } from "@/lib/outreach/suppression";
 import { scoreLeadQuality, scoreContactability } from "@/lib/outreach/scoring";
+import { verifyEmails, type EmailStatus } from "@/lib/outreach/verify-email";
 
 // Cold Outreach — Lead Inbox import (task T5). Table: co_lead_inbox (migration 0048).
-// Pipeline: normalize → dedup (within batch) → suppression check → mechanical scoring → classify.
+// Pipeline: normalize → dedup (within batch) → suppression check → MX check (cached) → mechanical scoring → classify.
 // Writes ops-role gated; GET authed-only.
 
 export const runtime = "nodejs";
@@ -31,10 +26,13 @@ function classify(
   contactability: number,
   isDup: boolean,
   suppressed: boolean,
+  emailStatus: EmailStatus | null,
 ): string {
   if (suppressed) return "risky";
   if (isDup) return "suspected_dup";
-  if (!n.email && !n.phone && !n.social_url) return "no_contact";
+  // An address whose domain has no mail server (verify-email.ts) is not a contact channel.
+  const email = emailStatus === "invalid" ? null : n.email;
+  if (!email && !n.phone && !n.social_url) return "no_contact";
   if (quality < 50) return "needs_data";
   if (quality >= 70 && contactability >= 50) return "high_quality";
   return "pending";
@@ -90,27 +88,27 @@ export async function POST(req: Request): Promise<Response> {
   if (rawList.length === 0) return NextResponse.json({ ok: false, error: "leads[] or lead required" }, { status: 400 });
   if (rawList.length > MAX_BATCH) return NextResponse.json({ ok: false, error: `max ${MAX_BATCH} leads per import` }, { status: 413 });
 
-  // Suppression rows for this org (email/domain/global scope).
-  let suppression: SuppressionRow[] = [];
-  {
-    let sq = supabase.from("co_suppression_list").select("email, domain, scope").limit(5000);
-    if (organizationId) sq = sq.eq("organization_id", organizationId);
-    const { data } = await sq;
-    if (Array.isArray(data)) suppression = data as SuppressionRow[];
-  }
-
   const normalized = rawList.map(normalizeLead);
   const dupFlags = flagDuplicatesInBatch(normalized);
+  let suppressedFlags: boolean[];
+  try {
+    suppressedFlags = await findSuppressed(supabase, organizationId, normalized.map((n) => ({ email: n.email, website: n.website, name: n.normalized_name })));
+  } catch (e) {
+    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "suppression read failed" }, { status: 500 });
+  }
+  // One MX lookup per domain, cached when definitive in co_verified_emails: "unknown" = domain accepts mail, only a paid verifier writes "valid".
+  const verified = await verifyEmails(supabase, organizationId, normalized.flatMap((n) => (n.email ? [n.email] : [])));
 
   const rows = normalized.map((n, i) => {
     const isDup = dupFlags[i];
-    const suppressed = isSuppressed(n, suppression);
+    const suppressed = suppressedFlags[i];
+    const emailStatus = n.email ? (verified.get(n.email) ?? "unknown") : null;
     const scorable = {
       name: n.normalized_name,
       industry: n.normalized_industry,
       website: n.website,
       social_url: n.social_url,
-      email: n.email,
+      email: emailStatus === "invalid" ? null : n.email,   // an undeliverable address scores as no address
       phone: n.phone,
       contact_name: n.contact_name,
       contact_role: n.contact_role,
@@ -118,8 +116,8 @@ export async function POST(req: Request): Promise<Response> {
       source_url: n.source_url,
     };
     const quality = scoreLeadQuality(scorable, { isDuplicate: isDup });
-    const contactability = scoreContactability(scorable, { doNotContact: suppressed });
-    const inbox_status = classify(n, quality, contactability, isDup, suppressed);
+    const contactability = scoreContactability(scorable, { doNotContact: suppressed, emailVerified: emailStatus === "valid" });
+    const inbox_status = classify(n, quality, contactability, isDup, suppressed, emailStatus);
     return {
       organization_id: organizationId,
       raw_payload: rawList[i] as object,
@@ -136,7 +134,7 @@ export async function POST(req: Request): Promise<Response> {
       contactability_score: contactability,
       duplicate_score: isDup ? 100 : 0,
       inbox_status,
-      ai_notes: suppressed ? "suppression hit — do not contact" : null,
+      ai_notes: suppressed ? "suppression hit — do not contact" : emailStatus === "invalid" ? "email domain has no mail server (MX) — treated as no email" : null,
     };
   });
 

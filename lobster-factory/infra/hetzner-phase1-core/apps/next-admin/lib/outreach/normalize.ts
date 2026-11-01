@@ -82,17 +82,26 @@ export function dedupKey(n: NormalizedLead): string | null {
 export interface SuppressionRow {
   email?: string | null;
   domain?: string | null;
+  company_name?: string | null;
   scope?: string | null; // email | domain | company | campaign | global
 }
 
-/** True when this lead must NOT be contacted per the suppression list. */
-export function isSuppressed(n: NormalizedLead, rows: SuppressionRow[]): boolean {
-  const email = n.email;
-  const dom = domainOf(n.email) ?? domainOf(n.website);
+/** Who a suppression row is matched against: an address, a site, a company name. */
+export interface SuppressionSubject { email?: string | null; website?: string | null; name?: string | null }
+
+const fold = (v: string | null | undefined): string | null => (v && v.trim() ? v.trim().toLowerCase() : null);
+
+/** True when this lead must NOT be contacted per the suppression list. Both sides are folded here: callers store and
+ *  pass mixed case (co_leads.email is only trimmed on manual entry), so a match may never depend on who lowercased. */
+export function isSuppressed(n: SuppressionSubject, rows: SuppressionRow[]): boolean {
+  const email = fold(n.email);
+  const dom = domainOf(email) ?? domainOf(n.website ?? null);
+  const name = fold(n.name);
   for (const r of rows) {
     if (r.scope === "global") return true;
-    if (email && r.email && r.email.trim().toLowerCase() === email) return true;
-    if (dom && r.domain && r.domain.trim().toLowerCase().replace(/^www\./, "") === dom) return true;
+    if (email && fold(r.email) === email) return true;
+    if (dom && fold(r.domain)?.replace(/^www\./, "") === dom) return true;
+    if (r.scope === "company" && name && fold(r.company_name) === name) return true;
   }
   return false;
 }
