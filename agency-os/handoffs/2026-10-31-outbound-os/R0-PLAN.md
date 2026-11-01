@@ -7,6 +7,7 @@
 
 - 根本問題：冷信工具只做了中段（評分、寫信、審核、建草稿），頭（AI 自己看對方並留證據）與尾（回信進系統、追蹤信有內容、暖名單進 FluentCRM、看得到成效）沒接；信本身缺主旨、署名、定位、多版本。
 - 不變量：SPEC §0 I1–I9。一句：**冷信的工作是換到一個回覆；每個具體主張對得到證據；系統不寄（除非該帳號明示打開）；回信即停。**
+- 量產目標 300 封／天（操作者 2026-11-01，SPEC D21）：量從信箱數來——次網域信箱池、暖機表、輪流寄、自動寄；名單擴到公司行號與個人（D20）。
 - 操作者的三份輸入：GPT v1.0 草案（git `26bce3452` 原樣）、「研究引擎」補充、「企業版 12 模組」補充。願景全收；與現有架構相撞的技術棧不收（SPEC §2、§3）。
 
 ## 2. 現況分析
@@ -14,7 +15,7 @@
 - git log（核心檔）：`NA/app/api/outreach/messages/route.ts`、`NA/lib/outreach/cold-gate.ts` 最後四次 `e87de9225`（10-20 entitlements）、`0a5b3e7c4`（09-11 uuid guard）、`d146eff7b`（07-02 per-org）、`2fce1cd38`（06-29 IDOR）。文件搬移與草案入庫 `26bce3452`（10-31）。
 - 七步現況與證據：SPEC §1 表。摘要：步驟 0–5 可用（2026-10-14 正式站建 1 封草稿）；研究無；主旨空（`NA/app/api/outreach/messages/route.ts:209`）；定位未用（`:123`）；一封一版（`:48-66`）；草稿只存 draft id（`NA/app/api/outreach/messages/gmail-draft/route.ts:186`）、不重查拒收（`:65`）；追蹤只有日期（`NA/app/api/outreach/followups/route.ts:6-8`）；Replies／首頁／Drafts 是 stub。
 - 可重用資產：`lib/collect`（entity-dossier、provenance、Serper/Brave、budget）、`lib/ai`（gateway、cheap-json、登記表、成本）、`co_*` 12 表、Trigger 工人＋主機 cron、wp-bridge 簽章寫入。GPT 提的 41 表／job queue／CRM／ai-router／brand_id 全部對應到已存在的東西，SPEC §1、§2。
-- 兩個既有說法訂正：scope `gmail.compose` 允許 `drafts.send`，不寄的守衛是程式不是 scope（`MODULE_MANIFEST.json:22` 寫反）；冷信不買專用網域，走品牌 Workspace 信箱低量人工寄（deliverability §11）。
+- 兩個既有說法訂正：scope `gmail.compose` 允許 `drafts.send`，不寄的守衛是程式不是 scope（`MODULE_MANIFEST.json:22` 寫反）；冷信不用主網域 aware-wave.com；量產走次網域信箱池（SPEC D12、D21）——deliverability §11.1 寫「主信箱」的前提是低量，§11.2「stream 不混用」才是不變量。
 
 ## 3. 風險清單
 
@@ -27,6 +28,8 @@
 | R5 | `auto` 寄出重複寄或退訂後仍寄 | 狀態鎖 `drafted→sending`、寄前重查、逾時只對帳不重寄（C8.2） |
 | R6 | wp-bridge 外掛更新到客戶站 | C6.2 High，照 release 腳本 |
 | R7 | 規格膨脹 | SPEC ≤ 300 行；一事一處；卡只寫做法 |
+| R8 | 次網域、Workspace、GCIS 白名單＝外部資產，要操作者動手 | C11.1、C12.3 標 High；程式先做、資產到位才 REALTEST |
+| R9 | 個人 email＝個資；社群平台禁爬 | D20：只用搜尋引擎索引、對方自有網站、商工登記、手動貼；首信含來源與拒絕方式 |
 
 ## 4. 方案比較
 
@@ -35,7 +38,7 @@
 
 ## 5. 建議方案
 
-B。順序：C1（守衛）→ C2（信本身）→ C3＋C10 並行（研究／名單發現，不同檔）→ C4（回信）→ C5＋C7 並行（追蹤／成效）。C6、C8、C9 parked，回頭條件在 SPEC D16、D17 與 data.mjs `waitFor`。每張卡完成就能單獨上線，不等整套。
+B。順序：C1（守衛）→ C2（信本身）→ C3＋C10＋C11 並行（研究／店家／信箱池）→ C4（回信）→ C8（自動寄＋輪流）→ C12＋C13 並行（公司登記／人員搜尋）→ C5＋C7 並行（追蹤／成效）。C6、C9 parked，回頭條件在 SPEC D16 與 data.mjs `waitFor`。每張卡完成就能單獨上線，不等整套。
 
 ## 6. 實作計畫
 
@@ -72,6 +75,21 @@ B。順序：C1（守衛）→ C2（信本身）→ C3＋C10 並行（研究／�
 | C3.6 | 測試：sink 子字串驗證（假 doc、假 JSON）；REALTEST：本機對 1 個真實公開網站跑研究 → `co_evidence` ≥1 列且 excerpt 可在頁面原文找到 |
 | C3.7 | 同一 sink 的純程式段：每份 doc 從 `doc.raw.bytes`（HTML）抓 `mailto:` 與從 `doc.text` 抓 email（regex），排除圖檔名誤判，優先與 seed 網站同網域；lead `email` 為空才寫 `co_leads.email`，timeline `email_found{source_url}`；接著呼叫 C1.5 `verifyEmails` 寫 `co_verified_emails`。測試：mailto 優先、同網域優先、已有 email 不覆蓋；REALTEST：對 1 個真實店家網站跑研究 → `co_leads.email` 填入且在頁面找得到 |
 
+### C10 名單發現
+
+| 卡號 | 做什麼 |
+|---|---|
+| C10.1 | `NA/lib/collect/net/providers.ts:88` serper `allowedPaths` 加 `/places`（同段註解要求：有呼叫者才放寬）；新檔 `NA/lib/outreach/discover.ts`：經 `createProviderCall`（`NA/lib/collect/index.ts` 匯出，帶預算與限速）`POST /places {q:"<查詢字> <地區>", gl:"tw", hl:"zh-tw"}` → 先真打一次記下回應形狀寫進檔頭（照 `NA/lib/collect/search/drivers.ts:67` 慣例）→ 每筆 `{title, address, phoneNumber, website, cid}`（`phoneNumber` 有時是地址，只收符合 `^\+?[\d\s()-]{7,}$` 的值，其餘留空）→ `co_lead_inbox`（`source_type='serper_places'`、`source_url=https://maps.google.com/?cid=<cid>`），再走既有 normalize／dedup／suppression（`NA/app/api/outreach/inbox/route.ts`）；沒有 email 的候選核准進名單後由 C3.7 補；每次 ≤20 筆；`NA/lib/outreach/connectors/router.ts:34` 的 `places` 槽位 note 改為 Serper |
+| C10.2 | Inbox 頁「找名單」表單（查詢字、地區兩個輸入框），按鈕顯示每次查詢費用；測試：假回應 → 20 筆 inbox、重複的被標出；REALTEST：1 次真查 |
+
+### C11 寄件信箱池：次網域、DNS、暖機
+
+| 卡號 | 做什麼 |
+|---|---|
+| C11.1 | 操作者（High，外部資產）：買 3 個次網域；Workspace 加為次網域、每網域 2 個使用者；依 deliverability §12 設 SPF `v=spf1 include:_spf.google.com ~all`、DKIM（Workspace 產生的 `google._domainkey`）、DMARC 先 `p=none`，暖機第 4 週改 `p=quarantine`；每個信箱在 Connectors 頁連 Gmail（C4.2 的發布狀態先完成） |
+| C11.2 | 新檔 `NA/lib/outreach/sender-health.ts`：對每個 `stream_type='cold'` 信箱的網域 `node:dns/promises` `resolveTxt`（根 TXT 含 `v=spf1` 且含 `include:_spf.google.com`；`_dmarc.<domain>` 含 `v=DMARC1`）、`google._domainkey.<domain>` TXT 或 CNAME；寫 `dns_status={spf,dkim,dmarc,checked}`、`dns_checked_at`；缺項 → `health_status='warning'`＋timeline；連續 2 天缺 → `paused`；新路由 `NA/app/api/internal/outreach/sender-health/route.ts`（Bearer `OUTREACH_SYNC_TOKEN`）＋`HS/cron.d/awarewave-schedules` 每日一行＋`NA/lib/schedules/host-jobs.ts` 登記 `outreach_sender_health` |
+| C11.3 | 測試：DNS 假回應四情境（全有、缺 SPF、缺 DKIM、第 2 天仍缺）；REALTEST：對一個真實次網域跑一次 → 三燈正確 |
+
 ### C4 回覆同步與 Replies 頁
 
 | 卡號 | 做什麼 |
@@ -84,6 +102,33 @@ B。順序：C1（守衛）→ C2（信本身）→ C3＋C10 並行（研究／�
 | C4.6 | `NA/app/(shell)/outreach/replies/page.tsx` 取代 stub：全 org 列表（時間、lead、分類、原文摘要）；按鈕：產報價摘要（`output_type=proposal_summary`）、問正確窗口、加入拒收、同步 FluentCRM（C6 後啟用）、約到會議、成交、失去（各改 `co_leads.status`） |
 | C4.7 | 測試：假回應四情境（已寄、同串回信、新開一封的退訂信、`no_reply` 後回信）＋退信；同一 `gmail_message_id` 跑兩次只一列；REALTEST（部署後）：操作者寄 1 封給自己的另一信箱並回覆 → 10 分內 Replies 出現該列、lead 狀態 replied、follow-up 日期清空 |
 
+### C8 自動寄與輪流寄（量產）
+
+| 卡號 | 做什麼 |
+|---|---|
+| C8.1 | `DB/migrations/0152_sender_pool.sql`：`co_sender_accounts` 加 `send_mode text not null default 'draft' check (send_mode in ('draft','auto'))`、`daily_count_date date`、`warmup_started_at date`、`dns_status jsonb`、`dns_checked_at timestamptz`、`connector_id uuid references co_connector_accounts(id)`（以 email 回填既有列）；`co_messages.status` CHECK 加 `sending`；OAuth callback（`NA/app/api/outreach/connectors/gmail/oauth/callback/route.ts`）建 `co_sender_accounts` 時填 `connector_id`、`warmup_started_at=today`；down 兩處 |
+| C8.2 | 新檔 `NA/lib/outreach/sender-pool.ts`（純函式）：`warmupCap(account, today)`＝第 1／2／3／4+ 週 10／20／35／min(50, `daily_limit`)；`pickSender(accounts)`＝`is_active ∧ healthy` 中「今日已寄／今日上限」最低；`claimSlot(sb, accountId, today)`＝compare-and-set `daily_sent_count`／`daily_count_date`（0 列＝已滿或被搶先）。測試：週數邊界、輪流選最低、CAS 競爭只成功一次、跨日歸零 |
+| C8.3 | `NA/app/api/outreach/messages/gmail-draft/route.ts`：建草稿改用 `pickSender`（首封）或上一封 `co_sending_events.sender_account_id`（追蹤信，同串）；用該信箱的 `connector_id` 取 token；事件記 `sender_account_id`；取代今天 `.limit(1)` 挑 connector 的寫法 |
+| C8.4 | 新檔 `NA/lib/outreach/send-adapter.ts`（never-sends 測試唯一白名單）：`sendDraft(draftId)`＝`drafts.send`；只在信箱 `send_mode='auto'` ∧ `healthy` ∧ 台北 09–18 週一至五 ∧ tick 配額（剩餘上限／剩餘 tick，加 0–120 秒抖動）∧ 重查 I6（含 `co_verified_emails` 非 invalid）→ `claimSlot` → `UPDATE co_messages SET status='sending' WHERE id=$1 AND status='drafted'` → 寄 → `sent`；逾時／5xx 留 `sending`，gmail-sync 以 `SENT` label 對帳，30 分未對到 → `needs_edit`＋timeline；寄失敗不退名額；Gmail 4xx 配額／拒收 → 該信箱 `paused`＋timeline＋推播（`NA/lib/schedules/alerts.ts` 的通知出口） |
+| C8.5 | gmail-sync tick 末尾呼叫 send-adapter；Connectors 頁信箱池表每列：email、網域、DNS 三燈（C11）、暖機週、今日已寄／上限、健康、「系統寄出：關／開」（開要輸入 email 確認；SPEC D17 條件）；測試：同一封信兩次只寄一次、同帳號 19／20 兩封只寄一封、視窗外不寄、paused 不寄；REALTEST：一個暖機中的次網域信箱開 auto，1 封寄到自己另一信箱 |
+
+### C12 名單來源：公司行號（商工登記開放資料）
+
+| 卡號 | 做什麼 |
+|---|---|
+| C12.1 | 新檔 `NA/lib/outreach/sources/gcis.ts`：經 `createProviderCall`（`NA/lib/collect/net/providers.ts` 加 `gcis` entry：origin `https://data.gcis.nat.gov.tw`、無 key、`allowedPaths` 三個 API id）兩步：①營業項目代碼表 `FCB90AB1-E382-45CE-8D4F-394861851E28` `$filter=Business_Item eq '<代碼>'` 列公司；②應用一 `5F64D864-61CB-4D0D-8AD9-492047CC1EA6` `$filter=Business_Accounting_NO eq <統編>` 取 `Company_Name`、`Responsible_Name`、`Company_Location`、`Capital_Stock_Amount`；先真打一次記下回應形狀與每日上限寫進檔頭；縣市用 `Company_Location` 前綴在本地篩；每次 ≤100 筆 |
+| C12.2 | Inbox 頁「找公司」：營業項目用搜尋框＋可見的符合清單（不用下拉）、縣市按鈕；候選 → `co_lead_inbox`（`source_type='gcis'`、`source_url=https://findbiz.nat.gov.tw/fts/query/QueryBar/queryInit.do?<統編>`、`contact_name=Responsible_Name`、`contact_role='負責人'`、`industry=Cmp_Business`）；頁腳一句顯名聲明（政府資料開放授權第 1 版）；email 由 C3.7 從公司網站補 |
+| C12.3 | 操作者（High，外部申請）：向 GCIS 填 API 使用告知書，白名單 IP＝ks-aw-01 出口 `145.239.195.47`；測試：假回應；REALTEST：1 個代碼真查 → inbox 出現含負責人的公司 |
+
+### C13 名單來源：人員搜尋、email 推斷、付費驗證
+
+| 卡號 | 做什麼 |
+|---|---|
+| C13.1 | 新檔 `NA/lib/outreach/sources/people-search.ts`：Serper `/search`（已允許）查 `site:linkedin.com/in "<職稱>" "<公司或產業>" "<縣市>"`、`site:instagram.com "<關鍵字>" "@"`；**只取搜尋結果的 title／snippet／link**（搜尋引擎已公開索引），不抓社群頁面（SPEC D20）；候選 `{name, role, company, profile_url, snippet}` → `co_lead_inbox`（`source_type='search'`、`source_url=link`、`social_url=link`）；snippet 內的 email 直接填；每次 ≤20 筆、費用顯示 |
+| C13.2 | 新檔 `NA/lib/outreach/email-guess.ts`（純函式）：從同網域已知 email（C3.7、C12）推格式（first.last／first／f.last／last.first／firstlast），對有姓名英文拼法的候選人產生 ≤4 個候選；交 C1.5 `verifyEmails` 先篩 MX；再交 Hunter verifier（`NA/lib/outreach/connectors/router.ts:26` 槽位，BYO key 存 vault，`GET /v2/email-verifier`）只收 `deliverable` 寫 `co_leads.email`、`co_verified_emails(provider='hunter')`；Hunter `GET /v2/email-finder`（domain＋姓名）為第二路；沒有 key 只做 MX 並標 `unverified`；費用顯示 |
+| C13.3 | Inbox 頁「貼上個人資料」表單：name、email、profile URL、來源一句；走既有 normalize／dedup／suppression（`NA/app/api/outreach/inbox/route.ts`） |
+| C13.4 | 測試：推斷規則、Hunter 假回應（deliverable／risky／undeliverable）；REALTEST：1 個真實公司 2 位人員 → 候選進 inbox，驗證結果記 `co_verified_emails` |
+
 ### C5 追蹤信與人工步驟
 
 | 卡號 | 做什麼 |
@@ -94,6 +139,14 @@ B。順序：C1（守衛）→ C2（信本身）→ C3＋C10 並行（研究／�
 | C5.4 | `channel≠email` 的步驟（`co_messages.channel` ig_dm／linkedin／phone）在同頁顯示為待辦＋「完成」按鈕（寫 timeline，推進 `next_followup_date`）；本卡只顯示與完成，不產生這類步驟（SPEC §2 D9） |
 | C5.5 | 測試：In-Reply-To 組裝；REALTEST：本機建一封 followup 草稿 → Gmail 中出現在原 thread |
 
+### C7 成效頁
+
+| 卡號 | 做什麼 |
+|---|---|
+| C7.1 | 新路由 `NA/app/api/outreach/stats/route.ts`（GET `?organizationId&from&to`）：依 service_profile × variant_label × angle 計 generated／drafted／sent／bounced／replied／positive／meeting_booked／customer／lost（SPEC §5.9；SQL 聚合 `co_messages`、`co_sending_events`、`co_replies`、`co_leads`） |
+| C7.2 | `NA/app/(shell)/outreach/page.tsx` 取代 stub：一張表＋回覆率、正向回覆率；無開信率欄位；CSV 下載 |
+| C7.3 | 測試：聚合對假資料的計數；REALTEST：本機種 3 筆 lead 走到 replied → 表數字正確 |
+
 ### C6 暖名單進 FluentCRM
 
 | 卡號 | 做什麼 |
@@ -103,23 +156,6 @@ B。順序：C1（守衛）→ C2（信本身）→ C3＋C10 並行（研究／�
 | C6.3 | 新路由 `NA/app/api/outreach/leads/sync-fluentcrm/route.ts`（POST `{leadId}`）：資格＝`consent_status ∈ {replied, opted_in, form_submitted, customer}` ∧ 非 suppression（marketing／all）；`NA/lib/crm/fluentcrm.ts` 加 `upsertContact(spec, {clientId})`（走 `bridgePost`，照 `createNewsletter` 寫法）；`clientId`＝該 org active `wp_sites.url` 的 host 對上 `NA/lib/payments/woo.ts:75-82` `rawBridgeEnv` 各站 base URL，對不到 422 `no_bridge`（SPEC D16）；成功寫 `fluentcrm_contact_id`、`fluentcrm_sync_status='synced'`、`fluentcrm_last_synced_at`、timeline；不合格 422 `not_eligible` |
 | C6.4 | Replies 頁「同步 FluentCRM」按鈕接上；測試：資格判斷四種 consent 與 suppression；REALTEST：對 staging WP 同步 1 個測試 lead → FluentCRM 出現 contact |
 
-### C7 成效頁
-
-| 卡號 | 做什麼 |
-|---|---|
-| C7.1 | 新路由 `NA/app/api/outreach/stats/route.ts`（GET `?organizationId&from&to`）：依 service_profile × variant_label × angle 計 generated／drafted／sent／bounced／replied／positive／meeting_booked／customer／lost（SPEC §5.9；SQL 聚合 `co_messages`、`co_sending_events`、`co_replies`、`co_leads`） |
-| C7.2 | `NA/app/(shell)/outreach/page.tsx` 取代 stub：一張表＋回覆率、正向回覆率；無開信率欄位；CSV 下載 |
-| C7.3 | 測試：聚合對假資料的計數；REALTEST：本機種 3 筆 lead 走到 replied → 表數字正確 |
-
-### C8 系統寄出開關（send_mode）
-
-| 卡號 | 做什麼 |
-|---|---|
-| C8.1 | `DB/migrations/0152_send_mode.sql`：`co_sender_accounts.send_mode text not null default 'draft' check (send_mode in ('draft','auto'))`、`co_sender_accounts.daily_count_date date`；`co_messages.status` CHECK 加 `sending`；down 兩處 |
-| C8.2 | 新檔 `NA/lib/outreach/send-adapter.ts`（never-sends 測試唯一白名單）：`sendDraft(draftId)`＝`drafts.send`；只在 `send_mode='auto'` ∧ `health_status='healthy'` ∧ 台北 09–18 週一至五 ∧ 重查 I6 → **先佔名額**：讀 `daily_sent_count`／`daily_count_date`（`0048:242`），以 compare-and-set 寫回（日期是今天：`.update({daily_sent_count: n+1}).eq('id').eq('daily_sent_count', n).eq('daily_count_date', today)` 且 `n < daily_limit`；不是今天：設 `(1, today)` 並 `.eq` 舊值），0 列更新＝被別人搶先或已滿，不寄 → **再鎖信**：`UPDATE co_messages SET status='sending' WHERE id=$1 AND status='drafted'` → 寄 → `sent`；寄失敗不退名額（寧少不多）；逾時／5xx 留 `sending`，由 gmail-sync 以 `SENT` label 對帳，30 分未對到 → `needs_edit`＋timeline，永不盲目重寄 |
-| C8.3 | gmail-sync tick 末尾呼叫 send-adapter；Connectors 頁每個寄件帳號「系統寄出：關／開」按鈕，開需輸入帳號 email 確認；翻開＝High，每帳號一次（SPEC D17 回頭條件達成後） |
-| C8.4 | 測試：同一封信兩次呼叫只寄一次；同帳號已寄 19／上限 20 時兩封不同的信同時呼叫只寄一封；跨日歸零；視窗外不寄、paused 不寄；REALTEST：操作者自己的帳號開 auto、1 封寄到自己另一信箱 |
-
 ### C9 舊欄位退場（contract）
 
 | 卡號 | 做什麼 |
@@ -127,16 +163,9 @@ B。順序：C1（守衛）→ C2（信本身）→ C3＋C10 並行（研究／�
 | C9.1 | 回填腳本（冪等）：每個有 `observation+source_url` 且無 evidence 的 lead → 1 列 approved evidence（`created_by='backfill'`） |
 | C9.2 | `checkColdGate` 只看 evidence；inbox 匯入的 `observation` 寫成 evidence 列；`NA/lib/outreach/scoring.ts` 的 observation 加分改讀 evidence 數；欄位保留不刪 |
 
-### C10 名單發現
-
-| 卡號 | 做什麼 |
-|---|---|
-| C10.1 | `NA/lib/collect/net/providers.ts:88` serper `allowedPaths` 加 `/places`（同段註解要求：有呼叫者才放寬）；新檔 `NA/lib/outreach/discover.ts`：經 `createProviderCall`（`NA/lib/collect/index.ts` 匯出，帶預算與限速）`POST /places {q:"<查詢字> <地區>", gl:"tw", hl:"zh-tw"}` → 先真打一次記下回應形狀寫進檔頭（照 `NA/lib/collect/search/drivers.ts:67` 慣例）→ 每筆 `{title, address, phoneNumber, website, cid}`（`phoneNumber` 有時是地址，只收符合 `^\+?[\d\s()-]{7,}$` 的值，其餘留空）→ `co_lead_inbox`（`source_type='serper_places'`、`source_url=https://maps.google.com/?cid=<cid>`），再走既有 normalize／dedup／suppression（`NA/app/api/outreach/inbox/route.ts`）；沒有 email 的候選核准進名單後由 C3.7 補；每次 ≤20 筆；`NA/lib/outreach/connectors/router.ts:34` 的 `places` 槽位 note 改為 Serper |
-| C10.2 | Inbox 頁「找名單」表單（查詢字、地區兩個輸入框），按鈕顯示每次查詢費用；測試：假回應 → 20 筆 inbox、重複的被標出；REALTEST：1 次真查 |
-
 ## 7. 驗證計畫（四動作）
 
-- 實測：每卡最後一項是 REALTEST（本機 dev 或部署後真跑）；`.ts` 改動前 `npx tsc --noEmit`；migration 先本機 Supabase 套用再走 prod 閘。
+- 實測：每卡最後一項是 REALTEST（本機 dev 或部署後真跑）；C8、C11 用暖機中的真實次網域信箱；C12 等 GCIS 白名單核准；`.ts` 改動前 `npx tsc --noEmit`；migration 先本機 Supabase 套用再走 prod 閘。
 - Review：Claude 寫的卡 `/codex-review`（每 commit 1 個，Standard）；Codex 寫的卡 `/claude-review`；auth／scope 改動（C4.2、C8）Deep。
 - 抓蟲：grep `observation`、`source_url`、`GMAIL_SCOPE`、`draft_created`、`next_followup_date`、`fluentcrm_sync_status` 的 call sites，scope `agency-os,scripts,lobster-factory,.claude`。
 - WORKLOG：每卡一條，四行機械證據；監工台 `data.mjs` 改狀態＋commit → `node build.mjs && node check.mjs` → 重新發布同一網址。

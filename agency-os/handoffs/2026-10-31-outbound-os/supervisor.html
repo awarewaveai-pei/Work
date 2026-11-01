@@ -79,11 +79,11 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
   <h1>外聯系統 v2 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-11-01</span></p>
   <div class="bar" data-computed><i class="d" style="width:0%"></i><i class="g" style="width:0%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>0</span>／<span data-computed>10</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>0</span>／<span data-computed>13</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
-<p class="sub">冷信系統從「幫你把信寫出來」升級成「替你找到客戶」：AI 自己查對方並留下證據、信有主旨與署名、每封有兩個版本與追蹤信、回信自動進系統並停止後續、暖名單進 FluentCRM、看得到回覆與成交。共 <span data-computed>10</span> 張卡、<span data-computed>45</span> 項工作，已完成 <span data-computed>0</span> 項。</p>
-<section id="now"><h2>現況</h2><p class="lead">目前已做到與還沒做到的事（2026-10-31 查）。</p><ul class="yn"><li class="yes"><b>可以</b><span>匯入名單、打分數、產冷信、人工審核、在 Gmail 建草稿。<small>2026-10-14 在正式站建了 1 封繁中草稿，沒有寄出（WORKLOG 2026-10-14 續28）。</small></span></li><li class="no"><b>還不行</b><span>AI 自己去看對方的網站並留下有來源的證據。<small>觀察要人工填，只有一格（co_leads.observation）。研究引擎沒有接上。</small></span></li><li class="no"><b>還不行</b><span>信有主旨、有署名、用到品牌定位。<small>主旨固定是空的（messages/route.ts:209）；定位讀了沒用（:123）；沒有署名。</small></span></li><li class="no"><b>還不行</b><span>每封信有兩個版本可比、追蹤信有內容。<small>一次只寫一封（buildPrompt :48-66）；追蹤只存日期（followups/route.ts:6-8）。</small></span></li><li class="no"><b>還不行</b><span>對方回信會進系統，後續信自動停。<small>Replies 頁是空殼；草稿只存 draft id，沒存對話串 id（gmail-draft/route.ts:186）。</small></span></li><li class="no"><b>還不行</b><span>暖名單同步到 FluentCRM。<small>wp-bridge 沒有 contact 端點（RestController.php:42-105），只能建電子報草稿。</small></span></li><li class="no"><b>還不行</b><span>看得到回覆率、會議數、成交數。<small>外聯首頁是空殼。</small></span></li><li class="no"><b>還不行</b><span>找到店家後拿得到它的 email，寄之前知道信箱存不存在。<small>沒有程式抓網站上的 email；匯入沒有 email、電話、社群就標無法聯絡（inbox/route.ts:37）；MX 查核只有名字沒程式；co_verified_emails 表零呼叫點。</small></span></li><li class="no"><b>還不行</b><span>Gmail 連線不會自己斷。<small>Google 專案在測試模式，restricted scope 的 refresh token 每 7 天到期；10-14 連的是否仍活著，C1.4 查。</small></span></li></ul></section>
+<p class="sub">冷信系統從「幫你把信寫出來」升級成「替你找到客戶」：AI 自己查對方並留下證據、信有主旨與署名、每封有兩個版本與追蹤信、多個次網域信箱輪流自動寄到一天 300 封、回信自動進系統並停止後續、名單來自店家、公司登記與公開簡介、看得到回覆與成交。共 <span data-computed>13</span> 張卡、<span data-computed>56</span> 項工作，已完成 <span data-computed>0</span> 項。</p>
+<section id="now"><h2>現況</h2><p class="lead">目前已做到與還沒做到的事（2026-11-01 查）。</p><ul class="yn"><li class="yes"><b>可以</b><span>匯入名單、打分數、產冷信、人工審核、在 Gmail 建草稿。<small>2026-10-14 在正式站建了 1 封繁中草稿，沒有寄出（WORKLOG 2026-10-14 續28）。</small></span></li><li class="no"><b>還不行</b><span>AI 自己去看對方的網站並留下有來源的證據。<small>觀察要人工填，只有一格（co_leads.observation）。研究引擎沒有接上。</small></span></li><li class="no"><b>還不行</b><span>信有主旨、有署名、用到品牌定位。<small>主旨固定是空的（messages/route.ts:209）；定位讀了沒用（:123）；沒有署名。</small></span></li><li class="no"><b>還不行</b><span>每封信有兩個版本可比、追蹤信有內容。<small>一次只寫一封（buildPrompt :48-66）；追蹤只存日期（followups/route.ts:6-8）。</small></span></li><li class="no"><b>還不行</b><span>一天寄得到 300 封而不傷主網域。<small>只有 1 個消費者 Gmail 信箱連線，上限 20 封。次網域、信箱池、暖機、輪流寄、自動寄都沒有；相關欄位存在但零呼叫點（0048:242-244）。</small></span></li><li class="no"><b>還不行</b><span>對方回信會進系統，後續信自動停。<small>Replies 頁是空殼；草稿只存 draft id，沒存對話串 id（gmail-draft/route.ts:186）。</small></span></li><li class="no"><b>還不行</b><span>能從公司登記、徵才頁、公開簡介找到公司和人的 email。<small>只有手動匯入。店家搜尋（C10）、公司登記（C12）、人員搜尋與 email 推斷（C13）都還沒做。</small></span></li><li class="no"><b>還不行</b><span>找到店家後拿得到它的 email，寄之前知道信箱存不存在。<small>沒有程式抓網站上的 email；匯入沒有 email、電話、社群就標無法聯絡（inbox/route.ts:37）；MX 查核只有名字沒程式；co_verified_emails 表零呼叫點。</small></span></li><li class="no"><b>還不行</b><span>暖名單同步到 FluentCRM。<small>wp-bridge 沒有 contact 端點（RestController.php:42-105），只能建電子報草稿。</small></span></li><li class="no"><b>還不行</b><span>看得到回覆率、會議數、成交數。<small>外聯首頁是空殼。</small></span></li><li class="no"><b>還不行</b><span>Gmail 連線不會自己斷。<small>Google 專案在測試模式，restricted scope 的 refresh token 每 7 天到期；10-14 連的是否仍活著，C1.4 查。</small></span></li></ul></section>
 
 <section id="steps"><h2>卡片與工作</h2><p class="lead">依編號進行。每張卡列出所有工作，勾選代表完成。同一組的卡修改不同檔案，可以同時進行。High 風險步驟經你同意才執行。</p><ol class="steps"><li class="step todo" id="C1">
     <div class="n">1</div>
@@ -108,11 +108,11 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
       <details><summary>工程細節：C2 署名、定位、主旨、多版本、追蹤信內容</summary>
         <p>migration 0149 expand；brand-context.ts；generation-schema.ts（手寫守衛，無 zod）；messages/route.ts 寫 2＋N 列；Connectors 署名欄；Review A/B；刪 drafts stub</p>
         <p><b>需先完成：</b><a href="#C1">C1</a></p>
-        <p><b>決定：</b>AwareWave 用已連線的 awarewaveai@gmail.com 寄，先寄滿 50 封看回覆率，再決定要不要買 aware-wave.com 的 Workspace 信箱。不要在 Gmail 設「以 @aware-wave.com 寄出」，網域設定會把那種信當假冒隔離。Soulful 的信箱在 Hostinger 不是 Google，連接器連不上，它的冷信先不寄。署名預設是寄件人名稱加品牌名稱，網站那行你填一次。每天上限 20 封。（規格 D12）</p>
+        <p><b>決定：</b>AwareWave 的冷信從自有的次網域信箱池寄出；主網域 aware-wave.com 永遠不寄冷信，也不要在 Gmail 設「以 @aware-wave.com 寄出」，網域設定會把那種信當假冒隔離。代操客戶有 Google 信箱就連它；沒有（Soulful 在 Hostinger）就用池裡掛給它的信箱。已連線的 awarewaveai@gmail.com 只在暖機期間試寫。署名預設是寄件人名稱加品牌名稱，網站那行你填一次。（規格 D12）</p>
         <p><b>檔案：</b><code>DB/migrations/0149_outbound_v2_expand.sql</code> <code>NA/lib/outreach/brand-context.ts</code> <code>NA/lib/outreach/generation-schema.ts</code> <code>NA/app/api/outreach/messages/route.ts</code> <code>NA/app/(shell)/outreach/review/ReviewClient.tsx</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C2</code></p>
       </details>
-    </div></li><li class="grp">可同時進行：<a href="#C3">C3</a>、<a href="#C10">C10</a></li><li class="step todo" id="C3">
+    </div></li><li class="grp">可同時進行：<a href="#C3">C3</a>、<a href="#C10">C10</a>、<a href="#C11">C11</a></li><li class="step todo" id="C3">
     <div class="n">3</div>
     <div class="b">
       <p class="plain">例：你按「研究這家」，系統去看小森咖啡的網站與 IG，抓出「菜單照片光線偏暗」這類觀察，每條附來源網址、原文片段與時間。你按核准，信才會用到它。</p>
@@ -126,21 +126,35 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C3</code></p>
       </details>
     </div></li><li class="step todo" id="C10">
-    <div class="n">10</div>
+    <div class="n">4</div>
     <div class="b">
       <p class="plain">例：你輸入「台中 咖啡廳」，系統用現有的 Serper 帳號查地圖，找出 20 家，連網站與電話一起放進待處理名單。</p>
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Codex</span></p>
       <p class="donewhen"><b>完成的樣子：</b>一次真查回 20 筆進待處理名單，每筆有名稱、網站或電話、來源網址。費用在畫面上。沒有 email 的，核准後由研究那步補。</p>
       <ul class="items"><li class="todo"><b>○</b><span><code>C10.1</code> 用 Serper 查地圖，結果接進名單匯入，照樣去重複與比對拒收名單。</span></li><li class="todo"><b>○</b><span><code>C10.2</code> Inbox 頁加找名單表單；測試與真查一次。</span></li></ul>
-      <details><summary>工程細節：C10 名單發現</summary>
+      <details><summary>工程細節：C10 名單來源：店家</summary>
         <p>serper allowedPaths 加 /places；discover.ts 經 createProviderCall（預算＋限速）→ co_lead_inbox → 既有 normalize／dedup／suppression；Inbox 頁找名單表單</p>
         <p><b>需先完成：</b>無</p>
         <p><b>決定：</b>用已經在付費使用的 Serper 查地圖。不用 Google Places API：它的條款不准把查到的店名、網站、電話存進自己的資料庫，而名單庫就是要存這些；資料也比較貴、要開帳單帳戶。它多出來的營業時間與評論，由研究那一步從店家網站取得。（規格 D18）</p>
         <p><b>檔案：</b><code>NA/lib/collect/net/providers.ts</code> <code>NA/lib/outreach/discover.ts</code> <code>NA/lib/outreach/connectors/router.ts</code> <code>NA/app/api/outreach/inbox/route.ts</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C10</code></p>
       </details>
-    </div></li><li class="grp">可同時進行：<a href="#C4">C4</a>、<a href="#C6">C6</a></li><li class="step todo" id="C4">
-    <div class="n">4</div>
+    </div></li><li class="step todo" id="C11">
+    <div class="n">5</div>
+    <div class="b">
+      <p class="plain">例：你買 3 個像品牌的次網域，每個開 2 個 Workspace 信箱，共 6 個。系統每天檢查每個網域的 SPF、DKIM、DMARC 三項設定，缺一就標黃並通知；新信箱照暖機表慢慢加量，第 4 週才到 50 封。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（C11.1 外部資產）</span><span class="who">負責：你＋Codex</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>6 個信箱都連上系統，每個網域三項 DNS 設定全綠。故意拿掉一項設定，隔天那個信箱標黃並收到通知，連兩天就暫停。</p>
+      <ul class="items"><li class="todo"><b>○</b><span><code>C11.1</code> 你動手：買 3 個次網域，在 Workspace 加成次網域、每個開 2 個使用者，設好三項 DNS，再到 Connectors 頁把每個信箱連上。</span></li><li class="todo"><b>○</b><span><code>C11.2</code> 每天檢查每個冷信信箱網域的 SPF、DKIM、DMARC，缺項標黃並通知，連兩天缺就暫停那個信箱；登記到排程頁。</span></li><li class="todo"><b>○</b><span><code>C11.3</code> 測試四種 DNS 情況；對一個真實次網域跑一次。</span></li></ul>
+      <details><summary>工程細節：C11 寄件信箱池：次網域、DNS、暖機</summary>
+        <p>操作者：買網域、Workspace 次網域＋使用者、SPF／DKIM／DMARC、每信箱連 Gmail；sender-health.ts 每日 DNS 查核寫 dns_status；internal route＋cron 每日＋host-jobs</p>
+        <p><b>需先完成：</b>無</p>
+        <p><b>決定：</b>量從信箱數來：3 個次網域 × 2 信箱 × 每信箱 50 封 ＝ 300 封。主網域 aware-wave.com 永遠不寄冷信。不用暖機服務，靠真實低量慢慢加。（規格 D12、D21）</p>
+        <p><b>檔案：</b><code>NA/lib/outreach/sender-health.ts</code> <code>NA/app/api/internal/outreach/sender-health/route.ts</code> <code>HS/cron.d/awarewave-schedules</code> <code>NA/lib/schedules/host-jobs.ts</code></p>
+        <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C11</code></p>
+      </details>
+    </div></li><li class="step todo" id="C4">
+    <div class="n">6</div>
     <div class="b">
       <p class="plain">例：你在 Gmail 按下寄出，10 分鐘內系統知道寄了；對方回信，系統抓回來分類成「問價」，名單狀態變「已回覆」，追蹤信自動停。退訂與退信也自動處理。</p>
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium（主機排程安裝 High）</span><span class="who">負責：Opus 5.5</span></p>
@@ -153,22 +167,50 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
         <p><b>檔案：</b><code>DB/migrations/0151_co_replies.sql</code> <code>NA/lib/outreach/google-oauth.ts</code> <code>NA/lib/outreach/gmail-sync.ts</code> <code>NA/app/api/internal/outreach/gmail-sync/route.ts</code> <code>HS/cron.d/awarewave-schedules</code> <code>NA/app/(shell)/outreach/replies/page.tsx</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C4</code></p>
       </details>
-    </div></li><li class="step todo" id="C6">
-    <div class="n">6</div>
+    </div></li><li class="step todo" id="C8">
+    <div class="n">7</div>
     <div class="b">
-      <p class="plain">例：對方回了信，你在 Replies 頁按「同步 FluentCRM」，他出現在該品牌 WordPress 的 FluentCRM 裡並掛上標籤。沒回過信、沒同意過的人按了也不會同步。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（客戶站外掛更新）</span><span class="who">負責：Opus 5.5</span><span class="who wait">等某個品牌有人回信，而且它的網站裝了 wp-bridge 和 FluentCRM</span></p>
-      <p class="donewhen"><b>完成的樣子：</b>對測試站同步 1 個測試名單，FluentCRM 出現該聯絡人與標籤。沒有同意依據的名單回 422。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>C6.1</code> wp-bridge 外掛加一個「新增／更新聯絡人」端點，只做這件事。</span></li><li class="todo"><b>○</b><span><code>C6.2</code> 外掛升版並發布到站上。</span></li><li class="todo"><b>○</b><span><code>C6.3</code> 同步的後端：先驗資格（回過信、填過表單、同意過、是客戶之一，且不在拒收名單），再呼叫外掛。</span></li><li class="todo"><b>○</b><span><code>C6.4</code> Replies 頁按鈕接上；測試與對測試站同步一次。</span></li></ul>
-      <details><summary>工程細節：C6 暖名單進 FluentCRM</summary>
-        <p>wp-bridge 加 /fluentcrm/contact（signed write，照 /newsletter）；版本 0.20.0＋release；lib/crm/fluentcrm.ts 加 upsertContact；sync-fluentcrm route（資格＝consent_status 四種∧非 suppression；clientId 由 wp_sites.url 對 bridge env）；Replies 按鈕</p>
-        <p><b>需先完成：</b>無</p>
-        <p><b>決定：</b>走系統已有的 FluentCRM 接頭（它已經會建電子報草稿），只加「新增聯絡人」一個動作，不另寫一套。同步到哪個站，照該品牌登記的網站對上已設定的 wp-bridge 連線，不寫死網址。aware-wave.com 依你 10-30 的決定只留 WordPress，不接回。（規格 D16）</p>
-        <p><b>檔案：</b><code>WPB/includes/Http/RestController.php</code> <code>WPB/includes/Crm/ContactUpserter.php</code> <code>NA/lib/crm/fluentcrm.ts</code> <code>NA/app/api/outreach/leads/sync-fluentcrm/route.ts</code></p>
-        <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C6</code></p>
+      <p class="plain">例：6 個信箱裡，系統每次挑今天寄得最少的那一個建草稿並寄出，追蹤信固定回原本那個信箱的對話串。每個信箱照暖機表限量，上班時間內平均分配。哪個信箱被 Gmail 拒收就自動暫停那一個，其他照寄。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（翻開 auto）</span><span class="who">負責：Opus 5.5＋你</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>同一封信兩個同時的請求只寄出一次；同一信箱已寄 19 封、上限 20 時兩封不同的信只寄一封；上班時間外不寄；暫停的信箱不寄。一個暖機中的次網域信箱開啟後，1 封寄到你另一個信箱。</p>
+      <ul class="items"><li class="todo"><b>○</b><span><code>C8.1</code> 寄件帳號加欄位：寄出方式、當日計數日期、暖機起算日、DNS 狀態、對應的連線。</span></li><li class="todo"><b>○</b><span><code>C8.2</code> 暖機表、輪流挑信箱、先佔名額再寄：三個純函式，各自有測試。</span></li><li class="todo"><b>○</b><span><code>C8.3</code> 建草稿時就用輪流規則挑信箱；追蹤信固定用上一封的信箱。</span></li><li class="todo"><b>○</b><span><code>C8.4</code> 寄出接頭：只在開啟、健康、上班時間、配額內、重查通過時寄；逾時不重寄；被拒收就暫停那個信箱並通知。</span></li><li class="todo"><b>○</b><span><code>C8.5</code> 每次同步末尾跑寄出；畫面上每個信箱一列：網域、DNS 三燈、暖機週、今日已寄、開關。測試與真寄一封。</span></li></ul>
+      <details><summary>工程細節：C8 自動寄與輪流寄（量產）</summary>
+        <p>migration 0152 sender_pool（send_mode、daily_count_date、warmup_started_at、dns_status、connector_id；status sending）；sender-pool.ts（暖機表、輪流選、CAS 佔名額）；gmail-draft 建草稿時選信箱；send-adapter.ts（唯一寄信白名單）；Connectors 信箱池表與開關</p>
+        <p><b>需先完成：</b><a href="#C4">C4</a>、<a href="#C11">C11</a></p>
+        <p><b>決定：</b>自動寄是做量的主路徑。每個信箱預設仍是草稿模式；暖機到第 2 週、退信低於 2%、Gmail 沒有拒收過，才由你一個一個打開。「沒有投訴」不列，因為 Gmail 不會告訴寄件人有沒有被檢舉。（規格 D17）</p>
+        <p><b>檔案：</b><code>DB/migrations/0152_sender_pool.sql</code> <code>NA/lib/outreach/sender-pool.ts</code> <code>NA/lib/outreach/send-adapter.ts</code> <code>NA/app/api/outreach/messages/gmail-draft/route.ts</code> <code>NA/lib/outreach/gmail-sync.ts</code></p>
+        <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C8</code></p>
+      </details>
+    </div></li><li class="grp">可同時進行：<a href="#C12">C12</a>、<a href="#C13">C13</a></li><li class="step todo" id="C12">
+    <div class="n">8</div>
+    <div class="b">
+      <p class="plain">例：你選「食品零售」加「台中市」，系統從經濟部的公司登記資料找出公司名、負責人、地址、資本額，放進待處理名單；email 之後由研究那步從公司網站補。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium（C12.3 外部申請）</span><span class="who">負責：Codex</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>一個營業項目真查一次，待處理名單出現含負責人姓名的公司。頁腳有資料來源聲明。</p>
+      <ul class="items"><li class="todo"><b>○</b><span><code>C12.1</code> 接經濟部商工登記 API：先依營業項目列公司，再補負責人、地址、資本額；縣市在本地篩。</span></li><li class="todo"><b>○</b><span><code>C12.2</code> Inbox 頁「找公司」：營業項目用搜尋框加可見清單、縣市用按鈕；結果進待處理名單，負責人填聯絡人。</span></li><li class="todo"><b>○</b><span><code>C12.3</code> 你動手：向經濟部填 API 使用告知書，白名單填主機的對外 IP。測試與真查一次。</span></li></ul>
+      <details><summary>工程細節：C12 名單來源：公司行號</summary>
+        <p>providers.ts 加 gcis entry；sources/gcis.ts 兩步查詢（營業項目代碼表 → 應用一）；Inbox 頁找公司表單；顯名聲明</p>
+        <p><b>需先完成：</b><a href="#C10">C10</a></p>
+        <p><b>決定：</b>公司行號用經濟部商工登記開放資料：免費、合法、有負責人姓名。要先申請 API 白名單（填一份使用告知書）。（規格 D20）</p>
+        <p><b>檔案：</b><code>NA/lib/collect/net/providers.ts</code> <code>NA/lib/outreach/sources/gcis.ts</code> <code>NA/app/api/outreach/inbox/route.ts</code></p>
+        <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C12</code></p>
+      </details>
+    </div></li><li class="step todo" id="C13">
+    <div class="n">9</div>
+    <div class="b">
+      <p class="plain">例：你要找台北行銷主管，系統用搜尋引擎找出公開的 LinkedIn 或 IG 簡介摘要，有 email 的直接填；只有姓名的，依公司已知的 email 格式推幾個候選，先免費查網域，再用 Hunter 驗證，驗過才進名單。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium（個資法邊界）</span><span class="who">負責：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>對一個真實公司找 2 位人員，候選進待處理名單；推斷出的 email 經驗證後只有有效的被填入，驗證紀錄存起來。沒有付費金鑰時只做免費查核並標「未驗證」。</p>
+      <ul class="items"><li class="todo"><b>○</b><span><code>C13.1</code> 用搜尋引擎找人：只取搜尋結果的標題、摘要、連結，不碰社群頁面；摘要裡有 email 就填。</span></li><li class="todo"><b>○</b><span><code>C13.2</code> 只有姓名時推 email 格式，先免費查網域，再用 Hunter 驗證，驗過才填；費用在畫面上。</span></li><li class="todo"><b>○</b><span><code>C13.3</code> Inbox 頁加「貼上個人資料」表單。</span></li><li class="todo"><b>○</b><span><code>C13.4</code> 測試與對一個真實公司找 2 位人員。</span></li></ul>
+      <details><summary>工程細節：C13 名單來源：人員搜尋、email 推斷、付費驗證</summary>
+        <p>sources/people-search.ts（Serper /search，只取 title／snippet／link）；email-guess.ts（格式推斷 ≤4 候選 → MX → Hunter verifier／finder）；Inbox 頁貼上個人資料表單</p>
+        <p><b>需先完成：</b><a href="#C3">C3</a></p>
+        <p><b>決定：</b>只用搜尋引擎已經公開索引的摘要、對方自己的網站、你手動貼的資料。不寫任何爬 IG、Facebook、LinkedIn 頁面的程式，違反平台條款會被封整條線。個人 email 依個資法：來自一般可得來源、第一封信說明來源、附免費拒絕方式。（規格 D20）</p>
+        <p><b>檔案：</b><code>NA/lib/outreach/sources/people-search.ts</code> <code>NA/lib/outreach/email-guess.ts</code> <code>NA/lib/outreach/connectors/router.ts</code> <code>NA/app/api/outreach/inbox/route.ts</code></p>
+        <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C13</code></p>
       </details>
     </div></li><li class="grp">可同時進行：<a href="#C5">C5</a>、<a href="#C7">C7</a></li><li class="step todo" id="C5">
-    <div class="n">5</div>
+    <div class="n">10</div>
     <div class="b">
       <p class="plain">例：第一封寄出 3 個工作天後沒回信，追蹤頁出現小森咖啡與那封寫好的追蹤信，你按建草稿，它出現在 Gmail 原本那串對話裡。電話或 IG 私訊的步驟顯示成待辦，做完打勾。</p>
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Codex</span></p>
@@ -181,34 +223,34 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C5</code></p>
       </details>
     </div></li><li class="step todo" id="C7">
-    <div class="n">7</div>
+    <div class="n">11</div>
     <div class="b">
-      <p class="plain">例：外聯首頁一張表：每個品牌、每種切角、A 版 B 版各寄了幾封、幾封回、幾封正向、約到幾個會議、成交幾個。沒有開信率，因為那個數字不可信。</p>
+      <p class="plain">例：外聯首頁一張表：每個品牌、每種切角、A 版 B 版各寄了幾封、幾封回、幾封正向、約到幾個會議、成交幾個；每個信箱的退信率與今日用量。沒有開信率，因為那個數字不可信。</p>
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Codex</span></p>
       <p class="donewhen"><b>完成的樣子：</b>種 3 筆走到已回覆的名單，表上的數字正確。可下載 CSV。</p>
       <ul class="items"><li class="todo"><b>○</b><span><code>C7.1</code> 統計的後端：依品牌、切角、版本算寄出、退信、回覆、正向、會議、成交。</span></li><li class="todo"><b>○</b><span><code>C7.2</code> 首頁取代空殼，顯示那張表與 CSV 下載。</span></li><li class="todo"><b>○</b><span><code>C7.3</code> 測試與種資料驗數字。</span></li></ul>
       <details><summary>工程細節：C7 成效頁</summary>
-        <p>stats route（SQL 聚合四張表）；首頁取代 stub；CSV</p>
+        <p>stats route（SQL 聚合四張表）；首頁取代 stub；CSV；每信箱健康列</p>
         <p><b>需先完成：</b><a href="#C4">C4</a></p>
         <p><b>檔案：</b><code>NA/app/api/outreach/stats/route.ts</code> <code>NA/app/(shell)/outreach/page.tsx</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C7</code></p>
       </details>
-    </div></li><li class="step todo" id="C8">
-    <div class="n">8</div>
+    </div></li><li class="grp">可同時進行：<a href="#C6">C6</a>、<a href="#C9">C9</a></li><li class="step todo" id="C6">
+    <div class="n">12</div>
     <div class="b">
-      <p class="plain">例：某個寄件帳號你決定讓系統自己寄。打開後，核准的信在上班時間、未超過每日上限、也沒進拒收名單時，由系統按寄出。帳號狀態一標「暫停」就全停。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（翻開 auto）</span><span class="who">負責：Opus 5.5＋你</span><span class="who wait">等一個寄件帳號用草稿方式寄滿 50 封且退信低於 2%</span></p>
-      <p class="donewhen"><b>完成的樣子：</b>同一封信兩個同時的請求只寄出一次。上班時間外不寄。暫停的帳號不寄。你自己的帳號開啟後，1 封寄到你另一個信箱。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>C8.1</code> 寄件帳號加「寄出方式」欄，預設是草稿。</span></li><li class="todo"><b>○</b><span><code>C8.2</code> 寄出接頭：只在開啟、健康、上班時間、未達上限、重查通過時寄；先佔帳號當日名額再鎖信，同帳號同時寄兩封也不會超過上限；逾時不重寄。</span></li><li class="todo"><b>○</b><span><code>C8.3</code> 每次同步末尾跑一次寄出；畫面上每個帳號有開關，開要輸入帳號確認。</span></li><li class="todo"><b>○</b><span><code>C8.4</code> 測試與你自己的帳號真寄一封。</span></li></ul>
-      <details><summary>工程細節：C8 系統寄出開關</summary>
-        <p>migration 0152 send_mode＋status sending；send-adapter.ts（唯一寄信白名單；鎖＋視窗＋上限＋重查；逾時只對帳不重寄）；sync tick 末尾呼叫；Connectors 開關</p>
-        <p><b>需先完成：</b><a href="#C4">C4</a></p>
-        <p><b>決定：</b>先不開。一個帳號用草稿方式寄滿 50 封、退信低於 2%、Gmail 沒有拒收過、回信同步上線滿 2 週，才考慮開那一個。「沒有投訴」拿掉，因為 Gmail 不會告訴寄件人有沒有被檢舉，寫了也查不到。（規格 D17）</p>
-        <p><b>檔案：</b><code>DB/migrations/0152_send_mode.sql</code> <code>NA/lib/outreach/send-adapter.ts</code> <code>NA/lib/outreach/gmail-sync.ts</code></p>
-        <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C8</code></p>
+      <p class="plain">例：對方回了信，你在 Replies 頁按「同步 FluentCRM」，他出現在該品牌 WordPress 的 FluentCRM 裡並掛上標籤。沒回過信、沒同意過的人按了也不會同步。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（客戶站外掛更新）</span><span class="who">負責：Opus 5.5</span><span class="who wait">等某個品牌有人回信，而且它的網站裝了 wp-bridge 和 FluentCRM</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>對測試站同步 1 個測試名單，FluentCRM 出現該聯絡人與標籤。沒有同意依據的名單回 422。</p>
+      <ul class="items"><li class="todo"><b>○</b><span><code>C6.1</code> wp-bridge 外掛加一個「新增／更新聯絡人」端點，只做這件事。</span></li><li class="todo"><b>○</b><span><code>C6.2</code> 外掛升版並發布到站上。</span></li><li class="todo"><b>○</b><span><code>C6.3</code> 同步的後端：先驗資格（回過信、填過表單、同意過、是客戶之一，且不在拒收名單），再呼叫外掛。</span></li><li class="todo"><b>○</b><span><code>C6.4</code> Replies 頁按鈕接上；測試與對測試站同步一次。</span></li></ul>
+      <details><summary>工程細節：C6 暖名單進 FluentCRM</summary>
+        <p>wp-bridge 加 /fluentcrm/contact（signed write，照 /newsletter）；版本 0.20.0＋release；lib/crm/fluentcrm.ts 加 upsertContact；sync-fluentcrm route（資格＝consent_status 四種∧非 suppression；clientId 由 wp_sites.url 對 bridge env）；Replies 按鈕</p>
+        <p><b>需先完成：</b>無</p>
+        <p><b>決定：</b>走系統已有的 FluentCRM 接頭（它已經會建電子報草稿），只加「新增聯絡人」一個動作，不另寫一套。同步到哪個站，照該品牌登記的網站對上已設定的 wp-bridge 連線，不寫死網址。aware-wave.com 依你 10-30 的決定只留 WordPress，不接回。（規格 D16）</p>
+        <p><b>檔案：</b><code>WPB/includes/Http/RestController.php</code> <code>WPB/includes/Crm/ContactUpserter.php</code> <code>NA/lib/crm/fluentcrm.ts</code> <code>NA/app/api/outreach/leads/sync-fluentcrm/route.ts</code></p>
+        <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C6</code></p>
       </details>
     </div></li><li class="step todo" id="C9">
-    <div class="n">9</div>
+    <div class="n">13</div>
     <div class="b">
       <p class="plain">例：舊名單還是用那一格觀察。回填成證據列後，產信與評分只看證據，舊欄位不再寫入。</p>
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">負責：Codex</span><span class="who wait">等 100 個名單走過研究流程</span></p>

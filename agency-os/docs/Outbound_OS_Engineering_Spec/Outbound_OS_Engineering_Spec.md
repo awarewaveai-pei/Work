@@ -8,7 +8,7 @@
 
 ## 0. 定位與不變量
 
-**定位**：冷信的工作是換到一個回覆，不是介紹產品。系統負責找證據、寫信、守規矩、讀回信、記成效；按寄出的是人，直到你把某個帳號的 `send_mode` 打開。品牌＝organization，多品牌＝多 org，今天就能跑。
+**定位**：冷信的工作是換到一個回覆，不是介紹產品。系統負責找證據、寫信、守規矩、讀回信、記成效；量產模式（D21）＝多個次網域、多個信箱、暖機表、輪流寄、系統自動寄；單信箱草稿模式只用於暖機期間的試寫。品牌＝organization，多品牌＝多 org，今天就能跑。
 
 | # | 不變量 | 守在哪 |
 |---|---|---|
@@ -21,6 +21,7 @@
 | I7 | 抓到的網頁永遠是 SOURCE_QUOTATION，進 prompt 前包裹，不當指令 | `NA/lib/collect/provenance.ts:1-20`；`brand-context.ts`（C2.2） |
 | I8 | 付費 AI 只經 `NA/lib/ai/gateway.ts` 與 `can()` grant；金鑰只在 vault | ADR 017 §4；`NA/app/api/outreach/messages/route.ts:139-164`；migration 0049 |
 | I9 | 幾秒的工作＝next-admin route；幾分鐘＝Trigger.dev 任務；定時＝主機 cron；n8n 不在路徑上 | §6；`agency-os/handoffs/2026-10-25-schedules-off-trigger/R0-PLAN.md:9` |
+| I10 | 量只從信箱數來：單信箱日上限＝暖機表，絕不靠調高一個信箱的上限換量；主網域 aware-wave.com 永不寄冷信 | `co_sender_accounts.daily_limit`／`warmup_stage`（`0048:241-244`）；D12、D21 |
 
 ## 1. 現況（2026-10-31 查證）
 
@@ -37,6 +38,7 @@
 | 8 成效 | `/outreach` | stub | `NA/app/(shell)/outreach/page.tsx` |
 | — 研究 | 無 | 人工填 | `co_leads.observation`、`source_url` 各一格（`0048:95-96`） |
 | — 暖名單 | 無 | wp-bridge 無 contact 端點 | `WPB/includes/Http/RestController.php:42-105`：只有 health／option／post／product／woo／newsletter／blocks |
+| — 信箱池 | `connectors` | 只有 1 個消費者 Gmail | `co_sender_accounts.daily_sent_count`／`weekly_sent_count`／`warmup_stage`（`0048:242-244`）存在、0 呼叫點；無次網域、無輪流 |
 | — Gmail 連線 | `connectors` | Testing 模式 | scope `gmail.compose`（`NA/lib/outreach/google-oauth.ts:11`）；restricted scope 在 Testing 狀態 refresh token 7 天到期（C1.4 查） |
 | — 未用的表 | — | 0 呼叫點 | `co_timeline_events`、`co_connector_usage`、`co_verified_emails`（`NA/lib/outreach/MODULE_MANIFEST.json` state_ownership） |
 
@@ -68,24 +70,26 @@
 | D9 | 序列固定形狀：首封 A／B＋N 封追蹤＋回信即停；步驟帶 `channel`；不做畫布 | 唯一條件是「有回信？」（I4 禁追蹤，無開信／點擊可分岔）；序列在 DB 已是一列一列（`co_messages.version`，`0048:143`）；第二種條件等 50 封真實回信後再議 |
 | D10 | 回信後＝人工對話：Replies 頁 AI 分類＋按鈕，不是序列分岔 | 對剛開口的人不能排罐頭信；v1 §B6 九種 `reply_type` 已設計 |
 | D11 | 冷信零追蹤；暖信統計看 FluentCRM | Apple Mail 預載圖片、Outlook 擋圖、安全閘道假點擊；deliverability §6.2 |
-| D12 | 冷信寄件身分＝每個品牌自己的 Google 信箱，一個 org 一列 `co_sender_accounts`；不買專用網域；stream 不混用。AwareWave＝已連線的 `awarewaveai@gmail.com`，先寄滿 50 封看回覆率，再決定要不要買 aware-wave.com 的 Workspace 信箱（那是另一個決策：MX 從 Cloudflare Routing 搬 Google，影響 `dmarc@` 等轉寄）。**禁止**在消費者 Gmail 設「以 @aware-wave.com 寄出」。代操客戶：連接器只有 Gmail，客戶信箱必須是 Google 帳號；Soulful 的信箱在 Hostinger，它的冷信 parked。`daily_limit` 預設 20（`0048:241`）。署名預設＝`display_name`＋org 名稱，網站那行操作者填一次 | deliverability §11（`:590-611`）；aware-wave.com SPF 無 google include、DMARC `p=quarantine`（DNS 2026-11-01 查）→ 消費者 Gmail 代寄會被隔離；soulfulexpression.org MX `mx1.hostinger.com`／`mx2.hostinger.com`、DMARC `p=none`（同日查）；organizations 無網站欄（`DB/migrations/0001_core.sql` 只有 `metadata`），不借 `proof_links` 當網站。回頭條件：客戶改用 Google Workspace，或第二個客戶也需要非 Google 信箱時才加 SMTP／IMAP 接頭（不為一個案子建） |
+| D12 | 冷信寄件身分＝AwareWave 自有的**次網域信箱池**：一個 Workspace 租戶掛多個次網域（例：awarewave.tw、aware-wave.co），每網域 2 個信箱，每信箱一列 `co_sender_accounts`（`provider='gmail'`、`stream_type='cold'`），掛在它服務的 org。主網域 aware-wave.com 只寄暖信與系統信，永不寄冷信；**禁止**在消費者 Gmail 設「以 @aware-wave.com 寄出」。代操客戶有自己的 Google 信箱就連它（客戶授權）；沒有（Soulful＝Hostinger）就用池裡掛給該 org 的信箱，`display_name` 寫客戶品牌。已連線的 `awarewaveai@gmail.com` 只做暖機期間的試寫，不進量產池。署名預設＝`display_name`＋org 名稱，網站那行操作者填一次 | 量只能從信箱數來（I10）；次網域壞了不傷主網域（deliverability §11.2 stream 不混用）；aware-wave.com SPF 無 google include、DMARC `p=quarantine`（DNS 2026-11-01）→ 消費者 Gmail 代寄會被隔離；soulfulexpression.org MX `mx1.hostinger.com`／`mx2.hostinger.com`（同日）；Workspace 每帳號 2,000 封／天、試用 500（knowledge.workspace.google.com「Gmail sending limits」2026-10-26 版）；organizations 無網站欄（`DB/migrations/0001_core.sql`）。成本≈US$7／信箱／月＋網域年費，官方頁為準 |
 | D13 | Google OAuth 專案改「已發布、未驗證」。操作者唯一動手：C4.2 重新授權前在 Console 按一次「發布」 | 7 天到期只寫在 Testing（developers.google.com/identity/protocols/oauth2「Refresh token expiration」）；「內部」使用者類型要 Workspace 組織，沒有；未驗證＋restricted scope（`gmail.compose`、`gmail.readonly` 皆 restricted，support.google.com/cloud/answer/13464325）上限 100 位新使用者、專案終身計（answer/13463817），自用＋代操用不到；授權入口 ops-role 閘＋HMAC state（`NA/app/api/outreach/connectors/gmail/authorize/route.ts`），外人拿不到同意畫面。回頭條件：開「賣」模式前做 restricted scope 驗證 |
 | D14 | n8n 不在路徑；v1 §E3 superseded；整台去留另案 | 5 條 workflow 全 `active:false`（2026-10-31 查）；T10 已改 next-admin route（`agency-os/TASKS.md:1176`） |
 | D15 | 不加依賴：JSON 守衛手寫（repo 無 zod） | `NA/package.json` 無 zod；`cheap-json.ts:29` 已有 `extractJsonArray` 慣例 |
 | D16 | FluentCRM 同步走**既有 CRM 接頭** `NA/lib/crm/fluentcrm.ts`（ADR 017 §4 `crm: fluentcrm`），加一個 `upsertContact()`，走同一條簽章＋system-mode 閘的 `bridgePost`；不另寫 bridge 呼叫。目標站＝bridge 連線由環境變數定（預設＋`WPBRIDGE_SITE_<i>_*`，`clientId`），org → `clientId` 用該 org active `wp_sites.url` 的 host 對上已設定的 bridge base URL；對不到 422 `no_bridge`。C6 parked | `NA/lib/crm/fluentcrm.ts:1-2`（adapter，今只有 `createNewsletter`）；`NA/lib/payments/woo.ts:12-22`（多站＝env，私鑰不進 DB）；`NA/app/api/content/newsletter/route.ts:173,207`（今只用預設站）；`DB/migrations/0039_wp_sites.sql`（`url`、`active`）、`0061_wp_sites_add_org.sql:36`（`organization_id`）；bridge `/health` 不報 FluentCRM（`RestController.php:128-150`），有沒有裝由 `fluentcrm_not_active` 回應判。回頭條件：某品牌有回信的 lead，且該品牌的站裝了 wp-bridge＋FluentCRM；aware-wave.com 只留 WordPress（操作者 2026-10-30），不接回 |
-| D17 | 先不開任何帳號的 `auto`；C8 parked | 沒有寄送資料可判斷帳號健康，且 20 封／天人手按寄出不到 5 分鐘，自動寄的價值要等量大。回頭條件（全部可機械查）：該帳號草稿模式寄滿 50 封、`hard_bounced`／`sent` < 2%、`co_sending_events` 無 Gmail 拒收（API 4xx／配額）事件、回覆同步上線滿 2 週。「0 投訴」拿掉：Gmail 不向寄件人揭露檢舉，條件查不到＝不是條件 |
+| D17 | 自動寄＝量產模式的主路徑：C8 解除擱置，排在 C4、C11 之後。每個信箱的 `send_mode` 仍預設 `draft`；暖機表到第 2 週且 `hard_bounced`／`sent` < 2%、無 Gmail 拒收事件，才由操作者翻 `auto`，一次一個 | 300 封／天沒有人手按得完；不變量不變：每封有紀錄、寄前重查、任一信箱 `paused` 即停（I3、I5、I6）。「0 投訴」不列：Gmail 不向寄件人揭露檢舉 |
 | D19 | 頭的最後一哩兩件事都純程式、零供應商：①研究時從店家網站抓 email（`mailto:` 與內文，優先與網站同網域），寫 `co_leads.email`＋timeline `email_found{source_url}`；②匯入與建草稿前做 MX 查核（`node:dns/promises resolveMx`），結果快取 `co_verified_emails`，`invalid` 不建草稿。Hunter 等 SMTP 級驗證留槽位 | 今天沒有任何程式抓 email，匯入無 email／電話／社群即 `no_contact`（`NA/app/api/outreach/inbox/route.ts:37`）→ 找名單的產出寄不出去；`scoreContactability` 早留 `emailVerified` 分數（`NA/lib/outreach/scoring.ts:62`）、`co_verified_emails`（`0048:295`）0 呼叫點、router `mx_syntax` 只有名字（`NA/lib/outreach/connectors/router.ts:28`）。回頭條件：`hard_bounced`／`sent` > 2% 才接 Hunter（`NA/lib/outreach/connectors/router.ts:26`） |
 | D18 | 名單發現用 Serper `/places`（既有 `SERPER_API_KEY`），不用 Google Places API | 決定性原因是條款：Google Places 政策「不得預先抓取、快取或儲存 Places 內容，例外只有 place ID」（developers.google.com/maps/documentation/places/web-service/policies），名單庫要存名稱、網站、電話，等於違反；且需啟用帳單帳戶、含電話／網站的 SKU＝Text Search Enterprise $35／千次（免費 1,000／月）。Serper 回 title／address／phoneNumber／website／rating／cid，沒有營業時間與評論——那是研究（C3 爬網站）的事，不是找名單的事。Serper 已是 collect 預設供應商（`NA/lib/collect/net/providers.ts:76-89`），只鎖 `/search` 是因為沒有別的呼叫者；C10 就是那個呼叫者。換供應商＝`providers.ts` 一個 entry＋一個 parser（`:63-66` 註解） |
+| D20 | 名單對象三種：公司行號（經濟部商工登記開放資料）、公司裡的人（公司網站、徵才頁、搜尋引擎公開摘要＋email 推斷＋付費驗證）、個人（搜尋引擎已索引的公開簡介、對方自己的網站、操作者手動貼）。**不寫任何爬 IG／Facebook／LinkedIn 頁面的程式**。個人 email 蒐集依據＝個資法 §19 第 1 項第 7 款（一般可得之來源）；首次行銷附免費拒絕方式（§20 第 3 項）＝拒收句＋`List-Unsubscribe`；當事人拒絕即停（§20 第 2 項）＝suppression；資料來源告知（§9 第 1 項）由 Cold Gate 的 observation＋source_url 結構保證，當事人自行公開者免告知（§9 第 2 項第 2 款） | 商工登記 API `https://data.gcis.nat.gov.tw/od/data/api/<id>?$format=json&$filter=…&$top≤1000`：營業項目代碼表 `FCB90AB1-E382-45CE-8D4F-394861851E28`（依 `Business_Item` 列公司）→ 應用一 `5F64D864-61CB-4D0D-8AD9-492047CC1EA6`（`Company_Name`、`Business_Accounting_NO`、`Responsible_Name`、`Company_Location`、`Capital_Stock_Amount`）→ 應用三 `236EE382-4942-41A9-BD03-CA0709025E7C`（`Cmp_Business`）；來源 IP 白名單需申請、每日次數有上限但未公布數字（/od/rule）；政府資料開放授權第 1 版、須顯名（/main/terms）；個資法條文 law.moj.gov.tw pcode=I0050021（2026-11-01 讀）；平台條款禁爬＝違者連接器被封、整條線停 |
+| D21 | 第一階段目標 **300 封／天**（操作者 2026-11-01 定）＝3 個次網域 × 2 信箱 × 50。暖機表每信箱：第 1 週 10、第 2 週 20、第 3 週 35、第 4 週起 50（不超過 `daily_limit`）；不用暖機服務（假互動抬信譽，Google 寄件者規範反對）；全部信箱同一視窗台北 09–18 週一至五，tick 內平均分配加抖動；追蹤信固定用首封的信箱（同一對話串） | 回覆率 1–5% → 每天 3–15 封回信，Replies 頁一人可消化；300 以上＝再加網域與信箱，不改程式（I10） |
 
 ## 3. GPT 企業版 12 模組對照
 
 | 模組 | 處置 | 落點 |
 |---|---|---|
 | 01 多品牌工作區 | 有 | organizations＋`?org=`；跨 org 全看＝ops-role（`NA/lib/ops-role.ts:120-124`） |
-| 02 Lead discovery | 卡 C10 | Serper `/places` → `co_lead_inbox`（D18） |
+| 02 Lead discovery | 卡 C10、C12、C13 | 店家＝Serper `/places`（D18）；公司＝商工登記（D20）；人＝搜尋引擎公開摘要＋email 推斷＋付費驗證（D20） |
 | 03 Enrichment | 卡 C1.5、C3.7 | email 從網站抓＋MX 查核（D19）；`co_evidence` 兼任其他事實；Hunter／Snov 槽位（`NA/lib/outreach/connectors/router.ts:26-27`）等退信率觸發 |
 | 04 AI research & personalization | 卡 C2、C3 | brand-context＋evidence |
-| 05 Email infrastructure | 有 | `co_sender_accounts`、Gmail OAuth；DNS 清單 deliverability §12 |
+| 05 Email infrastructure | 卡 C11、C8 | 次網域信箱池、DNS 自動檢查、暖機表、輪流寄、自動寄（D12、D21）；DNS 清單 deliverability §12 |
 | 06 Campaign／sequence builder | 卡 C2、C5 | 固定形狀；不做畫布（D9） |
 | 07 Unified inbox | 卡 C4 | Replies 頁列全 org |
 | 08 Multichannel | 卡 C5.4 | `channel≠email` 步驟＝人工待辦；LinkedIn／IG 不自動 |
@@ -101,7 +105,7 @@
 | `0149_outbound_v2_expand` | `co_sender_accounts.signature_block text`；`co_messages.followup_delay_days int`、`co_messages.gate_snapshot jsonb` | C2.1 |
 | `0150_co_evidence` | `co_evidence(id, organization_id, lead_id FK cascade, claim, source_url, excerpt, source_label, captured_at, source_date, confidence, status pending／approved／rejected, created_by, created_at)`；RLS service-role 照 `0048:5-11`；index `(lead_id, status)`；唯一 `(lead_id, source_url, claim)` | C3.1 |
 | `0151_co_replies` | v1 §B6 欄位＋`gmail_message_id text unique`、`received_at`、`classified_by` | C4.1 |
-| `0152_send_mode` | `co_sender_accounts.send_mode text default 'draft' check (draft／auto)`、`co_sender_accounts.daily_count_date date`（配既有 `daily_sent_count`，`0048:242`）；`co_messages.status` CHECK 加 `sending` | C8.1 |
+| `0152_sender_pool` | `co_sender_accounts`：`send_mode text default 'draft' check (draft／auto)`、`daily_count_date date`（配既有 `daily_sent_count`，`0048:242`）、`warmup_started_at date`、`dns_status jsonb`、`dns_checked_at timestamptz`、`connector_id uuid references co_connector_accounts(id)`（以 email 回填；OAuth callback 建帳號時直接填）；`co_messages.status` CHECK 加 `sending` | C8.1 |
 | 不加欄 | thread 對應存 `co_sending_events.metadata={threadId, messageId}`（`0048:273` 已有 jsonb） | C4.2 |
 | contract（parked） | `co_leads.observation`／`source_url` 停寫，由 evidence 取代；欄位不刪 | C9 |
 
@@ -129,8 +133,12 @@ Leads 頁列 pending 證據，approve／reject 兩顆按鈕。Cold Gate 通過�
 ### 5.4 審核與草稿（C1、C2、C4）
 Review 頁 A／B 並排，核准一版（另一版 `skipped`）。建草稿前重查 I6（`do_not_contact`、`isSuppressed` applies_to cold／all）→ 409。MIME：`Subject`（RFC 2047）、`List-Unsubscribe: <mailto:…>`（RFC 2369）；`drafts.create` 回 `{id, message:{id, threadId}}` → `co_sending_events` `draft_created` 的 `metadata={threadId, messageId}`。
 
-### 5.5 寄出接頭（C8）
-`send_mode='draft'`：到此為止，人在 Gmail 按。`auto`：sync tick 末尾，條件 `health_status='healthy'` ∧ 台北 09–18 週一至五 ∧ 重查 I6 → 先以 compare-and-set 佔寄件帳號當日名額（`daily_sent_count`＋`daily_count_date`；0 列更新＝已滿或被搶先，不寄；鎖住的是帳號，不是信，所以同帳號兩封不同的信同時跑也不會超過上限）→ 再 `UPDATE co_messages SET status='sending' WHERE id=$1 AND status='drafted'` 鎖信 → `drafts.send` → `sent`＋事件；寄失敗不退名額。逾時／5xx 留 `sending`，下一 tick 以 `threads.get` 的 `SENT` label 對帳；30 分未對到 → `needs_edit`＋timeline；永不盲目重寄。
+### 5.5 寄出接頭與信箱池（C8、C11）
+`send_mode='draft'`：到此為止，人在 Gmail 按。建草稿時就選信箱（§5.4 的 `gmail-draft`）：首封選該 org `is_active ∧ health_status='healthy'` 中「今日已寄／今日上限」最低的信箱（輪流寄），追蹤信固定用上一封 `co_sending_events.sender_account_id` 的信箱（同一對話串）；草稿建在該信箱的 connector（`connector_id`），事件記 `sender_account_id`。今日上限＝暖機表（`warmup_started_at` 起第 1／2／3／4+ 週＝10／20／35／min(50, `daily_limit`)）。
+
+`auto`：sync tick 末尾，對每封 `approved ∧ drafted` 且其信箱 `send_mode='auto'` 的信：①台北 09–18 週一至五，tick 配額＝該信箱剩餘上限／今日剩餘 tick 數，加 0–120 秒抖動；②重查 I6（`do_not_contact`、suppression、`co_verified_emails` 非 invalid）；③compare-and-set 佔信箱名額（`daily_sent_count`＋`daily_count_date`，0 列更新＝已滿或被搶先）；④`UPDATE co_messages SET status='sending' WHERE id=$1 AND status='drafted'` 鎖信 → `drafts.send` → `sent`＋事件。逾時／5xx 留 `sending`，下一 tick 以 `threads.get` 的 `SENT` label 對帳；30 分未對到 → `needs_edit`＋timeline；永不盲目重寄；寄失敗不退名額。Gmail API 回配額／拒收類 4xx → 該信箱 `health_status='paused'`＋timeline＋推播，其餘信箱照常。
+
+信箱池健康（C11）：每日 cron 對每個 cold 信箱的網域查 SPF（含 `_spf.google.com`）、DKIM（`google._domainkey`）、DMARC；寫 `dns_status`／`dns_checked_at`；缺項 → `warning`＋timeline；連續 2 天缺 → `paused`。
 
 ### 5.6 回覆同步（C4）
 scope＝`gmail.compose`＋`gmail.readonly`（不含 send／modify）。**不變量：來信靠寄件人地址認人，不靠我們建的對話串**——對方可能另開新信、用 `List-Unsubscribe` 寄來一封主旨 `unsubscribe` 的信、或在 lead 標 `no_reply` 之後才回。每 10 分、每個啟用 connector 兩段：
@@ -153,7 +161,8 @@ Follow-ups 頁＝`next_followup_date ≤ 今天` ∧ `status='sent'` 的 lead＋
 | 工作 | 頻率 | 跑在哪 | 登記 |
 |---|---|---|---|
 | 研究 run | 按鈕 | next-admin in-process 非同步（照 `/ops/collect`）；預算 ≤60 秒故不進 Trigger | — |
-| Gmail 同步＋auto 寄出 | `*/10` | 主機 cron → `HS/poke.sh` → `/api/internal/outreach/gmail-sync`（Bearer `OUTREACH_SYNC_TOKEN`，照 `NA/app/api/internal/schedules/alerts/route.ts:21-25`） | `HS/cron.d/awarewave-schedules`；`NA/lib/schedules/host-jobs.ts` `outreach_gmail_sync` |
+| Gmail 同步＋auto 寄出（輪流寄，§5.5） | `*/10` | 主機 cron → `HS/poke.sh` → `/api/internal/outreach/gmail-sync`（Bearer `OUTREACH_SYNC_TOKEN`，照 `NA/app/api/internal/schedules/alerts/route.ts:21-25`） | `HS/cron.d/awarewave-schedules`；`NA/lib/schedules/host-jobs.ts` `outreach_gmail_sync` |
+| 信箱池 DNS 與健康 | 每日 1 次 | cron → `/api/internal/outreach/sender-health`（§5.5；同 token 模式） | 同上；`outreach_sender_health` |
 | 追蹤到期 | 頁面讀時算 | — | — |
 | 成效 | 頁面讀時算 | — | — |
 | n8n | — | 不在路徑 | — |
@@ -166,7 +175,8 @@ Follow-ups 頁＝`next_followup_date ≤ 今天` ∧ `status='sent'` 的 lead＋
 - Prompt injection：抓到的內容走 `provenance.ts` 篩查與標記；證據包 SOURCE_QUOTATION；excerpt 子字串驗證擋掉模型編造的「原文」。
 - 同意：冷信＝`legitimate_interest`；只有 §5.8 四種 consent 才進 FluentCRM。
 - 退訂：內文拒收句＋`List-Unsubscribe` mailto；一鍵退訂（RFC 8058）要 HTTPS 端點，冷信人工低量用不到，不做。
-- 速率：`daily_limit`（預設 20）、台北 09–18 視窗、`health_status='paused'` 全停。
+- 速率：每信箱暖機表（D21）、台北 09–18 視窗、任一信箱 `paused`／`blocked` 只停該信箱；Gmail API 拒收事件自動 `paused`＋推播。
+- 個資與平台條款：D20——只用搜尋引擎已索引、對方自有網站、商工登記、操作者手動貼的資料；不爬社群頁面；首信必含來源與免費拒絕方式。
 - 資料：`co_evidence`、`co_replies` 隨 lead cascade 刪除；無軟刪。
 
 ## 8. KPI
@@ -179,15 +189,16 @@ Follow-ups 頁＝`next_followup_date ≤ 今天` ∧ `status='sent'` 的 lead＋
 | 退信率 | hard_bounced／sent | `co_sending_events` |
 | 有證據的信比率 | `evidence_snapshot.evidence_ids` 非空／generated | `co_messages` |
 | 每封研究成本 | `outreach.research` 用量 | `ai_call_logs` |
+| 每信箱健康 | 退信率、拒收事件、暖機週、今日已寄／上限 | `co_sender_accounts`、`co_sending_events` |
 
 ## 9. 不做
 
-`brand_id`；job queue／Worker；CRM 六表；HubSpot；Microsoft Graph；NestJS；Redis／BullMQ；S3；視覺化流程編輯器；開信／點擊追蹤；LinkedIn／IG 自動化；Resend 寄冷信；SES；Apollo 級資料庫；PostHog 接外聯；n8n；ops-role 之外的角色；專用冷信網域。
+`brand_id`；job queue／Worker；CRM 六表；HubSpot；Microsoft Graph；NestJS；Redis／BullMQ；S3；視覺化流程編輯器；開信／點擊追蹤；LinkedIn／IG 自動化；Resend 寄冷信；SES；Apollo 級資料庫；PostHog 接外聯；n8n；ops-role 之外的角色；暖機服務（假互動）；爬 IG／Facebook／LinkedIn 頁面；調高單信箱上限換量；用 aware-wave.com 寄冷信。
 
 ## 10. 卡片與順序
 
-[R0-PLAN.md §6](../../handoffs/2026-10-31-outbound-os/R0-PLAN.md)：C1 守衛 → C2 信本身 → C3 研究＋C10 名單發現（並行）→ C4 回信 → C5 追蹤＋C7 成效（並行）。Parked 附回頭條件：C6 暖名單（D16）、C8 開關（D17）、C9 舊欄位退場。
+[R0-PLAN.md §6](../../handoffs/2026-10-31-outbound-os/R0-PLAN.md)：C1 守衛 → C2 信本身 → C3 研究＋C10 店家＋C11 信箱池（並行；C11.1 操作者先買網域、開 Workspace）→ C4 回信 → C8 自動寄＋輪流 → C12 公司登記＋C13 人員搜尋（並行）→ C5 追蹤＋C7 成效（並行）。Parked 附回頭條件：C6 暖名單（D16）、C9 舊欄位退場。
 
 ## 11. 決定
 
-五項原待決已由規劃者決定（操作者 2026-11-01 授權）：D12 寄件信箱與署名、D13 Google 發布、D16 FluentCRM 目標、D17 auto、D18 名單來源。監工台 OPEN 為空。
+五項原待決已由規劃者決定（操作者 2026-11-01 授權）：D12 寄件信箱與署名、D13 Google 發布、D16 FluentCRM 目標、D17 auto、D18 名單來源；同日操作者定量產目標 300 封／天 → D21，名單擴到公司與個人 → D20。監工台 OPEN 為空；操作者要動手的事在卡片 C4.2、C11.1、C12.3。
