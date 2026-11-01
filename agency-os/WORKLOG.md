@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-01（續7）Outbound OS v2：量產模型 300 封／天（信箱池、暖機、輪流、自動寄）＋名單擴到公司與個人
+
+**觸發**：操作者「一天 20 封太少」「為什麼刻意低」「要個人 email 與公司行號」→ 說明量從信箱數來、刻意低＝等觸發條件 → 操作者定 300／天、改計畫。
+
+**決策**（SPEC `7f899328c`）：I10 量只從信箱數來、主網域永不寄冷信；D21 300＝3 次網域 × 2 信箱 × 50，暖機表 10／20／35／50，不用暖機服務；D12 重寫＝次網域信箱池（Workspace 次網域），代操無 Google 信箱者用池裡掛給該 org 的信箱；D17 重寫＝auto 為主路徑，C8 解除擱置；D20 名單三種來源與邊界：商工登記開放 API（營業項目代碼表 `FCB90AB1…` → 應用一 `5F64D864…`，IP 白名單、開放授權顯名）、搜尋引擎公開摘要、對方自有網站、手動貼；**不爬 IG／FB／LinkedIn**；個資法 §19(1)(7)／§20(2)(3)／§9(2)(2)（law.moj.gov.tw I0050021，今日讀）。Workspace 2,000 封／天、試用 500（knowledge.workspace.google.com，2026-10-26 版）。
+
+**已修改**：SPEC §0／I10／§1／D12／D17／D20／D21／§3／§4（0152 → sender_pool）／§5.5 重寫／§6／§7／§8／§9／§10／§11；R0-PLAN §1／§3 R8 R9／§5／§6 重排為執行順序（C1 C2 C3 C10 C11 C4 C8 C12 C13 C5 C7 C6 C9）、C8 重寫 5 項、新 C11（3 項）、C12（3 項）、C13（4 項）／§7；data.mjs 全檔重寫（13 卡 56 項、NOW 加 2 列、OPEN 空）。操作者要動手：C11.1（買網域、Workspace、DNS、連信箱）、C12.3（GCIS 白名單）、C4.2（Google 發布）。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=python verify_paths.py（133 條、0 缺）; node build.mjs && node check.mjs（13 cards／56 items 綁定 §6、0 open、page fresh） | exit=0 | ms=96
+- REVIEW_WAIVED: DOC_ONLY -- 規劃增修；外部事實經 web-fetch 讀官方頁；程式層的 Codex 審在各卡 commit 時做
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=C8 parked|不買專用網域|0152_send_mode | hits=0（SPEC、R0-PLAN、data.mjs 舊說法已清）
+
+**下一步**：C1；操作者可先做 C11.1 採購（不擋 C1–C3）。建議模型：Opus 5.5（C1 可派 Codex）。
 ## 2026-11-01（續6）Outbound OS v2：對照大牌後補兩個頭端缺口——C3.7 抓 email、C1.5 MX 查核
 
 **觸發**：操作者問「我的規劃有沒有包含 Apollo／Hunter／Instantly／HubSpot 的主要功能」→ 逐類對照，兩類刻意低（寄信規模、CRM）、一類高（證據鎖個人化）、兩類真缺口 → 操作者「補進卡片」。
