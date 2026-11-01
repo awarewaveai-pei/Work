@@ -1,4 +1,25 @@
 # Worklog
+## 2026-11-01（續2）權限強制模式前提檢查（排程 enforce-readiness-2026-10-31，唯讀，未改任何設定）
+
+**結論：可以提議翻 enforce**（翻動本身仍是 High，等操作者明示 go）。2026-10-24T01:00Z 起 `entitlement.would_deny` 僅 7 筆、全來自測試帳戶 `e2e-verify-0704-5c1356`／`content.plan`／`no_entitlement`（預期內）；`entitlement.infra_error` 0 筆；無 unresolved 主體；三個全產品帳戶權利列各 340、互等。
+
+- ENTITLEMENT_MODE：`docker exec lobster-next-admin printenv ENTITLEMENT_MODE` exit 1 ＝ 未設 ＝ 影子模式（ADR 017 §4）。
+- would_deny／infra_error 分組（left join organizations，窗口 > 2026-10-24T01:00Z）：
+  - `e2e-verify-0704-5c1356` | would_deny | content.plan | no_entitlement | 7 筆（2026-10-28 06:15Z ～ 2026-10-30 02:07Z）→ 預期：刻意不給權利的測試帳戶（任務卡列為 e2e-verify-0704，DB slug 帶後綴 `-5c1356`，同一帳戶）。
+  - mongolia-03、test-wp-webhook-co：窗口內 0 筆（沒有被打到，不是被放行）。
+  - infra_error：0 筆。unresolved（organization_id 對不到 org）：0 筆。
+- 同窗口 `entitlement.%` 事件共 99 筆：usage 90／would_deny 7／staff_grant 1／staff_revoke 1（b3df190e9 點數功能認權利列有在產事件）。
+- 全產品帳戶（0118 `organization_all_features` ⋈ `organization_entitlements` 同 source_ref、status='active'）：awarewave-ops（comp，all-features:internal）340／edd-research（comp）340／soulful-expression（contract，all-features:soulful-2026-10-23）340 → 相等，每日補齊 sweep 正常。三者 0 筆 would_deny。
+- 需處理：**無**。
+- 翻 enforce 前操作者要知道的一件事（非阻擋）：e2e-verify 帳戶打 `content.plan` 目前靠影子放行；翻 enforce 後該 e2e 會拿到拒絕，測試要改成預期 403，或給該帳戶一列 comp 權利（兩者擇一，不要為了讓測試綠而改門檻）。
+- 本次只回報，未改資料、設定、程式；所有 SQL 以 `set default_transaction_read_only=on;` 開頭。
+- 排程卡寫 `--date 2026-10-31`；實際跑在 2026-11-01 09:46 台灣，entry 依實際日期入帳（置頂插入不亂序）。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=ssh -p 58122 ubuntu@145.239.195.47 docker exec lobster-next-admin printenv ENTITLEMENT_MODE（exit 1 = shadow）；docker exec -i supabase-db psql -U postgres -d postgres -tA < q1/q2/q3.sql（would_deny 7 筆單一測試帳戶、infra_error 0、三帳戶 340/340/340、entitlement.% 共 99） | exit=0 | ms=15000
+- REVIEW_WAIVED: DOC_ONLY -- 唯讀檢查報告，無程式／設定改動
+- BUGHUNT_WAIVED: DOC_ONLY -- 無改動 symbol；查詢欄位對照 `lobster-factory/packages/db/migrations/0118_entitlement_all_features.sql:13-19,27-29`
+- ORACLE_WAIVED: 無 source 檔 staged，純 WORKLOG
+
 ## 2026-11-01（續1）remote-monthly-agent: monthly review 2026-11 generated -> reports/monthly/monthly-review-2026-11.md (governance drift overall: SKIPPED — no pwsh in remote Linux container; prev month: PASS span=19d)
 
 - REALTEST_WAIVED: SMOKE_COVERED -- report generation routine; no service call
