@@ -1,4 +1,34 @@
 # Worklog
+## 2026-11-01（續10）外聯系統 v2 卡 C1：守衛與事實訂正（C1.1–C1.5 完成、C1.6 程式完成待操作者發布）；outreach.aware-wave.com DNS／憑證／nginx；lobster-nginx reload 靜默失敗兩天的根因與修補腳本加固
+
+**根因**：
+- 「scope 不能寄」說法錯：`gmail.compose` 本身允許 `drafts.send`；守衛改為程式＋測試（SPEC I3）。
+- gmail-draft 只檢查 `status==='approved'`，生成後才退訂／拒收的 lead 仍建草稿。
+- 拒收讀取＝整份 `.limit(5000)`（PostgREST max-rows 1000）＋ lead 側未轉小寫（`co_leads.email` 手動新增只 trim）→ 靜默漏擋；company scope 從未比對。
+- 無程式查網域收信（`co_verified_emails` 0 呼叫點）。
+- C1.4：正式站 Gmail connector `616e063a…` refresh → Google `400 invalid_grant: Token has been expired or revoked`（Testing 模式 7 天到期已發生，最後授權 2026-10-14）。
+- lobster-nginx：10-30 `c3553ffb3` 改 `limit_req zone=wplogin` key 後，每次 `nginx -s reload` 被 master 拒（`[emerg] limit_req "wplogin" uses the "$wplogin_key" key while previously…`），`nginx -t` 綠、exit 0、舊 worker 留著；`safe-infra-patch.sh` 只看 exit code → 兩天來所有 nginx patch 宣稱成功但未生效。
+
+**做了**：
+- 程式（commit 306277bf2）：`lib/outreach/__tests__/never-sends.test.ts`（app/、lib/ 全掃：Gmail host 只在 google-oauth.ts；send 呼叫／scope 只准 send-adapter.ts）；`GMAIL_SCOPES` compose＋readonly；`List-Unsubscribe` mailto；`suppression.ts findSuppressed`（依 email／domain `.in` 分批＋company／global 分頁讀完；雙側大小寫折疊；匯入與草稿共用）；`verify-email.ts`（MX／隱含 MX＝unknown，NXDOMAIN／null MX／皆無＝invalid，逾時不快取，每網域一次，20 s 預算）；`contact-guard.ts contactBlock` → gmail-draft 409 `{blocked, reason}`；匯入 invalid＝無 email（分類與評分）。SPEC D19 規則、MODULE_MANIFEST、Foundry catalog 同步。
+- 子網域（操作者 2026-11-01「做一個子網域給他」）：Cloudflare A `outreach` → 145.239.195.47 proxied（record `ec541a055bcd57bed99ab136d9e308dc`）；主機 nginx `safe-infra-patch host-nginx`（備份 `/root/lobster-phase1/safe-patch-backups/_etc_nginx_sites-available_sg-stack.aware-wave.com.safe-patch-20261101-044834`）；`certbot --expand` 17 SAN 含 outreach；lobster-nginx `safe-infra-patch nginx`（備份 `default.conf.bak.safe-patch-20261101-045009`）＋`docker restart lobster-nginx`（唯一能載入 zone key 變更的方式）。門 `enabled:false` 未開 → outreach.aware-wave.com 回 404（fail closed）。
+- 修補腳本（commit a3967154d）：`safe-infra-patch.sh reload_verified`＝reload 後 worker PID 須在 10 s 內換新，否則 health-fail＋還原（nginx 與 host-nginx 兩型）；測試加 zone key 變更案例。`check-compose-invariants.py` PENDING 加 woo-drill（`4f2226576` 起 /verify 紅）。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=ks-aw-01 curl oauth2.googleapis.com/token grant_type=refresh_token（connector 616e063a，不寫 DB、密值不印） | exit=0 | ms=3000 → http=400 invalid_grant
+- REALTEST_EVIDENCE: tool=SSH | cmd=ks-aw-01 node mxStatus：no-such-domain-c15-awarewave-realtest-2026.com→invalid、gmail.com→unknown、soulfulexpression.org→unknown、bad-syntax→invalid | exit=0 | ms=2000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit；npx vitest run lib/outreach app/api/outreach registry-code middleware-door → 93/93（第二輪後） | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：isSuppressed 拿掉大小寫折疊→混合大小寫測試紅、還原綠；contactBlock 拿掉→3/3 紅、還原綠 | exit=0 | ms=40000
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash tests/host-scripts/safe-infra-patch-host-nginx.test.sh（zone key 變更＋收尾中 worker：exit 1、還原、舊設定仍服務）→ 19/19；突變（舊比較＋舊 pgrep）→ 3 FAIL | exit=0 | ms=90000
+- REALTEST_EVIDENCE: tool=SSH | cmd=主機裝新 safe-infra-patch.sh（備份 .bak-20261101，md5 與 repo 同）→ 以相同 default.conf 跑 nginx 型 → success；outreach 404、app /login 200 | exit=0 | ms=8000
+- REALTEST_EVIDENCE: tool=curl | cmd=lobster-nginx restart 前 Host outreach→200（WordPress，舊設定）、後→404；aware-wave.com 200、app /login 200、social / 307；openssl SAN 17 含 outreach | exit=0 | ms=20000
+- REVIEW_DONE: critic=Standard | verdict=fail→fixed | findings=2c/4m/8n（C1 大小寫、C2 截斷、M1 company、M2 暫時 unknown 永久快取、M3 草稿前無即時 MX、M4 掃描漏洞、m3 null MX、m4 invalid 仍加分、m5 行號、m7 To 注入全修；m2 NULL org 重複列待 migration）；第二輪 critic=Deep verdict=warn→fixed findings=0c/2m/4n（M1 收尾中 worker 讓被拒 reload 誤判成功＝已重現，改「出現新 PID」＋只認 master 子行程；M2 .in() 不跳脫引號→整批 500，送入前篩值；m1 keyset 分頁；m2 company 限 scope；m4 掃描加 components 與根目錄）；m3 拒收寫入大小寫 CHECK 併入 C2.1 migration 0149
+- ORACLE_WAIVED: codex 額度 usage limit 至 2026-11-01 16:18（scripts/oracle-quota.ps1 已設）；以兩輪獨立 critic＋突變證據替代
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=isSuppressed\|co_suppression_list\|findSuppressed\|contactBlock\|verifyEmails\|mxStatus\|GMAIL_SCOPE | hits=22（決定可否聯絡的讀者全經 findSuppressed；suppression/route.ts＝CRUD、db.ts＝計數；Foundry 生成檔已 resync）
+
+**剩**：C1.6 操作者兩步（Google Cloud Console → OAuth 同意畫面 →「發布應用程式」；Connectors 頁重連 awarewaveai@gmail.com）——現有連線已失效，重連前建不了草稿；程式今晚 03:00 自動部署。產品門頁面（`/outreach` 員工頁與門頁同路徑，需搬到 tools/outreach＋門路由逐條授權）未做。`co_verified_emails` UNIQUE NULLS DISTINCT 需 migration。List-Unsubscribe 經 Gmail 網頁寄出是否保留，C4.7 真寄時看原始郵件。
+
+**rollback**：程式 `git revert 306277bf2`；DNS 刪 record `ec541a05…`；主機 nginx／lobster-nginx 用上述備份＋`safe-infra-patch.sh`；修補腳本 `git revert a3967154d` 並把主機 `/root/lobster-phase1/scripts/safe-infra-patch.sh` 還原 `.bak`。
 ## 2026-11-01（續9）Outbound OS v2：整體計畫徹底檢視——Codex 三回合 37 項全採，15 卡定稿
 
 **觸發**：操作者「徹底檢視整個 PLAN 並優化，可和 GPT 討論幾回合」→ 自審 5 項（S1–S5）→ Codex inspect 三回合（`scripts/codex-oracle.ps1 -Mode inspect`，gpt-6-sol）。

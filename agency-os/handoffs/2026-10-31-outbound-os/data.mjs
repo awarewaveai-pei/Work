@@ -37,23 +37,25 @@ export const NOW = [
   { what: '找到店家後拿得到它的 email，寄之前知道對方網域收不收信。', state: 'no', ev: '沒有程式抓網站上的 email；匯入沒有 email、電話、社群就標無法聯絡（inbox/route.ts:37）；MX 查核只有名字沒程式；co_verified_emails 表零呼叫點。' },
   { what: '暖名單同步到 FluentCRM。', state: 'no', ev: 'wp-bridge 沒有 contact 端點（RestController.php:42-105），只能建電子報草稿。' },
   { what: '看得到回覆率、會議數、成交數。', state: 'no', ev: '外聯首頁是空殼。' },
-  { what: 'Gmail 連線不會自己斷。', state: 'no', ev: 'Google 專案在測試模式，restricted scope 的 refresh token 每 7 天到期；10-14 連的是否仍活著，C1.4 查。' },
+  { what: 'Gmail 連線不會自己斷。', state: 'no', ev: '已經斷了：2026-11-01 對 Google 續期，回「已過期或被撤銷」（invalid_grant）。Google 專案仍在測試模式，授權每 7 天失效。你在 Google Cloud Console 按「發布應用程式」並在 Connectors 頁重連後才會恢復（C1.6）。' },
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
+const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
+const C1 = '306277bf2';
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '守衛與事實訂正', plain: '例：名單上某人剛退訂，系統仍替他建草稿。改成建草稿前重查拒收名單。同時把「scope 不能寄信」這句不對的說法改正，用測試守住程式不呼叫寄信；順便把 Google 授權改成正式發布、加上讀信權限，之後 6 個新信箱只要授權一次。',
-    gate: '退訂後建草稿被擋下並說明原因。信的標頭有退訂方式。測試證明程式沒有任何寄信呼叫。Gmail 連線是否仍活著有查證結果。匯入一筆網域不存在的 email，會被標成無效。Google 專案已發布，既有信箱用新權限重新連上。', risk: 'Low（C1.4 只讀正式站；C1.6 你按一次發布）', model: 'Codex', status: 'not_started', depends: [],
+    gate: '退訂後建草稿被擋下並說明原因。信的標頭有退訂方式。測試證明程式沒有任何寄信呼叫。Gmail 連線是否仍活著有查證結果。匯入一筆網域不存在的 email，會被標成無效。Google 專案已發布，既有信箱用新權限重新連上。', risk: 'Low（C1.4 只讀正式站；C1.6 你按一次發布）', model: 'Codex', status: 'in_progress', depends: [],
     decided: 'Google 專案改成「已發布、未驗證」，連線不再每 7 天斷；讀信權限一起加，這樣之後每個池信箱只授權一次。你做兩步：在 Google Cloud Console 按一次「發布應用程式」，再到 Connectors 頁重新連既有的 Gmail。（規格 D13）',
     what: 'MODULE_MANIFEST 與 google-oauth 註解改寫；never-sends 測試；gmail-draft 重查 do_not_contact／suppression／email invalid；List-Unsubscribe header；prod connector refresh VBC；verify-email.ts MX 查核（有 MX＝unknown，不是 valid）＋co_verified_emails 快取＋匯入評分；GMAIL_SCOPE 加 readonly＋發布',
     files: ['NA/lib/outreach/MODULE_MANIFEST.json', 'NA/lib/outreach/google-oauth.ts', 'NA/app/api/outreach/messages/gmail-draft/route.ts', 'NA/lib/outreach/__tests__/never-sends.test.ts', 'NA/lib/outreach/verify-email.ts', 'NA/app/api/outreach/inbox/route.ts'],
     items: [
-      todo('C1.1', '把「scope 不能寄信」改成正確說法，加一個測試確認程式沒有寄信呼叫。'),
-      todo('C1.2', '建草稿前重查拒收名單與不可聯絡標記，有就擋下。'),
-      todo('C1.3', '信的標頭加上退訂方式。'),
-      todo('C1.4', '查正式站的 Gmail 連線是否仍能續期，結果寫進紀錄與本頁現況。'),
-      todo('C1.5', '匯入名單時查對方網域有沒有收信伺服器，結果存起來；沒有的信箱不給建草稿。這只證明網域收信，不證明信箱存在。免費，不用外部服務。'),
+      done('C1.1', '把「scope 不能寄信」改成正確說法，加一個測試確認程式沒有寄信呼叫。', C1),
+      done('C1.2', '建草稿前重查拒收名單與不可聯絡標記，有就擋下。', C1),
+      done('C1.3', '信的標頭加上退訂方式。', C1),
+      done('C1.4', '查正式站的 Gmail 連線是否仍能續期，結果寫進紀錄與本頁現況。', C1),
+      done('C1.5', '匯入名單時查對方網域有沒有收信伺服器，結果存起來；沒有的信箱不給建草稿。這只證明網域收信，不證明信箱存在。免費，不用外部服務。', C1),
       todo('C1.6', 'Gmail 授權多要「讀信」權限並把 Google 專案發布；你按一次發布、重新連既有信箱。'),
     ] },
   { n: 2, code: 'C2', group: 'B', title: '署名、定位、主旨、多版本、追蹤信內容', plain: '例：AI 一次寫出兩個主旨、兩個版本的第一封信、兩封追蹤信，每封都以你設定的署名結尾，用到品牌定位。來源不是對方自己公開的人，信尾多一行個資告知。你在審核頁並排看 A／B，核准一版；一個服務累積核准 50 封後，可以切成抽查模式。',
