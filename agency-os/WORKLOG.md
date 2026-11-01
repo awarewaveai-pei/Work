@@ -1,4 +1,42 @@
 # Worklog
+## 2026-11-01（續12）外聯系統 v2 卡 C2：A／B 兩版首封＋追蹤信、署名與個資告知由程式附加、審核政策（逐封／抽查＋事實核對）、migration 0149 已套正式站
+
+**操作者**：「做 C2」（續接 C1、產品門）。
+
+**根因**：
+- 產信一封一版、主旨固定 null、無署名、`positioning` 讀了沒用（SPEC §1 第 3 列）。
+- 名單無法指定服務設定（leads API 不收 `service_profile_id`）→ 定位、隱私頁、審核政策到不了任何名單（REALTEST 腳本撞到）。
+- 無「每名單一封首封」約束：人工＋自動同時核准會寄兩封（SPEC D23）。
+
+**做了**：
+- C2.1 `DB/migrations/0149_outbound_v2_expand.sql`：署名、追蹤天數、`gate_snapshot`、`privacy_url`、`review_mode`、`review_sample_pct`；唯一索引 `co_leads (org, lower(btrim(email))) nulls not distinct`、`co_messages (lead_id)` 首封在寄送路上（含 copied）；trigger `co_leads_profile_same_org`（errcode P0149）；併入 C1 m2／m3（驗證快取 NULL org 唯一、拒收小寫 CHECK）。套用前查重複／跨 org，有就 RAISE。down 兩處。
+- C2.2 `NA/lib/outreach/brand-context.ts`：SPEC §5.3 順序；證據＝外部引用圍欄（`fence`、未閉合標籤也清）；署名／告知行由 `composeBody` 原樣附加，AI 不寫。
+- C2.3 `generation-schema.ts`：手寫守衛（2 主旨、A/B、evidence_ids 必為已知、追蹤 step 連號）；壞 JSON 修一次再走 manual_prompt。
+- C2.4 `messages/route.ts`：2 列 cold_email＋N 列 followup，每列 `gateMessage`（主旨 ≤25 字、無高壓字、署名結尾、告知行）；`review-policy.ts`（雜湊選版、抽樣、三關）、`claim-check.ts`（`outreach.qa`，`cheap-json.ts` 加選用 grant）；PATCH 條件更新、重新檢查編輯、舊列不准核准；貼回 AI 回覆走同一路（manual_paste）；新組取代未寄舊組。
+- gmail-draft：以產信時的 `sender_id` 建草稿（active＋cold＋同 org），connector 以 `settings.email` 對上；Gmail 前先 approved→drafted 搶佔、用搶到的內容組信、失敗還原。connectors 拒收 `settings`（只 OAuth callback 寫）。
+- C2.5 UI：信箱與連線頁署名卡（`SendersCard.tsx`）、服務設定「審核與隱私」（`ProfilePolicy.tsx`，6 項清單全勾＋網址 GET 200 才存；審核方式＝手動／半自動／全自動三顆按鈕＝既有兩個欄位的組合（manual／sampled 10%／sampled 2%），離開手動需人工核准 ≥50，`review_sample_pct` 下限 1）、審核頁 A／B 並排＋追蹤信＋貼回框＋「Gmail 裡沒有？再建一次」、名單頁服務按鈕（依每筆名單的 org）；drafts stub 刪除。API：`senders` GET/PATCH、service-profiles PATCH、leads PATCH。
+- **不變量（gmail-draft 被 reviewer 連報 4 次後寫下）**：程式自己對同一列最多呼叫 Gmail 一次。做法：呼叫前條件搶佔 approved→drafted（`drafted_at`＝搶佔時間）；Gmail 4xx 拒絕才退回 approved，其他失敗（網路、5xx、回應不可讀）留 drafted；草稿建好後任何寫入失敗只回 warning 不回 error；卡住的列（>10 分鐘、無 draft_created 事件）只有人在 Gmail 看過並按確認（`confirmedNoDraft`）才能再呼叫。信箱由寫信時的 `prompt_snapshot.sender_id` 決定（須 active＋cold＋gmail＋同 org＋連線仍在）。
+- 正式站資料：名單 `aeac4f2c…`（2026-07-03 自測、0 信）email 與 T10 自測名單重複 → 清空，原值寫進 notes（可還原）。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=node scripts/apply-db-migration.mjs 0149 → APPLY_OK；--status 0149 applied；psql 查 2 索引＋trigger＋6 欄 | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsx c2-e2e.mts（真 route＋正式庫＋代理商 Gemini，修正前後各跑一次成功）：隱私無清單 400、有清單 200、抽查 409、空署名 400、產信 4 列（A/B 有主旨、追蹤 3／5 天、全 pass、皆署名結尾、首封含告知）、核准 A→B skipped、再核准 B 409、重產 409、清除測試列 0 殘留（中間一次 Gemini >240s 被 timeout 砍掉，測試列手動清除後查證 0 殘留） | exit=0 | ms=138509
+- REALTEST_EVIDENCE: tool=Bash | cmd=真 OpenAI（gpt-5.4-mini）跑 prompt→守衛→gate 兩次：4 列，第一次 1 封追蹤缺拒收句 warn→改 prompt（不放寬檢查）→第二次全 pass | exit=0 | ms=5152
+- REALTEST_EVIDENCE: tool=Bash | cmd=本機 PG17 拋棄式 DB：0149 遇重複拒套、索引與 trigger 生效（P0149）、空白 email 不算重複、可重跑、down→up | exit=0 | ms=8000
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變 12 守衛（profile org 篩選、指名信箱 org、Gmail 前搶佔、抽查解鎖、告知行、PATCH 條件、逾時重建需無事件、指名信箱須 Gmail、信箱須有連線、只撤較舊列、只在 Gmail 拒絕時退回、逾時重建需人確認）各自紅→還原綠 | exit=0 | ms=600000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit；vitest app/api/outreach lib/outreach lib/portal app/__tests__ lib/ai lib/entitlements → 452 passed，2 failed＝他 session 未追蹤 tools/seedstar | exit=1 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/6m/10n（M1 改狀態與建草稿競態、M2 qa 被拒 500、M3 署名與草稿信箱不同、M4 名單與服務跨 org、M5 貼回走不通、M6 50 封計數可灌；m1–m10 全修）；第二輪 verdict=warn→fixed findings=0c/1m/5n（N1 connector settings 可被清空／偽造、n1–n5 全修）；第三輪 verdict=pass findings=0c/0m/0n
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/4m/0n（Codex gpt-6-sol 第 1 輪 `reports/oracle/2026-11-01-partialreview-fdf50be0.md`：F1 寫信可能選到非 Gmail 信箱、F2 寫新組失敗先丟舊組、F3 行程中斷卡 drafted、F4 事件寫入失敗回 500；全修）；第 2 輪 `…-5dd5345a.md` 0c/3m/0n（Gmail 已建但回應失敗→退回可重試、連線刪除後舊信箱仍被選、兩個同時產信互相跳過；全修）；第 3 輪 `…-63077e4c.md` 0c/2m/0n（事件兩次失敗後逾時重試重複草稿→改成只有人確認 Gmail 無草稿才能重建、名單頁服務按鈕依每筆名單的 org；全修）
+- ORACLE_WAIVED: 三份 Codex artifact 皆為 -Path 局部審查（工作目錄混有他 session 未提交的 theme／seedstar 檔，不能整庫送審）；C2 全部檔案都在三輪 -Path 範圍內（artifact files-reviewed 列出 35 檔含全部新檔），加 Claude critic 三輪＋突變證據
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=buildEvidenceSnapshot\|outreach/drafts\|body.settings\|humanApprovedCount\|used_observation | hits=14（buildEvidenceSnapshot 成死碼已刪；其餘為歷史規格、session 紀錄、body.settings 拒收守衛與 humanApprovedCount 本次新碼）
+
+**剩**：
+- 正式站畫面驗證等今晚 03:00 自動部署。
+- 事實核對（gpt-5.4-nano）同一封信兩次結果不同（supported／unsupported 無 claims）→ 一律交人工，安全但抽查模式可能多退件；C15 實測時再看。
+- 撤舊組與寫新組非同一交易；卡在 drafted 的回收留 0152（sending）。
+- 事件寫入連續失敗時草稿存在但無紀錄；`drafted_at` 有、事件無＝需人到 Gmail 確認（UI 有按鈕）。0152 帶 `connector_id` 後信箱與連線不再靠 email 對應。
+
+**rollback**：`git revert 766df3df3`；資料庫 `DB/migrations/0149_outbound_v2_expand.down.sql`（先回程式）；名單 `aeac4f2c…` 的 email 在其 notes 內。
 ## 2026-11-01（續11）outreach 產品門開門：outreach.aware-wave.com 頁面（door.nav 7 頁）、員工頁移 /tools/outreach、開門前關掉兩個跨租戶洞＋一個密鑰洞
 
 **操作者**：「做產品門頁面」（子網域 DNS／憑證／nginx 已在續10）。

@@ -28,8 +28,8 @@ export const COPY = {
 export const NOW = [
   { what: '匯入名單、打分數、產冷信、人工審核、在 Gmail 建草稿。', state: 'yes', ev: '2026-10-14 在正式站建了 1 封繁中草稿，沒有寄出（WORKLOG 2026-10-14 續28）。' },
   { what: 'AI 自己去看對方的網站並留下有來源的證據。', state: 'no', ev: '觀察要人工填，只有一格（co_leads.observation）。研究引擎沒有接上。' },
-  { what: '信有主旨、有署名、用到品牌定位。', state: 'no', ev: '主旨固定是空的（messages/route.ts:209）；定位讀了沒用（:123）；沒有署名。' },
-  { what: '每封信有兩個版本可比、追蹤信有內容。', state: 'no', ev: '一次只寫一封（buildPrompt :48-66）；追蹤只存日期（followups/route.ts:6-8）。' },
+  { what: '信有主旨、有署名、用到品牌定位。', state: 'yes', ev: '2026-11-01 C2：每封有主旨（≤25 字），以寄件信箱的署名結尾（程式附加，AI 不能改），定位、賣點、語氣進 prompt（brand-context.ts）。正式庫真產驗過。' },
+  { what: '每封信有兩個版本可比、追蹤信有內容。', state: 'yes', ev: '2026-11-01 C2：一次產 A／B 兩版首封＋追蹤信（各有等幾天），審核頁並排；人核准一版另一版自動跳過。追蹤信「到期自動建草稿」在 C5。' },
   { what: '一天寄得到 300 封而不傷主網域。', state: 'no', ev: '只有 1 個消費者 Gmail 信箱連線，上限 20 封。次網域、信箱池、暖機、輪流寄、自動寄都沒有；相關欄位存在但零呼叫點（0048:242-244）。' },
   { what: '研究、產信、建草稿不用你一筆一筆按。', state: 'no', ev: '三個動作都是按鈕觸發（ReviewClient.tsx:19-20）；300 封一天等於 600 次點擊。' },
   { what: '對方回信會進系統，後續信自動停。', state: 'no', ev: 'Replies 頁是空殼；草稿只存 draft id，沒存對話串 id（gmail-draft/route.ts:186）。' },
@@ -43,6 +43,7 @@ export const NOW = [
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
 const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 const C1 = '306277bf2';
+const C2 = '766df3df3';
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '守衛與事實訂正', plain: '例：名單上某人剛退訂，系統仍替他建草稿。改成建草稿前重查拒收名單。同時把「scope 不能寄信」這句不對的說法改正，用測試守住程式不呼叫寄信；順便把 Google 授權改成正式發布、加上讀信權限，之後 6 個新信箱只要授權一次。',
@@ -59,17 +60,18 @@ export const STEPS = [
       todo('C1.6', 'Gmail 授權多要「讀信」權限並把 Google 專案發布；你按一次發布、重新連既有信箱。'),
     ] },
   { n: 2, code: 'C2', group: 'B', title: '署名、定位、主旨、多版本、追蹤信內容', plain: '例：AI 一次寫出兩個主旨、兩個版本的第一封信、兩封追蹤信，每封都以你設定的署名結尾，用到品牌定位。來源不是對方自己公開的人，信尾多一行個資告知。你在審核頁並排看 A／B，核准一版；一個服務累積核准 50 封後，可以切成抽查模式。',
-    gate: '對一個測試名單真產一次，資料庫出現 4 列：兩封第一封（各有主旨）、兩封追蹤信（各有等幾天）。內文以署名結尾；需要告知的名單信尾有告知行，沒有就被擋。審核頁可並排核准；抽查模式只在該服務核准滿 50 封後能開。', risk: 'Medium（migration 套正式站 High）', model: 'Opus 5.5', status: 'not_started', depends: ['C1'],
+    gate: '對一個測試名單真產一次，資料庫出現 4 列：兩封第一封（各有主旨）、兩封追蹤信（各有等幾天）。內文以署名結尾；需要告知的名單信尾有告知行，沒有就被擋。審核頁可並排核准；抽查模式只在該服務核准滿 50 封後能開。', risk: 'Medium（migration 套正式站 High）', model: 'Opus 5.5', status: 'done', commit: C2, depends: ['C1'],
+    result: '2026-11-01 正式庫真產 4 列（A／B 有主旨、追蹤 3／5 天、全過檢查、署名結尾、首封含告知行）；核准 A 後 B 自動跳過，再核准 B 被拒（409）。migration 0149 已套正式站。審核方式改成手動／半自動／全自動三顆按鈕（＝逐封、抽查 10%、抽查 2%）。Claude critic 三輪＋Codex 三輪共 17 項全修。',
     decided: 'AwareWave 的冷信從自有的次網域信箱池寄出；主網域 aware-wave.com 永遠不寄冷信，也不要在 Gmail 設「以 @aware-wave.com 寄出」，網域設定會把那種信當假冒隔離。代操客戶有 Google 信箱就連它；沒有（Soulful 在 Hostinger）就用池裡掛給它的信箱。已連線的 awarewaveai@gmail.com 只在暖機期間試寫。署名預設是寄件人名稱加品牌名稱，網站那行你填一次。人工把關改成政策：每個服務先逐封核准 50 封，之後只抽查 10%，檢查有警告的一律人工，被擋的永遠不寄。（規格 D12、D23）',
     what: 'migration 0149 expand（署名、追蹤天數、檢查結果、privacy_url、review_mode、review_sample_pct）；brand-context.ts（含個資告知行）；generation-schema.ts（手寫守衛，無 zod）；messages/route.ts 寫 2＋N 列＋依政策核准；Connectors 署名欄；Review A/B；profile 設定頁；刪 drafts stub',
     files: ['DB/migrations/0149_outbound_v2_expand.sql', 'NA/lib/outreach/brand-context.ts', 'NA/lib/outreach/generation-schema.ts', 'NA/app/api/outreach/messages/route.ts', 'NA/app/(shell)/tools/outreach/review/ReviewClient.tsx'],
     items: [
-      todo('C2.1', '資料表加欄位：寄件帳號的署名、追蹤信等幾天、品質檢查結果、服務的隱私頁網址與審核模式；同一品牌同一 email 只能有一筆名單；同一名單同時只能有一版首封在寄送路上。'),
-      todo('C2.2', '品牌脈絡組裝：定位、賣點、語氣、署名、已核准的證據、必要時的個資告知行，依固定順序組成給 AI 的指示。'),
-      todo('C2.3', 'AI 的輸出改成固定格式的 JSON，格式不對會修一次再放棄。'),
-      todo('C2.4', '產信改寫：一次寫兩個主旨、兩個版本、追蹤信，每封各自檢查，存成多列；抽查模式下每個名單只選一版、再用便宜模型核對信裡的主張都有證據，才自動核准。'),
-      todo('C2.5', '畫面：寄件帳號設定加署名欄；審核頁 A／B 並排；服務設定加隱私頁網址與審核模式；拿掉空的草稿頁。'),
-      todo('C2.6', '測試與真產一次。'),
+      done('C2.1', '資料表加欄位：寄件帳號的署名、追蹤信等幾天、品質檢查結果、服務的隱私頁網址與審核模式；同一品牌同一 email 只能有一筆名單；同一名單同時只能有一版首封在寄送路上。', C2),
+      done('C2.2', '品牌脈絡組裝：定位、賣點、語氣、署名、已核准的證據、必要時的個資告知行，依固定順序組成給 AI 的指示。', C2),
+      done('C2.3', 'AI 的輸出改成固定格式的 JSON，格式不對會修一次再放棄。', C2),
+      done('C2.4', '產信改寫：一次寫兩個主旨、兩個版本、追蹤信，每封各自檢查，存成多列；抽查模式下每個名單只選一版、再用便宜模型核對信裡的主張都有證據，才自動核准。', C2),
+      done('C2.5', '畫面：寄件帳號設定加署名欄；審核頁 A／B 並排；服務設定加隱私頁網址與審核模式；拿掉空的草稿頁。', C2),
+      done('C2.6', '測試與真產一次。', C2),
     ] },
   { n: 3, code: 'C3', group: 'C', title: '研究 → 證據', plain: '例：你按「研究這家」，系統去看小森咖啡自己的網站，抓出「菜單照片光線偏暗」這類觀察，每條附來源網址、原文片段與時間。來自店家自己網站的證據自動核准；來自別人網站的才要你看。不會去爬它的 IG。',
     gate: '對一個真實公開網站跑研究，出現至少一條證據，原文片段能在該頁找到，自家網站的那條已自動核准；網站上有 email 就自動填進名單。沒有證據的名單不能產信；暖名單永遠不能產冷信。費用在按鈕上看得到。', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['C2'],
