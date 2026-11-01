@@ -130,7 +130,7 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
       <p class="plain">例：你在 Gmail 按下寄出，10 分鐘內系統知道寄了；對方回信，系統抓回來分類成「問價」，名單狀態變「已回覆」，追蹤信自動停。退訂與退信也自動處理。</p>
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium（主機排程安裝 High）</span><span class="who">負責：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>你寄 1 封給自己另一個信箱並回覆，10 分鐘內 Replies 頁出現該列、名單狀態變已回覆、追蹤日期清空。退信與退訂會進拒收名單。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>C4.1</code> 新資料表：回信。</span></li><li class="todo"><b>○</b><span><code>C4.2</code> Gmail 授權多要「讀信」權限；建草稿時記下對話串 id。你要重新授權一次。</span></li><li class="todo"><b>○</b><span><code>C4.3</code> 每 10 分鐘讀一次對話串：看出已寄、回信、退信，更新名單與事件。</span></li><li class="todo"><b>○</b><span><code>C4.4</code> 回信交給便宜模型分類；有回信就停追蹤；退訂與拒絕進拒收名單。</span></li><li class="todo"><b>○</b><span><code>C4.5</code> 主機排程每 10 分鐘叫一次；登記到排程頁。</span></li><li class="todo"><b>○</b><span><code>C4.6</code> Replies 頁：列出回信，給你按鈕決定下一步（報價、問窗口、拒收、會議、成交、失去）。</span></li><li class="todo"><b>○</b><span><code>C4.7</code> 測試與真寄一封給自己。</span></li></ul>
+      <ul class="items"><li class="todo"><b>○</b><span><code>C4.1</code> 新資料表：回信。</span></li><li class="todo"><b>○</b><span><code>C4.2</code> Gmail 授權多要「讀信」權限；建草稿時記下對話串 id。你要重新授權一次。</span></li><li class="todo"><b>○</b><span><code>C4.3</code> 每 10 分鐘檢查一次：從對話串看出你寄了沒；從收件匣用寄件人地址認出回信、退訂信與退信，對方另開新信也認得出來。</span></li><li class="todo"><b>○</b><span><code>C4.4</code> 回信交給便宜模型分類；有回信就停追蹤；回過信的人記為可以同步 FluentCRM；退訂與拒絕進拒收名單。</span></li><li class="todo"><b>○</b><span><code>C4.5</code> 主機排程每 10 分鐘叫一次；登記到排程頁。</span></li><li class="todo"><b>○</b><span><code>C4.6</code> Replies 頁：列出回信，給你按鈕決定下一步（報價、問窗口、拒收、會議、成交、失去）。</span></li><li class="todo"><b>○</b><span><code>C4.7</code> 測試與真寄一封給自己。</span></li></ul>
       <details><summary>工程細節：C4 回覆同步與 Replies 頁</summary>
         <p>migration 0151 co_replies；scope 加 gmail.readonly；存 threadId；gmail-sync.ts（已寄／回信／退信）；分類＋停追蹤＋拒收；internal route＋cron */10＋host-jobs；Replies 頁按鈕</p>
         <p><b>需先完成：</b><a href="#C2">C2</a>；待決 1（Google 授權發布狀態）</p>
@@ -182,7 +182,7 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
       <p class="plain">例：某個寄件帳號你決定讓系統自己寄。打開後，核准的信在上班時間、未超過每日上限、也沒進拒收名單時，由系統按寄出。帳號狀態一標「暫停」就全停。</p>
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（翻開 auto）</span><span class="who">負責：Opus 5.5＋你</span></p>
       <p class="donewhen"><b>完成的樣子：</b>同一封信兩個同時的請求只寄出一次。上班時間外不寄。暫停的帳號不寄。你自己的帳號開啟後，1 封寄到你另一個信箱。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>C8.1</code> 寄件帳號加「寄出方式」欄，預設是草稿。</span></li><li class="todo"><b>○</b><span><code>C8.2</code> 寄出接頭：只在開啟、健康、上班時間、未達上限、重查通過時寄；寄之前先鎖，逾時不重寄。</span></li><li class="todo"><b>○</b><span><code>C8.3</code> 每次同步末尾跑一次寄出；畫面上每個帳號有開關，開要輸入帳號確認。</span></li><li class="todo"><b>○</b><span><code>C8.4</code> 測試與你自己的帳號真寄一封。</span></li></ul>
+      <ul class="items"><li class="todo"><b>○</b><span><code>C8.1</code> 寄件帳號加「寄出方式」欄，預設是草稿。</span></li><li class="todo"><b>○</b><span><code>C8.2</code> 寄出接頭：只在開啟、健康、上班時間、未達上限、重查通過時寄；先佔帳號當日名額再鎖信，同帳號同時寄兩封也不會超過上限；逾時不重寄。</span></li><li class="todo"><b>○</b><span><code>C8.3</code> 每次同步末尾跑一次寄出；畫面上每個帳號有開關，開要輸入帳號確認。</span></li><li class="todo"><b>○</b><span><code>C8.4</code> 測試與你自己的帳號真寄一封。</span></li></ul>
       <details><summary>工程細節：C8 系統寄出開關</summary>
         <p>migration 0152 send_mode＋status sending；send-adapter.ts（唯一寄信白名單；鎖＋視窗＋上限＋重查；逾時只對帳不重寄）；sync tick 末尾呼叫；Connectors 開關</p>
         <p><b>需先完成：</b><a href="#C4">C4</a>；待決 4（每帳號翻 auto）</p>

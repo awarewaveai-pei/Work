@@ -97,7 +97,7 @@
 | `0149_outbound_v2_expand` | `co_sender_accounts.signature_block text`；`co_messages.followup_delay_days int`、`co_messages.gate_snapshot jsonb` | C2.1 |
 | `0150_co_evidence` | `co_evidence(id, organization_id, lead_id FK cascade, claim, source_url, excerpt, source_label, captured_at, source_date, confidence, status pending／approved／rejected, created_by, created_at)`；RLS service-role 照 `0048:5-11`；index `(lead_id, status)`；唯一 `(lead_id, source_url, claim)` | C3.1 |
 | `0151_co_replies` | v1 §B6 欄位＋`gmail_message_id text unique`、`received_at`、`classified_by` | C4.1 |
-| `0152_send_mode` | `co_sender_accounts.send_mode text default 'draft' check (draft／auto)`；`co_messages.status` CHECK 加 `sending` | C8.1 |
+| `0152_send_mode` | `co_sender_accounts.send_mode text default 'draft' check (draft／auto)`、`co_sender_accounts.daily_count_date date`（配既有 `daily_sent_count`，`0048:242`）；`co_messages.status` CHECK 加 `sending` | C8.1 |
 | 不加欄 | thread 對應存 `co_sending_events.metadata={threadId, messageId}`（`0048:273` 已有 jsonb） | C4.2 |
 | contract（parked） | `co_leads.observation`／`source_url` 停寫，由 evidence 取代；欄位不刪 | C9 |
 
@@ -106,7 +106,7 @@
 ## 5. 流程契約
 
 ### 5.1 研究（C3）
-輸入 lead 的 `name`、`website`、`social_url`。seeds＝website 與 social_url 各一（`scope` 該 host、`meta.entityName=name`、`meta.anchors=[name]`）→ `crawl(seeds, {sink: outreach-evidence, budget ≤15 頁／60 秒, callProvider: serper 若已設, maxDepth: 1})`（`NA/lib/collect/orchestrator.ts:254`）。非同步＋輪詢照 `/ops/collect`（`NA/app/api/ops/clients/[slug]/collection-sources/route.ts:106`、`NA/lib/collect/run-jobs.ts`）。sink 對每份已過品質閘與 provenance 篩查的 doc 呼叫 `generateCheapJsonText` 抽 ≤3 `{claim, excerpt}`；`excerpt` 必須是 `doc.text` 的子字串（機械驗，不符丟棄）；寫 `co_evidence` pending。0 claim → timeline `research_insufficient`，不生成。費用：grant `outreach.research`，按鈕顯示估價（`NA/lib/ai/cost-model.ts`）。
+輸入 lead 的 `name`、`website`、`social_url`。seeds＝website 與 social_url 各一（`scope` 該 host、`meta.entityName=name`、`meta.anchors=[name]`）→ `crawl(seeds, {sink: outreach-evidence, budget ≤15 頁／60 秒, callProvider: serper 若已設, maxDepth: 2})`（`NA/lib/collect/orchestrator.ts:254`；`maxDepth` 含種子頁，2＝首頁＋一層，`:404`）。非同步＋輪詢照 `/ops/collect`（`NA/app/api/ops/clients/[slug]/collection-sources/route.ts:106`、`NA/lib/collect/run-jobs.ts`）。sink 對每份已過品質閘與 provenance 篩查的 doc 呼叫 `generateCheapJsonText` 抽 ≤3 `{claim, excerpt}`；`excerpt` 必須是 `doc.text` 的子字串（機械驗，不符丟棄）；寫 `co_evidence` pending（`source_url=doc.canonicalUrl`、`source_label=doc.collector`、`source_date=doc.publishedAt`）。0 claim → timeline `research_insufficient`，不生成。費用：grant `outreach.research` 傳進 `generateCheapJsonText`（它今天固定用 `ops.cheap-json`，`NA/lib/ai/cheap-json.ts:40`、`:86`，C3.2 加選用 `grant` 參數），按鈕顯示估價（`NA/lib/ai/cost-model.ts`）。
 
 ### 5.2 證據審核
 Leads 頁列 pending 證據，approve／reject 兩顆按鈕。Cold Gate 通過＝≥1 approved evidence；過渡期舊 `observation+source_url` 亦通過，C9 收掉。
@@ -126,17 +126,17 @@ Leads 頁列 pending 證據，approve／reject 兩顆按鈕。Cold Gate 通過�
 Review 頁 A／B 並排，核准一版（另一版 `skipped`）。建草稿前重查 I6（`do_not_contact`、`isSuppressed` applies_to cold／all）→ 409。MIME：`Subject`（RFC 2047）、`List-Unsubscribe: <mailto:…>`（RFC 2369）；`drafts.create` 回 `{id, message:{id, threadId}}` → `co_sending_events` `draft_created` 的 `metadata={threadId, messageId}`。
 
 ### 5.5 寄出接頭（C8）
-`send_mode='draft'`：到此為止，人在 Gmail 按。`auto`：sync tick 末尾，條件 `health_status='healthy'` ∧ 台北 09–18 週一至五 ∧ 當日 `sent` 事件 < `daily_limit` ∧ 重查 I6 → `UPDATE co_messages SET status='sending' WHERE id=$1 AND status='drafted'` 取鎖 → `drafts.send` → `sent`＋事件。逾時／5xx 留 `sending`，下一 tick 以 `threads.get` 的 `SENT` label 對帳；30 分未對到 → `needs_edit`＋timeline；永不盲目重寄。
+`send_mode='draft'`：到此為止，人在 Gmail 按。`auto`：sync tick 末尾，條件 `health_status='healthy'` ∧ 台北 09–18 週一至五 ∧ 重查 I6 → 先以 compare-and-set 佔寄件帳號當日名額（`daily_sent_count`＋`daily_count_date`；0 列更新＝已滿或被搶先，不寄；鎖住的是帳號，不是信，所以同帳號兩封不同的信同時跑也不會超過上限）→ 再 `UPDATE co_messages SET status='sending' WHERE id=$1 AND status='drafted'` 鎖信 → `drafts.send` → `sent`＋事件；寄失敗不退名額。逾時／5xx 留 `sending`，下一 tick 以 `threads.get` 的 `SENT` label 對帳；30 分未對到 → `needs_edit`＋timeline；永不盲目重寄。
 
 ### 5.6 回覆同步（C4）
-scope＝`gmail.compose`＋`gmail.readonly`（不含 send／modify）。每 10 分：每個啟用 connector，取有 `threadId` 且 lead 未結案（status ∉ replied／no_reply／customer／lost／do_not_contact／unsubscribed）的 thread → `threads.get?format=metadata`：
-- 本方訊息帶 `SENT` label 且 `co_messages.status≠sent` → `sent`、`sent_at`、事件 `sent`、lead `status='sent'`、`last_contact_date`、`next_followup_date=sent＋下一封 followup_delay_days`。
-- `From`≠sender → upsert `co_replies`（`gmail_message_id`）→ `generateCheapJsonText` 分類 `reply_type`（interested／pricing／more_info／case_study／wrong_contact／has_vendor／no_need／reject／unsubscribe）＋`suggested_response` → lead `status='replied'`、`next_followup_date=null`；`unsubscribe`／`reject` → suppression（`unsubscribe`／`manual_opt_out`）＋`do_not_contact`。
-- `From` 含 `mailer-daemon` → 事件 `hard_bounced`＋suppression `hard_bounce`＋`do_not_contact`。
+scope＝`gmail.compose`＋`gmail.readonly`（不含 send／modify）。**不變量：來信靠寄件人地址認人，不靠我們建的對話串**——對方可能另開新信、用 `List-Unsubscribe` 寄來一封主旨 `unsubscribe` 的信、或在 lead 標 `no_reply` 之後才回。每 10 分、每個啟用 connector 兩段：
+- **已寄偵測**（靠 thread）：`co_messages.status ∈ {drafted, sending}` 且事件有 `threadId` → `threads.get?format=metadata`；本方訊息帶 `SENT` label → `sent`、`sent_at`、事件 `sent`、lead `status='sent'`、`last_contact_date`、`next_followup_date=sent＋下一封 followup_delay_days`。
+- **來信比對**（靠地址）：`messages.list?q=in:inbox newer_than:7d -from:me` → `messages.get?format=metadata`（From、Subject、In-Reply-To、X-Failed-Recipients）→ 寄件人 email 小寫比對同 org `co_leads.email`，不論 lead 狀態 → upsert `co_replies`（`gmail_message_id` 唯一，重跑冪等）。主旨 `unsubscribe` 直接判 `unsubscribe`；其餘 `generateCheapJsonText`（grant `outreach.classify`）分類 `reply_type`（interested／pricing／more_info／case_study／wrong_contact／has_vendor／no_need／reject／unsubscribe）＋`suggested_response` → lead `status='replied'`、`next_followup_date=null`、`consent_status` 由 `unknown`／`legitimate_interest` 升為 `replied`（不降級）；`unsubscribe` → `consent_status='unsubscribed'`＋suppression `unsubscribe`＋`do_not_contact`；`reject` → `consent_status='do_not_contact'`＋suppression `manual_opt_out`＋`do_not_contact`。`From` 含 `mailer-daemon` → 以 `X-Failed-Recipients` 找 lead → 事件 `hard_bounced`＋suppression `hard_bounce`＋`do_not_contact`。
+- 7 天視窗夠用：同步停超過 7 天時 `/ops/schedules` 那列早已變紅並推播（`NA/lib/schedules/host-jobs.ts` 登記，C4.5）。
 全部寫 `co_timeline_events`。Replies 頁按鈕：產報價摘要（`output_type=proposal_summary`）、問正確窗口、加入拒收、同步 FluentCRM、約到會議、成交、失去。
 
 ### 5.7 追蹤（C5）
-Follow-ups 頁＝`next_followup_date ≤ 今天` ∧ `status='sent'` 的 lead＋下一封 followup 列。建草稿：MIME 加 `In-Reply-To`／`References`＝本方上一封 `Message-ID`（`threads.get` headers），`drafts.create` 帶 `threadId`（回同一串）。最後一封寄出後經其 `followup_delay_days` 無回信 → `no_reply`。`channel≠email` 步驟＝待辦＋完成按鈕。
+Follow-ups 頁＝`next_followup_date ≤ 今天` ∧ `status='sent'` 的 lead＋下一封 followup 列。建草稿：MIME 加 `In-Reply-To`／`References`＝本方上一封 `Message-ID`（`threads.get` headers），`drafts.create` 帶 `threadId`（回同一串）。最後一封寄出後經其 `followup_delay_days` 無回信 → `no_reply`；`no_reply` 不是同步終點，之後來信照 §5.6 改成 `replied`。`channel≠email` 步驟＝待辦＋完成按鈕。
 
 ### 5.8 暖名單（C6）
 資格＝`consent_status ∈ {replied, opted_in, form_submitted, customer}` ∧ 非 suppression（marketing／all）。呼叫該 org 站 wp-bridge `POST /fluentcrm/contact`（signed write）upsert contact＋lists／tags → `fluentcrm_contact_id`、`fluentcrm_sync_status='synced'`、`fluentcrm_last_synced_at`、timeline；不合格 422。冷名單不是訂閱者。

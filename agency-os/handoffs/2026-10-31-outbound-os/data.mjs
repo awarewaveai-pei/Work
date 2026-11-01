@@ -9,7 +9,7 @@ export const META = {
   req: 'agency-os/docs/Outbound_OS_Engineering_Spec/Outbound_OS_Engineering_Spec.md',
   worklog: 'agency-os/WORKLOG.md 2026-10-31',
   self: 'agency-os/handoffs/2026-10-31-outbound-os/',
-  url: '',
+  url: 'https://claude.ai/artifact/DbH1HLUihZwAiBiJZGSD4t',
 };
 
 // 頁面上所有固定文字（不含資料列）。{x} 由 build.mjs 代入算出來的值。
@@ -82,8 +82,8 @@ export const STEPS = [
     items: [
       todo('C4.1', '新資料表：回信。'),
       todo('C4.2', 'Gmail 授權多要「讀信」權限；建草稿時記下對話串 id。你要重新授權一次。'),
-      todo('C4.3', '每 10 分鐘讀一次對話串：看出已寄、回信、退信，更新名單與事件。'),
-      todo('C4.4', '回信交給便宜模型分類；有回信就停追蹤；退訂與拒絕進拒收名單。'),
+      todo('C4.3', '每 10 分鐘檢查一次：從對話串看出你寄了沒；從收件匣用寄件人地址認出回信、退訂信與退信，對方另開新信也認得出來。'),
+      todo('C4.4', '回信交給便宜模型分類；有回信就停追蹤；回過信的人記為可以同步 FluentCRM；退訂與拒絕進拒收名單。'),
       todo('C4.5', '主機排程每 10 分鐘叫一次；登記到排程頁。'),
       todo('C4.6', 'Replies 頁：列出回信，給你按鈕決定下一步（報價、問窗口、拒收、會議、成交、失去）。'),
       todo('C4.7', '測試與真寄一封給自己。'),
@@ -126,7 +126,7 @@ export const STEPS = [
     files: ['DB/migrations/0152_send_mode.sql', 'NA/lib/outreach/send-adapter.ts', 'NA/lib/outreach/gmail-sync.ts'],
     items: [
       todo('C8.1', '寄件帳號加「寄出方式」欄，預設是草稿。'),
-      todo('C8.2', '寄出接頭：只在開啟、健康、上班時間、未達上限、重查通過時寄；寄之前先鎖，逾時不重寄。'),
+      todo('C8.2', '寄出接頭：只在開啟、健康、上班時間、未達上限、重查通過時寄；先佔帳號當日名額再鎖信，同帳號同時寄兩封也不會超過上限；逾時不重寄。'),
       todo('C8.3', '每次同步末尾跑一次寄出；畫面上每個帳號有開關，開要輸入帳號確認。'),
       todo('C8.4', '測試與你自己的帳號真寄一封。'),
     ] },

@@ -64,8 +64,8 @@ B。順序：C1（守衛）→ C2（信本身）→ C3（研究）→ C4＋C6 �
 | 卡號 | 做什麼 |
 |---|---|
 | C3.1 | `DB/migrations/0150_co_evidence.sql`：`co_evidence(id, organization_id, lead_id FK cascade, claim text, source_url text, excerpt text, source_label text, captured_at timestamptz default now(), source_date date, confidence numeric, status text check in ('pending','approved','rejected') default 'pending', created_by text, created_at)`；RLS service-role（照 `DB/migrations/0048_co_outreach_core.sql:5-11`）；index `(lead_id, status)`；唯一鍵 `(lead_id, source_url, claim)`；down 兩處 |
-| C3.2 | 新檔 `NA/lib/collect/sinks/outreach-evidence.ts`：`SinkBlock`（`NA/lib/collect/types.ts:253-270`）；`run(docs)`：每份 doc → `generateCheapJsonText`（`NA/lib/ai/cheap-json.ts:33`，grant `outreach.research`）抽 ≤3 `{claim, excerpt}`；`excerpt` 必須是 `doc.text` 的子字串（機械驗，否則丟棄並計 skipped）；寫 `co_evidence` pending，`source_label=doc.provenance` |
-| C3.3 | 新檔 `NA/lib/outreach/research.ts`＋新路由 `NA/app/api/outreach/leads/research/route.ts`（POST `{leadId}`）：seeds＝lead `website`、`social_url`（各 `scope` 該 host，`meta.entityName=name`，`meta.anchors=[name]`）→ `crawl(seeds, {sink, budget ≤15 頁／60 秒, callProvider: serper 若已設, maxDepth 1})`（`NA/lib/collect/orchestrator.ts:254`）；非同步＋輪詢照 `NA/app/api/ops/clients/[slug]/collection-sources/route.ts:106` 與 `NA/lib/collect/run-jobs.ts`；0 claim → timeline `research_insufficient`，不生成 |
+| C3.2 | 先改 `NA/lib/ai/cheap-json.ts`：`CheapJsonTextArgs` 加選用 `grant`，兩條路（`:40` OpenAI、`:86` Anthropic）改用 `args.grant ?? await grantFor("ops.cheap-json")`，既有呼叫點不變。新檔 `NA/lib/collect/sinks/outreach-evidence.ts`：`SinkBlock`（`NA/lib/collect/types.ts:253-270`）；`run(docs)`：每份 doc → `generateCheapJsonText({ grant: grantFor("outreach.research", …) })` 抽 ≤3 `{claim, excerpt}`；`excerpt` 必須是 `doc.text` 的子字串（機械驗，否則丟棄並計 skipped）；寫 `co_evidence` pending，`source_url=doc.canonicalUrl`、`source_label=doc.collector`、`source_date=doc.publishedAt`（`doc.provenance` 是物件且恆為 EVIDENCE，`types.ts:41-45`，不存） |
+| C3.3 | 新檔 `NA/lib/outreach/research.ts`＋新路由 `NA/app/api/outreach/leads/research/route.ts`（POST `{leadId}`）：seeds＝lead `website`、`social_url`（各 `scope` 該 host，`meta.entityName=name`，`meta.anchors=[name]`）→ `crawl(seeds, {sink, budget ≤15 頁／60 秒, callProvider: serper 若已設, maxDepth: 2})`（`NA/lib/collect/orchestrator.ts:254`；`maxDepth` 含種子頁，2＝首頁＋一層，`:404`）；非同步＋輪詢照 `NA/app/api/ops/clients/[slug]/collection-sources/route.ts:106` 與 `NA/lib/collect/run-jobs.ts`；0 claim → timeline `research_insufficient`，不生成 |
 | C3.4 | `NA/lib/portal/products.ts:88` features 加 `quota("outreach.research", "客戶研究")`；`products.test.ts` 綠 |
 | C3.5 | UI：Leads 頁每筆「研究這家（約 NT$x）」按鈕（費用由 `NA/lib/ai/cost-model.ts` 算）；證據列表 approve／reject 兩顆按鈕；`NA/lib/outreach/cold-gate.ts` `checkColdGate` 改：≥1 approved evidence 通過；過渡期舊 `observation+source_url` 亦通過（C9 收） |
 | C3.6 | 測試：sink 子字串驗證（假 doc、假 JSON）；REALTEST：本機對 1 個真實公開網站跑研究 → `co_evidence` ≥1 列且 excerpt 可在頁面原文找到 |
@@ -76,11 +76,11 @@ B。順序：C1（守衛）→ C2（信本身）→ C3（研究）→ C4＋C6 �
 |---|---|
 | C4.1 | `DB/migrations/0151_co_replies.sql`：採 v1 spec §B6 欄位＋`gmail_message_id text unique`、`received_at timestamptz`、`classified_by text`；RLS 照 0048；down 兩處 |
 | C4.2 | `NA/lib/outreach/google-oauth.ts`：`GMAIL_SCOPE` → `gmail.compose`＋`gmail.readonly`；`createGmailDraft` 回 `{id, message:{id, threadId}}`；`NA/app/api/outreach/messages/gmail-draft/route.ts:179-188` 事件 `metadata={threadId, messageId}`；`NA/lib/outreach/__tests__/google-oauth.test.ts:60` 改斷言只含這兩個 scope；操作者重新授權一次（待決 1 先定） |
-| C4.3 | 新檔 `NA/lib/outreach/gmail-sync.ts`：每個啟用的 Gmail connector：取 `co_sending_events` 有 threadId 且 lead 未結案的 thread → `threads.get?format=metadata` → ①本方訊息帶 `SENT` label 且 message 未 sent → `co_messages.status='sent'`、`sent_at`、事件 `sent`、lead `status='sent'`、`last_contact_date`、`next_followup_date=sent＋下一封 followup_delay_days`；②`From`≠sender → upsert `co_replies`（`gmail_message_id`）；③`From` 含 `mailer-daemon` → 事件 `hard_bounced`＋suppression `hard_bounce`＋`do_not_contact` |
-| C4.4 | 分類：`generateCheapJsonText` → `reply_type`（v1 九種）＋`suggested_response`；lead `status='replied'`、`next_followup_date=null`；`unsubscribe`／`reject` → suppression（reason `unsubscribe`／`manual_opt_out`）＋`do_not_contact`；全部寫 `co_timeline_events` |
+| C4.3 | 新檔 `NA/lib/outreach/gmail-sync.ts`，每個啟用的 Gmail connector 兩段（SPEC §5.6）：①**已寄偵測**：`co_messages.status ∈ {drafted, sending}` 且事件有 threadId → `threads.get?format=metadata`，本方訊息帶 `SENT` label → `sent`、`sent_at`、事件 `sent`、lead `status='sent'`、`last_contact_date`、`next_followup_date`；②**來信比對**：`messages.list?q=in:inbox newer_than:7d -from:me` → `messages.get?format=metadata&metadataHeaders=From,Subject,In-Reply-To,X-Failed-Recipients` → 寄件人 email（小寫）比對同 org `co_leads.email`，不看 lead 狀態也不看 thread（新開的信、`List-Unsubscribe` 寄來的信、`no_reply` 之後的回信都抓得到）→ upsert `co_replies`（`gmail_message_id` 唯一＝重跑冪等）；`From` 含 `mailer-daemon` → 以 `X-Failed-Recipients` 比對 lead → 事件 `hard_bounced`＋suppression `hard_bounce`＋`do_not_contact` |
+| C4.4 | 分類：主旨為 `unsubscribe`（`List-Unsubscribe` mailto，C1.3）直接記 `unsubscribe` 不叫 AI；其餘 `generateCheapJsonText({ grant: grantFor("outreach.classify", …) })` → `reply_type`（v1 九種）＋`suggested_response`；`NA/lib/portal/products.ts:88` 加 `quota("outreach.classify", "回信分類")`。lead：`status='replied'`、`next_followup_date=null`、`consent_status` 由 `unknown`／`legitimate_interest` 升為 `replied`（不降 `opted_in`／`form_submitted`／`customer`）；`unsubscribe` → `consent_status='unsubscribed'`＋suppression `unsubscribe`＋`do_not_contact`；`reject` → `consent_status='do_not_contact'`＋suppression `manual_opt_out`＋`do_not_contact`；全部寫 `co_timeline_events` |
 | C4.5 | 新路由 `NA/app/api/internal/outreach/gmail-sync/route.ts`（Bearer `OUTREACH_SYNC_TOKEN`，照 `NA/app/api/internal/schedules/alerts/route.ts:21-25`）；`HS/cron.d/awarewave-schedules` 加 `*/10` 一行經 `poke.sh`；`NA/lib/schedules/host-jobs.ts` 登記 `outreach_gmail_sync`；安裝主機 cron（High） |
 | C4.6 | `NA/app/(shell)/outreach/replies/page.tsx` 取代 stub：全 org 列表（時間、lead、分類、原文摘要）；按鈕：產報價摘要（`output_type=proposal_summary`）、問正確窗口、加入拒收、同步 FluentCRM（C6 後啟用）、約到會議、成交、失去（各改 `co_leads.status`） |
-| C4.7 | 測試：threads.get 假回應三情境（已寄／回信／退信）；REALTEST（部署後）：操作者寄 1 封給自己的另一信箱並回覆 → 10 分內 Replies 出現該列、lead 狀態 replied、follow-up 日期清空 |
+| C4.7 | 測試：假回應四情境（已寄、同串回信、新開一封的退訂信、`no_reply` 後回信）＋退信；同一 `gmail_message_id` 跑兩次只一列；REALTEST（部署後）：操作者寄 1 封給自己的另一信箱並回覆 → 10 分內 Replies 出現該列、lead 狀態 replied、follow-up 日期清空 |
 
 ### C5 追蹤信與人工步驟
 
@@ -88,7 +88,7 @@ B。順序：C1（守衛）→ C2（信本身）→ C3（研究）→ C4＋C6 �
 |---|---|
 | C5.1 | `NA/app/(shell)/outreach/followups/page.tsx`：列出 `next_followup_date ≤ 今天` 且 `status='sent'` 的 lead，顯示下一封 followup 列（最小未寄 `version`）；「建草稿（回同一串）」按鈕 |
 | C5.2 | `NA/app/api/outreach/messages/gmail-draft/route.ts` 接受 followup 列：MIME 加 `In-Reply-To`／`References`＝本方上一封的 `Message-ID`（`threads.get` headers），`drafts.create` 帶 `threadId`；事件照常 |
-| C5.3 | 最後一封寄出後經其 `followup_delay_days` 無回信 → lead `status='no_reply'`（在 gmail-sync tick 判） |
+| C5.3 | 最後一封寄出後經其 `followup_delay_days` 無回信 → lead `status='no_reply'`（在 gmail-sync tick 判）；`no_reply` 不是同步終點，之後來信由 C4.3 ② 照常改成 `replied` |
 | C5.4 | `channel≠email` 的步驟（`co_messages.channel` ig_dm／linkedin／phone）在同頁顯示為待辦＋「完成」按鈕（寫 timeline，推進 `next_followup_date`）；本卡只顯示與完成，不產生這類步驟（SPEC §2 D9） |
 | C5.5 | 測試：In-Reply-To 組裝；REALTEST：本機建一封 followup 草稿 → Gmail 中出現在原 thread |
 
@@ -113,10 +113,10 @@ B。順序：C1（守衛）→ C2（信本身）→ C3（研究）→ C4＋C6 �
 
 | 卡號 | 做什麼 |
 |---|---|
-| C8.1 | `DB/migrations/0152_send_mode.sql`：`co_sender_accounts.send_mode text not null default 'draft' check (send_mode in ('draft','auto'))`；`co_messages.status` CHECK 加 `sending`；down 兩處 |
-| C8.2 | 新檔 `NA/lib/outreach/send-adapter.ts`（never-sends 測試唯一白名單）：`sendDraft(draftId)`＝`drafts.send`；只在 `send_mode='auto'` ∧ `health_status='healthy'` ∧ 台北 09–18 週一至五 ∧ 當日未達 `daily_limit` ∧ 重查 I6 → `UPDATE co_messages SET status='sending' WHERE id=$1 AND status='drafted'` 取鎖 → 寄 → `sent`；逾時／5xx 留 `sending`，由 gmail-sync 以 `SENT` label 對帳，30 分未對到 → `needs_edit`＋timeline，永不盲目重寄 |
+| C8.1 | `DB/migrations/0152_send_mode.sql`：`co_sender_accounts.send_mode text not null default 'draft' check (send_mode in ('draft','auto'))`、`co_sender_accounts.daily_count_date date`；`co_messages.status` CHECK 加 `sending`；down 兩處 |
+| C8.2 | 新檔 `NA/lib/outreach/send-adapter.ts`（never-sends 測試唯一白名單）：`sendDraft(draftId)`＝`drafts.send`；只在 `send_mode='auto'` ∧ `health_status='healthy'` ∧ 台北 09–18 週一至五 ∧ 重查 I6 → **先佔名額**：讀 `daily_sent_count`／`daily_count_date`（`0048:242`），以 compare-and-set 寫回（日期是今天：`.update({daily_sent_count: n+1}).eq('id').eq('daily_sent_count', n).eq('daily_count_date', today)` 且 `n < daily_limit`；不是今天：設 `(1, today)` 並 `.eq` 舊值），0 列更新＝被別人搶先或已滿，不寄 → **再鎖信**：`UPDATE co_messages SET status='sending' WHERE id=$1 AND status='drafted'` → 寄 → `sent`；寄失敗不退名額（寧少不多）；逾時／5xx 留 `sending`，由 gmail-sync 以 `SENT` label 對帳，30 分未對到 → `needs_edit`＋timeline，永不盲目重寄 |
 | C8.3 | gmail-sync tick 末尾呼叫 send-adapter；Connectors 頁每個寄件帳號「系統寄出：關／開」按鈕，開需輸入帳號 email 確認；翻開＝High，每帳號一次（待決 4） |
-| C8.4 | 測試：鎖競爭（兩次呼叫只寄一次）、視窗外不寄、paused 不寄；REALTEST：操作者自己的帳號開 auto、1 封寄到自己另一信箱 |
+| C8.4 | 測試：同一封信兩次呼叫只寄一次；同帳號已寄 19／上限 20 時兩封不同的信同時呼叫只寄一封；跨日歸零；視窗外不寄、paused 不寄；REALTEST：操作者自己的帳號開 auto、1 封寄到自己另一信箱 |
 
 ### C9 舊欄位退場（contract）
 
