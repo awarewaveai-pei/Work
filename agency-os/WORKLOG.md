@@ -1,4 +1,36 @@
 # Worklog
+## 2026-11-01（續19）外聯系統 v2 卡 C17：研究讀店家的 IG／FB 頁（Meta 官方 API → Google 摘要 → Apify），貼文事實一律待審；Apify 與 Meta 金鑰放進 user-env
+
+**操作者**：「研究功能不讀社群頁 要做成可以讀社群」→ 比較官方 API／搜尋摘要／第三方爬取與線上工具（PhantomBuster 用你的登入 cookie＝停權風險，排除）→「先裝, 但先不測試」→ 憑證檔 1306 行 Apify、Meta 同一份文件 → 「開工」；檔案鎖誤判「釋放並接手」；Codex 剩 1%「若不夠 就自我審查」。
+
+**根因**：C10 真查 20 家有 11 家拿 IG／FB 當網站；`research.ts` 拒絕平台網址、`social_url` 不讀（舊 D20），這些名單沒有事實也沒有 email。
+
+**做了**：
+- 金鑰：`mcp/user-env.ps1` 加 `APIFY_API_TOKEN`、`META_APP_ID`、`META_APP_SECRET`、`META_PAGE_TOKEN_AWARE_WAVE`、`META_PAGE_TOKEN_SOULFUL`（憑證檔 1306／1056／1057／630／649 行，只驗長度 46／16／32／208／212）；模板佔位 `116ff3d4b`。真打發現兩個粉專 token 都連著 IG 商業帳號、Business Discovery 可用（憑證檔 631 行「缺 instagram_basic」已過時）。
+- C17.1 SPEC D20 改寫＋§5.1 seed；R0-PLAN §6 C17。
+- C17.2 `NA/lib/collect/net/providers.ts`：`allowedPathPatterns`、`allowedMethods`；`meta_discovery`（只 GET、只 `/vX.Y/me` 與 `/vX.Y/<igId>`：這把 token 能發文，POST 物件會改資料）、`apify_instagram`／`apify_facebook`（各鎖一個 actor 路徑）。
+- C17.3 新檔 `NA/lib/outreach/social-research.ts`：`socialTarget`；階梯找到就停、沒金鑰 skipped、Apify 先 `Grant.hold`；自介 email 算對方宣告；注入篩查；貼文帶日期、180 天、`meta.reviewOnly`。
+- C17.4 `research.ts`：沒自家網站或網站沒可用 email 才跑；`sink/outreach-research` 加 `admit`（精確網址）與 reviewOnly→pending；timeline `social_research`、outcome `social`；研究路由讀 `social_url`；cost-model 上限加社群。
+- C17.5 名單頁：只有 IG／FB 頁也能按研究；結果顯示用了哪一層、費用、哪層未設定。
+- **真查抓到的問題**：兩篇近期貼文營業時間互相矛盾（5 月 13:00–00:00、6 月 13:00–01:00）原本都自動核准 → 不變量：貼文是當天公告，事實一律待人核准；只有自介（當下狀態）走自動核准。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsx c17-e2e.mts（真 leads／research 路由＋正式庫）Coffee Here（website＝IG）→ meta_discovery found、9 條證據：自介 3 條自動核准（地址、11 月公休、最後點餐）、貼文 6 條 pending；FB 粉專（social_url）→ serper empty、apify_facebook skipped（刻意清空 token）；測試名單刪除後 0 殘留 | exit=0 | ms=50286
+- REALTEST_EVIDENCE: tool=Bash | cmd=node meta-probe.mjs（唯讀）兩個粉專 token 有效、各連 IG 商業帳號、business_discovery 查 _coffeehere_ 回自介／網站／追蹤／3 篇貼文 | exit=0 | ms=4000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit；npx vitest run lib/outreach lib/collect app/api/outreach lib/ai lib/portal → 739 passed，2 failed＝他 session 未追蹤 tools/seedstar；新測試 social-research 9、research 2、provider 路徑／方法鎖 1；verify-build-gates ALL PASSED | exit=1 | ms=200000
+- REALTEST_EVIDENCE: tool=Bash | cmd=c17-mutate.py 突變 10 守衛（找到就停、摘要只認該頁、無預扣不跑 actor、注入篩查、180 天、貼文待審、admit 精確網址、Graph 路徑樣式、Graph 只 GET、IG 網站走社群）各自紅→還原綠 | exit=0 | ms=33414
+- REALTEST_WAIVED: NA -- Apify 兩個 actor 未真跑（操作者「先裝, 但先不測試」）；輸出欄位依 actor 頁面推定、防禦式解析，C17.6 留未完成
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/4n（書面對抗自審，操作者指示不送 Codex：token 只在 header 不進網址；IG handle 限 [a-z0-9._] 且 encode；n1 IG 帳號 id 快取後 token 若被撤銷，Business Discovery 的 400 會被當「查不到」而非錯誤；n2 搜尋摘要 US$0.001 記入費用但未扣點（與研究爬取的 Serper 一致、與找名單不一致）；n3 FB `profile.php?id=` 可能是個人帳號而非粉專；n4 研究結果 detail 會顯示 `missing_APIFY_API_TOKEN` 這類設定名）
+- ORACLE_WAIVED: Codex 額度剩 1%，操作者 2026-11-01「若不夠 就自我審查」；以書面自審＋10 項突變替代
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=social_url 不爬\|不寫任何爬 IG\|isPlatformHost\|allowedPaths | hits=3（SPEC D20 與 §5.1 兩處舊說法已改；allowedPaths 新語意與 pattern 並存，既有 provider 測試全綠）
+
+**剩**：
+- C17.6：Apify 真跑一次（約 NT$1–3），你說可以再做。
+- 檔案鎖誤判：`file-claims` 把本 session 的 Bash 寫入記到 `claude:5cbc518c` 名下（C3 也發生），依操作者同意 release；hook 歸屬邏輯值得查。
+- 名單頁顯示是字串改動，未在瀏覽器實看（需登入與正式資料）。
+- 正式站等今晚 03:00 自動部署。
+
+**rollback**：`git revert 5bdba0ef6`；無 migration；金鑰在本機 user-env.ps1，刪五行即回復。
 ## 2026-11-01（續18）Mockup Studio「模特兒印製」：模特兒圖庫（AI 建一次）＋程式把設計印到素色姿勢照（免費、隨皺褶）；migration 0151 補回 preset domain；R2 跨 bucket 路徑穿越關閉
 
 **操作者**：要固定模特兒、男女多位、不同姿勢＋同一設計圖合成；看完試驗後「圖案都沒有隨衣服的皺褶 這是最大的敗筆」→「改用程式印」。計畫 `agency-os/docs/operations/MOCKUP_FIXED_MODEL_PLAN.md`（頂端「與下文不同處」為準）。
