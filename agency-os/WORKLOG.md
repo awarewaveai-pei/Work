@@ -1,4 +1,21 @@
 # Worklog
+## 2026-11-01（續4）Outbound OS v2：五項待決由規劃者決定（操作者授權）
+
+**觸發**：操作者「需要決定的事都你決定」。
+
+**決定**（正本 SPEC §2，`d21f2481e`）：
+- D12 寄件：AwareWave＝已連線 `awarewaveai@gmail.com`；代操客戶＝客戶自己的信箱；署名預設 `display_name`＋org 名稱＋`proof_links[0]`；`daily_limit` 20（`0048:241`）。
+- D13 Google OAuth 發布（未驗證）。證據：7 天到期只寫在 Testing（developers.google.com/identity/protocols/oauth2）；`gmail.compose`／`gmail.readonly` 皆 restricted（support.google.com/cloud/answer/13464325）；未驗證上限 100 位新使用者、專案終身（answer/13463817）。操作者唯一動手在 C4.2。回頭：開「賣」前做驗證。
+- D16 FluentCRM 目標＝org 的 active `wp_sites` 列（`0039_wp_sites.sql:11`、`0061_wp_sites_add_org.sql:36`）；C6 parked（0 回信；aware-wave.com 只留 WordPress，操作者 10-30）。
+- D17 不開 auto；C8 parked 至：草稿模式 50 封、退信 < 2%、0 投訴、回信同步 2 週。
+- D18 名單發現＝Serper `/places`（既有 `SERPER_API_KEY`）；`providers.ts:88` 只放 `/search` 是因為沒別的呼叫者（`:76-82` 註解）。C10 解鎖、改與 C3 並行。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=python verify_paths.py（108 條、0 缺）; node build.mjs && node check.mjs（10 cards／43 items 綁定 §6、0 open、page fresh） | exit=0 | ms=88
+- REVIEW_WAIVED: DOC_ONLY -- 決策紀錄；Google 規則經 web-fetch 讀官方頁確認（未讀到 production 未驗證的 token 期限，SPEC 只寫已讀到的）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=待決 [0-9] | hits=0（SPEC、R0-PLAN、data.mjs）
+
+**下一步**：C1。建議模型：Opus 5.5（可派 Codex）。
 ## 2026-11-01（續3）Outbound OS v2：Codex 審規格 7 項全成立並改進卡片；監工台發布
 
 **觸發**：2026-10-31 續1 收尾因筆電沒電留下兩項：Codex 審規格、監工台發布。操作者「有電了」。
