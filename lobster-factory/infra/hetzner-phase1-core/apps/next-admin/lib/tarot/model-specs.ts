@@ -186,4 +186,12 @@ export const MODEL_SPECS: Record<TarotModel, ModelSpec> = {
     notes: "with an image the call goes to /images/edits",
     sources: [OPENAI_IMG, OPENAI_GUIDE],
   },
+  "openai-25-edit": {
+    label: "GPT-Image-2.5 修圖", vendor: "OpenAI",
+    promptLimit: "32,000 characters", promptOrder: "style-second", referenceRole: "edit", usesDeckPreview: false,
+    rewrite: "none on the Images API", seed: false, negativePrompt: "no field",
+    vendorOrder: "what to change, what stays identical, constraints",
+    notes: "gpt-image-2.5-sunburst via /images/edits: edits one photo while keeping the rest; prints follow fabric folds (Mockup Studio 2026-11-01)",
+    sources: [OPENAI_IMG, OPENAI_GUIDE],
+  },
 };

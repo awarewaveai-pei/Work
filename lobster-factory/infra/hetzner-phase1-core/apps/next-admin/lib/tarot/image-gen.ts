@@ -1,7 +1,7 @@
 // Server-side image generation for the tarot print-file tool.
 // Models (provider keys in app env), cheapest → priciest:
 //   flux-schnell/dev  → Replicate BFL (text2img; dev adds img2img)
-//   openai-low/med/hi → OpenAI images (OPENAI_IMAGE_MODEL in lib/ai/cost-model.ts)
+//   openai-low/med/hi → OpenAI images (OPENAI_IMAGE_MODEL in lib/ai/cost-model.ts); openai-25-edit → gpt-image-2.5-sunburst (config.openaiModel)
 //   ideogram-*        → Ideogram via Replicate (v2a-turbo/v3-balanced/v4-turbo/v4-quality/character)
 //   nano-banana-2/pro → Google Gemini Image via Replicate
 //   imagen-4          → Google Imagen 4 via Replicate
@@ -17,7 +17,7 @@ import { holdCost, logImageResult } from "@/lib/ai/log-ai-call";
 import { imageCostUsd } from "@/lib/ai/cost-calculator";
 import { OPENAI_IMAGE_MODEL, OPENAI_IMAGE_TOKEN_RATES } from "@/lib/ai/cost-model";
 
-const GEN_TIMEOUT_MS = 58_000; // stay under the 60s nginx/route ceiling
+const GEN_TIMEOUT_MS = 58_000; // default; a model sets ModelConfig.timeoutMs when its route allows more (app nginx proxy_read_timeout is 300s)
 // Replicate holds a "Prefer: wait" request up to this many seconds, then answers with the running prediction: shorter
 // than GEN_TIMEOUT_MS so the prediction id is always in hand before our own deadline (cancel + log it, below).
 const REPLICATE_WAIT_S = 45;
@@ -34,6 +34,7 @@ export type TarotModel =
   | "openai-low"
   | "openai-medium"
   | "openai-high"
+  | "openai-25-edit"
   | "ideogram-v2a-turbo"
   | "ideogram-v3-balanced"
   | "ideogram-v4-turbo"
@@ -63,6 +64,10 @@ interface ModelConfig {
   slug?: string;
   supportsImg2img: boolean;
   quality?: "low" | "medium" | "high";
+  /** OpenAI image model id when not OPENAI_IMAGE_MODEL (2026-11-01: gpt-image-2.5-sunburst keeps an edited photo's unmasked pixels and prints onto fabric following its folds; gpt-image-2 did not). */
+  openaiModel?: string;
+  /** Overrides GEN_TIMEOUT_MS; the calling route's maxDuration must cover it. */
+  timeoutMs?: number;
   /**
    * Per-model input builder. Returns the full `input` object sent to the Replicate prediction API.
    * This is the flexible combo-pack abstraction reusable across apps beyond Tarot Studio.
@@ -147,6 +152,8 @@ export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
   "openai-low": { provider: "openai", supportsImg2img: true, quality: "low" },
   "openai-medium": { provider: "openai", supportsImg2img: true, quality: "medium" },
   "openai-high": { provider: "openai", supportsImg2img: true, quality: "high" },
+  // 25-35 s measured 2026-11-01 (4 edits, high, 2 refs); fabric-print route maxDuration 120.
+  "openai-25-edit": { provider: "openai", supportsImg2img: true, quality: "high", openaiModel: "gpt-image-2.5-sunburst", timeoutMs: 110_000 },
   // ── Ideogram via Replicate ────────────────────────────────────────────────
   // v2a/v3 keep seed support; v4 dropped seed entirely (live schema 2026-06-11).
   // Optional enum params (style_type/magic_prompt_option) omitted — defaults are fine and the
@@ -579,7 +586,7 @@ async function generateOpenai(params: TarotGenParams, config: ModelConfig, signa
   const refs = params.referenceImages ?? [];
   if (refs.length > 0) {
     const form = new FormData();
-    form.append("model", OPENAI_IMAGE_MODEL);
+    form.append("model", config.openaiModel ?? OPENAI_IMAGE_MODEL);
     form.append("prompt", params.prompt);
     form.append("size", SIZE);
     form.append("quality", quality);
@@ -604,7 +611,7 @@ async function generateOpenai(params: TarotGenParams, config: ModelConfig, signa
     res = await fetch(providerUrl(grant, "openai", "/v1/images/generations"), {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: OPENAI_IMAGE_MODEL, prompt: params.prompt, size: SIZE, quality, n: 1 }),
+      body: JSON.stringify({ model: config.openaiModel ?? OPENAI_IMAGE_MODEL, prompt: params.prompt, size: SIZE, quality, n: 1 }),
       signal,
     });
   }
@@ -653,7 +660,7 @@ async function runGeneration(params: TarotGenParams, grant: Grant): Promise<Taro
   const config = TAROT_MODELS[params.model];
   if (!config) return { ok: false, error: "unknown_model" };
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), GEN_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), config.timeoutMs ?? GEN_TIMEOUT_MS);
   try {
     if (config.provider === "flux") return await generateFlux(params, config, controller.signal, grant);
     if (config.provider === "replicate") return await generateReplicate(params, config, controller.signal, grant);

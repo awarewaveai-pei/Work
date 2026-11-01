@@ -1,7 +1,7 @@
 "use client";
 // 模特兒印製: a library of saved models (plain-garment photos grouped by metadata.model_key) and a code print of one
-// design onto any photos picked across models (POST /api/tools/studio/fabric-print, no AI, no credits). Only building
-// the library calls AI: a 4-angle identity sheet per new model, then plain pose photos that use the model's photos as
+// design onto any photos picked across models (POST /api/tools/studio/fabric-print: engine ai = gpt-image-2.5 edit, charged
+// like any generated image; engine code = free displacement preview inside a saved print box). Building the library calls AI: a 4-angle identity sheet per new model, then plain pose photos that use the model's photos as
 // references. Plan: agency-os/docs/operations/MOCKUP_FIXED_MODEL_PLAN.md.
 import { useMemo, useRef, useState } from "react";
 import {
@@ -15,7 +15,8 @@ import {
   buildPlainPosePrompt,
   type GarmentColor,
 } from "@/lib/studio/mockup-prompt";
-import type { PrintBox } from "@/lib/studio/fabric-print";
+import { STUDIO_MODEL_OPTIONS } from "@/lib/studio/model-options";
+import { isPrintBox, type Point, type PrintBox } from "@/lib/studio/fabric-print";
 
 export interface LibraryPhoto {
   id: string;
@@ -36,6 +37,7 @@ type Shot = { status: "generating" } | { status: "done"; image: string } | { sta
 
 // Generation always uses nano-banana-2: it takes up to 14 reference images (lib/studio/model-options.ts).
 const GEN_MODEL = "nano-banana-2";
+const PRINT_COST_NT = STUDIO_MODEL_OPTIONS.find((m) => m.value === "openai-25-edit")?.costNt ?? 2;
 const MAX_IDENTITY_REFS = 14;
 const ROLE_LABEL: Record<string, string> = {
   ...Object.fromEntries(MODEL_SHEET_ANGLES.map((a) => [a.role, a.label])), pose: "姿勢", upload: "上傳",
@@ -43,6 +45,19 @@ const ROLE_LABEL: Record<string, string> = {
 const COLOR_LABEL: Record<string, string> = { white: "白", grey: "灰", black: "黑" };
 const GENDER_LABEL: Record<string, string> = { woman: "女", man: "男", "androgynous person": "中性" };
 const DEFAULT_BOX: PrintBox = { x: 0.32, y: 0.3, w: 0.36, h: 0.32 };
+type Quad = [Point, Point, Point, Point];
+const quadOf = (b: PrintBox): Quad => b.quad ?? [
+  { x: b.x, y: b.y }, { x: b.x + b.w, y: b.y }, { x: b.x + b.w, y: b.y + b.h }, { x: b.x, y: b.y + b.h },
+];
+/** The saved form: the quad plus its bounding rectangle (the server caps work by the rectangle). */
+function boxOf(q: Quad): PrintBox {
+  const xs = q.map((p) => p.x);
+  const ys = q.map((p) => p.y);
+  const x = Math.min(...xs);
+  const y = Math.min(...ys);
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y, quad: q };
+}
+const CORNER_LABEL = ["左上", "右上", "右下", "左下"];
 
 export function groupModels(photos: LibraryPhoto[]): Model[] {
   const byKey = new Map<string, Model>();
@@ -213,8 +228,9 @@ export default function ModelLibraryStudio({ designRef, photos, setPhotos, onDel
 
   // ── Print box editor ──
   const [boxPhoto, setBoxPhoto] = useState<LibraryPhoto | null>(null);
-  const [draft, setDraft] = useState<PrintBox | null>(null);
-  const dragFrom = useRef<{ x: number; y: number } | null>(null);
+  const [draft, setDraft] = useState<Quad | null>(null);
+  // Dragging on the photo draws a new upright box; dragging a corner handle moves just that corner (a tilted torso).
+  const drag = useRef<{ kind: "draw"; from: Point } | { kind: "corner"; index: number } | null>(null);
   const frame = useRef<HTMLDivElement>(null);
   const pointAt = (e: React.PointerEvent) => {
     const r = frame.current!.getBoundingClientRect();
@@ -222,8 +238,10 @@ export default function ModelLibraryStudio({ designRef, photos, setPhotos, onDel
   };
   async function saveBox() {
     if (!boxPhoto || !draft) return;
+    const printBox = boxOf(draft);
+    if (!isPrintBox(printBox)) { setMsg("四個角拉成交叉或太小了，請重拉"); return; }
     const res = await fetch(`/api/tools/presets?id=${boxPhoto.id}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ printBox: draft }),
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ printBox }),
     }).catch(() => null);
     const json = res ? ((await res.json().catch(() => ({}))) as { ok?: boolean; preset?: LibraryPhoto; error?: string }) : {};
     if (!json.ok || !json.preset) { setMsg(`印花框儲存失敗：${json.error ?? "網路錯誤"}`); return; }
@@ -235,23 +253,32 @@ export default function ModelLibraryStudio({ designRef, photos, setPhotos, onDel
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [designScale, setDesignScale] = useState(100);
   const [prints, setPrints] = useState<{ photo: LibraryPhoto; shot: Shot; saved?: "saving" | "saved" | "error" }[]>([]);
-  const pickedPhotos = photos.filter((p) => picked.has(p.id) && p.metadata?.print_box && p.object_url);
+  const pickedPhotos = photos.filter((p) => picked.has(p.id) && p.object_url);
+  // The free code preview needs a saved print outline; the AI print places the design itself.
+  const boxedPicked = pickedPhotos.filter((p) => p.metadata?.print_box);
 
-  async function printAll() {
+  async function printAll(engine: "ai" | "code") {
     if (!designRef) { setMsg("請先在右邊選一張設計圖"); return; }
-    if (pickedPhotos.length === 0) { setMsg("請先勾選已框好印花位置的照片"); return; }
+    const targets = engine === "code" ? boxedPicked : pickedPhotos;
+    if (targets.length === 0) { setMsg(engine === "code" ? "免費預覽只能印已框好印花位置的照片" : "請先勾選照片"); return; }
     setMsg(null);
-    setPrints(pickedPhotos.map((photo) => ({ photo, shot: { status: "generating" } })));
-    await inPairs(pickedPhotos, async (photo, i) => {
+    setPrints(targets.map((photo) => ({ photo, shot: { status: "generating" } })));
+    await inPairs(targets, async (photo, i) => {
       let shot: Shot;
       try {
         const res = await fetch("/api/tools/studio/fabric-print", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ photo: photo.object_url, design: designRef, box: photo.metadata!.print_box, designScale: designScale / 100 }),
+          body: JSON.stringify({
+            engine, photo: photo.object_url, design: designRef, designScale: designScale / 100,
+            garmentColor: photo.metadata?.garment_color,
+            ...(engine === "code" ? { box: photo.metadata!.print_box } : {}),
+          }),
         });
-        const json = (await res.json()) as { ok: boolean; image?: string; error?: string };
-        shot = json.ok && json.image ? { status: "done", image: json.image } : { status: "error", error: json.error ?? `HTTP ${res.status}` };
+        const json = (await res.json()) as { ok: boolean; image?: string; error?: string; code?: string };
+        // withFeature refuses with { ok:false, code } and no message (lib/entitlements/grant.ts).
+        const why = json.error ?? (res.status === 403 ? `沒有使用權限（${json.code ?? "403"}）` : `HTTP ${res.status}`);
+        shot = json.ok && json.image ? { status: "done", image: json.image } : { status: "error", error: why };
       } catch (err) { shot = { status: "error", error: err instanceof Error ? err.message : String(err) }; }
       setPrints((prev) => prev.map((p, k) => (k === i ? { ...p, shot } : p)));
     });
@@ -279,9 +306,9 @@ export default function ModelLibraryStudio({ designRef, photos, setPhotos, onDel
 
       {/* ── 1. Pick photos across models, print the design (free) ── */}
       <section>
-        <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>印製（免費，不用 AI）</h3>
+        <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>印製</h3>
         <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>
-          勾選要用的照片（可跨模特兒、男女都行）→ 右邊選設計圖 → 按「印上設計」。只能勾已框好印花位置的照片。
+          勾選要用的照片（可跨模特兒、男女都行）→ 右邊選設計圖 → 按「印上設計」。AI 印會跟著皺褶和身體，每張約 NT$2；免費預覽是程式印，要先在「管理」裡框印花位置。
         </div>
         {models.length === 0 && <p style={{ fontSize: 13, opacity: 0.6 }}>還沒有模特兒，先在下方建立一位。</p>}
         {models.map((m) => (
@@ -299,10 +326,10 @@ export default function ModelLibraryStudio({ designRef, photos, setPhotos, onDel
                 const boxed = !!p.metadata?.print_box;
                 const on = picked.has(p.id);
                 return (
-                  <label key={p.id} style={{ position: "relative", cursor: boxed ? "pointer" : "not-allowed", opacity: boxed ? 1 : 0.55 }} title={boxed ? "勾選來印" : "還沒框印花位置：按「管理」再點照片"}>
+                  <label key={p.id} style={{ position: "relative", cursor: "pointer" }} title={boxed ? "勾選來印" : "可 AI 印；免費預覽要先在「管理」框印花位置"}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={p.object_url!} alt={m.name} style={{ ...thumb, border: on ? "2px solid var(--accent)" : "2px solid transparent" }} />
-                    <input type="checkbox" disabled={!boxed} checked={on} style={{ position: "absolute", top: 4, left: 4 }}
+                    <input type="checkbox" checked={on} style={{ position: "absolute", top: 4, left: 4 }}
                       onChange={() => setPicked((prev) => { const n = new Set(prev); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n; })} />
                     <div style={{ fontSize: 10, textAlign: "center" }}>
                       {ROLE_LABEL[p.metadata?.photo_role ?? ""] ?? "照片"}{p.metadata?.garment_color ? `・${COLOR_LABEL[p.metadata.garment_color]}` : ""}{boxed ? "" : "・未框"}
@@ -315,11 +342,15 @@ export default function ModelLibraryStudio({ designRef, photos, setPhotos, onDel
         ))}
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 6 }}>
           <label style={{ fontSize: 12 }}>
-            設計大小 {designScale}%（框內）
+            設計大小 {designScale}%
             <input type="range" min={40} max={100} step={5} value={designScale} onChange={(e) => setDesignScale(Number(e.target.value))} style={{ width: 160, marginLeft: 6, verticalAlign: "middle" }} />
           </label>
-          <button className="btn-primary" disabled={pickedPhotos.length === 0 || !designRef || prints.some((p) => p.shot.status === "generating")} onClick={() => void printAll()}>
-            印上設計（{pickedPhotos.length} 張）
+          <button className="btn-primary" disabled={pickedPhotos.length === 0 || !designRef || prints.some((p) => p.shot.status === "generating")} onClick={() => void printAll("ai")}>
+            印上設計（AI，{pickedPhotos.length} 張，約 NT${(pickedPhotos.length * PRINT_COST_NT).toFixed(0)}）
+          </button>
+          <button className="btn-secondary" disabled={boxedPicked.length === 0 || !designRef || prints.some((p) => p.shot.status === "generating")} onClick={() => void printAll("code")}
+            title={boxedPicked.length < pickedPhotos.length ? `${pickedPhotos.length - boxedPicked.length} 張沒框印花位置，免費預覽會跳過` : undefined}>
+            免費預覽（程式印，{boxedPicked.length} 張）
           </button>
         </div>
         {prints.length > 0 && (
@@ -354,7 +385,7 @@ export default function ModelLibraryStudio({ designRef, photos, setPhotos, onDel
           <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>點照片 → 在照片上拖一個框，標出印花位置。每張照片只要框一次。</div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {active.photos.map((p) => (
-              <div key={p.id} style={{ position: "relative", cursor: "pointer" }} onClick={() => { setBoxPhoto(p); setDraft(p.metadata?.print_box ?? DEFAULT_BOX); }}>
+              <div key={p.id} style={{ position: "relative", cursor: "pointer" }} onClick={() => { setBoxPhoto(p); setDraft(quadOf(p.metadata?.print_box ?? DEFAULT_BOX)); }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={p.object_url!} alt={active.name} style={{ ...thumb, border: boxPhoto?.id === p.id ? "2px solid var(--accent)" : "2px solid transparent" }} />
                 <button style={{ position: "absolute", top: 0, right: 0, fontSize: 9, background: "var(--red)", color: "var(--btn-primary-text)", border: "none", borderRadius: 2, cursor: "pointer", padding: "1px 3px" }}
@@ -368,21 +399,39 @@ export default function ModelLibraryStudio({ designRef, photos, setPhotos, onDel
               <div
                 ref={frame}
                 style={{ position: "relative", display: "inline-block", touchAction: "none", cursor: "crosshair", userSelect: "none" }}
-                onPointerDown={(e) => { dragFrom.current = pointAt(e); (e.target as HTMLElement).setPointerCapture?.(e.pointerId); }}
+                onPointerDown={(e) => {
+                  const handle = (e.target as HTMLElement).dataset.corner;
+                  drag.current = handle !== undefined ? { kind: "corner", index: Number(handle) } : { kind: "draw", from: pointAt(e) };
+                  frame.current?.setPointerCapture?.(e.pointerId);
+                }}
                 onPointerMove={(e) => {
-                  if (!dragFrom.current) return;
-                  const a = dragFrom.current; const b = pointAt(e);
-                  // Stay inside the photo: the server refuses a box that leaves it (isPrintBox).
+                  const d = drag.current;
+                  if (!d) return;
+                  const b = pointAt(e); // already clamped to the photo
+                  if (d.kind === "corner") {
+                    setDraft((q) => (q ? (q.map((p, i) => (i === d.index ? b : p)) as Quad) : q));
+                    return;
+                  }
+                  const a = d.from;
                   const x = Math.min(0.97, Math.min(a.x, b.x));
                   const y = Math.min(0.97, Math.min(a.y, b.y));
-                  setDraft({ x, y, w: Math.min(1 - x, Math.max(0.03, Math.abs(b.x - a.x))), h: Math.min(1 - y, Math.max(0.03, Math.abs(b.y - a.y))) });
+                  const w = Math.min(1 - x, Math.max(0.03, Math.abs(b.x - a.x)));
+                  const h = Math.min(1 - y, Math.max(0.03, Math.abs(b.y - a.y)));
+                  setDraft(quadOf({ x, y, w, h }));
                 }}
-                onPointerUp={() => { dragFrom.current = null; }}
+                onPointerUp={() => { drag.current = null; }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={boxPhoto.object_url!} alt="框印花位置" draggable={false} style={{ maxHeight: 520, maxWidth: "100%", display: "block", borderRadius: 6 }} />
-                <div style={{ position: "absolute", left: `${draft.x * 100}%`, top: `${draft.y * 100}%`, width: `${draft.w * 100}%`, height: `${draft.h * 100}%`, border: "2px dashed var(--accent)", background: "rgba(255,255,255,0.12)", pointerEvents: "none" }} />
+                <svg viewBox="0 0 1 1" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
+                  <polygon points={draft.map((p) => `${p.x},${p.y}`).join(" ")} fill="rgba(255,255,255,0.15)" stroke="var(--accent)" strokeWidth={2} strokeDasharray="6 4" vectorEffect="non-scaling-stroke" />
+                </svg>
+                {draft.map((p, i) => (
+                  <div key={i} data-corner={i} title={`拖曳${CORNER_LABEL[i]}角`}
+                    style={{ position: "absolute", left: `${p.x * 100}%`, top: `${p.y * 100}%`, width: 16, height: 16, marginLeft: -8, marginTop: -8, borderRadius: "50%", background: "var(--accent)", border: "2px solid #fff", cursor: "move" }} />
+                ))}
               </div>
+              <div style={{ fontSize: 11, opacity: 0.7, marginTop: 4 }}>在照片上拖曳 = 畫新框；拖四個圓點 = 調整角度（身體斜的、轉身的，讓框貼著胸口的斜度）。</div>
               <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
                 <button className="btn-primary" onClick={() => void saveBox()}>儲存印花框</button>
                 <button className="btn-secondary" onClick={() => setBoxPhoto(null)}>取消</button>

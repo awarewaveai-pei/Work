@@ -1,4 +1,36 @@
 # Worklog
+## 2026-11-01（續20）模特兒印製第 3 步改 AI：gpt-image-2.5-sunburst（`openai-25-edit`）印花隨皺褶；五條路研究；印花框改四角；程式印降為免費預覽
+
+**操作者**：「圖案都沒有隨衣服的皺褶 這是最大的敗筆」→「你確定沒有別的方法了? 去研究」→ 看完比較圖「改用 GPT-Image-2.5」。
+
+**研究（同一設計圖、同兩張素色姿勢照）**：
+| 做法 | 結果 | 單張 |
+|---|---|---|
+| nano-banana-2／pro（Replicate） | 平貼方塊 | US$0.067／0.15 |
+| 程式置換（`lib/studio/fabric-print.ts`） | 內部有起伏，平順布料無效，邊緣破碎 | 0 |
+| FASHN v1.6 quality（fal.ai） | 隨皺褶，但**重畫衣服**：版型變寬鬆、印花放大蓋滿 | US$0.075 |
+| FLUX VTO（fal.ai） | 隨皺褶，但**人變胖**、背景被改 | US$0.0475 |
+| p-image-try-on（Replicate） | 印花消失 | US$0.015 |
+| **gpt-image-2.5-sunburst high**（Replicate 3 張＋OpenAI 直打 1 張） | 隨皺褶、隨身體弧度、人／姿勢／背景不動、設計不變 | US$0.06（usage 196 text＋2492 img in、1372 out） |
+對照圖 `D:/tmp/mockup-2026-11-01/cmp-cafe-3-zoom.jpg`、`cmp-street-3-zoom.jpg`、`e2e-openai-zoom.jpg`。研究花費約 NT$28（Replicate 12 張、fal 4 張、OpenAI 1 張）。fal.ai 新帳號；`FAL_KEY` 加進 `mcp/user-env.ps1`＋template（空值）。
+
+**做了**：
+- 新模型 `openai-25-edit`：`lib/tarot/image-gen.ts`（`ModelConfig.openaiModel` 覆寫 `OPENAI_IMAGE_MODEL`，edits／generations 兩處）、`lib/studio/model-options.ts`（NT$2、maxRefs 5、PRODUCT_COMPOSITE_MODELS）、`lib/tarot/model-specs.ts`；`lib/ai/cost-model.ts` IMAGE_RATES US$0.06＋MEDIA_MODELS `gpt-image-2.5-sunburst`（**此檔的兩個 hunk 被同時間的 outreach session 以 pathspec commit 掃進 `5bdba0ef6`**——共用工作目錄、檔案非 shared-file 清單；內容正確，已在 main）。
+- `lib/studio/mockup-prompt.ts` `buildPrintOntoPhotoPrompt`（第一張照片、第二張設計；大小由 designScale 換算成胸寬 %；深色鎖色）。
+- `POST /api/tools/studio/fabric-print`：`engine: "ai" | "code"`（預設 ai）；ai 分支走 `withFeature("studio.image")`＋`generateImage`（code 分支不問授權）；路由登記 `lib/entitlements/route-features.ts`，輸出比例取照片最接近的 `nearestAspect`，失敗 200 `ok:false`；code 保留（需 `box`）。
+- `lib/studio/fabric-print.ts`：`PrintBox.quad`（四角透視，`printCorners`＋homography），位移沿大褶皺（σ 11）、邊緣跟著位移、box blur O(1)；`isPrintBox` 要求 quad 凸且在外框內（route 以外框算像素上限）。
+- 畫面 `ModelLibraryStudio.tsx`：印花框編輯器可拖四角；「印上設計（AI）」任何照片都能勾、顯示估價；「免費預覽（程式印）」只送有框照片。
+- 文件：`MOCKUP_FIXED_MODEL_PLAN.md` 頂端加 2026-11-01 晚間決定。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=curl | cmd=GET api.openai.com/v1/models/gpt-image-2.5-sunburst → 200 (owned_by system)；POST /v1/images/edits 同 generateOpenai 格式（model、size 1024x1536、quality high、image[]×2）→ 200，usage 如上，輸出 `e2e-openai-zoom.jpg` | exit=0 | ms=34728
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run app/(shell)/tools/mockup/__tests__ app/api/tools/studio app/api/tools/presets lib/studio lib/storage lib/portal/__tests__ lib/ai/__tests__/model-registry.test.ts lib/ai/__tests__/billed-usage-log.test.ts lib/tarot/__tests__/model-specs.test.ts lib/db/__tests__/asset-domain-check.test.ts → 286 passed；2 failed 皆為他 session 未提交 `app/(shell)/tools/seedstar/` | exit=1 | ms=90000
+- REVIEW_DONE: critic=Quick | verdict=warn→fixed | findings=0c/2m/9n（M1 逾時：`ModelConfig.timeoutMs`，`openai-25-edit` 110 s、route maxDuration 120；M2 `ROUTE_FEATURES` 補 `/api/tools/studio/fabric-print`＋新不變量測試「每個 withFeature 路由必登記」；m：免費預覽不再要求授權（AI 分支才包 withFeature）、共用 `lib/studio/image-errors.ts friendlyImageError`、價錢讀 `STUDIO_MODEL_OPTIONS`、403 顯示原因、`asset-group` 標籤、過時註解；未修：sizeMap 只有 3 種尺寸所以 nearestAspect 多數落回 2:3／3:2／1:1；姿勢照讀兩次）
+- BUGHUNT_DONE: scope=agency-os/docs,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib | grep=OPENAI_IMAGE_MODEL | hits=7
+- ORACLE_WAIVED: Codex 額度 1%（操作者「若不夠就自我審查」）；critic Quick＋真打 OpenAI 一張替代。
+- `npx tsc --noEmit` 乾淨。畫面需操作者登入實測（今晚 03:00 自動部署）。
+
+**剩餘風險**：AI 每張約 30 秒、約 NT$2；偶爾一張不理想要重做；印花邊緣偶有輕微毛邊（`e2e-openai-zoom.jpg` 左緣）。
 ## 2026-11-01（續19）外聯系統 v2 卡 C17：研究讀店家的 IG／FB 頁（Meta 官方 API → Google 摘要 → Apify），貼文事實一律待審；Apify 與 Meta 金鑰放進 user-env
 
 **操作者**：「研究功能不讀社群頁 要做成可以讀社群」→ 比較官方 API／搜尋摘要／第三方爬取與線上工具（PhantomBuster 用你的登入 cookie＝停權風險，排除）→「先裝, 但先不測試」→ 憑證檔 1306 行 Apify、Meta 同一份文件 → 「開工」；檔案鎖誤判「釋放並接手」；Codex 剩 1%「若不夠 就自我審查」。

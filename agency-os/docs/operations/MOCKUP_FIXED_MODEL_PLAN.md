@@ -1,6 +1,7 @@
 # Mockup Studio 固定模特兒（多張姿勢照 ＋ 一張設計圖）建置計畫
 
 > 讀者：執行這份計畫的 agent。狀態：2026-11-01 已實作（WORKLOG 2026-11-01 續16）。原系統全部保留，只加新功能。
+> **2026-11-01 晚間再改**：第 3 步預設改為 **AI 印（gpt-image-2.5-sunburst，`openai-25-edit`）**——程式印在平順的 AI 照片上跟不到皺褶（操作者：「圖案都沒有隨衣服的皺褶」）。研究五條路（nano-banana-2／pro、程式置換、FASHN v1.6、FLUX VTO、gpt-image-2.5），只有 gpt-image-2.5 同時做到：印花隨皺褶與身體弧度、人／姿勢／背景不動、設計圖不變；FASHN／FLUX 會重畫衣服版型與身材。`POST /api/tools/studio/fabric-print` 收 `engine: "ai" | "code"`，AI 走 `generateImage` 扣 `studio.image`（約 US$0.06／張），程式印保留為免費預覽（需印花框）。對照圖 `D:/tmp/mockup-2026-11-01/cmp-cafe-3-zoom.jpg`。
 > **與下文不同處（以此為準）**：第 3 步改為**程式印**（`lib/studio/fabric-print.ts` 置換＋明暗，`POST /api/tools/studio/fabric-print`），不呼叫 AI、不扣點——AI 兩個模型（nano-banana-2／pro）試印都是平的方塊、不隨皺褶（試驗圖 `D:/tmp/mockup-2026-11-01/fold-3way.jpg`）。每張照片要先框印花位置（`metadata.print_box`，`PATCH /api/tools/presets?id=`）。presets 不做多張原子寫入：前端逐張 POST、同一 `modelKey`；整位刪除＝逐張 DELETE。畫面為新模式「模特兒印製」（`app/(shell)/tools/mockup/ModelLibraryStudio.tsx`）。
 > 路徑縮寫 `NA/` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`。
 

@@ -14,6 +14,8 @@ $vars = @{
     AIRTABLE_API_KEY             = "pat_xxx"
     REPLICATE_API_TOKEN          = "r8_xxx"
     REPLICATE_WEBHOOK_SIGNING_KEY = ""
+    # fal.ai (FASHN / FLUX virtual try-on tests, 2026-11-01): https://fal.ai/dashboard/keys
+    FAL_KEY                      = ""
     SERPER_API_KEY               = "xxx"
     APIFY_API_TOKEN             = "xxx"
     META_APP_ID                 = "xxx"

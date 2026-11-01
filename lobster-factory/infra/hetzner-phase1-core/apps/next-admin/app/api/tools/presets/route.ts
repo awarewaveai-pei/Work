@@ -91,8 +91,8 @@ function modelPhotoMeta(body: Pick<SavePresetBody, "modelKey" | "photoRole" | "g
   }
   if (body.printBox !== undefined && body.printBox !== null) {
     if (!isPrintBox(body.printBox)) return { error: "printBox must be {x,y,w,h} inside the photo (0..1)" };
-    const { x, y, w, h } = body.printBox;
-    meta.print_box = { x, y, w, h };
+    const { x, y, w, h, quad } = body.printBox;
+    meta.print_box = quad ? { x, y, w, h, quad: quad.map((p) => ({ x: p.x, y: p.y })) } : { x, y, w, h };
   }
   return meta;
 }

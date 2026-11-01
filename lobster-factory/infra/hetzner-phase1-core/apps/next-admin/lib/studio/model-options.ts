@@ -6,6 +6,7 @@ export type StudioModel =
   | "openai-low"
   | "openai-medium"
   | "openai-high"
+  | "openai-25-edit"
   | "ideogram-v2a-turbo"
   | "ideogram-v3-balanced"
   | "ideogram-v4-turbo"
@@ -49,6 +50,8 @@ export const STUDIO_MODEL_OPTIONS: readonly StudioModelOption[] = [
   { value: "openai-low", label: "GPT-Image-1 低", group: "OpenAI", costNt: 0.5, maxRefs: 5 },
   { value: "openai-medium", label: "GPT-Image-1 中", group: "OpenAI", costNt: 1.3, maxRefs: 5 },
   { value: "openai-high", label: "GPT-Image-1 高", group: "OpenAI", costNt: 5, maxRefs: 5 },
+  // Measured 2026-11-01 on OpenAI /v1/images/edits (high, 1024x1536, 2 refs): 196 text + 2492 image in, 1372 out = US$0.062 ≈ NT$2.
+  { value: "openai-25-edit", label: "GPT-Image-2.5 修圖", group: "OpenAI", costNt: 2, maxRefs: 5 },
 ];
 
 export function isStudioModel(v: unknown): v is StudioModel {
@@ -75,6 +78,7 @@ export const PRODUCT_COMPOSITE_MODELS: readonly StudioModel[] = [
   "openai-low",
   "openai-medium",
   "openai-high",
+  "openai-25-edit",
 ];
 
 export function modelCompositesProduct(model: StudioModel): boolean {

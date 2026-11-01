@@ -787,3 +787,32 @@ export function buildPlainPosePrompt(p: {
     PRO_QUALITY
   );
 }
+
+/** Print a design onto an EXISTING photo (image-to-image edit; Mockup Studio 模特兒印製). The first reference image is
+ *  the photo, the second the design. Written for gpt-image-2.5: the 2026-11-01 trials showed it keeps the person,
+ *  pose and background and bends the print with the folds when told so explicitly. */
+export function buildPrintOntoPhotoPrompt(p: {
+  /** 0.4–1: how much of the chest width the print takes (1 ≈ 60%). */
+  designScale?: number;
+  /** value from GARMENT_PLACEMENT (default center-chest). */
+  placement?: string;
+  garmentColor?: GarmentColor | string;
+}): string {
+  const scale = Math.min(1, Math.max(0.4, p.designScale ?? 1));
+  const widthPct = Math.round(60 * scale);
+  const where = p.placement === "left-chest" ? "on the left chest, small, like a pocket logo"
+    : p.placement === "right-chest" ? "on the right chest, small, like a pocket logo"
+    : p.placement === "full-front" || p.placement === "all-over" ? "across the whole front of the garment"
+    : `centered on the chest, about ${widthPct}% of the chest width, its top a hand's width below the collar, its bottom well above the waist`;
+  const dark = p.garmentColor === "black" || p.garmentColor === "grey"
+    ? " Keep every colour of the graphic exactly as it is on the dark fabric — do not lighten, darken, invert or recolour it."
+    : "";
+  return (
+    "Edit the first image only. Screen-print the graphic from the second image onto the garment the person is wearing, " +
+    `${where}. The print must physically follow the fabric: it bends, ripples and creases with every fold of the garment, ` +
+    "its outline too; it darkens inside fold shadows and brightens on highlights exactly like the surrounding fabric, and it " +
+    "curves with the body and the turn of the torso. Keep everything else pixel-identical: same person, face, expression, " +
+    "hair, pose, hands, framing, background, lighting, garment colour and cut. Reproduce the graphic exactly: same colours, " +
+    "shapes and proportions, no redesign, no added text or elements, no border or box around it." + dark
+  );
+}

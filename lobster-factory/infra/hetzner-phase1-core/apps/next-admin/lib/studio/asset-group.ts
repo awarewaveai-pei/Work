@@ -54,6 +54,7 @@ export const GALLERY_MODEL_LABELS: Record<string, string> = {
   "openai-low": "GPT-Image-1 低",
   "openai-medium": "GPT-Image-1 中",
   "openai-high": "GPT-Image-1 高",
+  "openai-25-edit": "GPT-Image-2.5 修圖",
 };
 
 /** My Designs product chips. Key rule (client assetProduct + server filter in lib/studio/designs-list.ts):

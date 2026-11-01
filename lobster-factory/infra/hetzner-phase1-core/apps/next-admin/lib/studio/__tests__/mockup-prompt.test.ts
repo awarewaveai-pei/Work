@@ -7,6 +7,7 @@ import {
   withIdentityReference,
   buildModelSheetPrompt,
   buildPlainPosePrompt,
+  buildPrintOntoPhotoPrompt,
   MODEL_SHEET_ANGLES,
 } from "../mockup-prompt";
 
@@ -317,5 +318,15 @@ describe("model library prompts (plain garments for code printing)", () => {
     expect(p).toContain("ALL reference images show the SAME person");
     expect(p).toContain("a plain black");
     expect(p).not.toContain("printed");
+  });
+
+  it("the print-onto-photo edit names both images, the size from designScale, and locks colour on dark fabric", () => {
+    const p = buildPrintOntoPhotoPrompt({ designScale: 0.5, garmentColor: "black" });
+    expect(p.startsWith("Edit the first image only.")).toBe(true);
+    expect(p).toContain("graphic from the second image");
+    expect(p).toContain("about 30% of the chest width");
+    expect(p).toContain("do not lighten, darken, invert or recolour");
+    expect(buildPrintOntoPhotoPrompt({ garmentColor: "white" })).not.toContain("recolour");
+    expect(buildPrintOntoPhotoPrompt({ placement: "left-chest" })).toContain("pocket logo");
   });
 });

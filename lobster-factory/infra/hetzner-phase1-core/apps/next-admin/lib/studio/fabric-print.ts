@@ -1,7 +1,8 @@
 /**
- * Print a design onto a plain-garment photo so it follows the fabric: the shirt's own folds displace the design and
- * its own light and shadow shade the ink (the Photoshop "displacement map + multiply" mockup technique). No AI: the
- * design's pixels are never redrawn, the result is deterministic, and it costs nothing.
+ * Print a design onto a plain-garment photo so it follows the fabric: the outline follows the torso's angle (a
+ * perspective map onto four corners), the shirt's own folds displace the design -- edges included -- and its own light
+ * and shadow shade the ink (the Photoshop "displacement map + multiply" mockup technique). No AI: the design's pixels
+ * are never redrawn, the result is deterministic, and it costs nothing.
  *
  * Why not AI: nano-banana-2 and nano-banana-pro both pasted a flat, evenly lit rectangle in the 2026-11-01 trials
  * (agency-os/docs/operations/MOCKUP_FIXED_MODEL_PLAN.md). Pure functions over RGBA buffers; the route decodes and
@@ -15,39 +16,114 @@ export interface RgbaImage {
   data: Uint8Array | Uint8ClampedArray;
 }
 
-/** Where the print may sit, as fractions of the photo (0..1). The design is fitted inside, keeping its aspect. */
+export interface Point {
+  x: number;
+  y: number;
+}
+
+/** Where the print may sit, as fractions of the photo (0..1). x/y/w/h is the bounding rectangle; `quad` (TL, TR, BR,
+ *  BL) is set when the corners were dragged to follow a turned or tilted torso -- an upright rectangle on a leaning
+ *  body read as a sticker (operator, 2026-11-01). The design is fitted inside, keeping its aspect. */
 export interface PrintBox {
   x: number;
   y: number;
   w: number;
   h: number;
+  quad?: [Point, Point, Point, Point];
 }
+
+const finite = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n);
 
 export function isPrintBox(v: unknown): v is PrintBox {
   if (!v || typeof v !== "object") return false;
   const b = v as Record<string, unknown>;
-  const ok = (n: unknown) => typeof n === "number" && Number.isFinite(n);
-  if (!ok(b.x) || !ok(b.y) || !ok(b.w) || !ok(b.h)) return false;
+  if (!finite(b.x) || !finite(b.y) || !finite(b.w) || !finite(b.h)) return false;
   const { x, y, w, h } = b as unknown as PrintBox;
-  return x >= 0 && y >= 0 && w > 0.02 && h > 0.02 && x + w <= 1.0001 && y + h <= 1.0001;
+  if (!(x >= 0 && y >= 0 && w > 0.02 && h > 0.02 && x + w <= 1.0001 && y + h <= 1.0001)) return false;
+  if (b.quad === undefined) return true;
+  const q = b.quad;
+  if (!Array.isArray(q) || q.length !== 4) return false;
+  for (const pt of q) {
+    if (!pt || typeof pt !== "object") return false;
+    const { x: px, y: py } = pt as Record<string, unknown>;
+    if (!finite(px) || !finite(py) || px < 0 || px > 1 || py < 0 || py > 1) return false;
+    // The rectangle bounds the quad: the route caps the work by the rectangle's area.
+    const e = 1e-4;
+    if (px < x - e || px > x + w + e || py < y - e || py > y + h + e) return false;
+  }
+  return isConvex(q as Point[]);
 }
 
-/** Pixel rectangle of the design inside the box: as large as fits, centred horizontally, top-aligned
- *  (a chest print hangs from just below the collar). designScale 0.4–1 shrinks it inside the box. */
-export function layoutPrint(
+/** A non-degenerate convex quad, corners in order (either winding): what a dragged print outline can be. */
+function isConvex(q: Point[]): boolean {
+  let sign = 0;
+  for (let i = 0; i < 4; i++) {
+    const a = q[i];
+    const b = q[(i + 1) % 4];
+    const c = q[(i + 2) % 4];
+    const cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+    if (Math.abs(cross) < 1e-6) return false;
+    if (sign === 0) sign = Math.sign(cross);
+    else if (Math.sign(cross) !== sign) return false;
+  }
+  return true;
+}
+
+const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
+const lerp = (a: Point, b: Point, t: number): Point => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+
+/** The design's four corners on the photo, in pixels (TL, TR, BR, BL): as large as fits inside the box keeping the
+ *  design's aspect, centred across, hung from the top edge (a chest print starts just below the collar).
+ *  designScale 0.4–1 shrinks it inside the box. */
+export function printCorners(
   photo: { width: number; height: number },
   design: { width: number; height: number },
   box: PrintBox,
   designScale = 1,
-): { x: number; y: number; w: number; h: number } {
-  const bw = box.w * photo.width;
-  const bh = box.h * photo.height;
-  const s = Math.min(bw / design.width, bh / design.height) * Math.min(1, Math.max(0.4, designScale));
-  const w = Math.max(1, Math.round(design.width * s));
-  const h = Math.max(1, Math.round(design.height * s));
-  const x = Math.round(box.x * photo.width + (bw - w) / 2);
-  const y = Math.round(box.y * photo.height);
-  return { x, y, w, h };
+): [Point, Point, Point, Point] {
+  const px = (p: Point): Point => ({ x: p.x * photo.width, y: p.y * photo.height });
+  const q = (box.quad ?? [
+    { x: box.x, y: box.y },
+    { x: box.x + box.w, y: box.y },
+    { x: box.x + box.w, y: box.y + box.h },
+    { x: box.x, y: box.y + box.h },
+  ]).map(px) as [Point, Point, Point, Point];
+  const qw = (dist(q[0], q[1]) + dist(q[3], q[2])) / 2;
+  const qh = (dist(q[0], q[3]) + dist(q[1], q[2])) / 2;
+  const s = Math.min(qw / design.width, qh / design.height) * Math.min(1, Math.max(0.4, designScale));
+  const fu = (design.width * s) / qw;
+  const fv = (design.height * s) / qh;
+  const u0 = (1 - fu) / 2;
+  const at = (u: number, v: number) => lerp(lerp(q[0], q[1], u), lerp(q[3], q[2], u), v);
+  return [at(u0, 0), at(u0 + fu, 0), at(u0 + fu, fv), at(u0, fv)];
+}
+
+/** 3x3 homography taking the unit square (0,0) (1,0) (1,1) (0,1) to the four corners (Heckbert closed form). */
+function squareToQuad(c: [Point, Point, Point, Point]): number[] {
+  const [p0, p1, p2, p3] = c;
+  const dx1 = p1.x - p2.x;
+  const dx2 = p3.x - p2.x;
+  const dy1 = p1.y - p2.y;
+  const dy2 = p3.y - p2.y;
+  const sx = p0.x - p1.x + p2.x - p3.x;
+  const sy = p0.y - p1.y + p2.y - p3.y;
+  const den = dx1 * dy2 - dx2 * dy1;
+  const g = (sx * dy2 - dx2 * sy) / den;
+  const h = (dx1 * sy - sx * dy1) / den;
+  return [p1.x - p0.x + g * p1.x, p3.x - p0.x + h * p3.x, p0.x, p1.y - p0.y + g * p1.y, p3.y - p0.y + h * p3.y, p0.y, g, h, 1];
+}
+
+function invert3(m: number[]): number[] {
+  const [a, b, c, d, e, f, g, h, i] = m;
+  const A = e * i - f * h;
+  const B = -(d * i - f * g);
+  const C = d * h - e * g;
+  const det = a * A + b * B + c * C;
+  return [
+    A / det, -(b * i - c * h) / det, (b * f - c * e) / det,
+    B / det, (a * i - c * g) / det, -(a * f - c * d) / det,
+    C / det, -(a * h - b * g) / det, (a * e - b * d) / det,
+  ];
 }
 
 /** Gaussian blur approximated by three box blurs (running sums): cost per pixel does not grow with sigma, so a large
@@ -55,8 +131,8 @@ export function layoutPrint(
 function gaussianBlur(src: Float32Array, w: number, h: number, sigma: number): Float32Array {
   if (sigma <= 0.3) return src.slice();
   const r = Math.max(1, Math.round((Math.sqrt(4 * sigma * sigma + 1) - 1) / 2)); // 3 boxes of 2r+1 ≈ variance sigma²
-  let a = src.slice();
-  let b = new Float32Array(w * h);
+  const a = src.slice();
+  const b = new Float32Array(w * h);
   for (let pass = 0; pass < 3; pass++) {
     boxPass(a, b, w, h, r, true);
     boxPass(b, a, w, h, r, false);
@@ -88,24 +164,35 @@ function percentile(values: Float32Array, p: number): number {
   return sample[Math.min(sample.length - 1, Math.floor((p / 100) * sample.length))] ?? 0;
 }
 
+// Tuned on the 2026-11-01 photos (540 px print on a 1696 px photo); the operator asked for stronger folds than the
+// first cut (displacement 22, shade 1.6). Displacement is in pixels at that scale.
+const DISPLACE = 28;
+const SHADE_GAMMA = 2.1;
+
 /**
- * Composite `design` (already resized to its final pixel size) onto `photo` at (at.x, at.y). Returns a new image;
- * pixels outside the design's rectangle are untouched. Strengths scale with the print's width so a 2K and a 1K
- * photo look alike.
+ * Composite `design` onto `photo` with its corners at `corners` (pixels, TL TR BR BL; see printCorners): a perspective
+ * map, then the shirt's folds displace it -- the outline too, so its edges ripple with the fabric -- and its light and
+ * shadow shade it. Returns a new image; pixels outside the displaced outline are untouched. Strengths scale with the
+ * print's width so a 2K and a 1K photo look alike. For a sharp result pass the design already resized to about the
+ * outline's size.
  */
-export function compositeOnFabric(photo: RgbaImage, design: RgbaImage, at: { x: number; y: number }): RgbaImage {
+export function compositeOnFabric(photo: RgbaImage, design: RgbaImage, corners: [Point, Point, Point, Point]): RgbaImage {
   const W = photo.width;
-  const w = design.width;
-  const h = design.height;
+  const H = photo.height;
+  const dw = design.width;
+  const dh = design.height;
   const out = new Uint8ClampedArray(photo.data);
-  // Region of the photo under the design (clipped to the photo).
-  const x0 = Math.max(0, at.x);
-  const y0 = Math.max(0, at.y);
-  const x1 = Math.min(W, at.x + w);
-  const y1 = Math.min(photo.height, at.y + h);
+  const unit = (dist(corners[0], corners[1]) + dist(corners[3], corners[2])) / 2 / 540;
+  // The outline moves with the folds, so the work area reaches past it by the largest displacement.
+  const pad = Math.ceil(DISPLACE * unit) + 2;
+  const x0 = Math.max(0, Math.floor(Math.min(...corners.map((c) => c.x))) - pad);
+  const y0 = Math.max(0, Math.floor(Math.min(...corners.map((c) => c.y))) - pad);
+  const x1 = Math.min(W, Math.ceil(Math.max(...corners.map((c) => c.x))) + pad);
+  const y1 = Math.min(H, Math.ceil(Math.max(...corners.map((c) => c.y))) + pad);
   const rw = x1 - x0;
   const rh = y1 - y0;
-  if (rw <= 0 || rh <= 0) return { width: W, height: photo.height, data: out };
+  if (rw <= 0 || rh <= 0) return { width: W, height: H, data: out };
+  const [m0, m1, m2, m3, m4, m5, m6, m7, m8] = invert3(squareToQuad(corners));
 
   const lum = new Float32Array(rw * rh);
   for (let y = 0; y < rh; y++) {
@@ -114,8 +201,8 @@ export function compositeOnFabric(photo: RgbaImage, design: RgbaImage, at: { x: 
       lum[y * rw + x] = (0.299 * photo.data[p] + 0.587 * photo.data[p + 1] + 0.114 * photo.data[p + 2]) / 255;
     }
   }
-  const unit = w / 540; // the tuned prototype printed 540 px wide on a 1696 px photo
-  const folds = gaussianBlur(lum, rw, rh, 6 * unit);
+  // Only the large folds move the print: following fine texture tore its edges like paper (2026-11-01 render).
+  const folds = gaussianBlur(lum, rw, rh, 11 * unit);
   const shadeSrc = gaussianBlur(lum, rw, rh, 1.2 * unit);
   const grainBase = gaussianBlur(lum, rw, rh, 2 * unit);
 
@@ -131,42 +218,50 @@ export function compositeOnFabric(photo: RgbaImage, design: RgbaImage, at: { x: 
     }
   }
   const p99 = percentile(mag, 99);
-  // A flat (fold-free) region has no gradient: no displacement rather than amplifying noise.
-  const strength = p99 > 1e-4 ? (22 * unit) / p99 : 0;
+  // A flat (fold-free) region has no gradient: no displacement rather than amplifying noise. Clamp each push to the pad.
+  const strength = p99 > 1e-4 ? (DISPLACE * unit) / p99 : 0;
+  const maxPush = pad - 1;
   const ref = Math.max(1e-3, percentile(lum, 92));
 
   const sample = (sx: number, sy: number, c: number): number => {
-    const cx = Math.min(w - 1, Math.max(0, sx));
-    const cy = Math.min(h - 1, Math.max(0, sy));
+    const cx = Math.min(dw - 1, Math.max(0, sx));
+    const cy = Math.min(dh - 1, Math.max(0, sy));
     const ix = Math.floor(cx);
     const iy = Math.floor(cy);
     const fx = cx - ix;
     const fy = cy - iy;
-    const ix1 = Math.min(w - 1, ix + 1);
-    const iy1 = Math.min(h - 1, iy + 1);
+    const ix1 = Math.min(dw - 1, ix + 1);
+    const iy1 = Math.min(dh - 1, iy + 1);
     const d = design.data;
-    const a = d[(iy * w + ix) * 4 + c];
-    const b = d[(iy * w + ix1) * 4 + c];
-    const e = d[(iy1 * w + ix) * 4 + c];
-    const f = d[(iy1 * w + ix1) * 4 + c];
+    const a = d[(iy * dw + ix) * 4 + c];
+    const b = d[(iy * dw + ix1) * 4 + c];
+    const e = d[(iy1 * dw + ix) * 4 + c];
+    const f = d[(iy1 * dw + ix1) * 4 + c];
     return (a * (1 - fx) + b * fx) * (1 - fy) + (e * (1 - fx) + f * fx) * fy;
   };
 
   for (let y = 0; y < rh; y++) {
     for (let x = 0; x < rw; x++) {
       const i = y * rw + x;
-      const dx = x0 - at.x + x + gx[i] * strength;
-      const dy = y0 - at.y + y + gy[i] * strength;
-      const alpha = (sample(dx, dy, 3) / 255) * 0.97;
+      // Pixel centre, pushed along the fold, back through the perspective into design pixels.
+      const X = x0 + x + 0.5 + Math.max(-maxPush, Math.min(maxPush, gx[i] * strength));
+      const Y = y0 + y + 0.5 + Math.max(-maxPush, Math.min(maxPush, gy[i] * strength));
+      const z = m6 * X + m7 * Y + m8;
+      const u = ((m0 * X + m1 * Y + m2) / z) * dw;
+      const v = ((m3 * X + m4 * Y + m5) / z) * dh;
+      // One-pixel antialiased edge; outside the (displaced) outline the photo stays as it was.
+      const cover = Math.min(1, Math.max(0, Math.min(u + 0.5, dw - u + 0.5, v + 0.5, dh - v + 0.5)));
+      if (cover <= 0) continue;
+      const alpha = (sample(u - 0.5, v - 0.5, 3) / 255) * 0.97 * cover;
       if (alpha <= 0) continue;
-      const shade = Math.pow(Math.min(1.08, Math.max(0, shadeSrc[i] / ref)), 1.6);
-      const grain = (lum[i] - grainBase[i]) * 0.6;
+      const shade = Math.pow(Math.min(1.08, Math.max(0, shadeSrc[i] / ref)), SHADE_GAMMA);
+      const grain = (lum[i] - grainBase[i]) * 0.7;
       const p = ((y0 + y) * W + (x0 + x)) * 4;
       for (let c = 0; c < 3; c++) {
-        const ink = Math.min(1, Math.max(0, (sample(dx, dy, c) / 255) * shade + grain));
+        const ink = Math.min(1, Math.max(0, (sample(u - 0.5, v - 0.5, c) / 255) * shade + grain));
         out[p + c] = Math.round((photo.data[p + c] / 255) * (1 - alpha) * 255 + ink * alpha * 255);
       }
     }
   }
-  return { width: W, height: photo.height, data: out };
+  return { width: W, height: H, data: out };
 }

@@ -26,6 +26,7 @@ export const ROUTE_FEATURES: Readonly<Record<string, string | readonly string[]>
   "/api/tools/script-forge": "video.script",
   "/api/tools/studio/culture": "ops.cheap-json",
   "/api/tools/studio/edit-prompt": "studio.edit-prompt",
+  "/api/tools/studio/fabric-print": "studio.image",
   "/api/tools/studio/generate": "studio.image",
   "/api/tools/studio/genfill": "studio.fill",
   "/api/tools/studio/inpaint": "studio.inpaint",

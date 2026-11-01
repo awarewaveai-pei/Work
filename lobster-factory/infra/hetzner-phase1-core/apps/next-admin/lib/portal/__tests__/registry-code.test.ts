@@ -201,7 +201,7 @@ describe("registry claims match the code", () => {
     "app/api/tools/events/upcoming/route.ts": "shared holiday table `events`, no organization column",
     "app/api/tools/image/process/route.ts": "converts the base64 image in the request body (sharp / Ghostscript); no database, no fetch, no paid model",
     "app/api/tools/designs/download/route.ts": "streams only public designs- and video-bucket objects as a download (exact-host allowlist); no database",
-    "app/api/tools/studio/fabric-print/route.ts": "prints the request's design onto a designs-bucket photo in code (lib/studio/fabric-print.ts); reads only objects of the PUBLIC designs bucket (isDesignsAsset), no database, no paid model, stores nothing",
+    "app/api/tools/studio/fabric-print/route.ts": "prints the request's design onto a PUBLIC designs-bucket photo (isDesignsAsset): engine=ai edits it with gpt-image-2.5 through generateImage on the caller's own withFeature(studio.image) grant (NOT_ROUTE_DATA, as generate/route.ts); engine=code composites in lib/studio/fabric-print.ts; no database, stores nothing",
     "app/api/tools/studio/mockup/route.ts": "Printful mockup (free) from the request image and the public catalog; uploads that image to the shared public designs bucket and shares the Printful store quota",
     "app/api/content/seo-check/route.ts": "scores the article in the request body (lib/content/quality/seo-check-core.ts); no database, no stored data",
     "app/api/content/brand-voice/route.ts": "analyses the pasted sample, or a page fetched through lib/collect/net/remote-file (no internal host); stores nothing",
@@ -212,6 +212,17 @@ describe("registry claims match the code", () => {
   };
   const routesUnder = (prefix: string) => [...FILES.keys()].filter((f) => isRoute(f) && (f.startsWith(`app${prefix}/`)));
   const authorizes = (r: string) => r in ORG_FREE_ROUTES || decidesItself(r) || (!readsDb(r) && FILES.get(r)!.asked.length > 0);
+  // Step 6 API-key scopes read ROUTE_FEATURES: a paid route left out of it is invisible to them (fabric-print, 2026-11-01).
+  it("every route that asks withFeature is listed in ROUTE_FEATURES under its own path", () => {
+    const missing: string[] = [];
+    for (const f of FILES.keys()) {
+      if (!isRoute(f) || !/\bwithFeature(?:<[^>]*>)?\(\s*["']/.test(readFileSync(path.join(ROOT, f), "utf8"))) continue;
+      const url = "/" + f.replace(/^app\//, "").replace(/\/route\.[cm]?[jt]sx?$/, "");
+      if (!(url in ROUTE_FEATURES)) missing.push(url);
+    }
+    expect(missing).toEqual([]);
+  });
+
   it("every route a built door serves authorizes its caller", () => {
     for (const p of builtDoors()) {
       expect([...new Set(doorApis(p).flatMap(routesUnder))].filter((r) => !authorizes(r)), `${p.key} door`).toEqual([]);
