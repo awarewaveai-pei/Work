@@ -33,6 +33,7 @@ export const NOW = [
   { what: '對方回信會進系統，後續信自動停。', state: 'no', ev: 'Replies 頁是空殼；草稿只存 draft id，沒存對話串 id（gmail-draft/route.ts:186）。' },
   { what: '暖名單同步到 FluentCRM。', state: 'no', ev: 'wp-bridge 沒有 contact 端點（RestController.php:42-105），只能建電子報草稿。' },
   { what: '看得到回覆率、會議數、成交數。', state: 'no', ev: '外聯首頁是空殼。' },
+  { what: '找到店家後拿得到它的 email，寄之前知道信箱存不存在。', state: 'no', ev: '沒有程式抓網站上的 email；匯入沒有 email、電話、社群就標無法聯絡（inbox/route.ts:37）；MX 查核只有名字沒程式；co_verified_emails 表零呼叫點。' },
   { what: 'Gmail 連線不會自己斷。', state: 'no', ev: 'Google 專案在測試模式，restricted scope 的 refresh token 每 7 天到期；10-14 連的是否仍活著，C1.4 查。' },
 ];
 
@@ -40,14 +41,15 @@ const todo = (id, plain) => ({ id, plain, status: 'todo' });
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '守衛與事實訂正', plain: '例：名單上某人剛退訂，系統仍替他建草稿。改成建草稿前重查拒收名單。同時把「scope 不能寄信」這句不對的說法改正，用測試守住程式不呼叫寄信。',
-    gate: '退訂後建草稿被擋下並說明原因。信的標頭有退訂方式。測試證明程式沒有任何寄信呼叫。Gmail 連線是否仍活著有查證結果。', risk: 'Low（C1.4 只讀正式站）', model: 'Codex', status: 'not_started', depends: [],
-    what: 'MODULE_MANIFEST 與 google-oauth 註解改寫；never-sends 測試；gmail-draft 重查 do_not_contact／suppression；List-Unsubscribe header；prod connector refresh VBC',
-    files: ['NA/lib/outreach/MODULE_MANIFEST.json', 'NA/lib/outreach/google-oauth.ts', 'NA/app/api/outreach/messages/gmail-draft/route.ts', 'NA/lib/outreach/__tests__/never-sends.test.ts'],
+    gate: '退訂後建草稿被擋下並說明原因。信的標頭有退訂方式。測試證明程式沒有任何寄信呼叫。Gmail 連線是否仍活著有查證結果。匯入一筆網域不存在的 email，會被標成無效。', risk: 'Low（C1.4 只讀正式站）', model: 'Codex', status: 'not_started', depends: [],
+    what: 'MODULE_MANIFEST 與 google-oauth 註解改寫；never-sends 測試；gmail-draft 重查 do_not_contact／suppression／email invalid；List-Unsubscribe header；prod connector refresh VBC；verify-email.ts MX 查核＋co_verified_emails 快取＋匯入評分',
+    files: ['NA/lib/outreach/MODULE_MANIFEST.json', 'NA/lib/outreach/google-oauth.ts', 'NA/app/api/outreach/messages/gmail-draft/route.ts', 'NA/lib/outreach/__tests__/never-sends.test.ts', 'NA/lib/outreach/verify-email.ts', 'NA/app/api/outreach/inbox/route.ts'],
     items: [
       todo('C1.1', '把「scope 不能寄信」改成正確說法，加一個測試確認程式沒有寄信呼叫。'),
       todo('C1.2', '建草稿前重查拒收名單與不可聯絡標記，有就擋下。'),
       todo('C1.3', '信的標頭加上退訂方式。'),
       todo('C1.4', '查正式站的 Gmail 連線是否仍能續期，結果寫進紀錄與本頁現況。'),
+      todo('C1.5', '匯入名單時查對方網域有沒有收信伺服器，結果存起來；無效的信箱不給建草稿。免費，不用外部服務。'),
     ] },
   { n: 2, code: 'C2', group: 'B', title: '署名、定位、主旨、多版本、追蹤信內容', plain: '例：AI 一次寫出兩個主旨、兩個版本的第一封信、兩封追蹤信，每封都以你設定的署名結尾，用到品牌定位。你在審核頁並排看 A／B，核准一版。',
     gate: '對一個測試名單真產一次，資料庫出現 4 列：兩封第一封（各有主旨）、兩封追蹤信（各有等幾天）。內文以署名結尾。審核頁可並排核准。', risk: 'Medium（migration 套正式站 High）', model: 'Opus 5.5', status: 'not_started', depends: ['C1'],
@@ -63,9 +65,9 @@ export const STEPS = [
       todo('C2.6', '測試與真產一次。'),
     ] },
   { n: 3, code: 'C3', group: 'C', title: '研究 → 證據', plain: '例：你按「研究這家」，系統去看小森咖啡的網站與 IG，抓出「菜單照片光線偏暗」這類觀察，每條附來源網址、原文片段與時間。你按核准，信才會用到它。',
-    gate: '對一個真實公開網站跑研究，出現至少一條證據，原文片段能在該頁找到。沒有證據的名單不能產信。費用在按鈕上看得到。', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['C2'],
-    what: 'migration 0150 co_evidence；collect sink outreach-evidence（excerpt 子字串驗）；research.ts＋route（crawl entity-dossier）；products.ts 加 outreach.research；Leads 頁按鈕與證據審核；cold-gate 改讀 evidence',
-    files: ['DB/migrations/0150_co_evidence.sql', 'NA/lib/collect/sinks/outreach-evidence.ts', 'NA/lib/outreach/research.ts', 'NA/app/api/outreach/leads/research/route.ts', 'NA/lib/outreach/cold-gate.ts', 'NA/lib/portal/products.ts'],
+    gate: '對一個真實公開網站跑研究，出現至少一條證據，原文片段能在該頁找到；網站上有 email 就自動填進名單。沒有證據的名單不能產信。費用在按鈕上看得到。', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['C2'],
+    what: 'migration 0150 co_evidence；collect sink outreach-research（excerpt 子字串驗＋純程式抓 email）；research.ts＋route（crawl entity-dossier）；products.ts 加 outreach.research；Leads 頁按鈕與證據審核；cold-gate 改讀 evidence',
+    files: ['DB/migrations/0150_co_evidence.sql', 'NA/lib/collect/sinks/outreach-research.ts', 'NA/lib/outreach/research.ts', 'NA/app/api/outreach/leads/research/route.ts', 'NA/lib/outreach/cold-gate.ts', 'NA/lib/portal/products.ts'],
     items: [
       todo('C3.1', '新資料表：證據（主張、來源、原文片段、時間、狀態）。'),
       todo('C3.2', '蒐集器加一個出口：把抓到的網頁交給便宜模型抽主張，原文片段對不上就丟掉。'),
@@ -73,6 +75,7 @@ export const STEPS = [
       todo('C3.4', '把「客戶研究」登記成收費功能。'),
       todo('C3.5', '畫面：研究按鈕（顯示費用）、證據核准／駁回；沒有核准證據就不產信。'),
       todo('C3.6', '測試與對真實網站跑一次。'),
+      todo('C3.7', '研究時順手從店家網站抓 email，填進名單並查核，不用 AI。'),
     ] },
   { n: 4, code: 'C4', group: 'D', title: '回覆同步與 Replies 頁', plain: '例：你在 Gmail 按下寄出，10 分鐘內系統知道寄了；對方回信，系統抓回來分類成「問價」，名單狀態變「已回覆」，追蹤信自動停。退訂與退信也自動處理。',
     gate: '你寄 1 封給自己另一個信箱並回覆，10 分鐘內 Replies 頁出現該列、名單狀態變已回覆、追蹤日期清空。退信與退訂會進拒收名單。', risk: 'Medium（主機排程安裝 High）', model: 'Opus 5.5', status: 'not_started', depends: ['C2'],
@@ -139,7 +142,7 @@ export const STEPS = [
       todo('C9.2', '產信與評分只看證據；匯入時直接寫證據。'),
     ] },
   { n: 10, code: 'C10', group: 'C', title: '名單發現', plain: '例：你輸入「台中 咖啡廳」，系統用現有的 Serper 帳號查地圖，找出 20 家，連網站與電話一起放進待處理名單。',
-    gate: '一次真查回 20 筆進待處理名單，每筆有名稱、網站或電話、來源網址。費用在畫面上。', risk: 'Low', model: 'Codex', status: 'not_started', depends: [],
+    gate: '一次真查回 20 筆進待處理名單，每筆有名稱、網站或電話、來源網址。費用在畫面上。沒有 email 的，核准後由研究那步補。', risk: 'Low', model: 'Codex', status: 'not_started', depends: [],
     decided: '用已經在付費使用的 Serper 查地圖。不用 Google Places API：它的條款不准把查到的店名、網站、電話存進自己的資料庫，而名單庫就是要存這些；資料也比較貴、要開帳單帳戶。它多出來的營業時間與評論，由研究那一步從店家網站取得。（規格 D18）',
     what: 'serper allowedPaths 加 /places；discover.ts 經 createProviderCall（預算＋限速）→ co_lead_inbox → 既有 normalize／dedup／suppression；Inbox 頁找名單表單',
     files: ['NA/lib/collect/net/providers.ts', 'NA/lib/outreach/discover.ts', 'NA/lib/outreach/connectors/router.ts', 'NA/app/api/outreach/inbox/route.ts'],

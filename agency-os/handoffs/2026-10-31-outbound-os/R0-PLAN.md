@@ -47,6 +47,7 @@ B。順序：C1（守衛）→ C2（信本身）→ C3＋C10 並行（研究／�
 | C1.2 | `NA/app/api/outreach/messages/gmail-draft/route.ts`：建草稿前重查 lead `do_not_contact` 與 `co_suppression_list`（用 `NA/lib/outreach/normalize.ts` 的 `isSuppressed`，applies_to cold／all）→ 409 `{blocked:true, reason}`；測試：lead 標 do_not_contact → 409 |
 | C1.3 | `NA/lib/outreach/google-oauth.ts` `buildRfc2822Message`：加 `List-Unsubscribe: <mailto:<from>?subject=unsubscribe>`（RFC 2369）；測試斷言 header 存在且與 from 一致 |
 | C1.4 | VBC：prod `co_connector_accounts` 的 Gmail connector 是否仍能 refresh（`timeout 60 ssh … docker exec … psql` 讀 `updated_at`／`is_enabled`，再對 Google token endpoint refresh 一次，不寫 DB）；結果寫 WORKLOG 與監工台 NOW；失敗＝Testing 7 天到期已發生 → 照 SPEC D13 提前在 C4.2 之前發布並重新連線 |
+| C1.5 | 新檔 `NA/lib/outreach/verify-email.ts`：`mxStatus(email)` 用 `node:dns/promises` `resolveMx(domain)` → `valid`（有 MX）／`invalid`（NXDOMAIN 或無 MX）／`unknown`（逾時 3 秒或其他錯），`provider='mx_syntax'`；`verifyEmails(orgId, emails[])` 先讀 `co_verified_emails`（`0048:295`，UNIQUE org＋email），沒有的並行 ≤10 查後寫入。`NA/app/api/outreach/inbox/route.ts:102-143` 匯入時呼叫，`scoreContactability(..., {emailVerified: status==='valid'})`（`NA/lib/outreach/scoring.ts:62`），`invalid` 在 `classify` 視同無 email；`gmail-draft/route.ts` I6 重查加 `invalid` → 409 `email_invalid`。測試：假 resolver 三種結果；REALTEST：匯入一筆不存在網域的 email → `invalid`、`no_contact` |
 
 ### C2 署名、定位、主旨、多版本、追蹤信內容
 
@@ -64,11 +65,12 @@ B。順序：C1（守衛）→ C2（信本身）→ C3＋C10 並行（研究／�
 | 卡號 | 做什麼 |
 |---|---|
 | C3.1 | `DB/migrations/0150_co_evidence.sql`：`co_evidence(id, organization_id, lead_id FK cascade, claim text, source_url text, excerpt text, source_label text, captured_at timestamptz default now(), source_date date, confidence numeric, status text check in ('pending','approved','rejected') default 'pending', created_by text, created_at)`；RLS service-role（照 `DB/migrations/0048_co_outreach_core.sql:5-11`）；index `(lead_id, status)`；唯一鍵 `(lead_id, source_url, claim)`；down 兩處 |
-| C3.2 | 先改 `NA/lib/ai/cheap-json.ts`：`CheapJsonTextArgs` 加選用 `grant`，兩條路（`:40` OpenAI、`:86` Anthropic）改用 `args.grant ?? await grantFor("ops.cheap-json")`，既有呼叫點不變。新檔 `NA/lib/collect/sinks/outreach-evidence.ts`：`SinkBlock`（`NA/lib/collect/types.ts:253-270`）；`run(docs)`：每份 doc → `generateCheapJsonText({ grant: grantFor("outreach.research", …) })` 抽 ≤3 `{claim, excerpt}`；`excerpt` 必須是 `doc.text` 的子字串（機械驗，否則丟棄並計 skipped）；寫 `co_evidence` pending，`source_url=doc.canonicalUrl`、`source_label=doc.collector`、`source_date=doc.publishedAt`（`doc.provenance` 是物件且恆為 EVIDENCE，`types.ts:41-45`，不存） |
+| C3.2 | 先改 `NA/lib/ai/cheap-json.ts`：`CheapJsonTextArgs` 加選用 `grant`，兩條路（`:40` OpenAI、`:86` Anthropic）改用 `args.grant ?? await grantFor("ops.cheap-json")`，既有呼叫點不變。新檔 `NA/lib/collect/sinks/outreach-research.ts`（一個 sink 兩種純輸出：證據列＋聯絡 email，見 C3.7）：`SinkBlock`（`NA/lib/collect/types.ts:253-270`）；`run(docs)`：每份 doc → `generateCheapJsonText({ grant: grantFor("outreach.research", …) })` 抽 ≤3 `{claim, excerpt}`；`excerpt` 必須是 `doc.text` 的子字串（機械驗，否則丟棄並計 skipped）；寫 `co_evidence` pending，`source_url=doc.canonicalUrl`、`source_label=doc.collector`、`source_date=doc.publishedAt`（`doc.provenance` 是物件且恆為 EVIDENCE，`types.ts:41-45`，不存） |
 | C3.3 | 新檔 `NA/lib/outreach/research.ts`＋新路由 `NA/app/api/outreach/leads/research/route.ts`（POST `{leadId}`）：seeds＝lead `website`、`social_url`（各 `scope` 該 host，`meta.entityName=name`，`meta.anchors=[name]`）→ `crawl(seeds, {sink, budget ≤15 頁／60 秒, callProvider: serper 若已設, maxDepth: 2})`（`NA/lib/collect/orchestrator.ts:254`；`maxDepth` 含種子頁，2＝首頁＋一層，`:404`）；非同步＋輪詢照 `NA/app/api/ops/clients/[slug]/collection-sources/route.ts:106` 與 `NA/lib/collect/run-jobs.ts`；0 claim → timeline `research_insufficient`，不生成 |
 | C3.4 | `NA/lib/portal/products.ts:88` features 加 `quota("outreach.research", "客戶研究")`；`products.test.ts` 綠 |
 | C3.5 | UI：Leads 頁每筆「研究這家（約 NT$x）」按鈕（費用由 `NA/lib/ai/cost-model.ts` 算）；證據列表 approve／reject 兩顆按鈕；`NA/lib/outreach/cold-gate.ts` `checkColdGate` 改：≥1 approved evidence 通過；過渡期舊 `observation+source_url` 亦通過（C9 收） |
 | C3.6 | 測試：sink 子字串驗證（假 doc、假 JSON）；REALTEST：本機對 1 個真實公開網站跑研究 → `co_evidence` ≥1 列且 excerpt 可在頁面原文找到 |
+| C3.7 | 同一 sink 的純程式段：每份 doc 從 `doc.raw.bytes`（HTML）抓 `mailto:` 與從 `doc.text` 抓 email（regex），排除圖檔名誤判，優先與 seed 網站同網域；lead `email` 為空才寫 `co_leads.email`，timeline `email_found{source_url}`；接著呼叫 C1.5 `verifyEmails` 寫 `co_verified_emails`。測試：mailto 優先、同網域優先、已有 email 不覆蓋；REALTEST：對 1 個真實店家網站跑研究 → `co_leads.email` 填入且在頁面找得到 |
 
 ### C4 回覆同步與 Replies 頁
 
@@ -129,7 +131,7 @@ B。順序：C1（守衛）→ C2（信本身）→ C3＋C10 並行（研究／�
 
 | 卡號 | 做什麼 |
 |---|---|
-| C10.1 | `NA/lib/collect/net/providers.ts:88` serper `allowedPaths` 加 `/places`（同段註解要求：有呼叫者才放寬）；新檔 `NA/lib/outreach/discover.ts`：經 `createProviderCall`（`NA/lib/collect/index.ts` 匯出，帶預算與限速）`POST /places {q:"<查詢字> <地區>", gl:"tw", hl:"zh-tw"}` → 先真打一次記下回應形狀寫進檔頭（照 `NA/lib/collect/search/drivers.ts:67` 慣例）→ 每筆 `{title, address, phoneNumber, website, cid}`（`phoneNumber` 有時是地址，只收符合 `^\+?[\d\s()-]{7,}$` 的值，其餘留空）→ `co_lead_inbox`（`source_type='serper_places'`、`source_url=https://maps.google.com/?cid=<cid>`），再走既有 normalize／dedup／suppression（`NA/app/api/outreach/inbox/route.ts`）；每次 ≤20 筆；`NA/lib/outreach/connectors/router.ts:34` 的 `places` 槽位 note 改為 Serper |
+| C10.1 | `NA/lib/collect/net/providers.ts:88` serper `allowedPaths` 加 `/places`（同段註解要求：有呼叫者才放寬）；新檔 `NA/lib/outreach/discover.ts`：經 `createProviderCall`（`NA/lib/collect/index.ts` 匯出，帶預算與限速）`POST /places {q:"<查詢字> <地區>", gl:"tw", hl:"zh-tw"}` → 先真打一次記下回應形狀寫進檔頭（照 `NA/lib/collect/search/drivers.ts:67` 慣例）→ 每筆 `{title, address, phoneNumber, website, cid}`（`phoneNumber` 有時是地址，只收符合 `^\+?[\d\s()-]{7,}$` 的值，其餘留空）→ `co_lead_inbox`（`source_type='serper_places'`、`source_url=https://maps.google.com/?cid=<cid>`），再走既有 normalize／dedup／suppression（`NA/app/api/outreach/inbox/route.ts`）；沒有 email 的候選核准進名單後由 C3.7 補；每次 ≤20 筆；`NA/lib/outreach/connectors/router.ts:34` 的 `places` 槽位 note 改為 Serper |
 | C10.2 | Inbox 頁「找名單」表單（查詢字、地區兩個輸入框），按鈕顯示每次查詢費用；測試：假回應 → 20 筆 inbox、重複的被標出；REALTEST：1 次真查 |
 
 ## 7. 驗證計畫（四動作）

@@ -74,6 +74,7 @@
 | D15 | 不加依賴：JSON 守衛手寫（repo 無 zod） | `NA/package.json` 無 zod；`cheap-json.ts:29` 已有 `extractJsonArray` 慣例 |
 | D16 | FluentCRM 同步走**既有 CRM 接頭** `NA/lib/crm/fluentcrm.ts`（ADR 017 §4 `crm: fluentcrm`），加一個 `upsertContact()`，走同一條簽章＋system-mode 閘的 `bridgePost`；不另寫 bridge 呼叫。目標站＝bridge 連線由環境變數定（預設＋`WPBRIDGE_SITE_<i>_*`，`clientId`），org → `clientId` 用該 org active `wp_sites.url` 的 host 對上已設定的 bridge base URL；對不到 422 `no_bridge`。C6 parked | `NA/lib/crm/fluentcrm.ts:1-2`（adapter，今只有 `createNewsletter`）；`NA/lib/payments/woo.ts:12-22`（多站＝env，私鑰不進 DB）；`NA/app/api/content/newsletter/route.ts:173,207`（今只用預設站）；`DB/migrations/0039_wp_sites.sql`（`url`、`active`）、`0061_wp_sites_add_org.sql:36`（`organization_id`）；bridge `/health` 不報 FluentCRM（`RestController.php:128-150`），有沒有裝由 `fluentcrm_not_active` 回應判。回頭條件：某品牌有回信的 lead，且該品牌的站裝了 wp-bridge＋FluentCRM；aware-wave.com 只留 WordPress（操作者 2026-10-30），不接回 |
 | D17 | 先不開任何帳號的 `auto`；C8 parked | 沒有寄送資料可判斷帳號健康，且 20 封／天人手按寄出不到 5 分鐘，自動寄的價值要等量大。回頭條件（全部可機械查）：該帳號草稿模式寄滿 50 封、`hard_bounced`／`sent` < 2%、`co_sending_events` 無 Gmail 拒收（API 4xx／配額）事件、回覆同步上線滿 2 週。「0 投訴」拿掉：Gmail 不向寄件人揭露檢舉，條件查不到＝不是條件 |
+| D19 | 頭的最後一哩兩件事都純程式、零供應商：①研究時從店家網站抓 email（`mailto:` 與內文，優先與網站同網域），寫 `co_leads.email`＋timeline `email_found{source_url}`；②匯入與建草稿前做 MX 查核（`node:dns/promises resolveMx`），結果快取 `co_verified_emails`，`invalid` 不建草稿。Hunter 等 SMTP 級驗證留槽位 | 今天沒有任何程式抓 email，匯入無 email／電話／社群即 `no_contact`（`NA/app/api/outreach/inbox/route.ts:37`）→ 找名單的產出寄不出去；`scoreContactability` 早留 `emailVerified` 分數（`NA/lib/outreach/scoring.ts:62`）、`co_verified_emails`（`0048:295`）0 呼叫點、router `mx_syntax` 只有名字（`connectors/router.ts:28`）。回頭條件：`hard_bounced`／`sent` > 2% 才接 Hunter（`router.ts:26`） |
 | D18 | 名單發現用 Serper `/places`（既有 `SERPER_API_KEY`），不用 Google Places API | 決定性原因是條款：Google Places 政策「不得預先抓取、快取或儲存 Places 內容，例外只有 place ID」（developers.google.com/maps/documentation/places/web-service/policies），名單庫要存名稱、網站、電話，等於違反；且需啟用帳單帳戶、含電話／網站的 SKU＝Text Search Enterprise $35／千次（免費 1,000／月）。Serper 回 title／address／phoneNumber／website／rating／cid，沒有營業時間與評論——那是研究（C3 爬網站）的事，不是找名單的事。Serper 已是 collect 預設供應商（`NA/lib/collect/net/providers.ts:76-89`），只鎖 `/search` 是因為沒有別的呼叫者；C10 就是那個呼叫者。換供應商＝`providers.ts` 一個 entry＋一個 parser（`:63-66` 註解） |
 
 ## 3. GPT 企業版 12 模組對照
@@ -82,7 +83,7 @@
 |---|---|---|
 | 01 多品牌工作區 | 有 | organizations＋`?org=`；跨 org 全看＝ops-role（`NA/lib/ops-role.ts:120-124`） |
 | 02 Lead discovery | 卡 C10 | Serper `/places` → `co_lead_inbox`（D18） |
-| 03 Enrichment | 部分 | `co_evidence` 兼任（每個事實附來源與時間）；Hunter／Snov 槽位（`NA/lib/outreach/connectors/router.ts:26-27`）有 key 再接 |
+| 03 Enrichment | 卡 C1.5、C3.7 | email 從網站抓＋MX 查核（D19）；`co_evidence` 兼任其他事實；Hunter／Snov 槽位（`NA/lib/outreach/connectors/router.ts:26-27`）等退信率觸發 |
 | 04 AI research & personalization | 卡 C2、C3 | brand-context＋evidence |
 | 05 Email infrastructure | 有 | `co_sender_accounts`、Gmail OAuth；DNS 清單 deliverability §12 |
 | 06 Campaign／sequence builder | 卡 C2、C5 | 固定形狀；不做畫布（D9） |
@@ -109,7 +110,7 @@
 ## 5. 流程契約
 
 ### 5.1 研究（C3）
-輸入 lead 的 `name`、`website`、`social_url`。seeds＝website 與 social_url 各一（`scope` 該 host、`meta.entityName=name`、`meta.anchors=[name]`）→ `crawl(seeds, {sink: outreach-evidence, budget ≤15 頁／60 秒, callProvider: serper 若已設, maxDepth: 2})`（`NA/lib/collect/orchestrator.ts:254`；`maxDepth` 含種子頁，2＝首頁＋一層，`:404`）。非同步＋輪詢照 `/ops/collect`（`NA/app/api/ops/clients/[slug]/collection-sources/route.ts:106`、`NA/lib/collect/run-jobs.ts`）。sink 對每份已過品質閘與 provenance 篩查的 doc 呼叫 `generateCheapJsonText` 抽 ≤3 `{claim, excerpt}`；`excerpt` 必須是 `doc.text` 的子字串（機械驗，不符丟棄）；寫 `co_evidence` pending（`source_url=doc.canonicalUrl`、`source_label=doc.collector`、`source_date=doc.publishedAt`）。0 claim → timeline `research_insufficient`，不生成。費用：grant `outreach.research` 傳進 `generateCheapJsonText`（它今天固定用 `ops.cheap-json`，`NA/lib/ai/cheap-json.ts:40`、`:86`，C3.2 加選用 `grant` 參數），按鈕顯示估價（`NA/lib/ai/cost-model.ts`）。
+輸入 lead 的 `name`、`website`、`social_url`。seeds＝website 與 social_url 各一（`scope` 該 host、`meta.entityName=name`、`meta.anchors=[name]`）→ `crawl(seeds, {sink: outreach-research, budget ≤15 頁／60 秒, callProvider: serper 若已設, maxDepth: 2})`（`NA/lib/collect/orchestrator.ts:254`；`maxDepth` 含種子頁，2＝首頁＋一層，`:404`）。非同步＋輪詢照 `/ops/collect`（`NA/app/api/ops/clients/[slug]/collection-sources/route.ts:106`、`NA/lib/collect/run-jobs.ts`）。sink 對每份已過品質閘與 provenance 篩查的 doc 呼叫 `generateCheapJsonText` 抽 ≤3 `{claim, excerpt}`；`excerpt` 必須是 `doc.text` 的子字串（機械驗，不符丟棄）；寫 `co_evidence` pending（`source_url=doc.canonicalUrl`、`source_label=doc.collector`、`source_date=doc.publishedAt`）。同一個 sink 另做純程式的 email 抓取（D19）：`mailto:` 與內文的 email，優先與網站同網域，`co_leads.email` 為空才填，寫 timeline `email_found{source_url}`，並做 MX 查核。0 claim → timeline `research_insufficient`，不生成。費用：grant `outreach.research` 傳進 `generateCheapJsonText`（它今天固定用 `ops.cheap-json`，`NA/lib/ai/cheap-json.ts:40`、`:86`，C3.2 加選用 `grant` 參數），按鈕顯示估價（`NA/lib/ai/cost-model.ts`）。
 
 ### 5.2 證據審核
 Leads 頁列 pending 證據，approve／reject 兩顆按鈕。Cold Gate 通過＝≥1 approved evidence；過渡期舊 `observation+source_url` 亦通過，C9 收掉。
