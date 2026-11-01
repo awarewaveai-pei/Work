@@ -243,6 +243,31 @@ describe("researchLead", () => {
     expect(m.timeline.map((t) => t.event_type)).toEqual(["research_started", "social_research", "email_found", "research_done"]);
   });
 
+  it("the own site an Instagram profile links becomes the lead's website and is read in the same run; a maps link is not a site", async () => {
+    const ig = (website: string) => async (_id: string, init: { path: string }) => new Response(JSON.stringify(
+      init.path.includes("/me?") ? { instagram_business_account: { id: "17841423840764175" } }
+        : { business_discovery: { name: "Coffee Here", biography: "台中北區的咖啡店", website } }), { status: 200 });
+    m.crawlDocs = [doc("https://coffeehere.tw/menu", "招牌手沖一杯 180 元，每週一公休")];
+    const o = await researchLead(db, lead({ website: "https://www.instagram.com/_coffeehere_/" }),
+      { grant: {} as never, grantContext: {} as never, runKey: "k", callProvider: ig("https://coffeehere.tw") as never });
+    expect(o.websiteFound).toBe("https://coffeehere.tw");
+    // the profile URL moves to social_url, the business's own site takes the website field
+    expect(m.leadUpdates[0]).toMatchObject({ website: "https://coffeehere.tw", social_url: "https://www.instagram.com/_coffeehere_/" });
+    expect(m.cheap.mock.calls.some(([a]) => a.user.includes("招牌手沖一杯 180 元"))).toBe(true); // the site page went to the model
+    expect(m.timeline.map((t) => t.event_type).slice(0, 3)).toEqual(["research_started", "social_research", "website_found"]);
+
+    m.leadUpdates.length = 0; m.timeline.length = 0; m.cheap.mockClear();
+    const o2 = await researchLead(db, lead({ website: "https://www.instagram.com/_coffeehere_/" }),
+      { grant: {} as never, grantContext: {} as never, runKey: "k", callProvider: ig("https://maps.app.goo.gl/sf1fMrZxgnHAAmSR8") as never });
+    expect(o2.websiteFound).toBeUndefined();
+    expect(m.leadUpdates.some((u) => (u as { website?: string }).website)).toBe(false);
+    expect(m.cheap.mock.calls.some(([a]) => a.user.includes("招牌手沖"))).toBe(false); // nothing crawled
+    // what profiles link instead of a site (live 2026-11-01): a form, a link page, a LINE account
+    for (const w of ["https://forms.gle/bJGRHYirEb71xn7V9", "https://linktr.ee/52syoga", "https://page.line.me/612qmcyq"]) {
+      expect(researchUrl(w)).toEqual({ reason: "platform_website" });
+    }
+  });
+
   it("a platform website that is not Instagram or Facebook is still refused", async () => {
     const o = await run(lead({ website: "https://linktr.ee/cafe" }));
     expect(o.status).toBe("platform_website");

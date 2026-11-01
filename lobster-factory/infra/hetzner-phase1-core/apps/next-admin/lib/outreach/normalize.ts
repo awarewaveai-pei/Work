@@ -54,7 +54,11 @@ export function domainOf(urlOrEmail: string | null): string | null {
  *  is shared by thousands of businesses, so it never identifies one (dedupKey, existing-leads.ts). */
 export const PLATFORM_HOSTS = ["facebook.com", "fb.com", "instagram.com", "threads.net", "linkedin.com", "x.com", "twitter.com", "tiktok.com",
   "youtube.com", "line.me", "lin.ee", "linktr.ee", "portaly.cc", "shopee.tw", "shopee.com", "pinkoi.com", "momoshop.com.tw",
-  "ruten.com.tw", "pchome.com.tw", "google.com", "goo.gl", "g.page", "maps.app.goo.gl", "sites.google.com"];
+  "ruten.com.tw", "pchome.com.tw", "google.com", "goo.gl", "g.page", "maps.app.goo.gl", "sites.google.com",
+  // What an Instagram profile links instead of a site (live 2026-11-01, 8 Taichung studios: none linked their own):
+  // forms, short links and link-in-bio pages.
+  "forms.gle", "bit.ly", "tinyurl.com", "reurl.cc", "ppt.cc", "lihi.cc", "lihi1.com", "lihi2.com", "beacons.ai", "lit.link", "linkin.bio",
+  "taplink.cc", "bio.site", "msha.ke", "carrd.co"];
 
 export function isPlatformHost(host: string): boolean {
   return PLATFORM_HOSTS.some((p) => host === p || host.endsWith(`.${p}`));

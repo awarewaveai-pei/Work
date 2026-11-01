@@ -39,6 +39,8 @@ export interface ResearchOutcome {
   /** Evidence waiting for a person. */
   pending: number;
   emailFound: string | null;
+  /** The own website the social profile links, set as the lead's website and read in this run. */
+  websiteFound?: string;
   /** The social profile ladder, when it ran: which layer gave the profile (null = none), every layer's result, US$. */
   social?: { url: string; layer: string | null; layers: Array<{ layer: string; result: string; detail?: string }>; costUsd: number };
   error?: string;
@@ -76,12 +78,48 @@ export async function researchLead(db: SupabaseClient, lead: ResearchLead,
     await timeline(db, lead, "research_insufficient", title, { reason: target.reason, website: lead.website }, errors);
     return { ...base, status: target.reason };
   }
-  const url = "url" in target ? target.url : null;
+  let url = "url" in target ? target.url : null;
   // started without done/insufficient/failed after it = a run the server lost (restart): the pipeline tick (C15) picks
   // the lead again by its state, so no job outlives the process.
   await timeline(db, lead, "research_started", "開始研究", { url, social: social?.url ?? null, run: opts.runKey }, errors);
 
   const tenantRef = `outreach:${lead.organization_id ?? "agency"}`;
+  let socialEmails: FoundEmail[] = [];
+  let socialRun: SocialOutcome | null = null;
+  const runSocial = async (t: NonNullable<typeof social>) => {
+    try {
+      const call = opts.callProvider ?? createProviderCall({ budget: createBudget(SOCIAL_BUDGET), grant: opts.grant, timeoutMs: 100_000 });
+      socialRun = await socialResearch(call, opts.grant, t, tenantRef);
+      socialEmails = socialRun.emails;
+    } catch (e) {
+      errors.push(`social: ${(e instanceof Error ? e.message : String(e)).slice(0, 200)}`);
+    }
+    const run = socialRun as SocialOutcome | null;
+    await timeline(db, lead, "social_research", run?.profile ? "讀了對方的社群頁" : socialEmails.length ? "從搜尋結果找到社群頁上的 email" : "社群頁讀不到資料",
+      { url: t.url, layers: run?.layers ?? [], profile_layer: run?.profile?.layer ?? null, docs: run?.docs.length ?? 0,
+        quarantined: run?.quarantined ?? 0, emails: socialEmails.map((f) => f.email), cost_usd: run?.costUsd ?? 0 }, errors);
+  };
+
+  // No own site: the profile first. The website it links, when that is the business's own (not a platform, not a maps
+  // link), becomes the lead's website -- compare-and-set on the value read at the start, the profile URL kept in
+  // social_url -- and is read in this same run.
+  if (!url && social) {
+    await runSocial(social);
+    const linked = researchUrl((socialRun as SocialOutcome | null)?.profile?.website ?? null);
+    if ("url" in linked) {
+      const keepProfile = !(lead.social_url ?? "").trim() && !!(lead.website ?? "").trim();
+      const q = db.from("co_leads").update({ website: linked.url, ...(keepProfile ? { social_url: lead.website } : {}), updated_at: new Date().toISOString() })
+        .eq("id", lead.id);
+      const { data, error } = await (lead.website === null ? q.is("website", null) : q.eq("website", lead.website)).select("id").maybeSingle();
+      if (error) errors.push(`website: ${error.message}`);
+      if (data) {
+        url = linked.url;
+        base.websiteFound = linked.url;
+        await timeline(db, lead, "website_found", "從社群頁找到對方的官網", { website: linked.url, source_url: social.url }, errors);
+      }
+    }
+  }
+
   const admit = new Set<string>();
   const sink = createOutreachResearchSink({ db, lead: { ...lead, website: url }, grant: opts.grant,
     deadline: Date.now() + LEAD_RESEARCH_BUDGET.ms + EXTRACTION_GRACE_MS, admit });
@@ -99,30 +137,22 @@ export async function researchLead(db: SupabaseClient, lead: ResearchLead,
     }
   }
 
-  // The profile is read when there is no own site, or the site published no address the lead may take (and it has none).
-  let socialEmails: FoundEmail[] = [];
-  let socialRun: SocialOutcome | null = null;
-  if (social && (!url || (!(lead.email ?? "").trim() && !sink.emails.some(autoEligible)))) {
+  // A lead with its own site reads the profile only when the site published no address the lead may take (and it has none).
+  if (social && !socialRun && (!url || (!(lead.email ?? "").trim() && !sink.emails.some(autoEligible)))) await runSocial(social);
+  const ran = socialRun as SocialOutcome | null;
+  if (ran?.docs.length) {
+    for (const d of ran.docs) admit.add(d.canonicalUrl);
     try {
-      const call = opts.callProvider ?? createProviderCall({ budget: createBudget(SOCIAL_BUDGET), grant: opts.grant, timeoutMs: 100_000 });
-      socialRun = await socialResearch(call, opts.grant, social, tenantRef);
-      socialEmails = socialRun.emails;
-      for (const d of socialRun.docs) admit.add(d.canonicalUrl);
-      if (socialRun.docs.length) {
-        const r = await sink.run(socialRun.docs, { tenantRef, runId: opts.runKey, log: opts.log ?? (() => {}) });
-        base.written += r.written;
-        sinkErrors.push(...(r.errors ?? []));
-      }
+      const r = await sink.run(ran.docs, { tenantRef, runId: opts.runKey, log: opts.log ?? (() => {}) });
+      base.written += r.written;
+      sinkErrors.push(...(r.errors ?? []));
     } catch (e) {
       errors.push(`social: ${(e instanceof Error ? e.message : String(e)).slice(0, 200)}`);
     }
-    await timeline(db, lead, "social_research", socialRun?.profile ? "讀了對方的社群頁" : socialEmails.length ? "從搜尋結果找到社群頁上的 email" : "社群頁讀不到資料",
-      { url: social.url, layers: socialRun?.layers ?? [], profile_layer: socialRun?.profile?.layer ?? null, docs: socialRun?.docs.length ?? 0,
-        quarantined: socialRun?.quarantined ?? 0, emails: socialEmails.map((f) => f.email), cost_usd: socialRun?.costUsd ?? 0 }, errors);
   }
   base.approved = sink.approved;
-  if (social && socialRun) base.social = { url: social.url, layer: socialRun.profile?.layer ?? (socialEmails.length ? "serper" : null),
-    layers: socialRun.layers, costUsd: socialRun.costUsd };
+  if (social && ran) base.social = { url: social.url, layer: ran.profile?.layer ?? (socialEmails.length ? "serper" : null),
+    layers: ran.layers, costUsd: ran.costUsd };
   const found = [...sink.emails, ...socialEmails];
 
   for (const status of ["approved", "pending"] as const) {

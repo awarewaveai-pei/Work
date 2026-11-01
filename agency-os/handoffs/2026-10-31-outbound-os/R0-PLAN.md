@@ -94,6 +94,7 @@ B。**第 0 天**操作者啟動 C11.1 採購（網域、Workspace 次網域、�
 | C17.4 | `NA/lib/outreach/research.ts`：沒有自家網站或網站沒可用 email 時跑階梯；文件以 `admit` 交給 `sink/outreach-research`（只收這些網址；`reviewOnly` 一律 pending）；email 與網站的合併後照 C3.7 選；timeline `social_research`（各層結果、費用）；outcome `social`；研究路由多讀 `social_url`；`cost-model.ts` 研究上限加社群 |
 | C17.5 | 名單頁：只有 IG／FB 頁的名單也能按「研究這家」；結果顯示用了哪一層、花多少 |
 | C17.6 | 測試（階梯找到就停、沒金鑰跳過、錢包不足不跑 actor、注入篩查、貼文日期與待審）；REALTEST 層 1＋2 正式庫；層 3 Apify 等操作者說可以再真跑一次 |
+| C17.7 | `NA/lib/outreach/research.ts`：沒有自家網站時先讀社群頁；頁上連的網址若是對方自己的網站（`researchUrl` 判斷：不是平台、表單、短網址、連結頁、地圖），compare-and-set 寫進 `co_leads.website`、社群網址移到 `social_url`、timeline `website_found`，同一次研究接著讀官網；`NA/lib/outreach/normalize.ts` `PLATFORM_HOSTS` 加表單、短網址、連結頁（2026-11-01 真資料：台中 8 家瑜珈 IG 沒有一家連自家官網） |
 
 ### C11 寄件信箱池：次網域、DNS、暖機
 
