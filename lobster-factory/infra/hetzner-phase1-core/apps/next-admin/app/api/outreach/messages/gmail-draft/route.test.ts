@@ -45,6 +45,12 @@ describe("POST /api/outreach/messages/gmail-draft re-checks the lead before draf
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ ok: false, blocked: true, reason: "do_not_contact" });
   });
+  it("a lead that replied (or turned warm) since approval is refused: the cold sequence is over", async () => {
+    state.lead = lead({ status: "replied" }); state.suppression = []; state.verified = [];
+    const res = await call();
+    expect(res.status).toBe(409);
+    expect((await res.json()).reason).toBe("warm");
+  });
   it("a lead on the suppression list is refused, whatever the case of the stored address", async () => {
     state.lead = lead({ email: "X@Blocked.Example" }); state.suppression = [{ id: "s1", email: "x@blocked.example", domain: null, scope: "email" }]; state.verified = [];
     const res = await call();

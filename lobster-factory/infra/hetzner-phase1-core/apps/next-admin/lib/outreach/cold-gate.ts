@@ -1,8 +1,8 @@
 // Cold Outreach — Cold Gate + message lint (task T8, spec §C2/§C3/§D2; v2 gateMessage below). Pure.
 //
 // Two gates:
-//  1. checkColdGate(): PRE-generation — refuse to generate a cold email without a concrete observation
-//     + source_url (anti-spam / anti-hallucination) or for a do_not_contact lead.
+//  1. checkColdGate(): PRE-generation — refuse a cold email without approved evidence (co_evidence, SPEC §5.2; the
+//     old observation + source_url still counts until card C9), for a do_not_contact lead, or for a warm lead.
 //  2. lintMessage(): POST-generation — forbidden words (hard block), hard CTA / missing opt-out /
 //     length (warn). Produces safety_score + quality_gate_status for co_messages.
 
@@ -18,7 +18,17 @@ export interface ColdGateLead {
   source_url?: string | null;
   pain_guess?: string | null;
   do_not_contact?: boolean | null;
+  status?: string | null;
+  consent_source?: string | null;
 }
+
+/** A lead in conversation or past it (replied, proposal, meeting, warm, synced, nurtured, a customer), one who opted
+ *  out, or one who left an address in a Meta lead ad never gets a cold email (SPEC §5.2, I-reply-stops): what follows a
+ *  reply is a person or FluentCRM. The statuses are 0048:109's, every one after the cold sequence. */
+export const NO_COLD_STATUSES = ["replied", "proposal_sent", "meeting_booked", "warm", "synced_to_fluentcrm", "nurturing", "customer",
+  "unsubscribed", "do_not_contact"];
+export const isWarm = (lead: ColdGateLead): boolean =>
+  NO_COLD_STATUSES.includes(lead.status ?? "") || (lead.consent_source ?? "").startsWith("meta_lead_ad");
 
 export interface ColdGateResult {
   status: "pass" | "block";
@@ -27,11 +37,13 @@ export interface ColdGateResult {
 
 const has = (v: unknown): boolean => typeof v === "string" && v.trim() !== "";
 
-export function checkColdGate(lead: ColdGateLead): ColdGateResult {
+/** approvedEvidence = the lead's co_evidence rows with status approved. */
+export function checkColdGate(lead: ColdGateLead, approvedEvidence = 0): ColdGateResult {
   const blockers: string[] = [];
   if (lead.do_not_contact) blockers.push("do_not_contact: 此 lead 標記不可聯絡");
-  if (!has(lead.observation)) blockers.push("缺 observation：冷信必須有具體觀察點（反罐頭/反幻覺）");
-  if (!has(lead.source_url)) blockers.push("缺 source_url：冷信必須有公開來源依據");
+  if (isWarm(lead)) blockers.push(`已在對話中或已退出（${lead.status ?? lead.consent_source}）：不寄冷信`);
+  const legacy = has(lead.observation) && has(lead.source_url);
+  if (approvedEvidence < 1 && !legacy) blockers.push("沒有已核准的證據：先按「研究這家」，或在證據清單核准一條");
   return { status: blockers.length === 0 ? "pass" : "block", blockers };
 }
 

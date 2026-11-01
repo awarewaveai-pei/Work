@@ -79,6 +79,12 @@ export interface CollectFetchOptions {
    * A POST follows no redirect: an API that redirects us is doing something unexpected.
    */
   postHosts?: readonly string[];
+  /**
+   * Where a redirect may lead. Omitted = anywhere the address gate allows (the crawl's scope then judges the delivered
+   * document). Given, a hop outside it is refused before it is requested: a research run that may read only one
+   * business's site never sends a request to another's (lib/collect/run.ts runLeadResearch).
+   */
+  stayWithin?: (url: string) => boolean;
 }
 
 /** Headers a collector may not set: they would change who we are or who we are talking to. */
@@ -189,7 +195,9 @@ export function createCollectFetch(opts: CollectFetchOptions) {
       ? null
       : (opts.robots ??
         new RobotsCache(async (robotsUrl) => {
-          const res = await createCollectFetch({ ...opts, robots: null, maxBytes: 512_000 })(robotsUrl);
+          // stayWithin bounds the pages a crawl reads; robots.txt is the site's rule file, and a refused hop there would
+          // read as "disallow everything" (robots.ts fails closed).
+          const res = await createCollectFetch({ ...opts, robots: null, maxBytes: 512_000, stayWithin: undefined })(robotsUrl);
           return { status: res.status, text: res.status === 200 ? await res.text() : "" };
         }, userAgent));
 
@@ -297,6 +305,7 @@ export function createCollectFetch(opts: CollectFetchOptions) {
         if (!location) throw new CollectFetchError(`redirect_without_location_${res.status}`, "http", res.status);
         try { current = new URL(location, current).toString(); } // relative Location headers are legal
         catch { throw new CollectFetchError(`redirect_bad_location_${res.status}`, "http", res.status); }
+        if (opts.stayWithin && !opts.stayWithin(current)) throw new CollectFetchError(`redirect_out_of_scope_${res.status}`, "blocked", res.status);
         log(`redirect ${res.status} -> ${current}`);
         continue; // and the gate runs again for this new URL
       }

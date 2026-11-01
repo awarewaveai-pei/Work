@@ -89,7 +89,7 @@ const PRODUCT_DEFINITIONS = [
         { path: "connectors", name: "信箱與連線", staff: "tools/outreach/connectors" },
         { path: "profiles", name: "服務設定", staff: "tools/outreach/settings/service-profiles" }, { path: "suppression", name: "拒收名單", staff: "tools/outreach/settings/suppression" }] },
     loginSources: ["local"], standalone: false, status: "coming_soon",
-    features: [quota("outreach.draft", "AI 開發信"), quota("outreach.qa", "事實核對")], accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/outreach/MODULE_MANIFEST.json" }, staffPaths: ["tools/outreach"] },
+    features: [quota("outreach.draft", "AI 開發信"), quota("outreach.qa", "事實核對"), quota("outreach.research", "客戶研究")], accessChannels: ["ui"], modules: { dependsOn: ["collect"], manifest: "lib/outreach/MODULE_MANIFEST.json" }, staffPaths: ["tools/outreach"] },
   // NEW_PRODUCT_ROWS: scripts/new-product.mjs inserts before this marker.
 ] as const satisfies readonly ProductDefinition[];
 export type ProductKey = (typeof PRODUCT_DEFINITIONS)[number]["key"];

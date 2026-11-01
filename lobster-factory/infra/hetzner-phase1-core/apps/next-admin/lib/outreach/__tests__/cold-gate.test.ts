@@ -1,16 +1,30 @@
 import { describe, it, expect } from "vitest";
 import { checkColdGate, lintMessage, DEFAULT_FORBIDDEN } from "../cold-gate";
 
+describe("checkColdGate with evidence (SPEC §5.2)", () => {
+  it("one approved evidence row passes without the old observation", () => {
+    expect(checkColdGate({}, 1).status).toBe("pass");
+    expect(checkColdGate({}, 0).status).toBe("block");
+  });
+  it("a warm lead is refused whatever its evidence", () => {
+    for (const status of ["replied", "proposal_sent", "meeting_booked", "warm", "synced_to_fluentcrm", "nurturing", "customer", "unsubscribed", "do_not_contact"]) {
+      expect(checkColdGate({ status }, 3).status).toBe("block");
+    }
+    expect(checkColdGate({ consent_source: "meta_lead_ad:123" }, 3).status).toBe("block");
+    expect(checkColdGate({ status: "qualified", consent_source: "self_published:https://a" }, 1).status).toBe("pass");
+  });
+});
+
 describe("checkColdGate (pre-generation)", () => {
   it("passes with observation + source_url", () => {
     const r = checkColdGate({ observation: "常辦週末小班", source_url: "https://dir/acme" });
     expect(r.status).toBe("pass");
     expect(r.blockers).toHaveLength(0);
   });
-  it("blocks when observation missing", () => {
+  it("blocks when observation missing and there is no approved evidence", () => {
     const r = checkColdGate({ source_url: "https://x" });
     expect(r.status).toBe("block");
-    expect(r.blockers.some((b) => b.includes("observation"))).toBe(true);
+    expect(r.blockers.some((b) => b.includes("證據"))).toBe(true);
   });
   it("blocks when source_url missing", () => {
     expect(checkColdGate({ observation: "o" }).status).toBe("block");

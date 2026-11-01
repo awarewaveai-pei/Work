@@ -8,7 +8,7 @@ import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse, u
 import { generateWithClaude } from "@/lib/outreach/ai-claude";
 import { generateWithOpenAI } from "@/lib/outreach/ai-openai";
 import { grantFor } from "@/lib/entitlements/grant";
-import { actorFor } from "@/lib/social/authz";
+import { billedTo } from "@/lib/outreach/billing";
 import { buildBrandContext, composeBody, BrandContextError, type BrandProfile, type EvidenceItem } from "@/lib/outreach/brand-context";
 import { parseGenerationOutput, repairPrompt } from "@/lib/outreach/generation-schema";
 import { pickVariant, inSample, autoApproves, type ClaimCheck } from "@/lib/outreach/review-policy";
@@ -39,6 +39,7 @@ interface LeadRow {
   observation: string | null;
   source_url: string | null;
   consent_source: string | null;
+  status: string | null;
   do_not_contact: boolean | null;
 }
 interface ProfileRow extends BrandProfile { id: string; review_mode: "manual" | "sampled"; review_sample_pct: number }
@@ -51,11 +52,16 @@ const BRAND_BLOCK: Record<BrandContextError["code"], string> = {
   no_privacy_url: "這筆名單需要個資告知：到「服務設定」填隱私說明網址",
 };
 
-// Until co_evidence (card C3, SPEC §5.2 transition) the lead's own observation + source is the one approved fact.
-function legacyEvidence(lead: LeadRow): EvidenceItem[] {
-  return lead.observation?.trim()
-    ? [{ id: "lead-observation", claim: lead.observation.trim(), excerpt: null, source_url: lead.source_url, status: "approved" }]
-    : [];
+// The lead's approved evidence (co_evidence, card C3) plus, until card C9, its old observation + source as one more fact.
+const EVIDENCE_LIMIT = 12;
+async function approvedEvidence(db: NonNullable<Awaited<ReturnType<typeof outreachDb>>>, lead: LeadRow): Promise<EvidenceItem[]> {
+  const { data, error } = await db.from("co_evidence").select("id, claim, excerpt, source_url, status")
+    .eq("lead_id", lead.id).eq("status", "approved").order("created_at", { ascending: true }).limit(EVIDENCE_LIMIT);
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []) as EvidenceItem[];
+  const legacy: EvidenceItem[] = lead.observation?.trim() && lead.source_url?.trim()
+    ? [{ id: "lead-observation", claim: lead.observation.trim(), excerpt: null, source_url: lead.source_url, status: "approved" }] : [];
+  return [...rows, ...legacy];
 }
 
 const isUniqueViolation = (e: { code?: string } | null): boolean => e?.code === "23505";
@@ -104,8 +110,11 @@ export async function POST(req: Request): Promise<Response> {
   try { assertOrgAccess(req, lead.organization_id); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
-  // Cold Gate — refuse to generate without evidence.
-  const gate = checkColdGate(lead);
+  let evidence: EvidenceItem[];
+  try { evidence = await approvedEvidence(supabase, lead); }
+  catch (e) { return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "evidence read failed" }, { status: 500 }); }
+  // Cold Gate — refuse to generate without evidence, for a do_not_contact lead, or for a warm one.
+  const gate = checkColdGate(lead, evidence.filter((e) => e.id !== "lead-observation").length);
   if (gate.status === "block") {
     return NextResponse.json({ ok: false, blocked: true, blockers: gate.blockers }, { status: 422 });
   }
@@ -137,7 +146,6 @@ export async function POST(req: Request): Promise<Response> {
     collector = (org as { name?: string } | null)?.name ?? collector;
   }
 
-  const evidence = legacyEvidence(lead);
   let ctx: ReturnType<typeof buildBrandContext>;
   try {
     ctx = buildBrandContext({ lead, profile: sp, signature: sender.signature_block, collector, evidence });
@@ -190,14 +198,6 @@ export async function POST(req: Request): Promise<Response> {
     }
   }
 
-  // Billed to the lead's organization (ADR 017 §3), through actorFor; a caller without a role there gets the gate's
-  // not_authorized_for_org (shadow allows and audits it, enforce refuses). A lead with no org = the internal account.
-  const billedTo = async () => {
-    const org = lead.organization_id;
-    const acting = org ? await actorFor(req, org).catch(() => null) : null;
-    return acting ? { req, acting } : org ? { req, orgId: org } : { req };
-  };
-
   let mode: AiProvider | "manual_prompt" | "manual_paste" = "manual_prompt";
   let aiModel: string | null = vaultError ? `vault_read_failed:${vaultError}` : null;
   let parsed: ReturnType<typeof parseGenerationOutput> | null = null;
@@ -208,7 +208,7 @@ export async function POST(req: Request): Promise<Response> {
     aiModel = null;
   } else if (apiKey && resolvedProvider) {
     try {
-      const grant = await grantFor("outreach.draft", await billedTo());
+      const grant = await grantFor("outreach.draft", await billedTo(req, lead.organization_id));
       const generate = (prompt: string) => resolvedProvider === "claude" ? generateWithClaude(grant, apiKey!, prompt)
         : resolvedProvider === "openai" ? generateWithOpenAI(grant, apiKey!, prompt) : generateWithGemini(grant, apiKey!, prompt);
       const first = await generate(ctx.prompt);
@@ -263,7 +263,7 @@ export async function POST(req: Request): Promise<Response> {
         // A refused outreach.qa grant (no credits) is a check that did not happen: the email goes to a person, and the
         // generation already paid for is kept.
         try {
-          claim = await checkClaims({ body: text, evidence, grant: await grantFor("outreach.qa", await billedTo()), metadata: { lead_id: lead.id } });
+          claim = await checkClaims({ body: text, evidence, grant: await grantFor("outreach.qa", await billedTo(req, lead.organization_id)), metadata: { lead_id: lead.id } });
         } catch (e) {
           claim = { verdict: "error", error: e instanceof Error ? e.message : "claim check failed" };
         }

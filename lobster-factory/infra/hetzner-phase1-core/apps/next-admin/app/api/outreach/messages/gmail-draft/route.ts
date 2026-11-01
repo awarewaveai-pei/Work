@@ -29,7 +29,8 @@ function todayStartUtcIso(): string {
   return new Date(`${dateStr}T00:00:00+08:00`).toISOString();
 }
 
-interface LeadRow { id: string; organization_id: string | null; name: string | null; email: string | null; website: string | null; do_not_contact: boolean; }
+interface LeadRow { id: string; organization_id: string | null; name: string | null; email: string | null; website: string | null; do_not_contact: boolean;
+  status: string | null; consent_source: string | null; }
 interface MessageRow { id: string; organization_id: string | null; lead_id: string; subject: string | null; body: string; status: string;
   drafted_at: string | null; prompt_snapshot: { sender_id?: string } | null; }
 
@@ -87,7 +88,7 @@ export async function POST(req: Request): Promise<Response> {
 
   const { data: leadData, error: leadErr } = await supabase
     .from("co_leads")
-    .select("id, organization_id, name, email, website, do_not_contact")
+    .select("id, organization_id, name, email, website, do_not_contact, status, consent_source")
     .eq("id", message.lead_id)
     .maybeSingle();
   if (leadErr) return NextResponse.json({ ok: false, error: leadErr.message }, { status: 500 });

@@ -9,6 +9,7 @@
 // different crawlers wearing one name.
 
 import { crawl, type CrawlProgress, type CrawlResult, type SeedInput } from "@/lib/collect/orchestrator";
+import { inScope, siteScope } from "@/lib/collect/canonical";
 import { createBudget, type BudgetLimits } from "@/lib/collect/budget";
 import { createCollectFetch } from "@/lib/collect/net/fetcher";
 import { createProviderCall } from "@/lib/collect/net/providers";
@@ -105,6 +106,10 @@ interface CrawlWithOptions {
   keepAside: boolean;
   /** Search calls draw from this one when given (a research run), page fetches from `budget`. */
   queryBudget?: ReturnType<typeof createBudget>;
+  /** A redirect outside this scope is refused before it is requested (fetcher stayWithin). */
+  redirectScope?: { hosts: string[]; pathPrefix?: string };
+  expandRefused?: boolean;
+  skipLink?: (uri: string) => boolean;
   /** The run's collect.fetch grant (paid vendors only; null = none, the free tier still crawls). */
   grant: Grant | null;
   onProgress?: (p: CrawlProgress) => void;
@@ -144,10 +149,13 @@ function crawlWith(o: CrawlWithOptions): Promise<CrawlResult> {
     blocks: collectors(),
     log: o.log,
     keepAside: o.keepAside,
+    expandRefused: o.expandRefused,
+    skipLink: o.skipLink,
     onProgress: o.onProgress,
     // Off ⇒ the orchestrator's own NO_URL_STATE default: every page is fetched and delivered in full.
     urlState: o.urlState ? createSupabaseUrlStateStore() : undefined,
-    fetch: createCollectFetch({ budget: o.budget, log: o.log, rateLimiter }),
+    fetch: createCollectFetch({ budget: o.budget, log: o.log, rateLimiter,
+      ...(o.redirectScope ? { stayWithin: (url: string) => inScope(url, o.redirectScope!) } : {}) }),
     // Present only so a provider-backed tier CAN run; it still scores 0 without a key.
     callProvider: createProviderCall({ budget: o.queryBudget ?? o.budget, grant: o.grant, log: o.log }),
   });
@@ -208,6 +216,42 @@ export async function runResearchCollection(opts: ResearchCollectionOptions): Pr
     grant: await collectGrant({}, opts.log ?? (() => {})),
     onProgress: opts.onProgress,
     log: opts.log ?? (() => {}),
+  });
+  return { report: result.report, sink: result.sink };
+}
+
+/** One lead's website (Outbound OS SPEC §5.1): at most 15 pages fetched in 60 s, the home page and one hop, nothing off the
+ *  site. No entity gate: every page of the lead's own site is about the lead, and the gate would drop a menu or a
+ *  price page for not naming the business. No url state: a 304 would deliver nothing to read. */
+export const LEAD_RESEARCH_BUDGET = { fetches: 15, ms: 60_000 } as const;
+
+/** Pages of a site that are machinery, not the business talking about itself: cart, checkout, account, login, admin,
+ *  feeds, add-to-cart and search links. Never facts, and each spends a page of a small research budget. */
+const TRANSACTIONAL_RE = /\/(cart|basket|checkout|my-?account|account|login|log-?in|signin|sign-in|register|wp-admin|wp-login\.php|wishlist|feed|comments)(\/|$)|[?&](add-to-cart|add_to_cart|s|replytocom)=/i;
+export const isTransactionalLink = (uri: string): boolean => TRANSACTIONAL_RE.test(uri);
+
+export async function runLeadResearch(opts: { website: string; sink: SinkBlock; tenantRef: string; runKey: string;
+  grantContext: GrantContext; log?: (msg: string) => void }): Promise<Pick<CrawlResult, "report" | "sink">> {
+  const log = opts.log ?? (() => {});
+  const scope = siteScope(opts.website);
+  const result = await crawlWith({
+    seeds: [{ uri: opts.website, scope }],
+    sink: opts.sink,
+    budget: createBudget(LEAD_RESEARCH_BUDGET),
+    tenantRef: opts.tenantRef,
+    runKey: opts.runKey,
+    maxDepth: 2,
+    durableRateLimit: true,
+    urlState: false,
+    // A page the quality gate refuses (a short contact page) still reaches the sink, labelled meta.aside: it is read for
+    // addresses, never for facts (sinks/outreach-research.ts). An injection-suspect page never reaches it either way.
+    keepAside: true,
+    redirectScope: scope,
+    // the scope is the business's own path: a thin home page's links are its own pages (orchestrator expandRefused)
+    expandRefused: true,
+    skipLink: isTransactionalLink,
+    grant: await collectGrant(opts.grantContext, log),
+    log,
   });
   return { report: result.report, sink: result.sink };
 }

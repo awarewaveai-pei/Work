@@ -82,6 +82,25 @@ export function inScope(uri: string, scope: { hosts: string[]; pathPrefix?: stri
     return host === allowed || host.endsWith(`.${allowed}`);
   });
   if (!hostOk) return false;
-  if (scope.pathPrefix && !u.pathname.startsWith(scope.pathPrefix)) return false;
+  if (scope.pathPrefix && !underPath(u.pathname, scope.pathPrefix)) return false;
   return true;
+}
+
+/**
+ * The scope of one site given by one URL: its host with and without www, and -- when the URL has a path -- that path,
+ * because the rest of the host may belong to someone else (example.com/company/abc, medium.com/@biz). The last segment
+ * is a directory unless it is a page file (index.html, about.php) -- /@john.doe and /store/abc.tw are directories.
+ */
+export function siteScope(url: string): { hosts: string[]; pathPrefix?: string } {
+  const u = new URL(url);
+  const host = u.hostname.toLowerCase();
+  const bare = host.replace(/^www\./, "");
+  const dir = /\.(?:s?html?|php\d?|aspx?|jsp|cgi|cfm)$/i.test(u.pathname) ? u.pathname.replace(/\/[^/]*$/, "") : u.pathname.replace(/\/+$/, "");
+  return { hosts: Array.from(new Set([host, bare, `www.${bare}`])), ...(dir ? { pathPrefix: dir } : {}) };
+}
+
+/** "/faq" covers /faq and /faq/..., never /faqs: a prefix is a path boundary, not a string prefix. */
+export function underPath(pathname: string, prefix: string): boolean {
+  const p = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
+  return p === "" || pathname === p || pathname.startsWith(`${p}/`);
 }

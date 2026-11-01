@@ -63,6 +63,15 @@ export interface CrawlOptions {
   maxAttemptsPerTarget?: number;
   log?: (msg: string) => void;
   /**
+   * Follow the links of a page whose every document was refused. Off by default (below: a refused page's links are a
+   * shell's or a stranger's). On only where the scope alone already bounds the crawl to one owner's pages -- lead
+   * research on one business's own site, where a thin, image-only home page is the usual way into the text.
+   */
+  expandRefused?: boolean;
+  /** Discovered links this run never queues (lead research: a shop's cart, checkout, account and login pages, which
+   *  say nothing about the business and would spend a 15-page budget). Applied with the scope, before the queue. */
+  skipLink?: (uri: string) => boolean;
+  /**
    * A research run (sink/cognitive; Cognitive OS STEP2_SHARED_RULES §4.1): nothing a gate refuses is dropped. A
    * refused document WITH text still reaches the sink, with `meta.aside` = the gate's reason; every page that does
    * not reach it with text is listed in `report.aside`. Off for the knowledge base, which must never store them.
@@ -420,6 +429,7 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
         const canonicalUri = canonicalize(d.uri);
         if (seen.has(canonicalUri)) continue;
         const scope = d.scope ?? target.scope;
+        if (opts.skipLink?.(d.uri)) continue;
         if (!inScope(d.uri, scope)) {
           report.outOfScope++;
           continue;
@@ -513,7 +523,7 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
       // rejected think-tank profile page put its cookie policy, ethics statement and DEI strategy
       // into the crawl (run manual-2026-09-20051728). A block that produced no documents at all
       // (a search, a sitemap, a feed index) is unaffected: discovery is its entire job.
-      if (graded.length === 0 || admitted > 0) enqueueDiscovered(result.discovered);
+      if (graded.length === 0 || admitted > 0 || opts.expandRefused) enqueueDiscovered(result.discovered);
       else log(`not expanding ${target.uri}: every extracted document was refused`);
     };
 

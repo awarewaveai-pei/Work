@@ -217,6 +217,8 @@ export const TEXT_FEATURES: FeatureProfile[] = [
   { key: "tarot-prompt",label: "塔羅 prompt 建議",           route: "/api/tools/tarot/suggest-prompt", model: "claude-haiku-5-5", inputTok: 500, outputTok: 400 },
   { key: "product-copy",label: "POD 商品文案 (SEO)",         route: "lib/studio/product-copy", model: "claude-opus-5-5", inputTok: 600, outputTok: 1000 },
   { key: "video-script",label: "影片腳本生成 (6 場景)",       route: "lib/content/video/video-script-core", model: "claude-opus-5-5", inputTok: 1200, outputTok: 2200 },
+  // One lead's website, the ceiling (lib/collect/run.ts LEAD_RESEARCH_BUDGET 15 pages x ~3.5k tokens in, ~400 out).
+  { key: "outreach-research", label: "客戶研究（最多 15 頁）", route: "/api/outreach/leads/research", model: "gpt-5.4-nano", inputTok: 52500, outputTok: 6000 },
 ];
 
 /**

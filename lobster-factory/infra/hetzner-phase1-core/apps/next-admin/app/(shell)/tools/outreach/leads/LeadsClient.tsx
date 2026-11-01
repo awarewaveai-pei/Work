@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from "react";
 import { useActiveOrg, withOrg } from "@/lib/outreach/use-active-org";
+import LeadResearch from "./LeadResearch";
 
 interface Lead {
   id: string;
@@ -15,6 +16,7 @@ interface Lead {
   status: string;
   service_profile_id: string | null;
   organization_id: string | null;
+  website: string | null;
 }
 interface Profile { id: string; service_name: string; organization_id: string | null }
 
@@ -149,7 +151,10 @@ export default function LeadsClient() {
                     ))}
                     {!profiles.some((p) => p.organization_id === l.organization_id) && <span className="card-sub">這個組織還沒有服務設定</span>}
                   </td>
-                  <td><button type="button" className="btn-secondary" onClick={() => void remove(l.id)}>刪除</button></td>
+                  <td style={{ display: "grid", gap: 6 }}>
+                    <LeadResearch leadId={l.id} hasWebsite={!!l.website?.trim()} onDone={() => void load()} />
+                    <button type="button" className="btn-secondary" onClick={() => void remove(l.id)}>刪除</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
