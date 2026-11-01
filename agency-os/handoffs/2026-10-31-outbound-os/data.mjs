@@ -4,7 +4,7 @@
 
 export const META = {
   title: '外聯系統 v2 監工台',
-  updated: '2026-10-31',
+  updated: '2026-11-01',
   plan: 'agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md',
   req: 'agency-os/docs/Outbound_OS_Engineering_Spec/Outbound_OS_Engineering_Spec.md',
   worklog: 'agency-os/WORKLOG.md 2026-10-31',
@@ -21,7 +21,7 @@ export const COPY = {
   steps: { h: '卡片與工作', lead: '依編號進行。每張卡列出所有工作，勾選代表完成。同一組的卡修改不同檔案，可以同時進行。High 風險步驟經你同意才執行。', count: '{done}／{total} 完成' },
   open: { h: '待你決定', lead: '決定後，對應的卡才能開始。', none: '目前沒有需要你決定的事。', count: '{n} 項', before: '需在第 {n} 張卡開始前決定', src: '出處' },
   paths: { h: '檔案', plan: '每項工作的做法', req: '規則與契約', track: '工作紀錄', self: '本頁來源', howto: '修改 data.mjs 後，執行 node build.mjs 和 node check.mjs，再重新發布到同一個網址。' },
-  label: { yes: '可以', no: '還不行', todo: '未開始', doing: '進行中', done: '已完成', risk: '風險', who: '負責', evidence: '完成的樣子', details: '工程細節', depends: '需先完成', none: '無', files: '檔案', card: '做法', doneAt: '完成於', decided: '你的決定', group: '可同時進行：' },
+  label: { yes: '可以', no: '還不行', todo: '未開始', doing: '進行中', done: '已完成', risk: '風險', who: '負責', evidence: '完成的樣子', details: '工程細節', depends: '需先完成', none: '無', files: '檔案', card: '做法', doneAt: '完成於', decided: '決定', group: '可同時進行：' },
 };
 
 // 現在真的能不能用（2026-10-31 查）
@@ -51,7 +51,7 @@ export const STEPS = [
     ] },
   { n: 2, code: 'C2', group: 'B', title: '署名、定位、主旨、多版本、追蹤信內容', plain: '例：AI 一次寫出兩個主旨、兩個版本的第一封信、兩封追蹤信，每封都以你設定的署名結尾，用到品牌定位。你在審核頁並排看 A／B，核准一版。',
     gate: '對一個測試名單真產一次，資料庫出現 4 列：兩封第一封（各有主旨）、兩封追蹤信（各有等幾天）。內文以署名結尾。審核頁可並排核准。', risk: 'Medium（migration 套正式站 High）', model: 'Opus 5.5', status: 'not_started', depends: ['C1'],
-    before: '待決 2（哪些信箱寄冷信、署名）',
+    decided: 'AwareWave 用已連線的 awarewaveai@gmail.com 寄；代操客戶用客戶自己的信箱。署名預設是寄件人名稱、品牌名稱、網站，可以改。每天上限維持 20 封。（規格 D12）',
     what: 'migration 0149 expand；brand-context.ts；generation-schema.ts（手寫守衛，無 zod）；messages/route.ts 寫 2＋N 列；Connectors 署名欄；Review A/B；刪 drafts stub',
     files: ['DB/migrations/0149_outbound_v2_expand.sql', 'NA/lib/outreach/brand-context.ts', 'NA/lib/outreach/generation-schema.ts', 'NA/app/api/outreach/messages/route.ts', 'NA/app/(shell)/outreach/review/ReviewClient.tsx'],
     items: [
@@ -76,7 +76,7 @@ export const STEPS = [
     ] },
   { n: 4, code: 'C4', group: 'D', title: '回覆同步與 Replies 頁', plain: '例：你在 Gmail 按下寄出，10 分鐘內系統知道寄了；對方回信，系統抓回來分類成「問價」，名單狀態變「已回覆」，追蹤信自動停。退訂與退信也自動處理。',
     gate: '你寄 1 封給自己另一個信箱並回覆，10 分鐘內 Replies 頁出現該列、名單狀態變已回覆、追蹤日期清空。退信與退訂會進拒收名單。', risk: 'Medium（主機排程安裝 High）', model: 'Opus 5.5', status: 'not_started', depends: ['C2'],
-    before: '待決 1（Google 授權發布狀態）',
+    decided: 'Google 專案改成「已發布、未驗證」，連線不再每 7 天斷。部署後你做兩步：在 Google Cloud Console 按一次「發布應用程式」，再到 Connectors 頁重新連 Gmail。（規格 D13）',
     what: 'migration 0151 co_replies；scope 加 gmail.readonly；存 threadId；gmail-sync.ts（已寄／回信／退信）；分類＋停追蹤＋拒收；internal route＋cron */10＋host-jobs；Replies 頁按鈕',
     files: ['DB/migrations/0151_co_replies.sql', 'NA/lib/outreach/google-oauth.ts', 'NA/lib/outreach/gmail-sync.ts', 'NA/app/api/internal/outreach/gmail-sync/route.ts', 'HS/cron.d/awarewave-schedules', 'NA/app/(shell)/outreach/replies/page.tsx'],
     items: [
@@ -99,9 +99,9 @@ export const STEPS = [
       todo('C5.4', '電話、IG、LinkedIn 的步驟顯示成待辦，有完成按鈕。'),
       todo('C5.5', '測試與在 Gmail 看到草稿在原串。'),
     ] },
-  { n: 6, code: 'C6', group: 'D', title: '暖名單進 FluentCRM', plain: '例：對方回了信，你在 Replies 頁按「同步 FluentCRM」，他出現在該品牌 WordPress 的 FluentCRM 裡並掛上標籤。沒回過信、沒同意過的人按了也不會同步。',
+  { n: 6, code: 'C6', group: 'D', title: '暖名單進 FluentCRM', waitFor: '等某個品牌有人回信，而且它的網站裝了 wp-bridge 和 FluentCRM', plain: '例：對方回了信，你在 Replies 頁按「同步 FluentCRM」，他出現在該品牌 WordPress 的 FluentCRM 裡並掛上標籤。沒回過信、沒同意過的人按了也不會同步。',
     gate: '對測試站同步 1 個測試名單，FluentCRM 出現該聯絡人與標籤。沒有同意依據的名單回 422。', risk: 'High（客戶站外掛更新）', model: 'Opus 5.5', status: 'not_started', depends: [],
-    before: '待決 3（FluentCRM 目標站）',
+    decided: '同步到該品牌自己登記的 WordPress 站，不寫死網址。aware-wave.com 依你 10-30 的決定只留 WordPress，不接回。（規格 D16）',
     what: 'wp-bridge 加 /fluentcrm/contact（signed write，照 /newsletter）；版本 0.20.0＋release；next-admin sync-fluentcrm route（資格＝consent_status 四種∧非 suppression）；Replies 按鈕',
     files: ['WPB/includes/Http/RestController.php', 'WPB/includes/Crm/ContactUpserter.php', 'NA/app/api/outreach/leads/sync-fluentcrm/route.ts'],
     items: [
@@ -119,9 +119,9 @@ export const STEPS = [
       todo('C7.2', '首頁取代空殼，顯示那張表與 CSV 下載。'),
       todo('C7.3', '測試與種資料驗數字。'),
     ] },
-  { n: 8, code: 'C8', group: 'F', title: '系統寄出開關', plain: '例：某個寄件帳號你決定讓系統自己寄。打開後，核准的信在上班時間、未超過每日上限、也沒進拒收名單時，由系統按寄出。帳號狀態一標「暫停」就全停。',
+  { n: 8, code: 'C8', group: 'F', title: '系統寄出開關', waitFor: '等一個寄件帳號用草稿方式寄滿 50 封且退信低於 2%', plain: '例：某個寄件帳號你決定讓系統自己寄。打開後，核准的信在上班時間、未超過每日上限、也沒進拒收名單時，由系統按寄出。帳號狀態一標「暫停」就全停。',
     gate: '同一封信兩個同時的請求只寄出一次。上班時間外不寄。暫停的帳號不寄。你自己的帳號開啟後，1 封寄到你另一個信箱。', risk: 'High（翻開 auto）', model: 'Opus 5.5＋你', status: 'not_started', depends: ['C4'],
-    before: '待決 4（每帳號翻 auto）',
+    decided: '先不開。一個帳號用草稿方式寄滿 50 封、退信低於 2%、沒有投訴、回信同步上線滿 2 週，才考慮開那一個。（規格 D17）',
     what: 'migration 0152 send_mode＋status sending；send-adapter.ts（唯一寄信白名單；鎖＋視窗＋上限＋重查；逾時只對帳不重寄）；sync tick 末尾呼叫；Connectors 開關',
     files: ['DB/migrations/0152_send_mode.sql', 'NA/lib/outreach/send-adapter.ts', 'NA/lib/outreach/gmail-sync.ts'],
     items: [
@@ -138,26 +138,16 @@ export const STEPS = [
       todo('C9.1', '把舊的觀察回填成證據列。'),
       todo('C9.2', '產信與評分只看證據；匯入時直接寫證據。'),
     ] },
-  { n: 10, code: 'C10', group: 'G', title: '名單發現', plain: '例：你輸入「台中 咖啡廳」，系統用 Google Places 找出 20 家，連網站與電話一起放進待處理名單。', waitFor: '等 Google Places API key',
+  { n: 10, code: 'C10', group: 'C', title: '名單發現', plain: '例：你輸入「台中 咖啡廳」，系統用現有的 Serper 帳號查地圖，找出 20 家，連網站與電話一起放進待處理名單。',
     gate: '一次真查回 20 筆進待處理名單，每筆有名稱、網站或電話、來源網址。費用在畫面上。', risk: 'Low', model: 'Codex', status: 'not_started', depends: [],
-    before: '待決 5（Google Places key）',
-    what: 'connector places 接 Text Search → co_lead_inbox；Inbox 頁找名單表單',
-    files: ['NA/lib/outreach/connectors/router.ts', 'NA/app/api/outreach/inbox/route.ts'],
+    decided: '用已經在付費使用的 Serper 查地圖，不另外申請 Google Places，不用綁新的信用卡。（規格 D18）',
+    what: 'serper allowedPaths 加 /places；discover.ts 經 createProviderCall（預算＋限速）→ co_lead_inbox → 既有 normalize／dedup／suppression；Inbox 頁找名單表單',
+    files: ['NA/lib/collect/net/providers.ts', 'NA/lib/outreach/discover.ts', 'NA/lib/outreach/connectors/router.ts', 'NA/app/api/outreach/inbox/route.ts'],
     items: [
-      todo('C10.1', 'Google Places 查詢接進名單匯入。'),
+      todo('C10.1', '用 Serper 查地圖，結果接進名單匯入，照樣去重複與比對拒收名單。'),
       todo('C10.2', 'Inbox 頁加找名單表單；測試與真查一次。'),
     ] },
 ];
 
 // 操作者自己要決定或親手做的（agent 不能替她定）
-export const OPEN = [
-  { n: 1, what: 'Google 專案的授權發布狀態。測試模式下讀信權限的 token 每 7 天到期，連線會一直斷。', before: 'C4', src: 'SPEC §7；C1.4 的查證結果',
-    options: [
-      { k: '改成已發布（未驗證）', t: 'token 不再 7 天到期。最多 100 個帳號，授權畫面會出現「未驗證」警告一次。內部使用可接受。', pick: true },
-      { k: '留在測試模式', t: '每 7 天要重新授權一次。' },
-    ] },
-  { n: 2, what: '哪些信箱寄冷信、各自的署名。每個品牌一個 Workspace 或 Gmail 帳號，不買專用網域。', before: 'C2', src: 'SPEC §2 D12；deliverability §11' },
-  { n: 3, what: '每個品牌的 FluentCRM 在哪個 WordPress 站。', before: 'C6', src: 'SPEC §5.8' },
-  { n: 4, what: '哪個寄件帳號讓系統自己寄。一次一個，可隨時關。', before: 'C8', src: 'SPEC §2 D8' },
-  { n: 5, what: 'Google Places API 要不要開（需要綁信用卡，有免費額度）。', before: 'C10', src: 'SPEC §3 第 02 列' },
-];
+export const OPEN = [];

@@ -77,9 +77,9 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
 <div class="shell">
 <aside><div class="in">
   <h1>外聯系統 v2 監工台</h1>
-  <p class="upd">更新於 <span data-computed>2026-10-31</span></p>
+  <p class="upd">更新於 <span data-computed>2026-11-01</span></p>
   <div class="bar" data-computed><i class="d" style="width:0%"></i><i class="g" style="width:0%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>0</span>／<span data-computed>10</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>5</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>0</span>／<span data-computed>10</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
 <p class="sub">冷信系統從「幫你把信寫出來」升級成「替你找到客戶」：AI 自己查對方並留下證據、信有主旨與署名、每封有兩個版本與追蹤信、回信自動進系統並停止後續、暖名單進 FluentCRM、看得到回覆與成交。共 <span data-computed>10</span> 張卡、<span data-computed>43</span> 項工作，已完成 <span data-computed>0</span> 項。</p>
@@ -107,11 +107,12 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
       <ul class="items"><li class="todo"><b>○</b><span><code>C2.1</code> 資料表加三個欄位：寄件帳號的署名、追蹤信等幾天、品質檢查結果。</span></li><li class="todo"><b>○</b><span><code>C2.2</code> 品牌脈絡組裝：定位、賣點、語氣、署名、已核准的證據，依固定順序組成給 AI 的指示。</span></li><li class="todo"><b>○</b><span><code>C2.3</code> AI 的輸出改成固定格式的 JSON，格式不對會修一次再放棄。</span></li><li class="todo"><b>○</b><span><code>C2.4</code> 產信改寫：一次寫兩個主旨、兩個版本、追蹤信，每封各自檢查，存成多列。</span></li><li class="todo"><b>○</b><span><code>C2.5</code> 畫面：寄件帳號設定加署名欄；審核頁 A／B 並排；拿掉空的草稿頁。</span></li><li class="todo"><b>○</b><span><code>C2.6</code> 測試與真產一次。</span></li></ul>
       <details><summary>工程細節：C2 署名、定位、主旨、多版本、追蹤信內容</summary>
         <p>migration 0149 expand；brand-context.ts；generation-schema.ts（手寫守衛，無 zod）；messages/route.ts 寫 2＋N 列；Connectors 署名欄；Review A/B；刪 drafts stub</p>
-        <p><b>需先完成：</b><a href="#C1">C1</a>；待決 2（哪些信箱寄冷信、署名）</p>
+        <p><b>需先完成：</b><a href="#C1">C1</a></p>
+        <p><b>決定：</b>AwareWave 用已連線的 awarewaveai@gmail.com 寄；代操客戶用客戶自己的信箱。署名預設是寄件人名稱、品牌名稱、網站，可以改。每天上限維持 20 封。（規格 D12）</p>
         <p><b>檔案：</b><code>DB/migrations/0149_outbound_v2_expand.sql</code> <code>NA/lib/outreach/brand-context.ts</code> <code>NA/lib/outreach/generation-schema.ts</code> <code>NA/app/api/outreach/messages/route.ts</code> <code>NA/app/(shell)/outreach/review/ReviewClient.tsx</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C2</code></p>
       </details>
-    </div></li><li class="step todo" id="C3">
+    </div></li><li class="grp">可同時進行：<a href="#C3">C3</a>、<a href="#C10">C10</a></li><li class="step todo" id="C3">
     <div class="n">3</div>
     <div class="b">
       <p class="plain">例：你按「研究這家」，系統去看小森咖啡的網站與 IG，抓出「菜單照片光線偏暗」這類觀察，每條附來源網址、原文片段與時間。你按核准，信才會用到它。</p>
@@ -124,6 +125,20 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
         <p><b>檔案：</b><code>DB/migrations/0150_co_evidence.sql</code> <code>NA/lib/collect/sinks/outreach-evidence.ts</code> <code>NA/lib/outreach/research.ts</code> <code>NA/app/api/outreach/leads/research/route.ts</code> <code>NA/lib/outreach/cold-gate.ts</code> <code>NA/lib/portal/products.ts</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C3</code></p>
       </details>
+    </div></li><li class="step todo" id="C10">
+    <div class="n">10</div>
+    <div class="b">
+      <p class="plain">例：你輸入「台中 咖啡廳」，系統用現有的 Serper 帳號查地圖，找出 20 家，連網站與電話一起放進待處理名單。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Codex</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>一次真查回 20 筆進待處理名單，每筆有名稱、網站或電話、來源網址。費用在畫面上。</p>
+      <ul class="items"><li class="todo"><b>○</b><span><code>C10.1</code> 用 Serper 查地圖，結果接進名單匯入，照樣去重複與比對拒收名單。</span></li><li class="todo"><b>○</b><span><code>C10.2</code> Inbox 頁加找名單表單；測試與真查一次。</span></li></ul>
+      <details><summary>工程細節：C10 名單發現</summary>
+        <p>serper allowedPaths 加 /places；discover.ts 經 createProviderCall（預算＋限速）→ co_lead_inbox → 既有 normalize／dedup／suppression；Inbox 頁找名單表單</p>
+        <p><b>需先完成：</b>無</p>
+        <p><b>決定：</b>用已經在付費使用的 Serper 查地圖，不另外申請 Google Places，不用綁新的信用卡。（規格 D18）</p>
+        <p><b>檔案：</b><code>NA/lib/collect/net/providers.ts</code> <code>NA/lib/outreach/discover.ts</code> <code>NA/lib/outreach/connectors/router.ts</code> <code>NA/app/api/outreach/inbox/route.ts</code></p>
+        <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C10</code></p>
+      </details>
     </div></li><li class="grp">可同時進行：<a href="#C4">C4</a>、<a href="#C6">C6</a></li><li class="step todo" id="C4">
     <div class="n">4</div>
     <div class="b">
@@ -133,7 +148,8 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
       <ul class="items"><li class="todo"><b>○</b><span><code>C4.1</code> 新資料表：回信。</span></li><li class="todo"><b>○</b><span><code>C4.2</code> Gmail 授權多要「讀信」權限；建草稿時記下對話串 id。你要重新授權一次。</span></li><li class="todo"><b>○</b><span><code>C4.3</code> 每 10 分鐘檢查一次：從對話串看出你寄了沒；從收件匣用寄件人地址認出回信、退訂信與退信，對方另開新信也認得出來。</span></li><li class="todo"><b>○</b><span><code>C4.4</code> 回信交給便宜模型分類；有回信就停追蹤；回過信的人記為可以同步 FluentCRM；退訂與拒絕進拒收名單。</span></li><li class="todo"><b>○</b><span><code>C4.5</code> 主機排程每 10 分鐘叫一次；登記到排程頁。</span></li><li class="todo"><b>○</b><span><code>C4.6</code> Replies 頁：列出回信，給你按鈕決定下一步（報價、問窗口、拒收、會議、成交、失去）。</span></li><li class="todo"><b>○</b><span><code>C4.7</code> 測試與真寄一封給自己。</span></li></ul>
       <details><summary>工程細節：C4 回覆同步與 Replies 頁</summary>
         <p>migration 0151 co_replies；scope 加 gmail.readonly；存 threadId；gmail-sync.ts（已寄／回信／退信）；分類＋停追蹤＋拒收；internal route＋cron */10＋host-jobs；Replies 頁按鈕</p>
-        <p><b>需先完成：</b><a href="#C2">C2</a>；待決 1（Google 授權發布狀態）</p>
+        <p><b>需先完成：</b><a href="#C2">C2</a></p>
+        <p><b>決定：</b>Google 專案改成「已發布、未驗證」，連線不再每 7 天斷。部署後你做兩步：在 Google Cloud Console 按一次「發布應用程式」，再到 Connectors 頁重新連 Gmail。（規格 D13）</p>
         <p><b>檔案：</b><code>DB/migrations/0151_co_replies.sql</code> <code>NA/lib/outreach/google-oauth.ts</code> <code>NA/lib/outreach/gmail-sync.ts</code> <code>NA/app/api/internal/outreach/gmail-sync/route.ts</code> <code>HS/cron.d/awarewave-schedules</code> <code>NA/app/(shell)/outreach/replies/page.tsx</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C4</code></p>
       </details>
@@ -141,12 +157,13 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
     <div class="n">6</div>
     <div class="b">
       <p class="plain">例：對方回了信，你在 Replies 頁按「同步 FluentCRM」，他出現在該品牌 WordPress 的 FluentCRM 裡並掛上標籤。沒回過信、沒同意過的人按了也不會同步。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（客戶站外掛更新）</span><span class="who">負責：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（客戶站外掛更新）</span><span class="who">負責：Opus 5.5</span><span class="who wait">等某個品牌有人回信，而且它的網站裝了 wp-bridge 和 FluentCRM</span></p>
       <p class="donewhen"><b>完成的樣子：</b>對測試站同步 1 個測試名單，FluentCRM 出現該聯絡人與標籤。沒有同意依據的名單回 422。</p>
       <ul class="items"><li class="todo"><b>○</b><span><code>C6.1</code> wp-bridge 外掛加一個「新增／更新聯絡人」端點，只做這件事。</span></li><li class="todo"><b>○</b><span><code>C6.2</code> 外掛升版並發布到站上。</span></li><li class="todo"><b>○</b><span><code>C6.3</code> 同步的後端：先驗資格（回過信、填過表單、同意過、是客戶之一，且不在拒收名單），再呼叫外掛。</span></li><li class="todo"><b>○</b><span><code>C6.4</code> Replies 頁按鈕接上；測試與對測試站同步一次。</span></li></ul>
       <details><summary>工程細節：C6 暖名單進 FluentCRM</summary>
         <p>wp-bridge 加 /fluentcrm/contact（signed write，照 /newsletter）；版本 0.20.0＋release；next-admin sync-fluentcrm route（資格＝consent_status 四種∧非 suppression）；Replies 按鈕</p>
-        <p><b>需先完成：</b>無；待決 3（FluentCRM 目標站）</p>
+        <p><b>需先完成：</b>無</p>
+        <p><b>決定：</b>同步到該品牌自己登記的 WordPress 站，不寫死網址。aware-wave.com 依你 10-30 的決定只留 WordPress，不接回。（規格 D16）</p>
         <p><b>檔案：</b><code>WPB/includes/Http/RestController.php</code> <code>WPB/includes/Crm/ContactUpserter.php</code> <code>NA/app/api/outreach/leads/sync-fluentcrm/route.ts</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C6</code></p>
       </details>
@@ -180,16 +197,17 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
     <div class="n">8</div>
     <div class="b">
       <p class="plain">例：某個寄件帳號你決定讓系統自己寄。打開後，核准的信在上班時間、未超過每日上限、也沒進拒收名單時，由系統按寄出。帳號狀態一標「暫停」就全停。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（翻開 auto）</span><span class="who">負責：Opus 5.5＋你</span></p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（翻開 auto）</span><span class="who">負責：Opus 5.5＋你</span><span class="who wait">等一個寄件帳號用草稿方式寄滿 50 封且退信低於 2%</span></p>
       <p class="donewhen"><b>完成的樣子：</b>同一封信兩個同時的請求只寄出一次。上班時間外不寄。暫停的帳號不寄。你自己的帳號開啟後，1 封寄到你另一個信箱。</p>
       <ul class="items"><li class="todo"><b>○</b><span><code>C8.1</code> 寄件帳號加「寄出方式」欄，預設是草稿。</span></li><li class="todo"><b>○</b><span><code>C8.2</code> 寄出接頭：只在開啟、健康、上班時間、未達上限、重查通過時寄；先佔帳號當日名額再鎖信，同帳號同時寄兩封也不會超過上限；逾時不重寄。</span></li><li class="todo"><b>○</b><span><code>C8.3</code> 每次同步末尾跑一次寄出；畫面上每個帳號有開關，開要輸入帳號確認。</span></li><li class="todo"><b>○</b><span><code>C8.4</code> 測試與你自己的帳號真寄一封。</span></li></ul>
       <details><summary>工程細節：C8 系統寄出開關</summary>
         <p>migration 0152 send_mode＋status sending；send-adapter.ts（唯一寄信白名單；鎖＋視窗＋上限＋重查；逾時只對帳不重寄）；sync tick 末尾呼叫；Connectors 開關</p>
-        <p><b>需先完成：</b><a href="#C4">C4</a>；待決 4（每帳號翻 auto）</p>
+        <p><b>需先完成：</b><a href="#C4">C4</a></p>
+        <p><b>決定：</b>先不開。一個帳號用草稿方式寄滿 50 封、退信低於 2%、沒有投訴、回信同步上線滿 2 週，才考慮開那一個。（規格 D17）</p>
         <p><b>檔案：</b><code>DB/migrations/0152_send_mode.sql</code> <code>NA/lib/outreach/send-adapter.ts</code> <code>NA/lib/outreach/gmail-sync.ts</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C8</code></p>
       </details>
-    </div></li><li class="grp">可同時進行：<a href="#C9">C9</a>、<a href="#C10">C10</a></li><li class="step todo" id="C9">
+    </div></li><li class="step todo" id="C9">
     <div class="n">9</div>
     <div class="b">
       <p class="plain">例：舊名單還是用那一格觀察。回填成證據列後，產信與評分只看證據，舊欄位不再寫入。</p>
@@ -202,22 +220,9 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
         <p><b>檔案：</b><code>NA/lib/outreach/cold-gate.ts</code> <code>NA/lib/outreach/scoring.ts</code> <code>NA/app/api/outreach/inbox/route.ts</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C9</code></p>
       </details>
-    </div></li><li class="step todo" id="C10">
-    <div class="n">10</div>
-    <div class="b">
-      <p class="plain">例：你輸入「台中 咖啡廳」，系統用 Google Places 找出 20 家，連網站與電話一起放進待處理名單。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Codex</span><span class="who wait">等 Google Places API key</span></p>
-      <p class="donewhen"><b>完成的樣子：</b>一次真查回 20 筆進待處理名單，每筆有名稱、網站或電話、來源網址。費用在畫面上。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>C10.1</code> Google Places 查詢接進名單匯入。</span></li><li class="todo"><b>○</b><span><code>C10.2</code> Inbox 頁加找名單表單；測試與真查一次。</span></li></ul>
-      <details><summary>工程細節：C10 名單發現</summary>
-        <p>connector places 接 Text Search → co_lead_inbox；Inbox 頁找名單表單</p>
-        <p><b>需先完成：</b>無；待決 5（Google Places key）</p>
-        <p><b>檔案：</b><code>NA/lib/outreach/connectors/router.ts</code> <code>NA/app/api/outreach/inbox/route.ts</code></p>
-        <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C10</code></p>
-      </details>
     </div></li></ol></section>
 
-<section id="open"><h2>待你決定</h2><p class="lead">決定後，對應的卡才能開始。</p><ol class="open"><li><div class="n">1</div><div class="b"><p class="plain">Google 專案的授權發布狀態。測試模式下讀信權限的 token 每 7 天到期，連線會一直斷。</p><ul class="opts"><li class="pick"><b>改成已發布（未驗證） ★</b><span>token 不再 7 天到期。最多 100 個帳號，授權畫面會出現「未驗證」警告一次。內部使用可接受。</span></li><li class=""><b>留在測試模式</b><span>每 7 天要重新授權一次。</span></li></ul><p class="meta"><a href="#C4" class="who">需在第 <span data-computed>4</span> 張卡開始前決定</a><span class="who">出處：SPEC §7；C1.4 的查證結果</span></p></div></li><li><div class="n">2</div><div class="b"><p class="plain">哪些信箱寄冷信、各自的署名。每個品牌一個 Workspace 或 Gmail 帳號，不買專用網域。</p><p class="meta"><a href="#C2" class="who">需在第 <span data-computed>2</span> 張卡開始前決定</a><span class="who">出處：SPEC §2 D12；deliverability §11</span></p></div></li><li><div class="n">3</div><div class="b"><p class="plain">每個品牌的 FluentCRM 在哪個 WordPress 站。</p><p class="meta"><a href="#C6" class="who">需在第 <span data-computed>6</span> 張卡開始前決定</a><span class="who">出處：SPEC §5.8</span></p></div></li><li><div class="n">4</div><div class="b"><p class="plain">哪個寄件帳號讓系統自己寄。一次一個，可隨時關。</p><p class="meta"><a href="#C8" class="who">需在第 <span data-computed>8</span> 張卡開始前決定</a><span class="who">出處：SPEC §2 D8</span></p></div></li><li><div class="n">5</div><div class="b"><p class="plain">Google Places API 要不要開（需要綁信用卡，有免費額度）。</p><p class="meta"><a href="#C10" class="who">需在第 <span data-computed>10</span> 張卡開始前決定</a><span class="who">出處：SPEC §3 第 02 列</span></p></div></li></ol></section>
+<section id="open"><h2>待你決定</h2><p class="lead">決定後，對應的卡才能開始。</p><p class="lead">目前沒有需要你決定的事。</p></section>
 
 <section id="paths"><h2>檔案</h2><div class="paths"><div><b>每項工作的做法</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6</code></div><div><b>規則與契約</b><code>agency-os/docs/Outbound_OS_Engineering_Spec/Outbound_OS_Engineering_Spec.md</code></div><div><b>工作紀錄</b><code>agency-os/WORKLOG.md 2026-10-31</code></div><div><b>本頁來源</b><span><code>agency-os/handoffs/2026-10-31-outbound-os/</code><br>修改 data.mjs 後，執行 node build.mjs 和 node check.mjs，再重新發布到同一個網址。</span></div></div></section>
 </main>

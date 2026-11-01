@@ -68,17 +68,20 @@
 | D9 | 序列固定形狀：首封 A／B＋N 封追蹤＋回信即停；步驟帶 `channel`；不做畫布 | 唯一條件是「有回信？」（I4 禁追蹤，無開信／點擊可分岔）；序列在 DB 已是一列一列（`co_messages.version`，`0048:143`）；第二種條件等 50 封真實回信後再議 |
 | D10 | 回信後＝人工對話：Replies 頁 AI 分類＋按鈕，不是序列分岔 | 對剛開口的人不能排罐頭信；v1 §B6 九種 `reply_type` 已設計 |
 | D11 | 冷信零追蹤；暖信統計看 FluentCRM | Apple Mail 預載圖片、Outlook 擋圖、安全閘道假點擊；deliverability §6.2 |
-| D12 | 冷信寄件身分＝品牌自己的 Workspace／Gmail 信箱、低量、人工寄；不買專用網域；stream 不混用 | deliverability §11（`:590-611`）；全新網域零信譽 |
-| D13 | Google OAuth 專案 Testing → 發布（unverified）：消除 7 天 token 到期；100 帳號上限內部使用可接受 | 待決 1（操作者在 Console 操作） |
+| D12 | 冷信寄件身分＝每個品牌自己的信箱，一個 org 一個；不買專用網域；stream 不混用。AwareWave＝已連線的 `awarewaveai@gmail.com`（2026-10-14 正式站建草稿成功）；Soulful 等代操客戶＝客戶自己的信箱，開始替它寄時由客戶授權。`daily_limit` 維持預設 20（`0048:241`）。署名預設＝`display_name`＋org 名稱＋service profile `proof_links[0]`，可改 | deliverability §11（`:590-611`）；全新網域零信譽；換 aware-wave.com 網域信箱只是換一列 `co_sender_accounts`，程式不動 |
+| D13 | Google OAuth 專案改「已發布、未驗證」。操作者唯一動手：C4.2 重新授權前在 Console 按一次「發布」 | 7 天到期只寫在 Testing（developers.google.com/identity/protocols/oauth2「Refresh token expiration」）；未驗證＋restricted scope（`gmail.compose`、`gmail.readonly` 皆 restricted，support.google.com/cloud/answer/13464325）上限 100 位新使用者、專案終身計（answer/13463817）。回頭條件：開「賣」模式前做 restricted scope 驗證 |
 | D14 | n8n 不在路徑；v1 §E3 superseded；整台去留另案 | 5 條 workflow 全 `active:false`（2026-10-31 查）；T10 已改 next-admin route（`agency-os/TASKS.md:1176`） |
 | D15 | 不加依賴：JSON 守衛手寫（repo 無 zod） | `NA/package.json` 無 zod；`cheap-json.ts:29` 已有 `extractJsonArray` 慣例 |
+| D16 | FluentCRM 目標＝該 org `active` 的 `wp_sites` 列，不寫死網域。C6 parked：今天沒有任何回信；AwareWave 沒有目標站（aware-wave.com 只留 WordPress，app 連線 2026-10-30 依操作者指示全斷，不得重接） | `DB/migrations/0039_wp_sites.sql:11`（`active`）、`DB/migrations/0061_wp_sites_add_org.sql:36`（`organization_id`）；讀法 `NA/lib/content/topics/plan-due.ts:61`；回頭條件：某品牌有回信的 lead，且該品牌的站裝了 wp-bridge＋FluentCRM |
+| D17 | 先不開任何帳號的 `auto`；C8 parked | 沒有寄送資料可判斷帳號健康。回頭條件：該帳號草稿模式寄滿 50 封、退信率 < 2%、0 投訴、回覆同步上線滿 2 週（C7 成效頁可讀） |
+| D18 | 名單發現用 Serper `/places`（既有 `SERPER_API_KEY`），不申請 Google Places key | Serper 已是 collect 預設搜尋供應商（`NA/lib/collect/net/providers.ts:76-89`），只鎖 `/search` 是因為沒有別的呼叫者（同段註解）；C10 就是那個呼叫者。新供應商、新信用卡、新金鑰都省掉 |
 
 ## 3. GPT 企業版 12 模組對照
 
 | 模組 | 處置 | 落點 |
 |---|---|---|
 | 01 多品牌工作區 | 有 | organizations＋`?org=`；跨 org 全看＝ops-role（`NA/lib/ops-role.ts:120-124`） |
-| 02 Lead discovery | 卡 C10（parked） | Google Places → `co_lead_inbox`；待決 5 |
+| 02 Lead discovery | 卡 C10 | Serper `/places` → `co_lead_inbox`（D18） |
 | 03 Enrichment | 部分 | `co_evidence` 兼任（每個事實附來源與時間）；Hunter／Snov 槽位（`NA/lib/outreach/connectors/router.ts:26-27`）有 key 再接 |
 | 04 AI research & personalization | 卡 C2、C3 | brand-context＋evidence |
 | 05 Email infrastructure | 有 | `co_sender_accounts`、Gmail OAuth；DNS 清單 deliverability §12 |
@@ -157,7 +160,7 @@ Follow-ups 頁＝`next_followup_date ≤ 今天` ∧ `status='sent'` 的 lead＋
 ## 7. 安全與合規
 
 - scope：`gmail.compose`＋`gmail.readonly`；測試禁 `gmail.send`／`gmail.modify`／`mail.google.com`；程式不呼叫 send 端點（I3）。
-- Google 專案發布狀態：待決 1（Testing 7 天到期 vs 發布 unverified）。
+- Google 專案發布狀態：已發布、未驗證（D13）；token 失效（改密碼、撤銷、6 個月未用）時 C4.5 那列在 `/ops/schedules` 變紅並推播。
 - token／API key：vault（0049）；`co_connector_accounts.credentials_ref` 只存參照。
 - Prompt injection：抓到的內容走 `provenance.ts` 篩查與標記；證據包 SOURCE_QUOTATION；excerpt 子字串驗證擋掉模型編造的「原文」。
 - 同意：冷信＝`legitimate_interest`；只有 §5.8 四種 consent 才進 FluentCRM。
@@ -182,8 +185,8 @@ Follow-ups 頁＝`next_followup_date ≤ 今天` ∧ `status='sent'` 的 lead＋
 
 ## 10. 卡片與順序
 
-[R0-PLAN.md §6](../../handoffs/2026-10-31-outbound-os/R0-PLAN.md)：C1 守衛 → C2 信本身 → C3 研究 → C4 回信＋C6 暖名單（並行）→ C5 追蹤＋C7 成效（並行）→ C8 開關；C9 舊欄位退場、C10 名單發現 parked。
+[R0-PLAN.md §6](../../handoffs/2026-10-31-outbound-os/R0-PLAN.md)：C1 守衛 → C2 信本身 → C3 研究＋C10 名單發現（並行）→ C4 回信 → C5 追蹤＋C7 成效（並行）。Parked 附回頭條件：C6 暖名單（D16）、C8 開關（D17）、C9 舊欄位退場。
 
-## 11. 待你決定
+## 11. 決定
 
-監工台 `data.mjs` OPEN：① Google 專案發布狀態（C4 前）② 哪些信箱寄冷信與署名（C2 前）③ 各品牌 FluentCRM 站（C6 前）④ 哪個帳號翻 auto（C8 前）⑤ Google Places key（C10 前）。
+五項原待決已由規劃者決定（操作者 2026-11-01 授權）：D12 寄件信箱與署名、D13 Google 發布、D16 FluentCRM 目標、D17 auto、D18 名單來源。監工台 OPEN 為空。

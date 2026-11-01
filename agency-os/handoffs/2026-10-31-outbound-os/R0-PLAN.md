@@ -20,9 +20,9 @@
 
 | # | 風險 | 處置 |
 |---|---|---|
-| R1 | Google 專案 Testing 模式＋restricted scope → refresh token 7 天到期，10-14 的連線可能已斷 | C1.4 VBC；待決 1 改發布狀態 |
+| R1 | Google 專案 Testing 模式＋restricted scope → refresh token 7 天到期，10-14 的連線可能已斷 | C1.4 VBC；SPEC D13 改發布 |
 | R2 | 證據改表動到 `co_leads`（prod 有資料） | expand（C3）→ 回填（C9）→ 停寫；不刪欄；migration 套 prod 走閘（High） |
-| R3 | 加 `gmail.readonly` 要操作者重新授權 | C4.2 一次；待決 1 先定 |
+| R3 | 加 `gmail.readonly` 要操作者重新授權 | C4.2 一次，同時按發布（D13） |
 | R4 | 研究抓到的網頁是攻擊面（prompt injection） | 走 collect 既有 provenance 篩查；證據包 SOURCE_QUOTATION；excerpt 子字串機械驗（C3.2） |
 | R5 | `auto` 寄出重複寄或退訂後仍寄 | 狀態鎖 `drafted→sending`、寄前重查、逾時只對帳不重寄（C8.2） |
 | R6 | wp-bridge 外掛更新到客戶站 | C6.2 High，照 release 腳本 |
@@ -35,7 +35,7 @@
 
 ## 5. 建議方案
 
-B。順序：C1（守衛）→ C2（信本身）→ C3（研究）→ C4＋C6 並行（回信／暖名單，不同檔）→ C5＋C7 並行（追蹤／成效）→ C8（開關）。每張卡完成就能單獨上線，不等整套。
+B。順序：C1（守衛）→ C2（信本身）→ C3＋C10 並行（研究／名單發現，不同檔）→ C4（回信）→ C5＋C7 並行（追蹤／成效）。C6、C8、C9 parked，回頭條件在 SPEC D16、D17 與 data.mjs `waitFor`。每張卡完成就能單獨上線，不等整套。
 
 ## 6. 實作計畫
 
@@ -46,7 +46,7 @@ B。順序：C1（守衛）→ C2（信本身）→ C3（研究）→ C4＋C6 �
 | C1.1 | `NA/lib/outreach/MODULE_MANIFEST.json:22` 與 `NA/lib/outreach/google-oauth.ts:1-10` 註解改寫：scope `gmail.compose` 允許 `drafts.send`，不寄的守衛是程式；新檔 `NA/lib/outreach/__tests__/never-sends.test.ts`：讀 `lib/outreach/**` 與 `app/api/outreach/**` 原始碼，出現 `/drafts/send`、`/messages/send`、`gmail.send`、`gmail.modify` 即紅（白名單只允許 C8 的 `send-adapter.ts`） |
 | C1.2 | `NA/app/api/outreach/messages/gmail-draft/route.ts`：建草稿前重查 lead `do_not_contact` 與 `co_suppression_list`（用 `NA/lib/outreach/normalize.ts` 的 `isSuppressed`，applies_to cold／all）→ 409 `{blocked:true, reason}`；測試：lead 標 do_not_contact → 409 |
 | C1.3 | `NA/lib/outreach/google-oauth.ts` `buildRfc2822Message`：加 `List-Unsubscribe: <mailto:<from>?subject=unsubscribe>`（RFC 2369）；測試斷言 header 存在且與 from 一致 |
-| C1.4 | VBC：prod `co_connector_accounts` 的 Gmail connector 是否仍能 refresh（`timeout 60 ssh … docker exec … psql` 讀 `updated_at`／`is_enabled`，再對 Google token endpoint refresh 一次，不寫 DB）；結果寫 WORKLOG 與監工台 NOW；失敗＝Testing 7 天到期已發生 → 待決 1 |
+| C1.4 | VBC：prod `co_connector_accounts` 的 Gmail connector 是否仍能 refresh（`timeout 60 ssh … docker exec … psql` 讀 `updated_at`／`is_enabled`，再對 Google token endpoint refresh 一次，不寫 DB）；結果寫 WORKLOG 與監工台 NOW；失敗＝Testing 7 天到期已發生 → 照 SPEC D13 提前在 C4.2 之前發布並重新連線 |
 
 ### C2 署名、定位、主旨、多版本、追蹤信內容
 
@@ -56,7 +56,7 @@ B。順序：C1（守衛）→ C2（信本身）→ C3（研究）→ C4＋C6 �
 | C2.2 | 新檔 `NA/lib/outreach/brand-context.ts`：純函式 `buildBrandContext({profile, sender, evidence, goal})` 依 SPEC §5.3 順序組 prompt 段落；證據以 SOURCE_QUOTATION 包裹；單元測試：缺署名 throw、證據段只含 approved |
 | C2.3 | 新檔 `NA/lib/outreach/generation-schema.ts`：`parseGenerationOutput(raw)` 手寫型別守衛（repo 無 zod，不加依賴）：`subjects[2]`、`bodies[2]{label,text,evidence_ids}`、`followups[]{step,delay_days,text}`；壞 JSON 允許 1 次修復重試（把錯誤回給模型），再失敗走既有 `manual_prompt` |
 | C2.4 | `NA/app/api/outreach/messages/route.ts`：`buildPrompt` 改呼叫 brand-context；輸出經 generation-schema → 寫 2 列 `cold_email`（`variant_label` A／B、`subject`、`version=1`）＋ N 列 `followup`（`version=step`、`followup_delay_days`、`subject=null`）；每列 `lintMessage`＋主旨 lint（≤25 字、無 `HARD_CTA`、無「免費」「限時」）→ `safety_score`、`quality_gate_status`、`gate_snapshot={gate_version,findings}`、`evidence_snapshot={evidence_ids}` |
-| C2.5 | UI：Connectors 頁寄件帳號加「署名」多行欄；Review 頁 A／B 並排＋主旨，核准一版（另一版 `skipped`）；`NA/app/(shell)/outreach/drafts/page.tsx` stub 刪除、側欄移除（Review 已涵蓋） |
+| C2.5 | UI：Connectors 頁寄件帳號加「署名」多行欄，預設＝`display_name`＋org 名稱＋service profile `proof_links[0]`（SPEC D12），空白不能存；Review 頁 A／B 並排＋主旨，核准一版（另一版 `skipped`）；`NA/app/(shell)/outreach/drafts/page.tsx` stub 刪除、側欄移除（Review 已涵蓋） |
 | C2.6 | 測試：`npx tsc --noEmit`、vitest（brand-context、generation-schema、route 寫列數）；REALTEST：本機 dev 對一個測試 lead 用 BYO key 真產一次 → `co_messages` 4 列、主旨非空、內文以署名結尾 |
 
 ### C3 研究 → 證據
@@ -75,7 +75,7 @@ B。順序：C1（守衛）→ C2（信本身）→ C3（研究）→ C4＋C6 �
 | 卡號 | 做什麼 |
 |---|---|
 | C4.1 | `DB/migrations/0151_co_replies.sql`：採 v1 spec §B6 欄位＋`gmail_message_id text unique`、`received_at timestamptz`、`classified_by text`；RLS 照 0048；down 兩處 |
-| C4.2 | `NA/lib/outreach/google-oauth.ts`：`GMAIL_SCOPE` → `gmail.compose`＋`gmail.readonly`；`createGmailDraft` 回 `{id, message:{id, threadId}}`；`NA/app/api/outreach/messages/gmail-draft/route.ts:179-188` 事件 `metadata={threadId, messageId}`；`NA/lib/outreach/__tests__/google-oauth.test.ts:60` 改斷言只含這兩個 scope；操作者重新授權一次（待決 1 先定） |
+| C4.2 | `NA/lib/outreach/google-oauth.ts`：`GMAIL_SCOPE` → `gmail.compose`＋`gmail.readonly`；`createGmailDraft` 回 `{id, message:{id, threadId}}`；`NA/app/api/outreach/messages/gmail-draft/route.ts:179-188` 事件 `metadata={threadId, messageId}`；`NA/lib/outreach/__tests__/google-oauth.test.ts:60` 改斷言只含這兩個 scope；部署後操作者兩步：Google Cloud Console → OAuth 同意畫面 → 按「發布應用程式」（SPEC D13）→ 在 Connectors 頁重新連 Gmail 一次 |
 | C4.3 | 新檔 `NA/lib/outreach/gmail-sync.ts`，每個啟用的 Gmail connector 兩段（SPEC §5.6）：①**已寄偵測**：`co_messages.status ∈ {drafted, sending}` 且事件有 threadId → `threads.get?format=metadata`，本方訊息帶 `SENT` label → `sent`、`sent_at`、事件 `sent`、lead `status='sent'`、`last_contact_date`、`next_followup_date`；②**來信比對**：`messages.list?q=in:inbox newer_than:7d -from:me` → `messages.get?format=metadata&metadataHeaders=From,Subject,In-Reply-To,X-Failed-Recipients` → 寄件人 email（小寫）比對同 org `co_leads.email`，不看 lead 狀態也不看 thread（新開的信、`List-Unsubscribe` 寄來的信、`no_reply` 之後的回信都抓得到）→ upsert `co_replies`（`gmail_message_id` 唯一＝重跑冪等）；`From` 含 `mailer-daemon` → 以 `X-Failed-Recipients` 比對 lead → 事件 `hard_bounced`＋suppression `hard_bounce`＋`do_not_contact` |
 | C4.4 | 分類：主旨為 `unsubscribe`（`List-Unsubscribe` mailto，C1.3）直接記 `unsubscribe` 不叫 AI；其餘 `generateCheapJsonText({ grant: grantFor("outreach.classify", …) })` → `reply_type`（v1 九種）＋`suggested_response`；`NA/lib/portal/products.ts:88` 加 `quota("outreach.classify", "回信分類")`。lead：`status='replied'`、`next_followup_date=null`、`consent_status` 由 `unknown`／`legitimate_interest` 升為 `replied`（不降 `opted_in`／`form_submitted`／`customer`）；`unsubscribe` → `consent_status='unsubscribed'`＋suppression `unsubscribe`＋`do_not_contact`；`reject` → `consent_status='do_not_contact'`＋suppression `manual_opt_out`＋`do_not_contact`；全部寫 `co_timeline_events` |
 | C4.5 | 新路由 `NA/app/api/internal/outreach/gmail-sync/route.ts`（Bearer `OUTREACH_SYNC_TOKEN`，照 `NA/app/api/internal/schedules/alerts/route.ts:21-25`）；`HS/cron.d/awarewave-schedules` 加 `*/10` 一行經 `poke.sh`；`NA/lib/schedules/host-jobs.ts` 登記 `outreach_gmail_sync`；安裝主機 cron（High） |
@@ -98,7 +98,7 @@ B。順序：C1（守衛）→ C2（信本身）→ C3（研究）→ C4＋C6 �
 |---|---|
 | C6.1 | `WPB/includes/Http/RestController.php`：`POST /fluentcrm/contact`（signed write，照 `/newsletter` `:92-103`）→ 新檔 `WPB/includes/Crm/ContactUpserter.php`：upsert contact（email 唯一）＋lists／tags；FluentCRM 未啟用回 `fluentcrm_not_active`（照 `:366`）；不碰 sequences、不寄信 |
 | C6.2 | `WPB` `AWBRIDGE_VERSION` 0.19.0 → 0.20.0；`scripts/release-wp-bridge.sh`（`bash` 執行；觸發索引：改 wp-bridge 必跑）；客戶站更新＝High |
-| C6.3 | 新路由 `NA/app/api/outreach/leads/sync-fluentcrm/route.ts`（POST `{leadId}`）：資格＝`consent_status ∈ {replied, opted_in, form_submitted, customer}` ∧ 非 suppression（marketing／all）；呼叫該 org 站的 wp-bridge（簽章照 `NA/lib/payments/woo.ts` 的呼叫方式）；成功寫 `fluentcrm_contact_id`、`fluentcrm_sync_status='synced'`、`fluentcrm_last_synced_at`、timeline；不合格 422 `not_eligible` |
+| C6.3 | 新路由 `NA/app/api/outreach/leads/sync-fluentcrm/route.ts`（POST `{leadId}`）：資格＝`consent_status ∈ {replied, opted_in, form_submitted, customer}` ∧ 非 suppression（marketing／all）；目標站＝該 org `active` 的 `wp_sites` 列（SPEC D16，讀法照 `NA/lib/content/topics/plan-due.ts:61`），沒有就 422 `no_site`；wp-bridge 簽章呼叫照 `NA/app/api/tools/publish/route.ts` 現行方式；成功寫 `fluentcrm_contact_id`、`fluentcrm_sync_status='synced'`、`fluentcrm_last_synced_at`、timeline；不合格 422 `not_eligible` |
 | C6.4 | Replies 頁「同步 FluentCRM」按鈕接上；測試：資格判斷四種 consent 與 suppression；REALTEST：對 staging WP 同步 1 個測試 lead → FluentCRM 出現 contact |
 
 ### C7 成效頁
@@ -115,7 +115,7 @@ B。順序：C1（守衛）→ C2（信本身）→ C3（研究）→ C4＋C6 �
 |---|---|
 | C8.1 | `DB/migrations/0152_send_mode.sql`：`co_sender_accounts.send_mode text not null default 'draft' check (send_mode in ('draft','auto'))`、`co_sender_accounts.daily_count_date date`；`co_messages.status` CHECK 加 `sending`；down 兩處 |
 | C8.2 | 新檔 `NA/lib/outreach/send-adapter.ts`（never-sends 測試唯一白名單）：`sendDraft(draftId)`＝`drafts.send`；只在 `send_mode='auto'` ∧ `health_status='healthy'` ∧ 台北 09–18 週一至五 ∧ 重查 I6 → **先佔名額**：讀 `daily_sent_count`／`daily_count_date`（`0048:242`），以 compare-and-set 寫回（日期是今天：`.update({daily_sent_count: n+1}).eq('id').eq('daily_sent_count', n).eq('daily_count_date', today)` 且 `n < daily_limit`；不是今天：設 `(1, today)` 並 `.eq` 舊值），0 列更新＝被別人搶先或已滿，不寄 → **再鎖信**：`UPDATE co_messages SET status='sending' WHERE id=$1 AND status='drafted'` → 寄 → `sent`；寄失敗不退名額（寧少不多）；逾時／5xx 留 `sending`，由 gmail-sync 以 `SENT` label 對帳，30 分未對到 → `needs_edit`＋timeline，永不盲目重寄 |
-| C8.3 | gmail-sync tick 末尾呼叫 send-adapter；Connectors 頁每個寄件帳號「系統寄出：關／開」按鈕，開需輸入帳號 email 確認；翻開＝High，每帳號一次（待決 4） |
+| C8.3 | gmail-sync tick 末尾呼叫 send-adapter；Connectors 頁每個寄件帳號「系統寄出：關／開」按鈕，開需輸入帳號 email 確認；翻開＝High，每帳號一次（SPEC D17 回頭條件達成後） |
 | C8.4 | 測試：同一封信兩次呼叫只寄一次；同帳號已寄 19／上限 20 時兩封不同的信同時呼叫只寄一封；跨日歸零；視窗外不寄、paused 不寄；REALTEST：操作者自己的帳號開 auto、1 封寄到自己另一信箱 |
 
 ### C9 舊欄位退場（contract）
@@ -129,8 +129,8 @@ B。順序：C1（守衛）→ C2（信本身）→ C3（研究）→ C4＋C6 �
 
 | 卡號 | 做什麼 |
 |---|---|
-| C10.1 | connector `places`（`NA/lib/outreach/connectors/router.ts:34`）接 Google Places Text Search：查詢字＋地區 → 候選（name, website, phone, address, maps url）→ `co_lead_inbox`（`source_type='google_places'`, `source_url=maps url`）；費用顯示；每次 ≤20 筆 |
-| C10.2 | Inbox 頁「找名單」表單（查詢字、地區）；測試：假回應 → 20 筆 inbox；REALTEST：1 次真查 |
+| C10.1 | `NA/lib/collect/net/providers.ts:88` serper `allowedPaths` 加 `/places`（同段註解要求：有呼叫者才放寬）；新檔 `NA/lib/outreach/discover.ts`：經 `createProviderCall`（`NA/lib/collect/index.ts` 匯出，帶預算與限速）`POST /places {q:"<查詢字> <地區>", gl:"tw", hl:"zh-tw"}` → 先真打一次記下回應形狀寫進檔頭（照 `NA/lib/collect/search/drivers.ts:67` 慣例）→ 每筆 `{title, address, phoneNumber, website, cid}` → `co_lead_inbox`（`source_type='serper_places'`、`source_url=https://maps.google.com/?cid=<cid>`），再走既有 normalize／dedup／suppression（`NA/app/api/outreach/inbox/route.ts`）；每次 ≤20 筆；`NA/lib/outreach/connectors/router.ts:34` 的 `places` 槽位 note 改為 Serper |
+| C10.2 | Inbox 頁「找名單」表單（查詢字、地區兩個輸入框），按鈕顯示每次查詢費用；測試：假回應 → 20 筆 inbox、重複的被標出；REALTEST：1 次真查 |
 
 ## 7. 驗證計畫（四動作）
 
