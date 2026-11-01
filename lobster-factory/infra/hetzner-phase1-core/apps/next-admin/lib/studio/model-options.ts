@@ -25,6 +25,16 @@ export function isAspectRatio(v: unknown): v is AspectRatio {
   return typeof v === "string" && (VALID_ASPECT_RATIOS as readonly string[]).includes(v);
 }
 
+const ASPECT_VALUES: readonly [AspectRatio, number][] = [
+  ["2:3", 2 / 3], ["3:4", 3 / 4], ["4:5", 4 / 5], ["1:1", 1], ["9:16", 9 / 16], ["3:2", 3 / 2], ["4:3", 4 / 3], ["16:9", 16 / 9],
+];
+
+/** The supported ratio closest to an image's own, so an edit of it keeps its framing. */
+export function nearestAspectRatio(width: number, height: number): AspectRatio {
+  const r = width / height;
+  return ASPECT_VALUES.reduce((best, o) => (Math.abs(o[1] - r) < Math.abs(best[1] - r) ? o : best))[0];
+}
+
 export interface StudioModelOption {
   value: StudioModel;
   label: string;

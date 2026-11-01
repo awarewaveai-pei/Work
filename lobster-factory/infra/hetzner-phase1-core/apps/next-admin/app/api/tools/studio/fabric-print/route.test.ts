@@ -9,7 +9,8 @@ vi.mock("@/lib/entitlements/grant", () => ({
   withFeature: (_k: string, h: (r: Request, g: unknown, c: unknown) => Promise<Response>) => (r: Request, c: unknown) => { gate.asked++; return h(r, { kind: "internal" }, c); },
 }));
 
-import { POST, nearestAspect } from "./route";
+import { POST } from "./route";
+import { nearestAspectRatio as nearestAspect } from "@/lib/studio/model-options";
 
 const post = (body: unknown) => POST(new Request("http://localhost/api/tools/studio/fabric-print", {
   method: "POST",

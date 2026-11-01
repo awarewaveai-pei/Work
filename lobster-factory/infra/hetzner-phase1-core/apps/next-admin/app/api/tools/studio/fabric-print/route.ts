@@ -5,7 +5,7 @@ import { withFeature } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
 import { getDesignObjectByUrl, isDesignsAsset, parseImageDataUrl } from "@/lib/storage/r2";
 import { generateImage } from "@/lib/studio/image-provider";
-import type { AspectRatio } from "@/lib/studio/model-options";
+import { nearestAspectRatio } from "@/lib/studio/model-options";
 import { compositeOnFabric, isPrintBox, printCorners } from "@/lib/studio/fabric-print";
 import { buildPrintOntoPhotoPrompt } from "@/lib/studio/mockup-prompt";
 import { friendlyImageError } from "@/lib/studio/image-errors";
@@ -45,13 +45,6 @@ async function loadImage(input: unknown): Promise<Buffer | { error: string }> {
   }
   const r = await getDesignObjectByUrl(input, MAX_BYTES);
   return "error" in r ? { error: r.error } : r.body;
-}
-
-/** The output ratio closest to the photo's, so the edit keeps its framing. */
-export function nearestAspect(width: number, height: number): AspectRatio {
-  const r = width / height;
-  const options: [AspectRatio, number][] = [["2:3", 2 / 3], ["3:4", 3 / 4], ["4:5", 4 / 5], ["1:1", 1], ["9:16", 9 / 16], ["3:2", 3 / 2], ["4:3", 4 / 3], ["16:9", 16 / 9]];
-  return options.reduce((best, o) => (Math.abs(o[1] - r) < Math.abs(best[1] - r) ? o : best))[0];
 }
 
 interface Body {
@@ -108,7 +101,7 @@ async function handleAi(_request: Request, grant: Grant, { body, scale }: Parsed
     const meta = await sharp(photoBuf, { limitInputPixels: INPUT_PIXELS }).rotate().metadata().catch(() => null);
     if (!meta?.width || !meta.height) return NextResponse.json({ ok: false, error: "姿勢照無法讀取" }, { status: 422 });
     const rotated = (meta.orientation ?? 1) >= 5;
-    const aspectRatio = nearestAspect(rotated ? meta.height : meta.width, rotated ? meta.width : meta.height);
+    const aspectRatio = nearestAspectRatio(rotated ? meta.height : meta.width, rotated ? meta.width : meta.height);
     const result = await generateImage({
       model: "openai-25-edit",
       prompt: buildPrintOntoPhotoPrompt({

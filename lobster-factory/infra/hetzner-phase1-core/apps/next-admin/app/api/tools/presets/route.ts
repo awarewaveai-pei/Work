@@ -5,7 +5,6 @@ import { withFeature } from "../../../../lib/entitlements/grant";
 import { getSupabaseReadClient, getSupabaseWriteClient } from "../../../../lib/supabase-server";
 import {
   buildDesignKey,
-  deleteDesignObject,
   isR2Configured,
   parseImageDataUrl,
   putDesignObject,
@@ -248,7 +247,8 @@ async function handlePost(request: Request): Promise<Response> {
   if (error) {
     console.error("[presets] media_assets insert failed:", error.message);
     // The object was uploaded first: without its row nothing lists or deletes it (0067 left one per failed save).
-    const cleanup = await deleteDesignObject(uploaded.objectKey);
+    // Through the guard like every asset delete; a just-minted key has no WordPress reference, so it goes.
+    const cleanup = await deleteUnreferencedAsset(uploaded.objectKey);
     if ("error" in cleanup) console.error("[presets] orphan object left:", uploaded.objectKey, cleanup.error);
     return NextResponse.json({ ok: false, error: "insert_failed" }, { status: 500 });
   }

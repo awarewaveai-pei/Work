@@ -1,4 +1,23 @@
 # Worklog
+## 2026-11-01（續23）sg-deploy next-admin 被 npm test 閘擋下：續20 兩處違反既有不變量；修正後重部署
+
+**操作者**：「COMMIT PUSH 部署」。`check-deploy-drift -AppCodeOnly`：prod 落後 14 個 app commit（72bfde142..4d050e8da），無 compose 變數漂移；migration 0149／0150／0151 帳本皆已套。
+
+**根因**：續18／續20 只跑相關測試子集，沒跑整套 `npm test`；主機閘跑整套才抓到：
+- `lib/content/__tests__/r2-delete-guard.test.ts` delete boundary：`presets/route.ts` 孤兒清理用了 `deleteDesignObject`，違反「刪 media_assets 列的路由只能經 `deleteUnreferencedAsset` 刪檔」。
+- `app/__tests__/route-exports.test.ts`：`fabric-print/route.ts` 多匯出 `nearestAspect`，route 檔只能匯出 Next.js 認得的名稱。
+
+**做了**：孤兒清理改 `deleteUnreferencedAsset(uploaded.objectKey)`（新鑄 key 無 WP 引用，照常刪）；`nearestAspect` 移為 `lib/studio/model-options.ts nearestAspectRatio`。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin（第一次）→ npm test 2 failed → deploy aborted（無變更上 prod） | exit=1 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（整套）→ 3789 passed，2 failed 皆為他 session 未提交 `app/(shell)/tools/seedstar/` | exit=1 | ms=180000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（自審：兩處皆為把呼叫改回專案既有唯一路徑，無新邏輯）
+- BUGHUNT_DONE: scope=agency-os/docs,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib | grep=nearestAspect | hits=9
+- ORACLE_WAIVED: 兩行修正、整套測試綠。
+- 第二次 sg-deploy 結果見下一則或本則補記。
+
+**避免再發生**：推 next-admin 前跑整套 `npx vitest run`（不是子集）；`/verify-recent` 的 exec 步驟對 next-admin 改動應指向整套。
 ## 2026-11-01（續22）外聯系統 v2 卡 C17.7：社群頁連到的自家官網回填名單並在同一次研究讀官網；表單、短網址、連結頁不算官網
 
 **操作者**：「要，這裡做」（回填 IG／FB 頁上的官網並研究）。
