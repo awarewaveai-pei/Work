@@ -1,7 +1,9 @@
-// Cold Outreach v2 -- research one lead (SPEC §5.1, card C3): read its own website (never social_url, SPEC D20), store
-// the facts each page proves (sink/outreach-research), and, when the lead has no email, take the best address the site
-// publishes and check its domain receives mail. Every outcome is a timeline row, so "why can't this lead get an email"
-// has an answer in the lead's history. The caller has already authorized the lead and holds its outreach.research grant.
+// Cold Outreach v2 -- research one lead (SPEC §5.1, cards C3, C17): read its own website, store the facts each page
+// proves (sink/outreach-research), and, when the lead has no email, take the best address it publishes and check its
+// domain receives mail. When the lead has no own website, or the site gave no address it may take, its Instagram or
+// Facebook profile is read through social-research.ts (official API, then search snippets, then a public-page actor;
+// SPEC D20). Every outcome is a timeline row, so "why can't this lead get an email" has an answer in the lead's history.
+// The caller has already authorized the lead and holds its outreach.research grant.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Grant } from "@/lib/entitlements/can";
 import type { GrantContext } from "@/lib/entitlements/grant";
@@ -10,13 +12,20 @@ import { createOutreachResearchSink } from "@/lib/collect/sinks/outreach-researc
 import { autoEligible, bestEmail, hostOf } from "./research-extract";
 import { isPlatformHost } from "./normalize";
 import { LEAD_RESEARCH_BUDGET } from "@/lib/collect/run";
+import { createBudget, createProviderCall } from "@/lib/collect";
+import type { ProviderCall } from "@/lib/collect/net/providers";
+import { socialResearch, socialTarget, type SocialOutcome } from "./social-research";
+import type { FoundEmail } from "./research-extract";
 
 /** Fetch budget plus time for the last pages to be read by the model; past it no page goes to the model. */
 const EXTRACTION_GRACE_MS = 30_000;
 import { verifyEmails } from "./verify-email";
 
 export interface ResearchLead { id: string; organization_id: string | null; name: string | null; website: string | null; email: string | null;
-  consent_source: string | null }
+  consent_source: string | null; social_url?: string | null }
+
+/** One profile's ladder: Business Discovery 2 calls, a search, an actor run. */
+const SOCIAL_BUDGET = { fetches: 4, ms: 120_000 } as const;
 
 export interface ResearchOutcome {
   leadId: string;
@@ -30,6 +39,8 @@ export interface ResearchOutcome {
   /** Evidence waiting for a person. */
   pending: number;
   emailFound: string | null;
+  /** The social profile ladder, when it ran: which layer gave the profile (null = none), every layer's result, US$. */
+  social?: { url: string; layer: string | null; layers: Array<{ layer: string; result: string; detail?: string }>; costUsd: number };
   error?: string;
   /** Bookkeeping that did not land (a timeline row, a count): the outcome stands, the record is incomplete. */
   errors: string[];
@@ -52,35 +63,67 @@ export function researchUrl(website: string | null): { url: string } | { reason:
 }
 
 export async function researchLead(db: SupabaseClient, lead: ResearchLead,
-  opts: { grant: Grant; grantContext: GrantContext; runKey: string; log?: (msg: string) => void }): Promise<ResearchOutcome> {
+  opts: { grant: Grant; grantContext: GrantContext; runKey: string; log?: (msg: string) => void; callProvider?: ProviderCall }): Promise<ResearchOutcome> {
   const errors: string[] = [];
   const base: ResearchOutcome = { leadId: lead.id, organizationId: lead.organization_id, status: "failed", written: 0, approved: 0, evidence: 0,
     pending: 0, emailFound: null, errors };
   const target = researchUrl(lead.website);
-  if ("reason" in target) {
-    const title = target.reason === "platform_website" ? "網站欄是社群或平台頁，不是對方自己的網站：不研究" : "沒有網站可研究";
+  // The profile to read when the site cannot speak for the business: the social_url field, or a website field that is
+  // itself an Instagram / Facebook page.
+  const social = socialTarget(lead.social_url) ?? ("reason" in target && target.reason === "platform_website" ? socialTarget(lead.website) : null);
+  if ("reason" in target && !social) {
+    const title = target.reason === "platform_website" ? "網站欄是平台頁，不是對方自己的網站，也不是能讀的 IG／FB 頁：不研究" : "沒有網站可研究";
     await timeline(db, lead, "research_insufficient", title, { reason: target.reason, website: lead.website }, errors);
     return { ...base, status: target.reason };
   }
-  const url = target.url;
+  const url = "url" in target ? target.url : null;
   // started without done/insufficient/failed after it = a run the server lost (restart): the pipeline tick (C15) picks
   // the lead again by its state, so no job outlives the process.
-  await timeline(db, lead, "research_started", "開始研究", { url, run: opts.runKey }, errors);
+  await timeline(db, lead, "research_started", "開始研究", { url, social: social?.url ?? null, run: opts.runKey }, errors);
 
+  const tenantRef = `outreach:${lead.organization_id ?? "agency"}`;
+  const admit = new Set<string>();
   const sink = createOutreachResearchSink({ db, lead: { ...lead, website: url }, grant: opts.grant,
-    deadline: Date.now() + LEAD_RESEARCH_BUDGET.ms + EXTRACTION_GRACE_MS });
+    deadline: Date.now() + LEAD_RESEARCH_BUDGET.ms + EXTRACTION_GRACE_MS, admit });
   let sinkErrors: string[] = [];
-  try {
-    const r = await runLeadResearch({ website: url, sink, tenantRef: `outreach:${lead.organization_id ?? "agency"}`,
-      runKey: opts.runKey, grantContext: opts.grantContext, log: opts.log });
-    sinkErrors = r.sink.errors ?? [];
-    base.written = r.sink.written;
-  } catch (e) {
-    const error = e instanceof Error ? e.message : String(e);
-    await timeline(db, lead, "research_failed", "研究失敗", { url, error: error.slice(0, 300) }, errors);
-    return { ...base, error };
+  if (url) {
+    try {
+      const r = await runLeadResearch({ website: url, sink, tenantRef, runKey: opts.runKey, grantContext: opts.grantContext, log: opts.log });
+      sinkErrors = r.sink.errors ?? [];
+      base.written = r.sink.written;
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e);
+      await timeline(db, lead, "research_failed", "研究失敗", { url, error: error.slice(0, 300) }, errors);
+      if (!social) return { ...base, error };
+      errors.push(`site: ${error.slice(0, 200)}`);
+    }
+  }
+
+  // The profile is read when there is no own site, or the site published no address the lead may take (and it has none).
+  let socialEmails: FoundEmail[] = [];
+  let socialRun: SocialOutcome | null = null;
+  if (social && (!url || (!(lead.email ?? "").trim() && !sink.emails.some(autoEligible)))) {
+    try {
+      const call = opts.callProvider ?? createProviderCall({ budget: createBudget(SOCIAL_BUDGET), grant: opts.grant, timeoutMs: 100_000 });
+      socialRun = await socialResearch(call, opts.grant, social, tenantRef);
+      socialEmails = socialRun.emails;
+      for (const d of socialRun.docs) admit.add(d.canonicalUrl);
+      if (socialRun.docs.length) {
+        const r = await sink.run(socialRun.docs, { tenantRef, runId: opts.runKey, log: opts.log ?? (() => {}) });
+        base.written += r.written;
+        sinkErrors.push(...(r.errors ?? []));
+      }
+    } catch (e) {
+      errors.push(`social: ${(e instanceof Error ? e.message : String(e)).slice(0, 200)}`);
+    }
+    await timeline(db, lead, "social_research", socialRun?.profile ? "讀了對方的社群頁" : socialEmails.length ? "從搜尋結果找到社群頁上的 email" : "社群頁讀不到資料",
+      { url: social.url, layers: socialRun?.layers ?? [], profile_layer: socialRun?.profile?.layer ?? null, docs: socialRun?.docs.length ?? 0,
+        quarantined: socialRun?.quarantined ?? 0, emails: socialEmails.map((f) => f.email), cost_usd: socialRun?.costUsd ?? 0 }, errors);
   }
   base.approved = sink.approved;
+  if (social && socialRun) base.social = { url: social.url, layer: socialRun.profile?.layer ?? (socialEmails.length ? "serper" : null),
+    layers: socialRun.layers, costUsd: socialRun.costUsd };
+  const found = [...sink.emails, ...socialEmails];
 
   for (const status of ["approved", "pending"] as const) {
     const { count, error } = await db.from("co_evidence").select("id", { count: "exact", head: true }).eq("lead_id", lead.id).eq("status", status);
@@ -95,10 +138,10 @@ export async function researchLead(db: SupabaseClient, lead: ResearchLead,
   if (!(lead.email ?? "").trim()) {
     // MX first: an undeliverable address would be filled in, block every draft (contact-guard email_invalid), and never
     // be replaced (an email is never overwritten). Only a definite "invalid" excludes; unknown is a later lookup.
-    const statuses = await verifyEmails(db, lead.organization_id, sink.emails.filter(autoEligible).map((f) => f.email)).catch(() => new Map<string, string>());
-    const undeliverable = sink.emails.filter((f) => autoEligible(f) && statuses.get(f.email) === "invalid");
-    const eligible = sink.emails.filter((f) => autoEligible(f) && statuses.get(f.email) !== "invalid");
-    const others = sink.emails.filter((f) => !autoEligible(f)).slice(0, 5);
+    const statuses = await verifyEmails(db, lead.organization_id, found.filter(autoEligible).map((f) => f.email)).catch(() => new Map<string, string>());
+    const undeliverable = found.filter((f) => autoEligible(f) && statuses.get(f.email) === "invalid");
+    const eligible = found.filter((f) => autoEligible(f) && statuses.get(f.email) !== "invalid");
+    const others = found.filter((f) => !autoEligible(f)).slice(0, 5);
     for (let pick = bestEmail(eligible); pick; pick = bestEmail(eligible)) {
       eligible.splice(eligible.indexOf(pick), 1);
       const q = db.from("co_leads").update({ email: pick.email, updated_at: new Date().toISOString() }).eq("id", lead.id);

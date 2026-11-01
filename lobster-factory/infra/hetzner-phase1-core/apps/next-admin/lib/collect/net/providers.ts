@@ -28,6 +28,11 @@ export interface ProviderSpec {
   authHeader?: (key: string) => Record<string, string>;
   /** If set, the only URL paths this provider may be called on; anything else is refused before the request. */
   allowedPaths?: readonly string[];
+  /** Paths with an id in them (a Graph API object): each must match one whole pattern. With allowedPaths, either
+   *  admits a path; with neither, every path is allowed. Anchor every pattern (^...$). */
+  allowedPathPatterns?: readonly RegExp[];
+  /** If set, the only HTTP methods allowed: a key that can also write (a page token can post) is held to reading. */
+  allowedMethods?: readonly ("GET" | "POST")[];
 }
 
 export const PROVIDERS: Record<string, ProviderSpec> = {
@@ -85,6 +90,36 @@ export const PROVIDERS: Record<string, ProviderSpec> = {
     apiKeyEnv: "SERPER_API_KEY",
     authHeader: (key) => ({ "x-api-key": key }),
     allowedPaths: ["/search", "/places"],
+  },
+
+  // Meta Graph API, read only: Instagram Business Discovery (a business/creator account's public profile and recent
+  // posts) asked from our own page's linked IG account, for lead research (lib/outreach/social-research.ts, card C17).
+  // The page token is permanent (expires_at 0) and the call is free. Two paths only: the page's own IG id, and an IG
+  // user object (Business Discovery is a field on it). Posting, ads and messaging use their own tokens elsewhere.
+  meta_discovery: {
+    id: "meta_discovery",
+    origin: "https://graph.facebook.com",
+    apiKeyEnv: "META_PAGE_TOKEN_AWARE_WAVE",
+    allowedPathPatterns: [/^\/v\d+\.\d+\/me$/, /^\/v\d+\.\d+\/\d{5,25}$/],
+    // The token can also post to the page; a POST to an object id would update it. Reading only.
+    allowedMethods: ["GET"],
+  },
+
+  // Apify actors that read a public profile page without logging in (card C17): one entry per platform, so one
+  // actor breaking or changing price leaves the other. Called only when Business Discovery and search snippets found
+  // nothing; never with our Meta app, accounts or host (the actor's own infrastructure fetches the page). Output
+  // shapes are not yet confirmed live: lib/outreach/social-research.ts parses them defensively.
+  apify_instagram: {
+    id: "apify_instagram",
+    origin: "https://api.apify.com",
+    apiKeyEnv: "APIFY_API_TOKEN",
+    allowedPaths: ["/v2/acts/apify~instagram-profile-scraper/run-sync-get-dataset-items"],
+  },
+  apify_facebook: {
+    id: "apify_facebook",
+    origin: "https://api.apify.com",
+    apiKeyEnv: "APIFY_API_TOKEN",
+    allowedPaths: ["/v2/acts/apify~facebook-pages-scraper/run-sync-get-dataset-items"],
   },
 };
 
@@ -156,8 +191,13 @@ export function createProviderCall(opts: ProviderCallOptions): ProviderCall {
     }
     const url = new URL(init.path, spec.origin);
     if (url.origin !== spec.origin) throw new ProviderCallError("origin_escape", "unconfigured");
-    if (spec.allowedPaths && !spec.allowedPaths.includes(url.pathname)) {
+    const listed = !!spec.allowedPaths || !!spec.allowedPathPatterns;
+    const admitted = (spec.allowedPaths?.includes(url.pathname) ?? false) || (spec.allowedPathPatterns?.some((re) => re.test(url.pathname)) ?? false);
+    if (listed && !admitted) {
       throw new ProviderCallError(`path_not_allowed_${providerId}`, "unconfigured");
+    }
+    if (spec.allowedMethods && !spec.allowedMethods.includes(init.method ?? "POST")) {
+      throw new ProviderCallError(`method_not_allowed_${providerId}`, "unconfigured");
     }
     void opts.grant.recordUse({ provider: providerId });
 

@@ -101,6 +101,7 @@ export const IMAGE_RATES: Record<string, { usd: number; label: string; vendor: s
   "openai-low":          { usd: 0.02, label: "GPT-Image-2 low", vendor: "OpenAI" },
   "openai-medium":       { usd: 0.07, label: "GPT-Image-2 medium", vendor: "OpenAI" },
   "openai-high":         { usd: 0.19, label: "GPT-Image-2 high", vendor: "OpenAI" },
+  "openai-25-edit":      { usd: 0.06, label: "GPT-Image-2.5 Sunburst edit (high)", vendor: "OpenAI" },
 };
 
 /** Default image model the app uses for cheap drafts (lib/tarot/image-gen.ts default). */
@@ -136,6 +137,8 @@ export const MEDIA_MODELS: Record<string, MediaModel> = {
   "google/nano-banana-pro":            { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
   "google/imagen-4":                   { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
   "gpt-image-2":                       { vendor: "OpenAI", kind: "image", status: "active", verifiedAt: "2026-10-28" },
+  // Same published token rates as gpt-image-2 (OPENAI_IMAGE_TOKEN_RATES); verified by 3 edits via Replicate 2026-11-01.
+  "gpt-image-2.5-sunburst":            { vendor: "OpenAI", kind: "image", status: "active", verifiedAt: "2026-11-01" },
   "whisper-1":                         { vendor: "OpenAI", kind: "tool", status: "active", verifiedAt: "2026-10-29" },
   // video-service default until 2026-10-28; OpenAI: "The model 'dall-e-3' does not exist".
   "dall-e-3":                          { vendor: "OpenAI", kind: "image", status: "retired" },
@@ -217,8 +220,9 @@ export const TEXT_FEATURES: FeatureProfile[] = [
   { key: "tarot-prompt",label: "塔羅 prompt 建議",           route: "/api/tools/tarot/suggest-prompt", model: "claude-haiku-5-5", inputTok: 500, outputTok: 400 },
   { key: "product-copy",label: "POD 商品文案 (SEO)",         route: "lib/studio/product-copy", model: "claude-opus-5-5", inputTok: 600, outputTok: 1000 },
   { key: "video-script",label: "影片腳本生成 (6 場景)",       route: "lib/content/video/video-script-core", model: "claude-opus-5-5", inputTok: 1200, outputTok: 2200 },
-  // One lead's website, the ceiling (lib/collect/run.ts LEAD_RESEARCH_BUDGET 15 pages x ~3.5k tokens in, ~400 out).
-  { key: "outreach-research", label: "客戶研究（最多 15 頁）", route: "/api/outreach/leads/research", model: "gpt-5.4-nano", inputTok: 52500, outputTok: 6000 },
+  // One lead's website, the ceiling (lib/collect/run.ts LEAD_RESEARCH_BUDGET 15 pages x ~3.5k tokens in, ~400 out), plus its
+  // social profile ladder at most: a search and the Facebook actor (lib/outreach/social-research.ts APIFY_USD).
+  { key: "outreach-research", label: "客戶研究（網站最多 15 頁＋社群頁）", route: "/api/outreach/leads/research", model: "gpt-5.4-nano", inputTok: 52500, outputTok: 6000, extraUsd: 0.0076 },
 ];
 
 /**

@@ -84,6 +84,17 @@ B。**第 0 天**操作者啟動 C11.1 採購（網域、Workspace 次網域、�
 | C10.1 | `NA/lib/collect/net/providers.ts:88` serper `allowedPaths` 加 `/places`（同段註解要求：有呼叫者才放寬）；新檔 `NA/lib/outreach/discover.ts`：經 `createProviderCall`（`NA/lib/collect/index.ts` 匯出，帶預算與限速）`POST /places {q:"<查詢字>", location:"<地區，例 Taipei City, Taiwan>", gl:"tw", hl:"zh-tw"}`（2026-11-01 真打：地名寫進 q 常只回 0–1 筆，要放 `location`；body 必須 UTF-8，Git Bash curl 會亂碼）→ 回應 `{searchParameters, places:[{position,title,address,latitude,longitude,rating,ratingCount,category,phoneNumber?,website?,cid,priceLevel?}], credits}`，一次 10 筆，phoneNumber／website 可缺、website 可能是 Facebook（C3 不研究），寫進檔頭（照 `NA/lib/collect/search/drivers.ts:67` 慣例）→ 每筆 `{title, address, phoneNumber, website, cid}`（`phoneNumber` 有時是地址，只收符合 `^\+?[\d\s()-]{7,}$` 的值，其餘留空）→ `co_lead_inbox`（`source_type='serper_places'`、`source_url=https://maps.google.com/?cid=<cid>`），再走既有 normalize／suppression；dedup 改跨庫：`dedupKey`（`NA/lib/outreach/normalize.ts:74`）對既有 `co_lead_inbox`＋`co_leads`（同 org，以 email／website host／`source_url` 查）已存在者標 `suspected_dup`（今天只比本次陣列，`normalize.ts:100-110`；`inbox/route.ts:143` 直接 insert）；核准進 leads（`NA/app/api/outreach/leads/route.ts:109`）改為 `upsert` on `(organization_id, lower(email))`（0149 的唯一索引，並行核准只留一列），沒有 email 的以 website host＋name 查後插入；沒有 email 的候選核准進名單後由 C3.7 補；每次 ≤20 筆；`NA/lib/outreach/connectors/router.ts:34` 的 `places` 槽位 note 改為 Serper |
 | C10.2 | Inbox 頁「找名單」表單（查詢字、地區兩個輸入框），按鈕顯示每次查詢費用；測試：假回應 → 20 筆 inbox、重複的被標出；REALTEST：1 次真查 |
 
+### C17 社群研究：IG／FB 頁的階梯
+
+| 卡號 | 做什麼 |
+|---|---|
+| C17.1 | SPEC D20 改寫：店家 IG／FB 公開頁可讀，三層階梯、隔離四條（不經我們的 Meta app／帳號／主機 IP、不登入）、貼文事實待審、180 天；§5.1 seed 說法同步 |
+| C17.2 | `NA/lib/collect/net/providers.ts`：`ProviderSpec.allowedPathPatterns`（Graph 路徑帶 id）；`meta_discovery`（`META_PAGE_TOKEN_AWARE_WAVE`，`/vX.Y/me` 與 `/vX.Y/<igId>`）、`apify_instagram`、`apify_facebook`（`APIFY_API_TOKEN`，各鎖一個 actor 路徑） |
+| C17.3 | 新檔 `NA/lib/outreach/social-research.ts`：`socialTarget`（IG／FB 個人頁網址，貼文與分享連結不算）；階梯 meta_discovery（只 IG）→ serper（`site:<host> "<handle>"`，只取該頁結果的 email）→ apify（`Grant.hold` 預扣、回應後結算）；沒有金鑰＝skipped 不報錯；自介與欄位的 email 算對方宣告（`FoundEmail.mailto`）；自介與貼文成為文件，注入篩查不過的不交給模型；貼文帶日期、180 天內、`meta.reviewOnly` |
+| C17.4 | `NA/lib/outreach/research.ts`：沒有自家網站或網站沒可用 email 時跑階梯；文件以 `admit` 交給 `sink/outreach-research`（只收這些網址；`reviewOnly` 一律 pending）；email 與網站的合併後照 C3.7 選；timeline `social_research`（各層結果、費用）；outcome `social`；研究路由多讀 `social_url`；`cost-model.ts` 研究上限加社群 |
+| C17.5 | 名單頁：只有 IG／FB 頁的名單也能按「研究這家」；結果顯示用了哪一層、花多少 |
+| C17.6 | 測試（階梯找到就停、沒金鑰跳過、錢包不足不跑 actor、注入篩查、貼文日期與待審）；REALTEST 層 1＋2 正式庫；層 3 Apify 等操作者說可以再真跑一次 |
+
 ### C11 寄件信箱池：次網域、DNS、暖機
 
 | 卡號 | 做什麼 |

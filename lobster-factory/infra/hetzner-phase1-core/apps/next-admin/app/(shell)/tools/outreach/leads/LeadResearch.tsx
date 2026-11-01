@@ -8,18 +8,27 @@ import { featureUnitCostUsd } from "@/lib/ai/cost-calculator";
 // here for approve / reject. Cold email generation reads approved evidence only.
 interface Evidence { id: string; claim: string; excerpt: string | null; source_url: string; status: "pending" | "approved" | "rejected" | "stale" }
 interface Outcome { status: "done" | "insufficient" | "no_website" | "platform_website" | "failed"; written: number; approved: number; evidence: number;
-  pending: number; emailFound: string | null; error?: string }
+  pending: number; emailFound: string | null; error?: string;
+  social?: { url: string; layer: string | null; layers: Array<{ layer: string; result: string }>; costUsd: number } }
 
 const RESEARCH_API = "/api/outreach/leads/research";
 const EVIDENCE_API = "/api/outreach/evidence";
 const profile = TEXT_FEATURES.find((f) => f.key === "outreach-research");
 const CEILING_TWD = profile ? Math.max(1, Math.ceil(featureUnitCostUsd(profile) * TWD_RATE)) : null;
 
+// Which rung of the social ladder answered (lib/outreach/social-research.ts), in the operator's words.
+const LAYER: Record<string, string> = { meta_discovery: "IG 官方 API", serper: "Google 搜尋摘要", apify_instagram: "Apify 讀 IG", apify_facebook: "Apify 讀 FB" };
+const socialLine = (s: NonNullable<Outcome["social"]>) => {
+  const skipped = s.layers.filter((l) => l.result === "skipped").map((l) => LAYER[l.layer] ?? l.layer);
+  const cost = s.costUsd > 0 ? `，約 NT$${(s.costUsd * TWD_RATE).toFixed(2)}` : "，免費";
+  return `社群頁：${s.layer ? `用 ${LAYER[s.layer] ?? s.layer}` : "每一層都沒資料"}${cost}${skipped.length ? `（未設定、跳過：${skipped.join("、")}）` : ""}`;
+};
+
 const OUTCOME: Record<Outcome["status"], string> = {
   done: "研究完成",
-  insufficient: "網站上找不到可用的事實",
-  no_website: "這筆名單沒有網站",
-  platform_website: "網站欄是社群或平台頁，不是對方自己的網站：改成對方的官網再研究",
+  insufficient: "網站和社群頁上找不到可用的事實",
+  no_website: "這筆名單沒有網站，也沒有 IG／FB 頁",
+  platform_website: "網站欄是平台頁（不是對方自己的網站，也不是 IG／FB）：改成對方的官網或 IG／FB 頁再研究",
   failed: "研究失敗",
 };
 
@@ -55,7 +64,7 @@ export default function LeadResearch({ leadId, hasWebsite, onDone }: { leadId: s
         if (p.status === "error") throw new Error(p.error || "研究失敗");
         const o = (p.outcomes as Outcome[])[0];
         const parts = [OUTCOME[o.status], o.written ? `新證據 ${o.written} 條（自動核准 ${o.approved} 條）` : "",
-          o.pending ? `${o.pending} 條等你核准` : "", o.emailFound ? `找到 email：${o.emailFound}` : "", o.error ?? ""];
+          o.pending ? `${o.pending} 條等你核准` : "", o.emailFound ? `找到 email：${o.emailFound}` : "", o.social ? socialLine(o.social) : "", o.error ?? ""];
         setMsg({ ok: o.status === "done", text: parts.filter(Boolean).join("；") });
         setOpen(true);
         await load();
@@ -80,7 +89,7 @@ export default function LeadResearch({ leadId, hasWebsite, onDone }: { leadId: s
   return (
     <div style={{ display: "grid", gap: 6 }}>
       <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        <button type="button" className="btn-secondary" disabled={busy || !hasWebsite} title={hasWebsite ? "" : "這筆名單沒有網站"} onClick={() => void research()}>
+        <button type="button" className="btn-secondary" disabled={busy || !hasWebsite} title={hasWebsite ? "" : "這筆名單沒有網站，也沒有 IG／FB 頁"} onClick={() => void research()}>
           {busy ? "研究中…" : `研究這家${CEILING_TWD ? `（最多約 NT$${CEILING_TWD}）` : ""}`}
         </button>
         <button type="button" className="btn-secondary" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? "收起證據" : "證據"}</button>

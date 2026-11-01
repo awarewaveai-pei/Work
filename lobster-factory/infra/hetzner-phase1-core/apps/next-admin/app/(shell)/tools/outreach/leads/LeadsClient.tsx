@@ -8,6 +8,7 @@ interface Lead {
   name: string;
   industry: string | null;
   email: string | null;
+  social_url?: string | null;
   lead_quality_score: number;
   contactability_score: number;
   icp_score: number;
@@ -152,7 +153,7 @@ export default function LeadsClient() {
                     {!profiles.some((p) => p.organization_id === l.organization_id) && <span className="card-sub">這個組織還沒有服務設定</span>}
                   </td>
                   <td style={{ display: "grid", gap: 6 }}>
-                    <LeadResearch leadId={l.id} hasWebsite={!!l.website?.trim()} onDone={() => void load()} />
+                    <LeadResearch leadId={l.id} hasWebsite={!!l.website?.trim() || !!l.social_url?.trim()} onDone={() => void load()} />
                     <button type="button" className="btn-secondary" onClick={() => void remove(l.id)}>刪除</button>
                   </td>
                 </tr>

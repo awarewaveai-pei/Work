@@ -137,8 +137,9 @@ const PLACEHOLDER_RE = /@(example\.(com|org|net)|test\.com|domain\.com|email\.co
 const MAILTO_RE = /href\s*=\s*["']\s*mailto:([^"'?]+)/gi;
 const JSONLD_RE = /<script[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
 
-/** mailto = the business declared it as its contact: a mailto link, or the email of its own schema.org data
- *  (Organization / LocalBusiness JSON-LD, which SEO plugins write from the owner's settings). */
+/** mailto = the business declared it as its contact: a mailto link, the email of its own schema.org data
+ *  (Organization / LocalBusiness JSON-LD, which SEO plugins write from the owner's settings), or an address in its own
+ *  social profile (the bio it wrote, the platform's contact field: lib/outreach/social-research.ts). */
 export interface FoundEmail { email: string; sourceUrl: string; own: boolean; mailto: boolean }
 
 /** Personal mailbox providers: an address there belongs to whoever publishes it, not to the provider. */

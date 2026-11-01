@@ -157,6 +157,22 @@ describe("createProviderCall", () => {
     await call("serper", { path: "/search", body: { q: "q" } });
     expect(hit).toEqual(["https://google.serper.dev/search"]);
   });
+
+  it("the Graph API entry reads only our page's IG id and an IG user object -- never a feed, a post or an ad account (card C17)", async () => {
+    const hit: string[] = [];
+    const call = createProviderCall({ grant: GRANT, budget: createBudget(), env: { META_PAGE_TOKEN_AWARE_WAVE: "page-test", APIFY_API_TOKEN: "apify-test" },
+      transport: (async (u: string | URL) => { hit.push(String(u)); return new Response("{}", { status: 200 }); }) as unknown as typeof fetch });
+    for (const path of ["/v21.0/me/accounts", "/v21.0/17841423840764175/media", "/v21.0/1418148121372301/feed", "/v21.0/act_123/ads", "/me"]) {
+      await expect(call("meta_discovery", { method: "GET", path })).rejects.toThrow(/path_not_allowed_meta_discovery/);
+    }
+    await expect(call("apify_instagram", { path: "/v2/acts/someone~other-actor/run-sync-get-dataset-items" })).rejects.toThrow(/path_not_allowed_apify_instagram/);
+    // the page token can post: a POST to an object id would update it, so the door reads only
+    await expect(call("meta_discovery", { path: "/v21.0/1418148121372301", body: { about: "x" } })).rejects.toThrow(/method_not_allowed_meta_discovery/);
+    expect(hit).toEqual([]);
+    await call("meta_discovery", { method: "GET", path: "/v21.0/me?fields=instagram_business_account" });
+    await call("meta_discovery", { method: "GET", path: "/v21.0/17841423840764175?fields=business_discovery" });
+    expect(hit.length).toBe(2);
+  });
 });
 
 describe("markdownToText", () => {

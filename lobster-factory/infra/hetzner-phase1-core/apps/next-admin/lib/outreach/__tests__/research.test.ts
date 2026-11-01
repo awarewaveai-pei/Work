@@ -223,4 +223,28 @@ describe("researchLead", () => {
     expect(o.status).toBe("no_website");
     expect(m.timeline.map((t) => t.event_type)).toEqual(["research_insufficient"]); // nothing was started
   });
+
+  // Card C17: a website field that is an Instagram page is read through the social ladder instead of being refused.
+  it("an Instagram website: the profile's facts become evidence, its declared address is filled, the site is not crawled", async () => {
+    const bio = "台中市北區篤行路316巷2號，平日 15:00—01:00 營業，訂位請寫信 coffeehere@gmail.com";
+    const call = async (id: string, init: { path: string }) => new Response(JSON.stringify(
+      init.path.includes("/me?") ? { instagram_business_account: { id: "17841423840764175" } }
+        : id === "meta_discovery" ? { business_discovery: { name: "Coffee Here", biography: bio,
+          media: { data: [{ caption: "六月起平日 15:00—01:00 營業，假日照常", permalink: "https://www.instagram.com/p/X1/", timestamp: new Date().toISOString() }] } } } : {}), { status: 200 });
+    m.crawlDocs = [doc("https://www.instagram.com/_coffeehere_/", "should never be crawled")];
+    m.cheap.mockImplementation(async () => ({ ok: true as const, model: "gpt-5.4-nano", raw: '[{"claim":"平日 15:00—01:00 營業","excerpt":"平日 15:00—01:00 營業"}]' }));
+    const o = await researchLead(db, lead({ website: "https://www.instagram.com/_coffeehere_?igsh=x" }),
+      { grant: {} as never, grantContext: {} as never, runKey: "k", callProvider: call as never });
+    // the profile's fact follows the auto-approve rule; the same fact in a post is a dated announcement and waits
+    expect(m.upserts.flat().map((r) => [r.claim, r.status, r.source_url])).toEqual([["平日 15:00—01:00 營業", "approved", "https://www.instagram.com/_coffeehere_/"],
+      ["平日 15:00—01:00 營業", "pending", "https://www.instagram.com/p/X1/"]]);
+    expect(o).toMatchObject({ status: "done", emailFound: "coffeehere@gmail.com" });
+    expect(m.leadUpdates).toMatchObject([{ email: "coffeehere@gmail.com" }, { consent_source: "self_published:https://www.instagram.com/_coffeehere_/" }]);
+    expect(m.timeline.map((t) => t.event_type)).toEqual(["research_started", "social_research", "email_found", "research_done"]);
+  });
+
+  it("a platform website that is not Instagram or Facebook is still refused", async () => {
+    const o = await run(lead({ website: "https://linktr.ee/cafe" }));
+    expect(o.status).toBe("platform_website");
+  });
 });

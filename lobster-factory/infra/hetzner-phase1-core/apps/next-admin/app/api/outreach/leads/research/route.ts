@@ -36,7 +36,7 @@ export async function POST(req: Request): Promise<Response> {
   if (leadIds.length === 0 || leadIds.length !== ids.length) return NextResponse.json({ ok: false, error: "leadId or leadIds (uuid) required" }, { status: 400 });
   if (leadIds.length > MAX_BATCH) return NextResponse.json({ ok: false, error: `at most ${MAX_BATCH} leads per run` }, { status: 400 });
 
-  const { data, error } = await supabase.from("co_leads").select("id, organization_id, name, website, email, consent_source, do_not_contact, status").in("id", leadIds);
+  const { data, error } = await supabase.from("co_leads").select("id, organization_id, name, website, social_url, email, consent_source, do_not_contact, status").in("id", leadIds);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   const leads = (data ?? []) as Array<ResearchLead & { do_not_contact: boolean; status: string | null }>;
   if (leads.length !== leadIds.length) return NextResponse.json({ ok: false, error: "lead not found" }, { status: 404 });

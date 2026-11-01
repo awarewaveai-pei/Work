@@ -5,7 +5,8 @@
 // only those whose excerpt is in the page text (lib/outreach/research-extract.ts) and stores them -- approved when the
 // page is on the lead's own website (SPEC D23), pending for a person otherwise. The addresses the page publishes are
 // collected for the caller (lib/outreach/research.ts decides whether the lead takes one). A per-run instance, not
-// registered: it carries one lead.
+// registered: it carries one lead. Besides the own site it reads exactly the documents the caller admits by URL: the
+// lead's own social profile and posts (lib/outreach/social-research.ts, card C17), whose addresses the ladder keeps.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RawDoc, SinkBlock, SinkCtx, SinkReport } from "@/lib/collect/types";
 import type { Grant } from "@/lib/entitlements/can";
@@ -40,6 +41,9 @@ export function createOutreachResearchSink(args: {
   grant: Grant;
   /** Epoch ms after which no page goes to the model: the run's whole time limit, extraction included. */
   deadline: number;
+  /** URLs off the site that are still the business speaking (its own social profile and posts), filled by the
+   *  caller before it delivers them. Matched exactly; nothing else off the site is ever read. */
+  admit?: ReadonlySet<string>;
 }): OutreachResearchSink {
   const siteHost = hostOf(args.lead.website);
   // The same scope the crawl was given (lib/collect/run.ts runLeadResearch): checked again on every delivered document,
@@ -69,10 +73,13 @@ export function createOutreachResearchSink(args: {
       const errors: string[] = [];
       const one = async (doc: RawDoc): Promise<void> => {
         // Only the lead's own site is read (SPEC D20): a page a redirect took elsewhere, or an oversized URL, is skipped.
-        if (!scope || !inScope(doc.canonicalUrl, scope) || doc.canonicalUrl.length > MAX_URL) { offSite++; skipped++; return; }
+        const onSite = !!scope && inScope(doc.canonicalUrl, scope);
+        const admitted = !onSite && !!args.admit?.has(doc.canonicalUrl);
+        if ((!onSite && !admitted) || doc.canonicalUrl.length > MAX_URL) { offSite++; skipped++; return; }
         const html = doc.raw && /html/i.test(doc.raw.mime) ? decoder.decode(doc.raw.bytes) : null;
         // One entry per address, holding its strongest sighting: a mailto on a later page upgrades a plain-text mention.
-        for (const f of pageEmailsOf({ html, text: doc.text, url: doc.canonicalUrl }, ownDomain)) {
+        // A social profile's addresses are the ladder's (social-research.ts profileEmails), not counted twice here.
+        for (const f of admitted ? [] : pageEmailsOf({ html, text: doc.text, url: doc.canonicalUrl }, ownDomain)) {
           const prev = emails.find((e) => e.email === f.email);
           if (!prev) emails.push(f);
           else if (f.mailto && !prev.mailto) Object.assign(prev, { mailto: true, sourceUrl: f.sourceUrl });
@@ -81,6 +88,8 @@ export function createOutreachResearchSink(args: {
         // A page the quality gate refused (meta.aside: too short, thin) gives addresses only -- never facts, and never a
         // verdict on facts: its text may be a fragment of the page (a challenge page, a half-rendered one).
         if (typeof doc.meta?.aside === "string") { skipped++; return; }
+        // A dated announcement (a social post): its facts are never approved without a person, however exact.
+        const reviewOnly = doc.meta?.reviewOnly === true;
 
         // What this lead's evidence from this admitted page says now: a row whose excerpt has left the page goes stale
         // (generation stops citing it); a stale row whose excerpt is back returns -- approved if a person had approved
@@ -93,7 +102,7 @@ export function createOutreachResearchSink(args: {
           if (!r.excerpt) continue;
           const onPage = excerptOnPage(r.excerpt, doc.text);
           const next = onPage
-            ? (r.status !== "stale" ? null : r.reviewed_by ? "approved" : autoApproves(r.claim, r.excerpt) ? "approved" : "pending")
+            ? (r.status !== "stale" ? null : r.reviewed_by ? "approved" : !reviewOnly && autoApproves(r.claim, r.excerpt) ? "approved" : "pending")
             : (r.status === "stale" ? null : "stale");
           if (!next) continue;
           const { error: sErr } = await args.db.from("co_evidence").update({ status: next }).eq("id", r.id).eq("status", r.status);
@@ -121,7 +130,7 @@ export function createOutreachResearchSink(args: {
           return {
             lead_id: args.lead.id, organization_id: args.lead.organization_id, claim: c.claim, excerpt: c.excerpt,
             source_url: doc.canonicalUrl, source_label: doc.collector, source_date: doc.publishedAt ? doc.publishedAt.slice(0, 10) : null,
-            confidence: Math.round(support * 100) / 100, status: autoApproves(c.claim, c.excerpt) ? "approved" : "pending", created_by: "research",
+            confidence: Math.round(support * 100) / 100, status: !reviewOnly && autoApproves(c.claim, c.excerpt) ? "approved" : "pending", created_by: "research",
           };
         });
         // Idempotent across flushes and reruns: the same fact from the same page is one row (0150 unique key).
