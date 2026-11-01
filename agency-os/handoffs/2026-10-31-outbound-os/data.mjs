@@ -212,6 +212,18 @@ export const STEPS = [
       todo('C9.1', '把舊的觀察回填成證據列。'),
       todo('C9.2', '產信與評分只看證據；匯入時直接寫證據。'),
     ] },
+  { n: 16, code: 'C16', group: 'G', title: '自動化調校：抽得準、核得穩、越寫越好', waitFor: '等 C7 成效頁上線，而且真的寄了 2 週',
+    plain: '例：全自動模式每天仍有 2% 的信給你看。現在是隨機抽；調校後優先抽新品牌、新產業、事實核對沒把握的、退信或負面回覆偏高的那類。事實核對換成判兩次結果一致的模型。哪種開場回覆率高，系統下次就多用那種。',
+    gate: '同樣的抽查比例下，高風險的信被抽中機率至少是低風險的 2 倍。事實核對同一封信判兩次一致率達 95%，報告存檔。某品牌兩種切角各寄滿 30 封後，回覆率高的那種出現在下一封信的寫法裡。', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['C7', 'C15'],
+    decided: '自動化程度用三顆按鈕：手動、半自動（抽 10%）、全自動（抽 2%）。全自動不設 0%，留 2% 當模型走偏的警報。按鈕已在 C2 做好；這張卡只改「抽哪些」「核得穩不穩」「越寫越好」，要真資料才調得準。（規格 D24）',
+    what: 'sampleWeight 依風險分配抽樣；claim-check 一致率實測與投票；generation 加 angle、stats 依切角、brand-context 有效做法段、pickVariant 偏向勝出版',
+    files: ['NA/lib/outreach/review-policy.ts', 'NA/lib/outreach/claim-check.ts', 'NA/lib/outreach/generation-schema.ts', 'NA/lib/outreach/brand-context.ts'],
+    items: [
+      todo('C16.1', '依風險抽樣：同樣的比例，優先抽新品牌、新產業、事實核對沒把握的、退信或負面回覆偏高的。'),
+      todo('C16.2', '事實核對變穩：真信判兩次量一致率，達 95% 的最便宜模型當預設；不到就判兩次、不一致交給人。'),
+      todo('C16.3', 'A／B 成效回饋：每封記下切角，回覆率高的切角寫進下一封的提示，選版偏向它。'),
+      todo('C16.4', '測試與真資料驗收。'),
+    ] },
 ];
 
 // 操作者自己要決定或親手做的（agent 不能替她定）

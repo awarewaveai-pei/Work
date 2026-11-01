@@ -39,7 +39,7 @@
 
 ## 5. 建議方案
 
-B。**第 0 天**操作者啟動 C11.1 採購（網域、Workspace 次網域、使用者），暖機 4–5 週是 300 封的關鍵路徑；程式在兩週內做到能寄（C1–C3、C10、C11.2），信箱一連上就以 w1 上限真實寄送。順序：C1（含 C1.6 scope＋發布，池信箱只授權一次）→ C2 → C3＋C10 並行 → C11（池欄位 migration、連信箱、DNS、健康）→ C4（回信）→ C8（自動寄＋輪流）→ C5（追蹤）→ C15（管線）→ C7（成效）→ C12＋C13 並行。C6、C14、C9 parked，回頭條件在 SPEC D16、D22 與 data.mjs `waitFor`。每張卡完成就能單獨上線，不等整套。
+B。**第 0 天**操作者啟動 C11.1 採購（網域、Workspace 次網域、使用者），暖機 4–5 週是 300 封的關鍵路徑；程式在兩週內做到能寄（C1–C3、C10、C11.2），信箱一連上就以 w1 上限真實寄送。順序：C1（含 C1.6 scope＋發布，池信箱只授權一次）→ C2 → C3＋C10 並行 → C11（池欄位 migration、連信箱、DNS、健康）→ C4（回信）→ C8（自動寄＋輪流）→ C5（追蹤）→ C15（管線）→ C7（成效）→ C12＋C13 並行。C6、C14、C9、C16 parked，回頭條件在 SPEC D16、D22、D24 與 data.mjs `waitFor`。每張卡完成就能單獨上線，不等整套。
 
 ## 6. 實作計畫
 
@@ -182,6 +182,15 @@ B。**第 0 天**操作者啟動 C11.1 採購（網域、Workspace 次網域、�
 |---|---|
 | C9.1 | 回填腳本（冪等）：每個有 `observation+source_url` 且無 evidence 的 lead → 1 列 approved evidence（`created_by='backfill'`） |
 | C9.2 | `checkColdGate` 只看 evidence；inbox 匯入的 `observation` 寫成 evidence 列；`NA/lib/outreach/scoring.ts` 的 observation 加分改讀 evidence 數；欄位保留不刪 |
+
+### C16 自動化調校：依風險抽樣、事實核對穩定、A／B 成效回饋
+
+| 卡號 | 做什麼 |
+|---|---|
+| C16.1 | `NA/lib/outreach/review-policy.ts` `inSample` 改 `sampleWeight(lead, profile, stats)`：總抽樣量仍＝`review_sample_pct`，分配給高風險信（profile 自動核准前 20 封、該 profile 沒做過的產業、事實核對低信心、C7 該 profile×angle 7 日退信率或負面回覆率高於全體）；決定仍可重算（雜湊＋權重）；測試：同比例下高風險信被抽中率 ≥ 2 倍低風險 |
+| C16.2 | `NA/lib/outreach/claim-check.ts`：一致率實測（對 ≥200 封真信各判兩次）→ 一致率 ≥95% 的最便宜模型當預設；未達 → 兩次投票，不一致＝`unsupported`；`gate_snapshot.claim_check` 記 `model`、`runs`；SPEC D24② |
+| C16.3 | `generation-schema.ts` 每版加 `angle`（固定詞表）→ 寫 `co_messages.angle`（`0048:146` 已有欄）；C7 stats 依 profile×angle 算回覆率；同 profile 每切角 ≥30 封後，`brand-context.ts` 加「有效做法」段（勝出切角、不含個資），`pickVariant` 偏向勝出切角（仍保留 ≥20% 給另一版，避免定死） |
+| C16.4 | 測試與真資料：C16.1 假資料分配；C16.2 一致率報告存 `agency-os/reports/`；C16.3 種兩切角各 30 封假回覆 → prompt 出現勝出切角 |
 
 ## 7. 驗證計畫（四動作）
 
