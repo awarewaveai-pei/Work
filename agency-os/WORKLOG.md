@@ -1,4 +1,10 @@
 # Worklog
+## 2026-11-01（續1）remote-monthly-agent: monthly review 2026-11 generated -> reports/monthly/monthly-review-2026-11.md (governance drift overall: SKIPPED — no pwsh in remote Linux container; prev month: PASS span=19d)
+
+- REALTEST_WAIVED: SMOKE_COVERED -- report generation routine; no service call
+- REVIEW_WAIVED: DOC_ONLY -- auto-generated report
+- BUGHUNT_WAIVED: DOC_ONLY -- report-only output
+
 ## 2026-10-31（續1）Outbound OS v2：GPT 草案重寫成可執行規格＋監工台 C1–C10
 
 **觸發**：操作者丟 GPT「Multi-Brand Outbound OS」v1.0 草案（自述未讀 repo）＋兩份補充（研究引擎、企業版 12 模組），要求「優化升級、不得畫蛇添足」，討論附件／畫布／開信追蹤／n8n／連結五題後：「寫一個完整的 plan 和監工台」。
