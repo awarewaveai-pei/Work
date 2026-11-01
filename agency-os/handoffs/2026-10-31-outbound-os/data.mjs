@@ -27,14 +27,14 @@ export const COPY = {
 // 現在真的能不能用（2026-11-01 查）
 export const NOW = [
   { what: '匯入名單、打分數、產冷信、人工審核、在 Gmail 建草稿。', state: 'yes', ev: '2026-10-14 在正式站建了 1 封繁中草稿，沒有寄出（WORKLOG 2026-10-14 續28）。' },
-  { what: 'AI 自己去看對方的網站並留下有來源的證據。', state: 'no', ev: '觀察要人工填，只有一格（co_leads.observation）。研究引擎沒有接上。' },
+  { what: 'AI 自己去看對方的網站並留下有來源的證據。', state: 'yes', ev: '2026-11-01 C3：名單頁「研究這家」讀對方自家網站最多 15 頁，每條事實附來源網址與逐字原文；數字、星期、否定跟原文一致才自動核准，其餘待你看。正式庫對 soulfulexpression.org 實測 5 條。' },
   { what: '信有主旨、有署名、用到品牌定位。', state: 'yes', ev: '2026-11-01 C2：每封有主旨（≤25 字），以寄件信箱的署名結尾（程式附加，AI 不能改），定位、賣點、語氣進 prompt（brand-context.ts）。正式庫真產驗過。' },
   { what: '每封信有兩個版本可比、追蹤信有內容。', state: 'yes', ev: '2026-11-01 C2：一次產 A／B 兩版首封＋追蹤信（各有等幾天），審核頁並排；人核准一版另一版自動跳過。追蹤信「到期自動建草稿」在 C5。' },
   { what: '一天寄得到 300 封而不傷主網域。', state: 'no', ev: '只有 1 個消費者 Gmail 信箱連線，上限 20 封。次網域、信箱池、暖機、輪流寄、自動寄都沒有；相關欄位存在但零呼叫點（0048:242-244）。' },
   { what: '研究、產信、建草稿不用你一筆一筆按。', state: 'no', ev: '三個動作都是按鈕觸發（ReviewClient.tsx:19-20）；300 封一天等於 600 次點擊。' },
   { what: '對方回信會進系統，後續信自動停。', state: 'no', ev: 'Replies 頁是空殼；草稿只存 draft id，沒存對話串 id（gmail-draft/route.ts:186）。' },
   { what: '能從公司登記、徵才頁、公開簡介找到公司和人的 email。', state: 'no', ev: '只有手動匯入。店家搜尋（C10）、公司登記（C12）、人員搜尋與 email 推斷（C13）都還沒做。' },
-  { what: '找到店家後拿得到它的 email，寄之前知道對方網域收不收信。', state: 'no', ev: '沒有程式抓網站上的 email；匯入沒有 email、電話、社群就標無法聯絡（inbox/route.ts:37）；MX 查核只有名字沒程式；co_verified_emails 表零呼叫點。' },
+  { what: '找到店家後拿得到它的 email，寄之前知道對方網域收不收信。', state: 'yes', ev: '2026-11-01 C3：研究時從對方網站自動填 email（對方網域、mailto 或網站結構化資料裡的商家信箱），先查網域收不收信才填；別家的地址只列成候選給你看。實測自動填入 info@soulfulexpression.org。找店家本身（C10）還沒做。' },
   { what: '暖名單同步到 FluentCRM。', state: 'no', ev: 'wp-bridge 沒有 contact 端點（RestController.php:42-105），只能建電子報草稿。' },
   { what: '看得到回覆率、會議數、成交數。', state: 'no', ev: '外聯首頁是空殼。' },
   { what: 'Gmail 連線不會自己斷。', state: 'no', ev: '已經斷了：2026-11-01 對 Google 續期，回「已過期或被撤銷」（invalid_grant）。Google 專案仍在測試模式，授權每 7 天失效。你在 Google Cloud Console 按「發布應用程式」並在 Connectors 頁重連後才會恢復（C1.6）。' },
@@ -44,6 +44,7 @@ const todo = (id, plain) => ({ id, plain, status: 'todo' });
 const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 const C1 = '306277bf2';
 const C2 = '766df3df3';
+const C3 = '25858b8b8';
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '守衛與事實訂正', plain: '例：名單上某人剛退訂，系統仍替他建草稿。改成建草稿前重查拒收名單。同時把「scope 不能寄信」這句不對的說法改正，用測試守住程式不呼叫寄信；順便把 Google 授權改成正式發布、加上讀信權限，之後 6 個新信箱只要授權一次。',
@@ -74,17 +75,18 @@ export const STEPS = [
       done('C2.6', '測試與真產一次。', C2),
     ] },
   { n: 3, code: 'C3', group: 'C', title: '研究 → 證據', plain: '例：你按「研究這家」，系統去看小森咖啡自己的網站，抓出「菜單照片光線偏暗」這類觀察，每條附來源網址、原文片段與時間。來自店家自己網站的證據自動核准；來自別人網站的才要你看。不會去爬它的 IG。',
-    gate: '對一個真實公開網站跑研究，出現至少一條證據，原文片段能在該頁找到，自家網站的那條已自動核准；網站上有 email 就自動填進名單。沒有證據的名單不能產信；暖名單永遠不能產冷信。費用在按鈕上看得到。', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['C2'],
+    gate: '對一個真實公開網站跑研究，出現至少一條證據，原文片段能在該頁找到，自家網站的那條已自動核准；網站上有 email 就自動填進名單。沒有證據的名單不能產信；暖名單永遠不能產冷信。費用在按鈕上看得到。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: C3, depends: ['C2'],
+    result: '2026-11-01 正式庫對 soulfulexpression.org 真研究：5 條證據全自動核准、每條原文另抓網頁都在頁上；自動填入 info@soulfulexpression.org；只靠證據產信成功。只讀對方自家網站（平台網址不研究、跳轉外站在請求前拒絕）；事實的數字、星期、否定要跟原文一致才自動核准；email 只取對方網域或對方公開的免費信箱。migration 0150 已套正式站。Claude critic 四輪＋Codex 三輪全修。',
     what: 'migration 0150 co_evidence；collect sink outreach-research（excerpt 子字串驗＋自家網站自動 approved＋純程式抓 email）；research.ts＋route（crawl 只用 website，接受批次）；products.ts 加 outreach.research；Leads 頁按鈕與第三方證據審核；cold-gate 改讀 evidence 並硬拒 warm',
     files: ['DB/migrations/0150_co_evidence.sql', 'NA/lib/collect/sinks/outreach-research.ts', 'NA/lib/outreach/research.ts', 'NA/app/api/outreach/leads/research/route.ts', 'NA/lib/outreach/cold-gate.ts', 'NA/lib/portal/products.ts'],
     items: [
-      todo('C3.1', '新資料表：證據（主張、來源、原文片段、時間、狀態）。'),
-      todo('C3.2', '蒐集器加一個出口：把抓到的網頁交給便宜模型抽主張，原文片段對不上就丟掉；來自店家自己網站的自動核准。'),
-      todo('C3.3', '「研究這家」的後端：只用名單上的網站起一次小範圍蒐集，不碰社群頁面；支援一次多筆。'),
-      todo('C3.4', '把「客戶研究」登記成收費功能。'),
-      todo('C3.5', '畫面：研究按鈕（顯示費用）、第三方證據核准／駁回；沒有核准證據就不產信；暖名單永不產冷信。'),
-      todo('C3.6', '測試與對真實網站跑一次。'),
-      todo('C3.7', '研究時順手從店家網站抓 email，填進名單並查核，不用 AI。'),
+      done('C3.1', '新資料表：證據（主張、來源、原文片段、時間、狀態）。', C3),
+      done('C3.2', '蒐集器加一個出口：把抓到的網頁交給便宜模型抽主張，原文片段對不上就丟掉；來自店家自己網站的自動核准。', C3),
+      done('C3.3', '「研究這家」的後端：只用名單上的網站起一次小範圍蒐集，不碰社群頁面；支援一次多筆。', C3),
+      done('C3.4', '把「客戶研究」登記成收費功能。', C3),
+      done('C3.5', '畫面：研究按鈕（顯示費用）、第三方證據核准／駁回；沒有核准證據就不產信；暖名單永不產冷信。', C3),
+      done('C3.6', '測試與對真實網站跑一次。', C3),
+      done('C3.7', '研究時順手從店家網站抓 email，填進名單並查核，不用 AI。', C3),
     ] },
   { n: 4, code: 'C10', group: 'C', title: '名單來源：店家', plain: '例：你輸入「台中 咖啡廳」，系統用現有的 Serper 帳號查地圖，找出 20 家，連網站與電話一起放進待處理名單；同一地區查第二次，已經在名單裡的會被標成重複。',
     gate: '一次真查回 20 筆進待處理名單，每筆有名稱、網站或電話、來源網址。費用在畫面上。同一查詢跑兩次不會建出兩份名單。沒有 email 的，核准後由研究那步補。', risk: 'Low', model: 'Codex', status: 'not_started', depends: [],

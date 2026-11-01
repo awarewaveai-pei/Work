@@ -1,4 +1,39 @@
 # Worklog
+## 2026-11-01（續16）外聯系統 v2 卡 C3：研究 → 證據（只讀對方自家網站、原文逐字驗、事實數字否定星期要一致才自動核准、email 只取屬於對方的）、migration 0150 已套正式站、C16 自動化調校排入計畫
+
+**操作者**：「做 C3」；中途「好自動化系統 依你說的做, 安排進入PLAN 和監工台」→ C16＋SPEC D24（commit `56763eb65`）。
+
+**根因**：冷信事實只有人工填的一格 `co_leads.observation`；沒有程式看對方網站、留來源、找 email（SPEC §1）。
+
+**做了**：
+- C3.1 `DB/migrations/0150_co_evidence.sql`：`co_evidence`（pending／approved／rejected／stale、`reviewed_by`、`confidence`、claim ≤300、source_url ≤1000、唯一 `(lead_id, source_url, claim)`）；trigger：org 取自 lead、隨 lead 移動；RLS service-role；down 兩處。
+- C3.2 `NA/lib/collect/sinks/outreach-research.ts`（每 run 一個，不註冊）＋ `NA/lib/outreach/research-extract.ts`（純函式）：每頁 cheap 模型 ≤3 `{claim, excerpt}`；excerpt ≥10 字且在頁面原文；自動核准＝`claimSupport ≥0.5` ∧ `claimExact`（數字、中文數字＋單位、星期一致；否定按子句比對）；否則 pending；原文離開原頁 → stale，回來 → 復原（人核准過的維持 approved）；品質門檻擋的短頁只收 email；claim 用原文語言。`cheap-json.ts` 選用 grant（C2 已加）。
+- C3.3 `NA/lib/outreach/research.ts`＋`NA/app/api/outreach/leads/research/route.ts`（POST {leadId|leadIds≤20} → 202 runKey(UUID)；GET 只回 canAccessOrg 的結果）：每筆先授權、拒 do_not_contact／暖名單、先拿 `outreach.research` grant 才開背景工作；每筆 try/catch；timeline research_started／done／insufficient／failed／email_found／email_skipped／email_candidates／email_undeliverable。
+- 爬取範圍（collect 共用）：`NA/lib/collect/run.ts` `runLeadResearch`（15 頁／60 秒＋30 秒抽取寬限、keepAside、expandRefused、跳過購物車／結帳／帳號／登入等交易頁）；`canonical.ts` `siteScope`（有路徑＝只讀該路徑，只認頁面副檔名）與 `underPath`（路徑邊界：/faq 不含 /faqs，所有 collect 來源適用）；`fetcher.ts` `stayWithin`（跳轉離開範圍在請求前拒絕；robots.txt 不適用）；`orchestrator.ts` `expandRefused`、`skipLink`（預設關）。平台網址（Facebook、IG、Linktree、蝦皮、Pinkoi、Google 網站…）不研究。
+- C3.7 email：同網域、或對方宣告的免費信箱（mailto 或 schema.org Organization／LocalBusiness 的 email；Person 不算）才自動填；共用平台路徑型網站的網域不算對方的；填之前先 MX 查核，invalid 不填；compare-and-set、23505 換下一個；`consent_source` 為空才寫 `self_published:<頁>`。
+- C3.4 `products.ts` `outreach.research` quota、`dependsOn: ["collect"]`；`cost-model.ts` 研究費用上限（UI 顯示）。
+- C3.5 Cold Gate：≥1 approved evidence（舊 observation+source_url 到 C9）；`NO_COLD_STATUSES`（replied、proposal_sent、meeting_booked、warm、synced、nurturing、customer、unsubscribed、do_not_contact）＋ meta_lead_ad 永不寄冷信；`contact-guard.ts` 建草稿時同樣擋。產信讀 approved `co_evidence`；`billing.ts` 共用計費。UI：名單頁「研究這家（最多約 NT$x）」、證據清單（核准／退回、已失效）；evidence API GET／PATCH（寫 reviewed_by）。
+- **不變量（同一段被 reviewer 連報 2 次後寫下）**：①範圍：研究永不離開對方自己那條路徑（seed、跳轉、每份交付文件三處同一條 `siteScope`＋`inScope`）②email：自動取的地址必須屬於對方（本站網域或對方宣告的免費信箱）③自動核准：事實裡每個數字、星期、否定都要原樣在原文，覆蓋率也夠。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=node scripts/apply-db-migration.mjs 0150 → APPLY_OK；psql 查兩 trigger＋16 欄 | exit=0 | ms=15000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsx c3-e2e.mts（真 route＋正式庫＋代理商 key）對 soulfulexpression.org：研究 done，5 條證據全自動核准、每條 excerpt 另抓網頁逐字比對都在頁上；email 自動填 info@soulfulexpression.org（schema.org Organization，同網域）；只靠證據產信 200、4 列、A 引用 2 條 co_evidence、gate pass；測試名單與服務刪除後正式庫 0 殘留 | exit=0 | ms=206130
+- REALTEST_EVIDENCE: tool=Bash | cmd=c3-diag.mts 對 aware-wave.com：首頁純文字 86 字（多為圖片／JS）被品質門檻擋 → 加 expandRefused＋交易頁跳過；該站多數頁仍薄、15 頁額度內無可用事實＝網站本身限制 | exit=0 | ms=30000
+- REALTEST_EVIDENCE: tool=Bash | cmd=本機 PG17 拋棄式 DB：0150 org 取自 lead、隨 lead 移動、upsert 去重、長度 CHECK、stale、可重跑、down→up | exit=0 | ms=8000
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變 25 守衛（研究範圍、路徑邊界、跳轉、平台拒絕、excerpt 長度、相符度、數字星期否定、否定子句、自動填 email 資格、第三方 mailto、JSON-LD 只取商家、共用網域、MX 先查、stale／復原／人核准保留、aside 不判、mailto 升級、交易頁、輪詢綁 org、研究與草稿擋暖名單、Cold Gate replied）各自紅→還原綠 | exit=0 | ms=1500000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit；npx vitest run（全套）→ 3737 passed，2 failed＝他 session 未追蹤 tools/seedstar | exit=1 | ms=300000
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/3m/8n（M1 網站欄可為平台／跳轉外站、M2 第三方 email 自動填且標自行公開、M3 excerpt 真但 claim 幻覺被核准；m1–m8 全修）；第二輪 warn→fixed 0c/3m/0n（N1 無尾斜線路徑範圍、N2 第三方 mailto、N3 數字否定星期）；第三輪 warn→fixed 0c/1m/2n（S1 stale 不可逆且短頁誤判、robots 被範圍擋、點號路徑段）；第四輪 warn→fixed 0c/1m/0n（否定只看後兩字 → 改子句）
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/5m/0n（Codex gpt-6-sol 第 1 輪 `reports/oracle/2026-11-01-partialreview-69705918.md`：replied 仍可冷信、抽取超時、null 項目、自家 email 未記來源、跨頁 email 排序；全修）；第 2 輪 `…-db136abd.md` 0c/6m/0n（短聯絡頁 email、改版後證據不失效、後頁 mailto 未升級、路徑範圍、跳轉外站、批次重啟；前 5 修，第 6 項以狀態驅動＋research_started 處理）；第 3 輪 `…-83b6eb5e.md` 0c/5m/0n（前 2 為同輪已修 S1；MX 先查、否定對象、共用網域信箱 全修）
+- ORACLE_WAIVED: 三份 Codex artifact 皆為 -Path 局部審查（工作目錄混有他 session 未提交的 theme／seedstar 檔）；C3 全部檔案在 -Path 範圍內，加 Claude critic 四輪＋25 項突變證據
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=WARM_STATUSES\|sameSite(\|legacyEvidence\|research_insufficient\|pathPrefix | hits=41（舊符號 0 殘留；pathPrefix 新語意＝路徑邊界，既有 collect 測試全綠；其餘為規格、計畫、vendored 套件）
+
+**剩**：
+- 正式站畫面等今晚 03:00 自動部署。
+- 「Mockup 工具故障」session 被 file-claim hook 誤判為 cold-gate.ts、canonical.ts 等檔的編輯者（該 session 回覆 not mine，diff 全為本 session）；已依操作者總授權 release。hook 歸屬誤判值得查（同時跑 Bash 即被記名）。
+- 文字很少的網站（aware-wave.com）研究不到事實；有渲染器 key 時 heavier tier 會接手（現在 `no_heavier_tier`）。
+- 研究後的證據寫進產信 prompt 的是 claim＋原文；claimExact 只驗數字有出現、不驗數字跟哪個單位（critic 建議，未做）。
+
+**rollback**：`git revert 25858b8b8`；資料庫 `DB/migrations/0150_co_evidence.down.sql`（先回程式）。
 ## 2026-11-01（續15）Mockup Studio 固定模特兒：選一位已存模特兒，合成時照片當第二張參考圖，每張同一個人
 
 **操作者**：「可否做模特兒清單，讓我之後可以固定選模特兒合成？」→「照做」。
