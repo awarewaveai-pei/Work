@@ -1,4 +1,26 @@
 # Worklog
+## 2026-11-01（續22）外聯系統 v2 卡 C17.7：社群頁連到的自家官網回填名單並在同一次研究讀官網；表單、短網址、連結頁不算官網
+
+**操作者**：「要，這裡做」（回填 IG／FB 頁上的官網並研究）。
+
+**根因**：只有 IG／FB 頁的名單，即使頁面寫了自家官網（Soulful 粉專寫 soulfulexpression.org），研究後 website 仍空，官網沒被讀、官網上的同網域 email 也找不到。
+
+**做了**（commit `e824205b0`）：
+- `NA/lib/outreach/research.ts`：沒有自家網站時先讀社群頁；頁上網址通過 `researchUrl`（不是平台）→ compare-and-set 寫 `co_leads.website`、社群網址移到空的 `social_url`、timeline `website_found`、outcome `websiteFound`，同一次接著爬官網。有自家網站的名單維持「網站沒 email 才讀社群」。
+- `NA/lib/outreach/normalize.ts` `PLATFORM_HOSTS` 加 forms.gle、短網址、連結頁服務。真資料：台中 8 家瑜珈 IG 連的是 Linktree、LINE、Google 表單，沒有一家連自家官網；forms.gle 原本會被當官網爬。
+- R0-PLAN C17.7；監工台 C17.7 done。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsx c17b-e2e.mts（真研究路由＋正式庫）只有 FB 粉專的 Soulful 名單 → Apify → website 填 https://soulfulexpression.org/、social_url＝粉專 → 同次爬官網 → 6 條證據（5 自動核准）、email info@soulfulexpression.org 取自官網（consent self_published:<官網>）；測試名單刪除後 0 殘留 | exit=0 | ms=118031
+- REALTEST_EVIDENCE: tool=Bash | cmd=node find-ig.mjs（唯讀：1 次搜尋＋8 次 Business Discovery）8 家 IG 的 website：無／linktr.ee／lin.ee×4／forms.gle／page.line.me | exit=0 | ms=8000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/outreach app/api/outreach → 180 passed；c17b-mutate.py 3 守衛（只收自家官網、同次讀官網、社群網址保留到 social_url）紅→還原綠；verify-build-gates ALL PASSED；tsc 唯一錯誤在他 session 的 fabric-print/route.ts | exit=0 | ms=120000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n（自審：n1 短網址可能轉到自家官網，現在一律不收——寧可少收不誤爬）
+- ORACLE_WAIVED: Codex 額度剩 1%，操作者指示自審；以 3 項突變＋真查替代
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=websiteFound\|website_found | hits=6（research.ts 3、research.test.ts 3；無其他讀者）
+
+**剩**：無。C17 全部 7 項完成。
+
+**rollback**：`git revert e824205b0`；回填過的 website 是資料，revert 不會清（需要時以 timeline `website_found` 找回原值）。
 ## 2026-11-01（續21）外聯系統 v2 卡 C17.6：Apify 兩個 actor 真跑一次，FB 粉專自動填入 email；C17 完成
 
 **操作者**：「真跑一次」。
