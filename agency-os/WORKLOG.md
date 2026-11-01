@@ -1,4 +1,22 @@
 # Worklog
+## 2026-11-01（續5）Outbound OS v2：Fable 5.1 複審五項決定——D12／D16／D17 改正，D13／D18 維持
+
+**觸發**：操作者「用 Fable 5.1 再檢視一次並做決定」。
+
+**改正**（正本 SPEC §2）：
+- D12：Gmail 連接器只接 Google 帳號；soulfulexpression.org 信箱在 Hostinger（MX `mx1.hostinger.com`／`mx2.hostinger.com`、DMARC `p=none`，DNS 2026-11-01）→ Soulful 冷信 parked，不為一個案子建 SMTP 接頭。aware-wave.com SPF 無 google include、DMARC `p=quarantine` → 禁止消費者 Gmail「以 @aware-wave.com 寄出」。署名預設拿掉 `proof_links[0]`（organizations 無網站欄，`0001_core.sql`），操作者填一次網站。AwareWave 先寄 50 封再決定 Workspace 信箱。
+- D16：**既有 CRM 接頭** `NA/lib/crm/fluentcrm.ts:1-2`（走 `bridgePost`，ADR 017 §4 `crm: fluentcrm`）→ C6.3 改為加 `upsertContact()`，不另寫 bridge 呼叫（原卡＝重複模組）。bridge 多站由 env `clientId` 定（`woo.ts:12-22`，私鑰不進 DB）；org→clientId 用 active `wp_sites.url` host 對 base URL；`/health` 不報 FluentCRM（`RestController.php:128-150`）。
+- D17：「0 投訴」拿掉（Gmail 不向寄件人揭露檢舉，查不到的條件不是條件）→ 改 `co_sending_events` 無 Gmail 拒收事件；加註 20 封／天人手按寄出 < 5 分鐘，auto 價值要等量大。
+- D13 維持，加「內部類型需 Workspace 組織（無）」與授權入口閘證據；D18 維持（續4 已附條款證據）。
+
+**已修改**：規格 D12／D13／D16／D17、R0-PLAN C2.5／C6.3、data.mjs C2／C6／C8 decided。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=python verify_paths.py（108 條、0 缺）; node build.mjs && node check.mjs（10 cards／43 items、0 open、page fresh） | exit=0 | ms=86
+- REVIEW_WAIVED: DOC_ONLY -- 決策紀錄；每條附 file:line 或 DNS 查證
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=lib/crm/fluentcrm | hits=3（`lib/crm/fluentcrm.ts`、`app/api/content/newsletter/route.ts:3`、其測試；C6.3 已指向此接頭）
+
+**下一步**：C1。建議模型：Opus 5.5（可派 Codex）。
 ## 2026-11-01（續4）Outbound OS v2：五項待決由規劃者決定（操作者授權）
 
 **觸發**：操作者「需要決定的事都你決定」。
