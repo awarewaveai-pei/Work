@@ -27,6 +27,7 @@ const KNOWN: { name: string; type: string; label: string }[] = [
 ];
 
 const API = "/api/outreach/connectors";
+const EMAIL_SHAPE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const SECRET_API = "/api/outreach/connectors/secret";
 const NEEDS: ConnectorNeed[] = ["ai_generation", "email_verification", "lead_scraping", "email_sending"];
 const NEED_LABEL: Record<ConnectorNeed, string> = {
@@ -44,6 +45,8 @@ export default function ConnectorsClient() {
   const [pick, setPick] = useState(KNOWN[0].name);
   const [keyingId, setKeyingId] = useState<string | null>(null);
   const [keyValue, setKeyValue] = useState("");
+  const [poolId, setPoolId] = useState<string | null>(null);   // the gmail connector being connected as a pool mailbox
+  const [poolEmail, setPoolEmail] = useState("");
 
   const org = useActiveOrg();
   const searchParams = useSearchParams();
@@ -201,9 +204,14 @@ export default function ConnectorsClient() {
                   </span>
                   <span style={{ display: "flex", gap: 8 }}>
                     {c.connector_name === "gmail" ? (
-                      <a className="btn-secondary" href={`/api/outreach/connectors/gmail/authorize?connectorId=${encodeURIComponent(c.id)}`}>
-                        {c.credentials_ref ? "🔗 重新連接" : "🔗 連接 Google 帳號"}
-                      </a>
+                      <>
+                        <a className="btn-secondary" href={`/api/outreach/connectors/gmail/authorize?connectorId=${encodeURIComponent(c.id)}`}>
+                          {c.credentials_ref ? "🔗 重新連接" : "🔗 連接 Google 帳號"}
+                        </a>
+                        <button type="button" className="btn-secondary" onClick={() => { setPoolId(poolId === c.id ? null : c.id); setPoolEmail(""); }}>
+                          📮 連為寄件池信箱
+                        </button>
+                      </>
                     ) : (
                       <>
                         <button type="button" className="btn-secondary" onClick={() => { setKeyingId(keyingId === c.id ? null : c.id); setKeyValue(""); }}>
@@ -218,6 +226,20 @@ export default function ConnectorsClient() {
                     <button type="button" className="btn-secondary" onClick={() => void remove(c.id)}>移除</button>
                   </span>
                 </div>
+                {poolId === c.id && c.connector_name === "gmail" && (
+                  <div style={{ display: "grid", gap: 6 }}>
+                    <p className="card-sub">此信箱屬於寄件池：系統自動寄出、每日上限 50，暖機從每天 10 封開始。輸入要連的信箱確認，Google 登入的帳號必須是這個地址。</p>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <input type="email" placeholder="例：hello@mail.yourbrand.com" value={poolEmail} aria-label="寄件池信箱地址"
+                        onChange={(e) => setPoolEmail(e.target.value)} style={{ flex: 1 }} />
+                      <a className="btn-primary" aria-disabled={!EMAIL_SHAPE.test(poolEmail.trim())}
+                        style={EMAIL_SHAPE.test(poolEmail.trim()) ? undefined : { pointerEvents: "none", opacity: 0.5 }}
+                        href={`/api/outreach/connectors/gmail/authorize?connectorId=${encodeURIComponent(c.id)}&pool=1&poolEmail=${encodeURIComponent(poolEmail.trim())}`}>
+                        確認並連接
+                      </a>
+                    </div>
+                  </div>
+                )}
                 {keyingId === c.id && c.connector_name !== "gmail" && (
                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                     <input

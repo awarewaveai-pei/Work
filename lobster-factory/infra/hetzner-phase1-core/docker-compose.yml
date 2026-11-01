@@ -438,6 +438,8 @@ services:
       SOCIAL_DISPATCH_TOKEN: ${SOCIAL_DISPATCH_TOKEN:-}
       SOCIAL_DISPATCH_ENABLED: ${SOCIAL_DISPATCH_ENABLED:-}
       SOCIAL_DISPATCH_MODE: ${SOCIAL_DISPATCH_MODE:-}
+      # Outreach internal routes (Outbound OS v2): bearer for /api/internal/outreach/* (sender-health daily; empty = 401).
+      OUTREACH_SYNC_TOKEN: ${OUTREACH_SYNC_TOKEN:-}
       # wp-bridge signing client (one-click publish; lib/studio/wp-bridge-client.ts). Was live on the
       # server since before this file tracked it (2026-09-20 compose-drift audit) -- added here so a
       # fresh deploy of this file no longer silently omits it.

@@ -147,7 +147,7 @@ export default function ReviewClient() {
 
   const card = (m: Message) => {
     const isEditing = editing?.id === m.id;
-    const locked = m.status === "drafted" || m.status === "sent";
+    const locked = m.status === "drafted" || m.status === "sending" || m.status === "sent";
     const findings = m.gate_snapshot?.findings ?? [];
     const claim = m.gate_snapshot?.claim_check;
     const isPrompt = m.prompt_snapshot?.mode === "manual_prompt";
@@ -204,6 +204,7 @@ export default function ReviewClient() {
               </button>
             )}
             {m.status === "drafted" && <span className="card-badge badge-green">✅ 已建 Gmail 草稿（未寄出）</span>}
+            {m.status === "sending" && <span className="card-badge badge-yellow">寄送中</span>}
             {m.status === "drafted" && m.output_type === "cold_email" && (
               <button type="button" className="btn-secondary" disabled={busy}
                 onClick={() => { if (window.confirm("你已經打開 Gmail 的草稿匣，確定裡面沒有這封信？按確定會再建一次。")) void createGmailDraft(m.id, true); }}>

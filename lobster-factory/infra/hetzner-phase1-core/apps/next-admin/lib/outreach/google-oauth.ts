@@ -32,6 +32,9 @@ export interface OAuthState {
   /** The org slug whose database the authorize route read the connector from (db-client.ts outreachSlug); the callback
    *  opens the same one. Signed, so a caller cannot redirect the write. Absent = the main database. */
   slug?: string;
+  /** Connect as a sender-pool mailbox (SPEC D17, D21): the address the operator typed to confirm, lowercased. The
+   *  callback refuses a Google account with another address, then sets send_mode='auto', 50/day, warm-up w1. */
+  poolEmail?: string;
 }
 
 const STATE_MAX_AGE_MS = 10 * 60 * 1000; // 10 minutes — long enough for a human to click through consent
@@ -57,6 +60,7 @@ export function verifyState(signed: string, secret: string): OAuthState | null {
     if (typeof state.connectorId !== "string" || typeof state.ts !== "number") return null;
     if (state.from !== undefined && state.from !== "door" && state.from !== "staff") return null;
     if (state.slug !== undefined && typeof state.slug !== "string") return null;
+    if (state.poolEmail !== undefined && typeof state.poolEmail !== "string") return null;
     if (Date.now() - state.ts > STATE_MAX_AGE_MS) return null;
     return state;
   } catch {

@@ -29,7 +29,7 @@ const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? 
 // Guard uuid-typed columns up front so a bad id returns a clean 400, not a raw PG 22P02 leak.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // First emails on the way out; at most one per lead (0149 co_messages_one_first_email).
-const OUTBOUND = ["approved", "drafted", "copied", "sent"];
+const OUTBOUND = ["approved", "drafted", "sending", "copied", "sent"];
 
 interface LeadRow {
   id: string;

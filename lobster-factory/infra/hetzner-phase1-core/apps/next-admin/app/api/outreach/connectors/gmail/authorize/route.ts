@@ -6,6 +6,9 @@ import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tena
 import { buildAuthorizeUrl, gmailOAuthRedirectUri, signState } from "@/lib/outreach/google-oauth";
 import crypto from "node:crypto";
 import { doorForHost } from "@/lib/portal/doors";
+import { isEmailSyntax } from "@/lib/outreach/verify-email";
+import { poolEmailRefusal } from "@/lib/outreach/sender-health";
+import { baseDomain } from "@/lib/portal/hosts";
 
 // Cold Outreach — Gmail OAuth step 1 (task T10). Redirects the operator to Google's consent
 // screen for the connector row already created via ../route.ts's normal "新增 Connector" flow.
@@ -26,6 +29,15 @@ export async function GET(req: Request): Promise<Response> {
   if (!connectorId || !UUID_RE.test(connectorId)) {
     return NextResponse.json({ ok: false, error: "connectorId (uuid) required" }, { status: 400 });
   }
+
+  // ?pool=1&poolEmail=<address>: connect as a sender-pool mailbox; the typed address is the operator's confirmation.
+  const pool = url.searchParams.get("pool") === "1";
+  const poolEmail = (url.searchParams.get("poolEmail") ?? "").trim().toLowerCase();
+  if (pool && !isEmailSyntax(poolEmail)) {
+    return NextResponse.json({ ok: false, error: "poolEmail (the mailbox address, typed to confirm) required" }, { status: 400 });
+  }
+  const refusal = pool ? poolEmailRefusal(poolEmail, baseDomain()) : null;
+  if (refusal) return NextResponse.json({ ok: false, error: refusal }, { status: 400 });
 
   const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
@@ -60,7 +72,8 @@ export async function GET(req: Request): Promise<Response> {
   // Same host reading as middleware.ts: a consent started on the outreach door returns there after Google.
   const door = doorForHost(req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "");
   const from = door.kind === "product" && door.product.key === "outreach" ? "door" : "staff";
-  const state = signState({ connectorId, nonce: crypto.randomBytes(12).toString("hex"), ts: Date.now(), from, ...(slug ? { slug } : {}) }, clientSecret);
+  const state = signState({ connectorId, nonce: crypto.randomBytes(12).toString("hex"), ts: Date.now(), from, ...(slug ? { slug } : {}),
+    ...(pool ? { poolEmail } : {}) }, clientSecret);
   const authorizeUrl = buildAuthorizeUrl({ clientId, redirectUri, state });
 
   return NextResponse.redirect(authorizeUrl);

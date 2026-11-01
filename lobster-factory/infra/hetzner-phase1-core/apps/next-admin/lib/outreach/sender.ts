@@ -36,3 +36,30 @@ export async function senderFor(db: SupabaseClient, orgId: string | null, opts: 
 export function defaultSignature(sender: Pick<SenderRow, "display_name" | "email">, orgName: string | null): string {
   return [sender.display_name ?? sender.email.split("@")[0], orgName].filter(Boolean).join("\n");
 }
+
+export const DRAFT_DAILY_LIMIT = 20;
+export const POOL_DAILY_LIMIT = 50;
+
+/** The Asia/Taipei calendar day (YYYY-MM-DD): the day every outreach daily cap and warm-up step counts on. */
+export const taipeiDay = (at: Date = new Date()): string =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit" }).format(at);
+
+/** What the Gmail OAuth callback writes to the mailbox row it connected (0152). Every connect links the connector.
+ *  A pool connect (SPEC D17, D21) makes a draft mailbox auto at 50/day starting warm-up at w1; a mailbox already in
+ *  the pool keeps its stage and start date, so reconnecting never restarts warm-up. existing = null: a new row. */
+export function connectedSenderFields(existing: { send_mode: string } | null, opts: { connectorId: string; pool: boolean; today: string }):
+  Record<string, string | number> {
+  const joinPool = opts.pool && existing?.send_mode !== "auto"
+    ? { send_mode: "auto", daily_limit: POOL_DAILY_LIMIT, warmup_stage: "w1", warmup_started_at: opts.today } : {};
+  return existing
+    ? { connector_id: opts.connectorId, ...joinPool }
+    : { provider: "gmail", stream_type: "cold", daily_limit: DRAFT_DAILY_LIMIT, connector_id: opts.connectorId, ...joinPool };
+}
+
+export type WarmupStage = "w1" | "w2" | "w3" | "full";
+const STAGE_CAPS: Record<Exclude<WarmupStage, "full">, number> = { w1: 10, w2: 20, w3: 35 };
+export const NEXT_STAGE: Record<WarmupStage, WarmupStage | null> = { w1: "w2", w2: "w3", w3: "full", full: null };
+
+/** A mailbox's daily cap at its warm-up stage (SPEC D21): 10 / 20 / 35, then its own limit up to 50. */
+export const stageCap = (stage: string, dailyLimit: number): number =>
+  stage in STAGE_CAPS ? STAGE_CAPS[stage as keyof typeof STAGE_CAPS] : Math.min(POOL_DAILY_LIMIT, dailyLimit);

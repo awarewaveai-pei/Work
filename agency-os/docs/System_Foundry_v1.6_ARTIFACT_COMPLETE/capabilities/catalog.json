@@ -5666,7 +5666,9 @@
       "name": "行銷開發信",
       "description": "產生開發信並管理寄送名單。",
       "module": "aw-outreach",
-      "requires": [],
+      "requires": [
+        "CAP-AW-COLLECT"
+      ],
       "acceptance": [
         {
           "test": "no file outside the send adapter names a send endpoint or a send/modify scope (lib/outreach/__tests__/never-sends.test.ts)",

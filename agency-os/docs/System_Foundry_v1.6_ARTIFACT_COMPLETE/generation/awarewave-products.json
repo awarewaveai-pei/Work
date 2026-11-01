@@ -2536,13 +2536,36 @@
           "limitKind": "QUOTA",
           "buyout": true,
           "billing": "credits"
+        },
+        {
+          "feature_key": "outreach.qa",
+          "name": "事實核對",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "outreach.research",
+          "name": "客戶研究",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "outreach.discover",
+          "name": "找名單",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
         }
       ],
       "accessChannels": [
         "ui"
       ],
       "modules": {
-        "dependsOn": [],
+        "dependsOn": [
+          "collect"
+        ],
         "manifest": "lib/outreach/MODULE_MANIFEST.json"
       },
       "staffPaths": [
