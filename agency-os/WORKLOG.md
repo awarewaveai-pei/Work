@@ -1,4 +1,23 @@
 # Worklog
+## 2026-11-02（續5）SeedStar 影音工作台原始碼搬進 repo：`apps/seedstar`；第三方擷取素材與使用者資料留本機
+
+**操作者**：要先做好功能頁，再和 video.aware-wave.com 整合；選「搬進去」。
+
+**根因**：工作台原始碼只在 `D:\Video\SeedStar-app`（非 git、交付包形式），而整合終點 video 產品在 repo 的 next-admin（`lib/portal/products.ts:49`）。在 repo 外做功能頁，接入時要再搬一次，也沒有版本紀錄。
+
+**做了**：
+- 複製到 `lobster-factory/infra/hetzner-phase1-core/apps/seedstar/`（121 檔、5.8MB）；`D:\Video` 原樣保留。
+- `.gitignore`：`assets/image-*`（194 張）與 `assets/storyboards-data.json` 是從第三方 seedstar.ai 擷取（`imageSourceUrl` 指向 seedstar.ai／wusa.ai），repo 公開，不進 git，只留本機；`.data`／`node_modules`／`runtime` 不進 git。
+- `scripts/vendor-vision.cjs`（postinstall）：MediaPipe bundle＋wasm 共 8 檔從 npm `@mediapipe/tasks-vision@1.2.0` 複製並以 `assets/vision/sources.json` SHA-256 驗證；只追蹤 4.4MB 模型＋LICENSE＋sources.json（原 41MB wasm 不進 git）。`start.cmd` 缺 wasm 時也會 `npm ci`。
+- `awarewave-source.json` 改指 `../next-admin`（外觀直接讀主系統，不再用 AwareWave-source 副本）。README 頂端加位置與不追蹤清單。
+- 不部署：sg-deploy／03:00 自動部署只同步 `apps/next-admin`。接入 video.aware-wave.com 與上線成服務是最後一張卡（High）。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=刪除 8 個 vision 檔後 npm ci --omit=dev → 「assets/vision: 10 files verified」；竄改 wasm js 後重跑被修回；竄改 tflite → exit 1 列出檔名，還原後 exit 0 | exit=0 | ms=2702
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/startup.cjs / appearance.cjs / host-adapter.cjs / backend.cjs（新位置）→ 全 PASS；resolveSource → D:\Work\...\apps\next-admin | exit=0 | ms=9669
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（自審：程式碼為原樣複製；新增 vendor-vision.cjs 只讀已追蹤的 sources.json，雜湊不符即失敗不略過；git add -n 確認 0 個第三方圖片／wasm／.data；金鑰 regex 掃描 0 命中）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=AwareWave-source | hits=7（全在 apps/seedstar：package.cjs 打包用、README 歷史段，皆刻意保留）
+- ORACLE_WAIVED: 既有程式碼原樣搬移（各輪已有 Claude 審查紀錄於該 README）；新增僅 30 行雜湊驗證腳本，已以刪除／竄改兩種突變實測。
 ## 2026-11-02（續4）部署 591cc1699；平拍「Unexpected token '<'」＝部署空窗的 502 HTML，Mockup 呼叫改讀成看得懂的錯誤
 
 **操作者**：「現在部署」；部署中回報「平拍 不能用>>OpenAI · GPT-Image-2.5 修圖 (~NT$2) >>Unexpected token '<', "<!DOCTYPE "... is not valid JSON」。
