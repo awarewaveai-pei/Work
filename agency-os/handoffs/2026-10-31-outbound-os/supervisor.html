@@ -108,7 +108,7 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
       <details><summary>工程細節：C2 署名、定位、主旨、多版本、追蹤信內容</summary>
         <p>migration 0149 expand；brand-context.ts；generation-schema.ts（手寫守衛，無 zod）；messages/route.ts 寫 2＋N 列；Connectors 署名欄；Review A/B；刪 drafts stub</p>
         <p><b>需先完成：</b><a href="#C1">C1</a></p>
-        <p><b>決定：</b>AwareWave 用已連線的 awarewaveai@gmail.com 寄；代操客戶用客戶自己的信箱。署名預設是寄件人名稱、品牌名稱、網站，可以改。每天上限維持 20 封。（規格 D12）</p>
+        <p><b>決定：</b>AwareWave 用已連線的 awarewaveai@gmail.com 寄，先寄滿 50 封看回覆率，再決定要不要買 aware-wave.com 的 Workspace 信箱。不要在 Gmail 設「以 @aware-wave.com 寄出」，網域設定會把那種信當假冒隔離。Soulful 的信箱在 Hostinger 不是 Google，連接器連不上，它的冷信先不寄。署名預設是寄件人名稱加品牌名稱，網站那行你填一次。每天上限 20 封。（規格 D12）</p>
         <p><b>檔案：</b><code>DB/migrations/0149_outbound_v2_expand.sql</code> <code>NA/lib/outreach/brand-context.ts</code> <code>NA/lib/outreach/generation-schema.ts</code> <code>NA/app/api/outreach/messages/route.ts</code> <code>NA/app/(shell)/outreach/review/ReviewClient.tsx</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C2</code></p>
       </details>
@@ -161,10 +161,10 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
       <p class="donewhen"><b>完成的樣子：</b>對測試站同步 1 個測試名單，FluentCRM 出現該聯絡人與標籤。沒有同意依據的名單回 422。</p>
       <ul class="items"><li class="todo"><b>○</b><span><code>C6.1</code> wp-bridge 外掛加一個「新增／更新聯絡人」端點，只做這件事。</span></li><li class="todo"><b>○</b><span><code>C6.2</code> 外掛升版並發布到站上。</span></li><li class="todo"><b>○</b><span><code>C6.3</code> 同步的後端：先驗資格（回過信、填過表單、同意過、是客戶之一，且不在拒收名單），再呼叫外掛。</span></li><li class="todo"><b>○</b><span><code>C6.4</code> Replies 頁按鈕接上；測試與對測試站同步一次。</span></li></ul>
       <details><summary>工程細節：C6 暖名單進 FluentCRM</summary>
-        <p>wp-bridge 加 /fluentcrm/contact（signed write，照 /newsletter）；版本 0.20.0＋release；next-admin sync-fluentcrm route（資格＝consent_status 四種∧非 suppression）；Replies 按鈕</p>
+        <p>wp-bridge 加 /fluentcrm/contact（signed write，照 /newsletter）；版本 0.20.0＋release；lib/crm/fluentcrm.ts 加 upsertContact；sync-fluentcrm route（資格＝consent_status 四種∧非 suppression；clientId 由 wp_sites.url 對 bridge env）；Replies 按鈕</p>
         <p><b>需先完成：</b>無</p>
-        <p><b>決定：</b>同步到該品牌自己登記的 WordPress 站，不寫死網址。aware-wave.com 依你 10-30 的決定只留 WordPress，不接回。（規格 D16）</p>
-        <p><b>檔案：</b><code>WPB/includes/Http/RestController.php</code> <code>WPB/includes/Crm/ContactUpserter.php</code> <code>NA/app/api/outreach/leads/sync-fluentcrm/route.ts</code></p>
+        <p><b>決定：</b>走系統已有的 FluentCRM 接頭（它已經會建電子報草稿），只加「新增聯絡人」一個動作，不另寫一套。同步到哪個站，照該品牌登記的網站對上已設定的 wp-bridge 連線，不寫死網址。aware-wave.com 依你 10-30 的決定只留 WordPress，不接回。（規格 D16）</p>
+        <p><b>檔案：</b><code>WPB/includes/Http/RestController.php</code> <code>WPB/includes/Crm/ContactUpserter.php</code> <code>NA/lib/crm/fluentcrm.ts</code> <code>NA/app/api/outreach/leads/sync-fluentcrm/route.ts</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C6</code></p>
       </details>
     </div></li><li class="grp">可同時進行：<a href="#C5">C5</a>、<a href="#C7">C7</a></li><li class="step todo" id="C5">
@@ -203,7 +203,7 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
       <details><summary>工程細節：C8 系統寄出開關</summary>
         <p>migration 0152 send_mode＋status sending；send-adapter.ts（唯一寄信白名單；鎖＋視窗＋上限＋重查；逾時只對帳不重寄）；sync tick 末尾呼叫；Connectors 開關</p>
         <p><b>需先完成：</b><a href="#C4">C4</a></p>
-        <p><b>決定：</b>先不開。一個帳號用草稿方式寄滿 50 封、退信低於 2%、沒有投訴、回信同步上線滿 2 週，才考慮開那一個。（規格 D17）</p>
+        <p><b>決定：</b>先不開。一個帳號用草稿方式寄滿 50 封、退信低於 2%、Gmail 沒有拒收過、回信同步上線滿 2 週，才考慮開那一個。「沒有投訴」拿掉，因為 Gmail 不會告訴寄件人有沒有被檢舉，寫了也查不到。（規格 D17）</p>
         <p><b>檔案：</b><code>DB/migrations/0152_send_mode.sql</code> <code>NA/lib/outreach/send-adapter.ts</code> <code>NA/lib/outreach/gmail-sync.ts</code></p>
         <p><b>做法：</b><code>agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md §6 C8</code></p>
       </details>

@@ -51,7 +51,7 @@ export const STEPS = [
     ] },
   { n: 2, code: 'C2', group: 'B', title: '署名、定位、主旨、多版本、追蹤信內容', plain: '例：AI 一次寫出兩個主旨、兩個版本的第一封信、兩封追蹤信，每封都以你設定的署名結尾，用到品牌定位。你在審核頁並排看 A／B，核准一版。',
     gate: '對一個測試名單真產一次，資料庫出現 4 列：兩封第一封（各有主旨）、兩封追蹤信（各有等幾天）。內文以署名結尾。審核頁可並排核准。', risk: 'Medium（migration 套正式站 High）', model: 'Opus 5.5', status: 'not_started', depends: ['C1'],
-    decided: 'AwareWave 用已連線的 awarewaveai@gmail.com 寄；代操客戶用客戶自己的信箱。署名預設是寄件人名稱、品牌名稱、網站，可以改。每天上限維持 20 封。（規格 D12）',
+    decided: 'AwareWave 用已連線的 awarewaveai@gmail.com 寄，先寄滿 50 封看回覆率，再決定要不要買 aware-wave.com 的 Workspace 信箱。不要在 Gmail 設「以 @aware-wave.com 寄出」，網域設定會把那種信當假冒隔離。Soulful 的信箱在 Hostinger 不是 Google，連接器連不上，它的冷信先不寄。署名預設是寄件人名稱加品牌名稱，網站那行你填一次。每天上限 20 封。（規格 D12）',
     what: 'migration 0149 expand；brand-context.ts；generation-schema.ts（手寫守衛，無 zod）；messages/route.ts 寫 2＋N 列；Connectors 署名欄；Review A/B；刪 drafts stub',
     files: ['DB/migrations/0149_outbound_v2_expand.sql', 'NA/lib/outreach/brand-context.ts', 'NA/lib/outreach/generation-schema.ts', 'NA/app/api/outreach/messages/route.ts', 'NA/app/(shell)/outreach/review/ReviewClient.tsx'],
     items: [
@@ -101,9 +101,9 @@ export const STEPS = [
     ] },
   { n: 6, code: 'C6', group: 'D', title: '暖名單進 FluentCRM', waitFor: '等某個品牌有人回信，而且它的網站裝了 wp-bridge 和 FluentCRM', plain: '例：對方回了信，你在 Replies 頁按「同步 FluentCRM」，他出現在該品牌 WordPress 的 FluentCRM 裡並掛上標籤。沒回過信、沒同意過的人按了也不會同步。',
     gate: '對測試站同步 1 個測試名單，FluentCRM 出現該聯絡人與標籤。沒有同意依據的名單回 422。', risk: 'High（客戶站外掛更新）', model: 'Opus 5.5', status: 'not_started', depends: [],
-    decided: '同步到該品牌自己登記的 WordPress 站，不寫死網址。aware-wave.com 依你 10-30 的決定只留 WordPress，不接回。（規格 D16）',
-    what: 'wp-bridge 加 /fluentcrm/contact（signed write，照 /newsletter）；版本 0.20.0＋release；next-admin sync-fluentcrm route（資格＝consent_status 四種∧非 suppression）；Replies 按鈕',
-    files: ['WPB/includes/Http/RestController.php', 'WPB/includes/Crm/ContactUpserter.php', 'NA/app/api/outreach/leads/sync-fluentcrm/route.ts'],
+    decided: '走系統已有的 FluentCRM 接頭（它已經會建電子報草稿），只加「新增聯絡人」一個動作，不另寫一套。同步到哪個站，照該品牌登記的網站對上已設定的 wp-bridge 連線，不寫死網址。aware-wave.com 依你 10-30 的決定只留 WordPress，不接回。（規格 D16）',
+    what: 'wp-bridge 加 /fluentcrm/contact（signed write，照 /newsletter）；版本 0.20.0＋release；lib/crm/fluentcrm.ts 加 upsertContact；sync-fluentcrm route（資格＝consent_status 四種∧非 suppression；clientId 由 wp_sites.url 對 bridge env）；Replies 按鈕',
+    files: ['WPB/includes/Http/RestController.php', 'WPB/includes/Crm/ContactUpserter.php', 'NA/lib/crm/fluentcrm.ts', 'NA/app/api/outreach/leads/sync-fluentcrm/route.ts'],
     items: [
       todo('C6.1', 'wp-bridge 外掛加一個「新增／更新聯絡人」端點，只做這件事。'),
       todo('C6.2', '外掛升版並發布到站上。'),
@@ -121,7 +121,7 @@ export const STEPS = [
     ] },
   { n: 8, code: 'C8', group: 'F', title: '系統寄出開關', waitFor: '等一個寄件帳號用草稿方式寄滿 50 封且退信低於 2%', plain: '例：某個寄件帳號你決定讓系統自己寄。打開後，核准的信在上班時間、未超過每日上限、也沒進拒收名單時，由系統按寄出。帳號狀態一標「暫停」就全停。',
     gate: '同一封信兩個同時的請求只寄出一次。上班時間外不寄。暫停的帳號不寄。你自己的帳號開啟後，1 封寄到你另一個信箱。', risk: 'High（翻開 auto）', model: 'Opus 5.5＋你', status: 'not_started', depends: ['C4'],
-    decided: '先不開。一個帳號用草稿方式寄滿 50 封、退信低於 2%、沒有投訴、回信同步上線滿 2 週，才考慮開那一個。（規格 D17）',
+    decided: '先不開。一個帳號用草稿方式寄滿 50 封、退信低於 2%、Gmail 沒有拒收過、回信同步上線滿 2 週，才考慮開那一個。「沒有投訴」拿掉，因為 Gmail 不會告訴寄件人有沒有被檢舉，寫了也查不到。（規格 D17）',
     what: 'migration 0152 send_mode＋status sending；send-adapter.ts（唯一寄信白名單；鎖＋視窗＋上限＋重查；逾時只對帳不重寄）；sync tick 末尾呼叫；Connectors 開關',
     files: ['DB/migrations/0152_send_mode.sql', 'NA/lib/outreach/send-adapter.ts', 'NA/lib/outreach/gmail-sync.ts'],
     items: [
