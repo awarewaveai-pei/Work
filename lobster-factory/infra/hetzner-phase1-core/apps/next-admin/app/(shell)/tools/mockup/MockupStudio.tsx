@@ -308,6 +308,11 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
   const inFlight = useRef(false);
   const printfulInFlight = useRef(false);
   const jobIdRef = useRef<string | null>(null);
+  // A finished composite belongs to the design it was made from: picking another design drops it from the preview.
+  useEffect(() => {
+    setGen((g) => (g.status === "generating" ? g : { status: "idle" }));
+    setSaveState("idle");
+  }, [designRef]);
   // presets
   const [modelPresets, setModelPresets] = useState<PresetAsset[]>([]);
   const [productPresets, setProductPresets] = useState<PresetAsset[]>([]);
@@ -1103,8 +1108,12 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
 
         {mode !== "printful" && (
           <>
-            {/* Design image — always shown when selected */}
-            {designThumb && (
+            {/* The composite takes the large slot once it exists; before that the selected design does.
+                Until 2026-11-01 the composite was never rendered at all, so a successful run looked broken. */}
+            {gen.status === "done" && gen.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={gen.image} alt="合成結果" style={{ maxWidth: "100%", maxHeight: 600, borderRadius: 8, background: "#111", display: "block", marginBottom: 10 }} />
+            ) : designThumb && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={designThumb} alt="selected design" style={{ maxWidth: "100%", maxHeight: 600, borderRadius: 8, background: "#111", display: "block", marginBottom: 10 }} />
             )}

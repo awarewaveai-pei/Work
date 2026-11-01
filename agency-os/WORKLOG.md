@@ -1,4 +1,26 @@
 # Worklog
+## 2026-11-01（續13）Mockup Studio「合成 Mockup」看似壞掉：成功的合成圖從未顯示在畫面上
+
+**操作者**：「https://app.aware-wave.com/tools/mockup 工具壞掉，無法生成 MOCKUP 圖片」。
+
+**根因**：
+- `NA/app/(shell)/tools/mockup/MockupStudio.tsx` 成功時 `setGen({ status: "done", image })`，但整個檔案沒有任何 `<img src={gen.image}>`；大圖位置永遠顯示原設計圖 → 成功看起來像沒反應。檔案建立時（checkpoint 3f31d5eec）就如此。
+- 證據：lobster-nginx 2026-11-01 09:33／09:35／09:38 UTC 三次 `POST /api/tools/studio/generate` 皆 200、body 6.5–7.0 MB；容器 log 對應三筆 `entitlement.usage studio.image owed=7`（後端有出圖、有計費）。同時段無 `/api/tools/studio/mockup` 請求（操作者用的是 AI 合成，不是 Printful 路徑）。
+
+**排除**：
+- Printful 路徑：容器內探測 R2 PUT 200 → 公開 GET 200 → `create-task/57` 200 → 第 2 次輪詢 completed，有 mockup_url。
+- 環境變數：`POD_DESIGNS_ENABLED=true`、`PRINTFUL_API_KEY`／`PRINTFUL_STORE_ID`／`R2_API_TOKEN`／`R2_ACCOUNT_ID` 皆在（`docker exec printenv`）。
+
+**做了**：done 且有 `gen.image` 時大圖位置顯示合成圖，否則顯示選中設計圖；換設計圖時清掉上一張合成圖（critic m1：否則大圖停在舊合成圖）。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-next-admin node /tmp/pf2.js (R2 put + Printful create-task + poll) | exit=0 | ms=9000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n (m1 已修)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib | grep=gen.image | hits=3
+- ORACLE_WAIVED: 單一 JSX 條件渲染改動，無邏輯／權限／資料面；critic 已審。
+- `npx tsc --noEmit`：MockupStudio 零錯誤；唯一錯誤在另一 session 進行中的 `lib/outreach/__tests__/research.test.ts:71`。畫面實測需操作者登入；今晚 03:00 自動部署後生效。
+
+**避免再發生**：生成類工具的「成功」狀態必須有對應的可見產出；本次為單例（grep `gen.image` 其他命中為無關的 server 變數）。
 ## 2026-11-01（續12）外聯系統 v2 卡 C2：A／B 兩版首封＋追蹤信、署名與個資告知由程式附加、審核政策（逐封／抽查＋事實核對）、migration 0149 已套正式站
 
 **操作者**：「做 C2」（續接 C1、產品門）。
