@@ -51,6 +51,7 @@ const C10 = '6397234f7';
 const C17 = '5bdba0ef6';
 const C17_6 = '77d0291d6';
 const C17_7 = 'e824205b0';
+const C11 = '3eea12c73';
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '守衛與事實訂正', plain: '例：名單上某人剛退訂，系統仍替他建草稿。改成建草稿前重查拒收名單。同時把「scope 不能寄信」這句不對的說法改正，用測試守住程式不呼叫寄信；順便把 Google 授權改成正式發布、加上讀信權限，之後 6 個新信箱只要授權一次。',
@@ -118,15 +119,15 @@ export const STEPS = [
       done('C17.7', '社群頁上連到對方自己的官網時，填進名單的網站欄，同一次研究接著讀官網。', C17_7),
     ] },
   { n: 6, code: 'C11', group: 'C', title: '寄件信箱池：次網域、DNS、暖機', plain: '例：你買 3 個像品牌的次網域，每個開 2 個 Workspace 信箱，共 6 個，連上時確認它們屬於寄件池：系統自動寄、每天上限 50。系統每天檢查每個網域的 SPF、DKIM、DMARC，缺一就標黃並通知；新信箱照暖機階慢慢加量，要真的寄滿才升階，退信太多就自動暫停。',
-    gate: '6 個信箱都連上系統並標為寄件池，每個網域三項 DNS 設定全綠。故意拿掉一項設定，隔天那個信箱標黃並收到通知，連兩天就暫停。一個信箱連續 5 天寄滿七成才升到下一階；退信率超過 3% 自動暫停，按「重新檢查並恢復」要兩項都過才恢復。兩個同網域信箱同時搶最後一個名額只有一個成功。', risk: 'High（C11.1 外部資產；migration 套正式站）', model: '你＋Codex', status: 'not_started', depends: ['C1'],
+    gate: '6 個信箱都連上系統並標為寄件池，每個網域三項 DNS 設定全綠。故意拿掉一項設定，隔天那個信箱標黃並收到通知，連兩天就暫停。一個信箱連續 5 天寄滿七成才升到下一階；退信率超過 3% 自動暫停，按「重新檢查並恢復」要兩項都過才恢復。兩個同網域信箱同時搶最後一個名額只有一個成功。', risk: 'High（C11.1 外部資產；migration 套正式站）', model: '你＋Codex', status: 'in_progress', depends: ['C1'],
     decided: '量從信箱數來：3 個次網域 × 2 信箱 × 每信箱 50 封 ＝ 300 封。主網域 aware-wave.com 永遠不寄冷信。不用暖機服務，靠真實低量慢慢加；升階看實際寄出，不看日曆。池信箱連上時就設成自動寄，安全靠每階上限、寄前重查、退信自動暫停。採購第 0 天就開始，暖機要 4 到 5 週。（規格 D12、D17、D21）',
-    what: '操作者：買網域、Workspace 次網域＋使用者、SPF／DKIM／DMARC；migration 0152 sender_pool（池欄位、co_send_claims、begin_send／convert_to_warm 兩個鎖 lead 的交易函式、callback 池參數）；C1.6＋C11.2 後每信箱連 Gmail 並確認為池（auto、50、w1）；sender-health.ts 每日 DNS＋退信率＋升階＋恢復按鈕；internal route＋cron 每日＋host-jobs',
+    what: '操作者：買網域、Workspace 次網域＋使用者、SPF／DKIM／DMARC；migration 0152 sender_pool（池欄位、co_send_claims、co_begin_send／co_convert_to_warm 兩個鎖 lead 的交易函式、callback 池參數）；C1.6＋C11.2 後每信箱連 Gmail 並確認為池（auto、50、w1）；sender-health.ts 每日 DNS＋退信率＋升階＋恢復按鈕；internal route＋cron 每日＋host-jobs',
     files: ['DB/migrations/0152_sender_pool.sql', 'NA/app/api/outreach/connectors/gmail/oauth/callback/route.ts', 'NA/lib/outreach/sender-health.ts', 'NA/app/api/internal/outreach/sender-health/route.ts', 'HS/cron.d/awarewave-schedules', 'NA/lib/schedules/host-jobs.ts'],
     items: [
       todo('C11.1', '你動手（第 0 天開始採購）：買 3 個次網域，在 Workspace 加成次網域、每個開 2 個使用者，設好三項 DNS；等 C1.6 和 C11.2 都上線後，到 Connectors 頁把每個信箱連上並確認為寄件池。'),
-      todo('C11.2', '資料表：寄件帳號加池欄位；新增「寄送名額」表與兩個資料庫函式——開始寄送（鎖住名單、一次佔下信箱、寄件網域、收件網域三種名額、把信標成寄送中）與轉為暖名單（鎖住名單、取消待寄冷信），兩者互斥；連線時可直接標為池信箱。'),
-      todo('C11.3', '每天檢查每個冷信信箱：三項 DNS 缺項標黃並通知、連兩天缺就暫停；7 日退信率達 3% 就暫停；連續 5 天寄滿七成就升一階；畫面有「重新檢查並恢復」。登記到排程頁。'),
-      todo('C11.4', '測試 DNS 四種情況、退信率門檻、升階、恢復、名額函式的併發；對一個真實次網域跑一次。'),
+      done('C11.2', '資料表：寄件帳號加池欄位；新增「寄送名額」表與兩個資料庫函式——開始寄送（鎖住名單、一次佔下信箱、寄件網域、收件網域三種名額、把信標成寄送中）與轉為暖名單（鎖住名單、取消待寄冷信），兩者互斥；連線時可直接標為池信箱。', C11),
+      done('C11.3', '每天檢查每個冷信信箱：三項 DNS 缺項標黃並通知、連兩天缺就暫停；7 日退信率達 3% 就暫停；連續 5 天寄滿七成就升一階；畫面有「重新檢查並恢復」。登記到排程頁。', C11),
+      todo('C11.4', '測試 DNS 四種情況、退信率門檻、升階、恢復、名額函式的併發（已完成，3eea12c73）；剩：網域買好後對一個真實次網域跑一次，看三燈正確。'),
     ] },
   { n: 7, code: 'C4', group: 'D', title: '回覆同步與 Replies 頁', plain: '例：你在 Gmail 按下寄出，10 分鐘內系統逐封確認寄了；對方回信，系統抓回內文分類成「問價」，名單狀態變「已回覆」，追蹤信自動停。退訂與退信也自動處理。同步停了幾天再恢復，可以補掃。',
     gate: '你寄 1 封給自己另一個信箱並回覆，10 分鐘內 Replies 頁出現該列含內文、名單狀態變已回覆、追蹤日期清空。第一封已寄而追蹤草稿未寄時，追蹤信不會被誤標為已寄。同一封回信重掃不會重複建事件或拒收。退信與退訂會進拒收名單。', risk: 'Medium（主機排程安裝 High）', model: 'Opus 5.5', status: 'not_started', depends: ['C2'],
@@ -144,7 +145,7 @@ export const STEPS = [
   { n: 8, code: 'C8', group: 'F', title: '自動寄與輪流寄（量產）', plain: '例：6 個信箱裡，系統每次挑今天寄得最少的那一個建草稿並寄出，追蹤信固定回原本那個信箱的對話串。每個信箱照暖機階限量，同一個網域的信箱加總也有上限，同一家公司 30 天最多收 2 封。哪個信箱被 Gmail 拒收就自動暫停那一個，其他照寄。',
     gate: '同一封信兩個同時的請求只寄出一次；同一信箱已寄 19 封、上限 20 時兩封不同的信只寄一封；同一家公司第 3 封不寄；同網域兩信箱搶最後一格只寄一封；名單轉成暖名單後既有草稿不寄；上班時間外不寄；暫停的信箱不寄。一個暖機第一階的次網域信箱寄 1 封到你另一個信箱。', risk: 'High（真寄）', model: 'Opus 5.5＋你', status: 'not_started', depends: ['C4', 'C11'],
     decided: '自動寄是做量的主路徑。池信箱連上時就是自動寄；人工把關在核准那一步，不在按寄出。「沒有投訴」不列，因為 Gmail 不會告訴寄件人有沒有被檢舉。（規格 D17）',
-    what: 'sender-pool.ts（各階上限、輪流選、begin_send RPC 包裝＋releaseClaim）；gmail-draft 建草稿時選信箱；send-adapter.ts（唯一寄信白名單；寄前重跑 Cold Gate 含 warm 硬拒；三額度原子佔用）；Connectors 信箱池表含恢復按鈕',
+    what: 'sender-pool.ts（各階上限、輪流選、co_begin_send RPC 包裝＋releaseClaim）；gmail-draft 建草稿時選信箱；send-adapter.ts（唯一寄信白名單；寄前重跑 Cold Gate 含 warm 硬拒；三額度原子佔用）；Connectors 信箱池表含恢復按鈕',
     files: ['NA/lib/outreach/sender-pool.ts', 'NA/lib/outreach/send-adapter.ts', 'NA/app/api/outreach/messages/gmail-draft/route.ts', 'NA/lib/outreach/gmail-sync.ts'],
     items: [
       todo('C8.1', '各階上限、輪流挑信箱、呼叫名額函式：純函式，各自有測試。'),

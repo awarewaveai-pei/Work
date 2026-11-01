@@ -1,4 +1,36 @@
 # Worklog
+## 2026-11-01（續25）外聯系統 v2 卡 C11.2–C11.4：寄件池 migration 0152（名額表＋兩個鎖名單的交易函式）、池信箱 OAuth 連線、每日信箱健康檢查
+
+**操作者**：「續做 外聯系統 v2 卡 C11 … 從 C11.2 開始 … 完成＝C11.2–C11.4 全部做完並 commit」；指定坑：免費信箱收件人要用完整 email 當鍵，清單與 `FREE_MAIL` 一致並加測試。
+
+**根因／不變量**：自動寄送的三種名額（信箱今日、寄件網域今日、收件對象 30 天 2 封）與「轉暖名單撤銷冷信」必須在同一把鎖下判斷，否則兩個 tick 或一個 tick＋一次轉暖可同時通過檢查。不變量＝每次寄送都先鎖該名單列、再依序鎖寄件網域與收件鍵，額度只從未釋放的 claims 數。收件鍵在免費信箱上是完整地址（否則所有 Gmail 收件人共用 2 封），SQL 清單＝`FREE_MAIL`，由測試守。
+
+**做了**（commit `3eea12c73`）：
+- `DB/migrations/0152_sender_pool.sql`（＋`.down.sql`、`scripts/0152_sender_pool_down.sql`）：`co_sender_accounts` 加 `send_mode`（draft／auto）、`warmup_started_at`、`dns_status`、`dns_checked_at`、`connector_id`（以 email＋組織回填最新的 Gmail connector）；`warmup_stage` 既有列回填 `full`、加 CHECK w1／w2／w3／full；`co_messages.status` 加 `sending`；新表 `co_send_claims`（`recipient_key`、未釋放者每封信唯一）；`co_recipient_cap_key`、`co_begin_send`、`co_convert_to_warm`（只給 service_role）。
+- 與規格的差異（已改規格 §4／§5.5／§5.8、R0-PLAN C8.1／C11.2／C14.1、data.mjs）：函式加 `co_` 前綴（public schema 已有 `social_begin_send`）；欄位叫 `recipient_key` 不叫 `recipient_domain`（免費信箱存的是地址）；claims 每封信唯一改為「未釋放者唯一」（證實未寄而釋放後可重新核准再寄）；`stageCap` 放 `NA/lib/outreach/sender.ts`，C8.1 直接用。
+- OAuth：authorize 收 `?pool=1&poolEmail=`（操作者輸入的地址＝確認），簽進 state；callback 先比對 Google 帳號地址，不同就不存 token；`connectedSenderFields` 新池信箱設 auto／50／w1／今天，已在池中的重連不重啟暖機；每次連線都寫 `connector_id`；寫入失敗改為回報錯誤（原本忽略）。
+- `NA/lib/outreach/sender-health.ts`：每日對 auto 冷信信箱查 DNS（SPF 含 Google、DKIM、DMARC；DNS 不回應＝不判定、沿用上次）、7 日退信率（≥30 封且 ≥3% 暫停）、升階（最近 5 個寄送日都 ≥ 上限 70% 且退信 <2%）；缺項 warning＋timeline＋推播一次，隔一個台北日仍缺→paused；paused 只能由「重新檢查並恢復」解除；刪 31 天前 claims。草稿信箱不查（不寄、免費信箱沒有我們的 DNS）。
+- `NA/app/api/internal/outreach/sender-health/route.ts`（Bearer `OUTREACH_SYNC_TOKEN`）、`HS/cron.d/awarewave-schedules` 每日 00:30 UTC、`host-jobs.ts` `outreach_sender_health`、repo compose 加 `OUTREACH_SYNC_TOKEN`；`senders` POST `recheck`。
+- UI：Connectors 頁 Gmail 列「📮 連為寄件池信箱」（輸入地址確認）；寄件信箱卡顯示寄件池、暖機階與上限、健康、DNS 三燈、「重新檢查並恢復」。
+- Codex 審查後補（同一輪）：F1 同一 Gmail connector 重連到另一帳號，舊信箱仍指向它（會用新帳號的 token 以舊地址寄信）→ 整類關閉：0152 `co_sender_accounts_connector_uniq`（一個 connector 只對一個信箱，回填時重複列只給最舊的一列）、callback 重連時解除其他列並改回 draft、`co_begin_send` 沒有 connector 一律 false；F3 主網域可被設成寄件池（違反 SPEC I10）→ `poolEmailRefusal`（主網域＝`PUBLIC_BASE_DOMAIN`、免費信箱都拒），authorize 與 callback 都查。
+- 同類掃描補漏：`messages/route.ts` `OUTBOUND` 缺 `sending`（0149 索引有）；審核頁 `sending` 也鎖定並顯示「寄送中」。
+- MODULE_MANIFEST（outreach）＋ Foundry 目錄同步。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m pytest lobster-factory/packages/db/tests/test_0152_sender_pool.py（拋棄式 postgres:15.8：回填、CHECK、免費信箱鍵、三額度、拒絕情境、轉暖、三個兩 session 競賽、重跑、down 拒絕 sending→down→up、anon 無 execute）10 passed（Codex 修正後重跑：connector 唯一、無 connector 拒寄）| exit=0 | ms=42880
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsx dns-live.mts（真 DNS，1.1.1.1）aware-wave.com spf=false（SPF 只含 cloudflare/resend）dkim=false dmarc=true；google.com spf=true；與 nslookup 原始記錄一致；本機系統 DNS 127.0.0.1 拒絕連線時三項皆 null（不誤判） | exit=0 | ms=1987
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（全套）3809 passed、2 failed 皆為他 session 未提交的 tools/seedstar（products／staff-tools）；npx tsc --noEmit 綠 | exit=1 | ms=23020
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（codex-oracle partialreview `agency-os/reports/oracle/2026-11-01-partialreview-a45f8dcf.md`：F1、F3 已修並加測試；F2 cron 不會隨自動部署安裝＝已知部署步驟，列入「剩」）
+- ORACLE_WAIVED: 審查限定本卡 14 個檔（-Path，artifact 標 partial）；整庫審查會混進其他 session 未提交的 theme／seedstar 改動
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=begin_send\|convert_to_warm\|recipient_domain\|"copied"\|warmup_stage | hits=50（規格／R0-PLAN／data.mjs 的舊名已改 co_ 前綴；messages/route.ts OUTBOUND 與 ReviewClient 補 sending；其餘命中為 0152 本身、測試與 WORKLOG）
+
+**剩**：
+- 正式庫套 0152（High，等操作者）：未套之前今晚 03:00 自動部署會被 migration 閘擋下並通知。
+- 正式機 `.env` 加 `OUTREACH_SYNC_TOKEN` 並經 `safe-infra-patch.sh compose` 套到 next-admin、`install-host-schedules.sh` 裝 cron（皆 High）。
+- C11.4 最後一項「對真實次網域跑一次」等 C11.1 買好網域。
+- 規劃表 C4 寫 `migration 0151 co_replies`，0151 已被 Mockup 用掉，C4 開工時要改號。
+
+**rollback**：`git revert 3eea12c73`；資料庫 `node scripts/apply-db-migration.mjs` 不適用 down，手動跑 `migrations/0152_sender_pool.down.sql`（有 sending 中的信會拒絕）。
 ## 2026-11-01（續24）sg-deploy next-admin 成功：ff3b374c1 上線（模特兒印製 AI 印＋ outreach C1–C17.7 共 14 個 app commit）
 
 **操作者**：「COMMIT PUSH 部署」。
