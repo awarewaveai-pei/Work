@@ -11,7 +11,9 @@
 //     the addresses in its title and snippet. Never evidence: a snippet is Google's excerpt, not the page.
 //  3. apify_instagram / apify_facebook (US$0.0026 / 0.0066 per profile, list price): an actor reads the public page
 //     without logging in, on Apify's machines -- never our Meta app, accounts or host. Credits are held before the call
-//     (Grant.hold) and kept when it answers. Output shapes NOT yet confirmed live; parsed defensively below.
+//     (Grant.hold) and kept when it answers. Live 2026-11-01 (~7 s each): instagram-profile-scraper [{fullName,
+//     biography, externalUrl, businessCategoryName, latestPosts:[{caption,url,timestamp}] (12)}], no email field;
+//     facebook-pages-scraper [{title, intro, info:[title+intro repeated], email, phone, website, websites}].
 //
 // An address written in the business's own profile is one it declared as its contact (FoundEmail.mailto); the profile
 // text becomes documents for sink/outreach-research, which keeps only facts whose excerpt is in that text.
@@ -170,9 +172,9 @@ export function apifyProfile(platform: SocialPlatform, t: SocialTarget, items: u
       website: str(it.externalUrl), phone: str(it.businessPhoneNumber), contactEmails: list([it.businessEmail, it.publicEmail]), posts };
     return profile.name || profile.bio || profile.website ? profile : null;
   }
-  const info = list(it.info).join("\n") || null;
+  // info repeats the title and intro (live 2026-11-01): read only when the page has no intro of its own.
   const profile: SocialProfile = { layer: "apify_facebook", url: t.url, name: str(it.title) ?? str(it.name),
-    bio: [str(it.intro), str(it.about), info].filter(Boolean).join("\n") || null, website: list(it.websites)[0] ?? str(it.website),
+    bio: str(it.intro) ?? str(it.about) ?? (list(it.info).join("\n") || null), website: list(it.websites)[0] ?? str(it.website),
     phone: str(it.phone), contactEmails: list([it.email, it.emails].flat()), posts: [] };
   return profile.name || profile.bio || profile.website ? profile : null;
 }

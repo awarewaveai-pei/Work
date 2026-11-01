@@ -108,7 +108,7 @@ export const PROVIDERS: Record<string, ProviderSpec> = {
   // Apify actors that read a public profile page without logging in (card C17): one entry per platform, so one
   // actor breaking or changing price leaves the other. Called only when Business Discovery and search snippets found
   // nothing; never with our Meta app, accounts or host (the actor's own infrastructure fetches the page). Output
-  // shapes are not yet confirmed live: lib/outreach/social-research.ts parses them defensively.
+  // shapes confirmed live 2026-11-01 (lib/outreach/social-research.ts header).
   apify_instagram: {
     id: "apify_instagram",
     origin: "https://api.apify.com",
