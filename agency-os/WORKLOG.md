@@ -1,4 +1,23 @@
 # Worklog
+## 2026-11-01（續9）Outbound OS v2：整體計畫徹底檢視——Codex 三回合 37 項全採，15 卡定稿
+
+**觸發**：操作者「徹底檢視整個 PLAN 並優化，可和 GPT 討論幾回合」→ 自審 5 項（S1–S5）→ Codex inspect 三回合（`scripts/codex-oracle.ps1 -Mode inspect`，gpt-6-sol）。
+
+**三回合**（報告 `agency-os/reports/oracle/2026-11-01-inspect-{8af4371a,30a78af4,84062c02}.md`，每項 file:line 逐一讀碼核實）：
+- R1 18 項：人工把關 600 次／天 → D23（自家網站證據自動核准、profile manual→sampled、事實核對、一版首封、C15 管線）；池信箱連線即 auto（D17）；scope＋發布提前 C1.6；研究 seed 只 website；已寄逐 message id（label 屬 message）；回信取 full；GCIS keyless＋官網查；Meta 冪等；MX≠信箱有效；§8／§9 告知行依 `consent_source`；C6 用 `listBridgeClients()`（`woo.ts:140`）。
+- R2 13 項：三額度原子；historyId 游標＋翻完分頁＋可重試處理；warm 轉換撤銷冷信草稿；池欄位移 C11；C5 提前 C15；keyless 不送 auth header（`providers.ts:165`）；org＋email 唯一索引；隱私頁清單。
+- R3 6 項：`begin_send()`／`convert_to_warm()` 鎖 lead 列的交易函式、收件網域也上鎖、claim 釋放與 31 天清理、重試耗盡失敗狀態＋推播、首封唯一索引、`gate_snapshot.auto`、C6 依賴 C4。
+
+**順序定稿**：C1 C2 C3 C10 C11 C4 C8 C5 C15 C7 C12 C13 C6 C14 C9；C11.1 採購第 0 天；操作者動手：C1.6、C11.1、C12.3、C14.3。
+
+**已修改**（`3335b9016`）：SPEC D17／D20／D21／D23、§4 0149／0151／0152／0153、§5.1／5.2／5.3／5.5／5.6／5.7／5.10、§6／§7／§10／§11；R0-PLAN §1／§3 R8–R10／§5／§6 全部 15 卡（C1.6、C11 四項、C8 五項、C15 新卡）／§7；data.mjs 全檔（15 卡 65 項）；三份 oracle 報告入庫。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=python verify_paths.py（155 條、0 缺）; node build.mjs && node check.mjs（15 cards／65 items 綁定 §6、0 open、page fresh） | exit=0 | ms=79
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/37m/0n（Codex 三回合 18＋13＋6，全部核實後採納；外部 oracle＝Codex CLI read-only）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=claim_send_slot|claimSlot | hits=0（改名 begin_send 後三檔皆清）
+
+**下一步**：C1（含 C1.6）；操作者可立刻開始 C11.1 採購。建議模型：Opus 5.5（C1 可派 Codex）。
 ## 2026-11-01（續8）Outbound OS v2：D22 個人消費者走 Meta 名單型廣告→FluentCRM，卡 C14
 
 **觸發**：操作者「所以我就沒辦法抓特定族群的 email 了？」→ 分店家／公司／公司裡的人（冷信，已有卡）與個人消費者（不走冷信）→ 操作者「加」。
