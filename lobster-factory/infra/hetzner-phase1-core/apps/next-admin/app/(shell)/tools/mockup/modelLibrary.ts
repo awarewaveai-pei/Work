@@ -42,6 +42,19 @@ export async function inPairs<T>(items: T[], run: (item: T, i: number) => Promis
   for (let i = 0; i < items.length; i += 2) await Promise.all(items.slice(i, i + 2).map((it, j) => run(it, i + j)));
 }
 
+/** The body of a JSON API call. A gateway error page (nginx 502/504 while a deploy restarts the app, 2026-11-02) is
+ *  HTML: res.json() would surface "Unexpected token '<'"; this answers { ok:false, error } in words instead. */
+export async function readJson<T extends object>(res: Response): Promise<T & { ok?: boolean; error?: string; code?: string }> {
+  try {
+    return (await res.json()) as T & { ok?: boolean; error?: string };
+  } catch {
+    const busy = res.status === 502 || res.status === 503 || res.status === 504;
+    return { ok: false, error: busy
+      ? `伺服器暫時沒有回應（HTTP ${res.status}），可能正在部署，請稍等一分鐘再試`
+      : `伺服器回傳了非預期的內容（HTTP ${res.status}）` } as T & { ok: boolean; error: string };
+  }
+}
+
 /** The message a refused or failed JSON call shows: withFeature answers 403 { ok:false, code } with no text. */
 export function failureText(res: Response, json: { error?: string; code?: string }): string {
   return json.error ?? (res.status === 403 ? `沒有使用權限（${json.code ?? "403"}）` : `HTTP ${res.status}`);

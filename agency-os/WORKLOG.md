@@ -1,4 +1,23 @@
 # Worklog
+## 2026-11-02（續4）部署 591cc1699；平拍「Unexpected token '<'」＝部署空窗的 502 HTML，Mockup 呼叫改讀成看得懂的錯誤
+
+**操作者**：「現在部署」；部署中回報「平拍 不能用>>OpenAI · GPT-Image-2.5 修圖 (~NT$2) >>Unexpected token '<', "<!DOCTYPE "... is not valid JSON」。
+
+**部署**：`sg-deploy.sh next-admin` → npm test 3815 passed → build → healthy 11 s → HTTP smoke 5/5；`.deployed-commit` = 591cc1699。
+
+**根因**：
+- 主機 access.log：今日 app 路由唯一真 502 = `16:33:08 POST /api/tools/studio/generate 502 559`，落在本次部署（`logs/sg-deploy-20261101-163125.log`，16:31:25 測試＋16:32:33 起建置）期間；`ai_call_logs` 無此次成本列（請求在 app 端未完成）；同模型 `openai-25-edit` 經同路由 15:26／15:28／15:33 皆成功記帳；容器 16:30–16:38 無重啟／OOM（`docker events` 只有 healthcheck）。＝撞上部署期間的閘道錯誤，不是模型或程式錯。
+- 前端 `res.json()` 讀到 nginx 的 HTML 錯誤頁 → 顯示 JSON 解析錯誤原文。
+
+**做了**：`modelLibrary.ts readJson()`：讀不到 JSON 時回 `{ ok:false, error }`，502/503/504 寫「伺服器暫時沒有回應（HTTP n），可能正在部署，請稍等一分鐘再試」；套到 Mockup 所有付費生成呼叫（平拍 generate、Printful mockup、【模特兒印製】生成、主頁模特合成）。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin → healthy 11 s，smoke 5/5，deployed 591cc1699；grep access.log 502、ai_call_logs、docker events 如上 | exit=0 | ms=420000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（整套）→ 全綠除他 session 未提交 seedstar 2 敗；新測試：HTML 502 顯示中文說明、不出現 Unexpected token | exit=1 | ms=200000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（自審：只改讀取方式，成功路徑不變）
+- BUGHUNT_DONE: scope=agency-os/docs,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib | grep=readJson | hits=22
+- ORACLE_WAIVED: 小範圍前端錯誤處理；整套測試綠。
+- 本修正尚未部署（今晚 03:00 自動，或操作者指示時手動）。
 ## 2026-11-02（續3）外聯系統 v2 卡 C11：正式機裝 `OUTREACH_SYNC_TOKEN` 與每日寄件信箱健康檢查排程
 
 **操作者**：「裝 token 和排程」。

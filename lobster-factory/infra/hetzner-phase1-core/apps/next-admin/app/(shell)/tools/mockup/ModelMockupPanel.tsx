@@ -6,7 +6,7 @@
 import { useMemo, useState } from "react";
 import { GARMENT_PLACEMENT } from "@/lib/studio/mockup-prompt";
 import { STUDIO_MODEL_OPTIONS } from "@/lib/studio/model-options";
-import { COLOR_LABEL, GENDER_LABEL, failureText, groupModels, inPairs, type LibraryPhoto, type Shot } from "./modelLibrary";
+import { COLOR_LABEL, GENDER_LABEL, failureText, groupModels, inPairs, readJson, type LibraryPhoto, type Shot } from "./modelLibrary";
 
 const PRINT_COST_NT = STUDIO_MODEL_OPTIONS.find((m) => m.value === "openai-25-edit")?.costNt ?? 2;
 
@@ -49,7 +49,7 @@ export default function ModelMockupPanel({ designRef, photos, onOpenLibrary }: {
             ...(engine === "code" ? { box: photo.metadata!.print_box } : {}),
           }),
         });
-        const json = (await res.json()) as { ok: boolean; image?: string; error?: string; code?: string };
+        const json = await readJson<{ ok: boolean; image?: string; error?: string; code?: string }>(res);
         shot = json.ok && json.image ? { status: "done", image: json.image } : { status: "error", error: failureText(res, json) };
       } catch (err) { shot = { status: "error", error: err instanceof Error ? err.message : String(err) }; }
       setResults((prev) => prev.map((r) => (r.photo.id === photo.id ? { ...r, shot } : r)));

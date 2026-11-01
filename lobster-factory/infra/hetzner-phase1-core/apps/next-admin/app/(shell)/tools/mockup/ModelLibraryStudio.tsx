@@ -24,7 +24,7 @@ import {
 } from "@/lib/studio/mockup-prompt";
 import { STUDIO_MODEL_OPTIONS, type AspectRatio } from "@/lib/studio/model-options";
 import { isPrintBox, type Point, type PrintBox } from "@/lib/studio/fabric-print";
-import { COLOR_LABEL, GENDER_LABEL, failureText, groupModels, inPairs, type LibraryPhoto, type Shot } from "./modelLibrary";
+import { COLOR_LABEL, GENDER_LABEL, failureText, groupModels, inPairs, readJson, type LibraryPhoto, type Shot } from "./modelLibrary";
 
 // nano-banana-2 takes up to 14 reference images (lib/studio/model-options.ts), enough for a model's whole library.
 const GEN_MODEL = "nano-banana-2";
@@ -53,7 +53,7 @@ async function generatePhoto(prompt: string, referenceImages: string[], aspectRa
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model: GEN_MODEL, prompt, referenceImages, aspectRatio }),
     });
-    const json = (await res.json()) as { ok: boolean; image?: string; error?: string; code?: string };
+    const json = await readJson<{ ok: boolean; image?: string; error?: string; code?: string }>(res);
     return json.ok && json.image ? { status: "done", image: json.image } : { status: "error", error: failureText(res, json) };
   } catch (err) {
     return { status: "error", error: err instanceof Error ? err.message : String(err) };

@@ -56,6 +56,15 @@ describe("主頁 模特: 模特兒圖 + design → product mockups", () => {
     expect(bodies(fetchMock).map((b) => [b.engine, b.box])).toEqual([["code", boxed], ["code", boxed]]);
   });
 
+  it("a gateway error page (HTML 502 while a deploy restarts the app) reads as words, not a JSON parse error", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("<!DOCTYPE html><html>502</html>", { status: 502, headers: { "content-type": "text/html" } })));
+    render(<ModelMockupPanel designRef={DESIGN} photos={library} onOpenLibrary={() => {}} />);
+    fireEvent.click(screen.getAllByRole("checkbox")[0]);
+    fireEvent.click(screen.getByRole("button", { name: /合成（1 張/ }));
+    await waitFor(() => expect(screen.getByText(/伺服器暫時沒有回應（HTTP 502）/)).toBeTruthy());
+    expect(screen.queryByText(/Unexpected token/)).toBeNull();
+  });
+
   it("an empty library points to 【模特兒印製】", () => {
     const open = vi.fn();
     render(<ModelMockupPanel designRef={DESIGN} photos={[]} onOpenLibrary={open} />);

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
 import ModelLibraryStudio from "./ModelLibraryStudio";
 import ModelMockupPanel from "./ModelMockupPanel";
-import type { LibraryPhoto } from "./modelLibrary";
+import { readJson, type LibraryPhoto } from "./modelLibrary";
 import {
   STUDIO_MODEL_OPTIONS,
   type AspectRatio,
@@ -376,7 +376,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model, prompt: effectivePrompt, referenceImages: [processedRef], aspectRatio: aspect, _jobId: jobIdRef.current }),
       });
-      const json = (await res.json()) as { ok: boolean; image?: string; error?: string };
+      const json = await readJson<{ ok: boolean; image?: string; error?: string }>(res);
       if (!json.ok || !json.image) { setGen({ status: "error", error: json.error ?? `HTTP ${res.status}` }); return; }
       setGen({ status: "done", image: json.image });
     } catch (err) {
@@ -429,7 +429,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
             ...(dims ? { imageWidth: dims.width, imageHeight: dims.height } : {}),
           }),
         });
-        const json = (await res.json()) as { ok: boolean; mockups?: MockupView[]; error?: string };
+        const json = await readJson<{ ok: boolean; mockups?: MockupView[]; error?: string }>(res);
         setProductResults((prev) => {
           const next = new Map(prev);
           next.set(pid, {
