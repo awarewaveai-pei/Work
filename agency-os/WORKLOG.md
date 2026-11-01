@@ -1,4 +1,23 @@
 # Worklog
+## 2026-11-01（續21）外聯系統 v2 卡 C17.6：Apify 兩個 actor 真跑一次，FB 粉專自動填入 email；C17 完成
+
+**操作者**：「真跑一次」。
+
+**根因**：C17 時 Apify 輸出格式是照 actor 頁面推的；真跑發現 `facebook-pages-scraper` 的 `info[]` 又放一次 title＋intro，自介文字重複一倍。
+
+**做了**：`NA/lib/outreach/social-research.ts` FB 自介只取 `intro`（沒有才用 about／info）；檔頭與 `providers.ts` 註解記下真實格式（commit `77d0291d6`）。監工台 C17.6 done、C17 完成。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsx apify-probe.mts：instagram-profile-scraper `_coffeehere_` 6.5 秒 1 筆（fullName、biography、externalUrl、latestPosts 12 篇含 timestamp，無 email 欄）；facebook-pages-scraper Soulful 粉專 7.4 秒 1 筆（title、intro、email、phone、website、websites）；解析器兩邊都對上 | exit=0 | ms=36552
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsx c17-e2e.mts（真研究路由＋正式庫，Apify 開啟）FB 名單 → serper empty → apify_facebook found → email 填入 info@soulfulexpression.org、consent `self_published:<粉專網址>`；測試名單刪除後 0 殘留 | exit=0 | ms=67847
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run social-research.test.ts 9 passed；verify-build-gates ALL PASSED；tsc 唯一錯誤在 `app/api/tools/studio/fabric-print/route.ts`＝另一個 session（claude:5cbc518c，Mockup）正在改的檔，非本卡 | exit=0 | ms=90000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n（自審 diff 4 行：n1 FB 粉專給了 `website`，名單沒網站時研究沒有接著爬它，下次研究才會讀到——未做）
+- ORACLE_WAIVED: Codex 額度剩 1%，操作者指示自審；改動為一個欄位選擇＋註解
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=not yet confirmed live\|NOT yet confirmed | hits=1（`contract-backlog.yaml:3317` 無關的「NOT yet confirmed landed」；本卡舊註解 0 殘留）
+
+**剩**：FB／IG 頁上的官網網址目前不會回填到名單的 website（n1）；兩次 Apify 實際扣款以 Apify 後台為準（列價合計約 US$0.009）。
+
+**rollback**：`git revert 77d0291d6`。
 ## 2026-11-01（續20）模特兒印製第 3 步改 AI：gpt-image-2.5-sunburst（`openai-25-edit`）印花隨皺褶；五條路研究；印花框改四角；程式印降為免費預覽
 
 **操作者**：「圖案都沒有隨衣服的皺褶 這是最大的敗筆」→「你確定沒有別的方法了? 去研究」→ 看完比較圖「改用 GPT-Image-2.5」。

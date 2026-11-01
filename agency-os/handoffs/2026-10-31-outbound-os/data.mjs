@@ -35,7 +35,7 @@ export const NOW = [
   { what: '對方回信會進系統，後續信自動停。', state: 'no', ev: 'Replies 頁是空殼；草稿只存 draft id，沒存對話串 id（gmail-draft/route.ts:186）。' },
   { what: '輸入「找什麼＋地區」就自動找到一批店家放進名單。', state: 'yes', ev: '2026-11-01 C10：Inbox 頁「找名單」用 Serper 查地圖，一次最多 20 家（網站或社群頁、電話、地圖來源），沒網站也沒電話的不放；已在名單或收件匣裡的標成重複，同一家核准兩次只有一筆。每次最多約 NT$0.1。正式庫實測「瑜珈教室／台中市」兩次：第一次 20 家，第二次 17 家標重複。' },
   { what: '能從公司登記、徵才頁、公開簡介找到公司和人的 email。', state: 'no', ev: '店家搜尋已有（C10），但多數店家沒 email，要再按「研究這家」從網站找。公司登記（C12）、人員搜尋與 email 推斷（C13）都還沒做。' },
-  { what: '用 IG／FB 當網站的店也研究得到。', state: 'yes', ev: '2026-11-01 C17：研究會讀店家的 IG／FB 頁（Meta 官方 API → Google 摘要 → Apify），自介的事實可自動核准，貼文的等你看。正式庫實測 Coffee Here 的 IG 拿到 9 條證據。Apify 已裝、還沒真跑。' },
+  { what: '用 IG／FB 當網站的店也研究得到。', state: 'yes', ev: '2026-11-01 C17：研究會讀店家的 IG／FB 頁（Meta 官方 API → Google 摘要 → Apify），自介的事實可自動核准，貼文的等你看。正式庫實測 Coffee Here 的 IG 拿到 9 條證據；Apify 讀 Soulful 的 FB 粉專自動填入 info@soulfulexpression.org。' },
   { what: '找到店家後拿得到它的 email，寄之前知道對方網域收不收信。', state: 'yes', ev: '2026-11-01 C3：研究時從對方網站自動填 email（對方網域、mailto 或網站結構化資料裡的商家信箱），先查網域收不收信才填；別家的地址只列成候選給你看。實測自動填入 info@soulfulexpression.org。' },
   { what: '暖名單同步到 FluentCRM。', state: 'no', ev: 'wp-bridge 沒有 contact 端點（RestController.php:42-105），只能建電子報草稿。' },
   { what: '看得到回覆率、會議數、成交數。', state: 'no', ev: '外聯首頁是空殼。' },
@@ -49,6 +49,7 @@ const C2 = '766df3df3';
 const C3 = '25858b8b8';
 const C10 = '6397234f7';
 const C17 = '5bdba0ef6';
+const C17_6 = '77d0291d6';
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '守衛與事實訂正', plain: '例：名單上某人剛退訂，系統仍替他建草稿。改成建草稿前重查拒收名單。同時把「scope 不能寄信」這句不對的說法改正，用測試守住程式不呼叫寄信；順便把 Google 授權改成正式發布、加上讀信權限，之後 6 個新信箱只要授權一次。',
@@ -102,7 +103,7 @@ export const STEPS = [
       done('C10.2', 'Inbox 頁加找名單表單；測試與真查一次。', C10),
     ] },
   { n: 5, code: 'C17', group: 'C', title: '名單研究：讀店家的 IG／FB 頁', plain: '例：C10 找到的店家有一半拿 IG 或 FB 當網站。按「研究這家」，系統先用 Meta 官方 API 讀它的 IG 商業帳號自介與最近貼文；查不到就搜 Google 的摘要找 email；再不行才用 Apify 讀公開頁。自介裡的事實可以自動核准，貼文是當天公告，一律等你看。',
-    gate: '一家用 IG 當網站的真實店家，研究後有證據、來源是它的 IG；自介的事實自動核准、貼文的待審。沒有 Apify 金鑰時那一層顯示跳過而不是失敗。系統自己的 Meta app、IG 帳號、主機都不去抓別人的頁面。', risk: 'Medium（法律灰色：只讀公開頁）', model: 'Opus 5.5', status: 'in_progress', depends: ['C3'],
+    gate: '一家用 IG 當網站的真實店家，研究後有證據、來源是它的 IG；自介的事實自動核准、貼文的待審。沒有 Apify 金鑰時那一層顯示跳過而不是失敗。系統自己的 Meta app、IG 帳號、主機都不去抓別人的頁面。', risk: 'Medium（法律灰色：只讀公開頁）', model: 'Opus 5.5', status: 'done', commit: C17, depends: ['C3'],
     decided: '照便宜到貴三層：Meta 官方 Business Discovery（免費、只限商業帳號）→ Google 搜尋摘要 → Apify 公開頁（按量付費、不登入）。不用會登入你帳號的工具（PhantomBuster），會被停權。Apify 先裝，等你說可以再真跑。（規格 D20，操作者 2026-11-01）',
     what: 'providers.ts 加 allowedPathPatterns＋meta_discovery／apify_instagram／apify_facebook；social-research.ts 階梯；research.ts 無自家網站或無 email 時跑；sink admit＋reviewOnly；名單頁按鈕與層級顯示',
     files: ['NA/lib/collect/net/providers.ts', 'NA/lib/outreach/social-research.ts', 'NA/lib/outreach/research.ts', 'NA/lib/collect/sinks/outreach-research.ts', 'NA/app/(shell)/tools/outreach/leads/LeadsClient.tsx', 'NA/app/(shell)/tools/outreach/leads/LeadResearch.tsx'],
@@ -112,7 +113,7 @@ export const STEPS = [
       done('C17.3', '社群研究的階梯：找到就停、沒金鑰就跳過、付費那層先預扣點數；自介裡的 email 算對方自己公開的。', C17),
       done('C17.4', '研究流程接上：沒有自家網站、或網站找不到 email 時讀社群頁；自介事實照原規則，貼文待審、只讀半年內。', C17),
       done('C17.5', '名單頁：只有 IG／FB 頁的名單也能按研究；顯示用了哪一層、花多少。', C17),
-      todo('C17.6', '測試與真查；Apify 那層等你說可以再真跑一次（測試、Meta 官方 API 與搜尋摘要的真查已做完）。'),
+      done('C17.6', '測試與真查；Apify 那層等你說可以再真跑一次。', C17_6),
     ] },
   { n: 6, code: 'C11', group: 'C', title: '寄件信箱池：次網域、DNS、暖機', plain: '例：你買 3 個像品牌的次網域，每個開 2 個 Workspace 信箱，共 6 個，連上時確認它們屬於寄件池：系統自動寄、每天上限 50。系統每天檢查每個網域的 SPF、DKIM、DMARC，缺一就標黃並通知；新信箱照暖機階慢慢加量，要真的寄滿才升階，退信太多就自動暫停。',
     gate: '6 個信箱都連上系統並標為寄件池，每個網域三項 DNS 設定全綠。故意拿掉一項設定，隔天那個信箱標黃並收到通知，連兩天就暫停。一個信箱連續 5 天寄滿七成才升到下一階；退信率超過 3% 自動暫停，按「重新檢查並恢復」要兩項都過才恢復。兩個同網域信箱同時搶最後一個名額只有一個成功。', risk: 'High（C11.1 外部資產；migration 套正式站）', model: '你＋Codex', status: 'not_started', depends: ['C1'],
