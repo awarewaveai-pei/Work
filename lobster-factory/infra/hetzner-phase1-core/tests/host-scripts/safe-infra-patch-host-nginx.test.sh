@@ -21,7 +21,8 @@ P_DIR="$(hostpath "$(cd "$(dirname "$PATCH")" && pwd)")"; P_FILE="$(basename "$P
 docker run -d --label aw-patch-test=1 --name "$C" -v "$P_DIR:/p:ro" nginx:alpine >/dev/null
 docker exec "$C" sh -c '
   apk add --no-cache -q bash curl openssl coreutils >/dev/null
-  mkdir -p /root/lobster-phase1 /etc/nginx/ssl
+  mkdir -p /root/lobster-phase1 /etc/nginx/ssl /srv
+  head -c 20000 /dev/zero > /srv/big
   openssl req -x509 -nodes -newkey rsa:2048 -days 1 -subj /CN=t.test \
     -keyout /etc/nginx/ssl/k.pem -out /etc/nginx/ssl/c.pem 2>/dev/null
   printf "#!/bin/sh\n[ \"\$1 \$2\" = \"reload nginx\" ] && exec nginx -s reload\nexit 1\n" > /usr/local/bin/systemctl
@@ -62,6 +63,25 @@ check "file outside /etc/nginx -> restored" test "$(docker exec "$C" cat /tmp/ou
 
 out="$(vhost 'return 200 "v4";' | patch /etc/nginx/conf.d/t.conf)"; rc=$?
 check "no vhost to probe -> refused, nothing applied" test "$rc:$(body)" = "1:v2"
+
+# A change nginx -t accepts but the running master refuses (a limit_req zone whose key changed, 2026-11-01): HUP is
+# delivered, exit 0, the old workers stay. The patch must see the kept workers, fail, and restore.
+zone() {
+  printf 'limit_req_zone %s zone=aw_t:1m rate=10r/s;\n' "$1"
+  printf 'server { listen 443 ssl; server_name t.test; ssl_certificate /etc/nginx/ssl/c.pem; ssl_certificate_key /etc/nginx/ssl/k.pem;\n  location /big { root /srv; limit_rate 2k; limit_rate_after 0; }\n  location / { limit_req zone=aw_t burst=5 nodelay; return 200 "vz"; }\n}\n'
+}
+out="$(zone '$binary_remote_addr' | patch /etc/nginx/conf.d/t.conf t.test)"; rc=$?
+check "zone introduced -> exit 0 and live" test "$rc:$(body)" = "0:vz"
+before="$(sum)"
+# A worker of an earlier reload still draining a slow download, exiting inside the 10 s window: its PID leaving must
+# not read as "the workers changed" (critic 2026-11-01 round 2 M1).
+docker exec -d "$C" sh -c 'curl -sk --resolve t.test:443:127.0.0.1 https://t.test/big -o /dev/null'
+sleep 1; docker exec "$C" nginx -s reload; sleep 1
+out="$(zone '$server_name' | patch /etc/nginx/conf.d/t.conf t.test)"; rc=$?
+check "zone key change (nginx -t passes, master refuses the reload) -> exit 1" test "$rc" = 1
+check "zone key change -> reason names the kept workers" has "$out" "kept its old workers"
+check "zone key change -> file restored byte-identical" test "$(sum)" = "$before"
+check "zone key change -> old config still serving" test "$(body)" = vz
 
 echo "---"; echo "safe-infra-patch host-nginx: $pass passed, $failed failed"
 [[ "$failed" == 0 ]]

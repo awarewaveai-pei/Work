@@ -55,6 +55,7 @@ PENDING = {
     "Projects/internal/hci30/infra/local/compose.dev.yml": "local dev",
     "Projects/internal/hci30/infra/local/compose.fetch-runner.yml": "local dev",
     "Projects/internal/hci30/infra/local/compose.test.yml": "local test",
+    "lobster-factory/infra/hetzner-phase1-core/tests/e2e/woo-drill/docker-compose.yml": "local e2e drill (4f2226576)",
 }
 # In the repo hci-app's build context lives outside apps/ (= sg-deploy.sh app_git_source_root); the host has it in apps/.
 REPO_CONTEXT = {"./apps/hci-app": "../../../Projects/internal/hci30"}

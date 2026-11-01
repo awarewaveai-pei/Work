@@ -132,6 +132,31 @@ trap 'exit 1' TERM HUP INT
 printf '%s\n' "$NEW_CONTENT" > "$FILE_PATH"
 log "apply | file=$FILE_PATH | bytes=${#NEW_CONTENT}"
 
+# A reload the master refuses at runtime -- `nginx -t` passes, HUP is delivered, exit 0 -- keeps the OLD workers and logs
+# only an [emerg] (2026-11-01: a limit_req zone whose key changed kept lobster-nginx on a two-day-old config while every
+# patch reported success). The one proof a reload happened is a new set of worker PIDs.
+# Workers = children of that nginx's own master whose title is exactly "worker process" (not "... is shutting down": an
+# old worker draining after an earlier reload; the host's pgrep also sees every container's nginx).
+nginx_worker_pids() {  # $1 = host | <container>
+  if [[ "$1" == host ]]; then
+    local m; m="$(cat /run/nginx.pid 2>/dev/null)"; [[ -n "$m" ]] && pgrep -P "$m" -f 'nginx: worker process$' | sort
+  else
+    docker top "$1" -o pid,ppid,cmd 2>/dev/null | awk '
+      /nginx: master process/ {m = $1}
+      {pid[NR] = $1; ppid[NR] = $2; worker[NR] = ($0 ~ /nginx: worker process$/)}
+      END {for (i = 1; i <= NR; i++) if (worker[i] && ppid[i] == m) print pid[i]}' | sort
+  fi
+}
+reload_verified() {  # $1 = host | <container>; $2.. = the reload command. Passes only when a worker PID not there before appears within 10 s.
+  local before after; before="$(nginx_worker_pids "$1")"
+  "${@:2}" || return 1
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    sleep 1; after="$(nginx_worker_pids "$1")"
+    [[ -n "$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after") | grep -v '^$')" ]] && return 0
+  done
+  return 1
+}
+
 # ── Step 3: Health check ──────────────────────────────────────────────────────
 health_ok=1
 
@@ -170,9 +195,10 @@ case "$TYPE" in
     if ! docker exec lobster-nginx nginx -t 2>/dev/null; then
       log "health-fail | reason=nginx -t failed"
       health_ok=0
+    elif ! reload_verified lobster-nginx docker exec lobster-nginx nginx -s reload; then
+      log "health-fail | reason=lobster-nginx kept its old workers after reload (config refused at runtime; a changed limit_req zone key needs a container restart): $(tail -n 5 /var/log/lobster-nginx/error.log 2>/dev/null | grep emerg | tail -1)"
+      health_ok=0
     else
-      docker exec lobster-nginx nginx -s reload
-      sleep 2
       # Probe lobster-nginx itself, not the outer host-nginx (port 80, Certbot-managed,
       # force-redirects several domains to HTTPS) -- resolved at runtime, not hardcoded,
       # because the host port is NGINX_HOST_PORT-driven (docker-compose.yml) and varies
@@ -197,11 +223,10 @@ case "$TYPE" in
       if ! nt="$(nginx -t 2>&1)"; then
         log "health-fail | reason=nginx -t failed: $(printf '%s' "$nt" | tail -2 | tr '\n' ' ')"
         health_ok=0
-      elif ! systemctl reload nginx; then
-        log "health-fail | reason=systemctl reload nginx failed"
+      elif ! reload_verified host systemctl reload nginx; then
+        log "health-fail | reason=host nginx kept its old workers after reload (config refused at runtime): $(tail -n 5 /var/log/nginx/error.log 2>/dev/null | grep emerg | tail -1)"
         health_ok=0
       else
-        sleep 2
         http_code=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 30 \
           --resolve "${TARGET}:443:127.0.0.1" "https://${TARGET}/" 2>/dev/null || true)
         if [[ ! "${http_code:-000}" =~ ^[23][0-9][0-9]$ ]]; then
