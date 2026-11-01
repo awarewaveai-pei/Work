@@ -1,4 +1,24 @@
 # Worklog
+## 2026-11-01（續3）Outbound OS v2：Codex 審規格 7 項全成立並改進卡片；監工台發布
+
+**觸發**：2026-10-31 續1 收尾因筆電沒電留下兩項：Codex 審規格、監工台發布。操作者「有電了」。
+
+**Codex 審查**（`scripts/codex-oracle.ps1 -Mode review -DiffRef 26bce3452..72bfde142 -Path <spec,R0-PLAN,data.mjs>`，報告 `agency-os/reports/oracle/2026-11-01-partialreview-5b123135.md`）7 項，逐一讀程式碼確認：
+- M1 `NA/lib/ai/cheap-json.ts:40`、`:86` 固定 grant `ops.cheap-json` → 研究／分類記不到 outreach 功能。C3.2 加選用 `grant` 參數，C4.4 加功能 `outreach.classify`。
+- M2 `NA/lib/collect/orchestrator.ts:404` `maxDepth` 含種子頁 → 卡寫 1＝只讀首頁。改 2。
+- M3 `RawDoc.provenance` 是物件（`NA/lib/collect/types.ts:41-45`）→ 不能進 text 欄。改 `source_label=doc.collector`、`source_date=doc.publishedAt`。
+- M4＋M6 同一類：來信只從我們建的 thread 找 → `List-Unsubscribe` mailto 寄來的新信、對方另開的新信、`no_reply` 之後的回信都漏。不變量改為「來信靠寄件人地址認人」：C4.3 第二段 `messages.list?q=in:inbox newer_than:7d -from:me` 比對同 org `co_leads.email`，不看狀態；`no_reply` 不再是終點（SPEC §5.6、§5.7）。
+- M5 回信只改 `status` 沒改 `consent_status` → C6 的 FluentCRM 資格永遠 422。C4.4 回信把 `unknown`／`legitimate_interest` 升為 `replied`（不降級），退訂／拒絕寫 `unsubscribed`／`do_not_contact`。
+- M7 每日上限只鎖信不鎖帳號 → 19／20 時兩封不同的信可同時寄出。C8.2 先以 compare-and-set 佔帳號名額（既有 `daily_sent_count`＋新 `daily_count_date`），C8.4 加對應測試。
+
+**已修改**：`ce17be5fe` 規格 §4／§5.1／§5.5／§5.6／§5.7、R0-PLAN C3.2／C3.3／C4.3／C4.4／C4.7／C5.3／C8.1／C8.2／C8.4、data.mjs（META.url＋三項白話）、supervisor.html、oracle 報告。監工台：https://claude.ai/artifact/DbH1HLUihZwAiBiJZGSD4t
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=python verify_paths.py（98 條路徑、0 缺）; node build.mjs && node check.mjs（10 cards／43 items 綁定 §6、5 open、page fresh） | exit=0 | ms=84
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/7m/0n（7 項全成立、全改；外部 oracle＝Codex CLI read-only）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=maxDepth: ?1|source_label=doc\.provenance|lead 未結案 | hits=0（規格、R0-PLAN、data.mjs 內舊說法已清；cheap-json 的固定 grant 為 C3.2 待改程式，非文件）
+
+**下一步**：C1（守衛與事實訂正，Low，可派 Codex）。建議模型：Opus 5.5。
 ## 2026-11-01（續2）權限強制模式前提檢查（排程 enforce-readiness-2026-10-31，唯讀，未改任何設定）
 
 **結論：可以提議翻 enforce**（翻動本身仍是 High，等操作者明示 go）。2026-10-24T01:00Z 起 `entitlement.would_deny` 僅 7 筆、全來自測試帳戶 `e2e-verify-0704-5c1356`／`content.plan`／`no_entitlement`（預期內）；`entitlement.infra_error` 0 筆；無 unresolved 主體；三個全產品帳戶權利列各 340、互等。
