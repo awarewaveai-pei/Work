@@ -54,6 +54,8 @@ const C17_7 = 'e824205b0';
 const C11 = '3eea12c73';
 const C4 = 'f00dbea9f';
 const C8 = '050a1041e';
+const C5 = 'd518cbb2c';
+const C15 = '96ecf614d';
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '守衛與事實訂正', plain: '例：名單上某人剛退訂，系統仍替他建草稿。改成建草稿前重查拒收名單。同時把「scope 不能寄信」這句不對的說法改正，用測試守住程式不呼叫寄信；順便把 Google 授權改成正式發布、加上讀信權限，之後 6 個新信箱只要授權一次。',
@@ -158,26 +160,26 @@ export const STEPS = [
       done('C8.6', '自動寄出前先用付費服務驗證收件信箱真的存在、沒有爆滿：只寄確定有效的；無法判定的交給你；無效的直接進拒收名單。只驗要自動寄的，不驗整個名單庫。沒有 Hunter／ZeroBounce 金鑰就一律不自動寄。', C8),
     ] },
   { n: 9, code: 'C5', group: 'E', title: '追蹤信與人工步驟', plain: '例：第一封寄出 3 個工作天後沒回信，系統自動把寫好的追蹤信建在 Gmail 原本那串對話裡並寄出（自動寄的信箱）；草稿模式的信箱則在追蹤頁等你按。電話或 IG 私訊的步驟顯示成待辦，做完打勾。',
-    gate: '到期的名單出現在追蹤頁並附內容。建的草稿在 Gmail 原對話串中。最後一封過期沒回信，名單標為無回應。', risk: 'Low', model: 'Codex', status: 'not_started', depends: ['C8'],
+    gate: '到期的名單出現在追蹤頁並附內容。建的草稿在 Gmail 原對話串中。最後一封過期沒回信，名單標為無回應。', risk: 'Low', model: 'Codex', status: 'in_progress', depends: ['C8'],
     what: 'followups 頁列到期 lead＋下一封；gmail-draft 支援 In-Reply-To／References＋threadId；no_reply 判定；非 email 步驟待辦；管線 tick 自動建草稿',
     files: ['NA/app/(shell)/tools/outreach/followups/page.tsx', 'NA/app/api/outreach/messages/gmail-draft/route.ts', 'NA/lib/outreach/gmail-sync.ts'],
     items: [
-      todo('C5.1', '追蹤頁列出到期名單與寫好的下一封。'),
-      todo('C5.2', '追蹤信草稿建在原對話串裡。'),
-      todo('C5.3', '最後一封過期沒回信，名單自動標為無回應。'),
-      todo('C5.4', '電話、IG、LinkedIn 的步驟顯示成待辦，有完成按鈕。'),
-      todo('C5.5', '測試與在 Gmail 看到草稿在原串。'),
+      done('C5.1', '追蹤頁列出到期名單與寫好的下一封。', C5),
+      done('C5.2', '追蹤信草稿建在原對話串裡（回覆標頭、Re: 主旨、同一串）；自動寄出也開放追蹤信：照順序、到期、在原串、同一名單一輪一封。', C5),
+      done('C5.3', '最後一封過期沒回信，名單自動標為無回應（收件匣讀完且沒有待處理回信時才判）。', C5),
+      done('C5.4', '電話、IG、LinkedIn 的步驟顯示成待辦，有完成按鈕。', C5),
+      todo('C5.5', '測試已完成（d518cbb2c）；剩：首封真的寄出後，建一封追蹤草稿，看它在 Gmail 原串裡。'),
     ] },
   { n: 10, code: 'C15', group: 'F', title: '量產管線：照政策自動前進', plain: '例：名單核准後，系統每 10 分鐘自動替它研究、產信、依政策核准、建草稿、寄出，每步都有上限；你每天只處理佇列裡抽到的信、有警告的信、第三方證據，還有回信。',
-    gate: '種 20 個有網站的名單，服務設成抽查模式，跑 3 個 tick，沒有任何人工點擊就出現至少 15 封已建草稿、2 封在佇列等你看。逐封模式的服務不會自動核准。暖名單永遠不會進管線。', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['C5'],
+    gate: '種 20 個有網站的名單，服務設成抽查模式，跑 3 個 tick，沒有任何人工點擊就出現至少 15 封已建草稿、2 封在佇列等你看。逐封模式的服務不會自動核准。暖名單永遠不會進管線。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['C5'],
     decided: '300 封一天不可能一筆一筆按：證據來自對方自家網站的自動核准；每個服務先逐封核准 50 封，之後抽查 10%，檢查有警告的一律人工，被擋的永遠不寄；管線照這套政策自動前進。（規格 D23）',
     what: 'pipeline.ts runPipelineTick（研究→產信→政策核准→建草稿→追蹤到期，各步每 tick 上限）；佇列頁含鍵盤操作；每 org 每日管線預算；成效頁顯示每日數',
     files: ['NA/lib/outreach/pipeline.ts', 'NA/app/(shell)/tools/outreach/review/ReviewClient.tsx', 'NA/lib/outreach/gmail-sync.ts'],
     items: [
-      todo('C15.1', '管線 tick：每 10 分鐘把名單往前推一步——研究、產信、依政策核准（每名單只一版、主張有證據才過）、建草稿、追蹤到期，每步有上限。'),
-      todo('C15.2', '佇列頁：抽到的信、有警告的信、第三方證據集中在一頁，鍵盤核准或退回。'),
-      todo('C15.3', '每個品牌每天的研究與產信預算跟寄信目標掛鉤，超過等明天；費用有紀錄。'),
-      todo('C15.4', '測試與種 20 個名單跑 3 個 tick。'),
+      done('C15.1', '管線 tick：每 10 分鐘把名單往前推一步——研究、產信、依政策核准（每名單只一版、主張有證據才過；追蹤信跟著首封一起核准）、建草稿、追蹤到期，每步有上限。只對有自動寄信箱的品牌動作。', C15),
+      done('C15.2', '佇列頁：抽到的信、有警告的信、第三方證據集中在一頁，鍵盤核准或退回。', C15),
+      done('C15.3', '每個品牌每天的研究與產信預算跟寄信目標掛鉤，超過等明天；費用有紀錄。', C15),
+      todo('C15.4', '測試已完成（96ecf614d）；剩：有自動寄信箱後，種 20 個名單跑 3 個 tick。'),
     ] },
   { n: 11, code: 'C7', group: 'E', title: '成效頁', plain: '例：外聯首頁一張表：每個品牌、每種切角、A 版 B 版各寄了幾封、幾封回、幾封正向、約到幾個會議、成交幾個；每個信箱的退信率與今日用量；每天研究、產信、寄出幾封。沒有開信率，因為那個數字不可信。',
     gate: '種 3 筆走到已回覆的名單，表上的數字正確。可下載 CSV。', risk: 'Low', model: 'Codex', status: 'in_progress', depends: ['C4'],

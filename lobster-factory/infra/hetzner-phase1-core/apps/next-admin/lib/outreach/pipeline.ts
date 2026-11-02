@@ -13,6 +13,7 @@
 // Cold Gate side: a do_not_contact or warm lead (isWarm: replied, opted out, Meta lead ad...) is never touched, whatever
 // the store returned. Work runs inside deps.runInOrg so every paid call bills that organization.
 import { EntitlementRequired } from "@/lib/entitlements/can";
+import { grantFor } from "@/lib/entitlements/grant";
 import type { EvidenceItem } from "./brand-context";
 import { isWarm } from "./cold-gate";
 import { autoDecision, type LeadRow } from "./generate";
@@ -196,7 +197,7 @@ async function applyPolicy(deps: PipelineDeps, org: string, lead: PipelineLead, 
   const others = variants.filter((v) => v.id !== keep.id).map((v) => v.id);
   const sampled = inSample(lead.id, profile.review_sample_pct);
   const evidence = await deps.store.evidence(lead);
-  const d = await autoDecision({ gate: keep.quality_gate_status, sampled, body: keep.body, evidence, leadId: lead.id, billing: async () => ({}),
+  const d = await autoDecision({ gate: keep.quality_gate_status, sampled, body: keep.body, evidence, leadId: lead.id, grant: (feature) => grantFor(feature),
     ...(deps.check ? { check: () => deps.check!(lead, keep.body, evidence) } : {}) });
   const snapshot: Record<string, unknown> = { ...(keep.gate_snapshot ?? {}), sampled, profile_id: profile.id, ...(d.claim ? { claim_check: d.claim } : {}) };
   let outcome: DecideResult;

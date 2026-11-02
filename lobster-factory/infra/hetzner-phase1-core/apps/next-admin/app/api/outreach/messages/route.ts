@@ -4,6 +4,7 @@ import { outreachDb } from "@/lib/outreach/db-client";
 import { gateMessage, lintMessage, GATE_VERSION, type RequiredParts } from "@/lib/outreach/cold-gate";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse, userKindOf } from "@/lib/tenant-guard";
 import { billedTo } from "@/lib/outreach/billing";
+import { grantFor } from "@/lib/entitlements/grant";
 import { generateForLead, isUniqueViolation, type LeadRow } from "@/lib/outreach/generate";
 
 // Cold Outreach — message generation and review (SPEC §5.3, §5.4, D23). Table: co_messages (0048, 0149).
@@ -64,7 +65,8 @@ export async function POST(req: Request): Promise<Response> {
 
   return generateForLead(supabase, lead, {
     agencyFallback: userKindOf(req.headers) !== "client",
-    billing: () => billedTo(req, lead.organization_id),
+    grant: async (feature) => feature === "outreach.draft" ? grantFor("outreach.draft", await billedTo(req, lead.organization_id))
+      : grantFor("outreach.qa", await billedTo(req, lead.organization_id)),
     pastedReply: typeof body.pastedReply === "string" && body.pastedReply.trim() ? body.pastedReply : null,
   });
 }

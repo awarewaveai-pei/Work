@@ -5,7 +5,11 @@ import { checkColdGate, gateMessage, GATE_VERSION, type RequiredParts } from "@/
 import { generateWithGemini } from "@/lib/outreach/ai-gemini";
 import { generateWithClaude } from "@/lib/outreach/ai-claude";
 import { generateWithOpenAI } from "@/lib/outreach/ai-openai";
-import { grantFor, type GrantContext } from "@/lib/entitlements/grant";
+import type { Grant } from "@/lib/entitlements/can";
+
+/** The caller's grant for a paid outreach step. Each caller asks it itself, literally (registry-code.test.ts reads the
+ *  route's own grantFor): the route for its request's billing account, the pipeline for its organization (runForOrg). */
+export type OutreachGrant = (feature: "outreach.draft" | "outreach.qa") => Promise<Grant>;
 import { buildBrandContext, composeBody, BrandContextError, type BrandProfile, type EvidenceItem } from "@/lib/outreach/brand-context";
 import { parseGenerationOutput, repairPrompt } from "@/lib/outreach/generation-schema";
 import { pickVariant, inSample, autoApproves, type ClaimCheck } from "@/lib/outreach/review-policy";
@@ -60,11 +64,11 @@ export const isUniqueViolation = (e: { code?: string } | null): boolean => e?.co
  *  sampled out -- a check that cannot change the outcome is not paid for), then autoApproves. A refused outreach.qa grant
  *  (no credits) is a check that did not happen: the email goes to a person. Shared by generation and the pipeline tick. */
 export async function autoDecision(a: { gate: "pass" | "warn" | "block"; sampled: boolean; body: string; evidence: EvidenceItem[]; leadId: string;
-  billing: () => Promise<GrantContext>; /** replaces the paid fact check (tests) */ check?: () => Promise<ClaimCheck> }): Promise<{ approve: boolean; claim: ClaimCheck | null }> {
+  grant: OutreachGrant; /** replaces the paid fact check (tests) */ check?: () => Promise<ClaimCheck> }): Promise<{ approve: boolean; claim: ClaimCheck | null }> {
   let claim: ClaimCheck | null = null;
   if (a.gate === "pass" && !a.sampled) {
     try {
-      claim = a.check ? await a.check() : await checkClaims({ body: a.body, evidence: a.evidence, grant: await grantFor("outreach.qa", await a.billing()), metadata: { lead_id: a.leadId } });
+      claim = a.check ? await a.check() : await checkClaims({ body: a.body, evidence: a.evidence, grant: await a.grant("outreach.qa"), metadata: { lead_id: a.leadId } });
     } catch (e) {
       claim = { verdict: "error", error: e instanceof Error ? e.message : "claim check failed" };
     }
@@ -76,7 +80,7 @@ export interface GenerateOptions {
   /** May the agency's own mailbox write for this lead (staff yes, a customer no). */
   agencyFallback: boolean;
   /** Who the AI calls are billed to: the request's billedTo, or {} inside runForOrg. */
-  billing: () => Promise<GrantContext>;
+  grant: OutreachGrant;
   /** A reply the operator got from ChatGPT/Claude for the manual prompt, pasted back. */
   pastedReply: string | null;
 }
@@ -181,7 +185,7 @@ export async function generateForLead(supabase: SupabaseClient, lead: LeadRow, o
     aiModel = null;
   } else if (apiKey && resolvedProvider) {
     try {
-      const grant = await grantFor("outreach.draft", await o.billing());
+      const grant = await o.grant("outreach.draft");
       const generate = (prompt: string) => resolvedProvider === "claude" ? generateWithClaude(grant, apiKey!, prompt)
         : resolvedProvider === "openai" ? generateWithOpenAI(grant, apiKey!, prompt) : generateWithGemini(grant, apiKey!, prompt);
       const first = await generate(ctx.prompt);
@@ -231,7 +235,7 @@ export async function generateForLead(supabase: SupabaseClient, lead: LeadRow, o
     if (keep && b.label !== keep) {
       status = "skipped";
     } else if (keep) {
-      const d = await autoDecision({ gate: g.quality_gate_status, sampled, body: text, evidence, leadId: lead.id, billing: o.billing });
+      const d = await autoDecision({ gate: g.quality_gate_status, sampled, body: text, evidence, leadId: lead.id, grant: o.grant });
       if (d.claim) snapshot.claim_check = d.claim;
       snapshot.sampled = sampled;
       if (d.approve) {

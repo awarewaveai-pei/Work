@@ -1,4 +1,20 @@
 # Worklog
+## 2026-11-02（續31）部署閘擋下 C15：messages route 看不出向呼叫者請額度 → 路由改成自己 grantFor 交給 lib；監工台 C5／C15
+
+**根因**：C15 把產信搬到 `lib/outreach/generate.ts`，grantFor 跟著搬走；route 只傳 `billing` callback。`lib/portal/__tests__/registry-code.test.ts`「every API route that reaches a product feature asks it for its caller」讀 route 自己的 `grantFor("…")` 字面 → `app/api/outreach/messages/route.ts reaches outreach.qa, outreach.draft` 紅；主機 `sg-deploy.sh` npm test 閘中止（04:19:58Z，正式站留在 050a1041e）。本機 C15 只跑 outreach 子集，沒跑這支。
+
+**做了**：
+- 不加豁免。`generate.ts` 改收 `grant: OutreachGrant`（呼叫端自己請）；`NA/app/api/outreach/messages/route.ts` 字面 `grantFor("outreach.draft"|"outreach.qa", await billedTo(req, org))`；管線（`pipeline.ts`、`pipeline-store.ts`）在 `runForOrg` 內 `grantFor(feature)`。
+- 監工台 `data.mjs`：C5.1–C5.4、C15.1–C15.3 done；C5.5／C15.4 剩真資料；build＋check 綠（49/77），已發布 v22。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（全套）→ 460 files passed、2 紅＝`/tools/seedstar`（他 session 未 commit 目錄）；registry-code 綠；npx tsc --noEmit exit 0 | exit=0 | ms=120000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（介面改動，行為不變：同一 grant 同一 billing 對象）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=OutreachGrant | hits=3
+
+**避免再發生**：搬 route 邏輯到 lib 前跑 `npx vitest run lib/portal/__tests__/registry-code.test.ts`（route 的 grantFor 是被讀字面的）。
+
+**rollback**：revert 本 commit 與 96ecf614d。
 ## 2026-11-02（續30）影音工作台卡 M2：狀態上伺服器（/state＋revision 鎖）、素材來源、任務冪等（2ab702e3f）
 
 - 根因：狀態只在 localStorage；兩分頁互蓋；素材無來源；網路失敗重送可能重複付費。內容見 commit 2ab702e3f。
