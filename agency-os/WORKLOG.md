@@ -17,7 +17,7 @@
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n（自審：SQL 全 prepare＋esc_like；讀端點要簽章；n1＝posts＋postmeta LIKE 全表掃描，Soulful 規模可接受，只有簽章請求能觸發）
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib,lobster-factory/packages/wp-bridge-plugin | grep=asset-references | hits=6
 - ORACLE_WAIVED: Codex 額度將盡（操作者「只剩1%，不夠就自我審查」）；以自審＋兩處突變證據代替。
-- 未做：0.20.0 尚未發版、尚未裝到 Soulful（rollout 為 High，等操作者）。發版前 Soulful 仍走 REST、仍會拒刪並顯示原因。aware-wave.com 的 bridge 依 10-30 決定維持停用，不升級。
+- 已發版 v0.20.0（`bash scripts/release-wp-bridge.sh`，release repo CI 綠、zip 在；本機 php.exe 被系統擋，lint 改由主機一次性 php:8.3-cli 容器跑）。未做：裝到 Soulful（rollout 為 High，等操作者）。發版前 Soulful 仍走 REST、仍會拒刪並顯示原因。aware-wave.com 的 bridge 依 10-30 決定維持停用，不升級。
 ## 2026-11-02（續8）影音工作台改名 `apps/video-workbench`；畫面上的 SeedStar 字樣全部換掉（分鏡靈感頁不動）
 
 **操作者**：「我不要用這個名字 seedstar」；資料夾由操作者改成 `video-workbench`；選「先改畫面字樣」。
