@@ -8,6 +8,9 @@ const r2DeleteObject = vi.hoisted(() => vi.fn(async () => ({ ok: true as const }
 const getWpSites = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/storage/r2", () => ({ deleteVideoObjects, deleteDesignObject, r2DeleteObject }));
 vi.mock("@/lib/content/wp-sites", () => ({ getWpSites, wpAuthHeader: () => "Basic x" }));
+const listBridgeClients = vi.hoisted(() => vi.fn((): Array<{ id: string; name: string; baseUrl: string }> => []));
+const bridgeRead = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/payments/woo", () => ({ listBridgeClients, bridgeRead }));
 
 const { deleteUnreferencedAsset, assetTarget } = await import("../r2-delete-guard");
 const { videoObjectKey } = await import("../blocks/video-pipeline");
@@ -36,6 +39,49 @@ afterEach(() => {
 
 const row = (id: number, raw: string): Row => ({ id, status: "publish", link: `https://soulful.example/?p=${id}`, content: { raw } });
 const nothingDeleted = () => [deleteVideoObjects, deleteDesignObject, r2DeleteObject].every((m) => m.mock.calls.length === 0);
+
+describe("a site with a wp-bridge client is asked through the bridge, not REST", () => {
+  const IMG = "designs/2026-11/3c7abcbd-0663-4ce5-8c5c-909b42a26992.png";
+  beforeEach(() => listBridgeClients.mockReturnValue([{ id: "", name: "Soulful", baseUrl: "https://SOULFUL.example" }]));
+  afterEach(() => { listBridgeClients.mockReturnValue([]); bridgeRead.mockReset(); });
+
+  it("a product or page that still shows the image refuses the delete; REST is never called", async () => {
+    bridgeRead.mockResolvedValue({ ok: true, value: { ok: true, references: [{ id: 40, type: "product", status: "publish", link: "https://soulful.example/p/40" }] } });
+    expect(await deleteUnreferencedAsset(IMG)).toMatchObject({ ok: false, error: "asset_in_use", references: [{ site: "Soulful", type: "product", id: 40 }] });
+    expect(bridgeRead).toHaveBeenCalledWith("/asset-references", { match: assetTarget(IMG)!.match }, { clientId: "" });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(nothingDeleted()).toBe(true);
+  });
+
+  it("no references -> deleted", async () => {
+    bridgeRead.mockResolvedValue({ ok: true, value: { ok: true, references: [] } });
+    expect(await deleteUnreferencedAsset(IMG)).toEqual({ ok: true, deleted: 1 });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("a bridge without the route (404, older than 0.20.0) falls back to the REST search", async () => {
+    bridgeRead.mockResolvedValue({ ok: false, error: "bridge_404" });
+    rowsFor = () => [row(5, `<img src="https://pub.r2.dev/${IMG}">`)];
+    expect(await deleteUnreferencedAsset(IMG)).toMatchObject({ ok: false, error: "asset_in_use", references: [{ id: 5 }] });
+    expect(fetchMock).toHaveBeenCalled();
+  });
+
+  it("any other bridge failure, or an answer without a reference list, refuses and deletes nothing", async () => {
+    for (const r of [
+      { ok: false, error: "bridge_timeout" },
+      { ok: false, error: "auth_failed" },
+      { ok: true, value: { ok: false, error: "too_many_candidates" } },
+      { ok: true, value: { ok: true } },
+    ]) {
+      bridgeRead.mockResolvedValueOnce(r);
+      const out = await deleteUnreferencedAsset(IMG);
+      expect(out.ok).toBe(false);
+      expect(out).toMatchObject({ message: expect.stringContaining("Soulful") });
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(nothingDeleted()).toBe(true);
+  });
+});
 
 describe("deleteUnreferencedAsset", () => {
   it("refuses and names the post while a post embeds the video", async () => {

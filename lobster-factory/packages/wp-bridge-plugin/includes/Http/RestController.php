@@ -21,6 +21,7 @@ use AwareWave\WpBridge\Auth\SignatureVerifier;
 use AwareWave\WpBridge\Auth\WpdbKeyStore;
 use AwareWave\WpBridge\Auth\WpdbNonceStore;
 use AwareWave\WpBridge\Operation\SetOptionOperation;
+use AwareWave\WpBridge\Content\AssetReferenceFinder;
 use AwareWave\WpBridge\Content\BlockLibrary;
 use AwareWave\WpBridge\Content\MediaSideloader;
 use AwareWave\WpBridge\Post\PostCreator;
@@ -99,6 +100,18 @@ final class RestController {
 			)
 		);
 
+		// Read-only: which posts still contain a file URL (the controller asks before deleting a stored image or
+		// video). Signed with any active key (read scope); POST because the needles travel in the signed body.
+		register_rest_route(
+			AWBRIDGE_REST_NAMESPACE,
+			'/asset-references',
+			array(
+				'methods'             => 'POST',
+				'permission_callback' => '__return_true',
+				'callback'            => array( $this, 'assetReferences' ),
+			)
+		);
+
 		// Read-only capability manifest: which block types /post accepts + their fields + examples.
 		// Public (no signature) — it exposes no site data or secrets, only what the engine can build,
 		// so an AI/app discovers capabilities without a hand-written doc that drifts from the code.
@@ -111,6 +124,31 @@ final class RestController {
 				'callback'            => array( $this, 'blocks' ),
 			)
 		);
+	}
+
+	/** Posts that still contain any of the given file URL fragments (see AssetReferenceFinder). */
+	public function assetReferences( $request ) {
+		$auth = $this->authenticate( $request, KeyRecord::SCOPE_READ );
+		if ( ! $auth->authenticated() ) {
+			$this->audit( 'auth_denied', array( 'reason' => $auth->auditReason() ) );
+			return new \WP_REST_Response( array( 'ok' => false, 'error' => $auth->reason() ), $auth->httpStatus() );
+		}
+		$needles = AssetReferenceFinder::needles( json_decode( (string) $request->get_body(), true ) );
+		if ( $needles === null ) {
+			return new \WP_REST_Response( array( 'ok' => false, 'error' => 'invalid_payload' ), 400 );
+		}
+		global $wpdb;
+		$result = ( new AssetReferenceFinder( $wpdb ) )->find( $needles );
+		if ( ! $result['ok'] ) {
+			$this->audit( 'asset_references_failed', array( 'key' => $auth->keyId(), 'error' => $result['error'] ) );
+			return new \WP_REST_Response( $result, 500 );
+		}
+		foreach ( $result['references'] as &$ref ) {
+			$link        = get_permalink( $ref['id'] );
+			$ref['link'] = is_string( $link ) ? $link : '';
+		}
+		unset( $ref );
+		return new \WP_REST_Response( $result, 200 );
 	}
 
 	/** Self-describing block manifest (see BlockLibrary::manifest()). */

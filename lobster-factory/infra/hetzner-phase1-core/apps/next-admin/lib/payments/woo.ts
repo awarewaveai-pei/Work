@@ -174,6 +174,30 @@ export async function bridgePost<T>(
     return { ok: false, error: BLOCKED_CHANGE_CODE, blockedMode: gate.mode };
   }
 
+  return signedPost<T>(config, path, payload, options?.dryRun ? "&dry_run=true" : "", options?.timeoutMs ?? 45_000);
+}
+
+/**
+ * Signed READ through the bridge (e.g. "/asset-references"). No production-change gate: it writes nothing,
+ * and the delete guard must still be able to look while a site is frozen. Same wire format as bridgePost.
+ */
+export async function bridgeRead<T>(
+  path: string,
+  payload: unknown,
+  options?: { timeoutMs?: number; clientId?: string },
+): Promise<BridgeResult<T>> {
+  const config = getConfig(options?.clientId);
+  if (!config) return { ok: false, error: "bridge_not_configured" };
+  return signedPost<T>(config, path, payload, "", options?.timeoutMs ?? 20_000);
+}
+
+async function signedPost<T>(
+  config: { baseUrl: string; keyId: string; key: KeyObject },
+  path: string,
+  payload: unknown,
+  query: string,
+  timeoutMs: number,
+): Promise<BridgeResult<T>> {
   const fullPath = `${REST_NAMESPACE}${path}`;
   const body = JSON.stringify(payload);
   const timestamp = Math.floor(Date.now() / 1000);
@@ -182,11 +206,10 @@ export async function bridgePost<T>(
   const canonical = `POST\n${fullPath}\n${timestamp}\n${nonce}\n${bodyHash}`;
   const signature = edSign(null, Buffer.from(canonical, "utf8"), config.key).toString("base64");
 
-  const dry = options?.dryRun ? "&dry_run=true" : "";
-  const url = `${config.baseUrl}/?rest_route=${fullPath}${dry}`;
+  const url = `${config.baseUrl}/?rest_route=${fullPath}${query}`;
 
   const controller = new AbortController();
-  const killer = setTimeout(() => controller.abort(), options?.timeoutMs ?? 45_000);
+  const killer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     let res: Response;
     try {

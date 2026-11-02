@@ -44,6 +44,8 @@ const ALLOWLIST: Record<string, string> = {
     "imports wordpress-core only for publishToWordPress(); the gate lives inside that function, not in this block wrapper.",
   "app/api/content/newsletter/route.ts":
     "imports the CRM adapter only for createNewsletter(); the gate lives in bridgePost(), not in this route.",
+  "lib/content/r2-delete-guard.ts":
+    "imports woo only for bridgeRead() + listBridgeClients(): the signed read-only /asset-references search before an R2 delete; writes nothing to WordPress.",
   "lib/crm/fluentcrm.ts":
     "draft campaign adapter delegates every write to the gated bridgePost transport in lib/payments/woo.ts.",
   "lib/studio/print-provider.ts":

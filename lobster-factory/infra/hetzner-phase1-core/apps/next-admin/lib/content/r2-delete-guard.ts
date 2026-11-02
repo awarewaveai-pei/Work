@@ -8,13 +8,18 @@
  * status but trash, raw content); any hit refuses the delete and names the posts. A site that cannot be searched
  * also refuses: "could not check" is never treated as "not used". REST goes through ?rest_route= because staging
  * sites in a subfolder may lack pretty permalinks.
+ * A site with a configured wp-bridge client (same host) is asked through the bridge's signed /asset-references
+ * instead (post content, excerpts and post meta of every post type): it needs no application password, which
+ * Wordfence can switch off (Soulful, 2026-11-02). A bridge without that route (older than 0.20.0) answers 404 and
+ * the site falls back to REST; any other bridge failure refuses.
  * Rollback deletes of objects uploaded moments ago (never published) do not need this and call r2.ts directly;
  * __tests__/r2-delete-guard.test.ts fails if deleteVideoObjects is called anywhere but here.
  */
 import { deleteDesignObject, deleteVideoObjects, r2DeleteObject } from "@/lib/storage/r2";
 import { getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
+import { bridgeRead, listBridgeClients } from "@/lib/payments/woo";
 
-export type AssetReference = { site: string; type: "post" | "page"; id: number; status: string; link: string };
+export type AssetReference = { site: string; type: string; id: number; status: string; link: string };
 
 export type ReferenceScan = { ok: true; references: AssetReference[] } | { ok: false; error: string };
 
@@ -79,7 +84,24 @@ export async function findAssetReferences(target: AssetTarget): Promise<Referenc
   // getWpSites() swallows DB errors; an empty list means "could not load", never "no site uses it".
   if (sites.length === 0) return { ok: false, error: "reference_scan_no_sites" };
   const references: AssetReference[] = [];
+  const bridges = listBridgeClients();
   for (const site of sites) {
+    const bridge = bridges.find((b) => sameHost(b.baseUrl, site.url));
+    if (bridge) {
+      const r = await bridgeRead<{ ok?: boolean; references?: Array<{ id: number; type: string; status: string; link: string }> }>(
+        "/asset-references",
+        { match: target.match },
+        { clientId: bridge.id },
+      );
+      if (r.ok) {
+        if (r.value.ok !== true || !Array.isArray(r.value.references)) return { ok: false, error: `reference_scan_bad_response:${site.name}` };
+        for (const x of r.value.references) {
+          references.push({ site: site.name, type: String(x.type), id: Number(x.id), status: String(x.status), link: String(x.link ?? "") });
+        }
+        continue;
+      }
+      if ("error" in r && r.error !== "bridge_404") return { ok: false, error: `reference_scan_bridge:${r.error}:${site.name}` };
+    }
     const token = tokens[site.id];
     if (!token) return { ok: false, error: `reference_scan_no_credentials:${site.name}` };
     const headers = { Authorization: wpAuthHeader(usernames[site.id] ?? "", token) };
@@ -114,6 +136,10 @@ export async function findAssetReferences(target: AssetTarget): Promise<Referenc
     }
   }
   return { ok: true, references };
+}
+
+function sameHost(a: string, b: string): boolean {
+  try { return new URL(a).host.toLowerCase() === new URL(b).host.toLowerCase(); } catch { return false; }
 }
 
 export async function deleteUnreferencedAsset(objectKey: string): Promise<GuardedDelete> {

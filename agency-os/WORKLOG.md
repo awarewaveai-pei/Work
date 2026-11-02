@@ -1,4 +1,23 @@
 # Worklog
+## 2026-11-02（續9）刪圖前的「有沒有被文章用到」改走 wp-bridge（0.20.0 新端點 /asset-references），不再需要應用程式密碼；Soulful 清掉 6 組舊應用程式密碼
+
+**操作者**：「wpmcp（10/26 用過）和 WPVibe（9/13）>>>不曉得>>都是AI在處理／其中沒在用或很久沒用（有的從來沒用過）幫我刪除／管理員帳號2FA >>>已經有／wp-bridge 外掛加這張圖有沒有被文章用到>>>怎麼用? 你處理」。Wordfence「停用應用程式密碼」保持開啟。
+
+**根因**：`lib/content/r2-delete-guard.ts` 刪任何已存圖前用 `/wp/v2` 搜每個站，需要應用程式密碼；Soulful 的 Wordfence 讓應用程式密碼全部失效 → 搜不到 → 拒刪（見本日前一則）。
+
+**做了**：
+- Soulful（WP-CLI，容器 `soulful-wp`）刪 6 組應用程式密碼：Admin 的 mcp、Claude、makeBlogPost；peijingartstudio 的 peijingartstudio、mcp、cursor-mcp。留 Admin 的 wpmcp、WPVibe (a514)。
+- wp-bridge 0.20.0：`includes/Content/AssetReferenceFinder.php`＋`RestController.php` `POST /asset-references`（簽章、read scope）。搜 post_content＋post_excerpt（所有類型，除 revision）＋所有 post meta（頁面編輯器、SEO 圖），狀態除 trash／auto-draft 全搜；比對規則同 `contentReferences()`（後面不能接檔名字元）；候選 >500 或查詢失敗 → 回錯，呼叫端拒刪。
+- next-admin：`lib/payments/woo.ts` 抽出 `signedPost`，新增 `bridgeRead`（唯讀、不過 production-change 閘；寫入仍只走 `bridgePost`＋閘）。`r2-delete-guard.ts`：站點與 bridge client 同 host → 問 bridge；bridge 回 404（外掛還沒到 0.20.0）→ 退回 REST；其他失敗一律拒刪。`production-change-coverage.test.ts` 加一行 allowlist（只讀）。
+- 主機名核對：prod `WPBRIDGE_BASE_URL` host = soulfulexpression.org = `wp_sites` Soulful url。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=一次性 php:8.3-cli 容器跑 phpunit-9.6（外掛全套 107 tests／351 assertions OK；新 AssetReferenceFinderTest 4 tests／26 assertions；突變「每個命中都算」→ 2 個測試紅） | exit=0 | ms=16
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（整套 3821 過、2 敗＝他 session 未提交的 app/(shell)/tools/seedstar/：products.test.ts、staff-tools.test.ts）；r2-delete-guard.test.ts 15 過；突變拔掉 404 退回 → 指名測試紅、還原綠；npx tsc --noEmit exit 0 | exit=1 | ms=31000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n（自審：SQL 全 prepare＋esc_like；讀端點要簽章；n1＝posts＋postmeta LIKE 全表掃描，Soulful 規模可接受，只有簽章請求能觸發）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib,lobster-factory/packages/wp-bridge-plugin | grep=asset-references | hits=6
+- ORACLE_WAIVED: Codex 額度將盡（操作者「只剩1%，不夠就自我審查」）；以自審＋兩處突變證據代替。
+- 未做：0.20.0 尚未發版、尚未裝到 Soulful（rollout 為 High，等操作者）。發版前 Soulful 仍走 REST、仍會拒刪並顯示原因。aware-wave.com 的 bridge 依 10-30 決定維持停用，不升級。
 ## 2026-11-02（續8）影音工作台改名 `apps/video-workbench`；畫面上的 SeedStar 字樣全部換掉（分鏡靈感頁不動）
 
 **操作者**：「我不要用這個名字 seedstar」；資料夾由操作者改成 `video-workbench`；選「先改畫面字樣」。
