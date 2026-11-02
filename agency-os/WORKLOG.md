@@ -30,6 +30,12 @@
 - REALTEST：操作者寄 1 封給自己另一個信箱並回覆，10 分鐘內回覆頁出現。
 
 **rollback**：`git revert f00dbea9f`；資料庫手動跑 `migrations/0153_co_replies.down.sql`（先 revert next-admin）；排程 `install-host-schedules.sh --rollback <備份>`。
+## 2026-11-02（續11）remote-weekly-agent: weekly summary 2026-11-02 生成
+
+- 01:10 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-11-02.md
+- REALTEST_WAIVED: DOC_ONLY -- auto-generated weekly report, no code change
+- REVIEW_WAIVED: DOC_ONLY -- report only
+- BUGHUNT_WAIVED: DOC_ONLY -- report only
 ## 2026-11-02（續10）wp-bridge 0.20.0 裝上 Soulful 與 aware-wave.com；aware-wave.com 的 bridge 重新啟用；升級腳本的收費檢查改看開關值
 
 **操作者**：「裝到 Soulful」；「aware-wave.com>>不要維持停用(不知道原因)>>要更新」。
