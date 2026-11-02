@@ -17,7 +17,11 @@ interface CheapJsonTextArgs {
   tool?: string | null;
   /** The feature the call is billed to (e.g. outreach.qa); default ops.cheap-json, internal. */
   grant?: Grant;
+  /** Abort after this long; default = the Anthropic SDK's own 10 min, so no call waits forever on either vendor. */
+  timeoutMs?: number;
 }
+
+const DEFAULT_TIMEOUT_MS = 600_000;
 
 interface OpenAiChatCompletion {
   model?: string;
@@ -47,6 +51,7 @@ async function generateOpenAiJsonText(args: CheapJsonTextArgs & { model: AiTextM
   try {
     const res = await fetch(providerUrl(grant, "openai", "/v1/chat/completions"), {
       method: "POST",
+      signal: AbortSignal.timeout(args.timeoutMs ?? DEFAULT_TIMEOUT_MS),
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
@@ -88,7 +93,7 @@ async function generateAnthropicJsonText(args: CheapJsonTextArgs & { model: AiTe
   try {
     const grant = args.grant ?? (await grantFor("ops.cheap-json"));
     const Anthropic = await loadAnthropic(grant);
-    const client = new Anthropic({ apiKey });
+    const client = new Anthropic({ apiKey, timeout: args.timeoutMs ?? DEFAULT_TIMEOUT_MS });
     const msg = await client.beta.messages.create({
       ...claudeParams(args.model, args.maxTokens, "low"),
       ...claudeFallback(args.model),

@@ -68,9 +68,21 @@ vi.mock("@/lib/org-client", () => {
   return { getOrgSupabaseWriteClient: async () => ({ from: query }) };
 });
 
-const { POST, PATCH } = await import("./route");
+const { GET, POST, PATCH } = await import("./route");
 const headers = { "x-ops-user-kind": "staff", "x-ops-claims-role": "owner", "x-ops-user-id": "u-1", "content-type": "application/json" };
-const post = () => POST(new Request("http://app.test/api/outreach/messages", { method: "POST", headers, body: JSON.stringify({ leadId: LEAD_ID }) }));
+const status = (runKey: string, h: Record<string, string> = headers) => GET(new Request(`http://app.test/api/outreach/messages?runKey=${runKey}`, { headers: h }));
+// POST answers 202 { runKey } for an AI generation; this waits for the job and returns the answer it would have given.
+const settle = async (res: Response): Promise<Response> => {
+  if (res.status !== 202) return res;
+  const { runKey } = await res.json();
+  for (;;) {
+    const j = await (await status(runKey)).json();
+    if (j.status === "done") return new Response(JSON.stringify(j.result), { status: j.httpStatus });
+    if (j.status !== "running") throw new Error(`generation ${j.status}: ${j.error}`);
+    await new Promise((r) => setTimeout(r, 0));
+  }
+};
+const post = async () => settle(await POST(new Request("http://app.test/api/outreach/messages", { method: "POST", headers, body: JSON.stringify({ leadId: LEAD_ID }) })));
 const patch = (body: Record<string, unknown>) =>
   PATCH(new Request("http://app.test/api/outreach/messages", { method: "PATCH", headers, body: JSON.stringify({ id: MSG_ID, ...body }) }));
 const inserted = () => (m.ops.find((o) => o.table === "co_messages" && o.kind === "insert")?.payload ?? []) as Array<Record<string, unknown>>;
@@ -282,5 +294,40 @@ ${SIGNATURE}`,
     m.state.updateNull = false;
     m.state.current = { ...(m.state.current as object), gate_snapshot: null };
     expect((await (await patch({ status: "approved" })).json()).error).toBe("regenerate_required");
+  });
+});
+
+describe("generation runs in the background (Cloudflare 524, 2026-11-02)", () => {
+  it("a second press while it runs joins the same job: one AI call, one set", async () => {
+    let finish: (v: { text: string; model: string }) => void = () => {};
+    m.claude.mockImplementation(() => new Promise((r) => { finish = r; }));
+    const req = () => POST(new Request("http://app.test/api/outreach/messages", { method: "POST", headers, body: JSON.stringify({ leadId: LEAD_ID }) }));
+    const first = await req();
+    expect(first.status).toBe(202);
+    await new Promise((r) => setTimeout(r, 0));
+    const second = await req();
+    expect(second.status).toBe(202);
+    const k1 = (await first.json()).runKey, k2 = (await second.json()).runKey;
+    expect(k2).toBe(k1);
+    finish({ text: GOOD, model: "m" });
+    const done = await settle(new Response(JSON.stringify({ runKey: k1 }), { status: 202 }));
+    expect(done.status).toBe(200);
+    expect(m.claude).toHaveBeenCalledTimes(1);
+    expect(m.ops.filter((o) => o.table === "co_messages" && o.kind === "insert")).toHaveLength(1);
+  });
+
+  it("only a caller who may act on the lead's organization sees the job: not while it runs, not its result", async () => {
+    let finish: (v: { text: string; model: string }) => void = () => {};
+    m.claude.mockImplementation(() => new Promise((r) => { finish = r; }));
+    const res = await POST(new Request("http://app.test/api/outreach/messages", { method: "POST", headers, body: JSON.stringify({ leadId: LEAD_ID }) }));
+    const { runKey } = await res.json();
+    const other = { "x-ops-user-kind": "client", "x-ops-org-id": "00000000-0000-4000-8000-0000000000c2", "x-ops-user-id": "c-2" };
+    await new Promise((r) => setTimeout(r, 0));
+    expect(await (await status(runKey, other)).json()).toMatchObject({ ok: false });
+    finish({ text: GOOD, model: "m" });
+    await settle(new Response(JSON.stringify({ runKey }), { status: 202 }));
+    const j = await (await status(runKey, other)).json();
+    expect(j.ok).toBe(false);
+    expect(j.result).toBeUndefined();
   });
 });

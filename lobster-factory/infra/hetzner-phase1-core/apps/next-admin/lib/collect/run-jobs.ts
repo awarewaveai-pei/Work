@@ -36,6 +36,8 @@ export interface RunJob<T = RunCollectionResult> {
   kind: string;
   status: "running" | "done" | "error";
   startedAt: number;
+  /** The organization a single-org job belongs to, known from the start (a status reader checks it while running too). */
+  organizationId?: string | null;
   result?: T;
   error?: string;
 }
@@ -65,10 +67,10 @@ function prune(now: number) {
  * this call. `kind` must be the same literal every caller in one feature uses (e.g. "collection-run",
  * "cognitive-os-import") — getRunJob checks it before returning a result.
  */
-export function startRunJob<T = RunCollectionResult>(kind: string, runKey: string, work: Promise<T>): void {
+export function startRunJob<T = RunCollectionResult>(kind: string, runKey: string, work: Promise<T>, organizationId?: string | null): void {
   const now = Date.now();
   prune(now);
-  jobs.set(runKey, { kind, status: "running", startedAt: now });
+  jobs.set(runKey, { kind, status: "running", startedAt: now, ...(organizationId !== undefined ? { organizationId } : {}) });
   work.then(
     (result) => {
       const job = jobs.get(runKey);

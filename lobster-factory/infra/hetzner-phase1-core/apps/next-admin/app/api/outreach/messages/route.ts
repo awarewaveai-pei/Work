@@ -2,14 +2,15 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
 import { outreachDb } from "@/lib/outreach/db-client";
 import { gateMessage, lintMessage, GATE_VERSION, type RequiredParts } from "@/lib/outreach/cold-gate";
-import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse, userKindOf } from "@/lib/tenant-guard";
+import { effectiveOrgId, assertOrgAccess, canAccessOrg, OrgAccessError, toOrgAccessResponse, userKindOf } from "@/lib/tenant-guard";
+import { getRunJob, startRunJob } from "@/lib/collect/run-jobs";
 import { billedTo } from "@/lib/outreach/billing";
 import { grantFor } from "@/lib/entitlements/grant";
 import { generateForLead, isUniqueViolation, type LeadRow } from "@/lib/outreach/generate";
 
 // Cold Outreach — message generation and review (SPEC §5.3, §5.4, D23). Table: co_messages (0048, 0149).
 // POST: access check, then lib/outreach/generate.ts (Cold Gate → brand context → AI ladder → JSON guard → gated rows →
-// the profile's review policy). Nothing is sent here; drafting in Gmail is gmail-draft/route.ts. Writes need
+// the profile's review policy) in the background: 202 { runKey }, polled with GET ?runKey=. Nothing is sent here; drafting in Gmail is gmail-draft/route.ts. Writes need
 // canManageOutreach; GET is authed-only.
 
 export const runtime = "nodejs";
@@ -21,6 +22,8 @@ const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export async function GET(req: Request): Promise<Response> {
   const params = new URL(req.url).searchParams;
+  const runKey = params.get("runKey");
+  if (runKey !== null) return generationStatus(req, runKey);
   const supabase = await outreachDb(req, params.get("orgSlug"));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const leadId = params.get("leadId");
@@ -63,12 +66,41 @@ export async function POST(req: Request): Promise<Response> {
   try { assertOrgAccess(req, lead.organization_id); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
-  return generateForLead(supabase, lead, {
+  const pastedReply = typeof body.pastedReply === "string" && body.pastedReply.trim() ? body.pastedReply : null;
+  const runKey = `${GEN_KIND}-${lead.id}`;
+  // One generation per lead at a time: a second press joins the running one instead of paying for a second set.
+  if (getRunJob(GEN_KIND, runKey)?.status === "running") {
+    return pastedReply ? NextResponse.json({ ok: false, error: "generating" }, { status: 409 }) : NextResponse.json({ ok: true, runKey }, { status: 202 });
+  }
+  const run = () => generateForLead(supabase, lead, {
     agencyFallback: userKindOf(req.headers) !== "client",
     grant: async (feature) => feature === "outreach.draft" ? grantFor("outreach.draft", await billedTo(req, lead.organization_id))
       : grantFor("outreach.qa", await billedTo(req, lead.organization_id)),
-    pastedReply: typeof body.pastedReply === "string" && body.pastedReply.trim() ? body.pastedReply : null,
+    pastedReply,
   });
+  // A pasted reply makes no AI call: answered now. An AI call can outlive Cloudflare's ~100 s edge timeout (2026-11-02:
+  // 524 while the set was still written), so it runs in the background and GET ?runKey= is polled.
+  if (pastedReply) return run();
+  startRunJob<GenJob>(GEN_KIND, runKey, run().then(async (r) => ({ httpStatus: r.status, body: await r.json() })), lead.organization_id);
+  return NextResponse.json({ ok: true, runKey }, { status: 202 });
+}
+
+const GEN_KIND = "outreach-generate";
+interface GenJob { httpStatus: number; body: unknown }
+
+// GET ?runKey= — a background generation: running, or the answer POST would have given (httpStatus + body).
+async function generationStatus(req: Request, runKey: string): Promise<Response> {
+  if (!canManageOutreach(resolveOpsRole(req).role)) return new NextResponse("forbidden", { status: 403 });
+  if (!new RegExp(`^${GEN_KIND}-[0-9a-f-]{36}$`, "i").test(runKey)) return NextResponse.json({ ok: false, error: "runKey invalid" }, { status: 400 });
+  const job = getRunJob<GenJob>(GEN_KIND, runKey);
+  // The key names a lead, not an authorization: only a caller who may act on its organization sees anything of the job
+  // (running, error text or result), checked against the organization recorded when it started.
+  if (!job || !canAccessOrg(req, job.organizationId)) {
+    return NextResponse.json({ ok: false, error: "not found (finished long ago, or the server restarted)" }, { status: 404 });
+  }
+  if (job.status === "running") return NextResponse.json({ ok: true, status: "running" });
+  if (job.status === "error") return NextResponse.json({ ok: true, status: "error", error: job.error ?? "generation failed" });
+  return NextResponse.json({ ok: true, status: "done", httpStatus: job.result!.httpStatus, result: job.result!.body });
 }
 
 // PATCH { id, status, subject?, body?, orgSlug? } — human review (approve / edit / skip). Never sends.

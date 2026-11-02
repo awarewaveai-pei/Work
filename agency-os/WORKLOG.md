@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-02（續48）外聯產信改背景跑（Cloudflare 524）
+
+- 根因：POST /api/outreach/messages 同步等 AI，>100s → 524，伺服器仍寫入；重按產兩組。
+- 修：route 202 {runKey} + GET ?runKey=（lib/collect/run-jobs.ts，同 research）；同 lead 執行中再按 = 同一工作；貼回保持同步。ReviewClient 輪詢 ≤11 分。
+- Codex 5 輪：m1 部署重啟丟工作（同舊行為，UI 改提示重按）；m2 組織只在 result → run-jobs 加 organizationId 開工即記；m3/m4 AI 與 cheap-json 無逾時 → 生成 240s、cheap-json 預設 600s、claim-check 120s；m5 DB 查詢無總時限 → 未修（UI 只提示，無資料損失）。
+- 不變量：背景工作必結束＝每個 await 外部呼叫有上限；可見性用開工時的資料判。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run app/api/outreach lib/outreach lib/collect lib/ai → 793 passed；tsc --noEmit exit 0；突變拔 canAccessOrg → 指名測試紅、還原綠 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=outreach/messages | hits=3
+- verify-build-gates 紅＝doc_integrity：video-workbench/engines/effectcraft/web/README.md（他 session 未追蹤檔），非本改動。
+- 正式站真測：部署後補。
 ## 2026-11-02（續47）外聯 v2 C4.7 回信同步真測
 
 - 操作者 03:25Z 重連 Gmail（含 readonly）；同步恢復。

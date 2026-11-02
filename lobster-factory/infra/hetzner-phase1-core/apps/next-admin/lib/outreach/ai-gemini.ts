@@ -2,7 +2,7 @@
 // SECURITY: the API key goes in the query string per Google's API; NEVER log the url or the key.
 // Errors surface the HTTP status + response body (which does not contain the key).
 import { providerUrl } from "@/lib/ai/gateway";
-import { OUTREACH_MAX_TOKENS } from "./generation-schema";
+import { OUTREACH_MAX_TOKENS, OUTREACH_AI_TIMEOUT_MS } from "./generation-schema";
 import type { Grant } from "@/lib/entitlements/can";
 import { geminiUsageTokens, logAiCall, type GeminiUsageLike } from "@/lib/ai/log-ai-call";
 
@@ -25,6 +25,7 @@ export async function generateWithGemini(
   const url = providerUrl(grant, "gemini", `/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`);
   const resp = await fetch(url, {
     method: "POST",
+    signal: AbortSignal.timeout(OUTREACH_AI_TIMEOUT_MS),
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],

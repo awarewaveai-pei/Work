@@ -24,6 +24,8 @@ export type ParseResult = { ok: true; value: GenerationOutput } | { ok: false; e
 const MAX_FOLLOWUPS = 4;
 /** Output ceiling for the generators (ai-claude/openai/gemini): two first emails and up to four follow-ups as JSON. */
 export const OUTREACH_MAX_TOKENS = 3000;
+// One AI call may not hang a generation (a lead's background job, a pipeline tick) forever; 2026-11-02 calls took >100 s.
+export const OUTREACH_AI_TIMEOUT_MS = 240_000;
 const isStr = (v: unknown): v is string => typeof v === "string" && v.trim() !== "";
 
 /** The first {...} block of a reply (models wrap JSON in prose or fences despite being told not to). */

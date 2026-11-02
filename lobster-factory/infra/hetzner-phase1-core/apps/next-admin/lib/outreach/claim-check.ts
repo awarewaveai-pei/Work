@@ -24,6 +24,8 @@ export async function checkClaims(args: { body: string; evidence: EvidenceItem[]
     system: SYSTEM,
     user: `## 證據\n<quoted_source untrusted="true">\n${evidence}\n</quoted_source>\n\n## 信\n<email>\n${fence(args.body)}\n</email>`,
     maxTokens: 400,
+    // Inside a lead's generation job (messages route, pipeline tick): bounded so the job always ends.
+    timeoutMs: 120_000,
     grant: args.grant,
     metadata: args.metadata,
     tool: "outreach",

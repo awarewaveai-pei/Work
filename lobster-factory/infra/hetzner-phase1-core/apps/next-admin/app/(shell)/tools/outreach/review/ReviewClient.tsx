@@ -33,6 +33,7 @@ const ERRORS: Record<string, string> = {
   gate_blocked: "檢查沒過，不能核准：先修改內容",
   already_drafted: "已經建成 Gmail 草稿，不能再改",
   already_sent: "已經寄出，不能再改",
+  generating: "這筆名單正在產信，等它完成再貼回",
 };
 
 function gateBadge(s: string | null): string {
@@ -86,7 +87,22 @@ export default function ReviewClient() {
     setBusy(true); setErr(null); setNotice(null);
     try {
       const r = await fetch(MSG_API, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ leadId, pastedReply }) });
-      const j = await r.json();
+      let j = await r.json();
+      // An AI generation runs in the background (it can outlive the ~100 s edge timeout): poll its runKey.
+      if (r.status === 202) {
+        for (let i = 0; ; i++) {
+          // Worst case: two AI calls (a repair turn) at 240 s each + a 120 s fact check = 10 min; one more of slack.
+          if (i === 220) { setErr("產信超過 11 分鐘還沒結束，晚點重新整理再看"); return; }
+          await new Promise((res) => setTimeout(res, 3000));
+          const p = await (await fetch(`${MSG_API}?runKey=${encodeURIComponent(j.runKey)}`)).json();
+          // 404 = the job is gone (a deploy restarted the server mid-run). A new press is safe: its set retires any earlier unsent one.
+          if (!p.ok) { setErr("產信中斷（伺服器重新啟動）：再按一次產信"); return; }
+          if (p.status === "running") continue;
+          if (p.status === "error") { setErr(p.error || "產信失敗"); return; }
+          j = p.result;
+          break;
+        }
+      }
       if (!j.ok) { setErr(j.error === "pasted_unparseable" ? `貼回的內容格式不對：${j.detail}` : fail(j)); return; }
       if (pastedReply) setPasted("");
       setNotice(j.mode === "manual_prompt"

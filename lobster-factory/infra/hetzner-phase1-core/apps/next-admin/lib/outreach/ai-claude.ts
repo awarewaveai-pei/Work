@@ -1,7 +1,7 @@
 // Claude API client for cold outreach message generation.
 // SECURITY: API key is passed in; NEVER log it.
 import { CLAUDE_FAST_MODEL, claudeParams, providerUrl } from "@/lib/ai/gateway";
-import { OUTREACH_MAX_TOKENS } from "./generation-schema";
+import { OUTREACH_MAX_TOKENS, OUTREACH_AI_TIMEOUT_MS } from "./generation-schema";
 import type { Grant } from "@/lib/entitlements/can";
 import { logAiCall } from "@/lib/ai/log-ai-call";
 
@@ -21,6 +21,7 @@ export async function generateWithClaude(
 ): Promise<ClaudeResult> {
   const resp = await fetch(providerUrl(grant, "anthropic", "/v1/messages"), {
     method: "POST",
+    signal: AbortSignal.timeout(OUTREACH_AI_TIMEOUT_MS),
     headers: {
       "content-type": "application/json",
       "x-api-key": apiKey,

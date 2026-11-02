@@ -1,7 +1,7 @@
 // OpenAI API client for cold outreach message generation.
 // SECURITY: API key is passed in; NEVER log it.
 import { providerUrl } from "@/lib/ai/gateway";
-import { OUTREACH_MAX_TOKENS } from "./generation-schema";
+import { OUTREACH_MAX_TOKENS, OUTREACH_AI_TIMEOUT_MS } from "./generation-schema";
 import type { Grant } from "@/lib/entitlements/can";
 import { logAiCall, openaiUsageTokens, type OpenAiUsageLike } from "@/lib/ai/log-ai-call";
 
@@ -21,6 +21,7 @@ export async function generateWithOpenAI(
 ): Promise<OpenAIResult> {
   const resp = await fetch(providerUrl(grant, "openai", "/v1/chat/completions"), {
     method: "POST",
+    signal: AbortSignal.timeout(OUTREACH_AI_TIMEOUT_MS),
     headers: {
       "content-type": "application/json",
       authorization: `Bearer ${apiKey}`,
