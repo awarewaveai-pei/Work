@@ -1,4 +1,26 @@
 # Worklog
+## 2026-11-02（續19）影音工作台總計畫定稿：handoff 入 repo、跟拍修正搬入、舊規劃＋四張場景卡＋handoff 收成一份卡片順序（卡 0 → P0 → S3a/S2 → P1 → P2 → P3 → P4 → P5(3D) → P6）
+
+**操作者**：「檢視整個 plan，加上 handoff/Claude_Code_handoff_20261102.md，做最完美的計畫和安排」。
+
+**發現**：
+- `D:\Video` 在 00:58 搬入後於 01:15–01:19 又改了 5 檔（人物跟拍：`scripts/follow-worker.js`、`scripts/tools-follow.js`、`shared/follow-math.js`、新 `tests/follow-identity.cjs`、新 `docs/follow-quality-20261102.md`），Downloads 副本同步；repo 沒有。三份程式／三份 `.data` 分歧 = handoff §3.3 警告的狀況。
+- handoff §3.1 仍以 `D:\Video` 為開發位置、「不建 git」，已被操作者 11-02 搬進 repo 的決定取代。
+- **操作者 10:00 當場改 handoff §0**：「先不用 3D」→「2D、3D 都要：模型、骨架、攝影機、燈光、動作重定向」（§4.5／§5.1／§10 內文未同步，以 §0 為準）→ 3D 自成 P5（Blender 處理引擎＋瀏覽器檢視器，P5.0 獨立閘門），S4 圖片轉 3D 併入 P5。
+- 昨日 S3 拼貼畫布 ≡ P3 合成圖層；S1 2D 人偶 ≡ P4 綁定控制器 → 併入，不做兩套（零重工）。
+- EffectCraft Web（`docs/web.md`）只內建 Inter／Noto Serif／JetBrains Mono，無 CJK 字型 → 繁中字幕是 P0 硬閘。
+
+**做了**：
+- 搬入跟拍 5 檔（repo 內三支 js 未被本 session 改過，直接採 `D:\Video` 版）。
+- `docs/creative-suite-plan-20261102.md` 整檔重寫為排程 SSOT：§0 已定案表、§1 現況、§2 三路線（A 單引擎／B 雙引擎／C 自製延伸，P0 決定）、§3 卡片（卡 0 切 4178 到 repo 版；P0 有五硬閘＋停止條件；S3a 去背接入＋S2 同場景多鏡；P1–P4；P5 3D 含 P5.0 閘門；P6 上線 High）、§4 四項場景卡落點、§5 機械閘門、§6 風險、§7 延後清單（3D 不再延後）。需求細節只指向 handoff §，不重複。
+- `handoff/` 入 git；README 頂段加計畫／需求指向與「D:\Video 不再修改」。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/follow-identity.cjs / follow-controls.cjs / follow-rotation.cjs / follow-tracking.cjs（搬入後）→ 4/4 exit 0；node tests/test-isolation.cjs PASS；python 逐檔 sha256 比對 repo vs D:\Video 列出全部差異 | exit=0 | ms=57000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（計畫引用的 19 個路徑 `[ -e ]` 全存在；`tools-editor.js:23`、`editor-export.cjs:182`、`api.cjs:442` 行號對上；handoff 與 follow-quality 金鑰 regex 0 命中）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=creative-suite-plan | hits=4（README、本 WORKLOG、plan 自身、memory 指標；全為指向本檔，無過期主張）
+- ORACLE_WAIVED: 跟拍三檔為另一模型撰寫並已審查（follow-quality 文件 REVIEW_DONE），本 session 原樣搬入並以其測試驗證；其餘為文件。
+- 未做：卡 0（4178 仍跑 Downloads 副本）；P0 開工前先問操作者（11-01 曾說先不要）。
 ## 2026-11-02（續18）next-admin 手動部署 c5071e997（外聯 C4 回信同步＋C11 寄件信箱健康檢查上線）
 
 **操作者**：「要部署的都馬上做，或是可以做多張卡後再部署 就等一起」→ 記為常設規則（memory `feedback_deploy_now_or_batch`）。
