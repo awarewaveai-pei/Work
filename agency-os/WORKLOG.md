@@ -18,7 +18,8 @@
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=outreach/messages | hits=3
 - verify-build-gates 紅＝doc_integrity：video-workbench/engines/effectcraft/web/README.md（他 session 未追蹤檔），非本改動。
-- 正式站真測：部署後補。
+- 部署 823a43307（sg-deploy smoke OK）。正式站真測：POST 202 0.7s；2s 後再按 202 同 runKey；第 1 次 Gemini 503 過載 → 47s 退回提示詞；第 2 次 151s 背景完成 mode=gemini 4 封（舊版必 524）。測試名單已刪，0 殘留。
+- REALTEST_EVIDENCE: tool=Bash | cmd=Chrome 登入身分 POST/GET /api/outreach/messages?runKey=（正式站）+ psql 刪除驗 0 | exit=0 | ms=151000
 ## 2026-11-02（續47）外聯 v2 C4.7 回信同步真測
 
 - 操作者 03:25Z 重連 Gmail（含 readonly）；同步恢復。
