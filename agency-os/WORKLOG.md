@@ -1,4 +1,24 @@
 # Worklog
+## 2026-11-02（續22）影音工作台總計畫 v4：專業 media 工具版，critic 1C／12M／10m 全數套用
+
+**操作者**：「徹底檢視優化原 Plan，讓他成為專業 media 工具」＋全能規劃師章程（零重工、完整閉環、file:line、文件 AI 極簡、不矛盾、不用中國模型）。
+
+**做了**（`apps/video-workbench/docs/creative-suite-plan-20261102.md`，117→83 行）：
+- C1 Rodin（上海 Deemos）自 S4 候選刪除，只留 Meshy 並要求確認資料處理地。
+- M1–M3 卡 M 對齊主系統：資產 ID = uuid＋`checksum_sha256`（0038:37），`.data/media/<sha256>/` 只做去重；來源型別直接用 `AssetOrigin`（asset-origin.ts:9-12）＋擴充 render／import；互通格式 = MediaTimelineV1，匯出有損（timeline-v1.ts:52、:8）明寫。
+- M11 §0 新定案：純契約檔直接 `import()` next-admin `.ts`（Node v24.14.0 實測 `ratioFor("linkedin",["16x9"])`→16x9），禁複製。
+- M12 卡 M 拆 M1（存放／探測／代理）、M2（帳冊上伺服器）、M3（時間／輸出驗證／外層）；每張驗收對應不變量編號；不變量 9 歸 S3a。
+- M8 ffprobe 不存在（只有 ffmpeg-static 5.3.0＝ffmpeg 6.1.1）→ M1 第一步釘 ffprobe 並排在 P0 之前。
+- M5 P0 硬閘拆合成類（①③⑤）／剪輯類（②④）：B = 合成全過剪輯不過；C = 合成不過或操作者否決。
+- M4 刪 P2 投遞預設表與 §4 平台舉例（platform-ratio.ts LinkedIn 無 1:1）；P2 直接讀 `RATIO_PREFERENCE`。
+- M6 路線 A P3「含 3D 攝影機」改 2.5D 不算 P5；M7 WordPress 檔案交付歸 P6（驗收加 WP 草稿），§延後只留會員嵌入；M9 輸出驗證加指定影格解碼＋ebur128／astats 非靜音，檢查碼對齊 video-service/quality.py:20-96；M10 P6 明寫四假設（video_jobs 1h TTL 非帳冊、0138 formats 限制需 High migration、R2 storage_key 搬移、org/workspace NOT NULL＋can()）。
+- m1–m10：引用行號更正（api.cjs:8、轉場五種 :72／:376-392、follow-quality:29）、引擎版本 v0.20.0／v0.16.0、loudnorm 預設沿用 -16（editor-export.cjs:512）改可設定、字幕沿用 toSrt／toVtt 重疊先處理、逐字時間來自 transcription.ts:15 host、bg-remover.ts:12／cost-model.ts:184、P0 時限 8 小時＋預覽有聲、卡 0 列本機獨有檔、Seedance 標籤清理歸 S2、Remotion 經 remotion-client.ts:7、路線 B 跨引擎 PNG 序列交換。
+- 刪 §4 能力矩陣、§6、§8 派工、§9 風險（重複 handoff／AGENTS／§5）；保留 §7 機械閘門→§5。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=node --input-type=module -e "import('../next-admin/lib/content/video/platform-ratio.ts')…ratioFor" | exit=0 | ms=400
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=1c/12m/10n（agent ab83f4d47f5a8be6a 審 v3；全部套用；套用後每個新引用 sed -n 逐行驗真）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=creative-suite-plan-20261102 | hits=3（README、handoff、worklog-excerpt 皆仍指同檔名，無 stale）
 ## 2026-11-02（續21）外聯 v2 C8 自動寄與輪流寄（程式完成、待真寄）＋C7 成效頁
 
 **做了**（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；SSOT R0-PLAN §6 C8／C7、SPEC §5.5／§5.9／D17／D21／D25）：
