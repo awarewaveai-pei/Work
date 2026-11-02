@@ -1,4 +1,10 @@
 # Worklog
+## 2026-11-02（續11）remote-weekly-agent: weekly summary 2026-11-02 生成
+
+- 01:10 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-11-02.md
+- REALTEST_WAIVED: DOC_ONLY -- auto-generated weekly report, no code change
+- REVIEW_WAIVED: DOC_ONLY -- report only
+- BUGHUNT_WAIVED: DOC_ONLY -- report only
 ## 2026-11-02（續10）wp-bridge 0.20.0 裝上 Soulful 與 aware-wave.com；aware-wave.com 的 bridge 重新啟用；升級腳本的收費檢查改看開關值
 
 **操作者**：「裝到 Soulful」；「aware-wave.com>>不要維持停用(不知道原因)>>要更新」。
