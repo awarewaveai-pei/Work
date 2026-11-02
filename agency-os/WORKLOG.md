@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-02（續27）影音工作台卡 M1：ffprobe 釘版、內容定址素材存放、HEVC 預覽代理（ca4297f00）
+
+**根因**：探測用 regex 刮 ffmpeg stderr 只得 4 項；沒有 ffprobe；上傳以隨機 uuid 存；手機 HEVC Main10 MOV 沒有瀏覽器可播的預覽。
+**做了**：cc.py 工人（Opus 5.5，US$2.66）依主 session 寫死的 brief 實作；主 session 讀 diff、跑全套、修 Codex 兩項。內容見 commit ca4297f00。ffprobe 6.1.1 與 ffmpeg-static 同 build（zip 內 ffmpeg.exe 逐位元相同）。
+**Codex 兩項（皆修並加測試）**：H.264 MOV 不產代理（改：非 MP4 容器一律代理）；verifyOutput 只看 r_frame_rate、可變影格率檔被放過（改：加 avgFrameRate 比對）。
+**未做**：4178（PID 31820）仍跑 commit 前的程式，需重啟才生效，等操作者同意。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=for t in tests/*.cjs; node $t（隔離 server，34 檔） | exit=0 | ms=560000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n（Codex gpt-6-sol，artifact agency-os/reports/oracle/2026-11-02-partialreview-d250d621.md；2m 已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=inspectMedia | hits=12（程式：editor-export、follow、media、media-store、media-inspect；測試：follow-rotation、follow-tracking、tools-workflows、media-store；文件：11-01 兩份紀錄與 oracle artifact 為歷史；回傳欄位不變，全綠）
 ## 2026-11-02（續26）影音工作台：Downloads 副本已由操作者刪除，repo 是唯一一份
 
 **操作者**：「apps/video-workbench 副本都刪掉了，以後只用這份」（卡 0 82d19db9e 把 `.data` 搬進 repo 之後）。
