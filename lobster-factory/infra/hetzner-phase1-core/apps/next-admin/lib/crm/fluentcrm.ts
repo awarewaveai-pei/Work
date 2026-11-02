@@ -37,3 +37,35 @@ export function createNewsletter(
 ): Promise<BridgeResult<BridgeNewsletterResponse>> {
   return bridgePost<BridgeNewsletterResponse>("/newsletter", spec, { timeoutMs: 60_000 });
 }
+
+export interface BridgeContactSpec {
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  /** List / tag titles; the plugin creates the missing ones. */
+  lists?: string[];
+  tags?: string[];
+}
+
+export interface BridgeContactResponse {
+  status: string; // committed | failed
+  ok?: boolean;
+  contact_id?: number;
+  created?: boolean;
+  contact_status?: string;
+  reason?: string;
+  detail?: unknown;
+}
+
+/**
+ * Upsert one FluentCRM contact (email key) with lists/tags through the Bridge `/fluentcrm/contact` route
+ * (ContactUpserter.php). Never starts a sequence or sends mail; an existing contact keeps its subscription status.
+ * `clientId` picks the bridge site (woo.ts listBridgeClients ids; "" = default). ⚠ Always a real write.
+ */
+export function upsertContact(
+  spec: BridgeContactSpec,
+  options: { clientId?: string } = {},
+): Promise<BridgeResult<BridgeContactResponse>> {
+  return bridgePost<BridgeContactResponse>("/fluentcrm/contact", spec, { timeoutMs: 30_000, clientId: options.clientId });
+}

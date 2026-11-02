@@ -78,6 +78,25 @@ export default function RepliesClient() {
     }
   }
 
+  const SYNC_ERR: Record<string, string> = {
+    no_bridge: "這個客戶沒有連上 WordPress 站，無法同步",
+    not_eligible: "這個名單還不能同步（要先有回信或同意，且沒被拒收）",
+    sync_failed: "FluentCRM 同步失敗，稍後再試",
+  };
+  async function syncCrm(id: string, leadId: string) {
+    setBusy(id); setMsg(null);
+    try {
+      const r = await fetch("/api/outreach/leads/sync-fluentcrm", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ leadId }) });
+      const j = await r.json();
+      if (!j.ok) throw new Error(SYNC_ERR[j.error] ?? j.error ?? "同步失敗");
+      setMsg({ ok: true, text: "已同步到 FluentCRM" });
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   if (loading && rows.length === 0) return <div style={{ padding: 16 }} className="card-sub">載入中…</div>;
 
   return (
@@ -119,7 +138,7 @@ export default function RepliesClient() {
                 <button type="button" className="btn-secondary" disabled={off} onClick={() => void act(r.id, "lost", "名單改為失去")}>失去</button>
                 <button type="button" className="btn-secondary" disabled={off || !!r.lead?.do_not_contact}
                   onClick={() => { if (window.confirm("加入拒收後，這個地址不會再收到任何信。確定？")) void act(r.id, "suppress", "已加入拒收名單"); }}>加入拒收</button>
-                <button type="button" className="btn-secondary" disabled title="FluentCRM 同步在卡 C6 上線後啟用">同步 FluentCRM（尚未開放）</button>
+                <button type="button" className="btn-secondary" disabled={off || !r.lead} onClick={() => void syncCrm(r.id, r.lead!.id)}>同步 FluentCRM</button>
               </span>
             )}
           </div>

@@ -27,6 +27,7 @@ use AwareWave\WpBridge\Content\MediaSideloader;
 use AwareWave\WpBridge\Post\PostCreator;
 use AwareWave\WpBridge\Product\ProductCreator;
 use AwareWave\WpBridge\Newsletter\NewsletterCreator;
+use AwareWave\WpBridge\Crm\ContactUpserter;
 use AwareWave\WpBridge\Woo\ShippingProfileManager;
 use AwareWave\WpBridge\Validation\KadenceValidator;
 use AwareWave\WpBridge\Transaction\Impl\HttpRenderer;
@@ -97,6 +98,17 @@ final class RestController {
 				'methods'             => 'POST',
 				'permission_callback' => '__return_true',
 				'callback'            => array( $this, 'createNewsletter' ),
+			)
+		);
+
+		// Upsert one FluentCRM contact (email key) with lists/tags. No sequences, no mail (see ContactUpserter).
+		register_rest_route(
+			AWBRIDGE_REST_NAMESPACE,
+			'/fluentcrm/contact',
+			array(
+				'methods'             => 'POST',
+				'permission_callback' => '__return_true',
+				'callback'            => array( $this, 'upsertContact' ),
 			)
 		);
 
@@ -396,6 +408,45 @@ final class RestController {
 
 		$result['ok'] = false;
 		return new \WP_REST_Response( $result, $this->newsletterErrorStatus( $result['reason'] ?? '' ) );
+	}
+
+	/** Upsert a FluentCRM contact. Signed write (SCOPE_WRITE). Never starts a sequence or sends mail. */
+	public function upsertContact( $request ) {
+		$auth = $this->authenticate( $request, KeyRecord::SCOPE_WRITE );
+		if ( ! $auth->authenticated() ) {
+			$this->audit( 'auth_denied', array( 'reason' => $auth->auditReason() ) );
+			return new \WP_REST_Response( array( 'ok' => false, 'error' => $auth->reason() ), $auth->httpStatus() );
+		}
+
+		$spec = json_decode( (string) $request->get_body(), true );
+		if ( ! is_array( $spec ) ) {
+			return new \WP_REST_Response( array( 'ok' => false, 'error' => 'invalid_payload' ), 400 );
+		}
+
+		$result = ( new ContactUpserter() )->upsert( $spec );
+
+		$this->audit(
+			'fluentcrm_contact_upsert',
+			array( 'key' => $auth->keyId(), 'status' => $result['status'], 'contact_id' => $result['contact_id'] ?? null, 'reason' => $result['reason'] ?? null )
+		);
+
+		if ( $result['status'] === 'committed' ) {
+			$result['ok'] = true;
+			return new \WP_REST_Response( $result, 200 );
+		}
+
+		$result['ok'] = false;
+		switch ( $result['reason'] ?? '' ) {
+			case 'fluentcrm_not_active':
+				$code = 422; // dependency missing
+				break;
+			case 'email_required':
+				$code = 400; // bad input
+				break;
+			default: // create_failed / upsert_failed
+				$code = 409;
+		}
+		return new \WP_REST_Response( $result, $code );
 	}
 
 	/** Map a NewsletterCreator failure reason to an HTTP status. */

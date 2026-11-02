@@ -1,4 +1,22 @@
 # Worklog
+## 2026-11-02（續35）外聯 v2 C6 暖名單進 FluentCRM（程式完成；wp-bridge 0.21.0 未發版、客戶站未更新）
+
+**做了**（cc.py SDK 派工 session 6b6a0d75，US$0.80；主 session 驗收＋修 Codex 3 項）：
+- C6.1 `lobster-factory/packages/wp-bridge-plugin/includes/Crm/ContactUpserter.php`（新）＋`includes/Http/RestController.php` `POST /fluentcrm/contact`（signed write，照 /newsletter）：email upsert＋lists／tags；既有聯絡人保留訂閱狀態、只補空欄；FluentCRM 未啟用 422 `fluentcrm_not_active`；不寄信、不碰 sequences。
+- C6.2 `aware-wave-wp-bridge.php` 0.20.0 → 0.21.0（0.20.0 已被 ea7206013 用掉）。**未跑** `scripts/release-wp-bridge.sh`、未更新客戶站（High）。
+- C6.3 `NA/lib/crm/fluentcrm.ts` `upsertContact`；`NA/app/api/outreach/leads/sync-fluentcrm/route.ts`：資格 consent ∈ replied／opted_in／form_submitted／customer ∧ 非 marketing／all 拒收 ∧ 非 do_not_contact；bridge＝org 的 `wp_sites` host 對 `listBridgeClients()`；成功寫 `fluentcrm_*`＋timeline。
+- C6.4 `RepliesClient.tsx`「同步 FluentCRM」接上。
+- Codex `agency-os/reports/oracle/2026-11-02-partialreview-0cf34789.md`：F2 手動停止聯絡（do_not_contact 無拒收列）仍可同步 → 擋；F3 系統模式擋寫回 423 不標 failed；F4 first_name 用 contact_name（不是公司名）。F1 不改：加標籤觸發 FluentCRM 自動化＝C6／C14 培養的目的（同步前已驗同意）。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run app/api/outreach/ lib/crm lib/portal/__tests__/registry-code.test.ts → 13 files / 84 passed；npx tsc --noEmit exit 0；php -l（docker wordpress:php8.3）3 檔 No syntax errors | exit=0 | ms=6000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n（Codex partialreview-0cf34789，3 修 1 屬設計）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=upsertContact | hits=6
+- 未驗：ContactUpserter 未對真 FluentCRM 跑；C6.4 REALTEST（staging 同步 1 名單）需 0.21.0 上 staging。
+
+**剩**：發布 wp-bridge 0.21.0（`bash scripts/release-wp-bridge.sh`）並更新目標站＝High，等操作者。
+
+**rollback**：revert 本 commit（外掛未發版，客戶站不受影響）。
 ## 2026-11-02（續34）外聯 v2 C13 人員搜尋、email 推斷、付費驗證（程式完成；無 Hunter key，REALTEST 未跑）
 
 **做了**（cc.py SDK 派工 session 1211e552，US$1.28；主 session 驗收＋修 Codex 3 項；NA = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）：
