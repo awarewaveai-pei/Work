@@ -57,6 +57,8 @@ function edNormalizeProject(project) {
     return normalized;
   }) };
 }
+// Saving is a PUT /state round trip (card M2): callers render first, then await the save, so an edit never
+// waits on the network to appear; a failed save is reported, the edit stays on screen and in memory.
 function edSave() {
   const copy = structuredClone(ed.projects);
   ed.queue = ed.queue
@@ -354,8 +356,8 @@ async function edAdd(asset, track) {
   p.clips.push(c);
   ed.selected = c.id;
   ed.time = start;
-  await edSave();
   edRender();
+  await edSave();
 }
 function edValidate(c) {
   for (const key of [
@@ -570,9 +572,9 @@ async function edAction(action) {
       ed.time = 0;
       ed.undo = [];
       ed.redo = [];
-      await edSave();
       d.close();
       edRender();
+      await edSave();
     };
     return;
   }
@@ -586,9 +588,9 @@ async function edAction(action) {
     return;
   }
   if (action === "projects") {
-    await edSave();
     ed.current = null;
     edRender();
+    await edSave();
     return;
   }
   if (!p) return;
@@ -679,8 +681,8 @@ async function edAction(action) {
     }
     p.clips.push(c);
     ed.selected = c.id;
-    await edSave();
     edRender();
+    await edSave();
     return;
   }
   if (action === "undo" || action === "redo") {
@@ -689,8 +691,8 @@ async function edAction(action) {
     if (from.length) {
       to.push(structuredClone(p));
       ed.projects[ed.projects.indexOf(p)] = from.pop();
-      await edSave();
       edRender();
+      await edSave();
     }
     return;
   }
@@ -739,8 +741,8 @@ async function edAction(action) {
         edCheckpoint();
         for (const cue of cues)
           p.clips.push(edText(cue.text, cue.start, cue.end - cue.start));
-        await edSave();
         edRender();
+        await edSave();
       } catch (e) {
         SeedStar.reportError(e);
       }
@@ -829,8 +831,8 @@ async function edAction(action) {
       ed.selected = null;
     }
   }
-  await edSave();
   edRender();
+  await edSave();
 }
 document.addEventListener("click", (e) => {
   const action = e.target.closest("[data-ed-action]"),

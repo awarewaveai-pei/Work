@@ -92,8 +92,9 @@
       SeedStar.generator.setDraft(d);
       SeedStar.router.activate("generator");
     } else {
-      await SeedStar.preferences.set("workflow.active", { ...row, step: 0 });
+      // Show the step first; remembering it is a server round trip (PUT /state, card M2).
       applyStep(row, 0);
+      await SeedStar.preferences.set("workflow.active", { ...row, step: 0 });
     }
   }
   function applyStep(row, index) {
@@ -111,11 +112,11 @@
     next.textContent = index + 1 < row.steps.length ? "下一步" : "完成流程";
     next.onclick = async () => {
       if (index + 1 < row.steps.length) {
+        applyStep(row, index + 1);
         await SeedStar.preferences.set("workflow.active", {
           ...row,
           step: index + 1,
         });
-        applyStep(row, index + 1);
       } else {
         bar.remove();
         await SeedStar.preferences.set("workflow.active", null);

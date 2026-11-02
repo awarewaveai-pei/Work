@@ -2,7 +2,7 @@
   const id = () => crypto.randomUUID();
   const asset = (v = {}, kind = "image") =>
     typeof v === "string"
-      ? { id: id(), kind, url: v, name: "" }
+      ? { id: id(), kind, url: v, name: "", origin: { kind: "import", legacy: true } }
       : {
           ...v,
           id: v.id || id(),
@@ -10,6 +10,8 @@
           name: v.name || "",
           url: v.url || v.image || "",
           references: v.refs || v.references || [],
+          // Every asset carries where it came from (contracts.d.ts AssetOrigin); one without = saved before M2.
+          origin: v.origin || { kind: "import", legacy: true },
         };
   const character = (v = {}) => {
     const { fav, garments, ...rest } = v;
@@ -37,7 +39,7 @@
     id: v.id || id(),
     title: String(v.title || v.name || ""),
     assets: Array.isArray(v.assets)
-      ? v.assets
+      ? v.assets.map((x) => asset(x))
       : Object.entries(v.assets || {}).flatMap(([kind, items]) =>
           items.map((x) => asset(x, kind)),
         ),

@@ -15,7 +15,8 @@ const fs = require("node:fs"), os = require("node:os"), path = require("node:pat
   await p.route("**/api/seedstar/**", async (r) => {
     const url = new URL(r.request().url()),
       route = url.pathname.replace("/api/seedstar", "");
-    if (route === "/uploads" || route === "/capabilities") return r.continue();
+    // /state is the workbench's own storage since card M2, not an AI call: let it reach the test server.
+    if (route === "/uploads" || route === "/capabilities" || route === "/state") return r.continue();
     const body = r.request().postDataJSON();
     calls.push({ route, body });
     if (route === "/director/chat") return r.fulfill({ json: { reply: "測試導演回覆", choices: [], stage: body.phase, script: body.phase === "script" ? "測試腳本：海邊，人物向鏡頭揮手。" : "", duration: 4 } });

@@ -38,6 +38,7 @@
                     : "video/mp4",
               name: (v.input?.operation || v.type) + "-" + v.id.slice(0, 8),
               url: v.result.url,
+              ...(v.result.origin ? { origin: v.result.origin } : {}),
             })
             .catch(SeedStar.reportError);
           if (options.onSuccess) {

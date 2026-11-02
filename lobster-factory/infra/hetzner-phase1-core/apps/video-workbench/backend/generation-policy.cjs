@@ -1,10 +1,14 @@
 const imageOutputs = Object.fromEntries([["1K", 1024], ["2K", 2048], ["4K", 4096]].map(([quality, size]) => [quality, { "1:1": [size, size], "16:9": [size, size * 9 / 16], "9:16": [size * 9 / 16, size], "4:5": [Math.round(size / 10) * 8, Math.round(size / 10) * 10], "4:3": [size, size * 3 / 4] }]));
+// The one place that names the provider and models: capabilities shows them, backend/api.cjs calls them and
+// writes them into each result's origin, so the origin always names the model that actually ran.
+const provider = "OpenAI";
+const models = (env) => ({ image: env.SEEDSTAR_IMAGE_MODEL || "gpt-image-2.5-flare", video: env.SEEDSTAR_VIDEO_MODEL || "sora-2", audio: env.SEEDSTAR_TTS_MODEL || "gpt-4o-mini-tts" });
 function capabilities(env, localTools) {
   return {
     image: !!env.OPENAI_API_KEY, text: !!env.OPENAI_API_KEY,
     audio: !!env.OPENAI_API_KEY, video: !!env.OPENAI_API_KEY,
-    provider: "OpenAI",
-    models: { image: env.SEEDSTAR_IMAGE_MODEL || "gpt-image-2.5-flare", video: env.SEEDSTAR_VIDEO_MODEL || "sora-2", audio: env.SEEDSTAR_TTS_MODEL || "gpt-4o-mini-tts" },
+    provider,
+    models: models(env),
     videoDurations: [4, 8, 12], videoRatios: ["16:9", "9:16"], videoQualities: ["720p"],
     maxVideoImages: 1, maxImageReferences: 4, multiModalReferences: false,
     imageQualities: Object.keys(imageOutputs), imageOutputs, imageExactOutput: true,
@@ -41,4 +45,4 @@ function imageDimensions(settings) {
   const dimensions = imageOutputs[settings.quality]?.[settings.ratio];
   if (settings.imageLayout !== 'center-crop' || !Array.isArray(dimensions)) throw Error('圖片輸出設定無效'); return dimensions;
 }
-module.exports = { capabilities, validate, imageOutputs, imageDimensions };
+module.exports = { provider, models, capabilities, validate, imageOutputs, imageDimensions };

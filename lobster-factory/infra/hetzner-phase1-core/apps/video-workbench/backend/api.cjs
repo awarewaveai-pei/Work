@@ -24,21 +24,35 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
     : [];
   const controls = new Map(),
     refreshes = new Map();
+  const writeJson = (file, value) => {
+    const tmp = file + ".tmp";
+    fs.writeFileSync(tmp, JSON.stringify(value));
+    fs.renameSync(tmp, file);
+  };
   const persist = () => {
-    const tmp = ledgerFile + ".tmp";
     const limit = Math.max(100, Number(env.SEEDSTAR_JOB_HISTORY_LIMIT) || 2000),
       terminal = jobs.filter((j) => !["queued", "running"].includes(j.status));
     const keep = new Set(terminal.slice(-limit).map((j) => j.id));
-    fs.writeFileSync(
-      tmp,
-      JSON.stringify(
-        jobs.filter(
-          (j) => keep.has(j.id) || ["queued", "running"].includes(j.status),
-        ),
+    writeJson(
+      ledgerFile,
+      jobs.filter(
+        (j) => keep.has(j.id) || ["queued", "running"].includes(j.status),
       ),
     );
-    fs.renameSync(tmp, ledgerFile);
   };
+  // The browser state (characters/projects/assets/jobs/preferences/selection) lives here, not in localStorage
+  // (plan invariant 6). Same contract as shared/adapters.js HttpAdapter: GET /state, PUT /state. Writes carry
+  // the revision they were based on; a stale one gets 409 plus the current state, so one tab cannot erase another.
+  const stateFile = path.join(dataDir, "state.json");
+  let state = fs.existsSync(stateFile)
+    ? JSON.parse(fs.readFileSync(stateFile, "utf8"))
+    : null;
+  const providerModels = generationPolicy.models(env);
+  const aiOrigin = (type) => ({
+    kind: "ai_generated",
+    model: providerModels[type],
+    provider: generationPolicy.provider,
+  });
   const key = () => {
     if (!env.OPENAI_API_KEY)
       throw Object.assign(
@@ -230,7 +244,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
         });
         if (signal.aborted) return;
         job.type = result.type;
-        job.result = { url: result.url, ...(result.sourceUrl ? { sourceUrl: result.sourceUrl } : {}), ...(result.width ? { width: result.width, height: result.height } : {}) };
+        const parentAssetId = job.input.references?.src?.id;
+        job.result = { url: result.url, ...(result.sourceUrl ? { sourceUrl: result.sourceUrl } : {}), ...(result.width ? { width: result.width, height: result.height } : {}), origin: { kind: "render", jobId: job.id, ...(typeof parentAssetId === "string" ? { parentAssetId } : {}) } };
         job.progress = 100;
         job.status = "succeeded";
         persist();
@@ -245,7 +260,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
         const audio = await provider(
           "/audio/speech",
           {
-            model: env.SEEDSTAR_TTS_MODEL || "gpt-4o-mini-tts",
+            model: providerModels.audio,
             input: prompt,
             voice: input.voice || "coral",
             instructions:
@@ -270,7 +285,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
           for (const url of input.character.references) refs.push({ url });
         const ratio = input.settings?.imageLayout === 'region-preserve' ? input.settings.regionWidth === input.settings.regionHeight ? '1:1' : input.settings.regionWidth > input.settings.regionHeight ? '16:9' : '9:16' : input.settings?.ratio || input.ratio;
         const body = {
-          model: env.SEEDSTAR_IMAGE_MODEL || "gpt-image-2.5-flare",
+          model: providerModels.image,
           prompt,
           size:
             ["16:9", "4:3"].includes(ratio)
@@ -345,7 +360,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
         const video = await provider(
           "/videos",
           {
-            model: env.SEEDSTAR_VIDEO_MODEL || "sora-2",
+            model: providerModels.video,
             prompt,
             seconds: String(input.duration || input.settings?.duration || 8),
             size: ratio === "9:16" ? "720x1280" : "1280x720",
@@ -362,6 +377,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
         return;
       }
       if (signal.aborted) return;
+      job.result.origin = aiOrigin(type);
       job.status = "succeeded";
       job.progress = 100;
       persist();
@@ -407,13 +423,40 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
           undefined,
           true,
         );
-        job.result = { url: output(binary, "mp4") };
+        job.result = { url: output(binary, "mp4"), origin: aiOrigin("video") };
         job.progress = 100;
         job.status = "succeeded";
       }
       persist();
     }
     return job;
+  }
+  // Validates, records and answers 202 before any provider call (runtime.js treats 501/503 as "never sent").
+  function start(input, res, extra) {
+    const isMedia = mediaTools.supported.includes(input.operation),
+      parsed = isMedia
+        ? { type: input.operation === "separate" ? "audio" : input.operation === "image-output" ? "image" : "video" }
+        : jobInput(input);
+    if (!isMedia) key();
+    const job = {
+      id: crypto.randomUUID(),
+      type: parsed.type,
+      input: durableInput(input),
+      status: "queued",
+      progress: 0,
+      createdAt: new Date().toISOString(),
+      ...extra,
+    };
+    jobs.push(job);
+    persist();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 600000);
+    timeout.unref();
+    controls.set(job.id, controller);
+    json(res, 202, job);
+    setImmediate(() =>
+      finish(job, controller.signal).finally(() => clearTimeout(timeout)),
+    );
   }
   async function body(req) {
     let bytes = 0,
@@ -490,6 +533,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
               : await mediaStore.ingest({ buffer, ext });
         json(res, 201, {
           ...stored,
+          origin: { kind: "upload", rightsConfirmed: false },
           name: String(input.name || "素材"),
           kind,
           type: mime,
@@ -508,39 +552,69 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
         });
         return true;
       }
-      if (req.method === "POST" && route === "/generations") {
-        const input = await body(req),
-          isMedia = mediaTools.supported.includes(input.operation),
-          parsed = isMedia
-            ? { type: input.operation === "separate" ? "audio" : input.operation === "image-output" ? "image" : "video" }
-            : jobInput(input);
-        if (!isMedia) key();
-        const storedInput = durableInput(input);
-        const job = {
-          id: crypto.randomUUID(),
-          type: parsed.type,
-          input: storedInput,
-          status: "queued",
-          progress: 0,
-          createdAt: new Date().toISOString(),
-        };
-        jobs.push(job);
-        persist();
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 600000);
-        timeout.unref();
-        controls.set(job.id, controller);
-        json(res, 202, job);
-        setImmediate(() =>
-          finish(job, controller.signal).finally(() => clearTimeout(timeout)),
-        );
+      if (route === "/state" && req.method === "GET") {
+        json(res, 200, state);
         return true;
       }
-      const match = /^\/generations\/([\w-]+)(\/cancel)?$/.exec(route);
+      if (route === "/state" && req.method === "PUT") {
+        // body() caps at 80MB; localStorage held this state before (about 5MB per origin), so that is ample.
+        const next = await body(req),
+          current = state?.revision ?? 0;
+        if (
+          !next ||
+          next.version !== 1 ||
+          !["characters", "projects", "assets", "jobs"].every((k) =>
+            Array.isArray(next[k]),
+          ) ||
+          !Number.isInteger(next.revision) ||
+          next.revision < 0
+        )
+          throw Object.assign(Error("資料格式不正確"), { status: 400 });
+        if (next.revision !== current) {
+          json(res, 409, {
+            error: { message: "另一個分頁已更新資料" },
+            state,
+          });
+          return true;
+        }
+        // Disk first: a failed write must not leave memory (and later GETs) ahead of what survives a restart.
+        const saved = { ...next, revision: current + 1 };
+        writeJson(stateFile, saved);
+        state = saved;
+        json(res, 200, { revision: state.revision });
+        return true;
+      }
+      if (req.method === "POST" && route === "/generations") {
+        const { idempotencyKey, ...input } = await body(req);
+        if (
+          idempotencyKey !== undefined &&
+          (typeof idempotencyKey !== "string" ||
+            !idempotencyKey ||
+            idempotencyKey.length > 128)
+        )
+          throw Object.assign(Error("idempotencyKey 無效"), { status: 400 });
+        // A resend of the same submission (e.g. after a network timeout) returns the first job and never calls
+        // the provider again; looked up before validation so a replay always gets the original answer.
+        const existing =
+          idempotencyKey && jobs.find((j) => j.idempotencyKey === idempotencyKey);
+        if (existing) {
+          json(res, 200, existing);
+          return true;
+        }
+        start(input, res, idempotencyKey ? { idempotencyKey } : {});
+        return true;
+      }
+      const match = /^\/generations\/([\w-]+)(\/cancel|\/retry)?$/.exec(route);
       if (match) {
         const job = jobs.find((j) => j.id === match[1]);
         if (!job) throw Object.assign(Error("找不到任務"), { status: 404 });
-        if (req.method === "POST" && match[2]) {
+        if (req.method === "POST" && match[2] === "/retry") {
+          if (!["failed", "cancelled"].includes(job.status))
+            throw Object.assign(Error("只有失敗或已取消的任務可以重試"), {
+              status: 409,
+            });
+          start(job.input, res, { retryOf: job.id });
+        } else if (req.method === "POST" && match[2]) {
           if (job.providerId)
             throw Object.assign(
               Error("供應商已接收此影片任務，目前不能取消。"),
@@ -552,7 +626,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
           controls.get(job.id)?.abort();
           persist();
           json(res, 200, job);
-        } else if (req.method === "GET") json(res, 200, await refresh(job));
+        } else if (req.method === "GET" && !match[2])
+          json(res, 200, await refresh(job));
         else throw Object.assign(Error("不支援此方法"), { status: 405 });
         return true;
       }
@@ -723,7 +798,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
         const bytes = image.bytes;
         const valid = ext === "png" ? bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10])) : ext === "jpg" ? bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255 : bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP";
         if (!valid) throw Error("商品圖片格式不正確，請改用本機上傳");
-        json(res, 201, { name: "商品參考圖", kind: "image", type: image.contentType, url: output(bytes, ext) }); return true;
+        json(res, 201, { name: "商品參考圖", kind: "image", type: image.contentType, url: output(bytes, ext), origin: { kind: "import" } }); return true;
       }
       throw Object.assign(Error("找不到服務"), { status: 404 });
     } catch (e) {

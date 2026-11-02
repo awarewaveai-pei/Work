@@ -8,9 +8,10 @@
   const adapter =
     config.mode === "http"
       ? new SeedStarAdapters.HttpAdapter(config)
-      : new SeedStarAdapters.LocalAdapter();
+      : new SeedStarAdapters.LocalAdapter({ report: (e) => reportError(e) });
   let db = {
     version: 1,
+    revision: 0,
     characters: [],
     projects: [],
     assets: [],
@@ -53,8 +54,38 @@
     }
     box.firstChild.textContent = error.message || String(error);
   }
+  // Pre-M2 data has assets without origin, top-level and inside projects; normalizing adds
+  // {kind:"import",legacy:true}. True = something changed.
+  function normalizeAssets() {
+    const bare = (a) => a && typeof a === "object" && !a.origin,
+      missing =
+        db.assets.some((a) => !a?.origin) ||
+        db.projects.some((p) => Array.isArray(p?.assets) && p.assets.some(bare));
+    db.assets = db.assets.map((a) => M.asset(a));
+    db.projects = db.projects.map((p) => M.project(p));
+    return missing;
+  }
+  const CONFLICT = "seedstar.conflict-reload";
   function persist() {
-    queue = queue.catch(() => {}).then(() => adapter.save(structuredClone(db)));
+    queue = queue
+      .catch(() => {})
+      .then(async () => {
+        try {
+          const saved = await adapter.save(structuredClone(db));
+          if (Number.isInteger(saved?.revision)) db.revision = saved.revision;
+        } catch (e) {
+          // Another tab saved first: its state wins, ours is dropped rather than overwriting it. Pages keep
+          // private copies (the editor's ed.projects), so reload everything from the server copy instead of
+          // patching db: a stale copy saved later would overwrite the other tab (Codex 2026-11-02).
+          if (e.status !== 409 || !e.state) throw e;
+          adapter.cache?.(e.state);
+          try {
+            sessionStorage.setItem(CONFLICT, "1");
+          } catch {}
+          setTimeout(() => location.reload(), 0);
+          throw new Error("另一個分頁已更新，已載入最新資料");
+        }
+      });
     queue.catch(reportError);
     return queue;
   }
@@ -176,10 +207,25 @@
     };
     db.jobs.push(job);
     try {
-      const result = await adapter.request("/generations", "POST", input);
+      // One key per submission: a resend after a network failure gets the first job back instead of a second
+      // provider call (backend/api.cjs POST /generations). Only the local server is known to honour the key.
+      const idempotencyKey = crypto.randomUUID(),
+        send = () =>
+          adapter.request("/generations", "POST", { ...input, idempotencyKey });
+      job.idempotencyKey = idempotencyKey;
+      let result;
+      try {
+        result = await send();
+      } catch (e) {
+        if (config.mode === "http" || e instanceof SeedStarAdapters.ServiceError)
+          throw e;
+        result = await send();
+      }
       if (
         !result?.id ||
-        !["queued", "running", "succeeded", "failed"].includes(result.status)
+        !["queued", "running", "succeeded", "failed", "cancelled"].includes(
+          result.status,
+        )
       )
         throw new Error("生成服務回傳格式不正確");
       Object.assign(job, result);
@@ -219,7 +265,15 @@
         if (v) {
           if (v.version !== 1) throw new Error("不支援的資料版本");
           db = v;
+          if (!Number.isInteger(db.revision)) db.revision = 0;
+          if (normalizeAssets()) persist().catch(() => {});
         }
+        try {
+          if (sessionStorage.getItem(CONFLICT)) {
+            sessionStorage.removeItem(CONFLICT);
+            reportError(new Error("另一個分頁已更新，已載入最新資料"));
+          }
+        } catch {}
       });
   const storage = {
     getItem: (key) => {
@@ -407,8 +461,9 @@
     backup: {
       export: async () => {
         await ready;
-        await queue;
-        return structuredClone(db);
+        await queue.catch(() => {});
+        // The server copy is the backup source; null = nothing saved yet, so this tab's state is all there is.
+        return (await adapter.request("/state", "GET")) ?? structuredClone(db);
       },
       import: async (value) => {
         await ready;
