@@ -75,6 +75,52 @@ WordPress aware-wave.com 同時支援工具嵌入及內容／成果使用。需�
 
 自用期間不扣平台點數；保留用量事件與未來訂閱權限接口，記錄實際處理／供應商成本不等於現在收費。
 
+## 先擺場景再生成（2026-11-02 操作者要求寫入）
+
+借自 ArtCraft（https://github.com/storytold/artcraft）的做法：先定構圖、姿勢、場景，再交給 AI 生成，結果可重現。只借流程，不用它的程式或雲端（它的生成走自家付費雲端，模型大半是中國模型）。模型只用已允許的：OpenAI GPT Image、Google Nano Banana、FLUX；3D 候選 Meshy、Rodin。不採用中國模型。
+
+與上面第 0–5 階段（剪輯／合成／骨架引擎）互不依賴，可先做。每張卡完成 = 工作台內真實操作一次 + 測試 + 成果可下載。
+
+現況（2026-11-02 grep）：
+- 去背：主系統有 AI 去背 `next-admin/lib/studio/bg-remover.ts:35`（Replicate `851-labs/background-remover`），路由 `next-admin/app/api/tools/studio/remove-bg/`。工作台只有「去白底（免費）」，`scripts/tools-overlays.js:30` 明寫 AI 去背尚未接入。
+- 畫布：主系統有 fabric 畫布 `next-admin/app/(shell)/tools/canvas/CanvasEditor.tsx`。工作台沒有 2D 拼貼畫布，只有局部編輯（最多八區）。
+- 角色：工作台有角色頁與參考圖（`pages/characters.html`、`scripts/characters-0.js`）。
+- 生成：工作台目前只接 OpenAI；圖片編輯最多四張參考圖（README「本機 OpenAI adapter」段）。主系統另有 FLUX Kontext、Nano Banana 2（`next-admin/lib/tarot/image-gen.ts`）。
+- 3D：兩邊都沒有。
+
+### 卡 S3：去背後 2D 拼貼成構圖（先做）
+
+- 做什麼：圖片去背成透明 PNG → 在工作台新的拼貼畫布擺放（移動、縮放、旋轉、上下層、翻轉）→ 匯出構圖圖片 → 帶入生成當參考圖或局部編輯底圖。
+- 怎麼做：去背接主系統同一個供應商與版本（不另找供應商）；工作台本機階段經 `backend/` 呼叫，成本照既有用量紀錄。畫布在工作台內實作，外觀讀 AwareWave tokens。
+- 驗收：兩張自有測試圖去背 → 拼成一張 → 匯出 PNG 尺寸正確、透明區正確 → 帶入生成頁的參考圖格子；保存後重開構圖仍在。
+- 建議模型：Opus 5.5。
+
+### 卡 S2：同一個場景拍好幾鏡
+
+- 做什麼：把一張背景固定成「場景」（存進素材庫並標記為場景）→ 每一鏡指定角度／景別（遠、中、近、俯、仰）與要放的人物 → 依序出圖，全部引用同一張場景圖。
+- 怎麼做：用圖片編輯（場景圖＋角色參考圖＋鏡頭描述）；專案頁的分鏡（`scripts/projects-0.js`）加「使用場景」欄位。同一場景的鏡頭在專案裡並排顯示，方便比對一致性。
+- 驗收：一個場景、三鏡不同景別，三張成果都引用同一場景素材 ID；任一鏡重生不影響其他鏡；草稿還原後場景引用仍在。
+- 限制：一致程度取決於模型，不承諾像 3D 一樣精確；畫面上要寫明。
+- 建議模型：Opus 5.5。
+
+### 卡 S1：人偶擺姿勢再換成角色
+
+- 做什麼：拖拉人偶關節（頭、肩、肘、腕、髖、膝、踝）定姿勢與位置 → 產生姿勢參考圖 → 選角色 → 生成同一角色、照這個姿勢的圖。同一角色可存多個姿勢、拍很多鏡。
+- 怎麼做：第一版用 2D 人偶（瀏覽器內骨架圖，存成座標 JSON＋渲染 PNG），送圖片編輯時附「依姿勢參考圖擺姿勢、外觀依角色參考圖」。姿勢存在角色底下，可重用。3D 人偶等 S4 有 3D 檢視器後再加。
+- 驗收：同一角色、兩個不同姿勢各生成一次，成果姿勢與人偶一致（人工比對截圖存證）；姿勢保存、重開、可再改。
+- 限制：模型不保證完全照姿勢；畫面要能「再生成」而不重扣同一筆（沿用既有任務重試規則）。
+- 建議模型：Opus 5.5（姿勢編輯器的互動設計先由 Fable 定）。
+
+### 卡 S4：圖片轉 3D 物件再擺位置（最後做）
+
+- 做什麼：一張物件圖 → 轉成 3D 模型（GLB）→ 在 3D 檢視器旋轉、移動、縮放、設鏡頭 → 截出畫面 → 帶入生成或拼貼。
+- 怎麼做：供應商候選 Meshy、Rodin，開工第一步先確認 API、價格、授權與輸出格式，再選一家；不用 Hunyuan 3D、Tripo 等中國模型。檢視器在瀏覽器內（three.js 等開源套件，固定版本）。
+- 驗收：自有測試物件圖轉成 GLB，可在檢視器轉到指定角度並截圖，截圖帶入生成頁成功；檔案與成本有紀錄。
+- 依賴：先完成 S3（拼貼畫布可放 3D 截圖）。
+- 建議模型：方向與供應商選型 Fable；實作 Opus 5.5。
+
+順序：S3 → S2 → S1 → S4。S3 先做，是因為主系統已有去背可直接沿用，最快能用。
+
 ## 範圍與節省反覆工作的方式
 
 先做第 0 階段的完整最小流程，不同時重寫三套編輯器。每階段以可操作專案與實際輸出驗收；失敗就處理具體阻塞，停止擴充。程式變更按小範圍測試與 Claude 跨模型審查；不反覆全站測試、不重複打 ZIP、不任意更換 4178。專業引擎預設 UI 可用於試作，但不當成已完成 AwareWave 外觀整合。
@@ -85,6 +131,7 @@ WordPress aware-wave.com 同時支援工具嵌入及內容／成果使用。需�
 
 - FilmCraft：https://github.com/storytold/filmcraft
 - EffectCraft：https://github.com/storytold/effectcraft
+- ArtCraft：https://github.com/storytold/artcraft
 - Blender 動畫／骨架：https://www.blender.org/features/animation/
 - Blender Grease Pencil 骨架：https://docs.blender.org/manual/en/5.1/grease_pencil/modifiers/deform/armature.html
 
