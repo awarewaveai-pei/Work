@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-02（續46）影音工作台卡 P1：輸出成素材帶來源；Remotion 片頭接自架服務（f9eca42b2）
+
+- 根因／缺口：editor-export 成品無 parentAssetId（api.cjs 舊 :285 只讀 references.src）；無片頭模板路徑。
+- 實機發現：Remotion 檔含靜音 AAC 墊到 5.056 s（影像 5.000 s）→ verifyOutput duration.mismatch；入庫只留影像軌（api.cjs remotion 分支），偵測器不放寬。
+- Codex F1 發布包漏 renderer-auth.ts／timeline-v1.ts（timeline-export 寫死 ../../next-admin）→ 打包清單＋resolveSource＋tests/package-sources.cjs 守。F2 片頭狀態跨專案 → 綁 projectId。
+- 憑證：REMOTION_SERVICE_URL／MEDIA_RENDER_AUTH_TOKEN 入 user-env.ps1、User env、AWARE_WAVE_CREDENTIALS.md §4.9（操作者同意）；template 7b0167bb5。
+- 操作者同意釋放已結束工人 8e27544f 的 file-claim。SDK US$3.42。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node real.cjs → 4178 POST /generations remotion-template → remotion-svc.aware-wave.com，succeeded、verification ok、影格見繁中標題；全套 44 測試 exit 0 | exit=0 | ms=157000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n（Codex，artifact agency-os/reports/oracle/2026-11-02-partialreview-70f9cc0c.md；已修，突變紅→綠）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=renderer-auth | hits=22（主系統文件既有引用，非 stale）
 ## 2026-11-02（續45）影音工作台卡 P0：EffectCraft Web 0.20.0 閘門不過，定案路線 C（3859d8c69）
 
 - ③ 不能載入使用者字型（上游 web.md:68），繁中 NO GLYPH（證據 docs/p0-evidence/1,2,4）→ 合成類硬閘不過 → C。① WebGPU 54 s device lost（GPU 重設使操作者 Edge 當掉，主 session 停掉工人改 headless＋停用 WebGPU 續跑）、WebGL2 0.47× 即時；⑤ 焦點出不了 iframe；② 重開後素材離線；④ 過。計畫 §0 記路線 C 與重評條件。

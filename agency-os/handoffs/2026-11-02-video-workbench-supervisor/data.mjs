@@ -30,6 +30,7 @@ export const NOW = [
   { what: '素材與專案存在伺服器，清瀏覽器資料不會不見。', state: 'yes', ev: '2026-11-02 卡 M2，4178 已重啟：瀏覽器裡的 7 個素材、5 筆任務已搬到伺服器，每個素材都有來源標記；原版在瀏覽器另存備份。' },
   { what: '剪輯能精確到影格、加減軌道、用多種轉場。', state: 'no', ev: '影格精確已完成（卡 M3）；加減軌道與更多轉場在卡 P2。' },
   { what: '輸出 720p 或 1080p 的 H.264 影片，含字幕與混音。', state: 'yes', ev: 'editor-export.cjs:182；比例有 16:9、9:16、1:1、4:5、4:3。' },
+  { what: '用模板做片頭（繁中可）。', state: 'yes', ev: '2026-11-02 卡 P1：剪輯器「片頭」分頁，自架 Remotion 服務渲染，免費；成品進素材庫並記來源。' },
   { what: '動畫合成、2D 角色骨架、3D。', state: 'no', ev: '都還沒有。卡 P3、P4、P5 做。' },
 ];
 
@@ -41,6 +42,7 @@ const S3 = 'd6835f354';
 const P0 = '3859d8c69';
 const M3 = 'b52b2ac04';
 const M2 = '2ab702e3f';
+const P1 = 'f9eca42b2';
 
 export const STEPS = [
   { n: 1, code: '0', title: '切 4178 到 repo', plain: '例：打開 127.0.0.1:4178，角色頁出現「示範角色庫」，代表跑的是 repo 版；舊資料一筆不少。',
@@ -109,11 +111,12 @@ export const STEPS = [
       done('S2.2', '清掉畫面上的 Seedance 字樣；測試。', S3),
     ] },
   { n: 7, code: 'P1', title: '引擎接入與存檔閉環', plain: '例：選素材建專案、剪、存、關掉重開、輸出，成品自動成為素材庫的一筆。',
-    gate: '建專案、編輯、保存、重開、輸出，成品成為素材並帶來源；舊編輯器仍可用。', risk: 'Medium', model: 'Opus', status: 'not_started', depends: ['P0', 'M3'],
+    gate: '建專案、編輯、保存、重開、輸出，成品成為素材並帶來源；舊編輯器仍可用。', risk: 'Medium', model: 'Opus（經 SDK API）', status: 'done', commit: P1, depends: ['P0', 'M3'],
+    result: '2026-11-02 輸出的影片自動進素材庫，記得來自哪個專案、哪段素材；舊專案照樣能開能輸出。剪輯器多了「片頭」：選模板、打字、選背景圖，按「產生片頭（免費）」由我們自架的服務做 5 秒片頭，可放到時間軸開頭。實測做出一支繁中片頭。Codex 審出 2 項全修。',
     what: '路線 C（P0 定案）：延伸現有五軌編輯器，補 Remotion 片頭／動態字幕模板路徑（remotion-client.ts）',
     items: [
-      todo('P1.1', '依 P0 路線接上引擎，或延伸自製編輯器。'),
-      todo('P1.2', '存檔、重開、輸出閉環；成品回素材庫；測試。'),
+      done('P1.1', '依 P0 路線接上引擎，或延伸自製編輯器。', P1),
+      done('P1.2', '存檔、重開、輸出閉環；成品回素材庫；測試。', P1),
     ] },
   { n: 8, code: 'P2', title: '完整剪輯', plain: '例：MOV、MP4、圖片、兩路音訊、字幕混在一起剪，加轉場、調色、音量正規化，輸出 4K。',
     gate: '混合素材成片；輸出自動檢查通過；響度在目標上下 1 LU 內、峰值不超過 −1 dBTP。', risk: 'Medium', model: 'Opus；子卡 Codex', status: 'not_started', depends: ['P1'],
