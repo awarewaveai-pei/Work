@@ -8,7 +8,7 @@ export const META = {
   req: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/handoff/Claude_Code_handoff_20261102.md',
   worklog: 'agency-os/WORKLOG.md 2026-11-02 續19–續45',
   self: 'agency-os/handoffs/2026-11-02-video-workbench-supervisor/',
-  url: 'https://claude.ai/artifact/MCTZ7PAeZdGKRuvDxPquUd',
+  url: 'https://claude.ai/artifact/YRsAwgH1cVEtcSLdCPWzCs',
 };
 
 export const COPY = {
