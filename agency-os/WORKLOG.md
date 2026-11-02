@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-02（續44）外聯 v2 本輪收尾：C6.4 不測（aware-wave.com bridge 不接回）；監工台 61/77
+
+- 操作者選「先不接」：不把 aware-wave.com 接回 app 的 bridge（維持 10-30 切斷），C6.4 等決定接回時再測（經 session local_6aa73d12 轉達）。
+- 查證：aware-wave.com FluentCRM 已啟用、fc_funnels 0 筆；正式 next-admin 只設 `WPBRIDGE_BASE_URL=https://soulfulexpression.org`（無 _1／_2）→ 同步 aware-wave.com 的 org（awarewave-ops）會 `no_bridge`。
+- 監工台 `data.mjs`：C6.2 done（8e7b353ea），C6.4 註明等接回；build＋check 綠（61/77），已發布。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp eval-file（fc_funnels 列表）→ 0 筆、fluentcrm active yes；docker exec lobster-next-admin printenv WPBRIDGE_BASE_URL{,_1,_2} → 只有 soulfulexpression.org | exit=0 | ms=4000
+- REVIEW_WAIVED: DOC_ONLY -- 監工台狀態與紀錄
+- BUGHUNT_WAIVED: DOC_ONLY -- 無程式改動
+
+**外聯 v2 剩（全為操作者步驟或等資料）**：C11.1 次網域＋信箱；Hunter／ZeroBounce 金鑰；C12.3 GCIS 白名單；C14.3 Meta App 權限＋頁面訂閱；C6.4 待接回 aware-wave.com；C9（100 名單後）；C16.2／C16.4（寄滿量後）；Google 品牌驗證 24h 後按「我已解決問題」。
+
+**rollback**：NA（無程式改動）。
 ## 2026-11-02（續43）影音工作台卡 S3a＋S2：付費去背（按鈕先標價）、同場景多鏡、移除 Seedance（d6835f354）
 
 - 內容見 commit d6835f354。cc.py 工人 US$3.04。Codex 3 項全修：取消／逾時／重送雙重付費（replicateId＋Replicate cancel＋同圖接回原 prediction）、關閉任務視窗後成果不進素材庫（runtime reconcileJobs，所有任務類型）、20MB 上限在全量下載後才檢查（串流截斷）；tests/remove-bg-money.cjs。

@@ -61,6 +61,7 @@ const C13 = '1c47a2904';
 const C6 = 'f57fd3512';
 const C14 = '27a93dbcc';
 const C16 = 'b0f5e4872';
+const C6REL = '8e7b353ea';
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '守衛與事實訂正', plain: '例：名單上某人剛退訂，系統仍替他建草稿。改成建草稿前重查拒收名單。同時把「scope 不能寄信」這句不對的說法改正，用測試守住程式不呼叫寄信；順便把 Google 授權改成正式發布、加上讀信權限，之後 6 個新信箱只要授權一次。',
@@ -223,9 +224,9 @@ export const STEPS = [
     files: ['WPB/includes/Http/RestController.php', 'WPB/includes/Crm/ContactUpserter.php', 'NA/lib/crm/fluentcrm.ts', 'NA/app/api/outreach/leads/sync-fluentcrm/route.ts'],
     items: [
       done('C6.1', 'wp-bridge 外掛加一個「新增／更新聯絡人」端點，只做這件事。', C6),
-      todo('C6.2', '外掛已升 0.21.0（f57fd3512）；剩：發版並更新目標站（High，等你同意）。'),
+      done('C6.2', '外掛升 0.21.0、發版，並推上 aware-wave.com 與 Soulful（兩站 health 200；Soulful 檢查 7/7 通過）。', C6REL),
       done('C6.3', '同步的後端：先驗資格（回過信、填過表單、同意過、是客戶之一，且不在拒收名單），再呼叫外掛。', C6),
-      todo('C6.4', '按鈕與測試已完成（f57fd3512）；剩：0.21.0 上 staging 後同步 1 個測試名單。'),
+      todo('C6.4', '按鈕與測試已完成（f57fd3512）；剩：真同步一筆。沒有 staging 站，aware-wave.com 的 bridge 自 10-30 起沒接回 app（你決定先不接）：等決定接回 aware-wave.com 時再測。'),
     ] },
   { n: 15, code: 'C14', group: 'G', title: '個人消費者：Meta 名單型廣告 → FluentCRM', waitFor: '等你在 Meta 廣告管理員建立第一個名單型廣告', plain: '例：你在廣告管理員圈「台灣、對塔羅有興趣」投名單型廣告，對方在 IG 上一鍵留 email。系統收到後存成暖名單並記下同意依據，自動進該品牌的 FluentCRM 培養。這些人永遠不會收到冷信。',
     gate: '用 Meta 的名單廣告測試工具送一筆，10 秒內名單出現、帶同意依據，FluentCRM 也有這個聯絡人；同一筆重送不會重複。下載 CSV 匯入也走同一條路得到同樣結果。', risk: 'Medium（C14.3 外部設定）', model: 'Opus 5.5', status: 'in_progress', depends: ['C6'],
