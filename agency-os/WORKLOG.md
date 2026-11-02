@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-02（續49）影音工作台卡 P2：完整剪輯（a0be1d012）
+
+- 工人改訂閱制 Agent（操作者：不用 SDK）；先前 cc.py 工人未動檔即停。
+- 規則單一來源 shared/editor-model.js（頁面＋輸出共用）；舊五軌物件專案遷移、原版另存。
+- Codex F1 .cube 上傳網址 404（server.cjs 白名單）；F2 軌道上限 20 > MediaTimelineV1 16 → 合計上限 16，tests/p2-review-fixes.cjs 守兩值相等。
+- 未做（工人列）：拖左緣、拖曳吸附；峰值表無實際讀數測試；音量關鍵影格 UI 無瀏覽器測試。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node real-p2.cjs → 4178 editor-export 1080p（MOV＋MP4 溶解＋圖＋繁中字幕＋兩路音＋LUT）→ verification ok、−16.3 LUFS、TP −11.6、bt709/tv、剪點格為 50/50 混合；全套 49 exit 0 | exit=0 | ms=120000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n（Codex，artifact agency-os/reports/oracle/2026-11-02-partialreview-c71e5626.md；已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=MEDIA_TIMELINE_V1_MAX_TRACKS | hits=5
 ## 2026-11-02（續48）外聯產信改背景跑（Cloudflare 524）
 
 - 根因：POST /api/outreach/messages 同步等 AI，>100s → 524，伺服器仍寫入；重按產兩組。
