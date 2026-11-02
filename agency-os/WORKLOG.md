@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-02（續37）影音工作台卡 M3：整數影格＋有理影格率、輸出驗證、專案外層、MediaTimelineV1 匯出（b52b2ac04）
+
+- 內容見 commit b52b2ac04。cc.py 工人 US$4.10。Codex 3 項全修（本機素材 ID 列 loss、sourceStart 量化列 loss、正式匯出抽格比對＋tests/export-frame-check.cjs）。
+- tests/media-contract.cjs 被已結束的工人 session 013e118e 佔用（file-claims），未覆寫；新案例放獨立檔。
+- media-store.cjs:89 Edge 播放 0.7 s 視窗在約 120 個 node 程序負載下失敗、單跑 10/10；generation-flows.cjs:155 HEAD 既有。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/media-contract.cjs; node tests/export-frame-check.cjs; node tests/editor-render.cjs | exit=0 | ms=420000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（Codex gpt-6-sol，artifact agency-os/reports/oracle/2026-11-02-partialreview-1f67d526.md；3 修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=verifyOutput | hits=6
 ## 2026-11-02（續36）部署閘擋下 C6：sync-fluentcrm 沒過系統模式閘 → 補 `checkProductionChangeAllowed`；423 改用共用契約
 
 **根因**：`NA/app/api/outreach/leads/sync-fluentcrm/route.ts`（f57fd3512）經 WP-Bridge 寫客戶站，沒呼叫 `checkProductionChangeAllowed` → `lib/system-modes/__tests__/production-change-coverage.test.ts` 紅；另手寫 423 → `blocked-change.test.ts`「no route hand-writes a 423」紅。主機 sg-deploy npm test 閘中止（05:02:52Z，正式站留 6c9f2a8c8）。驗收時只跑了 outreach／crm 子集。
