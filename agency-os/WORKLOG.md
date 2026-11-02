@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-02（續18）next-admin 手動部署 c5071e997（外聯 C4 回信同步＋C11 寄件信箱健康檢查上線）
+
+**操作者**：「要部署的都馬上做，或是可以做多張卡後再部署 就等一起」→ 記為常設規則（memory `feedback_deploy_now_or_batch`）。
+
+**做了**：`check-deploy-drift.ps1`（正式站落後 9 個 commit、compose 變數無漂移、無 DEPLOY_HOLD）→ 主機 `sg-deploy.sh next-admin`（npm test → build → healthy 16s → HTTP smoke 全 200），`.deployed-commit` dc80a0980 → c5071e997。部署後各打一次兩條新路由（同 cron 的 poke.sh）。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin → healthy after 16s、smoke all endpoints OK、deployed commit c5071e997 | exit=0 | ms=463245
+- REALTEST_EVIDENCE: tool=SSH | cmd=poke.sh outreach_sender_health → exit 0；poke.sh outreach_gmail_sync → HTTP 502 `awarewaveai@gmail.com: invalid_grant`（route 已上線、找到 1 個 connector；Google 授權 11-01 起失效，C1.4 已記） | exit=1 | ms=5656
+- REVIEW_WAIVED: NA -- 部署既有已審查的 commit（C4 審查見本日續11），無程式改動
+- BUGHUNT_WAIVED: NA -- 無程式改動
+
+**剩**：C1.6 操作者在 Google Cloud Console 按「發布應用程式」並在 Connectors 頁重連 Gmail → /ops/schedules「外聯回信同步」10 分內轉綠；之後 REALTEST 寄一封給自己並回覆。
+
+**rollback**：主機 `sg-deploy.sh` 以 dc80a0980 重部署（或 revert 後部署）。
 ## 2026-11-02（續17）next-admin 部署加速：webpack 快取留在 BuildKit cache mount；重複的型別檢查移到部署閘（next typegen＋tsc）
 
 **操作者**：「加速做掉」（前一則量測：docker build 120s → 336s）。
