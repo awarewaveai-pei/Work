@@ -95,15 +95,48 @@ function inspectMedia(file, signal) {
     };
   });
 }
-// Checks a rendered file against what the export promised. expect: { duration (s), fps ({num,den} or number),
-// width, height, audio (boolean) }; omitted keys are not checked. Duration tolerance = one frame.
+function runFfmpeg(args, signal) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(require("ffmpeg-static"), ["-hide_banner", "-nostats", ...args], {
+      windowsHide: true,
+      stdio: ["ignore", "ignore", "pipe"],
+      signal,
+    });
+    let log = "";
+    child.stderr.on("data", (c) => (log = (log + c).slice(-16000)));
+    child.once("error", reject);
+    child.once("close", (code) => (signal?.aborted ? reject(Error("任務已取消")) : resolve({ code, log })));
+  });
+}
+// Decodes frame N of the output and frame M of the source (select by decoded index: no seeking, so no keyframe
+// snapping) and compares them at the output size. Returns PSNR in dB (Infinity = identical) or null = no frame.
+async function framePsnr(output, outFrame, source, sourceFrame, width, height, signal) {
+  const pick = (n) => `select=eq(n\\,${n}),setpts=PTS-STARTPTS,scale=${width}:${height},setsar=1,format=yuv420p`;
+  const { log } = await runFfmpeg(
+    ["-i", output, "-i", source, "-filter_complex", `[0:v]${pick(outFrame)}[a];[1:v]${pick(sourceFrame)}[b];[a][b]psnr`, "-frames:v", "1", "-an", "-f", "null", "-"],
+    signal,
+  );
+  const match = [...log.matchAll(/PSNR y:\S+ u:\S+ v:\S+ average:(inf|[\d.]+)/g)].at(-1);
+  return match ? (match[1] === "inf" ? Infinity : Number(match[1])) : null;
+}
+async function integratedLoudness(file, signal) {
+  const { log } = await runFfmpeg(["-i", file, "-map", "0:a:0", "-af", "ebur128=framelog=verbose", "-f", "null", "-"], signal);
+  const match = /Integrated loudness:\s*I:\s*(-?inf|-?[\d.]+) LUFS/.exec(log);
+  return match ? (match[1].endsWith("inf") ? -Infinity : Number(match[1])) : null;
+}
+// Card M3 (plan §3 invariant 8): checks a rendered file against what the export promised. Findings are coded like
+// ../video-service/quality.py ({ code, message, evidence }). expect: { duration (s), fps ({num,den} or number),
+// width, height, audio (boolean), audible (true = integrated loudness must be above -70 LUFS),
+// frames ([{ outFrame, source, sourceFrame }] = decoded frames must match, PSNR >= 35 dB) }; omitted keys are not
+// checked. Duration tolerance = one frame.
 async function verifyOutput(file, expect = {}, signal) {
-  const findings = [];
+  const findings = [],
+    add = (code, message, evidence = {}) => findings.push({ code, message, evidence });
   let info;
   try {
     info = await inspectMedia(file, signal);
   } catch (error) {
-    return { ok: false, findings: ["無法讀取輸出檔：" + error.message] };
+    return { ok: false, findings: [{ code: "probe.unreadable", message: "無法讀取輸出檔：" + error.message, evidence: {} }] };
   }
   const actualFps = info.probe.frameRate ? info.probe.frameRate.num / info.probe.frameRate.den : null,
     expectFps =
@@ -113,21 +146,40 @@ async function verifyOutput(file, expect = {}, signal) {
           ? expect.fps.num / expect.fps.den
           : Number(expect.fps);
   if (expectFps !== null && (actualFps === null || Math.abs(actualFps - expectFps) > 0.001))
-    findings.push(`影格率應為 ${expectFps.toFixed(3)}，實際 ${actualFps === null ? "無" : actualFps.toFixed(3)}`);
+    add("video.fps", `影格率應為 ${expectFps.toFixed(3)}，實際 ${actualFps === null ? "無" : actualFps.toFixed(3)}`, { expected: expectFps, actual: actualFps });
   const avg = info.probe.avgFrameRate ? info.probe.avgFrameRate.num / info.probe.avgFrameRate.den : null;
   if (actualFps && avg && Math.abs(avg - actualFps) / actualFps > 0.01)
-    findings.push(`影格率不固定：標示 ${actualFps.toFixed(3)}，平均 ${avg.toFixed(3)}`);
+    add("video.variable_fps", `影格率不固定：標示 ${actualFps.toFixed(3)}，平均 ${avg.toFixed(3)}`, { declared: actualFps, average: avg });
   if (expect.duration !== undefined) {
     const frame = 1 / (expectFps || actualFps || 30);
     if (info.duration === null || Math.abs(info.duration - expect.duration) > frame + 1e-6)
-      findings.push(`時長應為 ${expect.duration} 秒（容差一格），實際 ${info.duration ?? "無"} 秒`);
+      add("duration.mismatch", `時長應為 ${expect.duration} 秒（容差一格），實際 ${info.duration ?? "無"} 秒`, { expected: expect.duration, actual: info.duration });
   }
   if (expect.width !== undefined && info.displayWidth !== expect.width)
-    findings.push(`寬應為 ${expect.width}，實際 ${info.displayWidth ?? "無"}`);
+    add("output.width", `寬應為 ${expect.width}，實際 ${info.displayWidth ?? "無"}`, { expected: expect.width, actual: info.displayWidth });
   if (expect.height !== undefined && info.displayHeight !== expect.height)
-    findings.push(`高應為 ${expect.height}，實際 ${info.displayHeight ?? "無"}`);
+    add("output.height", `高應為 ${expect.height}，實際 ${info.displayHeight ?? "無"}`, { expected: expect.height, actual: info.displayHeight });
   if (expect.audio !== undefined && info.audio !== !!expect.audio)
-    findings.push(expect.audio ? "應有音軌，實際沒有" : "不應有音軌，實際有");
+    add("container.audio_stream", expect.audio ? "應有音軌，實際沒有" : "不應有音軌，實際有", { expected: !!expect.audio });
+  for (const check of expect.frames || []) {
+    const psnr = info.video
+      ? await framePsnr(file, check.outFrame, check.source, check.sourceFrame, info.width, info.height, signal)
+      : null;
+    const floor = check.minPsnr ?? 35;
+    if (psnr === null || psnr < floor)
+      add(
+        "frame.mismatch",
+        psnr === null
+          ? `輸出第 ${check.outFrame} 格或來源第 ${check.sourceFrame} 格不存在`
+          : `輸出第 ${check.outFrame} 格與來源第 ${check.sourceFrame} 格不符（PSNR ${psnr.toFixed(1)} dB < ${floor}）`,
+        { outFrame: check.outFrame, sourceFrame: check.sourceFrame, psnr },
+      );
+  }
+  if (expect.audible) {
+    const lufs = info.audio ? await integratedLoudness(file, signal) : null;
+    if (lufs === null || !(lufs > -70))
+      add("audio.silent", lufs === null ? "應有聲音，但量不到響度（無音軌或量測失敗）" : `應有聲音，實際整體響度 ${lufs} LUFS（≤ -70 視為靜音）`, { integratedLufs: lufs });
+  }
   return { ok: findings.length === 0, findings, info };
 }
 module.exports = { inspectMedia, verifyOutput, ffprobePath };

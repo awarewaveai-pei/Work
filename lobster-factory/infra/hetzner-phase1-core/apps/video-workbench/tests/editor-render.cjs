@@ -37,8 +37,8 @@ const clip = (id, color, start) => ({
   kind: "video",
   track: "V1",
   asset: { url: color + ".mp4" },
-  start,
-  duration: 1,
+  startFrame: start * 30,
+  durationFrames: 30,
   filter: "鮮豔",
 });
 function pixels(file, time) {
@@ -62,6 +62,7 @@ function pixels(file, time) {
   for (const type of ["融接", "淡入淡出", "向左擦除", "向右擦除", "圓形裁切"]) {
     const p = {
       ratio: "16:9",
+      timebase: { num: 30, den: 1 },
       clips: [
         clip("red", "red", 0),
         {
@@ -90,6 +91,7 @@ function pixels(file, time) {
   for (const mask of ["圓形", "圓角矩形", "三角形"]) {
     const p = {
       ratio: "4:3",
+      timebase: { num: 30, den: 1 },
       clips: [
         {
           ...clip("masked", "red", 0),

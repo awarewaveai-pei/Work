@@ -245,7 +245,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
         if (signal.aborted) return;
         job.type = result.type;
         const parentAssetId = job.input.references?.src?.id;
-        job.result = { url: result.url, ...(result.sourceUrl ? { sourceUrl: result.sourceUrl } : {}), ...(result.width ? { width: result.width, height: result.height } : {}), origin: { kind: "render", jobId: job.id, ...(typeof parentAssetId === "string" ? { parentAssetId } : {}) } };
+        job.result = { url: result.url, ...(result.sourceUrl ? { sourceUrl: result.sourceUrl } : {}), ...(result.width ? { width: result.width, height: result.height } : {}), ...(result.verification ? { verification: result.verification } : {}), origin: { kind: "render", jobId: job.id, ...(typeof parentAssetId === "string" ? { parentAssetId } : {}) } };
         job.progress = 100;
         job.status = "succeeded";
         persist();
@@ -384,6 +384,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
     } catch (e) {
       if (job.status !== "cancelled") {
         job.status = "failed";
+        if (Array.isArray(e.findings)) job.findings = e.findings; // output verification (card M3): coded findings
         job.error = publicError((job.result?.sourceUrl && job.input.settings?.imageLayout ? "圖片已生成，但本機尺寸轉換失敗；原圖可下載，請只重試尺寸轉換。 " : "") + e.message);
         persist();
       }
@@ -582,6 +583,15 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
         writeJson(stateFile, saved);
         state = saved;
         json(res, 200, { revision: state.revision });
+        return true;
+      }
+      if (req.method === "POST" && route === "/editor/timeline-v1") {
+        const input = await body(req);
+        if (typeof input?.organizationId !== "string" || !input.organizationId)
+          throw Object.assign(Error("缺少 organizationId"), { status: 400 });
+        if (!input.project || typeof input.project !== "object")
+          throw Object.assign(Error("缺少剪輯專案"), { status: 400 });
+        json(res, 200, await require("./timeline-export.cjs").exportTimelineV1(input.project, { organizationId: input.organizationId, styleRef: input.styleRef }));
         return true;
       }
       if (req.method === "POST" && route === "/generations") {

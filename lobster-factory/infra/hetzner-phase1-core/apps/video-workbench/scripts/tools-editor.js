@@ -43,10 +43,36 @@ const edProject = () => ed.projects.find((p) => p.id === ed.current),
   edClip = () => edProject()?.clips.find((c) => c.id === ed.selected),
   edEnd = () =>
     Math.max(3, ...(edProject()?.clips || []).map((c) => c.start + c.duration));
-function edNormalizeProject(project) {
-  return { ...project, clips: (project.clips || []).map(clip => {
+// Card M3 (plan §3 invariant 5): stored clip time = integer frames at the project timebase. The seconds fields
+// are derived in memory for the UI and stripped on save; every clip time change goes through edTime.
+const edTimeKeys = [
+  ["start", "startFrame"],
+  ["duration", "durationFrames"],
+  ["sourceStart", "sourceStartFrame"],
+];
+function edTime(p, clip, patch = {}) {
+  const tb = p.timebase;
+  for (const [seconds, frames] of edTimeKeys) {
+    const value =
+      patch[frames] !== undefined
+        ? Math.round(Number(patch[frames]))
+        : patch[seconds] !== undefined
+          ? Timebase.toFrames(patch[seconds], tb)
+          : undefined;
+    if (value !== undefined) clip[frames] = frames === "durationFrames" ? Math.max(1, value) : value;
+  }
+  for (const [seconds, frames] of edTimeKeys) clip[seconds] = Timebase.toSeconds(clip[frames], tb);
+  return clip;
+}
+// Accepts an envelope or a bare project. Clips without frames (pre-M3 data, old job settings) convert once from
+// seconds at the project's timebase, which for pre-M3 projects is the 30 fps they were exported at.
+function edNormalizeProject(raw) {
+  const { native: project, revision } = ProjectEnvelope.unwrap(raw),
+    timebase = Timebase.find(project.timebase) ? Timebase.check(project.timebase) : { ...Timebase.DEFAULT },
+    p = { ...project, timebase, revision };
+  p.clips = (project.clips || []).map(clip => {
     const positioned = clip.track === 'V2' || clip.kind === 'text';
-    const defaults = { start: 0, duration: 3, sourceStart: 0, speed: 1, volume: 1, fadeIn: 0, fadeOut: 0, opacity: 1, scale: 1, x: positioned ? clip.track === 'V2' ? 80 : 50 : 0, y: positioned ? 80 : 0, rotation: 0, width: 25, fontSize: 36 };
+    const defaults = { speed: 1, volume: 1, fadeIn: 0, fadeOut: 0, opacity: 1, scale: 1, x: positioned ? clip.track === 'V2' ? 80 : 50 : 0, y: positioned ? 80 : 0, rotation: 0, width: 25, fontSize: 36 };
     const normalized = { font: '思源黑體', color: '#ffffff', align: '置中', animation: '無', ...clip };
     for (const [key, fallback] of Object.entries(defaults)) {
       const value = clip[key];
@@ -54,18 +80,60 @@ function edNormalizeProject(project) {
     }
     normalized.speed = Math.max(.25, Math.min(4, normalized.speed));
     normalized.volume = Math.max(0, Math.min(4, normalized.volume));
-    return normalized;
-  }) };
+    const patch = {};
+    for (const [seconds, frames] of edTimeKeys) {
+      if (Number.isSafeInteger(clip[frames])) patch[frames] = clip[frames];
+      else {
+        const value = Number(clip[seconds]);
+        patch[seconds] = clip[seconds] == null || clip[seconds] === '' || !Number.isFinite(value) ? { start: 0, duration: 3, sourceStart: 0 }[seconds] : value;
+      }
+    }
+    return edTime(p, normalized, patch);
+  });
+  return p;
 }
+// The stored form: frames only, wrapped in the project envelope (invariant 10).
+function edNative(p) {
+  const { revision, ...native } = structuredClone(p);
+  native.clips = native.clips.map((clip) => {
+    const { start, duration, sourceStart, ...rest } = clip;
+    return rest;
+  });
+  return native;
+}
+const edSaved = new Map();
 // Saving is a PUT /state round trip (card M2): callers render first, then await the save, so an edit never
 // waits on the network to appear; a failed save is reported, the edit stays on screen and in memory.
 function edSave() {
-  const copy = structuredClone(ed.projects);
+  const copy = ed.projects.map((p) => {
+    const native = edNative(p),
+      json = JSON.stringify(native);
+    // Counted from the last saved copy, not the in-memory object: an undo snapshot must not move it backwards.
+    const saved = edSaved.get(p.id);
+    p.revision = !saved ? p.revision || 0 : saved.json === json ? saved.revision : saved.revision + 1;
+    edSaved.set(p.id, { json, revision: p.revision });
+    return ProjectEnvelope.wrap(native, { revision: p.revision || 0 });
+  });
   ed.queue = ed.queue
     .catch(() => {})
     .then(() => SeedStar.preferences.set("tools.editor.projects", copy));
   ed.queue.catch(SeedStar.reportError);
   return ed.queue;
+}
+// First load after M3: the untouched pre-frames array is kept under its own key (never deleted), then converted.
+async function edLoadProjects() {
+  const rows = await SeedStar.preferences.get("tools.editor.projects", []),
+    list = Array.isArray(rows) ? rows : [],
+    legacy = list.some((row) => !ProjectEnvelope.isEnvelope(row));
+  if (legacy)
+    await SeedStar.preferences.set(
+      "tools.editor.projects.pre-frames-" + new Date().toISOString(),
+      list,
+    );
+  ed.projects = list.map(edNormalizeProject);
+  for (const p of ed.projects) edSaved.set(p.id, { json: JSON.stringify(edNative(p)), revision: p.revision });
+  ed.ready = true;
+  if (legacy) await edSave();
 }
 function edCheckpoint() {
   if (!edProject()) return;
@@ -272,7 +340,7 @@ function toolEditorScreen(t) {
   const [w, h] = edRatios[p.ratio];
   return wfWrap(
     t,
-    `<div class="editor-heading">${edButton("所有專案", "projects")}${edInput("project:title", "專案名稱", p.title, "text", 'maxlength="100"')}${edSelect("project:ratio", "輸出比例", p.ratio, Object.keys(edRatios))}${edButton("復原", "undo", !ed.undo.length)}${edButton("重做", "redo", !ed.redo.length)}${edButton("匯出影片", "export", !p.clips.length)}</div><div class="editor-workspace"><nav class="editor-panes">${["素材", "文字", "音訊", "轉場", "特效", "貼圖", "字幕", "剪贅字"].map((title) => `<button class="btn ${ed.pane === title ? "selected" : ""}" data-ed-pane="${title}" aria-pressed="${ed.pane === title}">${title}</button>`).join("")}</nav><aside class="editor-library">${pane}</aside><section class="editor-player"><div class="editor-stage" data-ed-stage style="aspect-ratio:${w}/${h};width:min(100%,${(430 * w) / h}px)"></div><div class="row">${edButton("播放／暫停", "play")}<span data-ed-clock></span><input type="range" aria-label="播放位置" data-ed-seek min="0" max="${edEnd()}" step="0.01" value="${ed.time}"></div><p class="note">預覽呈現片段、文字與基本變形；轉場、濾鏡與文字動畫以匯出影片為準。</p></section><aside class="editor-inspector">${inspector}</aside></div><div class="row editor-toolbar">${edButton("分割", "split", !c)}${edButton("複製", "duplicate", !c)}${edButton("刪除", "delete", !c)}${edButton("刪除並前移", "ripple", !c)}${edButton("主軌吸附排列", "compact")}${edButton("新增標記", "marker")}<label>時間軸縮放<input type="range" min="10" max="100" value="${ed.zoom}" data-ed-zoom></label></div><div class="editor-timeline">${edTracks
+    `<div class="editor-heading">${edButton("所有專案", "projects")}${edInput("project:title", "專案名稱", p.title, "text", 'maxlength="100"')}${edSelect("project:ratio", "輸出比例", p.ratio, Object.keys(edRatios))}${edSelect("project:timebase", "影格率", Timebase.label(p.timebase), Timebase.allowed.map(Timebase.label))}${edButton("復原", "undo", !ed.undo.length)}${edButton("重做", "redo", !ed.redo.length)}${edButton("匯出影片", "export", !p.clips.length)}</div><div class="editor-workspace"><nav class="editor-panes">${["素材", "文字", "音訊", "轉場", "特效", "貼圖", "字幕", "剪贅字"].map((title) => `<button class="btn ${ed.pane === title ? "selected" : ""}" data-ed-pane="${title}" aria-pressed="${ed.pane === title}">${title}</button>`).join("")}</nav><aside class="editor-library">${pane}</aside><section class="editor-player"><div class="editor-stage" data-ed-stage style="aspect-ratio:${w}/${h};width:min(100%,${(430 * w) / h}px)"></div><div class="row">${edButton("播放／暫停", "play")}<span data-ed-clock></span><input type="range" aria-label="播放位置" data-ed-seek min="0" max="${edEnd()}" step="0.01" value="${ed.time}"></div><p class="note">預覽呈現片段、文字與基本變形；轉場、濾鏡與文字動畫以匯出影片為準。</p></section><aside class="editor-inspector">${inspector}</aside></div><div class="row editor-toolbar">${edButton("分割", "split", !c)}${edButton("複製", "duplicate", !c)}${edButton("刪除", "delete", !c)}${edButton("刪除並前移", "ripple", !c)}${edButton("主軌吸附排列", "compact")}${edButton("新增標記", "marker")}<label>時間軸縮放<input type="range" min="10" max="100" value="${ed.zoom}" data-ed-zoom></label></div><div class="editor-timeline">${edTracks
       .map(
         (id) =>
           `<div class="editor-track"><div class="editor-track-name"><b>${id}</b>${edButton(p.tracks[id].hidden ? "顯示" : "隱藏", "track-hidden:" + id)}${edButton(p.tracks[id].muted ? "開聲" : "靜音", "track-muted:" + id)}${["A1", "A2"].includes(id) ? edButton(p.tracks[id].normalize ? "取消均衡" : "均衡", "track-normalize:" + id) : ""}</div><div class="editor-track-lane" data-ed-lane="${id}" style="width:${Math.max(600, edEnd() * ed.zoom + 100)}px">${p.clips
@@ -339,9 +407,6 @@ async function edAdd(asset, track) {
       kind: a.kind,
       asset: a,
       track,
-      start,
-      duration: Math.min(3600, a.duration),
-      sourceStart: 0,
       speed: 1,
       volume: 1,
       fadeIn: 0,
@@ -353,9 +418,10 @@ async function edAdd(asset, track) {
       rotation: 0,
       width: 25,
     };
+  edTime(p, c, { start, duration: Math.min(3600, a.duration), sourceStart: 0 });
   p.clips.push(c);
   ed.selected = c.id;
-  ed.time = start;
+  ed.time = c.start;
   edRender();
   await edSave();
 }
@@ -381,8 +447,9 @@ function edValidate(c) {
     if (c[key] !== undefined && !Number.isFinite(Number(c[key])))
       throw Error("請輸入有效數字");
   if (
-    c.start < 0 ||
-    c.duration < 0.05 ||
+    !(c.startFrame >= 0) ||
+    !(c.durationFrames >= 1) ||
+    !(c.sourceStartFrame >= 0) ||
     c.start + c.duration > 3600 ||
     c.sourceStart < 0 ||
     c.speed < 0.25 ||
@@ -482,11 +549,8 @@ function edPaint() {
 }
 function toolEditorAfterRender() {
   if (!ed.ready && !ed.loading)
-    ed.loading = SeedStar.preferences
-      .get("tools.editor.projects", [])
-      .then((rows) => {
-        ed.projects = Array.isArray(rows) ? rows.map(edNormalizeProject) : [];
-        ed.ready = true;
+    ed.loading = edLoadProjects()
+      .then(() => {
         if (tool === "edit") render();
       })
       .catch(SeedStar.reportError)
@@ -517,13 +581,13 @@ function edDialog(content) {
   d.showModal();
   return d;
 }
-function edText(text, start = ed.time, duration = 3) {
-  return {
+// Without a project (the short-video tool builds its own), seconds stay on the clip and edNormalizeProject
+// converts them through edTime with that project's timebase.
+function edText(text, start = ed.time, duration = 3, p = edProject()) {
+  const clip = {
     id: crypto.randomUUID(),
     track: "T",
     kind: "text",
-    start,
-    duration,
     text,
     font: "思源黑體",
     fontSize: 52,
@@ -536,11 +600,11 @@ function edText(text, start = ed.time, duration = 3) {
     opacity: 1,
     rotation: 0,
     speed: 1,
-    sourceStart: 0,
     volume: 1,
     fadeIn: 0,
     fadeOut: 0,
   };
+  return p ? edTime(p, clip, { start, duration, sourceStart: 0 }) : { ...clip, start, duration, sourceStart: 0 };
 }
 async function edAction(action) {
   const p = edProject(),
@@ -562,6 +626,7 @@ async function edAction(action) {
         id,
         title: String(title).trim() || "未命名專案",
         ratio,
+        timebase: { ...Timebase.DEFAULT },
         clips: [],
         assets: [],
         tracks: Object.fromEntries(edTracks.map((id) => [id, { volume: 1 }])),
@@ -699,8 +764,8 @@ async function edAction(action) {
   if (action === "export") {
     const d = edDialog(
       "<h3>匯出影片</h3><p>" +
-        esc(p.ratio) +
-        ' · MP4 · 30fps</p><label>畫質<select class="text-input" data-ed-quality><option value="1080p">1080P</option><option value="720p">720P</option></select></label><button class="btn primary" data-ed-export>開始匯出</button>',
+        esc(p.ratio + " · MP4 · " + Timebase.label(p.timebase)) +
+        '</p><label>畫質<select class="text-input" data-ed-quality><option value="1080p">1080P</option><option value="720p">720P</option></select></label><button class="btn primary" data-ed-export>開始匯出</button>',
     );
     d.querySelector("[data-ed-export]").onclick = async (e) => {
       e.target.disabled = true;
@@ -711,7 +776,7 @@ async function edAction(action) {
           operation: "editor-export",
           settings: {
             quality: d.querySelector("[data-ed-quality]").value,
-            project: structuredClone(p),
+            project: edNative(p),
           },
         });
         d.close();
@@ -778,9 +843,9 @@ async function edAction(action) {
     let t = 0;
     for (const row of p.clips
       .filter((c) => c.track === "V1")
-      .sort((a, b) => a.start - b.start)) {
-      row.start = t;
-      t += row.duration;
+      .sort((a, b) => a.startFrame - b.startFrame)) {
+      edTime(p, row, { startFrame: t });
+      t += row.durationFrames;
     }
   }
   if (action.startsWith("track-")) {
@@ -792,26 +857,20 @@ async function edAction(action) {
     if (action === "text-background")
       c.backgroundColor = c.backgroundColor ? null : "#000000";
     if (action === "duplicate") {
-      const copy = {
-        ...structuredClone(c),
-        id: crypto.randomUUID(),
-        start: c.start + c.duration,
-      };
+      const copy = edTime(p, { ...structuredClone(c), id: crypto.randomUUID() }, { startFrame: c.startFrame + c.durationFrames });
       p.clips.push(copy);
       ed.selected = copy.id;
     }
     if (action === "split") {
-      const offset = ed.time - c.start;
-      if (offset < 0.05 || offset > c.duration - 0.05)
+      const offset = Timebase.toFrames(ed.time, p.timebase) - c.startFrame;
+      if (offset < 1 || offset > c.durationFrames - 1)
         throw Error("播放頭需位於片段內部");
-      const copy = {
-        ...structuredClone(c),
-        id: crypto.randomUUID(),
-        start: ed.time,
-        duration: c.duration - offset,
-        sourceStart: c.sourceStart + offset * c.speed,
-      };
-      c.duration = offset;
+      const copy = edTime(p, { ...structuredClone(c), id: crypto.randomUUID() }, {
+        startFrame: c.startFrame + offset,
+        durationFrames: c.durationFrames - offset,
+        sourceStartFrame: c.sourceStartFrame + Math.round(offset * c.speed),
+      });
+      edTime(p, c, { durationFrames: offset });
       for (const row of [c, copy]) {
         row.fadeIn = Math.min(row.fadeIn, row.duration / 2);
         row.fadeOut = Math.min(row.fadeOut, row.duration / 2);
@@ -825,9 +884,9 @@ async function edAction(action) {
         p.clips
           .filter(
             (row) =>
-              row.track === c.track && row.start >= c.start + c.duration - 0.01,
+              row.track === c.track && row.startFrame >= c.startFrame + c.durationFrames,
           )
-          .forEach((row) => (row.start -= c.duration));
+          .forEach((row) => edTime(p, row, { startFrame: row.startFrame - c.durationFrames }));
       ed.selected = null;
     }
   }
@@ -862,9 +921,17 @@ document.addEventListener("change", (e) => {
   try {
     const value =
       e.target.type === "number" ? Number(e.target.value) : e.target.value;
-    if (key.startsWith("project:")) p[key.slice(8)] = value;
+    if (key === "project:timebase") {
+      const timebase = Timebase.fromLabel(value);
+      if (!timebase) throw Error("不支援的影格率");
+      // Re-snap once: each clip keeps its time in seconds as closely as the new frame grid allows.
+      p.timebase = { num: timebase.num, den: timebase.den };
+      for (const row of p.clips)
+        edTime(p, row, { start: row.start, duration: row.duration, sourceStart: row.sourceStart });
+    } else if (key.startsWith("project:")) p[key.slice(8)] = value;
     else if (c) {
       const next = { ...c, [key]: value };
+      if (edTimeKeys.some(([seconds]) => seconds === key)) edTime(p, next, { [key]: value });
       if (key === "track") {
         next.x = value === "V1" ? 0 : 50;
         next.y = value === "V1" ? 0 : 50;
@@ -907,14 +974,9 @@ document.addEventListener("pointerdown", (e) => {
     if (Math.abs(ev.clientX - startX) < 4 && !moved) return;
     moved = true;
     const key = trim ? "duration" : "start",
-      next = {
-        ...initial,
-        [key]: Math.max(
-          trim ? 0.05 : 0,
-          Math.round((initial[key] + (ev.clientX - startX) / ed.zoom) * 10) /
-            10,
-        ),
-      };
+      next = edTime(p, { ...initial }, {
+        [key]: Math.max(0, initial[key] + (ev.clientX - startX) / ed.zoom),
+      });
     try {
       edValidate(next);
       button.style.left = next.start * ed.zoom + "px";

@@ -116,10 +116,10 @@ const pass = (label) => {
   assert.equal(good.ok, true);
   const bad = await verifyOutput(h264, { duration: 3, audio: false });
   assert.equal(bad.ok, false);
-  assert.equal(bad.findings.length, 2, bad.findings.join(" | "));
+  assert.equal(bad.findings.length, 2, JSON.stringify(bad.findings));
   pass("verifyOutput：正確預期 ok；錯時長與錯音軌各一條 finding");
   const uneven = await verifyOutput(vfr, { fps: 30 });
-  assert.ok(uneven.findings.some((f) => f.startsWith("影格率不固定")), uneven.findings.join(" | ") + " " + JSON.stringify(uneven.info?.probe));
+  assert.ok(uneven.findings.some((f) => f.code === "video.variable_fps"), JSON.stringify(uneven.findings) + " " + JSON.stringify(uneven.info?.probe));
   pass("verifyOutput：標示 30 fps、實際平均 15 的檔被判不固定");
 
   const mov = await upload(h264mov, "video/quicktime");

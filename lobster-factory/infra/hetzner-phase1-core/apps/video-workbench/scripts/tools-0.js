@@ -576,7 +576,7 @@ SeedStar.tools = {
     if (payload.selection) selection = structuredClone(payload.selection);
     if (tool === 'edit' && payload.project) {
       if (ed.loading) await ed.loading;
-      if (!ed.ready) { ed.projects = (await SeedStar.preferences.get('tools.editor.projects', [])).map(edNormalizeProject); ed.ready = true; }
+      if (!ed.ready) await edLoadProjects();
       const project = edNormalizeProject(structuredClone(payload.project));
       // Restore a separate copy: saved job settings must not overwrite later edits.
       project.id = crypto.randomUUID(); project.title = (project.title || '剪輯專案') + '（還原）';

@@ -164,7 +164,7 @@ async function toolShortAction(action) {
               end = Math.min(cue.end, part.end);
             if (end > start)
               clips.push({
-                ...edText(cue.text, at + start - part.start, end - start),
+                ...edText(cue.text, at + start - part.start, end - start, null),
                 y: 88,
               });
           }
@@ -175,7 +175,8 @@ async function toolShortAction(action) {
         operation: "editor-export",
         settings: {
           quality: "720p",
-          project: { title: group[0].title, ratio: "9:16", clips, tracks: {} },
+          // Same stored form as the editor (card M3): frames at the project timebase, seconds stripped.
+          project: edNative(edNormalizeProject({ title: group[0].title, ratio: "9:16", timebase: { ...Timebase.DEFAULT }, clips, tracks: {} })),
         },
       });
       SeedStar.showJob(job);

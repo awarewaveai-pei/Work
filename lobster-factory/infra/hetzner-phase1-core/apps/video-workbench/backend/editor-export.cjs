@@ -1,7 +1,8 @@
 const fs = require("node:fs"),
   path = require("node:path");
-const { inspectMedia } = require("./media-inspect.cjs"),
-  { filterPath, assTime, assColor } = require("./subtitle-burn.cjs");
+const { inspectMedia, verifyOutput } = require("./media-inspect.cjs"),
+  { filterPath, assTime, assColor } = require("./subtitle-burn.cjs"),
+  Timebase = require("../shared/timebase.js");
 const ratios = {
   "16:9": [1920, 1080],
   "9:16": [1080, 1920],
@@ -32,6 +33,12 @@ function number(value, fallback, min, max, name) {
   if (!Number.isFinite(n) || n < min || n > max) throw Error(name + "超出範圍");
   return n;
 }
+function frames(value, min, max, name) {
+  if (!Number.isSafeInteger(value) || value < min || value > max) throw Error(name + "超出範圍");
+  return value;
+}
+// Card M3 (plan §3 invariant 5): the client sends integer frames + the project timebase; seconds are derived here
+// only for FFmpeg arguments. A seconds-only payload (pre-M3 page or an old job retried) is refused, not guessed.
 function validateProject(raw, quality = "1080p") {
   if (
     !raw ||
@@ -44,6 +51,11 @@ function validateProject(raw, quality = "1080p") {
     raw.clips.filter((c) => c?.kind === "text").length > 2000
   )
     throw Error("剪輯專案比例、畫質或片段資料無效");
+  if (raw.clips.some((c) => c?.startFrame === undefined || c?.durationFrames === undefined))
+    throw Error("剪輯專案是舊格式（以秒記錄時間），請重新開啟剪輯頁後再匯出");
+  if (!Timebase.find(raw.timebase)) throw Error("剪輯專案影格率無效");
+  const tb = Timebase.check(raw.timebase),
+    perHour = Math.ceil(3600 * Timebase.fps(tb));
   const clips = raw.clips.map((c) => {
     if (
       !["V1", "V2", "T", "A1", "A2"].includes(c.track) ||
@@ -53,8 +65,11 @@ function validateProject(raw, quality = "1080p") {
       (["V1", "V2"].includes(c.track) && !["video", "image"].includes(c.kind))
     )
       throw Error("片段與軌道類型不相符");
-    const start = number(c.start, 0, 0, 3600, "片段起點"),
-      duration = number(c.duration, 3, 0.05, 3600, "片段長度"),
+    const startFrame = frames(c.startFrame, 0, perHour, "片段起點"),
+      durationFrames = frames(c.durationFrames, 1, perHour, "片段長度"),
+      sourceStartFrame = frames(c.sourceStartFrame ?? 0, 0, perHour * 24, "來源起點"),
+      start = Timebase.toSeconds(startFrame, tb),
+      duration = Timebase.toSeconds(durationFrames, tb),
       speed = number(c.speed, 1, 0.25, 4, "播放速度");
     const track = Array.isArray(raw.tracks)
       ? raw.tracks.find((t) => t.id === c.track)
@@ -81,10 +96,13 @@ function validateProject(raw, quality = "1080p") {
       throw Error("轉場曲線不存在");
     const clip = {
       ...c,
+      startFrame,
+      durationFrames,
+      sourceStartFrame,
       start,
       duration,
       speed,
-      sourceStart: number(c.sourceStart, 0, 0, 86400, "來源起點"),
+      sourceStart: Timebase.toSeconds(sourceStartFrame, tb),
       opacity: number(c.opacity, 1, 0, 1, "不透明度"),
       scale: number(c.scale, 1, 0.1, 5, "縮放"),
       x: number(
@@ -134,19 +152,51 @@ function validateProject(raw, quality = "1080p") {
     new Set(clips.map((c) => c.id)).size !== clips.length
   )
     throw Error("片段識別碼無效或重複");
-  const duration = Math.max(...clips.map((c) => c.start + c.duration));
-  if (duration > 3600) throw Error("剪輯匯出單次最長一小時");
+  const totalFrames = Math.max(...clips.map((c) => c.startFrame + c.durationFrames)),
+    duration = Timebase.toSeconds(totalFrames, tb);
+  if (totalFrames > perHour) throw Error("剪輯匯出單次最長一小時");
   const scale = quality === "720p" ? 2 / 3 : 1,
     [baseWidth, baseHeight] = ratios[raw.ratio];
   return {
     ...raw,
     clips,
+    timebase: tb,
+    totalFrames,
     duration,
     width: Math.round((baseWidth * scale) / 2) * 2,
     height: Math.round((baseHeight * scale) / 2) * 2,
     baseWidth,
     baseHeight,
   };
+}
+// Invariant 8 (2): sample frames only where the output must equal the source (scaled): an untouched full-frame V1
+// video clip at the source's own frame rate, nothing else on screen within any transition reach. Styled clips are
+// skipped, not guessed; real footage after one x264 pass sits well above 28 dB, a wrong frame of moving footage below.
+function frameChecks(project, indexed, width, height) {
+  const tb = project.timebase,
+    margin = Math.ceil(2 * Timebase.fps(tb)) + 1,
+    checks = [];
+  for (const { clip, metadata, source } of indexed) {
+    if (checks.length >= 3) break;
+    const rate = metadata.probe?.frameRate;
+    if (
+      clip.kind !== "video" || clip.track !== "V1" || clip.speed !== 1 || clip.opacity !== 1 || clip.scale !== 1 ||
+      clip.x !== 0 || clip.y !== 0 || clip.rotation !== 0 || clip.grain !== 0 || clip.filter !== "原始" ||
+      (clip.mask && clip.mask !== "無") || clip.fadeIn || clip.fadeOut || clip.durationFrames < 2 * margin + 1 ||
+      !rate || rate.num * tb.den !== tb.num * rate.den ||
+      !metadata.displayWidth || metadata.displayWidth * height !== metadata.displayHeight * width
+    )
+      continue;
+    const mid = clip.startFrame + Math.floor(clip.durationFrames / 2);
+    if (
+      project.clips.some(
+        (o) => o !== clip && o.kind !== "audio" && mid >= o.startFrame - margin && mid < o.startFrame + o.durationFrames + margin,
+      )
+    )
+      continue;
+    checks.push({ outFrame: mid, source, sourceFrame: clip.sourceStartFrame + (mid - clip.startFrame), minPsnr: 28 });
+  }
+  return checks;
 }
 function tempo(speed) {
   const parts = [];
@@ -185,7 +235,10 @@ async function exportEditor(
   quality = "1080p",
 ) {
   const project = validateProject(raw, quality),
-    { width, height, duration } = project;
+    { width, height, duration, totalFrames, timebase: tb } = project,
+    rate = Timebase.ffRate(tb),
+    fps = Timebase.fps(tb),
+    total = Timebase.ffTime(totalFrames, tb);
   const args = [
     "-y",
     "-hide_banner",
@@ -194,11 +247,11 @@ async function exportEditor(
     "-f",
     "lavfi",
     "-i",
-    `color=c=black:s=${width}x${height}:r=30:d=${duration}`,
+    `color=c=black:s=${width}x${height}:r=${rate}:d=${total}`,
     "-f",
     "lavfi",
     "-i",
-    `anullsrc=r=48000:cl=stereo:d=${duration}`,
+    `anullsrc=r=48000:cl=stereo:d=${total}`,
   ];
   const sources = new Map(),
     indexed = [],
@@ -232,16 +285,16 @@ async function exportEditor(
       throw Error("片段超出原始素材時長");
     const index = indexed.length + 2;
     if (clip.kind === "image")
-      args.push("-loop", "1", "-framerate", "30", "-t", String(clip.duration));
+      args.push("-loop", "1", "-framerate", rate, "-t", Timebase.ffTime(clip.durationFrames, tb));
     args.push("-i", source);
-    indexed.push({ clip, metadata, index });
+    indexed.push({ clip, metadata, index, source });
   }
   let video = "[0:v]",
     layer = 0;
   try {
     const mainClips = project.clips
         .filter((c) => c.track === "V1")
-        .sort((a, b) => a.start - b.start),
+        .sort((a, b) => a.startFrame - b.startFrame),
       incoming = new Map(),
       outgoing = new Map();
     mainClips.forEach((clip, i) => {
@@ -249,7 +302,7 @@ async function exportEditor(
       const previous = mainClips[i - 1];
       if (
         !previous ||
-        Math.abs(previous.start + previous.duration - clip.start) > 0.03
+        Math.abs(previous.startFrame + previous.durationFrames - clip.startFrame) > 1
       )
         throw Error("轉場只能套用於相鄰主視訊剪點");
       const transition = {
@@ -295,16 +348,18 @@ async function exportEditor(
         );
       const enter = incoming.get(clip.id),
         leave = outgoing.get(clip.id),
-        preRoll = enter && enter.type !== "淡入淡出" ? enter.duration / 2 : 0,
-        postRoll = leave && leave.type !== "淡入淡出" ? leave.duration / 2 : 0;
+        preFrames = enter && enter.type !== "淡入淡出" ? Math.round((enter.duration / 2) * fps) : 0,
+        postFrames = leave && leave.type !== "淡入淡出" ? Math.round((leave.duration / 2) * fps) : 0,
+        preRoll = Timebase.toSeconds(preFrames, tb);
+      // After fps= the stream time base is exactly 1/fps, so the timeline offset below is an integer frame count.
       const prefix = [
-        `trim=start=${clip.sourceStart}:duration=${clip.duration * clip.speed}`,
+        `trim=start=${Timebase.ffTime(clip.sourceStartFrame, tb)}:duration=${clip.speed === 1 ? Timebase.ffTime(clip.durationFrames, tb) : clip.duration * clip.speed}`,
         `setpts=(PTS-STARTPTS)/${clip.speed}`,
-        "fps=30",
+        "fps=" + rate,
       ];
-      if (preRoll || postRoll)
+      if (preFrames || postFrames)
         prefix.push(
-          `tpad=start_mode=clone:stop_mode=clone:start_duration=${preRoll}:stop_duration=${postRoll}`,
+          `tpad=start_mode=clone:stop_mode=clone:start=${preFrames}:stop=${postFrames}`,
         );
       const steps = [];
       let inputLabel = `[${index}:v]`;
@@ -396,7 +451,7 @@ async function exportEditor(
         steps.push(
           `fade=t=out:st=${preRoll + clip.duration - leave.duration / 2}:d=${leave.duration / 2}:alpha=1`,
         );
-      steps.push(`setpts=PTS+${clip.start - preRoll}/TB`);
+      steps.push(`setpts=PTS+${clip.startFrame - preFrames}`);
       const sourceLabel = `[clip${layer}]`,
         next = `[video${layer}]`;
       graph.push(`${inputLabel}${steps.join(",")}${sourceLabel}`);
@@ -407,7 +462,8 @@ async function exportEditor(
           ? `(main_h-overlay_h)*${clip.y / 100}`
           : `(main_h-overlay_h)/2+${(clip.y * height) / project.baseHeight}`;
       graph.push(
-        `${video}${sourceLabel}overlay=x='${x}':y='${y}':enable='between(t,${clip.start - preRoll},${clip.start + clip.duration + postRoll})':eof_action=pass${next}`,
+        // Half-frame margins: output frames startFrame-pre .. end+post-1 are on, whatever the float rounding of t.
+        `${video}${sourceLabel}overlay=x='${x}':y='${y}':enable='between(t,${(clip.startFrame - preFrames - 0.5) / fps},${(clip.startFrame + clip.durationFrames + postFrames - 0.5) / fps})':eof_action=pass${next}`,
       );
       video = next;
       layer++;
@@ -499,7 +555,7 @@ async function exportEditor(
             : clip.volume * number(track.volume, 1, 0, 4, "軌道音量");
       if (!metadata.audio || !gain || clip.kind === "image") continue;
       const steps = [
-        `atrim=start=${clip.sourceStart}:duration=${clip.duration * clip.speed}`,
+        `atrim=start=${Timebase.ffTime(clip.sourceStartFrame, tb)}:duration=${clip.duration * clip.speed}`,
         "asetpts=PTS-STARTPTS",
         tempo(clip.speed),
         "volume=" + gain,
@@ -516,7 +572,7 @@ async function exportEditor(
       audio.push(label);
     }
     graph.push(
-      `${audio.join("")}amix=inputs=${audio.length}:duration=longest:normalize=0,atrim=duration=${duration}[audioout]`,
+      `${audio.join("")}amix=inputs=${audio.length}:duration=longest:normalize=0,atrim=duration=${total}[audioout]`,
     );
     const result = output("mp4");
     await run(
@@ -529,9 +585,9 @@ async function exportEditor(
         "-map",
         "[audioout]",
         "-t",
-        String(duration),
+        total,
         "-r",
-        "30",
+        rate,
         "-c:v",
         "libx264",
         "-preset",
@@ -548,7 +604,24 @@ async function exportEditor(
       ],
       signal,
     );
-    return { type: "video", url: result.url, width, height };
+    // Invariant 8: no silent pass. Audible is expected when any source audio reaches the mix with gain > 0.
+    const verification = await verifyOutput(
+      result.file,
+      {
+        duration, fps: tb, width, height, audio: true,
+        ...(audio.length > 1 ? { audible: true } : {}),
+        frames: frameChecks(project, indexed, width, height),
+      },
+      signal,
+    );
+    if (!verification.ok) {
+      temporary.push(result.file);
+      throw Object.assign(
+        Error("輸出驗證失敗：" + verification.findings.map((f) => `${f.code} ${f.message}`).join("；")),
+        { findings: verification.findings },
+      );
+    }
+    return { type: "video", url: result.url, width, height, verification: { ok: true, findings: [], frameChecks: frameChecks(project, indexed, width, height).length } };
   } finally {
     for (const temp of temporary) fs.rmSync(temp, { force: true });
   }
