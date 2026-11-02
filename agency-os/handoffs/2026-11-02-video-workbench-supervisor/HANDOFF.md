@@ -78,8 +78,8 @@
 
 | 東西 | 位置 |
 |---|---|
-| 資料（唯一要改的檔） | `D:\Workgency-os\handoffs6-11-02-video-workbench-supervisor\data.mjs` |
-| 產生器 | 同資料夾 `build.mjs`（版面共用 `D:\Work\scripts\supervisor-kituild.mjs`） |
+| 資料（唯一要改的檔） | `D:\Work\agency-os\handoffs\2026-11-02-video-workbench-supervisor\data.mjs` |
+| 產生器 | 同資料夾 `build.mjs`（版面共用 `D:\Work\scripts\supervisor-kit\build.mjs`） |
 | 檢查 | 同資料夾 `check.mjs`（數字是否由資料算出、卡號是否等於計畫 §4、頁面是否為最新產物） |
 | 產物 | 同資料夾 `supervisor.html` |
 
@@ -93,7 +93,7 @@ cd /d/Work/agency-os/handoffs/2026-11-02-video-workbench-supervisor && node buil
 
 **C. 發布成網址（Claude Code 的 Artifact 工具）**
 1. 第一次發布：呼叫 Artifact，action 用 publish，參數如下。
-   - `file_path`：`D:\Workgency-os\handoffs6-11-02-video-workbench-supervisor\supervisor.html`
+   - `file_path`：`D:\Work\agency-os\handoffs\2026-11-02-video-workbench-supervisor\supervisor.html`
    - `icon`：`video`
    - `description`：`影音工作台每張卡的進度與待決事項。`
    - 不要帶 `url`。舊網址屬於前一個帳號，新帳號無法寫入。
