@@ -5,6 +5,7 @@
 - 測試名單 d0ab3e45（peijingartstudio，consent 標 self_published:operator-provided-test）→ Chrome 登入身分呼叫 leads／messages／gmail-draft。
 - 結果：回信 07:20:03 入 co_replies（more_info），lead=replied，7 封 skipped（追蹤停）。
 - 首封仍 drafted：Gmail 探查 = 系統草稿未動（DRAFT），操作者另寄同主旨新信（不同 thread）→ 不判已寄為正確行為。
+- 補測：操作者改按草稿寄出 07:36 → 07:40 tick 標 sent；第二封回信掛 message_id。測試名單＋8 信＋4 events 已刪，0 殘留。
 - 發現 m1：手動產信 >100s → Cloudflare 524，伺服器仍產完；重按產兩組。未修。
 - REALTEST_EVIDENCE: tool=SSH | cmd=psql co_replies/co_leads/co_messages for lead d0ab3e45 + gmail probe (docker exec node, read-only) | exit=0 | ms=5000
 - REVIEW_WAIVED: NA -- 無程式改動
