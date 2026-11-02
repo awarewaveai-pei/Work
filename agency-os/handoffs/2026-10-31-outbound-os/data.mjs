@@ -57,6 +57,10 @@ const C8 = '050a1041e';
 const C5 = 'd518cbb2c';
 const C15 = '96ecf614d';
 const C12 = '6c9f2a8c8';
+const C13 = '1c47a2904';
+const C6 = 'f57fd3512';
+const C14 = '27a93dbcc';
+const C16 = 'b0f5e4872';
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '守衛與事實訂正', plain: '例：名單上某人剛退訂，系統仍替他建草稿。改成建草稿前重查拒收名單。同時把「scope 不能寄信」這句不對的說法改正，用測試守住程式不呼叫寄信；順便把 Google 授權改成正式發布、加上讀信權限，之後 6 個新信箱只要授權一次。',
@@ -202,36 +206,36 @@ export const STEPS = [
       todo('C12.3', '你動手：告知書寄 opendata.gcis@gmail.com，IP 填 145.239.195.47。測試已完成（6c9f2a8c8，假回應）；核准後真查一次。'),
     ] },
   { n: 13, code: 'C13', group: 'H', title: '名單來源：人員搜尋、email 推斷、付費驗證', plain: '例：你要找台北行銷主管，系統用搜尋引擎找出公開的 LinkedIn 或 IG 簡介摘要，有 email 的直接填；只有姓名的，依公司已知的 email 格式推幾個候選，先免費查網域，再用 Hunter 驗證，驗過才進名單。每筆記下來源類別，不是對方自己公開的，信尾會多一行告知。',
-    gate: '對一個真實公司找 2 位人員，候選進待處理名單；推斷出的 email 經驗證後只有有效的被填入，驗證紀錄存起來；來源類別正確。沒有付費金鑰時只做免費查核並標「未驗證」。', risk: 'Medium（個資法邊界）', model: 'Opus 5.5', status: 'not_started', depends: ['C3'],
+    gate: '對一個真實公司找 2 位人員，候選進待處理名單；推斷出的 email 經驗證後只有有效的被填入，驗證紀錄存起來；來源類別正確。沒有付費金鑰時只做免費查核並標「未驗證」。', risk: 'Medium（個資法邊界）', model: 'Opus 5.5', status: 'in_progress', depends: ['C3'],
     decided: '只用搜尋引擎已經公開索引的摘要、對方自己的網站、你手動貼的資料。不寫任何爬 IG、Facebook、LinkedIn 頁面的程式，違反平台條款會被封整條線。個人 email 依個資法：來自一般可得來源、不是對方自己公開的就在第一封信告知來源與目的、附免費拒絕方式。（規格 D20）',
     what: 'sources/people-search.ts（Serper /search，只取 title／snippet／link，記來源類別）；email-guess.ts（格式推斷 ≤4 候選 → MX → Hunter verifier／finder）；Inbox 頁貼上個人資料表單',
     files: ['NA/lib/outreach/sources/people-search.ts', 'NA/lib/outreach/email-guess.ts', 'NA/lib/outreach/connectors/router.ts', 'NA/app/api/outreach/inbox/route.ts'],
     items: [
-      todo('C13.1', '用搜尋引擎找人：只取搜尋結果的標題、摘要、連結，不碰社群頁面；摘要裡有 email 就填；記下是不是對方自己公開的。'),
-      todo('C13.2', '只有姓名時推 email 格式，先免費查網域，再用 Hunter 驗證，驗過才填；費用在畫面上。'),
-      todo('C13.3', 'Inbox 頁加「貼上個人資料」表單。'),
-      todo('C13.4', '測試與對一個真實公司找 2 位人員。'),
+      done('C13.1', '用搜尋引擎找人：只取搜尋結果的標題、摘要、連結，不碰社群頁面；摘要裡有 email 就填；記下是不是對方自己公開的。', C13),
+      done('C13.2', '只有姓名時推 email 格式，先免費查網域，再用 Hunter 驗證，驗過才填；費用在畫面上。', C13),
+      done('C13.3', 'Inbox 頁加「貼上個人資料」表單。', C13),
+      todo('C13.4', '測試已完成（1c47a2904，假回應）；剩：填 Hunter 金鑰後，對一個真實公司找 2 位人員。'),
     ] },
   { n: 14, code: 'C6', group: 'G', title: '暖名單進 FluentCRM', waitFor: '等某個品牌有人回信或開始跑名單型廣告，而且它的網站裝了 wp-bridge 和 FluentCRM', plain: '例：對方回了信，你在 Replies 頁按「同步 FluentCRM」，他出現在該品牌 WordPress 的 FluentCRM 裡並掛上標籤。沒回過信、沒同意過的人按了也不會同步。',
-    gate: '對測試站同步 1 個測試名單，FluentCRM 出現該聯絡人與標籤。沒有同意依據的名單回 422。', risk: 'High（客戶站外掛更新）', model: 'Opus 5.5', status: 'not_started', depends: ['C4'],
+    gate: '對測試站同步 1 個測試名單，FluentCRM 出現該聯絡人與標籤。沒有同意依據的名單回 422。', risk: 'High（客戶站外掛更新）', model: 'Opus 5.5', status: 'in_progress', depends: ['C4'],
     decided: '走系統已有的 FluentCRM 接頭（它已經會建電子報草稿），只加「新增聯絡人」一個動作，不另寫一套。同步到哪個站，照該品牌登記的網站對上已設定的 wp-bridge 連線，不寫死網址。aware-wave.com 依你 10-30 的決定只留 WordPress，不接回。（規格 D16）',
     what: 'wp-bridge 加 /fluentcrm/contact（signed write，照 /newsletter）；版本 0.20.0＋release；lib/crm/fluentcrm.ts 加 upsertContact；sync-fluentcrm route（資格＝consent_status 四種∧非 suppression；clientId 由 wp_sites.url 對 listBridgeClients()）；Replies 按鈕',
     files: ['WPB/includes/Http/RestController.php', 'WPB/includes/Crm/ContactUpserter.php', 'NA/lib/crm/fluentcrm.ts', 'NA/app/api/outreach/leads/sync-fluentcrm/route.ts'],
     items: [
-      todo('C6.1', 'wp-bridge 外掛加一個「新增／更新聯絡人」端點，只做這件事。'),
-      todo('C6.2', '外掛升版並發布到站上。'),
-      todo('C6.3', '同步的後端：先驗資格（回過信、填過表單、同意過、是客戶之一，且不在拒收名單），再呼叫外掛。'),
-      todo('C6.4', 'Replies 頁按鈕接上；測試與對測試站同步一次。'),
+      done('C6.1', 'wp-bridge 外掛加一個「新增／更新聯絡人」端點，只做這件事。', C6),
+      todo('C6.2', '外掛已升 0.21.0（f57fd3512）；剩：發版並更新目標站（High，等你同意）。'),
+      done('C6.3', '同步的後端：先驗資格（回過信、填過表單、同意過、是客戶之一，且不在拒收名單），再呼叫外掛。', C6),
+      todo('C6.4', '按鈕與測試已完成（f57fd3512）；剩：0.21.0 上 staging 後同步 1 個測試名單。'),
     ] },
   { n: 15, code: 'C14', group: 'G', title: '個人消費者：Meta 名單型廣告 → FluentCRM', waitFor: '等你在 Meta 廣告管理員建立第一個名單型廣告', plain: '例：你在廣告管理員圈「台灣、對塔羅有興趣」投名單型廣告，對方在 IG 上一鍵留 email。系統收到後存成暖名單並記下同意依據，自動進該品牌的 FluentCRM 培養。這些人永遠不會收到冷信。',
-    gate: '用 Meta 的名單廣告測試工具送一筆，10 秒內名單出現、帶同意依據，FluentCRM 也有這個聯絡人；同一筆重送不會重複。下載 CSV 匯入也走同一條路得到同樣結果。', risk: 'Medium（C14.3 外部設定）', model: 'Opus 5.5', status: 'not_started', depends: ['C6'],
+    gate: '用 Meta 的名單廣告測試工具送一筆，10 秒內名單出現、帶同意依據，FluentCRM 也有這個聯絡人；同一筆重送不會重複。下載 CSV 匯入也走同一條路得到同樣結果。', risk: 'Medium（C14.3 外部設定）', model: 'Opus 5.5', status: 'in_progress', depends: ['C6'],
     decided: '個人消費者不走冷信，讓他們自己留 email：Meta 名單型廣告由你在廣告管理員建立，系統只收名單、存同意、同步 FluentCRM。先做 CSV 匯入（不用 Meta 權限），再做自動接收；兩條路共用同一段程式。不買名單。（規格 D22）',
     what: 'warm-leads.ts captureWarmLead（upsert、consent、upsertContact、timeline；migration 0153 部分唯一索引）；Inbox CSV 匯入；meta-leads.ts 接既有 /api/webhooks/meta 的 leadgen 事件',
     files: ['NA/lib/outreach/warm-leads.ts', 'NA/lib/outreach/meta-leads.ts', 'NA/app/api/webhooks/meta/route.ts', 'DB/migrations/0153_meta_leads.sql'],
     items: [
-      todo('C14.1', '共用的「收暖名單」程式：存名單、存同意、取消這個人所有待寄的冷信、同步 FluentCRM；匯入廣告管理員下載的 CSV 就走它；重送同一筆不重複，但沒同步成功的會補。'),
-      todo('C14.2', '自動接收：Meta 送來的名單事件經既有的簽章驗證後，抓回資料、走同一段程式。'),
-      todo('C14.3', '你動手：App 加名單權限、每個品牌頁面訂閱名單事件。測試與用 Meta 測試工具送一筆。'),
+      done('C14.1', '共用的「收暖名單」程式：存名單、存同意、取消這個人所有待寄的冷信、同步 FluentCRM；匯入廣告管理員下載的 CSV 就走它；重送同一筆不重複，但沒同步成功的會補。', C14),
+      done('C14.2', '自動接收：Meta 送來的名單事件經既有的簽章驗證後，抓回資料、走同一段程式。', C14),
+      todo('C14.3', '你動手：App 加名單權限、每個品牌頁面訂閱名單事件。程式與測試已完成（27a93dbcc，0154 已套正式庫）；之後用 Meta 測試工具送一筆。'),
     ] },
   { n: 16, code: 'C9', group: 'G', title: '舊欄位退場', plain: '例：舊名單還是用那一格觀察。回填成證據列後，產信與評分只看證據，舊欄位不再寫入。', waitFor: '等 100 個名單走過研究流程',
     gate: '每個有舊觀察的名單都有一列證據。產信與評分不再讀舊欄位。欄位保留。', risk: 'Medium', model: 'Codex', status: 'not_started', depends: ['C3'],
@@ -243,15 +247,15 @@ export const STEPS = [
     ] },
   { n: 17, code: 'C16', group: 'G', title: '自動化調校：抽得準、核得穩、越寫越好', waitFor: '等 C7 成效頁上線，而且真的寄了 2 週',
     plain: '例：全自動模式每天仍有 2% 的信給你看。現在是隨機抽；調校後優先抽新品牌、新產業、事實核對沒把握的、退信或負面回覆偏高的那類。事實核對換成判兩次結果一致的模型。哪種開場回覆率高，系統下次就多用那種。',
-    gate: '同樣的抽查比例下，高風險的信被抽中機率至少是低風險的 2 倍。事實核對同一封信判兩次一致率達 95%，報告存檔。某品牌兩種切角各寄滿 30 封後，回覆率高的那種出現在下一封信的寫法裡。', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['C7', 'C15'],
+    gate: '同樣的抽查比例下，高風險的信被抽中機率至少是低風險的 2 倍。事實核對同一封信判兩次一致率達 95%，報告存檔。某品牌兩種切角各寄滿 30 封後，回覆率高的那種出現在下一封信的寫法裡。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['C7', 'C15'],
     decided: '自動化程度用三顆按鈕：手動、半自動（抽 10%）、全自動（抽 2%）。全自動不設 0%，留 2% 當模型走偏的警報。按鈕已在 C2 做好；這張卡只改「抽哪些」「核得穩不穩」「越寫越好」，要真資料才調得準。（規格 D24）',
     what: 'sampleWeight 依風險分配抽樣；claim-check 一致率實測與投票；generation 加 angle、stats 依切角、brand-context 有效做法段、pickVariant 偏向勝出版',
     files: ['NA/lib/outreach/review-policy.ts', 'NA/lib/outreach/claim-check.ts', 'NA/lib/outreach/generation-schema.ts', 'NA/lib/outreach/brand-context.ts'],
     items: [
-      todo('C16.1', '依風險抽樣：同樣的比例，優先抽新品牌、新產業、事實核對沒把握的、退信或負面回覆偏高的。'),
-      todo('C16.2', '事實核對變穩：真信判兩次量一致率，達 95% 的最便宜模型當預設；不到就判兩次、不一致交給人。'),
-      todo('C16.3', 'A／B 成效回饋：每封記下切角，回覆率高的切角寫進下一封的提示，選版偏向它。'),
-      todo('C16.4', '測試與真資料驗收。'),
+      done('C16.1', '依風險抽樣：同樣的比例，優先抽新品牌、新產業、事實核對沒把握的、退信或負面回覆偏高的。', C16),
+      todo('C16.2', '等真資料：寄出 200 封後，同一封判兩次量一致率。'),
+      done('C16.3', 'A／B 成效回饋：每封記下切角，回覆率高的切角寫進下一封的提示，選版偏向它。', C16),
+      todo('C16.4', '抽樣與切角的測試已完成（b0f5e4872）；剩：真寄滿 2 週後驗收。'),
     ] },
 ];
 

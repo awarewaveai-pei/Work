@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-02（續41）next-admin 部署 cac5a90d5（C13＋C6）與 b0f5e4872（C14＋C16）；外聯 v2 程式卡做到只剩操作者步驟；監工台 60/77
+
+- 部署：cac5a90d5（05:09:36Z healthy 15s、smoke OK）；b0f5e4872（05:28:39Z healthy 16s、smoke OK；0154 已在帳本，migration 閘過）。
+- 監工台 `data.mjs`：C13.1–13.3、C6.1／6.3、C14.1–14.2、C16.1／16.3 done；build＋check 綠（60/77），發布。
+- C9 不動：卡片條件「100 個名單走過研究流程」未到；C9.2 切換須先在正式庫跑回填（寫正式資料）。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo sg-deploy.sh next-admin（cac5a90d5、b0f5e4872）→ 兩次 healthy、smoke all endpoints OK | exit=0 | ms=800000
+- REVIEW_WAIVED: NA -- 部署已審查的 commit（續34–39）；監工台為狀態資料
+- BUGHUNT_WAIVED: NA -- 無程式改動
+
+**操作者待辦（外聯 v2 剩的都在這）**：C11.1 次網域＋2 信箱；Hunter 或 ZeroBounce 金鑰（→ C8.5 真寄、C13.4、C15.4、C5.5、C7.3）；C12.3 GCIS 白名單；C6.2 wp-bridge 0.21.0 發版＋更新目標站（High）→ C6.4；C14.3 Meta App 權限＋頁面訂閱；Google 品牌驗證 24h 後按「我已解決問題」。之後：C9（100 名單後）、C16.2／16.4（寄滿量後）。
+
+**rollback**：主機以 6c9f2a8c8 重部署；0154 down 見續38。
 ## 2026-11-02（續40）Mockup 頁設計圖只列設計圖（不含塔羅、已合成商品圖）；下載檔名有意義且不重複
 
 **根因**：`/tools/mockup` 設計圖挑選器打 `/api/tools/designs` 不帶 `?group=`（`MockupStudio.tsx` 載入處），拿到整個 My Designs（塔羅牌、mockup 都在）；既有 `group=design` 只排除 mockup，塔羅仍在（My Designs 設計圖分頁刻意含塔羅）。下載名寫死 `mockup-${mode}-${color}.png`／`mockup-<preset>-<i>.jpg`，同設定重下必撞名，副檔名也可能與實際 jpeg 不符。
