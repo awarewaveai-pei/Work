@@ -6,7 +6,7 @@ export const META = {
   updated: '2026-11-02',
   plan: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/creative-suite-plan-20261102.md',
   req: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/handoff/Claude_Code_handoff_20261102.md',
-  worklog: 'agency-os/WORKLOG.md 2026-11-02 續19–續43',
+  worklog: 'agency-os/WORKLOG.md 2026-11-02 續19–續45',
   self: 'agency-os/handoffs/2026-11-02-video-workbench-supervisor/',
   url: 'https://claude.ai/artifact/MCTZ7PAeZdGKRuvDxPquUd',
 };
@@ -38,6 +38,7 @@ const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 const C0 = '82d19db9e';
 const M1 = 'ca4297f00';
 const S3 = 'd6835f354';
+const P0 = '3859d8c69';
 const M3 = 'b52b2ac04';
 const M2 = '2ab702e3f';
 
@@ -65,14 +66,15 @@ export const STEPS = [
       done('M1.4', '縮圖與聲音波形；測試。', M1),
     ] },
   { n: 3, code: 'P0', title: 'EffectCraft 試驗', plain: '例：在這台筆電上用 EffectCraft 網頁版剪一段有繁中字幕的片，看順不順、能不能存回工作台；結果決定之後用哪個引擎。',
-    gate: '產出能力表、缺口清單與路線判定（A 單引擎、B 雙引擎、C 自製）；工時上限 8 小時。', risk: 'Medium', model: '做 Opus；判定 Fable', status: 'not_started', depends: ['M1'], before: '待決 1',
+    gate: '產出能力表、缺口清單與路線判定（A 單引擎、B 雙引擎、C 自製）；工時上限 8 小時。', risk: 'Medium', model: 'Opus（經 SDK API）', status: 'done', commit: P0, depends: ['M1'],
+    result: '2026-11-02 判定路線 C：EffectCraft 網頁版不能載入繁中字型（中文全變方框），這台筆電的 WebGPU 約 54 秒後斷線、WebGL2 只有 0.47 倍速，嵌入後焦點回不來，重開專案素材全部離線。之後由 P1 起延伸現有編輯器。上游支援自訂字型時可一條指令重新試驗。',
     what: '釘 release＋checksum；放 /engines/effectcraft/；合成類硬閘 ①③⑤、剪輯類硬閘 ②④、軟閘；不接付費生成',
     files: ['VW/engines/effectcraft/VERSION.json'],
     items: [
-      todo('P0.1', '下載固定版本並記下校驗碼與授權，放進工作台。'),
-      todo('P0.2', '試：預覽有聲、繁中字幕顯示與輸出、嵌入後側欄正常。'),
-      todo('P0.3', '試：匯入、多圖層、裁切、混音、存檔重開、輸出。'),
-      todo('P0.4', '寫能力表與路線判定。'),
+      done('P0.1', '下載固定版本並記下校驗碼與授權，放進工作台。', P0),
+      done('P0.2', '試：預覽有聲、繁中字幕顯示與輸出、嵌入後側欄正常。', P0),
+      done('P0.3', '試：匯入、多圖層、裁切、混音、存檔重開、輸出。', P0),
+      done('P0.4', '寫能力表與路線判定。', P0),
     ] },
   { n: 4, code: 'M2', title: '素材與專案存到伺服器', plain: '例：清掉瀏覽器資料，素材庫和專案還在；每個素材都記得從哪來（上傳、AI 生成、輸出）。',
     gate: '每筆素材有來源紀錄；清 localStorage 後清單完整；同一任務重送不重跑；取消中的任務狀態正確。', risk: 'Medium', model: 'Opus（經 SDK API）', status: 'done', commit: M2, depends: ['M1'],
@@ -108,7 +110,7 @@ export const STEPS = [
     ] },
   { n: 7, code: 'P1', title: '引擎接入與存檔閉環', plain: '例：選素材建專案、剪、存、關掉重開、輸出，成品自動成為素材庫的一筆。',
     gate: '建專案、編輯、保存、重開、輸出，成品成為素材並帶來源；舊編輯器仍可用。', risk: 'Medium', model: 'Opus', status: 'not_started', depends: ['P0', 'M3'],
-    what: 'A／B：adapter 只包驗證過的操作；B 另做 PNG 序列＋音訊交換；C：補 Remotion 模板路徑',
+    what: '路線 C（P0 定案）：延伸現有五軌編輯器，補 Remotion 片頭／動態字幕模板路徑（remotion-client.ts）',
     items: [
       todo('P1.1', '依 P0 路線接上引擎，或延伸自製編輯器。'),
       todo('P1.2', '存檔、重開、輸出閉環；成品回素材庫；測試。'),
@@ -148,7 +150,7 @@ export const STEPS = [
       todo('P5.3', '圖片轉 3D（Meshy）；測試。'),
     ] },
   { n: 12, code: 'P6', title: '上線 video.aware-wave.com', plain: '例：員工登入 video.aware-wave.com 做好一支片，一鍵送到 Postiz 和 WordPress 成為草稿。',
-    gate: '部署測試全綠；一支成品從工作台到 Postiz 草稿與 WordPress 草稿全程通。', risk: 'High', model: 'Fable 規劃；Opus 執行', status: 'not_started', depends: ['P5'], before: '待決 2',
+    gate: '部署測試全綠；一支成品從工作台到 Postiz 草稿與 WordPress 草稿全程通。', risk: 'High', model: 'Fable 規劃；Opus 執行', status: 'not_started', depends: ['P5'], before: '待決 1',
     what: 'compose 服務＋七項清單；素材帳冊→media_assets（補組織欄、R2 搬移）；任務新表；1:1 與 4:3 需 migration（High）；許可 can()；QA→release→delivery',
     items: [
       todo('P6.1', '服務部署，登入接主系統。'),
@@ -159,7 +161,5 @@ export const STEPS = [
 
 // 操作者自己要決定或親手做的
 export const OPEN = [
-  { n: 1, before: 'P0', what: 'EffectCraft 試驗要不要做？11-01 說過「先不要」。不做就直接走路線 C，延伸自製編輯器。', src: '計畫 §2、§4 P0',
-    options: [{ k: '做', t: '最多 8 小時，結果決定引擎。', pick: true }, { k: '不做', t: '走路線 C，P1 起延伸現有編輯器。' }] },
-  { n: 2, before: 'P6', what: '上線部署是 High 風險，要你同意才執行。', src: 'AGENTS §3' },
+  { n: 1, before: 'P6', what: '上線部署是 High 風險，要你同意才執行。', src: 'AGENTS §3' },
 ];
