@@ -104,9 +104,10 @@ for C in $NAMES; do
     fi
   fi
   # wp-bridge >= 0.19.0 no longer carries AwareWave billing: a site opted in to billing must have aware-wave-store
-  # first, or payments in between are never sent and unverified members can check out.
+  # first, or payments in between are never sent and unverified members can check out. "Opted in" = the option is
+  # exactly '1', as aware-wave-store Settings.php reads it; a site that switched billing off keeps it at '0'.
   if [ "$SLUG" = "aware-wave-wp-bridge" ] && [ "$(printf '%s\n' 0.19.0 "$V" | sort -V | head -1)" = "0.19.0" ] \
-     && wpc option get aware_wave_payments_enabled >/dev/null 2>&1 \
+     && [ "$(wpc option get aware_wave_payments_enabled 2>/dev/null | tr -d '\r')" = "1" ] \
      && ! wpc plugin is-active aware-wave-store >/dev/null 2>&1; then
     # Active, not merely present: an inactive store registers nothing either (Codex 2026-10-25 F2).
     echo "$C: FAIL billing is enabled here but aware-wave-store is not installed and active -- install/activate it first (-Plugin store -Install -Site $C); not upgraded"

@@ -1,4 +1,22 @@
 # Worklog
+## 2026-11-02（續10）wp-bridge 0.20.0 裝上 Soulful 與 aware-wave.com；aware-wave.com 的 bridge 重新啟用；升級腳本的收費檢查改看開關值
+
+**操作者**：「裝到 Soulful」；「aware-wave.com>>不要維持停用(不知道原因)>>要更新」。
+
+**根因（升級腳本誤擋）**：`scripts/rollout-wp-bridge.ps1` 判斷「這站有開收費」只看 `aware_wave_payments_enabled` 這個設定**存不存在**；aware-wave.com 10-30 關收費後值是 `0`，仍被當成「有開收費但商店外掛沒啟用」而拒升。商店外掛自己的判準是值等於 `'1'`（`lobster-factory/packages/aware-wave-store-plugin/includes/Settings.php:96`）。改成同一判準。
+
+**做了**：
+- Soulful（`soulful-wp`）0.19.0 → 0.20.0：腳本備份 `/root/backups/wordpress/soulful-wp-pre-wpbridge-0.20.0-20261102T005708Z.sql`＋`soulful-wp-wpbridge-0.19.0-20261102T005708Z.tgz`；health 200 0.20.0、首頁 200。
+- aware-wave.com（`lobster-wordpress`）0.19.0 → 0.20.0：備份 `lobster-wordpress-pre-wpbridge-0.20.0-20261102T010114Z.sql`＋`lobster-wordpress-wpbridge-0.19.0-20261102T010114Z.tgz`；之後 `wp plugin activate aware-wave-wp-bridge`。aware-wave-store 維持停用（沒被要求）。10-30 停用的理由：當時操作者要 aware-wave.com 與 app 完全切開；bridge 自 0.19.0 起不含收費，重新啟用不會接回收費。
+- 記憶 `project_awarewave_com_wordpress_only` 更新。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=lobster-next-admin 容器內用自己的 WPBRIDGE 金鑰簽章打 Soulful /asset-references：post 5646 用的圖 → 200 references=[5646]；少一字元（後面接 3.jpg）→ []；不存在 → []；不簽章 → 401 unknown_or_bad_signature | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=SSH | cmd=aware-wave.com：plugin list（bridge active 0.20.0、store inactive）＋ rest /health 200 0.20.0 ＋ curl 首頁 200、staging e2e-verify 200；rollout -DryRun 修正後「would upgrade 0.19.0 -> 0.20.0」（修正前 FAIL billing） | exit=0 | ms=20000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（自審：開關值 '1' 才擋，與商店外掛同判準；`tr -d '\r'` 防 CR）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/packages | grep=aware_wave_payments_enabled | hits=13
+- ORACLE_WAIVED: 一行條件判斷改為與 Settings.php:96 相同判準；Codex 額度將盡。
+- next-admin 刪除檢查改走 bridge 的程式（ea7206013）今晚 03:00 自動上線；上線後 Soulful 刪圖才會通（尚未實測 UI）。
 ## 2026-11-02（續9）刪圖前的「有沒有被文章用到」改走 wp-bridge（0.20.0 新端點 /asset-references），不再需要應用程式密碼；Soulful 清掉 6 組舊應用程式密碼
 
 **操作者**：「wpmcp（10/26 用過）和 WPVibe（9/13）>>>不曉得>>都是AI在處理／其中沒在用或很久沒用（有的從來沒用過）幫我刪除／管理員帳號2FA >>>已經有／wp-bridge 外掛加這張圖有沒有被文章用到>>>怎麼用? 你處理」。Wordfence「停用應用程式密碼」保持開啟。
