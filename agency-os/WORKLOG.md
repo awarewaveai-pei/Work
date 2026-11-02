@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-02（續33）next-admin 部署 6c9f2a8c8（C12 找公司上線）；監工台 51/77
+
+- 部署：`sudo sg-deploy.sh next-admin` → healthy 15s、smoke all OK、deployed 6c9f2a8c8。
+- 監工台 `data.mjs`：C12.1／C12.2 done（6c9f2a8c8）；C12.3 剩白名單＋真查；build＋check 綠（51/77），發布 v23。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo sg-deploy.sh next-admin → healthy after 15s、smoke all endpoints OK、deployed 6c9f2a8c8 | exit=0 | ms=400000
+- REVIEW_WAIVED: NA -- 部署已審查的 commit（續32）；監工台為狀態資料
+- BUGHUNT_WAIVED: NA -- 無程式改動
+
+**剩（外聯 v2）**：C11.1 次網域、Hunter／ZeroBounce 金鑰 → C8.5 真寄；C12.3 GCIS 白名單 → 真查；C5.5／C15.4／C7.3 等真資料；C13 等 Hunter 金鑰；C6、C14、C9、C16 等各自前置。
+
+**rollback**：主機以 8c8713c8b 重部署。
 ## 2026-11-02（續32）外聯 v2 C12.1＋C12.2 名單來源：公司行號（程式完成、假回應測試；C12.3 白名單待核准）；C5／C15 部署 8c8713c8b
 
 **做了**（cc.py SDK 派工 session 6a36564e，US$1.04；主 session 驗收＋修；NA = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）：

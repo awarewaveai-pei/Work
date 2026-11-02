@@ -56,6 +56,7 @@ const C4 = 'f00dbea9f';
 const C8 = '050a1041e';
 const C5 = 'd518cbb2c';
 const C15 = '96ecf614d';
+const C12 = '6c9f2a8c8';
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '守衛與事實訂正', plain: '例：名單上某人剛退訂，系統仍替他建草稿。改成建草稿前重查拒收名單。同時把「scope 不能寄信」這句不對的說法改正，用測試守住程式不呼叫寄信；順便把 Google 授權改成正式發布、加上讀信權限，之後 6 個新信箱只要授權一次。',
@@ -191,14 +192,14 @@ export const STEPS = [
       todo('C7.3', '計數測試已完成（050a1041e）；剩：種 3 筆走到已回覆的名單，看表上數字對。'),
     ] },
   { n: 12, code: 'C12', group: 'H', title: '名單來源：公司行號', plain: '例：你選「食品零售」加「台中市」，系統從經濟部的公司登記資料找出公司名、負責人、地址、資本額，再用搜尋引擎找出官網，放進待處理名單；email 之後由研究那步從官網補。',
-    gate: '一個營業項目真查一次，待處理名單出現含負責人姓名與官網的公司。頁腳有資料來源聲明。', risk: 'Medium（C12.3 外部申請）', model: 'Codex', status: 'not_started', depends: ['C10'],
+    gate: '一個營業項目真查一次，待處理名單出現含負責人姓名與官網的公司。頁腳有資料來源聲明。', risk: 'Medium（C12.3 外部申請）', model: 'Codex', status: 'in_progress', depends: ['C10'],
     decided: '公司行號用經濟部商工登記開放資料：免費、合法、有負責人姓名。要先申請 API 白名單（填一份使用告知書）。登記資料沒有網站，所以用搜尋引擎找官網並核對公司名，找不到的留空。（規格 D20）',
     what: 'ProviderSpec 允許 keyless 供應商（仍受預算、origin、allowedPaths）；gcis entry；sources/gcis.ts 三步（營業項目代碼表 → 應用一 → Serper 找官網並驗證）；Inbox 頁找公司表單；顯名聲明',
     files: ['NA/lib/collect/net/providers.ts', 'NA/lib/outreach/sources/gcis.ts', 'NA/app/api/outreach/inbox/route.ts'],
     items: [
-      todo('C12.1', '接經濟部商工登記 API（不需金鑰的供應商也走同一道門）：先依營業項目列公司，再補負責人、地址、資本額，再用搜尋引擎找官網、排除目錄站並核對；縣市在本地篩。'),
-      todo('C12.2', 'Inbox 頁「找公司」：營業項目用搜尋框加可見清單、縣市用按鈕；結果進待處理名單，負責人填聯絡人。'),
-      todo('C12.3', '你動手：向經濟部填 API 使用告知書，白名單填主機的對外 IP。測試與真查一次。'),
+      done('C12.1', '接經濟部商工登記 API（不需金鑰的供應商也走同一道門）：先依營業項目列公司，再補負責人、地址、資本額，再用搜尋引擎找官網、排除目錄站並核對；縣市在本地篩。（照官方文件寫，等白名單後真查確認）', C12),
+      done('C12.2', 'Inbox 頁「找公司」：營業項目用搜尋框加可見清單、縣市用按鈕；結果進待處理名單，負責人填聯絡人。', C12),
+      todo('C12.3', '你動手：告知書寄 opendata.gcis@gmail.com，IP 填 145.239.195.47。測試已完成（6c9f2a8c8，假回應）；核准後真查一次。'),
     ] },
   { n: 13, code: 'C13', group: 'H', title: '名單來源：人員搜尋、email 推斷、付費驗證', plain: '例：你要找台北行銷主管，系統用搜尋引擎找出公開的 LinkedIn 或 IG 簡介摘要，有 email 的直接填；只有姓名的，依公司已知的 email 格式推幾個候選，先免費查網域，再用 Hunter 驗證，驗過才進名單。每筆記下來源類別，不是對方自己公開的，信尾會多一行告知。',
     gate: '對一個真實公司找 2 位人員，候選進待處理名單；推斷出的 email 經驗證後只有有效的被填入，驗證紀錄存起來；來源類別正確。沒有付費金鑰時只做免費查核並標「未驗證」。', risk: 'Medium（個資法邊界）', model: 'Opus 5.5', status: 'not_started', depends: ['C3'],
