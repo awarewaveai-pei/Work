@@ -3,7 +3,7 @@
 寫於 2026-11-02，交接時 HEAD 為 `8c0020691`（影音工作台最後一個 commit）。讀者是接手的 AI。這份檔只是索引，事實的正本在下表各檔；細節不在這裡重述。
 
 **開場句**（貼進新 session 第一句）：
-> 續做 影音工作台：先讀 `agency-os/handoffs/2026-11-02-video-workbench-supervisor/HANDOFF.md` 全文。第一步照其 §5 重新產生並發布監工台，把新網址給我；第二步問我 P1 要不要開工，同意後照 §3 用 cc.py SDK 派工。P1 完成＝建專案→編輯→保存→重開→輸出→成品成素材並帶來源。建議模型：Opus 5.5
+> 續做 影音工作台：先讀 `agency-os/handoffs/2026-11-02-video-workbench-supervisor/HANDOFF.md` 全文。第一步照其 §5 重新產生並發布監工台，把新網址給我；第二步直接照 §3 用 cc.py SDK 做 P1。P1 完成＝建專案→編輯→保存→重開→輸出→成品成素材並帶來源。建議模型：Opus 5.5
 
 ## 1. 正本（全部在 repo，`VW` = `lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`）
 
@@ -25,7 +25,7 @@
 - **路線 = C**（P0 判定）：EffectCraft 不採用。原因與重評條件見計畫 §0 那一列。
 - **下一張 = P1**：延伸現有五軌編輯器，補 Remotion 片頭與動態字幕模板（經 `next-admin/lib/content/video/remotion-client.ts:7`），做存檔閉環。之後依序 P2 → P3 → P4 → P5 → P6。
 - 待決：只剩 P6 上線（High，要操作者明確同意）。
-- 操作者 2026-11-02 說「先不要」P1：**開工前先問一次**。
+- P1 已獲准：操作者 2026-11-02 說「先不要」只是因為要換帳號，新帳號發布監工台後直接做。
 - 本機實機：`127.0.0.1:4178`，從 VW 用 `node scripts\launch.cjs` 啟動（交接時 PID 70660），跑的是 S3a＋S2 那版。
   - 資料只有 `VW/.data/`（約 152 MB，不在 git，是唯一一份）。Downloads 與 `D:\Video` 副本已刪。
   - 還剩一份 `C:\Users\user1115\Downloads\SeedStar_AwareWave_20261030_修正版`（`.data` 是空的，操作者尚未決定是否刪）。
