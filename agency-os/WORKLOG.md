@@ -1,4 +1,22 @@
 # Worklog
+## 2026-11-02（續8）影音工作台改名 `apps/video-workbench`；畫面上的 SeedStar 字樣全部換掉（分鏡靈感頁不動）
+
+**操作者**：「我不要用這個名字 seedstar」；資料夾由操作者改成 `video-workbench`；選「先改畫面字樣」。
+
+**根因**：SeedStar 是第三方 seedstar.ai 的品牌。工作台畫面寫著「✦ SeedStar V3」（我們沒有這個模型，預設實際是 `sora-2`，`scripts/index-0.js:33`）、「SeedStar 角色庫」、「星角色」、「SEEDSTAR ·」頁首、「官網的角色授權…」；上線到 video.aware-wave.com 客人會當成別家產品。
+
+**做了**：
+- 資料夾 `apps/seedstar` → `apps/video-workbench`（操作者改，121 檔內容逐一比對與 f0d1f58b1 相同）。
+- 畫面字樣：模型鈕初始 `sora-2`；星角色→角色；SeedStar 角色庫→示範角色庫；SEEDSTAR→AWAREWAVE 頁首（角色、專案、模板牆）；「官網」→「外部平台」；專案頁標題去「SeedStar 截圖對照版」；下載檔名 `awarewave-video-*`；啟動視窗訊息。
+- 新專案預設模型 `SeedStar V3`→`sora-2`；讀取舊專案時同值自動改為 `sora-2`（`scripts/projects-0.js`）。
+- 不動：分鏡靈感五個保護檔（雜湊不變）、程式內部名稱（window.SeedStar、/api/seedstar、瀏覽器儲存鍵、next-admin `tools/seedstar`）——留到接入 video.aware-wave.com 那張卡。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=32 個 tests/*.cjs 全跑：26 PASS；6 個失敗（completion、regressions、services 逾時，generator-deep-actions、interactions、restored-ui 元素等待逾時）在改動前版本（暫存副本，HEAD 原檔）同樣失敗、首個錯誤訊息相同 → 既有問題，非本次造成 | exit=1 | ms=1300000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（自審：純字串替換，每處 count==1 斷言；分鏡保護檔 sha256 -c 五項 OK）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=SeedStar V3 | hits=2（projects-0.js 舊值轉換的註解與比對，刻意保留）
+- ORACLE_WAIVED: 只改畫面字串與一個預設值，無邏輯分支；全套測試前後對照無新失敗。
+- 既有 6 個失敗測試未修（舊問題，不在本次範圍）。
 ## 2026-11-02（續7）模特兒圖庫刪不掉：Soulful 的 Wordfence 停用了應用程式密碼 → 刪除前的 WordPress 引用檢查失敗；圖庫改多選永久刪除；平拍拿掉 Ideogram Character
 
 **操作者**：截圖模特兒圖庫「無法刪除, 也要多選, 永久刪除」；「把Ideogram Character從平拍的選單也拿掉」。
