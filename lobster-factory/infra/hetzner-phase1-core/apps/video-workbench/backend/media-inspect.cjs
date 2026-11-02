@@ -84,6 +84,7 @@ function inspectMedia(file, signal) {
         colorPrimaries: video?.color_primaries || null,
         colorTransfer: video?.color_transfer || null,
         colorSpace: video?.color_space || null,
+        colorRange: video?.color_range || null,
         audioStreams: audio.map((s) => ({
           codec: s.codec_name || null,
           sampleRate: number(s.sample_rate),
@@ -110,25 +111,33 @@ function runFfmpeg(args, signal) {
 }
 // Decodes frame N of the output and frame M of the source (select by decoded index: no seeking, so no keyframe
 // snapping) and compares them at the output size. Returns PSNR in dB (Infinity = identical) or null = no frame.
+// Compared as RGB, each file decoded with its own colour matrix: a BT.709 output of a BT.601 source holds other
+// YUV numbers for the same picture (card P2).
 async function framePsnr(output, outFrame, source, sourceFrame, width, height, signal) {
-  const pick = (n) => `select=eq(n\\,${n}),setpts=PTS-STARTPTS,scale=${width}:${height},setsar=1,format=yuv420p`;
+  const pick = (n) => `select=eq(n\\,${n}),setpts=PTS-STARTPTS,scale=${width}:${height},setsar=1,format=gbrp`;
   const { log } = await runFfmpeg(
     ["-i", output, "-i", source, "-filter_complex", `[0:v]${pick(outFrame)}[a];[1:v]${pick(sourceFrame)}[b];[a][b]psnr`, "-frames:v", "1", "-an", "-f", "null", "-"],
     signal,
   );
-  const match = [...log.matchAll(/PSNR y:\S+ u:\S+ v:\S+ average:(inf|[\d.]+)/g)].at(-1);
+  const match = [...log.matchAll(/PSNR (?:\w:\S+ )+average:(inf|[\d.]+)/g)].at(-1);
   return match ? (match[1] === "inf" ? Infinity : Number(match[1])) : null;
 }
-async function integratedLoudness(file, signal) {
-  const { log } = await runFfmpeg(["-i", file, "-map", "0:a:0", "-af", "ebur128=framelog=verbose", "-f", "null", "-"], signal);
-  const match = /Integrated loudness:\s*I:\s*(-?inf|-?[\d.]+) LUFS/.exec(log);
-  return match ? (match[1].endsWith("inf") ? -Infinity : Number(match[1])) : null;
+// EBU R128 integrated loudness (LUFS) and true peak (dBTP, oversampled) of the first audio stream.
+async function loudnessStats(file, signal) {
+  const { log } = await runFfmpeg(["-i", file, "-map", "0:a:0", "-af", "ebur128=peak=true", "-f", "null", "-"], signal);
+  const value = (m) => (m ? (m[1].endsWith("inf") ? (m[1].startsWith("-") ? -Infinity : Infinity) : Number(m[1])) : null);
+  return {
+    integratedLufs: value(/Integrated loudness:\s*I:\s*(-?inf|-?[\d.]+) LUFS/.exec(log)),
+    truePeakDb: value(/True peak:\s*Peak:\s*(-?inf|-?[\d.]+) dBFS/.exec(log)),
+  };
 }
 // Card M3 (plan §3 invariant 8): checks a rendered file against what the export promised. Findings are coded like
 // ../video-service/quality.py ({ code, message, evidence }). expect: { duration (s), fps ({num,den} or number),
 // width, height, audio (boolean), audible (true = integrated loudness must be above -70 LUFS),
-// frames ([{ outFrame, source, sourceFrame }] = decoded frames must match, PSNR >= 35 dB) }; omitted keys are not
-// checked. Duration tolerance = one frame.
+// frames ([{ outFrame, source, sourceFrame }] = decoded frames must match, PSNR >= 35 dB),
+// color ("bt709" = matrix, primaries and transfer tagged bt709, range tv),
+// loudness ({ target LUFS, tolerance LU, maxTruePeak dBTP }) }; omitted keys are not checked.
+// Duration tolerance = one frame. The result carries the measured loudness whenever audio was measured.
 async function verifyOutput(file, expect = {}, signal) {
   const findings = [],
     add = (code, message, evidence = {}) => findings.push({ code, message, evidence });
@@ -175,11 +184,24 @@ async function verifyOutput(file, expect = {}, signal) {
         { outFrame: check.outFrame, sourceFrame: check.sourceFrame, psnr },
       );
   }
-  if (expect.audible) {
-    const lufs = info.audio ? await integratedLoudness(file, signal) : null;
-    if (lufs === null || !(lufs > -70))
-      add("audio.silent", lufs === null ? "應有聲音，但量不到響度（無音軌或量測失敗）" : `應有聲音，實際整體響度 ${lufs} LUFS（≤ -70 視為靜音）`, { integratedLufs: lufs });
+  let color;
+  if (expect.color) {
+    color = { space: info.probe.colorSpace, primaries: info.probe.colorPrimaries, transfer: info.probe.colorTransfer, range: info.probe.colorRange };
+    if (color.space !== expect.color || color.primaries !== expect.color || color.transfer !== expect.color || color.range !== "tv")
+      add("video.color_tags", `色彩標記應為 ${expect.color}／tv，實際 ${color.space}／${color.primaries}／${color.transfer}／${color.range}`, color);
   }
-  return { ok: findings.length === 0, findings, info };
+  let loudness;
+  if (expect.audible || expect.loudness) {
+    loudness = info.audio ? await loudnessStats(file, signal) : { integratedLufs: null, truePeakDb: null };
+    const lufs = loudness.integratedLufs,
+      target = expect.loudness;
+    if (expect.audible && (lufs === null || !(lufs > -70)))
+      add("audio.silent", lufs === null ? "應有聲音，但量不到響度（無音軌或量測失敗）" : `應有聲音，實際整體響度 ${lufs} LUFS（≤ -70 視為靜音）`, { integratedLufs: lufs });
+    if (target && (lufs === null || Math.abs(lufs - target.target) > target.tolerance))
+      add("audio.loudness", `整體響度應為 ${target.target} ± ${target.tolerance} LUFS，實際 ${lufs ?? "無"}`, { ...loudness, target: target.target });
+    if (target && (loudness.truePeakDb === null || loudness.truePeakDb > target.maxTruePeak))
+      add("audio.true_peak", `真峰值應 ≤ ${target.maxTruePeak} dBTP，實際 ${loudness.truePeakDb ?? "無"}`, loudness);
+  }
+  return { ok: findings.length === 0, findings, info, ...(color ? { color } : {}), ...(loudness ? { loudness } : {}) };
 }
-module.exports = { inspectMedia, verifyOutput, ffprobePath };
+module.exports = { inspectMedia, verifyOutput, ffprobePath, loudnessStats };

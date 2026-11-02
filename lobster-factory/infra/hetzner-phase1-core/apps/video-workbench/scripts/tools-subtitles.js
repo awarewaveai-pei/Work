@@ -44,30 +44,14 @@ function toolSubtitleStamp(time, full = false) {
     String(ms % 1000).padStart(3, "0")
   );
 }
+// Card P2: one parser for every SRT/VTT the page reads (shared/subtitle-parse.js); seconds + ids for this tool.
 function toolSubtitleParse(text) {
-  const source = String(text)
-    .replace(/^\uFEFF/, "")
-    .replace(/\r\n?/g, "\n")
-    .replace(/^WEBVTT[^\n]*\n+/, "");
-  const cues = [];
-  for (const block of source.split(/\n\s*\n/)) {
-    const lines = block.trim().split("\n"),
-      index = lines.findIndex((line) => line.includes("-->"));
-    if (index < 0 || /^NOTE\b/.test(lines[0])) continue;
-    const times = lines[index].split("-->"),
-      start = toolSubtitleTime(times[0]),
-      end = toolSubtitleTime(times[1].trim().split(/\s+/)[0]);
-    if (end <= start) throw Error("字幕結束時間需晚於開始時間");
-    cues.push({
-      id: crypto.randomUUID(),
-      start,
-      end,
-      text: lines.slice(index + 1).join("\n"),
-    });
-  }
-  if (!cues.length) throw Error("字幕檔沒有有效的 SRT／VTT 時間碼");
-  if (cues.length > 2000) throw Error("單次字幕檔最多 2000 行");
-  return cues;
+  return SubtitleParse.parse(String(text)).map((cue) => ({
+    id: crypto.randomUUID(),
+    start: cue.startMs / 1000,
+    end: cue.endMs / 1000,
+    text: cue.text,
+  }));
 }
 function toolSubtitleSerialize(cues, format = "srt", texts = null) {
   const blocks = cues.map(

@@ -4,14 +4,16 @@
 const path = require("node:path"),
   { pathToFileURL } = require("node:url"),
   Timebase = require("../shared/timebase.js"),
-  ProjectEnvelope = require("../shared/project-envelope.js");
+  ProjectEnvelope = require("../shared/project-envelope.js"),
+  EditorModel = require("../shared/editor-model.js");
 // Resolved like every main-system file (awarewave-source.json), so a release package finds its bundled copy.
 const contractFile = path.join(require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env), "lib/content/video/timeline-v1.ts");
 let contract = null;
 const loadContract = () => (contract ||= import(pathToFileURL(contractFile).href));
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const profiles = { "16:9": "landscape_16_9", "9:16": "vertical_9_16", "1:1": "square_1_1", "4:5": "square_4_5" };
-const transitions = { 融接: "fade", 淡入淡出: "fade", 向左擦除: "slide_left", 向右擦除: "slide_right" };
+// Card P2 transition names (pre-P2 names are mapped by EditorModel.transitionName first).
+const transitions = { 溶解: "fade", 黑場: "fade", 向左擦除: "slide_left", 向右擦除: "slide_right", 向左推移: "slide_left", 向右推移: "slide_right" };
 // Clip fields with no V1 equivalent: [field, default, applies to].
 const unsupported = [
   ["speed", 1, ["video", "image", "audio"]],
@@ -62,17 +64,31 @@ async function exportTimelineV1(raw, { organizationId, styleRef } = {}) {
   const outputProfile = profiles[project.ratio];
   if (!outputProfile) loss("ratio", project.ratio, "Timeline v1 沒有此比例，改用 landscape_16_9");
   if (project.filter && project.filter !== "原始") loss("filter", project.filter, "Timeline v1 沒有專案濾鏡");
-  for (const [id, track] of Object.entries(project.tracks || {})) {
-    if (track?.muted) loss("track.muted", id, "Timeline v1 沒有軌道靜音");
-    if (track?.normalize) loss("track.normalize", id, "Timeline v1 沒有音量均衡");
-    if (track?.volume !== undefined && Number(track.volume) !== 1) loss("track.volume", track.volume, "Timeline v1 沒有軌道音量");
+  // Card P2: tracks are an ordered array (pre-P2 object form reads as V1, V2, T, A1, A2); V1 output keeps the
+  // video, audio, caption order and each workbench track id. The bottom video track is the full-frame main track.
+  const trackList = EditorModel.normalizeTracks(project.tracks),
+    trackOf = new Map(trackList.map((t) => [t.id, t])),
+    mainTrack = EditorModel.mainTrack(trackList);
+  for (const track of trackList) {
+    if (track.muted) loss("track.muted", track.id, "Timeline v1 沒有軌道靜音");
+    if (track.normalize) loss("track.normalize", track.id, "Timeline v1 沒有音量均衡");
+    if (Number(track.volume) !== 1) loss("track.volume", track.volume, "Timeline v1 沒有軌道音量");
   }
+  if (project.output?.loudness !== undefined && project.output.loudness !== EditorModel.LOUDNESS.neutral)
+    loss("output.loudness", project.output.loudness, "Timeline v1 沒有響度目標");
   const artifacts = [],
-    tracks = { V1: [], V2: [], A1: [], A2: [], T: [] },
+    tracks = Object.fromEntries(
+      ["video", "audio", "text"].flatMap((kind) => trackList.filter((t) => t.kind === kind).map((t) => [t.id, []])),
+    ),
     sorted = [...project.clips].sort((a, b) => a.startFrame - b.startFrame);
   for (const clip of sorted) {
-    const kind = clip.kind;
-    if (clip.hidden || project.tracks?.[clip.track]?.hidden) {
+    const kind = clip.kind,
+      track = trackOf.get(clip.track);
+    if (!track) {
+      loss("track", clip.track, "片段所在軌道不存在，不輸出", clip.id);
+      continue;
+    }
+    if (clip.hidden || track.hidden) {
       loss("hidden", true, "隱藏的片段不輸出", clip.id);
       continue;
     }
@@ -80,6 +96,10 @@ async function exportTimelineV1(raw, { organizationId, styleRef } = {}) {
       if (kinds.includes(kind) && clip[field] !== undefined && clip[field] !== fallback && !(field === "background" && clip[field] === "黑色"))
         loss(field, clip[field], "Timeline v1 沒有此欄位", clip.id);
     if (kind !== "text" && clip.muted) loss("muted", true, "Timeline v1 沒有片段靜音", clip.id);
+    if (Array.isArray(clip.volumeKeys) && clip.volumeKeys.length) loss("volumeKeys", clip.volumeKeys.length, "Timeline v1 沒有音量關鍵影格", clip.id);
+    for (const [key, range] of Object.entries(EditorModel.COLOR))
+      if (clip[key] !== undefined && Number(clip[key]) !== range.neutral) loss(key, clip[key], "Timeline v1 沒有調色", clip.id);
+    if (clip.lut) loss("lut", clip.lut.name || clip.lut.url, "Timeline v1 沒有 LUT", clip.id);
     const startMs = ms(clip.startFrame),
       endMs = ms(clip.startFrame + clip.durationFrames),
       sourceStartMs = ms(clip.sourceStartFrame || 0);
@@ -92,9 +112,9 @@ async function exportTimelineV1(raw, { organizationId, styleRef } = {}) {
       continue;
     }
     if (kind === "text") {
-      if (clip.track === "T" && (clip.x !== undefined && clip.x !== 50 || clip.y !== undefined && clip.y !== 80))
+      if (clip.x !== undefined && clip.x !== 50 || clip.y !== undefined && clip.y !== 80)
         loss("position", { x: clip.x, y: clip.y }, "Timeline v1 字幕沒有位置", clip.id);
-      tracks.T.push({ id: itemId("c_", clip.id), startMs, endMs, text: String(clip.text || ""), sourceTranscriptSegmentIds: [itemId("seg_", clip.id)] });
+      tracks[clip.track].push({ id: itemId("c_", clip.id), startMs, endMs, text: String(clip.text || ""), sourceTranscriptSegmentIds: [itemId("seg_", clip.id)] });
       continue;
     }
     const assetId = clip.asset?.id;
@@ -103,11 +123,11 @@ async function exportTimelineV1(raw, { organizationId, styleRef } = {}) {
       continue;
     }
     if (!artifacts.includes(assetId)) artifacts.push(assetId);
-    if (clip.track === "V2" && (clip.x !== 80 || clip.y !== 80 || clip.width !== 25))
+    if (track.kind === "video" && clip.track !== mainTrack && (clip.x !== 80 || clip.y !== 80 || clip.width !== 25))
       loss("position", { x: clip.x, y: clip.y, width: clip.width }, "Timeline v1 沒有疊加位置與大小", clip.id);
-    else if (clip.track === "V1" && ((clip.x || 0) !== 0 || (clip.y || 0) !== 0))
+    else if (clip.track === mainTrack && ((clip.x || 0) !== 0 || (clip.y || 0) !== 0))
       loss("position", { x: clip.x, y: clip.y }, "Timeline v1 沒有畫面位移", clip.id);
-    if (clip.track === "A1" || clip.track === "A2") {
+    if (track.kind === "audio") {
       if (clip.sourceStartFrame) loss("sourceStart", clip.sourceStartFrame, "Timeline v1 音訊沒有來源起點", clip.id);
       tracks[clip.track].push({ id: itemId("c_", clip.id), startMs, durationMs: endMs - startMs, sourceArtifactId: assetId });
       continue;
@@ -125,14 +145,16 @@ async function exportTimelineV1(raw, { organizationId, styleRef } = {}) {
     });
   }
   // The editor stores a transition on the incoming V1 clip; V1 stores it as transitionOut on the outgoing item.
-  const mainClips = sorted.filter((c) => c.track === "V1" && !c.hidden);
+  const mainClips = sorted.filter((c) => c.track === mainTrack && !c.hidden);
   for (const clip of mainClips) {
-    if (!clip.transition || clip.transition === "無") continue;
-    const previous = tracks.V1[tracks.V1.findIndex((item) => item.id === itemId("c_", clip.id)) - 1];
-    if (!previous || !transitions[clip.transition]) loss("transition", clip.transition, "Timeline v1 沒有此轉場", clip.id);
-    else previous.transitionOut = transitions[clip.transition];
+    const name = EditorModel.transitionName(clip.transition);
+    if (name === "無") continue;
+    const previous = tracks[mainTrack][tracks[mainTrack].findIndex((item) => item.id === itemId("c_", clip.id)) - 1];
+    if (!previous || !transitions[name]) loss("transition", clip.transition, "Timeline v1 沒有此轉場", clip.id);
+    else previous.transitionOut = transitions[name];
   }
-  if (tracks.T.length) loss("captions.transcript", tracks.T.length, "文字片段沒有轉錄來源，sourceTranscriptSegmentIds 以片段 ID 代填");
+  const captions = trackList.filter((t) => t.kind === "text").reduce((n, t) => n + tracks[t.id].length, 0);
+  if (captions) loss("captions.transcript", captions, "文字片段沒有轉錄來源，sourceTranscriptSegmentIds 以片段 ID 代填");
   if (!styleRef) {
     styleRef = artifacts[0];
     loss("styleRef", null, "工作台沒有風格資產，以第一個來源素材代填");
@@ -146,7 +168,7 @@ async function exportTimelineV1(raw, { organizationId, styleRef } = {}) {
     outputProfiles: [outputProfile || "landscape_16_9"],
     tracks: Object.entries(tracks)
       .filter(([, items]) => items.length)
-      .map(([id, items]) => ({ id, kind: id === "T" ? "caption" : id.startsWith("A") ? "audio" : "video", items })),
+      .map(([id, items]) => ({ id, kind: { text: "caption", audio: "audio", video: "video" }[trackOf.get(id).kind], items })),
     styleRef,
     provenance: { capabilityVersions: { "workbench.editor": ProjectEnvelope.ENGINE_VERSION }, sourceArtifacts: artifacts },
   };

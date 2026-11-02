@@ -2,7 +2,8 @@ const fs = require("node:fs"),
   path = require("node:path");
 const { inspectMedia, verifyOutput } = require("./media-inspect.cjs"),
   { filterPath, assTime, assColor } = require("./subtitle-burn.cjs"),
-  Timebase = require("../shared/timebase.js");
+  Timebase = require("../shared/timebase.js"),
+  EditorModel = require("../shared/editor-model.js");
 const ratios = {
   "16:9": [1920, 1080],
   "9:16": [1080, 1920],
@@ -43,7 +44,7 @@ function validateProject(raw, quality = "1080p") {
   if (
     !raw ||
     !Object.hasOwn(ratios, raw.ratio) ||
-    !["720p", "1080p"].includes(quality) ||
+    !Object.hasOwn(EditorModel.QUALITIES, quality) ||
     !Array.isArray(raw.clips) ||
     !raw.clips.length ||
     raw.clips.length > 2064 ||
@@ -56,25 +57,34 @@ function validateProject(raw, quality = "1080p") {
   if (!Timebase.find(raw.timebase)) throw Error("剪輯專案影格率無效");
   const tb = Timebase.check(raw.timebase),
     perHour = Math.ceil(3600 * Timebase.fps(tb));
+  // Card P2: an ordered track array (first video track = bottom = full-frame main track); the pre-P2 object of
+  // five fixed tracks (or none) reads as V1, V2, T, A1, A2.
+  let tracks;
+  try {
+    tracks = EditorModel.normalizeTracks(raw.tracks, { strict: true });
+  } catch (error) {
+    throw Error("軌道資料無效：" + error.message);
+  }
+  const trackOf = new Map(tracks.map((t) => [t.id, t])),
+    mainTrack = EditorModel.mainTrack(tracks),
+    loudness = number(raw.output?.loudness, EditorModel.LOUDNESS.neutral, EditorModel.LOUDNESS.min, EditorModel.LOUDNESS.max, "響度目標");
   const clips = raw.clips.map((c) => {
+    const track = trackOf.get(c?.track);
     if (
-      !["V1", "V2", "T", "A1", "A2"].includes(c.track) ||
+      !track ||
       !["video", "image", "audio", "text"].includes(c.kind) ||
-      (c.track === "T" && c.kind !== "text") ||
-      (["A1", "A2"].includes(c.track) && c.kind !== "audio") ||
-      (["V1", "V2"].includes(c.track) && !["video", "image"].includes(c.kind))
+      (track.kind === "text") !== (c.kind === "text") ||
+      (track.kind === "audio") !== (c.kind === "audio")
     )
       throw Error("片段與軌道類型不相符");
+    const overlay = track.kind === "video" && c.track !== mainTrack;
     const startFrame = frames(c.startFrame, 0, perHour, "片段起點"),
       durationFrames = frames(c.durationFrames, 1, perHour, "片段長度"),
       sourceStartFrame = frames(c.sourceStartFrame ?? 0, 0, perHour * 24, "來源起點"),
       start = Timebase.toSeconds(startFrame, tb),
       duration = Timebase.toSeconds(durationFrames, tb),
       speed = number(c.speed, 1, 0.25, 4, "播放速度");
-    const track = Array.isArray(raw.tracks)
-      ? raw.tracks.find((t) => t.id === c.track)
-      : raw.tracks?.[c.track];
-    const filter = c.filter || track?.filter || raw.filter || "原始";
+    const filter = c.filter || track.filter || raw.filter || "原始";
     if (!Object.hasOwn(filters, filter)) throw Error("濾鏡不存在");
     if (
       c.mask &&
@@ -82,13 +92,14 @@ function validateProject(raw, quality = "1080p") {
       !["圓形", "圓角矩形", "三角形"].includes(c.mask)
     )
       throw Error("遮罩不存在");
-    if (
-      c.transition &&
-      !["無", "融接", "淡入淡出", "向左擦除", "向右擦除", "圓形裁切"].includes(
-        c.transition,
-      )
-    )
-      throw Error("轉場不存在");
+    const transition = EditorModel.transitionName(c.transition);
+    if (transition === null) throw Error("轉場不存在");
+    if (c.transitionFrames !== undefined) {
+      const { min, max } = EditorModel.transitionLimits(tb);
+      frames(c.transitionFrames, min, max, "轉場長度");
+    }
+    if (c.lut !== undefined && c.lut !== null && (typeof c.lut?.url !== "string" || !/\.cube$/i.test(c.lut.url)))
+      throw Error("LUT 必須是素材庫的 .cube 檔");
     if (
       c.transitionCurve &&
       !["線性", "平滑", "加速"].includes(c.transitionCurve)
@@ -105,18 +116,19 @@ function validateProject(raw, quality = "1080p") {
       sourceStart: Timebase.toSeconds(sourceStartFrame, tb),
       opacity: number(c.opacity, 1, 0, 1, "不透明度"),
       scale: number(c.scale, 1, 0.1, 5, "縮放"),
+      overlay,
       x: number(
         c.x,
-        c.track === "V2" ? 80 : c.kind === "text" ? 50 : 0,
-        c.track === "V2" || c.kind === "text" ? 0 : -8000,
-        c.track === "V2" || c.kind === "text" ? 100 : 8000,
+        overlay ? 80 : c.kind === "text" ? 50 : 0,
+        overlay || c.kind === "text" ? 0 : -8000,
+        overlay || c.kind === "text" ? 100 : 8000,
         "水平位置",
       ),
       y: number(
         c.y,
-        c.track === "V2" ? 80 : c.kind === "text" ? 80 : 0,
-        c.track === "V2" || c.kind === "text" ? 0 : -8000,
-        c.track === "V2" || c.kind === "text" ? 100 : 8000,
+        overlay ? 80 : c.kind === "text" ? 80 : 0,
+        overlay || c.kind === "text" ? 0 : -8000,
+        overlay || c.kind === "text" ? 100 : 8000,
         "垂直位置",
       ),
       rotation: number(c.rotation, 0, -360, 360, "旋轉"),
@@ -126,7 +138,13 @@ function validateProject(raw, quality = "1080p") {
       width: number(c.width, 25, 1, 100, "疊加寬度"),
       filter,
       grain: number(c.grain, 0, 0, 1, "顆粒"),
-      transitionDuration: number(c.transitionDuration, 0.5, 0.1, 2, "轉場時長"),
+      transition,
+      transitionFrames: EditorModel.transitionFrames(c, tb),
+      volumeKeys: EditorModel.volumeKeys(c.volumeKeys, durationFrames),
+      ...Object.fromEntries(
+        Object.entries(EditorModel.COLOR).map(([key, r]) => [key, number(c[key], r.neutral, r.min, r.max, r.label)]),
+      ),
+      lut: c.lut ? { url: c.lut.url, name: String(c.lut.name || "LUT") } : null,
     };
     if (c.kind === "text") {
       if (typeof c.text !== "string" || c.text.length > 4000)
@@ -155,10 +173,13 @@ function validateProject(raw, quality = "1080p") {
   const totalFrames = Math.max(...clips.map((c) => c.startFrame + c.durationFrames)),
     duration = Timebase.toSeconds(totalFrames, tb);
   if (totalFrames > perHour) throw Error("剪輯匯出單次最長一小時");
-  const scale = quality === "720p" ? 2 / 3 : 1,
+  const scale = EditorModel.QUALITIES[quality],
     [baseWidth, baseHeight] = ratios[raw.ratio];
   return {
     ...raw,
+    tracks,
+    mainTrack,
+    loudness,
     clips,
     timebase: tb,
     totalFrames,
@@ -180,8 +201,8 @@ function frameChecks(project, indexed, width, height) {
     if (checks.length >= 3) break;
     const rate = metadata.probe?.frameRate;
     if (
-      clip.kind !== "video" || clip.track !== "V1" || clip.speed !== 1 || clip.opacity !== 1 || clip.scale !== 1 ||
-      clip.x !== 0 || clip.y !== 0 || clip.rotation !== 0 || clip.grain !== 0 || clip.filter !== "原始" ||
+      clip.kind !== "video" || clip.track !== project.mainTrack || clip.speed !== 1 || clip.opacity !== 1 || clip.scale !== 1 ||
+      clip.x !== 0 || clip.y !== 0 || clip.rotation !== 0 || clip.grain !== 0 || clip.filter !== "原始" || EditorModel.graded(clip) ||
       (clip.mask && clip.mask !== "無") || clip.fadeIn || clip.fadeOut || clip.durationFrames < 2 * margin + 1 ||
       !rate || rate.num * tb.den !== tb.num * rate.den ||
       !metadata.displayWidth || metadata.displayWidth * height !== metadata.displayHeight * width
@@ -229,16 +250,84 @@ function fontFile(clip) {
   );
   return fs.existsSync(candidate) ? candidate : null;
 }
+// Card P2: a .cube 3D LUT that lut3d can read: text, LUT_3D_SIZE 2..65 and exactly size^3 rows of three numbers.
+function checkCube(text) {
+  if (typeof text !== "string" || text.length > 8 * 1024 * 1024) throw Error("LUT 檔太大或不是文字");
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+  let size = 0,
+    rows = 0;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    const m = /^LUT_3D_SIZE\s+(\d+)$/.exec(line);
+    if (m) {
+      size = Number(m[1]);
+      continue;
+    }
+    if (/^(TITLE|DOMAIN_MIN|DOMAIN_MAX|LUT_3D_INPUT_RANGE)\b/.test(line)) continue;
+    if (/^LUT_1D_SIZE\b/.test(line)) throw Error("只支援 3D LUT（LUT_3D_SIZE）");
+    const values = line.split(/\s+/);
+    if (values.length !== 3 || values.some((v) => !/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(v))) throw Error("LUT 檔內容格式錯誤");
+    rows++;
+  }
+  if (size < 2 || size > 65 || rows !== size ** 3) throw Error("LUT 檔需有 LUT_3D_SIZE（2–65）且資料列數相符");
+  return size;
+}
+// Per-clip colour (card P2): exposure (EV, x2^EV on the encoded values), white balance, contrast/saturation, LUT.
+function gradeSteps(clip, lutFile) {
+  const steps = [];
+  if (clip.exposure) steps.push(`exposure=exposure=${clip.exposure}`);
+  if (clip.temperature !== 6500) steps.push(`colortemperature=temperature=${clip.temperature}`);
+  if (clip.contrast !== 1 || clip.saturation !== 1) steps.push(`eq=contrast=${clip.contrast}:saturation=${clip.saturation}`);
+  if (lutFile) steps.push(`lut3d=file='${filterPath(lutFile)}'`);
+  return steps;
+}
+// Volume keyframes -> a volume=eval=frame expression of t (seconds from the clip's start), linear between keys.
+function gainExpression(keys, fps, scale) {
+  const points = keys.map((k) => [k.frame / fps, k.gain * scale]);
+  let expr = String(points.at(-1)[1]);
+  for (let i = points.length - 2; i >= 0; i--) {
+    const [t0, g0] = points[i],
+      [t1, g1] = points[i + 1];
+    expr = `if(lt(t,${t1}),${g0}+(${g1 - g0})*(t-${t0})/${t1 - t0},${expr})`;
+  }
+  return `if(lt(t,${points[0][0]}),${points[0][1]},${expr})`;
+}
+const TRUE_PEAK_CEILING = -2; // dBTP for loudnorm and the limiter; the export must measure <= -1 dBTP after AAC.
 async function exportEditor(
   raw,
   { file, output, signal, run },
   quality = "1080p",
 ) {
   const project = validateProject(raw, quality),
-    { width, height, duration, totalFrames, timebase: tb } = project,
+    { width, height, duration, totalFrames, timebase: tb, tracks, mainTrack, loudness } = project,
     rate = Timebase.ffRate(tb),
     fps = Timebase.fps(tb),
-    total = Timebase.ffTime(totalFrames, tb);
+    total = Timebase.ffTime(totalFrames, tb),
+    order = new Map(tracks.map((t, i) => [t.id, i])),
+    getTrack = (id) => tracks.find((t) => t.id === id) || {},
+    visible = (c) => !c.hidden && !getTrack(c.track).hidden;
+  // Transitions sit at a cut between two adjacent main-track clips, centred on the cut: the outgoing clip runs
+  // `after` frames past its out point, the incoming one starts `before` frames before its in point (xfade).
+  const mainClips = project.clips
+      .filter((c) => c.track === mainTrack && visible(c))
+      .sort((a, b) => a.startFrame - b.startFrame),
+    incoming = new Map(),
+    outgoing = new Map();
+  mainClips.forEach((clip, i) => {
+    if (clip.transition === "無") return;
+    const previous = mainClips[i - 1];
+    if (!previous || previous.startFrame + previous.durationFrames !== clip.startFrame)
+      throw Error("轉場只能放在主影片軌上相鄰（無空隙）的兩段之間，可先按「主軌吸附排列」");
+    const before = Math.floor(clip.transitionFrames / 2),
+      transition = { type: EditorModel.TRANSITIONS[clip.transition], frames: clip.transitionFrames, before, after: clip.transitionFrames - before, cut: clip.startFrame };
+    incoming.set(clip.id, transition);
+    outgoing.set(previous.id, transition);
+  });
+  for (const clip of mainClips)
+    if ((incoming.get(clip.id)?.after || 0) + (outgoing.get(clip.id)?.before || 0) > clip.durationFrames)
+      throw Error("轉場太長：片段長度需大於兩側轉場各一半");
+  const handles = (clip) => (clip.overlay ? { pre: 0, post: 0 } : { pre: incoming.get(clip.id)?.before || 0, post: outgoing.get(clip.id)?.after || 0 });
   const args = [
     "-y",
     "-hide_banner",
@@ -257,12 +346,8 @@ async function exportEditor(
     indexed = [],
     temporary = [],
     graph = [],
+    agraph = [],
     audio = ["[1:a]"];
-  const tracks = project.tracks || {},
-    getTrack = (id) =>
-      Array.isArray(tracks)
-        ? tracks.find((t) => t.id === id) || {}
-        : tracks[id] || {};
   for (const clip of project.clips.filter((c) => c.kind !== "text")) {
     const url = clip.asset.url;
     let source;
@@ -284,49 +369,28 @@ async function exportEditor(
     )
       throw Error("片段超出原始素材時長");
     const index = indexed.length + 2;
-    if (clip.kind === "image")
-      args.push("-loop", "1", "-framerate", rate, "-t", Timebase.ffTime(clip.durationFrames, tb));
+    if (clip.kind === "image") {
+      const { pre, post } = handles(clip);
+      args.push("-loop", "1", "-framerate", rate, "-t", Timebase.ffTime(clip.durationFrames + pre + post, tb));
+    }
     args.push("-i", source);
     indexed.push({ clip, metadata, index, source });
   }
+  const lutFile = (clip) => {
+    if (!clip.lut) return null;
+    const found = file(clip.lut.url);
+    if (!found || !fs.existsSync(found)) throw Error("找不到片段使用的 LUT 檔");
+    return found;
+  };
   let video = "[0:v]",
-    layer = 0;
+    layer = 0,
+    chain = [];
   try {
-    const mainClips = project.clips
-        .filter((c) => c.track === "V1")
-        .sort((a, b) => a.startFrame - b.startFrame),
-      incoming = new Map(),
-      outgoing = new Map();
-    mainClips.forEach((clip, i) => {
-      if (!clip.transition || clip.transition === "無") return;
-      const previous = mainClips[i - 1];
-      if (
-        !previous ||
-        Math.abs(previous.startFrame + previous.durationFrames - clip.startFrame) > 1
-      )
-        throw Error("轉場只能套用於相鄰主視訊剪點");
-      const transition = {
-        type: clip.transition,
-        duration: Math.min(
-          clip.transitionDuration,
-          clip.duration / 2,
-          previous.duration / 2,
-        ),
-        curve: clip.transitionCurve || "線性",
-      };
-      incoming.set(clip.id, transition);
-      outgoing.set(previous.id, transition);
-    });
     for (const { clip, metadata, index } of [...indexed]
-      .filter((row) => ["V1", "V2"].includes(row.clip.track))
-      .sort(
-        (a, b) =>
-          (a.clip.track === "V1" ? 0 : 1) - (b.clip.track === "V1" ? 0 : 1) ||
-          a.clip.start - b.clip.start,
-      )) {
-      const track = getTrack(clip.track);
-      if (track.hidden || clip.hidden) continue;
-      const overlay = clip.track === "V2",
+      .filter((row) => row.clip.kind !== "audio")
+      .sort((a, b) => order.get(a.clip.track) - order.get(b.clip.track) || a.clip.startFrame - b.clip.startFrame)) {
+      if (!visible(clip)) continue;
+      const overlay = clip.overlay,
         boxWidth = overlay
           ? Math.max(2, Math.round((width * clip.width) / 100 / 2) * 2)
           : width,
@@ -346,21 +410,34 @@ async function exportEditor(
           2,
           Math.round((boxHeight * clip.scale) / 2) * 2,
         );
-      const enter = incoming.get(clip.id),
-        leave = outgoing.get(clip.id),
-        preFrames = enter && enter.type !== "淡入淡出" ? Math.round((enter.duration / 2) * fps) : 0,
-        postFrames = leave && leave.type !== "淡入淡出" ? Math.round((leave.duration / 2) * fps) : 0,
-        preRoll = Timebase.toSeconds(preFrames, tb);
-      // After fps= the stream time base is exactly 1/fps, so the timeline offset below is an integer frame count.
+      // Handle frames for transitions come from the source; what the source lacks repeats its edge frame.
+      const { pre, post } = handles(clip),
+        frameCount = clip.durationFrames + pre + post;
+      let availablePre = pre,
+        availablePost = post,
+        trimStart,
+        trimDuration;
+      if (clip.kind === "image") {
+        trimStart = "0";
+        trimDuration = Timebase.ffTime(frameCount, tb);
+      } else {
+        availablePre = Math.min(pre, Math.floor(clip.sourceStartFrame / clip.speed));
+        const usedEnd = clip.sourceStart + clip.duration * clip.speed,
+          left = metadata.duration ? Math.floor(((metadata.duration - usedEnd) * fps) / clip.speed) : 0;
+        availablePost = Math.max(0, Math.min(post, left));
+        const frames = clip.durationFrames + availablePre + availablePost;
+        trimStart = clip.speed === 1 ? Timebase.ffTime(clip.sourceStartFrame - availablePre, tb) : String(Math.max(0, clip.sourceStart - (availablePre * clip.speed) / fps));
+        trimDuration = clip.speed === 1 ? Timebase.ffTime(frames, tb) : String((frames / fps) * clip.speed);
+      }
+      // After fps= the stream time base is exactly 1/fps, so frame counts and the timeline offset are integers.
       const prefix = [
-        `trim=start=${Timebase.ffTime(clip.sourceStartFrame, tb)}:duration=${clip.speed === 1 ? Timebase.ffTime(clip.durationFrames, tb) : clip.duration * clip.speed}`,
+        `trim=start=${trimStart}:duration=${trimDuration}`,
         `setpts=(PTS-STARTPTS)/${clip.speed}`,
         "fps=" + rate,
+        `tpad=start_mode=clone:start=${pre - availablePre}:stop_mode=clone:stop=${post - availablePost + 2}`,
+        `trim=end_frame=${frameCount}`,
+        "setpts=PTS-STARTPTS",
       ];
-      if (preFrames || postFrames)
-        prefix.push(
-          `tpad=start_mode=clone:stop_mode=clone:start=${preFrames}:stop=${postFrames}`,
-        );
       const steps = [];
       let inputLabel = `[${index}:v]`;
       if (!overlay && clip.background === "模糊") {
@@ -390,13 +467,15 @@ async function exportEditor(
           `pad=${scaledWidth}:${scaledHeight}:(ow-iw)/2:(oh-ih)/2:color=${overlay ? "black@0" : clip.background === "純色" && /^#[\da-f]{6}$/i.test(clip.backgroundColor || "") ? clip.backgroundColor : "black"}`,
         );
       steps.push("setsar=1", "format=rgba");
-      if (filters[clip.filter] || clip.grain) {
-        // eq converts to YUV without alpha. Preserve the original alpha plane explicitly.
+      const grade = gradeSteps(clip, lutFile(clip));
+      if (filters[clip.filter] || clip.grain || grade.length) {
+        // eq / exposure / lut3d drop alpha. Preserve the original alpha plane explicitly.
         graph.push(
           `${inputLabel}${steps.join(",")},split=2[color${layer}][alpha${layer}]`,
         );
         graph.push(`[alpha${layer}]alphaextract[plane${layer}]`);
         const effects = [
+          ...grade,
           filters[clip.filter],
           clip.grain
             ? `noise=alls=${Math.round(clip.grain * 30)}:allf=t+u`
@@ -427,50 +506,53 @@ async function exportEditor(
         );
       }
       if (clip.opacity < 1) steps.push("colorchannelmixer=aa=" + clip.opacity);
-      if (enter && enter.type === "淡入淡出")
-        steps.push(`fade=t=in:st=0:d=${enter.duration / 2}:alpha=1`);
-      else if (enter) {
-        const linear = `min(1,max(0,T/${enter.duration}))`,
-          progress =
-            enter.curve === "平滑"
-              ? `((${linear})*(${linear})*(3-2*(${linear})))`
-              : enter.curve === "加速"
-                ? `pow(${linear},2)`
-                : linear;
-        const alpha =
-          enter.type === "融接"
-            ? `alpha(X,Y)*(${progress})`
-            : enter.type === "向左擦除"
-              ? `if(gte(X,W*(1-(${progress}))),alpha(X,Y),0)`
-              : enter.type === "向右擦除"
-                ? `if(lte(X,W*(${progress})),alpha(X,Y),0)`
-                : `if(lte(pow(X-W/2,2)+pow(Y-H/2,2),pow(sqrt(W*W+H*H)/2*(${progress}),2)),alpha(X,Y),0)`;
-        steps.push(`geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${alpha}'`);
-      }
-      if (leave?.type === "淡入淡出")
-        steps.push(
-          `fade=t=out:st=${preRoll + clip.duration - leave.duration / 2}:d=${leave.duration / 2}:alpha=1`,
-        );
-      steps.push(`setpts=PTS+${clip.startFrame - preFrames}`);
-      const sourceLabel = `[clip${layer}]`,
-        next = `[video${layer}]`;
-      graph.push(`${inputLabel}${steps.join(",")}${sourceLabel}`);
       const x = overlay
           ? `(main_w-overlay_w)*${clip.x / 100}`
           : `(main_w-overlay_w)/2+${(clip.x * width) / project.baseWidth}`,
         y = overlay
           ? `(main_h-overlay_h)*${clip.y / 100}`
           : `(main_h-overlay_h)/2+${(clip.y * height) / project.baseHeight}`;
+      const enter = incoming.get(clip.id),
+        leave = outgoing.get(clip.id);
+      if (!overlay && (enter || leave)) {
+        // In a transition chain: flatten onto the black frame (the main track is the bottom layer, so this is
+        // what it would show anyway), then xfade the chain and lay it on the timeline once.
+        graph.push(`${inputLabel}${steps.length ? steps.join(",") : "null"}[clip${layer}]`);
+        graph.push(`color=c=black:s=${width}x${height}:r=${rate}[canvas${layer}]`);
+        graph.push(`[canvas${layer}][clip${layer}]overlay=x='${x}':y='${y}':shortest=1,trim=end_frame=${frameCount},setpts=PTS-STARTPTS[flat${layer}]`);
+        chain.push({ clip, label: `[flat${layer}]` });
+        layer++;
+        if (leave) continue;
+        const groupStart = chain[0].clip.startFrame,
+          groupEnd = clip.startFrame + clip.durationFrames;
+        let joined = chain[0].label;
+        chain.slice(1).forEach(({ clip: next, label }, i) => {
+          const t = incoming.get(next.id),
+            out = `[xfade${layer}_${i}]`;
+          graph.push(`${joined}${label}xfade=transition=${t.type}:duration=${Timebase.ffTime(t.frames, tb)}:offset=${Timebase.ffTime(t.cut - t.before - groupStart, tb)}${out}`);
+          joined = out;
+        });
+        graph.push(`${joined}setpts=PTS+${groupStart}[group${layer}]`);
+        graph.push(`${video}[group${layer}]overlay=enable='between(t,${(groupStart - 0.5) / fps},${(groupEnd - 0.5) / fps})':eof_action=pass[video${layer}]`);
+        video = `[video${layer}]`;
+        layer++;
+        chain = [];
+        continue;
+      }
+      steps.push(`setpts=PTS+${clip.startFrame}`);
+      const sourceLabel = `[clip${layer}]`,
+        next = `[video${layer}]`;
+      graph.push(`${inputLabel}${steps.join(",")}${sourceLabel}`);
       graph.push(
-        // Half-frame margins: output frames startFrame-pre .. end+post-1 are on, whatever the float rounding of t.
-        `${video}${sourceLabel}overlay=x='${x}':y='${y}':enable='between(t,${(clip.startFrame - preFrames - 0.5) / fps},${(clip.startFrame + clip.durationFrames + postFrames - 0.5) / fps})':eof_action=pass${next}`,
+        // Half-frame margins: output frames startFrame .. end-1 are on, whatever the float rounding of t.
+        `${video}${sourceLabel}overlay=x='${x}':y='${y}':enable='between(t,${(clip.startFrame - 0.5) / fps},${(clip.startFrame + clip.durationFrames - 0.5) / fps})':eof_action=pass${next}`,
       );
       video = next;
       layer++;
     }
-    const textClips = project.clips.filter(
-      (c) => c.kind === "text" && !c.hidden && !getTrack(c.track).hidden,
-    );
+    const textClips = project.clips
+      .filter((c) => c.kind === "text" && visible(c))
+      .sort((a, b) => order.get(a.track) - order.get(b.track) || a.startFrame - b.startFrame);
     if (textClips.length) {
       const subtitle = output("ass");
       temporary.push(subtitle.file);
@@ -546,19 +628,23 @@ async function exportEditor(
       graph.push(`${video}ass=filename='${filterPath(subtitle.file)}'${next}`);
       video = next;
     }
+    // Overlays composite in BT.601 (FFmpeg's default for untagged RGB<->YUV); convert once to BT.709 TV range,
+    // which the encoder flags below declare (plan §3 invariant 8: explicit colour space and range).
+    graph.push(`${video}scale=in_color_matrix=bt601:out_color_matrix=bt709:in_range=tv:out_range=tv,format=yuv420p[videoout]`);
     let audioIndex = 0;
     for (const { clip, metadata, index } of indexed) {
       const track = getTrack(clip.track),
-        gain =
-          clip.hidden || track.hidden || clip.muted || track.muted
-            ? 0
-            : clip.volume * number(track.volume, 1, 0, 4, "軌道音量");
-      if (!metadata.audio || !gain || clip.kind === "image") continue;
+        trackGain = !visible(clip) || clip.muted || track.muted ? 0 : track.volume,
+        peak = clip.volumeKeys.length ? Math.max(...clip.volumeKeys.map((k) => k.gain)) : clip.volume;
+      if (!metadata.audio || !(trackGain * peak) || clip.kind === "image") continue;
       const steps = [
         `atrim=start=${Timebase.ffTime(clip.sourceStartFrame, tb)}:duration=${clip.duration * clip.speed}`,
         "asetpts=PTS-STARTPTS",
         tempo(clip.speed),
-        "volume=" + gain,
+        // Keyframes replace the clip volume over time; the track volume multiplies either.
+        clip.volumeKeys.length
+          ? `volume=volume='${gainExpression(clip.volumeKeys, fps, trackGain)}':eval=frame`
+          : "volume=" + clip.volume * trackGain,
       ];
       if (clip.fadeIn) steps.push(`afade=t=in:st=0:d=${clip.fadeIn}`);
       if (clip.fadeOut)
@@ -568,20 +654,41 @@ async function exportEditor(
       if (track.normalize) steps.push("loudnorm=I=-16:TP=-1.5:LRA=11");
       steps.push("adelay=" + Math.round(clip.start * 1000) + ":all=1");
       const label = `[audio${audioIndex++}]`;
-      graph.push(`[${index}:a]${steps.join(",")}${label}`);
+      agraph.push(`[${index}:a]${steps.join(",")}${label}`);
       audio.push(label);
     }
-    graph.push(
+    agraph.push(
       `${audio.join("")}amix=inputs=${audio.length}:duration=longest:normalize=0,atrim=duration=${total}[audioout]`,
     );
+    // Master loudness (card P2): render the mix, measure it (loudnorm pass 1), then apply the measured values
+    // linearly (pass 2, falling back to loudnorm's own dynamic mode when the peak forbids it) and limit the peak.
+    const audible = audio.length > 1;
+    let master = null,
+      audioGraph = agraph;
+    if (audible) {
+      const mix = output("wav");
+      temporary.push(mix.file);
+      await run([...args, "-filter_complex", agraph.join(";"), "-map", "[audioout]", "-c:a", "pcm_f32le", "-ar", "48000", mix.file], signal);
+      const log = await run(["-hide_banner", "-nostats", "-i", mix.file, "-af", `loudnorm=I=${loudness}:TP=${TRUE_PEAK_CEILING}:LRA=50:print_format=json`, "-f", "null", "-"], signal);
+      const stats = JSON.parse(/\{[^{}]*"input_i"[^{}]*\}/.exec(log)?.[0] || "null"),
+        measured = (key, min, max) => Math.max(min, Math.min(max, Number(stats?.[key])));
+      args.push("-i", mix.file);
+      const mixInput = `[${indexed.length + 2}:a]`;
+      if (stats && Number.isFinite(Number(stats.input_i)) && Number(stats.input_i) > -70) {
+        master = { target: loudness, measuredInput: Number(stats.input_i) };
+        audioGraph = [
+          `${mixInput}loudnorm=I=${loudness}:TP=${TRUE_PEAK_CEILING}:LRA=50:measured_I=${measured("input_i", -99, 0)}:measured_TP=${measured("input_tp", -99, 99)}:measured_LRA=${measured("input_lra", 0, 99)}:measured_thresh=${measured("input_thresh", -99, 0)}:offset=${measured("target_offset", -99, 99)}:linear=true,aresample=48000,alimiter=limit=${Math.pow(10, TRUE_PEAK_CEILING / 20).toFixed(4)}:level=false:latency=true,atrim=duration=${total}[audioout]`,
+        ];
+      } else audioGraph = [`${mixInput}atrim=duration=${total}[audioout]`]; // silent mix: nothing to normalise
+    }
     const result = output("mp4");
     await run(
       [
         ...args,
         "-filter_complex",
-        graph.join(";"),
+        [...graph, ...audioGraph].join(";"),
         "-map",
-        video,
+        "[videoout]",
         "-map",
         "[audioout]",
         "-t",
@@ -594,6 +701,14 @@ async function exportEditor(
         "fast",
         "-pix_fmt",
         "yuv420p",
+        "-colorspace",
+        "bt709",
+        "-color_primaries",
+        "bt709",
+        "-color_trc",
+        "bt709",
+        "-color_range",
+        "tv",
         "-c:a",
         "aac",
         "-b:a",
@@ -604,16 +719,19 @@ async function exportEditor(
       ],
       signal,
     );
-    // Invariant 8: no silent pass. Audible is expected when any source audio reaches the mix with gain > 0.
-    const verification = await verifyOutput(
-      result.file,
-      {
-        duration, fps: tb, width, height, audio: true,
-        ...(audio.length > 1 ? { audible: true } : {}),
-        frames: frameChecks(project, indexed, width, height),
-      },
-      signal,
-    );
+    // Invariant 8: no silent pass. Audible is expected when any source audio reaches the mix with gain > 0;
+    // then the measured loudness must sit within 1 LU of the target with a true peak at or below -1 dBTP.
+    const checks = frameChecks(project, indexed, width, height),
+      verification = await verifyOutput(
+        result.file,
+        {
+          duration, fps: tb, width, height, audio: true, color: "bt709",
+          ...(audible ? { audible: true } : {}),
+          ...(master ? { loudness: { target: loudness, tolerance: 1, maxTruePeak: -1 } } : {}),
+          frames: checks,
+        },
+        signal,
+      );
     if (!verification.ok) {
       temporary.push(result.file);
       throw Object.assign(
@@ -621,9 +739,21 @@ async function exportEditor(
         { findings: verification.findings },
       );
     }
-    return { type: "video", url: result.url, width, height, verification: { ok: true, findings: [], frameChecks: frameChecks(project, indexed, width, height).length } };
+    return {
+      type: "video",
+      url: result.url,
+      width,
+      height,
+      verification: {
+        ok: true,
+        findings: [],
+        frameChecks: checks.length,
+        color: verification.color,
+        ...(verification.loudness ? { loudness: { ...verification.loudness, target: master ? loudness : null } } : {}),
+      },
+    };
   } finally {
     for (const temp of temporary) fs.rmSync(temp, { force: true });
   }
 }
-module.exports = { exportEditor, validateProject, ratios, filters };
+module.exports = { exportEditor, validateProject, ratios, filters, checkCube };

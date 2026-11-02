@@ -580,7 +580,7 @@ SeedStar.tools = {
       const project = edNormalizeProject(structuredClone(payload.project));
       // Restore a separate copy: saved job settings must not overwrite later edits.
       project.id = crypto.randomUUID(); project.title = (project.title || '剪輯專案') + '（還原）';
-      project.assets ||= []; project.markers ||= []; project.tracks = Object.fromEntries(edTracks.map(id => [id, { volume: 1, ...(project.tracks?.[id] || {}) }]));
+      project.assets ||= []; project.markers ||= []; // tracks: edNormalizeProject already made the P2 track array
       ed.projects.push(project); ed.current = project.id; ed.selected = null; ed.undo = []; ed.redo = []; ed.time = 0; await edSave();
     }
     if (payload.asset) {

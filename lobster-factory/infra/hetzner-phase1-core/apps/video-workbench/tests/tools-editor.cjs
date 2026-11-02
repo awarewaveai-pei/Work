@@ -61,7 +61,7 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "seedstar-editor-"));
     await page.getByLabel("影片比例").selectOption("4:5");
     await page.getByRole("button", { name: "建立專案", exact: true }).click();
     await page.waitForSelector("[data-ed-stage]");
-    assert.equal(await page.locator("[data-ed-pane]").count(), 9);
+    assert.equal(await page.locator("[data-ed-pane]").count(), 10);
     assert.equal(await page.locator("[data-ed-lane]").count(), 5);
     await page.evaluate(async (asset) => edAdd(asset), {
       id: "fixture",
@@ -79,7 +79,7 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "seedstar-editor-"));
     await page.getByRole("button", { name: "重做", exact: true }).click();
     assert.equal(await page.locator("[data-ed-clip]").count(), 2);
     await page.locator('[data-ed-pane="轉場"]').click();
-    await page.getByLabel("轉場", { exact: true }).selectOption("融接");
+    await page.getByRole("group", { name: "轉場", exact: true }).getByRole("button", { name: "溶解", exact: true }).click();
     await page.getByLabel("轉場秒數").fill("0.4");
     await page.getByLabel("轉場秒數").press("Tab");
     await page.locator('[data-ed-pane="文字"]').click();
@@ -89,7 +89,7 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "seedstar-editor-"));
     await page.getByLabel("片段長度（秒）").fill("1");
     await page.getByLabel("片段長度（秒）").press("Tab");
     await page.getByRole("button", { name: "匯出影片", exact: true }).click();
-    await page.locator("[data-ed-quality]").selectOption("720p");
+    await page.locator('[data-ed-action="quality:720p"]').click();
     await page.locator("[data-ed-export]").click();
     await page.waitForFunction(
       () =>

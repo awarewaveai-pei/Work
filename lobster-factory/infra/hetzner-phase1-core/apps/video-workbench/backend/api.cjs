@@ -626,8 +626,15 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
         return true;
       }
       if (req.method === "POST" && route === "/uploads") {
-        const input = await body(req),
-          m =
+        const input = await body(req);
+        if (/^data:application\/x-cube;base64,/.test(String(input.data || ""))) {
+          // Card P2: a colour LUT (.cube text) is a library asset like an image: checked here, stored as is.
+          const buffer = Buffer.from(input.data.slice(input.data.indexOf(",") + 1), "base64");
+          require("./editor-export.cjs").checkCube(buffer.toString("utf8"));
+          json(res, 201, { id: crypto.randomUUID(), url: output(buffer, "cube"), origin: { kind: "upload", rightsConfirmed: false }, name: String(input.name || "LUT"), kind: "lut", type: "application/x-cube", size: buffer.length });
+          return true;
+        }
+        const m =
             /^data:(image\/(?:png|jpeg|webp|gif)|audio\/[\w.+-]+|video\/[\w.+-]+);base64,([\s\S]+)$/.exec(
               input.data || "",
             );
@@ -704,6 +711,14 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
         writeJson(stateFile, saved);
         state = saved;
         json(res, 200, { revision: state.revision });
+        return true;
+      }
+      if (req.method === "GET" && route === "/delivery-ratios") {
+        json(res, 200, await require("./delivery-ratios.cjs").deliveryRatios(Object.keys(require("./editor-export.cjs").ratios)));
+        return true;
+      }
+      if (req.method === "POST" && route === "/subtitles/export") {
+        json(res, 200, await require("./subtitle-export.cjs").exportSubtitles(await body(req)));
         return true;
       }
       if (req.method === "POST" && route === "/editor/timeline-v1") {

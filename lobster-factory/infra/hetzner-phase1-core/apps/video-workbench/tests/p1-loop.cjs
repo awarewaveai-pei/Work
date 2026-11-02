@@ -48,7 +48,7 @@ async function waitExportAsset(page) {
 }
 async function exportProject(page) {
   await page.getByRole("button", { name: "匯出影片", exact: true }).click();
-  await page.locator("[data-ed-quality]").selectOption("720p");
+  await page.locator('[data-ed-action="quality:720p"]').click();
   await page.locator("[data-ed-export]").click();
   return waitExportAsset(page);
 }

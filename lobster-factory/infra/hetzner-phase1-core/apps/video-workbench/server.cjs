@@ -21,6 +21,7 @@ const root = __dirname,
     ".mov": "video/quicktime",
     ".gif": "image/gif",
     ".jpg": "image/jpeg",
+    ".cube": "text/plain; charset=utf-8",
   };
 function createServer({
   dataDir = process.env.SEEDSTAR_DATA_DIR || path.join(root, ".data"),
@@ -58,7 +59,7 @@ function createServer({
         return;
       }
       if (
-        /^\/generated\/[a-f0-9-]+\.(png|jpg|webp|gif|mp3|wav|m4a|mp4|webm|mov)$/.test(
+        /^\/generated\/[a-f0-9-]+\.(png|jpg|webp|gif|mp3|wav|m4a|mp4|webm|mov|cube)$/.test(
           pathname,
         )
       )
