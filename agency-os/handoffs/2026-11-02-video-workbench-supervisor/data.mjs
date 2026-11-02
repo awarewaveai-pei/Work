@@ -6,7 +6,7 @@ export const META = {
   updated: '2026-11-02',
   plan: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/creative-suite-plan-20261102.md',
   req: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/handoff/Claude_Code_handoff_20261102.md',
-  worklog: 'agency-os/WORKLOG.md 2026-11-02 續19–續37',
+  worklog: 'agency-os/WORKLOG.md 2026-11-02 續19–續43',
   self: 'agency-os/handoffs/2026-11-02-video-workbench-supervisor/',
   url: 'https://claude.ai/artifact/MCTZ7PAeZdGKRuvDxPquUd',
 };
@@ -37,6 +37,7 @@ const todo = (id, plain) => ({ id, plain, status: 'todo' });
 const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 const C0 = '82d19db9e';
 const M1 = 'ca4297f00';
+const S3 = 'd6835f354';
 const M3 = 'b52b2ac04';
 const M2 = '2ab702e3f';
 
@@ -96,13 +97,14 @@ export const STEPS = [
       done('M3.4', '舊五軌專案轉過來，原版保留；測試。', M3),
     ] },
   { n: 6, code: 'S3a＋S2', title: '去背、同場景多鏡', plain: '例：按「去背」先看到費用，按下後得到透明背景圖進素材庫；同一個場景拍遠、中、近三鏡，重生一鏡不影響另外兩鏡。',
-    gate: '去背按鈕顯示成本並記實際成本；去背圖可當參考圖；三鏡引用同一場景素材。', risk: 'Low', model: 'Codex（卡已寫死）', status: 'not_started', depends: ['M2'],
+    gate: '去背按鈕顯示成本並記實際成本；去背圖可當參考圖；三鏡引用同一場景素材。', risk: 'Low', model: 'Opus（經 SDK API）', status: 'done', commit: S3, depends: ['M2'],
+    result: '2026-11-02 素材庫圖片有「去背 · 約 US$0.011」按鈕，結果存成新素材；同一張圖不會付兩次錢，關掉任務視窗也不會丟成果。鏡頭可選場景、角色、景別，生成時以該場景的參考圖為主。Seedance 字樣已移除。Codex 審出 3 項全修。4178 已重啟，去背已可用。',
     what: '去背沿用主系統同版本（bg-remover.ts:12）、成本 cost-model.ts:184；場景標記＋景別；清 Seedance 標籤（分鏡檔不動）',
     files: ['VW/backend/', 'VW/scripts/templates-0.js', 'VW/scripts/characters-0.js'],
     items: [
-      todo('S3a.1', '去背按鈕：先顯示成本，結果成為透明圖素材。'),
-      todo('S2.1', '場景標記與景別（遠、中、近、俯、仰），每鏡引用同一場景。'),
-      todo('S2.2', '清掉畫面上的 Seedance 字樣；測試。'),
+      done('S3a.1', '去背按鈕：先顯示成本，結果成為透明圖素材。', S3),
+      done('S2.1', '場景標記與景別（遠、中、近、俯、仰），每鏡引用同一場景。', S3),
+      done('S2.2', '清掉畫面上的 Seedance 字樣；測試。', S3),
     ] },
   { n: 7, code: 'P1', title: '引擎接入與存檔閉環', plain: '例：選素材建專案、剪、存、關掉重開、輸出，成品自動成為素材庫的一筆。',
     gate: '建專案、編輯、保存、重開、輸出，成品成為素材並帶來源；舊編輯器仍可用。', risk: 'Medium', model: 'Opus', status: 'not_started', depends: ['P0', 'M3'],
