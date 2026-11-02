@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-02（續12）next-admin 手動提前部署 dc80a0980（刪圖檢查改走 wp-bridge）；部署變慢的量測
+
+**操作者**：「部署」；「為什麼很久 而且現在部屬都越來越久」。
+
+**做了**：`/check-drift`：prod 落後 6 commits、無 DEPLOY_HOLD、compose 變數無漂移；next-admin 只有 ea7206013 的 4 個檔會出去。`sg-deploy.sh next-admin` → deployed dc80a0980（previous 2898f592e），healthy 16s，smoke 全 200。prod bundle 含 `asset-references`（`/app/.next/server/chunks/19280.js`）。
+
+**部署變慢（量測，未修）**：`/root/lobster-phase1/logs/sg-deploy-*.log`（911 份）抽樣：
+- 總時間 2026-05 約 140s → 06 約 200s → 07 約 290s → 10/28 445s → 今天 424s；其中 docker build 120s → 336s。
+- 今天各段：npm ci 閘 23s、tsc 閘 12s、npm test 閘 26s、`RUN npm run build` 313.6s（其他 layer 全 CACHED）、起容器＋健康 19s。
+- 原因：①頁面數 15（05-14）→ 108，`next build` 每次在乾淨容器裡全量重建，`.next/cache` 沒有留到下一次；②`next.config.ts` 沒關 build 內的型別檢查／lint，sg-deploy 前面已跑過 tsc 閘，等於做兩次。主機 32 核、125G，不是機器不夠。
+- 可做：Dockerfile `RUN --mount=type=cache,target=/app/.next/cache npm run build`（增量建置）＋ build 內跳過已由閘做過的型別檢查。等操作者決定。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo bash /root/lobster-phase1/scripts/sg-deploy.sh next-admin（complete，smoke 5/5 200）＋ grep asset-references /app/.next/server | exit=0 | ms=424000
+- REVIEW_WAIVED: NA -- 部署與量測，無程式改動
+- BUGHUNT_WAIVED: NA -- 無程式改動
 ## 2026-11-02（續11）外聯系統 v2 卡 C4：回覆同步（migration 0153 co_replies＋交易函式、Gmail 唯讀同步每 10 分、回覆頁）
 
 **操作者**：「照 B 開工」（C4.1–C4.7 全做）。
