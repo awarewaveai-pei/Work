@@ -17,6 +17,8 @@ interface Sender {
   health_status: string;
   dns_status: { spf: boolean; dkim: boolean; dmarc: boolean } | null;
   dns_checked_at: string | null;
+  last_sync_at: string | null;
+  rescan_days: number | null;
 }
 
 const HEALTH: Record<string, { label: string; badge: string }> = {
@@ -53,6 +55,22 @@ export default function SendersCard({ org }: { org: string | null }) {
       const j = await r.json();
       if (!j.ok) throw new Error(j.error || "檢查失敗");
       setMsg(j.healthy ? { ok: true, text: "檢查通過，已恢復自動寄出" } : { ok: false, text: `還不能恢復：${(j.reasons as string[]).join("；")}` });
+      await load();
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function rescan(id: string, days: number) {
+    setBusy(id); setMsg(null);
+    try {
+      const r = await fetch(API, { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "rescan", id, days }) });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "補掃失敗");
+      setMsg({ ok: true, text: `已排入補掃 ${days} 天，10 分鐘內會重讀收件匣` });
       await load();
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : String(e) });
@@ -109,6 +127,15 @@ export default function SendersCard({ org }: { org: string | null }) {
                 </button>
               </span>
             )}
+            <span style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+              <span className="card-sub">
+                回信同步：{s.last_sync_at ? `上次 ${new Date(s.last_sync_at).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", hour12: false })}` : "還沒同步過"}
+                {s.rescan_days ? `・補掃 ${s.rescan_days} 天排隊中` : ""}
+              </span>
+              {[1, 3, 7].map((d) => (
+                <button key={d} type="button" className="btn-secondary" disabled={busy === s.id} onClick={() => void rescan(s.id, d)}>補掃 {d} 天</button>
+              ))}
+            </span>
             <textarea rows={4} value={value} aria-label={`${s.email} 的署名`}
               onChange={(e) => setDrafts((d) => ({ ...d, [s.id]: e.target.value }))} />
             <button type="button" className="btn-primary" disabled={busy === s.id || !value.trim()} onClick={() => void save(s.id)}>

@@ -57,6 +57,7 @@ export const HOST_JOBS: Record<string, HostJob> = {
   pod_order_inbox_sweep: { label: "印製訂單重送", description: "每 10 分鐘重送已付款、但尚未送到 Printful 的訂單。", group: "site" },
   entitlements_expire: { label: "方案到期處理", description: "每天關閉已到期的方案與試用，並為新功能補上預設權限。", group: "site" },
   outreach_sender_health: { label: "寄件信箱健康檢查", description: "每天檢查寄件池每個信箱：網域的 SPF、DKIM、DMARC，7 天退信率，以及暖機能否升階；並清掉 31 天前的寄送名額紀錄。", group: "site", fail: "信箱設定有缺或退信過多時，Telegram 會收到通知；本列失敗代表有信箱沒檢查到。" },
+  outreach_gmail_sync: { label: "外聯回信同步", description: "每 10 分鐘查每個連上的 Gmail：草稿寄出了沒有，以及名單的回信、退訂與退信；回信分類後停掉追蹤信。", group: "site", fail: "Gmail 授權失效或讀不到信時本列變紅；恢復後按信箱的「補掃 N 天」補回漏掉的信。" },
   billing_reconcile: { label: "WooCommerce 對帳", description: "每天比對 aware-wave.com 近 7 天已付款的 AwareWave 訂單與收到的付款事件，對不上就開事件通知；/ops/billing 看同一份結果。", group: "site" },
   // Clocks off this host's cron, inventoried by report-host-schedules.py (handoffs/2026-10-25-schedules-off-trigger C5).
   // pg_cron_<job> and n8n_<id> rows are named from HOST_FAMILIES below; these are the fixed ones.

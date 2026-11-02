@@ -101,6 +101,7 @@ async function postForm(body: Record<string, string>): Promise<GoogleTokens> {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(body).toString(),
+    signal: AbortSignal.timeout(GMAIL_TIMEOUT_MS),
   });
   if (!resp.ok) {
     const detail = await resp.text().catch(() => "");
@@ -143,6 +144,26 @@ export async function getGmailProfile(accessToken: string): Promise<{ emailAddre
     throw new Error(`gmail profile ${resp.status}: ${detail.slice(0, 200)}`);
   }
   return (await resp.json()) as { emailAddress: string };
+}
+
+// A hung Gmail call would hold a sync tick past the next one (critic m2).
+const GMAIL_TIMEOUT_MS = 20_000;
+
+export class GmailNotFound extends Error {
+  constructor(what: string) { super(`gmail ${what}: 404`); this.name = "GmailNotFound"; }
+}
+
+/** A read of the Gmail API (the reply sync, lib/outreach/gmail-api.ts). GET only: this file stays the one exit for
+ *  Gmail HTTP (never-sends.test.ts), and nothing through here can send. 404 is GmailNotFound. */
+export async function gmailGet<T>(accessToken: string, path: string, what: string, fetcher: typeof fetch = fetch): Promise<T> {
+  const resp = await fetcher(`${GMAIL_API_BASE}${path}`, { method: "GET", headers: { authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(GMAIL_TIMEOUT_MS) });
+  if (resp.status === 404) throw new GmailNotFound(what);
+  if (!resp.ok) {
+    const detail = await resp.text().catch(() => "");
+    throw new Error(`gmail ${what} ${resp.status}: ${detail.slice(0, 200)}`);
+  }
+  return (await resp.json()) as T;
 }
 
 /** Wrap a base64 string at RFC 2045's 76-char line limit (CRLF-joined). */
@@ -193,7 +214,11 @@ export class GmailDraftError extends Error {
   constructor(message: string, readonly created: "no" | "unknown") { super(message); this.name = "GmailDraftError"; }
 }
 
-export async function createGmailDraft(accessToken: string, raw: string): Promise<{ id: string }> {
+/** message: the draft's Gmail message and thread (reply sync, SPEC §5.6: sent detection reads the message, replies
+ *  are matched by thread). Older Gmail replies without it give null; the sync then looks the draft up by id. */
+export interface GmailDraft { id: string; message: { id: string; threadId: string } | null }
+
+export async function createGmailDraft(accessToken: string, raw: string): Promise<GmailDraft> {
   let resp: Response;
   try {
     resp = await fetch(`${GMAIL_API_BASE}/drafts`, {
@@ -209,9 +234,10 @@ export async function createGmailDraft(accessToken: string, raw: string): Promis
     throw new GmailDraftError(`gmail drafts.create ${resp.status}: ${detail.slice(0, 300)}`, resp.status >= 400 && resp.status < 500 ? "no" : "unknown");
   }
   try {
-    const j = (await resp.json()) as { id?: string };
+    const j = (await resp.json()) as { id?: string; message?: { id?: string; threadId?: string } };
     if (!j.id) throw new Error("no draft id in the reply");
-    return { id: j.id };
+    const m = j.message;
+    return { id: j.id, message: m?.id && m.threadId ? { id: m.id, threadId: m.threadId } : null };
   } catch (e) {
     throw new GmailDraftError(`gmail drafts.create: ${e instanceof Error ? e.message : "unreadable reply"}`, "unknown");
   }

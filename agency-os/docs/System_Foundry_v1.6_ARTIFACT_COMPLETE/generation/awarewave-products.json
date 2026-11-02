@@ -2508,6 +2508,11 @@
             "staff": "tools/outreach/followups"
           },
           {
+            "path": "replies",
+            "name": "回信",
+            "staff": "tools/outreach/replies"
+          },
+          {
             "path": "connectors",
             "name": "信箱與連線",
             "staff": "tools/outreach/connectors"
@@ -2554,6 +2559,13 @@
         {
           "feature_key": "outreach.discover",
           "name": "找名單",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "outreach.classify",
+          "name": "回信分類",
           "limitKind": "QUOTA",
           "buyout": true,
           "billing": "credits"

@@ -6,7 +6,7 @@ const ORG = "00000000-0000-4000-8000-0000000000c1";
 const MSG = { id: "00000000-0000-4000-8000-00000000000a", organization_id: ORG, lead_id: "lead-1", subject: "主旨", body: "hi", status: "approved",
   prompt_snapshot: { sender_id: "s-1" } };
 const s = vi.hoisted(() => ({ sender: {} as Record<string, unknown>, taken: true as boolean, created: 0, fail: false as false | "refused" | "unknown", updates: [] as unknown[], built: "",
-  msg: null as Record<string, unknown> | null, events: 0 }));
+  msg: null as Record<string, unknown> | null, events: 0, inserted: [] as unknown[] }));
 
 vi.mock("@/lib/outreach/contact-guard", () => ({ contactBlock: async () => null }));
 vi.mock("@/lib/secret-vault", () => ({ getSecret: async () => "refresh", connectorSecretRef: (id: string) => id }));
@@ -19,7 +19,7 @@ vi.mock("@/lib/outreach/google-oauth", () => {
     createGmailDraft: async () => {
       if (s.fail === "refused") throw new GmailDraftError("gmail drafts.create 400", "no");
       if (s.fail === "unknown") throw new GmailDraftError("gmail drafts.create: socket hang up", "unknown");
-      s.created++; return { id: "d-1" };
+      s.created++; return { id: "d-1", message: { id: "m-1", threadId: "t-1" } };
     },
   };
 });
@@ -27,7 +27,8 @@ vi.mock("@/lib/org-client", () => {
   const query = (table: string) => {
     let updating = false;
     const q: Record<string, unknown> = {};
-    for (const k of ["select", "eq", "is", "in", "not", "gte", "order", "insert"]) q[k] = () => q;
+    for (const k of ["select", "eq", "is", "in", "not", "gte", "order"]) q[k] = () => q;
+    q.insert = (p: unknown) => { if (table === "co_sending_events") s.inserted.push(p); return q; };
     q.update = (p: unknown) => { updating = true; if (table === "co_messages") s.updates.push(p); return q; };
     q.limit = () => q;
     const one = () => table === "co_messages" ? (updating ? { data: s.taken ? { subject: "主旨", body: "edited after the read" } : null, error: null } : { data: s.msg ?? MSG, error: null })
@@ -51,7 +52,7 @@ const call = (extra: Record<string, unknown> = {}) => POST(new Request("http://a
 
 beforeEach(() => {
   s.sender = { id: "s-1", organization_id: ORG, email: "pool@x.example", daily_limit: 50, is_active: true, stream_type: "cold", provider: "gmail" };
-  s.taken = true; s.created = 0; s.fail = false; s.updates.length = 0; s.built = ""; s.msg = null; s.events = 0;
+  s.taken = true; s.created = 0; s.fail = false; s.updates.length = 0; s.built = ""; s.msg = null; s.events = 0; s.inserted.length = 0;
 });
 
 describe("gmail-draft", () => {
@@ -61,6 +62,8 @@ describe("gmail-draft", () => {
     expect((await res.json()).senderEmail).toBe("pool@x.example");
     expect(s.created).toBe(1);
     expect(s.built).toBe("edited after the read"); // the content taken, not the content read before
+    // the reply sync finds the draft's message and thread from this event (C4.2)
+    expect(s.inserted).toMatchObject([{ event_type: "draft_created", metadata: { draftId: "d-1", messageId: "m-1", threadId: "t-1" } }]);
   });
 
   it("a Gmail refusal gives the row back to approved; an ambiguous failure leaves it taken and says to look in Gmail", async () => {

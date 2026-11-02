@@ -3,7 +3,7 @@ import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
 import { outreachDb } from "@/lib/outreach/db-client";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse, userKindOf } from "@/lib/tenant-guard";
 import { getSecret, connectorSecretRef } from "@/lib/secret-vault";
-import { buildRfc2822Message, createGmailDraft, GmailDraftError, refreshAccessToken, toBase64Url } from "@/lib/outreach/google-oauth";
+import { buildRfc2822Message, createGmailDraft, GmailDraftError, refreshAccessToken, toBase64Url, type GmailDraft } from "@/lib/outreach/google-oauth";
 import { contactBlock } from "@/lib/outreach/contact-guard";
 
 // Cold Outreach — Gmail draft creation (task T10, acceptance: real draft via REALTEST, daily
@@ -228,7 +228,7 @@ export async function POST(req: Request): Promise<Response> {
   if (!taken) return NextResponse.json({ ok: false, error: "status_changed" }, { status: 409 });
   const content = taken as { subject: string | null; body: string };
 
-  let draft: { id: string };
+  let draft: GmailDraft;
   try {
     const raw = toBase64Url(buildRfc2822Message({ from: sender.email, to: lead.email.trim(), subject: content.subject, bodyText: content.body }));
     draft = await createGmailDraft(accessToken, raw);
@@ -247,7 +247,9 @@ export async function POST(req: Request): Promise<Response> {
   // The draft exists and the row is drafted: from here nothing is an error (an error invites a retry and a second
   // draft). The event is what the daily limit counts and what marks the take finished; one retry, then a warning.
   const event = { organization_id: connector.organization_id, lead_id: lead.id, message_id: message.id, stream_type: "cold",
-    provider: "gmail", sender_account_id: sender.id, event_type: "draft_created", provider_event_id: draft.id };
+    provider: "gmail", sender_account_id: sender.id, event_type: "draft_created", provider_event_id: draft.id,
+    // The reply sync reads these (lib/outreach/gmail-sync.ts): the message for "sent?", the thread for matching replies.
+    metadata: { draftId: draft.id, messageId: draft.message?.id ?? null, threadId: draft.message?.threadId ?? null } };
   let { error: eventErr } = await supabase.from("co_sending_events").insert(event);
   if (eventErr) ({ error: eventErr } = await supabase.from("co_sending_events").insert(event));
   const warning = eventErr ? `draft ${draft.id} created but its event was not recorded (${eventErr.message}): it is not counted in today's limit` : null;
