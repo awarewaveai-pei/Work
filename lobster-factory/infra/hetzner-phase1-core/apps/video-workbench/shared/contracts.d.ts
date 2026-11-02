@@ -2,7 +2,7 @@
  *  to media_assets.metadata.rightsSources), plus the workbench's own kinds: `render` = output of a local edit or
  *  tool job, `import` = arrived without a record (`legacy` = saved before origins existed). */
 export type AssetOrigin = (
-  | { kind: "ai_generated"; model: string; provider: string }
+  | { kind: "ai_generated"; model: string; provider: string; parentAssetId?: string }
   | { kind: "pexels"; sourceRef: string }
   | { kind: "upload"; rightsConfirmed: boolean }
   | { kind: "render"; jobId: string; parentAssetId?: string }

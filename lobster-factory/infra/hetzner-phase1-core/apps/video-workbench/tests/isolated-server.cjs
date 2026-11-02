@@ -3,14 +3,15 @@
 // test would check the wrong code and write into real data. tests/test-isolation.cjs enforces this.
 const fs = require("node:fs"), os = require("node:os"), path = require("node:path");
 
-// fetchImpl: a test may pass its own fake provider (never a real one) to check what the server does with a reply.
-async function isolatedServer(prefix = "vw-test-", { fetchImpl } = {}) {
+// fetchImpl: a test may pass its own fake provider (never a real one) to check what the server does with a reply;
+// env: extra placeholder keys (e.g. REPLICATE_API_TOKEN) so a route gets past its "not configured" check.
+async function isolatedServer(prefix = "vw-test-", { fetchImpl, env } = {}) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   const server = require("../server.cjs").createServer({
     dataDir,
     // A placeholder key makes the UI report the service as configured (send enabled); every
     // provider call still throws below, and tests mock /api/seedstar/generations themselves.
-    env: { OPENAI_API_KEY: "test-only" },
+    env: { OPENAI_API_KEY: "test-only", ...env },
     fetchImpl:
       fetchImpl ||
       (() => {

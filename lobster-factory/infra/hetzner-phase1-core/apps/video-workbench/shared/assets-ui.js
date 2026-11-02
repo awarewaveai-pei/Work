@@ -30,6 +30,19 @@
   const kind = (a) =>
     a.kind === "character" ? "image" : a.kind || a.type?.split("/")[0];
   SeedStar.mediaKind = kind;
+  // Background removal (backend/bg-remove.cjs): the price comes from /capabilities (generation-policy.cjs toolCosts)
+  // and is on the button before the click. The result is saved as a new library asset by showJob (jobs-view.js).
+  let toolCosts;
+  SeedStar.removeBgLabel = async () => {
+    toolCosts ||= SeedStar.capabilities?.toolCosts || (await SeedStar.request("/capabilities", undefined, "GET").catch(() => null))?.toolCosts;
+    const cost = toolCosts?.removeBackground;
+    return Number.isFinite(cost) ? "去背 · 約 US$" + cost : null;
+  };
+  SeedStar.removeBackground = async (asset) => {
+    const job = await SeedStar.generations.create({ type: "image", operation: "remove-bg", prompt: "去背", references: { src: { id: asset.id, url: asset.url } } });
+    SeedStar.showJob(job);
+    return job;
+  };
   SeedStar.uploadAsset = async (file) => {
     const videoTypes = { mov: 'video/quicktime', mp4: 'video/mp4', m4v: 'video/mp4', webm: 'video/webm' };
     const extension = String(file.name || '').split('.').at(-1).toLowerCase();
@@ -156,7 +169,7 @@
         if (preview) preview.remove(); else done([]);
       };
       document.addEventListener("keydown", onEscape);
-      panel.onclick = (e) => {
+      panel.onclick = async (e) => {
         const b = e.target.closest("button");
         if (!b) return;
         if (b.hasAttribute("data-picker-close")) done([]);
@@ -164,6 +177,11 @@
         else if (b.dataset.pickerSource) { source = b.dataset.pickerSource; query = ""; panel.querySelector("[data-picker-search]").value = ""; render(); }
         else if (b.dataset.pickerDuration) { durationFilter = b.dataset.pickerDuration; render(); }
         else if (b.hasAttribute("data-picker-preview-close")) panel.querySelector("[data-picker-preview-panel]")?.remove();
+        else if (b.dataset.pickerRemoveBg) {
+          const asset = items.find((a) => a.id === b.dataset.pickerRemoveBg);
+          b.disabled = true;
+          if (asset) SeedStar.removeBackground(asset).then(() => refresh(), SeedStar.reportError).finally(() => { b.disabled = false; });
+        }
         else if (b.dataset.pickerPreview) {
           const asset = items.find((a) => a.id === b.dataset.pickerPreview);
           if (!asset) return;
@@ -171,8 +189,10 @@
           const preview = document.createElement("section");
           preview.dataset.pickerPreviewPanel = "";
           preview.className = "picker-preview";
+          const removeBg = kind(asset) === "image" ? await SeedStar.removeBgLabel() : null;
+          if (!panel.isConnected) return;
           const url = escape(SeedStar.safeUrl(asset.url)), previewSrc = escape(SeedStar.safeUrl(asset.previewUrl || asset.url));
-          preview.innerHTML = SeedStar.sanitize(`<button data-picker-preview-close>返回素材選擇</button>${parityControls && url ? `<a href="${url}" download="${escape(asset.name)}" target="_blank" rel="noopener noreferrer">下載／開新分頁</a>` : ""}<h3>${escape(asset.name)}</h3>${kind(asset) === "image" ? `<img src="${url}" alt="${escape(asset.name)}">` : kind(asset) === "video" ? `<video src="${previewSrc}" controls></video>` : `<audio src="${previewSrc}" controls></audio>`}`);
+          preview.innerHTML = SeedStar.sanitize(`<button data-picker-preview-close>返回素材選擇</button>${parityControls && url ? `<a href="${url}" download="${escape(asset.name)}" target="_blank" rel="noopener noreferrer">下載／開新分頁</a>` : ""}${removeBg ? `<button data-picker-remove-bg="${escape(asset.id)}">${escape(removeBg)}</button>` : ""}<h3>${escape(asset.name)}</h3>${kind(asset) === "image" ? `<img src="${url}" alt="${escape(asset.name)}">` : kind(asset) === "video" ? `<video src="${previewSrc}" controls></video>` : `<audio src="${previewSrc}" controls></audio>`}`);
           panel.append(preview);
         }
         else if (b.hasAttribute("data-picker-confirm"))

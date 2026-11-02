@@ -275,6 +275,49 @@
           }
         } catch {}
       });
+  // The asset a finished job becomes. Id job-<jobId> keeps SeedStar.showJob and reconcileJobs from doubling it.
+  const jobAsset = (v) => ({
+    id: "job-" + v.id,
+    kind: v.type,
+    type: v.type === "audio" ? "audio/mpeg" : v.type === "image" ? "image/png" : "video/mp4",
+    name: (v.input?.operation || v.type) + "-" + v.id.slice(0, 8),
+    url: v.result.url,
+    ...(v.result.origin ? { origin: v.result.origin } : {}),
+  });
+  // Paid output must not depend on a job panel staying open (Codex 2026-11-02): on load, every job not known to be
+  // finished is asked again; succeeded ones without their asset get it. Still-running ones are re-asked every 5 s
+  // for up to 10 min. Parent page only (children share its db).
+  async function reconcileJobs(round = 0) {
+    const open = db.jobs
+      .filter((j) => j?.id && !["failed", "cancelled", "blocked"].includes(j.status) && !db.assets.some((a) => a.id === "job-" + j.id))
+      .slice(-50);
+    let changed = false,
+      running = false;
+    for (const j of open) {
+      let v;
+      try {
+        v = await adapter.request("/generations/" + encodeURIComponent(j.id), "GET");
+      } catch {
+        continue;
+      }
+      if (!v || v.status === j.status) {
+        running ||= ["queued", "running"].includes(v?.status);
+        if (v?.status !== "succeeded") continue;
+      }
+      Object.assign(j, v);
+      changed = true;
+      if (v.status === "succeeded" && v.result?.url && !db.assets.some((a) => a.id === "job-" + j.id))
+        db.assets.push(M.asset(jobAsset(v)));
+      running ||= ["queued", "running"].includes(v.status);
+    }
+    if (changed) {
+      await persist().catch(reportError);
+      broadcast();
+      document.dispatchEvent(new CustomEvent("seedstar:changed"));
+    }
+    if (running && round < 120) setTimeout(() => reconcileJobs(round + 1).catch(reportError), 5000);
+  }
+  if (!child) ready.then(() => reconcileJobs()).catch(reportError);
   const storage = {
     getItem: (key) => {
       const v = read(key);
@@ -343,6 +386,7 @@
     storage,
     reportError,
     models: M,
+    jobAsset,
     characters: collection("characters"),
     projects: collection("projects"),
     assets: {

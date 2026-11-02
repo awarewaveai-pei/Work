@@ -34,6 +34,8 @@ const cats = [
   "熱門",
   "最多讚",
 ];
+// The model actually called (backend/generation-policy.cjs via /capabilities, loaded in templates-boot.js).
+const videoModel = () => SeedStar.capabilities?.models?.video || "sora-2";
 const presets = [
   {
     id: "bear",
@@ -44,7 +46,6 @@ const presets = [
     replace: 4,
     author: "alanfeng",
     date: "10-29-26",
-    model: "Seedance 2.5",
     price: 280,
     tag: ["舞台表演", "吉祥物入鏡", "趣味短片"],
     img: thumbs[0],
@@ -60,7 +61,6 @@ const presets = [
     replace: 12,
     author: "alanfeng",
     date: "10-29-26",
-    model: "Seedance 2.5",
     price: 280,
     tag: ["建築", "房屋", "夜景"],
     img: thumbs[1],
@@ -75,7 +75,6 @@ const presets = [
     replace: 4,
     author: "alanfeng",
     date: "10-20-26",
-    model: "Seedance 2.5",
     price: 280,
     tag: ["畫廊", "藝術家", "音樂"],
     img: thumbs[2],
@@ -90,7 +89,6 @@ const presets = [
     replace: 7,
     author: "Crista",
     date: "10-29-26",
-    model: "Seedance 2.5",
     price: 280,
     tag: ["滑板", "跑車", "極限運動"],
     img: thumbs[3],
@@ -105,7 +103,6 @@ const presets = [
     replace: 4,
     author: "Crista",
     date: "10-29-26",
-    model: "Seedance 2.0",
     price: 173,
     tag: ["變裝", "換裝轉場", "快速變裝"],
     img: thumbs[7],
@@ -121,7 +118,6 @@ const presets = [
     replace: 2,
     author: "Crista",
     date: "10-29-26",
-    model: "Seedance 2.5",
     price: 280,
     tag: ["貓咪", "小狗", "爵士鼓", "可愛"],
     img: thumbs[6],
@@ -284,7 +280,7 @@ function renderDetail() {
       })
       .join(
         "",
-      )}</div></div><div class="section"><h3>參數</h3><div class="fields"><div><label>模型</label><select id="modelSelect">${["sora-2"].map((model) => `<option ${model === t.model ? "selected" : ""}>${model}</option>`).join("")}</select></div><div><label>解析度</label><select id="resolution">${["720p"].map((r) => `<option ${r === state.resolution ? "selected" : ""}>${r}</option>`).join("")}</select></div></div></div><div class="section"><p class="muted">帶入後可檢查提示詞與素材，再依 API 用量計費生成。</p><button class="primary" id="generate" style="width:100%">▷ 帶入生成頁</button></div></div></div></main>`,
+      )}</div></div><div class="section"><h3>參數</h3><div class="fields"><div><label>模型</label><select id="modelSelect">${[videoModel()].map((model) => `<option selected>${esc(model)}</option>`).join("")}</select></div><div><label>解析度</label><select id="resolution">${["720p"].map((r) => `<option ${r === state.resolution ? "selected" : ""}>${r}</option>`).join("")}</select></div></div></div><div class="section"><p class="muted">帶入後可檢查提示詞與素材，再依 API 用量計費生成。</p><button class="primary" id="generate" style="width:100%">▷ 帶入生成頁</button></div></div></div></main>`,
   );
   $("root").onclick = (e) => {
     const b = e.target.closest("button");
@@ -343,7 +339,7 @@ async function useTemplate(t) {
         imagePrompt: prompt,
         videoPrompt: prompt,
         duration: t.seconds,
-        model: "sora-2",
+        model: videoModel(),
       });
       if (result?.ok) {
         SeedStar.navigate("generator");

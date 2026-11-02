@@ -52,6 +52,7 @@
           (kind === "all" || SeedStar.mediaKind(a) === kind) &&
           a.name.toLowerCase().includes(search.toLowerCase()),
       );
+      const removeBg = items.some((a) => SeedStar.mediaKind(a) === "image") ? await SeedStar.removeBgLabel() : null;
       content = `<div class="workspace-actions"><label>搜尋素材<input id="workspaceSearch" value="${esc(search)}"></label><label>上傳素材<input id="workspaceUpload" type="file" accept="image/*,video/*,audio/*" multiple></label></div><div class="workspace-actions">${[
         ["all", "全部"],
         ["image", "圖片／角色"],
@@ -64,7 +65,7 @@
         )
         .join(
           "",
-        )}</div><div class="workspace-list">${items.length ? items.map((a) => `<article class="workspace-card">${media(a)}<h2>${esc(a.name)}</h2><div class="workspace-actions"><button data-asset-use="${esc(a.id)}">帶入生成</button><button data-asset-rename="${esc(a.id)}">重新命名</button><button data-asset-download="${esc(a.id)}">下載</button><button data-asset-delete="${esc(a.id)}">移除</button></div></article>`).join("") : "<p>尚無符合條件的素材。上傳後可在角色、專案與生成頁選取。</p>"}</div>`;
+        )}</div><div class="workspace-list">${items.length ? items.map((a) => `<article class="workspace-card">${media(a)}<h2>${esc(a.name)}</h2><div class="workspace-actions"><button data-asset-use="${esc(a.id)}">帶入生成</button><button data-asset-rename="${esc(a.id)}">重新命名</button><button data-asset-download="${esc(a.id)}">下載</button>${removeBg && SeedStar.mediaKind(a) === "image" ? `<button data-asset-remove-bg="${esc(a.id)}">${esc(removeBg)}</button>` : ""}<button data-asset-delete="${esc(a.id)}">移除</button></div></article>`).join("") : "<p>尚無符合條件的素材。上傳後可在角色、專案與生成頁選取。</p>"}</div>`;
     } else if (screen === "history") {
       const jobs = (await SeedStar.generations.list()).slice().reverse();
       content = `<div class="workspace-actions"><button data-refresh>重新整理</button><button data-export-jobs>匯出任務紀錄</button></div><div class="workspace-list">${jobs.length ? jobs.map((j) => `<article class="workspace-card"><h2>${esc(j.input?.operation || j.type)}</h2><p>${esc(j.id)} · ${esc(j.status)} · ${esc(j.createdAt || "")}</p>${j.error ? `<p>${esc(j.error)}</p>` : ""}<div class="workspace-actions"><button data-job-open="${esc(j.id)}">檢視任務</button><button ${["queued", "running", "submitting"].includes(j.status) ? "data-job-check" : "data-job-retry"}="${esc(j.id)}">${j.status === "failed" && j.type === "image" && j.result?.sourceUrl && j.input?.settings?.imageLayout === "center-crop" ? "只重試尺寸轉換（不呼叫 AI）" : ["queued", "running", "submitting"].includes(j.status) ? "檢查最新狀態" : j.status === "succeeded" ? "以相同設定再次執行" : "以相同設定重試"}</button><button data-job-draft="${esc(j.id)}">還原成草稿</button></div></article>`).join("") : "<p>尚無生成任務。送出、失敗及完成的任務都會記錄於此。</p>"}</div>`;
@@ -153,6 +154,9 @@
         ] = [a];
         SeedStar.generator.setDraft(d);
         SeedStar.router.activate("generator");
+      } else if (b.dataset.assetRemoveBg) {
+        const a = await getAsset(b.dataset.assetRemoveBg);
+        if (a) await SeedStar.removeBackground(a);
       } else if (b.dataset.assetDownload) {
         const a = await getAsset(b.dataset.assetDownload),
           res = await fetch(SeedStar.safeUrl(a.url));

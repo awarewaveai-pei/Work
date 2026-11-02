@@ -2,6 +2,9 @@ const imageOutputs = Object.fromEntries([["1K", 1024], ["2K", 2048], ["4K", 4096
 // The one place that names the provider and models: capabilities shows them, backend/api.cjs calls them and
 // writes them into each result's origin, so the origin always names the model that actually ran.
 const provider = "OpenAI";
+// USD per run shown on the button before the click. Must equal next-admin lib/ai/cost-model.ts TOOL_RATES
+// ("bg-remove"); tests/remove-bg.cjs reads that file and compares.
+const toolCosts = { removeBackground: 0.011 };
 const models = (env) => ({ image: env.SEEDSTAR_IMAGE_MODEL || "gpt-image-2.5-flare", video: env.SEEDSTAR_VIDEO_MODEL || "sora-2", audio: env.SEEDSTAR_TTS_MODEL || "gpt-4o-mini-tts" });
 function capabilities(env, localTools) {
   return {
@@ -12,6 +15,7 @@ function capabilities(env, localTools) {
     videoDurations: [4, 8, 12], videoRatios: ["16:9", "9:16"], videoQualities: ["720p"],
     maxVideoImages: 1, maxImageReferences: 4, multiModalReferences: false,
     imageQualities: Object.keys(imageOutputs), imageOutputs, imageExactOutput: true,
+    removeBackground: !!env.REPLICATE_API_TOKEN, toolCosts,
     motionReference: false, subtitles: false, muteOutput: false, generationWatermark: false,
     spokespersonVideo: false, reshoot: false, advancedMedia: false, localTools,
   };
@@ -45,4 +49,4 @@ function imageDimensions(settings) {
   const dimensions = imageOutputs[settings.quality]?.[settings.ratio];
   if (settings.imageLayout !== 'center-crop' || !Array.isArray(dimensions)) throw Error('圖片輸出設定無效'); return dimensions;
 }
-module.exports = { provider, models, capabilities, validate, imageOutputs, imageDimensions };
+module.exports = { provider, models, toolCosts, capabilities, validate, imageOutputs, imageDimensions };

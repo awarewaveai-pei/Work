@@ -4,6 +4,7 @@ const fs = require("node:fs"),
 function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
   const mediaTools = require("./media.cjs");
   const generationPolicy = require("./generation-policy.cjs");
+  const bgRemove = require("./bg-remove.cjs");
   fs.mkdirSync(dataDir, { recursive: true });
   const outputs = path.join(dataDir, "generated");
   fs.mkdirSync(outputs, { recursive: true });
@@ -222,8 +223,45 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
     if (input.cartoonStyle) prompt += "\n風格：" + String(input.cartoonStyle);
     return { type, prompt };
   }
+  // Background removal (Replicate, backend/bg-remove.cjs) runs as a job like any generation: history, cancel,
+  // retry and idempotencyKey all apply. Input: { operation: "remove-bg", references: { src: { url, id? } } }.
+  function removeBgSource(input) {
+    const file = localFile(input.references?.src?.url, { assets: true });
+    if (!file || !bgRemove.mimeOf(file) || !fs.existsSync(file))
+      throw Object.assign(Error("去背只支援本機素材庫中的 PNG、JPEG、WebP 圖片"), { status: 400 });
+    return file;
+  }
   async function finish(job, signal) {
     try {
+      if (job.input.operation === "remove-bg") {
+        job.status = "running";
+        persist();
+        // Invariant: never pay twice for one image. An earlier unfinished request for the same source (cancelled,
+        // timed out, restarted, or simply resent) is resumed. Field is replicateId, not providerId: providerId
+        // means "OpenAI video" to refresh() and the restart recovery.
+        const src = job.input.references.src.url,
+          earlier = jobs.findLast(
+            (j) => j !== job && j.input?.operation === "remove-bg" && j.input.references?.src?.url === src && j.replicateId && j.status !== "succeeded",
+          );
+        const buffer = await bgRemove.removeBackground({
+          file: removeBgSource(job.input), env, fetchImpl, signal,
+          resumeId: earlier?.replicateId,
+          onPrediction: (id) => {
+            job.replicateId = id;
+            persist();
+          },
+        });
+        if (signal.aborted) return;
+        const parentAssetId = job.input.references.src.id;
+        job.result = {
+          url: output(buffer, "png"),
+          origin: { kind: "ai_generated", model: bgRemove.modelLabel(env), provider: "Replicate", ...(typeof parentAssetId === "string" ? { parentAssetId } : {}), costUsd: generationPolicy.toolCosts.removeBackground },
+        };
+        job.progress = 100;
+        job.status = "succeeded";
+        persist();
+        return;
+      }
       if (mediaTools.supported.includes(job.input.operation)) {
         job.status = "running";
         persist();
@@ -435,10 +473,13 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
   // Validates, records and answers 202 before any provider call (runtime.js treats 501/503 as "never sent").
   function start(input, res, extra) {
     const isMedia = mediaTools.supported.includes(input.operation),
+      isRemoveBg = input.operation === "remove-bg",
       parsed = isMedia
         ? { type: input.operation === "separate" ? "audio" : input.operation === "image-output" ? "image" : "video" }
-        : jobInput(input);
-    if (!isMedia) key();
+        : isRemoveBg
+          ? (removeBgSource(input), bgRemove.token(env), { type: "image" })
+          : jobInput(input);
+    if (!isMedia && !isRemoveBg) key();
     const job = {
       id: crypto.randomUUID(),
       type: parsed.type,
@@ -594,8 +635,9 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
         json(res, 200, await require("./timeline-export.cjs").exportTimelineV1(input.project, { organizationId: input.organizationId, styleRef: input.styleRef }));
         return true;
       }
-      if (req.method === "POST" && route === "/generations") {
-        const { idempotencyKey, ...input } = await body(req);
+      if (req.method === "POST" && (route === "/generations" || route === "/tools/remove-bg")) {
+        const { idempotencyKey, ...sent } = await body(req);
+        const input = route === "/generations" ? sent : { type: "image", operation: "remove-bg", prompt: "去背", references: { src: { url: sent.url, ...(typeof sent.parentAssetId === "string" ? { id: sent.parentAssetId } : {}) } } };
         if (
           idempotencyKey !== undefined &&
           (typeof idempotencyKey !== "string" ||
@@ -634,6 +676,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
             throw Object.assign(Error("任務已結束"), { status: 409 });
           job.status = "cancelled";
           controls.get(job.id)?.abort();
+          if (job.replicateId) bgRemove.cancelPrediction({ id: job.replicateId, env, fetchImpl });
           persist();
           json(res, 200, job);
         } else if (req.method === "GET" && !match[2])

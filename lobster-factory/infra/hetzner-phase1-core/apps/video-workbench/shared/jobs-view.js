@@ -26,21 +26,7 @@
       if (v.error) result.textContent = v.error;
       if (v.result?.url) {
         if (v.status === "succeeded") {
-          SeedStar.assets
-            .save({
-              id: "job-" + v.id,
-              kind: v.type,
-              type:
-                v.type === "audio"
-                  ? "audio/mpeg"
-                  : v.type === "image"
-                    ? "image/png"
-                    : "video/mp4",
-              name: (v.input?.operation || v.type) + "-" + v.id.slice(0, 8),
-              url: v.result.url,
-              ...(v.result.origin ? { origin: v.result.origin } : {}),
-            })
-            .catch(SeedStar.reportError);
+          SeedStar.assets.save(SeedStar.jobAsset(v)).catch(SeedStar.reportError);
           if (options.onSuccess) {
             options.onSuccess(v);
             options.onSuccess = null;

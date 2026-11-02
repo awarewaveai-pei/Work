@@ -1,5 +1,6 @@
 (async () => {
   await SeedStar.ready;
+  try { SeedStar.capabilities = await SeedStar.request('/capabilities', undefined, 'GET'); } catch (error) { SeedStar.reportError(error); }
   for (const item of []) {
     document.getElementById(item.id).textContent = JSON.stringify(
       await (await fetch(item.url)).json(),
