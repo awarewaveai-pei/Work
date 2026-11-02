@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-02（續26）影音工作台：Downloads 副本已由操作者刪除，repo 是唯一一份
+
+**操作者**：「apps/video-workbench 副本都刪掉了，以後只用這份」（卡 0 82d19db9e 把 `.data` 搬進 repo 之後）。
+
+**做了**：計畫 §0 與卡 0 列、README 頂段、handoff 頂部告示、監工台 data.mjs 的「Downloads 副本保留為復原」改為「已刪，只剩 repo」；handoff §3.1／§11 與 `docs/follow-quality-20261102.md:57` 的 Downloads 路徑是當日紀錄，由頂部告示覆蓋，不改。
+**注意**：`C:\Users\user1115\Downloads\SeedStar_AwareWave_20261030_修正版` 仍在（772 檔，`.data` 空，卡 0 未用其資料）；未擅自刪除，已告知操作者。
+**復原面**：舊副本已不存在 → repo `.data/`（152 MB，不在 git）是工作台資料的唯一一份，需備份。
+
+**驗證**：
+- REALTEST_WAIVED: DOC_ONLY -- 四檔文字；python 逐句 assert count==1 後替換
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（git diff -U0 讀回；監工台 node check.mjs ok）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=Downloads | hits=6（tests/backend.cjs、interactions.cjs 是瀏覽器下載功能；follow-quality、handoff 內文為當日紀錄；其餘已改）
 ## 2026-11-02（續25）影音工作台卡 0：127.0.0.1:4178 改由 repo 版 video-workbench 提供，舊資料 5 筆任務＋17 檔全數搬入
 
 **做了**（無程式改動；計畫 `apps/video-workbench/docs/creative-suite-plan-20261102.md` §4 卡 0）：
