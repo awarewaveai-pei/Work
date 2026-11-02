@@ -1,12 +1,13 @@
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright"),
   assert = require("node:assert/strict");
 (async () => {
+  const { base } = await require("./isolated-server.cjs").isolatedServer("vw-layouts-");
   const b = await chromium.launch({ channel: "msedge" }),
     p = await b.newPage({ viewport: { width: 1440, height: 900 } }),
     errors = [];
   p.setDefaultTimeout(8000);
   p.on("pageerror", (e) => errors.push(e.message));
-  await p.goto("http://127.0.0.1:4178");
+  await p.goto(base);
   await p.locator("#toolsNav").click();
   let f = p.frameLocator("#toolsFrame");
   await f.locator('[data-act^="open:"]').first().waitFor();

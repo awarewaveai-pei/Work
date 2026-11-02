@@ -16,7 +16,7 @@ const readInput=require('./response-input.cjs');
  const post=async(route,input)=>{const r=await fetch(base+'/api/seedstar'+route,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(input)});const body=await r.json();assert(r.ok,JSON.stringify(body));return body;};
  try{
   const cues=[{start:0,end:2,text:'這是一段中文口白'}];const short=await post('/tools/short/analyze',{cues,duration:10,count:3,prompt:'挑出重點',length:'短'});assert.equal(short.clips.length,1);assert.deepEqual(readInput(calls[0]).cues,cues);
-  await post('/director/chat',{messages:[{role:'user',text:'請幫我拍咖啡'}],phase:'consultation',images:[{url:'/assets/image-1.png'}]});const vision=calls[1].input.find(message=>message.role==='user').content;assert(vision.some(part=>part.type==='input_image'&&part.image_url.startsWith('data:image/')));
+  await post('/director/chat',{messages:[{role:'user',text:'請幫我拍咖啡'}],phase:'consultation',images:[{url:'/assets/test-image-1.png'}]});const vision=calls[1].input.find(message=>message.role==='user').content;assert(vision.some(part=>part.type==='input_image'&&part.image_url.startsWith('data:image/')));
   await post('/tools/music/lyrics',{theme:'出發',language:'繁體中文'});assert.equal(calls[2].text,undefined);assert.equal(typeof calls[2].input,'string');
   assert(calls.slice(0,2).every(body=>body.input[0].role==='developer'&&/JSON/.test(body.input[0].content)));
   console.log('PASS 嚴格重現 JSON input guard：短影音與含圖導演請求符合要求，保留使用者資料；純文字回覆維持原格式');

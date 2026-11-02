@@ -8,6 +8,8 @@ runtime/
 # Operator's local reference only: not ours to republish. Keep a local copy beside the app.
 assets/image-*
 assets/storyboards-data.json
+# Tests use assets/test-image-1.png and -2.png instead: our own (FFmpeg lavfi testsrc2 / color),
+# flat under assets/ because the server only accepts /assets/<name> as a reference path.
 
 # Copied from node_modules/@mediapipe/tasks-vision by scripts/vendor-vision.cjs (postinstall),
 # SHA-256 checked against assets/vision/sources.json. LICENSE, sources.json and the model stay tracked.

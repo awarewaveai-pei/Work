@@ -27,7 +27,7 @@ const { chromium } = require("playwright");
       if (failureMode === "malformed") return r.fulfill({ json: {} });
       if (failureMode === "gateway") return r.fulfill({ status: 504, json: { error: { message: "gateway timeout" } } });
       if (route.includes("/generations/")) return r.fulfill({ status: 404, json: { error: { message: "unknown job" } } });
-      return r.fulfill({ json: { id: "host-job", type: "image", status: "succeeded", progress: 100, result: { url: "/assets/image-1.png" } } });
+      return r.fulfill({ json: { id: "host-job", type: "image", status: "succeeded", progress: 100, result: { url: "/assets/test-image-1.png" } } });
     });
     await p.goto(base);
     await p.waitForFunction(() => window.SeedStar?.generator?.controlsReady && SeedStar.capabilities?.models?.image === "host-image");

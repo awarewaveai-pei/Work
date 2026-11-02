@@ -230,7 +230,7 @@ async function generatorSubmit(payload) {
       if (!skill) throw Error("選取的技能已不存在，請重新選擇");
       return skill.prompt;
     });
-    const inputs = ratios.map((ratio) => ({ ...structuredClone(payload), prompt: [payload.prompt, ...applied].join("\n"), settings: { ...payload.settings, ratio, subtitleOptions: structuredClone(payload.settings?.subtitleOptions || state.subtitleOptions) } }));
+    const inputs = ratios.map((ratio) => ({ ...structuredClone(payload), prompt: [payload.prompt, ...applied].join("\n"), draftPrompt: payload.prompt, settings: { ...payload.settings, ratio, subtitleOptions: structuredClone(payload.settings?.subtitleOptions || state.subtitleOptions) } }));
     // Validate the entire batch before any paid submission.
     for (const input of inputs) generatorValidation(input);
     const results = [];

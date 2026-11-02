@@ -64,7 +64,7 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     await p.locator("[data-panel=settings]").first().click(); await p.locator('[data-ratio="9:16"]').click();
     await p.locator("[data-mode=image]").click(); assert.match(await p.locator("#outputBtn").innerText(), /16:9 · 2K/);
     await p.locator("[data-mode=reference]").click(); assert.match(await p.locator("#outputBtn").innerText(), /16:9、9:16 · 720p/);
-    await p.evaluate(() => SeedStar.generator.import({ target: "image", title: "作品參考", image: "/assets/image-1.png", imagePrompt: "帶入參考仍保留 2K" }));
+    await p.evaluate(() => SeedStar.generator.import({ target: "image", title: "作品參考", image: "/assets/test-image-1.png", imagePrompt: "帶入參考仍保留 2K" }));
     assert.match(await p.locator("#outputBtn").innerText(), /16:9 · 2K/);
     await p.locator('[data-remove="images:0"]').click();
     await p.locator("[data-mode=product]").click(); assert(await p.locator(".dock").isHidden());

@@ -29,13 +29,15 @@ async function generatorResultAction(payload) {
     const defaults = generatorDefaultSettings(mode);
     for (const key of generatorSettingKeys) if (key !== "style") state[key] = structuredClone(settings[key] ?? defaults[key]);
     if (!settings.ratios) state.ratios = [settings.ratio || state.ratio];
-    state.data[mode] = input.prompt || "";
+    // draftPrompt = what the user typed; prompt also carries applied skill guidance (generator-controls.js).
+    const typed = input.draftPrompt ?? input.prompt ?? "";
+    state.data[mode] = typed;
     if (mode === "reference") state.refType = ["all", "first", "motion"].includes(input.referenceMode) ? input.referenceMode : "all";
     if (mode === "cartoon") state.style = styles.indexOf(input.cartoonStyle);
     if (mode === "director") {
       state.directorConversationId = crypto.randomUUID(); state.directorChatInput = ""; state.directorPhase = "script";
-      state.directorMessages = [{ role: "user", text: "已保存腳本，接下來請依此協助修改：\n" + (input.prompt || ""), phase: "script" }, { role: "assistant", text: input.prompt || "", choices: [] }];
-      state.directorScript = input.prompt || ""; state.directorLength = settings.duration || input.duration || 8; state.directorStage = "video";
+      state.directorMessages = [{ role: "user", text: "已保存腳本，接下來請依此協助修改：\n" + typed, phase: "script" }, { role: "assistant", text: typed, choices: [] }];
+      state.directorScript = typed; state.directorLength = settings.duration || input.duration || 8; state.directorStage = "video";
     }
     if (mode === "product") {
       state.productStep = 3; state.productData = structuredClone(input.product || { title: "已保存商品", description: "" });

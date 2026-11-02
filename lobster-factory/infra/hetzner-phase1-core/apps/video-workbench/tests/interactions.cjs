@@ -5,6 +5,7 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
   require("node:path").join(require("node:os").tmpdir(), "seedstar-ui-"),
 );
 (async () => {
+  const { base } = await require("./isolated-server.cjs").isolatedServer("vw-interactions-");
   const browser = await chromium.launch({ headless: true, channel: "msedge" });
   const ctx = await browser.newContext({
     viewport: { width: 1440, height: 900 },
@@ -31,7 +32,7 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
       console.log("FAIL", name, e.message);
     }
   }
-  await p.goto("http://127.0.0.1:4178");
+  await p.goto(base);
   await p.waitForFunction(
     () => window.AwareWaveTheme && window.SeedStar?.sanitize,
   );
@@ -172,6 +173,7 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
   await test("生成失敗可見且沒有假成功", async () => {
     await p.locator("#generatorNav").click();
     await p.locator("[data-mode=image]").click();
+    await p.locator("#prompt").fill("測試：服務未設定"); // send stays disabled on an empty prompt
     await p.locator("#send").click();
     await p.locator("#service-error").waitFor();
     assert.match(await p.locator("#service-error").innerText(), /尚未設定/);
@@ -187,7 +189,7 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
       el.contentWindow.SeedStar.generator.import({
         target: "image",
         title: "測試帶入",
-        image: new URL("assets/image-1.webp", location.href).href,
+        image: new URL("assets/test-image-1.png", location.href).href,
         imagePrompt: "測試帶入提示",
       }),
     );

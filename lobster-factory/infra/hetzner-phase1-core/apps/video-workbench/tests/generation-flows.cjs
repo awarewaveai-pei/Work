@@ -39,7 +39,7 @@ const fs = require("node:fs"), os = require("node:os"), path = require("node:pat
           status: "succeeded",
           progress: 100,
           input: body,
-          result: { url: "/assets/image-1.png" },
+          result: { url: "/assets/test-image-1.png" },
         },
       });
     return r.fulfill({
@@ -127,7 +127,7 @@ const fs = require("node:fs"), os = require("node:os"), path = require("node:pat
       .find((f) => f.url().includes("/pages/tools.html"))
       .evaluate(() => {
         files.image = {
-          url: "/assets/image-1.png",
+          url: "/assets/test-image-1.png",
           type: "image/png",
         };
         render();

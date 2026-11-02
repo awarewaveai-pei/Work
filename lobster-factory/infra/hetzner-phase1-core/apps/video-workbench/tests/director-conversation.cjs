@@ -28,7 +28,7 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), 'seedstar-director-chat-'
     await p.goto(base); await p.waitForFunction(() => SeedStar.generator?.controlsReady);
     await p.locator('[data-mode="director"]').click();
     const draft = await p.evaluate(() => SeedStar.generator.getDraft());
-    draft.refs.director.images = [{ name: '咖啡參考', url: '/assets/image-1.png', purpose: '暖色光線' }];
+    draft.refs.director.images = [{ name: '咖啡參考', url: '/assets/test-image-1.png', purpose: '暖色光線' }];
     await p.evaluate(d => SeedStar.generator.setDraft(d), draft);
     await p.locator('#prompt').fill('八秒咖啡杯短片，無人物');
     await p.locator('[data-action="director-start"]').click();

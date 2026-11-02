@@ -13,7 +13,7 @@ const { chromium } = require('playwright');
       return r.request().url().startsWith(base + '/') ? r.continue() : r.abort();
     });
     await p.goto(base); await p.waitForFunction(() => SeedStar.router?.activate && SeedStar.generator?.controlsReady);
-    await p.evaluate(() => SeedStar.assets.save({ id: 'sidebar-image', name: '預覽測試', kind: 'image', type: 'image/png', url: '/assets/image-1.png' }));
+    await p.evaluate(() => SeedStar.assets.save({ id: 'sidebar-image', name: '預覽測試', kind: 'image', type: 'image/png', url: '/assets/test-image-1.png' }));
     const navs = ['generator', 'director', 'tools', 'projects', 'storyboards', 'templates', 'workflows', 'characters', 'skills', 'assets', 'history'];
     for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
       await p.setViewportSize(viewport);

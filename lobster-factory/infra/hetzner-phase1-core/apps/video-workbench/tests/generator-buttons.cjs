@@ -13,9 +13,9 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "seedstar-buttons-test-")
     await p.route("**/*", (r) => r.request().url().startsWith(base + "/") ? r.continue() : r.abort());
     await p.goto(base); await p.waitForFunction(() => window.SeedStar?.generator?.controlsReady);
     await p.evaluate(async () => {
-      await SeedStar.assets.save({ id: "test-image", name: "人物測試圖", kind: "image", url: "/assets/image-1.png", type: "image/png" });
+      await SeedStar.assets.save({ id: "test-image", name: "人物測試圖", kind: "image", url: "/assets/test-image-1.png", type: "image/png" });
       await SeedStar.assets.save({ id: "test-video", name: "短影片", kind: "video", duration: 8, url: "/generated/test.mp4", type: "video/mp4" });
-      await SeedStar.characters.save({ id: "test-character", name: "測試角色", image: "/assets/image-2.png" });
+      await SeedStar.characters.save({ id: "test-character", name: "測試角色", image: "/assets/test-image-2.png" });
       await SeedStar.preferences.set("workspace.skills", [{ id: "test-skill", name: "自訂驗證", prompt: "CUSTOM_INSTRUCTION" }]);
     });
     const panel = p.locator("#popover");

@@ -152,7 +152,7 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     await p.evaluate(() => {
       const draft = SeedStar.generator.getDraft();
       draft.mode = "director"; draft.directorStage = "script"; draft.directorScript = "六圖分鏡測試";
-      draft.refs.director.images = Array.from({ length: 6 }, (_, i) => ({ id: "r" + i, name: "參考" + i, url: "/assets/image-1.png", type: "image/png" }));
+      draft.refs.director.images = Array.from({ length: 6 }, (_, i) => ({ id: "r" + i, name: "參考" + i, url: "/assets/test-image-1.png", type: "image/png" }));
       SeedStar.generator.setDraft(draft);
     });
     await p.locator("[data-action=director-storyboard]").click();

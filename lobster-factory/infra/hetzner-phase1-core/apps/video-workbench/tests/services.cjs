@@ -5,6 +5,7 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
   require("node:path").join(require("node:os").tmpdir(), "seedstar-services-"),
 );
 (async () => {
+  const { base } = await require("./isolated-server.cjs").isolatedServer("vw-services-");
   const b = await chromium.launch({ channel: "msedge" }),
     p = await b.newPage();
   let db = {
@@ -37,6 +38,9 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
       if (req.method() === "PUT") db = req.postDataJSON();
       return r.fulfill({ json: db });
     }
+    // Without a capabilities answer the generator correctly reports the service as not configured.
+    if (url.endsWith("/capabilities"))
+      return r.fulfill({ json: { image: true, video: true, audio: true, models: { image: "host-image", video: "host-video", audio: "host-audio" } } });
     if (fail) return r.fulfill({ status: 503, json: { error: "unavailable" } });
     if (url.endsWith("/cancel")) {
       job = { ...job, status: "cancelled" };
@@ -44,7 +48,7 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
     }
     return r.fulfill({ json: job });
   });
-  await p.goto("http://127.0.0.1:4178");
+  await p.goto(base);
   await p.waitForFunction(() => window.SeedStar?.showJob);
   await p.evaluate(async () => {
     await SeedStar.ready;
@@ -53,7 +57,7 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
       id: "a1",
       name: "API 素材",
       kind: "image",
-      url: "/assets/image-1.webp",
+      url: "/assets/test-image-1.png",
     });
   });
   assert.equal(db.characters[0].name, "API 角色");
@@ -64,7 +68,7 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
     SeedStar.generator.import({
       target: "image",
       title: "Reference",
-      image: "/assets/image-1.webp",
+      image: "/assets/test-image-1.png",
       imagePrompt: "Reference test",
     }),
   );
@@ -73,7 +77,7 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
   assert.equal(
     requests.find((r) => r.method === "POST" && r.url.endsWith("/generations"))
       .body.references.images[0].url,
-    "/assets/image-1.webp",
+    "/assets/test-image-1.png",
   );
   assert.match(await p.locator(".job-view").innerText(), /queued/);
   await p.locator(".job-view button").filter({ hasText: "取消任務" }).click();
@@ -90,7 +94,7 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
     ...job,
     status: "succeeded",
     progress: 100,
-    result: { url: "/assets/image-1.webp" },
+    result: { url: "/assets/test-image-1.png" },
   };
   await p.locator(".job-view img").waitFor({ timeout: 5000 });
   assert(

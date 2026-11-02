@@ -1,7 +1,9 @@
 (function () {
   "use strict";
   const M = SeedStarModels,
-    child = parent !== window && !document.documentElement.hasAttribute("data-seedstar-root"),
+    child =
+      parent !== window &&
+      !document.documentElement.hasAttribute("data-seedstar-root"),
     config = window.SEEDSTAR_CONFIG;
   const adapter =
     config.mode === "http"
@@ -100,7 +102,11 @@
     if (action === "job-get") return SeedStar.generations.get(payload.id);
     if (action === "job-cancel") return SeedStar.generations.cancel(payload.id);
     if (action === "service-request")
-      return adapter.request(payload.path, payload.method || "POST", payload.body);
+      return adapter.request(
+        payload.path,
+        payload.method || "POST",
+        payload.body,
+      );
     if (action === "preference-set") {
       write(payload.key, payload.value);
       await persist();
@@ -179,11 +185,22 @@
       Object.assign(job, result);
       job.serverAccepted = true;
     } catch (e) {
-      const rejected = e instanceof SeedStarAdapters.ServiceError && [400, 401, 403, 404, 405, 413, 415, 422, 429].includes(e.status);
+      // A rejection proves nothing was sent to a provider, so retry is safe. Holds for POST /generations
+      // only: the local server answers 202 before touching a provider (backend/api.cjs finish() runs after),
+      // so 501 (unsupported) and 503 (no API key) come first. Text routes forward provider codes; do not
+      // reuse this list there. 502/504, network errors and malformed 2xx stay "unconfirmed".
+      const rejected =
+        e instanceof SeedStarAdapters.ServiceError &&
+        [400, 401, 403, 404, 405, 409, 413, 415, 422, 429, 501, 503].includes(
+          e.status,
+        );
       job.status = rejected ? "blocked" : "submitting";
       job.submissionRejected = rejected;
       job.submissionUnconfirmed = !rejected;
-      job.error = rejected ? e.message : "未收到服務端確認，任務可能已送出；請先確認任務紀錄，避免重複計費。 " + e.message;
+      job.error = rejected
+        ? e.message
+        : "未收到服務端確認，任務可能已送出；請先確認任務紀錄，避免重複計費。 " +
+          e.message;
       await persist().catch(() => {});
       broadcast();
       throw e;
@@ -303,16 +320,42 @@
           ? rpc("service-request", { path: "/generations/quote", body: input })
           : adapter.request("/generations/quote", "POST", input),
       create: generate,
-      refresh: (job) => job.serverAccepted === false || (!job.serverAccepted && ["blocked", "submitting"].includes(job.status)) ? Promise.resolve(job) : window.SeedStar.generations.get(job.id),
+      refresh: (job) =>
+        job.serverAccepted === false ||
+        (!job.serverAccepted && ["blocked", "submitting"].includes(job.status))
+          ? Promise.resolve(job)
+          : window.SeedStar.generations.get(job.id),
       retry: async (job) => {
         const current = await window.SeedStar.generations.refresh(job);
-        if (current.submissionUnconfirmed || (current.status === "blocked" && !current.serverAccepted && !current.submissionRejected)) throw Error("上次送出狀態未確認，不會自動重送；請先確認服務端任務紀錄。");
-        if (["queued", "running", "submitting"].includes(current.status)) throw Error("任務仍在執行，請先檢視任務，不會重複送出。");
-        if (["queued", "running", "submitting"].includes(job.status)) return current;
+        if (
+          current.submissionUnconfirmed ||
+          (current.status === "blocked" &&
+            !current.serverAccepted &&
+            !current.submissionRejected)
+        )
+          throw Error(
+            "上次送出狀態未確認，不會自動重送；請先確認服務端任務紀錄。",
+          );
+        if (["queued", "running", "submitting"].includes(current.status))
+          throw Error("任務仍在執行，請先檢視任務，不會重複送出。");
+        if (["queued", "running", "submitting"].includes(job.status))
+          return current;
         const sourceUrl = current.result?.sourceUrl;
-        return generate(current.status === "failed" && current.type === "image" && sourceUrl && ["center-crop", "region-preserve"].includes(current.input?.settings?.imageLayout)
-          ? { type: "image", operation: "image-output", references: { src: { url: sourceUrl } }, settings: current.input.settings }
-          : current.input);
+        return generate(
+          current.status === "failed" &&
+            current.type === "image" &&
+            sourceUrl &&
+            ["center-crop", "region-preserve"].includes(
+              current.input?.settings?.imageLayout,
+            )
+            ? {
+                type: "image",
+                operation: "image-output",
+                references: { src: { url: sourceUrl } },
+                settings: current.input.settings,
+              }
+            : current.input,
+        );
       },
       get: async (id) => {
         if (child) return rpc("job-get", { id });

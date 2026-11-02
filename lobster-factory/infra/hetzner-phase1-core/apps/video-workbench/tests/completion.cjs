@@ -1,6 +1,7 @@
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright"),
   assert = require("node:assert/strict");
 (async () => {
+  const { base } = await require("./isolated-server.cjs").isolatedServer("vw-completion-");
   const b = await chromium.launch({ channel: "msedge" }),
     p = await b.newPage({ viewport: { width: 1440, height: 900 } }),
     errors = [];
@@ -12,7 +13,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright"),
       json: { error: { message: "測試環境：生成服務尚未設定" } },
     }),
   );
-  await p.goto("http://127.0.0.1:4178");
+  await p.goto(base);
   await p.waitForFunction(() => SeedStar?.router);
   for (const [name, title] of [
     ["assets", "素材庫"],

@@ -68,6 +68,8 @@ export interface GenerationJob {
   result?: { url: string; sourceUrl?: string; width?: number; height?: number; layout?: "center-crop" };
   error?: string;
   serverAccepted?: boolean;
+  /** POST /generations answered 400/401/403/404/405/409/413/415/422/429/501/503. A host must use these
+   *  only when the request never reached a paid provider; once it may have, answer 2xx, 502 or 504. */
   submissionRejected?: boolean;
   submissionUnconfirmed?: boolean;
 }

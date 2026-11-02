@@ -356,7 +356,7 @@ const evidence = fs.mkdtempSync(
     await open(
       "region",
       {},
-      { name: "圖片測試", url: "/assets/image-1.png", type: "image/png" },
+      { name: "圖片測試", url: "/assets/test-image-1.png", type: "image/png" },
     );
     await p.locator('[data-key="regionPrompt"]').fill("整體光線柔和一些");
     await p.locator('[data-act="submit"]').click();

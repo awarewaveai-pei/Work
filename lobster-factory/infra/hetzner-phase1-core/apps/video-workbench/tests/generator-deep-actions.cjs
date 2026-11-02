@@ -44,7 +44,7 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "seedstar-deep-actions-")
     assert.equal(await p.locator("#prompt").inputValue(), "清除後的新內容");
     console.log("PASS 清除可復原提示詞與整組素材，新輸入不會被復原覆蓋");
 
-    const job = { id: "result-test", type: "image", status: "succeeded", result: { url: "/assets/image-1.png", width: 1024, height: 1024 }, input: { type: "image", mode: "image", prompt: "原始成果提示詞", settings: { model: "old-model", ratio: "9:16", quality: "2K", skill: "不套用技能" }, references: { images: [{ id: "original-reference", name: "原參考", kind: "image", type: "image/png", url: "/assets/image-2.png" }] } } };
+    const job = { id: "result-test", type: "image", status: "succeeded", result: { url: "/assets/test-image-1.png", width: 1024, height: 1024 }, input: { type: "image", mode: "image", prompt: "原始成果提示詞", settings: { model: "old-model", ratio: "9:16", quality: "2K", skill: "不套用技能" }, references: { images: [{ id: "original-reference", name: "原參考", kind: "image", type: "image/png", url: "/assets/test-image-2.png" }] } } };
     const show = () => p.evaluate((value) => SeedStar.showJob(value), job);
     await show(); await p.getByRole("button", { name: "重新生成（先還原設定）", exact: true }).click();
     assert.equal(await p.locator("#prompt").inputValue(), job.input.prompt);
@@ -75,11 +75,11 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "seedstar-deep-actions-")
     console.log("PASS 成果圖片真實帶入局部編輯器與配音工具，所有結果操作皆零生成請求");
     await p.locator("#generatorNav").click();
     for (const operation of ["character-image", "character-test", "project-shot", "image-output"]) {
-      await p.evaluate(({ operation, job }) => SeedStar.generator.import({ intent: "restore-job", job: { ...job, input: { ...job.input, operation, references: { src: { url: "/assets/image-1.png" } } } } }), { operation, job });
+      await p.evaluate(({ operation, job }) => SeedStar.generator.import({ intent: "restore-job", job: { ...job, input: { ...job.input, operation, references: { src: { url: "/assets/test-image-1.png" } } } } }), { operation, job });
       assert.equal((await p.evaluate(() => SeedStar.generator.getDraft())).mode, "image");
     }
     await p.evaluate(() => SeedStar.generator.import({ intent: "restore-job", job: { type: "audio", input: { operation: "separate", references: { src: { url: "/generated/test.mp4" } }, settings: {} } } }));
-    await tool.locator("#stage video").waitFor();
+    await tool.locator('video[data-flow-media="src"]').waitFor(); // 音軌分離 uses the workflow screen (wfSource), not #stage
     await p.locator("#generatorNav").click();
     const directorJob = { ...job, type: "video", input: { type: "video", mode: "director", prompt: "還原的全新腳本", settings: { duration: 8 } } };
     await p.evaluate(j => SeedStar.generator.import({ intent: "restore-job", job: j }), directorJob);

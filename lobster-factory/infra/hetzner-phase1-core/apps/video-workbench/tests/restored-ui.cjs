@@ -32,7 +32,7 @@ const root = path.resolve(__dirname, ".."),
           type: calls.at(-1).type,
           status: "succeeded",
           progress: 100,
-          result: { url: "/assets/image-1.png" },
+          result: { url: "/assets/test-image-1.png" },
         },
       });
     });
@@ -43,7 +43,7 @@ const root = path.resolve(__dirname, ".."),
         id: "restore-character",
         name: "昨晚角色",
         description: "測試角色",
-        image: "/assets/image-1.png",
+        image: "/assets/test-image-1.png",
       }),
     );
     await p.locator("[data-mode=spoken]").click();
@@ -61,38 +61,25 @@ const root = path.resolve(__dirname, ".."),
     await p.screenshot({ path: path.join(evidence, "restored-spoken.png") });
     await p.locator("#toolsNav").click();
     const t = p.frameLocator("#toolsFrame");
-    await t.locator('[data-act="open:edit"]').click();
-    p.once("dialog", (d) => d.accept("找回的剪輯專案"));
-    await t.locator("[data-act=newproject]").first().click();
-    await t
-      .locator("#project-list")
-      .getByText(/找回的剪輯專案/)
-      .waitFor();
-    await t.locator("[data-key=trimStart]").waitFor();
-    console.log("PASS 剪輯新建專案與裁切同時保留");
-    await t.locator("[data-act=home]").first().click();
+    // The old single-clip cut screen (新建剪輯專案 + trimStart) was replaced by the multi-track
+    // editor (toolEditorScreen); tests/tools-editor.cjs covers it, so it is not checked here.
     await t.locator('[data-act="open:enhance"]').click();
-    await t.locator('[data-act="set:enhanceType:畫面"]').click();
-    await t.locator('[data-act="set:imageEnhance:AI 修復畫面"]').waitFor();
-    await t.locator('[data-act="set:enhanceType:音訊"]').click();
-    await t.locator('[data-act="set:enhanceOption:只保留人聲"]').click();
+    // Enhance moved to the workflow screen (tools-workflows.js): choices are data-flow-choice buttons.
+    const choice = (key, value) => t.locator(`[data-flow-choice="${key}"][data-flow-value="${value}"]`);
+    await choice("enhanceType", "畫面").click();
+    await choice("enhanceOption", "AI 大模型增強").waitFor();
+    await choice("enhanceType", "音訊").click();
+    await choice("enhanceOption", "只保留人聲").click();
     assert(await t.locator("[data-act=submit]").isDisabled());
     console.log("PASS 畫面與音訊設定恢復，未接服務不誤送");
     await t.locator("[data-act=home]").first().click();
+    // CTA moved to the overlay screen (tools-overlays.js); it has no 出場 choice any more, only 淡入淡出.
     await t.locator('[data-act="open:cta"]').click();
-    await t.locator('[data-act="set:ctaAppear:彈出"]').click();
-    await t.locator('[data-act="set:ctaFade:0.5 秒"]').click();
+    await choice("ctaFade", "0.5 秒").click();
     await t.locator("[data-act=home]").first().click();
     await t.locator('[data-act="open:cta"]').click();
-    assert.match(
-      await t.locator('[data-act="set:ctaAppear:彈出"]').getAttribute("class"),
-      /selected/,
-    );
-    assert.match(
-      await t.locator('[data-act="set:ctaFade:0.5 秒"]').getAttribute("class"),
-      /selected/,
-    );
-    console.log("PASS CTA 出場與淡入淡出設定持久保存");
+    assert.equal(await choice("ctaFade", "0.5 秒").getAttribute("aria-pressed"), "true");
+    console.log("PASS CTA 淡入淡出設定持久保存");
     await p.screenshot({ path: path.join(evidence, "restored-cta.png") });
     await p.locator("#generatorNav").click();
     await p.locator("[data-mode=director]").click();

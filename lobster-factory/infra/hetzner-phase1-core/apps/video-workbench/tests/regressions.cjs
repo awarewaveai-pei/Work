@@ -1,10 +1,11 @@
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright"),
   assert = require("node:assert/strict");
 (async () => {
+  const { base } = await require("./isolated-server.cjs").isolatedServer("vw-regressions-");
   const b = await chromium.launch({ channel: "msedge" }),
     p = await b.newPage();
   p.setDefaultTimeout(8000);
-  await p.goto("http://127.0.0.1:4178");
+  await p.goto(base);
   await p.waitForFunction(() => SeedStar?.models);
   const checks = await p.evaluate(() => {
     const M = SeedStar.models;
@@ -34,7 +35,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright"),
       references: [],
       tags: [],
       inLibrary: true,
-      image: "/assets/image-1.webp",
+      image: "/assets/test-image-1.png",
     }),
   );
   await p.locator("#charactersNav").click();
@@ -56,14 +57,21 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright"),
   const lib = await tools
     .locator('[data-act^="open:"]')
     .evaluateAll((nodes) => nodes.map((x) => x.dataset.act));
+  // Video-only tools filter their library by clip length, so open each tool's library until one
+  // that takes images lists the character (tool order is not part of the contract).
+  let listed = false;
   for (const act of lib) {
     await tools.locator(`[data-act="${act}"]`).click();
-    if (await tools.locator('[data-act^="library:"]').count()) break;
+    if (await tools.locator('[data-act^="library:"]').count()) {
+      await tools.locator('[data-act^="library:"]').first().click();
+      await tools.locator(".asset-workspace").waitFor();
+      listed = /跨頁修改/.test(await tools.locator(".asset-workspace").innerText());
+      await tools.locator("[data-picker-close]").first().click();
+    }
+    if (listed) break;
     await tools.locator("[data-act=home]").first().click();
   }
-  await tools.locator('[data-act^="library:"]').first().click();
-  await tools.locator(".asset-workspace").waitFor();
-  assert.match(await tools.locator(".asset-workspace").innerText(), /跨頁修改/);
+  assert(listed, "no tool library lists the edited character");
   console.log("PASS 角色素材可在工具庫選取");
   await b.close();
 })().catch((e) => {
