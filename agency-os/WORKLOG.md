@@ -1,4 +1,22 @@
 # Worklog
+## 2026-11-02（續40）Mockup 頁設計圖只列設計圖（不含塔羅、已合成商品圖）；下載檔名有意義且不重複
+
+**根因**：`/tools/mockup` 設計圖挑選器打 `/api/tools/designs` 不帶 `?group=`（`MockupStudio.tsx` 載入處），拿到整個 My Designs（塔羅牌、mockup 都在）；既有 `group=design` 只排除 mockup，塔羅仍在（My Designs 設計圖分頁刻意含塔羅）。下載名寫死 `mockup-${mode}-${color}.png`／`mockup-<preset>-<i>.jpg`，同設定重下必撞名，副檔名也可能與實際 jpeg 不符。
+
+**做了**（NA = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）：
+- `NA/lib/studio/designs-list.ts` 新 `group: "print"` = design 再排除 `TAROT_SOURCES`（同一 SSOT，DB 端過濾）；`NA/app/api/tools/designs/route.ts` 接受 `print`；挑選器改打 `?group=print`。My Designs、發佈精靈的 `group=design` 不變。
+- `NA/lib/studio/semantic-filename.ts` 新 `buildUniqueFilename`（語意名＋本地時間戳＋4 碼亂數）、`extOfDataUrl`；平拍與模特下載用它，例 `商品圖-老虎-平拍-white-20261102-153012-a7k2.png`。
+- Codex F1/F2：檔名的設計名改在「生成當下」綁進結果（`GenState.fileMeta`、results 每列 `designName`），之後換設計不會改名；產品預設點選也設設計名。F3：測試補 tarot-art／tarot-preview-edit 列。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p . ; npx vitest run app/api/tools/designs lib/studio/__tests__/semantic-filename.test.ts app/(shell)/tools/mockup → 6 files 40 passed；突變：print 排除清單拔 TAROT_SOURCES → `?group=print` 測試紅，還原綠 | exit=0 | ms=4000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（Codex `agency-os/reports/oracle/2026-11-02-partialreview-2eb25d7b.md`，3 項皆修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=buildUniqueFilename | hits=5
+- 未驗：正式站畫面（要等部署；next-admin 03:00 自動部署 main）。
+
+**避免再發生**：新挑選器要「只有設計圖」就用 `?group=print`，分組定義只在 `asset-group.ts`。
+
+**rollback**：revert 本 commit。
 ## 2026-11-02（續39）外聯 v2 C16.1＋C16.3 依風險抽樣、切角回饋（程式完成；C16.2 一致率與 C16.4 真資料待寄量）
 
 **做了**（cc.py SDK 派工 session 08e27371，US$1.28；主 session 驗收＋修 Codex 4 項；NA = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）：

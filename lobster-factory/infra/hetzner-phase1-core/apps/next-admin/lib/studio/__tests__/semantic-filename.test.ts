@@ -1,5 +1,24 @@
 import { describe, it, expect } from "vitest";
-import { buildSemanticFilename, buildSemanticBase, extOf } from "../semantic-filename";
+import { buildSemanticFilename, buildSemanticBase, buildUniqueFilename, extOf, extOfDataUrl } from "../semantic-filename";
+
+describe("buildUniqueFilename (mockup downloads, 2026-11-02)", () => {
+  const now = new Date(2026, 10, 2, 15, 30, 12);
+  it("semantic name + local stamp + random tag, extension from the data URL", () => {
+    expect(
+      buildUniqueFilename({ product: "商品圖", subject: "老虎", style: "平拍", track: "white" }, extOfDataUrl("data:image/jpeg;base64,xx", "png"), "mockup", now, () => 0.5),
+    ).toBe("商品圖-老虎-平拍-white-20261102-153012-i000.jpg");
+  });
+  it("two downloads of the same setup differ; empty meta uses the fallback base", () => {
+    const a = buildUniqueFilename({}, "png", "mockup", now, () => 0.1);
+    const b = buildUniqueFilename({}, "png", "mockup", now, () => 0.2);
+    expect(a).not.toBe(b);
+    expect(a.startsWith("mockup-20261102-153012-")).toBe(true);
+  });
+  it("extOfDataUrl falls back for non-image or remote URLs", () => {
+    expect(extOfDataUrl("https://x/y.png", "jpg")).toBe("jpg");
+    expect(extOfDataUrl("data:image/webp;base64,xx", "png")).toBe("webp");
+  });
+});
 
 describe("buildSemanticFilename", () => {
   it("joins 產品-主圖名稱-風格-軌 with the given extension", () => {

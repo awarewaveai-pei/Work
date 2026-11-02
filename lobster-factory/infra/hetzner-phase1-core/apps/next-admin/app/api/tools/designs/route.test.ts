@@ -215,4 +215,17 @@ describe("GET /api/tools/designs list", () => {
     const res = await list("counts=1");
     expect(Object.keys(res.facets!.theme)).toEqual(["Alpha", "Zulu"]);
   });
+
+  it("?group=print (mockup picker) keeps design art only: no tarot cards, no mockups (2026-11-02)", async () => {
+    const design = asset(300, ORG_A, "pod-studio", "flux-dev");
+    const noSource = asset(301, ORG_A, "x", null);
+    noSource.metadata = {};
+    // beforeEach already seeds 81 tarot / tarot-preview rows; tarot-art + tarot-preview-edit added here too.
+    db.rows.push(design, noSource, asset(302, ORG_A, "mockup", null), asset(303, ORG_A, "printful-mockup", null),
+      asset(304, ORG_A, "tarot-art", null), asset(305, ORG_A, "tarot-preview-edit", null));
+    const res = await GET(new Request("http://localhost/api/tools/designs?group=print"));
+    const json = (await res.json()) as { ok: boolean; assets: { id: string }[] };
+    expect(json.ok).toBe(true);
+    expect(json.assets.map((a) => a.id).sort()).toEqual([design.id, noSource.id].sort());
+  });
 });

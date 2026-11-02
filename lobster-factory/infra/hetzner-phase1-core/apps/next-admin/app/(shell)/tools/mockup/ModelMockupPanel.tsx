@@ -6,12 +6,15 @@
 import { useMemo, useState } from "react";
 import { GARMENT_PLACEMENT } from "@/lib/studio/mockup-prompt";
 import { PHOTO_PRINT_MODELS, type StudioModel } from "@/lib/studio/model-options";
+import { buildUniqueFilename, extOfDataUrl } from "@/lib/studio/semantic-filename";
 import ImageLightbox from "./ImageLightbox";
 import { COLOR_LABEL, GENDER_LABEL, failureText, groupModels, inPairs, readJson, type LibraryPhoto, type Shot } from "./modelLibrary";
 
 
-export default function ModelMockupPanel({ designRef, photos, onOpenLibrary }: {
+export default function ModelMockupPanel({ designRef, designName, photos, onOpenLibrary }: {
   designRef: string | null;
+  /** Filename part for downloads (the picked design's subject or uploaded file name). */
+  designName: string;
   photos: LibraryPhoto[];
   /** Switches Mockup Studio to 【模特兒印製】. */
   onOpenLibrary: () => void;
@@ -20,7 +23,8 @@ export default function ModelMockupPanel({ designRef, photos, onOpenLibrary }: {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [placement, setPlacement] = useState("center-chest");
   const [designScale, setDesignScale] = useState(100);
-  const [results, setResults] = useState<{ photo: LibraryPhoto; engine: "ai" | "code"; model: StudioModel; shot: Shot; saved?: "saving" | "saved" | "error" }[]>([]);
+  // designName is captured per batch: picking another design later must not rename these downloads.
+  const [results, setResults] = useState<{ photo: LibraryPhoto; engine: "ai" | "code"; model: StudioModel; designName: string; shot: Shot; saved?: "saving" | "saved" | "error" }[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
   const [model, setModel] = useState<StudioModel>(PHOTO_PRINT_MODELS[0].value);
   const costNt = PHOTO_PRINT_MODELS.find((m) => m.value === model)?.costNt ?? 2;
@@ -39,7 +43,7 @@ export default function ModelMockupPanel({ designRef, photos, onOpenLibrary }: {
     const targets = engine === "code" ? boxedPicked : pickedPhotos;
     if (targets.length === 0) { setMsg(engine === "code" ? "免費預覽只能用已框好印花位置的模特兒圖" : "請先勾選模特兒圖"); return; }
     setMsg(null);
-    setResults(targets.map((photo) => ({ photo, engine, model, shot: { status: "generating" } })));
+    setResults(targets.map((photo) => ({ photo, engine, model, designName, shot: { status: "generating" } })));
     await inPairs(targets, async (photo, i) => {
       let shot: Shot;
       try {
@@ -178,7 +182,8 @@ export default function ModelMockupPanel({ designRef, photos, onOpenLibrary }: {
                       <button className="btn-secondary" style={{ fontSize: 11 }} disabled={r.saved === "saving" || r.saved === "saved"} onClick={() => void save(r.photo.id)}>
                         {r.saved === "saved" ? "已存 ✓" : r.saved === "saving" ? "儲存中…" : "存入 My Designs"}
                       </button>
-                      <a className="btn-secondary" style={{ fontSize: 11 }} href={r.shot.image} download={`mockup-${r.photo.metadata?.preset_name ?? "model"}-${i + 1}.jpg`}>下載</a>
+                      <a className="btn-secondary" style={{ fontSize: 11 }} href={r.shot.image} download
+                        onClick={(e) => { if (r.shot.status === "done") e.currentTarget.download = buildUniqueFilename({ product: "商品圖", subject: r.designName, style: "模特", track: r.photo.metadata?.preset_name ?? undefined }, extOfDataUrl(r.shot.image, "jpg"), "mockup"); }}>下載</a>
                     </div>
                     {r.saved === "error" && <div style={{ fontSize: 11, color: "var(--red)" }}>儲存失敗</div>}
                   </>

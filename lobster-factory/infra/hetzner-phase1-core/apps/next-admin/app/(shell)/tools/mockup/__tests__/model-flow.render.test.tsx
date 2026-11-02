@@ -30,7 +30,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("主頁 模特: 模特兒圖 + design → product mockups", () => {
   it("groups photos per model; every photo can be picked; 全選 picks a whole model", () => {
-    render(<ModelMockupPanel designRef={DESIGN} photos={library} onOpenLibrary={() => {}} />);
+    render(<ModelMockupPanel designRef={DESIGN} designName="" photos={library} onOpenLibrary={() => {}} />);
     expect(screen.getByText("Leo")).toBeTruthy();
     expect(screen.getByText("Mia")).toBeTruthy();
     fireEvent.click(screen.getAllByRole("button", { name: "全選" })[0]);
@@ -41,7 +41,7 @@ describe("主頁 模特: 模特兒圖 + design → product mockups", () => {
   it("合成 sends every picked photo across models to the AI print; 免費預覽 sends only outlined ones with their box", async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true, image: "data:image/jpeg;base64,AA==" })));
     vi.stubGlobal("fetch", fetchMock);
-    render(<ModelMockupPanel designRef={DESIGN} photos={library} onOpenLibrary={() => {}} />);
+    render(<ModelMockupPanel designRef={DESIGN} designName="" photos={library} onOpenLibrary={() => {}} />);
     for (const box of screen.getAllByRole("checkbox")) fireEvent.click(box);
     fireEvent.click(screen.getByRole("button", { name: /合成（3 張/ }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
@@ -58,7 +58,7 @@ describe("主頁 模特: 模特兒圖 + design → product mockups", () => {
 
   it("a gateway error page (HTML 502 while a deploy restarts the app) reads as words, not a JSON parse error", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("<!DOCTYPE html><html>502</html>", { status: 502, headers: { "content-type": "text/html" } })));
-    render(<ModelMockupPanel designRef={DESIGN} photos={library} onOpenLibrary={() => {}} />);
+    render(<ModelMockupPanel designRef={DESIGN} designName="" photos={library} onOpenLibrary={() => {}} />);
     fireEvent.click(screen.getAllByRole("checkbox")[0]);
     fireEvent.click(screen.getByRole("button", { name: /合成（1 張/ }));
     await waitFor(() => expect(screen.getByText(/伺服器暫時沒有回應（HTTP 502）/)).toBeTruthy());
@@ -68,7 +68,7 @@ describe("主頁 模特: 模特兒圖 + design → product mockups", () => {
   it("the model buttons list only models that take two references, and the picked one is sent; results enlarge on click", async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true, image: "data:image/jpeg;base64,AA==" })));
     vi.stubGlobal("fetch", fetchMock);
-    render(<ModelMockupPanel designRef={DESIGN} photos={library} onOpenLibrary={() => {}} />);
+    render(<ModelMockupPanel designRef={DESIGN} designName="" photos={library} onOpenLibrary={() => {}} />);
     expect(screen.queryByRole("button", { name: /FLUX/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Imagen/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /^Nano Banana 2（/ }));
@@ -84,7 +84,7 @@ describe("主頁 模特: 模特兒圖 + design → product mockups", () => {
 
   it("an empty library points to 【模特兒印製】", () => {
     const open = vi.fn();
-    render(<ModelMockupPanel designRef={DESIGN} photos={[]} onOpenLibrary={open} />);
+    render(<ModelMockupPanel designRef={DESIGN} designName="" photos={[]} onOpenLibrary={open} />);
     fireEvent.click(screen.getByRole("button", { name: "到【模特兒印製】生成" }));
     expect(open).toHaveBeenCalled();
   });

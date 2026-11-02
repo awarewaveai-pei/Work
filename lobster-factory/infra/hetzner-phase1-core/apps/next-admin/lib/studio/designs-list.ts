@@ -24,7 +24,8 @@ export interface DesignListFilters {
   /** null = staff without ?organizationId → all orgs (see route GET comment). */
   organizationId: string | null;
   mimePrefix: "image/%" | "video/%";
-  group: "design" | "mockup" | null;
+  /** "print" = 設計圖 minus tarot card art: what can go on a product (the mockup picker). */
+  group: "design" | "print" | "mockup" | null;
   model: string | null;
   product: string | null;
   theme: string | null;
@@ -121,10 +122,11 @@ function applyFilters(q: Query, f: DesignListFilters, now: Date, omit?: FacetDim
   // starve mockups out of the publish picker. Unknown ?group values are ignored by the route.
   if (f.group === "mockup") {
     ors.push(MOCKUP_SOURCES.map((s) => `metadata->>source.eq.${s}`).join(","));
-  } else if (f.group === "design") {
-    // NOT any mockup source, INCLUDING null source: jsonb ->> yields NULL for an absent key, which a
+  } else if (f.group === "design" || f.group === "print") {
+    // NOT any excluded source, INCLUDING null source: jsonb ->> yields NULL for an absent key, which a
     // bare neq would drop (three-valued logic), so is.null is OR-ed in explicitly.
-    const negated = MOCKUP_SOURCES.map((s) => `metadata->>source.neq.${s}`).join(",");
+    const excluded = f.group === "print" ? [...MOCKUP_SOURCES, ...TAROT_SOURCES] : MOCKUP_SOURCES;
+    const negated = excluded.map((s) => `metadata->>source.neq.${s}`).join(",");
     ors.push(`metadata->>source.is.null,and(${negated})`);
   }
 

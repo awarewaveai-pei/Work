@@ -1,7 +1,7 @@
 /**
  * Asset tool-group classification — SSOT shared by:
  *   - My Designs gallery tab segregation (DesignsGallery.tsx)
- *   - the /api/tools/designs list filter (?group=design|mockup)
+ *   - the /api/tools/designs list filter (?group=design|print|mockup; print = design minus TAROT_SOURCES)
  *   - the publish wizard's split design / 商品照 pickers (PublishWizard.tsx)
  *
  * Extracted from DesignsGallery.tsx (commit b553d5d4 first added the 設計圖/Mockup tab split

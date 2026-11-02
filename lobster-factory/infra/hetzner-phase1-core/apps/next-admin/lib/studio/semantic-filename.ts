@@ -82,3 +82,28 @@ export function extOf(filename: string | undefined, fallbackExt: string): string
   const dot = filename.lastIndexOf(".");
   return dot > 0 && dot < filename.length - 1 ? filename.slice(dot + 1) : fallbackExt;
 }
+
+/** Extension of a `data:image/...` URL (jpeg → jpg); fallbackExt for anything else. */
+export function extOfDataUrl(url: string, fallbackExt: string): string {
+  const m = /^data:image\/(png|jpe?g|webp);/i.exec(url);
+  if (!m) return fallbackExt;
+  const t = m[1].toLowerCase();
+  return t === "jpeg" ? "jpg" : t;
+}
+
+/**
+ * Semantic name + local-time stamp + 4 random chars, e.g. 商品圖-虎-平拍-white-20261102-153012-a7k2.png.
+ * For results that are not saved yet (no asset id): two downloads of the same setup never overwrite.
+ */
+export function buildUniqueFilename(
+  meta: SemanticFileMeta,
+  ext: string,
+  fallbackBase: string,
+  now: Date = new Date(),
+  rand: () => number = Math.random,
+): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  const stamp = `${now.getFullYear()}${p(now.getMonth() + 1)}${p(now.getDate())}-${p(now.getHours())}${p(now.getMinutes())}${p(now.getSeconds())}`;
+  const tag = Math.floor(rand() * 36 ** 4).toString(36).padStart(4, "0");
+  return `${buildBase(meta) || fallbackBase}-${stamp}-${tag}.${ext}`;
+}

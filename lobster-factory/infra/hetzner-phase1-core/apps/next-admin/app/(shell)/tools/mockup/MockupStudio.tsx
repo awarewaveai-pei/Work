@@ -26,6 +26,7 @@ import {
   type ProductCategory,
   type ReferenceKind,
 } from "@/lib/studio/mockup-prompt";
+import { buildUniqueFilename, extOfDataUrl } from "@/lib/studio/semantic-filename";
 
 
 // 平拍 sends the design as a reference image: a model that takes none would ignore it, and Ideogram Character reads
@@ -52,7 +53,12 @@ interface ProductMockupResult {
 interface DesignAsset {
   id: string;
   object_url: string | null;
-  metadata: { prompt?: string | null } | null;
+  metadata: { prompt?: string | null; subject?: string | null; theme?: string | null } | null;
+}
+
+/** Filename part for the picked design: subject → theme → first words of the prompt. */
+function designLabel(d: DesignAsset): string {
+  return d.metadata?.subject || d.metadata?.theme || (d.metadata?.prompt ?? "").replace(/^\[[^\]]*\]\s*/, "").slice(0, 30);
 }
 
 // Every saved preset row: model photos (模特兒圖, used by the 模特 tab and 【模特兒印製】) and product presets.
@@ -70,6 +76,8 @@ interface GenState {
   status: "idle" | "generating" | "done" | "error";
   image?: string;
   error?: string;
+  /** Download-name parts captured when the image was made: picking another design later must not rename it. */
+  fileMeta?: { subject: string; track: string };
 }
 
 interface SaveMockupState {
@@ -238,6 +246,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
   // design source
   const [designs, setDesigns] = useState<DesignAsset[]>([]);
   const [designRef, setDesignRef] = useState<string | null>(null);
+  const [designName, setDesignName] = useState("");
   const [designThumb, setDesignThumb] = useState<string | null>(null);
   // mode + shared
   const [mode, setMode] = useState<MockupMode | "printful" | "library">("model");
@@ -292,7 +301,8 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
   useEffect(() => {
     void (async () => {
       try {
-        const res = await fetch("/api/tools/designs", { cache: "no-store" });
+        // print = design art only: no mockups, no tarot cards (DB-side filter, lib/studio/designs-list.ts).
+        const res = await fetch("/api/tools/designs?group=print", { cache: "no-store" });
         const json = (await res.json()) as { ok: boolean; assets?: DesignAsset[] };
         if (json.ok) setDesigns((json.assets ?? []).filter((a) => a.object_url));
       } catch { /* unavailable */ }
@@ -360,6 +370,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
     try {
       const dataUrl = await readFileAsDataUrl(files[0]);
       setDesignRef(dataUrl);
+      setDesignName(files[0].name.replace(/\.[^.]+$/, ""));
       setDesignThumb(dataUrl);
     } catch { /* unreadable */ }
   }, []);
@@ -380,11 +391,11 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
       });
       const json = await readJson<{ ok: boolean; image?: string; error?: string }>(res);
       if (!json.ok || !json.image) { setGen({ status: "error", error: json.error ?? `HTTP ${res.status}` }); return; }
-      setGen({ status: "done", image: json.image });
+      setGen({ status: "done", image: json.image, fileMeta: { subject: designName, track: color } });
     } catch (err) {
       setGen({ status: "error", error: err instanceof Error ? err.message : String(err) });
     } finally { inFlight.current = false; }
-  }, [designRef, model, effectivePrompt, aspect, designOpacity]);
+  }, [designRef, designName, color, model, effectivePrompt, aspect, designOpacity]);
 
   const generatePrintful = useCallback(async () => {
     if (!designRef) {
@@ -555,7 +566,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
                     {productPresets.length === 0 && <p style={{ fontSize: 12, opacity: 0.5 }}>尚無產品預設</p>}
                     {productPresets.map((p) => (
-                      <div key={p.id} style={{ position: "relative", cursor: "pointer" }} onClick={() => { if (p.object_url) { setDesignRef(p.object_url); setDesignThumb(p.object_url); } }}>
+                      <div key={p.id} style={{ position: "relative", cursor: "pointer" }} onClick={() => { if (p.object_url) { setDesignRef(p.object_url); setDesignThumb(p.object_url); setDesignName(p.metadata?.preset_name ?? ""); } }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={p.object_url!} alt={p.metadata?.preset_name ?? p.id} style={{ width: 64, height: 80, objectFit: "cover", borderRadius: 4, background: "#111" }} />
                         <div style={{ fontSize: 10, textAlign: "center", maxWidth: 64, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.metadata?.preset_name ?? "預設"}</div>
@@ -579,7 +590,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
               // eslint-disable-next-line @next/next/no-img-element
               <img key={d.id} src={d.object_url!} alt={d.metadata?.prompt ?? d.id}
                 style={{ width: 56, height: 56, objectFit: "contain", background: "#111", ...selectStyle(designRef === d.object_url) }}
-                onClick={() => { setDesignRef(d.object_url); setDesignThumb(d.object_url); }}
+                onClick={() => { setDesignRef(d.object_url); setDesignThumb(d.object_url); setDesignName(designLabel(d)); }}
               />
             ))}
           </div>
@@ -823,7 +834,9 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
                 <button className="btn-primary" disabled={saveState === "saving" || saveState === "saved"} onClick={() => void saveMockup()}>
                   {saveState === "saved" ? "已存入 My Designs ✓" : saveState === "saving" ? "儲存中…" : "存入 My Designs"}
                 </button>
-                <a className="btn-secondary" href={gen.image} download={`mockup-${mode}-${color}.png`}>下載合成圖</a>
+                <a className="btn-secondary" href={gen.image}
+                  onClick={(e) => { e.currentTarget.download = buildUniqueFilename({ product: "商品圖", subject: gen.fileMeta?.subject, style: "平拍", track: gen.fileMeta?.track },extOfDataUrl(gen.image!, "png"), "mockup"); }}
+                  download>下載合成圖</a>
                 <button className="btn-secondary" onClick={() => void generate()}>再合成一張</button>
                 {saveState === "error" && <span style={{ color: "var(--red)", fontSize: 12 }}>儲存失敗</span>}
               </div>
@@ -840,7 +853,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
                   styleAnchor={{ model, mode: "image", stylePrompt: effectivePrompt, subject: `${mode} ${color}`, refs: designRef ? 1 : 0, target: "mockup" }}
                   onEditedImage={(image, meta) => {
                     setModel(meta.model);
-                    setGen({ status: "done", image });
+                    setGen((g) => ({ status: "done", image, fileMeta: g.fileMeta }));
                     setSaveState("idle");
                   }}
                 />
@@ -851,7 +864,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
 
         {/* Hidden, not unmounted: their unsaved results were paid for and survive a tab switch. */}
         <div style={{ display: mode === "model" ? "block" : "none" }}>
-          <ModelMockupPanel designRef={designRef} photos={modelPresets} onOpenLibrary={() => setMode("library")} />
+          <ModelMockupPanel designRef={designRef} designName={designName} photos={modelPresets} onOpenLibrary={() => setMode("library")} />
         </div>
         <div style={{ display: mode === "library" ? "block" : "none" }}>
           <ModelLibraryStudio photos={modelPresets} setPhotos={setModelPresets} />

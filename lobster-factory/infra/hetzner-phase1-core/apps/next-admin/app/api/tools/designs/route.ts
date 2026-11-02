@@ -414,12 +414,12 @@ export async function GET(request: Request) {
   const wantVideo = url.searchParams.get("domain") === "ai_video";
   const mimePrefix = wantVideo ? ("video/%" as const) : ("image/%" as const);
 
-  // Optional source-group filter for the publish picker's split 設計圖 / 商品照 sections and the
-  // My Designs tabs. Applied in the DB (lib/studio/designs-list.ts applyFilters) so each group pages
+  // Optional source-group filter for the publish picker's split 設計圖 / 商品照 sections, the
+  // mockup picker (print = 設計圖 without tarot card art) and the My Designs tabs. Applied in the DB (lib/studio/designs-list.ts applyFilters) so each group pages
   // on its own — the 洗版 bug (60-row cap × 87% tarot left mockups invisible) stays closed.
   // Unknown values are ignored (un-filtered list, backward compatible).
   const groupParam = url.searchParams.get("group");
-  const group = groupParam === "mockup" || groupParam === "design" ? groupParam : null;
+  const group = groupParam === "mockup" || groupParam === "design" || groupParam === "print" ? groupParam : null;
 
   // Paging: ?cursor=<nextCursor from the previous page>; keyset on (created_at, id), no OFFSET.
   const cursorParam = url.searchParams.get("cursor");
