@@ -3,7 +3,7 @@
 寫於 2026-11-02，交接時 HEAD 為 `8c0020691`（影音工作台最後一個 commit）。讀者是接手的 AI。這份檔只是索引，事實的正本在下表各檔；細節不在這裡重述。
 
 **開場句**（貼進新 session 第一句）：
-> 續做 影音工作台卡 P1：先讀 `agency-os/handoffs/2026-11-02-video-workbench-supervisor/HANDOFF.md` 全文，再依其 §1 讀計畫與監工台資料；照 §3 流程用 cc.py SDK 派工。完成＝建專案→編輯→保存→重開→輸出→成品成素材並帶來源。建議模型：Opus 5.5
+> 續做 影音工作台：先讀 `agency-os/handoffs/2026-11-02-video-workbench-supervisor/HANDOFF.md` 全文。第一步照其 §5 重新產生並發布監工台，把新網址給我；第二步問我 P1 要不要開工，同意後照 §3 用 cc.py SDK 派工。P1 完成＝建專案→編輯→保存→重開→輸出→成品成素材並帶來源。建議模型：Opus 5.5
 
 ## 1. 正本（全部在 repo，`VW` = `lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`）
 
@@ -72,8 +72,9 @@
 - 主系統契約檔（`next-admin/lib/content/video/{asset-origin,platform-ratio,delivery-contract,caption-formats,timeline-v1}.ts`）一律直接 `import()`，禁止複製。`bg-remover.ts` 例外（它依賴 gateway），工作台自己呼叫 Replicate，版本由測試核對。
 - 回報操作者一律繁中、短句；給 AI 的檔一律事實密集。
 
-## 5. 讓操作者看到監工台（新帳號）
+## 5. 讓操作者看到監工台（新帳號的第一步，做完才做別的）
 
+0. `cd agency-os/handoffs/2026-11-02-video-workbench-supervisor && node build.mjs && node check.mjs`（check 必須 ok）。
 1. 用 Artifact 工具發布 `agency-os/handoffs/2026-11-02-video-workbench-supervisor/supervisor.html`，會得到新帳號自己的網址。
 2. 把新網址寫進 `data.mjs` 的 `META.url`，跑 `node build.mjs && node check.mjs`，再用同一路徑重發一次，然後 commit。
 3. 之後每次改 `data.mjs` 都重建、重發同一路徑，網址不變。
