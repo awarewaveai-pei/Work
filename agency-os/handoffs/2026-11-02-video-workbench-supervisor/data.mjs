@@ -6,7 +6,7 @@ export const META = {
   updated: '2026-11-02',
   plan: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/creative-suite-plan-20261102.md',
   req: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/handoff/Claude_Code_handoff_20261102.md',
-  worklog: 'agency-os/WORKLOG.md 2026-11-02 續19–續30',
+  worklog: 'agency-os/WORKLOG.md 2026-11-02 續19–續37',
   self: 'agency-os/handoffs/2026-11-02-video-workbench-supervisor/',
   url: 'https://claude.ai/artifact/MCTZ7PAeZdGKRuvDxPquUd',
 };
@@ -28,7 +28,7 @@ export const NOW = [
   { what: '打開 127.0.0.1:4178 看到的是 repo 版。', state: 'yes', ev: '2026-11-02 卡 0：舊資料 5 筆任務、17 個生成檔搬進 repo，角色頁出現「示範角色庫」。' },
   { what: '手機拍的 HEVC MOV 能預覽。', state: 'yes', ev: '2026-11-02 卡 M1：上傳後自動產 H.264 代理檔供預覽，輸出仍用原檔；同一支影片只存一份。' },
   { what: '素材與專案存在伺服器，清瀏覽器資料不會不見。', state: 'yes', ev: '2026-11-02 卡 M2，4178 已重啟：瀏覽器裡的 7 個素材、5 筆任務已搬到伺服器，每個素材都有來源標記；原版在瀏覽器另存備份。' },
-  { what: '剪輯能精確到影格、加減軌道、用多種轉場。', state: 'no', ev: '固定五軌（tools-editor.js:23），時間用小數秒，轉場種類少。卡 M3、P2 做。' },
+  { what: '剪輯能精確到影格、加減軌道、用多種轉場。', state: 'no', ev: '影格精確已完成（卡 M3）；加減軌道與更多轉場在卡 P2。' },
   { what: '輸出 720p 或 1080p 的 H.264 影片，含字幕與混音。', state: 'yes', ev: 'editor-export.cjs:182；比例有 16:9、9:16、1:1、4:5、4:3。' },
   { what: '動畫合成、2D 角色骨架、3D。', state: 'no', ev: '都還沒有。卡 P3、P4、P5 做。' },
 ];
@@ -37,6 +37,7 @@ const todo = (id, plain) => ({ id, plain, status: 'todo' });
 const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 const C0 = '82d19db9e';
 const M1 = 'ca4297f00';
+const M3 = 'b52b2ac04';
 const M2 = '2ab702e3f';
 
 export const STEPS = [
@@ -84,14 +85,15 @@ export const STEPS = [
       done('M2.4', '任務可取消、可重試、重送不重跑；測試。', M2),
     ] },
   { n: 5, code: 'M3', title: '影格時間、輸出檢查、專案格式', plain: '例：29.97 格的手機片剪在第 120 格，存檔重開、輸出都還是第 120 格；輸出若沒聲音會被抓出來。',
-    gate: '裁切重開不偏移；故意靜音的輸出被判不合格；匯出主系統時間軸格式並列出丟失；舊五軌專案轉換列出未支援欄位。', risk: 'Medium', model: '設計 Fable；做 Opus', status: 'not_started', depends: ['M2'],
+    gate: '裁切重開不偏移；故意靜音的輸出被判不合格；匯出主系統時間軸格式並列出丟失；舊五軌專案轉換列出未支援欄位。', risk: 'Medium', model: 'Opus（經 SDK API）', status: 'done', commit: M3, depends: ['M2'],
+    result: '2026-11-02 片段時間改存整數影格，可選 29.97 等影格率；每次輸出自動檢查長度、規格、指定畫面與聲音，沒過就判失敗；可匯出成主系統時間軸格式並列出丟失的欄位。Codex 審出 3 項全修。4178 已重啟到新程式。',
     what: '{num,den}／影格型別；MediaTimelineV1 匯出器；輸出三步驗證 helper；專案外層格式；五軌編輯器改用此契約',
     files: ['VW/backend/editor-export.cjs', 'VW/scripts/tools-editor.js'],
     items: [
-      todo('M3.1', '時間改用影格，不再用小數秒。'),
-      todo('M3.2', '每次輸出自動檢查：長度、影格率、指定畫面、聲音不是靜音。'),
-      todo('M3.3', '專案格式統一，可匯出給主系統，丟失的欄位列出來。'),
-      todo('M3.4', '舊五軌專案轉過來，原版保留；測試。'),
+      done('M3.1', '時間改用影格，不再用小數秒。', M3),
+      done('M3.2', '每次輸出自動檢查：長度、影格率、指定畫面、聲音不是靜音。', M3),
+      done('M3.3', '專案格式統一，可匯出給主系統，丟失的欄位列出來。', M3),
+      done('M3.4', '舊五軌專案轉過來，原版保留；測試。', M3),
     ] },
   { n: 6, code: 'S3a＋S2', title: '去背、同場景多鏡', plain: '例：按「去背」先看到費用，按下後得到透明背景圖進素材庫；同一個場景拍遠、中、近三鏡，重生一鏡不影響另外兩鏡。',
     gate: '去背按鈕顯示成本並記實際成本；去背圖可當參考圖；三鏡引用同一場景素材。', risk: 'Low', model: 'Codex（卡已寫死）', status: 'not_started', depends: ['M2'],
