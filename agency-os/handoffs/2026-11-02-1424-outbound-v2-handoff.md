@@ -5,7 +5,7 @@ hint: "外聯 v2 交接給另一個 Claude 帳號（看不到監工台 artifact�
 source_session_summary: "Outbound OS v2: all code-only cards shipped to prod; remaining = operator steps + REALTEST waiting on real data"
 ---
 
-**續接語**：「續做外聯系統 v2：讀 $WORK_ROOT/agency-os/handoffs/2026-11-02-1424-outbound-v2-handoff.md，從 §5 步驟 1（讀狀態）開始；完成 = data.mjs 剩下的 todo 全部 done。建議模型：Opus 5.5」
+**續接語**：「續做外聯系統 v2：讀 $WORK_ROOT/agency-os/handoffs/2026-11-02-1424-outbound-v2-handoff.md，從 §5 步驟 1（讀狀態並重新發布監工台給操作者）開始；完成 = data.mjs 剩下的 todo 全部 done。建議模型：Opus 5.5」
 
 ### 1. 任務目標
 外聯系統 v2（冷開發信）：研究名單 → 產信 → 核准 → Gmail 草稿／自動寄 → 回信同步 → 追蹤信 → 暖名單進 FluentCRM。目標每天 300 封（SPEC D21）。進度 61/77 項。
@@ -32,7 +32,7 @@ source_session_summary: "Outbound OS v2: all code-only cards shipped to prod; re
 | C9、C16.2 | 要 100 個名單走過研究流程；要寄滿 200 封 |
 
 ### 5. 下一步指令
-1. 讀狀態：`$WORK_ROOT/agency-os/handoffs/2026-10-31-outbound-os/data.mjs`（監工台唯一資料來源；每項 `todo(...)`／`done(...)` 都附 commit）。要看畫面：`node build.mjs` 會產生同目錄的 `supervisor.html`，用瀏覽器開。原本的 artifact（claude.ai DbH1HLUihZwAiBiJZGSD4t）在另一個帳號底下，這邊打不開；要的話用新帳號重新發布 supervisor.html（新網址）。
+1. 讀狀態：`$WORK_ROOT/agency-os/handoffs/2026-10-31-outbound-os/data.mjs`（監工台唯一資料來源；每項 `todo(...)`／`done(...)` 都附 commit）。**開工第一件事：重新發布監工台給操作者看**（操作者要看）：`node build.mjs` → 用 Artifact 工具發布同目錄的 `supervisor.html`（新網址；原本的 claude.ai DbH1HLUihZwAiBiJZGSD4t 在另一個帳號，這邊打不開）→ 把新網址給操作者 → 新網址寫進本檔這一行和記憶 `project_outbound_os_v2_supervisor.md`。之後每次改 data.mjs 都重發布到同一個網址。
 2. 規則與合約：`$WORK_ROOT/agency-os/docs/Outbound_OS_Engineering_Spec/Outbound_OS_Engineering_Spec.md`（I1–I10 不變量、D1–D25 決策）。卡片細節：同目錄 `R0-PLAN.md` §6。
 3. 操作者回報某個前置做好了 → 做對應的 REALTEST，把 data.mjs 該項改成 done（附證據）→ `node check.mjs` → `node build.mjs` → 重新發布 → WORKLOG。
 4. 部署：照 AGENTS.md §0 走 `/check-drift` → 主機 `sg-deploy.sh next-admin`（ssh 指令首行要加 `# CONFIRMED-HIGH-RISK:`）。驗收跑**全套** `npm test`（11-02 只跑子集，部署閘擋了兩次）。
