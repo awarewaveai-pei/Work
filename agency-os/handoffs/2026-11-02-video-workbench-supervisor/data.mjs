@@ -6,7 +6,7 @@ export const META = {
   updated: '2026-11-02',
   plan: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/creative-suite-plan-20261102.md',
   req: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/handoff/Claude_Code_handoff_20261102.md',
-  worklog: 'agency-os/WORKLOG.md 2026-11-02 續19–續27',
+  worklog: 'agency-os/WORKLOG.md 2026-11-02 續19–續30',
   self: 'agency-os/handoffs/2026-11-02-video-workbench-supervisor/',
   url: 'https://claude.ai/artifact/MCTZ7PAeZdGKRuvDxPquUd',
 };
@@ -27,7 +27,7 @@ export const NOW = [
   { what: '程式在 repo 裡改，測試全綠。', state: 'yes', ev: 'apps/video-workbench 的測試全部通過（WORKLOG 11-02）。畫面上已沒有 SeedStar 字樣。' },
   { what: '打開 127.0.0.1:4178 看到的是 repo 版。', state: 'yes', ev: '2026-11-02 卡 0：舊資料 5 筆任務、17 個生成檔搬進 repo，角色頁出現「示範角色庫」。' },
   { what: '手機拍的 HEVC MOV 能預覽。', state: 'yes', ev: '2026-11-02 卡 M1：上傳後自動產 H.264 代理檔供預覽，輸出仍用原檔；同一支影片只存一份。' },
-  { what: '素材與專案存在伺服器，清瀏覽器資料不會不見。', state: 'no', ev: '素材清單存在瀏覽器 localStorage（shared/adapters.js:9）。卡 M2 做。' },
+  { what: '素材與專案存在伺服器，清瀏覽器資料不會不見。', state: 'no', ev: '程式已完成（卡 M2）；4178 重啟後才生效。' },
   { what: '剪輯能精確到影格、加減軌道、用多種轉場。', state: 'no', ev: '固定五軌（tools-editor.js:23），時間用小數秒，轉場種類少。卡 M3、P2 做。' },
   { what: '輸出 720p 或 1080p 的 H.264 影片，含字幕與混音。', state: 'yes', ev: 'editor-export.cjs:182；比例有 16:9、9:16、1:1、4:5、4:3。' },
   { what: '動畫合成、2D 角色骨架、3D。', state: 'no', ev: '都還沒有。卡 P3、P4、P5 做。' },
@@ -37,6 +37,7 @@ const todo = (id, plain) => ({ id, plain, status: 'todo' });
 const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 const C0 = '82d19db9e';
 const M1 = 'ca4297f00';
+const M2 = '2ab702e3f';
 
 export const STEPS = [
   { n: 1, code: '0', title: '切 4178 到 repo', plain: '例：打開 127.0.0.1:4178，角色頁出現「示範角色庫」，代表跑的是 repo 版；舊資料一筆不少。',
@@ -72,14 +73,15 @@ export const STEPS = [
       todo('P0.4', '寫能力表與路線判定。'),
     ] },
   { n: 4, code: 'M2', title: '素材與專案存到伺服器', plain: '例：清掉瀏覽器資料，素材庫和專案還在；每個素材都記得從哪來（上傳、AI 生成、輸出）。',
-    gate: '每筆素材有來源紀錄；清 localStorage 後清單完整；同一任務重送不重跑；取消中的任務狀態正確。', risk: 'Medium', model: 'Opus', status: 'not_started', depends: ['M1'],
+    gate: '每筆素材有來源紀錄；清 localStorage 後清單完整；同一任務重送不重跑；取消中的任務狀態正確。', risk: 'Medium', model: 'Opus（經 SDK API）', status: 'done', commit: M2, depends: ['M1'],
+    result: '2026-11-02 素材、專案、任務改存伺服器；兩分頁同時改時後存的那頁自動重新整理成最新資料；素材記來源；重送不重複付費。Codex 審出 6 項，5 項已修、1 項不成立。4178 重啟後生效，首次打開會把瀏覽器裡的資料搬到伺服器，原版另存備份。',
     what: '帳冊搬 .data；AssetOrigin＋擴充；舊 localStorage 遷移（保留原版）；backup.export／import 走伺服器；任務冪等鍵、取消、重試',
     files: ['VW/shared/adapters.js', 'VW/shared/runtime.js', 'VW/backend/api.cjs'],
     items: [
-      todo('M2.1', '素材、專案、任務清單改存伺服器；瀏覽器只當快取。'),
-      todo('M2.2', '每個素材記下來源、模型、成本，格式跟主系統一樣。'),
-      todo('M2.3', '舊資料搬過來，原版保留。'),
-      todo('M2.4', '任務可取消、可重試、重送不重跑；測試。'),
+      done('M2.1', '素材、專案、任務清單改存伺服器；瀏覽器只當快取。', M2),
+      done('M2.2', '每個素材記下來源、模型、成本，格式跟主系統一樣。', M2),
+      done('M2.3', '舊資料搬過來，原版保留。', M2),
+      done('M2.4', '任務可取消、可重試、重送不重跑；測試。', M2),
     ] },
   { n: 5, code: 'M3', title: '影格時間、輸出檢查、專案格式', plain: '例：29.97 格的手機片剪在第 120 格，存檔重開、輸出都還是第 120 格；輸出若沒聲音會被抓出來。',
     gate: '裁切重開不偏移；故意靜音的輸出被判不合格；匯出主系統時間軸格式並列出丟失；舊五軌專案轉換列出未支援欄位。', risk: 'Medium', model: '設計 Fable；做 Opus', status: 'not_started', depends: ['M2'],
