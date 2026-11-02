@@ -6,6 +6,8 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { findSuppressed } from "@/lib/outreach/suppression";
 import { upsertContact } from "@/lib/crm/fluentcrm";
 import { listBridgeClients } from "@/lib/payments/woo";
+import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
+import { blockedChangeResponse } from "@/lib/system-modes/blocked-change";
 
 // Cold Outreach -- a warm lead goes into FluentCRM (SPEC §5.8, D16, card C6.3). POST {leadId}. A lead is eligible when it
 // has said yes (consent_status replied / opted_in / form_submitted / customer) and no marketing or all-scope suppression
@@ -59,11 +61,16 @@ export async function POST(req: Request): Promise<Response> {
   const client = listBridgeClients().find((c) => { const h = hostOf(c.baseUrl); return !!h && hosts.has(h); });
   if (!client) return NextResponse.json({ ok: false, error: "no_bridge" }, { status: 422 });
 
+  // A write into a client's WordPress: the system-mode gate first, like every WP-Bridge write path
+  // (lib/system-modes/__tests__/production-change-coverage.test.ts).
+  const gate = await checkProductionChangeAllowed(main, lead.organization_id);
+  if (!gate.allowed) return blockedChangeResponse(gate.mode);
+
   const now = new Date().toISOString();
   // first_name is the person, not the company (Codex C6 F4)
   const res = await upsertContact({ email, first_name: (lead.contact_name ?? lead.name) ?? undefined, tags: ["outreach-warm"] }, { clientId: client.id });
   // The system-mode gate refused the write: nothing reached FluentCRM, the lead is not "failed" (Codex C6 F3).
-  if (res.ok === false && res.blockedMode) return NextResponse.json({ ok: false, error: res.error, mode: res.blockedMode }, { status: 423 });
+  if (res.ok === false && res.blockedMode) return blockedChangeResponse(res.blockedMode);
   if (!res.ok || res.value.status !== "committed" || res.value.contact_id == null) {
     const why = "error" in res ? res.error : res.value.reason ?? res.value.status;
     await supabase.from("co_leads").update({ fluentcrm_sync_status: "failed", updated_at: now }).eq("id", lead.id);

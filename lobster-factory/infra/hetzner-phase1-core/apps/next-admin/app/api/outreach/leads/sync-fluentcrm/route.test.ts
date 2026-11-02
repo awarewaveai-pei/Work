@@ -34,6 +34,7 @@ vi.mock("@/lib/outreach/suppression", () => ({
   findSuppressed: async (_db: unknown, _org: unknown, leads: unknown[], appliesTo: unknown) => { s.suppressionAsked.push(appliesTo); return leads.map(() => s.suppressed); },
 }));
 vi.mock("@/lib/payments/woo", () => ({ listBridgeClients: () => s.bridges, bridgePost: vi.fn(), isBridgeConfigured: () => true }));
+vi.mock("@/lib/system-modes/production-change-gate", () => ({ checkProductionChangeAllowed: async () => ({ allowed: true, mode: "normal" }) }));
 vi.mock("@/lib/crm/fluentcrm", () => ({
   upsertContact: async (spec: unknown, opts: unknown) => { s.upserts.push([spec, opts]); return { ok: true, value: { status: "committed", contact_id: 77 } }; },
 }));

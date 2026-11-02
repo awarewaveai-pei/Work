@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-02（續36）部署閘擋下 C6：sync-fluentcrm 沒過系統模式閘 → 補 `checkProductionChangeAllowed`；423 改用共用契約
+
+**根因**：`NA/app/api/outreach/leads/sync-fluentcrm/route.ts`（f57fd3512）經 WP-Bridge 寫客戶站，沒呼叫 `checkProductionChangeAllowed` → `lib/system-modes/__tests__/production-change-coverage.test.ts` 紅；另手寫 423 → `blocked-change.test.ts`「no route hand-writes a 423」紅。主機 sg-deploy npm test 閘中止（05:02:52Z，正式站留 6c9f2a8c8）。驗收時只跑了 outreach／crm 子集。
+
+**做了**：route 在寫入前 `checkProductionChangeAllowed(main, org)` → 擋下回 `blockedChangeResponse`；bridge 回 `blockedMode` 也走 `blockedChangeResponse`。測試 mock 該閘。不加 ALLOWLIST。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（全套）→ 只剩 seedstar 2 紅＋`production-change-coverage` 指 `lib/outreach/warm-leads.ts`（C14 worker 進行中、未 commit）；sync-fluentcrm 10 passed；npx tsc --noEmit exit 0 | exit=0 | ms=120000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（照 app/api/build/runs/route.ts:462-465 同一寫法）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=checkProductionChangeAllowed | hits=252
+
+**避免再發生**：驗收 cc.py 產出時跑**全套** vitest，不只卡片子集（registry-code、production-change-coverage、blocked-change 都是全域規則測試）。寫進交接筆記。
+
+**rollback**：revert 本 commit 與 f57fd3512。
 ## 2026-11-02（續35）外聯 v2 C6 暖名單進 FluentCRM（程式完成；wp-bridge 0.21.0 未發版、客戶站未更新）
 
 **做了**（cc.py SDK 派工 session 6b6a0d75，US$0.80；主 session 驗收＋修 Codex 3 項）：
