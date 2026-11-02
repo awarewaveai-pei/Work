@@ -6,7 +6,7 @@ export const META = {
   updated: '2026-11-02',
   plan: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/creative-suite-plan-20261102.md',
   req: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/handoff/Claude_Code_handoff_20261102.md',
-  worklog: 'agency-os/WORKLOG.md 2026-11-02 續19–續23',
+  worklog: 'agency-os/WORKLOG.md 2026-11-02 續19–續25',
   self: 'agency-os/handoffs/2026-11-02-video-workbench-supervisor/',
   url: 'https://claude.ai/artifact/MCTZ7PAeZdGKRuvDxPquUd',
 };
@@ -25,7 +25,7 @@ export const COPY = {
 // 現在真的能不能用（2026-11-02 查，出處見計畫 §1）
 export const NOW = [
   { what: '程式在 repo 裡改，測試全綠。', state: 'yes', ev: 'apps/video-workbench 的測試全部通過（WORKLOG 11-02）。畫面上已沒有 SeedStar 字樣。' },
-  { what: '打開 127.0.0.1:4178 看到的是 repo 版。', state: 'no', ev: '4178 還在跑 Downloads 裡的舊副本；卡 0 才切過來。' },
+  { what: '打開 127.0.0.1:4178 看到的是 repo 版。', state: 'yes', ev: '2026-11-02 卡 0：舊資料 5 筆任務、17 個生成檔搬進 repo，角色頁出現「示範角色庫」。' },
   { what: '手機拍的 HEVC MOV 能預覽。', state: 'no', ev: '沒有代理檔，瀏覽器解不出來（follow-quality-20261102.md:29）。卡 M1 做。' },
   { what: '素材與專案存在伺服器，清瀏覽器資料不會不見。', state: 'no', ev: '素材清單存在瀏覽器 localStorage（shared/adapters.js:9）。卡 M2 做。' },
   { what: '剪輯能精確到影格、加減軌道、用多種轉場。', state: 'no', ev: '固定五軌（tools-editor.js:23），時間用小數秒，轉場種類少。卡 M3、P2 做。' },
@@ -34,17 +34,20 @@ export const NOW = [
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
+const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
+const C0 = '82d19db9e';
 
 export const STEPS = [
   { n: 1, code: '0', title: '切 4178 到 repo', plain: '例：打開 127.0.0.1:4178，角色頁出現「示範角色庫」，代表跑的是 repo 版；舊資料一筆不少。',
-    gate: '4178 出現「示範角色庫」；任務筆數不少；素材庫、分鏡頁正常；啟動測試通過。', risk: 'Low', model: 'Opus（經 SDK API）', status: 'not_started', depends: [],
+    gate: '4178 出現「示範角色庫」；任務筆數不少；素材庫、分鏡頁正常；啟動測試通過。', risk: 'Low', model: 'Opus（經 SDK API）', status: 'done', commit: C0, depends: [],
+    result: '2026-11-02 取 20261102 完整最新版的 5 筆任務與生成檔，加另一份副本獨有的 2 支 mp4，共 17 檔（sha256 比對無衝突）；Downloads 四份原封保留。4178 由 repo 版提供，示範角色庫出現，啟動測試通過。',
     what: '確認埠持有程序與 jobs.json 無進行中任務 → 比對 Downloads 與 repo 的 .data → 較新者進 repo .data → 停舊、start.cmd 起新；列出只在本機的檔；Downloads 副本保留為復原',
     files: ['VW/start.cmd', 'VW/.data/', 'VW/tests/startup.cjs'],
     items: [
-      todo('0.1', '確認 4178 由哪個程式佔用、有沒有進行中的生成任務。'),
-      todo('0.2', '比對舊副本與 repo 的資料，較新的那份放進 repo。'),
-      todo('0.3', '停掉舊的、從 repo 啟動；列出只存在本機、不在 git 的檔與備份去處。'),
-      todo('0.4', '驗收：示範角色庫出現、任務筆數不少、啟動測試通過。'),
+      done('0.1', '確認 4178 由哪個程式佔用、有沒有進行中的生成任務。', C0),
+      done('0.2', '比對舊副本與 repo 的資料，較新的那份放進 repo。', C0),
+      done('0.3', '停掉舊的、從 repo 啟動；列出只存在本機、不在 git 的檔與備份去處。', C0),
+      done('0.4', '驗收：示範角色庫出現、任務筆數不少、啟動測試通過。', C0),
     ] },
   { n: 2, code: 'M1', title: '媒體存放、探測、代理檔', plain: '例：把手機拍的 HEVC 影片拖進來，馬上能預覽；同一支影片上傳兩次，硬碟只存一份。',
     gate: '同一檔上傳兩次只存一份；HEVC MOV 匯入後可預覽、輸出用原檔；探測結果有影格率與色彩資訊；既有測試全綠。', risk: 'Medium', model: '設計 Fable；做 Opus', status: 'not_started', depends: ['0'],
