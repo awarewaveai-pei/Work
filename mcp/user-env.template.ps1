@@ -72,6 +72,10 @@ $vars = @{
     POSTHOG_PERSONAL_API_KEY     = ""
     POSTHOG_API_BASE_URL         = "https://app.posthog.com/api"
     OPENAI_API_KEY               = "sk-..."
+
+    # Remotion render service (self-hosted on ks-aw-01) — video workbench title templates
+    REMOTION_SERVICE_URL         = "https://remotion-svc.aware-wave.com"
+    MEDIA_RENDER_AUTH_TOKEN      = ""
     XAI_API_KEY                  = "xai-..."
     GROK_MODEL                   = "grok-4.20-reasoning"
     ANTHROPIC_API_KEY            = "sk-ant-..."
