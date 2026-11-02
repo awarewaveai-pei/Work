@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-02（續24）影音工作台監工台上線：12 張卡、41 項工作，綁計畫 §4
+
+**操作者**：「先做監工台，做完從開始卡 0，卡 0 用 SDK API 做」。
+
+**做了**：`agency-os/handoffs/2026-11-02-video-workbench-supervisor/`（data.mjs → build.mjs → check.mjs，共用 `scripts/supervisor-kit/`，同外聯 v2 模式）。網址 https://claude.ai/artifact/MCTZ7PAeZdGKRuvDxPquUd。狀態只在 data.mjs；check.mjs 綁計畫 `creative-suite-plan-20261102.md` §4 表格第一欄卡號（順序一致），並擋計畫寫狀態（只認狀態標記，避免卡 0「無進行中任務」誤判）。待決兩項：P0 要不要做（11-01 說過先不要，否決→路線 C）；P6 部署 High 需同意。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=node check.mjs | exit=0 | ms=300
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（突變：計畫 M2→M9，check 紅並列出差異，還原後綠、計畫 diff 為空；頁面 get_page_text 讀回 12 卡、41 項、現況 7 列）
+- BUGHUNT_WAIVED: NA -- 新資料夾，無既有 symbol 改動；共用 kit 未改
 ## 2026-11-02（續23）next-admin 部署 050a1041e（外聯 C8 自動寄＋C7 成效頁上線）；監工台更新
 
 **做了**：`check-deploy-drift.ps1`（落後 9、compose 無漂移、無 DEPLOY_HOLD；next-admin 外只有 video-workbench 與文件）→ 主機 `sudo sg-deploy.sh next-admin`（ubuntu＋sudo；root 登入被拒）→ `.deployed-commit` c5071e997 → 050a1041e。監工台 `data.mjs`：C8.1–C8.4、C8.6、C7.1–C7.2 done（050a1041e），C8.5／C7.3 剩真寄與種資料；現況兩條改寫；`node build.mjs && node check.mjs` → 42/77 done；重新發布 https://claude.ai/artifact/DbH1HLUihZwAiBiJZGSD4t（v21）。
