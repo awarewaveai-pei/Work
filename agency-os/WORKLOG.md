@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-02（續45）影音工作台卡 P0：EffectCraft Web 0.20.0 閘門不過，定案路線 C（3859d8c69）
+
+- ③ 不能載入使用者字型（上游 web.md:68），繁中 NO GLYPH（證據 docs/p0-evidence/1,2,4）→ 合成類硬閘不過 → C。① WebGPU 54 s device lost（GPU 重設使操作者 Edge 當掉，主 session 停掉工人改 headless＋停用 WebGPU 續跑）、WebGL2 0.47× 即時；⑤ 焦點出不了 iframe；② 重開後素材離線；④ 過。計畫 §0 記路線 C 與重評條件。
+- 重評工具保留（未入 postinstall）：VERSION.json、vendor-effectcraft.cjs、server.cjs 標頭、effectcraft-serve.cjs。
+- 操作者同意後釋放已停工人 e3ccad7d 對 server.cjs 的 file-claim。
+- SDK：被停那次約 US$1.6＋新工人 US$2.88。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/effectcraft-serve.cjs; node -e createServer GET /engines/effectcraft/%2e%2e%2f%2e%2e%2findex.html（無 COOP） | exit=0 | ms=3000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n（Codex gpt-6-sol，artifact agency-os/reports/oracle/2026-11-02-partialreview-8fd1fb39.md；已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=vendor-effectcraft | hits=5
 ## 2026-11-02（續44）外聯 v2 本輪收尾：C6.4 不測（aware-wave.com bridge 不接回）；監工台 61/77
 
 - 操作者選「先不接」：不把 aware-wave.com 接回 app 的 bridge（維持 10-30 切斷），C6.4 等決定接回時再測（經 session local_6aa73d12 轉達）。
