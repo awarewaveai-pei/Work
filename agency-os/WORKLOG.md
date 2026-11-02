@@ -1,4 +1,22 @@
 # Worklog
+## 2026-11-02（續29）外聯 v2 C15 量產管線（程式完成；種 20 名單跑 3 tick 的 REALTEST 未跑）
+
+**做了**（cc.py SDK 派工 session 563c8843，US$1.80；主 session 驗收＋決定＋修 Codex 4 項；NA = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）：
+- C15.1 `NA/lib/outreach/pipeline.ts` `runPipelineTick`＋`pipeline-store.ts`：gmail-sync tick 內、send-adapter 前；只處理有 auto 信箱的 org（`runForOrg`）；① 研究 ② 產信 ③ sampled 政策（每名單一版、事實核對）③b 追蹤信隨首封自動核准 ④ 首封建 Gmail 草稿 ⑤ 到期追蹤信建草稿（④⑤ 只給 `inPool` 信箱）；每步每 tick ≤ 20。
+- 重構：產信與建草稿從兩條 route 原樣搬到 `NA/lib/outreach/generate.ts`、`draft.ts`，route 變薄殼，原測試全綠。
+- C15.2 佇列頁 `NA/app/(shell)/tools/outreach/review/QueueClient.tsx`＋`NA/app/api/outreach/review-queue/route.ts`（a 核准／r 退回／j 下一筆）。
+- C15.3 每 org 每日研究、產信各 ≤ 池信箱今日上限和 × 1.5（以當日 `research_started` 與 A 版首封計數）。
+- 決定（主 session）：sampled 模式下，首封被自動核准（產信時或 ③）→ 同名單 gate pass 的追蹤信一起核准；warn／block 留給人。SPEC 未定，否則 sampled 永遠沒人核准追蹤信。
+- Codex `agency-os/reports/oracle/2026-11-02-partialreview-1c58093f.md` 4 項皆修：F1 追蹤信核准改獨立步驟 ③b（涵蓋產信時已核准的首封）；F2 研究失敗 7 天後重試（原本永久略過）；F3 名單掃描起始頁隨 tick 輪轉（原本只看最早 1,000 筆）；F4 停用中的信箱不建草稿（`inPool`）。
+- MODULE_MANIFEST、Foundry catalog 同步。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/outreach/__tests__/ app/api/outreach/ app/api/internal/outreach/ → 29 files / 241 passed（pipeline-tick 10）；npx tsc --noEmit exit 0 | exit=0 | ms=6000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n（Codex partialreview-1c58093f，4 項已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=generateForLead | hits=5
+- 未驗：C15.4 REALTEST（種 20 名單、sampled、3 tick）需 auto 信箱；正式站目前無 auto 信箱，管線 `organizations()` 為空＝不動作。
+
+**rollback**：revert 本 commit；管線只在有 `send_mode='auto'` 信箱的 org 執行，關掉自動寄出即停。
 ## 2026-11-02（續28）外聯 v2 C5 追蹤信與人工步驟（程式完成；C5.5 Gmail 原串 REALTEST 未跑）
 
 **做了**（cc.py SDK 派工 session bbeb17f0，US$1.24；主 session 驗收＋修 Codex 2 項；NA = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）：

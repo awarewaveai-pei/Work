@@ -3,7 +3,8 @@
 // Rung every 10 minutes by the host cron (scripts/poke.sh outreach_gmail_sync, cron.d/awarewave-schedules). Logic in
 // lib/outreach/gmail-sync.ts; this file wires the main database, each connector's vault token, the outreach.classify
 // grant (billed to the lead's organization, else the internal account) and the operator Telegram into it. After the
-// sync (reconciliation first), the automatic send of the sender pool (lib/outreach/send-adapter.ts, card C8.4) with
+// sync (reconciliation first), the pipeline tick (lib/outreach/pipeline.ts, card C15: research, write, review policy,
+// Gmail drafts, follow-up drafts -- never sends), then the automatic send of the sender pool (lib/outreach/send-adapter.ts, card C8.4) with
 // the paid verifier under the outreach.verify grant (lib/outreach/mailbox-verify.ts).
 // Answers 502 ok:false when a mailbox could not be read (an expired grant, Gmail down): /ops/schedules turns red.
 import { NextResponse } from "next/server";
@@ -16,6 +17,8 @@ import { EntitlementRequired } from "@/lib/entitlements/can";
 import { refreshAccessToken } from "@/lib/outreach/google-oauth";
 import { gmailApi } from "@/lib/outreach/gmail-api";
 import { classifyReply, runGmailSync, supabaseSyncStore } from "@/lib/outreach/gmail-sync";
+import { pipelineDeps } from "@/lib/outreach/pipeline-store";
+import { runPipelineTick } from "@/lib/outreach/pipeline";
 import { runAutoSend, supabaseSendStore, type SendLead } from "@/lib/outreach/send-adapter";
 import { verifierKey, verifyMailbox, VerifyPending, type VerifierKey } from "@/lib/outreach/mailbox-verify";
 
@@ -26,6 +29,8 @@ export const dynamic = "force-dynamic";
 // gets the first part; the automatic send (up to 120 s of jitter per mailbox, mailboxes in parallel) the rest.
 const SYNC_BUDGET_MS = 150_000;
 const BUDGET_MS = 270_000;
+// The pipeline tick may start new leads until here; the automatic send keeps the rest of the round.
+const PIPELINE_BUDGET_MS = 200_000;
 const ACTOR = "schedule:outreach_gmail_sync";
 
 function verifyToken(request: Request): boolean {
@@ -69,6 +74,8 @@ async function syncOnce(): Promise<Response> {
     deadline: started + SYNC_BUDGET_MS,
   });
 
+  const pipeline = await runPipelineTick(pipelineDeps(sb, started + PIPELINE_BUDGET_MS));
+
   // One verifier key lookup per organization per tick; a verification still running (Hunter 202) is asked next tick.
   const keys = new Map<string, Promise<VerifierKey | null>>();
   const keyFor = (org: string | null) => { const k = org ?? ""; if (!keys.has(k)) keys.set(k, verifierKey(sb, org)); return keys.get(k)!; };
@@ -92,6 +99,6 @@ async function syncOnce(): Promise<Response> {
     notify: async (text) => { if (telegram) await telegram.sendText(text); },
     deadline: started + BUDGET_MS,
   });
-  const errors = [...result.errors, ...sending.errors];
-  return NextResponse.json({ ok: errors.length === 0, ...result, errors, send: { ...sending, errors: undefined } }, { status: errors.length ? 502 : 200 });
+  const errors = [...result.errors, ...pipeline.errors, ...sending.errors];
+  return NextResponse.json({ ok: errors.length === 0, ...result, errors, pipeline: { ...pipeline, errors: undefined }, send: { ...sending, errors: undefined } }, { status: errors.length ? 502 : 200 });
 }
