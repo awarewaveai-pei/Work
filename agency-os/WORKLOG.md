@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-02（續20）影音工作台：3D 全文納入範圍；`D:\Video`／Downloads 副本退場，只在 repo 改
+
+**操作者**：「D:\Video 已經不用啦，要用 apps/video-workbench」；「都要 3D」（針對 handoff §4.5／§5.1／§10 仍寫不做 3D）。
+
+**做了**：
+- `handoff/Claude_Code_handoff_20261102.md`：頂部加「位置與範圔更新」告示（所有 `D:\Video\SeedStar-app\…` 路徑 = 本資料夾；3D 要做）；§4.5、§5.1、§8 P4、§10、§11 五句「不做／延後 3D」改為指向計畫卡 P5。保留 §1 原始需求引言「先不用3D」與該檔自己的舊 REVIEW 行作歷史。
+- `docs/creative-suite-plan-20261102.md`：卡 0 只比對 Downloads（現跑）與 repo 兩份 `.data`；`D:\Video` 不再是備份角色；§0 註記 handoff 內文已同步。
+- `README.md`：新機擷取圖從舊機 `apps/video-workbench/assets/` 複製；D:\Video 已退場。
+
+**驗證**：
+- REALTEST_WAIVED: DOC_ONLY -- 三份文件文字；python 逐句 assert count==1 後替換（12 處）
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（grep 不做 3D／不先引入 3D／不預先導入 Blender／3D 延後 → 只剩兩行刻意保留的歷史）
+- BUGHUNT_WAIVED: DOC_ONLY -- 無程式符號改動；D:\Video 字串其餘出現處皆為 handoff §3.1／§11 當日紀錄，由頂部告示統一覆蓋
 ## 2026-11-02（續19）影音工作台總計畫定稿：handoff 入 repo、跟拍修正搬入、舊規劃＋四張場景卡＋handoff 收成一份卡片順序（卡 0 → P0 → S3a/S2 → P1 → P2 → P3 → P4 → P5(3D) → P6）
 
 **操作者**：「檢視整個 plan，加上 handoff/Claude_Code_handoff_20261102.md，做最完美的計畫和安排」。
