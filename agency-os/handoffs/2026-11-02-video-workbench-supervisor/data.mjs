@@ -26,7 +26,7 @@ export const COPY = {
 export const NOW = [
   { what: '程式在 repo 裡改，測試全綠。', state: 'yes', ev: 'apps/video-workbench 的測試全部通過（WORKLOG 11-02）。畫面上已沒有 SeedStar 字樣。' },
   { what: '打開 127.0.0.1:4178 看到的是 repo 版。', state: 'yes', ev: '2026-11-02 卡 0：舊資料 5 筆任務、17 個生成檔搬進 repo，角色頁出現「示範角色庫」。' },
-  { what: '手機拍的 HEVC MOV 能預覽。', state: 'yes', ev: '2026-11-02 卡 M1：上傳後自動產 H.264 代理檔供預覽，輸出仍用原檔；同一支影片只存一份。4178 重啟後生效。' },
+  { what: '手機拍的 HEVC MOV 能預覽。', state: 'yes', ev: '2026-11-02 卡 M1：上傳後自動產 H.264 代理檔供預覽，輸出仍用原檔；同一支影片只存一份。' },
   { what: '素材與專案存在伺服器，清瀏覽器資料不會不見。', state: 'no', ev: '素材清單存在瀏覽器 localStorage（shared/adapters.js:9）。卡 M2 做。' },
   { what: '剪輯能精確到影格、加減軌道、用多種轉場。', state: 'no', ev: '固定五軌（tools-editor.js:23），時間用小數秒，轉場種類少。卡 M3、P2 做。' },
   { what: '輸出 720p 或 1080p 的 H.264 影片，含字幕與混音。', state: 'yes', ev: 'editor-export.cjs:182；比例有 16:9、9:16、1:1、4:5、4:3。' },
@@ -52,7 +52,7 @@ export const STEPS = [
     ] },
   { n: 2, code: 'M1', title: '媒體存放、探測、代理檔', plain: '例：把手機拍的 HEVC 影片拖進來，馬上能預覽；同一支影片上傳兩次，硬碟只存一份。',
     gate: '同一檔上傳兩次只存一份；HEVC MOV 匯入後可預覽、輸出用原檔；探測結果有影格率與色彩資訊；既有測試全綠。', risk: 'Medium', model: 'Opus（經 SDK API）', status: 'done', commit: M1, depends: ['0'],
-    result: '2026-11-02 SDK 工人實作、主 session 審查；Codex 審出 2 項（H.264 MOV 沒產代理、影格率不固定的輸出沒被抓到）已修並加測試。34 個測試檔全綠，HEVC 代理在 Edge 實際播放。4178 需重啟才用到新程式。',
+    result: '2026-11-02 SDK 工人實作、主 session 審查；Codex 審出 2 項（H.264 MOV 沒產代理、影格率不固定的輸出沒被抓到）已修並加測試。34 個測試檔全綠，HEVC 代理在 Edge 實際播放。4178 已重啟，實測上傳 HEVC MOV 回傳代理檔。',
     what: '釘版 ffprobe＋checksum；media-inspect.cjs 換 ffprobe JSON；新增 media-store.cjs（uuid＋sha256、目錄、代理、縮圖、波形）；ffprobe 輸出核對 helper',
     files: ['VW/backend/media-inspect.cjs', 'VW/backend/media-store.cjs', 'VW/start.cmd'],
     items: [
