@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-02（續16）影音工作台規劃加「先擺場景再生成」四張候選卡 S1–S4（借 ArtCraft 流程，不用其程式／雲端／中國模型）
+
+**操作者**：貼上四項建議（人偶擺姿勢換角色、同場景多鏡、去背 2D 拼貼、圖片轉 3D），「寫入 plan」。
+
+**做了**：`apps/video-workbench/docs/creative-suite-plan-20261102.md` 新增一節（在「範圍與節省反覆工作的方式」之前）：每卡含做什麼／怎麼做／驗收／限制／建議模型；順序 S3 → S2 → S1 → S4；參考加 ArtCraft 連結。
+
+**更正前一輪說法**：「我們已經有去背和畫布」只在主系統成立——AI 去背 `next-admin/lib/studio/bg-remover.ts:35`、fabric 畫布 `next-admin/app/(shell)/tools/canvas/CanvasEditor.tsx`；工作台只有去白底（`scripts/tools-overlays.js:30` 寫明 AI 去背未接）、無拼貼畫布。規劃照實寫。3D（Meshy／Rodin）兩邊都沒有，供應商 API／價格／授權列為 S4 第一步確認。
+
+**驗證**：
+- REALTEST_WAIVED: DOC_ONLY -- 只改規劃文件
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（讀回新節；引用的 6 個路徑 ls 確認存在）
+- BUGHUNT_WAIVED: DOC_ONLY -- 新增規劃段落，無既有符號改動
 ## 2026-11-02（續15）影音工作台 6 個壞測試修好：測試改連自己的臨時伺服器＋自有測試圖；順帶修 2 個真 bug（503 誤報「可能已送出」、還原草稿重複技能文字）
 
 **操作者**：「需要修就修」（前一輪 32 個測試 6 個失敗，改動前就壞）。
