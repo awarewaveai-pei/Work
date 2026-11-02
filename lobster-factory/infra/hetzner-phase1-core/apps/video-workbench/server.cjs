@@ -32,6 +32,7 @@ function createServer({
     dataDir,
     env,
     fetchImpl,
+    appDir: awareWaveDir,
   });
   const server = http.createServer(async (req, res) => {
     let file;

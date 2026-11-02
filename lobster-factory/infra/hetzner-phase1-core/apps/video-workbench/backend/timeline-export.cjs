@@ -5,7 +5,8 @@ const path = require("node:path"),
   { pathToFileURL } = require("node:url"),
   Timebase = require("../shared/timebase.js"),
   ProjectEnvelope = require("../shared/project-envelope.js");
-const contractFile = path.join(__dirname, "../../next-admin/lib/content/video/timeline-v1.ts");
+// Resolved like every main-system file (awarewave-source.json), so a release package finds its bundled copy.
+const contractFile = path.join(require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env), "lib/content/video/timeline-v1.ts");
 let contract = null;
 const loadContract = () => (contract ||= import(pathToFileURL(contractFile).href));
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

@@ -61,7 +61,7 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "seedstar-editor-"));
     await page.getByLabel("影片比例").selectOption("4:5");
     await page.getByRole("button", { name: "建立專案", exact: true }).click();
     await page.waitForSelector("[data-ed-stage]");
-    assert.equal(await page.locator("[data-ed-pane]").count(), 8);
+    assert.equal(await page.locator("[data-ed-pane]").count(), 9);
     assert.equal(await page.locator("[data-ed-lane]").count(), 5);
     await page.evaluate(async (asset) => edAdd(asset), {
       id: "fixture",

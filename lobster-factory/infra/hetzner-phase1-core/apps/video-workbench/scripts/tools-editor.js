@@ -12,6 +12,8 @@ const ed = {
   undo: [],
   redo: [],
   queue: Promise.resolve(),
+  // 片頭 pane (card P1): chosen template, its text fields, background image, last job and the library images.
+  title: { templateId: null, fields: {}, image: null, jobId: null, images: null, done: null },
 };
 const edRatios = {
     "16:9": [1920, 1080],
@@ -70,6 +72,10 @@ function edNormalizeProject(raw) {
   const { native: project, revision } = ProjectEnvelope.unwrap(raw),
     timebase = Timebase.find(project.timebase) ? Timebase.check(project.timebase) : { ...Timebase.DEFAULT },
     p = { ...project, timebase, revision };
+  // Every track the screen draws must exist: pre-M3 and restored projects may carry tracks: {} (or none).
+  p.assets ||= [];
+  p.markers ||= [];
+  p.tracks = Object.fromEntries(edTracks.map((id) => [id, { volume: 1, ...(project.tracks?.[id] || {}) }]));
   p.clips = (project.clips || []).map(clip => {
     const positioned = clip.track === 'V2' || clip.kind === 'text';
     const defaults = { speed: 1, volume: 1, fadeIn: 0, fadeOut: 0, opacity: 1, scale: 1, x: positioned ? clip.track === 'V2' ? 80 : 50 : 0, y: positioned ? 80 : 0, rotation: 0, width: 25, fontSize: 36 };
@@ -173,6 +179,7 @@ function toolEditorScreen(t) {
     pane = `<h3>素材</h3>${edButton("從素材庫加入", "library")}${edButton("上傳素材", "upload")}<p class="note">影片／圖片加入 V1，音訊加入 A1。可在屬性更換軌道。</p>${p.assets.map((a) => `<div class="editor-asset">${esc(a.name || "素材")}${edButton("加入時間軸", "asset:" + a.id)}</div>`).join("")}`;
   if (ed.pane === "文字")
     pane = `<h3>文字</h3>${["空白文字", "主標題", "副標題", "內文", "重點提示", "金句", "步驟", "章節", "下標", "開場", "結尾", "價格", "標籤", "品牌", "呼籲行動"].map((title, i) => edButton(title, "text:" + i)).join("")}`;
+  if (ed.pane === "片頭") pane = edTitlePane(p);
   if (ed.pane === "音訊")
     pane = `<h3>音訊</h3>${edButton("選擇音訊", "library:audio")}${edButton("上傳音訊", "upload:audio")}<p class="note">A1／A2 可獨立安排時間、音量、淡入淡出與音量均衡。</p>`;
   if (ed.pane === "轉場")
@@ -340,7 +347,7 @@ function toolEditorScreen(t) {
   const [w, h] = edRatios[p.ratio];
   return wfWrap(
     t,
-    `<div class="editor-heading">${edButton("所有專案", "projects")}${edInput("project:title", "專案名稱", p.title, "text", 'maxlength="100"')}${edSelect("project:ratio", "輸出比例", p.ratio, Object.keys(edRatios))}${edSelect("project:timebase", "影格率", Timebase.label(p.timebase), Timebase.allowed.map(Timebase.label))}${edButton("復原", "undo", !ed.undo.length)}${edButton("重做", "redo", !ed.redo.length)}${edButton("匯出影片", "export", !p.clips.length)}</div><div class="editor-workspace"><nav class="editor-panes">${["素材", "文字", "音訊", "轉場", "特效", "貼圖", "字幕", "剪贅字"].map((title) => `<button class="btn ${ed.pane === title ? "selected" : ""}" data-ed-pane="${title}" aria-pressed="${ed.pane === title}">${title}</button>`).join("")}</nav><aside class="editor-library">${pane}</aside><section class="editor-player"><div class="editor-stage" data-ed-stage style="aspect-ratio:${w}/${h};width:min(100%,${(430 * w) / h}px)"></div><div class="row">${edButton("播放／暫停", "play")}<span data-ed-clock></span><input type="range" aria-label="播放位置" data-ed-seek min="0" max="${edEnd()}" step="0.01" value="${ed.time}"></div><p class="note">預覽呈現片段、文字與基本變形；轉場、濾鏡與文字動畫以匯出影片為準。</p></section><aside class="editor-inspector">${inspector}</aside></div><div class="row editor-toolbar">${edButton("分割", "split", !c)}${edButton("複製", "duplicate", !c)}${edButton("刪除", "delete", !c)}${edButton("刪除並前移", "ripple", !c)}${edButton("主軌吸附排列", "compact")}${edButton("新增標記", "marker")}<label>時間軸縮放<input type="range" min="10" max="100" value="${ed.zoom}" data-ed-zoom></label></div><div class="editor-timeline">${edTracks
+    `<div class="editor-heading">${edButton("所有專案", "projects")}${edInput("project:title", "專案名稱", p.title, "text", 'maxlength="100"')}${edSelect("project:ratio", "輸出比例", p.ratio, Object.keys(edRatios))}${edSelect("project:timebase", "影格率", Timebase.label(p.timebase), Timebase.allowed.map(Timebase.label))}${edButton("復原", "undo", !ed.undo.length)}${edButton("重做", "redo", !ed.redo.length)}${edButton("匯出影片", "export", !p.clips.length)}</div><div class="editor-workspace"><nav class="editor-panes">${["素材", "文字", "片頭", "音訊", "轉場", "特效", "貼圖", "字幕", "剪贅字"].map((title) => `<button class="btn ${ed.pane === title ? "selected" : ""}" data-ed-pane="${title}" aria-pressed="${ed.pane === title}">${title}</button>`).join("")}</nav><aside class="editor-library">${pane}</aside><section class="editor-player"><div class="editor-stage" data-ed-stage style="aspect-ratio:${w}/${h};width:min(100%,${(430 * w) / h}px)"></div><div class="row">${edButton("播放／暫停", "play")}<span data-ed-clock></span><input type="range" aria-label="播放位置" data-ed-seek min="0" max="${edEnd()}" step="0.01" value="${ed.time}"></div><p class="note">預覽呈現片段、文字與基本變形；轉場、濾鏡與文字動畫以匯出影片為準。</p></section><aside class="editor-inspector">${inspector}</aside></div><div class="row editor-toolbar">${edButton("分割", "split", !c)}${edButton("複製", "duplicate", !c)}${edButton("刪除", "delete", !c)}${edButton("刪除並前移", "ripple", !c)}${edButton("主軌吸附排列", "compact")}${edButton("新增標記", "marker")}<label>時間軸縮放<input type="range" min="10" max="100" value="${ed.zoom}" data-ed-zoom></label></div><div class="editor-timeline">${edTracks
       .map(
         (id) =>
           `<div class="editor-track"><div class="editor-track-name"><b>${id}</b>${edButton(p.tracks[id].hidden ? "顯示" : "隱藏", "track-hidden:" + id)}${edButton(p.tracks[id].muted ? "開聲" : "靜音", "track-muted:" + id)}${["A1", "A2"].includes(id) ? edButton(p.tracks[id].normalize ? "取消均衡" : "均衡", "track-normalize:" + id) : ""}</div><div class="editor-track-lane" data-ed-lane="${id}" style="width:${Math.max(600, edEnd() * ed.zoom + 100)}px">${p.clips
@@ -355,6 +362,60 @@ function toolEditorScreen(t) {
       )
       .join("")}</div>`,
   );
+}
+// Remotion title templates (backend/remotion.cjs via /generations). The catalog comes from /capabilities; ratio
+// and fps follow the project, so nothing here is a second source of template ids or sizes.
+const edTitleFormats = ["16:9", "9:16", "4:5", "1:1"],
+  edTitleFps = [24, 25, 30, 60];
+function edTitleTemplate() {
+  const list = SeedStar.capabilities?.remotionTemplates || [];
+  return list.find((t) => t.id === ed.title.templateId) || list[0] || null;
+}
+function edTitleBlocked(p) {
+  if (!SeedStar.capabilities?.remotion) return "片頭模板服務未設定";
+  if (!edTitleFormats.includes(p.ratio)) return "片頭模板不支援 " + p.ratio + " 比例";
+  if (!edTitleFps.includes(Timebase.fps(p.timebase))) return "片頭模板只支援 24、25、30、60 fps";
+  if (!ed.title.image) return "請先選一張背景圖";
+  return "";
+}
+async function edTitleRefresh() {
+  const rows = await SeedStar.assets.list();
+  ed.title.images = rows.filter((a) => SeedStar.mediaKind(a) === "image" && /^\/(generated|media)\/[^?#]+\.(png|jpe?g|webp)$/i.test(a.url || ""));
+  ed.title.done = ed.title.jobId ? rows.find((a) => a.id === "job-" + ed.title.jobId) || null : null;
+  if (tool === "edit" && ed.pane === "片頭") edRender();
+}
+function edTitlePane(p) {
+  // The pane's state belongs to one project: another project's finished title must not be offered here.
+  if (ed.title.projectId !== p.id) ed.title = { templateId: null, fields: {}, image: null, jobId: null, images: null, done: null, projectId: p.id };
+  const t = edTitleTemplate(),
+    blocked = edTitleBlocked(p),
+    list = SeedStar.capabilities?.remotionTemplates || [];
+  if (!ed.title.images) {
+    ed.title.images = [];
+    edTitleRefresh().catch(SeedStar.reportError);
+  }
+  return `<h3>片頭</h3><p class="note">比例與影格率跟隨專案（${esc(p.ratio)} · ${esc(Timebase.label(p.timebase))}），長度 5 秒。</p><div class="flow-choices">${list
+    .map((x) => `<button type="button" class="btn small ${x.id === t?.id ? "selected" : ""}" data-ed-action="title-template:${esc(x.id)}" aria-pressed="${x.id === t?.id}">${esc(x.label)}</button>`)
+    .join("")}</div>${(t?.fields || [])
+    .map((f) => `<label>${esc(f.label)}<input class="text-input" aria-label="${esc(f.label)}" data-ed-title-field="${esc(f.key)}" maxlength="${f.max}" value="${esc(ed.title.fields[f.key] ?? "")}"></label>`)
+    .join("")}${t ? `<p class="note">${esc(t.image.label)}（從素材庫選擇）</p><div class="flow-choices">${ed.title.images
+    .map((a) => `<button type="button" class="btn small ${ed.title.image?.id === a.id ? "selected" : ""}" data-ed-action="title-image:${esc(a.id)}" aria-pressed="${ed.title.image?.id === a.id}" title="${esc(a.name || "圖片")}"><img src="${esc(a.thumbUrl || a.url)}" alt="${esc(a.name || "圖片")}" width="64" height="40" style="object-fit:cover"></button>`)
+    .join("") || "<span class=\"note\">素材庫沒有圖片，請先上傳。</span>"}</div>` : ""}<button type="button" class="btn primary small" data-ed-action="title-generate" ${blocked ? "disabled" : ""}>產生片頭（免費）</button>${blocked ? `<p class="note" data-ed-title-blocked>${esc(blocked)}</p>` : ""}${ed.title.done ? edButton("放到時間軸開頭", "title-insert") : ""}`;
+}
+// Puts the finished title on V1 at frame 0; every clip on every track moves later by its length, so the
+// existing cut keeps its sync.
+async function edTitleInsert(p, asset) {
+  const a = await edProbe(asset);
+  if (!ed.projects.includes(p)) return;
+  edCheckpoint();
+  if (!p.assets.some((x) => x.id === a.id)) p.assets.push(a);
+  const c = edTime(p, { id: crypto.randomUUID(), kind: "video", asset: a, track: "V1", speed: 1, volume: 1, fadeIn: 0, fadeOut: 0, opacity: 1, scale: 1, x: 0, y: 0, rotation: 0, width: 25 }, { startFrame: 0, duration: Math.min(3600, a.duration), sourceStartFrame: 0 });
+  for (const row of p.clips) edTime(p, row, { startFrame: row.startFrame + c.durationFrames });
+  p.clips.push(c);
+  ed.selected = c.id;
+  ed.time = 0;
+  edRender();
+  await edSave();
 }
 async function edProbe(asset) {
   const kind = SeedStar.mediaKind(asset);
@@ -761,6 +822,49 @@ async function edAction(action) {
     }
     return;
   }
+  if (action.startsWith("title-template:")) {
+    ed.title.templateId = action.slice(15);
+    edRender();
+    return;
+  }
+  if (action.startsWith("title-image:")) {
+    ed.title.image = ed.title.images?.find((a) => String(a.id) === action.slice(12)) || null;
+    edRender();
+    return;
+  }
+  if (action === "title-generate") {
+    const t = edTitleTemplate(),
+      blocked = edTitleBlocked(p);
+    if (!t || blocked) throw Error(blocked || "片頭模板服務未設定");
+    const job = await SeedStar.generations.create({
+      type: "video",
+      operation: "remotion-template",
+      prompt: t.label,
+      settings: {
+        templateId: t.id,
+        fields: Object.fromEntries(t.fields.map((f) => [f.key, String(ed.title.fields[f.key] || "")])),
+        ratio: p.ratio,
+        fps: Timebase.fps(p.timebase),
+      },
+      references: { image: { url: ed.title.image.url, id: ed.title.image.id } },
+    });
+    ed.title.jobId = job.id;
+    ed.title.done = null;
+    edRender();
+    SeedStar.showJob(job, {
+      onSuccess: () => setTimeout(() => edTitleRefresh().catch(SeedStar.reportError), 300),
+      apply: async (v) => {
+        if (v.status !== "succeeded") return false;
+        await edTitleInsert(p, SeedStar.jobAsset(v));
+      },
+      applyLabel: "放到時間軸開頭",
+    });
+    return;
+  }
+  if (action === "title-insert") {
+    if (ed.title.done && ed.title.projectId === p.id) await edTitleInsert(p, ed.title.done);
+    return;
+  }
   if (action === "export") {
     const d = edDialog(
       "<h3>匯出影片</h3><p>" +
@@ -777,6 +881,7 @@ async function edAction(action) {
           settings: {
             quality: d.querySelector("[data-ed-quality]").value,
             project: edNative(p),
+            projectRevision: p.revision || 0,
           },
         });
         d.close();
@@ -901,6 +1006,7 @@ document.addEventListener("click", (e) => {
   if (action) edAction(action.dataset.edAction).catch(SeedStar.reportError);
   if (pane) {
     ed.pane = pane.dataset.edPane;
+    if (ed.pane === "片頭") ed.title.images = null;
     edRender();
   }
   if (clip) {
@@ -948,6 +1054,7 @@ document.addEventListener("change", (e) => {
   }
 });
 document.addEventListener("input", (e) => {
+  if (e.target.dataset.edTitleField) ed.title.fields[e.target.dataset.edTitleField] = e.target.value;
   if (e.target.matches("[data-ed-seek]")) {
     edStop();
     ed.time = Number(e.target.value);

@@ -1,8 +1,11 @@
 const fs = require("node:fs"),
   path = require("node:path"),
-  crypto = require("node:crypto");
-function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
+  crypto = require("node:crypto"),
+  { verifyOutput } = require("./media-inspect.cjs");
+function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
   const mediaTools = require("./media.cjs");
+  const remotion = require("./remotion.cjs");
+  appDir ||= require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), env);
   const generationPolicy = require("./generation-policy.cjs");
   const bgRemove = require("./bg-remove.cjs");
   fs.mkdirSync(dataDir, { recursive: true });
@@ -62,10 +65,9 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
       );
     return env.OPENAI_API_KEY;
   };
+  const secrets = [env.OPENAI_API_KEY, env.MEDIA_RENDER_AUTH_TOKEN, env.REMOTION_AUTH_TOKEN].filter((v) => typeof v === "string" && v.trim());
   const publicError = (message) =>
-    String(message)
-      .replaceAll(env.OPENAI_API_KEY || "\u0000", "[redacted]")
-      .slice(0, 800);
+    secrets.reduce((text, secret) => text.replaceAll(secret.trim(), "[redacted]"), String(message)).slice(0, 800);
   for (const job of jobs)
     if (["queued", "running"].includes(job.status) && !job.providerId) {
       job.status = "failed";
@@ -262,6 +264,47 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
         persist();
         return;
       }
+      if (job.input.operation === "remotion-template") {
+        job.status = "running";
+        persist();
+        const buffer = await remotion.render(job.input, {
+          env, appDir, fetchImpl, signal, imageData: imageReference,
+          onRemoteJob: (id) => {
+            job.remotionJobId = id;
+            persist();
+          },
+        });
+        if (signal.aborted) return;
+        // Remotion muxes a silent AAC track padded past the last frame (real 5 s render: video 5.000 s, file 5.056 s).
+        // P1 templates send no audio, so keep the video stream only; the clip then ends on its last frame.
+        const tmp = path.join(dataDir, "tmp-" + job.id);
+        fs.writeFileSync(tmp + "-in.mp4", buffer);
+        let stored;
+        try {
+          await mediaTools.run(["-y", "-hide_banner", "-i", tmp + "-in.mp4", "-map", "0:v:0", "-c", "copy", "-movflags", "+faststart", tmp + "-out.mp4"], signal);
+          stored = await mediaStore.ingest({ file: tmp + "-out.mp4", ext: "mp4", signal });
+        } finally {
+          fs.rmSync(tmp + "-in.mp4", { force: true });
+          fs.rmSync(tmp + "-out.mp4", { force: true });
+        }
+        if (signal.aborted) return;
+        const
+          { expect } = remotion.request(job.input, () => ""),
+          verification = await verifyOutput(mediaStore.fileFor(stored.url), expect, signal);
+        if (signal.aborted) return;
+        if (!verification.ok)
+          throw Object.assign(Error("輸出驗證失敗：" + verification.findings.map((f) => f.code + " " + f.message).join("；")), { findings: verification.findings });
+        const parentAssetId = job.input.references.image.id;
+        job.result = {
+          url: stored.url, previewUrl: stored.previewUrl, thumbUrl: stored.thumbUrl, width: expect.width, height: expect.height,
+          verification: { ok: true, findings: [] },
+          origin: { kind: "render", engine: "remotion", templateId: job.input.settings.templateId, jobId: job.id, remotionJobId: job.remotionJobId, ...(typeof parentAssetId === "string" ? { parentAssetId } : {}), costUsd: 0 },
+        };
+        job.progress = 100;
+        job.status = "succeeded";
+        persist();
+        return;
+      }
       if (mediaTools.supported.includes(job.input.operation)) {
         job.status = "running";
         persist();
@@ -283,6 +326,19 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
         if (signal.aborted) return;
         job.type = result.type;
         const parentAssetId = job.input.references?.src?.id;
+        if (job.input.operation === "editor-export") {
+          // Card P1: the export is a library asset like any upload (content-addressed, invariant 1) and names
+          // the project and every source it was cut from.
+          const generated = path.join(dataDir, result.url.slice(1)),
+            stored = await mediaStore.ingest({ file: generated, ext: "mp4", signal });
+          fs.rmSync(generated, { force: true });
+          if (signal.aborted) return;
+          job.result = { url: stored.url, previewUrl: stored.previewUrl, thumbUrl: stored.thumbUrl, width: result.width, height: result.height, verification: result.verification, origin: exportOrigin(job) };
+          job.progress = 100;
+          job.status = "succeeded";
+          persist();
+          return;
+        }
         job.result = { url: result.url, ...(result.sourceUrl ? { sourceUrl: result.sourceUrl } : {}), ...(result.width ? { width: result.width, height: result.height } : {}), ...(result.verification ? { verification: result.verification } : {}), origin: { kind: "render", jobId: job.id, ...(typeof parentAssetId === "string" ? { parentAssetId } : {}) } };
         job.progress = 100;
         job.status = "succeeded";
@@ -423,12 +479,28 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
       if (job.status !== "cancelled") {
         job.status = "failed";
         if (Array.isArray(e.findings)) job.findings = e.findings; // output verification (card M3): coded findings
-        job.error = publicError((job.result?.sourceUrl && job.input.settings?.imageLayout ? "圖片已生成，但本機尺寸轉換失敗；原圖可下載，請只重試尺寸轉換。 " : "") + e.message);
+        job.error = publicError(signal.aborted && job.input.operation === "remotion-template" ? "片頭模板任務逾時，已停止；請重試。" : (job.result?.sourceUrl && job.input.settings?.imageLayout ? "圖片已生成，但本機尺寸轉換失敗；原圖可下載，請只重試尺寸轉換。 " : "") + e.message);
         persist();
       }
     } finally {
       controls.delete(job.id);
     }
+  }
+  // parentAssetId = earliest clip on the main video track (V1), else the earliest clip of any track.
+  function exportOrigin(job) {
+    const project = job.input.settings?.project || {},
+      clips = (project.clips || [])
+        .filter((c) => typeof c?.asset?.id === "string" && c.asset.id)
+        .sort((a, b) => a.startFrame - b.startFrame),
+      parent = clips.find((c) => c.track === "V1") || clips[0],
+      revision = job.input.settings?.projectRevision;
+    return {
+      kind: "render", jobId: job.id, engine: "workbench-editor",
+      ...(typeof project.id === "string" ? { projectId: project.id } : {}),
+      ...(Number.isInteger(revision) ? { projectRevision: revision } : {}),
+      ...(parent ? { parentAssetId: parent.asset.id } : {}),
+      sourceAssetIds: [...new Set(clips.map((c) => c.asset.id))],
+    };
   }
   function refresh(job) {
     if (refreshes.has(job.id)) return refreshes.get(job.id);
@@ -470,16 +542,23 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
     }
     return job;
   }
+  async function remotionReady(input) {
+    if (input?.operation === "remotion-template" && !(await remotion.configured(env, appDir)))
+      throw Object.assign(Error("片頭模板服務未設定"), { status: 503 });
+  }
   // Validates, records and answers 202 before any provider call (runtime.js treats 501/503 as "never sent").
   function start(input, res, extra) {
     const isMedia = mediaTools.supported.includes(input.operation),
       isRemoveBg = input.operation === "remove-bg",
+      isRemotion = input.operation === "remotion-template",
       parsed = isMedia
         ? { type: input.operation === "separate" ? "audio" : input.operation === "image-output" ? "image" : "video" }
         : isRemoveBg
           ? (removeBgSource(input), bgRemove.token(env), { type: "image" })
-          : jobInput(input);
-    if (!isMedia && !isRemoveBg) key();
+          : isRemotion
+            ? (remotion.request(input, imageReference), { type: "video" })
+            : jobInput(input);
+    if (!isMedia && !isRemoveBg && !isRemotion) key();
     const job = {
       id: crypto.randomUUID(),
       type: parsed.type,
@@ -492,7 +571,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
     jobs.push(job);
     persist();
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 600000);
+    // Remotion polls up to 10 min itself; the extra minutes cover the download and verification.
+    const timeout = setTimeout(() => controller.abort(), isRemotion ? 780000 : 600000);
     timeout.unref();
     controls.set(job.id, controller);
     json(res, 202, job);
@@ -542,7 +622,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
       )
         throw Object.assign(Error("需要 JSON 請求"), { status: 415 });
       if (req.method === "GET" && route === "/capabilities") {
-        json(res, 200, generationPolicy.capabilities(env, mediaTools.supported));
+        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.publicCatalog });
         return true;
       }
       if (req.method === "POST" && route === "/uploads") {
@@ -653,6 +733,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
           json(res, 200, existing);
           return true;
         }
+        await remotionReady(input);
         start(input, res, idempotencyKey ? { idempotencyKey } : {});
         return true;
       }
@@ -665,6 +746,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
             throw Object.assign(Error("只有失敗或已取消的任務可以重試"), {
               status: 409,
             });
+          await remotionReady(job.input);
           start(job.input, res, { retryOf: job.id });
         } else if (req.method === "POST" && match[2]) {
           if (job.providerId)
