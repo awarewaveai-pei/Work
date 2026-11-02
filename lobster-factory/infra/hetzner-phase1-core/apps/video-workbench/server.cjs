@@ -111,6 +111,15 @@ function createServer({
         "Accept-Ranges": "bytes",
         "Content-Length": size,
       };
+      // EffectCraft Web (scripts/vendor-effectcraft.cjs): cross-origin isolated on its own path only,
+      // so the rest of the workbench keeps loading cross-origin resources without CORP headers. Decided on the
+      // resolved file, not the URL: an encoded /engines/effectcraft/%2e%2e/ path must not reach other files.
+      if (file.startsWith(path.join(root, "engines", "effectcraft") + path.sep))
+        Object.assign(headers, {
+          "Cross-Origin-Opener-Policy": "same-origin",
+          "Cross-Origin-Embedder-Policy": "require-corp",
+          "Cross-Origin-Resource-Policy": "same-origin",
+        });
       if (req.headers.range) {
         const match = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range);
         let start = 0,
