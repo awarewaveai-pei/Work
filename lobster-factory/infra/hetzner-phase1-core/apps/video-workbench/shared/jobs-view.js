@@ -55,7 +55,7 @@
           result.append(media);
           const download = document.createElement("a");
           download.href = url;
-          download.download = "seedstar-" + v.id;
+          download.download = "awarewave-video-" + v.id;
           download.textContent = v.status === "failed" && v.result.sourceUrl ? "下載供應商原圖" : "下載成果";
           result.append(download);
           if (v.result.sourceUrl && v.result.sourceUrl !== v.result.url && SeedStar.safeUrl(v.result.sourceUrl)) {

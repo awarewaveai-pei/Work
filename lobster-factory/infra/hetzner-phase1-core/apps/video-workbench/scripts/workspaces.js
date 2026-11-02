@@ -133,12 +133,12 @@
       } else if (b.hasAttribute("data-refresh")) await render();
       else if (b.hasAttribute("data-backup-export"))
         SeedStar.download(
-          "seedstar-backup.json",
+          "awarewave-video-backup.json",
           await SeedStar.backup.export(),
         );
       else if (b.hasAttribute("data-export-jobs"))
         SeedStar.download(
-          "seedstar-jobs.json",
+          "awarewave-video-jobs.json",
           await SeedStar.generations.list(),
         );
       else if (b.dataset.assetUse) {

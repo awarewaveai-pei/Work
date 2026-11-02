@@ -151,6 +151,6 @@ function createServer({
 }
 if (require.main === module)
   createServer().listen(process.env.PORT || 4178, "127.0.0.1", () =>
-    console.log("SeedStar: http://127.0.0.1:" + (process.env.PORT || 4178)),
+    console.log("AwareWave 影音工作台: http://127.0.0.1:" + (process.env.PORT || 4178)),
   );
 module.exports = { createServer };

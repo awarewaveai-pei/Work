@@ -125,7 +125,7 @@
                       `<article><button class="asset-choice ${selected.has(a.id) ? "selected" : ""}" data-picker-id="${escape(a.id)}" aria-pressed="${selected.has(a.id)}">${kind(a) === "image" ? `<img src="${escape(SeedStar.safeUrl(a.url))}" alt="">` : kind(a) === "video" ? "▣" : "♫"}<strong>${escape(a.name)}</strong></button><button data-picker-preview="${escape(a.id)}">預覽</button></article>`,
                   )
                   .join("")
-              : `<p>${["platform", "licensed"].includes(source) ? "尚未接入此角色來源。官網的角色與授權不會轉入本機工作台。" : "目前沒有符合條件的素材，可直接上傳；影片長度未知時只會列在全部長度。"}</p>`,
+              : `<p>${["platform", "licensed"].includes(source) ? "尚未接入此角色來源。外部平台的角色與授權不會轉入本機工作台。" : "目前沒有符合條件的素材，可直接上傳；影片長度未知時只會列在全部長度。"}</p>`,
           );
         panel.querySelector("[data-picker-count]").textContent =
           "已選 " + selected.size + " / " + limit;

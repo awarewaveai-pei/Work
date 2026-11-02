@@ -311,7 +311,7 @@ function spokenCastPanel() {
     "</div>" +
     (rows.length
       ? ""
-      : `<p class="small-note">${tab === "search" ? "授權角色來源尚未接入；官網的角色授權不會轉入本機。" : "目前沒有可選人物。可從星角色建立，或上傳圖片到素材庫。"}</p>`) +
+      : `<p class="small-note">${tab === "search" ? "授權角色來源尚未接入；外部平台的角色授權不會轉入本機。" : "目前沒有可選人物。可從角色頁建立，或上傳圖片到素材庫。"}</p>`) +
     "</div>"
   );
 }
