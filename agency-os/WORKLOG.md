@@ -1,4 +1,11 @@
 # Worklog
+## 2026-11-02（續43）影音工作台卡 S3a＋S2：付費去背（按鈕先標價）、同場景多鏡、移除 Seedance（d6835f354）
+
+- 內容見 commit d6835f354。cc.py 工人 US$3.04。Codex 3 項全修：取消／逾時／重送雙重付費（replicateId＋Replicate cancel＋同圖接回原 prediction）、關閉任務視窗後成果不進素材庫（runtime reconcileJobs，所有任務類型）、20MB 上限在全量下載後才檢查（串流截斷）；tests/remove-bg-money.cjs。
+- 注意：providerId 在 api.cjs:70/:426 代表 OpenAI 影片，Replicate id 另用 replicateId。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/remove-bg-money.cjs; node tests/remove-bg.cjs; node tests/scene-shots.cjs（＋11 個任務頁測試） | exit=0 | ms=300000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（Codex gpt-6-sol，artifact agency-os/reports/oracle/2026-11-02-partialreview-3aa41677.md；3 修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=replicateId | hits=1
 ## 2026-11-02（續42）wp-bridge 0.21.0 發版＋推上 aware-wave.com 與 Soulful（外聯 C6.2）；C6.4 無 staging 站
 
 **操作者**：「同意發版」（經 session local_6aa73d12 轉達）。
