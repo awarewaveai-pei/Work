@@ -116,3 +116,16 @@ describe("POST /api/outreach/inbox discover", () => {
     expect(m.settled).toEqual([1]); // the credit Serper spent on the refused page is charged
   });
 });
+
+describe("POST /api/outreach/inbox reserved sources", () => {
+  it("a plain import cannot claim source_type search (or gcis): approval would trust its consent_source", async () => {
+    for (const source_type of ["search", " Search ", "gcis"]) {
+      const res = await POST(new Request("http://app.test/api/outreach/inbox", { method: "POST", headers: STAFF,
+        body: JSON.stringify({ organizationId: ORG, leads: [{ name: "Ann Lee", email: "ann@acme.com", source_type,
+          source_url: "https://tw.linkedin.com/in/ann", consent_source: "self_published:https://tw.linkedin.com/in/ann" }] }) }));
+      expect(res.status, source_type).toBe(400);
+    }
+    expect(m.inserted).toEqual([]);
+  });
+});
+

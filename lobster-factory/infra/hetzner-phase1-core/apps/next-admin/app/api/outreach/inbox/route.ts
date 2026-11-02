@@ -15,6 +15,7 @@ import { grantFor } from "@/lib/entitlements/grant";
 import { EntitlementRequired } from "@/lib/entitlements/can";
 import { createBudget, createProviderCall, ProviderCallError } from "@/lib/collect";
 import { discoverCompanies, searchBusinessItems, GcisError, GCIS_COUNTIES, GCIS_MAX_SERPER_CREDITS, type GcisUsage } from "@/lib/outreach/sources/gcis";
+import { peopleInput, searchPeople, PEOPLE_MAX_SERPER_CREDITS, PEOPLE_SOURCE_TYPE, type PeopleUsage } from "@/lib/outreach/sources/people-search";
 
 // Cold Outreach — Lead Inbox import (task T5). Table: co_lead_inbox (migration 0048).
 // Pipeline: normalize → dedup (within batch, and against this org's existing inbox + leads) → suppression check →
@@ -72,6 +73,8 @@ export async function GET(req: Request): Promise<Response> {
 //   OR  { ..., gcis: { item, itemDesc, county } } — ≤ 100 registered companies running business item `item` (card C12);
 //   the answer adds discovery { credits, twd, skipped, withoutWebsite }.
 //   OR  { ..., gcisItems: "<text>" } — the business items whose description holds the text; nothing is written.
+//   OR  { ..., people: { role, company, location, keyword } } — ≤ 20 people from a search engine's public index (card
+//   C13.1; title, snippet and link only); the answer adds discovery { credits, twd, skipped }.
 export async function POST(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
@@ -99,9 +102,11 @@ export async function POST(req: Request): Promise<Response> {
     : body.lead && typeof body.lead === "object"
       ? [body.lead as RawLead]
       : [];
-  // gcis is a source this route writes itself (body.gcis below): an import may not claim it (Codex C12 F4).
-  if (rawList.some((l) => typeof l?.source_type === "string" && l.source_type.trim().toLowerCase() === "gcis")) {
-    return NextResponse.json({ ok: false, error: "source_type gcis is reserved for 找公司" }, { status: 400 });
+  // gcis and search are sources this route writes itself (body.gcis, body.people below), and approval trusts their
+  // consent_source (leads route, inboxConsentSource): an import may not claim them (Codex C12 F4).
+  const reserved = rawList.map((l) => (typeof l?.source_type === "string" ? l.source_type.trim().toLowerCase() : "")).find((t) => t === "gcis" || t === PEOPLE_SOURCE_TYPE);
+  if (reserved) {
+    return NextResponse.json({ ok: false, error: `source_type ${reserved} is reserved for ${reserved === "gcis" ? "找公司" : "找人"}` }, { status: 400 });
   }
 
   let discovery: { credits: number; twd: number; skipped: number } | null = null;
@@ -189,6 +194,36 @@ export async function POST(req: Request): Promise<Response> {
     } catch (e) {
       await settle();
       if (e instanceof GcisError) return NextResponse.json({ ok: false, error: e.message }, { status: 502 });
+      if (!(e instanceof ProviderCallError)) throw e;
+      return NextResponse.json({ ok: false, error: e.message }, { status: e.kind === "unconfigured" ? 503 : 502 });
+    }
+    if (rawList.length === 0) return NextResponse.json({ ok: true, imported: 0, summary: {}, discovery });
+  }
+
+  if (body.people !== undefined) {
+    const input = peopleInput(body.people);
+    if (!input) return NextResponse.json({ ok: false, error: "people.role or people.keyword required (each field ≤ 100 chars)" }, { status: 400 });
+    let grant;
+    try { grant = await grantFor("outreach.discover", await billedTo(req, organizationId)); }
+    catch (e) { if (e instanceof EntitlementRequired) return NextResponse.json({ ok: false, error: e.code }, { status: e.status }); throw e; }
+    // Same pricing as the other searches: the ceiling (2 pages per query) is held before the first request, the credits
+    // Serper reported are kept.
+    const hold = await holdCost(grant, creditsUsd(PEOPLE_MAX_SERPER_CREDITS));
+    if (!hold) return NextResponse.json({ ok: false, error: "no_credits" }, { status: 402 });
+    const usage: PeopleUsage = { serperCredits: 0 };
+    const settle = async () => {
+      try { await hold.settle(creditsForCost(creditsUsd(usage.serperCredits)), { provider: "serper", serper_credits: usage.serperCredits, source: "people" }); }
+      catch (e) { console.warn(`[outreach-people] settle failed: ${String(e).slice(0, 200)}`); }
+    };
+    let skipped = 0;
+    try {
+      const found = await searchPeople(createProviderCall({ budget: createBudget({ fetches: PEOPLE_MAX_SERPER_CREDITS, ms: 30_000 }), grant, timeoutMs: 20_000 }), usage, input);
+      await settle();
+      rawList = found.leads;
+      skipped = found.skipped;
+      discovery = { credits: usage.serperCredits, twd: creditsTwd(usage.serperCredits), skipped };
+    } catch (e) {
+      await settle();
       if (!(e instanceof ProviderCallError)) throw e;
       return NextResponse.json({ ok: false, error: e.message }, { status: e.kind === "unconfigured" ? 503 : 502 });
     }

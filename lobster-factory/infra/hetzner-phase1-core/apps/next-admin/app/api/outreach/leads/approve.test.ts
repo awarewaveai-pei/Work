@@ -10,6 +10,7 @@ const m = vi.hoisted(() => ({
   before: [] as Record<string, unknown>[],
   after: null as Record<string, unknown>[] | null,
   inserts: 0,
+  row: null as Record<string, unknown> | null,
   insertError: null as { code: string; message: string } | null,
 }));
 
@@ -20,8 +21,9 @@ vi.mock("@/lib/org-client", () => {
     const leads = () => (m.inserts > 0 && m.after ? m.after : m.before);
     q.then = (ok: (v: unknown) => unknown) => ok({ data: table === "co_leads" ? leads() : [], error: null });
     q.maybeSingle = async () => ({ data: table === "co_lead_inbox" ? m.inbox : leads()[0] ?? null, error: null });
-    q.insert = () => {
+    q.insert = (row: Record<string, unknown>) => {
       m.inserts++;
+      m.row = row;
       return { select: () => ({ single: async () => (m.insertError ? { data: null, error: m.insertError } : { data: { id: "new" }, error: null }) }) };
     };
     return q;
@@ -40,6 +42,7 @@ beforeEach(() => {
   m.before = [];
   m.after = null;
   m.inserts = 0;
+  m.row = null;
   m.insertError = null;
 });
 
@@ -67,3 +70,26 @@ describe("POST /api/outreach/leads fromInboxId", () => {
     expect(m.inserts).toBe(1);
   });
 });
+
+describe("approval passes on a search row's consent_source only when it names the row's own link", () => {
+  const LINK = "https://tw.linkedin.com/in/ann-lee";
+  const searchRow = (consent: string) => ({ id: INBOX, organization_id: ORG, normalized_name: "Ann Lee", email: null, website: null, social_url: LINK, source_type: "search",
+    source_url: LINK, raw_payload: { contact_name: "Ann Lee", contact_role: "CEO", consent_source: consent } });
+
+  it("self_published:<own link> and general_source:<own link> are copied; contact name and role too", async () => {
+    for (const c of [`self_published:${LINK}`, `general_source:${LINK}`]) {
+      m.inbox = searchRow(c);
+      expect((await approve()).status).toBe(201);
+      expect(m.row).toMatchObject({ consent_source: c, contact_name: "Ann Lee", contact_role: "CEO", source_type: "search" });
+    }
+  });
+
+  it("a claim naming another page, or any other value, is dropped (the notice stays)", async () => {
+    for (const c of ["self_published:https://evil.example/me", "meta_lead_ad:7", "self_published:", "inferred"]) {
+      m.inbox = searchRow(c);
+      expect((await approve()).status).toBe(201);
+      expect(m.row?.consent_source, c).toBeNull();
+    }
+  });
+});
+

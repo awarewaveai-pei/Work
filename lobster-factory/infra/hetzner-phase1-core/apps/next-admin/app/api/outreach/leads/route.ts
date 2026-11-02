@@ -4,11 +4,21 @@ import { outreachDb } from "@/lib/outreach/db-client";
 import { scoreLead } from "@/lib/outreach/scoring";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { findExistingLead } from "@/lib/outreach/existing-leads";
+import { inboxConsentSource } from "@/lib/outreach/sources/people-search";
+import { inferEmail, verifierKey } from "@/lib/outreach/mailbox-verify";
+import { splitLatinName } from "@/lib/outreach/email-guess";
+import { findSuppressed } from "@/lib/outreach/suppression";
+import { ownHostOf } from "@/lib/outreach/normalize";
+import { billedTo } from "@/lib/outreach/billing";
+import { grantFor } from "@/lib/entitlements/grant";
+import { EntitlementRequired } from "@/lib/entitlements/can";
 
 // Cold Outreach — Leads CRUD + Approve-to-Leads (task T7). Table: co_leads (migration 0048).
 // Approve flow: read a co_lead_inbox row → the same business already a lead? (existing-leads.ts) that one : mechanical
 // score → insert co_leads (a concurrent approve of the same email loses on 0149's unique index and gets the winner's
 // lead) → mark inbox approved. Approving twice never makes two leads.
+// findEmail (card C13.2): a person's address guessed from their company's formats, MX-checked, then verified by the paid
+// verifier under the organization's outreach.verify grant; only a paid `valid` is written (consent_source 'inferred').
 // Writes ops-role gated; GET authed-only.
 
 export const runtime = "nodejs";
@@ -104,6 +114,73 @@ export async function POST(req: Request): Promise<Response> {
   try { orgId = effectiveOrgId(req, uuid(body.organizationId)); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
+  // --- Find a person's email (card C13.2): body { findEmail: { fromInboxId, domain? } } ---
+  if (body.findEmail !== undefined) {
+    const f = body.findEmail && typeof body.findEmail === "object" ? (body.findEmail as Record<string, unknown>) : {};
+    const inboxId = str(f.fromInboxId);
+    if (!inboxId || !UUID_RE.test(inboxId)) return NextResponse.json({ ok: false, error: "findEmail.fromInboxId must be a uuid" }, { status: 400 });
+    const { data: ib, error: ibErr } = await supabase.from("co_lead_inbox").select("*").eq("id", inboxId).maybeSingle();
+    if (ibErr) return NextResponse.json({ ok: false, error: ibErr.message }, { status: 500 });
+    if (!ib) return NextResponse.json({ ok: false, error: "inbox row not found" }, { status: 404 });
+    const ibRow = ib as Record<string, unknown>;
+    const ibOrg = (ibRow.organization_id as string | null) ?? null;
+    try { assertOrgAccess(req, ibOrg); }
+    catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+    let found;
+    try { found = await findExistingLead(supabase, ibOrg, { email: str(ibRow.email), website: ibRow.website as string | null, source_url: ibRow.source_url as string | null, name: ibRow.normalized_name as string | null, phone: ibRow.phone as string | null }); }
+    catch (e) { return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 }); }
+    if (!found) return NextResponse.json({ ok: false, error: "not_a_lead_yet", detail: "先核准成名單，再找 email" }, { status: 409 });
+    const { data: lead, error: leadErr } = await supabase.from(TABLE).select("id, organization_id, name, email, website, contact_name, industry").eq("id", found.id).maybeSingle();
+    if (leadErr) return NextResponse.json({ ok: false, error: leadErr.message }, { status: 500 });
+    const l = lead as { id: string; organization_id: string | null; name: string | null; email: string | null; website: string | null; contact_name: string | null; industry: string | null } | null;
+    if (!l) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
+    if (l.email) return NextResponse.json({ ok: false, error: "has_email", detail: "這筆名單已經有 email" }, { status: 409 });
+    const personName = [l.contact_name, l.name].find((n) => splitLatinName(n)) ?? null;
+    if (!personName) return NextResponse.json({ ok: false, error: "no_latin_name", detail: "推 email 需要英文姓名（名＋姓）" }, { status: 422 });
+    const typed = str(f.domain)?.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0] ?? null;
+    const domain = typed ?? ownHostOf(l.website);
+    if (!domain || !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)) return NextResponse.json({ ok: false, error: "no_domain", detail: "需要公司網域（官網或手動填）" }, { status: 422 });
+
+    const org = l.organization_id;
+    let key, known;
+    try {
+      key = await verifierKey(supabase, org);
+      let kq = supabase.from(TABLE).select("email, contact_name, name").ilike("email", `%@${domain}`);
+      kq = org ? kq.eq("organization_id", org) : kq.is("organization_id", null);
+      const { data: ks, error: kErr } = await kq.limit(50);
+      if (kErr) throw new Error(`co_leads read failed: ${kErr.message}`);
+      known = ((ks ?? []) as Array<{ email: string | null; contact_name: string | null; name: string | null }>)
+        .flatMap((k) => (k.email ? [{ email: k.email, name: k.contact_name ?? k.name }] : []));
+    } catch (e) { return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 }); }
+    let grant;
+    if (key) {
+      try { grant = await grantFor("outreach.verify", await billedTo(req, org)); }
+      catch (e) { if (e instanceof EntitlementRequired) return NextResponse.json({ ok: false, error: e.code }, { status: e.status }); throw e; }
+    }
+    let inferred;
+    try {
+      // Each paid answer is metered as it arrives (same as auto-send's verification), so a run that stops midway is charged only for what it got.
+      inferred = await inferEmail(supabase, org, { name: personName, domain, known }, key, { onPaid: async (provider) => { await grant?.recordUse({ provider, lead_id: l.id, source: "email_find" }); } });
+    } catch (e) {
+      if (e instanceof EntitlementRequired) return NextResponse.json({ ok: false, error: e.code }, { status: e.status });
+      return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 502 });
+    }
+    const report = { candidates: inferred.candidates, paidCalls: inferred.paidCalls, provider: inferred.provider, via: inferred.via };
+    if (inferred.outcome !== "valid" || !inferred.email) return NextResponse.json({ ok: true, outcome: inferred.outcome, email: null, ...report });
+    try {
+      // A person found by search keeps the company in industry: a company-scope suppression must stop them too (Codex C13 F2).
+      const flags = await findSuppressed(supabase, org, [{ email: inferred.email, website: l.website, name: l.name },
+        ...(l.industry ? [{ email: null, website: null, name: l.industry }] : [])]);
+      if (flags.some(Boolean)) return NextResponse.json({ ok: true, outcome: "suppressed", email: null, ...report });
+    } catch (e) { return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 }); }
+    // Only into an empty address: one written meanwhile by a person or another path wins (Codex C13 F3).
+    const { data: upd, error: upErr } = await supabase.from(TABLE).update({ email: inferred.email, consent_source: "inferred", updated_at: new Date().toISOString() })
+      .eq("id", l.id).is("email", null).select("id");
+    if (upErr) return leadWriteError(upErr);
+    if (!(upd ?? []).length) return NextResponse.json({ ok: false, error: "email_set_meanwhile", detail: "這筆名單在查詢期間已經有 email 了，沒有覆寫", ...report }, { status: 409 });
+    return NextResponse.json({ ok: true, outcome: "valid", email: inferred.email, ...report });
+  }
+
   // --- Approve-from-inbox path ---
   const fromInboxId = str(body.fromInboxId);
   if (fromInboxId) {
@@ -162,9 +239,10 @@ export async function POST(req: Request): Promise<Response> {
         // general_source:<公示資料頁>), and they reach the lead here.
         contact_name: rawText("contact_name"),
         contact_role: rawText("contact_role"),
-        // Only the gcis source's own value: raw_payload is whatever an import sent, and a typed self_published:… would
-        // drop the personal-data notice (brand-context.ts), meta_lead_ad… would make the lead warm.
-        consent_source: row.source_type === "gcis" && (rawText("consent_source") ?? "").startsWith("general_source:") ? rawText("consent_source") : null,
+        // Only the values this app's own sources write (people-search.ts inboxConsentSource): raw_payload is whatever an
+        // import sent, and a typed self_published:… would drop the personal-data notice (brand-context.ts), meta_lead_ad…
+        // would make the lead warm.
+        consent_source: inboxConsentSource(row.source_type, rawText("consent_source"), lead.source_url ?? null),
         lead_quality_score: scores.lead_quality_score,
         contactability_score: scores.contactability_score,
         icp_score: scores.icp_score,

@@ -9,7 +9,8 @@
 // running; ZeroBounce GET /v2/validate: status); no key was on hand to record a live answer (WORKLOG 2026-11-02).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { connectorSecretRef, getSecret } from "@/lib/secret-vault";
-import type { EmailStatus } from "./verify-email";
+import { guessEmails, splitLatinName, type KnownEmail } from "./email-guess";
+import { verifyEmails, type EmailStatus } from "./verify-email";
 
 export const PAID_PROVIDERS = ["hunter", "zerobounce"] as const;
 export type PaidProvider = (typeof PAID_PROVIDERS)[number];
@@ -94,4 +95,98 @@ export async function saveVerdict(db: SupabaseClient, organizationId: string | n
   // The key is unique nulls not distinct (0149), so the agency's (NULL organization) row upserts the same way.
   const { error } = await db.from("co_verified_emails").upsert(row, { onConflict: "organization_id,email" });
   if (error) throw new Error(`co_verified_emails write failed: ${error.message}`);
+}
+
+/** Hunter GET /v2/email-finder (domain + first and last name): the address Hunter knows for that person, with its own
+ *  verification status (data.verification.status: valid / accept_all / unknown). Hunter only: ZeroBounce has no finder.
+ *  null = Hunter knows none. Throws like verifyMailbox. Shape is the documented v2 one; no key was on hand to record a live answer. */
+export async function findMailbox(domain: string, first: string, last: string, key: VerifierKey, fetcher: typeof fetch = fetch): Promise<{ email: string; status: EmailStatus } | null> {
+  if (key.provider !== "hunter") return null;
+  const url = `https://api.hunter.io/v2/email-finder?${new URLSearchParams({ domain, first_name: first, last_name: last, api_key: key.apiKey })}`;
+  const resp = await fetcher(url, { method: "GET", signal: AbortSignal.timeout(TIMEOUT_MS) });
+  if (resp.status === 202) throw new VerifyPending("hunter");
+  if (!resp.ok) throw new Error(`hunter find ${resp.status}: ${(await resp.text().catch(() => "")).slice(0, 200).replace(key.apiKey, "***")}`);
+  const j = (await resp.json()) as { data?: { email?: unknown; verification?: { status?: unknown } } };
+  const email = typeof j.data?.email === "string" ? j.data.email.trim().toLowerCase() : "";
+  if (!email) return null;
+  const st = j.data?.verification?.status;
+  return { email, status: mapHunter({ data: { status: typeof st === "string" ? st : undefined } }) };
+}
+
+export interface InferCandidate { email: string; mx: EmailStatus; paid: EmailStatus | null }
+export interface InferResult {
+  /** The one address a paid verifier called valid; null otherwise. */
+  email: string | null;
+  /** valid = `email` is set; unverified = no verifier key, candidates passed MX only; none = nothing deliverable found;
+   *  pending = a paid check was still running, ask again later. */
+  outcome: "valid" | "unverified" | "none" | "pending";
+  provider: PaidProvider | null;
+  via: "guess" | "finder" | null;
+  candidates: InferCandidate[];
+  /** Paid answers received (metered): what the run cost. */
+  paidCalls: number;
+}
+export interface InferDeps {
+  now?: () => Date;
+  mx?: (emails: readonly string[]) => Promise<Map<string, EmailStatus>>;
+  stored?: (email: string) => Promise<StoredVerdict | null>;
+  save?: (email: string, status: EmailStatus, provider: PaidProvider) => Promise<void>;
+  verify?: (email: string, key: VerifierKey) => Promise<EmailStatus>;
+  find?: (domain: string, first: string, last: string, key: VerifierKey) => Promise<{ email: string; status: EmailStatus } | null>;
+  /** Called once per paid answer, before the next paid call (meters it; throws to stop the run). */
+  onPaid?: (provider: PaidProvider) => Promise<void>;
+}
+
+/** A person's address (SPEC D20, card C13.2): guesses from the company's formats -> MX (nothing paid for a dead domain) ->
+ *  paid verifier on each survivor, first `valid` wins -> Hunter email-finder as the second path. Only a paid `valid` is
+ *  returned as `email`; every paid answer is stored (co_verified_emails) so asking again is free for 90 days. No key = MX
+ *  only: the survivors come back as `unverified` candidates and nothing is an address. */
+export async function inferEmail(db: SupabaseClient, organizationId: string | null,
+  person: { name: string | null; domain: string; known?: readonly KnownEmail[] }, key: VerifierKey | null, deps: InferDeps = {}): Promise<InferResult> {
+  const now = deps.now ?? (() => new Date());
+  const mx = deps.mx ?? ((emails: readonly string[]) => verifyEmails(db, organizationId, emails));
+  const stored = deps.stored ?? ((email: string) => storedVerdict(db, organizationId, email));
+  const save = deps.save ?? ((email: string, status: EmailStatus, provider: PaidProvider) => saveVerdict(db, organizationId, email, status, provider, now()));
+  const verify = deps.verify ?? ((email: string, k: VerifierKey) => verifyMailbox(email, k));
+  const find = deps.find ?? ((d: string, f: string, l: string, k: VerifierKey) => findMailbox(d, f, l, k));
+  const result: InferResult = { email: null, outcome: "none", provider: null, via: null, candidates: [], paidCalls: 0 };
+
+  const guesses = guessEmails(person.name, person.domain, person.known ?? []);
+  const parts = splitLatinName(person.name);
+  if (guesses.length === 0 || !parts) return result;
+  const checked = await mx(guesses);
+  const alive = guesses.filter((g) => (checked.get(g) ?? "unknown") !== "invalid");
+  result.candidates = alive.map((email) => ({ email, mx: checked.get(email) ?? "unknown", paid: null }));
+  if (!key) return alive.length ? { ...result, outcome: "unverified" } : result;
+  // Every guess dead: a domain with no mail server ends here (nothing paid); guesses a paid verifier called invalid
+  // mean the domain lives, and the finder may know a fifth form (Codex C13 F1).
+  if (!alive.length) {
+    const paidDead = await Promise.all(guesses.map(async (g) => PAID_PROVIDERS.includes((await stored(g))?.provider as PaidProvider)));
+    if (!paidDead.some(Boolean)) return result;
+  }
+
+  const accept = (email: string, via: "guess" | "finder"): InferResult => ({ ...result, email, outcome: "valid", provider: key.provider, via });
+  try {
+    for (const c of result.candidates) {
+      const fresh = freshPaid(await stored(c.email), now());
+      if (fresh) { c.paid = fresh.status; if (fresh.status === "valid") return accept(c.email, "guess"); continue; }
+      const status = await verify(c.email, key);
+      result.paidCalls++;
+      await deps.onPaid?.(key.provider);
+      c.paid = status;
+      await save(c.email, status, key.provider);
+      if (status === "valid") return accept(c.email, "guess");
+    }
+    const found = await find(person.domain.trim().toLowerCase().replace(/^www\./, ""), parts.first, parts.last, key);
+    if (key.provider === "hunter") { result.paidCalls++; await deps.onPaid?.(key.provider); }
+    if (found && !result.candidates.some((c) => c.email === found.email)) result.candidates.push({ email: found.email, mx: "unknown", paid: found.status });
+    if (found && found.status === "valid") {
+      await save(found.email, "valid", key.provider);
+      return accept(found.email, "finder");
+    }
+    return result;
+  } catch (e) {
+    if (e instanceof VerifyPending) return { ...result, outcome: "pending" };
+    throw e;
+  }
 }

@@ -1,4 +1,20 @@
 # Worklog
+## 2026-11-02（續34）外聯 v2 C13 人員搜尋、email 推斷、付費驗證（程式完成；無 Hunter key，REALTEST 未跑）
+
+**做了**（cc.py SDK 派工 session 1211e552，US$1.28；主 session 驗收＋修 Codex 3 項；NA = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）：
+- C13.1 `NA/lib/outreach/sources/people-search.ts`：Serper `/search` 只取 title／snippet／link（不抓社群頁），≤20；`inboxConsentSource`＝核准守衛唯一判斷。`NA/app/api/outreach/inbox/route.ts` `people` 分支（grant `outreach.discover`，預扣＋結算）；純匯入宣稱 `search`／`gcis` → 400。
+- 判準：snippet 內有 email 才 `self_published:<link>`，其餘 `general_source:<link>`（保守：多數附告知行）。核准只在值＝`self_published:|general_source:` ＋該列自己的 `source_url` 時複製。
+- C13.2 `NA/lib/outreach/email-guess.ts`（純函式，拉丁姓名，≤4 候選）；`mailbox-verify.ts` 加 `findMailbox`（Hunter email-finder）、`inferEmail`（MX → Hunter verifier → finder；無 key＝MX only、unverified）。`NA/app/api/outreach/leads/route.ts` `findEmail`（grant `outreach.verify`，每次付費回應記用量）：付費 valid 才寫 `co_leads.email`、`consent_source='inferred'`。
+- C13.3 `InboxClient.tsx`「找人」「貼上個人資料」（`source_type='pasted_person'`，不帶 consent → 一律附告知）、已核准列「找 email」。
+- Codex `agency-os/reports/oracle/2026-11-02-partialreview-5504b723.md` 3 項皆修：F1 猜測全被付費判死（網域活著）仍跑 finder，網域無 MX 不花錢；F2 公司層級拒收也比對 lead.industry（搜尋來的人公司名在此）；F3 只寫入仍為空的 email，查詢期間已被填則 409。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/outreach/ app/api/outreach/ lib/portal/__tests__/registry-code.test.ts → 35 files / 290 passed；npx tsc --noEmit exit 0；worker 突變：拔「link＝自己的 source_url」→ 2 指名測試紅，還原綠 | exit=0 | ms=8000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（Codex partialreview-5504b723，3 項已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=inboxConsentSource | hits=18
+- 未驗：Hunter verifier／finder 回應形狀照文件；Serper title 解析未對真回應；C13.4 REALTEST 需 Hunter key。
+
+**rollback**：revert 本 commit。
 ## 2026-11-02（續33）next-admin 部署 6c9f2a8c8（C12 找公司上線）；監工台 51/77
 
 - 部署：`sudo sg-deploy.sh next-admin` → healthy 15s、smoke all OK、deployed 6c9f2a8c8。
