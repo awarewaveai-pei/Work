@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-02（續47）外聯 v2 C4.7 回信同步真測
+
+- 操作者 03:25Z 重連 Gmail（含 readonly）；同步恢復。
+- 測試名單 d0ab3e45（peijingartstudio，consent 標 self_published:operator-provided-test）→ Chrome 登入身分呼叫 leads／messages／gmail-draft。
+- 結果：回信 07:20:03 入 co_replies（more_info），lead=replied，7 封 skipped（追蹤停）。
+- 首封仍 drafted：Gmail 探查 = 系統草稿未動（DRAFT），操作者另寄同主旨新信（不同 thread）→ 不判已寄為正確行為。
+- 發現 m1：手動產信 >100s → Cloudflare 524，伺服器仍產完；重按產兩組。未修。
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql co_replies/co_leads/co_messages for lead d0ab3e45 + gmail probe (docker exec node, read-only) | exit=0 | ms=5000
+- REVIEW_WAIVED: NA -- 無程式改動
+- BUGHUNT_WAIVED: NA -- 無程式改動
 ## 2026-11-02（續46）影音工作台卡 P1：輸出成素材帶來源；Remotion 片頭接自架服務（f9eca42b2）
 
 - 根因／缺口：editor-export 成品無 parentAssetId（api.cjs 舊 :285 只讀 references.src）；無片頭模板路徑。

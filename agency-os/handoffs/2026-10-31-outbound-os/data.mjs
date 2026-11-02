@@ -140,7 +140,7 @@ export const STEPS = [
       todo('C11.4', '測試 DNS 四種情況、退信率門檻、升階、恢復、名額函式的併發（已完成，3eea12c73）；剩：網域買好後對一個真實次網域跑一次，看三燈正確。'),
     ] },
   { n: 7, code: 'C4', group: 'D', title: '回覆同步與 Replies 頁', plain: '例：你在 Gmail 按下寄出，10 分鐘內系統逐封確認寄了；對方回信，系統抓回內文分類成「問價」，名單狀態變「已回覆」，追蹤信自動停。退訂與退信也自動處理。同步停了幾天再恢復，可以補掃。',
-    gate: '你寄 1 封給自己另一個信箱並回覆，10 分鐘內 Replies 頁出現該列含內文、名單狀態變已回覆、追蹤日期清空。第一封已寄而追蹤草稿未寄時，追蹤信不會被誤標為已寄。同一封回信重掃不會重複建事件或拒收。退信與退訂會進拒收名單。', risk: 'Medium（主機排程安裝 High）', model: 'Opus 5.5', status: 'in_progress', depends: ['C2'],
+    gate: '你寄 1 封給自己另一個信箱並回覆，10 分鐘內 Replies 頁出現該列含內文、名單狀態變已回覆、追蹤日期清空。第一封已寄而追蹤草稿未寄時，追蹤信不會被誤標為已寄。同一封回信重掃不會重複建事件或拒收。退信與退訂會進拒收名單。', risk: 'Medium（主機排程安裝 High）', model: 'Opus 5.5', status: 'done', commit: C4, depends: ['C2'],
     what: 'migration 0153 co_replies（0151 已被 Mockup 用掉）；存 threadId／messageId／draftId；gmail-sync.ts（逐封 message id 判已寄；收件匣以游標掃、先插入 co_replies 再做副作用、取 full 內文）；分類＋停追蹤＋拒收；internal route＋cron */10＋host-jobs；補掃按鈕；Replies 頁按鈕',
     files: ['DB/migrations/0153_co_replies.sql', 'NA/lib/outreach/gmail-api.ts', 'NA/app/api/outreach/replies/route.ts', 'NA/lib/outreach/google-oauth.ts', 'NA/lib/outreach/gmail-sync.ts', 'NA/app/api/internal/outreach/gmail-sync/route.ts', 'HS/cron.d/awarewave-schedules', 'NA/app/(shell)/tools/outreach/replies/page.tsx'],
     items: [
@@ -150,7 +150,7 @@ export const STEPS = [
       done('C4.4', '回信交給便宜模型分類；有回信就停追蹤；回過信的人記為可以同步 FluentCRM；退訂、拒絕與退信進拒收名單。', C4),
       done('C4.5', '主機排程每 10 分鐘叫一次；登記到排程頁；每個信箱有「補掃 N 天」按鈕和上次同步時間。（主機裝排程等你同意，High）', C4),
       done('C4.6', 'Replies 頁：列出回信與內文摘要，給你按鈕決定下一步（報價、問窗口、拒收、會議、成交、失去）。', C4),
-      todo('C4.7', '測試情境已完成（f00dbea9f）；剩：正式庫套 0153、裝排程、你在 Google Console 按發布並重連 Gmail 後，寄 1 封給自己另一個信箱並回覆，10 分鐘內回覆頁出現。'),
+      done('C4.7', '真測 11-02：寄給你另一個信箱並回信，07:20 那一輪同步就收進回覆頁（分類「想多了解」），名單變已回覆，追蹤信全停。', C4),
     ] },
   { n: 8, code: 'C8', group: 'F', title: '自動寄與輪流寄（量產）', plain: '例：6 個信箱裡，系統每次挑今天寄得最少的那一個建草稿並寄出，追蹤信固定回原本那個信箱的對話串。每個信箱照暖機階限量，同一個網域的信箱加總也有上限，同一家公司 30 天最多收 2 封。哪個信箱被 Gmail 拒收就自動暫停那一個，其他照寄。',
     gate: '同一封信兩個同時的請求只寄出一次；同一信箱已寄 19 封、上限 20 時兩封不同的信只寄一封；同一家公司第 3 封不寄；同網域兩信箱搶最後一格只寄一封；名單轉成暖名單後既有草稿不寄；上班時間外不寄；暫停的信箱不寄。一個暖機第一階的次網域信箱寄 1 封到你另一個信箱。', risk: 'High（真寄）', model: 'Opus 5.5＋你', status: 'in_progress', depends: ['C4', 'C11'],
