@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-02（續13）migration 0153 co_replies 套上正式庫＋C4 推上 main（外聯系統 v2 卡 C4，程式 f00dbea9f）
+
+**操作者**：「套 0153 並推上」。
+
+**做了**：`node scripts/apply-db-migration.mjs 0153`（只新增表、函式、trigger、索引，不改既有資料）；merge origin/main（weekly summary）後推上 main `c61d0a592`。今晚 03:00 自動部署的 migration 閘不再擋這版（C11 sender-health route 一起上線）。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scripts/apply-db-migration.mjs 0153 → APPLY_OK 1/1 | exit=0 | ms=17468
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql 查：co_replies 存在、7 個函式、trigger co_replies_stop_followups、5 個索引、anon 無 execute、帳本有 0153、drafted／sending 1 封 | exit=0 | ms=5098
+- REVIEW_WAIVED: NA -- 套用既有已審查的 migration（審查見本日續11），本次無程式改動
+- BUGHUNT_WAIVED: NA -- 無程式改動
+
+**剩**：主機重裝排程讓 `outreach_gmail_sync` 每 10 分跑（install-host-schedules.sh，High，等操作者）；C1.6 操作者按發布並重連 Gmail；REALTEST 真寄一封給自己。
+
+**rollback**：先 revert next-admin，再手動跑 `lobster-factory/packages/db/migrations/0153_co_replies.down.sql`。
 ## 2026-11-02（續12）next-admin 手動提前部署 dc80a0980（刪圖檢查改走 wp-bridge）；部署變慢的量測
 
 **操作者**：「部署」；「為什麼很久 而且現在部屬都越來越久」。
