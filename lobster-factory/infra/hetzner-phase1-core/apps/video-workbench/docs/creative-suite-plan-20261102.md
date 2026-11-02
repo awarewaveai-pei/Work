@@ -6,15 +6,15 @@
 
 | 決定 | 來源 | 影響 |
 |---|---|---|
-| 2D、3D 都要：模型、骨架、攝影機、燈光、動作重定向 | handoff §0（操作者 2026-11-02 10:00 改回；內文 §4.5／§5.1／§10 仍寫不做 3D，以 §0 為準） | 3D 自成階段 P5，排在 2D 骨架之後；圖片轉 3D（S4）併入 P5；3D 攝影機與燈光依路線落在 P3 或 P5 |
-| 原始碼在 repo `apps/video-workbench`，不叫 seedstar | 操作者 2026-11-02；commit f0d1f58b1、0d02453cc | handoff §3.1 的 `D:\Video` 開發位置與「不建 git」已失效；`D:\Video` 只是備份，**今天起不再在那裡改**。 |
+| 2D、3D 都要：模型、骨架、攝影機、燈光、動作重定向 | handoff §0（操作者 2026-11-02 10:00 改回；handoff 內文相關段已同步） | 3D 自成階段 P5，排在 2D 骨架之後；圖片轉 3D（S4）併入 P5；3D 攝影機與燈光依路線落在 P3 或 P5 |
+| 原始碼在 repo `apps/video-workbench`，不叫 seedstar | 操作者 2026-11-02；commit f0d1f58b1、0d02453cc | handoff §3.1 的 `D:\Video` 開發位置與「不建 git」已失效；`D:\Video` 與 Downloads 副本已退場，**只在 repo 改**。 |
 | 先做好功能頁，最後才接 video.aware-wave.com | 操作者 2026-11-02 | 部署與接入是最後一張卡（P6），High |
 | 【分鏡靈感】六檔不碰；4178 唯一入口；外觀讀 AwareWave tokens；不用中國模型；基本剪輯／動畫不強制付費 AI；自用不扣點 | handoff §2 | 每張卡的共同約束 |
 | 先擺場景再生成（四項） | 操作者 2026-11-02 | 併入 P3、P4、P5，見 §4 |
 
 ## 1. 現況（2026-11-02 查證）
 
-- 程式：repo 版 = `D:\Video` 版 + 畫面去 SeedStar 字樣 + 33 個測試全綠（WORKLOG 2026-11-02 續8、續15）+ 今日搬入的人物跟拍修正（`docs/follow-quality-20261102.md`，三支程式與 `tests/follow-identity.cjs`；四個 follow 測試通過）。
+- 程式：repo 版 = 交付包原始碼 + 畫面去 SeedStar 字樣 + 33 個測試全綠（WORKLOG 2026-11-02 續8、續15）+ 今日搬入的人物跟拍修正（`docs/follow-quality-20261102.md`，三支程式與 `tests/follow-identity.cjs`；四個 follow 測試通過）。
 - **4178 現在跑的是 `C:\Users\user1115\Downloads\SeedStar_AwareWave_20261102_完整最新版\SeedStar-app`**（handoff §3.1），不是 repo 版。切換是卡 0。
 - 編輯器：自製五軌 `scripts/tools-editor.js:23`，輸出 `backend/editor-export.cjs:182`（FFmpeg）。不是任何外部引擎。
 - 主系統可沿用：AI 去背 `../next-admin/lib/studio/bg-remover.ts:35`（Replicate，版本釘死）、fabric 畫布 `../next-admin/app/(shell)/tools/canvas/CanvasEditor.tsx`、Remotion 渲染服務 `../remotion-service`、圖片模型 GPT Image／Nano Banana／FLUX（`../next-admin/lib/tarot/image-gen.ts`）。工作台目前只接 OpenAI（README「本機 OpenAI adapter」）。
@@ -36,7 +36,7 @@
 
 ### 卡 0：執行位置切換與基線（先做，半天內）
 
-- 做：確認 4178 持有程序與 `jobs.json` 無進行中任務 → 比對 Downloads／`D:\Video`／repo 三份 `.data`（筆數、檔案引用）→ 最新一份複製進 repo `.data`（gitignored）→ 停舊程序、由 repo `start.cmd` 啟動 → 瀏覽器同網址，localStorage 延續。Downloads 副本保留為復原點；`D:\Video` 凍結。
+- 做：確認 4178 持有程序與 `jobs.json` 無進行中任務 → 比對 Downloads（現在跑的）與 repo 兩份 `.data`（筆數、檔案引用）→ 較新的複製進 repo `.data`（gitignored）→ 停舊程序、由 repo `start.cmd` 啟動 → 瀏覽器同網址，localStorage 延續。Downloads 副本只留作復原點，不再改。
 - 驗收：4178 畫面出現「示範角色庫」（repo 版才有）；`jobs.json` 筆數不少於切換前；既有素材庫可開；分鏡靈感頁正常；`tests/startup.cjs` 通過。
 - 不做：不殺所有 node.exe、不清瀏覽器資料（handoff §3.3）。
 - 建議模型：Opus 5.5。

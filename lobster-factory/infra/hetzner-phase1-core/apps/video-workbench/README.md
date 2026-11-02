@@ -1,14 +1,14 @@
 # 在 repo 的位置（2026-11-02 搬入，先讀這段）
 
-原始碼從 `D:\Video\SeedStar-app` 搬到這裡，之後在這裡改。啟動仍是雙擊 `start.cmd`（http://127.0.0.1:4178/）。外觀直接讀旁邊的 `../next-admin`，不再用 AwareWave-source 副本。
+原始碼 2026-11-02 從交付包（原 `D:\Video\SeedStar-app`，已退場）搬到這裡，只在這裡改。啟動仍是雙擊 `start.cmd`（http://127.0.0.1:4178/）。外觀直接讀旁邊的 `../next-admin`，不再用 AwareWave-source 副本。
 
 不進 git（見 `.gitignore`；D:\Work 是公開 repo）：
 
-- `assets/image-*`、`assets/storyboards-data.json`：從參考網站 seedstar.ai 擷取的圖片與分鏡資料，只供本機參考。新機從 `D:\Video\SeedStar-app\assets` 複製過來，分鏡靈感頁才有內容。
+- `assets/image-*`、`assets/storyboards-data.json`：從參考網站 seedstar.ai 擷取的圖片與分鏡資料，只供本機參考。新機從舊機的 `apps/video-workbench/assets/` 複製過來（不在 git），分鏡靈感頁才有內容。
 - `assets/vision` 的 bundle 與 wasm：`npm ci` 時由 `scripts/vendor-vision.cjs` 從 npm 套件複製並以 `sources.json` 的 SHA-256 驗證。
 - `.data`（作品與任務）、`node_modules`、`runtime`。
 
-**計畫與需求**：排程、卡片、路線在 `docs/creative-suite-plan-20261102.md`（唯一來源）；需求逐項與驗收在 `handoff/Claude_Code_handoff_20261102.md`。2026-11-02 已把 `D:\Video` 的人物跟拍修正（`docs/follow-quality-20261102.md`）搬進來；之後 `D:\Video` 不再修改。
+**計畫與需求**：排程、卡片、路線在 `docs/creative-suite-plan-20261102.md`（唯一來源）；需求逐項與驗收在 `handoff/Claude_Code_handoff_20261102.md`。2026-11-02 已把交付包最後的人物跟拍修正（`docs/follow-quality-20261102.md`）搬進來；`D:\Video` 與 Downloads 副本已退場。
 
 下方各段是搬入前的歷史紀錄，其中 4179、AwareWave-source 等說法以本段為準。
 
