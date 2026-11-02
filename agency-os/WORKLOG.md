@@ -1,4 +1,29 @@
 # Worklog
+## 2026-11-02（續15）影音工作台 6 個壞測試修好：測試改連自己的臨時伺服器＋自有測試圖；順帶修 2 個真 bug（503 誤報「可能已送出」、還原草稿重複技能文字）
+
+**操作者**：「需要修就修」（前一輪 32 個測試 6 個失敗，改動前就壞）。
+
+**根因（三類）**：
+- C1 測試連錯程式：completion／interactions／layouts／regressions／services 寫死 `127.0.0.1:4178`，測的是操作者當下在跑的那份舊工作台（還可能寫進其 `.data`）。查過 4 份本機副本 `.data` 測試期間無寫入。
+- C2 測試依賴不進 git 的擷取圖：14 個測試用 `assets/image-1.png`／`image-2.png`（seedstar.ai 擷取、gitignore），其中 6 處還是不存在的 `image-1.webp`；新 clone 全壞。
+- C3 測試過時：工具改版（剪輯→多軌編輯器、增強／音軌分離→流程畫面、CTA 拿掉「出場」）、空白提示詞不能送出、HTTP 模式需回 capabilities、工具順序變動。
+- 真 bug B1：`shared/runtime.js` 只把 4xx 當明確拒絕；本機伺服器沒設金鑰回 503（呼叫供應商前，`backend/api.cjs:32-35`），畫面卻警告「任務可能已送出，避免重複計費」。伺服器自己的拒絕清單含 409／501／503（`backend/api.cjs:722`）。
+- 真 bug B2：送出時提示詞＝使用者文字＋已選技能指引（`scripts/generator-controls.js:233`），還原任務草稿把整段放回輸入框且技能仍勾選 → 再送一次技能文字重複兩遍。
+
+**做了**：
+- `tests/isolated-server.cjs`：每個瀏覽器測試開自己的伺服器（port 0、暫存資料夾、假金鑰 `test-only`、供應商呼叫一律 throw）；5 個測試改用它。
+- `assets/test-image-1.png`（122×84）／`test-image-2.png`（114×84）：FFmpeg lavfi 自產；22 處引用改過去。放 `assets/` 第一層而非子資料夾：伺服器參考圖路徑只收 `/assets/<檔名>`（`backend/api.cjs:98` 防路徑穿越），第一版放 `assets/fixtures/` 讓 json-mode／director-conversation／generation-flows 被正確拒絕。
+- `tests/test-isolation.cjs`：任何測試再連 4178 或用 `assets/image-*` 即失敗（改前實測抓到 5 個）。
+- B1：瀏覽器端拒絕清單＝伺服器清單（加 409／501／503）；502／504／斷線／格式錯仍為「未確認」。
+- B2：送出另存 `draftPrompt`（使用者原文），還原優先用它；舊任務無此欄位時退回原行為。
+- C3：各測試照新畫面更新選擇器；已退役的舊剪輯畫面那段移除（由 `tests/tools-editor.cjs` 涵蓋）。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=逐一重跑 6 個原失敗測試 → 全 PASS；completion 在 B1、B2 修正前分別紅在 /blocked/ 與「第二步調色」斷言，修後綠（突變等價證據）；test-isolation 改前 exit 1 列 5 檔、改後 exit 0 | exit=0 | ms=40000
+- REALTEST_EVIDENCE: tool=Bash | cmd=完整 tests/*.cjs 一輪（33 檔，含新 test-isolation）→ 33/33 exit=0 | exit=0 | ms=216460
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（critic subagent 逐路徑追 POST /generations：202 前只有 403/413/415/400/501/503，供應商呼叫在 finish() 之後；draftPrompt 不轉供應商、無驗證擋、retry 送原 prompt。2 建議已採：runtime.js 註解收窄到 POST /generations、contracts.d.ts 寫明遠端主機只在未送供應商時回拒絕碼。另自審：B1 只放寬「伺服器在供應商呼叫前回的碼」，504 仍不重送，host-adapter 測試守住；B2 新欄位不送供應商——伺服器只讀 input.prompt；分鏡保護雜湊由 generator-deep-actions 驗證不變）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=127.0.0.1:4178 | hits=5（README 啟動說明 3、scripts/package.cjs 打包說明 1、本 WORKLOG 1；tests/ 內 0，由 test-isolation.cjs 機械守）
+- ORACLE_WAIVED: 工作台為本機自用、未部署；兩個邏輯修正各有紅→綠測試證據。
 ## 2026-11-02（續14）外聯系統 v2 卡 C4：主機裝每 10 分回信同步排程 outreach_gmail_sync
 
 **操作者**：「裝排程」。
