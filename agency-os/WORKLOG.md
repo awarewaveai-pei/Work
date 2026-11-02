@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-02（續30）影音工作台卡 M2：狀態上伺服器（/state＋revision 鎖）、素材來源、任務冪等（2ab702e3f）
+
+- 根因：狀態只在 localStorage；兩分頁互蓋；素材無來源；網路失敗重送可能重複付費。內容見 commit 2ab702e3f。
+- cc.py 工人 2 輪（max_turns 後 --resume），US$10.09。Codex 6 項：5 修（遷移 vs 配額、HttpAdapter 409、剪輯器 409 後舊副本→改為 409 整頁重載、專案內素材 origin、記憶體先於磁碟）、1 駁（冪等鍵跨 2000 筆＋重啟：重送在 180 s 內）。
+- generation-flows.cjs:154 拖曳位置在 HEAD（throwaway worktree）同樣失敗 2/2：既有、受負載影響，非 M2。
+- 4178 未重啟，M2 尚未生效；重啟後首次載入會把操作者瀏覽器資料遷到 .data/state.json（原版另存 pre-server- key）。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=for t in tests/*.cjs; node $t（隔離 server） | exit=0 | ms=600000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/6m/0n（Codex gpt-6-sol，artifact agency-os/reports/oracle/2026-11-02-partialreview-f0f03dcd.md；5 修 1 駁）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=AssetOrigin | hits=5
 ## 2026-11-02（續29）外聯 v2 C15 量產管線（程式完成；種 20 名單跑 3 tick 的 REALTEST 未跑）
 
 **做了**（cc.py SDK 派工 session 563c8843，US$1.80；主 session 驗收＋決定＋修 Codex 4 項；NA = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）：
