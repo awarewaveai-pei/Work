@@ -17,7 +17,7 @@ import { grantFor } from "@/lib/entitlements/grant";
 import type { EvidenceItem } from "./brand-context";
 import { isWarm } from "./cold-gate";
 import { autoDecision, type LeadRow } from "./generate";
-import { inSample, pickVariant, type ClaimCheck } from "./review-policy";
+import { decideSample, favouredLabel, minConfidence, pickVariant, NEUTRAL_SAMPLE_CONTEXT, type ClaimCheck, type SampleContext } from "./review-policy";
 import { capOf, inPool, type PoolAccount } from "./sender-pool";
 
 export const PIPELINE_CAP = 20;
@@ -28,7 +28,7 @@ const CONCURRENCY = 4;
 /** Lead columns the steps read; generation needs the whole row (LeadRow is what the messages route passes it). */
 export type PipelineLead = LeadRow & { website: string | null; email: string | null; social_url?: string | null };
 export interface Profile { id: string; review_mode: "manual" | "sampled"; review_sample_pct: number }
-export interface DraftRow { id: string; lead_id: string; variant_label: string | null; quality_gate_status: "pass" | "warn" | "block";
+export interface DraftRow { id: string; lead_id: string; variant_label: string | null; angle?: string | null; quality_gate_status: "pass" | "warn" | "block";
   body: string; gate_snapshot: Record<string, unknown> | null }
 export interface DraftableMessage { messageId: string; leadId: string; senderId: string | null }
 export type DecideResult = "ok" | "conflict" | "changed";
@@ -44,6 +44,8 @@ export interface PipelineStore {
   /** Draft first emails (A/B) not yet decided by the policy, of leads whose profile is sampled, with those leads. */
   undecidedDrafts(org: string, limit: number): Promise<{ rows: DraftRow[]; leads: Map<string, PipelineLead> }>;
   profile(org: string, id: string | null): Promise<Profile | null>;
+  /** The profile's sampling risk and angle winner (C16), one batch read; absent = nothing flagged, plain review_sample_pct. */
+  sampleContext?(org: string, profileId: string): Promise<SampleContext>;
   evidence(lead: PipelineLead): Promise<EvidenceItem[]>;
   /** draft -> approved or just the snapshot (status undefined); conditional on the row still being a draft. */
   decide(rowId: string, patch: { status?: "approved"; approved_at?: string; gate_snapshot: Record<string, unknown> }): Promise<DecideResult>;
@@ -164,9 +166,16 @@ async function runOrg(deps: PipelineDeps, org: string, r: PipelineResult, now: (
   const { rows, leads: draftLeads } = await store.undecidedDrafts(org, PIPELINE_CAP * 2 * 3);
   const byLead = new Map<string, DraftRow[]>();
   for (const row of rows) byLead.set(row.lead_id, [...(byLead.get(row.lead_id) ?? []), row]);
+  // one context read per profile per tick, shared by every lead of the profile
+  const contexts = new Map<string, Promise<SampleContext>>();
+  const contextOf = (profileId: string): Promise<SampleContext> => {
+    let c = contexts.get(profileId);
+    if (!c) { c = store.sampleContext ? store.sampleContext(org, profileId) : Promise.resolve(NEUTRAL_SAMPLE_CONTEXT); contexts.set(profileId, c); }
+    return c;
+  };
   const decide = [...byLead.entries()].filter(([id]) => { const l = draftLeads.get(id); return !!l && cold(l); }).slice(0, PIPELINE_CAP);
   await each(decide, end, now, async ([leadId, variants]) => {
-    try { await applyPolicy(deps, org, draftLeads.get(leadId)!, variants, r, now); }
+    try { await applyPolicy(deps, org, draftLeads.get(leadId)!, variants, r, now, contextOf); }
     catch (e) { if (e instanceof EntitlementRequired) r.held.push(`${org}:policy:${e.code}`); else r.failed++; }
   });
 
@@ -188,18 +197,21 @@ async function runOrg(deps: PipelineDeps, org: string, r: PipelineResult, now: (
 
 /** One lead's drafts of a sampled profile (SPEC D23). Decisions are deterministic: the same lead always gets the same
  *  variant and the same sample answer. */
-async function applyPolicy(deps: PipelineDeps, org: string, lead: PipelineLead, variants: DraftRow[], r: PipelineResult, now: () => Date): Promise<void> {
+async function applyPolicy(deps: PipelineDeps, org: string, lead: PipelineLead, variants: DraftRow[], r: PipelineResult, now: () => Date,
+  contextOf: (profileId: string) => Promise<SampleContext>): Promise<void> {
   const profile = await deps.store.profile(org, lead.service_profile_id);
   if (profile?.review_mode !== "sampled") return;
-  const keepLabel = pickVariant(lead.id);
+  const ctx = await contextOf(profile.id);
+  const keepLabel = pickVariant(lead.id, favouredLabel(ctx.winner, variants.map((v) => ({ label: v.variant_label, angle: v.angle ?? null }))));
   const keep = variants.find((v) => v.variant_label === keepLabel);
   if (!keep) return;
   const others = variants.filter((v) => v.id !== keep.id).map((v) => v.id);
-  const sampled = inSample(lead.id, profile.review_sample_pct);
   const evidence = await deps.store.evidence(lead);
+  const ds = decideSample(ctx, { leadId: lead.id, pct: profile.review_sample_pct, industry: lead.industry, angle: keep.angle, minConfidence: minConfidence(evidence) });
+  const sampled = ds.sampled;
   const d = await autoDecision({ gate: keep.quality_gate_status, sampled, body: keep.body, evidence, leadId: lead.id, grant: (feature) => grantFor(feature),
     ...(deps.check ? { check: () => deps.check!(lead, keep.body, evidence) } : {}) });
-  const snapshot: Record<string, unknown> = { ...(keep.gate_snapshot ?? {}), sampled, profile_id: profile.id, ...(d.claim ? { claim_check: d.claim } : {}) };
+  const snapshot: Record<string, unknown> = { ...(keep.gate_snapshot ?? {}), sampled, sample: { weight: ds.weight, mean: ds.mean, p: ds.p, flags: ds.flags }, profile_id: profile.id, ...(d.claim ? { claim_check: d.claim } : {}) };
   let outcome: DecideResult;
   if (d.approve) {
     snapshot.auto = true;

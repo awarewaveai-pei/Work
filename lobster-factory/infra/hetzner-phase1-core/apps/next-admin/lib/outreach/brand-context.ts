@@ -3,6 +3,8 @@
 // leaves room for them, and composeBody appends them verbatim. Evidence is an outsider's words, so it is fenced and
 // labelled as a quotation (DATA_COLLECTION_PLAN §1.3b; same fence as lib/cs/cis.ts renderPassage).
 
+import { ANGLES, ANGLE_LABEL, type Angle } from "./generation-schema";
+
 export interface BrandProfile {
   service_name: string | null;
   positioning: string | null;
@@ -22,6 +24,8 @@ export interface EvidenceItem {
   excerpt: string | null;
   source_url: string | null;
   status: "pending" | "approved" | "rejected";
+  /** claim-support score recorded by the research sink (co_evidence.confidence); absent for human-entered facts */
+  confidence?: number | null;
 }
 
 export interface BrandContextInput {
@@ -34,6 +38,8 @@ export interface BrandContextInput {
   evidence: EvidenceItem[];
   /** Something we really made for them (SPEC §5.3 goal); absent = no "I made you …" line. */
   madeForThem?: string | null;
+  /** The profile's winning opening angle (C16.3, winningAngle); null/absent = no 「有效做法」 section. No personal data. */
+  winningAngle?: Angle | null;
 }
 
 export interface BrandContext {
@@ -129,6 +135,8 @@ export function buildBrandContext(input: BrandContextInput): BrandContext {
       input.madeForThem ? `- 我們真的為對方做了：${input.madeForThem}，可以提一次。` : "- 不要說「我幫你做了一個…」：我們沒有為對方做任何東西。",
       `- 繁體中文，內文 120–180 字，語氣${p?.tone ?? "溫和專業"}。主旨 25 字以內，不用驚嘆號。`,
     ].join("\n"),
+    // 6b. what has worked for this service so far (SPEC D24 ③): the angle only, never a lead's words
+    input.winningAngle ? ["## 有效做法", `- 這個服務過去回覆率最高的開場角度是「${input.winningAngle}」（${ANGLE_LABEL[input.winningAngle]}）。兩版之中至少一版用它，另一版用不同的角度。`].join("\n") : "",
     // 7. notice: shown, never rewritten
     notice ? ["## 個資告知（系統會原樣加在署名前，你不要改寫或重複）", notice].join("\n") : "",
     // 8. output format (lib/outreach/generation-schema.ts)
@@ -136,8 +144,9 @@ export function buildBrandContext(input: BrandContextInput): BrandContext {
       "## 輸出",
       "只輸出一個 JSON 物件，不要任何說明或 markdown：",
       "{\"subjects\":[\"A 版主旨\",\"B 版主旨\"],",
-      " \"bodies\":[{\"label\":\"A\",\"text\":\"內文，不含署名與告知\",\"evidence_ids\":[\"…\"]},{\"label\":\"B\",\"text\":\"…\",\"evidence_ids\":[\"…\"]}],",
+      " \"bodies\":[{\"label\":\"A\",\"angle\":\"observation\",\"text\":\"內文，不含署名與告知\",\"evidence_ids\":[\"…\"]},{\"label\":\"B\",\"angle\":\"question\",\"text\":\"…\",\"evidence_ids\":[\"…\"]}],",
       " \"followups\":[{\"step\":2,\"delay_days\":3,\"text\":\"第二封追蹤信內文\"},{\"step\":3,\"delay_days\":5,\"text\":\"第三封\"}]}",
+      `每版的 angle 只能是：${ANGLES.map((a) => `${a}（${ANGLE_LABEL[a]}）`).join("、")}；A、B 兩版必須用不同的 angle。`,
       "A、B 兩版用不同的開場角度；追蹤信每封 60–100 字，不重複第一封的內容，結尾同樣加「如果不適合，我就不再打擾。」",
     ].join("\n"),
   ];

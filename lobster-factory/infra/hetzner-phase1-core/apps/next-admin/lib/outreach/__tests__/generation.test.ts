@@ -43,7 +43,7 @@ describe("buildBrandContext", () => {
 });
 
 describe("parseGenerationOutput", () => {
-  const ok = { subjects: ["一", "二"], bodies: [{ label: "A", text: "a", evidence_ids: ["e1"] }, { label: "B", text: "b", evidence_ids: ["e1"] }],
+  const ok = { subjects: ["一", "二"], bodies: [{ label: "A", angle: "observation", text: "a", evidence_ids: ["e1"] }, { label: "B", angle: "question", text: "b", evidence_ids: ["e1"] }],
     followups: [{ step: 2, delay_days: 3, text: "f" }] };
   it("accepts the contract, also wrapped in prose", () => {
     const r = parseGenerationOutput(`好的：\n\`\`\`json\n${JSON.stringify(ok)}\n\`\`\``, ["e1"]);

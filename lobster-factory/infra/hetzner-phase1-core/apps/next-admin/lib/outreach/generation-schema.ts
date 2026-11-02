@@ -1,7 +1,21 @@
 // Cold Outreach v2 — the shape a generation must have (SPEC §5.3). Hand-written guard: the repo carries no schema library.
 // Errors are short and specific because they go back to the model once as the repair request.
 
-export interface GeneratedBody { label: "A" | "B"; text: string; evidence_ids: string[] }
+/** The opening angle of a first email (SPEC D24 ③): fixed, so reply rates group per angle (co_messages.angle, stats.ts) and
+ *  the winner can be named in the prompt. The model picks one per variant; A and B must differ. */
+export const ANGLES = ["observation", "pain", "result", "question", "peer"] as const;
+export type Angle = (typeof ANGLES)[number];
+/** What each angle means, in the words the prompt and the 「有效做法」 section use. */
+export const ANGLE_LABEL: Record<Angle, string> = {
+  observation: "以對方網站上的具體觀察開場",
+  pain: "以這類業者常見的困擾開場",
+  result: "以我們做得出的具體成果開場",
+  question: "以一個直接的問句開場",
+  peer: "以同類型業者的做法開場",
+};
+export const isAngle = (v: unknown): v is Angle => typeof v === "string" && (ANGLES as readonly string[]).includes(v);
+
+export interface GeneratedBody { label: "A" | "B"; angle: Angle; text: string; evidence_ids: string[] }
 export interface GeneratedFollowup { step: number; delay_days: number; text: string }
 export interface GenerationOutput { subjects: [string, string]; bodies: [GeneratedBody, GeneratedBody]; followups: GeneratedFollowup[] }
 
@@ -42,13 +56,14 @@ export function parseGenerationOutput(raw: string, knownEvidenceIds: readonly st
     const r = b as Record<string, unknown>;
     if (r.label !== want) return { ok: false, error: `bodies[${i}].label must be "${want}"` };
     if (!isStr(r.text)) return { ok: false, error: `bodies[${i}].text must be a non-empty string` };
+    if (!isAngle(r.angle)) return { ok: false, error: `bodies[${i}].angle must be one of ${ANGLES.join(", ")}` };
     const ids = r.evidence_ids;
     if (!Array.isArray(ids) || ids.length === 0 || !ids.every(isStr)) {
       return { ok: false, error: `bodies[${i}].evidence_ids must list at least one evidence id` };
     }
     const unknown = ids.filter((id) => !known.has(id));
     if (unknown.length) return { ok: false, error: `bodies[${i}].evidence_ids names ids that are not in the evidence: ${unknown.join(", ")}` };
-    parsed.push({ label: want, text: r.text.trim(), evidence_ids: Array.from(new Set(ids)) });
+    parsed.push({ label: want, angle: r.angle, text: r.text.trim(), evidence_ids: Array.from(new Set(ids)) });
   }
 
   const followups = o.followups ?? [];
@@ -67,6 +82,8 @@ export function parseGenerationOutput(raw: string, knownEvidenceIds: readonly st
     if (!isStr(r.text)) return { ok: false, error: `followups[${i}].text must be a non-empty string` };
     fu.push({ step: i + 2, delay_days: delay, text: r.text.trim() });
   }
+
+  if (parsed[0].angle === parsed[1].angle) return { ok: false, error: "bodies A and B must use different angles" };
 
   return {
     ok: true,

@@ -7,6 +7,7 @@ import { isWarm } from "./cold-gate";
 import { draftMessage } from "./draft";
 import { approvedEvidence, generateForLead, isUniqueViolation } from "./generate";
 import { researchLead } from "./research";
+import { loadSampleContext, type SampleContext } from "./review-policy";
 import { POOL_COLS, type PoolAccount } from "./sender-pool";
 import type { DraftRow, DraftableMessage, PipelineDeps, PipelineLead, PipelineStore, Profile } from "./pipeline";
 
@@ -96,7 +97,7 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
       if (!profs.length) return { rows: [], leads: new Map() };
       // the policy decides a draft once: gate_snapshot.sampled is its mark (manual-mode drafts never get it, and are not read here)
       const rows = must<Array<DraftRow & { co_leads?: unknown }>>("drafts read", await sb.from("co_messages")
-        .select("id, lead_id, variant_label, quality_gate_status, body, gate_snapshot, co_leads!inner(service_profile_id)")
+        .select("id, lead_id, variant_label, angle, quality_gate_status, body, gate_snapshot, co_leads!inner(service_profile_id)")
         .eq("organization_id", org).eq("output_type", "cold_email").eq("status", "draft").in("variant_label", ["A", "B"])
         .is("gate_snapshot->>sampled", null).in("co_leads.service_profile_id", profs.map((p) => p.id)).order("created_at").limit(limit));
       return { rows: rows.map(({ co_leads: _l, ...r }) => r), leads: await leadsByIds([...new Set(rows.map((r) => r.lead_id))]) };
@@ -107,6 +108,7 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
       if (error) throw new Error(`profile read: ${error.message}`);
       return (data as Profile | null) ?? null;
     },
+    sampleContext: (org, profileId) => loadSampleContext(sb, org, profileId),
     evidence: (lead) => approvedEvidence(sb, lead),
     async decide(rowId, patch) {
       const { data, error } = await sb.from("co_messages").update(patch).eq("id", rowId).eq("status", "draft").select("id").maybeSingle();
@@ -164,6 +166,8 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
 
 /** The real deps: the tick's organization is the billing account (runForOrg), every call the same code the routes run. */
 export function pipelineDeps(sb: SupabaseClient, deadline: number): PipelineDeps {
+  // one sampling-context read per (organization, profile) for the whole tick, not one per written mail
+  const contexts = new Map<string, Promise<SampleContext>>();
   return {
     store: supabasePipelineStore(sb),
     deadline,
@@ -174,7 +178,13 @@ export function pipelineDeps(sb: SupabaseClient, deadline: number): PipelineDeps
       if (o.status === "failed") throw new Error(o.error ?? "research failed");
     },
     async generate(lead) {
-      const res = await generateForLead(sb, lead, { agencyFallback: false, grant: (feature) => grantFor(feature), pastedReply: null });
+      const res = await generateForLead(sb, lead, { agencyFallback: false, grant: (feature) => grantFor(feature), pastedReply: null,
+        sampleContext: (profileId) => {
+          const key = `${lead.organization_id}:${profileId}`;
+          let c = contexts.get(key);
+          if (!c) { c = loadSampleContext(sb, lead.organization_id, profileId); contexts.set(key, c); }
+          return c;
+        } });
       const j = (await res.json().catch(() => ({}))) as { error?: string };
       return { status: res.status, error: j.error };
     },

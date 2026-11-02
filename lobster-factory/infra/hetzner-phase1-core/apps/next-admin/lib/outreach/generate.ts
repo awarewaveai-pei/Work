@@ -12,7 +12,7 @@ import type { Grant } from "@/lib/entitlements/can";
 export type OutreachGrant = (feature: "outreach.draft" | "outreach.qa") => Promise<Grant>;
 import { buildBrandContext, composeBody, BrandContextError, type BrandProfile, type EvidenceItem } from "@/lib/outreach/brand-context";
 import { parseGenerationOutput, repairPrompt } from "@/lib/outreach/generation-schema";
-import { pickVariant, inSample, autoApproves, type ClaimCheck } from "@/lib/outreach/review-policy";
+import { pickVariant, favouredLabel, decideSample, minConfidence, loadSampleContext, NEUTRAL_SAMPLE_CONTEXT, autoApproves, type ClaimCheck, type SampleContext } from "@/lib/outreach/review-policy";
 import { checkClaims } from "@/lib/outreach/claim-check";
 import { senderFor } from "@/lib/outreach/sender";
 
@@ -29,6 +29,7 @@ export interface LeadRow {
   id: string;
   organization_id: string | null;
   service_profile_id: string | null;
+  industry?: string | null;
   name: string | null;
   observation: string | null;
   source_url: string | null;
@@ -49,7 +50,7 @@ const BRAND_BLOCK: Record<BrandContextError["code"], string> = {
 // The lead's approved evidence (co_evidence, card C3) plus, until card C9, its old observation + source as one more fact.
 const EVIDENCE_LIMIT = 12;
 export async function approvedEvidence(db: SupabaseClient, lead: LeadRow): Promise<EvidenceItem[]> {
-  const { data, error } = await db.from("co_evidence").select("id, claim, excerpt, source_url, status")
+  const { data, error } = await db.from("co_evidence").select("id, claim, excerpt, source_url, status, confidence")
     .eq("lead_id", lead.id).eq("status", "approved").order("created_at", { ascending: true }).limit(EVIDENCE_LIMIT);
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as EvidenceItem[];
@@ -83,6 +84,9 @@ export interface GenerateOptions {
   grant: OutreachGrant;
   /** A reply the operator got from ChatGPT/Claude for the manual prompt, pasted back. */
   pastedReply: string | null;
+  /** The profile's risk and angle context. The pipeline passes one cached per tick (a read per profile, not per mail);
+   *  absent = read it here. */
+  sampleContext?: (profileId: string) => Promise<SampleContext>;
 }
 
 /** The caller has authorized access to the lead's organization. */
@@ -123,9 +127,19 @@ export async function generateForLead(supabase: SupabaseClient, lead: LeadRow, o
     collector = (org as { name?: string } | null)?.name ?? collector;
   }
 
+  // C16: what the sampling weights and the angle winner are measured against. A sampled profile never samples on a failed
+  // read (nothing would be auto-approved on guesses); a manual one has no sampling, so the prompt just goes without.
+  let sctx: SampleContext = NEUTRAL_SAMPLE_CONTEXT;
+  if (sp) {
+    try { sctx = await (o.sampleContext ?? ((pid) => loadSampleContext(supabase, lead.organization_id, pid)))(sp.id); }
+    catch (e) {
+      if (sp.review_mode === "sampled") return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "sample context read failed" }, { status: 500 });
+    }
+  }
+
   let ctx: ReturnType<typeof buildBrandContext>;
   try {
-    ctx = buildBrandContext({ lead, profile: sp, signature: sender.signature_block, collector, evidence });
+    ctx = buildBrandContext({ lead, profile: sp, signature: sender.signature_block, collector, evidence, winningAngle: sctx.winner });
   } catch (e) {
     if (e instanceof BrandContextError) return NextResponse.json({ ok: false, blocked: true, blockers: [BRAND_BLOCK[e.code]] }, { status: 422 });
     throw e;
@@ -220,8 +234,8 @@ export async function generateForLead(supabase: SupabaseClient, lead: LeadRow, o
 
   const out = parsed.value;
   const sampledMode = sp?.review_mode === "sampled";
-  const keep = sampledMode ? pickVariant(lead.id) : null;
-  const sampled = sampledMode && inSample(lead.id, sp?.review_sample_pct ?? 10);
+  const keep = sampledMode ? pickVariant(lead.id, favouredLabel(sctx.winner, out.bodies)) : null;
+  const lowest = minConfidence(evidence);
   const nowIso = new Date().toISOString();
 
   const rows: Record<string, unknown>[] = [];
@@ -235,16 +249,18 @@ export async function generateForLead(supabase: SupabaseClient, lead: LeadRow, o
     if (keep && b.label !== keep) {
       status = "skipped";
     } else if (keep) {
-      const d = await autoDecision({ gate: g.quality_gate_status, sampled, body: text, evidence, leadId: lead.id, grant: o.grant });
+      const ds = decideSample(sctx, { leadId: lead.id, pct: sp?.review_sample_pct ?? 10, industry: lead.industry, angle: b.angle, minConfidence: lowest });
+      const d = await autoDecision({ gate: g.quality_gate_status, sampled: ds.sampled, body: text, evidence, leadId: lead.id, grant: o.grant });
       if (d.claim) snapshot.claim_check = d.claim;
-      snapshot.sampled = sampled;
+      snapshot.sampled = ds.sampled;
+      snapshot.sample = { weight: ds.weight, mean: ds.mean, p: ds.p, flags: ds.flags };
       if (d.approve) {
         status = "approved";
         approvedAt = nowIso;
         snapshot.auto = true;
       }
     }
-    rows.push({ ...base, output_type: "cold_email", variant_label: b.label, subject, body: text, version: 1,
+    rows.push({ ...base, output_type: "cold_email", variant_label: b.label, angle: b.angle, subject, body: text, version: 1,
       safety_score: g.safety_score, quality_gate_status: g.quality_gate_status, gate_snapshot: snapshot,
       evidence_snapshot: { evidence_ids: b.evidence_ids }, status, approved_at: approvedAt });
   }

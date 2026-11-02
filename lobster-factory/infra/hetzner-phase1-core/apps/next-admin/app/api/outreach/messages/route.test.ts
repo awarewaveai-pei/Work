@@ -10,8 +10,8 @@ const SIGNATURE = "王小明\n好夥伴工作室\nhttps://partner.example";
 const GOOD = JSON.stringify({
   subjects: ["想請教貴店的課表", "關於週末親子課"],
   bodies: [
-    { label: "A", text: "您好，看到貴店週末開了親子課。如果不適合，我就不再打擾。", evidence_ids: ["lead-observation"] },
-    { label: "B", text: "您好，注意到親子課很受歡迎。如果不適合，我就不再打擾。", evidence_ids: ["lead-observation"] },
+    { label: "A", angle: "observation", text: "您好，看到貴店週末開了親子課。如果不適合，我就不再打擾。", evidence_ids: ["lead-observation"] },
+    { label: "B", angle: "question", text: "您好，注意到親子課很受歡迎。如果不適合，我就不再打擾。", evidence_ids: ["lead-observation"] },
   ],
   followups: [{ step: 2, delay_days: 3, text: "再補充一個想法。如果不適合，我就不再打擾。" }],
 });
@@ -38,7 +38,7 @@ vi.mock("@/lib/org-client", () => {
   const query = (table: string) => {
     const op: Op = { table, kind: "select", filters: [] };
     const q: Record<string, unknown> = {};
-    for (const k of ["eq", "is", "not", "in", "neq", "lt", "match", "order", "limit"]) q[k] = (...a: unknown[]) => { op.filters.push([k, a]); return q; };
+    for (const k of ["eq", "is", "not", "in", "neq", "lt", "gte", "match", "order", "limit"]) q[k] = (...a: unknown[]) => { op.filters.push([k, a]); return q; };
     q.select = () => q;
     q.insert = (p: unknown) => { op.kind = "insert"; op.payload = p; return q; };
     q.update = (p: unknown) => { op.kind = "update"; op.payload = p; return q; };

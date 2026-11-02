@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-02（續39）外聯 v2 C16.1＋C16.3 依風險抽樣、切角回饋（程式完成；C16.2 一致率與 C16.4 真資料待寄量）
+
+**做了**（cc.py SDK 派工 session 08e27371，US$1.28；主 session 驗收＋修 Codex 4 項；NA = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）：
+- C16.1 `NA/lib/outreach/review-policy.ts` `sampleWeight`／`decideSample`／`loadSampleContext`（每 profile 每 tick 讀一次）：權重 1＋新 profile（自動核准未滿 20）4＋沒寄過的產業 2＋證據信心 <0.7 2＋profile×angle 7 日退信／負面回覆率高於全 org（≥10 封才比）3；機率＝pct×權重÷平均權重（雜湊可重算，`gate_snapshot.sample` 存權重與平均）。`generate.ts`、`pipeline.ts`、`pipeline-store.ts` 改用。
+- C16.3 `generation-schema.ts` 固定詞表 `ANGLES`（observation／pain／result／question／peer），每版必填、A／B 不同；寫 `co_messages.angle`；`brand-context.ts`「有效做法」段（兩切角各 ≥30 封、嚴格勝出）；`pickVariant` 偏向勝出版 75%／另一版 25%。（同時解掉 C7 Codex F1：angle 從此有值。）
+- Codex `agency-os/reports/oracle/2026-11-02-partialreview-197e782f.md` 4 項皆修：F1 歷史 <30 筆時不加權平均（每封自己為平均，抽樣率＝pct，原本新 profile 會到 5 倍）；F2「寄過的產業」只算 sending／sent；F3 7 日窗以 `sent_at` 計；F4 未分類回信（reply_type NULL）不算回覆。
+- 不做：C16.2（≥200 封真信判兩次量一致率）。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（全套）→ 469 files passed、2 紅＝seedstar；review-sampling 3（高風險抽中率 ≥2 倍、未知切角拒絕、勝出切角＋≥20% 保留）；npx tsc --noEmit exit 0 | exit=0 | ms=120000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n（Codex partialreview-197e782f，4 項已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=decideSample | hits=10
+- 未驗：`loadSampleContext` 的 PostgREST 查詢未對真資料跑（正式庫目前無 sampled profile 的寄送量）。
+
+**rollback**：revert 本 commit（抽樣回到均勻、無切角）。
 ## 2026-11-02（續38）外聯 v2 C14 Meta 名單型廣告 → 暖名單 → FluentCRM（程式完成；0154 已套正式庫；C14.3 Meta 設定待操作者）
 
 **操作者**：同意「套 0154 → commit C14 → 部署」（經 session local_6aa73d12 轉達）。
