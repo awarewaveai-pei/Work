@@ -1,4 +1,20 @@
 # Worklog
+## 2026-11-02（續14）外聯系統 v2 卡 C4：主機裝每 10 分回信同步排程 outreach_gmail_sync
+
+**操作者**：「裝排程」。
+
+**做了**：主機 `/root/lobster-phase1/scripts/cron.d/awarewave-schedules` 原本是舊版（沒有 outreach_gmail_sync）→ 用 `git show HEAD:` 的版本覆蓋（diff 只多註解與 `*/10` 一行；原檔備份 `/root/lobster-phase1/.state/awarewave-schedules.bak-c4-*`）→ `install-host-schedules.sh` 安裝。
+- 今晚 03:00 部署前 route 不存在：這段時間 poke 回 404，排程頁該列紅、schedule_alerts 推一次，部署後恢復。
+- 部署後若 Gmail 授權仍失效（2026-11-01 已 invalid_grant，見 C1.4），該列會繼續紅，直到操作者做 C1.6（發布＋重連）。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=install-host-schedules.sh → installed 7 file(s), retired 0；--check → exit 0；/etc/cron.d/awarewave-schedules 含 outreach_gmail_sync | exit=0 | ms=5423
+- REVIEW_WAIVED: NA -- 套用既有已審查的排程行（審查見本日續11），無程式改動
+- BUGHUNT_WAIVED: NA -- 無程式改動
+
+**剩**：C1.6 操作者按發布並重連 Gmail；REALTEST 真寄一封給自己並回覆。
+
+**rollback**：`./install-host-schedules.sh --rollback /root/lobster-phase1/.state/cron-backup-20261102T012447Z`；來源檔用 `.bak-c4-*` 蓋回。
 ## 2026-11-02（續13）migration 0153 co_replies 套上正式庫＋C4 推上 main（外聯系統 v2 卡 C4，程式 f00dbea9f）
 
 **操作者**：「套 0153 並推上」。
