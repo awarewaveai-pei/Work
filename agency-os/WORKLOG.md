@@ -1,4 +1,26 @@
 # Worklog
+## 2026-11-02（續38）外聯 v2 C14 Meta 名單型廣告 → 暖名單 → FluentCRM（程式完成；0154 已套正式庫；C14.3 Meta 設定待操作者）
+
+**操作者**：同意「套 0154 → commit C14 → 部署」（經 session local_6aa73d12 轉達）。
+
+**做了**（cc.py SDK 派工 session a9bcfa74，US$1.46；主 session 驗收＋修 Codex 2 項＋閘）：
+- `lobster-factory/packages/db/migrations/0154_co_leads_meta_source.sql`（down 兩處）：部分唯一索引 `co_leads(organization_id, source_url) nulls not distinct WHERE source_url LIKE 'meta:leadgen/%'`（已有重複＝拒套）；`co_convert_to_warm` 在 lead 鎖內重查退訂／do_not_contact → 回 -1 不改（Codex F1）。down 還原 0152 函式。
+- `NA/lib/outreach/warm-leads.ts` `captureWarmLead`（upsert → `co_convert_to_warm` → 系統模式閘 → `upsertContact` tag `meta-lead-ad` → timeline）；`bridgeClientId` 由此匯出，`leads/sync-fluentcrm/route.ts` 改用（一份規則）。
+- `NA/lib/outreach/meta-leads.ts` `handleLeadgenChanges`＋`NA/app/api/webhooks/meta/route.ts` 簽章後先處理 leadgen 再交社群模組；`csv-table.ts`；Inbox「匯入 Meta 名單 CSV」（`warmLeads` 分支，一次 ≤50 列、並行 5、檔內同 email 先合併，Codex F3：nginx 300 s）。
+- 不改：F2 找不到 bridge 時 webhook 不重試——名單頁「同步 FluentCRM」可手動補。
+- 套正式庫：`node scripts/apply-db-migration.mjs 0154`。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scripts/apply-db-migration.mjs 0154 → APPLY_OK 1/1 | exit=0 | ms=15000
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec supabase-db psql：索引 co_leads_org_meta_leadgen_uniq 存在、schema_migrations 有 0154、co_convert_to_warm 含 return -1 | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m pytest lobster-factory/packages/db/tests/test_0154_co_leads_meta_source.py → 4 passed；突變：拔退訂守衛 → test_convert_to_warm_refuses_an_opted_out_lead 紅，還原綠 | exit=0 | ms=13000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（全套）→ 469 files passed、2 紅＝seedstar；npx tsc --noEmit exit 0 | exit=0 | ms=120000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（Codex partialreview-da466b4c，F1／F3 修，F2 記）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=captureWarmLead | hits=10
+
+**剩**：C14.3 操作者：App 加 `leads_retrieval`、各品牌頁 `subscribed_apps?subscribed_fields=leadgen`；Meta 測試工具送一筆＝REALTEST。
+
+**rollback**：revert next-admin 本 commit → 手動 `0154_co_leads_meta_source.down.sql`（只刪索引、還原函式）。
 ## 2026-11-02（續37）影音工作台卡 M3：整數影格＋有理影格率、輸出驗證、專案外層、MediaTimelineV1 匯出（b52b2ac04）
 
 - 內容見 commit b52b2ac04。cc.py 工人 US$4.10。Codex 3 項全修（本機素材 ID 列 loss、sourceStart 量化列 loss、正式匯出抽格比對＋tests/export-frame-check.cjs）。

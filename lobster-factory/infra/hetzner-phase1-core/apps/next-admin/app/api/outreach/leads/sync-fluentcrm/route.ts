@@ -5,7 +5,7 @@ import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tena
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { findSuppressed } from "@/lib/outreach/suppression";
 import { upsertContact } from "@/lib/crm/fluentcrm";
-import { listBridgeClients } from "@/lib/payments/woo";
+import { bridgeClientId } from "@/lib/outreach/warm-leads";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 import { blockedChangeResponse } from "@/lib/system-modes/blocked-change";
 
@@ -19,7 +19,6 @@ export const dynamic = "force-dynamic";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SYNC_CONSENT = ["replied", "opted_in", "form_submitted", "customer"];
-const hostOf = (url: string): string | null => { try { return new URL(url).host.toLowerCase(); } catch { return null; } };
 
 export async function POST(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
@@ -53,13 +52,8 @@ export async function POST(req: Request): Promise<Response> {
   // wp_sites lives in the main database, whichever database this org's outreach data is in.
   const main = getSupabaseWriteClient();
   if (!main) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
-  const { data: sites, error: sErr } = lead.organization_id
-    ? await main.from("wp_sites").select("url").eq("organization_id", lead.organization_id).eq("active", true)
-    : { data: [], error: null };
-  if (sErr) return NextResponse.json({ ok: false, error: sErr.message }, { status: 500 });
-  const hosts = new Set(((sites ?? []) as Array<{ url: string }>).map((s) => hostOf(s.url)).filter((h): h is string => !!h));
-  const client = listBridgeClients().find((c) => { const h = hostOf(c.baseUrl); return !!h && hosts.has(h); });
-  if (!client) return NextResponse.json({ ok: false, error: "no_bridge" }, { status: 422 });
+  const clientId = await bridgeClientId(lead.organization_id);  // one rule with Meta / CSV warm leads (warm-leads.ts)
+  if (!clientId) return NextResponse.json({ ok: false, error: "no_bridge" }, { status: 422 });
 
   // A write into a client's WordPress: the system-mode gate first, like every WP-Bridge write path
   // (lib/system-modes/__tests__/production-change-coverage.test.ts).
@@ -68,7 +62,7 @@ export async function POST(req: Request): Promise<Response> {
 
   const now = new Date().toISOString();
   // first_name is the person, not the company (Codex C6 F4)
-  const res = await upsertContact({ email, first_name: (lead.contact_name ?? lead.name) ?? undefined, tags: ["outreach-warm"] }, { clientId: client.id });
+  const res = await upsertContact({ email, first_name: (lead.contact_name ?? lead.name) ?? undefined, tags: ["outreach-warm"] }, { clientId });
   // The system-mode gate refused the write: nothing reached FluentCRM, the lead is not "failed" (Codex C6 F3).
   if (res.ok === false && res.blockedMode) return blockedChangeResponse(res.blockedMode);
   if (!res.ok || res.value.status !== "committed" || res.value.contact_id == null) {
@@ -80,6 +74,6 @@ export async function POST(req: Request): Promise<Response> {
   const contactId = String(res.value.contact_id);
   const { error: uErr } = await supabase.from("co_leads").update({ fluentcrm_contact_id: contactId, fluentcrm_sync_status: "synced", fluentcrm_last_synced_at: now, updated_at: now }).eq("id", lead.id);
   if (uErr) return NextResponse.json({ ok: false, error: uErr.message }, { status: 500 });
-  await supabase.from("co_timeline_events").insert({ organization_id: lead.organization_id, lead_id: lead.id, event_type: "fluentcrm_synced", title: "已同步到 FluentCRM", metadata: { contact_id: contactId, bridge: client.baseUrl } });
+  await supabase.from("co_timeline_events").insert({ organization_id: lead.organization_id, lead_id: lead.id, event_type: "fluentcrm_synced", title: "已同步到 FluentCRM", metadata: { contact_id: contactId, bridge: clientId } });
   return NextResponse.json({ ok: true, contactId });
 }

@@ -5,6 +5,7 @@ import { DISCOVER_COST_TWD, MAX_DISCOVER, creditsTwd } from "@/lib/outreach/disc
 import { PLATFORM_HOSTS } from "@/lib/outreach/normalize";
 import { PEOPLE_MAX, PEOPLE_MAX_SERPER_CREDITS } from "@/lib/outreach/sources/people-search";
 import { MAX_GUESSES } from "@/lib/outreach/email-guess";
+import { decodeCsv, parseCsv } from "@/lib/outreach/csv-table";
 import { GCIS_ATTRIBUTION, GCIS_COUNTIES, GCIS_MAX_COMPANIES, GCIS_MAX_SERPER_CREDITS } from "@/lib/outreach/sources/gcis";
 
 interface InboxItem {
@@ -33,6 +34,14 @@ interface FormState {
 
 const EMPTY: FormState = { name: "", email: "", website: "", industry: "", sourceUrl: "", observation: "" };
 const PASTED_SOURCE_TYPE = "pasted_person";
+// The four columns of a Meta lead-ad export the import reads; the guesses are the names Meta uses, each is changed by a button.
+const CSV_FIELDS = [
+  { key: "email", label: "Email", guess: /^e-?mail$/i },
+  { key: "full_name", label: "姓名", guess: /^(full_?name|name)$/i },
+  { key: "phone", label: "電話", guess: /^phone(_?number)?$/i },
+  { key: "created_time", label: "送出時間", guess: /^created_?time$/i },
+] as const;
+type CsvKey = (typeof CSV_FIELDS)[number]["key"];
 const INBOX_API = "/api/outreach/inbox";
 const LEADS_API = "/api/outreach/leads";
 // Only http(s) becomes a link: website and source_url are imported text, and a javascript: URL in href runs on click.
@@ -60,6 +69,7 @@ export default function InboxClient() {
   const [people, setPeople] = useState({ role: "", company: "", location: "", keyword: "" });
   const [paste, setPaste] = useState({ name: "", email: "", url: "", source: "" });
   const [emailDomain, setEmailDomain] = useState("");
+  const [csv, setCsv] = useState<{ headers: string[]; rows: string[][]; form: string; map: Partial<Record<CsvKey, number>> } | null>(null);
 
   const org = useActiveOrg();
 
@@ -275,6 +285,44 @@ export default function InboxClient() {
     }
   }
 
+  async function readCsv(file: File | undefined) {
+    if (!file) return;
+    setErr(null);
+    setMsg(null);
+    const { headers, rows } = parseCsv(decodeCsv(await file.arrayBuffer()));
+    if (headers.length === 0 || rows.length === 0) { setCsv(null); setErr("這個檔案沒有資料列"); return; }
+    const map: Partial<Record<CsvKey, number>> = {};
+    for (const f of CSV_FIELDS) { const i = headers.findIndex((h) => f.guess.test(h)); if (i >= 0) map[f.key] = i; }
+    setCsv({ headers, rows, form: file.name.replace(/\.[^.]+$/, ""), map });
+  }
+
+  async function importCsv() {
+    if (!csv || csv.map.email === undefined || !csv.form.trim()) return;
+    setBusy(true);
+    setErr(null);
+    setMsg(null);
+    try {
+      const cell = (r: string[], k: CsvKey) => (csv.map[k] === undefined ? "" : r[csv.map[k]!] ?? "");
+      const rows = csv.rows.map((r) => ({ email: cell(r, "email"), full_name: cell(r, "full_name"), phone: cell(r, "phone"), created_time: cell(r, "created_time") }));
+      const r = await fetch(INBOX_API, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ warmLeads: { form: csv.form.trim(), rows }, organizationId: org }),
+      });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "import failed");
+      const s = j.summary as Record<string, number>;
+      const label: Record<string, string> = { synced: "已同步 FluentCRM", already_synced: "先前已同步", failed: "FluentCRM 同步失敗（再匯入一次會補）", not_eligible: "在拒收名單，未同步",
+        blocked: "已退出或不可聯絡，略過", invalid_email: "email 不正確，略過", db_error: "寫入失敗，再匯入一次會補" };
+      setCsv(null);
+      setMsg(`新增 ${j.imported} 位、原本就有 ${j.existing} 位 — ${Object.entries(s).map(([k, n]) => `${label[k] ?? k} ${n}`).join("；")}`);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function findEmail(it: InboxItem) {
     setBusy(true);
     setErr(null);
@@ -395,6 +443,30 @@ export default function InboxClient() {
         <input placeholder="資料從哪來（一句，例：2026 年 10 月展覽現場交換名片）" value={paste.source} onChange={(e) => setPaste((p) => ({ ...p, source: e.target.value }))} />
         <button type="submit" className="btn-primary" disabled={busy}>{busy ? "處理中…" : "匯入收件匣"}</button>
       </form>
+
+      <div className="card" style={{ display: "grid", gap: 8 }}>
+        <div className="card-header"><span className="card-label">匯入 Meta 名單 CSV</span></div>
+        <p className="card-sub">Meta 名單廣告表單匯出的檔案。這些人自己填了表單，直接成為暖名單並同步到 FluentCRM，不進收件匣審核，也不會收到開發信；名單裡已有的 email 不重複建，已排好的開發信會取消。</p>
+        <input type="file" accept=".csv,text/csv" aria-label="選擇 CSV 檔" onChange={(e) => void readCsv(e.target.files?.[0])} />
+        {csv && (
+          <>
+            <input placeholder="表單名稱" value={csv.form} onChange={(e) => setCsv((c) => (c ? { ...c, form: e.target.value } : c))} />
+            {CSV_FIELDS.map((f) => (
+              <div key={f.key} style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }} role="group" aria-label={`${f.label}是哪一欄`}>
+                <span className="card-sub">{f.label}{f.key === "email" ? "（必選）" : ""}：</span>
+                {csv.headers.map((h, i) => (
+                  <button key={`${f.key}-${i}`} type="button" className={csv.map[f.key] === i ? "btn-primary" : "btn-secondary"} aria-pressed={csv.map[f.key] === i}
+                    onClick={() => setCsv((c) => (c ? { ...c, map: { ...c.map, [f.key]: c.map[f.key] === i && f.key !== "email" ? undefined : i } } : c))}>{h}</button>
+                ))}
+              </div>
+            ))}
+            <p className="card-sub">共 {csv.rows.length} 列{csv.rows.length > 50 ? "（一次最多 50 列，請分檔）" : ""}。</p>
+            <button type="button" className="btn-primary" disabled={busy || csv.map.email === undefined || !csv.form.trim() || csv.rows.length > 50} onClick={() => void importCsv()}>
+              {busy ? "處理中…" : `匯入 ${csv.rows.length} 位為暖名單`}
+            </button>
+          </>
+        )}
+      </div>
 
       <form className="card" onSubmit={addOne} style={{ display: "grid", gap: 8 }}>
         <div className="card-header"><span className="card-label">手動新增一筆</span></div>

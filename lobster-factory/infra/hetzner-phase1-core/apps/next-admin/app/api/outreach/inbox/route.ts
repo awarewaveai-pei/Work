@@ -15,6 +15,7 @@ import { grantFor } from "@/lib/entitlements/grant";
 import { EntitlementRequired } from "@/lib/entitlements/can";
 import { createBudget, createProviderCall, ProviderCallError } from "@/lib/collect";
 import { discoverCompanies, searchBusinessItems, GcisError, GCIS_COUNTIES, GCIS_MAX_SERPER_CREDITS, type GcisUsage } from "@/lib/outreach/sources/gcis";
+import { captureWarmLead } from "@/lib/outreach/warm-leads";
 import { peopleInput, searchPeople, PEOPLE_MAX_SERPER_CREDITS, PEOPLE_SOURCE_TYPE, type PeopleUsage } from "@/lib/outreach/sources/people-search";
 
 // Cold Outreach — Lead Inbox import (task T5). Table: co_lead_inbox (migration 0048).
@@ -28,6 +29,10 @@ export const dynamic = "force-dynamic";
 const TABLE = "co_lead_inbox";
 const LIST_LIMIT = 200;
 const MAX_BATCH = 500;
+// Each row may call the FluentCRM bridge (up to ~30 s) inside this request, behind nginx's 300 s proxy_read_timeout
+// (nginx/default.conf:244): 5 at a time and at most 50 a request (Codex C14 F3).
+const MAX_WARM_ROWS = 50;
+const WARM_CONCURRENCY = 5;
 // Guard uuid-typed columns up front so a bad id returns a clean 400, not a raw PG 22P02 leak.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -75,6 +80,9 @@ export async function GET(req: Request): Promise<Response> {
 //   OR  { ..., gcisItems: "<text>" } — the business items whose description holds the text; nothing is written.
 //   OR  { ..., people: { role, company, location, keyword } } — ≤ 20 people from a search engine's public index (card
 //   C13.1; title, snippet and link only); the answer adds discovery { credits, twd, skipped }.
+//   OR  { ..., warmLeads: { form, rows: [{ email, full_name, phone, created_time }] } } — the CSV of a Meta lead-ad form
+//   (card C14.1): each row is a person who asked to hear from us, so it skips the inbox review and goes straight to a warm
+//   lead + FluentCRM (warm-leads.ts); the answer is { imported, existing, summary }.
 export async function POST(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
@@ -228,6 +236,39 @@ export async function POST(req: Request): Promise<Response> {
       return NextResponse.json({ ok: false, error: e.message }, { status: e.kind === "unconfigured" ? 503 : 502 });
     }
     if (rawList.length === 0) return NextResponse.json({ ok: true, imported: 0, summary: {}, discovery });
+  }
+
+  if (body.warmLeads !== undefined) {
+    const w = body.warmLeads && typeof body.warmLeads === "object" ? (body.warmLeads as Record<string, unknown>) : {};
+    const form = typeof w.form === "string" ? w.form.trim().slice(0, 100) : "";
+    const rows = Array.isArray(w.rows) ? (w.rows as Array<Record<string, unknown>>) : [];
+    if (!form) return NextResponse.json({ ok: false, error: "warmLeads.form (the form's name) required" }, { status: 400 });
+    if (rows.length === 0) return NextResponse.json({ ok: false, error: "warmLeads.rows required" }, { status: 400 });
+    if (rows.length > MAX_WARM_ROWS) return NextResponse.json({ ok: false, error: `max ${MAX_WARM_ROWS} rows per CSV import` }, { status: 413 });
+    const text = (v: unknown) => (typeof v === "string" ? v : "");
+    const summary: Record<string, number> = {};
+    let imported = 0;
+    let existing = 0;
+    // One row per address before rows run in parallel: two rows of one person would race to create the same lead.
+    const seenEmail = new Set<string>();
+    const unique = rows.filter((r) => { const e = text(r?.email).trim().toLowerCase(); if (!e) return true; if (seenEmail.has(e)) return false; seenEmail.add(e); return true; });
+    existing += rows.length - unique.length;
+    if (rows.length > unique.length) summary.duplicate_in_file = rows.length - unique.length;
+    let next = 0;
+    await Promise.all(Array.from({ length: Math.min(WARM_CONCURRENCY, unique.length) }, async () => {
+      while (next < unique.length) {
+        const r = unique[next++];
+        const at = Date.parse(text(r?.created_time));
+        const res = await captureWarmLead(supabase, {
+          orgId: organizationId, email: text(r?.email), name: text(r?.full_name), phone: text(r?.phone), sourceRef: null,
+          consent: { source: `meta_lead_ad_csv:${form}`, at: Number.isFinite(at) ? new Date(at).toISOString() : null },
+        });
+        const key = res.ok ? res.sync : res.reason;
+        summary[key] = (summary[key] ?? 0) + 1;
+        if (res.ok) { if (res.created) imported++; else existing++; }
+      }
+    }));
+    return NextResponse.json({ ok: true, imported, existing, summary }, { status: 201 });
   }
 
   if (rawList.length === 0) return NextResponse.json({ ok: false, error: "leads[] or lead required" }, { status: 400 });

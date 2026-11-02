@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { verifyMetaSignature } from "@/lib/social/meta-webhook";
 import { processMetaWebhook } from "@/lib/social/meta-auto-reply";
+import { handleLeadgenChanges } from "@/lib/outreach/meta-leads";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,6 +38,11 @@ export async function POST(req: Request): Promise<Response> {
   } catch {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
+  // Lead-ad forms (card C14.2) are stored before the social auto-reply runs; that module is idempotent per event id, so a
+  // delivery Meta repeats because a lead could not be finished (503 below) does not reply twice.
+  const leads = await handleLeadgenChanges(payload);
   // A valid delivery is acknowledged even while the review gate or token is off; this prevents Meta retry storms.
-  return NextResponse.json({ ok: true, ...await processMetaWebhook(payload) });
+  const social = await processMetaWebhook(payload);
+  if (leads.retry > 0) return NextResponse.json({ ok: false, error: "leadgen_retry", leads, ...social }, { status: 503 });
+  return NextResponse.json({ ok: true, ...social, ...(leads.received ? { leads } : {}) });
 }
