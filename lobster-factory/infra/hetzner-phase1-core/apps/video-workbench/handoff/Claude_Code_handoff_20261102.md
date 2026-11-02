@@ -1,4 +1,4 @@
-> **位置與範圍更新（操作者 2026-11-02）**：本檔所有 `D:\Video\SeedStar-app\…` 路徑 = repo `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\video-workbench\…`；`D:\Video`、Downloads 副本已退場，只在 repo 改（§3.1 表與 §11 貼文的舊路徑不再適用，保留為當日紀錄）。**3D 要做**：§0 已改為 2D、3D 都要；下文 §4.5、§5.1、§8 P4、§10、§11 原「不做 3D／延後」句已同步改寫。排程與卡片在 `../docs/creative-suite-plan-20261102.md`。
+> **位置與範圍更新（操作者 2026-11-02）**：本檔所有 `D:\Video\SeedStar-app\…` 路徑 = repo `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\video-workbench\…`；`D:\Video` 已退場、Downloads 副本已刪，4178 與資料都在 repo 這份（§3.1 表、§11 貼文與 Downloads 路徑不再適用，保留為當日紀錄）。**3D 要做**：§0 已改為 2D、3D 都要；下文 §4.5、§5.1、§8 P4、§10、§11 原「不做 3D／延後」句已同步改寫。排程與卡片在 `../docs/creative-suite-plan-20261102.md`。
 
 # Claude Code 交接：AwareWave 影片剪輯、2D 動畫合成與角色綁骨架
 

@@ -8,7 +8,7 @@
 - `assets/vision` 的 bundle 與 wasm：`npm ci` 時由 `scripts/vendor-vision.cjs` 從 npm 套件複製並以 `sources.json` 的 SHA-256 驗證。
 - `.data`（作品與任務）、`node_modules`、`runtime`。
 
-**計畫與需求**：排程、卡片、路線在 `docs/creative-suite-plan-20261102.md`（唯一來源）；需求逐項與驗收在 `handoff/Claude_Code_handoff_20261102.md`。2026-11-02 已把交付包最後的人物跟拍修正（`docs/follow-quality-20261102.md`）搬進來；`D:\Video` 與 Downloads 副本已退場。
+**計畫與需求**：排程、卡片、路線在 `docs/creative-suite-plan-20261102.md`（唯一來源）；需求逐項與驗收在 `handoff/Claude_Code_handoff_20261102.md`。2026-11-02 已把交付包最後的人物跟拍修正（`docs/follow-quality-20261102.md`）搬進來；`D:\Video` 已退場，Downloads 副本已刪（2026-11-02）；4178 跑這份，資料在本資料夾 `.data/`。
 
 下方各段是搬入前的歷史紀錄，其中 4179、AwareWave-source 等說法以本段為準。
 

@@ -40,8 +40,8 @@ const C0 = '82d19db9e';
 export const STEPS = [
   { n: 1, code: '0', title: '切 4178 到 repo', plain: '例：打開 127.0.0.1:4178，角色頁出現「示範角色庫」，代表跑的是 repo 版；舊資料一筆不少。',
     gate: '4178 出現「示範角色庫」；任務筆數不少；素材庫、分鏡頁正常；啟動測試通過。', risk: 'Low', model: 'Opus（經 SDK API）', status: 'done', commit: C0, depends: [],
-    result: '2026-11-02 取 20261102 完整最新版的 5 筆任務與生成檔，加另一份副本獨有的 2 支 mp4，共 17 檔（sha256 比對無衝突）；Downloads 四份原封保留。4178 由 repo 版提供，示範角色庫出現，啟動測試通過。',
-    what: '確認埠持有程序與 jobs.json 無進行中任務 → 比對 Downloads 與 repo 的 .data → 較新者進 repo .data → 停舊、start.cmd 起新；列出只在本機的檔；Downloads 副本保留為復原',
+    result: '2026-11-02 取 20261102 完整最新版的 5 筆任務與生成檔，加另一份副本獨有的 2 支 mp4，共 17 檔（sha256 比對無衝突）；之後 Downloads 副本由你刪除，只剩 repo 這份。4178 由 repo 版提供，示範角色庫出現，啟動測試通過。',
+    what: '確認埠持有程序與 jobs.json 無進行中任務 → 比對 Downloads 與 repo 的 .data → 較新者進 repo .data → 停舊、start.cmd 起新；列出只在本機的檔',
     files: ['VW/start.cmd', 'VW/.data/', 'VW/tests/startup.cjs'],
     items: [
       done('0.1', '確認 4178 由哪個程式佔用、有沒有進行中的生成任務。', C0),

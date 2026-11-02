@@ -7,7 +7,7 @@
 | 決定 | 來源 |
 |---|---|
 | 2D、3D 都要：模型、骨架、攝影機、燈光、動作重定向；3D 排 2D 之後（P5） | handoff §0，操作者 11-02 10:1x |
-| 唯一工作副本 = repo `apps/video-workbench`；`D:\Video`、Downloads 副本退場；名字不叫 seedstar | 操作者 11-02；f0d1f58b1、0d02453cc |
+| 唯一工作副本 = repo `apps/video-workbench`；`D:\Video` 退場、Downloads 副本已刪（卡 0 後，操作者 11-02）；名字不叫 seedstar | 操作者 11-02；f0d1f58b1、0d02453cc |
 | 先做好功能，最後接 video.aware-wave.com（P6，High） | 操作者 11-02 |
 | handoff §2 全部有效（分鏡六檔不碰、4178 唯一入口、AwareWave tokens、不用中國模型、基本剪輯不強制付費 AI、保留原檔） | handoff §2 |
 | 「先擺場景再生成」四項借 ArtCraft 流程，不用其程式／雲端／模型；落點 S3a＋P3（去背拼貼＝圖層）、S2（同場景多鏡）、P4（人偶擺姿）、P5（圖片轉 3D）；生成模型只用 `backend/generation-policy.cjs:7` 現行 OpenAI 路由 | 操作者 11-02 |
@@ -57,7 +57,7 @@
 
 | # | 卡 | 做 | 驗收 | 模型 |
 |---|---|---|---|---|
-| 0 | 切 4178 到 repo | 確認埠持有程序與 `jobs.json` 無進行中任務 → 比對 Downloads 與 repo `.data` → 較新者進 repo `.data` → 停舊、`start.cmd` 起新。列出只在本機的檔（`assets/storyboards-data.json`＝受保護基線卻被 `.gitignore` 排除、`assets/image-*`、`runtime/`、`.data/`）；Downloads 副本原位保留為復原，P6 前不刪 | 4178 出現「示範角色庫」（`pages/characters.html:24`，Downloads 版無）；jobs 筆數不少；素材庫、分鏡頁正常；`tests/startup.cjs` 過 | Opus |
+| 0 | 切 4178 到 repo | 確認埠持有程序與 `jobs.json` 無進行中任務 → 比對 Downloads 與 repo `.data` → 較新者進 repo `.data` → 停舊、`start.cmd` 起新。列出只在本機的檔（`assets/storyboards-data.json`＝受保護基線卻被 `.gitignore` 排除、`assets/image-*`、`runtime/`、`.data/`）；.data 由 Downloads 複製進來（82d19db9e），之後副本由操作者刪除 | 4178 出現「示範角色庫」（`pages/characters.html:24`，Downloads 版無）；jobs 筆數不少；素材庫、分鏡頁正常；`tests/startup.cjs` 過 | Opus |
 | M1 | 媒體存放、探測、代理 | 釘 ffprobe（與 ffmpeg 同 build 6.1.1，checksum 入 `assets/vision/sources.json` 同式清單）＋`start.cmd` 安裝檢查；`backend/media-inspect.cjs` 換 ffprobe JSON；新增 `backend/media-store.cjs`（uuid＋sha256、目錄、代理、縮圖、波形）；輸出 ffprobe helper 供 P0 用 | 不變量 1／3／4：同一檔上傳兩次只存一份目錄、兩筆資產；probe.json 含 fps 有理數與色彩欄位；HEVC Main10 MOV 匯入後預覽可播、輸出用原檔；既有 33 測試綠＋`tests/media-store.cjs` | 設計 Fable；做 Opus |
 | P0 | EffectCraft Web 閘門（**8 小時工時上限**） | 釘 release＋checksum＋授權於 `engines/effectcraft/VERSION.json`；放 `/engines/effectcraft/`，wasm MIME 正確；隔離資料；不接付費生成。素材：帶影格編號與音調的 MP4／MOV、PNG、兩路音訊、繁中 SRT | **合成類硬閘**（任一不過→C）：① 此筆電 Edge 1080p 預覽可操作且**有聲**（handoff `:291`） ③ **繁中字幕可顯示與輸出**（可載自有字型） ⑤ 嵌入工作區後側欄／Escape／焦點正常、關閉後 worker 釋放。**剪輯類硬閘**（任一不過→B）：② 匯入→多圖層→影格裁切→字幕→混音→保存→重開不丟→輸出 H.264＋AAC，M1 helper 核對 ④ 專案與媒體可匯出給工作台保存。**軟閘**：Puppet＋null 控制器小角色；egui 外觀可改程度；HEVC 解碼速度；4 GiB 下實拍片長。停止：時限到或無法繞過阻塞。交付：能力表、缺口、路線判定 | 做 Opus；判定 Fable。**操作者 11-01 說過先不要，開工前再問；否決→C** |
 | M2 | 帳冊上伺服器 | 資產／專案／任務帳冊搬 `.data`（JSON 檔，P6 換表）；`AssetOrigin`＋擴充型別；舊 localStorage 資料遷移（保留原版、寫對照表）；`backup.export／import` 改走伺服器；任務欄位補冪等鍵／取消／重試／失敗原因 | 不變量 2／6／7：每筆資產有 origin；清掉 localStorage 後資產與專案清單仍完整；重送同冪等鍵不重跑；取消中任務狀態正確；`tests/media-ledger.cjs` | Opus |
