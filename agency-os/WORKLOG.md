@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-02（續23）next-admin 部署 050a1041e（外聯 C8 自動寄＋C7 成效頁上線）；監工台更新
+
+**做了**：`check-deploy-drift.ps1`（落後 9、compose 無漂移、無 DEPLOY_HOLD；next-admin 外只有 video-workbench 與文件）→ 主機 `sudo sg-deploy.sh next-admin`（ubuntu＋sudo；root 登入被拒）→ `.deployed-commit` c5071e997 → 050a1041e。監工台 `data.mjs`：C8.1–C8.4、C8.6、C7.1–C7.2 done（050a1041e），C8.5／C7.3 剩真寄與種資料；現況兩條改寫；`node build.mjs && node check.mjs` → 42/77 done；重新發布 https://claude.ai/artifact/DbH1HLUihZwAiBiJZGSD4t（v21）。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo sg-deploy.sh next-admin → migration-gate OK、healthy after 15s、smoke all endpoints OK、deployed 050a1041e | exit=0 | ms=330000
+- REALTEST_EVIDENCE: tool=SSH | cmd=poke.sh outreach_gmail_sync（02:45:47Z，台北週一 10:45）→ HTTP 502 只因既有 `invalid_grant`；回應含 `"send":{"window":true,"mailboxes":0,...}` 且無 send 錯誤＝寄件池查詢（`co_connector_accounts!inner` 篩選）在正式 PostgREST 可跑；佇列查詢待有池信箱才執行 | exit=1 | ms=6000
+- REVIEW_WAIVED: NA -- 部署已審查的 050a1041e（審查見本日續21）；監工台為狀態資料
+- BUGHUNT_WAIVED: NA -- 無程式改動
+
+**剩**：C1.6 重連 Gmail；C11.1 次網域＋信箱；Hunter 或 ZeroBounce 金鑰（Connectors 頁）；之後 C8.5 真寄一封、C7.3 種 3 筆驗數字。
+
+**rollback**：主機 `sg-deploy.sh` 以 c5071e997 重部署，或映像 `lobster-phase1-next-admin:rollback-20261102-023934`。
 ## 2026-11-02（續22）影音工作台總計畫 v4：專業 media 工具版，critic 1C／12M／10m 全數套用
 
 **操作者**：「徹底檢視優化原 Plan，讓他成為專業 media 工具」＋全能規劃師章程（零重工、完整閉環、file:line、文件 AI 極簡、不矛盾、不用中國模型）。
