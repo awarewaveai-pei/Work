@@ -27,7 +27,7 @@ export const NOW = [
   { what: '程式在 repo 裡改，測試全綠。', state: 'yes', ev: 'apps/video-workbench 的測試全部通過（WORKLOG 11-02）。畫面上已沒有 SeedStar 字樣。' },
   { what: '打開 127.0.0.1:4178 看到的是 repo 版。', state: 'yes', ev: '2026-11-02 卡 0：舊資料 5 筆任務、17 個生成檔搬進 repo，角色頁出現「示範角色庫」。' },
   { what: '手機拍的 HEVC MOV 能預覽。', state: 'yes', ev: '2026-11-02 卡 M1：上傳後自動產 H.264 代理檔供預覽，輸出仍用原檔；同一支影片只存一份。' },
-  { what: '素材與專案存在伺服器，清瀏覽器資料不會不見。', state: 'no', ev: '程式已完成（卡 M2）；4178 重啟後才生效。' },
+  { what: '素材與專案存在伺服器，清瀏覽器資料不會不見。', state: 'yes', ev: '2026-11-02 卡 M2，4178 已重啟：瀏覽器裡的 7 個素材、5 筆任務已搬到伺服器，每個素材都有來源標記；原版在瀏覽器另存備份。' },
   { what: '剪輯能精確到影格、加減軌道、用多種轉場。', state: 'no', ev: '固定五軌（tools-editor.js:23），時間用小數秒，轉場種類少。卡 M3、P2 做。' },
   { what: '輸出 720p 或 1080p 的 H.264 影片，含字幕與混音。', state: 'yes', ev: 'editor-export.cjs:182；比例有 16:9、9:16、1:1、4:5、4:3。' },
   { what: '動畫合成、2D 角色骨架、3D。', state: 'no', ev: '都還沒有。卡 P3、P4、P5 做。' },
@@ -74,7 +74,7 @@ export const STEPS = [
     ] },
   { n: 4, code: 'M2', title: '素材與專案存到伺服器', plain: '例：清掉瀏覽器資料，素材庫和專案還在；每個素材都記得從哪來（上傳、AI 生成、輸出）。',
     gate: '每筆素材有來源紀錄；清 localStorage 後清單完整；同一任務重送不重跑；取消中的任務狀態正確。', risk: 'Medium', model: 'Opus（經 SDK API）', status: 'done', commit: M2, depends: ['M1'],
-    result: '2026-11-02 素材、專案、任務改存伺服器；兩分頁同時改時後存的那頁自動重新整理成最新資料；素材記來源；重送不重複付費。Codex 審出 6 項，5 項已修、1 項不成立。4178 重啟後生效，首次打開會把瀏覽器裡的資料搬到伺服器，原版另存備份。',
+    result: '2026-11-02 素材、專案、任務改存伺服器；兩分頁同時改時後存的那頁自動重新整理成最新資料；素材記來源；重送不重複付費。Codex 審出 6 項，5 項已修、1 項不成立。4178 已重啟，瀏覽器資料已搬到伺服器。',
     what: '帳冊搬 .data；AssetOrigin＋擴充；舊 localStorage 遷移（保留原版）；backup.export／import 走伺服器；任務冪等鍵、取消、重試',
     files: ['VW/shared/adapters.js', 'VW/shared/runtime.js', 'VW/backend/api.cjs'],
     items: [
