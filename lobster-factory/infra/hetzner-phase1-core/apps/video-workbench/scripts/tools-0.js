@@ -201,7 +201,7 @@ function chooser(id = "src") {
 }
 function stage(i, title, description, id = "src") {
   let f = files[id];
-  return `<div class="stage" id="stage"><div class="tool-icon">${i}</div><h3>${title}</h3><p>${description}</p>${f ? `<div class="fileline">已選：${esc(f.name)}</div>${f.type.startsWith("video/") ? `<video class="video-prev" src="${f.url}" controls playsinline></video>` : f.type.startsWith("image/") ? `<img class="upload-preview" src="${f.url}" alt="已選圖片">` : f.type.startsWith("audio/") ? `<audio src="${f.url}" controls></audio>` : ""}` : ""}${chooser(id)}</div>`;
+  return `<div class="stage" id="stage"><div class="tool-icon">${i}</div><h3>${title}</h3><p>${description}</p>${f ? `<div class="fileline">已選：${esc(f.name)}</div>${f.type.startsWith("video/") ? `<video class="video-prev" src="${f.previewUrl || f.url}" controls playsinline></video>` : f.type.startsWith("image/") ? `<img class="upload-preview" src="${f.url}" alt="已選圖片">` : f.type.startsWith("audio/") ? `<audio src="${f.previewUrl || f.url}" controls></audio>` : ""}` : ""}${chooser(id)}</div>`;
 }
 function side(s) {
   return `<aside class="side">${s}</aside>`;

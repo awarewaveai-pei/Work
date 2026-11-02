@@ -16,3 +16,6 @@ assets/storyboards-data.json
 assets/vision/vision_bundle.js
 assets/vision/vision_bundle.mjs
 assets/vision/wasm/
+
+# Downloaded by scripts/vendor-ffprobe.cjs (postinstall), SHA-256 checked against vendor/ffprobe/sources.json (tracked).
+vendor/ffprobe/ffprobe.exe

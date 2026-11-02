@@ -7,6 +7,17 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
   fs.mkdirSync(dataDir, { recursive: true });
   const outputs = path.join(dataDir, "generated");
   fs.mkdirSync(outputs, { recursive: true });
+  const mediaStore = require("./media-store.cjs").createMediaStore({ dataDir });
+  // The one check for every url the client sends as a local file: /generated/<uuid>.<ext>,
+  // /media/<sha256>/original.<ext> (only when stored) and, with assets, /assets/<name>.
+  function localFile(url, { assets = false } = {}) {
+    if (/^\/generated\/[a-f0-9-]+\.[a-z0-9]+$/.test(url || ""))
+      return path.join(dataDir, url.slice(1));
+    const media = mediaStore.fileFor(url);
+    if (media) return media;
+    const asset = assets && /^\/assets\/([\w.-]+)$/.exec(url || "");
+    return asset ? path.join(__dirname, "../assets", asset[1]) : null;
+  }
   const ledgerFile = path.join(dataDir, "jobs.json");
   let jobs = fs.existsSync(ledgerFile)
     ? JSON.parse(fs.readFileSync(ledgerFile, "utf8"))
@@ -95,12 +106,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
       .filter((v) => v && typeof v === "object" && v.url);
   function imageReference(url) {
     if (/^data:image\/(png|jpeg|webp);base64,/.test(url)) return url;
-    const match = /^\/(generated|assets)\/([\w.-]+)$/.exec(url);
-    if (!match) throw Error("參考圖需先上傳至本機素材庫");
-    const file = path.join(
-      match[1] === "generated" ? outputs : path.join(__dirname, "../assets"),
-      match[2],
-    );
+    const file = localFile(url, { assets: true });
+    if (!file) throw Error("參考圖需先上傳至本機素材庫");
     const ext = path.extname(file).slice(1),
       mime = ext === "jpg" ? "jpeg" : ext;
     if (!["png", "jpeg", "webp"].includes(mime))
@@ -209,9 +216,9 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
         const result = await mediaTools.media(job.input, {
           signal,
           file: (url) => {
-            if (!/^\/generated\/[a-f0-9-]+\.[a-z0-9]+$/.test(url || ""))
-              throw Error("請先從本機素材庫選擇檔案");
-            return path.join(dataDir, url.slice(1));
+            const file = localFile(url);
+            if (!file) throw Error("請先從本機素材庫選擇檔案");
+            return file;
           },
           output: (ext) => {
             const name = crypto.randomUUID() + "." + ext;
@@ -475,13 +482,17 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
             "video/quicktime": "mov",
           }[mime];
         if (!ext) throw Error("不支援此素材格式");
-        const buffer = Buffer.from(m[2], "base64");
+        const buffer = Buffer.from(m[2], "base64"),
+          kind = mime.split("/")[0],
+          stored =
+            kind === "image"
+              ? { id: crypto.randomUUID(), url: output(buffer, ext) }
+              : await mediaStore.ingest({ buffer, ext });
         json(res, 201, {
-          id: crypto.randomUUID(),
+          ...stored,
           name: String(input.name || "素材"),
-          kind: mime.split("/")[0],
+          kind,
           type: mime,
-          url: output(buffer, ext),
           size: buffer.length,
         });
         return true;
@@ -598,10 +609,9 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch }) {
       if (req.method === "POST" && route === "/transcriptions") {
         const input = await body(req),
           url = input.source?.url;
-        if (!/^\/generated\/[a-f0-9-]+\.[a-z0-9]+$/.test(url || ""))
-          throw Error("請先上傳音訊或影片");
-        const file = path.join(dataDir, url.slice(1)),
-          buffer = fs.readFileSync(file);
+        const file = localFile(url);
+        if (!file) throw Error("請先上傳音訊或影片");
+        const buffer = fs.readFileSync(file);
         if (buffer.length > 25 * 1024 * 1024)
           throw Error("語音辨識的檔案上限為25MB，請先裁短片段");
         const form = new FormData();

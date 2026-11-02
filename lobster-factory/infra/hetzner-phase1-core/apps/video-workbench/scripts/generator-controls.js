@@ -50,7 +50,7 @@ function generatorSwitchMode(mode) {
   for (const key of keys) state[key] = structuredClone((state.outputSettings[mode] || defaults)[key] ?? defaults[key]);
 }
 function generatorReferencePreview(asset) {
-  const url = SeedStar.safeUrl(asset.url), row = generatorReferences().find((r) => r.asset === asset);
+  const url = SeedStar.safeUrl(asset.previewUrl || asset.url), row = generatorReferences().find((r) => r.asset === asset);
   const kind = SeedStar.mediaKind(asset) || asset.type?.split("/")[0] || "image";
   return (url ? kind === "video" ? `<video class="reference-preview" src="${safe(url)}" controls preload="metadata"></video>` : kind === "audio" ? `<audio class="reference-preview" src="${safe(url)}" controls preload="metadata"></audio>` : `<img class="reference-preview" src="${safe(url)}" alt="${safe(asset.name)}">` : "") + (row ? `<small class="reference-token">${safe(row.token)}</small>` : "");
 }

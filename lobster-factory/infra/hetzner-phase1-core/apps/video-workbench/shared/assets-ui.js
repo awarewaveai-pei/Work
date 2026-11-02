@@ -171,8 +171,8 @@
           const preview = document.createElement("section");
           preview.dataset.pickerPreviewPanel = "";
           preview.className = "picker-preview";
-          const url = escape(SeedStar.safeUrl(asset.url));
-          preview.innerHTML = SeedStar.sanitize(`<button data-picker-preview-close>返回素材選擇</button>${parityControls && url ? `<a href="${url}" download="${escape(asset.name)}" target="_blank" rel="noopener noreferrer">下載／開新分頁</a>` : ""}<h3>${escape(asset.name)}</h3>${kind(asset) === "image" ? `<img src="${url}" alt="${escape(asset.name)}">` : kind(asset) === "video" ? `<video src="${url}" controls></video>` : `<audio src="${url}" controls></audio>`}`);
+          const url = escape(SeedStar.safeUrl(asset.url)), previewSrc = escape(SeedStar.safeUrl(asset.previewUrl || asset.url));
+          preview.innerHTML = SeedStar.sanitize(`<button data-picker-preview-close>返回素材選擇</button>${parityControls && url ? `<a href="${url}" download="${escape(asset.name)}" target="_blank" rel="noopener noreferrer">下載／開新分頁</a>` : ""}<h3>${escape(asset.name)}</h3>${kind(asset) === "image" ? `<img src="${url}" alt="${escape(asset.name)}">` : kind(asset) === "video" ? `<video src="${previewSrc}" controls></video>` : `<audio src="${previewSrc}" controls></audio>`}`);
           panel.append(preview);
         }
         else if (b.hasAttribute("data-picker-confirm"))

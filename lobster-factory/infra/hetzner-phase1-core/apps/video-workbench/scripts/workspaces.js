@@ -33,12 +33,13 @@
   ];
   function media(a) {
     const k = SeedStar.mediaKind(a),
-      url = esc(SeedStar.safeUrl(a.url));
+      url = esc(SeedStar.safeUrl(a.url)),
+      preview = esc(SeedStar.safeUrl(a.previewUrl || a.url));
     return k === "image"
       ? `<img class="media-preview" src="${url}" alt="${esc(a.name)}">`
       : k === "video"
-        ? `<video class="media-preview" src="${url}" controls></video>`
-        : `<audio class="media-preview" src="${url}" controls></audio>`;
+        ? `<video class="media-preview" src="${preview}" controls></video>`
+        : `<audio class="media-preview" src="${preview}" controls></audio>`;
   }
   async function render() {
     const host = $("workspaceArea");

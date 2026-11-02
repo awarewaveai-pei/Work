@@ -1,0 +1,10 @@
+{
+  "version": "6.1.1",
+  "url": "https://github.com/GyanD/codexffmpeg/releases/download/6.1.1/ffmpeg-6.1.1-essentials_build.zip",
+  "member": "ffmpeg-6.1.1-essentials_build/bin/ffprobe.exe",
+  "zipSha256": "742e32fc9f92681f9f254b925e1b613fdd8074ba40749d4879aefdb009b94cc5",
+  "zipBytes": 87520045,
+  "sha256": "3a7e2dc003dc2cd1472827e4c7c4f056ae1ae0ae7c5bbc580c99b49827351ba4",
+  "bytes": 82668032,
+  "sameBuildCheck": "bin/ffmpeg.exe in this zip has sha256 04e1307997530f9cf2fe35cba2ca7e8875ca91da02f89d6c7243df819c94ad00, byte-identical to node_modules/ffmpeg-static/ffmpeg.exe (ffmpeg-static 5.3.0); the GitHub release publishes no checksum"
+}

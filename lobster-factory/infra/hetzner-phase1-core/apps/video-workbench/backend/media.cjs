@@ -219,4 +219,4 @@ async function adjustVoice(source, destination, { pitch, gain, speed = 1, signal
   const factor = Math.pow(2, pitch / 12);
   await run(['-y', '-hide_banner', '-i', source, '-af', `aresample=48000,asetrate=${48000 * factor},aresample=48000,atempo=${1 / factor},atempo=${Math.sqrt(speed)},atempo=${Math.sqrt(speed)},volume=${Math.pow(10, gain / 20)}`, '-c:a', 'libmp3lame', destination], signal);
 }
-module.exports = { media, supported, normalizeImage, adjustVoice };
+module.exports = { media, supported, normalizeImage, adjustVoice, run };

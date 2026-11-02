@@ -6,6 +6,7 @@
 
 - `assets/image-*`、`assets/storyboards-data.json`：從參考網站 seedstar.ai 擷取的圖片與分鏡資料，只供本機參考。新機從舊機的 `apps/video-workbench/assets/` 複製過來（不在 git），分鏡靈感頁才有內容。
 - `assets/vision` 的 bundle 與 wasm：`npm ci` 時由 `scripts/vendor-vision.cjs` 從 npm 套件複製並以 `sources.json` 的 SHA-256 驗證。
+- `vendor/ffprobe/ffprobe.exe`：`npm ci` 時由 `scripts/vendor-ffprobe.cjs` 從 GyanD/codexffmpeg 6.1.1 essentials 下載（與 ffmpeg-static 內的 ffmpeg 同一 build），以 `vendor/ffprobe/sources.json` 的 SHA-256 驗證；非 Windows 用環境變數 `FFPROBE_PATH`。
 - `.data`（作品與任務）、`node_modules`、`runtime`。
 
 **計畫與需求**：排程、卡片、路線在 `docs/creative-suite-plan-20261102.md`（唯一來源）；需求逐項與驗收在 `handoff/Claude_Code_handoff_20261102.md`。2026-11-02 已把交付包最後的人物跟拍修正（`docs/follow-quality-20261102.md`）搬進來；`D:\Video` 已退場，Downloads 副本已刪（2026-11-02）；4178 跑這份，資料在本資料夾 `.data/`。

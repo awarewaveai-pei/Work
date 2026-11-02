@@ -163,7 +163,7 @@ function fileBox(bucket, cap, label, wide = false, accept = "image/*") {
   return `<div class="uploads">${lookup(bucket)
     .map(
       (f, i) =>
-        `<div class="file-tile">${f.type.startsWith("image/") ? `<img src="${f.url}" alt="${safe(f.name)}">` : f.type.startsWith("video/") ? `<video src="${f.url}" controls></video>` : `<span>♬ ${safe(f.name)}</span>`}<button class="remove" data-remove="${bucket}:${i}" aria-label="刪除素材">×</button></div>`,
+        `<div class="file-tile">${f.type.startsWith("image/") ? `<img src="${f.url}" alt="${safe(f.name)}">` : f.type.startsWith("video/") ? `<video src="${f.previewUrl || f.url}" controls></video>` : `<span>♬ ${safe(f.name)}</span>`}<button class="remove" data-remove="${bucket}:${i}" aria-label="刪除素材">×</button></div>`,
     )
     .join(
       "",

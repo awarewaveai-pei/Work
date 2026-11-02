@@ -311,7 +311,7 @@ async function edProbe(asset) {
         reject(Error("素材無法讀取"));
       };
       m.preload = "metadata";
-      m.src = asset.url;
+      m.src = asset.previewUrl || asset.url;
     });
   } finally {
     m.removeAttribute("src");
@@ -444,7 +444,7 @@ function edPaint() {
       );
       el.dataset.edLayer = c.id;
       if (["audio", "video"].includes(c.kind)) el.dataset.edMedia = "";
-      if (c.kind !== "text") el.src = c.asset.url;
+      if (c.kind !== "text") el.src = c.asset.previewUrl || c.asset.url;
       stage.append(el);
     }
     if (c.kind === "text") {

@@ -18,6 +18,7 @@ if errorlevel 1 (
 set "SEEDSTAR_INSTALL="
 if not exist node_modules\ffmpeg-static\index.js set "SEEDSTAR_INSTALL=1"
 if not exist assets\vision\wasm\vision_wasm_internal.wasm set "SEEDSTAR_INSTALL=1"
+if not exist vendor\ffprobe\ffprobe.exe set "SEEDSTAR_INSTALL=1"
 if defined SEEDSTAR_INSTALL (
   call npm.cmd ci --omit=dev
   if errorlevel 1 (

@@ -18,6 +18,7 @@ const root = __dirname,
     ".m4a": "audio/mp4",
     ".mp4": "video/mp4",
     ".webm": "video/webm",
+    ".mov": "video/quicktime",
     ".gif": "image/gif",
     ".jpg": "image/jpeg",
   };
@@ -61,7 +62,16 @@ function createServer({
         )
       )
         file = path.join(dataDir, pathname.slice(1));
-      else
+      else if (pathname.startsWith("/media/")) {
+        // backend/media-store.cjs layout only; other names and "/.." segments are 404.
+        if (
+          !/^\/media\/[a-f0-9]{64}\/(original\.(mp3|wav|m4a|mp4|webm|mov)|proxy\.mp4|thumb\.jpg|waveform\.json|probe\.json)$/.test(
+            pathname,
+          )
+        )
+          throw Error();
+        file = path.join(dataDir, pathname.slice(1));
+      } else
         file = path.resolve(
           root,
           "." +
@@ -69,13 +79,16 @@ function createServer({
         );
       const boundary = pathname.startsWith("/generated/")
         ? path.resolve(dataDir, "generated")
-        : root;
+        : pathname.startsWith("/media/")
+          ? path.resolve(dataDir, "media")
+          : root;
       file = path.resolve(file);
       if (!file.startsWith(boundary + path.sep) && file !== root) throw Error();
       if (file === root) file = path.join(root, "index.html");
       if (
         /[\\/](node_modules|\.data|backend)([\\/]|$)/i.test(file) &&
-        !pathname.startsWith("/generated/")
+        !pathname.startsWith("/generated/") &&
+        !pathname.startsWith("/media/")
       )
         throw Error();
       const stat = fs.statSync(file);
