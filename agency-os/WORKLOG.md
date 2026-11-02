@@ -1,4 +1,22 @@
 # Worklog
+## 2026-11-02（續42）wp-bridge 0.21.0 發版＋推上 aware-wave.com 與 Soulful（外聯 C6.2）；C6.4 無 staging 站
+
+**操作者**：「同意發版」（經 session local_6aa73d12 轉達）。
+
+**做了**：
+- `bash scripts/release-wp-bridge.sh`（本機 php.exe 被擋 Permission denied → 用 scratchpad 的 `php` 替身，在 docker `wordpress:php8.3-apache` 唯讀掛載跑 `php -l`）→ 發版 repo CI 過 → tag v0.21.0 → 產出 `aware-wave-wp-bridge-v0.21.0.zip`（https://github.com/awarewaveai-pei/aware-wave-wp-bridge/releases/tag/v0.21.0）。
+- `scripts/rollout-wp-bridge.ps1 -DryRun` → 兩站 0.20.0→0.21.0 → 正式執行：lobster-wordpress、soulful-wp 皆 OK（health `200 0.21.0`、home 200）；備份 `/root/backups/wordpress/{lobster-wordpress,soulful-wp}-pre-wpbridge-0.21.0-20261102T0536*.sql` 與 `*-wpbridge-0.20.0-*.tgz`。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/release-wp-bridge.sh → RELEASE OK v0.21.0 with asset | exit=0 | ms=600000
+- REALTEST_EVIDENCE: tool=SSH | cmd=powershell scripts/rollout-wp-bridge.ps1 → lobster-wordpress OK、soulful-wp OK（health 200 0.21.0） | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=scripts/client-status.ps1 -Slug soulful → soulful up；scripts/playwright-runner.ps1 -Mode client -ClientUrl https://soulfulexpression.org → 7 passed | exit=0 | ms=40000
+- REVIEW_WAIVED: NA -- 發版已審查的 f57fd3512＋cac5a90d5（續35–36）
+- BUGHUNT_WAIVED: NA -- 無程式改動
+
+**卡住**：C6.4「staging 同步一筆」沒有可用 staging（Soulful staging 2026-08-16 abandoned；aware-wave.com 與 Soulful 都是正式站）。在正式站建 FluentCRM 聯絡人會觸發該站以標籤啟動的自動化（可能寄信），等操作者決定。
+
+**rollback**：每站 `wp plugin install --force` 舊 zip，或還原上列 tgz／sql。
 ## 2026-11-02（續41）next-admin 部署 cac5a90d5（C13＋C6）與 b0f5e4872（C14＋C16）；外聯 v2 程式卡做到只剩操作者步驟；監工台 60/77
 
 - 部署：cac5a90d5（05:09:36Z healthy 15s、smoke OK）；b0f5e4872（05:28:39Z healthy 16s、smoke OK；0154 已在帳本，migration 閘過）。
