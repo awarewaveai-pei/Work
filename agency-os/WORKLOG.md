@@ -1,4 +1,35 @@
 # Worklog
+## 2026-11-02（續11）外聯系統 v2 卡 C4：回覆同步（migration 0153 co_replies＋交易函式、Gmail 唯讀同步每 10 分、回覆頁）
+
+**操作者**：「照 B 開工」（C4.1–C4.7 全做）。
+
+**根因／不變量**：系統只建 Gmail 草稿，不知道寄了沒、看不到回信 → 對方回信後追蹤信照排、退訂退信不進拒收。不變量：
+- 已寄只看該封自己的 Gmail message（一封 Gmail 信只對應一列 co_messages、一列只有一個 sent 事件，兩個唯一索引）→ 首封已寄不會把同串追蹤草稿標成已寄。
+- 一封來信只算一次（`co_replies.dedupe_key`＝Message-ID）；認領當下就停追蹤信（trigger，不等分類）；其餘副作用與 processed_at 同一交易（`co_apply_reply`）。
+- 游標只在讀完且沒有待處理列時前進；掃描可續跑，每輪必前進。
+- 認不出名單的信不落地；代理商信箱用地址只認它寫過信的名單。
+
+**做了**（commit `f00dbea9f`）：
+- `lobster-factory/packages/db/migrations/0153_co_replies.sql`（＋`.down.sql`、`scripts/0153_co_replies_down.sql`）：`co_replies`；`co_mark_sent`、`co_mark_unsent`（needs_edit＋釋放 0152 名額）、`co_apply_reply`、`co_fail_reply`、`co_stop_followups`（Gmail 草稿匣的追蹤信也 skipped＋timeline 提醒刪）、`co_merge_gmail_sync`（游標 jsonb 一句 SQL 合併）、trigger `co_replies_stop_followups`。
+- 規格差異（已改 SPEC §4 0153 列、§5.6、R0-PLAN C4.1）：號碼 0151→0153；去重鍵 Message-ID；認人＝我們的對話串優先、否則地址；自動回覆不存不停追蹤；初次最多回讀 14 天。
+- C4.2：`createGmailDraft` 回 message＋thread，`draft_created` metadata 存三個 id。
+- `next-admin/lib/outreach/gmail-api.ts`（GET 經 `google-oauth.ts gmailGet`，單一 Gmail 出口不變；format=metadata＋所需標頭；20 秒逾時）、`lib/outreach/gmail-sync.ts`、`app/api/internal/outreach/gmail-sync/route.ts`（Bearer、240 秒預算、同程序一次一輪）、cron `*/10`、host-jobs `outreach_gmail_sync`、products `outreach.classify`＋nav 回信、寄件信箱卡「補掃 N 天」、回覆頁（staff＋door）。
+- MODULE_MANIFEST（outreach）＋ Foundry 目錄；監工台 C4.1–C4.6 done、C4.7 剩真寄驗收。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m pytest lobster-factory/packages/db/tests/test_0153_co_replies.py tests/test_0152_sender_pool.py（拋棄式 postgres:15.8）→ 0153 10 passed、0152 10 passed | exit=0 | ms=73080
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/outreach app/api/outreach lib/schedules → 311 passed（gmail-sync.test.ts 16）；npx tsc --noEmit 綠；verify-build-gates ALL PASSED（health 100%） | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/9m/4n（Codex 三輪 `agency-os/reports/oracle/2026-11-02-partialreview-d83c2a9c.md` 4、`-950ef7e1.md` 1、`-48dcf133.md` 2；critic subagent 3 Major＋4 Minor；全部修並加測試）
+- ORACLE_WAIVED: 第三輪修正（主旨比對、無日期守衛）與 critic 修正後未再送 Codex（同檔已連報三輪，依 §4 寫不變量分析：假 Gmail 給的欄位比真 API 多 → 凡讀取欄位只用文件保證回傳它的格式，拿不到就報錯）；改以突變證據：拔主旨守衛、拔無日期守衛各令指名測試變紅，還原變綠
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=co_replies\|outreach_gmail_sync | hits=93（SPEC／R0-PLAN／data.mjs 舊 0151 已改；其餘為 0153、測試、host-jobs、cron、manifest）
+
+**剩**：
+- 正式庫套 0153（High）。**未套之前推上 main，今晚 03:00 自動部署會被 migration 閘擋下**（連帶 C11 的 sender-health route 也上不去）→ f00dbea9f 先不推，等操作者決定。
+- 主機重裝排程（install-host-schedules.sh，High）。
+- C1.6：操作者在 Google Console 按發布並重連 Gmail（沒做讀不到收件匣）。
+- REALTEST：操作者寄 1 封給自己另一個信箱並回覆，10 分鐘內回覆頁出現。
+
+**rollback**：`git revert f00dbea9f`；資料庫手動跑 `migrations/0153_co_replies.down.sql`（先 revert next-admin）；排程 `install-host-schedules.sh --rollback <備份>`。
 ## 2026-11-02（續10）wp-bridge 0.20.0 裝上 Soulful 與 aware-wave.com；aware-wave.com 的 bridge 重新啟用；升級腳本的收費檢查改看開關值
 
 **操作者**：「裝到 Soulful」；「aware-wave.com>>不要維持停用(不知道原因)>>要更新」。
