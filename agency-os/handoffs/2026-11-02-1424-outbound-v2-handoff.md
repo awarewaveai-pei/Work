@@ -32,7 +32,7 @@ source_session_summary: "Outbound OS v2: all code-only cards shipped to prod; re
 | C9、C16.2 | 要 100 個名單走過研究流程；要寄滿 200 封 |
 
 ### 5. 下一步指令
-1. 讀狀態：`$WORK_ROOT/agency-os/handoffs/2026-10-31-outbound-os/data.mjs`（監工台唯一資料來源；每項 `todo(...)`／`done(...)` 都附 commit）。**開工第一件事：重新發布監工台給操作者看**（操作者要看）：`node build.mjs` → 用 Artifact 工具發布同目錄的 `supervisor.html`（新網址；原本的 claude.ai DbH1HLUihZwAiBiJZGSD4t 在另一個帳號，這邊打不開）→ 把新網址給操作者 → 新網址寫進本檔這一行和記憶 `project_outbound_os_v2_supervisor.md`。之後每次改 data.mjs 都重發布到同一個網址。
+1. 讀狀態：`$WORK_ROOT/agency-os/handoffs/2026-10-31-outbound-os/data.mjs`（監工台唯一資料來源；每項 `todo(...)`／`done(...)` 都附 commit）。**開工第一件事：重新發布監工台給操作者看**（操作者要看）：`node build.mjs` → 用 Artifact 工具發布同目錄的 `supervisor.html`→ 目前網址 https://claude.ai/artifact/DzhhxdrEmZmMdBppq7EsE3（2026-11-02 由新帳號發布；舊的 DbH1HLUihZwAiBiJZGSD4t 在另一個帳號）。之後每次改 data.mjs 都重發布到同一個網址。
 2. 規則與合約：`$WORK_ROOT/agency-os/docs/Outbound_OS_Engineering_Spec/Outbound_OS_Engineering_Spec.md`（I1–I10 不變量、D1–D25 決策）。卡片細節：同目錄 `R0-PLAN.md` §6。
 3. 操作者回報某個前置做好了 → 做對應的 REALTEST，把 data.mjs 該項改成 done（附證據）→ `node check.mjs` → `node build.mjs` → 重新發布 → WORKLOG。
 4. 部署：照 AGENTS.md §0 走 `/check-drift` → 主機 `sg-deploy.sh next-admin`（ssh 指令首行要加 `# CONFIRMED-HIGH-RISK:`）。驗收跑**全套** `npm test`（11-02 只跑子集，部署閘擋了兩次）。
