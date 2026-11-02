@@ -72,12 +72,41 @@
 - 主系統契約檔（`next-admin/lib/content/video/{asset-origin,platform-ratio,delivery-contract,caption-formats,timeline-v1}.ts`）一律直接 `import()`，禁止複製。`bg-remover.ts` 例外（它依賴 gateway），工作台自己呼叫 Replicate，版本由測試核對。
 - 回報操作者一律繁中、短句；給 AI 的檔一律事實密集。
 
-## 5. 讓操作者看到監工台（新帳號的第一步，做完才做別的）
+## 5. 監工台：在哪裡生、怎麼發布（新帳號的第一步，做完才做別的）
 
-0. `cd agency-os/handoffs/2026-11-02-video-workbench-supervisor && node build.mjs && node check.mjs`（check 必須 ok）。
-1. 用 Artifact 工具發布 `agency-os/handoffs/2026-11-02-video-workbench-supervisor/supervisor.html`，會得到新帳號自己的網址。
-2. 把新網址寫進 `data.mjs` 的 `META.url`，跑 `node build.mjs && node check.mjs`，再用同一路徑重發一次，然後 commit。
-3. 之後每次改 `data.mjs` 都重建、重發同一路徑，網址不變。
+監工台＝一個 HTML 檔，由資料檔產生。不用另外建專案，也不用開伺服器。
+
+| 東西 | 位置 |
+|---|---|
+| 資料（唯一要改的檔） | `D:\Workgency-os\handoffs6-11-02-video-workbench-supervisor\data.mjs` |
+| 產生器 | 同資料夾 `build.mjs`（版面共用 `D:\Work\scripts\supervisor-kituild.mjs`） |
+| 檢查 | 同資料夾 `check.mjs`（數字是否由資料算出、卡號是否等於計畫 §4、頁面是否為最新產物） |
+| 產物 | 同資料夾 `supervisor.html` |
+
+**A. 產生（Bash）**
+```
+cd /d/Work/agency-os/handoffs/2026-11-02-video-workbench-supervisor && node build.mjs && node check.mjs
+```
+最後一行要是 `ok: 12 cards bound to plan §4 …`。不是的話先照錯誤訊息修 `data.mjs`。
+
+**B. 立刻給操作者看（不需任何工具）**：用瀏覽器打開 `file:///D:/Work/agency-os/handoffs/2026-11-02-video-workbench-supervisor/supervisor.html`。
+
+**C. 發布成網址（Claude Code 的 Artifact 工具）**
+1. 第一次發布：呼叫 Artifact，action 用 publish，參數如下。
+   - `file_path`：`D:\Workgency-os\handoffs6-11-02-video-workbench-supervisor\supervisor.html`
+   - `icon`：`video`
+   - `description`：`影音工作台每張卡的進度與待決事項。`
+   - 不要帶 `url`。舊網址屬於前一個帳號，新帳號無法寫入。
+2. 回傳的網址 `https://claude.ai/artifact/<id>` 寫進 `data.mjs` 的 `META.url: '...'`，然後跑 A。
+3. 用同一個 `file_path` 再呼叫一次 Artifact（不帶 `icon`）。網址不變，頁面裡的網址也更新了。
+4. commit `data.mjs` 與 `supervisor.html`（pathspec），push。把網址給操作者。
+
+**D. 之後每張卡**：改 `data.mjs` → 跑 A → 用同一個 `file_path` 重發 C3 → commit。網址永遠不變。
+- 卡片完成的寫法照 `data.mjs` 現有範例：
+  - 頂部加 commit 常數，例如 `const P1 = '<hash>';`。
+  - 該卡 items 的 `todo('P1.1', …)` 改成 `done('P1.1', …, P1)`。
+  - 該卡 step 改成 `status: 'done', commit: P1, result: '<一兩句白話>'`。
+  - NOW 表有變的列也一起改。
 
 ## 6. 花費（SDK API，2026-11-02）
 
