@@ -3,7 +3,7 @@
 // and Gmail failures (4xx refused = given back + paused; timeout = left 'sending', never resent). The cap races are SQL
 // (co_begin_send), in packages/db/tests/test_0152_sender_pool.py.
 import { describe, expect, it } from "vitest";
-import { inSendWindow, runAutoSend, tickQuota, type QueuedMail, type SendDeps, type SendLead, type SendStore } from "../send-adapter";
+import { inSendWindow, runAutoSend, tickQuota, type FollowupInfo, type QueuedMail, type SendDeps, type SendLead, type SendStore } from "../send-adapter";
 import { GmailSendError } from "../google-oauth";
 import type { PoolAccount, SendCaps } from "../sender-pool";
 import type { StoredVerdict } from "../mailbox-verify";
@@ -152,7 +152,7 @@ describe("auto send", () => {
 });
 
 describe("auto send holds", () => {
-  it("a follow-up is never sent automatically until C5 threads it; one mail's verifier error holds that mail only", async () => {
+  it("a follow-up with no step data is held; one mail's verifier error holds that mail only", async () => {
     const { store, deps, gmailSent } = setup({
       verify: async (l) => { if (l.email === "l-bad@shop.example") throw new Error("hunter verify 400"); return { status: "valid", provider: "hunter" }; },
       now: () => new Date("2026-11-02T09:55:00Z"),
@@ -164,5 +164,59 @@ describe("auto send holds", () => {
     expect(gmailSent).toEqual(["d-ok"]);
     expect(r.held).toBe(2);
     expect(r.errors).toEqual([expect.stringContaining("hunter verify 400")]);
+  });
+});
+
+describe("auto send follow-ups (C5)", () => {
+  const LAST_TICK = new Date("2026-11-02T09:55:00Z");  // Monday 17:55 Taipei: the quota covers every mail
+  // due: the previous mail went out 10-29 and step 2 follows 3 days later = 11-01 <= today 11-02
+  const info = (over: Partial<FollowupInfo> = {}): FollowupInfo => ({ version: 2, delayDays: 3, lowerUnsent: false, prevSentAt: "2026-10-29T02:00:00Z",
+    prevThreadId: "T1", draftThreadId: "T1", ...over });
+  const fu = (id: string, over: Partial<FollowupInfo> = {}, l: SendLead = lead(`l-${id}`, { status: "sent", next_followup_date: "2026-11-01" })) =>
+    ({ id, l, extra: { outputType: "followup", followup: info(over) } });
+  const add = (store: FakeStore, f: ReturnType<typeof fu>) => store.add(f.id, f.l, f.extra);
+
+  it("due, lowest step, drafted in the previous mail's thread: sent", async () => {
+    const { store, deps, gmailSent } = setup({ now: () => LAST_TICK });
+    add(store, fu("f1"));
+    await runAutoSend(deps);
+    expect(gmailSent).toEqual(["d-f1"]);
+  });
+
+  it("not due (previous mail + delay still ahead, or the lead's own next date ahead or empty): held", async () => {
+    const { store, deps, gmailSent } = setup({ now: () => LAST_TICK });
+    add(store, fu("late", { prevSentAt: "2026-10-31T02:00:00Z" }));  // +3 = 11-03
+    add(store, fu("snoozed", {}, lead("l-snoozed", { status: "sent", next_followup_date: "2026-11-05" })));
+    add(store, fu("nodate", {}, lead("l-nodate", { status: "sent", next_followup_date: null })));
+    const r = await runAutoSend(deps);
+    expect(gmailSent).toEqual([]);
+    expect(r.held).toBe(3);
+  });
+
+  it("a lower step of the lead still unsent: held", async () => {
+    const { store, deps, gmailSent } = setup({ now: () => LAST_TICK });
+    add(store, fu("f3", { version: 3, lowerUnsent: true }));
+    await runAutoSend(deps);
+    expect(gmailSent).toEqual([]);
+  });
+
+  it("two follow-ups of one lead queued together: one goes this tick, the other waits", async () => {
+    const { store, deps, gmailSent } = setup({ now: () => LAST_TICK });
+    const one = lead("l-same", { status: "sent", next_followup_date: "2026-11-01" });
+    add(store, fu("f2", { version: 2 }, one));
+    add(store, fu("f3", { version: 3 }, one));  // read before the first went out: it looks like the lowest step too
+    const r = await runAutoSend(deps);
+    expect(gmailSent).toEqual(["d-f2"]);
+    expect(r.held).toBe(1);
+  });
+
+  it("drafted outside the previous mail's thread (another thread, none, or no thread on record): held", async () => {
+    const { store, deps, gmailSent } = setup({ now: () => LAST_TICK });
+    add(store, fu("other", { draftThreadId: "T2" }));
+    add(store, fu("none", { draftThreadId: null }));
+    add(store, fu("nothread", { prevThreadId: null, draftThreadId: null }));
+    const r = await runAutoSend(deps);
+    expect(gmailSent).toEqual([]);
+    expect(r.held).toBe(3);
   });
 });

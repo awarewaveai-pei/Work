@@ -4,9 +4,10 @@
 // active, healthy, send_mode='auto', linked connector) -- a draft mailbox is never read here. Per mailbox:
 //   window      Taipei 09:00-18:00, Monday to Friday; outside it nothing is sent.
 //   tick quota  ceil(what is left of its stage cap today / ticks left today), after a 0-120 s jitter.
-//   per mail    its Gmail draft (status 'drafted', newest draft_created event names this mailbox), oldest first, first
-//               emails only -- a follow-up is held until card C5 drafts it in the first email's thread with its subject
-//               (critic M3/M4); then Cold Gate again (warm / Meta / evidence) + I6 (contact-guard: do_not_contact, suppression, MX invalid)
+//   per mail    its Gmail draft (status 'drafted', newest draft_created event names this mailbox), oldest first. A
+//               follow-up goes only when it is the lead's lowest unsent step, due (previous sent mail + its delay, and
+//               the lead's next_followup_date), drafted in the previous sent mail's thread (card C5.2), and no other
+//               mail of that lead went out this tick (critic M3/M4); then Cold Gate again (warm / Meta / evidence) + I6 (contact-guard: do_not_contact, suppression, MX invalid)
 //               + a paid verdict valid within 90 days (mailbox-verify.ts; no key = no send; risky / unknown stay for a
 //               person; invalid is suppressed) -> co_begin_send (lead lock, three caps, drafted -> sending, one
 //               transaction) -> drafts.send -> co_mark_sent.
@@ -31,9 +32,25 @@ export const JITTER_MAX_MS = 120_000;
 // extra cost: read far past the quota (critic M2) -- 400 is eight days of a full mailbox held.
 const QUEUE_READ = 400;
 
+/** What a follow-up needs to be sent in order and in its thread (C5), read in batches with the queue. */
+export interface FollowupInfo {
+  /** The step number, and the delay after the previous sent mail. */
+  version: number;
+  delayDays: number | null;
+  /** Another follow-up of this lead with a lower version is not yet sent, skipped or done. */
+  lowerUnsent: boolean;
+  /** The lead's latest sent mail: when, and its Gmail thread. */
+  prevSentAt: string | null;
+  prevThreadId: string | null;
+  /** The thread of this mail's newest Gmail draft. */
+  draftThreadId: string | null;
+}
+
 export type SendLead = GuardedLead & ColdGateLead & { id: string; organization_id: string | null; email: string | null; next_followup_date: string | null };
 /** verdict: the stored one read with the queue (undefined = not read, ask the store). */
-export interface QueuedMail { messageId: string; draftId: string; outputType: string; lead: SendLead; approvedEvidence: number; verdict?: StoredVerdict | null }
+export interface QueuedMail { messageId: string; draftId: string; outputType: string; lead: SendLead; approvedEvidence: number; verdict?: StoredVerdict | null;
+  /** Only for outputType 'followup'; absent = unknown, held. */
+  followup?: FollowupInfo | null }
 
 export interface SendStore {
   poolAccounts(): Promise<PoolAccount[]>;
@@ -93,12 +110,30 @@ export function ticksLeft(at: Date): number {
 export const tickQuota = (cap: number, claimedToday: number, at: Date): number =>
   Math.max(0, Math.ceil(Math.max(0, cap - claimedToday) / ticksLeft(at)));
 
+/** The Taipei calendar date (YYYY-MM-DD) of an instant. */
+export const taipeiDate = (at: Date): string => new Date(at.getTime() + 8 * 3_600_000).toISOString().slice(0, 10);
+const addDays = (date: string, n: number): string => { const d = new Date(`${date}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+
+/** Why a follow-up may not go out now (SPEC §5.7), or null: the lead's lowest unsent step only, due, and drafted in the
+ *  thread of the mail it follows (a draft made outside that thread would start a new conversation). */
+export function followupHold(mail: QueuedMail, now: Date): string | null {
+  const f = mail.followup;
+  if (!f) return "followup_no_data";
+  if (f.lowerUnsent) return "followup_out_of_order";
+  const today = taipeiDate(now);
+  const next = mail.lead.next_followup_date;
+  if (!f.prevSentAt || f.delayDays === null || addDays(taipeiDate(new Date(f.prevSentAt)), f.delayDays) > today || !next || next > today) return "followup_not_due";
+  if (!f.prevThreadId || f.draftThreadId !== f.prevThreadId) return "followup_not_threaded";
+  return null;
+}
+
 /** Why this queued mail is not sent automatically now, or null. Paid verification runs only for a mail that passed
  *  everything else, so nobody pays to verify a mail that would not go out anyway. */
 async function holdReason(deps: SendDeps, mail: QueuedMail, now: Date): Promise<string | null> {
   const lead = mail.lead;
   if (!lead.email) return "no_email";
-  if (mail.outputType !== "cold_email") return "followup_until_c5";
+  if (mail.outputType === "followup") { const hold = followupHold(mail, now); if (hold) return hold; }
+  else if (mail.outputType !== "cold_email") return "not_auto";
   if (checkColdGate(lead, mail.approvedEvidence).status === "block") return "cold_gate";
   // A stored risky / unknown / invalid verdict holds the mail without any further lookup (it stays for a person).
   let verdict: { status: EmailStatus; provider: string | null } | null =
@@ -132,6 +167,8 @@ export async function runAutoSend(deps: SendDeps): Promise<SendResult> {
   const pool = (await deps.store.poolAccounts()).filter(inPool);
   if (!pool.length) return r;
   const claimed = await deps.store.claimsToday(pool.map((a) => a.id));
+  // At most one mail per lead per tick: the queue was read before any send, so a lead's second follow-up would look due.
+  const leadsSent = new Set<string>();
 
   const runMailbox = async (a: PoolAccount): Promise<void> => {
     const quota = tickQuota(capOf(a), claimed.get(a.id) ?? 0, now());
@@ -150,10 +187,12 @@ export async function runAutoSend(deps: SendDeps): Promise<SendResult> {
       let why: string | null;
       try { why = await holdReason(deps, mail, now()); }
       catch (e) { why = "error"; r.errors.push(`${a.email}: ${mail.messageId}: ${errText(e)}`); }
+      if (!why && leadsSent.has(mail.lead.id)) why = "lead_sent_this_tick";
       if (why) { r.held++; continue; }
       token ??= await deps.tokenFor(a);
       if (!(await deps.store.beginSend(mail.messageId, a.id, mail.lead.email!, sendCaps(a, pool)))) continue;
       sent++;
+      leadsSent.add(mail.lead.id);
       let gmail: { id: string; threadId: string };
       try {
         gmail = await send(token, mail.draftId);
@@ -185,6 +224,50 @@ export async function runAutoSend(deps: SendDeps): Promise<SendResult> {
 const fail = (what: string, error: { message: string } | null): void => { if (error) throw new Error(`${what}: ${error.message}`); };
 const LEAD_COLS = "id, organization_id, name, email, website, do_not_contact, status, consent_source, observation, source_url, next_followup_date";
 
+const FOLLOWUP_DONE = new Set(["sent", "skipped", "copied"]);
+
+/** The batch read behind followupHold: every follow-up row of the queued follow-ups' leads (step order), each lead's latest
+ *  sent mail and that mail's thread. A few queries for the whole queue, none per mail. */
+async function followupInfo(db: SupabaseClient, queued: Array<{ messageId: string; leadId: string; draftThreadId: string | null }>): Promise<Map<string, FollowupInfo>> {
+  const out = new Map<string, FollowupInfo>();
+  if (!queued.length) return out;
+  const leadIds = [...new Set(queued.map((q) => q.leadId))];
+  type Msg = { id: string; lead_id: string; output_type: string; version: number; status: string; sent_at: string | null; followup_delay_days: number | null };
+  const msgs: Msg[] = [];
+  for (let i = 0; i < leadIds.length; i += 100) {
+    const { data, error } = await db.from("co_messages").select("id, lead_id, output_type, version, status, sent_at, followup_delay_days").in("lead_id", leadIds.slice(i, i + 100));
+    fail("follow-up rows read failed", error);
+    msgs.push(...((data ?? []) as Msg[]));
+  }
+  const lastSent = new Map<string, Msg>();
+  for (const m of msgs) {
+    if (m.status !== "sent" || !m.sent_at) continue;
+    const cur = lastSent.get(m.lead_id);
+    if (!cur || Date.parse(m.sent_at) > Date.parse(cur.sent_at!)) lastSent.set(m.lead_id, m);
+  }
+  const threads = new Map<string, string>();
+  const sentIds = [...lastSent.values()].map((m) => m.id);
+  for (let i = 0; i < sentIds.length; i += 100) {
+    const { data, error } = await db.from("co_sending_events").select("message_id, metadata, created_at").eq("event_type", "sent")
+      .in("message_id", sentIds.slice(i, i + 100)).order("created_at", { ascending: false });
+    fail("sent events read failed", error);
+    for (const e of (data ?? []) as Array<{ message_id: string; metadata: { threadId?: string } | null }>) {
+      if (e.metadata?.threadId && !threads.has(e.message_id)) threads.set(e.message_id, e.metadata.threadId);
+    }
+  }
+  for (const q of queued) {
+    const me = msgs.find((m) => m.id === q.messageId);
+    if (!me) continue;
+    const prev = lastSent.get(q.leadId);
+    out.set(q.messageId, {
+      version: me.version, delayDays: me.followup_delay_days,
+      lowerUnsent: msgs.some((m) => m.lead_id === q.leadId && m.output_type === "followup" && m.version < me.version && !FOLLOWUP_DONE.has(m.status)),
+      prevSentAt: prev?.sent_at ?? null, prevThreadId: prev ? threads.get(prev.id) ?? null : null, draftThreadId: q.draftThreadId,
+    });
+  }
+  return out;
+}
+
 export function supabaseSendStore(db: SupabaseClient): SendStore {
   return {
     async poolAccounts() {
@@ -204,7 +287,7 @@ export function supabaseSendStore(db: SupabaseClient): SendStore {
         .eq("event_type", "draft_created").eq("sender_account_id", accountId).eq("co_messages.status", "drafted")
         .order("created_at", { ascending: true }).limit(limit * 2);
       fail("send queue read failed", error);
-      type Row = { message_id: string; provider_event_id: string | null; metadata: { draftId?: string } | null; sender_account_id?: string;
+      type Row = { message_id: string; provider_event_id: string | null; metadata: { draftId?: string; threadId?: string | null } | null; sender_account_id?: string;
         co_messages: { id: string; output_type: string; lead_id: string } };
       const seen: Row[] = [];
       for (const row of (data ?? []) as unknown as Row[]) if (!seen.some((x) => x.message_id === row.message_id)) seen.push(row);
@@ -242,12 +325,15 @@ export function supabaseSendStore(db: SupabaseClient): SendStore {
           if (!verdicts.has(k)) verdicts.set(k, v);
         }
       }
+      const followups = await followupInfo(db, rows.filter((x) => x.co_messages.output_type === "followup").map((x) => ({ messageId: x.message_id, leadId: x.co_messages.lead_id,
+        draftThreadId: x.metadata?.threadId ?? null })));
       const out: QueuedMail[] = [];
       for (const x of rows) {
         const lead = byId.get(x.co_messages.lead_id);
         const draftId = x.metadata?.draftId ?? x.provider_event_id;
         if (lead && draftId) out.push({ messageId: x.message_id, draftId, outputType: x.co_messages.output_type, lead, approvedEvidence: evidence.get(lead.id) ?? 0,
-          verdict: verdicts.get(`${lead.organization_id ?? ""}|${(lead.email ?? "").trim().toLowerCase()}`) ?? null });
+          verdict: verdicts.get(`${lead.organization_id ?? ""}|${(lead.email ?? "").trim().toLowerCase()}`) ?? null,
+          ...(x.co_messages.output_type === "followup" ? { followup: followups.get(x.message_id) ?? null } : {}) });
       }
       return out.slice(0, limit);
     },

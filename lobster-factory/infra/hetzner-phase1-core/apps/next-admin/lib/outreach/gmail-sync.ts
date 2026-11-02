@@ -5,6 +5,8 @@
 //   (its message id is updated); gone too, nothing was sent (co_mark_unsent: needs_edit, claim released). An automatic
 //   send (send-adapter.ts) left 'sending' whose draft is still a draft 30 minutes after its claim did not go out:
 //   needs_edit and the claim released too (SPEC §5.5; never resent by code).
+// ③ no reply (C5.3, after the mailboxes, only in a tick that read all of them): a 'sent' lead whose last follow-up step is
+//   done and whose delay has passed without an answer becomes 'no_reply'. Not final: a later reply still makes it 'replied'.
 // ② incoming mail from the history cursor (settings.gmail_sync.history_id; first run, an expired cursor or a "補掃 N 天"
 //   request: a dated inbox scan over every page). A mail is ours when it sits in the thread of a mail we drafted (that
 //   thread's lead), else when its sender is a lead's address or a bounce names one (X-Failed-Recipients); anything else
@@ -54,6 +56,23 @@ export interface PendingSend {
   threadId: string | null;
 }
 export interface LeadRef { id: string; organization_id: string | null }
+/** A 'sent' lead and its follow-up steps (any channel), for the no-reply decision. */
+export interface FollowupLead extends LeadRef {
+  /** YYYY-MM-DD, Taipei */
+  last_contact_date: string | null;
+  steps: Array<{ version: number; status: string; delay: number | null }>;
+}
+const STEP_PENDING = new Set(["draft", "approved", "needs_edit", "drafted", "sending"]);
+const addDays = (date: string, n: number): string => { const d = new Date(`${date}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+
+/** True when every follow-up step is done (sent, or done by hand; skipped ones do not count), there was at least one, and
+ *  the last step's followup_delay_days have passed since the lead was last contacted (today = the Taipei date). */
+export function noReplyDue(l: FollowupLead, today: string): boolean {
+  const steps = l.steps.filter((s) => s.status !== "skipped");
+  if (!steps.length || !l.last_contact_date || steps.some((s) => STEP_PENDING.has(s.status))) return false;
+  const last = steps.reduce((a, b) => (b.version > a.version ? b : a));
+  return last.delay !== null && addDays(l.last_contact_date, last.delay) <= today;
+}
 export interface StoredReply {
   id: string;
   lead_id: string;
@@ -85,6 +104,10 @@ export interface SyncStore {
   /** The lead (and our email) of a thread one of this connector's mailboxes drafted or sent in. */
   leadForThread(connector: SyncConnector, threadId: string): Promise<(LeadRef & { message_id: string | null }) | null>;
   lastSentMessage(leadId: string): Promise<string | null>;
+  /** Every lead with status 'sent' that has follow-up rows. */
+  sentFollowupLeads(): Promise<FollowupLead[]>;
+  /** 'sent' -> 'no_reply' + timeline, only while the lead is still 'sent'; false = it changed meanwhile. */
+  markNoReply(lead: FollowupLead): Promise<boolean>;
   /** The new row's id, or null when that mail was claimed before. */
   claimReply(row: NewReply): Promise<string | null>;
   pendingReplies(connectorId: string): Promise<StoredReply[]>;
@@ -105,7 +128,7 @@ export interface SyncDeps {
   deadline?: number;
 }
 
-export interface SyncResult { connectors: number; sent: number; unsent: number; replies: number; bounces: number; failed: number; errors: string[] }
+export interface SyncResult { connectors: number; sent: number; unsent: number; replies: number; bounces: number; failed: number; noReply: number; errors: string[] }
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 const isSent = (m: GmailMessage): boolean => !!m.labelIds?.includes("SENT") && !m.labelIds.includes("DRAFT");
@@ -135,8 +158,9 @@ export const isUnsubscribeSubject = (subject: string | null): boolean => /^\s*(r
 export async function runGmailSync(deps: SyncDeps): Promise<SyncResult> {
   const now = deps.now ?? (() => new Date());
   const late = () => deps.deadline !== undefined && Date.now() > deps.deadline;
-  const r: SyncResult = { connectors: 0, sent: 0, unsent: 0, replies: 0, bounces: 0, failed: 0, errors: [] };
+  const r: SyncResult = { connectors: 0, sent: 0, unsent: 0, replies: 0, bounces: 0, failed: 0, noReply: 0, errors: [] };
   const tried = new Set<string>();  // one attempt per row per tick
+  let inboxOpen = false;  // some mailbox's inbox is not read to the end, or holds a reply not yet applied (Codex C5 F1)
 
   const processReply = async (row: StoredReply, who: string): Promise<void> => {
     if (tried.has(row.id)) return;
@@ -296,6 +320,7 @@ export async function runGmailSync(deps: SyncDeps): Promise<SyncResult> {
       await processReply(row, row.lead_id);
     }
     const pending = (await deps.store.pendingReplies(c.id)).length > 0;
+    if (!(complete && !pending)) inboxOpen = true;
     if (complete && !pending) {
       await deps.store.saveState(c.id, { history_id: scan ? scan.history_id : fromHistory!.historyId, last_ok_at: now().toISOString(), scan: null },
         scan?.rescan);
@@ -322,6 +347,19 @@ export async function runGmailSync(deps: SyncDeps): Promise<SyncResult> {
       await syncInbox(api, c);
     } catch (e) {
       r.errors.push(`${c.settings?.email ?? c.id}: ${errText(e)}`);
+    }
+  }
+  // A mailbox that failed, was not read to the end, or holds a reply still pending may hide an answer: no_reply is
+  // judged only after every inbox was read and every reply applied this tick.
+  if (!r.errors.length && !inboxOpen && !late()) {
+    try {
+      const today = new Date(now().getTime() + 8 * 3_600_000).toISOString().slice(0, 10);
+      for (const l of await deps.store.sentFollowupLeads()) {
+        if (late()) break;
+        if (noReplyDue(l, today) && (await deps.store.markNoReply(l))) r.noReply++;
+      }
+    } catch (e) {
+      r.errors.push(`no_reply: ${errText(e)}`);
     }
   }
   return r;
@@ -496,6 +534,34 @@ export function supabaseSyncStore(db: SupabaseClient): SyncStore {
         .order("sent_at", { ascending: false }).limit(1);
       fail("last sent read failed", error);
       return ((data ?? [])[0] as { id: string } | undefined)?.id ?? null;
+    },
+    async sentFollowupLeads() {
+      type Row = { lead_id: string; version: number; status: string; followup_delay_days: number | null;
+        co_leads: { id: string; organization_id: string | null; last_contact_date: string | null } };
+      const byLead = new Map<string, FollowupLead>();
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await db.from("co_messages")
+          .select("lead_id, version, status, followup_delay_days, co_leads!inner(id, organization_id, last_contact_date, status, do_not_contact)")
+          .eq("output_type", "followup").eq("co_leads.status", "sent").eq("co_leads.do_not_contact", false).order("id").range(from, from + PAGE - 1);
+        fail("follow-up rows read failed", error);
+        for (const x of (data ?? []) as unknown as Row[]) {
+          const l = byLead.get(x.lead_id) ?? { id: x.co_leads.id, organization_id: x.co_leads.organization_id, last_contact_date: x.co_leads.last_contact_date, steps: [] };
+          l.steps.push({ version: x.version, status: x.status, delay: x.followup_delay_days });
+          byLead.set(x.lead_id, l);
+        }
+        if ((data ?? []).length < PAGE) break;
+      }
+      return [...byLead.values()];
+    },
+    async markNoReply(lead) {
+      const { data, error } = await db.from("co_leads").update({ status: "no_reply", next_followup_date: null, updated_at: new Date().toISOString() })
+        .eq("id", lead.id).eq("status", "sent").eq("do_not_contact", false).select("id");
+      fail("no_reply update failed", error);
+      if (!(data ?? []).length) return false;
+      const { error: tErr } = await db.from("co_timeline_events").insert({ organization_id: lead.organization_id, lead_id: lead.id, event_type: "no_reply",
+        title: "追蹤信都寄完了，等過間隔天數仍沒有回信", metadata: { steps: lead.steps.length, last_contact_date: lead.last_contact_date } });
+      fail("timeline insert failed", tErr);
+      return true;
     },
     async claimReply(row) {
       const { data, error } = await db.from("co_replies").upsert(row, { onConflict: "dedupe_key", ignoreDuplicates: true }).select("id");

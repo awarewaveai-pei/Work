@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { GmailNotFound, type GmailApi, type GmailMessage } from "../gmail-api";
 import { gmailApi, replyText } from "../gmail-api";
-import { runGmailSync, type Classification, type GmailSyncState, type NewReply, type PendingSend, type StoredReply, type SyncConnector, type SyncStore } from "../gmail-sync";
+import { runGmailSync, type Classification, type FollowupLead, type GmailSyncState, type NewReply, type PendingSend, type StoredReply, type SyncConnector, type SyncStore } from "../gmail-sync";
 
 const CONN: SyncConnector = { id: "c1", organization_id: "org", created_at: "2026-11-01T00:00:00Z", settings: { email: "me@pool.example", gmail_sync: { history_id: "100" } } };
 const T0 = Date.parse("2026-11-02T01:00:00Z");
@@ -62,6 +62,10 @@ class FakeStore implements SyncStore {
   async leadForAddress(_c: SyncConnector, email: string) { return this.leads[email] ?? null; }
   async leadForThread(_c: SyncConnector, t: string) { return this.threads[t] ?? null; }
   async lastSentMessage() { return "msg-last"; }
+  followLeads: FollowupLead[] = [];
+  noReplied: string[] = [];
+  async sentFollowupLeads() { return this.followLeads.filter((l) => !this.noReplied.includes(l.id)); }
+  async markNoReply(l: FollowupLead) { this.noReplied.push(l.id); return true; }
   async claimReply(row: NewReply) { if (this.replies.some((r) => r.dedupe_key === row.dedupe_key)) return null; const id = `r${this.replies.length + 1}`; this.replies.push({ ...row, id, attempts: 0 }); return id; }
   async pendingReplies() { return this.replies.filter((r) => !r.done && r.attempts < 5) as StoredReply[]; }
   async applyReply(id: string, c: Classification) { const r = this.replies.find((x) => x.id === id)!; if (r.done) return "already"; r.done = c.type; return "applied"; }
@@ -338,5 +342,37 @@ describe("replyText", () => {
   it("falls back to the HTML part without tags and cuts a 寫道 quote", () => {
     const m: GmailMessage = { id: "h", threadId: "t", payload: { mimeType: "text/html", body: { data: b64("<p>好的，<b>下週</b>談</p><div>王小明 於 2026年11月1日 寫道：</div><p>舊信</p>") } } };
     expect(replyText(m)).toBe("好的，下週談");
+  });
+});
+
+describe("no reply (C5.3)", () => {
+  // now = 2026-11-02 11:00 Taipei
+  const fl = (id: string, last: string | null, steps: Array<[number, string, number | null]>): FollowupLead =>
+    ({ id, organization_id: "org", last_contact_date: last, steps: steps.map(([version, status, delay]) => ({ version, status, delay })) });
+
+  it("the last step's delay passed with no answer -> no_reply; not yet, a step still to do, or no steps -> unchanged", async () => {
+    const { store, deps } = setup();
+    store.followLeads = [
+      fl("due", "2026-10-28", [[2, "sent", 3], [3, "sent", 4]]),             // 10-28 + 4 = 11-01 <= 11-02
+      fl("on-the-day", "2026-10-29", [[2, "sent", 4]]),                      // 11-02 itself counts
+      fl("not-yet", "2026-10-30", [[2, "sent", 4]]),                         // 11-03
+      fl("step-left", "2026-10-01", [[2, "sent", 3], [3, "approved", 4]]),
+      fl("manual-left", "2026-10-01", [[2, "sent", 3], [3, "draft", 4]]),
+      fl("skipped-ignored", "2026-10-28", [[2, "sent", 3], [3, "skipped", 30]]),  // the last step that counts is v2
+      fl("manual-done-last", "2026-10-28", [[2, "sent", 3], [3, "copied", 4]]),
+      fl("no-steps", "2026-10-01", []),
+      fl("no-contact-date", null, [[2, "sent", 3]]),
+    ];
+    const r = await runGmailSync(deps);
+    expect(store.noReplied.sort()).toEqual(["due", "manual-done-last", "on-the-day", "skipped-ignored"]);
+    expect(r.noReply).toBe(4);
+  });
+
+  it("a tick in which a mailbox failed judges nothing: an unread answer may be waiting there", async () => {
+    const { store, deps } = setup();
+    store.followLeads = [fl("due", "2026-10-28", [[2, "sent", 3]])];
+    const r = await runGmailSync({ ...deps, gmailFor: async () => { throw new Error("token refresh failed"); } });
+    expect(r.errors).toHaveLength(1);
+    expect(store.noReplied).toEqual([]);
   });
 });

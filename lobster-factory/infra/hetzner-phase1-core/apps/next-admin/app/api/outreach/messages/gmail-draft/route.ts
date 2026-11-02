@@ -3,7 +3,8 @@ import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
 import { outreachDb } from "@/lib/outreach/db-client";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse, userKindOf } from "@/lib/tenant-guard";
 import { getSecret, connectorSecretRef } from "@/lib/secret-vault";
-import { buildRfc2822Message, createGmailDraft, GmailDraftError, refreshAccessToken, toBase64Url, type GmailDraft } from "@/lib/outreach/google-oauth";
+import { buildRfc2822Message, createGmailDraft, GmailDraftError, refreshAccessToken, replySubject, toBase64Url, type GmailDraft } from "@/lib/outreach/google-oauth";
+import { gmailApi, GmailNotFound, header } from "@/lib/outreach/gmail-api";
 import { contactBlock } from "@/lib/outreach/contact-guard";
 import { stageCap } from "@/lib/outreach/sender";
 
@@ -240,6 +241,37 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "token refresh failed" }, { status: 502 });
   }
 
+  // A follow-up replies in the thread of our last SENT mail to the lead (C5.2, SPEC §5.7): its RFC Message-ID becomes
+  // In-Reply-To / References, its thread the draft's thread, "Re: <first email's subject>" the subject. Read-only Gmail
+  // call, made before the take so a failure here leaves the row untouched.
+  let reply: { inReplyTo: string; threadId: string; subject: string | null } | null = null;
+  if (message.output_type === "followup") {
+    const { data: sentEv, error: sentErr } = await supabase.from("co_sending_events").select("sender_account_id, metadata")
+      .eq("lead_id", lead.id).eq("event_type", "sent").order("created_at", { ascending: false }).limit(1);
+    if (sentErr) return NextResponse.json({ ok: false, error: sentErr.message }, { status: 500 });
+    const prev = ((sentEv ?? []) as Array<{ sender_account_id: string | null; metadata: { gmailMessageId?: string; threadId?: string } | null }>)[0];
+    const prevGmailId = prev?.metadata?.gmailMessageId;
+    const prevThread = prev?.metadata?.threadId;
+    if (!prevGmailId || !prevThread) {
+      return NextResponse.json({ ok: false, error: "no_previous_mail", detail: "這筆名單還沒有寄出過的信，追蹤信沒有可回的那一串" }, { status: 409 });
+    }
+    if (prev?.sender_account_id && prev.sender_account_id !== sender.id) {
+      return NextResponse.json({ ok: false, error: "sender_mismatch", detail: "上一封是用另一個信箱寄出的：追蹤信要回同一串，不能換信箱" }, { status: 409 });
+    }
+    const { data: first, error: firstErr } = await supabase.from("co_messages").select("subject")
+      .eq("lead_id", lead.id).eq("output_type", "cold_email").eq("status", "sent").order("sent_at", { ascending: false }).limit(1);
+    if (firstErr) return NextResponse.json({ ok: false, error: firstErr.message }, { status: 500 });
+    let messageIdHeader: string | null;
+    try {
+      messageIdHeader = header(await gmailApi(accessToken).message(prevGmailId, "meta"), "Message-ID")?.trim() || null;
+    } catch (e) {
+      if (e instanceof GmailNotFound) return NextResponse.json({ ok: false, error: "no_previous_mail", detail: "Gmail 裡找不到上一封寄出的信（可能已被刪除）" }, { status: 409 });
+      return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "gmail read failed" }, { status: 502 });
+    }
+    if (!messageIdHeader) return NextResponse.json({ ok: false, error: "previous mail has no Message-ID header" }, { status: 502 });
+    reply = { inReplyTo: messageIdHeader, threadId: prevThread, subject: replySubject(((first ?? []) as Array<{ subject: string | null }>)[0]?.subject ?? null) };
+  }
+
   // Take the row before Gmail is called (approved → drafted, conditional): of two concurrent requests, or a review change
   // racing this one, only the one that took it creates a draft. The draft is built from the content taken, not the
   // content read earlier (an edit in between would otherwise be stored but not drafted). A failure gives the row back.
@@ -254,8 +286,9 @@ export async function POST(req: Request): Promise<Response> {
 
   let draft: GmailDraft;
   try {
-    const raw = toBase64Url(buildRfc2822Message({ from: sender.email, to: lead.email.trim(), subject: content.subject, bodyText: content.body }));
-    draft = await createGmailDraft(accessToken, raw);
+    const raw = toBase64Url(buildRfc2822Message({ from: sender.email, to: lead.email.trim(), subject: reply ? reply.subject : content.subject,
+      bodyText: content.body, ...(reply ? { inReplyTo: reply.inReplyTo } : {}) }));
+    draft = await createGmailDraft(accessToken, raw, reply?.threadId);
   } catch (e) {
     const error = e instanceof Error ? e.message : "gmail draft creation failed";
     // Gmail refused (4xx): no draft exists, the row goes back. Anything else (network, 5xx, unreadable reply): a draft

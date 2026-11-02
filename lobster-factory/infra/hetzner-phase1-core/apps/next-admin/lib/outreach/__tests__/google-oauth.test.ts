@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildAuthorizeUrl, buildRfc2822Message, GMAIL_SCOPE, signState, toBase64Url, verifyState } from "../google-oauth";
+import { buildAuthorizeUrl, buildRfc2822Message, createGmailDraft, GMAIL_SCOPE, replySubject, signState, toBase64Url, verifyState } from "../google-oauth";
 
 describe("signState / verifyState", () => {
   const secret = "test-secret-value";
@@ -137,5 +137,41 @@ describe("toBase64Url", () => {
     const encoded = toBase64Url(original);
     const decoded = Buffer.from(encoded, "base64url").toString("utf8");
     expect(decoded).toBe(original);
+  });
+});
+
+describe("follow-up in the first email's thread (C5.2)", () => {
+  const subjectOf = (msg: string) => {
+    const enc = /^Subject: =\?UTF-8\?B\?(.+)\?=$/m.exec(msg)?.[1];
+    return enc ? Buffer.from(enc, "base64").toString("utf8") : null;
+  };
+
+  it("In-Reply-To and References are the previous mail's Message-ID, once each; a first email has neither", () => {
+    const msg = buildRfc2822Message({ from: "a@x.com", to: "b@y.com", subject: "Re: 合作提案", bodyText: "hi", inReplyTo: "<abc123@mail.gmail.com>" });
+    expect(msg.match(/^In-Reply-To: <abc123@mail\.gmail\.com>$/gm)).toHaveLength(1);
+    expect(msg.match(/^References: <abc123@mail\.gmail\.com>$/gm)).toHaveLength(1);
+    expect(subjectOf(msg)).toBe("Re: 合作提案");
+    const first = buildRfc2822Message({ from: "a@x.com", to: "b@y.com", subject: "合作提案", bodyText: "hi" });
+    expect(first).not.toMatch(/^(In-Reply-To|References):/m);
+  });
+
+  it("the subject is Re: + the first email's subject, never doubled; none stays none", () => {
+    expect(replySubject("合作提案")).toBe("Re: 合作提案");
+    expect(replySubject("  Re: 合作提案 ")).toBe("Re: 合作提案");
+    expect(replySubject("RE: x")).toBe("RE: x");
+    expect(replySubject(null)).toBeNull();
+    expect(replySubject("  ")).toBeNull();
+  });
+
+  it("drafts.create carries the threadId only when one is given", async () => {
+    const bodies: unknown[] = [];
+    const fetcher = (async (_url: string, init: RequestInit) => {
+      bodies.push(JSON.parse(init.body as string));
+      return new Response(JSON.stringify({ id: "d1", message: { id: "m1", threadId: "T1" } }), { status: 200 });
+    }) as unknown as typeof fetch;
+    const inThread = await createGmailDraft("tok", "RAW", "T1", fetcher);
+    await createGmailDraft("tok", "RAW", undefined, fetcher);
+    expect(bodies).toEqual([{ message: { raw: "RAW", threadId: "T1" } }, { message: { raw: "RAW" } }]);
+    expect(inThread.message).toEqual({ id: "m1", threadId: "T1" });
   });
 });

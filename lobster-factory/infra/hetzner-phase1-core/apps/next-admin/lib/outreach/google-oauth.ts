@@ -183,6 +183,8 @@ function wrapBase64(b64: string): string {
  *  fine"). */
 export function buildRfc2822Message(opts: {
   from: string; to: string; subject: string | null; bodyText: string;
+  /** A follow-up in our earlier mail's thread (C5.2): that mail's RFC Message-ID, set as In-Reply-To and References. */
+  inReplyTo?: string;
 }): string {
   // RFC 2369 List-Unsubscribe: a free way to refuse further mail (個資法 §20 第 3 項), read by Gmail/Outlook
   // as an unsubscribe affordance; the reply-sync (SPEC §5.6) treats a mail with subject "unsubscribe" as opt-out.
@@ -196,12 +198,20 @@ export function buildRfc2822Message(opts: {
     `Content-Transfer-Encoding: base64`,
     `List-Unsubscribe: <mailto:${fromAddress}?subject=unsubscribe>`,
   ];
+  if (opts.inReplyTo) headers.splice(3, 0, `In-Reply-To: ${opts.inReplyTo}`, `References: ${opts.inReplyTo}`);
   if (opts.subject) {
     // RFC 2047 encode non-ASCII subjects (Traditional Chinese cold-email subjects are common here).
     headers.splice(3, 0, `Subject: =?UTF-8?B?${Buffer.from(opts.subject, "utf8").toString("base64")}?=`);
   }
   const encodedBody = wrapBase64(Buffer.from(opts.bodyText, "utf8").toString("base64"));
   return `${headers.join("\r\n")}\r\n\r\n${encodedBody}`;
+}
+
+/** Gmail threads a reply by subject as well as by threadId: the follow-up's subject is "Re: <first email's subject>". */
+export function replySubject(firstSubject: string | null): string | null {
+  const s = firstSubject?.trim();
+  if (!s) return null;
+  return /^re:/i.test(s) ? s : `Re: ${s}`;
 }
 
 export function toBase64Url(s: string): string {
@@ -218,13 +228,14 @@ export class GmailDraftError extends Error {
  *  are matched by thread). Older Gmail replies without it give null; the sync then looks the draft up by id. */
 export interface GmailDraft { id: string; message: { id: string; threadId: string } | null }
 
-export async function createGmailDraft(accessToken: string, raw: string): Promise<GmailDraft> {
+/** threadId: the draft joins that Gmail thread (a follow-up, C5.2); absent = a new thread. */
+export async function createGmailDraft(accessToken: string, raw: string, threadId?: string, fetcher: typeof fetch = fetch): Promise<GmailDraft> {
   let resp: Response;
   try {
-    resp = await fetch(`${GMAIL_API_BASE}/drafts`, {
+    resp = await fetcher(`${GMAIL_API_BASE}/drafts`, {
       method: "POST",
       headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
-      body: JSON.stringify({ message: { raw } }),
+      body: JSON.stringify({ message: threadId ? { raw, threadId } : { raw } }),
     });
   } catch (e) {
     throw new GmailDraftError(`gmail drafts.create: ${e instanceof Error ? e.message : "network error"}`, "unknown");

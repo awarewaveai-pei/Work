@@ -1,4 +1,20 @@
 # Worklog
+## 2026-11-02（續28）外聯 v2 C5 追蹤信與人工步驟（程式完成；C5.5 Gmail 原串 REALTEST 未跑）
+
+**做了**（cc.py SDK 派工 session bbeb17f0，US$1.24；主 session 驗收＋修 Codex 2 項；NA = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）：
+- C5.2 `NA/app/api/outreach/messages/gmail-draft/route.ts`：追蹤信讀 lead 最新 `sent` 事件 → Gmail `Message-ID` → MIME `In-Reply-To`／`References`、主旨 `Re: <首封主旨>`、`drafts.create` 帶 `threadId`；無已寄 → 409 `no_previous_mail`；上一封他信箱 → 409 `sender_mismatch`。`google-oauth.ts`：`buildRfc2822Message` 加 `inReplyTo`、`replySubject`、`createGmailDraft(threadId?)`。
+- C8 解鎖：`NA/lib/outreach/send-adapter.ts` `followupHold`：最小未寄 step、到期（上一封 sent_at＋delay 且 lead.next_followup_date）、草稿 thread＝上一封 thread、同 lead 一輪一封；資料由 `followupInfo` 批次讀。取代 `followup_until_c5`。
+- C5.3 `NA/lib/outreach/gmail-sync.ts` `noReplyDue`／`markNoReply`：最後一步 delay 過、無待寄步驟 → `status='no_reply'`（條件 `status='sent'`）。
+- C5.1／C5.4 `NA/app/api/outreach/followups/route.ts` GET `?due=1`、POST `step_done`（非 email 步驟 → `copied`＋timeline＋推進日期）；`FollowupsClient.tsx` 「該追的信」「人工步驟」兩塊。
+- Codex `agency-os/reports/oracle/2026-11-02-partialreview-3bf9de48.md` 2 項皆修：F1 收件匣未讀完或有待處理回信時不判 no_reply（`inboxOpen`）；F2 已完成步驟重按＝no-op，不再延後下一步。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/outreach/__tests__/ app/api/outreach/ → 28 files / 231 passed（追蹤信 5、no_reply 2、標頭組裝 3）；npx tsc --noEmit exit 0 | exit=0 | ms=5000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n（Codex partialreview-3bf9de48，2 項已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=followup_until_c5 | hits=0
+- 未驗：C5.5 REALTEST（本機建追蹤草稿 → Gmail 原串）需已寄出的首封；待池信箱或手動寄一封後做。
+
+**rollback**：revert 本 commit（追蹤信回到不自動寄）。
 ## 2026-11-02（續27）影音工作台卡 M1：ffprobe 釘版、內容定址素材存放、HEVC 預覽代理（ca4297f00）
 
 **根因**：探測用 regex 刮 ffmpeg stderr 只得 4 項；沒有 ffprobe；上傳以隨機 uuid 存；手機 HEVC Main10 MOV 沒有瀏覽器可播的預覽。
