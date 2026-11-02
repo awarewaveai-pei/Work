@@ -1,7 +1,8 @@
 'use client';
 import { useCallback, useEffect, useState } from "react";
 import { useActiveOrg, withOrg } from "@/lib/outreach/use-active-org";
-import { DISCOVER_COST_TWD, MAX_DISCOVER } from "@/lib/outreach/discover";
+import { DISCOVER_COST_TWD, MAX_DISCOVER, creditsTwd } from "@/lib/outreach/discover";
+import { GCIS_ATTRIBUTION, GCIS_COUNTIES, GCIS_MAX_COMPANIES, GCIS_MAX_SERPER_CREDITS } from "@/lib/outreach/sources/gcis";
 
 interface InboxItem {
   id: string;
@@ -49,6 +50,9 @@ export default function InboxClient() {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [bulk, setBulk] = useState("");
   const [find, setFind] = useState({ query: "", location: "" });
+  const [co, setCo] = useState({ text: "", county: "" });
+  const [coItems, setCoItems] = useState<Array<{ code: string; desc: string }> | null>(null);
+  const [coPick, setCoPick] = useState<{ code: string; desc: string } | null>(null);
 
   const org = useActiveOrg();
 
@@ -159,6 +163,54 @@ export default function InboxClient() {
     }
   }
 
+  async function findItems(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setErr(null);
+    setMsg(null);
+    setCoPick(null);
+    try {
+      const r = await fetch(INBOX_API, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ gcisItems: co.text, organizationId: org }),
+      });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "查詢失敗");
+      setCoItems(j.items as Array<{ code: string; desc: string }>);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function importCompanies() {
+    if (!coPick || !co.county) return;
+    setBusy(true);
+    setErr(null);
+    setMsg(null);
+    try {
+      const r = await fetch(INBOX_API, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ gcis: { item: coPick.code, itemDesc: coPick.desc, county: co.county }, organizationId: org }),
+      });
+      const j = await r.json();
+      const cost = j.discovery ? `（用了 ${j.discovery.credits} 次查詢，約 ${twd(j.discovery.twd)}）` : "";
+      if (!j.ok) throw new Error(`${j.detail || j.error || "查詢失敗"}${cost}`);
+      const dup = j.summary?.suspected_dup ?? 0;
+      const noSite = (j.discovery?.withoutWebsite ? `；${j.discovery.withoutWebsite} 家找不到官網` : "")
+        + (j.discovery?.listTruncated ? "；全國名單太長，只篩了前段，這個縣市可能還有更多" : "");
+      setMsg(`${j.imported ? `找到 ${j.imported} 家公司，已放進收件匣${dup ? `，其中 ${dup} 家已在名單或收件匣裡（標成 suspected_dup）` : ""}` : "這個營業項目在該縣市沒有找到公司"}${noSite}${cost}`);
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function approve(id: string) {
     setErr(null);
     try {
@@ -203,6 +255,33 @@ export default function InboxClient() {
           {busy ? "處理中…" : `找名單（每次最多約 ${twd(DISCOVER_COST_TWD)}）`}
         </button>
       </form>
+
+      <div className="card" style={{ display: "grid", gap: 8 }}>
+        <div className="card-header"><span className="card-label">找公司（經濟部商工登記）</span></div>
+        <p className="card-sub">先搜營業項目，點一個；再點縣市；一次最多 {GCIS_MAX_COMPANIES} 家，附負責人姓名，官網盡量找。沒有 email 的，核准後按「研究這家」補。</p>
+        <form onSubmit={findItems} style={{ display: "flex", gap: 8 }}>
+          <input style={{ flex: 1 }} placeholder="營業項目（例：餐館、咖啡、F501060，或代碼）" value={co.text}
+            onChange={(e) => setCo((c) => ({ ...c, text: e.target.value }))} />
+          <button type="submit" className="btn-secondary" disabled={busy || !co.text.trim()}>搜尋營業項目</button>
+        </form>
+        {coItems && (coItems.length === 0 ? <p className="card-sub">沒有符合的營業項目（目前只支援批發零售餐飲等已開放的大類）。</p> : (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }} role="group" aria-label="符合的營業項目">
+            {coItems.map((it) => (
+              <button key={it.code} type="button" className={coPick?.code === it.code ? "btn-primary" : "btn-secondary"}
+                aria-pressed={coPick?.code === it.code} onClick={() => setCoPick(it)}>{it.code} {it.desc}</button>
+            ))}
+          </div>
+        ))}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }} role="group" aria-label="縣市">
+          {GCIS_COUNTIES.map((c) => (
+            <button key={c} type="button" className={co.county === c ? "btn-primary" : "btn-secondary"}
+              aria-pressed={co.county === c} onClick={() => setCo((x) => ({ ...x, county: c }))}>{c}</button>
+          ))}
+        </div>
+        <button type="button" className="btn-primary" disabled={busy || !coPick || !co.county} onClick={() => void importCompanies()}>
+          {busy ? "處理中…" : `找公司${coPick && co.county ? `：${coPick.desc}／${co.county}` : ""}（每次最多約 ${twd(creditsTwd(GCIS_MAX_SERPER_CREDITS))}）`}
+        </button>
+      </div>
 
       <form className="card" onSubmit={addOne} style={{ display: "grid", gap: 8 }}>
         <div className="card-header"><span className="card-label">手動新增一筆</span></div>
@@ -265,6 +344,7 @@ export default function InboxClient() {
           </ul>
         )}
       </div>
+      <p className="card-sub">{GCIS_ATTRIBUTION}</p>
     </div>
   );
 }

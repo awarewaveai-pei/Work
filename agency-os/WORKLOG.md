@@ -1,4 +1,25 @@
 # Worklog
+## 2026-11-02（續32）外聯 v2 C12.1＋C12.2 名單來源：公司行號（程式完成、假回應測試；C12.3 白名單待核准）；C5／C15 部署 8c8713c8b
+
+**做了**（cc.py SDK 派工 session 6a36564e，US$1.04；主 session 驗收＋修；NA = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）：
+- C12.1 `NA/lib/collect/net/providers.ts`：`apiKeyEnv` 選用＋`keyless`（不帶 auth header；無 key 又非 keyless 仍 `unconfigured`）；`gcis` entry（GET only）。`NA/lib/site-watch/rendererClient.ts` 型別一行。
+- C12.1 `NA/lib/outreach/sources/gcis.ts`：營業項目搜尋 → 依代碼首字母選大類 API 列公司 → 統編查詳細（負責人、狀態，非核准設立跳過）→ Serper `/search` 找官網（目錄站拒絕＋title 含公司名核心）→ 縣市以 `Company_Location` 前綴篩；≤100 家、並行 5。
+- 計畫訂正：`FCB90AB1…` 是代碼表不是公司清單；列公司是每大類一支 API（F 類 `C8782705…` 正式，其餘九類規則頁標「測試」）；無 `Cmp_Business` 欄位，industry＝點選的營業項目說明。
+- C12.2 `NA/app/api/outreach/inbox/route.ts`（`gcisItems`、`gcis` 兩分支；grant `outreach.discover`；預扣 100 次 Serper，結束依用量結算）＋`InboxClient.tsx`「找公司」（搜尋框＋可見清單、22 縣市按鈕、顯名聲明）。
+- 主 session：`co_lead_inbox` 無聯絡人／同意欄 → `NA/app/api/outreach/leads/route.ts` 核准時從 `raw_payload` 帶 `contact_name`、`contact_role`；`consent_source` 只收 `source_type='gcis'` 且 `general_source:` 開頭（防匯入填 `self_published:` 跳過告知行）。不加 migration。
+- Codex `agency-os/reports/oracle/2026-11-02-partialreview-779887ea.md` 4 項皆處理：F1 並行查詢失敗時等在途查詢完成再結算；F2 全國名單超過頁數上限 → 回 `listTruncated`，頁面說明「只篩了前段」；F3 營業項目文字搜尋（`like` 非文件條件）被拒時回空，代碼搜尋照常（C12.3 實測確認）；F4 一般匯入不得自稱 `source_type='gcis'`（400）。
+- 部署：C5＋C15＋grant 修正 8c8713c8b 已上線（04:26:49Z healthy 16s、smoke all OK）。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（全套）→ 461 files passed、2 紅＝`/tools/seedstar`（他 session 未 commit 目錄）；gcis 3、keyless 1；npx tsc --noEmit exit 0 | exit=0 | ms=120000
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo sg-deploy.sh next-admin（8c8713c8b）→ healthy after 16s、smoke all endpoints OK | exit=0 | ms=420000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n（Codex partialreview-779887ea，4 項已處理）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=listTruncated | hits=7
+- 未驗：全用假回應；GCIS 欄位名、代碼表文字搜尋、每日上限、F 類以外大類可否呼叫，都等 C12.3 白名單後真打一次。
+
+**剩**：C12.3 操作者寄 API 使用告知書（opendata.gcis@gmail.com，IP 145.239.195.47），核准後真查一次。
+
+**rollback**：revert 本 commit；找公司按鈕即消失，既有匯入不受影響。
 ## 2026-11-02（續31）部署閘擋下 C15：messages route 看不出向呼叫者請額度 → 路由改成自己 grantFor 交給 lib；監工台 C5／C15
 
 **根因**：C15 把產信搬到 `lib/outreach/generate.ts`，grantFor 跟著搬走；route 只傳 `billing` callback。`lib/portal/__tests__/registry-code.test.ts`「every API route that reaches a product feature asks it for its caller」讀 route 自己的 `grantFor("…")` 字面 → `app/api/outreach/messages/route.ts reaches outreach.qa, outreach.draft` 紅；主機 `sg-deploy.sh` npm test 閘中止（04:19:58Z，正式站留在 050a1041e）。本機 C15 只跑 outreach 子集，沒跑這支。

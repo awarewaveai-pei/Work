@@ -14,6 +14,7 @@ import { billedTo } from "@/lib/outreach/billing";
 import { grantFor } from "@/lib/entitlements/grant";
 import { EntitlementRequired } from "@/lib/entitlements/can";
 import { createBudget, createProviderCall, ProviderCallError } from "@/lib/collect";
+import { discoverCompanies, searchBusinessItems, GcisError, GCIS_COUNTIES, GCIS_MAX_SERPER_CREDITS, type GcisUsage } from "@/lib/outreach/sources/gcis";
 
 // Cold Outreach — Lead Inbox import (task T5). Table: co_lead_inbox (migration 0048).
 // Pipeline: normalize → dedup (within batch, and against this org's existing inbox + leads) → suppression check →
@@ -68,6 +69,9 @@ export async function GET(req: Request): Promise<Response> {
 // POST — import one or many. Body: { organizationId?, orgSlug?, leads: RawLead[] }  OR  { ..., lead: RawLead }
 //   OR  { ..., discover: { query, location } } — ≤ 20 contactable businesses from a map search; the answer adds
 //   discovery { credits, twd, skipped }.
+//   OR  { ..., gcis: { item, itemDesc, county } } — ≤ 100 registered companies running business item `item` (card C12);
+//   the answer adds discovery { credits, twd, skipped, withoutWebsite }.
+//   OR  { ..., gcisItems: "<text>" } — the business items whose description holds the text; nothing is written.
 export async function POST(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
@@ -95,8 +99,14 @@ export async function POST(req: Request): Promise<Response> {
     : body.lead && typeof body.lead === "object"
       ? [body.lead as RawLead]
       : [];
+  // gcis is a source this route writes itself (body.gcis below): an import may not claim it (Codex C12 F4).
+  if (rawList.some((l) => typeof l?.source_type === "string" && l.source_type.trim().toLowerCase() === "gcis")) {
+    return NextResponse.json({ ok: false, error: "source_type gcis is reserved for 找公司" }, { status: 400 });
+  }
 
   let discovery: { credits: number; twd: number; skipped: number } | null = null;
+  let gcisWithoutWebsite = 0;
+  let gcisListTruncated = false;
   if (body.discover !== undefined) {
     const input = discoverInput(body.discover);
     if (!input) return NextResponse.json({ ok: false, error: "discover.query and discover.location required (≤ 100 chars)" }, { status: 400 });
@@ -126,6 +136,59 @@ export async function POST(req: Request): Promise<Response> {
           detail: "看不懂這個地區：請填縣市（例：台中市）或英文地名（例：Xinyi District, Taipei City, Taiwan）",
           discovery: { credits: e.credits, twd: creditsTwd(e.credits), skipped: 0 } }, { status: 422 });
       }
+      if (!(e instanceof ProviderCallError)) throw e;
+      return NextResponse.json({ ok: false, error: e.message }, { status: e.kind === "unconfigured" ? 503 : 502 });
+    }
+    if (rawList.length === 0) return NextResponse.json({ ok: true, imported: 0, summary: {}, discovery });
+  }
+
+  if (body.gcisItems !== undefined) {
+    const text = typeof body.gcisItems === "string" ? body.gcisItems.trim() : "";
+    if (!text || text.length > 40) return NextResponse.json({ ok: false, error: "gcisItems must be 1-40 chars" }, { status: 400 });
+    let grant;
+    try { grant = await grantFor("outreach.discover", await billedTo(req, organizationId)); }
+    catch (e) { if (e instanceof EntitlementRequired) return NextResponse.json({ ok: false, error: e.code }, { status: e.status }); throw e; }
+    try {
+      const usage: GcisUsage = { serperCredits: 0, gcisCalls: 0 };
+      const items = await searchBusinessItems(createProviderCall({ budget: createBudget({ fetches: 2, ms: 30_000 }), grant, timeoutMs: 20_000 }), usage, text);
+      return NextResponse.json({ ok: true, items });
+    } catch (e) {
+      if (e instanceof GcisError) return NextResponse.json({ ok: false, error: e.message }, { status: 502 });
+      if (!(e instanceof ProviderCallError)) throw e;
+      return NextResponse.json({ ok: false, error: e.message }, { status: e.kind === "unconfigured" ? 503 : 502 });
+    }
+  }
+
+  if (body.gcis !== undefined) {
+    const g = body.gcis && typeof body.gcis === "object" ? (body.gcis as Record<string, unknown>) : {};
+    const item = typeof g.item === "string" ? g.item.trim().toUpperCase() : "";
+    const itemDesc = typeof g.itemDesc === "string" ? g.itemDesc.trim().slice(0, 100) : "";
+    const county = typeof g.county === "string" ? g.county.trim() : "";
+    if (!/^[A-Z]\d{6}$/.test(item) || !(GCIS_COUNTIES as readonly string[]).includes(county)) {
+      return NextResponse.json({ ok: false, error: "gcis.item (e.g. F101040) and gcis.county (one of the 22 counties) required" }, { status: 400 });
+    }
+    let grant;
+    try { grant = await grantFor("outreach.discover", await billedTo(req, organizationId)); }
+    catch (e) { if (e instanceof EntitlementRequired) return NextResponse.json({ ok: false, error: e.code }, { status: e.status }); throw e; }
+    // Same pricing as the map search: the Serper ceiling (one /search per company) is held before the first request,
+    // the credits Serper reported are kept. The registry itself is free.
+    const hold = await holdCost(grant, creditsUsd(GCIS_MAX_SERPER_CREDITS));
+    if (!hold) return NextResponse.json({ ok: false, error: "no_credits" }, { status: 402 });
+    const usage: GcisUsage = { serperCredits: 0, gcisCalls: 0 };
+    const settle = async () => {
+      try { await hold.settle(creditsForCost(creditsUsd(usage.serperCredits)), { provider: "serper", serper_credits: usage.serperCredits, source: "gcis" }); }
+      catch (e) { console.warn(`[outreach-gcis] settle failed: ${String(e).slice(0, 200)}`); }
+    };
+    try {
+      const found = await discoverCompanies(createProviderCall({ budget: createBudget({ fetches: 220, ms: 240_000 }), grant, timeoutMs: 20_000 }), usage, { item, itemDesc, county });
+      await settle();
+      rawList = found.leads;
+      discovery = { credits: usage.serperCredits, twd: creditsTwd(usage.serperCredits), skipped: found.skipped };
+      gcisWithoutWebsite = found.withoutWebsite;
+      gcisListTruncated = found.listTruncated;
+    } catch (e) {
+      await settle();
+      if (e instanceof GcisError) return NextResponse.json({ ok: false, error: e.message }, { status: 502 });
       if (!(e instanceof ProviderCallError)) throw e;
       return NextResponse.json({ ok: false, error: e.message }, { status: e.kind === "unconfigured" ? 503 : 502 });
     }
@@ -196,7 +259,7 @@ export async function POST(req: Request): Promise<Response> {
     const s = (r as { inbox_status: string }).inbox_status;
     summary[s] = (summary[s] ?? 0) + 1;
   }
-  return NextResponse.json({ ok: true, imported: data?.length ?? 0, summary, ...(discovery ? { discovery } : {}) }, { status: 201 });
+  return NextResponse.json({ ok: true, imported: data?.length ?? 0, summary, ...(discovery ? { discovery: { ...discovery, ...(body.gcis !== undefined ? { withoutWebsite: gcisWithoutWebsite, listTruncated: gcisListTruncated } : {}) } } : {}) }, { status: 201 });
 }
 
 export async function DELETE(req: Request): Promise<Response> {

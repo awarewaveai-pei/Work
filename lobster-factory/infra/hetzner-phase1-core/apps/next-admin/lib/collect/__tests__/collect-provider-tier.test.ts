@@ -158,6 +158,20 @@ describe("createProviderCall", () => {
     expect(hit).toEqual(["https://google.serper.dev/search"]);
   });
 
+  it("a keyless provider sends no authorization header; a keyed one with its key missing is still unconfigured (card C12.1)", async () => {
+    const sent: Array<Record<string, string>> = [];
+    const transport = (async (_u: string | URL, init: RequestInit) => {
+      sent.push(init.headers as Record<string, string>);
+      return new Response("[]", { status: 200 });
+    }) as unknown as typeof fetch;
+    const call = createProviderCall({ grant: GRANT, budget: createBudget(), env: {}, transport });
+    await call("gcis", { method: "GET", path: "/od/data/api/5F64D864-61CB-4D0D-8AD9-492047CC1EA6?$format=json" });
+    expect(Object.keys(sent[0]).map((k) => k.toLowerCase())).not.toContain("authorization");
+    expect(providerConfigured("gcis")).toBe(true);
+    await expect(call("serper", { path: "/search", body: {} })).rejects.toMatchObject({ kind: "unconfigured", message: "missing_SERPER_API_KEY" });
+    expect(sent).toHaveLength(1);
+  });
+
   it("the Graph API entry reads only our page's IG id and an IG user object -- never a feed, a post or an ad account (card C17)", async () => {
     const hit: string[] = [];
     const call = createProviderCall({ grant: GRANT, budget: createBudget(), env: { META_PAGE_TOKEN_AWARE_WAVE: "page-test", APIFY_API_TOKEN: "apify-test" },

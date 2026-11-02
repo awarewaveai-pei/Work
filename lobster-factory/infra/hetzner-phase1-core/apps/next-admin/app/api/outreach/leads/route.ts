@@ -126,6 +126,8 @@ export async function POST(req: Request): Promise<Response> {
       observation: null,
       source_url: row.source_url as string | null,
     };
+    const raw = (row.raw_payload ?? {}) as Record<string, unknown>;
+    const rawText = (k: string): string | null => (typeof raw[k] === "string" && (raw[k] as string).trim() ? (raw[k] as string).trim().slice(0, 300) : null);
     const orgOfRow = (row.organization_id as string | null) ?? null;
     const identity = { email: lead.email, website: lead.website, source_url: lead.source_url, name: lead.name, phone: lead.phone };
     const markApproved = () => supabase.from("co_lead_inbox").update({ inbox_status: "approved", updated_at: new Date().toISOString() }).eq("id", fromInboxId);
@@ -156,6 +158,13 @@ export async function POST(req: Request): Promise<Response> {
         region: row.region ?? null,
         source_type: row.source_type ?? null,
         source_url: lead.source_url,
+        // co_lead_inbox has no contact or consent columns: the import keeps them in raw_payload (C12.2 gcis: 負責人,
+        // general_source:<公示資料頁>), and they reach the lead here.
+        contact_name: rawText("contact_name"),
+        contact_role: rawText("contact_role"),
+        // Only the gcis source's own value: raw_payload is whatever an import sent, and a typed self_published:… would
+        // drop the personal-data notice (brand-context.ts), meta_lead_ad… would make the lead warm.
+        consent_source: row.source_type === "gcis" && (rawText("consent_source") ?? "").startsWith("general_source:") ? rawText("consent_source") : null,
         lead_quality_score: scores.lead_quality_score,
         contactability_score: scores.contactability_score,
         icp_score: scores.icp_score,

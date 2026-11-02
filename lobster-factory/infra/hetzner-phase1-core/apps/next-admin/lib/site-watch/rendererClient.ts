@@ -30,7 +30,7 @@ const CLIENT_TIMEOUT_MS = 150_000;
 
 export async function takeSnapshot(url: string, fetchImpl: typeof fetch = fetch): Promise<SnapshotResult> {
   const spec = providerSpec("renderer");
-  const secret = spec ? process.env[spec.apiKeyEnv] : undefined;
+  const secret = spec?.apiKeyEnv ? process.env[spec.apiKeyEnv] : undefined;
   if (!spec || !secret) throw new RendererUnavailable("not_configured");
   let res: Response;
   try {

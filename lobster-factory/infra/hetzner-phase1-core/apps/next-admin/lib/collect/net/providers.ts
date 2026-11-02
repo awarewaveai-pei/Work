@@ -22,8 +22,11 @@ export interface ProviderSpec {
   id: string;
   /** Fixed origin. A block supplies a path; it can never redirect the call somewhere else. */
   origin: string;
-  /** Environment variable holding the key. Absent or empty ⇒ the provider is simply not available. */
-  apiKeyEnv: string;
+  /** Environment variable holding the key. Absent or empty ⇒ the provider is simply not available, unless `keyless`. */
+  apiKeyEnv?: string;
+  /** An open API with no credential (GCIS open data): callable without a key, and no auth header is sent. A spec
+   *  without this flag and without a key is still `unconfigured`. */
+  keyless?: boolean;
   /** How this vendor wants the key. Defaults to `Authorization: Bearer <key>`. */
   authHeader?: (key: string) => Record<string, string>;
   /** If set, the only URL paths this provider may be called on; anything else is refused before the request. */
@@ -92,6 +95,31 @@ export const PROVIDERS: Record<string, ProviderSpec> = {
     allowedPaths: ["/search", "/places"],
   },
 
+  // Taiwan business registry open data (data.gcis.nat.gov.tw), card C12. No key: access is by source-IP whitelist
+  // (the operator's usage notice, C12.3), so there is nothing to inject and no auth header. Only the dataset ids
+  // lib/outreach/sources/gcis.ts reads (code table, company detail, one company-by-item list per category letter); the dataset id is the path.
+  gcis: {
+    id: "gcis",
+    origin: "https://data.gcis.nat.gov.tw",
+    keyless: true,
+    allowedPaths: [
+      "/od/data/api/FCB90AB1-E382-45CE-8D4F-394861851E28",
+      "/od/data/api/5F64D864-61CB-4D0D-8AD9-492047CC1EA6",
+      "/od/data/api/C8782705-DA48-4897-8537-9F7B0FC463EF",
+      "/od/data/api/955A9F2C-8703-4550-A280-E6506B781A3B",
+      "/od/data/api/85F5E823-A0D5-4C2C-B7FA-765D80050ABA",
+      "/od/data/api/11944415-69DE-4770-8D19-1FD8732AA81A",
+      "/od/data/api/4C4B0E58-551B-479E-8636-8A581BA9BE29",
+      "/od/data/api/4C237B5D-E4BC-46DC-B246-6B20B8660A22",
+      "/od/data/api/7BC6C09E-502F-407E-86D0-7E4D1143D687",
+      "/od/data/api/8C5BF2E5-F867-4CDC-A698-E3C93A31FA7D",
+      "/od/data/api/B486F6AE-F486-4BA9-B217-E04D15ED58C3",
+      "/od/data/api/3FA36C1B-4D3F-489A-9ACC-DCE1A1EB401D",
+      "/od/data/api/BB446B37-1797-41BF-ADC2-D0B7BA846D23",
+    ],
+    allowedMethods: ["GET"],
+  },
+
   // Meta Graph API, read only: Instagram Business Discovery (a business/creator account's public profile and recent
   // posts) asked from our own page's linked IG account, for lead research (lib/outreach/social-research.ts, card C17).
   // The page token is permanent (expires_at 0) and the call is free. Two paths only: the page's own IG id, and an IG
@@ -130,7 +158,7 @@ export function providerSpec(id: string): ProviderSpec | null {
 /** Whether this provider can be used at all. Blocks call it from match() and score 0 when false. */
 export function providerConfigured(id: string): boolean {
   const spec = providerSpec(id);
-  return !!spec && !!process.env[spec.apiKeyEnv];
+  return !!spec && (!!spec.keyless || (!!spec.apiKeyEnv && !!process.env[spec.apiKeyEnv]));
 }
 
 export class ProviderCallError extends Error {
@@ -179,8 +207,8 @@ export function createProviderCall(opts: ProviderCallOptions): ProviderCall {
   return async function callProvider(providerId, init) {
     const spec = providerSpec(providerId);
     if (!spec) throw new ProviderCallError(`unknown_provider_${providerId}`, "unconfigured");
-    const key = env[spec.apiKeyEnv];
-    if (!key) throw new ProviderCallError(`missing_${spec.apiKeyEnv}`, "unconfigured");
+    const key = spec.apiKeyEnv ? env[spec.apiKeyEnv] : undefined;
+    if (!key && !spec.keyless) throw new ProviderCallError(`missing_${spec.apiKeyEnv ?? providerId}`, "unconfigured");
     if (!opts.budget.ok()) throw new ProviderCallError("budget_exhausted", "budget");
     if (!opts.grant?.allowed) throw new ProviderCallError(`entitlement_${opts.grant?.reason ?? "missing_grant"}`, "unconfigured");
 
@@ -201,7 +229,7 @@ export function createProviderCall(opts: ProviderCallOptions): ProviderCall {
     }
     void opts.grant.recordUse({ provider: providerId });
 
-    const auth = spec.authHeader ? spec.authHeader(key) : { authorization: `Bearer ${key}` };
+    const auth = !key ? {} : spec.authHeader ? spec.authHeader(key) : { authorization: `Bearer ${key}` };
     const startedAt = Date.now();
     let res: Response;
     try {
