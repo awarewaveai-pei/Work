@@ -36,26 +36,34 @@ function describe(bitmap, box) {
 function templateMatch(bitmap, track) {
   if (!track?.patch?.length) return null;
   let best = null;
+  for (const scale of [0.88, 1, 1.14]) {
+  const w = Math.max(0.03, Math.min(0.98, (track.referenceW || track.w) * 2.5, Math.max((track.referenceW || track.w) * 0.5, track.w * scale))),
+    h = Math.max(0.03, Math.min(0.98, (track.referenceH || track.h) * 2.5, Math.max((track.referenceH || track.h) * 0.5, track.h * scale)));
   for (let ix = -6; ix <= 6; ix++)
     for (let iy = -4; iy <= 4; iy++) {
-      const x = Math.max(0, Math.min(1 - track.w, track.x + ix * 0.01)),
-        y = Math.max(0, Math.min(1 - track.h, track.y + iy * 0.01)),
-        box = { ...track, x, y, cx: x + track.w / 2, cy: y + track.h / 2 };
+      const x = Math.max(0, Math.min(1 - w, track.cx - w / 2 + ix * 0.01)),
+        y = Math.max(0, Math.min(1 - h, track.cy - h / 2 + iy * 0.01)),
+        box = { ...track, x, y, w, h, cx: x + w / 2, cy: y + h / 2 };
       const descriptor = describe(bitmap, box),
         correlation = descriptor.patch.reduce(
           (sum, n, i) => sum + n * track.patch[i],
           0,
         ),
-        score = correlation - Math.hypot(ix * 0.01, iy * 0.01) * 0.3;
-      if (correlation > 0.5 && (!best || score > best.score))
+        reference = track.referencePatch || track.patch,
+        identity = descriptor.patch.reduce((sum, n, i) => sum + n * reference[i], 0),
+        distractor = Math.max(-1, ...(track.negativePatches || []).map((patch) => descriptor.patch.reduce((sum, n, i) => sum + n * patch[i], 0))),
+        score = correlation - Math.hypot(ix * 0.01, iy * 0.01) * 0.5 - Math.abs(Math.log(scale)) * 0.1;
+      if (correlation > 0.78 && identity > 0.45 && !(distractor > 0.55 && distractor > identity + 0.08) && (!best || score > best.score))
         best = {
           ...box,
           hist: descriptor.hist,
-          patch: track.patch,
+          patch: descriptor.patch,
+          referencePatch: reference,
           score,
           source: "template",
         };
     }
+  }
   return best;
 }
 async function initialize() {

@@ -12,11 +12,22 @@ const followRuntime = {
 };
 function followFingerprint(draft = values, source = files.src) {
   return JSON.stringify([
+    "identity-v2",
     source?.url,
     Number(draft.followStart || 0),
     Number(draft.followEnd),
-    draft.followAnchors || [],
+    (draft.followAnchors || []).map((a) => [a.time, a.box.x, a.box.y, a.box.w, a.box.h, a.revision || a.box.patch?.reduce((hash, n) => Math.imul(hash ^ Math.round(n * 100000), 16777619) >>> 0, 2166136261)]),
   ]);
+}
+function followReviews() {
+  const reviewed = values.followReviewed?.fingerprint === values.followFingerprint &&
+    values.followFingerprint === followFingerprint() ? values.followReviewed.keys || [] : [];
+  return FollowMath.reviews(values.followTrack || []).map((item) => ({
+    ...item, confirmed: reviewed.includes(item.key),
+  }));
+}
+function followNeedsReview() {
+  return followReviews().some((item) => !item.confirmed);
 }
 function followReady() {
   return (
@@ -47,7 +58,7 @@ function toolFollowScreen(t) {
     fixed = values.followMode === "固定位置",
     lost = (values.followTrack || []).filter((p) => p.lost).length;
   const stage = `<section><div class="follow-source"><video data-flow-media="src" controls preload="metadata" src="${esc(files.src.url)}"></video><div data-follow-crop></div><div data-follow-people></div></div><p>${esc(files.src.name || "已選影片")}</p><div class="row">${btn("更換影片", "library:src")}${btn("上傳影片", "upload:src")}</div><p class="note" data-follow-status>${esc(followRuntime.progress || "播放或拖動到要選人的畫面，再按「更新此畫面的人物」。")}</p><h3>點選要跟拍的人</h3><p class="note">沒被框出的人可直接點身體位置；拖曳此畫面可改成固定裁切。</p><canvas class="follow-pick" data-follow-pick aria-label="人物選取畫面"></canvas><h3>9:16 裁切預覽</h3><canvas class="follow-output" data-follow-output width="270" height="480"></canvas><div class="row">${wfButton("播放／暫停預覽", "follow-preview")}<input type="range" data-follow-seek aria-label="跟拍預覽位置" min="${Number(values.followStart || 0)}" max="${Number(values.followEnd || files.src.duration || 0)}" step="0.01" value="${followRuntime.playerTime}"><span data-follow-clock></span></div></section>`;
-  const settings = `<aside class="side"><h3>1 選擇片段</h3>${wfField("followStart", "開始（秒）", "number", 'min="0" step="0.1"')}${wfField("followEnd", "結束（秒）", "number", 'min="0" step="0.1"')}<div class="row">${wfButton("開始 −1s", "follow-nudge:start:-1", followRuntime.busy)}${wfButton("開始 +1s", "follow-nudge:start:1", followRuntime.busy)}${wfButton("開始設為目前時間", "follow-start-now", followRuntime.busy)}${wfButton("結束 −1s", "follow-nudge:end:-1", followRuntime.busy)}${wfButton("結束 +1s", "follow-nudge:end:1", followRuntime.busy)}${wfButton("結束設為目前時間", "follow-end-now", followRuntime.busy)}</div><h3>2 選取人物並跟拍</h3>${wfChoice("followMode", ["跟拍人物", "固定位置"])}${fixed ? range("followCenter", 50, 0, 100, 1) : `${wfButton("更新此畫面的人物", "follow-detect", followRuntime.busy)}<p>點選影片上的人物框，會開始追蹤。跟錯時，移到該時刻再更新人物並點選正確的人。</p>${wfButton("移除人物", "follow-clear", followRuntime.busy)}${wfButton("重新追蹤", "follow-track", followRuntime.busy || !values.followAnchors.length)}${wfButton("取消追蹤", "follow-cancel", !followRuntime.busy)}<label>跟拍移動</label>${wfChoice("followMotion", ["平穩", "標準", "靈敏"])}<p>${values.followAnchors.length} 個人物選取／修正點</p><div class="flow-choices">${values.followAnchors.map((a, i) => wfButton(a.time.toFixed(2) + " 秒 · 刪除修正點", "follow-remove:" + i, followRuntime.busy)).join("")}</div>${ready ? `<p role="status">追蹤完成，${values.followTrack.length} 個位置取樣${lost ? "；" + lost + " 個取樣未辨識到原人物，會保留最近位置，請預覽並修正。" : "。"}</p>` : '<p class="note">選好人物並完成追蹤後即可輸出。</p>'}`}${wfStats()}${wfButton(fixed ? "輸出固定位置的 9:16 影片" : "輸出跟拍 9:16 影片", fixed ? "follow-export" : "follow-render", followRuntime.busy || (!fixed && !ready))}<p class="note">Google EfficientDet-Lite0 在本機偵測人物；影片不傳至辨識服務。多人交錯、遮擋或離開畫面可能跟丟，可逐點修正。原始素材保留。</p></aside>`;
+  const settings = `<aside class="side"><h3>1 選擇片段</h3>${wfField("followStart", "開始（秒）", "number", 'min="0" step="0.1"')}${wfField("followEnd", "結束（秒）", "number", 'min="0" step="0.1"')}<div class="row">${wfButton("開始 −1s", "follow-nudge:start:-1", followRuntime.busy)}${wfButton("開始 +1s", "follow-nudge:start:1", followRuntime.busy)}${wfButton("開始設為目前時間", "follow-start-now", followRuntime.busy)}${wfButton("結束 −1s", "follow-nudge:end:-1", followRuntime.busy)}${wfButton("結束 +1s", "follow-nudge:end:1", followRuntime.busy)}${wfButton("結束設為目前時間", "follow-end-now", followRuntime.busy)}</div><h3>2 選取人物並跟拍</h3>${wfChoice("followMode", ["跟拍人物", "固定位置"])}${fixed ? range("followCenter", 50, 0, 100, 1) : `${wfButton("更新此畫面的人物", "follow-detect", followRuntime.busy)}<p>點選影片上的人物框，會開始追蹤。跟錯時，移到該時刻再更新人物並點選正確的人；無法確認的區間須先修正或明確保留位置。</p>${wfButton("移除人物", "follow-clear", followRuntime.busy)}${wfButton("重新追蹤", "follow-track", followRuntime.busy || !values.followAnchors.length)}${wfButton("取消追蹤", "follow-cancel", !followRuntime.busy)}<label>跟拍移動</label>${wfChoice("followMotion", ["平穩", "標準", "靈敏"])}<p>${values.followAnchors.length} 個人物選取／修正點</p><div class="flow-choices">${values.followAnchors.map((a, i) => wfButton(a.time.toFixed(2) + " 秒 · 刪除修正點", "follow-remove:" + i, followRuntime.busy)).join("")}</div>${ready ? `${followReviews().map((item) => `<div class="flow-review"><p>${item.time.toFixed(2)}–${item.end.toFixed(2)} 秒：${item.confirmed ? "已確認保留位置" : "人物無法確認，請檢查"}</p>${wfButton("檢查此區間／重新選人", "follow-review:" + item.time, followRuntime.busy)}${wfButton("此區間保留位置", "follow-keep:" + item.key, followRuntime.busy || item.confirmed)}</div>`).join("")}<p role="status">分析完成，${values.followTrack.length} 個位置取樣${lost ? "；" + lost + " 個取樣未辨識到原人物，保留最後可信位置，不會自動換人；需逐段檢查。" : "。"}</p>` : '<p class="note">選好人物並完成追蹤後即可輸出。</p>'}`}${wfStats()}${wfButton(fixed ? "輸出固定位置的 9:16 影片" : "輸出跟拍 9:16 影片", fixed ? "follow-export" : "follow-render", followRuntime.busy || (!fixed && (!ready || followNeedsReview())))}<p class="note">Google EfficientDet-Lite0 在本機偵測人物；影片不傳至辨識服務。多人交錯、遮擋或離開畫面可能跟丟，可逐點修正。原始素材保留。</p></aside>`;
   return wfWrap(
     t,
     `<div class="two-col flow-layout">${stage}${settings}</div>`,
@@ -105,7 +116,7 @@ function followRefreshButtons() {
       button.disabled =
         action === "follow-cancel" ||
         (action === "follow-track" && !values.followAnchors?.length) ||
-        (action === "follow-render" && !followReady());
+        (action === "follow-render" && (!followReady() || followNeedsReview()));
     });
   followStatus(followRuntime.progress);
 }
@@ -120,7 +131,11 @@ async function followMedia(source) {
     }, 15000);
     media.onloadeddata = () => {
       clearTimeout(timer);
-      resolve();
+      if (media.videoWidth && media.videoHeight) resolve();
+      else {
+        followRelease(media);
+        reject(Error("瀏覽器無法解碼這支影片的畫面；請先轉成 H.264 MP4 再跟拍，原始影片不會被修改。"));
+      }
     };
     media.onerror = () => {
       clearTimeout(timer);
@@ -284,8 +299,9 @@ async function followTrack() {
       })),
     ];
     for (const segment of segments) {
-      let previous = segment.anchor.box,
-        appearance = segment.anchor.box.hist.slice();
+      let previous = { ...segment.anchor.box, referencePatch: segment.anchor.box.patch, referenceW: segment.anchor.box.w, referenceH: segment.anchor.box.h },
+        appearance = segment.anchor.box.hist.slice(),
+        misses = 0;
       put(segment.anchor.time, previous);
       const count = Math.ceil(Math.abs(segment.end - segment.anchor.time) * 8);
       for (let i = 1; i <= count; i++) {
@@ -301,6 +317,13 @@ async function followTrack() {
           segment.direction > 0
             ? Math.min(segment.end, segment.anchor.time + i / 8)
             : Math.max(segment.end, segment.anchor.time - i / 8);
+        // After prolonged loss there is no safe identity evidence to reacquire a nearby person.
+        // An explicit correction anchor starts a fresh segment instead.
+        if (misses >= 4) {
+          put(time, previous, true);
+          done++;
+          continue;
+        }
         const bitmap = await followBitmap(media, time);
         if (
           token !== followRuntime.token ||
@@ -311,15 +334,21 @@ async function followTrack() {
           return;
         }
         const response = await followWorkerCall(bitmap, previous),
-          match = previous.manual
-            ? response.template
-            : FollowMath.match(response.boxes, previous, appearance) ||
-              response.template;
+          detected = FollowMath.match(response.boxes, previous, appearance),
+          template = response.template;
+        let match = previous.manual ? template : detected;
+        if (!match && template) {
+          const competing = response.boxes.filter((box) => FollowMath.overlap(box, template) > 0.3);
+          // A template must not override contradictory person detection.
+          if (!competing.length || competing.every((box) => FollowMath.correlation(box.patch, previous.patch) >= 0.3)) match = template;
+        }
+        if (!previous.manual && detected && template && FollowMath.overlap(detected, template) < 0.2) match = null;
         if (match) {
-          previous = match;
-          appearance = appearance.map(
-            (n, j) => n * 0.95 + match.hist[j] * 0.05,
-          );
+          previous = { ...match, referencePatch: previous.referencePatch, referenceW: previous.referenceW, referenceH: previous.referenceH, negativePatches: previous.negativePatches };
+          misses = 0;
+          // Keep the selected person's appearance fixed; never learn a new identity from drift.
+        } else {
+          misses++;
         }
         put(time, previous, !match);
         done++;
@@ -337,9 +366,12 @@ async function followTrack() {
     )
       return;
     draft.followTrack = [...points.values()].sort((a, b) => a.time - b.time);
+    draft.followReviewed = { fingerprint, keys: [] };
     draft.followFingerprint = fingerprint;
     saveDraft();
-    followStatus("人物追蹤完成；播放預覽，跟錯時可在該時間重新點選人物修正。");
+    followStatus(followNeedsReview()
+      ? "有無法確認人物的區間，已停止自動換人。請逐段檢查、重新選人，或明確選擇保留位置。"
+      : "人物追蹤完成；請播放預覽確認跟拍對象。");
   } catch (error) {
     if (token === followRuntime.token) throw error;
   } finally {
@@ -535,6 +567,24 @@ function toolFollowBeforeRender() {
     followRuntime.playerTime = media.currentTime;
 }
 async function toolFollowAction(action) {
+  if (action?.startsWith("follow-review:")) {
+    const media = document.querySelector('[data-flow-media="src"]');
+    if (media) {
+      media.pause();
+      media.currentTime = Number(action.slice(14));
+      followRuntime.playerTime = media.currentTime;
+      await followDetect();
+    }
+  }
+  if (action?.startsWith("follow-keep:")) {
+    const key = action.slice(12);
+    if (followReady() && followReviews().some((item) => item.key === key)) {
+      const keys = values.followReviewed?.fingerprint === values.followFingerprint ? values.followReviewed.keys || [] : [];
+      values.followReviewed = { fingerprint: values.followFingerprint, keys: [...new Set([...keys, key])] };
+      saveDraft();
+      render();
+    }
+  }
   if (action === "follow-preview") {
     const media = document.querySelector('[data-flow-media="src"]');
     if (!media) return;
@@ -559,6 +609,7 @@ async function toolFollowAction(action) {
     values.followAnchors = [];
     delete values.followTrack;
     delete values.followFingerprint;
+    delete values.followReviewed;
     saveDraft();
     render();
   }
@@ -578,11 +629,13 @@ async function toolFollowAction(action) {
   if (action?.startsWith("follow-remove:")) {
     values.followAnchors.splice(Number(action.slice(14)), 1);
     delete values.followFingerprint;
+    delete values.followReviewed;
     saveDraft();
     render();
   }
   if (action === "follow-render") {
     if (!followReady()) throw Error("來源、片段或選取人物已改變，請重新追蹤");
+    if (followNeedsReview()) throw Error("仍有未確認的跟丟區間，請先修正人物或確認保留位置後再輸出");
     const { start, end } = followBounds(),
       draft = structuredClone(values),
       source = structuredClone(files.src),
@@ -606,16 +659,23 @@ async function toolFollowAction(action) {
     SeedStar.showJob(job);
   }
 }
+function followNegatives(box) {
+  return followRuntime.boxes.filter((other) => other !== box &&
+    !(box.cx >= other.x && box.cx <= other.x + other.w && box.cy >= other.y && box.cy <= other.y + other.h))
+    .sort((a, b) => Math.hypot(a.cx - box.cx, a.cy - box.cy) - Math.hypot(b.cx - box.cx, b.cy - box.cy))
+    .slice(0, 3).map((other) => other.patch.map((n) => Math.round(n * 10000) / 10000));
+}
 document.addEventListener("click", (event) => {
   const b = event.target.closest("[data-follow-person]");
   if (!b || followRuntime.busy) return;
   const box = followRuntime.boxes[Number(b.dataset.followPerson)];
   if (!box) return;
   const time = followRuntime.boxTime;
+  const selectedBox = { ...box, negativePatches: followNegatives(box) };
   values.followAnchors = (values.followAnchors || []).filter(
     (a) => Math.abs(a.time - time) > 0.06,
   );
-  values.followAnchors.push({ time, box: structuredClone(box) });
+  values.followAnchors.push({ time, box: structuredClone(selectedBox), revision: crypto.randomUUID() });
   values.followAnchors.sort((a, b) => a.time - b.time);
   saveDraft();
   followTrack().catch(SeedStar.reportError);
@@ -712,7 +772,7 @@ document.addEventListener("pointerdown", (event) => {
         values.followAnchors = (values.followAnchors || []).filter(
           (a) => Math.abs(a.time - time) > 0.06,
         );
-        values.followAnchors.push({ time, box: structuredClone(box) });
+        values.followAnchors.push({ time, box: structuredClone({ ...box, negativePatches: followNegatives(box) }), revision: crypto.randomUUID() });
         values.followAnchors.sort((a, b) => a.time - b.time);
         values.followMode = "跟拍人物";
         saveDraft();

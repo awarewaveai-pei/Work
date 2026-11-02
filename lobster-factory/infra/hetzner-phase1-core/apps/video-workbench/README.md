@@ -8,6 +8,8 @@
 - `assets/vision` 的 bundle 與 wasm：`npm ci` 時由 `scripts/vendor-vision.cjs` 從 npm 套件複製並以 `sources.json` 的 SHA-256 驗證。
 - `.data`（作品與任務）、`node_modules`、`runtime`。
 
+**計畫與需求**：排程、卡片、路線在 `docs/creative-suite-plan-20261102.md`（唯一來源）；需求逐項與驗收在 `handoff/Claude_Code_handoff_20261102.md`。2026-11-02 已把 `D:\Video` 的人物跟拍修正（`docs/follow-quality-20261102.md`）搬進來；之後 `D:\Video` 不再修改。
+
 下方各段是搬入前的歷史紀錄，其中 4179、AwareWave-source 等說法以本段為準。
 
 ---
