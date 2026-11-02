@@ -1,4 +1,24 @@
 # Worklog
+## 2026-11-02（續25）影音工作台卡 0：127.0.0.1:4178 改由 repo 版 video-workbench 提供，舊資料 5 筆任務＋17 檔全數搬入
+
+**做了**（無程式改動；計畫 `apps/video-workbench/docs/creative-suite-plan-20261102.md` §4 卡 0）：
+- 4178 原本無 LISTEN；repo `VW/.data` 原本不存在（不需備份）。
+- 四份 Downloads 副本比對（sha256 逐檔、jobs 依 id）：`20261102_完整最新版` = 5 jobs（全 succeeded，最後 2026-11-01T15:05Z）＋15 檔，最新（jobs.json mtime 11-02 00:31、生成檔最後 11-02 01:52）；`20261101_JSON請求修正版` 是它的子集；`20261101_應用工具核對修正版` 0 jobs 但有 2 支 mp4（`b8275e27…`、`bd4039b7…`，未被任何 job 引用）不在最新版；`20261030_修正版` 空。無同名不同內容、無進行中任務。
+- 複製（不移動）：最新版 `.data` 全部＋應用工具核對版 2 支 → `VW/.data`（jobs 5、generated 17、152.2 MB）；`git status --ignored` 確認 `.data/` 被忽略。Downloads 四份原封保留作復原。
+- 啟動：`Start-Process node scripts\launch.cjs`（= start.cmd 的最後一步，依賴已在、node v24 → 不跑 npm ci），PID 31820 LISTEN 127.0.0.1:4178。
+
+**只在本機、不在 git**（VW 下）：`.data/`（17 檔 152.2 MB＋jobs.json）、`assets/image-*`（194 檔 10.4 MB）、`assets/storyboards-data.json`（1.7 MB，分鏡基線之一）、`assets/vision/` vendored（43.2 MB，postinstall 可重建）。建議備份去處：`.data/`＋`assets/image-*`＋`storyboards-data.json` 複製到雲端硬碟私人資料夾（repo 公開，不可進 git）；vision 不必備份。
+
+**驗證**：
+- REALTEST_EVIDENCE: tool=curl | cmd=curl -s 127.0.0.1:4178/pages/characters.html \| grep -c 示範角色庫 → 1 | exit=0 | ms=50
+- REALTEST_EVIDENCE: tool=curl | cmd=GET /api/seedstar/generations/<id> ×5 → 5/5 200（≥ 來源 5 筆；無列表端點，逐 id 查）；GET /generated/<檔> → 17/17 200 | exit=0 | ms=900
+- REALTEST_EVIDENCE: tool=curl | cmd=/、/index.html（素材庫在此頁）、/pages/storyboards.html、characters/projects/templates/tools、/assets/storyboards-data.json → 全 200 | exit=0 | ms=300
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/startup.cjs（隔離 server，port 49739）→ 3 PASS | exit=0 | ms=1713
+- 分鏡基線 `assets/storyboards-data.json` sha256 前綴 4596a2091d19 = `tests/storyboards-design-baseline.json`；VW `git status` 乾淨。
+- REVIEW_WAIVED: NA -- 無程式改動
+- BUGHUNT_WAIVED: NA -- 無程式改動
+
+**rollback**：停 PID 31820（只此一個）；刪 `VW/.data` 即回原狀（來源在 Downloads 四份未動）。
 ## 2026-11-02（續24）影音工作台監工台上線：12 張卡、41 項工作，綁計畫 §4
 
 **操作者**：「先做監工台，做完從開始卡 0，卡 0 用 SDK API 做」。
