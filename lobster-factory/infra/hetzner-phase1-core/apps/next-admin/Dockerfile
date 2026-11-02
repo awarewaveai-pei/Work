@@ -15,6 +15,8 @@ ARG NEXT_PUBLIC_API_BASE_PATH=/api
 ARG NEXT_PUBLIC_POSTHOG_KEY=
 ARG NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
 ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY=
+# 1 only from sg-deploy after its typecheck gate passed (next.config.ts skips the build's duplicate check).
+ARG NEXT_TYPECHECK_DONE=0
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
@@ -23,8 +25,12 @@ ENV NEXT_PUBLIC_API_BASE_PATH=$NEXT_PUBLIC_API_BASE_PATH
 ENV NEXT_PUBLIC_POSTHOG_KEY=$NEXT_PUBLIC_POSTHOG_KEY
 ENV NEXT_PUBLIC_POSTHOG_HOST=$NEXT_PUBLIC_POSTHOG_HOST
 ENV NEXT_PUBLIC_TURNSTILE_SITE_KEY=$NEXT_PUBLIC_TURNSTILE_SITE_KEY
+ENV NEXT_TYPECHECK_DONE=$NEXT_TYPECHECK_DONE
 
-RUN npm run build
+# .next/cache (webpack's persistent cache) survives between builds in a BuildKit cache mount, so a deploy recompiles
+# only what changed instead of all of it (the full compile grew from ~2 to ~3 min as pages went 15 -> 108).
+# The cache is not in the image; `docker builder prune` empties it and the next build is a full one again.
+RUN --mount=type=cache,id=next-admin-next-cache,target=/app/.next/cache npm run build
 
 FROM node:20-alpine AS runner
 WORKDIR /app

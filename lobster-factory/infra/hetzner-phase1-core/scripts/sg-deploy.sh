@@ -213,8 +213,9 @@ fi
 # 2. rsync each app
 # 1.5. pre-build gate — typecheck then tests, only for next-admin, before rsync/snapshot.
 #      Order: tsc first (fast, clean diagnostics) then vitest.
-#      Note: tsc runs against the source tree (no .next/types/** regeneration);
-#      covers source-level type errors — same scope as GHA next-admin-typecheck.yml.
+#      `npm run typecheck` = next typegen + tsc: the route types (.next/types) are regenerated first, so this is the
+#      same check next build does -- the image build is then told to skip its copy (NEXT_TYPECHECK_DONE, step 3).
+#      Same command as GHA next-admin-typecheck.yml.
 if [[ " ${APPS[*]} " =~ " next-admin " && $DRY_RUN -eq 0 ]]; then
   TEST_DIR="$GIT_APPS_ROOT/next-admin"
   # npm ci every run, NOT "install only when node_modules is missing": that old check tested
@@ -228,6 +229,7 @@ if [[ " ${APPS[*]} " =~ " next-admin " && $DRY_RUN -eq 0 ]]; then
   npm --prefix "$TEST_DIR" run typecheck 2>&1 | tee -a "$LOG_FILE" \
     || fail "tsc typecheck FAILED — deploy aborted; fix type errors before re-deploying next-admin"
   log "tsc typecheck passed"
+  TYPECHECK_GATE_PASSED=1
 
   log "--- npm test gate (next-admin) ---"
   npm --prefix "$TEST_DIR" test 2>&1 | tee -a "$LOG_FILE" \
@@ -349,7 +351,9 @@ fi
 # 3. build
 cd "$STAGING_DIR"
 log "--- docker compose build ${APPS[*]} ---"
-docker compose build "${APPS[@]}" 2>&1 | tee -a "$LOG_FILE" || fail "docker build failed"
+BUILD_ARGS=()
+[[ "${TYPECHECK_GATE_PASSED:-0}" == "1" ]] && BUILD_ARGS+=(--build-arg NEXT_TYPECHECK_DONE=1)
+docker compose build "${BUILD_ARGS[@]}" "${APPS[@]}" 2>&1 | tee -a "$LOG_FILE" || fail "docker build failed"
 
 # 4. up -d (with race-condition retry)
 log "--- docker compose up -d ${APPS[*]} ---"

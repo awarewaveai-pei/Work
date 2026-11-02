@@ -1,4 +1,32 @@
 # Worklog
+## 2026-11-02（續17）next-admin 部署加速：webpack 快取留在 BuildKit cache mount；重複的型別檢查移到部署閘（next typegen＋tsc）
+
+**操作者**：「加速做掉」（前一則量測：docker build 120s → 336s）。
+
+**根因**：今天 `RUN npm run build` 313.6s ＝ webpack 編譯 164s（每次在乾淨容器裡全量）＋「Linting and checking validity of types」64s（部署閘 tsc 已做過，但閘不產生 `.next/types`，所以少了 Next 的路由型別檢查，兩份不完全相同）＋收集頁面／追蹤檔約 81s。
+
+**做了**（`lobster-factory/infra/hetzner-phase1-core/`）：
+- `apps/next-admin/package.json`：`typecheck` = `next typegen && tsc --noEmit`。閘從此含 Next 的路由型別檢查（實測：故意把 `params` 寫成非 Promise 的 route → `.next/types/validator.ts` TS2344 紅；移除後 exit 0）。CI `next-admin-typecheck.yml` 用同一指令，一起得到。
+- `apps/next-admin/next.config.ts`：`NEXT_TYPECHECK_DONE=1` 時 build 跳過型別檢查與 lint；本機、CI 照舊檢查。
+- `apps/next-admin/Dockerfile`：`ARG NEXT_TYPECHECK_DONE=0`；`RUN --mount=type=cache,id=next-admin-next-cache,target=/app/.next/cache npm run build`（快取不進 image；`docker builder prune` 會清空，下次全量）。
+- `scripts/sg-deploy.sh`：閘過才設 `TYPECHECK_GATE_PASSED=1`，build 時帶 `--build-arg NEXT_TYPECHECK_DONE=1`；閘沒跑（例如只部署別的 app）就不帶。
+
+**實測（主機，獨立 tag `na-speedtest`，未碰 prod image／容器，測完已刪）**：
+
+| | 改前（今天部署） | 冷（第一次） | 熱（改一行後） |
+|---|---|---|---|
+| webpack 編譯 | 164s | 162s | 67s |
+| 型別＋lint | 64s | 跳過 | 跳過 |
+| `npm run build` 整段 | 313.6s | 254.7s | 156.1s |
+| docker build 總計 | 336s | 332s（含 package.json 變動重跑 npm ci 33s，只發生一次） | 181s |
+
+預估整次部署約 424s → 約 270s。剩下大頭是 Next 的 Collecting build traces（約 45s）與 page data（約 30s）。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=主機 docker build --build-arg NEXT_TYPECHECK_DONE=1 -t na-speedtest（冷 332s／熱 181s，log 顯示 Skipping validation of types、Compiled in 67s）＋本機 npm run typecheck exit 0＋路由型別突變紅／綠＋python scripts/check-compose-invariants.py 0 problem＋bash -n sg-deploy.sh | exit=0 | ms=520000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n（自審：跳過只在閘通過後；n1＝快取只在同一台主機有效，換機第一次全量）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core | grep=NEXT_TYPECHECK_DONE | hits=7
+- ORACLE_WAIVED: 建置設定與部署腳本小改，以主機實測冷／熱兩次＋型別突變代替；Codex 額度將盡。
+- 未部署：今晚 03:00 自動部署會第一次用新腳本（sync deploy scripts 先同步再執行）；失敗則 sg-deploy 自動退回。
 ## 2026-11-02（續16）影音工作台規劃加「先擺場景再生成」四張候選卡 S1–S4（借 ArtCraft 流程，不用其程式／雲端／中國模型）
 
 **操作者**：貼上四項建議（人偶擺姿勢換角色、同場景多鏡、去背 2D 拼貼、圖片轉 3D），「寫入 plan」。

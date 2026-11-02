@@ -8,6 +8,11 @@ const nextConfig: NextConfig = {
   // basePath is not needed — routing is handled at the domain/edge layer.
   // Keep file tracing scoped to this app (avoid parent monorepo lockfile warnings in Docker / CI).
   outputFileTracingRoot: path.join(__dirname),
+  // sg-deploy runs `npm run typecheck` (next typegen + tsc, the same route-type validation next build does) as a gate
+  // before the image build and then passes NEXT_TYPECHECK_DONE=1, so the build skips its second, ~60s copy. Any
+  // other build (local, CI) still checks.
+  typescript: { ignoreBuildErrors: process.env.NEXT_TYPECHECK_DONE === "1" },
+  eslint: { ignoreDuringBuilds: process.env.NEXT_TYPECHECK_DONE === "1" },
   webpack: (config) => {
     // @workflows alias: makes packages/workflows importable from next-admin routes.
     // In Docker build the monorepo root is outside the build context, so sg-deploy
