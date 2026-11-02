@@ -1,9 +1,11 @@
 'use client';
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { withOrg } from "@/lib/outreach/use-active-org";
 import { stageCap } from "@/lib/outreach/sender";
 
-// The cold mailboxes and their signature (SPEC D12). Every generated email ends with it, word for word.
+// The cold mailboxes and their signature (SPEC D12). Every generated email ends with it, word for word. On top, the
+// sender-pool table (card C8.4): per mailbox its domain, DNS, warm-up stage, today's sends against the cap, 7-day
+// bounce rate, health, the 自動寄出 switch (on = the address typed back) and 重新檢查並恢復.
 interface Sender {
   id: string;
   email: string;
@@ -19,7 +21,11 @@ interface Sender {
   dns_checked_at: string | null;
   last_sync_at: string | null;
   rescan_days: number | null;
+  today_claims: number | null;
+  bounce_rate_7d: number | null;
 }
+
+const cell: CSSProperties = { padding: "6px 8px", borderBottom: "1px solid var(--border-subtle)", textAlign: "left", verticalAlign: "middle" };
 
 const HEALTH: Record<string, { label: string; badge: string }> = {
   healthy: { label: "正常", badge: "badge-green" },
@@ -35,6 +41,8 @@ export default function SendersCard({ org }: { org: string | null }) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [typed, setTyped] = useState("");
 
   const load = useCallback(async () => {
     const r = await fetch(withOrg(API, org));
@@ -55,6 +63,23 @@ export default function SendersCard({ org }: { org: string | null }) {
       const j = await r.json();
       if (!j.ok) throw new Error(j.error || "檢查失敗");
       setMsg(j.healthy ? { ok: true, text: "檢查通過，已恢復自動寄出" } : { ok: false, text: `還不能恢復：${(j.reasons as string[]).join("；")}` });
+      await load();
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function setMode(id: string, mode: "auto" | "draft") {
+    setBusy(id); setMsg(null);
+    try {
+      const r = await fetch(API, { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "send_mode", id, mode, confirmEmail: typed }) });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "切換失敗");
+      setMsg({ ok: true, text: mode === "auto" ? "已開啟自動寄出：上班時間（週一至五 9–18 點）依暖機上限輪流寄" : "已關閉自動寄出：草稿留在 Gmail 等人按寄出" });
+      setConfirming(null); setTyped("");
       await load();
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : String(e) });
@@ -100,6 +125,68 @@ export default function SendersCard({ org }: { org: string | null }) {
       <div className="card-header"><span className="card-label">寄件信箱與署名（{senders.length}）</span></div>
       <p className="card-sub">每封信都以這段署名結尾，AI 不會改寫。預設是名稱和組織名；網站那一行請自己補上一次。</p>
       {msg && <div className={`card-badge ${msg.ok ? "badge-green" : "badge-red"}`} role={msg.ok ? undefined : "alert"}>{msg.text}</div>}
+      {senders.some((s) => s.stream_type === "cold") && (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr>
+                {["信箱", "網域", "DNS", "暖機", "今日已寄／上限", "7 日退信率", "健康", "自動寄出", ""].map((h, i) => <th key={i} style={cell}>{h}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {senders.filter((s) => s.stream_type === "cold").map((s) => {
+                const auto = s.send_mode === "auto";
+                const health = HEALTH[s.health_status] ?? HEALTH.blocked;
+                return (
+                  <tr key={s.id}>
+                    <td style={cell}>{s.email}</td>
+                    <td style={cell}>{s.email.split("@")[1] ?? ""}</td>
+                    <td style={cell}>
+                      <span style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                        {(["spf", "dkim", "dmarc"] as const).map((k) => (
+                          <span key={k} className={`card-badge ${!s.dns_status ? "badge-gray" : s.dns_status[k] ? "badge-green" : "badge-red"}`}>
+                            {k.toUpperCase()} {!s.dns_status ? "未檢查" : s.dns_status[k] ? "✓" : "缺"}
+                          </span>
+                        ))}
+                      </span>
+                    </td>
+                    <td style={cell}>{auto ? s.warmup_stage : "—"}</td>
+                    <td style={cell}>{auto ? `${s.today_claims ?? 0}／${stageCap(s.warmup_stage, s.daily_limit)}` : "—"}</td>
+                    <td style={cell}>{s.bounce_rate_7d === null ? "—" : `${(s.bounce_rate_7d * 100).toFixed(1)}%`}</td>
+                    <td style={cell}><span className={`card-badge ${health.badge}`}>{health.label}</span></td>
+                    <td style={cell}>
+                      <span style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+                        <button type="button" className={auto ? "btn-secondary" : "btn-primary"} aria-pressed={!auto} disabled={busy === s.id || !auto}
+                          onClick={() => void setMode(s.id, "draft")}>關</button>
+                        <button type="button" className={auto ? "btn-primary" : "btn-secondary"} aria-pressed={auto} disabled={busy === s.id || auto}
+                          onClick={() => { setConfirming(s.id); setTyped(""); setMsg(null); }}>開</button>
+                      </span>
+                      {confirming === s.id && !auto && (
+                        <span style={{ display: "grid", gap: 4, marginTop: 6 }}>
+                          <span className="card-sub">此信箱屬於寄件池：自動寄出、從暖機每日 10 封開始。請輸入 {s.email} 確認。</span>
+                          <input value={typed} onChange={(e) => setTyped(e.target.value)} aria-label={`輸入 ${s.email} 確認開啟自動寄出`} />
+                          <span style={{ display: "flex", gap: 4 }}>
+                            <button type="button" className="btn-primary" disabled={busy === s.id || typed.trim().toLowerCase() !== s.email.toLowerCase()}
+                              onClick={() => void setMode(s.id, "auto")}>確認開啟</button>
+                            <button type="button" className="btn-secondary" onClick={() => setConfirming(null)}>取消</button>
+                          </span>
+                        </span>
+                      )}
+                    </td>
+                    <td style={cell}>
+                      {auto && (
+                        <button type="button" className="btn-secondary" disabled={busy === s.id} onClick={() => void recheck(s.id)}>
+                          {busy === s.id ? "檢查中…" : "重新檢查並恢復"}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
       {senders.length === 0 ? (
         <p className="card-sub">還沒有寄件信箱。連接 Gmail 後會自動出現在這裡。</p>
       ) : senders.map((s) => {
@@ -112,21 +199,6 @@ export default function SendersCard({ org }: { org: string | null }) {
               <span className="card-sub"> · {s.stream_type}</span>
               {unsaved && <span className="card-badge badge-gray" style={{ marginLeft: 8 }}>署名尚未儲存</span>}
             </span>
-            {s.send_mode === "auto" && (
-              <span style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                <span className="card-badge badge-green">寄件池・自動寄出</span>
-                <span className="card-sub">暖機 {s.warmup_stage}・每日上限 {stageCap(s.warmup_stage, s.daily_limit)}</span>
-                <span className={`card-badge ${(HEALTH[s.health_status] ?? HEALTH.blocked).badge}`}>{(HEALTH[s.health_status] ?? HEALTH.blocked).label}</span>
-                {(["spf", "dkim", "dmarc"] as const).map((k) => (
-                  <span key={k} className={`card-badge ${!s.dns_status ? "badge-gray" : s.dns_status[k] ? "badge-green" : "badge-red"}`}>
-                    {k.toUpperCase()} {!s.dns_status ? "未檢查" : s.dns_status[k] ? "✓" : "缺"}
-                  </span>
-                ))}
-                <button type="button" className="btn-secondary" disabled={busy === s.id} onClick={() => void recheck(s.id)}>
-                  {busy === s.id ? "檢查中…" : "重新檢查並恢復"}
-                </button>
-              </span>
-            )}
             <span style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
               <span className="card-sub">
                 回信同步：{s.last_sync_at ? `上次 ${new Date(s.last_sync_at).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", hour12: false })}` : "還沒同步過"}

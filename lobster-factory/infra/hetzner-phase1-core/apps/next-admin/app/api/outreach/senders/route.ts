@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
 import { outreachDb } from "@/lib/outreach/db-client";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
-import { defaultSignature } from "@/lib/outreach/sender";
+import { defaultSignature, POOL_DAILY_LIMIT, taipeiDay } from "@/lib/outreach/sender";
+import { todayClaims } from "@/lib/outreach/sender-pool";
+import { baseDomain } from "@/lib/portal/hosts";
 import dns from "node:dns/promises";
-import { recheckSender, supabaseHealthStore } from "@/lib/outreach/sender-health";
+import { judgeBounce, poolEmailRefusal, recheckSender, statsFrom, supabaseHealthStore } from "@/lib/outreach/sender-health";
 import { supabaseSyncStore, type GmailSyncState } from "@/lib/outreach/gmail-sync";
 
 // Cold Outreach — sender mailboxes and their signature (SPEC D12). Rows are created by the Gmail OAuth callback; this
@@ -12,7 +14,10 @@ import { supabaseSyncStore, type GmailSyncState } from "@/lib/outreach/gmail-syn
 // GET carries the default signature for a mailbox that has none yet, so the page can show it filled in, and the
 // mailbox's last good reply sync. POST { action: "recheck", id } is the pool mailbox "重新檢查並恢復" button
 // (lib/outreach/sender-health.ts recheckSender); POST { action: "rescan", id, days } is "補掃 N 天": the next reply-sync
-// tick scans that mailbox's inbox N days back (settings.gmail_sync.rescan_days, lib/outreach/gmail-sync.ts).
+// tick scans that mailbox's inbox N days back (settings.gmail_sync.rescan_days, lib/outreach/gmail-sync.ts);
+// POST { action: "send_mode", id, mode, confirmEmail } is the pool table's 自動寄出 switch (card C8.4): turning it on
+// needs the mailbox's address typed back and a subdomain mailbox (poolEmailRefusal); a mailbox never in the pool starts
+// warm-up at w1, 50/day (SPEC D17, D21). GET adds, for pool mailboxes, today's claims and the 7-day bounce rate.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,8 +41,8 @@ export async function GET(req: Request): Promise<Response> {
   if (orgFilter) q = q.eq("organization_id", orgFilter);
   const { data, error } = await q;
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-  const rows = (data ?? []) as Array<{ organization_id: string | null; email: string; display_name: string | null; signature_block: string | null;
-    connector_id: string | null }>;
+  const rows = (data ?? []) as Array<{ id: string; organization_id: string | null; email: string; display_name: string | null; signature_block: string | null;
+    connector_id: string | null; send_mode: string }>;
   const orgIds = Array.from(new Set(rows.map((r) => r.organization_id).filter((v): v is string => !!v)));
   const names = new Map<string, string>();
   if (orgIds.length) {
@@ -51,10 +56,26 @@ export async function GET(req: Request): Promise<Response> {
     if (cErr) return NextResponse.json({ ok: false, error: cErr.message }, { status: 500 });
     for (const c of (conns ?? []) as Array<{ id: string; settings: { gmail_sync?: GmailSyncState } | null }>) sync.set(c.id, c.settings?.gmail_sync ?? {});
   }
+  const poolIds = rows.filter((r) => r.send_mode === "auto").map((r) => r.id);
+  let claims = new Map<string, number>();
+  const bounce = new Map<string, number | null>();
+  try {
+    claims = await todayClaims(supabase, poolIds);
+    const store = supabaseHealthStore(supabase);
+    const now = new Date();
+    for (const id of poolIds) {
+      const st = statsFrom(await store.events(id, new Date(now.getTime() - 7 * 86_400_000).toISOString()), now);
+      bounce.set(id, st.sent7 ? judgeBounce(st.sent7, st.hardBounced7).rate : null);
+    }
+  } catch (e) {
+    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "pool usage read failed" }, { status: 500 });
+  }
   const senders = rows.map((r) => {
     const state = r.connector_id ? sync.get(r.connector_id) : undefined;
+    const id = r.id;
     return { ...r, default_signature: defaultSignature(r, r.organization_id ? names.get(r.organization_id) ?? null : null),
-      last_sync_at: state?.last_ok_at ?? null, rescan_days: state?.rescan_days ?? null };
+      last_sync_at: state?.last_ok_at ?? null, rescan_days: state?.rescan_days ?? null,
+      today_claims: claims.get(id) ?? null, bounce_rate_7d: bounce.get(id) ?? null };
   });
   return NextResponse.json({ ok: true, senders });
 }
@@ -93,17 +114,39 @@ export async function POST(req: Request): Promise<Response> {
   if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return new NextResponse("invalid json", { status: 400 }); }
-  if (body.action !== "recheck" && body.action !== "rescan") return NextResponse.json({ ok: false, error: "action must be recheck or rescan" }, { status: 400 });
+  if (body.action !== "recheck" && body.action !== "rescan" && body.action !== "send_mode") {
+    return NextResponse.json({ ok: false, error: "action must be recheck, rescan or send_mode" }, { status: 400 });
+  }
   const supabase = await outreachDb(req, typeof body.orgSlug === "string" ? body.orgSlug : null);
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const id = typeof body.id === "string" ? body.id.trim() : "";
   if (!UUID_RE.test(id)) return NextResponse.json({ ok: false, error: "id must be a uuid" }, { status: 400 });
 
-  const { data: cur, error: readErr } = await supabase.from(TABLE).select("organization_id, send_mode, connector_id").eq("id", id).maybeSingle();
+  const { data: cur, error: readErr } = await supabase.from(TABLE).select("organization_id, email, stream_type, send_mode, connector_id, warmup_started_at").eq("id", id).maybeSingle();
   if (readErr) return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });
   if (!cur) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
   try { assertOrgAccess(req, (cur as { organization_id: string | null }).organization_id); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+  if (body.action === "send_mode") {
+    const row = cur as { email: string; stream_type: string; connector_id: string | null; warmup_started_at: string | null };
+    if (body.mode === "draft") {
+      const { error } = await supabase.from(TABLE).update({ send_mode: "draft", updated_at: new Date().toISOString() }).eq("id", id);
+      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true, sendMode: "draft" });
+    }
+    if (body.mode !== "auto") return NextResponse.json({ ok: false, error: "mode must be auto or draft" }, { status: 400 });
+    const typed = typeof body.confirmEmail === "string" ? body.confirmEmail.trim().toLowerCase() : "";
+    if (typed !== row.email.trim().toLowerCase()) return NextResponse.json({ ok: false, error: "輸入的 email 和這個信箱不同：沒有開啟" }, { status: 400 });
+    const refusal = poolEmailRefusal(row.email, baseDomain());
+    if (refusal) return NextResponse.json({ ok: false, error: refusal }, { status: 400 });
+    if (row.stream_type !== "cold") return NextResponse.json({ ok: false, error: "只有冷信信箱能自動寄出" }, { status: 400 });
+    if (!row.connector_id) return NextResponse.json({ ok: false, error: "這個信箱沒有連上 Gmail：先重新連線" }, { status: 409 });
+    // A mailbox back in the pool keeps its warm-up stage; a first time starts at w1 (sender.ts connectedSenderFields).
+    const join = row.warmup_started_at ? {} : { daily_limit: POOL_DAILY_LIMIT, warmup_stage: "w1", warmup_started_at: taipeiDay() };
+    const { error } = await supabase.from(TABLE).update({ send_mode: "auto", ...join, updated_at: new Date().toISOString() }).eq("id", id);
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, sendMode: "auto" });
+  }
   if (body.action === "rescan") {
     const days = RESCAN_DAYS.find((d) => d === body.days);
     if (!days) return NextResponse.json({ ok: false, error: `days must be ${RESCAN_DAYS.join(" / ")}` }, { status: 400 });

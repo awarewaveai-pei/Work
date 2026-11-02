@@ -5,6 +5,7 @@ import { assertOrgAccess, OrgAccessError, toOrgAccessResponse, userKindOf } from
 import { getSecret, connectorSecretRef } from "@/lib/secret-vault";
 import { buildRfc2822Message, createGmailDraft, GmailDraftError, refreshAccessToken, toBase64Url, type GmailDraft } from "@/lib/outreach/google-oauth";
 import { contactBlock } from "@/lib/outreach/contact-guard";
+import { stageCap } from "@/lib/outreach/sender";
 
 // Cold Outreach — Gmail draft creation (task T10, acceptance: real draft via REALTEST, daily
 // limit enforced, draft-only — never sends). A dedicated route rather than messages/route.ts's
@@ -32,12 +33,14 @@ function todayStartUtcIso(): string {
 interface LeadRow { id: string; organization_id: string | null; name: string | null; email: string | null; website: string | null; do_not_contact: boolean;
   status: string | null; consent_source: string | null; }
 interface MessageRow { id: string; organization_id: string | null; lead_id: string; subject: string | null; body: string; status: string;
-  drafted_at: string | null; prompt_snapshot: { sender_id?: string } | null; }
+  drafted_at: string | null; prompt_snapshot: { sender_id?: string } | null; output_type: string | null; }
 
 // A take older than this with no draft_created event is a request that died between the take and Gmail.
 const STALE_TAKE_MS = 10 * 60_000;
 interface ConnectorRow { id: string; organization_id: string | null; credentials_ref: string | null; is_enabled: boolean; settings: { email?: string } | null; }
-interface SenderRow { id: string; organization_id: string | null; email: string; daily_limit: number; is_active: boolean; stream_type: string; provider?: string; }
+interface SenderRow { id: string; organization_id: string | null; email: string; daily_limit: number; is_active: boolean; stream_type: string; provider?: string;
+  send_mode?: string; warmup_stage?: string; connector_id?: string | null; }
+const SENDER_COLS = "id, organization_id, email, daily_limit, is_active, stream_type, provider, send_mode, warmup_stage, connector_id";
 
 export async function POST(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
@@ -59,7 +62,7 @@ export async function POST(req: Request): Promise<Response> {
 
   const { data: msgData, error: msgErr } = await supabase
     .from("co_messages")
-    .select("id, organization_id, lead_id, subject, body, status, drafted_at, prompt_snapshot")
+    .select("id, organization_id, lead_id, subject, body, status, drafted_at, prompt_snapshot, output_type")
     .eq("id", messageId)
     .maybeSingle();
   if (msgErr) return NextResponse.json({ ok: false, error: msgErr.message }, { status: 500 });
@@ -136,12 +139,25 @@ export async function POST(req: Request): Promise<Response> {
       .maybeSingle();
     return (data as ConnectorRow | null) ?? null;
   };
-  // The mailbox the email was written for (its signature is in the body, SPEC D12): drafted there or not at all.
-  const writtenFor = message.prompt_snapshot?.sender_id ?? null;
+  // The mailbox the email was written for (its signature is in the body, SPEC D12): drafted there or not at all. The
+  // rotation over the sender pool happens when the email is written (sender.ts senderFor, C8.1). A follow-up goes out
+  // from the mailbox that drafted the lead's earlier mail (one thread, SPEC §5.5, C8.2).
+  let writtenFor = message.prompt_snapshot?.sender_id ?? null;
+  if (message.output_type === "followup") {
+    const { data: prev, error: prevErr } = await supabase.from("co_sending_events").select("sender_account_id")
+      .eq("lead_id", lead.id).in("event_type", ["draft_created", "sent"]).not("sender_account_id", "is", null)
+      .neq("message_id", message.id).order("created_at", { ascending: false }).limit(1);
+    if (prevErr) return NextResponse.json({ ok: false, error: prevErr.message }, { status: 500 });
+    const first = ((prev ?? []) as Array<{ sender_account_id: string }>)[0]?.sender_account_id ?? null;
+    if (first && writtenFor && first !== writtenFor) {
+      return NextResponse.json({ ok: false, error: "sender_mismatch", detail: "這封追蹤信的署名信箱和前一封不同：重新產生" }, { status: 409 });
+    }
+    writtenFor = first ?? writtenFor;
+  }
   let named: SenderRow | null = null;
   if (writtenFor) {
     const { data, error } = await supabase.from("co_sender_accounts")
-      .select("id, organization_id, email, daily_limit, is_active, stream_type, provider").eq("id", writtenFor).maybeSingle();
+      .select(SENDER_COLS).eq("id", writtenFor).maybeSingle();
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     named = (data as SenderRow | null) ?? null;
     const org = named?.organization_id ?? null;
@@ -150,6 +166,12 @@ export async function POST(req: Request): Promise<Response> {
     if (!usable) return NextResponse.json({ ok: false, error: "sender_unavailable", detail: "寫信用的寄件信箱已停用或不屬於這個組織：重新產生" }, { status: 409 });
   }
   const pickNamedConnector = async (s: SenderRow): Promise<ConnectorRow | null> => {
+    // 0152 links a mailbox to its connector; a mailbox from before that is matched by address.
+    if (s.connector_id) {
+      const { data } = await supabase.from("co_connector_accounts").select("id, organization_id, credentials_ref, is_enabled, settings")
+        .eq("id", s.connector_id).eq("is_enabled", true).not("credentials_ref", "is", null).maybeSingle();
+      return (data as ConnectorRow | null) ?? null;
+    }
     let q = supabase.from("co_connector_accounts").select("id, organization_id, credentials_ref, is_enabled, settings")
       .eq("connector_name", "gmail").eq("is_enabled", true).not("credentials_ref", "is", null);
     q = s.organization_id ? q.eq("organization_id", s.organization_id) : q.is("organization_id", null);
@@ -178,6 +200,8 @@ export async function POST(req: Request): Promise<Response> {
   if (senderErr) return NextResponse.json({ ok: false, error: senderErr.message }, { status: 500 });
   if (!senderData) return NextResponse.json({ ok: false, error: "no active Gmail sender account — reconnect Gmail" }, { status: 400 });
   const sender = senderData as SenderRow;
+  // A pool mailbox drafts no more a day than it may send (its warm-up stage cap, SPEC D21).
+  const dailyLimit = sender.send_mode === "auto" ? stageCap(sender.warmup_stage ?? "full", sender.daily_limit) : sender.daily_limit;
 
   // Gate on a live count of today's draft_created events, not a manually-reset counter column —
   // self-resetting on the Asia/Taipei day boundary with no cron dependency (critic: a stored
@@ -189,9 +213,9 @@ export async function POST(req: Request): Promise<Response> {
     .eq("event_type", "draft_created")
     .gte("created_at", todayStartUtcIso());
   if (countErr) return NextResponse.json({ ok: false, error: countErr.message }, { status: 500 });
-  if ((todayCount ?? 0) >= sender.daily_limit) {
+  if ((todayCount ?? 0) >= dailyLimit) {
     return NextResponse.json(
-      { ok: false, error: `daily Gmail draft limit reached (${todayCount}/${sender.daily_limit})`, dailyLimitReached: true },
+      { ok: false, error: `daily Gmail draft limit reached (${todayCount}/${dailyLimit})`, dailyLimitReached: true },
       { status: 429 },
     );
   }

@@ -3,21 +3,29 @@
 // gmail-draft/route.ts: the organization's own mailbox first; the agency's (organization_id IS NULL) only for staff --
 // a customer never writes as the agency.
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { inPool, pickSender, writingLoad, type PoolAccount } from "./sender-pool";
 
 export interface SenderRow { id: string; organization_id: string | null; email: string; display_name: string | null; signature_block: string | null }
 
 const COLS = "id, organization_id, email, display_name, signature_block";
 
-/** The oldest active cold Gmail mailbox of the organization whose Gmail connection still exists (a deleted connection
- *  leaves the mailbox row behind; 0152 will link the two by id). */
+/** The mailbox an email is written for. With sender-pool mailboxes (C8.1, SPEC §5.5): the least loaded of them
+ *  (sender-pool.ts pickSender over writingLoad), since the signature binds the email to its mailbox and so the rotation
+ *  happens here. Otherwise the oldest active cold Gmail mailbox whose Gmail connection still exists (a deleted
+ *  connection leaves the mailbox row behind). */
 export async function senderFor(db: SupabaseClient, orgId: string | null, opts: { agencyFallback: boolean }): Promise<SenderRow | null> {
   const pick = async (org: string | null): Promise<SenderRow | null> => {
-    let q = db.from("co_sender_accounts").select(COLS).eq("provider", "gmail").eq("stream_type", "cold").eq("is_active", true);
+    let q = db.from("co_sender_accounts").select(`${COLS}, is_active, health_status, send_mode, warmup_stage, daily_limit, connector_id`).eq("provider", "gmail").eq("stream_type", "cold").eq("is_active", true);
     q = org ? q.eq("organization_id", org) : q.is("organization_id", null);
     const { data, error } = await q.order("created_at", { ascending: true }).limit(20);
     if (error) throw new Error(error.message);
-    const senders = (data ?? []) as SenderRow[];
+    const senders = (data ?? []) as Array<SenderRow & PoolAccount>;
     if (senders.length === 0) return null;
+    const pool = senders.filter(inPool);
+    if (pool.length) {
+      const chosen = pickSender(pool, await writingLoad(db, pool.map((s) => s.id)));
+      if (chosen) return senders.find((s) => s.id === chosen.id)!;
+    }
     let c = db.from("co_connector_accounts").select("settings").eq("connector_name", "gmail").eq("is_enabled", true).not("credentials_ref", "is", null);
     c = org ? c.eq("organization_id", org) : c.is("organization_id", null);
     const { data: conns, error: cErr } = await c.limit(50);

@@ -92,7 +92,7 @@ function setup() {
   return { gmail, store, deps, classified, pushes, failClassify: (n: number) => { classifyFails = n; } };
 }
 
-const send = (id: string, over: Partial<PendingSend> = {}): PendingSend => ({ messageId: id, subject: "合作提案", leadEmail: "boss@shop.example", eventId: `e-${id}`,
+const send = (id: string, over: Partial<PendingSend> = {}): PendingSend => ({ messageId: id, status: "drafted", sendingSince: null, subject: "合作提案", leadEmail: "boss@shop.example", eventId: `e-${id}`,
   draftedAt: new Date(T0).toISOString(), draftId: `d-${id}`, gmailMessageId: `g-${id}`, threadId: "t-1", ...over });
 
 describe("sent detection", () => {
@@ -118,6 +118,18 @@ describe("sent detection", () => {
     expect(r.sent).toBe(1);
     expect(store.sent.get("a")).toBe("g-a-sent");
     expect(store.unsent).toEqual(["b"]);
+  });
+
+  it("an automatic send left 'sending' whose draft is still a draft: kept at 29 minutes, needs_edit at 31 (C8.3)", async () => {
+    const { gmail, store, deps } = setup();
+    const at = (min: number) => new Date(T0 + 7_200_000 - min * 60_000).toISOString();  // deps.now = T0 + 2 h
+    store.sends = [send("fresh", { status: "sending", sendingSince: at(29) }), send("old", { status: "sending", sendingSince: at(31), threadId: "t-old" })];
+    gmail.messages.set("g-fresh", mail("g-fresh", { thread: "t-1", labels: ["DRAFT"] }));
+    gmail.messages.set("g-old", mail("g-old", { thread: "t-old", labels: ["DRAFT"] }));
+    const r = await runGmailSync(deps);
+    expect(r.errors).toEqual([]);
+    expect(store.sent.size).toBe(0);
+    expect(store.unsent).toEqual(["old"]);
   });
 
   it("no internalDate: the Date header dates it; neither is an error, never a 1970 date (Codex rounds 2-3)", async () => {

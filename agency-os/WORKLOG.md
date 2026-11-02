@@ -1,4 +1,35 @@
 # Worklog
+## 2026-11-02（續21）外聯 v2 C8 自動寄與輪流寄（程式完成、待真寄）＋C7 成效頁
+
+**做了**（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；SSOT R0-PLAN §6 C8／C7、SPEC §5.5／§5.9／D17／D21／D25）：
+- C8.1 `NA/lib/outreach/sender-pool.ts`：`pickSender`（池內 今日負載／`stageCap` 最低）、`sendCaps`（信箱＝階上限、寄件網域＝同網域池信箱上限和、收件 30 天 2）、`todayClaims`、`writingLoad`（claims＋已寫未寄首封）、`beginSend`（`co_begin_send`）、`releaseClaim`。
+- C8.2 輪流發生在**寫信時**：`NA/lib/outreach/sender.ts senderFor` 有池信箱就 `pickSender`（署名綁信箱，D12，所以不能在建草稿時換信箱）；`gmail-draft/route.ts` 追蹤信用該 lead 前一封事件的 `sender_account_id`（與署名信箱不同 → 409 `sender_mismatch`），token 依 `connector_id`，池信箱每日草稿上限＝`stageCap`。
+- C8.3 `NA/lib/outreach/send-adapter.ts`（唯一呼叫 `sendGmailDraft` 的檔）＋`google-oauth.ts sendGmailDraft`（全程式唯一 `/drafts/send`）；`never-sends.test.ts` 三規則：send 端點只在 google-oauth 出現一次且在 `sendGmailDraft` 內、`sendGmailDraft` 只有 send-adapter 呼叫。寄前：台北 09–18 週一至五（每封再查）、tick 配額＝剩餘上限／剩餘 tick＋0–120 s 抖動、Cold Gate、`contactBlock`、付費驗證 → `co_begin_send` → `drafts.send` → `co_mark_sent`。4xx＝退回 drafted＋信箱 paused＋timeline＋Telegram；逾時／5xx／404＝留 `sending` 不重寄。`gmail-sync.ts` 對帳：`sending` 自最新 claim（含已釋放）起 30 分仍是草稿 → `co_mark_unsent`（needs_edit＋釋放）。
+- C8.4 `NA/app/api/internal/outreach/gmail-sync/route.ts` 同步後跑 `runAutoSend`（同步 150 s、全部 270 s）；`senders/route.ts` POST `send_mode`（開＝輸入 email＋`poolEmailRefusal`＋cold＋有 connector；首次入池 w1／50）；GET 加 `today_claims`、`bounce_rate_7d`；`SendersCard.tsx` 寄件池表（關／開兩顆按鈕，無下拉）。
+- C8.6 `NA/lib/outreach/mailbox-verify.ts`：Hunter／ZeroBounce（組織 key → 代理商 key；無 key＝不自動寄）、90 天內付費 valid 才寄、risky／unknown 留草稿給人（timeline `auto_send_held`）、invalid → 拒收 `invalid_email`；grant `outreach.verify`（`products.ts` 加 quota），有結果才 `recordUse`。回應形狀照兩家 v2 文件，**無 key 未真打**。
+- C7（cc.py SDK 派工，session e9e848f7，US$0.56）：`NA/lib/outreach/stats.ts`、`NA/app/api/outreach/stats/route.ts`、`NA/app/(shell)/tools/outreach/page.tsx`（表＋回覆率＋正向率＋CSV，三顆期間按鈕）。主 session 驗收：欄位對 `0048:84,145-146`、`0153:229-232`；CSV 公式注入補 `'`。
+- 同步：MODULE_MANIFEST、Foundry catalog（`node scripts/sync-foundry-catalog.mjs`）、router hunter／zerobounce note「自動寄前必驗」、ConnectorsClient 加 zerobounce。
+
+**審查**（Codex `agency-os/reports/oracle/2026-11-02-partialreview-706ac97a.md` 3m；critic Deep 1C/4M/6m）：
+- C1＝Codex F3：佇列取最舊草稿事件 → 改取每封最新 `draft_created`（與 gmail-sync 同規則）。
+- F2：停用的 Gmail connector 仍會寄 → 池查詢 inner join connector `is_enabled ∧ credentials_ref`。
+- M1：giveBack 兩步之間中斷 → 對帳改讀最新 claim（含已釋放），30 分後收尾。
+- M2：被擋的信塞住佇列／單封例外停整個信箱 → 佇列 400 封並批次帶入 verdict；單封錯只擋該封；`EntitlementRequired` ＝不寄。
+- M3＋M4：追蹤信無主旨、不在原串（C5.2 的事）→ C5 前自動寄**不寄追蹤信**（`followup_until_c5`）。
+- 不修：F1 `angle` 未由產信填入＝C16.3 範圍（SPEC D24 ③）；m3 上限滿仍逐封呼 RPC（效率）；m6 stats `.in()` 未分頁（每 200 lead 回信 >1000 才少算）；舊 Gmail 草稿重建後殘留（程式不刪 Gmail 草稿，0153 不變量）。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m pytest lobster-factory/packages/db/tests/test_0152_sender_pool.py -q（拋棄式 postgres；新增「同一封兩 session 只一個 claim」「信箱 19/20 兩封只一封」） → 12 passed | exit=0 | ms=60830
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/outreach/__tests__/（send-adapter 8、sender-pool 3、mailbox-verify 3、gmail-sync 17、never-sends 7、stats 2…） → 17 files / 164 passed；npx tsc --noEmit exit 0 | exit=0 | ms=4000
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：send-adapter 付費驗證閘改 `return null` → 「paid verification…」紅；還原 → 7/7 綠 | exit=0 | ms=3000
+- 全套 vitest：459 檔綠、2 紅＝`lib/portal/__tests__/products.test.ts`／`staff-tools.test.ts` 的 `/tools/seedstar`（他 session，非本卡）。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=1c/7m/6n（Codex 3m＋critic 1C/4M/6m；C1/F2/F3/M1/M2/M3/M4/m1/m2/m4/m5 已修，F1/m3/m6 記上方）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=sendGmailDraft | hits=13
+- 未驗：PostgREST 嵌入篩選（`co_connector_accounts!inner`、`co_messages!inner`）在部署後 tick 才真跑；真寄一封（C8.5 REALTEST）等 C11.1 次網域。
+
+**剩**：C8.5 REALTEST（C11.1 買網域、C1.6 重連 Gmail 後）；自動寄追蹤信等 C5.2。
+
+**rollback**：revert 本 commit；或 senders 頁把信箱「自動寄出：關」（`send_mode='draft'`），send-adapter 即不讀該信箱。
 ## 2026-11-02（續20）影音工作台：3D 全文納入範圍；`D:\Video`／Downloads 副本退場，只在 repo 改
 
 **操作者**：「D:\Video 已經不用啦，要用 apps/video-workbench」；「都要 3D」（針對 handoff §4.5／§5.1／§10 仍寫不做 3D）。

@@ -242,3 +242,40 @@ export async function createGmailDraft(accessToken: string, raw: string): Promis
     throw new GmailDraftError(`gmail drafts.create: ${e instanceof Error ? e.message : "unreadable reply"}`, "unknown");
   }
 }
+
+/** outcome: "refused" = Gmail answered 4xx and sent nothing; "no_draft" = 404, the draft is gone (a person may have sent
+ *  or deleted it: reconciliation decides); "unknown" = network error, timeout, 5xx or an unreadable reply -- the mail may
+ *  have gone out, so the caller never retries it (SPEC §5.5: leave it 'sending' for the reply sync to reconcile). */
+export class GmailSendError extends Error {
+  constructor(message: string, readonly outcome: "refused" | "no_draft" | "unknown", readonly status: number | null) {
+    super(message); this.name = "GmailSendError";
+  }
+}
+
+/** The one Gmail send in the program (drafts.send), called only by lib/outreach/send-adapter.ts: never-sends.test.ts
+ *  fails on this endpoint or this function name anywhere else (SPEC I3). Returns the sent message. */
+export async function sendGmailDraft(accessToken: string, draftId: string, fetcher: typeof fetch = fetch): Promise<{ id: string; threadId: string }> {
+  let resp: Response;
+  try {
+    resp = await fetcher(`${GMAIL_API_BASE}/drafts/send`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ id: draftId }),
+      signal: AbortSignal.timeout(GMAIL_TIMEOUT_MS),
+    });
+  } catch (e) {
+    throw new GmailSendError(`gmail drafts.send: ${e instanceof Error ? e.message : "network error"}`, "unknown", null);
+  }
+  if (!resp.ok) {
+    const detail = await resp.text().catch(() => "");
+    const outcome = resp.status === 404 ? "no_draft" : resp.status >= 400 && resp.status < 500 ? "refused" : "unknown";
+    throw new GmailSendError(`gmail drafts.send ${resp.status}: ${detail.slice(0, 300)}`, outcome, resp.status);
+  }
+  try {
+    const j = (await resp.json()) as { id?: string; threadId?: string };
+    if (!j.id || !j.threadId) throw new Error("no message id in the reply");
+    return { id: j.id, threadId: j.threadId };
+  } catch (e) {
+    throw new GmailSendError(`gmail drafts.send: ${e instanceof Error ? e.message : "unreadable reply"}`, "unknown", resp.status);
+  }
+}

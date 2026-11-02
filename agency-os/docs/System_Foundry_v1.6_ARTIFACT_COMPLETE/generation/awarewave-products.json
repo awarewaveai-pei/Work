@@ -2569,6 +2569,13 @@
           "limitKind": "QUOTA",
           "buyout": true,
           "billing": "credits"
+        },
+        {
+          "feature_key": "outreach.verify",
+          "name": "信箱驗證",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
         }
       ],
       "accessChannels": [

@@ -2,7 +2,9 @@
 // ① sent detection, one message at a time, never by thread: a drafted/sending email whose Gmail message carries SENT and
 //   not DRAFT is sent (co_mark_sent). The message gone (sending a draft can change its id): the thread's SENT message
 //   dated after the draft and not already another row's. Still nothing: the draft itself -- there, the person edited it
-//   (its message id is updated); gone too, nothing was sent (co_mark_unsent: needs_edit, claim released).
+//   (its message id is updated); gone too, nothing was sent (co_mark_unsent: needs_edit, claim released). An automatic
+//   send (send-adapter.ts) left 'sending' whose draft is still a draft 30 minutes after its claim did not go out:
+//   needs_edit and the claim released too (SPEC §5.5; never resent by code).
 // ② incoming mail from the history cursor (settings.gmail_sync.history_id; first run, an expired cursor or a "補掃 N 天"
 //   request: a dated inbox scan over every page). A mail is ours when it sits in the thread of a mail we drafted (that
 //   thread's lead), else when its sender is a lead's address or a bounce names one (X-Failed-Recipients); anything else
@@ -23,6 +25,7 @@ const SCAN_PAGES_PER_TICK = 20;   // a scan reads at most 2,000 inbox mails per 
 const HISTORY_TO_SCAN = 2_000;    // more new mails than this since the cursor: a resumable scan instead
 const FIRST_SCAN_DAYS = 14;       // a first connection reads back at most two weeks
 const SENT_SLACK_MS = 60_000;  // Gmail's clock against ours when comparing a sent date with the draft's creation
+export const SENDING_STALE_MS = 30 * 60_000;
 
 /** A resumable inbox scan, in epoch seconds: mails after `since` and before `before` (the oldest one handled so far)
  *  are still to read (seen = the ones in that last second already handled, so a tick always moves on); history_id
@@ -38,6 +41,9 @@ export interface SyncConnector {
 /** A drafted/sending email and the draft_created event that holds its Gmail ids. */
 export interface PendingSend {
   messageId: string;
+  status: "drafted" | "sending";
+  /** 'sending': when its send claim was taken (co_send_claims.claimed_at); null for 'drafted'. */
+  sendingSince: string | null;
   /** The email's subject: a pre-C4.2 draft that is gone is matched in the sent folder by it (follow-ups have none). */
   subject: string | null;
   leadEmail: string | null;
@@ -153,6 +159,8 @@ export async function runGmailSync(deps: SyncDeps): Promise<SyncResult> {
     for (const s of await deps.store.pendingSends(c.id)) {
       if (late()) return;
       const after = Date.parse(s.draftedAt) - SENT_SLACK_MS;
+      const staleSend = s.status === "sending" && !!s.sendingSince && now().getTime() - Date.parse(s.sendingSince) > SENDING_STALE_MS;
+      const STALE_REASON = "自動寄出後 30 分鐘，這封仍是 Gmail 草稿、沒有寄出：已退回待修改並釋放名額";
       const markFirst = async (candidates: GmailMessage[], threadId: string | null): Promise<boolean> => {
         for (const m of datedSent(candidates).filter((x) => dateOf(x) >= after).sort((a, b) => dateOf(a) - dateOf(b))) {
           if (await deps.store.sentElsewhere(m.id)) continue;
@@ -191,8 +199,9 @@ export async function runGmailSync(deps: SyncDeps): Promise<SyncResult> {
       }
       try {
         const m = await api.message(meta.gmailMessageId!, "meta");
-        if (datedSent([m]).length && !(await deps.store.sentElsewhere(m.id)) &&
-            (await deps.store.markSent(s.messageId, sentAt(m), m.id, m.threadId))) r.sent++;
+        if (datedSent([m]).length) {
+          if (!(await deps.store.sentElsewhere(m.id)) && (await deps.store.markSent(s.messageId, sentAt(m), m.id, m.threadId))) r.sent++;
+        } else if (staleSend && m.labelIds?.includes("DRAFT") && (await deps.store.markUnsent(s.messageId, STALE_REASON))) r.unsent++;
         continue;
       } catch (e) {
         if (!(e instanceof GmailNotFound)) throw e;
@@ -201,6 +210,7 @@ export async function runGmailSync(deps: SyncDeps): Promise<SyncResult> {
       try {
         const d = await api.draft(s.draftId);  // still a draft, edited in Gmail: follow its new message
         if (d.message.id !== meta.gmailMessageId) await deps.store.setDraftMeta(s.eventId, { draftId: s.draftId, messageId: d.message.id, threadId: d.message.threadId });
+        if (staleSend && (await deps.store.markUnsent(s.messageId, STALE_REASON))) r.unsent++;
       } catch (e) {
         if (!(e instanceof GmailNotFound)) throw e;
         // Sending removes the draft and adds the SENT mail at once: the person may have pressed send between our thread
@@ -392,9 +402,9 @@ export function supabaseSyncStore(db: SupabaseClient): SyncStore {
       const senders = await sendersOf(connectorId);
       if (!senders.length) return [];
       // Every drafted/sending email, all pages: one left out would never be reconciled.
-      const messages: Array<{ id: string; lead_id: string; subject: string | null }> = [];
+      const messages: Array<{ id: string; lead_id: string; subject: string | null; status: "drafted" | "sending" }> = [];
       for (let from = 0; ; from += PAGE) {
-        const { data, error } = await db.from("co_messages").select("id, lead_id, subject").in("status", ["drafted", "sending"])
+        const { data, error } = await db.from("co_messages").select("id, lead_id, subject, status").in("status", ["drafted", "sending"])
           .order("id").range(from, from + PAGE - 1);
         fail("pending messages read failed", error);
         messages.push(...((data ?? []) as typeof messages));
@@ -415,12 +425,20 @@ export function supabaseSyncStore(db: SupabaseClient): SyncStore {
         fail("leads read failed", error);
         for (const l of (data ?? []) as Array<{ id: string; email: string | null }>) emails.set(l.id, l.email?.trim().toLowerCase() || null);
       }
+      const since = new Map<string, string>();
+      for (const part of chunks(messages.filter((m) => m.status === "sending").map((m) => m.id))) {
+        // The newest claim, released or not: a give-back (send-adapter) that released the claim but died before putting the
+        // mail back to drafted leaves 'sending' with only a released claim, and that must still go stale (critic M1).
+        const { data, error } = await db.from("co_send_claims").select("message_id, claimed_at").in("message_id", part).order("claimed_at", { ascending: false });
+        fail("send claims read failed", error);
+        for (const c of (data ?? []) as Array<{ message_id: string; claimed_at: string }>) if (!since.has(c.message_id)) since.set(c.message_id, c.claimed_at);
+      }
       const out: PendingSend[] = [];
       for (const m of messages) {
         const e = events.find((x) => x.message_id === m.id);  // newest first: the latest draft of this email
         const draftId = e?.metadata?.draftId ?? e?.provider_event_id;
         if (!e || !draftId) continue;
-        out.push({ messageId: m.id, subject: m.subject, leadEmail: emails.get(m.lead_id) ?? null, eventId: e.id, draftedAt: e.created_at, draftId,
+        out.push({ messageId: m.id, status: m.status, sendingSince: since.get(m.id) ?? null, subject: m.subject, leadEmail: emails.get(m.lead_id) ?? null, eventId: e.id, draftedAt: e.created_at, draftId,
           gmailMessageId: e.metadata?.messageId ?? null, threadId: e.metadata?.threadId ?? null });
       }
       return out;

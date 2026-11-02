@@ -221,6 +221,31 @@ def test_race_two_sender_domains_same_recipient_third_mail(db):
     assert (first, second) == ("t", "f") and waited > 1
 
 
+def test_race_same_message_twice_one_claim(db):
+    """C8.5: two ticks (or a tick and a retry) on one mail -- one claim, one send."""
+    snd = sender(db, "s@race-twice.com")
+    _, m = lead_message(db, "t@race-twice-r.com")
+    first, second, waited = db.race(f"select co_begin_send('{m}', '{snd}', 't@race-twice-r.com', '{CAPS}')",
+                                    f"select co_begin_send('{m}', '{snd}', 't@race-twice-r.com', '{CAPS}');")
+    assert (first, second) == ("t", "f") and waited > 1
+    assert db.value(f"select count(*) from co_send_claims where message_id = '{m}';") == "1"
+
+
+def test_race_same_mailbox_last_slot_19_of_20(db):
+    """C8.5: a mailbox at 19 of 20 today and two mails at once -- only one goes out."""
+    snd = sender(db, "s@race-19.com")
+    caps = '{"mailbox": 20, "sender_domain": 50, "recipient_30d": 2}'
+    for i in range(19):
+        _, m = lead_message(db, f"r{i}@race-19-r{i}.com")
+        assert begin(db, m, snd, f"r{i}@race-19-r{i}.com", caps) == "t"
+    _, m1 = lead_message(db, "a@race-19-x.com")
+    _, m2 = lead_message(db, "b@race-19-y.com")
+    first, second, waited = db.race(f"select co_begin_send('{m1}', '{snd}', 'a@race-19-x.com', '{caps}')",
+                                    f"select co_begin_send('{m2}', '{snd}', 'b@race-19-y.com', '{caps}');")
+    assert (first, second) == ("t", "f") and waited > 1
+    assert db.value(f"select status from co_messages where id = '{m2}';") == "drafted"
+
+
 def test_race_warm_conversion_and_send_on_one_lead(db):
     snd = sender(db, "s@race-warm.com")
     # conversion first: the send waits on the lead row, then sees warm
