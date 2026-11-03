@@ -125,6 +125,14 @@
 
 > 刷卡／登入第三方面板／瀏覽器點測／給截圖。多數每條只要幾分鐘，卻卡住下游。
 
+- [ ] **【外聯 v2｜無死線】買冷信次網域＋開池信箱（C11.1），解鎖 C11.4、C8.5、C15.4**
+  - `🟠 未開始` · `2026-11-03 開` · `卡在你（買網域、開 Workspace 使用者）`
+  - **目前如何**：只用 awarewaveai@gmail.com 草稿模式（D26）：管線自動研究→產信→建 Gmail 草稿，上限約 20 封／天，每封你在 Gmail 按寄出；主信箱永不自動寄（I10）；冷信退信／檢舉算在這個消費者 Gmail 上。
+  - **買了可以如何**：3 次網域×2 信箱×50 封＝300 封／天，池信箱自動寄、輪流挑信箱、每日 DNS 檢查、暖機升階、退信自動暫停；風險跟主信箱隔開。暖機 4–5 週才到全量。建議先用主信箱寄 1–2 週看成效表回覆率再買。
+  - **下一步**：你買 3 個次網域→Workspace 加成次網域、每個開 2 使用者、設 SPF／DKIM／DMARC→Connectors 頁連 6 個信箱並勾寄件池；之後我跑 C11.4（一個真實次網域三燈）、C8.5（真寄一封到你另一信箱）、C15.4（種 20 名單跑 3 tick）。
+  - **續做要看**：`agency-os/handoffs/2026-11-03-outbound-v2-handoff.md`（§2 現況、§5 做法、§6 地雷）；`agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md` §6 C11／C8／C15；規格 `agency-os/docs/Outbound_OS_Engineering_Spec/Outbound_OS_Engineering_Spec.md` D12、D17、D21、D26、I10；狀態 `agency-os/handoffs/2026-10-31-outbound-os/data.mjs`（監工台 https://claude.ai/artifact/DbH1HLUihZwAiBiJZGSD4t）。
+  - **完成定義**：data.mjs C11.1、C11.4、C8.5、C15.4 全 done。
+
 - [ ] **【Soulful 搬站後收尾｜無死線】網域轉 Cloudflare Registrar** — 網域付到 2028，無時壓；DKIM selector 是 `hostingermail1`，轉移時勿動 DNS。（付費外掛授權盤點：操作者 2026-10-23 說不用做。）
   - 出自：兩條 Soulful 搬站項（操作者 2026-10-23 確認搬站完成，已歸檔）；其餘收尾（origin lockdown、Hostinger 拉取用公鑰）隨 Hostinger 11/12 到期或已由 ks-aw-01 origin guard 取代。
 - [ ] **【產品｜社群管理平台 V1】照 ADR 016 與 SOCIAL_MANAGER_PLAN.md 做：G5 升級 Postiz，C3 起逐卡**（文章→社群自動排程已由 `AUTO_CONTENT_EXECUTION_PLAN.md` P2／P4 做完。舊 `/api/content/social-publish`、`social-admin`、`social-channels` 還有 caller：影片 Release 面板 `ReleaseDeliveryPanel.tsx:90`、客戶中心社群頻道分頁 `ClientHubTabs.tsx:1892-1972`；兩處改走社群產品後才能刪三支 route，2026-10-25 查，計畫 P6.3）
