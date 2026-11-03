@@ -17,11 +17,13 @@
     assets: [],
     jobs: [],
     compositions: [],
+    scenes3d: [],
     preferences: {},
     selection: {},
   };
   // Card P3: compositor documents (shared/compositor.js) are a ledger collection like projects; stored as given.
-  const COLLECTIONS = ["characters", "projects", "assets", "compositions"];
+  // Card P5: 3D scene documents (scripts/tools-3d.js), same rules as compositions.
+  const COLLECTIONS = ["characters", "projects", "assets", "compositions", "scenes3d"];
   const composition = (v = {}) => ({ ...structuredClone(v), id: v.id || crypto.randomUUID() });
   let queue = Promise.resolve();
   const pending = new Map();
@@ -271,6 +273,7 @@
           db = v;
           if (!Number.isInteger(db.revision)) db.revision = 0;
           if (!Array.isArray(db.compositions)) db.compositions = []; // state saved before card P3
+          if (!Array.isArray(db.scenes3d)) db.scenes3d = []; // state saved before card P5
           if (normalizeAssets()) persist().catch(() => {});
         }
         try {
@@ -281,23 +284,35 @@
         } catch {}
       });
   // The asset a finished job becomes. Id job-<jobId> keeps SeedStar.showJob and reconcileJobs from doubling it.
-  const jobAsset = (v) => ({
-    id: "job-" + v.id,
-    kind: v.type,
-    type: v.type === "audio" ? "audio/mpeg" : v.type === "image" ? "image/png" : "video/mp4",
-    name: (v.input?.operation || v.type) + "-" + v.id.slice(0, 8),
-    url: v.result.url,
-    ...(v.result.origin ? { origin: v.result.origin } : {}),
-  });
+  // The result's own media fields win (an alpha MOV keeps its VP9 previewUrl and video/quicktime type).
+  const EXT_TYPE = { mov: "video/quicktime", mp4: "video/mp4", webm: "video/webm", glb: "model/gltf-binary", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", mp3: "audio/mpeg", wav: "audio/wav" };
+  const jobAsset = (v) => {
+    const r = v.result,
+      media = {};
+    for (const k of ["url", "previewUrl", "thumbUrl", "type", "width", "height", "duration", "frames", "origin"])
+      if (r[k] !== undefined && r[k] !== null) media[k] = r[k];
+    return {
+      id: "job-" + v.id,
+      kind: r.kind || v.type,
+      name: (v.input?.operation || v.type) + "-" + v.id.slice(0, 8),
+      ...media,
+      type:
+        media.type ||
+        EXT_TYPE[/\.([a-z0-9]+)(?:[?#]|$)/i.exec(r.url)?.[1]?.toLowerCase()] ||
+        (v.type === "audio" ? "audio/mpeg" : v.type === "image" ? "image/png" : v.type === "model" ? "model/gltf-binary" : "video/mp4"),
+    };
+  };
   // Paid output must not depend on a job panel staying open (Codex 2026-11-02): on load, every job not known to be
   // finished is asked again; succeeded ones without their asset get it. Still-running ones are re-asked every 5 s
-  // for up to 10 min. Parent page only (children share its db).
-  async function reconcileJobs(round = 0) {
+  // until the server's own deadline for that job (job.deadlineAt, backend/api.cjs jobTimeoutMs) -- no client limit.
+  // Parent page only (children share its db).
+  async function reconcileJobs() {
     const open = db.jobs
       .filter((j) => j?.id && !["failed", "cancelled", "blocked"].includes(j.status) && !db.assets.some((a) => a.id === "job-" + j.id))
       .slice(-50);
     let changed = false,
       running = false;
+    const watch = (x) => ["queued", "running"].includes(x?.status) && Date.now() < Date.parse(x.deadlineAt);
     for (const j of open) {
       let v;
       try {
@@ -306,21 +321,21 @@
         continue;
       }
       if (!v || v.status === j.status) {
-        running ||= ["queued", "running"].includes(v?.status);
+        running ||= watch(v);
         if (v?.status !== "succeeded") continue;
       }
       Object.assign(j, v);
       changed = true;
       if (v.status === "succeeded" && v.result?.url && !db.assets.some((a) => a.id === "job-" + j.id))
         db.assets.push(M.asset(jobAsset(v)));
-      running ||= ["queued", "running"].includes(v.status);
+      running ||= watch(v);
     }
     if (changed) {
       await persist().catch(reportError);
       broadcast();
       document.dispatchEvent(new CustomEvent("seedstar:changed"));
     }
-    if (running && round < 120) setTimeout(() => reconcileJobs(round + 1).catch(reportError), 5000);
+    if (running) setTimeout(() => reconcileJobs().catch(reportError), 5000);
   }
   if (!child) ready.then(() => reconcileJobs()).catch(reportError);
   const storage = {
@@ -363,7 +378,7 @@
       await ready;
       if (child) return rpc("entity-save", { name, value });
       const normalize =
-        name === "compositions"
+        name === "compositions" || name === "scenes3d"
           ? composition
           : M[
               name === "characters"
@@ -397,6 +412,7 @@
     characters: collection("characters"),
     projects: collection("projects"),
     compositions: collection("compositions"),
+    scenes3d: collection("scenes3d"),
     assets: {
       save: collection("assets").save,
       remove: async (id) => {
@@ -533,6 +549,7 @@
           ["assets", M.asset],
           ["jobs", (v) => v],
           ["compositions", composition],
+          ["scenes3d", composition],
         ])
           for (const item of value[name] || []) {
             if (!item || typeof item !== "object" || !item.id) continue;

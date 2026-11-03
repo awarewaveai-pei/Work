@@ -784,3 +784,19 @@ body {
 .rg-caps table { width:100%;border-collapse:collapse; }
 .rg-caps th,.rg-caps td { border:1px solid var(--border);padding:4px 8px;text-align:left;vertical-align:top; }
 .rg-thumb { display:block;width:64px;height:64px;object-fit:contain;margin-top:4px; }
+/* Card P5: 3D workspace (scripts/tools-3d.js). Theme tokens only. */
+.t3-layout { display:grid;grid-template-columns:240px minmax(300px,1fr) 300px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden; }
+.t3-col { padding:12px;background:var(--bg-subtle);overflow:auto;max-height:860px; }
+.t3-col .btn { margin:3px; }
+.t3-col label { display:block;margin:6px 0; }
+.t3-col .text-input,.t3-col textarea { width:100%; }
+.t3-stage { padding:12px;min-width:0; }
+.t3-canvas { width:100%;aspect-ratio:16/9;background:var(--bg-subtle); }
+.t3-canvas canvas { width:100%;height:100%;display:block; }
+.t3-num { display:inline-block;margin:4px 6px 4px 0; }
+.t3-num .text-input { width:84px; }
+.t3-light { border-bottom:1px solid var(--border);padding:6px 0; }
+.t3-banner { border:1px solid var(--accent);border-radius:var(--radius-sm);padding:10px;margin:10px 0;background:var(--bg-hover); }
+.tool-flow [data-t3-action][aria-pressed="true"],[data-tool-flow="3d"] [data-t3-action][aria-pressed="true"] { border-color:var(--accent);background:var(--bg-hover); }
+@media(max-width:1200px) { .t3-layout { grid-template-columns:200px minmax(260px,1fr); }.t3-layout > .t3-col:last-child { grid-column:1/3;max-height:480px; } }
+@media(max-width:700px) { .t3-layout { display:flex;flex-direction:column; } }

@@ -6,7 +6,7 @@
       await (await fetch(item.url)).json(),
     );
   }
-  for (const file of ["../shared/subtitles.js","tool-processing.js","tools-workflows.js","tools-overlays.js","tools-voice-music.js","../shared/subtitle-parse.js","tools-subtitles.js","../shared/timebase.js","../shared/project-envelope.js","../shared/editor-model.js","tools-editor.js","tools-short.js","../shared/follow-math.js","tools-follow.js","tools-0.js","../shared/rig.js","../shared/compositor.js","tools-rig.js","tools-compositor.js"]) {
+  for (const file of ["../shared/subtitles.js","tool-processing.js","tools-workflows.js","tools-overlays.js","tools-voice-music.js","../shared/subtitle-parse.js","tools-subtitles.js","../shared/timebase.js","../shared/project-envelope.js","../shared/editor-model.js","tools-editor.js","tools-short.js","../shared/follow-math.js","tools-follow.js","tools-0.js","../shared/rig.js","../shared/compositor.js","tools-rig.js","tools-compositor.js","tools-3d.js"]) {
     await new Promise((resolve, reject) => {
       const s = document.createElement("script");
       s.src = "../scripts/" + file;

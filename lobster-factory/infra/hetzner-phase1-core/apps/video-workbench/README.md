@@ -8,6 +8,9 @@
 - `assets/vision` 的 bundle 與 wasm：`npm ci` 時由 `scripts/vendor-vision.cjs` 從 npm 套件複製並以 `sources.json` 的 SHA-256 驗證。
 - `vendor/ffprobe/ffprobe.exe`：`npm ci` 時由 `scripts/vendor-ffprobe.cjs` 從 GyanD/codexffmpeg 6.1.1 essentials 下載（與 ffmpeg-static 內的 ffmpeg 同一 build），以 `vendor/ffprobe/sources.json` 的 SHA-256 驗證；非 Windows 用環境變數 `FFPROBE_PATH`。
 - `.data`（作品與任務）、`node_modules`、`runtime`。
+- `runtime/blender/`（3D 引擎，卡 P5，約 400 MB，選用、不隨 `npm ci` 也不進發行包）：要用 3D 工作區的渲染與動作重定向時，在本資料夾執行 `node scripts/vendor-blender.cjs`（下載 Blender 4.5.9 LTS portable，以 `vendor/blender/sources.json` 的大小與 SHA-256 驗證）；其他平台或已裝 Blender 的機器設環境變數 `BLENDER_PATH`。沒裝時 3D 頁顯示「尚未安裝 3D 引擎」與這條指令。閘門與能力表：`docs/p5-gate-20261103.md`。
+
+進 git：`vendor/three/0.186.0/`（three.js，MIT，`node scripts/vendor-three.cjs` 依 npm sha512 產生，各檔 SHA-256 在 `VERSION.json`；3D 檢視器只讀這份靜態檔，不連 CDN）。
 
 **計畫與需求**：排程、卡片、路線在 `docs/creative-suite-plan-20261102.md`（唯一來源）；需求逐項與驗收在 `handoff/Claude_Code_handoff_20261102.md`。2026-11-02 已把交付包最後的人物跟拍修正（`docs/follow-quality-20261102.md`）搬進來；`D:\Video` 已退場，Downloads 副本已刪（2026-11-02）；4178 跑這份，資料在本資料夾 `.data/`。
 

@@ -22,6 +22,8 @@ const root = __dirname,
     ".gif": "image/gif",
     ".jpg": "image/jpeg",
     ".cube": "text/plain; charset=utf-8",
+    ".glb": "model/gltf-binary",
+    ".bvh": "text/plain; charset=utf-8",
   };
 function createServer({
   dataDir = process.env.SEEDSTAR_DATA_DIR || path.join(root, ".data"),
@@ -67,7 +69,7 @@ function createServer({
       else if (pathname.startsWith("/media/")) {
         // backend/media-store.cjs layout only; other names and "/.." segments are 404.
         if (
-          !/^\/media\/[a-f0-9]{64}\/(original\.(mp3|wav|m4a|mp4|webm|mov)|proxy\.(mp4|webm)|thumb\.jpg|waveform\.json|probe\.json)$/.test(
+          !/^\/media\/[a-f0-9]{64}\/(original\.(mp3|wav|m4a|mp4|webm|mov|glb|bvh)|proxy\.(mp4|webm)|thumb\.jpg|waveform\.json|probe\.json)$/.test(
             pathname,
           )
         )
@@ -88,7 +90,7 @@ function createServer({
       if (!file.startsWith(boundary + path.sep) && file !== root) throw Error();
       if (file === root) file = path.join(root, "index.html");
       if (
-        /[\\/](node_modules|\.data|backend)([\\/]|$)/i.test(file) &&
+        /[\\/](node_modules|\.data|backend|runtime)([\\/]|$)/i.test(file) &&
         !pathname.startsWith("/generated/") &&
         !pathname.startsWith("/media/")
       )

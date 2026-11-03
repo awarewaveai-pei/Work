@@ -677,12 +677,21 @@ async function cpEditorReady() {
 // 放到剪輯時間軸: full-frame clip on the project's first overlay video track (P2 rules), after that track's last clip.
 async function cpPlace(projectId) {
   await cpEditorReady();
-  const p = ed.projects.find((x) => x.id === projectId);
-  if (!p) throw Error("找不到剪輯專案");
+  if (!ed.projects.some((x) => x.id === projectId)) throw Error("找不到剪輯專案");
   const doc = await cpEnsureSaved();
   const asset =
     (await cpRendered(doc)) ||
     (await cpRenderOutput(doc, document.querySelector("[data-cp-canvas]")));
+  const { p, track, startFrame, clip } = await cpPlaceAsset(projectId, asset, (doc.durationFrames * doc.timebase.den) / doc.timebase.num);
+  cp.status = `已放到「${p.title}」的 ${track} 軌（第 ${startFrame} 格起）`;
+  return clip;
+}
+// Shared with the 3D workspace (card P5, scripts/tools-3d.js): any alpha video asset -> full-frame clip on the
+// project's first overlay video track, after that track's last clip.
+async function cpPlaceAsset(projectId, asset, duration) {
+  await cpEditorReady();
+  const p = ed.projects.find((x) => x.id === projectId);
+  if (!p) throw Error("找不到剪輯專案");
   const a = await edProbe(asset);
   ed.current = p.id;
   edCheckpoint();
@@ -714,15 +723,14 @@ async function cpPlace(projectId) {
     },
     {
       startFrame,
-      duration: (doc.durationFrames * doc.timebase.den) / doc.timebase.num,
+      duration,
       sourceStartFrame: 0,
     },
   );
   p.clips.push(clip);
   ed.selected = clip.id;
   await edSave();
-  cp.status = `已放到「${p.title}」的 ${track} 軌（第 ${startFrame} 格起）`;
-  return clip;
+  return { p, track, startFrame, clip };
 }
 
 // ---- editor side ----------------------------------------------------------------------------------------

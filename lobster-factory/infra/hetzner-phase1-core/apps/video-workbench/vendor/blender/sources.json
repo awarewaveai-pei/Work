@@ -1,0 +1,10 @@
+{
+  "version": "4.5.9",
+  "url": "https://download.blender.org/release/Blender4.5/blender-4.5.9-windows-x64.zip",
+  "zipBytes": 399051129,
+  "zipSha256": "41da973b9bf95bb312cbeff4d1982feb13259b43c821686b9bafea4dfe5477cf",
+  "zipSha256Source": "https://download.blender.org/release/Blender4.5/blender-4.5.9.sha256 (official), read 2026-11-03",
+  "topFolder": "blender-4.5.9-windows-x64",
+  "exe": "blender.exe",
+  "license": "GPL-3.0-or-later (Blender); run as a separate process, never linked or bundled"
+}

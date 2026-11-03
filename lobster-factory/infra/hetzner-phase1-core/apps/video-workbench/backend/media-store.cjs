@@ -12,7 +12,24 @@ const ffmpeg = require("ffmpeg-static"),
   { run } = require("./media.cjs");
 const WAVEFORM_POINTS = 1000,
   WAVEFORM_RATE = 8000,
-  EXT = /^[a-z0-9]{2,5}$/;
+  EXT = /^[a-z0-9]{2,5}$/,
+  // Card P5: 3D files are stored like media (content-addressed, fresh asset id) but are not probed by ffprobe.
+  MODELS = new Set(["glb", "bvh"]);
+// A GLB starts with "glTF", version 2, and its header length equals the file size; a BVH starts with HIERARCHY.
+function checkModel(file, ext) {
+  const head = Buffer.alloc(12), fd = fs.openSync(file, "r");
+  try {
+    fs.readSync(fd, head, 0, 12, 0);
+  } finally {
+    fs.closeSync(fd);
+  }
+  const size = fs.statSync(file).size;
+  if (ext === "glb" && (head.toString("latin1", 0, 4) !== "glTF" || head.readUInt32LE(4) !== 2 || head.readUInt32LE(8) !== size))
+    throw Object.assign(Error("不是有效的 GLB 2.0 檔"), { status: 400 });
+  if (ext === "bvh" && !/^\s*HIERARCHY/.test(head.toString("latin1")))
+    throw Object.assign(Error("不是有效的 BVH 動作檔"), { status: 400 });
+  return { format: ext, size };
+}
 
 // Browsers decode H.264 8-bit 4:2:0 up to 1080p in an MP4 reliably; anything else (a .mov included: ffprobe reports
 // mov and mp4 as one format_name, and QuickTime playback varies by browser) gets an H.264 + AAC proxy.
@@ -100,6 +117,11 @@ function createMediaStore({ dataDir }) {
     else place(incoming, path.join(dir, "original." + ext));
     const originalName = existing || "original." + ext,
       original = path.join(dir, originalName);
+    if (MODELS.has(ext)) {
+      const probe = checkModel(original, ext);
+      await derive(dir, "probe.json", async (tmp) => fs.writeFileSync(tmp, JSON.stringify(probe, null, 2)));
+      return { checksum_sha256: sha, url: "/media/" + sha + "/" + originalName, previewUrl: null, probe, thumbUrl: null, waveformUrl: null };
+    }
     await derive(dir, "probe.json", async (tmp) => {
       const info = await inspectMedia(original, signal);
       fs.writeFileSync(tmp, JSON.stringify({ ...info, probe: undefined, ...info.probe }, null, 2));
@@ -167,6 +189,7 @@ function createMediaStore({ dataDir }) {
         for await (const chunk of fs.createReadStream(incoming)) hash.update(chunk);
         sha = hash.digest("hex");
       }
+      if (MODELS.has(ext)) checkModel(incoming, ext); // before it can reach the content directory
       for (let attempt = 0; ; attempt++) {
         let job = pending.get(sha);
         const owner = !job;

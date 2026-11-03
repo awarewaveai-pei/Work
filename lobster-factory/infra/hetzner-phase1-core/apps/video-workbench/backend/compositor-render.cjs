@@ -37,6 +37,25 @@ function origin(input, extra = {}) {
   };
 }
 
+// PNG sequence <dir>/%06d.png -> MOV with the PNG codec (lossless, keeps alpha) -> media store -> verified (duration,
+// fps, size, alpha). Shared by the compositor and the Blender render job (card P5), so both reach the editor alike.
+async function assembleAlphaMov({ dir, frames, fps, width, height, mediaStore, signal }) {
+  const mov = path.join(dir, "render.mov");
+  await run(["-y", "-hide_banner", "-framerate", `${fps.num}/${fps.den}`, "-i", path.join(dir, "%06d.png"), "-c:v", "png", "-pix_fmt", "rgba", "-r", `${fps.num}/${fps.den}`, mov], signal);
+  const expect = { duration: (frames * fps.den) / fps.num, fps, width, height, audio: false };
+  const stored = await mediaStore.ingest({ file: mov, ext: "mov", signal }),
+    file = mediaStore.fileFor(stored.url),
+    verification = await verifyOutput(file, expect, signal);
+  const probe = await inspectMedia(file, signal);
+  // Alpha must survive: a MOV without an alpha pixel format would come back to the timeline as a black box.
+  if (!/^(rgba|bgra|argb|abgr|yuva|gbrap|ya)/.test(probe.probe.pixFmt || ""))
+    verification.findings.push({ code: "video.no_alpha", message: "輸出沒有透明通道（" + probe.probe.pixFmt + "）", evidence: { pixFmt: probe.probe.pixFmt } });
+  verification.ok = verification.findings.length === 0;
+  delete verification.info;
+  if (!verification.ok) throw Object.assign(Error("輸出驗證失敗：" + verification.findings.map((f) => f.message).join("；")), { status: 500 });
+  return { ...stored, kind: "video", type: "video/quicktime", width, height, duration: expect.duration, frames, verification };
+}
+
 // Size limits (bytes): one /frames request (the page batches by this; api.cjs caps a body at 80 MB), one decoded
 // PNG frame, and everything one session may store. idleMs: a session with no frames/finish for this long is dropped
 // (an abandoned page must not hold one of the slots forever). Overridable for tests and small hosts.
@@ -102,31 +121,8 @@ function createCompositorRenders({ dataDir, mediaStore, output, limits = {}, now
     const made = origin(input);
     s.finishing = true;
     sessions.delete(id);
-    const mov = path.join(s.dir, "render.mov");
     try {
-      await run(["-y", "-hide_banner", "-framerate", `${s.fps.num}/${s.fps.den}`, "-i", path.join(s.dir, "%06d.png"), "-c:v", "png", "-pix_fmt", "rgba", "-r", `${s.fps.num}/${s.fps.den}`, mov]);
-      const expect = { duration: (s.frames * s.fps.den) / s.fps.num, fps: s.fps, width: s.width, height: s.height, audio: false };
-      const stored = await mediaStore.ingest({ file: mov, ext: "mov" }),
-        file = mediaStore.fileFor(stored.url),
-        verification = await verifyOutput(file, expect);
-      const probe = await inspectMedia(file);
-      // Alpha must survive: a MOV without an alpha pixel format would come back to the timeline as a black box.
-      if (!/^(rgba|bgra|argb|abgr|yuva|gbrap|ya)/.test(probe.probe.pixFmt || ""))
-        verification.findings.push({ code: "video.no_alpha", message: "輸出沒有透明通道（" + probe.probe.pixFmt + "）", evidence: { pixFmt: probe.probe.pixFmt } });
-      verification.ok = verification.findings.length === 0;
-      delete verification.info;
-      if (!verification.ok) throw Object.assign(Error("輸出驗證失敗：" + verification.findings.map((f) => f.message).join("；")), { status: 500 });
-      return {
-        ...stored,
-        kind: "video",
-        type: "video/quicktime",
-        width: s.width,
-        height: s.height,
-        duration: expect.duration,
-        frames: s.frames,
-        verification,
-        origin: made,
-      };
+      return { ...(await assembleAlphaMov({ dir: s.dir, frames: s.frames, fps: s.fps, width: s.width, height: s.height, mediaStore })), origin: made };
     } finally {
       fs.rmSync(s.dir, { recursive: true, force: true });
     }
@@ -165,4 +161,4 @@ function createCompositorRenders({ dataDir, mediaStore, output, limits = {}, now
   }
   return { create, frames, finish, cancel, still, poseStill, sweep, sessions: () => sessions.size };
 }
-module.exports = { createCompositorRenders, LIMITS };
+module.exports = { createCompositorRenders, assembleAlphaMov, LIMITS };

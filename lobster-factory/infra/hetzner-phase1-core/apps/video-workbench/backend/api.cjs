@@ -21,6 +21,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
   const renders = () => (compositorRenders ||= require("./compositor-render.cjs").createCompositorRenders({ dataDir, mediaStore, output, limits: {
     requestBytes: Number(env.VW_COMPOSITOR_REQUEST_BYTES), frameBytes: Number(env.VW_COMPOSITOR_FRAME_BYTES),
     sessionBytes: Number(env.VW_COMPOSITOR_SESSION_BYTES), idleMs: Number(env.VW_COMPOSITOR_IDLE_MS) } }));
+  // Card P5: Blender jobs (retarget, render) and Meshy image -> 3D run in the /generations queue.
+  let blenderJobs;
+  const blender3d = () => (blenderJobs ||= require("./blender-jobs.cjs").createBlenderJobs({ dataDir, mediaStore, env }));
+  const meshy = require("./meshy.cjs");
   // The one check for every url the client sends as a local file: /generated/<uuid>.<ext>,
   // /media/<sha256>/original.<ext> (only when stored) and, with assets, /assets/<name>.
   function localFile(url, { assets = false } = {}) {
@@ -244,6 +248,55 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
   }
   async function finish(job, signal) {
     try {
+      if (job.input.operation === "blender-retarget" || job.input.operation === "blender-render") {
+        job.status = "running";
+        persist();
+        const result = await blender3d().run(job, {
+          signal,
+          onSpawn: (pid) => {
+            job.blenderPid = pid; // shown in the job record; cancel kills this process tree
+            persist();
+          },
+          onProgress: (p) => {
+            job.progress = p;
+            persist();
+          },
+        });
+        if (signal.aborted) return;
+        job.result = result;
+        job.progress = 100;
+        job.status = "succeeded";
+        persist();
+        return;
+      }
+      if (job.input.operation === "meshy-image-to-3d") {
+        job.status = "running";
+        persist();
+        // Never pay twice for one image: an earlier unfinished task for the same image is resumed (as remove-bg).
+        const src = job.input.references.image.url,
+          sent = JSON.stringify(meshy.options(job.input)),
+          // Reuse key = image + every option Meshy receives: a task made with other options is a different model.
+          earlier = jobs.findLast((j) => j !== job && j.input?.operation === "meshy-image-to-3d" && j.input.references?.image?.url === src && JSON.stringify(meshy.options(j.input)) === sent && j.meshyTaskId && j.status !== "succeeded");
+        const result = await meshy.run(job, {
+          env, fetchImpl, signal, mediaStore, localFile,
+          resumeId: earlier?.meshyTaskId,
+          pollMs: Number(env.VW_MESHY_POLL_MS) || 5000,
+          onTask: (id) => {
+            job.meshyTaskId = id;
+            persist();
+          },
+          onProgress: (p) => {
+            job.progress = p;
+            persist();
+          },
+        });
+        if (signal.aborted) return;
+        job.result = result;
+        job.progress = 100;
+        job.status = "succeeded";
+        persist();
+        return;
+      }
       if (job.input.operation === "remove-bg") {
         job.status = "running";
         persist();
@@ -555,19 +608,32 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
     if (input?.operation === "remotion-template" && !(await remotion.configured(env, appDir)))
       throw Object.assign(Error("片頭模板服務未設定"), { status: 503 });
   }
+  // One per-operation limit: the server aborts the job at it, and job.deadlineAt publishes it so a reloaded page
+  // watches exactly as long (runtime.js reconcileJobs). Remotion polls up to 10 min itself, the extra minutes cover
+  // download + verification; Blender has its own 30 min limit (blender.cjs); Meshy tasks take minutes.
+  function jobTimeoutMs(input) {
+    const op = input?.operation;
+    return op === "blender-retarget" || op === "blender-render" ? 1860000 : op === "meshy-image-to-3d" ? 1200000 : op === "remotion-template" ? 780000 : 600000;
+  }
   // Validates, records and answers 202 before any provider call (runtime.js treats 501/503 as "never sent").
   function start(input, res, extra) {
     const isMedia = mediaTools.supported.includes(input.operation),
       isRemoveBg = input.operation === "remove-bg",
       isRemotion = input.operation === "remotion-template",
-      parsed = isMedia
+      isBlender = input.operation === "blender-retarget" || input.operation === "blender-render",
+      isMeshy = input.operation === "meshy-image-to-3d",
+      parsed = isBlender
+        ? blender3d().request(input)
+        : isMeshy
+          ? meshy.request(input, { env, localFile })
+          : isMedia
         ? { type: input.operation === "separate" ? "audio" : input.operation === "image-output" ? "image" : "video" }
         : isRemoveBg
           ? (removeBgSource(input), bgRemove.token(env), { type: "image" })
           : isRemotion
             ? (remotion.request(input, imageReference), { type: "video" })
             : jobInput(input);
-    if (!isMedia && !isRemoveBg && !isRemotion) key();
+    if (!isMedia && !isRemoveBg && !isRemotion && !isBlender && !isMeshy) key();
     const job = {
       id: crypto.randomUUID(),
       type: parsed.type,
@@ -577,11 +643,11 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
       createdAt: new Date().toISOString(),
       ...extra,
     };
+    job.deadlineAt = new Date(Date.parse(job.createdAt) + jobTimeoutMs(input)).toISOString();
     jobs.push(job);
     persist();
     const controller = new AbortController();
-    // Remotion polls up to 10 min itself; the extra minutes cover the download and verification.
-    const timeout = setTimeout(() => controller.abort(), isRemotion ? 780000 : 600000);
+    const timeout = setTimeout(() => controller.abort(), jobTimeoutMs(input));
     timeout.unref();
     controls.set(job.id, controller);
     json(res, 202, job);
@@ -631,7 +697,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
       )
         throw Object.assign(Error("需要 JSON 請求"), { status: 415 });
       if (req.method === "GET" && route === "/capabilities") {
-        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.publicCatalog });
+        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: require("./blender.cjs").capability(env), meshy: meshy.capability(env), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.publicCatalog });
         return true;
       }
       if (req.method === "POST" && route === "/uploads") {
@@ -641,6 +707,14 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
           const buffer = Buffer.from(input.data.slice(input.data.indexOf(",") + 1), "base64");
           require("./editor-export.cjs").checkCube(buffer.toString("utf8"));
           json(res, 201, { id: crypto.randomUUID(), url: output(buffer, "cube"), origin: { kind: "upload", rightsConfirmed: false }, name: String(input.name || "LUT"), kind: "lut", type: "application/x-cube", size: buffer.length });
+          return true;
+        }
+        // Card P5: 3D models (GLB) and motions (BVH) go to the media store; checked there before they are kept.
+        const model = /^data:(model\/gltf-binary|application\/x-bvh);base64,([\s\S]+)$/.exec(input.data || "");
+        if (model) {
+          const ext = model[1] === "model/gltf-binary" ? "glb" : "bvh";
+          const buffer = Buffer.from(model[2], "base64");
+          json(res, 201, { ...(await mediaStore.ingest({ buffer, ext })), origin: { kind: "upload", rightsConfirmed: false }, name: String(input.name || (ext === "glb" ? "3D 模型" : "動作")), kind: ext === "glb" ? "model" : "motion", type: model[1], size: buffer.length });
           return true;
         }
         const m =
@@ -706,6 +780,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
           ) ||
           // Card P3: compositions are optional (state saved before P3 has none = []), but an array when present.
           (next.compositions !== undefined && !Array.isArray(next.compositions)) ||
+          (next.scenes3d !== undefined && !Array.isArray(next.scenes3d)) || // card P5, optional like compositions
           !Number.isInteger(next.revision) ||
           next.revision < 0
         )
@@ -728,6 +803,18 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
       if (req.method === "POST" && render) {
         const input = await body(req), r = renders();
         json(res, render[1] ? 200 : 201, !render[1] ? r.create(input) : render[2] === "frames" ? r.frames(render[1], input) : render[2] === "cancel" ? r.cancel(render[1]) : await r.finish(render[1], input));
+        return true;
+      }
+      // Card P5: 指定角度截圖 from the 3D viewer -> PNG reference image with origin (usable on the generation pages).
+      if (req.method === "POST" && route === "/3d/stills") {
+        const input = await body(req), m = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(String(input.data || ""));
+        const buffer = m && Buffer.from(m[1], "base64");
+        if (!buffer || buffer.length < 33 || buffer.readUInt32BE(0) !== 0x89504e47) throw Object.assign(Error("截圖必須是 PNG"), { status: 400 });
+        const ref = (k) => (typeof input[k] === "string" && input[k] ? { [k]: input[k].slice(0, 100) } : {});
+        json(res, 201, {
+          id: crypto.randomUUID(), kind: "image", type: "image/png", url: output(buffer, "png"), size: buffer.length,
+          origin: { kind: "render", engine: "workbench-3d-viewer", ...ref("sceneId"), ...(Number.isInteger(input.sceneRevision) ? { sceneRevision: input.sceneRevision } : {}), ...ref("parentAssetId") },
+        });
         return true;
       }
       if (req.method === "POST" && route === "/compositor/stills") {
@@ -801,8 +888,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
           if (job.replicateId) bgRemove.cancelPrediction({ id: job.replicateId, env, fetchImpl });
           persist();
           json(res, 200, job);
-        } else if (req.method === "GET" && !match[2])
+        } else if (req.method === "GET" && !match[2]) {
+          job.deadlineAt ||= new Date(Date.parse(job.createdAt) + jobTimeoutMs(job.input)).toISOString(); // jobs saved before deadlineAt
           json(res, 200, await refresh(job));
+        }
         else throw Object.assign(Error("不支援此方法"), { status: 405 });
         return true;
       }

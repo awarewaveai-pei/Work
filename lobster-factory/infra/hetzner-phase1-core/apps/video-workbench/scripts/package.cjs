@@ -15,9 +15,12 @@ function include(file) {
   const build = fs.mkdtempSync(path.join(os.tmpdir(), "awarewave-release-"));
   const content = path.join(build, "content"), app = path.join(content, "SeedStar-app");
   fs.mkdirSync(app, { recursive: true });
-  for (const name of ["index.html", "server.cjs", "config.js", "package.json", "package-lock.json", "start.cmd", "README.md", "LICENSE-DOMPURIFY", "assets", "backend", "pages", "scripts", "shared", "styles", "tests", "docs", ...(lite ? [] : ["node_modules"])])
+  for (const name of ["index.html", "server.cjs", "config.js", "package.json", "package-lock.json", "start.cmd", "README.md", "LICENSE-DOMPURIFY", "assets", "backend", "pages", "scripts", "shared", "styles", "tests", "docs", "vendor/three", "vendor/blender", ...(lite ? [] : ["node_modules"])])
     fs.cpSync(path.join(root, name), path.join(app, name), { recursive: true, filter: include });
   if (!lite && !fs.existsSync(path.join(app, "node_modules/ffmpeg-static/ffmpeg.exe"))) throw Error("Install the Windows runtime dependencies before packaging");
+  // Card P5: the three.js viewer files ship (vendor/three, MIT); Blender does not (GPL, ~400 MB): the package has
+  // vendor/blender/sources.json so `node scripts/vendor-blender.cjs` can fetch the pinned build, or set BLENDER_PATH.
+  if (!fs.existsSync(path.join(app, "vendor/three/0.186.0/build/three.module.js")) || !fs.existsSync(path.join(app, "vendor/blender/sources.json"))) throw Error("vendor/three or vendor/blender/sources.json missing");
   const sourceFiles = [
     "app/globals.css", "public/awarewave/forms.css", "lib/theme/tokens.ts", "lib/theme/fonts.ts",
     "lib/theme/__tests__/tokens-match-globals.test.ts", "app/__tests__/sidebar-coverage.test.ts",

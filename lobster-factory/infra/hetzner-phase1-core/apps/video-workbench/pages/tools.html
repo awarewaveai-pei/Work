@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="../styles/theme.css" />
     <link rel="stylesheet" href="../styles/tools.css" />
     <link rel="stylesheet" href="../styles/workspaces.css" />
+    <!-- Card P5: the 3D viewer's bare "three" import -> the vendored, pinned build (scripts/vendor-three.cjs). -->
+    <script type="importmap">{ "imports": { "three": "../vendor/three/0.186.0/build/three.module.js" } }</script>
   </head>
   <body>
     <div id="app"></div>

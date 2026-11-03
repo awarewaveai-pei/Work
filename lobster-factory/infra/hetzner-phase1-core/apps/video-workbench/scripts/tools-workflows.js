@@ -48,6 +48,8 @@ function toolWorkflowScreen(t) {
     return typeof toolCompositorScreen === "function" ? toolCompositorScreen(t) : null;
   if (t.id === "rig")
     return typeof toolRigScreen === "function" ? toolRigScreen(t) : null;
+  if (t.id === "3d")
+    return typeof toolThreeDScreen === "function" ? toolThreeDScreen(t) : null;
   if (t.id === "subtitle")
     return typeof toolSubtitleScreen === "function"
       ? toolSubtitleScreen(t)
@@ -151,6 +153,8 @@ function toolWorkflowAfterRender() {
     toolCompositorAfterRender();
   if (typeof toolRigAfterRender === "function" && tool === "rig")
     toolRigAfterRender();
+  if (typeof toolThreeDAfterRender === "function" && tool === "3d")
+    toolThreeDAfterRender().catch(SeedStar.reportError);
   const source = files.src,
     currentTool = tool;
   document.querySelectorAll('[data-flow-media="src"]').forEach((media) => {

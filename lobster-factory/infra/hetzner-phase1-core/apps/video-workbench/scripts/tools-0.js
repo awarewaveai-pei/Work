@@ -29,6 +29,15 @@ const TOOLS = [
     new: 1,
   },
   {
+    id: "3d",
+    cat: "剪輯成片",
+    icon: "◈",
+    name: "3D",
+    desc: "GLB 模型、骨架擺姿、攝影機與燈光、動作重定向，Blender 渲染透明影片回剪輯；圖片可轉 3D 模型",
+    io: "GLB／圖片 → 3D 場景 → 透明影片／參考圖",
+    new: 1,
+  },
+  {
     id: "short",
     cat: "剪輯成片",
     icon: "✂",
