@@ -1,5 +1,5 @@
 (function () {
-  const isRoot = document.documentElement.hasAttribute("data-seedstar-root");
+  const isRoot = document.documentElement.hasAttribute("data-vw-root");
   const decorate = () => {
     for (const select of document.querySelectorAll("select")) select.classList.add("form-select");
   };
@@ -10,14 +10,14 @@
       if (
         e.source !== parent ||
         e.origin !== location.origin ||
-        e.data?.channel !== "seedstar:theme"
+        e.data?.channel !== "vw:theme"
       )
         return;
       for (const [k, v] of Object.entries(e.data.tokens))
         if (/^--[\w-]+$/.test(k))
           document.documentElement.style.setProperty(k, v);
     });
-    parent.postMessage({ channel: "seedstar:theme-ready" }, location.origin);
+    parent.postMessage({ channel: "vw:theme-ready" }, location.origin);
     return;
   }
   const root = document.documentElement;
@@ -45,7 +45,7 @@
     const values = getTokens();
     for (const f of document.querySelectorAll("iframe"))
       f.contentWindow?.postMessage(
-        { channel: "seedstar:theme", tokens: values },
+        { channel: "vw:theme", tokens: values },
         location.origin,
       );
     return values;
@@ -64,7 +64,7 @@
     }
     if (
       e.origin === location.origin &&
-      e.data?.channel === "seedstar:theme-ready" &&
+      e.data?.channel === "vw:theme-ready" &&
       [...document.querySelectorAll("iframe")].some(
         (f) => f.contentWindow === e.source,
       )

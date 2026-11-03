@@ -34,7 +34,7 @@ async function toolShortAnalyze() {
       ? toolSubtitleParse(values.subtitleText)
       : [];
     if (!cues.length) {
-      const response = await SeedStar.request("/transcriptions", {
+      const response = await VideoWorkbench.request("/transcriptions", {
         source,
         language: values.shortLanguage,
       });
@@ -42,7 +42,7 @@ async function toolShortAnalyze() {
     }
     if (!cues.length)
       throw Error("沒有可分析的字幕，請匯入 SRT 或手動新增片段");
-    const result = await SeedStar.request("/tools/short/analyze", {
+    const result = await VideoWorkbench.request("/tools/short/analyze", {
       cues: cues.map(({ start, end, text }) => ({ start, end, text })),
       duration,
       count: Number((draft.shortCount || "5").match(/\d+/)?.[0] || 5),
@@ -66,7 +66,7 @@ async function toolShortAnalyze() {
           ],
         })
     ) {
-      SeedStar.notify("來源或設定已變更，保留目前草稿，請重新分析");
+      VideoWorkbench.notify("來源或設定已變更，保留目前草稿，請重新分析");
       return;
     }
     draft.shortCues = cues;
@@ -170,7 +170,7 @@ async function toolShortAction(action) {
           }
         at += duration;
       }
-      const job = await SeedStar.generations.create({
+      const job = await VideoWorkbench.generations.create({
         type: "video",
         operation: "editor-export",
         settings: {
@@ -179,7 +179,7 @@ async function toolShortAction(action) {
           project: edNative(edNormalizeProject({ title: group[0].title, ratio: "9:16", timebase: { ...Timebase.DEFAULT }, clips, tracks: {} })),
         },
       });
-      SeedStar.showJob(job);
+      VideoWorkbench.showJob(job);
     }
   }
 }

@@ -113,7 +113,7 @@ function productDirectionStep() {
     state.productDuration +
     " 秒　· 約 " +
     Math.max(1, Math.round(state.productDuration / 3)) +
-    ' 個分鏡</span></div><div class="row">' + (SeedStar.capabilities?.videoDurations || [4, 8, 12]).map((seconds) => `<button class="minor" data-gen-product-duration="${seconds}" aria-pressed="${state.productDuration === seconds}">${seconds} 秒</button>`).join("") + '</div></div><div class="product-actions"><button class="minor" data-action="product-back-assets">‹ 上一步</button><button class="box-cta" data-action="product-generate-proposals">產生影片提案　›</button></div></section>'
+    ' 個分鏡</span></div><div class="row">' + (VideoWorkbench.capabilities?.videoDurations || [4, 8, 12]).map((seconds) => `<button class="minor" data-gen-product-duration="${seconds}" aria-pressed="${state.productDuration === seconds}">${seconds} 秒</button>`).join("") + '</div></div><div class="product-actions"><button class="minor" data-action="product-back-assets">‹ 上一步</button><button class="box-cta" data-action="product-generate-proposals">產生影片提案　›</button></div></section>'
   );
 }
 function productProposalStep() {
@@ -162,21 +162,21 @@ function productScriptInput() {
 async function productGenerateScript(refine = "") {
   if (productScriptPending) return;
   const input = productScriptInput();
-  if (!input.proposal) { SeedStar.notify("請先選擇提案"); return; }
+  if (!input.proposal) { VideoWorkbench.notify("請先選擇提案"); return; }
   if (refine) Object.assign(input, { refine, style: state.productScriptStyle, shots: structuredClone(state.productScripts) });
   const original = JSON.stringify(productScriptInput());
   const draftScripts = JSON.stringify([state.productScriptStyle, state.productScripts]);
   productScriptPending = true;
   const buttons = [...document.querySelectorAll('[data-product-refine],[data-action="product-to-script"]')];
   buttons.forEach(b => b.disabled = true);
-  SeedStar.notify(refine ? "正在修改腳本…" : "正在展開提案腳本…");
+  VideoWorkbench.notify(refine ? "正在修改腳本…" : "正在展開提案腳本…");
   try {
-    const result = await SeedStar.request("/products/script", input);
-    if (original !== JSON.stringify(productScriptInput()) || draftScripts !== JSON.stringify([state.productScriptStyle, state.productScripts])) { SeedStar.notify("內容已變更，保留目前草稿；請重新產生。"); return; }
+    const result = await VideoWorkbench.request("/products/script", input);
+    if (original !== JSON.stringify(productScriptInput()) || draftScripts !== JSON.stringify([state.productScriptStyle, state.productScripts])) { VideoWorkbench.notify("內容已變更，保留目前草稿；請重新產生。"); return; }
     if (!Array.isArray(result.shots) || !result.shots.length) throw Error("商品腳本格式不正確");
     state.productScripts = result.shots; state.productScriptStyle = result.style; state.productStep = 3;
     if (state.mode === "product") render();
-  } catch (error) { SeedStar.reportError(error); }
+  } catch (error) { VideoWorkbench.reportError(error); }
   finally { productScriptPending = false; buttons.filter(b => b.isConnected).forEach(b => b.disabled = false); }
 }
 document.addEventListener("click", event => {
@@ -193,7 +193,7 @@ async function productParse() {
     const u = new URL(url);
     if (u.protocol !== "https:")
       throw Error("請使用公開 HTTPS 商品網址");
-    const result = await SeedStar.request("/products/inspect", {
+    const result = await VideoWorkbench.request("/products/inspect", {
       url: u.href,
     });
     if (state.productData !== previousProduct || state.productStep !== 0) return;
@@ -205,15 +205,15 @@ async function productParse() {
     state.productSelectedTexts = [];
     state.productStep = 1;
     render();
-    if (result.note) SeedStar.notify(result.note);
+    if (result.note) VideoWorkbench.notify(result.note);
   } catch (e) {
-    SeedStar.reportError(e);
+    VideoWorkbench.reportError(e);
   } finally { productParsePending = false; if (button?.isConnected) { button.disabled = false; button.textContent = "解析商品網址"; } }
 }
 async function productGenerateProposals() {
   productCollect();
   try {
-    const result = await SeedStar.request("/products/proposals", {
+    const result = await VideoWorkbench.request("/products/proposals", {
       ...productScriptInput(),
     });
     if (!Array.isArray(result.proposals)) throw Error("提案格式不正確");
@@ -223,7 +223,7 @@ async function productGenerateProposals() {
     state.productStep = 2;
     render();
   } catch (e) {
-    SeedStar.reportError(e);
+    VideoWorkbench.reportError(e);
   }
 }
 function productCollect() {
@@ -309,15 +309,15 @@ let productParsePending = false;
 const productImagePending = new Set();
 async function productSelectImage(index) {
   if (state.productSelectedImages.includes(index)) { state.productSelectedImages = state.productSelectedImages.filter(i => i !== index); render(); return; }
-  if (state.productSelectedImages.length >= 9) { SeedStar.notify("最多選擇 9 張商品圖片"); return; }
+  if (state.productSelectedImages.length >= 9) { VideoWorkbench.notify("最多選擇 9 張商品圖片"); return; }
   const url = state.productImages[index];
   if (!url || productImagePending.has(url)) return;
   productImagePending.add(url);
   try {
-    const asset = /^https:/.test(url) ? await SeedStar.request("/products/image", { url }) : { url };
+    const asset = /^https:/.test(url) ? await VideoWorkbench.request("/products/image", { url }) : { url };
     if (state.productImages[index] !== url || state.productSelectedImages.length >= 9) return;
     state.productImages[index] = asset.url; state.productSelectedImages.push(index);
     if (state.mode === "product") render();
-  } catch (error) { SeedStar.reportError(error); }
+  } catch (error) { VideoWorkbench.reportError(error); }
   finally { productImagePending.delete(url); }
 }

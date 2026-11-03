@@ -24,7 +24,7 @@ function fakeReplicate() {
   return { calls, fetchImpl };
 }
 const api = (base) => async (route, body, method = body === undefined ? "GET" : "POST") => {
-  const r = await fetch(base + "/api/seedstar" + route, { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const r = await fetch(base + "/api/vw" + route, { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
   return { status: r.status, body: await r.json() };
 };
 const settle = async (call, id) => {
@@ -77,7 +77,7 @@ const settle = async (call, id) => {
       p.on("pageerror", (e) => errors.push(e.message));
       await p.route("**/*", (r) => (r.request().url().startsWith(base + "/") ? r.continue() : r.abort()));
       await p.goto(base);
-      await p.waitForFunction(() => window.SeedStar?.router);
+      await p.waitForFunction(() => window.VideoWorkbench?.router);
       await p.locator("#assetsNav").click();
       await p.locator("#workspaceUpload").setInputFiles({ name: "去背來源.png", mimeType: "image/png", buffer: png });
       const card = p.locator(".workspace-card").filter({ hasText: "去背來源.png" });
@@ -87,7 +87,7 @@ const settle = async (call, id) => {
       let saved;
       for (let i = 0; i < 100 && !saved; i++, await p.waitForTimeout(200))
         saved = await p.evaluate(async () => {
-          const list = await SeedStar.assets.list(), source = list.find((a) => a.name === "去背來源.png");
+          const list = await VideoWorkbench.assets.list(), source = list.find((a) => a.name === "去背來源.png");
           const result = list.find((a) => a.origin?.kind === "ai_generated" && a.origin.parentAssetId === source?.id);
           return result ? { result, sourceId: source.id } : null;
         });

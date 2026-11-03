@@ -60,7 +60,7 @@ const pass = (label) => {
 
   const { base, server } = await isolatedServer("vw-p2-subtitles-");
   const post = (body) =>
-    fetch(base + "/api/seedstar/subtitles/export", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(async (r) => ({ status: r.status, body: await r.json() }));
+    fetch(base + "/api/vw/subtitles/export", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(async (r) => ({ status: r.status, body: await r.json() }));
   const cues = parse(srt);
   for (const format of ["srt", "vtt"]) {
     const r = await post({ format, cues });

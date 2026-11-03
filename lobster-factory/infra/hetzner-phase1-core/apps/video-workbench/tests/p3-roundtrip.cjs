@@ -47,8 +47,8 @@ async function openProject(page, base) {
 async function waitExportAsset(page, known) {
   for (let i = 0; i < 1200; i++) {
     const found = await page.evaluate(async (known) => {
-      const job = (await SeedStar.generations.list()).filter((j) => j.input?.operation === "editor-export" && !known.includes(j.id)).at(-1);
-      return job ? (await SeedStar.assets.list()).find((a) => a.id === "job-" + job.id) || null : null;
+      const job = (await VideoWorkbench.generations.list()).filter((j) => j.input?.operation === "editor-export" && !known.includes(j.id)).at(-1);
+      return job ? (await VideoWorkbench.assets.list()).find((a) => a.id === "job-" + job.id) || null : null;
     }, known);
     if (found) return found;
     await page.waitForTimeout(250);
@@ -141,7 +141,7 @@ async function waitExportAsset(page, known) {
     await page.locator('input[type="number"][aria-label="目前影格"]').press("Enter");
     await page.getByRole("button", { name: "匯出構圖為參考圖" }).click();
     await waitStatus(page, /已存成參考圖/);
-    const still = await page.evaluate(async () => (await SeedStar.assets.list()).filter((a) => Number.isInteger(a.origin?.frame)).at(-1));
+    const still = await page.evaluate(async () => (await VideoWorkbench.assets.list()).filter((a) => Number.isInteger(a.origin?.frame)).at(-1));
     assert.equal(still.kind, "image");
     assert.match(still.url, /^\/generated\/[a-f0-9-]+\.png$/);
     assert.deepEqual({ kind: still.origin.kind, engine: still.origin.engine, compositionId: still.origin.compositionId, compositionRevision: still.origin.compositionRevision, frame: still.origin.frame }, { kind: "render", engine: "workbench-compositor", compositionId: compId, compositionRevision: 2, frame: 45 });

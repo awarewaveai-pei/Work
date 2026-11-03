@@ -8,7 +8,7 @@ const { isolatedServer } = require("./isolated-server.cjs");
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jTioAAAAASUVORK5CYII=", "base64");
 const env = { REPLICATE_API_TOKEN: "test-only-replicate" };
 const api = (base) => async (route, body) => {
-  const r = await fetch(base + "/api/seedstar" + route, { method: body === undefined ? "GET" : "POST", headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const r = await fetch(base + "/api/vw" + route, { method: body === undefined ? "GET" : "POST", headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
   return { status: r.status, body: await r.json() };
 };
 const settle = async (call, id) => {
@@ -92,12 +92,12 @@ const settle = async (call, id) => {
     try {
       const page = await browser.newPage();
       await page.goto(base + "/");
-      await page.waitForFunction(() => window.SeedStar?.assets);
+      await page.waitForFunction(() => window.VideoWorkbench?.assets);
       const jobId = await page.evaluate(async (data) => {
-        const asset = await SeedStar.request("/uploads", { name: "c.png", data });
-        await SeedStar.assets.save(asset);
-        const job = await SeedStar.generations.create({ type: "image", operation: "remove-bg", prompt: "去背", references: { src: { id: asset.id, url: asset.url } } });
-        await SeedStar.flush();
+        const asset = await VideoWorkbench.request("/uploads", { name: "c.png", data });
+        await VideoWorkbench.assets.save(asset);
+        const job = await VideoWorkbench.generations.create({ type: "image", operation: "remove-bg", prompt: "去背", references: { src: { id: asset.id, url: asset.url } } });
+        await VideoWorkbench.flush();
         return job.id;
       }, "data:image/png;base64," + png.toString("base64"));
       await page.close();
@@ -105,8 +105,8 @@ const settle = async (call, id) => {
       await settle(api(base), jobId);
       const again = await browser.newPage();
       await again.goto(base + "/");
-      await again.waitForFunction((id) => window.SeedStar && SeedStar.assets.list().then((a) => a.some((x) => x.id === "job-" + id)), jobId, { timeout: 20000 });
-      const saved = await again.evaluate((id) => SeedStar.assets.list().then((a) => a.find((x) => x.id === "job-" + id)), jobId);
+      await again.waitForFunction((id) => window.VideoWorkbench && VideoWorkbench.assets.list().then((a) => a.some((x) => x.id === "job-" + id)), jobId, { timeout: 20000 });
+      const saved = await again.evaluate((id) => VideoWorkbench.assets.list().then((a) => a.find((x) => x.id === "job-" + id)), jobId);
       assert.equal(saved.origin.provider, "Replicate");
       console.log("PASS 任務視窗關掉後完成的去背，下次開頁自動成為素材（含來源）");
     } finally {

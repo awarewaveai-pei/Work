@@ -129,14 +129,14 @@ const pass = (label) => {
           ] },
         { revision: 0 },
       );
-      await SeedStar.preferences.set("tools.editor.projects", [legacy]);
-      await SeedStar.flush();
+      await VideoWorkbench.preferences.set("tools.editor.projects", [legacy]);
+      await VideoWorkbench.flush();
     }, asset.url);
     await page.reload();
     await page.waitForFunction(() => typeof ed !== "undefined" && ed.ready);
     const migrated = await page.evaluate(async () => {
       const p = ed.projects.find((x) => x.id === "legacy-tracks"),
-        keys = Object.keys((await SeedStar.backup.export()).preferences || {});
+        keys = Object.keys((await VideoWorkbench.backup.export()).preferences || {});
       return { tracks: p.tracks.map((t) => [t.id, t.kind, t.hidden, t.muted, t.volume, t.normalize]), clip: p.clips[1], kept: keys.some((k) => k.startsWith("tools.editor.projects.pre-tracks-")) };
     });
     assert.deepEqual(migrated.tracks, [
@@ -156,7 +156,7 @@ const pass = (label) => {
     let result = null;
     for (let i = 0; i < 480 && !result; i++) {
       result = await page.evaluate(async () => {
-        const j = (await SeedStar.generations.list()).filter((x) => x.input?.operation === "editor-export").at(-1);
+        const j = (await VideoWorkbench.generations.list()).filter((x) => x.input?.operation === "editor-export").at(-1);
         return j && ["succeeded", "failed"].includes(j.status) ? { status: j.status, error: j.error, tracks: j.input.settings.project.tracks } : null;
       });
       if (!result) await page.waitForTimeout(250);

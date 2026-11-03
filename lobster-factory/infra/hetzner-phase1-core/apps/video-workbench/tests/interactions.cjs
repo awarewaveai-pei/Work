@@ -2,7 +2,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
-  require("node:path").join(require("node:os").tmpdir(), "seedstar-ui-"),
+  require("node:path").join(require("node:os").tmpdir(), "vw-ui-"),
 );
 (async () => {
   const { base } = await require("./isolated-server.cjs").isolatedServer("vw-interactions-");
@@ -12,7 +12,7 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
     acceptDownloads: true,
   });
   const p = await ctx.newPage();
-  await p.route("**/api/seedstar/generations", (r) =>
+  await p.route("**/api/vw/generations", (r) =>
     r.fulfill({
       status: 503,
       json: { error: { message: "測試環境：生成服務尚未設定" } },
@@ -34,7 +34,7 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
   }
   await p.goto(base);
   await p.waitForFunction(
-    () => window.AwareWaveTheme && window.SeedStar?.sanitize,
+    () => window.AwareWaveTheme && window.VideoWorkbench?.sanitize,
   );
   const frame = async (name) => {
     await p.locator("#" + name + "Nav").click();
@@ -42,7 +42,7 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
     await f.locator("body").waitFor();
     await p.waitForFunction(
       (n) =>
-        document.querySelector("#" + n + "Frame").contentWindow.SeedStar
+        document.querySelector("#" + n + "Frame").contentWindow.VideoWorkbench
           ?.sanitize,
       name,
     );
@@ -75,11 +75,11 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
     await f.locator('[data-detail="favorite"]').click();
     await f.locator('[data-detail="add"]').click();
     await p.waitForFunction(async () => {
-      const c = await SeedStar.characters.list();
+      const c = await VideoWorkbench.characters.list();
       return c.length && c[0].favorite && c[0].inLibrary;
     });
     await p.waitForFunction(
-      async () => (await SeedStar.assets.list()).length > 0,
+      async () => (await VideoWorkbench.assets.list()).length > 0,
     );
     await f.locator('[data-detail="back"]').click();
   });
@@ -98,7 +98,7 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
     await f.locator("#charDescription").fill("測試設定");
     await f.locator("#save").click();
     await p.waitForFunction(async () =>
-      (await SeedStar.characters.list()).some((c) => c.name === "測試角色"),
+      (await VideoWorkbench.characters.list()).some((c) => c.name === "測試角色"),
     );
   });
   await test("專案取消後可返回列表", async () => {
@@ -134,7 +134,7 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
     await f.locator("#asset-name").fill("角色 A");
     await f.locator('[data-action="saveAsset"]').click();
     await p.waitForFunction(async () => {
-      const a = await SeedStar.projects.list();
+      const a = await VideoWorkbench.projects.list();
       return (
         a.length &&
         Array.isArray(a[0].assets) &&
@@ -178,7 +178,7 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
     await p.locator("#service-error").waitFor();
     assert.match(await p.locator("#service-error").innerText(), /尚未設定/);
     const jobs = await p.evaluate(
-      () => JSON.parse(localStorage.getItem("seedstar.app.v1")).jobs,
+      () => JSON.parse(localStorage.getItem("vw.app.v1")).jobs,
     );
     assert.equal(jobs.at(-1).status, "blocked");
     await p.locator("#service-error button").click();
@@ -186,7 +186,7 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
   await test("模板透過訊息帶入生成頁", async () => {
     const f = await frame("templates");
     const result = await p.locator("#templatesFrame").evaluate((el) =>
-      el.contentWindow.SeedStar.generator.import({
+      el.contentWindow.VideoWorkbench.generator.import({
         target: "image",
         title: "測試帶入",
         image: new URL("assets/test-image-1.png", location.href).href,
@@ -199,13 +199,13 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
   });
   await test("重新整理保留角色與專案", async () => {
     await p.reload();
-    await p.waitForFunction(() => SeedStar?.characters);
+    await p.waitForFunction(() => VideoWorkbench?.characters);
     assert(
-      (await p.evaluate(() => SeedStar.characters.list())).some(
+      (await p.evaluate(() => VideoWorkbench.characters.list())).some(
         (c) => c.name === "測試角色",
       ),
     );
-    assert((await p.evaluate(() => SeedStar.projects.list())).length === 1);
+    assert((await p.evaluate(() => VideoWorkbench.projects.list())).length === 1);
   });
   await test("桌面與手機無雙重垂直捲軸", async () => {
     for (const width of [1440, 390]) {
@@ -235,7 +235,7 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
     await p.setViewportSize({ width: 1440, height: 900 });
   });
   await p.screenshot({
-    path: process.env.EVIDENCE_DIR + "/seedstar.png",
+    path: process.env.EVIDENCE_DIR + "/vw.png",
     fullPage: true,
   });
   fs.writeFileSync(

@@ -6,9 +6,9 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright"),
     p = await b.newPage();
   p.setDefaultTimeout(8000);
   await p.goto(base);
-  await p.waitForFunction(() => SeedStar?.models);
+  await p.waitForFunction(() => VideoWorkbench?.models);
   const checks = await p.evaluate(() => {
-    const M = SeedStar.models;
+    const M = VideoWorkbench.models;
     let x = M.project({
       id: "p",
       assets: [
@@ -29,7 +29,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright"),
   assert.deepEqual(checks.refs, []);
   console.log("PASS 未顯示素材保留及參考圖刪除投影");
   await p.evaluate(() =>
-    SeedStar.characters.save({
+    VideoWorkbench.characters.save({
       id: "edit",
       name: "原名",
       references: [],
@@ -50,7 +50,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright"),
   await p.locator("#charactersNav").click();
   await f.locator("#save").click();
   await p.waitForFunction(async () =>
-    (await SeedStar.characters.list()).some((x) => x.name === "跨頁修改"),
+    (await VideoWorkbench.characters.list()).some((x) => x.name === "跨頁修改"),
   );
   console.log("PASS 跨頁快照後仍按ID保存角色");
   await p.locator("#toolsNav").click();

@@ -1,6 +1,6 @@
 const assert = require("node:assert/strict"), fs = require("node:fs"), os = require("node:os"), path = require("node:path");
 const { chromium } = require("playwright");
-const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "seedstar-buttons-test-"));
+const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "vw-buttons-test-"));
 (async () => {
   const server = require("../server.cjs").createServer({ dataDir: path.join(evidence, "data"), env: {}, fetchImpl: async () => { throw Error("Provider calls forbidden"); } });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
@@ -11,12 +11,12 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "seedstar-buttons-test-")
     p.setDefaultTimeout(6000);
     const errors = [], requests = []; p.on("pageerror", (e) => errors.push(e.message));
     await p.route("**/*", (r) => r.request().url().startsWith(base + "/") ? r.continue() : r.abort());
-    await p.goto(base); await p.waitForFunction(() => window.SeedStar?.generator?.controlsReady);
+    await p.goto(base); await p.waitForFunction(() => window.VideoWorkbench?.generator?.controlsReady);
     await p.evaluate(async () => {
-      await SeedStar.assets.save({ id: "test-image", name: "人物測試圖", kind: "image", url: "/assets/test-image-1.png", type: "image/png" });
-      await SeedStar.assets.save({ id: "test-video", name: "短影片", kind: "video", duration: 8, url: "/generated/test.mp4", type: "video/mp4" });
-      await SeedStar.characters.save({ id: "test-character", name: "測試角色", image: "/assets/test-image-2.png" });
-      await SeedStar.preferences.set("workspace.skills", [{ id: "test-skill", name: "自訂驗證", prompt: "CUSTOM_INSTRUCTION" }]);
+      await VideoWorkbench.assets.save({ id: "test-image", name: "人物測試圖", kind: "image", url: "/assets/test-image-1.png", type: "image/png" });
+      await VideoWorkbench.assets.save({ id: "test-video", name: "短影片", kind: "video", duration: 8, url: "/generated/test.mp4", type: "video/mp4" });
+      await VideoWorkbench.characters.save({ id: "test-character", name: "測試角色", image: "/assets/test-image-2.png" });
+      await VideoWorkbench.preferences.set("workspace.skills", [{ id: "test-skill", name: "自訂驗證", prompt: "CUSTOM_INSTRUCTION" }]);
     });
     const panel = p.locator("#popover");
     for (const mode of ["reference", "cartoon", "image", "spoken", "reshoot"]) {
@@ -43,12 +43,12 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "seedstar-buttons-test-")
     }
     for (const size of ["小", "中", "大"]) await p.locator(`[data-gen-subtitle-option="size"][data-value="${size}"]`).click();
     for (const position of ["下方", "中下", "中間", "上方"]) await p.locator(`[data-gen-subtitle-option="position"][data-value="${position}"]`).click();
-    const subtitle = (await p.evaluate(() => SeedStar.generator.getDraft())).subtitleOptions;
+    const subtitle = (await p.evaluate(() => VideoWorkbench.generator.getDraft())).subtitleOptions;
     assert.deepEqual(subtitle, { languages: ["原文", "English"], style: "黃字黑邊", size: "大", position: "上方" });
     await p.screenshot({ path: path.join(evidence, "subtitles.png"), fullPage: true });
     await p.locator('[data-mode="image"]').click(); await p.locator('[data-mode="reference"]').click();
-    assert.deepEqual((await p.evaluate(() => SeedStar.generator.getDraft())).subtitleOptions, subtitle);
-    await p.evaluate(async () => { SeedStar.capabilities.video = true; });
+    assert.deepEqual((await p.evaluate(() => VideoWorkbench.generator.getDraft())).subtitleOptions, subtitle);
+    await p.evaluate(async () => { VideoWorkbench.capabilities.video = true; });
     await p.locator("#prompt").fill("不支援字幕時不得送供應商");
     await p.locator("#send").click(); await p.getByRole("alert").waitFor();
     assert.match(await p.getByRole("alert").innerText(), /字幕/);
@@ -63,15 +63,15 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "seedstar-buttons-test-")
     await p.locator('[data-gen-skill="system:review"]').click();
     await p.locator('[data-gen-skill-tab="custom"]').click(); await p.locator('[data-gen-skill="custom:test-skill"]').click();
     await p.locator('[data-panel="skill"]').click();
-    await p.route("**/api/seedstar/generations", (r) => { requests.push(r.request().postDataJSON()); return r.fulfill({ json: { id: "test-generation", type: "video", status: "queued" } }); });
+    await p.route("**/api/vw/generations", (r) => { requests.push(r.request().postDataJSON()); return r.fulfill({ json: { id: "test-generation", type: "video", status: "queued" } }); });
     await p.locator("#send").click(); await p.locator(".job-view").waitFor();
     assert.equal(requests.length, 1); assert.equal(requests[0].settings.skills.length, 5);
     assert.match(requests[0].prompt, /CUSTOM_INSTRUCTION/);
     assert(!requests[0].prompt.includes("以日常使用情境"));
     await p.locator(".job-view").getByRole("button", { name: "關閉", exact: true }).click();
     await p.evaluate(() => generatorApplyPreset({ settings: { skill: "自訂驗證" } }));
-    assert.deepEqual((await p.evaluate(() => SeedStar.generator.getDraft())).skills, []);
-    assert.deepEqual((await p.evaluate(() => SeedStar.generator.getDraft())).subtitleOptions, { languages: ["原文"], style: "白字黑邊", size: "中", position: "下方" });
+    assert.deepEqual((await p.evaluate(() => VideoWorkbench.generator.getDraft())).skills, []);
+    assert.deepEqual((await p.evaluate(() => VideoWorkbench.generator.getDraft())).subtitleOptions, { languages: ["原文"], style: "白字黑邊", size: "中", position: "下方" });
     await p.locator('[data-panel="skill"]').click();
     await p.locator('[data-gen-skill-tab="custom"]').click();
     assert.equal(await p.locator('[data-gen-skill="custom:test-skill"]').getAttribute("aria-checked"), "true");
@@ -117,7 +117,7 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "seedstar-buttons-test-")
     assert.equal(await p.locator('[data-action="voice-select"]').count(), 6);
     await p.locator('[data-action="spoken-back"]').click();
     await p.locator("#prompt").fill("請聯絡 @");
-    assert.equal((await p.evaluate(() => SeedStar.generator.getDraft())).spokenPanel, "none");
+    assert.equal((await p.evaluate(() => VideoWorkbench.generator.getDraft())).spokenPanel, "none");
     assert.equal(await p.locator("#prompt").evaluate((node) => node === document.activeElement), true);
     await p.locator('[data-action="mention"]').click();
     await p.locator('[data-action="cast-tab"][data-value="search"]').click();

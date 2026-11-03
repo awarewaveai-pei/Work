@@ -8,7 +8,7 @@ const cube = ["LUT_3D_SIZE 2", ...[0, 1].flatMap((b) => [0, 1].flatMap((g) => [0
 
 (async () => {
   const { base } = await isolatedServer("vw-p2-fixes-");
-  const up = await fetch(base + "/api/seedstar/uploads", {
+  const up = await fetch(base + "/api/vw/uploads", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name: "反紅.cube", data: "data:application/x-cube;base64," + Buffer.from(cube).toString("base64") }),

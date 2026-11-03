@@ -1,6 +1,6 @@
 const assert = require("node:assert/strict"), fs = require("node:fs"), os = require("node:os"), path = require("node:path"), crypto = require("node:crypto");
 const { chromium } = require("playwright");
-const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "seedstar-deep-actions-"));
+const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "vw-deep-actions-"));
 (async () => {
   const server = require("../server.cjs").createServer({ dataDir: path.join(evidence, "data"), env: {}, fetchImpl: async () => { throw Error("No provider calls permitted"); } });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
@@ -14,9 +14,9 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "seedstar-deep-actions-")
       if (r.request().url().includes("/generations") && r.request().method() === "POST") { generations.push(r.request().url()); return r.abort(); }
       return r.request().url().startsWith(base + "/") ? r.continue() : r.abort();
     });
-    await p.goto(base); await p.waitForFunction(() => window.SeedStar?.generator?.controlsReady);
+    await p.goto(base); await p.waitForFunction(() => window.VideoWorkbench?.generator?.controlsReady);
     await p.evaluate(async () => {
-      for (const id of ["a", "b"]) await SeedStar.assets.save({ id, name: "圖片 " + id, kind: "image", type: "image/png", url: "/assets/image-" + (id === "a" ? 1 : 2) + ".png" });
+      for (const id of ["a", "b"]) await VideoWorkbench.assets.save({ id, name: "圖片 " + id, kind: "image", type: "image/png", url: "/assets/image-" + (id === "a" ? 1 : 2) + ".png" });
     });
     await p.locator('[data-action="library"]').click();
     const picker = p.locator(".asset-workspace");
@@ -34,34 +34,34 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "seedstar-deep-actions-")
     await p.locator("#closeModal").click();
     console.log("PASS 素材勾選清除、取消替換、單選立即替換、數量／編號不變、真實下載");
     await p.locator("#prompt").fill("保留清除前內容");
-    const before = await p.evaluate(() => SeedStar.generator.getDraft());
+    const before = await p.evaluate(() => VideoWorkbench.generator.getDraft());
     await p.locator('[data-action="clear"]').click(); assert.equal(await p.locator(".reference-selected").count(), 0);
     await p.locator(".generator-clear-notice").getByRole("button", { name: "復原" }).click();
     assert.equal(await p.locator("#prompt").inputValue(), before.data.reference);
-    assert.deepEqual((await p.evaluate(() => SeedStar.generator.getDraft())).refs.reference, before.refs.reference);
+    assert.deepEqual((await p.evaluate(() => VideoWorkbench.generator.getDraft())).refs.reference, before.refs.reference);
     await p.locator('[data-action="clear"]').click(); await p.locator("#prompt").fill("清除後的新內容");
     await p.locator(".generator-clear-notice").getByRole("button", { name: "復原" }).click();
     assert.equal(await p.locator("#prompt").inputValue(), "清除後的新內容");
     console.log("PASS 清除可復原提示詞與整組素材，新輸入不會被復原覆蓋");
 
     const job = { id: "result-test", type: "image", status: "succeeded", result: { url: "/assets/test-image-1.png", width: 1024, height: 1024 }, input: { type: "image", mode: "image", prompt: "原始成果提示詞", settings: { model: "old-model", ratio: "9:16", quality: "2K", skill: "不套用技能" }, references: { images: [{ id: "original-reference", name: "原參考", kind: "image", type: "image/png", url: "/assets/test-image-2.png" }] } } };
-    const show = () => p.evaluate((value) => SeedStar.showJob(value), job);
+    const show = () => p.evaluate((value) => VideoWorkbench.showJob(value), job);
     await show(); await p.getByRole("button", { name: "重新生成（先還原設定）", exact: true }).click();
     assert.equal(await p.locator("#prompt").inputValue(), job.input.prompt);
     assert.match(await p.locator("#outputBtn").innerText(), /9:16 · 2K/);
     assert.match(await p.locator(".uploads img").first().getAttribute("src"), /image-2/);
-    assert.equal((await p.evaluate(() => SeedStar.generator.getDraft())).mode, "image");
-    assert.notEqual((await p.evaluate(() => SeedStar.generator.getDraft())).model.image, "old-model");
+    assert.equal((await p.evaluate(() => VideoWorkbench.generator.getDraft())).mode, "image");
+    assert.notEqual((await p.evaluate(() => VideoWorkbench.generator.getDraft())).model.image, "old-model");
     await show(); await p.getByRole("button", { name: "用於生成（首幀）", exact: true }).click();
-    let draft = await p.evaluate(() => SeedStar.generator.getDraft());
+    let draft = await p.evaluate(() => VideoWorkbench.generator.getDraft());
     assert.equal(draft.mode, "reference"); assert.equal(draft.refType, "first"); assert.equal(draft.refs.reference.firstFrame[0].url, job.result.url);
     await show(); await p.getByRole("button", { name: "模仿動作", exact: true }).click();
-    draft = await p.evaluate(() => SeedStar.generator.getDraft()); assert.equal(draft.refType, "motion"); assert.equal(draft.refs.reference.motionImage[0].url, job.result.url);
+    draft = await p.evaluate(() => VideoWorkbench.generator.getDraft()); assert.equal(draft.refType, "motion"); assert.equal(draft.refs.reference.motionImage[0].url, job.result.url);
     await show(); await p.getByRole("button", { name: "建立口播影片", exact: true }).click();
     await p.locator('[data-action="cast-clear"]').click();
-    draft = await p.evaluate(() => SeedStar.generator.getDraft()); assert.equal(draft.cast, "");
+    draft = await p.evaluate(() => VideoWorkbench.generator.getDraft()); assert.equal(draft.cast, "");
     await p.locator('[data-action="voice"]').click(); await p.locator('[data-action="voice-select"]').first().click(); await p.locator('[data-action="voice-clear"]').click();
-    assert.equal((await p.evaluate(() => SeedStar.generator.getDraft())).voice, "");
+    assert.equal((await p.evaluate(() => VideoWorkbench.generator.getDraft())).voice, "");
     console.log("PASS 成果重新生成只還原全部設定、不換供應商；首幀／動作／口播帶入與個別清除");
     await show(); await p.getByRole("button", { name: "編輯圖片", exact: true }).click();
     const tool = p.frameLocator("#toolsFrame");
@@ -75,15 +75,15 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "seedstar-deep-actions-")
     console.log("PASS 成果圖片真實帶入局部編輯器與配音工具，所有結果操作皆零生成請求");
     await p.locator("#generatorNav").click();
     for (const operation of ["character-image", "character-test", "project-shot", "image-output"]) {
-      await p.evaluate(({ operation, job }) => SeedStar.generator.import({ intent: "restore-job", job: { ...job, input: { ...job.input, operation, references: { src: { url: "/assets/test-image-1.png" } } } } }), { operation, job });
-      assert.equal((await p.evaluate(() => SeedStar.generator.getDraft())).mode, "image");
+      await p.evaluate(({ operation, job }) => VideoWorkbench.generator.import({ intent: "restore-job", job: { ...job, input: { ...job.input, operation, references: { src: { url: "/assets/test-image-1.png" } } } } }), { operation, job });
+      assert.equal((await p.evaluate(() => VideoWorkbench.generator.getDraft())).mode, "image");
     }
-    await p.evaluate(() => SeedStar.generator.import({ intent: "restore-job", job: { type: "audio", input: { operation: "separate", references: { src: { url: "/generated/test.mp4" } }, settings: {} } } }));
+    await p.evaluate(() => VideoWorkbench.generator.import({ intent: "restore-job", job: { type: "audio", input: { operation: "separate", references: { src: { url: "/generated/test.mp4" } }, settings: {} } } }));
     await tool.locator('video[data-flow-media="src"]').waitFor(); // 音軌分離 uses the workflow screen (wfSource), not #stage
     await p.locator("#generatorNav").click();
     const directorJob = { ...job, type: "video", input: { type: "video", mode: "director", prompt: "還原的全新腳本", settings: { duration: 8 } } };
-    await p.evaluate(j => SeedStar.generator.import({ intent: "restore-job", job: j }), directorJob);
-    draft = await p.evaluate(() => SeedStar.generator.getDraft());
+    await p.evaluate(j => VideoWorkbench.generator.import({ intent: "restore-job", job: j }), directorJob);
+    draft = await p.evaluate(() => VideoWorkbench.generator.getDraft());
     assert.equal(draft.directorMessages.length, 2); assert.match(draft.directorMessages[0].text, /還原的全新腳本/);
     console.log("PASS 角色／專案／圖片後處理還原與無提示詞音軌工具；導演還原建立獨立腳本上下文");
     await p.locator("#generatorNav").click(); await show();

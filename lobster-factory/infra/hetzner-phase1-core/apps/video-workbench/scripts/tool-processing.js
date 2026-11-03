@@ -39,7 +39,7 @@ async function submitTool() {
       ctx.textBaseline = "middle";
       ctx.fillText(text, 300, 70, 550);
       const blob = await new Promise((r) => canvas.toBlob(r, "image/png"));
-      files.ctaImage = await SeedStar.uploadAsset(
+      files.ctaImage = await VideoWorkbench.uploadAsset(
         new File([blob], "cta.png", { type: "image/png" }),
       );
     }
@@ -84,7 +84,7 @@ async function submitTool() {
       const ctx = canvas.getContext("2d");
       ctx.drawImage(image, 0, 0);
       const png = await new Promise((r) => canvas.toBlob(r, "image/png"));
-      const reference = await SeedStar.uploadAsset(
+      const reference = await VideoWorkbench.uploadAsset(
         new File([png], "region-source.png", { type: "image/png" }),
       );
       ctx.fillStyle = "white";
@@ -98,14 +98,14 @@ async function submitTool() {
           r.h * canvas.height,
         );
       mask = (
-        await SeedStar.request("/uploads", {
+        await VideoWorkbench.request("/uploads", {
           name: "region-mask.png",
           data: canvas.toDataURL("image/png"),
         })
       ).url;
       references = { images: [reference] };
     }
-    const job = await SeedStar.generations.create({
+    const job = await VideoWorkbench.generations.create({
       type,
       prompt,
       operation: tool,
@@ -114,8 +114,8 @@ async function submitTool() {
       mask,
       selection,
     });
-    SeedStar.showJob(job);
+    VideoWorkbench.showJob(job);
   } catch (e) {
-    SeedStar.reportError(e);
+    VideoWorkbench.reportError(e);
   }
 }

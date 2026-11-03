@@ -36,9 +36,9 @@ async function uploadThroughPane(page, pane, button, file) {
 async function waitExportAsset(page) {
   for (let i = 0; i < 1200; i++) {
     const found = await page.evaluate(async () => {
-      const job = (await SeedStar.generations.list()).filter((j) => j.input?.operation === "editor-export").at(-1);
+      const job = (await VideoWorkbench.generations.list()).filter((j) => j.input?.operation === "editor-export").at(-1);
       if (!job?.id) return null;
-      const asset = (await SeedStar.assets.list()).find((a) => a.id === "job-" + job.id);
+      const asset = (await VideoWorkbench.assets.list()).find((a) => a.id === "job-" + job.id);
       return asset ? { asset, jobId: job.id } : null;
     });
     if (found) return found;
@@ -120,13 +120,13 @@ async function exportProject(page) {
 
     // Old editor still usable: a pre-M3 (seconds-only) project opens and exports unchanged.
     const old = await isolatedServer("vw-p1-legacy-");
-    const up = await fetch(old.base + "/api/seedstar/uploads", {
+    const up = await fetch(old.base + "/api/vw/uploads", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: "舊片段.mp4", data: "data:video/mp4;base64," + fs.readFileSync(video).toString("base64") }),
     }).then((r) => r.json());
     const legacy = [{ id: "legacy-project", title: "舊專案", ratio: "16:9", clips: [{ id: "old-clip", kind: "video", track: "V1", asset: { url: up.url, name: "舊片段" }, start: 0, duration: 2, sourceStart: 0.5, speed: 1 }], assets: [], tracks: {}, markers: [] }];
-    const put = await fetch(old.base + "/api/seedstar/state", {
+    const put = await fetch(old.base + "/api/vw/state", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ version: 1, revision: 0, characters: [], projects: [], assets: [], jobs: [], selection: {}, preferences: { "tools.editor.projects": legacy } }),

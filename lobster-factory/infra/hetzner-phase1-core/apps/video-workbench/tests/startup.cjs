@@ -13,7 +13,7 @@ const root = path.resolve(__dirname, "..");
     await page.goto(pathToFileURL(path.join(root, "index.html")).href);
     await page.getByRole("heading", { name: "請從 start.cmd 啟動工作台" }).waitFor({ timeout: 2500 });
     assert.equal(await page.locator("iframe").count(), 0);
-    assert.equal(await page.evaluate(() => !!window.SeedStar), false);
+    assert.equal(await page.evaluate(() => !!window.VideoWorkbench), false);
     console.log("PASS direct index.html shows the startup instructions instead of a blank tool page");
 
     const { start } = require("../scripts/launch.cjs");
@@ -30,7 +30,7 @@ const root = path.resolve(__dirname, "..");
     app = running.server;
     assert.equal(opened, true);
     await page.goto(running.url);
-    await page.waitForFunction(() => !!window.SeedStar?.router);
+    await page.waitForFunction(() => !!window.VideoWorkbench?.router);
     await page.locator("#toolsNav").click();
     const tools = page.frameLocator("#toolsFrame");
     await tools.getByRole("heading", { name: "應用工具", exact: true }).waitFor();

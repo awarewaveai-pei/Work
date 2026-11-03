@@ -2,7 +2,7 @@ const { chromium } = require("playwright"),
   assert = require("node:assert/strict");
 const fs = require("node:fs"), os = require("node:os"), path = require("node:path");
 (async () => {
-  const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "seedstar-generation-flows-"));
+  const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "vw-generation-flows-"));
   const server = require("../server.cjs").createServer({ dataDir: path.join(evidence, "data"), env: { OPENAI_API_KEY: "test-only" }, fetchImpl: async () => { throw Error("Provider forbidden"); } });
   await new Promise(r => server.listen(0, "127.0.0.1", r));
   const base = "http://127.0.0.1:" + server.address().port;
@@ -12,9 +12,9 @@ const fs = require("node:fs"), os = require("node:os"), path = require("node:pat
   const calls = [],
     errors = [];
   p.on("pageerror", (e) => errors.push(e.message));
-  await p.route("**/api/seedstar/**", async (r) => {
+  await p.route("**/api/vw/**", async (r) => {
     const url = new URL(r.request().url()),
-      route = url.pathname.replace("/api/seedstar", "");
+      route = url.pathname.replace("/api/vw", "");
     // /state is the workbench's own storage since card M2, not an AI call: let it reach the test server.
     if (route === "/uploads" || route === "/capabilities" || route === "/state") return r.continue();
     const body = r.request().postDataJSON();
@@ -101,7 +101,7 @@ const fs = require("node:fs"), os = require("node:os"), path = require("node:pat
     await f.getByRole("button", { name: "設為角色聲音" }).click();
     await f.locator("#save").click();
     await p.waitForFunction(async () =>
-      (await SeedStar.characters.list()).some(
+      (await VideoWorkbench.characters.list()).some(
         (c) => c.name === "語音角色" && c.voice?.url,
       ),
     );
@@ -110,7 +110,7 @@ const fs = require("node:fs"), os = require("node:os"), path = require("node:pat
     const tools = p.frameLocator("#toolsFrame");
     await tools.locator('[data-act="open:subtitle"]').click();
     const output = await p.locator("#toolsFrame").evaluate((el) => {
-      const S = el.contentWindow.SeedStar;
+      const S = el.contentWindow.VideoWorkbench;
       const vtt = S.convertSubtitles(
         "1\n00:00:00,000 --> 00:00:01,200\n你好",
         "vtt",
@@ -176,7 +176,7 @@ const fs = require("node:fs"), os = require("node:os"), path = require("node:pat
         throw new DOMException("quota test", "QuotaExceededError");
       };
       try {
-        const job = await SeedStar.generations.create({
+        const job = await VideoWorkbench.generations.create({
           type: "image",
           prompt: "儲存失敗仍保留已接收任務",
         });

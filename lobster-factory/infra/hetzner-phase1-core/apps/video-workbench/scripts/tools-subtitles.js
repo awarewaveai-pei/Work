@@ -241,7 +241,7 @@ document.addEventListener("change", (event) => {
     event.target.value = toolSubtitleStamp(
       event.target.dataset.subtitleStart !== undefined ? cue.start : cue.end,
     );
-    SeedStar.reportError(error);
+    VideoWorkbench.reportError(error);
   }
 });
 document.addEventListener("click", async (event) => {
@@ -325,7 +325,7 @@ document.addEventListener("click", async (event) => {
           values.subtitleFirstLine === "原文"
             ? null
             : values.subtitleTranslations[values.subtitleFirstLine];
-      SeedStar.download(
+      VideoWorkbench.download(
         "subtitles." + format,
         toolSubtitleSerialize(cues, format, translated),
         "text/plain;charset=utf-8",
@@ -340,7 +340,7 @@ document.addEventListener("click", async (event) => {
       toolSubtitlePending = true;
       button.disabled = true;
       try {
-        const response = await SeedStar.request("/transcriptions", {
+        const response = await VideoWorkbench.request("/transcriptions", {
           source: originalFile,
           language: values.subtitleLanguage,
         });
@@ -348,7 +348,7 @@ document.addEventListener("click", async (event) => {
           files.src !== originalFile ||
           values.subtitleText !== originalText
         ) {
-          SeedStar.notify("來源或字幕已改變，保留目前內容，請重新辨識。");
+          VideoWorkbench.notify("來源或字幕已改變，保留目前內容，請重新辨識。");
           return;
         }
         values.subtitleCues = toolSubtitleParse(response.srt);
@@ -374,7 +374,7 @@ document.addEventListener("click", async (event) => {
           size = 0;
         const send = async () => {
           if (!batch.length) return;
-          const result = await SeedStar.request("/tools/subtitles/translate", {
+          const result = await VideoWorkbench.request("/tools/subtitles/translate", {
             language,
             cues: batch,
           });
@@ -393,7 +393,7 @@ document.addEventListener("click", async (event) => {
         }
         await send();
         if (fingerprint !== JSON.stringify(values.subtitleCues)) {
-          SeedStar.notify("字幕內容已改變，保留目前草稿，請重新翻譯。");
+          VideoWorkbench.notify("字幕內容已改變，保留目前草稿，請重新翻譯。");
           return;
         }
         values.subtitleTranslations[language] = translated;
@@ -426,7 +426,7 @@ document.addEventListener("click", async (event) => {
                   ] || "")
             : ""),
       }));
-      const job = await SeedStar.generations.create({
+      const job = await VideoWorkbench.generations.create({
         type: "video",
         operation: "subtitle-burn",
         references: { src: files.src },
@@ -440,9 +440,9 @@ document.addEventListener("click", async (event) => {
           height: files.src.height,
         },
       });
-      SeedStar.showJob(job);
+      VideoWorkbench.showJob(job);
     }
   } catch (error) {
-    SeedStar.reportError(error);
+    VideoWorkbench.reportError(error);
   }
 });

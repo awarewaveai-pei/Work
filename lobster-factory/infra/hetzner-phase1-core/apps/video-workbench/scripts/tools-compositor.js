@@ -1,7 +1,7 @@
 // Card P3 (handoff §4.3 動態字幕／片頭動畫, §4.5): the 動畫合成 workspace. Layer list | canvas + transport + mini
 // timeline | inspector. The canvas is drawn by Compositor.renderFrame (shared/compositor.js); output renders every
 // frame with the same function on the same canvas and streams PNGs to backend/compositor-render.cjs, so the preview
-// of frame N is the output's frame N. Compositions live in the server ledger (SeedStar.compositions), with a
+// of frame N is the output's frame N. Compositions live in the server ledger (VideoWorkbench.compositions), with a
 // revision and the last 20 previous revisions. Visible buttons only, no <select>.
 const cp = {
   ready: false,
@@ -86,7 +86,7 @@ const cpRid = () => Math.random().toString(36).slice(2, 10);
 
 // ---- data -------------------------------------------------------------------------------------------------
 async function cpLoad() {
-  cp.list = (await SeedStar.compositions.list()).map((c) =>
+  cp.list = (await VideoWorkbench.compositions.list()).map((c) =>
     Compositor.normalize(c),
   );
   // Card P4: rig layers draw from the characters' rigs (scripts/tools-rig.js).
@@ -99,7 +99,7 @@ function cpBoot() {
     .then(() => {
       if (tool === "compose" || tool === "edit") render();
     })
-    .catch(SeedStar.reportError)
+    .catch(VideoWorkbench.reportError)
     .finally(() => (cp.loading = null));
   return cp.loading;
 }
@@ -127,7 +127,7 @@ async function cpSave() {
     history: saved ? [cpStrip(saved), ...saved.history].slice(0, 20) : [],
     updatedAt: new Date().toISOString(),
   };
-  await SeedStar.compositions.save(next);
+  await VideoWorkbench.compositions.save(next);
   const normal = Compositor.normalize(next);
   cp.list = [...cp.list.filter((c) => c.id !== doc.id), normal];
   cp.doc = Compositor.normalize(next);
@@ -146,7 +146,7 @@ async function cpRestore() {
     history: [cpStrip(saved), ...rest].slice(0, 20),
     updatedAt: new Date().toISOString(),
   };
-  await SeedStar.compositions.save(next);
+  await VideoWorkbench.compositions.save(next);
   cp.list = [
     ...cp.list.filter((c) => c.id !== saved.id),
     Compositor.normalize(next),
@@ -544,7 +544,7 @@ async function cpRenderOutput(doc, canvas) {
     height: doc.height,
   });
   await cpOutputMedia(doc);
-  const session = await SeedStar.request("/compositor/renders", {
+  const session = await VideoWorkbench.request("/compositor/renders", {
     width: doc.width,
     height: doc.height,
     fps: doc.timebase,
@@ -569,7 +569,7 @@ async function cpRenderOutput(doc, canvas) {
       sent = performance.now();
     const flush = async () => {
       if (!batch.length) return;
-      await SeedStar.request("/compositor/renders/" + session.id + "/frames", {
+      await VideoWorkbench.request("/compositor/renders/" + session.id + "/frames", {
         start,
         frames: batch,
       });
@@ -594,7 +594,7 @@ async function cpRenderOutput(doc, canvas) {
       cp.render.done = f + 1;
       cpProgress();
     }
-    const stored = await SeedStar.request(
+    const stored = await VideoWorkbench.request(
       "/compositor/renders/" + session.id + "/finish",
       {
         compositionId: doc.id,
@@ -602,13 +602,13 @@ async function cpRenderOutput(doc, canvas) {
         ...cpSources(doc),
       },
     );
-    return await SeedStar.assets.save({
+    return await VideoWorkbench.assets.save({
       ...stored,
       name: `${doc.title} · 第 ${doc.revision} 版`,
       createdAt: new Date().toISOString(),
     });
   } catch (e) {
-    await SeedStar.request(
+    await VideoWorkbench.request(
       "/compositor/renders/" + session.id + "/cancel",
       {},
     ).catch(() => {});
@@ -620,7 +620,7 @@ async function cpRenderOutput(doc, canvas) {
 }
 // The library asset already rendered from this exact revision, if any.
 async function cpRendered(doc) {
-  const rows = await SeedStar.assets.list();
+  const rows = await VideoWorkbench.assets.list();
   return (
     rows
       .filter(
@@ -655,14 +655,14 @@ async function cpStill() {
   if (missing.length) throw Error("缺少字型：" + missing.join("、"));
   await cpOutputMedia(doc);
   await cpDraw(canvas, doc, cp.frame);
-  const stored = await SeedStar.request("/compositor/stills", {
+  const stored = await VideoWorkbench.request("/compositor/stills", {
     data: canvas.toDataURL("image/png"),
     compositionId: doc.id,
     compositionRevision: doc.revision,
     frame: cp.frame,
     ...cpSources(doc),
   });
-  const asset = await SeedStar.assets.save({
+  const asset = await VideoWorkbench.assets.save({
     ...stored,
     name: `${doc.title} 構圖 · 第 ${cp.frame} 格`,
     createdAt: new Date().toISOString(),
@@ -1030,7 +1030,7 @@ function toolCompositorScreen(t) {
 function toolCompositorAfterRender() {
   cpProgress();
   cpBuildCurve();
-  cpPaint().catch(SeedStar.reportError);
+  cpPaint().catch(VideoWorkbench.reportError);
 }
 // The curve editor: SVG built here (the sanitizer only passes HTML), two draggable handles = cubic-bezier.
 function cpBuildCurve() {
@@ -1196,12 +1196,12 @@ function cpPoints(text) {
   return pts;
 }
 async function cpPickMedia(l) {
-  const rows = await SeedStar.pickAssets({ kind: l.kind });
+  const rows = await VideoWorkbench.pickAssets({ kind: l.kind });
   const a = rows?.[0];
   if (!a) return;
   if (
-    !SeedStar.safeUrl(a.url) ||
-    (a.previewUrl && !SeedStar.safeUrl(a.previewUrl))
+    !VideoWorkbench.safeUrl(a.url) ||
+    (a.previewUrl && !VideoWorkbench.safeUrl(a.previewUrl))
   )
     throw Error("素材網址無效");
   l.url = a.url;
@@ -1304,7 +1304,7 @@ async function cpAction(action) {
   }
   if (name === "play") {
     if (cp.playing) cp.playing = false;
-    else cpPlay().catch(SeedStar.reportError);
+    else cpPlay().catch(VideoWorkbench.reportError);
     return render();
   }
   if (name === "frame") {
@@ -1353,7 +1353,7 @@ async function cpAction(action) {
     cp.key = null;
     cpTouch();
     if (kind === "image" || kind === "video")
-      await cpPickMedia(layer).catch(SeedStar.reportError);
+      await cpPickMedia(layer).catch(VideoWorkbench.reportError);
     return render();
   }
   if (name === "layer") {
@@ -1648,7 +1648,7 @@ document.addEventListener("click", (e) => {
     cp.status = error.message;
     const box = document.querySelector("[data-cp-status]");
     if (box) box.textContent = error.message;
-    SeedStar.reportError(error);
+    VideoWorkbench.reportError(error);
   });
 });
 document.addEventListener("change", (e) => {
@@ -1666,7 +1666,7 @@ document.addEventListener("change", (e) => {
     return;
   cpField(el).catch((error) => {
     cp.status = error.message;
-    SeedStar.reportError(error);
+    VideoWorkbench.reportError(error);
   });
 });
 // Mini timeline: drag a key diamond to move it (commits on release).
@@ -1722,7 +1722,7 @@ document.addEventListener("input", (e) => {
     if (input) input.value = cp.frame;
     if (clock)
       clock.textContent = (cp.frame / cpFps(cp.doc)).toFixed(2) + " 秒";
-    cpPaint().catch(SeedStar.reportError);
+    cpPaint().catch(VideoWorkbench.reportError);
   }
 });
 // Loaded after tools-0.js (so the other tools render without waiting for this file): a page opened at #compose

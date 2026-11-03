@@ -1,6 +1,6 @@
 (async () => {
-  await SeedStar.ready;
-  try { SeedStar.capabilities = await SeedStar.request('/capabilities', undefined, 'GET'); } catch (error) { SeedStar.reportError(error); }
+  await VideoWorkbench.ready;
+  try { VideoWorkbench.capabilities = await VideoWorkbench.request('/capabilities', undefined, 'GET'); } catch (error) { VideoWorkbench.reportError(error); }
   for (const item of []) {
     document.getElementById(item.id).textContent = JSON.stringify(
       await (await fetch(item.url)).json(),
@@ -15,4 +15,4 @@
       document.body.append(s);
     });
   }
-})().catch(SeedStar.reportError);
+})().catch(VideoWorkbench.reportError);

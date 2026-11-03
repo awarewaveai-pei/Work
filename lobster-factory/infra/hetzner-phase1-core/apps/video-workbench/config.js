@@ -1,5 +1,5 @@
-window.SEEDSTAR_CONFIG = {
+window.VW_CONFIG = {
   mode: "local",
-  apiBaseUrl: "/api/seedstar",
+  apiBaseUrl: "/api/vw",
   timeoutMs: 15000,
 };

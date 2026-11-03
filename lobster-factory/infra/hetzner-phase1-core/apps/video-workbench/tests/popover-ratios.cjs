@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict'), fs = require('node:fs'), os = require('node:os'), path = require('node:path');
 const { chromium } = require('playwright');
 (async () => {
-  const evidence = fs.mkdtempSync(path.join(os.tmpdir(), 'seedstar-popover-ratios-test-'));
+  const evidence = fs.mkdtempSync(path.join(os.tmpdir(), 'vw-popover-ratios-test-'));
   const calls = [], png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jTioAAAAASUVORK5CYII=', 'base64');
   const server = require('../server.cjs').createServer({ dataDir: path.join(evidence, 'data'), env: { OPENAI_API_KEY: 'test-only' }, fetchImpl: async (url, options) => {
     assert.equal(url, 'https://api.openai.com/v1/images/generations'); calls.push(JSON.parse(options.body));
@@ -13,7 +13,7 @@ const { chromium } = require('playwright');
     const p = await browser.newPage({ viewport: { width: 1440, height: 1000 } }); p.setDefaultTimeout(7000);
     const errors = []; p.on('pageerror', e => errors.push(e.message));
     await p.route('**/*', r => r.request().url().startsWith(base + '/') ? r.continue() : r.abort());
-    await p.goto(base); await p.waitForFunction(() => SeedStar.generator?.controlsReady);
+    await p.goto(base); await p.waitForFunction(() => VideoWorkbench.generator?.controlsReady);
     await p.locator('[data-mode="image"]').click();
     for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
       await p.setViewportSize(viewport);
@@ -35,14 +35,14 @@ const { chromium } = require('playwright');
     }
     for (const ratio of ['4:5', '4:3']) {
       await p.locator('.dock [data-panel="settings"]').click(); await p.locator('[data-ratio="' + ratio + '"]').click(); await p.getByRole('button', { name: '完成並關閉設定' }).click();
-      const draft = await p.evaluate(() => SeedStar.generator.getDraft()); await p.evaluate(d => SeedStar.generator.setDraft(d), draft);
-      assert.equal((await p.evaluate(() => SeedStar.generator.getDraft())).ratio, ratio);
+      const draft = await p.evaluate(() => VideoWorkbench.generator.getDraft()); await p.evaluate(d => VideoWorkbench.generator.setDraft(d), draft);
+      assert.equal((await p.evaluate(() => VideoWorkbench.generator.getDraft())).ratio, ratio);
     }
     const outputs = require('../backend/generation-policy.cjs').imageOutputs;
     for (const ratio of ['4:5', '4:3']) for (const quality of ['1K', '2K', '4K']) {
-      const response = await fetch(base + '/api/seedstar/generations', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'image', prompt: '比例輸出測試', settings: { ratio, quality, imageLayout: 'center-crop' } }) });
+      const response = await fetch(base + '/api/vw/generations', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'image', prompt: '比例輸出測試', settings: { ratio, quality, imageLayout: 'center-crop' } }) });
       assert.equal(response.status, 202); let job = await response.json();
-      for (let i = 0; i < 100 && !['succeeded', 'failed'].includes(job.status); i++) { await new Promise(r => setTimeout(r, 100)); job = await (await fetch(base + '/api/seedstar/generations/' + job.id)).json(); }
+      for (let i = 0; i < 100 && !['succeeded', 'failed'].includes(job.status); i++) { await new Promise(r => setTimeout(r, 100)); job = await (await fetch(base + '/api/vw/generations/' + job.id)).json(); }
       assert.equal(job.status, 'succeeded', job.error);
       const bytes = Buffer.from(await (await fetch(base + job.result.url)).arrayBuffer());
       const dimensions = [bytes.readUInt32BE(16), bytes.readUInt32BE(20)]; assert.deepEqual(dimensions, outputs[quality][ratio]);

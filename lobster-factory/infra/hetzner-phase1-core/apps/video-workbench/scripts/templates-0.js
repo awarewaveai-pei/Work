@@ -35,7 +35,7 @@ const cats = [
   "最多讚",
 ];
 // The model actually called (backend/generation-policy.cjs via /capabilities, loaded in templates-boot.js).
-const videoModel = () => SeedStar.capabilities?.models?.video || "sora-2";
+const videoModel = () => VideoWorkbench.capabilities?.models?.video || "sora-2";
 const presets = [
   {
     id: "bear",
@@ -139,7 +139,7 @@ const state = {
   credit: 90,
 };
 const restored = JSON.parse(
-  SeedStar.storage.getItem("workspace.templates") || "null",
+  VideoWorkbench.storage.getItem("workspace.templates") || "null",
 );
 if (restored) {
   state.mine = Array.isArray(restored.mine) ? restored.mine : [];
@@ -195,7 +195,7 @@ function available() {
   return arr;
 }
 function render() {
-  SeedStar.storage.setItem(
+  VideoWorkbench.storage.setItem(
     "workspace.templates",
     JSON.stringify({
       mine: state.mine,
@@ -208,7 +208,7 @@ function render() {
     return;
   }
   const arr = available();
-  $("root").innerHTML = SeedStar.sanitize(
+  $("root").innerHTML = VideoWorkbench.sanitize(
     `<div class="top"><span>AWAREWAVE · 模板牆</span><span>◎ 繁　♧　✦ ${state.credit} PTS</span></div><main class="wrap"><div class="eyebrow">生成模板 · TEMPLATES</div><h1 class="headline">借用一支影片的<span class="gradient">完整配方</span>，換上你的素材</h1><p class="lede">每個模板都來自一支真實生成過的影片，保留它的提示詞、參考素材與參數。<br>把作者開放的素材換成你自己的，就能生成同款影片。</p><div class="toolrow"><div class="tabs">${["模板牆", "我的模板", "我的收藏"].map((t) => `<button class="tab ${state.tab === t ? "sel" : ""}" data-tab="${t}">${t}</button>`).join("")}</div><div class="row"><input class="search" id="search" placeholder="⌕ 搜尋模板名稱、說明或標籤" value="${esc(state.search)}"><button class="primary" id="create">＋ 建立模板</button></div></div><div class="sorts"><span class="muted">排序</span>${[
       ["newest", "最新"],
       ["popular", "最多使用"],
@@ -271,7 +271,7 @@ function renderDetail() {
     );
   let prompt = t.prompt || "此模板提示詞不公開";
   let restricted = !t.prompt;
-  $("root").innerHTML = SeedStar.sanitize(
+  $("root").innerHTML = VideoWorkbench.sanitize(
     `<div class="top"><span>AWAREWAVE · 模板牆</span><span>◎ 繁　♧　✦ ${state.credit} PTS</span></div><main class="detail"><button class="back" id="back">‹ 返回模板牆</button><div class="detailgrid"><div><div class="poster"><img src="${t.img}" alt="${esc(t.name)} 示意圖（來自參考截圖）"></div><h1 class="detailname">${esc(t.name)}</h1>'<p class="muted">${t.tag.map((x) => "#" + x).join("　")}</p></div><div><div class="section"><div class="row" style="justify-content:space-between"><h3>提示詞</h3><span class="muted">${restricted ? "已隱藏" : "可修改"}</span></div>${restricted ? `<div class="notice">此模板提示詞不公開</div>` : `<textarea id="prompt" class="prompt">${esc(prompt)}</textarea><div class="muted">提示詞中的 @image1 等代號，對應下方素材。</div>`}</div><div class="section"><h3>素材</h3><p class="muted">把開放的素材換成你自己的；沒有更換的會沿用模板原本的素材。</p><div class="assets">${assets
       .map((a, i) => {
         let key = "a" + i;
@@ -328,7 +328,7 @@ async function useTemplate(t) {
     return;
   }
   try {
-    const bridge = SeedStar.generator;
+    const bridge = VideoWorkbench.generator;
     if (bridge?.import) {
       const result = await bridge.import({
         target: "reference",
@@ -342,7 +342,7 @@ async function useTemplate(t) {
         model: videoModel(),
       });
       if (result?.ok) {
-        SeedStar.navigate("generator");
+        VideoWorkbench.navigate("generator");
         toast("已帶入生成影片頁，可繼續修改後送出");
         return;
       }
@@ -357,7 +357,7 @@ async function useTemplate(t) {
 }
 async function selectFile(i) {
   try {
-    const rows = await SeedStar.pickAssets({
+    const rows = await VideoWorkbench.pickAssets({
       kind: "image",
     });
     if (rows[0]) {
@@ -365,12 +365,12 @@ async function selectFile(i) {
       renderDetail();
     }
   } catch (e) {
-    SeedStar.reportError(e);
+    VideoWorkbench.reportError(e);
   }
 }
 function createDialog() {
   $("overlay").hidden = false;
-  $("dialogContent").innerHTML = SeedStar.sanitize(
+  $("dialogContent").innerHTML = VideoWorkbench.sanitize(
     `<h2>建立模板</h2><p class="muted">新增自己的模板，需有已完成影片和參考素材才能正式發佈。</p><label>模板名稱</label><input id="templateName" maxlength="100" placeholder="輸入模板標題"><label>說明</label><textarea id="templateDescription" rows="3" placeholder="模板說明"></textarea><label>分類</label><select id="templateCategory">${cats
       .slice(1, 8)
       .map((x) => `<option>${x}</option>`)

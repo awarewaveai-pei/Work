@@ -136,11 +136,11 @@ async function fillField(page, label, value) {
     const words = await page.evaluate(() => cp.doc.layers.find((l) => l.name === "標題").words);
     assert.deepEqual(words.map((w) => [w.text, w.startFrame, w.endFrame]), [["新", 0, 8], ["的", 8, 15], ["片", 15, 23], ["頭", 23, 30]]);
 
-    const assetsBefore = await page.evaluate(async () => (await SeedStar.assets.list()).length);
+    const assetsBefore = await page.evaluate(async () => (await VideoWorkbench.assets.list()).length);
     await page.getByRole("button", { name: "輸出透明影片" }).click();
     await page.waitForFunction(() => /已輸出|缺少|失敗|錯誤/.test(document.querySelector("[data-cp-status]")?.textContent || ""), null, { timeout: 240000 });
     assert.match(await page.locator("[data-cp-status]").textContent(), /已輸出/);
-    const asset = await page.evaluate(async () => (await SeedStar.assets.list()).filter((a) => a.origin?.engine === "workbench-compositor").at(-1));
+    const asset = await page.evaluate(async () => (await VideoWorkbench.assets.list()).filter((a) => a.origin?.engine === "workbench-compositor").at(-1));
     assert.equal(asset.origin.kind, "render");
     assert.equal(asset.origin.compositionId, after.id);
     assert.equal(asset.origin.compositionRevision, 3);
@@ -188,7 +188,7 @@ async function fillField(page, label, value) {
     await page.getByRole("button", { name: "輸出透明影片" }).click();
     await page.waitForFunction(() => /缺少字型/.test(document.querySelector("[data-cp-status]")?.textContent || ""));
     assert.match(await page.locator("[data-cp-status]").textContent(), /缺少字型：NoSuchFontP3/);
-    assert.equal(await page.evaluate(async () => (await SeedStar.assets.list()).length), assetsBefore + 1);
+    assert.equal(await page.evaluate(async () => (await VideoWorkbench.assets.list()).length), assetsBefore + 1);
     pass("缺字型：輸出被擋並顯示「缺少字型：NoSuchFontP3」，不偷換字型");
 
     assert.equal(await page.locator('[data-tool-flow="compose"] select').count(), 0);

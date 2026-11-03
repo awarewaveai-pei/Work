@@ -32,7 +32,7 @@ const pass = (label) => {
   const { base, dataDir } = await isolatedServer("vw-media-store-");
   const media = path.join(dataDir, "media");
   const upload = async (file, type) => {
-    const r = await fetch(base + "/api/seedstar/uploads", {
+    const r = await fetch(base + "/api/vw/uploads", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: path.basename(file), data: `data:${type};base64,` + fs.readFileSync(file).toString("base64") }),

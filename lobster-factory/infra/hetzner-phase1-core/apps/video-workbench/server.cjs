@@ -26,7 +26,7 @@ const root = __dirname,
     ".bvh": "text/plain; charset=utf-8",
   };
 function createServer({
-  dataDir = process.env.SEEDSTAR_DATA_DIR || path.join(root, ".data"),
+  dataDir = require("./backend/env-compat.cjs").vwEnv(process.env, "DATA_DIR") || path.join(root, ".data"),
   env = process.env,
   fetchImpl = fetch,
   awareWaveDir = require("./backend/appearance.cjs").resolveSource(root, env),

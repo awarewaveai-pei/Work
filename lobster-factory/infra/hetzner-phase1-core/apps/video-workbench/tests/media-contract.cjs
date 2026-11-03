@@ -33,7 +33,7 @@ const NTSC = { num: 30000, den: 1001 };
 (async () => {
   const { base, dataDir } = await isolatedServer("vw-media-contract-");
   const api = async (route, method = "GET", body) => {
-    const r = await fetch(base + "/api/seedstar" + route, {
+    const r = await fetch(base + "/api/vw" + route, {
       method,
       headers: body === undefined ? {} : { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),

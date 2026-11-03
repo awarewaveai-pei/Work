@@ -68,7 +68,7 @@
       ]),
     ),
   });
-  window.SeedStarModels = {
+  window.VideoWorkbenchModels = {
     asset,
     character,
     project,

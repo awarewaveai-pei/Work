@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict'), fs = require('node:fs'), os = require('node:os'), path = require('node:path');
 const { chromium } = require('playwright');
 (async () => {
-  const evidence = fs.mkdtempSync(path.join(os.tmpdir(), 'seedstar-product-script-')), calls = [];
+  const evidence = fs.mkdtempSync(path.join(os.tmpdir(), 'vw-product-script-')), calls = [];
   let failNext = false;
   const server = require('../server.cjs').createServer({ dataDir: path.join(evidence, 'data'), env: { OPENAI_API_KEY: 'test-only' }, fetchImpl: async (url, options) => {
     assert.equal(url, 'https://api.openai.com/v1/responses');
@@ -19,10 +19,10 @@ const { chromium } = require('playwright');
       if (/\/generations(?:\/quote)?$/.test(new URL(r.request().url()).pathname) && r.request().method() === 'POST') { generations.push(r.request().url()); return r.abort(); }
       return r.request().url().startsWith(base + '/') ? r.continue() : r.abort();
     });
-    await p.goto(base); await p.waitForFunction(() => SeedStar.generator?.controlsReady);
-    const d = await p.evaluate(() => SeedStar.generator.getDraft());
+    await p.goto(base); await p.waitForFunction(() => VideoWorkbench.generator?.controlsReady);
+    const d = await p.evaluate(() => VideoWorkbench.generator.getDraft());
     Object.assign(d, { mode: 'product', productStep: 1, productData: { title: '咖啡杯', description: '未勾選的秘密文案' }, productTexts: ['陶瓷杯身', '未勾選的秘密文案'], productSelectedTexts: [0] });
-    await p.evaluate(d => SeedStar.generator.setDraft(d), d);
+    await p.evaluate(d => VideoWorkbench.generator.setDraft(d), d);
     await p.locator('[data-action="product-generate-proposals"]').click();
     await p.locator('[data-action="product-to-script"]').waitFor();
     assert.equal(JSON.stringify(calls[0]).includes('未勾選的秘密文案'), false);
@@ -48,8 +48,8 @@ const { chromium } = require('playwright');
     assert.equal(await p.locator('[data-product-script]').count(), 3);
     await p.getByRole('button', { name: '刪除分鏡 3', exact: true }).click();
     assert.equal(await p.locator('[data-product-script]').count(), 2);
-    const saved = await p.evaluate(() => SeedStar.generator.getDraft());
-    await p.evaluate(d => SeedStar.generator.setDraft(d), saved);
+    const saved = await p.evaluate(() => VideoWorkbench.generator.getDraft());
+    await p.evaluate(d => VideoWorkbench.generator.setDraft(d), saved);
     assert.equal(await p.locator('[data-product-dialogue="0"]').inputValue(), '保留手動口白');
     assert.equal(generations.length, 0); assert.deepEqual(errors, []);
     await p.screenshot({ path: path.join(evidence, 'product-script.png'), fullPage: true });

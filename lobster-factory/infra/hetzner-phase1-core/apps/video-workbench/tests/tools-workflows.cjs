@@ -7,7 +7,7 @@ const assert = require("node:assert/strict"),
 const { chromium } = require("playwright"),
   ffmpeg = require("ffmpeg-static");
 const evidence = fs.mkdtempSync(
-  path.join(os.tmpdir(), "seedstar-tools-workflows-"),
+  path.join(os.tmpdir(), "vw-tools-workflows-"),
 );
 (async () => {
   const dataDir = path.join(evidence, "data"),
@@ -109,7 +109,7 @@ const evidence = fs.mkdtempSync(
         : r.abort(),
     );
     await p.goto(base + "/pages/tools.html");
-    await p.waitForFunction(() => SeedStar.tools?.acceptAsset);
+    await p.waitForFunction(() => VideoWorkbench.tools?.acceptAsset);
     const asset = {
       id: "test-video",
       name: "測試影片",
@@ -123,7 +123,7 @@ const evidence = fs.mkdtempSync(
     const open = (tool, settings, image) =>
       p.evaluate(
         ({ tool, settings, asset }) =>
-          SeedStar.tools.acceptAsset({ tool, settings, asset }),
+          VideoWorkbench.tools.acceptAsset({ tool, settings, asset }),
         { tool, settings, asset: image || asset },
       );
     const waitJob = async () => {

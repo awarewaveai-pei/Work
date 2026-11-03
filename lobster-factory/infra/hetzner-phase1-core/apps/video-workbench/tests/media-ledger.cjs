@@ -15,8 +15,8 @@ const open = async (context, base) => {
   p.setDefaultTimeout(15000);
   await p.route("**/*", (r) => (r.request().url().startsWith(base + "/") ? r.continue() : r.abort()));
   await p.goto(base);
-  await p.waitForFunction(() => window.SeedStar?.router);
-  await p.evaluate(() => SeedStar.ready);
+  await p.waitForFunction(() => window.VideoWorkbench?.router);
+  await p.evaluate(() => VideoWorkbench.ready);
   return p;
 };
 
@@ -33,15 +33,15 @@ const open = async (context, base) => {
       await p.locator("#workspaceUpload").setInputFiles({ name: "帳冊測試.png", mimeType: "image/png", buffer: png });
       await p.locator(".workspace-card h2").filter({ hasText: "帳冊測試.png" }).waitFor();
       await p.evaluate(async () => {
-        await SeedStar.projects.save({ id: "ledger-project", title: "帳冊專案", type: "single" });
-        await SeedStar.flush();
+        await VideoWorkbench.projects.save({ id: "ledger-project", title: "帳冊專案", type: "single" });
+        await VideoWorkbench.flush();
         localStorage.clear();
       });
       await p.reload();
-      await p.waitForFunction(() => window.SeedStar?.router);
+      await p.waitForFunction(() => window.VideoWorkbench?.router);
       const after = await p.evaluate(async () => {
-        await SeedStar.ready;
-        return { assets: await SeedStar.assets.list(), projects: await SeedStar.projects.list() };
+        await VideoWorkbench.ready;
+        return { assets: await VideoWorkbench.assets.list(), projects: await VideoWorkbench.projects.list() };
       });
       const uploaded = after.assets.find((a) => a.name === "帳冊測試.png");
       assert(uploaded, "上傳的素材在清掉 localStorage 後消失");
@@ -67,15 +67,15 @@ const open = async (context, base) => {
         preferences: {},
         selection: {},
       });
-      await seed.evaluate((v) => localStorage.setItem("seedstar.app.v1", v), legacy);
+      await seed.evaluate((v) => localStorage.setItem("vw.app.v1", v), legacy);
       await seed.close();
       assert(!fs.existsSync(path.join(dataDir, "state.json")));
       const a = await open(context, base);
       a.on("pageerror", (e) => errors.push(e.message));
       const backups = await a.evaluate(async () => {
-        await SeedStar.flush();
+        await VideoWorkbench.flush();
         return Object.keys(localStorage)
-          .filter((k) => k.startsWith("seedstar.app.v1.pre-server-"))
+          .filter((k) => k.startsWith("vw.app.v1.pre-server-"))
           .map((k) => localStorage.getItem(k));
       });
       assert.deepEqual(backups, [legacy], "原版 localStorage 沒有另存為 pre-server- 備份");
@@ -88,12 +88,12 @@ const open = async (context, base) => {
       const b = await open(context, base);
       b.on("pageerror", (e) => errors.push(e.message));
       await a.evaluate(async () => {
-        await SeedStar.projects.save({ id: "from-a", title: "A 分頁", type: "single" });
-        await SeedStar.flush();
+        await VideoWorkbench.projects.save({ id: "from-a", title: "A 分頁", type: "single" });
+        await VideoWorkbench.flush();
       });
       const result = await b.evaluate(async () => {
         try {
-          await SeedStar.projects.save({ id: "from-b", title: "B 分頁", type: "single" });
+          await VideoWorkbench.projects.save({ id: "from-b", title: "B 分頁", type: "single" });
           return "saved";
         } catch (e) {
           return e.message;
@@ -101,7 +101,7 @@ const open = async (context, base) => {
       });
       assert.match(result, /另一個分頁已更新/);
       await b.locator("#service-error").filter({ hasText: "另一個分頁已更新" }).waitFor();
-      const server = stateOf(dataDir), bProjects = await b.evaluate(() => SeedStar.projects.list());
+      const server = stateOf(dataDir), bProjects = await b.evaluate(() => VideoWorkbench.projects.list());
       assert(server.projects.some((x) => x.id === "from-a") && !server.projects.some((x) => x.id === "from-b"));
       assert(bProjects.some((x) => x.id === "from-a") && !bProjects.some((x) => x.id === "from-b"));
       console.log("PASS 兩個分頁：B 用舊 revision 寫入得 409，載入 A 的最新資料，未覆蓋 A");
@@ -124,7 +124,7 @@ const open = async (context, base) => {
       };
       const { base, dataDir } = await isolatedServer("vw-media-ledger-c-", { fetchImpl: fakeProvider });
       const call = async (route, body, method = body === undefined ? "GET" : "POST") => {
-        const r = await fetch(base + "/api/seedstar" + route, {
+        const r = await fetch(base + "/api/vw" + route, {
           method,
           headers: { "Content-Type": "application/json" },
           body: body === undefined ? undefined : JSON.stringify(body),

@@ -54,16 +54,16 @@ async function generatorResultAction(payload) {
     }
     if (mode === "spoken") { state.voice = input.voice || ""; state.cast = input.cast?.id || ""; state.castName = input.cast?.name || ""; state.spokenVisualDirection = input.cast?.direction || ""; state.performance = input.instructions || ""; state.spokenPanel = "none"; }
     generatorNormalizeSettings();
-    SeedStar.router.activate("generator"); close(); render();
+    VideoWorkbench.router.activate("generator"); close(); render();
     return { ok: true, mode };
   }
   if (payload.intent === "open-tool") return generatorOpenTool(payload);
   if (payload.intent !== "use-result" || !["first", "motion", "spoken"].includes(payload.action)) throw Error("未知成果操作");
   const asset = payload.asset;
-  if (!asset || !SeedStar.safeUrl(asset.url) || SeedStar.mediaKind(asset) !== "image") throw Error("這個操作需要圖片成果");
+  if (!asset || !VideoWorkbench.safeUrl(asset.url) || VideoWorkbench.mediaKind(asset) !== "image") throw Error("這個操作需要圖片成果");
   const copy = { ...structuredClone(asset), type: asset.type || "image/png" };
   if (payload.action === "spoken") {
-    await SeedStar.assets.save(copy);
+    await VideoWorkbench.assets.save(copy);
     generatorSwitchMode("spoken");
     state.cast = copy.id; state.castName = copy.name; state.spokenPanel = "none";
   } else {
@@ -71,18 +71,18 @@ async function generatorResultAction(payload) {
     state.refType = payload.action === "first" ? "first" : "motion";
     state.refs.reference[payload.action === "first" ? "firstFrame" : "motionImage"] = [copy];
   }
-  SeedStar.router.activate("generator"); close(); render();
+  VideoWorkbench.router.activate("generator"); close(); render();
   return { ok: true, mode: state.mode };
 }
 async function generatorOpenTool(payload) {
   if (!generatorResultTools.includes(payload.tool)) throw Error("未知工具");
-  if (payload.asset && !SeedStar.safeUrl(payload.asset.url)) throw Error("素材網址無效");
+  if (payload.asset && !VideoWorkbench.safeUrl(payload.asset.url)) throw Error("素材網址無效");
   if (payload.asset) payload = { ...payload, asset: generatorRestoredAsset(payload.asset, payload.tool === "region" ? "images" : "source") };
-  SeedStar.router.activate("tools");
+  VideoWorkbench.router.activate("tools");
   const frame = document.getElementById("toolsFrame"), deadline = Date.now() + 10000;
-  while (!frame.contentWindow?.SeedStar?.tools?.acceptAsset) {
+  while (!frame.contentWindow?.VideoWorkbench?.tools?.acceptAsset) {
     if (Date.now() > deadline) throw Error("工具載入逾時，請重新開啟工具");
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
-  return frame.contentWindow.SeedStar.tools.acceptAsset(structuredClone(payload));
+  return frame.contentWindow.VideoWorkbench.tools.acceptAsset(structuredClone(payload));
 }

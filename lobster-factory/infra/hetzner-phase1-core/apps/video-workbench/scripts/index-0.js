@@ -244,8 +244,8 @@ function spokenCastName() {
 }
 async function loadSpokenCatalog() {
   const [characters, assets] = await Promise.all([
-    SeedStar.characters.list(),
-    SeedStar.assets.list(),
+    VideoWorkbench.characters.list(),
+    VideoWorkbench.assets.list(),
   ]);
   spokenCatalog.characters = characters;
   spokenCatalog.assets = assets;
@@ -282,7 +282,7 @@ function spokenCastPanel() {
   const tab = state.castTab;
   const rows =
     tab === "library"
-      ? spokenCatalog.assets.filter((a) => SeedStar.mediaKind(a) === "image")
+      ? spokenCatalog.assets.filter((a) => VideoWorkbench.mediaKind(a) === "image")
       : tab === "search" ? [] : spokenCatalog.characters.filter((c) => !c.id.startsWith("catalog-"));
   return (
     '<div class="spoken-picker"><div class="spoken-picker-head"><button class="minor" data-action="spoken-back">‹ 返回</button><b>選擇人物</b>' +
@@ -296,9 +296,9 @@ function spokenCastPanel() {
           '" data-action="cast-select" data-value="' +
           safe(c.id) +
           '">' +
-          (SeedStar.safeUrl(c.image || c.url || "")
+          (VideoWorkbench.safeUrl(c.image || c.url || "")
             ? '<img src="' +
-              safe(SeedStar.safeUrl(c.image || c.url)) +
+              safe(VideoWorkbench.safeUrl(c.image || c.url)) +
               '" alt="">'
             : "") +
           "<div><b>" +
@@ -318,7 +318,7 @@ function spokenCastPanel() {
 function spokenVoicePanel() {
   const rows =
     state.voiceTab === "library"
-      ? spokenCatalog.assets.filter((a) => SeedStar.mediaKind(a) === "audio")
+      ? spokenCatalog.assets.filter((a) => VideoWorkbench.mediaKind(a) === "audio")
       : spokenVoices;
   return (
     '<div class="spoken-picker"><div class="spoken-picker-head"><button class="minor" data-action="spoken-back">‹ 返回</button><b>選擇聲音</b>' +
@@ -516,7 +516,7 @@ const libraryMusic = [
   "質感生活",
 ];
 function render() {
-  $("tabs").innerHTML = SeedStar.sanitize(
+  $("tabs").innerHTML = VideoWorkbench.sanitize(
     tabs
       .map(
         (t) =>
@@ -552,7 +552,7 @@ function render() {
     h = area(placeholders[m]);
     h += fileBox("images", 4, "參考圖");
   }
-  $("content").innerHTML = SeedStar.sanitize(h);
+  $("content").innerHTML = VideoWorkbench.sanitize(h);
   document.querySelector(".dock").hidden = m === "director" || m === "product" || (m === "reference" && state.refType === "motion");
   const s = state;
   $("modelBtn").textContent = "✦ " + s.model[m] + "⌄";
@@ -574,7 +574,7 @@ function close() {
   document.querySelectorAll('button[data-panel]').forEach((b) => b.setAttribute("aria-expanded", "false"));
 }
 function pop(html) {
-  $("popover").innerHTML = SeedStar.sanitize('<div class="popover-toolbar"><button type="button" class="minor" data-popover-close aria-label="完成並關閉設定">完成 ×</button></div>' + html);
+  $("popover").innerHTML = VideoWorkbench.sanitize('<div class="popover-toolbar"><button type="button" class="minor" data-popover-close aria-label="完成並關閉設定">完成 ×</button></div>' + html);
   $("popover").classList.remove("hidden");
   document.querySelectorAll('button[data-panel]').forEach((b) => b.setAttribute("aria-expanded", String(b.dataset.panel === $("popover").dataset.activePanel)));
   const box = $("popover"), anchor = [...document.querySelectorAll('button[data-panel]')].find((b) => b.dataset.panel === box.dataset.activePanel && b.getClientRects().length);
@@ -587,7 +587,7 @@ function pop(html) {
   }
 }
 function settings() {
-  const c = SeedStar.capabilities || {}, image = state.mode === "image", spoken = state.mode === "spoken";
+  const c = VideoWorkbench.capabilities || {}, image = state.mode === "image", spoken = state.mode === "spoken";
   const ratios = image ? ["16:9", "9:16", "1:1", "4:5", "4:3"] : c.videoRatios || ["16:9", "9:16"];
   const qualities = image ? c.imageQualities || ["1K"] : c.videoQualities || ["720p"];
   const durations = c.videoDurations || [4, 8, 12];
@@ -624,7 +624,7 @@ async function panel(p) {
 }
 function modal(title, inner) {
   close();
-  $("modalContent").innerHTML = SeedStar.sanitize(`<h2>${title}</h2>${inner}`);
+  $("modalContent").innerHTML = VideoWorkbench.sanitize(`<h2>${title}</h2>${inner}`);
   $("modal").classList.remove("hidden");
 }
 $("closeModal").onclick = () => $("modal").classList.add("hidden");
@@ -721,7 +721,7 @@ document.addEventListener("click", (e) => {
       const title = $("manualProductName")?.value.trim(),
         description = $("manualProductDescription")?.value.trim();
       if (!title || !description) {
-        SeedStar.reportError(Error("請填寫商品名稱及描述"));
+        VideoWorkbench.reportError(Error("請填寫商品名稱及描述"));
         return;
       }
       state.productData = { title, description, price: "" };
@@ -745,13 +745,13 @@ document.addEventListener("click", (e) => {
       generatorOfferClearUndo(undo);
     }
     if (a === "mention") {
-      generatorMentions().catch(SeedStar.reportError);
+      generatorMentions().catch(VideoWorkbench.reportError);
     }
     if (a === "library") {
       if (state.mode === "spoken") {
         state.spokenPanel = "cast";
         state.castTab = "library";
-        loadSpokenCatalog().catch(SeedStar.reportError);
+        loadSpokenCatalog().catch(VideoWorkbench.reportError);
         render();
       } else openLibrary(
         state.mode === "reshoot" ? "video" : "image",
@@ -776,7 +776,7 @@ document.addEventListener("click", (e) => {
     if (a === "director-confirm-length") {
       const length = Number($("directorCustomLength")?.value);
       if (![4, 8, 12].includes(length)) {
-        SeedStar.reportError(Error("目前影片支援 4、8、12 秒"));
+        VideoWorkbench.reportError(Error("目前影片支援 4、8、12 秒"));
         return;
       }
       state.directorLength = length;
@@ -793,7 +793,7 @@ document.addEventListener("click", (e) => {
       render();
     }
     if (a === "director-generate-script") {
-      SeedStar.request("/director/script", {
+      VideoWorkbench.request("/director/script", {
         prompt: state.data.director,
         duration: state.directorLength,
         references: lookup("images"),
@@ -804,7 +804,7 @@ document.addEventListener("click", (e) => {
           state.directorStage = "script";
           render();
         })
-        .catch(SeedStar.reportError);
+        .catch(VideoWorkbench.reportError);
     }
     if (a === "director-edit-script") {
       state.directorStage = state.directorMessages.length ? "chat" : "edit";
@@ -829,9 +829,9 @@ document.addEventListener("click", (e) => {
     }
     if (a === "director-confirm-storyboard") {
       const selected = [...$("modalContent").querySelectorAll("[data-storyboard-reference]:checked")].map((el) => lookup("images")[Number(el.dataset.storyboardReference)]);
-      if (selected.length > 4) { SeedStar.reportError(Error("本次分鏡圖最多使用 4 張參考圖，請取消多餘選項。")); return; }
+      if (selected.length > 4) { VideoWorkbench.reportError(Error("本次分鏡圖最多使用 4 張參考圖，請取消多餘選項。")); return; }
       $("modal").classList.add("hidden");
-      SeedStar.generations
+      VideoWorkbench.generations
         .create({
           type: "image",
           prompt:
@@ -839,16 +839,16 @@ document.addEventListener("click", (e) => {
             state.directorScript,
           references: selected,
         })
-        .then(SeedStar.showJob)
-        .catch(SeedStar.reportError);
+        .then(VideoWorkbench.showJob)
+        .catch(VideoWorkbench.reportError);
     }
-    if (a === "director-history") SeedStar.router.activate("history");
+    if (a === "director-history") VideoWorkbench.router.activate("history");
     if (a === "director-to-video") {
       state.directorStage = "video";
       render();
     }
     if (a === "director-generate-video") {
-      SeedStar.generations
+      VideoWorkbench.generations
         .quote(directorGenerationInput())
         .then((quote) => {
           state.directorQuote = quote;
@@ -859,7 +859,7 @@ document.addEventListener("click", (e) => {
               '</p><button class="box-cta" data-action="director-confirm-generate">確認生成</button><button class="minor" data-action="director-adjust">調整</button><button class="minor" data-action="director-cancel">取消</button>',
           );
         })
-        .catch(SeedStar.reportError);
+        .catch(VideoWorkbench.reportError);
     }
     if (a === "director-confirm-generate") {
       directorStartGeneration();
@@ -897,7 +897,7 @@ document.addEventListener("click", (e) => {
     if (a === "reshoot-library-images") openLibrary("image", "images");
     if (a === "cast") {
       state.spokenPanel = "cast";
-      loadSpokenCatalog().catch(SeedStar.reportError);
+      loadSpokenCatalog().catch(VideoWorkbench.reportError);
       render();
     }
     if (a === "cast-clear") {
@@ -912,7 +912,7 @@ document.addEventListener("click", (e) => {
     }
     if (a === "voice") {
       state.spokenPanel = "voice";
-      loadSpokenCatalog().catch(SeedStar.reportError);
+      loadSpokenCatalog().catch(VideoWorkbench.reportError);
       render();
     }
     if (a === "spoken-back") {
@@ -1026,7 +1026,7 @@ $("file").onchange = async (e) => {
   if (bucket === "product") {
     for (let f of e.target.files) {
       if (!f.type.startsWith("image/")) continue;
-      state.productImages.push((await SeedStar.uploadAsset(f)).url);
+      state.productImages.push((await VideoWorkbench.uploadAsset(f)).url);
       state.productSelectedImages.push(state.productImages.length - 1);
     }
     e.target.value = "";
@@ -1034,7 +1034,7 @@ $("file").onchange = async (e) => {
     return;
   }
   try { await generatorUpload(e.target.files, bucket); }
-  catch (error) { SeedStar.reportError(error); }
+  catch (error) { VideoWorkbench.reportError(error); }
   e.target.value = "";
   render();
 };
@@ -1066,7 +1066,7 @@ $("send").onclick = () => {
     state.mode === "spoken" &&
     !["coral", "alloy", "onyx", "nova", "shimmer"].includes(spokenVoiceCode())
   ) {
-    SeedStar.reportError(
+    VideoWorkbench.reportError(
       Error("已保存聲音參考；聲音複製服務尚未接入，請選擇內建聲音生成配音。"),
     );
     return;
@@ -1085,7 +1085,7 @@ $("send").onclick = () => {
       subtitleOptions: structuredClone(state.subtitleOptions),
       skill: state.skill,
       skills: [...state.skills],
-      imageLayout: state.mode === "image" && SeedStar.capabilities?.imageExactOutput ? "center-crop" : undefined,
+      imageLayout: state.mode === "image" && VideoWorkbench.capabilities?.imageExactOutput ? "center-crop" : undefined,
     },
     references: generatorReferences().reduce((groups, { bucket, asset }) => {
       (groups[bucket] ||= []).push(structuredClone(asset));
@@ -1110,7 +1110,7 @@ $("send").onclick = () => {
       ...payload,
     });
 };
-SeedStar.generator = {
+VideoWorkbench.generator = {
   import(payload) {
     if (payload?.intent) return generatorResultAction(payload);
     const target = payload?.target;
@@ -1126,7 +1126,7 @@ SeedStar.generator = {
         ok: false,
         message: "未取得此作品的原文提示詞",
       };
-    if (!SeedStar.safeUrl(payload.image || ""))
+    if (!VideoWorkbench.safeUrl(payload.image || ""))
       return {
         ok: false,
         message: "未取得可帶入的圖片",
@@ -1175,9 +1175,9 @@ SeedStar.generator = {
   },
 };
 render();
-SeedStar.generator.getDraft = () => structuredClone(state);
-SeedStar.generator.newDirectorConversation = directorNewConversation;
-SeedStar.generator.setDraft = (value) => {
+VideoWorkbench.generator.getDraft = () => structuredClone(state);
+VideoWorkbench.generator.newDirectorConversation = directorNewConversation;
+VideoWorkbench.generator.setDraft = (value) => {
   if (!value || !tabs.some(([mode]) => mode === value.mode))
     throw Error("草稿生成模式無效");
   for (const key of Object.keys(state))
@@ -1192,9 +1192,9 @@ SeedStar.generator.setDraft = (value) => {
   generatorNormalizeSettings();
   render();
 };
-SeedStar.request("/capabilities", undefined, "GET")
+VideoWorkbench.request("/capabilities", undefined, "GET")
   .then((c) => {
-    SeedStar.capabilities = c;
+    VideoWorkbench.capabilities = c;
     if (c.models) {
       for (const mode of ["director", "reference", "cartoon", "product"]) state.model[mode] = c.models.video || state.model[mode];
       state.model.image = c.models.image || state.model.image;

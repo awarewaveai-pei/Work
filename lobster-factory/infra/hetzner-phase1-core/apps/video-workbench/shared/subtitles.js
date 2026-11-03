@@ -1,5 +1,5 @@
 (function () {
-  SeedStar.convertSubtitles = (input, type) => {
+  VideoWorkbench.convertSubtitles = (input, type) => {
     const source = String(input)
       .replace(/^\uFEFF/, "")
       .replace(/\r\n/g, "\n")

@@ -21,7 +21,7 @@ function generatorOfferClearUndo(before) {
   undo.onclick = () => {
     // Do not overwrite text or references entered after the clear action.
     if (JSON.stringify(generatorContentSnapshot()) !== after) {
-      SeedStar.notify("內容已變更，保留目前內容。"); notice.remove(); return;
+      VideoWorkbench.notify("內容已變更，保留目前內容。"); notice.remove(); return;
     }
     state.data[before.mode] = before.prompt;
     state.refs[before.mode] = structuredClone(before.references);
@@ -33,8 +33,8 @@ function generatorOfferClearUndo(before) {
 }
 function generatorPreviewReference(bucket, index) {
   const asset = state.refs[state.mode]?.[bucket]?.[index];
-  if (!asset || !SeedStar.safeUrl(asset.url)) return;
-  modal("素材預覽", generatorReferencePreview(asset) + `<p>${safe(asset.name)}</p><a href="${safe(SeedStar.safeUrl(asset.url))}" target="_blank" rel="noopener noreferrer" download="${safe(asset.name)}">下載／開新分頁</a>`);
+  if (!asset || !VideoWorkbench.safeUrl(asset.url)) return;
+  modal("素材預覽", generatorReferencePreview(asset) + `<p>${safe(asset.name)}</p><a href="${safe(VideoWorkbench.safeUrl(asset.url))}" target="_blank" rel="noopener noreferrer" download="${safe(asset.name)}">下載／開新分頁</a>`);
 }
 function generatorDefaultSettings(mode) {
   return { ratio: mode === "image" ? "1:1" : "16:9", ratios: [mode === "image" ? "1:1" : "16:9"], quality: mode === "image" ? "1K" : "720p", duration: 8, audio: "有聲", watermark: "不套用", subtitle: "關", subtitleOptions: { languages: ["原文"], style: "白字黑邊", size: "中", position: "下方" }, skill: "不套用技能", skills: [] };
@@ -50,8 +50,8 @@ function generatorSwitchMode(mode) {
   for (const key of keys) state[key] = structuredClone((state.outputSettings[mode] || defaults)[key] ?? defaults[key]);
 }
 function generatorReferencePreview(asset) {
-  const url = SeedStar.safeUrl(asset.previewUrl || asset.url), row = generatorReferences().find((r) => r.asset === asset);
-  const kind = SeedStar.mediaKind(asset) || asset.type?.split("/")[0] || "image";
+  const url = VideoWorkbench.safeUrl(asset.previewUrl || asset.url), row = generatorReferences().find((r) => r.asset === asset);
+  const kind = VideoWorkbench.mediaKind(asset) || asset.type?.split("/")[0] || "image";
   return (url ? kind === "video" ? `<video class="reference-preview" src="${safe(url)}" controls preload="metadata"></video>` : kind === "audio" ? `<audio class="reference-preview" src="${safe(url)}" controls preload="metadata"></audio>` : `<img class="reference-preview" src="${safe(url)}" alt="${safe(asset.name)}">` : "") + (row ? `<small class="reference-token">${safe(row.token)}</small>` : "");
 }
 function generatorMotionWorkspace() {
@@ -64,13 +64,13 @@ function generatorRatios() {
 }
 function generatorNormalizeSettings() {
   if (state.mode === "image") {
-    const qualities = SeedStar.capabilities?.imageQualities || ["1K"];
+    const qualities = VideoWorkbench.capabilities?.imageQualities || ["1K"];
     if (!qualities.includes(state.quality)) state.quality = qualities[0];
     state.ratios = [state.ratio];
     return;
   }
   if (["spoken", "reshoot"].includes(state.mode)) return;
-  const allowed = SeedStar.capabilities?.videoRatios || ["16:9", "9:16"];
+  const allowed = VideoWorkbench.capabilities?.videoRatios || ["16:9", "9:16"];
   state.ratios = generatorRatios().filter((ratio) => allowed.includes(ratio));
   if (!state.ratios.length) state.ratios = [allowed[0] || "16:9"];
   state.ratio = state.ratios[0];
@@ -83,7 +83,7 @@ function generatorReferences() {
     : Object.keys(groups);
   const counts = { image: 0, video: 0, audio: 0 };
   return keys.flatMap((bucket) => (groups[bucket] || []).map((asset, index) => {
-    const mediaKind = SeedStar.mediaKind(asset) || asset.type?.split("/")[0];
+    const mediaKind = VideoWorkbench.mediaKind(asset) || asset.type?.split("/")[0];
     const kind = ["audio", "video"].includes(mediaKind) ? mediaKind : "image";
     return { bucket, index, asset, token: "@" + kind + (++counts[kind]) };
   }));
@@ -112,11 +112,11 @@ async function generatorMentions(typed = false) {
   const match = typed ? /@([^@\s]*)$/.exec(p.value.slice(0, p.selectionStart)) : null;
   generatorPromptSelection = { start: p.selectionStart - (match ? match[0].length : 0), end: p.selectionEnd };
   generatorMentionRows = generatorReferences();
-  const assets = await SeedStar.assets.list();
+  const assets = await VideoWorkbench.assets.list();
   if (request !== generatorMentionRequest || mode !== state.mode || p !== $("prompt")) return;
   const availableBuckets = mode === "reference" ? state.refType === "first" ? { image: "firstFrame", audio: "audios" } : { image: "images", video: "videos", audio: "audios" } : mode === "reshoot" ? { image: "images", video: "source" } : { image: "images" };
   for (const asset of assets) {
-    const bucket = availableBuckets[SeedStar.mediaKind(asset)];
+    const bucket = availableBuckets[VideoWorkbench.mediaKind(asset)];
     if (!bucket || !state.refs[mode][bucket] || state.refs[mode][bucket].length >= max[mode][bucket] || generatorMentionRows.some((r) => r.asset.id === asset.id || r.asset.url === asset.url)) continue;
     generatorMentionRows.push({ bucket, asset, available: true, token: "素材庫" });
   }
@@ -125,7 +125,7 @@ async function generatorMentions(typed = false) {
   menu.id = "generatorMentionMenu";
   menu.className = "generator-mention-menu";
   menu.setAttribute("role", "region"); menu.setAttribute("aria-label", "素材引用建議");
-  menu.innerHTML = SeedStar.sanitize(`<div class="mention-list">${generatorMentionRows.map((r, i) => `<button class="option" data-gen-mention="${i}">${safe(r.token)} · ${safe(r.asset.name || "未命名素材")}</button>`).join("") || '<p>尚無可引用素材。</p>'}</div><div class="row"><button class="minor" data-gen-mention-upload>從裝置上傳</button><button class="minor" data-gen-mention-library>從素材庫選取</button><button class="minor" data-gen-mention-close>關閉引用</button></div>`);
+  menu.innerHTML = VideoWorkbench.sanitize(`<div class="mention-list">${generatorMentionRows.map((r, i) => `<button class="option" data-gen-mention="${i}">${safe(r.token)} · ${safe(r.asset.name || "未命名素材")}</button>`).join("") || '<p>尚無可引用素材。</p>'}</div><div class="row"><button class="minor" data-gen-mention-upload>從裝置上傳</button><button class="minor" data-gen-mention-library>從素材庫選取</button><button class="minor" data-gen-mention-close>關閉引用</button></div>`);
   p.after(menu);
   p.setAttribute("aria-expanded", "true"); p.setAttribute("aria-controls", menu.id);
 }
@@ -136,7 +136,7 @@ function generatorInsertMention(index) {
   if (row.available) {
     const target = state.refs[state.mode][row.bucket];
     if (target.length >= max[state.mode][row.bucket]) throw Error("參考素材已達上限");
-    target.push({ ...row.asset, type: row.asset.type || SeedStar.mediaKind(row.asset) + "/" });
+    target.push({ ...row.asset, type: row.asset.type || VideoWorkbench.mediaKind(row.asset) + "/" });
     row = generatorReferences().find((r) => r.asset === target.at(-1));
   }
   const text = p.value, start = generatorPromptSelection?.start ?? text.length, end = generatorPromptSelection?.end ?? start;
@@ -159,7 +159,7 @@ function generatorApplyPreset(preset) {
   if (!Object.hasOwn(preset.settings, "subtitleOptions")) state.subtitleOptions = generatorSubtitleDefaults();
   for (const key of generatorSettingKeys) if (Object.hasOwn(preset.settings, key)) state[key] = structuredClone(preset.settings[key]);
   const kind = state.mode === "image" ? "image" : state.mode === "spoken" ? "audio" : "video";
-  if (preset.model) state.model[state.mode] = SeedStar.capabilities?.models?.[kind] || preset.model;
+  if (preset.model) state.model[state.mode] = VideoWorkbench.capabilities?.models?.[kind] || preset.model;
   generatorNormalizeSettings();
   if (state.mode === "director") state.directorLength = state.duration;
   if (state.mode === "product") state.productDuration = state.duration;
@@ -170,7 +170,7 @@ function generatorApplyDefault() {
   if (preset) generatorApplyPreset(preset);
 }
 async function generatorSavePresets(rows) {
-  await SeedStar.preferences.set(generatorPresetKey, rows);
+  await VideoWorkbench.preferences.set(generatorPresetKey, rows);
   generatorPresets = rows;
   generatorPresetPanel();
 }
@@ -185,7 +185,7 @@ function generatorSyncPrompt() {
   const send = $("send");
   send.disabled = generatorBusy || !n || (state.mode === "cartoon" && state.style < 0) || (state.mode === "reference" && state.refType === "first" && !state.refs.reference.firstFrame.length);
   send.textContent = generatorBusy ? "送出中…" : state.mode === "image" ? "生成圖片" : state.mode === "spoken" ? "生成配音" : `開始生成${generatorRatios().length > 1 ? ` · ${generatorRatios().length} 種比例` : ""}`;
-  const c = SeedStar.capabilities, status = $("providerStatus");
+  const c = VideoWorkbench.capabilities, status = $("providerStatus");
   if (c && status) {
     const serviceKind = state.mode === "image" ? "image" : state.mode === "spoken" ? "audio" : "video";
     status.textContent = !c[serviceKind] ? "此生成服務尚未設定；草稿、素材與設定可正常保存。" : state.mode === "spoken"
@@ -196,7 +196,7 @@ function generatorSyncPrompt() {
   }
 }
 function generatorValidation(input) {
-  const caps = SeedStar.capabilities;
+  const caps = VideoWorkbench.capabilities;
   const type = input.type === "image" ? "image" : input.type === "spoken" ? "audio" : "video";
   if (!input.prompt?.trim()) throw Error("請先輸入生成內容");
   if (caps && !caps[type]) throw Error("此生成服務尚未設定；可以先儲存草稿。");
@@ -235,25 +235,25 @@ async function generatorSubmit(payload) {
     for (const input of inputs) generatorValidation(input);
     const results = [];
     for (const input of inputs) {
-      try { const job = await SeedStar.generations.create(input); results.push({ ratio: input.settings.ratio, job }); }
+      try { const job = await VideoWorkbench.generations.create(input); results.push({ ratio: input.settings.ratio, job }); }
       catch (error) { results.push({ ratio: input.settings.ratio, error: error.message }); }
     }
     if (results.length === 1) {
       if (results[0].error) throw Error(results[0].error);
-      SeedStar.showJob(results[0].job);
+      VideoWorkbench.showJob(results[0].job);
     } else {
       modal("多比例生成任務", '<p>每個比例各有獨立任務；可從歷史紀錄查看完成狀態。</p>' + results.map((r) => `<article class="workspace-card"><b>${safe(r.ratio)}</b><p>${safe(r.error || r.job.error || r.job.status)}</p>${r.job ? `<button class="minor" data-gen-job="${safe(r.job.id)}">檢視任務</button>` : ''}</article>`).join(""));
     }
-  } catch (e) { SeedStar.reportError(e); }
+  } catch (e) { VideoWorkbench.reportError(e); }
   finally { generatorBusy = false; generatorSyncPrompt(); }
 }
 async function generatorExtractAudio() {
   const target = state.refs.reference.audios;
   if (target.length >= max.reference.audios) throw Error("音訊參考已達上限");
-  const [source] = await SeedStar.pickAssets({ kind: "video", limit: 1 });
+  const [source] = await VideoWorkbench.pickAssets({ kind: "video", limit: 1 });
   if (!source) return;
-  const job = await SeedStar.generations.create({ type: "video", operation: "separate", references: { src: source }, settings: {} });
-  SeedStar.showJob(job, { applyLabel: "加入參考音訊", apply: async (done) => {
+  const job = await VideoWorkbench.generations.create({ type: "video", operation: "separate", references: { src: source }, settings: {} });
+  VideoWorkbench.showJob(job, { applyLabel: "加入參考音訊", apply: async (done) => {
     if (target.length >= max.reference.audios) throw Error("音訊參考已達上限");
     target.push({ id: "job-" + done.id, name: source.name + " · 音軌", url: done.result.url, kind: "audio", type: "audio/mpeg" });
     if (state.mode === "reference") render();
@@ -266,13 +266,13 @@ async function generatorUpload(files, bucket, mode = state.mode) {
   let skipped = 0;
   for (const file of files) {
     if (current.length >= cap || !file.type.startsWith(needed + "/")) { skipped++; continue; }
-    current.push(await SeedStar.uploadAsset(file));
+    current.push(await VideoWorkbench.uploadAsset(file));
   }
-  if (skipped) SeedStar.notify(`有 ${skipped} 個檔案因格式不符或超過上限而未加入。`);
+  if (skipped) VideoWorkbench.notify(`有 ${skipped} 個檔案因格式不符或超過上限而未加入。`);
   render();
 }
 async function generatorControlsInit() {
-  generatorPresets = await SeedStar.preferences.get(generatorPresetKey, []);
+  generatorPresets = await VideoWorkbench.preferences.get(generatorPresetKey, []);
   generatorApplyDefault();
   document.addEventListener("click", async (event) => {
     const b = event.target.closest("[data-gen-mention],[data-gen-preset-save],[data-gen-preset-apply],[data-gen-preset-default],[data-gen-preset-delete],[data-gen-job],[data-gen-extract],[data-gen-voice],[data-gen-duration],[data-gen-product-choice],[data-gen-product-duration],[data-gen-motion-facing],[data-gen-motion-quality]");
@@ -295,7 +295,7 @@ async function generatorControlsInit() {
         await generatorSavePresets(generatorPresets.map((p) => p.mode === state.mode ? { ...p, default: p.id === row.id && !row.default } : p));
       }
       if (b.dataset.genPresetDelete && confirm("刪除此生成設定？")) await generatorSavePresets(generatorPresets.filter((p) => p.id !== b.dataset.genPresetDelete));
-      if (b.dataset.genJob) SeedStar.showJob(await SeedStar.generations.get(b.dataset.genJob));
+      if (b.dataset.genJob) VideoWorkbench.showJob(await VideoWorkbench.generations.get(b.dataset.genJob));
       if (b.hasAttribute("data-gen-extract")) await generatorExtractAudio();
       if (b.dataset.genVoice) { state.voice = b.dataset.genVoice; render(); }
       if (b.dataset.genDuration) {
@@ -308,7 +308,7 @@ async function generatorControlsInit() {
       if (b.dataset.genProductDuration) { state.productDuration = Number(b.dataset.genProductDuration); render(); }
       if (b.dataset.genMotionFacing) { state.motion.facing = b.dataset.genMotionFacing; render(); }
       if (b.dataset.genMotionQuality) { state.motion.quality = b.dataset.genMotionQuality; render(); }
-    } catch (e) { SeedStar.reportError(e); }
+    } catch (e) { VideoWorkbench.reportError(e); }
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") { close(); generatorCloseMentions(); $("modal").classList.add("hidden"); }
@@ -325,7 +325,7 @@ async function generatorControlsInit() {
   document.addEventListener("input", (event) => {
     if (event.target.id === "prompt") {
       generatorSyncPrompt();
-      if (/(?:^|\s)@[^@\s]*$/.test(event.target.value.slice(0, event.target.selectionStart))) generatorMentions(true).catch(SeedStar.reportError);
+      if (/(?:^|\s)@[^@\s]*$/.test(event.target.value.slice(0, event.target.selectionStart))) generatorMentions(true).catch(VideoWorkbench.reportError);
       else generatorCloseMentions();
     }
     if (event.target.id === "motionPrompt") state.motion.prompt = event.target.value;
@@ -341,10 +341,10 @@ async function generatorControlsInit() {
     event.preventDefault();
     const target = event.target.closest("[data-drop-bucket],[data-upload]");
     const bucket = target?.dataset.dropBucket || target?.dataset.upload;
-    generatorUpload(event.dataTransfer.files, bucket).catch(SeedStar.reportError);
+    generatorUpload(event.dataTransfer.files, bucket).catch(VideoWorkbench.reportError);
   });
   generatorSyncPrompt();
-  SeedStar.generator.controlsReady = true;
+  VideoWorkbench.generator.controlsReady = true;
 }
 
 // These guides are local prompts; no third-party skill catalogue is imported.
@@ -360,7 +360,7 @@ const generatorSystemSkills = [
 ].map(([id, name, prompt]) => ({ key: "system:" + id, name, prompt, source: "system" }));
 let generatorSkillTab = "system";
 async function generatorSkillCatalogue() {
-  const custom = await SeedStar.preferences.get("workspace.skills", []);
+  const custom = await VideoWorkbench.preferences.get("workspace.skills", []);
   return [...generatorSystemSkills, ...custom.map((s) => ({ ...s, key: "custom:" + (s.id || s.name), source: "custom" }))];
 }
 async function generatorSkillPanel() {
@@ -375,7 +375,7 @@ async function generatorSkillPanel() {
 function generatorSubtitlePanel() {
   const options = state.subtitleOptions;
   const choices = (key, values) => `<div class="chips">${values.map((value) => `<button data-gen-subtitle-option="${key}" data-value="${value}" aria-pressed="${options[key] === value}">${value}</button>`).join("")}</div>`;
-  return `<h3>自動產生字幕</h3><p class="small-note">保存原片，另產生字幕版。${SeedStar.capabilities?.subtitles ? "" : "字幕辨識、翻譯與燒錄尚未接入；以下可先保存為草稿，開啟時不會送出生成。"}</p><div class="chips">${["關", "開"].map((value) => `<button data-subtitle="${value}" aria-pressed="${state.subtitle === value}">${value === "開" ? "開啟" : "關閉"}</button>`).join("")}</div>${state.subtitle === "開" ? `<fieldset><legend>字幕語言（最多 2 種）</legend><p class="small-note">第一個語言顯示在上方，第二個顯示在下方。</p><div class="chips">${["原文", "繁體中文", "簡體中文", "English", "日本語", "한국어", "ภาษาไทย"].map((value) => `<button role="checkbox" data-gen-subtitle-language="${value}" aria-checked="${options.languages.includes(value)}">${value}</button>`).join("")}</div></fieldset><fieldset><legend>字幕樣式</legend>${choices("style", ["白字黑邊", "白字灰底", "黑底白字", "白底黑字", "白字陰影", "黃字黑邊"])}</fieldset><fieldset><legend>大小</legend>${choices("size", ["小", "中", "大"])}</fieldset><fieldset><legend>位置</legend>${choices("position", ["下方", "中下", "中間", "上方"])}</fieldset><p class="subtitle-preview" data-subtitle-preview data-style="${options.style}" data-size="${options.size}" data-position="${options.position}"><span>字幕預覽${options.languages.length > 1 ? '<br>Subtitle preview' : ''}</span></p>` : ""}`;
+  return `<h3>自動產生字幕</h3><p class="small-note">保存原片，另產生字幕版。${VideoWorkbench.capabilities?.subtitles ? "" : "字幕辨識、翻譯與燒錄尚未接入；以下可先保存為草稿，開啟時不會送出生成。"}</p><div class="chips">${["關", "開"].map((value) => `<button data-subtitle="${value}" aria-pressed="${state.subtitle === value}">${value === "開" ? "開啟" : "關閉"}</button>`).join("")}</div>${state.subtitle === "開" ? `<fieldset><legend>字幕語言（最多 2 種）</legend><p class="small-note">第一個語言顯示在上方，第二個顯示在下方。</p><div class="chips">${["原文", "繁體中文", "簡體中文", "English", "日本語", "한국어", "ภาษาไทย"].map((value) => `<button role="checkbox" data-gen-subtitle-language="${value}" aria-checked="${options.languages.includes(value)}">${value}</button>`).join("")}</div></fieldset><fieldset><legend>字幕樣式</legend>${choices("style", ["白字黑邊", "白字灰底", "黑底白字", "白底黑字", "白字陰影", "黃字黑邊"])}</fieldset><fieldset><legend>大小</legend>${choices("size", ["小", "中", "大"])}</fieldset><fieldset><legend>位置</legend>${choices("position", ["下方", "中下", "中間", "上方"])}</fieldset><p class="subtitle-preview" data-subtitle-preview data-style="${options.style}" data-size="${options.size}" data-position="${options.position}"><span>字幕預覽${options.languages.length > 1 ? '<br>Subtitle preview' : ''}</span></p>` : ""}`;
 }
 function generatorReshootSettings() {
   const size = { "480p": [854,480], "720p": [1280,720], "1080p": [1920,1080] }[state.quality] || [1280,720];
@@ -393,7 +393,7 @@ document.addEventListener("click", async (event) => {
       const key = b.dataset.genSkill;
       if (state.skills.includes(key)) state.skills = state.skills.filter((s) => s !== key);
       else if (state.skills.length < 5) state.skills.push(key);
-      else { SeedStar.notify("最多套用五個技能"); return; }
+      else { VideoWorkbench.notify("最多套用五個技能"); return; }
       const catalogue = await generatorSkillCatalogue();
       state.skill = state.skills.map((key) => catalogue.find((s) => s.key === key)?.name || key).join("、") || "不套用技能";
     }
@@ -402,12 +402,12 @@ document.addEventListener("click", async (event) => {
       if (languages.includes(value)) {
         if (languages.length > 1) state.subtitleOptions.languages = languages.filter((s) => s !== value);
       } else if (languages.length < 2) languages.push(value);
-      else { SeedStar.notify("字幕最多選擇兩種語言"); return; }
+      else { VideoWorkbench.notify("字幕最多選擇兩種語言"); return; }
     }
     if (b.dataset.genSubtitleOption) state.subtitleOptions[b.dataset.genSubtitleOption] = b.dataset.value;
     render();
     await panel(b.hasAttribute("data-gen-subtitle-language") || b.hasAttribute("data-gen-subtitle-option") ? "subtitle" : "skill");
-  } catch (error) { SeedStar.reportError(error); }
+  } catch (error) { VideoWorkbench.reportError(error); }
 });
 // A panel must never remain behind a second overlay or a different mode.
 document.addEventListener("click", (event) => {

@@ -115,7 +115,7 @@ const noSelect = async (page, flow) => assert.equal(await page.locator(`[data-to
     await waitStatus(page, "[data-rg-status]", /已建立示範角色/);
     const demo = await page.evaluate(async () => {
       const c = rg.chars.find((x) => x.name === "示範角色（揮手）"),
-        comp = (await SeedStar.compositions.list()).find((x) => x.title === "示範角色揮手");
+        comp = (await VideoWorkbench.compositions.list()).find((x) => x.title === "示範角色揮手");
       return { c, comp };
     });
     const rig = demo.c.rigs[0], layer0 = demo.comp.layers[0];
@@ -166,7 +166,7 @@ const noSelect = async (page, flow) => assert.equal(await page.locator(`[data-to
     await page.getByRole("button", { name: "輸出透明影片" }).click();
     await waitStatus(page, "[data-cp-status]", /已輸出|缺少|失敗|錯誤/);
     assert.match(await page.locator("[data-cp-status]").textContent(), /已輸出/);
-    const asset = await page.evaluate(async () => (await SeedStar.assets.list()).filter((a) => a.origin?.engine === "workbench-compositor").at(-1));
+    const asset = await page.evaluate(async () => (await VideoWorkbench.assets.list()).filter((a) => a.origin?.engine === "workbench-compositor").at(-1));
     assert.equal(asset.verification.ok, true);
     assert.equal(asset.origin.compositionRevision, 3);
     assert.ok(rig.parts.every((p) => asset.origin.sourceAssetIds.includes(p.assetId)), "output lists the part images as sources");
@@ -242,8 +242,8 @@ const noSelect = async (page, flow) => assert.equal(await page.locator(`[data-to
     await page.locator("[data-rg-pose]", { hasText: "揮手高點" }).getByRole("button", { name: "匯出姿勢圖" }).click();
     await waitStatus(page, "[data-cp-status]", /已匯出姿勢圖|錯誤|缺少/);
     const exported = await page.evaluate(async () => {
-      const c = (await SeedStar.characters.list()).find((x) => x.name === "示範角色（揮手）"),
-        a = (await SeedStar.assets.list()).filter((x) => x.origin?.engine === "workbench-rig").at(-1);
+      const c = (await VideoWorkbench.characters.list()).find((x) => x.name === "示範角色（揮手）"),
+        a = (await VideoWorkbench.assets.list()).filter((x) => x.origin?.engine === "workbench-rig").at(-1);
       return { c, a };
     });
     const pose = exported.c.poses[0];

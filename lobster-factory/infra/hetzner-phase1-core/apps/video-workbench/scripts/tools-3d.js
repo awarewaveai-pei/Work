@@ -1,6 +1,6 @@
 // Card P5 (handoff 3D scope: models, skeleton, camera, lights, retargeting): the 「3D」 workspace (#3d).
 // Library (GLB in the media store) | viewer (scripts/viewer3d.mjs, three.js WebGL) | inspector. Scenes live in the
-// server ledger (SeedStar.scenes3d) with a revision and the last 20 previous revisions, like P3 compositions.
+// server ledger (VideoWorkbench.scenes3d) with a revision and the last 20 previous revisions, like P3 compositions.
 // Blender jobs (retarget, render) and Meshy image -> 3D go through the /generations queue (cancel/retry/history).
 // The render is an alpha MOV that 放到剪輯時間軸 places like a composition (cpPlaceAsset). The viewer is a preview
 // (預覽近似: lights, IK); the Blender render is the output. Visible buttons/inputs only, no <select>.
@@ -50,7 +50,7 @@ const t3Num = (label, field, value, { step = 0.1, min, max } = {}) =>
 const t3Obj = () => t3.doc?.objects.find((o) => o.id === t3.obj) || null;
 const t3Rid = () => Math.random().toString(36).slice(2, 10);
 const t3Engine = () =>
-  SeedStar.capabilities?.blender || {
+  VideoWorkbench.capabilities?.blender || {
     available: false,
     install: "node scripts/vendor-blender.cjs",
   };
@@ -83,14 +83,14 @@ const t3Strip = (d) => {
 
 // ---- data -------------------------------------------------------------------------------------------------
 async function t3Load() {
-  t3.list = await SeedStar.scenes3d.list();
+  t3.list = await VideoWorkbench.scenes3d.list();
   t3.ready = true;
 }
 function t3Boot() {
   if (t3.ready || t3.loading) return t3.loading;
   t3.loading = t3Load()
     .then(() => tool === "3d" && render())
-    .catch(SeedStar.reportError)
+    .catch(VideoWorkbench.reportError)
     .finally(() => (t3.loading = null));
   return t3.loading;
 }
@@ -113,7 +113,7 @@ async function t3Save() {
     history: saved ? [t3Strip(saved), ...saved.history].slice(0, 20) : [],
     updatedAt: new Date().toISOString(),
   };
-  await SeedStar.scenes3d.save(next);
+  await VideoWorkbench.scenes3d.save(next);
   t3.list = [...t3.list.filter((s) => s.id !== doc.id), next];
   t3.doc = structuredClone(next);
   t3.dirty = false;
@@ -130,13 +130,13 @@ async function t3Restore() {
     history: [t3Strip(saved), ...rest].slice(0, 20),
     updatedAt: new Date().toISOString(),
   };
-  await SeedStar.scenes3d.save(next);
+  await VideoWorkbench.scenes3d.save(next);
   t3.list = [...t3.list.filter((s) => s.id !== saved.id), next];
   t3Open(saved.id);
 }
 const t3Touch = () => (t3.dirty = true);
 async function t3Models() {
-  return (await SeedStar.assets.list()).filter(
+  return (await VideoWorkbench.assets.list()).filter(
     (a) => a.kind === "model" || /\.glb$/.test(a.url || ""),
   );
 }
@@ -216,13 +216,13 @@ async function t3Wait(job, label) {
   t3.job = { id: job.id, label, progress: 0 };
   render();
   for (;;) {
-    const j = await SeedStar.generations.get(job.id);
+    const j = await VideoWorkbench.generations.get(job.id);
     if (t3.job?.id === job.id) t3.job.progress = j.progress || 0;
     const el = document.querySelector("[data-t3-progress]");
     if (el) el.textContent = `${label}：${j.progress || 0}%`;
     if (j.status === "succeeded") {
       t3.job = null;
-      return await SeedStar.assets.save({
+      return await VideoWorkbench.assets.save({
         ...j.result,
         id: "job-" + j.id,
         name:
@@ -300,7 +300,7 @@ async function t3Retarget() {
   const doc = await t3Ensure();
   const boneMap = t3ParseMap(t3.boneMapText);
   for (const k of Object.keys(boneMap)) if (!boneMap[k]) delete boneMap[k];
-  const job = await SeedStar.generations.create({
+  const job = await VideoWorkbench.generations.create({
     type: "model",
     operation: "blender-retarget",
     prompt: "3D 動作重定向",
@@ -343,7 +343,7 @@ async function t3Render() {
   };
   await t3Sync();
   const { width, height, frames, fps } = doc.output;
-  const job = await SeedStar.generations.create({
+  const job = await VideoWorkbench.generations.create({
     type: "video",
     operation: "blender-render",
     prompt: "3D 渲染",
@@ -355,7 +355,7 @@ async function t3Render() {
 }
 async function t3Rendered(doc) {
   return (
-    (await SeedStar.assets.list())
+    (await VideoWorkbench.assets.list())
       .filter(
         (a) =>
           a.origin?.engine?.startsWith("blender-") &&
@@ -379,13 +379,13 @@ async function t3Place(projectId) {
 async function t3Shot() {
   const o = t3Obj();
   await t3Sync();
-  const stored = await SeedStar.request("/3d/stills", {
+  const stored = await VideoWorkbench.request("/3d/stills", {
     data: t3.viewer.screenshot(),
     sceneId: t3.doc?.revision ? t3.doc.id : undefined,
     sceneRevision: t3.doc?.revision || undefined,
     parentAssetId: o?.asset.id,
   });
-  const asset = await SeedStar.assets.save({
+  const asset = await VideoWorkbench.assets.save({
     ...stored,
     name: `${o?.asset.name || "3D"} 指定角度`,
     createdAt: new Date().toISOString(),
@@ -394,7 +394,7 @@ async function t3Shot() {
 }
 async function t3Meshy() {
   if (!t3.meshyImage) throw Error("先選一張圖片");
-  const job = await SeedStar.generations.create({
+  const job = await VideoWorkbench.generations.create({
     type: "model",
     operation: "meshy-image-to-3d",
     prompt: "圖片轉 3D",
@@ -436,11 +436,11 @@ async function t3Upload(kind) {
   const mime = /\.bvh$/i.test(file.name)
     ? "application/x-bvh"
     : "model/gltf-binary";
-  const stored = await SeedStar.request("/uploads", {
+  const stored = await VideoWorkbench.request("/uploads", {
     name: file.name,
     data: `data:${mime};base64,${btoa(binary)}`,
   });
-  const asset = await SeedStar.assets.save({
+  const asset = await VideoWorkbench.assets.save({
     ...stored,
     createdAt: new Date().toISOString(),
   });
@@ -462,7 +462,7 @@ async function t3PickMotion(asset) {
 function toolThreeDScreen(t) {
   t3Boot();
   const engine = t3Engine(),
-    meshy = SeedStar.capabilities?.meshy || { available: false },
+    meshy = VideoWorkbench.capabilities?.meshy || { available: false },
     d = t3.doc;
   const banner = engine.available
     ? ""
@@ -527,10 +527,10 @@ function t3MeshyPanel(meshy) {
 // Lists that need the asset library / editor projects are filled after render (both are async).
 async function toolThreeDAfterRender() {
   if (!t3.ready) return;
-  const assets = await SeedStar.assets.list();
+  const assets = await VideoWorkbench.assets.list();
   const fill = (sel, html) =>
     document.querySelector(sel) &&
-    (document.querySelector(sel).innerHTML = SeedStar.sanitize(html));
+    (document.querySelector(sel).innerHTML = VideoWorkbench.sanitize(html));
   fill(
     "[data-t3-library]",
     assets
@@ -593,7 +593,7 @@ async function t3Action(action) {
     arg = rest.join(":"),
     d = t3.doc,
     o = t3Obj();
-  const assets = () => SeedStar.assets.list();
+  const assets = () => VideoWorkbench.assets.list();
   if (name === "new") ((t3.doc = t3New()), (t3.obj = null), (t3.dirty = true));
   else if (name === "open") t3Open(arg);
   else if (name === "list") t3.doc = null;
@@ -665,7 +665,7 @@ async function t3Action(action) {
   else if (name === "retarget") await t3Retarget();
   else if (name === "render") await t3Render();
   else if (name === "cancel-job") {
-    if (t3.job) await SeedStar.generations.cancel(t3.job.id);
+    if (t3.job) await VideoWorkbench.generations.cancel(t3.job.id);
     return;
   } else if (name === "place") await t3Place(arg);
   else if (name === "shot") await t3Shot();
@@ -708,7 +708,7 @@ document.addEventListener("click", (e) => {
   t3Action(el.dataset.t3Action).catch((error) => {
     t3.status = error.message;
     render();
-    SeedStar.reportError(error);
+    VideoWorkbench.reportError(error);
   });
 });
 document.addEventListener("change", (e) => {

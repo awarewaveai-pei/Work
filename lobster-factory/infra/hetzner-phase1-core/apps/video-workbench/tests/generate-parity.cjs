@@ -1,10 +1,10 @@
 const assert = require("node:assert/strict"), fs = require("node:fs"), path = require("node:path"), os = require("node:os"), { spawnSync } = require("node:child_process");
 const { chromium } = require("playwright");
-const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "seedstar-generate-parity-"));
+const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "vw-generate-parity-"));
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jTioAAAAASUVORK5CYII=", "base64");
 (async () => {
   const providerCalls = [];
-  const server = require("../server.cjs").createServer({ dataDir: path.join(evidence, "data"), env: { OPENAI_API_KEY: "test-only", SEEDSTAR_VIDEO_MODEL: "configured-video" }, fetchImpl: async (url, options) => {
+  const server = require("../server.cjs").createServer({ dataDir: path.join(evidence, "data"), env: { OPENAI_API_KEY: "test-only", VW_VIDEO_MODEL: "configured-video" }, fetchImpl: async (url, options) => {
     providerCalls.push({ url, body: options.body });
     if (url.endsWith("/videos")) return Response.json({ id: "fixture-video", status: "queued" });
     if (url.endsWith("/images/generations")) return Response.json({ data: [{ b64_json: png.toString("base64") }] });
@@ -20,7 +20,7 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     p.setDefaultTimeout(7000);
     await p.route("**/*", (r) => r.request().url().startsWith(base + "/") ? r.continue() : r.abort());
     await p.goto(base);
-    await p.waitForFunction(() => window.SeedStar?.generator?.controlsReady);
+    await p.waitForFunction(() => window.VideoWorkbench?.generator?.controlsReady);
     await p.locator("[data-mode=reference]").click();
     assert.match(await p.locator("#modelBtn").innerText(), /configured-video/);
     await p.locator("#prompt").fill("測試海邊影片");
@@ -34,7 +34,7 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     await p.getByRole("button", { name: "設為預設", exact: true }).click();
     await p.locator("#closeModal").click();
     await p.reload();
-    await p.waitForFunction(() => SeedStar.generator.controlsReady);
+    await p.waitForFunction(() => VideoWorkbench.generator.controlsReady);
     await p.locator("[data-mode=reference]").click();
     assert.match(await p.locator("#outputBtn").innerText(), /16:9、9:16.*12s/);
     console.log("PASS 儲存設定與預設跨重新整理生效；多比例、支援時長、服務端模型");
@@ -51,7 +51,7 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     assert.match(await p.locator("#prompt").inputValue(), /@image1/);
     console.log("PASS @ 引用選擇實際素材");
 
-    await p.route("**/api/seedstar/generations", async (r) => {
+    await p.route("**/api/vw/generations", async (r) => {
       const body = r.request().postDataJSON(); submissions.push(body);
       if (body.operation === "separate") return r.continue();
       if (body.settings?.ratio === "9:16") return r.fulfill({ status: 503, json: { error: { message: "測試：直式暫時不可用" } } });
@@ -81,12 +81,12 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     assert.equal(await p.locator('[data-gen-product-choice="target"][data-value="促進購買"]').getAttribute("aria-pressed"), "true");
     console.log("PASS 拍片來源與素材欄位；商品不再顯示假圖，選項可見且重繪保留");
     await p.evaluate(async () => {
-      await SeedStar.preferences.set("workspace.skills", [{ id: "hidden-skill", name: "先前技能", prompt: "HIDDEN_SKILL_MARKER" }]);
-      const draft = SeedStar.generator.getDraft();
+      await VideoWorkbench.preferences.set("workspace.skills", [{ id: "hidden-skill", name: "先前技能", prompt: "HIDDEN_SKILL_MARKER" }]);
+      const draft = VideoWorkbench.generator.getDraft();
       draft.mode = "product"; draft.skill = "先前技能"; draft.productStep = 3;
       draft.ratio = "16:9"; draft.ratios = ["16:9", "9:16"];
       draft.productScripts = [{ time: "0–8秒", text: "商品實測腳本" }];
-      SeedStar.generator.setDraft(draft);
+      VideoWorkbench.generator.setDraft(draft);
     });
     await p.locator('[data-action="product-submit"]').click();
     await p.getByRole("heading", { name: "多比例生成任務" }).waitFor();
@@ -123,7 +123,7 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     await p.locator("[data-picker-confirm]").click();
     await p.getByRole("button", { name: "加入參考音訊" }).waitFor();
     await p.getByRole("button", { name: "加入參考音訊" }).click();
-    const extracted = await p.evaluate(() => SeedStar.generator.getDraft().refs.reference.audios[0]);
+    const extracted = await p.evaluate(() => VideoWorkbench.generator.getDraft().refs.reference.audios[0]);
     assert.match(extracted.url, /\.mp3$/);
     assert.equal((await p.request.get(base + extracted.url)).status(), 200);
     await p.screenshot({ path: path.join(evidence, "reference.png") });
@@ -132,11 +132,11 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     assert(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
     console.log("PASS 從影片擷取真實 MP3 並套用，手機版無橫向溢出");
     await p.evaluate(() => {
-      const draft = SeedStar.generator.getDraft();
+      const draft = VideoWorkbench.generator.getDraft();
       draft.refType = "first"; draft.refs.reference.firstFrame = draft.refs.reference.images.slice(0, 1);
       draft.refs.reference.audios = []; draft.refs.reference.lastFrame = [];
       draft.refs.reference.videos = [{ name: "隱藏的全能參考影片", type: "video/mp4", url: "/generated/hidden.mp4" }];
-      SeedStar.generator.setDraft(draft);
+      VideoWorkbench.generator.setDraft(draft);
     });
     await p.locator("#send").click();
     await p.getByRole("heading", { name: "多比例生成任務" }).waitFor();
@@ -148,12 +148,12 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     await p.locator("[data-panel=settings]").first().click();
     await p.locator('[data-ratio="1:1"]').click();
     await p.locator("[data-mode=reference]").click();
-    assert(!(await p.evaluate(() => SeedStar.generator.getDraft().ratios)).includes("1:1"));
+    assert(!(await p.evaluate(() => VideoWorkbench.generator.getDraft().ratios)).includes("1:1"));
     await p.evaluate(() => {
-      const draft = SeedStar.generator.getDraft();
+      const draft = VideoWorkbench.generator.getDraft();
       draft.mode = "director"; draft.directorStage = "script"; draft.directorScript = "六圖分鏡測試";
       draft.refs.director.images = Array.from({ length: 6 }, (_, i) => ({ id: "r" + i, name: "參考" + i, url: "/assets/test-image-1.png", type: "image/png" }));
-      SeedStar.generator.setDraft(draft);
+      VideoWorkbench.generator.setDraft(draft);
     });
     await p.locator("[data-action=director-storyboard]").click();
     assert.equal(await p.locator("[data-storyboard-reference]").count(), 6);
@@ -174,11 +174,11 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
 
     const before = providerCalls.length;
     for (const settings of [{ subtitle: "開" }, { audio: "靜音" }, { quality: "480p" }, { ratio: "1:1" }]) {
-      const response = await fetch(base + "/api/seedstar/generations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "video", prompt: "guard", settings }) });
+      const response = await fetch(base + "/api/vw/generations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "video", prompt: "guard", settings }) });
       assert.equal(response.status, 400);
     }
     assert.equal(providerCalls.length, before);
-    const response = await fetch(base + "/api/seedstar/generations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "cartoon", prompt: "cat", cartoonStyle: "水彩", settings: { duration: 4 } }) });
+    const response = await fetch(base + "/api/vw/generations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "cartoon", prompt: "cat", cartoonStyle: "水彩", settings: { duration: 4 } }) });
     assert.equal(response.status, 202);
     assert.equal((await response.json()).type, "video");
     await new Promise((r) => setTimeout(r, 100));

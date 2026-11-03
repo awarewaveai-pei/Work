@@ -1,6 +1,6 @@
 # 在 repo 的位置（2026-11-02 搬入，先讀這段）
 
-原始碼 2026-11-02 從交付包（原 `D:\Video\SeedStar-app`，已退場）搬到這裡，只在這裡改。啟動仍是雙擊 `start.cmd`（http://127.0.0.1:4178/）。外觀直接讀旁邊的 `../next-admin`，不再用 AwareWave-source 副本。
+原始碼 2026-11-02 從交付包（原 `D:\Video\video-workbench`，已退場）搬到這裡，只在這裡改。啟動仍是雙擊 `start.cmd`（http://127.0.0.1:4178/）。外觀直接讀旁邊的 `../next-admin`，不再用 AwareWave-source 副本。
 
 不進 git（見 `.gitignore`；D:\Work 是公開 repo）：
 
@@ -24,13 +24,13 @@
 
 `tests/sidebar-overlays.cjs` 以隔離 TEMP 資料驗證桌面／手機各 11 個導覽入口，涵蓋設定、素材預覽及成果浮層，確認點擊命中導覽、切頁完成且沒有殘留輪詢。generator-deep-actions、popover-ratios、appearance 回歸通過。實際 4179 預覽亦已操作儲存設定→應用工具、素材庫→應用工具→生成頁成功。
 
-Claude 首次審查 approve，提出兩個 minor：引用選單改用既有關閉 helper，已修正且限定複核為 approve／零 finding；成果帶入工具時若工具載入失敗，成果視窗已關閉，但成果仍可從歷史紀錄重新開啟，此行為保留。原文、備份及凍結快照：`%TEMP%/seedstar-sidebar-4repghxx/`。
+Claude 首次審查 approve，提出兩個 minor：引用選單改用既有關閉 helper，已修正且限定複核為 approve／零 finding；成果帶入工具時若工具載入失敗，成果視窗已關閉，但成果仍可從歷史紀錄重新開啟，此行為保留。原文、備份及凍結快照：`%TEMP%/vw-sidebar-4repghxx/`。
 
 分鏡靈感五個專用檔案及共用 workspaces.css SHA-256 均符合修改前基線；沒有修改分鏡設計。僅根工作台 CSS、路由浮層清理及成果關閉按鍵標記有所變更。新版請使用 http://127.0.0.1:4179/ ，既有分頁需重新整理才會載入新 CSS／路由程式。
 
 - REALTEST_EVIDENCE: tool=exec_command | cmd=node tests/sidebar-overlays.cjs | exit=0
 - REVIEW_DONE: critic=Claude | verdict=approve | findings=0 | scope=引用選單關閉限定複核
-- BUGHUNT_DONE: scope=SeedStar-app/styles/index.css,scripts/index-1.js,shared/jobs-view.js,tests | checks=overlay-hit-testing,sidebar-navigation,picker-settlement,polling-cleanup
+- BUGHUNT_DONE: scope=video-workbench/styles/index.css,scripts/index-1.js,shared/jobs-view.js,tests | checks=overlay-hit-testing,sidebar-navigation,picker-settlement,polling-cleanup
 
 ---
 
@@ -41,13 +41,13 @@ Claude 首次審查 approve，提出兩個 minor：引用選單改用既有關�
 - 影片服務仍只接受 16:9／9:16，新比例在影片設定中明示停用；重拍可保存新比例草稿，仍未接專用服務。
 - 分鏡靈感保護檔六項 SHA-256 與修改前完全相同，沒有更動其設計。
 
-新增 `tests/popover-ratios.cjs`，以隔離 TEMP 資料與 mock provider 驗證桌面／手機關閉、焦點返回、草稿保存及六種真實 PNG 尺寸。generator-buttons、generate-parity、generate-mode-audit 回歸通過。Claude 唯讀審查 approve、零 finding；凍結差異與原文在 `%TEMP%/seedstar-popover-ratios-crg5vww9/`。
+新增 `tests/popover-ratios.cjs`，以隔離 TEMP 資料與 mock provider 驗證桌面／手機關閉、焦點返回、草稿保存及六種真實 PNG 尺寸。generator-buttons、generate-parity、generate-mode-audit 回歸通過。Claude 唯讀審查 approve、零 finding；凍結差異與原文在 `%TEMP%/vw-popover-ratios-crg5vww9/`。
 
 新版受管理預覽已啟動於 http://127.0.0.1:4179/ ，資料隔離於 `.data-4179`。原本 http://127.0.0.1:4178/ 程序保留，該程序的後端仍是舊版；請使用 4179 檢查本次新增比例。預覽沒有遷移原網址瀏覽器的素材庫。封裝仍以 start.cmd 啟動，預設 4178，需先關閉原本佔用該埠的服務。
 
 - REALTEST_EVIDENCE: tool=exec_command | cmd=node tests/popover-ratios.cjs | exit=0
 - REVIEW_DONE: critic=Claude | verdict=approve | findings=0 | scope=設定關閉與新圖片比例
-- BUGHUNT_DONE: scope=SeedStar-app/scripts,backend,styles,tests | checks=popover-close,focus-return,ratio-restore,provider-orientation,image-dimensions
+- BUGHUNT_DONE: scope=video-workbench/scripts,backend,styles,tests | checks=popover-close,focus-return,ratio-restore,provider-orientation,image-dimensions
 
 ---
 
@@ -73,11 +73,11 @@ Claude 首次審查 approve，提出兩個 minor：引用選單改用既有關�
 
 本輪測試通過：director-conversation、product-script、product-inspect、generator-deep-actions、generation-flows、generator-buttons、backend、generate-parity、generate-mode-audit、appearance、host-adapter、startup、restored-ui。原 generate-parity 的「商品技能隱藏所以不套用」舊斷言，已隨商品頁新增明確可見的技能控制，更新為驗證顯示並實際套用。
 
-Claude 首次審查提出成果還原與導演生命週期等五項問題，已修正並新增回歸；限定修正複核為 approve、零 finding。完整原文與凍結快照在 `%TEMP%/seedstar-deep-review-3w3bjtps/`。無 Git repo，未建立虛構 Git ORACLE 紀錄。分鏡保護雜湊全部符合基線。
+Claude 首次審查提出成果還原與導演生命週期等五項問題，已修正並新增回歸；限定修正複核為 approve、零 finding。完整原文與凍結快照在 `%TEMP%/vw-deep-review-3w3bjtps/`。無 Git repo，未建立虛構 Git ORACLE 紀錄。分鏡保護雜湊全部符合基線。
 
 - REALTEST_EVIDENCE: tool=exec_command | cmd=node tests/director-conversation.cjs | exit=0
 - REVIEW_DONE: critic=Claude | verdict=approve | findings=0 | scope=本輪深層流程及審查修正
-- BUGHUNT_DONE: scope=SeedStar-app/scripts,shared,backend,styles,tests | checks=restore-routing,conversation-reset,stale-reply,duration,region-mask,public-url
+- BUGHUNT_DONE: scope=video-workbench/scripts,shared,backend,styles,tests | checks=restore-routing,conversation-reset,stale-reply,duration,region-mask,public-url
 
 啟動狀態：原本 4178 的程序仍在運作；本輪重啟與另開背景服務的命令均遭工具政策拒絕（blocked by policy），未能套用新後端到該執行中程序。新程式碼與封裝已寫入磁碟；要使用新後端，請關閉原啟動視窗，再執行此版本的 `start.cmd`。不要把原程序仍回應 HTTP 200 當成新後端已部署。
 
@@ -99,16 +99,16 @@ Claude 首次審查提出成果還原與導演生命週期等五項問題，已�
 | 面板關閉 | 修正輸出面板遮住原按鍵，及面板容器誤被當成觸發按鍵的問題；面板按觸發按鍵定位，再點原鍵、點外側、Escape 或切換模式可關閉。 |
 | 其他既有按鍵 | 六種卡通風格、導演初始／腳本操作、商品四步驟、圖片尺寸、儲存／套用預設、上傳、清除、音軌擷取由既有及新增回歸覆蓋。商品解析、對嘴、動作轉移及官網模型仍受服務邊界限制。 |
 
-驗證：`node tests/generator-buttons.cjs`、`node tests/generate-parity.cjs`、`node tests/generate-mode-audit.cjs`、`node tests/restored-ui.cjs` 通過；合約型別檢查與 `node tests/appearance.cjs`、`node tests/generation-flows.cjs` 通過。測試採隔離暫存資料與供應商攔截；沒有呼叫付費生成。另以實際 4178 工作台目視確認字幕面板；隔離桌面截圖在 `%TEMP%/seedstar-buttons-visual-CnWwjU/`。外觀延用 AwareWave tokens，沒有改主系統或部署。
+驗證：`node tests/generator-buttons.cjs`、`node tests/generate-parity.cjs`、`node tests/generate-mode-audit.cjs`、`node tests/restored-ui.cjs` 通過；合約型別檢查與 `node tests/appearance.cjs`、`node tests/generation-flows.cjs` 通過。測試採隔離暫存資料與供應商攔截；沒有呼叫付費生成。另以實際 4178 工作台目視確認字幕面板；隔離桌面截圖在 `%TEMP%/vw-buttons-visual-CnWwjU/`。外觀延用 AwareWave tokens，沒有改主系統或部署。
 
 跨模型審查：Claude 唯讀檢查九個改動檔，提出舊設定字幕值殘留與口播 @ 焦點問題；均修正並由實測驗證。最後限定焦點守衛複核為 `approve`，保留一項不影響功能的測試顯式斷言建議；不把限定複核當全站驗收。審查原文 `review-answer.json`、`verify-answer.json`、`focus-answer.json` 均在下述備份目錄。
 
 - REALTEST_EVIDENCE: tool=Bash | cmd=node tests/generator-buttons.cjs | exit=0 | ms=9119
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n
-- BUGHUNT_DONE: scope=SeedStar-app/scripts,SeedStar-app/shared,SeedStar-app/styles,SeedStar-app/tests,D:/Work/agency-os,D:/Work/scripts | grep=subtitleOptions,generatorMentions,generatorSkillCatalogue,data-picker-source,dataset.activePanel | hits=31
+- BUGHUNT_DONE: scope=video-workbench/scripts,video-workbench/shared,video-workbench/styles,video-workbench/tests,D:/Work/agency-os,D:/Work/scripts | grep=subtitleOptions,generatorMentions,generatorSkillCatalogue,data-picker-source,dataset.activePanel | hits=31
 - BUGHUNT_SCOPE_NARROW: D:/Work 僅唯讀核對；所有功能修改限本機交付資料夾。
 
-測試截圖：`%TEMP%/seedstar-buttons-test-0ZkleY/`；其他證據：`seedstar-generate-parity-T1fHTR`、`seedstar-mode-audit-Js5O36`、`seedstar-restored-ui-DFs93Z`。修改前備份與審查快照：`%TEMP%/seedstar-buttons-cbb16ced8d1e42a88895f234cb1da62f/`。復原時先停止服務，以該備份對應檔案復原；不要覆蓋 `.data`。此目錄無 Git，不建立 repo 或分支。
+測試截圖：`%TEMP%/vw-buttons-test-0ZkleY/`；其他證據：`vw-generate-parity-T1fHTR`、`vw-mode-audit-Js5O36`、`vw-restored-ui-DFs93Z`。修改前備份與審查快照：`%TEMP%/vw-buttons-cbb16ced8d1e42a88895f234cb1da62f/`。復原時先停止服務，以該備份對應檔案復原；不要覆蓋 `.data`。此目錄無 Git，不建立 repo 或分支。
 
 ---
 
@@ -130,7 +130,7 @@ Claude 首次審查提出成果還原與導演生命週期等五項問題，已�
 | 口播加入參考圖能進素材來源 | 本機會嘗試開啟不存在的 spoken/images，直接報錯 | 導向人物選擇器的素材庫分頁。人物對嘴服務仍未接入，輸出仍為配音 |
 | 圖片預設 1:1，單選比例，1K／2K／4K及明確尺寸 | 與影片共用比例、只有 1K；16:9 也可能實際拿到 3:2 | 圖片設定獨立，實際輸出符合尺寸；本機置中裁切及縮放，保留並提供供應商原圖下載。2K／4K不是新增AI細節 |
 
-本輪測試：`npm run test:modes`（實際瀏覽器／檔案結果驗證）、`npm run test:generate`、`npm run test:backend`，外觀橋接、復原 UI 與 HTTP adapter 回歸也通過。`test:modes` 讀取真實 PNG IHDR，確認 2K 橫式為 2048×1152、4K 直式為 2304×4096；另注入 FFmpeg 失敗，驗證原圖仍可下載，工作台與歷史重試均經 `generations.retry` 改走本機 `image-output`，不再次呼叫 AI。作品帶入保留既有 2K 設定。API 回應使用 mock，尺寸轉換為真實 FFmpeg；未呼叫付費供應商。最新證據：`%TEMP%/seedstar-mode-audit-zo2VBG/`。`shared/contracts.d.ts` 以 strict/noEmit、`types: []` 獨立檢查通過，避免無關的 Node ambient types 版本衝突；未修改主系統 TypeScript 設定。上一輪紀錄保留在下方，不能據此推論已和官網全功能相同。
+本輪測試：`npm run test:modes`（實際瀏覽器／檔案結果驗證）、`npm run test:generate`、`npm run test:backend`，外觀橋接、復原 UI 與 HTTP adapter 回歸也通過。`test:modes` 讀取真實 PNG IHDR，確認 2K 橫式為 2048×1152、4K 直式為 2304×4096；另注入 FFmpeg 失敗，驗證原圖仍可下載，工作台與歷史重試均經 `generations.retry` 改走本機 `image-output`，不再次呼叫 AI。作品帶入保留既有 2K 設定。API 回應使用 mock，尺寸轉換為真實 FFmpeg；未呼叫付費供應商。最新證據：`%TEMP%/vw-mode-audit-zo2VBG/`。`shared/contracts.d.ts` 以 strict/noEmit、`types: []` 獨立檢查通過，避免無關的 Node ambient types 版本衝突；未修改主系統 TypeScript 設定。上一輪紀錄保留在下方，不能據此推論已和官網全功能相同。
 
 圖片轉換失敗仍標記失敗，並明示目前提供的是供應商原圖，不能把錯誤尺寸宣稱為完成。原圖的 `sourceUrl` 留在任務結果；本機轉換重試只需生成檔案來源與原設定，不需要供應商金鑰。「檢查最新狀態」只查詢和顯示，不建立任務；只有明確選擇再次執行才可重跑 AI。網路中斷、逾時或 2xx 格式不符會保留為 submissionUnconfirmed，不能直接重送；明確 HTTP 拒絕則可重試。
 
@@ -138,16 +138,16 @@ Claude 首次審查提出成果還原與導演生命週期等五項問題，已�
 
 - REALTEST_EVIDENCE: tool=Bash | cmd=node tests/generate-mode-audit.cjs | exit=0 | ms=17406
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n
-- BUGHUNT_DONE: scope=SeedStar-app/scripts,SeedStar-app/shared,SeedStar-app/backend,SeedStar-app/tests,D:/Work/agency-os,D:/Work/scripts | grep=generatorSwitchMode,generatorMotionWorkspace,image-output,normalizeImage,submissionUnconfirmed,generations.refresh | hits=28
+- BUGHUNT_DONE: scope=video-workbench/scripts,video-workbench/shared,video-workbench/backend,video-workbench/tests,D:/Work/agency-os,D:/Work/scripts | grep=generatorSwitchMode,generatorMotionWorkspace,image-output,normalizeImage,submissionUnconfirmed,generations.refresh | hits=28
 - BUGHUNT_SCOPE_NARROW: 主系統僅唯讀核對；改動仍限本機工作台，未部署。
 
-最後一次完整模式測試證據：`%TEMP%/seedstar-mode-audit-UsCFBe/`。HTTP 測試另驗證 422 明確拒絕可重試；網路錯誤、格式不符與 504 閘道逾時不重送。Claude 的初審、逐項複核及最後剩餘問題的限定範圍 `approve` 原文皆保存在 `%TEMP%/seedstar-mode-review-i7k8mpkf/`；靜態審查沒有代替上述真實測試。第二輪修改前備份：`%TEMP%/seedstar-second-audit-ba422fc6-2e72-4b61-a7d4-02d65bba1ad1/`，只還原對應原始碼，不覆寫 `.data`；本輪新檔僅 `tests/generate-mode-audit.cjs`。
+最後一次完整模式測試證據：`%TEMP%/vw-mode-audit-UsCFBe/`。HTTP 測試另驗證 422 明確拒絕可重試；網路錯誤、格式不符與 504 閘道逾時不重送。Claude 的初審、逐項複核及最後剩餘問題的限定範圍 `approve` 原文皆保存在 `%TEMP%/vw-mode-review-i7k8mpkf/`；靜態審查沒有代替上述真實測試。第二輪修改前備份：`%TEMP%/vw-second-audit-ba422fc6-2e72-4b61-a7d4-02d65bba1ad1/`，只還原對應原始碼，不覆寫 `.data`；本輪新檔僅 `tests/generate-mode-audit.cjs`。
 
 ---
 
 ## 第一次修改紀錄（有遺漏，以上方第二次核對為準）
 
-第一次曾開啟 [SeedStar 生成頁](https://seedstar.ai/generate)，但未完成逐項對齊就交付，導致上方所列缺口。以下是當時的修改紀錄，不是全功能核對完成的證據。
+第一次曾開啟 [VideoWorkbench 生成頁](https://seedstar.ai/generate)，但未完成逐項對齊就交付，導致上方所列缺口。以下是當時的修改紀錄，不是全功能核對完成的證據。
 
 | 項目 | 本輪變更 |
 |---|---|
@@ -178,14 +178,14 @@ Claude 首次審查提出成果還原與導演生命週期等五項問題，已�
 
 本輪可重跑：`npm run test:generate`、`npm run test:host`、`node tests/appearance.cjs`、`npm run test:backend`、`node tests/startup.cjs`、`node tests/restored-ui.cjs`。所有新測試採暫存資料目錄；付費供應商均攔截或 mock。`test:generate` 的音軌擷取使用真實 FFmpeg。
 
-驗證紀錄：上述六組皆通過。Claude 初審提出 2 個 medium、2 個 low，查證後全部修正，複核 `approve / findings: []`。審查快照及原文保存在 `%TEMP%/seedstar-review-5zfd13mx/`；生成流程截圖與測試證據在 `%TEMP%/seedstar-generate-parity-lkzle3/`。審查工具只讀檔；測試由本機 Node／Edge／FFmpeg 實際執行。
+驗證紀錄：上述六組皆通過。Claude 初審提出 2 個 medium、2 個 low，查證後全部修正，複核 `approve / findings: []`。審查快照及原文保存在 `%TEMP%/vw-review-5zfd13mx/`；生成流程截圖與測試證據在 `%TEMP%/vw-generate-parity-lkzle3/`。審查工具只讀檔；測試由本機 Node／Edge／FFmpeg 實際執行。
 
 - REALTEST_EVIDENCE: tool=Bash | cmd=node tests/generate-parity.cjs | exit=0 | ms=8151
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n
-- BUGHUNT_DONE: scope=SeedStar-app/scripts,SeedStar-app/shared,SeedStar-app/backend,SeedStar-app/tests,SeedStar-app/README.md,D:/Work/agency-os,D:/Work/scripts | grep=generatorNormalizeSettings,generatorSubmit,generatorPresetKey,generationPolicy,service-request,data-storyboard-reference | hits=25
+- BUGHUNT_DONE: scope=video-workbench/scripts,video-workbench/shared,video-workbench/backend,video-workbench/tests,video-workbench/README.md,D:/Work/agency-os,D:/Work/scripts | grep=generatorNormalizeSettings,generatorSubmit,generatorPresetKey,generationPolicy,service-request,data-storyboard-reference | hits=25
 - BUGHUNT_SCOPE_NARROW: 主系統僅唯讀核對；本輪改動限本機工作台及共享操作者記憶，未修改或部署 D:/Work。
 
-復原：修改前備份位於 `%TEMP%/seedstar-before-62c3ca10-d39f-4da0-ab08-49e785e37c0d/SeedStar-app/`。如需回復，先停止此目錄服務，再以備份對應原始碼取代改動檔並移除本輪新檔 `scripts/generator-controls.js`、`backend/generation-policy.cjs`、`tests/generate-parity.cjs`、`tests/host-adapter.cjs`；不要覆寫 `.data`。此目錄不是 Git repo，未建立 repo／分支或宣稱已提交。
+復原：修改前備份位於 `%TEMP%/vw-before-62c3ca10-d39f-4da0-ab08-49e785e37c0d/video-workbench/`。如需回復，先停止此目錄服務，再以備份對應原始碼取代改動檔並移除本輪新檔 `scripts/generator-controls.js`、`backend/generation-policy.cjs`、`tests/generate-parity.cjs`、`tests/host-adapter.cjs`；不要覆寫 `.data`。此目錄不是 Git repo，未建立 repo／分支或宣稱已提交。
 
 ---
 
@@ -208,11 +208,11 @@ Claude 首次審查提出成果還原與導演生命週期等五項問題，已�
 
 ---
 
-# SeedStar 可操作本機版
+# VideoWorkbench 可操作本機版
 
 請執行 `start.cmd`。直接開啟 `index.html` 會顯示啟動說明；本機服務成功啟動後才會開瀏覽器。若 4178 已被舊版占用，啟動視窗會顯示原因並停止，避免誤開另一份程式；既有服務及資料不會被關閉或更動。
 
-解壓縮整個壓縮檔後執行 SeedStar-app/start.cmd。離線交付包已附 Windows Node.js 與 FFmpeg；若使用不含 runtime 與 node_modules 的原始碼資料夾，需安裝 Node.js 18 以上，首次啟動會安裝依賴。成功後開啟 http://127.0.0.1:4178，啟動視窗使用期間保持開啟。
+解壓縮整個壓縮檔後執行 video-workbench/start.cmd。離線交付包已附 Windows Node.js 與 FFmpeg；若使用不含 runtime 與 node_modules 的原始碼資料夾，需安裝 Node.js 18 以上，首次啟動會安裝依賴。成功後開啟 http://127.0.0.1:4178，啟動視窗使用期間保持開啟。
 
 這次已補上素材庫、技能、工作流、歷史紀錄、導演草稿、統一素材選擇器與持久檔案上傳；角色／專案／模板可以互相引用素材。工具設定按工具分別保存，重新整理可恢復。
 
@@ -236,7 +236,7 @@ Claude 首次審查提出成果還原與導演生命週期等五項問題，已�
 
 金鑰只讀取伺服器程序的 `OPENAI_API_KEY` 環境變數，沒有放在 HTML、JavaScript、ZIP 或 localStorage。設定或更換環境變數後，重開啟動視窗。
 
-可覆寫 `SEEDSTAR_TEXT_MODEL`、`SEEDSTAR_IMAGE_MODEL`、`SEEDSTAR_VIDEO_MODEL`、`SEEDSTAR_TTS_MODEL`。預設為 gpt-4.1-mini、gpt-image-2.5-flare、sora-2、gpt-4o-mini-tts。可使用的模型取決於該金鑰權限及供應商供應情況。實作依據：[OpenAI 官方文件](https://developers.openai.com/api/docs/guides/image-generation)。
+可覆寫 `VW_TEXT_MODEL`、`VW_IMAGE_MODEL`、`VW_VIDEO_MODEL`、`VW_TTS_MODEL`。預設為 gpt-4.1-mini、gpt-image-2.5-flare、sora-2、gpt-4o-mini-tts。可使用的模型取決於該金鑰權限及供應商供應情況。實作依據：[OpenAI 官方文件](https://developers.openai.com/api/docs/guides/image-generation)。
 
 目前影片服務支援 4／8／12 秒、16:9 或 9:16、單張 PNG/JPEG/WebP 參考圖；不支援影片／音訊參考及人物聲音複製。口播頁目前輸出配音音檔，人物對嘴影片尚缺專用服務。語音辨識檔案上限 25MB。
 
@@ -250,9 +250,9 @@ Claude 首次審查提出成果還原與導演生命週期等五項問題，已�
 
 ## 檔案與備份
 
-角色、專案、技能等資料由共用 store 保存於該瀏覽器的 localStorage。上傳及生成的實體檔案位於 `.data/generated`，任務帳本位於 `.data/jobs.json`。可用 `SEEDSTAR_DATA_DIR` 更換儲存位置；生成檔仍透過 `/generated/…` 讀取。
+角色、專案、技能等資料由共用 store 保存於該瀏覽器的 localStorage。上傳及生成的實體檔案位於 `.data/generated`，任務帳本位於 `.data/jobs.json`。可用 `VW_DATA_DIR` 更換儲存位置；生成檔仍透過 `/generated/…` 讀取。
 
-介面的 JSON 備份包含資料與檔案 URL，**不包含媒體實體檔案**。搬電腦時請另備份 `.data`，並匯入 JSON。交付 ZIP 不含使用者 `.data`；原始 `SeedStar_完整整合版.html` 和舊 ZIP 保留。
+介面的 JSON 備份包含資料與檔案 URL，**不包含媒體實體檔案**。搬電腦時請另備份 `.data`，並匯入 JSON。交付 ZIP 不含使用者 `.data`；原始 `VideoWorkbench_完整整合版.html` 和舊 ZIP 保留。
 
 本機服務只綁定 127.0.0.1。這不是正式多人服務；正式串接仍需登入／權限、物件儲存、扣點與帳務、資料庫及協作衝突控制。勿直接作為公開伺服器部署。
 
@@ -271,7 +271,7 @@ Claude 首次審查提出成果還原與導演生命週期等五項問題，已�
 
 正式後端 adapter 的 State 定義見 `shared/contracts.d.ts`。`config.js` 設 `mode: "http"` 與 `apiBaseUrl` 後，會呼叫 GET/PUT `/state` 及 `/generations`、`/generations/:id`、`/generations/:id/cancel` 等路由。正式服務需實作或映射這些 contract；HTTP 失敗不會偷偷改用本機資料。
 
-任務帳本預設保留最近 2000 筆已結束任務及尚未結束的任務；可用 `SEEDSTAR_JOB_HISTORY_LIMIT` 調整。舊媒體不會自動刪除，清理前請先備份。
+任務帳本預設保留最近 2000 筆已結束任務及尚未結束的任務；可用 `VW_JOB_HISTORY_LIMIT` 調整。舊媒體不會自動刪除，清理前請先備份。
 
 
 2026-11-01 補充修正：所有 JSON 模式文字請求明確帶入 JSON 回覆指令，修正 input messages 缺少 json 的 OpenAI 400。已以合成台詞完成一次真實 API 驗證，詳見 docs/json-mode-fix-20261101.md。

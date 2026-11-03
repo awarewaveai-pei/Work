@@ -7,14 +7,14 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright"),
     errors = [];
   p.on("pageerror", (e) => errors.push(e.message));
   p.setDefaultTimeout(10000);
-  await p.route("**/api/seedstar/generations", (r) =>
+  await p.route("**/api/vw/generations", (r) =>
     r.fulfill({
       status: 503,
       json: { error: { message: "測試環境：生成服務尚未設定" } },
     }),
   );
   await p.goto(base);
-  await p.waitForFunction(() => SeedStar?.router);
+  await p.waitForFunction(() => VideoWorkbench?.router);
   for (const [name, title] of [
     ["assets", "素材庫"],
     ["skills", "我的技能"],
@@ -39,7 +39,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright"),
     .locator(".workspace-card h2")
     .filter({ hasText: "可共用的圖片.png" })
     .waitFor();
-  const saved = await p.evaluate(() => SeedStar.assets.list());
+  const saved = await p.evaluate(() => VideoWorkbench.assets.list());
   assert.match(saved[0].url, /^\/generated\//);
   assert.equal(
     (await p.request.get(new URL(saved[0].url, p.url()).href)).status(),
@@ -60,7 +60,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright"),
   await projects.locator("[data-picker-confirm]").click();
   await projects.locator("[data-action=saveAsset]").click();
   await p.waitForFunction(
-    async () => (await SeedStar.projects.list())[0]?.assets[0]?.references[0],
+    async () => (await VideoWorkbench.projects.list())[0]?.assets[0]?.references[0],
   );
   console.log("PASS 專案參考圖從統一素材庫選取");
   await p.locator("#skillsNav").click();
@@ -103,7 +103,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright"),
   assert.equal(await p.locator("#prompt").inputValue(), "第二步調色");
   console.log("PASS 任務歷史檢視及草稿還原");
   await p.reload();
-  await p.waitForFunction(() => SeedStar?.router);
+  await p.waitForFunction(() => VideoWorkbench?.router);
   await p.locator("#skillsNav").click();
   await p
     .locator(".workspace-card h2")

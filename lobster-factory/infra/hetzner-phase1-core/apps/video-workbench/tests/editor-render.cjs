@@ -6,7 +6,7 @@ const assert = require("node:assert/strict"),
   { spawnSync } = require("node:child_process"),
   ffmpeg = require("ffmpeg-static"),
   { media } = require("../backend/media.cjs");
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "seedstar-editor-render-"));
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vw-editor-render-"));
 function run(args) {
   const r = spawnSync(ffmpeg, ["-y", "-hide_banner", ...args], {
     windowsHide: true,

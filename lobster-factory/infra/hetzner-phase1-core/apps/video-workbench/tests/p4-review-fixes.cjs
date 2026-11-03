@@ -51,7 +51,7 @@ function png(colour) {
     await new Promise((r) => server.listen(0, "127.0.0.1", r));
     const base = "http://127.0.0.1:" + server.address().port,
       call = async (route, data, method = "POST") => {
-        const r = await fetch(base + "/api/seedstar" + route, { method, headers: { "Content-Type": "application/json" }, ...(data ? { body: JSON.stringify(data) } : {}) });
+        const r = await fetch(base + "/api/vw" + route, { method, headers: { "Content-Type": "application/json" }, ...(data ? { body: JSON.stringify(data) } : {}) });
         const v = await r.json();
         assert(r.ok, JSON.stringify(v));
         return v;

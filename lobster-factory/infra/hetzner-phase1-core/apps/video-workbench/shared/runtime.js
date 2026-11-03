@@ -1,14 +1,14 @@
 (function () {
   "use strict";
-  const M = SeedStarModels,
+  const M = VideoWorkbenchModels,
     child =
       parent !== window &&
-      !document.documentElement.hasAttribute("data-seedstar-root"),
-    config = window.SEEDSTAR_CONFIG;
+      !document.documentElement.hasAttribute("data-vw-root"),
+    config = window.VW_CONFIG;
   const adapter =
     config.mode === "http"
-      ? new SeedStarAdapters.HttpAdapter(config)
-      : new SeedStarAdapters.LocalAdapter({ report: (e) => reportError(e) });
+      ? new VideoWorkbenchAdapters.HttpAdapter(config)
+      : new VideoWorkbenchAdapters.LocalAdapter({ report: (e) => reportError(e) });
   let db = {
     version: 1,
     revision: 0,
@@ -40,12 +40,12 @@
       }, config.timeoutMs);
       pending.set(id, { resolve, reject, timer });
       parent.postMessage(
-        { channel: "seedstar:v1", id, action, payload },
+        { channel: "vw:v1", id, action, payload },
         location.origin,
       );
     });
   function reportError(error) {
-    console.error("[SeedStar]", error);
+    console.error("[VideoWorkbench]", error);
     let box = document.getElementById("service-error");
     if (!box) {
       box = document.createElement("div");
@@ -71,7 +71,7 @@
     db.projects = db.projects.map((p) => M.project(p));
     return missing;
   }
-  const CONFLICT = "seedstar.conflict-reload";
+  const CONFLICT = "vw.conflict-reload";
   function persist() {
     queue = queue
       .catch(() => {})
@@ -96,7 +96,7 @@
     return queue;
   }
   function read(key) {
-    if (key === "seedstar.characters")
+    if (key === "vw.characters")
       return db.characters.map(M.legacyCharacter);
     if (key === "awarewave-projects-screenshot-frontend-v1")
       return { projects: db.projects.map(M.legacyProject), ...db.selection };
@@ -105,7 +105,7 @@
   function write(key, value) {
     if (["__proto__", "constructor", "prototype"].includes(key))
       throw new Error("無效的資料鍵");
-    if (key === "seedstar.characters")
+    if (key === "vw.characters")
       db.characters = [
         ...db.characters.filter(
           (c) =>
@@ -121,7 +121,7 @@
   function broadcast() {
     for (const f of document.querySelectorAll("iframe"))
       f.contentWindow?.postMessage(
-        { channel: "seedstar:v1", action: "snapshot", payload: db },
+        { channel: "vw:v1", action: "snapshot", payload: db },
         location.origin,
       );
   }
@@ -135,9 +135,9 @@
     if (action === "entity-remove")
       return collection(payload.name).remove(payload.id);
     if (action === "generator-import")
-      return SeedStar.generator.import(payload);
-    if (action === "job-get") return SeedStar.generations.get(payload.id);
-    if (action === "job-cancel") return SeedStar.generations.cancel(payload.id);
+      return VideoWorkbench.generator.import(payload);
+    if (action === "job-get") return VideoWorkbench.generations.get(payload.id);
+    if (action === "job-cancel") return VideoWorkbench.generations.cancel(payload.id);
     if (action === "service-request")
       return adapter.request(
         payload.path,
@@ -148,7 +148,7 @@
       write(payload.key, payload.value);
       await persist();
       broadcast();
-      document.dispatchEvent(new CustomEvent("seedstar:changed"));
+      document.dispatchEvent(new CustomEvent("vw:changed"));
       return payload.value;
     }
     if (action === "write") {
@@ -167,7 +167,7 @@
   window.addEventListener("message", async (event) => {
     if (
       event.origin !== location.origin ||
-      event.data?.channel !== "seedstar:v1"
+      event.data?.channel !== "vw:v1"
     )
       return;
     const m = event.data;
@@ -175,7 +175,7 @@
       if (event.source !== parent) return;
       if (m.action === "snapshot") {
         db = m.payload;
-        document.dispatchEvent(new CustomEvent("seedstar:changed"));
+        document.dispatchEvent(new CustomEvent("vw:changed"));
         return;
       }
       const p = pending.get(m.id);
@@ -190,12 +190,12 @@
     try {
       const payload = await perform(m.action, m.payload);
       event.source.postMessage(
-        { channel: "seedstar:v1", id: m.id, payload },
+        { channel: "vw:v1", id: m.id, payload },
         event.origin,
       );
     } catch (e) {
       event.source.postMessage(
-        { channel: "seedstar:v1", id: m.id, error: e.message },
+        { channel: "vw:v1", id: m.id, error: e.message },
         event.origin,
       );
     }
@@ -223,7 +223,7 @@
       try {
         result = await send();
       } catch (e) {
-        if (config.mode === "http" || e instanceof SeedStarAdapters.ServiceError)
+        if (config.mode === "http" || e instanceof VideoWorkbenchAdapters.ServiceError)
           throw e;
         result = await send();
       }
@@ -242,7 +242,7 @@
       // so 501 (unsupported) and 503 (no API key) come first. Text routes forward provider codes; do not
       // reuse this list there. 502/504, network errors and malformed 2xx stay "unconfirmed".
       const rejected =
-        e instanceof SeedStarAdapters.ServiceError &&
+        e instanceof VideoWorkbenchAdapters.ServiceError &&
         [400, 401, 403, 404, 405, 409, 413, 415, 422, 429, 501, 503].includes(
           e.status,
         );
@@ -283,7 +283,7 @@
           }
         } catch {}
       });
-  // The asset a finished job becomes. Id job-<jobId> keeps SeedStar.showJob and reconcileJobs from doubling it.
+  // The asset a finished job becomes. Id job-<jobId> keeps VideoWorkbench.showJob and reconcileJobs from doubling it.
   // The result's own media fields win (an alpha MOV keeps its VP9 previewUrl and video/quicktime type).
   const EXT_TYPE = { mov: "video/quicktime", mp4: "video/mp4", webm: "video/webm", glb: "model/gltf-binary", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", mp3: "audio/mpeg", wav: "audio/wav" };
   const jobAsset = (v) => {
@@ -333,7 +333,7 @@
     if (changed) {
       await persist().catch(reportError);
       broadcast();
-      document.dispatchEvent(new CustomEvent("seedstar:changed"));
+      document.dispatchEvent(new CustomEvent("vw:changed"));
     }
     if (running) setTimeout(() => reconcileJobs().catch(reportError), 5000);
   }
@@ -398,7 +398,7 @@
       return v;
     },
   });
-  window.SeedStar = {
+  window.VideoWorkbench = {
     request: (path, body, method = "POST") =>
       child
         ? rpc("service-request", { path, body, method })
@@ -446,9 +446,9 @@
         job.serverAccepted === false ||
         (!job.serverAccepted && ["blocked", "submitting"].includes(job.status))
           ? Promise.resolve(job)
-          : window.SeedStar.generations.get(job.id),
+          : window.VideoWorkbench.generations.get(job.id),
       retry: async (job) => {
-        const current = await window.SeedStar.generations.refresh(job);
+        const current = await window.VideoWorkbench.generations.refresh(job);
         if (
           current.submissionUnconfirmed ||
           (current.status === "blocked" &&
@@ -559,11 +559,13 @@
         db.preferences = { ...value.preferences, ...db.preferences };
         await persist();
         broadcast();
-        document.dispatchEvent(new CustomEvent("seedstar:changed"));
+        document.dispatchEvent(new CustomEvent("vw:changed"));
       },
     },
     navigate: (target) =>
       child ? rpc("navigate", { target }) : perform("navigate", { target }),
   };
+  // storyboards-0.js is hash-protected and still calls the old global name.
+  window.SeedStar = window.VideoWorkbench;
   ready.catch(reportError);
 })();

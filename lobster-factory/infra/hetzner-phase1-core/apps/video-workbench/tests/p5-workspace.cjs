@@ -30,7 +30,7 @@ const status = (page, re, timeout = 240000) =>
     throw Error(`status never matched ${re}: "${await page.locator("[data-t3-status]").textContent().catch(() => "")}"`, { cause: e });
   });
 const ready = (page) => page.waitForSelector('[data-t3-ready="1"] canvas', { timeout: 60000 });
-const scenes = (page) => page.evaluate(() => SeedStar.scenes3d.list());
+const scenes = (page) => page.evaluate(() => VideoWorkbench.scenes3d.list());
 async function open(page, base, title) {
   await page.goto(base + "/pages/tools.html?r=" + Math.random() + "#3d");
   await page.getByRole("button", { name: new RegExp("^" + title + " · 第 \\d+ 版$") }).click();
@@ -81,7 +81,7 @@ async function setField(page, label, value) {
     await setField(page, "場景名稱", "揮手測試");
     await page.getByRole("button", { name: /^儲存/ }).click();
     await page.waitForSelector("[data-t3-revision]:has-text('第 1 版')");
-    const model = (await page.evaluate(() => SeedStar.assets.list())).find((a) => a.name === "hero.glb");
+    const model = (await page.evaluate(() => VideoWorkbench.assets.list())).find((a) => a.name === "hero.glb");
     assert.equal(model.kind, "model");
     assert.match(model.url, /^\/media\/[a-f0-9]{64}\/original\.glb$/);
     await open(page, base, "揮手測試");
@@ -149,7 +149,7 @@ async function setField(page, label, value) {
     await page.getByLabel("骨骼對照").dispatchEvent("change");
     await page.getByRole("button", { name: "套用動作（Blender 重定向）", exact: true }).click();
     await status(page, /已套用動作（4 根骨骼）/);
-    const retargeted = (await page.evaluate(() => SeedStar.assets.list())).filter((a) => a.origin?.operation === "retarget").at(-1);
+    const retargeted = (await page.evaluate(() => VideoWorkbench.assets.list())).filter((a) => a.origin?.operation === "retarget").at(-1);
     assert.equal(retargeted.kind, "model");
     assert.match(retargeted.url, /original\.glb$/);
     assert.deepEqual({ kind: retargeted.origin.kind, engine: retargeted.origin.engine, parent: retargeted.origin.parentAssetId }, { kind: "render", engine: "blender-4.5.9", parent: model.id });
@@ -167,7 +167,7 @@ async function setField(page, label, value) {
     await setField(page, "長度（格）", 24);
     await page.getByRole("button", { name: "放到「P5 3D」", exact: true }).click();
     await status(page, /已放到「P5 3D」的 V2 軌（第 0 格起）/);
-    const rendered = (await page.evaluate(() => SeedStar.assets.list())).filter((a) => a.origin?.engine === "blender-4.5.9" && a.kind === "video").at(-1);
+    const rendered = (await page.evaluate(() => VideoWorkbench.assets.list())).filter((a) => a.origin?.engine === "blender-4.5.9" && a.kind === "video").at(-1);
     s = (await scenes(page)).find((x) => x.title === "揮手測試");
     assert.deepEqual({ sceneId: rendered.origin.sceneId, rev: rendered.origin.sceneRevision, parent: rendered.origin.parentAssetId }, { sceneId: s.id, rev: s.revision, parent: retargeted.id });
     assert.equal(rendered.verification.ok, true);
@@ -182,18 +182,18 @@ async function setField(page, label, value) {
 
     // 6) cancel a render mid-way: no asset, Blender process tree gone, job dir removed
     await setField(page, "長度（格）", 600);
-    const known = (await page.evaluate(() => SeedStar.assets.list())).length;
+    const known = (await page.evaluate(() => VideoWorkbench.assets.list())).length;
     await page.getByRole("button", { name: "Blender 渲染（透明 MOV）", exact: true }).click();
     await page.waitForFunction(() => t3.job && t3.job.progress > 0, null, { timeout: 120000 });
     const jobId = await page.evaluate(() => t3.job.id);
-    const pid = (await (await fetch(base + "/api/seedstar/generations/" + jobId)).json()).blenderPid;
+    const pid = (await (await fetch(base + "/api/vw/generations/" + jobId)).json()).blenderPid;
     assert.ok(Number.isInteger(pid));
     await page.getByRole("button", { name: "取消", exact: true }).click();
     await status(page, /Blender 渲染已取消/);
-    const job = await (await fetch(base + "/api/seedstar/generations/" + jobId)).json();
+    const job = await (await fetch(base + "/api/vw/generations/" + jobId)).json();
     assert.equal(job.status, "cancelled");
     assert.ok(!job.result);
-    assert.equal((await page.evaluate(() => SeedStar.assets.list())).length, known, "no new asset");
+    assert.equal((await page.evaluate(() => VideoWorkbench.assets.list())).length, known, "no new asset");
     await new Promise((r) => setTimeout(r, 1500));
     const tasks = spawnSync("tasklist", ["/FI", `PID eq ${pid}`, "/NH"], { encoding: "utf8", windowsHide: true }).stdout;
     assert.doesNotMatch(tasks, /blender/i, "Blender process still running: " + tasks);
@@ -236,8 +236,8 @@ async function setField(page, label, value) {
         f.onload = () => r(f.result);
         f.readAsDataURL(blob);
       });
-      const stored = await SeedStar.request("/uploads", { name: "杯子.png", data });
-      await SeedStar.assets.save({ ...stored, createdAt: new Date().toISOString() });
+      const stored = await VideoWorkbench.request("/uploads", { name: "杯子.png", data });
+      await VideoWorkbench.assets.save({ ...stored, createdAt: new Date().toISOString() });
     });
     await page.goto(base + "/pages/tools.html?m=1#3d");
     await page.getByRole("button", { name: "圖片：杯子.png", exact: true }).click();
@@ -249,14 +249,14 @@ async function setField(page, label, value) {
     assert.match(post.body.image_url, /^data:image\/png;base64,/);
     assert.deepEqual({ ai_model: post.body.ai_model, should_texture: post.body.should_texture, target_formats: post.body.target_formats }, { ai_model: "latest", should_texture: true, target_formats: ["glb"] });
     assert.ok(calls.filter((c) => c.url.endsWith("/task-123")).length >= 3, "polled until SUCCEEDED");
-    const made = (await page.evaluate(() => SeedStar.assets.list())).filter((a) => a.origin?.provider === "Meshy").at(-1);
-    const image = (await page.evaluate(() => SeedStar.assets.list())).find((a) => a.name === "杯子.png");
+    const made = (await page.evaluate(() => VideoWorkbench.assets.list())).filter((a) => a.origin?.provider === "Meshy").at(-1);
+    const image = (await page.evaluate(() => VideoWorkbench.assets.list())).find((a) => a.name === "杯子.png");
     assert.deepEqual({ kind: made.origin.kind, model: made.origin.model, credits: made.origin.credits, parent: made.origin.parentAssetId }, { kind: "ai_generated", model: "meshy-7.1", credits: 30, parent: image.id });
     assert.match(made.url, /original\.glb$/);
     await ready(page);
     await page.getByRole("button", { name: "指定角度截圖", exact: true }).click();
     await status(page, /已存成參考圖/);
-    const shot = (await page.evaluate(() => SeedStar.assets.list())).filter((a) => a.origin?.engine === "workbench-3d-viewer").at(-1);
+    const shot = (await page.evaluate(() => VideoWorkbench.assets.list())).filter((a) => a.origin?.engine === "workbench-3d-viewer").at(-1);
     assert.equal(shot.kind, "image");
     assert.equal(shot.origin.parentAssetId, made.id);
     assert.match(shot.url, /^\/generated\/[a-f0-9-]+\.png$/);

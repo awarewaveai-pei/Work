@@ -154,7 +154,7 @@ function toolWorkflowAfterRender() {
   if (typeof toolRigAfterRender === "function" && tool === "rig")
     toolRigAfterRender();
   if (typeof toolThreeDAfterRender === "function" && tool === "3d")
-    toolThreeDAfterRender().catch(SeedStar.reportError);
+    toolThreeDAfterRender().catch(VideoWorkbench.reportError);
   const source = files.src,
     currentTool = tool;
   document.querySelectorAll('[data-flow-media="src"]').forEach((media) => {
@@ -199,16 +199,16 @@ function toolWorkflowAfterRender() {
   });
   const gallery = document.querySelector("[data-flow-video-gallery]");
   if (gallery)
-    SeedStar.assets
+    VideoWorkbench.assets
       .list()
       .then((rows) => {
         if (!gallery.isConnected) return;
         const query = String(values.searchAssets || "").toLowerCase();
-        gallery.innerHTML = SeedStar.sanitize(
+        gallery.innerHTML = VideoWorkbench.sanitize(
           rows
             .filter(
               (a) =>
-                SeedStar.mediaKind(a) === "video" &&
+                VideoWorkbench.mediaKind(a) === "video" &&
                 String(a.name || "")
                   .toLowerCase()
                   .includes(query),
@@ -220,7 +220,7 @@ function toolWorkflowAfterRender() {
             .join("") || "<p>沒有符合條件的影片，可上傳或從素材庫選取。</p>",
         );
       })
-      .catch(SeedStar.reportError);
+      .catch(VideoWorkbench.reportError);
   if (typeof toolOverlayAfterRender === "function") toolOverlayAfterRender();
 }
 document.addEventListener("click", async (event) => {
@@ -250,7 +250,7 @@ document.addEventListener("click", async (event) => {
       return;
     }
     if (button.dataset.flowAsset) {
-      const asset = (await SeedStar.assets.list()).find(
+      const asset = (await VideoWorkbench.assets.list()).find(
         (a) => String(a.id) === button.dataset.flowAsset,
       );
       if (asset) {
@@ -301,17 +301,17 @@ document.addEventListener("click", async (event) => {
         end > Number(files.src.duration || 0) + 0.1
       )
         throw Error("片段需介於 5 秒與 3 分鐘，並位於來源範圍內");
-      const job = await SeedStar.generations.create({
+      const job = await VideoWorkbench.generations.create({
         type: "video",
         operation: "follow-manual",
         references: { src: files.src },
         settings: { start, end, center: Number(values.followCenter) / 100 },
       });
-      SeedStar.showJob(job);
+      VideoWorkbench.showJob(job);
     }
     if (action === "short-analyze") {
       if (typeof toolShortAnalyze === "function") await toolShortAnalyze();
-      else SeedStar.notify("分析服務接線準備中；設定已保留。");
+      else VideoWorkbench.notify("分析服務接線準備中；設定已保留。");
     }
     if (typeof toolShortAction === "function") await toolShortAction(action);
     if (typeof toolFollowAction === "function") await toolFollowAction(action);
@@ -322,7 +322,7 @@ document.addEventListener("click", async (event) => {
     if (typeof toolMusicAction === "function")
       await toolMusicAction(action, button);
   } catch (error) {
-    SeedStar.reportError(error);
+    VideoWorkbench.reportError(error);
   }
 });
 document.addEventListener("change", (event) => {

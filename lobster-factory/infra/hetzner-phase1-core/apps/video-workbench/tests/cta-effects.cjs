@@ -6,7 +6,7 @@ const root = path.resolve(__dirname, ".."),
   ffmpeg = require("ffmpeg-static"),
   { media } = require(root + "/backend/media.cjs");
 const dir = fs.mkdtempSync(
-  path.join(require("node:os").tmpdir(), "seedstar-cta-effects-"),
+  path.join(require("node:os").tmpdir(), "vw-cta-effects-"),
 );
 function run(args) {
   const r = spawnSync(ffmpeg, ["-hide_banner", "-loglevel", "error", ...args], {

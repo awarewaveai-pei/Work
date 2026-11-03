@@ -17,7 +17,7 @@ const ffmpeg = require("ffmpeg-static");
     "-f", "lavfi", "-i", "sine=duration=10", "-c:v", "libx264", "-crf", "12", "-c:a", "aac", "-shortest",
     path.join(generated, name)]);
   const api = (route, method = "GET", body) =>
-    fetch(base + "/api/seedstar" + route, {
+    fetch(base + "/api/vw" + route, {
       method,
       headers: body ? { "Content-Type": "application/json" } : {},
       body: body && JSON.stringify(body),

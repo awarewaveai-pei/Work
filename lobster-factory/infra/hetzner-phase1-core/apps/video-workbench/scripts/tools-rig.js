@@ -91,19 +91,19 @@ function rgNormalize(r) {
 
 // ---- data -------------------------------------------------------------------------------------------------
 async function rgLoad() {
-  rg.chars = await SeedStar.characters.list();
+  rg.chars = await VideoWorkbench.characters.list();
   rg.ready = true;
 }
 function rgBoot() {
   if (rg.ready || rg.loading) return rg.loading;
   rg.loading = rgLoad()
     .then(() => tool === "rig" && render())
-    .catch(SeedStar.reportError)
+    .catch(VideoWorkbench.reportError)
     .finally(() => (rg.loading = null));
   return rg.loading;
 }
 async function rgSaveChar(c) {
-  await SeedStar.characters.save(c);
+  await VideoWorkbench.characters.save(c);
   rg.chars = [...rg.chars.filter((x) => x.id !== c.id), structuredClone(c)];
 }
 // Saving = a new version; the saved copy it replaces goes to the front of history (last 20 kept).
@@ -451,14 +451,14 @@ async function rgExportPose(char, pose) {
       rgImageFn("output"),
     );
   if (out.missing.length) throw Error("缺少素材：" + out.missing.join("、"));
-  const stored = await SeedStar.request("/rig/pose-stills", {
+  const stored = await VideoWorkbench.request("/rig/pose-stills", {
     data: canvas.toDataURL("image/png"),
     characterId: char.id,
     rigId: rig.id,
     rigVersion: rig.version,
     poseId: pose.id,
   });
-  const asset = await SeedStar.assets.save({
+  const asset = await VideoWorkbench.assets.save({
     ...stored,
     name: `${char.name || "角色"} 姿勢「${pose.name}」`,
     createdAt: new Date().toISOString(),
@@ -523,7 +523,7 @@ document.addEventListener("pointerdown", (e) => {
   canvas.onpointermove = (ev) => {
     const p = Rig.apply(inv, toComp(ev));
     rgDragIk(chain.id, p[0], p[1]);
-    cpPaint().catch(SeedStar.reportError);
+    cpPaint().catch(VideoWorkbench.reportError);
   };
   canvas.onpointerup = canvas.onpointercancel = () => {
     canvas.onpointermove = canvas.onpointerup = canvas.onpointercancel = null;
@@ -541,11 +541,11 @@ async function rgDemoImage(name, w, h, paint) {
     }),
     x = c.getContext("2d");
   paint(x, w, h);
-  const stored = await SeedStar.request("/uploads", {
+  const stored = await VideoWorkbench.request("/uploads", {
     data: c.toDataURL("image/png"),
     name,
   });
-  const asset = await SeedStar.assets.save({
+  const asset = await VideoWorkbench.assets.save({
     ...stored,
     name,
     createdAt: new Date().toISOString(),
@@ -854,7 +854,7 @@ async function rgDemo() {
     ],
   };
   comp.layers = [layer];
-  await SeedStar.compositions.save(comp);
+  await VideoWorkbench.compositions.save(comp);
   if (typeof cp === "object") cp.ready = false; // the compositor reloads its list next time it opens
   rg.demoComp = comp.id;
   rg.status =
@@ -959,7 +959,7 @@ function toolRigScreen(t) {
   );
 }
 function toolRigAfterRender() {
-  rgPaint().catch(SeedStar.reportError);
+  rgPaint().catch(VideoWorkbench.reportError);
 }
 const rgTestValues = (r) => ({ rot: { ...r.testPose.rot }, ik: {}, pins: {} });
 async function rgPaint() {
@@ -1076,13 +1076,13 @@ function rgPaintAt(x, y) {
   return n;
 }
 async function rgImport() {
-  const rows = await SeedStar.pickAssets({
+  const rows = await VideoWorkbench.pickAssets({
     kind: "image",
     multiple: true,
     limit: 20,
   });
   for (const a of rows || []) {
-    if (!SeedStar.safeUrl(a.url)) continue;
+    if (!VideoWorkbench.safeUrl(a.url)) continue;
     const part = {
       id: rgId("T"),
       name: String(a.name || "部件").slice(0, 40),
@@ -1332,7 +1332,7 @@ document.addEventListener("click", (e) => {
     rg.status = error.message;
     const box = document.querySelector("[data-rg-status]");
     if (box) box.textContent = error.message;
-    SeedStar.reportError(error);
+    VideoWorkbench.reportError(error);
   });
 });
 document.addEventListener("change", (e) => {
@@ -1341,7 +1341,7 @@ document.addEventListener("change", (e) => {
   try {
     rgField(el);
   } catch (error) {
-    SeedStar.reportError(error);
+    VideoWorkbench.reportError(error);
   }
 });
 // Canvas editing in rig space (rest pose). Each gesture changes the working copy; 儲存綁定 makes it a version.
@@ -1469,7 +1469,7 @@ document.addEventListener("pointerdown", (e) => {
       rgTouch();
     } else if (rg.mode === "weight") rgPaintAt(...p);
     last = p;
-    if (rg.mode !== "bone") rgPaint().catch(SeedStar.reportError);
+    if (rg.mode !== "bone") rgPaint().catch(VideoWorkbench.reportError);
   };
   canvas.onpointerup = canvas.onpointercancel = (ev) => {
     canvas.onpointermove = canvas.onpointerup = canvas.onpointercancel = null;

@@ -3,7 +3,7 @@ const $ = (id) => document.getElementById(id);
 // /capabilities); each thumbnail says whether it is sent. Unknown until the capabilities arrive = no label.
 let sentRefs = null;
 const refTag = (i) => (Number.isInteger(sentRefs) ? (i < sentRefs ? "生成時送出" : "僅保存") : "");
-SeedStar.request("/capabilities", undefined, "GET")
+VideoWorkbench.request("/capabilities", undefined, "GET")
   .then((c) => {
     sentRefs = Number.isInteger(c?.maxSentReferences) ? c.maxSentReferences : null;
     document.querySelectorAll("[data-ref-tag]").forEach((el) => (el.textContent = refTag(Number(el.dataset.refTag))));
@@ -30,7 +30,7 @@ let tab = "library",
   my = (() => {
     try {
       return JSON.parse(
-        SeedStar.storage.getItem("seedstar.characters") || "[]",
+        VideoWorkbench.storage.getItem("vw.characters") || "[]",
       );
     } catch {
       return [];
@@ -160,9 +160,9 @@ demo.forEach((c, i) => {
   if (saved) Object.assign(c, saved);
 });
 my = my.filter((c) => !c.id?.startsWith("catalog-"));
-document.addEventListener("seedstar:changed", () => {
+document.addEventListener("vw:changed", () => {
   my = JSON.parse(
-    SeedStar.storage.getItem("seedstar.characters") || "[]",
+    VideoWorkbench.storage.getItem("vw.characters") || "[]",
   ).filter((c) => !c.id?.startsWith("catalog-"));
 });
 function esc(s) {
@@ -185,8 +185,8 @@ function toast(s) {
 }
 function openModal(title, inner, foot = "", small = false) {
   $("modalTitle").textContent = title;
-  $("modalInner").innerHTML = SeedStar.sanitize(inner);
-  $("modalFoot").innerHTML = SeedStar.sanitize(foot);
+  $("modalInner").innerHTML = VideoWorkbench.sanitize(inner);
+  $("modalFoot").innerHTML = VideoWorkbench.sanitize(foot);
   $("modal").classList.toggle("small", small);
   $("back").classList.add("show");
   document.body.style.overflow = "hidden";
@@ -235,7 +235,7 @@ function render() {
   );
   $("count").textContent =
     tab === "library" ? `${items.length} 位示範角色` : `${items.length} 個角色`;
-  $("gallery").innerHTML = SeedStar.sanitize(
+  $("gallery").innerHTML = VideoWorkbench.sanitize(
     items
       .map(
         (c, i) =>
@@ -248,7 +248,7 @@ function render() {
     items.length !== 0 || $("search").value !== "",
   );
   if (!items.length && $("search").value)
-    $("gallery").innerHTML = SeedStar.sanitize(
+    $("gallery").innerHTML = VideoWorkbench.sanitize(
       '<p class="muted">沒有符合條件的角色</p>',
     );
   window.visibleItems = items;
@@ -284,20 +284,20 @@ $("gallery").onclick = (e) => {
     return;
   }
   if (b.dataset.act === "listen") {
-    if (c.voice?.url) new Audio(c.voice.url).play().catch(SeedStar.reportError);
+    if (c.voice?.url) new Audio(c.voice.url).play().catch(VideoWorkbench.reportError);
     else {
-      SeedStar.speak(c.intro || c.description || c.name);
+      VideoWorkbench.speak(c.intro || c.description || c.name);
       toast("系統語音試聽");
     }
   }
   if (b.dataset.act === "fav") {
     c.fav = !c.fav;
-    SeedStar.characters.save(c).catch(SeedStar.reportError);
+    VideoWorkbench.characters.save(c).catch(VideoWorkbench.reportError);
     render();
   }
   if (b.dataset.act === "add") {
     c.inLibrary = true;
-    SeedStar.characters.save(c).catch(SeedStar.reportError);
+    VideoWorkbench.characters.save(c).catch(VideoWorkbench.reportError);
     toast("已加入素材庫，可在生成影片時引用");
   }
   if (b.dataset.act === "edit") {
@@ -330,7 +330,7 @@ function detailModal(c) {
   }
   document.querySelector("main").setAttribute("hidden", "");
   document.body.classList.add("detail-open");
-  root.innerHTML = SeedStar.sanitize(
+  root.innerHTML = VideoWorkbench.sanitize(
     `<div class="detail-page"><div class="detail-page-head"><div><div class="crumb">角色　/　示範角色庫</div><h1>角色詳情</h1></div><button class="btn outline" data-detail="back">← 返回角色庫</button></div><div class="detail-page-grid"><div><div class="detail-page-preview"><img src="${esc(c.image)}" alt="${esc(c.name)}"><span class="play-badge">▷ 角色預覽</span></div></div><div class="detail-page-copy"><h2>${esc(c.name)}</h2><p class="meta">${esc(c.country)} · ${esc(c.age)} 歲 · ${esc(c.gender)}</p><p class="slogan">${esc(c.description)}</p><h3>自我介紹</h3><p>${esc(c.intro || "這是一位可以在影片中直接引用的角色。")}</p><h3>角色台詞</h3><div class="detail-page-lines">${(c.lines || []).map((line) => `<button class="detail-page-line" data-detail="line"><span>▷</span>${esc(line)}</button>`).join("")}</div><div class="detail-page-tags">${(c.tags || []).map((t) => `<span>${esc(t)}</span>`).join("")}</div></div></div><section class="detail-page-assets"><h3>服裝與配件</h3><div class="detail-page-asset-grid">${(c.assets || []).map(([name, color]) => `<div class="detail-page-asset"><div class="detail-page-asset-art" >${esc(name)}</div><small>${esc(name)}</small></div>`).join("")}</div></section><div class="detail-page-footer"><button class="btn" data-detail="favorite">${c.fav ? "★ 已收藏" : "☆ 加入最愛"}</button><button class="btn" data-detail="add">＋ 加入素材庫</button><button class="btn primary" data-detail="generate">✧ 加入並前往生成</button></div></div>`,
   );
   root.onclick = (e) => {
@@ -338,22 +338,22 @@ function detailModal(c) {
     if (!b) return;
     const a = b.dataset.detail;
     if (a === "back") closeDetailPage();
-    if (a === "line") SeedStar.speak(b.innerText.replace("▷", ""));
+    if (a === "line") VideoWorkbench.speak(b.innerText.replace("▷", ""));
     if (a === "favorite") {
       c.fav = !c.fav;
-      SeedStar.characters.save(c).catch(SeedStar.reportError);
+      VideoWorkbench.characters.save(c).catch(VideoWorkbench.reportError);
       detailModal(c);
     }
     if (a === "add") {
       c.inLibrary = true;
-      SeedStar.characters.save(c).catch(SeedStar.reportError);
+      VideoWorkbench.characters.save(c).catch(VideoWorkbench.reportError);
       toast("已加入素材庫，可在生成影片時引用");
     }
     if (a === "generate") {
       c.inLibrary = true;
-      SeedStar.characters.save(c).catch(SeedStar.reportError);
+      VideoWorkbench.characters.save(c).catch(VideoWorkbench.reportError);
       closeDetailPage();
-      SeedStar.navigate("generator");
+      VideoWorkbench.navigate("generator");
     }
   };
 }
@@ -377,7 +377,7 @@ function quickCreate() {
       let prompt = $("quickPrompt").value.trim();
       if (!prompt) return toast("請先描述角色");
       try {
-        const result = await SeedStar.request("/characters/draft", {
+        const result = await VideoWorkbench.request("/characters/draft", {
           prompt,
           style: quickStyle,
         });
@@ -389,7 +389,7 @@ function quickCreate() {
           style: quickStyle,
         };
       } catch (e) {
-        SeedStar.reportError(e);
+        VideoWorkbench.reportError(e);
         return;
       }
       style = quickStyle;
@@ -400,7 +400,7 @@ function quickCreate() {
       subtab = "basic";
       fullEditor();
     } else if (b.id === "quickQuestions")
-      SeedStar.request("/characters/questions", {
+      VideoWorkbench.request("/characters/questions", {
         prompt: $("quickPrompt").value,
       })
         .then((r) => {
@@ -408,7 +408,7 @@ function quickCreate() {
           p.textContent = r.questions;
           $("modalInner").append(p);
         })
-        .catch(SeedStar.reportError);
+        .catch(VideoWorkbench.reportError);
     else if (b.dataset.start) {
       draft = {
         name: "",
@@ -430,7 +430,7 @@ function quickCreate() {
   };
 }
 function persist() {
-  SeedStar.storage.setItem("seedstar.characters", JSON.stringify(my));
+  VideoWorkbench.storage.setItem("vw.characters", JSON.stringify(my));
 }
 function currentValues() {
   let n = $("charName"),
@@ -523,10 +523,10 @@ function fullEditor() {
       }
     } else if (b.id === "lockAppearance")
       ((selected.locked = !selected.locked),
-        SeedStar.characters
+        VideoWorkbench.characters
           .save(selected)
           .then(() => toast(selected.locked ? "外觀已鎖定" : "外觀已解鎖"))
-          .catch(SeedStar.reportError));
+          .catch(VideoWorkbench.reportError));
   };
 }
 function startUpload(kind) {
@@ -546,10 +546,10 @@ $("filePick").onchange = async (e) => {
   for (let f of files.slice(0, Math.max(0, limit - target.length))) {
     if (!f.type.startsWith("image/")) continue;
     try {
-      target.push((await SeedStar.uploadAsset(f)).url);
+      target.push((await VideoWorkbench.uploadAsset(f)).url);
       fullEditor();
     } catch (e) {
-      SeedStar.reportError(e);
+      VideoWorkbench.reportError(e);
     }
   }
   e.target.value = "";
@@ -576,16 +576,16 @@ function extendedAI() {
     if (!prompt) return toast("請先輸入角色描述");
     if (e.target.id === "ask") {
       try {
-        const r = await SeedStar.request("/characters/questions", { prompt });
+        const r = await VideoWorkbench.request("/characters/questions", { prompt });
         const p = document.createElement("p");
         p.textContent = r.questions;
         $("modalInner").append(p);
       } catch (e) {
-        SeedStar.reportError(e);
+        VideoWorkbench.reportError(e);
       }
     } else if (e.target.id === "generateRole") {
       try {
-        const r = await SeedStar.request("/characters/draft", { prompt });
+        const r = await VideoWorkbench.request("/characters/draft", { prompt });
         draft = {
           ...draft,
           ...r,
@@ -593,7 +593,7 @@ function extendedAI() {
         };
         returnEditor();
       } catch (e) {
-        SeedStar.reportError(e);
+        VideoWorkbench.reportError(e);
       }
     } else if (e.target.id === "generateMain")
       requestCharacterAction("角色主圖");
@@ -706,7 +706,7 @@ async function requestCharacterAction(label) {
     const character = { ...draft, references: [...refs] },
       originalId = draft.id;
     for (const variant of variants) {
-      const job = await SeedStar.generations.create({
+      const job = await VideoWorkbench.generations.create({
         type,
         operation:
           type === "audio"
@@ -740,7 +740,7 @@ async function requestCharacterAction(label) {
                 .filter(Boolean)
                 .join("\n"),
       });
-      SeedStar.showJob(job, {
+      VideoWorkbench.showJob(job, {
         applyLabel:
           type === "audio"
             ? "設為角色聲音"
@@ -769,12 +769,12 @@ async function requestCharacterAction(label) {
       });
     }
   } catch (e) {
-    SeedStar.reportError(e);
+    VideoWorkbench.reportError(e);
   }
 }
 async function pickSharedAsset(kind = "image") {
   try {
-    const chosen = await SeedStar.pickAssets({
+    const chosen = await VideoWorkbench.pickAssets({
       kind,
     });
     if (!chosen[0]) return;
@@ -786,6 +786,6 @@ async function pickSharedAsset(kind = "image") {
       fullEditor();
     }
   } catch (e) {
-    SeedStar.reportError(e);
+    VideoWorkbench.reportError(e);
   }
 }

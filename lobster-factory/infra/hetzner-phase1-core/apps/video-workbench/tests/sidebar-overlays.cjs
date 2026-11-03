@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict'), fs = require('node:fs'), os = require('node:os'), path = require('node:path'), crypto = require('node:crypto');
 const { chromium } = require('playwright');
 (async () => {
-  const evidence = fs.mkdtempSync(path.join(os.tmpdir(), 'seedstar-sidebar-test-'));
+  const evidence = fs.mkdtempSync(path.join(os.tmpdir(), 'vw-sidebar-test-'));
   const server = require('../server.cjs').createServer({ dataDir: path.join(evidence, 'data'), env: {}, fetchImpl: async () => { throw Error('Provider forbidden'); } });
   await new Promise(r => server.listen(0, '127.0.0.1', r)); const base = 'http://127.0.0.1:' + server.address().port;
   const browser = await chromium.launch({ channel: 'msedge', headless: true });
@@ -12,8 +12,8 @@ const { chromium } = require('playwright');
       if (/\/generations\/sidebar-running$/.test(r.request().url())) { polls.push(r.request().url()); return r.fulfill({ json: { id: 'sidebar-running', status: 'running' } }); }
       return r.request().url().startsWith(base + '/') ? r.continue() : r.abort();
     });
-    await p.goto(base); await p.waitForFunction(() => SeedStar.router?.activate && SeedStar.generator?.controlsReady);
-    await p.evaluate(() => SeedStar.assets.save({ id: 'sidebar-image', name: '預覽測試', kind: 'image', type: 'image/png', url: '/assets/test-image-1.png' }));
+    await p.goto(base); await p.waitForFunction(() => VideoWorkbench.router?.activate && VideoWorkbench.generator?.controlsReady);
+    await p.evaluate(() => VideoWorkbench.assets.save({ id: 'sidebar-image', name: '預覽測試', kind: 'image', type: 'image/png', url: '/assets/test-image-1.png' }));
     const navs = ['generator', 'director', 'tools', 'projects', 'storyboards', 'templates', 'workflows', 'characters', 'skills', 'assets', 'history'];
     for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
       await p.setViewportSize(viewport);
@@ -21,11 +21,11 @@ const { chromium } = require('playwright');
         await p.locator('#generatorNav').click();
         if (index % 3 === 0) await p.locator('.dock [data-panel="presets"]').click();
         else if (index % 3 === 1) { await p.locator('[data-action="library"]').click(); await p.locator('[data-picker-preview="sidebar-image"]').click(); }
-        else await p.evaluate(() => SeedStar.showJob({ id: 'sidebar-running', type: 'image', status: 'running', progress: 1, input: { prompt: '測試' } }));
+        else await p.evaluate(() => VideoWorkbench.showJob({ id: 'sidebar-running', type: 'image', status: 'running', progress: 1, input: { prompt: '測試' } }));
         const target = p.locator('#' + name + 'Nav'); await target.scrollIntoViewIfNeeded();
         assert(await target.evaluate(button => { const r = button.getBoundingClientRect(); const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return hit === button || button.contains(hit); }), name + ' intercepted');
         await target.click();
-        assert.equal(await p.evaluate(() => SeedStar.router.active), name);
+        assert.equal(await p.evaluate(() => VideoWorkbench.router.active), name);
         assert(await p.locator('#modal').isHidden()); assert.equal(await p.locator('.asset-workspace,.job-view').count(), 0);
         assert(await p.locator('#popover').isHidden());
       }

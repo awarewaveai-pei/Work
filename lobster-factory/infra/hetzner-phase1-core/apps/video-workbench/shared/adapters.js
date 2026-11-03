@@ -10,7 +10,14 @@
   // server confirmed, so a reload while the server is down still shows something. Never written back as truth.
   class LocalAdapter {
     constructor({ report = () => {} } = {}) {
-      this.key = "seedstar.app.v1";
+      this.key = "vw.app.v1";
+      // Browsers that saved under the old name: copy (never move) each key, pre-server originals included.
+      try {
+        for (const k of Object.keys(localStorage)) {
+          const next = k.replace(/^seedstar\.app\.v1/, this.key);
+          if (next !== k && localStorage.getItem(next) === null) localStorage.setItem(next, localStorage.getItem(k));
+        }
+      } catch {}
       this.report = report;
     }
     cache(v) {
@@ -62,7 +69,7 @@
     }
     // Resolves { revision } on success. 409 throws ServiceError with .state = the server's current state.
     async save(v) {
-      const res = await fetch("/api/seedstar/state", {
+      const res = await fetch("/api/vw/state", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(v),
@@ -78,7 +85,7 @@
       return data;
     }
     async request(path, method = "POST", body) {
-      const res = await fetch("/api/seedstar" + path, {
+      const res = await fetch("/api/vw" + path, {
         method,
         headers: { "Content-Type": "application/json" },
         body: body === undefined ? undefined : JSON.stringify(body),
@@ -132,5 +139,5 @@
       return this.request("/state", "PUT", v);
     }
   }
-  window.SeedStarAdapters = { LocalAdapter, HttpAdapter, ServiceError };
+  window.VideoWorkbenchAdapters = { LocalAdapter, HttpAdapter, ServiceError };
 })();

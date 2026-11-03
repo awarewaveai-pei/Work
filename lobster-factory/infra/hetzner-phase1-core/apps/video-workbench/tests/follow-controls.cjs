@@ -40,10 +40,10 @@ const assert = require("node:assert/strict"),
     await page.goto(
       "http://127.0.0.1:" + server.address().port + "/pages/tools.html",
     );
-    await page.waitForFunction(() => SeedStar.tools);
+    await page.waitForFunction(() => VideoWorkbench.tools);
     await page.evaluate(
       (asset) =>
-        SeedStar.tools.acceptAsset({
+        VideoWorkbench.tools.acceptAsset({
           tool: "follow",
           asset,
           settings: { followStart: 1, followEnd: 6 },

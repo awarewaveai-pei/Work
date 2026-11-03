@@ -186,7 +186,7 @@ let category = "全部",
   tool = null,
   files = {},
   favorites = new Set(
-    JSON.parse(SeedStar.storage.getItem("appToolFavs") || "[]"),
+    JSON.parse(VideoWorkbench.storage.getItem("appToolFavs") || "[]"),
   ),
   assets = [],
   selection = {},
@@ -196,7 +196,7 @@ let category = "全部",
 let toolDrafts = {};
 try {
   toolDrafts = JSON.parse(
-    SeedStar.storage.getItem("awarewave_app_tools_state") || "{}",
+    VideoWorkbench.storage.getItem("awarewave_app_tools_state") || "{}",
   );
 } catch {}
 function restoreToolDraft() {
@@ -332,7 +332,7 @@ function screen(t) {
       body = `<div class="two-col">${stage("◉", "選一支要保護肖像的影片", "從素材庫挑選，或上傳 MP4 / MOV / WebM 影片（最長 5 分鐘）。原片不會被修改。")} ${side(`<h3>保護設定</h3>${label("保護方式")}${segmented("privacyType", ["馬賽克", "模糊"], "馬賽克")}${label("強度")}${segmented("privacyStrength", ["低", "中", "高"], "中")}${cost(2, "／秒，最低以 10 秒計")}<p class="note">若處理失敗會全額退回點數。側臉、遮擋或太小的臉可能偵測不到，發布前請先檢查成品。</p>`)}</div>`;
       break;
     case "region":
-      body = `<div class="two-col"><div>${stage("▧", "先選一張圖片，接著在畫面上拖曳框出要修改的位置", "", "image")}<div class="out">已標記區域：<span id="regionCount">0</span>／8 <button class="btn small" data-act="resetRegions">清空區域</button></div></div>${side(`<h3>圖片 <span style="color:var(--red)">*</span> <span style="float:right" class="muted">0/1</span></h3>${btn("選擇圖片", "upload:image")}${label("修改區域")}<p class="note">還沒有框選任何區域。在左側圖片上拖曳即可新增；也可以只填寫整體修改指令。</p><div id="regionInstructions"></div>${label("整體修改指令（選填）")}${ta("regionPrompt", "套用到所有選取區域的補充指令")}${label("參數")}<div class="row"><span class="note">${esc(SeedStar.capabilities?.models?.image || "服務端設定模型")}</span>${chips("regionQuality", ["1K", "2K", "4K"], "2K")}</div>${btn("生成區域編輯（API 計費）", "submit", "primary primary-wide")}<p class="note">圖片載入後，可在左側圖片上拖曳框選最多 8 個區域。</p>`)}</div>`;
+      body = `<div class="two-col"><div>${stage("▧", "先選一張圖片，接著在畫面上拖曳框出要修改的位置", "", "image")}<div class="out">已標記區域：<span id="regionCount">0</span>／8 <button class="btn small" data-act="resetRegions">清空區域</button></div></div>${side(`<h3>圖片 <span style="color:var(--red)">*</span> <span style="float:right" class="muted">0/1</span></h3>${btn("選擇圖片", "upload:image")}${label("修改區域")}<p class="note">還沒有框選任何區域。在左側圖片上拖曳即可新增；也可以只填寫整體修改指令。</p><div id="regionInstructions"></div>${label("整體修改指令（選填）")}${ta("regionPrompt", "套用到所有選取區域的補充指令")}${label("參數")}<div class="row"><span class="note">${esc(VideoWorkbench.capabilities?.models?.image || "服務端設定模型")}</span>${chips("regionQuality", ["1K", "2K", "4K"], "2K")}</div>${btn("生成區域編輯（API 計費）", "submit", "primary primary-wide")}<p class="note">圖片載入後，可在左側圖片上拖曳框選最多 8 個區域。</p>`)}</div>`;
       break;
     case "depth":
       body = `<div class="two-col">${stage("▱", "請先選取影片或直接上傳（最長支援 30 秒）", "支援 MP4 / MOV 影片。深度提取模型將自動重構空間三維幾何，生成黑白深度對照影片。")} ${side(`<h3>轉檔設定與費用</h3><p class="note" style="text-align:center">請先於左側上傳或選取影片</p>${cost(2, "／秒（最低 20 點、最高 60 點）")}<p class="note">* 雲端 GPU 高精度深度推計算。若轉檔失敗將全額自動退回點數。</p>`)}</div>`;
@@ -363,14 +363,14 @@ function render() {
   document.title =
     (tool ? TOOLS.find((t) => t.id === tool).name : "應用工具") +
     " · AwareWave";
-  $("#app").innerHTML = SeedStar.sanitize(
+  $("#app").innerHTML = VideoWorkbench.sanitize(
     tool ? screen(TOOLS.find((t) => t.id === tool)) : home(),
   );
   if (tool === "edit" && document.getElementById('project-list')) renderProjects();
   if (tool === "upscale" && files.src && typeof toolWorkflowScreen !== "function")
     $("#app").insertAdjacentHTML(
       "beforeend",
-      SeedStar.sanitize(btn("開始處理", "submit", "primary")),
+      VideoWorkbench.sanitize(btn("開始處理", "submit", "primary")),
     );
   if (tool === "region" && files.image) setupRegionCanvas();
   if (typeof toolWorkflowAfterRender === "function") toolWorkflowAfterRender();
@@ -406,14 +406,14 @@ function render() {
         if (!files.src) throw Error("請先選取影片或音檔");
         b.disabled = true;
         b.textContent = "辨識中…";
-        const r = await SeedStar.request("/transcriptions", {
+        const r = await VideoWorkbench.request("/transcriptions", {
           source: files.src,
         });
         setVal("subtitleText", r.srt);
         saveDraft();
         render();
       } catch (e) {
-        SeedStar.reportError(e);
+        VideoWorkbench.reportError(e);
         b.disabled = false;
         b.textContent = "辨識字幕";
       }
@@ -432,7 +432,7 @@ function setToolHash(hash) {
 }
 function saveDraft() {
   if (tool) toolDrafts[tool] = { values, files, selection };
-  SeedStar.storage.setItem(
+  VideoWorkbench.storage.setItem(
     "awarewave_app_tools_state",
     JSON.stringify(toolDrafts),
   );
@@ -455,7 +455,7 @@ function upload(id) {
     let f = el.files?.[0];
     if (!f) return;
     const uploaded =
-      id === "subtitlefile" ? null : await SeedStar.uploadAsset(f);
+      id === "subtitlefile" ? null : await VideoWorkbench.uploadAsset(f);
     files[id] = uploaded || { name: f.name, type: f.type, url: "" };
     if (typeof toolWorkflowSourceChanged === "function") toolWorkflowSourceChanged(id);
     if (id === "image") selection.regions = [];
@@ -482,25 +482,25 @@ async function openLibrary(id) {
           ? "audio"
           : id === "src" && tool === "subtitle" ? (values.subtitleSourceKind === "音檔" ? "audio" : "video")
             : id === "src" && tool === "voice" && values.voiceSourceKind === "圖片" ? "image" : "video";
-    const rows = await SeedStar.pickAssets({
+    const rows = await VideoWorkbench.pickAssets({
       kind: k,
     });
     if (rows[0]) {
       files[id] = {
         ...rows[0],
-        type: rows[0].type || SeedStar.mediaKind(rows[0]) + "/",
+        type: rows[0].type || VideoWorkbench.mediaKind(rows[0]) + "/",
       };
       if (typeof toolWorkflowSourceChanged === "function") toolWorkflowSourceChanged(id);
       saveDraft();
       render();
     }
   } catch (e) {
-    SeedStar.reportError(e);
+    VideoWorkbench.reportError(e);
   }
 }
 function renderProjects() {
-  let a = JSON.parse(SeedStar.storage.getItem("appToolProjects") || "[]");
-  $("#project-list").innerHTML = SeedStar.sanitize(
+  let a = JSON.parse(VideoWorkbench.storage.getItem("appToolProjects") || "[]");
+  $("#project-list").innerHTML = VideoWorkbench.sanitize(
     a
       .map(
         (x) =>
@@ -592,10 +592,10 @@ function setupRegionCanvas() {
   };
 }
 
-SeedStar.tools = {
+VideoWorkbench.tools = {
   async acceptAsset(payload) {
     if (!TOOLS.some((item) => item.id === payload.tool)) throw Error("工具不存在");
-    if (payload.asset && !SeedStar.safeUrl(payload.asset.url)) throw Error("素材網址無效");
+    if (payload.asset && !VideoWorkbench.safeUrl(payload.asset.url)) throw Error("素材網址無效");
     saveDraft();
     tool = payload.tool;
     restoreToolDraft();
@@ -611,7 +611,7 @@ SeedStar.tools = {
       ed.projects.push(project); ed.current = project.id; ed.selected = null; ed.undo = []; ed.redo = []; ed.time = 0; await edSave();
     }
     if (payload.asset) {
-      const asset = { ...payload.asset, type: payload.asset.type || SeedStar.mediaKind(payload.asset) + "/" };
+      const asset = { ...payload.asset, type: payload.asset.type || VideoWorkbench.mediaKind(payload.asset) + "/" };
       files[tool === "region" ? "image" : "src"] = asset;
       if (tool === "region" && !payload.selection) selection.regions = [];
     }
@@ -627,7 +627,7 @@ document.addEventListener("click", (e) => {
   if (action.startsWith("favorite:")) {
     let k = action.slice(9);
     favorites.has(k) ? favorites.delete(k) : favorites.add(k);
-    SeedStar.storage.setItem("appToolFavs", JSON.stringify([...favorites]));
+    VideoWorkbench.storage.setItem("appToolFavs", JSON.stringify([...favorites]));
     render();
     return;
   }
@@ -640,7 +640,7 @@ document.addEventListener("click", (e) => {
     tool = action.slice(5);
     restoreToolDraft();
     if (tool === "watermark")
-      SeedStar.preferences
+      VideoWorkbench.preferences
         .get("tools.watermark", null)
         .then((v) => {
           if (v && tool === "watermark" && !files.png) {
@@ -649,7 +649,7 @@ document.addEventListener("click", (e) => {
             render();
           }
         })
-        .catch(SeedStar.reportError);
+        .catch(VideoWorkbench.reportError);
     setToolHash(`#${tool}`);
     render();
     scrollTo(0, 0);
@@ -709,22 +709,22 @@ document.addEventListener("click", (e) => {
     return;
   }
   if (action === "savewatermark") {
-    SeedStar.preferences
+    VideoWorkbench.preferences
       .set("tools.watermark", { values, files })
-      .then(() => SeedStar.notify("浮水印設定已保存"))
-      .catch(SeedStar.reportError);
+      .then(() => VideoWorkbench.notify("浮水印設定已保存"))
+      .catch(VideoWorkbench.reportError);
     saveDraft();
     return;
   }
   if (action === "newproject") {
     let title = prompt("新剪輯專案名稱", "未命名剪輯專案");
     if (title) {
-      let arr = JSON.parse(SeedStar.storage.getItem("appToolProjects") || "[]");
+      let arr = JSON.parse(VideoWorkbench.storage.getItem("appToolProjects") || "[]");
       arr.unshift({
         title,
         date: new Date().toLocaleString("zh-TW"),
       });
-      SeedStar.storage.setItem("appToolProjects", JSON.stringify(arr));
+      VideoWorkbench.storage.setItem("appToolProjects", JSON.stringify(arr));
       renderProjects();
 
     }
@@ -736,9 +736,9 @@ document.addEventListener("click", (e) => {
     let type = action.slice(7),
       text;
     try {
-      text = SeedStar.convertSubtitles(data, type);
+      text = VideoWorkbench.convertSubtitles(data, type);
     } catch (e) {
-      SeedStar.reportError(e);
+      VideoWorkbench.reportError(e);
       return;
     }
     let blob = new Blob([text], {

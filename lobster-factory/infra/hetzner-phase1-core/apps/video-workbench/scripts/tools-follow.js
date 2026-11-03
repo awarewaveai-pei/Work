@@ -544,7 +544,7 @@ function toolFollowAfterRender() {
         Number(values.followEnd) - Number(values.followStart || 0) >= 5
       ) {
         followRuntime.autoSource = files.src.url;
-        followDetect().catch(SeedStar.reportError);
+        followDetect().catch(VideoWorkbench.reportError);
       }
     },
     { once: true },
@@ -640,7 +640,7 @@ async function toolFollowAction(action) {
       draft = structuredClone(values),
       source = structuredClone(files.src),
       points = followPlan();
-    const job = await SeedStar.generations.create({
+    const job = await VideoWorkbench.generations.create({
       type: "video",
       operation: "follow-track",
       references: { src: source },
@@ -656,7 +656,7 @@ async function toolFollowAction(action) {
         },
       },
     });
-    SeedStar.showJob(job);
+    VideoWorkbench.showJob(job);
   }
 }
 function followNegatives(box) {
@@ -678,7 +678,7 @@ document.addEventListener("click", (event) => {
   values.followAnchors.push({ time, box: structuredClone(selectedBox), revision: crypto.randomUUID() });
   values.followAnchors.sort((a, b) => a.time - b.time);
   saveDraft();
-  followTrack().catch(SeedStar.reportError);
+  followTrack().catch(VideoWorkbench.reportError);
 });
 function followCanvasBox(canvas, x, y) {
   const w = 0.16,
@@ -776,13 +776,13 @@ document.addEventListener("pointerdown", (event) => {
         values.followAnchors.sort((a, b) => a.time - b.time);
         values.followMode = "跟拍人物";
         saveDraft();
-        followTrack().catch(SeedStar.reportError);
+        followTrack().catch(VideoWorkbench.reportError);
       } else {
         saveDraft();
         render();
       }
     } catch (error) {
-      SeedStar.reportError(error);
+      VideoWorkbench.reportError(error);
     }
   };
   canvas.onpointercancel = () => {

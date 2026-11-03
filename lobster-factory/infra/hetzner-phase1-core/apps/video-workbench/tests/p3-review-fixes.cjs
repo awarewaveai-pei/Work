@@ -68,7 +68,7 @@ const PNG1 = "data:image/png;base64," + Buffer.from(spawnSync(ffmpeg, ["-v", "er
     const bodies = [];
     page.on("request", (r) => r.url().includes("/compositor/renders/") && r.url().endsWith("/frames") && bodies.push(r.postData().length));
     const status = (re) => page.waitForFunction((src) => new RegExp(src).test(document.querySelector("[data-cp-status]")?.textContent || ""), re.source, { timeout: 240000 });
-    const assetCount = () => page.evaluate(async () => (await SeedStar.assets.list()).length);
+    const assetCount = () => page.evaluate(async () => (await VideoWorkbench.assets.list()).length);
 
     // ---- #2 client batching by size ----
     await page.goto(A.base + "/pages/tools.html#compose");
@@ -113,7 +113,7 @@ const PNG1 = "data:image/png;base64," + Buffer.from(spawnSync(ffmpeg, ["-v", "er
     const hi = make("hi.mp4", ["-loop", "1", "-framerate", "30", "-i", still, "-t", "1", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "10", "-pix_fmt", "yuv420p"]);
     const prores = make("prores.mov", ["-f", "lavfi", "-i", "testsrc2=size=640x360:rate=30:duration=1", "-c:v", "prores_ks", "-profile:v", "1"]);
     const upload = (file, name) =>
-      page.evaluate(async ({ data, name }) => SeedStar.assets.save(await SeedStar.request("/uploads", { name, data })), { data: "data:video/" + (name.endsWith("mov") ? "quicktime" : "mp4") + ";base64," + fs.readFileSync(file).toString("base64"), name });
+      page.evaluate(async ({ data, name }) => VideoWorkbench.assets.save(await VideoWorkbench.request("/uploads", { name, data })), { data: "data:video/" + (name.endsWith("mov") ? "quicktime" : "mp4") + ";base64," + fs.readFileSync(file).toString("base64"), name });
     const hiAsset = await upload(hi, "hi.mp4");
     assert.match(hiAsset.previewUrl, /proxy\.mp4$/, "1440p source gets a 1080p proxy");
     await page.evaluate(async (a) => {
@@ -126,7 +126,7 @@ const PNG1 = "data:image/png;base64," + Buffer.from(spawnSync(ffmpeg, ["-v", "er
     }, hiAsset);
     await page.getByRole("button", { name: "輸出透明影片" }).click();
     await status(/已輸出/);
-    const out = await page.evaluate(async () => (await SeedStar.assets.list()).filter((a) => a.origin?.compositionId === "Chi").at(-1));
+    const out = await page.evaluate(async () => (await VideoWorkbench.assets.list()).filter((a) => a.origin?.compositionId === "Chi").at(-1));
     const outFile = path.join(A.dataDir, out.url.slice(1)),
       proxyFile = path.join(A.dataDir, hiAsset.previewUrl.slice(1));
     // Detail = mean |Laplacian| of the luma at 2560x1440 (colour-matrix independent: the browser and ffmpeg may convert
@@ -164,8 +164,8 @@ const PNG1 = "data:image/png;base64," + Buffer.from(spawnSync(ffmpeg, ["-v", "er
         { id: "clip-main", kind: "video", track: "V1", asset: { ...P(a.previewUrl), id: "asset-main" }, start: 0, duration: 0.3, sourceStart: 0, speed: 1 },
         { id: "clip-comp", kind: "video", track: "V2", asset: old, start: 0, duration: 0.3, sourceStart: 0, speed: 1, x: 50, y: 50, width: 100 },
       ] };
-      await SeedStar.preferences.set("tools.editor.projects", [project]);
-      return (await SeedStar.compositions.list()).find((c) => c.id === "Chi");
+      await VideoWorkbench.preferences.set("tools.editor.projects", [project]);
+      return (await VideoWorkbench.compositions.list()).find((c) => c.id === "Chi");
     }, hiAsset);
     assert.ok(comp.revision >= 1);
     await page.goto(A.base + "/pages/tools.html?u=1#edit");

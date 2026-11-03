@@ -29,12 +29,12 @@
     if (node.tagName === "A" && node.target === "_blank")
       node.rel = "noopener noreferrer";
   });
-  SeedStar.sanitize = (value) =>
+  VideoWorkbench.sanitize = (value) =>
     DOMPurify.sanitize(String(value ?? ""), {
       USE_PROFILES: { html: true },
       ADD_TAGS: ["video", "audio", "source"],
       FORBID_TAGS: ["iframe", "object", "embed", "style"],
       FORBID_ATTR: ["srcdoc", "action", "formaction"],
     });
-  SeedStar.safeUrl = (value) => (allowedUrl(value) ? String(value) : "");
+  VideoWorkbench.safeUrl = (value) => (allowedUrl(value) ? String(value) : "");
 })();

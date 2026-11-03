@@ -10,7 +10,7 @@ async function isolatedServer(prefix = "vw-test-", { fetchImpl, env } = {}) {
   const server = require("../server.cjs").createServer({
     dataDir,
     // A placeholder key makes the UI report the service as configured (send enabled); every
-    // provider call still throws below, and tests mock /api/seedstar/generations themselves.
+    // provider call still throws below, and tests mock /api/vw/generations themselves.
     env: { OPENAI_API_KEY: "test-only", ...env },
     fetchImpl:
       fetchImpl ||

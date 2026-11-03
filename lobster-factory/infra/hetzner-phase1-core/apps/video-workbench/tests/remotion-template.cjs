@@ -44,7 +44,7 @@ function fakeService(statuses) {
   return { calls, fetchImpl };
 }
 async function api(base, route, method = "GET", body) {
-  const r = await fetch(base + "/api/seedstar" + route, { method, headers: body ? { "Content-Type": "application/json" } : {}, body: body && JSON.stringify(body) });
+  const r = await fetch(base + "/api/vw" + route, { method, headers: body ? { "Content-Type": "application/json" } : {}, body: body && JSON.stringify(body) });
   return { status: r.status, body: await r.json() };
 }
 async function upload(base) {

@@ -235,14 +235,14 @@ function edSave() {
   });
   ed.queue = ed.queue
     .catch(() => {})
-    .then(() => SeedStar.preferences.set("tools.editor.projects", copy));
-  ed.queue.catch(SeedStar.reportError);
+    .then(() => VideoWorkbench.preferences.set("tools.editor.projects", copy));
+  ed.queue.catch(VideoWorkbench.reportError);
   return ed.queue;
 }
 // First load after M3: the untouched pre-frames array is kept under its own key (never deleted), then converted.
 // First load after P2 likewise keeps the projects that still carry the five-track object (pre-tracks key).
 async function edLoadProjects() {
-  const rows = await SeedStar.preferences.get("tools.editor.projects", []),
+  const rows = await VideoWorkbench.preferences.get("tools.editor.projects", []),
     list = Array.isArray(rows) ? rows : [],
     legacy = list.some((row) => !ProjectEnvelope.isEnvelope(row)),
     legacyTracks = list.some((row) => {
@@ -254,12 +254,12 @@ async function edLoadProjects() {
     });
   const stamp = new Date().toISOString();
   if (legacy)
-    await SeedStar.preferences.set(
+    await VideoWorkbench.preferences.set(
       "tools.editor.projects.pre-frames-" + stamp,
       list,
     );
   else if (legacyTracks)
-    await SeedStar.preferences.set(
+    await VideoWorkbench.preferences.set(
       "tools.editor.projects.pre-tracks-" + stamp,
       list,
     );
@@ -369,7 +369,7 @@ function edTransitionPane(p, c) {
   );
 }
 async function edLutRefresh() {
-  const rows = await SeedStar.assets.list();
+  const rows = await VideoWorkbench.assets.list();
   ed.luts = rows.filter((a) => /\.cube$/i.test(a.url || ""));
   if (tool === "edit" && ed.pane === "調色") edRender();
 }
@@ -378,7 +378,7 @@ function edColorPane(p, c) {
     return "<h3>調色</h3><p>請先選取影片或圖片片段。</p>";
   if (!ed.luts) {
     ed.luts = [];
-    edLutRefresh().catch(SeedStar.reportError);
+    edLutRefresh().catch(VideoWorkbench.reportError);
   }
   return (
     "<h3>調色</h3>" +
@@ -618,11 +618,11 @@ function toolEditorScreen(t) {
 const edTitleFormats = ["16:9", "9:16", "4:5", "1:1"],
   edTitleFps = [24, 25, 30, 60];
 function edTitleTemplate() {
-  const list = SeedStar.capabilities?.remotionTemplates || [];
+  const list = VideoWorkbench.capabilities?.remotionTemplates || [];
   return list.find((t) => t.id === ed.title.templateId) || list[0] || null;
 }
 function edTitleBlocked(p) {
-  if (!SeedStar.capabilities?.remotion) return "片頭模板服務未設定";
+  if (!VideoWorkbench.capabilities?.remotion) return "片頭模板服務未設定";
   if (!edTitleFormats.includes(p.ratio))
     return "片頭模板不支援 " + p.ratio + " 比例";
   if (!edTitleFps.includes(Timebase.fps(p.timebase)))
@@ -631,10 +631,10 @@ function edTitleBlocked(p) {
   return "";
 }
 async function edTitleRefresh() {
-  const rows = await SeedStar.assets.list();
+  const rows = await VideoWorkbench.assets.list();
   ed.title.images = rows.filter(
     (a) =>
-      SeedStar.mediaKind(a) === "image" &&
+      VideoWorkbench.mediaKind(a) === "image" &&
       /^\/(generated|media)\/[^?#]+\.(png|jpe?g|webp)$/i.test(a.url || ""),
   );
   ed.title.done = ed.title.jobId
@@ -656,10 +656,10 @@ function edTitlePane(p) {
     };
   const t = edTitleTemplate(),
     blocked = edTitleBlocked(p),
-    list = SeedStar.capabilities?.remotionTemplates || [];
+    list = VideoWorkbench.capabilities?.remotionTemplates || [];
   if (!ed.title.images) {
     ed.title.images = [];
-    edTitleRefresh().catch(SeedStar.reportError);
+    edTitleRefresh().catch(VideoWorkbench.reportError);
   }
   return `<h3>片頭</h3><p class="note">比例與影格率跟隨專案（${esc(p.ratio)} · ${esc(Timebase.label(p.timebase))}），長度 5 秒。</p><div class="flow-choices">${list
     .map(
@@ -724,7 +724,7 @@ async function edTitleInsert(p, asset) {
   await edSave();
 }
 async function edProbe(asset) {
-  const kind = SeedStar.mediaKind(asset);
+  const kind = VideoWorkbench.mediaKind(asset);
   // Card P2: image size too (the export dialog warns when a source is smaller than the 4K frame).
   if (kind === "image")
     return await new Promise((resolve) => {
@@ -1091,7 +1091,7 @@ function toolEditorAfterRender() {
       .then(() => {
         if (tool === "edit") render();
       })
-      .catch(SeedStar.reportError)
+      .catch(VideoWorkbench.reportError)
       .finally(() => (ed.loading = null));
   if (typeof cpEditorAfterRender === "function") cpEditorAfterRender();
   edPaint();
@@ -1099,7 +1099,7 @@ function toolEditorAfterRender() {
 function edDialog(content) {
   const d = document.createElement("dialog");
   d.className = "editor-dialog";
-  d.innerHTML = SeedStar.sanitize(
+  d.innerHTML = VideoWorkbench.sanitize(
     content + '<button class="btn" type="button" data-ed-close>關閉</button>',
   );
   document.body.append(d);
@@ -1234,7 +1234,7 @@ async function edAction(action) {
   }
   if (action.startsWith("library")) {
     const kind = action.split(":")[1],
-      rows = await SeedStar.pickAssets({ kind: kind || "all" });
+      rows = await VideoWorkbench.pickAssets({ kind: kind || "all" });
     if (rows[0] && edProject() === p)
       await edAdd(rows[0], kind === "image" ? "overlay" : undefined);
     return;
@@ -1252,12 +1252,12 @@ async function edAction(action) {
     input.onchange = async () => {
       try {
         if (input.files?.[0]) {
-          const a = await SeedStar.uploadAsset(input.files[0]);
+          const a = await VideoWorkbench.uploadAsset(input.files[0]);
           if (edProject() === p)
             await edAdd(a, kind === "image" ? "overlay" : undefined);
         }
       } catch (e) {
-        SeedStar.reportError(e);
+        VideoWorkbench.reportError(e);
       }
     };
     input.click();
@@ -1327,7 +1327,7 @@ async function edAction(action) {
     const t = edTitleTemplate(),
       blocked = edTitleBlocked(p);
     if (!t || blocked) throw Error(blocked || "片頭模板服務未設定");
-    const job = await SeedStar.generations.create({
+    const job = await VideoWorkbench.generations.create({
       type: "video",
       operation: "remotion-template",
       prompt: t.label,
@@ -1344,12 +1344,12 @@ async function edAction(action) {
     ed.title.jobId = job.id;
     ed.title.done = null;
     edRender();
-    SeedStar.showJob(job, {
+    VideoWorkbench.showJob(job, {
       onSuccess: () =>
-        setTimeout(() => edTitleRefresh().catch(SeedStar.reportError), 300),
+        setTimeout(() => edTitleRefresh().catch(VideoWorkbench.reportError), 300),
       apply: async (v) => {
         if (v.status !== "succeeded") return false;
-        await edTitleInsert(p, SeedStar.jobAsset(v));
+        await edTitleInsert(p, VideoWorkbench.jobAsset(v));
       },
       applyLabel: "放到時間軸開頭",
     });
@@ -1389,7 +1389,7 @@ async function edAction(action) {
         edRender();
         await edSave();
       } catch (e) {
-        SeedStar.reportError(e);
+        VideoWorkbench.reportError(e);
       }
     };
     input.click();
@@ -1406,7 +1406,7 @@ async function edAction(action) {
           text: c.text,
         }));
     if (!cues.length) throw Error("沒有文字片段可下載");
-    const result = await SeedStar.request("/subtitles/export", {
+    const result = await VideoWorkbench.request("/subtitles/export", {
         format,
         cues,
       }),
@@ -1436,11 +1436,11 @@ async function edAction(action) {
         let binary = "";
         for (let i = 0; i < bytes.length; i += 0x8000)
           binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-        const uploaded = await SeedStar.request("/uploads", {
+        const uploaded = await VideoWorkbench.request("/uploads", {
             name: f.name,
             data: "data:application/x-cube;base64," + btoa(binary),
           }),
-          asset = await SeedStar.assets.save({
+          asset = await VideoWorkbench.assets.save({
             ...uploaded,
             createdAt: new Date().toISOString(),
           });
@@ -1453,7 +1453,7 @@ async function edAction(action) {
         }
         edRender();
       } catch (e) {
-        SeedStar.reportError(e);
+        VideoWorkbench.reportError(e);
       }
     };
     input.click();
@@ -1794,16 +1794,16 @@ function edExportDialog(p) {
   const d = edDialog(`<div data-ed-export-body>${body()}</div>`),
     refresh = () => {
       const box = d.querySelector("[data-ed-export-body]");
-      if (box) box.innerHTML = SeedStar.sanitize(body());
+      if (box) box.innerHTML = VideoWorkbench.sanitize(body());
       wire();
     };
   if (!ed.delivery)
-    SeedStar.request("/delivery-ratios", undefined, "GET")
+    VideoWorkbench.request("/delivery-ratios", undefined, "GET")
       .then((value) => {
         ed.delivery = value;
         refresh();
       })
-      .catch(SeedStar.reportError);
+      .catch(VideoWorkbench.reportError);
   function wire() {
     d.querySelectorAll('[data-ed-action^="quality:"]').forEach((b) => {
       b.onclick = (e) => {
@@ -1816,7 +1816,7 @@ function edExportDialog(p) {
       e.target.disabled = true;
       try {
         p.clips.forEach(edValidate);
-        const job = await SeedStar.generations.create({
+        const job = await VideoWorkbench.generations.create({
           type: "video",
           operation: "editor-export",
           settings: {
@@ -1826,9 +1826,9 @@ function edExportDialog(p) {
           },
         });
         d.close();
-        SeedStar.showJob(job);
+        VideoWorkbench.showJob(job);
       } catch (err) {
-        SeedStar.reportError(err);
+        VideoWorkbench.reportError(err);
         e.target.disabled = false;
       }
     };
@@ -1840,7 +1840,7 @@ document.addEventListener("click", (e) => {
     pane = e.target.closest("[data-ed-pane]"),
     clip = e.target.closest("[data-ed-clip]"),
     marker = e.target.closest("[data-ed-marker]");
-  if (action) edAction(action.dataset.edAction).catch(SeedStar.reportError);
+  if (action) edAction(action.dataset.edAction).catch(VideoWorkbench.reportError);
   if (pane) {
     ed.pane = pane.dataset.edPane;
     if (ed.pane === "片頭") ed.title.images = null;
@@ -1899,7 +1899,7 @@ document.addEventListener("change", (e) => {
     edRender();
   } catch (error) {
     ed.undo.pop();
-    SeedStar.reportError(error);
+    VideoWorkbench.reportError(error);
     edRender();
   }
 });
@@ -1989,6 +1989,6 @@ document.addEventListener("keydown", (e) => {
               : null;
   if (action) {
     e.preventDefault();
-    edAction(action).catch(SeedStar.reportError);
+    edAction(action).catch(VideoWorkbench.reportError);
   }
 });

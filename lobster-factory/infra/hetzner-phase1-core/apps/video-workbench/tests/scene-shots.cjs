@@ -16,7 +16,7 @@ const SIZES = ["遠景", "中景", "近景"], PHRASES = ["遠景（wide shot）"
   assert.deepEqual(labelled, [], "scripts 仍有 Seedance 字樣");
   const { base, dataDir } = await isolatedServer("vw-scene-shots-");
   const upload = async (name) =>
-    (await (await fetch(base + "/api/seedstar/uploads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, data: "data:image/png;base64," + png.toString("base64") }) })).json()).url;
+    (await (await fetch(base + "/api/vw/uploads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, data: "data:image/png;base64," + png.toString("base64") }) })).json()).url;
   const [scene1, scene2, castRef, propRef] = [await upload("s1.png"), await upload("s2.png"), await upload("c.png"), await upload("p.png")];
   const results = [];
   for (let i = 0; i < 4; i++) results.push(await upload("result-" + i + ".png"));
@@ -28,17 +28,17 @@ const SIZES = ["遠景", "中景", "近景"], PHRASES = ["遠景（wide shot）"
     p.setDefaultTimeout(20000);
     p.on("pageerror", (e) => errors.push(e.message));
     await p.route("**/*", (r) => (r.request().url().startsWith(base + "/") ? r.continue() : r.abort()));
-    await p.route("**/api/seedstar/generations**", async (r) => {
-      const route = new URL(r.request().url()).pathname.replace("/api/seedstar", "");
+    await p.route("**/api/vw/generations**", async (r) => {
+      const route = new URL(r.request().url()).pathname.replace("/api/vw", "");
       if (route !== "/generations") return r.fulfill({ status: 404, json: { error: { message: "unexpected " + route } } });
       const body = r.request().postDataJSON(), n = sent.push(body) - 1;
       return r.fulfill({ status: 202, json: { id: "job-" + n, type: "image", status: "succeeded", progress: 100, input: body, result: { url: results[n] } } });
     });
     await p.goto(base);
-    await p.waitForFunction(() => window.SeedStar?.router);
+    await p.waitForFunction(() => window.VideoWorkbench?.router);
     await p.evaluate(async ({ STORE, scene1, scene2, castRef, propRef }) => {
-      await SeedStar.ready;
-      SeedStar.storage.setItem(STORE, JSON.stringify({
+      await VideoWorkbench.ready;
+      VideoWorkbench.storage.setItem(STORE, JSON.stringify({
         current: "proj-scene", episode: 0,
         projects: [{
           id: "proj-scene", title: "豆花店", type: "single", ratio: "16:9", style: 1, customStyle: "溫暖寫實", settings: {},
@@ -50,7 +50,7 @@ const SIZES = ["遠景", "中景", "近景"], PHRASES = ["遠景（wide shot）"
           episodes: [{ id: "ep-1", name: "第 1 集", outline: "", shots: [1, 2, 3].map((n) => ({ id: "shot-" + n, text: "鏡頭" + n + "：阿姨端出豆花", seconds: 4 })) }],
         }],
       }));
-      await SeedStar.flush();
+      await VideoWorkbench.flush();
     }, { STORE, scene1, scene2, castRef, propRef });
 
     const openProjects = async () => {
@@ -82,7 +82,7 @@ const SIZES = ["遠景", "中景", "近景"], PHRASES = ["遠景（wide shot）"
     });
     console.log("PASS 三個鏡頭同一場景：參考圖以場景圖開頭，各自帶自己的景別描述");
 
-    const images = async () => p.evaluate(async () => (await SeedStar.projects.list()).find((x) => x.id === "proj-scene").episodes[0].shots.map((s) => s.image));
+    const images = async () => p.evaluate(async () => (await VideoWorkbench.projects.list()).find((x) => x.id === "proj-scene").episodes[0].shots.map((s) => s.image));
     const before = await images();
     assert.deepEqual(before, results.slice(0, 3));
     await f.locator('[data-action=shotGenerate][data-index="1"]').click();
@@ -93,7 +93,7 @@ const SIZES = ["遠景", "中景", "近景"], PHRASES = ["遠景（wide shot）"
     console.log("PASS 只重新生成鏡頭 2，其他鏡頭畫面不變");
 
     await p.reload();
-    await p.waitForFunction(() => window.SeedStar?.router);
+    await p.waitForFunction(() => window.VideoWorkbench?.router);
     f = await openProjects();
     for (let i = 0; i < 3; i++) {
       assert.equal(await f.locator(`[data-action=shotScene][data-index="${i}"][data-value="scene-1"]`).getAttribute("aria-pressed"), "true");

@@ -35,7 +35,7 @@ const json = (body, status = 200) => ({ status, contentType: "application/json",
     };
     const { base } = await isolatedServer("vw-p5-fix-meshy-", { fetchImpl, env: { MESHY_API_KEY: "meshy-test-only", VW_MESHY_POLL_MS: "50" } });
     const call = async (route, data, method = "POST") => {
-      const r = await fetch(base + "/api/seedstar" + route, { method, headers: { "Content-Type": "application/json" }, ...(data ? { body: JSON.stringify(data) } : {}) });
+      const r = await fetch(base + "/api/vw" + route, { method, headers: { "Content-Type": "application/json" }, ...(data ? { body: JSON.stringify(data) } : {}) });
       const v = await r.json();
       assert(r.ok, JSON.stringify(v));
       return v;
@@ -73,19 +73,19 @@ const json = (body, status = 200) => ({ status, contentType: "application/json",
       const page = await browser.newPage();
       await page.route("**/*", (r) => (r.request().url().startsWith(base + "/") ? r.continue() : r.abort()));
       let posted;
-      await page.route(base + "/api/seedstar/generations", async (r) => {
+      await page.route(base + "/api/vw/generations", async (r) => {
         if (r.request().method() !== "POST") return r.continue();
         posted = JSON.parse(r.request().postData());
         await r.fulfill(json({ id: "rt1", type: "model", input: posted, status: "queued", progress: 0, createdAt: new Date().toISOString(), deadlineAt: new Date(Date.now() + 1860000).toISOString() }, 202));
       });
-      await page.route(base + "/api/seedstar/generations/rt1", (r) =>
+      await page.route(base + "/api/vw/generations/rt1", (r) =>
         r.fulfill(json({ id: "rt1", type: "model", input: posted, status: "succeeded", progress: 100, result: { url: "/media/retargeted/original.glb", kind: "model", type: "model/gltf-binary", retarget: { bones: ["Hips"], frames: 24 }, origin: { kind: "render", engine: "blender", operation: "retarget" } } })),
       );
       // Not the 3D tab: only the t3 state machine runs, no viewer (the mocked GLB urls do not exist).
       await page.goto(base + "/pages/tools.html#edit");
-      await page.waitForFunction(() => typeof t3 !== "undefined" && typeof SeedStar !== "undefined" && SeedStar.scenes3d);
+      await page.waitForFunction(() => typeof t3 !== "undefined" && typeof VideoWorkbench !== "undefined" && VideoWorkbench.scenes3d);
       const saved = await page.evaluate(async () => {
-        t3.list = await SeedStar.scenes3d.list();
+        t3.list = await VideoWorkbench.scenes3d.list();
         t3.doc = t3New();
         t3.doc.title = "重定向測試";
         t3.doc.objects.push({ id: "o1", asset: { id: "char", url: "/media/char/original.glb", name: "char.glb" }, position: [0, 0, 0], rotationY: 0, scale: 1, pose: {}, ik: [] });
@@ -96,7 +96,7 @@ const json = (body, status = 200) => ({ status, contentType: "application/json",
         t3.motion = { id: "wave", url: "/media/wave/original.bvh", name: "wave.bvh" };
         t3.boneMapText = "";
         await t3Retarget();
-        return (await SeedStar.scenes3d.list()).find((s) => s.id === t3.doc.id);
+        return (await VideoWorkbench.scenes3d.list()).find((s) => s.id === t3.doc.id);
       });
       assert.equal(posted.settings.sceneRevision, 2, "the pose edit was saved before the job (t3Ensure)");
       assert.equal(saved.revision, 3);
@@ -119,13 +119,13 @@ const json = (body, status = 200) => ({ status, contentType: "application/json",
       let job,
         done = false,
         gets = 0;
-      await page.route(base + "/api/seedstar/generations", async (r) => {
+      await page.route(base + "/api/vw/generations", async (r) => {
         if (r.request().method() !== "POST") return r.continue();
         const now = await page.evaluate(() => Date.now());
         job = { id: "rd1", type: "video", input, status: "running", progress: 5, createdAt: new Date(now).toISOString(), deadlineAt: new Date(now + 1860000).toISOString() };
         await r.fulfill(json(job, 202));
       });
-      await page.route(base + "/api/seedstar/generations/rd1", (r) => {
+      await page.route(base + "/api/vw/generations/rd1", (r) => {
         gets++;
         r.fulfill(
           json(
@@ -136,10 +136,10 @@ const json = (body, status = 200) => ({ status, contentType: "application/json",
         );
       });
       await page.goto(base + "/pages/tools.html#edit");
-      await page.waitForFunction(() => typeof SeedStar !== "undefined" && SeedStar.generations);
-      await page.evaluate(() => SeedStar.generations.create({ type: "video", operation: "blender-render", prompt: "3D 渲染", references: {}, settings: {} }));
+      await page.waitForFunction(() => typeof VideoWorkbench !== "undefined" && VideoWorkbench.generations);
+      await page.evaluate(() => VideoWorkbench.generations.create({ type: "video", operation: "blender-render", prompt: "3D 渲染", references: {}, settings: {} }));
       await page.reload(); // reload during the render: only reconcileJobs can bring the asset back
-      await page.waitForFunction(() => typeof SeedStar !== "undefined" && SeedStar.generations);
+      await page.waitForFunction(() => typeof VideoWorkbench !== "undefined" && VideoWorkbench.generations);
       // One reconcile round = a 5 s fake timer + a real request; wait for the request before the next 5 s.
       const round = async () => {
         const seen = gets;
@@ -150,7 +150,7 @@ const json = (body, status = 200) => ({ status, contentType: "application/json",
       for (let i = 0; i < 11 * 12; i++) assert(await round(), `round ${i}: reconcileJobs stopped watching`); // 11 min > the old 10 min window
       done = true;
       assert(await round(), "still watching after 11 min (server deadline 31 min)");
-      const asset = await page.waitForFunction(() => SeedStar.assets.list().then((l) => l.find((a) => a.id === "job-rd1"))).then((h) => h.jsonValue());
+      const asset = await page.waitForFunction(() => VideoWorkbench.assets.list().then((l) => l.find((a) => a.id === "job-rd1"))).then((h) => h.jsonValue());
       pass("重載後的追蹤時限＝伺服器 deadlineAt：11 分鐘後仍在追蹤並補建素材");
       assert.equal(asset.type, "video/quicktime");
       assert.equal(asset.previewUrl, "/media/abc/preview.webm");

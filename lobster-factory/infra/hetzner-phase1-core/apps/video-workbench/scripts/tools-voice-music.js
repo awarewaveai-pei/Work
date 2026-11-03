@@ -115,7 +115,7 @@ async function toolVoiceAction(action, button) {
   toolVoicePending = true;
   button.disabled = true;
   try {
-    const audio = await SeedStar.generations.create({
+    const audio = await VideoWorkbench.generations.create({
       type: "audio",
       operation: "voice",
       prompt: text,
@@ -124,10 +124,10 @@ async function toolVoiceAction(action, button) {
       settings: { voiceSpeed: speed, voicePitch: pitch, voiceGain: gain },
     });
     if (settings.voiceMode === "純聲音") {
-      SeedStar.showJob(audio);
+      VideoWorkbench.showJob(audio);
       return;
     }
-    SeedStar.showJob(audio, {
+    VideoWorkbench.showJob(audio, {
       applyLabel: "把此配音合成至素材",
       apply: async (done) => {
         const duration = await new Promise((resolve, reject) => {
@@ -158,7 +158,7 @@ async function toolVoiceAction(action, button) {
           throw Error(
             "配音比可合成片長更長；可下載完整配音，或縮短台詞後再合成。",
           );
-        const job = await SeedStar.generations.create({
+        const job = await VideoWorkbench.generations.create({
           type: "video",
           operation: "voice-overlay",
           references: { src: source, audio: { url: done.result.url } },
@@ -170,7 +170,7 @@ async function toolVoiceAction(action, button) {
             ),
           },
         });
-        SeedStar.showJob(job);
+        VideoWorkbench.showJob(job);
       },
     });
   } finally {
@@ -290,7 +290,7 @@ async function toolMusicAction(action, button) {
     render();
   }
   if (action === "music-download")
-    SeedStar.download("music-settings.json", {
+    VideoWorkbench.download("music-settings.json", {
       ...values,
       compiledPrompt: toolMusicCompile(),
       reference: files.musicref || null,
@@ -303,7 +303,7 @@ async function toolMusicAction(action, button) {
     toolMusicLyricsPending = true;
     button.disabled = true;
     try {
-      const response = await SeedStar.request("/tools/music/lyrics", {
+      const response = await VideoWorkbench.request("/tools/music/lyrics", {
         theme,
         language,
         style: toolMusicCompile(),
@@ -312,7 +312,7 @@ async function toolMusicAction(action, button) {
         values.musicLyrics !== previous ||
         values.musicLyricsTheme !== theme
       ) {
-        SeedStar.notify("內容已變更，保留目前歌詞，請重新產生。");
+        VideoWorkbench.notify("內容已變更，保留目前歌詞，請重新產生。");
         return;
       }
       values.musicLyrics = response.lyrics;

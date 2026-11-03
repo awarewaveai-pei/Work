@@ -11,7 +11,7 @@ const evidence = fs
   .trim();
 (async () => {
   const dataDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), "seedstar-follow-test-"),
+      path.join(os.tmpdir(), "vw-follow-test-"),
     ),
     generated = path.join(dataDir, "generated");
   fs.mkdirSync(generated);
@@ -107,10 +107,10 @@ const evidence = fs
         : r.abort(),
     );
     await p.goto(base + "/pages/tools.html#follow");
-    await p.waitForFunction(() => SeedStar.tools?.acceptAsset);
+    await p.waitForFunction(() => VideoWorkbench.tools?.acceptAsset);
     await p.evaluate(
       (asset) =>
-        SeedStar.tools.acceptAsset({
+        VideoWorkbench.tools.acceptAsset({
           tool: "follow",
           asset,
           settings: { followStart: 1, followEnd: 6 },

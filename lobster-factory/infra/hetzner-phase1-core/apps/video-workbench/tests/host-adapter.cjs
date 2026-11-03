@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict"), fs = require("node:fs"), path = require("node:path"), os = require("node:os");
 const { chromium } = require("playwright");
 (async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "seedstar-host-adapter-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vw-host-adapter-"));
   const server = require("../server.cjs").createServer({ env: {}, dataDir: dir, fetchImpl: () => { throw Error("Provider forbidden"); } });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
   const base = "http://127.0.0.1:" + server.address().port;
@@ -12,7 +12,7 @@ const { chromium } = require("playwright");
     let db = { version: 1, assets: [], characters: [], projects: [], jobs: [], preferences: {}, selection: {} }, fail = false, failureMode = "";
     p.on("pageerror", (e) => errors.push(e.message));
     await p.route("**/*", (r) => r.request().url().startsWith(base + "/") ? r.continue() : r.abort());
-    await p.route("**/config.js", (r) => r.fulfill({ contentType: "text/javascript", body: "window.SEEDSTAR_CONFIG={mode:'http',apiBaseUrl:'/api/host-media',timeoutMs:2000}" }));
+    await p.route("**/config.js", (r) => r.fulfill({ contentType: "text/javascript", body: "window.VW_CONFIG={mode:'http',apiBaseUrl:'/api/host-media',timeoutMs:2000}" }));
     await p.route("**/api/**", (r) => {
       const req = r.request(), route = new URL(req.url()).pathname, method = req.method();
       calls.push({ route, method });
@@ -30,7 +30,7 @@ const { chromium } = require("playwright");
       return r.fulfill({ json: { id: "host-job", type: "image", status: "succeeded", progress: 100, result: { url: "/assets/test-image-1.png" } } });
     });
     await p.goto(base);
-    await p.waitForFunction(() => window.SeedStar?.generator?.controlsReady && SeedStar.capabilities?.models?.image === "host-image");
+    await p.waitForFunction(() => window.VideoWorkbench?.generator?.controlsReady && VideoWorkbench.capabilities?.models?.image === "host-image");
     await p.locator("[data-mode=image]").click();
     assert.match(await p.locator("#modelBtn").innerText(), /host-image/);
     await p.locator("#prompt").fill("主系統測試");
@@ -47,24 +47,24 @@ const { chromium } = require("playwright");
     await p.locator("#send").click();
     await p.locator("#service-error").waitFor();
     assert.match(await p.locator("#service-error").innerText(), /422/);
-    assert.equal(await p.evaluate(() => localStorage.getItem("seedstar.app.v1")), null);
+    assert.equal(await p.evaluate(() => localStorage.getItem("vw.app.v1")), null);
     const retryStart = calls.length;
     fail = false;
     await p.evaluate(async () => {
-      const blocked = (await SeedStar.generations.list()).find((j) => j.status === "blocked");
+      const blocked = (await VideoWorkbench.generations.list()).find((j) => j.status === "blocked");
       if (blocked.serverAccepted !== false) throw Error("未確認拒絕狀態");
-      await SeedStar.generations.retry(blocked);
+      await VideoWorkbench.generations.retry(blocked);
     });
     assert.deepEqual(calls.slice(retryStart).filter((c) => c.route.includes("/generations")).map((c) => [c.method, c.route]), [["POST", "/api/host-media/generations"]]);
     for (const mode of ["network", "malformed", "gateway"]) {
       failureMode = mode;
       const unknown = await p.evaluate(async () => {
-        try { await SeedStar.generations.create({ type: "image", prompt: "未知送出狀態" }); } catch {}
-        return (await SeedStar.generations.list()).at(-1);
+        try { await VideoWorkbench.generations.create({ type: "image", prompt: "未知送出狀態" }); } catch {}
+        return (await VideoWorkbench.generations.list()).at(-1);
       });
       assert.equal(unknown.status, "submitting"); assert.equal(unknown.submissionUnconfirmed, true);
       const beforeUnknown = calls.length;
-      assert.equal(await p.evaluate(async (job) => { try { await SeedStar.generations.retry(job); return false; } catch (e) { return e.message.includes("未確認"); } }, unknown), true);
+      assert.equal(await p.evaluate(async (job) => { try { await VideoWorkbench.generations.retry(job); return false; } catch (e) { return e.message.includes("未確認"); } }, unknown), true);
       assert.equal(calls.length, beforeUnknown);
     }
     assert(calls.some((c) => c.route === "/api/host-media/capabilities" && c.method === "GET"));

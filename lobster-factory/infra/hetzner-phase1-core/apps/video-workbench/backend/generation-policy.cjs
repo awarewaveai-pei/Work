@@ -1,3 +1,4 @@
+const { vwEnv } = require("./env-compat.cjs");
 const imageOutputs = Object.fromEntries([["1K", 1024], ["2K", 2048], ["4K", 4096]].map(([quality, size]) => [quality, { "1:1": [size, size], "16:9": [size, size * 9 / 16], "9:16": [size * 9 / 16, size], "4:5": [Math.round(size / 10) * 8, Math.round(size / 10) * 10], "4:3": [size, size * 3 / 4] }]));
 // The one place that names the provider and models: capabilities shows them, backend/api.cjs calls them and
 // writes them into each result's origin, so the origin always names the model that actually ran.
@@ -5,7 +6,7 @@ const provider = "OpenAI";
 // USD per run shown on the button before the click. Must equal next-admin lib/ai/cost-model.ts TOOL_RATES
 // ("bg-remove"); tests/remove-bg.cjs reads that file and compares.
 const toolCosts = { removeBackground: 0.011 };
-const models = (env) => ({ image: env.SEEDSTAR_IMAGE_MODEL || "gpt-image-2.5-flare", video: env.SEEDSTAR_VIDEO_MODEL || "sora-2", audio: env.SEEDSTAR_TTS_MODEL || "gpt-4o-mini-tts" });
+const models = (env) => ({ image: vwEnv(env, "IMAGE_MODEL") || "gpt-image-2.5-flare", video: vwEnv(env, "VIDEO_MODEL") || "sora-2", audio: vwEnv(env, "TTS_MODEL") || "gpt-4o-mini-tts" });
 function capabilities(env, localTools) {
   return {
     image: !!env.OPENAI_API_KEY, text: !!env.OPENAI_API_KEY,

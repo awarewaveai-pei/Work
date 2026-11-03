@@ -58,7 +58,7 @@ const pass = (label) => {
   const voice = fixture("wav", ["-f", "lavfi", "-i", "sine=f=300:sample_rate=48000:d=3"]);
   const music = fixture("wav", ["-f", "lavfi", "-i", "sine=f=220:sample_rate=48000:d=4"]);
   const api = (route, method = "GET", body) =>
-    fetch(base + "/api/seedstar" + route, { method, headers: body ? { "Content-Type": "application/json" } : {}, body: body && JSON.stringify(body) }).then(async (r) => ({ status: r.status, body: await r.json() }));
+    fetch(base + "/api/vw" + route, { method, headers: body ? { "Content-Type": "application/json" } : {}, body: body && JSON.stringify(body) }).then(async (r) => ({ status: r.status, body: await r.json() }));
 
   // LUT asset: a 2-point cube that inverts red (R' = 1 - R), uploaded like any library file.
   const rows = [];

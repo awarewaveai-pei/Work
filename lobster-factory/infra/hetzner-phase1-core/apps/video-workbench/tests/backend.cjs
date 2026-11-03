@@ -6,7 +6,7 @@ const assert = require("node:assert/strict"),
   { spawnSync } = require("node:child_process");
 const { createServer } = require("../server.cjs");
 (async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "seedstar-backend-")),
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vw-backend-")),
     png = Buffer.from(
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jTioAAAAASUVORK5CYII=",
       "base64",
@@ -52,7 +52,7 @@ const { createServer } = require("../server.cjs");
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
   const base = "http://127.0.0.1:" + server.address().port;
   const post = async (route, data) => {
-    const r = await fetch(base + "/api/seedstar" + route, {
+    const r = await fetch(base + "/api/vw" + route, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -63,7 +63,7 @@ const { createServer } = require("../server.cjs");
   };
   const poll = async (job) => {
     for (let i = 0; i < 100; i++) {
-      const r = await fetch(base + "/api/seedstar/generations/" + job.id);
+      const r = await fetch(base + "/api/vw/generations/" + job.id);
       const v = await r.json();
       if (["succeeded", "failed", "cancelled"].includes(v.status)) return v;
       await new Promise((r) => setTimeout(r, 30));
@@ -105,7 +105,7 @@ const { createServer } = require("../server.cjs");
     const beforeDownloads = downloads;
     const batch = await Promise.all(
       Array.from({ length: 12 }, () =>
-        fetch(base + "/api/seedstar/generations/" + queued.id).then((r) =>
+        fetch(base + "/api/vw/generations/" + queued.id).then((r) =>
           r.json(),
         ),
       ),
@@ -216,7 +216,7 @@ const { createServer } = require("../server.cjs");
     assert.equal((await fetch(base + "/")).status, 200);
     assert.equal((await fetch(base + "/.data/jobs.json")).status, 404);
     console.log("PASS 無效網址不會中止服務；任務資料不公開");
-    const foreign = await fetch(base + "/api/seedstar/uploads", {
+    const foreign = await fetch(base + "/api/vw/uploads", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -226,7 +226,7 @@ const { createServer } = require("../server.cjs");
     });
     assert.equal(foreign.status, 403);
     const fileCount = fs.readdirSync(path.join(dir, "generated")).length;
-    const invalid = await fetch(base + "/api/seedstar/generations", {
+    const invalid = await fetch(base + "/api/vw/generations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

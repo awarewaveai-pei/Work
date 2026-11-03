@@ -220,7 +220,7 @@ async function toolOverlayUpdate() {
     }
   } catch (error) {
     if (request === toolOverlayPaint && mark.isConnected)
-      SeedStar.reportError(error);
+      VideoWorkbench.reportError(error);
   }
 }
 function toolOverlayAfterRender() {
@@ -338,11 +338,11 @@ async function toolOverlayAction(action, button) {
     }
   }
   if (action === "overlay-save") {
-    await SeedStar.preferences.set("tools.watermark", {
+    await VideoWorkbench.preferences.set("tools.watermark", {
       values: structuredClone(values),
       files: structuredClone(files),
     });
-    SeedStar.notify("浮水印設定已儲存");
+    VideoWorkbench.notify("浮水印設定已儲存");
   }
   if (action === "overlay-export") {
     const currentTool = tool,
@@ -375,7 +375,7 @@ async function toolOverlayAction(action, button) {
       const blob = await new Promise((resolve) =>
         canvas.toBlob(resolve, "image/png"),
       );
-      const asset = await SeedStar.uploadAsset(
+      const asset = await VideoWorkbench.uploadAsset(
         new File([blob], currentTool + "-overlay.png", { type: "image/png" }),
       );
       settings.overlayWidth = Math.max(
@@ -384,7 +384,7 @@ async function toolOverlayAction(action, button) {
       );
       settings.ctaPos ??= 4;
       settings.watermarkPos ??= 4;
-      const job = await SeedStar.generations.create({
+      const job = await VideoWorkbench.generations.create({
         type: "video",
         operation: currentTool,
         settings,
@@ -393,7 +393,7 @@ async function toolOverlayAction(action, button) {
           [currentTool === "cta" ? "ctaImage" : "png"]: asset,
         },
       });
-      SeedStar.showJob(job);
+      VideoWorkbench.showJob(job);
     } finally {
       if (button.isConnected) button.disabled = false;
     }

@@ -1,7 +1,8 @@
 const fs = require("node:fs"),
   path = require("node:path"),
   crypto = require("node:crypto"),
-  { verifyOutput } = require("./media-inspect.cjs");
+  { verifyOutput } = require("./media-inspect.cjs"),
+  { vwEnv } = require("./env-compat.cjs");
 // How many reference images an image generation sends (the rest of a character's references are kept, not sent).
 // The one owner of that number: the request below slices by it, /capabilities publishes it, the character page and
 // the pose export (shared/rig.js poseReferences) place and label references by it.
@@ -47,7 +48,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
     fs.renameSync(tmp, file);
   };
   const persist = () => {
-    const limit = Math.max(100, Number(env.SEEDSTAR_JOB_HISTORY_LIMIT) || 2000),
+    const limit = Math.max(100, Number(vwEnv(env, "JOB_HISTORY_LIMIT")) || 2000),
       terminal = jobs.filter((j) => !["queued", "running"].includes(j.status));
     const keep = new Set(terminal.slice(-limit).map((j) => j.id));
     writeJson(
@@ -156,7 +157,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
       ? [{ role: "developer", content: "Return a valid JSON object only, following the output schema in the instructions." }, { role: "user", content: userContent }]
       : images.length ? [{ role: "user", content: userContent }] : content;
     const r = await provider("/responses", {
-      model: env.SEEDSTAR_TEXT_MODEL || "gpt-4.1-mini",
+      model: vwEnv(env, "TEXT_MODEL") || "gpt-4.1-mini",
       instructions,
       input: responseInput,
       max_output_tokens: 3000,
@@ -683,8 +684,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
       json(res, 400, { error: { message: "無效的網址" } });
       return true;
     }
-    const route = url.pathname.replace("/api/seedstar", "");
-    if (!url.pathname.startsWith("/api/seedstar/")) return false;
+    const route = url.pathname.replace("/api/vw", "");
+    if (!url.pathname.startsWith("/api/vw/")) return false;
     try {
       const host = req.headers.host;
       if (!/^(localhost|127\.0\.0\.1):\d+$/.test(host || ""))

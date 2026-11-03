@@ -2,7 +2,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright"),
   assert = require("node:assert/strict"),
   fs = require("node:fs");
 process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
-  require("node:path").join(require("node:os").tmpdir(), "seedstar-services-"),
+  require("node:path").join(require("node:os").tmpdir(), "vw-services-"),
 );
 (async () => {
   const { base } = await require("./isolated-server.cjs").isolatedServer("vw-services-");
@@ -23,10 +23,10 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
   await p.route("**/config.js", (r) =>
     r.fulfill({
       contentType: "text/javascript",
-      body: `window.SEEDSTAR_CONFIG={mode:'http',apiBaseUrl:'/api/seedstar',timeoutMs:1000}`,
+      body: `window.VW_CONFIG={mode:'http',apiBaseUrl:'/api/vw',timeoutMs:1000}`,
     }),
   );
-  await p.route("**/api/seedstar/**", async (r) => {
+  await p.route("**/api/vw/**", async (r) => {
     const req = r.request(),
       url = new URL(req.url()).pathname;
     requests.push({
@@ -49,11 +49,11 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
     return r.fulfill({ json: job });
   });
   await p.goto(base);
-  await p.waitForFunction(() => window.SeedStar?.showJob);
+  await p.waitForFunction(() => window.VideoWorkbench?.showJob);
   await p.evaluate(async () => {
-    await SeedStar.ready;
-    await SeedStar.characters.save({ id: "c1", name: "API 角色" });
-    await SeedStar.assets.save({
+    await VideoWorkbench.ready;
+    await VideoWorkbench.characters.save({ id: "c1", name: "API 角色" });
+    await VideoWorkbench.assets.save({
       id: "a1",
       name: "API 素材",
       kind: "image",
@@ -65,7 +65,7 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
   console.log("PASS HTTP 資料保存");
   await p.locator("[data-mode=image]").click();
   await p.evaluate(() =>
-    SeedStar.generator.import({
+    VideoWorkbench.generator.import({
       target: "image",
       title: "Reference",
       image: "/assets/test-image-1.png",
@@ -111,7 +111,7 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
   assert.equal(await p.locator(".job-view").count(), 0);
   console.log("PASS HTTP 錯誤不會偽裝成功");
   const sanitized = await p.evaluate(() =>
-    SeedStar.sanitize(
+    VideoWorkbench.sanitize(
       '<img src="javascript:alert(1)" onerror="alert(1)"><svg onload="alert(1)"></svg><div style="background:url(javascript:alert(1))">x</div><iframe srcdoc="evil"></iframe>',
     ),
   );

@@ -1,5 +1,5 @@
 (async () => {
-  await SeedStar.ready;
+  await VideoWorkbench.ready;
   for (const item of []) {
     document.getElementById(item.id).textContent = JSON.stringify(
       await (await fetch(item.url)).json(),
@@ -14,4 +14,4 @@
       document.body.append(s);
     });
   }
-})().catch(SeedStar.reportError);
+})().catch(VideoWorkbench.reportError);

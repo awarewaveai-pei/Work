@@ -65,14 +65,14 @@ let state = {
   episode: 0,
 };
 try {
-  const s = JSON.parse(SeedStar.storage.getItem(STORE) || "null");
+  const s = JSON.parse(VideoWorkbench.storage.getItem(STORE) || "null");
   if (s && Array.isArray(s.projects))
     state = {
       ...state,
       ...s,
     };
-  // 舊版新專案預設寫入不存在的「SeedStar V3」；實際預設影片模型是 sora-2（index-0.js model.director）。
-  for (const p of state.projects) if (p?.settings?.model === "SeedStar V3") p.settings.model = "sora-2";
+  // 舊版新專案預設寫入不存在的「VideoWorkbench V3」；實際預設影片模型是 sora-2（index-0.js model.director）。
+  for (const p of state.projects) if (p?.settings?.model === "VideoWorkbench V3") p.settings.model = "sora-2";
 } catch {}
 let dialog = null;
 let selectedFileTarget = null;
@@ -80,7 +80,7 @@ let modalDraft = {};
 let snackbarTimeout = null;
 function save() {
   try {
-    SeedStar.storage.setItem(STORE, JSON.stringify(state));
+    VideoWorkbench.storage.setItem(STORE, JSON.stringify(state));
   } catch (e) {
     notify("瀏覽器儲存空間不足。部分圖片可能只能保留在本次開啟期間。");
   }
@@ -110,7 +110,7 @@ function render() {
 }
 function renderHome() {
   const count = state.projects.length;
-  $("home").innerHTML = SeedStar.sanitize(
+  $("home").innerHTML = VideoWorkbench.sanitize(
     `<div class="eyebrow">專案 · PROJECTS</div><h1>在同一個世界觀裡，一次又一次開拍。</h1><p class="sub">把角色、場景與道具定義成可複用的元件，套用鎖定的視覺風格 —— 讓長片與系列作品的每一個鏡頭都保持一致。</p>${!count ? `<div class="project-empty"><div class="bigicon">⊞</div><h2>還沒有專案</h2><p>建立第一個專案，開始打造你的世界觀。</p><button class="btn primary" data-action="create">＋　建立新專案</button></div>` : `<div class="split"><h2 style="margin:0">我的專案 <span class="quiet">${count} 個</span></h2><button class="btn primary" data-action="create">＋　建立新專案</button></div><div class="project-grid">${state.projects.map((p) => `<button class="project-card" data-action="openProject" data-id="${esc(p.id)}"><div class="project-cover">${p.cover ? `<img src="${esc(p.cover)}" alt="專案封面" style="width:100%;height:100%;object-fit:cover">` : "▦"}</div><div class="desc"><strong>${esc(p.title)}</strong><span class="badge">${esc(fmtType(p.type))}</span> <span class="badge">${esc(p.ratio)}</span><p class="quiet">${p.episodes.length} 集 · ${esc(STYLE_NAMES[p.style])}</p></div></button>`).join("")}</div>`}`,
   );
 }
@@ -121,7 +121,7 @@ function renderWorkbench() {
   const e = ep();
   const total = e.shots.length;
   const menu = `<div class="row"><button class="btn small outline" data-action="preview">◉　預覽整集</button><button class="btn small outline" data-action="export">↓　匯出片段 · 0</button><button class="btn small outline" data-action="cover">▧　更換封面</button><button class="btn small outline" data-action="settings">☷　生成設定</button></div>`;
-  $("workbench").innerHTML = SeedStar.sanitize(
+  $("workbench").innerHTML = VideoWorkbench.sanitize(
     `<div class="work-nav"><button class="btn small outline" data-action="backHome">←　專案列表</button><span class="eyebrow" style="color:var(--text-muted)">AWAREWAVE · 專案</span><span class="quiet">本機專案 · AI 依 API 用量計費</span></div><div class="work-grid"><aside class="bible"><div class="eyebrow">— 製作聖經 · BIBLE</div><h2>${esc(p.title)}</h2><div class="quiet">${esc(p.type === "series" ? "短影集" : "單支影片")} · ${p.episodes.length} 集 · ${esc(p.ratio)}</div><div class="fixed">♙　卡司、場景與風格定義一次，在所有鏡頭間保持一致。</div>${["character", "scene", "prop"].map((k) => entityList(k, p)).join("")}<div class="entity-group"><div class="entity-header">◉　風格錨點</div><div class="style-record"><h3>${esc(STYLE_NAMES[p.style])}</h3><div class="muted">${esc(styleText(p))}</div></div></div><button class="btn" style="width:100%;margin-top:20px" data-action="settings">☷　生成設定　⌃</button><p class="tiny">風格與負面提示詞的專案／本集兩層設定，會合成後用於實際內容。</p></aside><main class="work-content"><div class="work-top"><div><div class="quiet">專案　›　${esc(p.title)}</div><h1>第 ${state.episode + 1} 集 · ${esc(state.episode === 0 ? p.title : e.name)}</h1><div class="tiny">${total} 個鏡頭 · 約 ${e.shots.reduce((v, s) => v + Number(s.seconds || 5), 0)} 秒 · ${esc(p.ratio)} · ${e.shots.filter((s) => s.image).length}/${total} 已生成</div></div><div class="work-actions"><button class="btn primary" data-action="storyboard">✧　AI 分鏡</button><button class="btn" data-action="batch">▤　批次生成</button><button class="btn" data-action="fullVideo">✧　帶入影片生成</button><div style="position:relative"><button class="btn" data-action="toggleMore">⋯　更多</button><div class="panel" id="more-menu" hidden style="position:absolute;right:0;top:43px;z-index:4;width:205px;padding:7px">${menu}</div></div></div></div><div class="outline-box"><label>□ 本集大綱</label><textarea data-bind="episode.outline" placeholder="用幾句話寫下這一集的故事：誰、在哪裡、發生什麼、怎麼收尾">${esc(e.outline)}</textarea><div class="tiny">AI 分鏡會從這裡開始。改了大綱之後可以重新分鏡。</div></div><div class="episode-tabs">${p.episodes.map((x, i) => `<button class="${i === state.episode ? "on" : ""}" data-action="episode" data-index="${i}">EP${i + 1}　${esc(x.name)} ${x.shots.length}</button>`).join("")}<button data-action="addEpisode" aria-label="新增一集">＋</button></div>${total ? `<div class="split" style="margin-bottom:16px"><strong>本集鏡頭 <span class="quiet">${total} 個</span></strong><button class="btn small primary" data-action="addShot">＋　新增鏡頭</button></div><div class="shot-grid">${e.shots.map((s, i) => `<div class="shot"><div class="split"><h3>鏡頭 ${String(i + 1).padStart(2, "0")}</h3><button class="btn small danger" data-action="deleteShot" data-index="${i}" title="刪除鏡頭">×</button></div>${s.image ? `<img src="${esc(s.image)}" alt="生成畫面" style="width:100%;max-height:220px;object-fit:contain">` : ""}<label>畫面描述</label><textarea data-bind="shot.${i}.text" placeholder="描述鏡頭內的動作與構圖">${esc(s.text)}</textarea>${shotControls(p, s, i)}<div class="row"><label style="margin:0">時長 <input aria-label="鏡頭時長" style="width:70px;padding:6px" type="number" min="1" max="120" data-bind="shot.${i}.seconds" value="${esc(s.seconds)}"></label><span class="tiny">秒</span><button class="btn small" data-action="shotGenerate" data-index="${i}">生成畫面</button></div></div>`).join("")}</div>` : `<div class="work-empty panel"><h3>這一集還沒有鏡頭，從這裡開始</h3><div class="step"><span class="circle">1</span><div><strong>先建立角色與場景</strong><p>每個角色、場景、道具都可以上傳參考圖。鏡頭鎖定它們之後，長相與環境才會每一鏡都一致。</p><button class="btn small outline" data-action="asset" data-kind="character">♧　建立角色</button></div></div><div class="step"><span class="circle">2</span><div><strong>寫下大綱，讓 AI 分鏡</strong><p>AI 導演會先問幾個問題，再把故事拆成一顆一顆鏡頭，你可以逐鏡修改後再建立。</p><button class="btn small outline" data-action="storyboard">✧　AI 分鏡</button></div></div><div class="step"><span class="circle">3</span><div><strong>或者自己加一顆鏡頭</strong><p>想手動控制每一鏡的細節與鏡頭，就直接開始寫。</p><button class="btn small outline" data-action="addShot">＋　新增鏡頭</button></div></div></div>`}</main></div>`,
   );
 }
@@ -152,7 +152,7 @@ function closeDialog() {
   const wasCreate = dialog?.type === "create";
   dialog = null;
   $("overlay").hidden = true;
-  $("overlay").innerHTML = SeedStar.sanitize("");
+  $("overlay").innerHTML = VideoWorkbench.sanitize("");
   if (wasCreate) render();
 }
 const modal = (title, body, foot = "", size = "") =>
@@ -160,9 +160,9 @@ const modal = (title, body, foot = "", size = "") =>
 function renderCreatePage() {
   const d = modalDraft;
   $("overlay").hidden = true;
-  $("overlay").innerHTML = SeedStar.sanitize("");
+  $("overlay").innerHTML = VideoWorkbench.sanitize("");
   $("home").hidden = false;
-  $("home").innerHTML = SeedStar.sanitize(
+  $("home").innerHTML = VideoWorkbench.sanitize(
     `<div class="create-page"><div class="create-page-head"><div><div class="eyebrow">專案 · PROJECTS</div><h1>建立新專案</h1><p>先定義作品的世界觀與畫面方向，之後可以在同一個專案裡持續製作。</p></div><button class="btn outline" data-action="close">← 返回專案列表</button></div><div class="create-page-grid"><div><section class="create-section"><h2>基本資料</h2><label>專案名稱</label><input id="create-name" maxlength="120" placeholder="例如：夏日的豆花店" value="${esc(d.name || "")}"><label>類型</label><div class="create-choice-grid">${[
       ["series", "系列 / 短影集", "多集共用同一組卡司與世界觀"],
       ["single", "單支影片", "一支多場景的作品"],
@@ -284,7 +284,7 @@ function renderDialog() {
     );
   }
   if (html) {
-    $("overlay").innerHTML = SeedStar.sanitize(html);
+    $("overlay").innerHTML = VideoWorkbench.sanitize(html);
     $("overlay").hidden = false;
   }
 }
@@ -404,7 +404,7 @@ async function generateShot(index) {
   const references = chosen
     .flatMap((a) => (a.refs || []).map((url) => ({ url })))
     .slice(0, 4);
-  const job = await SeedStar.generations.create({
+  const job = await VideoWorkbench.generations.create({
     type: "image",
     operation: "project-shot",
     prompt: [
@@ -429,7 +429,7 @@ async function generateShot(index) {
   });
   shot.jobId = job.id;
   save();
-  SeedStar.showJob(job, {
+  VideoWorkbench.showJob(job, {
     onSuccess: (v) => {
       const owner = state.projects.find((x) => x.id === projectId),
         target = owner?.episodes
@@ -577,7 +577,7 @@ async function action(a, button) {
         return;
       }
       snapshotAsset();
-      SeedStar.request("/assets/describe", {
+      VideoWorkbench.request("/assets/describe", {
         kind: dialog.kind,
         prompt: input,
         references: dialog.draft.refs,
@@ -586,13 +586,13 @@ async function action(a, button) {
           dialog.draft.descr = result.description;
           renderDialog();
         })
-        .catch(SeedStar.reportError);
+        .catch(VideoWorkbench.reportError);
       break;
     }
     case "library": {
       snapshotAsset();
       const target = dialog;
-      const rows = await SeedStar.pickAssets({
+      const rows = await VideoWorkbench.pickAssets({
         kind: "image",
         multiple: true,
         limit: 8 - (target?.draft?.refs?.length || 0),
@@ -711,7 +711,7 @@ async function action(a, button) {
         const outline = $("story-outline")?.value.trim();
         if (!outline) throw Error("請先填寫大綱");
         const target = ep();
-        const result = await SeedStar.request("/director/shots", {
+        const result = await VideoWorkbench.request("/director/shots", {
           outline,
           count: dialog.count,
           assets: p.assets,
@@ -723,14 +723,14 @@ async function action(a, button) {
         closeDialog();
         renderWorkbench();
       } catch (e) {
-        SeedStar.reportError(e);
+        VideoWorkbench.reportError(e);
       }
       break;
     case "shotGenerate":
       try {
         await generateShot(index);
       } catch (e) {
-        SeedStar.reportError(e);
+        VideoWorkbench.reportError(e);
       }
       break;
     case "batch":
@@ -746,7 +746,7 @@ async function action(a, button) {
         )
           for (const i of indices) await generateShot(i);
       } catch (e) {
-        SeedStar.reportError(e);
+        VideoWorkbench.reportError(e);
       }
       break;
     case "fullVideo":
@@ -761,7 +761,7 @@ async function action(a, button) {
           .filter(Boolean)
           .join("\n");
         if (!prompt) throw Error("請先填寫本集大綱或鏡頭描述");
-        await SeedStar.generator.import({
+        await VideoWorkbench.generator.import({
           target: "reference",
           title: p.title,
           image:
@@ -774,9 +774,9 @@ async function action(a, button) {
           duration: 8,
           model: "sora-2",
         });
-        SeedStar.navigate("generator");
+        VideoWorkbench.navigate("generator");
       } catch (e) {
-        SeedStar.reportError(e);
+        VideoWorkbench.reportError(e);
       }
       break;
     case "saveEpisode": {
@@ -808,7 +808,7 @@ $("filePick").addEventListener("change", async (e) => {
     const allowed = Math.max(0, 8 - dialog.draft.refs.length);
     for (const f of files.slice(0, allowed)) {
       try {
-        dialog.draft.refs.push((await SeedStar.uploadAsset(f)).url);
+        dialog.draft.refs.push((await VideoWorkbench.uploadAsset(f)).url);
       } catch {
         notify("無法讀取圖片");
       }
@@ -816,7 +816,7 @@ $("filePick").addEventListener("change", async (e) => {
     renderDialog();
   } else if (selectedFileTarget === "cover") {
     try {
-      project().cover = (await SeedStar.uploadAsset(files[0])).url;
+      project().cover = (await VideoWorkbench.uploadAsset(files[0])).url;
       save();
       renderDialog();
       notify("已套用自訂封面");

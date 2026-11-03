@@ -6,7 +6,7 @@ async function openLibrary(kind, target) {
     if (!current) throw Error("此模式不支援這類素材");
     const cap = max[state.mode][bucket] || 1;
     if (current.length >= cap) throw Error("參考素材已達上限，請先移除");
-    const picked = await SeedStar.pickAssets({
+    const picked = await VideoWorkbench.pickAssets({
       kind,
       multiple: true,
       limit: cap - current.length,
@@ -16,12 +16,12 @@ async function openLibrary(kind, target) {
     current.push(
       ...picked.map((a) => ({
         ...a,
-        type: a.type || SeedStar.mediaKind(a) + "/",
+        type: a.type || VideoWorkbench.mediaKind(a) + "/",
       })),
     );
     render();
   } catch (e) {
-    SeedStar.reportError(e);
+    VideoWorkbench.reportError(e);
   }
 }
 
@@ -30,9 +30,9 @@ async function replaceReference(bucket, index) {
   if (!previous) return;
   close();
   try {
-    const [asset] = await SeedStar.pickAssets({ kind: SeedStar.mediaKind(previous) || "image", limit: 1, immediate: true, sources: SeedStar.mediaKind(previous) === "image", parityControls: true });
+    const [asset] = await VideoWorkbench.pickAssets({ kind: VideoWorkbench.mediaKind(previous) || "image", limit: 1, immediate: true, sources: VideoWorkbench.mediaKind(previous) === "image", parityControls: true });
     if (!asset || state.refs[mode]?.[bucket]?.[index] !== previous) return;
-    rows[index] = { ...asset, type: asset.type || SeedStar.mediaKind(asset) + "/", tag: previous.tag, purpose: previous.purpose };
+    rows[index] = { ...asset, type: asset.type || VideoWorkbench.mediaKind(asset) + "/", tag: previous.tag, purpose: previous.purpose };
     if (state.mode === mode) render();
-  } catch (error) { SeedStar.reportError(error); }
+  } catch (error) { VideoWorkbench.reportError(error); }
 }

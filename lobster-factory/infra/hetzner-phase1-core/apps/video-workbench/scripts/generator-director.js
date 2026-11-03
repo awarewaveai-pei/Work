@@ -145,6 +145,6 @@ async function directorStartGeneration() {
     $("modal").classList.add("hidden");
     await generatorSubmit(directorGenerationInput());
   } catch (e) {
-    SeedStar.reportError(e);
+    VideoWorkbench.reportError(e);
   }
 }

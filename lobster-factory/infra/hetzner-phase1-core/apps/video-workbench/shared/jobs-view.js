@@ -1,5 +1,5 @@
 (function () {
-  SeedStar.showJob = (job, options = {}) => {
+  VideoWorkbench.showJob = (job, options = {}) => {
     let panel = document.createElement("section");
     panel.className = "job-view";
     panel.setAttribute("role", "status");
@@ -26,13 +26,13 @@
       if (v.error) result.textContent = v.error;
       if (v.result?.url) {
         if (v.status === "succeeded") {
-          SeedStar.assets.save(SeedStar.jobAsset(v)).catch(SeedStar.reportError);
+          VideoWorkbench.assets.save(VideoWorkbench.jobAsset(v)).catch(VideoWorkbench.reportError);
           if (options.onSuccess) {
             options.onSuccess(v);
             options.onSuccess = null;
           }
         }
-        const url = SeedStar.safeUrl(v.result.url);
+        const url = VideoWorkbench.safeUrl(v.result.url);
         if (url) {
           const media = document.createElement(
             v.type === "audio" ? "audio" : v.type === "image" ? "img" : "video",
@@ -45,9 +45,9 @@
           download.download = "awarewave-video-" + v.id;
           download.textContent = v.status === "failed" && v.result.sourceUrl ? "下載供應商原圖" : "下載成果";
           result.append(download);
-          if (v.result.sourceUrl && v.result.sourceUrl !== v.result.url && SeedStar.safeUrl(v.result.sourceUrl)) {
+          if (v.result.sourceUrl && v.result.sourceUrl !== v.result.url && VideoWorkbench.safeUrl(v.result.sourceUrl)) {
             const original = document.createElement("a");
-            original.href = SeedStar.safeUrl(v.result.sourceUrl);
+            original.href = VideoWorkbench.safeUrl(v.result.sourceUrl);
             original.download = "original-" + v.id;
             original.textContent = "下載供應商原圖";
             result.append(original);
@@ -58,9 +58,9 @@
             retry.onclick = async () => {
               retry.disabled = true;
               try {
-                const next = await SeedStar.generations.retry(v);
-                closed = true; clearTimeout(timer); panel.remove(); SeedStar.showJob(next);
-              } catch (error) { retry.disabled = false; SeedStar.reportError(error); }
+                const next = await VideoWorkbench.generations.retry(v);
+                closed = true; clearTimeout(timer); panel.remove(); VideoWorkbench.showJob(next);
+              } catch (error) { retry.disabled = false; VideoWorkbench.reportError(error); }
             };
             result.append(retry);
           }
@@ -74,7 +74,7 @@
                 clearTimeout(timer);
                 panel.remove();
               } catch (e) {
-                SeedStar.reportError(e);
+                VideoWorkbench.reportError(e);
               }
             };
             result.append(apply);
@@ -95,20 +95,20 @@
                   const output = await callback();
                   if (output?.ok === false) throw Error(output.message || "無法帶入");
                   if (output?.ok) { closed = true; clearTimeout(timer); panel.remove(); }
-                } catch (error) { SeedStar.reportError(error); }
+                } catch (error) { VideoWorkbench.reportError(error); }
                 finally { button.disabled = false; }
               };
               actions.append(button);
             };
-            if (v.input?.prompt) action("複製提示詞", async () => { await navigator.clipboard.writeText(v.input.prompt); SeedStar.notify("已複製提示詞"); });
-            if (v.input) action("重新生成（先還原設定）", () => SeedStar.generator.import({ intent: "restore-job", job: v }));
+            if (v.input?.prompt) action("複製提示詞", async () => { await navigator.clipboard.writeText(v.input.prompt); VideoWorkbench.notify("已複製提示詞"); });
+            if (v.input) action("重新生成（先還原設定）", () => VideoWorkbench.generator.import({ intent: "restore-job", job: v }));
             if (v.type === "image") {
               const asset = { id: "job-" + v.id, name: v.input?.prompt?.slice(0, 80) || "圖片成果", kind: "image", type: "image/png", url };
-              action("用於生成（首幀）", () => SeedStar.generator.import({ intent: "use-result", action: "first", asset }));
-              action("模仿動作", () => SeedStar.generator.import({ intent: "use-result", action: "motion", asset }));
-              action("建立口播影片", () => SeedStar.generator.import({ intent: "use-result", action: "spoken", asset }));
-              action("編輯圖片", () => SeedStar.generator.import({ intent: "open-tool", tool: "region", asset }));
-              action("配音", () => SeedStar.generator.import({ intent: "open-tool", tool: "voice" }));
+              action("用於生成（首幀）", () => VideoWorkbench.generator.import({ intent: "use-result", action: "first", asset }));
+              action("模仿動作", () => VideoWorkbench.generator.import({ intent: "use-result", action: "motion", asset }));
+              action("建立口播影片", () => VideoWorkbench.generator.import({ intent: "use-result", action: "spoken", asset }));
+              action("編輯圖片", () => VideoWorkbench.generator.import({ intent: "open-tool", tool: "region", asset }));
+              action("配音", () => VideoWorkbench.generator.import({ intent: "open-tool", tool: "voice" }));
             }
             result.append(actions);
           }
@@ -117,9 +117,9 @@
       if (!closed && ["queued", "running"].includes(v.status))
         timer = setTimeout(async () => {
           try {
-            update(await SeedStar.generations.get(v.id));
+            update(await VideoWorkbench.generations.get(v.id));
           } catch (e) {
-            SeedStar.reportError(e);
+            VideoWorkbench.reportError(e);
             status.textContent = "狀態查詢失敗，5 秒後重試";
             if (!closed) timer = setTimeout(() => update(v), 5000);
           }
@@ -128,10 +128,10 @@
     cancel.onclick = async () => {
       try {
         clearTimeout(timer);
-        const v = await SeedStar.generations.cancel(job.id);
+        const v = await VideoWorkbench.generations.cancel(job.id);
         update(v);
       } catch (e) {
-        SeedStar.reportError(e);
+        VideoWorkbench.reportError(e);
         update(job);
       }
     };

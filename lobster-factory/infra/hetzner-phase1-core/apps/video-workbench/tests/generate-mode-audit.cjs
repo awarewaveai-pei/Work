@@ -1,6 +1,6 @@
 const assert = require("node:assert/strict"), fs = require("node:fs"), path = require("node:path"), os = require("node:os");
 const { chromium } = require("playwright");
-const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "seedstar-mode-audit-"));
+const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "vw-mode-audit-"));
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jTioAAAAASUVORK5CYII=", "base64");
 (async () => {
   const provider = [];
@@ -18,7 +18,7 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     const errors = []; p.on("pageerror", (error) => errors.push(error.message)); p.setDefaultTimeout(8000);
     await p.route("**/*", (r) => r.request().url().startsWith(base + "/") ? r.continue() : r.abort());
     await p.goto(base);
-    await p.waitForFunction(() => window.SeedStar?.generator?.controlsReady && SeedStar.capabilities?.imageExactOutput);
+    await p.waitForFunction(() => window.VideoWorkbench?.generator?.controlsReady && VideoWorkbench.capabilities?.imageExactOutput);
     assert.equal(await p.locator('[role=tab][aria-selected=true]').getAttribute("data-mode"), "reference");
     assert.equal(await p.locator("#tabs .tab").count(), 7);
     const boxes = await p.locator("#tabs .tab").evaluateAll((nodes) => nodes.map((n) => n.getBoundingClientRect().top));
@@ -47,9 +47,9 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     assert.equal(await p.locator('[data-gen-motion-quality="720p"]').getAttribute("aria-pressed"), "true");
     assert(await p.locator("#motionPreserveAudio").isChecked());
     assert.equal(await p.locator("#motionPrompt").inputValue(), "鏡頭慢慢推近");
-    const draft = await p.evaluate(() => SeedStar.generator.getDraft());
-    await p.evaluate((value) => SeedStar.generator.setDraft(value), draft);
-    assert.deepEqual((await p.evaluate(() => SeedStar.generator.getDraft())).motion, draft.motion);
+    const draft = await p.evaluate(() => VideoWorkbench.generator.getDraft());
+    await p.evaluate((value) => VideoWorkbench.generator.setDraft(value), draft);
+    assert.deepEqual((await p.evaluate(() => VideoWorkbench.generator.getDraft())).motion, draft.motion);
     await p.screenshot({ path: path.join(evidence, "motion.png"), fullPage: true });
     console.log("PASS 動作參考專屬照片／影片、朝向、畫質、原聲、補充指示，可重繪與還原");
 
@@ -64,7 +64,7 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     await p.locator("[data-panel=settings]").first().click(); await p.locator('[data-ratio="9:16"]').click();
     await p.locator("[data-mode=image]").click(); assert.match(await p.locator("#outputBtn").innerText(), /16:9 · 2K/);
     await p.locator("[data-mode=reference]").click(); assert.match(await p.locator("#outputBtn").innerText(), /16:9、9:16 · 720p/);
-    await p.evaluate(() => SeedStar.generator.import({ target: "image", title: "作品參考", image: "/assets/test-image-1.png", imagePrompt: "帶入參考仍保留 2K" }));
+    await p.evaluate(() => VideoWorkbench.generator.import({ target: "image", title: "作品參考", image: "/assets/test-image-1.png", imagePrompt: "帶入參考仍保留 2K" }));
     assert.match(await p.locator("#outputBtn").innerText(), /16:9 · 2K/);
     await p.locator('[data-remove="images:0"]').click();
     await p.locator("[data-mode=product]").click(); assert(await p.locator(".dock").isHidden());
@@ -87,14 +87,14 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     await p.screenshot({ path: path.join(evidence, "image-result.png"), fullPage: true });
     console.log("PASS 口播加入參考圖不報錯；卡通風格不滲入圖片；真實 PNG 為 2048×1152 且保留原圖");
 
-    const post = (body) => fetch(base + "/api/seedstar/generations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const post = (body) => fetch(base + "/api/vw/generations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const before = provider.length;
     assert.equal((await post({ type: "video", referenceMode: "first", prompt: "missing first frame" })).status, 400);
     assert.equal((await post({ type: "image", prompt: "bad output", settings: { imageLayout: "center-crop", ratio: "16:9", quality: "6K" } })).status, 400);
     assert.equal(provider.length, before);
     const response = await post({ type: "image", prompt: "portrait", settings: { imageLayout: "center-crop", ratio: "9:16", quality: "4K" } });
     assert.equal(response.status, 202); const job = await response.json(); let done;
-    for (let i = 0; i < 80; i++) { done = await (await fetch(base + "/api/seedstar/generations/" + job.id)).json(); if (["succeeded", "failed"].includes(done.status)) break; await new Promise((r) => setTimeout(r, 100)); }
+    for (let i = 0; i < 80; i++) { done = await (await fetch(base + "/api/vw/generations/" + job.id)).json(); if (["succeeded", "failed"].includes(done.status)) break; await new Promise((r) => setTimeout(r, 100)); }
     assert.equal(done.status, "succeeded", done.error); const bytes = Buffer.from(await (await fetch(base + done.result.url)).arrayBuffer());
     assert.deepEqual([bytes.readUInt32BE(16), bytes.readUInt32BE(20)], [2304, 4096]);
     assert((await fetch(base + done.result.sourceUrl)).ok);
@@ -116,7 +116,7 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     const retryUrl = await p.locator(".job-view img").getAttribute("src");
     const retried = Buffer.from(await (await fetch(new URL(retryUrl, base))).arrayBuffer());
     assert.deepEqual([retried.readUInt32BE(16), retried.readUInt32BE(20)], [2048, 1152]);
-    assert.equal((await p.evaluate(() => SeedStar.generations.list())).at(-1).input.operation, "image-output");
+    assert.equal((await p.evaluate(() => VideoWorkbench.generations.list())).at(-1).input.operation, "image-output");
     serverEnv.OPENAI_API_KEY = "test-only";
     await p.locator(".job-view button").filter({ hasText: "關閉" }).click();
     console.log("PASS 作品帶入保留 2K；圖片後處理失敗可下載原圖，只重試 FFmpeg 不增加供應商呼叫");
@@ -125,7 +125,7 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     media.normalizeImage = async () => { await gate; throw Error("TEST: delayed local failure"); };
     let stale;
     try {
-      stale = await p.evaluate(() => SeedStar.generations.create({ type: "image", mode: "image", prompt: "關閉視窗後的任務", settings: { ratio: "16:9", quality: "1K", imageLayout: "center-crop" } }));
+      stale = await p.evaluate(() => VideoWorkbench.generations.create({ type: "image", mode: "image", prompt: "關閉視窗後的任務", settings: { ratio: "16:9", quality: "1K", imageLayout: "center-crop" } }));
       const count = provider.length;
       await p.locator("#historyNav").click();
       await p.locator(`[data-job-check="${stale.id}"]`).click();
@@ -134,32 +134,32 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
       assert.equal(provider.length, count);
       await p.locator(".job-view button").filter({ hasText: "關閉" }).click();
       release();
-      for (let i = 0; i < 80; i++) { const latest = await (await fetch(base + "/api/seedstar/generations/" + stale.id)).json(); if (latest.status === "failed") break; await new Promise((r) => setTimeout(r, 50)); }
+      for (let i = 0; i < 80; i++) { const latest = await (await fetch(base + "/api/vw/generations/" + stale.id)).json(); if (latest.status === "failed") break; await new Promise((r) => setTimeout(r, 50)); }
     } finally { release(); media.normalizeImage = normalize; }
     const beforeStaleRetry = provider.length;
     await p.locator(`[data-job-check="${stale.id}"]`).click();
     await p.locator(".job-view").getByRole("button", { name: "只重試尺寸轉換（不呼叫 AI）", exact: true }).click();
     await p.getByRole("link", { name: "下載成果", exact: true }).waitFor({ timeout: 15000 });
     assert.equal(provider.length, beforeStaleRetry);
-    assert.equal((await p.evaluate(() => SeedStar.generations.list())).at(-1).input.operation, "image-output");
+    assert.equal((await p.evaluate(() => VideoWorkbench.generations.list())).at(-1).input.operation, "image-output");
     await p.locator(".job-view button").filter({ hasText: "關閉" }).click();
-    const successful = (await p.evaluate(() => SeedStar.generations.list())).find((j) => j.status === "succeeded" && !j.input.operation && j.input.settings?.imageLayout === "center-crop");
+    const successful = (await p.evaluate(() => VideoWorkbench.generations.list())).find((j) => j.status === "succeeded" && !j.input.operation && j.input.settings?.imageLayout === "center-crop");
     const beforeAgain = provider.length;
     await p.locator(`[data-job-retry="${successful.id}"]`).click();
     await p.getByRole("link", { name: "下載成果", exact: true }).waitFor({ timeout: 15000 });
     assert.equal(provider.length, beforeAgain + 1);
-    assert.notEqual((await p.evaluate(() => SeedStar.generations.list())).at(-1).input.operation, "image-output");
+    assert.notEqual((await p.evaluate(() => VideoWorkbench.generations.list())).at(-1).input.operation, "image-output");
     await p.locator(".job-view button").filter({ hasText: "關閉" }).click();
-    const fresh = await p.evaluate(() => SeedStar.generations.create({ type: "image", mode: "image", prompt: "未輪詢但已完成", settings: { ratio: "1:1", quality: "1K", imageLayout: "center-crop" } }));
-    for (let i = 0; i < 80; i++) { const latest = await (await fetch(base + "/api/seedstar/generations/" + fresh.id)).json(); if (latest.status === "succeeded") break; await new Promise((r) => setTimeout(r, 50)); }
+    const fresh = await p.evaluate(() => VideoWorkbench.generations.create({ type: "image", mode: "image", prompt: "未輪詢但已完成", settings: { ratio: "1:1", quality: "1K", imageLayout: "center-crop" } }));
+    for (let i = 0; i < 80; i++) { const latest = await (await fetch(base + "/api/vw/generations/" + fresh.id)).json(); if (latest.status === "succeeded") break; await new Promise((r) => setTimeout(r, 50)); }
     const beforeRefresh = provider.length;
-    const jobCount = (await p.evaluate(() => SeedStar.generations.list())).length;
+    const jobCount = (await p.evaluate(() => VideoWorkbench.generations.list())).length;
     await p.getByRole("button", { name: "重新整理", exact: true }).click();
     await p.locator(`[data-job-check="${fresh.id}"]`).click();
     await p.getByRole("link", { name: "下載成果", exact: true }).waitFor();
     assert.equal(provider.length, beforeRefresh);
     assert.match(await p.locator(".job-view").innerText(), new RegExp(fresh.id));
-    assert.equal((await p.evaluate(() => SeedStar.generations.list())).length, jobCount);
+    assert.equal((await p.evaluate(() => VideoWorkbench.generations.list())).length, jobCount);
     await p.locator(".job-view button").filter({ hasText: "關閉" }).click();
     await p.locator("#generatorNav").click();
     console.log("PASS 歷史先更新狀態，執行中不重送；過期快取失敗只重試轉換；已完成顯示成果；明選再次執行才新生成");

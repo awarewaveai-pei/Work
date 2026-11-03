@@ -23,7 +23,7 @@ const { isolatedServer } = require("./isolated-server.cjs");
     // Project A has a finished title, and its asset is in the library (as after a real job), so a later
     // edTitleRefresh would still find it by jobId.
     await page.evaluate(async () => {
-      const asset = await SeedStar.assets.save({ id: "job-job-a", kind: "video", type: "video/mp4", url: "/media/a/original.mp4", name: "片頭 A" });
+      const asset = await VideoWorkbench.assets.save({ id: "job-job-a", kind: "video", type: "video/mp4", url: "/media/a/original.mp4", name: "片頭 A" });
       ed.title.jobId = "job-a";
       ed.title.done = asset;
       edRender();

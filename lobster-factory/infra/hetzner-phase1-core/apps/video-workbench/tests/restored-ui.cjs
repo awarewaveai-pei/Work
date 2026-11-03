@@ -4,7 +4,7 @@ const assert = require("node:assert/strict"),
   { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
 const root = path.resolve(__dirname, ".."),
   evidence = fs.mkdtempSync(
-    path.join(require("node:os").tmpdir(), "seedstar-restored-ui-"),
+    path.join(require("node:os").tmpdir(), "vw-restored-ui-"),
   );
 (async () => {
   const server = require(root + "/server.cjs").createServer({
@@ -24,7 +24,7 @@ const root = path.resolve(__dirname, ".."),
       r.request().url().startsWith(base) ? r.continue() : r.abort(),
     );
     const calls = [];
-    await p.route("**/api/seedstar/generations", (r) => {
+    await p.route("**/api/vw/generations", (r) => {
       calls.push(r.request().postDataJSON());
       return r.fulfill({
         json: {
@@ -37,9 +37,9 @@ const root = path.resolve(__dirname, ".."),
       });
     });
     await p.goto(base);
-    await p.waitForFunction(() => window.SeedStar?.router);
+    await p.waitForFunction(() => window.VideoWorkbench?.router);
     await p.evaluate(() =>
-      SeedStar.characters.save({
+      VideoWorkbench.characters.save({
         id: "restore-character",
         name: "昨晚角色",
         description: "測試角色",
@@ -52,7 +52,7 @@ const root = path.resolve(__dirname, ".."),
     await p.locator("[data-action=voice]").click();
     await p.locator("[data-action=voice-select]").first().click();
     assert.match(await p.locator("[data-action=cast]").innerText(), /昨晚角色/);
-    const draft = await p.evaluate(() => SeedStar.generator.getDraft());
+    const draft = await p.evaluate(() => VideoWorkbench.generator.getDraft());
     assert(draft.cast);
     await p.locator("[data-mode=image]").click();
     await p.locator("[data-mode=spoken]").click();
@@ -84,12 +84,12 @@ const root = path.resolve(__dirname, ".."),
     await p.locator("#generatorNav").click();
     await p.locator("[data-mode=director]").click();
     await p.evaluate(() => {
-      const d = SeedStar.generator.getDraft();
+      const d = VideoWorkbench.generator.getDraft();
       d.mode = "director";
       d.directorStage = "script";
       d.directorGeneration = "idle";
       d.directorScript = "第一鏡：人物在海邊揮手。";
-      SeedStar.generator.setDraft(d);
+      VideoWorkbench.generator.setDraft(d);
     });
     await p.locator("[data-action=director-storyboard]").click();
     assert.equal(calls.length, 0);
@@ -101,9 +101,9 @@ const root = path.resolve(__dirname, ".."),
     await p.locator(".job-view button").filter({ hasText: "關閉" }).click();
     for (const status of ["generating", "result"]) {
       await p.evaluate((status) => {
-        const d = SeedStar.generator.getDraft();
+        const d = VideoWorkbench.generator.getDraft();
         d.directorGeneration = status;
-        SeedStar.generator.setDraft(d);
+        VideoWorkbench.generator.setDraft(d);
       }, status);
       await p.locator("[data-action=director-history]").waitFor();
       await p.locator("[data-action=director-regenerate]").click();

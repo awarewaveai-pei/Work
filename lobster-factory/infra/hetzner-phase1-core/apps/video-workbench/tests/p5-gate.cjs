@@ -161,7 +161,7 @@ function bvh(frames) {
   const browser = await chromium.launch({ channel: "msedge", headless: true, args: ["--disable-features=WebGPU"] });
   try {
     const { base } = await isolatedServer("vw-p5-gate-");
-    const up = await fetch(base + "/api/seedstar/uploads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "gate.glb", data: "data:model/gltf-binary;base64," + fs.readFileSync(path.join(cDir, "out.glb")).toString("base64") }) });
+    const up = await fetch(base + "/api/vw/uploads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "gate.glb", data: "data:model/gltf-binary;base64," + fs.readFileSync(path.join(cDir, "out.glb")).toString("base64") }) });
     assert.equal(up.status, 201);
     const asset = await up.json();
     assert.match(asset.url, /^\/media\/[a-f0-9]{64}\/original\.glb$/);

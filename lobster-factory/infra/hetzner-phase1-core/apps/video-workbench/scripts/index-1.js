@@ -55,12 +55,12 @@
     ])
       document.body.classList.toggle(n + "-open", name === n);
     if (["workflows", "skills", "assets", "history"].includes(name))
-      SeedStar.workspaces.open(name).catch(SeedStar.reportError);
+      VideoWorkbench.workspaces.open(name).catch(VideoWorkbench.reportError);
     if (name === "director") renderSessions();
     active = name;
   }
   async function renderSessions() {
-    const rows = await SeedStar.preferences.get("director.sessions", []),
+    const rows = await VideoWorkbench.preferences.get("director.sessions", []),
       host = $("directorSessions");
     host.replaceChildren();
     if (!rows.length) {
@@ -77,14 +77,14 @@
       const open = document.createElement("button");
       open.textContent = "繼續編輯";
       open.onclick = () => {
-        SeedStar.generator.setDraft(row.draft);
+        VideoWorkbench.generator.setDraft(row.draft);
         activate("generator", true);
       };
       const del = document.createElement("button");
       del.textContent = "刪除";
       del.onclick = async () => {
         if (confirm("刪除此對話草稿？")) {
-          await SeedStar.preferences.set(
+          await VideoWorkbench.preferences.set(
             "director.sessions",
             rows.filter((r) => r.id !== row.id),
           );
@@ -101,31 +101,31 @@
     b.addEventListener("click", () => {
       activate("generator", true);
       document.querySelector("#generatorView [data-mode=director]")?.click();
-      SeedStar.generator.newDirectorConversation();
+      VideoWorkbench.generator.newDirectorConversation();
     }),
   );
   $("saveGeneratorDraft").onclick = async () => {
     try {
-      const draft = SeedStar.generator.getDraft(),
+      const draft = VideoWorkbench.generator.getDraft(),
         name = prompt(
           "草稿名稱",
           draft.data[draft.mode]?.slice?.(0, 30) || "新的影片想法",
         );
       if (!name?.trim()) return;
-      const rows = await SeedStar.preferences.get("director.sessions", []);
+      const rows = await VideoWorkbench.preferences.get("director.sessions", []);
       rows.unshift({
         id: crypto.randomUUID(),
         name: name.trim(),
         draft,
         updatedAt: new Date().toISOString(),
       });
-      await SeedStar.preferences.set("director.sessions", rows);
+      await VideoWorkbench.preferences.set("director.sessions", rows);
       $("draftStatus").textContent = "草稿已儲存，可從 AI 導演繼續編輯。";
     } catch (e) {
-      SeedStar.reportError(e);
+      VideoWorkbench.reportError(e);
     }
   };
-  SeedStar.router = {
+  VideoWorkbench.router = {
     activate,
     get active() {
       return active;

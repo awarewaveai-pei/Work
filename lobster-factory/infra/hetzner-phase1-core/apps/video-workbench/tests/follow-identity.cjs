@@ -33,7 +33,7 @@ const vm = require('node:vm'), fs = require('node:fs'), path = require('node:pat
     document: { addEventListener() {}, querySelector() { return null; } },
     window: { addEventListener() {} }, values: { followStart: 0, followEnd: 5, followAnchors: [{ time: 0, box: previous }] },
     files: { src: { url: '/test.mp4', duration: 5 } }, tool: 'follow', render() {}, saveDraft() {},
-    outputCalls: 0, SeedStar: { generations: { create: async () => ({ id: 'test' }) }, showJob() {} },
+    outputCalls: 0, VideoWorkbench: { generations: { create: async () => ({ id: 'test' }) }, showJob() {} },
   });
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../scripts/tools-follow.js'), 'utf8'), context);
   vm.runInContext(`
@@ -46,7 +46,7 @@ const vm = require('node:vm'), fs = require('node:fs'), path = require('node:pat
       return observed <= 3 ? { boxes: [${JSON.stringify(target)}], template: null }
         : { boxes: [${JSON.stringify(distractor)}], template: null };
     };
-    SeedStar.generations.create = async () => { outputCalls++; return { id: 'test' }; };
+    VideoWorkbench.generations.create = async () => { outputCalls++; return { id: 'test' }; };
   `, context);
   await vm.runInContext('followTrack()', context);
   assert.equal(vm.runInContext('observed', context), 7, 'four misses must stop automatic reacquisition');
