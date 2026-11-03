@@ -63,6 +63,7 @@ const C6 = 'f57fd3512';
 const C14 = '27a93dbcc';
 const C16 = 'b0f5e4872';
 const C6REL = '8e7b353ea';
+const C9 = 'bc1b685c8';
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '守衛與事實訂正', plain: '例：名單上某人剛退訂，系統仍替他建草稿。改成建草稿前重查拒收名單。同時把「scope 不能寄信」這句不對的說法改正，用測試守住程式不呼叫寄信；順便把 Google 授權改成正式發布、加上讀信權限，之後 6 個新信箱只要授權一次。',
@@ -237,15 +238,15 @@ export const STEPS = [
     items: [
       done('C14.1', '共用的「收暖名單」程式：存名單、存同意、取消這個人所有待寄的冷信、同步 FluentCRM；匯入廣告管理員下載的 CSV 就走它；重送同一筆不重複，但沒同步成功的會補。', C14),
       done('C14.2', '自動接收：Meta 送來的名單事件經既有的簽章驗證後，抓回資料、走同一段程式。', C14),
-      todo('C14.3', '你動手：App 加名單權限、每個品牌頁面訂閱名單事件。程式與測試已完成（27a93dbcc，0154 已套正式庫）；之後用 Meta 測試工具送一筆。'),
+      todo('C14.3', '你動手（等要投名單型廣告時）：Meta 開發者後台替 App 加 leads_retrieval 權限（AwareWave 粉專另加 pages_manage_metadata），重新產生兩個粉專權杖放回 user-env；之後我讓粉專訂閱名單事件、用 Meta 測試工具送一筆。11-03 查：兩個權杖都沒有 leads_retrieval。程式與測試已完成（27a93dbcc，0154 已套正式庫）。'),
     ] },
   { n: 16, code: 'C9', group: 'G', title: '舊欄位退場', plain: '例：舊名單還是用那一格觀察。回填成證據列後，產信與評分只看證據，舊欄位不再寫入。', waitFor: '等 100 個名單走過研究流程',
-    gate: '每個有舊觀察的名單都有一列證據。產信與評分不再讀舊欄位。欄位保留。', risk: 'Medium', model: 'Codex', status: 'not_started', depends: ['C3'],
+    gate: '每個有舊觀察的名單都有一列證據。產信與評分不再讀舊欄位。欄位保留。', risk: 'Medium', model: 'Codex', status: 'done', commit: C9, depends: ['C3'],
     what: '冪等回填；checkColdGate 與 scoring 改讀 evidence；inbox 匯入寫 evidence',
     files: ['NA/lib/outreach/cold-gate.ts', 'NA/lib/outreach/scoring.ts', 'NA/app/api/outreach/inbox/route.ts'],
     items: [
-      todo('C9.1', '把舊的觀察回填成證據列。'),
-      todo('C9.2', '產信與評分只看證據；匯入時直接寫證據。'),
+      done('C9.1', '把舊的觀察回填成證據列（migration 0156，11-03 已套正式庫，回填 1 列）。', C9),
+      done('C9.2', '產信與評分只看證據；名單核准或手動建立時，觀察＋來源網址寫成已核准證據；沒附來源的觀察會被擋下並提示。', C9),
     ] },
   { n: 17, code: 'C16', group: 'G', title: '自動化調校：抽得準、核得穩、越寫越好', waitFor: '等 C7 成效頁上線，而且真的寄了 2 週',
     plain: '例：全自動模式每天仍有 2% 的信給你看。現在是隨機抽；調校後優先抽新品牌、新產業、事實核對沒把握的、退信或負面回覆偏高的那類。事實核對換成判兩次結果一致的模型。哪種開場回覆率高，系統下次就多用那種。',
