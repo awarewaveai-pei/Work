@@ -227,7 +227,7 @@ export const STEPS = [
       done('C6.1', 'wp-bridge 外掛加一個「新增／更新聯絡人」端點，只做這件事。', C6),
       done('C6.2', '外掛升 0.21.0、發版，並推上 aware-wave.com 與 Soulful（兩站 health 200；Soulful 檢查 7/7 通過）。', C6REL),
       done('C6.3', '同步的後端：先驗資格（回過信、填過表單、同意過、是客戶之一，且不在拒收名單），再呼叫外掛。', C6),
-      todo('C6.4', '按鈕與測試已完成（f57fd3512）；剩：真同步一筆。沒有 staging 站，aware-wave.com 的 bridge 自 10-30 起沒接回 app（你決定先不接）：等決定接回 aware-wave.com 時再測。'),
+      todo('C6.4', '按鈕與測試已完成（f57fd3512）。每家公司的回信者只進自己網站的 FluentCRM（依名單所屬公司找它自己的 WordPress 連線，route.ts:55；沒接網站就不同步，不會送去別家）。剩：哪家公司先有人回信，就用那筆真資料在那家網站同步一次。'),
     ] },
   { n: 15, code: 'C14', group: 'G', title: '個人消費者：Meta 名單型廣告 → FluentCRM', waitFor: '等你在 Meta 廣告管理員建立第一個名單型廣告', plain: '例：你在廣告管理員圈「台灣、對塔羅有興趣」投名單型廣告，對方在 IG 上一鍵留 email。系統收到後存成暖名單並記下同意依據，自動進該品牌的 FluentCRM 培養。這些人永遠不會收到冷信。',
     gate: '用 Meta 的名單廣告測試工具送一筆，10 秒內名單出現、帶同意依據，FluentCRM 也有這個聯絡人；同一筆重送不會重複。下載 CSV 匯入也走同一條路得到同樣結果。', risk: 'Medium（C14.3 外部設定）', model: 'Opus 5.5', status: 'in_progress', depends: ['C6'],

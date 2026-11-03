@@ -29,7 +29,7 @@ hint: "外聯 v2 交接給另一個 Claude 帳號；取代 2026-11-02-1424-outbo
 | C5.5 | 等第一封真信寄出 | 首封 sent 後，到期追蹤由管線建草稿 → 查 Gmail 該草稿 threadId = 首封 thread |
 | C14.3 | 操作者 | Meta App `leads_retrieval`＋頁面訂閱 leadgen（頁面訂閱可用 user-env 的 `META_PAGE_TOKEN_*` 代做，先問） |
 | C11.1／C11.4／C8.5／C15.4 | 延後（D26） | 買次網域＋Workspace 才做；C15.4 另需 sampled profile（同服務人工核准滿 50 封） |
-| C6.4 | 停放 | 操作者 11-02：aware-wave.com bridge 不接回 app |
+| C6.4 | 等真資料 | 每家公司各自網站（sync-fluentcrm route.ts:55）；哪家先有人回信就用那家真同步一次 |
 | C9.1／C9.2 | 等資料 | 100 個名單走過研究後 |
 | C16.2／C16.4 | 等資料 | 寄滿 200 封／2 週 |
 - 操作者待辦（提醒一次）：Gmail 草稿匣刪測試草稿「WuSheng 療癒模組與線上體驗的交流」（收件 peijingartstudio）。
