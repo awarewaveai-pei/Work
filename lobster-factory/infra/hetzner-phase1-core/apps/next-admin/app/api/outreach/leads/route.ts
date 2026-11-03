@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
 import { outreachDb } from "@/lib/outreach/db-client";
 import { scoreLead } from "@/lib/outreach/scoring";
+import { citableFact, recordLeadEvidence } from "@/lib/outreach/lead-evidence";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { findExistingLead } from "@/lib/outreach/existing-leads";
 import { inboxConsentSource } from "@/lib/outreach/sources/people-search";
@@ -19,6 +20,8 @@ import { EntitlementRequired } from "@/lib/entitlements/can";
 // lead) → mark inbox approved. Approving twice never makes two leads.
 // findEmail (card C13.2): a person's address guessed from their company's formats, MX-checked, then verified by the paid
 // verifier under the organization's outreach.verify grant; only a paid `valid` is written (consent_source 'inferred').
+// Evidence (card C9.2): the inbox row's observation + source_url (or a manual lead's) become the lead's approved evidence
+// (created_by import / manual; same fact twice = one row); co_leads.observation is no longer written.
 // Writes ops-role gated; GET authed-only.
 
 export const runtime = "nodejs";
@@ -60,8 +63,8 @@ interface ScoreInput {
   phone?: string | null;
   contact_name?: string | null;
   contact_role?: string | null;
-  observation?: string | null;
   source_url?: string | null;
+  evidence_count?: number;
 }
 
 export async function GET(req: Request): Promise<Response> {
@@ -193,6 +196,10 @@ export async function POST(req: Request): Promise<Response> {
     // Verify caller may act on this inbox item's org before promoting it to a lead.
     try { assertOrgAccess(req, row.organization_id as string | null); }
     catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+    const raw = (row.raw_payload ?? {}) as Record<string, unknown>;
+    const rawText = (k: string): string | null => (typeof raw[k] === "string" && (raw[k] as string).trim() ? (raw[k] as string).trim().slice(0, 300) : null);
+    // co_lead_inbox has no observation column: the imported observation is in raw_payload.
+    const importedFact = { claim: rawText("observation"), sourceUrl: row.source_url as string | null };
     const lead: ScoreInput = {
       name: (row.normalized_name as string | null) ?? "(未命名)",
       industry: row.normalized_industry as string | null,
@@ -200,11 +207,13 @@ export async function POST(req: Request): Promise<Response> {
       social_url: row.social_url as string | null,
       email: str(row.email),
       phone: row.phone as string | null,
-      observation: null,
       source_url: row.source_url as string | null,
+      evidence_count: citableFact(importedFact.claim, importedFact.sourceUrl) ? 1 : 0,
     };
-    const raw = (row.raw_payload ?? {}) as Record<string, unknown>;
-    const rawText = (k: string): string | null => (typeof raw[k] === "string" && (raw[k] as string).trim() ? (raw[k] as string).trim().slice(0, 300) : null);
+    const evidenceFor = async (lead: { id: string; organization_id: string | null }): Promise<Response | null> => {
+      const err = await recordLeadEvidence(supabase, { lead, ...importedFact, createdBy: "import" });
+      return err ? NextResponse.json({ ok: false, error: err }, { status: 500 }) : null;
+    };
     const orgOfRow = (row.organization_id as string | null) ?? null;
     const identity = { email: lead.email, website: lead.website, source_url: lead.source_url, name: lead.name, phone: lead.phone };
     const markApproved = () => supabase.from("co_lead_inbox").update({ inbox_status: "approved", updated_at: new Date().toISOString() }).eq("id", fromInboxId);
@@ -215,6 +224,8 @@ export async function POST(req: Request): Promise<Response> {
       if (!found) return null;
       const { data: full, error: readErr } = await supabase.from(TABLE).select("*").eq("id", found.id).maybeSingle();
       if (readErr) return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });
+      const evErr = await evidenceFor({ id: found.id, organization_id: orgOfRow });  // findExistingLead is scoped to orgOfRow
+      if (evErr) return evErr;
       await markApproved();
       return NextResponse.json({ ok: true, lead: full, existing: true });
     };
@@ -258,6 +269,8 @@ export async function POST(req: Request): Promise<Response> {
     }
     if (createErr) return leadWriteError(createErr);
 
+    const evErr = await evidenceFor({ id: (created as { id: string }).id, organization_id: orgOfRow });
+    if (evErr) return evErr;
     await markApproved();
     return NextResponse.json({ ok: true, lead: created }, { status: 201 });
   }
@@ -277,10 +290,22 @@ export async function POST(req: Request): Promise<Response> {
     phone: str(body.phone),
     contact_name: str(body.contactName),
     contact_role: str(body.contactRole),
-    observation: str(body.observation),
     source_url: str(body.sourceUrl),
   };
-  const scores = scoreLead(base, { isDuplicate: false, doNotContact: false });
+  // An observation is a fact only with the page it came from: it becomes the lead's approved evidence (card C9.2).
+  const manualFact = citableFact(str(body.observation), str(body.sourceUrl));
+  if (str(body.observation) && !manualFact) {
+    return NextResponse.json({ ok: false, error: "observation_needs_source", detail: "觀察要附來源網址（1000 字以內）" }, { status: 400 });
+  }
+  const scored = (evidenceCount: number) => {
+    const s = scoreLead({ ...base, evidence_count: evidenceCount }, { isDuplicate: false, doNotContact: false });
+    return { lead_quality_score: s.lead_quality_score, contactability_score: s.contactability_score, icp_score: s.icp_score, score: s.score, priority: s.priority };
+  };
+
+  const manualEvidence = async (lead: { id: string; organization_id: string | null }): Promise<Response | null> => {
+    const err = await recordLeadEvidence(supabase, { lead, claim: str(body.observation), sourceUrl: str(body.sourceUrl), createdBy: "manual" });
+    return err ? NextResponse.json({ ok: false, error: err }, { status: 500 }) : null;
+  };
 
   const profileId = str(body.serviceProfileId);
   const badProfile = await checkProfile(supabase, profileId, orgId);
@@ -301,12 +326,6 @@ export async function POST(req: Request): Promise<Response> {
     region: str(body.region),
     source_type: str(body.sourceType),
     source_url: base.source_url,
-    observation: base.observation,
-    lead_quality_score: scores.lead_quality_score,
-    contactability_score: scores.contactability_score,
-    icp_score: scores.icp_score,
-    score: scores.score,
-    priority: scores.priority,
   };
 
   if (id) {
@@ -319,12 +338,15 @@ export async function POST(req: Request): Promise<Response> {
     catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
     // A lead moved to another organization cannot keep the old one's profile (0149 trigger refuses it).
     const keepsProfile = "serviceProfileId" in body || !prev.service_profile_id || prev.organization_id === orgId;
+    // The score counts the evidence the lead already has (research, backfill), not only what this request sends.
+    const { count: evCount, error: evReadErr } = await supabase.from("co_evidence").select("id", { count: "exact", head: true }).eq("lead_id", id).eq("status", "approved");
+    if (evReadErr) return NextResponse.json({ ok: false, error: evReadErr.message }, { status: 500 });
 
     const { data, error } = await supabase
       .from(TABLE)
       // consent_source describes where THIS address came from (self_published: lets it skip verification, SPEC D25;
       // inferred / general_source: carry the notice): a person typing another address leaves no known source.
-      .update({ ...fields, ...(keepsProfile ? {} : { service_profile_id: null }),
+      .update({ ...fields, ...scored((evCount ?? 0) + (manualFact ? 1 : 0)), ...(keepsProfile ? {} : { service_profile_id: null }),
         ...((prev.email ?? "").trim().toLowerCase() !== (base.email ?? "").trim().toLowerCase() ? { consent_source: null } : {}),
         updated_at: new Date().toISOString() })
       .eq("id", id)
@@ -332,11 +354,15 @@ export async function POST(req: Request): Promise<Response> {
       .maybeSingle();
     if (error) return leadWriteError(error);
     if (!data) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
+    const evErr = await manualEvidence(data as { id: string; organization_id: string | null });
+    if (evErr) return evErr;
     return NextResponse.json({ ok: true, lead: data });
   }
 
-  const { data, error } = await supabase.from(TABLE).insert({ ...fields, status: "new" }).select("*").single();
+  const { data, error } = await supabase.from(TABLE).insert({ ...fields, ...scored(manualFact ? 1 : 0), status: "new" }).select("*").single();
   if (error) return leadWriteError(error);
+  const evErr = await manualEvidence(data as { id: string; organization_id: string | null });
+  if (evErr) return evErr;
   return NextResponse.json({ ok: true, lead: data }, { status: 201 });
 }
 

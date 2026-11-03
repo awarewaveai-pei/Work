@@ -50,7 +50,7 @@ describe("scoring — mechanical (no LLM)", () => {
     const lead = {
       name: "Acme Yoga", website: "https://acme.com", social_url: "https://instagram.com/acme",
       email: "hi@acme.com", phone: "0900",
-      industry: "yoga", observation: "常辦週末小班", source_url: "https://dir.com/acme",
+      industry: "yoga", evidence_count: 1, source_url: "https://dir.com/acme",
       contact_name: "Jane", contact_role: "Owner",
     };
     expect(scoreLeadQuality(lead, { isDuplicate: false })).toBe(100);
@@ -58,7 +58,7 @@ describe("scoring — mechanical (no LLM)", () => {
   });
 
   it("duplicate loses the non-duplicate 10 points", () => {
-    const lead = { name: "A", website: "x.com", email: "a@x.com", industry: "y", observation: "o", source_url: "s" };
+    const lead = { name: "A", website: "x.com", email: "a@x.com", industry: "y", evidence_count: 1, source_url: "s" };
     expect(scoreLeadQuality(lead, { isDuplicate: true })).toBe(90);
   });
 
@@ -83,7 +83,7 @@ describe("scoring — mechanical (no LLM)", () => {
   });
 
   it("scoreLead returns all three + overall + priority", () => {
-    const r = scoreLead({ name: "A", email: "a@b.com", website: "b.com", industry: "yoga", observation: "o", source_url: "s", contact_role: "Owner" }, { emailVerified: false });
+    const r = scoreLead({ name: "A", email: "a@b.com", website: "b.com", industry: "yoga", evidence_count: 1, source_url: "s", contact_role: "Owner" }, { emailVerified: false });
     expect(r).toHaveProperty("lead_quality_score");
     expect(r).toHaveProperty("contactability_score");
     expect(r).toHaveProperty("icp_score");

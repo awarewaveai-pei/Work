@@ -5,6 +5,7 @@ import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } 
 import { normalizeLead, flagDuplicatesInBatch, type RawLead, type NormalizedLead } from "@/lib/outreach/normalize";
 import { findSuppressed } from "@/lib/outreach/suppression";
 import { scoreLeadQuality, scoreContactability } from "@/lib/outreach/scoring";
+import { citableFact } from "@/lib/outreach/lead-evidence";
 import { verifyEmails, type EmailStatus } from "@/lib/outreach/verify-email";
 import { findExisting } from "@/lib/outreach/existing-leads";
 import { discoverInput, discoverPlaces, creditsTwd, creditsUsd, DISCOVER_MAX_USD, LocationNotRecognized, MAX_PAGES } from "@/lib/outreach/discover";
@@ -300,8 +301,8 @@ export async function POST(req: Request): Promise<Response> {
       phone: n.phone,
       contact_name: n.contact_name,
       contact_role: n.contact_role,
-      observation: n.observation,
       source_url: n.source_url,
+      evidence_count: citableFact(n.observation, n.source_url) ? 1 : 0,   // approval turns the pair into evidence
     };
     const quality = scoreLeadQuality(scorable, { isDuplicate: isDup });
     const contactability = scoreContactability(scorable, { doNotContact: suppressed, emailVerified: emailStatus === "valid" });

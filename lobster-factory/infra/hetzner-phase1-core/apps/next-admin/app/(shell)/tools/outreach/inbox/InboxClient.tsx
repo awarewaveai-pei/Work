@@ -266,8 +266,9 @@ export default function InboxClient() {
     setMsg(null);
     try {
       // consent_source is not sent: a pasted row never claims where the data came from (approval ignores it for this type).
+      // source_note, not observation: where the data came from is not a fact about the person, so never evidence (C9.2).
       const lead = { name: paste.name, contact_name: paste.name, email: paste.email, source_type: PASTED_SOURCE_TYPE, source_url: url || null,
-        social_url: onPlatform ? url : null, website: url && !onPlatform ? url : null, observation: paste.source };
+        social_url: onPlatform ? url : null, website: url && !onPlatform ? url : null, source_note: paste.source };
       const r = await fetch(INBOX_API, {
         method: "POST",
         headers: { "content-type": "application/json" },

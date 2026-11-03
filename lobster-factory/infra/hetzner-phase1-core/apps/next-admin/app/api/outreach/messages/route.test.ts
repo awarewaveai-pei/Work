@@ -10,8 +10,8 @@ const SIGNATURE = "王小明\n好夥伴工作室\nhttps://partner.example";
 const GOOD = JSON.stringify({
   subjects: ["想請教貴店的課表", "關於週末親子課"],
   bodies: [
-    { label: "A", angle: "observation", text: "您好，看到貴店週末開了親子課。如果不適合，我就不再打擾。", evidence_ids: ["lead-observation"] },
-    { label: "B", angle: "question", text: "您好，注意到親子課很受歡迎。如果不適合，我就不再打擾。", evidence_ids: ["lead-observation"] },
+    { label: "A", angle: "observation", text: "您好，看到貴店週末開了親子課。如果不適合，我就不再打擾。", evidence_ids: ["e1"] },
+    { label: "B", angle: "question", text: "您好，注意到親子課很受歡迎。如果不適合，我就不再打擾。", evidence_ids: ["e1"] },
   ],
   followups: [{ step: 2, delay_days: 3, text: "再補充一個想法。如果不適合，我就不再打擾。" }],
 });
@@ -52,6 +52,7 @@ vi.mock("@/lib/org-client", () => {
   function respond(op: Op, single: boolean): unknown {
     const s = m.state;
     if (op.table === "co_leads") return { data: s.lead, error: null };
+    if (op.table === "co_evidence") return { data: [{ id: "e1", claim: "週末開親子課", excerpt: null, source_url: "https://tree.example", status: "approved" }], error: null };
     if (op.table === "co_service_profiles") return { data: s.profile ?? null, error: null };
     if (op.table === "co_sender_accounts") return { data: s.sender ? [s.sender] : [], error: null };
     if (op.table === "organizations") return { data: { name: "好夥伴工作室" }, error: null };
@@ -96,7 +97,7 @@ beforeEach(() => {
   m.claims.mockResolvedValue({ verdict: "supported" });
   m.ops.length = 0;
   m.state = {
-    lead: { id: LEAD_ID, organization_id: ORG, service_profile_id: "p-1", name: "小樹親子館", observation: "週末開親子課", source_url: "https://tree.example",
+    lead: { id: LEAD_ID, organization_id: ORG, service_profile_id: "p-1", name: "小樹親子館", source_url: "https://tree.example",
       consent_source: "self_published:https://tree.example/contact", do_not_contact: false },
     profile: { id: "p-1", service_name: "課程行銷", privacy_url: "https://partner.example/privacy", review_mode: "manual", review_sample_pct: 10, forbidden_words: [] },
     sender: { id: "s-1", organization_id: ORG, email: "hi@partner.example", display_name: "王小明", signature_block: SIGNATURE },
@@ -134,7 +135,7 @@ describe("one generation writes two first emails and the follow-ups", () => {
       expect(r.status).toBe("draft");
       expect(r.quality_gate_status).toBe("pass");
     }
-    expect(rows[0].evidence_snapshot).toEqual({ evidence_ids: ["lead-observation"] });
+    expect(rows[0].evidence_snapshot).toEqual({ evidence_ids: ["e1"] });
   });
 
   it("a lead that did not publish the address itself gets the notice line on the first emails only", async () => {

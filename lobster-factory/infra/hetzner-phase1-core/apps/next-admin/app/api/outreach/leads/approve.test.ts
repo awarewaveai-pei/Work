@@ -12,6 +12,7 @@ const m = vi.hoisted(() => ({
   inserts: 0,
   row: null as Record<string, unknown> | null,
   insertError: null as { code: string; message: string } | null,
+  evidence: [] as Record<string, unknown>[],
 }));
 
 vi.mock("@/lib/org-client", () => {
@@ -21,6 +22,12 @@ vi.mock("@/lib/org-client", () => {
     const leads = () => (m.inserts > 0 && m.after ? m.after : m.before);
     q.then = (ok: (v: unknown) => unknown) => ok({ data: table === "co_leads" ? leads() : [], error: null });
     q.maybeSingle = async () => ({ data: table === "co_lead_inbox" ? m.inbox : leads()[0] ?? null, error: null });
+    // co_evidence upsert with ignoreDuplicates: (lead_id, source_url, claim) already there = no new row
+    q.upsert = (row: Record<string, unknown>) => {
+      const key = (r: Record<string, unknown>) => `${r.lead_id}|${r.source_url}|${r.claim}`;
+      if (!m.evidence.some((e) => key(e) === key(row))) m.evidence.push(row);
+      return Promise.resolve({ error: null });
+    };
     q.insert = (row: Record<string, unknown>) => {
       m.inserts++;
       m.row = row;
@@ -44,6 +51,7 @@ beforeEach(() => {
   m.inserts = 0;
   m.row = null;
   m.insertError = null;
+  m.evidence = [];
 });
 
 describe("POST /api/outreach/leads fromInboxId", () => {
@@ -68,6 +76,18 @@ describe("POST /api/outreach/leads fromInboxId", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ existing: true, lead: { id: "lead-1" } });
     expect(m.inserts).toBe(1);
+  });
+});
+
+describe("approving an inbox row with an observation + source_url writes the lead's evidence (card C9.2)", () => {
+  it("one approved evidence row (created_by import), and approving the same row again adds none", async () => {
+    m.inbox = { ...m.inbox, raw_payload: { observation: "常辦週末小班" } };   // the inbox keeps it in raw_payload, as in prod
+    expect((await approve()).status).toBe(201);
+    expect(m.evidence).toEqual([{ lead_id: "new", organization_id: ORG, claim: "常辦週末小班", source_url: "https://maps.google.com/?cid=7", excerpt: null, status: "approved", created_by: "import" }]);
+    expect(m.row).not.toHaveProperty("observation");
+    m.before = [{ ...existing, id: "new" }];
+    expect((await approve()).status).toBe(200);
+    expect(m.evidence).toHaveLength(1);
   });
 });
 

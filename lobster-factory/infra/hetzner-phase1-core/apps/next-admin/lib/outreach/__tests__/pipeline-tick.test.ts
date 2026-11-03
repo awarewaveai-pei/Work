@@ -9,7 +9,7 @@ import type { PoolAccount } from "../sender-pool";
 const NOW = new Date("2026-11-02T02:00:00Z");
 const acc = (id: string, over: Partial<PoolAccount> = {}): PoolAccount => ({ id, organization_id: "org", email: `${id}@a.pool.example`, is_active: true,
   health_status: "healthy", send_mode: "auto", warmup_stage: "w3", daily_limit: 50, connector_id: `c-${id}`, ...over });
-const lead = (id: string, over: Partial<PipelineLead> = {}): PipelineLead => ({ id, organization_id: "org", service_profile_id: "p1", name: id, observation: null,
+const lead = (id: string, over: Partial<PipelineLead> = {}): PipelineLead => ({ id, organization_id: "org", service_profile_id: "p1", name: id,
   source_url: null, consent_source: null, status: "qualified", do_not_contact: false, website: `https://${id}.example`, email: `${id}@x.example`, ...over });
 type Row = DraftRow & { status: string; approved_at?: string };
 

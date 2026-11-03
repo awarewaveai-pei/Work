@@ -31,7 +31,6 @@ export interface LeadRow {
   service_profile_id: string | null;
   industry?: string | null;
   name: string | null;
-  observation: string | null;
   source_url: string | null;
   consent_source: string | null;
   status: string | null;
@@ -47,16 +46,13 @@ const BRAND_BLOCK: Record<BrandContextError["code"], string> = {
   no_privacy_url: "這筆名單需要個資告知：到「服務設定」填隱私說明網址",
 };
 
-// The lead's approved evidence (co_evidence, card C3) plus, until card C9, its old observation + source as one more fact.
+// The lead's approved evidence (co_evidence, card C3).
 const EVIDENCE_LIMIT = 12;
 export async function approvedEvidence(db: SupabaseClient, lead: LeadRow): Promise<EvidenceItem[]> {
   const { data, error } = await db.from("co_evidence").select("id, claim, excerpt, source_url, status, confidence")
     .eq("lead_id", lead.id).eq("status", "approved").order("created_at", { ascending: true }).limit(EVIDENCE_LIMIT);
   if (error) throw new Error(error.message);
-  const rows = (data ?? []) as EvidenceItem[];
-  const legacy: EvidenceItem[] = lead.observation?.trim() && lead.source_url?.trim()
-    ? [{ id: "lead-observation", claim: lead.observation.trim(), excerpt: null, source_url: lead.source_url, status: "approved" }] : [];
-  return [...rows, ...legacy];
+  return (data ?? []) as EvidenceItem[];
 }
 
 export const isUniqueViolation = (e: { code?: string } | null): boolean => e?.code === "23505";
@@ -98,7 +94,7 @@ export async function generateForLead(supabase: SupabaseClient, lead: LeadRow, o
   try { evidence = await approvedEvidence(supabase, lead); }
   catch (e) { return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "evidence read failed" }, { status: 500 }); }
   // Cold Gate — refuse to generate without evidence, for a do_not_contact lead, or for a warm one.
-  const gate = checkColdGate(lead, evidence.filter((e) => e.id !== "lead-observation").length);
+  const gate = checkColdGate(lead, evidence.length);
   if (gate.status === "block") {
     return NextResponse.json({ ok: false, blocked: true, blockers: gate.blockers }, { status: 422 });
   }

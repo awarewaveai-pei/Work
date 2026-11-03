@@ -14,8 +14,9 @@ export interface ScorableLead {
   phone?: string | null;
   contact_name?: string | null;
   contact_role?: string | null;
-  observation?: string | null;
   source_url?: string | null;
+  /** approved co_evidence rows (an inbox row's observation + source counts as 1: approval turns it into evidence) */
+  evidence_count?: number;
   // AI-derived (may be absent until enrichment):
   pain_guess?: string | null;
   social_summary?: string | null;
@@ -49,7 +50,7 @@ export function scoreLeadQuality(l: ScorableLead, opts: ScoreOptions = {}): numb
   if (has(l.website) || has(l.social_url)) s += 15;
   if (has(l.email) || has(l.phone)) s += 20;
   if (has(l.industry)) s += 10;
-  if (has(l.observation)) s += 20;
+  if ((l.evidence_count ?? 0) >= 1) s += 20;
   if (has(l.source_url)) s += 10;
   if (!opts.isDuplicate) s += 10;
   return clamp100(s);

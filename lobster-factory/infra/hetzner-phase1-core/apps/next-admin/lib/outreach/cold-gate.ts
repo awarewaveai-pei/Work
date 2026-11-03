@@ -1,8 +1,7 @@
 // Cold Outreach — Cold Gate + message lint (task T8, spec §C2/§C3/§D2; v2 gateMessage below). Pure.
 //
 // Two gates:
-//  1. checkColdGate(): PRE-generation — refuse a cold email without approved evidence (co_evidence, SPEC §5.2; the
-//     old observation + source_url still counts until card C9), for a do_not_contact lead, or for a warm lead.
+//  1. checkColdGate(): PRE-generation — refuse a cold email without approved evidence (co_evidence, SPEC §5.2), for a do_not_contact lead, or for a warm lead.
 //  2. lintMessage(): POST-generation — forbidden words (hard block), hard CTA / missing opt-out /
 //     length (warn). Produces safety_score + quality_gate_status for co_messages.
 
@@ -14,8 +13,6 @@ export const DEFAULT_FORBIDDEN: string[] = [
 
 export interface ColdGateLead {
   name?: string | null;
-  observation?: string | null;
-  source_url?: string | null;
   pain_guess?: string | null;
   do_not_contact?: boolean | null;
   status?: string | null;
@@ -35,15 +32,12 @@ export interface ColdGateResult {
   blockers: string[];
 }
 
-const has = (v: unknown): boolean => typeof v === "string" && v.trim() !== "";
-
 /** approvedEvidence = the lead's co_evidence rows with status approved. */
 export function checkColdGate(lead: ColdGateLead, approvedEvidence = 0): ColdGateResult {
   const blockers: string[] = [];
   if (lead.do_not_contact) blockers.push("do_not_contact: 此 lead 標記不可聯絡");
   if (isWarm(lead)) blockers.push(`已在對話中或已退出（${lead.status ?? lead.consent_source}）：不寄冷信`);
-  const legacy = has(lead.observation) && has(lead.source_url);
-  if (approvedEvidence < 1 && !legacy) blockers.push("沒有已核准的證據：先按「研究這家」，或在證據清單核准一條");
+  if (approvedEvidence < 1) blockers.push("沒有已核准的證據：先按「研究這家」，或在證據清單核准一條");
   return { status: blockers.length === 0 ? "pass" : "block", blockers };
 }
 

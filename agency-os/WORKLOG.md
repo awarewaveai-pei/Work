@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-03（續9）外聯 C9：co_leads.observation 退場，冷信只看 co_evidence
+
+- 決定：C9 waitFor「100 名單走過研究」＝等研究證明可靠；11-03 正式站已多次實跑 → 現在做（操作者：你決定）。
+- 0156 data backfill（observation＋source_url、無任何 evidence 的 lead → approved、created_by backfill；冪等 not exists；down 刪 backfill 列）已套正式庫：APPLY_OK，回填 1 列。
+- C9.2：cold-gate.ts、generate.ts（拿掉 lead-observation 假證據）、send-adapter LEAD_COLS 不再讀 observation；scoring 吃 evidence_count；lead-evidence.ts `citableFact`（評分與寫入共用：claim ≤300、source 必填 ≤1000）＋`recordLeadEvidence`（upsert ignoreDuplicates，organization_id＝lead 的）。
+- 核准 inbox：co_lead_inbox 沒有 observation 欄 → 讀 raw_payload.observation（worker 原寫 row.observation＝正式站永遠空，單元測試 mock 把它放在欄位上而遮住；測試改成正式形狀）。
+- critic Deep warn：M1 貼上人選的「資料從哪來」被存成 observation → 會變成 approved 證據放行冷信 → InboxClient 改送 `source_note`（raw_payload 留存，不當證據；正式庫 pasted_person 0 列，無舊資料）；m1 編輯 lead 時分數改讀實際 approved 證據數；m2 判斷與寫入共用 citableFact；m3 手動觀察沒附來源 → 400 observation_needs_source。
+- worker（fullstack-engineer）寫，本 session 補 organization_id、raw_payload 讀取與四項修正。
+- REALTEST_EVIDENCE: tool=SSH | cmd=node scripts/apply-db-migration.mjs 0156 → APPLY_OK；psql co_evidence created_by=backfill 1 列 approved | exit=0 | ms=20000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/3n（全修）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=citableFact | hits=11（code 8：lead-evidence.ts:10,16,19、leads route:5,211,296、inbox route:8,305；WORKLOG 本條目 3）
+- ORACLE_WAIVED: critic Deep 已逐項查並全修；突變＝approve 改回讀 row.observation，approve.test 新測試必紅（修正前即紅過）
+- tsc 0；vitest lib/outreach＋app/api/outreach＋app/api/internal 371 passed
 ## 2026-11-03（續8）外聯 C5.5＋自動寄送真測；管線遇 AI 暫時錯誤不再卡死名單
 
 - 操作者：「現在在測試中，要測自動寄送」。主信箱 awarewaveai（1e04842d）暫切 send_mode=auto 兩次（各一個 tick），測完切回 draft（已查 draft）。程式未改、未加例外；sender-health.ts:21（免費信箱不入池）每日 00:30 才跑，測試窗口內不影響。

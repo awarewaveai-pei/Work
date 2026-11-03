@@ -228,7 +228,7 @@ export async function runAutoSend(deps: SendDeps): Promise<SendResult> {
 }
 
 const fail = (what: string, error: { message: string } | null): void => { if (error) throw new Error(`${what}: ${error.message}`); };
-const LEAD_COLS = "id, organization_id, name, email, website, do_not_contact, status, consent_source, observation, source_url, next_followup_date";
+const LEAD_COLS = "id, organization_id, name, email, website, do_not_contact, status, consent_source, source_url, next_followup_date";
 
 const FOLLOWUP_DONE = new Set(["sent", "skipped", "copied"]);
 

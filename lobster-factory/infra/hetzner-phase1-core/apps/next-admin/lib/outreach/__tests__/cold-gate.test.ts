@@ -16,21 +16,14 @@ describe("checkColdGate with evidence (SPEC §5.2)", () => {
 });
 
 describe("checkColdGate (pre-generation)", () => {
-  it("passes with observation + source_url", () => {
-    const r = checkColdGate({ observation: "常辦週末小班", source_url: "https://dir/acme" });
-    expect(r.status).toBe("pass");
-    expect(r.blockers).toHaveLength(0);
-  });
-  it("blocks when observation missing and there is no approved evidence", () => {
-    const r = checkColdGate({ source_url: "https://x" });
+  it("a lead with only the old observation + source_url and no evidence row is blocked (card C9.2)", () => {
+    const old = { observation: "常辦週末小班", source_url: "https://dir/acme" };
+    const r = checkColdGate({ ...old, name: "acme" });
     expect(r.status).toBe("block");
     expect(r.blockers.some((b) => b.includes("證據"))).toBe(true);
   });
-  it("blocks when source_url missing", () => {
-    expect(checkColdGate({ observation: "o" }).status).toBe("block");
-  });
-  it("blocks do_not_contact regardless of data", () => {
-    const r = checkColdGate({ observation: "o", source_url: "s", do_not_contact: true });
+  it("blocks do_not_contact regardless of evidence", () => {
+    const r = checkColdGate({ do_not_contact: true }, 2);
     expect(r.status).toBe("block");
     expect(r.blockers.some((b) => b.includes("do_not_contact"))).toBe(true);
   });
