@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-03（續12）外聯：Gemini 過載時改用 lite 模型
+
+- 現象：開關真測的測試名單（+t1）連 40 分鐘產信失敗；tick errors `503 ai_unavailable:gemini_failed:gemini 503 … overloaded` 與 240s timeout。直打 API：gemini-flash-latest 503、gemini-3.8-flash 503、gemini-pro-latest 429；gemini-flash-lite-latest 1s、gemini-3.5-flash 2s 正常。
+- 不變量：單一模型過載不得停掉整條外聯管線 → ai-gemini.ts：預設模型回 503／429 時改打一次 GEMINI_LITE_MODEL（lib/ai/gemini-models.ts，已有 cost-model 價格列）；timeout 不轉（會在 tick 內等兩倍），交下一 tick 重試（續8 unattended）。
+- REALTEST_EVIDENCE: tool=curl | cmd=gemini-probe.ps1 五模型直打（503/503/429/200/200）＋vitest lib/outreach app/api/outreach app/api/internal lib/ai 460 passed | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=GEMINI_LITE_MODEL | hits=28（同一常數供 cs、ops-inbox、outreach 三個 fallback，價格列 cost-model.ts:70-72＋cost-calculator.test 守；舊 WORKLOG／oracle 敘述不改）
+- ORACLE_WAIVED: 單檔 try/catch 改道＋2 測試（503/429 轉 lite、400 不轉）；突變＝拿掉 catch，測試必紅
 ## 2026-11-03（續11）外聯：測試寄送放寬給連續測試用
 
 - 操作者：要一連串測試，不是單次動作 → 拿掉卡住連續測試的限制；只留「只寄操作者自己的地址」（拿掉＝主信箱對真實店家自動寄冷信）。

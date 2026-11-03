@@ -5,6 +5,7 @@ import { providerUrl } from "@/lib/ai/gateway";
 import { OUTREACH_MAX_TOKENS, OUTREACH_AI_TIMEOUT_MS } from "./generation-schema";
 import type { Grant } from "@/lib/entitlements/can";
 import { geminiUsageTokens, logAiCall, type GeminiUsageLike } from "@/lib/ai/log-ai-call";
+import { GEMINI_LITE_MODEL } from "@/lib/ai/gemini-models";
 
 export interface GeminiResult {
   text: string;
@@ -16,12 +17,30 @@ export interface GeminiResult {
 // per-deploy with GEMINI_MODEL if a pinned version is ever needed.
 export const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-flash-latest";
 
+/** Google answers 503 "model overloaded" / 429 for one model while others serve (2026-11-03: flash-latest 503 for over
+ *  an hour, the lite model fine): those two go once to GEMINI_LITE_MODEL. A timeout does not (it would double the wait
+ *  inside the pipeline tick); the tick retries the lead. */
+const OVERLOADED = new Set([429, 503]);
+
 export async function generateWithGemini(
   grant: Grant,
   apiKey: string,
   prompt: string,
   model = DEFAULT_GEMINI_MODEL,
 ): Promise<GeminiResult> {
+  try {
+    return await callGemini(grant, apiKey, prompt, model);
+  } catch (e) {
+    if (!(e instanceof GeminiHttpError) || !OVERLOADED.has(e.status) || model === GEMINI_LITE_MODEL) throw e;
+    return callGemini(grant, apiKey, prompt, GEMINI_LITE_MODEL);
+  }
+}
+
+class GeminiHttpError extends Error {
+  constructor(readonly status: number, detail: string) { super(`gemini ${status}: ${detail.slice(0, 200)}`); }
+}
+
+async function callGemini(grant: Grant, apiKey: string, prompt: string, model: string): Promise<GeminiResult> {
   const url = providerUrl(grant, "gemini", `/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`);
   const resp = await fetch(url, {
     method: "POST",
@@ -35,8 +54,7 @@ export async function generateWithGemini(
     }),
   });
   if (!resp.ok) {
-    const detail = await resp.text().catch(() => "");
-    throw new Error(`gemini ${resp.status}: ${detail.slice(0, 200)}`);
+    throw new GeminiHttpError(resp.status, await resp.text().catch(() => ""));
   }
   const j: unknown = await resp.json();
   void logAiCall({ route: "outreach/generate", model, ...geminiUsageTokens((j as { usageMetadata?: GeminiUsageLike }).usageMetadata),
