@@ -17,6 +17,7 @@
 - Codex 5 輪：a52b36ca 3 項、45d209c6 3 項、f2b6954b 1、7d900e0a 1、5a23dcad 1，全修。不變量：豁免只綁此地址＋它自己的 MX 列；每個驗證呼叫在 tick 內結束。
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/outreach app/api/outreach app/api/internal lib/collect lib/ai → 864 passed；tsc 0；突變（leads consent 清除、MX-only 豁免）各紅→綠；install SQL 於正式庫 rollback 交易驗證；Hunter /v2/account 200 plan=Free；prod connector hunter vault len=40 | exit=0 | ms=90000
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/9m/0n
+- 部署 68b034e2a（smoke OK）。正式站真測：容器內以 vault 金鑰各驗 awarewaveai@gmail.com 一次 → hunter 200 valid/deliverable、reoon 200 safe（皆 map 為 valid，~1.2s）。
 - ORACLE_WAIVED: 最後一字修正 break→continue 照 5a23dcad 原文，附測試；停止再審（review stop rule）
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=自動寄前必驗|no key = no send|verifierKey\( | hits=0
 ## 2026-11-02（續49）影音工作台卡 P2：完整剪輯（a0be1d012）
