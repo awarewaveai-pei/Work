@@ -190,7 +190,7 @@ export function pipelineDeps(sb: SupabaseClient, deadline: number): PipelineDeps
       if (o.status === "failed") throw new Error(o.error ?? "research failed");
     },
     async generate(lead) {
-      const res = await generateForLead(sb, lead, { agencyFallback: false, grant: (feature) => grantFor(feature), pastedReply: null,
+      const res = await generateForLead(sb, lead, { agencyFallback: false, grant: (feature) => grantFor(feature), pastedReply: null, unattended: true,
         sampleContext: (profileId) => {
           const key = `${lead.organization_id}:${profileId}`;
           let c = contexts.get(key);

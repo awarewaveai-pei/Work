@@ -69,6 +69,8 @@ vi.mock("@/lib/org-client", () => {
 });
 
 const { GET, POST, PATCH } = await import("./route");
+const { generateForLead } = await import("@/lib/outreach/generate");
+const { getOrgSupabaseWriteClient } = await import("@/lib/org-client");
 const headers = { "x-ops-user-kind": "staff", "x-ops-claims-role": "owner", "x-ops-user-id": "u-1", "content-type": "application/json" };
 const status = (runKey: string, h: Record<string, string> = headers) => GET(new Request(`http://app.test/api/outreach/messages?runKey=${runKey}`, { headers: h }));
 // POST answers 202 { runKey } for an AI generation; this waits for the job and returns the answer it would have given.
@@ -179,6 +181,17 @@ describe("one generation writes two first emails and the follow-ups", () => {
     expect(body.mode).toBe("manual_prompt");
     const rows = inserted() as unknown as Record<string, unknown>;
     expect(rows).toMatchObject({ quality_gate_status: "block", status: "draft" });
+  });
+});
+
+describe("unattended generation (the pipeline tick)", () => {
+  it("an AI failure writes no row and answers 503, so the lead is tried again next tick", async () => {
+    m.claude.mockReset(); m.claude.mockRejectedValue(new Error("gemini 503 overloaded"));
+    const sb = await getOrgSupabaseWriteClient(ORG);
+    const res = await generateForLead(sb as never, m.state.lead as never, { agencyFallback: false, grant: async () => ({ allowed: true }) as never, pastedReply: null, unattended: true });
+    expect(res.status).toBe(503);
+    expect(String((await res.json()).error)).toContain("ai_unavailable");
+    expect(inserted()).toEqual([]);
   });
 });
 

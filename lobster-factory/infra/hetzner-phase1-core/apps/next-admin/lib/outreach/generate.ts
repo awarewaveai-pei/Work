@@ -87,6 +87,9 @@ export interface GenerateOptions {
   /** The profile's risk and angle context. The pipeline passes one cached per tick (a read per profile, not per mail);
    *  absent = read it here. */
   sampleContext?: (profileId: string) => Promise<SampleContext>;
+  /** No person is watching (the pipeline tick): without usable AI output write nothing and answer 503, so the lead stays
+   *  a candidate for the next tick. A person pressing the button still gets the manual prompt row. */
+  unattended?: boolean;
 }
 
 /** The caller has authorized access to the lead's organization. */
@@ -221,6 +224,7 @@ export async function generateForLead(supabase: SupabaseClient, lead: LeadRow, o
 
 
   if (!parsed?.ok) {
+    if (o.unattended) return NextResponse.json({ ok: false, error: `ai_unavailable:${aiModel ?? "no_ai_key"}` }, { status: 503 });
     // No usable AI output: the prompt itself, for the operator to paste into ChatGPT/Claude (極省模式). It is a prompt,
     // not an email, so it is blocked until a person pastes the email back (PATCH re-gates the edited body).
     const { data: created, error: createErr } = await supabase.from(TABLE).insert({

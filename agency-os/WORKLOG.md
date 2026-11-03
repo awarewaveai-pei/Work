@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-03（續8）外聯 C5.5＋自動寄送真測；管線遇 AI 暫時錯誤不再卡死名單
+
+- 操作者：「現在在測試中，要測自動寄送」。主信箱 awarewaveai（1e04842d）暫切 send_mode=auto 兩次（各一個 tick），測完切回 draft（已查 draft）。程式未改、未加例外；sender-health.ts:21（免費信箱不入池）每日 00:30 才跑，測試窗口內不影響。
+- 流程：測試 lead c5500000-…01（awarewave-ops、peijingartstudio、self_published:operator-provided-test、website soulfulexpression.org）→ tick 研究＋產信 → B 版 PATCH 核准 → tick drafted=1（thread 1a19f56a0fdbf5bc）→ auto tick sent=1 → 寄出時間 −3 天＋next_followup_date=今天 → 追蹤 3 天那封 PATCH 核准 → tick followupsDrafted=1（draft_created threadId 1a19f56a0fdbf5bc＝首封）→ auto tick sent=1。Gmail get_thread：2 則 SENT、同串、第二封主旨 Re:。
+- 首次產信遇 Gemini 503（ai_model gemini_failed:…503），generate.ts 寫一列「提示詞」block 列並回 200 → 名單有訊息就不再被 generateCandidates 選中＝一次暫時錯誤永久卡住。不變量：無人值守路徑不得寫出提示詞列 → GenerateOptions.unattended（pipeline-store generate 傳 true）：無 AI 輸出回 503 `ai_unavailable:<原因>`、不插列；pipeline.ts 非 200 記 r.errors。UI 按鈕路徑不變。worker（fullstack-engineer）寫，本 session 驗收。
+- 管線行為確認（照設計）：首封人工核准時追蹤信也要人核准（pipeline.ts:195 只連帶核准 auto 首封的追蹤信）。
+- 測試資料刪除（send_claims 2、events 4、lead 1 連帶 messages／evidence）殘留 0。
+- REALTEST_EVIDENCE: tool=SSH | cmd=POST /api/internal/outreach/gmail-sync ×6（sent 1、followupsDrafted 1、sent 1）＋Gmail get_thread 1a19f56a0fdbf5bc messageCount 2 SENT | exit=0 | ms=300000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n（無 AI key 的 org 每 tick 記一筆 failed，可見即可）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=unattended | hits=10（本改動 5：generate.ts:92,227、pipeline-store.ts:193、route.test.ts:187,191；其餘 5 為無關的 unattended-upgrades／repair-center 文案）
+- ORACLE_WAIVED: 一個布林選項＋一個早回分支；突變＝拿掉 unattended 早回，新測試 inserted() 非空必紅
+- tsc 0；vitest lib/outreach＋app/api/outreach＋app/api/internal 372 passed
 ## 2026-11-03（續7）外聯 C12.3 完成：部署 dafa32cd9 後真查；平台 host 補進 PLATFORM_HOSTS
 
 - 部署 dafa32cd9（sg-deploy OK，.deployed-commit 同）。真查 F501060／台中：201 imported 99、負責人 99、網站 8（目錄頁 0；修前 75 筆多為目錄）、Serper 99 credits≈NT$3.2。測試列已刪，0 轉 lead。

@@ -167,7 +167,7 @@ export const STEPS = [
       done('C8.6', '自動寄出前先用付費服務驗證收件信箱真的存在、沒有爆滿：只寄確定有效的；無法判定的交給你；無效的直接進拒收名單。只驗要自動寄的，不驗整個名單庫。11-03 改：店家自己公開的地址免驗；其他用免費額度（Reoon → ZeroBounce → Hunter，用完換下一家）。', C8),
     ] },
   { n: 9, code: 'C5', group: 'E', title: '追蹤信與人工步驟', plain: '例：第一封寄出 3 個工作天後沒回信，系統自動把寫好的追蹤信建在 Gmail 原本那串對話裡並寄出（自動寄的信箱）；草稿模式的信箱則在追蹤頁等你按。電話或 IG 私訊的步驟顯示成待辦，做完打勾。',
-    gate: '到期的名單出現在追蹤頁並附內容。建的草稿在 Gmail 原對話串中。最後一封過期沒回信，名單標為無回應。', risk: 'Low', model: 'Codex', status: 'in_progress', depends: ['C8'],
+    gate: '到期的名單出現在追蹤頁並附內容。建的草稿在 Gmail 原對話串中。最後一封過期沒回信，名單標為無回應。', risk: 'Low', model: 'Codex', status: 'done', commit: C5, depends: ['C8'],
     what: 'followups 頁列到期 lead＋下一封；gmail-draft 支援 In-Reply-To／References＋threadId；no_reply 判定；非 email 步驟待辦；管線 tick 自動建草稿',
     files: ['NA/app/(shell)/tools/outreach/followups/page.tsx', 'NA/app/api/outreach/messages/gmail-draft/route.ts', 'NA/lib/outreach/gmail-sync.ts'],
     items: [
@@ -175,7 +175,7 @@ export const STEPS = [
       done('C5.2', '追蹤信草稿建在原對話串裡（回覆標頭、Re: 主旨、同一串）；自動寄出也開放追蹤信：照順序、到期、在原串、同一名單一輪一封。', C5),
       done('C5.3', '最後一封過期沒回信，名單自動標為無回應（收件匣讀完且沒有待處理回信時才判）。', C5),
       done('C5.4', '電話、IG、LinkedIn 的步驟顯示成待辦，有完成按鈕。', C5),
-      todo('C5.5', '測試已完成（d518cbb2c）；剩：首封真的寄出後，建一封追蹤草稿，看它在 Gmail 原串裡。'),
+      done('C5.5', '11-03 正式站真測：測試名單（收件人你的 peijingartstudio）→ 管線研究、產信 → 核准 B 版 → 主信箱暫切自動寄，首封由自動寄送程式寄出 → 追蹤到期後管線把追蹤草稿建在同一串（threadId 相同）→ 再自動寄出，Gmail 同串 2 封、主旨帶 Re:。測完主信箱切回草稿模式、測試資料刪除。', C5),
     ] },
   { n: 10, code: 'C15', group: 'F', title: '量產管線：照政策自動前進', plain: '例：名單核准後，系統每 10 分鐘自動替它研究、產信、依政策核准、建草稿、寄出，每步都有上限；你每天只處理佇列裡抽到的信、有警告的信、第三方證據，還有回信。',
     gate: '種 20 個有網站的名單，服務設成抽查模式，跑 3 個 tick，沒有任何人工點擊就出現至少 15 封已建草稿、2 封在佇列等你看。逐封模式的服務不會自動核准。暖名單永遠不會進管線。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['C5'],

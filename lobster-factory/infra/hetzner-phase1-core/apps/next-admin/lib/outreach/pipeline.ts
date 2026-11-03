@@ -170,7 +170,8 @@ async function runOrg(deps: PipelineDeps, org: string, r: PipelineResult, now: (
     const leads = (await store.generateCandidates(org, writeRoom)).filter(cold).slice(0, writeRoom);
     await each(leads, end - 30_000, now, async (lead) => {
       const res = await guarded("generate", () => deps.generate(lead)).catch(() => ({ status: 500 }));
-      if (res && res.status === 200) r.generated++; else if (res && res.status !== 409) r.failed++;
+      if (res && res.status === 200) r.generated++;
+      else if (res && res.status !== 409) { r.failed++; r.errors.push(`generate ${lead.id}: ${res.status}${"error" in res && res.error ? ` ${res.error}` : ""}`); }
     });
   }
 
