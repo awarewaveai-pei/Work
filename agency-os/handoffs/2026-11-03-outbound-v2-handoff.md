@@ -23,11 +23,9 @@ hint: "外聯 v2 交接給另一個 Claude 帳號；取代 2026-11-02-1424-outbo
 - SPEC：`agency-os/docs/Outbound_OS_Engineering_Spec/Outbound_OS_Engineering_Spec.md`（I1–I10、D1–D26）；卡細節：`agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md` §6。
 - 監工台唯一資料源：`data.mjs`（`todo(...)`／`done(..., <commit 常數>)`）。
 
-## 4. 剩下 14 項（data.mjs `todo`）
+## 4. 剩下 12 項（data.mjs `todo`；C13.4、C7.3 已於 11-03 真測完成 7d4f98f44）
 | 項 | 誰 | 怎麼做 |
 |---|---|---|
-| C13.4 | 你（可做） | Hunter 金鑰已在：對一個真實公司「貼上個人資料／找人」找 2 位 → 驗證紀錄 `co_verified_emails` provider=hunter → done |
-| C7.3 | 你（可做） | 種 3 筆走到 replied 的測試名單 → 外聯首頁表數字對 → 刪測試資料 → done |
 | C5.5 | 等第一封真信寄出 | 首封 sent 後，到期追蹤由管線建草稿 → 查 Gmail 該草稿 threadId = 首封 thread |
 | C12.3 | 操作者 | GCIS 告知書寄 opendata.gcis@gmail.com（IP 145.239.195.47）；核准後真查 |
 | C14.3 | 操作者 | Meta App `leads_retrieval`＋頁面訂閱 leadgen（頁面訂閱可用 user-env 的 `META_PAGE_TOKEN_*` 代做，先問） |
