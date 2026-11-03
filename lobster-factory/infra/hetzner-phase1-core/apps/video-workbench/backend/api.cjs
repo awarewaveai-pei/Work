@@ -12,6 +12,11 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
   const outputs = path.join(dataDir, "generated");
   fs.mkdirSync(outputs, { recursive: true });
   const mediaStore = require("./media-store.cjs").createMediaStore({ dataDir });
+  // Card P3: compositor renders (frames from the page -> PNG MOV -> media store) and S3b reference stills.
+  let compositorRenders;
+  const renders = () => (compositorRenders ||= require("./compositor-render.cjs").createCompositorRenders({ dataDir, mediaStore, output, limits: {
+    requestBytes: Number(env.VW_COMPOSITOR_REQUEST_BYTES), frameBytes: Number(env.VW_COMPOSITOR_FRAME_BYTES),
+    sessionBytes: Number(env.VW_COMPOSITOR_SESSION_BYTES), idleMs: Number(env.VW_COMPOSITOR_IDLE_MS) } }));
   // The one check for every url the client sends as a local file: /generated/<uuid>.<ext>,
   // /media/<sha256>/original.<ext> (only when stored) and, with assets, /assets/<name>.
   function localFile(url, { assets = false } = {}) {
@@ -695,6 +700,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
           !["characters", "projects", "assets", "jobs"].every((k) =>
             Array.isArray(next[k]),
           ) ||
+          // Card P3: compositions are optional (state saved before P3 has none = []), but an array when present.
+          (next.compositions !== undefined && !Array.isArray(next.compositions)) ||
           !Number.isInteger(next.revision) ||
           next.revision < 0
         )
@@ -711,6 +718,16 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
         writeJson(stateFile, saved);
         state = saved;
         json(res, 200, { revision: state.revision });
+        return true;
+      }
+      const render = /^\/compositor\/renders(?:\/([\w-]+)\/(frames|finish|cancel))?$/.exec(route);
+      if (req.method === "POST" && render) {
+        const input = await body(req), r = renders();
+        json(res, render[1] ? 200 : 201, !render[1] ? r.create(input) : render[2] === "frames" ? r.frames(render[1], input) : render[2] === "cancel" ? r.cancel(render[1]) : await r.finish(render[1], input));
+        return true;
+      }
+      if (req.method === "POST" && route === "/compositor/stills") {
+        json(res, 201, renders().still(await body(req)));
         return true;
       }
       if (req.method === "GET" && route === "/delivery-ratios") {

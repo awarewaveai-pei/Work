@@ -22,6 +22,7 @@ function needsProxy(probe, ext) {
   const shortSide = Math.min(probe.displayWidth || 0, probe.displayHeight || 0);
   return ext !== "mp4" || probe.videoCodec !== "h264" || probe.bitDepth > 8 || probe.pixFmt !== "yuv420p" || shortSide > 1080;
 }
+const hasAlpha = (probe) => !!probe.video && /^(rgba|bgra|argb|abgr|yuva|gbrap|ya)/.test(probe.pixFmt || "");
 function createMediaStore({ dataDir }) {
   const root = path.join(dataDir, "media");
   fs.mkdirSync(root, { recursive: true });
@@ -104,8 +105,21 @@ function createMediaStore({ dataDir }) {
       fs.writeFileSync(tmp, JSON.stringify({ ...info, probe: undefined, ...info.probe }, null, 2));
     });
     const probe = JSON.parse(fs.readFileSync(path.join(dir, "probe.json"), "utf8"));
-    const proxy = needsProxy(probe, path.extname(originalName).slice(1));
-    if (proxy)
+    const proxy = needsProxy(probe, path.extname(originalName).slice(1)),
+      alpha = hasAlpha(probe);
+    // Card P3: a source with an alpha channel (the compositor's PNG MOV) gets a VP9 + alpha WebM proxy instead, so
+    // the editor preview shows it transparent too (H.264 has no alpha). Output still reads the original.
+    if (proxy && alpha)
+      await derive(dir, "proxy.webm", (tmp) =>
+        run(
+          ["-y", "-hide_banner", "-i", original, "-map", "0:v:0",
+            "-vf", "scale=w='if(lte(iw,ih),trunc(min(iw,1080)/2)*2,-2)':h='if(lte(iw,ih),-2,trunc(min(ih,1080)/2)*2)',format=yuva420p",
+            "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-deadline", "realtime", "-cpu-used", "8", "-b:v", "0", "-crf", "30",
+            "-auto-alt-ref", "0", "-an", tmp],
+          signal,
+        ),
+      );
+    else if (proxy)
       await derive(dir, "proxy.mp4", (tmp) =>
         run(
           ["-y", "-hide_banner", "-i", original, "-map", "0:v:0", "-map", "0:a:0?",
@@ -132,7 +146,7 @@ function createMediaStore({ dataDir }) {
     return {
       checksum_sha256: sha,
       url: url(originalName),
-      previewUrl: url(proxy ? "proxy.mp4" : originalName),
+      previewUrl: url(proxy ? (alpha ? "proxy.webm" : "proxy.mp4") : originalName),
       probe,
       thumbUrl: visual ? url("thumb.jpg") : null,
       waveformUrl: probe.audio ? url("waveform.json") : null,
@@ -181,4 +195,4 @@ function createMediaStore({ dataDir }) {
   }
   return { root, ingest, fileFor };
 }
-module.exports = { createMediaStore, needsProxy };
+module.exports = { createMediaStore, needsProxy, hasAlpha };

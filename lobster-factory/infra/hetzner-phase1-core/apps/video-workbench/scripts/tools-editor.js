@@ -592,6 +592,8 @@ function toolEditorScreen(t) {
                 : "")
             : "");
   }
+  // Card P3: a clip rendered by the compositor links back to its source composition (scripts/tools-compositor.js).
+  if (c && typeof cpEditorClip === "function") inspector += cpEditorClip(p, c);
   const [w, h] = edRatios[p.ratio];
   return wfWrap(
     t,
@@ -1091,6 +1093,7 @@ function toolEditorAfterRender() {
       })
       .catch(SeedStar.reportError)
       .finally(() => (ed.loading = null));
+  if (typeof cpEditorAfterRender === "function") cpEditorAfterRender();
   edPaint();
 }
 function edDialog(content) {
@@ -1153,6 +1156,8 @@ function edText(
 async function edAction(action) {
   const p = edProject(),
     c = edClip();
+  if (action.startsWith("comp-") && typeof cpEditorAction === "function")
+    return cpEditorAction(action, p, c);
   if (action === "new") {
     const d = edDialog(
       '<form><h3>新增剪輯專案</h3><label>專案標題<input data-ed-create-title class="text-input" aria-label="專案標題" maxlength="100" value="未命名專案" required></label><label>影片比例<select data-ed-create-ratio class="text-input" aria-label="影片比例">' +

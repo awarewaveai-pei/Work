@@ -67,7 +67,7 @@ function createServer({
       else if (pathname.startsWith("/media/")) {
         // backend/media-store.cjs layout only; other names and "/.." segments are 404.
         if (
-          !/^\/media\/[a-f0-9]{64}\/(original\.(mp3|wav|m4a|mp4|webm|mov)|proxy\.mp4|thumb\.jpg|waveform\.json|probe\.json)$/.test(
+          !/^\/media\/[a-f0-9]{64}\/(original\.(mp3|wav|m4a|mp4|webm|mov)|proxy\.(mp4|webm)|thumb\.jpg|waveform\.json|probe\.json)$/.test(
             pathname,
           )
         )

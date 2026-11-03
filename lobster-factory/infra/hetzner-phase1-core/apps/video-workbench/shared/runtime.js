@@ -16,9 +16,13 @@
     projects: [],
     assets: [],
     jobs: [],
+    compositions: [],
     preferences: {},
     selection: {},
   };
+  // Card P3: compositor documents (shared/compositor.js) are a ledger collection like projects; stored as given.
+  const COLLECTIONS = ["characters", "projects", "assets", "compositions"];
+  const composition = (v = {}) => ({ ...structuredClone(v), id: v.id || crypto.randomUUID() });
   let queue = Promise.resolve();
   const pending = new Map();
   const knownSource = (source) =>
@@ -266,6 +270,7 @@
           if (v.version !== 1) throw new Error("不支援的資料版本");
           db = v;
           if (!Number.isInteger(db.revision)) db.revision = 0;
+          if (!Array.isArray(db.compositions)) db.compositions = []; // state saved before card P3
           if (normalizeAssets()) persist().catch(() => {});
         }
         try {
@@ -340,7 +345,7 @@
   };
   const collection = (name) => ({
     remove: async (id) => {
-      if (!["characters", "projects", "assets"].includes(name))
+      if (!COLLECTIONS.includes(name))
         throw new Error("未知資源");
       await ready;
       if (child) return rpc("entity-remove", { name, id });
@@ -350,21 +355,23 @@
     },
     list: async () => {
       await ready;
-      return structuredClone(db[name]);
+      return structuredClone(db[name] || []);
     },
     save: async (value) => {
-      if (!["characters", "projects", "assets"].includes(name))
+      if (!COLLECTIONS.includes(name))
         throw new Error("未知資源");
       await ready;
       if (child) return rpc("entity-save", { name, value });
       const normalize =
-        M[
-          name === "characters"
-            ? "character"
-            : name === "projects"
-              ? "project"
-              : "asset"
-        ];
+        name === "compositions"
+          ? composition
+          : M[
+              name === "characters"
+                ? "character"
+                : name === "projects"
+                  ? "project"
+                  : "asset"
+            ];
       const v = normalize(value);
       const items = db[name],
         i = items.findIndex((x) => x.id === v.id);
@@ -389,6 +396,7 @@
     jobAsset,
     characters: collection("characters"),
     projects: collection("projects"),
+    compositions: collection("compositions"),
     assets: {
       save: collection("assets").save,
       remove: async (id) => {
@@ -524,8 +532,9 @@
           ["projects", M.project],
           ["assets", M.asset],
           ["jobs", (v) => v],
+          ["compositions", composition],
         ])
-          for (const item of value[name]) {
+          for (const item of value[name] || []) {
             if (!item || typeof item !== "object" || !item.id) continue;
             if (!db[name].some((v) => v.id === item.id))
               db[name].push(normalize(item));

@@ -44,6 +44,8 @@ function wfStats() {
 function toolWorkflowScreen(t) {
   if (t.id === "edit")
     return typeof toolEditorScreen === "function" ? toolEditorScreen(t) : null;
+  if (t.id === "compose")
+    return typeof toolCompositorScreen === "function" ? toolCompositorScreen(t) : null;
   if (t.id === "subtitle")
     return typeof toolSubtitleScreen === "function"
       ? toolSubtitleScreen(t)
@@ -143,6 +145,8 @@ function toolWorkflowAfterRender() {
     toolSubtitleAfterRender();
   if (typeof toolEditorAfterRender === "function" && tool === "edit")
     toolEditorAfterRender();
+  if (typeof toolCompositorAfterRender === "function" && tool === "compose")
+    toolCompositorAfterRender();
   const source = files.src,
     currentTool = tool;
   document.querySelectorAll('[data-flow-media="src"]').forEach((media) => {
