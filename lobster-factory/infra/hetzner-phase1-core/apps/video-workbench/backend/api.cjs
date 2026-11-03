@@ -669,6 +669,16 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
       ? JSON.parse(Buffer.concat(chunks).toString("utf8"))
       : {};
   }
+  // P6 L1: VW_ALLOWED_HOSTS = comma list; "name:*" = that name on any port, otherwise an exact Host header.
+  // Unset = the local default (localhost / 127.0.0.1 on any port). VW_PUBLIC_ORIGIN replaces http://<host> as the
+  // only accepted Origin (container: https://video.aware-wave.com).
+  const allowedHosts = String(env.VW_ALLOWED_HOSTS || "localhost:*,127.0.0.1:*").split(",").map((h) => h.trim().toLowerCase()).filter(Boolean);
+  function hostAllowed(host) {
+    host = String(host || "").toLowerCase();
+    return allowedHosts.some((rule) => rule.endsWith(":*")
+      ? host.startsWith(rule.slice(0, -1)) && /^\d+$/.test(host.slice(rule.length - 1))
+      : host === rule);
+  }
   function json(res, status, value) {
     res.writeHead(status, {
       "Content-Type": "application/json; charset=utf-8",
@@ -688,9 +698,9 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
     if (!url.pathname.startsWith("/api/vw/")) return false;
     try {
       const host = req.headers.host;
-      if (!/^(localhost|127\.0\.0\.1):\d+$/.test(host || ""))
+      if (!hostAllowed(host))
         throw Object.assign(Error("不允許的主機"), { status: 403 });
-      if (req.headers.origin && req.headers.origin !== "http://" + host)
+      if (req.headers.origin && req.headers.origin !== (env.VW_PUBLIC_ORIGIN || "http://" + host))
         throw Object.assign(Error("不允許跨來源請求"), { status: 403 });
       if (
         req.method !== "GET" &&

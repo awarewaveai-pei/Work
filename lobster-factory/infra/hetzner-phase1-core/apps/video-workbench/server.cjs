@@ -31,19 +31,53 @@ function createServer({
   fetchImpl = fetch,
   awareWaveDir = require("./backend/appearance.cjs").resolveSource(root, env),
 } = {}) {
-  const api = require("./backend/api.cjs").createApi({
-    dataDir,
+  const createApi = (orgDir) => require("./backend/api.cjs").createApi({
+    dataDir: orgDir,
     env,
     fetchImpl,
     appDir: awareWaveDir,
   });
+  // P6 L1 / D2+D4: behind nginx (VW_TRUST_PROXY_IDENTITY=1) every /api/vw, /media, /generated request carries the
+  // X-VW-User-Id + X-VW-Org-Id that nginx auth_request set, and each org gets its own <dataDir>/orgs/<orgId>/.
+  // Local mode (unset) keeps the single dataDir exactly as before. One createApi per org (own queue, state, ledger).
+  const trustProxy = env.VW_TRUST_PROXY_IDENTITY === "1";
+  const orgs = new Map();
+  const local = trustProxy ? null : { dir: dataDir, api: createApi(dataDir) };
+  const forOrg = (orgId) => {
+    if (!orgs.has(orgId)) {
+      const dir = path.join(dataDir, "orgs", orgId);
+      orgs.set(orgId, { dir, api: createApi(dir) });
+    }
+    return orgs.get(orgId);
+  };
+  const identity = (req) => {
+    const user = req.headers["x-vw-user-id"], org = String(req.headers["x-vw-org-id"] || "").toLowerCase();
+    if (!user || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(org)) return null;
+    return forOrg(org);
+  };
+  const version = require("./package.json").version;
   const server = http.createServer(async (req, res) => {
     let file;
     try {
-      if (await api(req, res)) return;
       const pathname = decodeURIComponent(
         new URL(req.url, "http://localhost").pathname,
       );
+      if (pathname === "/healthz" && (req.method === "GET" || req.method === "HEAD")) {
+        res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+        res.end(req.method === "HEAD" ? undefined : JSON.stringify({ ok: true, version }));
+        return;
+      }
+      let tenant = local;
+      if (trustProxy && /^\/(api\/vw|media|generated)\//.test(pathname)) {
+        tenant = identity(req);
+        if (!tenant) {
+          res.writeHead(401, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+          res.end(JSON.stringify({ error: { message: "需要登入" } }));
+          return;
+        }
+      }
+      if (tenant && (await tenant.api(req, res))) return;
+      const dataDir = tenant ? tenant.dir : null;
       if (
         pathname === "/awarewave/theme.css" ||
         pathname === "/awarewave/forms.css"
@@ -175,8 +209,11 @@ function createServer({
   });
   return server;
 }
-if (require.main === module)
-  createServer().listen(process.env.PORT || 4178, "127.0.0.1", () =>
-    console.log("AwareWave 影音工作台: http://127.0.0.1:" + (process.env.PORT || 4178)),
+if (require.main === module) {
+  // Local default 127.0.0.1; the container sets VW_HOST=0.0.0.0 (no host port is published, only lobster-net).
+  const host = process.env.VW_HOST || "127.0.0.1", port = process.env.PORT || 4178;
+  createServer().listen(port, host, () =>
+    console.log("AwareWave 影音工作台: http://" + host + ":" + port),
   );
+}
 module.exports = { createServer };
