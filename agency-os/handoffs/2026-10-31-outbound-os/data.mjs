@@ -34,7 +34,7 @@ export const NOW = [
   { what: '研究、產信、建草稿不用你一筆一筆按。', state: 'no', ev: '三個動作都是按鈕觸發（ReviewClient.tsx:19-20）；300 封一天等於 600 次點擊。' },
   { what: '對方回信會進系統，後續信自動停。', state: 'no', ev: 'Replies 頁是空殼；草稿只存 draft id，沒存對話串 id（gmail-draft/route.ts:186）。' },
   { what: '輸入「找什麼＋地區」就自動找到一批店家放進名單。', state: 'yes', ev: '2026-11-01 C10：Inbox 頁「找名單」用 Serper 查地圖，一次最多 20 家（網站或社群頁、電話、地圖來源），沒網站也沒電話的不放；已在名單或收件匣裡的標成重複，同一家核准兩次只有一筆。每次最多約 NT$0.1。正式庫實測「瑜珈教室／台中市」兩次：第一次 20 家，第二次 17 家標重複。' },
-  { what: '能從公司登記、徵才頁、公開簡介找到公司和人的 email。', state: 'no', ev: '店家搜尋（C10）、人員搜尋與 email 推斷（C13，11-03 真查 Gogoro：Hunter 驗出 1 個有效 email）已上線；公司登記（C12）程式已備，等經濟部白名單（C12.3）。' },
+  { what: '能從公司登記、徵才頁、公開簡介找到公司和人的 email。', state: 'yes', ev: '店家搜尋（C10）、人員搜尋與 email 推斷（C13，11-03 真查 Gogoro：Hunter 驗出 1 個有效 email）、公司登記（C12，11-03 真查餐館業／台中 99 家含負責人；零售、批發、餐飲以外的行業要寄經濟部告知書才查得到）都已上線。' },
   { what: '用 IG／FB 當網站的店也研究得到。', state: 'yes', ev: '2026-11-01 C17：研究會讀店家的 IG／FB 頁（Meta 官方 API → Google 摘要 → Apify），自介的事實可自動核准，貼文的等你看。正式庫實測 Coffee Here 的 IG 拿到 9 條證據；Apify 讀 Soulful 的 FB 粉專自動填入 info@soulfulexpression.org。' },
   { what: '找到店家後拿得到它的 email，寄之前知道對方網域收不收信。', state: 'yes', ev: '2026-11-01 C3：研究時從對方網站自動填 email（對方網域、mailto 或網站結構化資料裡的商家信箱），先查網域收不收信才填；別家的地址只列成候選給你看。實測自動填入 info@soulfulexpression.org。' },
   { what: '暖名單同步到 FluentCRM。', state: 'no', ev: 'wp-bridge 沒有 contact 端點（RestController.php:42-105），只能建電子報草稿。' },
@@ -57,6 +57,7 @@ const C8 = '050a1041e';
 const C5 = 'd518cbb2c';
 const C15 = '96ecf614d';
 const C12 = '6c9f2a8c8';
+const C12_3 = 'dafa32cd9';
 const C13 = '1c47a2904';
 const C6 = 'f57fd3512';
 const C14 = '27a93dbcc';
@@ -197,14 +198,14 @@ export const STEPS = [
       done('C7.3', '計數測試（050a1041e）；11-03 正式庫種 3 筆走到已回覆（正向 2、會議 1、失去 1），首頁表 3 寄／3 回／2 正向／1 會議／1 失去、回覆率 100%、正向 66.7% 全對，測完刪除。', C8),
     ] },
   { n: 12, code: 'C12', group: 'H', title: '名單來源：公司行號', plain: '例：你選「食品零售」加「台中市」，系統從經濟部的公司登記資料找出公司名、負責人、地址、資本額，再用搜尋引擎找出官網，放進待處理名單；email 之後由研究那步從官網補。',
-    gate: '一個營業項目真查一次，待處理名單出現含負責人姓名與官網的公司。頁腳有資料來源聲明。', risk: 'Medium（C12.3 外部申請）', model: 'Codex', status: 'in_progress', depends: ['C10'],
+    gate: '一個營業項目真查一次，待處理名單出現含負責人姓名與官網的公司。頁腳有資料來源聲明。', risk: 'Medium（C12.3 外部申請）', model: 'Codex', status: 'done', commit: C12, depends: ['C10'],
     decided: '公司行號用經濟部商工登記開放資料：免費、合法、有負責人姓名。要先申請 API 白名單（填一份使用告知書）。登記資料沒有網站，所以用搜尋引擎找官網並核對公司名，找不到的留空。（規格 D20）',
     what: 'ProviderSpec 允許 keyless 供應商（仍受預算、origin、allowedPaths）；gcis entry；sources/gcis.ts 三步（營業項目代碼表 → 應用一 → Serper 找官網並驗證）；Inbox 頁找公司表單；顯名聲明',
     files: ['NA/lib/collect/net/providers.ts', 'NA/lib/outreach/sources/gcis.ts', 'NA/app/api/outreach/inbox/route.ts'],
     items: [
       done('C12.1', '接經濟部商工登記 API（不需金鑰的供應商也走同一道門）：先依營業項目列公司，再補負責人、地址、資本額，再用搜尋引擎找官網、排除目錄站並核對；縣市在本地篩。（照官方文件寫，等白名單後真查確認）', C12),
       done('C12.2', 'Inbox 頁「找公司」：營業項目用搜尋框加可見清單、縣市用按鈕；結果進待處理名單，負責人填聯絡人。', C12),
-      todo('C12.3', '你動手：告知書寄 opendata.gcis@gmail.com，IP 填 145.239.195.47。測試已完成（6c9f2a8c8，假回應）；核准後真查一次。'),
+      done('C12.3', '11-03 查證：F 類（零售、批發、餐飲）API 是正式版，不用白名單、不用寄信；其他行業是「測試」版，要用時才寄告知書。真查「餐館業／台中市」：99 家都有負責人，8 家有網站。修了兩個問題：主機查詢一長就 502；公司目錄頁被當成官網（同一個網站對到多家公司就不採用）。測完刪除。', C12_3),
     ] },
   { n: 13, code: 'C13', group: 'H', title: '名單來源：人員搜尋、email 推斷、付費驗證', plain: '例：你要找台北行銷主管，系統用搜尋引擎找出公開的 LinkedIn 或 IG 簡介摘要，有 email 的直接填；只有姓名的，依公司已知的 email 格式推幾個候選，先免費查網域，再用 Hunter 驗證，驗過才進名單。每筆記下來源類別，不是對方自己公開的，信尾會多一行告知。',
     gate: '對一個真實公司找 2 位人員，候選進待處理名單；推斷出的 email 經驗證後只有有效的被填入，驗證紀錄存起來；來源類別正確。沒有付費金鑰時只做免費查核並標「未驗證」。', risk: 'Medium（個資法邊界）', model: 'Opus 5.5', status: 'done', commit: C13, depends: ['C3'],

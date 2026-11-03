@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-03（續7）外聯 C12.3 完成：部署 dafa32cd9 後真查；平台 host 補進 PLATFORM_HOSTS
+
+- 部署 dafa32cd9（sg-deploy OK，.deployed-commit 同）。真查 F501060／台中：201 imported 99、負責人 99、網站 8（目錄頁 0；修前 75 筆多為目錄）、Serper 99 credits≈NT$3.2。測試列已刪，0 轉 lead。
+- 剩的單筆錯網站：inline.app、ubereats.com、accupass.com＝店家在訂位／外送／售票平台上的頁 → normalize.ts PLATFORM_HOSTS 加 ubereats.com、foodpanda.com.tw、inline.app、accupass.com（同 shopee／pinkoi 機制；也避免兩家都填 ubereats 被去重成同一家）。
+- 監工台 C12.3 done（C12_3＝dafa32cd9）、C12 卡 done；66/77。
+- REALTEST_EVIDENCE: tool=curl | cmd=browser POST /api/outreach/inbox gcis{F501060,台中市} → 201 imported 99 withoutWebsite 91；psql 網站 host 無目錄站 | exit=0 | ms=40000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（normalize.ts 清單加 4 項；tsc 0、outreach vitest 308 passed）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=PLATFORM_HOSTS | hits=4 code（normalize.ts:55,66；InboxClient.tsx:5,263 import 同一常數，新 host 一併生效）＋舊 WORKLOG／週報敘述（不改）
+- ORACLE_WAIVED: 只加 4 個字串到既有清單
 ## 2026-11-03（續6）外聯 C12.3：F 類免白名單；supabase nginx 502；官網挑選改跨公司判定
 
 - GCIS：非「測試」API（1 代碼表、2 應用一、29 F 查公司）主機直連免白名單可用；「測試」版（A–E、G–J、Z 查公司）回「非授權介接之IP」→ 只有非 F 類需告知書，暫不寄（操作者：不用寫信）。

@@ -58,7 +58,9 @@ export const PLATFORM_HOSTS = ["facebook.com", "fb.com", "instagram.com", "threa
   // What an Instagram profile links instead of a site (live 2026-11-01, 8 Taichung studios: none linked their own):
   // forms, short links and link-in-bio pages.
   "forms.gle", "bit.ly", "tinyurl.com", "reurl.cc", "ppt.cc", "lihi.cc", "lihi1.com", "lihi2.com", "beacons.ai", "lit.link", "linkin.bio",
-  "taplink.cc", "bio.site", "msha.ke", "carrd.co"];
+  "taplink.cc", "bio.site", "msha.ke", "carrd.co",
+  // A shop's page on an ordering, booking or ticketing platform (live 2026-11-03, GCIS 餐館業 台中).
+  "ubereats.com", "foodpanda.com.tw", "inline.app", "accupass.com"];
 
 export function isPlatformHost(host: string): boolean {
   return PLATFORM_HOSTS.some((p) => host === p || host.endsWith(`.${p}`));
