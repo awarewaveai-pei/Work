@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-03（續14）外聯：測試寄送窗打通 DB 寄送閘（0158）；開關正式站全程真測通過
+
+- 根因：co_begin_send（0152:122）`send_mode <> 'auto'` 一律 return false；程式層 testing 信箱放行，DB 層拒絕 → 草稿模式信箱永遠寄不出（runAutoSend:207 beginSend false 時 continue 不計數，看起來「沒寄也沒 held」）。單元測試 mock beginSend 而漏掉。
+- 0158：co_begin_send 換成 0152 本體＋一個放行分支（auto，或 draft＋test_send_until>now＋收件人去 +tag 在 test_recipients），整段 coalesce(…, false)（NULL 時 IF 會放行）。down＝0152 本體。套前 truth table（psql 純 SELECT）6 情境全對；APPLY_OK。
+- 正式站全程：UI 開關開窗 → +t1 測試名單 → 管線研究＋產信（Gemini 已恢復）→ 核准 B → 建草稿 → 下一輪自動寄出 sent=1；名單外舊草稿（2dad5486，收件 awarewaveai）testSkipped 仍 drafted。Gmail thread 1a19fca580cd9dda SENT to peijingartstudio+t1@gmail.com。測試資料已刪。
+- 另：1 小時窗 12:47 準時自動失效（test_send_until 比 now()）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=apply-db-migration 0158 APPLY_OK；gmail-sync tick send.sent=1 testSkipped=1；Gmail get_thread SENT | exit=0 | ms=300000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/1m/0n（m：NULL 放行，已以 coalesce 修並 truth table 驗）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=co_begin_send | hits=71（定義 0152＋0158＋0158.down；呼叫只經 sender-pool.ts beginSend；其餘註解與 WORKLOG）
+- ORACLE_WAIVED: SQL 只動一個條件；truth table 6 情境實跑＋正式站真寄
 ## 2026-11-03（續13）外聯：lite 模型不收 thinkingBudget 0
 
 - 部署 2dc645a40 後真測：fallback 打 gemini-3.5-flash-lite 回 400 INVALID_ARGUMENT。直打驗證：lite＋thinkingConfig{thinkingBudget:0} → 400；不帶 → 200。
