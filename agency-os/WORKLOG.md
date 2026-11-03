@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-03（續13）外聯：lite 模型不收 thinkingBudget 0
+
+- 部署 2dc645a40 後真測：fallback 打 gemini-3.5-flash-lite 回 400 INVALID_ARGUMENT。直打驗證：lite＋thinkingConfig{thinkingBudget:0} → 400；不帶 → 200。
+- ai-gemini.ts：thinkingConfig 只給非 lite 模型；fallback 測試加斷言（第一次有、第二次沒有 thinkingConfig）。
+- REALTEST_EVIDENCE: tool=curl | cmd=gemini-probe2.ps1（lite with-thinking0 400、no-thinking ok）＋vitest 460 passed | exit=0 | ms=40000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=thinkingBudget | hits=12（code 只有 ai-gemini.ts:53,55＋其測試；cs／ops-inbox 用 lite 但不送 thinkingConfig；其餘為 WORKLOG 敘述）
+- ORACLE_WAIVED: 一行條件；測試斷言 body 欄位
 ## 2026-11-03（續12）外聯：Gemini 過載時改用 lite 模型
 
 - 現象：開關真測的測試名單（+t1）連 40 分鐘產信失敗；tick errors `503 ai_unavailable:gemini_failed:gemini 503 … overloaded` 與 240s timeout。直打 API：gemini-flash-latest 503、gemini-3.8-flash 503、gemini-pro-latest 429；gemini-flash-lite-latest 1s、gemini-3.5-flash 2s 正常。

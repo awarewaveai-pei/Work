@@ -20,6 +20,10 @@ describe("generateWithGemini fallback", () => {
     const r = await generateWithGemini({} as never, "k", "p", "gemini-flash-latest");
     expect(fetchMock.mock.calls.map((c) => modelOf(c[0]))).toEqual(["gemini-flash-latest", GEMINI_LITE_MODEL]);
     expect(r.model).toBe(GEMINI_LITE_MODEL);
+    // the lite model answers 400 to thinkingConfig.thinkingBudget 0 (live 2026-11-03)
+    const cfg = (c: unknown[]) => JSON.parse(String((c[1] as RequestInit).body)).generationConfig;
+    expect(cfg(fetchMock.mock.calls[0])).toHaveProperty("thinkingConfig");
+    expect(cfg(fetchMock.mock.calls[1])).not.toHaveProperty("thinkingConfig");
   });
 
   it("another error (400) is not retried", async () => {

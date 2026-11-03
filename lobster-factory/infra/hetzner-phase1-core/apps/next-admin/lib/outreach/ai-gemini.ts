@@ -49,8 +49,10 @@ async function callGemini(grant: Grant, apiKey: string, prompt: string, model: s
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
       // gemini-2.5/flash-latest are thinking models — reasoning consumes maxOutputTokens and truncates
-      // the actual answer. Disable thinking (cold-email copy needs none) + give the output room.
-      generationConfig: { temperature: 0.7, maxOutputTokens: OUTREACH_MAX_TOKENS, thinkingConfig: { thinkingBudget: 0 } },
+      // the actual answer. Disable thinking (cold-email copy needs none) + give the output room. The lite model
+      // refuses thinkingBudget 0 with 400 INVALID_ARGUMENT (live 2026-11-03), so it gets no thinkingConfig.
+      generationConfig: { temperature: 0.7, maxOutputTokens: OUTREACH_MAX_TOKENS,
+        ...(model === GEMINI_LITE_MODEL ? {} : { thinkingConfig: { thinkingBudget: 0 } }) },
     }),
   });
   if (!resp.ok) {
