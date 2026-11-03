@@ -21,6 +21,9 @@ export interface PoolAccount {
   warmup_stage: string;
   daily_limit: number;
   connector_id: string | null;
+  /** Read by send-adapter only (0157): a draft-mode mailbox's test-send window; never makes a mailbox part of the pool. */
+  test_send_until?: string | null;
+  test_recipients?: string[];
 }
 export const POOL_COLS = "id, organization_id, email, is_active, health_status, send_mode, warmup_stage, daily_limit, connector_id";
 
@@ -29,6 +32,10 @@ export interface SendCaps { mailbox: number; sender_domain: number; recipient_30
 /** In the pool and allowed to send now: active, healthy, auto, and linked to the Gmail connector that holds its token. */
 export const inPool = (a: PoolAccount): boolean =>
   a.is_active && a.health_status === "healthy" && a.send_mode === "auto" && !!a.connector_id;
+/** A draft-mode mailbox whose test-send window is open now (0157): active, healthy, linked, with recipients. Sends only to them. */
+export const testingNow = (a: PoolAccount, at: Date): boolean =>
+  a.send_mode === "draft" && a.is_active && a.health_status === "healthy" && !!a.connector_id && !!a.test_send_until
+  && Date.parse(a.test_send_until) > at.getTime() && (a.test_recipients?.length ?? 0) > 0;
 export const capOf = (a: Pick<PoolAccount, "warmup_stage" | "daily_limit">): number => stageCap(a.warmup_stage, a.daily_limit);
 export const domainOfEmail = (email: string): string => (email.trim().toLowerCase().split("@")[1] ?? "");
 

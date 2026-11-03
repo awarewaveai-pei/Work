@@ -24,7 +24,7 @@ class FakeStore implements SendStore {
   paused: string[] = [];
   timelines: string[] = [];
   sent: string[] = [];
-  add(id: string, l: SendLead = lead(`l-${id}`), over: Partial<QueuedMail> = {}) {
+  add(id: string, l: SendLead = lead(`l-${id}`), over: Partial<QueuedMail & { account: string }> = {}) {
     this.mails.push({ messageId: id, draftId: `d-${id}`, outputType: "cold_email", lead: l, approvedEvidence: 1, account: "a", status: "drafted", ...over });
   }
   async poolAccounts() { return this.accounts; }
@@ -187,6 +187,53 @@ describe("auto send", () => {
     unsure.fail(null);
     await runAutoSend(unsure.deps);  // the next tick does not resend it: reconciliation (gmail-sync) decides
     expect(unsure.gmailSent).toEqual([]);
+  });
+});
+
+describe("auto send test window (0157)", () => {
+  const SAT = new Date("2026-11-07T02:00:00Z");  // Saturday 10:00 Taipei: outside the send window
+  const main = (over: Partial<PoolAccount> = {}) => acc("t", { email: "main@gmail.com", send_mode: "draft", warmup_stage: "full", daily_limit: 20,
+    test_send_until: "2026-11-08T00:00:00Z", test_recipients: ["Me@Mine.example"], ...over });
+  const mine = (id: string) => lead(id, { email: "me@mine.example" });
+
+  it("mail to a listed recipient is sent (even outside the window); anyone else stays drafted and untouched", async () => {
+    const { store, deps, gmailSent } = setup({ now: () => SAT });
+    store.accounts = [main()];
+    store.add("in", mine("l-in"), { account: "t" });
+    store.add("out", lead("l-out"), { account: "t" });
+    const r = await runAutoSend(deps);
+    expect(gmailSent).toEqual(["d-in"]);
+    expect(r.testSkipped).toBe(1);
+    expect(store.mails.find((m) => m.messageId === "out")!.status).toBe("drafted");
+    expect(store.claims).toEqual(["in"]);
+  });
+
+  it("an expired window, a missing list or a mailbox already paused sends nothing", async () => {
+    for (const over of [{ test_send_until: "2026-11-06T00:00:00Z" }, { test_send_until: null }, { test_recipients: [] }, { health_status: "paused" }]) {
+      const { store, deps, gmailSent } = setup({ now: () => SAT });
+      store.accounts = [main(over)];
+      store.add("in", mine("l-in"), { account: "t" });
+      await runAutoSend(deps);
+      expect(gmailSent, JSON.stringify(over)).toEqual([]);
+    }
+  });
+
+  it("a pool mailbox still waits for the window while a test mailbox runs", async () => {
+    const { store, deps, gmailSent } = setup({ now: () => SAT });
+    store.accounts = [acc("a"), main()];
+    store.add("pool", lead("l-pool"));
+    store.add("in", mine("l-in"), { account: "t" });
+    const r = await runAutoSend(deps);
+    expect(gmailSent).toEqual(["d-in"]);
+    expect(r.window).toBe(false);
+  });
+
+  it("a mailbox in the test window is held to its daily cap (full = daily_limit 20)", async () => {
+    const { store, deps, gmailSent } = setup();
+    store.accounts = [main()];
+    for (let i = 0; i < 22; i++) store.add(`m${i}`, lead(`l-${i}`, { email: "me@mine.example" }), { account: "t" });
+    await runAutoSend(deps);
+    expect(gmailSent.length).toBe(20);
   });
 });
 

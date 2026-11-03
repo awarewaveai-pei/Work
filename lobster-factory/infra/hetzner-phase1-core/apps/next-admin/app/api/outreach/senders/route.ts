@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
+import { resolveOpsRole, canManageOutreach, canWriteTenantConfig } from "@/lib/ops-role";
 import { outreachDb } from "@/lib/outreach/db-client";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { defaultSignature, POOL_DAILY_LIMIT, taipeiDay } from "@/lib/outreach/sender";
@@ -17,7 +17,8 @@ import { supabaseSyncStore, type GmailSyncState } from "@/lib/outreach/gmail-syn
 // tick scans that mailbox's inbox N days back (settings.gmail_sync.rescan_days, lib/outreach/gmail-sync.ts);
 // POST { action: "send_mode", id, mode, confirmEmail } is the pool table's 自動寄出 switch (card C8.4): turning it on
 // needs the mailbox's address typed back and a subdomain mailbox (poolEmailRefusal); a mailbox never in the pool starts
-// warm-up at w1, 50/day (SPEC D17, D21). GET adds, for pool mailboxes, today's claims and the 7-day bounce rate.
+// warm-up at w1, 50/day (SPEC D17, D21); POST { action: "test_send", id, hours: 0|1|8|24, recipients } (owner/admin) opens a timed
+// window in which a draft-mode mailbox sends only to those addresses (0157, send-adapter.ts), 0 = off. GET adds, for pool mailboxes, today's claims and the 7-day bounce rate.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,8 +26,11 @@ export const dynamic = "force-dynamic";
 const TABLE = "co_sender_accounts";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SIGNATURE_MAX = 500;
-const COLS = "id, organization_id, email, display_name, provider, stream_type, signature_block, is_active, send_mode, daily_limit, warmup_stage, warmup_started_at, health_status, dns_status, dns_checked_at, connector_id";
+const COLS = "id, organization_id, email, display_name, provider, stream_type, signature_block, is_active, send_mode, daily_limit, warmup_stage, warmup_started_at, health_status, dns_status, dns_checked_at, connector_id, test_send_until, test_recipients";
 const RESCAN_DAYS = [1, 3, 7] as const;
+const TEST_HOURS = [0, 1, 8, 24] as const;
+const TEST_RECIPIENTS_MAX = 10;
+const EMAIL_RE = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
 
 export async function GET(req: Request): Promise<Response> {
   const params = new URL(req.url).searchParams;
@@ -114,9 +118,10 @@ export async function POST(req: Request): Promise<Response> {
   if (!canManageOutreach(role)) return new NextResponse("forbidden", { status: 403 });
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return new NextResponse("invalid json", { status: 400 }); }
-  if (body.action !== "recheck" && body.action !== "rescan" && body.action !== "send_mode") {
-    return NextResponse.json({ ok: false, error: "action must be recheck, rescan or send_mode" }, { status: 400 });
+  if (body.action !== "recheck" && body.action !== "rescan" && body.action !== "send_mode" && body.action !== "test_send") {
+    return NextResponse.json({ ok: false, error: "action must be recheck, rescan, send_mode or test_send" }, { status: 400 });
   }
+  if (body.action === "test_send" && !canWriteTenantConfig(role)) return new NextResponse("forbidden", { status: 403 });
   const supabase = await outreachDb(req, typeof body.orgSlug === "string" ? body.orgSlug : null);
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const id = typeof body.id === "string" ? body.id.trim() : "";
@@ -127,6 +132,27 @@ export async function POST(req: Request): Promise<Response> {
   if (!cur) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
   try { assertOrgAccess(req, (cur as { organization_id: string | null }).organization_id); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+  if (body.action === "test_send") {
+    if ((cur as { send_mode: string }).send_mode !== "draft") return NextResponse.json({ ok: false, error: "寄件池信箱不用測試寄送；只有草稿模式的信箱能開" }, { status: 400 });
+    const hours = TEST_HOURS.find((h) => h === body.hours);
+    if (hours === undefined) return NextResponse.json({ ok: false, error: `hours must be ${TEST_HOURS.join(" / ")}` }, { status: 400 });
+    const raw = Array.isArray(body.recipients) ? body.recipients : [];
+    const recipients = [...new Set(raw.map((e) => (typeof e === "string" ? e.trim().toLowerCase() : "")))];
+    if (hours > 0) {
+      if (!recipients.length || recipients.some((e) => !EMAIL_RE.test(e))) return NextResponse.json({ ok: false, error: "收件人要至少一個，且都是 email 地址" }, { status: 400 });
+      if (recipients.length > TEST_RECIPIENTS_MAX) return NextResponse.json({ ok: false, error: `收件人最多 ${TEST_RECIPIENTS_MAX} 個` }, { status: 400 });
+    }
+    const until = hours > 0 ? new Date(Date.now() + hours * 3_600_000).toISOString() : null;
+    const patch = hours > 0 ? { test_send_until: until, test_recipients: recipients } : { test_send_until: null };
+    const { error } = await supabase.from(TABLE).update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id);
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    const email = (cur as { email: string }).email;
+    const { error: tErr } = await supabase.from("co_timeline_events").insert({ organization_id: (cur as { organization_id: string | null }).organization_id, lead_id: null,
+      event_type: hours > 0 ? "test_send_on" : "test_send_off", title: hours > 0 ? `${email}：開啟測試自動寄送 ${hours} 小時` : `${email}：關閉測試自動寄送`,
+      metadata: { sender_account_id: id, actor: req.headers.get("x-ops-user-id") ?? "unknown", until, recipients: hours > 0 ? recipients.length : 0 } });
+    if (tErr) return NextResponse.json({ ok: false, error: tErr.message }, { status: 500 });
+    return NextResponse.json({ ok: true, testSendUntil: until, recipients: hours > 0 ? recipients : [] });
+  }
   if (body.action === "send_mode") {
     const row = cur as { email: string; stream_type: string; connector_id: string | null; warmup_started_at: string | null };
     if (body.mode === "draft") {

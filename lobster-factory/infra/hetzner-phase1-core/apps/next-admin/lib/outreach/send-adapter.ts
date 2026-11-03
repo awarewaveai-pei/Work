@@ -1,7 +1,9 @@
 // The automatic send (card C8.3-C8.4; SPEC §5.5, D17, D21, D25): the one file that sends mail. never-sends.test.ts
 // allows sendGmailDraft (google-oauth.ts, drafts.send) here and nowhere else. Run at the end of each reply-sync tick
 // (app/api/internal/outreach/gmail-sync), after reconciliation, for every mailbox in the pool (sender-pool.ts inPool:
-// active, healthy, send_mode='auto', linked connector) -- a draft mailbox is never read here. Per mailbox:
+// active, healthy, send_mode='auto', linked connector) -- a draft mailbox is read only while its test-send window is open
+// (0157 test_send_until, sender-pool.ts testingNow): then only its mail to the window's test_recipients is sent, anyone
+// else's stays drafted (testSkipped), the whole remaining cap may go in one tick, and the Taipei window does not apply. Per mailbox:
 //   window      Taipei 09:00-18:00, Monday to Friday; outside it nothing is sent.
 //   tick quota  ceil(what is left of its stage cap today / ticks left today), after a 0-120 s jitter.
 //   per mail    its Gmail draft (status 'drafted', newest draft_created event names this mailbox), oldest first. A
@@ -22,7 +24,7 @@ import { checkColdGate, type ColdGateLead } from "./cold-gate";
 import { contactBlock, type ContactBlock, type GuardedLead } from "./contact-guard";
 import { sendGmailDraft } from "./google-oauth";
 import { freshPaid, saveVerdict, storedVerdict, type PaidProvider, type StoredVerdict } from "./mailbox-verify";
-import { beginSend, capOf, inPool, POOL_COLS, releaseClaim, sendCaps, todayClaims, type PoolAccount, type SendCaps } from "./sender-pool";
+import { beginSend, capOf, inPool, POOL_COLS, releaseClaim, sendCaps, testingNow, todayClaims, type PoolAccount, type SendCaps } from "./sender-pool";
 import { MX_PROVIDER, type EmailStatus } from "./verify-email";
 
 export const WINDOW_START_HOUR = 9;
@@ -54,6 +56,7 @@ export interface QueuedMail { messageId: string; draftId: string; outputType: st
   followup?: FollowupInfo | null }
 
 export interface SendStore {
+  /** Every pool mailbox plus the draft mailboxes with an unexpired test-send window (the caller filters). */
   poolAccounts(): Promise<PoolAccount[]>;
   claimsToday(accountIds: string[]): Promise<Map<string, number>>;
   /** This mailbox's Gmail drafts still to send (status 'drafted'), oldest first. */
@@ -87,7 +90,7 @@ export interface SendDeps {
   deadline?: number;
 }
 
-export interface SendResult { window: boolean; mailboxes: number; sent: number; held: number; refused: number; uncertain: number; errors: string[] }
+export interface SendResult { window: boolean; mailboxes: number; sent: number; held: number; refused: number; uncertain: number; testSkipped: number; errors: string[] }
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
@@ -167,28 +170,33 @@ export async function runAutoSend(deps: SendDeps): Promise<SendResult> {
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const random = deps.random ?? Math.random;
   const late = (extra = 0) => deps.deadline !== undefined && Date.now() + extra > deps.deadline;
-  const r: SendResult = { window: inSendWindow(now()), mailboxes: 0, sent: 0, held: 0, refused: 0, uncertain: 0, errors: [] };
-  if (!r.window) return r;
+  const r: SendResult = { window: inSendWindow(now()), mailboxes: 0, sent: 0, held: 0, refused: 0, uncertain: 0, testSkipped: 0, errors: [] };
 
-  const pool = (await deps.store.poolAccounts()).filter(inPool);
-  if (!pool.length) return r;
-  const claimed = await deps.store.claimsToday(pool.map((a) => a.id));
+  const all = await deps.store.poolAccounts();
+  const pool = all.filter(inPool);
+  const testing = all.filter((a) => !inPool(a) && testingNow(a, now()));
+  const mailboxes = [...(r.window ? pool : []), ...testing];
+  if (!mailboxes.length) return r;
+  const claimed = await deps.store.claimsToday(mailboxes.map((a) => a.id));
   // At most one mail per lead per tick: the queue was read before any send, so a lead's second follow-up would look due.
   const leadsSent = new Set<string>();
 
   const runMailbox = async (a: PoolAccount): Promise<void> => {
-    const quota = tickQuota(capOf(a), claimed.get(a.id) ?? 0, now());
+    const test = testing.includes(a);
+    const testTo = new Set((a.test_recipients ?? []).map((e) => e.trim().toLowerCase()));
+    const quota = test ? Math.max(0, capOf(a) - (claimed.get(a.id) ?? 0)) : tickQuota(capOf(a), claimed.get(a.id) ?? 0, now());
     if (quota <= 0) return;
     const queue = await deps.store.queue(a.id, QUEUE_READ);
     if (!queue.length) return;
     r.mailboxes++;
-    const jitter = Math.floor(random() * JITTER_MAX_MS);
+    const jitter = test ? 0 : Math.floor(random() * JITTER_MAX_MS);
     if (late(jitter)) return;
     await sleep(jitter);
     let token: string | null = null;
     let sent = 0;
     for (const mail of queue) {
-      if (sent >= quota || late() || !inSendWindow(now())) return;
+      if (sent >= quota || late() || (test ? !testingNow(a, now()) : !inSendWindow(now()))) return;
+      if (test && !testTo.has((mail.lead.email ?? "").trim().toLowerCase())) { r.testSkipped++; continue; }
       // One mail's failure (a verifier error) holds that mail only, never the mailbox (critic M2).
       let why: string | null;
       try { why = await holdReason(deps, mail, now()); }
@@ -223,7 +231,7 @@ export async function runAutoSend(deps: SendDeps): Promise<SendResult> {
     }
   };
 
-  await Promise.all(pool.map((a) => runMailbox(a).catch((e) => { r.errors.push(`${a.email}: ${errText(e)}`); })));
+  await Promise.all(mailboxes.map((a) => runMailbox(a).catch((e) => { r.errors.push(`${a.email}: ${errText(e)}`); })));
   return r;
 }
 
@@ -278,8 +286,10 @@ export function supabaseSendStore(db: SupabaseClient): SendStore {
   return {
     async poolAccounts() {
       // A disabled or token-less Gmail connector stops its mailbox, the same rule the reply sync reads (Codex F2).
-      const { data, error } = await db.from("co_sender_accounts").select(`${POOL_COLS}, co_connector_accounts!inner(id)`)
-        .eq("stream_type", "cold").eq("provider", "gmail").eq("send_mode", "auto").eq("is_active", true).eq("health_status", "healthy")
+      // Pool mailboxes, plus draft ones inside an open test-send window (runAutoSend re-checks it against its own clock).
+      const { data, error } = await db.from("co_sender_accounts").select(`${POOL_COLS}, test_send_until, test_recipients, co_connector_accounts!inner(id)`)
+        .eq("stream_type", "cold").eq("provider", "gmail").or(`send_mode.eq.auto,and(send_mode.eq.draft,test_send_until.gt.${new Date().toISOString()})`)
+        .eq("is_active", true).eq("health_status", "healthy")
         .not("connector_id", "is", null).eq("co_connector_accounts.is_enabled", true).not("co_connector_accounts.credentials_ref", "is", null)
         .order("created_at").limit(500);
       fail("pool read failed", error);

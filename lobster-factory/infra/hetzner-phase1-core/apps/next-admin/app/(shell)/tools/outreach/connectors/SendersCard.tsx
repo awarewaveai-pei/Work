@@ -23,7 +23,13 @@ interface Sender {
   rescan_days: number | null;
   today_claims: number | null;
   bounce_rate_7d: number | null;
+  test_send_until: string | null;
+  test_recipients: string[];
 }
+
+const DEFAULT_TEST_TO = "peijingartstudio@gmail.com";
+const testOpen = (s: Sender): boolean => !!s.test_send_until && Date.parse(s.test_send_until) > Date.now();
+const taipeiHm = (iso: string): string => new Date(iso).toLocaleTimeString("zh-TW", { timeZone: "Asia/Taipei", hour12: false, hour: "2-digit", minute: "2-digit" });
 
 const cell: CSSProperties = { padding: "6px 8px", borderBottom: "1px solid var(--border-subtle)", textAlign: "left", verticalAlign: "middle" };
 
@@ -43,6 +49,7 @@ export default function SendersCard({ org }: { org: string | null }) {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
+  const [testTo, setTestTo] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     const r = await fetch(withOrg(API, org));
@@ -80,6 +87,23 @@ export default function SendersCard({ org }: { org: string | null }) {
       if (!j.ok) throw new Error(j.error || "切換失敗");
       setMsg({ ok: true, text: mode === "auto" ? "已開啟自動寄出：上班時間（週一至五 9–18 點）依暖機上限輪流寄" : "已關閉自動寄出：草稿留在 Gmail 等人按寄出" });
       setConfirming(null); setTyped("");
+      await load();
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function testSend(id: string, hours: 0 | 1 | 8 | 24) {
+    setBusy(id); setMsg(null);
+    try {
+      const recipients = (testTo[id] ?? DEFAULT_TEST_TO).split(/[,\n;\s]+/).map((e) => e.trim()).filter(Boolean);
+      const r = await fetch(API, { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "test_send", id, hours, recipients }) });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "切換失敗");
+      setMsg({ ok: true, text: hours ? `已開啟測試自動寄送 ${hours} 小時：只寄給你列的收件人，其他人的信仍留草稿` : "已關閉測試自動寄送" });
       await load();
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : String(e) });
@@ -178,6 +202,22 @@ export default function SendersCard({ org }: { org: string | null }) {
                         <button type="button" className="btn-secondary" disabled={busy === s.id} onClick={() => void recheck(s.id)}>
                           {busy === s.id ? "檢查中…" : "重新檢查並恢復"}
                         </button>
+                      )}
+                      {!auto && (
+                        <span style={{ display: "grid", gap: 4, minWidth: 220 }}>
+                          <span className="card-sub">測試自動寄送：只寄給下面的收件人，其他人的信照舊留草稿。同一個地址 30 天最多收 2 封；要多測就用 peijingartstudio+t1@gmail.com、+t2… 這種地址，都會進你的信箱。</span>
+                          {testOpen(s) && (
+                            <span className="card-badge badge-green">測試中，到 {taipeiHm(s.test_send_until!)}（台北）自動關閉；只寄給：{s.test_recipients.join("、")}</span>
+                          )}
+                          <textarea rows={2} value={testTo[s.id] ?? DEFAULT_TEST_TO} aria-label={`${s.email} 的測試收件人`}
+                            onChange={(e) => setTestTo((t) => ({ ...t, [s.id]: e.target.value }))} />
+                          <span style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                            {([1, 8, 24] as const).map((h) => (
+                              <button key={h} type="button" className="btn-primary" disabled={busy === s.id} onClick={() => void testSend(s.id, h)}>開 {h} 小時</button>
+                            ))}
+                            <button type="button" className="btn-secondary" disabled={busy === s.id || !testOpen(s)} onClick={() => void testSend(s.id, 0)}>關閉</button>
+                          </span>
+                        </span>
                       )}
                     </td>
                   </tr>

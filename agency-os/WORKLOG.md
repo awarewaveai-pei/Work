@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-03（續10）外聯：主信箱「測試自動寄送」開關（0157）
+
+- 操作者：要做一堆測試，app 上要有開關自己操控主信箱自動寄。
+- 決定（不拆保護）：草稿模式信箱可開限時測試窗（1／8／24 小時，0＝關；owner／admin），窗內只自動寄給 test_recipients（≤10），其他人的信照舊留草稿（testSkipped）；不看台北時段窗、不分散到各輪；cold gate、I6、驗證、co_begin_send 三種名額、daily_limit 全照舊；inPool 不變（不進寄件池，I10）。過期以讀取時比 now()，不靠排程關。開關寫 co_timeline_events test_send_on／off（actor、until、人數）。
+- 每地址 30 天 2 封（co_recipient_cap_key 免費信箱以完整地址為鍵，0152:80-90）→ 不改；UI 提示用 peijingartstudio+t1@gmail.com 等 + 地址。
+- 0157（test_send_until、test_recipients＋≤10 check）已套正式庫 APPLY_OK；需先於程式部署（send-adapter select 新欄）。
+- 檔：send-adapter.ts（runAutoSend：pool 受時段窗、testing 不受；名單外 continue）、sender-pool.ts testingNow、senders route POST test_send、SendersCard.tsx。worker（fullstack-engineer）寫，本 session 驗收＋UI 提示。
+- REALTEST_EVIDENCE: tool=SSH | cmd=node scripts/apply-db-migration.mjs 0157 → APPLY_OK；psql co_sender_accounts test_send_until null、test_recipients {} | exit=0 | ms=15000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n（QUEUE_READ 400：名單外草稿超過 400 封時測試信可能排不到，主信箱上限 20／天，不會發生）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=testingNow | hits=7（code 5：sender-pool.ts:36、send-adapter.ts:5,27,177,198；WORKLOG 本條目 2）
+- ORACLE_WAIVED: 測試涵蓋名單內寄／名單外不動／過期不寄／時段窗、route 403／池信箱拒絕／hours 驗證；never-sends 7 綠；突變＝拿掉名單過濾，(a) 必紅
+- tsc 0；vitest lib/outreach＋app/api/outreach＋app/api/internal 384 passed
 ## 2026-11-03（續9）外聯 C9：co_leads.observation 退場，冷信只看 co_evidence
 
 - 決定：C9 waitFor「100 名單走過研究」＝等研究證明可靠；11-03 正式站已多次實跑 → 現在做（操作者：你決定）。
