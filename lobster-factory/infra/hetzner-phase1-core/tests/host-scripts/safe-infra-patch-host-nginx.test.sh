@@ -64,6 +64,13 @@ check "file outside /etc/nginx -> restored" test "$(docker exec "$C" cat /tmp/ou
 out="$(vhost 'return 200 "v4";' | patch /etc/nginx/conf.d/t.conf)"; rc=$?
 check "no vhost to probe -> refused, nothing applied" test "$rc:$(body)" = "1:v2"
 
+# An API gateway answers 401 at / (supabase.aware-wave.com, 2026-11-03): probe an open path given as vhost/path.
+gw='server { listen 443 ssl; server_name t.test; ssl_certificate /etc/nginx/ssl/c.pem; ssl_certificate_key /etc/nginx/ssl/k.pem;\n  location = /open { return 200 "gw"; }\n  location / { return 401; }\n}\n'
+out="$(printf "$gw" | patch /etc/nginx/conf.d/t.conf t.test)"; rc=$?
+check "gateway probed at / (401) -> exit 1, rolled back" test "$rc:$(body)" = "1:v2"
+out="$(printf "$gw" | patch /etc/nginx/conf.d/t.conf t.test/open)"; rc=$?
+check "gateway probed at vhost/open (200) -> exit 0" test "$rc" = 0
+
 # A change nginx -t accepts but the running master refuses (a limit_req zone whose key changed, 2026-11-01): HUP is
 # delivered, exit 0, the old workers stay. The patch must see the kept workers, fail, and restore.
 zone() {

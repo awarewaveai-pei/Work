@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-03（續6）外聯 C12.3：F 類免白名單；supabase nginx 502；官網挑選改跨公司判定
+
+- GCIS：非「測試」API（1 代碼表、2 應用一、29 F 查公司）主機直連免白名單可用；「測試」版（A–E、G–J、Z 查公司）回「非授權介接之IP」→ 只有非 F 類需告知書，暫不寄（操作者：不用寫信）。
+- 502 根因：PostgREST 把整條請求 URL 回寫在 `Content-Location`（50 個 findbiz URL＝4369 B）＞ host nginx 預設 `proxy_buffer_size` 4k → `upstream sent too big header`（/var/log/nginx/error.log）。凡長 `in.(...)` 都中（stats route 200 uuid＝7.8 KB 同類）。
+- 修：`/etc/nginx/sites-available/supabase.aware-wave.com` server 層 `large_client_header_buffers 4 16k; proxy_buffer_size 32k; proxy_buffers 8 32k; proxy_busy_buffers_size 64k;`（接受的最長請求列一定放得進回應標頭緩衝）；repo `nginx/system-sites/supabase-subdomains.conf` 同步。
+- safe-infra-patch.sh host-nginx：TARGET 可帶 `vhost/path`（API gateway 的 / 回 401）；第一次套用因 401 自動還原，改後以 `supabase.aware-wave.com/storage/v1/status` 探測成功；主機腳本 sha256 與 repo 同 22053ad1…。
+- 真查（修 nginx 後）F501060 台中 100 家、負責人 100、網站 75，但網站 host：info.technews.tw 43、lawplayer.com 11、data.bznk.com 5、chickpt 3、icatalog 2＝目錄頁。不變量：一個 host＝一家公司 → gcis.ts `websiteCandidates`（前 3 筆候選）＋同一次查詢 ≥2 家共用的 host 全部不採用；gov/edu host 一律拒。DIRECTORY_HOSTS 不再擴充。worker（fullstack-engineer）寫，本 session 驗收。測試 100 列已刪（0 轉 lead）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl supabase.aware-wave.com in.(50 findbiz URL)／in.(200 uuid) → 200／200（修前 502）；safe-infra-patch-host-nginx.test.sh 21 passed | exit=0 | ms=40000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/2n（n1 兩家真共用官網→都無網站；n2 甲名含於乙名時乙官網標題也含甲→兩家都無網站 gcis.ts:203-205；皆偏保守（少給不錯給），接受）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=websiteCandidates | hits=4（gcis.ts 定義＋呼叫、本條、續6 說明；舊名零殘留）
+- ORACLE_WAIVED: gcis.ts 單函式重構＋2 測試、shell 探測參數；書面自審：host 計數以每家 Set 去重、ownCandidate 依排名取第一個專屬 host；突變＝舊 regex 不收 `/`，新測試「vhost/open → exit 0」必紅
+- tsc 0；vitest 全套 3933 passed、2 failed＝tools/seedstar 他 session 未追蹤檔（registry 測試），非本線
 ## 2026-11-03（續5）外聯 C13.4、C7.3 正式站真測（無程式改動）
 
 - 監工台網址改回 DbH1HLUihZwAiBiJZGSD4t（操作者帳號）；交接檔 §1＋記憶同步；v27 發布 65/77。

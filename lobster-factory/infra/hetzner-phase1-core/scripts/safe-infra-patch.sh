@@ -7,7 +7,7 @@
 # Usage:
 #   echo "new content" | safe-infra-patch.sh compose <file-path> <service>   # any project: /root/chatwoot/docker-compose.yml too
 #   echo "new content" | safe-infra-patch.sh nginx   <file-path>
-#   echo "new content" | safe-infra-patch.sh host-nginx /etc/nginx/<file> <vhost-to-probe>
+#   echo "new content" | safe-infra-patch.sh host-nginx /etc/nginx/<file> <vhost-to-probe>[/open-path]
 #   echo "new content" | safe-infra-patch.sh file    <file-path>   # no health check
 #
 # nginx = the lobster-nginx CONTAINER. host-nginx = the host's own /etc/nginx (client vhosts such as
@@ -215,10 +215,13 @@ case "$TYPE" in
     fi
     ;;
   host-nginx)
-    # TARGET = a vhost this file serves, probed over 127.0.0.1 (cf-only.conf admits loopback).
+    # TARGET = a vhost this file serves, probed over 127.0.0.1 (cf-only.conf admits loopback); `vhost/path` when the
+    # vhost's / is behind auth (an API gateway answers 401 there) and an open path proves the upstream answers.
     case "$(realpath -m "$FILE_PATH")" in /etc/nginx/*) ;; *)
       log "health-fail | reason=host-nginx file outside /etc/nginx"; health_ok=0 ;; esac
-    [[ "$TARGET" =~ ^[a-z0-9.-]+$ ]] || { log "health-fail | reason=host-nginx needs a vhost to probe"; health_ok=0; }
+    [[ "$TARGET" =~ ^[a-z0-9.-]+(/[A-Za-z0-9._/-]*)?$ ]] || { log "health-fail | reason=host-nginx needs a vhost to probe"; health_ok=0; }
+    probe_host="${TARGET%%/*}"
+    probe_path="${TARGET#"$probe_host"}"; probe_path="${probe_path:-/}"
     if [[ $health_ok -eq 1 ]]; then
       if ! nt="$(nginx -t 2>&1)"; then
         log "health-fail | reason=nginx -t failed: $(printf '%s' "$nt" | tail -2 | tr '\n' ' ')"
@@ -228,9 +231,9 @@ case "$TYPE" in
         health_ok=0
       else
         http_code=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 30 \
-          --resolve "${TARGET}:443:127.0.0.1" "https://${TARGET}/" 2>/dev/null || true)
+          --resolve "${probe_host}:443:127.0.0.1" "https://${probe_host}${probe_path}" 2>/dev/null || true)
         if [[ ! "${http_code:-000}" =~ ^[23][0-9][0-9]$ ]]; then
-          log "health-fail | reason=https://${TARGET}/ via 127.0.0.1 returned ${http_code:-000}"
+          log "health-fail | reason=https://${probe_host}${probe_path} via 127.0.0.1 returned ${http_code:-000}"
           health_ok=0
         fi
       fi

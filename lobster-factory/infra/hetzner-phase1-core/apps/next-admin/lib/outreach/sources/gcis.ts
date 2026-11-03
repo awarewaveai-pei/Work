@@ -102,21 +102,35 @@ export function companyCore(name: string): string {
   return name.replace(/[（(][^)）]*[)）]/g, "").replace(SUFFIXES, "").trim();
 }
 
-/** The company's own site root from a Serper /search answer: the first of the top 3 results whose host is not a
- *  directory or platform and whose title holds the company's core name; else null. */
-export function pickWebsite(name: string, organic: unknown): string | null {
+const isGovEdu = (host: string): boolean => {
+  const l = host.split(".");
+  return ["gov", "edu"].includes(l[l.length - 1]) || (l.length >= 2 && l[l.length - 1] === "tw" && ["gov", "edu"].includes(l[l.length - 2]));
+};
+
+/** Site roots from a Serper /search answer, in rank order: from the top 3 results, those whose host is not a platform,
+ *  directory, or gov/edu host and whose title holds the company's core name. Whether a candidate really is this
+ *  company's own site is decided across companies (ownCandidate). */
+export function websiteCandidates(name: string, organic: unknown): string[] {
   const core = companyCore(name);
-  if (core.length < 2 || !Array.isArray(organic)) return null;
+  const out: string[] = [];
+  if (core.length < 2 || !Array.isArray(organic)) return out;
   for (const r of organic.slice(0, 3) as Array<{ link?: unknown; title?: unknown }>) {
     const link = str(r.link);
     const title = str(r.title);
     const host = domainOf(link)?.split(":")[0];
     if (!link || !title || !host || !/^https?:\/\//i.test(link)) continue;
-    if (isPlatformHost(host) || DIRECTORY_HOSTS.some((d) => host === d || host.endsWith(`.${d}`))) continue;
+    if (isPlatformHost(host) || isGovEdu(host) || DIRECTORY_HOSTS.some((d) => host === d || host.endsWith(`.${d}`))) continue;
     if (!fold(title).includes(fold(core))) continue;
-    try { return new URL(link).origin + "/"; } catch { continue; }
+    try { const o = new URL(link).origin + "/"; if (!out.includes(o)) out.push(o); } catch { continue; }
   }
-  return null;
+  return out;
+}
+const hostOf = (origin: string): string => new URL(origin).host;
+
+/** One host stands for one company: a host that is a candidate of two or more different companies in the same run is a
+ *  directory, whatever its name, and is nobody's website. */
+function ownCandidate(candidates: string[], hostCompanies: Map<string, number>): string | null {
+  return candidates.find((o) => hostCompanies.get(hostOf(o)) === 1) ?? null;
 }
 
 /** Runs `fn` over `items`, at most CONCURRENCY at a time, results in input order. */
@@ -166,26 +180,29 @@ export async function discoverCompanies(call: ProviderCall, usage: GcisUsage, in
   }
 
   let skipped = 0;
-  let withoutWebsite = 0;
-  const found = await pool(ids, async (taxId): Promise<GcisLead | null> => {
+  const found = await pool(ids, async (taxId): Promise<{ lead: Omit<GcisLead, "website">; candidates: string[] } | null> => {
     let d: Record<string, unknown> | undefined;
     try { d = (await gcisRows(call, usage, DETAIL_API, `Business_Accounting_NO eq ${taxId}`))[0]; }
     catch (e) { if (!survivable(e)) throw e; skipped++; return null; }
     const name = str(d?.Company_Name);
     const status = str(d?.Company_Status_Desc);
     if (!d || !name || (status && !status.includes("核准設立"))) { skipped++; return null; }
-    let website: string | null = null;
+    let candidates: string[] = [];
     try {
       const res = await call("serper", { path: "/search", body: { q: name, num: 3, gl: "tw", hl: "zh-tw" } });
       const j = (await res.json()) as { organic?: unknown; credits?: unknown };
       usage.serperCredits += typeof j.credits === "number" ? j.credits : 1;
-      website = pickWebsite(name, j.organic);
+      candidates = websiteCandidates(name, j.organic);
     } catch (e) { if (!survivable(e)) throw e; usage.serperCredits += 1; }
-    if (!website) withoutWebsite++;
     const url = findbizUrl(taxId);
-    return { name, website, industry: input.itemDesc.trim() || null, region: str(d.Company_Location),
+    return { candidates, lead: { name, industry: input.itemDesc.trim() || null, region: str(d.Company_Location),
       contact_name: str(d.Responsible_Name), contact_role: "負責人", source_type: GCIS_SOURCE_TYPE, source_url: url,
-      consent_source: `general_source:${url}` };
+      consent_source: `general_source:${url}` } };
   });
-  return { leads: found.filter((l): l is GcisLead => !!l), skipped, withoutWebsite, listTruncated };
+  const done = found.filter((f): f is NonNullable<typeof f> => !!f);
+  const hostCompanies = new Map<string, number>();
+  for (const f of done) for (const h of new Set(f.candidates.map(hostOf))) hostCompanies.set(h, (hostCompanies.get(h) ?? 0) + 1);
+  const leads: GcisLead[] = done.map((f) => ({ ...f.lead, website: ownCandidate(f.candidates, hostCompanies) }));
+  const withoutWebsite = leads.filter((l) => !l.website).length;
+  return { leads, skipped, withoutWebsite, listTruncated };
 }

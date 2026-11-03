@@ -77,4 +77,24 @@ describe("discoverCompanies", () => {
     expect(r.leads).toHaveLength(100);
     expect(r.urls.filter((u) => u.includes(DETAIL_API))).toHaveLength(100);
   });
+
+  it("a host that is a candidate of 2+ companies is a directory: each company keeps its own host, or none", async () => {
+    const dir = (n: string) => ({ link: `https://dir.example.com/c/${n}`, title: `${n}` });
+    const r = await run([
+      { taxId: "11111111", name: "甲甲餐飲有限公司", location: "台中市西區1號", organic: [dir("甲甲餐飲"), { link: "https://jiajia.example.tw/", title: "甲甲餐飲" }] },
+      { taxId: "22222222", name: "乙乙餐飲有限公司", location: "台中市西區2號", organic: [dir("乙乙餐飲"), { link: "https://yiyi.example.tw/", title: "乙乙餐飲" }] },
+      { taxId: "33333333", name: "丙丙餐飲有限公司", location: "台中市西區3號", organic: [dir("丙丙餐飲")] },
+    ]);
+    expect(r.leads.map((l) => l.website)).toEqual(["https://jiajia.example.tw/", "https://yiyi.example.tw/", null]);
+    expect(r.withoutWebsite).toBe(1);
+  });
+
+  it("gov.tw and edu.tw hosts are never a company's website", async () => {
+    const r = await run([
+      { taxId: "11111111", name: "丁丁餐飲有限公司", location: "台中市西區1號", organic: [
+        { link: "https://www.mlshb.gov.tw/a", title: "丁丁餐飲" }, { link: "https://cm.asia.edu.tw/b", title: "丁丁餐飲" }] },
+    ]);
+    expect(r.leads[0].website).toBeNull();
+    expect(r.withoutWebsite).toBe(1);
+  });
 });
