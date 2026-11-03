@@ -64,7 +64,8 @@ describe("media_assets.asset_domain CHECK covers every domain the code writes", 
   });
 
   it("mutation control: the 0067 rebuild alone (without 0151) is caught", () => {
-    const before = checks.filter((c) => !c.file.startsWith("0151_"));
+    // History as it stood before 0151 (later rebuilds, e.g. 0159, carry the presets forward).
+    const before = checks.filter((c) => c.file < "0151_");
     const latest = new Set(before[before.length - 1].values);
     const named = domainsTheCodeNames(new Set(checks.flatMap((c) => c.values)));
     expect([...named.keys()].filter((v) => !latest.has(v))).toEqual(expect.arrayContaining(["mockup_model_preset", "mockup_product_preset"]));
