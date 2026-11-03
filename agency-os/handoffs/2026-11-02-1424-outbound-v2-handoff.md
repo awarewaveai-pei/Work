@@ -5,6 +5,7 @@ hint: "外聯 v2 交接給另一個 Claude 帳號（看不到監工台 artifact�
 source_session_summary: "Outbound OS v2: all code-only cards shipped to prod; remaining = operator steps + REALTEST waiting on real data"
 ---
 
+> **已被 `agency-os/handoffs/2026-11-03-outbound-v2-handoff.md` 取代**（2026-11-03）。
 **續接語**：「續做外聯系統 v2：讀 $WORK_ROOT/agency-os/handoffs/2026-11-02-1424-outbound-v2-handoff.md，從 §5 步驟 1（讀狀態並重新發布監工台給操作者）開始；完成 = data.mjs 剩下的 todo 全部 done。建議模型：Opus 5.5」
 
 ### 1. 任務目標
