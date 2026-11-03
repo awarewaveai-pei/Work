@@ -13,7 +13,7 @@
 | 「先擺場景再生成」四項借 ArtCraft 流程，不用其程式／雲端／模型；落點 S3a＋P3（去背拼貼＝圖層）、S2（同場景多鏡）、P4（人偶擺姿）、P5（圖片轉 3D）；生成模型只用 `backend/generation-policy.cjs:7` 現行 OpenAI 路由 | 操作者 11-02 |
 | **主系統契約沿用方式**：純契約檔直接 `import()` `../next-admin/lib/content/video/{asset-origin,platform-ratio,delivery-contract,caption-formats,timeline-v1}.ts`（只依賴 `node:crypto`；Node v24.14.0 type stripping 實測 `ratioFor("linkedin",["16x9"])`→`16x9`）；P6 容器 build context 含這些檔；**禁止複製一份** | 本檔 v4；AGENTS §0「不另建帳本／登入／素材庫」 |
 | 引擎升級＝獨立卡（釘版＋checksum 改動），不夾帶 | 本檔 v4 |
-| **圖片轉 3D（S4b，2026-11-03 操作者「好」）**：主力 Stability AI API（SPAR3D／SF3D，英國）＋本機 Stable Fast 3D（免費，RTX 5060 8 GB）；備援 fal TRELLIS.2；**Meshy 停用**（營運實體疑在北京，adapter 保留不設預設）；綁骨／動作用 Blender（P5）＋S4b 補：生成模型 Rigify 自動人形骨架（非人形手動對位）、內建免費動作庫（CMU BVH）。卡排 P6 之後 | `docs/s4-image-to-3d-providers-20261103.md` |
+| **圖片轉 3D（S4b，2026-11-03 操作者「好」）**：主力 Stability AI API（SPAR3D／SF3D，英國）＋本機 Stable Fast 3D（免費，RTX 5060 8 GB）；備援 Replicate TRELLIS（2026-11-03 改，沿用去背金鑰；原 fal TRELLIS.2）；**Meshy 停用**（營運實體疑在北京，adapter 保留不設預設）；綁骨／動作用 Blender（P5）＋S4b 補：生成模型 Rigify 自動人形骨架（非人形手動對位）、內建免費動作庫（CMU BVH）。卡排 P6 之後 | `docs/s4-image-to-3d-providers-20261103.md` |
 | **路線 = C**（P0 2026-11-02）：合成類 ③ 不能載入自備字型，繁中顯示 NO GLYPH（上游 web.md:68），另 ① WebGPU 54 s device lost、WebGL2 0.47× 即時，⑤ 焦點出不了 iframe；剪輯類 ② 重開後素材離線。重評條件：上游支援使用者字型時，`node scripts/vendor-effectcraft.cjs` 後重跑 P0（engines/effectcraft/VERSION.json 改版＝獨立卡） | `docs/p0-effectcraft-gate-20261102.md` |
 
 ## 1. 現況與缺口（2026-11-02 查證，`file:line`）
@@ -71,6 +71,7 @@
 | P4 | 2D 角色骨架（§4.6）＋S1 | A 肢體綁定→B Puppet→C 骨骼鏈／IK／權重（能力表誠實）；**姿勢→匯出姿勢圖→圖片編輯附角色參考**，姿勢存角色下 | 身體／上臂／前臂／手掌揮手，保存重開可改；同角色兩姿勢各生成一次留比對截圖 | 方向 Fable；做 Opus |
 | P5 | 3D＋S4 | **P5.0 閘門**：Blender 背景程序（`blender -b --python`）＋固定版本瀏覽器檢視器（three.js 類）；硬閘：GLB 進出不丟骨架權重；測試角色建骨→蒙皮→IK 擺姿→匯入動作重定向→渲染 RGBA 序列回剪輯；檢視器旋轉／鏡頭／燈光可操作可截圖。過→3D 工作區、Blender 任務（可取消、版本化）、渲染回時間軸；S4 圖片轉 3D 候選只有 **Meshy**（矽谷；開工前確認 API／價格／授權／GLB／資料處理地；Rodin 屬上海 Deemos，排除） | 角色綁定＋重定向動作，保存重開可改，渲染回專案；物件圖→GLB→指定角度截圖→生成頁。初版只支援驗證過格式 | P5.0 與設計 Fable；做 Opus |
 | P6 | 上線 video.aware-wave.com（High） | compose 服務＋七項清單（AGENTS §0）；HttpAdapter 接主系統身分；**四項明寫**：① 資產帳冊 → `media_assets`（補 `organization_id`／`workspace_id`；`.data/media` → R2 `storage_key` 搬移腳本；`rightsSources` 寫入）② 任務帳冊 → 新表（`video_jobs` 是 1h TTL 進度表，不可用）③ 比例 1:1／4:3 需 migration 放寬 0138:21 與 `platform-ratio.ts:28`（**High**，另卡先過 db-expert）④ 許可走 `can(主體, feature_key, actor)`（ADR 017 §4）；成果走 QA→release→delivery（`delivery-contract.ts`）→ Postiz＋WordPress；`RATIO_PREFERENCE` 決定投遞比例；成本接 `cost-model.ts`；Host／Origin（`backend/api.cjs:442-446`）改設定；內部名稱 SeedStar→video-workbench；Blender headless 容器先量 CPU 渲染 | sg-deploy 綠、smoke 過；一支成品從工作台 → Postiz 草稿 **與** WordPress 草稿全鏈通；`media_assets` 列含 checksum 與 rightsSources | Fable 規劃；Opus 執行；等操作者 go |
+| S4b | 圖片轉 3D 換供應商＋自動骨架 | 見 §0 圖片轉 3D 列：provider adapter（Stability API 主力、本機 SF3D 免費、Replicate TRELLIS 備援，Meshy 停用）；Blender Rigify 自動人形骨架；內建 CMU BVH 動作庫；一個 job id 只呼叫廠商一次 | 同 10 張圖三方式比品質定預設；人形模型自動綁骨＋套動作，保存重開可改 | Opus |
 
 ## 5. 機械閘門（每卡）
 

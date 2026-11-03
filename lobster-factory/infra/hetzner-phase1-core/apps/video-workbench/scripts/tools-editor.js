@@ -1788,7 +1788,7 @@ function edExportDialog(p) {
                 .map((x) => x.platform + (x.preferred ? "（首選）" : ""))
                 .join("、"),
             )
-          : esc(delivery?.note || "主系統目前不收此比例（P6 處理）")
+          : esc(delivery?.note || "此比例尚不能投遞")
     }</p><button class="btn primary" type="button" data-ed-export>開始匯出</button>`;
   };
   const d = edDialog(`<div data-ed-export-body>${body()}</div>`),

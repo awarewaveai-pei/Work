@@ -1,0 +1,12 @@
+# next-admin files this server reads at runtime (paths relative to next-admin). The one list: scripts/package.cjs
+# ships it, the container image copies it to .awarewave/ (awarewave-source.json bundledAppDir), and
+# tests/awarewave-files.cjs fails when a backend import or a relative import of a listed .ts file is missing here.
+app/globals.css
+public/awarewave/forms.css
+lib/content/video/asset-origin.ts
+lib/content/video/caption-formats.ts
+lib/content/video/platform-ratio.ts
+lib/content/video/renderer-auth.ts
+lib/content/video/timeline-v1.ts
+lib/entitlements/permit.ts
+lib/ai/cost-model.ts

@@ -8,6 +8,10 @@ function resolveSource(appRoot, env) {
   return path.resolve(appRoot, config.bundledAppDir);
 }
 
+// awarewave-files.txt: the next-admin files read at runtime (one per line, # = comment).
+const runtimeFiles = (appRoot) => fs.readFileSync(path.join(appRoot, "awarewave-files.txt"), "utf8")
+  .split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
+
 // Read the canonical sources on every request; never maintain a second palette or form stylesheet.
 function appearance(pathname, appDir) {
   if (pathname === "/awarewave/forms.css")
@@ -20,4 +24,4 @@ function appearance(pathname, appDir) {
   }
   return null;
 }
-module.exports = { appearance, resolveSource };
+module.exports = { appearance, resolveSource, runtimeFiles };

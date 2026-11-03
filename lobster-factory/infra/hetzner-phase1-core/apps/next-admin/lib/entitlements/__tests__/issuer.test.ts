@@ -35,6 +35,13 @@ describe("permit issuer for the cognitive service (ADR 017 §3)", () => {
     expect((await issueForService("cognitive", { feature_key: 1 }, deps, root)).status).toBe(400);
   });
 
+  it("the video token (video-workbench, P6 D5) mints only video features for video:<id> actors", async () => {
+    const { deps } = gateFixture({ entitlement: { productKey: "video", featureKey: "video.image" } });
+    expect((await issueForService("video", ask({ feature_key: "video.image", actor: "video:person-1" }), deps, root)).body.allowed).toBe(true);
+    expect((await issueForService("video", ask({ actor: "video:person-1" }), deps, root)).body).toEqual({ allowed: false, reason: "feature_outside_product" });
+    expect((await issueForService("video", ask({ feature_key: "video.image" }), deps, root)).body).toEqual({ allowed: false, reason: "actor_outside_product" });
+  });
+
   it("an infrastructure error answers 503 infrastructure_error, never a permit", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const answer = await issueForService("cognitive", ask({}), gateFixture({ storeError: new Error("db down"), entitlement: { productKey: "cognitive" } }).deps, root);

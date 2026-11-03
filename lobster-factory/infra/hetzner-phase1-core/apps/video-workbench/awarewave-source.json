@@ -1,3 +1,4 @@
 {
-  "appDir": "../next-admin"
+  "appDir": "../next-admin",
+  "bundledAppDir": ".awarewave"
 }

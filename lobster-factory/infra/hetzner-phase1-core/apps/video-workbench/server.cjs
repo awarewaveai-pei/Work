@@ -31,8 +31,9 @@ function createServer({
   fetchImpl = fetch,
   awareWaveDir = require("./backend/appearance.cjs").resolveSource(root, env),
 } = {}) {
-  const createApi = (orgDir) => require("./backend/api.cjs").createApi({
+  const createApi = (orgDir, orgId) => require("./backend/api.cjs").createApi({
     dataDir: orgDir,
+    orgId,
     env,
     fetchImpl,
     appDir: awareWaveDir,
@@ -46,13 +47,21 @@ function createServer({
   const forOrg = (orgId) => {
     if (!orgs.has(orgId)) {
       const dir = path.join(dataDir, "orgs", orgId);
-      orgs.set(orgId, { dir, api: createApi(dir) });
+      orgs.set(orgId, { dir, api: createApi(dir, orgId) });
     }
     return orgs.get(orgId);
   };
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  // Usage still owed from before a restart is sent at startup, not on the org's next request (main-system.cjs outbox).
+  if (trustProxy && fs.existsSync(path.join(dataDir, "orgs")))
+    for (const org of fs.readdirSync(path.join(dataDir, "orgs")))
+      if (uuid.test(org) && fs.existsSync(path.join(dataDir, "orgs", org, "usage-outbox.json"))) forOrg(org);
   const identity = (req) => {
     const user = req.headers["x-vw-user-id"], org = String(req.headers["x-vw-org-id"] || "").toLowerCase();
-    if (!user || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(org)) return null;
+    if (!user || !uuid.test(org)) return null;
+    // P6 L3: who acts and which billing account pays (permits, job createdBy) -- only nginx sets these headers.
+    const billing = String(req.headers["x-vw-billing-org-id"] || "").toLowerCase();
+    req.vwIdentity = { userId: String(user), orgId: org, ...(uuid.test(billing) ? { billingOrgId: billing } : {}), userKind: req.headers["x-vw-user-kind"], role: req.headers["x-vw-role"] };
     return forOrg(org);
   };
   const version = require("./package.json").version;
@@ -65,6 +74,13 @@ function createServer({
       if (pathname === "/healthz" && (req.method === "GET" || req.method === "HEAD")) {
         res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
         res.end(req.method === "HEAD" ? undefined : JSON.stringify({ ok: true, version }));
+        return;
+      }
+      // P6 L3: VW_CONFIG_MODE=http (container) serves config.js with mode "http"; the file itself stays the local default.
+      if (pathname === "/config.js" && env.VW_CONFIG_MODE === "http") {
+        const source = fs.readFileSync(path.join(root, "config.js"), "utf8");
+        res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
+        res.end(source.replace(/mode:\s*"local"/, 'mode: "http"'));
         return;
       }
       let tenant = local;

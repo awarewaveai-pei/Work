@@ -4,14 +4,16 @@
 const assert = require("node:assert/strict"), fs = require("node:fs"), path = require("node:path");
 const root = path.join(__dirname, ".."),
   pkg = fs.readFileSync(path.join(root, "scripts/package.cjs"), "utf8"),
-  backend = path.join(root, "backend");
+  backend = path.join(root, "backend"),
+  listed = new Set(require("../backend/appearance.cjs").runtimeFiles(root));
+assert.match(pkg, /runtimeFiles\(root\)/, "scripts/package.cjs must ship awarewave-files.txt");
 let found = 0;
 for (const name of fs.readdirSync(backend).filter((f) => f.endsWith(".cjs"))) {
   const text = fs.readFileSync(path.join(backend, name), "utf8");
   assert.doesNotMatch(text, /next-admin\/lib\//, name + " must resolve main-system files via appearance.cjs resolveSource");
   for (const [, file] of text.matchAll(/"(lib\/[\w/.-]+\.ts)"/g)) {
     found++;
-    assert.ok(pkg.includes(JSON.stringify(file)), name + " imports " + file + " but scripts/package.cjs does not ship it");
+    assert.ok(listed.has(file), name + " imports " + file + " but awarewave-files.txt (what scripts/package.cjs ships) does not list it");
   }
 }
 assert.ok(found >= 2, "expected the timeline-v1 and renderer-auth imports, found " + found);

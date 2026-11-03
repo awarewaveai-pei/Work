@@ -1,4 +1,37 @@
 (function () {
+  // P6 L3 送審: a finished video registered in the main system goes to next-admin's release gate (/api/video/release,
+  // same origin: next-admin owns /api/ on this host). Only 16:9 / 9:16 / 4:5 can be delivered (D6, /delivery-ratios);
+  // Invariant: a permission refusal is never shown as success -- 403 = 「沒有送審權限」 and the button stays usable.
+  let delivery;
+  const caps = async () => (VideoWorkbench.capabilities ||= await VideoWorkbench.request("/capabilities", undefined, "GET"));
+  async function sendForReview(v) {
+    const org = (await caps())?.mainSystem?.organizationId;
+    if (!org || !v.result?.assetId || !v.result?.checksumSha256) throw Error("此成果尚未登記到主系統，無法送審");
+    delivery ||= await VideoWorkbench.request("/delivery-ratios", undefined, "GET");
+    const ratio = v.input?.settings?.ratio || v.input?.settings?.project?.ratio || "16:9", fit = delivery?.ratios?.[ratio];
+    if (!fit?.deliverable) throw Error(fit?.note || "此比例尚不能投遞");
+    const res = await fetch("/api/video/release", {
+      method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ organizationId: org, candidateAssetId: v.result.assetId, candidateChecksum: v.result.checksumSha256 }),
+    });
+    if (res.status === 403) throw Error("沒有送審權限");
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || body.ok !== true) throw Error("送審未通過：" + String(body.error || body.reason || res.status));
+    return "已核准發布，可到主系統建立社群／WordPress 草稿";
+  }
+  function reviewButton(v, actions) {
+    if (!v.result?.assetId) return;   // local mode registers nothing: no button
+    const button = document.createElement("button");
+    button.textContent = "送審";
+    button.dataset.jobReview = v.id;
+    button.onclick = async () => {
+      button.disabled = true;
+      try { VideoWorkbench.notify(await sendForReview(v)); }
+      catch (error) { VideoWorkbench.reportError(error); button.disabled = false; }
+    };
+    actions.append(button);
+  }
+  VideoWorkbench.sendForReview = sendForReview;
   VideoWorkbench.showJob = (job, options = {}) => {
     let panel = document.createElement("section");
     panel.className = "job-view";
@@ -110,6 +143,7 @@
               action("編輯圖片", () => VideoWorkbench.generator.import({ intent: "open-tool", tool: "region", asset }));
               action("配音", () => VideoWorkbench.generator.import({ intent: "open-tool", tool: "voice" }));
             }
+            if (v.type === "video") reviewButton(v, actions);
             result.append(actions);
           }
         }

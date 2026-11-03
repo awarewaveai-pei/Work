@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
-import { PLATFORM_PAGES, RESERVED_SUBDOMAINS, nextAdminProducts } from "../doors";
+import { PLATFORM_PAGES, RESERVED_SUBDOMAINS, nextAdminProducts, productHost, servedNextAdminProducts } from "../doors";
 import { STAFF_PLATFORM, covers } from "../staff-tools";
 import { BACK_OFFICE, STAFF_UTILITIES, LOGIN_SOURCES, PRODUCTS } from "../products";
 
@@ -57,6 +57,31 @@ describe("product registry", () => {
         expect(existsSync(path.join(APP_DIR, p.door.page.slice(1), "page.tsx")), p.key).toBe(true);
       }
       for (const a of p.door.api) expect(a, p.key).toMatch(/^\/api\/[a-z][a-z0-9-]*(?:\/[a-z][a-z0-9-]*)*$/);
+    }
+  });
+
+  // P6 D1: a door whose UI is a separate container (door.uiService) needs its own nginx server block, routing everything
+  // but next-admin's paths to that container; every other open door stays in the one shared next-admin door block.
+  // Flip both together: setting uiService without the nginx block (or the reverse) fails here.
+  it("a door with a uiService has its own nginx server block; every other open door is in the shared door block", () => {
+    const conf = readFileSync(path.join(__dirname, "../../../../../nginx/default.conf"), "utf8");
+    const blocks = [...conf.matchAll(/^\s*server_name\s+([^;]+);/gm)].map((m) => m[1].trim().split(/\s+/));
+    const doors = servedNextAdminProducts().map((p) => ({ p, host: productHost(p, {}) }));
+    const shared = doors.filter((d) => !d.p.door.uiService).map((d) => blocks.findIndex((b) => b.includes(d.host)));
+    expect(shared.length).toBeGreaterThan(1);
+    expect(new Set(shared).size, "shared door block").toBe(1);
+    expect(shared[0]).toBeGreaterThanOrEqual(0);
+    for (const d of doors.filter((x) => x.p.door.uiService)) {
+      const own = blocks.map((b, i) => (b.includes(d.host) ? i : -1)).filter((i) => i >= 0);
+      expect(own, d.p.key).toHaveLength(1);
+      expect(own[0], `${d.p.key}: still in the shared door block`).not.toBe(shared[0]);
+    }
+    // Reverse direction: a next-admin product host in any block but the shared one must declare uiService, so moving
+    // a host out in nginx alone fails too (the loop above runs zero times when no product sets uiService).
+    for (const p of nextAdminProducts()) {
+      const host = productHost(p, {});
+      if (!blocks.some((b, i) => i !== shared[0] && b.includes(host))) continue;
+      expect(p.door.app === "next-admin" ? p.door.uiService : undefined, `${p.key}: own nginx block without uiService`).toBeTruthy();
     }
   });
 

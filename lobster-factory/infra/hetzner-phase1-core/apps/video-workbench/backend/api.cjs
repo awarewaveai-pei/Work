@@ -7,12 +7,19 @@ const fs = require("node:fs"),
 // The one owner of that number: the request below slices by it, /capabilities publishes it, the character page and
 // the pose export (shared/rig.js poseReferences) place and label references by it.
 const MAX_SENT_REFERENCES = 4;
-function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
+function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgId }) {
   const mediaTools = require("./media.cjs");
   const remotion = require("./remotion.cjs");
   appDir ||= require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), env);
   const generationPolicy = require("./generation-policy.cjs");
   const bgRemove = require("./bg-remove.cjs");
+  const costs = require("./provider-cost.cjs");
+  // Per-request spend of the sync paid routes (text, transcription): each handler call runs in its own meter.
+  const meters = new (require("node:async_hooks").AsyncLocalStorage)();
+  const spend = (usd) => { const m = meters.getStore(); if (m) m.costUsd += usd; };
+  // P6 L3: null in local mode (VW_INTERNAL_BASE / VW_INTERNAL_TOKEN unset); then nothing below changes behaviour.
+  const mainSystemTools = require("./main-system.cjs");
+  const main = mainSystemTools.createMainSystem({ env, fetchImpl, appDir, dataDir, orgId });
   fs.mkdirSync(dataDir, { recursive: true });
   const outputs = path.join(dataDir, "generated");
   fs.mkdirSync(outputs, { recursive: true });
@@ -35,6 +42,53 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
     if (media) return media;
     const asset = assets && /^\/assets\/([\w.-]+)$/.exec(url || "");
     return asset ? path.join(__dirname, "../assets", asset[1]) : null;
+  }
+  // P6 L3: a finished file goes to the main system's asset ledger (sources = every local url in the job input).
+  async function register(url, origin, { sources = [], costUsd, jobId } = {}) {
+    const file = localFile(url);
+    if (!file) throw Object.assign(Error("找不到要登記的檔案"), { status: 502 });
+    const r = await main.ingest({ url, file, origin, sources, costUsd, jobId });
+    return r.skipped ? { ledger: r.skipped } : { assetId: r.assetId, checksumSha256: r.checksumSha256 };
+  }
+  // Upload-style responses: registered before the answer; a failed registration fails the request.
+  const registered = async (asset) => (main ? { ...asset, ...(await register(asset.url, asset.origin)) } : asset);
+  const mirror = (job) => main?.mirror(job, (e) => {
+    if (e) job.ledgerSyncError = publicError(e.message);
+    else delete job.ledgerSyncError;
+  });
+  // Job results: a failed registration keeps the (already paid) result and records ledgerError; the next GET retries.
+  async function settle(job) {
+    if (!main) return;
+    if (job.status === "succeeded" && job.result?.url && !job.result.assetId && !job.result.ledger) {
+      try {
+        Object.assign(job.result, await register(job.result.url, job.result.origin, { sources: mainSystemTools.localUrls(job.input), costUsd: job.result.origin?.costUsd, jobId: job.id }));
+        delete job.ledgerError;
+      } catch (e) {
+        job.ledgerError = publicError(e.message);
+      }
+      persist();
+    }
+    // Paid work is charged once it delivered (job.paid = the permit's account, set at creation): the record goes to the
+    // main-system usage outbox, which owns delivery and retries; usageReported = durably recorded, never queued twice.
+    if (job.status === "succeeded" && job.paid && !job.usageReported) {
+      try {
+        main.usage({ ...job.paid, jobId: job.id, costUsd: job.result?.origin?.costUsd });
+        job.usageReported = true;
+        delete job.usageError;
+      } catch (e) {
+        job.usageError = publicError(e.message);
+        console.error("[vw] usage not recorded:", job.id, e.message);
+      }
+      persist();
+    }
+    mirror(job);
+  }
+  // D5: paid work asks the issuer first; no permit = refused before any provider call.
+  // Returns who pays (job.paid) so the delivered work can be charged; null = local mode or free work.
+  async function requirePermit(req, feature) {
+    if (!main || !feature) return null;
+    await main.permit(req?.vwIdentity, feature);
+    return { feature, billingOrgId: req.vwIdentity.billingOrgId, userId: String(req.vwIdentity.userId) };
   }
   const ledgerFile = path.join(dataDir, "jobs.json");
   let jobs = fs.existsSync(ledgerFile)
@@ -66,11 +120,13 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
     ? JSON.parse(fs.readFileSync(stateFile, "utf8"))
     : null;
   const providerModels = generationPolicy.models(env);
-  const aiOrigin = (type) => ({
+  const aiOrigin = (type, costUsd) => ({
     kind: "ai_generated",
     model: providerModels[type],
     provider: generationPolicy.provider,
+    costUsd,
   });
+  const textModel = vwEnv(env, "TEXT_MODEL") || "gpt-4.1-mini";
   const key = () => {
     if (!env.OPENAI_API_KEY)
       throw Object.assign(
@@ -157,12 +213,13 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
       ? [{ role: "developer", content: "Return a valid JSON object only, following the output schema in the instructions." }, { role: "user", content: userContent }]
       : images.length ? [{ role: "user", content: userContent }] : content;
     const r = await provider("/responses", {
-      model: vwEnv(env, "TEXT_MODEL") || "gpt-4.1-mini",
+      model: textModel,
       instructions,
       input: responseInput,
       max_output_tokens: 3000,
       ...(json ? { text: { format: { type: "json_object" } } } : {}),
     });
+    if (main) spend(costs.textUsd(r.model || textModel, r.usage, { inputChars: String(instructions).length + JSON.stringify(responseInput).length, maxOutputTokens: 3000 }));
     const result =
       r.output
         ?.flatMap((x) => x.content || [])
@@ -430,6 +487,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
           true,
         );
         job.result = { url: output(audio, "mp3") };
+        job.costUsd = costs.speechUsd(providerModels.audio, prompt.length);
         if (Number(input.settings?.voicePitch || 0) || Number(input.settings?.voiceGain || 0) || Number(input.settings?.voiceSpeed ?? 1) !== 1) {
           const destination = path.join(outputs, crypto.randomUUID() + '.mp3');
           await mediaTools.adjustVoice(path.join(dataDir, job.result.url.slice(1)), destination, { pitch: Number(input.settings.voicePitch || 0), gain: Number(input.settings.voiceGain || 0), speed: Number(input.settings.voiceSpeed ?? 1), signal });
@@ -489,6 +547,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
           result = await r.json();
         } else result = await provider("/images/generations", body, signal);
         if (!result.data?.[0]?.b64_json) throw Error("圖片服務沒有回傳圖片");
+        job.costUsd = costs.imageUsd(providerModels.image, result.usage);
         job.result = {
           url: output(Buffer.from(result.data[0].b64_json, "base64"), "png"),
         };
@@ -534,7 +593,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
         return;
       }
       if (signal.aborted) return;
-      job.result.origin = aiOrigin(type);
+      job.result.origin = aiOrigin(type, job.costUsd);
       job.status = "succeeded";
       job.progress = 100;
       persist();
@@ -572,6 +631,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
     return pending;
   }
   async function refreshOnce(job) {
+    const before = job.status;
     if (job.providerId && ["queued", "running"].includes(job.status)) {
       const result = await provider(
         "/videos/" + encodeURIComponent(job.providerId),
@@ -597,12 +657,13 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
           undefined,
           true,
         );
-        job.result = { url: output(binary, "mp4"), origin: aiOrigin("video") };
+        job.result = { url: output(binary, "mp4"), origin: aiOrigin("video", costs.videoUsd(providerModels.video, Number(result.seconds) || Number(job.input.duration || job.input.settings?.duration || 8))) };
         job.progress = 100;
         job.status = "succeeded";
       }
       persist();
     }
+    if (main && (job.status !== before || (job.status === "succeeded" && job.ledgerError))) await settle(job);
     return job;
   }
   async function remotionReady(input) {
@@ -617,7 +678,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
     return op === "blender-retarget" || op === "blender-render" ? 1860000 : op === "meshy-image-to-3d" ? 1200000 : op === "remotion-template" ? 780000 : 600000;
   }
   // Validates, records and answers 202 before any provider call (runtime.js treats 501/503 as "never sent").
-  function start(input, res, extra) {
+  async function start(input, res, extra, req) {
     const isMedia = mediaTools.supported.includes(input.operation),
       isRemoveBg = input.operation === "remove-bg",
       isRemotion = input.operation === "remotion-template",
@@ -635,6 +696,11 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
             ? (remotion.request(input, imageReference), { type: "video" })
             : jobInput(input);
     if (!isMedia && !isRemoveBg && !isRemotion && !isBlender && !isMeshy) key();
+    const feature = main && mainSystemTools.paidFeature(input, parsed.type);
+    // No paid call without a price: the model a paid job will run must be in next-admin's cost model.
+    if (feature) costs.priceOf({ "video.image": "image", "video.motion": "video", "video.tts": "audio", "video.bg-remove": "remove-bg" }[feature] || feature,
+      { "video.image": providerModels.image, "video.motion": providerModels.video, "video.tts": providerModels.audio }[feature]);
+    const paid = await requirePermit(req, feature);
     const job = {
       id: crypto.randomUUID(),
       type: parsed.type,
@@ -643,6 +709,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
       progress: 0,
       createdAt: new Date().toISOString(),
       ...extra,
+      ...(main && req?.vwIdentity?.userId ? { createdBy: req.vwIdentity.userId } : {}),
+      ...(paid ? { paid } : {}),
     };
     job.deadlineAt = new Date(Date.parse(job.createdAt) + jobTimeoutMs(input)).toISOString();
     jobs.push(job);
@@ -651,9 +719,13 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
     const timeout = setTimeout(() => controller.abort(), jobTimeoutMs(input));
     timeout.unref();
     controls.set(job.id, controller);
+    mirror(job);
     json(res, 202, job);
     setImmediate(() =>
-      finish(job, controller.signal).finally(() => clearTimeout(timeout)),
+      finish(job, controller.signal).finally(() => {
+        clearTimeout(timeout);
+        return settle(job);
+      }),
     );
   }
   async function body(req) {
@@ -686,7 +758,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
     });
     res.end(JSON.stringify(value));
   }
-  return async (req, res) => {
+  return (req, res) => meters.run({ costUsd: 0 }, () => handle(req, res));
+  async function handle(req, res) {
     let url;
     try {
       url = new URL(req.url, "http://localhost");
@@ -707,8 +780,21 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
         !/^application\/json/.test(req.headers["content-type"] || "")
       )
         throw Object.assign(Error("需要 JSON 請求"), { status: 415 });
+      if (req.method === "POST" && Object.hasOwn(mainSystemTools.PAID_ROUTES, route)) {
+        // A text/transcription call answers in this request: charged when it answered 2xx, one report per request.
+        if (main) route === "/transcriptions" ? costs.priceOf("transcribe", "whisper-1") : costs.priceOf("text", textModel);
+        const paid = await requirePermit(req, mainSystemTools.PAID_ROUTES[route]);
+        const meter = meters.getStore();
+        if (paid) res.once("finish", () => {
+          if (res.statusCode >= 300) return;
+          try { main.usage({ ...paid, jobId: "req:" + crypto.randomUUID(), costUsd: meter.costUsd }); }
+          catch (e) { console.error("[vw] usage not recorded:", route, e.message); }
+        });
+      }
       if (req.method === "GET" && route === "/capabilities") {
-        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: require("./blender.cjs").capability(env), meshy: meshy.capability(env), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.publicCatalog });
+        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: require("./blender.cjs").capability(env), meshy: meshy.capability(env), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.publicCatalog,
+          // P6 L3: connected = finished videos can be sent for review on next-admin (/api/video/release, same origin).
+          mainSystem: main ? { organizationId: orgId } : null });
         return true;
       }
       if (req.method === "POST" && route === "/uploads") {
@@ -717,7 +803,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
           // Card P2: a colour LUT (.cube text) is a library asset like an image: checked here, stored as is.
           const buffer = Buffer.from(input.data.slice(input.data.indexOf(",") + 1), "base64");
           require("./editor-export.cjs").checkCube(buffer.toString("utf8"));
-          json(res, 201, { id: crypto.randomUUID(), url: output(buffer, "cube"), origin: { kind: "upload", rightsConfirmed: false }, name: String(input.name || "LUT"), kind: "lut", type: "application/x-cube", size: buffer.length });
+          json(res, 201, await registered({ id: crypto.randomUUID(), url: output(buffer, "cube"), origin: { kind: "upload", rightsConfirmed: false }, name: String(input.name || "LUT"), kind: "lut", type: "application/x-cube", size: buffer.length }));
           return true;
         }
         // Card P5: 3D models (GLB) and motions (BVH) go to the media store; checked there before they are kept.
@@ -725,7 +811,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
         if (model) {
           const ext = model[1] === "model/gltf-binary" ? "glb" : "bvh";
           const buffer = Buffer.from(model[2], "base64");
-          json(res, 201, { ...(await mediaStore.ingest({ buffer, ext })), origin: { kind: "upload", rightsConfirmed: false }, name: String(input.name || (ext === "glb" ? "3D 模型" : "動作")), kind: ext === "glb" ? "model" : "motion", type: model[1], size: buffer.length });
+          json(res, 201, await registered({ ...(await mediaStore.ingest({ buffer, ext })), origin: { kind: "upload", rightsConfirmed: false }, name: String(input.name || (ext === "glb" ? "3D 模型" : "動作")), kind: ext === "glb" ? "model" : "motion", type: model[1], size: buffer.length }));
           return true;
         }
         const m =
@@ -754,14 +840,14 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
             kind === "image"
               ? { id: crypto.randomUUID(), url: output(buffer, ext) }
               : await mediaStore.ingest({ buffer, ext });
-        json(res, 201, {
+        json(res, 201, await registered({
           ...stored,
           origin: { kind: "upload", rightsConfirmed: false },
           name: String(input.name || "素材"),
           kind,
           type: mime,
           size: buffer.length,
-        });
+        }));
         return true;
       }
       if (req.method === "POST" && route === "/generations/quote") {
@@ -813,7 +899,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
       const render = /^\/compositor\/renders(?:\/([\w-]+)\/(frames|finish|cancel))?$/.exec(route);
       if (req.method === "POST" && render) {
         const input = await body(req), r = renders();
-        json(res, render[1] ? 200 : 201, !render[1] ? r.create(input) : render[2] === "frames" ? r.frames(render[1], input) : render[2] === "cancel" ? r.cancel(render[1]) : await r.finish(render[1], input));
+        json(res, render[1] ? 200 : 201, !render[1] ? r.create(input) : render[2] === "frames" ? r.frames(render[1], input) : render[2] === "cancel" ? r.cancel(render[1]) : await registered(await r.finish(render[1], input)));
         return true;
       }
       // Card P5: 指定角度截圖 from the 3D viewer -> PNG reference image with origin (usable on the generation pages).
@@ -822,18 +908,18 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
         const buffer = m && Buffer.from(m[1], "base64");
         if (!buffer || buffer.length < 33 || buffer.readUInt32BE(0) !== 0x89504e47) throw Object.assign(Error("截圖必須是 PNG"), { status: 400 });
         const ref = (k) => (typeof input[k] === "string" && input[k] ? { [k]: input[k].slice(0, 100) } : {});
-        json(res, 201, {
+        json(res, 201, await registered({
           id: crypto.randomUUID(), kind: "image", type: "image/png", url: output(buffer, "png"), size: buffer.length,
           origin: { kind: "render", engine: "workbench-3d-viewer", ...ref("sceneId"), ...(Number.isInteger(input.sceneRevision) ? { sceneRevision: input.sceneRevision } : {}), ...ref("parentAssetId") },
-        });
+        }));
         return true;
       }
       if (req.method === "POST" && route === "/compositor/stills") {
-        json(res, 201, renders().still(await body(req)));
+        json(res, 201, await registered(renders().still(await body(req))));
         return true;
       }
       if (req.method === "POST" && route === "/rig/pose-stills") {
-        json(res, 201, renders().poseStill(await body(req)));
+        json(res, 201, await registered(renders().poseStill(await body(req))));
         return true;
       }
       if (req.method === "GET" && route === "/delivery-ratios") {
@@ -872,7 +958,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
           return true;
         }
         await remotionReady(input);
-        start(input, res, idempotencyKey ? { idempotencyKey } : {});
+        await start(input, res, idempotencyKey ? { idempotencyKey } : {}, req);
         return true;
       }
       const match = /^\/generations\/([\w-]+)(\/cancel|\/retry)?$/.exec(route);
@@ -885,7 +971,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
               status: 409,
             });
           await remotionReady(job.input);
-          start(job.input, res, { retryOf: job.id });
+          await start(job.input, res, { retryOf: job.id, attempt: (job.attempt || 1) + 1 }, req);
         } else if (req.method === "POST" && match[2]) {
           if (job.providerId)
             throw Object.assign(
@@ -898,6 +984,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
           controls.get(job.id)?.abort();
           if (job.replicateId) bgRemove.cancelPrediction({ id: job.replicateId, env, fetchImpl });
           persist();
+          mirror(job);
           json(res, 200, job);
         } else if (req.method === "GET" && !match[2]) {
           job.deadlineAt ||= new Date(Date.parse(job.createdAt) + jobTimeoutMs(job.input)).toISOString(); // jobs saved before deadlineAt
@@ -987,7 +1074,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
           },
         );
         if (!r.ok) throw Error("語音辨識失敗：" + r.status);
-        json(res, 200, { srt: await r.text() });
+        const srt = await r.text();
+        // whisper-1 bills per audio minute and its srt answer carries no usage: the file's own duration (ffprobe).
+        if (main) spend(costs.transcribeUsd("whisper-1", (await require("./media-inspect.cjs").inspectMedia(file).catch(() => null))?.duration ?? 25 * 60));
+        json(res, 200, { srt });
         return true;
       }
       if (req.method === 'POST' && route === '/tools/short/analyze') {
@@ -1073,13 +1163,13 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
         const bytes = image.bytes;
         const valid = ext === "png" ? bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10])) : ext === "jpg" ? bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255 : bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP";
         if (!valid) throw Error("商品圖片格式不正確，請改用本機上傳");
-        json(res, 201, { name: "商品參考圖", kind: "image", type: image.contentType, url: output(bytes, ext), origin: { kind: "import" } }); return true;
+        json(res, 201, await registered({ name: "商品參考圖", kind: "image", type: image.contentType, url: output(bytes, ext), origin: { kind: "import" } })); return true;
       }
       throw Object.assign(Error("找不到服務"), { status: 404 });
     } catch (e) {
       json(
         res,
-        [400, 401, 403, 404, 405, 409, 413, 415, 429, 501, 503].includes(
+        [400, 401, 403, 404, 405, 409, 413, 415, 429, 501, 502, 503].includes(
           e.status,
         )
           ? e.status

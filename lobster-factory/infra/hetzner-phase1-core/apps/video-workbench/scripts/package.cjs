@@ -26,10 +26,9 @@ function include(file) {
     "lib/theme/__tests__/tokens-match-globals.test.ts", "app/__tests__/sidebar-coverage.test.ts",
     "components/tools/AwareWaveThemeFrame.tsx", "app/(shell)/tools/seedstar/page.tsx",
     "app/(shell)/tools/theme/page.tsx", "app/(shell)/tools/theme/THEME_ARCHITECTURE_APPEARANCE.md",
-    // Imported at runtime (backend/timeline-export.cjs, backend/remotion.cjs, backend/subtitle-export.cjs, backend/delivery-ratios.cjs); tests/package-sources.cjs keeps this complete.
-    "lib/content/video/timeline-v1.ts", "lib/content/video/renderer-auth.ts",
-    "lib/content/video/caption-formats.ts", "lib/content/video/platform-ratio.ts",
-  ];
+    // What the server reads at runtime: awarewave-files.txt (tests/awarewave-files.cjs keeps it complete).
+    ...require("../backend/appearance.cjs").runtimeFiles(root),
+  ].filter((name, i, all) => all.indexOf(name) === i);
   const manifest = { source: "AwareWave", mode: lite ? "lite" : "offline", node: process.version, files: {} };
   for (const name of sourceFiles) {
     const source = path.join(appDir, name), target = path.join(content, "AwareWave-source", name);

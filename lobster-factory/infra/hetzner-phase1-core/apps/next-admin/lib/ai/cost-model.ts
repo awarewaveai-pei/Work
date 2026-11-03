@@ -65,6 +65,8 @@ export const TEXT_RATES: Record<string, TextRate> = {
   "gpt-4o":                    { inputPerM: 2.5, outputPerM: 10, cacheReadMult: 0.5, cacheWriteMult: 1, label: "GPT-4o", vendor: "OpenAI", status: "legacy", fallback: "gpt-5.4", verifiedAt: "2026-10-28" },
   // Former outreach default (lib/outreach/ai-openai.ts); kept for older cost-log rows.
   "gpt-4o-mini":               { inputPerM: 0.15, outputPerM: 0.6, cacheReadMult: 0.5, cacheWriteMult: 1, label: "GPT-4o mini", vendor: "OpenAI", status: "legacy", fallback: "gpt-5.4-mini", verifiedAt: "2026-10-28" },
+  // video-workbench text routes default (apps/video-workbench backend/api.cjs VW_TEXT_MODEL). openai.com/api/pricing list price.
+  "gpt-4.1-mini":              { inputPerM: 0.4, outputPerM: 1.6, cacheReadMult: 0.25, cacheWriteMult: 1, label: "GPT-4.1 mini", vendor: "OpenAI", status: "active", fallback: "claude-haiku-5-5" },
   // lib/kb/config.ts KB_EMBEDDING. No fallback: stored vectors are bound to this model's 1536 dims.
   "text-embedding-3-small":    { inputPerM: 0.02, outputPerM: 0, cacheReadMult: 1, cacheWriteMult: 1, label: "OpenAI text-embedding-3-small", vendor: "OpenAI", status: "active", verifiedAt: "2026-10-28" },
   // Gemini Flash-Lite: lib/ai/gemini-models.ts GEMINI_LITE_MODEL (ops-inbox diagnostics, cs fallback). Google list price
@@ -140,6 +142,8 @@ export const MEDIA_MODELS: Record<string, MediaModel> = {
   // Same published token rates as gpt-image-2 (OPENAI_IMAGE_TOKEN_RATES); verified by 3 edits via Replicate 2026-11-01.
   "gpt-image-2.5-sunburst":            { vendor: "OpenAI", kind: "image", status: "active", verifiedAt: "2026-11-01" },
   "whisper-1":                         { vendor: "OpenAI", kind: "tool", status: "active", verifiedAt: "2026-10-29" },
+  // video-workbench speech (OPENAI_TTS_RATES).
+  "gpt-4o-mini-tts":                   { vendor: "OpenAI", kind: "tool", status: "active" },
   // video-service default until 2026-10-28; OpenAI: "The model 'dall-e-3' does not exist".
   "dall-e-3":                          { vendor: "OpenAI", kind: "image", status: "retired" },
   "runwayml/gen4-turbo":               { vendor: "Replicate", kind: "video", status: "active", verifiedAt: "2026-10-28" },
@@ -184,6 +188,10 @@ export const TOOL_RATES: Record<string, { usd: number; label: string; vendor: st
   "bg-remove":   { usd: 0.011, label: "去背 (851-labs)", vendor: "Replicate", estimate: true },
   "upscale":     { usd: 0.005, label: "升頻 (real-esrgan, 每 pass)", vendor: "Replicate", estimate: true },
   "inpaint":     { usd: 0.04, label: "去物件 (bria/eraser)", vendor: "Replicate", estimate: true },
+  // video-workbench image-to-3D (creative-suite-plan §0 2026-11-03; Meshy disabled). Prices: docs.stability.ai/pricing, replicate.com/firtoz/trellis.
+  "3d-spar3d":   { usd: 0.04, label: "圖片轉 3D (Stability SPAR3D)", vendor: "Stability AI", estimate: false },
+  "3d-sf3d":     { usd: 0.10, label: "圖片轉 3D (Stability SF3D)", vendor: "Stability AI", estimate: false },
+  "3d-trellis":  { usd: 0.036, label: "圖片轉 3D (TRELLIS, Replicate 按秒計)", vendor: "Replicate", estimate: true },
   // Printful mockup generator + product create are free; only fulfillment (per order) costs money,
   // and that is pass-through to the customer, not an app operating cost.
   "printful-mockup": { usd: 0, label: "Printful mockup", vendor: "Printful", estimate: false },
@@ -259,3 +267,16 @@ export const INFRA_MONTHLY: InfraCost[] = [
 /** gpt-image-2, USD per 1M tokens (OpenAI pricing page, 2026-10-25): text input, image input, image output. */
 export const OPENAI_IMAGE_MODEL = "gpt-image-2";
 export const OPENAI_IMAGE_TOKEN_RATES = { textInPerM: 5, imageInPerM: 8, imageOutPerM: 30 } as const;
+
+/** OpenAI video (video-workbench /videos), USD per output second at 720p (openai.com/api/pricing). */
+export const OPENAI_VIDEO_RATES: Record<string, { usdPerSec: number; label: string }> = {
+  "sora-2": { usdPerSec: 0.1, label: "Sora 2 (720p)" },
+  "sora-2-pro": { usdPerSec: 0.3, label: "Sora 2 Pro (720p)" },
+};
+
+/** OpenAI speech (video-workbench /audio/speech), USD per 1M input characters; binary response carries no usage. */
+export const OPENAI_TTS_RATES: Record<string, { usdPerMChars: number; label: string }> = {
+  "gpt-4o-mini-tts": { usdPerMChars: 15, label: "gpt-4o-mini-tts (~$15/1M chars, model-comparison.ts)" },
+  "tts-1": { usdPerMChars: 15, label: "TTS-1" },
+  "tts-1-hd": { usdPerMChars: 30, label: "TTS-1 HD" },
+};

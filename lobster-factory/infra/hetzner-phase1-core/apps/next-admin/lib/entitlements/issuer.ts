@@ -2,11 +2,11 @@ import { PRODUCTS } from "@/lib/portal/products";
 import { issuePermit, type GateDependencies } from "./can";
 import { supabaseSubjectStore, type SubjectStore } from "./subject";
 
-// Permit issuer for a separate product service (ADR 017 §3): the cognitive API asks here, verifies the answer locally
+// Permit issuer for a separate product service (ADR 017 §3): the cognitive API or video-workbench asks here, verifies the answer locally
 // with ENTITLEMENT_PUBLIC_KEYS and binds it to its own (billing account, feature, actor). One bearer per product: the
 // token can only mint permits for that product's features and actors spelled `<product>:<id>`.
 
-export const ISSUER_TOKENS: Readonly<Record<string, string>> = { cognitive: "ENTITLEMENT_ISSUER_TOKEN_COGNITIVE" };
+export const ISSUER_TOKENS: Readonly<Record<string, string>> = { cognitive: "ENTITLEMENT_ISSUER_TOKEN_COGNITIVE", video: "ENTITLEMENT_ISSUER_TOKEN_VIDEO" };
 
 const REASONS: Record<string, string> = { no_active_entitlement: "no_entitlement", insufficient_credits: "no_credits" };
 type Answer = { status: number; body: { allowed: true; permit: string } | { allowed: false; reason: string } };

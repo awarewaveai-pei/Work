@@ -3,9 +3,10 @@ const imageOutputs = Object.fromEntries([["1K", 1024], ["2K", 2048], ["4K", 4096
 // The one place that names the provider and models: capabilities shows them, backend/api.cjs calls them and
 // writes them into each result's origin, so the origin always names the model that actually ran.
 const provider = "OpenAI";
-// USD per run shown on the button before the click. Must equal next-admin lib/ai/cost-model.ts TOOL_RATES
-// ("bg-remove"); tests/remove-bg.cjs reads that file and compares.
-const toolCosts = { removeBackground: 0.011 };
+// USD per run shown on the button before the click and charged after it: read from next-admin's cost SSOT
+// (lib/ai/cost-model.ts TOOL_RATES, Node type stripping), never copied here.
+const { TOOL_RATES } = require(require("node:path").join(require("./appearance.cjs").resolveSource(require("node:path").join(__dirname, ".."), process.env), "lib/ai/cost-model.ts"));
+const toolCosts = Object.freeze({ removeBackground: TOOL_RATES["bg-remove"].usd });
 const models = (env) => ({ image: vwEnv(env, "IMAGE_MODEL") || "gpt-image-2.5-flare", video: vwEnv(env, "VIDEO_MODEL") || "sora-2", audio: vwEnv(env, "TTS_MODEL") || "gpt-4o-mini-tts" });
 function capabilities(env, localTools) {
   return {
