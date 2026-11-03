@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-03（續5）外聯 C13.4、C7.3 正式站真測（無程式改動）
+
+- 監工台網址改回 DbH1HLUihZwAiBiJZGSD4t（操作者帳號）；交接檔 §1＋記憶同步；v27 發布 65/77。
+- C13.4：內建瀏覽器（操作者登入）POST /api/outreach/inbox people{Marketing Manager,Gogoro,Taipei} → 201 imported 3、Serper 1 credit；核准 2 位 → findEmail domain gogoro.com：Joyce Lo → joyce.lo@ valid（hunter，paidCalls 1，via guess）；Angela Hsiung → 4 候選 hunter invalid，未填（paidCalls 5）。co_verified_emails 8 列（4 hunter invalid、1 hunter valid、3 mx_syntax unknown）。測完刪 inbox 3＋leads 2＋verified 8，查 0 殘留（第三方個資）。
+- C7.3：正式庫 org awarewave-ops 種 3 lead（replied／meeting_booked／lost）＋cold_email（2020-01-01，variant c73-test）＋sent＋reply（interested／pricing／reject）→ 首頁表（全部）3 產生／3 寄出／3 回覆／2 正向／1 會議／1 失去／100%／66.7% 全對。刪 replies／events／messages／leads 各 3，查 0 殘留。
+- 剩 12 項全卡操作者或真資料（C5.5 需首封真寄：近 3 天 co_sending_events 0 列）。
+- REALTEST_EVIDENCE: tool=curl | cmd=browser fetch /api/outreach/inbox people + /api/outreach/leads findEmail + /api/outreach/stats; ssh psql co_verified_emails | exit=0 | ms=20000
+- REVIEW_WAIVED: NA -- 無程式改動，只改 data.mjs 狀態與交接檔網址
+- BUGHUNT_DONE: scope=agency-os,scripts,C:/Users/user1115/.claude/projects/D--Work/memory | grep=DzhhxdrEmZmMdBppq7EsE3 | hits=3（新交接檔停用註記、記憶 retired 註記、舊交接檔 2026-11-02-1424 已被取代不改）
+- ORACLE_WAIVED: 無 source 改動
 ## 2026-11-03（續4）影音工作台卡 P4：2D 角色骨架（1c5bde805）
 
 - 綁定 = compositor 圖層 kind rig（shared/rig.js）；綁定版本存角色下、與部件原圖和動畫分開。

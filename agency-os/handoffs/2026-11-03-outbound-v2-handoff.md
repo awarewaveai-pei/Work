@@ -7,11 +7,10 @@ hint: "外聯 v2 交接給另一個 Claude 帳號；取代 2026-11-02-1424-outbo
 **續接語**：「續做外聯系統 v2：讀 $WORK_ROOT/agency-os/handoffs/2026-11-03-outbound-v2-handoff.md，先做 §1（重生並發布監工台給操作者），再從 §4 第一個可做項開始；完成 = data.mjs 的 todo 全部 done。建議模型：Opus 5.5」
 
 ## 1. 第一件事：重生並發布監工台（操作者要看）
-舊網址 claude.ai/artifact/DzhhxdrEmZmMdBppq7EsE3 在原帳號，新帳號打不開 → 發新網址。
+監工台網址 https://claude.ai/artifact/DbH1HLUihZwAiBiJZGSD4t（操作者帳號；2026-11-03 v26）。**不發新網址**；DzhhxdrEmZmMdBppq7EsE3 停用。
 1. `cd $WORK_ROOT/agency-os/handoffs/2026-10-31-outbound-os && node build.mjs && node check.mjs`（check 必須印 `ok: 17 cards, 77 items ... (63 done) ... page fresh`）。
-2. 先讀完 `supervisor.html`（Artifact 規則：發布前必讀整檔）→ Artifact 工具 publish `file_path=<上面目錄>/supervisor.html`、`icon=checklist`、不帶 `url`（新 artifact）。
-3. 新網址：給操作者；寫進本檔本節第一行；更新記憶 `project_outbound_os_v2_supervisor.md` 與 MEMORY.md 該行（舊 ID 換掉）。
-4. 之後每次改 `data.mjs`：`node build.mjs && node check.mjs` → 同一 file_path 再 publish（同網址）。check 紅 = 先修資料（done 項要 commit 常數；卡全 done 時卡 status 要 `done` 並帶 `commit:`）。
+2. Artifact `action:"read"` 讀上面網址一次 → publish `file_path=<上面目錄>/supervisor.html`＋`url=<上面網址>`。
+3. 之後每次改 `data.mjs`：`node build.mjs && node check.mjs` → 同 2。check 紅 = 先修資料（done 項要 commit 常數；卡全 done 時卡 status 要 `done` 並帶 `commit:`）。
 
 ## 2. 現況（2026-11-03）
 - 正式站 next-admin = `12f2de50e`（`/root/lobster-phase1/.deployed-commit`）；migration 0152–0155 已套。
