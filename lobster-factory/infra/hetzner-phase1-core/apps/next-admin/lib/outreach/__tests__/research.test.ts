@@ -159,7 +159,7 @@ describe("researchLead", () => {
     expect(m.cheap).toHaveBeenCalledTimes(1); // news.example was never sent to the model
     expect(o).toMatchObject({ status: "done", written: 2, approved: 1, emailFound: "info@tree.example" });
     // read off the lead's own site: published by the business itself (SPEC D20), so no notice line is needed
-    expect(m.leadUpdates).toMatchObject([{ email: "info@tree.example" }, { consent_source: "self_published:https://tree.example/about" }]);
+    expect(m.leadUpdates).toMatchObject([{ email: "info@tree.example", consent_source: "self_published:https://tree.example/about" }]);
     expect(m.verified).toEqual([["info@tree.example"]]);
     expect(m.timeline.map((t) => t.event_type)).toEqual(["research_started", "email_found", "research_done"]);
   });
@@ -239,7 +239,7 @@ describe("researchLead", () => {
     expect(m.upserts.flat().map((r) => [r.claim, r.status, r.source_url])).toEqual([["平日 15:00—01:00 營業", "approved", "https://www.instagram.com/_coffeehere_/"],
       ["平日 15:00—01:00 營業", "pending", "https://www.instagram.com/p/X1/"]]);
     expect(o).toMatchObject({ status: "done", emailFound: "coffeehere@gmail.com" });
-    expect(m.leadUpdates).toMatchObject([{ email: "coffeehere@gmail.com" }, { consent_source: "self_published:https://www.instagram.com/_coffeehere_/" }]);
+    expect(m.leadUpdates).toMatchObject([{ email: "coffeehere@gmail.com", consent_source: "self_published:https://www.instagram.com/_coffeehere_/" }]);
     expect(m.timeline.map((t) => t.event_type)).toEqual(["research_started", "social_research", "email_found", "research_done"]);
   });
 

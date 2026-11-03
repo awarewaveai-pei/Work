@@ -25,8 +25,9 @@ export const LADDERS: Record<ConnectorNeed, FallbackStep[]> = {
   ],
   email_verification: [
     // Paid verification is required before any automatic send (SPEC D25, lib/outreach/mailbox-verify.ts).
-    { provider: "hunter",          kind: "byo",  connectorName: "hunter",     requiresConnector: true,  note: "自動寄前必驗：客戶 BYO 或代理商 Hunter" },
-    { provider: "zerobounce",      kind: "byo",  connectorName: "zerobounce", requiresConnector: true,  note: "自動寄前必驗：客戶 BYO 或代理商 ZeroBounce" },
+    { provider: "reoon",           kind: "byo",  connectorName: "reoon",      requiresConnector: true,  note: "自動寄前驗（店家自己公開的地址免驗）：客戶 BYO 或代理商 Reoon（每天免費 20 筆）" },
+    { provider: "hunter",          kind: "byo",  connectorName: "hunter",     requiresConnector: true,  note: "自動寄前驗（店家自己公開的地址免驗）：客戶 BYO 或代理商 Hunter（每月免費 50 點）" },
+    { provider: "zerobounce",      kind: "byo",  connectorName: "zerobounce", requiresConnector: true,  note: "自動寄前驗（店家自己公開的地址免驗）：客戶 BYO 或代理商 ZeroBounce（每月免費 100 筆）" },
     { provider: "snov",            kind: "byo",  connectorName: "snov",   requiresConnector: true,  note: "客戶 BYO Snov（Phase 3）" },
     { provider: "mx_syntax",       kind: "free",                          requiresConnector: false, note: "免費 MX / syntax 檢查" },
     { provider: "mark_unverified", kind: "manual",                        requiresConnector: false, note: "標 unverified，不付費" },

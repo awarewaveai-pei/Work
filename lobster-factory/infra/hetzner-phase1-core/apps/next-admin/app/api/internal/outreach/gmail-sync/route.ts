@@ -20,7 +20,7 @@ import { classifyReply, runGmailSync, supabaseSyncStore } from "@/lib/outreach/g
 import { pipelineDeps } from "@/lib/outreach/pipeline-store";
 import { runPipelineTick } from "@/lib/outreach/pipeline";
 import { runAutoSend, supabaseSendStore, type SendLead } from "@/lib/outreach/send-adapter";
-import { verifierKey, verifyMailbox, VerifyPending, type VerifierKey } from "@/lib/outreach/mailbox-verify";
+import { verifierKeys, verifyWithFallback, VerifyPending, type VerifierKey } from "@/lib/outreach/mailbox-verify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,16 +77,16 @@ async function syncOnce(): Promise<Response> {
   const pipeline = await runPipelineTick(pipelineDeps(sb, started + PIPELINE_BUDGET_MS));
 
   // One verifier key lookup per organization per tick; a verification still running (Hunter 202) is asked next tick.
-  const keys = new Map<string, Promise<VerifierKey | null>>();
-  const keyFor = (org: string | null) => { const k = org ?? ""; if (!keys.has(k)) keys.set(k, verifierKey(sb, org)); return keys.get(k)!; };
+  const keys = new Map<string, Promise<VerifierKey[]>>();
+  const keysFor = (org: string | null) => { const k = org ?? ""; if (!keys.has(k)) keys.set(k, verifierKeys(sb, org)); return keys.get(k)!; };
   const verifyOnce = async (lead: SendLead) => {
-    const key = await keyFor(lead.organization_id);
-    if (!key || !lead.email) return null;
+    const ks = await keysFor(lead.organization_id);
+    if (!ks.length || !lead.email) return null;
     try {
       const grant = await grantFor("outreach.verify");
-      const status = await verifyMailbox(lead.email.trim().toLowerCase(), key);
-      await grant.recordUse({ provider: key.provider, lead_id: lead.id });  // metered once there is an answer (critic m1)
-      return { status, provider: key.provider };
+      const v = await verifyWithFallback(lead.email.trim().toLowerCase(), ks, undefined, started + BUDGET_MS);
+      if (v) await grant.recordUse({ provider: v.provider, lead_id: lead.id });  // metered once there is an answer (critic m1)
+      return v;
     } catch (e) {
       if (e instanceof VerifyPending || e instanceof EntitlementRequired) return null;  // not now / not allowed: no send
       throw e;

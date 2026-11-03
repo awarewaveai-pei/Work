@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const ORG = "00000000-0000-4000-8000-0000000000c1";
 const LEAD = "00000000-0000-4000-8000-00000000001a";
 const PROFILE = "00000000-0000-4000-8000-0000000000b1";
-const s = vi.hoisted(() => ({ profileOrg: null as string | null, updates: [] as unknown[], updateError: null as unknown, filters: [] as unknown[][] }));
+const s = vi.hoisted(() => ({ profileOrg: null as string | null, updates: [] as unknown[], updateError: null as unknown, filters: [] as unknown[][], curEmail: null as string | null }));
 
 vi.mock("@/lib/org-client", () => {
   const query = (table: string) => {
@@ -23,19 +23,19 @@ vi.mock("@/lib/org-client", () => {
         return { data: matches ? { id: PROFILE } : null, error: null };
       }
       if (updating) return s.updateError ? { data: null, error: s.updateError } : { data: { id: LEAD }, error: null };
-      return { data: { organization_id: ORG }, error: null };
+      return { data: { organization_id: ORG, email: s.curEmail }, error: null };
     };
     return q;
   };
   return { getOrgSupabaseWriteClient: async () => ({ from: query }) };
 });
 
-const { PATCH } = await import("./route");
+const { PATCH, POST } = await import("./route");
 const call = (serviceProfileId: string | null) => PATCH(new Request("http://app.test/api/outreach/leads", { method: "PATCH",
   headers: { "x-ops-user-kind": "staff", "x-ops-claims-role": "owner", "x-ops-user-id": "u-1", "content-type": "application/json" },
   body: JSON.stringify({ id: LEAD, serviceProfileId }) }));
 
-beforeEach(() => { s.updates.length = 0; s.filters.length = 0; s.updateError = null; s.profileOrg = ORG; });
+beforeEach(() => { s.updates.length = 0; s.filters.length = 0; s.updateError = null; s.profileOrg = ORG; s.curEmail = null; });
 
 describe("PATCH /api/outreach/leads assigns a service profile", () => {
   it("assigns a profile of the lead's organization", async () => {
@@ -61,5 +61,18 @@ describe("PATCH /api/outreach/leads assigns a service profile", () => {
     const res = await call(PROFILE);
     expect(res.status).toBe(409);
     expect((await res.json()).error).toBe("profile_other_org");
+  });
+});
+
+describe("POST update: a changed address loses its source (SPEC D25)", () => {
+  const save = (email: string) => POST(new Request("http://app.test/api/outreach/leads", { method: "POST",
+    headers: { "x-ops-user-kind": "staff", "x-ops-claims-role": "owner", "x-ops-user-id": "u-1", "content-type": "application/json" },
+    body: JSON.stringify({ id: LEAD, name: "店", email }) }));
+  it("another address clears consent_source (a self_published mark never carries over); the same one keeps it", async () => {
+    s.curEmail = "info@shop.example";
+    await save("guess@shop.example");
+    expect(s.updates[0]).toMatchObject({ email: "guess@shop.example", consent_source: null });
+    await save("INFO@shop.example");
+    expect(s.updates[1]).not.toHaveProperty("consent_source");
   });
 });

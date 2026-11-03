@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-03（續1）外聯 D25 改版：自公開地址免驗、免費額度輪用
+
+- 操作者：不付費驗證。新規則（SPEC D25 修訂）：consent_source=self_published: 且 co_verified_emails 為 MX 列（provider=mx_syntax）非 invalid → 免驗自動寄；其餘才驗。
+- 驗證商：Reoon（新增，power mode）→ ZeroBounce → Hunter，verifyWithFallback 失敗/額度換下一家；有截止時間時不開跑不下的那家（continue）。C13 推 email 用 inferenceKey（有 Hunter 用 Hunter，finder 只有它）。
+- 綁定地址：leads POST 改 email 清 consent_source；research 寫 email 與 consent 同一次 update。
+- 金鑰：scripts/outreach-verifier-keys.ps1（user-env → 代理商 connector + vault，ssh stdin）；Hunter 已裝（Free：驗證 100/月、搜尋 50/月）；Reoon 已裝（balance API：每日 20＋一次性 100）。template 加 REOON/ZEROBOUNCE/HUNTER_API_KEY。
+- Codex 5 輪：a52b36ca 3 項、45d209c6 3 項、f2b6954b 1、7d900e0a 1、5a23dcad 1，全修。不變量：豁免只綁此地址＋它自己的 MX 列；每個驗證呼叫在 tick 內結束。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/outreach app/api/outreach app/api/internal lib/collect lib/ai → 864 passed；tsc 0；突變（leads consent 清除、MX-only 豁免）各紅→綠；install SQL 於正式庫 rollback 交易驗證；Hunter /v2/account 200 plan=Free；prod connector hunter vault len=40 | exit=0 | ms=90000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/9m/0n
+- ORACLE_WAIVED: 最後一字修正 break→continue 照 5a23dcad 原文，附測試；停止再審（review stop rule）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=自動寄前必驗|no key = no send|verifierKey\( | hits=0
 ## 2026-11-02（續49）影音工作台卡 P2：完整剪輯（a0be1d012）
 
 - 工人改訂閱制 Agent（操作者：不用 SDK）；先前 cc.py 工人未動檔即停。

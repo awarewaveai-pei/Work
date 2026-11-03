@@ -18,8 +18,9 @@ interface Connector {
 
 const KNOWN: { name: string; type: string; label: string }[] = [
   { name: "gemini",     type: "ai_generation",      label: "Gemini（AI 生成 · 客戶 BYO）" },
-  { name: "hunter",     type: "email_verification", label: "Hunter（Email 驗證 · 自動寄前必驗 · 客戶 BYO）" },
-  { name: "zerobounce", type: "email_verification", label: "ZeroBounce（Email 驗證 · 自動寄前必驗 · 客戶 BYO）" },
+  { name: "hunter",     type: "email_verification", label: "Hunter（Email 驗證 · 每月免費 50 點 · 客戶 BYO）" },
+  { name: "zerobounce", type: "email_verification", label: "ZeroBounce（Email 驗證 · 每月免費 100 筆 · 客戶 BYO）" },
+  { name: "reoon",      type: "email_verification", label: "Reoon（Email 驗證 · 每天免費 20 筆 · 客戶 BYO）" },
   { name: "gmail",      type: "email_send",         label: "Gmail（冷信草稿 · 客戶 OAuth）" },
   { name: "fluentsmtp", type: "email_send",         label: "FluentSMTP（暖信 · 客戶自有）" },
   { name: "brevo",      type: "email_send",         label: "Brevo（暖信 fallback free 300/日）" },

@@ -2,9 +2,10 @@
 // mail, not that the mailbox exists: send-adapter.ts sends automatically only to an address a paid verifier called
 // valid in the last 90 days. risky (catch-all, undecidable) and unknown go to a person (the Gmail draft stays for them);
 // invalid is never sent and is suppressed (invalid_email). Only addresses about to be sent automatically are verified,
-// never the whole lead base. The key is the organization's own Hunter / ZeroBounce connector, else the agency's
-// (organization_id IS NULL); no key anywhere = no automatic send. The result overwrites the MX row in co_verified_emails
-// (provider = hunter | zerobounce, verified_at).
+// never the whole lead base, and not a self-published address whose domain takes mail (SPEC D25, send-adapter.ts).
+// Keys: the organization's own Hunter / ZeroBounce connectors, then the agency's (organization_id IS NULL), each tried in
+// turn when one is out of quota; no key anywhere = only self-published addresses are sent automatically. The result overwrites the MX row in co_verified_emails
+// (provider = reoon | zerobounce | hunter, verified_at).
 // Response shapes are the providers' documented v2 ones (Hunter GET /v2/email-verifier: data.status, 202 = still
 // running; ZeroBounce GET /v2/validate: status); no key was on hand to record a live answer (WORKLOG 2026-11-02).
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -12,10 +13,16 @@ import { connectorSecretRef, getSecret } from "@/lib/secret-vault";
 import { guessEmails, splitLatinName, type KnownEmail } from "./email-guess";
 import { verifyEmails, type EmailStatus } from "./verify-email";
 
-export const PAID_PROVIDERS = ["hunter", "zerobounce"] as const;
+// Order = which free quota is spent first: Reoon refills daily (20), ZeroBounce monthly (100), Hunter's 50 a month are
+// shared with its email finder (C13).
+export const PAID_PROVIDERS = ["reoon", "zerobounce", "hunter"] as const;
 export type PaidProvider = (typeof PAID_PROVIDERS)[number];
 export const VERIFY_TTL_DAYS = 90;
 const TIMEOUT_MS = 20_000;
+// Reoon power mode talks to the recipient's mail server and may take "more than a minute" (its API documentation).
+const REOON_TIMEOUT_MS = 90_000;
+/** How long one call to this provider may take. */
+export const timeoutOf = (provider: PaidProvider): number => (provider === "reoon" ? REOON_TIMEOUT_MS : TIMEOUT_MS);
 
 export interface VerifierKey { provider: PaidProvider; apiKey: string }
 export interface StoredVerdict { status: EmailStatus; provider: string | null; verified_at: string }
@@ -46,6 +53,17 @@ export function mapZeroBounce(j: { status?: string }): EmailStatus {
   return "unknown";
 }
 
+/** Reoon power-mode status: safe / invalid / disabled / disposable / inbox_full / catch_all / role_account / spamtrap /
+ *  unknown (https://www.reoon.com/articles/api-documentation-of-reoon-email-verifier/). A role account (info@) is a real
+ *  mailbox: valid, as Hunter and ZeroBounce treat it. */
+export function mapReoon(j: { status?: string }): EmailStatus {
+  const st = (j.status ?? "").toLowerCase();
+  if (st === "safe" || st === "role_account") return "valid";
+  if (st === "invalid" || st === "disabled" || st === "disposable" || st === "spamtrap") return "invalid";
+  if (st === "catch_all" || st === "inbox_full") return "risky";
+  return "unknown";
+}
+
 export class VerifyPending extends Error {
   constructor(provider: string) { super(`${provider}: verification still running`); this.name = "VerifyPending"; }
 }
@@ -54,30 +72,58 @@ export class VerifyPending extends Error {
 export async function verifyMailbox(email: string, key: VerifierKey, fetcher: typeof fetch = fetch): Promise<EmailStatus> {
   const url = key.provider === "hunter"
     ? `https://api.hunter.io/v2/email-verifier?${new URLSearchParams({ email, api_key: key.apiKey })}`
-    : `https://api.zerobounce.net/v2/validate?${new URLSearchParams({ api_key: key.apiKey, email, ip_address: "" })}`;
-  const resp = await fetcher(url, { method: "GET", signal: AbortSignal.timeout(TIMEOUT_MS) });
+    : key.provider === "reoon"
+      ? `https://emailverifier.reoon.com/api/v1/verify?${new URLSearchParams({ email, key: key.apiKey, mode: "power" })}`
+      : `https://api.zerobounce.net/v2/validate?${new URLSearchParams({ api_key: key.apiKey, email, ip_address: "" })}`;
+  const resp = await fetcher(url, { method: "GET", signal: AbortSignal.timeout(timeoutOf(key.provider)) });
   if (key.provider === "hunter" && resp.status === 202) throw new VerifyPending("hunter");
   if (!resp.ok) throw new Error(`${key.provider} verify ${resp.status}: ${(await resp.text().catch(() => "")).slice(0, 200).replace(key.apiKey, "***")}`);
   const j = await resp.json();
   if (key.provider === "zerobounce" && typeof (j as { error?: unknown }).error === "string") {
     throw new Error(`zerobounce verify: ${String((j as { error: string }).error).slice(0, 200)}`);
   }
-  return key.provider === "hunter" ? mapHunter(j) : mapZeroBounce(j);
+  // Reoon answers an error (bad key, no credits) as { status: "error", reason } (its bulk endpoints document it).
+  if (key.provider === "reoon" && (j as { status?: unknown }).status === "error") {
+    throw new Error(`reoon verify: ${String((j as { reason?: unknown }).reason ?? "error").slice(0, 200)}`);
+  }
+  return key.provider === "hunter" ? mapHunter(j) : key.provider === "reoon" ? mapReoon(j) : mapZeroBounce(j);
 }
 
-/** The verifier key for an organization: its own enabled Hunter / ZeroBounce connector first, then the agency's. */
-export async function verifierKey(db: SupabaseClient, organizationId: string | null): Promise<VerifierKey | null> {
+/** Every verifier key an organization may use, in order: its own enabled Hunter / ZeroBounce connectors, then the
+ *  agency's. More than one = a second free quota to fall back on (verifyWithFallback). */
+export async function verifierKeys(db: SupabaseClient, organizationId: string | null): Promise<VerifierKey[]> {
+  const out: VerifierKey[] = [];
   for (const org of organizationId ? [organizationId, null] : [null]) {
     let q = db.from("co_connector_accounts").select("id, connector_name").in("connector_name", [...PAID_PROVIDERS])
       .eq("is_enabled", true).not("credentials_ref", "is", null);
     q = org ? q.eq("organization_id", org) : q.is("organization_id", null);
     const { data, error } = await q.order("created_at").limit(10);
     if (error) throw new Error(`verifier connector read failed: ${error.message}`);
-    for (const c of (data ?? []) as Array<{ id: string; connector_name: PaidProvider }>) {
+    const rows = ((data ?? []) as Array<{ id: string; connector_name: PaidProvider }>)
+      .sort((a, b) => PAID_PROVIDERS.indexOf(a.connector_name) - PAID_PROVIDERS.indexOf(b.connector_name));
+    for (const c of rows) {
       const apiKey = await getSecret(connectorSecretRef(c.id));
-      if (apiKey) return { provider: c.connector_name, apiKey };
+      if (apiKey) out.push({ provider: c.connector_name, apiKey });
     }
   }
+  return out;
+}
+
+/** The key email inference (C13) uses: Hunter when there is one -- only Hunter has the email finder -- else the first. */
+export const inferenceKey = (keys: readonly VerifierKey[]): VerifierKey | null => keys.find((k) => k.provider === "hunter") ?? keys[0] ?? null;
+
+/** One answer from the first key that gives one: a key out of quota or failing (non-2xx, timeout) hands over to the next;
+ *  a check still running (VerifyPending) stops here and is asked again next tick. All failing = the last error. With a
+ *  deadline (epoch ms), no call starts that could end after it (the send tick's own limit). */
+export async function verifyWithFallback(email: string, keys: readonly VerifierKey[],
+  verify: (email: string, key: VerifierKey) => Promise<EmailStatus> = verifyMailbox, deadline?: number): Promise<{ status: EmailStatus; provider: PaidProvider } | null> {
+  let last: unknown = null;
+  for (const key of keys) {
+    if (deadline !== undefined && Date.now() + timeoutOf(key.provider) > deadline) continue;  // a faster one may still fit
+    try { return { status: await verify(email, key), provider: key.provider }; }
+    catch (e) { if (e instanceof VerifyPending) throw e; last = e; }
+  }
+  if (last) throw last;
   return null;
 }
 

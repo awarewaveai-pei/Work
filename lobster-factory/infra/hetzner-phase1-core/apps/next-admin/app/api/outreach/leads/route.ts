@@ -5,7 +5,7 @@ import { scoreLead } from "@/lib/outreach/scoring";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { findExistingLead } from "@/lib/outreach/existing-leads";
 import { inboxConsentSource } from "@/lib/outreach/sources/people-search";
-import { inferEmail, verifierKey } from "@/lib/outreach/mailbox-verify";
+import { inferEmail, inferenceKey, verifierKeys } from "@/lib/outreach/mailbox-verify";
 import { splitLatinName } from "@/lib/outreach/email-guess";
 import { findSuppressed } from "@/lib/outreach/suppression";
 import { ownHostOf } from "@/lib/outreach/normalize";
@@ -144,7 +144,7 @@ export async function POST(req: Request): Promise<Response> {
     const org = l.organization_id;
     let key, known;
     try {
-      key = await verifierKey(supabase, org);
+      key = inferenceKey(await verifierKeys(supabase, org));
       let kq = supabase.from(TABLE).select("email, contact_name, name").ilike("email", `%@${domain}`);
       kq = org ? kq.eq("organization_id", org) : kq.is("organization_id", null);
       const { data: ks, error: kErr } = await kq.limit(50);
@@ -311,10 +311,10 @@ export async function POST(req: Request): Promise<Response> {
 
   if (id) {
     // Verify caller owns this lead before overwriting.
-    const { data: cur, error: curErr } = await supabase.from(TABLE).select("organization_id, service_profile_id").eq("id", id).maybeSingle();
+    const { data: cur, error: curErr } = await supabase.from(TABLE).select("organization_id, service_profile_id, email").eq("id", id).maybeSingle();
     if (curErr) return NextResponse.json({ ok: false, error: curErr.message }, { status: 500 });
     if (!cur) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
-    const prev = cur as { organization_id: string | null; service_profile_id: string | null };
+    const prev = cur as { organization_id: string | null; service_profile_id: string | null; email: string | null };
     try { assertOrgAccess(req, prev.organization_id); }
     catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
     // A lead moved to another organization cannot keep the old one's profile (0149 trigger refuses it).
@@ -322,7 +322,11 @@ export async function POST(req: Request): Promise<Response> {
 
     const { data, error } = await supabase
       .from(TABLE)
-      .update({ ...fields, ...(keepsProfile ? {} : { service_profile_id: null }), updated_at: new Date().toISOString() })
+      // consent_source describes where THIS address came from (self_published: lets it skip verification, SPEC D25;
+      // inferred / general_source: carry the notice): a person typing another address leaves no known source.
+      .update({ ...fields, ...(keepsProfile ? {} : { service_profile_id: null }),
+        ...((prev.email ?? "").trim().toLowerCase() !== (base.email ?? "").trim().toLowerCase() ? { consent_source: null } : {}),
+        updated_at: new Date().toISOString() })
       .eq("id", id)
       .select("*")
       .maybeSingle();

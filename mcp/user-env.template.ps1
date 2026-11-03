@@ -17,6 +17,11 @@ $vars = @{
     # fal.ai (FASHN / FLUX virtual try-on tests, 2026-11-01): https://fal.ai/dashboard/keys
     FAL_KEY                      = ""
     SERPER_API_KEY               = "xxx"
+    # Outreach mailbox verification (SPEC D25); after filling run scripts/outreach-verifier-keys.ps1. Free tiers:
+    # Reoon 20/day https://emailverifier.reoon.com , ZeroBounce 100/month (business-domain signup), Hunter 100 verifications + 50 searches/month.
+    REOON_API_KEY                = ""
+    ZEROBOUNCE_API_KEY           = ""
+    HUNTER_API_KEY               = ""
     APIFY_API_TOKEN             = "xxx"
     META_APP_ID                 = "xxx"
     META_APP_SECRET             = "xxx"

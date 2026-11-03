@@ -8,8 +8,8 @@
 //               follow-up goes only when it is the lead's lowest unsent step, due (previous sent mail + its delay, and
 //               the lead's next_followup_date), drafted in the previous sent mail's thread (card C5.2), and no other
 //               mail of that lead went out this tick (critic M3/M4); then Cold Gate again (warm / Meta / evidence) + I6 (contact-guard: do_not_contact, suppression, MX invalid)
-//               + a paid verdict valid within 90 days (mailbox-verify.ts; no key = no send; risky / unknown stay for a
-//               person; invalid is suppressed) -> co_begin_send (lead lock, three caps, drafted -> sending, one
+//               + a paid verdict valid within 90 days (mailbox-verify.ts; no key = held; risky / unknown stay for a
+//               person; invalid is suppressed), except a self-published address whose domain takes mail (D25) -> co_begin_send (lead lock, three caps, drafted -> sending, one
 //               transaction) -> drafts.send -> co_mark_sent.
 //   failure     Gmail 4xx refused = nothing was sent: the claim is given back, the mail is drafted again, the mailbox
 //               paused + timeline + push (sender-health's "重新檢查並恢復" brings it back). 404 (draft gone), timeout,
@@ -17,12 +17,13 @@
 //               gmail-sync reconciles it by message id and, 30 minutes on with the draft still unsent, marks it
 //               needs_edit and releases the claim (co_mark_unsent).
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { needsNotice } from "./brand-context";
 import { checkColdGate, type ColdGateLead } from "./cold-gate";
 import { contactBlock, type ContactBlock, type GuardedLead } from "./contact-guard";
 import { sendGmailDraft } from "./google-oauth";
 import { freshPaid, saveVerdict, storedVerdict, type PaidProvider, type StoredVerdict } from "./mailbox-verify";
 import { beginSend, capOf, inPool, POOL_COLS, releaseClaim, sendCaps, todayClaims, type PoolAccount, type SendCaps } from "./sender-pool";
-import type { EmailStatus } from "./verify-email";
+import { MX_PROVIDER, type EmailStatus } from "./verify-email";
 
 export const WINDOW_START_HOUR = 9;
 export const WINDOW_END_HOUR = 18;
@@ -136,11 +137,16 @@ async function holdReason(deps: SendDeps, mail: QueuedMail, now: Date): Promise<
   else if (mail.outputType !== "cold_email") return "not_auto";
   if (checkColdGate(lead, mail.approvedEvidence).status === "block") return "cold_gate";
   // A stored risky / unknown / invalid verdict holds the mail without any further lookup (it stays for a person).
-  let verdict: { status: EmailStatus; provider: string | null } | null =
-    freshPaid(mail.verdict !== undefined ? mail.verdict : await deps.store.verdict(lead), now);
+  const stored = mail.verdict !== undefined ? mail.verdict : await deps.store.verdict(lead);
+  let verdict: { status: EmailStatus; provider: string | null } | null = freshPaid(stored, now);
   if (verdict && verdict.status !== "valid") return `verify_${verdict.status}`;
   const blocked = await deps.store.contactBlock(lead);
   if (blocked) return blocked;
+  // SPEC D25 (2026-11-02): an address the business published itself (research read it off its own site or page) whose
+  // domain was checked to take mail goes without a paid check; the free paid quota is spent on the rest (inferred,
+  // imported, third-party), where mailboxes that do not exist come from. Bounces still pause the mailbox at 3 %.
+  // The exemption rests on the MX row only: any verifier verdict (risky / unknown, or one past its 90 days) is asked again.
+  if (!verdict && !needsNotice(lead.consent_source) && stored?.provider === MX_PROVIDER && stored.status !== "invalid") return null;
   if (!verdict) {
     const v = await deps.verify(lead);
     if (!v) return "no_verifier";

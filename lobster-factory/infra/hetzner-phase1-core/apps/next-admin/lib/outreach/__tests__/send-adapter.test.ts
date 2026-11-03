@@ -1,5 +1,5 @@
 // Cards C8.3, C8.5, C8.6 against a fake store: one send per mail across ticks, the window, a paused mailbox, a lead
-// gone warm, the paid-verification gate (valid only, risky held, invalid suppressed, 90-day cache, no key = no send),
+// gone warm, the paid-verification gate (valid only, risky held, invalid suppressed, 90-day cache, no key = held, self-published + MX exempt (D25)),
 // and Gmail failures (4xx refused = given back + paused; timeout = left 'sending', never resent). The cap races are SQL
 // (co_begin_send), in packages/db/tests/test_0152_sender_pool.py.
 import { describe, expect, it } from "vitest";
@@ -127,6 +127,45 @@ describe("auto send", () => {
     store.verdicts.set("l-m3@shop.example", { status: "unknown", provider: "mx_syntax", verified_at: "2026-11-01T00:00:00Z" });
     await runAutoSend({ ...deps, now: () => new Date("2026-11-02T09:55:00Z") });  // 17:55, the last tick: the quota covers both
     expect(verifyCalls).toEqual(["l-m2@shop.example", "l-m3@shop.example"]);
+  });
+
+  it("D25: a self-published address whose domain takes mail goes without a paid check; anything else still needs one", async () => {
+    const { store, deps, gmailSent, verifyCalls, verdict } = setup();
+    verdict.next = null;  // no verifier key
+    const mx = { status: "unknown" as const, provider: "mx_syntax", verified_at: "2026-11-01T00:00:00Z" };
+    store.add("m1", lead("own", { consent_source: "self_published:https://shop.example/contact" }));
+    store.verdicts.set("own@shop.example", mx);
+    store.add("m2", lead("guess", { consent_source: "inferred" }));
+    store.verdicts.set("guess@shop.example", mx);
+    store.add("m3", lead("nomx", { consent_source: "self_published:https://shop.example" }));  // MX never checked
+    store.add("m4", lead("dead", { consent_source: "self_published:https://shop.example" }));
+    store.verdicts.set("dead@shop.example", { ...mx, status: "invalid" });
+    await runAutoSend({ ...deps, now: () => new Date("2026-11-02T09:55:00Z") });  // last tick: the quota covers all four
+    expect(gmailSent).toEqual(["d-m1"]);
+    // dead: a domain without mail never goes unverified (the real contactBlock stops it even before a paid check)
+    expect(verifyCalls).toEqual(["guess@shop.example", "nomx@shop.example", "dead@shop.example"]);
+  });
+
+  it("D25: only the MX row grants the exemption (a NULL-provider row is asked like any other)", async () => {
+    const { store, deps, gmailSent, verifyCalls, verdict } = setup();
+    verdict.next = null;
+    store.add("m1", lead("nul", { consent_source: "self_published:https://shop.example" }));
+    store.verdicts.set("nul@shop.example", { status: "unknown", provider: null, verified_at: "2026-11-01T00:00:00Z" });
+    store.add("m2", lead("own", { consent_source: "self_published:https://shop.example" }));
+    store.verdicts.set("own@shop.example", { status: "unknown", provider: "mx_syntax", verified_at: "2026-11-01T00:00:00Z" });
+    await runAutoSend({ ...deps, now: () => new Date("2026-11-02T09:55:00Z") });
+    expect(verifyCalls).toEqual(["nul@shop.example"]);
+    expect(gmailSent).toEqual(["d-m2"]);
+  });
+
+  it("D25: an old verifier verdict (risky, or valid past 90 days) is never an exemption: it is asked again", async () => {
+    const { store, deps, gmailSent, verifyCalls, verdict } = setup();
+    verdict.next = null;
+    store.add("m1", lead("old", { consent_source: "self_published:https://shop.example" }));
+    store.verdicts.set("old@shop.example", { status: "risky", provider: "zerobounce", verified_at: "2026-07-01T00:00:00Z" });
+    await runAutoSend(deps);
+    expect(gmailSent).toEqual([]);
+    expect(verifyCalls).toEqual(["old@shop.example"]);
   });
 
   it("Gmail refuses (4xx): the mail is given back as drafted and the mailbox paused with a push; a timeout leaves it sending", async () => {

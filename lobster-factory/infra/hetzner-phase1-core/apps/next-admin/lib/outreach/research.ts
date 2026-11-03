@@ -174,7 +174,9 @@ export async function researchLead(db: SupabaseClient, lead: ResearchLead,
     const others = found.filter((f) => !autoEligible(f)).slice(0, 5);
     for (let pick = bestEmail(eligible); pick; pick = bestEmail(eligible)) {
       eligible.splice(eligible.indexOf(pick), 1);
-      const q = db.from("co_leads").update({ email: pick.email, updated_at: new Date().toISOString() }).eq("id", lead.id);
+      // The address and where it came from are one write: consent_source describes this address (self_published lets it
+      // skip paid verification, SPEC D25), so a later write could land it on an address someone typed meanwhile.
+      const q = db.from("co_leads").update({ email: pick.email, consent_source: `self_published:${pick.sourceUrl}`, updated_at: new Date().toISOString() }).eq("id", lead.id);
       const { data, error } = await (lead.email === null ? q.is("email", null) : q.eq("email", lead.email)).select("id").maybeSingle();
       if (error?.code === "23505") {
         await timeline(db, lead, "email_skipped", "網站上的 email 已屬於另一筆名單", { email: pick.email, source_url: pick.sourceUrl }, errors);
@@ -184,9 +186,6 @@ export async function researchLead(db: SupabaseClient, lead: ResearchLead,
       if (!data) break; // someone set the address meanwhile
       base.emailFound = pick.email;
       await timeline(db, lead, "email_found", "從網站找到 email", { email: pick.email, source_url: pick.sourceUrl, mailto: pick.mailto }, errors);
-      const { error: cErr } = await db.from("co_leads").update({ consent_source: `self_published:${pick.sourceUrl}` })
-        .eq("id", lead.id).is("consent_source", null);
-      if (cErr) errors.push(`consent_source: ${cErr.message}`);
       break;
     }
     if (undeliverable.length) {
