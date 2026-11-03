@@ -33,7 +33,7 @@ export const NOW = [
   { what: '用模板做片頭（繁中可）。', state: 'yes', ev: '2026-11-02 卡 P1：剪輯器「片頭」分頁，自架 Remotion 服務渲染，免費；成品進素材庫並記來源。' },
   { what: '動畫合成（2D）。', state: 'yes', ev: '2026-11-03 卡 P3：工具「動畫合成」，輸出透明影片回剪輯。' },
   { what: '2D 角色骨架。', state: 'yes', ev: '2026-11-03 卡 P4：工具「角色綁定」，姿勢圖可當生成參考。' },
-  { what: '3D。', state: 'no', ev: '卡 P5 做。' },
+  { what: '3D。', state: 'yes', ev: '2026-11-03 卡 P5：工具「3D」，Blender 4.5.9 渲染回剪輯。Meshy 等金鑰。' },
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
@@ -48,6 +48,7 @@ const P1 = 'f9eca42b2';
 const P2 = 'a0be1d012';
 const P3 = '40c7b8ebd';
 const P4 = '1c5bde805';
+const P5 = '646cc9778';
 
 export const STEPS = [
   { n: 1, code: '0', title: '切 4178 到 repo', plain: '例：打開 127.0.0.1:4178，角色頁出現「示範角色庫」，代表跑的是 repo 版；舊資料一筆不少。',
@@ -152,13 +153,14 @@ export const STEPS = [
       done('P4.3', '姿勢圖匯出給生成用；測試。', P4),
     ] },
   { n: 11, code: 'P5', title: '3D', plain: '例：3D 角色綁好骨架、套上一段動作、轉鏡頭打燈，渲染成透明片段放回剪輯；一張物件圖轉成 3D 模型。',
-    gate: '先過 3D 試驗（Blender 背景處理＋瀏覽器檢視器）；角色套用動作後保存重開可改，並渲染回專案。', risk: 'Medium', model: '試驗與設計 Fable；做 Opus', status: 'not_started', depends: ['P4'],
+    gate: '先過 3D 試驗（Blender 背景處理＋瀏覽器檢視器）；角色套用動作後保存重開可改，並渲染回專案。', risk: 'Medium', model: 'Opus（SDK 工人）', status: 'done', commit: P5, depends: ['P4'],
+    result: '2026-11-03 新工具「3D」：匯入 3D 模型、檢視器轉鏡頭打光、擺骨架姿勢、把動作套到角色上、用 Blender 渲染成透明影片放回剪輯。圖片轉 3D 接 Meshy（約 30 點），金鑰未設定前按鈕停用。可行性五項全過。Codex 審出 4 項全修。',
     decided: '圖片轉 3D 只考慮 Meshy（美國）；Rodin 屬上海公司，排除。',
     what: 'P5.0 閘門：GLB 進出不丟骨架、建骨→蒙皮→IK→重定向→RGBA 序列；過了才做 3D 工作區與 Blender 任務',
     items: [
-      todo('P5.1', '3D 試驗：骨架、蒙皮、擺姿、套用動作、渲染回剪輯。'),
-      todo('P5.2', '3D 工作區：檢視器、鏡頭、燈光。'),
-      todo('P5.3', '圖片轉 3D（Meshy）；測試。'),
+      done('P5.1', '3D 試驗：骨架、蒙皮、擺姿、套用動作、渲染回剪輯。', P5),
+      done('P5.2', '3D 工作區：檢視器、鏡頭、燈光。', P5),
+      done('P5.3', '圖片轉 3D（Meshy）；測試。', P5),
     ] },
   { n: 12, code: 'P6', title: '上線 video.aware-wave.com', plain: '例：員工登入 video.aware-wave.com 做好一支片，一鍵送到 Postiz 和 WordPress 成為草稿。',
     gate: '部署測試全綠；一支成品從工作台到 Postiz 草稿與 WordPress 草稿全程通。', risk: 'High', model: 'Fable 規劃；Opus 執行', status: 'not_started', depends: ['P5'], before: '待決 1',

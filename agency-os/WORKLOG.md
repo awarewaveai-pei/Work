@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-03（續15）影音工作台卡 P5：3D（646cc9778）
+
+- P5.0 五閘全過（docs/p5-gate-20261103.md）。Blender 4.5.9（runtime/，不進 git、不進 postinstall）＋three.js 0.186.0（vendor/）皆釘版校驗。
+- 工人改 SDK（操作者：額度剩 6%）：3 次 cc.py 共約 US$10.5；首工人 100 輪停在背景測試，續工人只修不重寫。
+- Codex 4m 全修（未存場景重定向、前端追蹤時限、補建素材欄位、Meshy 沿用鍵）。全套發現 layouts/regressions 卡死：tools-3d.js 未用共用 header()（tools-0.js:257）缺返回鈕 → 已修。
+- Meshy 無金鑰（MESHY_API_KEY 未設），只測假供應商。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/p5-gate.cjs（真 Blender 4.5.9：GLB 往返、建骨蒙皮 IK、BVH 重定向、Eevee alpha MOV、three 檢視器）；4178 capabilities blender available | exit=0 | ms=16000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n（Codex，artifact agency-os/reports/oracle/2026-11-03-partialreview-90a002b9.md；已修，突變紅→綠）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=deadlineAt | hits=11
 ## 2026-11-03（續14）外聯：測試寄送窗打通 DB 寄送閘（0158）；開關正式站全程真測通過
 
 - 根因：co_begin_send（0152:122）`send_mode <> 'auto'` 一律 return false；程式層 testing 信箱放行，DB 層拒絕 → 草稿模式信箱永遠寄不出（runAutoSend:207 beginSend false 時 continue 不計數，看起來「沒寄也沒 held」）。單元測試 mock beginSend 而漏掉。
