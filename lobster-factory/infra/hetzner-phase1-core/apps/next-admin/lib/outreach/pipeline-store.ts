@@ -9,7 +9,8 @@ import { approvedEvidence, generateForLead, isUniqueViolation } from "./generate
 import { researchLead } from "./research";
 import { loadSampleContext, type SampleContext } from "./review-policy";
 import { POOL_COLS, type PoolAccount } from "./sender-pool";
-import type { DraftRow, DraftableMessage, PipelineDeps, PipelineLead, PipelineStore, Profile } from "./pipeline";
+import { autoDrafts, type DraftRow, type DraftableMessage, type PipelineAccount, type PipelineDeps, type PipelineLead, type PipelineStore, type Profile } from "./pipeline";
+import { inPool } from "./sender-pool";
 
 export const PIPELINE_ACTOR = "schedule:outreach_pipeline";
 const SCAN_PAGE = 200;
@@ -24,6 +25,16 @@ const must = <T>(what: string, r: { data: T | null; error: { message: string } |
   return (r.data ?? ([] as unknown as T));
 };
 const ids = (rows: Array<{ lead_id: string }>): Set<string> => new Set(rows.map((r) => r.lead_id));
+// The auto_draft switch (0155) with the account; the connector says whether drafts can be made at all.
+const SWITCH_COLS = `${POOL_COLS}, auto_draft, co_connector_accounts(is_enabled, credentials_ref)`;
+type Conn = { is_enabled?: boolean | null; credentials_ref?: string | null };
+type SwitchedRow = PoolAccount & { auto_draft?: boolean | null; co_connector_accounts?: Conn | Conn[] | null };
+type SwitchedRead = { data: SwitchedRow[] | null; error: { message: string } | null };
+const withSwitch = (rows: SwitchedRow[]): PipelineAccount[] =>
+  rows.map(({ co_connector_accounts: c, ...a }) => {
+    const conn = Array.isArray(c) ? c[0] : c;
+    return { ...a, auto_draft: a.auto_draft === true, connector_ok: conn?.is_enabled === true && !!conn?.credentials_ref };
+  });
 
 export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
   const leadsByIds = async (leadIds: string[]): Promise<Map<string, PipelineLead>> => {
@@ -53,12 +64,13 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
 
   return {
     async organizations() {
-      const rows = must<Array<{ organization_id: string }>>("sender accounts read",
-        await sb.from("co_sender_accounts").select("organization_id").eq("is_active", true).eq("send_mode", "auto").not("organization_id", "is", null).limit(1000));
-      return [...new Set(rows.map((r) => r.organization_id))];
+      const rows = withSwitch(must<SwitchedRow[]>("sender accounts read", (await sb.from("co_sender_accounts").select(SWITCH_COLS)
+        .eq("is_active", true).eq("stream_type", "cold").not("organization_id", "is", null).or("send_mode.eq.auto,auto_draft.eq.true")
+        .limit(1000)) as unknown as SwitchedRead));
+      return [...new Set(rows.filter((a) => inPool(a) || autoDrafts(a)).map((r) => r.organization_id!))];
     },
     async accounts(org) {
-      return must<PoolAccount[]>("sender accounts read", await sb.from("co_sender_accounts").select(POOL_COLS).eq("organization_id", org).eq("stream_type", "cold"));
+      return withSwitch(must<SwitchedRow[]>("sender accounts read", (await sb.from("co_sender_accounts").select(SWITCH_COLS).eq("organization_id", org).eq("stream_type", "cold")) as unknown as SwitchedRead));
     },
     async usedSince(org, sinceIso) {
       const research = await sb.from("co_timeline_events").select("id", { count: "exact", head: true })

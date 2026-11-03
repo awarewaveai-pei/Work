@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-03（續3）外聯 D26：主信箱草稿模式接管線（auto_draft）
+
+- 操作者：先不買次網域，用 awarewaveai@gmail.com；選 B（管線自動研究→產信→建草稿，人按寄出）。
+- 0155 `co_sender_accounts.auto_draft boolean default false`（down 同目錄）；已套正式庫＋`notify pgrst`，REST 讀到欄位。
+- pipeline.ts `autoDrafts`＝draft＋healthy＋active＋auto_draft＋connector 啟用有 token；drafting＝inPool∪autoDrafts；預算 daily_limit×1.5。pipeline-store 讀欄位＋connector join，organizations 先 `.or(send_mode.eq.auto,auto_draft.eq.true)` 再 limit。sender.ts 無池時優先 healthy auto_draft 信箱。send-adapter 未改（I10）。
+- Codex 078b7ce6：開關原放 connector settings（OAuth 重連會覆寫）→ 改欄位；connector 停用仍跑 → connector_ok；多信箱選錯 → senderFor 優先。5dfc1fe0：paused 優先、1000 筆截斷 → 修。不變量：開關屬於信箱；能建草稿才自動化。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/outreach app/api/outreach app/api/internal lib/schedules → 463 passed；tsc 0；突變（auto_draft、connector_ok、senderFor 優先）各紅→綠；apply-db-migration 0155 APPLY_OK；REST select auto_draft 200 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n
+- ORACLE_WAIVED: 5dfc1fe0 兩項照原文小修（health 條件、查詢先篩）附測試；停止再審（review stop rule）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=inPool（word，app,lib 非測試） | hits=9（send-adapter.ts:173 只讀 inPool；其餘為管線/選信箱）
 ## 2026-11-03（續2）影音工作台卡 P3：2D 動畫合成（40c7b8ebd）
 
 - 預覽＝輸出同一繪製程式 shared/compositor.js；頁面逐格 PNG → backend/compositor-render.cjs → PNG MOV（alpha）。

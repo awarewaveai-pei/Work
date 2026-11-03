@@ -7,9 +7,12 @@
 //   ③ policy     draft first emails of a sampled profile's leads: one variant per lead (hash), the other 'skipped';
 //                lint pass + fact check supported + not sampled out -> approved, gate_snapshot.auto=true; else queue.
 //                'manual' never reaches here: nothing approves it but a person.
-//   ④ draft      approved first email whose mailbox is send_mode='auto'              -> deps.draft
-//   ⑤ follow-up  lead 'sent', next_followup_date <= today (Taipei), its lowest unsent step approved, mailbox auto -> deps.draft
-// Every step has a per-tick cap (PIPELINE_CAP) and ①② a per-organization daily budget: pool mailbox caps today x 1.5.
+//   ④ draft      approved first email whose mailbox drafts by itself                 -> deps.draft
+//   ⑤ follow-up  lead 'sent', next_followup_date <= today (Taipei), its lowest unsent step approved, same mailboxes -> deps.draft
+// "Drafts by itself" = a pool mailbox (send_mode='auto', sent by send-adapter.ts) or a draft mailbox with auto_draft on
+// (migration 0155) and an enabled Gmail connector (the operator's own Gmail, 2026-11-03: drafts appear in Gmail, a person
+// presses send; send-adapter never reads it, SPEC I10). Every step has a per-tick cap (PIPELINE_CAP) and ①② a per-organization daily
+// budget: those mailboxes' caps today x 1.5.
 // Cold Gate side: a do_not_contact or warm lead (isWarm: replied, opted out, Meta lead ad...) is never touched, whatever
 // the store returned. Work runs inside deps.runInOrg so every paid call bills that organization.
 import { EntitlementRequired } from "@/lib/entitlements/can";
@@ -25,6 +28,14 @@ export const BUDGET_FACTOR = 1.5;
 /** Paid steps run this many leads at once: 20 leads one after another would not fit a tick. */
 const CONCURRENCY = 4;
 
+/** A sender account with its auto_draft switch and whether its Gmail connector is enabled and holds a token. */
+export type PipelineAccount = PoolAccount & { auto_draft?: boolean; connector_ok?: boolean };
+/** A draft-mode mailbox the operator switched on for the pipeline: drafted for, never sent from. A disabled connector
+ *  could not take the drafts, so nothing is researched or written for it. */
+export const autoDrafts = (a: PipelineAccount): boolean =>
+  a.is_active && a.health_status === "healthy" && a.send_mode === "draft" && a.auto_draft === true && !!a.connector_id && a.connector_ok === true;
+const drafting = (a: PipelineAccount): boolean => inPool(a) || autoDrafts(a);
+
 /** Lead columns the steps read; generation needs the whole row (LeadRow is what the messages route passes it). */
 export type PipelineLead = LeadRow & { website: string | null; email: string | null; social_url?: string | null };
 export interface Profile { id: string; review_mode: "manual" | "sampled"; review_sample_pct: number }
@@ -34,9 +45,9 @@ export interface DraftableMessage { messageId: string; leadId: string; senderId:
 export type DecideResult = "ok" | "conflict" | "changed";
 
 export interface PipelineStore {
-  /** Organizations with a mailbox that sends by itself: the only ones the pipeline works for. */
+  /** Organizations with a mailbox that drafts by itself (pool, or draft + auto_draft): the only ones the pipeline works for. */
   organizations(): Promise<string[]>;
-  accounts(org: string): Promise<PoolAccount[]>;
+  accounts(org: string): Promise<PipelineAccount[]>;
   /** Research runs started and first-email sets written since sinceIso (the Taipei day start). */
   usedSince(org: string, sinceIso: string): Promise<{ research: number; generate: number }>;
   researchCandidates(org: string, limit: number): Promise<PipelineLead[]>;
@@ -101,9 +112,10 @@ const taipeiDate = (at: Date): string => new Date(at.getTime() + 8 * 3_600_000).
 const dayStartIso = (at: Date): string => new Date(`${taipeiDate(at)}T00:00:00+08:00`).toISOString();
 const cold = (l: PipelineLead): boolean => !l.do_not_contact && !isWarm(l);
 
-/** The daily limit of ① and ②: what the organization's pool mailboxes may send today, x 1.5 (C15.3). */
-export const dailyBudget = (accounts: readonly PoolAccount[]): number =>
-  Math.floor(accounts.filter(inPool).reduce((n, a) => n + capOf(a), 0) * BUDGET_FACTOR);
+/** The daily limit of ① and ②: what the organization's drafting mailboxes may take today, x 1.5 (C15.3); a draft
+ *  mailbox counts its daily_limit (the draft route's own daily cap). */
+export const dailyBudget = (accounts: readonly PipelineAccount[]): number =>
+  Math.floor(accounts.reduce((n, a) => n + (inPool(a) ? capOf(a) : autoDrafts(a) ? a.daily_limit : 0), 0) * BUDGET_FACTOR);
 
 /** fn over items, CONCURRENCY at a time; no new item starts after stopAt. */
 async function each<T>(items: readonly T[], stopAt: number, now: () => Date, fn: (item: T) => Promise<void>): Promise<void> {
@@ -130,8 +142,8 @@ async function runOrg(deps: PipelineDeps, org: string, r: PipelineResult, now: (
   const { store } = deps;
   const end = deps.deadline ?? Number.POSITIVE_INFINITY;
   const accounts = await store.accounts(org);
-  // Drafts only for mailboxes that can send now (sender-pool inPool: a paused one gets none; Codex C15 F4).
-  const autoIds = accounts.filter(inPool).map((a) => a.id);
+  // Drafts only for mailboxes that can take them now (a paused one gets none; Codex C15 F4).
+  const autoIds = accounts.filter(drafting).map((a) => a.id);
   const budget = dailyBudget(accounts);
   const used = await store.usedSince(org, dayStartIso(now()));
   // A refused grant (no credits) stops that paid step for the organization: not a failure of the leads.
@@ -186,7 +198,7 @@ async function runOrg(deps: PipelineDeps, org: string, r: PipelineResult, now: (
     try { r.autoApproved += await store.approveFollowups(leadId, now().toISOString()); } catch { r.failed++; }
   }
 
-  // ④ Gmail drafts of approved first emails, auto mailboxes only
+  // ④ Gmail drafts of approved first emails, drafting mailboxes only
   const firsts = await store.approvedFirstEmails(org, autoIds, PIPELINE_CAP);
   r.drafted += await draftAll(deps, firsts, end, now, r);
 

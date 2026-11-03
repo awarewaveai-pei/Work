@@ -15,7 +15,7 @@ const COLS = "id, organization_id, email, display_name, signature_block";
  *  connection leaves the mailbox row behind). */
 export async function senderFor(db: SupabaseClient, orgId: string | null, opts: { agencyFallback: boolean }): Promise<SenderRow | null> {
   const pick = async (org: string | null): Promise<SenderRow | null> => {
-    let q = db.from("co_sender_accounts").select(`${COLS}, is_active, health_status, send_mode, warmup_stage, daily_limit, connector_id`).eq("provider", "gmail").eq("stream_type", "cold").eq("is_active", true);
+    let q = db.from("co_sender_accounts").select(`${COLS}, is_active, health_status, send_mode, warmup_stage, daily_limit, connector_id, auto_draft`).eq("provider", "gmail").eq("stream_type", "cold").eq("is_active", true);
     q = org ? q.eq("organization_id", org) : q.is("organization_id", null);
     const { data, error } = await q.order("created_at", { ascending: true }).limit(20);
     if (error) throw new Error(error.message);
@@ -31,7 +31,9 @@ export async function senderFor(db: SupabaseClient, orgId: string | null, opts: 
     const { data: conns, error: cErr } = await c.limit(50);
     if (cErr) throw new Error(cErr.message);
     const connected = new Set(((conns ?? []) as Array<{ settings: { email?: string } | null }>).map((r) => (r.settings?.email ?? "").toLowerCase()).filter(Boolean));
-    return senders.find((s) => connected.has(s.email.toLowerCase())) ?? null;
+    // A mailbox the pipeline drafts for (auto_draft, 0155) first: written mail must name it, or the pipeline never drafts it.
+    const usable = senders.filter((s) => connected.has(s.email.toLowerCase()));
+    return usable.find((s) => (s as { auto_draft?: boolean }).auto_draft === true && s.health_status === "healthy") ?? usable[0] ?? null;
   };
   if (orgId) {
     const own = await pick(orgId);

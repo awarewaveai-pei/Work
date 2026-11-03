@@ -2,7 +2,7 @@
 // policy (manual never approves; sampled ratio; one variant per lead; unsupported and warn go to the queue; auto rows
 // carry gate_snapshot.auto=true), and a warm lead never entering any step. The queries are the store's (pipeline-store.ts).
 import { describe, expect, it } from "vitest";
-import { dailyBudget, PIPELINE_CAP, runPipelineTick, type DecideResult, type DraftRow, type DraftableMessage, type PipelineDeps, type PipelineLead, type PipelineStore, type Profile } from "../pipeline";
+import { dailyBudget, PIPELINE_CAP, runPipelineTick, type DecideResult, type DraftRow, type DraftableMessage, type PipelineAccount, type PipelineDeps, type PipelineLead, type PipelineStore, type Profile } from "../pipeline";
 import { inSample, pickVariant, type ClaimCheck } from "../review-policy";
 import type { PoolAccount } from "../sender-pool";
 
@@ -14,7 +14,7 @@ const lead = (id: string, over: Partial<PipelineLead> = {}): PipelineLead => ({ 
 type Row = DraftRow & { status: string; approved_at?: string };
 
 class FakeStore implements PipelineStore {
-  accountsOf: PoolAccount[] = [acc("a"), acc("b")];  // 2 x 35 x 1.5 = 105 a day
+  accountsOf: PipelineAccount[] = [acc("a"), acc("b")];  // 2 x 35 x 1.5 = 105 a day
   used = { research: 0, generate: 0 };
   researchFor: PipelineLead[] = [];
   generateFor: PipelineLead[] = [];
@@ -47,7 +47,7 @@ class FakeStore implements PipelineStore {
   async approveFollowups() { return 0; }
   async autoApprovedFollowupLeads() { return []; }
   async skip(ids: string[]) { for (const r of this.rows) if (ids.includes(r.id) && r.status === "draft") r.status = "skipped"; }
-  async approvedFirstEmails() { return { rows: this.approvedFirsts, leads: this.leads }; }
+  async approvedFirstEmails(_org: string, _senderIds: string[]) { return { rows: this.approvedFirsts, leads: this.leads }; }
   async dueFollowups() { return { rows: this.followups, leads: this.leads }; }
 }
 
@@ -209,5 +209,35 @@ describe("a lead nobody may cold-email never enters a step (Cold Gate)", () => {
     expect(calls).toMatchObject({ research: [], generate: [], draft: [], check: 0 });
     expect(store.decideCalls).toBe(0);
     expect(r).toMatchObject({ researched: 0, generated: 0, autoApproved: 0, queued: 0, drafted: 0, followupsDrafted: 0 });
+  });
+});
+
+describe("the operator's own Gmail in draft mode (2026-11-03): drafted for when switched on, never otherwise", () => {
+  const mine = (over: Partial<PipelineAccount> = {}): PipelineAccount =>
+    ({ ...acc("me", { send_mode: "draft", warmup_stage: "full", daily_limit: 20 }), auto_draft: true, connector_ok: true, ...over });
+  it("auto_draft on: its daily_limit sets the budget and its approved mail is drafted", async () => {
+    const { store, deps, calls } = setup();
+    store.accountsOf = [mine()];
+    const asked: string[][] = [];
+    store.approvedFirstEmails = async (_o: string, senderIds: string[]) => { asked.push(senderIds); return { rows: [{ messageId: "m1", leadId: "l1", senderId: "me" }], leads: new Map([["l1", lead("l1")]]) }; };
+    store.researchFor = leadsOf(40, "r");
+    await runPipelineTick(deps);
+    expect(dailyBudget(store.accountsOf)).toBe(30);  // 20 x 1.5
+    expect(asked).toEqual([["me"]]);
+    expect(calls.draft).toEqual(["m1"]);
+  });
+  it("switch off, the mailbox paused, or its Gmail connector disabled: no budget and no mailbox to draft for", async () => {
+    for (const a of [mine({ auto_draft: false }), mine({ health_status: "paused" }), mine({ connector_ok: false })]) {
+      const { store, deps, calls } = setup();
+      store.accountsOf = [a];
+      const asked: string[][] = [];
+      store.approvedFirstEmails = async (_o: string, senderIds: string[]) => { asked.push(senderIds); return { rows: [], leads: new Map() }; };
+      store.researchFor = leadsOf(5, "r");
+      const r = await runPipelineTick(deps);
+      expect(dailyBudget([a])).toBe(0);
+      expect(calls.research).toEqual([]);
+      expect(r.held).toContain("org:research:daily_budget");
+      expect(asked).toEqual([[]]);
+    }
   });
 });
