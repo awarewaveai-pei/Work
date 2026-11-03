@@ -32,7 +32,8 @@ export const NOW = [
   { what: '輸出 720p 或 1080p 的 H.264 影片，含字幕與混音。', state: 'yes', ev: 'editor-export.cjs:182；比例有 16:9、9:16、1:1、4:5、4:3。' },
   { what: '用模板做片頭（繁中可）。', state: 'yes', ev: '2026-11-02 卡 P1：剪輯器「片頭」分頁，自架 Remotion 服務渲染，免費；成品進素材庫並記來源。' },
   { what: '動畫合成（2D）。', state: 'yes', ev: '2026-11-03 卡 P3：工具「動畫合成」，輸出透明影片回剪輯。' },
-  { what: '2D 角色骨架、3D。', state: 'no', ev: '卡 P4、P5 做。' },
+  { what: '2D 角色骨架。', state: 'yes', ev: '2026-11-03 卡 P4：工具「角色綁定」，姿勢圖可當生成參考。' },
+  { what: '3D。', state: 'no', ev: '卡 P5 做。' },
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
@@ -46,6 +47,7 @@ const M2 = '2ab702e3f';
 const P1 = 'f9eca42b2';
 const P2 = 'a0be1d012';
 const P3 = '40c7b8ebd';
+const P4 = '1c5bde805';
 
 export const STEPS = [
   { n: 1, code: '0', title: '切 4178 到 repo', plain: '例：打開 127.0.0.1:4178，角色頁出現「示範角色庫」，代表跑的是 repo 版；舊資料一筆不少。',
@@ -141,12 +143,13 @@ export const STEPS = [
       done('P3.3', '拼貼構圖匯出成參考圖；測試。', P3),
     ] },
   { n: 10, code: 'P4', title: '2D 角色骨架', plain: '例：把角色分成身體、上臂、前臂、手掌，做揮手動作；擺好姿勢後匯出姿勢圖，生成時當參考。',
-    gate: '揮手動作保存重開可改；同角色兩個姿勢各生成一次，留比對截圖。', risk: 'Medium', model: '方向 Fable；做 Opus', status: 'not_started', depends: ['P3'],
+    gate: '揮手動作保存重開可改；同角色兩個姿勢各生成一次，留比對截圖。', risk: 'Medium', model: 'Opus（訂閱制工人）', status: 'done', commit: P4, depends: ['P3'],
+    result: '2026-11-03 新工具「角色綁定」：部件掛骨骼、轉上臂前臂跟著動（FK）、拖手掌手肘自動算（IK）、關節角度限制、頭髮披風用網格與控制釘變形、權重筆刷。姿勢存在角色下，匯出姿勢圖當參考圖。實測同一角色兩個姿勢各生成一張，都照姿勢畫出。Codex 審出 3 項全修。',
     what: 'A 肢體綁定 → B Puppet → C 骨骼鏈、IK、權重；姿勢存角色下',
     items: [
-      todo('P4.1', '肢體綁定與揮手動作。'),
-      todo('P4.2', '骨骼鏈與反向運動：拉手掌，手臂跟著動。'),
-      todo('P4.3', '姿勢圖匯出給生成用；測試。'),
+      done('P4.1', '肢體綁定與揮手動作。', P4),
+      done('P4.2', '骨骼鏈與反向運動：拉手掌，手臂跟著動。', P4),
+      done('P4.3', '姿勢圖匯出給生成用；測試。', P4),
     ] },
   { n: 11, code: 'P5', title: '3D', plain: '例：3D 角色綁好骨架、套上一段動作、轉鏡頭打燈，渲染成透明片段放回剪輯；一張物件圖轉成 3D 模型。',
     gate: '先過 3D 試驗（Blender 背景處理＋瀏覽器檢視器）；角色套用動作後保存重開可改，並渲染回專案。', risk: 'Medium', model: '試驗與設計 Fable；做 Opus', status: 'not_started', depends: ['P4'],

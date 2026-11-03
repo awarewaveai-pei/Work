@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-03（續4）影音工作台卡 P4：2D 角色骨架（1c5bde805）
+
+- 綁定 = compositor 圖層 kind rig（shared/rig.js）；綁定版本存角色下、與部件原圖和動畫分開。
+- Codex 3m 全修：生成只送前 4 張參考圖（api.cjs MAX_SENT_REFERENCES 單一來源）；網格改存部件相對座標；蒙皮網格控制釘跟骨骼。
+- 未做（能力表標未完成）：控制釘旋轉／縮放；自動拆部件／建骨／動捕（§4.6 不要求）。殘留：生成請求若另帶其他參考圖，姿勢圖仍可能排在第 5 張後。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node real-p4.cjs → 4178 #rig 建立示範角色→姿勢 放下／揮手高點→匯出姿勢圖→各一次 OpenAI 生圖 succeeded，照姿勢（docs/p4-evidence/pose-generation-compare.png） | exit=0 | ms=300000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（Codex，artifact agency-os/reports/oracle/2026-11-03-partialreview-e3cbe88a.md；已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=MAX_SENT_REFERENCES | hits=11
 ## 2026-11-03（續3）外聯 D26：主信箱草稿模式接管線（auto_draft）
 
 - 操作者：先不買次網域，用 awarewaveai@gmail.com；選 B（管線自動研究→產信→建草稿，人按寄出）。
