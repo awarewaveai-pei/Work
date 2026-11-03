@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-03（續2）影音工作台卡 P3：2D 動畫合成（40c7b8ebd）
+
+- 預覽＝輸出同一繪製程式 shared/compositor.js；頁面逐格 PNG → backend/compositor-render.cjs → PNG MOV（alpha）。
+- 字詞時間無免費來源：host whisper 只回 segments（video-whisper-worker/app.py:127-131）→ 整句／平均分配（估計）。
+- Codex 6m 全修（代理檔輸出、4K 批次超 80MB、閒置工作佔名額、更新錯片段、缺素材仍成功、無取消鈕）。
+- 工人中途撞訂閱 session 上限，重置後續跑。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node real-p3.cjs → 4178 #compose 片頭範本改名→儲存→輸出 → MOV png/rgba 1920x1080 90 格、verification ok、疊藍底透明正確 | exit=0 | ms=600000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/6m/0n（Codex，artifact agency-os/reports/oracle/2026-11-03-partialreview-f1bf54fd.md；已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=compositor-render | hits=6
 ## 2026-11-03（續1）外聯 D25 改版：自公開地址免驗、免費額度輪用
 
 - 操作者：不付費驗證。新規則（SPEC D25 修訂）：consent_source=self_published: 且 co_verified_emails 為 MX 列（provider=mx_syntax）非 invalid → 免驗自動寄；其餘才驗。
