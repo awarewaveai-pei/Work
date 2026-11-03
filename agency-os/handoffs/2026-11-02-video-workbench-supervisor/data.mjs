@@ -3,7 +3,7 @@
 
 export const META = {
   title: '影音工作台監工台',
-  updated: '2026-11-02',
+  updated: '2026-11-03',
   plan: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/creative-suite-plan-20261102.md',
   req: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/handoff/Claude_Code_handoff_20261102.md',
   worklog: 'agency-os/WORKLOG.md 2026-11-02 續19–續45',
@@ -33,7 +33,8 @@ export const NOW = [
   { what: '用模板做片頭（繁中可）。', state: 'yes', ev: '2026-11-02 卡 P1：剪輯器「片頭」分頁，自架 Remotion 服務渲染，免費；成品進素材庫並記來源。' },
   { what: '動畫合成（2D）。', state: 'yes', ev: '2026-11-03 卡 P3：工具「動畫合成」，輸出透明影片回剪輯。' },
   { what: '2D 角色骨架。', state: 'yes', ev: '2026-11-03 卡 P4：工具「角色綁定」，姿勢圖可當生成參考。' },
-  { what: '3D。', state: 'yes', ev: '2026-11-03 卡 P5：工具「3D」，Blender 4.5.9 渲染回剪輯。Meshy 等金鑰。' },
+  { what: '3D。', state: 'yes', ev: '2026-11-03 卡 P5：工具「3D」，Blender 4.5.9 渲染回剪輯。圖片轉 3D 改走 S4b（Meshy 停用）。' },
+  { what: '在 video.aware-wave.com 登入使用。', state: 'no', ev: '2026-11-03 卡 P6 進行中：還沒部署到主機，進度看卡 P6 的工作清單。' },
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
@@ -49,6 +50,7 @@ const P2 = 'a0be1d012';
 const P3 = '40c7b8ebd';
 const P4 = '1c5bde805';
 const P5 = '646cc9778';
+const P6 = '9465bbc8c';
 
 export const STEPS = [
   { n: 1, code: '0', title: '切 4178 到 repo', plain: '例：打開 127.0.0.1:4178，角色頁出現「示範角色庫」，代表跑的是 repo 版；舊資料一筆不少。',
@@ -163,16 +165,32 @@ export const STEPS = [
       done('P5.3', '圖片轉 3D（Meshy）；測試。', P5),
     ] },
   { n: 12, code: 'P6', title: '上線 video.aware-wave.com', plain: '例：員工登入 video.aware-wave.com 做好一支片，一鍵送到 Postiz 和 WordPress 成為草稿。',
-    gate: '部署測試全綠；一支成品從工作台到 Postiz 草稿與 WordPress 草稿全程通。', risk: 'High', model: 'Fable 規劃；Opus 執行', status: 'not_started', depends: ['P5'], before: '待決 1',
-    what: 'compose 服務＋七項清單；素材帳冊→media_assets（補組織欄、R2 搬移）；任務新表；1:1 與 4:3 需 migration（High）；許可 can()；QA→release→delivery',
+    gate: '部署測試全綠；一支成品從工作台到 Postiz 草稿與 WordPress 草稿全程通。', risk: 'High', model: 'Fable 規劃；Opus 執行', status: 'in_progress', depends: ['P5'],
+    decided: '2026-11-03 你已同意上線部署。做法與卡號（L0–L6、D1、H0–H6）見 docs/p6-golive-plan-20261103.md。自用組織不儲值、不設點數上限（11-03 你定）；自用花費上限＝各廠商帳戶的預付餘額。',
+    what: 'compose 服務＋七項清單；素材帳冊→media_assets（補組織欄、R2 搬移）；任務新表；1:1 與 4:3 不投遞；許可 can()；QA→release→delivery',
     items: [
-      todo('P6.1', '服務部署，登入接主系統。'),
-      todo('P6.2', '素材與任務搬進主系統資料庫，檔案搬到雲端儲存。'),
-      todo('P6.3', '成品經品質檢查送 Postiz 與 WordPress；內部名稱改掉。'),
+      done('P6.1', '內部名稱 SeedStar 改成 video-workbench，舊設定與瀏覽器資料自動沿用。', '5bc940864'),
+      done('P6.2', '伺服器可部署：健康檢查、只認主系統轉來的登入身分、每個組織資料分開。', '08a362e29'),
+      done('P6.3', '主系統資料庫加任務帳冊表，已套到正式資料庫。', 'c86f7d0fd'),
+      done('P6.4', '主系統接口：登入、素材入帳（附技術品質檢查）、任務同步、用量回報；工作台付費前先拿許可。', P6),
+      done('P6.5', '付費功能照廠商實際用量算錢並回報；主系統暫時連不上時用量先存檔，之後補送且只算一次。', P6),
+      todo('P6.11', '收尾小項：工作台預設圖片模型借用 gpt-image-2 的價目計價，要補正式價目；上傳失敗留在雲端的孤兒檔目前沒有清掃。'),
+      todo('P6.6', '送審後一鍵送到 Postiz 和 WordPress 成草稿：還缺選帳號、選網站的畫面。'),
+      todo('P6.7', '舊素材檔搬到雲端儲存（R2）的腳本。'),
+      todo('P6.8', '容器、compose、nginx 設定檔，以及部署七項清單。容器要用 Node 22.6 以上（直接讀主系統的 .ts 檔）；外觀檔 public/awarewave/forms.css 屬另一個 session 還沒提交的主題工作，要等它進 git。'),
+      todo('P6.9', '上主機：先唯讀檢查、放金鑰、部署主系統、啟動工作台、量 3D 渲染速度。'),
+      todo('P6.10', '全程實測：一支成品從工作台到 Postiz 草稿與 WordPress 草稿。'),
+    ] },
+  { n: 13, code: 'S4b', title: '圖片轉 3D 換供應商＋自動骨架', plain: '例：上傳一張人物圖，按一下（顯示價格）變成 3D 模型，自動綁好人形骨架，從動作庫挑「走路」套上去。',
+    gate: '同一組十張圖跑三種方式比品質，選預設；生成的人形模型能自動綁骨並套用動作庫的動作。', risk: 'Medium', model: 'Opus（SDK 工人）', status: 'not_started', depends: ['P6'],
+    decided: '主力 Stability API（英國）；免費走筆電本機 Stable Fast 3D；備援 Replicate TRELLIS（沿用去背金鑰）；Meshy 停用。金鑰已放好（STABILITY_API_KEY）；帳戶已關「用資料訓練模型」，沒有自動加值＝預付餘額就是上限。',
+    what: 'provider adapter：Stability SPAR3D／SF3D、本機 SF3D（獨立可中止程序，PyTorch CUDA 12.8+）、Replicate TRELLIS；Blender Rigify 自動人形骨架；內建 CMU BVH 動作庫；一次點擊只呼叫一次廠商',
+    items: [
+      todo('S4b.1', '三種圖片轉 3D 方式接成同一個按鈕，按鈕顯示價格。'),
+      todo('S4b.2', '十張圖品質比較，選預設。'),
+      todo('S4b.3', '人形模型自動綁骨架＋內建免費動作庫。'),
     ] },
 ];
 
 // 操作者自己要決定或親手做的
-export const OPEN = [
-  { n: 1, before: 'P6', what: '上線部署是 High 風險，要你同意才執行。', src: 'AGENTS §3' },
-];
+export const OPEN = [];

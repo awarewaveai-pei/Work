@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-03（續16）影音工作台卡 P6 L0–L3＋D1：改名、可部署、任務表、主系統接口（5bc940864／08a362e29／c86f7d0fd／9465bbc8c）
+
+- 計畫 SSOT：apps/video-workbench/docs/p6-golive-plan-20261103.md（a9fb08857）。操作者 11-03 同意上線（High 預授權）。
+- L0 SeedStar→video-workbench（VW_* env 經 env-compat 相容、localStorage 搬鍵）；L1 /healthz、proxy 身分、per-org 資料夾（本機模式維持根目錄＝偏離計畫）；D1 0159 已套 prod（APPLY_OK）。
+- L2+L3（9465bbc8c）：next-admin internal session/assets/jobs/usage（無 VW_INTERNAL_TOKEN = fail closed，03:00 自動部署上線也無作用）；VW 入帳帶 ffprobe 技術 QA、付費前許可、用量 outbox、真實廠商成本（provider-cost.cjs 直讀 cost-model.ts）。
+- Codex 兩輪 4m＋6m 全修，每項一測試；同一 reviewer 對 assets route 第 2 次報 → 不變量寫死：請求路徑永不刪 content-addressed 物件；冪等用呼叫端 key 不用 bytes。
+- 決策：圖片轉 3D 備援改 Replicate TRELLIS（沿用去背金鑰）；Stability 金鑰進 user-env（STABILITY_API_KEY），帳戶已關資料訓練、無自動加值；自用組織不儲值（操作者）；花費上限＝主系統錢包＋廠商預付，不另建 VW 帳本。
+- 未完（監工台 P6.5–P6.10、S4b）：p6-chain 真端到端只能上機；workbench R2 孤兒無清掃；預設圖片模型借 gpt-image-2 前綴計價；送 Postiz/WP 草稿缺選帳號 UI；L4 下次做（操作者）。
+- 工人：cc.py SDK 共約 US$9.1（L2b+L3b 5.39、修正 3.72）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin npx tsc --noEmit && npx vitest run lib/ai app/api/internal/video/workbench（94 pass）；VW node tests/p6-main-system.cjs tests/backend.cjs tests/tenancy.cjs tests/package-sources.cjs tests/awarewave-files.cjs tests/remove-bg-money.cjs | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/10m/0n（Codex，agency-os/reports/oracle/2026-11-03-partialreview-7d926bbe.md、2026-11-03-partialreview-2daffb75.md；已修，守衛 2/3/5 突變紅→綠）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=VW_INTERNAL_TOKEN | hits=12
+- 避免再發生：worker RISKS 一律進監工台 data.mjs（memory feedback_everything_on_supervisor）。
 ## 2026-11-03（續15）影音工作台卡 P5：3D（646cc9778）
 
 - P5.0 五閘全過（docs/p5-gate-20261103.md）。Blender 4.5.9（runtime/，不進 git、不進 postinstall）＋three.js 0.186.0（vendor/）皆釘版校驗。
