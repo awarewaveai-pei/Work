@@ -13,6 +13,7 @@
 | 「先擺場景再生成」四項借 ArtCraft 流程，不用其程式／雲端／模型；落點 S3a＋P3（去背拼貼＝圖層）、S2（同場景多鏡）、P4（人偶擺姿）、P5（圖片轉 3D）；生成模型只用 `backend/generation-policy.cjs:7` 現行 OpenAI 路由 | 操作者 11-02 |
 | **主系統契約沿用方式**：純契約檔直接 `import()` `../next-admin/lib/content/video/{asset-origin,platform-ratio,delivery-contract,caption-formats,timeline-v1}.ts`（只依賴 `node:crypto`；Node v24.14.0 type stripping 實測 `ratioFor("linkedin",["16x9"])`→`16x9`）；P6 容器 build context 含這些檔；**禁止複製一份** | 本檔 v4；AGENTS §0「不另建帳本／登入／素材庫」 |
 | 引擎升級＝獨立卡（釘版＋checksum 改動），不夾帶 | 本檔 v4 |
+| **圖片轉 3D（S4b，2026-11-03 操作者「好」）**：主力 Stability AI API（SPAR3D／SF3D，英國）＋本機 Stable Fast 3D（免費，RTX 5060 8 GB）；備援 fal TRELLIS.2；**Meshy 停用**（營運實體疑在北京，adapter 保留不設預設）；綁骨／動作用 Blender（P5）。卡排 P6 之後 | `docs/s4-image-to-3d-providers-20261103.md` |
 | **路線 = C**（P0 2026-11-02）：合成類 ③ 不能載入自備字型，繁中顯示 NO GLYPH（上游 web.md:68），另 ① WebGPU 54 s device lost、WebGL2 0.47× 即時，⑤ 焦點出不了 iframe；剪輯類 ② 重開後素材離線。重評條件：上游支援使用者字型時，`node scripts/vendor-effectcraft.cjs` 後重跑 P0（engines/effectcraft/VERSION.json 改版＝獨立卡） | `docs/p0-effectcraft-gate-20261102.md` |
 
 ## 1. 現況與缺口（2026-11-02 查證，`file:line`）
