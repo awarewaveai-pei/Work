@@ -95,7 +95,7 @@ export default function SendersCard({ org }: { org: string | null }) {
     }
   }
 
-  async function testSend(id: string, hours: 0 | 1 | 8 | 24) {
+  async function testSend(id: string, hours: 0 | 1 | 8 | 24 | 168) {
     setBusy(id); setMsg(null);
     try {
       const recipients = (testTo[id] ?? DEFAULT_TEST_TO).split(/[,\n;\s]+/).map((e) => e.trim()).filter(Boolean);
@@ -103,7 +103,7 @@ export default function SendersCard({ org }: { org: string | null }) {
         body: JSON.stringify({ action: "test_send", id, hours, recipients }) });
       const j = await r.json();
       if (!j.ok) throw new Error(j.error || "切換失敗");
-      setMsg({ ok: true, text: hours ? `已開啟測試自動寄送 ${hours} 小時：只寄給你列的收件人，其他人的信仍留草稿` : "已關閉測試自動寄送" });
+      setMsg({ ok: true, text: hours ? `已開啟測試自動寄送 ${hours === 168 ? "7 天" : `${hours} 小時`}：只寄給你列的信箱（含 +任何字 的地址），其他人的信仍留草稿` : "已關閉測試自動寄送" });
       await load();
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : String(e) });
@@ -205,15 +205,15 @@ export default function SendersCard({ org }: { org: string | null }) {
                       )}
                       {!auto && (
                         <span style={{ display: "grid", gap: 4, minWidth: 220 }}>
-                          <span className="card-sub">測試自動寄送：只寄給下面的收件人，其他人的信照舊留草稿。同一個地址 30 天最多收 2 封；要多測就用 peijingartstudio+t1@gmail.com、+t2… 這種地址，都會進你的信箱。</span>
+                          <span className="card-sub">測試自動寄送：只寄給下面列的信箱，其他人的信照舊留草稿。列 peijingartstudio@gmail.com 就涵蓋 peijingartstudio+t1@gmail.com、+t2… 所有 + 地址（都進你的信箱）；每筆測試名單用不同 + 地址，就不會撞到「同一地址 30 天 2 封」。測試期間每天上限 100 封。</span>
                           {testOpen(s) && (
                             <span className="card-badge badge-green">測試中，到 {taipeiHm(s.test_send_until!)}（台北）自動關閉；只寄給：{s.test_recipients.join("、")}</span>
                           )}
                           <textarea rows={2} value={testTo[s.id] ?? DEFAULT_TEST_TO} aria-label={`${s.email} 的測試收件人`}
                             onChange={(e) => setTestTo((t) => ({ ...t, [s.id]: e.target.value }))} />
                           <span style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                            {([1, 8, 24] as const).map((h) => (
-                              <button key={h} type="button" className="btn-primary" disabled={busy === s.id} onClick={() => void testSend(s.id, h)}>開 {h} 小時</button>
+                            {([1, 8, 24, 168] as const).map((h) => (
+                              <button key={h} type="button" className="btn-primary" disabled={busy === s.id} onClick={() => void testSend(s.id, h)}>開 {h === 168 ? "7 天" : `${h} 小時`}</button>
                             ))}
                             <button type="button" className="btn-secondary" disabled={busy === s.id || !testOpen(s)} onClick={() => void testSend(s.id, 0)}>關閉</button>
                           </span>

@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-03（續11）外聯：測試寄送放寬給連續測試用
+
+- 操作者：要一連串測試，不是單次動作 → 拿掉卡住連續測試的限制；只留「只寄操作者自己的地址」（拿掉＝主信箱對真實店家自動寄冷信）。
+- 名單比對 sender-pool.ts testRecipientKey（小寫、去 +tag）：列 peijingartstudio@gmail.com 涵蓋所有 +tag；每個 +tag 仍是獨立地址（co_recipient_cap_key 以完整地址為鍵，30 天 2 封各自計）。
+- 每日上限 sender-pool.ts mailboxCap：池信箱＝stageCap，測試窗＝TEST_DAILY_CAP 100（runAutoSend quota 與 sendCaps→co_begin_send 同一來源）。
+- 時效加 168 小時（7 天）：senders route TEST_HOURS、SendersCard 按鈕「開 7 天」；UI 說明 + 地址用法。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/outreach app/api/outreach app/api/internal → 385 passed（+tag 被寄、名單外留草稿、102 封寄 100、hours 168 開 7 天）；tsc 0 | exit=0 | ms=40000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=mailboxCap | hits=6（code 4：sender-pool.ts:43,66、send-adapter.ts:28,188；WORKLOG 本條目 2）
+- ORACLE_WAIVED: 兩個純函式＋常數；舊測試「上限 20」照新規則先紅後改綠
 ## 2026-11-03（續10）外聯：主信箱「測試自動寄送」開關（0157）
 
 - 操作者：要做一堆測試，app 上要有開關自己操控主信箱自動寄。

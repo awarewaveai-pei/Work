@@ -196,16 +196,17 @@ describe("auto send test window (0157)", () => {
     test_send_until: "2026-11-08T00:00:00Z", test_recipients: ["Me@Mine.example"], ...over });
   const mine = (id: string) => lead(id, { email: "me@mine.example" });
 
-  it("mail to a listed recipient is sent (even outside the window); anyone else stays drafted and untouched", async () => {
+  it("mail to a listed recipient or any +tag of it is sent (even outside the window); anyone else stays drafted and untouched", async () => {
     const { store, deps, gmailSent } = setup({ now: () => SAT });
     store.accounts = [main()];
     store.add("in", mine("l-in"), { account: "t" });
+    store.add("tag", lead("l-tag", { email: "Me+T7@mine.example" }), { account: "t" });
     store.add("out", lead("l-out"), { account: "t" });
     const r = await runAutoSend(deps);
-    expect(gmailSent).toEqual(["d-in"]);
+    expect(gmailSent).toEqual(["d-in", "d-tag"]);
     expect(r.testSkipped).toBe(1);
     expect(store.mails.find((m) => m.messageId === "out")!.status).toBe("drafted");
-    expect(store.claims).toEqual(["in"]);
+    expect(store.claims).toEqual(["in", "tag"]);
   });
 
   it("an expired window, a missing list or a mailbox already paused sends nothing", async () => {
@@ -228,12 +229,12 @@ describe("auto send test window (0157)", () => {
     expect(r.window).toBe(false);
   });
 
-  it("a mailbox in the test window is held to its daily cap (full = daily_limit 20)", async () => {
+  it("a mailbox in the test window is held to the test cap (100), not its cold-mail stage cap (daily_limit 20)", async () => {
     const { store, deps, gmailSent } = setup();
     store.accounts = [main()];
-    for (let i = 0; i < 22; i++) store.add(`m${i}`, lead(`l-${i}`, { email: "me@mine.example" }), { account: "t" });
+    for (let i = 0; i < 102; i++) store.add(`m${i}`, lead(`l-${i}`, { email: `me+t${i}@mine.example` }), { account: "t" });
     await runAutoSend(deps);
-    expect(gmailSent.length).toBe(20);
+    expect(gmailSent.length).toBe(100);
   });
 });
 

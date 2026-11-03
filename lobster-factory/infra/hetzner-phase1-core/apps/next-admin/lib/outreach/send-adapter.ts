@@ -2,8 +2,9 @@
 // allows sendGmailDraft (google-oauth.ts, drafts.send) here and nowhere else. Run at the end of each reply-sync tick
 // (app/api/internal/outreach/gmail-sync), after reconciliation, for every mailbox in the pool (sender-pool.ts inPool:
 // active, healthy, send_mode='auto', linked connector) -- a draft mailbox is read only while its test-send window is open
-// (0157 test_send_until, sender-pool.ts testingNow): then only its mail to the window's test_recipients is sent, anyone
-// else's stays drafted (testSkipped), the whole remaining cap may go in one tick, and the Taipei window does not apply. Per mailbox:
+// (0157 test_send_until, sender-pool.ts testingNow): then only its mail to the window's test_recipients (any +tag of them,
+// testRecipientKey) is sent, anyone else's stays drafted (testSkipped), the cap is TEST_DAILY_CAP and may all go in one tick,
+// and the Taipei window does not apply. Per mailbox:
 //   window      Taipei 09:00-18:00, Monday to Friday; outside it nothing is sent.
 //   tick quota  ceil(what is left of its stage cap today / ticks left today), after a 0-120 s jitter.
 //   per mail    its Gmail draft (status 'drafted', newest draft_created event names this mailbox), oldest first. A
@@ -24,7 +25,7 @@ import { checkColdGate, type ColdGateLead } from "./cold-gate";
 import { contactBlock, type ContactBlock, type GuardedLead } from "./contact-guard";
 import { sendGmailDraft } from "./google-oauth";
 import { freshPaid, saveVerdict, storedVerdict, type PaidProvider, type StoredVerdict } from "./mailbox-verify";
-import { beginSend, capOf, inPool, POOL_COLS, releaseClaim, sendCaps, testingNow, todayClaims, type PoolAccount, type SendCaps } from "./sender-pool";
+import { beginSend, inPool, mailboxCap, POOL_COLS, releaseClaim, sendCaps, testingNow, testRecipientKey, todayClaims, type PoolAccount, type SendCaps } from "./sender-pool";
 import { MX_PROVIDER, type EmailStatus } from "./verify-email";
 
 export const WINDOW_START_HOUR = 9;
@@ -183,8 +184,8 @@ export async function runAutoSend(deps: SendDeps): Promise<SendResult> {
 
   const runMailbox = async (a: PoolAccount): Promise<void> => {
     const test = testing.includes(a);
-    const testTo = new Set((a.test_recipients ?? []).map((e) => e.trim().toLowerCase()));
-    const quota = test ? Math.max(0, capOf(a) - (claimed.get(a.id) ?? 0)) : tickQuota(capOf(a), claimed.get(a.id) ?? 0, now());
+    const testTo = new Set((a.test_recipients ?? []).map(testRecipientKey));
+    const quota = test ? Math.max(0, mailboxCap(a) - (claimed.get(a.id) ?? 0)) : tickQuota(mailboxCap(a), claimed.get(a.id) ?? 0, now());
     if (quota <= 0) return;
     const queue = await deps.store.queue(a.id, QUEUE_READ);
     if (!queue.length) return;
@@ -196,7 +197,7 @@ export async function runAutoSend(deps: SendDeps): Promise<SendResult> {
     let sent = 0;
     for (const mail of queue) {
       if (sent >= quota || late() || (test ? !testingNow(a, now()) : !inSendWindow(now()))) return;
-      if (test && !testTo.has((mail.lead.email ?? "").trim().toLowerCase())) { r.testSkipped++; continue; }
+      if (test && !testTo.has(testRecipientKey(mail.lead.email ?? ""))) { r.testSkipped++; continue; }
       // One mail's failure (a verifier error) holds that mail only, never the mailbox (critic M2).
       let why: string | null;
       try { why = await holdReason(deps, mail, now()); }

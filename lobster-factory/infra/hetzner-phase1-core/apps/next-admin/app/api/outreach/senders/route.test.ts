@@ -54,6 +54,12 @@ describe("POST /api/outreach/senders test_send", () => {
     expect(s.updates).toEqual([]);
   });
 
+  it("hours 168 (7 days) opens a week-long window", async () => {
+    expect((await call("owner", { hours: 168 })).status).toBe(200);
+    const until = Date.parse((s.updates[0] as { test_send_until: string }).test_send_until);
+    expect(until - Date.now()).toBeGreaterThan(167 * 3_600_000);
+  });
+
   it.each([2, 12, -1, "8"])("hours %s is refused", async (hours) => {
     expect((await call("owner", { hours })).status).toBe(400);
     expect(s.updates).toEqual([]);

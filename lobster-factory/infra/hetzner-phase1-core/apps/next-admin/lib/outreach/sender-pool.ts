@@ -37,6 +37,16 @@ export const testingNow = (a: PoolAccount, at: Date): boolean =>
   a.send_mode === "draft" && a.is_active && a.health_status === "healthy" && !!a.connector_id && !!a.test_send_until
   && Date.parse(a.test_send_until) > at.getTime() && (a.test_recipients?.length ?? 0) > 0;
 export const capOf = (a: Pick<PoolAccount, "warmup_stage" | "daily_limit">): number => stageCap(a.warmup_stage, a.daily_limit);
+/** A test-send window's daily cap: every mail goes to the operator's own addresses, so a test run is not throttled like cold mail. */
+export const TEST_DAILY_CAP = 100;
+/** Today's cap of a mailbox runAutoSend sends from: a pool mailbox's stage cap; the only other kind it sends from is a test window. */
+export const mailboxCap = (a: PoolAccount): number => (inPool(a) ? capOf(a) : TEST_DAILY_CAP);
+/** A test recipient's identity: lower-case, any +tag dropped, so one listed mailbox covers name+t1@, name+t2@ ... (each still its own
+ *  address for the 2-in-30-days recipient cap). */
+export const testRecipientKey = (email: string): string => {
+  const [local = "", domain = ""] = email.trim().toLowerCase().split("@");
+  return `${local.split("+")[0]}@${domain}`;
+};
 export const domainOfEmail = (email: string): string => (email.trim().toLowerCase().split("@")[1] ?? "");
 
 /** The in-pool mailbox whose load is the smallest share of its cap (ties: the smaller load, then the id), or null when
@@ -53,7 +63,7 @@ export function sendCaps(account: PoolAccount, pool: readonly PoolAccount[]): Se
   const domain = domainOfEmail(account.email);
   const onDomain = pool.filter((a) => inPool(a) && domainOfEmail(a.email) === domain);
   const sum = onDomain.reduce((n, a) => n + capOf(a), 0);
-  return { mailbox: capOf(account), sender_domain: Math.max(sum, capOf(account)), recipient_30d: RECIPIENT_30D_CAP };
+  return { mailbox: mailboxCap(account), sender_domain: Math.max(sum, mailboxCap(account)), recipient_30d: RECIPIENT_30D_CAP };
 }
 
 /** The Asia/Taipei midnight that today's caps count from, as an ISO instant (0152 v_today). */

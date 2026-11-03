@@ -17,7 +17,7 @@ import { supabaseSyncStore, type GmailSyncState } from "@/lib/outreach/gmail-syn
 // tick scans that mailbox's inbox N days back (settings.gmail_sync.rescan_days, lib/outreach/gmail-sync.ts);
 // POST { action: "send_mode", id, mode, confirmEmail } is the pool table's 自動寄出 switch (card C8.4): turning it on
 // needs the mailbox's address typed back and a subdomain mailbox (poolEmailRefusal); a mailbox never in the pool starts
-// warm-up at w1, 50/day (SPEC D17, D21); POST { action: "test_send", id, hours: 0|1|8|24, recipients } (owner/admin) opens a timed
+// warm-up at w1, 50/day (SPEC D17, D21); POST { action: "test_send", id, hours: 0|1|8|24|168, recipients } (owner/admin) opens a timed
 // window in which a draft-mode mailbox sends only to those addresses (0157, send-adapter.ts), 0 = off. GET adds, for pool mailboxes, today's claims and the 7-day bounce rate.
 
 export const runtime = "nodejs";
@@ -28,7 +28,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const SIGNATURE_MAX = 500;
 const COLS = "id, organization_id, email, display_name, provider, stream_type, signature_block, is_active, send_mode, daily_limit, warmup_stage, warmup_started_at, health_status, dns_status, dns_checked_at, connector_id, test_send_until, test_recipients";
 const RESCAN_DAYS = [1, 3, 7] as const;
-const TEST_HOURS = [0, 1, 8, 24] as const;
+const TEST_HOURS = [0, 1, 8, 24, 168] as const;
 const TEST_RECIPIENTS_MAX = 10;
 const EMAIL_RE = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
 
