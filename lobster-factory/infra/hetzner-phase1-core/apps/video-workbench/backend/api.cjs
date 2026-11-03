@@ -2,6 +2,10 @@ const fs = require("node:fs"),
   path = require("node:path"),
   crypto = require("node:crypto"),
   { verifyOutput } = require("./media-inspect.cjs");
+// How many reference images an image generation sends (the rest of a character's references are kept, not sent).
+// The one owner of that number: the request below slices by it, /capabilities publishes it, the character page and
+// the pose export (shared/rig.js poseReferences) place and label references by it.
+const MAX_SENT_REFERENCES = 4;
 function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
   const mediaTools = require("./media.cjs");
   const remotion = require("./remotion.cjs");
@@ -398,7 +402,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
         if (refs.length) {
           const form = new FormData();
           for (const [k, v] of Object.entries(body)) form.append(k, String(v));
-          for (const [i, ref] of refs.slice(0, 4).entries()) {
+          for (const [i, ref] of refs.slice(0, MAX_SENT_REFERENCES).entries()) {
             const data = imageReference(ref.url),
               mime = data.slice(5, data.indexOf(";"));
             form.append(
@@ -627,7 +631,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
       )
         throw Object.assign(Error("需要 JSON 請求"), { status: 415 });
       if (req.method === "GET" && route === "/capabilities") {
-        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.publicCatalog });
+        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.publicCatalog });
         return true;
       }
       if (req.method === "POST" && route === "/uploads") {
@@ -728,6 +732,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
       }
       if (req.method === "POST" && route === "/compositor/stills") {
         json(res, 201, renders().still(await body(req)));
+        return true;
+      }
+      if (req.method === "POST" && route === "/rig/pose-stills") {
+        json(res, 201, renders().poseStill(await body(req)));
         return true;
       }
       if (req.method === "GET" && route === "/delivery-ratios") {
@@ -982,4 +990,4 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir }) {
     return true;
   };
 }
-module.exports = { createApi };
+module.exports = { createApi, MAX_SENT_REFERENCES };

@@ -46,6 +46,8 @@ function toolWorkflowScreen(t) {
     return typeof toolEditorScreen === "function" ? toolEditorScreen(t) : null;
   if (t.id === "compose")
     return typeof toolCompositorScreen === "function" ? toolCompositorScreen(t) : null;
+  if (t.id === "rig")
+    return typeof toolRigScreen === "function" ? toolRigScreen(t) : null;
   if (t.id === "subtitle")
     return typeof toolSubtitleScreen === "function"
       ? toolSubtitleScreen(t)
@@ -147,6 +149,8 @@ function toolWorkflowAfterRender() {
     toolEditorAfterRender();
   if (typeof toolCompositorAfterRender === "function" && tool === "compose")
     toolCompositorAfterRender();
+  if (typeof toolRigAfterRender === "function" && tool === "rig")
+    toolRigAfterRender();
   const source = files.src,
     currentTool = tool;
   document.querySelectorAll('[data-flow-media="src"]').forEach((media) => {

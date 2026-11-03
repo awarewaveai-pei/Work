@@ -6,7 +6,8 @@
   "use strict";
   const BLENDS = { normal: "source-over", multiply: "multiply", screen: "screen", overlay: "overlay", darken: "darken", lighten: "lighten", add: "lighter" };
   const BLEND_LABEL = { normal: "一般", multiply: "色彩增值", screen: "濾色", overlay: "覆蓋", darken: "變暗", lighten: "變亮", add: "相加" };
-  const KINDS = ["video", "image", "text", "shape", "null"];
+  // "rig" (card P4): a character rig from shared/rig.js; its bone/IK/pin controls are ordinary keyframed props.
+  const KINDS = ["video", "image", "text", "shape", "null", "rig"];
   const EASES = ["linear", "hold", "ease-in", "ease-out", "ease-in-out", "bezier"];
   const EASE_LABEL = { linear: "線性", hold: "停格", "ease-in": "緩入", "ease-out": "緩出", "ease-in-out": "緩入緩出", bezier: "自訂曲線" };
   const PRESET = { linear: [0, 0, 1, 1], "ease-in": [0.42, 0, 1, 1], "ease-out": [0, 0, 0.58, 1], "ease-in-out": [0.42, 0, 0.58, 1] };
@@ -28,6 +29,7 @@
     image: { width: 640, height: 360 },
     video: { width: 640, height: 360 },
     null: {},
+    rig: {},
   };
   const MASK_PROPS = { maskX: 0, maskY: 0, maskWidth: 400, maskHeight: 200, feather: 0, expansion: 0 };
   // Props an expression may read from another layer: layer("名稱").opacity (allow-list; nothing else is reachable).
@@ -563,7 +565,7 @@
     for (const [k, v] of Object.entries({ ...LAYER_PROPS, ...KIND_PROPS[kind] })) props[k] = P(v);
     return {
       id: extra.id || "L" + Math.random().toString(36).slice(2, 10),
-      name: { video: "影片", image: "圖片", text: "文字", shape: "形狀", null: "控制器" }[kind],
+      name: { video: "影片", image: "圖片", text: "文字", shape: "形狀", null: "控制器", rig: "角色" }[kind],
       kind,
       visible: true,
       parent: null,
@@ -604,6 +606,7 @@
     return c;
   }
 
+  const rigApi = () => root.Rig || (typeof require === "function" ? require("./rig.js") : null);
   // ---- rendering ----------------------------------------------------------------------------------------
   // resources = { createCanvas(w, h), media(layer) -> drawable | null, report: {} }. Returns the report:
   // { errors: Map, missingMedia: [names] }. Pure for the same inputs; nothing reads the clock or Math.random.
@@ -650,6 +653,12 @@
         if (!src) missing.push(layer.name);
         else c.drawImage(src, 0, 0, Number(v("width")) || 0, Number(v("height")) || 0);
       } else if (layer.kind === "text") drawText(c, layer, v);
+      else if (layer.kind === "rig") {
+        // resources.rig(layer) -> { rig (at the layer's pinned rigVersion), image(part) -> drawable | null } | null
+        const r = resources.rig?.(layer), R = rigApi();
+        if (!r || !R) missing.push(layer.name);
+        else for (const n of R.draw(c, r.rig, R.valuesFrom(r.rig, v), r.image).missing) missing.push(layer.name + "・" + n);
+      }
     }
     function drawText(c, layer, v) {
       const size = Number(v("fontSize")) || 1,

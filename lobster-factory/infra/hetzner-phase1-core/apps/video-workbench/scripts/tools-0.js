@@ -20,6 +20,15 @@ const TOOLS = [
     new: 1,
   },
   {
+    id: "rig",
+    cat: "剪輯成片",
+    icon: "✦",
+    name: "角色綁定",
+    desc: "分層角色組骨架、IK、Puppet 網格與權重，在動畫合成做揮手等動作；姿勢圖可當生成參考",
+    io: "分層角色 → 可動畫角色／姿勢圖",
+    new: 1,
+  },
+  {
     id: "short",
     cat: "剪輯成片",
     icon: "✂",

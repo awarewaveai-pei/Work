@@ -68,6 +68,7 @@ const CP_KIND = {
   text: "文字",
   shape: "形狀",
   null: "控制器",
+  rig: "角色",
 };
 const cpEsc = (v) =>
   typeof esc === "function"
@@ -88,6 +89,8 @@ async function cpLoad() {
   cp.list = (await SeedStar.compositions.list()).map((c) =>
     Compositor.normalize(c),
   );
+  // Card P4: rig layers draw from the characters' rigs (scripts/tools-rig.js).
+  if (typeof rgLoad === "function") await rgLoad();
   cp.ready = true;
 }
 function cpBoot() {
@@ -381,6 +384,10 @@ function cpMediaEntry(layer, mode = "preview") {
 // Before a frame is drawn: media decoded and each video seeked to its exact source time (renderFrame is sync).
 async function cpPrepare(doc, frame, mode = "preview") {
   for (const l of doc.layers) {
+    if (l.kind === "rig" && typeof rgPrepare === "function") {
+      await rgPrepare(l, mode);
+      continue;
+    }
     if (l.kind !== "image" && l.kind !== "video") continue;
     const entry = cpMediaEntry(l, mode);
     if (!entry || !(await entry.ready) || l.kind !== "video") continue;
@@ -414,6 +421,8 @@ const cpResources = (mode = "preview") => ({
     const e = cp.media.get(layer.kind + ":" + cpSrc(layer, mode));
     return e?.ok ? e.el : null;
   },
+  rig: (layer) =>
+    typeof rgResource === "function" ? rgResource(layer, mode) : null,
 });
 // Output/still drawing: originals only, and a frame that misses any layer's media is an error, not a gap (review #5).
 async function cpDraw(canvas, doc, frame) {
@@ -430,6 +439,7 @@ async function cpDraw(canvas, doc, frame) {
 }
 // Every media layer's original must decode in this browser before output starts (HEVC, ProRes ... do not).
 async function cpOutputMedia(doc) {
+  if (typeof rgOutputMedia === "function") await rgOutputMedia(doc);
   for (const l of doc.layers.filter(
     (x) => (x.kind === "image" || x.kind === "video") && x.visible && x.url,
   )) {
@@ -466,6 +476,8 @@ async function cpPaint() {
   canvas.dataset.cpFrame = String(frame);
   canvas.dataset.cpRevision = String(doc.revision) + (cp.dirty ? "*" : "");
   cpShowErrors();
+  // Card P4: the skeleton overlay is its own canvas above this one; it never reaches the output.
+  if (typeof rgCpOverlay === "function") rgCpOverlay(doc, frame);
 }
 function cpShowErrors() {
   const errors = cp.report?.errors || new Map();
@@ -490,9 +502,10 @@ const cpSources = (doc) => {
   const media = doc.layers.filter(
     (l) => (l.kind === "image" || l.kind === "video") && l.assetId,
   );
+  const rigIds = typeof rgSourceIds === "function" ? rgSourceIds(doc) : [];
   return {
-    parentAssetId: media[0]?.assetId,
-    sourceAssetIds: [...new Set(media.map((l) => l.assetId))],
+    parentAssetId: media[0]?.assetId || rigIds[0],
+    sourceAssetIds: [...new Set([...media.map((l) => l.assetId), ...rigIds])],
   };
 };
 // Updated in place (a full render() would replace the canvas the output is drawing on): progress text, the
@@ -809,6 +822,8 @@ function cpPropsTab(l, d) {
       .join(
         "",
       )}</div>${l.shape === "path" ? `<label>路徑點（x,y；每點以分號分隔，至少 3 點）<textarea aria-label="路徑點" data-cp-field="points">${cpEsc((l.points || []).map((p) => p.join(",")).join("; "))}</textarea></label>` : ""}`;
+  if (l.kind === "rig" && typeof rgInspector === "function")
+    html += rgInspector(l);
   if (l.kind === "image" || l.kind === "video")
     html += `${cpB(l.url ? "更換素材" : "選擇素材", "media-pick")}<p class="note">${l.url ? cpEsc(l.assetName || "已選素材") : "尚未選擇素材"}</p>`;
   if (i === 0 && d.layers[1]?.matte)
@@ -921,7 +936,8 @@ function cpLabelOf(path) {
       ? "遮罩・"
       : path.startsWith("fx.")
         ? "特效・"
-        : "") + (CP_LABEL[name] || name)
+        : "") +
+    (CP_LABEL[name] || (typeof rgLabel === "function" && rgLabel(name)) || name)
   );
 }
 function toolCompositorScreen(t) {
@@ -983,6 +999,7 @@ function toolCompositorScreen(t) {
     ["null", "控制器"],
     ["image", "圖片"],
     ["video", "影片"],
+    ["rig", "角色"],
   ]
     .map(([k, t]) => cpB("＋" + t, "add:" + k))
     .join("")}</div><p class="note">清單最上面＝最上層。</p>${d.layers
@@ -991,7 +1008,7 @@ function toolCompositorScreen(t) {
         `<div class="cp-layer${x.id === cp.layer ? " selected" : ""}" data-cp-layer="${cpEsc(x.id)}">${cpB(x.name + " · " + CP_KIND[x.kind] + (x.parent ? " ↳" : "") + (x.matte ? " ▣" : ""), "layer:" + x.id, { pressed: x.id === cp.layer })}<span class="row">${cpB("上移", "up:" + x.id, { disabled: i === 0 })}${cpB("下移", "down:" + x.id, { disabled: i === d.layers.length - 1 })}${cpB(x.visible ? "隱藏" : "顯示", "visible:" + x.id, { pressed: !x.visible })}${cpB("刪除", "delete:" + x.id)}</span></div>`,
     )
     .join("")}</aside>`;
-  const stage = `<section class="cp-stage"><div class="cp-canvas-wrap" style="aspect-ratio:${d.width}/${d.height}"><canvas data-cp-canvas width="${d.width}" height="${d.height}" aria-label="合成預覽"></canvas></div><p class="note" data-cp-missing-media></p><div class="row">${cpB("第一格", "frame:first")}${cpB("上一格", "frame:-1")}${cpB(cp.playing ? "暫停" : "播放", "play", { pressed: cp.playing })}${cpB("下一格", "frame:1")}${cpB("上一個關鍵影格", "key-prev", { disabled: !l })}${cpB("下一個關鍵影格", "key-next", { disabled: !l })}<label>目前影格<input class="text-input" type="number" aria-label="目前影格" data-cp-field="frame" min="0" max="${d.durationFrames - 1}" value="${cp.frame}"></label><span class="note" data-cp-clock>${(cp.frame / cpFps(d)).toFixed(2)} 秒</span></div><div class="cp-mini" data-cp-mini aria-label="迷你時間軸（${cpEsc(l ? cpLabelOf(cp.prop) : "")}）"><input type="range" aria-label="播放位置" data-cp-field="frame" min="0" max="${d.durationFrames - 1}" step="1" value="${cp.frame}">${keys
+  const stage = `<section class="cp-stage"><div class="cp-canvas-wrap" style="aspect-ratio:${d.width}/${d.height}"><canvas data-cp-canvas width="${d.width}" height="${d.height}" aria-label="合成預覽"></canvas><canvas data-cp-overlay class="cp-overlay" width="${d.width}" height="${d.height}" aria-label="骨架顯示（不會輸出）"></canvas></div><p class="note" data-cp-missing-media></p><div class="row">${cpB("第一格", "frame:first")}${cpB("上一格", "frame:-1")}${cpB(cp.playing ? "暫停" : "播放", "play", { pressed: cp.playing })}${cpB("下一格", "frame:1")}${cpB("上一個關鍵影格", "key-prev", { disabled: !l })}${cpB("下一個關鍵影格", "key-next", { disabled: !l })}<label>目前影格<input class="text-input" type="number" aria-label="目前影格" data-cp-field="frame" min="0" max="${d.durationFrames - 1}" value="${cp.frame}"></label><span class="note" data-cp-clock>${(cp.frame / cpFps(d)).toFixed(2)} 秒</span></div><div class="cp-mini" data-cp-mini aria-label="迷你時間軸（${cpEsc(l ? cpLabelOf(cp.prop) : "")}）"><input type="range" aria-label="播放位置" data-cp-field="frame" min="0" max="${d.durationFrames - 1}" step="1" value="${cp.frame}">${keys
     .map(
       (k, i) =>
         `<button type="button" class="cp-key${i === cp.key ? " selected" : ""}" data-cp-key="${i}" style="left:${pct(k.frame)}%" title="第 ${k.frame} 格（拖動可移動）" aria-label="關鍵影格第 ${k.frame} 格">◆</button>`,
@@ -1215,6 +1232,11 @@ async function cpAction(action) {
     arg = rest.join(":"),
     d = cp.doc,
     l = cpLayer();
+  // Card P4: rig layer actions (scripts/tools-rig.js).
+  if (name.startsWith("rig-") && typeof rgCpAction === "function")
+    return rgCpAction(name, arg, d, l);
+  if (name === "add" && arg === "rig" && typeof rgAddLayer === "function")
+    return rgAddLayer(d);
   if (name === "new" || name === "template") {
     const doc =
       name === "template"
@@ -1696,5 +1718,5 @@ document.addEventListener("input", (e) => {
   }
 });
 // Loaded after tools-0.js (so the other tools render without waiting for this file): a page opened at #compose
-// rendered a placeholder first and is drawn again now.
-if (tool === "compose") render();
+// rendered a placeholder first and is drawn again now; so is #rig (scripts/tools-rig.js loads just before this).
+if (tool === "compose" || tool === "rig") render();

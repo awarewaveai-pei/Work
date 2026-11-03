@@ -149,6 +149,20 @@ function createCompositorRenders({ dataDir, mediaStore, output, limits = {}, now
       origin: origin(input, { frame: input.frame }),
     };
   }
-  return { create, frames, finish, cancel, still, sweep, sessions: () => sessions.size };
+  // Card P4: a character pose drawn by shared/rig.js as a PNG (pose image -> the character's generation references).
+  function poseStill(input) {
+    const buffer = png(input?.data), id = (k) => (typeof input?.[k] === "string" && input[k] ? input[k].slice(0, 100) : null);
+    for (const k of ["characterId", "rigId", "poseId"]) if (!id(k)) throw bad("缺少 " + k);
+    if (!Number.isInteger(input.rigVersion) || input.rigVersion < 1) throw bad("缺少綁定版本");
+    return {
+      id: crypto.randomUUID(),
+      kind: "image",
+      type: "image/png",
+      url: output(buffer, "png"),
+      size: buffer.length,
+      origin: { kind: "render", engine: "workbench-rig", characterId: id("characterId"), rigId: id("rigId"), rigVersion: input.rigVersion, poseId: id("poseId") },
+    };
+  }
+  return { create, frames, finish, cancel, still, poseStill, sweep, sessions: () => sessions.size };
 }
 module.exports = { createCompositorRenders, LIMITS };

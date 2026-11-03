@@ -870,3 +870,6 @@ body {
   min-height: 100%;
   overflow-x: hidden;
 }
+/* Card P4 review #1: which references image generation sends. Theme tokens only. */
+.thumb .ref-tag { position:absolute;left:4px;bottom:4px;padding:0 4px;border-radius:var(--radius-sm);background:var(--bg-subtle);color:var(--text-secondary);font-size:11px; }
+.thumb .ref-tag:empty { display:none; }
