@@ -26,7 +26,7 @@ hint: "外聯 v2 交接給另一個 Claude 帳號；取代 2026-11-02-1424-outbo
 ## 4. 剩下 8 項（data.mjs `todo`；11-03 完成 C13.4、C7.3、C12.3、C5.5、C9.1、C9.2）
 | 項 | 誰 | 怎麼做 |
 |---|---|---|
-| C14.3 | 操作者 | Meta App `leads_retrieval`＋頁面訂閱 leadgen（頁面訂閱可用 user-env 的 `META_PAGE_TOKEN_*` 代做，先問） |
+| C14.3 | 進行中（11-04） | 新 Meta App AwareWave App Webhooks 1107251218596741（憑證檔 9.4b：secret、驗證碼、Aware Wave 長期粉專權杖）；正式站 .env＋compose 已設 META_APP_SECRET／META_WEBHOOK_VERIFY_TOKEN／META_PAGE_TOKEN_1418148121372301；App 訂閱 page/leadgen→app.aware-wave.com/api/webhooks/meta（握手 200）；粉專 subscribed_apps leadgen；social_meta_assets 53882285（awarewave-ops）；粉專已接受名單條款；測試表單 1465777858795184（不公開，測完刪）。卡點：測試名單在測試工具顯示 Pending、沒送達 → 疑 Leads Access Manager 已啟用（測試工具警告）→ 操作者到 business.facebook.com 設定→整合→潛在顧客存取權限→Aware Wave→指派此 App。剩：送達後驗 co_leads 暖名單＋FluentCRM、刪測試名單／表單；Soulful 需 Pei Huang 帳號加 App 角色＋產權杖＋接條款；隱私政策補名單段（待操作者同意）；App 上線模式。 |
 | C11.1／C11.4／C8.5／C15.4 | 延後（D26） | 買次網域＋Workspace 才做；C15.4 另需 sampled profile（同服務人工核准滿 50 封） |
 | C6.4 | 等真資料 | 每家公司各自網站（sync-fluentcrm route.ts:55）；哪家先有人回信就用那家真同步一次 |
 | C16.2／C16.4 | 等資料 | 寄滿 200 封／2 週 |
