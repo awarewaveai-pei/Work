@@ -222,7 +222,8 @@ async function applyPolicy(deps: PipelineDeps, org: string, lead: PipelineLead, 
   const evidence = await deps.store.evidence(lead);
   const ds = decideSample(ctx, { leadId: lead.id, pct: profile.review_sample_pct, industry: lead.industry, angle: keep.angle, minConfidence: minConfidence(evidence) });
   const sampled = ds.sampled;
-  const d = await autoDecision({ gate: keep.quality_gate_status, sampled, body: keep.body, evidence, leadId: lead.id, grant: (feature) => grantFor(feature),
+  const d = await autoDecision({ gate: keep.quality_gate_status, sampled, body: keep.body, evidence, leadId: lead.id,
+    recipient: { name: lead.name, website: lead.website }, grant: (feature) => grantFor(feature),
     ...(deps.check ? { check: () => deps.check!(lead, keep.body, evidence) } : {}) });
   const snapshot: Record<string, unknown> = { ...(keep.gate_snapshot ?? {}), sampled, sample: { weight: ds.weight, mean: ds.mean, p: ds.p, flags: ds.flags }, profile_id: profile.id, ...(d.claim ? { claim_check: d.claim } : {}) };
   let outcome: DecideResult;

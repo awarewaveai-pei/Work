@@ -13,7 +13,7 @@ export type OutreachGrant = (feature: "outreach.draft" | "outreach.qa") => Promi
 import { buildBrandContext, composeBody, BrandContextError, type BrandProfile, type EvidenceItem } from "@/lib/outreach/brand-context";
 import { parseGenerationOutput, repairPrompt } from "@/lib/outreach/generation-schema";
 import { pickVariant, favouredLabel, decideSample, minConfidence, loadSampleContext, NEUTRAL_SAMPLE_CONTEXT, autoApproves, type ClaimCheck, type SampleContext } from "@/lib/outreach/review-policy";
-import { checkClaims } from "@/lib/outreach/claim-check";
+import { checkClaims, type Recipient } from "@/lib/outreach/claim-check";
 import { senderFor } from "@/lib/outreach/sender";
 
 // Cold Outreach -- write one lead's first emails and follow-ups (SPEC §5.3, D23). The one implementation: the messages
@@ -31,6 +31,7 @@ export interface LeadRow {
   service_profile_id: string | null;
   industry?: string | null;
   name: string | null;
+  website?: string | null;
   source_url: string | null;
   consent_source: string | null;
   status: string | null;
@@ -61,11 +62,12 @@ export const isUniqueViolation = (e: { code?: string } | null): boolean => e?.co
  *  sampled out -- a check that cannot change the outcome is not paid for), then autoApproves. A refused outreach.qa grant
  *  (no credits) is a check that did not happen: the email goes to a person. Shared by generation and the pipeline tick. */
 export async function autoDecision(a: { gate: "pass" | "warn" | "block"; sampled: boolean; body: string; evidence: EvidenceItem[]; leadId: string;
+  /** who the email is to: naming them or their own site is not a claim */ recipient: Recipient;
   grant: OutreachGrant; /** replaces the paid fact check (tests) */ check?: () => Promise<ClaimCheck> }): Promise<{ approve: boolean; claim: ClaimCheck | null }> {
   let claim: ClaimCheck | null = null;
   if (a.gate === "pass" && !a.sampled) {
     try {
-      claim = a.check ? await a.check() : await checkClaims({ body: a.body, evidence: a.evidence, grant: await a.grant("outreach.qa"), metadata: { lead_id: a.leadId } });
+      claim = a.check ? await a.check() : await checkClaims({ body: a.body, evidence: a.evidence, recipient: a.recipient, grant: await a.grant("outreach.qa"), metadata: { lead_id: a.leadId } });
     } catch (e) {
       claim = { verdict: "error", error: e instanceof Error ? e.message : "claim check failed" };
     }
@@ -250,7 +252,8 @@ export async function generateForLead(supabase: SupabaseClient, lead: LeadRow, o
       status = "skipped";
     } else if (keep) {
       const ds = decideSample(sctx, { leadId: lead.id, pct: sp?.review_sample_pct ?? 10, industry: lead.industry, angle: b.angle, minConfidence: lowest });
-      const d = await autoDecision({ gate: g.quality_gate_status, sampled: ds.sampled, body: text, evidence, leadId: lead.id, grant: o.grant });
+      const d = await autoDecision({ gate: g.quality_gate_status, sampled: ds.sampled, body: text, evidence, leadId: lead.id,
+        recipient: { name: lead.name, website: lead.website ?? null }, grant: o.grant });
       if (d.claim) snapshot.claim_check = d.claim;
       snapshot.sampled = ds.sampled;
       snapshot.sample = { weight: ds.weight, mean: ds.mean, p: ds.p, flags: ds.flags };
