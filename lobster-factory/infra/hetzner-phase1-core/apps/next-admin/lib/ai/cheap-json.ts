@@ -19,6 +19,9 @@ interface CheapJsonTextArgs {
   grant?: Grant;
   /** Abort after this long; default = the Anthropic SDK's own 10 min, so no call waits forever on either vendor. */
   timeoutMs?: number;
+  /** OpenAI models only (a Claude model's parameters come from claudeParams). 0 for a judgment that must answer the same
+   *  input the same way; unset = the vendor default. */
+  temperature?: number;
 }
 
 const DEFAULT_TIMEOUT_MS = 600_000;
@@ -59,6 +62,7 @@ async function generateOpenAiJsonText(args: CheapJsonTextArgs & { model: AiTextM
       body: JSON.stringify({
         model: args.model,
         max_completion_tokens: args.maxTokens,
+        ...(args.temperature === undefined ? {} : { temperature: args.temperature }),
         messages: [
           { role: "system", content: args.system },
           { role: "user", content: args.user },

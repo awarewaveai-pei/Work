@@ -40,6 +40,9 @@ export async function checkClaims(args: { body: string; evidence: EvidenceItem[]
     // nano labelled questions, courtesy and the signature as recipient claims (C15.4 REALTEST, 11 of 11 after the
     // sentence-label change); this is the only fact gate before an automatic approval
     model: "gpt-5.4-mini",
+    // A judgment, not writing: the vendor's default sampling made the same email flip between runs (C16.2: 0.89, 0.92,
+    // 0.87 on prompt and schema changes alone).
+    temperature: 0,
     system: SYSTEM,
     user: `## 收件人\n<recipient>\n名稱：${fence(args.recipient.name ?? "")}\n網站：${fence(args.recipient.website ?? "")}\n</recipient>\n\n## 證據\n<quoted_source untrusted="true">\n${evidence}\n</quoted_source>\n\n## 信的句子\n<email>\n${sentences.map((s, i) => `#${i + 1} ${fence(s)}`).join("\n")}\n</email>`,
     // one short entry per sentence of a 120-180 character email plus signature
