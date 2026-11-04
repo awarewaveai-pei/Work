@@ -239,7 +239,7 @@ export const STEPS = [
     items: [
       done('C14.1', '共用的「收暖名單」程式：存名單、存同意、取消這個人所有待寄的冷信、同步 FluentCRM；匯入廣告管理員下載的 CSV 就走它；重送同一筆不重複，但沒同步成功的會補。', C14),
       done('C14.2', '自動接收：Meta 送來的名單事件經既有的簽章驗證後，抓回資料、走同一段程式。', C14),
-      todo('C14.3', '11-04 查：Meta App「AwareWave Postiz」(2998470257172880) 的粉專 webhook 送到 chatwoot.aware-wave.com/bot，不是本系統；同一個 App 每種物件只能有一個回呼網址，改掉會讓 Chatwoot 收不到私訊。兩個粉專權杖都沒有 leads_retrieval（AwareWave 也沒有 pages_manage_metadata）。要決定：名單事件用另一個 Meta App，或由本系統收全部事件再轉給 Chatwoot。程式與測試已完成（27a93dbcc，0154 已套）。'),
+      todo('C14.3', '決定（11-04）：另開一個 Meta App 專收本系統事件，Postiz App 留給 Chatwoot 私訊。你動手 3 步：① https://developers.facebook.com/apps →「建立應用程式」→ 類型選「企業」→ 名稱 AwareWave App Webhooks → 連到 AwareWave 企業管理平台；② 該 App「應用程式設定 → 基本資料」把 App ID 與 App Secret 貼進 AWARE_WAVE_CREDENTIALS.md 的 Meta 段；③ https://developers.facebook.com/tools/explorer 右上選這個新 App →「產生存取權杖」勾 pages_show_list、pages_manage_metadata、pages_read_engagement、leads_retrieval，兩個粉專都勾選 → 把產生的權杖也貼進同一段。之後我做：換成長期粉專權杖、設定 webhook 到 app.aware-wave.com、兩個粉專訂閱名單事件、正式站環境變數（現在是空的）、用 Meta 測試工具送一筆。程式已完成（27a93dbcc）。'),
     ] },
   { n: 16, code: 'C9', group: 'G', title: '舊欄位退場', plain: '例：舊名單還是用那一格觀察。回填成證據列後，產信與評分只看證據，舊欄位不再寫入。', waitFor: '等 100 個名單走過研究流程',
     gate: '每個有舊觀察的名單都有一列證據。產信與評分不再讀舊欄位。欄位保留。', risk: 'Medium', model: 'Codex', status: 'done', commit: C9, depends: ['C3'],

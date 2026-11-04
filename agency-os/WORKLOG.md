@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-04（續4）外聯 C14.3 決定：專用 Meta App
+
+- 現況（唯讀查證）：Postiz App 2998470257172880 page webhook→chatwoot.aware-wave.com/bot（Chatwoot FB_APP_ID 用它）；next-admin 容器 META_APP_SECRET＝空字串（sha256 e3b0c442…）→ /api/webhooks/meta 從未接通；容器無任何 META_PAGE_TOKEN_<pageId>（compose 未傳）。
+- 決定（操作者：你決定）：另開「AwareWave App Webhooks」Meta App，callback app.aware-wave.com/api/webhooks/meta（leadgen；之後 C27 留言自動回覆同用）；不做「app 收再轉 Chatwoot」（客服私訊依賴 next-admin 可用性，爆炸半徑大）。
+- 操作者 3 步已寫入監工台 C14.3；之後：長期粉專權杖、App webhook 訂閱、subscribed_apps leadgen、compose/.env（secret、verify token、頁面權杖）、測試工具送一筆。
+- REALTEST_WAIVED: QUERY_ONLY -- 只讀 Graph／容器 env／chatwoot env 名稱
+- REVIEW_WAIVED: DOC_ONLY -- 只改監工台文字
+- BUGHUNT_WAIVED: DOC_ONLY -- 無程式改動
 ## 2026-11-04（續3）外聯 C6.4 完成：兩站真同步
 
 - 部署 467a54e65 後（操作者本 session「可以，兩站都測」），sync-fluentcrm：awarewave-ops lead → 200 contactId 1；soulful-expression lead → 200 contactId 1。
