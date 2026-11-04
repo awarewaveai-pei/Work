@@ -37,31 +37,40 @@ export type BridgeResult<T> = { ok: true; value: T } | { ok: false; error: strin
 
 type WriteClient = NonNullable<ReturnType<typeof getSupabaseWriteClient>>;
 
-function hostOf(url: string): string | null {
+/**
+ * One WordPress install = its origin + path (lower case, no trailing slash): a staging install under a path of the same
+ * host (https://aware-wave.com/staging/<slug>) is another site with another owner, so the host alone cannot name it.
+ */
+export function wpSiteKey(url: string): string | null {
   try {
-    return new URL(url).host;
+    const u = new URL(url);
+    return `${u.origin}${u.pathname.replace(/\/+$/, "")}`.toLowerCase();
   } catch {
     return null;
   }
 }
 
 /**
- * The bridge site's owning org = the org of the active wp_sites row on the same host -- the source
- * wordpress-core gates on too. No row -> null (global mode only). Unreadable, or rows on that host
- * naming different orgs -> undefined: the org cannot be told, so the caller blocks.
+ * The bridge site's owning org = the org of the active wp_sites row for the same install (wpSiteKey) -- the source
+ * wordpress-core gates on too. No row -> null (global mode only). Unreadable, or rows for that install naming
+ * different orgs -> undefined: the org cannot be told, so the caller blocks.
  */
 export async function bridgeSiteOrg(db: WriteClient, baseUrl: string): Promise<string | null | undefined> {
-  const host = hostOf(baseUrl);
-  if (!host) return undefined;
+  const site = wpSiteKey(baseUrl);
+  if (!site) return undefined;
   const { data, error } = await db.from("wp_sites").select("url, organization_id").eq("active", true);
   if (error) {
     console.error("[wp-bridge] wp_sites lookup failed; bridge write blocked:", error.message);
     return undefined;
   }
   const rows = (data ?? []) as Array<{ url: string; organization_id: string | null }>;
-  const orgs = new Set(rows.filter((r) => hostOf(r.url) === host).map((r) => r.organization_id ?? null));
+  const orgs = new Set(rows.filter((r) => wpSiteKey(r.url) === site).map((r) => r.organization_id ?? null));
   if (orgs.size > 1) return undefined;
-  return orgs.size === 1 ? [...orgs][0] : null;
+  if (orgs.size === 1) return [...orgs][0];
+  // No row for this install, but rows on its host (spelled http://, or another install under a path): the owner
+  // cannot be told -- block rather than fall back to the global gate (critic 2026-11-04).
+  const host = new URL(site).hostname;
+  return rows.some((r) => { const k = wpSiteKey(r.url); return !!k && new URL(k).hostname === host; }) ? undefined : null;
 }
 
 /** A configured bridge client the publish UI can target. `id` = "" for default, "1".."10" for extras. */

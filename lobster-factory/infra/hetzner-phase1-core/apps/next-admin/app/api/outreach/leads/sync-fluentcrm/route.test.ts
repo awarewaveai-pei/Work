@@ -33,7 +33,8 @@ vi.mock("@/lib/supabase-server", () => ({
 vi.mock("@/lib/outreach/suppression", () => ({
   findSuppressed: async (_db: unknown, _org: unknown, leads: unknown[], appliesTo: unknown) => { s.suppressionAsked.push(appliesTo); return leads.map(() => s.suppressed); },
 }));
-vi.mock("@/lib/payments/woo", () => ({ listBridgeClients: () => s.bridges, bridgePost: vi.fn(), isBridgeConfigured: () => true }));
+vi.mock("@/lib/payments/woo", async (orig) => ({ wpSiteKey: (await orig<typeof import("@/lib/payments/woo")>()).wpSiteKey,
+  listBridgeClients: () => s.bridges, bridgePost: vi.fn(), isBridgeConfigured: () => true }));
 vi.mock("@/lib/system-modes/production-change-gate", () => ({ checkProductionChangeAllowed: async () => ({ allowed: true, mode: "normal" }) }));
 vi.mock("@/lib/crm/fluentcrm", () => ({
   upsertContact: async (spec: unknown, opts: unknown) => { s.upserts.push([spec, opts]); return { ok: true, value: { status: "committed", contact_id: 77 } }; },
@@ -76,6 +77,19 @@ describe("POST /api/outreach/leads/sync-fluentcrm", () => {
     expect(s.suppressionAsked[0]).toEqual(["marketing", "all"]);
     expect(s.upserts).toEqual([]);
     expect(s.updates).toEqual([]);
+  });
+
+  it("syncs through the default bridge (id \"\" is a bridge, not none)", async () => {
+    s.bridges = [{ id: "", name: "client", baseUrl: "https://client.example" }];
+    expect((await call()).status).toBe(200);
+    expect(s.upserts[0][1]).toEqual({ clientId: "" });
+  });
+
+  it("a staging install under a path of the bridge host is another site: no_bridge", async () => {
+    s.siteUrls = ["https://client.example/staging/e2e-1"];
+    const res = await call();
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ error: "no_bridge" });
   });
 
   it("is 422 no_bridge when no site of the organization is a configured bridge host", async () => {

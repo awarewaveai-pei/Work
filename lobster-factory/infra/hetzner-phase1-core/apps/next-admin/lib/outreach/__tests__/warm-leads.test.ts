@@ -6,7 +6,8 @@ const ORG = "00000000-0000-4000-8000-0000000000c1";
 const m = vi.hoisted(() => ({ upsert: vi.fn() }));
 vi.mock("@/lib/system-modes/production-change-gate", () => ({ checkProductionChangeAllowed: async () => ({ allowed: true, mode: "normal" }) }));
 vi.mock("@/lib/crm/fluentcrm", () => ({ upsertContact: m.upsert }));
-vi.mock("@/lib/payments/woo", () => ({ listBridgeClients: () => [{ id: "1", name: "wp", baseUrl: "https://wp.example" }] }));
+vi.mock("@/lib/payments/woo", async (orig) => ({ wpSiteKey: (await orig<typeof import("@/lib/payments/woo")>()).wpSiteKey,
+  listBridgeClients: () => [{ id: "1", name: "wp", baseUrl: "https://wp.example" }] }));
 vi.mock("@/lib/supabase-server", () => ({
   getSupabaseWriteClient: () => ({ from: () => { const q: Record<string, unknown> = {}; q.select = () => q; q.eq = () => q;
     q.then = (ok: (v: unknown) => unknown) => ok({ data: [{ url: "https://wp.example" }], error: null }); return q; } }),

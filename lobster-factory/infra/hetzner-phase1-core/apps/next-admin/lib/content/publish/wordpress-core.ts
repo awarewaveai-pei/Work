@@ -11,7 +11,7 @@
  */
 import { resolveWpSite, getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
 import { OrgAccessError } from "@/lib/tenant-guard";
-import { isBridgeConfigured, bridgeBaseUrl, createPost } from "@/lib/payments/woo";
+import { isBridgeConfigured, bridgeBaseUrl, createPost, wpSiteKey } from "@/lib/payments/woo";
 import { markdownToBlocks } from "@/lib/content/markdown-to-blocks";
 import { decodeWpEntities } from "@/lib/content/wp-entities";
 import { normalizeManyForWp } from "@/lib/studio/wp-web-image";
@@ -392,12 +392,14 @@ export async function publishToWordPress(
   // When the target site IS the configured bridge site, route through the signed /post endpoint:
   // the plugin composes real Kadence blocks, sideloads in-article images into the media library,
   // and persists Rank Math SEO meta server-side (standard WP REST silently drops the unregistered
-  // rank_math_focus_keyword meta). Gate on a hostname match so an article for a NON-bridge site is
-  // never mis-published to the bridge site; non-bridge sites keep the standard-REST path below.
+  // rank_math_focus_keyword meta). Gate on the same install (woo.ts wpSiteKey: origin + path) so an article for a
+  // NON-bridge site -- a staging install under a path of the bridge host included -- is never mis-published to the
+  // bridge site; non-bridge sites keep the standard-REST path below.
   const bridgeBase = isBridgeConfigured() ? bridgeBaseUrl() : null;
   let bridgeHostMatch = false;
   if (bridgeBase) {
-    try { bridgeHostMatch = new URL(bridgeBase).host === new URL(base).host; } catch { bridgeHostMatch = false; }
+    const k = wpSiteKey(bridgeBase);
+    bridgeHostMatch = k !== null && k === wpSiteKey(base);
   }
   if (bridgeHostMatch) {
     // Bridge supports "draft" and "publish". Scheduled posts ("future") require the WP date field

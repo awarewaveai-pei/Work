@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-04（續2）WP 站身分＝安裝（origin＋path），不是 host
+
+- C6.4 真測：aware-wave.com 同步 423 unavailable、Soulful 422 no_bridge。
+- 根因 1：bridgeSiteOrg 以 host 比對 wp_sites；prod 有 awarewave-ops→https://aware-wave.com 與 e2e-verify→https://aware-wave.com/staging/e2e-verify-0704-6e2b91（獨立安裝、表前綴 wp_s_…、HTTP 200）→ 兩 org → undefined → 每個寫 aware-wave.com 的 bridge 動作都被擋。同類：warm-leads bridgeClientId、r2-delete-guard sameHost（staging 被當成主站掃）、wordpress-core 發文路由（staging 文章可能誤發主站）。
+- 不變量：一個 WordPress 安裝＝lower(origin＋path 去尾斜線) → woo.ts wpSiteKey，四處共用。bridgeSiteOrg：完全相符 1 org→該 org；>1→undefined；0 但同 host 有列（http 寫法、只有路徑列）→undefined（critic m1）；無→null。
+- 根因 2：sync-fluentcrm route `!clientId`，預設 bridge id 是 "" → 誤判 no_bridge → `=== null`（warm-leads:124 原本即 === null）。
+- 測試：wp-site-key.test.ts（新）、sync-fluentcrm、r2-delete-guard、wordpress-core-mode-gate 各加 staging 案例；wp-bridge-client-mode-gate 舊案例「/shop 別 org＝模糊」改為「同安裝兩 org＝模糊」＋「路徑安裝不影響主站 org」；4 個 woo mock 補真 wpSiteKey。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（全套 3989 passed，2 failed＝tools/seedstar 他 session 未追蹤）；tsc 0；prod psql wp_sites 三列 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/0m/1n（無相符列時降 null → 改 block，已修＋測試）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=wpSiteKey | hits=32（woo.ts 定義＋bridgeSiteOrg、warm-leads、r2-delete-guard、wordpress-core、測試與 mock、本條）
+- ORACLE_WAIVED: critic Deep 已逐項；突變＝bridgeSiteOrg 改回 host 比對，wp-site-key「main install's org」案例必紅
 ## 2026-11-04（續1）外聯 C6.4 接回 aware-wave.com bridge；C14.3 查 Meta 訂閱
 
 - 操作者（主 session 轉達）：「接回並兩站都測」。

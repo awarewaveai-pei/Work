@@ -85,17 +85,28 @@ describe("bridgePost -- system-mode gate", () => {
     expect(checkProductionChangeAllowed).toHaveBeenCalledWith(fakeClient, null);
   });
 
-  it("wp_sites unreadable, or rows on the host naming two orgs: blocked unavailable, no gate guess, no request", async () => {
+  // One install = origin + path (woo.ts wpSiteKey): rows naming two orgs for the bridge's own install block; another org's
+  // install under a path of the same host (a staging copy) does not.
+  it("wp_sites unreadable, or rows naming two orgs for the bridge's install: blocked unavailable, no gate guess, no request", async () => {
     db.error = { message: "boom" };
     expect(await bridgePost("/post", { title: "x" })).toEqual({ ok: false, error: "system_mode_blocks_change", blockedMode: "unavailable" });
     db.error = null;
     db.rows = [
       { url: "https://bridge.example", organization_id: ORG_A },
-      { url: "https://bridge.example/shop", organization_id: ORG_B },
+      { url: "https://Bridge.example/", organization_id: ORG_B },
     ];
     expect(await bridgePost("/post", { title: "x" })).toEqual({ ok: false, error: "system_mode_blocks_change", blockedMode: "unavailable" });
     expect(checkProductionChangeAllowed).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("another org's install under a path of the bridge host does not make the bridge's own org ambiguous", async () => {
+    db.rows = [
+      { url: "https://bridge.example", organization_id: ORG_A },
+      { url: "https://bridge.example/staging/x", organization_id: ORG_B },
+    ];
+    await bridgePost("/post", { title: "x" });
+    expect(checkProductionChangeAllowed).toHaveBeenCalledWith(fakeClient, ORG_A);
   });
 
   it("no DB client: the gate is asked with a null client (it answers unavailable)", async () => {

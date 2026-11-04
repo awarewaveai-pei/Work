@@ -10,7 +10,8 @@ vi.mock("@/lib/storage/r2", () => ({ deleteVideoObjects, deleteDesignObject, r2D
 vi.mock("@/lib/content/wp-sites", () => ({ getWpSites, wpAuthHeader: () => "Basic x" }));
 const listBridgeClients = vi.hoisted(() => vi.fn((): Array<{ id: string; name: string; baseUrl: string }> => []));
 const bridgeRead = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/payments/woo", () => ({ listBridgeClients, bridgeRead }));
+vi.mock("@/lib/payments/woo", async (orig) => ({ listBridgeClients, bridgeRead,
+  wpSiteKey: (await orig<typeof import("@/lib/payments/woo")>()).wpSiteKey }));
 
 const { deleteUnreferencedAsset, assetTarget } = await import("../r2-delete-guard");
 const { videoObjectKey } = await import("../blocks/video-pipeline");
@@ -51,6 +52,14 @@ describe("a site with a wp-bridge client is asked through the bridge, not REST",
     expect(bridgeRead).toHaveBeenCalledWith("/asset-references", { match: assetTarget(IMG)!.match }, { clientId: "" });
     expect(fetchMock).not.toHaveBeenCalled();
     expect(nothingDeleted()).toBe(true);
+  });
+
+  it("a bridge on another install of the same host (a path) is not this site's bridge: REST is asked", async () => {
+    listBridgeClients.mockReturnValue([{ id: "", name: "Soulful", baseUrl: "https://SOULFUL.example/staging/x" }]);
+    rowsFor = () => [row(5, `<img src="https://pub.r2.dev/${IMG}">`)];
+    expect(await deleteUnreferencedAsset(IMG)).toMatchObject({ ok: false, error: "asset_in_use", references: [{ id: 5 }] });
+    expect(bridgeRead).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalled();
   });
 
   it("no references -> deleted", async () => {

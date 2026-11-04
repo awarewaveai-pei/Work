@@ -33,11 +33,13 @@ vi.mock("@/lib/content/wp-sites", () => ({
 
 const bridge = vi.hoisted(() => ({
   configured: false,
+  base: "https://acme.example",
   createPost: vi.fn(async (): Promise<{ ok: boolean; error?: string; blockedMode?: string; value?: unknown }> => ({ ok: true, value: {} })),
 }));
-vi.mock("@/lib/payments/woo", () => ({
+vi.mock("@/lib/payments/woo", async (orig) => ({
+  wpSiteKey: (await orig<typeof import("@/lib/payments/woo")>()).wpSiteKey,
   isBridgeConfigured: () => bridge.configured,
-  bridgeBaseUrl: () => (bridge.configured ? "https://acme.example" : null),
+  bridgeBaseUrl: () => (bridge.configured ? bridge.base : null),
   createPost: bridge.createPost,
 }));
 
@@ -55,6 +57,7 @@ beforeEach(() => {
   checkProductionChangeAllowed.mockClear();
   resolveWpSite.mockClear();
   bridge.configured = false;
+  bridge.base = "https://acme.example";
   bridge.createPost.mockClear();
   fetchMock.mockReset();
   fetchMock.mockResolvedValue({ ok: true, json: async () => ({ id: 5, link: "https://acme.example/?p=5" }) });
@@ -92,6 +95,14 @@ describe("publishToWordPress -- system-mode gate", () => {
     const result = await publishToWordPress(INPUT, req());
     expect(result).toEqual({ ok: false, status: 423, error: "system_mode_blocks_change", wire: "json", mode: "maintenance" });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("a bridge on another install of the same host (a path) is not this site's: standard REST, no bridge call", async () => {
+    bridge.configured = true;
+    bridge.base = "https://acme.example/staging/x";
+    await publishToWordPress(INPUT, req());
+    expect(bridge.createPost).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalled();
   });
 
   it("bridge path: any other bridge failure stays 502", async () => {

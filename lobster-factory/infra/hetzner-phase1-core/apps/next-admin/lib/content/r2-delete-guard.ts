@@ -17,7 +17,7 @@
  */
 import { deleteDesignObject, deleteVideoObjects, r2DeleteObject } from "@/lib/storage/r2";
 import { getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
-import { bridgeRead, listBridgeClients } from "@/lib/payments/woo";
+import { bridgeRead, listBridgeClients, wpSiteKey } from "@/lib/payments/woo";
 
 export type AssetReference = { site: string; type: string; id: number; status: string; link: string };
 
@@ -86,7 +86,7 @@ export async function findAssetReferences(target: AssetTarget): Promise<Referenc
   const references: AssetReference[] = [];
   const bridges = listBridgeClients();
   for (const site of sites) {
-    const bridge = bridges.find((b) => sameHost(b.baseUrl, site.url));
+    const bridge = bridges.find((b) => sameSite(b.baseUrl, site.url));
     if (bridge) {
       const r = await bridgeRead<{ ok?: boolean; references?: Array<{ id: number; type: string; status: string; link: string }> }>(
         "/asset-references",
@@ -138,8 +138,10 @@ export async function findAssetReferences(target: AssetTarget): Promise<Referenc
   return { ok: true, references };
 }
 
-function sameHost(a: string, b: string): boolean {
-  try { return new URL(a).host.toLowerCase() === new URL(b).host.toLowerCase(); } catch { return false; }
+/** Same WordPress install (woo.ts wpSiteKey): a staging install under a path of a bridge host is scanned as itself. */
+function sameSite(a: string, b: string): boolean {
+  const k = wpSiteKey(a);
+  return k !== null && k === wpSiteKey(b);
 }
 
 export async function deleteUnreferencedAsset(objectKey: string): Promise<GuardedDelete> {

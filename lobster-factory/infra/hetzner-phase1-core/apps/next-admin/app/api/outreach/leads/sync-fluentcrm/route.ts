@@ -53,7 +53,7 @@ export async function POST(req: Request): Promise<Response> {
   const main = getSupabaseWriteClient();
   if (!main) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const clientId = await bridgeClientId(lead.organization_id);  // one rule with Meta / CSV warm leads (warm-leads.ts)
-  if (!clientId) return NextResponse.json({ ok: false, error: "no_bridge" }, { status: 422 });
+  if (clientId === null) return NextResponse.json({ ok: false, error: "no_bridge" }, { status: 422 });  // "" = the default bridge
 
   // A write into a client's WordPress: the system-mode gate first, like every WP-Bridge write path
   // (lib/system-modes/__tests__/production-change-coverage.test.ts).
