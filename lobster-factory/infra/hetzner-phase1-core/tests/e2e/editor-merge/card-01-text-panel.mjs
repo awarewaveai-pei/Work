@@ -66,7 +66,9 @@ async function setVal(loc, v) {
     if (!(await page.locator('button[title="匯出可再編輯的設計檔（.design.json）"]').isVisible())) await more.click();
     const [dl] = await Promise.all([page.waitForEvent("download"), page.locator('button[title="匯出可再編輯的設計檔（.design.json）"]').click()]);
     const json = JSON.parse(readFileSync(await dl.path(), "utf8"));
-    return json.objects.filter((o) => /text/i.test(o.type));
+    // awarewave-design/1 (CARD-03) wraps the fabric JSON in { format, json, meta }; older files are the bare fabric JSON
+    const fab = json.format ? json.json : json;
+    return fab.objects.filter((o) => /text/i.test(o.type));
   }
 
   // 1) nothing selected → controls set the DEFAULT of the next text

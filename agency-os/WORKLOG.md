@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-04（續16）編輯器整合 CARD-03：匯出／專案存讀聯集（Canvas Editor ⇄ Vector Editor）
+
+- SDK worker（cc.py session 503caa69，US$1.94，47 turns），卡 `agency-os/handoffs/2026-11-04-editor-merge/CARD-03-export-panel.md`。
+- 兩邊 = 檔名欄＋PNG（真實 DPI）／WebP（≤200KB）／SVG（真實 cm）／PDF（向量）＋存入 My Designs＋專案存讀同一格式 `awarewave-design/1`（`{format,json,meta}`，兩邊都讀新舊檔）＋所有匯出都吃「匯出透明底」＋縮放列（−／符合／＋／100%）。canvas 新依賴 `jspdf@2.5.1`＋`svg2pdf.js@2.2.3`（與 html CDN 同版，點擊時 dynamic import）。
+- 主 session 驗收追加修正：
+  - Codex F1：存檔送全尺寸 PNG，>12M 字元被 route.ts:164 回 413 → 兩邊 `uploadableImage()`／`uploadableDataUrl()`：超過 11.5M 先轉 WebP 0.92 再縮像素。
+  - Codex F2：底色／透明底改動、存檔進行中的修改不會讓「已存入」失效 → 兩邊 editSeq：snapshot／底色／透明底都 +1，回應時序號沒變才標已存入。
+  - Codex F3：WebP 品質到底仍 >200KB 照樣宣稱成功 → 品質下限 0.6 後縮像素，訊息報實際 KB 與尺寸（canvas 同修）。
+  - 互讀：canvas（fabric v7）寫 `IText`／`Rect`，vector（Fabric 5）載入後保留成實例 type → 文字面板與圖層標籤認不出 → vector 載入前 `normalizeV7Types()` 轉 kebab（含 group／clipPath）。反方向（v5→v7）實測本來就 OK。
+  - vector 面板直屬控制項 `width:100%`＋10px margin 溢出卡片（CARD-01 只補文字面板）→ 改一條 `details > input/select/textarea/button { width:calc(100% - 20px) }`，刪掉文字面板特例。
+  - card-01 e2e 讀匯出檔頂層 `objects` → 改為兩種格式都讀。
+- REALTEST_EVIDENCE: tool=Bash | cmd=worker：tsc 0、SRI 13/13、vitest designs 14/14、card-03 e2e 94/94；主 session 修後：tsc 0、SRI 13/13、3903 重跑 card-01/02/03 e2e = 63/63、147/147、94/94；JS 探測：v7 檔載入 vector → types i-text/rect、文字被認出、標籤「📝 跨編輯器」；存檔中改物件→按鈕回「存入」、乾淨存檔→「已存入 ✓」、改底色→回「存入」；36,195,850 字元雜訊 PNG → 上傳 11,438,259 字元 WebP；WebP 193KB（縮成 369×369）；全面板溢出量測 0 | exit=0 | ms=10216
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（agency-os/reports/oracle/2026-11-04-partialreview-32bc17ad.md，3 項已修＋同類 canvas 端一併修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=#textPanel >\|json.objects.filter\|quality > 0.2\|q>0.2 | hits=0（舊特例、舊格式讀取、舊品質下限皆已清）
+- npm test（worker）：4016 passed／2 failed，兩個失敗都來自別的 session 未追蹤的 `app/(shell)/tools/seedstar/`（products.test、staff-tools.test），不在 commit 內、主機 rsync 只拿 commit → 部署 gate 不受影響。
 ## 2026-11-04（續15）編輯器整合 CARD-02：圖層面板聯集（Canvas Editor ⇄ Vector Editor）
 
 - SDK worker（cc.py session 0c7dc5b1，US$1.58，38 turns），卡 `agency-os/handoffs/2026-11-04-editor-merge/CARD-02-layers-panel.md`。

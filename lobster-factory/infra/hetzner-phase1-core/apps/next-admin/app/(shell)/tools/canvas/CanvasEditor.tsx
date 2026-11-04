@@ -84,6 +84,56 @@ function isTextObject(o: { type?: string } | null | undefined): boolean {
   return !!o && (o.type === "i-text" || o.type === "text" || o.type === "textbox");
 }
 
+/** Project file shared with public/vector-editor.html (see exportDesign). */
+const DESIGN_FORMAT = "awarewave-design/1";
+type DesignMeta = { wv: number; hv: number; unit: "cm" | "mm" | "px"; dpi: number; bgColor?: string; transparent?: boolean };
+/** Validate the `meta` block of a project file (either editor's, old or new); null = keep the current document size. */
+function readDesignMeta(raw: unknown): DesignMeta | null {
+  const m = raw as Partial<DesignMeta> | null | undefined;
+  if (!m || typeof m !== "object") return null;
+  const unit = m.unit === "cm" || m.unit === "mm" || m.unit === "px" ? m.unit : null;
+  const { wv, hv, dpi } = m;
+  if (!unit || typeof wv !== "number" || typeof hv !== "number" || typeof dpi !== "number") return null;
+  if (!(wv > 0 && hv > 0 && dpi >= 1 && dpi <= 2400)) return null;
+  return {
+    wv, hv, unit, dpi,
+    bgColor: typeof m.bgColor === "string" && /^#[0-9a-f]{6}$/i.test(m.bgColor) ? m.bgColor : undefined,
+    transparent: typeof m.transparent === "boolean" ? m.transparent : undefined,
+  };
+}
+
+// app/api/tools/designs/route.ts MAX_IMAGE_CHARS = 12_000_000 → shrink the data URL under it (WebP, then fewer
+// pixels) instead of letting the save fail with 413 (Codex 32bc17ad F1, same class as vector-editor.html).
+const UPLOAD_MAX_CHARS = 11_500_000;
+async function uploadableDataUrl(url: string): Promise<string> {
+  if (url.length <= UPLOAD_MAX_CHARS) return url;
+  const img = new Image();
+  await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(new Error("decode failed")); img.src = url; });
+  const oc = document.createElement("canvas");
+  const g = oc.getContext("2d");
+  if (!g) return url;
+  let sc = 1;
+  let out = url;
+  while (out.length > UPLOAD_MAX_CHARS && sc > 0.05) {
+    oc.width = Math.max(1, Math.round(img.width * sc));
+    oc.height = Math.max(1, Math.round(img.height * sc));
+    g.clearRect(0, 0, oc.width, oc.height);
+    g.drawImage(img, 0, 0, oc.width, oc.height);
+    out = oc.toDataURL("image/webp", 0.92);
+    sc *= 0.85;
+  }
+  return out;
+}
+
+function triggerDownload(href: string, filename: string, revoke = false) {
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  if (revoke) setTimeout(() => URL.revokeObjectURL(href), 1000);
+}
 
 export default function CanvasEditor() {
   const canvasElRef = useRef<HTMLCanvasElement | null>(null);
@@ -129,6 +179,8 @@ export default function CanvasEditor() {
   // ↩️ Undo/Redo — JSON snapshots of the canvas.
   const undoStack = useRef<string[]>([]);
   const redoStack = useRef<string[]>([]);
+  // bumped by every recorded edit (+ 透明底): 已存入 only sticks when nothing changed while the save was in flight
+  const editSeqRef = useRef(0);
   // text-style edits call set() (no object:modified) → debounced undo step (Codex 85ff8658 F2);
   // ref because snapshot is declared later in this component.
   const snapshotRef = useRef<() => void>(() => {});
@@ -151,6 +203,23 @@ export default function CanvasEditor() {
     return `canvas-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
   });
   const canvasMetaRef = useRef<{ realW: number; realH: number; dispScale: number; dpi: number } | null>(null);
+  const [viewPct, setViewPct] = useState(100); // 檢視縮放 % (display scale of the artboard; export is always real px)
+  const [exportBusy, setExportBusy] = useState(false); // PDF build in flight
+  // Download base name: handoff name until the user edits the input; illegal filename characters are replaced.
+  // The document as the user sized it: the typed size when it still equals the real px (so 10×6 cm stays 10×6, not
+  // 10.01×5.99 from a px round trip), else the real px converted into the current unit.
+  const docMeta = useCallback(() => {
+    const m = canvasMetaRef.current;
+    const dpi = m?.dpi ?? szDpi;
+    const toPxN = (v: number) => (szUnit === "px" ? Math.round(v) : Math.round(((szUnit === "mm" ? v / 10 : v) * dpi) / 2.54));
+    const typed = !m || (toPxN(szW) === m.realW && toPxN(szH) === m.realH);
+    const wv = typed ? szW : convertUnit(m!.realW, "px", szUnit, dpi);
+    const hv = typed ? szH : convertUnit(m!.realH, "px", szUnit, dpi);
+    const realW = m?.realW ?? toPxN(szW), realH = m?.realH ?? toPxN(szH);
+    const cm = (v: number, real: number) => (szUnit === "cm" && typed ? v : szUnit === "mm" && typed ? v / 10 : +((real / dpi) * 2.54).toFixed(2));
+    return { wv, hv, unit: szUnit, dpi, realW, realH, cmW: cm(wv, realW), cmH: cm(hv, realH) };
+  }, [szW, szH, szUnit, szDpi]);
+  const fileBase = useCallback(() => (nameRef.current || editName).replace(/[\\/:*?"<>|]/g, "-").trim() || "design", [editName]);
   const [drawMode, setDrawMode] = useState<"off" | "draw" | "erase">("off"); // 自由繪筆 / 橡皮擦
   const [drawColor, setDrawColor] = useState("#111111");
   const [drawWidth, setDrawWidth] = useState(6);
@@ -267,6 +336,8 @@ export default function CanvasEditor() {
         wrap.style.boxShadow = "0 3px 14px rgba(0,0,0,0.26)";
         wrap.style.outline = "1px solid rgba(128,128,128,0.5)";
         wrap.style.borderRadius = "2px";
+        wrap.style.margin = "auto"; // centred when it fits, scrollable (not clipped) when 100% is larger than the workspace
+        wrap.style.flex = "none";
       }
       // Default 800×800 document so the auto-fit (relayoutCanvas) has a real size to scale from even
       // before a handoff/upload. Export uses these realW/realH. (Was null → no auto-fit on direct visit.)
@@ -649,6 +720,7 @@ export default function CanvasEditor() {
   }, []);
   const snapshot = useCallback(() => {
     if (restoringRef.current) return;
+    editSeqRef.current++;
     const c = fabricRef.current as unknown as { toJSON: () => unknown; getZoom: () => number } | null;
     if (!c) return;
     undoStack.current.push(JSON.stringify({ json: c.toJSON(), zoom: c.getZoom() }));
@@ -827,6 +899,20 @@ export default function CanvasEditor() {
     canvas.setZoom(dispScale);
     canvas.setDimensions({ width: Math.round(m.realW * dispScale), height: Math.round(m.realH * dispScale) });
     canvasMetaRef.current = { ...m, dispScale };
+    setViewPct(Math.round(dispScale * 100));
+    canvas.requestRenderAll();
+  }, []);
+
+  // 🔍 檢視縮放 −／＋／100% — display scale only (objects + export stay in real px); 符合 = relayoutCanvas().
+  const setViewScale = useCallback((s: number) => {
+    const canvas = fabricRef.current;
+    const m = canvasMetaRef.current;
+    if (!canvas || !m) return;
+    const z = Math.min(5, Math.max(0.05, s));
+    canvas.setZoom(z);
+    canvas.setDimensions({ width: Math.round(m.realW * z), height: Math.round(m.realH * z) });
+    canvasMetaRef.current = { ...m, dispScale: z };
+    setViewPct(Math.round(z * 100));
     canvas.requestRenderAll();
   }, []);
 
@@ -1401,20 +1487,18 @@ export default function CanvasEditor() {
 
   // 💾 設計檔（可再編輯）— export the full canvas JSON (custom `name` included via customProperties)
   // so a design can be reloaded and keep editing. Client-only: download a .design.json blob.
+  // Shared with public/vector-editor.html: { format: "awarewave-design/1", json: <fabric toJSON incl. name + background>,
+  // meta: { wv, hv, unit, dpi, bgColor, transparent } }. Load also accepts the old canvas shape (bare toJSON) and the
+  // old vector shape ({ _proj, meta, w, h, canvas }).
   const exportDesign = useCallback(() => {
-    const c = fabricRef.current as unknown as { toJSON: () => unknown } | null;
+    const c = fabricRef.current as unknown as { toJSON: () => unknown; backgroundColor?: unknown } | null;
     if (!c) return;
-    const json = JSON.stringify(c.toJSON());
-    const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${nameRef.current || editName}.design.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  }, [editName]);
+    const { wv, hv, unit, dpi } = docMeta();
+    const meta = { wv, hv, unit, dpi };
+    const bg = typeof c.backgroundColor === "string" && /^#[0-9a-f]{6}$/i.test(c.backgroundColor) ? c.backgroundColor : bgColor;
+    const doc = { format: DESIGN_FORMAT, json: c.toJSON(), meta: { ...meta, bgColor: bg, transparent: exportTransparent } };
+    triggerDownload(URL.createObjectURL(new Blob([JSON.stringify(doc)], { type: "application/json" })), `${fileBase()}.design.json`, true);
+  }, [docMeta, bgColor, exportTransparent, fileBase]);
 
   const importDesign = useCallback(
     (file: File | null) => {
@@ -1425,8 +1509,11 @@ export default function CanvasEditor() {
       const reader = new FileReader();
       reader.onload = () => {
         let json: unknown;
+        let meta: DesignMeta | null = null;
         try {
-          json = JSON.parse(reader.result as string);
+          const data = JSON.parse(reader.result as string) as Record<string, unknown>;
+          json = data.json ?? data.canvas ?? data; // new envelope | old vector | old canvas (bare toJSON)
+          meta = readDesignMeta(data.meta);
         } catch {
           setError("設計檔格式錯誤，無法載入");
           return;
@@ -1437,9 +1524,23 @@ export default function CanvasEditor() {
             const im = o as unknown as { type?: string; filters?: unknown[]; applyFilters?: () => void };
             if (im.type === "image" && im.filters && im.filters.length > 0 && im.applyFilters) im.applyFilters();
           });
+          if (meta) {
+            // restore the real document size / unit / DPI / bg / transparent flag the file was saved with
+            const toPxN = (v: number) => (meta!.unit === "px" ? Math.round(v) : Math.round(((meta!.unit === "mm" ? v / 10 : v) * meta!.dpi) / 2.54));
+            const prev = canvasMetaRef.current;
+            canvasMetaRef.current = { realW: Math.max(1, toPxN(meta.wv)), realH: Math.max(1, toPxN(meta.hv)), dispScale: prev?.dispScale ?? 1, dpi: meta.dpi };
+            sizedByCanvasApply.current = true;
+            setSzW(meta.wv); setSzH(meta.hv); setSzUnit(meta.unit); setSzDpi(meta.dpi);
+            if (typeof meta.transparent === "boolean") setExportTransparent(meta.transparent);
+            if (meta.bgColor) (c as unknown as { backgroundColor?: string }).backgroundColor = meta.bgColor;
+            relayoutCanvas();
+            const m2 = canvasMetaRef.current;
+            setSzInfo(`真實 ${m2.realW}×${m2.realH}px @${meta.dpi}DPI = ${+((m2.realW / meta.dpi) * 2.54).toFixed(2)}×${+((m2.realH / meta.dpi) * 2.54).toFixed(2)}cm（預覽 ${Math.round(m2.dispScale * 100)}%）`);
+          }
           c.requestRenderAll();
           refreshLayers();
           syncBgFromCanvas();
+          setSaveState("idle");
           restoringRef.current = false;
           snapshot(); // record the loaded design as an undo baseline
         }).catch(() => {
@@ -1451,7 +1552,7 @@ export default function CanvasEditor() {
       };
       reader.readAsText(file);
     },
-    [refreshLayers, snapshot]
+    [refreshLayers, snapshot, relayoutCanvas, syncBgFromCanvas]
   );
 
   // 🪄 AI 去除不要的部分 — paint a mask over the unwanted region, send image+mask to bria/eraser.
@@ -1594,69 +1695,96 @@ export default function CanvasEditor() {
     }
   }, [maskMode, fillPrompt, resetAdjToNeutral]);
 
-  /** Flatten the canvas to a PNG data URL (codebase convention — see file header). */
-  const exportPng = useCallback((): string | null => {
-    const canvas = fabricRef.current as unknown as {
-      discardActiveObject: () => void;
-      requestRenderAll: () => void;
-      toDataURL: (o: Record<string, unknown>) => string;
-      getZoom: () => number;
-      setZoom: (z: number) => void;
-      setDimensions: (d: { width: number; height: number }) => void;
-    } | null;
+  /** Run `fn` with the artboard in export state: selection dropped, 匯出透明底 honoured, zoom 1 at full real px
+   *  (export is full-DPI), then the display restored. Every export below (PNG/WebP/SVG/PDF/存入) goes through this. */
+  const withRealExport = useCallback(<T,>(fn: (c: FabricCanvas) => T): T | null => {
+    const canvas = fabricRef.current as unknown as (FabricCanvas & {
+      setZoom: (z: number) => void; getZoom: () => number;
+      setDimensions: (d: { width: number; height: number }) => void; backgroundColor?: string;
+    }) | null;
     if (!canvas) return null;
     canvas.discardActiveObject(); // drop selection handles from the export
-    // 匯出透明底: blank the artboard colour only for the export, then put it back.
-    const bgHolder = canvas as unknown as { backgroundColor?: string };
-    const prevBg = bgHolder.backgroundColor;
-    if (exportTransparent) bgHolder.backgroundColor = "";
-    const restoreBg = () => { if (exportTransparent) bgHolder.backgroundColor = prevBg; };
+    const prevBg = canvas.backgroundColor;
+    if (exportTransparent) canvas.backgroundColor = "";
     const m = canvasMetaRef.current;
-    if (!m) {
-      canvas.requestRenderAll();
-      const url = canvas.toDataURL({ format: "png", multiplier: 1 });
-      restoreBg();
-      canvas.requestRenderAll();
-      return url;
-    }
-    // Print canvas set: temporarily reset zoom + render at full real px so the export is
-    // full-DPI (toDataURL honours viewportTransform; restore the display afterwards).
     const zoom = canvas.getZoom();
-    canvas.setZoom(1);
-    canvas.setDimensions({ width: m.realW, height: m.realH });
-    const url = canvas.toDataURL({ format: "png", multiplier: 1 });
-    restoreBg();
-    canvas.setZoom(zoom);
-    canvas.setDimensions({ width: Math.round(m.realW * m.dispScale), height: Math.round(m.realH * m.dispScale) });
-    canvas.requestRenderAll();
-    return url;
+    if (m) { canvas.setZoom(1); canvas.setDimensions({ width: m.realW, height: m.realH }); }
+    try {
+      return fn(canvas);
+    } finally {
+      if (exportTransparent) canvas.backgroundColor = prevBg;
+      if (m) { canvas.setZoom(zoom); canvas.setDimensions({ width: Math.round(m.realW * m.dispScale), height: Math.round(m.realH * m.dispScale) }); }
+      canvas.requestRenderAll();
+    }
   }, [exportTransparent]);
+
+  /** Flatten the canvas to a PNG data URL (codebase convention — see file header). */
+  const exportPng = useCallback((): string | null => withRealExport((c) => c.toDataURL({ format: "png", multiplier: 1 })), [withRealExport]);
+
+  /** SVG of the artboard; width/height in real cm (from the document DPI) so print tools open it at true size. */
+  const exportSvgString = useCallback((pdf: boolean): string | null => withRealExport((c) => {
+    const m = canvasMetaRef.current;
+    const rw = m?.realW ?? c.getWidth(), rh = m?.realH ?? c.getHeight();
+    const dm = docMeta();
+    const size = pdf ? { width: rw, height: rh } : { width: `${dm.cmW}cm`, height: `${dm.cmH}cm` };
+    return (c as unknown as { toSVG: (o: unknown) => string }).toSVG({ ...size, viewBox: { x: 0, y: 0, width: rw, height: rh } });
+  }), [withRealExport, docMeta]);
+
+  const downloadSvg = useCallback(() => {
+    const svg = exportSvgString(false);
+    if (!svg) return;
+    triggerDownload(URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" })), `${fileBase()}.svg`, true);
+  }, [exportSvgString, fileBase]);
+
+  // jspdf + svg2pdf.js load on click only → no bundle growth for the other pages.
+  const downloadPdf = useCallback(async () => {
+    const svg = exportSvgString(true);
+    const m = canvasMetaRef.current;
+    if (!svg || !m) return;
+    setExportBusy(true);
+    setError(null);
+    let host: HTMLElement | null = null;
+    try {
+      const [{ jsPDF }, { svg2pdf }] = await Promise.all([import("jspdf"), import("svg2pdf.js")]);
+      const dm = docMeta();
+      const wMm = dm.cmW * 10, hMm = dm.cmH * 10;
+      const el = new DOMParser().parseFromString(svg, "image/svg+xml").documentElement as unknown as SVGElement;
+      host = document.createElement("div"); // svg2pdf reads computed styles → the element must be in the document
+      host.style.cssText = "position:fixed;left:-99999px;top:0;visibility:hidden";
+      host.appendChild(document.importNode(el, true));
+      document.body.appendChild(host);
+      const doc = new jsPDF({ unit: "mm", format: [wMm, hMm], orientation: wMm >= hMm ? "landscape" : "portrait" });
+      await svg2pdf(host.firstElementChild as SVGElement, doc, { x: 0, y: 0, width: wMm, height: hMm });
+      doc.save(`${fileBase()}.pdf`);
+    } catch (err) {
+      setError(`PDF 失敗：${err instanceof Error ? err.message : String(err)}（改用 SVG 下載）`);
+    } finally {
+      host?.remove();
+      setExportBusy(false);
+    }
+  }, [exportSvgString, fileBase, docMeta]);
 
   const download = useCallback(() => {
     const png = exportPng();
     if (!png) return;
-    const base = nameRef.current || editName;
-    const a = document.createElement("a");
-    a.href = png;
-    a.download = `${base}.png`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  }, [exportPng, editName]);
+    triggerDownload(png, `${fileBase()}.png`);
+  }, [exportPng, fileBase]);
 
   const saveToDesigns = useCallback(async () => {
-    const png = exportPng();
-    if (!png) return;
+    const full = exportPng();
+    if (!full) return;
     setSaveState("saving");
     setError(null);
+    const seq = editSeqRef.current;
     try {
+      const png = await uploadableDataUrl(full);
       const res = await fetch("/api/tools/designs", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...roleHeader("operator") },
         body: JSON.stringify({ image: png, prompt: "canvas edit", modelName: "canvas", source: "canvas" }),
       });
       const json = (await res.json()) as { ok: boolean; error?: string };
-      setSaveState(json.ok ? "saved" : "error");
+      setSaveState(json.ok ? (editSeqRef.current === seq ? "saved" : "idle") : "error");
       if (!json.ok) setError(json.error ?? "儲存失敗");
     } catch (err) {
       setSaveState("error");
@@ -1753,18 +1881,21 @@ export default function CanvasEditor() {
     let quality = 0.9;
     let dataUrl = oc.toDataURL("image/webp", quality);
     // Base64 → bytes ratio: length × 0.75; iterate down until ≤ 200 KB.
-    while (dataUrl.length * 0.75 > 200 * 1024 && quality > 0.2) {
+    while (dataUrl.length * 0.75 > 200 * 1024 && quality > 0.6) {
       quality = Math.round((quality - 0.1) * 10) / 10;
       dataUrl = oc.toDataURL("image/webp", quality);
     }
-    const base = nameRef.current || editName;
-    const a = document.createElement("a");
-    a.href = dataUrl;
-    a.download = `${base}.webp`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  }, [exportPng, editName]);
+    // still >200KB at quality 0.6 → fewer pixels, so the ≤200KB promise holds (Codex 32bc17ad F3)
+    let sc = 1;
+    while (dataUrl.startsWith("data:image/webp") && dataUrl.length * 0.75 > 200 * 1024 && sc > 0.05) {
+      sc = Math.round(sc * 0.85 * 1000) / 1000;
+      oc.width = Math.max(1, Math.round(img.width * sc));
+      oc.height = Math.max(1, Math.round(img.height * sc));
+      ctx2d.drawImage(img, 0, 0, oc.width, oc.height);
+      dataUrl = oc.toDataURL("image/webp", quality);
+    }
+    triggerDownload(dataUrl, `${fileBase()}.webp`);
+  }, [exportPng, fileBase]);
 
   // ⌨️ Adobe 風快捷鍵：Ctrl/⌘+Z 復原、Ctrl+Shift+Z / Ctrl+Y 重做、Delete/Backspace 刪除、Esc 取消
   // 當前模式。防呆：在輸入框/下拉打字、或畫布內編輯文字(i-text editing)時不攔截，讓打字/刪字正常。
@@ -1825,7 +1956,7 @@ export default function CanvasEditor() {
           style={{
             border: "1px solid var(--card-border)", borderRadius: 8, flex: 1, minWidth: 0,
             height: workspaceH, // dynamic workspace height (measured) → artboard floats centred inside it
-            display: "flex", justifyContent: "center", alignItems: "center", overflow: "hidden",
+            display: "flex", overflow: "auto", // the artboard wrapper has margin:auto → centred, and scrolls at 100%/zoom-in
             // 工作區 = 淡灰棋盤格（半透明灰，明暗主題皆可讀）。白色畫板(=匯出範圍)浮在上面、有陰影邊框 →
             // 一眼看出「灰格=非畫布、不可用」「白卡=真正可用範圍」。
             backgroundColor: "var(--card-bg)",
@@ -1874,6 +2005,16 @@ export default function CanvasEditor() {
           ) : null}
         </div>
 
+        {/* 🔍 檢視縮放 — same four controls as vector-editor.html 8. 檢視（−／符合／＋／100%）；只改預覽，匯出永遠是真實 px */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", fontSize: 12, whiteSpace: "nowrap" }}>
+          <span style={{ opacity: 0.6 }}>縮放</span>
+          <span data-testid="view-pct" style={{ minWidth: 38, fontVariantNumeric: "tabular-nums" }}>{viewPct}%</span>
+          <button className="btn-secondary" disabled={!ready} onClick={() => setViewScale((canvasMetaRef.current?.dispScale ?? 1) / 1.2)} title="縮小預覽">－</button>
+          <button className="btn-secondary" disabled={!ready} onClick={relayoutCanvas} title="符合工作區">符合</button>
+          <button className="btn-secondary" disabled={!ready} onClick={() => setViewScale((canvasMetaRef.current?.dispScale ?? 1) * 1.2)} title="放大預覽">＋</button>
+          <button className="btn-secondary" disabled={!ready} onClick={() => setViewScale(1)} title="100%（實際像素）">100%</button>
+        </div>
+
         {/* 💾 匯出 / 下載 — 放最上方（主要輸出動作，免捲動）*/}
         <SidebarPanel id="export" title="💾 匯出 / 下載" defaultPos={{ x: 816, y: 0 }} width={280}>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1890,9 +2031,14 @@ export default function CanvasEditor() {
               <button className="btn-primary" style={{ flex: 1 }} disabled={!ready || canvasBusy} onClick={download} title="下載全尺寸 PNG">PNG下載</button>
               <button className="btn-primary" style={{ flex: 1 }} disabled={!ready || canvasBusy} onClick={() => void downloadWebP()} title="下載 WebP，自動壓縮至 200KB 以內">WebP下載</button>
             </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready || canvasBusy} onClick={downloadSvg} title="下載 SVG（向量，真實 cm 尺寸）">SVG下載</button>
+              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready || canvasBusy || exportBusy} onClick={() => void downloadPdf()} title="下載 PDF（向量·印刷·真實 cm）">{exportBusy ? "PDF 產生中…" : "PDF下載"}</button>
+            </div>
             <button className="btn-primary" style={{ width: "100%" }} disabled={!ready || canvasBusy || saveState === "saving" || saveState === "saved"} onClick={() => void saveToDesigns()}>
-              {saveState === "saved" ? "已存入 ✓" : saveState === "saving" ? "儲存中…" : "存入 My Designs"}
+              {saveState === "saved" ? "已存入 ✓" : saveState === "saving" ? "儲存中…" : saveState === "error" ? "儲存失敗 ✗（重試）" : "存入 My Designs"}
             </button>
+            <span style={{ fontSize: 11, opacity: 0.6 }}>交印刷廠選 PDF。文字建議再轉外框，字體缺時最保險。</span>
           </div>
         </SidebarPanel>
 
@@ -1988,7 +2134,7 @@ export default function CanvasEditor() {
                 }} style={{ width: "100%", height: 30, padding: 2, border: "1px solid var(--card-border)", borderRadius: 4, cursor: "pointer" }} />
               </label>
               <label style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, paddingBottom: 6 }}>
-                <input type="checkbox" checked={exportTransparent} onChange={(e) => setExportTransparent(e.target.checked)} />
+                <input type="checkbox" checked={exportTransparent} onChange={(e) => { setExportTransparent(e.target.checked); editSeqRef.current++; setSaveState("idle"); }} />
                 匯出透明底
               </label>
             </div>

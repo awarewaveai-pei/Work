@@ -65,8 +65,8 @@
   button.act:hover { background:var(--btn-primary-hover); }
   button.ghost, label.ghost { background:var(--btn-secondary-bg); border:1px solid var(--btn-secondary-border); color:var(--btn-secondary-text); font-weight:var(--font-weight-semibold); cursor:pointer; transition:background .15s, border-color .15s; }
   button.ghost:hover, label.ghost:hover { background:var(--body-bg); border-color:var(--btn-secondary-hover-border); }
-  /* direct-child full-width inputs overflow by the 20px side margins; fixed for this panel only */
-  #textPanel > input[type=range], #textPanel > input#fontSearch { width:calc(100% - 20px); }
+  /* every full-width control sitting directly in a panel keeps the 10px side margins (width:100% + margin overflowed the card) */
+  details > input, details > select, details > textarea, details > button { width:calc(100% - 20px); }
   button.ghost.on { border-color:var(--accent); background:var(--accent-light); }
   button:disabled { opacity:.45; cursor:not-allowed; box-shadow:none; }
   .info { font-size:11px; color:var(--text-muted); margin-top:6px; line-height:1.6; }
@@ -331,10 +331,16 @@
       <div class="layers" id="layers"></div>
     </details>
 
-    <details open><summary>7. 匯出</summary>
+    <details open id="exportPanel"><summary>7. 匯出 / 存入</summary>
+      <label>檔名（不含副檔名）</label>
+      <input id="fname" type="text" placeholder="檔名" title="下載檔名（不含副檔名）">
       <button class="act" id="exportPdf">匯出 PDF（向量·印刷·真實 cm）</button>
-      <button class="ghost" id="exportSvg">匯出 SVG</button>
-      <button class="ghost" id="exportPng">匯出 PNG（含 DPI）</button>
+      <button class="ghost" id="exportSvg">匯出 SVG（向量，真實 cm）</button>
+      <div class="row" style="margin-top:6px;">
+        <button class="ghost" id="exportPng" title="全尺寸 PNG（真實 DPI）">匯出 PNG（含 DPI）</button>
+        <button class="ghost" id="exportWebp" title="WebP，自動壓縮至 200KB 以內">匯出 WebP（≤200KB）</button>
+      </div>
+      <button class="act" id="saveDesign">存入 My Designs</button>
       <div class="info">交印刷廠選 PDF。CJK 文字若印刷字體缺，建議匯 SVG → Inkscape「物件轉路徑」最保險。</div>
     </details>
 
@@ -347,10 +353,10 @@
       </div>
       <button class="ghost" id="zoom100" style="margin-top:6px;">100%（實際像素）</button>
       <hr>
-      <button class="act" id="saveProj">💾 儲存專案（.json）</button>
+      <button class="act" id="saveProj">💾 儲存專案（.design.json）</button>
       <label>讀取專案</label>
       <input id="loadProj" type="file" accept=".json,application/json">
-      <div class="info">存檔保留所有物件、字型、圖層。接案做到一半可存起來下次續做。</div>
+      <div class="info">存檔保留所有物件、字型、圖層、畫布尺寸與底色，與 Canvas Editor 同一格式（也讀舊檔）。接案做到一半可存起來下次續做。</div>
     </details>
 
     <div class="blocks-head">🧩 額外積木（plug-in blocks）</div>
@@ -767,26 +773,75 @@ document.getElementById('svgFile').onchange=(e)=>{ const f=e.target.files[0]; if
 // ====== 匯出 ======
 function withRealCoords(fn){ const z=canvas.getZoom(); canvas.setZoom(1); canvas.setDimensions({width:realW,height:realH}); const r=fn(); canvas.setDimensions({width:Math.round(realW*z),height:Math.round(realH*z)}); canvas.setZoom(z); return r; }
 function withTransparent(fn){ const el=document.getElementById('transBg'); if(!el||!el.checked) return fn(); const bg=canvas.backgroundColor; canvas.backgroundColor=''; const r=fn(); canvas.backgroundColor=bg; canvas.requestRenderAll(); return r; }
-function download(blob,name){ const u=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=u; a.download=name; a.click(); URL.revokeObjectURL(u); }
+// every export (PNG/WebP/SVG/PDF/存入) = selection dropped + 匯出透明底 honoured + full real px
+function exportState(fn){ canvas.discardActiveObject(); canvas.requestRenderAll(); return withTransparent(()=> withRealCoords(fn)); }
+function download(blob,name){ const u=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),1000); }
+function dlUrl(url,name){ const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); }
+// shared with /tools/canvas: editable file name, default design-yyyymmdd-hhmm; illegal filename characters replaced
+(function(){ const d=new Date(), p=n=>String(n).padStart(2,'0'); document.getElementById('fname').value='design-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes()); })();
+function fileBase(){ return document.getElementById('fname').value.replace(/[\\/:*?"<>|]/g,'-').trim()||'design'; }
 
 document.getElementById('exportSvg').onclick=()=>{
   const m=canvas._meta;
-  const svg=withTransparent(()=> withRealCoords(()=> canvas.toSVG(m?{ width:`${m.cmW}cm`, height:`${m.cmH}cm`, viewBox:{x:0,y:0,width:realW,height:realH} }:undefined)));
-  download(new Blob([svg],{type:'image/svg+xml'}),'design.svg');
+  const svg=exportState(()=> canvas.toSVG(m?{ width:`${m.cmW}cm`, height:`${m.cmH}cm`, viewBox:{x:0,y:0,width:realW,height:realH} }:undefined));
+  download(new Blob([svg],{type:'image/svg+xml'}),fileBase()+'.svg');
 };
-document.getElementById('exportPng').onclick=()=>{
-  const url=withTransparent(()=> withRealCoords(()=> canvas.toDataURL({format:'png', multiplier:1})));
-  const a=document.createElement('a'); a.href=url; a.download='design.png'; a.click();
+function pngUrl(){ return exportState(()=> canvas.toDataURL({format:'png', multiplier:1})); }
+document.getElementById('exportPng').onclick=()=> dlUrl(pngUrl(), fileBase()+'.png');
+// WebP: draw the full-DPI PNG on a scratch canvas, lower the quality until the file is <= 200 KB
+document.getElementById('exportWebp').onclick=async ()=>{
+  const info=document.getElementById('traceInfo');
+  const img=new Image(); await new Promise((res,rej)=>{ img.onload=res; img.onerror=rej; img.src=pngUrl(); });
+  const oc=document.createElement('canvas'); oc.width=img.width; oc.height=img.height;
+  const g=oc.getContext('2d'); if(!g){ info.innerHTML='⚠️ WebP 失敗：無法建立畫布'; return; }
+  g.drawImage(img,0,0);
+  const toBlob=(q)=> new Promise(res=> oc.toBlob(res,'image/webp',q));
+  let q=0.9, sc=1, blob=await toBlob(q);
+  while(blob && blob.size>200*1024 && q>0.6){ q=Math.round((q-0.1)*10)/10; blob=await toBlob(q); }
+  // still >200KB at q 0.6 → shrink the pixels so the file really is <=200KB (Codex 32bc17ad F3)
+  while(blob && blob.type==='image/webp' && blob.size>200*1024 && sc>0.05){ sc=Math.round(sc*0.85*1000)/1000; oc.width=Math.max(1,Math.round(img.width*sc)); oc.height=Math.max(1,Math.round(img.height*sc)); g.drawImage(img,0,0,oc.width,oc.height); blob=await toBlob(q); }
+  if(!blob || blob.type!=='image/webp'){ info.innerHTML='⚠️ WebP 失敗：此瀏覽器不支援 WebP 編碼（改用 PNG）'; return; }
+  download(blob, fileBase()+'.webp');
+  info.innerHTML='✅ WebP：'+Math.round(blob.size/1024)+' KB（品質 '+q+(sc<1?'，縮成 '+oc.width+'×'+oc.height+'px':'')+'）';
 };
 document.getElementById('exportPdf').onclick=async ()=>{
   const m=canvas._meta; if(!m){ alert('請先套用畫布尺寸'); return; }
   document.getElementById('traceInfo').innerHTML='<span class="busy">產生 PDF…</span>';
-  const svgStr=withTransparent(()=> withRealCoords(()=> canvas.toSVG({ viewBox:{x:0,y:0,width:realW,height:realH}, width:realW, height:realH })));
+  const svgStr=exportState(()=> canvas.toSVG({ viewBox:{x:0,y:0,width:realW,height:realH}, width:realW, height:realH }));
   const svgEl=new DOMParser().parseFromString(svgStr,'image/svg+xml').documentElement;
   const wMm=m.cmW*10, hMm=m.cmH*10;
   const doc=new jspdf.jsPDF({ unit:'mm', format:[wMm,hMm], orientation: wMm>=hMm?'landscape':'portrait' });
-  try{ await doc.svg(svgEl,{x:0,y:0,width:wMm,height:hMm}); doc.save('design.pdf'); document.getElementById('traceInfo').innerHTML=`✅ PDF：${m.cmW}×${m.cmH}cm 向量`; }
+  try{ await doc.svg(svgEl,{x:0,y:0,width:wMm,height:hMm}); doc.save(fileBase()+'.pdf'); document.getElementById('traceInfo').innerHTML=`✅ PDF：${m.cmW}×${m.cmH}cm 向量`; }
   catch(err){ document.getElementById('traceInfo').innerHTML='⚠️ PDF 失敗：'+err.message+'（改用匯出 SVG）'; }
+};
+// 存入 My Designs — same-origin inside the logged-in app, same POST as /tools/canvas (header = lib/ops-role.ts roleHeader("operator"))
+let saveSt='idle';
+// every edit (objects, 底色, 透明底, edits made while a save is in flight) bumps editSeq; 已存入 only sticks if nothing changed since the save started (Codex 32bc17ad F2)
+let editSeq=0;
+function markDirty(){ editSeq++; if(saveSt==='saved') setSaveSt('idle'); }
+// app/api/tools/designs/route.ts MAX_IMAGE_CHARS = 12_000_000 → keep the data URL under it: WebP, then fewer pixels (Codex 32bc17ad F1)
+const UPLOAD_MAX_CHARS=11500000;
+async function uploadableImage(){
+  const png=pngUrl(); if(png.length<=UPLOAD_MAX_CHARS) return png;
+  const img=new Image(); await new Promise((res,rej)=>{ img.onload=res; img.onerror=rej; img.src=png; });
+  const oc=document.createElement('canvas'), g=oc.getContext('2d'); let sc=1, url=png;
+  while(url.length>UPLOAD_MAX_CHARS && sc>0.05){ oc.width=Math.max(1,Math.round(img.width*sc)); oc.height=Math.max(1,Math.round(img.height*sc)); g.clearRect(0,0,oc.width,oc.height); g.drawImage(img,0,0,oc.width,oc.height); url=oc.toDataURL('image/webp',0.92); sc*=0.85; }
+  return url;
+}
+function setSaveSt(st){ saveSt=st; const b=document.getElementById('saveDesign'); b.disabled = st==='saving'||st==='saved';
+  b.textContent = st==='saved' ? '已存入 ✓' : st==='saving' ? '儲存中…' : st==='error' ? '儲存失敗 ✗（重試）' : '存入 My Designs'; }
+document.getElementById('saveDesign').onclick=async ()=>{
+  const info=document.getElementById('traceInfo');
+  setSaveSt('saving'); const seq=editSeq;
+  try{
+    const image=await uploadableImage();
+    const res=await fetch('/api/tools/designs',{ method:'POST', credentials:'same-origin',
+      headers:{ 'Content-Type':'application/json', 'x-ops-simulated-role':'operator' },
+      body:JSON.stringify({ image, prompt:'vector edit', modelName:'vector-editor', source:'vector-editor' }) });
+    const data=await res.json().catch(()=>({ok:false,error:'HTTP '+res.status}));
+    setSaveSt(data.ok ? (editSeq===seq?'saved':'idle') : 'error');
+    info.innerHTML = data.ok ? '✅ 已存入 My Designs' : '⚠️ 儲存失敗：'+(data.error||('HTTP '+res.status));
+  }catch(err){ setSaveSt('error'); info.innerHTML='⚠️ 儲存失敗：'+err.message; }
 };
 
 // ====== 滾輪縮放 + 空白鍵平移 ======
@@ -829,7 +884,7 @@ document.getElementById('fitSel').onclick=()=>fitSel('fit');
 document.getElementById('fillSel').onclick=()=>fitSel('fill');
 // 防抖：批次操作（如解散 282 路徑群組）只在最後存檔/重繪一次，避免 O(N²) 卡死
 let _syncTimer=null;
-function scheduleSync(){ if(_syncTimer) return; _syncTimer=setTimeout(()=>{ _syncTimer=null; snapshot(); renderLayers(); }, 16); }
+function scheduleSync(){ if(_syncTimer) return; _syncTimer=setTimeout(()=>{ _syncTimer=null; snapshot(); renderLayers(); markDirty(); }, 16); }
 canvas.on('object:added', scheduleSync);
 canvas.on('object:removed', scheduleSync);
 canvas.on('object:modified', scheduleSync);
@@ -1021,7 +1076,8 @@ document.querySelectorAll('[data-bool]').forEach(b=> b.onclick=()=>{
 });
 
 // ====== 畫布底色 ======
-document.getElementById('bgColor').oninput=(e)=> canvas.setBackgroundColor(e.target.value, ()=>canvas.requestRenderAll());
+document.getElementById('bgColor').oninput=(e)=>{ canvas.setBackgroundColor(e.target.value, ()=>canvas.requestRenderAll()); markDirty(); };
+document.getElementById('transBg').addEventListener('change', markDirty);
 
 // ====== 圓角 ======
 document.getElementById('cornerR').oninput=(e)=>{ const v=+e.target.value; document.getElementById('rxVal').textContent=v; applyToSel(o=>{ if(o.type==='rect') o.set({rx:v, ry:v}); }); };
@@ -1072,24 +1128,44 @@ function doPaste(){ if(!clip) return; clip.clone((c)=>{
 }); }
 function doCut(){ doCopy(); canvas.getActiveObjects().forEach(o=>canvas.remove(o)); canvas.discardActiveObject().requestRenderAll(); }
 
-// ====== 專案存 / 讀（.json）======
+// ====== 專案存 / 讀（.design.json）======
+// Shared with /tools/canvas: { format:"awarewave-design/1", json:<fabric toJSON incl. name + background>, meta:{ wv,hv,unit,dpi,bgColor,transparent } }.
+// Load also reads this editor's old shape ({ _proj, meta, w, h, canvas }) and the old canvas shape (bare toJSON).
 document.getElementById('saveProj').onclick=()=>{
-  const data={ _proj:1, meta:canvas._meta, w:realW, h:realH, canvas:canvas.toJSON() };
-  download(new Blob([JSON.stringify(data)],{type:'application/json'}),'project.json');
+  const m=canvas._meta||{};
+  const bg=/^#[0-9a-f]{6}$/i.test(canvas.backgroundColor||'') ? canvas.backgroundColor : document.getElementById('bgColor').value;
+  const data={ format:'awarewave-design/1', json:canvas.toJSON(),
+    meta:{ wv:m.wv, hv:m.hv, unit:m.unit, dpi:m.dpi, bgColor:bg, transparent:document.getElementById('transBg').checked } };
+  download(new Blob([JSON.stringify(data)],{type:'application/json'}), fileBase()+'.design.json');
 };
+// /tools/canvas (fabric v7) writes type 'IText'/'Rect'/'Image'…; fabric 5 here uses 'i-text'/'rect'/'image' → convert in place, groups and clipPaths too
+function normalizeV7Types(node){
+  if(!node||typeof node!=='object') return;
+  if(typeof node.type==='string' && /^[A-Z]/.test(node.type)) node.type=node.type.replace(/^([A-Z])([A-Z])/,'$1-$2').replace(/([a-z])([A-Z])/g,'$1-$2').toLowerCase();
+  (node.objects||[]).forEach(normalizeV7Types); if(node.clipPath) normalizeV7Types(node.clipPath);
+}
 document.getElementById('loadProj').onchange=(e)=>{
   const f=e.target.files[0]; if(!f) return; const r=new FileReader();
   r.onload=()=>{ try{
     const data=JSON.parse(r.result);
-    if(data.meta){
-      canvas._meta=data.meta; realW=data.w; realH=data.h;
-      document.getElementById('w').value=data.meta.wv; document.getElementById('h').value=data.meta.hv;
-      document.getElementById('unit').value=data.meta.unit; document.getElementById('dpi').value=data.meta.dpi;
+    const mt=data.meta;
+    const okMeta = mt && ['cm','mm','px'].includes(mt.unit) && mt.wv>0 && mt.hv>0 && mt.dpi>=1 && mt.dpi<=2400;
+    if(okMeta){
+      document.getElementById('w').value=mt.wv; document.getElementById('h').value=mt.hv;
+      document.getElementById('unit').value=mt.unit; document.getElementById('dpi').value=mt.dpi;
+      realW=toPx(mt.wv,mt.unit,mt.dpi); realH=toPx(mt.hv,mt.unit,mt.dpi);
+      canvas._meta={ wv:mt.wv, hv:mt.hv, unit:mt.unit, dpi:mt.dpi, cmW:toCm(mt.wv,mt.unit,mt.dpi), cmH:toCm(mt.hv,mt.unit,mt.dpi) };
+      if(typeof mt.transparent==='boolean') document.getElementById('transBg').checked=mt.transparent;
       dispScale=Math.min(1,maxDisp()/Math.max(realW,realH));
       canvas.setDimensions({width:Math.round(realW*dispScale),height:Math.round(realH*dispScale)}); canvas.setZoom(dispScale);
+      document.getElementById('sizeInfo').innerHTML=`真實 <b>${realW}×${realH}px</b> @${mt.dpi}DPI = ${canvas._meta.cmW}×${canvas._meta.cmH}cm（預覽 ${(dispScale*100).toFixed(0)}%）`;
     }
     locked=true;
-    canvas.loadFromJSON(data.canvas||data, ()=>{ canvas.requestRenderAll(); locked=false; history=[]; hi=-1; snapshot(); renderLayers(); setZoomDisplay(); });
+    const fab=data.json||data.canvas||data; normalizeV7Types(fab);
+    canvas.loadFromJSON(fab, ()=>{
+      if(okMeta && /^#[0-9a-f]{6}$/i.test(mt.bgColor||'')) canvas.backgroundColor=mt.bgColor;
+      if(/^#[0-9a-f]{6}$/i.test(canvas.backgroundColor||'')) document.getElementById('bgColor').value=canvas.backgroundColor;
+      canvas.requestRenderAll(); locked=false; history=[]; hi=-1; snapshot(); renderLayers(); setZoomDisplay(); setSaveSt('idle'); });
   }catch(err){ alert('讀檔失敗：'+err.message); } };
   r.readAsText(f);
 };
