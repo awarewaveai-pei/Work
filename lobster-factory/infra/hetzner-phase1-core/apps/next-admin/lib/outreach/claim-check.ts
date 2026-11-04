@@ -32,6 +32,9 @@ export async function checkClaims(args: { body: string; evidence: EvidenceItem[]
   if (!sentences.length) return { verdict: "error", error: "empty body" };
   const r = await generateCheapJsonText({
     route: "outreach/claim-check",
+    // nano labelled questions, courtesy and the signature as recipient claims (C15.4 REALTEST, 11 of 11 after the
+    // sentence-label change); this is the only fact gate before an automatic approval
+    model: "gpt-5.4-mini",
     system: SYSTEM,
     user: `## 證據\n<quoted_source untrusted="true">\n${evidence}\n</quoted_source>\n\n## 信的句子\n<email>\n${sentences.map((s, i) => `#${i + 1} ${fence(s)}`).join("\n")}\n</email>`,
     // one short entry per sentence of a 120-180 character email plus signature
