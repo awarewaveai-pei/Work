@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-04（續21）編輯器整合 CARD-06：去背面板聯集＋濾鏡單一擁有者（修 CARD-05 Codex F1–F3）
+
+- SDK worker（cc.py session 5d2f0abd，US$4.47，60 turns），卡 `agency-os/handoffs/2026-11-04-editor-merge/CARD-06-background-removal.md`（含「Filter ownership invariant」段）。
+- 兩邊同一個「🪄 去背」：指定顏色→透明（色票＋💧 從圖片吸色＋容差，存在 `adj.removeColor`）、AI 去背（同一請求＋operator role header，vector 原本沒帶；超過 12M 字元先縮，實測 3.8M）、還原（只清色鍵與 AI 結果，保留調色與去白底；`img.bgOriginal` 存原圖，存讀與跨編輯器載入都帶）、非圖片停用並提示。刪 vector `bg-remove`、`ai-bg` 積木；canvas 去背面板為新增（CARD-05 後 canvas 已無去背按鈕）。共用 `public/editor-shared/bg-remove.js`＋`lib/studio/editor-bg-remove.ts`。
+- 不變量（操作者問「為什麼會弄壞」的根因）：CARD-05 依 adj 重建濾鏡時靠濾鏡類別／參數猜擁有權 → 舊專案無 adj 的濾鏡、去背白色 0.12、去背還原都會被誤刪。改成「圖片上每個濾鏡都由 adj 產生」：`adoptAdj()` 把沒有可用 adj 的圖片原有濾鏡原封搬進 `adj.legacy`（最多 24 個，重建時接在最後）、去背色鍵進 `adj.removeColor`、`resetGradeAdj()` 不碰 removeColor/legacy、刪 `isGradeFilter`。根因是我的 CARD-05 卡沒寫「既有資料怎麼保留」→ 記憶 `feedback_brief_must_cover_existing_data`。CARD-05（0a24f4c29）未單獨部署，正式站沒受影響。
+- REALTEST_EVIDENCE: tool=Bash | cmd=worker：tsc 0、SRI 綠、lib/studio 211 pass（新 editor-filter-ownership.test 三案：舊 Brightness 經調色編輯仍在、白 0.12 色鍵經調色編輯仍在、還原保留去白底；editor-bg-remove-drift.test）、app/api/tools/studio 綠、card-06 e2e 169/169（匯出 PNG 角落 alpha 0／中心 255）、回歸 card-01..05 = 63/147/94/264/195；主 session 讀 color-grade.js ownership diff；修後 tsc 0、lib/studio＋lib/security＋app/api/tools/studio 249/249、3903 重跑 card-05 195/195、card-06 169/169；真 Fabric 5 探測：調色＋去白底＋綠色色鍵＋HSL＋模糊產生 7 個濾鏡 → adoptAdj 收成 legacy 0 個，再加藍色 RemoveColor → legacy 正好收這 1 個 | exit=0 | ms=0
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（agency-os/reports/oracle/2026-11-04-partialreview-697e7d45.md）。F1 有可用 adj 但旁邊另有 adj 不產生的濾鏡（舊去背積木色鍵）→ `adoptAdj` 比對 buildFilterSpecs(adj)：同類別且雙方共有的值都相等才算 adj 自己的，其餘收進 legacy（無類別特例、從不刪、不重複收）；新增 F1b 測試兩案。F2/F3 同一類「非同步完成時寫到目前選取」（與 CARD-05 F4 同類）→ canvas `revertBg` 記下起始 adj，選取已換就用 `applyAdjToImage(img, …)` 直接寫原圖；vector `bgRevert` 用起始 `baseAdj` 不用全域 `cgAdj`。掃過兩邊其餘非同步寫入：AI 去背兩邊都寫捕捉的物件、canvas 自動調整已在 CARD-05 修。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=isGradeFilter\|id:'bg-remove'\|id:'ai-bg' | hits=2（皆為新測試裡「不得再出現」的斷言）；側欄「13 積木」實際已剩 10（CARD-05/06 再刪 adjust、bg-remove、ai-bg）→ sidebar-sections.ts 改 10，sidebar-coverage 8/8
+- 剩餘：AI 去背後專案 JSON 對該圖約加倍（存原圖）；舊 canvas 設計 adj.grade.hue≠0 的圖，舊版以弧度渲染、新版以角度 → 載入後色相會不同（少見）。
 ## 2026-11-04（續20）編輯器整合 CARD-05：調色面板聯集＋調色數學單一來源
 
 - SDK worker（cc.py session 1f3eb412，US$3.69，60 turns），卡 `agency-os/handoffs/2026-11-04-editor-merge/CARD-05-color-grade.md`。

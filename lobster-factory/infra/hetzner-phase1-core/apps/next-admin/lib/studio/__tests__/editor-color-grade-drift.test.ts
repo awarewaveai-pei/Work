@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { GRADE_LIMITS as BAKE_LIMITS, NEUTRAL_STATE, stateToParams } from "../color-grade";
 import {
   EFFECT_LIMITS, GRADE_LIMITS, GRADE_SECTIONS, PRESETS, applyAuto, applyBlurPixels, applyHslPixels, buildFilterSpecs, getPath, hslNeutral,
-  isGradeFilter, isNeutralAdj, limitOf, makeFilters, neutralAdj, sanitizeAdj, setPath,
+  isNeutralAdj, limitOf, makeFilters, neutralAdj, sanitizeAdj, setPath,
 } from "../editor-color-grade";
 import { buildFabricImageFilters } from "../../../app/(shell)/tools/canvas/fabric-filters";
 
@@ -130,12 +130,6 @@ describe("pixel math", () => {
     const flat = new Uint8ClampedArray([100, 100, 100, 255, 100, 100, 100, 255]);
     expect(applyAuto(neutralAdj(), "contrast", flat)).toEqual(neutralAdj());
   });
-  it("isGradeFilter keeps only a foreign RemoveColor (the 去背 block's), regenerates everything else", () => {
-    expect(isGradeFilter({ type: "Brightness" })).toBe(true);
-    expect(isGradeFilter({ type: "RemoveColor", color: "#ffffff", distance: 0.12 })).toBe(true);
-    expect(isGradeFilter({ type: "RemoveColor", color: "#ffffff", distance: 0.15 })).toBe(false);
-    expect(isGradeFilter({ type: "RemoveColor", color: "#00ff00", distance: 0.12 })).toBe(false);
-  });
 });
 
 describe("no private copy of the math in either editor", () => {
@@ -149,9 +143,10 @@ describe("no private copy of the math in either editor", () => {
     expect(vector).not.toMatch(/new F\.(Brightness|Contrast|Saturation|HueRotation|BlendColor|Convolute|Noise)\(/);
     expect(vector).not.toMatch(/rgbToHsl|PRESETS\s*=\s*\{/);
     expect((vector.match(/<summary>🎨 調色<\/summary>/g) ?? []).length).toBe(1);
-    // the 調色 panel sits right after 圖層 and before the 去背 block (CARD-04 order)
+    // the 調色 panel sits right after 圖層, then 去背 (CARD-06), then 匯出 (CARD-04 order)
     expect(vector.indexOf("<summary>🗂 圖層</summary>")).toBeLessThan(vector.indexOf('id="gradePanel"'));
-    expect(vector.indexOf('id="gradePanel"')).toBeLessThan(vector.indexOf('<details id="exportPanel">'));
+    expect(vector.indexOf('id="gradePanel"')).toBeLessThan(vector.indexOf('<details id="bgPanel">'));
+    expect(vector.indexOf('<details id="bgPanel">')).toBeLessThan(vector.indexOf('<details id="exportPanel">'));
   });
   it("canvas reads the shared module only; the old per-panel state and builders are gone", () => {
     expect(canvasTsx).toContain('from "@/lib/studio/editor-color-grade"');

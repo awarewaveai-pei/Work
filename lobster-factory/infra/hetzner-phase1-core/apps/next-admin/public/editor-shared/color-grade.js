@@ -6,7 +6,10 @@
 //
 // adj (stored on every image as `adj`, rides in the project file) =
 //   { grade:{hue,sat,bri,black,white,gamma,sharpen,balCR,balMG,balYB}, presetId, removeWhite, vibrance, temp, blur,
-//     noise, contrast, shadows, highlights, exposure, clarity, dehaze, hslMixer }
+//     noise, contrast, shadows, highlights, exposure, clarity, dehaze, hslMixer,
+//     removeColor:{color,distance}|null  (the 🪄 去背 colour key),  legacy:[serialized filters]  (filters an old project carried) }
+// INVARIANT: every filter on an image is derived from its `adj` by buildFilterSpecs — nothing infers ownership from filter
+// class or params. A filter the panels cannot express lives in adj.legacy (copied verbatim, re-added last on every rebuild).
 
 const clampN = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const finite = (v, fallback) => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
@@ -37,6 +40,9 @@ export const EFFECT_LIMITS = {
   clarity: { min: 0, max: 100, neutral: 0 },
   dehaze: { min: 0, max: 100, neutral: 0 },
 };
+
+/** 🪄 去背 colour-key tolerance (Fabric RemoveColor `distance`); `neutral` = the slider's default, "off" is removeColor === null. */
+export const REMOVE_COLOR_LIMITS = { min: 0, max: 0.6, neutral: 0.15 };
 
 // ── 預設風格: one entry per name; cls = Fabric filter class (same name in Fabric 5 and 7), opts = its options ──
 const tintMatrix = (hex, a) => {
@@ -228,8 +234,28 @@ export function neutralAdj() {
   return {
     grade: gradeNeutral(), presetId: null, removeWhite: false,
     ...Object.fromEntries(Object.entries(EFFECT_LIMITS).map(([k, v]) => [k, v.neutral])),
-    hslMixer: hslNeutral(),
+    hslMixer: hslNeutral(), removeColor: null, legacy: [],
   };
+}
+const HEX6 = /^#[0-9a-f]{6}$/i;
+const LEGACY_MAX = 24;
+const ADJ_KEYS = Object.keys(neutralAdj());
+/** Untrusted → { color: "#rrggbb", distance } (clamped) or null (= colour key off). */
+export function sanitizeRemoveColor(raw) {
+  if (!raw || typeof raw !== "object" || typeof raw.color !== "string" || !HEX6.test(raw.color)) return null;
+  const L = REMOVE_COLOR_LIMITS;
+  return { color: raw.color.toLowerCase(), distance: clampN(finite(raw.distance, L.neutral), L.min, L.max) };
+}
+/** Untrusted → plain-JSON filter objects ({ type, ...params }); anything else is dropped. */
+export function sanitizeLegacy(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const e of raw) {
+    if (out.length >= LEGACY_MAX) break;
+    if (!e || typeof e !== "object" || typeof e.type !== "string" || !/^[A-Za-z][A-Za-z0-9]*$/.test(e.type)) continue;
+    try { out.push(JSON.parse(JSON.stringify(e))); } catch { /* not plain JSON → drop */ }
+  }
+  return out;
 }
 /** Untrusted value (design JSON / img.adj, old canvas shape included) → complete, clamped adj. */
 export function sanitizeAdj(raw) {
@@ -241,14 +267,76 @@ export function sanitizeAdj(raw) {
   out.presetId = PRESETS.some((p) => p.id === raw.presetId) ? raw.presetId : null;
   out.removeWhite = !!raw.removeWhite;
   out.hslMixer = sanitizeHsl(raw.hslMixer);
+  out.removeColor = sanitizeRemoveColor(raw.removeColor);
+  out.legacy = sanitizeLegacy(raw.legacy);
   return out;
 }
 export function isNeutralAdj(adj) {
   const a = sanitizeAdj(adj), n = neutralAdj();
   return JSON.stringify(a) === JSON.stringify(n);
 }
+/** 調色 重設: everything the 調色 panel owns back to neutral; the 去背 colour key and legacy filters are not its to touch. */
+export function resetGradeAdj(adj) {
+  const a = sanitizeAdj(adj), n = neutralAdj();
+  n.removeColor = a.removeColor; n.legacy = a.legacy;
+  return n;
+}
+export function isGradeNeutral(adj) { return JSON.stringify(resetGradeAdj(adj)) === JSON.stringify(sanitizeAdj(adj)); }
+/** 去背: set / clear only the colour key. */
+export function setRemoveColor(adj, color, distance) { return { ...sanitizeAdj(adj), removeColor: sanitizeRemoveColor({ color, distance }) }; }
+export function clearRemoveColor(adj) { return { ...sanitizeAdj(adj), removeColor: null }; }
 
-// ── adj → ordered filter specs [{cls, opts}] (order: grade → 去白底/預設 → effects → HSL) ──
+/** Fabric filter instances → serialized legacy list (each filter's own toObject()). Used only to adopt an image that has filters but no usable adj. */
+export function serializeFilters(filters) {
+  const out = [];
+  for (const f of filters || []) {
+    if (!f) continue;
+    let o;
+    try { o = typeof f.toObject === "function" ? f.toObject() : {}; } catch { continue; }
+    const type = (o && o.type) || f.type || (f.constructor && f.constructor.type);
+    if (typeof type === "string") out.push({ ...o, type });
+  }
+  return sanitizeLegacy(out);
+}
+/**
+ * The adj to show / edit for an image. A usable adj (only keys this module knows) is sanitized; an image that has filters but
+ * no adj — or an adj shape sanitizeAdj cannot map — gets a neutral adj whose `legacy` holds its filters verbatim, so the first
+ * 調色 / 去背 edit rebuilds exactly the picture it had, plus the edit.
+ */
+/** Same class and equal values on every key both serialized filters carry (numbers ±1e-6, strings case-insensitive, rest by JSON). */
+function sameFilter(x, y) {
+  if (x.type !== y.type) return false;
+  for (const k of Object.keys(x)) {
+    if (k === "type" || !(k in y)) continue;
+    const u = x[k], v = y[k];
+    if (typeof u === "number" && typeof v === "number") { if (Math.abs(u - v) > 1e-6) return false; }
+    else if (typeof u === "string" && typeof v === "string") { if (u.toLowerCase() !== v.toLowerCase()) return false; }
+    else if (JSON.stringify(u) !== JSON.stringify(v)) return false;
+  }
+  return true;
+}
+export function adoptAdj(raw, filters) {
+  if (raw && typeof raw === "object" && !Array.isArray(raw) && Object.keys(raw).every((k) => ADJ_KEYS.includes(k))) {
+    // A usable adj can still sit next to filters it does not produce (an old 去背 block's colour key, a hand-added filter):
+    // keep those in adj.legacy instead of letting the next rebuild drop them (Codex 697e7d45 F1). A filter counts as the
+    // adj's own only when buildFilterSpecs(adj) yields the same class with the same values (every key both sides carry);
+    // no class gets special treatment, nothing is ever dropped, and the adj's own filters are never adopted twice.
+    const a = sanitizeAdj(raw);
+    const want = buildFilterSpecs(a).map((sp) => ({ type: sp.cls, ...(sp.opts || {}) }));
+    const extra = [];
+    for (const f of serializeFilters(filters)) {
+      const i = want.findIndex((w) => sameFilter(w, f));
+      if (i >= 0) want.splice(i, 1); else extra.push(f);
+    }
+    if (extra.length) a.legacy = sanitizeLegacy([...a.legacy, ...extra]);
+    return a;
+  }
+  const a = neutralAdj();
+  a.legacy = serializeFilters(filters);
+  return a;
+}
+
+// ── adj → ordered filter specs [{cls, opts}] (order: grade → 去白底/去背色鍵/預設 → effects → HSL → legacy) ──
 export const REMOVE_WHITE = { color: "#ffffff", distance: 0.12 };
 export function buildFilterSpecs(rawAdj) {
   const adj = sanitizeAdj(rawAdj), g = adj.grade, out = [];
@@ -264,6 +352,7 @@ export function buildFilterSpecs(rawAdj) {
   if (g.sharpen > 0) { const s = g.sharpen / 10; add("Convolute", { matrix: [0, -s, 0, -s, 1 + 4 * s, -s, 0, -s, 0] }); }
   // 去白底 + 預設風格
   if (adj.removeWhite) add("RemoveColor", { ...REMOVE_WHITE });
+  if (adj.removeColor) add("RemoveColor", { ...adj.removeColor });
   const preset = PRESETS.find((p) => p.id === adj.presetId);
   if (preset) add(preset.cls, preset.opts ? JSON.parse(JSON.stringify(preset.opts)) : undefined);
   // effects (Photoshop adjustments + Camera RAW)
@@ -285,6 +374,7 @@ export function buildFilterSpecs(rawAdj) {
     add("ColorMatrix", { matrix: [1, 0, 0, 0, t, 0, 1, 0, 0, 0, 0, 0, 1, 0, -t, 0, 0, 0, 1, 0] });
   }
   if (hasAnyHsl(adj.hslMixer)) add("AwHsl", { state: JSON.parse(JSON.stringify(adj.hslMixer)) });
+  for (const l of adj.legacy) { const { type, ...opts } = l; add(type, Object.keys(opts).length ? opts : undefined); } // an old project's own filters, after everything the panels build
   return out;
 }
 /** specs → Fabric filter instances; `ctor(cls)` returns the editor's Fabric class for a name (null = skip). */
@@ -293,13 +383,6 @@ export function makeFilters(ctor, specs) {
   for (const s of specs) { const C = ctor(s.cls); if (C) out.push(s.opts === undefined ? new C() : new C(s.opts)); }
   return out;
 }
-/** Is this Fabric filter one the 調色 panel owns (it regenerates it)? Anything else — the 去背 block's RemoveColor — is kept. */
-export function isGradeFilter(f) {
-  const t = f && (f.type || (f.constructor && f.constructor.type));
-  if (t !== "RemoveColor") return true;
-  return String(f.color).toLowerCase() === REMOVE_WHITE.color && Math.abs((f.distance ?? 0) - REMOVE_WHITE.distance) < 1e-6;
-}
-
 // ── 自動對比 / 自動色彩 / 自動色調: pixel analysis → slider values (RGBA Uint8ClampedArray in) ──
 /** → { contrast, exposure } or null when the image has no tonal range. */
 export function analyzeContrast(d) {

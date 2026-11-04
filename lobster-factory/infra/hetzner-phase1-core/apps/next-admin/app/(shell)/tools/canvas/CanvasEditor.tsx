@@ -23,7 +23,9 @@ import { roleHeader } from "@/lib/ops-role";
 import { CANVAS_NAME_KEY, toCanvasSrc, readCanvasSource } from "@/components/tools/canvas-handoff";
 import { ensureAwFilters } from "./fabric-filters";
 // 🎨 調色: the math, slider rows, presets and `adj` shape are public/editor-shared/color-grade.js (the Vector Editor loads the same file)
-import { GRADE_SECTIONS, HSL_AXES, HSL_RANGES, PRESETS, applyAuto, buildFilterSpecs, fmtValue, getPath, hasAnyHsl, hslNeutral, isNeutralAdj, limitOf, makeFilters, neutralAdj, sanitizeAdj, setPath, type AdjState, type AutoKind, type HslKey } from "@/lib/studio/editor-color-grade";
+import { GRADE_SECTIONS, HSL_AXES, HSL_RANGES, PRESETS, REMOVE_COLOR_LIMITS, adoptAdj, applyAuto, buildFilterSpecs, clearRemoveColor, fmtValue, getPath, hasAnyHsl, hslNeutral, isGradeNeutral, limitOf, makeFilters, neutralAdj, resetGradeAdj, sanitizeAdj, setPath, setRemoveColor, type AdjState, type AutoKind, type HslKey } from "@/lib/studio/editor-color-grade";
+// 🪄 去背: the AI 去背 request, its messages and the pixel pick are public/editor-shared/bg-remove.js (the Vector Editor loads the same file); the colour key is adj.removeColor
+import { BG_MSG, hexAtClient, isRouteImage, keepViewAfterSwap, requestRemoveBg } from "@/lib/studio/editor-bg-remove";
 import SidebarPanel from "@/components/tools/SidebarPanel";
 import FontLibrary, { type FontPreset } from "@/components/tools/FontLibrary";
 import { posterizeDataUrl } from "@/lib/studio/posterize";
@@ -325,6 +327,13 @@ export default function CanvasEditor() {
   const [edgeStyleApplied, setEdgeStyleApplied] = useState<EdgeMaskId | null>(null);
   const [posterLevels, setPosterLevels] = useState(5);
   const [hslTab, setHslTab] = useState<HslKey>("all"); // which HSL range the mixer sliders show
+  // 🪄 去背: the colour-key controls (applied = adj.removeColor), AI 去背 busy flag + message, and whether the selected image still has its pre-AI source
+  const [keyColor, setKeyColor] = useState("#ffffff");
+  const [keyDist, setKeyDist] = useState(REMOVE_COLOR_LIMITS.neutral);
+  const [bgBusy, setBgBusy] = useState(false);
+  const bgBusyRef = useRef(false);
+  const [bgMsg, setBgMsg] = useState<{ text: string; busy: boolean }>({ text: BG_MSG.intro, busy: false });
+  const [hasBgOriginal, setHasBgOriginal] = useState(false);
   // 🗂 群組 — track whether the active selection can be grouped / ungrouped.
   const [multiSelected, setMultiSelected] = useState(false); // ActiveSelection (≥2 objects)
   const [groupSelected, setGroupSelected] = useState(false); // a single Group object
@@ -398,7 +407,7 @@ export default function CanvasEditor() {
       // every toObject; per-instance assignment is ignored). Confirmed: fabricjs discussion #10176.
       // The lock* props + hasControls ride along so a layer 🔒 survives undo/redo and design save/load.
       (fabric.FabricObject as unknown as { customProperties: string[] }).customProperties = [
-        "name", "adj", "lockMovementX", "lockMovementY", "lockScalingX", "lockScalingY", "lockRotation", "hasControls",
+        "name", "adj", "bgOriginal", "lockMovementX", "lockMovementY", "lockScalingX", "lockScalingY", "lockRotation", "hasControls",
       ];
 
       canvas = new fabric.Canvas(canvasElRef.current, {
@@ -424,9 +433,9 @@ export default function CanvasEditor() {
       canvasMetaRef.current = { realW: 800, realH: 800, dispScale: 1, dpi: szDpi };
       setReady(true);
 
-      // 🎨 Load an image's saved adjustments into the sliders (or neutral). Sets state WITHOUT
-      // touching userEditRef, so the filter effect won't record an undo step for a mere selection.
-      const loadAdj = (raw: unknown) => setAdj(raw ? sanitizeAdj(raw) : neutralAdj());
+      // 🎨 Load an image's saved adjustments into the controls (or neutral). An image with filters but no usable adj gets them as
+      // adj.legacy (adoptAdj), so the rebuild below keeps them. Sets state WITHOUT touching userEditRef → no undo step for a mere selection.
+      const loadAdj = (img: { adj?: unknown; filters?: unknown[] } | null) => setAdj(img ? adoptAdj(img.adj, img.filters) : neutralAdj());
 
       // Keep the toolbar in sync with the selected text object (and vice-versa).
       const syncFromSelection = () => {
@@ -450,7 +459,8 @@ export default function CanvasEditor() {
         }
         setImageSelected(o?.type === "image");
         // 🎨 per-image adjustments (#3): load THIS image's saved sliders, or neutral for non-images.
-        loadAdj(o?.type === "image" ? ((o as unknown as { adj?: AdjState }).adj ?? null) : null);
+        loadAdj(o?.type === "image" ? (o as unknown as { adj?: unknown; filters?: unknown[] }) : null);
+        setHasBgOriginal(o?.type === "image" && !!(o as unknown as { bgOriginal?: string }).bgOriginal);
         // reflect THIS image's own applied edge style (or none) in the edge-mask panel
         setEdgeStyleApplied((o as unknown as { edgeStyle?: EdgeMaskId } | null)?.edgeStyle ?? null);
         setAnySelected(!!o);
@@ -468,6 +478,7 @@ export default function CanvasEditor() {
         setTextSelected(false);
         setImageSelected(false);
         loadAdj(null); // no image selected → sliders show neutral (not the last image's settings)
+        setHasBgOriginal(false);
         setEdgeStyleApplied(null);
         setAnySelected(false);
         setMultiSelected(false);
@@ -580,7 +591,7 @@ export default function CanvasEditor() {
       canvas.requestRenderAll();
       setSaveState("idle"); // filter/adjust change is an edit → re-enable save
       // persist on THIS image so re-selecting it (or save/load, undo) restores the exact controls
-      (obj as unknown as { adj?: AdjState }).adj = JSON.parse(JSON.stringify(adj));
+      (obj as unknown as { adj?: AdjState }).adj = sanitizeAdj(adj);
       // ↩️ record ONE undo step after the user stops dragging (debounced). Only when THIS object
       // is the genuine edit target — never for selection-sync (loadAdj) or undo/redo restore.
       if (userEditRef.current === obj && !restoringRef.current) {
@@ -1568,6 +1579,128 @@ export default function CanvasEditor() {
     }
   }, [edgeAmount, refreshLayers, resetAdjToNeutral]);
 
+  // 🪄 去背 — 去除此色 = adj.removeColor (a RemoveColor filter built from adj like every other entry, rebuilt by the [adj] effect);
+  // AI 去背 swaps the image's own source in place (same object → left/top/scale/angle/flip/name/lock/adj stay) and keeps the first
+  // pre-removal source in img.bgOriginal (customProperties → undo / save / load). 還原 clears the key + puts bgOriginal back; 調色 is not touched.
+  type BgImg = FabricObject & {
+    type?: string; cropX?: number; cropY?: number; width: number; height: number; scaleX: number; scaleY: number; bgOriginal?: string;
+    _originalElement?: HTMLImageElement | HTMLCanvasElement; getElement: () => HTMLImageElement | HTMLCanvasElement;
+    setSrc: (src: string, o?: { crossOrigin?: string }) => Promise<unknown>; set: (p: Record<string, unknown>) => void; setCoords: () => void; dirty?: boolean;
+  };
+  const bgEl = (img: BgImg) => (img._originalElement ?? img.getElement()) as HTMLImageElement & HTMLCanvasElement; // the unfiltered pixels, never the filtered copy
+  const bgSourceUrl = (img: BgImg): string => {
+    const el = bgEl(img);
+    if (isRouteImage(el.src)) return el.src;
+    const cv = document.createElement("canvas");
+    cv.width = el.naturalWidth || el.width; cv.height = el.naturalHeight || el.height;
+    cv.getContext("2d")?.drawImage(el, 0, 0);
+    return cv.toDataURL("image/png");
+  };
+  const bgNaturalW = (img: BgImg) => { const el = bgEl(img); return el.naturalWidth || el.width || img.width; };
+  const bgSwapSource = async (img: BgImg, url: string) => {
+    const oldW = bgNaturalW(img);
+    const before = { cropX: img.cropX, cropY: img.cropY, width: img.width, height: img.height, scaleX: img.scaleX, scaleY: img.scaleY };
+    await img.setSrc(url, { crossOrigin: "anonymous" });
+    img.set(keepViewAfterSwap(before, oldW, bgNaturalW(img))); // crop window + display size keep their meaning if the pixel size changed (a shrunk upload)
+    img.dirty = true;
+    img.setCoords();
+  };
+  const applyBgAi = useCallback(async () => {
+    const canvas = fabricRef.current;
+    const img = canvas?.getActiveObject() as BgImg | null;
+    if (!canvas || !img || img.type !== "image" || bgBusyRef.current) return;
+    bgBusyRef.current = true;
+    setBgBusy(true);
+    setBgMsg({ text: BG_MSG.busy, busy: true });
+    try {
+      const src = bgSourceUrl(img);
+      const r = await requestRemoveBg(await uploadableDataUrl(src));
+      if (!r.ok) { setBgMsg({ text: BG_MSG.failed((r as { ok: false; error: string }).error), busy: false }); return; }
+      if (fabricRef.current !== canvas || !canvas.getObjects().includes(img)) return; // deleted / disposed while the cloud worked
+      await bgSwapSource(img, (r as { ok: true; image: string }).image);
+      if (!img.bgOriginal) img.bgOriginal = src;
+      setHasBgOriginal(true);
+      canvas.requestRenderAll();
+      setSaveState("idle");
+      snapshot(); // setSrc fires no object:modified → ONE undo step recorded here
+      setBgMsg({ text: BG_MSG.ok, busy: false });
+    } catch (err) {
+      setBgMsg({ text: BG_MSG.failed(err instanceof Error ? err.message : String(err)), busy: false });
+    } finally {
+      bgBusyRef.current = false;
+      setBgBusy(false);
+    }
+  // bgSourceUrl / bgSwapSource only read their arguments
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshot]);
+  // adj → filters on ONE given image (not the selection): for async work whose selection may have moved meanwhile
+  const applyAdjToImage = useCallback(async (image: unknown, next: AdjState) => {
+    const fabric = await import("fabric");
+    const F = (fabric as unknown as { filters: Record<string, new (o?: Record<string, unknown>) => object> }).filters;
+    const aw = ensureAwFilters(fabric);
+    const t = image as { filters: object[]; applyFilters: () => void; adj?: AdjState };
+    t.filters = makeFilters((cls) => aw[cls] ?? F[cls], buildFilterSpecs(next));
+    t.applyFilters();
+    t.adj = sanitizeAdj(next);
+  }, []);
+  const revertBg = useCallback(async () => {
+    const canvas = fabricRef.current;
+    const img = canvas?.getActiveObject() as BgImg | null;
+    if (!canvas || !img || img.type !== "image" || bgBusyRef.current) return;
+    const baseAdj = adj; // THIS image's adj — the selection (and the adj state) may move while the original decodes
+    const hasKey = !!baseAdj.removeColor, orig = img.bgOriginal;
+    if (!hasKey && !orig) { setBgMsg({ text: BG_MSG.nothingToRevert, busy: false }); return; }
+    bgBusyRef.current = true;
+    setBgBusy(true);
+    try {
+      if (orig) {
+        await bgSwapSource(img, orig);
+        delete img.bgOriginal;
+        setHasBgOriginal(false);
+      }
+      if (hasKey && canvas.getActiveObject() === img) { markEdit(); setAdj(clearRemoveColor(baseAdj)); } // the [adj] effect rebuilds the filters; its debounced undo step covers the swap too
+      else if (hasKey) { await applyAdjToImage(img, clearRemoveColor(baseAdj)); canvas.requestRenderAll(); setSaveState("idle"); snapshot(); } // selection moved (Codex 697e7d45 F2)
+      else { canvas.requestRenderAll(); setSaveState("idle"); snapshot(); }
+      setBgMsg({ text: BG_MSG.reverted, busy: false });
+    } catch (err) {
+      setBgMsg({ text: BG_MSG.revertFailed(err instanceof Error ? err.message : String(err)), busy: false });
+    } finally {
+      bgBusyRef.current = false;
+      setBgBusy(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adj, markEdit, snapshot, applyAdjToImage]);
+  // 💧 從圖片吸色: native EyeDropper where the browser has it; otherwise the next click on the artboard picks that pixel (same as 外觀 吸色)
+  const pickKeyColor = useCallback(async () => {
+    const ED = (window as unknown as { EyeDropper?: new () => { open: () => Promise<{ sRGBHex: string }> } }).EyeDropper;
+    const got = (hex: string) => { setKeyColor(hex); setBgMsg({ text: BG_MSG.picked(hex), busy: false }); };
+    if (ED) {
+      try { got((await new ED().open()).sRGBHex); } catch { /* cancelled (Esc) */ }
+      return;
+    }
+    const c = fabricRef.current as unknown as {
+      defaultCursor: string; lowerCanvasEl: HTMLCanvasElement;
+      on: (ev: string, fn: (o: { e: MouseEvent }) => void) => void; off: (ev: string, fn: (o: { e: MouseEvent }) => void) => void;
+      getActiveObjects: () => FabricObject[]; discardActiveObject: () => void; setActiveObject: (o: FabricObject) => void; requestRenderAll: () => void;
+    } | null;
+    if (!c) return;
+    const targets = c.getActiveObjects(); // the pick click may deselect the image → put it back
+    const prevCursor = c.defaultCursor;
+    c.defaultCursor = "crosshair";
+    setBgMsg({ text: BG_MSG.pickHint, busy: true });
+    const once = (opt: { e: MouseEvent }) => {
+      c.off("mouse:down", once);
+      c.defaultCursor = prevCursor;
+      c.discardActiveObject();
+      if (targets.length === 1) c.setActiveObject(targets[0]);
+      try { got(hexAtClient(c.lowerCanvasEl, opt.e.clientX, opt.e.clientY)); }
+      catch (err) { setBgMsg({ text: BG_MSG.pickFailed(err instanceof Error ? err.message : String(err)), busy: false }); }
+    };
+    c.on("mouse:down", once);
+  }, []);
+  // the applied colour key shows in the controls when its image is selected
+  useEffect(() => { if (adj.removeColor) { setKeyColor(adj.removeColor.color); setKeyDist(adj.removeColor.distance); } }, [adj.removeColor]);
+
   // 💾 設計檔（可再編輯）— export the full canvas JSON (custom `name` included via customProperties)
   // so a design can be reloaded and keep editing. Client-only: download a .design.json blob.
   // Shared with public/vector-editor.html: { format: "awarewave-design/1", json: <fabric toJSON incl. name + background>,
@@ -2345,7 +2478,7 @@ export default function CanvasEditor() {
           <SidebarPanel id="grade" title="🎨 調色" defaultPos={{ x: 816, y: 328 }} width={272} defaultCollapsed>
             <fieldset data-cg-panel disabled={imageToolsDisabled} style={{ border: 0, padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
               {imageToolHint ? <span style={{ fontSize: 11, opacity: 0.65 }}>{imageToolHint}</span> : null}
-              <button className="btn-secondary" data-cg-reset style={{ fontSize: 12 }} disabled={isNeutralAdj(adj)} onClick={() => { markEdit(); setAdj(neutralAdj()); }} title="全部回到中性值">重設</button>
+              <button className="btn-secondary" data-cg-reset style={{ fontSize: 12 }} disabled={isGradeNeutral(adj)} onClick={() => { markEdit(); setAdj((a) => resetGradeAdj(a)); }} title="全部回到中性值（去背的去除顏色不動）">重設</button>
               {([
                 ["presets", "預設風格 Presets"],
                 ["auto", "自動 Auto"],
@@ -2431,6 +2564,32 @@ export default function CanvasEditor() {
                   </div>
                 </div>
               </details>
+            </fieldset>
+          </SidebarPanel>
+
+          {/* 🪄 去背 — ONE panel: 去除此色 (adj.removeColor) · 💧 吸色 · AI 去背 · 還原. Same data-bg-* hooks and messages as public/vector-editor.html (bg-remove.js). */}
+          <SidebarPanel id="bg-remove" title="🪄 去背" defaultPos={{ x: 816, y: 370 }} width={272} defaultCollapsed>
+            <fieldset data-bg-panel disabled={imageToolsDisabled || bgBusy} style={{ border: 0, padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
+              {imageToolHint ? <span data-bg-hint style={{ fontSize: 11, opacity: 0.65 }}>{imageToolHint}</span> : null}
+              <span style={{ fontWeight: 600 }}>去除指定顏色 → 透明</span>
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                <label style={{ flex: "none", display: "flex", flexDirection: "column", gap: 2 }}>
+                  要去除的顏色
+                  <input type="color" data-bg-color value={keyColor} onChange={(e) => setKeyColor(e.target.value)} style={{ width: 56, height: 30, padding: 2, border: "1px solid var(--card-border)", borderRadius: 4, cursor: "pointer" }} />
+                </label>
+                <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ display: "flex", justifyContent: "space-between" }}><span>容差</span><span data-bg-dist-val style={{ opacity: 0.7, fontVariantNumeric: "tabular-nums" }}>{keyDist.toFixed(2)}</span></span>
+                  <input type="range" data-bg-dist min={REMOVE_COLOR_LIMITS.min} max={REMOVE_COLOR_LIMITS.max} step={0.01} value={keyDist} onChange={(e) => setKeyDist(Number(e.target.value))} style={{ width: "100%" }} />
+                </label>
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button className="btn-secondary" data-bg-pick style={{ flex: 1, fontSize: 12 }} onClick={() => void pickKeyColor()} title="吸取畫面任一點的顏色">💧 從圖片吸色</button>
+                <button className="btn-primary" data-bg-go style={{ flex: 1, fontSize: 12 }} onClick={() => { markEdit(); setAdj((a) => setRemoveColor(a, keyColor, keyDist)); setBgMsg({ text: BG_MSG.keyOk, busy: false }); }}>去除此色 → 透明</button>
+              </div>
+              <span style={{ fontWeight: 600 }}>AI 去背（雲端）</span>
+              <button className="btn-primary" data-bg-ai onClick={() => void applyBgAi()}>AI 去背（選圖片）</button>
+              <button className="btn-secondary" data-bg-revert disabled={bgBusy || !(adj.removeColor || hasBgOriginal)} onClick={() => void revertBg()} title="清掉去除顏色，並把 AI 去背前的圖換回來；調色不動">還原</button>
+              <span data-bg-msg style={{ fontSize: 11, opacity: bgMsg.busy ? 1 : 0.7, color: bgMsg.busy ? "var(--accent)" : undefined, lineHeight: 1.5 }}>{bgMsg.text}</span>
             </fieldset>
           </SidebarPanel>
 

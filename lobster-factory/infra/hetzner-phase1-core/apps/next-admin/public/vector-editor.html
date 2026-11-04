@@ -11,8 +11,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/paper.js/0.12.17/paper-core.min.js" integrity="sha384-Op8nZ4kg7nr8T9UV4Xg7qdSbWTZEiRGZscs336HbfqzA702wz3DqmHySyvvGEJw4" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js" integrity="sha384-8FWZA6BGMXhsfO+BLtrJK0We6gg5o1JyO8xQm6peWDEUs17ACA5ziE/NIAkl9z2k" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js" integrity="sha384-Kk5SjBOKprEnGfyBWfD2zROFd1Cu8kwOXxG2GIhYPcoDL2rBJS9P8Ud1ZMy4412a" crossorigin="anonymous"></script>
-<!-- 🎨 調色 math = public/editor-shared/color-grade.js, the same file /tools/canvas imports (lib/studio/editor-color-grade.ts) -->
-<script type="module">import * as cg from "./editor-shared/color-grade.js"; window.AWCG = cg; window.dispatchEvent(new Event("awcg-ready"));</script>
+<!-- 🎨 調色 math = public/editor-shared/color-grade.js, 🪄 去背 request + messages = bg-remove.js: the same files /tools/canvas imports (lib/studio/editor-color-grade.ts, editor-bg-remove.ts) -->
+<script type="module">import * as cg from "./editor-shared/color-grade.js"; import * as bg from "./editor-shared/bg-remove.js"; window.AWCG = cg; window.AWBG = bg; window.dispatchEvent(new Event("awcg-ready"));</script>
 <style>
   /* Theme = the app's tokens (app/globals.css defaults; the DB-saved theme is copied from the parent
      <html> by the bridge script below), so this page paints like /tools/canvas. */
@@ -96,11 +96,11 @@
   .sw:hover { outline:2px solid var(--accent); outline-offset:1px; }
   #blockPanels, #imageBlocks { display:flex; flex-direction:column; gap:10px; }
   /* 🎨 調色 sub-sections */
-  #cgFields { border:0; padding:0; margin:0; min-width:0; }
+  #cgFields, #bgFields { border:0; padding:0; margin:0; min-width:0; }
   details.cgsec { box-shadow:none; border-radius:6px; margin-top:6px; }
   details.cgsec[open] { padding-bottom:6px; }
   details.cgsec > summary { padding:5px 8px; }
-  #cgFields:disabled { opacity:.55; }
+  #cgFields:disabled, #bgFields:disabled { opacity:.55; }
   .blocks-head { margin-top:2px; font-size:12px; font-weight:var(--font-weight-bold); color:var(--accent); }
 </style>
 <script>
@@ -366,6 +366,19 @@
           <div id="cgSecs"></div>
         </fieldset>
       </details>
+      <!-- 🪄 去背: ONE panel (colour key → adj.removeColor · AI 去背 · 還原); same data-bg-* hooks as /tools/canvas -->
+      <details id="bgPanel"><summary>🪄 去背</summary>
+        <fieldset id="bgFields" disabled>
+          <div class="info" id="bgHint" data-bg-hint>先選取圖片後才能使用。</div>
+          <label>去除指定顏色 → 透明</label>
+          <div class="grid2"><div><label>要去除的顏色</label><input id="bgKeyColor" data-bg-color type="color" value="#ffffff"></div><div><label>容差 <span id="bgKeyDistV" data-bg-dist-val>0.15</span></label><input id="bgKeyDist" data-bg-dist type="range" min="0" max="0.6" step="0.01" value="0.15"></div></div>
+          <div class="row" style="margin-top:6px;"><button class="ghost" id="bgKeyPick" data-bg-pick title="吸取畫面任一點的顏色">💧 從圖片吸色</button><button class="act" id="bgKeyGo" data-bg-go>去除此色 → 透明</button></div>
+          <label>AI 去背（雲端）</label>
+          <button class="act" id="bgAiGo" data-bg-ai>AI 去背（選圖片）</button>
+          <button class="ghost" id="bgRevert" data-bg-revert style="margin-top:6px;" title="清掉去除顏色，並把 AI 去背前的圖換回來；調色不動">還原</button>
+          <div class="info" id="bgMsg" data-bg-msg></div>
+        </fieldset>
+      </details>
     </div>
 
     <details id="exportPanel"><summary>💾 匯出 / 存入</summary>
@@ -420,7 +433,7 @@ let nextText = { font:DEFAULT_FONT, size:48, fill:'#111111', bold:false, italic:
 const canvas = new fabric.Canvas('c', { backgroundColor:'#ffffff', preserveObjectStacking:true });
 // Layer name + lock state ride in every toObject() (snapshot/undo, saveProj, clone/copy-paste) -- Fabric 5 drops unknown props otherwise.
 // Group/Text/Path toObject all reach this via callSuper, so one prototype wrap covers every object type.
-const LAYER_PROPS=['name','adj','lockMovementX','lockMovementY','lockScalingX','lockScalingY','lockRotation','hasControls']; // adj = the image's 調色 settings (same key as /tools/canvas)
+const LAYER_PROPS=['name','adj','bgOriginal','lockMovementX','lockMovementY','lockScalingX','lockScalingY','lockRotation','hasControls']; // adj = the image's 調色 / 去背 settings, bgOriginal = its source before the first AI 去背 (same keys as /tools/canvas)
 const _objToObject=fabric.Object.prototype.toObject;
 fabric.Object.prototype.toObject=function(extra){ return _objToObject.call(this, LAYER_PROPS.concat(extra||[])); };
 // 🔒 invariant: every programmatic move/scale (arrow keys, 座標面板, 對齊, 分布, 符合畫布) skips locked objects, same as mouse drag (Codex 2e307b0a F1)
@@ -994,13 +1007,14 @@ let editSeq=0;
 function markDirty(){ editSeq++; if(saveSt==='saved') setSaveSt('idle'); }
 // app/api/tools/designs/route.ts MAX_IMAGE_CHARS = 12_000_000 → keep the data URL under it: WebP, then fewer pixels (Codex 32bc17ad F1)
 const UPLOAD_MAX_CHARS=11500000;
-async function uploadableImage(){
-  const png=pngUrl(); if(png.length<=UPLOAD_MAX_CHARS) return png;
+async function uploadableDataUrl(png){
+  if(png.length<=UPLOAD_MAX_CHARS) return png;
   const img=new Image(); await new Promise((res,rej)=>{ img.onload=res; img.onerror=rej; img.src=png; });
   const oc=document.createElement('canvas'), g=oc.getContext('2d'); let sc=1, url=png;
   while(url.length>UPLOAD_MAX_CHARS && sc>0.05){ oc.width=Math.max(1,Math.round(img.width*sc)); oc.height=Math.max(1,Math.round(img.height*sc)); g.clearRect(0,0,oc.width,oc.height); g.drawImage(img,0,0,oc.width,oc.height); url=oc.toDataURL('image/webp',0.92); sc*=0.85; }
   return url;
 }
+const uploadableImage=()=>uploadableDataUrl(pngUrl());
 function setSaveSt(st){ saveSt=st; const b=document.getElementById('saveDesign'); b.disabled = st==='saving'||st==='saved';
   b.textContent = st==='saved' ? '已存入 ✓' : st==='saving' ? '儲存中…' : st==='error' ? '儲存失敗 ✗（重試）' : '存入 My Designs'; }
 document.getElementById('saveDesign').onclick=async ()=>{
@@ -1309,9 +1323,8 @@ let cgAdj=null, cgHslTab='all';
 function cgImg(){ const o=canvas.getActiveObject(); return (o&&o.type==='image')?o:null; }
 function cgApply(o, adj){
   const cg=window.AWCG, F=fabric.Image.filters;
-  const foreign=(o.filters||[]).filter(f=>f && !cg.isGradeFilter(f)); // keep the 去背 block's RemoveColor
-  o.filters=foreign.concat(cg.makeFilters(cls=>F[cls], cg.buildFilterSpecs(adj)));
-  o.adj=JSON.parse(JSON.stringify(adj));
+  o.filters=cg.makeFilters(cls=>F[cls], cg.buildFilterSpecs(adj)); // every filter derives from adj (colour key, legacy filters included)
+  o.adj=cg.sanitizeAdj(adj);
   o.applyFilters();
 }
 function cgCommit(next){
@@ -1326,11 +1339,12 @@ function cgPaint(){
   body.querySelector('[data-cg-removewhite]').checked=!!cgAdj.removeWhite;
   body.querySelectorAll('[data-cg-hsl-tab]').forEach(b=> b.classList.toggle('on', b.dataset.cgHslTab===cgHslTab));
   body.querySelectorAll('input[data-cg-hsl]').forEach(el=>{ const v=cgAdj.hslMixer[cgHslTab][el.dataset.cgHsl]; el.value=v; body.querySelector('[data-cg-hsl-val="'+el.dataset.cgHsl+'"]').textContent=v>0?'+'+v:''+v; });
-  document.getElementById('cgReset').disabled=cg.isNeutralAdj(cgAdj);
+  document.getElementById('cgReset').disabled=cg.isGradeNeutral(cgAdj);
+  bgPaint();
 }
 function cgSyncUI(){
   const cg=window.AWCG; if(!cg||!document.getElementById('cgSecs').firstChild) return;
-  const o=cgImg(); cgAdj=o?cg.sanitizeAdj(o.adj):cg.neutralAdj(); cgPaint();
+  const o=cgImg(); cgAdj=o?cg.adoptAdj(o.adj, o.filters):cg.neutralAdj(); cgPaint(); bgPaint(true); // an image with filters but no usable adj shows neutral controls; its filters ride in adj.legacy from the first edit
   document.getElementById('cgFields').disabled=!o; document.getElementById('cgHint').textContent=o?'':'先選取圖片後才能使用。';
 }
 function cgAuto(kind){
@@ -1396,10 +1410,93 @@ function cgInit(){
   const hr=document.createElement('div'); hr.className='row'; hr.style.marginTop='6px'; hb.appendChild(hr);
   [['range','重置此色段'],['all','全部重置']].forEach(([k,t])=>{ const b=document.createElement('button'); b.className='ghost'; b.dataset.cgHslReset=k; b.textContent=t;
     b.onclick=()=>{ if(!cgImg()) return; const hm=JSON.parse(JSON.stringify(cgAdj.hslMixer)); if(k==='all') cg.HSL_RANGES.concat([{key:'all'}]).forEach(r=>{ hm[r.key]={h:0,s:0,l:0}; }); else hm[cgHslTab]={h:0,s:0,l:0}; cgCommit({ ...cgAdj, hslMixer:hm }); }; hr.appendChild(b); });
-  document.getElementById('cgReset').onclick=()=>{ if(cgImg()) cgCommit(cg.neutralAdj()); };
+  document.getElementById('cgReset').onclick=()=>{ if(cgImg()) cgCommit(cg.resetGradeAdj(cgAdj)); }; // the 去背 colour key and legacy filters are not 調色's to reset
   ['selection:created','selection:updated','selection:cleared'].forEach(ev=>canvas.on(ev, cgSyncUI));
+  bgInit();
   cgSyncUI();
 }
+// ====== 🪄 去背（聯集面板；請求 / 訊息 = public/editor-shared/bg-remove.js，色鍵 = adj.removeColor）======
+// 去除此色 → adj.removeColor (a RemoveColor filter built from adj like every other entry); AI 去背 swaps the image's own source in place
+// (same object: left/top/scale/angle/flip/name/lock/adj stay) and keeps the first pre-removal source in img.bgOriginal (rides toObject via LAYER_PROPS).
+// 還原 = clear the colour key + put bgOriginal back; 調色 is not touched.
+let bgBusy=false, bgPicking=false, bgPickTargets=[];
+function bgSay(msg, busy){ const el=document.getElementById('bgMsg'); if(!el) return; el.textContent=msg; el.classList.toggle('busy', !!busy); }
+function bgPaint(syncInputs){
+  const f=document.getElementById('bgFields'), B=window.AWBG; if(!f||!B) return;
+  const o=cgImg(), rc=cgAdj&&cgAdj.removeColor;
+  f.disabled=!o||bgBusy;
+  document.getElementById('bgHint').textContent=o?'':B.BG_MSG.needImage;
+  if(syncInputs&&o&&rc){ document.getElementById('bgKeyColor').value=rc.color; document.getElementById('bgKeyDist').value=rc.distance; document.getElementById('bgKeyDistV').textContent=rc.distance.toFixed(2); }
+  document.getElementById('bgRevert').disabled=!o||bgBusy||!(rc||o.bgOriginal);
+}
+// the image's own pixels (never the filtered copy): its data URL when the route accepts it, else re-encoded as PNG
+function bgSourceUrl(o){
+  const el=o._originalElement||o._element;
+  if(window.AWBG.isRouteImage(el.src)) return el.src;
+  const cv=document.createElement('canvas'); cv.width=el.naturalWidth||el.width; cv.height=el.naturalHeight||el.height; cv.getContext('2d').drawImage(el,0,0);
+  return cv.toDataURL('image/png');
+}
+const bgNaturalW=(o)=>{ const el=o._originalElement||o._element; return (el&&(el.naturalWidth||el.width))||o.width; };
+// swap the source of THIS object; crop window + display scale keep their meaning when the new pixel size differs (a shrunk upload)
+function bgSwapSource(o, url){
+  return new Promise((res,rej)=>{
+    const oldW=bgNaturalW(o), before={ cropX:o.cropX, cropY:o.cropY, width:o.width, height:o.height, scaleX:o.scaleX, scaleY:o.scaleY };
+    o.setSrc(url,(img,isErr)=>{
+      if(isErr){ rej(new Error('圖片解碼失敗')); return; }
+      o.set(window.AWBG.keepViewAfterSwap(before, oldW, bgNaturalW(o))); o.dirty=true; o.setCoords(); res();
+    });
+  });
+}
+async function bgAi(){
+  const M=window.AWBG.BG_MSG, o=cgImg(); if(!o||bgBusy) return;
+  bgBusy=true; bgPaint(); bgSay(M.busy, true);
+  try{
+    const src=bgSourceUrl(o);
+    const r=await window.AWBG.requestRemoveBg(await uploadableDataUrl(src));
+    if(!r.ok){ bgSay(M.failed(r.error)); return; }
+    if(!canvas.getObjects().includes(o)) return; // deleted while the cloud worked
+    await bgSwapSource(o, r.image);
+    if(!o.bgOriginal) o.bgOriginal=src;
+    canvas.requestRenderAll(); markDirty(); snapshot(); bgSay(M.ok);
+  }catch(err){ bgSay(M.failed(err.message)); }
+  finally{ bgBusy=false; bgPaint(); }
+}
+async function bgRevert(){
+  const cg=window.AWCG, M=window.AWBG.BG_MSG, o=cgImg(); if(!o||bgBusy) return;
+  // cgAdj follows the selection; the await below may outlive it -> keep THIS image's adj (Codex 697e7d45 F3)
+  const baseAdj=cgAdj, rc=baseAdj&&baseAdj.removeColor, orig=o.bgOriginal;
+  if(!rc&&!orig){ bgSay(M.nothingToRevert); return; }
+  bgBusy=true; bgPaint();
+  try{
+    if(orig){ await bgSwapSource(o, orig); delete o.bgOriginal; }
+    const next=rc?cg.clearRemoveColor(baseAdj):null;
+    if(next&&cgImg()===o) cgCommit(next); // one debounced undo step covers the swap and the key
+    else { if(next){ cgApply(o,next); } canvas.requestRenderAll(); markDirty(); snapshot(); }
+    bgSay(M.reverted);
+  }catch(err){ bgSay(M.revertFailed(err.message)); }
+  finally{ bgBusy=false; bgPaint(); }
+}
+function bgPicked(hex){ document.getElementById('bgKeyColor').value=hex; bgSay(window.AWBG.BG_MSG.picked(hex)); }
+async function bgPick(){
+  if('EyeDropper' in window){ try{ bgPicked((await new EyeDropper().open()).sRGBHex); }catch(err){ /* cancelled (Esc) */ } return; }
+  bgPicking=true; bgPickTargets=canvas.getActiveObjects(); canvas.defaultCursor='crosshair'; bgSay(window.AWBG.BG_MSG.pickHint, true);
+}
+canvas.on('mouse:down',(opt)=>{
+  if(!bgPicking) return;
+  bgPicking=false; canvas.defaultCursor= tool==='pen'?'crosshair':'default';
+  canvas.discardActiveObject(); if(bgPickTargets.length===1) canvas.setActiveObject(bgPickTargets[0]); bgPickTargets=[]; // the pick click may have deselected the image
+  try{ bgPicked(window.AWBG.hexAtClient(canvas.lowerCanvasEl, opt.e.clientX, opt.e.clientY)); }
+  catch(err){ bgSay(window.AWBG.BG_MSG.pickFailed(err.message)); }
+});
+function bgInit(){
+  const $=(id)=>document.getElementById(id), cg=window.AWCG;
+  $('bgKeyDist').oninput=(e)=>{ $('bgKeyDistV').textContent=(+e.target.value).toFixed(2); };
+  $('bgKeyGo').onclick=()=>{ if(!cgImg()) return; cgCommit(cg.setRemoveColor(cgAdj, $('bgKeyColor').value, +$('bgKeyDist').value)); bgSay(window.AWBG.BG_MSG.keyOk); };
+  $('bgKeyPick').onclick=bgPick; $('bgAiGo').onclick=bgAi; $('bgRevert').onclick=bgRevert;
+  bgSay(window.AWBG.BG_MSG.intro);
+  bgPaint();
+}
+
 if(window.AWCG) cgInit(); else window.addEventListener('awcg-ready', cgInit, { once:true });
 
 // ========================================================
@@ -1433,8 +1530,7 @@ const AB = (function(){
   };
   function registerBlock(def){
     blocks.push(def);
-    // image blocks (去背) sit right after 圖層 / 調色, like /tools/canvas; the rest stay under 其他積木
-    const host=document.getElementById(['bg-remove','ai-bg'].includes(def.id)?'imageBlocks':'blockPanels');
+    const host=document.getElementById('blockPanels'); // 調色 / 去背 are static panels in #imageBlocks, not blocks
     const d=document.createElement('details'); d.open=false;
     const s=document.createElement('summary'); s.textContent=(def.icon?def.icon+' ':'')+def.title; d.appendChild(s);
     const body=document.createElement('div'); d.appendChild(body); host.appendChild(d);
@@ -1458,34 +1554,6 @@ AB.registerBlock({ id:'qr', icon:'🔳', title:'QR Code（向量）',
         ctx.snapshot(); ctx.info('✅ QR 已產生（'+n+'×'+n+' 模組，向量）');
       }catch(e){ alert('QR 產生失敗：'+e.message); }
     };
-  }
-});
-
-// ── 積木 4：去白底 / 去背（免費 · 近色去除）──
-AB.registerBlock({ id:'bg-remove', icon:'🪄', title:'去白底 / 去背',
-  mount(ctx, body){
-    const F=fabric.Image.filters;
-    body.innerHTML=''
-      +'<div class="grid2"><div><label>要去除的顏色</label><input id="bgColorPick" type="color" value="#ffffff"></div><div><label>容差 <span id="bgDistV">0.15</span></label><input id="bgDist" type="range" min="0" max="0.6" step="0.01" value="0.15"></div></div>'
-      +'<div class="row"><button class="act" id="bgGo">去除此色 → 透明</button><button class="ghost" id="bgUndo">還原</button></div>'
-      +'<div class="info">免費即時，適合白底 logo/線稿。複雜照片去背請等「AI 去背」(規劃中，本機伺服器)。匯出時記得勾「匯出透明底」。</div>';
-    function img(){ const o=ctx.canvas.getActiveObject(); return (o&&o.type==='image')?o:null; }
-    body.querySelector('#bgDist').oninput=(e)=>{ body.querySelector('#bgDistV').textContent=(+e.target.value).toFixed(2); };
-    body.querySelector('#bgGo').onclick=()=>{
-      const o=img(); if(!o){ alert('先選一張圖片（用「原圖放入」上傳的）'); return; }
-      const col=body.querySelector('#bgColorPick').value, dist=+body.querySelector('#bgDist').value;
-      if(F.RemoveColor){ o.filters=o.filters.filter(f=>!(f instanceof F.RemoveColor)); o.filters.push(new F.RemoveColor({color:col, distance:dist})); o.applyFilters(); }
-      else { removeColorManual(o, col, dist); }
-      ctx.render(); ctx.snapshot(); ctx.info('✅ 已去除背景色（透明）');
-    };
-    body.querySelector('#bgUndo').onclick=()=>{ const o=img(); if(!o) return; if(F.RemoveColor){ o.filters=o.filters.filter(f=>!(f instanceof F.RemoveColor)); o.applyFilters(); ctx.render(); ctx.snapshot(); } else alert('手動模式無法還原，請重新放入原圖'); };
-    function removeColorManual(o, hex, dist){
-      const el=o._originalElement||o._element; const w=el.naturalWidth||el.width, h=el.naturalHeight||el.height;
-      const cv=document.createElement('canvas'); cv.width=w; cv.height=h; const cx2=cv.getContext('2d'); cx2.drawImage(el,0,0,w,h);
-      const id=cx2.getImageData(0,0,w,h), d=id.data; const tr=parseInt(hex.slice(1,3),16), tg=parseInt(hex.slice(3,5),16), tb=parseInt(hex.slice(5,7),16); const TH=dist*441;
-      for(let i=0;i<d.length;i+=4){ if(Math.sqrt((d[i]-tr)**2+(d[i+1]-tg)**2+(d[i+2]-tb)**2)<TH) d[i+3]=0; }
-      cx2.putImageData(id,0,0); o.setElement(cv); o.applyFilters();
-    }
   }
 });
 
@@ -1572,30 +1640,6 @@ AB.registerBlock({ id:'templates', icon:'📁', title:'範本庫（尺寸預設�
     T.forEach(([name,wv,hv,unit,dpi])=>{ const b=document.createElement('button'); b.className='ghost'; b.textContent=name; b.onclick=()=>{ document.getElementById('w').value=wv; document.getElementById('h').value=hv; document.getElementById('unit').value=unit; document.getElementById('dpi').value=dpi; document.getElementById('setCanvas').click(); ctx.info('✅ 已套用範本：'+name); }; wrap.appendChild(b); });
     body.appendChild(wrap);
     const note=document.createElement('div'); note.className='info'; note.textContent='套用會改畫布尺寸，不動現有物件。'; body.appendChild(note);
-  }
-});
-
-// ── 積木 8：AI 去背（AwareWave 雲端 Replicate；複雜照片/人像）──
-AB.registerBlock({ id:'ai-bg', icon:'🤖', title:'AI 去背（雲端）',
-  mount(ctx, body){
-    body.innerHTML=''
-      +'<button class="act" id="aiGo">AI 去背（選圖片）</button>'
-      +'<div class="info">複雜照片/人像去背，走 AwareWave 雲端（Replicate）。需登入且有權限。簡單白底用「🪄 去白底」更快、免額度。</div>';
-    function img(){ const o=ctx.canvas.getActiveObject(); return (o&&o.type==='image')?o:null; }
-    body.querySelector('#aiGo').onclick=async ()=>{
-      const o=img(); if(!o){ alert('先選一張圖片（用「原圖放入」上傳的）'); return; }
-      ctx.info('<span class="busy">AI 去背中…（雲端處理，約 5~20 秒）</span>');
-      try{
-        const src=o._originalElement||o._element;
-        const cv=document.createElement('canvas'); cv.width=src.naturalWidth||src.width; cv.height=src.naturalHeight||src.height;
-        cv.getContext('2d').drawImage(src,0,0);
-        const dataUrl=cv.toDataURL('image/png');
-        const res=await fetch('/api/tools/studio/remove-bg',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({image:dataUrl}) });
-        const data=await res.json().catch(()=>({ok:false,error:'bad_response'}));
-        if(!data.ok || !data.image){ ctx.info('⚠️ AI 去背失敗：'+(data.error||('HTTP '+res.status))+'（需登入且有權限；或改用 🪄 去白底）'); return; }
-        fabric.Image.fromURL(data.image, ni=>{ ni.set({left:o.left,top:o.top,scaleX:o.scaleX,scaleY:o.scaleY,angle:o.angle,flipX:o.flipX,flipY:o.flipY}); ctx.canvas.remove(o); ctx.canvas.add(ni); ctx.canvas.setActiveObject(ni); ctx.render(); ctx.snapshot(); ctx.info('✅ AI 去背完成（透明底，記得勾匯出透明底）'); });
-      }catch(err){ ctx.info('⚠️ AI 去背失敗：'+err.message); }
-    };
   }
 });
 

@@ -281,17 +281,21 @@ for (const [label, target, file, pic] of loaders) {
   await c2.close();
 }
 
-// ── 去背 block in the vector editor keeps its RemoveColor while 調色 regenerates
+// ── an image with filters but no adj (an old project) keeps them: they ride in adj.legacy, after the 調色 filters (CARD-06 invariant)
 {
   await ui.reset(vc);
   const cnt = await vc.frame.evaluate(() => {
-    const o = canvas.getObjects().find((x) => x.type === "image"); canvas.setActiveObject(o);
-    o.filters.push(new fabric.Image.filters.RemoveColor({ color: "#00ff00", distance: 0.2 })); o.applyFilters();
+    const o = canvas.getObjects().find((x) => x.type === "image");
+    o.adj = undefined; o.filters = [new fabric.Image.filters.RemoveColor({ color: "#00ff00", distance: 0.2 })]; o.applyFilters();
+    canvas.discardActiveObject(); canvas.setActiveObject(o);
     return o.filters.length;
   });
+  await vc.page.waitForTimeout(250);
   await ui.slider(vc, "grade.sat", 130); await ui.slider(vc, "grade.sat", 140);
-  eq("vector: the 去背 block's RemoveColor survives 調色 edits (kept once, grade filters regenerated)", await vc.filterNames(), ["RemoveColor", "Saturation"]);
+  eq("vector: a legacy filter (no adj) survives 調色 edits (kept once, after the grade filters)", await vc.filterNames(), ["Saturation", "RemoveColor"]);
+  eq("vector: it moved into adj.legacy verbatim", (await vc.getAdj()).legacy, [{ type: "RemoveColor", color: "#00ff00", distance: 0.2 }]);
   check("vector: (sanity) it was added", cnt === 1);
+  await vc.frame.evaluate(() => { const o = canvas.getObjects().find((x) => x.type === "image"); o.adj = undefined; o.filters = []; o.applyFilters(); });
   await ui.reset(vc);
 }
 
@@ -302,7 +306,7 @@ await cv.shot("card-05-canvas.png"); await vc.shot("card-05-vector.png");
 eq("REMOVED vector: exactly one 調色 summary, no old 調色 / 修圖 block", await vc.root.evaluate(() => [[...document.querySelectorAll("summary")].filter((s) => /調色/.test(s.textContent)).length, [...document.querySelectorAll("summary")].some((s) => /修圖/.test(s.textContent))]), [1, false]);
 eq("REMOVED canvas: exactly one 調色 panel, no 調整 / Camera RAW / HSL / 濾鏡 panels", await cv.page.evaluate(() => [[...document.querySelectorAll("button")].filter((b) => /調色/.test(b.textContent) && /🎨/.test(b.textContent) && b.title === "收合").length, [...document.querySelectorAll("button")].filter((b) => /Camera RAW 效果|調整 Adjustments|濾鏡 \/ 去背|色彩混合器 HSL/.test(b.textContent) && b.title).length]), [1, 0]);
 eq("canvas panel order: 圖層 → 調色 (same order as vector)", await cv.page.evaluate(() => { const t = [...document.querySelectorAll(".build-panel > button")].map((b) => b.textContent.trim()); const i = t.findIndex((x) => /圖層/.test(x)), j = t.findIndex((x) => x === "▾🎨 調色" || x === "▸🎨 調色"); return j === i + 1; }), true);
-eq("vector panel order: 圖層 → 調色 → 去白底 / 去背", await vc.root.evaluate(() => { const t = [...document.querySelectorAll(".side > details > summary, #imageBlocks > details > summary")].map((s) => s.textContent.trim()); const i = t.findIndex((x) => /圖層/.test(x)); return [t[i + 1], t[i + 2]]; }), ["🎨 調色", "🪄 去白底 / 去背"]);
+eq("vector panel order: 圖層 → 調色 → 去背", await vc.root.evaluate(() => { const t = [...document.querySelectorAll(".side > details > summary, #imageBlocks > details > summary")].map((s) => s.textContent.trim()); const i = t.findIndex((x) => /圖層/.test(x)); return [t[i + 1], t[i + 2]]; }), ["🎨 調色", "🪄 去背"]);
 
 await browser.close();
 const envNoise = (e) => /Failed to load resource|supabase_unavailable/.test(e);
