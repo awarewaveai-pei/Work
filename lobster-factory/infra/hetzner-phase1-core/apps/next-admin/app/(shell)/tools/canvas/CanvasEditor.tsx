@@ -122,6 +122,9 @@ export default function CanvasEditor() {
   const [szUnit, setSzUnit] = useState<"cm" | "mm" | "px">("cm");
   const [szDpi, setSzDpi] = useState(300);
   const [szInfo, setSzInfo] = useState<string | null>(null);
+  // 畫布底色 / 匯出透明底 — same two controls as vector-editor.html's 畫布尺寸 panel (merged 2026-11-04)
+  const [bgColor, setBgColor] = useState("#ffffff");
+  const [exportTransparent, setExportTransparent] = useState(false);
   // Editable download filename: auto-filled from upload filename or handoff name; user can override.
   const [editName, setEditName] = useState(() => {
     const now = new Date();
@@ -591,6 +594,12 @@ export default function CanvasEditor() {
   }, []);
 
   // ↩️ Undo/Redo — snapshot {canvas JSON, zoom} after each change; restore on undo/redo.
+  // 畫布底色 picker follows the artboard after undo/redo/import (loadFromJSON restores `background`).
+  const syncBgFromCanvas = useCallback(() => {
+    const c = fabricRef.current as unknown as { backgroundColor?: unknown } | null;
+    const bg = c?.backgroundColor;
+    setBgColor(typeof bg === "string" && /^#[0-9a-f]{6}$/i.test(bg) ? bg : "#ffffff");
+  }, []);
   const snapshot = useCallback(() => {
     if (restoringRef.current) return;
     const c = fabricRef.current as unknown as { toJSON: () => unknown; getZoom: () => number } | null;
@@ -624,10 +633,11 @@ export default function CanvasEditor() {
         c.requestRenderAll();
         refreshLayers();
         resetAdjToNeutral(); // loadFromJSON clears selection → sliders back to neutral (no stale display)
+        syncBgFromCanvas();
         restoringRef.current = false; // only now are all object:added events done
       });
     },
-    [refreshLayers, resetAdjToNeutral]
+    [refreshLayers, resetAdjToNeutral, syncBgFromCanvas]
   );
   const undo = useCallback(() => {
     if (undoStack.current.length < 2) return;
@@ -1367,6 +1377,7 @@ export default function CanvasEditor() {
           });
           c.requestRenderAll();
           refreshLayers();
+          syncBgFromCanvas();
           restoringRef.current = false;
           snapshot(); // record the loaded design as an undo baseline
         }).catch(() => {
@@ -1533,10 +1544,18 @@ export default function CanvasEditor() {
     } | null;
     if (!canvas) return null;
     canvas.discardActiveObject(); // drop selection handles from the export
+    // 匯出透明底: blank the artboard colour only for the export, then put it back.
+    const bgHolder = canvas as unknown as { backgroundColor?: string };
+    const prevBg = bgHolder.backgroundColor;
+    if (exportTransparent) bgHolder.backgroundColor = "";
+    const restoreBg = () => { if (exportTransparent) bgHolder.backgroundColor = prevBg; };
     const m = canvasMetaRef.current;
     if (!m) {
       canvas.requestRenderAll();
-      return canvas.toDataURL({ format: "png", multiplier: 1 });
+      const url = canvas.toDataURL({ format: "png", multiplier: 1 });
+      restoreBg();
+      canvas.requestRenderAll();
+      return url;
     }
     // Print canvas set: temporarily reset zoom + render at full real px so the export is
     // full-DPI (toDataURL honours viewportTransform; restore the display afterwards).
@@ -1544,11 +1563,12 @@ export default function CanvasEditor() {
     canvas.setZoom(1);
     canvas.setDimensions({ width: m.realW, height: m.realH });
     const url = canvas.toDataURL({ format: "png", multiplier: 1 });
+    restoreBg();
     canvas.setZoom(zoom);
     canvas.setDimensions({ width: Math.round(m.realW * m.dispScale), height: Math.round(m.realH * m.dispScale) });
     canvas.requestRenderAll();
     return url;
-  }, []);
+  }, [exportTransparent]);
 
   const download = useCallback(() => {
     const png = exportPng();
@@ -1722,11 +1742,9 @@ export default function CanvasEditor() {
   const objectToolHint = !anySelected ? "先選取畫布上的物件後才能使用。" : canvasBusy ? "先完成或取消目前的編輯模式。" : null;
 
   return (
-    <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
-      <h1 style={{ fontSize: 18, margin: 0 }}>✏️ 快速編輯 Canvas</h1>
-      <p style={{ fontSize: 12, opacity: 0.6, margin: 0 }}>
-        上傳圖案、加文字，拖曳 / 縮放 / 旋轉，即時預覽。完成後可下載 PNG 或存入 My Designs。
-      </p>
+    <div style={{ padding: "8px 12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+      {/* compact one-line title (operator 2026-11-04: the header stole workspace height) */}
+      <h1 style={{ fontSize: 14, margin: 0, lineHeight: 1.3 }}>✏️ Canvas Editor</h1>
 
       {error ? <span style={{ color: "var(--red)", fontSize: 12 }}>{error}</span> : null}
 
@@ -1885,6 +1903,25 @@ export default function CanvasEditor() {
               <button className="btn-secondary" style={{ flex: 1, fontSize: 12 }} disabled={!imageSelected} onClick={() => fitImageToCanvas("fill")} title="把選取的圖放大到填滿畫布（超出邊界裁掉）">填滿畫布</button>
             </div>
             <span style={{ fontSize: 10, opacity: 0.5, lineHeight: 1.4 }}>畫布＝最終輸出尺寸；圖片是內容，選圖後用上面兩鍵貼合畫布。</span>
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+              <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+                畫布底色
+                <input type="color" value={bgColor} disabled={!ready} title="畫布底色（匯出時也會帶上，除非勾透明底）" onChange={(e) => {
+                  const v = e.target.value;
+                  setBgColor(v);
+                  const c = fabricRef.current as unknown as { backgroundColor?: string; requestRenderAll: () => void } | null;
+                  if (!c) return;
+                  c.backgroundColor = v;
+                  c.requestRenderAll();
+                  setSaveState("idle"); // a user edit → 存入 My Designs enabled again (Codex F1)
+                  snapshot(); // background is canvas state, no object:modified fires (Codex F2)
+                }} style={{ width: "100%", height: 30, padding: 2, border: "1px solid var(--card-border)", borderRadius: 4, cursor: "pointer" }} />
+              </label>
+              <label style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, paddingBottom: 6 }}>
+                <input type="checkbox" checked={exportTransparent} onChange={(e) => setExportTransparent(e.target.checked)} />
+                匯出透明底
+              </label>
+            </div>
             {szInfo ? <span style={{ fontSize: 11, opacity: 0.7 }}>{szInfo}</span> : null}
           </div>
         </SidebarPanel>

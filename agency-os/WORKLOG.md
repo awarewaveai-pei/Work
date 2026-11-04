@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-04（續13）Canvas／Vector 標題精簡＋「畫布尺寸」面板兩邊補成聯集（工具整合第 1 格）
+
+- 操作者三點：①canvas 去副標、改名 Canvas Editor、標題區縮小；②vector 去副標與「畫布：…」badge、標題區縮小；③兩個工具都有的面板整合成最完整版、兩邊共用（例：畫布尺寸）。本條做 ①②＋③的畫布尺寸格；其餘共用面板交 SDK worker（cc.py，操作者「用 SDK 做」）逐格做，見 TASKS／下一條。
+- canvas（CanvasEditor.tsx）：h1 14px 單行「✏️ Canvas Editor」、padding 8/12；畫布尺寸面板加「畫布底色」color＋「匯出透明底」checkbox，`exportPng` 匯出時暫清 backgroundColor；底色改動 = 使用者編輯 → `setSaveState("idle")`＋`snapshot()`；undo／redo／importDesign 後 `syncBgFromCanvas()` 同步選色器。
+- vector（vector-editor.html）：去 `.sub`／`#badge`（applyCanvas 與載入專案兩處引用一併刪）、h1 14px；單位加 px（`toPx`／`toCm`），切單位經精確 px 換算、只在顯示時取 4／3 位小數（px 來回不掉 1px）；「符合／填滿畫布」用旋轉後 bounding box 縮放＋置中；`.stage` min-height 跟標題縮小連動。
+- Codex 5 個 minor（底色未進 undo／未重開存檔、載入後選色器不同步、旋轉物件 fit 裁切、px↔cm 精度）全修。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit exit 0；3903 預覽 JS 量測：canvas 畫布尺寸面板含 color／透明底／符合畫布；vector 無 .sub／badge、unit 有 px、9cm→1063px→9cm 來回、矩形 fit 893×638 置中；修 F4/F5 後再測 100px@600dpi 來回與旋轉 90° fit | exit=0 | ms=600
+- 修後再測（3903 JS）：600dpi 100×200px→0.4233×0.8467cm→100×200px；旋轉 90° 的 100×200 矩形「符合畫布」→ bbox 100×50 置中 (0,75)；canvas 改底色後「復原」鈕啟用、復原後選色器回 #ffffff。sidebar-sections.ts:67 title「快速編輯 Canvas」同步改 Canvas Editor。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n（agency-os/reports/oracle/2026-11-04-partialreview-ad9acb20.md，5 項已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=快速編輯 Canvas\|getElementById('badge')\|szInfo | hits=3（WORKLOG 歷史 2、CanvasEditor 自身 1；無 stale 引用）
 ## 2026-11-04（續12）外聯產信改用平台 OpenAI 金鑰（代理商 Gemini 免費金鑰 429）
 
 - 根因：唯一的代理商 AI connector 是免費 Gemini，C15.4 產約 12 封後 `gemini 429`＋`no_ai_key`（續11）。
