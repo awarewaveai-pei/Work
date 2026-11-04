@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-04（續8）Soulful 公開頁補 clickjacking 防護：X-Frame-Options + CSP frame-ancestors 走 soulful-proxy.inc
+
+- 緣由：操作者問「能被 iframe 是資安問題嗎」。實測 soulfulexpression.org 公開頁無任何 frame header（wp-login/wp-admin 有，WP 自送）；AW 全站 nginx 已送 XFO SAMEORIGIN。Soulful 有 WooCommerce 結帳＋Ultimate Member 登入 → clickjacking 風險真實。
+- 不變量：每個 proxied location 都送同一組 frame header。落點 `lobster-factory/infra/soulful/nginx/soulful-proxy.inc`（三個 location 皆 include），不放 server 層：`soulfulexpression.org.conf:193` 的 `location /` 自有 add_header，會讓 server 層 header 在整個公開站靜默消失（M9 陷阱）。
+- 值：`X-Frame-Options SAMEORIGIN` + `CSP frame-ancestors 'self'`，兩個都送、不 proxy_hide_header（OWASP Clickjacking Cheat Sheet／MDN：CSP 為正式、XFO 給舊瀏覽器、ALLOW-FROM 已廢）。wp-login 出現同值重複 header，規範允許。repo 內無任何地方嵌入 Soulful（next-admin 兩個 iframe 皆 loopback／同源）。
+- 主機：`safe-infra-patch.sh host-nginx` 兩次（snippet＋vhost 註解同步），backup `/root/lobster-phase1/safe-patch-backups/_etc_nginx_snippets_soulful-proxy.inc.safe-patch-20261104-050347`；live md5 == repo。
+- 檢查器：`scripts/public-endpoint-smoke.ps1` 新增 `RequireHeaders`（soulful／aware-wave／app 三條）。未做：AW 容器 nginx 八處 XFO 抽 snippet 補 CSP——XFO 在現代瀏覽器已等價 'self'，等有跨站嵌入需求再做。
+- Codex F1（minor）：smoke 註解宣稱「login/checkout doors」但只探 `/` → 改註解對齊事實（wp-login/wp-admin header 由 WP 送，nginx 漂移類只在 `location /`）。
+- REALTEST_EVIDENCE: tool=curl | cmd=curl -sD- https://soulfulexpression.org{/,/shop/,/cart/,/wp-login.php,/wp-admin/} → 五頁皆 XFO+CSP；public-endpoint-smoke.ps1 8/8 OK；突變 RequireHeaders 加不存在 header → FAIL exit 1 → 還原綠 | exit=0 | ms=3000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n（agency-os/reports/oracle/2026-11-04-partialreview-6bc543e1.md）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks | grep=soulful-proxy.inc|X-Frame-Options.*(WordPress|passthrough)|frame-ancestors | hits=12（3 include 現行、8 歷史 WORKLOG、1 effectcraft HOSTING.md 為嵌入方指引非主張；`soulfulexpression.org.conf:188` 過時註解已改）
 ## 2026-11-04（續7）外聯 C14.4：Meta webhook 支援「一家公司一個 App」（Soulful 用自己的 App）
 
 - 決定：Soulful 粉專屬商家組合 Soulful Expression（2042282976397079），用該組合自己的 App 992677007160936，不借 AwareWave App；兩家公司各自的 App／密鑰／權杖。
