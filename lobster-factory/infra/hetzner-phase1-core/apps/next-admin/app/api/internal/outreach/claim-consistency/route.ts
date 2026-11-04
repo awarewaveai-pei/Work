@@ -1,8 +1,9 @@
 // POST /api/internal/outreach/claim-consistency  { organizationId, limit? }
 //
 // Card C16.2: the latest first emails (both variants) of one organization, each fact-checked twice; answers the
-// consistency report (lib/outreach/claim-consistency.ts). Paid: two outreach.qa calls per email, billed to that
-// organization like the pipeline tick. Run by hand (OUTREACH_SYNC_TOKEN), not on a schedule.
+// consistency report (lib/outreach/claim-consistency.ts). It measures ONE check run against another: the vote approvals
+// use (checkClaimsTwice) would turn a flip into a stable "unsupported" and hide it (Codex 2026-11-04). Paid: two
+// outreach.qa calls per email, billed to that organization like the pipeline tick. Run by hand (OUTREACH_SYNC_TOKEN).
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "@/lib/security/timingSafeEqual";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";

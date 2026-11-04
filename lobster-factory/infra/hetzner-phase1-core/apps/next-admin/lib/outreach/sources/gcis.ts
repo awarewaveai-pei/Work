@@ -56,8 +56,11 @@ export interface GcisLead extends RawLead { consent_source: string }
 /** Counters the caller reads even when the run throws midway: what to settle. */
 export interface GcisUsage { serperCredits: number; gcisCalls: number }
 export interface GcisItem { code: string; desc: string }
+/** Where the next run of the same search starts in the national list by business item ($skip). */
+export interface GcisCursor { skip: number }
 export interface GcisResult { leads: GcisLead[]; /** Companies dropped: closed, not found, or a failed detail call. */ skipped: number; withoutWebsite: number;
-  /** The national list was longer than MAX_LIST_PAGES pages: the county filter saw only its first part (Codex C12 F2). */ listTruncated: boolean }
+  /** null = the national list was read to its end. A run reads at most MAX_LIST_PAGES pages (Codex C12 F2); a long list
+   *  carries on from here the next run instead of being cut. */ next: GcisCursor | null }
 
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
 const fold = (v: string): string => v.replace(/臺/g, "台").toLowerCase();
@@ -156,7 +159,8 @@ const survivable = (e: unknown): boolean => e instanceof GcisError
 /** Up to `limit` (≤ 100) companies running business item `item` in `county`: list by item, county filtered on
  *  Company_Location, detail by tax id (owner, status), website by a Serper search. A company with no website is kept
  *  (the pipeline marks it research_insufficient). The caller's callProvider carries the grant and budget. */
-export async function discoverCompanies(call: ProviderCall, usage: GcisUsage, input: { item: string; itemDesc: string; county: string }, limit = GCIS_MAX_COMPANIES): Promise<GcisResult> {
+export async function discoverCompanies(call: ProviderCall, usage: GcisUsage, input: { item: string; itemDesc: string; county: string }, limit = GCIS_MAX_COMPANIES,
+  from: GcisCursor | null = null): Promise<GcisResult> {
   const want = Math.min(Math.max(1, limit), GCIS_MAX_COMPANIES);
   const item = input.item.trim().toUpperCase();
   const api = CATEGORY_API[item[0] ?? ""];
@@ -165,18 +169,18 @@ export async function discoverCompanies(call: ProviderCall, usage: GcisUsage, in
 
   const ids: string[] = [];
   const seen = new Set<string>();
-  let listTruncated = false;
-  for (let page = 0; ids.length < want; page++) {
-    if (page >= MAX_LIST_PAGES) { listTruncated = true; break; }
-    const rows = await gcisRows(call, usage, api, `Business_Item eq ${item}`, page * LIST_TOP, LIST_TOP);
-    for (const r of rows) {
-      const taxId = str(r.Business_Accounting_NO);
-      if (!taxId || !/^\d{8}$/.test(taxId) || seen.has(taxId) || ids.length >= want) continue;
+  let next: GcisCursor | null = from ?? { skip: 0 };
+  for (let n = 0; next && ids.length < want && n < MAX_LIST_PAGES; n++) {
+    const rows = await gcisRows(call, usage, api, `Business_Item eq ${item}`, next.skip, LIST_TOP);
+    let i = 0;
+    for (; i < rows.length && ids.length < want; i++) {
+      const taxId = str(rows[i].Business_Accounting_NO);
+      if (!taxId || !/^\d{8}$/.test(taxId) || seen.has(taxId)) continue;
       seen.add(taxId);
-      if (county && !fold(str(r.Company_Location) ?? "").startsWith(county)) continue;
+      if (county && !fold(str(rows[i].Company_Location) ?? "").startsWith(county)) continue;
       ids.push(taxId);
     }
-    if (rows.length < LIST_TOP) break;
+    next = i < rows.length || rows.length === LIST_TOP ? { skip: next.skip + i } : null;
   }
 
   let skipped = 0;
@@ -204,5 +208,5 @@ export async function discoverCompanies(call: ProviderCall, usage: GcisUsage, in
   for (const f of done) for (const h of new Set(f.candidates.map(hostOf))) hostCompanies.set(h, (hostCompanies.get(h) ?? 0) + 1);
   const leads: GcisLead[] = done.map((f) => ({ ...f.lead, website: ownCandidate(f.candidates, hostCompanies) }));
   const withoutWebsite = leads.filter((l) => !l.website).length;
-  return { leads, skipped, withoutWebsite, listTruncated };
+  return { leads, skipped, withoutWebsite, next };
 }

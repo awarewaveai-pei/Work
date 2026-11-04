@@ -8,16 +8,17 @@ import { scoreLeadQuality, scoreContactability } from "@/lib/outreach/scoring";
 import { citableFact } from "@/lib/outreach/lead-evidence";
 import { verifyEmails, type EmailStatus } from "@/lib/outreach/verify-email";
 import { findExisting } from "@/lib/outreach/existing-leads";
-import { discoverInput, discoverPlaces, creditsTwd, creditsUsd, DISCOVER_MAX_USD, LocationNotRecognized, MAX_PAGES } from "@/lib/outreach/discover";
+import { discoverInput, discoverPlaces, creditsTwd, creditsUsd, DISCOVER_MAX_USD, LocationNotRecognized, MAX_PAGES, type PlacesCursor } from "@/lib/outreach/discover";
+import { loadCursor, saveCursor, searchKey, type SearchSource } from "@/lib/outreach/search-cursor";
 import { holdCost } from "@/lib/ai/log-ai-call";
 import { creditsForCost } from "@/lib/entitlements/ledger";
 import { billedTo } from "@/lib/outreach/billing";
 import { grantFor } from "@/lib/entitlements/grant";
 import { EntitlementRequired } from "@/lib/entitlements/can";
 import { createBudget, createProviderCall, ProviderCallError } from "@/lib/collect";
-import { discoverCompanies, searchBusinessItems, GcisError, GCIS_COUNTIES, GCIS_MAX_SERPER_CREDITS, type GcisUsage } from "@/lib/outreach/sources/gcis";
+import { discoverCompanies, searchBusinessItems, GcisError, GCIS_COUNTIES, GCIS_MAX_SERPER_CREDITS, type GcisCursor, type GcisUsage } from "@/lib/outreach/sources/gcis";
 import { captureWarmLead } from "@/lib/outreach/warm-leads";
-import { peopleInput, searchPeople, PEOPLE_MAX_SERPER_CREDITS, PEOPLE_SOURCE_TYPE, type PeopleUsage } from "@/lib/outreach/sources/people-search";
+import { peopleInput, searchPeople, PEOPLE_MAX_SERPER_CREDITS, PEOPLE_SOURCE_TYPE, type PeopleCursor, type PeopleUsage } from "@/lib/outreach/sources/people-search";
 
 // Cold Outreach — Lead Inbox import (task T5). Table: co_lead_inbox (migration 0048).
 // Pipeline: normalize → dedup (within batch, and against this org's existing inbox + leads) → suppression check →
@@ -120,10 +121,31 @@ export async function POST(req: Request): Promise<Response> {
 
   let discovery: { credits: number; twd: number; skipped: number } | null = null;
   let gcisWithoutWebsite = 0;
-  let gcisListTruncated = false;
+  // A search resumes where the same search stopped (search-cursor.ts). The new position is saved only once its rows are
+  // in the inbox: a failed insert must not skip them for good. A search already at its end spends nothing.
+  const restart = body.restart === true;
+  let advance: (() => Promise<void>) | null = null;
+  let more: boolean | null = null;
+  const resume = async <S,>(source: SearchSource, key: string) => {
+    const c = await loadCursor<S>(supabase, organizationId, source, key, restart);
+    const done = (next: S | null) => { more = next !== null; advance = () => saveCursor(supabase, organizationId, source, key, c, next); };
+    return { from: c.from, exhausted: c.exhausted, done };
+  };
+  const exhausted = () => NextResponse.json({ ok: true, imported: 0, summary: {}, discovery: { credits: 0, twd: 0, skipped: 0 }, search: { exhausted: true } });
+  // The rows are already in when this runs: a failed cursor write must not answer "failed" (a retry would import them
+  // again); the answer says the position was not kept, so the next same search repeats this one (Codex 2026-11-04).
+  const finish = async (res: Record<string, unknown>, status = 200) => {
+    if (more === null) return NextResponse.json(res, { status });
+    let saved = true;
+    try { await advance!(); }
+    catch (e) { saved = false; console.error(`[outreach-search] cursor not saved: ${String(e).slice(0, 200)}`); }
+    return NextResponse.json({ ...res, search: saved ? { more } : { more, saved } }, { status });
+  };
   if (body.discover !== undefined) {
     const input = discoverInput(body.discover);
     if (!input) return NextResponse.json({ ok: false, error: "discover.query and discover.location required (≤ 100 chars)" }, { status: 400 });
+    const cur = await resume<PlacesCursor>("places", searchKey([input.query, input.location]));
+    if (cur.exhausted) return exhausted();
     let grant;
     try { grant = await grantFor("outreach.discover", await billedTo(req, organizationId)); }
     catch (e) { if (e instanceof EntitlementRequired) return NextResponse.json({ ok: false, error: e.code }, { status: e.status }); throw e; }
@@ -137,10 +159,11 @@ export async function POST(req: Request): Promise<Response> {
       catch (e) { console.warn(`[outreach-discover] settle failed: ${String(e).slice(0, 200)}`); }
     };
     try {
-      const found = await discoverPlaces(createProviderCall({ budget: createBudget({ fetches: MAX_PAGES, ms: 30_000 }), grant, timeoutMs: 20_000 }), input);
+      const found = await discoverPlaces(createProviderCall({ budget: createBudget({ fetches: MAX_PAGES, ms: 30_000 }), grant, timeoutMs: 20_000 }), input, undefined, cur.from);
       used = found.credits;
       await settle();
       rawList = found.leads;
+      cur.done(found.next);
       discovery = { credits: found.credits, twd: creditsTwd(found.credits), skipped: found.skipped };
     } catch (e) {
       if (e instanceof LocationNotRecognized) used = e.credits;
@@ -153,7 +176,7 @@ export async function POST(req: Request): Promise<Response> {
       if (!(e instanceof ProviderCallError)) throw e;
       return NextResponse.json({ ok: false, error: e.message }, { status: e.kind === "unconfigured" ? 503 : 502 });
     }
-    if (rawList.length === 0) return NextResponse.json({ ok: true, imported: 0, summary: {}, discovery });
+    if (rawList.length === 0) return finish({ ok: true, imported: 0, summary: {}, discovery });
   }
 
   if (body.gcisItems !== undefined) {
@@ -181,6 +204,8 @@ export async function POST(req: Request): Promise<Response> {
     if (!/^[A-Z]\d{6}$/.test(item) || !(GCIS_COUNTIES as readonly string[]).includes(county)) {
       return NextResponse.json({ ok: false, error: "gcis.item (e.g. F101040) and gcis.county (one of the 22 counties) required" }, { status: 400 });
     }
+    const cur = await resume<GcisCursor>("gcis", searchKey([item, county]));
+    if (cur.exhausted) return exhausted();
     let grant;
     try { grant = await grantFor("outreach.discover", await billedTo(req, organizationId)); }
     catch (e) { if (e instanceof EntitlementRequired) return NextResponse.json({ ok: false, error: e.code }, { status: e.status }); throw e; }
@@ -194,24 +219,26 @@ export async function POST(req: Request): Promise<Response> {
       catch (e) { console.warn(`[outreach-gcis] settle failed: ${String(e).slice(0, 200)}`); }
     };
     try {
-      const found = await discoverCompanies(createProviderCall({ budget: createBudget({ fetches: 220, ms: 240_000 }), grant, timeoutMs: 20_000 }), usage, { item, itemDesc, county });
+      const found = await discoverCompanies(createProviderCall({ budget: createBudget({ fetches: 220, ms: 240_000 }), grant, timeoutMs: 20_000 }), usage, { item, itemDesc, county }, undefined, cur.from);
       await settle();
       rawList = found.leads;
       discovery = { credits: usage.serperCredits, twd: creditsTwd(usage.serperCredits), skipped: found.skipped };
       gcisWithoutWebsite = found.withoutWebsite;
-      gcisListTruncated = found.listTruncated;
+      cur.done(found.next);
     } catch (e) {
       await settle();
       if (e instanceof GcisError) return NextResponse.json({ ok: false, error: e.message }, { status: 502 });
       if (!(e instanceof ProviderCallError)) throw e;
       return NextResponse.json({ ok: false, error: e.message }, { status: e.kind === "unconfigured" ? 503 : 502 });
     }
-    if (rawList.length === 0) return NextResponse.json({ ok: true, imported: 0, summary: {}, discovery });
+    if (rawList.length === 0) return finish({ ok: true, imported: 0, summary: {}, discovery });
   }
 
   if (body.people !== undefined) {
     const input = peopleInput(body.people);
     if (!input) return NextResponse.json({ ok: false, error: "people.role or people.keyword required (each field ≤ 100 chars)" }, { status: 400 });
+    const cur = await resume<PeopleCursor>("people", searchKey([input.role, input.company, input.location, input.keyword]));
+    if (cur.exhausted) return exhausted();
     let grant;
     try { grant = await grantFor("outreach.discover", await billedTo(req, organizationId)); }
     catch (e) { if (e instanceof EntitlementRequired) return NextResponse.json({ ok: false, error: e.code }, { status: e.status }); throw e; }
@@ -226,9 +253,10 @@ export async function POST(req: Request): Promise<Response> {
     };
     let skipped = 0;
     try {
-      const found = await searchPeople(createProviderCall({ budget: createBudget({ fetches: PEOPLE_MAX_SERPER_CREDITS, ms: 30_000 }), grant, timeoutMs: 20_000 }), usage, input);
+      const found = await searchPeople(createProviderCall({ budget: createBudget({ fetches: PEOPLE_MAX_SERPER_CREDITS, ms: 30_000 }), grant, timeoutMs: 20_000 }), usage, input, undefined, cur.from);
       await settle();
       rawList = found.leads;
+      cur.done(found.next);
       skipped = found.skipped;
       discovery = { credits: usage.serperCredits, twd: creditsTwd(usage.serperCredits), skipped };
     } catch (e) {
@@ -236,7 +264,7 @@ export async function POST(req: Request): Promise<Response> {
       if (!(e instanceof ProviderCallError)) throw e;
       return NextResponse.json({ ok: false, error: e.message }, { status: e.kind === "unconfigured" ? 503 : 502 });
     }
-    if (rawList.length === 0) return NextResponse.json({ ok: true, imported: 0, summary: {}, discovery });
+    if (rawList.length === 0) return finish({ ok: true, imported: 0, summary: {}, discovery });
   }
 
   if (body.warmLeads !== undefined) {
@@ -337,7 +365,7 @@ export async function POST(req: Request): Promise<Response> {
     const s = (r as { inbox_status: string }).inbox_status;
     summary[s] = (summary[s] ?? 0) + 1;
   }
-  return NextResponse.json({ ok: true, imported: data?.length ?? 0, summary, ...(discovery ? { discovery: { ...discovery, ...(body.gcis !== undefined ? { withoutWebsite: gcisWithoutWebsite, listTruncated: gcisListTruncated } : {}) } } : {}) }, { status: 201 });
+  return finish({ ok: true, imported: data?.length ?? 0, summary, ...(discovery ? { discovery: { ...discovery, ...(body.gcis !== undefined ? { withoutWebsite: gcisWithoutWebsite } : {}) } } : {}) }, 201);
 }
 
 export async function DELETE(req: Request): Promise<Response> {

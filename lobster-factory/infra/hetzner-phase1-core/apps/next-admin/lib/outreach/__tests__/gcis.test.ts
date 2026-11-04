@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { createBudget, createProviderCall } from "@/lib/collect";
 import { collectGrant } from "@/lib/collect/__tests__/grant-fixture";
-import { discoverCompanies, type GcisUsage } from "../sources/gcis";
+import { discoverCompanies, type GcisCursor, type GcisUsage } from "../sources/gcis";
 
 const GRANT = await collectGrant();
 const F_API = "C8782705-DA48-4897-8537-9F7B0FC463EF";
@@ -22,7 +22,10 @@ function setup(companies: Fake[]) {
       return json({ organic: companies.find((c) => c.name === q)?.organic ?? [], credits: 1 });
     }
     const filter = decodeURIComponent(new URL(url).search.match(/\$filter=([^&]*)/)![1]);
-    if (url.includes(F_API)) return json(companies.map((c) => ({ Business_Accounting_NO: c.taxId, Company_Name: c.name, Company_Location: c.location, Capital_Stock_Amount: "1" })));
+    if (url.includes(F_API)) {
+      const skip = Number(new URL(url).searchParams.get("$skip") ?? 0), top = Number(new URL(url).searchParams.get("$top") ?? 1000);
+      return json(companies.slice(skip, skip + top).map((c) => ({ Business_Accounting_NO: c.taxId, Company_Name: c.name, Company_Location: c.location, Capital_Stock_Amount: "1" })));
+    }
     if (url.includes(DETAIL_API)) {
       const c = companies.find((x) => filter.endsWith(` ${x.taxId}`));
       return c ? json([{ Business_Accounting_NO: c.taxId, Company_Name: c.name, Responsible_Name: `負責人${c.taxId}`, Company_Location: c.location, Company_Status_Desc: c.status ?? "核准設立" }]) : new Response("", { status: 200 });
@@ -33,9 +36,9 @@ function setup(companies: Fake[]) {
   const usage: GcisUsage = { serperCredits: 0, gcisCalls: 0 };
   return { call, usage, urls };
 }
-const run = (companies: Fake[], county = "台中市", limit?: number) => {
+const run = (companies: Fake[], county = "台中市", limit?: number, from: GcisCursor | null = null) => {
   const s = setup(companies);
-  return discoverCompanies(s.call, s.usage, { item: "F501060", itemDesc: "餐館業", county }, limit).then((r) => ({ ...r, ...s }));
+  return discoverCompanies(s.call, s.usage, { item: "F501060", itemDesc: "餐館業", county }, limit, from).then((r) => ({ ...r, ...s }));
 };
 
 describe("discoverCompanies", () => {
@@ -76,6 +79,10 @@ describe("discoverCompanies", () => {
     const r = await run(many, "台中市", 500);
     expect(r.leads).toHaveLength(100);
     expect(r.urls.filter((u) => u.includes(DETAIL_API))).toHaveLength(100);
+    expect(r.next).toEqual({ skip: 100 });
+    const rest = await run(many, "台中市", 500, r.next);  // the same search again: the other 30, then the list's end
+    expect(rest.leads.map((l) => l.name)).toEqual(many.slice(100).map((c) => c.name));
+    expect(rest.next).toBeNull();
   });
 
   it("a host that is a candidate of 2+ companies is a directory: each company keeps its own host, or none", async () => {

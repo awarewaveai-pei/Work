@@ -32,7 +32,7 @@ vi.mock("@/lib/social/authz", () => ({ actorFor: m.actorFor }));
 vi.mock("@/lib/outreach/ai-claude", () => ({ generateWithClaude: m.claude }));
 vi.mock("@/lib/outreach/ai-openai", () => ({ generateWithOpenAI: vi.fn() }));
 vi.mock("@/lib/outreach/ai-gemini", () => ({ generateWithGemini: vi.fn() }));
-vi.mock("@/lib/outreach/claim-check", () => ({ checkClaims: m.claims }));
+vi.mock("@/lib/outreach/claim-check", () => ({ checkClaims: m.claims, checkClaimsTwice: m.claims }));
 vi.mock("@/lib/secret-vault", () => ({ getSecret: async () => "key", connectorSecretRef: (id: string) => `co_connector:${id}` }));
 vi.mock("@/lib/org-client", () => {
   const query = (table: string) => {

@@ -54,12 +54,22 @@ function badge(status: string): string {
   return "badge-gray";
 }
 
+/** What the answer says about the next run of the same search (search-cursor.ts). */
+function searchNote(j: { search?: { more?: boolean; exhausted?: boolean } }): string {
+  if (j.search?.exhausted) return "這個條件已經搜完，沒有新的了；要從頭再搜一次就按「從頭再搜」";
+  if (j.search?.more === true) return "；還有更多：同樣條件再按一次，會接著往下找";
+  if (j.search?.more === false) return "；這個條件已經搜完";
+  return "";
+}
+
 export default function InboxClient() {
   const [items, setItems] = useState<InboxItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  // The search that answered "nothing more under these conditions": its button runs it again from the beginning.
+  const [ended, setEnded] = useState<"places" | "gcis" | "people" | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY);
   const [bulk, setBulk] = useState("");
   const [find, setFind] = useState({ query: "", location: "" });
@@ -155,23 +165,25 @@ export default function InboxClient() {
     }
   }
 
-  async function discover(e: React.FormEvent) {
-    e.preventDefault();
+  async function discover(e?: React.FormEvent, restart = false) {
+    e?.preventDefault();
     setBusy(true);
     setErr(null);
     setMsg(null);
+    setEnded(null);
     try {
       const r = await fetch(INBOX_API, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ discover: find, organizationId: org }),
+        body: JSON.stringify({ discover: find, organizationId: org, restart }),
       });
       const j = await r.json();
       const cost = j.discovery ? `（用了 ${j.discovery.credits} 次查詢，約 ${twd(j.discovery.twd)}）` : "";
       if (!j.ok) throw new Error(`${j.detail || j.error || "查詢失敗"}${cost}`);
       const dup = j.summary?.suspected_dup ?? 0;
       const skipped = j.discovery?.skipped ? `；${j.discovery.skipped} 家沒有網站也沒有電話，沒放進來` : "";
-      setMsg(`${j.imported ? `找到 ${j.imported} 家，已放進收件匣${dup ? `，其中 ${dup} 家已在名單或收件匣裡（標成 suspected_dup）` : ""}` : "沒有找到可聯絡的店家"}${skipped}${cost}`);
+      if (j.search?.exhausted) { setEnded("places"); setMsg(searchNote(j)); return; }
+      setMsg(`${j.imported ? `找到 ${j.imported} 家，已放進收件匣${dup ? `，其中 ${dup} 家已在名單或收件匣裡（標成 suspected_dup）` : ""}` : "沒有找到可聯絡的店家"}${skipped}${searchNote(j)}${cost}`);
       await load();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -202,24 +214,25 @@ export default function InboxClient() {
     }
   }
 
-  async function importCompanies() {
+  async function importCompanies(restart = false) {
     if (!coPick || !co.county) return;
     setBusy(true);
     setErr(null);
     setMsg(null);
+    setEnded(null);
     try {
       const r = await fetch(INBOX_API, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ gcis: { item: coPick.code, itemDesc: coPick.desc, county: co.county }, organizationId: org }),
+        body: JSON.stringify({ gcis: { item: coPick.code, itemDesc: coPick.desc, county: co.county }, organizationId: org, restart }),
       });
       const j = await r.json();
       const cost = j.discovery ? `（用了 ${j.discovery.credits} 次查詢，約 ${twd(j.discovery.twd)}）` : "";
       if (!j.ok) throw new Error(`${j.detail || j.error || "查詢失敗"}${cost}`);
       const dup = j.summary?.suspected_dup ?? 0;
-      const noSite = (j.discovery?.withoutWebsite ? `；${j.discovery.withoutWebsite} 家找不到官網` : "")
-        + (j.discovery?.listTruncated ? "；全國名單太長，只篩了前段，這個縣市可能還有更多" : "");
-      setMsg(`${j.imported ? `找到 ${j.imported} 家公司，已放進收件匣${dup ? `，其中 ${dup} 家已在名單或收件匣裡（標成 suspected_dup）` : ""}` : "這個營業項目在該縣市沒有找到公司"}${noSite}${cost}`);
+      const noSite = j.discovery?.withoutWebsite ? `；${j.discovery.withoutWebsite} 家找不到官網` : "";
+      if (j.search?.exhausted) { setEnded("gcis"); setMsg(searchNote(j)); return; }
+      setMsg(`${j.imported ? `找到 ${j.imported} 家公司，已放進收件匣${dup ? `，其中 ${dup} 家已在名單或收件匣裡（標成 suspected_dup）` : ""}` : "這個營業項目在該縣市沒有找到公司"}${noSite}${searchNote(j)}${cost}`);
       await load();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -228,22 +241,24 @@ export default function InboxClient() {
     }
   }
 
-  async function findPeople(e: React.FormEvent) {
-    e.preventDefault();
+  async function findPeople(e?: React.FormEvent, restart = false) {
+    e?.preventDefault();
     setBusy(true);
     setErr(null);
     setMsg(null);
+    setEnded(null);
     try {
       const r = await fetch(INBOX_API, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ people, organizationId: org }),
+        body: JSON.stringify({ people, organizationId: org, restart }),
       });
       const j = await r.json();
       const cost = j.discovery ? `（用了 ${j.discovery.credits} 次查詢，約 ${twd(j.discovery.twd)}）` : "";
       if (!j.ok) throw new Error(`${j.detail || j.error || "查詢失敗"}${cost}`);
       const dup = j.summary?.suspected_dup ?? 0;
-      setMsg(`${j.imported ? `找到 ${j.imported} 位，已放進收件匣${dup ? `，其中 ${dup} 位已在名單或收件匣裡（標成 suspected_dup）` : ""}` : "沒有找到公開簡介"}${j.discovery?.skipped ? `；${j.discovery.skipped} 筆不是個人簡介頁，沒放進來` : ""}${cost}`);
+      if (j.search?.exhausted) { setEnded("people"); setMsg(searchNote(j)); return; }
+      setMsg(`${j.imported ? `找到 ${j.imported} 位，已放進收件匣${dup ? `，其中 ${dup} 位已在名單或收件匣裡（標成 suspected_dup）` : ""}` : "沒有找到公開簡介"}${j.discovery?.skipped ? `；${j.discovery.skipped} 筆不是個人簡介頁，沒放進來` : ""}${searchNote(j)}${cost}`);
       await load();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -384,6 +399,12 @@ export default function InboxClient() {
     <div style={{ padding: 16, display: "grid", gap: 16 }}>
       {err && <div className="card-badge badge-red" role="alert">{err}</div>}
       {msg && <div className="card-badge badge-green">{msg}</div>}
+      {ended && (
+        <button type="button" className="btn-secondary" disabled={busy}
+          onClick={() => void (ended === "places" ? discover(undefined, true) : ended === "gcis" ? importCompanies(true) : findPeople(undefined, true))}>
+          從頭再搜
+        </button>
+      )}
 
       <form className="card" onSubmit={discover} style={{ display: "grid", gap: 8 }}>
         <div className="card-header"><span className="card-label">找名單（地圖上的店家）</span></div>

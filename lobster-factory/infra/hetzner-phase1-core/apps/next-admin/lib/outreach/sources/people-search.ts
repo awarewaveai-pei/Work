@@ -26,7 +26,10 @@ export interface PeopleInput { role: string; company: string; location: string; 
 export interface PeopleLead extends RawLead { consent_source: string }
 /** Counter the caller reads even when the run throws midway: what to settle. */
 export interface PeopleUsage { serperCredits: number }
-export interface PeopleResult { leads: PeopleLead[]; /** Results dropped: not a profile page, no name, already seen. */ skipped: number }
+/** Where the next run of the same search starts, one entry per query of peopleQueries (same order); null = that query ended. */
+export interface PeopleCursor { pos: Array<{ page: number; skip: number } | null> }
+export interface PeopleResult { leads: PeopleLead[]; /** Results dropped: not a profile page, no name, already seen. */ skipped: number;
+  /** null = every query reached its end */ next: PeopleCursor | null }
 
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
 const clip = (v: unknown): string => (typeof v === "string" ? v.trim().replace(/["“”]/g, "").slice(0, MAX_INPUT) : "");
@@ -94,30 +97,34 @@ export function resultToLead(site: "linkedin" | "instagram", r: { title?: unknow
     consent_source: `${email ? "self_published" : "general_source"}:${link}` };
 }
 
-/** Up to `limit` (≤ PEOPLE_MAX) people, query after query, page after page until a short page or PEOPLE_MAX_PAGES; one profile
- *  once. The caller's callProvider carries the grant and the budget, so a refused or exhausted run throws before anything is sent. */
-export async function searchPeople(call: ProviderCall, usage: PeopleUsage, input: PeopleInput, limit = PEOPLE_MAX): Promise<PeopleResult> {
+/** Up to `limit` (≤ PEOPLE_MAX) people from `from` on, query after query, each query at most PEOPLE_MAX_PAGES pages a run
+ *  until a short page; one profile once. A page left half-used is fetched again next run and its taken results skipped.
+ *  The caller's callProvider carries the grant and the budget, so a refused or exhausted run throws before anything is sent. */
+export async function searchPeople(call: ProviderCall, usage: PeopleUsage, input: PeopleInput, limit = PEOPLE_MAX, from: PeopleCursor | null = null): Promise<PeopleResult> {
   const want = Math.min(Math.max(1, limit), PEOPLE_MAX);
   const leads: PeopleLead[] = [];
   const seen = new Set<string>();
   let skipped = 0;
-  for (const { site, q } of peopleQueries(input)) {
-    for (let page = 1; leads.length < want && page <= PEOPLE_MAX_PAGES; page++) {
+  const queries = peopleQueries(input);
+  const pos = queries.map((_, k) => (from ? from.pos[k] ?? null : { page: 1, skip: 0 }));
+  for (const [k, { site, q }] of queries.entries()) {
+    for (let n = 0; pos[k] && leads.length < want && n < PEOPLE_MAX_PAGES; n++) {
+      const { page, skip } = pos[k]!;
       const res = await call("serper", { path: "/search", body: { q, num: PEOPLE_PAGE_SIZE, page, gl: "tw", hl: "zh-tw" } });
       const j = (await res.json()) as { organic?: unknown; credits?: unknown };
       usage.serperCredits += typeof j.credits === "number" ? j.credits : 1;
       const organic = Array.isArray(j.organic) ? (j.organic as Array<{ title?: unknown; link?: unknown; snippet?: unknown }>) : [];
-      for (const r of organic) {
-        const lead = resultToLead(site, r, input.location);
+      let i = skip;
+      for (; i < organic.length && leads.length < want; i++) {
+        const lead = resultToLead(site, organic[i], input.location);
         if (!lead || seen.has(lead.source_url!)) { skipped++; continue; }
-        if (leads.length >= want) continue;
         seen.add(lead.source_url!);
         leads.push(lead);
       }
-      if (organic.length < PEOPLE_PAGE_SIZE) break;
+      pos[k] = i < organic.length ? { page, skip: i } : organic.length < PEOPLE_PAGE_SIZE ? null : { page: page + 1, skip: 0 };
     }
   }
-  return { leads, skipped };
+  return { leads, skipped, next: pos.some(Boolean) ? { pos } : null };
 }
 
 /** What an approved inbox row may pass on as the lead's consent_source (raw_payload is whatever an import sent; a typed

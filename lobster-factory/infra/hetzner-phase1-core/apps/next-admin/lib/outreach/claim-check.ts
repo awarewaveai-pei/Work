@@ -54,6 +54,13 @@ export async function checkClaims(args: { body: string; evidence: EvidenceItem[]
   return parseClaimCheck(r.raw, sentences, new Set(approved.map((e) => e.id)));
 }
 
+/** The check an approval rests on (C16.2): two independent runs, supported only when both say so; otherwise the first
+ *  run that did not, so a person sees why. One run flipped on 22 of 200 emails; a flip now lands with a person. */
+export async function checkClaimsTwice(args: Parameters<typeof checkClaims>[0]): Promise<ClaimCheck> {
+  const [a, b] = await Promise.all([checkClaims(args), checkClaims(args)]);
+  return a.verdict !== "supported" ? a : b;
+}
+
 const KINDS = new Set(["recipient", "sender", "question", "courtesy"]);
 
 /** Supported = each of the email's sentences got exactly one label, and every sentence about the recipient cites an

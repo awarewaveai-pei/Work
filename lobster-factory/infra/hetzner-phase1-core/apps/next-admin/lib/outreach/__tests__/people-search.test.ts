@@ -62,5 +62,12 @@ describe("search results become profile rows", () => {
     expect(r.leads).toHaveLength(16); // 8 distinct links per page, 2 pages, links repeat inside a page
     expect(new Set(r.leads.map((l) => l.source_url)).size).toBe(16);
     expect(usage.serperCredits).toBe(2);
+    expect(r.next).toEqual({ pos: [{ page: 3, skip: 0 }] });
+    urls.length = 0;
+    const pages: number[] = [];
+    const again = createProviderCall({ grant: await collectGrant(), budget: createBudget(), env: { SERPER_API_KEY: "serper-test" },
+      transport: (async (u: string | URL, init: RequestInit) => { pages.push((JSON.parse(String(init.body)) as { page: number }).page); return transport(u, init); }) as unknown as typeof fetch });
+    await searchPeople(again, { serperCredits: 0 }, { role: "CEO", company: "", location: "", keyword: "" }, undefined, r.next);
+    expect(pages).toEqual([3, 4]);  // the same search again starts after the pages already read
   });
 });

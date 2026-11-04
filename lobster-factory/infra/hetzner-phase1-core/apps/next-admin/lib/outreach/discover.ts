@@ -21,7 +21,7 @@ import { domainOf, isPlatformHost, type RawLead } from "./normalize";
 export const PLACES_PER_PAGE = 10;
 /** What the operator reviews in one sitting (card C10). */
 export const MAX_DISCOVER = 20;
-/** Two pages fill 20 unless places without any contact were skipped; a third page tops up, never more. */
+/** Per run: two pages fill 20 unless places without any contact were skipped; a third page tops up, never more. */
 export const MAX_PAGES = 3;
 export const PLACES_CREDITS_PER_PAGE = 1;
 export const PLACES_SOURCE_TYPE = "serper_places";
@@ -102,32 +102,39 @@ export function placeToLead(p: SerperPlace): RawLead | null {
   };
 }
 
-export interface DiscoverResult { leads: RawLead[]; credits: number; /** Places with no website, social page or phone. */ skipped: number }
+/** Where the next run of the same search starts: the page, and how many of its places were already taken. */
+export interface PlacesCursor { page: number; skip: number }
+export interface DiscoverResult { leads: RawLead[]; credits: number; /** Places with no website, social page or phone. */ skipped: number;
+  /** null = the search reached its end (a short page) */ next: PlacesCursor | null }
 
-/** Up to `limit` (≤ MAX_DISCOVER) places, page after page until a short page or MAX_PAGES; one place once (by cid). A
- *  place with no website, social page or phone cannot be contacted or researched: skipped, not an inbox row. The
+/** Up to `limit` (≤ MAX_DISCOVER) places from `from` on, page after page until a short page or MAX_PAGES; one place once
+ *  (by cid). A place with no website, social page or phone cannot be contacted or researched: skipped, not an inbox row.
+ *  A page left half-used is fetched again next run and its taken places skipped: one credit, no place lost. The
  *  caller's callProvider carries the grant and the budget, so a refused or exhausted run throws before anything is sent. */
-export async function discoverPlaces(callProvider: ProviderCall, input: DiscoverInput, limit = MAX_DISCOVER): Promise<DiscoverResult> {
+export async function discoverPlaces(callProvider: ProviderCall, input: DiscoverInput, limit = MAX_DISCOVER, from: PlacesCursor | null = null): Promise<DiscoverResult> {
   const want = Math.min(Math.max(1, limit), MAX_DISCOVER);
   const leads: RawLead[] = [];
   const seen = new Set<string>();
   let credits = 0;
   let skipped = 0;
-  for (let page = 1; leads.length < want && page <= MAX_PAGES; page++) {
+  let next: PlacesCursor | null = from ?? { page: 1, skip: 0 };
+  for (let n = 0; next && leads.length < want && n < MAX_PAGES; n++) {
+    const { page, skip } = next;
     const res = await callProvider("serper", { path: "/places",
       body: { q: input.query, location: input.location, gl: "tw", hl: "zh-tw", page } });
     const json = (await res.json()) as { places?: SerperPlace[]; credits?: unknown; searchParameters?: { uule?: unknown } };
     credits += typeof json.credits === "number" ? json.credits : PLACES_CREDITS_PER_PAGE;
     if (!json.searchParameters?.uule) throw new LocationNotRecognized(input.location, credits);
     const places = Array.isArray(json.places) ? json.places : [];
-    for (const p of places) {
-      const lead = placeToLead(p);
-      if (!lead || seen.has(lead.source_url!) || leads.length >= want) continue;
+    let i = skip;
+    for (; i < places.length && leads.length < want; i++) {
+      const lead = placeToLead(places[i]);
+      if (!lead || seen.has(lead.source_url!)) continue;
       seen.add(lead.source_url!);
       if (!lead.website && !lead.social_url && !lead.phone) { skipped++; continue; }
       leads.push(lead);
     }
-    if (places.length < PLACES_PER_PAGE) break;
+    next = i < places.length ? { page, skip: i } : places.length < PLACES_PER_PAGE ? null : { page: page + 1, skip: 0 };
   }
-  return { leads, credits, skipped };
+  return { leads, credits, skipped, next };
 }
