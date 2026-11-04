@@ -156,8 +156,8 @@ async function suite(tag, page, env) {
   await page.goto(`${BASE}/tools/canvas`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => !!document.querySelector('button[title="加文字"]') && !document.querySelector('button[title="加文字"]').disabled, null, { timeout: 90000 });
   await page.waitForFunction(() => !!window.__cvTest, null, { timeout: 30000 });
-  // shapes live in 更多工具 (collapsed by default)
-  await page.locator("button", { hasText: "更多工具" }).first().click();
+  // shapes live in 形狀 / 畫筆 / 設計檔 (collapsed by default)
+  await page.locator("button", { hasText: "形狀 / 畫筆 / 設計檔" }).first().click();
   await page.locator('button[title="加方框"]').click(); await page.waitForTimeout(400);
   await page.locator('button[title="加圓形"]').click(); await page.waitForTimeout(400);
   await page.locator('button[title="加文字"]').first().click(); await page.waitForTimeout(400);
@@ -236,6 +236,7 @@ async function suite(tag, page, env) {
   await page.waitForFunction(() => [...document.querySelectorAll("iframe")].some((f) => f.src.includes("vector-editor.html")), null, { timeout: 90000 });
   const frame = page.frames().find((f) => f.url().includes("vector-editor.html"));
   await frame.waitForFunction(() => typeof canvas !== "undefined" && document.getElementById("lyr-group"));
+  await frame.evaluate(() => document.querySelectorAll("details").forEach((d) => { d.open = true; })); // panels ship collapsed
   await frame.locator('[data-shape="rect"]').click();
   await frame.locator('[data-shape="circle"]').click();
   await frame.locator("#addText").click();

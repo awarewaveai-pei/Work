@@ -65,7 +65,7 @@ export const DEFAULT_SECTIONS: NavSection[] = [
       { type: 'link',     href: '/tools/mockup',        icon: '👕', label: 'Mockup',        title: 'AI 擬真商品照' },
       { type: 'link',     href: '/tools/banner',        icon: '🖼', label: 'Banner Studio', title: 'Social media banner 生成工具' },
       { type: 'link',     href: '/tools/canvas',        icon: '🎨', label: 'Canvas Editor', title: 'Fabric.js Canvas Editor' },
-      { type: 'link',     href: '/tools/vector-editor', icon: '✒', label: 'Vector Editor', title: '向量設計工具（14 積木）' },
+      { type: 'link',     href: '/tools/vector-editor', icon: '✒', label: 'Vector Editor', title: '向量設計工具（13 積木）' },
       { type: 'link',     href: '/tools/designs',       icon: '🗂', label: 'My Designs',    title: '已儲存設計庫（R2 持久化）' },
       { type: 'link',     href: '/tools/publish',       icon: '🛒', label: 'Publish',       title: '一鍵上架 Woo + Printful' },
       { type: 'disabled', icon: '◧', label: 'Templates' },

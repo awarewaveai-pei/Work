@@ -84,6 +84,112 @@ function isTextObject(o: { type?: string } | null | undefined): boolean {
   return !!o && (o.type === "i-text" || o.type === "text" || o.type === "textbox");
 }
 
+/**
+ * 🎨 外觀 / 物件效果 — the style a shape carries. One shape of data for the controls, the "next new shape" default and the
+ * selected object (mirror of nextStyle in public/vector-editor.html). fill "" / "transparent" = 無填色; grad = applied gradient or null.
+ */
+type GradCfg = { a: string; b: string; c: string; mid: boolean; type: "linear" | "radial"; angle: "0" | "90" | "45" | "135" };
+type FxCfg = { type: "none" | "shadow" | "glow"; color: string; blur: number; off: number };
+type ObjStyle = {
+  fill: string; grad: GradCfg | null; stroke: string; strokeWidth: number; dash: boolean; dashGap: number;
+  rx: number; opacity: number; blend: string; fx: FxCfg; clip: "none" | "circle" | "round";
+};
+const DEFAULT_STYLE: ObjStyle = {
+  fill: "transparent", grad: null, stroke: "#111111", strokeWidth: 4, dash: false, dashGap: 8,
+  rx: 0, opacity: 100, blend: "normal", fx: { type: "none", color: "#000000", blur: 12, off: 6 }, clip: "none",
+};
+const DEFAULT_GRAD: GradCfg = { a: "#ff5e62", b: "#ff9966", c: "#ffe066", mid: false, type: "linear", angle: "0" };
+const STYLE_KEYS = ["fill", "stroke", "strokeWidth", "dash", "rx", "opacity", "blend", "fx", "clip"] as const;
+type StyleKey = (typeof STYLE_KEYS)[number];
+const BLEND_MODES = ["normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "soft-light", "hard-light", "difference"];
+const SWATCHES = ["#000000", "#ffffff", "#e63946", "#ff5e62", "#f1a208", "#ffd166", "#ffbe0b", "#06d6a0", "#2ec4b6", "#118ab2", "#3a86ff", "#073b4c", "#ef476f", "#7209b7", "#8338ec", "#fb5607", "#cbb47f", "#6c757d", "#495057", "#212529"];
+const HEX6 = /^#[0-9a-f]{6}$/i;
+function toHex6(c: unknown): string | null {
+  if (typeof c !== "string") return null;
+  if (HEX6.test(c)) return c.toLowerCase();
+  const m = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(c);
+  return m ? `#${m[1]}${m[1]}${m[2]}${m[2]}${m[3]}${m[3]}`.toLowerCase() : null;
+}
+
+/** The slice of a Fabric object the style code reads/writes. */
+type StyleObj = {
+  type?: string; fill?: unknown; stroke?: unknown; strokeWidth?: number; strokeDashArray?: number[] | null; rx?: number; opacity?: number;
+  globalCompositeOperation?: string; width?: number; height?: number;
+  shadow?: { offsetX?: number; offsetY?: number; blur?: number; color?: unknown } | null;
+  clipPath?: { type?: string } | null;
+  set: (p: Record<string, unknown>) => void;
+};
+type FabricNs = typeof import("fabric");
+
+function makeGradient(fb: FabricNs, g: GradCfg, o: StyleObj) {
+  const w = o.width || 100, h = o.height || 100; // object-local (unscaled) space: Fabric scales the fill with the object
+  const colorStops = g.mid
+    ? [{ offset: 0, color: g.a }, { offset: 0.5, color: g.c }, { offset: 1, color: g.b }]
+    : [{ offset: 0, color: g.a }, { offset: 1, color: g.b }];
+  if (g.type === "radial") {
+    const cx = w / 2, cy = h / 2;
+    return new fb.Gradient({ type: "radial", gradientUnits: "pixels", coords: { x1: cx, y1: cy, r1: 0, x2: cx, y2: cy, r2: Math.max(w, h) / 2 }, colorStops });
+  }
+  const coords = g.angle === "0" ? { x1: 0, y1: h / 2, x2: w, y2: h / 2 }
+    : g.angle === "90" ? { x1: w / 2, y1: 0, x2: w / 2, y2: h }
+    : g.angle === "45" ? { x1: 0, y1: 0, x2: w, y2: h }
+    : { x1: w, y1: 0, x2: 0, y2: h };
+  return new fb.Gradient({ type: "linear", gradientUnits: "pixels", coords, colorStops });
+}
+function makeShadow(fb: FabricNs, fx: FxCfg) {
+  if (fx.type === "shadow") return new fb.Shadow({ color: fx.color, blur: fx.blur, offsetX: fx.off, offsetY: fx.off });
+  if (fx.type === "glow") return new fb.Shadow({ color: fx.color, blur: Math.max(fx.blur, 10), offsetX: 0, offsetY: 0 }); // glow = offset-0 coloured shadow
+  return null;
+}
+function makeClip(fb: FabricNs, kind: ObjStyle["clip"], o: StyleObj) {
+  if (kind === "none") return undefined;
+  const w = o.width ?? 100, h = o.height ?? 100;
+  // clipPath positioned relative to the object's centre (default, non-absolute)
+  if (kind === "circle") return new fb.Circle({ radius: Math.min(w, h) / 2, originX: "center", originY: "center" });
+  return new fb.Rect({ width: w, height: h, rx: Math.min(w, h) * 0.15, ry: Math.min(w, h) * 0.15, originX: "center", originY: "center" });
+}
+function applyStyleTo(fb: FabricNs, o: StyleObj, st: ObjStyle, keys: readonly StyleKey[]) {
+  const has = (k: StyleKey) => keys.includes(k);
+  if (has("fill")) o.set({ fill: st.grad ? makeGradient(fb, st.grad, o) : st.fill });
+  if (has("stroke")) o.set({ stroke: st.stroke });
+  if (has("strokeWidth")) o.set({ strokeWidth: st.strokeWidth });
+  if (has("dash")) o.set({ strokeDashArray: st.dash ? [st.dashGap, st.dashGap] : null });
+  if (has("rx") && o.type === "rect") o.set({ rx: st.rx, ry: st.rx });
+  if (has("opacity")) o.set({ opacity: st.opacity / 100 });
+  if (has("blend")) o.set({ globalCompositeOperation: st.blend === "normal" ? "source-over" : st.blend });
+  if (has("fx")) o.set({ shadow: makeShadow(fb, st.fx) });
+  if (has("clip")) o.set({ clipPath: makeClip(fb, st.clip, o) });
+}
+/** Object → ObjStyle; what an object cannot tell (gradient-fill colour, effect colour when no effect…) stays as `fb`'s. */
+function readStyle(o: StyleObj, fb: ObjStyle): ObjStyle {
+  const f = o.fill as { type?: string; colorStops?: { color?: string }[]; coords?: { x1?: number; x2?: number; y1?: number; y2?: number } } | string | null | undefined;
+  const isG = !!f && typeof f === "object" && Array.isArray(f.colorStops) && f.colorStops.length > 0;
+  const st: ObjStyle = {
+    fill: typeof f === "string" ? f : f == null ? "" : fb.fill, grad: null,
+    stroke: typeof o.stroke === "string" ? o.stroke : fb.stroke, strokeWidth: o.strokeWidth ?? 0,
+    dash: Array.isArray(o.strokeDashArray) && o.strokeDashArray.length > 0,
+    dashGap: Array.isArray(o.strokeDashArray) && o.strokeDashArray[0] > 0 ? o.strokeDashArray[0] : fb.dashGap,
+    rx: o.type === "rect" ? o.rx ?? 0 : 0, opacity: Math.round((o.opacity ?? 1) * 100),
+    blend: o.globalCompositeOperation && o.globalCompositeOperation !== "source-over" ? o.globalCompositeOperation : "normal",
+    fx: { ...fb.fx, type: "none" }, clip: "none",
+  };
+  if (isG && typeof f === "object" && f) {
+    const cs = f.colorStops!, co = f.coords ?? {}, dx = (co.x2 ?? 0) - (co.x1 ?? 0), dy = (co.y2 ?? 0) - (co.y1 ?? 0);
+    st.grad = {
+      type: f.type === "radial" ? "radial" : "linear",
+      a: toHex6(cs[0].color) ?? DEFAULT_GRAD.a, b: toHex6(cs[cs.length - 1].color) ?? DEFAULT_GRAD.b,
+      mid: cs.length > 2, c: cs.length > 2 ? toHex6(cs[1].color) ?? DEFAULT_GRAD.c : DEFAULT_GRAD.c,
+      angle: dx > 0 && Math.abs(dy) < 1e-6 ? "0" : Math.abs(dx) < 1e-6 && dy > 0 ? "90" : dx > 0 && dy > 0 ? "45" : "135",
+    };
+  }
+  if (o.shadow) {
+    const sh = o.shadow;
+    st.fx = { type: !sh.offsetX && !sh.offsetY ? "glow" : "shadow", color: toHex6(sh.color) ?? fb.fx.color, blur: Math.round(sh.blur ?? 0), off: Math.round(Math.abs(sh.offsetX ?? 0)) };
+  }
+  if (o.clipPath) st.clip = o.clipPath.type === "circle" ? "circle" : "round";
+  return st;
+}
+
 /** Project file shared with public/vector-editor.html (see exportDesign). */
 const DESIGN_FORMAT = "awarewave-design/1";
 type DesignMeta = { wv: number; hv: number; unit: "cm" | "mm" | "px"; dpi: number; bgColor?: string; transparent?: boolean };
@@ -255,13 +361,19 @@ export default function CanvasEditor() {
   const [cropMode, setCropMode] = useState(false);
   const cropImgRef = useRef<FabricObject | null>(null); // image being cropped
   const cropRectRef = useRef<FabricObject | null>(null); // the draggable crop rectangle overlay
-  // 🎨 物件效果（PS 圖層樣式）— apply to the selected object (text/image/shape).
-  const [objOpacity, setObjOpacity] = useState(100);
-  const [objBlend, setObjBlend] = useState("normal");
-  const [objShadow, setObjShadow] = useState(false);
-  const [objStroke, setObjStroke] = useState(false);
-  const [objStrokeColor, setObjStrokeColor] = useState("#000000");
-  const [objStrokeWidth, setObjStrokeWidth] = useState(4);
+  // 🎨 外觀 / 物件效果 — objStyle = what the panel shows (the selected object's style, or the next-shape default when nothing is selected)
+  const [objStyle, setObjStyle] = useState<ObjStyle>(DEFAULT_STYLE);
+  const [fillPick, setFillPick] = useState("#3366ff"); // colour input value while the fill is 無填色 (an input needs a hex)
+  const [gradCfg, setGradCfg] = useState<GradCfg>(DEFAULT_GRAD); // 漸層 controls; 套用漸層 = apply this config
+  const nextStyleRef = useRef<ObjStyle>(DEFAULT_STYLE); // style of the next new shape (addShape reads it)
+  const fabricNsRef = useRef<FabricNs | null>(null);
+  const styleSnapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showStyle = useCallback((st: ObjStyle) => {
+    setObjStyle((prev) => ({ ...st, fx: st.fx.type === "none" ? { ...prev.fx, type: "none" } : st.fx }));
+    const fh = toHex6(st.fill);
+    if (fh) setFillPick(fh);
+    if (st.grad) setGradCfg(st.grad);
+  }, []);
   const grade = useColorGrade(); // 修圖積木 applied to the selected image via Fabric filters
   // 🎨 per-image adjustments (#3/#4): userEditRef holds the OBJECT the user is editing (not a bool).
   // The debounced undo snapshot fires only when the filter effect's active object === userEditRef,
@@ -307,6 +419,7 @@ export default function CanvasEditor() {
       }
       const fabric = await import("fabric");
       if (disposed || !canvasElRef.current) return;
+      fabricNsRef.current = fabric;
 
       // Force Canvas 2D filter backend so custom per-pixel filters (HslColorMixer) work correctly.
       // Fabric v7 defaults to WebGL (enableGLFiltering=true); custom filters that only implement
@@ -394,23 +507,9 @@ export default function CanvasEditor() {
         setGroupSelected((o as { type?: string } | null)?.type === "group");
         setLockSelected(!!(o as { lockMovementX?: boolean } | null)?.lockMovementX);
         setSelLayers(canvas.getActiveObjects());
-        const e = o as
-          | { opacity?: number; globalCompositeOperation?: string; shadow?: unknown; stroke?: unknown; strokeWidth?: number }
-          | null;
-        if (e) {
-          if (typeof e.opacity === "number") setObjOpacity(Math.round(e.opacity * 100));
-          // Fabric's default GCO is "source-over"; map it back to the UI's "normal" (critic M1).
-          setObjBlend(
-            e.globalCompositeOperation && e.globalCompositeOperation !== "source-over"
-              ? e.globalCompositeOperation
-              : "normal"
-          );
-          setObjShadow(!!e.shadow);
-          setObjStroke(!!e.stroke && (e.strokeWidth ?? 0) > 0);
-          // Reset to defaults when the new object has no stroke (critic M3 — avoid stale carry-over).
-          setObjStrokeColor(typeof e.stroke === "string" ? e.stroke : "#000000");
-          setObjStrokeWidth(typeof e.strokeWidth === "number" && e.strokeWidth > 0 ? e.strokeWidth : 4);
-        }
+        // 🎨 外觀 / 物件效果: every control shows the selection's values (first object of a multi-selection)
+        const rep0 = canvas.getActiveObjects()[0] ?? o;
+        if (rep0) showStyle(readStyle(rep0 as unknown as StyleObj, nextStyleRef.current));
       };
       canvas.on("selection:created", syncFromSelection);
       canvas.on("selection:updated", syncFromSelection);
@@ -424,6 +523,7 @@ export default function CanvasEditor() {
         setGroupSelected(false);
         setLockSelected(false);
         setSelLayers([]);
+        showStyle(nextStyleRef.current); // nothing selected → the controls show the next-shape default again
       });
       // 🗂 keep the layer panel in sync with the object stack.
       const onStack = () => {
@@ -497,6 +597,7 @@ export default function CanvasEditor() {
       disposed = true;
       // Cancel any pending debounced undo snapshot so it can't fire against a disposing canvas.
       if (snapTimerRef.current) { window.clearTimeout(snapTimerRef.current); snapTimerRef.current = null; }
+      if (styleSnapTimer.current) { clearTimeout(styleSnapTimer.current); styleSnapTimer.current = null; }
       // dispose() detaches DOM listeners; ref cleared so a fast remount can't double-dispose.
       // Park the (async) dispose promise so the next mount can await it before reinit.
       const c = fabricRef.current;
@@ -612,79 +713,105 @@ export default function CanvasEditor() {
     else { const on = !textUnderline; setTextUnderline(on); applyTextStyle({ underline: on }); }
   }, [applyTextStyle, textBold, textItalic, textUnderline]);
 
-  // 🎨 物件效果 — set any property on the active object (opacity/blend/stroke/flip).
-  const setActiveProp = useCallback((patch: Record<string, unknown>) => {
+  // 🎨 外觀 / 物件效果 — every control = nextStyleRef patch (default for the next new shape) + the same keys written to the
+  // selection. Style is not a move, so locked objects still take it. One undo step per burst (debounced like applyTextStyle).
+  const commitStyle = useCallback(() => {
+    setSaveState("idle");
+    if (styleSnapTimer.current) clearTimeout(styleSnapTimer.current);
+    styleSnapTimer.current = setTimeout(() => { styleSnapTimer.current = null; snapshotRef.current(); }, 300);
+  }, []);
+  const refreshStyleUI = useCallback(() => {
     const canvas = fabricRef.current;
     if (!canvas) return;
-    const o = canvas.getActiveObject();
-    if (!o) return;
-    (o as unknown as { set: (p: Record<string, unknown>) => void }).set(patch);
-    canvas.requestRenderAll();
-  }, []);
-
+    const a = canvas.getActiveObjects();
+    showStyle(a.length ? readStyle(a[0] as unknown as StyleObj, nextStyleRef.current) : nextStyleRef.current);
+  }, [showStyle]);
+  const styleSet = useCallback((patch: Partial<ObjStyle>, keys: readonly StyleKey[], refresh = false) => {
+    const canvas = fabricRef.current;
+    const fb = fabricNsRef.current;
+    if (!canvas || !fb) return;
+    nextStyleRef.current = { ...nextStyleRef.current, ...patch };
+    setObjStyle((s) => ({ ...s, ...patch }));
+    const sel = canvas.getActiveObjects();
+    if (sel.length) {
+      sel.forEach((o) => applyStyleTo(fb, o as unknown as StyleObj, nextStyleRef.current, keys));
+      canvas.requestRenderAll();
+      commitStyle();
+    }
+    if (refresh) refreshStyleUI();
+  }, [commitStyle, refreshStyleUI]);
+  // a dashed stroke needs a visible width: bump a 0-width target to 2 (the selection, or the default when nothing is selected)
+  const setDash = useCallback((on: boolean, gap: number) => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const sel = canvas.getActiveObjects();
+    if (on) {
+      if (sel.length) sel.forEach((o) => { if (!((o as unknown as StyleObj).strokeWidth! >= 1)) (o as unknown as StyleObj).set({ strokeWidth: 2 }); });
+      if (nextStyleRef.current.strokeWidth < 1) nextStyleRef.current = { ...nextStyleRef.current, strokeWidth: 2 };
+    }
+    styleSet({ dash: on, dashGap: Math.max(1, gap || 8) }, ["dash"], true);
+  }, [styleSet]);
+  const applyGradient = useCallback(() => styleSet({ grad: { ...gradCfg } }, ["fill"]), [styleSet, gradCfg]);
   const flipActive = useCallback((axis: "x" | "y") => {
     const canvas = fabricRef.current;
-    const o = canvas?.getActiveObject() as (FabricObject & { flipX?: boolean; flipY?: boolean }) | null;
-    if (!canvas || !o) return;
-    setActiveProp(axis === "x" ? { flipX: !o.flipX } : { flipY: !o.flipY });
-  }, [setActiveProp]);
-
-  // Drop shadow needs the Fabric Shadow class (dynamic import).
-  const toggleShadow = useCallback((on: boolean) => {
-    setObjShadow(on);
-    const canvas = fabricRef.current;
-    const o = canvas?.getActiveObject() as (FabricObject & { set: (p: Record<string, unknown>) => void }) | null;
-    if (!canvas || !o) return;
-    if (!on) {
-      o.set({ shadow: null });
-      canvas.requestRenderAll();
+    if (!canvas) return;
+    const sel = canvas.getActiveObjects() as unknown as (StyleObj & { flipX?: boolean; flipY?: boolean })[];
+    if (!sel.length) return;
+    sel.forEach((o) => o.set(axis === "x" ? { flipX: !o.flipX } : { flipY: !o.flipY }));
+    canvas.requestRenderAll();
+    commitStyle();
+  }, [commitStyle]);
+  // 💧 native EyeDropper (any screen pixel) where the browser has it; otherwise the next click on the artboard
+  // picks that pixel (Firefox/Safari have no EyeDropper — same fallback as vector-editor.html, nobody loses the tool)
+  const pickColor = useCallback(async () => {
+    const ED = (window as unknown as { EyeDropper?: new () => { open: () => Promise<{ sRGBHex: string }> } }).EyeDropper;
+    if (ED) {
+      try {
+        const r = await new ED().open();
+        styleSet({ fill: r.sRGBHex, grad: null }, ["fill"], true);
+      } catch { /* cancelled (Esc) */ }
       return;
     }
-    // Capture the target object now; if selection moves during the async import, don't mis-apply (critic M2).
-    void import("fabric").then((fabric) => {
-      if (fabricRef.current !== canvas || canvas.getActiveObject() !== o) return;
-      o.set({ shadow: new fabric.Shadow({ color: "rgba(0,0,0,0.45)", blur: 16, offsetX: 6, offsetY: 6 }) });
-      canvas.requestRenderAll();
-    });
-  }, []);
-
-  const toggleStroke = useCallback((on: boolean) => {
-    setObjStroke(on);
-    setActiveProp(on ? { stroke: objStrokeColor, strokeWidth: objStrokeWidth } : { stroke: null, strokeWidth: 0 });
-  }, [setActiveProp, objStrokeColor, objStrokeWidth]);
-
-  // ✂️ 剪裁遮罩 clipPath — clip the selected object to a circle / rounded-rect (or none).
-  const applyClip = useCallback((shape: "none" | "circle" | "round") => {
-    const canvas = fabricRef.current;
-    const o = canvas?.getActiveObject() as
-      | (FabricObject & { width?: number; height?: number; set: (p: Record<string, unknown>) => void })
-      | null;
-    if (!canvas || !o) return;
-    if (shape === "none") {
-      o.set({ clipPath: undefined });
-      canvas.requestRenderAll();
-      return;
-    }
-    void import("fabric").then((fabric) => {
-      if (fabricRef.current !== canvas) return;
-      const w = o.width ?? 100;
-      const h = o.height ?? 100;
-      const clip =
-        shape === "circle"
-          ? new fabric.Circle({ radius: Math.min(w, h) / 2, originX: "center", originY: "center" })
-          : new fabric.Rect({
-              width: w,
-              height: h,
-              rx: Math.min(w, h) * 0.15,
-              ry: Math.min(w, h) * 0.15,
-              originX: "center",
-              originY: "center",
-            });
-      // clipPath positioned relative to the object's centre (default, non-absolute).
-      o.set({ clipPath: clip });
-      canvas.requestRenderAll();
-    });
-  }, []);
+    const c = fabricRef.current as unknown as {
+      defaultCursor: string;
+      lowerCanvasEl: HTMLCanvasElement;
+      on: (ev: string, fn: (o: { e: MouseEvent }) => void) => void;
+      off: (ev: string, fn: (o: { e: MouseEvent }) => void) => void;
+      getActiveObjects: () => FabricObject[];
+      discardActiveObject: () => void;
+      setActiveObject: (o: FabricObject) => void;
+      requestRenderAll: () => void;
+    } | null;
+    if (!c) return;
+    const targets = c.getActiveObjects(); // the pick click (de)selects what is under it → restored below
+    const prevCursor = c.defaultCursor;
+    c.defaultCursor = "crosshair";
+    const once = (opt: { e: MouseEvent }) => {
+      c.off("mouse:down", once);
+      c.defaultCursor = prevCursor;
+      const el = c.lowerCanvasEl;
+      const rect = el.getBoundingClientRect();
+      const x = Math.floor((opt.e.clientX - rect.left) * (el.width / rect.width));
+      const y = Math.floor((opt.e.clientY - rect.top) * (el.height / rect.height));
+      const px = el.getContext("2d")?.getImageData(x, y, 1, 1).data;
+      if (!px) return;
+      const hex = "#" + [px[0], px[1], px[2]].map((n) => n.toString(16).padStart(2, "0")).join("");
+      const apply = () => styleSet({ fill: hex, grad: null }, ["fill"], true);
+      c.discardActiveObject();
+      if (targets.length > 1) {
+        // multi-selection is rebuilt async (fabric namespace) → apply only once it is back
+        void import("fabric").then((fabric) => {
+          c.setActiveObject(new fabric.ActiveSelection(targets, { canvas: c as unknown as InstanceType<typeof fabric.Canvas> }) as unknown as FabricObject);
+          c.requestRenderAll();
+          apply();
+        });
+        return;
+      }
+      if (targets.length === 1) c.setActiveObject(targets[0]);
+      apply();
+    };
+    c.on("mouse:down", once);
+  }, [styleSet]);
 
   // 〽️ 文字沿路徑 — make the selected text follow a curved (arc) path, or straighten it.
   const applyTextArc = useCallback((on: boolean) => {
@@ -759,22 +886,32 @@ export default function CanvasEditor() {
     },
     [refreshLayers, resetAdjToNeutral, syncBgFromCanvas]
   );
+  // a change still inside a debounce window (style / text / filter sliders) is history the user already sees → record it first
+  const flushPendingSnaps = useCallback(() => {
+    let pending = false;
+    if (styleSnapTimer.current) { clearTimeout(styleSnapTimer.current); styleSnapTimer.current = null; pending = true; }
+    if (textSnapTimer.current) { clearTimeout(textSnapTimer.current); textSnapTimer.current = null; pending = true; }
+    if (snapTimerRef.current) { window.clearTimeout(snapTimerRef.current); snapTimerRef.current = null; pending = true; }
+    if (pending) snapshot();
+  }, [snapshot]);
   const undo = useCallback(() => {
+    flushPendingSnaps();
     if (undoStack.current.length < 2) return;
     const cur = undoStack.current.pop();
     if (cur) redoStack.current.push(cur);
     restore(undoStack.current[undoStack.current.length - 1]);
     setCanUndo(undoStack.current.length > 1);
     setCanRedo(redoStack.current.length > 0);
-  }, [restore]);
+  }, [restore, flushPendingSnaps]);
   const redo = useCallback(() => {
+    flushPendingSnaps();
     const next = redoStack.current.pop();
     if (!next) return;
     undoStack.current.push(next);
     restore(next);
     setCanUndo(undoStack.current.length > 1);
     setCanRedo(redoStack.current.length > 0);
-  }, [restore]);
+  }, [restore, flushPendingSnaps]);
   const selectLayer = useCallback((o: FabricObject) => {
     const c = fabricRef.current;
     if (!c) return;
@@ -965,28 +1102,53 @@ export default function CanvasEditor() {
   // 📐 符合畫布 / 填滿畫布 — snap the selected image to the artboard (contain / cover). The artboard
   // (canvas) is the authoritative output size; images are content that conform to it. Fixes the
   // "畫布有畫布尺寸、圖有自己尺寸" disconnect the user hit.
+  // 符合 / 填滿畫布 — the selection (any type, rotation kept) or, with nothing selected, every visible object as one block.
+  // Same rule as vector-editor.html fitSel (operator 2026-11-04: the image-only version was unusable).
   const fitImageToCanvas = useCallback((mode: "fit" | "fill") => {
+    type Box = { left: number; top: number; width: number; height: number };
+    type Fit = FabricObject & { scaleX?: number; scaleY?: number; left?: number; top?: number; visible?: boolean; lockMovementX?: boolean;
+      set: (p: Record<string, unknown>) => void; setCoords: () => void; getBoundingRect: () => Box; getObjects?: () => Fit[] };
     const canvas = fabricRef.current as unknown as {
-      getActiveObject: () => FabricObject | null;
-      getWidth: () => number; getHeight: () => number; getZoom: () => number;
-      setActiveObject: (o: FabricObject) => void; requestRenderAll: () => void;
+      getActiveObject: () => Fit | null; getObjects: () => Fit[]; setActiveObject: (o: FabricObject) => void; discardActiveObject: () => void;
+      getWidth: () => number; getHeight: () => number; getZoom: () => number; requestRenderAll: () => void;
     } | null;
-    if (!canvas) return;
-    const img = canvas.getActiveObject() as
-      | (FabricObject & { type?: string; width?: number; height?: number; set: (p: Record<string, unknown>) => void })
-      | null;
-    if (!img || img.type !== "image") { setError("請先點選一張圖片"); return; }
-    if ((img as unknown as { lockMovementX?: boolean }).lockMovementX) { setError("圖層已鎖定，先解鎖再貼合畫布"); return; } // 🔒 programmatic moves honour the lock
+    const fb = fabricNsRef.current;
+    if (!canvas || !fb) return;
+    let target = canvas.getActiveObject();
+    let temp = false;
+    if (!target) {
+      const all = canvas.getObjects().filter((o) => o.visible !== false);
+      if (!all.length) { setError("畫布上還沒有物件"); return; }
+      if (all.length === 1) target = all[0];
+      else {
+        target = new fb.ActiveSelection(all as unknown as FabricObject[], { canvas: canvas as unknown as InstanceType<typeof fb.Canvas> }) as unknown as Fit;
+        canvas.setActiveObject(target);
+        temp = true;
+      }
+    }
+    const locked = (o: Fit): boolean => !!o.lockMovementX || (o.getObjects?.() ?? []).some(locked);
+    if (locked(target)) {
+      if (temp) canvas.discardActiveObject();
+      setError("有圖層已鎖定，先解鎖再貼合畫布"); // 🔒 programmatic moves honour the lock
+      canvas.requestRenderAll();
+      return;
+    }
+    setError(null);
     const m = canvasMetaRef.current;
     const z = canvas.getZoom() || 1;
     const aw = m ? m.realW : canvas.getWidth() / z; // artboard real width (px)
     const ah = m ? m.realH : canvas.getHeight() / z;
-    const iw = img.width || 1, ih = img.height || 1;
-    const s = mode === "fill" ? Math.max(aw / iw, ah / ih) : Math.min(aw / iw, ah / ih);
-    img.set({ scaleX: s, scaleY: s, angle: 0, originX: "center", originY: "center", left: aw / 2, top: ah / 2 });
-    (img as unknown as { setCoords: () => void }).setCoords();
-    canvas.setActiveObject(img);
+    target.setCoords();
+    const b0 = target.getBoundingRect();
+    const s = mode === "fill" ? Math.max(aw / (b0.width || 1), ah / (b0.height || 1)) : Math.min(aw / (b0.width || 1), ah / (b0.height || 1));
+    target.set({ scaleX: (target.scaleX ?? 1) * s, scaleY: (target.scaleY ?? 1) * s });
+    target.setCoords();
+    const b = target.getBoundingRect();
+    target.set({ left: (target.left ?? 0) + (aw - b.width) / 2 - b.left, top: (target.top ?? 0) + (ah - b.height) / 2 - b.top });
+    target.setCoords();
+    if (temp) canvas.discardActiveObject();
     canvas.requestRenderAll();
+    setSaveState("idle");
     snapshot();
   }, [snapshot]);
 
@@ -1186,28 +1348,6 @@ export default function CanvasEditor() {
     });
   }, [drawColor, drawWidth]);
 
-  // 🌈 漸層填色 — apply a 2-stop linear gradient as the selected object's fill.
-  const applyGradient = useCallback(() => {
-    const canvas = fabricRef.current;
-    const o = canvas?.getActiveObject();
-    if (!canvas || !o) return;
-    void import("fabric").then((fabric) => {
-      if (fabricRef.current !== canvas) return;
-      const oo = o as unknown as { width?: number; scaleX?: number };
-      const w = (oo.width ?? 200) * (oo.scaleX ?? 1); // scaled width so the gradient spans the visible object (critic M5)
-      const grad = new fabric.Gradient({
-        type: "linear",
-        coords: { x1: 0, y1: 0, x2: w, y2: 0 },
-        colorStops: [
-          { offset: 0, color: drawColor },
-          { offset: 1, color: "#ffffff" },
-        ],
-      });
-      (o as unknown as { set: (p: Record<string, unknown>) => void }).set({ fill: grad });
-      canvas.requestRenderAll();
-    });
-  }, [drawColor]);
-
   const uploadImage = useCallback((file: File | null) => {
     const canvas = fabricRef.current;
     if (!canvas || !file) return;
@@ -1279,15 +1419,17 @@ export default function CanvasEditor() {
       const z = canvas.getZoom() || 1;
       const cx = m ? m.realW / 2 : canvas.getWidth() / z / 2;
       const cy = m ? m.realH / 2 : canvas.getHeight() / z / 2;
-      const common = { fill: "transparent", stroke: "#111111", strokeWidth: 4 };
       let shape: FabricObject;
       if (kind === "rect") {
-        shape = new fabric.Rect({ left: cx, top: cy, originX: "center", originY: "center", width: 200, height: 140, ...common });
+        shape = new fabric.Rect({ left: cx, top: cy, originX: "center", originY: "center", width: 200, height: 140 });
       } else if (kind === "circle") {
-        shape = new fabric.Circle({ left: cx, top: cy, originX: "center", originY: "center", radius: 90, ...common });
+        shape = new fabric.Circle({ left: cx, top: cy, originX: "center", originY: "center", radius: 90 });
       } else {
-        shape = new fabric.Line([cx - 120, cy, cx + 120, cy], { stroke: "#111111", strokeWidth: 4 });
+        shape = new fabric.Line([cx - 120, cy, cx + 120, cy], {});
       }
+      // the 外觀 panel's next-shape default (nothing selected → the controls edit this)
+      applyStyleTo(fabric, shape as unknown as StyleObj, nextStyleRef.current, STYLE_KEYS);
+      if ((kind === "line" || nextStyleRef.current.dash) && !((shape as unknown as StyleObj).strokeWidth! >= 1)) (shape as unknown as StyleObj).set({ strokeWidth: 2 }); // a 0-width line / dashed outline would be invisible
       canvas.add(shape);
       canvas.setActiveObject(shape);
       setAnySelected(true);
@@ -2015,66 +2157,6 @@ export default function CanvasEditor() {
           <button className="btn-secondary" disabled={!ready} onClick={() => setViewScale(1)} title="100%（實際像素）">100%</button>
         </div>
 
-        {/* 💾 匯出 / 下載 — 放最上方（主要輸出動作，免捲動）*/}
-        <SidebarPanel id="export" title="💾 匯出 / 下載" defaultPos={{ x: 816, y: 0 }} width={280}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <input
-              type="text"
-              value={editName}
-              onChange={(e) => { setEditName(e.target.value); nameRef.current = null; }}
-              placeholder="檔名"
-              title="下載檔名（不含副檔名）"
-              style={{ fontSize: 12, padding: "2px 6px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)", width: "100%" }}
-            />
-            {canvasBusy ? <span style={{ fontSize: 11, opacity: 0.65 }}>先套用或取消目前的編輯模式，才能下載或存檔。</span> : null}
-            <div style={{ display: "flex", gap: 8 }}>
-              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready || canvasBusy} onClick={download} title="下載全尺寸 PNG">PNG下載</button>
-              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready || canvasBusy} onClick={() => void downloadWebP()} title="下載 WebP，自動壓縮至 200KB 以內">WebP下載</button>
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready || canvasBusy} onClick={downloadSvg} title="下載 SVG（向量，真實 cm 尺寸）">SVG下載</button>
-              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready || canvasBusy || exportBusy} onClick={() => void downloadPdf()} title="下載 PDF（向量·印刷·真實 cm）">{exportBusy ? "PDF 產生中…" : "PDF下載"}</button>
-            </div>
-            <button className="btn-primary" style={{ width: "100%" }} disabled={!ready || canvasBusy || saveState === "saving" || saveState === "saved"} onClick={() => void saveToDesigns()}>
-              {saveState === "saved" ? "已存入 ✓" : saveState === "saving" ? "儲存中…" : saveState === "error" ? "儲存失敗 ✗（重試）" : "存入 My Designs"}
-            </button>
-            <span style={{ fontSize: 11, opacity: 0.6 }}>交印刷廠選 PDF。文字建議再轉外框，字體缺時最保險。</span>
-          </div>
-        </SidebarPanel>
-
-        {/* 🧰 更多工具 — 形狀 / 鎖定 / 群組 / 畫筆 / 橡皮擦 / 設計檔（低頻，收合省空間）*/}
-        <SidebarPanel id="more-tools" title="🧰 更多工具" defaultPos={{ x: 816, y: 0 }} width={280} defaultCollapsed>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-              <span style={{ fontSize: 11, opacity: 0.6 }}>形狀</span>
-              <button className="btn-secondary" disabled={!ready} onClick={() => addShape("rect")} title="加方框">▭</button>
-              <button className="btn-secondary" disabled={!ready} onClick={() => addShape("circle")} title="加圓形">◯</button>
-              <button className="btn-secondary" disabled={!ready} onClick={() => addShape("line")} title="加線條">／</button>
-              <button className="btn-secondary" disabled={objectToolsDisabled} onClick={toggleLock} title={objectToolHint ?? "鎖定／解鎖選取物件（防誤移）"}>{lockSelected ? "🔒 已鎖定" : "🔓 鎖定"}</button>
-              {multiSelected ? (<button className="btn-secondary" disabled={!ready || canvasBusy} onClick={groupSelection} title="把選取的多個物件組成群組">🗂 群組</button>) : null}
-              {groupSelected ? (<button className="btn-secondary" disabled={!ready || canvasBusy} onClick={ungroupSelection} title="把群組拆回個別物件">🗂 解散</button>) : null}
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-              <button className="btn-secondary" disabled={!ready || inpaintMode || cropMode} style={{ fontWeight: drawMode === "draw" ? 700 : 400 }} onClick={() => applyDrawMode(drawMode === "draw" ? "off" : "draw")} title="自由繪筆">✏️ 畫筆</button>
-              <button className="btn-secondary" disabled={!ready || inpaintMode || cropMode} style={{ fontWeight: drawMode === "erase" ? 700 : 400 }} onClick={() => applyDrawMode(drawMode === "erase" ? "off" : "erase")} title="橡皮擦（擦掉畫到的地方）">🧹 橡皮擦</button>
-              {drawMode !== "off" ? (
-                <>
-                  {drawMode === "draw" ? (<input type="color" value={drawColor} title="畫筆顏色" onChange={(e) => { setDrawColor(e.target.value); const c = fabricRef.current; if (c?.freeDrawingBrush) c.freeDrawingBrush.color = e.target.value; }} style={{ width: 30, height: 24, padding: 0 }} />) : null}
-                  <input type="range" min={1} max={80} value={drawWidth} title="筆刷大小" onChange={(e) => { const w = Number(e.target.value); setDrawWidth(w); const c = fabricRef.current; if (c?.freeDrawingBrush) c.freeDrawingBrush.width = w; }} />
-                </>
-              ) : null}
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-              <span style={{ fontSize: 11, opacity: 0.6 }}>設計檔</span>
-              <button className="btn-secondary" disabled={!ready || canvasBusy} onClick={exportDesign} title="匯出可再編輯的設計檔（.design.json）">💾 匯出</button>
-              <label className="btn-secondary" style={{ cursor: ready ? "pointer" : "default" }} title="載入先前匯出的設計檔">
-                📂 載入
-                <input type="file" accept="application/json,.json" style={{ display: "none" }} disabled={!ready} onChange={(e) => { importDesign(e.target.files?.[0] ?? null); e.target.value = ""; }} />
-              </label>
-            </div>
-          </div>
-        </SidebarPanel>
-
         {/* 📐 畫布尺寸 / DPI — 公分/公釐 + DPI 自設（參考 vector-trace-demo）。 */}
         <SidebarPanel id="canvas-size" title="📐 畫布尺寸 / DPI" defaultPos={{ x: 816, y: 0 }} width={236} defaultCollapsed>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
@@ -2115,10 +2197,10 @@ export default function CanvasEditor() {
             <button className="btn-primary" onClick={applyCanvasSize}>套用畫布尺寸</button>
             {/* 📐 把選取的圖貼合畫布（畫布＝輸出尺寸，圖是內容） */}
             <div style={{ display: "flex", gap: 8 }}>
-              <button className="btn-secondary" style={{ flex: 1, fontSize: 12 }} disabled={!imageSelected} onClick={() => fitImageToCanvas("fit")} title="把選取的圖縮放到剛好放進畫布（保留全圖）">符合畫布</button>
-              <button className="btn-secondary" style={{ flex: 1, fontSize: 12 }} disabled={!imageSelected} onClick={() => fitImageToCanvas("fill")} title="把選取的圖放大到填滿畫布（超出邊界裁掉）">填滿畫布</button>
+              <button className="btn-secondary" style={{ flex: 1, fontSize: 12 }} disabled={!ready || canvasBusy} onClick={() => fitImageToCanvas("fit")} title="選取物件（沒選＝全部）縮放到剛好放進畫布">符合畫布</button>
+              <button className="btn-secondary" style={{ flex: 1, fontSize: 12 }} disabled={!ready || canvasBusy} onClick={() => fitImageToCanvas("fill")} title="選取物件（沒選＝全部）放大到填滿畫布（超出裁掉）">填滿畫布</button>
             </div>
-            <span style={{ fontSize: 10, opacity: 0.5, lineHeight: 1.4 }}>畫布＝最終輸出尺寸；圖片是內容，選圖後用上面兩鍵貼合畫布。</span>
+            <span style={{ fontSize: 10, opacity: 0.5, lineHeight: 1.4 }}>畫布＝最終輸出尺寸。選物件（沒選＝全部）後用上面兩鍵貼合畫布。</span>
             <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
               <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
                 畫布底色
@@ -2142,37 +2224,38 @@ export default function CanvasEditor() {
           </div>
         </SidebarPanel>
 
-        {/* 🗂 圖層面板 — 群組/解散 on top; rows (top layer first): show-hide, lock, name, rename, step/front/back, duplicate, delete. */}
-        {layers.length > 0 ? (
-          <SidebarPanel id="layers" title={`🗂 圖層（${layers.length}）`} defaultPos={{ x: 816, y: 244 }} width={280} defaultCollapsed>
-            <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
-              <button className="btn-secondary" style={{ flex: 1, fontSize: 12 }} disabled={!ready || canvasBusy || !multiSelected} onClick={groupSelection} title="群組選取的多個物件">🗂 群組</button>
-              <button className="btn-secondary" style={{ flex: 1, fontSize: 12 }} disabled={!ready || canvasBusy || !groupSelected} onClick={ungroupSelection} title="解散選取的群組">🗂 解散</button>
+        {/* 🧰 更多工具 — 形狀 / 鎖定 / 群組 / 畫筆 / 橡皮擦 / 設計檔（低頻，收合省空間）*/}
+        <SidebarPanel id="more-tools" title="🧰 形狀 / 畫筆 / 設計檔" defaultPos={{ x: 816, y: 0 }} width={280} defaultCollapsed>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+              <span style={{ fontSize: 11, opacity: 0.6 }}>形狀</span>
+              <button className="btn-secondary" disabled={!ready} onClick={() => addShape("rect")} title="加方框">▭</button>
+              <button className="btn-secondary" disabled={!ready} onClick={() => addShape("circle")} title="加圓形">◯</button>
+              <button className="btn-secondary" disabled={!ready} onClick={() => addShape("line")} title="加線條">／</button>
+              <button className="btn-secondary" disabled={objectToolsDisabled} onClick={toggleLock} title={objectToolHint ?? "鎖定／解鎖選取物件（防誤移）"}>{lockSelected ? "🔒 已鎖定" : "🔓 鎖定"}</button>
+              {multiSelected ? (<button className="btn-secondary" disabled={!ready || canvasBusy} onClick={groupSelection} title="把選取的多個物件組成群組">🗂 群組</button>) : null}
+              {groupSelected ? (<button className="btn-secondary" disabled={!ready || canvasBusy} onClick={ungroupSelection} title="把群組拆回個別物件">🗂 解散</button>) : null}
             </div>
-            <div ref={layersListRef} style={{ position: "relative", display: "flex", flexDirection: "column", gap: 4, maxHeight: 520, overflowY: "auto" }}>
-              {layers.map((o, i) => {
-                const vis = (o as unknown as { visible?: boolean }).visible !== false;
-                const locked = !!(o as unknown as { lockMovementX?: boolean }).lockMovementX;
-                const sel = selLayers.includes(o);
-                const ib = { background: "none", border: "none", cursor: "pointer", padding: 0 } as const;
-                return (
-                  <div key={i} data-layer-row="1" data-sel={sel ? "1" : "0"} data-hidden={vis ? "0" : "1"} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, border: `1px solid ${sel ? "var(--accent)" : "var(--card-border)"}`, background: sel ? "var(--accent-light)" : undefined, borderRadius: 4, padding: "3px 5px" }}>
-                    <button title="顯示/隱藏" onClick={() => toggleLayerVisible(o)} style={ib}>{vis ? "👁" : "🚫"}</button>
-                    <button title="鎖定/解鎖" onClick={() => toggleLayerLock(o)} style={ib}>{locked ? "🔒" : "🔓"}</button>
-                    <button onClick={() => selectLayer(o)} onDoubleClick={() => renameLayer(o)} title="點選圖層（雙擊改名）" style={{ flex: 1, textAlign: "left", background: "none", border: "none", cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", opacity: vis ? 1 : 0.45 }}>{layerLabel(o)}</button>
-                    <button title="改名" onClick={() => renameLayer(o)} style={ib}>✏️</button>
-                    <button title="上移" onClick={() => moveLayer(o, "up")} style={ib}>↑</button>
-                    <button title="下移" onClick={() => moveLayer(o, "down")} style={ib}>↓</button>
-                    <button title="移至最前" onClick={() => moveLayer(o, "front")} style={ib}>⤒</button>
-                    <button title="移至最後" onClick={() => moveLayer(o, "back")} style={ib}>⤓</button>
-                    <button title="複製" onClick={() => duplicateLayer(o)} style={ib}>⧉</button>
-                    <button title="刪除" onClick={() => deleteLayer(o)} style={{ ...ib, color: "var(--red)" }}>🗑</button>
-                  </div>
-                );
-              })}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+              <button className="btn-secondary" disabled={!ready || inpaintMode || cropMode} style={{ fontWeight: drawMode === "draw" ? 700 : 400 }} onClick={() => applyDrawMode(drawMode === "draw" ? "off" : "draw")} title="自由繪筆">✏️ 畫筆</button>
+              <button className="btn-secondary" disabled={!ready || inpaintMode || cropMode} style={{ fontWeight: drawMode === "erase" ? 700 : 400 }} onClick={() => applyDrawMode(drawMode === "erase" ? "off" : "erase")} title="橡皮擦（擦掉畫到的地方）">🧹 橡皮擦</button>
+              {drawMode !== "off" ? (
+                <>
+                  {drawMode === "draw" ? (<input type="color" value={drawColor} title="畫筆顏色" onChange={(e) => { setDrawColor(e.target.value); const c = fabricRef.current; if (c?.freeDrawingBrush) c.freeDrawingBrush.color = e.target.value; }} style={{ width: 30, height: 24, padding: 0 }} />) : null}
+                  <input type="range" min={1} max={80} value={drawWidth} title="筆刷大小" onChange={(e) => { const w = Number(e.target.value); setDrawWidth(w); const c = fabricRef.current; if (c?.freeDrawingBrush) c.freeDrawingBrush.width = w; }} />
+                </>
+              ) : null}
             </div>
-          </SidebarPanel>
-        ) : null}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+              <span style={{ fontSize: 11, opacity: 0.6 }}>設計檔</span>
+              <button className="btn-secondary" disabled={!ready || canvasBusy} onClick={exportDesign} title="匯出可再編輯的設計檔（.design.json）">💾 匯出</button>
+              <label className="btn-secondary" style={{ cursor: ready ? "pointer" : "default" }} title="載入先前匯出的設計檔">
+                📂 載入
+                <input type="file" accept="application/json,.json" style={{ display: "none" }} disabled={!ready} onChange={(e) => { importDesign(e.target.files?.[0] ?? null); e.target.value = ""; }} />
+              </label>
+            </div>
+          </div>
+        </SidebarPanel>
 
         {/* 🔤 文字 — 整合：字型/顏色/字級 + 樣式切換(B/I/U/弧形) + 進階字型庫。放在圖層下方。
             (原「文字樣式」+「字型庫」兩面板合併,避免重複混淆。) */}
@@ -2227,54 +2310,143 @@ export default function CanvasEditor() {
           </div>
         </SidebarPanel>
 
-        {/* 🎨 物件效果（PS 圖層樣式）— always shown (collapsed); acts on the active object when one is selected. */}
-        {(
-          <SidebarPanel id="effects" title="🎨 物件效果" defaultPos={{ x: 816, y: 286 }} width={260} defaultCollapsed>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <label style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 2 }}>
-              <span style={{ display: "flex", justifyContent: "space-between" }}><span>透明度</span><span style={{ opacity: 0.7 }}>{objOpacity}%</span></span>
-              <input type="range" min={0} max={100} value={objOpacity} disabled={objectToolsDisabled} onChange={(e) => { const v = Number(e.target.value); setObjOpacity(v); setActiveProp({ opacity: v / 100 }); }} />
-            </label>
-            <label style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 2 }}>
-              混合模式
-              <select className="btn-secondary" value={objBlend} disabled={objectToolsDisabled} onChange={(e) => { setObjBlend(e.target.value); setActiveProp({ globalCompositeOperation: e.target.value === "normal" ? "source-over" : e.target.value }); }}>
-                {["normal", "multiply", "screen", "overlay", "darken", "lighten", "difference", "color-dodge", "color-burn", "soft-light", "hard-light"].map((m) => (
-                  <option key={m} value={m}>{m}</option>
+        {/* 🎨 外觀 / 物件效果 — fill / stroke / dash / corner / opacity / blend / gradient / effect / flip / mask in ONE panel
+            (same controls as public/vector-editor.html 3. 外觀). Nothing selected → edits the style of the next new shape. */}
+        <SidebarPanel id="effects" title="🎨 外觀 / 物件效果" defaultPos={{ x: 816, y: 286 }} width={260} defaultCollapsed>
+          <fieldset disabled={!ready || canvasBusy} style={{ border: 0, padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 10, fontSize: 12 }}>
+            <span style={{ opacity: 0.6 }}>{anySelected ? "套用到選取物件" : "新物件預設（選取物件後改成套用到該物件）"}</span>
+            <div style={{ display: "flex", gap: 8 }}>
+              <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+                填色
+                <input type="color" title="填色" value={toHex6(objStyle.fill) ?? fillPick} onChange={(e) => { setFillPick(e.target.value); styleSet({ fill: e.target.value, grad: null }, ["fill"]); }} style={{ width: "100%", height: 30, padding: 2, cursor: "pointer" }} />
+              </label>
+              <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+                描邊色
+                <input type="color" title="描邊色" value={toHex6(objStyle.stroke) ?? "#111111"} onChange={(e) => styleSet({ stroke: e.target.value }, ["stroke"])} style={{ width: "100%", height: 30, padding: 2, cursor: "pointer" }} />
+              </label>
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button className="btn-secondary" style={{ flex: 1, fontSize: 12, outline: !objStyle.grad && (objStyle.fill === "" || objStyle.fill === "transparent") ? "2px solid var(--accent)" : undefined }} title="無填色" onClick={() => styleSet({ fill: "transparent", grad: null }, ["fill"], true)}>⊘ 無填色</button>
+              <button className="btn-secondary" style={{ flex: 1, fontSize: 12 }} title="吸色（支援的瀏覽器可吸螢幕任一點；否則點畫布取色）" onClick={() => void pickColor()}>💧 吸色</button>
+            </div>
+            <div>
+              <span style={{ opacity: 0.6 }}>色票（點選套用填色）</span>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(10, 1fr)", gap: 4, marginTop: 4 }}>
+                {SWATCHES.map((c) => (
+                  <button key={c} title={c} aria-label={`色票 ${c}`} onClick={() => { setFillPick(c); styleSet({ fill: c, grad: null }, ["fill"], true); }} style={{ width: "100%", aspectRatio: "1", borderRadius: 5, border: "1px solid var(--card-border)", background: c, cursor: "pointer", padding: 0 }} />
                 ))}
+              </div>
+            </div>
+            <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <span style={{ display: "flex", justifyContent: "space-between" }}><span>描邊寬度</span><span style={{ opacity: 0.7 }}>{objStyle.strokeWidth}</span></span>
+              <input type="range" title="描邊寬度" min={0} max={40} value={Math.min(40, objStyle.strokeWidth)} onChange={(e) => styleSet({ strokeWidth: Number(e.target.value) }, ["strokeWidth"])} />
+            </label>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <label style={{ flex: 1, display: "flex", alignItems: "center", gap: 6 }}>
+                <input type="checkbox" title="虛線" checked={objStyle.dash} onChange={(e) => setDash(e.target.checked, objStyle.dashGap)} /> 虛線
+              </label>
+              <input className="btn-secondary" type="number" title="虛線長度/間距" min={1} value={objStyle.dashGap} onChange={(e) => setDash(objStyle.dash, Number(e.target.value))} style={{ width: 70, padding: "4px 6px" }} />
+            </div>
+            <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <span style={{ display: "flex", justifyContent: "space-between" }}><span>圓角（矩形）</span><span style={{ opacity: 0.7 }}>{Math.round(objStyle.rx)}</span></span>
+              <input type="range" title="圓角" min={0} max={200} value={Math.min(200, objStyle.rx)} onChange={(e) => styleSet({ rx: Number(e.target.value) }, ["rx"])} />
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <span style={{ display: "flex", justifyContent: "space-between" }}><span>不透明度</span><span style={{ opacity: 0.7 }}>{objStyle.opacity}%</span></span>
+              <input type="range" title="不透明度" min={0} max={100} value={objStyle.opacity} onChange={(e) => styleSet({ opacity: Number(e.target.value) }, ["opacity"])} />
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              混合模式
+              <select className="btn-secondary" title="混合模式" value={objStyle.blend} onChange={(e) => styleSet({ blend: e.target.value }, ["blend"])}>
+                {BLEND_MODES.map((m) => (<option key={m} value={m}>{m}</option>))}
               </select>
             </label>
-            <div style={{ display: "flex", gap: 6 }}>
-              <button className="btn-secondary" disabled={objectToolsDisabled} style={{ fontSize: 12 }} title={objectToolHint ?? undefined} onClick={() => flipActive("x")}>↔ 水平翻轉</button>
-              <button className="btn-secondary" disabled={objectToolsDisabled} style={{ fontSize: 12 }} title={objectToolHint ?? undefined} onClick={() => flipActive("y")}>↕ 垂直翻轉</button>
-            </div>
-            <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
-              <input type="checkbox" checked={objShadow} disabled={objectToolsDisabled} onChange={(e) => toggleShadow(e.target.checked)} /> 陰影 Drop shadow
-            </label>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                <input type="checkbox" checked={objStroke} disabled={objectToolsDisabled} onChange={(e) => toggleStroke(e.target.checked)} /> 描邊 Stroke
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span>漸層填色</span>
+              <div style={{ display: "flex", gap: 6 }}>
+                <input type="color" title="漸層起色" value={gradCfg.a} onChange={(e) => setGradCfg((g) => ({ ...g, a: e.target.value }))} style={{ flex: 1, minWidth: 0, height: 30, padding: 2 }} />
+                <input type="color" title="漸層終色" value={gradCfg.b} onChange={(e) => setGradCfg((g) => ({ ...g, b: e.target.value }))} style={{ flex: 1, minWidth: 0, height: 30, padding: 2 }} />
+                <select className="btn-secondary" title="漸層類型" value={gradCfg.type} onChange={(e) => setGradCfg((g) => ({ ...g, type: e.target.value as GradCfg["type"] }))} style={{ width: 62 }}>
+                  <option value="linear">線性</option><option value="radial">放射</option>
+                </select>
+                <select className="btn-secondary" title="漸層角度" value={gradCfg.angle} onChange={(e) => setGradCfg((g) => ({ ...g, angle: e.target.value as GradCfg["angle"] }))} style={{ width: 56 }}>
+                  <option value="0">→</option><option value="90">↓</option><option value="45">↘</option><option value="135">↙</option>
+                </select>
+              </div>
+              <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <input type="checkbox" title="漸層中間色開關" checked={gradCfg.mid} onChange={(e) => setGradCfg((g) => ({ ...g, mid: e.target.checked }))} /> 中間色
+                <input type="color" title="漸層中間色" value={gradCfg.c} onChange={(e) => setGradCfg((g) => ({ ...g, c: e.target.value }))} style={{ width: 48, height: 24, padding: 0 }} />
               </label>
-              {objStroke ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 22 }}>
-                  <input type="color" value={objStrokeColor} disabled={objectToolsDisabled} onChange={(e) => { setObjStrokeColor(e.target.value); setActiveProp({ stroke: e.target.value }); }} style={{ width: 30, height: 22, padding: 0 }} />
-                  <input type="range" min={1} max={40} value={objStrokeWidth} disabled={objectToolsDisabled} onChange={(e) => { const w = Number(e.target.value); setObjStrokeWidth(w); setActiveProp({ strokeWidth: w }); }} style={{ flex: 1 }} />
-                  <span style={{ width: 22, textAlign: "right" }}>{objStrokeWidth}</span>
-                </div>
-              ) : null}
+              <div style={{ display: "flex", gap: 6 }}>
+                <button className="btn-secondary" style={{ flex: 1, fontSize: 12 }} title="套用漸層" onClick={applyGradient}>套用漸層</button>
+                <button className="btn-secondary" style={{ flex: 1, fontSize: 12 }} title="清除漸層" onClick={() => styleSet({ grad: null }, ["fill"], true)}>清除</button>
+              </div>
             </div>
-            {!imageSelected ? (
-              <button className="btn-secondary" disabled={objectToolsDisabled || imageSelected} style={{ fontSize: 12 }} onClick={applyGradient} title={!anySelected ? "先選取文字或形狀後才能使用。" : "把選取的文字/形狀填成漸層（左色用畫筆顏色）"}>🌈 漸層填色</button>
-            ) : null}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span>效果</span>
+              <select className="btn-secondary" title="效果類型" value={objStyle.fx.type} onChange={(e) => styleSet({ fx: { ...objStyle.fx, type: e.target.value as FxCfg["type"] } }, ["fx"])}>
+                <option value="none">無</option><option value="shadow">陰影 Drop shadow</option><option value="glow">光暈 Glow</option>
+              </select>
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+                  顏色
+                  <input type="color" title="效果顏色" value={objStyle.fx.color} onChange={(e) => styleSet({ fx: { ...objStyle.fx, color: e.target.value } }, ["fx"])} style={{ width: "100%", height: 30, padding: 2 }} />
+                </label>
+                <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ display: "flex", justifyContent: "space-between" }}><span>模糊</span><span style={{ opacity: 0.7 }}>{objStyle.fx.blur}</span></span>
+                  <input type="range" title="效果模糊" min={0} max={60} value={objStyle.fx.blur} onChange={(e) => styleSet({ fx: { ...objStyle.fx, blur: Number(e.target.value) } }, ["fx"])} />
+                </label>
+              </div>
+              <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <span style={{ display: "flex", justifyContent: "space-between" }}><span>位移</span><span style={{ opacity: 0.7 }}>{objStyle.fx.off}</span></span>
+                <input type="range" title="效果位移" min={0} max={40} value={objStyle.fx.off} onChange={(e) => styleSet({ fx: { ...objStyle.fx, off: Number(e.target.value) } }, ["fx"])} />
+              </label>
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button className="btn-secondary" disabled={!anySelected} style={{ flex: 1, fontSize: 12 }} title={anySelected ? "水平翻轉" : "先選取畫布上的物件後才能使用。"} onClick={() => flipActive("x")}>↔ 水平翻轉</button>
+              <button className="btn-secondary" disabled={!anySelected} style={{ flex: 1, fontSize: 12 }} title={anySelected ? "垂直翻轉" : "先選取畫布上的物件後才能使用。"} onClick={() => flipActive("y")}>↕ 垂直翻轉</button>
+            </div>
             {/* ✂️ 剪裁遮罩 clipPath */}
-            <div style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12 }}>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
               <span style={{ opacity: 0.6 }}>遮罩</span>
-              <button className="btn-secondary" disabled={objectToolsDisabled} style={{ fontSize: 12 }} title={objectToolHint ?? "圓形遮罩"} onClick={() => applyClip("circle")}>⬤</button>
-              <button className="btn-secondary" disabled={objectToolsDisabled} style={{ fontSize: 12 }} title={objectToolHint ?? "圓角遮罩"} onClick={() => applyClip("round")}>▢</button>
-              <button className="btn-secondary" disabled={objectToolsDisabled} style={{ fontSize: 12 }} title={objectToolHint ?? "移除遮罩"} onClick={() => applyClip("none")}>無</button>
+              {([["circle", "⬤", "圓形遮罩"], ["round", "▢", "圓角遮罩"], ["none", "無", "移除遮罩"]] as const).map(([k, label, title]) => (
+                <button key={k} className="btn-secondary" style={{ fontSize: 12, outline: objStyle.clip === k ? "2px solid var(--accent)" : undefined }} title={title} onClick={() => styleSet({ clip: k }, ["clip"], true)}>{label}</button>
+              ))}
             </div>
-          </div>
+          </fieldset>
+        </SidebarPanel>
+
+        {/* 🗂 圖層面板 — 群組/解散 on top; rows (top layer first): show-hide, lock, name, rename, step/front/back, duplicate, delete. */}
+        {layers.length > 0 ? (
+          <SidebarPanel id="layers" title={`🗂 圖層（${layers.length}）`} defaultPos={{ x: 816, y: 244 }} width={280} defaultCollapsed>
+            <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+              <button className="btn-secondary" style={{ flex: 1, fontSize: 12 }} disabled={!ready || canvasBusy || !multiSelected} onClick={groupSelection} title="群組選取的多個物件">🗂 群組</button>
+              <button className="btn-secondary" style={{ flex: 1, fontSize: 12 }} disabled={!ready || canvasBusy || !groupSelected} onClick={ungroupSelection} title="解散選取的群組">🗂 解散</button>
+            </div>
+            <div ref={layersListRef} style={{ position: "relative", display: "flex", flexDirection: "column", gap: 4, maxHeight: 520, overflowY: "auto" }}>
+              {layers.map((o, i) => {
+                const vis = (o as unknown as { visible?: boolean }).visible !== false;
+                const locked = !!(o as unknown as { lockMovementX?: boolean }).lockMovementX;
+                const sel = selLayers.includes(o);
+                const ib = { background: "none", border: "none", cursor: "pointer", padding: 0 } as const;
+                return (
+                  <div key={i} data-layer-row="1" data-sel={sel ? "1" : "0"} data-hidden={vis ? "0" : "1"} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, border: `1px solid ${sel ? "var(--accent)" : "var(--card-border)"}`, background: sel ? "var(--accent-light)" : undefined, borderRadius: 4, padding: "3px 5px" }}>
+                    <button title="顯示/隱藏" onClick={() => toggleLayerVisible(o)} style={ib}>{vis ? "👁" : "🚫"}</button>
+                    <button title="鎖定/解鎖" onClick={() => toggleLayerLock(o)} style={ib}>{locked ? "🔒" : "🔓"}</button>
+                    <button onClick={() => selectLayer(o)} onDoubleClick={() => renameLayer(o)} title="點選圖層（雙擊改名）" style={{ flex: 1, textAlign: "left", background: "none", border: "none", cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", opacity: vis ? 1 : 0.45 }}>{layerLabel(o)}</button>
+                    <button title="改名" onClick={() => renameLayer(o)} style={ib}>✏️</button>
+                    <button title="上移" onClick={() => moveLayer(o, "up")} style={ib}>↑</button>
+                    <button title="下移" onClick={() => moveLayer(o, "down")} style={ib}>↓</button>
+                    <button title="移至最前" onClick={() => moveLayer(o, "front")} style={ib}>⤒</button>
+                    <button title="移至最後" onClick={() => moveLayer(o, "back")} style={ib}>⤓</button>
+                    <button title="複製" onClick={() => duplicateLayer(o)} style={ib}>⧉</button>
+                    <button title="刪除" onClick={() => deleteLayer(o)} style={{ ...ib, color: "var(--red)" }}>🗑</button>
+                  </div>
+                );
+              })}
+            </div>
           </SidebarPanel>
-        )}
+        ) : null}
 
         {/* 調色工具包 — always shown (collapsed); each tool acts on the active image when one is selected. */}
         {(
@@ -2580,6 +2752,33 @@ export default function CanvasEditor() {
           </SidebarPanel>
           </>
         )}
+
+        {/* 💾 匯出 / 下載 — 輸出放最後（流程：設定 → 加內容 → 樣式 → 排列 → 圖片處理 → 輸出）*/}
+        <SidebarPanel id="export" title="💾 匯出 / 存入" defaultPos={{ x: 816, y: 0 }} width={280} defaultCollapsed>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <input
+              type="text"
+              value={editName}
+              onChange={(e) => { setEditName(e.target.value); nameRef.current = null; }}
+              placeholder="檔名"
+              title="下載檔名（不含副檔名）"
+              style={{ fontSize: 12, padding: "2px 6px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--card-bg)", width: "100%" }}
+            />
+            {canvasBusy ? <span style={{ fontSize: 11, opacity: 0.65 }}>先套用或取消目前的編輯模式，才能下載或存檔。</span> : null}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready || canvasBusy} onClick={download} title="下載全尺寸 PNG">PNG下載</button>
+              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready || canvasBusy} onClick={() => void downloadWebP()} title="下載 WebP，自動壓縮至 200KB 以內">WebP下載</button>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready || canvasBusy} onClick={downloadSvg} title="下載 SVG（向量，真實 cm 尺寸）">SVG下載</button>
+              <button className="btn-primary" style={{ flex: 1 }} disabled={!ready || canvasBusy || exportBusy} onClick={() => void downloadPdf()} title="下載 PDF（向量·印刷·真實 cm）">{exportBusy ? "PDF 產生中…" : "PDF下載"}</button>
+            </div>
+            <button className="btn-primary" style={{ width: "100%" }} disabled={!ready || canvasBusy || saveState === "saving" || saveState === "saved"} onClick={() => void saveToDesigns()}>
+              {saveState === "saved" ? "已存入 ✓" : saveState === "saving" ? "儲存中…" : saveState === "error" ? "儲存失敗 ✗（重試）" : "存入 My Designs"}
+            </button>
+            <span style={{ fontSize: 11, opacity: 0.6 }}>交印刷廠選 PDF。文字建議再轉外框，字體缺時最保險。</span>
+          </div>
+        </SidebarPanel>
 
         {/* (原獨立「🔤 字型庫」面板已併入上方「🔤 文字」面板,避免兩個文字面板重複混淆。) */}
         </div>

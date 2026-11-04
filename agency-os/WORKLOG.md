@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-04（續18）編輯器整合 CARD-04 外觀／物件效果聯集＋操作者四點修正（符合畫布、面板排序收合、刪操作說明）
+
+- CARD-04（SDK worker cc.py session 40db9c88，US$2.56，42 turns，卡 `agency-os/handoffs/2026-11-04-editor-merge/CARD-04-object-effects.md`）：兩邊同一個「🎨 外觀 / 物件效果」= 填色／無填色／吸色／色票、描邊色＋寬＋虛線、圓角、不透明度＋混合模式、2/3 色漸層（線性/放射＋角度）、效果（陰影/光暈＋顏色/模糊/位移）、翻轉、遮罩（圓/圓角/無）、未選＝下一個物件預設、選取回填。刪掉 canvas 舊物件效果面板與 vector `obj-fx` 積木；`sidebar-sections.ts` 14→13 積木；`lib/content/blocks/README.md` 刪 obj-fx 列。CARD-05（調色）、CARD-06（去背）卡已寫好待派。
+- 主 session 追加：
+  - 吸色：我卡上寫「沒 EyeDropper 就隱藏」→ Firefox/Safari 失去原本能用的點畫布取色＝退步。改成兩邊「原生 EyeDropper 優先，否則點畫布取色」，點下後先恢復原選取再套色（舊版會套到點到的物件上）。
+  - Codex 7047f051 5 項：不變量①「新物件不能因預設樣式而看不見」→ 線條／虛線新物件寬度 <1 一律 2，啟用虛線時同步把下一物件預設寬度補到 2（兩邊）；不變量②「debounce 中的快照是使用者已看到的歷史」→ 兩邊 undo/redo 先 flush 待寫快照（canvas styleSnap／textSnap／snapTimer，vector _styleT／_syncTimer）。
+  - 操作者「符合畫布、填滿畫布兩個工具都無法使用」：根因 canvas 只在選了「圖片」才可按（形狀、文字、未選全灰）；vector 未選時靜默無反應、提示寫在收合面板裡。改成兩邊同規則：有選＝選取物件（任何類型、保留旋轉、多選當一塊），沒選＝全部可見物件當一塊；鎖定／空畫布給提示（vector 寫在同面板 sizeInfo、canvas setError）。
+  - 操作者「選單照邏輯排好、都合起來」：兩邊同序＝畫布尺寸 → 加內容（canvas 形狀/畫筆/設計檔、vector 圖片+描圖）→ 文字 → 外觀 → （vector 對齊、座標）→ 圖層 → 圖片調色/去背/AI → 匯出/存入（vector 再接 檢視/專案、其他積木）；全部預設收合。vector 調色／去白底／AI 去背積木改掛到圖層後的 `#imageBlocks`。標題統一 icon＋名稱、去掉編號。
+  - 操作者「不要這些標註文字」：刪 vector 畫布下方「拖曳移動·角落縮放…方向鍵微調」一行。（先誤刪外聯 InboxClient 找人說明，操作者更正後已 `git show HEAD:` 還原，未 commit。）
+  - e2e：四套測試取 vector frame 後先展開全部面板、canvas 匯出面板收合要先開、改名的面板標題、吸色斷言改成「沒 EyeDropper 仍顯示（fallback）」。
+- REALTEST_EVIDENCE: tool=Bash | cmd=tsc 0；SRI 13/13；3903 重跑 card-01/02/03/04 e2e = 63/63、147/147、94/94、264/264；JS 探測 vector：面板順序 22 項正確、0 個展開、說明行不在、新線條寬 2、未選→全部物件 bbox 21..1042×0..638（=畫布高、水平置中）、改填色後立刻復原 → 矩形仍在且回原色、可重做、刪 EyeDropper 後點畫布取到 #ff8800；canvas：順序 14 項正確、0 個展開、符合畫布按鈕可按、旋轉矩形＋圓未選→ bbox 0..800×162..638、改填色立刻復原 → 回 #ff0000、可重做 | exit=0 | ms=0
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n（agency-os/reports/oracle/2026-11-04-partialreview-7047f051.md，5 項已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=disabled={!imageSelected} onClick={() => fitImageToCanvas\|eyeOk\|拖曳移動·角落縮放\|<details open | hits=0
 ## 2026-11-04（續17）外聯 C16.2 事實核對一致率：0.89 < 0.95，門檻未過
 
 - 結果：n=200、agreed=178、rate=0.89、errors=0；22 筆不一致（supported→unsupported 12、unsupported→supported 10）。報告 `agency-os/reports/outreach/c16-2-claim-consistency-2026-11-04.json`。C16.2 維持 todo，不調門檻、不改判定。

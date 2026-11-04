@@ -61,8 +61,8 @@ async function setVal(loc, v) {
   const row = (title) => page.locator(`button[title="${title}"]`).first();
 
   async function exportTexts() {
-    // 🧰 更多工具 → 💾 匯出 downloads the full canvas JSON
-    const more = page.locator("button", { hasText: "更多工具" }).first();
+    // 🧰 形狀 / 畫筆 / 設計檔 → 💾 匯出 downloads the full canvas JSON
+    const more = page.locator("button", { hasText: "形狀 / 畫筆 / 設計檔" }).first();
     if (!(await page.locator('button[title="匯出可再編輯的設計檔（.design.json）"]').isVisible())) await more.click();
     const [dl] = await Promise.all([page.waitForEvent("download"), page.locator('button[title="匯出可再編輯的設計檔（.design.json）"]').click()]);
     const json = JSON.parse(readFileSync(await dl.path(), "utf8"));
@@ -157,6 +157,7 @@ async function setVal(loc, v) {
   await page.waitForFunction(() => [...document.querySelectorAll("iframe")].some((f) => f.src.includes("vector-editor.html")), null, { timeout: 60000 });
   const frame = page.frames().find((f) => f.url().includes("vector-editor.html"));
   await frame.waitForFunction(() => typeof canvas !== "undefined" && document.getElementById("btnArc"));
+  await frame.evaluate(() => document.querySelectorAll("details").forEach((d) => { d.open = true; })); // panels ship collapsed
   const $ = (id) => frame.locator("#" + id);
   const text = () => frame.evaluate(() => canvas.getObjects().filter((o) => /text/i.test(o.type)).map((o) => ({
     text: o.text, fontFamily: o.fontFamily, fontSize: o.fontSize, fill: o.fill, fontWeight: o.fontWeight, fontStyle: o.fontStyle,

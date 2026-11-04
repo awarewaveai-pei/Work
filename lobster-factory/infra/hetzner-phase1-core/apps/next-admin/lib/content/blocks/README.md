@@ -28,7 +28,7 @@
 | 註冊 | `AB.registerBlock({...})` | `register({...})`（`registry.ts`） |
 | 進入點 | `mount(ctx, body=DOM)` | `run(ctx)` |
 | `ctx` | fabric canvas（`canvas/add/snapshot/render`） | 執行資料（`geo`…） |
-| 用途 | 畫布工具（QR / 調色 / 物件效果） | 搜尋源 / 文章 / 影片 / 發佈 |
+| 用途 | 畫布工具（QR / 調色 / 去背） | 搜尋源 / 文章 / 影片 / 發佈 |
 | 契約 | id・icon・title・自註冊・ctx-only・刪即關 | **同上** |
 
 **規則**：積木只透過 `ctx` 互動，不直接碰全域 → 才能整段複製到別的專案，只要對方提供同樣的 `ctx` 介面。
@@ -225,7 +225,6 @@ AI prompt 是獨立積木，不併進 `image/style-design-workbench`。改圖流
 |---|---|---|---|
 | `qr` | `UI block` | `public/vector-editor.html` | QR Code（向量） |
 | `adjust` | `UI block` | `public/vector-editor.html` | 調色 / 修圖（選圖片） |
-| `obj-fx` | `UI block` | `public/vector-editor.html` | 物件效果 |
 | `bg-remove` | `UI block` | `public/vector-editor.html` | 去白底 / 去背 |
 | `smart-guides` | `UI block` | `public/vector-editor.html` | 智慧磁吸對齊 |
 | `arc-text` | `UI block` | `public/vector-editor.html` | 環形 / 弧形文字 |

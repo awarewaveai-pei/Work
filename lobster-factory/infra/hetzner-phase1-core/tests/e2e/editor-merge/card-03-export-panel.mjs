@@ -161,11 +161,13 @@ async function suite(tag, page, env) {
     await page.goto(`${BASE}/tools/canvas`, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => !!document.querySelector('button[title="加文字"]') && !document.querySelector('button[title="加文字"]').disabled, null, { timeout: 90000 });
     await page.waitForFunction(() => !!window.__cvTest, null, { timeout: 30000 });
+    // 匯出 / 存入 ships collapsed (panel order 2026-11-04)
+    if ((await page.locator('input[title="下載檔名（不含副檔名）"]').count()) === 0) await page.locator("button", { hasText: "匯出 / 存入" }).first().click();
   };
   const ensureOpen = async (title, probe) => { if ((await page.locator(probe).count()) === 0) await page.locator("button", { hasText: title }).first().click(); };
   const SIZE_PROBE = 'button:has-text("套用畫布尺寸")', TOOLS_PROBE = 'button[title="匯出可再編輯的設計檔（.design.json）"]';
   await open();
-  await page.locator("button", { hasText: "更多工具" }).first().click();
+  await page.locator("button", { hasText: "形狀 / 畫筆 / 設計檔" }).first().click();
   await page.locator('button[title="加方框"]').click(); await page.waitForTimeout(400);
   await page.locator('button[title="加文字"]').first().click(); await page.waitForTimeout(400);
   await ensureOpen("畫布尺寸 / DPI", SIZE_PROBE);
@@ -201,7 +203,7 @@ async function suite(tag, page, env) {
     count: () => page.evaluate(() => window.__cvTest.canvas.getObjects().length),
     kinds: () => page.evaluate(() => window.__cvTest.canvas.getObjects().map((o) => String(o.type).toLowerCase().replace(/-/g, ""))),
     loadFile: async (path) => {
-      await ensureOpen("更多工具", TOOLS_PROBE);
+      await ensureOpen("形狀 / 畫筆 / 設計檔", TOOLS_PROBE);
       await page.locator('input[type=file][accept="application/json,.json"]').setInputFiles(path); await page.waitForTimeout(1200);
     },
     uiState: async () => {
@@ -237,6 +239,7 @@ async function suite(tag, page, env) {
     await page.waitForFunction(() => [...document.querySelectorAll("iframe")].some((f) => f.src.includes("vector-editor.html")), null, { timeout: 90000 });
     frame = page.frames().find((f) => f.url().includes("vector-editor.html"));
     await frame.waitForFunction(() => typeof canvas !== "undefined" && document.getElementById("exportPdf") && typeof jspdf !== "undefined", null, { timeout: 60000 });
+    await frame.evaluate(() => document.querySelectorAll("details").forEach((d) => { d.open = true; })); // panels ship collapsed
   };
   await open();
   const addTwo = async () => {
