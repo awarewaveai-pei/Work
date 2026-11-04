@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-04（續3）外聯 C6.4 完成：兩站真同步
+
+- 部署 467a54e65 後（操作者本 session「可以，兩站都測」），sync-fluentcrm：awarewave-ops lead → 200 contactId 1；soulful-expression lead → 200 contactId 1。
+- fcrm-verify.php：aware-wave.com 只有 +c64aw、Soulful 只有 +c64sf；皆 subscribed、tags=outreach-warm；無寄信。
+- 清理：兩站各刪 1 聯絡人＋本次新建 outreach-warm 標籤（測前 0 聯絡人、0 該標籤）→ contacts 0、tag 0；app co_leads c6400000-* 2 列刪，殘留 0。
+- 監工台 C6.4 done（C6_4＝467a54e65）、C6 卡 done；70/77。
+- REALTEST_EVIDENCE: tool=curl | cmd=browser POST /api/outreach/leads/sync-fluentcrm ×2 → 200／200；wp eval-file 兩站驗證＋清理 | exit=0 | ms=30000
+- REVIEW_WAIVED: NA -- 真測與清理，無程式改動
+- BUGHUNT_WAIVED: NA -- 無程式改動
 ## 2026-11-04（續2）WP 站身分＝安裝（origin＋path），不是 host
 
 - C6.4 真測：aware-wave.com 同步 423 unavailable、Soulful 422 no_bridge。

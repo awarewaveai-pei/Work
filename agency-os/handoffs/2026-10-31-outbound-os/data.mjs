@@ -63,6 +63,7 @@ const C6 = 'f57fd3512';
 const C14 = '27a93dbcc';
 const C16 = 'b0f5e4872';
 const C6REL = '8e7b353ea';
+const C6_4 = '467a54e65';
 const C9 = 'bc1b685c8';
 
 export const STEPS = [
@@ -219,8 +220,8 @@ export const STEPS = [
       done('C13.3', 'Inbox 頁加「貼上個人資料」表單。', C13),
       done('C13.4', '假回應測試（1c47a2904）；11-03 正式站真查：找人「Marketing Manager／Gogoro／Taipei」進 3 位，2 位核准後推 email：1 位 Hunter 判有效並填入、1 位 4 個候選全無效不填，驗證紀錄 provider=hunter 存入；測完刪除（第三方個資）。', C13),
     ] },
-  { n: 14, code: 'C6', group: 'G', title: '暖名單進 FluentCRM', waitFor: '等某個品牌有人回信或開始跑名單型廣告，而且它的網站裝了 wp-bridge 和 FluentCRM', plain: '例：對方回了信，你在 Replies 頁按「同步 FluentCRM」，他出現在該品牌 WordPress 的 FluentCRM 裡並掛上標籤。沒回過信、沒同意過的人按了也不會同步。',
-    gate: '對測試站同步 1 個測試名單，FluentCRM 出現該聯絡人與標籤。沒有同意依據的名單回 422。', risk: 'High（客戶站外掛更新）', model: 'Opus 5.5', status: 'in_progress', depends: ['C4'],
+  { n: 14, code: 'C6', group: 'G', title: '暖名單進 FluentCRM', plain: '例：對方回了信，你在 Replies 頁按「同步 FluentCRM」，他出現在該品牌 WordPress 的 FluentCRM 裡並掛上標籤。沒回過信、沒同意過的人按了也不會同步。',
+    gate: '對測試站同步 1 個測試名單，FluentCRM 出現該聯絡人與標籤。沒有同意依據的名單回 422。', risk: 'High（客戶站外掛更新）', model: 'Opus 5.5', status: 'done', commit: C6, depends: ['C4'],
     decided: '走系統已有的 FluentCRM 接頭（它已經會建電子報草稿），只加「新增聯絡人」一個動作，不另寫一套。同步到哪個站，照該品牌登記的網站對上已設定的 wp-bridge 連線，不寫死網址。aware-wave.com 依你 10-30 的決定只留 WordPress，不接回。（規格 D16）',
     what: 'wp-bridge 加 /fluentcrm/contact（signed write，照 /newsletter）；版本 0.20.0＋release；lib/crm/fluentcrm.ts 加 upsertContact；sync-fluentcrm route（資格＝consent_status 四種∧非 suppression；clientId 由 wp_sites.url 對 listBridgeClients()）；Replies 按鈕',
     files: ['WPB/includes/Http/RestController.php', 'WPB/includes/Crm/ContactUpserter.php', 'NA/lib/crm/fluentcrm.ts', 'NA/app/api/outreach/leads/sync-fluentcrm/route.ts'],
@@ -228,7 +229,7 @@ export const STEPS = [
       done('C6.1', 'wp-bridge 外掛加一個「新增／更新聯絡人」端點，只做這件事。', C6),
       done('C6.2', '外掛升 0.21.0、發版，並推上 aware-wave.com 與 Soulful（兩站 health 200；Soulful 檢查 7/7 通過）。', C6REL),
       done('C6.3', '同步的後端：先驗資格（回過信、填過表單、同意過、是客戶之一，且不在拒收名單），再呼叫外掛。', C6),
-      todo('C6.4', '11-04：aware-wave.com 的 bridge 已接回 app（新金鑰、WPBRIDGE_SITE_1_*，容器內已確認）；兩站 FluentCRM 都沒有自動化、新聯絡人直接是已訂閱不寄確認信。剩：兩站各同步一筆測試聯絡人（peijingartstudio+c64…）再刪掉——寫入客戶站要你在執行的 session 直接說一聲。'),
+      done('C6.4', '11-04 兩站真同步：aware-wave.com（bridge 重新接回，新金鑰）與 Soulful 各同步一筆測試聯絡人，各自只進自己網站的 FluentCRM、已訂閱、標籤 outreach-warm、沒寄任何信；測完兩站與 app 都刪乾淨。途中修好「同網域下的 staging 站被當成同一站」與「預設 bridge 被當成沒有」兩個問題（467a54e65）。', C6_4),
     ] },
   { n: 15, code: 'C14', group: 'G', title: '個人消費者：Meta 名單型廣告 → FluentCRM', waitFor: '等你在 Meta 廣告管理員建立第一個名單型廣告', plain: '例：你在廣告管理員圈「台灣、對塔羅有興趣」投名單型廣告，對方在 IG 上一鍵留 email。系統收到後存成暖名單並記下同意依據，自動進該品牌的 FluentCRM 培養。這些人永遠不會收到冷信。',
     gate: '用 Meta 的名單廣告測試工具送一筆，10 秒內名單出現、帶同意依據，FluentCRM 也有這個聯絡人；同一筆重送不會重複。下載 CSV 匯入也走同一條路得到同樣結果。', risk: 'Medium（C14.3 外部設定）', model: 'Opus 5.5', status: 'in_progress', depends: ['C6'],
