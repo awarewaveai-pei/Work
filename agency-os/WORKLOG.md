@@ -16,6 +16,7 @@
 - 主機：`safe-infra-patch.sh host-nginx` 兩次（snippet＋vhost 註解同步），backup `/root/lobster-phase1/safe-patch-backups/_etc_nginx_snippets_soulful-proxy.inc.safe-patch-20261104-050347`；live md5 == repo。
 - 檢查器：`scripts/public-endpoint-smoke.ps1` 新增 `RequireHeaders`（soulful／aware-wave／app 三條）。未做：AW 容器 nginx 八處 XFO 抽 snippet 補 CSP——XFO 在現代瀏覽器已等價 'self'，等有跨站嵌入需求再做。
 - Codex F1（minor）：smoke 註解宣稱「login/checkout doors」但只探 `/` → 改註解對齊事實（wp-login/wp-admin header 由 WP 送，nginx 漂移類只在 `location /`）。
+- 外站嵌入查證（操作者追問）：`/var/log/nginx/soulful-access.log*` 14 天 referer 全無外站；`/embed/`（WP oEmbed）只有 bot 與 Soulful 自己的文內嵌入（同源，'self' 放行）；`/wp-json/oembed` 348 次皆無 referer＝掃描。結論：無人外嵌，frame-ancestors 'self' 不壞任何現行用途；日後要外嵌只需在 soulful-proxy.inc 加該網域。AW 八處 XFO 不補 CSP：所有瀏覽器都認 SAMEORIGIN，CSP 只在需要白名單時才有增益，到時一併抽 snippet。
 - REALTEST_EVIDENCE: tool=curl | cmd=curl -sD- https://soulfulexpression.org{/,/shop/,/cart/,/wp-login.php,/wp-admin/} → 五頁皆 XFO+CSP；public-endpoint-smoke.ps1 8/8 OK；突變 RequireHeaders 加不存在 header → FAIL exit 1 → 還原綠 | exit=0 | ms=3000
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n（agency-os/reports/oracle/2026-11-04-partialreview-6bc543e1.md）
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks | grep=soulful-proxy.inc|X-Frame-Options.*(WordPress|passthrough)|frame-ancestors | hits=12（3 include 現行、8 歷史 WORKLOG、1 effectcraft HOSTING.md 為嵌入方指引非主張；`soulfulexpression.org.conf:188` 過時註解已改）
