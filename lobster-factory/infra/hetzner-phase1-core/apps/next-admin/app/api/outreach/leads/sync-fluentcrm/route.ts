@@ -6,6 +6,7 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { findSuppressed } from "@/lib/outreach/suppression";
 import { upsertContact } from "@/lib/crm/fluentcrm";
 import { bridgeClientId } from "@/lib/outreach/warm-leads";
+import { channelOfConsentSource, channelTags } from "@/lib/outreach/channels";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 import { blockedChangeResponse } from "@/lib/system-modes/blocked-change";
 
@@ -30,11 +31,11 @@ export async function POST(req: Request): Promise<Response> {
   const supabase = await outreachDb(req, typeof body.orgSlug === "string" ? body.orgSlug.trim() || null : null);
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
-  const { data, error } = await supabase.from("co_leads").select("id, organization_id, name, contact_name, email, website, consent_status, do_not_contact").eq("id", leadId).maybeSingle();
+  const { data, error } = await supabase.from("co_leads").select("id, organization_id, name, contact_name, email, website, consent_status, consent_source, do_not_contact").eq("id", leadId).maybeSingle();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ ok: false, error: "lead not found" }, { status: 404 });
   const lead = data as { id: string; organization_id: string | null; name: string | null; contact_name: string | null; email: string | null; website: string | null;
-    consent_status: string; do_not_contact: boolean | null };
+    consent_status: string; consent_source: string | null; do_not_contact: boolean | null };
   try { assertOrgAccess(req, lead.organization_id); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
@@ -61,8 +62,10 @@ export async function POST(req: Request): Promise<Response> {
   if (!gate.allowed) return blockedChangeResponse(gate.mode);
 
   const now = new Date().toISOString();
-  // first_name is the person, not the company (Codex C6 F4)
-  const res = await upsertContact({ email, first_name: (lead.contact_name ?? lead.name) ?? undefined, tags: ["outreach-warm"] }, { clientId });
+  // first_name is the person, not the company (Codex C6 F4). The channel tag only (channels.ts): the form tag came with
+  // the capture, and FluentCRM tags only add.
+  const tags = channelTags(channelOfConsentSource(lead.consent_source) ?? "cold_outreach");
+  const res = await upsertContact({ email, first_name: (lead.contact_name ?? lead.name) ?? undefined, tags }, { clientId });
   // The system-mode gate refused the write: nothing reached FluentCRM, the lead is not "failed" (Codex C6 F3).
   if (res.ok === false && res.blockedMode) return blockedChangeResponse(res.blockedMode);
   if (!res.ok || res.value.status !== "committed" || res.value.contact_id == null) {

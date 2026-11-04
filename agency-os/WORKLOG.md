@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-04（續6）外聯：FluentCRM 標籤改成「來源＋表單」兩層（操作者：一看就知道哪個管道）
+
+- 根因：標籤寫死在三處（warm-leads.ts `meta-lead-ad`、sync-fluentcrm `outreach-warm`），沒有表單層；已同步的人從新管道進來會被「已同步就跳過」擋掉，新標籤補不上。
+- 改：新 `lib/outreach/channels.ts` 一份管道清單（Meta 名單廣告／冷信開發），`channelTags()` 產 `來源：<管道>` ＋ `表單：<名稱>`；webhook 用 Graph 讀表單名稱（5xx/429/網路 → 請 Meta 重送；4xx → 只帶來源標籤），CSV 用匯入時的表單名稱，sync-fluentcrm 依 consent_source 判管道。
+- 不變量：每次收單的標籤都送達 FluentCRM；重做無害（外掛 attachTags 只加）且不降級已同步。已同步只跳過「同一筆收單」＝ fluentcrm_synced 事件的 metadata.capture；補標籤失敗不把 synced 改成 failed。
+- slug 坑：fc_tags.slug varchar(192)、sanitize_title 把中文編成 9 bytes → 表單名依編碼長度整字裁；不成對 surrogate 先去掉。
+- 兩站 FluentCRM 現有 0 聯絡人 → 無舊標籤要搬。
+- Codex 4 輪：R1 F1（已同步跳過新管道）修、F2 由 F1 解；R2 F1（consent_source 不更新）→ 改記 capture；R3 F1 修（拿掉 source_url 捷徑）、F2 接受（只多一次冪等呼叫）、F3 修（表單名暫時失敗請重送）；R4 F1 不修（no_bridge 既有設計＝設定缺漏，非本次範圍）、F2 修（surrogate）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run channels/meta-leads/warm-leads/inbox warm-leads/sync-fluentcrm → 30 passed；npx tsc --noEmit exit 0；突變 3 守衛（syncedBefore、!wasSynced、form retry）各紅→還原綠 | exit=0 | ms=5000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/8m/0n
+- ORACLE_WAIVED: R4 F2 一行修（去 surrogate）在 R4 後，有指名測試覆蓋
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app,scripts | grep=outreach-warm|meta-lead-ad|WARM_TAG | hits=0
+- BUGHUNT_SCOPE_NARROW: agency-os 剩餘命中＝歷史記錄（WORKLOG、監工台 C6.4、R0-PLAN 已完成卡、System_Foundry 產生檔），舊檔不回改；契約 MODULE_MANIFEST.json＋Spec §5.10 已同 commit 改
 ## 2026-11-04（續5）外聯 C14.3 完成：Meta 名單事件 → 暖名單 → FluentCRM（Aware Wave 粉專）
 
 - 根因：測試工具一直 Pending ＝ App 1107251218596741「尚未發佈」；Leads Access 頁未自訂（預設管理員＋連結 CRM 皆可下載），測試工具警告是誤導。

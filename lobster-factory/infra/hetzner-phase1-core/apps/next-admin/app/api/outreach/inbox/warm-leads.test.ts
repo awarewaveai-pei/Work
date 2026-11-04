@@ -43,5 +43,6 @@ describe("inbox POST warmLeads", () => {
     expect(leads).toHaveLength(1);
     expect(leads[0]).toMatchObject({ status: "warm", consent_source: "meta_lead_ad_csv:Spring sale", consent_status: "form_submitted" });
     expect(m.upsert).toHaveBeenCalledTimes(1);
+    expect(m.upsert.mock.calls[0][0].tags).toEqual(["來源：Meta 名單廣告", "表單：Spring sale"]);
   });
 });

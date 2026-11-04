@@ -29,21 +29,24 @@ vi.mock("@/lib/supabase-server", () => ({
 
 const { handleLeadgenChanges } = await import("../meta-leads");
 const env = { META_PAGE_TOKEN_555: "page-token", META_GRAPH_API_BASE_URL: "https://graph.test" };
-const payload = { object: "page", entry: [{ id: "555", time: 1, changes: [{ field: "leadgen", value: { leadgen_id: "9001", page_id: "555", form_id: "F1", created_time: 1793600000 } }] }] };
+const payload = { object: "page", entry: [{ id: "555", time: 1, changes: [{ field: "leadgen", value: { leadgen_id: "9001", page_id: "555", form_id: "777", created_time: 1793600000 } }] }] };
 const graphLead = {
-  id: "9001", created_time: "2026-11-02T10:00:00+0000", form_id: "F1",
+  id: "9001", created_time: "2026-11-02T10:00:00+0000", form_id: "777",
   field_data: [{ name: "email", values: ["Amy@Example.com"] }, { name: "full_name", values: ["Amy Lin"] }, { name: "phone_number", values: ["+886912345678"] }],
 };
 const urls: string[] = [];
+let formRes = () => new Response(JSON.stringify({ id: "777", name: "塔羅免費解讀" }), { status: 200 });
 
 beforeEach(() => {
   m.db = fakeWarmDb();
   m.upsert.mockReset();
   m.upsert.mockResolvedValue({ ok: true, value: { status: "committed", contact_id: 42 } });
   urls.length = 0;
+  formRes = () => new Response(JSON.stringify({ id: "777", name: "塔羅免費解讀" }), { status: 200 });
   vi.stubGlobal("fetch", async (url: URL, init: RequestInit) => {
     urls.push(String(url));
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer page-token");
+    if (String(url).includes("/777?")) return formRes();
     return new Response(JSON.stringify(graphLead), { status: 200 });
   });
 });
@@ -57,11 +60,26 @@ describe("handleLeadgenChanges", () => {
     expect(tables().co_leads).toHaveLength(1);
     expect(tables().co_leads[0]).toMatchObject({
       organization_id: ORG, email: "amy@example.com", name: "Amy Lin", phone: "+886912345678", source_url: "meta:leadgen/9001",
-      status: "warm", consent_status: "form_submitted", consent_source: "meta_lead_ad:F1", fluentcrm_sync_status: "synced", fluentcrm_contact_id: "42",
+      status: "warm", consent_status: "form_submitted", consent_source: "meta_lead_ad:777", fluentcrm_sync_status: "synced", fluentcrm_contact_id: "42",
     });
     expect(m.upsert).toHaveBeenCalledTimes(1);
-    expect(m.upsert).toHaveBeenCalledWith({ email: "amy@example.com", first_name: "Amy Lin", phone: "+886912345678", tags: ["meta-lead-ad"] }, { clientId: "1" });
+    expect(m.upsert).toHaveBeenCalledWith({ email: "amy@example.com", first_name: "Amy Lin", phone: "+886912345678", tags: ["來源：Meta 名單廣告", "表單：塔羅免費解讀"] }, { clientId: "1" });
     expect(tables().co_timeline_events.map((e) => e.event_type)).toEqual(["lead_captured", "fluentcrm_synced"]);
+  });
+
+  it("captures with the channel tag alone when the form's name is refused (4xx)", async () => {
+    formRes = () => new Response(JSON.stringify({ error: { message: "no" } }), { status: 400 });
+    expect(await handleLeadgenChanges(payload, env)).toMatchObject({ captured: 1 });
+    expect(m.upsert.mock.calls[0][0].tags).toEqual(["來源：Meta 名單廣告"]);
+  });
+
+  it("asks Meta to resend when the form's name read fails for now (5xx), and tags the form on the resend", async () => {
+    formRes = () => new Response("{}", { status: 503 });
+    expect(await handleLeadgenChanges(payload, env)).toMatchObject({ captured: 0, retry: 1 });
+    expect(tables().co_leads).toHaveLength(0);
+    formRes = () => new Response(JSON.stringify({ id: "777", name: "塔羅免費解讀" }), { status: 200 });
+    expect(await handleLeadgenChanges(payload, env)).toMatchObject({ captured: 1 });
+    expect(m.upsert.mock.calls[0][0].tags).toEqual(["來源：Meta 名單廣告", "表單：塔羅免費解讀"]);
   });
 
   it("does not duplicate on a resend, and finishes a sync that failed the first time", async () => {

@@ -263,6 +263,7 @@ export async function POST(req: Request): Promise<Response> {
         const res = await captureWarmLead(supabase, {
           orgId: organizationId, email: text(r?.email), name: text(r?.full_name), phone: text(r?.phone), sourceRef: null,
           consent: { source: `meta_lead_ad_csv:${form}`, at: Number.isFinite(at) ? new Date(at).toISOString() : null },
+          channel: "meta_lead_ad", form,
         });
         const key = res.ok ? res.sync : res.reason;
         summary[key] = (summary[key] ?? 0) + 1;

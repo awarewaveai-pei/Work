@@ -36,6 +36,23 @@ function answers(fieldData: unknown): Map<string, string> {
   return out;
 }
 
+/** The form's name for its FluentCRM tag (channels.ts). "retry" = Graph 5xx / 429 / network: the caller asks Meta to resend
+ *  rather than capture without the tag for good; any other failure captures the lead without a form tag. */
+async function formName(baseUrl: string, token: string, formId: string): Promise<string | null | "retry"> {
+  if (!ID_RE.test(formId)) return null;
+  try {
+    const url = new URL(`${baseUrl}/${formId}`);
+    url.searchParams.set("fields", "name");
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store", signal: AbortSignal.timeout(10_000) });
+    if (res.ok) return str(record(await res.json().catch(() => null))?.name);
+    console.warn(`[meta-leads] form ${formId} name: Graph ${res.status}`);
+    return res.status >= 500 || res.status === 429 ? "retry" : null;
+  } catch (e) {
+    console.warn(`[meta-leads] form ${formId} name: ${e instanceof Error ? e.message : String(e)}`);
+    return "retry";
+  }
+}
+
 async function orgDb(orgId: string): Promise<SupabaseClient> {
   const main = getSupabaseWriteClient();
   if (!main) throw new Error("Supabase not configured");
@@ -77,9 +94,12 @@ export async function handleLeadgenChanges(payload: unknown, env: MetaSocialEnv 
         const name = a.get("full_name") ?? [a.get("first_name"), a.get("last_name")].filter(Boolean).join(" ");
         const at = isoOf(str(body.created_time) ?? str(value?.created_time));
         const formId = str(body.form_id) ?? str(value?.form_id) ?? "unknown";
+        const form = await formName(config.baseUrl, config.accessToken, formId);
+        if (form === "retry") { result.retry++; continue; }
         const captured = await captureWarmLead(await orgDb(asset.organizationId), {
           orgId: asset.organizationId, email: a.get("email") ?? "", name: name || null, phone: a.get("phone_number") ?? a.get("phone") ?? null,
           sourceRef: leadgenKey(leadgenId), consent: { source: `meta_lead_ad:${formId}`, at },
+          channel: "meta_lead_ad", form,
         });
         if (!captured.ok) {
           console.error(`[meta-leads] leadgen ${leadgenId}: ${captured.reason}${"detail" in captured && captured.detail ? ` ${captured.detail}` : ""}`);

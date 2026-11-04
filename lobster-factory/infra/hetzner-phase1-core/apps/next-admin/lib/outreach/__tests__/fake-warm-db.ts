@@ -27,7 +27,8 @@ export function fakeWarmDb() {
     const q: Record<string, unknown> = {
       select: () => q,
       limit: () => q,
-      eq: (c: string, v: unknown) => { filters.push((r) => r[c] === v); return q; },
+      // "col->>key" is a PostgREST JSON path filter
+      eq: (c: string, v: unknown) => { const [col, key] = c.split("->>"); filters.push((r) => (key ? (r[col] as Row | undefined)?.[key] : r[c]) === v); return q; },
       is: (c: string, v: null) => { filters.push((r) => (r[c] ?? null) === v); return q; },
       // the code escapes % _ \ with a backslash: the fake compares the unescaped text, case-insensitively
       ilike: (c: string, p: string) => { filters.push((r) => String(r[c] ?? "").toLowerCase() === p.replace(/\\(.)/g, "$1").toLowerCase()); return q; },

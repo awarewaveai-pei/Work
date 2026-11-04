@@ -1,6 +1,6 @@
 // A person who asked to hear from us (Meta lead-ad form, or its CSV export) becomes a WARM lead (SPEC §5.10, card C14.1):
 // co_leads row -> co_convert_to_warm (0152: lead row lock, warm + consent, unsent cold mail skipped) -> FluentCRM contact
-// tagged meta-lead-ad -> timeline. Never cold mail: cold-gate.ts isWarm refuses consent_source meta_lead_ad*.
+// tagged by channels.ts (channel + form) -> timeline. Never cold mail: cold-gate.ts isWarm refuses consent_source meta_lead_ad*.
 // Idempotent on two keys: the Meta key (organization, source_url 'meta:leadgen/<id>', 0154) and (organization, lower(email))
 // (0149). A repeat finds the row and only finishes what is missing: the FluentCRM sync when it is not 'synced'.
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -8,10 +8,10 @@ import { upsertContact } from "@/lib/crm/fluentcrm";
 import { listBridgeClients, wpSiteKey } from "@/lib/payments/woo";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
+import { channelTags, type Channel } from "./channels";
 import { findSuppressed } from "./suppression";
 import { isEmailSyntax } from "./verify-email";
 
-export const WARM_TAG = "meta-lead-ad";
 export const LEADGEN_PREFIX = "meta:leadgen/";
 export const leadgenKey = (leadgenId: string): string => `${LEADGEN_PREFIX}${leadgenId}`;
 
@@ -27,6 +27,9 @@ export interface WarmLeadInput {
   /** 'meta:leadgen/<id>' for a webhook lead; null for a CSV row (keyed by email alone). */
   sourceRef: string | null;
   consent: { source: string; at?: string | null };
+  /** FluentCRM tags (channels.ts): the channel, and the form's name when known. */
+  channel: Channel;
+  form?: string | null;
 }
 
 export type WarmLeadResult =
@@ -66,10 +69,18 @@ async function timeline(db: SupabaseClient, orgId: string | null, leadId: string
   if (error) console.error(`[warm-leads] timeline ${event_type} for ${leadId}: ${error.message}`);
 }
 
+async function syncedBefore(db: SupabaseClient, leadId: string, capture: string): Promise<boolean> {
+  const { data, error } = await db.from("co_timeline_events").select("id").eq("lead_id", leadId).eq("event_type", "fluentcrm_synced")
+    .eq("metadata->>capture", capture).limit(1).maybeSingle();
+  if (error) throw new Error(error.message);
+  return !!data;
+}
+
 export async function captureWarmLead(db: SupabaseClient, input: WarmLeadInput): Promise<WarmLeadResult> {
   const email = input.email.trim().toLowerCase();
   if (!isEmailSyntax(email)) return { ok: false, reason: "invalid_email" };
   const { orgId, sourceRef } = input;
+  const captureKey = sourceRef ?? input.consent.source;
   const name = input.name?.trim() || null;
   const phone = input.phone?.trim() || null;
   const now = new Date().toISOString();
@@ -110,11 +121,15 @@ export async function captureWarmLead(db: SupabaseClient, input: WarmLeadInput):
       await timeline(db, orgId, row.id, "lead_captured", "名單表單送出，已轉暖名單", { metadata: { source: input.consent.source, source_ref: sourceRef, created, cancelled_cold: cancelledCold } });
     }
 
-    if (row.fluentcrm_sync_status === "synced") return { ok: true, leadId: row.id, created, cancelledCold, sync: "already_synced", retryable: false };
+    // Every capture's tags reach the contact (FluentCRM tags only add, so a repeat is harmless): a synced lead skips only a
+    // capture already on a fluentcrm_synced event (this Meta lead / this CSV form). Codex 2026-11-04 F1 x3.
+    const wasSynced = row.fluentcrm_sync_status === "synced";
+    if (wasSynced && await syncedBefore(db, row.id, captureKey)) return { ok: true, leadId: row.id, created, cancelledCold, sync: "already_synced", retryable: false };
 
     const notSynced = async (status: "failed" | "not_eligible", event: string, title: string, reason: string, retryable: boolean): Promise<WarmLeadResult> => {
-      await db.from("co_leads").update({ fluentcrm_sync_status: status, updated_at: now }).eq("id", row.id);
-      await timeline(db, orgId, row.id, event, title, { description: reason });
+      // A failed tag top-up leaves a synced contact synced: the contact exists, only this capture's tags are missing.
+      if (!wasSynced) await db.from("co_leads").update({ fluentcrm_sync_status: status, updated_at: now }).eq("id", row.id);
+      await timeline(db, orgId, row.id, event, title, { description: reason, metadata: { capture: captureKey } });
       return { ok: true, leadId: row.id, created, cancelledCold, sync: status, retryable, reason };
     };
     // A person on the marketing / all-scope suppression list is not added to FluentCRM, even after a form (same rule as C6).
@@ -126,14 +141,14 @@ export async function captureWarmLead(db: SupabaseClient, input: WarmLeadInput):
     const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), orgId);
     if (!gate.allowed) return await notSynced("failed", "fluentcrm_sync_failed", "系統模式暫停寫入，FluentCRM 稍後再同步", `blocked_mode:${gate.mode}`, true);
 
-    const res = await upsertContact({ email, first_name: name ?? undefined, phone: phone ?? undefined, tags: [WARM_TAG] }, { clientId });
+    const res = await upsertContact({ email, first_name: name ?? undefined, phone: phone ?? undefined, tags: channelTags(input.channel, input.form) }, { clientId });
     if (!res.ok || res.value.status !== "committed" || res.value.contact_id == null) {
       return await notSynced("failed", "fluentcrm_sync_failed", "FluentCRM 同步失敗", "error" in res ? res.error : res.value.reason ?? res.value.status, true);
     }
     const contactId = String(res.value.contact_id);
     const { error: uErr } = await db.from("co_leads").update({ fluentcrm_contact_id: contactId, fluentcrm_sync_status: "synced", fluentcrm_last_synced_at: now, updated_at: now }).eq("id", row.id);
     if (uErr) return { ok: false, reason: "db_error", detail: uErr.message };
-    await timeline(db, orgId, row.id, "fluentcrm_synced", "已同步到 FluentCRM", { metadata: { contact_id: contactId } });
+    await timeline(db, orgId, row.id, "fluentcrm_synced", "已同步到 FluentCRM", { metadata: { contact_id: contactId, capture: captureKey } });
     return { ok: true, leadId: row.id, created, cancelledCold, sync: "synced", retryable: false };
   } catch (e) {
     return { ok: false, reason: "db_error", detail: e instanceof Error ? e.message : String(e) };

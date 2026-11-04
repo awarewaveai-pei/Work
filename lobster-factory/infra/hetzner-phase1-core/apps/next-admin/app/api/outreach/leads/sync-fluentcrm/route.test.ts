@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const ORG = "00000000-0000-4000-8000-0000000000c1";
 const LEAD = "00000000-0000-4000-8000-00000000001a";
 const s = vi.hoisted(() => ({
-  consent: "replied", suppressed: false, siteUrls: ["https://client.example/"] as string[],
+  consent: "replied", source: null as string | null, suppressed: false, siteUrls: ["https://client.example/"] as string[],
   bridges: [{ id: "2", name: "client", baseUrl: "https://client.example" }] as Array<{ id: string; name: string; baseUrl: string }>,
   updates: [] as unknown[], timeline: [] as unknown[], upserts: [] as unknown[], suppressionAsked: [] as unknown[],
 }));
@@ -18,7 +18,7 @@ vi.mock("@/lib/org-client", () => ({
       q.eq = () => q;
       q.update = (p: unknown) => { s.updates.push(p); return q; };
       q.insert = async (p: unknown) => { if (table === "co_timeline_events") s.timeline.push(p); return { error: null }; };
-      q.maybeSingle = async () => ({ data: { id: LEAD, organization_id: ORG, name: "Acme", email: "Pat@Acme.test", website: null, consent_status: s.consent }, error: null });
+      q.maybeSingle = async () => ({ data: { id: LEAD, organization_id: ORG, name: "Acme", email: "Pat@Acme.test", website: null, consent_status: s.consent, consent_source: s.source }, error: null });
       q.then = (res: (v: unknown) => unknown) => res({ error: null });
       return q;
     },
@@ -46,7 +46,7 @@ const call = () => POST(new Request("http://app.test/api/outreach/leads/sync-flu
   body: JSON.stringify({ leadId: LEAD }) }));
 
 beforeEach(() => {
-  s.consent = "replied"; s.suppressed = false; s.siteUrls = ["https://client.example/"];
+  s.consent = "replied"; s.source = null; s.suppressed = false; s.siteUrls = ["https://client.example/"];
   s.bridges = [{ id: "2", name: "client", baseUrl: "https://client.example" }];
   for (const a of [s.updates, s.timeline, s.upserts, s.suppressionAsked]) a.length = 0;
 });
@@ -56,9 +56,15 @@ describe("POST /api/outreach/leads/sync-fluentcrm", () => {
     s.consent = consent;
     const res = await call();
     expect(res.status).toBe(200);
-    expect(s.upserts[0]).toEqual([{ email: "pat@acme.test", first_name: "Acme", tags: ["outreach-warm"] }, { clientId: "2" }]);
+    expect(s.upserts[0]).toEqual([{ email: "pat@acme.test", first_name: "Acme", tags: ["來源：冷信開發"] }, { clientId: "2" }]);
     expect(s.updates[0]).toMatchObject({ fluentcrm_contact_id: "77", fluentcrm_sync_status: "synced" });
     expect(s.timeline[0]).toMatchObject({ event_type: "fluentcrm_synced" });
+  });
+
+  it("tags a Meta lead-ad lead with its channel, not cold outreach", async () => {
+    s.consent = "form_submitted"; s.source = "meta_lead_ad:123";
+    expect((await call()).status).toBe(200);
+    expect((s.upserts[0] as [{ tags: string[] }])[0].tags).toEqual(["來源：Meta 名單廣告"]);
   });
 
   it.each(["unknown", "legitimate_interest", "unsubscribed", "do_not_contact"])("refuses consent %s with 422 not_eligible", async (consent) => {
