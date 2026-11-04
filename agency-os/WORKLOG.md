@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-04（續1）外聯 C6.4 接回 aware-wave.com bridge；C14.3 查 Meta 訂閱
+
+- 操作者（主 session 轉達）：「接回並兩站都測」。
+- aware-wave.com（lobster-wordpress，bridge 0.21.0）原本 awbridge_keys 0 列 → wp eval sodium 產 key app-next-admin-20261104（write）；私鑰經管線直寫 /root/lobster-phase1/.env（備份 .env.bak.bridge-site1-*），不落地不顯示。compose 加 WPBRIDGE_SITE_1_{BASE_URL,KEY_ID,PRIVATE_KEY,NAME}：safe-infra-patch compose OK（備份 docker-compose.yml.bak.safe-patch-20261104-003551）；printenv BASE_URL=https://aware-wave.com、KEY_ID 正確、私鑰 88 字。repo compose 同步。aware-wave-store 仍關。
+- 兩站 FluentCRM 唯讀檢查：fc_funnels 0 列、無 outreach 標籤、無雙重確認設定；ContactUpserter 新聯絡人 status=subscribed（不寄確認信）。wp_sites：awarewave-ops→aware-wave.com、soulful-expression→soulfulexpression.org。
+- 同步真測未做：測試名單 c6400000-…a1／…b1 已建（replied），呼叫 sync-fluentcrm 被 Claude Code 自動模式分類器擋（寫客戶站需操作者在執行 session 直接確認）。
+- C14.3：App 2998470257172880「AwareWave Postiz」page webhook callback＝chatwoot.aware-wave.com/bot（非 app /api/webhooks/meta）；同 App 每物件一個 callback → 不能直接加 leadgen。兩權杖皆無 leads_retrieval；AW 無 pages_manage_metadata。未做任何 Meta 寫入。
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-next-admin printenv WPBRIDGE_SITE_1_BASE_URL → https://aware-wave.com；fcrm-check.php 兩站；Graph debug_token／app subscriptions（唯讀） | exit=0 | ms=60000
+- REVIEW_WAIVED: NA -- 設定與唯讀檢查，無程式改動
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=WPBRIDGE_SITE_1_ | hits=9（repo compose 4 行＋本條；程式經 woo.ts rawBridgeEnv 以 WPBRIDGE_SITE_${n}_ 讀）
 ## 2026-11-03（續16）影音工作台卡 P6 L0–L3＋D1：改名、可部署、任務表、主系統接口（5bc940864／08a362e29／c86f7d0fd／9465bbc8c）
 
 - 計畫 SSOT：apps/video-workbench/docs/p6-golive-plan-20261103.md（a9fb08857）。操作者 11-03 同意上線（High 預授權）。

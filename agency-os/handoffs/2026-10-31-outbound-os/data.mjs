@@ -228,7 +228,7 @@ export const STEPS = [
       done('C6.1', 'wp-bridge 外掛加一個「新增／更新聯絡人」端點，只做這件事。', C6),
       done('C6.2', '外掛升 0.21.0、發版，並推上 aware-wave.com 與 Soulful（兩站 health 200；Soulful 檢查 7/7 通過）。', C6REL),
       done('C6.3', '同步的後端：先驗資格（回過信、填過表單、同意過、是客戶之一，且不在拒收名單），再呼叫外掛。', C6),
-      todo('C6.4', '按鈕與測試已完成（f57fd3512）。每家公司的回信者只進自己網站的 FluentCRM（依名單所屬公司找它自己的 WordPress 連線，route.ts:55；沒接網站就不同步，不會送去別家）。剩：哪家公司先有人回信，就用那筆真資料在那家網站同步一次。'),
+      todo('C6.4', '11-04：aware-wave.com 的 bridge 已接回 app（新金鑰、WPBRIDGE_SITE_1_*，容器內已確認）；兩站 FluentCRM 都沒有自動化、新聯絡人直接是已訂閱不寄確認信。剩：兩站各同步一筆測試聯絡人（peijingartstudio+c64…）再刪掉——寫入客戶站要你在執行的 session 直接說一聲。'),
     ] },
   { n: 15, code: 'C14', group: 'G', title: '個人消費者：Meta 名單型廣告 → FluentCRM', waitFor: '等你在 Meta 廣告管理員建立第一個名單型廣告', plain: '例：你在廣告管理員圈「台灣、對塔羅有興趣」投名單型廣告，對方在 IG 上一鍵留 email。系統收到後存成暖名單並記下同意依據，自動進該品牌的 FluentCRM 培養。這些人永遠不會收到冷信。',
     gate: '用 Meta 的名單廣告測試工具送一筆，10 秒內名單出現、帶同意依據，FluentCRM 也有這個聯絡人；同一筆重送不會重複。下載 CSV 匯入也走同一條路得到同樣結果。', risk: 'Medium（C14.3 外部設定）', model: 'Opus 5.5', status: 'in_progress', depends: ['C6'],
@@ -238,7 +238,7 @@ export const STEPS = [
     items: [
       done('C14.1', '共用的「收暖名單」程式：存名單、存同意、取消這個人所有待寄的冷信、同步 FluentCRM；匯入廣告管理員下載的 CSV 就走它；重送同一筆不重複，但沒同步成功的會補。', C14),
       done('C14.2', '自動接收：Meta 送來的名單事件經既有的簽章驗證後，抓回資料、走同一段程式。', C14),
-      todo('C14.3', '你動手（等要投名單型廣告時）：Meta 開發者後台替 App 加 leads_retrieval 權限（AwareWave 粉專另加 pages_manage_metadata），重新產生兩個粉專權杖放回 user-env；之後我讓粉專訂閱名單事件、用 Meta 測試工具送一筆。11-03 查：兩個權杖都沒有 leads_retrieval。程式與測試已完成（27a93dbcc，0154 已套正式庫）。'),
+      todo('C14.3', '11-04 查：Meta App「AwareWave Postiz」(2998470257172880) 的粉專 webhook 送到 chatwoot.aware-wave.com/bot，不是本系統；同一個 App 每種物件只能有一個回呼網址，改掉會讓 Chatwoot 收不到私訊。兩個粉專權杖都沒有 leads_retrieval（AwareWave 也沒有 pages_manage_metadata）。要決定：名單事件用另一個 Meta App，或由本系統收全部事件再轉給 Chatwoot。程式與測試已完成（27a93dbcc，0154 已套）。'),
     ] },
   { n: 16, code: 'C9', group: 'G', title: '舊欄位退場', plain: '例：舊名單還是用那一格觀察。回填成證據列後，產信與評分只看證據，舊欄位不再寫入。', waitFor: '等 100 個名單走過研究流程',
     gate: '每個有舊觀察的名單都有一列證據。產信與評分不再讀舊欄位。欄位保留。', risk: 'Medium', model: 'Codex', status: 'done', commit: C9, depends: ['C3'],
