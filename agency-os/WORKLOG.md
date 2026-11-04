@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-04（續19）外聯：名單搜尋接續（游標，migration 0160）＋C16.2 修法（產信只寫證據、核准投票兩次）
+
+- 根因（操作者問「同條件再搜會不會重複付費」）：找名單／經濟部／找人都從第 1 頁搜（`discover.ts:116`、`sources/gcis.ts:169`、`sources/people-search.ts:105`）→ 同條件再搜＝同一批付費、只標 suspected_dup。
+- 修：0160 `co_search_cursors`（org、source、search_key JSON → next_state jsonb，null＝搜完）；`NA/lib/outreach/search-cursor.ts`；各來源自定接續點：places {page, skip}、GCIS {skip}（取代 listTruncated）、people {每個查詢的 pos}；半頁重抓並跳過已取（多 1 credit、不漏）。route：搜完＝不花錢回 `search.exhausted`；`restart:true` 從頭；游標在 inbox insert 成功後才前進；游標寫失敗仍回成功＋`saved:false`＋log。Inbox 頁顯示「還有更多／已搜完」＋「從頭再搜」。
+- C16.2（0.89，edae2ac84）：不一致來自對收件人的推測句 → 產信規則只寫證據原文說的事（`brand-context.ts` 證據段）；自動核准用 `checkClaimsTwice`（兩次都 supported）；一致率工具仍量單次對單次（投票會把翻轉藏成穩定的 unsupported）。
+- Codex（`agency-os/reports/oracle/2026-11-04-partialreview-c31b862e.md`）5 項：F1 逾時＋F2 投票掩蓋翻轉 → 報告量單次；F3 `|` 撞鍵 → JSON 鍵（DB check ≤1000）；F4 insert 後游標寫失敗 → 不誤報失敗；F5 兩分頁同時同條件會重複匯入＝既有競態，未修（剩餘風險）。
+- 部署：migration 0160 套正式庫（ledger 有列）→ sg-deploy b7598e8cc smoke all OK。
+- 真測：「室內設計／台北市」連搜兩次 → 第 2 次 19 新＋1 重複（改前＝20 全重複）；游標 `{"page":5,"skip":0} runs=2`。另 8 條件第二次各 15–20 新。C16.2 第二次量測交 SDK worker（289 筆名單，`brief-c162b.md`）。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=browser fetch POST /api/outreach/inbox discover 室內設計/台北市 x2 + psql co_search_cursors | exit=0 | ms=20000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/1n
+  - external oracle = Codex CLI（agency-os/reports/oracle/2026-11-04-partialreview-c31b862e.md）；F1–F4 已修，F5 列剩餘風險
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=listTruncated|discoverPlaces|discoverCompanies|searchPeople|checkClaimsTwice | hits=12
 ## 2026-11-04（續18）編輯器整合 CARD-04 外觀／物件效果聯集＋操作者四點修正（符合畫布、面板排序收合、刪操作說明）
 
 - CARD-04（SDK worker cc.py session 40db9c88，US$2.56，42 turns，卡 `agency-os/handoffs/2026-11-04-editor-merge/CARD-04-object-effects.md`）：兩邊同一個「🎨 外觀 / 物件效果」= 填色／無填色／吸色／色票、描邊色＋寬＋虛線、圓角、不透明度＋混合模式、2/3 色漸層（線性/放射＋角度）、效果（陰影/光暈＋顏色/模糊/位移）、翻轉、遮罩（圓/圓角/無）、未選＝下一個物件預設、選取回填。刪掉 canvas 舊物件效果面板與 vector `obj-fx` 積木；`sidebar-sections.ts` 14→13 積木；`lib/content/blocks/README.md` 刪 obj-fx 列。CARD-05（調色）、CARD-06（去背）卡已寫好待派。
