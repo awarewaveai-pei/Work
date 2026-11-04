@@ -74,8 +74,9 @@
   .badge { font-size:11px; color:var(--text-muted); }
   hr { border:none; border-top:1px solid var(--card-border); margin:14px 10px; }
   .busy { color:var(--accent); }
-  .layers { margin-top:8px; max-height:200px; overflow:auto; }
-  .lyr { display:flex; align-items:center; gap:6px; padding:5px 6px; border-radius:6px; font-size:12px; cursor:pointer; border:1px solid var(--card-border); margin-bottom:4px; }
+  .layers { position:relative; margin-top:8px; max-height:200px; overflow:auto; }
+  .lyr .nm.dim { opacity:.45; }
+  .lyr { display:flex; align-items:center; gap:3px; padding:5px 6px; border-radius:6px; font-size:12px; cursor:pointer; border:1px solid var(--card-border); margin-bottom:4px; }
   .lyr:hover { background:var(--accent-light); }
   .lyr.sel { border-color:var(--accent); background:var(--accent-light); }
   .lyr .nm { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -323,6 +324,10 @@
     </details>
 
     <details open><summary>6. 圖層</summary>
+      <div class="row" style="margin-top:8px;">
+        <button class="ghost" id="lyr-group" title="群組選取的多個物件 (Ctrl+G)">⊞ 群組</button>
+        <button class="ghost" id="lyr-ungroup" title="解散選取的群組 (Ctrl+Shift+G)">⊟ 解散</button>
+      </div>
       <div class="layers" id="layers"></div>
     </details>
 
@@ -368,6 +373,13 @@ const DEFAULT_FONT='"Microsoft JhengHei", system-ui, sans-serif';
 let nextText = { font:DEFAULT_FONT, size:48, fill:'#111111', bold:false, italic:false, underline:false, align:'left', charSpacing:0, lineHeight:1.16, arc:false };
 
 const canvas = new fabric.Canvas('c', { backgroundColor:'#ffffff', preserveObjectStacking:true });
+// Layer name + lock state ride in every toObject() (snapshot/undo, saveProj, clone/copy-paste) -- Fabric 5 drops unknown props otherwise.
+// Group/Text/Path toObject all reach this via callSuper, so one prototype wrap covers every object type.
+const LAYER_PROPS=['name','lockMovementX','lockMovementY','lockScalingX','lockScalingY','lockRotation','hasControls'];
+const _objToObject=fabric.Object.prototype.toObject;
+fabric.Object.prototype.toObject=function(extra){ return _objToObject.call(this, LAYER_PROPS.concat(extra||[])); };
+// 🔒 invariant: every programmatic move/scale (arrow keys, 座標面板, 對齊, 分布, 符合畫布) skips locked objects, same as mouse drag (Codex 2e307b0a F1)
+function isLocked(o){ return !!(o && (o.lockMovementX || (o.type==='activeSelection' && (o._objects||[]).some(isLocked)))); }
 
 function toPx(val, unit, dpi){ if(unit==='px') return Math.round(val); const cm = unit==='mm'? val/10 : val; return Math.round(cm*dpi/2.54); }
 function toCm(val, unit, dpi){ return unit==='px' ? +(val*2.54/dpi).toFixed(2) : unit==='mm' ? val/10 : val; }
@@ -404,8 +416,10 @@ function snapshot(){
   if(history.length>60) history.shift();
   hi=history.length-1;
 }
-function undo(){ if(hi<=0) return; locked=true; hi--; canvas.loadFromJSON(history[hi], ()=>{ canvas.requestRenderAll(); locked=false; renderLayers(); }); }
-function redo(){ if(hi>=history.length-1) return; locked=true; hi++; canvas.loadFromJSON(history[hi], ()=>{ canvas.requestRenderAll(); locked=false; renderLayers(); }); }
+// loadFromJSON fires object:added per object; scheduleSync's 16ms timer would then snapshot the restored state as a NEW entry (truncating redo, making undo need two presses) -- drop it
+function restoreDone(){ canvas.requestRenderAll(); locked=false; clearTimeout(_syncTimer); _syncTimer=null; renderLayers(); }
+function undo(){ if(hi<=0) return; locked=true; hi--; canvas.loadFromJSON(history[hi], restoreDone); }
+function redo(){ if(hi>=history.length-1) return; locked=true; hi++; canvas.loadFromJSON(history[hi], restoreDone); }
 
 // ====== 加入物件通用 ======
 function place(obj, center){
@@ -557,7 +571,7 @@ document.querySelectorAll('[data-align]').forEach(b=> b.onclick=()=>{
     const rs=objs.map(o=>o.getBoundingRect(true,true));
     const L=Math.min(...rs.map(r=>r.left)), R=Math.max(...rs.map(r=>r.left+r.width));
     const T=Math.min(...rs.map(r=>r.top)),  B=Math.max(...rs.map(r=>r.top+r.height));
-    objs.forEach((o,i)=>{ const r=rs[i];
+    objs.forEach((o,i)=>{ const r=rs[i]; if(isLocked(o)) return;
       if(k==='left') o.left+=L-r.left;
       else if(k==='right') o.left+=R-(r.left+r.width);
       else if(k==='cx') o.left+=(L+R)/2-(r.left+r.width/2);
@@ -570,7 +584,7 @@ document.querySelectorAll('[data-align]').forEach(b=> b.onclick=()=>{
     reselect(objs); canvas.requestRenderAll(); snapshot(); return;
   }
   // 對畫布（單選或 mode=canvas）
-  const a=canvas.getActiveObject(), w=a.getScaledWidth(), h=a.getScaledHeight();
+  const a=canvas.getActiveObject(); if(isLocked(a)) return; const w=a.getScaledWidth(), h=a.getScaledHeight();
   if(k==='left') a.set('left',0);
   else if(k==='right') a.set('left',realW-w);
   else if(k==='cx') a.set('left',(realW-w)/2);
@@ -590,23 +604,33 @@ document.querySelectorAll('[data-dist]').forEach(b=> b.onclick=()=>{
   if(axis==='h'){
     arr.sort((a,c)=>(a.r.left+a.r.width/2)-(c.r.left+c.r.width/2));
     const f=arr[0].r.left+arr[0].r.width/2, l=arr[arr.length-1].r.left+arr[arr.length-1].r.width/2, step=(l-f)/(arr.length-1);
-    arr.forEach((x,i)=>{ if(i===0||i===arr.length-1) return; x.o.left+=(f+step*i)-(x.r.left+x.r.width/2); x.o.setCoords(); });
+    arr.forEach((x,i)=>{ if(i===0||i===arr.length-1||isLocked(x.o)) return; x.o.left+=(f+step*i)-(x.r.left+x.r.width/2); x.o.setCoords(); });
   } else {
     arr.sort((a,c)=>(a.r.top+a.r.height/2)-(c.r.top+c.r.height/2));
     const f=arr[0].r.top+arr[0].r.height/2, l=arr[arr.length-1].r.top+arr[arr.length-1].r.height/2, step=(l-f)/(arr.length-1);
-    arr.forEach((x,i)=>{ if(i===0||i===arr.length-1) return; x.o.top+=(f+step*i)-(x.r.top+x.r.height/2); x.o.setCoords(); });
+    arr.forEach((x,i)=>{ if(i===0||i===arr.length-1||isLocked(x.o)) return; x.o.top+=(f+step*i)-(x.r.top+x.r.height/2); x.o.setCoords(); });
   }
   reselect(objs); canvas.requestRenderAll(); snapshot();
 });
 
 // ====== 排序 / 翻轉 / 群組 / 再製 / 刪除 ======
-document.getElementById('btn-front').onclick=()=>{ const o=canvas.getActiveObject(); if(o){ o.bringToFront(); canvas.requestRenderAll(); renderLayers(); } };
-document.getElementById('btn-back').onclick =()=>{ const o=canvas.getActiveObject(); if(o){ o.sendToBack(); canvas.requestRenderAll(); renderLayers(); } };
+// z-order: stack moves fire no canvas event, so they record their own undo step (only when the order really changed)
+function moveLayer(o, dir){
+  const before=canvas.getObjects().indexOf(o);
+  if(dir==='up') canvas.bringForward(o); else if(dir==='down') canvas.sendBackwards(o);
+  else if(dir==='front') canvas.bringToFront(o); else canvas.sendToBack(o);
+  canvas.requestRenderAll();
+  if(canvas.getObjects().indexOf(o)!==before) snapshot();
+  renderLayers();
+}
+document.getElementById('btn-front').onclick=()=>{ const o=canvas.getActiveObject(); if(o) moveLayer(o,'front'); };
+document.getElementById('btn-back').onclick =()=>{ const o=canvas.getActiveObject(); if(o) moveLayer(o,'back'); };
 document.getElementById('btn-flipx').onclick=()=> applyToSel(o=>o.set('flipX',!o.flipX));
 document.getElementById('btn-flipy').onclick=()=> applyToSel(o=>o.set('flipY',!o.flipY));
 document.getElementById('btn-del').onclick=()=>{ canvas.getActiveObjects().forEach(o=>canvas.remove(o)); canvas.discardActiveObject().requestRenderAll(); };
 document.getElementById('btn-dup').onclick=()=> duplicate();
-function duplicate(){ const o=canvas.getActiveObject(); if(!o) return; o.clone((c)=>{ c.set({left:o.left+20, top:o.top+20}); canvas.add(c); canvas.setActiveObject(c); canvas.requestRenderAll(); }); }
+function duplicateObj(o){ o.clone((c)=>{ c.set({left:o.left+20, top:o.top+20}); canvas.add(c); canvas.setActiveObject(c); canvas.requestRenderAll(); }); }
+function duplicate(){ const o=canvas.getActiveObject(); if(o) duplicateObj(o); }
 document.getElementById('btn-group').onclick=()=>{
   const a=canvas.getActiveObject(); if(!a||a.type!=='activeSelection') return;
   a.toGroup(); canvas.requestRenderAll(); renderLayers();
@@ -624,26 +648,66 @@ document.getElementById('btn-undo').onclick=undo;
 document.getElementById('btn-redo').onclick=redo;
 
 // ====== 圖層面板 ======
-function objName(o,i){ const m={rect:'矩形',circle:'圓',triangle:'三角',line:'線',polygon:'多邊形',polyline:'路徑','i-text':'文字',text:'文字',image:'圖片',group:'群組',path:'路徑'}; return (m[o.type]||o.type)+' '+(i+1); }
+// row label = custom name if set, else the type label (same scheme as /tools/canvas layerLabel)
+function objName(o){
+  if(o.name) return '🏷 '+String(o.name).slice(0,14);
+  const t=o.type;
+  if(t==='group') return '🗂 群組('+(o.getObjects?o.getObjects().length:0)+')';
+  if(isTextObj(o)) return '📝 '+String(o.text==null?'文字':o.text).slice(0,12);
+  if(t==='image') return '🖼 圖片';
+  if(t==='path') return o.globalCompositeOperation==='destination-out' ? '🧹 擦除' : '✏️ 筆畫';
+  const zh={ rect:'矩形', circle:'圓', triangle:'三角', line:'線', polygon:'多邊形', polyline:'折線' };
+  return '🔷 '+(zh[t]||t||'物件');
+}
+function renameLayer(o){
+  const next=prompt('圖層名稱', o.name||'');
+  if(next===null) return;
+  o.set('name', next.trim()||undefined); snapshot(); renderLayers();
+}
+function toggleLayerVisible(o){ o.set('visible', o.visible===false); canvas.requestRenderAll(); snapshot(); renderLayers(); }
+// 🔒 = move/scale/rotate frozen but still selectable (same as /tools/canvas), so the row can unlock it again
+function toggleLayerLock(o){
+  const lock=!o.lockMovementX;
+  o.set({ lockMovementX:lock, lockMovementY:lock, lockScalingX:lock, lockScalingY:lock, lockRotation:lock, hasControls:!lock });
+  canvas.requestRenderAll(); snapshot(); renderLayers();
+}
+function deleteLayer(o){ if(canvas.getActiveObjects().includes(o)) canvas.discardActiveObject(); canvas.remove(o); canvas.requestRenderAll(); }
 function renderLayers(){
-  const box=document.getElementById('layers'); box.innerHTML='';
+  const box=document.getElementById('layers'); const keepTop=box.scrollTop; box.innerHTML='';
   const objs=canvas.getObjects(); const active=canvas.getActiveObjects();
+  const ao=canvas.getActiveObject();
+  document.getElementById('lyr-group').disabled = !(ao && ao.type==='activeSelection');
+  document.getElementById('lyr-ungroup').disabled = !(ao && ao.type==='group');
   const CAP=200, end=Math.max(0, objs.length-CAP);
   if(objs.length>CAP){ const note=document.createElement('div'); note.className='info'; note.style.padding='4px 6px'; note.textContent='物件共 '+objs.length+' 個，僅列最上面 '+CAP+' 個（避免卡頓）'; box.appendChild(note); }
   for(let i=objs.length-1;i>=end;i--){
     const o=objs[i];
     const row=document.createElement('div');
-    row.className='lyr'+(active.includes(o)?' sel':'');
-    const eye=document.createElement('button'); eye.className='ic'; eye.textContent=o.visible===false?'🚫':'👁';
-    eye.onclick=(e)=>{ e.stopPropagation(); o.visible=!(o.visible!==false); canvas.requestRenderAll(); renderLayers(); };
-    const lock=document.createElement('button'); lock.className='ic'; lock.textContent=o.selectable===false?'🔒':'🔓';
-    lock.onclick=(e)=>{ e.stopPropagation(); const L=o.selectable===false; o.selectable=L; o.evented=L; canvas.requestRenderAll(); renderLayers(); };
-    const nm=document.createElement('span'); nm.className='nm'; nm.textContent=objName(o,i);
-    row.append(eye,lock,nm);
-    row.onclick=()=>{ if(o.selectable!==false){ canvas.setActiveObject(o); canvas.requestRenderAll(); } };
+    const hidden=o.visible===false;
+    row.className='lyr'+(active.includes(o)?' sel':''); row.dataset.hidden=hidden?'1':'0';
+    // icon button: title + action; stopPropagation so the row click (select) does not also fire
+    const ic=(txt,title,fn,color)=>{ const b=document.createElement('button'); b.className='ic'; b.textContent=txt; b.title=title; if(color) b.style.color=color; b.onclick=(e)=>{ e.stopPropagation(); fn(); }; return b; };
+    const nm=document.createElement('span'); nm.className='nm'+(hidden?' dim':''); nm.textContent=objName(o); nm.title='點選圖層（雙擊改名）';
+    row._o=o; // dblclick-rename is delegated on the list box: the first click of a double-click re-renders the rows
+    row.append(
+      ic(hidden?'🚫':'👁','顯示/隱藏',()=>toggleLayerVisible(o)),
+      ic(o.lockMovementX?'🔒':'🔓','鎖定/解鎖',()=>toggleLayerLock(o)),
+      nm,
+      ic('↑','上移',()=>moveLayer(o,'up')), ic('↓','下移',()=>moveLayer(o,'down')),
+      ic('⤒','移至最前',()=>moveLayer(o,'front')), ic('⤓','移至最後',()=>moveLayer(o,'back')),
+      ic('⧉','複製',()=>duplicateObj(o)), ic('🗑','刪除',()=>deleteLayer(o),'var(--red)'));
+    row.onclick=()=>{ canvas.setActiveObject(o); canvas.requestRenderAll(); };
     box.appendChild(row);
   }
+  // keep scroll position; if a selected row is out of view (selected on the canvas), scroll the list box (not the page) to it
+  box.scrollTop=keepTop;
+  const sr=box.querySelector('.lyr.sel');
+  if(sr){ if(sr.offsetTop<box.scrollTop) box.scrollTop=sr.offsetTop-4; else if(sr.offsetTop+sr.offsetHeight>box.scrollTop+box.clientHeight) box.scrollTop=sr.offsetTop+sr.offsetHeight-box.clientHeight+4; }
 }
+// first click re-renders the rows → the browser may fire dblclick on #layers (common ancestor); resolve the row under the pointer (Codex 2e307b0a F2)
+document.getElementById('layers').ondblclick=(e)=>{ const hit=document.elementFromPoint(e.clientX,e.clientY)||e.target; const nm=hit.closest&&hit.closest('.nm'); const row=nm&&nm.closest('.lyr'); if(row&&row._o) renameLayer(row._o); };
+document.getElementById('lyr-group').onclick=()=> document.getElementById('btn-group').click();
+document.getElementById('lyr-ungroup').onclick=()=> document.getElementById('btn-ungroup').click();
 
 // ====== 工具列切換 ======
 document.querySelectorAll('[data-tool]').forEach(b=> b.onclick=()=> setTool(b.dataset.tool));
@@ -750,7 +814,7 @@ window.addEventListener('keydown',(e)=>{
   else if(e.key==='Delete'||e.key==='Backspace'){ if(active){ e.preventDefault(); canvas.getActiveObjects().forEach(o=>canvas.remove(o)); canvas.discardActiveObject().requestRenderAll(); } }
   else if(e.key==='Escape'){ if(tool==='pen') finishPen(true); }
   else if(e.key==='Enter'){ if(tool==='pen') finishPen(false); }
-  else if(active&&['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){
+  else if(active&&!isLocked(active)&&['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){
     e.preventDefault(); const d=e.shiftKey?10:1;
     if(e.key==='ArrowUp') active.top-=d; if(e.key==='ArrowDown') active.top+=d;
     if(e.key==='ArrowLeft') active.left-=d; if(e.key==='ArrowRight') active.left+=d;
@@ -760,7 +824,7 @@ window.addEventListener('keydown',(e)=>{
 
 // ====== 事件掛載 ======
 document.getElementById('setCanvas').onclick=applyCanvas;
-function fitSel(mode){ const o=canvas.getActiveObject(); if(!o||!realW) return; o.setCoords(); const b0=o.getBoundingRect(true,true); const bw=b0.width||1, bh=b0.height||1; const s=mode==='fit'?Math.min(realW/bw,realH/bh):Math.max(realW/bw,realH/bh); o.scaleX=(o.scaleX||1)*s; o.scaleY=(o.scaleY||1)*s; o.setCoords(); const b=o.getBoundingRect(true,true); o.set({ left:o.left+(realW-b.width)/2-b.left, top:o.top+(realH-b.height)/2-b.top }); o.setCoords(); canvas.requestRenderAll(); snapshot(); }
+function fitSel(mode){ const o=canvas.getActiveObject(); if(!o||!realW||isLocked(o)) return; o.setCoords(); const b0=o.getBoundingRect(true,true); const bw=b0.width||1, bh=b0.height||1; const s=mode==='fit'?Math.min(realW/bw,realH/bh):Math.max(realW/bw,realH/bh); o.scaleX=(o.scaleX||1)*s; o.scaleY=(o.scaleY||1)*s; o.setCoords(); const b=o.getBoundingRect(true,true); o.set({ left:o.left+(realW-b.width)/2-b.left, top:o.top+(realH-b.height)/2-b.top }); o.setCoords(); canvas.requestRenderAll(); snapshot(); }
 document.getElementById('fitSel').onclick=()=>fitSel('fit');
 document.getElementById('fillSel').onclick=()=>fitSel('fill');
 // 防抖：批次操作（如解散 282 路徑群組）只在最後存檔/重繪一次，避免 O(N²) 卡死
@@ -973,6 +1037,7 @@ setTextToggles({ align:nextText.align });
 function applyTransform(){
   if(syncing) return;
   const o=canvas.getActiveObject(); if(!o) return;
+  if(isLocked(o)){ syncProps(); return; } // locked: put the fields back to the real values
   const tX=parseFloat(document.getElementById('posX').value), tY=parseFloat(document.getElementById('posY').value);
   const tW=parseFloat(document.getElementById('dimW').value), tH=parseFloat(document.getElementById('dimH').value);
   const lock=document.getElementById('lockAspect').checked;

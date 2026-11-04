@@ -124,6 +124,8 @@ export default function CanvasEditor() {
   const [noisev, setNoisev] = useState(0); // 雜訊 0..100
   const [temp, setTemp] = useState(0); // 色溫 -100(冷)..100(暖)
   const [layers, setLayers] = useState<FabricObject[]>([]); // 圖層面板 (top layer first)
+  const [selLayers, setSelLayers] = useState<FabricObject[]>([]); // objects currently selected on the canvas → highlighted rows
+  const layersListRef = useRef<HTMLDivElement | null>(null);
   // ↩️ Undo/Redo — JSON snapshots of the canvas.
   const undoStack = useRef<string[]>([]);
   const redoStack = useRef<string[]>([]);
@@ -245,13 +247,18 @@ export default function CanvasEditor() {
       // Persist our custom `name` (圖層改名) through toJSON/loadFromJSON + design save. Must be set
       // class-level BEFORE any object is created (Fabric v7 concatenates customProperties into
       // every toObject; per-instance assignment is ignored). Confirmed: fabricjs discussion #10176.
-      (fabric.FabricObject as unknown as { customProperties: string[] }).customProperties = ["name", "adj"];
+      // The lock* props + hasControls ride along so a layer 🔒 survives undo/redo and design save/load.
+      (fabric.FabricObject as unknown as { customProperties: string[] }).customProperties = [
+        "name", "adj", "lockMovementX", "lockMovementY", "lockScalingX", "lockScalingY", "lockRotation", "hasControls",
+      ];
 
       canvas = new fabric.Canvas(canvasElRef.current, {
         backgroundColor: "#ffffff",
         preserveObjectStacking: true,
       });
       fabricRef.current = canvas;
+      // dev-only e2e probe (tests/e2e/editor-merge): real canvas + fabric namespace; stripped from production builds
+      if (process.env.NODE_ENV !== "production") (window as unknown as { __cvTest?: unknown }).__cvTest = { canvas, fabric, undoStack: undoStack.current };
       // The artboard = the white canvas = the real export bounds. Give Fabric's wrapper a drop-shadow
       // + crisp border so it stands out from the grey checker workspace → the user sees exactly where
       // the usable area ends (Photoshop/Figma-style). setDimensions only touches size, not these.
@@ -315,6 +322,7 @@ export default function CanvasEditor() {
         setMultiSelected((o as { type?: string } | null)?.type === "activeselection");
         setGroupSelected((o as { type?: string } | null)?.type === "group");
         setLockSelected(!!(o as { lockMovementX?: boolean } | null)?.lockMovementX);
+        setSelLayers(canvas.getActiveObjects());
         const e = o as
           | { opacity?: number; globalCompositeOperation?: string; shadow?: unknown; stroke?: unknown; strokeWidth?: number }
           | null;
@@ -344,6 +352,7 @@ export default function CanvasEditor() {
         setMultiSelected(false);
         setGroupSelected(false);
         setLockSelected(false);
+        setSelLayers([]);
       });
       // 🗂 keep the layer panel in sync with the object stack.
       const onStack = () => {
@@ -707,20 +716,49 @@ export default function CanvasEditor() {
     const shown = (o as unknown as { visible?: boolean }).visible !== false;
     (o as unknown as { set: (p: Record<string, unknown>) => void }).set({ visible: !shown });
     c.requestRenderAll();
+    setSaveState("idle");
+    snapshot(); // set() fires no object:modified → record the undo step here
     refreshLayers();
-  }, [refreshLayers]);
-  const moveLayer = useCallback((o: FabricObject, dir: "up" | "down") => {
+  }, [refreshLayers, snapshot]);
+  const moveLayer = useCallback((o: FabricObject, dir: "up" | "down" | "front" | "back") => {
     const c = fabricRef.current as unknown as {
       bringObjectForward?: (o: FabricObject) => void;
       sendObjectBackwards?: (o: FabricObject) => void;
+      bringObjectToFront?: (o: FabricObject) => void;
+      sendObjectToBack?: (o: FabricObject) => void;
+      getObjects: () => FabricObject[];
       requestRenderAll: () => void;
     } | null;
     if (!c) return;
+    const before = c.getObjects().indexOf(o);
     if (dir === "up") c.bringObjectForward?.(o);
-    else c.sendObjectBackwards?.(o);
+    else if (dir === "down") c.sendObjectBackwards?.(o);
+    else if (dir === "front") c.bringObjectToFront?.(o);
+    else c.sendObjectToBack?.(o);
     c.requestRenderAll();
+    if (c.getObjects().indexOf(o) !== before) { setSaveState("idle"); snapshot(); } // stack change fires no event
     refreshLayers();
-  }, [refreshLayers]);
+  }, [refreshLayers, snapshot]);
+  // 🔒 per-layer lock: move/scale/rotate frozen, still selectable (so the row can unlock it again).
+  const toggleLayerLock = useCallback((o: FabricObject) => {
+    const c = fabricRef.current;
+    if (!c) return;
+    const lock = !(o as unknown as { lockMovementX?: boolean }).lockMovementX;
+    (o as unknown as { set: (p: Record<string, unknown>) => void }).set({
+      lockMovementX: lock,
+      lockMovementY: lock,
+      lockScalingX: lock,
+      lockScalingY: lock,
+      lockRotation: lock,
+      hasControls: !lock,
+      selectable: true,
+    });
+    if (c.getActiveObject() === o) setLockSelected(lock);
+    c.requestRenderAll();
+    setSaveState("idle");
+    snapshot();
+    refreshLayers();
+  }, [refreshLayers, snapshot]);
   const duplicateLayer = useCallback((o: FabricObject) => {
     const c = fabricRef.current;
     if (!c) return;
@@ -758,9 +796,9 @@ export default function CanvasEditor() {
     const custom = (o as unknown as { name?: string }).name;
     if (custom) return `🏷 ${custom.slice(0, 14)}`; // 改過名的圖層優先顯示名稱
     const t = (o as { type?: string }).type;
-    if (t === "group") return "🗂 群組";
+    if (t === "group") return `🗂 群組(${(o as unknown as { getObjects?: () => unknown[] }).getObjects?.().length ?? 0})`;
     if (t === "i-text" || t === "textbox" || t === "text") {
-      const s = String((o as { text?: string }).text ?? "文字").slice(0, 10);
+      const s = String((o as { text?: string }).text ?? "文字").slice(0, 12);
       return `📝 ${s}`;
     }
     if (t === "image") return "🖼 圖片";
@@ -768,7 +806,8 @@ export default function CanvasEditor() {
       // destination-out paths are eraser strokes (they erase whatever is below them).
       return (o as { globalCompositeOperation?: string }).globalCompositeOperation === "destination-out" ? "🧹 擦除" : "✏️ 筆畫";
     }
-    return `🔷 ${t ?? "物件"}`;
+    const zh: Record<string, string> = { rect: "矩形", circle: "圓", triangle: "三角", line: "線", polygon: "多邊形", polyline: "折線" };
+    return `🔷 ${zh[t ?? ""] ?? t ?? "物件"}`;
   }
 
   // 🖥 自動把畫布「顯示」縮放到塞進可用視窗（寬+高），實際輸出尺寸(canvasMetaRef.realW/H)不變 →
@@ -851,6 +890,7 @@ export default function CanvasEditor() {
       | (FabricObject & { type?: string; width?: number; height?: number; set: (p: Record<string, unknown>) => void })
       | null;
     if (!img || img.type !== "image") { setError("請先點選一張圖片"); return; }
+    if ((img as unknown as { lockMovementX?: boolean }).lockMovementX) { setError("圖層已鎖定，先解鎖再貼合畫布"); return; } // 🔒 programmatic moves honour the lock
     const m = canvasMetaRef.current;
     const z = canvas.getZoom() || 1;
     const aw = m ? m.realW : canvas.getWidth() / z; // artboard real width (px)
@@ -1138,26 +1178,9 @@ export default function CanvasEditor() {
   const toggleLock = useCallback(() => {
     const canvas = fabricRef.current;
     if (!canvas) return;
-    const o = canvas.getActiveObject() as
-      | (FabricObject & {
-          lockMovementX?: boolean;
-          set: (p: Record<string, unknown>) => void;
-        })
-      | null;
-    if (!o) return;
-    const lock = !o.lockMovementX;
-    o.set({
-      lockMovementX: lock,
-      lockMovementY: lock,
-      lockScalingX: lock,
-      lockScalingY: lock,
-      lockRotation: lock,
-      hasControls: !lock,
-      selectable: true,
-    });
-    setLockSelected(lock);
-    canvas.requestRenderAll();
-  }, []);
+    const o = canvas.getActiveObject();
+    if (o) toggleLayerLock(o);
+  }, [toggleLayerLock]);
 
   // 🔷 形狀積木 — add a basic shape (rect / circle / line) at canvas centre.
   const addShape = useCallback((kind: "rect" | "circle" | "line") => {
@@ -1773,6 +1796,15 @@ export default function CanvasEditor() {
     return () => window.removeEventListener("keydown", onKey);
   }, [ready, canUndo, canRedo, drawMode, inpaintMode, cropMode, anySelected, undo, redo, deleteSelected, cancelCrop, exitInpaint, applyDrawMode]);
 
+  // selecting on the canvas scrolls the first selected layer row into view (list box only, never the page)
+  useEffect(() => {
+    const box = layersListRef.current;
+    const row = box?.querySelector<HTMLElement>('[data-sel="1"]');
+    if (!box || !row) return;
+    if (row.offsetTop < box.scrollTop) box.scrollTop = row.offsetTop - 4;
+    else if (row.offsetTop + row.offsetHeight > box.scrollTop + box.clientHeight) box.scrollTop = row.offsetTop + row.offsetHeight - box.clientHeight + 4;
+  }, [selLayers, layers]);
+
   const canvasBusy = cropMode || inpaintMode;
   const objectToolsDisabled = !ready || canvasBusy || !anySelected;
   const imageToolsDisabled = !ready || canvasBusy || !imageSelected;
@@ -1964,21 +1996,31 @@ export default function CanvasEditor() {
           </div>
         </SidebarPanel>
 
-        {/* 🗂 圖層面板 — reorder / show-hide / duplicate / delete, top layer first. */}
+        {/* 🗂 圖層面板 — 群組/解散 on top; rows (top layer first): show-hide, lock, name, rename, step/front/back, duplicate, delete. */}
         {layers.length > 0 ? (
-          <SidebarPanel id="layers" title={`🗂 圖層（${layers.length}）`} defaultPos={{ x: 816, y: 244 }} width={240} defaultCollapsed>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 520, overflowY: "auto" }}>
+          <SidebarPanel id="layers" title={`🗂 圖層（${layers.length}）`} defaultPos={{ x: 816, y: 244 }} width={280} defaultCollapsed>
+            <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+              <button className="btn-secondary" style={{ flex: 1, fontSize: 12 }} disabled={!ready || canvasBusy || !multiSelected} onClick={groupSelection} title="群組選取的多個物件">🗂 群組</button>
+              <button className="btn-secondary" style={{ flex: 1, fontSize: 12 }} disabled={!ready || canvasBusy || !groupSelected} onClick={ungroupSelection} title="解散選取的群組">🗂 解散</button>
+            </div>
+            <div ref={layersListRef} style={{ position: "relative", display: "flex", flexDirection: "column", gap: 4, maxHeight: 520, overflowY: "auto" }}>
               {layers.map((o, i) => {
                 const vis = (o as unknown as { visible?: boolean }).visible !== false;
+                const locked = !!(o as unknown as { lockMovementX?: boolean }).lockMovementX;
+                const sel = selLayers.includes(o);
+                const ib = { background: "none", border: "none", cursor: "pointer", padding: 0 } as const;
                 return (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, border: "1px solid var(--card-border)", borderRadius: 4, padding: "3px 5px" }}>
-                    <button title="顯示/隱藏" onClick={() => toggleLayerVisible(o)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>{vis ? "👁" : "🚫"}</button>
+                  <div key={i} data-layer-row="1" data-sel={sel ? "1" : "0"} data-hidden={vis ? "0" : "1"} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, border: `1px solid ${sel ? "var(--accent)" : "var(--card-border)"}`, background: sel ? "var(--accent-light)" : undefined, borderRadius: 4, padding: "3px 5px" }}>
+                    <button title="顯示/隱藏" onClick={() => toggleLayerVisible(o)} style={ib}>{vis ? "👁" : "🚫"}</button>
+                    <button title="鎖定/解鎖" onClick={() => toggleLayerLock(o)} style={ib}>{locked ? "🔒" : "🔓"}</button>
                     <button onClick={() => selectLayer(o)} onDoubleClick={() => renameLayer(o)} title="點選圖層（雙擊改名）" style={{ flex: 1, textAlign: "left", background: "none", border: "none", cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", opacity: vis ? 1 : 0.45 }}>{layerLabel(o)}</button>
-                    <button title="改名" onClick={() => renameLayer(o)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>✏️</button>
-                    <button title="上移" onClick={() => moveLayer(o, "up")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>↑</button>
-                    <button title="下移" onClick={() => moveLayer(o, "down")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>↓</button>
-                    <button title="複製" onClick={() => duplicateLayer(o)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>⧉</button>
-                    <button title="刪除" onClick={() => deleteLayer(o)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "var(--red)" }}>🗑</button>
+                    <button title="改名" onClick={() => renameLayer(o)} style={ib}>✏️</button>
+                    <button title="上移" onClick={() => moveLayer(o, "up")} style={ib}>↑</button>
+                    <button title="下移" onClick={() => moveLayer(o, "down")} style={ib}>↓</button>
+                    <button title="移至最前" onClick={() => moveLayer(o, "front")} style={ib}>⤒</button>
+                    <button title="移至最後" onClick={() => moveLayer(o, "back")} style={ib}>⤓</button>
+                    <button title="複製" onClick={() => duplicateLayer(o)} style={ib}>⧉</button>
+                    <button title="刪除" onClick={() => deleteLayer(o)} style={{ ...ib, color: "var(--red)" }}>🗑</button>
                   </div>
                 );
               })}

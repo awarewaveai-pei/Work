@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-04（續15）編輯器整合 CARD-02：圖層面板聯集（Canvas Editor ⇄ Vector Editor）
+
+- SDK worker（cc.py session 0c7dc5b1，US$1.58，38 turns），卡 `agency-os/handoffs/2026-11-04-editor-merge/CARD-02-layers-panel.md`。
+- 兩邊圖層列 = 👁 顯示／🔒 鎖定（移動縮放旋轉凍結、仍可選取）／名稱（點＝選、雙擊＝改名）／↑↓／⤒⤓／⧉／🗑；標籤同一套（自訂名優先、群組(N)、文字前 12 字、形狀中文名）；畫布選取→列高亮＋清單內捲動；面板頂端 群組／解散（原入口保留）；隱藏列 opacity .45；每個列動作都記 undo。
+- canvas：`customProperties` 加 lock* + hasControls（undo／存讀保留鎖）、`toggleLayerLock` 共用給 更多工具 的鎖、`moveLayer` 加 front/back 且順序有變才 snapshot、dev-only `window.__cvTest`（NODE_ENV!=="production"）。vector：`fabric.Object.prototype.toObject` 包一層帶 name＋lock*、`restoreDone()` 清 `_syncTimer`（修既有 bug：undo 後 16ms 又快照一次 → 要按兩次、redo 被截斷）、鎖改成與 canvas 同語意（不再 selectable=false）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=worker：tsc 0；SRI 13/13；node tests/e2e/editor-merge/card-02-layers-panel.mjs → 147/147 checks（讀物件屬性與 stack 順序）；截圖 card-02-{canvas,vector}.png；主 session 讀完整 diff（CanvasEditor +79/−38、vector-editor.html +78/−17）＋截圖對照；修後重跑 card-02 e2e 對 3903 → 147/147；JS 探測：鎖定矩形按 →↓／對齊左／符合畫布 位置與 scale 全不變，dblclick 派在 #layers 上 → 圖層名稱 prompt 出現且改名成功 | exit=0 | ms=0
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n（agency-os/reports/oracle/2026-11-04-partialreview-2e307b0a.md）。F1 不變量＝「任何程式路徑移動／縮放都跳過被鎖物件」：vector `isLocked()` 擋 方向鍵／座標面板（擋下並 syncProps 還原欄位）／對齊單選＋多選／分布／符合畫布，canvas `fitImageToCanvas` 同擋。F2 雙擊未選取列：第一下重繪 → dblclick 落在 #layers → 改用 `elementFromPoint` 解析列。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=selectable===false\|o.bringToFront()\|o.sendToBack() | hits=0（舊鎖 selectable=false 與 v5 物件層 bringToFront/sendToBack 已全換掉）
 ## 2026-11-04（續14）編輯器整合 CARD-01：文字面板聯集（Canvas Editor ⇄ Vector Editor）＋ fc689bb27 已部署
 
 - 操作者：「你要去讀 codes，不是只有用看的，用 SDK 做」→ 第三項「共用面板整合成最完整版」改由 cc.py SDK worker 逐卡做（卡在 `agency-os/handoffs/2026-11-04-editor-merge/CARD-0N-*.md`，Decision／Files file:line／Union 清單／Constraints／Acceptance／Output block）。主 session 驗收 diff → Codex → commit。
