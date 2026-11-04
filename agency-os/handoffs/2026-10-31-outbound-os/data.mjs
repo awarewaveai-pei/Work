@@ -4,7 +4,7 @@
 
 export const META = {
   title: '外聯系統 v2 監工台',
-  updated: '2026-11-03',
+  updated: '2026-11-04',
   plan: 'agency-os/handoffs/2026-10-31-outbound-os/R0-PLAN.md',
   req: 'agency-os/docs/Outbound_OS_Engineering_Spec/Outbound_OS_Engineering_Spec.md',
   worklog: 'agency-os/WORKLOG.md 2026-10-31',
@@ -17,29 +17,29 @@ export const COPY = {
   sub: '冷信系統從「幫你把信寫出來」升級成「替你找到客戶」：AI 自己查對方並留下證據、信有主旨與署名、每封有兩個版本與追蹤信、多個次網域信箱輪流自動寄到一天 300 封、管線照政策自動前進而你只處理佇列與回信、回信自動進系統並停止後續、名單來自店家、公司登記與公開簡介、看得到回覆與成交。共 {total} 張卡、{items} 項工作，已完成 {itemsDone} 項。',
   updated: '更新於 {date}',
   nav: { now: '現況', steps: '卡片與工作', open: '待你決定', paths: '檔案' },
-  now: { h: '現況', lead: '目前已做到與還沒做到的事（2026-11-02 查）。' },
+  now: { h: '現況', lead: '目前已做到與還沒做到的事（2026-11-04 查）。' },
   steps: { h: '卡片與工作', lead: '依編號進行。每張卡列出所有工作，勾選代表完成。同一組的卡修改不同檔案，可以同時進行。High 風險步驟經你同意才執行。信箱池那張卡的採購（買網域、開信箱）從第 0 天就開始，不等前面的卡。', count: '{done}／{total} 完成' },
   open: { h: '待你決定', lead: '決定後，對應的卡才能開始。', none: '目前沒有需要你決定的事。', count: '{n} 項', before: '需在第 {n} 張卡開始前決定', src: '出處' },
   paths: { h: '檔案', plan: '每項工作的做法', req: '規則與契約', track: '工作紀錄', self: '本頁來源', howto: '修改 data.mjs 後，執行 node build.mjs 和 node check.mjs，再重新發布到同一個網址。' },
   label: { yes: '可以', no: '還不行', todo: '未開始', doing: '進行中', done: '已完成', risk: '風險', who: '負責', evidence: '完成的樣子', details: '工程細節', depends: '需先完成', none: '無', files: '檔案', card: '做法', doneAt: '完成於', decided: '決定', group: '可同時進行：' },
 };
 
-// 現在真的能不能用（2026-11-01 查）
+// 現在真的能不能用（2026-11-04 查；每列對照程式碼或正式站實測）
 export const NOW = [
   { what: '匯入名單、打分數、產冷信、人工審核、在 Gmail 建草稿。', state: 'yes', ev: '2026-10-14 在正式站建了 1 封繁中草稿，沒有寄出（WORKLOG 2026-10-14 續28）。' },
   { what: 'AI 自己去看對方的網站並留下有來源的證據。', state: 'yes', ev: '2026-11-01 C3：名單頁「研究這家」讀對方自家網站最多 15 頁，每條事實附來源網址與逐字原文；數字、星期、否定跟原文一致才自動核准，其餘待你看。正式庫對 soulfulexpression.org 實測 5 條。' },
   { what: '信有主旨、有署名、用到品牌定位。', state: 'yes', ev: '2026-11-01 C2：每封有主旨（≤25 字），以寄件信箱的署名結尾（程式附加，AI 不能改），定位、賣點、語氣進 prompt（brand-context.ts）。正式庫真產驗過。' },
   { what: '每封信有兩個版本可比、追蹤信有內容。', state: 'yes', ev: '2026-11-01 C2：一次產 A／B 兩版首封＋追蹤信（各有等幾天），審核頁並排；人核准一版另一版自動跳過。追蹤信「到期自動建草稿」在 C5。' },
-  { what: '一天寄得到 300 封而不傷主網域。', state: 'no', ev: '程式已備妥（2026-11-02 C11、C8）：信箱池、每日 DNS 檢查、暖機升階、輪流寄、自動寄、寄前付費驗證都上線。還差你買次網域、開信箱並連上（C11.1）；店家自己公開的地址免驗直接寄，其他地址用 Hunter／Reoon 免費額度驗證（11-03 已裝）。11-03 起先不買次網域：主信箱 awarewaveai 用草稿模式跑管線，系統每天自動研究、產信、建 Gmail 草稿（上限 20 封），你在佇列頁核准、在 Gmail 按寄出（規格 D26）。目前只有 1 個消費者 Gmail 信箱（草稿模式），Google 授權已發布並重連（C1.6 完成）。' },
-  { what: '研究、產信、建草稿不用你一筆一筆按。', state: 'no', ev: '三個動作都是按鈕觸發（ReviewClient.tsx:19-20）；300 封一天等於 600 次點擊。' },
-  { what: '對方回信會進系統，後續信自動停。', state: 'no', ev: 'Replies 頁是空殼；草稿只存 draft id，沒存對話串 id（gmail-draft/route.ts:186）。' },
+  { what: '一天寄得到 300 封而不傷主網域。', state: 'no', ev: '程式已備妥（2026-11-02 C11、C8）：信箱池、每日 DNS 檢查、暖機升階、輪流寄、自動寄、寄前付費驗證都上線。還差你買次網域、開信箱並連上（C11.1）；店家自己公開的地址免驗直接寄，其他地址用 Hunter／Reoon 免費額度驗證（11-03 已裝）。11-03 起先不買次網域：主信箱 awarewaveai 用草稿模式跑管線，系統每天自動研究、產信、建 Gmail 草稿（上限 20 封），你在佇列頁核准、在 Gmail 按寄出（規格 D26）。目前只有 1 個消費者 Gmail 信箱（草稿模式），Google 授權已發布並重連（C1.6 完成）。11-04 真測量產管線：20 筆名單 3 輪自動建出 17 封草稿；同時發現代理商的 Gemini 免費金鑰一次產十幾封就被限流（429），量要上去得換有額度的 AI 金鑰。' },
+  { what: '研究、產信、建草稿不用你一筆一筆按。', state: 'yes', ev: '2026-11-04 C15.4 正式站真測：種 20 筆名單、抽查模式，管線每 10 分鐘自己研究、產信、依政策核准、建 Gmail 草稿，沒有任何人工點擊就建出 17 封草稿，抽 2 封進佇列給你看（lib/outreach/pipeline.ts:127）。測完草稿與資料已刪。' },
+  { what: '對方回信會進系統，後續信自動停。', state: 'yes', ev: '2026-11-02 C4 真測：寄給你另一個信箱並回信，那一輪同步就收進回覆頁（分類「想多了解」），名單變已回覆、追蹤信全停。建草稿時存下草稿、訊息、對話串三個 id（lib/outreach/draft.ts:291）。' },
   { what: '輸入「找什麼＋地區」就自動找到一批店家放進名單。', state: 'yes', ev: '2026-11-01 C10：Inbox 頁「找名單」用 Serper 查地圖，一次最多 20 家（網站或社群頁、電話、地圖來源），沒網站也沒電話的不放；已在名單或收件匣裡的標成重複，同一家核准兩次只有一筆。每次最多約 NT$0.1。正式庫實測「瑜珈教室／台中市」兩次：第一次 20 家，第二次 17 家標重複。' },
   { what: '能從公司登記、徵才頁、公開簡介找到公司和人的 email。', state: 'yes', ev: '店家搜尋（C10）、人員搜尋與 email 推斷（C13，11-03 真查 Gogoro：Hunter 驗出 1 個有效 email）、公司登記（C12，11-03 真查餐館業／台中 99 家含負責人；零售、批發、餐飲以外的行業要寄經濟部告知書才查得到）都已上線。' },
   { what: '用 IG／FB 當網站的店也研究得到。', state: 'yes', ev: '2026-11-01 C17：研究會讀店家的 IG／FB 頁（Meta 官方 API → Google 摘要 → Apify），自介的事實可自動核准，貼文的等你看。正式庫實測 Coffee Here 的 IG 拿到 9 條證據；Apify 讀 Soulful 的 FB 粉專自動填入 info@soulfulexpression.org。' },
   { what: '找到店家後拿得到它的 email，寄之前知道對方網域收不收信。', state: 'yes', ev: '2026-11-01 C3：研究時從對方網站自動填 email（對方網域、mailto 或網站結構化資料裡的商家信箱），先查網域收不收信才填；別家的地址只列成候選給你看。實測自動填入 info@soulfulexpression.org。' },
-  { what: '暖名單同步到 FluentCRM。', state: 'no', ev: 'wp-bridge 沒有 contact 端點（RestController.php:42-105），只能建電子報草稿。' },
+  { what: '暖名單同步到 FluentCRM。', state: 'yes', ev: '2026-11-04 C6.4：wp-bridge 有建聯絡人端點（packages/wp-bridge-plugin/includes/Http/RestController.php:107），aware-wave.com 與 Soulful 的 FluentCRM 各真同步一次，測試資料已清。' },
   { what: '看得到回覆率、會議數、成交數。', state: 'yes', ev: '2026-11-02 C7：外聯首頁一張表，依服務、版本、切角列寄出、退信、回覆、正向、會議、成交、失去與回覆率，可下載 CSV；沒有開信率。切角要等 C16 產信時填入才分得開。' },
-  { what: 'Gmail 連線不會自己斷。', state: 'no', ev: '已經斷了：2026-11-01 對 Google 續期，回「已過期或被撤銷」（invalid_grant）。Google 專案仍在測試模式，授權每 7 天失效。你在 Google Cloud Console 按「發布應用程式」並在 Connectors 頁重連後才會恢復（C1.6）。' },
+  { what: 'Gmail 連線不會自己斷。', state: 'yes', ev: 'C1.6：Google 應用程式已發布、重連完成。2026-11-04 手動跑同步：Gmail 連線 1 個、錯誤 0；Connectors 頁顯示上次同步成功時間。' },
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
@@ -67,6 +67,7 @@ const C6_4 = '467a54e65';
 const C14_3 = '5729dda84';
 const C14_4 = 'a84b8e41a';
 const C9 = 'bc1b685c8';
+const C15_4 = 'b5aff2e51';
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '守衛與事實訂正', plain: '例：名單上某人剛退訂，系統仍替他建草稿。改成建草稿前重查拒收名單。同時把「scope 不能寄信」這句不對的說法改正，用測試守住程式不呼叫寄信；順便把 Google 授權改成正式發布、加上讀信權限，之後 6 個新信箱只要授權一次。',
@@ -182,7 +183,7 @@ export const STEPS = [
       done('C5.5', '11-03 正式站真測：測試名單（收件人你的 peijingartstudio）→ 管線研究、產信 → 核准 B 版 → 主信箱暫切自動寄，首封由自動寄送程式寄出 → 追蹤到期後管線把追蹤草稿建在同一串（threadId 相同）→ 再自動寄出，Gmail 同串 2 封、主旨帶 Re:。測完主信箱切回草稿模式、測試資料刪除。', C5),
     ] },
   { n: 10, code: 'C15', group: 'F', title: '量產管線：照政策自動前進', plain: '例：名單核准後，系統每 10 分鐘自動替它研究、產信、依政策核准、建草稿、寄出，每步都有上限；你每天只處理佇列裡抽到的信、有警告的信、第三方證據，還有回信。',
-    gate: '種 20 個有網站的名單，服務設成抽查模式，跑 3 個 tick，沒有任何人工點擊就出現至少 15 封已建草稿、2 封在佇列等你看。逐封模式的服務不會自動核准。暖名單永遠不會進管線。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['C5'],
+    gate: '種 20 個有網站的名單，服務設成抽查模式，跑 3 個 tick，沒有任何人工點擊就出現至少 15 封已建草稿、2 封在佇列等你看。逐封模式的服務不會自動核准。暖名單永遠不會進管線。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: C15_4, depends: ['C5'],
     decided: '300 封一天不可能一筆一筆按：證據來自對方自家網站的自動核准；每個服務先逐封核准 50 封，之後抽查 10%，檢查有警告的一律人工，被擋的永遠不寄；管線照這套政策自動前進。（規格 D23）',
     what: 'pipeline.ts runPipelineTick（研究→產信→政策核准→建草稿→追蹤到期，各步每 tick 上限）；佇列頁含鍵盤操作；每 org 每日管線預算；成效頁顯示每日數',
     files: ['NA/lib/outreach/pipeline.ts', 'NA/app/(shell)/tools/outreach/review/ReviewClient.tsx', 'NA/lib/outreach/gmail-sync.ts'],
@@ -190,7 +191,7 @@ export const STEPS = [
       done('C15.1', '管線 tick：每 10 分鐘把名單往前推一步——研究、產信、依政策核准（每名單只一版、主張有證據才過；追蹤信跟著首封一起核准）、建草稿、追蹤到期，每步有上限。只對有自動寄信箱的品牌動作。', C15),
       done('C15.2', '佇列頁：抽到的信、有警告的信、第三方證據集中在一頁，鍵盤核准或退回。', C15),
       done('C15.3', '每個品牌每天的研究與產信預算跟寄信目標掛鉤，超過等明天；費用有紀錄。', C15),
-      todo('C15.4', '測試已完成（96ecf614d）；剩：有自動寄信箱後，種 20 個名單跑 3 個 tick。'),
+      done('C15.4', '11-04 正式站真測（草稿模式主信箱，D26）：種 20 筆名單、抽查 10%，管線自己跑，17 封建成 Gmail 草稿、2 封抽進佇列、1 封事實核對擋下（信裡有證據沒有的事）。真測抓到兩個 bug 並修好：主旨長度把英文字母算一整字（20 封擋 13 封）、事實核對把問句與客套話當成對方的事實。測完草稿與資料全刪。', C15_4),
     ] },
   { n: 11, code: 'C7', group: 'E', title: '成效頁', plain: '例：外聯首頁一張表：每個品牌、每種切角、A 版 B 版各寄了幾封、幾封回、幾封正向、約到幾個會議、成交幾個；每個信箱的退信率與今日用量；每天研究、產信、寄出幾封。沒有開信率，因為那個數字不可信。',
     gate: '種 3 筆走到已回覆的名單，表上的數字正確。可下載 CSV。', risk: 'Low', model: 'Codex', status: 'done', commit: C8, depends: ['C4'],

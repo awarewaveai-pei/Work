@@ -1,4 +1,30 @@
 # Worklog
+## 2026-11-04（續11）外聯 C15.4 完成：量產管線正式站真測（草稿模式，D26）＋真測抓到的 3 個 bug＋Connectors 頁補齊
+
+**根因**（C15.4 REALTEST：awarewave-ops 種 20 筆 qualified 名單、sampled 10% profile、主信箱 auto_draft）：
+- C1 主旨長度以 code point 計：英文品牌名「Soulful Expression」佔 18，13/20 首封被 `lintSubject` 擋。改顯示寬度（英數空白半字、CJK 1 字，上限仍 25 全形；純中文不變）`NA/lib/outreach/cold-gate.ts:93-106`，prompt 同步 `brand-context.ts:136`。
+- C2 事實核對信任 nano 單字結論：把問句、寄件人自述、客套、署名當成對方事實（7/7 unsupported）。改成程式切句編號、模型逐句標 about＋證據編號、程式判（每句都要回且只回一次；recipient 句須引用存在的已核准證據 id）`NA/lib/outreach/claim-check.ts`。
+- C3 同一步驟仍失敗 → 換方法：模型改 gpt-5.4-mini（7c43e3d1f）；再把收件人名稱與網站給模型，只提對方名稱／網站不算陳述（b5aff2e51，`generate.ts autoDecision recipient`）。
+- m1 Connectors 頁只列該公司自己的 connector，runtime 卻會退回代理商（org null）金鑰（`generate.ts pickRef`、`mailbox-verify.ts:94 verifierKeys`）→ 頁面看起來缺資料。GET 加回代理商列（不含 vault 指標）＋主機內建服務有無設定，僅員工；每列標公司、Gmail 上次同步時間、新增清單補 Claude／OpenAI／Gemini 代理商、下拉改按鈕（a50a40340）。
+- m2 監工台 NOW 四列「還不行」早已過時（管線自動、回信同步、FluentCRM、Gmail 連線），操作者照它來問；改成實測證據。
+
+**結果**：最後一輪 17 封建成 Gmail 草稿、2 封抽進佇列、1 封事實核對擋下（信寫「Art Kits Shop、五階段療癒系統」，證據沒有＝擋得對）；全程無人工點擊。
+
+**發現（未修，非本卡）**：
+- aware-wave.com 首頁研究 0 條可用事實（research_insufficient），測試改用 soulfulexpression.org。
+- 代理商 Gemini 免費金鑰產十幾封就 429（`ai_unavailable:gemini_failed:gemini 429`）＋偶發 `no_ai_key`；量上去要換有額度的 AI 金鑰。已寫進監工台現況。
+
+**清理**：Gmail 17 封草稿刪除（list_drafts to:peijingartstudio → `{}`）；DB 刪 sending_events 17／messages 78／timeline 40／evidence 212／verified_emails 17／leads 20／profile 1，查 0 殘留。
+
+**部署**：a50a40340、7c43e3d1f、b5aff2e51 依序 sg-deploy（各 smoke all OK）；正式站 = b5aff2e51。監工台 73/78 → v37。
+
+**剩**：C11.1／C11.4／C8.5（D26 不買次網域）、C16.2／C16.4（寄滿 200 封／2 週）。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl -X POST http://127.0.0.1:3002/api/internal/outreach/gmail-sync (pipeline tick after b5aff2e51) | exit=0 | ms=40000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
+  - external oracle = Codex CLI（agency-os/reports/oracle/2026-11-04-partialreview-dac711a9.md）：客戶看得到代理商列、模型可漏句 → 都已修；突變：拔員工守衛 → 客戶測試紅 → 還原綠
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=parseClaimCheck|checkClaims|lintSubject|autoDecision | hits=7
+- ORACLE_WAIVED: 7c43e3d1f／b5aff2e51 只改模型常數與傳入收件人名稱，判定規則沒變；Codex 已審 a50a40340 的規則本體
 ## 2026-11-04（續10）/tools/vector-editor 外觀對齊 /tools/canvas：主題 tokens + 面板欄 + theme bridge
 
 - 緣由：操作者「把 vector-editor 的 style 改成和 canvas 相同」。根因：`public/vector-editor.html` 是獨立 iframe，自帶寫死深色調色盤（#0f1115／#1a1d24／#5b9dff）＋頂部工具列；DB 主題只畫在父 `<html style>`（app/layout.tsx:23），iframe 看不到；page.tsx 另加 canvas 沒有的 `.topbar`。
