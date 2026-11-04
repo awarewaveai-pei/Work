@@ -1,0 +1,118 @@
+{
+  "n": 200,
+  "agreed": 178,
+  "rate": 0.89,
+  "errors": 0,
+  "disagreements": [
+    {
+      "messageId": "5ca4fbb2-a124-4d88-99d2-ae8577aee64d",
+      "first": "supported",
+      "second": "unsupported"
+    },
+    {
+      "messageId": "0cd7b547-e28e-42c6-be71-e44bef0f8622",
+      "first": "supported",
+      "second": "unsupported"
+    },
+    {
+      "messageId": "65a97014-b9a4-4d6e-9874-e1a7c9712713",
+      "first": "supported",
+      "second": "unsupported"
+    },
+    {
+      "messageId": "fc1ed124-2b8b-4dcd-a016-d910155d266d",
+      "first": "supported",
+      "second": "unsupported"
+    },
+    {
+      "messageId": "09f87c8e-915f-44af-8aa8-c44851e67cc3",
+      "first": "supported",
+      "second": "unsupported"
+    },
+    {
+      "messageId": "38704dbd-a2ba-4eb5-a705-dc485e64f999",
+      "first": "unsupported",
+      "second": "supported"
+    },
+    {
+      "messageId": "d025ff94-03bc-4f3f-bebe-0ff6746bd63c",
+      "first": "supported",
+      "second": "unsupported"
+    },
+    {
+      "messageId": "bc4a6c8d-dc09-4669-b59f-3f3a0a9c7fc2",
+      "first": "supported",
+      "second": "unsupported"
+    },
+    {
+      "messageId": "19ab07d8-1b8b-46a1-9cbe-e6dbcccfcfe2",
+      "first": "unsupported",
+      "second": "supported"
+    },
+    {
+      "messageId": "7821cab9-f511-4495-ba2f-256d70e68604",
+      "first": "supported",
+      "second": "unsupported"
+    },
+    {
+      "messageId": "aaf73ea7-cec1-4fcc-be7f-4666e185b559",
+      "first": "unsupported",
+      "second": "supported"
+    },
+    {
+      "messageId": "5fc875c3-7e77-42fd-920a-d9ec365c6c30",
+      "first": "supported",
+      "second": "unsupported"
+    },
+    {
+      "messageId": "7198928f-da10-4025-a7b4-ecc3f25bc23e",
+      "first": "supported",
+      "second": "unsupported"
+    },
+    {
+      "messageId": "cfee9771-ee96-4c61-9947-0bc6214d84c5",
+      "first": "supported",
+      "second": "unsupported"
+    },
+    {
+      "messageId": "73d78dcb-8cd3-4036-9f80-34760ddd9a95",
+      "first": "unsupported",
+      "second": "supported"
+    },
+    {
+      "messageId": "6a380aee-34aa-4c11-b21f-06517f8383e1",
+      "first": "unsupported",
+      "second": "supported"
+    },
+    {
+      "messageId": "ba036f80-630a-47dc-830d-ee71982d8624",
+      "first": "unsupported",
+      "second": "supported"
+    },
+    {
+      "messageId": "98674aa3-dd1d-42a2-8b62-31ed23074156",
+      "first": "supported",
+      "second": "unsupported"
+    },
+    {
+      "messageId": "04453212-f4d6-4c8c-b985-24aee55fc0c0",
+      "first": "unsupported",
+      "second": "supported"
+    },
+    {
+      "messageId": "98873823-a48f-4d09-ab72-805b9178d95e",
+      "first": "unsupported",
+      "second": "supported"
+    },
+    {
+      "messageId": "2797bad9-aa1a-4978-8c64-0b0d0325a223",
+      "first": "unsupported",
+      "second": "supported"
+    },
+    {
+      "messageId": "c8ff2e68-861e-44bc-97ca-8af26443369c",
+      "first": "unsupported",
+      "second": "supported"
+    }
+  ]
+}

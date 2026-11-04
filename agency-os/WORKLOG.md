@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-04（續17）外聯 C16.2 事實核對一致率：0.89 < 0.95，門檻未過
+
+- 結果：n=200、agreed=178、rate=0.89、errors=0；22 筆不一致（supported→unsupported 12、unsupported→supported 10）。報告 `agency-os/reports/outreach/c16-2-claim-consistency-2026-11-04.json`。C16.2 維持 todo，不調門檻、不改判定。
+- 樣本：337 筆測試名單（peijingartstudio+c162-NNN）；研究 `daily_budget`（limit 20→200×1.5=300）當日用滿 300，研究後 149 家有首封（298 封 A/B），其餘 188 家（37 家未研究＋150 家 research_insufficient）無首封；管線被 `research:daily_budget` 擋到台北午夜，不再跑。核對 limit=200 只取其中 200 封。
+- 不一致抽 5 封（5ca4fbb2／0cd7b547／65a97014／fc1ed124／09f87c8e）讀 body 與 evidence：信文是對證據的概括／推論（「資訊量看起來不少」「預約與營業資訊」「至少三人組成的專業法律團隊」「持續刊登法普文章」），不是逐字事實；判定者對這類概括句兩次回答不同。非工具壞（errors=0）。方向：產信端少寫概括句、或核對端對概括句固定規則——需操作者決定，未動程式。
+- 清理（單一交易）：co_sending_events 0／co_replies 0／co_messages 596／co_timeline_events 601／co_evidence 2495／co_verified_emails 0／co_leads 337／profile c1620000 1／co_lead_inbox 時間窗 578；殘留查詢全 0；`co_sender_accounts.daily_limit` 讀回 20。manual 模式不建草稿。
+- 監工台 `node build.mjs && node check.mjs`：ok（17 cards、73 done、page fresh）；data.mjs／supervisor.html 無變動。
+- REALTEST_EVIDENCE: tool=curl | cmd=ssh ks-aw-01 POST /api/internal/outreach/claim-consistency limit=200 → n=200 agreed=178 rate=0.89；清理交易 COMMIT＋殘留 0 | exit=0 | ms=300000
+- REVIEW_WAIVED: NA -- 真測與清理，無程式改動
+- BUGHUNT_WAIVED: NA -- 無程式改動
 ## 2026-11-04（續16）編輯器整合 CARD-03：匯出／專案存讀聯集（Canvas Editor ⇄ Vector Editor）
 
 - SDK worker（cc.py session 503caa69，US$1.94，47 turns），卡 `agency-os/handoffs/2026-11-04-editor-merge/CARD-03-export-panel.md`。
