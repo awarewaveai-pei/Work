@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-04（續9）外聯 C14.4 完成：Soulful 名單廣告接通（另一家公司、自己的 App）
+
+- C1 Soulful 外聯資料庫：client_credentials 5 列指向已消失的 Supabase Cloud `mffjqjiidbeibilmxzef`（DNS NXDOMAIN）→ org-client.ts:97 resolveFromCredentialsLib 回該專案 → `fetch failed`。主庫 Soulful 外聯資料 0 列、vault 無 org:soulful-expression:*。處置：5 列備份 `/root/lobster-phase1/backups/client_credentials-soulful-supabase-20261104.sql`（600）後刪，vault 密鑰保留（還原＝插回 5 列）→ 走主庫（organization_id 分隔）。
+- C2 原 Soulful App 992677007160936 掛 15 個使用案例，部分需商家驗證（操作者無統編）且介面不能移除使用案例 → 另建 Soulful Lead Webhooks 1463806625712672（名單＋粉專，建立流程顯示「無要求」），原 App 保留全部功能；憑證檔 9.4d（用戶與粉專權杖 expires 0，含 pages_manage_metadata）。
+- 正式站：.env 換成 META_APP_SECRET_1463806625712672＋新粉專權杖（備份 .env.bak.meta-soulful2-*）；compose 經 safe-infra-patch（backup ...20261104-052742）；social_meta_assets 0b7e0b81 → soulful-expression。
+- REALTEST_EVIDENCE: tool=SSH | cmd=API 建測試名單 → nginx `05:29:40 POST /api/webhooks/meta 200 "Webhooks/1.0"`；wp eval-file soulful-wp contact 帶「來源：Meta 名單廣告／表單：系統測試表單2…」、lobster-wordpress 0；清理後 contacts 0、tags 0、co_leads 0 | exit=0 | ms=120000
+- REVIEW_WAIVED: NA -- 設定與憑證資料變更，程式改動已在 614e564a2 審過
+- BUGHUNT_WAIVED: NA -- 無程式改動（compose 變數改名，repo＝主機）
+- 舊 App 密鑰已失效（Graph 回 190），舊 App 未發佈、正式站已不用；其 webhook 設定待哪天用舊 App 再清。
 ## 2026-11-04（續8）Soulful 公開頁補 clickjacking 防護：X-Frame-Options + CSP frame-ancestors 走 soulful-proxy.inc
 
 - 緣由：操作者問「能被 iframe 是資安問題嗎」。實測 soulfulexpression.org 公開頁無任何 frame header（wp-login/wp-admin 有，WP 自送）；AW 全站 nginx 已送 XFO SAMEORIGIN。Soulful 有 WooCommerce 結帳＋Ultimate Member 登入 → clickjacking 風險真實。

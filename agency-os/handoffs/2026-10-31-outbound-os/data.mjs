@@ -65,6 +65,7 @@ const C16 = 'b0f5e4872';
 const C6REL = '8e7b353ea';
 const C6_4 = '467a54e65';
 const C14_3 = '5729dda84';
+const C14_4 = 'a84b8e41a';
 const C9 = 'bc1b685c8';
 
 export const STEPS = [
@@ -233,7 +234,7 @@ export const STEPS = [
       done('C6.4', '11-04 兩站真同步：aware-wave.com（bridge 重新接回，新金鑰）與 Soulful 各同步一筆測試聯絡人，各自只進自己網站的 FluentCRM、已訂閱、標籤 outreach-warm、沒寄任何信；測完兩站與 app 都刪乾淨。途中修好「同網域下的 staging 站被當成同一站」與「預設 bridge 被當成沒有」兩個問題（467a54e65）。', C6_4),
     ] },
   { n: 15, code: 'C14', group: 'G', title: '個人消費者：Meta 名單型廣告 → FluentCRM', waitFor: '等你在 Meta 廣告管理員建立第一個名單型廣告', plain: '例：你在廣告管理員圈「台灣、對塔羅有興趣」投名單型廣告，對方在 IG 上一鍵留 email。系統收到後存成暖名單並記下同意依據，自動進該品牌的 FluentCRM 培養。這些人永遠不會收到冷信。',
-    gate: '用 Meta 的名單廣告測試工具送一筆，10 秒內名單出現、帶同意依據，FluentCRM 也有這個聯絡人；同一筆重送不會重複。下載 CSV 匯入也走同一條路得到同樣結果。', risk: 'Medium（C14.3 外部設定）', model: 'Opus 5.5', status: 'in_progress', depends: ['C6'],
+    gate: '用 Meta 的名單廣告測試工具送一筆，10 秒內名單出現、帶同意依據，FluentCRM 也有這個聯絡人；同一筆重送不會重複。下載 CSV 匯入也走同一條路得到同樣結果。', risk: 'Medium（C14.3 外部設定）', model: 'Opus 5.5', status: 'done', commit: C14_4, depends: ['C6'],
     decided: '個人消費者不走冷信，讓他們自己留 email：Meta 名單型廣告由你在廣告管理員建立，系統只收名單、存同意、同步 FluentCRM。先做 CSV 匯入（不用 Meta 權限），再做自動接收；兩條路共用同一段程式。不買名單。（規格 D22）',
     what: 'warm-leads.ts captureWarmLead（upsert、consent、upsertContact、timeline；migration 0153 部分唯一索引）；Inbox CSV 匯入；meta-leads.ts 接既有 /api/webhooks/meta 的 leadgen 事件',
     files: ['NA/lib/outreach/warm-leads.ts', 'NA/lib/outreach/meta-leads.ts', 'NA/app/api/webhooks/meta/route.ts', 'DB/migrations/0153_meta_leads.sql'],
@@ -241,7 +242,7 @@ export const STEPS = [
       done('C14.1', '共用的「收暖名單」程式：存名單、存同意、取消這個人所有待寄的冷信、同步 FluentCRM；匯入廣告管理員下載的 CSV 就走它；重送同一筆不重複，但沒同步成功的會補。', C14),
       done('C14.2', '自動接收：Meta 送來的名單事件經既有的簽章驗證後，抓回資料、走同一段程式。', C14),
       done('C14.3', '11-04 Aware Wave 粉專接通：另開 Meta App「AwareWave App Webhooks」（Postiz App 留給 Chatwoot），長期粉專權杖、webhook 指到 app.aware-wave.com、粉專訂閱名單事件、App 已發佈。Meta 測試工具送一筆 → 02:37 Meta 打進來 200 → 存成暖名單 → aware-wave.com FluentCRM 出現聯絡人；同一人兩筆只留一列。測完 app、FluentCRM 都刪乾淨，測試表單已封存。', C14_3),
-      todo('C14.4', 'Soulful 粉專（另一家公司，自己一套）：粉專管理員是 Pei Huang 帳號，那個帳號登入後我把它加為這個 App 的管理員，你在 https://developers.facebook.com/tools/explorer 選 Soulful 粉專產生權杖、接受名單條款；其餘（長期權杖、正式站環境變數、登記到 soulful-expression、訂閱、測試）我做。另：要投真廣告前，aware-wave.com 隱私權政策加一段「名單型廣告」說明（草稿已給，等你點頭才改公開頁）。'),
+      done('C14.4', '11-04 Soulful 粉專接通，當另一家公司：Soulful 商家組合自己的精簡 App「Soulful Lead Webhooks」（只有名單＋粉專兩個使用案例，不需商家驗證就能發佈；原 Soulful App 保留全部功能）。webhook 改成一家公司一個 App 都能進（614e564a2）；Soulful 外聯資料庫原指向已消失的 Supabase Cloud，改走主資料庫。Meta 測試名單 05:29 真送達 → 只進 Soulful 的 FluentCRM，帶「來源／表單」標籤；測完都刪、表單封存。', C14_4),
     ] },
   { n: 16, code: 'C9', group: 'G', title: '舊欄位退場', plain: '例：舊名單還是用那一格觀察。回填成證據列後，產信與評分只看證據，舊欄位不再寫入。', waitFor: '等 100 個名單走過研究流程',
     gate: '每個有舊觀察的名單都有一列證據。產信與評分不再讀舊欄位。欄位保留。', risk: 'Medium', model: 'Codex', status: 'done', commit: C9, depends: ['C3'],

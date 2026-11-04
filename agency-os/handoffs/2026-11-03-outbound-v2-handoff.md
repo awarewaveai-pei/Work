@@ -26,7 +26,7 @@ hint: "外聯 v2 交接給另一個 Claude 帳號；取代 2026-11-02-1424-outbo
 ## 4. 剩下 8 項（data.mjs `todo`；11-03 完成 C13.4、C7.3、C12.3、C5.5、C9.1、C9.2）
 | 項 | 誰 | 怎麼做 |
 |---|---|---|
-| C14.3 | done（11-04） | Aware Wave 粉專接通：App 1107251218596741 已發佈（未發佈時測試工具永遠 Pending；Leads Access 未自訂＝不用指派）；Meta 02:37 POST 200 → 暖名單 → aware-wave.com FluentCRM；測試資料已清、表單 1465777858795184 封存。剩 C14.4 Soulful（Pei Huang 帳號）＋隱私政策名單段（待同意）＋建議重設 App Secret（曾出現在工具輸出）。 |
+| C14.3 | done（11-04） | Aware Wave 粉專接通：App 1107251218596741 已發佈（未發佈時測試工具永遠 Pending；Leads Access 未自訂＝不用指派）；Meta 02:37 POST 200 → 暖名單 → aware-wave.com FluentCRM；測試資料已清、表單 1465777858795184 封存。C14.4 Soulful done（a84b8e41a，App 1463806625712672，憑證檔 9.4d）。剩：aware-wave.com 隱私政策名單段（待同意）；兩把 App Secret 曾出現在工具輸出，想換時改 .env 一行。 |
 | C11.1／C11.4／C8.5／C15.4 | 延後（D26） | 買次網域＋Workspace 才做；C15.4 另需 sampled profile（同服務人工核准滿 50 封） |
 | C6.4 | 等真資料 | 每家公司各自網站（sync-fluentcrm route.ts:55）；哪家先有人回信就用那家真同步一次 |
 | C16.2／C16.4 | 等資料 | 寄滿 200 封／2 週 |
