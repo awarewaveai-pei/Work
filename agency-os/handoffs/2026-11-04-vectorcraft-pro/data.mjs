@@ -13,7 +13,7 @@ export const META = {
 };
 
 export const COPY = {
-  sub: '把開源的 VectorCraft（Illustrator 的完整重製，工具、面板、快捷鍵都一樣）放進 app.aware-wave.com 當「向量（專業版）」；現有的 QR、條碼、Mockup、批次匯出、AI 去背、My Designs 做成共用積木掛在旁邊；舊的向量編輯器留著當快速出稿。共 {total} 張卡、{items} 項工作，已完成 {itemsDone} 項。',
+  sub: '把開源的 VectorCraft（Illustrator 的完整重製，工具、面板、快捷鍵都一樣）放進 app.aware-wave.com 當「向量（專業版）」；AwareWave 獨有的十項（尺寸範本、Google Fonts 字型、調色、去背、WebP、My Designs、QR、條碼、Mockup、批次匯出）做成第二個 dock 欄，長得跟它的面板一樣；舊設計轉檔後舊編輯器退場，只留一套。共 {total} 張卡、{items} 項工作，已完成 {itemsDone} 項。',
   updated: '更新於 {date}',
   nav: { now: '現況', steps: '卡片與工作', open: '待你決定', paths: '檔案' },
   now: { h: '現況', lead: '目前已做到與還沒做到的事（2026-11-04 查）。' },
@@ -26,8 +26,8 @@ export const COPY = {
 export const NOW = [
   { what: '在 app.aware-wave.com 用 Illustrator 一樣的工具列、面板、快捷鍵畫向量。', state: 'no', ev: '真品原始碼讀完（2026-11-04）：工具 89/92、Pathfinder 全套、文字轉外框、多畫板都在 code 裡；網頁版有 iframe 用的 window.vectorcraft 介面（apps/vectorcraft-web/src/api.rs:1-17）。還沒建置、沒上線。' },
   { what: '介面與字型是繁體中文。', state: 'no', ev: '介面有 zh-hant（crates/ui-egui/src/i18n/zh-hant.tsv）；字型庫只有簡中 Noto Sans CJK SC，繁中 Noto Sans TC 要在 C1.2 自己加。' },
-  { what: 'QR、條碼、Mockup、批次匯出、AI 去背、存入 My Designs 在專業版裡也能用。', state: 'no', ev: '六個積木現在寫死在 public/vector-editor.html 內；C4 抽成共用模組、兩邊各一個轉接器。' },
-  { what: '舊的向量編輯器（快速出稿）照常可用。', state: 'yes', ev: 'CARD-01～05 已上線（0a24f4c29）；本計畫不改它的行為，只在 C4.1 把積木搬成模組後原樣載回。' },
+  { what: 'AwareWave 獨有的十項功能在專業版裡，長在 Illustrator 版面的第二個 dock 欄。', state: 'no', ev: '十項＝尺寸範本、Google Fonts 字型、調色、去背、WebP ≤200KB、My Designs、QR、條碼、Mockup、批次匯出（R0-PLAN §6 C4 對照表）；其餘功能真品原生都有。' },
+  { what: '舊的向量設計檔在專業版打得開，舊編輯器退場，只有一套。', state: 'no', ev: 'C7：舊 .design.json 批次匯出成 SVG 存回 My Designs，專業版開 SVG；轉完才拆舊頁。在那之前舊編輯器照常可用（0a24f4c29）。' },
   { what: '本機能建出網頁版。', state: 'no', ev: '本機沒有 rustup／cargo／trunk（2026-11-04 查）；C1.1 安裝。' },
 ];
 
@@ -38,12 +38,13 @@ export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '建置鏈（本機）', plain: '例：在這台筆電按一個指令，就從 VectorCraft 原始碼建出可放網站的檔案（含繁中字型），並在本機瀏覽器開起來確認。',
     gate: '一個指令建出 dist/<版本>/；本機開 index.html?lang=zh-hant 選單是繁中、能打繁中字、程式介面回得了資料。', risk: 'Low（只動本機與 scripts/）', model: 'Opus 5.5', status: 'not_started', depends: [],
     decided: '版本釘在固定 commit（PIN.json），升級要經 C6 流程。字型加 Noto Sans TC（開源 OFL）。',
-    what: 'rustup＋wasm32＋trunk；build.ps1：fetch 原始碼到 repo 外、套 web-fonts patch、加 TC 字型、trunk build、產 SHA256SUMS、預壓 .gz',
-    files: ['scripts/vectorcraft-pro/PIN.json', 'scripts/vectorcraft-pro/build.ps1', 'scripts/vectorcraft-pro/web-fonts.patch', 'scripts/vectorcraft-pro/README.md'],
+    what: 'rustup＋wasm32＋trunk；build.ps1：fetch 原始碼到 repo 外、套 web-fonts patch 與 api addFont patch、加 TC 字型、trunk build、產 SHA256SUMS、預壓 .gz；addFont 補丁同日開上游 PR',
+    files: ['scripts/vectorcraft-pro/PIN.json', 'scripts/vectorcraft-pro/build.ps1', 'scripts/vectorcraft-pro/web-fonts.patch', 'scripts/vectorcraft-pro/api-addfont.patch', 'scripts/vectorcraft-pro/README.md'],
     items: [
       todo('C1.1', '筆電裝 Rust 工具鏈與 trunk，前置需求寫進 README。'),
       todo('C1.2', '一個建置腳本：抓固定版本的原始碼、加繁中字型、建出網頁版、算校驗碼、預先壓縮。'),
       todo('C1.3', '本機開起來：繁中選單、能打繁中字、介面回得了資料，截圖存進 README。'),
+      todo('C1.4', '加一個「載入字型檔」的介面（約 15 行，補丁＋送回上游），讓字型面板能把 Google Fonts 字型塞進去。'),
     ] },
   { n: 2, code: 'C2', group: 'B', title: '承載（正式站靜態檔）', plain: '例：建好的檔案放到主機一個獨立資料夾，由 nginx 直接供給，不經 next-admin，也不會被每天的自動部署刪掉；換版本只是把 current 指向新資料夾。',
     gate: '瀏覽器開 /vector-pro/current/index.html 回 200；wasm 以 gzip 送出並標對型別；nginx 容器內看得到檔案。', risk: 'High（上傳正式站、改 nginx 與 compose；走 safe-infra-patch 自動還原）', model: 'Opus 5.5', status: 'not_started', depends: [], before: '待決 1',
@@ -66,16 +67,16 @@ export const STEPS = [
       todo('C3.3', '設計編輯器的側欄加「向量（專業版）」，登記與權限測試全綠。'),
       todo('C3.4', '正式站登入實開一次，介面回得了資料，截圖存紀錄。'),
     ] },
-  { n: 4, code: 'C4', group: 'D', title: '積木共用層（LEGO）', plain: '例：QR 積木只寫一份，放在舊編輯器會畫進 Fabric 畫布，放在專業版會送進 VectorCraft 畫布；以後新積木也只寫一份。',
-    gate: '六個積木搬成模組後，舊編輯器行為不變（既有 smoke 綠）；專業版右側工具箱列出同樣六個積木；兩邊積木清單相等有測試守著。', risk: 'Medium（動舊編輯器載入方式；行為不變）', model: 'Opus 5.5', status: 'not_started', depends: ['C3'],
-    decided: '積木契約六個方法（addSvg、grabDesign、info、busy、mm2px/px2mm、snapshot）寫成 30 行以內的 ctx-contract.md；兩個轉接器各一檔。',
-    what: 'blocks/<id>.js 六檔原樣搬；ctx-contract.md；ctx-vectorcraft.js（openFile／app.export／captureDownloads）；ctx-fabric.js 導出既有 ctx；vector-pro-toolbox.js 右側 310px；parity 測試＋契約測試',
-    files: ['NA/public/editor-shared/blocks/', 'NA/public/editor-shared/ctx-contract.md', 'NA/public/editor-shared/ctx-vectorcraft.js', 'NA/public/editor-shared/ctx-fabric.js', 'NA/public/vector-pro-toolbox.js', 'NA/lib/studio/__tests__/editor-blocks-parity.test.ts'],
+  { n: 4, code: 'C4', group: 'D', title: '第二 dock 欄：AwareWave 獨有的十個面板', plain: '例：畫面就是 Illustrator，右邊多一欄面板，顏色、分頁高度、收合方式都跟它的面板一樣；裡面是尺寸範本、字型、調色、去背、WebP、My Designs、QR、條碼、Mockup、批次匯出。真品本來就有的（描圖、弧形文字、裁切標記…）直接用它的。',
+    gate: '十個面板都在第二欄且外觀與真品面板一致（截圖並排）；調色與去背對一張選取的圖真的換圖且位置大小不變；字型面板搜到的 Google Fonts 能套到文字；測試守住十個面板清單與色值。', risk: 'Medium（新頁面；C4.3 換圖先做 spike，做不到就改契約）', model: 'Opus 5.5', status: 'not_started', depends: ['C3'],
+    decided: '不 fork 加 Rust 面板（面板要用網路與 HTML，egui 放不下；上游說 panel plugins 不在 v1）。調色與去背的數學仍是 CARD-05 與 CARD-06 的同一份模組，不複製。',
+    what: 'dock.js＋theme.css（色值抽自 theme.rs 四組；分頁 33、欄寬 310、圖示欄 38）；blocks/ 十檔；ctx-contract.md＋ctx-vectorcraft.js（placeSvg／placeImage／selectedImage／replaceImage／exportArtboard／addFont／saveAs）；dock 測試＋契約測試＋色值抽樣測試',
+    files: ['NA/public/vector-pro/dock.js', 'NA/public/vector-pro/theme.css', 'NA/public/editor-shared/blocks/', 'NA/public/editor-shared/ctx-contract.md', 'NA/public/editor-shared/ctx-vectorcraft.js', 'NA/lib/studio/__tests__/vector-pro-dock.test.ts'],
     items: [
-      todo('C4.1', '六個積木從舊編輯器搬成獨立模組，舊編輯器原樣載回，行為不變。'),
-      todo('C4.2', '寫下積木與編輯器之間的契約，做專業版與舊編輯器各一個轉接器。'),
-      todo('C4.3', '專業版右側工具箱，列出六個積木。'),
-      todo('C4.4', '測試：兩邊積木清單相等；專業版轉接器六個方法各一條。'),
+      todo('C4.1', '第二 dock 欄：與 Illustrator 畫面並排、同色同尺寸、可收成圖示欄。'),
+      todo('C4.2', '十個面板各一個模組；六個從舊編輯器原樣搬，調色與去背沿用同一份數學。'),
+      todo('C4.3', '面板與編輯器之間的契約與轉接器；先用一張圖驗證「換圖後位置大小不變」。'),
+      todo('C4.4', '測試：面板清單、轉接器每個方法、色值抽樣。'),
     ] },
   { n: 5, code: 'C5', group: 'E', title: '繁中與存檔', plain: '例：打開就是 Essentials Classic 工作區（上方有控制列）；打繁中字不缺字；按「存入 My Designs」在「我的設計」看得到，檔案可再開。',
     gate: '繁中字截圖無缺字；存入後「我的設計」有縮圖；下載回來的檔可在專業版再開。', risk: 'Low（只用既有 designs API，不改 schema）', model: 'Opus 5.5', status: 'not_started', depends: ['C4'],
@@ -88,13 +89,24 @@ export const STEPS = [
     ] },
   { n: 6, code: 'C6', group: 'F', title: '驗收、升級流程、文件', plain: '例：VectorCraft 出新版時，改一個版本號、跑建置、跑 smoke、上傳、切 current；壞了切回上一版。每天 smoke 會確認專業版還開得起來。',
     gate: 'playwright smoke 有這一條且綠；README 寫清升級與回退；RUNNABLE_DEMOS 有一條；WORKLOG 有機械證據。', risk: 'Low', model: 'fullstack-engineer（Sonnet）', status: 'not_started', depends: ['C5'],
-    what: 'e2e smoke（swiftshader）；README 升級段；RUNNABLE_DEMOS＋ADR_INDEX 一列；WORKLOG 四行；舊頁註解一行',
+    what: 'e2e smoke（swiftshader）；README 升級段；RUNNABLE_DEMOS＋ADR_INDEX 一列；WORKLOG 四行',
     files: ['INFRA/tests/e2e/', 'scripts/vectorcraft-pro/README.md', 'agency-os/docs/operations/RUNNABLE_DEMOS.md', 'agency-os/docs/architecture/decisions/ADR_INDEX.md'],
     items: [
       todo('C6.1', '自動 smoke：開專業版頁、介面回得了資料。'),
       todo('C6.2', 'README 寫升級與回退步驟，保留最近兩版。'),
       todo('C6.3', '登記可跑的示範與決策索引。'),
-      todo('C6.4', '工作紀錄四行證據；舊編輯器頁註明「快速出稿；專業版在 tools/vector-pro」。'),
+      todo('C6.4', '工作紀錄四行證據。'),
+    ] },
+  { n: 7, code: 'C7', group: 'G', title: '舊設計轉檔、舊編輯器退場', plain: '例：以前在舊編輯器存的設計，在專業版的 My Designs 面板一樣打得開；轉完之後 /tools/vector-editor 自動跳到專業版，舊頁面刪掉，只剩一套。',
+    gate: '舊設計轉檔數＝原數量；專業版開舊設計物件數與 SVG 一致；舊網址跳轉；舊頁、白名單、登記、相關測試都拆乾淨且全綠。', risk: 'Medium（刪舊頁；轉檔若要加欄位則 migration High）', model: 'Opus 5.5', status: 'not_started', depends: ['C6'],
+    decided: '不留兩扇門。點陣的 Canvas Editor 不受影響。',
+    what: 'convert-designs.mjs（playwright 用舊頁匯出 SVG 存回）；My Designs 面板開 SVG；vector-editor 頁改 redirect、刪 html、拆白名單與登記、改 e2e 與 drift 測試；文件與記憶',
+    files: ['scripts/vectorcraft-pro/convert-designs.mjs', 'NA/app/(shell)/tools/vector-editor/page.tsx', 'NA/middleware.ts', 'NA/public/vector-editor.html', 'NA/lib/portal/products.ts'],
+    items: [
+      todo('C7.1', '把舊設計批次匯出成 SVG 存回 My Designs，數量對得上。'),
+      todo('C7.2', '專業版的 My Designs 面板打得開舊設計。'),
+      todo('C7.3', '舊網址跳轉到專業版；刪舊頁與相關設定、測試改好。'),
+      todo('C7.4', '文件與記憶更新。'),
     ] },
 ];
 

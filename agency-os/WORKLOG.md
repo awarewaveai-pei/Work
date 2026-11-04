@@ -8,6 +8,7 @@
 - REALTEST_WAIVED: DOC_ONLY -- 本輪只有研究、計畫與監工台；`node check.mjs` ok: 6 cards, 22 items, 1 open。
 - REVIEW_WAIVED: DOC_ONLY -- 計畫待操作者拍板待決 1 後開卡；每卡各自 /codex-review。
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=vectorcraft-pro | hits=3（R0-PLAN、data.mjs、TASKS 新條目；舊檔無引用）
+- 操作者更正（「沒有真的做到三件事同時」）：獨有功能從 6 項重盤為 10 項（逐項對照表 R0-PLAN §6 C4）；積木改做第二 dock 欄（theme.rs／panel_docking.rs 的色值尺寸），不是旁邊黏一欄；新增 C1.4 addFont 補丁（`fonts.rs:71` 已有 `FontDb::add_font`）與 C7 舊設計轉 SVG 後舊編輯器退場，只留一套。check：7 cards, 27 items。
 ## 2026-11-04（續21）編輯器整合 CARD-06：去背面板聯集＋濾鏡單一擁有者（修 CARD-05 Codex F1–F3）
 
 - SDK worker（cc.py session 5d2f0abd，US$4.47，60 turns），卡 `agency-os/handoffs/2026-11-04-editor-merge/CARD-06-background-removal.md`（含「Filter ownership invariant」段）。

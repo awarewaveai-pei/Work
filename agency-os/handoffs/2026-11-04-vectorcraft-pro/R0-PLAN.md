@@ -39,7 +39,7 @@
 
 ## 5. 建議方案
 
-B。決策：靜態檔由 nginx 供給、版本目錄 `<rev7>/`＋`current` symlink；積木抽到 `NA/public/editor-shared/blocks/`，舊編輯器與專業版各用一個 ctx 轉接器；專業版頁在 design 門下 `tools/vector-pro`；舊 `tools/vector-editor` 保留。
+B。決策：靜態檔由 nginx 供給、版本目錄 `<rev7>/`＋`current` symlink；**只有一套編輯器**：Illustrator 的部分全是真品，我們獨有的 10 項做成第二 dock 欄（照真品面板尺寸與色值，Illustrator 本來就有多欄 dock），舊 `/tools/vector-editor` 在舊設計轉檔後退場（C7）；專業版頁在 design 門下 `tools/vector-pro`。不走 fork 加 Rust 面板：面板要用網路（Google Fonts、Replicate）與 HTML，egui 畫布放不下，且上游 `plugins.md` 明寫 panel plugins 不在 v1。
 
 ## 6. 實作計畫
 
@@ -50,6 +50,7 @@ B。決策：靜態檔由 nginx 供給、版本目錄 `<rev7>/`＋`current` syml
 | C1.1 | 本機裝 `rustup`（stable ≥ 1.95，`VC/Cargo.toml` rust-version）、`rustup target add wasm32-unknown-unknown`、`cargo install trunk`；寫入 `scripts/vectorcraft-pro/README.md` 前置需求段 |
 | C1.2 | 新檔 `scripts/vectorcraft-pro/PIN.json`（`{rev, craftFontsRev, notoSansTc:{url,sha256}}`）＋`scripts/vectorcraft-pro/build.ps1`：clone／fetch 到 `%LOCALAPPDATA%\awarewave\vectorcraft-src`（repo 外）；checkout `rev`；fonts 目錄 = craft-fonts checkout ＋ 下載 Noto Sans TC（OFL，校 sha256）追加 manifest 列；`web-fonts.txt` 追加 `startup | Noto Sans TC | Regular`（patch 檔 `scripts/vectorcraft-pro/web-fonts.patch`，`git apply --check` 失敗即停）；`trunk build --release`；輸出 `dist/<rev7>/`＋`NOTICE`＋`SHA256SUMS`；每個 `.wasm/.js/.otf` 預壓 `.gz` |
 | C1.3 | 本機 smoke：`python -m http.server` 供 `dist/<rev7>/`，內建瀏覽器開 `index.html?lang=zh-hant` → `await vectorcraft.request('ui.inspect')` 回 JSON、選單為繁中、打 3 個繁中字截圖；結果寫 README「驗證」段 |
+| C1.4 | 上游補丁 `scripts/vectorcraft-pro/api-addfont.patch`：`VC/apps/vectorcraft-web/src/api.rs:121-160` `install()` 加 `addFont(bytes: Uint8Array) → Promise<number>`（呼叫 `FontDb::global().add_font(bytes)`，同 `VC/apps/vectorcraft-web/src/fonts.rs:71`，回傳加入的 face 數並 `ctx.request_repaint()`）；`build.ps1` 以 `git apply --check` 套用；同一天對 storytold/vectorcraft 開 PR，合併後改 PIN 並刪補丁 |
 
 ### C2 承載（prod nginx 靜態）
 
@@ -69,21 +70,44 @@ B。決策：靜態檔由 nginx 供給、版本目錄 `<rev7>/`＋`current` syml
 | C3.3 | `NA/lib/portal/products.ts:73` design 門：`nav` 加 `{ path: "pro", name: "向量（專業版）", staff: "tools/vector-pro" }`，`staffPaths` 加 `tools/vector-pro`；`products.test`／`staff-tools.test`／`sidebar-coverage.test`／`npx tsc --noEmit` 綠 |
 | C3.4 | REALTEST：deploy 後登入開 `/tools/vector-pro`，`ui.inspect` 回 JSON（內建瀏覽器 javascript_tool），截圖存 WORKLOG |
 
-### C4 積木共用層（LEGO）
+### C4 第二 dock 欄：妳獨有的 10 個面板，照真品面板規格長在 Illustrator 版面裡
+
+功能逐項對照（`NA/public/vector-editor.html` 全部 11 個面板＋10 個積木）：
+
+| 我們的功能 | 真品有？ | 處置 |
+|---|---|---|
+| 畫布尺寸 cm/mm/DPI、符合／填滿畫布、底色、透明底 | 有（`file.new {width,height,units,bleed}`、`artboard.setProps`、`document.setUnits`、`app.export {background}`） | 真品原生 |
+| 範本庫（IG／FB／名片／海報尺寸預設） | 無 | **面板 1「尺寸範本」**：點一下 → `artboard.setProps`／`file.new` |
+| 圖片匯入、向量描圖（ImageTracer／VTracer 預設）、匯入 SVG | 有（Image Trace `imageTrace.make/expand`＋預設；`openFile` 置入） | 真品原生；VTracer 本機伺服器退場 |
+| Google Fonts 搜尋（中／英／全部）、上傳字型檔 | 無（web 版不讀系統字型；只有 `fonts/` 預載） | **面板 2「字型」**：搜尋／上傳 → fetch TTF → `vectorcraft.addFont(bytes)`（C1.4）→ 選取文字套 `type.setFont` |
+| B/I/U、字距、行距、對齊、弧形文字、文字沿路徑 | 有（Character／Paragraph、Type on Path 五種效果） | 真品原生 |
+| 填色／描邊／虛線／不透明／混合／漸層／陰影／光暈／遮罩／色票 | 有（Appearance、Effect › Stylize、Clipping Mask、Swatches） | 真品原生 |
+| 對齊／分布、座標 mm、圖層、智慧磁吸、路徑簡化、出血＋裁切標記 | 有 | 真品原生 |
+| 調色（CARD-05 `editor-shared/color-grade.js`：預設、HSL、模糊、自動） | 無同款（有 Adjust Colors 與 57 個 Photoshop 濾鏡，但不是這個面板） | **面板 3「調色」**：同一個 `color-grade.js`，對選取圖片離屏套 Fabric 5 濾鏡 → PNG → 換圖（§C4.3 換圖程序） |
+| 去背：色鍵（RemoveColor）、AI（Replicate `/api/tools/studio/remove-bg`） | 無 | **面板 4「去背」**：同 `editor-shared/bg-remove.js`，同換圖程序 |
+| 匯出 PDF 真實 cm、SVG、PNG DPI | 有（`app.export {format, ppi}`、PDF/X、出血、裁切標記） | 真品原生 |
+| WebP ≤200KB 自動壓 | 無（有 WebP，無上限迴圈） | **面板 5「匯出 WebP」**：`app.export {format:'webp', quality}` 迴圈＋`captureDownloads` 量大小 |
+| 存入 My Designs | 無 | **面板 6「My Designs」**：`file.saveAs .vectorcraft`＋PNG 預覽 → `/api/tools/designs` |
+| 儲存／讀取專案 `.design.json` | 有（`.vectorcraft`） | 真品原生；舊檔見 C7 |
+| QR Code（向量） | 無 | **面板 7「QR」**：SVG → `openFile` |
+| 條碼（Code128／EAN／UPC／Code39） | 無 | **面板 8「條碼」**：SVG → `openFile` |
+| 商品 Mockup 預覽（T 恤／帆布袋／馬克杯／手機殼／海報框） | 無 | **面板 9「Mockup」**：`app.export {format:'png', background:'transparent'}`（整個畫板）→ 畫商品 |
+| 批次多尺寸匯出（IG／FB／名片／海報） | 無（Export for Screens 是比例縮放，不是重排尺寸） | **面板 10「批次匯出」**：同上取 PNG → 各尺寸合成 |
+| 縮放／平移 | 有 | 真品原生 |
 
 | 卡號 | 做什麼 |
 |---|---|
-| C4.1 | 抽出：`NA/public/vector-editor.html` 內 `AB.registerBlock` 的 qr／barcode／batch-export／mockup／ai-bg／my-designs 六個積木搬到 `NA/public/editor-shared/blocks/<id>.js`（ES module，`export default { id, title, icon, mount(ctx, body) }`，程式碼原樣搬），`vector-editor.html` 改 `import` 後 `AB.registerBlock`；ctx 不變；既有 smoke 綠、`public-html-sri.test` 綠 |
-| C4.2 | 新檔 `NA/public/editor-shared/ctx-contract.md`（≤30 行）：ctx 必備方法 `addSvg(svg)`、`grabDesign()→Blob(PNG)`、`info(msg)`、`busy(on)`、`mm2px/px2mm`、`snapshot()`；新檔 `NA/public/editor-shared/ctx-vectorcraft.js`：用 `iframe.contentWindow.vectorcraft` 實作（`addSvg`→`openFile`；`grabDesign`→`execute('app.export',{format:'png'})`＋`captureDownloads`／`readFile`；`snapshot`→`execute('edit.undoMark')` 或無）；新檔 `ctx-fabric.js` 只是把現有 ctx 物件導出，不改邏輯 |
-| C4.3 | 新檔 `NA/public/vector-pro-toolbox.js`：右側 `<aside>`（寬 310，照真品 dock）列六個積木 `<details>`，`mount(ctx, body)`；`page.tsx` 載入它（iframe 同源） |
-| C4.4 | 測試 `NA/lib/studio/__tests__/editor-blocks-parity.test.ts`：兩個 host 載入的積木 id 集合相等；`ctx-vectorcraft.js` 對 mock `vectorcraft` 的契約測試（六個方法各一條） |
+| C4.1 | 版面：`page.tsx` 把 VectorCraft iframe 與 **第二 dock 欄** `NA/public/vector-pro/dock.js` 並排成一個全高容器（flex；iframe `flex:1`，dock 欄固定寬 310、可收成 38 的圖示欄，分頁高 33，內距 10，面板最小寬 220），色值從 `ui.inspect` 的 brightness 對應 `VC/crates/ui-egui/src/theme.rs:173-306` 四組 Modern tokens（app_bar／panel／tab_strip／input／border／text；accent `#f06a52`／`#d9472f`）寫成 `NA/public/vector-pro/theme.css` 的 CSS 變數；分頁列、圖示欄、» 收合鈕照 `VC/crates/ui-egui/src/panel_docking.rs:1208-1226` 的樣式；只有這一欄是我們的，其餘畫面全是真品 |
+| C4.2 | 面板模組：`NA/public/editor-shared/blocks/<id>.js` 十檔（templates、fonts、color-grade、bg-remove、webp、my-designs、qr、barcode、mockup、batch-export），每檔 `export default { id, title, icon, mount(ctx, body) }`；qr／barcode／mockup／batch-export／templates／my-designs 的程式碼從 `vector-editor.html` 原樣搬；color-grade／bg-remove 面板 DOM 從 `vector-editor.html:362-383` 搬，數學仍 `import` 同一個 `editor-shared/color-grade.js`／`bg-remove.js`（CARD-05／06 的 SSOT 不動，drift 測試照舊）；fonts 面板從 `vector-editor.html:216-258` 的字型清單搬 |
+| C4.3 | ctx 契約 `NA/public/editor-shared/ctx-contract.md`（≤30 行）：`placeSvg(svg)`、`placeImage(blob)`、`selectedImage()→{id, blob, transform}`、`replaceImage(id, blob)`（置入新圖 → 以 `document.node` 讀舊圖 transform 套到新圖 → 刪舊圖，一個 undo 步）、`exportArtboard({format, ppi, background, quality})→Blob`、`addFont(bytes)`、`saveAs()→Blob`、`info/busy`。實作 `NA/public/editor-shared/ctx-vectorcraft.js`（全部走 `iframe.contentWindow.vectorcraft`）。**C4.3 先做 spike**：`replaceImage` 用一張圖真測（位置、大小、旋轉不變）才繼續；做不到就改成「置入新圖並選取、舊圖隱藏」並寫進契約 |
+| C4.4 | 測試 `NA/lib/studio/__tests__/vector-pro-dock.test.ts`：十個面板 id 與 `dock.js` 清單相等；`ctx-vectorcraft.js` 對 mock `vectorcraft` 的契約測試（每個方法一條）；`theme.css` 四組色值與 `theme.rs` 抽樣相等（寫死在測試，升級 PIN 時重抽） |
 
 ### C5 繁中與存檔
 
 | 卡號 | 做什麼 |
 |---|---|
-| C5.1 | 預設工作區 Essentials Classic（control bar 開，`VC/crates/ui-egui/src/workspaces.rs:86`）：toolbox 載入後 `vectorcraft.request('ui.menu.invoke', {path:['Window','Workspace','Essentials Classic']})` 一次，之後尊重使用者偏好（`localStorage` 旗標） |
-| C5.2 | my-designs 積木（C4.1 搬來的）在 pro ctx 下：`captureDownloads(true)` → 使用者按「存入 My Designs」→ `execute('file.saveAs',{format:'vectorcraft'})`＋PNG 預覽 → POST `NA/app/api/tools/designs/route.ts`（既有欄位，原檔以 `attachments` 或既有 json 欄存；不改 schema，超限則拒並說明） |
+| C5.1 | 預設工作區 Essentials Classic（control bar 開，`VC/crates/ui-egui/src/workspaces.rs:86`）：dock 欄載入後 `vectorcraft.request('ui.menu.invoke', {path:['Window','Workspace','Essentials Classic']})` 一次，之後尊重使用者偏好（`localStorage` 旗標）；dock 欄色值跟著 `ui.inspect` 的 brightness |
+| C5.2 | 「My Designs」面板（C4.2）：`captureDownloads(true)` → 「存入 My Designs」→ `execute('file.saveAs',{format:'vectorcraft'})`＋`app.export png` 預覽 → POST `NA/app/api/tools/designs/route.ts`（既有欄位；不改 schema，超限則拒並說明） |
 | C5.3 | REALTEST：打繁中字、存入 My Designs、在「我的設計」看到縮圖、下載回 `.vectorcraft` 可再開 |
 
 ### C6 驗收、升級流程、文件
@@ -93,7 +117,16 @@ B。決策：靜態檔由 nginx 供給、版本目錄 `<rev7>/`＋`current` syml
 | C6.1 | `INFRA/tests/e2e/` 加 smoke：開 `/tools/vector-pro`（`--use-gl=angle --use-angle=swiftshader`）等 `window.vectorcraft`，`ui.inspect` 回 JSON；納入 `/playwright smoke` |
 | C6.2 | `scripts/vectorcraft-pro/README.md` 升級段：改 `PIN.json` → `build.ps1` → C1.3 smoke → rsync 新 `<rev7>/` → 切 `current` → C6.1 smoke → 失敗切回舊目錄；保留最近 2 版 |
 | C6.3 | `agency-os/docs/operations/RUNNABLE_DEMOS.md` 登記一條（開頁＋`ui.inspect`）；`agency-os/docs/architecture/decisions/ADR_INDEX.md` 加一列指向研究報告（不新開 ADR） |
-| C6.4 | WORKLOG：四行機械證據；`vector-editor/page.tsx` 註解一行「快速出稿門；專業版在 tools/vector-pro」 |
+| C6.4 | WORKLOG：四行機械證據 |
+
+### C7 舊設計轉檔與舊編輯器退場（一套，不留兩扇門）
+
+| 卡號 | 做什麼 |
+|---|---|
+| C7.1 | `scripts/vectorcraft-pro/convert-designs.mjs`：用 playwright 開舊 `/vector-editor.html` 逐一載入 My Designs 裡 `kind=vector` 的 `.design.json` → 既有「匯出 SVG（真實 cm）」→ 以同 id 存回 `designs` 的 `svg` 附件（不改 schema：用既有附件欄；沒有就加一個 nullable 欄的 migration 並記 High）；轉完數量＝原數量才算 |
+| C7.2 | `/tools/vector-pro` 的「My Designs」面板開舊設計時取 SVG → `openFile`；e2e：舊設計開得起來、物件數與 SVG 一致 |
+| C7.3 | `NA/app/(shell)/tools/vector-editor/page.tsx` 改 `redirect('/tools/vector-pro')`；`NA/middleware.ts:476` 白名單移除 `vector-editor.html`；`NA/public/vector-editor.html` 刪除；`products.ts` `staffPaths` 移除 `tools/vector-editor`；相關 e2e（card-01～06 取 vector frame 的）改成只跑 canvas；`editor-*-drift.test` 的 vector 端改指向 `blocks/color-grade.js`／`bg-remove.js` 面板；Canvas Editor（點陣）不動 |
+| C7.4 | 文件：RUNNABLE_DEMOS 舊條目改指專業版；記憶 `project_vector_editor_blocks.md` 更新；WORKLOG |
 
 ## 7. 驗證計畫（四動作）
 

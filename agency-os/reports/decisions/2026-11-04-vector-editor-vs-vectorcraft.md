@@ -132,7 +132,8 @@
 - 我們的積木接法：QR／條碼 → 產 SVG → `openFile`；Mockup／批次匯出 → `screenshot()` 或 `app.export` 後 `readFile`；AI 去背 → `readFile` → Replicate → `openFile`；My Designs → `captureDownloads` 攔存檔 → 寫入現有 API。
 - 建置：`rustup target add wasm32-unknown-unknown` + `trunk build --release`（`docs/development.md:16-33`）；輸出 `dist/web`（wasm 17.5 MB、gz 7.1 MB）。字型：web 版只內嵌 BIZ UDPGothic，繁中字型要照 `crates/text/web-fonts.txt` 放 `fonts/`（`docs/development.md:154-156`）。
 - 風險：alpha 穩定度；7 MB 首載；需 WebGPU／WebGL2；UI 不能套我們主題（操作者要 Illustrator 原樣，反而是優點）；版本釘在 commit，升級要重建；授權保留 NOTICE。
-- 部署：靜態檔，不進 git（17.5 MB），放主機 volume 由 nginx 供給 `/vector-pro/`，next-admin 頁 `app/(shell)/tools/vector-pro/page.tsx` iframe + `products.ts` 登記；現有 `/tools/vector-editor` 保留為「快速出稿」門。
+- 部署：靜態檔，不進 git（17.5 MB），放主機 volume 由 nginx 供給 `/vector-pro/`，next-admin 頁 `app/(shell)/tools/vector-pro/page.tsx` iframe + `products.ts` 登記。
+- 操作者 2026-11-04 晚更正（「沒有真的做到三件事同時」）：我們獨有的是 **10 項**（尺寸範本、Google Fonts 搜尋／上傳、調色、去背、WebP ≤200KB、My Designs、QR、條碼、Mockup、批次匯出），不是 6；全部做成**第二 dock 欄**（照 `theme.rs`／`panel_docking.rs` 的色值與尺寸，Illustrator 本就多欄），不是旁邊黏一塊；舊 `/tools/vector-editor` 在舊設計轉 SVG 後退場，**只留一套**。字型載入靠 `FontDb::global().add_font(bytes)`（`apps/vectorcraft-web/src/fonts.rs:71`）加 15 行 JS 介面補丁並送上游。完整對照表在 `agency-os/handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md` §6 C4。
 
 ## 7. 下一步
 
