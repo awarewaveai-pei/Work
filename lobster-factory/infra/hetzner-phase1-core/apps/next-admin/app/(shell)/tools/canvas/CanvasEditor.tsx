@@ -25,7 +25,7 @@ import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePan
 import type { ColorGradeState } from "@/lib/studio/color-grade";
 import { buildFabricImageFilters, buildPresetFilters, buildEffectFilters, PRESET_FILTERS, buildHslMixerFilter, HSL_NEUTRAL, HSL_RANGES, hasAnyHslAdjustment, sanitizeHslMixer, type HslMixerState, type HslRange } from "./fabric-filters";
 import SidebarPanel from "@/components/tools/SidebarPanel";
-import FontLibrary from "@/components/tools/FontLibrary";
+import FontLibrary, { type FontPreset } from "@/components/tools/FontLibrary";
 import { posterizeDataUrl } from "@/lib/studio/posterize";
 // Pure-data import only (NOT generative-fill.ts — that uses Buffer/process.env, server-only).
 import { OUTPAINT_PRESETS, OUTPAINT_LABELS, type OutpaintPreset } from "@/lib/studio/outpaint-presets";
@@ -62,16 +62,22 @@ type AdjState = {
  * resolve fallbacks), covering Windows + macOS system fonts so CJK renders without a web-font
  * download: 黑體=JhengHei/PingFang, 明體=Noto/PMingLiU serif, 楷書=DFKai/Kaiti.
  */
-const FONT_OPTIONS: { label: string; value: string }[] = [
-  { label: "黑體（中）", value: '"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif' },
-  { label: "明體（中）", value: '"Noto Serif TC","Source Han Serif TC","PMingLiU",serif' },
-  { label: "楷書（中）", value: '"DFKai-SB","BiauKai","Kaiti TC",serif' },
-  { label: "圓體（中）", value: '"Yuanti TC","Microsoft JhengHei","Noto Sans TC",sans-serif' },
-  { label: "Sans (En)", value: "Arial,Helvetica,sans-serif" },
-  { label: "Serif (En)", value: 'Georgia,"Times New Roman",serif' },
-  { label: "Mono (En)", value: '"Courier New",monospace' },
-  { label: "手寫 (En)", value: '"Comic Sans MS","Segoe Script",cursive' },
+const FONT_OPTIONS: FontPreset[] = [
+  { label: "黑體（中）", value: '"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif', cat: "cjk" },
+  { label: "明體（中）", value: '"Noto Serif TC","Source Han Serif TC","PMingLiU",serif', cat: "cjk" },
+  { label: "楷書（中）", value: '"DFKai-SB","BiauKai","Kaiti TC",serif', cat: "cjk" },
+  { label: "圓體（中）", value: '"Yuanti TC","Microsoft JhengHei","Noto Sans TC",sans-serif', cat: "cjk" },
+  { label: "Sans (En)", value: "Arial,Helvetica,sans-serif", cat: "latin" },
+  { label: "Serif (En)", value: 'Georgia,"Times New Roman",serif', cat: "latin" },
+  { label: "Mono (En)", value: '"Courier New",monospace', cat: "latin" },
+  { label: "手寫 (En)", value: '"Comic Sans MS","Segoe Script",cursive', cat: "latin" },
 ];
+
+/** Quadratic arc path the 弧形 toggle sets as a text's `path` (Fabric v7 text-on-path). */
+function arcPathData(textWidth: number): string {
+  const len = Math.max(220, textWidth * 1.5);
+  return `M 0 80 Q ${len / 2} -20 ${len} 80`;
+}
 
 /** Fabric text-like object types whose font/colour/size the toolbar can edit. */
 function isTextObject(o: { type?: string } | null | undefined): boolean {
@@ -99,6 +105,14 @@ export default function CanvasEditor() {
   const [textFont, setTextFont] = useState(FONT_OPTIONS[0].value);
   const [textColor, setTextColor] = useState("#111111");
   const [textSize, setTextSize] = useState(48);
+  const [textInput, setTextInput] = useState("你的文字"); // 加文字 content (same input as vector-editor)
+  const [textBold, setTextBold] = useState(false);
+  const [textItalic, setTextItalic] = useState(false);
+  const [textUnderline, setTextUnderline] = useState(false);
+  const [textAlign, setTextAlign] = useState<"left" | "center" | "right">("left");
+  const [textSpacing, setTextSpacing] = useState(0); // charSpacing −100…800
+  const [textLineH, setTextLineH] = useState(1.16); // lineHeight 0.8–3
+  const [textArc, setTextArc] = useState(false); // 弧形 on/off
   const [textSelected, setTextSelected] = useState(false);
   const [imageSelected, setImageSelected] = useState(false); // an image object is selected → show 調色
   const [anySelected, setAnySelected] = useState(false); // any object selected → enable per-object tools
@@ -113,6 +127,10 @@ export default function CanvasEditor() {
   // ↩️ Undo/Redo — JSON snapshots of the canvas.
   const undoStack = useRef<string[]>([]);
   const redoStack = useRef<string[]>([]);
+  // text-style edits call set() (no object:modified) → debounced undo step (Codex 85ff8658 F2);
+  // ref because snapshot is declared later in this component.
+  const snapshotRef = useRef<() => void>(() => {});
+  const textSnapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restoringRef = useRef(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -271,13 +289,20 @@ export default function CanvasEditor() {
       // Keep the toolbar in sync with the selected text object (and vice-versa).
       const syncFromSelection = () => {
         const o = canvas.getActiveObject() as
-          | { type?: string; fontFamily?: unknown; fill?: unknown; fontSize?: unknown }
+          | { type?: string; fontFamily?: unknown; fill?: unknown; fontSize?: unknown; fontWeight?: unknown; fontStyle?: unknown; underline?: unknown; textAlign?: unknown; charSpacing?: unknown; lineHeight?: unknown; path?: unknown }
           | null;
         if (isTextObject(o)) {
           setTextSelected(true);
           if (typeof o!.fontFamily === "string") setTextFont(o!.fontFamily);
           if (typeof o!.fill === "string") setTextColor(o!.fill);
-          if (typeof o!.fontSize === "number") setTextSize(o!.fontSize);
+          if (typeof o!.fontSize === "number") setTextSize(Math.round(o!.fontSize));
+          setTextBold(o!.fontWeight === "bold" || o!.fontWeight === 700);
+          setTextItalic(o!.fontStyle === "italic");
+          setTextUnderline(!!o!.underline);
+          if (o!.textAlign === "left" || o!.textAlign === "center" || o!.textAlign === "right") setTextAlign(o!.textAlign);
+          setTextSpacing(typeof o!.charSpacing === "number" ? o!.charSpacing : 0);
+          setTextLineH(typeof o!.lineHeight === "number" ? o!.lineHeight : 1.16);
+          setTextArc(!!o!.path);
         } else {
           setTextSelected(false);
         }
@@ -458,7 +483,7 @@ export default function CanvasEditor() {
       // auto-fit, so getWidth() (display px) would mis-place the text (critic Major).
       const m = canvasMetaRef.current;
       const z = canvas.getZoom() || 1;
-      const text = new fabric.IText("雙擊編輯文字", {
+      const text = new fabric.IText(textInput || "文字", {
         left: m ? m.realW / 2 : canvas.getWidth() / z / 2,
         top: m ? m.realH / 2 : canvas.getHeight() / z / 2,
         originX: "center",
@@ -466,13 +491,24 @@ export default function CanvasEditor() {
         fontSize: textSize,
         fill: textColor,
         fontFamily: textFont,
+        fontWeight: textBold ? "bold" : "normal",
+        fontStyle: textItalic ? "italic" : "normal",
+        underline: textUnderline,
+        textAlign,
+        charSpacing: textSpacing,
+        lineHeight: textLineH,
       });
+      if (textArc) {
+        (text as unknown as { set: (p: Record<string, unknown>) => void }).set({
+          path: new fabric.Path(arcPathData(text.width ?? 220), { fill: "", stroke: "" }),
+        });
+      }
       canvas.add(text);
       canvas.setActiveObject(text);
       setTextSelected(true);
       canvas.requestRenderAll();
     });
-  }, [textFont, textColor, textSize]);
+  }, [textInput, textFont, textColor, textSize, textBold, textItalic, textUnderline, textAlign, textSpacing, textLineH, textArc]);
 
   /** Apply a font/colour/size change to the selected text object (no-op if none). */
   const applyTextStyle = useCallback((patch: Record<string, unknown>) => {
@@ -482,17 +518,19 @@ export default function CanvasEditor() {
     if (isTextObject(o as { type?: string } | null)) {
       (o as unknown as { set: (p: Record<string, unknown>) => void }).set(patch);
       canvas.requestRenderAll();
+      // one undo step per burst of slider/button changes, so 復原 undoes the style, not the object
+      if (textSnapTimer.current) clearTimeout(textSnapTimer.current);
+      textSnapTimer.current = setTimeout(() => { textSnapTimer.current = null; snapshotRef.current(); }, 300);
     }
   }, []);
 
-  /** Toggle a boolean-ish text style (bold/italic/underline) by reading the active object. */
+  /** Toggle bold/italic/underline: flips the control state (= the default for the next text) and
+   *  applies it to the selected text, if any. */
   const toggleText = useCallback((prop: "fontWeight" | "fontStyle" | "underline") => {
-    const o = fabricRef.current?.getActiveObject() as unknown as Record<string, unknown> | null;
-    if (!o || !isTextObject(o as { type?: string })) return;
-    if (prop === "fontWeight") applyTextStyle({ fontWeight: o.fontWeight === "bold" ? "normal" : "bold" });
-    else if (prop === "fontStyle") applyTextStyle({ fontStyle: o.fontStyle === "italic" ? "normal" : "italic" });
-    else applyTextStyle({ underline: !o.underline });
-  }, [applyTextStyle]);
+    if (prop === "fontWeight") { const on = !textBold; setTextBold(on); applyTextStyle({ fontWeight: on ? "bold" : "normal" }); }
+    else if (prop === "fontStyle") { const on = !textItalic; setTextItalic(on); applyTextStyle({ fontStyle: on ? "italic" : "normal" }); }
+    else { const on = !textUnderline; setTextUnderline(on); applyTextStyle({ underline: on }); }
+  }, [applyTextStyle, textBold, textItalic, textUnderline]);
 
   // 🎨 物件效果 — set any property on the active object (opacity/blend/stroke/flip).
   const setActiveProp = useCallback((patch: Record<string, unknown>) => {
@@ -570,6 +608,7 @@ export default function CanvasEditor() {
 
   // 〽️ 文字沿路徑 — make the selected text follow a curved (arc) path, or straighten it.
   const applyTextArc = useCallback((on: boolean) => {
+    setTextArc(on); // also the default for the next text
     const canvas = fabricRef.current;
     const o = canvas?.getActiveObject() as unknown as (Record<string, unknown> & { width?: number }) | null;
     if (!canvas || !o || !isTextObject(o as { type?: string })) return;
@@ -580,8 +619,7 @@ export default function CanvasEditor() {
     }
     void import("fabric").then((fabric) => {
       if (fabricRef.current !== canvas) return;
-      const len = Math.max(220, (o.width ?? 220) * 1.5);
-      const arc = new fabric.Path(`M 0 80 Q ${len / 2} -20 ${len} 80`, { fill: "", stroke: "" });
+      const arc = new fabric.Path(arcPathData(o.width ?? 220), { fill: "", stroke: "" });
       (o as unknown as { set: (p: Record<string, unknown>) => void }).set({ path: arc });
       canvas.requestRenderAll();
     });
@@ -610,6 +648,7 @@ export default function CanvasEditor() {
     setCanUndo(undoStack.current.length > 1);
     setCanRedo(false);
   }, []);
+  snapshotRef.current = snapshot;
   const restore = useCallback(
     (snap: string) => {
       const c = fabricRef.current as unknown as
@@ -1737,7 +1776,6 @@ export default function CanvasEditor() {
   const canvasBusy = cropMode || inpaintMode;
   const objectToolsDisabled = !ready || canvasBusy || !anySelected;
   const imageToolsDisabled = !ready || canvasBusy || !imageSelected;
-  const textToolsDisabled = !ready || canvasBusy || !textSelected;
   const imageToolHint = !imageSelected ? "先選取圖片後才能使用。" : canvasBusy ? "先完成或取消目前的編輯模式。" : null;
   const objectToolHint = !anySelected ? "先選取畫布上的物件後才能使用。" : canvasBusy ? "先完成或取消目前的編輯模式。" : null;
 
@@ -1952,35 +1990,46 @@ export default function CanvasEditor() {
             (原「文字樣式」+「字型庫」兩面板合併,避免重複混淆。) */}
         <SidebarPanel id="text-style" title="🔤 文字" defaultPos={{ x: 816, y: 0 }} width={280} defaultCollapsed>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
-            <span style={{ opacity: 0.6 }}>{textSelected ? "套用到選取文字" : "新文字預設"}</span>
-            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 30 }}>字型</span>
-              <select className="btn-secondary" value={textFont} disabled={!ready} onChange={(e) => { setTextFont(e.target.value); applyTextStyle({ fontFamily: e.target.value }); }} style={{ flex: 1 }}>
-                {FONT_OPTIONS.map((f) => (<option key={f.label} value={f.value} style={{ fontFamily: f.value }}>{f.label}</option>))}
-              </select>
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ display: "flex", gap: 6 }}>
+              <input className="btn-secondary" type="text" title="新文字內容" placeholder="輸入文字…" value={textInput} disabled={!ready} onChange={(e) => setTextInput(e.target.value)} style={{ flex: 1, minWidth: 0 }} />
+              <button className="btn-primary" disabled={!ready || canvasBusy} onClick={addText} title="加文字" style={{ flex: "none" }}>加文字</button>
+            </div>
+            <span style={{ opacity: 0.6 }}>{textSelected ? "套用到選取文字" : "新文字預設（選取文字後改成套用到該文字）"}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ width: 30 }}>顏色</span>
-              <input type="color" value={textColor} disabled={!ready} onChange={(e) => { setTextColor(e.target.value); applyTextStyle({ fill: e.target.value }); }} style={{ width: 36, height: 24, padding: 0, border: "1px solid var(--card-border)", borderRadius: 4, cursor: "pointer" }} />
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <input type="color" title="文字顏色" value={textColor} disabled={!ready} onChange={(e) => { setTextColor(e.target.value); applyTextStyle({ fill: e.target.value }); }} style={{ width: 36, height: 24, padding: 0, border: "1px solid var(--card-border)", borderRadius: 4, cursor: "pointer" }} />
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ width: 30 }}>字級</span>
-              <input type="range" min={8} max={200} step={1} value={textSize} disabled={!ready} onChange={(e) => { const v = Number(e.target.value); setTextSize(v); applyTextStyle({ fontSize: v }); }} style={{ flex: 1 }} />
-              <span style={{ width: 28, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{textSize}</span>
-            </label>
+              <input type="range" title="字級滑桿" min={8} max={200} step={1} value={Math.min(200, Math.max(8, textSize))} disabled={!ready} onChange={(e) => { const v = Number(e.target.value); setTextSize(v); applyTextStyle({ fontSize: v }); }} style={{ flex: 1 }} />
+              <input className="btn-secondary" type="number" title="字級 px" min={2} step={1} value={textSize} disabled={!ready} onChange={(e) => { const v = Math.max(2, Number(e.target.value) || 2); setTextSize(v); applyTextStyle({ fontSize: v }); }} style={{ width: 76, padding: "4px 6px", fontVariantNumeric: "tabular-nums" }} />
+            </div>
             {/* 樣式切換 */}
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              <button className="btn-secondary" disabled={textToolsDisabled} style={{ fontSize: 13, fontWeight: 700 }} title={textSelected ? "粗體（切換）" : "先選取文字後才能使用。"} onClick={() => toggleText("fontWeight")}>B</button>
-              <button className="btn-secondary" disabled={textToolsDisabled} style={{ fontSize: 13, fontStyle: "italic" }} title={textSelected ? "斜體（切換）" : "先選取文字後才能使用。"} onClick={() => toggleText("fontStyle")}>I</button>
-              <button className="btn-secondary" disabled={textToolsDisabled} style={{ fontSize: 13, textDecoration: "underline" }} title={textSelected ? "底線（切換）" : "先選取文字後才能使用。"} onClick={() => toggleText("underline")}>U</button>
-              <button className="btn-secondary" disabled={textToolsDisabled} style={{ fontSize: 12 }} title={textSelected ? "文字沿弧形路徑" : "先選取文字後才能使用。"} onClick={() => applyTextArc(true)}>〽️ 弧形</button>
-              <button className="btn-secondary" disabled={textToolsDisabled} style={{ fontSize: 12 }} title={textSelected ? "取消弧形（拉直）" : "先選取文字後才能使用。"} onClick={() => applyTextArc(false)}>直</button>
+              <button className="btn-secondary" disabled={!ready || canvasBusy} style={{ fontSize: 13, fontWeight: 700, outline: textBold ? "2px solid var(--accent)" : undefined }} title="粗體（切換）" onClick={() => toggleText("fontWeight")}>B</button>
+              <button className="btn-secondary" disabled={!ready || canvasBusy} style={{ fontSize: 13, fontStyle: "italic", outline: textItalic ? "2px solid var(--accent)" : undefined }} title="斜體（切換）" onClick={() => toggleText("fontStyle")}>I</button>
+              <button className="btn-secondary" disabled={!ready || canvasBusy} style={{ fontSize: 13, textDecoration: "underline", outline: textUnderline ? "2px solid var(--accent)" : undefined }} title="底線（切換）" onClick={() => toggleText("underline")}>U</button>
+              <button className="btn-secondary" disabled={!ready || canvasBusy} style={{ fontSize: 12, outline: textArc ? "2px solid var(--accent)" : undefined }} title="弧形文字 開／關" onClick={() => applyTextArc(!textArc)}>〽️ 弧形</button>
             </div>
-            {/* 進階字型庫：Google Fonts（中/英）+ 上傳字型 */}
+            <div style={{ display: "flex", gap: 6 }}>
+              {([["left", "靠左"], ["center", "置中"], ["right", "靠右"]] as const).map(([k, label]) => (
+                <button key={k} className="btn-secondary" disabled={!ready || canvasBusy} style={{ flex: 1, fontSize: 12, outline: textAlign === k ? "2px solid var(--accent)" : undefined }} title={`對齊：${label}`} onClick={() => { setTextAlign(k); applyTextStyle({ textAlign: k }); }}>{label}</button>
+              ))}
+            </div>
+            <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <span style={{ display: "flex", justifyContent: "space-between" }}><span>字距</span><span style={{ opacity: 0.7 }}>{textSpacing}</span></span>
+              <input type="range" title="字距" min={-100} max={800} step={1} value={textSpacing} disabled={!ready} onChange={(e) => { const v = Number(e.target.value); setTextSpacing(v); applyTextStyle({ charSpacing: v }); }} />
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <span style={{ display: "flex", justifyContent: "space-between" }}><span>行距</span><span style={{ opacity: 0.7 }}>{textLineH.toFixed(2)}</span></span>
+              <input type="range" title="行距" min={0.8} max={3} step={0.02} value={textLineH} disabled={!ready} onChange={(e) => { const v = Number(e.target.value); setTextLineH(v); applyTextStyle({ lineHeight: v }); }} />
+            </label>
+            {/* 字型：搜尋＋中文／英文／全部＋預覽清單＋上傳；原內建字型堆疊列在最上方 */}
             <div style={{ borderTop: "1px solid var(--card-border)", paddingTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
-              <span style={{ opacity: 0.6, fontSize: 11 }}>更多字型（Google Fonts / 上傳）</span>
+              <span style={{ opacity: 0.6, fontSize: 11 }}>字型（搜尋 Google Fonts · 上傳字型檔）</span>
               <FontLibrary
                 current={textFont}
+                presets={FONT_OPTIONS}
                 onPick={(family) => {
                   setTextFont(family);
                   applyTextStyle({ fontFamily: family });

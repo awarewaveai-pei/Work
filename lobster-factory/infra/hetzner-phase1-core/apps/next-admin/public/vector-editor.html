@@ -65,6 +65,9 @@
   button.act:hover { background:var(--btn-primary-hover); }
   button.ghost, label.ghost { background:var(--btn-secondary-bg); border:1px solid var(--btn-secondary-border); color:var(--btn-secondary-text); font-weight:var(--font-weight-semibold); cursor:pointer; transition:background .15s, border-color .15s; }
   button.ghost:hover, label.ghost:hover { background:var(--body-bg); border-color:var(--btn-secondary-hover-border); }
+  /* direct-child full-width inputs overflow by the 20px side margins; fixed for this panel only */
+  #textPanel > input[type=range], #textPanel > input#fontSearch { width:calc(100% - 20px); }
+  button.ghost.on { border-color:var(--accent); background:var(--accent-light); }
   button:disabled { opacity:.45; cursor:not-allowed; box-shadow:none; }
   .info { font-size:11px; color:var(--text-muted); margin-top:6px; line-height:1.6; }
   .canvas-frame { background:#fff; box-shadow:0 8px 30px rgba(0,0,0,.25); border-radius:4px; border:1px solid var(--card-border); }
@@ -240,21 +243,28 @@
       <div class="info">未選物件時改的是「下一個新物件」預設值。</div>
     </details>
 
-    <details open><summary>4. 文字（加字 · 字型 · 排版一條龍）</summary>
+    <details open id="textPanel"><summary>4. 文字（加字 · 字型 · 排版一條龍）</summary>
       <div class="row">
         <input id="txtInput" type="text" placeholder="輸入文字…" value="你的文字">
         <button class="act" id="addText" style="flex:none;width:80px;">加文字</button>
       </div>
-      <div class="row" style="margin-top:6px;align-items:flex-end;">
-        <div style="flex:none;width:96px;"><label>字級 px</label><input id="fontSize" type="number" value="48" min="2" step="1"></div>
-        <div><label>樣式</label>
-          <div class="grid3">
-            <button class="ghost" id="btnBold" style="font-weight:bold;">B</button>
-            <button class="ghost" id="btnItalic" style="font-style:italic;">I</button>
-            <button class="ghost" id="btnUnderline" style="text-decoration:underline;">U</button>
+      <div class="info" id="txtMode">新文字預設（選取文字後改成套用到該文字）</div>
+      <div class="row" style="align-items:flex-end;">
+        <div style="flex:none;width:56px;"><label>顏色</label><input id="txtFill" type="color" value="#111111" title="文字顏色（只改文字物件）"></div>
+        <div><label>字級 px</label>
+          <div class="row">
+            <input id="fontSizeR" type="range" min="8" max="200" value="48" title="字級滑桿">
+            <input id="fontSize" type="number" value="48" min="2" step="1" title="字級 px" style="flex:none;width:64px;">
           </div>
         </div>
       </div>
+      <label>樣式</label>
+      <div class="grid3">
+        <button class="ghost" id="btnBold" style="font-weight:bold;">B</button>
+        <button class="ghost" id="btnItalic" style="font-style:italic;">I</button>
+        <button class="ghost" id="btnUnderline" style="text-decoration:underline;">U</button>
+      </div>
+      <button class="ghost" id="btnArc" style="margin-top:6px;" title="弧形文字 開／關">〽️ 弧形文字</button>
       <label>對齊</label>
       <div class="grid3">
         <button class="ghost" data-talign="left">靠左</button>
@@ -353,6 +363,9 @@ const MAX_DISP = 720;
 function maxDisp(){ const st=document.querySelector('.stage'); const w=st? st.clientWidth-34 : 0; return w>200 ? Math.min(MAX_DISP, w) : MAX_DISP; }
 let tool='select';
 let nextStyle = { fill:'#3366ff', stroke:'#111111', strokeWidth:0 };
+// 文字預設：未選文字時控制項改的是「下一個新文字」；選了文字就套用到該文字（同 /tools/canvas）
+const DEFAULT_FONT='"Microsoft JhengHei", system-ui, sans-serif';
+let nextText = { font:DEFAULT_FONT, size:48, fill:'#111111', bold:false, italic:false, underline:false, align:'left', charSpacing:0, lineHeight:1.16, arc:false };
 
 const canvas = new fabric.Canvas('c', { backgroundColor:'#ffffff', preserveObjectStacking:true });
 
@@ -363,7 +376,7 @@ document.getElementById('unit').addEventListener('focus', (e)=>{ e.target._prev=
 document.getElementById('unit').addEventListener('change', (e)=>{ const prev=e.target._prev||'cm', next=e.target.value, dpi=parseInt(document.getElementById('dpi').value,10)||300; if(prev===next) return;
   ['w','h'].forEach(id=>{ const el=document.getElementById(id); const v=parseFloat(el.value)||0; const cm = prev==='px' ? v*2.54/dpi : prev==='mm' ? v/10 : v; el.value = next==='px' ? Math.round(cm*dpi/2.54) : next==='mm' ? +(cm*10).toFixed(3) : +cm.toFixed(4); el.step = next==='px' ? 1 : 0.1; }); e.target._prev=next; });
 
-function applyCanvas(){
+function applyCanvas(fromResize){
   const unit=document.getElementById('unit').value, dpi=parseInt(document.getElementById('dpi').value,10);
   const wv=parseFloat(document.getElementById('w').value), hv=parseFloat(document.getElementById('h').value);
   realW=toPx(wv,unit,dpi); realH=toPx(hv,unit,dpi);
@@ -376,10 +389,11 @@ function applyCanvas(){
   const cmW=toCm(wv,unit,dpi), cmH=toCm(hv,unit,dpi);
   document.getElementById('sizeInfo').innerHTML=`真實 <b>${realW}×${realH}px</b> @${dpi}DPI = ${cmW}×${cmH}cm（預覽 ${(dispScale*100).toFixed(0)}%）`;
   canvas._meta={ wv,hv,unit,dpi,cmW,cmH };
-  const fsEl=document.getElementById('fontSize'); if(fsEl && !canvas.getActiveObject()) fsEl.value=Math.max(8,Math.round(realH*0.08));
+  // only an explicit 套用畫布尺寸 re-derives the default size; a window resize must not clobber it (Codex 85ff8658 F1)
+  if(!fromResize && !canvas.getActiveObject()) setSizeUI(nextText.size=Math.max(8,Math.round(realH*0.08)));
 }
 
-let _rsT=null; window.addEventListener('resize', ()=>{ clearTimeout(_rsT); _rsT=setTimeout(()=>{ if(realW) applyCanvas(); }, 150); });
+let _rsT=null; window.addEventListener('resize', ()=>{ clearTimeout(_rsT); _rsT=setTimeout(()=>{ if(realW) applyCanvas(true); }, 150); });
 
 // ====== 歷史（Undo/Redo）======
 let history=[], hi=-1, locked=false;
@@ -473,23 +487,60 @@ function syncProps(){
   document.getElementById('posY').value=px2mm(r.top);
   document.getElementById('dimW').value=px2mm(r.width);
   document.getElementById('dimH').value=px2mm(r.height);
-  if(o.fontFamily!==undefined){
-    document.getElementById('curFont').textContent=o.fontFamily;
-    document.getElementById('fontSize').value=Math.round(o.fontSize||48);
+  if(isTextObj(o)){
+    document.getElementById('curFont').textContent=fontLabel(o.fontFamily);
+    setSizeUI(Math.round(o.fontSize||48));
+    if(typeof o.fill==='string') document.getElementById('txtFill').value=o.fill||'#000000';
     const ls=o.charSpacing||0; document.getElementById('letterSp').value=ls; document.getElementById('lsVal').textContent=ls;
     const lh=o.lineHeight||1.16; document.getElementById('lineH').value=lh; document.getElementById('lhVal').textContent=(+lh).toFixed(2);
+    const tg={ bold:o.fontWeight==='bold'||o.fontWeight===700, italic:o.fontStyle==='italic', underline:!!o.underline, align:o.textAlign||'left', arc:!!o.path };
+    setTextToggles(tg);
+    // controls now show this text → same values become the default for the next new text (as on /tools/canvas)
+    Object.assign(nextText, tg, { font:o.fontFamily, size:Math.round(o.fontSize||48), charSpacing:ls, lineHeight:lh });
+    if(typeof o.fill==='string' && o.fill) nextText.fill=o.fill;
   }
+  setTxtMode();
   syncing=false;
 }
 
 // ====== 文字 ======
+function isTextObj(o){ return !!o && (o.type==='i-text'||o.type==='text'||o.type==='textbox'); }
+function selTexts(){ return canvas.getActiveObjects().filter(isTextObj); }
+function setTxtMode(){ document.getElementById('txtMode').textContent = selTexts().length ? '套用到選取文字' : '新文字預設（選取文字後改成套用到該文字）'; }
+function setSizeUI(v){ document.getElementById('fontSize').value=v; document.getElementById('fontSizeR').value=Math.min(200,Math.max(8,v)); }
+function setTextToggles(s){
+  if('bold' in s) document.getElementById('btnBold').classList.toggle('on', !!s.bold);
+  if('italic' in s) document.getElementById('btnItalic').classList.toggle('on', !!s.italic);
+  if('underline' in s) document.getElementById('btnUnderline').classList.toggle('on', !!s.underline);
+  if('arc' in s) document.getElementById('btnArc').classList.toggle('on', !!s.arc);
+  if('align' in s) document.querySelectorAll('[data-talign]').forEach(b=>b.classList.toggle('on', b.dataset.talign===s.align));
+}
+// Fabric 5.3 supports `path` on text (same as v7): arc = quadratic path, straight = null
+function arcPathD(w){ const len=Math.max(220,w*1.5); return 'M 0 80 Q '+(len/2)+' -20 '+len+' 80'; }
+function setArc(o, on){ o.set('path', on ? new fabric.Path(arcPathD(o.width||220), { fill:'', stroke:'', objectCaching:false }) : null); o.setCoords(); }
+// Change one text property: always the new-text default, plus every selected text object.
+function setText(key, val, applyFn){
+  nextText[key]=val;
+  const t=selTexts(); t.forEach(o=> applyFn ? applyFn(o,val) : o.set(TEXT_PROP[key], val));
+  canvas.requestRenderAll();
+  return t.length>0;
+}
+const TEXT_PROP={ font:'fontFamily', size:'fontSize', fill:'fill', charSpacing:'charSpacing', lineHeight:'lineHeight', align:'textAlign' };
 document.getElementById('addText').onclick=()=>{
   const t=document.getElementById('txtInput').value||'文字';
-  const fs=Math.max(2, parseInt(document.getElementById('fontSize').value,10)||Math.round(realH*0.08));
-  const obj=new fabric.IText(t, { left:realW*0.1, top:realH*0.1, fontSize:fs, fontFamily:(nextStyle.font||'"Microsoft JhengHei", system-ui, sans-serif'), fill:nextStyle.fill });
+  const n=nextText;
+  const obj=new fabric.IText(t, { left:realW*0.1, top:realH*0.1, fontSize:n.size, fontFamily:n.font, fill:n.fill,
+    fontWeight:n.bold?'bold':'normal', fontStyle:n.italic?'italic':'normal', underline:n.underline, textAlign:n.align, charSpacing:n.charSpacing, lineHeight:n.lineHeight });
+  if(n.arc) setArc(obj, true);
   canvas.add(obj); canvas.setActiveObject(obj); canvas.requestRenderAll();
 };
-document.getElementById('fontSize').onchange=(e)=>{ const v=Math.max(2,parseInt(e.target.value,10)||48); applyToSel(o=>{ if(o.fontSize!==undefined) o.set('fontSize', v); }); };
+function onSize(v){ v=Math.max(2,Math.round(+v)||2); setSizeUI(v); setText('size', v); }
+document.getElementById('fontSize').oninput=(e)=>{ const v=Math.max(2,parseInt(e.target.value,10)||0); if(v) { nextText.size=v; document.getElementById('fontSizeR').value=Math.min(200,Math.max(8,v)); selTexts().forEach(o=>o.set('fontSize',v)); canvas.requestRenderAll(); } };
+document.getElementById('fontSizeR').oninput=(e)=>{ onSize(e.target.value); };
+['fontSize','fontSizeR'].forEach(id=> document.getElementById(id).onchange=()=>{ if(selTexts().length) snapshot(); });
+document.getElementById('txtFill').oninput=(e)=>{ setText('fill', e.target.value); };
+document.getElementById('txtFill').onchange=()=>{ if(selTexts().length) snapshot(); };
+canvas.on('selection:cleared', setTxtMode);
 
 // ====== 對齊 / 分布 ======
 function reselect(objs){ const ns=new fabric.ActiveSelection(objs,{canvas}); canvas.setActiveObject(ns); }
@@ -736,8 +787,27 @@ function gfLink(families){
 }
 gfLink(CJK);    // 分開載：CJK 較大，獨立 request，壞了不拖累拉丁字型
 gfLink(LATIN);
+// 內建字型堆疊（與 /tools/canvas FONT_OPTIONS 同一組，列在清單最上方）
+const PRESET_FONTS=[
+  { label:'黑體（中）', value:'"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif', cat:'cjk' },
+  { label:'明體（中）', value:'"Noto Serif TC","Source Han Serif TC","PMingLiU",serif', cat:'cjk' },
+  { label:'楷書（中）', value:'"DFKai-SB","BiauKai","Kaiti TC",serif', cat:'cjk' },
+  { label:'圓體（中）', value:'"Yuanti TC","Microsoft JhengHei","Noto Sans TC",sans-serif', cat:'cjk' },
+  { label:'Sans (En)', value:'Arial,Helvetica,sans-serif', cat:'latin' },
+  { label:'Serif (En)', value:'Georgia,"Times New Roman",serif', cat:'latin' },
+  { label:'Mono (En)', value:'"Courier New",monospace', cat:'latin' },
+  { label:'手寫 (En)', value:'"Comic Sans MS","Segoe Script",cursive', cat:'latin' }
+];
+function fontLabel(v){ const p=PRESET_FONTS.find(x=>x.value===v); return p? p.label : (v||'—'); }
 function buildFontList(filter, cat){
   const box=document.getElementById('fontList'); box.innerHTML='';
+  PRESET_FONTS.filter(p=> (!cat||cat==='all'||p.cat===cat) && (!filter || p.label.toLowerCase().includes(filter.toLowerCase()))).forEach(p=>{
+    const b=document.createElement('button'); b.className='fontrow'; b.title=p.label;
+    const nm=document.createElement('div'); nm.className='fname'; nm.textContent=p.label;
+    const pv=document.createElement('div'); pv.className='fprev'; pv.style.fontFamily=p.value;
+    pv.textContent = p.cat==='cjk' ? '你好 永字 Ag123' : 'Ag123 Hello';
+    b.append(nm,pv); b.onclick=()=>useFont(p.value); box.appendChild(b);
+  });
   const all=UPLOADED.concat(GFONTS);
   all.filter(f=>{
     const isC=CJK.includes(f), isL=LATIN.includes(f);
@@ -754,11 +824,10 @@ function buildFontList(filter, cat){
   });
 }
 async function useFont(name){
-  try{ await document.fonts.load('20px "'+name+'"'); }catch(e){}
-  nextStyle.font=name;
-  applyToSel(o=>{ if(o.fontFamily!==undefined) o.set('fontFamily', name); });
-  canvas.requestRenderAll();
-  document.getElementById('curFont').textContent=name;
+  if(!PRESET_FONTS.some(p=>p.value===name)){ try{ await document.fonts.load('20px "'+name+'"'); }catch(e){} }
+  const applied=setText('font', name);
+  document.getElementById('curFont').textContent=fontLabel(name);
+  if(applied) snapshot();
 }
 document.getElementById('fontSearch').oninput=(e)=>buildFontList(e.target.value);
 document.getElementById('fontCJK').onclick=()=>{ document.getElementById('fontSearch').value=''; buildFontList('', 'cjk'); };
@@ -779,9 +848,15 @@ document.getElementById('fontUpload').onchange=(e)=>{
   };
   r.readAsArrayBuffer(f);
 };
-document.getElementById('btnBold').onclick=()=> applyToSel(o=>{ if(o.fontWeight!==undefined) o.set('fontWeight', o.fontWeight==='bold'?'normal':'bold'); });
-document.getElementById('btnItalic').onclick=()=> applyToSel(o=>{ if(o.fontStyle!==undefined) o.set('fontStyle', o.fontStyle==='italic'?'normal':'italic'); });
-document.getElementById('btnUnderline').onclick=()=> applyToSel(o=>{ if(o.underline!==undefined) o.set('underline', !o.underline); });
+// B / I / U / 弧形：翻轉狀態（= 新文字預設），並套用到選取的文字
+function toggleTextProp(key, apply, btnId){
+  const on=!nextText[key]; const hit=setText(key, on, (o)=>apply(o,on));
+  document.getElementById(btnId).classList.toggle('on', on); if(hit) snapshot();
+}
+document.getElementById('btnBold').onclick=()=> toggleTextProp('bold', (o,on)=>o.set('fontWeight', on?'bold':'normal'), 'btnBold');
+document.getElementById('btnItalic').onclick=()=> toggleTextProp('italic', (o,on)=>o.set('fontStyle', on?'italic':'normal'), 'btnItalic');
+document.getElementById('btnUnderline').onclick=()=> toggleTextProp('underline', (o,on)=>o.set('underline', on), 'btnUnderline');
+document.getElementById('btnArc').onclick=()=> toggleTextProp('arc', (o,on)=>setArc(o,on), 'btnArc');
 buildFontList('');
 
 // ====== 漸層填色 ======
@@ -888,9 +963,11 @@ document.getElementById('bgColor').oninput=(e)=> canvas.setBackgroundColor(e.tar
 document.getElementById('cornerR').oninput=(e)=>{ const v=+e.target.value; document.getElementById('rxVal').textContent=v; applyToSel(o=>{ if(o.type==='rect') o.set({rx:v, ry:v}); }); };
 
 // ====== 文字對齊 / 字距 / 行距 ======
-document.querySelectorAll('[data-talign]').forEach(b=> b.onclick=()=> applyToSel(o=>{ if(o.textAlign!==undefined) o.set('textAlign', b.dataset.talign); }));
-document.getElementById('letterSp').oninput=(e)=>{ const v=+e.target.value; document.getElementById('lsVal').textContent=v; applyToSel(o=>{ if(o.charSpacing!==undefined) o.set('charSpacing', v); }); };
-document.getElementById('lineH').oninput=(e)=>{ const v=+e.target.value; document.getElementById('lhVal').textContent=(+v).toFixed(2); applyToSel(o=>{ if(o.lineHeight!==undefined) o.set('lineHeight', v); }); };
+document.querySelectorAll('[data-talign]').forEach(b=> b.onclick=()=>{ const hit=setText('align', b.dataset.talign); setTextToggles({ align:b.dataset.talign }); if(hit) snapshot(); });
+document.getElementById('letterSp').oninput=(e)=>{ const v=+e.target.value; document.getElementById('lsVal').textContent=v; setText('charSpacing', v); };
+document.getElementById('lineH').oninput=(e)=>{ const v=+e.target.value; document.getElementById('lhVal').textContent=(+v).toFixed(2); setText('lineHeight', v); };
+['letterSp','lineH'].forEach(id=> document.getElementById(id).onchange=()=>{ if(selTexts().length) snapshot(); });
+setTextToggles({ align:nextText.align });
 
 // ====== 精準座標 / 尺寸（mm）======
 function applyTransform(){

@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-04（續14）編輯器整合 CARD-01：文字面板聯集（Canvas Editor ⇄ Vector Editor）＋ fc689bb27 已部署
+
+- 操作者：「你要去讀 codes，不是只有用看的，用 SDK 做」→ 第三項「共用面板整合成最完整版」改由 cc.py SDK worker 逐卡做（卡在 `agency-os/handoffs/2026-11-04-editor-merge/CARD-0N-*.md`，Decision／Files file:line／Union 清單／Constraints／Acceptance／Output block）。主 session 驗收 diff → Codex → commit。
+- CARD-01 結果（worker session 668e5a3f，US$2.06，71 turns）：兩邊文字面板 = 加文字 input＋鈕／顏色／字級 range＋number／B I U／弧形開關／對齊／字距／行距／可搜尋字型預覽清單（內建 8 組 FONT_OPTIONS 列最上）＋上傳；「未選文字 = 新文字預設、選了 = 套用」兩邊同語意；選取時控制項回填。canvas：`FontLibrary` 加 `presets` prop、`FONT_OPTIONS` 帶 cat、`textBold/Italic/Underline/Align/Spacing/LineH/Arc` state；vector：`nextText`＋`setText()`＋`TEXT_PROP`、`PRESET_FONTS`、`setArc()`（Fabric 5.3 text `path` 驗過可用）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=worker：tsc 0；SRI 13/13；node tests/e2e/editor-merge/card-01-text-panel.mjs → 63/63 checks（canvas 讀匯出 .design.json 的物件屬性、vector 讀 live fabric canvas）；截圖 agency-os/reports/e2e/2026-11-04/editor-merge/card-01-{canvas,vector}.png（目錄 gitignored，本機留證）；主 session 讀完整 diff（CanvasEditor +86/−45、FontLibrary +32/−1、vector-editor.html +102/−26）＋兩張截圖逐項對照聯集清單；Codex F2 修後 3903 JS 實測：選取文字→字距 600→300ms timer ran→undo 後圖層仍 1、redo 可用（只退字距） | exit=0 | ms=0
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n（agency-os/reports/oracle/2026-11-04-partialreview-85ff8658.md）。F1 vector resize 路徑 `applyCanvas(true)` 不再重設 `nextText.size`；F2 canvas `applyTextStyle` 300ms debounce 後 `snapshotRef.current()` → 字距／行距／對齊／顏色／字級改動各成一個復原步，不再連文字物件一起退掉。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=FONT_OPTIONS\|textToolsDisabled\|nextStyle.font | hits=3（皆 CanvasEditor 內 FONT_OPTIONS 現行引用；textToolsDisabled／nextStyle.font 已無殘留）
+- 前一條（續13）的 fc689bb27 已部署：sg-deploy deployed-commit fc689bb27、容器 healthy、主機 smoke 全 OK、playwright smoke 26 passed。
+- 下一張：CARD-02 圖層、CARD-03 匯出／專案存讀（brief 已寫）；之後 外觀／物件效果、調色／去背。
 ## 2026-11-04（續13）Canvas／Vector 標題精簡＋「畫布尺寸」面板兩邊補成聯集（工具整合第 1 格）
 
 - 操作者三點：①canvas 去副標、改名 Canvas Editor、標題區縮小；②vector 去副標與「畫布：…」badge、標題區縮小；③兩個工具都有的面板整合成最完整版、兩邊共用（例：畫布尺寸）。本條做 ①②＋③的畫布尺寸格；其餘共用面板交 SDK worker（cc.py，操作者「用 SDK 做」）逐格做，見 TASKS／下一條。

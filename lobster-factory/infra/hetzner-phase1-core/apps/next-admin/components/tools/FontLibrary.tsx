@@ -17,12 +17,16 @@ import {
   loadUploadedFont,
 } from "@/components/tools/font-library";
 
+/** Host-supplied CSS font stacks listed first (value = full font-family stack; no glyph load needed). */
+export type FontPreset = { label: string; value: string; cat: "cjk" | "latin" };
+
 type Props = {
   current?: string;
   onPick: (family: string) => void;
+  presets?: FontPreset[];
 };
 
-export default function FontLibrary({ current, onPick }: Props) {
+export default function FontLibrary({ current, onPick, presets = [] }: Props) {
   const [filter, setFilter] = useState("");
   const [cat, setCat] = useState<"all" | "cjk" | "latin">("all");
   const [uploaded, setUploaded] = useState<string[]>([]);
@@ -45,6 +49,11 @@ export default function FontLibrary({ current, onPick }: Props) {
       return true;
     });
   }, [uploaded, filter, cat]);
+
+  const presetList = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    return presets.filter((p) => (cat === "all" || p.cat === cat) && (!q || p.label.toLowerCase().includes(q)));
+  }, [presets, filter, cat]);
 
   const pick = useCallback(
     async (name: string) => {
@@ -110,6 +119,28 @@ export default function FontLibrary({ current, onPick }: Props) {
       </div>
       {error ? <span style={{ color: "#e5484d", fontSize: 11 }}>{error}</span> : null}
       <div style={{ display: "flex", flexDirection: "column", gap: 3, maxHeight: 320, overflowY: "auto" }}>
+        {presetList.map((p) => (
+          <button
+            key={`preset:${p.label}`}
+            onClick={() => onPick(p.value)}
+            title={p.label}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: 1,
+              textAlign: "left",
+              padding: "4px 6px",
+              border: `1px solid ${current === p.value ? "#6366f1" : "var(--card-border)"}`,
+              borderRadius: 4,
+              background: current === p.value ? "#eef2ff" : "transparent",
+              cursor: "pointer",
+            }}
+          >
+            <span style={{ fontSize: 10, opacity: 0.6 }}>{p.label}</span>
+            <span style={{ fontFamily: p.value, fontSize: 16 }}>{p.cat === "cjk" ? "你好 永字 Ag123" : "Ag123 Hello"}</span>
+          </button>
+        ))}
         {list.map((f) => (
           <button
             key={f}
