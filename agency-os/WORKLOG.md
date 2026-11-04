@@ -37,6 +37,7 @@
 - 順手：verify-build-gates 紅在 main 既有債 `down-migration-copies.test.mjs`（0155–0158 缺 `packages/db/scripts/*_down.sql` 副本，12f2de50e 等留下）→ cp 四檔（byte-identical），gate 綠；非本任務根因。
 - 順手 2：gate 再紅在 doc_integrity：`validate-doc-integrity.mjs` 走檔案系統，把 git-ignored 的本機檔（video-workbench/runtime/blender/**、engines/effectcraft/web/** README，共 18 個 broken_link）也當 repo 文件掃。不變量：doc integrity 只管會出貨的檔 → walker 與 inLinkScope 以 `git ls-files --others --ignored --exclude-standard --directory` 跳過 ignored 路徑（git 失敗 = 空集合、行為同舊版）。突變證據：修前 18 broken_link 紅、修後 PASSED。
 - 順手 3：scan-local-config-for-secrets baseline-miss：本機 `mcp/user-env.ps1` 的 STABILITY_API_KEY（`sk-` 前綴）被 OpenAI pattern 誤判 → `agency-os/config/scan-local-config-known-suppressed.json` 加一條（file+pattern+sourceKey，無值）。verify-build-gates 全綠。
+- 部署結果：本 session 的 sg-deploy 撞到主機另一個 deploy（PID 294246，outreach session 推 b5aff2e51 觸發）→ 等其完成；`.deployed-commit`=b5aff2e51（含 ee0766d62，merge-base 驗過）、lobster-next-admin healthy；curl 正式站 vector-editor.html 200 含 theme bridge／maxDisp；playwright smoke 26 passed／6 skipped（exit 0）。
 ## 2026-11-04（續9）外聯 C14.4 完成：Soulful 名單廣告接通（另一家公司、自己的 App）
 
 - C1 Soulful 外聯資料庫：client_credentials 5 列指向已消失的 Supabase Cloud `mffjqjiidbeibilmxzef`（DNS NXDOMAIN）→ org-client.ts:97 resolveFromCredentialsLib 回該專案 → `fetch failed`。主庫 Soulful 外聯資料 0 列、vault 無 org:soulful-expression:*。處置：5 列備份 `/root/lobster-phase1/backups/client_credentials-soulful-supabase-20261104.sql`（600）後刪，vault 密鑰保留（還原＝插回 5 列）→ 走主庫（organization_id 分隔）。
