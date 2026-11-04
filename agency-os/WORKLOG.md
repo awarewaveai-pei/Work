@@ -14,6 +14,7 @@
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（agency-os/reports/oracle/2026-11-04-partialreview-32bc17ad.md，3 項已修＋同類 canvas 端一併修）
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=#textPanel >\|json.objects.filter\|quality > 0.2\|q>0.2 | hits=0（舊特例、舊格式讀取、舊品質下限皆已清）
 - npm test（worker）：4016 passed／2 failed，兩個失敗都來自別的 session 未追蹤的 `app/(shell)/tools/seedstar/`（products.test、staff-tools.test），不在 commit 內、主機 rsync 只拿 commit → 部署 gate 不受影響。
+- 部署：sg-deploy next-admin → deployed-commit 923dd507a（含 CARD-01 2afcc6113、CARD-02 844bd73b8、CARD-03），主機 npm test gate 過、容器 healthy、主機 smoke 全 OK；curl 正式站 vector-editor.html 含 normalizeV7Types／uploadableImage／awarewave-design/1／lyr-group；playwright smoke 26 passed。
 ## 2026-11-04（續15）編輯器整合 CARD-02：圖層面板聯集（Canvas Editor ⇄ Vector Editor）
 
 - SDK worker（cc.py session 0c7dc5b1，US$1.58，38 turns），卡 `agency-os/handoffs/2026-11-04-editor-merge/CARD-02-layers-panel.md`。
