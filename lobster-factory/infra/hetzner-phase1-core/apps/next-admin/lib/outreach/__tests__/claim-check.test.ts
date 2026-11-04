@@ -26,6 +26,12 @@ describe("parseClaimCheck", () => {
       { n: 1, about: "recipient", evidence: null }, { n: 2, about: "recipient", evidence: "e9" }, { n: 3, about: "recipient", evidence: "[e2]" },
     ]), s, ids)).toEqual({ verdict: "unsupported", claims: ["你們上月擴店。", "你們有 3 位老師。"] });
   });
+  it("a sentence stating facts from several rows cites them all; one unknown id among them makes it unsupported", () => {
+    const s = ["貴司有台北、台中、高雄公司，也提供售後保固。"];
+    expect(parseClaimCheck(reply([{ n: 1, about: "recipient", evidence: ["e1", "e2"] }]), s, ids)).toEqual({ verdict: "supported" });
+    expect(parseClaimCheck(reply([{ n: 1, about: "recipient", evidence: ["e1", "e9"] }]), s, ids).verdict).toBe("unsupported");
+    expect(parseClaimCheck(reply([{ n: 1, about: "recipient", evidence: [] }]), s, ids).verdict).toBe("unsupported");
+  });
   it("a sentence left out, repeated or out of range is doubt, not a pass (Codex 2026-11-04)", () => {
     const s = ["你們上月擴店。", "如果不適合，我就不再打擾。"];
     expect(parseClaimCheck(reply([{ n: 2, about: "courtesy", evidence: null }]), s, ids).verdict).toBe("error");
