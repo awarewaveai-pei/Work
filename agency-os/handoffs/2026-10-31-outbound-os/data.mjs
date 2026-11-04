@@ -64,6 +64,7 @@ const C14 = '27a93dbcc';
 const C16 = 'b0f5e4872';
 const C6REL = '8e7b353ea';
 const C6_4 = '467a54e65';
+const C14_3 = '5729dda84';
 const C9 = 'bc1b685c8';
 
 export const STEPS = [
@@ -239,7 +240,8 @@ export const STEPS = [
     items: [
       done('C14.1', '共用的「收暖名單」程式：存名單、存同意、取消這個人所有待寄的冷信、同步 FluentCRM；匯入廣告管理員下載的 CSV 就走它；重送同一筆不重複，但沒同步成功的會補。', C14),
       done('C14.2', '自動接收：Meta 送來的名單事件經既有的簽章驗證後，抓回資料、走同一段程式。', C14),
-      todo('C14.3', '決定（11-04）：另開一個 Meta App 專收本系統事件，Postiz App 留給 Chatwoot 私訊。你動手 3 步：① https://developers.facebook.com/apps →「建立應用程式」→ 類型選「企業」→ 名稱 AwareWave App Webhooks → 連到 AwareWave 企業管理平台；② 該 App「應用程式設定 → 基本資料」把 App ID 與 App Secret 貼進 AWARE_WAVE_CREDENTIALS.md 的 Meta 段；③ https://developers.facebook.com/tools/explorer 右上選這個新 App →「產生存取權杖」勾 pages_show_list、pages_manage_metadata、pages_read_engagement、leads_retrieval，兩個粉專都勾選 → 把產生的權杖也貼進同一段。之後我做：換成長期粉專權杖、設定 webhook 到 app.aware-wave.com、兩個粉專訂閱名單事件、正式站環境變數（現在是空的）、用 Meta 測試工具送一筆。程式已完成（27a93dbcc）。'),
+      done('C14.3', '11-04 Aware Wave 粉專接通：另開 Meta App「AwareWave App Webhooks」（Postiz App 留給 Chatwoot），長期粉專權杖、webhook 指到 app.aware-wave.com、粉專訂閱名單事件、App 已發佈。Meta 測試工具送一筆 → 02:37 Meta 打進來 200 → 存成暖名單 → aware-wave.com FluentCRM 出現聯絡人；同一人兩筆只留一列。測完 app、FluentCRM 都刪乾淨，測試表單已封存。', C14_3),
+      todo('C14.4', 'Soulful 粉專（另一家公司，自己一套）：粉專管理員是 Pei Huang 帳號，那個帳號登入後我把它加為這個 App 的管理員，你在 https://developers.facebook.com/tools/explorer 選 Soulful 粉專產生權杖、接受名單條款；其餘（長期權杖、正式站環境變數、登記到 soulful-expression、訂閱、測試）我做。另：要投真廣告前，aware-wave.com 隱私權政策加一段「名單型廣告」說明（草稿已給，等你點頭才改公開頁）。'),
     ] },
   { n: 16, code: 'C9', group: 'G', title: '舊欄位退場', plain: '例：舊名單還是用那一格觀察。回填成證據列後，產信與評分只看證據，舊欄位不再寫入。', waitFor: '等 100 個名單走過研究流程',
     gate: '每個有舊觀察的名單都有一列證據。產信與評分不再讀舊欄位。欄位保留。', risk: 'Medium', model: 'Codex', status: 'done', commit: C9, depends: ['C3'],

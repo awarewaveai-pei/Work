@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-04（續5）外聯 C14.3 完成：Meta 名單事件 → 暖名單 → FluentCRM（Aware Wave 粉專）
+
+- 根因：測試工具一直 Pending ＝ App 1107251218596741「尚未發佈」；Leads Access 頁未自訂（預設管理員＋連結 CRM 皆可下載），測試工具警告是誤導。
+- 步驟：自簽 leadgen（App Secret HMAC、Meta UA；Python 預設 UA 被 Cloudflare 1010 擋）→ app 200 captured 1 → aware-wave.com FluentCRM 出現 test@meta.com（tag meta-lead-ad）；操作者發佈 App；測試工具刪舊名單＋建新 → nginx `02:37:42 POST /api/webhooks/meta 200 "Webhooks/1.0"`（Meta 2a03:2880）。
+- 清理：FluentCRM contact 1 刪、meta-lead-ad tag 刪（contacts 0、tag 0）；co_leads 9dae8fab 1 列＋timeline 2 列刪，殘留 0；表單 ARCHIVED（Meta 表單不可刪，殘 1 筆測試名單 API 刪不掉）。
+- repo compose 補 META_PAGE_TOKEN_1418148121372301（5729dda84）＝主機同集合。
+- 監工台 C14.3 done、新增 C14.4 Soulful（R0-PLAN §6 同步），71/78。
+- 避免再發生：Meta webhook 測試前先確認 App 已發佈；外部 POST 測試帶非預設 UA。
+- REALTEST_EVIDENCE: tool=SSH | cmd=grep 'POST /api/webhooks/meta' nginx log → Meta 200；wp eval-file fcrm verify/clean；psql co_leads count=0 | exit=0 | ms=60000
+- REVIEW_WAIVED: NA -- 外部設定與真測，程式僅 compose 一行對照
+- BUGHUNT_WAIVED: NA -- 無程式邏輯改動
 ## 2026-11-04（續4）外聯 C14.3 決定：專用 Meta App
 
 - 現況（唯讀查證）：Postiz App 2998470257172880 page webhook→chatwoot.aware-wave.com/bot（Chatwoot FB_APP_ID 用它）；next-admin 容器 META_APP_SECRET＝空字串（sha256 e3b0c442…）→ /api/webhooks/meta 從未接通；容器無任何 META_PAGE_TOKEN_<pageId>（compose 未傳）。
