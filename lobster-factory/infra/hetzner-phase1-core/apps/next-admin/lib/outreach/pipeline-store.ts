@@ -88,10 +88,12 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
         if (!cand.length) return [];
         const idList = cand.map((l) => l.id);
         const withEvidence = ids(must("evidence read", await sb.from("co_evidence").select("lead_id").in("lead_id", idList)));
-        // researched in the last week (nothing found, or the run died): retried once a week, never every tick (Codex C15 F2)
+        // researched in the last week (nothing found, or the run died): retried once a week, never every tick (Codex C15 F2).
+        // research_insufficient counts too: a website that is a platform page (line.me) is refused before research_started
+        // is written, and was picked again every tick (C16.2 REALTEST 2026-11-04).
         const weekAgo = new Date(Date.now() - RESEARCH_RETRY_DAYS * 86_400_000).toISOString();
-        const tried = ids(must("timeline read", await sb.from("co_timeline_events").select("lead_id").eq("event_type", "research_started")
-          .gte("created_at", weekAgo).in("lead_id", idList)));
+        const tried = ids(must("timeline read", await sb.from("co_timeline_events").select("lead_id")
+          .in("event_type", ["research_started", "research_insufficient"]).gte("created_at", weekAgo).in("lead_id", idList)));
         return cand.filter((l) => !withEvidence.has(l.id) && !tried.has(l.id));
       }, limit);
     },
