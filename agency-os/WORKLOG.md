@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-04（續7）外聯 C14.4：Meta webhook 支援「一家公司一個 App」（Soulful 用自己的 App）
+
+- 決定：Soulful 粉專屬商家組合 Soulful Expression（2042282976397079），用該組合自己的 App 992677007160936，不借 AwareWave App；兩家公司各自的 App／密鑰／權杖。
+- 根因：webhook 驗簽只認 META_APP_SECRET 一把 → 第二家公司的 App 送來會 403。
+- 改：`lib/social/meta-webhook.ts` metaAppSecrets() = META_APP_SECRET ＋ META_APP_SECRET_<appId>；route 任一把簽名對得上即收（內容仍用該粉專自己的權杖回 Graph 讀）。repo compose 加 META_APP_SECRET_992677007160936、META_PAGE_TOKEN_808838245657038。
+- 正式站 .env 加同兩行（備份 .env.bak.meta-soulful-*）；憑證檔 9.4c（App Secret、長期用戶權杖、Soulful 長期粉專權杖 expires 0）。
+- Codex：F1/F2 = compose 未宣告兩個變數 → 已加（repo；主機走 safe-infra-patch）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run app/api/webhooks/meta lib/social → 157 passed；tsc exit 0；突變 secrets.some→true 紅 2 → 還原綠 | exit=0 | ms=4000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib | grep=META_APP_SECRET | hits=8
+- BUGHUNT_SCOPE_NARROW: 只有 next-admin 讀這個變數；scripts／agency-os 無程式使用
 ## 2026-11-04（續6）外聯：FluentCRM 標籤改成「來源＋表單」兩層（操作者：一看就知道哪個管道）
 
 - 根因：標籤寫死在三處（warm-leads.ts `meta-lead-ad`、sync-fluentcrm `outreach-warm`），沒有表單層；已同步的人從新管道進來會被「已同步就跳過」擋掉，新標籤補不上。

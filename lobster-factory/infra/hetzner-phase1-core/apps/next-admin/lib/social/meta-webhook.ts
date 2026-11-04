@@ -53,6 +53,14 @@ export function verifyMetaSignature(rawBody: string, signature: string | null, a
   return timingSafeEqual(Buffer.from(received, "hex"), Buffer.from(expected, "hex"));
 }
 
+/** One Meta app per company, all calling this endpoint: META_APP_SECRET plus META_APP_SECRET_<appId> (each needs its
+ *  compose line). A delivery is genuine when any one signs it; its content is still read back with the Page's own token. */
+export function metaAppSecrets(env: MetaSocialEnv = process.env): string[] {
+  return Object.entries(env)
+    .filter(([k, v]) => /^META_APP_SECRET(_\d{1,30})?$/.test(k) && !!v?.trim())
+    .map(([, v]) => (v as string).trim());
+}
+
 export function autoReplyReady(env: MetaSocialEnv = process.env): boolean {
   return env.META_AUTO_REPLY_ENABLED?.trim().toLowerCase() === "true"
     && env.META_AUTO_REPLY_OPERATOR_APPROVED?.trim().toLowerCase() === "true";

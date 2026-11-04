@@ -39,4 +39,21 @@ describe("Meta webhook route", () => {
     expect(response.status).toBe(200);
     expect(processMock).toHaveBeenCalledWith({ object: "page", entry: [] });
   });
+
+  it("accepts a delivery signed by another company's app (META_APP_SECRET_<appId>), and no unconfigured secret", async () => {
+    process.env.META_APP_SECRET = "app-secret";
+    process.env.META_APP_SECRET_992677007160936 = "soulful-secret";
+    const body = JSON.stringify({ object: "page", entry: [] });
+    const signed = (secret: string) => POST(new Request("https://example.test/api/webhooks/meta", {
+      method: "POST", body, headers: { "x-hub-signature-256": `sha256=${createHmac("sha256", secret).update(body).digest("hex")}` },
+    }));
+    expect((await signed("soulful-secret")).status).toBe(200);
+    expect((await signed("someone-else")).status).toBe(403);
+  });
+
+  it("is 503 when no app secret is configured", async () => {
+    delete process.env.META_APP_SECRET;
+    const response = await POST(new Request("https://example.test/api/webhooks/meta", { method: "POST", body: "{}" }));
+    expect(response.status).toBe(503);
+  });
 });

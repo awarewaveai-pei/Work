@@ -1,7 +1,7 @@
 // Public Meta webhook endpoint for C27 comment/DM auto-replies.
 // GET is Meta's verification handshake; POST validates the raw-body signature before parsing JSON.
 import { NextResponse } from "next/server";
-import { verifyMetaSignature } from "@/lib/social/meta-webhook";
+import { metaAppSecrets, verifyMetaSignature } from "@/lib/social/meta-webhook";
 import { processMetaWebhook } from "@/lib/social/meta-auto-reply";
 import { handleLeadgenChanges } from "@/lib/outreach/meta-leads";
 
@@ -26,10 +26,11 @@ export async function GET(req: Request): Promise<Response> {
 }
 
 export async function POST(req: Request): Promise<Response> {
-  const appSecret = configured("META_APP_SECRET");
-  if (!appSecret) return NextResponse.json({ ok: false, error: "meta_webhook_not_configured" }, { status: 503 });
+  const secrets = metaAppSecrets();
+  if (secrets.length === 0) return NextResponse.json({ ok: false, error: "meta_webhook_not_configured" }, { status: 503 });
   const rawBody = await req.text();
-  if (!verifyMetaSignature(rawBody, req.headers.get("x-hub-signature-256"), appSecret)) {
+  const signature = req.headers.get("x-hub-signature-256");
+  if (!secrets.some((s) => verifyMetaSignature(rawBody, signature, s))) {
     return NextResponse.json({ ok: false, error: "invalid_meta_signature" }, { status: 403 });
   }
   let payload: unknown;
