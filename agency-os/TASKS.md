@@ -106,6 +106,7 @@
 
 
 ### 未完成
+- [ ] **【未開始 2026-11-04｜向量專業版】VectorCraft（storytold，Illustrator 開源重製）WASM 網頁版嵌入 app `tools/vector-pro`＋六個出稿積木抽成共用層** — 計畫 `agency-os/handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md` §6（C1–C6，22 項）；監工台 https://claude.ai/artifact/GKGxtNsXbW65SDhsHiTqRK；研究 `agency-os/reports/decisions/2026-11-04-vector-editor-vs-vectorcraft.md`。待決 1：wasm 靜態檔不經登入。下一步 C1.1 裝 Rust 工具鏈。建議模型：Opus 5.5。
 
 #### A. ⏰ 有外部時鐘（死線／到期日）
 

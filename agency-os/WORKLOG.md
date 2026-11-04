@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-04（續22）向量專業版：研究 storytold/vectorcraft 原始碼 → 選嵌入路線，計畫 C1–C6＋監工台
+
+- 根因（操作者：「功能比我的齊全、更像 Illustrator，想補缺＋照它排版」→「要完整 Illustrator 功能與相同排版」）：Fabric.js 編輯器 7 工具 vs Illustrator 89 工具，補到齊＝重寫；真品有 MIT/Apache WASM 網頁版且明寫供 iframe（`apps/vectorcraft-web/src/api.rs:1-17` `window.vectorcraft`）。
+- 先貼的 `vectorcraft-app/vectorcraft` 是假複製品（無 workspace Cargo.toml、核心 14 crate 缺、5 commit 10 分鐘、73 MB 7z、topics installer）；真品 `storytold/vectorcraft` 11k★、815,771 行、24 crate。記憶 `reference_vectorcraft_real_repo.md`。
+- 讀碼：兩個 Explore agent 分讀 ui-egui（版面尺寸、工具順序、控制列、Properties 規則、主題色）與 tools/pathops/text/doc（實作清單）；主 session 抽查 8 處 file:line 全命中。報告 `agency-os/reports/decisions/2026-11-04-vector-editor-vs-vectorcraft.md`。
+- 計畫 `agency-os/handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md`：C1 本機建置鏈（釘 commit、加 Noto Sans TC）→ C2 nginx 靜態承載（wasm 不進 git、不放 apps/ 樹因 sg-deploy `--delete`）→ C3 app 門 → C4 積木共用層（六積木一份、兩 ctx 轉接器）→ C5 繁中與 My Designs → C6 smoke／升級流程。監工台 https://claude.ai/artifact/GKGxtNsXbW65SDhsHiTqRK（data.mjs → build → check 綠）。
+- REALTEST_WAIVED: DOC_ONLY -- 本輪只有研究、計畫與監工台；`node check.mjs` ok: 6 cards, 22 items, 1 open。
+- REVIEW_WAIVED: DOC_ONLY -- 計畫待操作者拍板待決 1 後開卡；每卡各自 /codex-review。
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=vectorcraft-pro | hits=3（R0-PLAN、data.mjs、TASKS 新條目；舊檔無引用）
 ## 2026-11-04（續21）編輯器整合 CARD-06：去背面板聯集＋濾鏡單一擁有者（修 CARD-05 Codex F1–F3）
 
 - SDK worker（cc.py session 5d2f0abd，US$4.47，60 turns），卡 `agency-os/handoffs/2026-11-04-editor-merge/CARD-06-background-removal.md`（含「Filter ownership invariant」段）。
