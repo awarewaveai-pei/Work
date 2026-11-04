@@ -222,3 +222,11 @@ describe("staff tools", () => {
     expect(toolsFor("/api/nothing-here")).toBeNull();
   });
 });
+
+// public/editor-shared/*.js is loaded by /tools/canvas and the /vector-editor.html iframe (調色 math, CARD-05 2026-11-04):
+// it must reach every signed-in staff member, or a staff member with only the design tool ticked loses 調色.
+describe("shared editor assets belong to every staff member", () => {
+  it("/editor-shared/* is platform", () => {
+    expect(toolsFor("/editor-shared/color-grade.js")).toBe("platform");
+  });
+});

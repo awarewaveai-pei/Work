@@ -21,9 +21,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Canvas as FabricCanvas, FabricObject } from "fabric";
 import { roleHeader } from "@/lib/ops-role";
 import { CANVAS_NAME_KEY, toCanvasSrc, readCanvasSource } from "@/components/tools/canvas-handoff";
-import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
-import type { ColorGradeState } from "@/lib/studio/color-grade";
-import { buildFabricImageFilters, buildPresetFilters, buildEffectFilters, PRESET_FILTERS, buildHslMixerFilter, HSL_NEUTRAL, HSL_RANGES, hasAnyHslAdjustment, sanitizeHslMixer, type HslMixerState, type HslRange } from "./fabric-filters";
+import { ensureAwFilters } from "./fabric-filters";
+// 🎨 調色: the math, slider rows, presets and `adj` shape are public/editor-shared/color-grade.js (the Vector Editor loads the same file)
+import { GRADE_SECTIONS, HSL_AXES, HSL_RANGES, PRESETS, applyAuto, buildFilterSpecs, fmtValue, getPath, hasAnyHsl, hslNeutral, isNeutralAdj, limitOf, makeFilters, neutralAdj, sanitizeAdj, setPath, type AdjState, type AutoKind, type HslKey } from "@/lib/studio/editor-color-grade";
 import SidebarPanel from "@/components/tools/SidebarPanel";
 import FontLibrary, { type FontPreset } from "@/components/tools/FontLibrary";
 import { posterizeDataUrl } from "@/lib/studio/posterize";
@@ -41,21 +41,6 @@ const EDGE_PREVIEWS = EDGE_MASK_STYLES.map((s) => ({
 }));
 
 type SaveState = "idle" | "saving" | "saved" | "error";
-
-/**
- * 🎨 Per-image adjustment bundle (#3). Stored on each Fabric image as `.adj` (registered in
- * customProperties so it survives toJSON / design save / load). Re-selecting an image restores
- * exactly these sliders — switching images no longer carries the previous image's settings.
- */
-type AdjState = {
-  grade: ColorGradeState;
-  presetId: string | null;
-  removeWhite: boolean;
-  vibrance: number; temp: number; blur: number; noise: number;
-  contrast: number; shadows: number; highlights: number;
-  exposure: number; clarity: number; dehaze: number;
-  hslMixer?: HslMixerState;
-};
 
 /**
  * Font choices for the text tool. Each value is a CSS font-family STACK (canvas 2D / Fabric
@@ -273,12 +258,9 @@ export default function CanvasEditor() {
   const [imageSelected, setImageSelected] = useState(false); // an image object is selected → show 調色
   const [anySelected, setAnySelected] = useState(false); // any object selected → enable per-object tools
   const [lockSelected, setLockSelected] = useState(false); // selected object is locked (防呆 block)
-  const [presetId, setPresetId] = useState<string | null>(null); // one-click look preset (active image)
-  const [removeWhite, setRemoveWhite] = useState(false); // free chroma-key white-bg removal
-  const [vibrance, setVibrance] = useState(0); // 自然飽和 -100..100
-  const [blurv, setBlurv] = useState(0); // 高斯模糊 0..100
-  const [noisev, setNoisev] = useState(0); // 雜訊 0..100
-  const [temp, setTemp] = useState(0); // 色溫 -100(冷)..100(暖)
+  // 🎨 調色: every control of the panel edits this one object (shape + math = public/editor-shared/color-grade.js);
+  // it is written to the selected image as `adj`, so selecting an image fills the controls and project save/load keep it
+  const [adj, setAdj] = useState<AdjState>(() => neutralAdj());
   const [layers, setLayers] = useState<FabricObject[]>([]); // 圖層面板 (top layer first)
   const [selLayers, setSelLayers] = useState<FabricObject[]>([]); // objects currently selected on the canvas → highlighted rows
   const layersListRef = useRef<HTMLDivElement | null>(null);
@@ -342,16 +324,7 @@ export default function CanvasEditor() {
   const [edgeAmount, setEdgeAmount] = useState(55);
   const [edgeStyleApplied, setEdgeStyleApplied] = useState<EdgeMaskId | null>(null);
   const [posterLevels, setPosterLevels] = useState(5);
-  // 🎛 調整 Adjustments (PS-style: contrast/shadows/highlights + Camera RAW)
-  const [contrast, setContrast] = useState(0);     // 對比 -100..100
-  const [shadows, setShadows] = useState(0);        // 陰影 -100..100
-  const [highlights, setHighlights] = useState(0);  // 高光 -100..100
-  const [exposure, setExposure] = useState(0);      // 曝光 -100..100
-  const [clarity, setClarity] = useState(0);        // 清晰度 0..100
-  const [dehaze, setDehaze] = useState(0);          // 去霧 0..100
-  // 🎨 HSL Color Mixer — 8 hue ranges × H/S/L (Photoshop-style targeted adjustment)
-  const [hslMixer, setHslMixer] = useState<HslMixerState>(() => JSON.parse(JSON.stringify(HSL_NEUTRAL)));
-  const [hslTab, setHslTab] = useState<HslRange>("all");
+  const [hslTab, setHslTab] = useState<HslKey>("all"); // which HSL range the mixer sliders show
   // 🗂 群組 — track whether the active selection can be grouped / ungrouped.
   const [multiSelected, setMultiSelected] = useState(false); // ActiveSelection (≥2 objects)
   const [groupSelected, setGroupSelected] = useState(false); // a single Group object
@@ -374,7 +347,6 @@ export default function CanvasEditor() {
     if (fh) setFillPick(fh);
     if (st.grad) setGradCfg(st.grad);
   }, []);
-  const grade = useColorGrade(); // 修圖積木 applied to the selected image via Fabric filters
   // 🎨 per-image adjustments (#3/#4): userEditRef holds the OBJECT the user is editing (not a bool).
   // The debounced undo snapshot fires only when the filter effect's active object === userEditRef,
   // so a programmatic selection-sync (loadAdj) can never consume a flag meant for another object
@@ -385,13 +357,7 @@ export default function CanvasEditor() {
   const markEdit = useCallback(() => { userEditRef.current = fabricRef.current?.getActiveObject() ?? null; }, []);
   // Reset all adjustment sliders to neutral (programmatic — does NOT markEdit). Used after a bake
   // replaces the image (new pixels already include the look) and after undo/redo restore.
-  const resetAdjToNeutral = useCallback(() => {
-    grade.reset();
-    setPresetId(null); setRemoveWhite(false);
-    setVibrance(0); setTemp(0); setBlurv(0); setNoisev(0);
-    setContrast(0); setShadows(0); setHighlights(0); setExposure(0); setClarity(0); setDehaze(0);
-    setHslMixer(JSON.parse(JSON.stringify(HSL_NEUTRAL)));
-  }, [grade]);
+  const resetAdjToNeutral = useCallback(() => setAdj(neutralAdj()), []);
 
   // Container width for dynamic MAX_DISP — keeps canvas within viewport without horizontal scroll.
   const [containerWidth, setContainerWidth] = useState(650);
@@ -425,6 +391,7 @@ export default function CanvasEditor() {
       // Fabric v7 defaults to WebGL (enableGLFiltering=true); custom filters that only implement
       // applyTo2d are silently skipped — WebGL runs the identity shader instead (critic 2026-06-29).
       (fabric as unknown as { config?: { configure(o: Record<string, unknown>): void } }).config?.configure({ enableGLFiltering: false });
+      ensureAwFilters(fabric); // HSL mixer + blur filter classes → classRegistry, so undo / design load can revive them
 
       // Persist our custom `name` (圖層改名) through toJSON/loadFromJSON + design save. Must be set
       // class-level BEFORE any object is created (Fabric v7 concatenates customProperties into
@@ -459,23 +426,7 @@ export default function CanvasEditor() {
 
       // 🎨 Load an image's saved adjustments into the sliders (or neutral). Sets state WITHOUT
       // touching userEditRef, so the filter effect won't record an undo step for a mere selection.
-      const loadAdj = (adj: AdjState | null) => {
-        if (adj) {
-          adj.grade ? grade.setAll(adj.grade) : grade.reset();
-          setPresetId(adj.presetId ?? null);
-          setRemoveWhite(!!adj.removeWhite);
-          setVibrance(adj.vibrance ?? 0); setTemp(adj.temp ?? 0); setBlurv(adj.blur ?? 0); setNoisev(adj.noise ?? 0);
-          setContrast(adj.contrast ?? 0); setShadows(adj.shadows ?? 0); setHighlights(adj.highlights ?? 0);
-          setExposure(adj.exposure ?? 0); setClarity(adj.clarity ?? 0); setDehaze(adj.dehaze ?? 0);
-          setHslMixer(sanitizeHslMixer(adj.hslMixer));
-        } else {
-          grade.reset();
-          setPresetId(null); setRemoveWhite(false);
-          setVibrance(0); setTemp(0); setBlurv(0); setNoisev(0);
-          setContrast(0); setShadows(0); setHighlights(0); setExposure(0); setClarity(0); setDehaze(0);
-          setHslMixer(sanitizeHslMixer(undefined));
-        }
-      };
+      const loadAdj = (raw: unknown) => setAdj(raw ? sanitizeAdj(raw) : neutralAdj());
 
       // Keep the toolbar in sync with the selected text object (and vice-versa).
       const syncFromSelection = () => {
@@ -611,8 +562,8 @@ export default function CanvasEditor() {
     };
   }, []);
 
-  // Apply colour-grade + preset/RemoveColor to the selected IMAGE (Fabric filters), combined so
-  // both coexist. Canvas is WYSIWYG: the filtered pixels are exactly what toDataURL exports.
+  // Apply the 調色 adj (grade + 去白底/預設 + effects + HSL, built by the shared buildFilterSpecs) to the selected IMAGE.
+  // Canvas is WYSIWYG: the filtered pixels are exactly what toDataURL exports.
   useEffect(() => {
     const canvas = fabricRef.current;
     if (!canvas) return;
@@ -621,25 +572,16 @@ export default function CanvasEditor() {
     let cancelled = false;
     void import("fabric").then((fabric) => {
       if (cancelled || fabricRef.current !== canvas) return;
-      const ns = fabric as unknown as { filters: Record<string, new (o?: Record<string, unknown>) => object> };
+      const F = (fabric as unknown as { filters: Record<string, new (o?: Record<string, unknown>) => object> }).filters;
+      const aw = ensureAwFilters(fabric);
       const target = obj as unknown as { filters: object[]; applyFilters: () => void };
-      target.filters = [
-        ...buildFabricImageFilters(ns, grade.params),
-        ...buildPresetFilters(ns, presetId, removeWhite),
-        ...buildEffectFilters(ns, { vibrance, blur: blurv, noise: noisev, temp, contrast, shadows, highlights, exposure, clarity, dehaze }),
-        ...buildHslMixerFilter(ns, hslMixer),
-      ];
+      target.filters = makeFilters((cls) => aw[cls] ?? F[cls], buildFilterSpecs(adj));
       target.applyFilters();
       canvas.requestRenderAll();
       setSaveState("idle"); // filter/adjust change is an edit → re-enable save
-      // 🎨 persist these params on THIS image (#3) so re-selecting it restores the exact sliders.
-      (obj as unknown as { adj?: AdjState }).adj = {
-        grade: { ...grade.state }, presetId, removeWhite,
-        vibrance, temp, blur: blurv, noise: noisev,
-        contrast, shadows, highlights, exposure, clarity, dehaze,
-        hslMixer: JSON.parse(JSON.stringify(hslMixer)),
-      };
-      // ↩️ #4 record ONE undo step after the user stops dragging (debounced). Only when THIS object
+      // persist on THIS image so re-selecting it (or save/load, undo) restores the exact controls
+      (obj as unknown as { adj?: AdjState }).adj = JSON.parse(JSON.stringify(adj));
+      // ↩️ record ONE undo step after the user stops dragging (debounced). Only when THIS object
       // is the genuine edit target — never for selection-sync (loadAdj) or undo/redo restore.
       if (userEditRef.current === obj && !restoringRef.current) {
         userEditRef.current = null;
@@ -650,10 +592,9 @@ export default function CanvasEditor() {
     return () => {
       cancelled = true;
     };
-    // snapshot intentionally omitted from deps (declared later; stable useCallback). grade.state read
-    // via grade.params dep. userEditRef/snapTimerRef are refs.
+    // snapshot intentionally omitted from deps (declared later; stable useCallback). userEditRef/snapTimerRef are refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grade.params, presetId, removeWhite, vibrance, blurv, noisev, temp, contrast, shadows, highlights, exposure, clarity, dehaze, hslMixer]);
+  }, [adj]);
 
   const addText = useCallback(() => {
     const canvas = fabricRef.current;
@@ -1934,80 +1875,28 @@ export default function CanvasEditor() {
     }
   }, [exportPng]);
 
-  // 🔄 Auto 色階 / 色彩 / 色調 — pixel analysis on the selected image → auto-set sliders.
-  const autoContrast = useCallback(() => {
+  // 🔄 自動對比 / 自動色彩 / 自動色調 — pixel analysis of the selected image → sliders (analysis = shared applyAuto)
+  const runAuto = useCallback((kind: AutoKind) => {
     const canvas = fabricRef.current;
     const obj = canvas?.getActiveObject() as { type?: string; toDataURL?: (o?: Record<string, unknown>) => string } | null;
     if (!canvas || !obj || obj.type !== "image" || !obj.toDataURL) return;
     markEdit(); // auto-adjust is a user edit → undoable + persisted to img.adj
     const dataUrl = obj.toDataURL({ format: "png", multiplier: 1, withoutTransform: true });
     const img = new Image();
-    img.onerror = () => setError("自動對比失敗：無法解碼圖片");
+    img.onerror = () => setError("自動調整失敗：無法解碼圖片");
     img.onload = () => {
+      // setAdj writes to whatever image is selected NOW → if the selection moved while decoding, drop it (same as vector-editor)
+      if (fabricRef.current !== canvas || canvas.getActiveObject() !== (obj as unknown)) { setError("選取已變更，自動調整已取消"); return; }
       const oc = document.createElement("canvas");
       oc.width = img.width; oc.height = img.height;
       const ctx = oc.getContext("2d");
       if (!ctx) return;
       ctx.drawImage(img, 0, 0);
       const d = ctx.getImageData(0, 0, img.width, img.height).data;
-      let lo = 255, hi = 0;
-      for (let i = 0; i < d.length; i += 4) {
-        if (d[i + 3] < 10) continue;
-        const luma = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
-        if (luma < lo) lo = luma;
-        if (luma > hi) hi = luma;
-      }
-      if (hi <= lo) return;
-      const range = hi - lo;
-      // Map the compressed tonal range → contrast/exposure sliders (full -100..100 range).
-      // grade.black/white sliders have narrow bounds (0..64 / 191..255) so we use the
-      // dedicated contrast + exposure sliders that cover the full range correctly.
-      const contrastBoost = Math.round(Math.min(100, (255 / range - 1) * 50));
-      const midpoint = (lo + hi) / 2;
-      const exposureAdj = Math.round(Math.max(-50, Math.min(50, (127.5 - midpoint) / 2.55)));
-      setContrast(contrastBoost);
-      setExposure(exposureAdj);
+      setAdj((a) => applyAuto(a, kind, d));
     };
     img.src = dataUrl;
-    // setContrast/setExposure are stable useState dispatchers — no dep needed.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const autoColor = useCallback(() => {
-    const canvas = fabricRef.current;
-    const obj = canvas?.getActiveObject() as { type?: string; toDataURL?: (o?: Record<string, unknown>) => string } | null;
-    if (!canvas || !obj || obj.type !== "image" || !obj.toDataURL) return;
-    markEdit(); // auto-adjust is a user edit → undoable + persisted to img.adj
-    const dataUrl = obj.toDataURL({ format: "png", multiplier: 1, withoutTransform: true });
-    const img = new Image();
-    img.onerror = () => setError("自動色彩失敗：無法解碼圖片");
-    img.onload = () => {
-      const oc = document.createElement("canvas");
-      oc.width = img.width; oc.height = img.height;
-      const ctx = oc.getContext("2d");
-      if (!ctx) return;
-      ctx.drawImage(img, 0, 0);
-      const d = ctx.getImageData(0, 0, img.width, img.height).data;
-      let r = 0, g = 0, b = 0, n = 0;
-      for (let i = 0; i < d.length; i += 4) {
-        if (d[i + 3] < 10) continue;
-        r += d[i]; g += d[i + 1]; b += d[i + 2]; n++;
-      }
-      if (n === 0) return;
-      r /= n; g /= n; b /= n;
-      const gray = (r + g + b) / 3;
-      // Gray world assumption: shift each channel to neutralise cast (SSOT: ColorGradePanel balCR/MG/YB).
-      grade.set("balCR", Math.round(Math.max(-100, Math.min(100, (gray - r) / 2.55))));
-      grade.set("balMG", Math.round(Math.max(-100, Math.min(100, (gray - g) / 2.55))));
-      grade.set("balYB", Math.round(Math.max(-100, Math.min(100, (gray - b) / 2.55))));
-    };
-    img.src = dataUrl;
-  }, [grade]);
-
-  const autoTone = useCallback(() => {
-    autoContrast();
-    autoColor();
-  }, [autoContrast, autoColor]);
+  }, [markEdit]);
 
   // 💾 下載 WebP — export full-DPI canvas then compress to target size (≤ 200 KB).
   const downloadWebP = useCallback(async () => {
@@ -2451,176 +2340,97 @@ export default function CanvasEditor() {
         {/* 調色工具包 — always shown (collapsed); each tool acts on the active image when one is selected. */}
         {(
           <>
-          {/* 3 個獨立可拖面板：調色 / 濾鏡效果 / AI 去除 */}
-          <SidebarPanel id="grade" title="🎨 調色 / 色階 Levels" defaultPos={{ x: 816, y: 328 }} width={272} defaultCollapsed>
-            <fieldset disabled={imageToolsDisabled} style={{ border: 0, padding: 0, margin: 0 }}>
-              {imageToolHint ? <span style={{ display: "block", fontSize: 11, opacity: 0.65, marginBottom: 8 }}>{imageToolHint}</span> : null}
-              <ColorGradePanel state={grade.state} onSet={(k, v) => { markEdit(); grade.set(k, v); }} onReset={() => { markEdit(); grade.reset(); }} neutral={grade.neutral} />
-            </fieldset>
-          </SidebarPanel>
-
-          {/* 🎛 調整 Adjustments — PS-style contrast / shadows / highlights + auto corrections */}
-          <SidebarPanel id="adjust" title="🎛 調整 Adjustments" defaultPos={{ x: 816, y: 348 }} width={272} defaultCollapsed>
-            <fieldset disabled={imageToolsDisabled} style={{ border: 0, padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+          {/* 🎨 調色 — ONE panel: presets · auto · levels · colour balance · basic sliders · Camera RAW · HSL mixer.
+              Same sections / rows / ranges as public/vector-editor.html (both render public/editor-shared/color-grade.js). */}
+          <SidebarPanel id="grade" title="🎨 調色" defaultPos={{ x: 816, y: 328 }} width={272} defaultCollapsed>
+            <fieldset data-cg-panel disabled={imageToolsDisabled} style={{ border: 0, padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
               {imageToolHint ? <span style={{ fontSize: 11, opacity: 0.65 }}>{imageToolHint}</span> : null}
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                <button className="btn-secondary" style={{ fontSize: 12 }} onClick={autoContrast} title="分析畫素亮度範圍，自動設黑白點">自動對比</button>
-                <button className="btn-secondary" style={{ fontSize: 12 }} onClick={autoColor} title="中性灰平衡，自動矯正偏色">自動色彩</button>
-                <button className="btn-secondary" style={{ fontSize: 12 }} onClick={autoTone} title="同時套用自動對比 + 自動色彩">自動色調</button>
-              </div>
+              <button className="btn-secondary" data-cg-reset style={{ fontSize: 12 }} disabled={isNeutralAdj(adj)} onClick={() => { markEdit(); setAdj(neutralAdj()); }} title="全部回到中性值">重設</button>
               {([
-                { label: "對比 Contrast", v: contrast, set: setContrast, min: -100, max: 100 },
-                { label: "陰影 Shadows", v: shadows, set: setShadows, min: -100, max: 100 },
-                { label: "高光 Highlights", v: highlights, set: setHighlights, min: -100, max: 100 },
-              ] as { label: string; v: number; set: (n: number) => void; min: number; max: number }[]).map((row) => (
-                <label key={row.label} style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 2 }}>
-                  <span style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span>{row.label}</span>
-                    <span style={{ opacity: 0.7, fontVariantNumeric: "tabular-nums" }}>{row.v > 0 ? `+${row.v}` : `${row.v}`}</span>
-                  </span>
-                  <input type="range" min={row.min} max={row.max} value={row.v} onChange={(e) => { markEdit(); row.set(Number(e.target.value)); }} style={{ width: "100%" }} />
-                </label>
+                ["presets", "預設風格 Presets"],
+                ["auto", "自動 Auto"],
+              ] as const).map(([id, title]) => (
+                <details key={id} data-cg-sec={id} style={{ border: "1px solid var(--card-border)", borderRadius: 6, padding: "4px 8px" }}>
+                  <summary style={{ cursor: "pointer", fontWeight: 600 }}>{title}</summary>
+                  {id === "presets" ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        <button className="btn-secondary" data-cg-preset="" style={{ fontSize: 12, fontWeight: adj.presetId === null ? 700 : 400 }} onClick={() => { markEdit(); setAdj((a) => ({ ...a, presetId: null })); }}>原圖</button>
+                        {PRESETS.map((p) => (
+                          <button key={p.id} className="btn-secondary" data-cg-preset={p.id} style={{ fontSize: 12, fontWeight: adj.presetId === p.id ? 700 : 400 }} onClick={() => { markEdit(); setAdj((a) => ({ ...a, presetId: a.presetId === p.id ? null : p.id })); }}>{p.label}</button>
+                        ))}
+                      </div>
+                      <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <input type="checkbox" data-cg-removewhite checked={adj.removeWhite} onChange={(e) => { markEdit(); setAdj((a) => ({ ...a, removeWhite: e.target.checked })); }} />
+                        ✂️ 去白底（免費，近白色變透明）
+                      </label>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                      <button className="btn-secondary" data-cg-auto="contrast" style={{ fontSize: 12 }} onClick={() => runAuto("contrast")} title="分析畫素亮度範圍，自動設對比／曝光">自動對比</button>
+                      <button className="btn-secondary" data-cg-auto="color" style={{ fontSize: 12 }} onClick={() => runAuto("color")} title="中性灰平衡，自動矯正偏色">自動色彩</button>
+                      <button className="btn-secondary" data-cg-auto="tone" style={{ fontSize: 12 }} onClick={() => runAuto("tone")} title="同時套用自動對比 + 自動色彩">自動色調</button>
+                    </div>
+                  )}
+                </details>
               ))}
-            </fieldset>
-          </SidebarPanel>
-
-          {/* 🎞 Camera RAW — exposure / clarity / dehaze sliders */}
-          <SidebarPanel id="cameraraw" title="🎞 Camera RAW 效果" defaultPos={{ x: 816, y: 368 }} width={272} defaultCollapsed>
-            <fieldset disabled={imageToolsDisabled} style={{ border: 0, padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-              {imageToolHint ? <span style={{ fontSize: 11, opacity: 0.65 }}>{imageToolHint}</span> : null}
-              {([
-                { label: "曝光 Exposure", v: exposure, set: setExposure, min: -100, max: 100 },
-                { label: "清晰度 Clarity", v: clarity, set: setClarity, min: 0, max: 100 },
-                { label: "去霧 Dehaze", v: dehaze, set: setDehaze, min: 0, max: 100 },
-              ] as { label: string; v: number; set: (n: number) => void; min: number; max: number }[]).map((row) => (
-                <label key={row.label} style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 2 }}>
-                  <span style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span>{row.label}</span>
-                    <span style={{ opacity: 0.7, fontVariantNumeric: "tabular-nums" }}>{row.v > 0 ? `+${row.v}` : `${row.v}`}</span>
-                  </span>
-                  <input type="range" min={row.min} max={row.max} value={row.v} onChange={(e) => { markEdit(); row.set(Number(e.target.value)); }} style={{ width: "100%" }} />
-                </label>
+              {GRADE_SECTIONS.map((sec) => (
+                <details key={sec.id} data-cg-sec={sec.id} style={{ border: "1px solid var(--card-border)", borderRadius: 6, padding: "4px 8px" }}>
+                  <summary style={{ cursor: "pointer", fontWeight: 600 }}>{sec.title}</summary>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+                    {sec.rows.map((row) => {
+                      const lim = limitOf(row.path);
+                      const v = getPath(adj, row.path);
+                      return (
+                        <label key={row.path} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                          <span style={{ display: "flex", justifyContent: "space-between" }}>
+                            <span>{row.label}</span>
+                            <span data-cg-val={row.path} style={{ opacity: 0.7, fontVariantNumeric: "tabular-nums" }}>{fmtValue(row.fmt, v)}</span>
+                          </span>
+                          <input type="range" data-cg={row.path} min={lim.min} max={lim.max} step={row.step} value={v} onChange={(e) => { markEdit(); setAdj((a) => setPath(a, row.path, Number(e.target.value))); }} style={{ width: "100%" }} />
+                        </label>
+                      );
+                    })}
+                  </div>
+                </details>
               ))}
-            </fieldset>
-          </SidebarPanel>
-
-          {/* 🎨 HSL Color Mixer — Photoshop-style 8-range targeted H/S/L (精準版) */}
-          <SidebarPanel id="hslmixer" title="🎨 色彩混合器 HSL" defaultPos={{ x: 816, y: 370 }} width={272} defaultCollapsed>
-            <fieldset disabled={imageToolsDisabled} style={{ border: 0, padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
-              {imageToolHint ? <span style={{ fontSize: 11, opacity: 0.65 }}>{imageToolHint}</span> : null}
-              {/* Tab strip: 全部 + 8 ranges */}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                <button
-                  className="btn-secondary"
-                  style={{ fontSize: 11, padding: "2px 7px", fontWeight: hslTab === "all" ? 700 : 400,
-                    borderBottom: hslTab === "all" ? "2px solid var(--accent)" : "2px solid transparent" }}
-                  onClick={() => setHslTab("all")}
-                >全部</button>
-                {HSL_RANGES.map((r) => (
-                  <button key={r.key} className="btn-secondary"
-                    style={{ fontSize: 11, padding: "2px 5px", fontWeight: hslTab === r.key ? 700 : 400,
-                      borderBottom: hslTab === r.key ? `2px solid ${r.color}` : "2px solid transparent" }}
-                    onClick={() => setHslTab(r.key)}
-                  >
-                    <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: r.color, marginRight: 3, verticalAlign: "middle" }} />
-                    {r.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Active range label */}
-              <div style={{ opacity: 0.55, fontSize: 11 }}>
-                {hslTab === "all" ? "全部色相（整體偏移）" : `${HSL_RANGES.find(r => r.key === hslTab)?.label ?? ""} 色段`}
-                {hasAnyHslAdjustment(hslMixer) && (
-                  <span style={{ color: "var(--accent-text)", marginLeft: 6 }}>已調整</span>
-                )}
-              </div>
-
-              {/* H / S / L sliders for current tab */}
-              {(
-                [
-                  { label: "色相 Hue", axis: "h" as const, min: -40, max: 40 },
-                  { label: "飽和度 Saturation", axis: "s" as const, min: -100, max: 100 },
-                  { label: "明度 Luminance", axis: "l" as const, min: -100, max: 100 },
-                ] satisfies { label: string; axis: "h" | "s" | "l"; min: number; max: number }[]
-              ).map((row) => {
-                const v = hslMixer[hslTab][row.axis];
-                return (
-                  <label key={row.axis} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <span style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span>{row.label}</span>
-                      <span style={{ opacity: 0.7, fontVariantNumeric: "tabular-nums", color: v !== 0 ? "var(--accent-text)" : undefined }}>
-                        {v > 0 ? `+${v}` : `${v}`}
-                      </span>
-                    </span>
-                    <input
-                      type="range" min={row.min} max={row.max} value={v}
-                      onChange={(e) => {
-                        markEdit();
-                        const nv = Number(e.target.value);
-                        setHslMixer(prev => ({
-                          ...prev,
-                          [hslTab]: { ...prev[hslTab], [row.axis]: nv },
-                        }));
-                      }}
-                      style={{ width: "100%" }}
-                    />
-                  </label>
-                );
-              })}
-
-              {/* Reset buttons */}
-              <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
-                <button className="btn-secondary" style={{ fontSize: 11 }}
-                  onClick={() => { markEdit(); setHslMixer(prev => ({ ...prev, [hslTab]: { h: 0, s: 0, l: 0 } })); }}>
-                  重置此色段
-                </button>
-                <button className="btn-secondary" style={{ fontSize: 11 }}
-                  onClick={() => { markEdit(); setHslMixer(JSON.parse(JSON.stringify(HSL_NEUTRAL))); }}>
-                  全部重置
-                </button>
-              </div>
-            </fieldset>
-          </SidebarPanel>
-
-          <SidebarPanel id="filters" title="🎨 濾鏡 / 去背 / 效果" defaultPos={{ x: 816, y: 390 }} width={272} defaultCollapsed>
-            <fieldset disabled={imageToolsDisabled} style={{ border: 0, padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-              {imageToolHint ? <span style={{ fontSize: 11, opacity: 0.65 }}>{imageToolHint}</span> : null}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                <button
-                  className="btn-secondary"
-                  style={{ fontSize: 12, fontWeight: presetId === null ? 700 : 400 }}
-                  onClick={() => { markEdit(); setPresetId(null); }}
-                >
-                  原圖
-                </button>
-                {PRESET_FILTERS.map((p) => (
-                  <button
-                    key={p.id}
-                    className="btn-secondary"
-                    style={{ fontSize: 12, fontWeight: presetId === p.id ? 700 : 400 }}
-                    onClick={() => { markEdit(); setPresetId(presetId === p.id ? null : p.id); }}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-              <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                <input type="checkbox" checked={removeWhite} onChange={(e) => { markEdit(); setRemoveWhite(e.target.checked); }} />
-                ✂️ 去白底（免費，近白色變透明）
-              </label>
-              {/* 影像效果積木：自然飽和 / 高斯模糊 / 雜訊 */}
-              {[
-                { label: "自然飽和", v: vibrance, set: setVibrance, min: -100, max: 100 },
-                { label: "色溫 冷↔暖", v: temp, set: setTemp, min: -100, max: 100 },
-                { label: "高斯模糊", v: blurv, set: setBlurv, min: 0, max: 100 },
-                { label: "雜訊", v: noisev, set: setNoisev, min: 0, max: 100 },
-              ].map((row) => (
-                <label key={row.label} style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 2 }}>
-                  <span style={{ display: "flex", justifyContent: "space-between" }}><span>{row.label}</span><span style={{ opacity: 0.7 }}>{row.v}</span></span>
-                  <input type="range" min={row.min} max={row.max} value={row.v} onChange={(e) => { markEdit(); row.set(Number(e.target.value)); }} />
-                </label>
-              ))}
+              <details data-cg-sec="hsl" style={{ border: "1px solid var(--card-border)", borderRadius: 6, padding: "4px 8px" }}>
+                <summary style={{ cursor: "pointer", fontWeight: 600 }}>色彩混合器 HSL</summary>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+                  {/* Tab strip: 全部 + 8 ranges */}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                    <button className="btn-secondary" data-cg-hsl-tab="all" style={{ fontSize: 11, padding: "2px 7px", fontWeight: hslTab === "all" ? 700 : 400, borderBottom: hslTab === "all" ? "2px solid var(--accent)" : "2px solid transparent" }} onClick={() => setHslTab("all")}>全部</button>
+                    {HSL_RANGES.map((r) => (
+                      <button key={r.key} className="btn-secondary" data-cg-hsl-tab={r.key} style={{ fontSize: 11, padding: "2px 5px", fontWeight: hslTab === r.key ? 700 : 400, borderBottom: hslTab === r.key ? `2px solid ${r.color}` : "2px solid transparent" }} onClick={() => setHslTab(r.key)}>
+                        <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: r.color, marginRight: 3, verticalAlign: "middle" }} />
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ opacity: 0.55, fontSize: 11 }}>
+                    {hslTab === "all" ? "全部色相（整體偏移）" : `${HSL_RANGES.find((r) => r.key === hslTab)?.label ?? ""} 色段`}
+                    {hasAnyHsl(adj.hslMixer) && <span style={{ color: "var(--accent-text)", marginLeft: 6 }}>已調整</span>}
+                  </div>
+                  {HSL_AXES.map((row) => {
+                    const v = adj.hslMixer[hslTab][row.axis];
+                    return (
+                      <label key={row.axis} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        <span style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span>{row.label}</span>
+                          <span style={{ opacity: 0.7, fontVariantNumeric: "tabular-nums", color: v !== 0 ? "var(--accent-text)" : undefined }}>{v > 0 ? `+${v}` : `${v}`}</span>
+                        </span>
+                        <input type="range" data-cg-hsl={row.axis} min={row.min} max={row.max} value={v}
+                          onChange={(e) => { markEdit(); const nv = Number(e.target.value); setAdj((a) => ({ ...a, hslMixer: { ...a.hslMixer, [hslTab]: { ...a.hslMixer[hslTab], [row.axis]: nv } } })); }}
+                          style={{ width: "100%" }} />
+                      </label>
+                    );
+                  })}
+                  <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
+                    <button className="btn-secondary" data-cg-hsl-reset="range" style={{ fontSize: 11 }} onClick={() => { markEdit(); setAdj((a) => ({ ...a, hslMixer: { ...a.hslMixer, [hslTab]: { h: 0, s: 0, l: 0 } } })); }}>重置此色段</button>
+                    <button className="btn-secondary" data-cg-hsl-reset="all" style={{ fontSize: 11 }} onClick={() => { markEdit(); setAdj((a) => ({ ...a, hslMixer: hslNeutral() })); }}>全部重置</button>
+                  </div>
+                </div>
+              </details>
             </fieldset>
           </SidebarPanel>
 

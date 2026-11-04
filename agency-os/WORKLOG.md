@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-04（續20）編輯器整合 CARD-05：調色面板聯集＋調色數學單一來源
+
+- SDK worker（cc.py session 1f3eb412，US$3.69，60 turns），卡 `agency-os/handoffs/2026-11-04-editor-merge/CARD-05-color-grade.md`。
+- 兩邊同一個「🎨 調色」：預設風格（10＋原圖＋去白底）、自動對比/色彩/色調、Levels 黑白點＋Gamma、色彩平衡 3 軸、亮度/對比/飽和/鮮豔度/色相/色溫/陰影/亮部/銳利/模糊/雜訊、Camera RAW（曝光/清晰度/去霧）、HSL 混合器、重設；設定存在圖片 `adj`（vector 加進 LAYER_PROPS，undo/redo、存讀、跨編輯器載入都帶著）；非圖片選取時停用並提示。刪 vector `adjust` 積木、canvas `adjust`／`cameraraw`／`hslmixer`／`filters` 四面板；blocks README 合成一列 `color-grade`。
+- 單一來源：`public/editor-shared/color-grade.js`（純 ES module：adj 模型、滑桿範圍、預設、`buildFilterSpecs(adj)`、HSL／模糊像素數學、自動分析）；vector 用 `<script type="module">` 載入，canvas 經 `lib/studio/editor-color-grade.ts`（只加型別）import；兩邊只負責把 spec 對到各自 Fabric 類別，自訂濾鏡 `AwHsl`／`AwBlur` 兩邊都註冊。漂移測試 `lib/studio/__tests__/editor-color-grade-drift.test.ts`。
+- 主 session 追加：`/editor-shared/*` 會經過 middleware 員工工具授權，`toolsFor()` 對它回 null → enforce 模式下只勾 design 的員工 vector 調色會載不到。matcher 排除不可行（`middleware-portal-guards.test.ts` 要求每個產品網域 nginx 拒絕被排除路徑 → 要動正式站 nginx）；`staffPaths` 只能是 app 目錄（products.test）。改列 `STAFF_PLATFORM.pages` 加 `/editor-shared`（純靜態數學、無資料），`staff-tools.test.ts` 加「`toolsFor('/editor-shared/color-grade.js') === 'platform'`」。
+- REALTEST_EVIDENCE: tool=Bash | cmd=worker：tsc 0、SRI 13、vitest 220（24 files）、drift test 15、card-05 e2e 194/194（同一張測試圖兩邊套同設定、匯出 PNG 平均 RGB 差 ≤3）、回歸 card-01..04 = 63/147/94/264；主 session：tsc 0、vitest lib/portal＋middleware guards＋lib/studio＋sidebar＋lib/security 324 passed／2 failed（兩個失敗皆別的 session 未提交的 tools/seedstar，與本卡無關），新增 platform 測試綠 | exit=0 | ms=0
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n（agency-os/reports/oracle/2026-11-04-partialreview-7b1c8fc0.md）。F4 canvas 自動調整解碼期間換選取 → 已修（選取變了就取消並提示）。F1–F3 同一類「濾鏡擁有權靠參數猜」（舊專案無 adj 的濾鏡、去背 white/0.12、去背還原刪掉去白底）→ 不變量「圖片每個濾鏡都由 adj 產生」，寫進 CARD-06 卡（去背也進 adj、舊濾鏡搬 adj.legacy）一起修；修好前不單獨部署本卡。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=id:'adjust'\|SidebarPanel id="cameraraw"\|SidebarPanel id="hslmixer"\|SidebarPanel id="filters" | hits=0（舊積木與四個舊面板皆已移除；buildFabricImageFilters 只剩 tarot renderPrintCard、GradedPreview 兩個範圍外使用者）
+- 未處理（範圍外，worker 回報）：Tarot 列印與 Studio GradedPreview 仍用舊 `buildFabricImageFilters`，色相以弧度傳入（30° 實際約 94°）。
 ## 2026-11-04（續19）外聯：名單搜尋接續（游標，migration 0160）＋C16.2 修法（產信只寫證據、核准投票兩次）
 
 - 根因（操作者問「同條件再搜會不會重複付費」）：找名單／經濟部／找人都從第 1 頁搜（`discover.ts:116`、`sources/gcis.ts:169`、`sources/people-search.ts:105`）→ 同條件再搜＝同一批付費、只標 suspected_dup。

@@ -55,7 +55,9 @@ export const STAFF_API_OWNERS: Readonly<Record<string, readonly string[]>> = {
 
 /** Pages and APIs every signed-in staff member may use, whatever is ticked. */
 export const STAFF_PLATFORM: { pages: readonly string[]; apis: readonly string[] } = {
-  pages: ["/$", "/no-access$"],   // /no-access: where the gate sends a page it refuses (a loop otherwise)
+  // /no-access: where the gate sends a page it refuses (a loop otherwise). /editor-shared: static editor math (public/editor-shared/*.js,
+  // no data) that /tools/canvas and the /vector-editor.html iframe both load -- a restricted staff member must not lose 調色.
+  pages: ["/$", "/no-access$", "/editor-shared"],
   apis: [...PLATFORM_APIS, "/api/ops/build-id", "/api/ops/analytics-context"],
 };
 

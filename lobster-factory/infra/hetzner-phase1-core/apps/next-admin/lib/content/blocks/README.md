@@ -195,7 +195,7 @@ AI prompt 是獨立積木，不併進 `image/style-design-workbench`。改圖流
 | id / 名稱 | 狀態 | 入口 / 檔案 | 外部依賴 | 說明 |
 |---|---|---|---|---|
 | `image/process` | `route/action` | `app/api/tools/image/process/route.ts` | Sharp / Ghostscript gate | web / print bake；套色彩調整，輸出 WebP/PDF 目的地 |
-| `image/color-grade` | `toolkit` + `UI block` | `components/tools/ColorGradePanel`, `lib/studio/color-grade.ts` | 無 | 色彩/色階/銳利度；Tarot/Studio/Canvas 共用 |
+| `image/color-grade` | `toolkit` + `UI block` | `components/tools/ColorGradePanel`, `lib/studio/color-grade.ts` | 無 | 色彩/色階/銳利度；Tarot/Studio 共用（Canvas／Vector Editor 另走 `color-grade` UI 積木）|
 | `image/product-image` | `toolkit` + `route/action` | `lib/studio/to-product-image.ts`, publish `action:"productimage"` | Sharp | 商品頁 web-square WebP |
 | `image/print-file` | `toolkit` + `route/action` | `lib/studio/print-file.ts`, `to-print-file.ts`, `upscaler.ts`, publish `action:"upscale"` | Sharp / optional Real-ESRGAN path | POD 印刷檔 / upscale |
 | `image/flatlay` | `toolkit` + `route/action` | `lib/studio/flatlay.ts`, publish `action:"flatlay"` | Sharp | 真設計圖 faithful 平拍合成 |
@@ -224,7 +224,6 @@ AI prompt 是獨立積木，不併進 `image/style-design-workbench`。改圖流
 | id / 名稱 | 狀態 | 入口 / 檔案 | 說明 |
 |---|---|---|---|
 | `qr` | `UI block` | `public/vector-editor.html` | QR Code（向量） |
-| `adjust` | `UI block` | `public/vector-editor.html` | 調色 / 修圖（選圖片） |
 | `bg-remove` | `UI block` | `public/vector-editor.html` | 去白底 / 去背 |
 | `smart-guides` | `UI block` | `public/vector-editor.html` | 智慧磁吸對齊 |
 | `arc-text` | `UI block` | `public/vector-editor.html` | 環形 / 弧形文字 |
@@ -238,10 +237,7 @@ AI prompt 是獨立積木，不併進 `image/style-design-workbench`。改圖流
 | `simplify` | `UI block` | `public/vector-editor.html` | 路徑簡化 |
 | `canvas/shape` | `UI block` | `app/tools/canvas/CanvasEditor.tsx` | 基本形狀（rect/circle/line） |
 | `canvas/object-lock` | `UI block` | `app/tools/canvas/CanvasEditor.tsx` | 鎖定/解鎖物件移動、縮放、旋轉 |
-| `canvas/image-effects` | `UI block` | `app/tools/canvas/CanvasEditor.tsx` | 自然飽和/高斯模糊/雜訊/色溫（vibrance/blur/noise/temp）|
-| `canvas/adjustments` | `UI block` | `app/tools/canvas/CanvasEditor.tsx` | PS 調整：對比/陰影/高光 + 自動對比/色彩/色調（pixel analysis）|
-| `canvas/camera-raw` | `UI block` | `app/tools/canvas/CanvasEditor.tsx` | Camera RAW 效果：曝光/清晰度/去霧（exposure/clarity/dehaze）|
-| `canvas/color-grade` | `UI block` | `app/tools/canvas/CanvasEditor.tsx` | PS 色階/調色：hue/sat/bri/black/white/gamma/sharpen/colorBalance（共用 ColorGradePanel seam）|
+| `color-grade` | `UI block` | `public/editor-shared/color-grade.js`（Canvas Editor + Vector Editor 共用，`lib/studio/editor-color-grade.ts` 為型別入口） | 🎨 調色單一面板：預設風格/去白底、自動對比·色彩·色調、色階、色彩平衡、基本滑桿、Camera RAW、HSL 色彩混合器；`adj` 存在圖片上 |
 | `canvas/download` | `UI block` | `app/tools/canvas/CanvasEditor.tsx` | 下載 PNG（全尺寸）或 WebP（自動壓縮至 200KB）|
 | `ai/image-edit-prompt-panel` | `UI block` | `components/tools/ImageEditPromptPanel.tsx` | 共用 AI 修圖 prompt 面板；Tarot / Studio / Mockup 都掛這顆，不各寫一套 |
 | `tarot/output-track` | `UI block` | `app/tools/tarot/TarotStudio.tsx` | Tarot print/export outputs |

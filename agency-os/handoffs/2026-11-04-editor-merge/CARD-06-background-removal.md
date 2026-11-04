@@ -15,6 +15,16 @@ Decision (operator 2026-11-04): every panel BOTH editors have becomes ONE comple
 - Size guard: images sent to remove-bg stay under the route's limit (reuse CARD-03's shrink approach if the route has a cap).
 - Remove the duplicate blocks/buttons (vector `bg-remove` + `ai-bg` blocks; canvas 去背 buttons inside `filters`) — the merged panel is the only place. Remaining non-去背 content of canvas `filters` (effects) stays where it is. Update `lib/content/blocks/registry.ts` / block counts.
 
+## Filter ownership invariant (Codex 7b1c8fc0 F1–F3 on CARD-05 — fix in this card)
+Since CARD-05 the 🎨 調色 panel rebuilds an image's filters from `adj` and decides which filters it "owns" by guessing from class/params (`isGradeFilter` in `public/editor-shared/color-grade.js` ~L299–300). That guess loses data:
+- F1: an old project image with filters but no `adj` (e.g. Brightness) → first 調色 edit removes them.
+- F2: a 去背 RemoveColor at white / 0.12 is mistaken for the panel's 去白底 and removed by any 調色 slider.
+- F3: the 去背 block's 還原 deletes every RemoveColor, including the panel's 去白底, while `adj.removeWhite` still says on.
+Invariant to implement on BOTH editors: **every filter on an image is derived from `adj`; nothing infers ownership from filter params.**
+- 去背 colour key lives in `adj` (e.g. `adj.removeColor = { color, distance } | null`), built by `buildFilterSpecs` like everything else; 去白底 stays its own flag. 還原 clears only `adj.removeColor` (and the AI result per item 3), never other entries.
+- An image that has filters but no `adj` (legacy): on the first 調色/去背 touch, move those filters verbatim into `adj.legacy` (serialized `toObject()` list) and keep re-adding them after the panel's own filters on every rebuild; persisted with `adj` through undo/save/load/cross-editor load. Same for old canvas `adj` shapes `sanitizeAdj` cannot map.
+- Delete `isGradeFilter`-style param guessing; add drift/unit tests in `lib/studio/__tests__/` for: legacy Brightness survives a 調色 edit; white/0.12 colour key survives a 調色 edit; 還原 keeps 去白底.
+
 ## Constraints
 - No new npm deps; no new CDN tags. Do not touch other panels.
 - `npx tsc --noEmit` green; SRI green; route tests `npx vitest run app/api/tools/studio` green.

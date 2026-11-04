@@ -11,6 +11,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/paper.js/0.12.17/paper-core.min.js" integrity="sha384-Op8nZ4kg7nr8T9UV4Xg7qdSbWTZEiRGZscs336HbfqzA702wz3DqmHySyvvGEJw4" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js" integrity="sha384-8FWZA6BGMXhsfO+BLtrJK0We6gg5o1JyO8xQm6peWDEUs17ACA5ziE/NIAkl9z2k" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js" integrity="sha384-Kk5SjBOKprEnGfyBWfD2zROFd1Cu8kwOXxG2GIhYPcoDL2rBJS9P8Ud1ZMy4412a" crossorigin="anonymous"></script>
+<!-- 🎨 調色 math = public/editor-shared/color-grade.js, the same file /tools/canvas imports (lib/studio/editor-color-grade.ts) -->
+<script type="module">import * as cg from "./editor-shared/color-grade.js"; window.AWCG = cg; window.dispatchEvent(new Event("awcg-ready"));</script>
 <style>
   /* Theme = the app's tokens (app/globals.css defaults; the DB-saved theme is copied from the parent
      <html> by the bridge script below), so this page paints like /tools/canvas. */
@@ -93,6 +95,12 @@
   .sw { width:100%; aspect-ratio:1; border-radius:5px; border:1px solid var(--card-border); cursor:pointer; padding:0; }
   .sw:hover { outline:2px solid var(--accent); outline-offset:1px; }
   #blockPanels, #imageBlocks { display:flex; flex-direction:column; gap:10px; }
+  /* 🎨 調色 sub-sections */
+  #cgFields { border:0; padding:0; margin:0; min-width:0; }
+  details.cgsec { box-shadow:none; border-radius:6px; margin-top:6px; }
+  details.cgsec[open] { padding-bottom:6px; }
+  details.cgsec > summary { padding:5px 8px; }
+  #cgFields:disabled { opacity:.55; }
   .blocks-head { margin-top:2px; font-size:12px; font-weight:var(--font-weight-bold); color:var(--accent); }
 </style>
 <script>
@@ -152,7 +160,7 @@
     </div>
   </div>
 
-    <!-- panel order = same logic as /tools/canvas: 設定 → 加內容 → 文字 → 外觀 → 排列 → 圖層 → 圖片調色/去背 → 輸出; all collapsed -->
+    <!-- panel order = same logic as /tools/canvas: 設定 → 加內容 → 文字 → 外觀 → 排列 → 圖層 → 調色 → 去背 → 輸出; all collapsed -->
     <details><summary>📐 畫布尺寸 / DPI</summary>
       <div class="row">
         <div><label>寬</label><input id="w" type="number" value="9" step="0.1"></div>
@@ -349,7 +357,16 @@
       <div class="layers" id="layers"></div>
     </details>
 
-    <div id="imageBlocks"></div>
+    <div id="imageBlocks">
+      <!-- 🎨 調色: ONE panel (presets · auto · levels · colour balance · basic · Camera RAW · HSL); controls are built from the shared module's rows -->
+      <details id="gradePanel"><summary>🎨 調色</summary>
+        <fieldset id="cgFields" disabled>
+          <div class="info" id="cgHint">先選取圖片後才能使用。</div>
+          <button class="ghost" id="cgReset" data-cg-reset style="margin-top:6px;" title="全部回到中性值">重設</button>
+          <div id="cgSecs"></div>
+        </fieldset>
+      </details>
+    </div>
 
     <details id="exportPanel"><summary>💾 匯出 / 存入</summary>
       <label>檔名（不含副檔名）</label>
@@ -403,7 +420,7 @@ let nextText = { font:DEFAULT_FONT, size:48, fill:'#111111', bold:false, italic:
 const canvas = new fabric.Canvas('c', { backgroundColor:'#ffffff', preserveObjectStacking:true });
 // Layer name + lock state ride in every toObject() (snapshot/undo, saveProj, clone/copy-paste) -- Fabric 5 drops unknown props otherwise.
 // Group/Text/Path toObject all reach this via callSuper, so one prototype wrap covers every object type.
-const LAYER_PROPS=['name','lockMovementX','lockMovementY','lockScalingX','lockScalingY','lockRotation','hasControls'];
+const LAYER_PROPS=['name','adj','lockMovementX','lockMovementY','lockScalingX','lockScalingY','lockRotation','hasControls']; // adj = the image's 調色 settings (same key as /tools/canvas)
 const _objToObject=fabric.Object.prototype.toObject;
 fabric.Object.prototype.toObject=function(extra){ return _objToObject.call(this, LAYER_PROPS.concat(extra||[])); };
 // 🔒 invariant: every programmatic move/scale (arrow keys, 座標面板, 對齊, 分布, 符合畫布) skips locked objects, same as mouse drag (Codex 2e307b0a F1)
@@ -445,9 +462,9 @@ function snapshot(){
   hi=history.length-1;
 }
 // loadFromJSON fires object:added per object; scheduleSync's 16ms timer would then snapshot the restored state as a NEW entry (truncating redo, making undo need two presses) -- drop it
-function restoreDone(){ canvas.requestRenderAll(); locked=false; clearTimeout(_syncTimer); _syncTimer=null; renderLayers(); }
+function restoreDone(){ canvas.requestRenderAll(); locked=false; clearTimeout(_syncTimer); _syncTimer=null; renderLayers(); cgSyncUI(); }
 // a style/sync change still inside its debounce window is part of the history the user sees -> record it before moving
-function flushPendingSnap(){ let p=false; if(_styleT){ clearTimeout(_styleT); _styleT=null; p=true; } if(_syncTimer){ clearTimeout(_syncTimer); _syncTimer=null; p=true; } if(p){ snapshot(); renderLayers(); } }
+function flushPendingSnap(){ let p=false; if(_cgT){ clearTimeout(_cgT); _cgT=null; p=true; } if(_styleT){ clearTimeout(_styleT); _styleT=null; p=true; } if(_syncTimer){ clearTimeout(_syncTimer); _syncTimer=null; p=true; } if(p){ snapshot(); renderLayers(); } }
 function undo(){ flushPendingSnap(); if(hi<=0) return; locked=true; hi--; canvas.loadFromJSON(history[hi], restoreDone); }
 function redo(){ flushPendingSnap(); if(hi>=history.length-1) return; locked=true; hi++; canvas.loadFromJSON(history[hi], restoreDone); }
 
@@ -589,6 +606,7 @@ function showStyle(st){
 function refreshStyleUI(){ const a=canvas.getActiveObjects(); showStyle(a.length ? readStyle(a[0]) : nextStyle); }
 // one undo step per burst of slider/button changes (set() fires no object:modified)
 let _styleT=null;
+let _cgT=null; // 調色 debounce (declared with _styleT: flushPendingSnap reads both)
 function styleCommit(){ markDirty(); clearTimeout(_styleT); _styleT=setTimeout(()=>{ _styleT=null; snapshot(); }, 300); }
 function styleSet(patch, keys){ Object.assign(nextStyle, patch); if(applyToSel(o=>applyStyleTo(o,nextStyle,keys))) styleCommit(); }
 const $id=id=>document.getElementById(id);
@@ -1284,6 +1302,106 @@ document.getElementById('loadProj').onchange=(e)=>{
   r.readAsText(f);
 };
 
+// ====== 🎨 調色（聯集面板；與 /tools/canvas 同一份 public/editor-shared/color-grade.js）======
+// cgAdj = the controls' value: the selected image's `adj`, or neutral. Every change → cgCommit → filters rebuilt from
+// buildFilterSpecs(adj) + adj stored on the image (rides in toObject via LAYER_PROPS) + ONE debounced undo step.
+let cgAdj=null, cgHslTab='all';
+function cgImg(){ const o=canvas.getActiveObject(); return (o&&o.type==='image')?o:null; }
+function cgApply(o, adj){
+  const cg=window.AWCG, F=fabric.Image.filters;
+  const foreign=(o.filters||[]).filter(f=>f && !cg.isGradeFilter(f)); // keep the 去背 block's RemoveColor
+  o.filters=foreign.concat(cg.makeFilters(cls=>F[cls], cg.buildFilterSpecs(adj)));
+  o.adj=JSON.parse(JSON.stringify(adj));
+  o.applyFilters();
+}
+function cgCommit(next){
+  const o=cgImg(); if(!o) return;
+  cgAdj=next; cgApply(o,next); canvas.requestRenderAll(); cgPaint(); markDirty();
+  clearTimeout(_cgT); _cgT=setTimeout(()=>{ _cgT=null; snapshot(); }, 450);
+}
+function cgPaint(){
+  const cg=window.AWCG, body=document.getElementById('cgSecs'); if(!cg||!body||!cgAdj) return;
+  body.querySelectorAll('input[data-cg]').forEach(el=>{ const v=cg.getPath(cgAdj,el.dataset.cg); el.value=v; const row=cg.GRADE_SECTIONS.flatMap(s=>s.rows).find(r=>r.path===el.dataset.cg); body.querySelector('[data-cg-val="'+el.dataset.cg+'"]').textContent=cg.fmtValue(row.fmt,v); });
+  body.querySelectorAll('[data-cg-preset]').forEach(b=> b.classList.toggle('on', (b.dataset.cgPreset||null)===cgAdj.presetId));
+  body.querySelector('[data-cg-removewhite]').checked=!!cgAdj.removeWhite;
+  body.querySelectorAll('[data-cg-hsl-tab]').forEach(b=> b.classList.toggle('on', b.dataset.cgHslTab===cgHslTab));
+  body.querySelectorAll('input[data-cg-hsl]').forEach(el=>{ const v=cgAdj.hslMixer[cgHslTab][el.dataset.cgHsl]; el.value=v; body.querySelector('[data-cg-hsl-val="'+el.dataset.cgHsl+'"]').textContent=v>0?'+'+v:''+v; });
+  document.getElementById('cgReset').disabled=cg.isNeutralAdj(cgAdj);
+}
+function cgSyncUI(){
+  const cg=window.AWCG; if(!cg||!document.getElementById('cgSecs').firstChild) return;
+  const o=cgImg(); cgAdj=o?cg.sanitizeAdj(o.adj):cg.neutralAdj(); cgPaint();
+  document.getElementById('cgFields').disabled=!o; document.getElementById('cgHint').textContent=o?'':'先選取圖片後才能使用。';
+}
+function cgAuto(kind){
+  const o=cgImg(), cg=window.AWCG; if(!o) return;
+  const im=new Image();
+  im.onerror=()=>{ document.getElementById('traceInfo').innerHTML='⚠️ 自動調整失敗：無法解碼圖片'; };
+  im.onload=()=>{
+    if(cgImg()!==o) return; // selection moved while decoding
+    const oc=document.createElement('canvas'); oc.width=im.width; oc.height=im.height; const g=oc.getContext('2d'); g.drawImage(im,0,0);
+    cgCommit(cg.applyAuto(cgAdj, kind, g.getImageData(0,0,im.width,im.height).data));
+  };
+  im.src=o.toDataURL({ format:'png', multiplier:1, withoutTransform:true });
+}
+function cgInit(){
+  const cg=window.AWCG, F=fabric.Image.filters, body=document.getElementById('cgSecs');
+  // the HSL mixer + blur = per-pixel filters (state on the instance, so toObject / undo / project load revive them); pixel math = shared applyHslPixels / applyBlurPixels
+  F.AwHsl=fabric.util.createClass(F.BaseFilter, {
+    type:'AwHsl',
+    initialize:function(o){ this.state=cg.sanitizeHsl(o&&o.state); },
+    applyTo2d:function(opts){ cg.applyHslPixels(opts.imageData.data, this.state); },
+    isNeutralTransformation:function(){ return !cg.hasAnyHsl(this.state); },
+    toObject:function(){ return { type:this.type, state:this.state }; }
+  });
+  F.AwHsl.fromObject=F.BaseFilter.fromObject;
+  F.AwBlur=fabric.util.createClass(F.BaseFilter, {
+    type:'AwBlur',
+    initialize:function(o){ const b=o&&o.blur; this.blur=(typeof b==='number'&&isFinite(b))?Math.min(100,Math.max(0,b)):0; },
+    applyTo2d:function(opts){ cg.applyBlurPixels(opts.imageData, this.blur); },
+    isNeutralTransformation:function(){ return this.blur===0; },
+    toObject:function(){ return { type:this.type, blur:this.blur }; }
+  });
+  F.AwBlur.fromObject=F.BaseFilter.fromObject;
+  // Canvas 2D filter backend, like /tools/canvas (WebGL would skip the per-pixel AwHsl and round differently): both editors then render the same pixels
+  fabric.filterBackend=new fabric.Canvas2dFilterBackend();
+  const sec=(id,title)=>{ const d=document.createElement('details'); d.className='cgsec'; d.dataset.cgSec=id; const sm=document.createElement('summary'); sm.textContent=title; d.appendChild(sm); const b=document.createElement('div'); d.appendChild(b); body.appendChild(d); return b; };
+  // 預設風格 + 去白底
+  const pb=sec('presets','預設風格 Presets'), pr=document.createElement('div'); pr.className='grid3'; pb.appendChild(pr);
+  [{id:'',label:'原圖'}].concat(cg.PRESETS).forEach(p=>{ const b=document.createElement('button'); b.className='ghost'; b.dataset.cgPreset=p.id; b.textContent=p.label;
+    b.onclick=()=>{ if(!cgImg()) return; cgCommit({ ...cgAdj, presetId: p.id==='' ? null : (cgAdj.presetId===p.id ? null : p.id) }); }; pr.appendChild(b); });
+  const rw=document.createElement('label'); rw.style.cssText='font-size:12px;color:var(--txt);display:flex;gap:6px;align-items:center;';
+  rw.innerHTML='<input type="checkbox" data-cg-removewhite style="width:auto;"> ✂️ 去白底（免費，近白色變透明）'; pb.appendChild(rw);
+  rw.querySelector('input').onchange=(e)=>{ if(cgImg()) cgCommit({ ...cgAdj, removeWhite:e.target.checked }); };
+  // 自動
+  const ab=sec('auto','自動 Auto'), ar=document.createElement('div'); ar.className='grid3'; ab.appendChild(ar);
+  [['contrast','自動對比','分析畫素亮度範圍，自動設對比／曝光'],['color','自動色彩','中性灰平衡，自動矯正偏色'],['tone','自動色調','同時套用自動對比 + 自動色彩']].forEach(([k,t,tip])=>{
+    const b=document.createElement('button'); b.className='ghost'; b.dataset.cgAuto=k; b.textContent=t; b.title=tip; b.onclick=()=>cgAuto(k); ar.appendChild(b); });
+  // 色階 / 色彩平衡 / 基本 / Camera RAW — rows straight from the shared module
+  cg.GRADE_SECTIONS.forEach(s=>{
+    const sb=sec(s.id,s.title);
+    s.rows.forEach(r=>{ const lim=cg.limitOf(r.path);
+      const lb=document.createElement('label'); lb.innerHTML=r.label+' <span data-cg-val="'+r.path+'"></span>'; sb.appendChild(lb);
+      const el=document.createElement('input'); el.type='range'; el.dataset.cg=r.path; el.min=lim.min; el.max=lim.max; el.step=r.step; el.value=lim.neutral;
+      el.oninput=()=>{ if(cgImg()) cgCommit(cg.setPath(cgAdj, r.path, +el.value)); }; sb.appendChild(el); });
+  });
+  // 色彩混合器 HSL
+  const hb=sec('hsl','色彩混合器 HSL'), tabs=document.createElement('div'); tabs.className='grid3'; hb.appendChild(tabs);
+  [{key:'all',label:'全部'}].concat(cg.HSL_RANGES).forEach(r=>{ const b=document.createElement('button'); b.className='ghost'; b.dataset.cgHslTab=r.key; b.textContent=r.label;
+    if(r.color) b.style.borderBottom='2px solid '+r.color; b.onclick=()=>{ cgHslTab=r.key; cgPaint(); }; tabs.appendChild(b); });
+  cg.HSL_AXES.forEach(a=>{
+    const lb=document.createElement('label'); lb.innerHTML=a.label+' <span data-cg-hsl-val="'+a.axis+'"></span>'; hb.appendChild(lb);
+    const el=document.createElement('input'); el.type='range'; el.dataset.cgHsl=a.axis; el.min=a.min; el.max=a.max; el.step=1; el.value=0;
+    el.oninput=()=>{ if(!cgImg()) return; const hm=JSON.parse(JSON.stringify(cgAdj.hslMixer)); hm[cgHslTab][a.axis]=+el.value; cgCommit({ ...cgAdj, hslMixer:hm }); }; hb.appendChild(el); });
+  const hr=document.createElement('div'); hr.className='row'; hr.style.marginTop='6px'; hb.appendChild(hr);
+  [['range','重置此色段'],['all','全部重置']].forEach(([k,t])=>{ const b=document.createElement('button'); b.className='ghost'; b.dataset.cgHslReset=k; b.textContent=t;
+    b.onclick=()=>{ if(!cgImg()) return; const hm=JSON.parse(JSON.stringify(cgAdj.hslMixer)); if(k==='all') cg.HSL_RANGES.concat([{key:'all'}]).forEach(r=>{ hm[r.key]={h:0,s:0,l:0}; }); else hm[cgHslTab]={h:0,s:0,l:0}; cgCommit({ ...cgAdj, hslMixer:hm }); }; hr.appendChild(b); });
+  document.getElementById('cgReset').onclick=()=>{ if(cgImg()) cgCommit(cg.neutralAdj()); };
+  ['selection:created','selection:updated','selection:cleared'].forEach(ev=>canvas.on(ev, cgSyncUI));
+  cgSyncUI();
+}
+if(window.AWCG) cgInit(); else window.addEventListener('awcg-ready', cgInit, { once:true });
+
 // ========================================================
 // 🧩 積木系統 Block Registry — 讓功能變成可抽換/可移植的真積木
 // 契約 SSOT 見 lib/content/blocks/README.md。每個積木 = registerBlock({id,title,icon,mount(ctx,body)})
@@ -1315,8 +1433,8 @@ const AB = (function(){
   };
   function registerBlock(def){
     blocks.push(def);
-    // image blocks (調色 / 去背) sit right after 圖層, like /tools/canvas; the rest stay under 其他積木
-    const host=document.getElementById(['adjust','bg-remove','ai-bg'].includes(def.id)?'imageBlocks':'blockPanels');
+    // image blocks (去背) sit right after 圖層 / 調色, like /tools/canvas; the rest stay under 其他積木
+    const host=document.getElementById(['bg-remove','ai-bg'].includes(def.id)?'imageBlocks':'blockPanels');
     const d=document.createElement('details'); d.open=false;
     const s=document.createElement('summary'); s.textContent=(def.icon?def.icon+' ':'')+def.title; d.appendChild(s);
     const body=document.createElement('div'); d.appendChild(body); host.appendChild(d);
@@ -1340,50 +1458,6 @@ AB.registerBlock({ id:'qr', icon:'🔳', title:'QR Code（向量）',
         ctx.snapshot(); ctx.info('✅ QR 已產生（'+n+'×'+n+' 模組，向量）');
       }catch(e){ alert('QR 產生失敗：'+e.message); }
     };
-  }
-});
-
-// ── 積木 2：調色 / 修圖（作用於選取的圖片；非破壞性，可重設）──
-AB.registerBlock({ id:'adjust', icon:'🎨', title:'調色 / 修圖（選圖片）',
-  mount(ctx, body){
-    const F=fabric.Image.filters;
-    function img(){ const o=ctx.canvas.getActiveObject(); return (o&&o.type==='image')?o:null; }
-    body.innerHTML=''
-      +'<label>預設風格</label><div class="grid3" id="presetRow"></div>'
-      +'<label>亮度 <span id="a_b">0</span></label><input id="s_b" type="range" min="-1" max="1" step="0.02" value="0">'
-      +'<label>對比 <span id="a_c">0</span></label><input id="s_c" type="range" min="-1" max="1" step="0.02" value="0">'
-      +'<label>飽和 <span id="a_s">0</span></label><input id="s_s" type="range" min="-1" max="1" step="0.02" value="0">'
-      +'<label>色相 <span id="a_h">0</span></label><input id="s_h" type="range" min="-1" max="1" step="0.02" value="0">'
-      +'<label>色溫 冷↔暖 <span id="a_t">0</span></label><input id="s_t" type="range" min="-1" max="1" step="0.02" value="0">'
-      +'<label>銳利 <span id="a_sh">0</span></label><input id="s_sh" type="range" min="0" max="1" step="0.05" value="0">'
-      +'<label>雜訊 <span id="a_n">0</span></label><input id="s_n" type="range" min="0" max="200" step="5" value="0">'
-      +'<button class="ghost" id="adjReset" style="margin-top:6px;">重設</button>'
-      +'<div class="info">先選一張圖片。預覽色彩可能與最終輸出略異。</div>';
-    let preset=[];
-    const ids=['b','c','s','h','t','sh','n'];
-    const val=k=>+body.querySelector('#s_'+k).value;
-    function rebuild(){
-      const o=img(); if(!o) return;
-      const b=val('b'),c=val('c'),s=val('s'),h=val('h'),t=val('t'),sh=val('sh'),n=val('n');
-      body.querySelector('#a_b').textContent=b.toFixed(2); body.querySelector('#a_c').textContent=c.toFixed(2);
-      body.querySelector('#a_s').textContent=s.toFixed(2); body.querySelector('#a_h').textContent=h.toFixed(2);
-      body.querySelector('#a_t').textContent=t.toFixed(2); body.querySelector('#a_sh').textContent=sh.toFixed(2);
-      body.querySelector('#a_n').textContent=n;
-      const adj=[];
-      if(b) adj.push(new F.Brightness({brightness:b}));
-      if(c) adj.push(new F.Contrast({contrast:c}));
-      if(s) adj.push(new F.Saturation({saturation:s}));
-      if(h) adj.push(new F.HueRotation({rotation:h}));
-      if(t) adj.push(new F.BlendColor({color: t>0?'#ff7a00':'#0066ff', mode:'tint', alpha:Math.min(0.6,Math.abs(t)*0.6)}));
-      if(sh) adj.push(new F.Convolute({matrix:[0,-sh,0,-sh,1+4*sh,-sh,0,-sh,0]}));
-      if(n) adj.push(new F.Noise({noise:n}));
-      const keep=o.filters.filter(f=>f instanceof F.RemoveColor); // 保留別的積木的去背，不互相蓋掉
-      o.filters=keep.concat(preset).concat(adj); o.applyFilters(); ctx.render();
-    }
-    ids.forEach(k=>{ const el=body.querySelector('#s_'+k); el.oninput=rebuild; el.onchange=()=>{ rebuild(); ctx.snapshot(); }; });
-    const PRESETS={ '原圖':()=>[], '灰階':()=>[new F.Grayscale()], '黑白':()=>[new F.Grayscale(),new F.Contrast({contrast:0.25})], '反相':()=>[new F.Invert()], '復古':()=>[new F.Sepia(),new F.Contrast({contrast:0.1})], '拍立得':()=>[new F.Saturation({saturation:-0.2}),new F.Brightness({brightness:0.08}),new F.BlendColor({color:'#ffcc66',mode:'tint',alpha:0.15})], '暖色':()=>[new F.BlendColor({color:'#ff7a00',mode:'tint',alpha:0.2})], '冷色':()=>[new F.BlendColor({color:'#0066ff',mode:'tint',alpha:0.2})] };
-    Object.keys(PRESETS).forEach(name=>{ const b=document.createElement('button'); b.className='ghost'; b.textContent=name; b.onclick=()=>{ const o=img(); if(!o){ alert('先選一張圖片'); return; } preset=PRESETS[name](); rebuild(); ctx.snapshot(); }; body.querySelector('#presetRow').appendChild(b); });
-    body.querySelector('#adjReset').onclick=()=>{ const o=img(); if(!o) return; preset=[]; ids.forEach(k=>body.querySelector('#s_'+k).value=0); rebuild(); ctx.snapshot(); }; // rebuild 保留去背
   }
 });
 
