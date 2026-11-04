@@ -17,6 +17,7 @@
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（agency-os/reports/oracle/2026-11-04-partialreview-697e7d45.md）。F1 有可用 adj 但旁邊另有 adj 不產生的濾鏡（舊去背積木色鍵）→ `adoptAdj` 比對 buildFilterSpecs(adj)：同類別且雙方共有的值都相等才算 adj 自己的，其餘收進 legacy（無類別特例、從不刪、不重複收）；新增 F1b 測試兩案。F2/F3 同一類「非同步完成時寫到目前選取」（與 CARD-05 F4 同類）→ canvas `revertBg` 記下起始 adj，選取已換就用 `applyAdjToImage(img, …)` 直接寫原圖；vector `bgRevert` 用起始 `baseAdj` 不用全域 `cgAdj`。掃過兩邊其餘非同步寫入：AI 去背兩邊都寫捕捉的物件、canvas 自動調整已在 CARD-05 修。
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=isGradeFilter\|id:'bg-remove'\|id:'ai-bg' | hits=2（皆為新測試裡「不得再出現」的斷言）；側欄「13 積木」實際已剩 10（CARD-05/06 再刪 adjust、bg-remove、ai-bg）→ sidebar-sections.ts 改 10，sidebar-coverage 8/8
 - 剩餘：AI 去背後專案 JSON 對該圖約加倍（存原圖）；舊 canvas 設計 adj.grade.hue≠0 的圖，舊版以弧度渲染、新版以角度 → 載入後色相會不同（少見）。
+- 部署插曲：外聯 session 同時部署 51f6731fb（含 CARD-05、不含 CARD-06）→ 正式站短暫帶著未修的 CARD-05；我排隊部署時主機 `sg-deploy.sh` 內建 git pull 第二段 SSH 被拒 → 改外聯同款「先 sudo git pull 再 --skip-pull」；主機 npm test 紅在 `accent-not-text.test`（CanvasEditor.tsx:2592 去背忙碌訊息用 `var(--accent)` 當字色）→ 兩邊改 `--accent-text`（vector 的 `.busy`／`.blocks-head` 同修，`:root` 補 token）；本機 npm test 4061 pass／2 fail（皆 seedstar，主機無此目錄）。
 ## 2026-11-04（續20）編輯器整合 CARD-05：調色面板聯集＋調色數學單一來源
 
 - SDK worker（cc.py session 1f3eb412，US$3.69，60 turns），卡 `agency-os/handoffs/2026-11-04-editor-merge/CARD-05-color-grade.md`。

@@ -17,7 +17,7 @@
   /* Theme = the app's tokens (app/globals.css defaults; the DB-saved theme is copied from the parent
      <html> by the bridge script below), so this page paints like /tools/canvas. */
   :root {
-    --accent:#6366f1; --accent-hover:#818cf8; --accent-light:color-mix(in srgb, var(--accent) 8%, transparent);
+    --accent:#6366f1; --accent-hover:#818cf8; --accent-text:var(--accent); --accent-light:color-mix(in srgb, var(--accent) 8%, transparent);
     --body-bg:#f2f5fb; --card-bg:#ffffff; --card-border:#e6eaf4; --build-panel-bg:var(--card-bg);
     --text-primary:#0d1526; --text-muted:#64748b; --red:#ef4444;
     --radius:12px; --radius-sm:8px; --shadow:0 1px 3px rgb(0 0 0/.04), 0 4px 16px rgb(0 0 0/.06);
@@ -76,7 +76,7 @@
   .canvas-frame { background:#fff; box-shadow:0 8px 30px rgba(0,0,0,.25); border-radius:4px; border:1px solid var(--card-border); }
   .badge { font-size:11px; color:var(--text-muted); }
   hr { border:none; border-top:1px solid var(--card-border); margin:14px 10px; }
-  .busy { color:var(--accent); }
+  .busy { color:var(--accent-text); }
   .layers { position:relative; margin-top:8px; max-height:200px; overflow:auto; }
   .lyr .nm.dim { opacity:.45; }
   .lyr { display:flex; align-items:center; gap:3px; padding:5px 6px; border-radius:6px; font-size:12px; cursor:pointer; border:1px solid var(--card-border); margin-bottom:4px; }
@@ -101,7 +101,7 @@
   details.cgsec[open] { padding-bottom:6px; }
   details.cgsec > summary { padding:5px 8px; }
   #cgFields:disabled, #bgFields:disabled { opacity:.55; }
-  .blocks-head { margin-top:2px; font-size:12px; font-weight:var(--font-weight-bold); color:var(--accent); }
+  .blocks-head { margin-top:2px; font-size:12px; font-weight:var(--font-weight-bold); color:var(--accent-text); }
 </style>
 <script>
 // Theme bridge: app/layout.tsx paints the DB-saved theme as inline tokens on the parent <html>.

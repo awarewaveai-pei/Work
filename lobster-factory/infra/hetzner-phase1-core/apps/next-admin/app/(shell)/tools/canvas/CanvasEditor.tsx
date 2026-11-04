@@ -2589,7 +2589,7 @@ export default function CanvasEditor() {
               <span style={{ fontWeight: 600 }}>AI 去背（雲端）</span>
               <button className="btn-primary" data-bg-ai onClick={() => void applyBgAi()}>AI 去背（選圖片）</button>
               <button className="btn-secondary" data-bg-revert disabled={bgBusy || !(adj.removeColor || hasBgOriginal)} onClick={() => void revertBg()} title="清掉去除顏色，並把 AI 去背前的圖換回來；調色不動">還原</button>
-              <span data-bg-msg style={{ fontSize: 11, opacity: bgMsg.busy ? 1 : 0.7, color: bgMsg.busy ? "var(--accent)" : undefined, lineHeight: 1.5 }}>{bgMsg.text}</span>
+              <span data-bg-msg style={{ fontSize: 11, opacity: bgMsg.busy ? 1 : 0.7, color: bgMsg.busy ? "var(--accent-text)" : undefined, lineHeight: 1.5 }}>{bgMsg.text}</span>
             </fieldset>
           </SidebarPanel>
 
