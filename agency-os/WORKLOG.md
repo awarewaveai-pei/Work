@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-04（續10）/tools/vector-editor 外觀對齊 /tools/canvas：主題 tokens + 面板欄 + theme bridge
+
+- 緣由：操作者「把 vector-editor 的 style 改成和 canvas 相同」。根因：`public/vector-editor.html` 是獨立 iframe，自帶寫死深色調色盤（#0f1115／#1a1d24／#5b9dff）＋頂部工具列；DB 主題只畫在父 `<html style>`（app/layout.tsx:23），iframe 看不到；page.tsx 另加 canvas 沒有的 `.topbar`。
+- 不變量：所有 /tools 頁用同一組主題 tokens 上色。做法：iframe `:root` = globals.css 淺色預設（--accent／--card-*／--text-*／--btn-*／--radius*／--shadow），舊 --bg/--panel/--line/--txt/--mut/--acc/--acc2 保留為別名（14 個積木腳本照用）；theme bridge 同源複製父 `documentElement.style.cssText`＋父 head 的 fonts.googleapis.com `<link>`；版面照 CanvasEditor.tsx:1725–1770（16px 頁、h1 18px、棋盤工作區左、300px sticky 面板欄右、`<details>` = SidebarPanel 卡片、.act = btn-primary、.ghost/.tbtn = btn-secondary）；page.tsx 去 topbar、iframe 100vh。
+- Codex F1（m）：主題字型不跨 iframe → bridge 連 Google Fonts link 一起複製（vector-editor.html:100）。F2（m）：畫布預覽固定 720px 在 1280px 視窗壓到工具欄 → `maxDisp()` = min(720, 工作區寬)，resize 重算，`.stage overflow:auto`（:347–351）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit exit 0；npx vitest run lib/security/__tests__/public-html-sri.test.ts 13/13；next-admin-ui-3903 預覽兩頁截圖並排（DB 綠主題經 bridge 生效）；1280px 視窗 JS 量測 canvasRight 671 < sideLeft 701、fontLinks 含父頁 Inter | exit=0 | ms=400
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n（agency-os/reports/oracle/2026-11-04-partialreview-4adc8fea.md，兩項已修並實測）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=vector-editor\|topbar-env\|calc(100vh - 54px) | hits=12（products.ts／sidebar-sections.ts／middleware／SRI test 皆路徑引用不受影響；topbar-env 其餘 5 頁各自的 topbar，未改）
+- 部署：操作者「做完 部屬」→ sg-deploy next-admin（結果見本條末行）。rollback：git revert 本 commit → sg-deploy。
+- 順手：verify-build-gates 紅在 main 既有債 `down-migration-copies.test.mjs`（0155–0158 缺 `packages/db/scripts/*_down.sql` 副本，12f2de50e 等留下）→ cp 四檔（byte-identical），gate 綠；非本任務根因。
+- 順手 2：gate 再紅在 doc_integrity：`validate-doc-integrity.mjs` 走檔案系統，把 git-ignored 的本機檔（video-workbench/runtime/blender/**、engines/effectcraft/web/** README，共 18 個 broken_link）也當 repo 文件掃。不變量：doc integrity 只管會出貨的檔 → walker 與 inLinkScope 以 `git ls-files --others --ignored --exclude-standard --directory` 跳過 ignored 路徑（git 失敗 = 空集合、行為同舊版）。突變證據：修前 18 broken_link 紅、修後 PASSED。
+- 順手 3：scan-local-config-for-secrets baseline-miss：本機 `mcp/user-env.ps1` 的 STABILITY_API_KEY（`sk-` 前綴）被 OpenAI pattern 誤判 → `agency-os/config/scan-local-config-known-suppressed.json` 加一條（file+pattern+sourceKey，無值）。verify-build-gates 全綠。
 ## 2026-11-04（續9）外聯 C14.4 完成：Soulful 名單廣告接通（另一家公司、自己的 App）
 
 - C1 Soulful 外聯資料庫：client_credentials 5 列指向已消失的 Supabase Cloud `mffjqjiidbeibilmxzef`（DNS NXDOMAIN）→ org-client.ts:97 resolveFromCredentialsLib 回該專案 → `fetch failed`。主庫 Soulful 外聯資料 0 列、vault 無 org:soulful-expression:*。處置：5 列備份 `/root/lobster-phase1/backups/client_credentials-soulful-supabase-20261104.sql`（600）後刪，vault 密鑰保留（還原＝插回 5 列）→ 走主庫（organization_id 分隔）。

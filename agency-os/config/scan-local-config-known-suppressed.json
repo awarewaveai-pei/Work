@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "description": "Known, already-governed local plaintext findings for scripts/scan-local-config-for-secrets.ps1. Do not store secret values here.",
-  "lastReviewed": "2026-06-15",
+  "lastReviewed": "2026-11-04",
   "suppressions": [
     {
       "file": ".claude/settings.json",
@@ -164,6 +164,12 @@
       "pattern": "Google API key",
       "sourceKey": "YOUTUBE_API_KEY",
       "reason": "Known local MCP env registry entry; gitignored; value in the local vault (imported 2026-10-29, ADR 017 4c-2 session)."
+    },
+    {
+      "file": "mcp/user-env.ps1",
+      "pattern": "OpenAI API key",
+      "sourceKey": "STABILITY_API_KEY",
+      "reason": "Stability AI key shares the sk- prefix with the OpenAI pattern; known local MCP env registry entry; gitignored; value in the local vault (2026-11-04)."
     }
   ]
 }

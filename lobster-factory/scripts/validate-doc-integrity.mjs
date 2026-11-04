@@ -43,15 +43,43 @@ const skipAgencyCanonical =
 // link integrity.
 const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "RankMath-KB", "GEO"]);
 
+// Git-ignored paths are machine-local (vendored runtimes, downloaded kits) and never ship, so their
+// markdown is out of scope -- 2026-11-04 the gate went red on video-workbench/runtime/blender/** and
+// engines/effectcraft/web/** READMEs that exist only on the laptop. Lazily read once; git missing or
+// failing = empty set (fail-open: same behaviour as before this filter).
+let gitIgnoredCache = null;
+function gitIgnoredPaths() {
+  if (gitIgnoredCache) return gitIgnoredCache;
+  gitIgnoredCache = new Set();
+  try {
+    const out = execFileSync("git", ["ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z"], {
+      cwd: workRoot, maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"],
+    }).toString("utf8");
+    for (const rel of out.split(String.fromCharCode(0))) if (rel) gitIgnoredCache.add(rel);
+  } catch { /* fail-open */ }
+  return gitIgnoredCache;
+}
+function isGitIgnored(absPath, isDir) {
+  const rel = path.relative(workRoot, absPath).split(path.sep).join("/");
+  if (!rel || rel.startsWith("..")) return false;
+  const ignored = gitIgnoredPaths();
+  if (ignored.has(rel) || (isDir && ignored.has(rel + "/"))) return true;
+  // a file under an ignored directory: git lists the directory once (--directory), not each file
+  const parts = rel.split("/");
+  for (let i = 1; i < parts.length; i++) if (ignored.has(parts.slice(0, i).join("/") + "/")) return true;
+  return false;
+}
+
 function walkMarkdownFiles(rootDir, out = []) {
   if (!fs.existsSync(rootDir)) return out;
   const entries = fs.readdirSync(rootDir, { withFileTypes: true });
   for (const ent of entries) {
     const full = path.join(rootDir, ent.name);
     if (ent.isDirectory()) {
-      if (SKIP_DIRS.has(ent.name)) continue;
+      if (SKIP_DIRS.has(ent.name) || isGitIgnored(full, true)) continue;
       walkMarkdownFiles(full, out);
     } else if (ent.isFile() && ent.name.endsWith(".md")) {
+      if (isGitIgnored(full, false)) continue;
       out.push(full);
     }
   }
@@ -173,6 +201,7 @@ function inLinkScope(absFile) {
     const rel = path.relative(root.dir, absFile);
     if (!rel || rel === ".." || rel.startsWith(".." + path.sep) || path.isAbsolute(rel)) continue;
     const dirs = rel.split(path.sep).slice(0, -1);
+    if (isGitIgnored(absFile, false)) return false;
     if (root.recursive ? !dirs.some((d) => SKIP_DIRS.has(d)) : dirs.length === 0) return true;
   }
   return false;
