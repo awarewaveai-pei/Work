@@ -102,7 +102,7 @@ All scripts live in this flat directory. Paths are hard-coded as `scripts\<name>
 | `sync-observability-grafana-content.ps1` | Sync Grafana dashboards/content |
 | `sync-pagerduty-endpoint-alert.ps1` | Sync PagerDuty endpoint alerts |
 | `sync-slack-alert-webhooks.ps1` | Sync Slack alert webhooks |
-| `public-endpoint-smoke.ps1` | Smoke test public endpoints (HTTP-only; Playwright gives browser-level equivalent) |
+| `public-endpoint-smoke.ps1` | Smoke test public endpoints + clickjacking headers on login/checkout doors (HTTP-only; Playwright gives browser-level equivalent) |
 | `playwright-runner.ps1` | Playwright E2E orchestrator — smoke / qa / client / screenshot / a11y / perf / install. Called by `/playwright` skill. |
 | `ops-console-bootstrap.ps1` | Bootstrap ops console |
 | `ops-console-smoke.ps1` | Smoke test ops console |

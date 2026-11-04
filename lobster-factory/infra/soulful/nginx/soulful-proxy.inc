@@ -21,3 +21,12 @@ proxy_set_header X-Forwarded-Host  $host;
 proxy_buffering on;
 proxy_buffer_size 16k;
 proxy_buffers 8 16k;
+
+# Clickjacking guard for the PUBLIC site (WooCommerce checkout, Ultimate Member). Lives here, not at
+# server level: `location /` declares its own add_header (X-Soulful-Cache), which stops server-level
+# add_header from being inherited there -- see soulfulexpression.org.conf M9. WordPress already sends
+# both on wp-login/wp-admin with the same value; duplicates of equal value are harmless and we do not
+# proxy_hide_header so a future plugin CSP is not silently swallowed. External embedding of a Soulful
+# page needs its origin appended to frame-ancestors (never X-Frame-Options ALLOW-FROM: obsolete).
+add_header X-Frame-Options "SAMEORIGIN" always;
+add_header Content-Security-Policy "frame-ancestors 'self'" always;
