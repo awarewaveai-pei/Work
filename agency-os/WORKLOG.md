@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-04（續12）外聯產信改用平台 OpenAI 金鑰（代理商 Gemini 免費金鑰 429）
+
+- 根因：唯一的代理商 AI connector 是免費 Gemini，C15.4 產約 12 封後 `gemini 429`＋`no_ai_key`（續11）。
+- 決定（操作者「你決定」）：AI 順位 openai 一階，公司與代理商都沒有 openai connector 時用 `process.env.OPENAI_API_KEY`（`NA/lib/outreach/generate.ts:182-185`），與 `lib/ai/cheap-json.ts:48` 同一把；不複製進 vault（兩份要換）。順位不變，Gemini 退為備援；計費仍走 outreach.draft。
+- Connectors「系統內建」加 OpenAI 平台金鑰有無設定（`app/api/outreach/connectors/route.ts`）；router 說明同步。
+- 部署 b9038d692（smoke all OK；容器 printenv OPENAI_API_KEY 存在）。真測：1 筆名單一輪內研究→產信（gpt-5.4-mini）→自動核准→Gmail 草稿；草稿與資料已刪，0 殘留。監工台 v38。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl -X POST http://127.0.0.1:3002/api/internal/outreach/gmail-sync + psql ai_model=gpt-5.4-mini-2026-03-17 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=OPENAI_API_KEY|gemini_agency | hits=53
+- ORACLE_WAIVED: 一個分支（無 connector 時讀既有平台金鑰），判定與權限不變；真測已證實走 OpenAI
 ## 2026-11-04（續11）外聯 C15.4 完成：量產管線正式站真測（草稿模式，D26）＋真測抓到的 3 個 bug＋Connectors 頁補齊
 
 **根因**（C15.4 REALTEST：awarewave-ops 種 20 筆 qualified 名單、sampled 10% profile、主信箱 auto_draft）：
