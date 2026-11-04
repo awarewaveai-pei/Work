@@ -133,7 +133,7 @@ export function buildBrandContext(input: BrandContextInput): BrandContext {
       `- 這封信只為了換到「${who}」的一個回覆，不是成交。`,
       "- 結尾用一句低壓的問句（例如問對方要不要看一個簡短的想法），再加一句拒收：「如果不適合，我就不再打擾。」",
       input.madeForThem ? `- 我們真的為對方做了：${input.madeForThem}，可以提一次。` : "- 不要說「我幫你做了一個…」：我們沒有為對方做任何東西。",
-      `- 繁體中文，內文 120–180 字，語氣${p?.tone ?? "溫和專業"}。主旨 25 字以內，不用驚嘆號。`,
+      `- 繁體中文，內文 120–180 字，語氣${p?.tone ?? "溫和專業"}。主旨 25 字以內（英文字母、數字、空格算半字），不用驚嘆號。`,
     ].join("\n"),
     // 6b. what has worked for this service so far (SPEC D24 ③): the angle only, never a lead's words
     input.winningAngle ? ["## 有效做法", `- 這個服務過去回覆率最高的開場角度是「${input.winningAngle}」（${ANGLE_LABEL[input.winningAngle]}）。兩版之中至少一版用它，另一版用不同的角度。`].join("\n") : "",

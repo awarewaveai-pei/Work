@@ -179,7 +179,7 @@ export default function ReviewClient() {
         {isEditing ? (
           <>
             {m.output_type === "cold_email" && (
-              <input value={editing.subject} aria-label="主旨" placeholder="主旨（25 字以內）"
+              <input value={editing.subject} aria-label="主旨" placeholder="主旨（25 字以內，英數字算半字）"
                 onChange={(e) => setEditing({ ...editing, subject: e.target.value })} />
             )}
             <textarea rows={12} value={editing.body} aria-label="內文" onChange={(e) => setEditing({ ...editing, body: e.target.value })} />

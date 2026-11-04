@@ -12,12 +12,28 @@ interface Connector {
   connector_type: string;
   is_enabled: boolean;
   credentials_ref: string | null;
-  settings: { email?: string } | null;
+  settings: { email?: string; gmail_sync?: { last_ok_at?: string } } | null;
+  organization_id: string | null;
+  organizations?: { name: string | null } | null;
   created_at: string;
 }
+interface AgencyConnector { connector_name: string; connector_type: string; is_enabled: boolean; has_key: boolean }
+interface Builtin { name: string; configured: boolean }
 
+const BUILTIN_LABEL: Record<string, string> = {
+  serper: "Serper（Google 搜尋：找名單、查社群頁）",
+  google_oauth: "Google OAuth 用戶端（連 Gmail 用）",
+};
+const labelOf = (name: string): string => KNOWN.find((k) => k.name === name)?.label ?? name;
+const taipei = (iso: string): string => new Date(iso).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", hour12: false });
+
+// Every name a runtime reader looks up in co_connector_accounts (generate.ts AI_PROVIDERS, mailbox-verify.ts
+// PAID_PROVIDERS, draft.ts gmail): one missing here can be used but never added from this page.
 const KNOWN: { name: string; type: string; label: string }[] = [
+  { name: "claude",     type: "ai_generation",      label: "Claude（AI 生成 · 第 1 順位）" },
+  { name: "openai",     type: "ai_generation",      label: "OpenAI（AI 生成 · 第 2 順位）" },
   { name: "gemini",     type: "ai_generation",      label: "Gemini（AI 生成 · 客戶 BYO）" },
+  { name: "gemini_agency", type: "ai_generation",   label: "Gemini 代理商額度（AI 生成 · 最後順位）" },
   { name: "hunter",     type: "email_verification", label: "Hunter（Email 驗證 · 每月免費 50 點 · 客戶 BYO）" },
   { name: "zerobounce", type: "email_verification", label: "ZeroBounce（Email 驗證 · 每月免費 100 筆 · 客戶 BYO）" },
   { name: "reoon",      type: "email_verification", label: "Reoon（Email 驗證 · 每天免費 20 筆 · 客戶 BYO）" },
@@ -41,6 +57,8 @@ const NEED_LABEL: Record<ConnectorNeed, string> = {
 
 export default function ConnectorsClient() {
   const [connectors, setConnectors] = useState<Connector[]>([]);
+  const [agency, setAgency] = useState<AgencyConnector[]>([]);
+  const [builtin, setBuiltin] = useState<Builtin[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -63,6 +81,8 @@ export default function ConnectorsClient() {
       const j = await r.json();
       if (!j.ok) throw new Error(j.error || "load failed");
       setConnectors(j.connectors as Connector[]);
+      setAgency((j.agency ?? []) as AgencyConnector[]);
+      setBuiltin((j.builtin ?? []) as Builtin[]);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -166,15 +186,20 @@ export default function ConnectorsClient() {
       {gmailStatus === "connected" && <div className="card-badge badge-green">已連接 Gmail：{gmailDetail}</div>}
       {gmailStatus === "error" && <div className="card-badge badge-red" role="alert">Gmail 連接失敗：{gmailDetail}</div>}
 
-      <form className="card" onSubmit={add} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <span className="card-label">新增 Connector：</span>
-        <select value={pick} onChange={(e) => setPick(e.target.value)}>
+      <form className="card" onSubmit={add} style={{ display: "grid", gap: 8 }}>
+        <span className="card-label">新增 Connector：先選一個，再按「新增」</span>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }} role="radiogroup" aria-label="要新增的 connector">
           {KNOWN.map((k) => (
-            <option key={k.name} value={k.name}>{k.label}</option>
+            <button key={k.name} type="button" role="radio" aria-checked={pick === k.name}
+              className={pick === k.name ? "btn-primary" : "btn-secondary"} onClick={() => setPick(k.name)}>
+              {k.label}
+            </button>
           ))}
-        </select>
-        <button type="submit" className="btn-primary" disabled={busy}>新增</button>
-        <span className="card-sub">（先建 connector，再為它「🔑 設定金鑰」→ 金鑰加密存 Supabase Vault，DB 只留指標）</span>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button type="submit" className="btn-primary" disabled={busy}>新增</button>
+          <span className="card-sub">先建 connector，再按「🔑 設定金鑰」。金鑰加密存在 Supabase Vault，資料庫只留指標。</span>
+        </div>
       </form>
 
       <div className="card">
@@ -189,7 +214,8 @@ export default function ConnectorsClient() {
               <li key={c.id} className="card" style={{ display: "grid", gap: 8 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
                   <span>
-                    <strong>{c.connector_name}</strong>
+                    <strong>{labelOf(c.connector_name)}</strong>
+                    <span className="card-sub"> · {c.organization_id ? (c.organizations?.name ?? "某家公司") : "代理商共用"}</span>
                     <span className="card-sub"> · {c.connector_type}</span>
                     <span className={`card-badge ${c.is_enabled ? "badge-green" : "badge-gray"}`} style={{ marginLeft: 8 }}>
                       {c.is_enabled ? "enabled" : "disabled"}
@@ -228,6 +254,9 @@ export default function ConnectorsClient() {
                     <button type="button" className="btn-secondary" onClick={() => void remove(c.id)}>移除</button>
                   </span>
                 </div>
+                {c.connector_name === "gmail" && c.credentials_ref && (
+                  <p className="card-sub">上次同步成功：{c.settings?.gmail_sync?.last_ok_at ? taipei(c.settings.gmail_sync.last_ok_at) : "還沒同步過"}</p>
+                )}
                 {poolId === c.id && c.connector_name === "gmail" && (
                   <div style={{ display: "grid", gap: 6 }}>
                     <p className="card-sub">此信箱屬於寄件池：系統自動寄出、每日上限 50，暖機從每天 10 封開始。輸入要連的信箱確認，Google 登入的帳號必須是這個地址。</p>
@@ -262,6 +291,37 @@ export default function ConnectorsClient() {
           </ul>
         )}
       </div>
+
+      {org && agency.length > 0 && (
+        <div className="card">
+          <div className="card-header"><span className="card-label">代理商共用（{agency.length}）</span></div>
+          <p className="card-sub">這家公司自己沒設某項時，系統改用這一組；費用記在這家公司的點數。</p>
+            <ul style={{ display: "grid", gap: 6, listStyle: "none", padding: 0 }}>
+              {agency.map((a) => (
+                <li key={`${a.connector_name}-${a.connector_type}`}>
+                  <strong>{labelOf(a.connector_name)}</strong>
+                  <span className={`card-badge ${a.is_enabled ? "badge-green" : "badge-gray"}`} style={{ marginLeft: 8 }}>{a.is_enabled ? "啟用" : "停用"}</span>
+                  <span className={`card-badge ${a.has_key ? "badge-green" : "badge-gray"}`} style={{ marginLeft: 4 }}>{a.has_key ? "🔑 已設金鑰" : "未設金鑰"}</span>
+                  {connectors.some((c) => c.connector_name === a.connector_name && c.is_enabled && c.credentials_ref)
+                    && <span className="card-sub">（這家公司有自己的，優先用自己的）</span>}
+                </li>
+              ))}
+            </ul>
+        </div>
+      )}
+
+      {builtin.length > 0 && <div className="card">
+        <div className="card-header"><span className="card-label">系統內建（{builtin.length}）</span></div>
+        <p className="card-sub">設在主機環境變數，所有公司共用；這裡只顯示有沒有設定，不顯示金鑰。</p>
+        <ul style={{ display: "grid", gap: 6, listStyle: "none", padding: 0 }}>
+          {builtin.map((b) => (
+            <li key={b.name}>
+              <strong>{BUILTIN_LABEL[b.name] ?? b.name}</strong>
+              <span className={`card-badge ${b.configured ? "badge-green" : "badge-red"}`} style={{ marginLeft: 8 }}>{b.configured ? "已設定" : "未設定"}</span>
+            </li>
+          ))}
+        </ul>
+      </div>}
 
       <SendersCard org={org} />
 

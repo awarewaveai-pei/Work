@@ -69,6 +69,11 @@ describe("gateMessage", () => {
     expect(lintSubject("限時優惠")).not.toEqual([]);
     expect(lintSubject("一".repeat(26))).not.toEqual([]);
   });
+  it("measures a subject as an inbox shows it: a Latin letter or space is half a character", () => {
+    expect(lintSubject("一".repeat(25))).toEqual([]);
+    expect(lintSubject("想請教關於 Soulful Expression 的網站維護與 AI 工具")).toEqual([]);  // C15.4: blocked at 37 code points
+    expect(lintSubject("a".repeat(51))).not.toEqual([]);
+  });
 });
 
 describe("review policy", () => {

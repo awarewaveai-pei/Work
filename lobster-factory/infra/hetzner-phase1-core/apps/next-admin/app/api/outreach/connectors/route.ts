@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canManageOutreach } from "@/lib/ops-role";
 import { outreachDb } from "@/lib/outreach/db-client";
-import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
+import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse, userKindOf } from "@/lib/tenant-guard";
 
 // Cold Outreach — Connector account CRUD (task T4). Table: co_connector_accounts (migration 0048).
 //
@@ -36,13 +36,37 @@ export async function GET(req: Request): Promise<Response> {
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   let query = supabase
     .from(TABLE)
-    .select("id, organization_id, connector_name, connector_type, is_enabled, credentials_ref, settings, created_at, updated_at")
+    .select("id, organization_id, connector_name, connector_type, is_enabled, credentials_ref, settings, created_at, updated_at, organizations(name)")
     .order("created_at", { ascending: false })
     .limit(LIST_LIMIT);
   if (orgFilter) query = query.eq("organization_id", orgFilter);
   const { data, error } = await query;
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, connectors: data ?? [] });
+  // An organization without its own key runs on the agency's (organization_id IS NULL): generate.ts pickRef and
+  // mailbox-verify.ts verifierKeys read it second. Listing only the organization's rows hid what it actually uses.
+  // Staff only: rows with no organization are agency data, never a customer's (tenant-guard.ts assertOrgAccess).
+  const staff = userKindOf(req.headers) !== "client";
+  let agency: AgencyConnector[] = [];
+  if (orgFilter && staff) {
+    const { data: rows, error: agencyErr } = await supabase.from(TABLE)
+      .select("connector_name, connector_type, is_enabled, credentials_ref")
+      .is("organization_id", null).order("created_at").limit(LIST_LIMIT);
+    if (agencyErr) return NextResponse.json({ ok: false, error: agencyErr.message }, { status: 500 });
+    agency = ((rows ?? []) as Array<{ connector_name: string; connector_type: string; is_enabled: boolean; credentials_ref: string | null }>)
+      .map((r) => ({ connector_name: r.connector_name, connector_type: r.connector_type, is_enabled: r.is_enabled, has_key: !!r.credentials_ref }));
+  }
+  return NextResponse.json({ ok: true, connectors: data ?? [], agency, builtin: staff ? builtinConnectors() : [] });
+}
+
+interface AgencyConnector { connector_name: string; connector_type: string; is_enabled: boolean; has_key: boolean }
+
+/** Services the server reads from its own environment, not from co_connector_accounts: set or not, never the value. */
+function builtinConnectors(): Array<{ name: string; configured: boolean }> {
+  const set = (k: string) => !!process.env[k]?.trim();
+  return [
+    { name: "serper", configured: set("SERPER_API_KEY") },
+    { name: "google_oauth", configured: set("GOOGLE_OAUTH_CLIENT_ID") && set("GOOGLE_OAUTH_CLIENT_SECRET") },
+  ];
 }
 
 export async function POST(req: Request): Promise<Response> {

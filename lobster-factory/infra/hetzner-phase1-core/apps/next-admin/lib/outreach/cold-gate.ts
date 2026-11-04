@@ -91,14 +91,18 @@ export function lintMessage(body: string, forbiddenWords: string[] = []): Messag
 // v2 (SPEC §5.3): the subject is gated, and the parts code appends (signature, personal-data notice) must still be
 // there -- an edited body is re-gated the same way (messages/route.ts PATCH), so a person cannot remove them unnoticed.
 export const GATE_VERSION = "v2";
-const SUBJECT_MAX = 25;
+/** In full-width characters, what an inbox line shows: a Latin letter, digit or space is half of one. Counting code
+ *  points made an English brand name ("Soulful Expression" = 18) eat the whole limit (C15.4 REALTEST, 13 of 20 blocked). */
+export const SUBJECT_MAX = 25;
 const SUBJECT_BANNED = ["免費", "限時"];
+export const subjectWidth = (s: string): number => [...s].reduce((w, ch) => w + (ch.charCodeAt(0) < 0x2e80 ? 0.5 : 1), 0);
 
 export function lintSubject(subject: string): string[] {
   const s = (subject ?? "").trim();
   const findings: string[] = [];
   if (!s) findings.push("主旨空白");
-  if ([...s].length > SUBJECT_MAX) findings.push(`主旨過長（${[...s].length} 字，上限 ${SUBJECT_MAX}）`);
+  const width = subjectWidth(s);
+  if (width > SUBJECT_MAX) findings.push(`主旨過長（${Math.ceil(width)} 字，上限 ${SUBJECT_MAX}；英數字算半字）`);
   const hits = Array.from(new Set([...HARD_CTA, ...SUBJECT_BANNED])).filter((w) => s.includes(w));
   if (hits.length) findings.push(`主旨含高壓字：${hits.join(", ")}`);
   return findings;
