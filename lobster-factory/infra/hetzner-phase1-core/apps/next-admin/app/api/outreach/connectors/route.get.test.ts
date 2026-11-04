@@ -30,7 +30,7 @@ describe("GET /api/outreach/connectors", () => {
     expect(j.connectors.map((c: { id: string }) => c.id)).toEqual(["a"]);
     expect(j.agency).toEqual([{ connector_name: "hunter", connector_type: "email_verification", is_enabled: true, has_key: true }]);
     expect(JSON.stringify(j.agency)).not.toContain("vault:");
-    expect(j.builtin.map((b: { name: string }) => b.name)).toEqual(["serper", "google_oauth"]);
+    expect(j.builtin.map((b: { name: string }) => b.name)).toEqual(["openai", "serper", "google_oauth"]);
   });
   it("a customer gets neither the agency's rows nor the host's settings (Codex 2026-11-04)", async () => {
     const res = await GET(new Request(`http://app.test/api/outreach/connectors?organizationId=${ORG}`,

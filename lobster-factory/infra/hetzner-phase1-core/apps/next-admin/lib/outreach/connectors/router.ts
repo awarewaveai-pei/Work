@@ -16,7 +16,7 @@ export const LADDERS: Record<ConnectorNeed, FallbackStep[]> = {
   ai_generation: [
     // Upgrade tier — higher quality, client pays for their own key
     { provider: "claude",        kind: "byo",    connectorName: "claude",        requiresConnector: true,  note: "客戶 BYO Claude key（品質最高，繁中尤佳）" },
-    { provider: "openai",        kind: "byo",    connectorName: "openai",        requiresConnector: true,  note: "客戶 BYO OpenAI key（GPT-4o-mini 預設）" },
+    { provider: "openai",        kind: "byo",    connectorName: "openai",        requiresConnector: true,  note: "客戶 BYO OpenAI key；沒有就用平台 OPENAI_API_KEY（generate.ts）" },
     // Free tier — default path, zero cost to client
     { provider: "gemini",        kind: "byo",    connectorName: "gemini",        requiresConnector: true,  note: "客戶 BYO Gemini free key（成本歸客戶，乘客戶數）" },
     { provider: "gemini_agency", kind: "agency", connectorName: "gemini_agency", requiresConnector: true,  note: "agency Gemini key（受 quota guard 限制）" },

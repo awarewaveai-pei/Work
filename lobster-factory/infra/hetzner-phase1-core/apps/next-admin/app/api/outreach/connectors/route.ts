@@ -64,6 +64,7 @@ interface AgencyConnector { connector_name: string; connector_type: string; is_e
 function builtinConnectors(): Array<{ name: string; configured: boolean }> {
   const set = (k: string) => !!process.env[k]?.trim();
   return [
+    { name: "openai", configured: set("OPENAI_API_KEY") },
     { name: "serper", configured: set("SERPER_API_KEY") },
     { name: "google_oauth", configured: set("GOOGLE_OAUTH_CLIENT_ID") && set("GOOGLE_OAUTH_CLIENT_SECRET") },
   ];

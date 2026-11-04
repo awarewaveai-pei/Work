@@ -179,6 +179,10 @@ export async function generateForLead(supabase: SupabaseClient, lead: LeadRow, o
       return id ? connectorSecretRef(id) : null;
     };
     const ref = (lead.organization_id ? await pickRef("client") : null) ?? (await pickRef("agency"));
+    // No connector: OpenAI falls back to the platform key every other feature uses (lib/ai/cheap-json.ts), one copy of
+    // it in the host env rather than a second in the vault. The agency Gemini free key 429s after ~12 emails (C15.4).
+    const platform = !ref && provider === "openai" ? process.env.OPENAI_API_KEY?.trim() : undefined;
+    if (platform) { apiKey = platform; resolvedProvider = provider; break; }
     if (!ref) continue;
     try {
       apiKey = await getSecret(ref);

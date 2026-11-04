@@ -21,6 +21,7 @@ interface AgencyConnector { connector_name: string; connector_type: string; is_e
 interface Builtin { name: string; configured: boolean }
 
 const BUILTIN_LABEL: Record<string, string> = {
+  openai: "OpenAI 平台金鑰（產信、事實核對；公司沒設自己的 AI 金鑰時用）",
   serper: "Serper（Google 搜尋：找名單、查社群頁）",
   google_oauth: "Google OAuth 用戶端（連 Gmail 用）",
 };
