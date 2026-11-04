@@ -12,6 +12,7 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=tsc 0；SRI 13/13；3903 重跑 card-01/02/03/04 e2e = 63/63、147/147、94/94、264/264；JS 探測 vector：面板順序 22 項正確、0 個展開、說明行不在、新線條寬 2、未選→全部物件 bbox 21..1042×0..638（=畫布高、水平置中）、改填色後立刻復原 → 矩形仍在且回原色、可重做、刪 EyeDropper 後點畫布取到 #ff8800；canvas：順序 14 項正確、0 個展開、符合畫布按鈕可按、旋轉矩形＋圓未選→ bbox 0..800×162..638、改填色立刻復原 → 回 #ff0000、可重做 | exit=0 | ms=0
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n（agency-os/reports/oracle/2026-11-04-partialreview-7047f051.md，5 項已修）
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=disabled={!imageSelected} onClick={() => fitImageToCanvas\|eyeOk\|拖曳移動·角落縮放\|<details open | hits=0
+- 部署：sg-deploy next-admin → deployed-commit 83a1f3ceb、容器 healthy、主機 smoke 全 OK；curl 正式站 vector-editor.html 含 imageBlocks／flushPendingSnap／pickedColor；playwright smoke 26 passed。
 ## 2026-11-04（續17）外聯 C16.2 事實核對一致率：0.89 < 0.95，門檻未過
 
 - 結果：n=200、agreed=178、rate=0.89、errors=0；22 筆不一致（supported→unsupported 12、unsupported→supported 10）。報告 `agency-os/reports/outreach/c16-2-claim-consistency-2026-11-04.json`。C16.2 維持 todo，不調門檻、不改判定。
