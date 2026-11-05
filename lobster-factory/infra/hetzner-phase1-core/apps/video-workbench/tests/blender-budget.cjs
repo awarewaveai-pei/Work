@@ -8,7 +8,7 @@ const { createBlenderJobs } = require("../backend/blender-jobs.cjs");
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "vw-blender-budget-"));
 try {
-  const jobs = createBlenderJobs({ dataDir, mediaStore: { fileFor: () => path.join(dataDir, "model.glb") }, env: {} });
+  const jobs = createBlenderJobs({ dataDir, mediaStore: { fileFor: () => path.join(dataDir, "model.glb") }, env: { BLENDER_PATH: process.execPath } });
   const scene = { id: "s1", revision: 1, objects: [{ asset: { id: "m", url: "/media/" + "a".repeat(64) + "/original.glb" }, position: [0, 0, 0], rotationY: 0, scale: 1 }], camera: { fov: 40, keys: [{ frame: 0, position: [0, 1, 4], target: [0, 1, 0] }] }, lights: [] };
   const input = (width, height, frames) => ({ type: "video", operation: "blender-render", settings: { scene, width, height, frames, fps: { num: 30, den: 1 } } });
   const short = jobs.timeoutMs(input(1920, 1080, 150)), long = jobs.timeoutMs(input(1920, 1080, 300));
