@@ -1,30 +1,15 @@
 /**
- * Outpaint presets — the `outpaint` enum of black-forest-labs/flux-fill-pro, verbatim.
- *
- * Pure data (no server deps) so the client CanvasEditor can import the list + type without
- * pulling generative-fill.ts (which uses Buffer/process.env) into the browser bundle. The
- * server module re-exports from here so the enum stays single-sourced. Mirrors the
- * print-destinations.ts split that keeps sharp/r2 off the client.
+ * Typed door to public/editor-shared/outpaint-presets.js — the ONE copy of the flux-fill-pro `outpaint` enum and its UI labels, for
+ * /tools/canvas and the server (generative-fill.ts re-exports it for the genfill route) and the editor-shared dock blocks (same file as
+ * an ES module). Pure data, no server deps (keeps Buffer/process.env of generative-fill.ts out of the browser bundle).
+ * Nothing is re-implemented in TS; this file only adds types. drift guard: lib/studio/__tests__/editor-edge-mask-drift.test.ts
  */
-export const OUTPAINT_PRESETS = [
-  "Zoom out 1.5x",
-  "Zoom out 2x",
-  "Make square",
-  "Left outpaint",
-  "Right outpaint",
-  "Top outpaint",
-  "Bottom outpaint",
-] as const;
+import * as shared from "../../public/editor-shared/outpaint-presets.js";
 
-export type OutpaintPreset = (typeof OUTPAINT_PRESETS)[number];
+export type OutpaintPreset =
+  | "Zoom out 1.5x" | "Zoom out 2x" | "Make square" | "Left outpaint" | "Right outpaint" | "Top outpaint" | "Bottom outpaint";
+
+export const OUTPAINT_PRESETS = shared.OUTPAINT_PRESETS as readonly OutpaintPreset[];
 
 /** Friendly Chinese labels for the UI (keys must match OUTPAINT_PRESETS values). */
-export const OUTPAINT_LABELS: Record<OutpaintPreset, string> = {
-  "Zoom out 1.5x": "縮小 1.5×（四周擴）",
-  "Zoom out 2x": "縮小 2×（四周擴）",
-  "Make square": "補成正方形",
-  "Left outpaint": "向左擴",
-  "Right outpaint": "向右擴",
-  "Top outpaint": "向上擴",
-  "Bottom outpaint": "向下擴",
-};
+export const OUTPAINT_LABELS = shared.OUTPAINT_LABELS as Readonly<Record<OutpaintPreset, string>>;
