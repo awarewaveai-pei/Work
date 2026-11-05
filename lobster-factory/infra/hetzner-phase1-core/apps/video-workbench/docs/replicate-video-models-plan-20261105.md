@@ -27,7 +27,7 @@ VW 影片生成只接 OpenAI sora-2，模型由環境變數決定、每個任務
 
 ## 3. 風險
 
-- R1 **NA 現有 Veo 可能少算錢**：`video-motion-gen.ts:65-78` 沒送 `resolution`，Veo 會跑 1080p；`cost-model.ts:174-175` 的價是否為 1080p 價未查。RV.1 先查 Replicate 頁面價目，再釘 `resolution:"720p"`（VW 只開 720p）。
+- R1 Veo 價格（2026-11-05 查 replicate.com billingConfig）：只分有無音訊，不分解析度；NA 送 `generate_audio:false` → $0.10／$0.20 每秒與 `cost-model.ts:174-175` 相符，沒有少算。VW 仍明送 `resolution:"720p"`（`buildInput` 的選填參數，NA 不送＝行為不變）。
 - R2 抽出共用檔改到 NA 的 Tarot／內容影片流程（`lib/content/blocks/video-pipeline.ts:24,469`、`app/api/video/draft/route.ts:62`）：純搬移，`npx tsc --noEmit`＋NA 影片相關測試守；推上 main 即當晚 03:00 上線。
 - R3 舊專案 `settings.model:"sora-2"`、未知值、`"VideoWorkbench V3"`（`projects-0.js:66-67`）必須照舊跑 sora；未知 id 回 sora 並在畫面顯示「已改用 sora-2」，不靜默換付費模型。
 - R4 重開不丟錢：Replicate 任務也存 `providerId`＋`provider:"replicate"`，重開後續輪詢；取消改成可呼叫 Replicate cancel（`bg-remove.cjs:49-56` 同式）。
@@ -45,7 +45,7 @@ B。理由：「不另建模型清單」是需求本身；A 正是被禁止的�
 
 ## 6. 實作計畫（卡 RV，一次一項）
 
-- **RV.1 NA 共用模型檔**：新檔 `NA/lib/ai/video-motion-models.ts`（從 `video-motion-gen.ts:42-85` 原樣搬，加 `durations`、`ratios`、`requiresImage`、`resolution`；`isAllowedOutputUrl` 從 `image-gen.ts:323-329` 搬來並由 image-gen 轉出）；`video-motion-gen.ts` 改 import；`cost-model.ts:172` 型別改指新檔。先查 `replicate.com/google/veo-3.1-fast`、`/google/veo-3.1` 720p 價，價不同就更新 `VIDEO_MOTION_RATES` 並在 `buildInput` 送 `resolution:"720p"`。驗收：`npx tsc --noEmit` 綠；`model-registry.test.ts` 綠；新測試：VIDEO_MOTION_RATES 鍵 = 模型檔鍵。
+- **RV.1 NA 共用模型檔**：新檔 `NA/lib/ai/video-motion-models.ts`（從 `video-motion-gen.ts:42-85` 原樣搬，加 `durations`、`ratios`、`requiresImage`、`resolution`；輸出網址守門不搬：VW 沿用 `bg-remove.cjs` 同一條 replicate.delivery 規則）；`video-motion-gen.ts` 改 import；`cost-model.ts:172` 型別改指新檔。先查 `replicate.com/google/veo-3.1-fast`、`/google/veo-3.1` 720p 價，價不同就更新 `VIDEO_MOTION_RATES` 並在 `buildInput` 送 `resolution:"720p"`。驗收：`npx tsc --noEmit` 綠；`model-registry.test.ts` 綠；新測試：VIDEO_MOTION_RATES 鍵 = 模型檔鍵。
 - **RV.2 VW 後端**：`awarewave-files.txt` 加新檔；`generation-policy.cjs` 改成模型表＝sora（OpenAI）＋NA 四個（Replicate），`capabilities().videoModels[id] = {label, vendor, provider, durations, ratios, requiresImage, usdPerSec, available}`（available：sora 看 OPENAI_API_KEY、其他看 REPLICATE_API_TOKEN），頂層 `videoDurations` 等保留為 sora 值給舊前端；`validate()` 依任務的 `settings.model` 檢查；`api.cjs` 依任務模型分流（新 `backend/replicate-video.cjs`：建立、輪詢、下載≤80MB 串流擋、只信 replicate.delivery、取消）；`provider-cost.cjs` `videoUsd` 先查 OPENAI 再查 `VIDEO_MOTION_RATES`；`aiOrigin` 記任務實際模型與廠商；`api.cjs:152` 遮罩加 REPLICATE_API_TOKEN。驗收：`tests/replicate-video.cjs`（假 fetch）：送出 body 的 slug 與欄位＝NA 模型檔 `buildInput` 結果、重開續輪詢、取消呼叫 cancel、未知模型回 sora、`settings.model:"sora-2"` 走 OpenAI 且送出內容與改前相同；`tests/p6-main-system.cjs` 用量回報＝`usdPerSec×秒數`。
 - **RV.3 VW 前端**：模型面板（`index-0.js:586-600`）列 `videoModels` 全部，每顆按鈕顯示「名稱 · US$x.xx（N 秒）」，不可用的灰掉並寫原因；`projects-0.js:225` `<select>` 改成同款按鈕；`index-0.js:32-40`、`:1176`、`templates-0.js:38` 預設仍 sora-2；時長／比例讀取點（`generator-controls.js:73,193,205-216`、`generator-conversation.js:11,39`、`generator-product.js:116`、`index-0.js:569-571`）改讀選定模型的限制；生成按鈕顯示價格（sora 也是）。驗收：既有 UI 測試綠＋新斷言：模型面板無 `<select>`、每顆按鈕有 US$、選 Runway 無圖時生成按鈕停用、舊專案 sora-2 開啟後仍選 sora-2。
 - **RV.4 真打一次**：主機 `docker exec <vw> printenv REPLICATE_API_TOKEN` 確認有；部署後用員工帳號以 **Runway Gen-4 Turbo 5 秒（US$0.25，四個裡最便宜）** 帶一張小圖生一支；看成品能播、素材帳冊 `origin.model = runwayml/gen4-turbo`、用量回報 0.25。部署屬 High，要你說 go。

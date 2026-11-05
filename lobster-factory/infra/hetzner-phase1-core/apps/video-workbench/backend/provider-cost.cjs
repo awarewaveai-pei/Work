@@ -34,8 +34,10 @@ function imageUsd(model, usage) {
     text = d.text_tokens ?? (d.image_tokens === undefined ? usage.input_tokens : tok(usage.input_tokens) - tok(d.image_tokens));
   return round((tok(text) * r.textInPerM + tok(d.image_tokens) * r.imageInPerM + tok(usage.output_tokens) * r.imageOutPerM) / 1e6);
 }
+// OpenAI ids (sora-2...) or next-admin video-motion ids (runway-gen4-turbo...): both tables are per output second.
 function videoUsd(model, seconds) {
-  const rate = rates.OPENAI_VIDEO_RATES[model];
+  const rate = Object.hasOwn(rates.OPENAI_VIDEO_RATES, model) ? rates.OPENAI_VIDEO_RATES[model]
+    : Object.hasOwn(rates.VIDEO_MOTION_RATES, model) ? rates.VIDEO_MOTION_RATES[model] : null;
   if (!rate) throw unpriced(model);
   return round(rate.usdPerSec * tok(seconds));
 }

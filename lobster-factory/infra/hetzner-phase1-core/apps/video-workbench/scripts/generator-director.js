@@ -114,7 +114,7 @@ function directorEdit() {
   );
 }
 function directorVideo() {
-  return `<section class="director-video-settings"><h2>生成設定</h2><div class="director-setting-chips"><button data-panel="model">${safe(state.model.director)}⌄</button><button data-panel="director-ratio">${safe(state.ratio)}⌄</button><button data-panel="director-duration">${state.directorLength} 秒⌄</button><button data-panel="director-quality">${safe(state.quality)}⌄</button><button data-panel="skill">${safe(state.skill)}⌄</button></div><p class="small-note">確認模型與影片長度，就可以開始生成。</p><div class="director-video-actions"><button class="minor" data-action="director-edit-script">✏️ 修改腳本</button><button class="box-cta" data-action="director-generate-video">生成影片</button></div></section>`;
+  return `<section class="director-video-settings"><h2>生成設定</h2><div class="director-setting-chips"><button data-panel="model">${safe(generatorVideoModel("director").label)}⌄</button><button data-panel="director-ratio">${safe(state.ratio)}⌄</button><button data-panel="director-duration">${state.directorLength} 秒⌄</button><button data-panel="director-quality">${safe(state.quality)}⌄</button><button data-panel="skill">${safe(state.skill)}⌄</button></div><p class="small-note">確認模型與影片長度，就可以開始生成。</p><div class="director-video-actions"><button class="minor" data-action="director-edit-script">✏️ 修改腳本</button><button class="box-cta" data-action="director-generate-video" ${generatorVideoBlock("director") ? "disabled" : ""} title="${safe(generatorVideoBlock("director"))}">生成影片 · ${generatorVideoPrice("director")}</button></div></section>`;
 }
 function directorWorkspace() {
   if (state.directorStage === "chat") return directorChatWorkspace();

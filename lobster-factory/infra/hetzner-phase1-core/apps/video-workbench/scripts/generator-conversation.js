@@ -8,7 +8,7 @@ function directorNewConversation() {
 }
 function directorOutputPanel(kind) {
   const capabilities = VideoWorkbench.capabilities || {};
-  const spec = kind === "director-ratio" ? { title: "長寬比", values: ["16:9", "9:16", "1:1", "4:5", "4:3"], allowed: capabilities.videoRatios || ["16:9", "9:16"], key: "ratio", attribute: "data-ratio" } : kind === "director-duration" ? { title: "影片長度", values: [4, 5, 6, 8, 10, 12, 15, 20, 25, 30], allowed: capabilities.videoDurations || [4, 8, 12], key: "directorLength", attribute: "data-gen-duration" } : { title: "畫質", values: ["480p", "720p", "1080p"], allowed: capabilities.videoQualities || ["720p"], key: "quality", attribute: "data-quality" };
+  const spec = kind === "director-ratio" ? { title: "長寬比", values: ["16:9", "9:16", "1:1", "4:5", "4:3"], allowed: generatorVideoModel("director").ratios, key: "ratio", attribute: "data-ratio" } : kind === "director-duration" ? { title: "影片長度", values: [4, 5, 6, 8, 10, 12, 15, 20, 25, 30], allowed: generatorVideoModel("director").durations, key: "directorLength", attribute: "data-gen-duration" } : { title: "畫質", values: ["480p", "720p", "1080p"], allowed: capabilities.videoQualities || ["720p"], key: "quality", attribute: "data-quality" };
   return `<h3>${spec.title}</h3><div class="chips">${spec.values.map((value) => `<button ${spec.attribute}="${value}" aria-pressed="${state[spec.key] === value}" ${spec.allowed.includes(value) ? "" : 'disabled title="目前服務尚未支援"'}>${value}${typeof value === "number" ? " 秒" : ""}</button>`).join("")}</div><p class="small-note">可使用的選項依目前接入服務顯示；尚未支援的選項不會送出。</p>`;
 }
 function generatorRefreshOutputPanel() {
@@ -36,7 +36,7 @@ async function directorSendMessage(text, phase = state.directorPhase, regenerate
     state.directorMessages.push({ role: "assistant", text: reply.script || reply.reply, choices: reply.choices.filter((x) => typeof x === "string").slice(0, 4) });
     if (reply.script) { state.directorScript = reply.script; state.directorPhase = "script"; }
     else state.directorPhase = reply.stage === "script" && state.directorScript ? "script" : "consultation";
-    if ((VideoWorkbench.capabilities?.videoDurations || [4, 8, 12]).includes(reply.duration)) { state.directorLength = reply.duration; if (state.mode === "director") state.duration = reply.duration; }
+    if (generatorVideoModel("director").durations.includes(reply.duration)) { state.directorLength = reply.duration; if (state.mode === "director") state.duration = reply.duration; }
     return true;
   } catch (error) {
     if (state.directorConversationId !== conversationId || state.directorMessages !== conversation) return false;

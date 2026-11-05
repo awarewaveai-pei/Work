@@ -5,18 +5,14 @@
  * 且生成時間量級不同（image-gen.ts 的 58s 逾時打底是給圖片用；影片生成常態 30s-3min，
  * 需要更長的逾時預算，硬塞同一個 GEN_TIMEOUT_MS 會誤殺正常在跑的影片工作）。
  *
- * 皆走 Replicate（2026-09-12 直接查 API schema + 頁面定價確認，非猜測）；slug 登錄在 lib/ai/cost-model.ts MEDIA_MODELS：
- *   - Runway Gen-4 Turbo：input_image 欄位叫 "image"
- *   - （Luma Ray 2 / Flash 2 已從 Replicate 下架，2026-10-28 移除）
- *   - Luma Ray 3.2（2026-10-28 查 schema）：起始圖叫 "start_image"，有 start_image 時只准 5s，
- *     aspect_ratio 被忽略（比例跟起始圖走）；resolution 釘 720p，價格表按解析度×秒數計支
- *   - Google Veo 3.1 / 3.1 Fast：叫 "image"（另有 generate_audio，關掉——旁白配音另外做，
- *     Veo 自己生的音軌用不到只會浪費且可能跟 TTS 對不上嘴形時間軸）
+ * 皆走 Replicate；模型清單與輸入欄位唯一一份在 lib/ai/video-motion-models.ts（video-workbench 也直接讀），
+ * slug 登錄在 lib/ai/cost-model.ts MEDIA_MODELS，價格在同檔 VIDEO_MOTION_RATES。
  */
 
 import { fetchWithRetry429, REPLICATE_POLL_MS, isAllowedOutputUrl } from "./image-gen";
 import { providerUrl } from "@/lib/ai/gateway";
 import type { Grant } from "@/lib/entitlements/can";
+import { MOTION_MODELS, type VideoMotionModel } from "@/lib/ai/video-motion-models";
 
 const GEN_TIMEOUT_MS = 280_000; // 留在 nginx app.aware-wave.com /api/ 的 proxy_read_timeout 300s 內
 // 影片比圖片檔案大很多（5-8s 720p 常見 5-20MB）；20MB（image-gen.ts 的圖片上限）太緊，但box 本來就
@@ -38,52 +34,8 @@ async function runWithConcurrency<T>(limit: number, tasks: (() => Promise<T>)[])
   return results;
 }
 
-export type VideoMotionModel =
-  | "runway-gen4-turbo"
-  | "veo-3-1-fast"
-  | "veo-3-1"
-  | "luma-ray-3-2";
-
-export function isVideoMotionModel(v: unknown): v is VideoMotionModel {
-  return v === "runway-gen4-turbo" || v === "veo-3-1-fast" || v === "veo-3-1" || v === "luma-ray-3-2";
-}
-
-interface MotionConfig {
-  slug: string;
-  defaultDurationSec: number;
-  buildInput: (opts: { imageUrl: string; prompt: string; aspectRatio: "16:9" | "9:16"; durationSec: number }) => Record<string, unknown>;
-}
-
-const MOTION_MODELS: Record<VideoMotionModel, MotionConfig> = {
-  "runway-gen4-turbo": {
-    slug: "runwayml/gen4-turbo",
-    defaultDurationSec: 5,
-    buildInput: ({ imageUrl, prompt, aspectRatio, durationSec }) => ({
-      image: imageUrl, prompt, aspect_ratio: aspectRatio, duration: durationSec,
-    }),
-  },
-  "veo-3-1-fast": {
-    slug: "google/veo-3.1-fast",
-    defaultDurationSec: 8,
-    buildInput: ({ imageUrl, prompt, aspectRatio, durationSec }) => ({
-      image: imageUrl, prompt, aspect_ratio: aspectRatio, duration: durationSec, generate_audio: false,
-    }),
-  },
-  "veo-3-1": {
-    slug: "google/veo-3.1",
-    defaultDurationSec: 8,
-    buildInput: ({ imageUrl, prompt, aspectRatio, durationSec }) => ({
-      image: imageUrl, prompt, aspect_ratio: aspectRatio, duration: durationSec, generate_audio: false,
-    }),
-  },
-  "luma-ray-3-2": {
-    slug: "luma/ray-3.2",
-    defaultDurationSec: 5,
-    buildInput: ({ imageUrl, prompt, aspectRatio, durationSec }) => ({
-      start_image: imageUrl, prompt, aspect_ratio: aspectRatio, duration: durationSec, resolution: "720p",
-    }),
-  },
-};
+export { isVideoMotionModel, MOTION_MODELS } from "@/lib/ai/video-motion-models";
+export type { VideoMotionModel } from "@/lib/ai/video-motion-models";
 
 export type VideoMotionOutcome =
   | { ok: true; buffer: Buffer; mime: string }

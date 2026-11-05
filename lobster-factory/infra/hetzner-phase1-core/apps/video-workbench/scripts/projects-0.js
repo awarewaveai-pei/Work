@@ -26,8 +26,8 @@ const STYLE_NAMES = [
 ];
 const JAPANESE_PROMPT =
   "暖色調 · 低對比 · Kodak Portra · 35mm · 淺景深 · 細膩顆粒 · 柔和逆光 · 溫馨 · 生活感";
-// Third-party reference pictures (backend/reference.cjs): staff only, display only, never sent as a generation reference.
-const stylePicture = (i) => (VideoWorkbench.capabilities?.reference ? "/reference/image-" + (187 + i) + ".jpeg" : "");
+// Our own example pictures (examples/styles.json, public): display only, never sent as a generation reference.
+const stylePicture = (i) => "/examples/style-proj-" + (i + 1) + ".webp";
 const STORE = "awarewave-projects-screenshot-frontend-v1";
 // Shot size chips (buttons, no dropdown) and the phrase each adds to the shot prompt.
 const SHOT_SIZES = {
@@ -222,7 +222,7 @@ function renderDialog() {
     const s = p.settings || {};
     html = modal(
       "生成設定",
-      `<p class="quiet">本集的設定是「加在專案設定後面」，不是取代它。下方每一區最後一行就是生成時真正送出去的內容。</p><div class="settings-section"><h3>◉　風格錨點</h3><div class="settings-two"><span>專案</span><div><div class="note">${esc(styleText(p))}</div><button class="btn small outline" data-action="editStyle">✎　編輯風格</button></div><span>EP${state.episode + 1}</span><div><textarea data-settings="episodeStyle" placeholder="例：冬季雪景、冷色調">${esc(ep().styleOverride || "")}</textarea><p class="tiny">加在專案設定之後，不會取代它。</p></div></div><strong class="quiet">關鍵幀實際送出的內容</strong><div style="margin-top:7px" class="tiny">${esc(styleText(p))}</div></div><div class="settings-section"><h3>▣　影片模型與解析度</h3><div class="settings-two"><span>專案</span><div><select data-settings="model">${["sora-2"].map((v) => `<option ${s.model === v ? "selected" : ""}>${v}</option>`).join("")}</select><p class="tiny">所有鏡頭預設使用的模型；解析度預設 720p，每一鏡仍可在鏡頭抽屜另外指定。</p></div><span>鎖定影片模型</span><div><label><input type="checkbox" id="lockModel" style="width:auto" ${s.lockModel ? "checked" : ""}> 鎖定影片模型　${s.lockModel ? "已鎖定" : "未鎖定"}</label><p class="tiny">不同模型對同一畫面的色彩與臉部詮釋差很多；鎖定時鏡頭抽屜只顯示專案預設。</p></div></div></div><div class="settings-section"><h3>☷　影片預設提示</h3><div class="settings-two"><span>專案</span><textarea data-settings="videoPrompt" placeholder="例：影片中不要有文字">${esc(s.videoPrompt || "")}</textarea><span>EP${state.episode + 1}</span><div><textarea data-settings="episodeVideoPrompt" placeholder="例：影片中不要有文字">${esc(ep().videoPrompt || "")}</textarea><p class="tiny">加在專案設定之後，不會取代它。</p></div></div></div>`,
+      `<p class="quiet">本集的設定是「加在專案設定後面」，不是取代它。下方每一區最後一行就是生成時真正送出去的內容。</p><div class="settings-section"><h3>◉　風格錨點</h3><div class="settings-two"><span>專案</span><div><div class="note">${esc(styleText(p))}</div><button class="btn small outline" data-action="editStyle">✎　編輯風格</button></div><span>EP${state.episode + 1}</span><div><textarea data-settings="episodeStyle" placeholder="例：冬季雪景、冷色調">${esc(ep().styleOverride || "")}</textarea><p class="tiny">加在專案設定之後，不會取代它。</p></div></div><strong class="quiet">關鍵幀實際送出的內容</strong><div style="margin-top:7px" class="tiny">${esc(styleText(p))}</div></div><div class="settings-section"><h3>▣　影片模型與解析度</h3><div class="settings-two"><span>專案</span><div><div class="row">${VideoWorkbenchVideoModels.list(VideoWorkbench.capabilities).map((v) => `<button class="chip ${VideoWorkbenchVideoModels.get(VideoWorkbench.capabilities, s.model).id === v.id ? "on" : ""}" data-action="projectModel" data-value="${esc(v.id)}" aria-pressed="${VideoWorkbenchVideoModels.get(VideoWorkbench.capabilities, s.model).id === v.id}" ${v.available === false ? 'disabled title="尚未設定服務金鑰"' : ""}>${esc(v.label)} · ${VideoWorkbenchVideoModels.priceText(v, v.defaultDurationSec || v.durations[0])}／${v.defaultDurationSec || v.durations[0]} 秒</button>`).join("")}</div><p class="tiny">所有鏡頭預設使用的模型（按鈕上是預設長度的費用）；解析度預設 720p，每一鏡仍可在鏡頭抽屜另外指定。</p></div><span>鎖定影片模型</span><div><label><input type="checkbox" id="lockModel" style="width:auto" ${s.lockModel ? "checked" : ""}> 鎖定影片模型　${s.lockModel ? "已鎖定" : "未鎖定"}</label><p class="tiny">不同模型對同一畫面的色彩與臉部詮釋差很多；鎖定時鏡頭抽屜只顯示專案預設。</p></div></div></div><div class="settings-section"><h3>☷　影片預設提示</h3><div class="settings-two"><span>專案</span><textarea data-settings="videoPrompt" placeholder="例：影片中不要有文字">${esc(s.videoPrompt || "")}</textarea><span>EP${state.episode + 1}</span><div><textarea data-settings="episodeVideoPrompt" placeholder="例：影片中不要有文字">${esc(ep().videoPrompt || "")}</textarea><p class="tiny">加在專案設定之後，不會取代它。</p></div></div></div>`,
       btnCancel +
         '<button class="btn primary" data-action="saveSettings">儲存</button>',
       "mid",
@@ -658,6 +658,11 @@ async function action(a, button) {
     case "settings":
       showDialog("settings");
       break;
+    case "projectModel":
+      p.settings.model = button.dataset.value;
+      save();
+      showDialog("settings");
+      break;
     case "saveSettings": {
       const lock = $("lockModel");
       if (lock) p.settings.lockModel = lock.checked;
@@ -763,7 +768,7 @@ async function action(a, button) {
               .flatMap((x) => x.refs || [])[0],
           videoPrompt: prompt,
           duration: 8,
-          model: "sora-2",
+          projectModel: p.settings?.model,
         });
         VideoWorkbench.navigate("generator");
       } catch (e) {

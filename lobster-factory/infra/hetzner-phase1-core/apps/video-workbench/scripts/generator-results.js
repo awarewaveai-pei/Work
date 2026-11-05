@@ -28,6 +28,8 @@ async function generatorResultAction(payload) {
     const settings = input.settings || {};
     const defaults = generatorDefaultSettings(mode);
     for (const key of generatorSettingKeys) if (key !== "style") state[key] = structuredClone(settings[key] ?? defaults[key]);
+    // The video model that job ran (card RV); a value the server does not offer becomes its default, like the server.
+    if (generatorVideoMode(mode)) state.model[mode] = VideoWorkbenchVideoModels.get(VideoWorkbench.capabilities, settings.model).id;
     if (!settings.ratios) state.ratios = [settings.ratio || state.ratio];
     // draftPrompt = what the user typed; prompt also carries applied skill guidance (generator-controls.js).
     const typed = input.draftPrompt ?? input.prompt ?? "";

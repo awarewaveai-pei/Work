@@ -10,3 +10,4 @@ lib/content/video/renderer-auth.ts
 lib/content/video/timeline-v1.ts
 lib/entitlements/permit.ts
 lib/ai/cost-model.ts
+lib/ai/video-motion-models.ts

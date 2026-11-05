@@ -72,9 +72,9 @@ const styles = [
   "美式漫畫 · 粗線條",
   "像素風",
 ];
-// Style thumbnails are third-party reference pictures (backend/reference.cjs): staff only, display only, never sent as
-// a generation reference. Without them the style button is text only.
-const styleImage = (i) => (VideoWorkbench.capabilities?.reference ? "/reference/image-" + (i + 1) + ".png" : "");
+// Style thumbnails are our own examples (examples/styles.json, public for everyone): display only, never a default
+// generation reference.
+const styleImage = (i) => "/examples/style-home-" + (i + 1) + ".webp";
 const state = {
   mode: "reference",
   outputSettings: {},
@@ -533,7 +533,7 @@ function render() {
   $("content").innerHTML = VideoWorkbench.sanitize(h);
   document.querySelector(".dock").hidden = m === "director" || m === "product" || (m === "reference" && state.refType === "motion");
   const s = state;
-  $("modelBtn").textContent = "✦ " + s.model[m] + "⌄";
+  $("modelBtn").textContent = "✦ " + (generatorVideoMode(m) ? generatorVideoModel(m).label : s.model[m]) + "⌄";
   $("outputBtn").textContent =
     `▱ ${generatorRatios().join("、")} · ${s.quality}${["image", "reshoot"].includes(m) ? "" : ` · ${s.duration}s`}⌄`;
   $("skillBtn").textContent = "✧ " + s.skill + "⌄";
@@ -542,7 +542,7 @@ function render() {
   $("subtitleBtn").textContent = "▣ 字幕：" + s.subtitle + "⌄";
   $("skillBtn").style.display =
     m === "reshoot" || m === "product" ? "none" : "";
-  $("credits").textContent = "API";
+  $("credits").textContent = generatorVideoMode(m) ? generatorVideoPrice(m) : "API";
   $("send").style.display =
     m === "director" || m === "reshoot" || m === "product" ? "none" : "";
   generatorSyncPrompt();
@@ -566,9 +566,10 @@ function pop(html) {
 }
 function settings() {
   const c = VideoWorkbench.capabilities || {}, image = state.mode === "image", spoken = state.mode === "spoken";
-  const ratios = image ? ["16:9", "9:16", "1:1", "4:5", "4:3"] : c.videoRatios || ["16:9", "9:16"];
+  const vm = generatorVideoModel();
+  const ratios = image ? ["16:9", "9:16", "1:1", "4:5", "4:3"] : vm.ratios;
   const qualities = image ? c.imageQualities || ["1K"] : c.videoQualities || ["720p"];
-  const durations = c.videoDurations || [4, 8, 12];
+  const durations = vm.durations;
   const dimensions = image ? c.imageOutputs?.[state.quality]?.[state.ratio] : state.ratio === "9:16" ? [720, 1280] : [1280, 720];
   if (state.mode === "reshoot") return generatorReshootSettings();
   if (spoken) return '<h3>輸出設定</h3><p>目前輸出配音音檔，比例、畫質及影片時長不適用。</p>';
@@ -583,22 +584,24 @@ async function panel(p) {
   if (p === "subtitle") return pop(generatorSubtitlePanel());
   if (p === "skill") return generatorSkillPanel();
   if (p === "settings") pop(settings());
-  if (p === "model")
+  if (p === "model") {
+    // Video modes: every model the server offers, each button with its price for the current length (card RV).
+    if (generatorVideoMode()) {
+      const seconds = Number(generatorVideoSeconds()), count = state.mode === "director" ? 1 : generatorRatios().length;
+      return pop(
+        '<h3>影片模型</h3><p class="small-note">按鈕上是這次設定的費用（' + (count > 1 ? count + " 種比例、" : "") + "長度不支援時改用該模型的預設長度）。</p>" +
+          VideoWorkbenchVideoModels.list(VideoWorkbench.capabilities).map((vm) => {
+            const s = vm.durations.includes(seconds) ? seconds : vm.defaultDurationSec || vm.durations[0];
+            const off = vm.available === false ? "尚未設定服務金鑰" : "";
+            return `<button class="option ${vm.id === generatorVideoModel().id ? "on" : ""}" data-model="${safe(vm.id)}" aria-pressed="${vm.id === generatorVideoModel().id}" ${off ? `disabled title="${off}"` : ""}><b>${safe(vm.label)}</b> · ${VideoWorkbenchVideoModels.priceText(vm, s, count)}（${s} 秒）<small>${safe(vm.vendor || vm.provider)}${vm.requiresImage ? " · 需要一張參考圖" : ""}${off ? " · " + off : ""}</small></button>`;
+          }).join(""),
+      );
+    }
     pop(
       "<h3>已接入模型</h3><p class=\"small-note\">可用模型由服務端設定。</p>" +
-        [
-          state.model[state.mode],
-        ]
-          .map(
-            (x) =>
-              '<button class="option" data-model="' +
-              x +
-              '">' +
-              x +
-              "</button>",
-          )
-          .join(""),
+        '<button class="option" data-model="' + safe(state.model[state.mode]) + '">' + safe(state.model[state.mode]) + "</button>",
     );
+  }
 }
 function modal(title, inner) {
   close();
@@ -675,6 +678,7 @@ document.addEventListener("click", (e) => {
     generatorRefreshOutputPanel();
   } else if (t.dataset.model) {
     state.model[state.mode] = t.dataset.model;
+    generatorNormalizeSettings();
     close();
     render();
   } else if (t.dataset.audio) {
@@ -1116,7 +1120,10 @@ VideoWorkbench.generator = {
         message: "參考圖已滿，請先移除一張後再帶入",
       };
     generatorSwitchMode(target);
-    // Reference metadata must not switch the configured service model.
+    // Reference metadata must not switch the configured service model; a project's own default model (projectModel,
+    // picked by the user in the project settings) does (card RV).
+    if (target === "reference" && typeof payload.projectModel === "string")
+      state.model.reference = VideoWorkbenchVideoModels.get(VideoWorkbench.capabilities, payload.projectModel).id;
     generatorNormalizeSettings();
     state.ratios = [state.ratio];
     state.data[target] = prompt;
@@ -1124,7 +1131,7 @@ VideoWorkbench.generator = {
       state.refType = "all";
       const duration = parseFloat(payload.duration);
       if (Number.isFinite(duration))
-        state.duration = [4, 8, 12].reduce((a, b) =>
+        state.duration = generatorVideoModel("reference").durations.reduce((a, b) =>
           Math.abs(b - duration) < Math.abs(a - duration) ? b : a,
         );
     }
@@ -1173,7 +1180,8 @@ VideoWorkbench.request("/capabilities", undefined, "GET")
   .then((c) => {
     VideoWorkbench.capabilities = c;
     if (c.models) {
-      for (const mode of ["director", "reference", "cartoon", "product"]) state.model[mode] = c.models.video || state.model[mode];
+      // A picked Replicate model stays; anything else becomes the server's default (card RV, same as the server).
+      for (const mode of ["director", "reference", "cartoon", "product"]) state.model[mode] = VideoWorkbenchVideoModels.get(c, state.model[mode]).id;
       state.model.image = c.models.image || state.model.image;
       state.model.spoken = c.models.audio || state.model.spoken;
     }

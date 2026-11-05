@@ -59,6 +59,24 @@ function generatorMotionWorkspace() {
   return `<section class="motion-workspace"><p class="small-note">人物照片與 3–${motion.facing === "image" ? 10 : 30} 秒動作影片各一份；動作由影片提供。</p><details class="reference-guidance"><summary>查看使用須知</summary><p>請使用單一人物、上半身或全身清楚可見的照片與影片；避免多姿勢拼圖或遮住身體。</p></details><div class="reference-grid reference-motion-grid">${referenceAsset("motionImage", 1, "人物照片", "image/*", "motion-image")}${referenceAsset("motionVideo", 1, "動作影片", "video/*", "motion-video")}</div><fieldset class="motion-options"><legend>角色朝向</legend>${[["video", "朝向跟影片"], ["image", "朝向跟照片"]].map(([value, name]) => `<button class="minor" data-gen-motion-facing="${value}" aria-pressed="${motion.facing === value}">${name}</button>`).join("")}<p class="small-note">朝向跟影片適合複雜動作；朝向跟照片可保留照片構圖，並以描述補充運鏡。目前最長 ${motion.facing === "image" ? 10 : 30} 秒。</p></fieldset><fieldset class="motion-options"><legend>畫質</legend>${["720p", "1080p"].map((value) => `<button class="minor" data-gen-motion-quality="${value}" aria-pressed="${motion.quality === value}">${value}</button>`).join("")}</fieldset><label class="motion-audio"><input id="motionPreserveAudio" type="checkbox" ${motion.preserveAudio ? "checked" : ""}>保留影片原聲</label><label for="motionPrompt">補充場景與運鏡（選填）</label><textarea class="field" id="motionPrompt" placeholder="補充場景、背景或鏡頭移動；人物動作以參考影片為準。">${safe(motion.prompt)}</textarea><button class="box-cta" disabled>動作參考服務尚未接入</button><p class="small-note">這些設定會保留在草稿；尚未設定符合供應商政策的動作轉移服務。</p></section>`;
 }
 
+// Card RV: the video model picked for this mode (shared/models.js VideoWorkbenchVideoModels) and its price.
+const generatorVideoMode = (mode = state.mode) => ["reference", "cartoon", "director", "product"].includes(mode);
+function generatorVideoModel(mode = state.mode) {
+  return VideoWorkbenchVideoModels.get(VideoWorkbench.capabilities, state.model[mode]);
+}
+function generatorVideoSeconds(mode = state.mode) {
+  return mode === "director" ? state.directorLength : mode === "product" ? state.productDuration : state.duration;
+}
+function generatorVideoPrice(mode = state.mode) {
+  return VideoWorkbenchVideoModels.priceText(generatorVideoModel(mode), Number(generatorVideoSeconds(mode)), mode === "director" ? 1 : generatorRatios().length);
+}
+// Why this mode's model cannot run now ("" = it can): it needs a first-frame image. A model without its key stays
+// clickable and is refused with a message on send, like an unconfigured service (generatorValidation).
+function generatorVideoBlock(mode = state.mode) {
+  const vm = generatorVideoModel(mode);
+  if (vm.requiresImage && !Object.values(state.refs[mode] || {}).some((rows) => Array.isArray(rows) && rows.length)) return vm.label + " 需要一張參考圖當第一格畫面";
+  return "";
+}
 function generatorRatios() {
   return [...new Set([state.ratio, ...(state.ratios || [])])].filter((v) => ["16:9", "9:16", "1:1", "4:5", "4:3"].includes(v));
 }
@@ -70,7 +88,11 @@ function generatorNormalizeSettings() {
     return;
   }
   if (["spoken", "reshoot"].includes(state.mode)) return;
-  const allowed = VideoWorkbench.capabilities?.videoRatios || ["16:9", "9:16"];
+  const vm = generatorVideoModel(), allowed = vm.ratios;
+  const fit = (seconds) => (vm.durations.includes(Number(seconds)) ? Number(seconds) : vm.defaultDurationSec || vm.durations[0]);
+  state.duration = fit(state.duration);
+  if (state.mode === "director") state.directorLength = fit(state.directorLength);
+  if (state.mode === "product") state.productDuration = fit(state.productDuration);
   state.ratios = generatorRatios().filter((ratio) => allowed.includes(ratio));
   if (!state.ratios.length) state.ratios = [allowed[0] || "16:9"];
   state.ratio = state.ratios[0];
@@ -159,7 +181,7 @@ function generatorApplyPreset(preset) {
   if (!Object.hasOwn(preset.settings, "subtitleOptions")) state.subtitleOptions = generatorSubtitleDefaults();
   for (const key of generatorSettingKeys) if (Object.hasOwn(preset.settings, key)) state[key] = structuredClone(preset.settings[key]);
   const kind = state.mode === "image" ? "image" : state.mode === "spoken" ? "audio" : "video";
-  if (preset.model) state.model[state.mode] = VideoWorkbench.capabilities?.models?.[kind] || preset.model;
+  if (preset.model) state.model[state.mode] = kind === "video" ? VideoWorkbenchVideoModels.get(VideoWorkbench.capabilities, preset.model).id : VideoWorkbench.capabilities?.models?.[kind] || preset.model;
   generatorNormalizeSettings();
   if (state.mode === "director") state.directorLength = state.duration;
   if (state.mode === "product") state.productDuration = state.duration;
@@ -183,15 +205,17 @@ function generatorSyncPrompt() {
   const directorStart = document.querySelector('[data-action="director-start"]');
   if (directorStart) directorStart.disabled = !state.data.director.trim();
   const send = $("send");
-  send.disabled = generatorBusy || !n || (state.mode === "cartoon" && state.style < 0) || (state.mode === "reference" && state.refType === "first" && !state.refs.reference.firstFrame.length);
-  send.textContent = generatorBusy ? "送出中…" : state.mode === "image" ? "生成圖片" : state.mode === "spoken" ? "生成配音" : `開始生成${generatorRatios().length > 1 ? ` · ${generatorRatios().length} 種比例` : ""}`;
+  const block = generatorVideoMode() ? generatorVideoBlock() : "";
+  send.disabled = generatorBusy || !n || !!block || (state.mode === "cartoon" && state.style < 0) || (state.mode === "reference" && state.refType === "first" && !state.refs.reference.firstFrame.length);
+  send.title = block || "提交";
+  send.textContent = generatorBusy ? "送出中…" : state.mode === "image" ? "生成圖片" : state.mode === "spoken" ? "生成配音" : `開始生成${generatorRatios().length > 1 ? ` · ${generatorRatios().length} 種比例` : ""} · ${generatorVideoPrice()}`;
   const c = VideoWorkbench.capabilities, status = $("providerStatus");
   if (c && status) {
     const serviceKind = state.mode === "image" ? "image" : state.mode === "spoken" ? "audio" : "video";
     status.textContent = !c[serviceKind] ? "此生成服務尚未設定；草稿、素材與設定可正常保存。" : state.mode === "spoken"
       ? "目前輸出配音音檔。人物對嘴與聲音複製尚未接入；送出依服務用量計費。"
       : ["reference", "cartoon", "director", "product"].includes(state.mode) && c.maxVideoImages === 1
-        ? "目前影片服務：單張參考圖、16:9／9:16、720p、4／8／12 秒；影片、音訊及尾幀控制尚未接入。可先保存完整草稿。"
+        ? (() => { const vm = generatorVideoModel(); return generatorVideoBlock() || `目前影片模型 ${vm.label}：${vm.requiresImage ? "必須一張" : "單張"}參考圖、${vm.ratios.join("／")}、720p、${vm.durations.join("／")} 秒；影片、音訊及尾幀控制尚未接入。可先保存完整草稿。`; })()
         : "送出依服務實際用量計費；可從歷史紀錄查看任務與成果。";
   }
 }
@@ -202,8 +226,10 @@ function generatorValidation(input) {
   if (caps && !caps[type]) throw Error("此生成服務尚未設定；可以先儲存草稿。");
   const settings = input.settings || {};
   if (type === "video" && caps) {
-    if (caps.videoDurations && !caps.videoDurations.includes(settings.duration)) throw Error("目前影片服務不支援這個時長");
-    if (caps.videoRatios && !caps.videoRatios.includes(settings.ratio)) throw Error("目前影片服務不支援 " + settings.ratio + "，請調整比例。");
+    const vm = VideoWorkbenchVideoModels.get(caps, settings.model);
+    if (vm.available === false && vm.provider !== "OpenAI") throw Error(vm.label + " 尚未設定服務金鑰（REPLICATE_API_TOKEN）；可以先儲存草稿。");
+    if (!vm.durations.includes(Number(settings.duration))) throw Error(vm.label + " 不支援這個時長（可選 " + vm.durations.join("、") + " 秒）");
+    if (!vm.ratios.includes(settings.ratio)) throw Error("目前影片服務不支援 " + settings.ratio + "，請調整比例。");
     if (caps.videoQualities && !caps.videoQualities.includes(settings.quality)) throw Error("目前影片服務不支援此畫質");
     if (input.referenceMode === "motion" && !caps.motionReference) throw Error("動作參考服務尚未接入；素材與設定可保存為草稿。");
     if (input.referenceMode === "first" && !input.references?.firstFrame?.length) throw Error("首尾幀參考必須先選擇首幀。");
@@ -214,6 +240,7 @@ function generatorValidation(input) {
     const refs = Object.values(input.references || {}).flat();
     if (!caps.multiModalReferences && refs.some((r) => /^(video|audio)\//.test(r.type || "") || ["video", "audio"].includes(r.kind))) throw Error("目前影片服務只接受圖片參考；影片及音訊參考需要其他服務。");
     if (caps.maxVideoImages != null && refs.length > caps.maxVideoImages) throw Error(`目前影片服務最多接受 ${caps.maxVideoImages} 張參考圖。`);
+    if (vm.requiresImage && !refs.length) throw Error(vm.label + " 需要一張參考圖當第一格畫面；請先加入圖片。");
   }
 }
 async function generatorSubmit(payload) {

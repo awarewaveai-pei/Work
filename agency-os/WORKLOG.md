@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-05（續20）影音工作台卡 RV.1–RV.3：影片模型接 next-admin 的 Replicate 模型（Runway／Veo／Luma）
+
+- 根因：VW 影片模型整台一個（generation-policy.cjs:10、api.cjs:136），任務的 settings.model 不被讀；NA 四個實測模型（舊 video-motion-gen.ts:52-85）因 import gateway VW 讀不到。
+- 做法：NA 模型清單搬成無 import 的 `next-admin/lib/ai/video-motion-models.ts`（video-motion-gen.ts 轉出、cost-model.ts 型別改指它）；VW 經 awarewave-files.txt＋type stripping 直接 require（backend/replicate-video.cjs：建立、輪詢、下載 ≤80MB 只信 replicate.delivery、取消）。每個任務依 settings.model：Replicate id → Replicate；其他（sora-2、VideoWorkbench V3、無值）→ 伺服器 OpenAI 模型，送出內容與改前相同。價格只讀 VIDEO_MOTION_RATES／OPENAI_VIDEO_RATES；時長／比例／必須帶圖改為每模型（validate）。前端：模型面板列五顆按鈕各標價、生成按鈕標價（sora 也是）、專案設定的 <select> 改按鈕且真的帶到生成頁（projectModel）、Runway 沒圖停用並寫原因、還原任務帶回原模型。
+- Veo 價格查證（replicate.com billingConfig）：只分有無音訊、不分解析度，NA 現價正確，沒有少算。
+- 未做：RV.4 真打一次（Runway 5 秒 US$0.25）要部署後做，部署待操作者同意。tests/host-adapter.cjs:49（422 斷言）在 HEAD 就失敗（拋棄式 worktree 驗過），非本次；generation-flows.cjs:155 區域拖曳斷言時好時壞，與影片模型無關。p6-main-system 第 9 段（examples）是另一 session 未提交的工作。api.cjs 另一 session 的 /examples/ 段未混入（私有 index 只收 15/17 段）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/replicate-video.cjs（7 段 PASS）&& node tests/replicate-video-ui.cjs && node tests/gate.cjs（replicate-video 在部署閘）&& npx vitest run lib/ai/__tests__/{video-motion-models,model-registry,ai-cost-logged}.test.ts（14 passed）&& npx tsc --noEmit（原始碼 0 錯，僅 .next/types 舊產物 2 條） | exit=0 | ms=90000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（Codex agency-os/reports/oracle/2026-11-05-partialreview-12443a9b.md：還原任務掉模型、輪詢中取消被蓋成成功、Replicate 拒絕取消仍顯示已取消；三項全修，各補指名測試）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=providerModels.video|"sora-2"|videoDurations|MOTION_MODELS | hits=31
 ## 2026-11-05（續19）Cloudflare 限速規則排除其餘 8 個產品門（操作者同意）
 
 - 承 #17：check-cloudflare-security.ps1 列出 hci、social、tarot、design、content、cs、collect、outreach 未排除（同 video 的 429 類）。操作者「一起排除」→ PATCH 規則 b8ffa72d expression；改前存 scratchpad cf-rule-before-doors.json；退回 = 拿掉這 8 個 `and http.host ne` 子句。runbooks/CLOUDFLARE-WAF-SETUP.md 已記。

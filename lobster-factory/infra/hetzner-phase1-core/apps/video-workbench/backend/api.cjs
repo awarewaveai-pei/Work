@@ -13,6 +13,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   appDir ||= require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), env);
   const generationPolicy = require("./generation-policy.cjs");
   const bgRemove = require("./bg-remove.cjs");
+  const replicateVideo = require("./replicate-video.cjs");
   const costs = require("./provider-cost.cjs");
   // Per-request spend of the sync paid routes (text, transcription): each handler call runs in its own meter.
   const meters = new (require("node:async_hooks").AsyncLocalStorage)();
@@ -134,10 +135,11 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     ? JSON.parse(fs.readFileSync(stateFile, "utf8"))
     : null;
   const providerModels = generationPolicy.models(env);
-  const aiOrigin = (type, costUsd) => ({
+  // vm = the video model that ran (generationPolicy.videoModelOf); other types name the server's model.
+  const aiOrigin = (type, costUsd, vm) => ({
     kind: "ai_generated",
-    model: providerModels[type],
-    provider: generationPolicy.provider,
+    model: vm ? vm.model : providerModels[type],
+    provider: vm ? vm.provider : generationPolicy.provider,
     costUsd,
   });
   const textModel = vwEnv(env, "TEXT_MODEL") || "gpt-4.1-mini";
@@ -149,7 +151,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       );
     return env.OPENAI_API_KEY;
   };
-  const secrets = [env.OPENAI_API_KEY, env.MEDIA_RENDER_AUTH_TOKEN, env.REMOTION_AUTH_TOKEN].filter((v) => typeof v === "string" && v.trim());
+  const secrets = [env.OPENAI_API_KEY, env.REPLICATE_API_TOKEN, env.MEDIA_RENDER_AUTH_TOKEN, env.REMOTION_AUTH_TOKEN].filter((v) => typeof v === "string" && v.trim());
   const publicError = (message) =>
     secrets.reduce((text, secret) => text.replaceAll(secret.trim(), "[redacted]"), String(message)).slice(0, 800);
   for (const job of jobs)
@@ -288,13 +290,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       throw Object.assign(Error("影片重拍需要專用服務，尚未設定。"), {
         status: 501,
       });
-    if (
-      type === "video" &&
-      ![4, 8, 12].includes(
-        Number(input.duration || input.settings?.duration || 8),
-      )
-    )
-      throw Error("目前 Sora 支援 4、8、12 秒；請調整影片長度後送出。");
+    // Video length, ratio and reference rules are per model: generationPolicy.validate below.
     let prompt = String(
       input.prompt ||
         input.settings?.voiceText ||
@@ -306,7 +302,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       const settings = input.settings || {};
       if (settings.voiceSpeed !== undefined && (!Number.isFinite(Number(settings.voiceSpeed)) || Number(settings.voiceSpeed) < .25 || Number(settings.voiceSpeed) > 4) || settings.voicePitch !== undefined && (!Number.isFinite(Number(settings.voicePitch)) || Math.abs(Number(settings.voicePitch)) > 12) || settings.voiceGain !== undefined && (!Number.isFinite(Number(settings.voiceGain)) || Number(settings.voiceGain) < -30 || Number(settings.voiceGain) > 12)) throw Error("語音參數超出範圍");
     }
-    generationPolicy.validate(input, type);
+    generationPolicy.validate(input, type, env);
     if (input.cartoonStyle) prompt += "\n風格：" + String(input.cartoonStyle);
     return { type, prompt };
   }
@@ -587,12 +583,26 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         const ratio = input.settings?.ratio || input.ratio || "16:9";
         if (!["16:9", "9:16"].includes(ratio))
           throw Error("目前影片服務支援 16:9 或 9:16");
+        const vm = generationPolicy.videoModelOf(input, env),
+          seconds = Number(input.duration || input.settings?.duration || 8);
+        // Recorded before the call: refresh prices, labels and polls by what was sent, not by later settings.
+        job.video = { id: vm.id, provider: vm.provider, model: vm.model, seconds };
+        if (vm.provider === "Replicate") {
+          job.providerId = await replicateVideo.create({
+            model: vm.id, prompt, ratio, seconds, env, fetchImpl, signal,
+            ...(refs.length ? { imageUrl: imageReference(refs[0].url) } : {}),
+          });
+          job.status = "queued";
+          job.progress = 0;
+          persist();
+          return;
+        }
         const video = await provider(
           "/videos",
           {
-            model: providerModels.video,
+            model: vm.model,
             prompt,
-            seconds: String(input.duration || input.settings?.duration || 8),
+            seconds: String(seconds),
             size: ratio === "9:16" ? "720x1280" : "1280x720",
             ...(refs.length
               ? { input_reference: { image_url: imageReference(refs[0].url) } }
@@ -646,7 +656,20 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   }
   async function refreshOnce(job) {
     const before = job.status;
-    if (job.providerId && ["queued", "running"].includes(job.status)) {
+    if (job.providerId && job.video?.provider === "Replicate" && ["queued", "running"].includes(job.status)) {
+      const result = await replicateVideo.status({ id: job.providerId, env, fetchImpl });
+      if (job.status === "cancelled") return job; // cancelled while this poll was in flight: the cancel wins
+      job.status = result.status === "succeeded" ? "running" : result.status;
+      if (result.error) job.error = publicError(result.error);
+      if (result.status === "succeeded") {
+        const binary = await replicateVideo.download({ url: result.outputUrl, fetchImpl });
+        if (job.status === "cancelled") return job;
+        job.result = { url: output(binary, "mp4"), origin: aiOrigin("video", costs.videoUsd(job.video.id, job.video.seconds), job.video) };
+        job.progress = 100;
+        job.status = "succeeded";
+      }
+      persist();
+    } else if (job.providerId && ["queued", "running"].includes(job.status)) {
       const result = await provider(
         "/videos/" + encodeURIComponent(job.providerId),
       );
@@ -671,7 +694,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           undefined,
           true,
         );
-        job.result = { url: output(binary, "mp4"), origin: aiOrigin("video", costs.videoUsd(providerModels.video, Number(result.seconds) || Number(job.input.duration || job.input.settings?.duration || 8))) };
+        job.result = { url: output(binary, "mp4"), origin: aiOrigin("video", costs.videoUsd(job.video?.model || providerModels.video, Number(result.seconds) || Number(job.input.duration || job.input.settings?.duration || 8)), job.video) };
         job.progress = 100;
         job.status = "succeeded";
       }
@@ -709,11 +732,13 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           : isRemotion
             ? (remotion.request(input, imageReference), { type: "video" })
             : jobInput(input);
-    if (!isMedia && !isRemoveBg && !isRemotion && !isBlender && !isMeshy) key();
+    const videoModel = !isMedia && !isRemotion && !isBlender && !isMeshy && parsed.type === "video" ? generationPolicy.videoModelOf(input, env) : null;
+    if (videoModel?.provider === "Replicate") replicateVideo.token(env);
+    else if (!isMedia && !isRemoveBg && !isRemotion && !isBlender && !isMeshy) key();
     const feature = main && mainSystemTools.paidFeature(input, parsed.type);
     // No paid call without a price: the model a paid job will run must be in next-admin's cost model.
     if (feature) costs.priceOf({ "video.image": "image", "video.motion": "video", "video.tts": "audio", "video.bg-remove": "remove-bg" }[feature] || feature,
-      { "video.image": providerModels.image, "video.motion": providerModels.video, "video.tts": providerModels.audio }[feature]);
+      { "video.image": providerModels.image, "video.motion": videoModel?.id || providerModels.video, "video.tts": providerModels.audio }[feature]);
     const paid = await requirePermit(req, feature);
     const release = isBlender ? blender3d().claim() : null;
     if (isBlender && !release) throw Object.assign(Error("3D 渲染進行中，請等目前的工作完成再送出"), { status: 409 });
@@ -997,13 +1022,16 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           await remotionReady(job.input);
           await start(job.input, res, { retryOf: job.id, attempt: (job.attempt || 1) + 1 }, req);
         } else if (req.method === "POST" && match[2]) {
-          if (job.providerId)
+          if (job.providerId && job.video?.provider !== "Replicate")
             throw Object.assign(
               Error("供應商已接收此影片任務，目前不能取消。"),
               { status: 409 },
             );
           if (!["queued", "running"].includes(job.status))
             throw Object.assign(Error("任務已結束"), { status: 409 });
+          // Replicate video: cancelled only once Replicate accepts, so billing has really stopped.
+          if (job.providerId && job.video?.provider === "Replicate" && !(await replicateVideo.cancel({ id: job.providerId, env, fetchImpl })))
+            throw Object.assign(Error("Replicate 沒有接受取消，影片仍在生成並計費；請稍後再試。"), { status: 502 });
           job.status = "cancelled";
           controls.get(job.id)?.abort();
           if (job.replicateId) bgRemove.cancelPrediction({ id: job.replicateId, env, fetchImpl });

@@ -76,3 +76,19 @@
     legacyProject,
   };
 })();
+// Card RV: the video models a job can pick, from /capabilities videoModels (backend/generation-policy.cjs). A host or
+// older server without that list = one model with the top-level limits, as before.
+(function () {
+  const list = (caps) =>
+    Array.isArray(caps?.videoModels) && caps.videoModels.length
+      ? caps.videoModels
+      : [{ id: caps?.models?.video || "sora-2", label: caps?.models?.video || "sora-2", provider: "OpenAI", durations: caps?.videoDurations || [4, 8, 12], ratios: caps?.videoRatios || ["16:9", "9:16"], requiresImage: false, usdPerSec: null, defaultDurationSec: 8, available: caps?.video !== false }];
+  // Unknown or old values (sora-2 on a server whose default is another OpenAI model) = the default, like the server.
+  const get = (caps, id) => list(caps).find((m) => m.id === id) || list(caps)[0];
+  const usd = (m, seconds, count = 1) => (Number.isFinite(m?.usdPerSec) ? m.usdPerSec * seconds * count : null);
+  const priceText = (m, seconds, count = 1) => {
+    const v = usd(m, seconds, count);
+    return v === null ? "依實際用量" : "US$" + v.toFixed(2);
+  };
+  window.VideoWorkbenchVideoModels = { list, get, usd, priceText };
+})();
