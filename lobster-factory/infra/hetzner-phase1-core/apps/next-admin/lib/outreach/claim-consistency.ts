@@ -16,8 +16,9 @@ export interface ConsistencyReport {
   disagreements: Array<{ messageId: string; first: ClaimCheck["verdict"]; second: ClaimCheck["verdict"] }>;
 }
 
-/** Emails checked at once. Each voted check makes two calls at once; 8 workers got the database gateway's 429. */
-const CONCURRENCY = 4;
+/** Emails checked at once. Each voted check makes two calls at once; the free Gemini key allows ~15 calls a minute
+ *  (2026-11-05), so 2 at once stays under it: 4 at once left 429s that outlasted the retries. */
+const CONCURRENCY = 2;
 
 export async function measureConsistency(samples: readonly ConsistencySample[]): Promise<ConsistencyReport> {
   const r: ConsistencyReport = { n: 0, agreed: 0, rate: 0, errors: 0, firstError: null, disagreements: [] };
