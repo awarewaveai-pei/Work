@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-05（續10）migration 0161：每個 auth user 都有 profiles（已上 prod）＋常駐偵測器（39f3a7dbd）
+
+- 根因：auth.users 5 筆中 2 筆 staff（staff-accounts.ts createUser 建）無 profiles、auth.users 無觸發器；16 條 FK references profiles(id) → 這兩人的寫入全失敗（media_workbench_jobs_created_by_fkey）；workbench jobs/assets route 吞掉 DB 錯誤。
+- 0161：AFTER INSERT 觸發器建 profile（org NULL 不授權、email 小寫、永不擋註冊）＋同函式回填；AFTER DELETE 釋放無 org profile（email 墓碑、display_name/avatar_url/metadata 清空、disabled）；portal_complete_signup（0110 版）upsert 自有欄位；down 兩份、保留 profiles。
+- 偵測器 check-auth-profiles.sh（只計數）每 10 分鐘，cron.d＋host-jobs.ts 登記；主機 install-host-schedules.sh 已裝（backup .state/cron-backup-20261105T074102Z），首跑 ok。
+- 審查：db-expert fix-first（F1 釋放、F2 偵測器、F3 不印 email、F4–F8）全修；Codex 416573d6 兩項（清全部個資欄位、需裝 cron）已處理。工人曾在共用 worktree `git stash` 後立即 pop（無衝突，已記）。
+- prod：APPLY_OK 0161；缺 profile 0（原 2）；回填帶 org 0；兩觸發器 tgenabled O；新圖片任務寫入 media_workbench_jobs（succeeded、0.006、有 actor）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=node scripts/apply-db-migration.mjs 0161 && psql 計數查詢 && check-auth-profiles.sh（ok）; pytest test_0161 9 passed; check-auth-profiles.test.sh all passed | exit=0 | ms=120000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/5n（db-expert F1–F8；Codex agency-os/reports/oracle/2026-11-05-partialreview-416573d6.md 2m，全修；突變：釋放 update 拿掉→紅）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=references profiles(id) | hits=17
+- 待辦（不在本卡）：GoTrue phone provider 開著（SMS_AUTOCONFIRM），db-expert 建議另開 infra 卡關閉；auth 改 email 不同步 profile（F9，未做）。
 ## 2026-11-05（續9）影音工作台 H6 續：圖片生成通、任務帳冊因 profiles 缺列寫不進（facdb592f）
 
 - OpenAI 儲值後，video.aware-wave.com 生成圖片成功：job 25b67cc8，成本 US$0.006；media_assets 774ac141（ai_generated、checksum、rightsSources gpt-image-2.5-flare、vwJobId、costUsd）；usageReported=true。
