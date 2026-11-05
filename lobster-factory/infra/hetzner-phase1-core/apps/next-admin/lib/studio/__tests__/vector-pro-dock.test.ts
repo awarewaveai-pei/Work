@@ -197,27 +197,36 @@ const styleSnippets = (src: string) => [
 const unknownVars = (src: string, own: Set<string>) =>
   [...src.matchAll(/var\(\s*(--[a-z0-9-]+)/g)].map((m) => m[1]).filter((v) => !ROOT_TOKENS.has(v) && !own.has(v));
 
-describe("dock 顏色只來自主題 token", () => {
-  const css = read("public/vector-pro-dock/theme.css").replace(/\/\*[\s\S]*?\*\//g, "");
-  // --swatch：色相範圍本身的顏色（資料色），由 blocks/color-grade.js 設在按鈕上；唯一允許的非主題變數
-  const own = new Set([...[...css.matchAll(/(--vp-[a-z0-9-]+)\s*:/g)].map((m) => m[1]), "--swatch"]);
-  it("theme.css 無字面色（#hex／rgb()／hsl()），--vp-* 只放版面尺寸", () => {
+describe("dock 外殼（editor-shared/dock.css＋dock.js）顏色只來自主題 token、尺寸只來自各編輯器 SIZES", () => {
+  const css = read("public/editor-shared/dock.css").replace(/\/\*[\s\S]*?\*\//g, "");
+  const shared = read("public/editor-shared/dock.js");
+  // mountDock 寫在 root 上的 --vp-*（SIZE_VARS 的值）
+  const sizeVars = new Map(
+    [...shared.match(/export const SIZE_VARS = Object\.freeze\(\{([\s\S]*?)\}\)/)![1].matchAll(/(\w+):\s*"(--vp-[a-z-]+)"/g)].map((m) => [m[1], m[2]]),
+  );
+  // --swatch：色相範圍本身的顏色（資料色），由 blocks/color-grade.js 設在按鈕上；唯一允許的非主題、非尺寸變數
+  const own = new Set([...sizeVars.values(), "--swatch"]);
+  it("dock.css 無字面色（#hex／rgb()／hsl()），不定義 --vp-*（數值只在各編輯器 dock.js 的 SIZES）", () => {
     expect(css.match(HEX)).toBeNull();
     expect(css.match(FUNC_COLOR)).toBeNull();
-    for (const m of css.matchAll(/--vp-[a-z0-9-]+\s*:\s*([^;]+);/g)) expect(m[1].trim(), m[0]).toMatch(/^\d+px$/);
+    expect(css.match(/--vp-[a-z0-9-]+\s*:/g)).toBeNull();
   });
-  it("theme.css 用到的 var() 都是 globals.css :root 的 token", () => {
+  it("dock.css 用到的 var() 都是 globals.css :root 的 token 或 mountDock 寫的 --vp-*；每個 --vp-* 都有用到", () => {
     expect(unknownVars(css, own)).toEqual([]);
+    const used = new Set([...css.matchAll(/var\(\s*(--vp-[a-z0-9-]+)/g)].map((m) => m[1]));
+    expect([...used].sort()).toEqual([...sizeVars.values()].sort());
   });
-  it("dock.js 無字面色，元件用 app 統一 class", () => {
-    const js = read("public/vector-pro-dock/dock.js");
-    expect(js.match(HEX)).toBeNull();
-    expect(js.match(FUNC_COLOR)).toBeNull();
-    for (const cls of ["tab-bar", "tab tab--active", "card vp-flyout"]) expect(js).toContain(cls);
+  it("dock.js（共用外殼與向量清單）無字面色，元件用 app 統一 class", () => {
+    for (const js of [shared, read("public/vector-pro-dock/dock.js")]) {
+      expect(js.match(HEX)).toBeNull();
+      expect(js.match(FUNC_COLOR)).toBeNull();
+    }
+    for (const cls of ["tab-bar", "tab tab--active", "card vp-flyout"]) expect(shared).toContain(cls);
   });
-  it("尺寸 = 真品 panel_docking.rs:36-43 與 dock_style tab_height 33", () => {
-    const t = Object.fromEntries([...css.matchAll(/--vp-([a-z-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
-    expect([t["column-width"], t["panel-min"], t["panel-max"], t["icon-width"], t["tab-height"]]).toEqual(["310px", "220px", "720px", "38px", "33px"]);
+  it("向量 SIZES = 真品 panel_docking.rs:36-43 與 dock_style tab_height 33；鍵 = SIZE_VARS", async () => {
+    const { SIZES } = await loadModule("public/vector-pro-dock/dock.js");
+    expect(Object.keys(SIZES).sort()).toEqual([...sizeVars.keys()].sort());
+    expect(SIZES).toEqual({ rail: 38, button: 30, panel: 310, panelMin: 220, panelMax: 720, tab: 33, pad: 10 });
   });
 });
 
@@ -261,7 +270,7 @@ async function loadModule(rel: string) {
 }
 
 describe("瀏覽器模組都能被解析與載入成 ES module", () => {
-  it.each(["public/vector-pro-dock/dock.js", "public/editor-shared/ctx-vectorcraft.js"])("%s", async (rel) => {
+  it.each(["public/vector-pro-dock/dock.js", "public/editor-shared/dock.js", "public/editor-shared/ctx-vectorcraft.js"])("%s", async (rel) => {
     const mod = await loadModule(rel);
     expect(Object.keys(mod).length).toBeGreaterThan(0);
   });

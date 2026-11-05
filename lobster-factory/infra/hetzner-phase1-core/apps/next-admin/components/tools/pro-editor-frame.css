@@ -1,5 +1,6 @@
-/* /tools/vector-pro layout only. Colours come from theme tokens (app/globals.css :root, edited at /tools/theme);
-   the failure line and the footer use the shared .build-alert / .form-hint classes. */
+/* Full-window Craft editor page layout (components/tools/ProEditorFrame.tsx; /tools/vector-pro, /tools/photo-pro). Colours come
+   from theme tokens (app/globals.css :root, edited at /tools/theme); the failure line and the footer use the shared
+   .build-alert / .form-hint classes. */
 .vp-page {
   display: flex;
   flex-direction: column;
