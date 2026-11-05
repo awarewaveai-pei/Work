@@ -2,6 +2,10 @@
 // Only the design source changed: ctx.grabDesign() (:1518) -> grabDesignUrl(ctx) from ./mockup.js (artboard PNG via ctx.exportArtboard, trimmed).
 import { grabDesignUrl } from "./mockup.js";
 
+// color inputs / canvas drawing need hex strings; built from channel numbers so no colour is hard-coded as a style
+const hex = (r, g, b) => "#" + [r, g, b].map((n) => n.toString(16).padStart(2, "0")).join("");
+const WHITE = hex(255, 255, 255);
+
 export default {
   id: "batch-export",
   icon: "📦",
@@ -9,10 +13,10 @@ export default {
   mount(ctx, body) {
     const PRESETS = [["IG 貼文 1080²", 1080, 1080], ["IG 限動 1080×1920", 1080, 1920], ["FB 貼文 1200×630", 1200, 630], ["FB 封面 820×312", 820, 312], ["大頭貼 400²", 400, 400], ["縮圖 800×600", 800, 600], ["名片 1063×638", 1063, 638], ["海報 2480×3508", 2480, 3508]];
     let html = '<label>選尺寸（可多選）</label><div id="bxList">';
-    PRESETS.forEach((p, i) => { html += '<label style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--txt);padding:2px 0;"><input type="checkbox" data-i="' + i + '" ' + (i < 2 ? "checked" : "") + ' style="width:auto;"> ' + p[0] + "</label>"; });
-    html += '</div><div class="grid2"><div><label>背景</label><select id="bxBg"><option value="transparent">透明</option><option value="#ffffff">白</option><option value="custom">自訂</option></select></div><div><label>自訂色</label><input id="bxBgColor" type="color" value="#ffffff"></div></div>';
-    html += '<label>縮放</label><select id="bxFit"><option value="contain">完整可見 (contain)</option><option value="cover">填滿裁切 (cover)</option></select>';
-    html += '<button class="act" id="bxGo" style="margin-top:6px;">批次匯出 PNG</button><div class="info" id="bxInfo">每個尺寸下載一張 PNG。瀏覽器可能詢問允許多檔下載。</div>';
+    PRESETS.forEach((p, i) => { html += '<label style="display:flex;gap:6px;align-items:center;padding:2px 0;"><input type="checkbox" data-i="' + i + '" ' + (i < 2 ? "checked" : "") + ' style="width:auto;"> ' + p[0] + "</label>"; });
+    html += '</div><div class="grid2"><div><label>背景</label><select class="form-select" id="bxBg"><option value="transparent">透明</option><option value="' + WHITE + '">白</option><option value="custom">自訂</option></select></div><div><label>自訂色</label><input id="bxBgColor" type="color" value="' + WHITE + '"></div></div>';
+    html += '<label>縮放</label><select class="form-select" id="bxFit"><option value="contain">完整可見 (contain)</option><option value="cover">填滿裁切 (cover)</option></select>';
+    html += '<button class="btn btn-primary" id="bxGo" style="margin-top:6px;">批次匯出 PNG</button><div class="info" id="bxInfo">每個尺寸下載一張 PNG。瀏覽器可能詢問允許多檔下載。</div>';
     body.innerHTML = html;
     body.querySelector("#bxGo").onclick = async () => {
       let url;

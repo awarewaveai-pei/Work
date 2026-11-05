@@ -25,12 +25,12 @@ export default {
   mount(ctx, body) {
     const UPLOADED = []; // 使用者上傳的自有字型（本次開啟有效）
     gfLink(CJK); gfLink(LATIN); // 分開載：CJK 較大，獨立 request，壞了不拖累拉丁字型
-    body.innerHTML = '<label>字型（搜尋 Google Fonts · 像 Canva）</label><input id="fontSearch" placeholder="搜尋字型名稱…">'
+    body.innerHTML = '<label>字型（搜尋 Google Fonts · 像 Canva）</label><input class="form-input" id="fontSearch" placeholder="搜尋字型名稱…">'
       + '<div class="row" style="margin-top:6px;">'
-      + '<button class="ghost" id="fontCJK" style="flex:none;width:46px;">中文</button>'
-      + '<button class="ghost" id="fontLatin" style="flex:none;width:46px;">英文</button>'
-      + '<button class="ghost" id="fontAll" style="flex:none;width:46px;">全部</button>'
-      + '<label class="ghost" style="flex:1;text-align:center;cursor:pointer;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px;">＋ 字型檔<input type="file" id="fontUpload" accept=".ttf,.otf,.woff,.woff2" style="display:none;"></label></div>'
+      + '<button class="btn btn-ghost" id="fontCJK" style="flex:none;width:46px;">中文</button>'
+      + '<button class="btn btn-ghost" id="fontLatin" style="flex:none;width:46px;">英文</button>'
+      + '<button class="btn btn-ghost" id="fontAll" style="flex:none;width:46px;">全部</button>'
+      + '<label class="btn btn-ghost" style="flex:1;text-align:center;cursor:pointer;">＋ 字型檔<input type="file" id="fontUpload" accept=".ttf,.otf,.woff,.woff2" style="display:none;"></label></div>'
       + '<div class="info">每列上方小字=字型名稱、下方大字=樣式預覽。先選取文字，再點清單套用。目前字型：<b id="curFont">—</b></div>'
       + '<div id="fontList" class="fontlist"></div>';
     const $ = (id) => body.querySelector("#" + id);
