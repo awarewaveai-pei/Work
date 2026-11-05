@@ -26,6 +26,17 @@ describe("generateCheapJsonText on Gemini", () => {
     expect(calls[0]).toContain(`/models/${GEMINI_LITE_MODEL}:generateContent`);
   });
 
+  it("a 503 overloaded is retried the same way", async () => {
+    vi.useFakeTimers();
+    process.env.GEMINI_API_KEY = "g-test";
+    let n = 0;
+    vi.stubGlobal("fetch", async () => (++n === 1 ? new Response("{}", { status: 503 }) : ok("[]")));
+    const p = generateCheapJsonText({ route: "t", system: "s", user: "u", maxTokens: 10, model: GEMINI_LITE_MODEL, grant: {} as never });
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(await p).toMatchObject({ ok: true, raw: "[]" });
+    expect(n).toBe(2);
+  });
+
   it("no key is a 503, not a call", async () => {
     vi.stubGlobal("fetch", async () => { throw new Error("must not be called"); });
     expect(await generateCheapJsonText({ route: "t", system: "s", user: "u", maxTokens: 10, model: GEMINI_LITE_MODEL, grant: {} as never }))

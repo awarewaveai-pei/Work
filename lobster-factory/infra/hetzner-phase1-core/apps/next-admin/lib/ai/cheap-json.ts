@@ -93,8 +93,9 @@ async function generateOpenAiJsonText(args: CheapJsonTextArgs & { model: AiTextM
   }
 }
 
-const GEMINI_429_RETRIES = 3;
-/** The wait a Gemini 429 asks for (RetryInfo retryDelay "23s"), bounded to 5-60 s; 20 s when it names none. */
+const GEMINI_RETRIES = 3;
+const GEMINI_RETRY_STATUS = new Set([429, 503]);
+/** The wait a Gemini 429 / 503 asks for (RetryInfo retryDelay "23s"), bounded to 5-60 s; 20 s when it names none. */
 export function geminiRetryMs(body: string): number {
   const s = Number(body.match(/"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/)?.[1]);
   return Math.min(60_000, Math.max(5_000, Number.isFinite(s) && s > 0 ? s * 1000 : 20_000));
@@ -115,12 +116,13 @@ async function generateGeminiJsonText(args: CheapJsonTextArgs): Promise<CheapJso
         ...(args.temperature === undefined ? {} : { temperature: args.temperature }) },
     });
     let res: Response;
-    // The free tier allows ~15 requests a minute (probed 2026-11-05: 17 of 20 back-to-back calls passed): a 429 waits the
-    // delay Google names, then asks again, so a burst is slowed instead of answered as an error.
+    // The free tier allows ~15 requests a minute (probed 2026-11-05: 17 of 20 back-to-back calls passed) and the lite model
+    // answers 503 "overloaded" at busy hours (6 of 20 the same day): both wait the delay Google names, then ask again, so a
+    // burst or a busy minute is slowed instead of answered as an error.
     for (let attempt = 0; ; attempt++) {
       res = await fetch(providerUrl(grant, "gemini", `/v1beta/models/${GEMINI_LITE_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`),
         { method: "POST", signal, headers: { "content-type": "application/json" }, body });
-      if (res.status !== 429 || attempt >= GEMINI_429_RETRIES) break;
+      if (!GEMINI_RETRY_STATUS.has(res.status) || attempt >= GEMINI_RETRIES) break;
       const waitMs = geminiRetryMs(await res.text().catch(() => ""));
       await new Promise((r) => setTimeout(r, waitMs));
     }
