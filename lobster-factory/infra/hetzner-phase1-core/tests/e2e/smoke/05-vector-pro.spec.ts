@@ -62,9 +62,15 @@ async function openPage(page: Page): Promise<void> {
     await page.locator('button[type="submit"]').click();
     await page.waitForURL(/\/tools\/vector-pro/, { timeout: 30_000 });
   }
+  // the dock is mounted by the page's effect: once it has panels, the page's listeners (theme, dock) are live
+  await page.waitForFunction(() => !!document.querySelector('#vector-pro-dock [data-panel]'), null, { timeout: 60_000 });
 }
 
-const vcFrame = (page: Page) => page.frames().find((f) => f.url().includes('/vector-pro/'));
+/** The VectorCraft iframe once the page has rendered it (the page is a client component: not there at domcontentloaded). */
+async function vcFrame(page: Page): Promise<Frame | null> {
+  const el = await page.locator('iframe.vp-frame').elementHandle({ timeout: 60_000 });
+  return el ? el.contentFrame() : null;
+}
 
 test.describe('Vector Pro (VectorCraft) smoke', () => {
   test('the public build boots and answers ui.inspect', async ({ page }) => {
@@ -86,10 +92,43 @@ test.describe('Vector Pro (VectorCraft) smoke', () => {
     test.skip(!CAN_OPEN_PAGE, 'Set OPS_TEST_EMAIL + OPS_TEST_PASSWORD (or VECTOR_PRO_NO_AUTH=1 on a dev server) to open the page');
     await openPage(page);
     await expect(page.locator('#vector-pro-dock')).toBeAttached();
-    const frame = vcFrame(page);
+    const frame = await vcFrame(page);
     expect(frame, 'no /vector-pro/ iframe on the page').toBeTruthy();
     await inspect(frame!);
     await page.screenshot({ path: screenshotPath('smoke-vector-pro-page') });
+  });
+
+  // lib/theme/frame-theme.ts: the page answers VectorCraft's awarewave:theme-ready with the app tokens; VectorCraft's
+  // awarewave:theme-applied marks the iframe data-theme-linked="1". Red until the build carries the receiver (C1), so it
+  // runs only with VECTOR_PRO_THEME_RECEIVER=1: a known red in the post-deploy smoke would hide a real regression.
+  // Drop the fixme line in the commit that ships the receiver.
+  test('VectorCraft receives the app theme and answers applied', async ({ page }) => {
+    test.fixme(process.env.VECTOR_PRO_THEME_RECEIVER !== '1', 'VectorCraft theme receiver (C1) not shipped; VECTOR_PRO_THEME_RECEIVER=1 runs it');
+    test.skip(!CAN_OPEN_PAGE,'Set OPS_TEST_EMAIL + OPS_TEST_PASSWORD (or VECTOR_PRO_NO_AUTH=1 on a dev server) to open the page');
+    await openPage(page);
+    await inspect((await vcFrame(page))!);
+    await expect(page.locator('iframe.vp-frame[data-theme-linked="1"]')).toBeAttached({ timeout: 30_000 });
+  });
+
+  // The sender alone, with a stand-in receiver inside the iframe: ready → every theme token arrives → applied links it.
+  test('the page answers theme-ready with the app tokens (stand-in receiver)', async ({ page }) => {
+    test.skip(!CAN_OPEN_PAGE, 'Set OPS_TEST_EMAIL + OPS_TEST_PASSWORD (or VECTOR_PRO_NO_AUTH=1 on a dev server) to open the page');
+    await openPage(page);
+    const frame = (await vcFrame(page))!;
+    await frame.waitForLoadState('domcontentloaded');
+    const got = await frame.evaluate(() => new Promise<Record<string, string>>((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error('no awarewave:theme within 10 s of theme-ready')), 10_000);
+      window.addEventListener('message', (e) => {
+        if (e.origin !== location.origin || e.data?.channel !== 'awarewave:theme') return;
+        clearTimeout(t);
+        window.parent.postMessage({ channel: 'awarewave:theme-applied' }, location.origin);
+        resolve(e.data.tokens);
+      });
+      window.parent.postMessage({ channel: 'awarewave:theme-ready' }, location.origin);
+    }));
+    expect(Object.keys(got)).toContain('--accent-text');
+    expect(got['--body-bg'], '--body-bg carries a value').not.toBe('');
+    await expect(page.locator('iframe.vp-frame[data-theme-linked="1"]')).toBeAttached();
   });
 
   test('every dock panel\'s main button has a real effect', async ({ page }) => {
@@ -126,7 +165,7 @@ test.describe('Vector Pro (VectorCraft) smoke', () => {
 
     await openPage(page);
     await page.waitForFunction(() => !!document.querySelector('#vector-pro-dock [data-panel]'), null, { timeout: 60_000 });
-    const frame = vcFrame(page);
+    const frame = await vcFrame(page);
     expect(frame, 'no /vector-pro/ iframe on the page').toBeTruthy();
     await inspect(frame!);
     const vc = <T = any>(cmd: string, params: Record<string, unknown> = {}): Promise<T> =>
