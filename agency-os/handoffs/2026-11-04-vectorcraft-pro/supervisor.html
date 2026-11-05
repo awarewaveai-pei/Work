@@ -78,40 +78,42 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
 <aside><div class="in">
   <h1>向量專業版監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-11-05</span></p>
-  <div class="bar" data-computed><i class="d" style="width:14.285714285714285%"></i><i class="g" style="width:57.14285714285714%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>1</span>／<span data-computed>7</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:42.857142857142854%"></i><i class="g" style="width:57.14285714285714%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>3</span>／<span data-computed>7</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
-<p class="sub">把開源的 VectorCraft（Illustrator 的完整重製，工具、面板、快捷鍵都一樣）放進 app.aware-wave.com 當「向量（專業版）」；AwareWave 獨有的十項（尺寸範本、Google Fonts 字型、調色、去背、WebP、My Designs、QR、條碼、Mockup、批次匯出）做成第二個 dock 欄，長得跟它的面板一樣；舊設計轉檔後舊編輯器退場，只留一套。共 <span data-computed>7</span> 張卡、<span data-computed>27</span> 項工作，已完成 <span data-computed>13</span> 項。</p>
+<p class="sub">把開源的 VectorCraft（Illustrator 的完整重製，工具、面板、快捷鍵都一樣）放進 app.aware-wave.com 當「向量（專業版）」；AwareWave 獨有的十項（尺寸範本、Google Fonts 字型、調色、去背、WebP、My Designs、QR、條碼、Mockup、批次匯出）做成第二個 dock 欄，長得跟它的面板一樣；舊設計轉檔後舊編輯器退場，只留一套。共 <span data-computed>7</span> 張卡、<span data-computed>27</span> 項工作，已完成 <span data-computed>21</span> 項。</p>
 <section id="now"><h2>現況</h2><p class="lead">目前已做到與還沒做到的事（2026-11-04 查）。</p><ul class="yn"><li class="no"><b>還不行</b><span>在 app.aware-wave.com 用 Illustrator 一樣的工具列、面板、快捷鍵畫向量。<small>真品原始碼讀完（2026-11-04）：工具 89/92、Pathfinder 全套、文字轉外框、多畫板都在 code 裡；網頁版有 iframe 用的 window.vectorcraft 介面（apps/vectorcraft-web/src/api.rs:1-17）。還沒建置、沒上線。</small></span></li><li class="no"><b>還不行</b><span>介面與字型是繁體中文。<small>介面有 zh-hant（crates/ui-egui/src/i18n/zh-hant.tsv）；字型庫只有簡中 Noto Sans CJK SC，繁中 Noto Sans TC 要在 C1.2 自己加。</small></span></li><li class="no"><b>還不行</b><span>AwareWave 獨有的十項功能在專業版裡，長在 Illustrator 版面的第二個 dock 欄。<small>十項＝尺寸範本、Google Fonts 字型、調色、去背、WebP ≤200KB、My Designs、QR、條碼、Mockup、批次匯出（R0-PLAN §6 C4 對照表）；其餘功能真品原生都有。</small></span></li><li class="no"><b>還不行</b><span>舊的向量設計檔在專業版打得開，舊編輯器退場，只有一套。<small>C7：舊 .design.json 批次匯出成 SVG 存回 My Designs，專業版開 SVG；轉完才拆舊頁。在那之前舊編輯器照常可用（0a24f4c29）。</small></span></li><li class="no"><b>還不行</b><span>本機能建出網頁版。<small>本機沒有 rustup／cargo／trunk（2026-11-04 查）；C1.1 安裝。</small></span></li></ul></section>
 
-<section id="steps"><h2>卡片與工作</h2><p class="lead">依編號進行。每張卡列出所有工作，勾選代表完成。High 風險步驟（上傳正式站、改 nginx）經你同意才做。</p><ol class="steps"><li class="step todo" id="C1">
+<section id="steps"><h2>卡片與工作</h2><p class="lead">依編號進行。每張卡列出所有工作，勾選代表完成。High 風險步驟（上傳正式站、改 nginx）經你同意才做。</p><ol class="steps"><li class="step done" id="C1">
     <div class="n">1</div>
     <div class="b">
       <p class="plain">例：在這台筆電按一個指令，就從 VectorCraft 原始碼建出可放網站的檔案（含繁中字型），並在本機瀏覽器開起來確認。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low（只動本機與 scripts/）</span><span class="who">負責：Opus 5.5｜已派 session vp-c1-build（2026-11-05）</span></p>
+      <p class="meta"><span class="pill st-done">已完成</span><span class="pill risk-low">風險 Low（只動本機與 scripts/）</span><span class="who">負責：Opus 5.5｜vp-c1-build 完成；正在修 wasm 體積（89 MB，應約 17.5 MB）</span></p>
       <p class="donewhen"><b>完成的樣子：</b>一個指令建出 dist/&lt;版本&gt;/；本機開 index.html?lang=zh-hant 選單是繁中、能打繁中字、程式介面回得了資料。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>C1.1</code> 筆電裝 Rust 工具鏈與 trunk，前置需求寫進 README。</span></li><li class="todo"><b>○</b><span><code>C1.2</code> 一個建置腳本：抓固定版本的原始碼、加繁中字型、建出網頁版、算校驗碼、預先壓縮。</span></li><li class="todo"><b>○</b><span><code>C1.3</code> 本機開起來：繁中選單、能打繁中字、介面回得了資料，截圖存進 README。</span></li><li class="todo"><b>○</b><span><code>C1.4</code> 加一個「載入字型檔」的介面（約 15 行，補丁＋送回上游），讓字型面板能把 Google Fonts 字型塞進去。</span></li></ul>
+      <ul class="items"><li class="done"><b>✓</b><span><code>C1.1</code> 筆電裝 Rust 工具鏈與 trunk，前置需求寫進 README。 <small>完成於 <code>0f1bdc062</code></small></span></li><li class="done"><b>✓</b><span><code>C1.2</code> 一個建置腳本：抓固定版本的原始碼、加繁中字型、建出網頁版、算校驗碼、預先壓縮。 <small>完成於 <code>0f1bdc062</code></small></span></li><li class="done"><b>✓</b><span><code>C1.3</code> 本機開起來：繁中選單、能打繁中字、介面回得了資料，截圖存進 README。 <small>完成於 <code>0f1bdc062</code></small></span></li><li class="done"><b>✓</b><span><code>C1.4</code> 加一個「載入字型檔」的介面（約 15 行，補丁＋送回上游），讓字型面板能把 Google Fonts 字型塞進去。 <small>完成於 <code>0f1bdc062</code></small></span></li></ul>
       <details><summary>工程細節：C1 建置鏈（本機）</summary>
         <p>rustup＋wasm32＋trunk；build.ps1：fetch 原始碼到 repo 外、套 web-fonts patch 與 api addFont patch、加 TC 字型、trunk build、產 SHA256SUMS、預壓 .gz；addFont 補丁同日開上游 PR</p>
         <p><b>需先完成：</b>無</p>
         <p><b>已定案：</b>版本釘在固定 commit（PIN.json），升級要經 C6 流程。字型加 Noto Sans TC（開源 OFL）。</p>
         <p><b>檔案：</b><code>scripts/vectorcraft-pro/PIN.json</code> <code>scripts/vectorcraft-pro/build.ps1</code> <code>scripts/vectorcraft-pro/web-fonts.patch</code> <code>scripts/vectorcraft-pro/api-addfont.patch</code> <code>scripts/vectorcraft-pro/README.md</code></p>
         <p><b>卡：</b><code>agency-os/handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md §6 C1</code></p>
+        <p><b>完成於：</b><code>0f1bdc062</code></p>
       </details>
-    </div></li><li class="step todo" id="C2">
+    </div></li><li class="step done" id="C2">
     <div class="n">2</div>
     <div class="b">
       <p class="plain">例：建好的檔案放到主機一個獨立資料夾，由 nginx 直接供給，不經 next-admin，也不會被每天的自動部署刪掉；換版本只是把 current 指向新資料夾。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（上傳正式站、改 nginx 與 compose；走 safe-infra-patch 自動還原）</span><span class="who">負責：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-done">已完成</span><span class="pill risk-high">風險 High（上傳正式站、改 nginx 與 compose；走 safe-infra-patch 自動還原）</span><span class="who">負責：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>瀏覽器開 /vector-pro/current/index.html 回 200；wasm 以 gzip 送出並標對型別；nginx 容器內看得到檔案。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>C2.1</code> 把建好的資料夾上傳主機，建 current 連結，校驗碼比對通過。</span></li><li class="todo"><b>○</b><span><code>C2.2</code> nginx 容器掛上那個資料夾（compose 走安全補丁流程）。</span></li><li class="todo"><b>○</b><span><code>C2.3</code> nginx 加一段只供這個資料夾的設定（走安全補丁流程）。</span></li><li class="todo"><b>○</b><span><code>C2.4</code> 用 curl 驗：頁面 200、wasm 型別與壓縮正確、容器內有檔。</span></li></ul>
+      <ul class="items"><li class="done"><b>✓</b><span><code>C2.1</code> 把建好的資料夾上傳主機，建 current 連結，校驗碼比對通過。 <small>完成於 <code>f53144584</code></small></span></li><li class="done"><b>✓</b><span><code>C2.2</code> nginx 容器掛上那個資料夾（compose 走安全補丁流程）。 <small>完成於 <code>f53144584</code></small></span></li><li class="done"><b>✓</b><span><code>C2.3</code> nginx 加一段只供這個資料夾的設定（走安全補丁流程）。 <small>完成於 <code>f53144584</code></small></span></li><li class="done"><b>✓</b><span><code>C2.4</code> 用 curl 驗：頁面 200、wasm 型別與壓縮正確、容器內有檔。 <small>完成於 <code>f53144584</code></small></span></li></ul>
       <details><summary>工程細節：C2 承載（正式站靜態檔）</summary>
         <p>rsync dist → 主機；compose 加 nginx 唯讀掛載；nginx 加 /vector-pro/ 靜態 location（wasm mime、gzip_static、hash 檔 immutable、index no-cache）；repo 對照檔同步</p>
         <p><b>需先完成：</b><a href="#C1">C1</a></p>
         <p><b>已定案：</b>靜態檔由 nginx 公開供給、頁面本身要登入（操作者 2026-11-05 定案待決 1）。放 /root/lobster-phase1/static/vector-pro/&lt;版本&gt;/ 加 current 連結；不放 apps/ 樹（sg-deploy 的 --delete 會刪）。</p>
         <p><b>檔案：</b><code>INFRA/docker-compose.yml</code> <code>INFRA/nginx/default.conf</code></p>
         <p><b>卡：</b><code>agency-os/handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md §6 C2</code></p>
+        <p><b>完成於：</b><code>f53144584</code></p>
       </details>
     </div></li><li class="step doing" id="C3">
     <div class="n">3</div>
