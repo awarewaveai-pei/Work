@@ -32,6 +32,8 @@ powershell -ExecutionPolicy Bypass -File D:\Work\scripts\vectorcraft-pro\build.p
 | `notoSansTc` | 繁中字型：notofonts/noto-cjk 的 SubsetOTF/TC（OFL-1.1），url+sha256 釘死；licence 複製 craft-fonts 既有 `fonts/noto-sans-cjk-sc/OFL.txt`（同一 Noto CJK 專案同一份 OFL） |
 
 升級：改 `rev`（或 `craftFontsRev`）→ 跑 `build.ps1` → 本機 smoke（下方「驗證」）→ 交 C2/C6 流程上線。patch `git apply --check` 失敗 = 上游改了該區 → 重排 patch 再跑。
+上線（主機 ks-aw-01，High）：`tar cf - <dist名> | ssh … 'sudo tar xf - -C /root/lobster-phase1/static/vector-pro'` → 主機 `sha256sum -c SHA256SUMS` → `ln -sfn <dist名> current` → `BASE_URL=https://app.aware-wave.com npx playwright test smoke/05-vector-pro.spec.ts --project=smoke`（`lobster-factory/infra/hetzner-phase1-core/tests`）。nginx／compose 只在第一次上線時改（已完成 2026-11-05），換版本不用動。
+回退：`ln -sfn <上一版目錄> current`（立即生效；index.html no-cache，hash 檔名不同不衝突）。主機保留最近 2 個版本目錄，第 3 個上線且 smoke 綠後才刪最舊的。
 
 ## 補丁（建置時套在 src checkout，不改上游）
 

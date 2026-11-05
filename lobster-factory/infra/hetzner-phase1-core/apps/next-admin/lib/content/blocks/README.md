@@ -224,15 +224,15 @@ AI prompt 是獨立積木，不併進 `image/style-design-workbench`。改圖流
 | id / 名稱 | 狀態 | 入口 / 檔案 | 說明 |
 |---|---|---|---|
 | `qr` | `UI block` | `public/editor-shared/blocks/qr.js`（/tools/vector-pro dock） | QR Code（向量） |
-| `smart-guides` | `UI block` | 退場（2026-11-05 隨舊 `public/vector-editor.html` 刪除，未移植到 /tools/vector-pro dock） | 智慧磁吸對齊 |
-| `arc-text` | `UI block` | 退場（2026-11-05 隨舊 `public/vector-editor.html` 刪除，未移植到 /tools/vector-pro dock） | 環形 / 弧形文字 |
-| `crop-marks` | `UI block` | 退場（2026-11-05 隨舊 `public/vector-editor.html` 刪除，未移植到 /tools/vector-pro dock） | 出血 + 裁切標記 |
+| `smart-guides` | `UI block` | 退場（2026-11-05 隨舊 `public/vector-editor.html` 刪除；/tools/vector-pro 由 VectorCraft 原生功能取代，見 `agency-os/handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md` §6 C4 對照表） | 智慧磁吸對齊 |
+| `arc-text` | `UI block` | 退場（2026-11-05 隨舊 `public/vector-editor.html` 刪除；/tools/vector-pro 由 VectorCraft 原生功能取代，見 `agency-os/handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md` §6 C4 對照表） | 環形 / 弧形文字 |
+| `crop-marks` | `UI block` | 退場（2026-11-05 隨舊 `public/vector-editor.html` 刪除；/tools/vector-pro 由 VectorCraft 原生功能取代，見 `agency-os/handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md` §6 C4 對照表） | 出血 + 裁切標記 |
 | `templates` | `UI block` | `public/editor-shared/blocks/templates.js`（/tools/vector-pro dock） | 範本庫（尺寸預設） |
 | `mockup` | `UI block` | `public/editor-shared/blocks/mockup.js`（/tools/vector-pro dock） | 商品 Mockup 預覽 |
 | `batch-export` | `UI block` | `public/editor-shared/blocks/batch-export.js`（/tools/vector-pro dock） | 批次多尺寸匯出 |
 | `barcode` | `UI block` | `public/editor-shared/blocks/barcode.js`（/tools/vector-pro dock） | 條碼 Barcode（向量） |
-| `text-path` | `UI block` | 退場（2026-11-05 隨舊 `public/vector-editor.html` 刪除，未移植到 /tools/vector-pro dock） | 文字沿路徑 |
-| `simplify` | `UI block` | 退場（2026-11-05 隨舊 `public/vector-editor.html` 刪除，未移植到 /tools/vector-pro dock） | 路徑簡化 |
+| `text-path` | `UI block` | 退場（2026-11-05 隨舊 `public/vector-editor.html` 刪除；/tools/vector-pro 由 VectorCraft 原生功能取代，見 `agency-os/handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md` §6 C4 對照表） | 文字沿路徑 |
+| `simplify` | `UI block` | 退場（2026-11-05 隨舊 `public/vector-editor.html` 刪除；/tools/vector-pro 由 VectorCraft 原生功能取代，見 `agency-os/handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md` §6 C4 對照表） | 路徑簡化 |
 | `canvas/shape` | `UI block` | `app/tools/canvas/CanvasEditor.tsx` | 基本形狀（rect/circle/line） |
 | `canvas/object-lock` | `UI block` | `app/tools/canvas/CanvasEditor.tsx` | 鎖定/解鎖物件移動、縮放、旋轉 |
 | `color-grade` | `UI block` | `public/editor-shared/color-grade.js`（Canvas Editor + /tools/vector-pro 調色積木 `blocks/color-grade.js` 共用，`lib/studio/editor-color-grade.ts` 為型別入口） | 🎨 調色單一面板：預設風格/去白底、自動對比·色彩·色調、色階、色彩平衡、基本滑桿、Camera RAW、HSL 色彩混合器；`adj` 存在圖片上 |
