@@ -1,0 +1,17 @@
+.git
+runtime/
+.data*
+node_modules
+tests/
+docs/
+handoff/
+vendor/ffprobe/ffprobe.exe
+engines/effectcraft/web/
+assets/image-*
+assets/storyboards-data.json
+assets/vision/vision_bundle.js
+assets/vision/vision_bundle.mjs
+assets/vision/wasm/
+backend/blender/__pycache__/
+Dockerfile
+.dockerignore

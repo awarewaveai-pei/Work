@@ -6,5 +6,12 @@
   "zipSha256Source": "https://download.blender.org/release/Blender4.5/blender-4.5.9.sha256 (official), read 2026-11-03",
   "topFolder": "blender-4.5.9-windows-x64",
   "exe": "blender.exe",
-  "license": "GPL-3.0-or-later (Blender); run as a separate process, never linked or bundled"
+  "license": "GPL-3.0-or-later (Blender); run as a separate process, never linked or bundled",
+  "linux": {
+    "url": "https://download.blender.org/release/Blender4.5/blender-4.5.9-linux-x64.tar.xz",
+    "tarBytes": 377929956,
+    "tarSha256": "dcdc3eca6c9825bb35a8033b689c053f3cb5a9b0cd2a61b2eac2a49436b4ad3d",
+    "tarSha256Source": "https://download.blender.org/release/Blender4.5/blender-4.5.9.sha256 (official), read 2026-11-05",
+    "note": "used by the container image (Dockerfile), not by scripts/vendor-blender.cjs"
+  }
 }

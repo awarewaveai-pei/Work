@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "@/lib/ops-role";
 import { assertOrgAccess, OrgAccessError, resolveTenant } from "@/lib/tenant-guard";
@@ -14,6 +15,8 @@ export async function GET(req: Request): Promise<Response> {
   const deny = (status: number, error: string) => NextResponse.json({ ok: false, error }, { status, headers: { "Cache-Control": "no-store" } });
   // Middleware strips client copies of these and sets them only from a validated session; resolveTenant would read
   // their absence as staff, so a request that did not pass the session gate stops here.
+  const token = process.env.VW_INTERNAL_TOKEN?.trim();
+  if (!token) return deny(503, "unavailable");
   const userId = req.headers.get("x-ops-user-id")?.trim();
   const kind = req.headers.get("x-ops-user-kind");
   if (!userId || (kind !== "staff" && kind !== "client")) return deny(401, "unauthenticated");
@@ -43,6 +46,12 @@ export async function GET(req: Request): Promise<Response> {
     console.warn(`[vw-session] subject lookup failed: ${msg.slice(0, 200)}`);
     return deny(503, "unavailable");
   }
+  // Invariant: video-workbench accepts an identity only when signed here (no network boundary); canonical string mirrors
+  // apps/video-workbench/backend/session-signature.cjs.
+  const expires = String(Math.floor(Date.now() / 1000) + 120);
+  const signature = createHmac("sha256", token)
+    .update(["vw-session-v1", userId, orgId, billingOrgId, tenant.userKind, resolved.role, expires].join("\n"))
+    .digest("base64url");
   return new Response(null, { status: 204, headers: {
     "Cache-Control": "no-store",
     "X-VW-User-Id": userId,
@@ -50,5 +59,7 @@ export async function GET(req: Request): Promise<Response> {
     "X-VW-Billing-Org-Id": billingOrgId,
     "X-VW-User-Kind": tenant.userKind,
     "X-VW-Role": resolved.role,
+    "X-VW-Expires": expires,
+    "X-VW-Signature": signature,
   } });
 }

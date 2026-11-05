@@ -59,6 +59,8 @@ function createServer({
   const identity = (req) => {
     const user = req.headers["x-vw-user-id"], org = String(req.headers["x-vw-org-id"] || "").toLowerCase();
     if (!user || !uuid.test(org)) return null;
+    // Invariant: only next-admin-signed identity is accepted; any container on the network can reach this port.
+    if (!require("./backend/session-signature.cjs").verify(String(require("./backend/env-compat.cjs").vwEnv(env, "INTERNAL_TOKEN") || "").trim(), req.headers)) return null;
     // P6 L3: who acts and which billing account pays (permits, job createdBy) -- only nginx sets these headers.
     const billing = String(req.headers["x-vw-billing-org-id"] || "").toLowerCase();
     req.vwIdentity = { userId: String(user), orgId: org, ...(uuid.test(billing) ? { billingOrgId: billing } : {}), userKind: req.headers["x-vw-user-kind"], role: req.headers["x-vw-role"] };

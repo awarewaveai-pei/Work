@@ -98,7 +98,10 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
   const server = createServer({ dataDir: path.join(dir, "connected"), env, fetchImpl });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
   const port = server.address().port;
-  const who = (extra = {}) => ({ "X-VW-User-Id": USER, "X-VW-Org-Id": ORG, "X-VW-Billing-Org-Id": BILLING, "Content-Type": "application/json", ...extra });
+  const who = (extra = {}) => {
+    const h = { "X-VW-User-Id": USER, "X-VW-Org-Id": ORG, "X-VW-Billing-Org-Id": BILLING, "X-VW-User-Kind": "staff", "X-VW-Role": "owner", "X-VW-Expires": String(Math.floor(Date.now() / 1000) + 120), "Content-Type": "application/json", ...extra };
+    return { ...h, "X-VW-Signature": require("../backend/session-signature.cjs").sign("internal-secret", { userId: h["X-VW-User-Id"], orgId: h["X-VW-Org-Id"], billingOrgId: h["X-VW-Billing-Org-Id"], userKind: h["X-VW-User-Kind"], role: h["X-VW-Role"], expires: h["X-VW-Expires"] }) };
+  };
   const generate = (body, headers = who()) => request(port, "POST", "/api/vw/generations", headers, JSON.stringify(body));
   const imageInput = { type: "image", prompt: "一隻貓", settings: { ratio: "1:1", quality: "1K", imageLayout: "center-crop" } };
   try {

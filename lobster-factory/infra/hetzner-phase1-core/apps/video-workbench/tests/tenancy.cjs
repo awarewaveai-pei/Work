@@ -6,6 +6,8 @@ const assert = require("node:assert/strict"),
   path = require("node:path"),
   http = require("node:http");
 const { createServer } = require("../server.cjs");
+const { sign } = require("../backend/session-signature.cjs");
+const TOKEN = "internal-secret";
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jTioAAAAASUVORK5CYII=", "base64"),
   bvh = Buffer.from("HIERARCHY\nROOT Hips\n{\n OFFSET 0 0 0\n CHANNELS 3 Xposition Yposition Zposition\n End Site\n {\n  OFFSET 0 1 0\n }\n}\nMOTION\nFrames: 1\nFrame Time: 0.033333\n0 0 0\n"),
   A = "11111111-1111-4111-8111-111111111111",
@@ -28,10 +30,14 @@ async function listen(options) {
 }
 (async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vw-tenancy-"));
-  const proxy = await listen({ dataDir: path.join(dir, "proxy"), env: { VW_TRUST_PROXY_IDENTITY: "1", VW_ALLOWED_HOSTS: "video.aware-wave.com,127.0.0.1:*", VW_PUBLIC_ORIGIN: "https://video.aware-wave.com" } });
+  const proxy = await listen({ dataDir: path.join(dir, "proxy"), env: { VW_TRUST_PROXY_IDENTITY: "1", VW_INTERNAL_TOKEN: TOKEN, VW_ALLOWED_HOSTS: "video.aware-wave.com,127.0.0.1:*", VW_PUBLIC_ORIGIN: "https://video.aware-wave.com" } });
   const local = await listen({ dataDir: path.join(dir, "local"), env: {} });
   try {
-    const as = (org, extra = {}) => ({ "X-VW-User-Id": "u-" + org.slice(0, 4), "X-VW-Org-Id": org, ...extra });
+    const signed = (org, over = {}) => {
+      const f = { userId: "u-" + org.slice(0, 4), orgId: org, billingOrgId: "", userKind: "staff", role: "owner", expires: String(Math.floor(Date.now() / 1000) + 120), ...over };
+      return { "X-VW-User-Id": f.userId, "X-VW-Org-Id": f.orgId, "X-VW-Billing-Org-Id": f.billingOrgId, "X-VW-User-Kind": f.userKind, "X-VW-Role": f.role, "X-VW-Expires": f.expires, "X-VW-Signature": sign(TOKEN, f) };
+    };
+    const as = (org, extra = {}) => ({ ...signed(org), ...extra });
     const upload = async (org, data, name) => {
       const res = await request(proxy.port, "POST", "/api/vw/uploads", as(org, { "Content-Type": "application/json" }), JSON.stringify({ data, name }));
       assert.equal(res.status, 201, res.body.toString());
@@ -57,6 +63,16 @@ async function listen(options) {
       assert.equal((await request(proxy.port, "GET", url, { "X-VW-User-Id": "u" })).status, 401, "缺 org header = 401");
       assert.equal((await request(proxy.port, "GET", url, as("../" + A))).status, 401, "org 非 UUID = 401");
     }
+
+    // Signed identity only: forged headers from another container on the network are refused.
+    const forged = { ...signed(A) };
+    delete forged["X-VW-Signature"];
+    assert.equal((await request(proxy.port, "GET", "/api/vw/state", forged)).status, 401, "無簽章 = 401");
+    assert.equal((await request(proxy.port, "GET", "/api/vw/state", { ...signed(A), "X-VW-Signature": sign("wrong-token", { userId: "u-1111", orgId: A, billingOrgId: "", userKind: "staff", role: "owner", expires: signed(A)["X-VW-Expires"] }) })).status, 401, "錯 key 簽章 = 401");
+    assert.equal((await request(proxy.port, "GET", "/api/vw/state", { ...signed(A), "X-VW-Org-Id": B })).status, 401, "org 被改 = 401");
+    assert.equal((await request(proxy.port, "GET", "/api/vw/state", { ...signed(A), "X-VW-Role": "operator" })).status, 401, "role 被改 = 401");
+    assert.equal((await request(proxy.port, "GET", "/api/vw/state", signed(A, { expires: String(Math.floor(Date.now() / 1000) - 120) }))).status, 401, "簽章過期 = 401");
+    assert.equal((await request(proxy.port, "GET", "/api/vw/state", signed(A, { expires: String(Math.floor(Date.now() / 1000) - 10) }))).status, 200, "30 秒時鐘偏差內放行");
 
     assert.equal((await request(proxy.port, "GET", "/api/vw/state", as(A, { Host: "video.aware-wave.com", Origin: "https://video.aware-wave.com" }))).status, 200);
     assert.equal((await request(proxy.port, "GET", "/api/vw/state", as(A, { Host: "video.aware-wave.com", Origin: "http://video.aware-wave.com" }))).status, 403, "Origin 須等於 VW_PUBLIC_ORIGIN");

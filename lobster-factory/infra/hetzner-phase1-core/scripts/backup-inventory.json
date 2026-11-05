@@ -40,6 +40,7 @@
     {"id": "uptime-kuma", "pipeline": "stack", "mounts": ["uptime-kuma:/app/data"], "artifacts": ["uptime-kuma.tgz"], "sources": {"uptime-kuma:/app/data": "uptime-kuma"}},
     {"id": "lobster-wordpress-db", "pipeline": "lobster", "mounts": ["lobster-wordpress-db:/var/lib/mysql"], "artifacts": ["wordpress-db.sql.gz"], "drill": {"engine": "mysql", "container": "lobster-wordpress-db", "expect": [["wordpress", "wp_options"], ["wordpress", "wp_users"]]}, "note": "--databases: the site and every staging site (wp_s_<site id>)"},
     {"id": "lobster-wordpress", "pipeline": "lobster", "mounts": ["lobster-wordpress:/var/www/html"], "artifacts": ["wp-html.tgz"]},
+    {"id": "video-workbench", "pipeline": "lobster", "mounts": ["lobster-video-workbench:/data"], "artifacts": ["video-workbench-data.tgz"], "sources": {"lobster-video-workbench:/data": "lobster-phase1_video_workbench_data"}, "note": "per-organisation project state.json, job ledger, local media; assets of record are in R2/media_assets"},
     {"id": "soulful-db", "pipeline": "ks-aw-01", "mounts": ["soulful-db:/var/lib/mysql"], "artifacts": ["soulful-db.sql.gz"], "drill": {"engine": "mysql", "container": "soulful-db", "expect": [["soulful", "wp_options"], ["soulful", "wp_users"]]}},
     {"id": "soulful-wp", "pipeline": "ks-aw-01", "mounts": ["soulful-wp:/var/www/html"], "artifacts": ["soulful-wordpress.tgz"], "sources": {"soulful-wp:/var/www/html": "soulful_wordpress_data"}},
     {"id": "ks-secrets", "pipeline": "ks-aw-01", "mounts": [], "plan": "B4",

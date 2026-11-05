@@ -110,6 +110,26 @@ else
   log "  SKIP: lobster-n8n not running"
 fi
 
+# --- 3b. video-workbench data volume (per-organisation project state, job ledger, local media; backup-inventory.json store "video-workbench") ---
+if docker ps --format '{{.Names}}' | grep -q '^lobster-video-workbench$'; then
+  log "Archiving video-workbench data volume..."
+  if docker run --rm \
+    -v lobster-phase1_video_workbench_data:/data:ro \
+    -v "$(realpath "${OUT}")":/backup \
+    alpine tar czf /backup/video-workbench-data.tgz -C /data . 2>/dev/null; then
+    if [[ -s "${OUT}/video-workbench-data.tgz" ]]; then
+      SIZE=$(du -h "${OUT}/video-workbench-data.tgz" | cut -f1)
+      log "  video-workbench-data.tgz OK (${SIZE})"
+    else
+      log "  WARN: video-workbench-data.tgz is empty (volume may be empty)"
+    fi
+  else
+    log "  WARN: video-workbench volume archive failed (non-fatal; backup-coverage-check flags the missing artifact)"
+  fi
+else
+  log "  SKIP: lobster-video-workbench not running"
+fi
+
 # --- 4. Abort if critical errors ---
 if [[ $ERRORS -gt 0 ]]; then
   log "FATAL: ${ERRORS} critical error(s) during backup. Local backup at ${OUT} may be incomplete."

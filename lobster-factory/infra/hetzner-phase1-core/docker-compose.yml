@@ -316,6 +316,10 @@ services:
       # Bearer for POST /api/internal/entitlements/permit/cognitive (lib/entitlements/issuer.ts); the SAME value is
       # ENTITLEMENT_ISSUER_TOKEN in /opt/cognitive-os/.../deploy/.env. Empty = the issuer answers 401 (fail closed).
       ENTITLEMENT_ISSUER_TOKEN_COGNITIVE: ${ENTITLEMENT_ISSUER_TOKEN_COGNITIVE:-}
+      # video-workbench (P6): permit issuer Bearer for /permit/video (issuer.ts:9) and the Bearer for
+      # /api/internal/video/workbench/*; the SAME values go to the video-workbench service. Empty = 401 (fail closed).
+      ENTITLEMENT_ISSUER_TOKEN_VIDEO: ${ENTITLEMENT_ISSUER_TOKEN_VIDEO:-}
+      VW_INTERNAL_TOKEN: ${VW_INTERNAL_TOKEN:-}
       # Cross-product id reconciliation -> GET /api/internal/reconcile (BACKUP_COVERAGE_PLAN.md B8). The same value
       # sits in /etc/default/awarewave-reconcile for backup-coverage-check.py on the host. Empty = 401 (fail closed).
       RECONCILE_TOKEN: ${RECONCILE_TOKEN:-}
@@ -666,6 +670,62 @@ services:
           pids: 1024
     logging: *lobster-logging
 
+  # Video workbench (apps/video-workbench, P6): video.aware-wave.com minus the next-admin door paths (nginx/default.conf).
+  #   * NO ports, and identity is signed: VW_TRUST_PROXY_IDENTITY=1 accepts X-VW-* only with next-admin's HMAC
+  #     (VW_INTERNAL_TOKEN) from auth_request /_vw_session; other lobster-net containers can reach :4178 but cannot forge it.
+  #   * holds no Supabase/R2 key: assets, jobs and usage go to next-admin /api/internal/video/workbench/* with VW_INTERNAL_TOKEN.
+  #   * lobster-video-net only to reach lobster-remotion-service (REMOTION_SERVICE_URL).
+  #   * Blender is off until BLENDER_PATH is set (VW_BLENDER_PATH=/opt/blender/blender in .env after the H5 CPU measurement).
+  video-workbench:
+    init: true
+    build:
+      context: ./apps/video-workbench
+    image: lobster-phase1-video-workbench:local
+    container_name: lobster-video-workbench
+    restart: unless-stopped
+    environment:
+      PORT: "4178"
+      VW_HOST: 0.0.0.0
+      VW_DATA_DIR: /data
+      VW_TRUST_PROXY_IDENTITY: "1"
+      VW_CONFIG_MODE: http
+      VW_PUBLIC_ORIGIN: ${VW_PUBLIC_ORIGIN:-https://video.aware-wave.com}
+      VW_ALLOWED_HOSTS: ${VW_ALLOWED_HOSTS:-video.aware-wave.com}
+      VW_INTERNAL_BASE: http://next-admin:3000
+      VW_INTERNAL_TOKEN: ${VW_INTERNAL_TOKEN:-}
+      ENTITLEMENT_ISSUER_TOKEN_VIDEO: ${ENTITLEMENT_ISSUER_TOKEN_VIDEO:-}
+      ENTITLEMENT_PUBLIC_KEYS: ${ENTITLEMENT_PUBLIC_KEYS:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      REPLICATE_API_TOKEN: ${REPLICATE_API_TOKEN:-}
+      MESHY_API_KEY: ${MESHY_API_KEY:-}
+      REMOTION_SERVICE_URL: ${REMOTION_SERVICE_URL:-http://lobster-remotion-service:8733}
+      REMOTION_AUTH_TOKEN: ${REMOTION_AUTH_TOKEN:-}
+      MEDIA_RENDER_AUTH_TOKEN: ${MEDIA_RENDER_AUTH_TOKEN:-}
+      BLENDER_PATH: ${VW_BLENDER_PATH:-}
+    networks:
+      - lobster-net
+      - video-net
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - video_workbench_data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4178/healthz',{signal:AbortSignal.timeout(4000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    memswap_limit: 4G
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '3.00'
+          pids: 512
+    logging: *lobster-logging
+
   # HCI-30 (ADR-0021: dedicated Postgres, physically isolated from the shared Supabase instance
   # so an RLS bypass on this schema cannot reach n8n's workflow secrets on that same cluster;
   # ADR-0007 gate 1 requires this service definition to live HERE, in the single existing
@@ -875,6 +935,10 @@ networks:
   observability:
     name: lobster-phase1_observability
     external: true
+  # Created by apps/remotion-service/docker-compose.remotion.yml; video-workbench joins it to call lobster-remotion-service.
+  video-net:
+    name: lobster-video-net
+    external: true
   # Private hci-postgres <-> hci-app link only. Explicit subnet outside 172.16.0.0/12 (ks-aw-01's
   # entire default Docker address pool -- all 15 /16s -- is already occupied by other networks;
   # verified via `ip route show`, no 10.x route exists on that host today). Local dev is
@@ -912,3 +976,4 @@ volumes:
   hci_pgdata:
   hci_fetch_runner_objectstore:
   wordpress_data:
+  video_workbench_data:

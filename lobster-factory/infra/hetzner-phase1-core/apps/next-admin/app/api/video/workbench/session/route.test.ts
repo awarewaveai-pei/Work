@@ -1,4 +1,5 @@
 // nginx auth_request target for video-workbench (P6 D2): every deny path, and the identity headers it hands nginx.
+import { createHmac } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
@@ -26,7 +27,8 @@ const at = "https://video.aware-wave.com/api/video/workbench/session";
 const call = (headers: Record<string, string>) => GET(new Request(at, { headers }));
 const client = (org: string | null, extra: Record<string, string> = {}) => ({ "x-ops-user-kind": "client", "x-ops-user-id": "u-client", ...(org ? { "x-ops-org-id": org } : {}), ...extra });
 const staff = (role: string, extra: Record<string, string> = {}) => ({ "x-ops-user-kind": "staff", "x-ops-claims-role": role, "x-ops-user-id": "u-staff", ...extra });
-beforeEach(() => resetSubjectCache());
+const TOKEN = "vw-test-token";
+beforeEach(() => { resetSubjectCache(); vi.stubEnv("VW_INTERNAL_TOKEN", TOKEN); });
 
 describe("GET /api/video/workbench/session", () => {
   it("denies a request the session gate did not mark: no user id, or no user kind", async () => {
@@ -63,5 +65,21 @@ describe("GET /api/video/workbench/session", () => {
     expect([chosen.status, chosen.headers.get("x-vw-org-id"), chosen.headers.get("x-vw-role")]).toEqual([204, OTHER, "operator"]);
     const none = await call(staff("owner"));
     expect([none.status, none.headers.get("x-vw-org-id"), none.headers.get("x-vw-billing-org-id")]).toEqual([204, INTERNAL, INTERNAL]);
+  });
+
+  it("signs the identity with VW_INTERNAL_TOKEN over the canonical string, expiring in ~120 s", async () => {
+    const res = await call(client(CHILD));
+    const expires = res.headers.get("x-vw-expires")!;
+    const want = createHmac("sha256", TOKEN)
+      .update(["vw-session-v1", "u-client", CHILD, ORG, "client", res.headers.get("x-vw-role"), expires].join("\n")).digest("base64url");
+    expect(res.headers.get("x-vw-signature")).toBe(want);
+    expect(Number(expires) - Math.floor(Date.now() / 1000)).toBeGreaterThan(100);
+  });
+
+  it("no VW_INTERNAL_TOKEN: 503, never an unsigned 204", async () => {
+    vi.stubEnv("VW_INTERNAL_TOKEN", "");
+    const res = await call(client(CHILD));
+    expect(res.status).toBe(503);
+    expect(res.headers.get("x-vw-signature")).toBeNull();
   });
 });
