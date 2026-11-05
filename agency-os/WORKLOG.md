@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-05（續2）向量專業版上線：VectorCraft 嵌入 app、第二 dock 欄十面板、舊向量編輯器退場
+
+- 計畫／監工台：`agency-os/handoffs/2026-11-04-vectorcraft-pro/`（R0-PLAN §6、data.mjs → https://claude.ai/artifact/GKGxtNsXbW65SDhsHiTqRK）。四個工人 session 平行（C1／C3／C4 dock／C4 blocks），主 session 驗收＋整合＋C2＋部署。
+- C1 `0f1bdc062`＋`c9b541cae`：build.ps1（WSL 內建置；本機 Smart App Control 擋本地編譯 exe）、Noto Sans TC、addFont 補丁；wasm 89 MB 非異常：上游 v0.21.0 web zip 87.4 MB，`docs/development.md:33` 的 17.5 MB 過時；build 加不變量「wasm-opt 重跑縮 >2% = 失敗」。
+- C2 `f53144584`：主機 `/root/lobster-phase1/static/vector-pro/4cce336-3db6064` + `current`；compose ro 掛載、nginx `location ^~ /vector-pro/`（app＋產品門兩區塊；`^~` 防 regex location 搶；用 `expires` 不用巢狀 `add_header`，否則丟伺服器層安全標頭）。safe-infra-patch 備份 `docker-compose.yml.bak.safe-patch-20261105-022755`、`default.conf.bak.safe-patch-20261105-022810`。
+- C3/C4/C5/C7（分支 door/dock/blocks 合併 `5c8429183`）：`app/(full)/tools/vector-pro`、`/vector-pro-dock/`（dock 不放 `/vector-pro/`：nginx 整段給 VectorCraft）、ctx 契約（replaceImage spike 未降級）、`designs` POST `sourceFile`（.vectorcraft/.svg 內容嗅探、octet-stream、metadata，不改 schema）、舊 `.design.json` 改瀏覽器內匯入（查證：從未上伺服器，`vector-editor.html:1285`）、舊頁 308 → `/tools/vector-pro`。
+- 部署閘抓 2 紅（工人只跑指名測試）：r2-delete-guard 不變量（回滾直呼 deleteDesignObject）、accent-not-text（`var(--accent)` 當字色）→ `bca9a846d` 治本。教訓：合 main 前在整合樹跑全套一次（本次 490 files 綠後再部署）。
+- 待：C3.4／C5.3 登入實測（需操作者在 Chrome 登入）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=sg-deploy.sh next-admin → deployed bca9a846d, healthy 15s, tests 4097 passed；curl /vector-pro/current/index.html 200 no-cache nosniff、wasm 200 application/wasm gzip max-age=31536000、design.aware-wave.com 同路徑 200；playwright smoke/05-vector-pro.spec.ts BASE_URL=prod 2 passed 1 skipped（無測試帳號） | exit=0 | ms=0
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/2m/1n（主 session 讀 C3 diff、designs sourceFile diff、dock 契約、blocks SSOT import；m1 回滾繞過 R2 guard、m2 accent 字色 → bca9a846d；n1 blocks/color-grade.js 濾鏡包裝重複 → b268cfd63 收成 AW_FILTERS）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=vector-editor.html | hits=19（next.config 308 轉址 1、blocks README 退場說明 5 已改正確措辭、CanvasEditor 歷史註解 7、blocks 來源行號註解 6；無執行期引用）
 ## 2026-11-05（續1）塔羅調色色相角度修正：HueRotation 不再收弧度
 
 - 操作者：「修的舊 bug」（CARD-05 worker 回報、範圍外）。根因：`app/(shell)/tools/canvas/fabric-filters.ts` 舊 `buildFabricImageFilters` 傳 `rotation: hue*π/180`，但 Fabric 7 自己算 `rad = rotation * Math.PI`（node_modules/fabric/dist/index.mjs:22012）→ π 乘兩次，30° 實際轉約 94°。使用者只有塔羅工作室：`components/tools/GradedPreview.tsx`（調色預覽）與 `tarot/renderPrintCard.ts`（印製卡／圖庫縮圖烘焙）。編輯器共用模組 `public/editor-shared/color-grade.js:345` 早就是 `hue/180`。
