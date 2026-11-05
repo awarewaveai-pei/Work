@@ -1,11 +1,13 @@
-// CARD-06 🪄 去背 union: the SAME generated white-background PNG goes into /tools/canvas (Fabric 7) and /tools/vector-editor (Fabric 5);
-// every item is driven through the REAL panel controls ([data-bg-*] hooks are identical on both sides) and read back from the
-// exported PNG / the image object. AI 去背 is answered by page.route (the dev server has no Supabase) so the request itself is asserted.
-//   item 1 colour key  → corner alpha 0 / centre alpha 255 in the exported PNG, adj.removeColor identical on both
+// CARD-06 🪄 去背 on /tools/canvas (Fabric 7): a generated white-background PNG; every item is driven through the REAL panel controls
+// ([data-bg-*] hooks) and read back from the exported PNG / the image object. AI 去背 is answered by page.route (the dev server has
+// no Supabase) so the request itself is asserted.
+//   item 1 colour key  → corner alpha 0 / centre alpha 255 in the exported PNG, adj.removeColor stored
 //   item 2 AI 去背     → request (method, role header, body = the source), busy/failed/ok messages, in-place swap, ONE undo step, size guard
 //   item 3 還原        → key off + AI source back, 調色 / 去白底 untouched
 //   item 4 disabled    → non-image selection disables the panel with the hint
 //   invariant (Codex F1–F3): legacy filters survive, white/0.12 key survives 調色 edits, 還原 keeps 去白底
+// The old Vector Editor (public/vector-editor.html) retired 2026-11-05 (R0-PLAN C7.3): the Fabric 5 side and the cross-editor
+// comparisons are gone; the vector editor is /tools/vector-pro (smoke: tests/e2e/smoke/05-vector-pro.spec.ts).
 // Run (dev server first): node lobster-factory/infra/hetzner-phase1-core/tests/e2e/social/dev-server-no-supabase.mjs 3904
 //   cd lobster-factory/infra/hetzner-phase1-core/tests && node e2e/editor-merge/card-06-background-removal.mjs [baseUrl] [outDir]
 import { chromium } from "@playwright/test";
@@ -63,9 +65,9 @@ async function pixelsOf(file, pts) {
 const CORNER = [2, 2], CENTRE = [W / 2, H / 2];
 const a = (p) => p[3];
 
-// browser-side helpers, serialised into page.evaluate (the vector page has a global `canvas`, the canvas page window.__cvTest.canvas)
+// browser-side helpers, serialised into page.evaluate (the canvas page exposes window.__cvTest.canvas)
 const IN_PAGE = {
-  C: `(typeof canvas !== "undefined" ? canvas : window.__cvTest.canvas)`,
+  C: "window.__cvTest.canvas",
 };
 
 async function openCanvas(ctx, tag, { upload = IMG } = {}) {
@@ -114,50 +116,7 @@ async function openCanvas(ctx, tag, { upload = IMG } = {}) {
   };
   return h;
 }
-async function openVector(ctx, tag, { upload = IMG, w = W, hh = H } = {}) {
-  const page = await ctx.newPage(); watch(page, tag);
-  await page.goto(`${BASE}/tools/vector-editor`, { waitUntil: "domcontentloaded" });
-  await page.waitForFunction(() => [...document.querySelectorAll("iframe")].some((f) => f.src.includes("vector-editor.html")), null, { timeout: 90000 });
-  const frame = page.frames().find((f) => f.url().includes("vector-editor.html"));
-  await frame.waitForFunction(() => typeof canvas !== "undefined" && !!window.AWCG && !!window.AWBG && document.querySelectorAll("#cgSecs [data-cg]").length > 10, null, { timeout: 60000 });
-  await frame.evaluate(() => document.querySelectorAll("details").forEach((d) => { d.open = true; }));
-  await frame.evaluate(() => { window.__snaps = 0; const o = snapshot; snapshot = function () { window.__snaps++; return o(); }; delete window.EyeDropper; });
-  if (upload) {
-    await frame.locator("#unit").selectOption("px"); await frame.locator("#w").fill(String(w)); await frame.locator("#h").fill(String(hh)); await frame.locator("#setCanvas").click();
-    await frame.locator("#file").setInputFiles(upload); await frame.waitForFunction(() => !document.getElementById("placeRaw").disabled, null, { timeout: 60000 });
-    await frame.locator("#placeRaw").click();
-    await frame.waitForFunction(() => canvas.getObjects().some((o) => o.type === "image"), null, { timeout: 60000 });
-    await frame.evaluate(() => { const o = canvas.getObjects().find((x) => x.type === "image"); o.set({ scaleX: 1, scaleY: 1, left: 0, top: 0 }); o.setCoords(); canvas.setActiveObject(o); canvas.setBackgroundColor("", () => canvas.requestRenderAll()); });
-  } else await frame.evaluate(() => canvas.setBackgroundColor("", () => canvas.requestRenderAll()));
-  const h = {
-    tag, page, root: frame, kind: "vector", frame,
-    ev: (fn, arg) => frame.evaluate(fn, arg),
-    select: async () => { await frame.evaluate(() => { canvas.setActiveObject(canvas.getObjects().find((x) => x.type === "image")); canvas.requestRenderAll(); }); await page.waitForTimeout(300); },
-    reselect: async () => { await frame.evaluate(() => { canvas.discardActiveObject(); canvas.setActiveObject(canvas.getObjects().find((x) => x.type === "image")); canvas.requestRenderAll(); }); await page.waitForTimeout(400); },
-    selectNone: async () => { await frame.evaluate(() => { canvas.discardActiveObject(); canvas.requestRenderAll(); }); await page.waitForTimeout(300); },
-    addText: async () => { await frame.locator("#addText").click(); await page.waitForTimeout(400); },
-    dropText: async () => { await frame.evaluate(() => { canvas.getObjects().filter((x) => x.type !== "image").forEach((x) => canvas.remove(x)); canvas.discardActiveObject(); canvas.requestRenderAll(); }); await page.waitForTimeout(300); },
-    pushes: () => frame.evaluate(() => window.__snaps),
-    undo: async () => { await frame.locator("#btn-undo").click(); await page.waitForTimeout(1100); },
-    redo: async () => { await frame.locator("#btn-redo").click(); await page.waitForTimeout(1100); },
-    exportPng: async (name) => {
-      const [dl] = await Promise.all([page.waitForEvent("download"), frame.locator("#exportPng").click()]);
-      const f = join(OUT, `_tmp-${name ?? tag}.png`); await dl.saveAs(f); return f;
-    },
-    saveProj: async (name) => { const [dl] = await Promise.all([page.waitForEvent("download"), frame.locator("#saveProj").click()]); const f = join(OUT, name); await dl.saveAs(f); return f; },
-    loadProj: async (file) => {
-      await frame.locator("#loadProj").setInputFiles(file);
-      await frame.waitForFunction(() => canvas.getObjects().some((o) => o.type === "image"), null, { timeout: 30000 });
-      await page.waitForTimeout(1800);
-    },
-    shot: async (name) => { await frame.locator("#bgPanel").scrollIntoViewIfNeeded(); await frame.locator(".side").screenshot({ path: join(OUT, name) }); },
-    clientOf: async (x, y) => { const box = await (await frame.frameElement()).boundingBox(); const [cx, cy] = await frame.evaluate(([x, y]) => { const r = canvas.lowerCanvasEl.getBoundingClientRect(), z = canvas.getZoom(); return [r.left + x * z, r.top + y * z]; }, [x, y]); return [box.x + cx, box.y + cy]; },
-    click: async (x, y) => { const [cx, cy] = await h.clientOf(x, y); await page.mouse.click(cx, cy); await page.waitForTimeout(300); },
-  };
-  return h;
-}
-
-// ── shared drivers (identical selectors on both editors) ──
+// ── drivers ──
 const imgJs = `${IN_PAGE.C}.getObjects().find((o) => o.type === "image")`;
 const ui = {
   setKey: async (h, color, dist) => { await h.select(); await h.root.locator("[data-bg-color]").fill(color); await h.root.locator("[data-bg-dist]").fill(String(dist)); },
@@ -186,7 +145,7 @@ const ui = {
 };
 // back to the plain placement (the AI section tilts / scales / locks the image to prove the swap keeps all of it)
 const resetXform = (h) => h.ev((js) => { const o = eval(js); o.set({ scaleX: 1, scaleY: 1, angle: 0, flipX: false, flipY: false, name: undefined, lockMovementX: false, lockMovementY: false, lockScalingX: false, lockScalingY: false, lockRotation: false, hasControls: true });
-  o.set({ left: 60 - (o.originX === "center" ? 0 : o.width / 2), top: 40 - (o.originY === "center" ? 0 : o.height / 2) }); o.setCoords(); (typeof canvas !== "undefined" ? canvas : window.__cvTest.canvas).requestRenderAll(); }, imgJs);
+  o.set({ left: 60 - (o.originX === "center" ? 0 : o.width / 2), top: 40 - (o.originY === "center" ? 0 : o.height / 2) }); o.setCoords(); window.__cvTest.canvas.requestRenderAll(); }, imgJs);
 const alphaAfter = async (h, name) => { const f = await h.exportPng(name); return pixelsOf(f, [CORNER, CENTRE]); };
 const stubAi = async (ctx, handler) => { const seen = []; await ctx.route("**/api/tools/studio/remove-bg", async (route) => { const req = route.request(); seen.push({ method: req.method(), headers: req.headers(), body: req.postData() }); await handler(route, seen.length); }); return seen; };
 const okJson = (image, delay = 0) => async (route) => { if (delay) await new Promise((r) => setTimeout(r, delay)); await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, image }) }); };
@@ -195,19 +154,15 @@ const ctxOpts = { viewport: { width: 1400, height: 2400 }, acceptDownloads: true
 const ctx = await browser.newContext(ctxOpts);
 const aiSeen = await stubAi(ctx, okJson(RESULT_URL, 700));
 const cv = await openCanvas(ctx, "canvas");
-const vc = await openVector(ctx, "vector");
-const both = [cv, vc];
+const both = [cv];
 
 // ───────────────────────── structure: one panel, order, removed duplicates ─────────────────────────
-eq("REMOVED vector: exactly one 🪄 去背 summary, no 去白底 / 去背 or AI 去背（雲端） block", await vc.root.evaluate(() => [[...document.querySelectorAll("summary")].filter((s) => /🪄 去背$/.test(s.textContent.trim())).length, [...document.querySelectorAll("summary")].some((s) => /去白底 \/ 去背|AI 去背（雲端）/.test(s.textContent))]), [1, false]);
 eq("REMOVED canvas: exactly one 🪄 去背 panel; no 濾鏡 / 去背 panel", await cv.page.evaluate(() => [[...document.querySelectorAll(".build-panel > button")].filter((b) => /🪄 去背$/.test(b.textContent.trim())).length, [...document.querySelectorAll(".build-panel > button")].some((b) => /濾鏡 \/ 去背/.test(b.textContent))]), [1, false]);
 eq("canvas panel order: 圖層 → 調色 → 去背", await cv.page.evaluate(() => { const t = [...document.querySelectorAll(".build-panel > button")].map((b) => b.textContent.replace(/^[▾▸]/, "").trim()); const i = t.findIndex((x) => /圖層/.test(x)); return [t[i + 1], t[i + 2]]; }), ["🎨 調色", "🪄 去背"]);
-eq("vector panel order: 圖層 → 調色 → 去背 → 匯出", await vc.root.evaluate(() => { const t = [...document.querySelectorAll(".side > details > summary, #imageBlocks > details > summary")].map((s) => s.textContent.trim()); const i = t.findIndex((x) => /圖層/.test(x)); return [t[i + 1], t[i + 2], t[i + 3]]; }), ["🎨 調色", "🪄 去背", "💾 匯出 / 存入"]);
-eq("vector: the 其他積木 list no longer has the two 去背 blocks", await vc.root.evaluate(() => [...document.querySelectorAll("#blockPanels > details > summary")].map((s) => s.textContent.trim()).filter((t) => /去背|去白底/.test(t))), []);
-eq("both: same controls, same default values", await Promise.all(both.map((h) => ui.panel(h))).then(([c, v]) => [JSON.stringify(c) === JSON.stringify(v), c.color, c.dist, c.distLabel]), [true, "#ffffff", 0.15, "0.15"]);
+eq("default values", await ui.panel(cv).then((c) => [c.color, c.dist, c.distLabel]), ["#ffffff", 0.15, "0.15"]);
 {
-  const html = readFileSync("../apps/next-admin/public/vector-editor.html", "utf8"), tsx = readFileSync("../apps/next-admin/app/(shell)/tools/canvas/CanvasEditor.tsx", "utf8");
-  check("both panels ship collapsed (vector markup has no open attr; canvas SidebarPanel is defaultCollapsed)", html.includes('<details id="bgPanel">') && /title="🪄 去背"[^>]*defaultCollapsed/.test(tsx));
+  const tsx = readFileSync("../apps/next-admin/app/(shell)/tools/canvas/CanvasEditor.tsx", "utf8");
+  check("the panel ships collapsed (SidebarPanel defaultCollapsed)", /title="🪄 去背"[^>]*defaultCollapsed/.test(tsx));
 }
 
 // ───────────────────────── item 4: disabled with a hint when the selection is not an image ─────────────────────────
@@ -216,18 +171,17 @@ for (const h of both) {
   await h.selectNone();
   let p = await ui.panel(h);
   eq(t("4 nothing selected → panel disabled + hint"), [p.disabled, p.hint], [true, "先選取圖片後才能使用。"]);
-  await h.addText(); await h.ev(() => { const c = typeof canvas !== "undefined" ? canvas : window.__cvTest.canvas; c.setActiveObject(c.getObjects().find((x) => x.type !== "image")); c.requestRenderAll(); }); await h.page.waitForTimeout(300);
+  await h.addText(); await h.ev(() => { const c = window.__cvTest.canvas; c.setActiveObject(c.getObjects().find((x) => x.type !== "image")); c.requestRenderAll(); }); await h.page.waitForTimeout(300);
   p = await ui.panel(h);
   eq(t("4 text selected → still disabled + hint"), [p.disabled, p.hint], [true, "先選取圖片後才能使用。"]);
   await h.dropText(); await h.select();
   p = await ui.panel(h);
   eq(t("4 image selected → enabled, no hint, 還原 disabled (nothing to revert)"), [p.disabled, p.hint, p.revertDisabled], [false, "", true]);
 }
-eq("4 hint text is the same string on both", await Promise.all(both.map(async (h) => { await h.selectNone(); return (await ui.panel(h)).hint; })), ["先選取圖片後才能使用。", "先選取圖片後才能使用。"]);
 for (const h of both) await h.select();
 
 // ───────────────────────── item 1: colour key → transparent ─────────────────────────
-const base = [await alphaAfter(cv, "base-canvas"), await alphaAfter(vc, "base-vector")];
+const base = [await alphaAfter(cv, "base-canvas")];
 for (const [i, h] of both.entries()) check(`${h.tag} baseline: opaque white corner, red centre (${base[i].w}×${base[i].h})`, a(base[i].px[0]) === 255 && a(base[i].px[1]) === 255 && base[i].px[0][0] === 255 && base[i].px[1][1] === 0 && base[i].w === W && base[i].h === H, JSON.stringify(base[i]));
 for (const h of both) {
   const t = (n) => `${h.tag} ${n}`;
@@ -241,10 +195,8 @@ for (const h of both) {
   await h.select();
   eq(t("3 還原 is enabled now"), (await ui.panel(h)).revertDisabled, false);
 }
-eq("1 same adj.removeColor on both editors", await Promise.all(both.map(async (h) => (await ui.adj(h)).removeColor)).then(([x, y]) => x), { color: "#ffffff", distance: 0.15 });
-eq("1 same corner / centre alpha on both editors", await Promise.all(both.map(async (h) => (await alphaAfter(h, "cmp-" + h.tag)).px.map(a))).then(([x, y]) => [x, y]), [[0, 255], [0, 255]]);
 
-// 吸色 (the EyeDropper API is deleted on both pages → the artboard-click fallback, which reads the pixel under the click)
+// 吸色 (the EyeDropper API is deleted on the page → the artboard-click fallback, which reads the pixel under the click)
 for (const h of both) {
   const t = (n) => `${h.tag} ${n}`;
   await ui.revert(h);
@@ -313,8 +265,8 @@ for (const h of both) {
   const t = (n) => `${h.tag} F1 ${n}`;
   await ui.resetGrade(h);
   await h.ev((js) => {
-    const C = typeof canvas !== "undefined" ? canvas : window.__cvTest.canvas, o = eval(js);
-    const F = typeof fabric !== "undefined" ? fabric.Image.filters : window.__cvTest.fabric.filters;
+    const C = window.__cvTest.canvas, o = eval(js);
+    const F = window.__cvTest.fabric.filters;
     o.adj = undefined; o.filters = [new F.Brightness({ brightness: 0.2 })]; o.applyFilters(); C.requestRenderAll();
   }, imgJs);
   await h.reselect();
@@ -394,7 +346,7 @@ for (const h of both) {
   const srcBefore = await ui.src(h), n0 = await h.pushes();
   await ui.ai(h);
   await h.root.waitForFunction(() => /AI 去背失敗/.test(document.querySelector("[data-bg-msg]").textContent), null, { timeout: 15000 });
-  eq(t("2 failed (ok:false) → same message on both"), await ui.msg(h), "⚠️ AI 去背失敗：no_credits（需登入且有權限；或改用「去除此色」）");
+  eq(t("2 failed (ok:false) → message"), await ui.msg(h), "⚠️ AI 去背失敗：no_credits（需登入且有權限；或改用「去除此色」）");
   await ui.ai(h);
   await h.root.waitForFunction(() => /forbidden_role/.test(document.querySelector("[data-bg-msg]").textContent), null, { timeout: 15000 });
   eq(t("2 failed (HTTP 403) → error text from the route"), await ui.msg(h), "⚠️ AI 去背失敗：forbidden_role（需登入且有權限；或改用「去除此色」）");
@@ -425,12 +377,12 @@ for (const h of both) {
   check(t("3 還原 = ONE undo step"), (await h.pushes()) - n0 === 1, String((await h.pushes()) - n0));
   eq(t("3 還原 disabled again (nothing left to revert)"), (await ui.panel(h)).revertDisabled, true);
 }
-// save/load: same editor and across editors, then 還原 on the loaded image
-for (const [label, target, from] of [["canvas→canvas", "canvas", cv], ["vector→vector", "vector", vc], ["canvas→vector", "vector", cv], ["vector→canvas", "canvas", vc]]) {
+// save/load, then 還原 on the loaded image
+for (const [label, from] of [["canvas→canvas", cv]]) {
   const c2 = await browser.newContext(ctxOpts); await stubAi(c2, okJson(RESULT_URL));
-  const h = target === "canvas" ? await openCanvas(c2, `load-${label}`, { upload: null }) : await openVector(c2, `load-${label}`, { upload: null });
+  const h = await openCanvas(c2, `load-${label}`, { upload: null });
   await h.loadProj(from.proj);
-  await h.ev(() => { const C = typeof canvas !== "undefined" ? canvas : window.__cvTest.canvas; C.backgroundColor = ""; C.requestRenderAll(); }); // the file stores the white artboard colour; the test reads alpha
+  await h.ev(() => { const C = window.__cvTest.canvas; C.backgroundColor = ""; C.requestRenderAll(); }); // the file stores the white artboard colour; the test reads alpha
   await h.select();
   const t = (n) => `load ${label}: ${n}`;
   const adj = await ui.adj(h), s = await ui.src(h);
@@ -449,10 +401,10 @@ await ctx.unroute("**/api/tools/studio/remove-bg");
 
 // ───────────────────────── size guard: a source over the route's 12M-char cap is shrunk ─────────────────────────
 {
-  for (const kind of ["canvas", "vector"]) {
+  {
     const c3 = await browser.newContext(ctxOpts);
     const bigSeen = await stubAi(c3, okJson(BIG_RESULT_URL));
-    const h = kind === "canvas" ? await openCanvas(c3, "big-canvas", { upload: BIG_IMG }) : await openVector(c3, "big-vector", { upload: BIG_IMG, w: 1800, hh: 1800 });
+    const h = await openCanvas(c3, "big-canvas", { upload: BIG_IMG });
     const t = (n) => `${h.kind} size guard: ${n}`;
     await h.select();
     const before = await ui.xform(h), s0 = await ui.src(h);
@@ -476,12 +428,12 @@ await ctx.unroute("**/api/tools/studio/remove-bg");
 
 // ───────────────────────── screenshots ─────────────────────────
 const ctxS = await browser.newContext(ctxOpts); await stubAi(ctxS, okJson(RESULT_URL));
-const sc = await openCanvas(ctxS, "shot-canvas"), sv = await openVector(ctxS, "shot-vector");
-for (const h of [sc, sv]) {
+const sc = await openCanvas(ctxS, "shot-canvas");
+for (const h of [sc]) {
   await ui.key(h, "#ffffff", 0.22); await h.root.locator("[data-bg-ai]").scrollIntoViewIfNeeded();
   await ui.ai(h); await h.root.waitForFunction(() => /AI 去背完成/.test(document.querySelector("[data-bg-msg]").textContent), null, { timeout: 20000 }); await h.page.waitForTimeout(500);
 }
-await sc.shot("card-06-canvas.png"); await sv.shot("card-06-vector.png");
+await sc.shot("card-06-canvas.png");
 await ctxS.close();
 
 await browser.close();

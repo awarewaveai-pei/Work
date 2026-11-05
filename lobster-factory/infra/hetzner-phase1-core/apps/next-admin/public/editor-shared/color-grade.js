@@ -1,5 +1,5 @@
-// 🎨 調色 SSOT — the colour math of /tools/canvas (Fabric 7) and /vector-editor.html (Fabric 5), in ONE plain ES module
-// (no build step, no deps, no CDN). Vector loads it with <script type="module">; canvas imports it through
+// 🎨 調色 SSOT — the colour math of /tools/canvas (Fabric 7) and the /tools/vector-pro dock (Fabric 5), in ONE plain ES module
+// (no build step, no deps, no CDN). The dock block blocks/color-grade.js imports it; canvas imports it through
 // lib/studio/editor-color-grade.ts. Both sides turn the SAME `adj` object into the SAME ordered filter specs and only
 // differ in how a spec becomes a Fabric class (new fabric.filters[cls](opts) vs new fabric.Image.filters[cls](opts)).
 // drift guard: lib/studio/__tests__/editor-color-grade-drift.test.ts

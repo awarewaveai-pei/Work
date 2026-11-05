@@ -8,7 +8,7 @@ const NOTICE_HREF = `${FRAME_SRC.split(/[?#]/)[0].replace(/[^/]*$/, "")}NOTICE`;
 // Our own dock (public/vector-pro-dock/, served by next-admin). Not under /vector-pro/: nginx's /vector-pro/ location
 // answers that whole prefix from the VectorCraft build and would 404 it.
 const DOCK_SRC = "/vector-pro-dock/dock.js";
-const FALLBACK = "/tools/vector-editor";
+const FALLBACK = "/tools/canvas";
 
 declare global {
   interface Window { __vectorProFrame?: HTMLIFrameElement | null }
@@ -57,7 +57,7 @@ export function VectorProFrame() {
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "var(--body-bg)" }}>
       {failure ? (
         <p style={{ flex: 1, margin: 0, padding: 16, color: "var(--text-primary)" }}>
-          {failure} 請改用 <a href={FALLBACK} style={{ color: "var(--accent)" }}>向量編輯器</a>。
+          {failure} 請改用 <a href={FALLBACK} style={{ color: "var(--accent)" }}>Canvas 編輯器</a>。
         </p>
       ) : (
         <div style={{ flex: 1, display: "flex", minHeight: 0 }}>

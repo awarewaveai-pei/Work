@@ -1,6 +1,6 @@
 /**
  * Typed door to public/editor-shared/bg-remove.js — the ONE place the 🪄 去背 request and messages live for both
- * /tools/canvas (Fabric 7, imports it here) and public/vector-editor.html (Fabric 5, loads the same file as <script type="module">).
+ * /tools/canvas (Fabric 7, imports it here) and the /tools/vector-pro 去背 block public/editor-shared/blocks/bg-remove.js (ES module import).
  * drift guard: lib/studio/__tests__/editor-bg-remove-drift.test.ts
  */
 import * as shared from "../../public/editor-shared/bg-remove.js";

@@ -3,7 +3,7 @@
 // AW_FILTERS definitions, only wrapped in Fabric 5 classes here (Fabric 7 wraps the same ones in tools/canvas/fabric-filters.ts). Offscreen: selectedImage() -> Fabric 5 filters -> PNG -> replaceImage().
 import * as cg from "/editor-shared/color-grade.js";
 
-const FABRIC_URL = "https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"; // same pin + SRI as vector-editor.html:7
+const FABRIC_URL = "https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"; // pinned + SRI (lib/security/__tests__/public-html-sri.test.ts)
 const FABRIC_SRI = "sha384-K2R7AzsJQPCDnhTlIEZr5pifaODgyx7XqbqkZMtLKzGJNo/Irtg9yU85F+1YwL8X";
 let fabricP = null;
 export function ensureFabric() {

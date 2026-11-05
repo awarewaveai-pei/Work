@@ -1,7 +1,9 @@
-// CARD-01 text-panel union: drives /tools/canvas and /tools/vector-editor and reads the text object's real props after
-// every control (canvas: exported .design.json; vector: the live fabric `canvas` global).
+// CARD-01 text-panel union: drives /tools/canvas and reads the text object's real props after
+// every control (exported .design.json).
 // Run (dev server first): node lobster-factory/infra/hetzner-phase1-core/tests/e2e/social/dev-server-no-supabase.mjs 3904
 //   cd lobster-factory/infra/hetzner-phase1-core/tests && node e2e/editor-merge/card-01-text-panel.mjs [baseUrl] [outDir]
+// The old Vector Editor (public/vector-editor.html) retired 2026-11-05 (R0-PLAN C7.3): /tools/vector-editor redirects to
+// /tools/vector-pro, so only the Canvas Editor half of this card runs.
 import { chromium } from "@playwright/test";
 import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -148,112 +150,13 @@ async function setVal(loc, v) {
   await ctx.close();
 }
 
-// ───────────────────────── Vector Editor ─────────────────────────
-{
-  const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
-  const page = await ctx.newPage();
-  watch(page, "vector");
-  await page.goto(`${BASE}/tools/vector-editor`, { waitUntil: "domcontentloaded" });
-  await page.waitForFunction(() => [...document.querySelectorAll("iframe")].some((f) => f.src.includes("vector-editor.html")), null, { timeout: 60000 });
-  const frame = page.frames().find((f) => f.url().includes("vector-editor.html"));
-  await frame.waitForFunction(() => typeof canvas !== "undefined" && document.getElementById("btnArc"));
-  await frame.evaluate(() => document.querySelectorAll("details").forEach((d) => { d.open = true; })); // panels ship collapsed
-  const $ = (id) => frame.locator("#" + id);
-  const text = () => frame.evaluate(() => canvas.getObjects().filter((o) => /text/i.test(o.type)).map((o) => ({
-    text: o.text, fontFamily: o.fontFamily, fontSize: o.fontSize, fill: o.fill, fontWeight: o.fontWeight, fontStyle: o.fontStyle,
-    underline: o.underline, textAlign: o.textAlign, charSpacing: o.charSpacing, lineHeight: o.lineHeight, hasPath: !!o.path })));
-  const align = (k) => frame.locator(`[data-talign="${k}"]`);
-  const fontRow = (name) => frame.locator(`#fontList .fontrow:has(.fname:text-is("${name}"))`).first();
-
-  // 1) nothing selected → defaults
-  await $("txtInput").fill("測試AB");
-  await setVal($("txtFill"), "#ff0000");
-  await setVal($("fontSize"), 72);
-  check("vector 4 number → range follows", (await $("fontSizeR").inputValue()) === "72", await $("fontSizeR").inputValue());
-  await $("btnBold").click(); await $("btnItalic").click(); await $("btnUnderline").click();
-  await align("center").click();
-  await setVal($("letterSp"), 120);
-  await setVal($("lineH"), 1.5);
-  await fontRow("明體（中）").click(); // preset row at the top of the list
-  await $("btnArc").click();
-  await $("addText").click();
-  await page.waitForTimeout(300);
-  let t = await text();
-  eq("vector 1 加文字: text", t[0]?.text, "測試AB");
-  eq("vector 2 字型 preset at top → new text", t[0]?.fontFamily, '"Noto Serif TC","Source Han Serif TC","PMingLiU",serif');
-  eq("vector 3 顏色 default → new text", t[0]?.fill, "#ff0000");
-  eq("vector 4 字級 → new text", t[0]?.fontSize, 72);
-  eq("vector 5 B", t[0]?.fontWeight, "bold");
-  eq("vector 5 I", t[0]?.fontStyle, "italic");
-  eq("vector 5 U", t[0]?.underline, true);
-  eq("vector 5 對齊 置中", t[0]?.textAlign, "center");
-  eq("vector 5 字距", t[0]?.charSpacing, 120);
-  near("vector 5 行距", t[0]?.lineHeight, 1.5);
-  eq("vector 5 弧形 on → path", t[0]?.hasPath, true);
-
-  // 2) text selected → every control edits that object
-  await setVal($("fontSizeR"), 100);
-  await $("btnBold").click(); await $("btnItalic").click(); await $("btnUnderline").click();
-  await align("right").click();
-  await setVal($("letterSp"), -50);
-  await setVal($("lineH"), 2.2);
-  await setVal($("txtFill"), "#00aa00");
-  await $("btnArc").click();
-  await $("fontSearch").fill("Noto Sans TC");
-  await $("fontSearch").dispatchEvent("input");
-  await fontRow("Noto Sans TC").click();
-  await page.waitForTimeout(300);
-  t = await text();
-  eq("vector 4 字級 range → selected", t[0]?.fontSize, 100);
-  eq("vector 5 B off", t[0]?.fontWeight, "normal");
-  eq("vector 5 I off", t[0]?.fontStyle, "normal");
-  eq("vector 5 U off", t[0]?.underline, false);
-  eq("vector 5 對齊 靠右", t[0]?.textAlign, "right");
-  eq("vector 5 字距 −50", t[0]?.charSpacing, -50);
-  near("vector 5 行距 2.2", t[0]?.lineHeight, 2.2);
-  eq("vector 3 顏色 → selected", t[0]?.fill, "#00aa00");
-  eq("vector 5 弧形 off → no path", t[0]?.hasPath, false);
-  eq("vector 2 Google font row → selected", t[0]?.fontFamily, "Noto Sans TC");
-  // 顏色 is text-only: a rect selected keeps its fill when the text colour changes
-  await frame.evaluate(() => { const r = new fabric.Rect({ width: 50, height: 50, fill: "#123456", left: 5, top: 5 }); canvas.add(r); canvas.setActiveObject(r); });
-  await setVal($("txtFill"), "#abcdef");
-  check("vector 3 顏色 leaves non-text fill alone", (await frame.evaluate(() => canvas.getActiveObject().fill)) === "#123456", "rect fill changed");
-
-  // 3) selection sync
-  await frame.evaluate(() => canvas.discardActiveObject());
-  await setVal($("fontSize"), 30);
-  await $("addText").click();
-  await page.waitForTimeout(200);
-  await frame.evaluate(() => { const first = canvas.getObjects().find((o) => o.type === "i-text"); canvas.setActiveObject(first); });
-  await page.waitForTimeout(200);
-  eq("vector 7 sync 字級 number", await $("fontSize").inputValue(), "100");
-  eq("vector 7 sync 字級 range", await $("fontSizeR").inputValue(), "100");
-  eq("vector 7 sync 顏色", await $("txtFill").inputValue(), "#00aa00");
-  eq("vector 7 sync 字距", await $("letterSp").inputValue(), "-50");
-  eq("vector 7 sync 行距", await $("lineH").inputValue(), "2.2");
-  check("vector 7 sync 靠右 on", await align("right").evaluate((b) => b.classList.contains("on")), "not on");
-  check("vector 7 sync B/I/U off", !(await $("btnBold").evaluate((b) => b.classList.contains("on"))) && !(await $("btnUnderline").evaluate((b) => b.classList.contains("on"))), "on");
-  eq("vector 7 mode label", await $("txtMode").textContent(), "套用到選取文字");
-
-  // 4) upload font
-  await $("fontSearch").fill("");
-  await $("fontSearch").dispatchEvent("input");
-  await $("fontUpload").setInputFiles(FONT_FILE);
-  await page.waitForTimeout(600);
-  check("vector 2 upload → （自有）row", (await frame.locator('#fontList .fname:text-is("arial（自有）")').count()) > 0, "no row");
-  check("vector 2 upload → applied to selected", (await text()).some((o) => o.fontFamily === "arial"), JSON.stringify((await text()).map((o) => o.fontFamily)));
-  // vector 6: the 6th card item is covered by sections 1 (defaults) and 2 (selected) above
-  await frame.locator("#textPanel").screenshot({ path: join(OUT, "card-01-vector.png") });
-  await ctx.close();
-}
-
 await browser.close();
 // dev server has no Supabase: its server-component theme fetch logs "supabase_unavailable" into the browser console
 // (and the matching 503 resource line); neither comes from the editors.
 const envNoise = (e) => /Failed to load resource|supabase_unavailable/.test(e);
 const consoleErrs = errors.filter((e) => !envNoise(e));
 const resourceErrs = errors.filter(envNoise);
-check("no console/page errors on either page", consoleErrs.length === 0, consoleErrs.join(" | "));
+check("no console/page errors on the page", consoleErrs.length === 0, consoleErrs.join(" | "));
 if (resourceErrs.length) console.log(`NOTE ${resourceErrs.length} failed resource loads (dev-server no-Supabase noise, excluded): ${resourceErrs.map((e) => e.slice(0, 90)).join(" | ")}`);
 const failed = results.filter((r) => !r.ok).length;
 console.log(`\n${results.length - failed}/${results.length} checks passed`);

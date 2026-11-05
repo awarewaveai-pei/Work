@@ -1,7 +1,7 @@
 // Drift guard for the 🪄 去背 union (CARD-06): the AI 去背 request, messages and pixel pick are ONE file,
-// public/editor-shared/bg-remove.js, used by /tools/canvas (via lib/studio/editor-bg-remove.ts) and public/vector-editor.html
-// (<script type="module">). Fails if the request loses the role header the route needs, the duplicate blocks come back,
-// or either editor grows a private copy.
+// public/editor-shared/bg-remove.js, used by /tools/canvas (via lib/studio/editor-bg-remove.ts) and the /tools/vector-pro dock
+// block public/editor-shared/blocks/bg-remove.js. Fails if the request loses the role header the route needs, the duplicate
+// blocks come back, or either editor grows a private copy.
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -57,14 +57,13 @@ describe("keepViewAfterSwap", () => {
 });
 
 describe("no duplicates, no private copies", () => {
-  const vector = read("public/vector-editor.html");
+  const vector = read("public/editor-shared/blocks/bg-remove.js");
   const canvas = read("app/(shell)/tools/canvas/CanvasEditor.tsx");
-  it("vector: the old 去白底 / 去背 and AI 去背 blocks are gone; exactly one 🪄 去背 panel, loaded from the shared module", () => {
-    expect(vector).not.toMatch(/id:'bg-remove'|id:'ai-bg'|去白底 \/ 去背|AI 去背（雲端）'/);
-    expect((vector.match(/<summary>🪄 去背<\/summary>/g) ?? []).length).toBe(1);
-    expect(vector).toMatch(/<script type="module">[^<]*editor-shared\/bg-remove\.js/);
-    expect(vector).toMatch(/const LAYER_PROPS=\[[^\]]*'bgOriginal'/);
-    expect(vector).not.toMatch(/fetch\('\/api\/tools\/studio\/remove-bg'/); // the request lives in bg-remove.js only
+  it("vector-pro: the 🪄 去背 block takes the request and messages from the shared module, the colour key from color-grade.js", () => {
+    expect(vector).toMatch(/import \* as bg from "\/editor-shared\/bg-remove\.js"/);
+    expect(vector).toMatch(/bg\.requestRemoveBg\(/);
+    expect(vector).toMatch(/cg\.setRemoveColor\(/);
+    expect(vector).not.toMatch(/fetch\(\s*["'`]\/api\/tools\/studio\/remove-bg/); // the request lives in bg-remove.js only
   });
   it("canvas: one 🪄 去背 panel, request / messages from the shared module, bgOriginal persisted", () => {
     expect((canvas.match(/title="🪄 去背"/g) ?? []).length).toBe(1);
@@ -81,7 +80,7 @@ describe("no duplicates, no private copies", () => {
       expect(vector).not.toContain(msg);
       expect(canvas).not.toContain(msg);
     }
-    expect(vector).toContain("window.AWBG.BG_MSG");
+    expect(vector).toContain("bg.BG_MSG");
   });
   it("canvas: 去背 sits right after 調色 and before the other AI image tools; vector: 調色 → 去背 → 匯出", () => {
     const i = canvas.indexOf('title="🎨 調色"'), j = canvas.indexOf('title="🪄 去背"'), k = canvas.indexOf('title="🪄 去除 / 生成填色（AI）"');

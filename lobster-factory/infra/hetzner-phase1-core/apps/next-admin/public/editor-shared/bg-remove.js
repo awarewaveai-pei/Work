@@ -1,4 +1,4 @@
-// 🪄 去背 SSOT for /tools/canvas (Fabric 7) and /vector-editor.html (Fabric 5), one plain ES module like color-grade.js.
+// 🪄 去背 SSOT for /tools/canvas (Fabric 7) and the /tools/vector-pro dock block blocks/bg-remove.js, one plain ES module like color-grade.js.
 // Shared: the AI 去背 request (URL + role header + body), the messages both editors show, the pixel pick. The colour key itself is
 // adj.removeColor in color-grade.js (built into a RemoveColor filter like every other entry); 還原 clears only that key and
 // the AI result (img.bgOriginal = the source before the first AI 去背).

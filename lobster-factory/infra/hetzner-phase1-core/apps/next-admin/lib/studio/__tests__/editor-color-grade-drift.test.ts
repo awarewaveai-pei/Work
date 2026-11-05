@@ -1,5 +1,5 @@
 // Drift guard for the 🎨 調色 union (CARD-05): the colour math is ONE file, public/editor-shared/color-grade.js, used by
-// /tools/canvas (via lib/studio/editor-color-grade.ts) and public/vector-editor.html (<script type="module">).
+// /tools/canvas (via lib/studio/editor-color-grade.ts) and the /tools/vector-pro dock block public/editor-shared/blocks/color-grade.js.
 // This test fails if (a) the shared limits drift from the Sharp-bake model, (b) the spec builder drifts from the legacy
 // params mapping it replaced, (c) either editor grows a private copy of the math again.
 import fs from "node:fs";
@@ -162,20 +162,16 @@ describe("AwHsl / AwBlur: one definition (AW_FILTERS), wrapped per Fabric versio
 });
 
 describe("no private copy of the math in either editor", () => {
-  const vector = read("public/vector-editor.html");
+  const block = read("public/editor-shared/blocks/color-grade.js");
   const canvasTsx = read("app/(shell)/tools/canvas/CanvasEditor.tsx");
   const filtersTs = read("app/(shell)/tools/canvas/fabric-filters.ts");
-  it("vector loads the shared module, carries adj in toObject, and has no old adjust block / local filter maths", () => {
-    expect(vector).toMatch(/<script type="module">[^<]*editor-shared\/color-grade\.js/);
-    expect(vector).toMatch(/const LAYER_PROPS=\[[^\]]*'adj'/);
-    expect(vector).not.toMatch(/id:'adjust'/);
-    expect(vector).not.toMatch(/new F\.(Brightness|Contrast|Saturation|HueRotation|BlendColor|Convolute|Noise)\(/);
-    expect(vector).not.toMatch(/rgbToHsl|PRESETS\s*=\s*\{/);
-    expect((vector.match(/<summary>🎨 調色<\/summary>/g) ?? []).length).toBe(1);
-    // the 調色 panel sits right after 圖層, then 去背 (CARD-06), then 匯出 (CARD-04 order)
-    expect(vector.indexOf("<summary>🗂 圖層</summary>")).toBeLessThan(vector.indexOf('id="gradePanel"'));
-    expect(vector.indexOf('id="gradePanel"')).toBeLessThan(vector.indexOf('<details id="bgPanel">'));
-    expect(vector.indexOf('<details id="bgPanel">')).toBeLessThan(vector.indexOf('<details id="exportPanel">'));
+  it("the vector-pro 調色 block imports the shared module and builds every filter from it, no local filter maths", () => {
+    expect(block).toMatch(/import \* as cg from "\/editor-shared\/color-grade\.js"/);
+    expect(block).toMatch(/cg\.makeFilters\(\(cls\) => F\[cls\], cg\.buildFilterSpecs\(adj\)\)/);
+    expect(block).toMatch(/cg\.GRADE_SECTIONS/);
+    expect(block).toMatch(/cg\.resetGradeAdj\(adj\)/);
+    expect(block).not.toMatch(/new F\.(Brightness|Contrast|Saturation|HueRotation|BlendColor|Convolute|Noise)\(/);
+    expect(block).not.toMatch(/rgbToHsl|PRESETS\s*=\s*[\[{]/);
   });
   it("canvas reads the shared module only; the old per-panel state and builders are gone", () => {
     expect(canvasTsx).toContain('from "@/lib/studio/editor-color-grade"');

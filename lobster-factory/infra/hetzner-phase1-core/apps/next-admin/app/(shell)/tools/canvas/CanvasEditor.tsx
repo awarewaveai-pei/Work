@@ -177,7 +177,7 @@ function readStyle(o: StyleObj, fb: ObjStyle): ObjStyle {
   return st;
 }
 
-/** Project file shared with public/vector-editor.html (see exportDesign). */
+/** Project file (see exportDesign). */
 const DESIGN_FORMAT = "awarewave-design/1";
 type DesignMeta = { wv: number; hv: number; unit: "cm" | "mm" | "px"; dpi: number; bgColor?: string; transparent?: boolean };
 /** Validate the `meta` block of a project file (either editor's, old or new); null = keep the current document size. */
@@ -1703,7 +1703,7 @@ export default function CanvasEditor() {
 
   // 💾 設計檔（可再編輯）— export the full canvas JSON (custom `name` included via customProperties)
   // so a design can be reloaded and keep editing. Client-only: download a .design.json blob.
-  // Shared with public/vector-editor.html: { format: "awarewave-design/1", json: <fabric toJSON incl. name + background>,
+  // { format: "awarewave-design/1", json: <fabric toJSON incl. name + background>,
   // meta: { wv, hv, unit, dpi, bgColor, transparent } }. Load also accepts the old canvas shape (bare toJSON) and the
   // old vector shape ({ _proj, meta, w, h, canvas }).
   const exportDesign = useCallback(() => {
@@ -2474,7 +2474,7 @@ export default function CanvasEditor() {
         {(
           <>
           {/* 🎨 調色 — ONE panel: presets · auto · levels · colour balance · basic sliders · Camera RAW · HSL mixer.
-              Same sections / rows / ranges as public/vector-editor.html (both render public/editor-shared/color-grade.js). */}
+              Sections / rows / ranges from public/editor-shared/color-grade.js (the /tools/vector-pro 調色 block renders the same). */}
           <SidebarPanel id="grade" title="🎨 調色" defaultPos={{ x: 816, y: 328 }} width={272} defaultCollapsed>
             <fieldset data-cg-panel disabled={imageToolsDisabled} style={{ border: 0, padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
               {imageToolHint ? <span style={{ fontSize: 11, opacity: 0.65 }}>{imageToolHint}</span> : null}
@@ -2567,7 +2567,7 @@ export default function CanvasEditor() {
             </fieldset>
           </SidebarPanel>
 
-          {/* 🪄 去背 — ONE panel: 去除此色 (adj.removeColor) · 💧 吸色 · AI 去背 · 還原. Same data-bg-* hooks and messages as public/vector-editor.html (bg-remove.js). */}
+          {/* 🪄 去背 — ONE panel: 去除此色 (adj.removeColor) · 💧 吸色 · AI 去背 · 還原. Same data-bg-* hooks and messages as the /tools/vector-pro 去背 block (bg-remove.js). */}
           <SidebarPanel id="bg-remove" title="🪄 去背" defaultPos={{ x: 816, y: 370 }} width={272} defaultCollapsed>
             <fieldset data-bg-panel disabled={imageToolsDisabled || bgBusy} style={{ border: 0, padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
               {imageToolHint ? <span data-bg-hint style={{ fontSize: 11, opacity: 0.65 }}>{imageToolHint}</span> : null}

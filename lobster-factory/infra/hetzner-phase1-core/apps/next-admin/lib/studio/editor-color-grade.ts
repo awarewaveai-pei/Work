@@ -1,7 +1,7 @@
 /**
  * Typed door to public/editor-shared/color-grade.js — the ONE place the 🎨 調色 math lives for both
- * /tools/canvas (Fabric 7, imports it here) and public/vector-editor.html (Fabric 5, loads the same file
- * as <script type="module">). Nothing is re-implemented in TS; this file only adds types.
+ * /tools/canvas (Fabric 7, imports it here) and the /tools/vector-pro 調色 block public/editor-shared/blocks/color-grade.js
+ * (Fabric 5, imports the same file as an ES module). Nothing is re-implemented in TS; this file only adds types.
  * drift guard: lib/studio/__tests__/editor-color-grade-drift.test.ts
  */
 import * as shared from "../../public/editor-shared/color-grade.js";

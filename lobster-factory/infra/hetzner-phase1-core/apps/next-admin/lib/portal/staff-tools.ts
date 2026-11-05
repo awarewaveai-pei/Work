@@ -56,7 +56,7 @@ export const STAFF_API_OWNERS: Readonly<Record<string, readonly string[]>> = {
 /** Pages and APIs every signed-in staff member may use, whatever is ticked. */
 export const STAFF_PLATFORM: { pages: readonly string[]; apis: readonly string[] } = {
   // /no-access: where the gate sends a page it refuses (a loop otherwise). /editor-shared: static editor math (public/editor-shared/*.js,
-  // no data) that /tools/canvas and the /vector-editor.html iframe both load -- a restricted staff member must not lose 調色.
+  // no data) that /tools/canvas and the /tools/vector-pro dock blocks both load -- a restricted staff member must not lose 調色.
   // /vector-pro, /vector-pro-dock: static files /tools/vector-pro loads (the VectorCraft build nginx serves publicly, and
   // locally next.config.ts rewrites; our dock in public/vector-pro-dock/). No data, like /editor-shared.
   pages: ["/$", "/no-access$", "/editor-shared", "/vector-pro", "/vector-pro-dock"],

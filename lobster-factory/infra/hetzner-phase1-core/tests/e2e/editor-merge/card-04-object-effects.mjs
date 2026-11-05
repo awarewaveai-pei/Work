@@ -1,9 +1,11 @@
-// CARD-04 外觀 / 物件效果 union: drives /tools/canvas and /tools/vector-editor with a rect + circle + text each, uses
+// CARD-04 外觀 / 物件效果 union: drives /tools/canvas with a rect + circle + text each, uses
 // the REAL panel controls for items 1-10 and reads the real Fabric object props after every change; one undo step per
 // change (counted at snapshot()/undoStack.push), undo/redo round trips, locked objects, save-state reset, EyeDropper.
-//   canvas: dev-only probe window.__cvTest = { canvas, fabric, undoStack }   vector: the page globals `canvas`, `snapshot`, ...
+//   canvas: dev-only probe window.__cvTest = { canvas, fabric, undoStack }
 // Run (dev server first): node lobster-factory/infra/hetzner-phase1-core/tests/e2e/social/dev-server-no-supabase.mjs 3904
 //   cd lobster-factory/infra/hetzner-phase1-core/tests && node e2e/editor-merge/card-04-object-effects.mjs [baseUrl] [outDir]
+// The old Vector Editor (public/vector-editor.html) retired 2026-11-05 (R0-PLAN C7.3): /tools/vector-editor redirects to
+// /tools/vector-pro, so only the Canvas Editor half of this card runs.
 import { chromium } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
@@ -286,97 +288,11 @@ async function suite(tag, page, env) {
   await ctx.close();
 }
 
-// ───────────────────────── Vector Editor ─────────────────────────
-{
-  const ctx = await browser.newContext({ viewport: { width: 1400, height: 2200 }, acceptDownloads: true });
-  await ctx.addInitScript(EYE_STUB);
-  const page = await ctx.newPage();
-  watch(page, "vector");
-  await page.goto(`${BASE}/tools/vector-editor`, { waitUntil: "domcontentloaded" });
-  await page.waitForFunction(() => [...document.querySelectorAll("iframe")].some((f) => f.src.includes("vector-editor.html")), null, { timeout: 90000 });
-  const frame = page.frames().find((f) => f.url().includes("vector-editor.html"));
-  await frame.waitForFunction(() => typeof canvas !== "undefined" && document.getElementById("appearPanel"), null, { timeout: 60000 });
-  await frame.evaluate(() => document.querySelectorAll("details").forEach((d) => { d.open = true; })); // panels ship collapsed
-  await frame.locator('[data-shape="rect"]').click(); await page.waitForTimeout(250);
-  await frame.locator('[data-shape="circle"]').click(); await page.waitForTimeout(250);
-  await frame.locator("#addText").click(); await page.waitForTimeout(400);
-  await frame.evaluate(() => { window.__snaps = 0; const o = snapshot; snapshot = function () { window.__snaps++; return o(); }; });
-  const O = (i) => `canvas.getObjects()[${i}]`;
-  const ui = {
-    fill: (v) => frame.locator("#fill").fill(v), stroke: (v) => frame.locator("#stroke").fill(v), strokeW: (n) => frame.locator("#strokeW").fill(String(n)),
-    noFill: () => frame.locator("#noFill").click(), noFillOn: () => frame.locator("#noFill").evaluate((b) => b.classList.contains("on")),
-    swatch: (c) => frame.locator(`#swatches button[title="${c}"]`).click(),
-    eyeVisible: () => frame.locator("#eyedrop").isVisible(), eye: () => frame.locator("#eyedrop").click(),
-    dash: async (on, gap) => { await frame.locator("#dashGap").fill(String(gap)); await frame.locator("#dashGap").blur(); await frame.locator("#dashed").setChecked(on); },
-    rx: (n) => frame.locator("#cornerR").fill(String(n)), opacity: (n) => frame.locator("#opacity").fill(String(n)), blend: (m) => frame.locator("#fxBlend").selectOption(m),
-    blendOptions: () => frame.locator("#fxBlend option").evaluateAll((os) => os.map((o) => o.value)),
-    grad: async (g) => { await frame.locator("#gradA").fill(g.a); await frame.locator("#gradB").fill(g.b); await frame.locator("#gradC").fill(g.c); await frame.locator("#gradMid").setChecked(g.mid); await frame.locator("#gradType").selectOption(g.type); await frame.locator("#gradAngle").selectOption(g.angle); },
-    applyGrad: () => frame.locator("#applyGrad").click(), clearGrad: () => frame.locator("#clearGrad").click(),
-    fx: async (f) => { await frame.locator("#fxType").selectOption(f.type); await frame.locator("#fxColor").fill(f.color); await frame.locator("#fxBlur").fill(String(f.blur)); await frame.locator("#fxOff").fill(String(f.off)); },
-    fxType: (v) => frame.locator("#fxType").selectOption(v), fxBlur: (n) => frame.locator("#fxBlur").fill(String(n)), fxOff: (n) => frame.locator("#fxOff").fill(String(n)), fxColor: (v) => frame.locator("#fxColor").fill(v),
-    flip: (a) => frame.locator(a === "x" ? "#fxFlipX" : "#fxFlipY").click(),
-    clip: (k) => frame.locator(`#clip${k[0].toUpperCase()}${k.slice(1)}`).click(),
-    read: () => frame.evaluate(() => { const v = (id) => document.getElementById(id).value; const on = (id) => document.getElementById(id).classList.contains("on");
-      return { fill: v("fill"), stroke: v("stroke"), sw: +v("strokeW"), dash: document.getElementById("dashed").checked, gap: +v("dashGap"), rx: +v("cornerR"),
-        opacity: +v("opacity"), blend: v("fxBlend"), gradA: v("gradA"), gradB: v("gradB"), gradC: v("gradC"), gradMid: document.getElementById("gradMid").checked, gradType: v("gradType"),
-        fxType: v("fxType"), fxColor: v("fxColor"), fxBlur: +v("fxBlur"), fxOff: +v("fxOff"), clip: on("clipCircle") ? "circle" : on("clipRound") ? "round" : on("clipNone") ? "none" : null, noFillOn: on("noFill") }; }),
-  };
-  const env = {
-    sel: 0, ui,
-    kinds: () => frame.evaluate(() => canvas.getObjects().map((o) => String(o.type).toLowerCase().replace(/-/g, ""))),
-    props: (i) => frame.evaluate(`(${PROPS})(${O(i)})`),
-    allProps: () => frame.evaluate(`canvas.getObjects().map(${PROPS})`),
-    select: async (i) => { await frame.evaluate(`canvas.setActiveObject(${O(i)}); canvas.requestRenderAll()`); await page.waitForTimeout(120); },
-    deselect: async () => { await frame.evaluate(`canvas.discardActiveObject(); canvas.requestRenderAll()`); await page.waitForTimeout(120); },
-    pushes: () => frame.evaluate(() => window.__snaps),
-    undo: () => frame.locator("#btn-undo").click(), redo: () => frame.locator("#btn-redo").click(),
-    toolbarFlip: (a) => frame.locator(a === "x" ? "#btn-flipx" : "#btn-flipy").click(),
-    lock: (i, on) => frame.evaluate(`${O(i)}.set({ lockMovementX:${on}, lockMovementY:${on}, lockScalingX:${on}, lockScalingY:${on}, lockRotation:${on}, hasControls:${!on} })`),
-    addShape: async (k) => { await frame.locator(`[data-shape="${k}"]`).click(); },
-    cornerVsCentre: (i) => frame.evaluate(async (idx) => {
-      const o = canvas.getObjects()[idx]; canvas.discardActiveObject(); const others = canvas.getObjects().filter((x) => x !== o); others.forEach((x) => x.set({ visible: false })); canvas.renderAll();
-      const el = canvas.lowerCanvasEl, z = canvas.getZoom(); const px = (x, y) => Array.from(el.getContext("2d").getImageData(Math.round(x * z), Math.round(y * z), 1, 1).data.slice(0, 3));
-      const w = o.getScaledWidth(), h = o.getScaledHeight(), ox = o.left, oy = o.top;
-      const out = { corner: px(ox + 2, oy + 2), centre: px(ox + w / 2, oy + h / 2) }; others.forEach((x) => x.set({ visible: true })); canvas.requestRenderAll(); return out;
-    }, i),
-    setupSyncObjects: async () => {
-      await frame.evaluate(() => { const [rect, circle, text] = canvas.getObjects();
-        circle.set({ fill: "#336699", stroke: "#cc3300", strokeWidth: 9, opacity: 0.35, globalCompositeOperation: "multiply", strokeDashArray: [6, 6],
-          shadow: new fabric.Shadow({ color: "#224466", blur: 18, offsetX: 7, offsetY: 7 }), clipPath: new fabric.Circle({ radius: 40, originX: "center", originY: "center" }) });
-        rect.set({ rx: 22, ry: 22, shadow: null, clipPath: undefined, fill: new fabric.Gradient({ type: "radial", gradientUnits: "pixels", coords: { x1: 10, y1: 10, r1: 0, x2: 10, y2: 10, r2: 50 }, colorStops: [{ offset: 0, color: "#ff0000" }, { offset: 0.5, color: "#00ff00" }, { offset: 1, color: "#0000ff" }] }) });
-        text.set({ fill: "#101010", opacity: 1 }); canvas.requestRenderAll(); });
-    },
-    saveFlow: async () => {
-      await page.route("**/api/tools/designs", (rt) => rt.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, asset: { id: "x" } }) }));
-      await frame.locator("#saveDesign").click(); await page.waitForTimeout(1200);
-      eq("vector save: 已存入 before the style edit", (await frame.locator("#saveDesign").textContent()).trim(), "已存入 ✓");
-      await env.select(1); await ui.opacity(60); await page.waitForTimeout(500);
-      eq("vector save: a style edit resets 已存入 → 存入 My Designs", (await frame.locator("#saveDesign").textContent()).trim(), "存入 My Designs");
-      await page.unroute("**/api/tools/designs");
-    },
-    shot: async () => { await frame.locator("#appearPanel").scrollIntoViewIfNeeded(); await frame.locator(".side").screenshot({ path: join(OUT, "card-04-vector.png") }); },
-  };
-  await suite("vector", page, env);
-  // no duplicate: the old 物件效果 block is gone, one panel carries the effect controls
-  eq("vector REMOVED: exactly one 物件效果 summary (the merged panel), one #fxType", [await frame.evaluate(() => [...document.querySelectorAll("summary")].filter((s) => /物件效果/.test(s.textContent)).length), await frame.locator("#fxType").count()], [1, 1]);
-  const ctx2 = await browser.newContext({ viewport: { width: 1400, height: 1500 } });
-  await ctx2.addInitScript(NO_EYE);
-  const p2 = await ctx2.newPage();
-  await p2.goto(`${BASE}/tools/vector-editor`, { waitUntil: "domcontentloaded" });
-  await p2.waitForFunction(() => [...document.querySelectorAll("iframe")].some((f) => f.src.includes("vector-editor.html")), null, { timeout: 90000 });
-  const f2 = p2.frames().find((f) => f.url().includes("vector-editor.html"));
-  await f2.waitForFunction(() => typeof canvas !== "undefined" && document.getElementById("appearPanel"), null, { timeout: 60000 });
-  await f2.evaluate(() => document.querySelectorAll("details").forEach((d) => { d.open = true; })); // panels ship collapsed
-  eq("vector 1 吸色 button still shown (artboard-pixel fallback) when EyeDropper is missing", [await f2.evaluate(() => !!window.EyeDropper), await f2.locator("#eyedrop").isVisible()], [false, true]);
-  await ctx2.close();
-  await ctx.close();
-}
-
 await browser.close();
 const envNoise = (e) => /Failed to load resource|supabase_unavailable/.test(e);
 const consoleErrs = errors.filter((e) => !envNoise(e));
 const resourceErrs = errors.filter(envNoise);
-check("no console/page errors on either page", consoleErrs.length === 0, consoleErrs.join(" | "));
+check("no console/page errors on the page", consoleErrs.length === 0, consoleErrs.join(" | "));
 if (resourceErrs.length) console.log(`NOTE ${resourceErrs.length} failed resource loads (dev-server no-Supabase noise, excluded)`);
 const failed = results.filter((r) => !r.ok).length;
 console.log(`\n${results.length - failed}/${results.length} checks passed`);
