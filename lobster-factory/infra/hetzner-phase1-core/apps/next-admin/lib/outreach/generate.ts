@@ -155,9 +155,14 @@ export async function generateForLead(supabase: SupabaseClient, lead: LeadRow, o
   // For each paid provider: try client BYO key first, then agency default (null org).
   const AI_PROVIDERS = ["claude", "openai", "gemini", "gemini_agency"] as const;
   type AiProvider = (typeof AI_PROVIDERS)[number];
-  let resolvedProvider: AiProvider | null = null;
-  let apiKey: string | null = null;
-  let vaultError: string | null = null;
+  let mode: AiProvider | "manual_prompt" | "manual_paste" = "manual_prompt";
+  let aiModel: string | null = null;
+  let parsed: ReturnType<typeof parseGenerationOutput> | null = null;
+  if (pasted) {
+    parsed = parseGenerationOutput(pasted, ctx.evidenceIds);
+    if (parsed.ok === false) return NextResponse.json({ ok: false, error: "pasted_unparseable", detail: parsed.error }, { status: 400 });
+    mode = "manual_paste";
+  }
 
   for (const provider of pasted ? [] : AI_PROVIDERS) {
     const pickRef = async (orgFilter: "client" | "agency"): Promise<string | null> => {
@@ -181,32 +186,21 @@ export async function generateForLead(supabase: SupabaseClient, lead: LeadRow, o
     const ref = (lead.organization_id ? await pickRef("client") : null) ?? (await pickRef("agency"));
     // No connector: OpenAI falls back to the platform key every other feature uses (lib/ai/cheap-json.ts), one copy of
     // it in the host env rather than a second in the vault. The agency Gemini free key 429s after ~12 emails (C15.4).
-    const platform = !ref && provider === "openai" ? process.env.OPENAI_API_KEY?.trim() : undefined;
-    if (platform) { apiKey = platform; resolvedProvider = provider; break; }
-    if (!ref) continue;
-    try {
-      apiKey = await getSecret(ref);
-      resolvedProvider = provider;
-      break;
-    } catch (e) {
-      vaultError = e instanceof Error ? e.message.slice(0, 80) : "vault read error";
+    let apiKey: string | null = !ref && provider === "openai" ? process.env.OPENAI_API_KEY?.trim() || null : null;
+    if (ref) {
       // vault error on one provider → try next rather than hard-fail
+      try { apiKey = await getSecret(ref); }
+      catch (e) { aiModel ??= `vault_read_failed:${e instanceof Error ? e.message.slice(0, 80) : "vault read error"}`; }
     }
-  }
-
-  let mode: AiProvider | "manual_prompt" | "manual_paste" = "manual_prompt";
-  let aiModel: string | null = vaultError ? `vault_read_failed:${vaultError}` : null;
-  let parsed: ReturnType<typeof parseGenerationOutput> | null = null;
-  if (pasted) {
-    parsed = parseGenerationOutput(pasted, ctx.evidenceIds);
-    if (parsed.ok === false) return NextResponse.json({ ok: false, error: "pasted_unparseable", detail: parsed.error }, { status: 400 });
-    mode = "manual_paste";
-    aiModel = null;
-  } else if (apiKey && resolvedProvider) {
+    if (!apiKey) continue;
+    const key = apiKey;
+    // A provider whose call fails (no credits, 429, network) hands the lead to the next rung: with the platform OpenAI
+    // key out of credits (2026-11-05) nothing was written although the Gemini key worked. An answer that cannot be
+    // parsed, even after the repair prompt, is that model's output and ends the walk.
     try {
       const grant = await o.grant("outreach.draft");
-      const generate = (prompt: string) => resolvedProvider === "claude" ? generateWithClaude(grant, apiKey!, prompt)
-        : resolvedProvider === "openai" ? generateWithOpenAI(grant, apiKey!, prompt) : generateWithGemini(grant, apiKey!, prompt);
+      const generate = (prompt: string) => provider === "claude" ? generateWithClaude(grant, key, prompt)
+        : provider === "openai" ? generateWithOpenAI(grant, key, prompt) : generateWithGemini(grant, key, prompt);
       const first = await generate(ctx.prompt);
       parsed = parseGenerationOutput(first.text, ctx.evidenceIds);
       aiModel = first.model;
@@ -214,10 +208,11 @@ export async function generateForLead(supabase: SupabaseClient, lead: LeadRow, o
         const second = await generate(repairPrompt(ctx.prompt, first.text, parsed.error));
         parsed = parseGenerationOutput(second.text, ctx.evidenceIds);
       }
-      if (parsed.ok === true) mode = resolvedProvider;
-      else aiModel = `${resolvedProvider}_unparseable:${parsed.error.slice(0, 80)}`;
+      if (parsed.ok === true) mode = provider;
+      else aiModel = `${provider}_unparseable:${parsed.error.slice(0, 80)}`;
+      break;
     } catch (e) {
-      aiModel = `${resolvedProvider}_failed:${e instanceof Error ? e.message.slice(0, 80) : "error"}`;
+      aiModel = `${provider}_failed:${e instanceof Error ? e.message.slice(0, 80) : "error"}`;
     }
   }
 

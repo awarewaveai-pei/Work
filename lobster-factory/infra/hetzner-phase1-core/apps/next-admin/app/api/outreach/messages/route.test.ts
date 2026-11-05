@@ -23,6 +23,7 @@ const m = vi.hoisted(() => ({
   actorFor: vi.fn(),
   claude: vi.fn(async (_g: unknown, _k: string, _p: string) => ({ text: "", model: "m" })),
   claims: vi.fn(async () => ({ verdict: "supported" as const })),
+  openai: vi.fn(async (_g: unknown, _k: string, _p: string) => ({ text: "", model: "gpt" })),
   ops: [] as Op[],
   state: {} as Record<string, unknown>,
 }));
@@ -30,7 +31,7 @@ const m = vi.hoisted(() => ({
 vi.mock("@/lib/entitlements/grant", () => ({ grantFor: m.grantFor }));
 vi.mock("@/lib/social/authz", () => ({ actorFor: m.actorFor }));
 vi.mock("@/lib/outreach/ai-claude", () => ({ generateWithClaude: m.claude }));
-vi.mock("@/lib/outreach/ai-openai", () => ({ generateWithOpenAI: vi.fn() }));
+vi.mock("@/lib/outreach/ai-openai", () => ({ generateWithOpenAI: m.openai }));
 vi.mock("@/lib/outreach/ai-gemini", () => ({ generateWithGemini: vi.fn() }));
 vi.mock("@/lib/outreach/claim-check", () => ({ checkClaims: m.claims, checkClaimsVoted: m.claims }));
 vi.mock("@/lib/secret-vault", () => ({ getSecret: async () => "key", connectorSecretRef: (id: string) => `co_connector:${id}` }));
@@ -186,8 +187,20 @@ describe("one generation writes two first emails and the follow-ups", () => {
 });
 
 describe("unattended generation (the pipeline tick)", () => {
-  it("an AI failure writes no row and answers 503, so the lead is tried again next tick", async () => {
+  it("a provider whose call fails hands the lead to the next rung: Claude out of credits, OpenAI writes it", async () => {
+    m.claude.mockReset(); m.claude.mockRejectedValue(new Error("claude 429 credit_balance_exhausted"));
+    m.openai.mockReset(); m.openai.mockResolvedValue({ text: GOOD, model: "gpt-5.4-mini" });
+    const sb = await getOrgSupabaseWriteClient(ORG);
+    const res = await generateForLead(sb as never, m.state.lead as never, { agencyFallback: false, grant: async () => ({ allowed: true }) as never, pastedReply: null, unattended: true });
+    expect(res.status).toBe(200);
+    expect(m.openai).toHaveBeenCalled();
+    expect(inserted().length).toBeGreaterThan(0);
+    expect(inserted()[0]).toMatchObject({ ai_model: "gpt-5.4-mini" });
+  });
+
+  it("every rung failing writes no row and answers 503, so the lead is tried again next tick", async () => {
     m.claude.mockReset(); m.claude.mockRejectedValue(new Error("gemini 503 overloaded"));
+    m.openai.mockReset(); m.openai.mockRejectedValue(new Error("openai_429"));
     const sb = await getOrgSupabaseWriteClient(ORG);
     const res = await generateForLead(sb as never, m.state.lead as never, { agencyFallback: false, grant: async () => ({ allowed: true }) as never, pastedReply: null, unattended: true });
     expect(res.status).toBe(503);
