@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-05（續5）影音工作台 P6 L6 部署管線＋上機 H0/H2/H3（62acae78b／8bf7f1908／e25062e7d）
+
+- L6 七項（62acae78b）：bundle-awarewave.cjs（清單＝appearance.cjs runtimeFiles）、Dockerfile.gate 測試閘（runtime 映像不含測試）、smoke 未登入 /api/vw/state 必 401、RESTORABLE＋IMAGE_MAP＋runbook、notify 只在含 video-workbench 時送、CI video-workbench-ci.yml。Codex 12dab604：CI paths 漏 p6-main-system 讀的 next-admin 契約檔 → 補。
+- 上機（操作者「現在就部署」，後更正為「做好後部署」→ H4 起暫停）：H0 磁碟 646G、可用記憶體 105G、32 核、無 DEPLOY_HOLD；H2 VW_INTERNAL_TOKEN／ENTITLEMENT_ISSUER_TOKEN_VIDEO 寫入主機 .env（先備份，未印值）；H3 next-admin compose env 經 safe-infra-patch（backup docker-compose.yml.bak.safe-patch-20261105-051049）、printenv 兩變數 ok。
+- sg-deploy next-admin 第一次被測試閘擋（products.test door↔nginx 對照：L5 把 video 拆出共用 door 但 products.ts 無 uiService；prod 未動，03:00 也會擋）→ 8bf7f1908 補 uiService 後重跑。
+- forms.css 原樣提交（e25062e7d）：工作台執行期讀它（appearance.cjs:18），未追蹤則主機打包失敗；其餘主題未提交檔不動。
+- 未完：H4 首次上線順序（無舊版可回滾；nginx 未切前 smoke 會失敗）→ 監工台 P6.9。
+- REALTEST_EVIDENCE: tool=SSH | cmd=ssh ks-aw-01 safe-infra-patch.sh compose next-admin + docker exec lobster-next-admin printenv VW_INTERNAL_TOKEN/ENTITLEMENT_ISSUER_TOKEN_VIDEO | exit=0 | ms=25000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n（Codex agency-os/reports/oracle/2026-11-05-partialreview-12dab604.md 已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=bundle-awarewave | hits=5
+- 避免再發生：拆 nginx server 區塊的卡要同 commit 改 products.ts uiService（products.test 已守，L5 沒跑該測試）。
 ## 2026-11-05（續4）影音工作台 P6 L5：容器映像＋compose＋nginx＋簽章身分（99a1250b6）
 
 - Dockerfile/.dockerignore、compose `video-workbench`（無 ports）、nginx video.aware-wave.com 獨立 server、備份 store＋backup-phase1.sh 3b；只寫檔未上機。
