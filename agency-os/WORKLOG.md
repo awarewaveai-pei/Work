@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-05（續4）影音工作台 P6 L5：容器映像＋compose＋nginx＋簽章身分（99a1250b6）
+
+- Dockerfile/.dockerignore、compose `video-workbench`（無 ports）、nginx video.aware-wave.com 獨立 server、備份 store＋backup-phase1.sh 3b；只寫檔未上機。
+- Codex 30f4ad8b：lobster-net 任一容器可直連 4178 偽造 X-VW-* → 不變量：工作台只認 next-admin 簽章身分（HMAC VW_INTERNAL_TOKEN、120 s），`backend/session-signature.cjs`；next-admin session route 無 token = 503。讀 diff 另抓 `/_vw_session` 缺 `proxy_method GET`（POST 子請求 405）。複審 d7bd002b 0 項。
+- 偏離計畫：`VW_INTERNAL_BASE` 取代 `VW_NEXT_ADMIN_INTERNAL_URL`；Blender 以 `VW_BLENDER_PATH` 空值關閉（程式不讀 `VW_BLENDER_ENABLED`）。缺口進監工台 P6.9／P6.12。
+- 工人：訂閱制 Agent tool（fullstack-engineer ×2）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=docker compose config --quiet; nginx -t (nginx:stable stubs); docker build + blender -b --version + ffprobe -version + /healthz + unsigned /api/vw/state 401; NA vitest app/api/video/workbench; VW tests/tenancy.cjs p6-main-system.cjs backend.cjs | exit=0 | ms=420000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n（Codex agency-os/reports/oracle/2026-11-05-partialreview-30f4ad8b.md 已修；複審 2026-11-05-partialreview-d7bd002b.md 0 項；突變拿掉簽章驗證 → tenancy 紅→綠）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=X-VW-Signature | hits=6
 ## 2026-11-05（續3）影音工作台 P6 L4：舊素材搬進主系統帳冊腳本（63b19bafb）
 
 - `VW/scripts/migrate-media-to-r2.cjs`＋`backend/migrate-media.cjs`：來源＝jobs.json 成功結果（帶 jobId，同 settle()）＋state 資產＋未引用 media；全走 `createMainSystem().ingest`；回填 state assetId；revision 變動拒寫；每次一份 report；--undo 只還原本機。
