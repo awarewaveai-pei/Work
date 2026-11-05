@@ -11,6 +11,8 @@
  * (fixed model / product keys, a handful of themes / brands), so one parallel round of HEAD counts
  * replaces the GROUP BY.
  */
+import { getDesignsPublicBase } from "../storage/r2";
+import { withSourceUrls } from "./design-source";
 import { GALLERY_MODEL_LABELS, GALLERY_PRODUCT_LABELS, MOCKUP_SOURCES, TAROT_SOURCES } from "./asset-group";
 
 export const PAGE_SIZE = 60;
@@ -250,7 +252,7 @@ export async function listDesigns(
   if (error) throw new Error(`list failed: ${error.message}`);
 
   const rows = (data ?? []) as Record<string, unknown>[];
-  const assets = rows.slice(0, PAGE_SIZE);
+  const assets = withSourceUrls(rows.slice(0, PAGE_SIZE), () => getDesignsPublicBase()); // rows with a saved original file also get source_url
   const last = assets[assets.length - 1] as { created_at: string; id: string } | undefined;
   const nextCursor = rows.length > PAGE_SIZE && last ? encodeCursor(last) : null;
 
