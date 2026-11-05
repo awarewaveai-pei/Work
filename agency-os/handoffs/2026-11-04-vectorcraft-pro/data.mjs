@@ -26,7 +26,7 @@ export const COPY = {
 export const NOW = [
   { what: '在 app.aware-wave.com 用 Illustrator 一樣的工具列、面板、快捷鍵畫向量。', state: 'yes', ev: '2026-11-05 上線：側欄 Vector Pro 開新分頁全視窗（bca9a846d）；正式站 playwright smoke：VectorCraft 開得起來、ui.inspect 回 JSON。' },
   { what: '介面與字型是繁體中文。', state: 'yes', ev: '介面 zh-hant；建置加 Noto Sans TC，本機實測罕用字「嘸」正常顯示（0f1bdc062）。' },
-  { what: 'AwareWave 獨有的十項功能在專業版裡，長在 Illustrator 版面的第二個 dock 欄。', state: 'yes', ev: '2026-11-05 正式站實測：dock 顏色、按鈕、字型全取主題 token（改主題即套用，零寫死色碼，測試守）；存入 My Designs 後可重新打開（文字與畫板完整）。收尾中：VectorCraft 本體每次開頁跟主題明暗（目前要手動切一次）。' },
+  { what: 'AwareWave 獨有的十項功能在專業版裡，長在 Illustrator 版面的第二個 dock 欄。', state: 'no', ev: '2026-11-05 正式站逐一實測：能用＝調色、去背（色鍵）、My Designs、Mockup、批次匯出；壞＝範本庫（轉接器缺 setArtboardSize）、字型（不換選取文字）、WebP（品質參數型別錯）；QR／條碼散成數百物件未群組；Mockup 用了下拉選單。版面：dock 改成一條圖示欄＋浮出面板，讓畫布變大。修正中，並加「每個面板按下去要有效果」的 e2e 測試。' },
   { what: '舊的向量設計檔在專業版打得開，舊編輯器退場，只有一套。', state: 'yes', ev: '舊 .design.json 在 My Designs 面板「匯入舊專案」轉向量；舊 PNG 照常開；/tools/vector-editor 與 /vector-editor.html 轉到專業版（6740e006d）。' },
   { what: '本機能建出網頁版。', state: 'yes', ev: '一個指令 build.ps1；wasm 89 MB 與上游 v0.21.0 同級，建置會驗證已最佳化（c9b541cae）。' },
 ];
