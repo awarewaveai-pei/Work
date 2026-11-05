@@ -4,6 +4,7 @@
 //     零字面色；面板用 app 統一 class，不用舊 vector-editor 的 act／ghost。
 import fs from "node:fs";
 import path from "node:path";
+import { transformSync } from "esbuild";
 import { describe, expect, it } from "vitest";
 import { createVectorcraftCtx } from "../../../public/editor-shared/ctx-vectorcraft.js";
 
@@ -201,6 +202,8 @@ describe("dock 顏色只來自主題 token", () => {
 describe("面板模組（editor-shared/blocks）用統一 class、樣式只用主題 token", () => {
   it.each(blockFiles())("%s", (f) => {
     const src = read(f);
+    // 語法錯 = 整個面板載入失敗（vitest 其他測試不會載入面板模組，2026-11-05 color-grade.js:108 行中註解吞掉程式）
+    expect(() => transformSync(src, { loader: "js", format: "esm" }), `${f} 語法錯`).not.toThrow();
     const classes = [...src.matchAll(/class(?:Name)?\s*[=:]\s*\\?["'`]([^"'`\\]*)/g)].flatMap((m) => m[1].split(/\s+/));
     expect(classes.filter((c) => c === "act" || c === "ghost"), "舊 class act→btn btn-primary、ghost→btn btn-secondary").toEqual([]);
     for (const snip of styleSnippets(src)) {
