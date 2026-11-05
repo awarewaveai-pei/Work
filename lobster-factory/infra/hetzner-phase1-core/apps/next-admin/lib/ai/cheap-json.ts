@@ -1,4 +1,5 @@
-import { logAiCall, openaiUsageTokens } from "./log-ai-call";
+import { geminiUsageTokens, logAiCall, openaiUsageTokens, type GeminiUsageLike } from "./log-ai-call";
+import { GEMINI_LITE_MODEL } from "./gemini-models";
 import { loadAnthropic, type Anthropic, providerUrl } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
@@ -19,8 +20,8 @@ interface CheapJsonTextArgs {
   grant?: Grant;
   /** Abort after this long; default = the Anthropic SDK's own 10 min, so no call waits forever on either vendor. */
   timeoutMs?: number;
-  /** OpenAI models only (a Claude model's parameters come from claudeParams). 0 for a judgment that must answer the same
-   *  input the same way; unset = the vendor default. */
+  /** OpenAI and Gemini models (a Claude model's parameters come from claudeParams). 0 for a judgment that must answer
+   *  the same input the same way; unset = the vendor default. */
   temperature?: number;
 }
 
@@ -33,7 +34,7 @@ interface OpenAiChatCompletion {
 }
 
 export type CheapJsonTextResult =
-  | { ok: true; raw: string; model: AiTextModel }
+  | { ok: true; raw: string; model: AiTextModel | typeof GEMINI_LITE_MODEL }
   | { ok: false; status: number; error: string };
 
 export function extractJsonArray(raw: string): string | null {
@@ -41,6 +42,8 @@ export function extractJsonArray(raw: string): string | null {
 }
 
 export async function generateCheapJsonText(args: CheapJsonTextArgs): Promise<CheapJsonTextResult> {
+  // Gemini is not a picker model (AI_TEXT_MODELS); the one id cost-model.ts prices is accepted here by name.
+  if (args.model === GEMINI_LITE_MODEL) return generateGeminiJsonText(args);
   const model = normalizeAiTextModel(args.model ?? CHEAP_JSON_MODEL);
   if (!isOpenAiTextModel(model)) return generateAnthropicJsonText({ ...args, model });
   return generateOpenAiJsonText({ ...args, model });
@@ -85,6 +88,34 @@ async function generateOpenAiJsonText(args: CheapJsonTextArgs & { model: AiTextM
     });
 
     return { ok: true, raw, model: args.model };
+  } catch (err) {
+    return { ok: false, status: 502, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** The platform's free-tier Gemini key (operator 2026-11-05: the OpenAI account ran out of credits). JSON mode; the lite
+ *  model refuses thinkingBudget 0, so no thinkingConfig. The key goes in the query string; never log the url. */
+async function generateGeminiJsonText(args: CheapJsonTextArgs): Promise<CheapJsonTextResult> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return { ok: false, status: 503, error: "GEMINI_API_KEY not configured" };
+  try {
+    const grant = args.grant ?? (await grantFor("ops.cheap-json"));
+    const res = await fetch(providerUrl(grant, "gemini", `/v1beta/models/${GEMINI_LITE_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`), {
+      method: "POST",
+      signal: AbortSignal.timeout(args.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: args.system }] },
+        contents: [{ role: "user", parts: [{ text: args.user }] }],
+        generationConfig: { maxOutputTokens: args.maxTokens, responseMimeType: "application/json",
+          ...(args.temperature === undefined ? {} : { temperature: args.temperature }) },
+      }),
+    });
+    if (!res.ok) return { ok: false, status: 502, error: `gemini_${res.status}` };
+    const json = (await res.json()) as { usageMetadata?: GeminiUsageLike; candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+    const raw = (json.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("");
+    void logAiCall({ route: args.route, model: GEMINI_LITE_MODEL, ...geminiUsageTokens(json.usageMetadata), grant, metadata: args.metadata, tool: args.tool });
+    return { ok: true, raw, model: GEMINI_LITE_MODEL };
   } catch (err) {
     return { ok: false, status: 502, error: err instanceof Error ? err.message : String(err) };
   }

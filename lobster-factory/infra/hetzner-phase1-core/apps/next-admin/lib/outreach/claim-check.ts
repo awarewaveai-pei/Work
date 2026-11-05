@@ -3,6 +3,7 @@
 // Any doubt is "not supported": an unreadable reply, a failed call, a claim the model cannot tie to evidence -- all go to a
 // person. Billed to outreach.qa.
 import { generateCheapJsonText } from "@/lib/ai/cheap-json";
+import { OUTREACH_JSON_MODEL } from "./ai-gemini";
 import type { Grant } from "@/lib/entitlements/can";
 import { fence, type EvidenceItem } from "./brand-context";
 import type { ClaimCheck } from "./review-policy";
@@ -37,9 +38,9 @@ export async function checkClaims(args: { body: string; evidence: EvidenceItem[]
   if (!sentences.length) return { verdict: "error", error: "empty body" };
   const r = await generateCheapJsonText({
     route: "outreach/claim-check",
-    // nano labelled questions, courtesy and the signature as recipient claims (C15.4 REALTEST, 11 of 11 after the
-    // sentence-label change); this is the only fact gate before an automatic approval
-    model: "gpt-5.4-mini",
+    // gpt-5.4-nano labelled questions and the signature as recipient claims (C15.4); gpt-5.4-mini until its account
+    // ran out of credits (2026-11-05). The only fact gate before an automatic approval: re-measure on any model change.
+    model: OUTREACH_JSON_MODEL,
     // A judgment, not writing: the vendor's default sampling made the same email flip between runs (C16.2: 0.89, 0.92,
     // 0.87 on prompt and schema changes alone).
     temperature: 0,
