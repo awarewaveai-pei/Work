@@ -1,4 +1,8 @@
-// POST /api/internal/outreach/claim-consistency  { organizationId, limit? }
+// POST /api/internal/outreach/claim-consistency  { organizationId, limit?, offset? }
+//
+// offset pages the same ordered set (newest first, id as tie-break): 200 emails on the free Gemini key take ~2.5 h, and
+// a deploy restarts the container (two 2026-11-05 runs were cut at 11:14 and earlier), so a caller measures in batches
+// of ~20 and sums them; a cut batch is asked again.
 //
 // Card C16.2: the latest first emails (both variants) of one organization, each fact-checked twice; answers the
 // consistency report (lib/outreach/claim-consistency.ts) of the check approvals rest on: checkClaimsVoted, a majority
@@ -31,15 +35,16 @@ function verifyToken(request: Request): boolean {
 
 export async function POST(request: Request) {
   if (!verifyToken(request)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-  const body = (await request.json().catch(() => ({}))) as { organizationId?: unknown; limit?: unknown };
+  const body = (await request.json().catch(() => ({}))) as { organizationId?: unknown; limit?: unknown; offset?: unknown };
   const org = typeof body.organizationId === "string" && UUID_RE.test(body.organizationId) ? body.organizationId : null;
   if (!org) return NextResponse.json({ ok: false, error: "organizationId (uuid) required" }, { status: 400 });
   const limit = Math.min(MAX, Math.max(1, Number.isInteger(body.limit) ? (body.limit as number) : MAX));
+  const offset = Number.isInteger(body.offset) && (body.offset as number) > 0 ? (body.offset as number) : 0;
   const sb = getSupabaseWriteClient();
   if (!sb) return NextResponse.json({ ok: false, error: "no_supabase_client" }, { status: 503 });
 
   const { data: msgs, error } = await sb.from("co_messages").select("id, lead_id, body")
-    .eq("organization_id", org).not("variant_label", "is", null).order("created_at", { ascending: false }).limit(limit);
+    .eq("organization_id", org).not("variant_label", "is", null).order("created_at", { ascending: false }).order("id").range(offset, offset + limit - 1);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   const rows = (msgs ?? []) as Array<{ id: string; lead_id: string; body: string }>;
   const { data: leadRows, error: leadErr } = await sb.from("co_leads").select("*").in("id", [...new Set(rows.map((m) => m.lead_id))]);
