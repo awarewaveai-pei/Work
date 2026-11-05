@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<!-- C1.4 smoke host: serve a folder holding this page and the dist as ./pc/ (same origin), open
+     smoke-host.html. The frame runs PhotoCraft with ?host=parent; this page speaks craft-web-host's
+     messages and keeps every photocraft:save so a console (or a test) can read the bytes back. -->
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>PhotoCraft smoke host</title>
+<style>
+  html, body { margin: 0; height: 100%; }
+  #pc { position: absolute; inset: 0 0 24px 0; width: 100%; height: calc(100% - 24px); border: 0; }
+  #log { position: absolute; left: 0; right: 0; bottom: 0; height: 24px; font: 12px monospace; overflow: hidden; white-space: nowrap; }
+</style>
+</head>
+<body>
+<iframe id="pc" src="pc/index.html?host=parent" allow="clipboard-read; clipboard-write"></iframe>
+<div id="log"></div>
+<script>
+  const frame = document.getElementById('pc');
+  const log = (s) => { document.getElementById('log').textContent = s; console.log('[host]', s); };
+  // Everything the app posted, in order: {type, name?, size?, dirty?, error?, bytes?}.
+  window.events = [];
+  window.saves = [];
+  window.addEventListener('message', (e) => {
+    if (e.origin !== location.origin || e.source !== frame.contentWindow) return;
+    const m = e.data || {};
+    if (typeof m.type !== 'string' || !m.type.startsWith('photocraft:')) return;
+    const rec = { type: m.type, at: performance.now() };
+    if (m.type === 'photocraft:save') {
+      rec.name = m.name; rec.size = m.bytes.byteLength; rec.saveAs = m.saveAs;
+      window.saves.push({ name: m.name, bytes: new Uint8Array(m.bytes) });
+    }
+    if ('dirty' in m) rec.dirty = m.dirty;
+    if ('error' in m) rec.error = m.error;
+    if ('version' in m) rec.version = m.version;
+    window.events.push(rec);
+    log(JSON.stringify(rec));
+  });
+  // The frame's page API.
+  window.pc = () => frame.contentWindow.photocraft;
+  window.ready = () => new Promise((resolve) => {
+    const seen = () => window.events.some((e) => e.type === 'photocraft:ready');
+    if (seen()) return resolve(true);
+    const t = setInterval(() => { if (seen()) { clearInterval(t); resolve(true); } }, 100);
+  });
+  // Open a document as File › Open would: bytes is an ArrayBuffer or Uint8Array.
+  window.openBytes = (name, bytes) => {
+    const buf = bytes instanceof ArrayBuffer ? bytes : bytes.slice().buffer;
+    frame.contentWindow.postMessage({ type: 'photocraft:open', name, bytes: buf }, location.origin, [buf]);
+  };
+  window.openUrl = async (url, name) => window.openBytes(name || url.split('/').pop(), await (await fetch(url)).arrayBuffer());
+  // Resolve with the next photocraft:save whose name matches (string or RegExp).
+  window.nextSave = (match, timeoutMs = 30000) => new Promise((resolve, reject) => {
+    const start = window.saves.length;
+    const t0 = Date.now();
+    const t = setInterval(() => {
+      const hit = window.saves.slice(start).find((s) => (match instanceof RegExp ? match.test(s.name) : s.name === match));
+      if (hit) { clearInterval(t); resolve(hit); }
+      else if (Date.now() - t0 > timeoutMs) { clearInterval(t); reject(new Error('no save ' + match)); }
+    }, 50);
+  });
+  window.blobUrl = (save, type) => URL.createObjectURL(new Blob([save.bytes], { type: type || 'application/octet-stream' }));
+</script>
+</body>
+</html>

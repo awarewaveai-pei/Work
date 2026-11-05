@@ -1,0 +1,8 @@
+{
+  "repo": "https://github.com/storytold/photocraft",
+  "rev": "98bcbfab9005b4915b3143b4daed91df365db107",
+  "craftLibsRev": "a8b996d20753c3ab160b4f6eada00c33a2279add",
+  "craftFontsRepo": "https://github.com/storytold/craft-fonts",
+  "craftFontsRev": "b076417b5880bd4154bd22f00695b1d28c6bea83",
+  "trunk": "0.21.14"
+}

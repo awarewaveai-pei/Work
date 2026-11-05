@@ -8,7 +8,7 @@
 powershell -ExecutionPolicy Bypass -File D:\Work\scripts\vectorcraft-pro\build.ps1
 ```
 
-輸出：`%LOCALAPPDATA%\awarewave\vectorcraft-dist\<rev前7碼>-<inputs前7碼>\`（`VECTORCRAFT_HOME` 環境變數可改 base）。目錄名含**全部輸入**的身份：`inputs7` = sha256(PIN.json＋patch) 前 7 碼——只改字型或 patch、`rev` 不變時也會得到新目錄，C6「保留最近 2 版」才守得住；組裝在 `.staging-*` 完成並通過 `SHA256SUMS -c` 後才原子換名，失敗不汙染既有 dist（codex oracle 2026-11-05 兩個 finding 的治本）。內容 = trunk 產物 + `fonts/`（SRI 命名）+ `NOTICE`（含 provenance）+ `LICENSE-*` + `SHA256SUMS`；`.wasm/.js/.otf/.ttf` 各帶預壓 `.gz`（nginx `gzip_static` 用）。
+輸出：`%LOCALAPPDATA%\awarewave\vectorcraft-dist\<rev前7碼>-<inputs前7碼>\`（`VECTORCRAFT_HOME` 環境變數可改 base）。目錄名含**全部輸入**的身份：`inputs7` = sha256(PIN.json＋`scripts/craft-web-build/fonts.json`＋patch) 前 7 碼——只改字型或 patch、`rev` 不變時也會得到新目錄，C6「保留最近 2 版」才守得住；組裝在 `.staging-*` 完成並通過 `SHA256SUMS -c` 後才原子換名，失敗不汙染既有 dist（codex oracle 2026-11-05 兩個 finding 的治本）。內容 = trunk 產物 + `fonts/`（SRI 命名）+ `NOTICE`（含 provenance）+ `LICENSE-*` + `SHA256SUMS`；`.wasm/.js/.otf/.ttf` 各帶預壓 `.gz`（nginx `gzip_static` 用）。
 
 ## 前置需求（一次性）
 
@@ -29,10 +29,15 @@ powershell -ExecutionPolicy Bypass -File D:\Work\scripts\vectorcraft-pro\build.p
 |---|---|
 | `rev` | storytold/vectorcraft commit（`<rev前7碼>` = dist 目錄名） |
 | `craftFontsRev` | storytold/craft-fonts commit（CI/release 同一顆：`.github/workflows/ci.yml:25`） |
+
+字型清單不在這裡：`scripts/craft-web-build/fonts.json`（`googleFontsRev`＋`webFonts[]`，向量版與畫布專業版共用一份；下載、驗 sha256、追加 manifest 列由 `scripts/craft-web-build/lib.sh` `craft_web_fonts` 做，`pin`／`checkout` 也在同檔）。
+
+| fonts.json 欄位 | 意義 |
+|---|---|
 | `googleFontsRev` | google/fonts repo 釘定 commit（latin 字型來源） |
 | `webFonts[]` | 51 個字型（CJK 4：Noto Sans/Serif TC、Sans/Serif HK，來源 notofonts/noto-cjk 釘定 commit；latin 47，來源 google/fonts 釘定 commit），每個 url+sha256+licence(sha) 釘死，build.sh 下載進 craft-fonts checkout 並追加 manifest 列。清單來源 = 舊編輯器 `vector-editor.html:1101-1102@e8786bf3d`＋`editor-shared/blocks/fonts.js:3-4`；**Ubuntu 剔除**（UFL 授權，非 OFL/Apache），其餘 47/48 latin 全為 OFL 或 Apache-2.0（Permanent Marker、Satisfy = Apache） |
 
-升級：改 `rev`（或 `craftFontsRev`）→ 跑 `build.ps1` → 本機 smoke（下方「驗證」）→ 交 C2/C6 流程上線。patch `git apply --check` 失敗 = 上游改了該區 → 重排 patch 再跑。
+加一個字型：改 `scripts/craft-web-build/fonts.json`（兩個編輯器都會拿到，各自重建）。升級：改 `rev`（或 `craftFontsRev`）→ 跑 `build.ps1` → 本機 smoke（下方「驗證」）→ 交 C2/C6 流程上線。patch `git apply --check` 失敗 = 上游改了該區 → 重排 patch 再跑。
 上線（主機 ks-aw-01，High）：`tar cf - <dist名> | ssh … 'sudo tar xf - -C /root/lobster-phase1/static/vector-pro'` → 主機 `sha256sum -c SHA256SUMS` → `ln -sfn <dist名> current` → `BASE_URL=https://app.aware-wave.com npx playwright test smoke/05-vector-pro.spec.ts --project=smoke`（`lobster-factory/infra/hetzner-phase1-core/tests`）。nginx／compose 只在第一次上線時改（已完成 2026-11-05），換版本不用動。
 回退：`ln -sfn <上一版目錄> current`（立即生效；index.html no-cache，hash 檔名不同不衝突）。主機保留最近 2 個版本目錄，第 3 個上線且 smoke 綠後才刪最舊的。
 
@@ -40,7 +45,7 @@ powershell -ExecutionPolicy Bypass -File D:\Work\scripts\vectorcraft-pro\build.p
 
 | 檔 | 做什麼 |
 |---|---|
-| `web-fonts.patch` | `crates/text/web-fonts.txt` 加 51 行 `background \| <family> \| Regular`（PIN `webFonts[]` 全部；manifest 列由 build.sh 動態追加到 craft-fonts checkout）。**startup vs background**（`crates/text/web-fonts.txt:2-4`）：startup 在 app 啟動前抓（擋首載，`apps/vectorcraft-web/src/fonts.rs:27-35`）；background 在啟動後抓（4 併發、不擋首載，`fonts.rs:38-60`）——上游**沒有**「點選才載」的真按需，background 是全部延後抓；CJK 大字型因此全走 background，首載只付 wasm |
+| `web-fonts.patch` | `crates/text/web-fonts.txt` 加 51 行 `background \| <family> \| Regular`（`fonts.json` `webFonts[]` 全部；manifest 列由 `lib.sh` 動態追加到 craft-fonts checkout）。**startup vs background**（`crates/text/web-fonts.txt:2-4`）：startup 在 app 啟動前抓（擋首載，`apps/vectorcraft-web/src/fonts.rs:27-35`）；background 在啟動後抓（4 併發、不擋首載，`fonts.rs:38-60`）——上游**沒有**「點選才載」的真按需，background 是全部延後抓；CJK 大字型因此全走 background，首載只付 wasm |
 
 已移除（2026-11-05 晚）：`api-addfont.patch`（字型面板取消後無人呼叫，`550764e16`）、`api-settheme.patch`＋`awarewave-theme-receiver.js`＋父頁 `lib/theme/frame-theme.ts`（操作者：Craft 編輯器不套 app 主題，用自己的深色／淺色）。線上 dist `4cce336-7303550` 建於移除前，仍帶 `addFont`／`setTheme` 與接收端，但已無人呼叫；下次升級重建即消失。
 

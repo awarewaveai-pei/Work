@@ -18,7 +18,9 @@ for tool in cargo trunk git python3 sha256sum gzip; do
   command -v "$tool" >/dev/null || { echo "FATAL: $tool not found — see README.md prerequisites" >&2; exit 1; }
 done
 
-pin() { python3 -c "import json,sys; d=json.load(open('$PIN')); print(d$1)"; }
+# pin, checkout, craft_web_fonts; the font list is scripts/craft-web-build/fonts.json.
+# shellcheck source=../craft-web-build/lib.sh
+source "$SCRIPT_DIR/../craft-web-build/lib.sh"
 REPO=$(pin "['repo']")
 REV=$(pin "['rev']")
 CF_REPO=$(pin "['craftFontsRepo']")
@@ -26,54 +28,14 @@ CF_REV=$(pin "['craftFontsRev']")
 REV7=${REV:0:7}
 # Dist dir identity covers EVERY build input, not just the vectorcraft rev: a font or patch
 # change with the same rev must get a new directory (C6 keeps the last 2 versions).
-INPUTS7=$(cat "$PIN" $(for p in $PATCHES; do echo "$SCRIPT_DIR/$p"; done) | sha256sum | cut -c1-7)
+INPUTS7=$(cat "$PIN" "$CRAFT_WEB_FONTS_JSON" $(for p in $PATCHES; do echo "$SCRIPT_DIR/$p"; done) | sha256sum | cut -c1-7)
 DIST_NAME="$REV7-$INPUTS7"
 
-checkout() { # checkout <dir> <repo> <rev>
-  local dir=$1 repo=$2 rev=$3
-  if [ ! -d "$dir/.git" ]; then git clone "$repo" "$dir"; fi
-  git -C "$dir" cat-file -e "$rev^{commit}" 2>/dev/null || git -C "$dir" fetch origin
-  git -C "$dir" -c advice.detachedHead=false checkout --force --detach "$rev"
-  [ "$(git -C "$dir" rev-parse HEAD)" = "$rev" ] || { echo "FATAL: $dir not at $rev" >&2; exit 1; }
-}
 checkout "$SRC" "$REPO" "$REV"
 checkout "$FONTS" "$CF_REPO" "$CF_REV"
 
-# Web fonts (PIN.json webFonts[]): download each into the craft-fonts checkout, verify its
-# sha256 and its licence's, and append its manifest row. The craft-fonts checkout was just
-# reset by checkout --force, so rows are re-appended each build; downloads are cached.
 WF_TSV=/tmp/awarewave-webfonts.$$.tsv
-# '|'-separated: a non-whitespace IFS keeps EMPTY fields (tab-IFS merges them and shifts columns).
-python3 - "$PIN" > "$WF_TSV" <<'EOF'
-import json, sys
-for f in json.load(open(sys.argv[1]))["webFonts"]:
-    row = [f["family"], f["style"], f["dir"], f["file"], f["url"], f["sha256"],
-           f["licence"], f.get("licenseFrom", ""), f.get("licenseUrl", ""),
-           f.get("licenseSha256", ""), f["scripts"]]
-    assert not any("|" in v for v in row), row
-    print("|".join(row))
-EOF
-while IFS='|' read -r FAM STYLE DIR FILE URL SHA LIC LFROM LURL LSHA SCRIPTS; do
-  dest="$FONTS/$DIR/$FILE"
-  mkdir -p "$FONTS/$DIR"
-  if [ ! -f "$dest" ] || ! echo "$SHA  $dest" | sha256sum -c --quiet - 2>/dev/null; then
-    curl -sSL -o "$dest" "$URL"
-  fi
-  echo "$SHA  $dest" | sha256sum -c --quiet - || { echo "FATAL: $FAM: sha256 mismatch for $FILE" >&2; exit 1; }
-  licname="OFL.txt"; [ "$LIC" = "Apache-2.0" ] && licname="LICENSE.txt"
-  licdest="$FONTS/$DIR/$licname"
-  if [ -n "$LFROM" ]; then
-    echo "$LSHA  $FONTS/$LFROM" | sha256sum -c --quiet - || { echo "FATAL: $FAM: licence source $LFROM sha mismatch" >&2; exit 1; }
-    cp "$FONTS/$LFROM" "$licdest"
-  else
-    if [ ! -f "$licdest" ] || ! echo "$LSHA  $licdest" | sha256sum -c --quiet - 2>/dev/null; then
-      curl -sSL -o "$licdest" "$LURL"
-    fi
-    echo "$LSHA  $licdest" | sha256sum -c --quiet - || { echo "FATAL: $FAM: licence sha256 mismatch" >&2; exit 1; }
-  fi
-  grep -qF "$FAM | $STYLE" "$FONTS/fonts/manifest.txt" || \
-    echo "$FAM | $STYLE | $DIR/$FILE | $SCRIPTS | $LIC | $DIR/$licname | $SHA | $URL" >> "$FONTS/fonts/manifest.txt"
-done < "$WF_TSV"
+craft_web_fonts "$FONTS" "$WF_TSV"
 
 # Patches: web-fonts.txt gets the fetched faces. Nothing else of upstream is changed.
 for p in $PATCHES; do
@@ -88,7 +50,7 @@ DIST="$SRC/dist/web"
 [ -f "$DIST/index.html" ] || { echo "FATAL: no index.html in $DIST" >&2; exit 1; }
 ls "$DIST"/*.wasm >/dev/null || { echo "FATAL: no .wasm in $DIST" >&2; exit 1; }
 
-# Every PIN webFont must have landed beside the wasm (xtask only WARNS on a face the
+# Every fonts.json webFont must have landed beside the wasm (xtask only WARNS on a face the
 # manifest lacks, which would silently drop a font from the app).
 while IFS='|' read -r FAM STYLE DIR FILE URL SHA REST; do
   [ -f "$DIST/fonts/${SHA:0:16}/$FILE" ] || { echo "FATAL: $FAM missing from dist/fonts/${SHA:0:16} — web-fonts.txt vs manifest mismatch?" >&2; exit 1; }
@@ -101,7 +63,7 @@ rm -f "$WF_TSV"
 # large and we FAIL instead of shipping a bloated artifact. (Note: ~87-90MB IS the
 # correct optimized size — upstream docs' 17.5MB is stale; official v0.21.0 release
 # wasm measures 87.4MB raw.)
-WOPT=$(find "$HOME/.cache/trunk" -name wasm-opt -type f 2>/dev/null | head -1)
+WOPT=$(find "$HOME/.cache/trunk" -name wasm-opt -type f 2>/dev/null | head -1 || true)
 [ -n "$WOPT" ] || { echo "FATAL: trunk's wasm-opt binary not found under ~/.cache/trunk — cannot prove the wasm was optimized" >&2; exit 1; }
 WASM=$(ls "$DIST"/*.wasm | head -1)
 "$WOPT" -Oz --enable-reference-types --enable-bulk-memory -o /tmp/wasm-opt-check.wasm "$WASM" || { echo "FATAL: wasm-opt verification run failed on $WASM" >&2; exit 1; }
@@ -120,20 +82,29 @@ trap 'rm -rf "$STAGE"' EXIT
 rm -rf "$STAGE" && mkdir -p "$STAGE"
 cp -r "$DIST"/. "$STAGE"/
 cp "$SRC/NOTICE" "$SRC/LICENSE-MIT" "$SRC/LICENSE-APACHE" "$STAGE"/
-# Invariant: every root-level .js/.wasm filename carries a 16-hex content hash (the nginx
+# Invariant: every root-level .js/.wasm filename carries a content hash: Trunk's u64 in hex, NOT
+# zero-padded, so 12-16 digits (a 15-digit one happened 2026-11-06; same rule as photocraft-pro) (the nginx
 # immutable rule applies to all of them; index.html alone is no-cache).
 for f in "$STAGE"/*.js "$STAGE"/*.wasm; do
   [ -e "$f" ] || continue
-  basename "$f" | grep -qE '[0-9a-f]{16}' || { echo "FATAL: $(basename "$f") in dist root lacks a 16-hex content hash — immutable caching would pin it stale" >&2; exit 1; }
+  basename "$f" | grep -qE -- '-[0-9a-f]{12,16}(_bg)?\.(js|wasm)$' || { echo "FATAL: $(basename "$f") in dist root lacks a hex content hash — immutable caching would pin it stale" >&2; exit 1; }
 done
 { echo ""; echo "--- AwareWave build provenance ---"
   echo "storytold/vectorcraft @ $REV (MIT OR Apache-2.0)"
   echo "storytold/craft-fonts @ $CF_REV (fonts under OFL-1.1, licence beside each font in fonts/)"
-  echo "extra fonts from PIN.json webFonts[] (OFL-1.1 / Apache-2.0, licence beside each in fonts/)"
+  echo "extra fonts from scripts/craft-web-build/fonts.json (OFL-1.1 / Apache-2.0, licence beside each in fonts/)"
   echo "local patches: $PATCHES (scripts/vectorcraft-pro/)"
 } >> "$STAGE/NOTICE"
 find "$STAGE" \( -name '*.wasm' -o -name '*.js' -o -name '*.otf' -o -name '*.ttf' \) -exec gzip -k -9 {} \;
 ( cd "$STAGE" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS && sha256sum -c --quiet SHA256SUMS )
-rm -rf "$OUT" && mv "$STAGE" "$OUT"
+# Same name rebuilt: keep the old dist until the new one is in place (a failed mv on /mnt/c, e.g.
+# a file held open by a preview server, must not leave neither).
+OLD="$OUT.old.$$"
+if [ -e "$OUT" ]; then mv "$OUT" "$OLD"; fi
+if ! mv "$STAGE" "$OUT"; then
+  if [ -e "$OLD" ]; then mv "$OLD" "$OUT"; fi
+  echo "FATAL: could not move $STAGE into place; the previous $OUT is kept" >&2; exit 1
+fi
+rm -rf "$OLD"
 trap - EXIT
 echo "OK: $OUT ($(find "$OUT" -type f | wc -l) files, wasm $(du -h "$OUT"/*.wasm | cut -f1))"

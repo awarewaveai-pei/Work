@@ -1,0 +1,244 @@
+diff --git a/apps/photocraft-web/Cargo.toml b/apps/photocraft-web/Cargo.toml
+index 0176e0fe8..70eccc418 100644
+--- a/apps/photocraft-web/Cargo.toml
++++ b/apps/photocraft-web/Cargo.toml
+@@ -31,6 +31,11 @@ log = { workspace = true }
+ # `wgpu` pulls egui-wgpu's defaults: WebGPU plus the WebGL2 fallback.
+ eframe = { workspace = true, features = ["wgpu", "accesskit", "clipboard"] }
+ rfd = { workspace = true }
++# `window.photocraft` (the page's control channel) and the host messages (`?host=parent`): the
++# family's shared bridges, so a page hosts PhotoCraft the way it hosts the other Craft web builds.
++craft-web-api = { git = "https://github.com/storytold/craft-libs", rev = "a8b996d20753c3ab160b4f6eada00c33a2279add" }
++craft-web-host = { git = "https://github.com/storytold/craft-libs", rev = "a8b996d20753c3ab160b4f6eada00c33a2279add" }
++serde_json = { workspace = true }
+ wasm-bindgen = "0.2"
+ wasm-bindgen-futures = "0.4"
+ js-sys = "0.3"
+diff --git a/apps/photocraft-web/src/web.rs b/apps/photocraft-web/src/web.rs
+index 024888c65..44d71805f 100644
+--- a/apps/photocraft-web/src/web.rs
++++ b/apps/photocraft-web/src/web.rs
+@@ -1,11 +1,13 @@
+-//! The browser shell: web `Services`, drag-and-drop, and the eframe web runner.
++//! The browser shell: web `Services`, drag-and-drop, the page's `window.photocraft`, the hosting
++//! page's messages, and the eframe web runner.
+ 
+-use std::cell::Cell;
++use std::cell::{Cell, RefCell};
+ use std::collections::{HashMap, HashSet};
+ use std::rc::Rc;
+ use std::sync::atomic::{AtomicBool, Ordering};
+ use std::sync::{Arc, Mutex, PoisonError};
+ 
++use craft_web_host::web::{FileData, Host, Message};
+ use photocraft_codecs::{ChannelLayout, EncodeOptions, Image};
+ use photocraft_doc::Document;
+ use photocraft_ui_egui::i18n;
+@@ -16,6 +18,10 @@ use wasm_bindgen::JsCast as _;
+ 
+ type Inbox = Arc<Mutex<Vec<(String, Vec<u8>)>>>;
+ 
++/// `window.photocraft` requests the app has taken but not yet answered, each with the function that
++/// settles its promise. Settled after every frame ([`WebShell::answer_requests`]).
++type Waiting = Rc<RefCell<Vec<(std::sync::mpsc::Receiver<serde_json::Value>, js_sys::Function)>>>;
++
+ /// Everything File › Open reads: PhotoCraft, Photoshop, OpenRaster, Krita and Affinity documents, flat images, and
+ /// Photoshop brushes (.abr), gradients (.grd), layer styles (.asl) and swatches (.aco, .act, .ase), which go to the preset libraries.
+ const OPEN_EXTS: &[&str] = &[
+@@ -89,7 +95,18 @@ pub fn start() {
+                     let (session, warnings) = crate::preset_bridge::session(presets.clone());
+                     preset_warnings.extend(warnings);
+                     let drag = listen_drag(&pen_target);
+-                    let mut app = PhotocraftApp::new(session, services(inbox.clone(), place_inbox.clone(), drag_pos_service(pen_target.clone(), drag)));
++                    // The hosting page (`?host=parent`, or `data-host="page"` on the canvas), if any:
++                    // it sends files to open, and takes saves and exports instead of downloads.
++                    let host = Host::connect("photocraft", &pen_target).map(Rc::new);
++                    let services = services(inbox.clone(), place_inbox.clone(), drag_pos_service(pen_target.clone(), drag), host.clone());
++                    // `window.photocraft`: the desktop control server's methods, over the same channel.
++                    let (control_tx, control_rx) = std::sync::mpsc::channel();
++                    let mut app = PhotocraftApp::new(session, services).with_control(control_rx);
++                    let waiting = Waiting::default();
++                    install_page_api(control_tx, waiting.clone(), cc.egui_ctx.clone());
++                    if let Some(host) = &host {
++                        listen_host(host.clone(), inbox.clone(), cc.egui_ctx.clone());
++                    }
+                     if !preset_warnings.is_empty() {
+                         photocraft_ui_egui::notices::post(&mut app, i18n::t("Some brush presets could not be loaded"), preset_warnings, true, None);
+                     }
+@@ -103,10 +120,23 @@ pub fn start() {
+                     }
+                     let unsaved = Arc::new(AtomicBool::new(false));
+                     guard_unload(unsaved.clone());
+-                    Ok(Box::new(WebShell { app, inbox, place_inbox, unsaved, served, database, presets, ui_language: "" }))
++                    let shell = WebShell { app, inbox, place_inbox, unsaved, served, database, presets, ui_language: "", host, waiting };
++                    if let Some(host) = &shell.host
++                        && let Err(e) = host.post_ready(env!("CARGO_PKG_VERSION"), false)
++                    {
++                        log::error!("photocraft-web: couldn't tell the host it is ready: {e}");
++                    }
++                    Ok(Box::new(shell))
+                 }),
+             )
+             .await;
++        // A hosting page waits for `ready`: tell it the app won't come.
++        if let Err(e) = &result
++            && let Some(canvas) = document.get_element_by_id(CANVAS_ID)
++            && let Some(host) = Host::connect("photocraft", &canvas)
++        {
++            let _ = host.post_failed(&format!("PhotoCraft failed to start: {e:?}"), None);
++        }
+         if let Some(el) = document.get_element_by_id("photocraft_loading") {
+             match result {
+                 Ok(()) => el.remove(),
+@@ -196,6 +226,77 @@ fn guard_unload(unsaved: Arc<AtomicBool>) {
+     }
+ }
+ 
++/// `window.photocraft` (craft-web-api): each request goes into the app's control channel, the one
++/// the desktop control server feeds, and settles once the app answers it.
++fn install_page_api(control: std::sync::mpsc::Sender<photocraft_ui_egui::ControlRequest>, waiting: Waiting, ctx: egui::Context) {
++    use craft_web_api::methods::Methods;
++    use craft_web_api::page::{PageApi, Request};
++    // The desktop transport's deadline (`control::REPLY_DEADLINE`). Past it the request is given up
++    // through its `Dispatch`, as the TCP transport does: a request still queued then never runs
++    // (a hidden tab draws no frames), so re-sending it can't apply an edit twice (#3662).
++    let deadline_ms = i32::try_from(photocraft_ui_egui::control::REPLY_DEADLINE.as_millis()).unwrap_or(i32::MAX);
++    let request: Request = Rc::new(move |method: String, params: serde_json::Value| {
++        let (request, reply) = photocraft_ui_egui::ControlRequest::new(method, params);
++        let dispatch = request.dispatch.clone();
++        // A request the app never takes drops its reply sender: `after_frame` reports that.
++        let _ = control.send(request);
++        let mut reply = Some(reply);
++        let answered = js_sys::Promise::new(&mut |resolve, _reject| {
++            if let Some(reply) = reply.take() {
++                waiting.borrow_mut().push((reply, resolve));
++            }
++        });
++        let expired = js_sys::Promise::new(&mut |resolve, _reject| {
++            if let Some(window) = web_sys::window() {
++                let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, deadline_ms);
++            }
++        });
++        ctx.request_repaint(); // requests are taken between frames
++        Box::pin(async move {
++            let first = js_sys::Promise::race(&js_sys::Array::of2(&answered, &expired));
++            // The reply is JSON text; the deadline resolves with `undefined`.
++            match wasm_bindgen_futures::JsFuture::from(first).await.ok().and_then(|v| v.as_string()) {
++                Some(text) => serde_json::from_str(&text).unwrap_or_else(|_| serde_json::json!({"ok": false, "error": "unreadable reply"})),
++                None => serde_json::json!({"ok": false, "error": dispatch.give_up()}),
++            }
++        })
++    });
++    // The page's own timeout only backs this deadline up.
++    let timeout_ms = u32::try_from(deadline_ms).unwrap_or(u32::MAX).saturating_add(5_000);
++    // `document.inspect` is an engine command here, not a control method: reach it with
++    // `execute("document.inspect", {})`, so no `docInspect` that could only fail.
++    let methods = Methods { doc_inspect: None, ..Methods::default() };
++    if let Err(e) = Rc::new(PageApi::new("photocraft", methods, request).with_timeout(timeout_ms)).install() {
++        log::error!("photocraft-web: couldn't install window.photocraft: {e:?}");
++    }
++}
++
++/// A file the hosting page sends (`photocraft:open`) opens as File › Open would, through the same
++/// inbox as a dropped file.
++fn listen_host(host: Rc<Host>, inbox: Inbox, ctx: egui::Context) {
++    let reply_to = host.clone();
++    host.listen(move |message| {
++        let Message::Open { name, data } = message else { return };
++        let (host, inbox, ctx) = (reply_to.clone(), inbox.clone(), ctx.clone());
++        wasm_bindgen_futures::spawn_local(async move {
++            let bytes = match data {
++                FileData::Bytes(array) => Ok(array.to_vec()),
++                FileData::Blob(blob) => wasm_bindgen_futures::JsFuture::from(blob.array_buffer()).await.map(|b| js_sys::Uint8Array::new(&b).to_vec()),
++            };
++            match bytes {
++                Ok(bytes) => {
++                    inbox.lock().unwrap_or_else(PoisonError::into_inner).push((name, bytes));
++                    ctx.request_repaint();
++                }
++                Err(e) => {
++                    log::error!("couldn't read {name} from the host: {e:?}");
++                    let _ = host.post_failed(&format!("couldn't read {name}"), None);
++                }
++            }
++        });
++    });
++}
++
+ fn query() -> String {
+     web_sys::window().and_then(|w| w.location().search().ok()).unwrap_or_default()
+ }
+@@ -275,9 +376,33 @@ struct WebShell {
+     presets: crate::preset_bridge::Bridge,
+     /// The interface language whose served script font was last asked for.
+     ui_language: &'static str,
++    /// The hosting page, if any: told when unsaved changes appear or go away.
++    host: Option<Rc<Host>>,
++    waiting: Waiting,
+ }
+ 
+ impl WebShell {
++    /// After each frame: settle the `window.photocraft` requests the app answered (replies are
++    /// read only between frames, so keep drawing while any wait) and report the unsaved state.
++    fn after_frame(&self, ctx: &egui::Context) {
++        let mut waiting = self.waiting.borrow_mut();
++        waiting.retain(|(reply, resolve)| {
++            let answer = match reply.try_recv() {
++                Ok(answer) => answer,
++                Err(std::sync::mpsc::TryRecvError::Empty) => return true,
++                Err(std::sync::mpsc::TryRecvError::Disconnected) => serde_json::json!({"ok": false, "error": "the request was dropped"}),
++            };
++            let _ = resolve.call1(&wasm_bindgen::JsValue::NULL, &wasm_bindgen::JsValue::from_str(&answer.to_string()));
++            false
++        });
++        if !waiting.is_empty() {
++            ctx.request_repaint();
++        }
++        if let Some(host) = &self.host {
++            host.post_dirty(self.app.has_unsaved_work());
++        }
++    }
++
+     fn save_presets(&mut self, ctx: &egui::Context) {
+         if let Some(db) = self.database.clone()
+             && let Some(batch) = self.presets.begin()
+@@ -375,6 +500,7 @@ impl eframe::App for WebShell {
+         self.app.logic_frame(ctx, frame);
+         self.save_presets(ctx);
+         self.app.finish_type_reset_logic(ctx);
++        self.after_frame(ctx);
+     }
+ 
+     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
+@@ -404,10 +530,14 @@ impl eframe::App for WebShell {
+         self.app.ui_frame(ui, frame);
+         self.save_presets(ui.ctx());
+         self.app.finish_type_reset_pass(ui.ctx());
++        self.after_frame(ui.ctx());
+     }
+ }
+ 
+-fn services(inbox: Inbox, place_inbox: Inbox, cursor_pos: photocraft_ui_egui::CursorPosFn) -> Services {
++fn services(inbox: Inbox, place_inbox: Inbox, cursor_pos: photocraft_ui_egui::CursorPosFn, host: Option<Rc<Host>>) -> Services {
++    // A download may be cancelled and never reports back, so it doesn't save the document; a host
++    // has the file once it is posted (no `id`: no `saved` to wait for).
++    let write_unconfirmed = host.is_none();
+     Services {
+         screen_pick: screen_color_service(),
+         import: Some(Box::new(|name: &str, bytes: &[u8], opts: &photocraft_io::ImportOptions| {
+@@ -452,9 +582,12 @@ fn services(inbox: Inbox, place_inbox: Inbox, cursor_pos: photocraft_ui_egui::Cu
+                 reply.send(Some(FileDialogAnswer::SaveTo(name)));
+             }
+         })),
+-        write: Some(Box::new(|path: &str, bytes: &[u8]| download(path, bytes))),
+-        // A download may be cancelled and never reports back: it doesn't save the document.
+-        write_unconfirmed: true,
++        // Save, Save As and Export: to the hosting page (`photocraft:save`), else a download.
++        write: Some(Box::new(move |path: &str, bytes: &[u8]| match &host {
++            Some(host) => host.post_save(path, bytes, None, false),
++            None => download(path, bytes),
++        })),
++        write_unconfirmed,
+         encode_png: Some(Box::new(|w, h, rgba| {
+             let img = Image::from_u8(w, h, ChannelLayout::Rgba, rgba.to_vec()).map_err(|e| e.to_string())?;
+             photocraft_codecs::encode(&img, photocraft_codecs::Format::Png, &EncodeOptions::default()).map_err(|e| e.to_string())
