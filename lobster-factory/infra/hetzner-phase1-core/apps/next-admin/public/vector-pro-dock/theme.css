@@ -7,24 +7,21 @@
  *   面板最小寬 220）與 dock_style() :1216-1226（分頁高 33）。 */
 
 #vector-pro-dock {
-  --vp-column-width: 310px;   /* COLUMN_WIDTH */
-  --vp-column-min: 220px;     /* COLUMN_MIN */
-  --vp-column-max: 720px;     /* COLUMN_MAX */
   --vp-icon-width: 38px;      /* ICON_WIDTH */
-  --vp-panel-min: 220px;      /* PANEL_MIN_WIDTH */
+  --vp-panel-min: 220px;      /* PANEL_MIN_WIDTH / COLUMN_MIN */
+  --vp-panel-max: 720px;      /* COLUMN_MAX */
+  --vp-column-width: 310px;   /* COLUMN_WIDTH：浮出層預設寬 */
   --vp-tab-height: 33px;      /* dock_style tab_height */
   --vp-pad: 10px;             /* R0-PLAN C4.1 內距 10 */
   --vp-icon-cell: 30px;       /* craft-ui icon_size 20 + 10 */
-  --vp-header: 14px;          /* craft-ui chrome TITLE_HEIGHT */
 
+  /* 只有一條圖示欄：寬 38、全高；iframe 吃滿其餘寬度 */
   position: relative;
   display: flex;
   flex-direction: column;
-  flex: 0 0 auto;
+  flex: 0 0 var(--vp-icon-width);
   box-sizing: border-box;
-  width: var(--vp-column-width);
-  min-width: var(--vp-column-min);
-  max-width: var(--vp-column-max);
+  width: var(--vp-icon-width);
   height: 100%;
   background: var(--card-bg);
   border-left: 1px solid var(--border);
@@ -32,58 +29,11 @@
   font-family: var(--font-family-base);
   font-size: var(--font-size-sm);
   line-height: 1.4;
-  user-select: none;
-  overflow: hidden;
 }
 #vector-pro-dock *, #vector-pro-dock *::before, #vector-pro-dock *::after { box-sizing: border-box; }
-#vector-pro-dock.vp-collapsed { width: var(--vp-icon-width); min-width: var(--vp-icon-width); }
 
-/* 欄頂：» 收合鈕（Collapse to Icons／Expand Panels） */
-.vp-head {
-  flex: 0 0 var(--vp-header);
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  background: var(--bg-subtle);
-  border-bottom: 1px solid var(--border);
-}
-.vp-collapse {
-  height: var(--vp-header);
-  min-width: var(--vp-header);
-  padding: 0 4px;
-  border: 0;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: var(--font-size-xs);
-  line-height: var(--vp-header);
-  cursor: pointer;
-}
-.vp-collapse:hover { color: var(--text-primary); background: var(--bg-hover); }
-
-/* 左緣拉寬把手（craft-ui resize-left：寬 4） */
-.vp-resize { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; cursor: ew-resize; z-index: 2; touch-action: none; }
-.vp-resize:hover, .vp-resize.vp-active { background: var(--accent); }
-#vector-pro-dock.vp-collapsed .vp-resize { display: none; }
-
-/* ---- 面板群組：.tab-bar（高 33）+ 內容 ---- */
-.vp-groups { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; }
-.vp-group { border-bottom: 1px solid var(--border); }
-#vector-pro-dock .vp-tabs { height: var(--vp-tab-height); flex-wrap: nowrap; background: var(--bg-subtle); }
-#vector-pro-dock .vp-tab { display: flex; align-items: center; gap: 6px; padding-block: 0; }
-.vp-body {
-  display: none;
-  min-width: var(--vp-panel-min);
-  padding: var(--vp-pad);
-  background: var(--card-bg);
-  user-select: text;
-}
-.vp-group.vp-open .vp-body { display: block; }
-.vp-error { color: var(--text-muted); font-size: var(--font-size-xs); }
-
-/* ---- 收成圖示欄 38：圖示格 30，點開飛出面板（.card） ---- */
-.vp-icons { display: none; flex-direction: column; align-items: center; padding-top: 4px; gap: 2px; }
-#vector-pro-dock.vp-collapsed .vp-icons { display: flex; }
-#vector-pro-dock.vp-collapsed .vp-groups { display: none; }
+/* ---- 圖示欄：圖示格 30 ---- */
+.vp-icons { display: flex; flex-direction: column; align-items: center; padding-top: 4px; gap: 2px; }
 #vector-pro-dock .vp-icon {
   width: var(--vp-icon-cell);
   height: var(--vp-icon-cell);
@@ -93,16 +43,37 @@
   line-height: var(--vp-icon-cell);
   text-align: center;
 }
+
+/* ---- 浮出層：全高、在圖示欄左側、蓋在 iframe 之上（不推擠）；寬 310（拉 220–720） ---- */
 #vector-pro-dock .vp-flyout {
   position: fixed;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
   width: var(--vp-column-width);
   min-width: var(--vp-panel-min);
-  max-height: 80vh;
-  overflow: auto;
+  max-width: var(--vp-panel-max);
   padding: 0;
+  border-radius: 0;
+  overflow: hidden;
   z-index: 50;
+  user-select: none;
 }
-.vp-flyout .vp-body { display: block; }
+#vector-pro-dock .vp-flyout[hidden] { display: none; }
+#vector-pro-dock .vp-tabs { flex: 0 0 var(--vp-tab-height); height: var(--vp-tab-height); flex-wrap: nowrap; background: var(--bg-subtle); }
+#vector-pro-dock .vp-tab { display: flex; align-items: center; gap: 6px; padding-block: 0; }
+.vp-bodies { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; }
+.vp-body { min-width: var(--vp-panel-min); padding: var(--vp-pad); user-select: text; }
+.vp-body[hidden] { display: none; }
+.vp-status { flex: 0 0 auto; min-height: 0; padding: 6px var(--vp-pad); border-top: 1px solid var(--border); color: var(--text-muted); font-size: var(--font-size-xs); }
+.vp-status:empty { display: none; }
+.vp-busy .vp-status { color: var(--accent-text); }
+.vp-error { color: var(--text-muted); font-size: var(--font-size-xs); }
+
+/* 浮出層左緣拉寬把手（craft-ui resize-left：寬 4） */
+.vp-resize { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; cursor: ew-resize; z-index: 2; touch-action: none; }
+.vp-resize:hover, .vp-resize.vp-active { background: var(--accent); }
 
 /* ---- 面板內版面 class（app 無對應者；只含版面，顏色只用 token） ---- */
 #vector-pro-dock .vp-body label { display: block; font-size: var(--font-size-xs); color: var(--text-muted); margin: 10px 0 4px; }
@@ -120,7 +91,6 @@
 }
 #vector-pro-dock .vp-body .fontrow:hover { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
 #vector-pro-dock .vp-body .fname { font-size: var(--font-size-xs); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#vector-pro-dock .vp-body .fprev { font-size: var(--font-size-xl); line-height: 1.4; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #vector-pro-dock .vp-body .cgsec { margin-top: 8px; }
 /* 色彩混合器分頁底線 = 該色相範圍本身的顏色（資料色，不是 UI 主題色；blocks/color-grade.js 以 --swatch 設在按鈕上）。
  * --swatch 是本檔唯一允許的非主題變數；作用中分頁仍用主題的 --tab-border-active。 */
