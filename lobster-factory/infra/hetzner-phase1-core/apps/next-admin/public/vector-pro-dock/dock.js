@@ -1,14 +1,16 @@
-// 向量（專業版）第二 dock 欄：門頁提供空的 <aside id="vector-pro-dock"> 與 window.__vectorProFrame（VectorCraft iframe），
-// 本模組自己掛載。外觀 = theme.css（同目錄，跟著本檔走，不寫路徑常數）；面板 = /editor-shared/blocks/<id>.js，
+// 向量（專業版）dock：門頁提供空的 <aside id="vector-pro-dock"> 與 window.__vectorProFrame（VectorCraft iframe），
+// 本模組自己掛載。版面（操作者 2026-11-05「右側兩欄應該做成同一欄」）：只有一條圖示欄（寬 38，同真品 icon rail），
+// 點圖示 → 該面板以浮出層打開（寬 310、全高、蓋在 iframe 右側之上，不推擠 iframe）；再點同圖示、點頁面其他地方
+// 或 Esc 收起；一次只開一個。外觀 = theme.css（同目錄）；面板 = /editor-shared/blocks/<id>.js，
 // 介面 export default { id, title, icon, mount(ctx, body) }，單一面板載入或掛載失敗只影響它自己。
-// 欄寬 310（220–720）、收成 38 圖示欄、分頁 33：真品 crates/ui-egui/src/panel_docking.rs:36-43、:1216-1226。
+// 尺寸：真品 crates/ui-egui/src/panel_docking.rs:36-43（圖示欄 38、面板 310，220–720）、:1216-1226（分頁 33）。
 
 import { createVectorcraftCtx } from "/editor-shared/ctx-vectorcraft.js";
 
 /** 面板模組所在（搬路徑只改這一處）。 */
 export const BLOCKS_BASE = "/editor-shared/blocks/";
 
-/** 十個我們獨有的面板，欄內由上而下的順序（R0-PLAN §6 C4.2）。 */
+/** 十個我們獨有的面板，圖示欄由上而下的順序（R0-PLAN §6 C4.2）。 */
 export const PANEL_IDS = Object.freeze([
   "templates",
   "fonts",
@@ -22,11 +24,11 @@ export const PANEL_IDS = Object.freeze([
   "batch-export",
 ]);
 
-const COLUMN_WIDTH = 310;
-const COLUMN_MIN = 220;
-const COLUMN_MAX = 720;
-const STORE = "vector-pro-dock:v1";
-
+const PANEL_WIDTH = 310;
+const PANEL_MIN = 220;
+const PANEL_MAX = 720;
+const STORE = "vector-pro-dock:v2";
+const LEGACY_KEYS = ["vector-pro-dock:v1", "vector-pro-dock:brightness-applied:v1"]; // 舊版欄位狀態與明暗旗標
 
 const el = (tag, cls, text) => {
   const n = document.createElement(tag);
@@ -35,16 +37,13 @@ const el = (tag, cls, text) => {
   return n;
 };
 
-function loadState() {
-  let s = {};
+function loadWidth() {
   try {
-    s = JSON.parse(localStorage.getItem(STORE) || "{}") || {};
-  } catch {}
-  return {
-    width: Number.isFinite(s.width) ? s.width : COLUMN_WIDTH,
-    collapsed: s.collapsed === true,
-    open: Array.isArray(s.open) ? s.open.filter((id) => PANEL_IDS.includes(id)) : [PANEL_IDS[0]],
-  };
+    const w = JSON.parse(localStorage.getItem(STORE) || "{}")?.width;
+    return Number.isFinite(w) ? Math.min(PANEL_MAX, Math.max(PANEL_MIN, w)) : PANEL_WIDTH;
+  } catch {
+    return PANEL_WIDTH;
+  }
 }
 
 /** C5.1：第一次開啟切到 Essentials Classic（控制列開；真品 crates/ui-egui/src/workspaces.rs:85-91），
@@ -67,93 +66,64 @@ export async function applyDefaultWorkspace(ctx) {
   }
 }
 
-/** VectorCraft 本體明暗跟 app 主題：--body-bg 亮 → Light，暗 → MediumDark（真品 theme.rs:9-33 Brightness id；
- *  ui.set {brightness} = control.rs:638 → window.brightness）。只在使用者沒在 VectorCraft 自己改過時套用：
- *  記下我們上次套的值，現值不同 = 使用者選過，從此不碰。 */
-const BRIGHTNESS_FLAG = "vector-pro-dock:brightness-applied:v1";
-
-export function themeIsLight(doc = document) {
-  const probe = doc.createElement("span");
-  probe.style.cssText = "position:absolute;visibility:hidden;background:var(--body-bg)";
-  doc.body.appendChild(probe);
-  const m = getComputedStyle(probe).backgroundColor.match(/[\d.]+/g) || [];
-  probe.remove();
-  const [r, g, b, a = 1] = m.map(Number);
-  if (![r, g, b].every(Number.isFinite) || a === 0) return null; // 沒有 --body-bg（透明）= 不判斷
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b >= 128;
-}
-
-export async function followThemeBrightness(ctx) {
-  try {
-    const light = themeIsLight();
-    if (light === null) return;
-    const want = light ? "light" : "mediumDark";
-    await ctx.ready();
-    const api = globalThis.__vectorProFrame?.contentWindow?.vectorcraft;
-    const raw = String((await api.inspect())?.ui?.brightness ?? ""); // 序列化為變體名 "MediumDark"
-    const cur = raw.charAt(0).toLowerCase() + raw.slice(1);
-    const applied = localStorage.getItem(BRIGHTNESS_FLAG);
-    if (applied && applied !== cur) return; // 使用者自己選過
-    if (cur !== want) await api.request("ui.set", { brightness: want });
-    localStorage.setItem(BRIGHTNESS_FLAG, want);
-  } catch (err) {
-    console.warn("[vector-pro dock] VectorCraft 明暗未套用", err);
-  }
-}
-
-export async function mountDock(root, ctx = createVectorcraftCtx()) {
-  const state = loadState();
-  const save = () => {
+export async function mountDock(root, makeCtx = createVectorcraftCtx) {
+  for (const k of LEGACY_KEYS) {
     try {
-      localStorage.setItem(STORE, JSON.stringify(state));
+      localStorage.removeItem(k);
     } catch {}
-  };
-
+  }
   const css = el("link");
   css.rel = "stylesheet";
   css.href = new URL("./theme.css", import.meta.url).href;
   document.head.appendChild(css);
 
   root.textContent = "";
-  root.style.width = `${Math.min(COLUMN_MAX, Math.max(COLUMN_MIN, state.width))}px`;
-  root.classList.toggle("vp-collapsed", state.collapsed);
-
-  const head = el("div", "vp-head");
-  const collapse = el("button", "vp-collapse");
-  collapse.type = "button";
-  const resize = el("div", "vp-resize");
-  const groups = el("div", "vp-groups");
   const icons = el("div", "vp-icons");
-  head.appendChild(collapse);
-  root.append(resize, head, groups, icons);
+  // 浮出層：固定在圖示欄左側、全高；面板 body 都掛在裡面，切換只換顯示，狀態保留
+  const flyout = el("div", "card vp-flyout");
+  flyout.hidden = true;
+  const resize = el("div", "vp-resize");
+  const tabs = el("div", "tab-bar vp-tabs");
+  const tab = el("div", "tab tab--active vp-tab");
+  tabs.appendChild(tab);
+  const bodies = el("div", "vp-bodies");
+  const status = el("div", "vp-status");
+  status.setAttribute("role", "status");
+  flyout.append(resize, tabs, bodies, status);
+  root.append(icons, flyout);
 
-  const setCollapsed = (on) => {
-    state.collapsed = on;
-    root.classList.toggle("vp-collapsed", on);
-    root.style.width = on ? "" : `${state.width}px`;
-    collapse.textContent = on ? "«" : "»";
-    collapse.title = on ? "展開面板" : "收合為圖示";
-    closeFlyout();
-    save();
+  let width = loadWidth();
+  const place = () => {
+    flyout.style.width = `${width}px`;
+    flyout.style.right = `${root.getBoundingClientRect().width}px`;
   };
-  collapse.addEventListener("click", () => setCollapsed(!state.collapsed));
+
+  // ctx.info／ctx.busy：面板的狀態訊息與忙碌顯示在浮出層底部
+  const ctx = makeCtx({
+    onInfo: (msg) => {
+      status.textContent = String(msg ?? "").replace(/<[^>]*>/g, "");
+    },
+    onBusy: (on) => flyout.classList.toggle("vp-busy", !!on),
+  });
 
   // 左緣拉寬（220–720）
   resize.addEventListener("pointerdown", (e) => {
     e.preventDefault();
     const startX = e.clientX;
-    const startW = root.getBoundingClientRect().width;
+    const startW = width;
     resize.classList.add("vp-active");
     resize.setPointerCapture(e.pointerId);
     const move = (m) => {
-      state.width = Math.round(Math.min(COLUMN_MAX, Math.max(COLUMN_MIN, startW + (startX - m.clientX))));
-      root.style.width = `${state.width}px`;
+      width = Math.round(Math.min(PANEL_MAX, Math.max(PANEL_MIN, startW + (startX - m.clientX))));
+      place();
     };
     const up = () => {
       resize.classList.remove("vp-active");
       resize.removeEventListener("pointermove", move);
       for (const t of ["pointerup", "pointercancel", "lostpointercapture"]) resize.removeEventListener(t, up);
-      save();
+      try {
+        localStorage.setItem(STORE, JSON.stringify({ width }));
+      } catch {}
     };
     resize.addEventListener("pointermove", move);
     for (const t of ["pointerup", "pointercancel", "lostpointercapture"]) resize.addEventListener(t, up);
@@ -167,101 +137,68 @@ export async function mountDock(root, ctx = createVectorcraftCtx()) {
     if (!mod || typeof mod.mount !== "function") {
       console.warn(`[vector-pro dock] 面板 ${id} 載入失敗`, r.status === "rejected" ? r.reason : "沒有 default.mount");
     }
-    return { id, mod: mod && typeof mod.mount === "function" ? mod : null, title: mod?.title || id, icon: mod?.icon || "▢", body: null };
+    return { id, mod: mod && typeof mod.mount === "function" ? mod : null, title: mod?.title || id, icon: mod?.icon || "▢", body: null, button: null };
   });
 
-  const mountInto = (p, body) => {
-    if (!p.mod) {
-      body.appendChild(el("div", "vp-error", "此面板載入失敗，其他面板不受影響。"));
-      return;
-    }
-    try {
-      const r = p.mod.mount(ctx, body);
-      if (r && typeof r.catch === "function") r.catch((err) => showError(body, err));
-    } catch (err) {
-      showError(body, err);
-    }
-  };
   const showError = (body, err) => {
     console.error("[vector-pro dock]", err);
     body.appendChild(el("div", "vp-error", `面板出錯：${err?.message || err}`));
   };
+  const mountInto = (p) => {
+    p.body = el("div", "vp-body");
+    p.body.dataset.panel = p.id;
+    bodies.appendChild(p.body);
+    if (!p.mod) {
+      p.body.appendChild(el("div", "vp-error", "此面板載入失敗，其他面板不受影響。"));
+      return;
+    }
+    try {
+      const r = p.mod.mount(ctx, p.body);
+      if (r && typeof r.catch === "function") r.catch((err) => showError(p.body, err));
+    } catch (err) {
+      showError(p.body, err);
+    }
+  };
 
-  // 展開狀態：每個面板一個群組（分頁列 33 + 內容）
-  for (const p of panels) {
-    const group = el("section", "vp-group");
-    group.dataset.panel = p.id;
-    const tabs = el("div", "tab-bar vp-tabs");
-    const tab = el("button", "tab vp-tab");
-    tab.type = "button";
-    tab.append(el("span", null, p.icon), el("span", null, p.title));
-    tabs.appendChild(tab);
-    const body = el("div", "vp-body");
-    group.append(tabs, body);
-    groups.appendChild(group);
-    const setOpen = (on) => {
-      group.classList.toggle("vp-open", on);
-      tab.classList.toggle("tab--active", on);
-      if (on && !p.body) {
-        p.body = body;
-        mountInto(p, body);
-      }
-    };
-    tab.addEventListener("click", () => {
-      const on = !group.classList.contains("vp-open");
-      state.open = on ? [...new Set([...state.open, p.id])] : state.open.filter((x) => x !== p.id);
-      setOpen(on);
-      save();
-    });
-    setOpen(state.open.includes(p.id));
-  }
-
-  // 收合狀態：38 圖示欄，點圖示在欄左側飛出該面板（與展開狀態共用同一個掛載好的 body）
-  let flyout = null;
-  function closeFlyout() {
-    if (!flyout) return;
-    flyout.home.appendChild(flyout.panel.body); // home = 群組 section，body 回到分頁列下方
-    flyout.box.remove();
-    flyout.button.classList.remove("tab--active");
-    flyout = null;
-  }
+  let open = null;
+  const close = () => {
+    if (!open) return;
+    open.button.classList.remove("tab--active");
+    open.body.hidden = true;
+    flyout.hidden = true;
+    open = null;
+  };
+  const show = (p) => {
+    const same = open === p;
+    close();
+    if (same) return;
+    if (!p.body) mountInto(p);
+    for (const b of bodies.children) b.hidden = b !== p.body;
+    tab.textContent = p.title;
+    status.textContent = "";
+    flyout.hidden = false;
+    place();
+    p.button.classList.add("tab--active");
+    open = p;
+  };
   for (const p of panels) {
     const b = el("button", "tab vp-icon", p.icon);
     b.type = "button";
     b.title = p.title;
+    b.setAttribute("aria-label", p.title);
+    b.addEventListener("click", () => show(p));
+    p.button = b;
     icons.appendChild(b);
-    b.addEventListener("click", () => {
-      const same = flyout?.panel === p;
-      closeFlyout();
-      if (same) return;
-      const group = groups.querySelector(`[data-panel="${p.id}"]`);
-      const home = group; // .vp-body 的原父節點
-      if (!p.body) {
-        p.body = group.querySelector(".vp-body");
-        mountInto(p, p.body);
-      }
-      const box = el("div", "card vp-flyout");
-      const tabs = el("div", "tab-bar vp-tabs");
-      const tab = el("div", "tab tab--active vp-tab", p.title);
-      tabs.appendChild(tab);
-      box.append(tabs, p.body);
-      root.appendChild(box);
-      const r = root.getBoundingClientRect();
-      box.style.top = `${Math.max(0, Math.min(b.getBoundingClientRect().top, window.innerHeight - box.offsetHeight - 8))}px`;
-      box.style.right = `${window.innerWidth - r.left}px`;
-      b.classList.add("tab--active");
-      flyout = { panel: p, box, home, button: b };
-    });
   }
-  document.addEventListener("keydown", (e) => e.key === "Escape" && closeFlyout());
-  window.addEventListener("resize", () => closeFlyout());
+  // 點頁面其他地方（不在浮出層、不在圖示欄）收起；iframe 裡的點擊不會傳到這頁，畫布操作不會關掉面板
+  document.addEventListener("pointerdown", (e) => {
+    if (open && !flyout.contains(e.target) && !icons.contains(e.target)) close();
+  });
+  document.addEventListener("keydown", (e) => e.key === "Escape" && close());
+  window.addEventListener("resize", () => open && place());
 
-  setCollapsed(state.collapsed);
-
-  followThemeBrightness(ctx);
   applyDefaultWorkspace(ctx);
-
-  return { ctx, panels };
+  return { ctx, panels, show, close };
 }
 
 if (typeof document !== "undefined") {

@@ -22,15 +22,34 @@ function base64ToBlob(b64, type) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** 長度 → 點（pt，真品文件座標）。px 以 dpi 換成實體長度（1 in = 72 pt）。 */
+const PER_UNIT = { pt: 1, in: 72, mm: 72 / 25.4, cm: 72 / 2.54 };
+export function toPoints(value, unit = "pt", dpi = 72) {
+  const v = Number(value);
+  const k = unit === "px" ? 72 / (Number(dpi) > 0 ? Number(dpi) : 72) : PER_UNIT[unit];
+  if (!(v > 0) || !Number.isFinite(v) || !k) throw new Error(`尺寸不正確：${value} ${unit}`);
+  return v * k;
+}
+/** file.new 的 units 名（engine cmd/edit.rs:26）。 */
+const UNIT_NAME = { pt: "Points", in: "Inches", mm: "Millimeters", cm: "Centimeters", px: "Pixels" };
+
+/** 匯出品質 → 真品要的 0–100 整數（u8；傳 0.9 會被拒 "invalid type: floating point"）。0–1 視為比例。 */
+export function toQuality(q) {
+  const n = Number(q);
+  if (!Number.isFinite(n)) return undefined;
+  return Math.round(Math.min(100, Math.max(0, n <= 1 ? n * 100 : n)));
+}
+
 /**
- * @param {{frame?: () => (HTMLIFrameElement|undefined), timeoutMs?: number, pollMs?: number}} [opts]
+ * @param {{frame?: () => (HTMLIFrameElement|undefined), timeoutMs?: number, pollMs?: number,
+ *          onInfo?: (msg: string) => void, onBusy?: (on: boolean) => void}} [opts]
  *   frame：回傳宿主 iframe（預設 window.__vectorProFrame，門頁 page.tsx 提供）。
+ *   onInfo／onBusy：面板的狀態訊息與忙碌顯示，由 dock 決定畫在哪。
  */
 export function createVectorcraftCtx(opts = {}) {
   const frame = opts.frame || (() => globalThis.__vectorProFrame);
   const timeoutMs = opts.timeoutMs ?? 30000;
   const pollMs = opts.pollMs ?? 200;
-  let running = 0;
   let queue = Promise.resolve(); // ctx 呼叫一次跑一個：選取與 captureDownloads 都是宿主全域狀態
 
   /** 等到 iframe 內 window.vectorcraft 出現（wasm 啟動前不存在）。同源才讀得到。 */
@@ -44,12 +63,11 @@ export function createVectorcraftCtx(opts = {}) {
     }
   }
 
-  /** 每個對外方法包一層：busy 計數。 */
+  /** 每個對外方法包一層：排隊一次一個。 */
   const op = (fn) => (...args) => {
-    running++;
     const run = queue.then(async () => fn(await vc(), ...args));
     queue = run.catch(() => {});
-    return run.finally(() => running--);
+    return run;
   };
 
   async function place(api, name, data, extra) {
@@ -73,14 +91,20 @@ export function createVectorcraftCtx(opts = {}) {
   }
 
   const ctx = {
-    info: { host: "vectorcraft", contract: 1 },
-    get busy() {
-      return running > 0;
-    },
+    host: "vectorcraft",
+    /** 面板狀態訊息（同步，不排隊）。 */
+    info: (msg) => opts.onInfo?.(String(msg ?? "")),
+    /** 面板告知忙碌中／結束（同步，不排隊）。 */
+    busy: (on) => opts.onBusy?.(!!on),
     ready: () => vc().then(() => true),
 
-    /** 置入 SVG 字串，置中於視窗並選取；回 {ids}。 */
-    placeSvg: op((api, svg, name = "awarewave.svg") => place(api, name, new Blob([svg], { type: "image/svg+xml" }))),
+    /** 置入 SVG 字串，置中於視窗；多個物件群組成一個（object.group，engine cmd/object/commands.rs:135）並選取；回 {ids}。 */
+    placeSvg: op(async (api, svg, name = "awarewave.svg") => {
+      const { ids } = await place(api, name, new Blob([svg], { type: "image/svg+xml" }));
+      if (ids.length < 2) return { ids };
+      const g = await api.execute("object.group", { ids });
+      return { ids: [g.id] };
+    }),
 
     /** 置入點陣圖（內嵌），置中並選取；回 {ids}。 */
     placeImage: op((api, blob, name) => place(api, name || `awarewave.${EXT[blob.type] || "png"}`, blob)),
@@ -121,7 +145,9 @@ export function createVectorcraftCtx(opts = {}) {
     exportArtboard: op(async (api, o = {}) => {
       const format = o.format || "png";
       const params = { format };
-      for (const k of ["ppi", "background", "quality", "artboard", "width", "height"]) if (o[k] !== undefined) params[k] = o[k];
+      for (const k of ["ppi", "background", "artboard", "width", "height"]) if (o[k] !== undefined) params[k] = o[k];
+      const q = toQuality(o.quality);
+      if (q !== undefined) params.quality = q;
       const r = await api.request("app.export", params);
       return base64ToBlob(r.dataBase64, MIME[format] || "application/octet-stream");
     }),
@@ -130,6 +156,28 @@ export function createVectorcraftCtx(opts = {}) {
     addFont: op(async (api, bytes) => {
       if (typeof api.addFont !== "function") throw new Error("addFont 不可用：此 VectorCraft 建置沒有 C1.4 字型補丁");
       return api.addFont(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
+    }),
+
+    /** 畫板改尺寸：第一個畫板 artboard.setProps {index:0, width, height}（engine cmd/layer.rs:158，pt）；
+     *  沒有開啟的文件就 file.new 一份該尺寸（cmd/edit.rs:26）。unit：mm／cm／in／pt／px（px 以 dpi 換算）。 */
+    setArtboardSize: op(async (api, { width, height, unit = "px", dpi = 72 } = {}) => {
+      const w = toPoints(width, unit, dpi);
+      const h = toPoints(height, unit, dpi);
+      try {
+        await api.execute("artboard.setProps", { index: 0, width: w, height: h });
+        return { width: w, height: h, created: false };
+      } catch (err) {
+        if (!/no (active )?document/i.test(String(err?.message))) throw err;
+        await api.execute("file.new", { width: w, height: h, units: UNIT_NAME[unit] || "Points" });
+        return { width: w, height: h, created: true };
+      }
+    }),
+
+    /** 選取的文字套字型：text.setStyle {font, style?}（engine cmd/typecmd.rs:122；不帶 ids = 選取）。
+     *  字型不可用時真品回 warning（畫成替代字型），一併回傳。 */
+    setFont: op(async (api, family, style) => {
+      if (!family) throw new Error("setFont 需要字型名稱");
+      return api.execute("text.setStyle", style ? { font: family, style } : { font: family });
     }),
 
     /** 目前文件存成 .vectorcraft → Blob；用 Save a Copy，不改文件自己的路徑與標題。 */

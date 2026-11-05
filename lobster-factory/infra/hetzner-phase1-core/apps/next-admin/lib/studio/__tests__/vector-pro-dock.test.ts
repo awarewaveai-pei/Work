@@ -23,7 +23,7 @@ describe("dock.js 面板註冊表", () => {
 
 // ---- mock window.vectorcraft（介面同真品 apps/vectorcraft-web/src/api.rs install()） ----
 type Call = [string, string, any];
-function mockHost(handlers: Record<string, (p: any) => any> = {}, extra: Record<string, any> = {}) {
+function mockHost(handlers: Record<string, (p: any) => any> = {}, extra: Record<string, any> = {}, opts: Record<string, any> = {}) {
   const calls: Call[] = [];
   const kept = new Map<string, Uint8Array>();
   let capture = false;
@@ -46,7 +46,7 @@ function mockHost(handlers: Record<string, (p: any) => any> = {}, extra: Record<
     ...extra,
   };
   const frame = { contentWindow: { vectorcraft } } as unknown as HTMLIFrameElement;
-  const ctx = createVectorcraftCtx({ frame: () => frame, timeoutMs: 50, pollMs: 5 });
+  const ctx = createVectorcraftCtx({ frame: () => frame, timeoutMs: 50, pollMs: 5, ...opts });
   return { ctx, calls, vectorcraft };
 }
 const b64 = (s: string) => Buffer.from(s, "binary").toString("base64");
@@ -58,6 +58,10 @@ describe("ctx-vectorcraft.js 契約（mock vectorcraft）", () => {
     const { ctx, calls } = mockHost({ "file.place": () => ({ ids: [7] }) });
     expect(await ctx.placeSvg("<svg/>")).toEqual({ ids: [7] });
     expect(calls[0][2]).toEqual({ name: "awarewave.svg", dataBase64: b64("<svg/>") });
+    // 置入成多個物件時群組成一個（QR／條碼不能是幾百個散物件）
+    const many = mockHost({ "file.place": () => ({ ids: [1, 2, 3] }), "object.group": () => ({ id: 9 }) });
+    expect(await many.ctx.placeSvg("<svg/>")).toEqual({ ids: [9] });
+    expect(many.calls[1]).toEqual(["execute", "object.group", { ids: [1, 2, 3] }]);
   });
 
   it("placeImage → file.place，副檔名跟 MIME", async () => {
@@ -110,6 +114,36 @@ describe("ctx-vectorcraft.js 契約（mock vectorcraft）", () => {
     expect(calls[0]).toEqual(["request", "app.export", { format: "webp", quality: 80, background: "transparent" }]);
     expect(blob.type).toBe("image/webp");
     expect(await text(blob)).toBe("WEBP");
+    // 真品只收 0–100 整數（u8）：webp.js 傳 0.9 被拒 "invalid type: floating point 0.9, expected u8"
+    const frac = mockHost({ "app.export": () => ({ dataBase64: b64("W") }) });
+    await frac.ctx.exportArtboard({ format: "webp", quality: 0.9 });
+    expect(frac.calls[0][2]).toEqual({ format: "webp", quality: 90 });
+  });
+
+  it("setArtboardSize → artboard.setProps（pt）；沒文件就 file.new", async () => {
+    const { ctx, calls } = mockHost({ "artboard.setProps": () => null });
+    expect(await ctx.setArtboardSize({ width: 210, height: 297, unit: "mm", dpi: 300 })).toMatchObject({ created: false });
+    expect(calls[0][1]).toBe("artboard.setProps");
+    expect(calls[0][2].index).toBe(0);
+    expect(calls[0][2].width).toBeCloseTo(595.2756, 3);
+    expect(calls[0][2].height).toBeCloseTo(841.8898, 3);
+    const px = mockHost({ "artboard.setProps": () => null });
+    await px.ctx.setArtboardSize({ width: 1080, height: 1080, unit: "px", dpi: 300 });
+    expect(px.calls[0][2].width).toBeCloseTo(259.2, 6);
+    const none = mockHost({ "artboard.setProps": () => { throw new Error("no document"); }, "file.new": () => ({}) });
+    expect(await none.ctx.setArtboardSize({ width: 90, height: 54, unit: "mm" })).toMatchObject({ created: true });
+    expect(none.calls[1][1]).toBe("file.new");
+    expect(none.calls[1][2]).toMatchObject({ units: "Millimeters" });
+    await expect(mockHost().ctx.setArtboardSize({ width: 0, height: 1, unit: "mm" })).rejects.toThrow(/尺寸/);
+  });
+
+  it("setFont → text.setStyle {font}（選取的文字）", async () => {
+    const { ctx, calls } = mockHost({ "text.setStyle": () => ({ ids: [4] }) });
+    expect(await ctx.setFont("Noto Serif TC")).toEqual({ ids: [4] });
+    expect(calls[0]).toEqual(["execute", "text.setStyle", { font: "Noto Serif TC" }]);
+    await ctx.setFont("Noto Serif TC", "Bold");
+    expect(calls[1][2]).toEqual({ font: "Noto Serif TC", style: "Bold" });
+    await expect(ctx.setFont("")).rejects.toThrow(/字型名稱/);
   });
 
   it("openFile → vectorcraft.openFile(name, bytes)；沒檔名就 reject", async () => {
@@ -142,16 +176,14 @@ describe("ctx-vectorcraft.js 契約（mock vectorcraft）", () => {
     expect(host.calls.filter((c) => c[0] === "captureDownloads").map((c) => c[1])).toEqual(["true", "false"]);
   });
 
-  it("info / busy / ready：執行中 busy，宿主未載入 ready reject", async () => {
-    let release!: () => void;
-    const { ctx } = mockHost({ "file.place": () => new Promise((r) => (release = () => r({ ids: [1] }))) });
-    expect(ctx.info).toEqual({ host: "vectorcraft", contract: 1 });
-    const p = ctx.placeSvg("<svg/>");
-    await new Promise((r) => setTimeout(r, 0));
-    expect(ctx.busy).toBe(true);
-    release();
-    await p;
-    expect(ctx.busy).toBe(false);
+  it("info(msg) / busy(on) 交給 dock；宿主未載入 ready reject", async () => {
+    const seen: unknown[] = [];
+    const { ctx } = mockHost({}, {}, { onInfo: (m: string) => seen.push(["info", m]), onBusy: (b: boolean) => seen.push(["busy", b]) });
+    ctx.info("✅ 完成");
+    ctx.busy(true);
+    ctx.busy(false);
+    expect(seen).toEqual([["info", "✅ 完成"], ["busy", true], ["busy", false]]);
+    expect(() => mockHost().ctx.info("沒有 dock 也不炸")).not.toThrow();
     const absent = createVectorcraftCtx({ frame: () => undefined, timeoutMs: 20, pollMs: 5 });
     await expect(absent.ready()).rejects.toThrow(/尚未載入/);
   });
@@ -196,7 +228,7 @@ describe("dock 顏色只來自主題 token", () => {
   });
   it("尺寸 = 真品 panel_docking.rs:36-43 與 dock_style tab_height 33", () => {
     const t = Object.fromEntries([...css.matchAll(/--vp-([a-z-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
-    expect([t["column-width"], t["column-min"], t["column-max"], t["icon-width"], t["panel-min"], t["tab-height"]]).toEqual(["310px", "220px", "720px", "38px", "220px", "33px"]);
+    expect([t["column-width"], t["panel-min"], t["panel-max"], t["icon-width"], t["tab-height"]]).toEqual(["310px", "220px", "720px", "38px", "33px"]);
   });
 });
 
@@ -250,5 +282,31 @@ describe("瀏覽器模組都能被解析與載入成 ES module", () => {
     expect(d?.id).toBe(path.basename(rel, ".js"));
     expect(typeof d?.title).toBe("string");
     expect(typeof d?.mount).toBe("function");
+  });
+});
+
+// ---- 面板呼叫的 ctx 方法 = 轉接器與契約提供的（關整類：2026-11-05 正式站範本庫無效，templates.js 呼叫的
+//      setArtboardSize 轉接器沒有；ctx.info(msg) 被各面板當函式呼叫，轉接器卻是物件） ----
+const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`\\])\/\/.*$/gm, "$1");
+const calledCtxMethods = () => {
+  const out = new Map<string, string[]>();
+  for (const f of blockFiles()) {
+    for (const m of stripComments(read(f)).matchAll(/\bctx\.([A-Za-z_$][\w$]*)\s*\(/g)) {
+      out.set(m[1], [...(out.get(m[1]) ?? []), path.basename(f)]);
+    }
+  }
+  return out;
+};
+
+describe("面板呼叫的每個 ctx 方法都在轉接器與契約裡", () => {
+  const called = calledCtxMethods();
+  const ctx = createVectorcraftCtx({ frame: () => undefined, timeoutMs: 1 }) as Record<string, unknown>;
+  const contract = read("public/editor-shared/ctx-contract.md");
+  it("面板確實有呼叫 ctx（掃描沒有失效）", () => {
+    expect(called.size).toBeGreaterThan(5);
+  });
+  it.each([...calledCtxMethods().keys()].sort())("ctx.%s", (name) => {
+    expect(typeof ctx[name], `${name} 被 ${called.get(name)!.join("、")} 呼叫，轉接器沒有這個函式`).toBe("function");
+    expect(contract, `${name} 沒寫進 ctx-contract.md`).toContain(`\`${name}(`);
   });
 });
