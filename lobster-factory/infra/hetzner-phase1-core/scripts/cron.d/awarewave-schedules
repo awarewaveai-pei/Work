@@ -13,6 +13,7 @@
 # outreach_sender_health: 08:30 Taipei, the sender-pool mailboxes' DNS, bounce rate and warm-up step (lib/outreach/sender-health.ts).
 # outreach_gmail_sync: every 10 min, sent detection and replies / unsubscribes / bounces from each connected Gmail (lib/outreach/gmail-sync.ts).
 # trigger_slots_check: a Trigger.dev concurrency slot held by a run that is not running (C3; the 2026-10-23 outage).
+# auth_profiles_check: an auth.users row without a profiles row, or a 0161 auth.users trigger missing / disabled (count-only).
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 */10 * * * * root /root/lobster-phase1/scripts/cron-run.sh host_schedules_report 'python3 /root/lobster-phase1/scripts/report-host-schedules.py >> /var/log/host-schedules.log 2>&1'
@@ -32,6 +33,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 */10 * * * * root /root/lobster-phase1/scripts/cron-run.sh dispatch_action_run '/root/lobster-phase1/scripts/trigger-task.sh dispatch_action_run dispatch-action-run'
 0 4 * * * root /root/lobster-phase1/scripts/cron-run.sh ao_infrastructure_check '/root/lobster-phase1/scripts/trigger-task.sh ao_infrastructure_check ao-infrastructure-check'
 */10 * * * * root /root/lobster-phase1/scripts/cron-run.sh trigger_slots_check '/root/lobster-phase1/scripts/check-trigger-slots.sh >> /var/log/trigger-slots.log 2>&1'
+*/10 * * * * root /root/lobster-phase1/scripts/cron-run.sh auth_profiles_check '/root/lobster-phase1/scripts/check-auth-profiles.sh >> /var/log/auth-profiles.log 2>&1'
 */10 * * * * root /root/lobster-phase1/scripts/cron-run.sh schedule_alerts '/root/lobster-phase1/scripts/poke.sh schedule_alerts /api/internal/schedules/alerts SCHEDULE_INGEST_TOKEN'
 0 1 * * * root /root/lobster-phase1/scripts/cron-run.sh schedule_digest '/root/lobster-phase1/scripts/poke.sh schedule_digest /api/internal/schedules/alerts?digest=1 SCHEDULE_INGEST_TOKEN'
 */5 * * * * root /root/lobster-phase1/scripts/cron-run.sh mainwp_wp_cron 'curl -s -o /dev/null http://127.0.0.1:8090/wp-cron.php?doing_wp_cron >/dev/null 2>&1'

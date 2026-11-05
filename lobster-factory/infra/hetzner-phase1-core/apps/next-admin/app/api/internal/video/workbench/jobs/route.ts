@@ -25,7 +25,11 @@ function unauthorized(req: Request): Response | null {
   if (!expected || !bearer || !timingSafeEqual(bearer, expected)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   return null;
 }
-const fail = (status: number, error: string) => NextResponse.json({ ok: false, error }, { status });
+// Invariant: a database/storage failure is logged with its own code and message; the caller gets the label only.
+const fail = (status: number, error: string, cause?: { code?: string; message?: string } | null) => {
+  if (cause) console.error(`[vw-internal] ${error}: ${cause.code ?? ""} ${String(cause.message ?? "").slice(0, 300)}`);
+  return NextResponse.json({ ok: false, error }, { status });
+};
 
 export async function POST(req: Request): Promise<Response> {
   const denied = unauthorized(req); if (denied) return denied;
@@ -40,7 +44,7 @@ export async function POST(req: Request): Promise<Response> {
   if (body.action === "cancel") {
     const { data, error } = await db.from("media_workbench_jobs").update({ cancel_requested: true, updated_at: new Date().toISOString() })
       .eq("organization_id", organizationId).eq("idempotency_key", idempotencyKey).select(COLUMNS).maybeSingle();
-    if (error) return fail(502, "job_update_failed");
+    if (error) return fail(502, "job_update_failed", error);
     if (!data) return fail(404, "job_not_found");
     return NextResponse.json({ ok: true, job: data });
   }
@@ -75,14 +79,14 @@ export async function POST(req: Request): Promise<Response> {
   // on the status read, so a concurrent change makes the update match nothing and the loop re-reads.
   for (let i = 0; i < 3; i++) {
     const cur = await jobs().select(COLUMNS).eq("organization_id", organizationId).eq("idempotency_key", idempotencyKey).maybeSingle();
-    if (cur.error) return fail(502, "job_lookup_failed");
+    if (cur.error) return fail(502, "job_lookup_failed", cur.error);
     const now = new Date().toISOString();
     if (!cur.data) {
       const ins = await jobs().insert({ organization_id: organizationId, idempotency_key: idempotencyKey, kind, status, ...given, updated_at: now })
         .select(COLUMNS).single();
       if (!ins.error && ins.data) return NextResponse.json({ ok: true, job: ins.data });
       if (ins.error?.code === "23505") continue;   // another request created it first: apply this one as an update
-      return fail(502, "job_upsert_failed");
+      return fail(502, "job_upsert_failed", ins.error);
     }
     const was = String((cur.data as { status: unknown }).status);
     if (TERMINAL.has(was) || RANK[status] < RANK[was]) {
@@ -91,7 +95,7 @@ export async function POST(req: Request): Promise<Response> {
       if (TERMINAL.has(was) && cost !== null && (cur.data as { cost_usd: unknown }).cost_usd === null) {
         const fill = await jobs().update({ cost_usd: cost, updated_at: now })
           .eq("organization_id", organizationId).eq("idempotency_key", idempotencyKey).is("cost_usd", null).select(COLUMNS).maybeSingle();
-        if (fill.error) return fail(502, "job_upsert_failed");
+        if (fill.error) return fail(502, "job_upsert_failed", fill.error);
         if (fill.data) return NextResponse.json({ ok: true, job: fill.data, applied: false, costRecorded: true });
         continue;
       }
@@ -99,7 +103,7 @@ export async function POST(req: Request): Promise<Response> {
     }
     const upd = await jobs().update({ status, ...given, updated_at: now })
       .eq("organization_id", organizationId).eq("idempotency_key", idempotencyKey).eq("status", was).select(COLUMNS).maybeSingle();
-    if (upd.error) return fail(502, "job_upsert_failed");
+    if (upd.error) return fail(502, "job_upsert_failed", upd.error);
     if (upd.data) return NextResponse.json({ ok: true, job: upd.data });
   }
   return fail(409, "job_conflict");
@@ -114,6 +118,6 @@ export async function GET(req: Request): Promise<Response> {
   const db = getSupabaseWriteClient(); if (!db) return fail(503, "db_unavailable");
   const { data, error } = await db.from("media_workbench_jobs").select(COLUMNS).eq("organization_id", organizationId)
     .order("created_at", { ascending: false }).limit(limit);
-  if (error) return fail(502, "job_list_failed");
+  if (error) return fail(502, "job_list_failed", error);
   return NextResponse.json({ ok: true, jobs: data ?? [] });
 }

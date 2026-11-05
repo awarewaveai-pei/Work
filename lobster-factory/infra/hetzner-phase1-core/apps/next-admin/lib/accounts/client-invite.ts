@@ -127,7 +127,8 @@ async function adoptOrphan(sb: SupabaseClient, orgId: string, email: string): Pr
   const { data: byId, error: byIdErr } = await sb.from("profiles").select("default_organization_id").eq("id", found.id).maybeSingle();
   if (byIdErr) return { ok: false, status: 503, error: "profile_lookup_failed" };
   const existingOrg = (byId as { default_organization_id: string | null } | null)?.default_organization_id;
-  if (byId && existingOrg !== orgId) return { ok: false, status: 409, error: "email_taken" };
+  // null = the bare row migration 0161's auth.users trigger writes (no organization); only a row owned by another org refuses
+  if (byId && existingOrg !== null && existingOrg !== orgId) return { ok: false, status: 409, error: "email_taken" };
   // upsert: a profile row with this id may survive under an old email (the lookup above went by email)
   const { error: pErr } = await sb
     .from("profiles")
@@ -188,6 +189,11 @@ async function readyAccount(sb: SupabaseClient, orgId: string, email: string): P
   // generateLink goes by email, so the account it resolves must be this same user (a profile email can lag an auth
   // email change)
   if (!belongsTo(user, orgId) || (user.email ?? "").toLowerCase() !== email) return { ok: false, status: 409, error: "email_taken" };
+  if (profile.default_organization_id === null) {
+    // the auth.users trigger (0161) wrote this row bare when createUser ran; an earlier press stopped before setting the org
+    const { error: pErr } = await sb.from("profiles").upsert({ id: profile.id, email, default_organization_id: orgId }, { onConflict: "id" });
+    if (pErr) return { ok: false, status: 503, error: "profile_write_failed" };
+  }
   if (!(await ensureMembership(sb, orgId, user.id))) return { ok: false, status: 503, error: "membership_write_failed" };
   return { userId: user.id, created: false, verified: Boolean(user.email_confirmed_at) };
 }

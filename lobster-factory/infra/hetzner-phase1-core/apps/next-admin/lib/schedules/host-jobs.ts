@@ -49,6 +49,7 @@ export const HOST_JOBS: Record<string, HostJob> = {
   schedule_alerts: { label: "排程異常通知", description: "每 10 分鐘檢查本頁，有排程變紅或恢復時，送一則通知到 Telegram 與 Slack；持續異常不重複通知。", group: "deploy", fail: "本列失敗代表通知沒有送出，或送出後沒有記下；各通道是否收到，看每日排程報告。" },
   schedule_digest: { label: "每日排程報告", description: "每天 09:00 送一行排程報告到 Telegram 與 Slack；沒收到這行代表通知系統故障。", group: "deploy" },
   trigger_slots_check: { label: "Trigger 名額檢查", description: "每 10 分鐘檢查 Trigger 的執行名額，找出已停止卻仍占用名額的工作；名額被占滿時，所有 Trigger 工作都會停住。", group: "deploy", fail: "發現卡住的名額時本列標示失敗並推播；處理方式見 runbooks/TRIGGER-RUNS-STUCK-QUEUED.md。" },
+  auth_profiles_check: { label: "登入帳號資料檢查", description: "每 10 分鐘確認每個登入帳號都有對應的 profiles 資料列，且建立／刪除帳號的兩個資料庫觸發器仍啟用；缺列時新功能寫入該帳號會失敗。", group: "deploy", fail: "發現缺資料列或觸發器停用時本列標示失敗並推播；輸出只有數量，處理方式見 migration 0161 檔頭。" },
   dispatch_action_run: { label: "後台操作補派", description: "每 10 分鐘把未送出的後台操作（例如建站）交給 Trigger 執行；平常按下按鈕就會立即送出。", group: "deploy" },
   social_dispatch: { label: "社群貼文發送", description: "每 5 分鐘將到期的社群貼文送到 Postiz 發布，並取回發布結果。", group: "site" },
   social_rotation: { label: "社群輪播排程", description: "每天將輪播清單展開成未來 7 天的排程貼文。", group: "site" },

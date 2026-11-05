@@ -112,7 +112,11 @@ async function readCapped(req: Request, cap: number): Promise<{ ok: true; buf: B
 }
 
 export async function POST(req: Request): Promise<Response> {
-  const fail = (status: number, error: string) => NextResponse.json({ ok: false, error }, { status });
+  // Invariant: a database/storage failure is logged with its own code and message; the caller gets the label only.
+  const fail = (status: number, error: string, cause?: { code?: string; message?: string } | null) => {
+    if (cause) console.error(`[vw-internal] ${error}: ${cause.code ?? ""} ${String(cause.message ?? "").slice(0, 300)}`);
+    return NextResponse.json({ ok: false, error }, { status });
+  };
   const expected = process.env.VW_INTERNAL_TOKEN;
   const bearer = req.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1];
   if (!expected || !bearer || !timingSafeEqual(bearer, expected)) return fail(401, "unauthorized");
@@ -144,7 +148,7 @@ export async function POST(req: Request): Promise<Response> {
       .order("created_at", { ascending: true }).limit(1).maybeSingle();
   };
   const existing = await findMine();
-  if (existing.error) return fail(502, "asset_lookup_failed");
+  if (existing.error) return fail(502, "asset_lookup_failed", existing.error);
   if (existing.data) return NextResponse.json({ ok: true, existing: true, assetId: existing.data.id, checksumSha256: body.sha, objectUrl: existing.data.object_url });
 
   const { isR2Configured, r2PutObject } = await import("@/lib/storage/r2");
@@ -154,7 +158,7 @@ export async function POST(req: Request): Promise<Response> {
   const key = `video/workbench/${organizationId.toLowerCase()}/${body.sha}.${ext}`;
   // Re-putting the same bytes under a content-addressed key is a no-op for any row already pointing at it.
   const put = await r2PutObject(bucket, key, body.buf, mime, { timeoutMs: 240_000 });
-  if (!put.ok) return fail(502, "storage_put_failed");
+  if ("error" in put) return fail(502, "storage_put_failed", { message: put.error });
   const objectUrl = `${publicBase}/${key}`;
 
   // Invariant (2nd report): this request never deletes an object under a content-addressed key -- another request may be
@@ -164,7 +168,7 @@ export async function POST(req: Request): Promise<Response> {
     const latest = await db.from("media_assets").select("version")
       .eq("organization_id", organizationId).eq("storage_backend", "r2").eq("object_key", key)
       .order("version", { ascending: false }).limit(1).maybeSingle();
-    if (latest.error) return fail(502, "asset_lookup_failed");
+    if (latest.error) return fail(502, "asset_lookup_failed", latest.error);
     inserted = await db.from("media_assets").insert({
       organization_id: organizationId,
       storage_backend: "r2",
@@ -190,7 +194,7 @@ export async function POST(req: Request): Promise<Response> {
     if (mine.data) return NextResponse.json({ ok: true, existing: true, assetId: mine.data.id, checksumSha256: body.sha, objectUrl: mine.data.object_url });
     if (inserted.error?.code !== "23505") break;   // a version taken by another origin's row: take the next one
   }
-  if (inserted.error || !inserted.data) return fail(502, "asset_registration_failed");
+  if (inserted.error || !inserted.data) return fail(502, "asset_registration_failed", inserted.error ?? { message: "no row returned" });
   const assetId = String(inserted.data.id);
 
   // QA evidence for a video: the render worker's technical reports (none supplied = none recorded, never a pass) and

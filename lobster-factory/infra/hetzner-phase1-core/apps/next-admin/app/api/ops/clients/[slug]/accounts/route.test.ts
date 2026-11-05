@@ -11,8 +11,8 @@ const OTHER = "33333333-3333-4333-8333-333333333333";
 
 type FakeUser = { id: string; email: string; email_confirmed_at: string | null; app_metadata: Record<string, unknown> };
 const state = vi.hoisted(() => ({
-  profile: null as null | { id: string; default_organization_id?: string },
-  profileById: null as null | { default_organization_id: string },
+  profile: null as null | { id: string; default_organization_id?: string | null },
+  profileById: null as null | { default_organization_id: string | null },
   user: null as null | FakeUser,
   memberRows: 0,
   otherOrgMemberships: 0,
@@ -231,6 +231,24 @@ describe("POST accounts -- a half-made account is finished by pressing again (no
     expect(await res.json()).toMatchObject({ ok: true, userId: NEW_USER, kind: "invite", created: true });
     expect(inserts.mock.calls.map((c) => c[0])).toEqual(["profiles", "organization_memberships"]);
     expect(mail).toHaveBeenCalledTimes(1);
+  });
+
+  it("adopts a bare profile (organization null, written by the auth.users trigger) instead of refusing it", async () => {
+    admin.createUser.mockResolvedValueOnce(exists);
+    searchReturns({ id: NEW_USER, email: "staff.person@client.example", email_confirmed_at: null, app_metadata: { user_kind: "client", org_id: ORG } });
+    state.profileById = { default_organization_id: null };
+    const res = await POST(post({ "x-ops-claims-role": "admin" }), ctx());
+    expect(res.status).toBe(200);
+    expect(inserts).toHaveBeenCalledWith("profiles", { id: NEW_USER, email: "staff.person@client.example", default_organization_id: ORG });
+  });
+
+  it("gives a bare profile of this client's own live account its organization on the next press", async () => {
+    state.profile = { id: NEW_USER, default_organization_id: null };
+    state.user = { id: NEW_USER, email: "staff.person@client.example", email_confirmed_at: null, app_metadata: { user_kind: "client", org_id: ORG } };
+    const res = await POST(post({ "x-ops-claims-role": "admin" }), ctx());
+    expect(res.status).toBe(200);
+    expect(inserts).toHaveBeenCalledWith("profiles", { id: NEW_USER, email: "staff.person@client.example", default_organization_id: ORG });
+    expect(admin.createUser).not.toHaveBeenCalled();
   });
 
   it("never adopts a user the search returned that only resembles the email (the filter is a substring LIKE)", async () => {
