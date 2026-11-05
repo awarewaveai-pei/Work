@@ -290,4 +290,4 @@ function createMainSystem({ env, fetchImpl, appDir, dataDir, orgId, inspect = re
   return { ingest, mirror, permit, usage, flush, pendingUsage: () => outbox.length, idle: () => Promise.all([...chains.values(), flushing]) };
 }
 
-module.exports = { createMainSystem, configured, paidFeature, ledgerKind, localUrls, PAID_ROUTES, MIME };
+module.exports = { createMainSystem, configured, paidFeature, ledgerKind, localUrls, PAID_ROUTES, MIME, LOCAL_URL };

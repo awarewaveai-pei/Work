@@ -85,9 +85,9 @@ HEAD 804594c93。只讀規劃；無 SSH／無改檔。回報繁中；brief 照�
 - rollback：revert；本機 DB 列可刪。
 
 **L4 `.data/media` → R2 搬移腳本**（Medium）
-- `VW/scripts/migrate-media-to-r2.cjs --org <uuid> [--dry-run]`：走 `.data/orgs/<org>/media/<sha>/original.*`，每檔呼叫 L2 assets route（冪等：同 checksum 回既有 id），寫 `migrate-report.json`（sha → assetId／錯誤），回填 state 資產 `assetId`；不刪本地檔。
+- `VW/scripts/migrate-media-to-r2.cjs --org <uuid> [--dry-run]`：走 `jobs.json` 成功結果＋state 資產＋未引用的 `media/<sha>/original.*`，經 `createMainSystem().ingest` 登記（冪等），每次寫一份 `migrate-report-<時間>.json`（url → assetId／錯誤），回填 state 資產 `assetId`；不刪本地檔。
 - 驗收：本機 dry-run 列數 = media 目錄數；實跑兩次第二次全部 `existing`。
-- rollback：本機 DB 刪 `metadata->>source='video_workbench'` 列＋R2 前綴 `video/workbench/<org>/`（腳本附 `--undo report.json`）。
+- rollback：`--undo report.json` 只還原本機（state 回填欄位、`main-system-assets.json`）並印出 asset id；無刪除路由，請求路徑不刪 R2 內容定址物件，DB 列由操作者依印出的 id 以 SQL 刪除。
 
 **L5 容器映像＋compose 區塊＋nginx 區塊（只寫檔，不上機）**（Medium）
 - `VW/Dockerfile`（新）：`node:24.14.0-bookworm-slim`（對齊本機 v24.14.0；type stripping 需要）；apt `ffmpeg`（FFPROBE_PATH=/usr/bin/ffprobe）＋ Blender 執行庫（libxi6 libxxf86vm1 libxfixes3 libxrender1 libgl1 libxkbcommon0 libsm6）；Blender 4.5.9 linux-x64 tarball，`vendor/blender/sources.json` 加 linux 條目（官方 .sha256 驗）→ `BLENDER_PATH=/opt/blender/blender`；`npm ci --omit=dev`；跑 `scripts/vendor-effectcraft.cjs`、`vendor-three.cjs`（sha 驗）；`COPY .awarewave/`；非 root 使用者；`ENV VW_HOST=0.0.0.0 VW_DATA_DIR=/data`。`.dockerignore`：`runtime/ .data* node_modules tests/ docs/ handoff/`。
