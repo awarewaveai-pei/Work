@@ -1,6 +1,6 @@
 # 影音工作台：引擎路線重評與「一支影片一條線」計畫（2026-11-06）
 
-狀態：**等操作者選路線，沒有動任何正式程式。** 事實與證據在 [`p0-reeval-gates-20261106.md`](p0-reeval-gates-20261106.md)（下稱「閘檔」）；本檔只放判斷與做法。卡片狀態只在監工台 `agency-os/handoffs/2026-11-02-video-workbench-supervisor/data.mjs`（卡 RE）。讀者是 AI agent 與操作者。
+狀態：**操作者 2026-11-06 選路線 B（並存）。** 卡片規格在 §9；§1–§8 是選路線前的分析，保留原樣。 事實與證據在 [`p0-reeval-gates-20261106.md`](p0-reeval-gates-20261106.md)（下稱「閘檔」）；本檔只放判斷與做法。卡片狀態只在監工台 `agency-os/handoffs/2026-11-02-video-workbench-supervisor/data.mjs`（卡 RE）。讀者是 AI agent 與操作者。
 
 ## 1. 任務理解
 
@@ -199,7 +199,7 @@
 
 ## 7. 實作計畫與驗證計畫
 
-**現在不開工。** 操作者在監工台「待你決定」選路線後，才把下面的卡寫成可執行的 brief（逐檔 file:line）。
+操作者已選 B（2026-11-06）。下表是選路線前的總覽；可執行的規格在 §9。
 
 | 卡 | 內容 | 風險 | 建議模型 |
 |---|---|---|---|
@@ -228,3 +228,122 @@
 ## 8. 回退（本輪）
 
 本輪只新增文件與證據檔、改監工台資料。回退＝`git revert` 這一個 commit。WSL 裡的原始碼與產物（`~/awarewave/effectcraft-src`、`filmcraft-src`、`craft-fonts-video`）不影響任何正式環境，要清掉可以手動刪。
+## 9. 路線 B 卡片規格（操作者 2026-11-06 選 B）
+
+卡號與狀態：總計畫 `creative-suite-plan-20261102.md` §4 的 PJ、FC、EC 三列＋監工台 `data.mjs`。本節是做法正本。`VW`＝`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`。行號 2026-11-06 grep 過；開卡時再 grep 一次。
+
+**選路線後才發現的兩件事（改變做法，不改路線）**：
+- 另一個 session 已建好共用建置庫 `scripts/craft-web-build/`（`lib.sh` 的 `pin`／`checkout`／`craft_web_fonts`、字型清單 `fonts.json`），向量版與畫布版都在用。FC.1 直接沿用，不寫第二套。
+- 畫布版用補丁替 PhotoCraft 加了嵌入橋（`scripts/photocraft-pro/web-host-api.patch`，用上游 craft-libs 的 `craft-web-host`）。EffectCraft 沒有橋的問題（閘檔 §3 ④）可以照這個做法補，EC.1 以它為範本。
+
+### 順序與依賴
+
+`FC.1`（建置鏈）→ `FC.0`（要操作者在場的十分鐘檢查）→ `FC.2`（頁面）→ `FC.3`（入帳與送審）→ `FC.4`（上線，High）。
+`PJ.1` 等卡 RV.4 結束才動 `scripts/projects-0.js`（R8）；PJ 與 FC 碰的檔不同，可以交錯。`EC.*` 在 FC.4 驗收後才開。
+
+### FC.1 建置鏈（Low；卡寫死 → `fullstack-engineer` 或 Codex）
+
+待建立 `scripts/filmcraft-pro/`，五個檔：
+
+| 檔 | 內容 |
+|---|---|
+| `PIN.json` | `repo` `https://github.com/storytold/filmcraft`；`rev` `46763a85d9777d3a60c2a557f359d988296d6a44`；`craftFontsRepo` `https://github.com/storytold/craft-fonts`；`craftFontsRev` `b076417b5880bd4154bd22f00695b1d28c6bea83`（上游 `.github/workflows/release.yml:28` 同一顆）；`wasmBindgen` `0.2.129`（上游 `docs/web.md:13`） |
+| `tc-fonts.patch` | 內容＝`VW/docs/p0-reeval-evidence/filmcraft-tc-fonts.patch`（2 檔 +2 −2）。之後以這份為準，證據資料夾那份是 11-06 的紀錄 |
+| `build.sh` | 見下 |
+| `build.ps1` | 照 `scripts/photocraft-pro/build.ps1`：只是 WSL 的 wrapper，base 預設 `%LOCALAPPDATA%\awarewave`，環境變數 `FILMCRAFT_HOME` 可改 |
+| `README.md` | 一鍵指令、PIN 欄位、補丁表、升級與回退；格式照 `scripts/photocraft-pro/README.md` |
+
+`build.sh` 步驟（結構照 `scripts/photocraft-pro/build.sh`，同樣 `set -euo pipefail`、`source ../craft-web-build/lib.sh`）：
+1. `SRC=$HOME/awarewave/filmcraft-src`；`FONTS=$HOME/awarewave/craft-fonts-filmcraft`。**自己一份 craft-fonts checkout**：向量版與畫布版共用 `~/awarewave/craft-fonts` 而且不能同時跑（`scripts/photocraft-pro/build.sh:13-14`），FilmCraft 不加入那個限制。
+2. wasm-bindgen 釘版：`cargo install wasm-bindgen-cli --version <PIN> --locked --root $HOME/awarewave/tools/wasm-bindgen-<PIN>`，放到 PATH 最前，版本不符就 FATAL（照 photocraft 釘 Trunk 的寫法，`build.sh:36-43`）。
+3. `checkout` 兩個 repo → `craft_web_fonts "$FONTS" "$WF_TSV"`（下載並驗 sha256、把 `fonts.json` 的字型寫進 manifest；真正編進 wasm 的只有補丁 `wasm_keeps` 點名的 Noto Sans TC、Noto Serif TC）。
+4. 套同資料夾所有 `*.patch`，先 `git apply --check`，失敗 FATAL。
+5. `CRAFT_FONTS_DIR="$FONTS" CRAFT_FONTS_REQUIRED=1 cargo xtask web`（在 `$SRC`）。產物在 `$SRC/target/web/dist`。
+6. 檢查，任一不過 FATAL、不出產物：
+   - `index.html`、`filmcraft_web.js`、`filmcraft_web_bg.wasm`、`audio-worklet.js` 都在。
+   - wasm 裡有兩個 TC 字型：以 bytes 搜尋 PostScript 名 `NotoSansTC-Regular`、`NotoSerifTC-Regular`，各至少一次。
+   - 品牌資產：dist 內任何檔的 sha256 不得等於 `$SRC/docs/brand/` 內任何檔的 sha256（R6）。
+7. 暫存目錄組裝 → 附 `NOTICE`（加 provenance 段）、`LICENSE-MIT`、`LICENSE-APACHE` → `.wasm`／`.js` 各出 `.gz` → `SHA256SUMS` 並 `-c` 驗 → 原子換名到 `<base>/filmcraft-dist/<rev7>-<inputs7>/`。`inputs7`＝sha256(`PIN.json`＋`fonts.json`＋所有 patch) 前 7 碼。換名與保留舊版的寫法照 `scripts/photocraft-pro/build.sh` 結尾。
+
+不做：不用 Trunk（FilmCraft 的網頁版是 `cargo xtask web`）；不做檔名 hash 檢查（FilmCraft 產物檔名不帶 hash，用 `?v=` 查詢字串，上游 `packaging/web/README.md:19-21`）；不碰向量版、畫布版的檔。
+
+驗收：
+- `build.ps1` exit 0，印出 `OK: …`；`sha256sum -c SHA256SUMS` 全過。
+- 把 11-06 的 `harness/fc-main.cjs` 的 dist 指到新產物跑一次：`fonts` 含兩個 TC、`out.probe` 是 h264 1920×1080 300 格＋aac、第 120 格截圖有繁中。這是唯一要跑的實測，不寫新測試。
+- 故意把 `PIN.json` 的 `rev` 改一碼 → build FATAL、舊 dist 還在（做完改回）。
+
+回退：刪 `scripts/filmcraft-pro/`。
+
+### FC.0 開工前的檢查（Low；要操作者在場約十分鐘）
+
+headless 測不到的三件事，用真的視窗、只在 NVIDIA 顯示卡上開（`--force_high_performance_gpu`，理由見閘檔 §3）：
+1. 播放時操作者聽得到聲音（11-02 的 G7）。
+2. 操作者用注音輸入法在標題與字幕打得進中文。
+3. 操作者看一眼英文介面，確認可以接受。
+
+同時定案兩個預設（不用另外問，除非操作者反對）：
+- **送進引擎的檔**：原檔 ≤ 512 MiB 且瀏覽器能解 → 送原檔；否則送卡 M1 的預覽檔（`VW/backend/media-store.cjs:130-145`）。
+- **輸出上限**：專業剪輯輸出最高 1080p；4K 與很長的片用一般剪輯（伺服器用原檔輸出）。頁面上用一句話寫明。主機端 `filmcraft-cli` 用原檔輸出不在這一輪，操作者要 4K 時另開卡。
+
+三項任一不過 → FC.2 不開工，回報操作者。
+
+### FC.2 「專業剪輯」頁（Medium；Opus）
+
+| 檔 | 改什麼 |
+|---|---|
+| `VW/scripts/tools-0.js` 的 `TOOLS`（`:3` 起，`edit` 那筆之後） | 加一筆 `{ id: "edit-pro", cat: "剪輯成片", name: "專業剪輯", io: "多支素材 → 成片", … }`。引擎檔不存在時不顯示這張卡（開頁時 `HEAD /engines/filmcraft/web/index.html`，非 200 就濾掉），所以程式可以比引擎檔早上線，本機沒建引擎也不會壞 |
+| `VW/scripts/tools-engine-host.js`（待建立；加進 `VW/scripts/tools-boot.js:9` 的載入清單） | 外框。只做這幾件事，不包引擎的其他指令：① 開啟前查 `navigator.gpu.requestAdapter()`，沒有 adapter 或 `info.vendor` 是 intel → 白話提醒＋「改用一般剪輯」「仍然開啟」兩顆按鈕；② 掛 iframe `…/index.html?host=parent`；③ `message` 監聽只收 `event.origin === location.origin` 且 `event.source === iframe.contentWindow` 的 `filmcraft:*`；④ 素材用現有選擇器（`VW/shared/assets-ui.js`）挑 → 讀檔 → `filmcraft:open`，並記下「檔名 → 資產 id／url」；⑤ `filmcraft:dirty` 顯示「尚未存檔」，離開前提醒；⑥ iframe `contentWindow` 上掛 `keydown`，F6 把焦點交回側欄（閘檔 §3 ⑤ 驗過）；⑦ 離開工具時移除 iframe。外框的按鈕用工作台現有的 class，不寫色碼、不用下拉 |
+| `VW/shared/project-envelope.js:24-36` | `wrap(native, { revision, engine, engineVersion })`：兩個新參數有預設值＝現在的常數，舊呼叫不變。`unwrap`（`:38-47`）不動：自製剪輯遇到 `filmcraft` 的檔照舊拒開 |
+| 專案檔存哪 | `filmcraft:save` 且 `saveAs:true` 的 `.fcproj`（JSON 文字，實測 12–17 KB）→ 解析後包成 envelope（`engine:"filmcraft"`、`engineVersion`＝`filmcraft:ready` 的 `appVersion`、`assets`＝送過的資產）→ `VideoWorkbench.preferences.set("tools.engine.projects", …)`，跟自製剪輯同一條儲存路（`VW/scripts/tools-editor.js:238,245`）。不加後端路由。PJ.1 之後這份清單收進專案頁 |
+| `VW/server.cjs:182-189` | 不動。那段只給 `engines/effectcraft` 加 COOP／COEP；FilmCraft 不需要（上游 `packaging/web/README.md:36-39`） |
+
+本機開發：引擎檔放 `VW/engines/filmcraft/web/`（跟 `engines/effectcraft/web/` 一樣不進 git；`VW/.gitignore` 加一行）。寫一支 `VW/scripts/vendor-filmcraft.cjs` 從 `%LOCALAPPDATA%\awarewave\filmcraft-dist\<名>` 複製並驗 `SHA256SUMS`，版本記在 `VW/engines/filmcraft/VERSION.json`（照 `engines/effectcraft/VERSION.json`）。
+
+驗收（測試檔 `VW/tests/fc2-engine-host.cjs` 待建立，只測這四件）：
+- 沒有引擎檔 → 工具目錄沒有「專業剪輯」。
+- 假的 iframe 頁送 `filmcraft:ready`／`save`／`dirty` → 外框的反應正確；別的 origin 或別的 window 送來的訊息被忽略（**這條做一次突變：拿掉來源檢查，測試要變紅**）。
+- 存檔後 `tools.engine.projects` 有一筆 `engine:"filmcraft"`；自製剪輯的專案清單數量不變。
+- F6 後 `document.activeElement` 在側欄。
+- 另跑既有機械閘：分鏡六檔雜湊、`tests/sidebar-overlays.cjs`、`tests/test-isolation.cjs`、`tests/appearance.cjs`。
+
+回退：`TOOLS` 拿掉那一筆、`tools-boot.js` 拿掉載入。`tools.engine.projects` 的資料留著不刪。
+
+### FC.3 成品入帳與送審文字（Medium；Opus）
+
+做法的核心：**把引擎輸出當成一筆「已經完成的任務」**。這樣任務紀錄、主系統入帳、送審文字、「送審與投遞」按鈕都走現有的路，不另開一條。
+
+| 檔 | 改什麼 |
+|---|---|
+| `VW/backend/api.cjs`（路由區，`/uploads` 在 `:849`） | 新路由 `POST /api/vw/engine/renders`。本體是檔案位元組（串流收，不用 `body()`：它是 JSON、上限 80 MB，`:779-785`）；中繼資料放標頭：引擎名與版本、專案標題、比例、送進去的資產 url 清單、SRT 字幕文字（都用 base64url JSON）。做三件事：`mediaStore.ingest` 存檔 → `verifyOutput` 檢查（跟其他輸出一樣）→ 建一筆 `status: "succeeded"` 的任務，`input.operation = "engine-render"`、`input.references`＝送進去的資產、`input.settings = { engine, engineVersion, title, ratio, cues }`、`result.origin = { kind: "render", engine: "filmcraft", engineVersion }` |
+| 入帳 | 不改。任務完成後的 `settle()`（`api.cjs:60-66`）本來就會用 `mainSystemTools.localUrls(job.input)` 當來源呼叫 `register()`（`:48-53`）→ `main.ingest()` 寫 `rightsSources`／`parentAssetIds`（`VW/backend/main-system.cjs:136-147`） |
+| `VW/backend/release-text.cjs:43-48` | `releaseText()` 多認一種 `engine-render`：標題＝`settings.title`，字幕＝`settings.cues`。做法跟現有的 `fromCues`（`:38-42`）相同，共用它。沒有字幕的片回傳的時間軸是空的，照現在的規則不能送審。呼叫點 `api.cjs:74-84` 不動 |
+| `VW/scripts/tools-engine-host.js` | 每次輸出由外框送指令給引擎，固定帶 `captionSidecar: "srt"` 與 `loudnessLufs: -16`（實測準確，閘檔 §3 ④）。收到同一次輸出的影片與 `.srt` 兩個 `filmcraft:save` 後，用 `VW/shared/subtitle-parse.js:30` 解析 SRT，一起送上面的路由 |
+
+驗收（`VW/tests/fc3-engine-render.cjs` 待建立）：
+- 送一支小 MP4＋兩句 SRT＋兩個來源 url → 任務紀錄多一筆成功的任務；假的主系統收到的 `sources` 正好是那兩個 url；`releaseText` 回傳標題與兩句字幕。
+- 不帶來源清單 → 400（**權利紀錄的守衛，做一次突變**）。
+- 靜音或壞檔 → `verifyOutput` 判失敗，不建任務。
+- `tests/p6-main-system.cjs` 仍過。
+
+回退：拿掉路由與 `release-text.cjs` 的分支。已登記的成品是正常資產，不用清。
+
+### FC.4 上線（**High，要操作者說可以**）
+
+1. 主機：`/root/lobster-phase1/static/video-engines/filmcraft/<dist 名>/`，`current` 連結指向它（版面照 `/root/lobster-phase1/static/vector-pro`，`scripts/vectorcraft-pro/README.md:36-37`）。上傳後在主機 `sha256sum -c SHA256SUMS`。
+2. `docker-compose.yml:37-39` 旁加一條唯讀掛載 `…/static/video-engines:/srv/video-engines:ro`；`nginx/default.conf` 的 video 伺服器區塊（`:545` 起）在現有的 `location ~ ^/(pages|…|engines|…)/`（`:583`）**之前**加 `location ^~ /engines/filmcraft/web/ { alias /srv/video-engines/filmcraft/current/; … }`：`gzip_static on`、`.wasm` 的 MIME、`index.html` 用 `no-cache`、其餘靠 ETag 重新驗證（檔名不帶 hash，不設 immutable）。兩處都走 `safe-infra-patch.sh`（AGENTS §0）。
+3. `sg-deploy` 工作台（FC.2、FC.3 的程式）。
+4. 驗：登入後工具目錄出現「專業剪輯」；送一支素材 → 存檔 → 重開 → 輸出 → 任務紀錄有一筆 → 主系統資產有 `rightsSources` → 「送審與投遞」四項檢查過。
+5. 回退：主機刪 `current` 連結（工具卡自動消失）；或 `ln -sfn` 回上一版。nginx／compose 由 `safe-infra-patch.sh` 的備份還原。
+
+### PJ（專案主線；等卡 RV.4 結束）
+
+內容＝本檔 §6。開卡前要先讀完 `VW/scripts/projects-0.js`（864 行）才能寫到逐行，所以這裡只定不會變的部分：
+- PJ.1 資料格式：專案頁的「集」多三個欄位：`edit`（`{ engine, projectId }`，指向 `tools.editor.projects` 或 `tools.engine.projects` 的一筆）、`steps`（§6 答 3 的紀錄）、`outputs`（成片的資產 id）。存在專案頁現有的狀態裡（`projects-0.js:60,75`）。
+- PJ.1 舊資料：`tools.editor.projects` 的每一筆（`tools-editor.js:245`）在專案頁沒有任何「集」指向它時，自動建一個同名專案＋一集指向它。剪輯專案那一筆本身不改。測試：搬前搬後筆數相同、每筆能開、輸出設定相同。
+- PJ.2–PJ.4：§6 答 1–3。
+
+### EC（專業特效；FC.4 驗收後）
+
+- EC.1 建置鏈＋嵌入橋補丁：`scripts/effectcraft-pro/`，沿用 FC.1 的 `build.sh` 結構；補丁兩份：繁中字型（`VW/docs/p0-reeval-evidence/effectcraft-tc-fonts.patch`）、嵌入橋（照 `scripts/photocraft-pro/web-host-api.patch` 的做法接 `craft-web-host`）。先查上游是否已自己加了橋，有就不補。
+- EC.2 頁面：沿用 `tools-engine-host.js`，訊息前綴換成 `effectcraft:`；重開專案後補一個 `footage.relink`（閘檔 §3 ②）；`server.cjs:182-189` 的 COOP／COEP 路徑對到新的引擎目錄。
+- EC.3 入帳：沿用 FC.3 的路由，`engine: "effectcraft"`。
