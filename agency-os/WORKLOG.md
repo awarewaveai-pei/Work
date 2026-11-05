@@ -1,4 +1,10 @@
 # Worklog
+## 2026-11-05（續19）Cloudflare 限速規則排除其餘 8 個產品門（操作者同意）
+
+- 承 #17：check-cloudflare-security.ps1 列出 hci、social、tarot、design、content、cs、collect、outreach 未排除（同 video 的 429 類）。操作者「一起排除」→ PATCH 規則 b8ffa72d expression；改前存 scratchpad cf-rule-before-doors.json；退回 = 拿掉這 8 個 `and http.host ne` 子句。runbooks/CLOUDFLARE-WAF-SETUP.md 已記。
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell scripts/check-cloudflare-security.ps1（PASS，Product doors not excluded = none）; curl 6 個門 307/200 | exit=0 | ms=20000
+- REVIEW_WAIVED: NA -- Cloudflare 規則 expression 只加排除子句，偵測器即驗證
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks | grep=http.host ne | hits=2
 ## 2026-11-05（續18）影音工作台 P6.13：工作台成品能過送審 QA（1aaa139d5，已部署）
 
 - 根因：送審要 technical/caption/editorial/rights 四份皆 passed（next-admin lib/content/video/release-gate.ts:17）；VW 成品登記無 metadata.title/script（editorial-rights-persist.ts:31）、上傳寫死 rightsConfirmed:false 且無 UI、無人寫 caption QA（只有 finalize.ts:130／transcription.ts）。
