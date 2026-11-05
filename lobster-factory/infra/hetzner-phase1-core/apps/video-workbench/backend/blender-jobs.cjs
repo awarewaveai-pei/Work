@@ -2,7 +2,7 @@
 //   blender-retarget: { references: { character: {url,id}, motion: {url,id} }, settings: { boneMap, sceneId?, sceneRevision? } }
 //     -> character GLB with the motion baked in, as a model asset.
 //   blender-render: { settings: { scene: <scenes3d doc>, width, height, frames, fps } }
-//     -> RGBA PNG sequence (Eevee) -> alpha MOV through the compositor's assembleAlphaMov -> video asset.
+//     -> RGBA PNG sequence (Eevee, or Cycles on a CPU-only host) -> alpha MOV through the compositor's assembleAlphaMov -> video asset.
 // Inputs are copied into a per-job directory (<dataDir>/blender/<jobId>/) that is removed afterwards; the Python
 // scripts only see that directory. Results carry origin {kind:"render", engine:"blender-<pin>", sceneId,
 // sceneRevision, parentAssetId, sourceAssetIds} (plan invariant 2).
@@ -10,12 +10,19 @@ const fs = require("node:fs"),
   path = require("node:path");
 const blender = require("./blender.cjs"),
   { assembleAlphaMov } = require("./compositor-render.cjs");
+const { vwEnv } = require("./env-compat.cjs");
 
 const RATES = new Set(["24/1", "25/1", "30/1", "60/1", "24000/1001", "30000/1001", "60000/1001"]);
 const bad = (message) => Object.assign(Error(message), { status: 400 });
 const num = (v, max = 1000) => Number.isFinite(v) && Math.abs(v) <= max;
 const vec = (v) => Array.isArray(v) && v.length === 3 && v.every((x) => num(x));
 const id = (v) => (typeof v === "string" && v ? v.slice(0, 100) : undefined);
+
+// Render time is bounded before the job starts (P6 H5: CPU-only host, Cycles ~12 s per 1080p frame at 12 cores). Budget =
+// 30 s per 1080p-frame-equivalent (2.5x measured) + 2 min start; over MAX_RENDER_MS is refused, never cut off midway.
+const FRAME_1080P_MS = 30000, MAX_RENDER_MS = 3 * 3600000;
+const renderBudgetMs = (st) => 120000 + Math.ceil(st.frames * (st.width * st.height / (1920 * 1080)) * FRAME_1080P_MS);
+const RETARGET_MS = 1800000;
 
 function createBlenderJobs({ dataDir, mediaStore, env }) {
   const root = path.join(dataDir, "blender");
@@ -63,6 +70,7 @@ function createBlenderJobs({ dataDir, mediaStore, env }) {
     if (![st.width, st.height].every((n) => Number.isInteger(n) && n >= 16 && n <= 1920 && n % 2 === 0)) throw bad("輸出尺寸無效（16–1920，偶數）");
     if (!Number.isInteger(st.frames) || st.frames < 1 || st.frames > 1200) throw bad("影格數無效（1–1200）");
     if (!RATES.has(rate)) throw bad("不支援的影格率");
+    if (renderBudgetMs(st) > MAX_RENDER_MS) throw bad("此 3D 片太長：請縮短秒數或降低解析度");
     return { type: "video" };
   }
   async function run(job, { signal, onProgress, onSpawn }) {
@@ -97,7 +105,7 @@ function createBlenderJobs({ dataDir, mediaStore, env }) {
       }
       const s = scene(input), st = input.settings, framesDir = path.join(dir, "frames");
       await blender.runBlender({
-        script: "render.py", workdir: dir, env, signal, onSpawn,
+        script: "render.py", workdir: dir, env, signal, onSpawn, timeoutMs: renderBudgetMs(st),
         onProgress: (done, total) => onProgress(Math.round((done / total) * 90)),
         args: {
           framesDir, width: st.width, height: st.height, frameCount: st.frames, fps: st.fps,
@@ -105,6 +113,8 @@ function createBlenderJobs({ dataDir, mediaStore, env }) {
           camera: { fov: s.camera.fov, keys: s.camera.keys.map((k) => ({ frame: k.frame, position: k.position, target: k.target })) },
           lights: (s.lights || []).map((l) => ({ type: l.type, position: l.position, intensity: l.intensity, color: l.color })),
           ground: !!s.ground,
+          // eevee needs a GPU to be fast; a CPU-only host sets VW_BLENDER_ENGINE=cycles (render.py).
+          engine: vwEnv(env, "BLENDER_ENGINE") === "cycles" ? "cycles" : "eevee",
         },
       });
       const asset = await assembleAlphaMov({ dir: framesDir, frames: st.frames, fps: st.fps, width: st.width, height: st.height, mediaStore, signal });
@@ -118,6 +128,8 @@ function createBlenderJobs({ dataDir, mediaStore, env }) {
       fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
     }
   }
-  return { request, run, operations: ["blender-retarget", "blender-render"] };
+  // Whole-job limit (api.cjs): the Blender budget plus 10 min for copying inputs and assembling the MOV.
+  const timeoutMs = (input) => (input?.operation === "blender-render" ? renderBudgetMs(input.settings) : RETARGET_MS) + 600000;
+  return { request, run, timeoutMs, claim: blender.claim, operations: ["blender-retarget", "blender-render"] };
 }
 module.exports = { createBlenderJobs };

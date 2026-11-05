@@ -675,7 +675,7 @@ services:
   #     (VW_INTERNAL_TOKEN) from auth_request /_vw_session; other lobster-net containers can reach :4178 but cannot forge it.
   #   * holds no Supabase/R2 key: assets, jobs and usage go to next-admin /api/internal/video/workbench/* with VW_INTERNAL_TOKEN.
   #   * lobster-video-net only to reach lobster-remotion-service (REMOTION_SERVICE_URL).
-  #   * Blender is off until BLENDER_PATH is set (VW_BLENDER_PATH=/opt/blender/blender in .env after the H5 CPU measurement).
+  #   * 3D renders run on CPU (no GPU here): Cycles, ~12 s per 1080p frame at 12 cores (P6 H5); BLENDER_PATH comes from the image.
   video-workbench:
     init: true
     build:
@@ -701,7 +701,7 @@ services:
       REMOTION_SERVICE_URL: ${REMOTION_SERVICE_URL:-http://lobster-remotion-service:8733}
       REMOTION_AUTH_TOKEN: ${REMOTION_AUTH_TOKEN:-}
       MEDIA_RENDER_AUTH_TOKEN: ${MEDIA_RENDER_AUTH_TOKEN:-}
-      BLENDER_PATH: ${VW_BLENDER_PATH:-}
+      VW_BLENDER_ENGINE: cycles
     networks:
       - lobster-net
       - video-net
@@ -722,7 +722,7 @@ services:
       resources:
         limits:
           memory: 4G
-          cpus: '3.00'
+          cpus: '12.00'
           pids: 512
     logging: *lobster-logging
 

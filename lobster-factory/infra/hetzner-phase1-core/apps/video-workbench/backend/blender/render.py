@@ -2,7 +2,9 @@
 # backend/blender-jobs.cjs assembles the PNGs into an alpha MOV exactly like the compositor (P3).
 # Args (positions in glTF / three.js axes, Y up): {workdir, framesDir, width, height, frameCount, fps: {num, den},
 #   objects: [{modelPath, position, rotationY (deg), scale, pose?: {bone: [w,x,y,z]}, ik?: [{bone, chain, target}]}], camera: {fov (vertical deg), keys: [{frame, position,
-#   target}]}, lights: [{type: point|sun|spot, position, intensity, color: "#rrggbb"}], ground: bool}.
+#   target}]}, lights: [{type: point|sun|spot, position, intensity, color: "#rrggbb"}], ground: bool, engine?: eevee|cycles}.
+# engine: eevee (default, needs a GPU to be fast) | cycles (CPU path tracer + OIDN denoise: hosts without a GPU, where
+# Eevee runs through Mesa llvmpipe at ~80 s per 1080p frame, P6 H5).
 # Frame k of the output (0-based) is scene frame k + 1: an imported glTF animation starts at frame 1.
 # pose = each bone's world rotation change from rest (scene axes, from the viewer's poseDeltas), ik = Blender IK
 # constraints toward world targets, evaluated on every frame. A posed model's own animation is switched off.
@@ -93,8 +95,15 @@ def main():
     scene.render.fps, scene.render.fps_base = int(a["fps"]["num"]), int(a["fps"]["den"])
     scene.render.resolution_x, scene.render.resolution_y = int(a["width"]), int(a["height"])
     scene.render.resolution_percentage = 100
-    scene.render.engine = eevee()
-    scene.eevee.taa_render_samples = 16
+    if a.get("engine") == "cycles":
+        scene.render.engine = "CYCLES"
+        scene.cycles.device = "CPU"
+        scene.cycles.samples = 16
+        scene.cycles.use_denoising = True
+        scene.cycles.denoiser = "OPENIMAGEDENOISE"
+    else:
+        scene.render.engine = eevee()
+        scene.eevee.taa_render_samples = 16
     scene.render.film_transparent = True
     scene.render.image_settings.file_format = "PNG"
     scene.render.image_settings.color_mode = "RGBA"

@@ -1,11 +1,12 @@
 // Card P5: runs one Blender background job. Binary = BLENDER_PATH, else runtime/blender/blender.exe from
-// scripts/vendor-blender.cjs (pinned 4.5.9). Command: blender -b --factory-startup --offline-mode --python-exit-code 1
+// scripts/vendor-blender.cjs (pinned 4.5.9). Command: blender -b -t <cores> --factory-startup --offline-mode --python-exit-code 1
 // --python backend/blender/<script>.py -- <workdir>/args.json. The scripts read and write only inside workdir
 // (backend/blender/common.py checks every *Path/*Dir argument). The child gets a minimal environment (no API keys;
 // Blender's user config/scripts dirs point into workdir), and cancel/timeout kills the whole process tree.
-// One Blender at a time per server process (a render takes every core; two would also double the memory).
+// One Blender at a time per server process (a render takes every core it is given; two would also double the memory).
 const fs = require("node:fs"),
   path = require("node:path"),
+  os = require("node:os"),
   { spawn, spawnSync } = require("node:child_process");
 
 const SCRIPTS = path.join(__dirname, "blender");
@@ -35,6 +36,10 @@ function killTree(child) {
 }
 
 let lane = Promise.resolve();
+// One Blender JOB at a time per host process: a second request is refused (409) instead of queued, so a job's time limit
+// (api.cjs, from acceptance) never includes waiting behind another render. claim() -> release fn, or null when busy.
+let held = false;
+const claim = () => (held ? null : ((held = true), () => { held = false; }));
 // Resolves with the script's VWRESULT object. onProgress(done, total) per VWPROGRESS line; onSpawn(pid) once started.
 function runBlender({ script, args, workdir, env = process.env, signal, timeoutMs = 1800000, onProgress, onSpawn }) {
   const turn = lane.then(() => once({ script, args, workdir, env, signal, timeoutMs, onProgress, onSpawn }));
@@ -64,7 +69,9 @@ function once({ script, args, workdir, env, signal, timeoutMs, onProgress, onSpa
       BLENDER_USER_DATAFILES: path.join(user, "datafiles"),
       BLENDER_USER_EXTENSIONS: path.join(user, "extensions"),
     };
-    const child = spawn(exe, ["-b", "--factory-startup", "--offline-mode", "--python-exit-code", "1", "--python", path.join(SCRIPTS, script), "--", argsFile], {
+    // -t: threads = the cores this process may use (cgroup quota, os.availableParallelism), not the host's core count --
+    // 32 threads under a 3-core quota made each frame ~2x slower (P6 H5).
+    const child = spawn(exe, ["-b", "-t", String(os.availableParallelism()), "--factory-startup", "--offline-mode", "--python-exit-code", "1", "--python", path.join(SCRIPTS, script), "--", argsFile], {
       cwd: workdir,
       env: childEnv,
       windowsHide: true,
@@ -115,4 +122,4 @@ function once({ script, args, workdir, env, signal, timeoutMs, onProgress, onSpa
     });
   });
 }
-module.exports = { runBlender, blenderPath, capability, ENGINE, killTree };
+module.exports = { claim, runBlender, blenderPath, capability, ENGINE, killTree };

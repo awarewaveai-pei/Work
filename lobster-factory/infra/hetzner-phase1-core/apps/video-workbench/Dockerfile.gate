@@ -9,3 +9,5 @@ RUN --network=none node tests/gate.cjs
 # aborted every 3D render while `blender --version` passed, P6 H5).
 RUN --network=none /opt/blender/blender -b --factory-startup --python-exit-code 1 --python-expr "import bpy; s=bpy.context.scene; s.render.engine='BLENDER_EEVEE_NEXT'; s.render.resolution_x=16; s.render.resolution_y=16; s.render.filepath='/tmp/eevee-gate.png'; bpy.ops.render.render(write_still=True)" \
     && test -s /tmp/eevee-gate.png
+# The engine the CPU-only host uses (VW_BLENDER_ENGINE=cycles): one 16x16 Cycles frame.
+RUN --network=none /opt/blender/blender -b -t 2 --factory-startup --python-exit-code 1 --python-expr "import bpy; s=bpy.context.scene; s.render.engine='CYCLES'; s.cycles.device='CPU'; s.cycles.samples=4; s.render.resolution_x=16; s.render.resolution_y=16; s.render.filepath='/tmp/cycles-gate.png'; bpy.ops.render.render(write_still=True)"     && test -s /tmp/cycles-gate.png

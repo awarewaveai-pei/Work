@@ -675,7 +675,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   // download + verification; Blender has its own 30 min limit (blender.cjs); Meshy tasks take minutes.
   function jobTimeoutMs(input) {
     const op = input?.operation;
-    return op === "blender-retarget" || op === "blender-render" ? 1860000 : op === "meshy-image-to-3d" ? 1200000 : op === "remotion-template" ? 780000 : 600000;
+    return op === "blender-retarget" || op === "blender-render" ? blender3d().timeoutMs(input) : op === "meshy-image-to-3d" ? 1200000 : op === "remotion-template" ? 780000 : 600000;
   }
   // Validates, records and answers 202 before any provider call (runtime.js treats 501/503 as "never sent").
   async function start(input, res, extra, req) {
@@ -701,29 +701,38 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     if (feature) costs.priceOf({ "video.image": "image", "video.motion": "video", "video.tts": "audio", "video.bg-remove": "remove-bg" }[feature] || feature,
       { "video.image": providerModels.image, "video.motion": providerModels.video, "video.tts": providerModels.audio }[feature]);
     const paid = await requirePermit(req, feature);
-    const job = {
-      id: crypto.randomUUID(),
-      type: parsed.type,
-      input: durableInput(input),
-      status: "queued",
-      progress: 0,
-      createdAt: new Date().toISOString(),
-      ...extra,
-      ...(main && req?.vwIdentity?.userId ? { createdBy: req.vwIdentity.userId } : {}),
-      ...(paid ? { paid } : {}),
-    };
-    job.deadlineAt = new Date(Date.parse(job.createdAt) + jobTimeoutMs(input)).toISOString();
-    jobs.push(job);
-    persist();
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), jobTimeoutMs(input));
-    timeout.unref();
-    controls.set(job.id, controller);
-    mirror(job);
-    json(res, 202, job);
+    const release = isBlender ? blender3d().claim() : null;
+    if (isBlender && !release) throw Object.assign(Error("3D 渲染進行中，請等目前的工作完成再送出"), { status: 409 });
+    let job, controller, timeout;
+    try {
+      job = {
+        id: crypto.randomUUID(),
+        type: parsed.type,
+        input: durableInput(input),
+        status: "queued",
+        progress: 0,
+        createdAt: new Date().toISOString(),
+        ...extra,
+        ...(main && req?.vwIdentity?.userId ? { createdBy: req.vwIdentity.userId } : {}),
+        ...(paid ? { paid } : {}),
+      };
+      job.deadlineAt = new Date(Date.parse(job.createdAt) + jobTimeoutMs(input)).toISOString();
+      jobs.push(job);
+      persist();
+      controller = new AbortController();
+      timeout = setTimeout(() => controller.abort(), jobTimeoutMs(input));
+      timeout.unref();
+      controls.set(job.id, controller);
+      mirror(job);
+      json(res, 202, job);
+    } catch (error) {
+      release?.();   // never leave the 3D slot held by a job that was not started
+      throw error;
+    }
     setImmediate(() =>
       finish(job, controller.signal).finally(() => {
         clearTimeout(timeout);
+        release?.();
         return settle(job);
       }),
     );
