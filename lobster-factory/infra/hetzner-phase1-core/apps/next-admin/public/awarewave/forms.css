@@ -1,0 +1,25 @@
+/* Shared by the AwareWave shell and local tools. Color values live in the theme tokens. */
+.form-input,
+.form-select,
+.form-textarea {
+  width: 100%;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--form-input-bg);
+  transition: border-color .15s, box-shadow .15s;
+  outline: none;
+}
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+.form-select option {
+  color: var(--text-primary);
+  background: var(--form-input-bg);
+}
+.form-textarea { min-height: 80px; resize: vertical; }
