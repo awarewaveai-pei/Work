@@ -27,15 +27,16 @@ export const COPY = {
 
 export const NOW = [
   { what: '確認拿到的是真的 PhotoCraft，不是同名假貨。', state: 'yes', ev: 'storytold/photocraft：七萬七千多顆星、Apache-2.0、今天還在更新、官網 getartcraft.com 連到同一個地方。只複製原始碼來讀，沒有下載安裝檔、沒有執行。' },
-  { what: 'PhotoCraft 有網頁版，可以放進 app 的頁面裡。', state: 'yes', ev: '官方每版都發網頁版，約十三 MB（向量版是八十九 MB），首次載入快很多。' },
+  { what: 'PhotoCraft 有網頁版，可以放進 app 的頁面裡。', state: 'yes', ev: '2026-11-06 已放上正式站：app.aware-wave.com/photo-pro/current/ 開得起來（14 MB 分段檔、一年快取；其餘每次重新確認）。頁面與側欄入口還沒合併上線。' },
   { what: '舊 Canvas Editor 的每個功能，在專業版都有著落。', state: 'yes', ev: '舊編輯器全部按鈕與控制項逐一比對過：大多數 PhotoCraft 原生就有而且更完整（調整、濾鏡、文字、形狀、圖層、印刷用 PDF、另存與換格式）；它沒有的全部排進右側面板。有三項做法會變：上傳字型改成建置時加進字型庫；調色要能回頭改請用原生的調整圖層；舊專案檔換成 PhotoCraft 的格式。' },
-  { what: '右側面板能對 PhotoCraft 下指令（放圖進去、拿圖出來、匯出、存檔）。', state: 'no', ev: '這是和向量版最大的差別：PhotoCraft 的網頁版還沒有這個「遙控器」。它的團隊已經做好零件，只是還沒裝上。做法已定：動工時先看他們裝了沒，裝了就直接用；還沒裝就先幫它裝上，同時把裝法寄回給他們，他們裝好後這邊的就拿掉。' },
-  { what: '放圖進圖層、取出圖層的圖、換掉圖層的圖，這幾個動作做得到。', state: 'no', ev: 'PhotoCraft 沒有現成的指令做這幾件事，要在本機實際試（卡 C1 的最後一項）。試出來做不到的會列出來回報，不會硬做。AI 去背、AI 填色、邊緣遮罩、調色面板都靠這幾個動作。' },
+  { what: '右側面板能對 PhotoCraft 下指令（放圖進去、拿圖出來、匯出、存檔）。', state: 'yes', ev: 'W1 已把 PhotoCraft 團隊自己的介面接上（一個只動網頁外殼的補丁，上游 PR 草稿已寫、未送出），本機實測可以下指令。' },
+  { what: '放圖進圖層、取出圖層的圖、換掉圖層的圖，這幾個動作做得到。', state: 'yes', ev: 'W1 本機實測全部做得到：開檔、匯出、放 SVG、放圖片、取圖層的圖、換圖層的圖（位置與順序不變）、選取轉遮罩、按 Q 塗出範圍、符合／填滿畫布。兩點差異已交給下一張卡：按 Q 塗的地方預設是「不選」，要反過來；換圖時圖層樣式不會帶過去。My Designs 的原始檔改存 .psd（網頁版存不出 PhotoCraft 自己的格式）。' },
   { what: '從 Studio、塔羅、Banner、Mockup、我的設計按一下就進專業版改圖；改完可以存入 My Designs、另存、換格式、匯出。', state: 'no', ev: '進來：Studio、塔羅、Banner、我的設計現在就有按鈕，都經過同一個函式，改一處全部接過去；Mockup 現在沒有按鈕，計畫裡補上；有圖層的設計會開原始檔，不是壓平的圖。出去：存入 My Designs（縮圖加原始檔，Mockup 工具照舊選得到）；另存、換格式、匯出用 PhotoCraft 自己的選單，檔案照常下載到電腦。' },
   { what: '介面是繁體中文、用妳的字型。', state: 'no', ev: '繁中翻譯檔已經有；字型沿用向量版那份清單，不用補丁。要等建置後才看得到。PhotoCraft 的畫面用它自己的深色或淺色，不套 app 主題（妳 2026-11-05 晚上的決定；向量專業版的主題連動 2026-11-06 一併拿掉）；右側那條圖示欄照舊跟著 app 主題。' },
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
+const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '建置鏈、介面、本機試做', plain: '例：在這台筆電按一個指令，就從 PhotoCraft 原始碼建出可放網站的檔案（含妳的字型）；接上讓面板能下指令的介面；在本機瀏覽器實際試「放圖進去、拿圖出來、換圖、匯出」做不做得到。',
@@ -50,15 +51,15 @@ export const STEPS = [
       todo('C1.4', '本機開起來實測：繁中、字型、介面，以及放圖、取圖、換圖、匯出、取選取範圍、符合畫布這幾個動作；做不到的回報。'),
     ] },
   { n: 2, code: 'C2', group: 'B', title: '承載（正式站靜態檔）', plain: '例：建好的檔案放到主機一個獨立資料夾，由 nginx 直接供給，不經 next-admin，也不會被每天的自動部署刪掉；換版本只是把 current 指向新資料夾。',
-    gate: '瀏覽器開 /photo-pro/current/index.html 回 200；檔名帶雜湊的檔才長時間快取，其餘每次都重新確認；nginx 容器內看得到檔案。', risk: 'High（上傳正式站、改 nginx 與 compose；走 safe-infra-patch 自動還原）', model: 'fullstack-engineer（Sonnet）；主 session 驗收', status: 'not_started', depends: ['C1'],
+    gate: '瀏覽器開 /photo-pro/current/index.html 回 200；檔名帶雜湊的檔才長時間快取，其餘每次都重新確認；nginx 容器內看得到檔案。', risk: 'High（上傳正式站、改 nginx 與 compose；走 safe-infra-patch 自動還原）', model: 'fullstack-engineer（Sonnet）；主 session 驗收', status: 'done', commit: 'c9c7e3bb1', depends: ['C1'],
     decided: '靜態檔公開供給、頁面本身要登入（同向量版 2026-11-05 的定案）。',
     what: 'rsync dist → 主機；compose 加 nginx 唯讀掛載；nginx 兩個 server block 各加 /photo-pro/ 靜態 location（預設 expires -1，只有帶雜湊的檔與分段檔一年；不開 gzip_static）；repo 對照檔同步',
     files: ['INFRA/docker-compose.yml', 'INFRA/nginx/default.conf'],
     items: [
-      todo('C2.1', '把建好的資料夾上傳主機，建 current 連結，校驗碼比對通過。'),
-      todo('C2.2', 'nginx 容器掛上那個資料夾（compose 走安全補丁流程）。'),
-      todo('C2.3', 'nginx 加一段只供這個資料夾的設定（走安全補丁流程）。'),
-      todo('C2.4', '用 curl 驗：頁面 200、快取設定正確、容器內有檔。'),
+      done('C2.1', '把建好的資料夾上傳主機，建 current 連結，校驗碼比對通過。', 'c9c7e3bb1'),
+      done('C2.2', 'nginx 容器掛上那個資料夾（compose 走安全補丁流程）。', 'c9c7e3bb1'),
+      done('C2.3', 'nginx 加一段只供這個資料夾的設定（走安全補丁流程）。', 'c9c7e3bb1'),
+      done('C2.4', '用 curl 驗：頁面 200、快取設定正確、容器內有檔。', 'c9c7e3bb1'),
     ] },
   { n: 3, code: 'C3', group: 'C', title: 'app 門', plain: '例：側欄多一項「畫布（專業版）」，點了開新分頁、全視窗，就是 Photoshop 的介面；瀏覽器太舊時顯示一行說明。',
     gate: '登入後開 /tools/photo-pro 看得到 PhotoCraft；介面回得了資料；相關測試與型別檢查全綠；向量專業版照常。', risk: 'Medium（改側欄與產品登記；向量頁改用共用外框）', model: 'Opus 5.5｜工人 W2（C3.1–C3.3 先寫好，C2 上線後才併入正式版）', status: 'not_started', depends: ['C2'],
