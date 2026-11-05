@@ -7,7 +7,7 @@ const assert = require("node:assert/strict"),
   os = require("node:os"),
   path = require("node:path"),
   crypto = require("node:crypto");
-const { migrate, undo } = require("../backend/migrate-media.cjs");
+const { migrate, undo, sources } = require("../backend/migrate-media.cjs");
 const appDir = require("../backend/appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env);
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jTioAAAAASUVORK5CYII=", "base64");
 const ORG = "11111111-1111-4111-8111-111111111111", BASE = "http://next-admin.test:3000";
@@ -43,7 +43,7 @@ const JOB = "cccccccc-0000-4000-8000-000000000001";
     fs.writeFileSync(path.join(data, "generated", path.basename(GJOB)), Buffer.concat([png, Buffer.from("job")]));
     // A pre-L3 job result that never made it into state.assets (settle() only runs on a status change).
     fs.writeFileSync(path.join(data, "jobs.json"), JSON.stringify([
-      { id: JOB, type: "image", status: "succeeded", input: {}, result: { url: GJOB, origin: { kind: "ai_generated", model: "gpt-image-1", provider: "OpenAI" } } },
+      { id: JOB, type: "image", status: "succeeded", input: { settings: { ratio: "9:16" } }, result: { url: GJOB, origin: { kind: "ai_generated", model: "gpt-image-1", provider: "OpenAI" } } },
       { id: "cccccccc-0000-4000-8000-000000000002", type: "image", status: "failed", result: null },
     ]));
     fs.writeFileSync(path.join(data, "media", MSHA, "original.png"), mediaBytes);
@@ -69,6 +69,8 @@ const JOB = "cccccccc-0000-4000-8000-000000000001";
     const data = fixture("org"), before = snapshot(data), stateBefore = fs.readFileSync(path.join(data, "state.json"), "utf8");
     const dry = await run(data, { dryRun: true, fetchImpl: async () => { throw Error("dry-run must not call the network"); } });
     assert.equal(dry.rows.length, 6);
+    // a job result carries its job's delivery ratio to ingest (recorded for renders; the release panel reads it)
+    assert.equal(sources(data, JSON.parse(fs.readFileSync(path.join(data, "state.json"), "utf8"))).find((r) => r.url === GJOB).ratio, "9:16");
     assert.deepEqual(dry.counts, { total: 6, "dry-run": 4, skipped: 1, error: 1 });
     assert.equal(dry.rows.filter((r) => r.reason === "unreferenced_media").length, 1);
     assert(!fs.readdirSync(data).some((f) => f.startsWith("migrate-report")) && !fs.existsSync(path.join(data, "main-system-assets.json")));

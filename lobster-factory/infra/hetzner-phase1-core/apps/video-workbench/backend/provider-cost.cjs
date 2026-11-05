@@ -23,9 +23,11 @@ function textUsd(model, usage, bound = {}) {
   const cached = Math.min(tok(usage.input_tokens_details?.cached_tokens), tok(usage.input_tokens));
   return round(((tok(usage.input_tokens) - cached) + cached * rate.cacheReadMult) * rate.inputPerM / 1e6 + tok(usage.output_tokens) * rate.outputPerM / 1e6);
 }
-// gpt-image-2 family bills by token (OPENAI_IMAGE_TOKEN_RATES); no usage = the highest per-image estimate.
+// Token-billed OpenAI image models (OPENAI_TOKEN_PRICED_IMAGE_MODELS; a dated snapshot = its base id); no usage = the
+// highest per-image estimate. A model only priced by name resemblance is refused.
 function imageUsd(model, usage) {
-  if (!/^gpt-image-2(\.|-|$)/.test(String(model))) throw unpriced(model);
+  const base = String(model).replace(/-\d{4}-\d{2}-\d{2}$/, "");
+  if (!rates.OPENAI_TOKEN_PRICED_IMAGE_MODELS.includes(base)) throw unpriced(model);
   const r = rates.OPENAI_IMAGE_TOKEN_RATES;
   if (!usage || !Number.isFinite(Number(usage.output_tokens))) return rates.IMAGE_RATES["openai-high"].usd;
   const d = usage.input_tokens_details || {},

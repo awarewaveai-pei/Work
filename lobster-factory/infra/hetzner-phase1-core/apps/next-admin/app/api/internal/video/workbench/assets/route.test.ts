@@ -112,6 +112,15 @@ describe("POST /api/internal/video/workbench/assets", () => {
     expect((await post({ ...auth, "content-type": "application/x-bvh" })).status).toBe(415);   // non-media stays local
   });
 
+  it("records a deliverable ratio in metadata and refuses any other value", async () => {
+    const meta = (m: object) => ({ "x-vw-meta": Buffer.from(JSON.stringify(m)).toString("base64url") });
+    expect((await post({ ...auth, ...meta({ ratio: "1x1" }) })).status).toBe(400);
+    expect((await post({ ...auth, ...meta({ ratio: "16:9" }) })).status).toBe(400);
+    expect(state.inserts).toEqual([]);
+    expect((await post({ ...auth, ...meta({ ratio: "9x16" }) })).status).toBe(201);
+    expect(state.inserts[0]).toMatchObject({ metadata: { ratio: "9x16" } });
+  });
+
   it("same org + origin + checksum again returns the existing row and uploads nothing", async () => {
     const first = await (await post(auth)).json();
     const json = await (await post(auth)).json();

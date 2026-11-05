@@ -46,7 +46,10 @@ html[data-awarewave-embedded] .app > main { flex: 1; height: auto; min-height: 0
   max-width: 100%;
   max-height: 70vh;
 }
-.job-view button {
+.job-view button,
+.job-view a.button {
+  display: inline-block;
+  text-decoration: none;
   margin: 12px 8px 0 0;
   padding: 10px 16px;
   background: var(--btn-secondary-bg);
@@ -54,4 +57,8 @@ html[data-awarewave-embedded] .app > main { flex: 1; height: auto; min-height: 0
   color: var(--btn-secondary-text);
   border-radius: var(--radius-sm);
   cursor: pointer;
+}
+.job-view a.button[aria-disabled="true"] {
+  opacity: .6;
+  cursor: not-allowed;
 }

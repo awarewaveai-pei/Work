@@ -3,7 +3,7 @@
  * platform takes (platform-ratio.ts) and its own text; the video is uploaded to the brand's media once per ratio.
  * Dependencies are passed in so the route owns auth and the social store, and the rule stays testable.
  */
-import { ratioFor, ratioOfUrl } from "./platform-ratio";
+import { ratioFor } from "./platform-ratio";
 
 export interface DraftItem { accountId: string; text: string }
 export interface DraftDeps {
@@ -39,7 +39,7 @@ export async function saveVideoSocialDrafts(deps: DraftDeps, title: string, item
   const media = new Map<string, string>();
   const drafts: Array<{ accountId: string; postId: string; ratio: string; platform: string }> = [];
   for (const p of plan) {
-    if (!media.has(p.ratio)) media.set(p.ratio, (await deps.addVideo(p.videoUrl, `${ratioOfUrl(p.videoUrl) ?? p.ratio}.mp4`)).id);
+    if (!media.has(p.ratio)) media.set(p.ratio, (await deps.addVideo(p.videoUrl, `${p.ratio}.mp4`)).id);
     const post = await deps.savePost({ body: p.text, notes: `影片：${title}`.slice(0, 500) }, p.accountId, media.get(p.ratio)!);
     drafts.push({ accountId: p.accountId, postId: post.id, ratio: p.ratio, platform: p.platform });
   }

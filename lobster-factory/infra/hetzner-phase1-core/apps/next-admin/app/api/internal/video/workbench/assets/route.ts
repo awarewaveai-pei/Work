@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "@/lib/security/timingSafeEqual";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { DELIVERY_RATIOS } from "@/lib/content/video/platform-ratio";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +13,7 @@ export const maxDuration = 300;
  * VW holds no Supabase or R2 key). Bearer = VW_INTERNAL_TOKEN; unset = every call 401.
  * Body = the raw file bytes. Headers: Content-Type (mime), X-VW-Org-Id (uuid), X-VW-Origin (ai_generated |
  * real_footage | workbench_render), X-VW-Meta (base64url JSON: rightsSources, parentAssetIds, costUsd, vwJobId,
- * render {outputs, outputMeta} = the render worker's QA evidence for a video).
+ * ratio (render delivery ratio: 16x9 | 9x16 | 4x5, stored in metadata), render {outputs, outputMeta} = the render worker's QA evidence for a video).
  * Idempotent by the caller's key: same org + origin + vwJobId (or, without a job, origin + checksum) -> that row, nothing
  * uploaded. The same bytes under another origin or job get their own row (own origin/rights/cost) over the shared
  * content-addressed object, as the next `version` of its key (unique org+backend+key+version, migration 0038).
@@ -53,7 +54,7 @@ function maxBytes(): number {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : DEFAULT_MAX_BYTES;
 }
 
-type Meta = { rightsSources?: unknown[]; parentAssetIds?: string[]; costUsd?: number; vwJobId?: string; render?: { outputs: Record<string, string>; outputMeta?: Record<string, unknown> } };
+type Meta = { rightsSources?: unknown[]; parentAssetIds?: string[]; costUsd?: number; vwJobId?: string; ratio?: string; render?: { outputs: Record<string, string>; outputMeta?: Record<string, unknown> } };
 
 function parseMeta(raw: string | null): Meta | null {
   if (!raw) return {};
@@ -78,6 +79,11 @@ function parseMeta(raw: string | null): Meta | null {
   if (m.vwJobId !== undefined) {
     if (typeof m.vwJobId !== "string" || !/^[A-Za-z0-9._:-]{1,128}$/.test(m.vwJobId)) return null;
     out.vwJobId = m.vwJobId;
+  }
+  // Invariant: a recorded delivery ratio is one the platform can deliver (DELIVERY_RATIOS); anything else is a bad request.
+  if (m.ratio !== undefined) {
+    if (typeof m.ratio !== "string" || !DELIVERY_RATIOS.includes(m.ratio)) return null;
+    out.ratio = m.ratio;
   }
   if (m.render !== undefined) {
     const r = m.render as Record<string, unknown> | null;
@@ -175,6 +181,7 @@ export async function POST(req: Request): Promise<Response> {
         ...(meta.parentAssetIds ? { parentAssetIds: meta.parentAssetIds } : {}),
         ...(meta.costUsd !== undefined ? { costUsd: meta.costUsd } : {}),
         ...(meta.vwJobId ? { vwJobId: meta.vwJobId } : {}),
+        ...(meta.ratio ? { ratio: meta.ratio } : {}),
       },
     }).select("id").single();
     if (!inserted.error && inserted.data) break;

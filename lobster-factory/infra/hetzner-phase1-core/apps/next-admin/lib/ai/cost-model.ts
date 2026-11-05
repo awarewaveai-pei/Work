@@ -141,6 +141,8 @@ export const MEDIA_MODELS: Record<string, MediaModel> = {
   "gpt-image-2":                       { vendor: "OpenAI", kind: "image", status: "active", verifiedAt: "2026-10-28" },
   // Same published token rates as gpt-image-2 (OPENAI_IMAGE_TOKEN_RATES); verified by 3 edits via Replicate 2026-11-01.
   "gpt-image-2.5-sunburst":            { vendor: "OpenAI", kind: "image", status: "active", verifiedAt: "2026-11-01" },
+  // video-workbench default image model; same published token rates as gpt-image-2 (pricing page, 2026-11-05).
+  "gpt-image-2.5-flare":               { vendor: "OpenAI", kind: "image", status: "active", verifiedAt: "2026-11-05" },
   "whisper-1":                         { vendor: "OpenAI", kind: "tool", status: "active", verifiedAt: "2026-10-29" },
   // video-workbench speech (OPENAI_TTS_RATES).
   "gpt-4o-mini-tts":                   { vendor: "OpenAI", kind: "tool", status: "active" },
@@ -267,6 +269,9 @@ export const INFRA_MONTHLY: InfraCost[] = [
 /** gpt-image-2, USD per 1M tokens (OpenAI pricing page, 2026-10-25): text input, image input, image output. */
 export const OPENAI_IMAGE_MODEL = "gpt-image-2";
 export const OPENAI_IMAGE_TOKEN_RATES = { textInPerM: 5, imageInPerM: 8, imageOutPerM: 30 } as const;
+/** OpenAI image models billed at exactly OPENAI_IMAGE_TOKEN_RATES (pricing page, 2026-11-05). A model not listed here has
+ *  no price: callers that charge by these rates refuse it rather than guess from its name. */
+export const OPENAI_TOKEN_PRICED_IMAGE_MODELS: readonly string[] = ["gpt-image-2", "gpt-image-2.5-sunburst", "gpt-image-2.5-flare"];
 
 /** OpenAI video (video-workbench /videos), USD per output second at 720p (openai.com/api/pricing). */
 export const OPENAI_VIDEO_RATES: Record<string, { usdPerSec: number; label: string }> = {

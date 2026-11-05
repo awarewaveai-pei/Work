@@ -44,10 +44,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     return asset ? path.join(__dirname, "../assets", asset[1]) : null;
   }
   // P6 L3: a finished file goes to the main system's asset ledger (sources = every local url in the job input).
-  async function register(url, origin, { sources = [], costUsd, jobId } = {}) {
+  async function register(url, origin, { sources = [], costUsd, jobId, ratio } = {}) {
     const file = localFile(url);
     if (!file) throw Object.assign(Error("找不到要登記的檔案"), { status: 502 });
-    const r = await main.ingest({ url, file, origin, sources, costUsd, jobId });
+    const r = await main.ingest({ url, file, origin, sources, costUsd, jobId, ratio });
     return r.skipped ? { ledger: r.skipped } : { assetId: r.assetId, checksumSha256: r.checksumSha256 };
   }
   // Upload-style responses: registered before the answer; a failed registration fails the request.
@@ -61,7 +61,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     if (!main) return;
     if (job.status === "succeeded" && job.result?.url && !job.result.assetId && !job.result.ledger) {
       try {
-        Object.assign(job.result, await register(job.result.url, job.result.origin, { sources: mainSystemTools.localUrls(job.input), costUsd: job.result.origin?.costUsd, jobId: job.id }));
+        Object.assign(job.result, await register(job.result.url, job.result.origin, { sources: mainSystemTools.localUrls(job.input), costUsd: job.result.origin?.costUsd, jobId: job.id, ratio: job.input?.settings?.ratio || job.input?.settings?.project?.ratio }));
         delete job.ledgerError;
       } catch (e) {
         job.ledgerError = publicError(e.message);
@@ -793,7 +793,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       }
       if (req.method === "GET" && route === "/capabilities") {
         json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: require("./blender.cjs").capability(env), meshy: meshy.capability(env), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.publicCatalog,
-          // P6 L3: connected = finished videos can be sent for review on next-admin (/api/video/release, same origin).
+          // P6 L3: connected = finished videos open next-admin /release (same origin) for review and delivery.
           mainSystem: main ? { organizationId: orgId } : null });
         return true;
       }

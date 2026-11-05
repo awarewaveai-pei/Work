@@ -9,7 +9,7 @@ import { claudeWriter } from "@/lib/social/write-posts-claude";
 import { persistEditorialRightsQa } from "./editorial-rights-persist";
 import { finalizeVideoJob } from "./finalize";
 import { readJob } from "./job-store";
-import { ratioOfUrl } from "./platform-ratio";
+import { ratioOfAsset } from "./platform-ratio";
 import type { AdvanceDeps } from "./project-advance";
 import { REQUIRED_RELEASE_QA_KINDS, loadAuthoritativeReleaseEvidence } from "./release-evidence";
 import { createApprovedRelease } from "./release-create";
@@ -35,9 +35,9 @@ export function advanceDeps(sb: SupabaseClient, org: string, actor: string): Adv
     },
 
     async rows(projectId) {
-      const { data, error } = await sb.from("media_assets").select("id, object_url, checksum_sha256").eq("organization_id", org).eq("media_project_id", projectId).eq("is_current", true).eq("mime_type", "video/mp4");
+      const { data, error } = await sb.from("media_assets").select("id, object_url, checksum_sha256, metadata").eq("organization_id", org).eq("media_project_id", projectId).eq("is_current", true).eq("mime_type", "video/mp4");
       if (error) fail("media_assets", error);
-      return (data ?? []).flatMap((a) => { const ratio = ratioOfUrl(a.object_url as string | null); return ratio && a.checksum_sha256 ? [{ id: String(a.id), ratio, checksum: String(a.checksum_sha256) }] : []; });
+      return (data ?? []).flatMap((a) => { const ratio = a.object_url ? ratioOfAsset({ object_url: String(a.object_url), metadata: a.metadata as { ratio?: unknown } | null }) : undefined; return ratio && a.checksum_sha256 ? [{ id: String(a.id), ratio, checksum: String(a.checksum_sha256) }] : []; });
     },
 
     async qaProblems(row) {

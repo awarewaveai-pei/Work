@@ -10,6 +10,7 @@
  * 不加 EU↔SG 反向耦合（不在 EU 放任何 SG 憑證）；重用 recordVideoAsset（記錄邏輯單一真相）。
  */
 import { getSupabaseWriteClient } from "../../supabase-server";
+import { WORKBENCH_PREFIX } from "./workbench-sweep";
 import { recordVideoAsset, videoObjectKey, pickPrimaryOutput, parseOrgPrefixFromDir } from "../blocks/video-pipeline";
 
 function r2cfg(): { apiToken: string; accountId: string; bucket: string; publicBase: string } | null {
@@ -98,6 +99,8 @@ export async function reconcileVideos(): Promise<ReconcileResult> {
   const FORMAT_SUFFIX_RE = /^video\/(.+)\/([^/]+)\.mp4$/;
   const groups = new Map<string, Record<string, string>>();
   for (const k of keys) {
+    // Workbench objects have no pipeline origin/rights: never recorded here; workbench-sweep.ts owns them.
+    if (k.startsWith(WORKBENCH_PREFIX)) continue;
     const m = FORMAT_SUFFIX_RE.exec(k);
     if (!m) continue;
     const dir = m[1];

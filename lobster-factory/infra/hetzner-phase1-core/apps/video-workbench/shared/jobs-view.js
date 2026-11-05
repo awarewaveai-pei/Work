@@ -1,37 +1,40 @@
 (function () {
-  // P6 L3 送審: a finished video registered in the main system goes to next-admin's release gate (/api/video/release,
-  // same origin: next-admin owns /api/ on this host). Only 16:9 / 9:16 / 4:5 can be delivered (D6, /delivery-ratios);
-  // Invariant: a permission refusal is never shown as success -- 403 = 「沒有送審權限」 and the button stays usable.
+  // P6.6 送審與投遞: a finished video registered in the main system is released and delivered on next-admin's /release page
+  // (same origin; it owns QA, release, social and WordPress drafts). Only 16:9 / 9:16 / 4:5 can be delivered (D6, /delivery-ratios).
   let delivery;
   const caps = async () => (VideoWorkbench.capabilities ||= await VideoWorkbench.request("/capabilities", undefined, "GET"));
-  async function sendForReview(v) {
+  // The page opens through a real link (href resolved before the click), never window.open after an await: browsers
+  // block a popup that is not opened synchronously by the click, silently.
+  async function deliveryUrl(v) {
     const org = (await caps())?.mainSystem?.organizationId;
-    if (!org || !v.result?.assetId || !v.result?.checksumSha256) throw Error("此成果尚未登記到主系統，無法送審");
+    if (!org || !v.result?.assetId) throw Error("此成果尚未登記到主系統，無法送審");
     delivery ||= await VideoWorkbench.request("/delivery-ratios", undefined, "GET");
     const ratio = v.input?.settings?.ratio || v.input?.settings?.project?.ratio || "16:9", fit = delivery?.ratios?.[ratio];
     if (!fit?.deliverable) throw Error(fit?.note || "此比例尚不能投遞");
-    const res = await fetch("/api/video/release", {
-      method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ organizationId: org, candidateAssetId: v.result.assetId, candidateChecksum: v.result.checksumSha256 }),
-    });
-    if (res.status === 403) throw Error("沒有送審權限");
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok || body.ok !== true) throw Error("送審未通過：" + String(body.error || body.reason || res.status));
-    return "已核准發布，可到主系統建立社群／WordPress 草稿";
+    return "/release?" + new URLSearchParams({ organizationId: org, candidateAssetId: v.result.assetId });
   }
   function reviewButton(v, actions) {
     if (!v.result?.assetId) return;   // local mode registers nothing: no button
-    const button = document.createElement("button");
-    button.textContent = "送審";
-    button.dataset.jobReview = v.id;
-    button.onclick = async () => {
-      button.disabled = true;
-      try { VideoWorkbench.notify(await sendForReview(v)); }
-      catch (error) { VideoWorkbench.reportError(error); button.disabled = false; }
+    const link = document.createElement("a");
+    link.textContent = "送審與投遞";
+    link.className = "button";
+    link.dataset.jobReview = v.id;
+    link.setAttribute("aria-disabled", "true");
+    let refusal = null;
+    link.onclick = (event) => {
+      if (link.getAttribute("aria-disabled") === "false") return;   // native navigation to /release in a new tab
+      event.preventDefault();
+      if (refusal) VideoWorkbench.reportError(refusal);
     };
-    actions.append(button);
+    deliveryUrl(v).then((url) => {
+      link.href = url;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.setAttribute("aria-disabled", "false");
+    }, (error) => { refusal = error; link.title = error.message; });
+    actions.append(link);
   }
-  VideoWorkbench.sendForReview = sendForReview;
+  VideoWorkbench.deliveryUrl = deliveryUrl;
   VideoWorkbench.showJob = (job, options = {}) => {
     let panel = document.createElement("section");
     panel.className = "job-view";

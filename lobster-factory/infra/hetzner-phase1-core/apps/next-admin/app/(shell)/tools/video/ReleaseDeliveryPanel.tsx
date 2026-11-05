@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import OrganizationPicker from "./OrganizationPicker";
 import { QA_LABELS, STATUS_TEXT, findingLabel } from "./qa-labels";
-import { RATIO_LABEL, ratioFor, ratioOfUrl } from "@/lib/content/video/platform-ratio";
+import { RATIO_LABEL, ratioFor, ratioOfAsset } from "@/lib/content/video/platform-ratio";
 import { textsForAccounts, writerKeysFor } from "@/lib/social/write-posts";
 
 const card: React.CSSProperties = { background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 10, padding: 14, display: "grid", gap: 9 };
@@ -12,7 +12,7 @@ const btn = (on: boolean): React.CSSProperties => ({ width: "fit-content", paddi
 const chip = (on: boolean): React.CSSProperties => ({ padding: "6px 10px", borderRadius: 7, border: `1px solid ${on ? "var(--accent)" : "var(--border-subtle)"}`, background: on ? "var(--bg-subtle)" : "var(--card-bg)", color: "var(--text-primary)", fontSize: 12, cursor: "pointer", textAlign: "left" });
 
 const KINDS = ["technical", "caption", "editorial", "rights"] as const;
-type Asset = { id: string; object_url: string; checksum_sha256?: string; metadata?: { title?: string; variantOf?: string; script?: string }; created_at: string; asset_domain: string };
+type Asset = { id: string; object_url: string; checksum_sha256?: string; metadata?: { title?: string; variantOf?: string; script?: string; ratio?: string }; created_at: string; asset_domain: string };
 type Qa = { kind: string; status: string; candidateChecksum: string; findings?: Array<{ rule: string; message: string }> };
 type Account = { id: string; platform: string; label: string; status: string };
 type Site = { id: string; name: string; organization_id?: string | null };
@@ -51,14 +51,14 @@ export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCan
   const primaries = useMemo(() => assets.filter((a) => !a.metadata?.variantOf), [assets]);
   const primary = assets.find((a) => a.id === candidateId);
   const rows = useMemo(() => assets.filter((a) => a.id === candidateId || a.metadata?.variantOf === candidateId)
-    .map((a) => ({ ...a, ratio: ratioOfUrl(a.object_url) ?? "" })).filter((a) => a.ratio), [assets, candidateId]);
+    .map((a) => ({ ...a, ratio: ratioOfAsset(a) ?? "" })).filter((a) => a.ratio), [assets, candidateId]);
   const releasedRows = rows.filter((r) => released[r.id]);
   const releasedRatios = releasedRows.map((r) => r.ratio);
 
   useEffect(() => {
     if (!org) { setAssets([]); setAccounts([]); setSites([]); return; }
     let cancelled = false;
-    void getJson<{ items?: Asset[] }>(`/api/video/assets?organizationId=${encodeURIComponent(org)}`).then((j) => { if (!cancelled) setAssets(j?.items ?? []); });
+    void getJson<{ items?: Asset[] }>(`/api/video/assets?organizationId=${encodeURIComponent(org)}&includeWorkbench=1`).then((j) => { if (!cancelled) setAssets(j?.items ?? []); });
     void getJson<{ accounts?: Account[] }>(`/api/video/social-channels?organizationId=${encodeURIComponent(org)}`).then((j) => { if (!cancelled) setAccounts(j?.accounts ?? []); });
     void getJson<{ sites?: Site[] }>("/api/content/sites").then((j) => { if (!cancelled) setSites((j?.sites ?? []).filter((s) => s.organization_id === org)); });
     return () => { cancelled = true; };

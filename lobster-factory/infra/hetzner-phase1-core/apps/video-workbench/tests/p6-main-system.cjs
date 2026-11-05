@@ -232,6 +232,20 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
       }
     }
 
+    // 6a2. A render records its delivery ratio from the job settings ("16:9" -> "16x9"); an undeliverable ratio (1:1) is not sent.
+    {
+      const sent = [];
+      const main = require("../backend/main-system.cjs").createMainSystem({
+        env, appDir, orgId: ORG, dataDir: fs.mkdtempSync(path.join(dir, "ratio-")),
+        inspect: { verifyOutput: async () => ({ ok: true, info: {} }), loudnessStats: async () => ({}) },
+        fetchImpl: async (_url, o) => { sent.push(JSON.parse(Buffer.from(o.headers["X-VW-Meta"], "base64url").toString("utf8"))); return Response.json({ ok: true, assetId: "bbbbbbbb-0000-4000-8000-00000000000" + sent.length, checksumSha256: "x" }, { status: 201 }); },
+      });
+      const mp4 = path.join(dir, "clip.mp4");
+      for (const [url, ratio] of [["/generated/r1.mp4", "16:9"], ["/generated/r2.mp4", "1:1"]]) await main.ingest({ url, file: mp4, origin: { kind: "render" }, ratio });
+      await main.ingest({ url: "/generated/r3.mp4", file: mp4, origin: { kind: "upload", rightsConfirmed: true }, ratio: "16:9" });
+      assert.deepEqual(sent.map((m) => m.ratio), ["16x9", undefined, undefined]);
+    }
+
     // 6b. Per provider kind: real cost from next-admin's tables; a model with no price is refused before the call.
     {
       const costs = require("../backend/provider-cost.cjs");
@@ -241,6 +255,10 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
       near(costs.toolUsd("bg-remove"), rates.TOOL_RATES["bg-remove"].usd, "去背");
       assert.equal(costs.imageUsd("gpt-image-2", undefined), rates.IMAGE_RATES["openai-high"].usd, "沒有 usage = 該模型固定價，不是 0");
       assert(costs.textUsd("gpt-4.1-mini", undefined, { inputChars: 100, maxOutputTokens: 3000 }) > 0);
+      // Image models are priced only when cost-model lists them (default model + its dated snapshot); a lookalike name is refused.
+      costs.priceOf("image", require("../backend/generation-policy.cjs").models({}).image);
+      costs.priceOf("image", "gpt-image-2.5-flare-2026-09-08");
+      assert.throws(() => costs.priceOf("image", "gpt-image-2.6-flare"), /尚無價目/, "未登記的新版本不得用名稱猜價");
       for (const [kind, model] of [["video", "veo-x"], ["audio", "nope-tts"], ["image", "dall-e-3"], ["text", "mystery-1"], ["3d", undefined]])
         assert.throws(() => costs.priceOf(kind, model), /尚無價目/, kind);
       const speech = JSON.parse((await generate({ type: "spoken", prompt: "你好世界", idempotencyKey: "tts-1" })).body);
@@ -248,14 +266,16 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
       near(calls.usage.find((u) => u.job_id === speech.id).cost_usd, 4 * rates.OPENAI_TTS_RATES["gpt-4o-mini-tts"].usdPerMChars / 1e6, "語音任務");
     }
 
-    // 6c. 送審 refused (403) is never shown as success.
+    // 6c. 送審與投遞 links to next-admin's /release for the registered asset; an undeliverable ratio gets no link.
     {
-      const vm = require("node:vm"), notes = [];
-      const ctx = { VideoWorkbench: { request: async (p) => (p === "/capabilities" ? { mainSystem: { organizationId: ORG } } : { ratios: { "16:9": { deliverable: true } } }), notify: (n) => notes.push(n) },
-        fetch: async () => ({ status: 403, ok: false, json: async () => ({ ok: false, error: "forbidden" }) }), document: {} };
+      const vm = require("node:vm");
+      const ratios = { "16:9": { deliverable: true }, "1:1": { deliverable: false, note: "此比例尚不能投遞" } };
+      const ctx = { VideoWorkbench: { request: async (p) => (p === "/capabilities" ? { mainSystem: { organizationId: ORG } } : { ratios }) }, document: {}, URLSearchParams };
       vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../shared/jobs-view.js"), "utf8"), ctx);
-      await assert.rejects(ctx.VideoWorkbench.sendForReview({ result: { assetId: "a", checksumSha256: "c" }, input: { settings: { ratio: "16:9" } } }), /沒有送審權限/);
-      assert.equal(notes.length, 0);
+      const job = (ratio) => ({ result: { assetId: "a" }, input: { settings: { ratio } } });
+      await assert.rejects(ctx.VideoWorkbench.deliveryUrl(job("1:1")), /尚不能投遞/);
+      assert.equal(await ctx.VideoWorkbench.deliveryUrl(job("16:9")), "/release?organizationId=" + ORG + "&candidateAssetId=a");
+      assert.doesNotMatch(fs.readFileSync(path.join(__dirname, "../shared/jobs-view.js"), "utf8"), /window\.open\(/, "彈窗在 await 後會被瀏覽器擋掉，用連結");
     }
 
     // 6. Upload: registered as real_footage before the answer; the response carries the asset id.
@@ -304,7 +324,8 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
     assert.doesNotMatch(fs.readFileSync(path.join(__dirname, "../backend/generation-policy.cjs"), "utf8"), /removeBackground:\s*0\./, "成本不得手抄");
     const caps = JSON.parse((await request(port, "GET", "/api/vw/capabilities", who())).body);
     assert.deepEqual(caps.mainSystem, { organizationId: ORG });
-    assert.match(fs.readFileSync(path.join(__dirname, "../shared/jobs-view.js"), "utf8"), /"\/api\/video\/release"/);
+    assert.match(fs.readFileSync(path.join(__dirname, "../shared/jobs-view.js"), "utf8"), /"\/release\?"/);
+    if (fullSource) assert(fs.existsSync(path.join(appDir, "app/video/release/page.tsx")), "/release 頁必須存在");
 
     // 9. Every name sent exists in the L2 route files.
     if (fullSource) {

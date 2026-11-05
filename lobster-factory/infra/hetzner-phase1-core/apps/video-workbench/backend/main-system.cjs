@@ -133,7 +133,7 @@ function createMainSystem({ env, fetchImpl, appDir, dataDir, orgId, inspect = re
   }
 
   // POST /api/internal/video/workbench/assets: body = the file bytes (streamed), metadata in X-VW-* headers.
-  async function ingest({ url, file, origin, sources = [], costUsd, jobId }) {
+  async function ingest({ url, file, origin, sources = [], costUsd, jobId, ratio }) {
     if (index[url]) return { ...index[url], existing: true };
     const ext = path.extname(file || "").slice(1).toLowerCase(), mime = MIME[ext];
     if (!mime) return { skipped: "unsupported_type" };
@@ -146,6 +146,12 @@ function createMainSystem({ env, fetchImpl, appDir, dataDir, orgId, inspect = re
     if (Number.isFinite(costUsd) && costUsd >= 0) meta.costUsd = costUsd;
     if (JOB_ID.test(String(jobId || ""))) meta.vwJobId = jobId;
     const size = fs.statSync(file).size;
+    // Invariant: a render's delivery ratio is recorded from the job's settings ("16:9" -> "16x9"), never parsed from a file name later.
+    // Deliverability comes from the main system's own list (delivery-ratios.cjs); an undeliverable ratio (1:1) is simply not recorded.
+    if (domain === "workbench_render" && typeof ratio === "string") {
+      const fit = (await require("./delivery-ratios.cjs").deliveryRatios([ratio])).ratios[ratio];
+      if (fit?.deliverable) meta.ratio = fit.key;
+    }
     if (mime.startsWith("video/")) meta.render = await renderEvidence(url, file, size);
     let r;
     try {

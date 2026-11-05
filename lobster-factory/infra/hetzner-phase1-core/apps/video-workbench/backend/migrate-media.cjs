@@ -35,7 +35,7 @@ function sources(data, state) {
     const url = job?.status === "succeeded" ? job.result?.url : null;
     if (typeof url !== "string" || !LOCAL_URL.test(url) || rows.has(url)) continue;
     const origin = ORIGINS.has(job.result.origin?.kind) ? job.result.origin : null;
-    rows.set(url, { url, origin, jobId: job.id, sources: [...localUrls(job.input)], costUsd: origin?.costUsd });
+    rows.set(url, { url, origin, jobId: job.id, sources: [...localUrls(job.input)], costUsd: origin?.costUsd, ratio: job.input?.settings?.ratio || job.input?.settings?.project?.ratio });
   }
   for (const a of state?.assets || []) {
     if (typeof a?.url !== "string" || !LOCAL_URL.test(a.url)) continue;
@@ -76,7 +76,7 @@ async function migrate({ data, org, dryRun = false, env, fetchImpl, appDir, insp
     const row = rows[i];
     try {
       if (!fs.existsSync(s.file)) { row.reason = "file_missing"; throw row; }
-      const r = await main.ingest({ url: s.url, file: s.file, origin: s.origin, sources: s.sources, costUsd: s.costUsd, jobId: s.jobId });
+      const r = await main.ingest({ url: s.url, file: s.file, origin: s.origin, sources: s.sources, costUsd: s.costUsd, jobId: s.jobId, ratio: s.ratio });
       if (r.skipped) { row.status = "skipped"; row.reason = r.skipped; }
       else {
         row.status = r.existing ? "existing" : "registered";

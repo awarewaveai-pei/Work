@@ -24,8 +24,17 @@ export function ratioFor(platform: string, available: readonly string[]): string
 }
 
 /** The ratio a finished video file is, read from its R2 name (`video/<dir>/<ratio>.mp4`). */
-export function ratioOfUrl(url: string | null | undefined): string | undefined {
+function ratioOfUrl(url: string | null | undefined): string | undefined {
   return /\/(16x9|9x16|4x5)\.mp4(?:$|\?)/.exec(url ?? "")?.[1];
+}
+
+/** The ratios a finished video can be delivered in; the one list the ingest route validates against. */
+export const DELIVERY_RATIOS: readonly string[] = ["16x9", "9x16", "4x5"];
+
+// Invariant: an asset row's ratio is read ONLY through here (metadata.ratio first; file name = pipeline fallback); ratioOfUrl stays private.
+export function ratioOfAsset(a: { object_url: string; metadata?: { ratio?: unknown } | null }): string | undefined {
+  const m = a.metadata?.ratio;
+  return typeof m === "string" && DELIVERY_RATIOS.includes(m) ? m : ratioOfUrl(a.object_url);
 }
 
 export const RATIO_LABEL: Record<string, string> = { "16x9": "橫式 16:9", "9x16": "直式 9:16", "4x5": "直式 4:5" };

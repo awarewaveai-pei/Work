@@ -3,10 +3,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { assertWithinLimits } from "@/lib/social/posts";
 import { addVideo, listAccounts, savePost } from "@/lib/social/store";
-import { ratioOfUrl } from "./platform-ratio";
+import { ratioOfAsset } from "./platform-ratio";
 import type { DraftDeps } from "./social-drafts";
 
-export type VideoRow = { id: string; object_url: string | null; checksum_sha256: string | null; metadata: { title?: string; script?: string } | null };
+export type VideoRow = { id: string; object_url: string | null; checksum_sha256: string | null; metadata: { title?: string; script?: string; ratio?: unknown } | null };
 
 /** This video's ratio rows: the primary row plus the rows that point back at it. */
 export async function loadVideoRows(db: SupabaseClient, org: string, candidate: string): Promise<VideoRow[]> {
@@ -24,7 +24,7 @@ export function draftDeps(db: SupabaseClient, org: string, rows: VideoRow[], act
       const out: Array<{ releaseId: string; ratio: string; videoUrl: string }> = [];
       for (const r of (rel ?? []) as Array<{ id: string; candidate_asset_id: string; candidate_checksum: string }>) {
         const row = rows.find((x) => x.id === r.candidate_asset_id);
-        const ratio = ratioOfUrl(row?.object_url);
+        const ratio = row?.object_url ? ratioOfAsset({ object_url: row.object_url, metadata: row.metadata }) : undefined;
         // a Release pins its bytes: one for an older file (after a caption reburn) is not this video any more
         if (row?.object_url && ratio && row.checksum_sha256 === r.candidate_checksum && !out.some((o) => o.ratio === ratio)) out.push({ releaseId: r.id, ratio, videoUrl: row.object_url });
       }
