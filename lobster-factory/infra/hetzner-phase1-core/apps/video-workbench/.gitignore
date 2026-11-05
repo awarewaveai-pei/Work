@@ -25,3 +25,6 @@ engines/effectcraft/web/
 
 # Card P5: bytecode Blender may leave beside its job scripts (backend/blender.cjs also sets PYTHONDONTWRITEBYTECODE).
 backend/blender/__pycache__/
+
+# P6 L6: next-admin files copied by scripts/bundle-awarewave.cjs (sg-deploy / CI) for the container image.
+.awarewave/

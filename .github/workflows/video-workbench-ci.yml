@@ -1,0 +1,82 @@
+name: video-workbench — deploy gate
+
+# Runs the same tests/gate.cjs that sg-deploy.sh runs inside the built image (pure-node tests + node --check),
+# on every push to main (and PR to main) that touches video-workbench or a next-admin file it bundles.
+# Two independent layers, like next-admin-typecheck.yml: this CI surfaces a break within minutes of the push;
+# sg-deploy.sh's post-build gate (Dockerfile.gate) is the hard stop before production.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/**'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/globals.css'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/public/awarewave/forms.css'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/content/video/**'
+      # bundled files above + the next-admin sources tests/p6-main-system.cjs checks as contracts (routes, ledger, registry)
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/**'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/video/workbench/**'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/video/workbench/**'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/products.ts'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ai/cost-model.ts'
+      - '.github/workflows/video-workbench-ci.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/**'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/globals.css'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/public/awarewave/forms.css'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/content/video/**'
+      # bundled files above + the next-admin sources tests/p6-main-system.cjs checks as contracts (routes, ledger, registry)
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/**'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/video/workbench/**'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/video/workbench/**'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/products.ts'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ai/cost-model.ts'
+      - '.github/workflows/video-workbench-ci.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: video-workbench-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  gate:
+    name: tests/gate.cjs
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lobster-factory/infra/hetzner-phase1-core/apps/video-workbench
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Use Node.js 24.14.0
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24.14.0"
+          cache: "npm"
+          cache-dependency-path: lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/package-lock.json
+
+      - name: ffprobe (the image gets it from apt)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+
+      # --ignore-scripts skips the Windows-only postinstall vendoring; ffmpeg-static's own downloader runs explicitly.
+      - name: Install dependencies
+        run: npm ci --omit=dev --ignore-scripts && node node_modules/ffmpeg-static/install.js
+
+      - name: Bundle .awarewave from the checked-out next-admin
+        run: node scripts/bundle-awarewave.cjs ../next-admin
+
+      - name: Gate
+        env:
+          FFPROBE_PATH: /usr/bin/ffprobe
+        run: node tests/gate.cjs

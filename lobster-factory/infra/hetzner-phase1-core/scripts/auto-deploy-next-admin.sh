@@ -184,7 +184,8 @@ DEPLOY_SUCCESS=0
 SMOKE_WARN_SUFFIX=""
 ROLLBACK_SUFFIX=""
 NEW_COMMIT="${DEPLOYED}"
-if bash "$DEPLOY_DIR/scripts/sg-deploy.sh" "$APP" >> "$LOG_FILE" 2>&1; then
+# This script sends its own outcome message below; sg-deploy.sh must not send a second one.
+if SG_DEPLOY_NOTIFY=0 bash "$DEPLOY_DIR/scripts/sg-deploy.sh" "$APP" >> "$LOG_FILE" 2>&1; then
     NEW_COMMIT=$(cat "$DEPLOY_DIR/.deployed-commit" | tr -d '[:space:]')
     log "SUCCESS: $APP deployed to ${NEW_COMMIT:0:12}"
     DEPLOY_SUCCESS=1

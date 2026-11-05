@@ -52,7 +52,7 @@ export LOG_FILE
 SELF_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*" | tee -a "$LOG_FILE"; }
-fail() { log "ERROR: $*"; exit 1; }
+fail() { LAST_ERROR="$*"; log "ERROR: $*"; exit 1; }
 # 75 = EX_TEMPFAIL: refused on purpose (DEPLOY_HOLD, or another deploy holds the lock), not broken.
 # auto-deploy-next-admin.sh skips the tick without an alert on 75; every other non-zero alerts.
 refuse() { log "REFUSED: $*"; exit 75; }
@@ -100,7 +100,29 @@ fi
 echo $$ > "$LOCK_FILE"
 LOCK_HELD=1
 exec 8>&-
-trap 'if [ $LOCK_HELD -eq 1 ]; then rm -f "$LOCK_FILE"; fi' EXIT INT TERM
+trap 'if [ $LOCK_HELD -eq 1 ]; then rm -f "$LOCK_FILE"; fi' INT TERM
+# Outcome notification (video-workbench only; auto-deploy-next-admin.sh sends its own and sets SG_DEPLOY_NOTIFY=0).
+# DEPLOY_OUTCOME is set by the paths that know it (do_rollback, drill-mode smoke, success); anything else non-zero = FAIL.
+# 75 (refused on purpose), --dry-run and --help send nothing. A failed notify never changes the exit code.
+LAST_ERROR=""
+DEPLOY_OUTCOME=""
+notify_result() {
+  local rc="$1" outcome="$DEPLOY_OUTCOME" icon="❌" head
+  [[ "${SG_DEPLOY_NOTIFY:-1}" != "0" && $DRY_RUN -eq 0 && "$rc" -ne 75 ]] || return 0
+  [[ " ${APPS[*]} " =~ " video-workbench " ]] || return 0
+  if [[ "$rc" -eq 0 ]]; then [[ -n "$outcome" ]] || return 0
+  elif [[ "$outcome" != "ROLLBACK" ]]; then outcome="FAIL"; fi
+  case "$outcome" in SUCCESS) icon="✅" ;; SMOKE_WARN) icon="⚠️" ;; ROLLBACK) icon="🔴" ;; esac
+  head="$(git -C "$REPO_DIR" rev-parse --short=12 HEAD 2>/dev/null || echo "?")"
+  printf '%s sg-deploy %s -- %s\n（技術資訊：commit=%s rc=%s%s log=%s）' "$icon" "${APPS[*]}" "$outcome" "$head" "$rc" "${LAST_ERROR:+ error=$LAST_ERROR}" "$LOG_FILE" \
+    | "$(dirname "$SELF_PATH")/notify.sh" >/dev/null 2>&1 || log "notify_result: notify incomplete"
+}
+on_exit() {
+  local rc=$?
+  if [ $LOCK_HELD -eq 1 ]; then rm -f "$LOCK_FILE"; fi
+  notify_result "$rc" || true
+}
+trap on_exit EXIT
 # A previous run's rollback marker must not be reported as THIS run's rollback when this run
 # fails before reaching do_rollback (auto-deploy-next-admin.sh reads it on any failure).
 rm -f "$STAGING_DIR/.rollback-triggered"
@@ -121,7 +143,7 @@ RESTORABLE_APPS=()
 NON_RESTORABLE_APPS=()
 for _app in "${APPS[@]}"; do
   case "$_app" in
-    wordpress|node-api|next-admin|hci-app|renderer) RESTORABLE_APPS+=("$_app") ;;
+    wordpress|node-api|next-admin|hci-app|renderer|video-workbench) RESTORABLE_APPS+=("$_app") ;;
     *) NON_RESTORABLE_APPS+=("$_app") ;;
   esac
 done
@@ -285,6 +307,14 @@ for APP in "${APPS[@]}"; do
   grep -qx "$APP" <<<"$STAGING_SERVICES" || fail "$APP is not a service in $STAGING_DIR/docker-compose.yml -- deploy it with its own compose; nothing was changed"
 done
 
+# video-workbench: the image build needs .awarewave/ (next-admin files listed in its awarewave-files.txt). Rebuilt fresh
+# in the git checkout (git-ignored) so the rsync below carries it; a missing listed file fails the deploy here.
+if [[ " ${APPS[*]} " =~ " video-workbench " ]]; then
+  log "--- bundle .awarewave (video-workbench) ---"
+  node "$(app_git_source_root video-workbench)/scripts/bundle-awarewave.cjs" "$GIT_APPS_ROOT/next-admin" 2>&1 | tee -a "$LOG_FILE" \
+    || fail "bundle-awarewave FAILED -- a file in video-workbench/awarewave-files.txt is missing from next-admin; deploy aborted"
+fi
+
 for APP in "${APPS[@]}"; do
   SRC="$(app_git_source_root "$APP")/"
   DST="$STAGING_DIR/apps/$APP/"
@@ -355,6 +385,20 @@ BUILD_ARGS=()
 [[ "${TYPECHECK_GATE_PASSED:-0}" == "1" ]] && BUILD_ARGS+=(--build-arg NEXT_TYPECHECK_DONE=1)
 docker compose build "${BUILD_ARGS[@]}" "${APPS[@]}" 2>&1 | tee -a "$LOG_FILE" || fail "docker build failed"
 
+# 3.5 post-build gate (video-workbench): tests/gate.cjs inside the just-built image (Dockerfile.gate adds tests/ to a copy;
+#     the runtime image stays test-free). Nothing is up yet, so a failure leaves the running container untouched.
+if [[ " ${APPS[*]} " =~ " video-workbench " ]]; then
+  log "--- post-build gate (video-workbench) ---"
+  _vw_gate_img="lobster-phase1-video-workbench-gate:tmp"
+  _vw_gate_ok=1
+  docker build --no-cache --progress=plain -f "$STAGING_DIR/apps/video-workbench/Dockerfile.gate" \
+    --build-arg BASE=lobster-phase1-video-workbench:local -t "$_vw_gate_img" "$STAGING_DIR/apps/video-workbench" 2>&1 | tee -a "$LOG_FILE" \
+    || _vw_gate_ok=0
+  docker image rm -f "$_vw_gate_img" >/dev/null 2>&1 || true
+  [[ $_vw_gate_ok -eq 1 ]] || fail "video-workbench gate (tests/gate.cjs) FAILED -- deploy aborted before up; the running container is unchanged"
+  log "video-workbench gate passed"
+fi
+
 # 4. up -d (with race-condition retry)
 log "--- docker compose up -d ${APPS[*]} ---"
 UP_OUT=$(docker compose up -d "${APPS[@]}" 2>&1 | tee -a "$LOG_FILE" || true)
@@ -392,6 +436,7 @@ log "wrote .deployed-commit = $NEW_COMMIT (previous: ${PREVIOUS_COMMIT:-none})"
 rollback_enabled() { [[ "${AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL:-true}" == "true" ]]; }
 do_rollback() {
   local reason="$1" smoke_errors="${2:-0}" failures=0 app tag
+  DEPLOY_OUTCOME="ROLLBACK"
   log "--- AUTO-ROLLBACK triggered: $reason ---"
   [[ ${#RESTORABLE_APPS[@]} -gt 0 ]] || fail "$reason; no restorable apps in this deploy, cannot auto-rollback"
   for app in "${RESTORABLE_APPS[@]}"; do
@@ -467,6 +512,13 @@ done
 #    extra www->apex redirect hop); `curl -H "Host: api.aware-wave.com"
 #    http://127.0.0.1/health` -> 200.
 _smoke_errors=0
+# Negative probe: the status MUST equal $2 (an unauthenticated call that returns 2xx means the identity gate is broken).
+_smoke_expect_status() {
+  local label="$1" want="$2" url="$3" resolve_host="$4" http
+  http=$(curl -s --max-time 5 -o /dev/null -w "%{http_code}" -k --resolve "${resolve_host}:443:127.0.0.1" "$url" 2>/dev/null) || http="000"
+  if [[ "$http" == "$want" ]]; then log "  smoke OK: $label -> $http (expected $want)"
+  else log "  SMOKE_WARN: $label -> $http (expected $want)"; _smoke_errors=$((_smoke_errors + 1)); fi
+}
 _smoke_check() {
   local label="$1" url="$2" host_header="${3:-}" resolve_host="${4:-}"
   local http
@@ -567,6 +619,14 @@ if [[ " ${APPS[*]} " =~ " renderer " ]]; then
   else log "  SMOKE_WARN: renderer real snapshot failed or example.com not up"; _smoke_errors=$((_smoke_errors + 1)); fi
 fi
 
+# video-workbench (P6 L6): public door through the local nginx (--resolve, never leaves the box). /healthz and /login are
+# 2xx; /api/vw/state without a session MUST be 401 -- 2xx there means the nginx auth_request / identity gate is broken.
+if [[ " ${APPS[*]} " =~ " video-workbench " ]]; then
+  _smoke_check "video-workbench healthz" "https://video.aware-wave.com/healthz" "" "video.aware-wave.com"
+  _smoke_check "video door /login"       "https://video.aware-wave.com/login" "" "video.aware-wave.com"
+  _smoke_expect_status "vw api unauthenticated" 401 "https://video.aware-wave.com/api/vw/state" "video.aware-wave.com"
+fi
+
 if [[ "$_smoke_errors" -gt 0 ]]; then
   log "SMOKE_WARN: $_smoke_errors endpoint(s) returned non-2xx -- service may be partially degraded"
   printf '%s|%s\n' "$_smoke_errors" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$STAGING_DIR/.smoke-warn"
@@ -576,12 +636,14 @@ if [[ "$_smoke_errors" -gt 0 ]]; then
     do_rollback "smoke check: $_smoke_errors endpoint(s) non-2xx" "$_smoke_errors"
   else
     log "AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL=false -- DRILL MODE; leaving degraded state for inspection"
+    DEPLOY_OUTCOME="SMOKE_WARN"
   fi
 else
   log "smoke: all endpoints OK"
   rm -f "$STAGING_DIR/.smoke-warn"
   rm -f "$STAGING_DIR/.rollback-triggered"
 fi
+[[ -n "$DEPLOY_OUTCOME" ]] || DEPLOY_OUTCOME="SUCCESS"
 
 log "=== sg-deploy complete ==="
 log "deployed commit: $(cat "$STAGING_DIR/.deployed-commit")"

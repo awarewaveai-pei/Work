@@ -1,0 +1,7 @@
+# Deploy gate image (P6 L6): the just-built runtime image plus tests/, then tests/gate.cjs with no network. A failing
+# test fails this build, so sg-deploy.sh stops before `up`. The runtime image itself stays test-free (.dockerignore).
+# Context = this directory; Dockerfile.gate.dockerignore lets only tests/ in.
+ARG BASE=lobster-phase1-video-workbench:local
+FROM ${BASE}
+COPY tests/ tests/
+RUN --network=none node tests/gate.cjs
