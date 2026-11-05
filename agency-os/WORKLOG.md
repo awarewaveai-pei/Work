@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-05（續21）video 自製範例上線：分鏡 12、模板 8、風格圖 14，著作權自有（de0e1836a，已部署）
+
+- 起因：#17 後 seedstar 參考員工限定，客戶看到空畫面。操作者同意生成（估 US$2.4、上限 4），實花 US$1.67（gpt-image-2 medium，34 張 WebP ≤60KB）。
+- 做法：examples/{storyboards,templates,styles}.json 原創文字；分鏡／模板對所有人載入自製，staff 再加 seedstar；風格縮圖用自製圖；api.cjs localFile 接受 /examples/ 為使用者自選參考（不當預設）；storyboards 頁拿掉 seedstar 擷取說明與字樣；nginx 公開靜態加 examples（safe-infra-patch 已套）。
+- 共用 worktree：index-0.js／projects-0.js 的風格圖 hunk 被另一 session 的 d84f65ec5 一起帶走（內容正確，圖檔在 de0e1836a）。
+- REALTEST_EVIDENCE: tool=curl | cmd=curl /examples/storyboards.json 200 json、aw-001.webp 200 webp、/reference/image-7.jpeg 401；瀏覽器 staff：分鏡 184（自製 12 在前）、模板 14、0 破圖、0 個 ≥400；tests/p6-main-system PASS | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n（Codex agency-os/reports/oracle/2026-11-05-partialreview-8990eebe.md：F1 nginx 主機套用；F2 轉檔先寫暫存再搬；F3 呼叫前預留單次上限；F4 自製卡來源／匯出／提示不寫 SeedStar；全修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=seedstar.ai | hits=0
 ## 2026-11-05（續20）影音工作台卡 RV.1–RV.3：影片模型接 next-admin 的 Replicate 模型（Runway／Veo／Luma）
 
 - 根因：VW 影片模型整台一個（generation-policy.cjs:10、api.cjs:136），任務的 settings.model 不被讀；NA 四個實測模型（舊 video-motion-gen.ts:52-85）因 import gateway VW 讀不到。
