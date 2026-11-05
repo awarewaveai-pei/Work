@@ -55,6 +55,7 @@ const P6 = '9465bbc8c';
 const RV = 'd84f65ec5';
 const RE = '1c0dcce1f';
 const RB = '28dff199c';
+const FC1 = '6cbcae4e5';
 
 export const STEPS = [
   { n: 1, code: '0', title: '切 4178 到 repo', plain: '例：打開 127.0.0.1:4178，角色頁出現「示範角色庫」，代表跑的是 repo 版；舊資料一筆不少。',
@@ -236,13 +237,13 @@ export const STEPS = [
       todo('PJ.4', '前面的步驟改了，後面的步驟顯示「要重做」；每支成片可以看到它是怎麼做出來的。'),
     ] },
   { n: 17, code: 'FC', title: '專業剪輯（FilmCraft）', plain: '例：在應用工具按「專業剪輯」，選幾支素材，進到 FilmCraft 的完整剪輯畫面（修剪工具、三十多種轉場、調色曲線與色輪、混音器）。按存檔，專案存回工作台；按輸出，成片直接進素材庫與任務紀錄，不用下載再上傳。',
-    gate: '送素材進去、存檔、關掉重開、輸出，成片在任務紀錄與素材庫都有，帶來源紀錄，送審檢查通過；沒有獨立顯示卡的電腦會先看到提醒。', risk: 'High', model: '建置可派工；頁面與入帳 Opus；上線等你同意', status: 'not_started', depends: ['RE'], before: '待決 3',
+    gate: '送素材進去、存檔、關掉重開、輸出，成片在任務紀錄與素材庫都有，帶來源紀錄，送審檢查通過；沒有獨立顯示卡的電腦會先看到提醒。', risk: 'High', model: '建置可派工；頁面與入帳 Opus；上線等你同意', status: 'in_progress', depends: ['RE'],
     decided: '介面是英文、不跟站上的主題、裡面有下拉選單（引擎自己的畫面，改不了）。輸出最高 1080p；要 4K 或很長的片用一般剪輯。沒有獨立顯示卡的電腦會很卡，開啟前會提醒並可改用一般剪輯。',
     what: '建置鏈沿用 scripts/craft-web-build；外框頁用上游嵌入橋 ?host=parent 送檔、收存檔與輸出；輸出當成一筆已完成的任務，入帳與送審走現有路；主機靜態目錄＋nginx',
     files: ['VW/docs/engine-route-plan-20261106.md', 'scripts/filmcraft-pro/', 'VW/scripts/tools-engine-host.js', 'VW/scripts/tools-0.js', 'VW/backend/api.cjs', 'VW/backend/release-text.cjs', 'nginx/default.conf'],
     items: [
-      todo('FC.1', '建置：固定 FilmCraft 的版本，加繁中字型，建出可上線的檔案；跟向量版、畫布版共用同一套建置工具。'),
-      todo('FC.0', '請你到場約十分鐘：開一個真的視窗，你聽播放有沒有聲音、用注音打幾個中文字、看一眼英文介面能不能接受。'),
+      done('FC.1', '建置完成：固定 FilmCraft 的版本、加繁中字型，一個指令建出可上線的檔案，跟向量版、畫布版共用同一套建置工具。審查時發現上游把 ArtCraft 的標誌編在程式裡，授權規定改過的版本要拿掉，已拿掉並加了自動檢查；已上線的向量版、畫布版查過沒有這個問題。', FC1),
+      done('FC.0', '你到場確認過：播放有聲音、注音打得進中文、英文介面可以接受。視窗只用獨立顯示卡，全程沒有斷線。', FC1),
       todo('FC.2', '「專業剪輯」頁：選素材送進去、存檔存回工作台、按 F6 回到側欄、顯示卡不夠力時先提醒。'),
       todo('FC.3', '輸出的成片自動進任務紀錄與素材庫，記下用了哪些素材；字幕一起帶出來，送審時用得到。'),
       todo('FC.4', '上線到 video.aware-wave.com。要你說可以才做。'),
@@ -262,5 +263,4 @@ export const STEPS = [
 // 操作者自己要決定或親手做的
 export const OPEN = [
   { n: 1, before: 'RV', what: 'RV.4：部署工作台與 app（High），之後用 Runway 5 秒、一張小圖真打一次，約 US$0.25。要你說可以部署。', src: 'AGENTS §3' },
-  { n: 3, before: 'FC', what: 'FC.0：請你到場約十分鐘。會開一個 FilmCraft 的視窗（只用獨立顯示卡，不會動到你正在用的瀏覽器），請你聽播放有沒有聲音、用注音打幾個中文字、看英文介面能不能接受。三樣都過才做「專業剪輯」頁。', src: 'VW/docs/engine-route-plan-20261106.md §9 FC.0' },
 ];
