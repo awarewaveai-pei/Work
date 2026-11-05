@@ -1,12 +1,12 @@
 const thumbs = [
-  "../assets/image-7.jpeg",
-  "../assets/image-8.jpeg",
-  "../assets/image-9.jpeg",
-  "../assets/image-10.jpeg",
-  "../assets/image-11.jpeg",
-  "../assets/image-12.jpeg",
-  "../assets/image-13.jpeg",
-  "../assets/image-14.jpeg",
+  "/reference/image-7.jpeg",
+  "/reference/image-8.jpeg",
+  "/reference/image-9.jpeg",
+  "/reference/image-10.jpeg",
+  "/reference/image-11.jpeg",
+  "/reference/image-12.jpeg",
+  "/reference/image-13.jpeg",
+  "/reference/image-14.jpeg",
 ];
 const $ = (id) => document.getElementById(id);
 const esc = (s) =>
@@ -36,7 +36,8 @@ const cats = [
 ];
 // The model actually called (backend/generation-policy.cjs via /capabilities, loaded in templates-boot.js).
 const videoModel = () => VideoWorkbench.capabilities?.models?.video || "sora-2";
-const presets = [
+// Third-party sample templates (their thumbnails are seedstar reference material): staff only, see backend/reference.cjs.
+const seedPresets = [
   {
     id: "bear",
     name: "我要離職了",
@@ -124,6 +125,8 @@ const presets = [
     prompt: "",
   },
 ];
+const presets = VideoWorkbench.capabilities?.reference ? seedPresets : [];
+const imgOf = (t) => (VideoWorkbench.capabilities?.reference && String(t.img || "").startsWith("/reference/") ? t.img : "");
 const state = {
   tab: "模板牆",
   cat: "全部作品",
@@ -220,7 +223,7 @@ function render() {
       )
       .join(
         "",
-      )}</div><div class="filters">${cats.map((c) => `<button class="pill ${state.cat === c ? "sel" : ""}" data-cat="${c}">${c}</button>`).join("")}</div>${arr.length ? `<div class="cards">${arr.map((t) => `<article class="card" data-id="${t.id}"><div class="cover"><img src="${t.img}" alt="${esc(t.name)} 參考截圖"><span class="bubble">${t.ratio} · ${t.seconds} 秒</span><span class="bubble right">可替換 ${t.replace} 項</span></div><div class="cardbody"><h3>${esc(t.name)}</h3><div>${t.tag.map((x) => `<span class="tag">#${esc(x)}</span>`).join("")}</div><div class="cardfoot">◉ ${esc(t.author)}</div><div class="cardfoot">${t.uses || 0} 次使用 · ${esc(t.date)}</div><div class="cardactions"><button class="secondary" data-fav="${t.id}">${state.favorites.has(t.id) ? "♥" : "♡"} 收藏</button><span class="muted">◉ ${t.id === "dress" ? 1 : 2}</span></div></div></article>`).join("")}</div>` : `<div class="empty"><h2>${state.tab === "我的模板" ? "還沒有模板" : state.tab === "我的收藏" ? "還沒有收藏" : "沒有符合條件的模板"}</h2><p>可以建立自己的模板，或回到模板牆尋找作品。</p><button class="primary" id="emptyCreate">＋ 建立模板</button></div>`}</main>`,
+      )}</div><div class="filters">${cats.map((c) => `<button class="pill ${state.cat === c ? "sel" : ""}" data-cat="${c}">${c}</button>`).join("")}</div>${arr.length ? `<div class="cards">${arr.map((t) => `<article class="card" data-id="${t.id}"><div class="cover">${imgOf(t) ? `<img src="${imgOf(t)}" alt="${esc(t.name)} 參考截圖">` : ""}<span class="bubble">${t.ratio} · ${t.seconds} 秒</span><span class="bubble right">可替換 ${t.replace} 項</span></div><div class="cardbody"><h3>${esc(t.name)}</h3><div>${t.tag.map((x) => `<span class="tag">#${esc(x)}</span>`).join("")}</div><div class="cardfoot">◉ ${esc(t.author)}</div><div class="cardfoot">${t.uses || 0} 次使用 · ${esc(t.date)}</div><div class="cardactions"><button class="secondary" data-fav="${t.id}">${state.favorites.has(t.id) ? "♥" : "♡"} 收藏</button><span class="muted">◉ ${t.id === "dress" ? 1 : 2}</span></div></div></article>`).join("")}</div>` : `<div class="empty"><h2>${state.tab === "我的模板" ? "還沒有模板" : state.tab === "我的收藏" ? "還沒有收藏" : presets.length ? "沒有符合條件的模板" : "還沒有範例模板"}</h2><p>可以建立自己的模板，或回到模板牆尋找作品。</p><button class="primary" id="emptyCreate">＋ 建立模板</button></div>`}</main>`,
   );
   $("root").onclick = (e) => {
     const b = e.target.closest("button"),
@@ -272,11 +275,11 @@ function renderDetail() {
   let prompt = t.prompt || "此模板提示詞不公開";
   let restricted = !t.prompt;
   $("root").innerHTML = VideoWorkbench.sanitize(
-    `<div class="top"><span>AWAREWAVE · 模板牆</span><span>◎ 繁　♧　✦ ${state.credit} PTS</span></div><main class="detail"><button class="back" id="back">‹ 返回模板牆</button><div class="detailgrid"><div><div class="poster"><img src="${t.img}" alt="${esc(t.name)} 示意圖（來自參考截圖）"></div><h1 class="detailname">${esc(t.name)}</h1>'<p class="muted">${t.tag.map((x) => "#" + x).join("　")}</p></div><div><div class="section"><div class="row" style="justify-content:space-between"><h3>提示詞</h3><span class="muted">${restricted ? "已隱藏" : "可修改"}</span></div>${restricted ? `<div class="notice">此模板提示詞不公開</div>` : `<textarea id="prompt" class="prompt">${esc(prompt)}</textarea><div class="muted">提示詞中的 @image1 等代號，對應下方素材。</div>`}</div><div class="section"><h3>素材</h3><p class="muted">把開放的素材換成你自己的；沒有更換的會沿用模板原本的素材。</p><div class="assets">${assets
+    `<div class="top"><span>AWAREWAVE · 模板牆</span><span>◎ 繁　♧　✦ ${state.credit} PTS</span></div><main class="detail"><button class="back" id="back">‹ 返回模板牆</button><div class="detailgrid"><div><div class="poster">${imgOf(t) ? `<img src="${imgOf(t)}" alt="${esc(t.name)} 示意圖（來自參考截圖）">` : ""}</div><h1 class="detailname">${esc(t.name)}</h1>'<p class="muted">${t.tag.map((x) => "#" + x).join("　")}</p></div><div><div class="section"><div class="row" style="justify-content:space-between"><h3>提示詞</h3><span class="muted">${restricted ? "已隱藏" : "可修改"}</span></div>${restricted ? `<div class="notice">此模板提示詞不公開</div>` : `<textarea id="prompt" class="prompt">${esc(prompt)}</textarea><div class="muted">提示詞中的 @image1 等代號，對應下方素材。</div>`}</div><div class="section"><h3>素材</h3><p class="muted">把開放的素材換成你自己的；沒有更換的會沿用模板原本的素材。</p><div class="assets">${assets
       .map((a, i) => {
         let key = "a" + i;
         let replacement = state.replacements[key];
-        return `<div class="asset"><img src="${replacement?.url || t.img}" alt="${esc(a)}"><div class="label">${esc(a)}</div><div class="row"><button data-replace="${i}">替換</button></div></div>`;
+        return `<div class="asset">${replacement?.url || imgOf(t) ? `<img src="${replacement?.url || imgOf(t)}" alt="${esc(a)}">` : ""}<div class="label">${esc(a)}</div><div class="row"><button data-replace="${i}">替換</button></div></div>`;
       })
       .join(
         "",
@@ -333,9 +336,7 @@ async function useTemplate(t) {
       const result = await bridge.import({
         target: "reference",
         title: t.name,
-        image:
-          Object.values(state.replacements)[0]?.url ||
-          new URL(t.img, location.href).pathname,
+        image: Object.values(state.replacements)[0]?.url,
         imagePrompt: prompt,
         videoPrompt: prompt,
         duration: t.seconds,
@@ -387,12 +388,12 @@ function createDialog() {
         return;
       }
       const item = {
-        ...presets[0],
+        ...seedPresets[0],
         id: "own" + Date.now(),
         name,
         category: $("templateCategory").value,
         author: "我",
-        img: thumbs[0],
+        img: "",
         tag: [],
         prompt: $("templateDescription").value.trim(),
         description: $("templateDescription").value.trim(),

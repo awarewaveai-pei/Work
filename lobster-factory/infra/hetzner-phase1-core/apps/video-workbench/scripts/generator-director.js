@@ -44,9 +44,9 @@ function directorTopAssets() {
     files
       .map(
         (f) =>
-          '<div><img src="' +
-          (f.url || styleImages[0]) +
-          '"><small>' +
+          "<div>" +
+          (f.url ? '<img src="' + f.url + '">' : "") +
+          "<small>" +
           safe(f.tag || "參考素材") +
           "</small></div>",
       )

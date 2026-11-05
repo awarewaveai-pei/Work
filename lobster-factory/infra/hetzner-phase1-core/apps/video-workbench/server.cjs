@@ -86,6 +86,17 @@ function createServer({
         res.end(source.replace(/mode:\s*"local"/, 'mode: "http"'));
         return;
       }
+      if (pathname.startsWith("/reference/")) {
+        // Unsigned, non-staff and non-whitelisted names are all the same 404 (existence is not revealed).
+        if (trustProxy) identity(req);
+        const reference = require("./backend/reference.cjs"),
+          found = (req.method === "GET" || req.method === "HEAD") && reference.allowed(env, req) && reference.file(env, pathname.slice("/reference/".length));
+        if (!found) throw Error();
+        const body = fs.readFileSync(found);
+        res.writeHead(200, { "Content-Type": types[path.extname(found)] || "application/octet-stream", "Content-Length": body.length, "Cache-Control": "private", "X-Content-Type-Options": "nosniff" });
+        res.end(req.method === "HEAD" ? undefined : body);
+        return;
+      }
       let tenant = local;
       if (trustProxy && /^\/(api\/vw|media|generated)\//.test(pathname)) {
         tenant = identity(req);

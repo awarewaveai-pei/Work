@@ -29,7 +29,7 @@ function request(port, method, pathname, headers = {}, body) {
     const req = http.request({ host: "127.0.0.1", port, method, path: pathname, headers }, (res) => {
       const chunks = [];
       res.on("data", (c) => chunks.push(c));
-      res.on("end", () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString("utf8") }));
+      res.on("end", () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks).toString("utf8") }));
     });
     req.on("error", reject);
     req.end(body);
@@ -384,6 +384,47 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
       for (const field of Object.keys(calls.usage[0])) assert(usageLib.includes(field), "service-usage 讀 " + field);
       const products = read("lib/portal/products.ts");
       for (const f of ["video.image", "video.motion", "video.tts", "video.script", "video.transcribe", "video.bg-remove", "video.3d"]) assert(products.includes(`"${f}"`), "products.ts 登記 " + f);
+    }
+
+    // 8. Reference material (seedstar captures): signed staff only behind the proxy, local mode as before; the page code
+    //    never names the files directly (a hard-coded path = 404 broken thumbnails on the public site).
+    {
+      const ref = path.join(dir, "reference");
+      fs.mkdirSync(ref);
+      fs.writeFileSync(path.join(ref, "image-1.png"), png);
+      fs.writeFileSync(path.join(ref, "storyboards-data.json"), '{"cards":[]}');
+      fs.writeFileSync(path.join(dir, "secret.txt"), "secret");
+      env.VW_REFERENCE_DIR = ref;
+      const get = (p, h) => request(port, "GET", p, h);
+      const staff = await get("/reference/image-1.png", who());
+      assert.equal(staff.status, 200);
+      assert.equal(staff.headers["cache-control"], "private");
+      assert.equal(staff.headers["content-type"], "image/png");
+      assert.equal((await get("/reference/storyboards-data.json", who())).status, 200);
+      assert.equal((await get("/reference/image-1.png", who({ "X-VW-User-Kind": "client" }))).status, 404, "客戶讀不到參考資料");
+      assert.equal((await get("/reference/image-1.png", {})).status, 404, "未簽章");
+      assert.equal((await get("/reference/image-1.png", { "X-VW-User-Id": USER, "X-VW-Org-Id": ORG, "X-VW-User-Kind": "staff" })).status, 404, "偽造 staff 標頭沒有簽章");
+      for (const bad of ["/reference/..%2fsecret.txt", "/reference/%2e%2e/secret.txt", "/reference/secret.txt", "/reference/image-1.gif", "/reference/image-2.png", "/reference/sub/image-1.png"])
+        assert.equal((await get(bad, who())).status, 404, bad);
+      assert.equal(JSON.parse((await get("/api/vw/capabilities", who())).body).reference, true);
+      assert.equal(JSON.parse((await get("/api/vw/capabilities", who({ "X-VW-User-Kind": "client" }))).body).reference, false);
+      const local = createServer({ dataDir: path.join(dir, "local-ref"), env: { VW_REFERENCE_DIR: ref } });
+      await new Promise((r) => local.listen(0, "127.0.0.1", r));
+      assert.equal((await request(local.address().port, "GET", "/reference/image-1.png")).status, 200, "本機模式照舊可讀");
+      assert.equal(JSON.parse((await request(local.address().port, "GET", "/api/vw/capabilities")).body).reference, true);
+      local.close();
+      const bare = createServer({ dataDir: path.join(dir, "local-none"), env: { VW_REFERENCE_DIR: path.join(dir, "missing") } });
+      await new Promise((r) => bare.listen(0, "127.0.0.1", r));
+      assert.equal(JSON.parse((await request(bare.address().port, "GET", "/api/vw/capabilities")).body).reference, false, "目錄沒有參考檔 = false");
+      bare.close();
+      const named = [];
+      for (const sub of ["scripts", "shared", "pages"])
+        for (const f of fs.readdirSync(path.join(__dirname, "..", sub))) {
+          if (!/\.(js|mjs|html)$/.test(f)) continue;
+          if (/assets\/(image-|storyboards-data)/.test(fs.readFileSync(path.join(__dirname, "..", sub, f), "utf8"))) named.push(sub + "/" + f);
+        }
+      assert(!/assets\/(image-|storyboards-data)/.test(fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8")), "index.html 不得直接引用參考檔");
+      assert.deepEqual(named, [], "頁面程式只能走 /reference/（staff 限定）");
     }
 
     console.log("PASS p6-main-system：許可→生成→資產帳冊→任務帳冊、拒絕不呼叫供應商、偽造許可拒絕、上傳入帳、本機模式不變、D6、欄位對照 L2");

@@ -802,6 +802,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       }
       if (req.method === "GET" && route === "/capabilities") {
         json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: require("./blender.cjs").capability(env), meshy: meshy.capability(env), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.publicCatalog,
+          reference: require("./reference.cjs").allowed(env, req) && require("./reference.cjs").present(env),
           // P6 L3: connected = finished videos open next-admin /release (same origin) for review and delivery.
           mainSystem: main ? { organizationId: orgId } : null });
         return true;

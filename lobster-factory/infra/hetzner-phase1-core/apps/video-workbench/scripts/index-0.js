@@ -72,14 +72,9 @@ const styles = [
   "美式漫畫 · 粗線條",
   "像素風",
 ];
-const styleImages = [
-  "assets/image-1.png",
-  "assets/image-2.png",
-  "assets/image-3.png",
-  "assets/image-4.png",
-  "assets/image-5.png",
-  "assets/image-6.png",
-];
+// Style thumbnails are third-party reference pictures (backend/reference.cjs): staff only, display only, never sent as
+// a generation reference. Without them the style button is text only.
+const styleImage = (i) => (VideoWorkbench.capabilities?.reference ? "/reference/image-" + (i + 1) + ".png" : "");
 const state = {
   mode: "reference",
   outputSettings: {},
@@ -186,13 +181,6 @@ const productTextDefaults = [
   "• 100% combed and ring-spun cotton (Heather colors contain polyester)",
   "• Fabric weight: 4.2 oz./yd.² (142 g/m²)",
   "• Pre-shrunk fabric",
-];
-const spokenCharacters = [
-  {
-    name: "Accountant",
-    desc: "我的角色・授權角色與素材庫",
-    image: styleImages[0],
-  },
 ];
 const spokenVoices = [
   {
@@ -487,16 +475,6 @@ function reshootWorkspace() {
   h += '<section class="reshoot-section" data-drop-bucket="images"><h2>02　參考素材 <small>選填 · ' + lookup("images").length + ' / 28</small></h2><button class="minor" data-action="reshoot-library-images">從素材庫加入參考圖</button>' + fileBox("images", 28, "加參考圖") + '<div class="reshoot-tags">' + lookup("images").map((f, i) => '<fieldset><legend>' + safe(f.name) + '</legend>' + ["場景", "人物", "未標"].map((tag) => '<label><input type="radio" name="reshoot-tag-' + i + '" data-gen-tag="' + i + '" value="' + tag + '" ' + ((f.tag || "未標") === tag ? 'checked' : '') + '>' + tag + '</label>').join("") + '</fieldset>').join("") + '</div><p class="small-note">場景：參考光線與背景。人物：替換原片人物。未標：參考道具、服裝或風格。</p></section><p class="small-note">重拍專用服務尚未接入，來源、標籤與提示詞可先儲存草稿。</p><button class="box-cta" disabled>尚未接入重拍服務</button>';
   return h;
 }
-const libraryImages = [
-  {
-    name: "參考人物 1",
-    url: styleImages[0],
-  },
-  {
-    name: "商品參考圖",
-    url: styleImages[0],
-  },
-];
 const libraryCharacters = [
   "陳朝榮",
   "陳林秀玉",
@@ -540,7 +518,7 @@ function render() {
       placeholders[m],
       `<div class="small-note" id="generatorPromptCount">${state.data[m].length} 字 · ${state.style < 0 ? "尚未選風格" : styles[state.style]}</div>`,
     );
-    h += `<div class="styles">${styles.map((name, i) => `<button class="style ${state.style === i ? "on" : ""}" data-style="${i}"><img src="${styleImages[i]}" alt="${name}">${name}</button>`).join("")}</div><div class="section-label">參考圖（選填） <span class="small-note" style="float:right">已選 ${lookup("images").length}/9</span></div>${fileBox("images", 9, "上傳參考圖")}<p class="small-note">ⓘ 上傳照片或圖片，角色與畫面會以參考圖中的主體為基準，用選定的風格重新繪製。</p>`;
+    h += `<div class="styles">${styles.map((name, i) => `<button class="style ${state.style === i ? "on" : ""}" data-style="${i}">${styleImage(i) ? `<img src="${styleImage(i)}" alt="${name}">` : ""}${name}</button>`).join("")}</div><div class="section-label">參考圖（選填） <span class="small-note" style="float:right">已選 ${lookup("images").length}/9</span></div>${fileBox("images", 9, "上傳參考圖")}<p class="small-note">ⓘ 上傳照片或圖片，角色與畫面會以參考圖中的主體為基準，用選定的風格重新繪製。</p>`;
   }
   if (m === "product") {
     h = productSeed();
@@ -880,9 +858,7 @@ document.addEventListener("click", (e) => {
     if (a === "director-preview") {
       modal(
         "影片預覽",
-        '<img style="width:100%;border-radius:10px" src="' +
-          styleImages[0] +
-          '"><p class="small-note">離線預覽畫面；接上影片生成服務後會替換成實際影片。</p>',
+        '<p class="small-note">離線預覽畫面；接上影片生成服務後會替換成實際影片。</p>',
       );
     }
     if (a === "reference-library-image") openLibrary("image", "images");
@@ -1126,14 +1102,15 @@ VideoWorkbench.generator = {
         ok: false,
         message: "未取得此作品的原文提示詞",
       };
-    if (!VideoWorkbench.safeUrl(payload.image || ""))
+    // No picture = no reference sent: only a picture the caller actually has is brought in.
+    if (payload.image && !VideoWorkbench.safeUrl(payload.image))
       return {
         ok: false,
         message: "未取得可帶入的圖片",
       };
     const refs = state.refs[target].images;
-    const existing = refs.find((f) => f.url === payload.image);
-    if (!existing && refs.length >= max[target].images)
+    const existing = payload.image ? refs.find((f) => f.url === payload.image) : null;
+    if (payload.image && !existing && refs.length >= max[target].images)
       return {
         ok: false,
         message: "參考圖已滿，請先移除一張後再帶入",
@@ -1151,7 +1128,7 @@ VideoWorkbench.generator = {
           Math.abs(b - duration) < Math.abs(a - duration) ? b : a,
         );
     }
-    if (!existing) {
+    if (payload.image && !existing) {
       const type = payload.image.startsWith("data:")
         ? payload.image.slice(5, payload.image.indexOf(";"))
         : "image/webp";

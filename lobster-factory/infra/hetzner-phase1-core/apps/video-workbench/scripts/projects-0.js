@@ -26,16 +26,8 @@ const STYLE_NAMES = [
 ];
 const JAPANESE_PROMPT =
   "暖色調 · 低對比 · Kodak Portra · 35mm · 淺景深 · 細膩顆粒 · 柔和逆光 · 溫馨 · 生活感";
-const STYLE_PICTURES = [
-  "../assets/image-187.jpeg",
-  "../assets/image-188.jpeg",
-  "../assets/image-189.jpeg",
-  "../assets/image-190.jpeg",
-  "../assets/image-191.jpeg",
-  "../assets/image-192.jpeg",
-  "../assets/image-193.jpeg",
-  "../assets/image-194.jpeg",
-];
+// Third-party reference pictures (backend/reference.cjs): staff only, display only, never sent as a generation reference.
+const stylePicture = (i) => (VideoWorkbench.capabilities?.reference ? "/reference/image-" + (187 + i) + ".jpeg" : "");
 const STORE = "awarewave-projects-screenshot-frontend-v1";
 // Shot size chips (buttons, no dropdown) and the phrase each adds to the shot prompt.
 const SHOT_SIZES = {
@@ -182,7 +174,7 @@ function renderCreatePage() {
       )
       .join(
         "",
-      )}</div></section><section class="create-section"><h2>風格錨點</h2><p class="hint">選一個整個專案都能沿用的視覺方向。之後仍可在製作聖經裡調整。</p><div class="create-styles">${STYLE_NAMES.map((v, i) => `<button class="create-style ${d.style === i ? "on" : ""} ${i === 8 ? "custom" : ""}" data-action="chooseStyle" data-index="${i}">${i < 8 ? `<img src="${STYLE_PICTURES[i]}" alt="${esc(v)}">` : "＋"}<span>${esc(v)}</span></button>`).join("")}</div><label>風格提示</label><textarea id="style-hint" rows="3" placeholder="補充色彩、光線、材質或時代感">${esc(d.styleText || "")}</textarea></section></div><aside class="create-summary"><section class="create-section"><h2>專案預覽</h2><div class="summary-icon">✦</div><dl><dt>名稱</dt><dd>${esc(d.name || "尚未命名")}</dd><dt>類型</dt><dd>${d.type === "series" ? "系列 / 短影集" : "單支影片"}</dd><dt>比例</dt><dd>${esc(d.ratio)}</dd><dt>風格</dt><dd>${esc(STYLE_NAMES[d.style] || "自訂")}</dd></dl></section></aside></div><div class="create-actions"><button class="btn outline" data-action="close">取消</button><button class="btn primary" data-action="saveProject">＋　建立專案</button></div></div>`,
+      )}</div></section><section class="create-section"><h2>風格錨點</h2><p class="hint">選一個整個專案都能沿用的視覺方向。之後仍可在製作聖經裡調整。</p><div class="create-styles">${STYLE_NAMES.map((v, i) => `<button class="create-style ${d.style === i ? "on" : ""} ${i === 8 ? "custom" : ""}" data-action="chooseStyle" data-index="${i}">${i < 8 && stylePicture(i) ? `<img src="${stylePicture(i)}" alt="${esc(v)}">` : i < 8 ? "" : "＋"}<span>${esc(v)}</span></button>`).join("")}</div><label>風格提示</label><textarea id="style-hint" rows="3" placeholder="補充色彩、光線、材質或時代感">${esc(d.styleText || "")}</textarea></section></div><aside class="create-summary"><section class="create-section"><h2>專案預覽</h2><div class="summary-icon">✦</div><dl><dt>名稱</dt><dd>${esc(d.name || "尚未命名")}</dd><dt>類型</dt><dd>${d.type === "series" ? "系列 / 短影集" : "單支影片"}</dd><dt>比例</dt><dd>${esc(d.ratio)}</dd><dt>風格</dt><dd>${esc(STYLE_NAMES[d.style] || "自訂")}</dd></dl></section></aside></div><div class="create-actions"><button class="btn outline" data-action="close">取消</button><button class="btn primary" data-action="saveProject">＋　建立專案</button></div></div>`,
   );
 }
 function renderDialog() {
@@ -246,7 +238,7 @@ function renderDialog() {
   } else if (dialog.type === "editStyle") {
     html = modal(
       "編輯風格",
-      `<label>風格錨點</label><div class="styles-grid">${STYLE_NAMES.map((name, i) => `<button class="style-tile ${p.style === i ? "on" : ""} ${i === 8 ? "custom" : ""}" data-action="setProjectStyle" data-index="${i}">${i < 8 ? `<img src="${STYLE_PICTURES[i]}" alt="${esc(name)}">` : "＋"}<span>${esc(name)}</span></button>`).join("")}</div><label>風格提示</label><textarea id="project-style-input">${esc(p.customStyle || styleText(p))}</textarea>`,
+      `<label>風格錨點</label><div class="styles-grid">${STYLE_NAMES.map((name, i) => `<button class="style-tile ${p.style === i ? "on" : ""} ${i === 8 ? "custom" : ""}" data-action="setProjectStyle" data-index="${i}">${i < 8 && stylePicture(i) ? `<img src="${stylePicture(i)}" alt="${esc(name)}">` : i < 8 ? "" : "＋"}<span>${esc(name)}</span></button>`).join("")}</div><label>風格提示</label><textarea id="project-style-input">${esc(p.customStyle || styleText(p))}</textarea>`,
       btnCancel +
         '<button class="btn primary" data-action="saveProjectStyle">儲存</button>',
       "mid",
@@ -768,8 +760,7 @@ async function action(a, button) {
             ep().shots.find((s) => s.image)?.image ||
             Object.values(p.assets)
               .flatMap((x) => x)
-              .flatMap((x) => x.refs || [])[0] ||
-            STYLE_PICTURES[p.style || 0],
+              .flatMap((x) => x.refs || [])[0],
           videoPrompt: prompt,
           duration: 8,
           model: "sora-2",

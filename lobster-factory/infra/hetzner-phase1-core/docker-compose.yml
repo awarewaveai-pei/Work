@@ -687,6 +687,8 @@ services:
       PORT: "4178"
       VW_HOST: 0.0.0.0
       VW_DATA_DIR: /data
+      # Staff-only third-party reference pictures/data (backend/reference.cjs); copied onto the volume by hand, not in git or the image.
+      VW_REFERENCE_DIR: /data/reference
       VW_TRUST_PROXY_IDENTITY: "1"
       VW_CONFIG_MODE: http
       VW_PUBLIC_ORIGIN: ${VW_PUBLIC_ORIGIN:-https://video.aware-wave.com}
