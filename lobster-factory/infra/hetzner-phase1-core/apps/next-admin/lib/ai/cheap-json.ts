@@ -95,10 +95,13 @@ async function generateOpenAiJsonText(args: CheapJsonTextArgs & { model: AiTextM
 
 const GEMINI_RETRIES = 3;
 const GEMINI_RETRY_STATUS = new Set([429, 503]);
-/** The wait a Gemini 429 / 503 asks for (RetryInfo retryDelay "23s"), bounded to 5-60 s; 20 s when it names none. */
-export function geminiRetryMs(body: string): number {
+/** The wait a Gemini 429 / 503 asks for (RetryInfo retryDelay "23s"), at least 5 s; 20 s when it names none; null when
+ *  it is over a minute: that is the free tier's 500-a-day cap ("retry in 9h48m", 2026-11-05), not a busy minute, and
+ *  waiting it out inside a call only burns the caller's timeout (all 400 checks of a run ended "aborted due to timeout"). */
+export function geminiRetryMs(body: string): number | null {
   const s = Number(body.match(/"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/)?.[1]);
-  return Math.min(60_000, Math.max(5_000, Number.isFinite(s) && s > 0 ? s * 1000 : 20_000));
+  const ms = Number.isFinite(s) && s > 0 ? s * 1000 : 20_000;
+  return ms > 60_000 ? null : Math.max(5_000, ms);
 }
 
 /** The platform's free-tier Gemini key (operator 2026-11-05: the OpenAI account ran out of credits). JSON mode; the lite
@@ -124,6 +127,7 @@ async function generateGeminiJsonText(args: CheapJsonTextArgs): Promise<CheapJso
         { method: "POST", signal, headers: { "content-type": "application/json" }, body });
       if (!GEMINI_RETRY_STATUS.has(res.status) || attempt >= GEMINI_RETRIES) break;
       const waitMs = geminiRetryMs(await res.text().catch(() => ""));
+      if (waitMs === null) return { ok: false, status: 502, error: "gemini_429_daily_quota" };
       await new Promise((r) => setTimeout(r, waitMs));
     }
     if (!res.ok) return { ok: false, status: 502, error: `gemini_${res.status}` };

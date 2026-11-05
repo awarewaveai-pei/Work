@@ -43,10 +43,19 @@ describe("generateCheapJsonText on Gemini", () => {
       .toMatchObject({ ok: false, status: 503 });
   });
 
-  it("the delay is read from RetryInfo and bounded", () => {
+  it("the delay is read from RetryInfo; over a minute is the daily cap, not a wait", () => {
     expect(geminiRetryMs('{"retryDelay": "23s"}')).toBe(23_000);
     expect(geminiRetryMs('{"retryDelay":"0.5s"}')).toBe(5_000);
-    expect(geminiRetryMs('{"retryDelay":"300s"}')).toBe(60_000);
+    expect(geminiRetryMs('{"retryDelay":"35336s"}')).toBeNull();
     expect(geminiRetryMs("")).toBe(20_000);
+  });
+
+  it("the daily cap answers at once, without waiting or asking again", async () => {
+    process.env.GEMINI_API_KEY = "g-test";
+    let n = 0;
+    vi.stubGlobal("fetch", async () => { n++; return new Response(JSON.stringify({ error: { code: 429, details: [{ retryDelay: "35336s" }] } }), { status: 429 }); });
+    expect(await generateCheapJsonText({ route: "t", system: "s", user: "u", maxTokens: 10, model: GEMINI_LITE_MODEL, grant: {} as never }))
+      .toEqual({ ok: false, status: 502, error: "gemini_429_daily_quota" });
+    expect(n).toBe(1);
   });
 });
