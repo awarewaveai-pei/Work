@@ -5,3 +5,7 @@ ARG BASE=lobster-phase1-video-workbench:local
 FROM ${BASE}
 COPY tests/ tests/
 RUN --network=none node tests/gate.cjs
+# The image must actually render, not just start Blender: a 16x16 Eevee frame (headless EGL; a missing GL/EGL library
+# aborted every 3D render while `blender --version` passed, P6 H5).
+RUN --network=none /opt/blender/blender -b --factory-startup --python-exit-code 1 --python-expr "import bpy; s=bpy.context.scene; s.render.engine='BLENDER_EEVEE_NEXT'; s.render.resolution_x=16; s.render.resolution_y=16; s.render.filepath='/tmp/eevee-gate.png'; bpy.ops.render.render(write_still=True)" \
+    && test -s /tmp/eevee-gate.png

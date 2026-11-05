@@ -3,9 +3,11 @@
 # `docker compose build`. A missing or incomplete .awarewave/ fails the build (check below).
 FROM node:24.14.0-bookworm-slim
 
+# Blender runtime libs + EGL/Mesa: headless Eevee needs an EGL context; no GPU here, so Mesa llvmpipe renders on CPU.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl unzip xz-utils ffmpeg \
       libxi6 libxxf86vm1 libxfixes3 libxrender1 libgl1 libxkbcommon0 libsm6 \
+      libegl1 libegl-mesa0 libgl1-mesa-dri libgbm1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Blender 4.5.9 LTS: URL and SHA-256 come from vendor/blender/sources.json (linux entry; hash from the official .sha256).
