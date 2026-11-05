@@ -93,6 +93,13 @@ async function generateOpenAiJsonText(args: CheapJsonTextArgs & { model: AiTextM
   }
 }
 
+const GEMINI_429_RETRIES = 3;
+/** The wait a Gemini 429 asks for (RetryInfo retryDelay "23s"), bounded to 5-60 s; 20 s when it names none. */
+export function geminiRetryMs(body: string): number {
+  const s = Number(body.match(/"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/)?.[1]);
+  return Math.min(60_000, Math.max(5_000, Number.isFinite(s) && s > 0 ? s * 1000 : 20_000));
+}
+
 /** The platform's free-tier Gemini key (operator 2026-11-05: the OpenAI account ran out of credits). JSON mode; the lite
  *  model refuses thinkingBudget 0, so no thinkingConfig. The key goes in the query string; never log the url. */
 async function generateGeminiJsonText(args: CheapJsonTextArgs): Promise<CheapJsonTextResult> {
@@ -100,17 +107,23 @@ async function generateGeminiJsonText(args: CheapJsonTextArgs): Promise<CheapJso
   if (!apiKey) return { ok: false, status: 503, error: "GEMINI_API_KEY not configured" };
   try {
     const grant = args.grant ?? (await grantFor("ops.cheap-json"));
-    const res = await fetch(providerUrl(grant, "gemini", `/v1beta/models/${GEMINI_LITE_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`), {
-      method: "POST",
-      signal: AbortSignal.timeout(args.timeoutMs ?? DEFAULT_TIMEOUT_MS),
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: args.system }] },
-        contents: [{ role: "user", parts: [{ text: args.user }] }],
-        generationConfig: { maxOutputTokens: args.maxTokens, responseMimeType: "application/json",
-          ...(args.temperature === undefined ? {} : { temperature: args.temperature }) },
-      }),
+    const signal = AbortSignal.timeout(args.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+    const body = JSON.stringify({
+      systemInstruction: { parts: [{ text: args.system }] },
+      contents: [{ role: "user", parts: [{ text: args.user }] }],
+      generationConfig: { maxOutputTokens: args.maxTokens, responseMimeType: "application/json",
+        ...(args.temperature === undefined ? {} : { temperature: args.temperature }) },
     });
+    let res: Response;
+    // The free tier allows ~15 requests a minute (probed 2026-11-05: 17 of 20 back-to-back calls passed): a 429 waits the
+    // delay Google names, then asks again, so a burst is slowed instead of answered as an error.
+    for (let attempt = 0; ; attempt++) {
+      res = await fetch(providerUrl(grant, "gemini", `/v1beta/models/${GEMINI_LITE_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`),
+        { method: "POST", signal, headers: { "content-type": "application/json" }, body });
+      if (res.status !== 429 || attempt >= GEMINI_429_RETRIES) break;
+      const waitMs = geminiRetryMs(await res.text().catch(() => ""));
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
     if (!res.ok) return { ok: false, status: 502, error: `gemini_${res.status}` };
     const json = (await res.json()) as { usageMetadata?: GeminiUsageLike; candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
     const raw = (json.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("");
