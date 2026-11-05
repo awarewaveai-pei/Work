@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-05（續14）向量專業版收尾：圖示欄、九面板修正、主題傳色、字型灌入，正式站實測全過
+
+- 操作者當天追加定案：右側只留一條圖示欄；統一 class＋主題 token；不要深淺色，VectorCraft 本體照 video 模式吃主題（接收補丁已核准）；字型灌進 VectorCraft 字型庫、取消我方字型面板。
+- 正式站逐面板實測抓到的缺陷（單元測試全綠未抓到）：範本庫（轉接器無 setArtboardSize）、字型不換字、WebP 品質參數型別（0.9 vs u8）、QR／條碼未群組（+321／+53 物件）、Mockup 用下拉。修正 `6ae1d5800`、`550764e16`（dock）、`eaa2660d5`、`8ffde950e`（blocks）→ 合併 `33883b57b`。
+- 主題：`lib/theme/frame-theme.ts`（協定唯一處）＋`VectorProFrame.tsx` 傳送（`93f7fec27` → `e18897556`）；VectorCraft 端 `scripts/vectorcraft-pro/api-settheme.patch`＋`awarewave-theme-receiver.js`（`3ef5e981a`）。
+- 驗收退回一次：receiver 檔名無內容雜湊，nginx 對 `.js` `expires 1y` → 改成 `awarewave-theme-receiver-<sha16>.js`，build 加「dist 根目錄 .js/.wasm 檔名必含 16-hex」FATAL（`717c9975f`）。
+- 上線：dist `4cce336-7303550` 上傳、主機 `sha256sum -c` OK、`current` 切換（回退 `ln -sfn 4cce336-3db6064 current`）。
+- 新增守門：登入 e2e 每面板主要按鈕要有效果（`tests/e2e/smoke/05-vector-pro.spec.ts`，`f39d0b803`）；blocks 用到的 ctx 方法必在轉接器與契約；每個瀏覽器模組必須能解析；`lib/public-asset-cache.ts`（固定網址模組 `private, no-cache`）。
+- Canvas 專業版交接：`agency-os/handoffs/2026-11-05-photocraft-pro/BRIEF.md`（`185c67c5a`）；PhotoCraft 網頁版無 `window.photocraft`（上游 issue #9345 等未結）列為 G1。
+- REALTEST_EVIDENCE: tool=Bash | cmd=sg-deploy 33883b57b、e18897556 皆 healthy；整合樹 tsc 0＋vitest 497 files／4156 passed；curl 新版 index 200 no-cache、receiver/wasm/ttf 200 gzip；內建瀏覽器登入正式站：iframe data-theme-linked=1、截圖全畫面主題色；text.fontList 57 家族、text.setStyle Noto Serif TC／Playfair／Roboto／Montserrat／Noto Sans HK 生效、missingFonts 0；九面板逐一有效（A4 595x842、QR+1、條碼+1、WebP image/webp、Mockup 出圖 select=0、批次 2 檔、My Designs 存入 dcbc9076 重開文字 2 段） | exit=0 | ms=0
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/2n（快取標頭 critic：Major「Cloudflare 是否保留 no-cache」部署後實測 15 檔 private, no-cache 排除；主 session 讀 receiver、frame-theme、blocks、dock diff；receiver 檔名雜湊為主 session 驗收發現）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=awarewave:theme | hits=10（video-workbench/shared/theme.js 接收端、frame-theme.ts、receiver、e2e；無漂移）
 ## 2026-11-05（續13）畫布專業版計畫複查：功能無漏列；進出流程補五個缺口（只有文件）
 
 - 根因：第一版盤點靠面板標題＋函式清單，未逐項核對控制項，也沒沿「存入／另存／轉存／匯出」與 Mockup 入口走一遍 → 操作者問後複查。
