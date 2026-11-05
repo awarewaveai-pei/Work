@@ -4,7 +4,8 @@ import type { SavedLayout } from '../lib/theme/tokens';
 
 // ── Nav data ────────────────────────────────────────────────────────────────
 export type NavItem =
-  | { type: 'link';     href: string; icon: string; label: string; title?: string; badge?: 'ops-inbox' }
+  // newTab: opens in a new tab (a full-window page under app/(full), which has no sidebar to come back by).
+  | { type: 'link';     href: string; icon: string; label: string; title?: string; badge?: 'ops-inbox'; newTab?: true }
   | { type: 'ext';      href: string; icon: string; label: string }
   | { type: 'disabled'; icon: string; label: string };
 
@@ -17,7 +18,7 @@ export interface NavSection {
 // Order follows the work: win and build a client → keep the client running → the services we run for
 // clients (content tools, marketing, outreach, knowledge, CS) → keeping the platform running.
 // Labels are English only (sidebar-coverage.test.ts checks); the Chinese explanation lives in `title`.
-// Every built page under app/(shell) is linked here or listed in __tests__/sidebar-coverage.test.ts
+// Every built page under app/(shell) and app/(full) is linked here or listed in __tests__/sidebar-coverage.test.ts
 // with where it is reached from, so a new page fails that test until it is placed.
 // Section ids build-onboard / repair-control are mirrored by the dashboard (app/(shell)/page.tsx).
 export const DEFAULT_SECTIONS: NavSection[] = [
@@ -66,6 +67,7 @@ export const DEFAULT_SECTIONS: NavSection[] = [
       { type: 'link',     href: '/tools/banner',        icon: '🖼', label: 'Banner Studio', title: 'Social media banner 生成工具' },
       { type: 'link',     href: '/tools/canvas',        icon: '🎨', label: 'Canvas Editor', title: 'Fabric.js Canvas Editor' },
       { type: 'link',     href: '/tools/vector-editor', icon: '✒', label: 'Vector Editor', title: '向量設計工具（10 積木）' },
+      { type: 'link',     href: '/tools/vector-pro',    icon: '✒', label: 'Vector Pro',    title: '向量（專業版）：VectorCraft 全視窗，開新分頁', newTab: true },
       { type: 'link',     href: '/tools/designs',       icon: '🗂', label: 'My Designs',    title: '已儲存設計庫（R2 持久化）' },
       { type: 'link',     href: '/tools/publish',       icon: '🛒', label: 'Publish',       title: '一鍵上架 Woo + Printful' },
       { type: 'disabled', icon: '◧', label: 'Templates' },

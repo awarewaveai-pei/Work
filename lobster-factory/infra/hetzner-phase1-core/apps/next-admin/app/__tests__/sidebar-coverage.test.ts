@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import fs from "fs";
 import path from "path";
 import { DEFAULT_SECTIONS, activeSectionId, applyLayout, itemKey } from "../SidebarNav";
+import { STAFF_ROUTE_GROUPS } from "../../lib/portal/doors";
 
-// A built page nobody can click to is a page nobody uses: every static page under app/(shell) is
+// A built page nobody can click to is a page nobody uses: every static page under a staff route group is
 // linked from the sidebar, or listed here with the page that links to it.
 const REACHED_ELSEWHERE: Record<string, string> = {
   "/no-access": "middleware sends a page refused by staff tool grants here (lib/staff-access.ts)",
@@ -18,7 +19,7 @@ const REACHED_ELSEWHERE: Record<string, string> = {
   "/tools/social/smartlinks": "social app side nav (tools/social/routes.ts)",
 };
 
-const SHELL = path.resolve(__dirname, "../(shell)");
+const GROUPS = STAFF_ROUTE_GROUPS.map((g) => path.resolve(__dirname, "..", g));
 
 function staticPages(dir: string, route: string): string[] {
   const out: string[] = [];
@@ -34,13 +35,13 @@ function staticPages(dir: string, route: string): string[] {
 const linked = DEFAULT_SECTIONS.flatMap((s) => s.items.filter((i) => i.type === "link").map((i) => itemKey(i)));
 
 describe("sidebar coverage", () => {
-  it("every static (shell) page is in the sidebar or reached from a named page", () => {
-    const orphans = staticPages(SHELL, "").filter((p) => !linked.includes(p) && !(p in REACHED_ELSEWHERE));
+  it("every static staff page is in the sidebar or reached from a named page", () => {
+    const orphans = GROUPS.flatMap((g) => staticPages(g, "")).filter((p) => !linked.includes(p) && !(p in REACHED_ELSEWHERE));
     expect(orphans).toEqual([]);
   });
 
   it("every sidebar link and allowlist entry is a page that exists", () => {
-    const pages = new Set(staticPages(SHELL, ""));
+    const pages = new Set(GROUPS.flatMap((g) => staticPages(g, "")));
     expect(linked.filter((h) => !pages.has(h))).toEqual([]);
     expect(Object.keys(REACHED_ELSEWHERE).filter((h) => !pages.has(h))).toEqual([]);
   });

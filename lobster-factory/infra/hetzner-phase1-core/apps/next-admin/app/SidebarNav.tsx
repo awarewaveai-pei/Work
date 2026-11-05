@@ -72,6 +72,14 @@ export function SidebarNav({ initialLayout, visible = null }: { initialLayout?: 
                 </a>
               );
             }
+            if (item.newTab) {
+              return (
+                <a key={item.href} href={item.href} title={item.title} target="_blank" rel="noopener" className="sidebar-link">
+                  <span className="sidebar-icon">{item.icon}</span> {item.label}
+                  <span className="sidebar-ext">↗</span>
+                </a>
+              );
+            }
             return (
               <Link key={item.href} href={item.href} title={item.title}
                 className={item.href === current?.href ? 'sidebar-link active' : 'sidebar-link'}

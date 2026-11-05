@@ -10,12 +10,12 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import { BACK_OFFICE_FEATURES } from "../../entitlements/can";
 import { ROUTE_FEATURES } from "../../entitlements/route-features";
-import { PLATFORM_APIS, PLATFORM_PAGES, doorApis, nextAdminProducts, type NextAdminProduct } from "../doors";
+import { PLATFORM_APIS, PLATFORM_PAGES, STAFF_ROUTE_GROUPS, doorApis, nextAdminProducts, type NextAdminProduct } from "../doors";
 import { PRODUCTS, type PortalProduct } from "../products";
 import { ROOT, under, sources, scan, FILES, resolve, isRoute, importClosure } from "./code-scan";
 
 // Code a product owns: lib/<key>/, its staff paths, its door page and door API directories (longest prefix wins).
-const OWNED = PRODUCTS.flatMap((p) => [`lib/${p.key}`, ...p.staffPaths.map((s) => `app/(shell)/${s}`),
+const OWNED = PRODUCTS.flatMap((p) => [`lib/${p.key}`, ...p.staffPaths.flatMap((s) => STAFF_ROUTE_GROUPS.map((g) => `app/${g}/${s}`)),
   ...(p.door.app === "next-admin" ? [`app${p.door.page}`, ...p.door.api.map((a) => `app${a}`)] : [])].map((dir) => ({ dir, key: p.key })))
   .sort((a, b) => b.dir.length - a.dir.length);
 const ownerOfFile = (rel: string) => OWNED.find((o) => rel.startsWith(`${o.dir}/`))?.key ?? null;
