@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-05（續6）影音工作台 P6.6 投遞＋P6.11 價目與 R2 孤兒清掃（1b869b8af）
+
+- P6.6：next-admin door 頁 /release 包 ReleaseDeliveryPanel（單一投遞 UI）；工作台按鈕＝先算好 href 的連結（await 後 window.open 會被當彈窗靜默擋）。比例＝入帳時記 metadata.ratio，只經 ratioOfAsset 讀（ratioOfUrl 改私有）；/api/video/assets 只在 includeWorkbench=1 回 workbench_render。
+- P6.11：gpt-image-2.5-flare 價目（官方價目頁 2026-11-05＝gpt-image-2 token 價）＋OPENAI_TOKEN_PRICED_IMAGE_MODELS，不再用名稱前綴猜價；workbench-sweep 排程清孤兒（>24 h 且無 object_key 列；分頁截斷＝視為有引用；刪前 DB 複查＋單 key 重讀時間；R2 單呼叫逾時；時間預算在 curl -m 120 內；任何 R2 錯誤 ok:false）。
+- Codex 三輪：8127207d（4）、d3da7deb（3）、c2ecf32c（2）。同 reviewer 第 2 次報比例類 → 不變量：比例是記錄的事實，只經 ratioOfAsset。接受殘餘：R2 無條件刪除（LIST→DELETE 窗口）；修正前已登記無 ratio 的列（prod 無）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin npx tsc --noEmit && npx vitest run lib/content/video app/api/internal/video app/api/video tools/video app/video lib/portal（337 pass，2 已知 seedstar）；VW node tests/p6-main-system.cjs tests/migrate-media.cjs tests/gate.cjs | exit=0 | ms=300000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/9m/0n（Codex agency-os/reports/oracle/2026-11-05-partialreview-8127207d.md、-d3da7deb.md、-c2ecf32c.md；7 修、2 接受殘餘；突變：價目清單、ratio 驗證、年齡、引用、deadline、重讀時間、分頁截斷守衛 紅→綠）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=ratioOfUrl | hits=2
 ## 2026-11-05（續5）影音工作台 P6 L6 部署管線＋上機 H0/H2/H3（62acae78b／8bf7f1908／e25062e7d）
 
 - L6 七項（62acae78b）：bundle-awarewave.cjs（清單＝appearance.cjs runtimeFiles）、Dockerfile.gate 測試閘（runtime 映像不含測試）、smoke 未登入 /api/vw/state 必 401、RESTORABLE＋IMAGE_MAP＋runbook、notify 只在含 video-workbench 時送、CI video-workbench-ci.yml。Codex 12dab604：CI paths 漏 p6-main-system 讀的 next-admin 契約檔 → 補。
