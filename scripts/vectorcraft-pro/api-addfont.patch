@@ -1,0 +1,29 @@
+diff --git a/apps/vectorcraft-web/src/api.rs b/apps/vectorcraft-web/src/api.rs
+index 526e56be1..51f1a6c3c 100644
+--- a/apps/vectorcraft-web/src/api.rs
++++ b/apps/vectorcraft-web/src/api.rs
+@@ -10,6 +10,7 @@
+ //! await vectorcraft.commands()                                 // command list
+ //! const {base64} = await vectorcraft.screenshot()              // the canvas as PNG (base64)
+ //! await vectorcraft.openFile("logo.svg", bytes)               // opened as a dropped file is
++//! await vectorcraft.addFont(bytes)                             // font into the document font database → faces added
+ //! vectorcraft.captureDownloads(true)                           // saves stay in the page…
+ //! vectorcraft.files(); await vectorcraft.readFile("logo.png")  // …to be read back
+ //! ```
+@@ -156,6 +157,16 @@ pub fn install() -> Result<(), JsValue> {
+         })
+         .into_js_value(),
+     )?;
++    set_fn(
++        &obj,
++        "addFont",
++        Closure::<dyn Fn(js_sys::Uint8Array) -> js_sys::Promise>::new(|bytes: js_sys::Uint8Array| {
++            let added = vectorcraft_text::FontDb::global().add_font(bytes.to_vec());
++            repaint();
++            js_sys::Promise::resolve(&JsValue::from_f64(added as f64))
++        })
++        .into_js_value(),
++    )?;
+     set_fn(&obj, "captureDownloads", Closure::<dyn Fn(bool)>::new(|on: bool| CAPTURE.with(|c| c.set(on))).into_js_value())?;
+     set_fn(
+         &obj,
