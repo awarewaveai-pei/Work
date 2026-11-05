@@ -78,12 +78,12 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
 <aside><div class="in">
   <h1>向量專業版監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-11-05</span></p>
-  <div class="bar" data-computed><i class="d" style="width:71.42857142857143%"></i><i class="g" style="width:28.57142857142857%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>5</span>／<span data-computed>7</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:85.71428571428571%"></i><i class="g" style="width:14.285714285714285%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>6</span>／<span data-computed>7</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
-<p class="sub">把開源的 VectorCraft（Illustrator 的完整重製，工具、面板、快捷鍵都一樣）放進 app.aware-wave.com 當「向量（專業版）」；AwareWave 獨有的十項（尺寸範本、Google Fonts 字型、調色、去背、WebP、My Designs、QR、條碼、Mockup、批次匯出）做成第二個 dock 欄，長得跟它的面板一樣；舊設計轉檔後舊編輯器退場，只留一套。共 <span data-computed>7</span> 張卡、<span data-computed>27</span> 項工作，已完成 <span data-computed>25</span> 項。</p>
-<section id="now"><h2>現況</h2><p class="lead">目前已做到與還沒做到的事（2026-11-05 查）。</p><ul class="yn"><li class="yes"><b>可以</b><span>在 app.aware-wave.com 用 Illustrator 一樣的工具列、面板、快捷鍵畫向量。<small>2026-11-05 上線：側欄 Vector Pro 開新分頁全視窗（bca9a846d）；正式站 playwright smoke：VectorCraft 開得起來、ui.inspect 回 JSON。</small></span></li><li class="yes"><b>可以</b><span>介面與字型是繁體中文。<small>介面 zh-hant；建置加 Noto Sans TC，本機實測罕用字「嘸」正常顯示（0f1bdc062）。</small></span></li><li class="yes"><b>可以</b><span>AwareWave 獨有的十項功能在專業版裡，長在 Illustrator 版面的第二個 dock 欄。<small>十個面板模組＋dock 外殼（色值抽自真品 theme.rs）；換圖實測位置、大小、旋轉不變（3934f17f2）。</small></span></li><li class="yes"><b>可以</b><span>舊的向量設計檔在專業版打得開，舊編輯器退場，只有一套。<small>舊 .design.json 在 My Designs 面板「匯入舊專案」轉向量；舊 PNG 照常開；/tools/vector-editor 與 /vector-editor.html 轉到專業版（6740e006d）。</small></span></li><li class="yes"><b>可以</b><span>本機能建出網頁版。<small>一個指令 build.ps1；wasm 89 MB 與上游 v0.21.0 同級，建置會驗證已最佳化（c9b541cae）。</small></span></li></ul></section>
+<p class="sub">把開源的 VectorCraft（Illustrator 的完整重製，工具、面板、快捷鍵都一樣）放進 app.aware-wave.com 當「向量（專業版）」；AwareWave 獨有的十項（尺寸範本、Google Fonts 字型、調色、去背、WebP、My Designs、QR、條碼、Mockup、批次匯出）做成第二個 dock 欄，長得跟它的面板一樣；舊設計轉檔後舊編輯器退場，只留一套。共 <span data-computed>7</span> 張卡、<span data-computed>27</span> 項工作，已完成 <span data-computed>26</span> 項。</p>
+<section id="now"><h2>現況</h2><p class="lead">目前已做到與還沒做到的事（2026-11-05 查）。</p><ul class="yn"><li class="yes"><b>可以</b><span>在 app.aware-wave.com 用 Illustrator 一樣的工具列、面板、快捷鍵畫向量。<small>2026-11-05 上線：側欄 Vector Pro 開新分頁全視窗（bca9a846d）；正式站 playwright smoke：VectorCraft 開得起來、ui.inspect 回 JSON。</small></span></li><li class="yes"><b>可以</b><span>介面與字型是繁體中文。<small>介面 zh-hant；建置加 Noto Sans TC，本機實測罕用字「嘸」正常顯示（0f1bdc062）。</small></span></li><li class="no"><b>還不行</b><span>AwareWave 獨有的十項功能在專業版裡，長在 Illustrator 版面的第二個 dock 欄。<small>修正中（2026-11-05 實測）：①重新打開 My Designs 設計失敗——R2 公開網域不給跨網域讀，改走既有同源代理；②dock 寫死 65 個色碼，改主題不會套用——改成 app 統一 class＋主題 token，VectorCraft 跟主題明暗。原有：十個面板模組＋dock 外殼（色值抽自真品 theme.rs）；換圖實測位置、大小、旋轉不變（3934f17f2）。</small></span></li><li class="yes"><b>可以</b><span>舊的向量設計檔在專業版打得開，舊編輯器退場，只有一套。<small>舊 .design.json 在 My Designs 面板「匯入舊專案」轉向量；舊 PNG 照常開；/tools/vector-editor 與 /vector-editor.html 轉到專業版（6740e006d）。</small></span></li><li class="yes"><b>可以</b><span>本機能建出網頁版。<small>一個指令 build.ps1；wasm 89 MB 與上游 v0.21.0 同級，建置會驗證已最佳化（c9b541cae）。</small></span></li></ul></section>
 
 <section id="steps"><h2>卡片與工作</h2><p class="lead">依編號進行。每張卡列出所有工作，勾選代表完成。High 風險步驟（上傳正式站、改 nginx）經你同意才做。</p><ol class="steps"><li class="step done" id="C1">
     <div class="n">1</div>
@@ -115,19 +115,20 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
         <p><b>卡：</b><code>agency-os/handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md §6 C2</code></p>
         <p><b>完成於：</b><code>f53144584</code></p>
       </details>
-    </div></li><li class="step doing" id="C3">
+    </div></li><li class="step done" id="C3">
     <div class="n">3</div>
     <div class="b">
       <p class="plain">例：側欄「設計編輯器」多一項「向量（專業版）」，點開就是 Illustrator 介面；瀏覽器太舊時給一行說明並連回快速出稿。</p>
-      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-med">風險 Medium（改 products.ts 登記；頁面本身是 iframe）</span><span class="who">負責：Opus 5.5｜vp-c3-door-2 完成 C3.1–C3.3（分支 claude/vector-pro-door-634881，待與 C4 一起合併）；C3.4 等 C2</span></p>
+      <p class="meta"><span class="pill st-done">已完成</span><span class="pill risk-med">風險 Medium（改 products.ts 登記；頁面本身是 iframe）</span><span class="who">負責：Opus 5.5｜vp-c3-door-2；2026-11-05 登入實測通過（ui.inspect、十面板、addFont）</span></p>
       <p class="donewhen"><b>完成的樣子：</b>登入後開 /tools/vector-pro 看到 VectorCraft；本機開發也能開（轉到 trunk serve）；產品登記測試全綠。</p>
-      <ul class="items"><li class="done"><b>✓</b><span><code>C3.1</code> 無側欄全視窗頁嵌入專業版，側欄點開新分頁；失敗時給說明與回舊編輯器的連結。 <small>完成於 <code>b29753811</code></small></span></li><li class="done"><b>✓</b><span><code>C3.2</code> 本機開發時把 /vector-pro/ 轉到本機建置伺服器，正式站不受影響。 <small>完成於 <code>b29753811</code></small></span></li><li class="done"><b>✓</b><span><code>C3.3</code> 設計編輯器的側欄加「向量（專業版）」，登記與權限測試全綠。 <small>完成於 <code>b29753811</code></small></span></li><li class="todo"><b>○</b><span><code>C3.4</code> 正式站登入實開一次，介面回得了資料，截圖存紀錄。</span></li></ul>
+      <ul class="items"><li class="done"><b>✓</b><span><code>C3.1</code> 無側欄全視窗頁嵌入專業版，側欄點開新分頁；失敗時給說明與回舊編輯器的連結。 <small>完成於 <code>b29753811</code></small></span></li><li class="done"><b>✓</b><span><code>C3.2</code> 本機開發時把 /vector-pro/ 轉到本機建置伺服器，正式站不受影響。 <small>完成於 <code>b29753811</code></small></span></li><li class="done"><b>✓</b><span><code>C3.3</code> 設計編輯器的側欄加「向量（專業版）」，登記與權限測試全綠。 <small>完成於 <code>b29753811</code></small></span></li><li class="done"><b>✓</b><span><code>C3.4</code> 正式站登入實開一次，介面回得了資料，截圖存紀錄。 <small>完成於 <code>bca9a846d</code></small></span></li></ul>
       <details><summary>工程細節：C3 app 門</summary>
         <p>無側欄區 app/(full)/tools/vector-pro/page.tsx（iframe＋右欄 dock 100vh）＋WebGL 偵測＋NOTICE 連結；側欄連結 target=_blank；next.config 開發用 rewrite；products.ts nav／staffPaths；tsc＋四個測試</p>
         <p><b>需先完成：</b><a href="#C2">C2</a></p>
         <p><b>已定案：</b>全視窗開新分頁（操作者 2026-11-05：嵌在側欄旁可操作版面太小）：頁面放無側欄區，側欄連結開新分頁，登入照管。門的架構照 ADR 018：員工門＝app 這一頁；客戶門＝將來啟用既有的產品子網域 door（同一 next-admin、host 路由、products.ts 一列），不另建站；塔羅／studio／mockup 銜接走同 app 的 API 與 My Designs，不跨源。</p>
         <p><b>檔案：</b><code>NA/app/(shell)/tools/vector-pro/page.tsx</code> <code>NA/next.config.*</code> <code>NA/lib/portal/products.ts</code></p>
         <p><b>卡：</b><code>agency-os/handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md §6 C3</code></p>
+        <p><b>完成於：</b><code>bca9a846d</code></p>
       </details>
     </div></li><li class="step done" id="C4">
     <div class="n">4</div>

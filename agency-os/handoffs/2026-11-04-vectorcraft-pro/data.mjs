@@ -26,7 +26,7 @@ export const COPY = {
 export const NOW = [
   { what: '在 app.aware-wave.com 用 Illustrator 一樣的工具列、面板、快捷鍵畫向量。', state: 'yes', ev: '2026-11-05 上線：側欄 Vector Pro 開新分頁全視窗（bca9a846d）；正式站 playwright smoke：VectorCraft 開得起來、ui.inspect 回 JSON。' },
   { what: '介面與字型是繁體中文。', state: 'yes', ev: '介面 zh-hant；建置加 Noto Sans TC，本機實測罕用字「嘸」正常顯示（0f1bdc062）。' },
-  { what: 'AwareWave 獨有的十項功能在專業版裡，長在 Illustrator 版面的第二個 dock 欄。', state: 'yes', ev: '十個面板模組＋dock 外殼（色值抽自真品 theme.rs）；換圖實測位置、大小、旋轉不變（3934f17f2）。' },
+  { what: 'AwareWave 獨有的十項功能在專業版裡，長在 Illustrator 版面的第二個 dock 欄。', state: 'no', ev: '修正中（2026-11-05 實測）：①重新打開 My Designs 設計失敗——R2 公開網域不給跨網域讀，改走既有同源代理；②dock 寫死 65 個色碼，改主題不會套用——改成 app 統一 class＋主題 token，VectorCraft 跟主題明暗。原有：十個面板模組＋dock 外殼（色值抽自真品 theme.rs）；換圖實測位置、大小、旋轉不變（3934f17f2）。' },
   { what: '舊的向量設計檔在專業版打得開，舊編輯器退場，只有一套。', state: 'yes', ev: '舊 .design.json 在 My Designs 面板「匯入舊專案」轉向量；舊 PNG 照常開；/tools/vector-editor 與 /vector-editor.html 轉到專業版（6740e006d）。' },
   { what: '本機能建出網頁版。', state: 'yes', ev: '一個指令 build.ps1；wasm 89 MB 與上游 v0.21.0 同級，建置會驗證已最佳化（c9b541cae）。' },
 ];
@@ -58,7 +58,7 @@ export const STEPS = [
       done('C2.4', '用 curl 驗：頁面 200、wasm 型別與壓縮正確、容器內有檔。', 'f53144584'),
     ] },
   { n: 3, code: 'C3', group: 'C', title: 'app 門', plain: '例：側欄「設計編輯器」多一項「向量（專業版）」，點開就是 Illustrator 介面；瀏覽器太舊時給一行說明並連回快速出稿。',
-    gate: '登入後開 /tools/vector-pro 看到 VectorCraft；本機開發也能開（轉到 trunk serve）；產品登記測試全綠。', risk: 'Medium（改 products.ts 登記；頁面本身是 iframe）', model: 'Opus 5.5｜vp-c3-door-2 完成 C3.1–C3.3（分支 claude/vector-pro-door-634881，待與 C4 一起合併）；C3.4 等 C2', status: 'in_progress', depends: ['C2'],
+    gate: '登入後開 /tools/vector-pro 看到 VectorCraft；本機開發也能開（轉到 trunk serve）；產品登記測試全綠。', risk: 'Medium（改 products.ts 登記；頁面本身是 iframe）', model: 'Opus 5.5｜vp-c3-door-2；2026-11-05 登入實測通過（ui.inspect、十面板、addFont）', status: 'done', commit: 'bca9a846d', depends: ['C2'],
     decided: '全視窗開新分頁（操作者 2026-11-05：嵌在側欄旁可操作版面太小）：頁面放無側欄區，側欄連結開新分頁，登入照管。門的架構照 ADR 018：員工門＝app 這一頁；客戶門＝將來啟用既有的產品子網域 door（同一 next-admin、host 路由、products.ts 一列），不另建站；塔羅／studio／mockup 銜接走同 app 的 API 與 My Designs，不跨源。',
     what: '無側欄區 app/(full)/tools/vector-pro/page.tsx（iframe＋右欄 dock 100vh）＋WebGL 偵測＋NOTICE 連結；側欄連結 target=_blank；next.config 開發用 rewrite；products.ts nav／staffPaths；tsc＋四個測試',
     files: ['NA/app/(shell)/tools/vector-pro/page.tsx', 'NA/next.config.*', 'NA/lib/portal/products.ts'],
@@ -66,7 +66,7 @@ export const STEPS = [
       done('C3.1', '無側欄全視窗頁嵌入專業版，側欄點開新分頁；失敗時給說明與回舊編輯器的連結。', 'b29753811'),
       done('C3.2', '本機開發時把 /vector-pro/ 轉到本機建置伺服器，正式站不受影響。', 'b29753811'),
       done('C3.3', '設計編輯器的側欄加「向量（專業版）」，登記與權限測試全綠。', 'b29753811'),
-      todo('C3.4', '正式站登入實開一次，介面回得了資料，截圖存紀錄。'),
+      done('C3.4', '正式站登入實開一次，介面回得了資料，截圖存紀錄。', 'bca9a846d'),
     ] },
   { n: 4, code: 'C4', group: 'D', title: '第二 dock 欄：AwareWave 獨有的十個面板', plain: '例：畫面就是 Illustrator，右邊多一欄面板，顏色、分頁高度、收合方式都跟它的面板一樣；裡面是尺寸範本、字型、調色、去背、WebP、My Designs、QR、條碼、Mockup、批次匯出。真品本來就有的（描圖、弧形文字、裁切標記…）直接用它的。',
     gate: '十個面板都在第二欄且外觀與真品面板一致（截圖並排）；調色與去背對一張選取的圖真的換圖且位置大小不變；字型面板搜到的 Google Fonts 能套到文字；測試守住十個面板清單與色值。', risk: 'Medium（新頁面；C4.3 換圖先做 spike，做不到就改契約）', model: 'Opus 5.5＋Sonnet｜已派 session vp-c4-dock-2（外殼＋轉接器）與 vp-c4-blocks-2（十面板搬移）；三條分支整合後 tsc 綠、相關測試 118/118（2026-11-05）', status: 'done', commit: '3934f17f2', depends: ['C3'],
