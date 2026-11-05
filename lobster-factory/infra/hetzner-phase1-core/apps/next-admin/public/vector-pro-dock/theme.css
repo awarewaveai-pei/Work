@@ -1,0 +1,235 @@
+/* 向量（專業版）第二 dock 欄的外觀 = 真品 VectorCraft Modern 主題（storytold/vectorcraft @ 4cce3363）。
+ * 色值：crates/ui-egui/src/theme.rs:173-306 Tokens::for_brightness（Dark = base :178-221；MediumDark :225-248；
+ *       MediumLight :249-277；Light :278-306）。升級 PIN 時重抽，測試 lib/studio/__tests__/vector-pro-dock.test.ts 守。
+ * 尺寸：crates/ui-egui/src/panel_docking.rs:36-43（欄寬 310，220–720，圖示欄 38，面板最小寬 220）；
+ *       dock_style() panel_docking.rs:1216-1226（分頁高 33、背景 panel、分頁列 tab_strip、作用中分頁 button、
+ *       文字 text_strong／inactive text_dim、1px border、accent）；craft-ui docking/surface.rs（字 12px、分頁左右內距 12、
+ *       圖示 20 + 10 = 圖示格 30）；theme.rs radius 4、font_size 13。 */
+
+#vector-pro-dock {
+  /* MediumDark = 真品預設（theme.rs:224 「Charcoal, the default」） */
+  --vp-app-bar: #1b1f27;
+  --vp-panel: #272c36;
+  --vp-panel-darker: #21262f;
+  --vp-tab-strip: #1e222a;
+  --vp-input: #1a1e26;
+  --vp-input-border: #3a414e;
+  --vp-border: #11141a;
+  --vp-divider: #323946;
+  --vp-text: #e4e9f1;
+  --vp-text-dim: #99a2b2;
+  --vp-text-strong: #ffffff;
+  --vp-hover: #353c49;
+  --vp-button: #39404d;
+  --vp-button-border: #5a6476;
+  --vp-accent: #f06a52;
+  --vp-accent-strong: #e8573f;
+
+  --vp-column-width: 310px;   /* COLUMN_WIDTH */
+  --vp-column-min: 220px;     /* COLUMN_MIN */
+  --vp-column-max: 720px;     /* COLUMN_MAX */
+  --vp-icon-width: 38px;      /* ICON_WIDTH */
+  --vp-panel-min: 220px;      /* PANEL_MIN_WIDTH */
+  --vp-tab-height: 33px;      /* dock_style tab_height */
+  --vp-pad: 10px;             /* R0-PLAN C4.1 內距 10 */
+  --vp-radius: 4px;           /* Tokens.radius */
+  --vp-font: 13px;            /* Tokens.font_size */
+  --vp-tab-font: 12px;        /* DockStyle font */
+  --vp-icon: 20px;            /* DockStyle icon_size */
+  --vp-header: 14px;          /* craft-ui chrome TITLE_HEIGHT */
+}
+
+#vector-pro-dock[data-brightness="dark"] {
+  --vp-app-bar: #0b0d12;
+  --vp-panel: #181b22;
+  --vp-panel-darker: #13161c;
+  --vp-tab-strip: #0f1116;
+  --vp-input: #0f1116;
+  --vp-input-border: #2c323e;
+  --vp-border: #06070a;
+  --vp-divider: #232832;
+  --vp-text: #dfe4ec;
+  --vp-text-dim: #969faf;
+  --vp-text-strong: #ffffff;
+  --vp-hover: #262b35;
+  --vp-button: #282d37;
+  --vp-button-border: #4a5363;
+  --vp-accent: #f06a52;
+  --vp-accent-strong: #e8573f;
+}
+
+#vector-pro-dock[data-brightness="mediumLight"] {
+  --vp-app-bar: #c4cad4;
+  --vp-panel: #d3d8e0;
+  --vp-panel-darker: #c9cfd8;
+  --vp-tab-strip: #c4cad4;
+  --vp-input: #e9ecf1;
+  --vp-input-border: #9aa2b0;
+  --vp-border: #a9b0bc;
+  --vp-divider: #bcc3ce;
+  --vp-text: #1b1f27;
+  --vp-text-dim: #4a5160;
+  --vp-text-strong: #000000;
+  --vp-hover: #c5ccd6;
+  --vp-button: #c9d0da;
+  --vp-button-border: #8a93a2;
+  --vp-accent: #d9472f;
+  --vp-accent-strong: #d14a33;
+}
+
+#vector-pro-dock[data-brightness="light"] {
+  --vp-app-bar: #e6e9ee;
+  --vp-panel: #f3f5f8;
+  --vp-panel-darker: #e9ecf1;
+  --vp-tab-strip: #e6e9ee;
+  --vp-input: #ffffff;
+  --vp-input-border: #c3c9d3;
+  --vp-border: #d0d5dd;
+  --vp-divider: #dde1e8;
+  --vp-text: #1b1f27;
+  --vp-text-dim: #58606e;
+  --vp-text-strong: #000000;
+  --vp-hover: #e3e7ed;
+  --vp-button: #e3e7ed;
+  --vp-button-border: #a4abb8;
+  --vp-accent: #d9472f;
+  --vp-accent-strong: #d14a33;
+}
+
+/* ---- 欄 ---- */
+#vector-pro-dock {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: var(--vp-column-width);
+  min-width: var(--vp-column-min);
+  max-width: var(--vp-column-max);
+  height: 100%;
+  background: var(--vp-panel);
+  border-left: 1px solid var(--vp-border);
+  color: var(--vp-text);
+  font: var(--vp-font)/1.35 system-ui, -apple-system, "Segoe UI", "Noto Sans TC", sans-serif;
+  user-select: none;
+  overflow: hidden;
+}
+#vector-pro-dock *, #vector-pro-dock *::before, #vector-pro-dock *::after { box-sizing: border-box; }
+#vector-pro-dock.vp-collapsed { width: var(--vp-icon-width); min-width: var(--vp-icon-width); }
+
+/* 欄頂：» 收合鈕（Collapse to Icons／Expand Panels） */
+.vp-head {
+  flex: 0 0 var(--vp-header);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  background: var(--vp-tab-strip);
+  border-bottom: 1px solid var(--vp-border);
+}
+.vp-collapse {
+  height: var(--vp-header);
+  min-width: var(--vp-header);
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--vp-text-dim);
+  font-size: 11px;
+  line-height: var(--vp-header);
+  cursor: pointer;
+}
+.vp-collapse:hover { color: var(--vp-text-strong); background: var(--vp-hover); }
+
+/* 左緣拉寬把手（craft-ui resize-left：寬 4） */
+.vp-resize { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; cursor: ew-resize; z-index: 2; touch-action: none; }
+.vp-resize:hover, .vp-resize.vp-active { background: var(--vp-accent); }
+#vector-pro-dock.vp-collapsed .vp-resize { display: none; }
+
+/* ---- 面板群組：分頁列 33 + 內容 ---- */
+.vp-groups { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; }
+.vp-group { border-bottom: 1px solid var(--vp-border); }
+.vp-tabs {
+  display: flex;
+  align-items: stretch;
+  height: var(--vp-tab-height);
+  background: var(--vp-tab-strip);
+  border-bottom: 1px solid var(--vp-border);
+}
+.vp-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 54px;            /* min_tab_width = 12 × 2.5 + 24 */
+  padding: 0 12px;            /* TAB_PADDING 24 */
+  border: 0;
+  border-right: 1px solid var(--vp-border);
+  background: transparent;
+  color: var(--vp-text-dim);
+  font-size: var(--vp-tab-font);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.vp-tab:hover { color: var(--vp-text-strong); }
+.vp-group.vp-open .vp-tab { background: var(--vp-button); color: var(--vp-text-strong); }
+.vp-body {
+  display: none;
+  min-width: var(--vp-panel-min);
+  padding: var(--vp-pad);
+  background: var(--vp-panel);
+}
+.vp-group.vp-open .vp-body { display: block; }
+.vp-error { color: var(--vp-text-dim); font-size: 11px; }
+
+/* ---- 收成圖示欄 38：圖示格 30（icon 20 + 10），點開飛出面板 ---- */
+.vp-icons { display: none; flex-direction: column; align-items: center; padding-top: 4px; gap: 2px; }
+#vector-pro-dock.vp-collapsed .vp-icons { display: flex; }
+#vector-pro-dock.vp-collapsed .vp-groups { display: none; }
+.vp-icon {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: var(--vp-radius);
+  background: transparent;
+  color: var(--vp-text);
+  font-size: var(--vp-icon);
+  line-height: 30px;
+  cursor: pointer;
+}
+.vp-icon:hover { background: var(--vp-hover); }
+.vp-icon.vp-on { background: var(--vp-button); }
+.vp-flyout {
+  position: fixed;
+  width: var(--vp-column-width);
+  min-width: var(--vp-panel-min);
+  max-height: 80vh;
+  overflow: auto;
+  background: var(--vp-panel);
+  border: 1px solid var(--vp-border);
+  border-radius: var(--vp-radius);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  z-index: 50;
+}
+.vp-flyout .vp-tabs { cursor: default; }
+.vp-flyout .vp-body { display: block; }
+
+/* ---- 面板內常用元件（面板模組可直接用 class） ---- */
+#vector-pro-dock input, #vector-pro-dock select, #vector-pro-dock textarea {
+  background: var(--vp-input);
+  border: 1px solid var(--vp-input-border);
+  border-radius: var(--vp-radius);
+  color: var(--vp-text);
+  font: inherit;
+  padding: 3px 6px;
+}
+#vector-pro-dock input:focus, #vector-pro-dock select:focus, #vector-pro-dock textarea:focus { outline: 1px solid var(--vp-accent); }
+#vector-pro-dock button.vp-btn, #vector-pro-dock .vp-body button {
+  background: var(--vp-button);
+  border: 1px solid var(--vp-button-border);
+  border-radius: var(--vp-radius);
+  color: var(--vp-text);
+  font: inherit;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+#vector-pro-dock .vp-body button:hover { background: var(--vp-hover); }
+#vector-pro-dock .vp-body button.vp-primary { background: var(--vp-accent); border-color: var(--vp-accent-strong); color: #ffffff; }
+#vector-pro-dock hr { border: 0; border-top: 1px solid var(--vp-divider); margin: var(--vp-pad) 0; }
