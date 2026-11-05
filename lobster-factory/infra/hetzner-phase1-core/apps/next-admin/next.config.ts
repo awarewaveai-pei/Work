@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import path from "path";
 import { withSentryConfig } from "@sentry/nextjs";
+import { UNVERSIONED_PUBLIC_DIRS } from "./lib/public-asset-cache";
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -23,6 +24,16 @@ const nextConfig: NextConfig = {
       { source: "/tools/vector-editor", destination: "/tools/vector-pro", permanent: true },
       { source: "/vector-editor.html", destination: "/tools/vector-pro", permanent: true },
     ];
+  },
+  // Our own editor modules and shared styles keep fixed, unversioned URLs (ES module imports between them can't carry a
+  // build hash), and Cloudflare's 4 h browser TTL replaces Next's max-age=0 on them: after a deploy a browser kept the old
+  // dock for hours, and could mix old and new modules. no-cache = revalidate every load (a 304 when unchanged); private:
+  // these are login-gated, so no shared cache keeps them (Cloudflare keeps an origin `private`).
+  async headers() {
+    return UNVERSIONED_PUBLIC_DIRS.map((dir) => ({
+      source: `/${dir}/:path*`,
+      headers: [{ key: "Cache-Control", value: "private, no-cache" }],
+    }));
   },
   async rewrites() {
     const origin = process.env.VECTOR_PRO_DEV_ORIGIN?.trim().replace(/\/+$/, "");
