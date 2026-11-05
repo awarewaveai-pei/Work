@@ -1,4 +1,22 @@
 # Worklog
+## 2026-11-05（續12）畫布專業版（PhotoCraft）研究＋R0-PLAN＋監工台；G1 待操作者決定（只有文件，未動程式）
+
+- 根因／需求：操作者要 Canvas Editor 照向量專業版同模式換成 PhotoCraft（完整功能＋相同排版＋保留獨有功能做第二 dock 欄，只留一套）。
+- 步驟：clone `storytold/photocraft`@`98bcbfab9`（77,055★、Apache-2.0，只讀）；兩個 Explore agent 盤版面與功能，主 session 查 G1 與我方盤點；產出研究 `agency-os/reports/decisions/2026-11-05-canvas-editor-vs-photocraft.md`、計畫 `agency-os/handoffs/2026-11-05-photocraft-pro/R0-PLAN.md`（C1–C7，28 項）、監工台 `data.mjs`／`build.mjs`／`check.mjs`／`supervisor.html`（https://claude.ai/artifact/SdDBg3KBHF7A4b6ZSBCHGM）。
+- 發現：
+  - C1 G1：網頁版無 `window.photocraft`（`apps/photocraft-web/src/main.rs:8`）；控制協定與傳輸無關、app 有 `with_control`（`crates/ui-egui/src/app/control.rs:5`）；上游 craft-libs 已合併 `craft-web-api`（#413，2026-11-05）與 `craft-web-host`，PhotoCraft 未接；上游 PR #9345／#3101 open 無維護者回覆 → 待決 1（A 等上游／B 釘接線補丁★／C 不用 API）。
+  - M1 圖層像素進出無現成指令（帶路徑指令被拒 `docs/control-protocol.md:190`）→ 計畫 C1.5 spike 為第二個閘。
+  - M2 官方網頁版 zip 13 MB；字型走 `fonts/manifest.txt` 不需補丁；語言 `auto` 在 wasm 恆為英文（`crates/ui-egui/src/i18n/system.rs:55-58`）；固定檔名三個不可長快取（nginx 規則與向量版不同，計畫 C2.3）。
+  - M3 五個上游入口全經 `components/tools/canvas-handoff.ts:98`；舊 `.design.json` 只在使用者電腦（`CanvasEditor.tsx:1716`）；退場不可刪 `fabric-filters.ts`／`editor-color-grade.ts`／`editor-bg-remove.ts`／fabric（`GradedPreview.tsx:22`、`tarot/renderPrintCard.ts`）。
+  - m1 發布監工台：`supervisor.html` 是片段，claude-artifacts `publish_files` 要完整文件 → 前面加 `<!DOCTYPE html><html lang="zh-Hant"><meta charset>` 四行另存再發（不改 `supervisor.html`，check 驗它等於 build 產物）。
+  - m2 順帶看到：`https://app.aware-wave.com/vector-pro/current/awarewave-theme-receiver.js` 回 404（2026-11-05 19 時查；向量版主題 commit `3ef5e981a` 之後是否已重建上傳，由該線 session 確認）。
+- 驗證：`node check.mjs` → `ok: 7 cards, 28 items bound to plan §6 (0 done), 3 open, page fresh`；agent 回報 file:line 抽查 15 處（版面 8、功能 7）全符；計畫／報告／data 引用的 repo 路徑 96 個存在、22 個不存在者皆為卡片將新建的檔。
+- 避免再發生：G1 與 spike 兩個閘寫進監工台「待你決定」與 C1.5；並行 session 於本次寫檔前新增 `lib/theme/frame-theme.ts`，行號已重查。
+- rollback：`git revert` 本 commit（只有文件與監工台檔）；artifact 留著無害。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd agency-os/handoffs/2026-11-05-photocraft-pro && node build.mjs && node check.mjs | exit=0 | ms=900
+- REVIEW_WAIVED: DOC_ONLY -- 研究報告、計畫與監工台資料；讀回產物、code fence 成對（報告 2、計畫 0）、路徑存在性機械核對 96/96
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=photocraft-pro | hits=21
+- ORACLE_WAIVED: 只有 .md 與監工台 data/build/check（由 supervisor-kit 範本複製，check.mjs 綠），無執行期程式碼
 ## 2026-11-05（續11）影音工作台主題連動：app 存的主題套到 video.aware-wave.com（ff40c9be7＋72f07aa77，已部署）
 
 - 根因：VW /awarewave/theme.css 只回打包 globals.css :root，app_theme 存的外觀從未到 video。
