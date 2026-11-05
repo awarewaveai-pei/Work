@@ -27,8 +27,6 @@ const COLUMN_MIN = 220;
 const COLUMN_MAX = 720;
 const STORE = "vector-pro-dock:v1";
 
-/** 真品 ui.inspect → ui.brightness 的序列化值（theme.rs Brightness 變體名）→ theme.css 的 data-brightness。 */
-const BRIGHTNESS = { Dark: "dark", MediumDark: "mediumDark", MediumLight: "mediumLight", Light: "light" };
 
 const el = (tag, cls, text) => {
   const n = document.createElement(tag);
@@ -66,6 +64,40 @@ export async function applyDefaultWorkspace(ctx) {
     localStorage.setItem(WORKSPACE_FLAG, "1");
   } catch (err) {
     console.warn("[vector-pro dock] 預設工作區未套用", err);
+  }
+}
+
+/** VectorCraft 本體明暗跟 app 主題：--body-bg 亮 → Light，暗 → MediumDark（真品 theme.rs:9-33 Brightness id；
+ *  ui.set {brightness} = control.rs:638 → window.brightness）。只在使用者沒在 VectorCraft 自己改過時套用：
+ *  記下我們上次套的值，現值不同 = 使用者選過，從此不碰。 */
+const BRIGHTNESS_FLAG = "vector-pro-dock:brightness-applied:v1";
+
+export function themeIsLight(doc = document) {
+  const probe = doc.createElement("span");
+  probe.style.cssText = "position:absolute;visibility:hidden;background:var(--body-bg)";
+  doc.body.appendChild(probe);
+  const m = getComputedStyle(probe).backgroundColor.match(/[\d.]+/g) || [];
+  probe.remove();
+  const [r, g, b, a = 1] = m.map(Number);
+  if (![r, g, b].every(Number.isFinite) || a === 0) return null; // 沒有 --body-bg（透明）= 不判斷
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b >= 128;
+}
+
+export async function followThemeBrightness(ctx) {
+  try {
+    const light = themeIsLight();
+    if (light === null) return;
+    const want = light ? "light" : "mediumDark";
+    await ctx.ready();
+    const api = globalThis.__vectorProFrame?.contentWindow?.vectorcraft;
+    const raw = String((await api.inspect())?.ui?.brightness ?? ""); // 序列化為變體名 "MediumDark"
+    const cur = raw.charAt(0).toLowerCase() + raw.slice(1);
+    const applied = localStorage.getItem(BRIGHTNESS_FLAG);
+    if (applied && applied !== cur) return; // 使用者自己選過
+    if (cur !== want) await api.request("ui.set", { brightness: want });
+    localStorage.setItem(BRIGHTNESS_FLAG, want);
+  } catch (err) {
+    console.warn("[vector-pro dock] VectorCraft 明暗未套用", err);
   }
 }
 
@@ -159,8 +191,8 @@ export async function mountDock(root, ctx = createVectorcraftCtx()) {
   for (const p of panels) {
     const group = el("section", "vp-group");
     group.dataset.panel = p.id;
-    const tabs = el("div", "vp-tabs");
-    const tab = el("button", "vp-tab");
+    const tabs = el("div", "tab-bar vp-tabs");
+    const tab = el("button", "tab vp-tab");
     tab.type = "button";
     tab.append(el("span", null, p.icon), el("span", null, p.title));
     tabs.appendChild(tab);
@@ -169,6 +201,7 @@ export async function mountDock(root, ctx = createVectorcraftCtx()) {
     groups.appendChild(group);
     const setOpen = (on) => {
       group.classList.toggle("vp-open", on);
+      tab.classList.toggle("tab--active", on);
       if (on && !p.body) {
         p.body = body;
         mountInto(p, body);
@@ -189,11 +222,11 @@ export async function mountDock(root, ctx = createVectorcraftCtx()) {
     if (!flyout) return;
     flyout.home.appendChild(flyout.panel.body); // home = 群組 section，body 回到分頁列下方
     flyout.box.remove();
-    flyout.button.classList.remove("vp-on");
+    flyout.button.classList.remove("tab--active");
     flyout = null;
   }
   for (const p of panels) {
-    const b = el("button", "vp-icon", p.icon);
+    const b = el("button", "tab vp-icon", p.icon);
     b.type = "button";
     b.title = p.title;
     icons.appendChild(b);
@@ -207,16 +240,16 @@ export async function mountDock(root, ctx = createVectorcraftCtx()) {
         p.body = group.querySelector(".vp-body");
         mountInto(p, p.body);
       }
-      const box = el("div", "vp-flyout");
-      const tabs = el("div", "vp-tabs");
-      const tab = el("div", "vp-tab", p.title);
+      const box = el("div", "card vp-flyout");
+      const tabs = el("div", "tab-bar vp-tabs");
+      const tab = el("div", "tab tab--active vp-tab", p.title);
       tabs.appendChild(tab);
       box.append(tabs, p.body);
       root.appendChild(box);
       const r = root.getBoundingClientRect();
       box.style.top = `${Math.max(0, Math.min(b.getBoundingClientRect().top, window.innerHeight - box.offsetHeight - 8))}px`;
       box.style.right = `${window.innerWidth - r.left}px`;
-      b.classList.add("vp-on");
+      b.classList.add("tab--active");
       flyout = { panel: p, box, home, button: b };
     });
   }
@@ -225,23 +258,7 @@ export async function mountDock(root, ctx = createVectorcraftCtx()) {
 
   setCollapsed(state.collapsed);
 
-  // 顏色跟著真品亮度（ui.inspect → ui.brightness）；載入後一次，之後滑進欄時再對一次。
-  let syncing = false;
-  const syncBrightness = async () => {
-    if (syncing) return;
-    syncing = true;
-    try {
-      await ctx.ready();
-      const api = (globalThis.__vectorProFrame || {}).contentWindow?.vectorcraft;
-      const b = BRIGHTNESS[(await api?.inspect())?.ui?.brightness];
-      if (b) root.dataset.brightness = b;
-    } catch {
-    } finally {
-      syncing = false;
-    }
-  };
-  syncBrightness();
-  root.addEventListener("pointerenter", syncBrightness);
+  followThemeBrightness(ctx);
   applyDefaultWorkspace(ctx);
 
   return { ctx, panels };

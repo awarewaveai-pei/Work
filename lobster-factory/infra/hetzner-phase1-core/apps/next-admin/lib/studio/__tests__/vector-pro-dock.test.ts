@@ -1,8 +1,10 @@
 // 向量（專業版）第二 dock 欄（R0-PLAN §6 C4.4）：
 // (1) dock.js 註冊表 = 十個面板 id；(2) ctx-vectorcraft.js 對 mock window.vectorcraft，每個契約方法一條；
-// (3) theme.css 色值 = 真品 storytold/vectorcraft crates/ui-egui/src/theme.rs:173-306（寫死於此，升級 PIN 時重抽）。
+// (3) 不變量（操作者 2026-11-05「要用統一的 class，這樣我改 theme 才會套用」）：dock 與面板的顏色只來自 app 主題 token，
+//     零字面色；面板用 app 統一 class，不用舊 vector-editor 的 act／ghost。
 import fs from "node:fs";
 import path from "node:path";
+import { build } from "esbuild";
 import { describe, expect, it } from "vitest";
 import { createVectorcraftCtx } from "../../../public/editor-shared/ctx-vectorcraft.js";
 
@@ -155,32 +157,98 @@ describe("ctx-vectorcraft.js 契約（mock vectorcraft）", () => {
   });
 });
 
-// ---- theme.css = theme.rs Modern tokens（抽樣：每組 app_bar/panel/tab_strip/input/border/text/accent） ----
-const THEME_RS: Record<string, Record<string, string>> = {
-  // theme.rs:178-221（base = Dark）
-  dark: { "app-bar": "#0b0d12", panel: "#181b22", "tab-strip": "#0f1116", input: "#0f1116", border: "#06070a", text: "#dfe4ec", accent: "#f06a52" },
-  // theme.rs:225-248
-  mediumDark: { "app-bar": "#1b1f27", panel: "#272c36", "tab-strip": "#1e222a", input: "#1a1e26", border: "#11141a", text: "#e4e9f1", accent: "#f06a52" },
-  // theme.rs:249-277
-  mediumLight: { "app-bar": "#c4cad4", panel: "#d3d8e0", "tab-strip": "#c4cad4", input: "#e9ecf1", border: "#a9b0bc", text: "#1b1f27", accent: "#d9472f" },
-  // theme.rs:278-306
-  light: { "app-bar": "#e6e9ee", panel: "#f3f5f8", "tab-strip": "#e6e9ee", input: "#ffffff", border: "#d0d5dd", text: "#1b1f27", accent: "#d9472f" },
-};
+// ---- 主題不變量 ----
+const ROOT_TOKENS = (() => {
+  const css = read("app/globals.css");
+  const root = css.slice(css.indexOf(":root {"), css.indexOf("\n}", css.indexOf(":root {")));
+  return new Set([...root.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]));
+})();
+const BLOCKS_DIR = "public/editor-shared/blocks";
+const blockFiles = () => fs.readdirSync(path.join(APP, BLOCKS_DIR)).filter((f) => f.endsWith(".js")).map((f) => `${BLOCKS_DIR}/${f}`);
+const HEX = /#[0-9a-fA-F]{3,8}\b/;
+const FUNC_COLOR = /\b(?:rgba?|hsla?)\(/;
+/** 只看樣式：style="…"、.style.x = …、cssText、fillStyle 以外的 CSS 文字（面板裡的 #ffffff 預設值、畫布 fillStyle 是資料不是樣式）。 */
+const styleSnippets = (src: string) => [
+  ...[...src.matchAll(/style\s*=\s*\\?["']([^"'\\]*)/g)].map((m) => m[1]),
+  ...[...src.matchAll(/\.style\.(?!cssText)[a-zA-Z]+\s*=\s*([^;\n]+)/g)].map((m) => m[1]),
+  ...[...src.matchAll(/cssText\s*=\s*([^;\n]+)/g)].map((m) => m[1]),
+];
+const unknownVars = (src: string, own: Set<string>) =>
+  [...src.matchAll(/var\(\s*(--[a-z0-9-]+)/g)].map((m) => m[1]).filter((v) => !ROOT_TOKENS.has(v) && !own.has(v));
 
-describe("theme.css 色值 = 真品 theme.rs", () => {
-  const css = read("public/vector-pro-dock/theme.css");
-  const block = (selector: string) => {
-    const i = css.indexOf(`${selector} {`);
-    expect(i, selector).toBeGreaterThanOrEqual(0);
-    return css.slice(i, css.indexOf("}", i));
-  };
-  const tokens = (body: string) => Object.fromEntries([...body.matchAll(/--vp-([a-z-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim().toLowerCase()]));
-  it.each(Object.keys(THEME_RS))("%s", (b) => {
-    const t = tokens(block(b === "mediumDark" ? "#vector-pro-dock" : `#vector-pro-dock[data-brightness="${b}"]`));
-    for (const [k, v] of Object.entries(THEME_RS[b])) expect(t[k], `${b} --vp-${k}`).toBe(v);
+describe("dock 顏色只來自主題 token", () => {
+  const css = read("public/vector-pro-dock/theme.css").replace(/\/\*[\s\S]*?\*\//g, "");
+  // --swatch：色相範圍本身的顏色（資料色），由 blocks/color-grade.js 設在按鈕上；唯一允許的非主題變數
+  const own = new Set([...[...css.matchAll(/(--vp-[a-z0-9-]+)\s*:/g)].map((m) => m[1]), "--swatch"]);
+  it("theme.css 無字面色（#hex／rgb()／hsl()），--vp-* 只放版面尺寸", () => {
+    expect(css.match(HEX)).toBeNull();
+    expect(css.match(FUNC_COLOR)).toBeNull();
+    for (const m of css.matchAll(/--vp-[a-z0-9-]+\s*:\s*([^;]+);/g)) expect(m[1].trim(), m[0]).toMatch(/^\d+px$/);
   });
-  it("尺寸 = panel_docking.rs:36-43 與 dock_style tab_height 33", () => {
-    const t = tokens(block("#vector-pro-dock"));
+  it("theme.css 用到的 var() 都是 globals.css :root 的 token", () => {
+    expect(unknownVars(css, own)).toEqual([]);
+  });
+  it("dock.js 無字面色，元件用 app 統一 class", () => {
+    const js = read("public/vector-pro-dock/dock.js");
+    expect(js.match(HEX)).toBeNull();
+    expect(js.match(FUNC_COLOR)).toBeNull();
+    for (const cls of ["tab-bar", "tab tab--active", "card vp-flyout"]) expect(js).toContain(cls);
+  });
+  it("尺寸 = 真品 panel_docking.rs:36-43 與 dock_style tab_height 33", () => {
+    const t = Object.fromEntries([...css.matchAll(/--vp-([a-z-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
     expect([t["column-width"], t["column-min"], t["column-max"], t["icon-width"], t["panel-min"], t["tab-height"]]).toEqual(["310px", "220px", "720px", "38px", "220px", "33px"]);
+  });
+});
+
+describe("面板模組（editor-shared/blocks）用統一 class、樣式只用主題 token", () => {
+  it.each(blockFiles())("%s", (f) => {
+    const src = read(f);
+    const classes = [...src.matchAll(/class(?:Name)?\s*[=:]\s*\\?["'`]([^"'`\\]*)/g)].flatMap((m) => m[1].split(/\s+/));
+    expect(classes.filter((c) => c === "act" || c === "ghost"), "舊 class act→btn btn-primary、ghost→btn btn-secondary").toEqual([]);
+    for (const snip of styleSnippets(src)) {
+      expect(snip.match(HEX), `${f} 樣式字面色：${snip}`).toBeNull();
+      expect(snip.match(FUNC_COLOR), `${f} 樣式字面色：${snip}`).toBeNull();
+    }
+    expect(unknownVars(src, new Set()), `${f} 用了主題沒有的變數`).toEqual([]);
+  });
+});
+
+// ---- 每個瀏覽器模組都能載入（關整類：2026-11-05 blocks/color-grade.js:108 行中註解吞掉程式，
+//      color-grade／bg-remove／my-designs 三個面板整個載入失敗，而全套 vitest 是綠的，因為沒有測試載入面板模組） ----
+// 做法：esbuild 把模組連同它 import 的 /editor-shared/… 打包（站台絕對路徑對到 public/），再以 data: URL import。
+// 選 esbuild 而非 node --check（next-admin 無 "type":"module"，.js 會被當 CJS，import 語法誤判）或
+// vm.SourceTextModule（要 --experimental-vm-modules 旗標，vitest worker 沒開）；esbuild 已是依賴、同進程、
+// 錯誤訊息帶 file:line，而且連被 import 的檔案一起檢查。只載入模組本體，不執行 mount／不掛 dock（node 無 document）。
+const PUBLIC = path.join(APP, "public");
+async function loadModule(rel: string) {
+  const out = await build({
+    entryPoints: [path.join(APP, rel)],
+    bundle: true,
+    format: "esm",
+    platform: "neutral",
+    write: false,
+    logLevel: "silent",
+    plugins: [{
+      name: "site-root",
+      setup(b) {
+        b.onResolve({ filter: /^\/(editor-shared|vector-pro-dock)\// }, (a) => ({ path: path.join(PUBLIC, a.path) }));
+      },
+    }],
+  });
+  const code = out.outputFiles[0].text;
+  return import(/* @vite-ignore */ `data:text/javascript;base64,${Buffer.from(code).toString("base64")}`);
+}
+
+describe("瀏覽器模組都能被解析與載入成 ES module", () => {
+  it.each(["public/vector-pro-dock/dock.js", "public/editor-shared/ctx-vectorcraft.js"])("%s", async (rel) => {
+    const mod = await loadModule(rel);
+    expect(Object.keys(mod).length).toBeGreaterThan(0);
+  });
+  it.each(blockFiles())("%s：default export 有 id／title／mount", async (rel) => {
+    const mod = await loadModule(rel);
+    const d = mod.default;
+    expect(d?.id).toBe(path.basename(rel, ".js"));
+    expect(typeof d?.title).toBe("string");
+    expect(typeof d?.mount).toBe("function");
   });
 });
