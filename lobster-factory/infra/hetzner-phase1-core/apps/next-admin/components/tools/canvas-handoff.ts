@@ -6,9 +6,13 @@
  * Banner results are multi-MB base64 data URLs that BLOW the ~5MB sessionStorage quota —
  * setItem throws QuotaExceededError, which used to be swallowed → the editor opened blank
  * ("沒有把圖帶入 canvas"). So when sessionStorage fails we fall back to IndexedDB (no
- * practical size cap) and leave a sentinel flag. CanvasEditor's readCanvasSource() checks
- * sessionStorage, then the flag → IndexedDB. Tiny standalone module so importers don't pull
- * in either component.
+ * practical size cap) and leave a sentinel flag. Readers check sessionStorage, then the flag → IndexedDB.
+ * Tiny standalone module so importers don't pull in either component.
+ *
+ * Which editor (R0-PLAN 2026-11-05-photocraft-pro C7.1): one table, CANVAS_TARGETS, picks the editor from the design's
+ * source file (.vectorcraft/.svg → VectorCraft, anything else or none → PhotoCraft). The handoff carries that editor id;
+ * the pro editors' frame (ProEditorFrame) takes it with takeCanvasHandoff(editor) and leaves another editor's handoff
+ * alone. A taken handoff is cleared (the editor opens it as a document; a reload starts empty).
  */
 
 import { bucketDownloadHref } from "@/lib/storage/download-href";
@@ -17,6 +21,24 @@ export const CANVAS_SOURCE_KEY = "canvas:source-image";
 export const CANVAS_NAME_KEY = "canvas:source-name";
 /** Sentinel: set when the source image was stashed in IndexedDB instead of sessionStorage. */
 export const CANVAS_IDB_FLAG = "canvas:source-in-idb";
+/** JSON { editor, source? } of a handoff meant for a pro editor (absent = an old-style handoff for the Fabric editor). */
+export const CANVAS_TARGET_KEY = "canvas:target";
+
+export type CanvasEditorId = "photocraft" | "vectorcraft";
+/** A design's editable original (My Designs `source_url` + `metadata.source_name`). */
+export type CanvasSourceFile = { url: string; name: string };
+
+/** Where a design is edited, by its source file's extension. First match wins; the last row (no `exts`) takes the rest. */
+export const CANVAS_TARGETS: readonly { editor: CanvasEditorId; staffHref: string; exts?: readonly string[] }[] = [
+  { editor: "vectorcraft", staffHref: "/tools/vector-pro", exts: [".vectorcraft", ".svg"] },
+  { editor: "photocraft", staffHref: "/tools/photo-pro" },
+];
+
+export function canvasTarget(sourceName?: string | null): { editor: CanvasEditorId; staffHref: string } {
+  const name = (sourceName ?? "").toLowerCase();
+  const row = CANVAS_TARGETS.find((t) => !t.exts || t.exts.some((e) => name.endsWith(e)))!;
+  return { editor: row.editor, staffHref: row.staffHref };
+}
 
 const IDB_DB = "canvas-handoff";
 const IDB_STORE = "kv";
@@ -84,18 +106,24 @@ async function idbDel(key: string): Promise<void> {
 
 /**
  * Stash the image (and an optional base filename for the editor's download) and navigate
- * to the Fabric editor. Full nav = clean fabric load. `baseName` carries the semantic
+ * to the editor. Full nav = clean fabric load. `baseName` carries the semantic
  * 產品-主圖名稱-風格 across the handoff so the canvas export isn't named canvas-design.png.
  *
  * Async: when the image overflows sessionStorage we MUST await the IndexedDB write before
  * navigating, otherwise window.location.assign would unload the page mid-write. Callers
  * invoke this fire-and-forget from onClick — the returned promise is harmless to ignore.
  */
-export const CANVAS_STAFF_HREF = "/tools/canvas";
+export const CANVAS_STAFF_HREF = canvasTarget().staffHref;
 
-/** `href` is where the canvas lives on this page: `useDoorHref(CANVAS_STAFF_HREF)` -- /tools/canvas for staff, the design
- *  door's canvas page there, null (hide the button) on a door without one. */
-export async function openInCanvas(image: string, baseName: string | undefined, href: string): Promise<void> {
+/** `href` is where the target editor lives on this page: `useDoorHref(canvasTarget(source?.name).staffHref)` --
+ *  CANVAS_STAFF_HREF for an image, /tools/vector-pro for a vector source; the design door's page there, null (hide the
+ *  button) on a door without one. `source`: the design's editable original, opened instead of the image. */
+export async function openInCanvas(image: string, baseName: string | undefined, href: string, source?: CanvasSourceFile): Promise<void> {
+  try {
+    sessionStorage.setItem(CANVAS_TARGET_KEY, JSON.stringify({ editor: canvasTarget(source?.name).editor, ...(source ? { source } : {}) }));
+  } catch {
+    /* sessionStorage unavailable → the editor finds no handoff (opens empty) */
+  }
   let stashed = false;
   // Fast path: small payloads (short R2/gallery URLs) live in sessionStorage.
   try {
@@ -126,13 +154,14 @@ export async function openInCanvas(image: string, baseName: string | undefined, 
 }
 
 /**
- * Read back the stashed source image on the editor side. Checks sessionStorage first
- * (preserves the previous refresh-keeps-image behaviour for small payloads), then the
- * IndexedDB sentinel — consuming the IDB entry so a future session can't inherit a stale
- * multi-MB image. Returns null when no handoff is pending.
+ * Fabric editor (CanvasEditor, until card C7.2) only: read back an old-style stashed image. A handoff addressed to a pro
+ * editor (CANVAS_TARGET_KEY set) is not its to take. Checks sessionStorage first (preserves the previous
+ * refresh-keeps-image behaviour for small payloads), then the IndexedDB sentinel — consuming the IDB entry so a future
+ * session can't inherit a stale multi-MB image. Returns null when no handoff is pending.
  */
 export async function readCanvasSource(): Promise<string | null> {
   try {
+    if (sessionStorage.getItem(CANVAS_TARGET_KEY)) return null;
     const inline = sessionStorage.getItem(CANVAS_SOURCE_KEY);
     if (inline) return inline;
     if (sessionStorage.getItem(CANVAS_IDB_FLAG) === "1") {
@@ -145,6 +174,51 @@ export async function readCanvasSource(): Promise<string | null> {
     /* storage unavailable → no handoff */
   }
   return null;
+}
+
+/** What a pro editor's dock opens: a same-origin URL to fetch and the file name to open it as. */
+export type ProEditorHandoff = { url: string; name: string };
+
+const IMAGE_EXT: Record<string, string> = { png: "png", jpg: "jpg", jpeg: "jpg", webp: "webp", gif: "gif" };
+
+/** `<base>.<ext>` for the handed-off image: ext from a data: URL's MIME or a URL's path, else png. */
+export function handoffImageName(image: string, base: string | null): string {
+  const kind = (/^data:image\/([a-z0-9.+-]+)[;,]/i.exec(image)?.[1] ?? /\.([a-z0-9]{2,5})(?:[?#]|$)/i.exec(image.split(/[?#]/)[0] + "#")?.[1] ?? "").toLowerCase();
+  return `${base || "canvas"}.${IMAGE_EXT[kind] ?? "png"}`;
+}
+
+/**
+ * A pro editor's side: take the pending handoff if it is addressed to `editor`, else leave it for its own editor and
+ * return null. Taken = every key cleared (sessionStorage and IndexedDB). The source file, when there is one, is opened
+ * instead of the image; remote URLs go through the same-origin bucket download route (toCanvasSrc: the bucket is
+ * cross-origin, so CORS blocks a direct fetch), data: URLs pass as they are.
+ */
+export async function takeCanvasHandoff(editor: CanvasEditorId): Promise<ProEditorHandoff | null> {
+  try {
+    const raw = sessionStorage.getItem(CANVAS_TARGET_KEY);
+    if (!raw) return null;
+    let target: { editor?: unknown; source?: { url?: unknown; name?: unknown } } | null = null;
+    try {
+      target = JSON.parse(raw);
+    } catch {
+      /* unreadable target = nobody's: cleared below */
+    }
+    if (target && target.editor !== editor) return null;
+    const inline = sessionStorage.getItem(CANVAS_SOURCE_KEY);
+    const inIdb = sessionStorage.getItem(CANVAS_IDB_FLAG) === "1";
+    const base = sessionStorage.getItem(CANVAS_NAME_KEY);
+    for (const k of [CANVAS_TARGET_KEY, CANVAS_SOURCE_KEY, CANVAS_IDB_FLAG, CANVAS_NAME_KEY]) sessionStorage.removeItem(k);
+    const image = inline ?? (inIdb ? await idbGet(IDB_IMAGE_KEY).catch(() => null) : null);
+    if (inIdb) void idbDel(IDB_IMAGE_KEY);
+    if (!target) return null;
+    const src = target.source;
+    if (src && typeof src.url === "string" && src.url && typeof src.name === "string" && src.name) {
+      return { url: toCanvasSrc(src.url), name: src.name };
+    }
+    return image ? { url: toCanvasSrc(image), name: handoffImageName(image, base) } : null;
+  } catch {
+    return null; // storage unavailable → no handoff
+  }
 }
 
 /**

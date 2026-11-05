@@ -10,7 +10,7 @@ import {
   buildMaskSvg,
   type EdgeMaskId,
 } from "@/lib/studio/edge-mask";
-import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
+import { CANVAS_STAFF_HREF, canvasTarget, openInCanvas } from "@/components/tools/canvas-handoff";
 import { useDoorHref } from "@/app/DoorContext";
 import { bucketDownloadHref } from "@/lib/storage/download-href";
 
@@ -26,6 +26,8 @@ interface AssetMetadata {
   style_tags?: string[] | null;
   /** Main subject (tarot subject override / studio subject) — feeds the download filename. */
   subject?: string | null;
+  /** File name of the editable original saved beside the image (lib/studio/design-source.ts). */
+  source_name?: string | null;
 }
 
 interface VideoAssetMetadata {
@@ -43,6 +45,8 @@ interface DesignAsset {
   byte_size: number | null;
   created_at: string;
   metadata: AssetMetadata | null;
+  /** Public URL of the editable original, when there is one (design-source.ts withSourceUrls). */
+  source_url?: string | null;
 }
 
 interface VideoAsset {
@@ -257,7 +261,15 @@ function Chips({
 }
 
 export default function DesignsGallery({ initialTab = "designs" }: { initialTab?: ActiveTab }) {
+  // Edit opens the design in its editor (canvas-handoff.ts CANVAS_TARGETS): a vector original in VectorCraft, anything
+  // else in PhotoCraft. Both hrefs up front: hooks can't be called per row.
   const canvasHref = useDoorHref(CANVAS_STAFF_HREF);
+  const vectorHref = useDoorHref(canvasTarget(".vectorcraft").staffHref);
+  const editTarget = (asset: DesignAsset) => {
+    const source = asset.source_url && asset.metadata?.source_name ? { url: asset.source_url, name: asset.metadata.source_name } : undefined;
+    const vector = canvasTarget(source?.name).editor === "vectorcraft";
+    return { source, vector, href: vector ? vectorHref : canvasHref };
+  };
   const publishHref = useDoorHref("/tools/publish");
   /* ── tab ── */
   const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab);
@@ -1289,14 +1301,17 @@ export default function DesignsGallery({ initialTab = "designs" }: { initialTab?
                       className="designs-kebab-menu"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {asset.object_url && canvasHref ? (
-                        <button
-                          className="designs-kebab-item"
-                          onClick={() => { setOpenMenuId(null); openInCanvas(asset.object_url!, designBaseName(asset), canvasHref); }}
-                        >
-                          🎨 Canvas 編輯
-                        </button>
-                      ) : null}
+                      {(() => {
+                        const t = editTarget(asset);
+                        return asset.object_url && t.href ? (
+                          <button
+                            className="designs-kebab-item"
+                            onClick={() => { setOpenMenuId(null); openInCanvas(asset.object_url!, designBaseName(asset), t.href!, t.source); }}
+                          >
+                            {t.vector ? "✒ 向量編輯" : "🎨 畫布編輯"}
+                          </button>
+                        ) : null;
+                      })()}
                       {asset.object_url ? (
                         <button
                           className="designs-kebab-item"

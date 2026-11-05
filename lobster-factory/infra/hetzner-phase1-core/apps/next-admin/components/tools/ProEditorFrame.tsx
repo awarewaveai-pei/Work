@@ -1,15 +1,18 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { takeCanvasHandoff, type CanvasEditorId, type ProEditorHandoff } from "./canvas-handoff";
 import "./pro-editor-frame.css";
 
 // One frame for every Craft editor (VectorCraft, PhotoCraft; agency-os/handoffs/2026-11-05-photocraft-pro/R0-PLAN.md C3.1):
 // the editor's static web build in an iframe + our dock beside it. The dock's only link to this page is
-// window.__proEditor = { editor, frame }; the dock script is a module the page loads and may be missing (it then
-// runs without the dock). No theme link: the Craft editors keep their own dark/light (operator 2026-11-06).
+// window.__proEditor = { editor, frame, handoff }; the dock script is a module the page loads and may be missing (it then
+// runs without the dock). handoff = the design another tool sent here (canvas-handoff.ts openInCanvas), taken once if it
+// is addressed to this editor; the dock opens it once the editor is ready (C7.1).
+// No theme link: the Craft editors keep their own dark/light (operator 2026-11-06).
 
 export type ProEditorFrameProps = {
-  /** Editor id, also handed to the dock ("vectorcraft", "photocraft"). */
-  editor: string;
+  /** Editor id, also handed to the dock; the handoff table's id (canvas-handoff.ts CANVAS_TARGETS). */
+  editor: CanvasEditorId;
   /** Entry file of the editor's web build (nginx static; locally next.config.ts rewrites it to a dev origin). */
   frameSrc: string;
   /** Our dock module (public/<editor>-dock/dock.js, served by next-admin; not under the build's nginx prefix). */
@@ -24,7 +27,12 @@ export type ProEditorFrameProps = {
   product: string;
 };
 
-export type ProEditorLink = { editor: string; frame: HTMLIFrameElement | null };
+export type ProEditorLink = {
+  editor: CanvasEditorId;
+  frame: HTMLIFrameElement | null;
+  /** Resolves to the design to open, or null. A promise: the handoff may sit in IndexedDB. */
+  handoff: Promise<ProEditorHandoff | null>;
+};
 
 declare global {
   interface Window { __proEditor?: ProEditorLink | null }
@@ -40,6 +48,9 @@ function hasWebGL2(): boolean {
 
 export function ProEditorFrame({ editor, frameSrc, dockSrc, dockId, fallback, title, product }: ProEditorFrameProps) {
   const frame = useRef<HTMLIFrameElement>(null);
+  // Taken once per page: a ref survives React's dev double-run of effects, which would otherwise take and clear the
+  // handoff in the first run and find nothing in the second.
+  const handoff = useRef<Promise<ProEditorHandoff | null> | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const noticeHref = `${frameSrc.split(/[?#]/)[0].replace(/[^/]*$/, "")}NOTICE`;
 
@@ -50,11 +61,13 @@ export function ProEditorFrame({ editor, frameSrc, dockSrc, dockId, fallback, ti
     }
     // An iframe fires no error on a 404, so ask for the entry file first.
     let live = true;
-    fetch(frameSrc, { method: "HEAD", cache: "no-store" })
-      .then((r) => { if (live && !r.ok) setFailure(`專業版檔案讀不到（HTTP ${r.status}）。`); })
-      .catch(() => { if (live) setFailure("專業版檔案讀不到（網路錯誤）。"); });
+    const reachable = fetch(frameSrc, { method: "HEAD", cache: "no-store" })
+      .then((r) => { if (live && !r.ok) setFailure(`專業版檔案讀不到（HTTP ${r.status}）。`); return r.ok; })
+      .catch(() => { if (live) setFailure("專業版檔案讀不到（網路錯誤）。"); return false; });
     // The dock reads the frame from here. Its script may not be deployed yet: a failed load leaves the page as it is.
-    window.__proEditor = { editor, frame: frame.current };
+    // The handoff is taken (and cleared) only once the editor's files answer: on a failure it stays for a retry.
+    handoff.current ??= reachable.then((ok) => (ok ? takeCanvasHandoff(editor) : null));
+    window.__proEditor = { editor, frame: frame.current, handoff: handoff.current };
     const dock = document.createElement("script");
     dock.type = "module";
     dock.src = dockSrc;

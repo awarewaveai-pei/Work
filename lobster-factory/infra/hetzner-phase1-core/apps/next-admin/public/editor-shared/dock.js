@@ -176,7 +176,25 @@ export async function mountDock(root, { makeCtx, panelIds, storeKey, sizes }) {
   document.addEventListener("keydown", (e) => e.key === "Escape" && close());
   window.addEventListener("resize", () => open && place());
 
+  openHandoff(ctx, tag);
   return { ctx, panels, show, close };
+}
+
+/** C7.1：別的工具送來的設計（門頁的 __proEditor.handoff，canvas-handoff.ts openInCanvas）——編輯器就緒後開成文件。
+ *  沒有交接就什麼都不做；失敗只顯示訊息，不影響 dock。 */
+export async function openHandoff(ctx, tag = "[pro dock]") {
+  let h = null;
+  try {
+    h = await globalThis.__proEditor?.handoff;
+    if (!h) return;
+    await ctx.ready();
+    const r = await fetch(h.url);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    await ctx.openFile(await r.blob(), h.name);
+  } catch (err) {
+    console.error(tag, "交接的設計開不起來", err);
+    ctx.info?.(`❌ 帶入的設計開不起來：${err?.message || err}`);
+  }
 }
 
 /** 頁面就緒後把 dock 掛進 #rootId 一次（重複載入同一 script 不重掛）；掛好後以 mountDock 的結果呼叫 then。 */
