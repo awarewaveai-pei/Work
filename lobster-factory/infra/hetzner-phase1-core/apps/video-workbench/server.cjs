@@ -42,6 +42,7 @@ function createServer({
   // X-VW-User-Id + X-VW-Org-Id that nginx auth_request set, and each org gets its own <dataDir>/orgs/<orgId>/.
   // Local mode (unset) keeps the single dataDir exactly as before. One createApi per org (own queue, state, ledger).
   const trustProxy = env.VW_TRUST_PROXY_IDENTITY === "1";
+  const savedTheme = require("./backend/appearance.cjs").savedTheme({ env, fetchImpl });
   const orgs = new Map();
   const local = trustProxy ? null : { dir: dataDir, api: createApi(dataDir) };
   const forOrg = (orgId) => {
@@ -100,10 +101,8 @@ function createServer({
         pathname === "/awarewave/theme.css" ||
         pathname === "/awarewave/forms.css"
       ) {
-        const content = require("./backend/appearance.cjs").appearance(
-          pathname,
-          awareWaveDir,
-        );
+        const content = require("./backend/appearance.cjs").appearance(pathname, awareWaveDir) +
+          (pathname === "/awarewave/theme.css" ? "\n" + (await savedTheme()) : "");
         res.writeHead(200, {
           "Content-Type": "text/css; charset=utf-8",
           "Cache-Control": "no-store",

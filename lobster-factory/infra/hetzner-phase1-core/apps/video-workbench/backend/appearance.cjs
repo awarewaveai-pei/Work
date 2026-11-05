@@ -24,4 +24,23 @@ function appearance(pathname, appDir) {
   }
   return null;
 }
-module.exports = { appearance, resolveSource, runtimeFiles };
+
+// Connected mode: the theme saved on app (next-admin GET /api/internal/theme/css) is appended after the bundled
+// :root so it wins. Cached 30 s; a failed fetch keeps the last good block (or none) -- the page never breaks on it.
+function savedTheme({ env, fetchImpl, ttlMs = 30000, now = Date.now }) {
+  const base = String(env.VW_INTERNAL_BASE || "").trim().replace(/\/+$/, ""), token = String(env.VW_INTERNAL_TOKEN || "").trim();
+  if (!base || !token) return async () => "";
+  let css = "", until = 0, pending = null;
+  // Concurrent requests share one in-flight fetch, so none of them gets the empty pre-fetch value.
+  return () => now() < until ? Promise.resolve(css) : (pending ||= refresh().finally(() => { until = now() + ttlMs; pending = null; }));
+  async function refresh() {
+    try {
+      const r = await fetchImpl(base + "/api/internal/theme/css", { headers: { Authorization: "Bearer " + token }, signal: AbortSignal.timeout(3000) });
+      const body = r.ok ? await r.text() : "";
+      if (/^:root\{[^{}<]*\}$/.test(body)) css = body;
+      else console.error("[vw] saved theme fetch:", r.status);
+    } catch (e) { console.error("[vw] saved theme fetch:", e.message); }
+    return css;
+  }
+}
+module.exports = { appearance, savedTheme, resolveSource, runtimeFiles };

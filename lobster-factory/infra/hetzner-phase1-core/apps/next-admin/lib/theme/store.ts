@@ -52,6 +52,11 @@ const getCachedThemeConfig = unstable_cache(fetchThemeConfig, [CACHE_TAG], {
   revalidate: 300, // 5-min background refresh as a safety net
 });
 
+/** Same cached read, but a failed read throws (for callers that must not mistake an outage for "no theme"). */
+export function loadThemeConfig(): Promise<ThemeConfig> {
+  return getCachedThemeConfig();
+}
+
 /**
  * Read saved theme overrides + sidebar layout for the single global row.
  * FAIL-OPEN: any missing config / DB error / timeout returns empty overrides.
@@ -59,7 +64,7 @@ const getCachedThemeConfig = unstable_cache(fetchThemeConfig, [CACHE_TAG], {
  */
 export async function getThemeConfig(): Promise<ThemeConfig> {
   try {
-    return await getCachedThemeConfig();
+    return await loadThemeConfig();
   } catch {
     return EMPTY;
   }

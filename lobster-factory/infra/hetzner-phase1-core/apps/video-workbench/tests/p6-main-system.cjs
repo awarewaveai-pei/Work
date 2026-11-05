@@ -51,7 +51,7 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
   const near = (a, b, msg) => assert(Math.abs(a - b) < 1e-6, `${msg}: ${a} != ${b}`);
   const { signPermit } = await import(pathToFileURL(path.join(appDir, "lib/entitlements/permit.ts")).href);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vw-p6-main-"));
-  const calls = { openai: 0, permits: [], assets: [], jobs: [], usage: [] };
+  const calls = { openai: 0, theme: 0, permits: [], assets: [], jobs: [], usage: [] };
   let permitMode = "allow", usageDown = false, assetsDown = false;
   // next-admin, as its route files answer.
   async function fetchImpl(url, options = {}) {
@@ -85,6 +85,11 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
     if (url === BASE + "/api/internal/video/workbench/jobs") {
       calls.jobs.push(JSON.parse(options.body));
       return Response.json({ ok: true, job: {} });
+    }
+    if (url === BASE + "/api/internal/theme/css") {
+      assert.equal(options.headers.Authorization, "Bearer internal-secret");
+      calls.theme++;
+      return new Response(":root{--body-bg:#112233;}", { headers: { "Content-Type": "text/css" } });
     }
     if (url === BASE + "/api/internal/video/workbench/usage") {
       if (usageDown) return Response.json({ ok: false, reason: "infrastructure_error" }, { status: 503 });
@@ -335,6 +340,24 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
     assert.deepEqual(caps.mainSystem, { organizationId: ORG });
     assert.match(fs.readFileSync(path.join(__dirname, "../shared/jobs-view.js"), "utf8"), /"\/release\?"/);
     if (fullSource) assert(fs.existsSync(path.join(appDir, "app/video/release/page.tsx")), "/release 頁必須存在");
+
+    // 8c. Theme saved on app reaches video.aware-wave.com: appended after the bundled :root (wins), cached 30 s;
+    // local mode never asks; a bad answer keeps the last good block.
+    const themeCss = (await request(port, "GET", "/awarewave/theme.css")).body;
+    assert.match(themeCss, /^:root\s*\{[\s\S]*\}\n:root\{--body-bg:#112233;\}$/);
+    await request(port, "GET", "/awarewave/theme.css");
+    assert.equal(calls.theme, 1, "30 秒內不重抓");
+    const { savedTheme } = require("../backend/appearance.cjs");
+    assert.equal(await savedTheme({ env: {}, fetchImpl: () => assert.fail("本機模式不得連主系統") })(), "");
+    let clock = 0, answer = ":root{--a:#111;}";
+    const linked = savedTheme({ env, now: () => clock, fetchImpl: async () => new Response(answer) });
+    assert.equal(await linked(), ":root{--a:#111;}");
+    clock = 31000; answer = "</style><script>x</script>";
+    let gate; const slow = savedTheme({ env, fetchImpl: () => new Promise((r) => { gate = () => r(new Response(":root{--b:#222;}")); }) });
+    const pair = [slow(), slow()]; gate();
+    assert.deepEqual(await Promise.all(pair), [":root{--b:#222;}", ":root{--b:#222;}"], "併發請求共用同一次抓取");
+    assert.equal(await linked(), ":root{--a:#111;}", "壞回應保留上一份");
+    if (fullSource) assert.match(fs.readFileSync(path.join(appDir, "app/api/internal/theme/css/route.ts"), "utf8"), /export async function GET/);
 
     // 9. Every name sent exists in the L2 route files.
     if (fullSource) {
