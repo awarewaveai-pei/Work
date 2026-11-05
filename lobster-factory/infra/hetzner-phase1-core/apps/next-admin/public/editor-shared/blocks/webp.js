@@ -7,9 +7,9 @@ export default {
   icon: "🌐",
   title: "匯出 WebP（≤200KB）",
   mount(ctx, body) {
-    body.innerHTML = '<label>檔名（不含副檔名）</label><input id="wpName" type="text" value="design">'
-      + '<label>起始 DPI</label><input id="wpPpi" type="number" value="300" min="10" step="1">'
-      + '<button class="act" id="wpGo" style="margin-top:6px;">匯出 WebP（≤200KB）</button>'
+    body.innerHTML = '<label>檔名（不含副檔名）</label><input class="form-input" id="wpName" type="text" value="design">'
+      + '<label>起始 DPI</label><input class="form-input" id="wpPpi" type="number" value="300" min="10" step="1">'
+      + '<button class="btn btn-primary" id="wpGo" style="margin-top:6px;">匯出 WebP（≤200KB）</button>'
       + '<div class="info" id="wpInfo">自動壓縮到 200KB 以內：先降品質，仍超過再縮小像素。</div>';
     const info = body.querySelector("#wpInfo");
     body.querySelector("#wpGo").onclick = async () => {

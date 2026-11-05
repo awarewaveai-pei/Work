@@ -18,6 +18,8 @@ async function uploadableDataUrl(png) {
   while (url.length > UPLOAD_MAX_CHARS && sc > 0.05) { oc.width = Math.max(1, Math.round(img.width * sc)); oc.height = Math.max(1, Math.round(img.height * sc)); g.clearRect(0, 0, oc.width, oc.height); g.drawImage(img, 0, 0, oc.width, oc.height); url = oc.toDataURL("image/webp", 0.92); sc *= 0.85; }
   return url.length > UPLOAD_MAX_CHARS ? null : url;
 }
+// The R2 public host sends no CORS headers, so a browser fetch of it fails ("Failed to fetch"): same-origin proxy (app/api/tools/designs/download/route.ts, host allowlist).
+const viaProxy = (publicUrl) => "/api/tools/designs/download?url=" + encodeURIComponent(publicUrl);
 const headers = { "Content-Type": "application/json", "x-ops-simulated-role": "operator" };
 // vector-editor.html:442-443
 const toPx = (val, unit, dpi) => { if (unit === "px") return Math.round(val); const cm = unit === "mm" ? val / 10 : val; return Math.round(cm * dpi / 2.54); };
@@ -34,11 +36,11 @@ export default {
   icon: "💾",
   title: "My Designs",
   mount(ctx, body) {
-    body.innerHTML = '<button class="act" id="saveDesign">存入 My Designs</button>'
+    body.innerHTML = '<button class="btn btn-primary" id="saveDesign">存入 My Designs</button>'
       + '<div class="info" id="mdInfo">存入＝預覽圖＋可編輯原檔（.vectorcraft）。</div>'
       + '<label>匯入舊專案（.design.json）</label><input id="mdProj" type="file" accept=".json,application/json">'
-      + '<hr><div class="row"><button class="ghost" id="mdReload">重新整理清單</button></div>'
-      + '<div id="mdList" class="fontlist" style="margin-top:6px;"></div><button class="ghost" id="mdMore" style="margin-top:6px;" hidden>載入更多</button>';
+      + '<hr><div class="row"><button class="btn btn-ghost" id="mdReload">重新整理清單</button></div>'
+      + '<div id="mdList" class="fontlist" style="margin-top:6px;"></div><button class="btn btn-ghost" id="mdMore" style="margin-top:6px;" hidden>載入更多</button>';
     const $ = (id) => body.querySelector("#" + id);
     const btn = $("saveDesign"), info = $("mdInfo");
     let cursor = null, loading = false;
@@ -66,11 +68,11 @@ export default {
       info.innerHTML = '<span class="busy">開啟中…</span>';
       try {
         if (a.source_url) {
-          const res = await fetch(a.source_url); if (!res.ok) throw new Error("HTTP " + res.status);
+          const res = await fetch(viaProxy(a.source_url), { credentials: "same-origin" }); if (!res.ok) throw new Error("HTTP " + res.status);
           if (typeof ctx.openFile !== "function") throw new Error("編輯器轉接器缺少 openFile(blob, name)");
           await ctx.openFile(await res.blob(), (a.metadata && a.metadata.source_name) || "design.vectorcraft");
         } else {
-          const res = await fetch(a.object_url); if (!res.ok) throw new Error("HTTP " + res.status);
+          const res = await fetch(viaProxy(a.object_url), { credentials: "same-origin" }); if (!res.ok) throw new Error("HTTP " + res.status);
           await ctx.placeImage(await res.blob());
         }
         info.innerHTML = a.source_url ? "✅ 已開啟設計" : "✅ 舊設計只有預覽圖，已放入畫板";

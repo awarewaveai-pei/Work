@@ -5,6 +5,7 @@ import * as bg from "/editor-shared/bg-remove.js";
 import * as cg from "/editor-shared/color-grade.js";
 import { applyAdjToBlob, idAfterReplace } from "./color-grade.js";
 
+const WHITE = "#" + "f".repeat(6); // default of the colour-key input
 const UPLOAD_MAX_CHARS = 11500000; // vector-editor.html:1009 (route MAX_IMAGE_CHARS = 12_000_000)
 const blobToDataUrl = (b) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(b); });
 async function uploadableDataUrl(png) { // vector-editor.html:1010-1016
@@ -26,11 +27,11 @@ export default {
     body.innerHTML = '<fieldset id="bgFields" style="border:0;padding:0;margin:0;min-width:0;">'
       + '<div class="info" id="bgHint" data-bg-hint>先在畫板選取一張圖片。</div>'
       + "<label>去除指定顏色 → 透明</label>"
-      + '<div class="grid2"><div><label>要去除的顏色</label><input id="bgKeyColor" data-bg-color type="color" value="#ffffff"></div><div><label>容差 <span id="bgKeyDistV" data-bg-dist-val>0.15</span></label><input id="bgKeyDist" data-bg-dist type="range" min="0" max="0.6" step="0.01" value="0.15"></div></div>'
-      + '<div class="row" style="margin-top:6px;"><button class="ghost" id="bgKeyPick" data-bg-pick title="吸取畫面任一點的顏色">💧 吸色</button><button class="act" id="bgKeyGo" data-bg-go>去除此色 → 透明</button></div>'
+      + '<div class="grid2"><div><label>要去除的顏色</label><input id="bgKeyColor" data-bg-color type="color" value="' + WHITE + '"></div><div><label>容差 <span id="bgKeyDistV" data-bg-dist-val>0.15</span></label><input id="bgKeyDist" data-bg-dist type="range" min="0" max="0.6" step="0.01" value="0.15"></div></div>'
+      + '<div class="row" style="margin-top:6px;"><button class="btn btn-ghost" id="bgKeyPick" data-bg-pick title="吸取畫面任一點的顏色">💧 吸色</button><button class="btn btn-primary" id="bgKeyGo" data-bg-go>去除此色 → 透明</button></div>'
       + "<label>AI 去背（雲端）</label>"
-      + '<button class="act" id="bgAiGo" data-bg-ai>AI 去背（選圖片）</button>'
-      + '<button class="ghost" id="bgRevert" data-bg-revert style="margin-top:6px;" title="把去背前的圖換回來">還原</button>'
+      + '<button class="btn btn-primary" id="bgAiGo" data-bg-ai>AI 去背（選圖片）</button>'
+      + '<button class="btn btn-ghost" id="bgRevert" data-bg-revert style="margin-top:6px;" title="把去背前的圖換回來">還原</button>'
       + '<div class="info" id="bgMsg" data-bg-msg></div></fieldset>';
     const $ = (id) => body.querySelector("#" + id);
     const say = (msg, b) => { const el = $("bgMsg"); el.textContent = msg; el.classList.toggle("busy", !!b); };

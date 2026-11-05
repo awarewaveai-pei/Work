@@ -60,30 +60,30 @@ export default {
     const origin = new Map(); // image id -> Blob before its first 調色 (re-grading always starts from the untouched pixels)
     body.innerHTML = '<fieldset id="cgFields" style="border:0;padding:0;margin:0;min-width:0;">'
       + '<div class="info" id="cgHint">先在畫板選取一張圖片，調好後按「套用到選取圖片」。</div>'
-      + '<div class="row" style="margin-top:6px;"><button class="ghost" id="cgReset" data-cg-reset title="全部回到中性值">重設</button><button class="act" id="cgApply" style="margin-top:0;">套用到選取圖片</button></div>'
+      + '<div class="row" style="margin-top:6px;"><button class="btn btn-ghost" id="cgReset" data-cg-reset title="全部回到中性值">重設</button><button class="btn btn-primary" id="cgApply" style="margin-top:0;">套用到選取圖片</button></div>'
       + '<div id="cgSecs"></div></fieldset>';
     const secs = body.querySelector("#cgSecs"), hint = body.querySelector("#cgHint");
     const sec = (id, title) => { const d = document.createElement("details"); d.className = "cgsec"; d.dataset.cgSec = id; const sm = document.createElement("summary"); sm.textContent = title; d.appendChild(sm); const b = document.createElement("div"); d.appendChild(b); secs.appendChild(d); return b; };
     function paint() {
       secs.querySelectorAll("input[data-cg]").forEach((el) => { const v = cg.getPath(adj, el.dataset.cg); el.value = v; const row = cg.GRADE_SECTIONS.flatMap((s) => s.rows).find((r) => r.path === el.dataset.cg); secs.querySelector('[data-cg-val="' + el.dataset.cg + '"]').textContent = cg.fmtValue(row.fmt, v); });
-      secs.querySelectorAll("[data-cg-preset]").forEach((b) => b.classList.toggle("on", (b.dataset.cgPreset || null) === adj.presetId));
+      secs.querySelectorAll("[data-cg-preset]").forEach((b) => b.classList.toggle("tab--active", (b.dataset.cgPreset || null) === adj.presetId));
       secs.querySelector("[data-cg-removewhite]").checked = !!adj.removeWhite;
-      secs.querySelectorAll("[data-cg-hsl-tab]").forEach((b) => b.classList.toggle("on", b.dataset.cgHslTab === hslTab));
+      secs.querySelectorAll("[data-cg-hsl-tab]").forEach((b) => b.classList.toggle("tab--active", b.dataset.cgHslTab === hslTab));
       secs.querySelectorAll("input[data-cg-hsl]").forEach((el) => { const v = adj.hslMixer[hslTab][el.dataset.cgHsl]; el.value = v; secs.querySelector('[data-cg-hsl-val="' + el.dataset.cgHsl + '"]').textContent = v > 0 ? "+" + v : "" + v; });
       body.querySelector("#cgReset").disabled = cg.isGradeNeutral(adj);
     }
     const set = (next) => { adj = next; paint(); };
     // 預設風格 + 去白底
     const pb = sec("presets", "預設風格 Presets"), pr = document.createElement("div"); pr.className = "grid3"; pb.appendChild(pr);
-    [{ id: "", label: "原圖" }].concat(cg.PRESETS).forEach((p) => { const b = document.createElement("button"); b.className = "ghost"; b.dataset.cgPreset = p.id; b.textContent = p.label;
+    [{ id: "", label: "原圖" }].concat(cg.PRESETS).forEach((p) => { const b = document.createElement("button"); b.className = "btn btn-ghost"; b.dataset.cgPreset = p.id; b.textContent = p.label;
       b.onclick = () => set({ ...adj, presetId: p.id === "" ? null : (adj.presetId === p.id ? null : p.id) }); pr.appendChild(b); });
-    const rw = document.createElement("label"); rw.style.cssText = "font-size:12px;color:var(--txt);display:flex;gap:6px;align-items:center;";
+    const rw = document.createElement("label"); rw.style.cssText = "display:flex;gap:6px;align-items:center;";
     rw.innerHTML = '<input type="checkbox" data-cg-removewhite style="width:auto;"> ✂️ 去白底（免費，近白色變透明）'; pb.appendChild(rw);
     rw.querySelector("input").onchange = (e) => set({ ...adj, removeWhite: e.target.checked });
     // 自動: analysis reads the selected image's pixels, then only moves the sliders
     const ab = sec("auto", "自動 Auto"), ar = document.createElement("div"); ar.className = "grid3"; ab.appendChild(ar);
     [["contrast", "自動對比", "分析畫素亮度範圍，自動設對比／曝光"], ["color", "自動色彩", "中性灰平衡，自動矯正偏色"], ["tone", "自動色調", "同時套用自動對比 + 自動色彩"]].forEach(([k, t, tip]) => {
-      const b = document.createElement("button"); b.className = "ghost"; b.dataset.cgAuto = k; b.textContent = t; b.title = tip;
+      const b = document.createElement("button"); b.className = "btn btn-ghost"; b.dataset.cgAuto = k; b.textContent = t; b.title = tip;
       b.onclick = async () => {
         const sel = await ctx.selectedImage(); if (!sel) { hint.textContent = "先選取圖片後才能使用。"; return; }
         try {
@@ -104,14 +104,16 @@ export default {
     });
     // 色彩混合器 HSL
     const hb = sec("hsl", "色彩混合器 HSL"), tabs = document.createElement("div"); tabs.className = "grid3"; hb.appendChild(tabs);
-    [{ key: "all", label: "全部" }].concat(cg.HSL_RANGES).forEach((r) => { const b = document.createElement("button"); b.className = "ghost"; b.dataset.cgHslTab = r.key; b.textContent = r.label;
-      if (r.color) b.style.borderBottom = "2px solid " + r.color; b.onclick = () => { hslTab = r.key; paint(); }; tabs.appendChild(b); });
+    [{ key: "all", label: "全部" }].concat(cg.HSL_RANGES).forEach((r) => { const b = document.createElement("button"); b.className = "tab"; b.dataset.cgHslTab = r.key; b.textContent = r.label;
+      // hue of the range comes from the shared module; theme.css draws it from --swatch
+      if (r.color) b.style.setProperty("--swatch", r.color);
+      b.onclick = () => { hslTab = r.key; paint(); }; tabs.appendChild(b); });
     cg.HSL_AXES.forEach((a) => {
       const lb = document.createElement("label"); lb.innerHTML = a.label + ' <span data-cg-hsl-val="' + a.axis + '"></span>'; hb.appendChild(lb);
       const el = document.createElement("input"); el.type = "range"; el.dataset.cgHsl = a.axis; el.min = a.min; el.max = a.max; el.step = 1; el.value = 0;
       el.oninput = () => { const hm = JSON.parse(JSON.stringify(adj.hslMixer)); hm[hslTab][a.axis] = +el.value; set({ ...adj, hslMixer: hm }); }; hb.appendChild(el); });
     const hr = document.createElement("div"); hr.className = "row"; hr.style.marginTop = "6px"; hb.appendChild(hr);
-    [["range", "重置此色段"], ["all", "全部重置"]].forEach(([k, t]) => { const b = document.createElement("button"); b.className = "ghost"; b.dataset.cgHslReset = k; b.textContent = t;
+    [["range", "重置此色段"], ["all", "全部重置"]].forEach(([k, t]) => { const b = document.createElement("button"); b.className = "btn btn-ghost"; b.dataset.cgHslReset = k; b.textContent = t;
       b.onclick = () => { const hm = JSON.parse(JSON.stringify(adj.hslMixer)); if (k === "all") cg.HSL_RANGES.concat([{ key: "all" }]).forEach((r) => { hm[r.key] = { h: 0, s: 0, l: 0 }; }); else hm[hslTab] = { h: 0, s: 0, l: 0 }; set({ ...adj, hslMixer: hm }); }; hr.appendChild(b); });
     body.querySelector("#cgReset").onclick = () => set(cg.resetGradeAdj(adj));
     // 套用: selected image -> offscreen filters -> PNG -> replaceImage (one undo step in the host)
