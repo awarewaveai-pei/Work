@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-05（續11）影音工作台主題連動：app 存的主題套到 video.aware-wave.com（ff40c9be7＋72f07aa77，已部署）
+
+- 根因：VW /awarewave/theme.css 只回打包 globals.css :root，app_theme 存的外觀從未到 video。
+- 做法：next-admin GET /api/internal/theme/css（Bearer VW_INTERNAL_TOKEN；輸出 saved overrides 為 :root{}，再過 VALID_TOKEN_NAMES＋isSafeTokenValue；DB 讀失敗 503，store 新增 loadThemeConfig 會丟錯，getThemeConfig 照舊 fail-open）；VW appearance.savedTheme 連線模式才抓，接在打包 :root 後，theme.css 被請求時最多 30 秒抓一次（無計時器輪詢），3 秒逾時，併發共用同一次抓取，壞回應保留上一份；本機／獨立產品模式不抓。
+- 部署第一次被擋：public-asset-cache 測試紅——eb3445421 把 awarewave 移出 UNVERSIONED_PUBLIC_DIRS（當時 forms.css 未提交），e25062e7d 提交 forms.css 後清單漏回；72f07aa77 補回。
+- 未做：Google 網路字型 video 不另載入（退回系統字型）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy next-admin && sg-deploy video-workbench（smoke 全綠）; curl https://video.aware-wave.com/awarewave/theme.css 結尾 44 項 = app_theme 44 項、--sidebar-active-bar 值一致; 容器內無 token 呼叫端點 401 | exit=0 | ms=300000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n（Codex agency-os/reports/oracle/2026-11-05-partialreview-12d8b5ee.md：DB 失敗回空 200→503；首請求併發拿空值→共用抓取；皆修＋測；突變：拿掉 :root 形狀檢查→紅）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=UNVERSIONED_PUBLIC_DIRS | hits=5
 ## 2026-11-05（續10）migration 0161：每個 auth user 都有 profiles（已上 prod）＋常駐偵測器（39f3a7dbd）
 
 - 根因：auth.users 5 筆中 2 筆 staff（staff-accounts.ts createUser 建）無 profiles、auth.users 無觸發器；16 條 FK references profiles(id) → 這兩人的寫入全失敗（media_workbench_jobs_created_by_fkey）；workbench jobs/assets route 吞掉 DB 錯誤。
