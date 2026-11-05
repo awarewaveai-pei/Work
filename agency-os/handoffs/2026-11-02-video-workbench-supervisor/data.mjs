@@ -51,6 +51,7 @@ const P3 = '40c7b8ebd';
 const P4 = '1c5bde805';
 const P5 = '646cc9778';
 const P6 = '9465bbc8c';
+const RV = 'd84f65ec5';
 
 export const STEPS = [
   { n: 1, code: '0', title: '切 4178 到 repo', plain: '例：打開 127.0.0.1:4178，角色頁出現「示範角色庫」，代表跑的是 repo 版；舊資料一筆不少。',
@@ -199,19 +200,19 @@ export const STEPS = [
       todo('S4b.3', '人形模型自動綁骨架＋內建免費動作庫。'),
     ] },
   { n: 14, code: 'RV', title: '影片模型接 Replicate', plain: '例：在工作台選影片模型時，除了 sora-2，還能按「Runway Gen-4 Turbo · US$0.25（5 秒）」「Veo 3.1 Fast」「Veo 3.1」「Luma Ray 3.2」，價格寫在按鈕上；舊專案照樣用 sora-2。',
-    gate: '舊專案 sora-2 送出內容與改前相同；四個 Replicate 模型送出的欄位和 app 那份一致；真打一次 Runway 5 秒（US$0.25），成品能播，帳冊與用量記對模型和金額。', risk: 'Medium', model: 'Opus', status: 'not_started', depends: ['P6'], before: '待決 1',
+    gate: '舊專案 sora-2 送出內容與改前相同；四個 Replicate 模型送出的欄位和 app 那份一致；真打一次 Runway 5 秒（US$0.25），成品能播，帳冊與用量記對模型和金額。', risk: 'Medium', model: 'Opus', status: 'in_progress', depends: ['P6'], before: '待決 1',
     decided: '沿用 app（next-admin）已實測、已定價的四個模型，不另做研究：Runway（美）、Google Veo（美）、Luma（美）；不列中國公司的模型。模型清單只有一份，放在 app，工作台直接讀。',
     what: 'NA MOTION_MODELS 抽成無 import 的 lib/ai/video-motion-models.ts（VW 經 awarewave-files.txt 讀）；每個任務依 settings.model 選 OpenAI 或 Replicate；價格只讀 VIDEO_MOTION_RATES；模型與專案設定的下拉改成按鈕；Replicate 任務重開續輪詢、可取消',
     files: ['VW/docs/replicate-video-models-plan-20261105.md', 'NA/lib/tarot/video-motion-gen.ts', 'NA/lib/ai/cost-model.ts', 'VW/backend/generation-policy.cjs', 'VW/backend/api.cjs', 'VW/backend/provider-cost.cjs', 'VW/scripts/index-0.js', 'VW/scripts/projects-0.js'],
     items: [
-      todo('RV.1', 'app 的影片模型清單搬成工作台也能直接讀的一個檔；順便查 Veo 的價格：app 現在沒指定解析度，Veo 會跑 1080p，價格表若是 720p 的價就是少算錢，要一起改正。'),
-      todo('RV.2', '工作台後端每個任務照選的模型送：sora-2 走 OpenAI，其他四個走 Replicate；算錢、帳冊、用量都記實際跑的模型。'),
-      todo('RV.3', '畫面：模型改成可見按鈕，每顆寫價格；專案設定的下拉也改按鈕；Runway 一定要一張參考圖，沒圖時按鈕不能按並說明原因。'),
+      done('RV.1', 'app 的影片模型清單搬成工作台也能直接讀的一個檔，全系統只有這一份。Veo 價格查過：只分有沒有聲音、不分解析度，app 現在的價格是對的，沒有少算。', RV),
+      done('RV.2', '工作台後端每個任務照選的模型送：sora-2 走 OpenAI（送出內容和以前一樣），其他四個走 Replicate；算錢、帳冊、用量都記實際跑的模型。重開機會接著等同一支影片；取消會叫 Replicate 停止計費，Replicate 不接受就照實說還在跑。', RV),
+      done('RV.3', '畫面：模型是五顆可見按鈕，每顆寫價格，生成按鈕也寫這次的費用；專案設定的下拉改成按鈕，選的模型會真的帶到生成頁；Runway 沒圖時按鈕不能按並寫原因；還原舊任務會帶回當時的模型。', RV),
       todo('RV.4', '上線後真打一次：Runway 5 秒、一張小圖，約 US$0.25；部署要你同意。'),
     ] },
 ];
 
 // 操作者自己要決定或親手做的
 export const OPEN = [
-  { n: 1, before: 'RV', what: '影片模型接 Replicate 的計畫已寫好（docs/replicate-video-models-plan-20261105.md）；你說「開始」才寫程式。', src: '操作者 2026-11-05' },
+  { n: 1, before: 'RV', what: 'RV.4：部署工作台與 app（High），之後用 Runway 5 秒、一張小圖真打一次，約 US$0.25。要你說可以部署。', src: 'AGENTS §3' },
 ];
