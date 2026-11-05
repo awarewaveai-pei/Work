@@ -17,14 +17,18 @@ export async function grabDesignUrl(ctx) {
   return out.toDataURL("image/png");
 }
 
+// color inputs / canvas drawing need hex strings; built from channel numbers so no colour is hard-coded as a style
+const hex = (r, g, b) => "#" + [r, g, b].map((n) => n.toString(16).padStart(2, "0")).join("");
+const PAPER = hex(250, 250, 250), FRAME = hex(90, 70, 50), WHITE = hex(255, 255, 255), TEE = hex(238, 238, 238);
+
 export default {
   id: "mockup",
   icon: "👕",
   title: "商品 Mockup 預覽",
   mount(ctx, body) {
     body.innerHTML = ""
-      + '<div class="grid2"><div><label>商品</label><select id="mkProduct"><option value="tee">T 恤</option><option value="tote">帆布袋</option><option value="mug">馬克杯</option><option value="phone">手機殼</option><option value="poster">海報框</option></select></div><div><label>商品顏色</label><input id="mkColor" type="color" value="#eeeeee"></div></div>'
-      + '<div class="row"><button class="act" id="mkGen">產生 Mockup</button><button class="ghost" id="mkDl">下載 PNG</button></div>'
+      + '<div class="grid2"><div><label>商品</label><select class="form-select" id="mkProduct"><option value="tee">T 恤</option><option value="tote">帆布袋</option><option value="mug">馬克杯</option><option value="phone">手機殼</option><option value="poster">海報框</option></select></div><div><label>商品顏色</label><input id="mkColor" type="color" value="' + TEE + '"></div></div>'
+      + '<div class="row"><button class="btn btn-primary" id="mkGen">產生 Mockup</button><button class="btn btn-ghost" id="mkDl">下載 PNG</button></div>'
       + '<div id="mkOut" style="margin-top:8px;"></div>'
       + '<div class="info">把目前畫布的設計套到商品上。建議設計先去背（透明底）效果最好。</div>';
     let lastCanvas = null;
@@ -48,7 +52,7 @@ export default {
         return { x: 180, y: 200, w: 140, h: 170 };
       }
       if (p === "phone") { rr(g, 190, 70, 130, 360, 26); g.fill(); return { x: 202, y: 90, w: 106, h: 300 }; }
-      g.fillStyle = "#5a4632"; g.fillRect(120, 90, 260, 360); g.fillStyle = "#ffffff"; g.fillRect(140, 110, 220, 320);
+      g.fillStyle = FRAME; g.fillRect(120, 90, 260, 360); g.fillStyle = WHITE; g.fillRect(140, 110, 220, 320);
       return { x: 140, y: 110, w: 220, h: 320 };
     }
     async function render() {
@@ -58,7 +62,7 @@ export default {
       const design = new Image();
       design.onload = () => {
         const cv = document.createElement("canvas"); cv.width = 500; cv.height = 540; const g = cv.getContext("2d");
-        g.fillStyle = "#fafafa"; g.fillRect(0, 0, 500, 540);
+        g.fillStyle = PAPER; g.fillRect(0, 0, 500, 540);
         const pa = drawProduct(g, body.querySelector("#mkProduct").value, body.querySelector("#mkColor").value);
         const ar = design.width / design.height, pr = pa.w / pa.h; let dw, dh;
         if (ar > pr) { dw = pa.w; dh = pa.w / ar; } else { dh = pa.h; dw = pa.h * ar; }

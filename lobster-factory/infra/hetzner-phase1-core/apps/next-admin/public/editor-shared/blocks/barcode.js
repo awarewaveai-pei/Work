@@ -20,9 +20,9 @@ export default {
   title: "條碼 Barcode（向量）",
   mount(ctx, body) {
     body.innerHTML = ""
-      + '<input id="bcVal" type="text" placeholder="編號 / 文字…" value="AWAREWAVE-001">'
-      + '<div class="grid2"><div><label>類型</label><select id="bcFmt"><option value="CODE128">Code128（任意）</option><option value="EAN13">EAN-13（12~13碼）</option><option value="EAN8">EAN-8（7~8碼）</option><option value="UPC">UPC-A（11~12碼）</option><option value="CODE39">Code39</option></select></div><div><label>顯示文字</label><select id="bcText"><option value="1">是</option><option value="0">否</option></select></div></div>'
-      + '<button class="act" id="bcGo" style="margin-top:6px;">產生條碼</button>'
+      + '<input class="form-input" id="bcVal" type="text" placeholder="編號 / 文字…" value="AWAREWAVE-001">'
+      + '<div class="grid2"><div><label>類型</label><select class="form-select" id="bcFmt"><option value="CODE128">Code128（任意）</option><option value="EAN13">EAN-13（12~13碼）</option><option value="EAN8">EAN-8（7~8碼）</option><option value="UPC">UPC-A（11~12碼）</option><option value="CODE39">Code39</option></select></div><div><label>顯示文字</label><select class="form-select" id="bcText"><option value="1">是</option><option value="0">否</option></select></div></div>'
+      + '<button class="btn btn-primary" id="bcGo" style="margin-top:6px;">產生條碼</button>'
       + '<div class="info">向量輸出，列印清晰。EAN-13/UPC 需正確位數的數字（零售真碼要 GS1 公司號）。內部編號/標籤用 Code128 最彈性。</div>';
     body.querySelector("#bcGo").onclick = async () => {
       const val = body.querySelector("#bcVal").value.trim(); if (!val) { alert("請輸入內容"); return; }
