@@ -78,12 +78,12 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
 <aside><div class="in">
   <h1>向量專業版監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-11-05</span></p>
-  <div class="bar" data-computed><i class="d" style="width:42.857142857142854%"></i><i class="g" style="width:57.14285714285714%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>3</span>／<span data-computed>7</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:71.42857142857143%"></i><i class="g" style="width:28.57142857142857%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>5</span>／<span data-computed>7</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
-<p class="sub">把開源的 VectorCraft（Illustrator 的完整重製，工具、面板、快捷鍵都一樣）放進 app.aware-wave.com 當「向量（專業版）」；AwareWave 獨有的十項（尺寸範本、Google Fonts 字型、調色、去背、WebP、My Designs、QR、條碼、Mockup、批次匯出）做成第二個 dock 欄，長得跟它的面板一樣；舊設計轉檔後舊編輯器退場，只留一套。共 <span data-computed>7</span> 張卡、<span data-computed>27</span> 項工作，已完成 <span data-computed>21</span> 項。</p>
-<section id="now"><h2>現況</h2><p class="lead">目前已做到與還沒做到的事（2026-11-04 查）。</p><ul class="yn"><li class="no"><b>還不行</b><span>在 app.aware-wave.com 用 Illustrator 一樣的工具列、面板、快捷鍵畫向量。<small>真品原始碼讀完（2026-11-04）：工具 89/92、Pathfinder 全套、文字轉外框、多畫板都在 code 裡；網頁版有 iframe 用的 window.vectorcraft 介面（apps/vectorcraft-web/src/api.rs:1-17）。還沒建置、沒上線。</small></span></li><li class="no"><b>還不行</b><span>介面與字型是繁體中文。<small>介面有 zh-hant（crates/ui-egui/src/i18n/zh-hant.tsv）；字型庫只有簡中 Noto Sans CJK SC，繁中 Noto Sans TC 要在 C1.2 自己加。</small></span></li><li class="no"><b>還不行</b><span>AwareWave 獨有的十項功能在專業版裡，長在 Illustrator 版面的第二個 dock 欄。<small>十項＝尺寸範本、Google Fonts 字型、調色、去背、WebP ≤200KB、My Designs、QR、條碼、Mockup、批次匯出（R0-PLAN §6 C4 對照表）；其餘功能真品原生都有。</small></span></li><li class="no"><b>還不行</b><span>舊的向量設計檔在專業版打得開，舊編輯器退場，只有一套。<small>C7：舊 .design.json 批次匯出成 SVG 存回 My Designs，專業版開 SVG；轉完才拆舊頁。在那之前舊編輯器照常可用（0a24f4c29）。</small></span></li><li class="no"><b>還不行</b><span>本機能建出網頁版。<small>本機沒有 rustup／cargo／trunk（2026-11-04 查）；C1.1 安裝。</small></span></li></ul></section>
+<p class="sub">把開源的 VectorCraft（Illustrator 的完整重製，工具、面板、快捷鍵都一樣）放進 app.aware-wave.com 當「向量（專業版）」；AwareWave 獨有的十項（尺寸範本、Google Fonts 字型、調色、去背、WebP、My Designs、QR、條碼、Mockup、批次匯出）做成第二個 dock 欄，長得跟它的面板一樣；舊設計轉檔後舊編輯器退場，只留一套。共 <span data-computed>7</span> 張卡、<span data-computed>27</span> 項工作，已完成 <span data-computed>25</span> 項。</p>
+<section id="now"><h2>現況</h2><p class="lead">目前已做到與還沒做到的事（2026-11-05 查）。</p><ul class="yn"><li class="yes"><b>可以</b><span>在 app.aware-wave.com 用 Illustrator 一樣的工具列、面板、快捷鍵畫向量。<small>2026-11-05 上線：側欄 Vector Pro 開新分頁全視窗（bca9a846d）；正式站 playwright smoke：VectorCraft 開得起來、ui.inspect 回 JSON。</small></span></li><li class="yes"><b>可以</b><span>介面與字型是繁體中文。<small>介面 zh-hant；建置加 Noto Sans TC，本機實測罕用字「嘸」正常顯示（0f1bdc062）。</small></span></li><li class="yes"><b>可以</b><span>AwareWave 獨有的十項功能在專業版裡，長在 Illustrator 版面的第二個 dock 欄。<small>十個面板模組＋dock 外殼（色值抽自真品 theme.rs）；換圖實測位置、大小、旋轉不變（3934f17f2）。</small></span></li><li class="yes"><b>可以</b><span>舊的向量設計檔在專業版打得開，舊編輯器退場，只有一套。<small>舊 .design.json 在 My Designs 面板「匯入舊專案」轉向量；舊 PNG 照常開；/tools/vector-editor 與 /vector-editor.html 轉到專業版（6740e006d）。</small></span></li><li class="yes"><b>可以</b><span>本機能建出網頁版。<small>一個指令 build.ps1；wasm 89 MB 與上游 v0.21.0 同級，建置會驗證已最佳化（c9b541cae）。</small></span></li></ul></section>
 
 <section id="steps"><h2>卡片與工作</h2><p class="lead">依編號進行。每張卡列出所有工作，勾選代表完成。High 風險步驟（上傳正式站、改 nginx）經你同意才做。</p><ol class="steps"><li class="step done" id="C1">
     <div class="n">1</div>
@@ -157,32 +157,34 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
         <p><b>檔案：</b><code>NA/public/vector-pro-toolbox.js</code> <code>NA/public/editor-shared/blocks/my-designs.js</code></p>
         <p><b>卡：</b><code>agency-os/handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md §6 C5</code></p>
       </details>
-    </div></li><li class="step doing" id="C6">
+    </div></li><li class="step done" id="C6">
     <div class="n">6</div>
     <div class="b">
       <p class="plain">例：VectorCraft 出新版時，改一個版本號、跑建置、跑 smoke、上傳、切 current；壞了切回上一版。每天 smoke 會確認專業版還開得起來。</p>
-      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-low">風險 Low</span><span class="who">負責：fullstack-engineer（Sonnet）</span></p>
+      <p class="meta"><span class="pill st-done">已完成</span><span class="pill risk-low">風險 Low</span><span class="who">負責：fullstack-engineer（Sonnet）</span></p>
       <p class="donewhen"><b>完成的樣子：</b>playwright smoke 有這一條且綠；README 寫清升級與回退；RUNNABLE_DEMOS 有一條；WORKLOG 有機械證據。</p>
-      <ul class="items"><li class="done"><b>✓</b><span><code>C6.1</code> 自動 smoke：開專業版頁、介面回得了資料。 <small>完成於 <code>a11061ab1</code></small></span></li><li class="todo"><b>○</b><span><code>C6.2</code> README 寫升級與回退步驟，保留最近兩版。</span></li><li class="todo"><b>○</b><span><code>C6.3</code> 登記可跑的示範與決策索引。</span></li><li class="todo"><b>○</b><span><code>C6.4</code> 工作紀錄四行證據。</span></li></ul>
+      <ul class="items"><li class="done"><b>✓</b><span><code>C6.1</code> 自動 smoke：開專業版頁、介面回得了資料。 <small>完成於 <code>a11061ab1</code></small></span></li><li class="done"><b>✓</b><span><code>C6.2</code> README 寫升級與回退步驟，保留最近兩版。 <small>完成於 <code>803fc34d2</code></small></span></li><li class="done"><b>✓</b><span><code>C6.3</code> 登記可跑的示範與決策索引。 <small>完成於 <code>7fc2c4fe8</code></small></span></li><li class="done"><b>✓</b><span><code>C6.4</code> 工作紀錄四行證據。 <small>完成於 <code>7fc2c4fe8</code></small></span></li></ul>
       <details><summary>工程細節：C6 驗收、升級流程、文件</summary>
         <p>e2e smoke（swiftshader）；README 升級段；RUNNABLE_DEMOS＋ADR_INDEX 一列；WORKLOG 四行</p>
         <p><b>需先完成：</b><a href="#C5">C5</a></p>
         <p><b>檔案：</b><code>INFRA/tests/e2e/</code> <code>scripts/vectorcraft-pro/README.md</code> <code>agency-os/docs/operations/RUNNABLE_DEMOS.md</code> <code>agency-os/docs/architecture/decisions/ADR_INDEX.md</code></p>
         <p><b>卡：</b><code>agency-os/handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md §6 C6</code></p>
+        <p><b>完成於：</b><code>7fc2c4fe8</code></p>
       </details>
-    </div></li><li class="step doing" id="C7">
+    </div></li><li class="step done" id="C7">
     <div class="n">7</div>
     <div class="b">
       <p class="plain">例：以前在舊編輯器存的設計，在專業版的 My Designs 面板一樣打得開；轉完之後 /tools/vector-editor 自動跳到專業版，舊頁面刪掉，只剩一套。</p>
-      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-med">風險 Medium（刪舊頁；轉檔若要加欄位則 migration High）</span><span class="who">負責：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-done">已完成</span><span class="pill risk-med">風險 Medium（刪舊頁；轉檔若要加欄位則 migration High）</span><span class="who">負責：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>舊設計轉檔數＝原數量；專業版開舊設計物件數與 SVG 一致；舊網址跳轉；舊頁、白名單、登記、相關測試都拆乾淨且全綠。</p>
-      <ul class="items"><li class="done"><b>✓</b><span><code>C7.1</code> 舊專案檔（.design.json，只存在妳電腦裡）在 My Designs 面板按「匯入舊專案」就轉成向量放進畫板；舊的 PNG 設計照常開。 <small>完成於 <code>ebcad8326</code></small></span></li><li class="done"><b>✓</b><span><code>C7.2</code> 專業版的 My Designs 面板打得開舊設計。 <small>完成於 <code>ebcad8326</code></small></span></li><li class="done"><b>✓</b><span><code>C7.3</code> 舊網址跳轉到專業版；刪舊頁與相關設定、測試改好。 <small>完成於 <code>6740e006d</code></small></span></li><li class="todo"><b>○</b><span><code>C7.4</code> 文件與記憶更新。</span></li></ul>
+      <ul class="items"><li class="done"><b>✓</b><span><code>C7.1</code> 舊專案檔（.design.json，只存在妳電腦裡）在 My Designs 面板按「匯入舊專案」就轉成向量放進畫板；舊的 PNG 設計照常開。 <small>完成於 <code>ebcad8326</code></small></span></li><li class="done"><b>✓</b><span><code>C7.2</code> 專業版的 My Designs 面板打得開舊設計。 <small>完成於 <code>ebcad8326</code></small></span></li><li class="done"><b>✓</b><span><code>C7.3</code> 舊網址跳轉到專業版；刪舊頁與相關設定、測試改好。 <small>完成於 <code>6740e006d</code></small></span></li><li class="done"><b>✓</b><span><code>C7.4</code> 文件與記憶更新。 <small>完成於 <code>803fc34d2</code></small></span></li></ul>
       <details><summary>工程細節：C7 舊設計轉檔、舊編輯器退場</summary>
         <p>convert-designs.mjs（playwright 用舊頁匯出 SVG 存回）；My Designs 面板開 SVG；vector-editor 頁改 redirect、刪 html、拆白名單與登記、改 e2e 與 drift 測試；文件與記憶</p>
         <p><b>需先完成：</b><a href="#C6">C6</a></p>
         <p><b>已定案：</b>不留兩扇門。點陣的 Canvas Editor 不受影響。</p>
         <p><b>檔案：</b><code>scripts/vectorcraft-pro/convert-designs.mjs</code> <code>NA/app/(shell)/tools/vector-editor/page.tsx</code> <code>NA/middleware.ts</code> <code>NA/public/vector-editor.html</code> <code>NA/lib/portal/products.ts</code></p>
         <p><b>卡：</b><code>agency-os/handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md §6 C7</code></p>
+        <p><b>完成於：</b><code>6740e006d</code></p>
       </details>
     </div></li></ol></section>
 

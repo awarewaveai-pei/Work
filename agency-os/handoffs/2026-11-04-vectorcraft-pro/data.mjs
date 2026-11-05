@@ -16,7 +16,7 @@ export const COPY = {
   sub: '把開源的 VectorCraft（Illustrator 的完整重製，工具、面板、快捷鍵都一樣）放進 app.aware-wave.com 當「向量（專業版）」；AwareWave 獨有的十項（尺寸範本、Google Fonts 字型、調色、去背、WebP、My Designs、QR、條碼、Mockup、批次匯出）做成第二個 dock 欄，長得跟它的面板一樣；舊設計轉檔後舊編輯器退場，只留一套。共 {total} 張卡、{items} 項工作，已完成 {itemsDone} 項。',
   updated: '更新於 {date}',
   nav: { now: '現況', steps: '卡片與工作', open: '待你決定', paths: '檔案' },
-  now: { h: '現況', lead: '目前已做到與還沒做到的事（2026-11-04 查）。' },
+  now: { h: '現況', lead: '目前已做到與還沒做到的事（2026-11-05 查）。' },
   steps: { h: '卡片與工作', lead: '依編號進行。每張卡列出所有工作，勾選代表完成。High 風險步驟（上傳正式站、改 nginx）經你同意才做。', count: '{done}／{total} 完成' },
   open: { h: '待你決定', lead: '決定後，對應的卡才能開始。', none: '目前沒有需要你決定的事。', count: '{n} 項', before: '需在第 {n} 張卡開始前決定', src: '出處' },
   paths: { h: '檔案', plan: '每項工作的做法', req: '研究與對照（為什麼選這條路）', track: '工作紀錄', self: '本頁來源', howto: '修改 data.mjs 後，執行 node build.mjs 和 node check.mjs，再重新發布同一網址。' },
@@ -24,11 +24,11 @@ export const COPY = {
 };
 
 export const NOW = [
-  { what: '在 app.aware-wave.com 用 Illustrator 一樣的工具列、面板、快捷鍵畫向量。', state: 'no', ev: '真品原始碼讀完（2026-11-04）：工具 89/92、Pathfinder 全套、文字轉外框、多畫板都在 code 裡；網頁版有 iframe 用的 window.vectorcraft 介面（apps/vectorcraft-web/src/api.rs:1-17）。還沒建置、沒上線。' },
-  { what: '介面與字型是繁體中文。', state: 'no', ev: '介面有 zh-hant（crates/ui-egui/src/i18n/zh-hant.tsv）；字型庫只有簡中 Noto Sans CJK SC，繁中 Noto Sans TC 要在 C1.2 自己加。' },
-  { what: 'AwareWave 獨有的十項功能在專業版裡，長在 Illustrator 版面的第二個 dock 欄。', state: 'no', ev: '十項＝尺寸範本、Google Fonts 字型、調色、去背、WebP ≤200KB、My Designs、QR、條碼、Mockup、批次匯出（R0-PLAN §6 C4 對照表）；其餘功能真品原生都有。' },
-  { what: '舊的向量設計檔在專業版打得開，舊編輯器退場，只有一套。', state: 'no', ev: 'C7：舊 .design.json 批次匯出成 SVG 存回 My Designs，專業版開 SVG；轉完才拆舊頁。在那之前舊編輯器照常可用（0a24f4c29）。' },
-  { what: '本機能建出網頁版。', state: 'no', ev: '本機沒有 rustup／cargo／trunk（2026-11-04 查）；C1.1 安裝。' },
+  { what: '在 app.aware-wave.com 用 Illustrator 一樣的工具列、面板、快捷鍵畫向量。', state: 'yes', ev: '2026-11-05 上線：側欄 Vector Pro 開新分頁全視窗（bca9a846d）；正式站 playwright smoke：VectorCraft 開得起來、ui.inspect 回 JSON。' },
+  { what: '介面與字型是繁體中文。', state: 'yes', ev: '介面 zh-hant；建置加 Noto Sans TC，本機實測罕用字「嘸」正常顯示（0f1bdc062）。' },
+  { what: 'AwareWave 獨有的十項功能在專業版裡，長在 Illustrator 版面的第二個 dock 欄。', state: 'yes', ev: '十個面板模組＋dock 外殼（色值抽自真品 theme.rs）；換圖實測位置、大小、旋轉不變（3934f17f2）。' },
+  { what: '舊的向量設計檔在專業版打得開，舊編輯器退場，只有一套。', state: 'yes', ev: '舊 .design.json 在 My Designs 面板「匯入舊專案」轉向量；舊 PNG 照常開；/tools/vector-editor 與 /vector-editor.html 轉到專業版（6740e006d）。' },
+  { what: '本機能建出網頁版。', state: 'yes', ev: '一個指令 build.ps1；wasm 89 MB 與上游 v0.21.0 同級，建置會驗證已最佳化（c9b541cae）。' },
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
@@ -89,17 +89,17 @@ export const STEPS = [
       todo('C5.3', '實測：打繁中字、存入、看到縮圖、下載再開。'),
     ] },
   { n: 6, code: 'C6', group: 'F', title: '驗收、升級流程、文件', plain: '例：VectorCraft 出新版時，改一個版本號、跑建置、跑 smoke、上傳、切 current；壞了切回上一版。每天 smoke 會確認專業版還開得起來。',
-    gate: 'playwright smoke 有這一條且綠；README 寫清升級與回退；RUNNABLE_DEMOS 有一條；WORKLOG 有機械證據。', risk: 'Low', model: 'fullstack-engineer（Sonnet）', status: 'in_progress', depends: ['C5'],
+    gate: 'playwright smoke 有這一條且綠；README 寫清升級與回退；RUNNABLE_DEMOS 有一條；WORKLOG 有機械證據。', risk: 'Low', model: 'fullstack-engineer（Sonnet）', status: 'done', commit: '7fc2c4fe8', depends: ['C5'],
     what: 'e2e smoke（swiftshader）；README 升級段；RUNNABLE_DEMOS＋ADR_INDEX 一列；WORKLOG 四行',
     files: ['INFRA/tests/e2e/', 'scripts/vectorcraft-pro/README.md', 'agency-os/docs/operations/RUNNABLE_DEMOS.md', 'agency-os/docs/architecture/decisions/ADR_INDEX.md'],
     items: [
       done('C6.1', '自動 smoke：開專業版頁、介面回得了資料。', 'a11061ab1'),
-      todo('C6.2', 'README 寫升級與回退步驟，保留最近兩版。'),
-      todo('C6.3', '登記可跑的示範與決策索引。'),
-      todo('C6.4', '工作紀錄四行證據。'),
+      done('C6.2', 'README 寫升級與回退步驟，保留最近兩版。', '803fc34d2'),
+      done('C6.3', '登記可跑的示範與決策索引。', '7fc2c4fe8'),
+      done('C6.4', '工作紀錄四行證據。', '7fc2c4fe8'),
     ] },
   { n: 7, code: 'C7', group: 'G', title: '舊設計轉檔、舊編輯器退場', plain: '例：以前在舊編輯器存的設計，在專業版的 My Designs 面板一樣打得開；轉完之後 /tools/vector-editor 自動跳到專業版，舊頁面刪掉，只剩一套。',
-    gate: '舊設計轉檔數＝原數量；專業版開舊設計物件數與 SVG 一致；舊網址跳轉；舊頁、白名單、登記、相關測試都拆乾淨且全綠。', risk: 'Medium（刪舊頁；轉檔若要加欄位則 migration High）', model: 'Opus 5.5', status: 'in_progress', depends: ['C6'],
+    gate: '舊設計轉檔數＝原數量；專業版開舊設計物件數與 SVG 一致；舊網址跳轉；舊頁、白名單、登記、相關測試都拆乾淨且全綠。', risk: 'Medium（刪舊頁；轉檔若要加欄位則 migration High）', model: 'Opus 5.5', status: 'done', commit: '6740e006d', depends: ['C6'],
     decided: '不留兩扇門。點陣的 Canvas Editor 不受影響。',
     what: 'convert-designs.mjs（playwright 用舊頁匯出 SVG 存回）；My Designs 面板開 SVG；vector-editor 頁改 redirect、刪 html、拆白名單與登記、改 e2e 與 drift 測試；文件與記憶',
     files: ['scripts/vectorcraft-pro/convert-designs.mjs', 'NA/app/(shell)/tools/vector-editor/page.tsx', 'NA/middleware.ts', 'NA/public/vector-editor.html', 'NA/lib/portal/products.ts'],
@@ -107,7 +107,7 @@ export const STEPS = [
       done('C7.1', '舊專案檔（.design.json，只存在妳電腦裡）在 My Designs 面板按「匯入舊專案」就轉成向量放進畫板；舊的 PNG 設計照常開。', 'ebcad8326'),
       done('C7.2', '專業版的 My Designs 面板打得開舊設計。', 'ebcad8326'),
       done('C7.3', '舊網址跳轉到專業版；刪舊頁與相關設定、測試改好。', '6740e006d'),
-      todo('C7.4', '文件與記憶更新。'),
+      done('C7.4', '文件與記憶更新。', '803fc34d2'),
     ] },
 ];
 
