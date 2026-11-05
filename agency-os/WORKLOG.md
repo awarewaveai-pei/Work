@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-05（續8）影音工作台 H6 全程實測（部分）：OpenAI 額度為零、送審 QA 缺口、錯誤訊息修正（9fa2320f8）
+
+- 操作者在內建瀏覽器登入 video.aware-wave.com；工作台載入、許可（permit 200 allowed）、生成請求 202 皆通。
+- 圖片生成失敗：OpenAI 429「no credits remaining」，未扣費 → 操作者需儲值（監工台 P6.10）。
+- 首次介面送出 503 無法重現（第二次 202）；介面只顯示「服務回應 503」→ 9fa2320f8：HttpAdapter 讀 body error.message（LocalAdapter 已如此），已部署。
+- 結構缺口（監工台 P6.13）：工作台成品無 metadata.title/script → editorial QA 必敗（lib/content/video/editorial-rights-qa.ts:80-81）；上傳一律 rightsConfirmed:false（apps/video-workbench/backend/api.cjs:854）且無確認 UI → rights QA 必敗（editorial-rights-qa.ts:110）；caption QA 來源待查。送審與投遞目前無法對工作台成品走通。
+- next-admin 投遞前提齊：MEDIA_PRODUCTION_PERSISTENCE_ENABLED=true、POSTIZ_API_BASE_URL／KEY、R2 設定皆在。
+- REALTEST_EVIDENCE: tool=WebFetch | cmd=browser POST /api/vw/generations（202）→ job failed OpenAI 429；permit-probe.cjs in container → 200 allowed | exit=0 | ms=60000
+- REVIEW_WAIVED: NA -- adapters.js 一行修正，測試 6d＋突變紅→綠；Codex 未跑（單點錯誤訊息傳遞）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=服務回應 | hits=1
 ## 2026-11-05（續7）影音工作台上線 H4＋H5：video.aware-wave.com live、3D 走 CPU Cycles（a8c682b86／c09e37b72／7b76f9f6c）
 
 - H4：host compose 只插入 video-workbench 服務／video-net／volume（file 型 safe-infra-patch，backup docker-compose.yml.bak.safe-patch-20261105-054638）；首次 sg-deploy 關 smoke 回滾（nginx 未切）；nginx 套 repo 版（host＝repo L5 前版本，backup default.conf.bak.safe-patch-20261105-055001）；驗收 /healthz 200、/login 200、未登入 /api/vw/state 401、/ 302、偽造 X-VW-* 401、無發布 port；其他七個門 200；一般模式 redeploy 全綠＋rollback 快照。
