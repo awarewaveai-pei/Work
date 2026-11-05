@@ -178,7 +178,7 @@
       ? "截圖示例（與目前卡片無關；運鏡 Prompt 只包含截圖可見部分）"
       : text
         ? "此文字來自目前卡片中已收錄的資料。"
-        : "未提供原始 Prompt；不以自動產生的文字充當 SeedStar 原文。";
+        : "未提供原始 Prompt；不以自動產生的文字充當原文。";
   }
   function displayRecord(r) {
     return displayLanguage === "zh" && r.translations?.zh
@@ -203,7 +203,7 @@
       const provenance =
         displayLanguage === "zh"
           ? sel.translations?.zh?.provenance || "未取得中文翻譯，顯示原文。"
-          : "SeedStar 已取得的英文原文。";
+          : String(sel.id || "").startsWith("aw-") ? "AwareWave 自製範例原文。" : "SeedStar 已取得的英文原文。";
       $("imagePromptProvenance").textContent = provenance;
       $("videoPromptProvenance").textContent = provenance;
     }
@@ -228,7 +228,7 @@
     try {
       const bridge = SeedStar.generator;
       if (!bridge) {
-        toast("請在完整 SeedStar HTML 中使用此功能");
+        toast("請在影音工作台內使用此功能");
         return;
       }
       const result = await bridge.import({
@@ -299,8 +299,7 @@
     $("source").textContent =
       "資料來源：" +
       (r.origin || "未取得") +
-      "；來源頁：" +
-      (r.sourceUrl || "未取得") +
+      (r.sourceUrl ? "；來源頁：" + r.sourceUrl : "") +
       "；原始格數標籤：" +
       (r.originalType || r.type);
     let shots = displayRecord(r).shots || [];
@@ -437,7 +436,7 @@
     download(
       JSON.stringify(
         {
-          source: "SeedStar Cloud Browser capture, 2026-10-29",
+          source: "AwareWave video-workbench storyboard export",
           cards: items,
         },
         null,

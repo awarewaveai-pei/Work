@@ -125,8 +125,12 @@ const seedPresets = [
     prompt: "",
   },
 ];
-const presets = VideoWorkbench.capabilities?.reference ? seedPresets : [];
-const imgOf = (t) => (VideoWorkbench.capabilities?.reference && String(t.img || "").startsWith("/reference/") ? t.img : "");
+// Own examples first and for everyone; the seedstar ones only for staff.
+const presets = [...(VideoWorkbench.exampleTemplates || []), ...(VideoWorkbench.capabilities?.reference ? seedPresets : [])];
+const imgOf = (t) => {
+  const img = String(t.img || "");
+  return img.startsWith("/examples/") || (VideoWorkbench.capabilities?.reference && img.startsWith("/reference/")) ? img : "";
+};
 const state = {
   tab: "模板牆",
   cat: "全部作品",

@@ -1,0 +1,90 @@
+{
+  "home": [
+    {
+      "id": "style-home-1",
+      "name": "卡通動漫",
+      "image": "/examples/style-home-1.webp",
+      "imagePrompt": "a small street-corner cafe with a cat sitting by the door and a bicycle leaning on the wall, clean anime-style illustration with crisp outlines and bright cel shading"
+    },
+    {
+      "id": "style-home-2",
+      "name": "3D 皮克斯感",
+      "image": "/examples/style-home-2.webp",
+      "imagePrompt": "a small street-corner cafe with a cat sitting by the door and a bicycle leaning on the wall, polished 3D animated-film look with soft rounded shapes and warm global lighting"
+    },
+    {
+      "id": "style-home-3",
+      "name": "扁平插畫 · MG",
+      "image": "/examples/style-home-3.webp",
+      "imagePrompt": "a small street-corner cafe with a cat sitting by the door and a bicycle leaning on the wall, flat vector motion-graphics illustration with simple geometric shapes and a limited bright palette"
+    },
+    {
+      "id": "style-home-4",
+      "name": "水彩繪本",
+      "image": "/examples/style-home-4.webp",
+      "imagePrompt": "a small street-corner cafe with a cat sitting by the door and a bicycle leaning on the wall, gentle watercolor picture-book illustration with soft washes and visible paper texture"
+    },
+    {
+      "id": "style-home-5",
+      "name": "美式漫畫 · 粗線條",
+      "image": "/examples/style-home-5.webp",
+      "imagePrompt": "a small street-corner cafe with a cat sitting by the door and a bicycle leaning on the wall, American comic-book style with bold black ink outlines, halftone dots and punchy colors"
+    },
+    {
+      "id": "style-home-6",
+      "name": "像素風",
+      "image": "/examples/style-home-6.webp",
+      "imagePrompt": "a small street-corner cafe with a cat sitting by the door and a bicycle leaning on the wall, retro 16-bit pixel art with a limited palette and chunky pixels"
+    }
+  ],
+  "project": [
+    {
+      "id": "style-proj-1",
+      "name": "日系電影感",
+      "image": "/examples/style-proj-1.webp",
+      "imagePrompt": "a young traveler with a backpack walking down a quiet old street lined with small shops, Japanese cinematic film look, warm low-contrast tones, Portra-like color, shallow depth of field, soft backlight"
+    },
+    {
+      "id": "style-proj-2",
+      "name": "賽博霓虹",
+      "image": "/examples/style-proj-2.webp",
+      "imagePrompt": "a young traveler with a backpack walking down a quiet old street lined with small shops, cyberpunk neon night look with magenta and cyan lights, wet reflective streets, strong contrast"
+    },
+    {
+      "id": "style-proj-3",
+      "name": "清透紀實",
+      "image": "/examples/style-proj-3.webp",
+      "imagePrompt": "a young traveler with a backpack walking down a quiet old street lined with small shops, clear airy documentary look, natural daylight, clean true-to-life colors, light handheld feel"
+    },
+    {
+      "id": "style-proj-4",
+      "name": "復古膠片",
+      "image": "/examples/style-proj-4.webp",
+      "imagePrompt": "a young traveler with a backpack walking down a quiet old street lined with small shops, vintage film photograph look with visible grain, faded colors and slightly warm cast"
+    },
+    {
+      "id": "style-proj-5",
+      "name": "卡通動漫",
+      "image": "/examples/style-proj-5.webp",
+      "imagePrompt": "a young traveler with a backpack walking down a quiet old street lined with small shops, clean anime-style illustration with crisp outlines and bright cel shading"
+    },
+    {
+      "id": "style-proj-6",
+      "name": "黑白電影",
+      "image": "/examples/style-proj-6.webp",
+      "imagePrompt": "a young traveler with a backpack walking down a quiet old street lined with small shops, high-contrast black-and-white cinema look, dramatic shadows, classic film grain"
+    },
+    {
+      "id": "style-proj-7",
+      "name": "黃金時刻",
+      "image": "/examples/style-proj-7.webp",
+      "imagePrompt": "a young traveler with a backpack walking down a quiet old street lined with small shops, golden-hour look, low warm sun, long soft shadows, glowing rim light"
+    },
+    {
+      "id": "style-proj-8",
+      "name": "夢幻粉彩",
+      "image": "/examples/style-proj-8.webp",
+      "imagePrompt": "a young traveler with a backpack walking down a quiet old street lined with small shops, dreamy pastel look, soft pink and lavender tones, hazy glow, gentle diffusion"
+    }
+  ]
+}

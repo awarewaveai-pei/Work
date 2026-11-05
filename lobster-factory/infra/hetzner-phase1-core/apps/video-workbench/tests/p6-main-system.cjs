@@ -504,6 +504,58 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
       assert.deepEqual(named, [], "頁面程式只能走 /reference/（staff 限定）");
     }
 
+    // 9. Our own examples (examples/): complete, pictures present and <= 60 KB, nothing third-party, public static for every
+    //    identity, and the pages load them outside the staff-only reference gate.
+    {
+      const ex = path.join(__dirname, "..", "examples"), j = (f) => JSON.parse(fs.readFileSync(path.join(ex, f), "utf8"));
+      const boards = j("storyboards.json").cards, templates = j("templates.json").templates, styles = j("styles.json");
+      const picture = (p, id) => {
+        assert.equal(p, "/examples/" + id + ".webp", "圖片路徑 " + id);
+        assert(fs.existsSync(path.join(ex, id + ".webp")), "圖存在 " + id);
+        assert(fs.statSync(path.join(ex, id + ".webp")).size <= 60 * 1024, "圖 <= 60KB " + id);
+      };
+      const filled = (o, keys, id) => { for (const k of keys) assert(Array.isArray(o[k]) ? o[k].length : String(o[k] ?? "").trim(), id + " 缺 " + k); };
+      assert.equal(boards.length, 12);
+      assert.equal(boards.filter((c) => c.category === "商業廣告").length, 6);
+      assert.equal(boards.filter((c) => c.category === "人文生活").length, 6);
+      for (const c of boards) {
+        filled(c, ["id", "title", "category", "type", "tags", "duration", "style", "image", "grid_layout", "fps", "imagePrompt", "videoPrompt", "shots"], c.id);
+        assert.equal(c.origin, "AwareWave 自製範例");
+        assert(!c.sourceUrl && !c.sourceLinks && !c.imageSourceUrl, c.id + " 不得有來源連結");
+        assert.equal(c.shots.length, parseInt(c.type, 10), c.id + " 鏡頭數 = 格數");
+        for (const sh of c.shots) filled(sh, ["cut", "shot", "camera", "action", "time"], c.id);
+        filled(c.translations.zh, ["imagePrompt", "videoPrompt", "shots"], c.id + ".zh");
+        assert.equal(c.translations.zh.shots.length, c.shots.length);
+        picture(c.image, c.id);
+      }
+      assert(new Set(boards.map((c) => c.type)).size === 3, "4/6/9-Grid 都有");
+      assert.equal(templates.length, 8);
+      for (const t of templates) {
+        filled(t, ["id", "name", "category", "ratio", "seconds", "replace", "author", "date", "tag", "prompt", "description", "img"], t.id);
+        assert.equal(t.author, "AwareWave");
+        assert(t.prompt.includes("@image1"), t.id + " 提示詞用 @image1");
+        picture(t.img, t.id);
+      }
+      assert.equal(styles.home.length, 6);
+      assert.equal(styles.project.length, 8);
+      for (const st of [...styles.home, ...styles.project]) { filled(st, ["id", "name", "image"], st.id); picture(st.image, st.id); }
+      for (const f of fs.readdirSync(ex)) if (f.endsWith(".json")) assert(!/seedstar\.ai|sweetprompt/i.test(fs.readFileSync(path.join(ex, f), "utf8")), f + " 不得出現第三方來源");
+      const pub = (p, h) => request(port, "GET", p, h);
+      for (const h of [who({ "X-VW-User-Kind": "client" }), {}]) {
+        assert.equal((await pub("/examples/storyboards.json", h)).status, 200, "自製分鏡公開");
+        assert.equal((await pub("/examples/templates.json", h)).status, 200, "自製模板公開");
+        const img = await pub("/examples/aw-001.webp", h);
+        assert.equal(img.status, 200);
+        assert.equal(img.headers["content-type"], "image/webp");
+      }
+      const caps = JSON.parse((await pub("/api/vw/capabilities", who({ "X-VW-User-Kind": "client" }))).body);
+      assert.equal(caps.reference, false, "客戶沒有 seedstar 參考，自製內容仍由頁面載入：");
+      const boot = fs.readFileSync(path.join(__dirname, "..", "scripts/storyboards-boot.js"), "utf8");
+      assert(boot.indexOf("/examples/storyboards.json") > 0 && boot.indexOf("/examples/storyboards.json") < boot.indexOf("caps.reference"), "分鏡自製內容在 reference 判斷之前載入");
+      assert(fs.readFileSync(path.join(__dirname, "..", "scripts/templates-boot.js"), "utf8").includes("/examples/templates.json"), "模板頁載入自製模板");
+      assert(/exampleTemplates/.test(fs.readFileSync(path.join(__dirname, "..", "scripts/templates-0.js"), "utf8")), "模板牆併入自製模板");
+    }
+
     console.log("PASS p6-main-system：許可→生成→資產帳冊→任務帳冊、拒絕不呼叫供應商、偽造許可拒絕、上傳入帳、本機模式不變、D6、欄位對照 L2");
   } finally {
     server.close();

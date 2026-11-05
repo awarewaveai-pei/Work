@@ -1,0 +1,1440 @@
+{
+  "cards": [
+    {
+      "id": "aw-001",
+      "title": "巷口咖啡店新品上市",
+      "category": "商業廣告",
+      "type": "4-Grid",
+      "originalType": "4-Grid",
+      "tags": [
+        "咖啡店",
+        "新品上市",
+        "手沖"
+      ],
+      "duration": "8s",
+      "style": "暖色調・木質質感",
+      "image": "/examples/aw-001.webp",
+      "grid_layout": "2x2 四宮格",
+      "fps": "24 FPS",
+      "origin": "AwareWave 自製範例",
+      "imagePrompt": "A clean 2x2 storyboard sheet with 4 equal panels separated by thin white gutters. Subject: a small neighborhood coffee shop and its barista in a linen apron. Panel 1: Warm morning light on a small shopfront, steam fogging the glass window. Panel 2: Hot water spirals over the coffee bed in a ceramic dripper. Panel 3: Finished cup with leaf latte art on an oak counter beside a small pastry. Panel 4: A customer takes the first sip by the window and smiles. Keep the subject, color palette and lighting consistent across all panels. Warm tones, natural wood textures, realistic photographic look, no text, no captions, no watermarks, no logos.",
+      "videoPrompt": "[TARGET DURATION: 8s | 24FPS]\nVisual Authority: Use the uploaded 4-panel storyboard sheet as the continuous visual reference.\n\nScene: Neighborhood Coffee Shop New Menu Launch\nStyle & Atmosphere: Warm tones, natural wood textures\n\nShot Progression & Pacing (8 Seconds Total):\n• Cut 1 [0:00–0:02 | 2s] (Establishing): Warm morning light on a small shopfront, steam fogging the glass window\n• Cut 2 [0:02–0:04 | 2s] (Pour Detail): Hot water spirals over the coffee bed in a ceramic dripper\n• Cut 3 [0:04–0:06 | 2s] (Cup Hero): Finished cup with leaf latte art on an oak counter beside a small pastry\n• Cut 4 [0:06–0:08 | 2s] (Customer Smile): A customer takes the first sip by the window and smiles\n\nMotion & Continuity Rules:\n1. Follow the panels in order from first to last.\n2. Keep the subject's look, clothing and the lighting consistent across every cut.\n3. Use smooth, physically plausible camera moves; no on-screen text or logos.",
+      "shots": [
+        {
+          "cut": "#1",
+          "shot": "Establishing",
+          "camera": "Slow push-in",
+          "action": "Warm morning light on a small shopfront, steam fogging the glass window",
+          "time": "0:00–0:02 (2s / 48f)"
+        },
+        {
+          "cut": "#2",
+          "shot": "Pour Detail",
+          "camera": "Top-down, slight drift",
+          "action": "Hot water spirals over the coffee bed in a ceramic dripper",
+          "time": "0:02–0:04 (2s / 48f)"
+        },
+        {
+          "cut": "#3",
+          "shot": "Cup Hero",
+          "camera": "Slow orbit",
+          "action": "Finished cup with leaf latte art on an oak counter beside a small pastry",
+          "time": "0:04–0:06 (2s / 48f)"
+        },
+        {
+          "cut": "#4",
+          "shot": "Customer Smile",
+          "camera": "Handheld, steady",
+          "action": "A customer takes the first sip by the window and smiles",
+          "time": "0:06–0:08 (2s / 48f)"
+        }
+      ],
+      "translations": {
+        "zh": {
+          "imagePrompt": "一張乾淨的 2x2 四宮格分鏡台紙，4 格等大，以細白邊隔開。主體：一間巷口小咖啡店與穿亞麻圍裙的咖啡師。第 1 格：清晨暖光照著小店面，玻璃窗內蒸氣氤氳。 第 2 格：熱水以螺旋方式注入陶瓷濾杯中的咖啡粉。 第 3 格：橡木吧台上一杯拉花咖啡，旁邊放著小點心。 第 4 格：窗邊的客人喝下第一口，露出微笑。所有格子的主體、色調與光線保持一致。暖色調・木質質感，寫實攝影質感，畫面不要任何文字、字幕、浮水印或標誌。",
+          "videoPrompt": "[目標長度：8s｜24FPS]\n視覺依據：以上傳的 4 格分鏡台紙作為連續的視覺參考。\n\n場景：巷口咖啡店新品上市\n風格與氛圍：暖色調・木質質感\n\n鏡頭進程與節奏（共 8 秒）：\n• 第 1 鏡 [0:00–0:02 | 2 秒]（店面全景）：清晨暖光照著小店面，玻璃窗內蒸氣氤氳\n• 第 2 鏡 [0:02–0:04 | 2 秒]（手沖特寫）：熱水以螺旋方式注入陶瓷濾杯中的咖啡粉\n• 第 3 鏡 [0:04–0:06 | 2 秒]（成品主角）：橡木吧台上一杯拉花咖啡，旁邊放著小點心\n• 第 4 鏡 [0:06–0:08 | 2 秒]（客人微笑）：窗邊的客人喝下第一口，露出微笑\n\n運鏡與連戲規則：\n1. 依照分鏡台紙從第一格到最後一格的順序進行。\n2. 每一鏡的主體外觀、服裝與光線保持一致。\n3. 運鏡平順、符合物理；畫面不要出現文字或標誌。",
+          "shots": [
+            {
+              "cut": "#1",
+              "shot": "店面全景",
+              "camera": "緩慢推近",
+              "action": "清晨暖光照著小店面，玻璃窗內蒸氣氤氳",
+              "time": "0:00–0:02 (2s / 48f)"
+            },
+            {
+              "cut": "#2",
+              "shot": "手沖特寫",
+              "camera": "俯拍微移",
+              "action": "熱水以螺旋方式注入陶瓷濾杯中的咖啡粉",
+              "time": "0:02–0:04 (2s / 48f)"
+            },
+            {
+              "cut": "#3",
+              "shot": "成品主角",
+              "camera": "緩慢環繞",
+              "action": "橡木吧台上一杯拉花咖啡，旁邊放著小點心",
+              "time": "0:04–0:06 (2s / 48f)"
+            },
+            {
+              "cut": "#4",
+              "shot": "客人微笑",
+              "camera": "手持穩定",
+              "action": "窗邊的客人喝下第一口，露出微笑",
+              "time": "0:06–0:08 (2s / 48f)"
+            }
+          ],
+          "provenance": "AwareWave 自製範例的提示詞，可自由修改使用。"
+        }
+      }
+    },
+    {
+      "id": "aw-002",
+      "title": "手作甜點禮盒",
+      "category": "商業廣告",
+      "type": "6-Grid",
+      "originalType": "6-Grid",
+      "tags": [
+        "手作甜點",
+        "禮盒",
+        "送禮"
+      ],
+      "duration": "12s",
+      "style": "柔光・淡雅色調",
+      "image": "/examples/aw-002.webp",
+      "grid_layout": "3x2 六宮格",
+      "fps": "24 FPS",
+      "origin": "AwareWave 自製範例",
+      "imagePrompt": "A clean 3x2 storyboard sheet with 6 equal panels separated by thin white gutters. Subject: a handmade dessert gift box with six small cakes and the pastry maker's hands. Panel 1: An open gift box holding six small cakes on a linen cloth. Panel 2: Hands dust powdered sugar over a fruit tart. Panel 3: A fork cuts a cake open to show a moist crumb and fruit filling. Panel 4: Fingers tie a kraft-paper ribbon around the box. Panel 5: The shop owner hands the box across the counter to a smiling customer. Panel 6: Friends share the desserts around a sunlit table. Keep the subject, color palette and lighting consistent across all panels. Soft light, muted pastel palette, realistic photographic look, no text, no captions, no watermarks, no logos.",
+      "videoPrompt": "[TARGET DURATION: 12s | 24FPS]\nVisual Authority: Use the uploaded 6-panel storyboard sheet as the continuous visual reference.\n\nScene: Handmade Dessert Gift Box\nStyle & Atmosphere: Soft light, muted pastel palette\n\nShot Progression & Pacing (12 Seconds Total):\n• Cut 1 [0:00–0:02 | 2s] (Flat-lay Hero): An open gift box holding six small cakes on a linen cloth\n• Cut 2 [0:02–0:04 | 2s] (Hands at Work): Hands dust powdered sugar over a fruit tart\n• Cut 3 [0:04–0:06 | 2s] (Texture Macro): A fork cuts a cake open to show a moist crumb and fruit filling\n• Cut 4 [0:06–0:08 | 2s] (Ribbon Tie): Fingers tie a kraft-paper ribbon around the box\n• Cut 5 [0:08–0:10 | 2s] (Gift Handover): The shop owner hands the box across the counter to a smiling customer\n• Cut 6 [0:10–0:12 | 2s] (Table Share): Friends share the desserts around a sunlit table\n\nMotion & Continuity Rules:\n1. Follow the panels in order from first to last.\n2. Keep the subject's look, clothing and the lighting consistent across every cut.\n3. Use smooth, physically plausible camera moves; no on-screen text or logos.",
+      "shots": [
+        {
+          "cut": "#1",
+          "shot": "Flat-lay Hero",
+          "camera": "Top-down, static",
+          "action": "An open gift box holding six small cakes on a linen cloth",
+          "time": "0:00–0:02 (2s / 48f)"
+        },
+        {
+          "cut": "#2",
+          "shot": "Hands at Work",
+          "camera": "Close, handheld",
+          "action": "Hands dust powdered sugar over a fruit tart",
+          "time": "0:02–0:04 (2s / 48f)"
+        },
+        {
+          "cut": "#3",
+          "shot": "Texture Macro",
+          "camera": "Slow macro push",
+          "action": "A fork cuts a cake open to show a moist crumb and fruit filling",
+          "time": "0:04–0:06 (2s / 48f)"
+        },
+        {
+          "cut": "#4",
+          "shot": "Ribbon Tie",
+          "camera": "Over-the-shoulder",
+          "action": "Fingers tie a kraft-paper ribbon around the box",
+          "time": "0:06–0:08 (2s / 48f)"
+        },
+        {
+          "cut": "#5",
+          "shot": "Gift Handover",
+          "camera": "Medium two-shot, slow dolly",
+          "action": "The shop owner hands the box across the counter to a smiling customer",
+          "time": "0:08–0:10 (2s / 48f)"
+        },
+        {
+          "cut": "#6",
+          "shot": "Table Share",
+          "camera": "Wide, static",
+          "action": "Friends share the desserts around a sunlit table",
+          "time": "0:10–0:12 (2s / 48f)"
+        }
+      ],
+      "translations": {
+        "zh": {
+          "imagePrompt": "一張乾淨的 3x2 六宮格分鏡台紙，6 格等大，以細白邊隔開。主體：一盒六款小蛋糕的手作甜點禮盒與甜點師的雙手。第 1 格：打開的禮盒裡有六款小蛋糕，擺在亞麻布上。 第 2 格：雙手在水果塔上篩糖粉。 第 3 格：叉子切開蛋糕，露出濕潤的蛋糕體與水果內餡。 第 4 格：手指在牛皮紙盒上繫好緞帶。 第 5 格：店主隔著櫃檯把禮盒遞給微笑的客人。 第 6 格：朋友們圍著陽光灑落的餐桌分享甜點。所有格子的主體、色調與光線保持一致。柔光・淡雅色調，寫實攝影質感，畫面不要任何文字、字幕、浮水印或標誌。",
+          "videoPrompt": "[目標長度：12s｜24FPS]\n視覺依據：以上傳的 6 格分鏡台紙作為連續的視覺參考。\n\n場景：手作甜點禮盒\n風格與氛圍：柔光・淡雅色調\n\n鏡頭進程與節奏（共 12 秒）：\n• 第 1 鏡 [0:00–0:02 | 2 秒]（俯拍主圖）：打開的禮盒裡有六款小蛋糕，擺在亞麻布上\n• 第 2 鏡 [0:02–0:04 | 2 秒]（手作過程）：雙手在水果塔上篩糖粉\n• 第 3 鏡 [0:04–0:06 | 2 秒]（質地微距）：叉子切開蛋糕，露出濕潤的蛋糕體與水果內餡\n• 第 4 鏡 [0:06–0:08 | 2 秒]（繫上緞帶）：手指在牛皮紙盒上繫好緞帶\n• 第 5 鏡 [0:08–0:10 | 2 秒]（遞送禮物）：店主隔著櫃檯把禮盒遞給微笑的客人\n• 第 6 鏡 [0:10–0:12 | 2 秒]（餐桌分享）：朋友們圍著陽光灑落的餐桌分享甜點\n\n運鏡與連戲規則：\n1. 依照分鏡台紙從第一格到最後一格的順序進行。\n2. 每一鏡的主體外觀、服裝與光線保持一致。\n3. 運鏡平順、符合物理；畫面不要出現文字或標誌。",
+          "shots": [
+            {
+              "cut": "#1",
+              "shot": "俯拍主圖",
+              "camera": "俯拍定鏡",
+              "action": "打開的禮盒裡有六款小蛋糕，擺在亞麻布上",
+              "time": "0:00–0:02 (2s / 48f)"
+            },
+            {
+              "cut": "#2",
+              "shot": "手作過程",
+              "camera": "近距離手持",
+              "action": "雙手在水果塔上篩糖粉",
+              "time": "0:02–0:04 (2s / 48f)"
+            },
+            {
+              "cut": "#3",
+              "shot": "質地微距",
+              "camera": "緩慢微距推進",
+              "action": "叉子切開蛋糕，露出濕潤的蛋糕體與水果內餡",
+              "time": "0:04–0:06 (2s / 48f)"
+            },
+            {
+              "cut": "#4",
+              "shot": "繫上緞帶",
+              "camera": "過肩視角",
+              "action": "手指在牛皮紙盒上繫好緞帶",
+              "time": "0:06–0:08 (2s / 48f)"
+            },
+            {
+              "cut": "#5",
+              "shot": "遞送禮物",
+              "camera": "中景雙人緩推",
+              "action": "店主隔著櫃檯把禮盒遞給微笑的客人",
+              "time": "0:08–0:10 (2s / 48f)"
+            },
+            {
+              "cut": "#6",
+              "shot": "餐桌分享",
+              "camera": "廣角定鏡",
+              "action": "朋友們圍著陽光灑落的餐桌分享甜點",
+              "time": "0:10–0:12 (2s / 48f)"
+            }
+          ],
+          "provenance": "AwareWave 自製範例的提示詞，可自由修改使用。"
+        }
+      }
+    },
+    {
+      "id": "aw-003",
+      "title": "保養品精華液",
+      "category": "商業廣告",
+      "type": "9-Grid",
+      "originalType": "9-Grid",
+      "tags": [
+        "保養品",
+        "精華液",
+        "晨間保養"
+      ],
+      "duration": "15s",
+      "style": "乾淨明亮・極簡",
+      "image": "/examples/aw-003.webp",
+      "grid_layout": "3x3 九宮格",
+      "fps": "24 FPS",
+      "origin": "AwareWave 自製範例",
+      "imagePrompt": "A clean 3x3 storyboard sheet with 9 equal panels separated by thin white gutters. Subject: a frosted-glass dropper serum bottle with no printed labels. Panel 1: The frosted-glass bottle stands on a pale stone plinth. Panel 2: A golden serum drop swells at the dropper tip. Panel 3: Serum is smeared across a glass surface showing a silky texture. Panel 4: A woman pats serum onto her cheek in window light. Panel 5: Citrus slices, green leaves and water droplets arranged as a still life. Panel 6: Close-up of dewy healthy skin catching soft light. Panel 7: The bottle sits on a bathroom shelf beside folded towels and a small plant. Panel 8: The bottle is wrapped in soft paper as a gift. Panel 9: The bottle and three small drops on a pale background with empty space above for a logo. Keep the subject, color palette and lighting consistent across all panels. Clean, bright, minimal, realistic photographic look, no text, no captions, no watermarks, no logos.",
+      "videoPrompt": "[TARGET DURATION: 15s | 24FPS]\nVisual Authority: Use the uploaded 9-panel storyboard sheet as the continuous visual reference.\n\nScene: Skincare Serum Product Film\nStyle & Atmosphere: Clean, bright, minimal\n\nShot Progression & Pacing (15 Seconds Total):\n• Cut 1 [0:00–0:02 | 2s] (Hero Bottle): The frosted-glass bottle stands on a pale stone plinth\n• Cut 2 [0:02–0:04 | 2s] (Dropper Macro): A golden serum drop swells at the dropper tip\n• Cut 3 [0:04–0:05.5 | 1.5s] (Texture Swatch): Serum is smeared across a glass surface showing a silky texture\n• Cut 4 [0:05.5–0:07 | 1.5s] (Morning Routine): A woman pats serum onto her cheek in window light\n• Cut 5 [0:07–0:09 | 2s] (Ingredient Still Life): Citrus slices, green leaves and water droplets arranged as a still life\n• Cut 6 [0:09–0:10.5 | 1.5s] (Skin Close-up): Close-up of dewy healthy skin catching soft light\n• Cut 7 [0:10.5–0:12 | 1.5s] (Shelf Lifestyle): The bottle sits on a bathroom shelf beside folded towels and a small plant\n• Cut 8 [0:12–0:13.5 | 1.5s] (Gift Moment): The bottle is wrapped in soft paper as a gift\n• Cut 9 [0:13.5–0:15 | 1.5s] (Closing Hero): The bottle and three small drops on a pale background with empty space above for a logo\n\nMotion & Continuity Rules:\n1. Follow the panels in order from first to last.\n2. Keep the subject's look, clothing and the lighting consistent across every cut.\n3. Use smooth, physically plausible camera moves; no on-screen text or logos.",
+      "shots": [
+        {
+          "cut": "#1",
+          "shot": "Hero Bottle",
+          "camera": "Static, soft shadow",
+          "action": "The frosted-glass bottle stands on a pale stone plinth",
+          "time": "0:00–0:02 (2s / 48f)"
+        },
+        {
+          "cut": "#2",
+          "shot": "Dropper Macro",
+          "camera": "Macro push-in",
+          "action": "A golden serum drop swells at the dropper tip",
+          "time": "0:02–0:04 (2s / 48f)"
+        },
+        {
+          "cut": "#3",
+          "shot": "Texture Swatch",
+          "camera": "Top-down",
+          "action": "Serum is smeared across a glass surface showing a silky texture",
+          "time": "0:04–0:05.5 (1.5s / 36f)"
+        },
+        {
+          "cut": "#4",
+          "shot": "Morning Routine",
+          "camera": "Medium, handheld",
+          "action": "A woman pats serum onto her cheek in window light",
+          "time": "0:05.5–0:07 (1.5s / 36f)"
+        },
+        {
+          "cut": "#5",
+          "shot": "Ingredient Still Life",
+          "camera": "Slow pan",
+          "action": "Citrus slices, green leaves and water droplets arranged as a still life",
+          "time": "0:07–0:09 (2s / 48f)"
+        },
+        {
+          "cut": "#6",
+          "shot": "Skin Close-up",
+          "camera": "Slow push-in",
+          "action": "Close-up of dewy healthy skin catching soft light",
+          "time": "0:09–0:10.5 (1.5s / 36f)"
+        },
+        {
+          "cut": "#7",
+          "shot": "Shelf Lifestyle",
+          "camera": "Wide, static",
+          "action": "The bottle sits on a bathroom shelf beside folded towels and a small plant",
+          "time": "0:10.5–0:12 (1.5s / 36f)"
+        },
+        {
+          "cut": "#8",
+          "shot": "Gift Moment",
+          "camera": "Medium, static",
+          "action": "The bottle is wrapped in soft paper as a gift",
+          "time": "0:12–0:13.5 (1.5s / 36f)"
+        },
+        {
+          "cut": "#9",
+          "shot": "Closing Hero",
+          "camera": "Slow pull-back",
+          "action": "The bottle and three small drops on a pale background with empty space above for a logo",
+          "time": "0:13.5–0:15 (1.5s / 36f)"
+        }
+      ],
+      "translations": {
+        "zh": {
+          "imagePrompt": "一張乾淨的 3x3 九宮格分鏡台紙，9 格等大，以細白邊隔開。主體：一支沒有任何印字的霧面玻璃滴管精華液瓶。第 1 格：霧面玻璃瓶立在淺色石台上。 第 2 格：金色精華液在滴管尖端慢慢凝聚成滴。 第 3 格：精華液在玻璃面上抹開，呈現絲滑質地。 第 4 格：女子在窗邊光線下把精華液輕拍上臉頰。 第 5 格：柑橘切片、綠葉與水珠排成一組靜物。 第 6 格：柔光下水潤透亮的肌膚特寫。 第 7 格：瓶子擺在浴室層架上，旁邊有摺好的毛巾與小盆栽。 第 8 格：瓶子被柔軟的紙包好，成為一份禮物。 第 9 格：瓶身與三滴精華液置於淺色背景，上方留白可放標誌。所有格子的主體、色調與光線保持一致。乾淨明亮・極簡，寫實攝影質感，畫面不要任何文字、字幕、浮水印或標誌。",
+          "videoPrompt": "[目標長度：15s｜24FPS]\n視覺依據：以上傳的 9 格分鏡台紙作為連續的視覺參考。\n\n場景：保養品精華液產品影片\n風格與氛圍：乾淨明亮・極簡\n\n鏡頭進程與節奏（共 15 秒）：\n• 第 1 鏡 [0:00–0:02 | 2 秒]（瓶身主圖）：霧面玻璃瓶立在淺色石台上\n• 第 2 鏡 [0:02–0:04 | 2 秒]（滴管微距）：金色精華液在滴管尖端慢慢凝聚成滴\n• 第 3 鏡 [0:04–0:05.5 | 1.5 秒]（質地塗抹）：精華液在玻璃面上抹開，呈現絲滑質地\n• 第 4 鏡 [0:05.5–0:07 | 1.5 秒]（晨間保養）：女子在窗邊光線下把精華液輕拍上臉頰\n• 第 5 鏡 [0:07–0:09 | 2 秒]（成分意象）：柑橘切片、綠葉與水珠排成一組靜物\n• 第 6 鏡 [0:09–0:10.5 | 1.5 秒]（肌膚特寫）：柔光下水潤透亮的肌膚特寫\n• 第 7 鏡 [0:10.5–0:12 | 1.5 秒]（日常擺放）：瓶子擺在浴室層架上，旁邊有摺好的毛巾與小盆栽\n• 第 8 鏡 [0:12–0:13.5 | 1.5 秒]（禮物情境）：瓶子被柔軟的紙包好，成為一份禮物\n• 第 9 鏡 [0:13.5–0:15 | 1.5 秒]（結尾主圖）：瓶身與三滴精華液置於淺色背景，上方留白可放標誌\n\n運鏡與連戲規則：\n1. 依照分鏡台紙從第一格到最後一格的順序進行。\n2. 每一鏡的主體外觀、服裝與光線保持一致。\n3. 運鏡平順、符合物理；畫面不要出現文字或標誌。",
+          "shots": [
+            {
+              "cut": "#1",
+              "shot": "瓶身主圖",
+              "camera": "定鏡柔影",
+              "action": "霧面玻璃瓶立在淺色石台上",
+              "time": "0:00–0:02 (2s / 48f)"
+            },
+            {
+              "cut": "#2",
+              "shot": "滴管微距",
+              "camera": "微距推進",
+              "action": "金色精華液在滴管尖端慢慢凝聚成滴",
+              "time": "0:02–0:04 (2s / 48f)"
+            },
+            {
+              "cut": "#3",
+              "shot": "質地塗抹",
+              "camera": "俯拍",
+              "action": "精華液在玻璃面上抹開，呈現絲滑質地",
+              "time": "0:04–0:05.5 (1.5s / 36f)"
+            },
+            {
+              "cut": "#4",
+              "shot": "晨間保養",
+              "camera": "中景手持",
+              "action": "女子在窗邊光線下把精華液輕拍上臉頰",
+              "time": "0:05.5–0:07 (1.5s / 36f)"
+            },
+            {
+              "cut": "#5",
+              "shot": "成分意象",
+              "camera": "緩慢橫搖",
+              "action": "柑橘切片、綠葉與水珠排成一組靜物",
+              "time": "0:07–0:09 (2s / 48f)"
+            },
+            {
+              "cut": "#6",
+              "shot": "肌膚特寫",
+              "camera": "緩慢推近",
+              "action": "柔光下水潤透亮的肌膚特寫",
+              "time": "0:09–0:10.5 (1.5s / 36f)"
+            },
+            {
+              "cut": "#7",
+              "shot": "日常擺放",
+              "camera": "廣角定鏡",
+              "action": "瓶子擺在浴室層架上，旁邊有摺好的毛巾與小盆栽",
+              "time": "0:10.5–0:12 (1.5s / 36f)"
+            },
+            {
+              "cut": "#8",
+              "shot": "禮物情境",
+              "camera": "中景定鏡",
+              "action": "瓶子被柔軟的紙包好，成為一份禮物",
+              "time": "0:12–0:13.5 (1.5s / 36f)"
+            },
+            {
+              "cut": "#9",
+              "shot": "結尾主圖",
+              "camera": "緩慢拉遠",
+              "action": "瓶身與三滴精華液置於淺色背景，上方留白可放標誌",
+              "time": "0:13.5–0:15 (1.5s / 36f)"
+            }
+          ],
+          "provenance": "AwareWave 自製範例的提示詞，可自由修改使用。"
+        }
+      }
+    },
+    {
+      "id": "aw-004",
+      "title": "運動鞋新色發表",
+      "category": "商業廣告",
+      "type": "6-Grid",
+      "originalType": "6-Grid",
+      "tags": [
+        "運動鞋",
+        "慢跑",
+        "新色"
+      ],
+      "duration": "12s",
+      "style": "清晨冷調・動感",
+      "image": "/examples/aw-004.webp",
+      "grid_layout": "3x2 六宮格",
+      "fps": "24 FPS",
+      "origin": "AwareWave 自製範例",
+      "imagePrompt": "A clean 3x2 storyboard sheet with 6 equal panels separated by thin white gutters. Subject: a white-and-orange running shoe and a runner in a grey jacket. Panel 1: A single running shoe on wet asphalt at dawn. Panel 2: The runner ties the laces on stone steps with the city behind. Panel 3: The outsole pattern presses into the wet pavement. Panel 4: The runner's legs mid-stride along a riverside path. Panel 5: The runner sprints across a pedestrian bridge at sunrise in silhouette. Panel 6: The runner sits on steps with the shoes beside them, breath visible in the cool air. Keep the subject, color palette and lighting consistent across all panels. Cool dawn tones, dynamic, realistic photographic look, no text, no captions, no watermarks, no logos.",
+      "videoPrompt": "[TARGET DURATION: 12s | 24FPS]\nVisual Authority: Use the uploaded 6-panel storyboard sheet as the continuous visual reference.\n\nScene: Running Shoe New Colorway Launch\nStyle & Atmosphere: Cool dawn tones, dynamic\n\nShot Progression & Pacing (12 Seconds Total):\n• Cut 1 [0:00–0:02 | 2s] (Hero Shoe): A single running shoe on wet asphalt at dawn\n• Cut 2 [0:02–0:04 | 2s] (Lacing Up): The runner ties the laces on stone steps with the city behind\n• Cut 3 [0:04–0:06 | 2s] (Sole Macro): The outsole pattern presses into the wet pavement\n• Cut 4 [0:06–0:08 | 2s] (Stride): The runner's legs mid-stride along a riverside path\n• Cut 5 [0:08–0:10 | 2s] (Bridge Sprint): The runner sprints across a pedestrian bridge at sunrise in silhouette\n• Cut 6 [0:10–0:12 | 2s] (Cool Down): The runner sits on steps with the shoes beside them, breath visible in the cool air\n\nMotion & Continuity Rules:\n1. Follow the panels in order from first to last.\n2. Keep the subject's look, clothing and the lighting consistent across every cut.\n3. Use smooth, physically plausible camera moves; no on-screen text or logos.",
+      "shots": [
+        {
+          "cut": "#1",
+          "shot": "Hero Shoe",
+          "camera": "Low angle, static",
+          "action": "A single running shoe on wet asphalt at dawn",
+          "time": "0:00–0:02 (2s / 48f)"
+        },
+        {
+          "cut": "#2",
+          "shot": "Lacing Up",
+          "camera": "Close, handheld",
+          "action": "The runner ties the laces on stone steps with the city behind",
+          "time": "0:02–0:04 (2s / 48f)"
+        },
+        {
+          "cut": "#3",
+          "shot": "Sole Macro",
+          "camera": "Low tracking",
+          "action": "The outsole pattern presses into the wet pavement",
+          "time": "0:04–0:06 (2s / 48f)"
+        },
+        {
+          "cut": "#4",
+          "shot": "Stride",
+          "camera": "Side tracking",
+          "action": "The runner's legs mid-stride along a riverside path",
+          "time": "0:06–0:08 (2s / 48f)"
+        },
+        {
+          "cut": "#5",
+          "shot": "Bridge Sprint",
+          "camera": "Low wide",
+          "action": "The runner sprints across a pedestrian bridge at sunrise in silhouette",
+          "time": "0:08–0:10 (2s / 48f)"
+        },
+        {
+          "cut": "#6",
+          "shot": "Cool Down",
+          "camera": "Slow push-in",
+          "action": "The runner sits on steps with the shoes beside them, breath visible in the cool air",
+          "time": "0:10–0:12 (2s / 48f)"
+        }
+      ],
+      "translations": {
+        "zh": {
+          "imagePrompt": "一張乾淨的 3x2 六宮格分鏡台紙，6 格等大，以細白邊隔開。主體：一雙白橘配色的跑鞋與穿灰色外套的跑者。第 1 格：清晨濕潤柏油路上的一隻跑鞋。 第 2 格：跑者坐在石階上繫鞋帶，背後是城市。 第 3 格：鞋底紋路踩進濕潤的路面。 第 4 格：跑者在河濱步道上邁開步伐的雙腿。 第 5 格：日出時跑者在行人天橋上衝刺的剪影。 第 6 格：跑者坐在階梯上休息，鞋子放在身旁，冷空氣中可見呼出的白氣。所有格子的主體、色調與光線保持一致。清晨冷調・動感，寫實攝影質感，畫面不要任何文字、字幕、浮水印或標誌。",
+          "videoPrompt": "[目標長度：12s｜24FPS]\n視覺依據：以上傳的 6 格分鏡台紙作為連續的視覺參考。\n\n場景：運動鞋新色發表\n風格與氛圍：清晨冷調・動感\n\n鏡頭進程與節奏（共 12 秒）：\n• 第 1 鏡 [0:00–0:02 | 2 秒]（鞋款主圖）：清晨濕潤柏油路上的一隻跑鞋\n• 第 2 鏡 [0:02–0:04 | 2 秒]（繫鞋帶）：跑者坐在石階上繫鞋帶，背後是城市\n• 第 3 鏡 [0:04–0:06 | 2 秒]（鞋底微距）：鞋底紋路踩進濕潤的路面\n• 第 4 鏡 [0:06–0:08 | 2 秒]（步伐跟拍）：跑者在河濱步道上邁開步伐的雙腿\n• 第 5 鏡 [0:08–0:10 | 2 秒]（橋上衝刺）：日出時跑者在行人天橋上衝刺的剪影\n• 第 6 鏡 [0:10–0:12 | 2 秒]（完賽休息）：跑者坐在階梯上休息，鞋子放在身旁，冷空氣中可見呼出的白氣\n\n運鏡與連戲規則：\n1. 依照分鏡台紙從第一格到最後一格的順序進行。\n2. 每一鏡的主體外觀、服裝與光線保持一致。\n3. 運鏡平順、符合物理；畫面不要出現文字或標誌。",
+          "shots": [
+            {
+              "cut": "#1",
+              "shot": "鞋款主圖",
+              "camera": "低角度定鏡",
+              "action": "清晨濕潤柏油路上的一隻跑鞋",
+              "time": "0:00–0:02 (2s / 48f)"
+            },
+            {
+              "cut": "#2",
+              "shot": "繫鞋帶",
+              "camera": "近距離手持",
+              "action": "跑者坐在石階上繫鞋帶，背後是城市",
+              "time": "0:02–0:04 (2s / 48f)"
+            },
+            {
+              "cut": "#3",
+              "shot": "鞋底微距",
+              "camera": "低位跟拍",
+              "action": "鞋底紋路踩進濕潤的路面",
+              "time": "0:04–0:06 (2s / 48f)"
+            },
+            {
+              "cut": "#4",
+              "shot": "步伐跟拍",
+              "camera": "側面跟拍",
+              "action": "跑者在河濱步道上邁開步伐的雙腿",
+              "time": "0:06–0:08 (2s / 48f)"
+            },
+            {
+              "cut": "#5",
+              "shot": "橋上衝刺",
+              "camera": "低位廣角",
+              "action": "日出時跑者在行人天橋上衝刺的剪影",
+              "time": "0:08–0:10 (2s / 48f)"
+            },
+            {
+              "cut": "#6",
+              "shot": "完賽休息",
+              "camera": "緩慢推近",
+              "action": "跑者坐在階梯上休息，鞋子放在身旁，冷空氣中可見呼出的白氣",
+              "time": "0:10–0:12 (2s / 48f)"
+            }
+          ],
+          "provenance": "AwareWave 自製範例的提示詞，可自由修改使用。"
+        }
+      }
+    },
+    {
+      "id": "aw-005",
+      "title": "在地旅宿早鳥優惠",
+      "category": "商業廣告",
+      "type": "9-Grid",
+      "originalType": "9-Grid",
+      "tags": [
+        "旅宿",
+        "民宿",
+        "早鳥"
+      ],
+      "duration": "15s",
+      "style": "自然光・靜謐鄉間",
+      "image": "/examples/aw-005.webp",
+      "grid_layout": "3x3 九宮格",
+      "fps": "24 FPS",
+      "origin": "AwareWave 自製範例",
+      "imagePrompt": "A clean 3x3 storyboard sheet with 9 equal panels separated by thin white gutters. Subject: a small wooden guesthouse at the foot of green hills and its host. Panel 1: A small wooden guesthouse at the foot of green hills in morning mist. Panel 2: The host slides open the wooden door and offers a guest a cup of tea. Panel 3: A timber-and-tatami room with a large window facing the rice fields. Panel 4: A local breakfast spread on a wooden tray. Panel 5: Steam rises from a wooden soaking tub beside a window. Panel 6: Two guests stroll along a path between green fields. Panel 7: A guest reads on the terrace with tea in golden afternoon light. Panel 8: Lanterns glow warmly as dusk falls over the guesthouse. Panel 9: Guests wave from a car window while the host waves from the gate, with open sky above for booking details. Keep the subject, color palette and lighting consistent across all panels. Natural light, quiet countryside, realistic photographic look, no text, no captions, no watermarks, no logos.",
+      "videoPrompt": "[TARGET DURATION: 15s | 24FPS]\nVisual Authority: Use the uploaded 9-panel storyboard sheet as the continuous visual reference.\n\nScene: Local Guesthouse Early-Bird Offer\nStyle & Atmosphere: Natural light, quiet countryside\n\nShot Progression & Pacing (15 Seconds Total):\n• Cut 1 [0:00–0:02 | 2s] (Arrival): A small wooden guesthouse at the foot of green hills in morning mist\n• Cut 2 [0:02–0:04 | 2s] (Welcome): The host slides open the wooden door and offers a guest a cup of tea\n• Cut 3 [0:04–0:05.5 | 1.5s] (Room View): A timber-and-tatami room with a large window facing the rice fields\n• Cut 4 [0:05.5–0:07 | 1.5s] (Local Breakfast): A local breakfast spread on a wooden tray\n• Cut 5 [0:07–0:09 | 2s] (Soaking Tub): Steam rises from a wooden soaking tub beside a window\n• Cut 6 [0:09–0:10.5 | 1.5s] (Field Walk): Two guests stroll along a path between green fields\n• Cut 7 [0:10.5–0:12 | 1.5s] (Afternoon Terrace): A guest reads on the terrace with tea in golden afternoon light\n• Cut 8 [0:12–0:13.5 | 1.5s] (Dusk Lanterns): Lanterns glow warmly as dusk falls over the guesthouse\n• Cut 9 [0:13.5–0:15 | 1.5s] (Farewell): Guests wave from a car window while the host waves from the gate, with open sky above for booking details\n\nMotion & Continuity Rules:\n1. Follow the panels in order from first to last.\n2. Keep the subject's look, clothing and the lighting consistent across every cut.\n3. Use smooth, physically plausible camera moves; no on-screen text or logos.",
+      "shots": [
+        {
+          "cut": "#1",
+          "shot": "Arrival",
+          "camera": "High wide, slow descent",
+          "action": "A small wooden guesthouse at the foot of green hills in morning mist",
+          "time": "0:00–0:02 (2s / 48f)"
+        },
+        {
+          "cut": "#2",
+          "shot": "Welcome",
+          "camera": "Slow dolly-in",
+          "action": "The host slides open the wooden door and offers a guest a cup of tea",
+          "time": "0:02–0:04 (2s / 48f)"
+        },
+        {
+          "cut": "#3",
+          "shot": "Room View",
+          "camera": "Slow pan",
+          "action": "A timber-and-tatami room with a large window facing the rice fields",
+          "time": "0:04–0:05.5 (1.5s / 36f)"
+        },
+        {
+          "cut": "#4",
+          "shot": "Local Breakfast",
+          "camera": "Top-down",
+          "action": "A local breakfast spread on a wooden tray",
+          "time": "0:05.5–0:07 (1.5s / 36f)"
+        },
+        {
+          "cut": "#5",
+          "shot": "Soaking Tub",
+          "camera": "Close, static",
+          "action": "Steam rises from a wooden soaking tub beside a window",
+          "time": "0:07–0:09 (2s / 48f)"
+        },
+        {
+          "cut": "#6",
+          "shot": "Field Walk",
+          "camera": "Tracking from behind",
+          "action": "Two guests stroll along a path between green fields",
+          "time": "0:09–0:10.5 (1.5s / 36f)"
+        },
+        {
+          "cut": "#7",
+          "shot": "Afternoon Terrace",
+          "camera": "Medium, static",
+          "action": "A guest reads on the terrace with tea in golden afternoon light",
+          "time": "0:10.5–0:12 (1.5s / 36f)"
+        },
+        {
+          "cut": "#8",
+          "shot": "Dusk Lanterns",
+          "camera": "Slow pull-back",
+          "action": "Lanterns glow warmly as dusk falls over the guesthouse",
+          "time": "0:12–0:13.5 (1.5s / 36f)"
+        },
+        {
+          "cut": "#9",
+          "shot": "Farewell",
+          "camera": "Medium, static",
+          "action": "Guests wave from a car window while the host waves from the gate, with open sky above for booking details",
+          "time": "0:13.5–0:15 (1.5s / 36f)"
+        }
+      ],
+      "translations": {
+        "zh": {
+          "imagePrompt": "一張乾淨的 3x3 九宮格分鏡台紙，9 格等大，以細白邊隔開。主體：一間位於青山腳下的小木造旅宿與民宿主人。第 1 格：晨霧中，青山腳下的小木造旅宿。 第 2 格：主人拉開木門，端茶迎接客人。 第 3 格：木質與榻榻米的房間，大窗面向稻田。 第 4 格：木托盤上擺著在地早餐。 第 5 格：窗邊的木質浴桶冒出蒸氣。 第 6 格：兩位旅客沿著綠色田間小路散步。 第 7 格：旅客在午後金色光線下的陽台上喝茶閱讀。 第 8 格：黃昏降臨，旅宿的燈籠亮起暖光。 第 9 格：旅客從車窗揮手，主人在門口揮手道別，上方留出天空空間可放預約資訊。所有格子的主體、色調與光線保持一致。自然光・靜謐鄉間，寫實攝影質感，畫面不要任何文字、字幕、浮水印或標誌。",
+          "videoPrompt": "[目標長度：15s｜24FPS]\n視覺依據：以上傳的 9 格分鏡台紙作為連續的視覺參考。\n\n場景：在地旅宿早鳥優惠\n風格與氛圍：自然光・靜謐鄉間\n\n鏡頭進程與節奏（共 15 秒）：\n• 第 1 鏡 [0:00–0:02 | 2 秒]（抵達全景）：晨霧中，青山腳下的小木造旅宿\n• 第 2 鏡 [0:02–0:04 | 2 秒]（玄關迎賓）：主人拉開木門，端茶迎接客人\n• 第 3 鏡 [0:04–0:05.5 | 1.5 秒]（房間全景）：木質與榻榻米的房間，大窗面向稻田\n• 第 4 鏡 [0:05.5–0:07 | 1.5 秒]（在地早餐）：木托盤上擺著在地早餐\n• 第 5 鏡 [0:07–0:09 | 2 秒]（泡湯時光）：窗邊的木質浴桶冒出蒸氣\n• 第 6 鏡 [0:09–0:10.5 | 1.5 秒]（田間散步）：兩位旅客沿著綠色田間小路散步\n• 第 7 鏡 [0:10.5–0:12 | 1.5 秒]（陽台午後）：旅客在午後金色光線下的陽台上喝茶閱讀\n• 第 8 鏡 [0:12–0:13.5 | 1.5 秒]（黃昏燈光）：黃昏降臨，旅宿的燈籠亮起暖光\n• 第 9 鏡 [0:13.5–0:15 | 1.5 秒]（離別與預約）：旅客從車窗揮手，主人在門口揮手道別，上方留出天空空間可放預約資訊\n\n運鏡與連戲規則：\n1. 依照分鏡台紙從第一格到最後一格的順序進行。\n2. 每一鏡的主體外觀、服裝與光線保持一致。\n3. 運鏡平順、符合物理；畫面不要出現文字或標誌。",
+          "shots": [
+            {
+              "cut": "#1",
+              "shot": "抵達全景",
+              "camera": "高空廣角緩降",
+              "action": "晨霧中，青山腳下的小木造旅宿",
+              "time": "0:00–0:02 (2s / 48f)"
+            },
+            {
+              "cut": "#2",
+              "shot": "玄關迎賓",
+              "camera": "緩慢推軌",
+              "action": "主人拉開木門，端茶迎接客人",
+              "time": "0:02–0:04 (2s / 48f)"
+            },
+            {
+              "cut": "#3",
+              "shot": "房間全景",
+              "camera": "緩慢橫搖",
+              "action": "木質與榻榻米的房間，大窗面向稻田",
+              "time": "0:04–0:05.5 (1.5s / 36f)"
+            },
+            {
+              "cut": "#4",
+              "shot": "在地早餐",
+              "camera": "俯拍",
+              "action": "木托盤上擺著在地早餐",
+              "time": "0:05.5–0:07 (1.5s / 36f)"
+            },
+            {
+              "cut": "#5",
+              "shot": "泡湯時光",
+              "camera": "近景定鏡",
+              "action": "窗邊的木質浴桶冒出蒸氣",
+              "time": "0:07–0:09 (2s / 48f)"
+            },
+            {
+              "cut": "#6",
+              "shot": "田間散步",
+              "camera": "背後跟拍",
+              "action": "兩位旅客沿著綠色田間小路散步",
+              "time": "0:09–0:10.5 (1.5s / 36f)"
+            },
+            {
+              "cut": "#7",
+              "shot": "陽台午後",
+              "camera": "中景定鏡",
+              "action": "旅客在午後金色光線下的陽台上喝茶閱讀",
+              "time": "0:10.5–0:12 (1.5s / 36f)"
+            },
+            {
+              "cut": "#8",
+              "shot": "黃昏燈光",
+              "camera": "緩慢拉遠",
+              "action": "黃昏降臨，旅宿的燈籠亮起暖光",
+              "time": "0:12–0:13.5 (1.5s / 36f)"
+            },
+            {
+              "cut": "#9",
+              "shot": "離別與預約",
+              "camera": "中景定鏡",
+              "action": "旅客從車窗揮手，主人在門口揮手道別，上方留出天空空間可放預約資訊",
+              "time": "0:13.5–0:15 (1.5s / 36f)"
+            }
+          ],
+          "provenance": "AwareWave 自製範例的提示詞，可自由修改使用。"
+        }
+      }
+    },
+    {
+      "id": "aw-006",
+      "title": "手搖飲夏季新品",
+      "category": "商業廣告",
+      "type": "4-Grid",
+      "originalType": "4-Grid",
+      "tags": [
+        "手搖飲",
+        "夏季新品",
+        "水果茶"
+      ],
+      "duration": "8s",
+      "style": "明亮飽和・清爽",
+      "image": "/examples/aw-006.webp",
+      "grid_layout": "2x2 四宮格",
+      "fps": "24 FPS",
+      "origin": "AwareWave 自製範例",
+      "imagePrompt": "A clean 2x2 storyboard sheet with 4 equal panels separated by thin white gutters. Subject: a clear cup of peach fruit tea with ice, no printed logo. Panel 1: Fresh peach slices drop into a clear cup of ice. Panel 2: Amber tea pours over the ice and swirls. Panel 3: The finished cup with condensation on a sunlit table. Panel 4: Two friends clink their cups at a bright street corner. Keep the subject, color palette and lighting consistent across all panels. Bright, saturated, refreshing, realistic photographic look, no text, no captions, no watermarks, no logos.",
+      "videoPrompt": "[TARGET DURATION: 8s | 24FPS]\nVisual Authority: Use the uploaded 4-panel storyboard sheet as the continuous visual reference.\n\nScene: Summer Fruit Tea New Drink\nStyle & Atmosphere: Bright, saturated, refreshing\n\nShot Progression & Pacing (8 Seconds Total):\n• Cut 1 [0:00–0:02 | 2s] (Fruit Drop): Fresh peach slices drop into a clear cup of ice\n• Cut 2 [0:02–0:04 | 2s] (Tea Pour): Amber tea pours over the ice and swirls\n• Cut 3 [0:04–0:06 | 2s] (Hero Cup): The finished cup with condensation on a sunlit table\n• Cut 4 [0:06–0:08 | 2s] (Cheers): Two friends clink their cups at a bright street corner\n\nMotion & Continuity Rules:\n1. Follow the panels in order from first to last.\n2. Keep the subject's look, clothing and the lighting consistent across every cut.\n3. Use smooth, physically plausible camera moves; no on-screen text or logos.",
+      "shots": [
+        {
+          "cut": "#1",
+          "shot": "Fruit Drop",
+          "camera": "Slow-motion tracking",
+          "action": "Fresh peach slices drop into a clear cup of ice",
+          "time": "0:00–0:02 (2s / 48f)"
+        },
+        {
+          "cut": "#2",
+          "shot": "Tea Pour",
+          "camera": "Close, static",
+          "action": "Amber tea pours over the ice and swirls",
+          "time": "0:02–0:04 (2s / 48f)"
+        },
+        {
+          "cut": "#3",
+          "shot": "Hero Cup",
+          "camera": "Low angle, static",
+          "action": "The finished cup with condensation on a sunlit table",
+          "time": "0:04–0:06 (2s / 48f)"
+        },
+        {
+          "cut": "#4",
+          "shot": "Cheers",
+          "camera": "Handheld, steady",
+          "action": "Two friends clink their cups at a bright street corner",
+          "time": "0:06–0:08 (2s / 48f)"
+        }
+      ],
+      "translations": {
+        "zh": {
+          "imagePrompt": "一張乾淨的 2x2 四宮格分鏡台紙，4 格等大，以細白邊隔開。主體：一杯加冰的蜜桃水果茶，杯身沒有任何印字。第 1 格：新鮮蜜桃片落入裝滿冰塊的透明杯中。 第 2 格：琥珀色茶湯淋過冰塊，旋出漂亮的紋路。 第 3 格：陽光灑落的桌上，掛著水珠的成品飲料。 第 4 格：兩位朋友在明亮的街角輕碰杯子。所有格子的主體、色調與光線保持一致。明亮飽和・清爽，寫實攝影質感，畫面不要任何文字、字幕、浮水印或標誌。",
+          "videoPrompt": "[目標長度：8s｜24FPS]\n視覺依據：以上傳的 4 格分鏡台紙作為連續的視覺參考。\n\n場景：手搖飲夏季新品\n風格與氛圍：明亮飽和・清爽\n\n鏡頭進程與節奏（共 8 秒）：\n• 第 1 鏡 [0:00–0:02 | 2 秒]（水果入杯）：新鮮蜜桃片落入裝滿冰塊的透明杯中\n• 第 2 鏡 [0:02–0:04 | 2 秒]（茶湯倒入）：琥珀色茶湯淋過冰塊，旋出漂亮的紋路\n• 第 3 鏡 [0:04–0:06 | 2 秒]（成品主角）：陽光灑落的桌上，掛著水珠的成品飲料\n• 第 4 鏡 [0:06–0:08 | 2 秒]（友人乾杯）：兩位朋友在明亮的街角輕碰杯子\n\n運鏡與連戲規則：\n1. 依照分鏡台紙從第一格到最後一格的順序進行。\n2. 每一鏡的主體外觀、服裝與光線保持一致。\n3. 運鏡平順、符合物理；畫面不要出現文字或標誌。",
+          "shots": [
+            {
+              "cut": "#1",
+              "shot": "水果入杯",
+              "camera": "慢動作跟拍",
+              "action": "新鮮蜜桃片落入裝滿冰塊的透明杯中",
+              "time": "0:00–0:02 (2s / 48f)"
+            },
+            {
+              "cut": "#2",
+              "shot": "茶湯倒入",
+              "camera": "近景定鏡",
+              "action": "琥珀色茶湯淋過冰塊，旋出漂亮的紋路",
+              "time": "0:02–0:04 (2s / 48f)"
+            },
+            {
+              "cut": "#3",
+              "shot": "成品主角",
+              "camera": "低角度定鏡",
+              "action": "陽光灑落的桌上，掛著水珠的成品飲料",
+              "time": "0:04–0:06 (2s / 48f)"
+            },
+            {
+              "cut": "#4",
+              "shot": "友人乾杯",
+              "camera": "手持穩定",
+              "action": "兩位朋友在明亮的街角輕碰杯子",
+              "time": "0:06–0:08 (2s / 48f)"
+            }
+          ],
+          "provenance": "AwareWave 自製範例的提示詞，可自由修改使用。"
+        }
+      }
+    },
+    {
+      "id": "aw-007",
+      "title": "柴犬的一天",
+      "category": "人文生活",
+      "type": "6-Grid",
+      "originalType": "6-Grid",
+      "tags": [
+        "寵物",
+        "柴犬",
+        "日常"
+      ],
+      "duration": "12s",
+      "style": "溫暖自然光・生活感",
+      "image": "/examples/aw-007.webp",
+      "grid_layout": "3x2 六宮格",
+      "fps": "24 FPS",
+      "origin": "AwareWave 自製範例",
+      "imagePrompt": "A clean 3x2 storyboard sheet with 6 equal panels separated by thin white gutters. Subject: a Shiba Inu with a cream-and-tan coat and a red collar. Panel 1: The Shiba stretches on a sofa in morning light. Panel 2: The Shiba eats from a ceramic bowl. Panel 3: The Shiba pulls happily on a leash along a neighborhood lane. Panel 4: The Shiba runs across the grass with ears flapping. Panel 5: The Shiba curls up on a sunny window mat. Panel 6: The Shiba waits at the door, tail wagging, as the owner's shoes enter the frame. Keep the subject, color palette and lighting consistent across all panels. Warm natural light, everyday feel, realistic photographic look, no text, no captions, no watermarks, no logos.",
+      "videoPrompt": "[TARGET DURATION: 12s | 24FPS]\nVisual Authority: Use the uploaded 6-panel storyboard sheet as the continuous visual reference.\n\nScene: A Shiba Inu's Day\nStyle & Atmosphere: Warm natural light, everyday feel\n\nShot Progression & Pacing (12 Seconds Total):\n• Cut 1 [0:00–0:02 | 2s] (Wake Up): The Shiba stretches on a sofa in morning light\n• Cut 2 [0:02–0:04 | 2s] (Breakfast): The Shiba eats from a ceramic bowl\n• Cut 3 [0:04–0:06 | 2s] (Walk Out): The Shiba pulls happily on a leash along a neighborhood lane\n• Cut 4 [0:06–0:08 | 2s] (Park Run): The Shiba runs across the grass with ears flapping\n• Cut 5 [0:08–0:10 | 2s] (Afternoon Nap): The Shiba curls up on a sunny window mat\n• Cut 6 [0:10–0:12 | 2s] (Welcome Home): The Shiba waits at the door, tail wagging, as the owner's shoes enter the frame\n\nMotion & Continuity Rules:\n1. Follow the panels in order from first to last.\n2. Keep the subject's look, clothing and the lighting consistent across every cut.\n3. Use smooth, physically plausible camera moves; no on-screen text or logos.",
+      "shots": [
+        {
+          "cut": "#1",
+          "shot": "Wake Up",
+          "camera": "Medium, static",
+          "action": "The Shiba stretches on a sofa in morning light",
+          "time": "0:00–0:02 (2s / 48f)"
+        },
+        {
+          "cut": "#2",
+          "shot": "Breakfast",
+          "camera": "Low-angle close",
+          "action": "The Shiba eats from a ceramic bowl",
+          "time": "0:02–0:04 (2s / 48f)"
+        },
+        {
+          "cut": "#3",
+          "shot": "Walk Out",
+          "camera": "Tracking from behind",
+          "action": "The Shiba pulls happily on a leash along a neighborhood lane",
+          "time": "0:04–0:06 (2s / 48f)"
+        },
+        {
+          "cut": "#4",
+          "shot": "Park Run",
+          "camera": "Low tracking",
+          "action": "The Shiba runs across the grass with ears flapping",
+          "time": "0:06–0:08 (2s / 48f)"
+        },
+        {
+          "cut": "#5",
+          "shot": "Afternoon Nap",
+          "camera": "Slow push-in",
+          "action": "The Shiba curls up on a sunny window mat",
+          "time": "0:08–0:10 (2s / 48f)"
+        },
+        {
+          "cut": "#6",
+          "shot": "Welcome Home",
+          "camera": "Static",
+          "action": "The Shiba waits at the door, tail wagging, as the owner's shoes enter the frame",
+          "time": "0:10–0:12 (2s / 48f)"
+        }
+      ],
+      "translations": {
+        "zh": {
+          "imagePrompt": "一張乾淨的 3x2 六宮格分鏡台紙，6 格等大，以細白邊隔開。主體：一隻奶油與赤色毛色、戴紅色項圈的柴犬。第 1 格：柴犬在晨光下的沙發上伸懶腰。 第 2 格：柴犬低頭吃著陶碗裡的早餐。 第 3 格：柴犬開心地拉著牽繩走過社區巷弄。 第 4 格：柴犬在草地上奔跑，耳朵隨風擺動。 第 5 格：柴犬蜷縮在陽光窗邊的墊子上睡覺。 第 6 格：柴犬在門口搖著尾巴等待，主人的鞋子走進畫面。所有格子的主體、色調與光線保持一致。溫暖自然光・生活感，寫實攝影質感，畫面不要任何文字、字幕、浮水印或標誌。",
+          "videoPrompt": "[目標長度：12s｜24FPS]\n視覺依據：以上傳的 6 格分鏡台紙作為連續的視覺參考。\n\n場景：柴犬的一天\n風格與氛圍：溫暖自然光・生活感\n\n鏡頭進程與節奏（共 12 秒）：\n• 第 1 鏡 [0:00–0:02 | 2 秒]（起床）：柴犬在晨光下的沙發上伸懶腰\n• 第 2 鏡 [0:02–0:04 | 2 秒]（吃早餐）：柴犬低頭吃著陶碗裡的早餐\n• 第 3 鏡 [0:04–0:06 | 2 秒]（出門散步）：柴犬開心地拉著牽繩走過社區巷弄\n• 第 4 鏡 [0:06–0:08 | 2 秒]（公園奔跑）：柴犬在草地上奔跑，耳朵隨風擺動\n• 第 5 鏡 [0:08–0:10 | 2 秒]（午後打盹）：柴犬蜷縮在陽光窗邊的墊子上睡覺\n• 第 6 鏡 [0:10–0:12 | 2 秒]（迎接主人）：柴犬在門口搖著尾巴等待，主人的鞋子走進畫面\n\n運鏡與連戲規則：\n1. 依照分鏡台紙從第一格到最後一格的順序進行。\n2. 每一鏡的主體外觀、服裝與光線保持一致。\n3. 運鏡平順、符合物理；畫面不要出現文字或標誌。",
+          "shots": [
+            {
+              "cut": "#1",
+              "shot": "起床",
+              "camera": "中景定鏡",
+              "action": "柴犬在晨光下的沙發上伸懶腰",
+              "time": "0:00–0:02 (2s / 48f)"
+            },
+            {
+              "cut": "#2",
+              "shot": "吃早餐",
+              "camera": "低角度近景",
+              "action": "柴犬低頭吃著陶碗裡的早餐",
+              "time": "0:02–0:04 (2s / 48f)"
+            },
+            {
+              "cut": "#3",
+              "shot": "出門散步",
+              "camera": "背後跟拍",
+              "action": "柴犬開心地拉著牽繩走過社區巷弄",
+              "time": "0:04–0:06 (2s / 48f)"
+            },
+            {
+              "cut": "#4",
+              "shot": "公園奔跑",
+              "camera": "低位跟拍",
+              "action": "柴犬在草地上奔跑，耳朵隨風擺動",
+              "time": "0:06–0:08 (2s / 48f)"
+            },
+            {
+              "cut": "#5",
+              "shot": "午後打盹",
+              "camera": "緩慢推近",
+              "action": "柴犬蜷縮在陽光窗邊的墊子上睡覺",
+              "time": "0:08–0:10 (2s / 48f)"
+            },
+            {
+              "cut": "#6",
+              "shot": "迎接主人",
+              "camera": "定鏡",
+              "action": "柴犬在門口搖著尾巴等待，主人的鞋子走進畫面",
+              "time": "0:10–0:12 (2s / 48f)"
+            }
+          ],
+          "provenance": "AwareWave 自製範例的提示詞，可自由修改使用。"
+        }
+      }
+    },
+    {
+      "id": "aw-008",
+      "title": "親子週末早晨",
+      "category": "人文生活",
+      "type": "4-Grid",
+      "originalType": "4-Grid",
+      "tags": [
+        "親子",
+        "週末",
+        "早餐"
+      ],
+      "duration": "8s",
+      "style": "柔和暖光・溫馨",
+      "image": "/examples/aw-008.webp",
+      "grid_layout": "2x2 四宮格",
+      "fps": "24 FPS",
+      "origin": "AwareWave 自製範例",
+      "imagePrompt": "A clean 2x2 storyboard sheet with 4 equal panels separated by thin white gutters. Subject: a parent and a young child in pajamas. Panel 1: A parent and child lie under a blanket in morning light. Panel 2: The child on a stool cracks an egg into a bowl with the parent's help. Panel 3: A table with pancakes, fruit and two plates. Panel 4: The parent and child walk hand in hand toward a park. Keep the subject, color palette and lighting consistent across all panels. Soft warm light, cozy, realistic photographic look, no text, no captions, no watermarks, no logos.",
+      "videoPrompt": "[TARGET DURATION: 8s | 24FPS]\nVisual Authority: Use the uploaded 4-panel storyboard sheet as the continuous visual reference.\n\nScene: Parent-Child Weekend Morning\nStyle & Atmosphere: Soft warm light, cozy\n\nShot Progression & Pacing (8 Seconds Total):\n• Cut 1 [0:00–0:02 | 2s] (Lazy Morning): A parent and child lie under a blanket in morning light\n• Cut 2 [0:02–0:04 | 2s] (Cooking Together): The child on a stool cracks an egg into a bowl with the parent's help\n• Cut 3 [0:04–0:06 | 2s] (Shared Breakfast): A table with pancakes, fruit and two plates\n• Cut 4 [0:06–0:08 | 2s] (Out to the Park): The parent and child walk hand in hand toward a park\n\nMotion & Continuity Rules:\n1. Follow the panels in order from first to last.\n2. Keep the subject's look, clothing and the lighting consistent across every cut.\n3. Use smooth, physically plausible camera moves; no on-screen text or logos.",
+      "shots": [
+        {
+          "cut": "#1",
+          "shot": "Lazy Morning",
+          "camera": "Slow push-in",
+          "action": "A parent and child lie under a blanket in morning light",
+          "time": "0:00–0:02 (2s / 48f)"
+        },
+        {
+          "cut": "#2",
+          "shot": "Cooking Together",
+          "camera": "Medium, handheld",
+          "action": "The child on a stool cracks an egg into a bowl with the parent's help",
+          "time": "0:02–0:04 (2s / 48f)"
+        },
+        {
+          "cut": "#3",
+          "shot": "Shared Breakfast",
+          "camera": "Top-down",
+          "action": "A table with pancakes, fruit and two plates",
+          "time": "0:04–0:06 (2s / 48f)"
+        },
+        {
+          "cut": "#4",
+          "shot": "Out to the Park",
+          "camera": "Wide, from behind",
+          "action": "The parent and child walk hand in hand toward a park",
+          "time": "0:06–0:08 (2s / 48f)"
+        }
+      ],
+      "translations": {
+        "zh": {
+          "imagePrompt": "一張乾淨的 2x2 四宮格分鏡台紙，4 格等大，以細白邊隔開。主體：一位家長與穿著睡衣的小孩。第 1 格：家長與孩子在晨光下裹著毯子賴床。 第 2 格：孩子站在小凳子上，在家長協助下把蛋打進碗裡。 第 3 格：餐桌上有鬆餅、水果和兩個盤子。 第 4 格：家長牽著孩子的手走向公園。所有格子的主體、色調與光線保持一致。柔和暖光・溫馨，寫實攝影質感，畫面不要任何文字、字幕、浮水印或標誌。",
+          "videoPrompt": "[目標長度：8s｜24FPS]\n視覺依據：以上傳的 4 格分鏡台紙作為連續的視覺參考。\n\n場景：親子週末早晨\n風格與氛圍：柔和暖光・溫馨\n\n鏡頭進程與節奏（共 8 秒）：\n• 第 1 鏡 [0:00–0:02 | 2 秒]（賴床）：家長與孩子在晨光下裹著毯子賴床\n• 第 2 鏡 [0:02–0:04 | 2 秒]（一起做早餐）：孩子站在小凳子上，在家長協助下把蛋打進碗裡\n• 第 3 鏡 [0:04–0:06 | 2 秒]（共享早餐）：餐桌上有鬆餅、水果和兩個盤子\n• 第 4 鏡 [0:06–0:08 | 2 秒]（出門去公園）：家長牽著孩子的手走向公園\n\n運鏡與連戲規則：\n1. 依照分鏡台紙從第一格到最後一格的順序進行。\n2. 每一鏡的主體外觀、服裝與光線保持一致。\n3. 運鏡平順、符合物理；畫面不要出現文字或標誌。",
+          "shots": [
+            {
+              "cut": "#1",
+              "shot": "賴床",
+              "camera": "緩慢推近",
+              "action": "家長與孩子在晨光下裹著毯子賴床",
+              "time": "0:00–0:02 (2s / 48f)"
+            },
+            {
+              "cut": "#2",
+              "shot": "一起做早餐",
+              "camera": "中景手持",
+              "action": "孩子站在小凳子上，在家長協助下把蛋打進碗裡",
+              "time": "0:02–0:04 (2s / 48f)"
+            },
+            {
+              "cut": "#3",
+              "shot": "共享早餐",
+              "camera": "俯拍",
+              "action": "餐桌上有鬆餅、水果和兩個盤子",
+              "time": "0:04–0:06 (2s / 48f)"
+            },
+            {
+              "cut": "#4",
+              "shot": "出門去公園",
+              "camera": "背面廣角",
+              "action": "家長牽著孩子的手走向公園",
+              "time": "0:06–0:08 (2s / 48f)"
+            }
+          ],
+          "provenance": "AwareWave 自製範例的提示詞，可自由修改使用。"
+        }
+      }
+    },
+    {
+      "id": "aw-009",
+      "title": "通勤日常",
+      "category": "人文生活",
+      "type": "9-Grid",
+      "originalType": "9-Grid",
+      "tags": [
+        "通勤",
+        "上班族",
+        "城市日常"
+      ],
+      "duration": "15s",
+      "style": "自然紀實・都會",
+      "image": "/examples/aw-009.webp",
+      "grid_layout": "3x3 九宮格",
+      "fps": "24 FPS",
+      "origin": "AwareWave 自製範例",
+      "imagePrompt": "A clean 3x3 storyboard sheet with 9 equal panels separated by thin white gutters. Subject: an office worker in a light-blue shirt with a tote bag. Panel 1: A phone alarm glows on a bedside table as a hand reaches for it. Panel 2: The worker pours coffee into a thermos by the kitchen window. Panel 3: The worker passes through a station gate among the crowd. Panel 4: A platform with a train arriving as motion blur. Panel 5: The worker holds a strap while the city passes by the window. Panel 6: A crowd crosses a busy intersection. Panel 7: The worker sits at a desk and opens a notebook in morning light. Panel 8: A steaming noodle bowl at a small eatery. Panel 9: The worker walks home along a quiet street at dusk with warm windows glowing. Keep the subject, color palette and lighting consistent across all panels. Natural documentary, urban, realistic photographic look, no text, no captions, no watermarks, no logos.",
+      "videoPrompt": "[TARGET DURATION: 15s | 24FPS]\nVisual Authority: Use the uploaded 9-panel storyboard sheet as the continuous visual reference.\n\nScene: A Commuter's Day\nStyle & Atmosphere: Natural documentary, urban\n\nShot Progression & Pacing (15 Seconds Total):\n• Cut 1 [0:00–0:02 | 2s] (Alarm): A phone alarm glows on a bedside table as a hand reaches for it\n• Cut 2 [0:02–0:04 | 2s] (Morning Coffee): The worker pours coffee into a thermos by the kitchen window\n• Cut 3 [0:04–0:05.5 | 1.5s] (Into the Station): The worker passes through a station gate among the crowd\n• Cut 4 [0:05.5–0:07 | 1.5s] (Platform): A platform with a train arriving as motion blur\n• Cut 5 [0:07–0:09 | 2s] (On the Train): The worker holds a strap while the city passes by the window\n• Cut 6 [0:09–0:10.5 | 1.5s] (Crosswalk): A crowd crosses a busy intersection\n• Cut 7 [0:10.5–0:12 | 1.5s] (At the Desk): The worker sits at a desk and opens a notebook in morning light\n• Cut 8 [0:12–0:13.5 | 1.5s] (Lunch Break): A steaming noodle bowl at a small eatery\n• Cut 9 [0:13.5–0:15 | 1.5s] (Heading Home): The worker walks home along a quiet street at dusk with warm windows glowing\n\nMotion & Continuity Rules:\n1. Follow the panels in order from first to last.\n2. Keep the subject's look, clothing and the lighting consistent across every cut.\n3. Use smooth, physically plausible camera moves; no on-screen text or logos.",
+      "shots": [
+        {
+          "cut": "#1",
+          "shot": "Alarm",
+          "camera": "Close, static",
+          "action": "A phone alarm glows on a bedside table as a hand reaches for it",
+          "time": "0:00–0:02 (2s / 48f)"
+        },
+        {
+          "cut": "#2",
+          "shot": "Morning Coffee",
+          "camera": "Medium, static",
+          "action": "The worker pours coffee into a thermos by the kitchen window",
+          "time": "0:02–0:04 (2s / 48f)"
+        },
+        {
+          "cut": "#3",
+          "shot": "Into the Station",
+          "camera": "Tracking from behind",
+          "action": "The worker passes through a station gate among the crowd",
+          "time": "0:04–0:05.5 (1.5s / 36f)"
+        },
+        {
+          "cut": "#4",
+          "shot": "Platform",
+          "camera": "Wide, static",
+          "action": "A platform with a train arriving as motion blur",
+          "time": "0:05.5–0:07 (1.5s / 36f)"
+        },
+        {
+          "cut": "#5",
+          "shot": "On the Train",
+          "camera": "Over-the-shoulder",
+          "action": "The worker holds a strap while the city passes by the window",
+          "time": "0:07–0:09 (2s / 48f)"
+        },
+        {
+          "cut": "#6",
+          "shot": "Crosswalk",
+          "camera": "High angle",
+          "action": "A crowd crosses a busy intersection",
+          "time": "0:09–0:10.5 (1.5s / 36f)"
+        },
+        {
+          "cut": "#7",
+          "shot": "At the Desk",
+          "camera": "Medium, static",
+          "action": "The worker sits at a desk and opens a notebook in morning light",
+          "time": "0:10.5–0:12 (1.5s / 36f)"
+        },
+        {
+          "cut": "#8",
+          "shot": "Lunch Break",
+          "camera": "Close, static",
+          "action": "A steaming noodle bowl at a small eatery",
+          "time": "0:12–0:13.5 (1.5s / 36f)"
+        },
+        {
+          "cut": "#9",
+          "shot": "Heading Home",
+          "camera": "Wide, static",
+          "action": "The worker walks home along a quiet street at dusk with warm windows glowing",
+          "time": "0:13.5–0:15 (1.5s / 36f)"
+        }
+      ],
+      "translations": {
+        "zh": {
+          "imagePrompt": "一張乾淨的 3x3 九宮格分鏡台紙，9 格等大，以細白邊隔開。主體：一位穿淺藍襯衫、背托特包的上班族。第 1 格：床頭的手機鬧鐘亮起，一隻手伸過去。 第 2 格：上班族在廚房窗邊把咖啡倒進保溫瓶。 第 3 格：上班族在人群中通過車站閘門。 第 4 格：月台上，列車以動態模糊進站。 第 5 格：上班族抓著吊環，窗外城市快速掠過。 第 6 格：人群穿越繁忙的路口。 第 7 格：上班族在晨光下坐到桌前攤開筆記本。 第 8 格：小餐館裡一碗冒著熱氣的麵。 第 9 格：黃昏時上班族走在安靜街道回家，沿路窗戶透出暖光。所有格子的主體、色調與光線保持一致。自然紀實・都會，寫實攝影質感，畫面不要任何文字、字幕、浮水印或標誌。",
+          "videoPrompt": "[目標長度：15s｜24FPS]\n視覺依據：以上傳的 9 格分鏡台紙作為連續的視覺參考。\n\n場景：通勤日常\n風格與氛圍：自然紀實・都會\n\n鏡頭進程與節奏（共 15 秒）：\n• 第 1 鏡 [0:00–0:02 | 2 秒]（鬧鐘響起）：床頭的手機鬧鐘亮起，一隻手伸過去\n• 第 2 鏡 [0:02–0:04 | 2 秒]（出門前咖啡）：上班族在廚房窗邊把咖啡倒進保溫瓶\n• 第 3 鏡 [0:04–0:05.5 | 1.5 秒]（走進車站）：上班族在人群中通過車站閘門\n• 第 4 鏡 [0:05.5–0:07 | 1.5 秒]（月台等車）：月台上，列車以動態模糊進站\n• 第 5 鏡 [0:07–0:09 | 2 秒]（車廂風景）：上班族抓著吊環，窗外城市快速掠過\n• 第 6 鏡 [0:09–0:10.5 | 1.5 秒]（路口人潮）：人群穿越繁忙的路口\n• 第 7 鏡 [0:10.5–0:12 | 1.5 秒]（抵達座位）：上班族在晨光下坐到桌前攤開筆記本\n• 第 8 鏡 [0:12–0:13.5 | 1.5 秒]（午餐小店）：小餐館裡一碗冒著熱氣的麵\n• 第 9 鏡 [0:13.5–0:15 | 1.5 秒]（下班回家）：黃昏時上班族走在安靜街道回家，沿路窗戶透出暖光\n\n運鏡與連戲規則：\n1. 依照分鏡台紙從第一格到最後一格的順序進行。\n2. 每一鏡的主體外觀、服裝與光線保持一致。\n3. 運鏡平順、符合物理；畫面不要出現文字或標誌。",
+          "shots": [
+            {
+              "cut": "#1",
+              "shot": "鬧鐘響起",
+              "camera": "近景定鏡",
+              "action": "床頭的手機鬧鐘亮起，一隻手伸過去",
+              "time": "0:00–0:02 (2s / 48f)"
+            },
+            {
+              "cut": "#2",
+              "shot": "出門前咖啡",
+              "camera": "中景定鏡",
+              "action": "上班族在廚房窗邊把咖啡倒進保溫瓶",
+              "time": "0:02–0:04 (2s / 48f)"
+            },
+            {
+              "cut": "#3",
+              "shot": "走進車站",
+              "camera": "背後跟拍",
+              "action": "上班族在人群中通過車站閘門",
+              "time": "0:04–0:05.5 (1.5s / 36f)"
+            },
+            {
+              "cut": "#4",
+              "shot": "月台等車",
+              "camera": "廣角定鏡",
+              "action": "月台上，列車以動態模糊進站",
+              "time": "0:05.5–0:07 (1.5s / 36f)"
+            },
+            {
+              "cut": "#5",
+              "shot": "車廂風景",
+              "camera": "過肩視角",
+              "action": "上班族抓著吊環，窗外城市快速掠過",
+              "time": "0:07–0:09 (2s / 48f)"
+            },
+            {
+              "cut": "#6",
+              "shot": "路口人潮",
+              "camera": "高角度",
+              "action": "人群穿越繁忙的路口",
+              "time": "0:09–0:10.5 (1.5s / 36f)"
+            },
+            {
+              "cut": "#7",
+              "shot": "抵達座位",
+              "camera": "中景定鏡",
+              "action": "上班族在晨光下坐到桌前攤開筆記本",
+              "time": "0:10.5–0:12 (1.5s / 36f)"
+            },
+            {
+              "cut": "#8",
+              "shot": "午餐小店",
+              "camera": "近景定鏡",
+              "action": "小餐館裡一碗冒著熱氣的麵",
+              "time": "0:12–0:13.5 (1.5s / 36f)"
+            },
+            {
+              "cut": "#9",
+              "shot": "下班回家",
+              "camera": "廣角定鏡",
+              "action": "黃昏時上班族走在安靜街道回家，沿路窗戶透出暖光",
+              "time": "0:13.5–0:15 (1.5s / 36f)"
+            }
+          ],
+          "provenance": "AwareWave 自製範例的提示詞，可自由修改使用。"
+        }
+      }
+    },
+    {
+      "id": "aw-010",
+      "title": "清晨傳統市場",
+      "category": "人文生活",
+      "type": "6-Grid",
+      "originalType": "6-Grid",
+      "tags": [
+        "傳統市場",
+        "清晨",
+        "在地生活"
+      ],
+      "duration": "12s",
+      "style": "晨霧暖光・紀實",
+      "image": "/examples/aw-010.webp",
+      "grid_layout": "3x2 六宮格",
+      "fps": "24 FPS",
+      "origin": "AwareWave 自製範例",
+      "imagePrompt": "A clean 3x2 storyboard sheet with 6 equal panels separated by thin white gutters. Subject: a traditional morning market lane and its vendors. Panel 1: A dawn market lane with colorful awnings and light mist. Panel 2: Hands arrange pyramids of fresh vegetables. Panel 3: An elderly vendor hands a bag of greens to a smiling customer. Panel 4: Fresh fish glint on ice under a hanging lamp. Panel 5: Steam rises from a bamboo steamer basket of buns. Panel 6: A customer cycles away with a basket full of produce. Keep the subject, color palette and lighting consistent across all panels. Misty warm light, documentary, realistic photographic look, no text, no captions, no watermarks, no logos.",
+      "videoPrompt": "[TARGET DURATION: 12s | 24FPS]\nVisual Authority: Use the uploaded 6-panel storyboard sheet as the continuous visual reference.\n\nScene: Early Morning Traditional Market\nStyle & Atmosphere: Misty warm light, documentary\n\nShot Progression & Pacing (12 Seconds Total):\n• Cut 1 [0:00–0:02 | 2s] (Market Lane): A dawn market lane with colorful awnings and light mist\n• Cut 2 [0:02–0:04 | 2s] (Vegetable Stall): Hands arrange pyramids of fresh vegetables\n• Cut 3 [0:04–0:06 | 2s] (Vendor Chat): An elderly vendor hands a bag of greens to a smiling customer\n• Cut 4 [0:06–0:08 | 2s] (Fish Stall): Fresh fish glint on ice under a hanging lamp\n• Cut 5 [0:08–0:10 | 2s] (Steamer Basket): Steam rises from a bamboo steamer basket of buns\n• Cut 6 [0:10–0:12 | 2s] (Cycling Home): A customer cycles away with a basket full of produce\n\nMotion & Continuity Rules:\n1. Follow the panels in order from first to last.\n2. Keep the subject's look, clothing and the lighting consistent across every cut.\n3. Use smooth, physically plausible camera moves; no on-screen text or logos.",
+      "shots": [
+        {
+          "cut": "#1",
+          "shot": "Market Lane",
+          "camera": "Wide, static",
+          "action": "A dawn market lane with colorful awnings and light mist",
+          "time": "0:00–0:02 (2s / 48f)"
+        },
+        {
+          "cut": "#2",
+          "shot": "Vegetable Stall",
+          "camera": "Close, slow pan",
+          "action": "Hands arrange pyramids of fresh vegetables",
+          "time": "0:02–0:04 (2s / 48f)"
+        },
+        {
+          "cut": "#3",
+          "shot": "Vendor Chat",
+          "camera": "Medium two-shot",
+          "action": "An elderly vendor hands a bag of greens to a smiling customer",
+          "time": "0:04–0:06 (2s / 48f)"
+        },
+        {
+          "cut": "#4",
+          "shot": "Fish Stall",
+          "camera": "Close, static",
+          "action": "Fresh fish glint on ice under a hanging lamp",
+          "time": "0:06–0:08 (2s / 48f)"
+        },
+        {
+          "cut": "#5",
+          "shot": "Steamer Basket",
+          "camera": "Close, static",
+          "action": "Steam rises from a bamboo steamer basket of buns",
+          "time": "0:08–0:10 (2s / 48f)"
+        },
+        {
+          "cut": "#6",
+          "shot": "Cycling Home",
+          "camera": "Tracking",
+          "action": "A customer cycles away with a basket full of produce",
+          "time": "0:10–0:12 (2s / 48f)"
+        }
+      ],
+      "translations": {
+        "zh": {
+          "imagePrompt": "一張乾淨的 3x2 六宮格分鏡台紙，6 格等大，以細白邊隔開。主體：一條清晨的傳統市場巷道與攤商。第 1 格：清晨的市場巷道，彩色遮陽棚與淡淡薄霧。 第 2 格：雙手把新鮮蔬菜堆成小山。 第 3 格：年長的攤商把一袋青菜遞給微笑的客人。 第 4 格：吊燈下，冰上的鮮魚閃著光。 第 5 格：竹蒸籠裡的包子冒出蒸氣。 第 6 格：客人騎著腳踏車，籃子裝滿蔬果離開。所有格子的主體、色調與光線保持一致。晨霧暖光・紀實，寫實攝影質感，畫面不要任何文字、字幕、浮水印或標誌。",
+          "videoPrompt": "[目標長度：12s｜24FPS]\n視覺依據：以上傳的 6 格分鏡台紙作為連續的視覺參考。\n\n場景：清晨傳統市場\n風格與氛圍：晨霧暖光・紀實\n\n鏡頭進程與節奏（共 12 秒）：\n• 第 1 鏡 [0:00–0:02 | 2 秒]（市場入口）：清晨的市場巷道，彩色遮陽棚與淡淡薄霧\n• 第 2 鏡 [0:02–0:04 | 2 秒]（蔬果攤）：雙手把新鮮蔬菜堆成小山\n• 第 3 鏡 [0:04–0:06 | 2 秒]（老闆與客人）：年長的攤商把一袋青菜遞給微笑的客人\n• 第 4 鏡 [0:06–0:08 | 2 秒]（魚攤）：吊燈下，冰上的鮮魚閃著光\n• 第 5 鏡 [0:08–0:10 | 2 秒]（早點蒸籠）：竹蒸籠裡的包子冒出蒸氣\n• 第 6 鏡 [0:10–0:12 | 2 秒]（滿載而歸）：客人騎著腳踏車，籃子裝滿蔬果離開\n\n運鏡與連戲規則：\n1. 依照分鏡台紙從第一格到最後一格的順序進行。\n2. 每一鏡的主體外觀、服裝與光線保持一致。\n3. 運鏡平順、符合物理；畫面不要出現文字或標誌。",
+          "shots": [
+            {
+              "cut": "#1",
+              "shot": "市場入口",
+              "camera": "廣角定鏡",
+              "action": "清晨的市場巷道，彩色遮陽棚與淡淡薄霧",
+              "time": "0:00–0:02 (2s / 48f)"
+            },
+            {
+              "cut": "#2",
+              "shot": "蔬果攤",
+              "camera": "近景緩慢橫搖",
+              "action": "雙手把新鮮蔬菜堆成小山",
+              "time": "0:02–0:04 (2s / 48f)"
+            },
+            {
+              "cut": "#3",
+              "shot": "老闆與客人",
+              "camera": "中景雙人鏡頭",
+              "action": "年長的攤商把一袋青菜遞給微笑的客人",
+              "time": "0:04–0:06 (2s / 48f)"
+            },
+            {
+              "cut": "#4",
+              "shot": "魚攤",
+              "camera": "近景定鏡",
+              "action": "吊燈下，冰上的鮮魚閃著光",
+              "time": "0:06–0:08 (2s / 48f)"
+            },
+            {
+              "cut": "#5",
+              "shot": "早點蒸籠",
+              "camera": "近景定鏡",
+              "action": "竹蒸籠裡的包子冒出蒸氣",
+              "time": "0:08–0:10 (2s / 48f)"
+            },
+            {
+              "cut": "#6",
+              "shot": "滿載而歸",
+              "camera": "跟拍",
+              "action": "客人騎著腳踏車，籃子裝滿蔬果離開",
+              "time": "0:10–0:12 (2s / 48f)"
+            }
+          ],
+          "provenance": "AwareWave 自製範例的提示詞，可自由修改使用。"
+        }
+      }
+    },
+    {
+      "id": "aw-011",
+      "title": "手作陶藝工作室",
+      "category": "人文生活",
+      "type": "4-Grid",
+      "originalType": "4-Grid",
+      "tags": [
+        "陶藝",
+        "手作",
+        "工作室"
+      ],
+      "duration": "8s",
+      "style": "自然光・手作質感",
+      "image": "/examples/aw-011.webp",
+      "grid_layout": "2x2 四宮格",
+      "fps": "24 FPS",
+      "origin": "AwareWave 自製範例",
+      "imagePrompt": "A clean 2x2 storyboard sheet with 4 equal panels separated by thin white gutters. Subject: a potter's studio and a potter with clay-dusted hands. Panel 1: Hands shape spinning clay on a pottery wheel. Panel 2: A trimming tool curls thin clay shavings off a bowl. Panel 3: A brush spreads glaze across a bowl. Panel 4: A row of finished bowls on a wooden shelf in window light. Keep the subject, color palette and lighting consistent across all panels. Natural light, handmade texture, realistic photographic look, no text, no captions, no watermarks, no logos.",
+      "videoPrompt": "[TARGET DURATION: 8s | 24FPS]\nVisual Authority: Use the uploaded 4-panel storyboard sheet as the continuous visual reference.\n\nScene: Pottery Studio Craft Story\nStyle & Atmosphere: Natural light, handmade texture\n\nShot Progression & Pacing (8 Seconds Total):\n• Cut 1 [0:00–0:02 | 2s] (Throwing): Hands shape spinning clay on a pottery wheel\n• Cut 2 [0:02–0:04 | 2s] (Trimming): A trimming tool curls thin clay shavings off a bowl\n• Cut 3 [0:04–0:06 | 2s] (Glazing): A brush spreads glaze across a bowl\n• Cut 4 [0:06–0:08 | 2s] (Finished Pieces): A row of finished bowls on a wooden shelf in window light\n\nMotion & Continuity Rules:\n1. Follow the panels in order from first to last.\n2. Keep the subject's look, clothing and the lighting consistent across every cut.\n3. Use smooth, physically plausible camera moves; no on-screen text or logos.",
+      "shots": [
+        {
+          "cut": "#1",
+          "shot": "Throwing",
+          "camera": "Close, static",
+          "action": "Hands shape spinning clay on a pottery wheel",
+          "time": "0:00–0:02 (2s / 48f)"
+        },
+        {
+          "cut": "#2",
+          "shot": "Trimming",
+          "camera": "Close, handheld",
+          "action": "A trimming tool curls thin clay shavings off a bowl",
+          "time": "0:02–0:04 (2s / 48f)"
+        },
+        {
+          "cut": "#3",
+          "shot": "Glazing",
+          "camera": "Medium, static",
+          "action": "A brush spreads glaze across a bowl",
+          "time": "0:04–0:06 (2s / 48f)"
+        },
+        {
+          "cut": "#4",
+          "shot": "Finished Pieces",
+          "camera": "Slow pan",
+          "action": "A row of finished bowls on a wooden shelf in window light",
+          "time": "0:06–0:08 (2s / 48f)"
+        }
+      ],
+      "translations": {
+        "zh": {
+          "imagePrompt": "一張乾淨的 2x2 四宮格分鏡台紙，4 格等大，以細白邊隔開。主體：一間陶藝工作室與雙手沾著陶土的陶藝家。第 1 格：雙手在轉盤上塑形旋轉中的陶土。 第 2 格：修坯刀削下一圈圈薄薄的陶土。 第 3 格：毛刷把釉料刷在碗上。 第 4 格：窗光下，木架上排列著完成的碗。所有格子的主體、色調與光線保持一致。自然光・手作質感，寫實攝影質感，畫面不要任何文字、字幕、浮水印或標誌。",
+          "videoPrompt": "[目標長度：8s｜24FPS]\n視覺依據：以上傳的 4 格分鏡台紙作為連續的視覺參考。\n\n場景：手作陶藝工作室\n風格與氛圍：自然光・手作質感\n\n鏡頭進程與節奏（共 8 秒）：\n• 第 1 鏡 [0:00–0:02 | 2 秒]（拉坯）：雙手在轉盤上塑形旋轉中的陶土\n• 第 2 鏡 [0:02–0:04 | 2 秒]（修坯）：修坯刀削下一圈圈薄薄的陶土\n• 第 3 鏡 [0:04–0:06 | 2 秒]（上釉）：毛刷把釉料刷在碗上\n• 第 4 鏡 [0:06–0:08 | 2 秒]（成品陳列）：窗光下，木架上排列著完成的碗\n\n運鏡與連戲規則：\n1. 依照分鏡台紙從第一格到最後一格的順序進行。\n2. 每一鏡的主體外觀、服裝與光線保持一致。\n3. 運鏡平順、符合物理；畫面不要出現文字或標誌。",
+          "shots": [
+            {
+              "cut": "#1",
+              "shot": "拉坯",
+              "camera": "近景定鏡",
+              "action": "雙手在轉盤上塑形旋轉中的陶土",
+              "time": "0:00–0:02 (2s / 48f)"
+            },
+            {
+              "cut": "#2",
+              "shot": "修坯",
+              "camera": "近距離手持",
+              "action": "修坯刀削下一圈圈薄薄的陶土",
+              "time": "0:02–0:04 (2s / 48f)"
+            },
+            {
+              "cut": "#3",
+              "shot": "上釉",
+              "camera": "中景定鏡",
+              "action": "毛刷把釉料刷在碗上",
+              "time": "0:04–0:06 (2s / 48f)"
+            },
+            {
+              "cut": "#4",
+              "shot": "成品陳列",
+              "camera": "緩慢橫搖",
+              "action": "窗光下，木架上排列著完成的碗",
+              "time": "0:06–0:08 (2s / 48f)"
+            }
+          ],
+          "provenance": "AwareWave 自製範例的提示詞，可自由修改使用。"
+        }
+      }
+    },
+    {
+      "id": "aw-012",
+      "title": "夜市小吃之夜",
+      "category": "人文生活",
+      "type": "9-Grid",
+      "originalType": "9-Grid",
+      "tags": [
+        "夜市",
+        "小吃",
+        "夜晚"
+      ],
+      "duration": "15s",
+      "style": "暖黃燈光・熱鬧",
+      "image": "/examples/aw-012.webp",
+      "grid_layout": "3x3 九宮格",
+      "fps": "24 FPS",
+      "origin": "AwareWave 自製範例",
+      "imagePrompt": "A clean 3x3 storyboard sheet with 9 equal panels separated by thin white gutters. Subject: a night market lane with glowing lanterns and food vendors. Panel 1: Glowing paper lanterns and string lights above a lively lane. Panel 2: Skewers grill over charcoal with smoke and sparks. Panel 3: Pan-fried buns sizzle on a wide griddle. Panel 4: A vendor hands a paper tray of food to a customer. Panel 5: The camera moves through the busy lane among the crowd. Panel 6: Children play a ring-toss game with glowing prizes. Panel 7: Friends share fried snacks from a paper bag. Panel 8: Wet ground reflects the lights as walkers' feet pass. Panel 9: A vendor lowers the shutter as the last warm lights fade. Keep the subject, color palette and lighting consistent across all panels. Warm lantern light, lively, realistic photographic look, no text, no captions, no watermarks, no logos.",
+      "videoPrompt": "[TARGET DURATION: 15s | 24FPS]\nVisual Authority: Use the uploaded 9-panel storyboard sheet as the continuous visual reference.\n\nScene: A Night at the Night Market\nStyle & Atmosphere: Warm lantern light, lively\n\nShot Progression & Pacing (15 Seconds Total):\n• Cut 1 [0:00–0:02 | 2s] (Market Entrance): Glowing paper lanterns and string lights above a lively lane\n• Cut 2 [0:02–0:04 | 2s] (Charcoal Grill): Skewers grill over charcoal with smoke and sparks\n• Cut 3 [0:04–0:05.5 | 1.5s] (Pan-fry): Pan-fried buns sizzle on a wide griddle\n• Cut 4 [0:05.5–0:07 | 1.5s] (Hand-over): A vendor hands a paper tray of food to a customer\n• Cut 5 [0:07–0:09 | 2s] (Crowd Flow): The camera moves through the busy lane among the crowd\n• Cut 6 [0:09–0:10.5 | 1.5s] (Ring Toss): Children play a ring-toss game with glowing prizes\n• Cut 7 [0:10.5–0:12 | 1.5s] (Sharing Snacks): Friends share fried snacks from a paper bag\n• Cut 8 [0:12–0:13.5 | 1.5s] (Wet Reflections): Wet ground reflects the lights as walkers' feet pass\n• Cut 9 [0:13.5–0:15 | 1.5s] (Closing Time): A vendor lowers the shutter as the last warm lights fade\n\nMotion & Continuity Rules:\n1. Follow the panels in order from first to last.\n2. Keep the subject's look, clothing and the lighting consistent across every cut.\n3. Use smooth, physically plausible camera moves; no on-screen text or logos.",
+      "shots": [
+        {
+          "cut": "#1",
+          "shot": "Market Entrance",
+          "camera": "Wide, static",
+          "action": "Glowing paper lanterns and string lights above a lively lane",
+          "time": "0:00–0:02 (2s / 48f)"
+        },
+        {
+          "cut": "#2",
+          "shot": "Charcoal Grill",
+          "camera": "Close, static",
+          "action": "Skewers grill over charcoal with smoke and sparks",
+          "time": "0:02–0:04 (2s / 48f)"
+        },
+        {
+          "cut": "#3",
+          "shot": "Pan-fry",
+          "camera": "Overhead",
+          "action": "Pan-fried buns sizzle on a wide griddle",
+          "time": "0:04–0:05.5 (1.5s / 36f)"
+        },
+        {
+          "cut": "#4",
+          "shot": "Hand-over",
+          "camera": "Medium, static",
+          "action": "A vendor hands a paper tray of food to a customer",
+          "time": "0:05.5–0:07 (1.5s / 36f)"
+        },
+        {
+          "cut": "#5",
+          "shot": "Crowd Flow",
+          "camera": "Tracking",
+          "action": "The camera moves through the busy lane among the crowd",
+          "time": "0:07–0:09 (2s / 48f)"
+        },
+        {
+          "cut": "#6",
+          "shot": "Ring Toss",
+          "camera": "Medium, static",
+          "action": "Children play a ring-toss game with glowing prizes",
+          "time": "0:09–0:10.5 (1.5s / 36f)"
+        },
+        {
+          "cut": "#7",
+          "shot": "Sharing Snacks",
+          "camera": "Close, handheld",
+          "action": "Friends share fried snacks from a paper bag",
+          "time": "0:10.5–0:12 (1.5s / 36f)"
+        },
+        {
+          "cut": "#8",
+          "shot": "Wet Reflections",
+          "camera": "Low angle",
+          "action": "Wet ground reflects the lights as walkers' feet pass",
+          "time": "0:12–0:13.5 (1.5s / 36f)"
+        },
+        {
+          "cut": "#9",
+          "shot": "Closing Time",
+          "camera": "Slow pull-back",
+          "action": "A vendor lowers the shutter as the last warm lights fade",
+          "time": "0:13.5–0:15 (1.5s / 36f)"
+        }
+      ],
+      "translations": {
+        "zh": {
+          "imagePrompt": "一張乾淨的 3x3 九宮格分鏡台紙，9 格等大，以細白邊隔開。主體：一條掛滿燈籠、有小吃攤商的夜市巷道。第 1 格：熱鬧巷道上方的發亮紙燈籠與燈串。 第 2 格：串燒在炭火上烤著，冒出煙與火星。 第 3 格：寬大的煎台上，煎包滋滋作響。 第 4 格：攤商把一盤小吃遞給客人。 第 5 格：鏡頭穿過熱鬧人潮的巷道。 第 6 格：孩子們玩著擺滿發亮獎品的套圈圈。 第 7 格：朋友們分食紙袋裡的炸物。 第 8 格：濕潤的地面倒映燈光，行人的腳步走過。 第 9 格：攤商拉下鐵門，最後的暖光漸漸熄滅。所有格子的主體、色調與光線保持一致。暖黃燈光・熱鬧，寫實攝影質感，畫面不要任何文字、字幕、浮水印或標誌。",
+          "videoPrompt": "[目標長度：15s｜24FPS]\n視覺依據：以上傳的 9 格分鏡台紙作為連續的視覺參考。\n\n場景：夜市小吃之夜\n風格與氛圍：暖黃燈光・熱鬧\n\n鏡頭進程與節奏（共 15 秒）：\n• 第 1 鏡 [0:00–0:02 | 2 秒]（夜市入口）：熱鬧巷道上方的發亮紙燈籠與燈串\n• 第 2 鏡 [0:02–0:04 | 2 秒]（炭烤）：串燒在炭火上烤著，冒出煙與火星\n• 第 3 鏡 [0:04–0:05.5 | 1.5 秒]（煎台）：寬大的煎台上，煎包滋滋作響\n• 第 4 鏡 [0:05.5–0:07 | 1.5 秒]（遞餐）：攤商把一盤小吃遞給客人\n• 第 5 鏡 [0:07–0:09 | 2 秒]（人潮穿梭）：鏡頭穿過熱鬧人潮的巷道\n• 第 6 鏡 [0:09–0:10.5 | 1.5 秒]（套圈圈）：孩子們玩著擺滿發亮獎品的套圈圈\n• 第 7 鏡 [0:10.5–0:12 | 1.5 秒]（邊走邊吃）：朋友們分食紙袋裡的炸物\n• 第 8 鏡 [0:12–0:13.5 | 1.5 秒]（雨後倒影）：濕潤的地面倒映燈光，行人的腳步走過\n• 第 9 鏡 [0:13.5–0:15 | 1.5 秒]（收攤）：攤商拉下鐵門，最後的暖光漸漸熄滅\n\n運鏡與連戲規則：\n1. 依照分鏡台紙從第一格到最後一格的順序進行。\n2. 每一鏡的主體外觀、服裝與光線保持一致。\n3. 運鏡平順、符合物理；畫面不要出現文字或標誌。",
+          "shots": [
+            {
+              "cut": "#1",
+              "shot": "夜市入口",
+              "camera": "廣角定鏡",
+              "action": "熱鬧巷道上方的發亮紙燈籠與燈串",
+              "time": "0:00–0:02 (2s / 48f)"
+            },
+            {
+              "cut": "#2",
+              "shot": "炭烤",
+              "camera": "近景定鏡",
+              "action": "串燒在炭火上烤著，冒出煙與火星",
+              "time": "0:02–0:04 (2s / 48f)"
+            },
+            {
+              "cut": "#3",
+              "shot": "煎台",
+              "camera": "頂部俯拍",
+              "action": "寬大的煎台上，煎包滋滋作響",
+              "time": "0:04–0:05.5 (1.5s / 36f)"
+            },
+            {
+              "cut": "#4",
+              "shot": "遞餐",
+              "camera": "中景定鏡",
+              "action": "攤商把一盤小吃遞給客人",
+              "time": "0:05.5–0:07 (1.5s / 36f)"
+            },
+            {
+              "cut": "#5",
+              "shot": "人潮穿梭",
+              "camera": "跟拍",
+              "action": "鏡頭穿過熱鬧人潮的巷道",
+              "time": "0:07–0:09 (2s / 48f)"
+            },
+            {
+              "cut": "#6",
+              "shot": "套圈圈",
+              "camera": "中景定鏡",
+              "action": "孩子們玩著擺滿發亮獎品的套圈圈",
+              "time": "0:09–0:10.5 (1.5s / 36f)"
+            },
+            {
+              "cut": "#7",
+              "shot": "邊走邊吃",
+              "camera": "近距離手持",
+              "action": "朋友們分食紙袋裡的炸物",
+              "time": "0:10.5–0:12 (1.5s / 36f)"
+            },
+            {
+              "cut": "#8",
+              "shot": "雨後倒影",
+              "camera": "低角度",
+              "action": "濕潤的地面倒映燈光，行人的腳步走過",
+              "time": "0:12–0:13.5 (1.5s / 36f)"
+            },
+            {
+              "cut": "#9",
+              "shot": "收攤",
+              "camera": "緩慢拉遠",
+              "action": "攤商拉下鐵門，最後的暖光漸漸熄滅",
+              "time": "0:13.5–0:15 (1.5s / 36f)"
+            }
+          ],
+          "provenance": "AwareWave 自製範例的提示詞，可自由修改使用。"
+        }
+      }
+    }
+  ]
+}

@@ -35,14 +35,14 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   const blender3d = () => (blenderJobs ||= require("./blender-jobs.cjs").createBlenderJobs({ dataDir, mediaStore, env }));
   const meshy = require("./meshy.cjs");
   // The one check for every url the client sends as a local file: /generated/<uuid>.<ext>,
-  // /media/<sha256>/original.<ext> (only when stored) and, with assets, /assets/<name>.
+  // /media/<sha256>/original.<ext> (only when stored) and, with assets, /assets/<name> and our own /examples/<name> (picked by the user, never a default).
   function localFile(url, { assets = false } = {}) {
     if (/^\/generated\/[a-f0-9-]+\.[a-z0-9]+$/.test(url || ""))
       return path.join(dataDir, url.slice(1));
     const media = mediaStore.fileFor(url);
     if (media) return media;
-    const asset = assets && /^\/assets\/([\w.-]+)$/.exec(url || "");
-    return asset ? path.join(__dirname, "../assets", asset[1]) : null;
+    const asset = assets && /^\/(assets|examples)\/([\w.-]+)$/.exec(url || "");
+    return asset ? path.join(__dirname, "..", asset[1], asset[2]) : null;
   }
   // P6 L3: a finished file goes to the main system's asset ledger (sources = every local url in the job input).
   async function register(url, origin, { sources = [], costUsd, jobId, ratio } = {}) {

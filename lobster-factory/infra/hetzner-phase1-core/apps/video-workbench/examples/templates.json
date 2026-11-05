@@ -1,0 +1,156 @@
+{
+  "templates": [
+    {
+      "id": "aw-t-001",
+      "name": "商品旋轉展示",
+      "category": "產品介紹",
+      "ratio": "9:16",
+      "seconds": 10,
+      "replace": 2,
+      "author": "AwareWave",
+      "date": "11-05-26",
+      "tag": [
+        "商品",
+        "旋轉展示",
+        "電商"
+      ],
+      "img": "/examples/aw-t-001.webp",
+      "prompt": "把畫面中的商品替換為 @image1，保持原本的緩慢旋轉與柔光桌面，背景色參考 @image2。",
+      "description": "單一商品在柔光桌面上緩慢旋轉，適合電商主圖影片。",
+      "imagePrompt": "A single small product, a ceramic mug, slowly rotating on a soft-lit pastel tabletop, clean studio look, shallow depth of field"
+    },
+    {
+      "id": "aw-t-002",
+      "name": "新店開幕預告",
+      "category": "產品介紹",
+      "ratio": "16:9",
+      "seconds": 15,
+      "replace": 3,
+      "author": "AwareWave",
+      "date": "11-05-26",
+      "tag": [
+        "開幕",
+        "店面",
+        "預告"
+      ],
+      "img": "/examples/aw-t-002.webp",
+      "prompt": "把畫面中的店面替換為 @image1，招牌與門口擺設參考 @image2，店內氣氛參考 @image3。",
+      "description": "從店門口推進到店內的開幕預告，三個素材可替換。",
+      "imagePrompt": "A small shop front at golden hour with the door opening inward and warm interior light, empty sign board, welcoming mood"
+    },
+    {
+      "id": "aw-t-003",
+      "name": "毛孩日常",
+      "category": "寵物主題",
+      "ratio": "9:16",
+      "seconds": 12,
+      "replace": 2,
+      "author": "AwareWave",
+      "date": "11-05-26",
+      "tag": [
+        "寵物",
+        "日常",
+        "短影音"
+      ],
+      "img": "/examples/aw-t-003.webp",
+      "prompt": "把畫面中的小狗替換為 @image1，保持散步、奔跑、午睡三個場景的節奏，場景色調參考 @image2。",
+      "description": "一天三個場景的毛孩短影音，換成你家毛孩即可。",
+      "imagePrompt": "A small dog trotting along a sunny park path, soft natural light, joyful mood, vertical composition"
+    },
+    {
+      "id": "aw-t-004",
+      "name": "三步驟教學",
+      "category": "教育生活",
+      "ratio": "16:9",
+      "seconds": 20,
+      "replace": 4,
+      "author": "AwareWave",
+      "date": "11-05-26",
+      "tag": [
+        "教學",
+        "步驟",
+        "教育"
+      ],
+      "img": "/examples/aw-t-004.webp",
+      "prompt": "把第一步的示範物件替換為 @image1，第二步為 @image2，第三步為 @image3，結尾畫面使用 @image4。",
+      "description": "把一件事拆成三個步驟示範，每個步驟一張素材。",
+      "imagePrompt": "A bright desk with hands performing a simple three-step craft demonstration, top-down view, clean and tidy, educational tone"
+    },
+    {
+      "id": "aw-t-005",
+      "name": "角色律動",
+      "category": "動作跳舞",
+      "ratio": "9:16",
+      "seconds": 8,
+      "replace": 2,
+      "author": "AwareWave",
+      "date": "11-05-26",
+      "tag": [
+        "角色",
+        "跳舞",
+        "律動"
+      ],
+      "img": "/examples/aw-t-005.webp",
+      "prompt": "把畫面中的舞者替換為 @image1，背景參考 @image2，保持原本的節拍與動作。",
+      "description": "一個角色在簡單背景前跟著節拍律動的短片。",
+      "imagePrompt": "A cheerful cartoon-style character dancing in a simple colorful room, dynamic pose, vertical composition"
+    },
+    {
+      "id": "aw-t-006",
+      "name": "店面形象影片",
+      "category": "建物環境",
+      "ratio": "16:9",
+      "seconds": 15,
+      "replace": 3,
+      "author": "AwareWave",
+      "date": "11-05-26",
+      "tag": [
+        "店面",
+        "建築",
+        "形象"
+      ],
+      "img": "/examples/aw-t-006.webp",
+      "prompt": "保持原影片的鏡頭運動，把建築外觀替換為 @image1，招牌區域使用 @image2，周邊街景參考 @image3。",
+      "description": "沿街緩慢推進的店面形象影片，適合民宿、工作室與門市。",
+      "imagePrompt": "A calm street-level view of a small low-rise shop building with large windows and plants at the entrance, late afternoon light"
+    },
+    {
+      "id": "aw-t-007",
+      "name": "吉祥物開場",
+      "category": "角色創作",
+      "ratio": "16:9",
+      "seconds": 8,
+      "replace": 2,
+      "author": "AwareWave",
+      "date": "11-05-26",
+      "tag": [
+        "吉祥物",
+        "開場",
+        "品牌"
+      ],
+      "img": "/examples/aw-t-007.webp",
+      "prompt": "把畫面中的吉祥物替換為 @image1，開場背景參考 @image2，保持揮手與跳入畫面的動作。",
+      "description": "品牌吉祥物跳入畫面揮手的開場片頭。",
+      "imagePrompt": "A friendly round mascot character waving at the camera in front of a soft gradient background, playful, clean illustration style"
+    },
+    {
+      "id": "aw-t-008",
+      "name": "上班前後對比",
+      "category": "創意迷因",
+      "ratio": "9:16",
+      "seconds": 10,
+      "replace": 3,
+      "author": "AwareWave",
+      "date": "11-05-26",
+      "tag": [
+        "上班",
+        "對比",
+        "趣味"
+      ],
+      "img": "/examples/aw-t-008.webp",
+      "prompt": "把畫面中的主角替換為 @image1，早上的場景參考 @image2，下班後的場景參考 @image3，保持前後對比的剪接節奏。",
+      "description": "同一個人早上與下班後的狀態對比，輕鬆的趣味短片。",
+      "imagePrompt": "Split-moment portrait of an office worker, left side fresh and neat in morning light, right side relaxed on a sofa in warm evening light, humorous mood"
+    }
+  ]
+}
