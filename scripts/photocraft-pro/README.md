@@ -70,25 +70,4 @@ PLAYWRIGHT_DIR=D:/Work/lobster-factory/infra/hetzner-phase1-core/tests node scri
 
 ## ctx 指令序列
 
-實測於上述 smoke（2026-11-06）。`ex(c,p)`＝`photocraft.execute(c,p)`；`inv(id)`＝`photocraft.request('ui.menu.invoke',{id})`；「等 save」＝等下一個 `photocraft:save`（網頁版存檔對話框直接用建議檔名，所以**一次只跑一個**、照順序配對，不靠檔名）；開檔＝父頁 `postMessage({type:'photocraft:open', name, bytes}, origin, [bytes])` 後輪詢 `request('ui.inspect').session.documents` 出現該名。文件索引＝`session.documents[].index`，作用中＝`session.active`。undo 步數＝`execute('document.inspect').history.length` 差。
-
-| 動作 | 序列 | 原文件 undo | 結果 |
-|---|---|---|---|
-| 開檔 | `photocraft:open {name, bytes}` | 0（新分頁） | PNG／SVG／PSD 開成新文件；`session.documents[].path` 為 null |
-| 整張 PNG | `inv('file.export.quickExportAsPng')` → 等 save | 0 | `<文件名>.png`，PNG 簽名 |
-| 整張 WebP（JPEG 同法） | `inv('file.export.exportAs')` → 回 `{dialog:id}` → `request('ui.dialog.set',{dialog:id, field:'format', value:'webp'})`（另有 `quality`、`width/height`、`transparency` 欄）→ `request('ui.dialog.confirm',{dialog:id})` → 等 save | 0 | `<文件名>.webp`，RIFF 簽名 |
-| 分層原檔 | `inv('file.saveAs')`（或 `file.saveACopy`）→ 等 save | 0 | **`.psd`**（`<名>.psd`／`<名> copy.psd`），分層、重開可編；**`.pcraft` 做不到**，見下 |
-| SVG 置入 | 開 SVG（成文件 k）→ `ex('layer.copyToDocument',{document:目標, center:true, name})` → `ex('file.close',{document:k, save:'discard'})` | 1 | 成 **Shape 圖層**（向量，不是點陣）、置中、為作用中圖層 |
-| 圖片置入成新圖層 | 開圖（文件 k）→ `ex('layer.copyToDocument',{document:目標, at:[cx,cy] 或 center:true, name})` → 關 k | 1 | 原像素大小、`at` 為中心點、在作用中圖層之上 |
-| 取作用中圖層像素 | `ex('layer.list')` 取 `bounds [x,y,w,h]` → `ex('layer.duplicate',{layer:id, document:'new'})` → `ex('image.crop',{x,y,width:w,height:h})` → `inv('file.export.quickExportAsPng')` → 等 save → `ex('file.close',{save:'discard'})` → `ex('document.activate',{document:原})` | 0 | PNG＝圖層 bounds 大小（實測 120×80） |
-| 換作用中圖層像素 | 記 `{id, name, bounds}` → 開新圖（文件 k）→ `ex('layer.copyToDocument',{document:原, at:[x+w/2, y+h/2], name})` → 關 k → `ex('layer.delete',{layer:舊id})` | 2 | 堆疊位置、bounds、名稱不變（實測 idx 0→0、[40,60,120,80]→同）；新 id；圖層樣式／遮色片不帶過去 |
-| 選取→遮罩 PNG（作用中圖層框） | 取作用中圖層 bounds → `ex('image.duplicate',{name:'__mask'})`（副本帶選取）→ `ex('layer.new.layer')` → `ex('edit.fill',{contents:'white'})` → `ex('select.inverse')` → `ex('edit.fill',{contents:'black'})` → `ex('image.crop',{x,y,width:w,height:h})` → `inv('file.export.quickExportAsPng')` → 等 save → `ex('file.close',{save:'discard'})` → `ex('document.activate',{document:原})`。沒選取＝`execute('document.inspect').hasSelection` false → 回 null | 0（選取保留） | 白＝選取、黑＝其餘、不透明；實測 50×30 選取 → 120×80 圖中白 1500 點。座標框＝作用中圖層 bounds（W3 的假設） |
-| 快速遮色片塗出的範圍 | `ex('select.editInQuickMaskMode',{on:true})` → 使用者塗 → `{on:false}` → 選取 → 同上一列 | 3（進、每筆、出各 1；改 `channel.options` 再 +1） | PhotoCraft 的快速遮色片**以白色＝選取**（實測：`indicates:'selected'`＋塗白 → 選取＝筆畫；預設模式先 `edit.fill black` 再塗白 → 選取＝筆畫）。預設前景是黑、無選取進 Q 時全為選取，**直接塗＝把塗到的排除**（選取＝整張扣筆畫），與舊編輯器「紅筆塗＝要改」相反 → 面板說明（C4.3）要寫成「按 Q，按 X 換白色再塗」，或轉接器在進 Q 時先 `channel.options {channel:'quickMask', indicates:'selected'}`（要在 Q 開啟中設才生效）＋前景改白 |
-| 圖層縮到符合／填滿畫布 | 取 `bounds b`、畫布 `W×H`（`ui.inspect().document` 或 `session.documents`）→ `s = min(W/b.w, H/b.h)`（填滿用 max）→ 目標框置中 → `ex('edit.transform',{layer:id, quad:[[x,y],[x+w,y],[x+w,y+h],[x,y+h]]})` | 1 | 實測 120×80 → 符合 `[0,16,400,268]`、填滿 `[-25,0,450,300]` |
-
-**整張存原始檔＝`.psd`**（`inv('file.saveAs')`；網頁版不出 `.pcraft`，`crates/ui-egui/src/app/files.rs:236-245`；主 session 2026-11-06 定案 My Designs 原始檔存 `.psd`，不加補丁）。
-
-做不到（需要決定，沒有自行加補丁）：
-
-1. **`.pcraft` 原生檔存不出來**。網頁版路徑型存檔全部關閉（`crates/engine/src/cmd/file_cmds.rs:76`「not available on the web (no file system)」，`file.saveACopy {path}`、`layer.exportAs {path}` 同）；互動式另存的副檔名由上游決定：文件沒有自己的路徑時，只有 `.pdn`→`pcraft`、`.kra`→`ora`，其餘一律 `.psd`（`crates/ui-egui/src/app/files.rs:236-245`）。網頁版開檔一律沒有路徑，連開一個 `.pcraft` 再另存也會變 `.psd`；網頁存檔對話框直接回建議檔名，使用者也改不了。選項：(a) My Designs 原始檔改存 `.psd`（零補丁，現在就能做；PhotoCraft 讀寫 PSD 含圖層，但 PhotoCraft 專有、PSD 表達不了的東西會降級）；(b) 接線補丁多一處：有宿主時 `FileDialogRequest::Save` 的回答由頁面指定副檔名（計畫外補丁，要操作者同意）；(c) 向上游提「網頁版 Save As 預設 `.pcraft`」。影響卡 C5.1／C5.2（W4 正在做 `.pcraft` 嗅探）。
-2. 存檔訊息的 `saveAs` 恆為 `false`、沒有 `id`：宿主收到 `photocraft:save` 就要可靠落地；失敗時文件已被標成已存（`write_unconfirmed=false`），離頁保護解除——C4.2 的父頁存檔要「存不成就提示並保留 bytes」。
+已搬到 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/public/editor-shared/ctx-contract.md`「PhotoCraft」段（實作 `ctx-photocraft.js`；卡 C4.2）。
