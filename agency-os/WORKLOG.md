@@ -1,4 +1,27 @@
 # Worklog
+## 2026-11-06（續5）外聯 v2 C16.2：一致率量測無效（免費 Gemini 每日上限）→ 修正並改成三天分量；清 inbox／游標；監工台 v39
+
+**根因**
+- C1：11-05 分批量測（`/root/c162-batches.sh`，11:20–18:52 UTC）10 批全部 `n=20 agreed=0 errors=40`，`firstError="The operation was aborted due to timeout"`。容器內直打 Gemini：`429 RESOURCE_EXHAUSTED`，`quotaId=GenerateRequestsPerDayPerProjectPerModel-FreeTier`，`limit: 500`，`retry in 9h48m`。`lib/ai/cheap-json.ts` 舊 `geminiRetryMs` 把數小時的 retryDelay 壓成 60 s 重試 3 次，全耗在 claim-check 的 120 s 逾時裡（`lib/outreach/claim-check.ts:52`）。
+- C2：200 封多數決 ≈ 每封 4–6 次呼叫 ≈ 1000 次 > 一天 500 次，且管線共用同一把金鑰 → 一天量不完，必須分天；分天時新信會讓 offset 位移 → 要固定樣本。
+- m1：舊批次腳本收「`ok && n`」就算成功，沒擋全錯的批（新腳本只收 `errors==0`，第 3 次才照收）。
+
+**做了**
+- b29c0aa31：`geminiRetryMs` 回 `null` 當 delay > 60 s → 立刻回 `gemini_429_daily_quota`（不空等、不重試）；claim-consistency route 收 `until` 固定樣本。測試＋突變。已 sg-deploy。
+- 主機 `/root/c162-daily.sh`＋`/etc/cron.d/c162`（08:30 UTC，Google 太平洋午夜重設後；每天 4 批 ≈ 360 次，留給管線）；10 批收齊寫 DONE 並自刪 cron。舊結果移到 `/root/c162/old-2026-11-05/`。報告 `agency-os/reports/outreach/c16-2-claim-consistency-2026-11-05.json`（valid=false）。
+- 五次量測對照：11-04 單次對單次（OpenAI nano/mini）0.89／0.92／0.87／0.93；11-05 多數決＋Gemini = 無效（全逾時）。C16.2 未完成，門檻 95% 不動。
+- OpenAI 額度事件：11-04 測試花 US$4.61 把平台 OpenAI 額度用完（credit_balance_exhausted 10:20 UTC），操作者選免費 Gemini、不儲值（2138c5e2c）；產信 AI 失敗往下一階（81a1b43a0）。
+- 清測試資料（一個交易）：co_lead_inbox 520 列、co_search_cursors 17 列 → 0 殘留。289 筆 REALTEST 名單與其信件／證據／profile 量完才清（量測就是這些信）。
+- 監工台 data.mjs：NOW 補搜尋游標（b7598e8cc）、Gemini 切換、每日上限；C16.2 文字；`node build.mjs && node check.mjs` = 73/78；發布 DbH1HLUihZwAiBiJZGSD4t v39。交接檔 §0 已更新。
+
+**避免再發生**：量測工具的呼叫量要先對照供應商每日上限；批次只收無錯批。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-next-admin node /tmp/gprobe.js (Gemini 3 calls: 200 then 429 daily limit 500) | exit=0 | ms=1500
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/ai/__tests__/cheap-json-gemini.test.ts lib/outreach (32 files 268 passed; mutation guard removed -> 1 red, restored -> 5 green) | exit=0 | ms=2930
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin (deployed b29c0aa31, smoke all OK) | exit=0 | ms=330000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n
+- ORACLE_WAIVED: codex quota blocked until 2026-11-08 11:18 (scripts/oracle-quota.ps1 exit 3); written self-review + mutation evidence above
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=geminiRetryMs|claim-consistency | hits=6
 ## 2026-11-06（續4）影音工作台：操作者選路線 B（並存）；卡 PJ／FC／EC 排進總計畫與監工台（只有文件）
 
 - 決定：操作者 2026-11-06 選 B。FilmCraft＝「專業剪輯」、EffectCraft＝「專業特效」，跟自製工具並存；先做專案主線。前情：同日（續2）。

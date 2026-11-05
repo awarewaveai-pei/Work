@@ -4,7 +4,18 @@ created_utc: 2026-11-05T11:05:00Z
 hint: "C16.2 fifth consistency measure running on host; finish = read result, clean test data, supervisor, WORKLOG"
 ---
 
-**續接語**：「續做外聯 C16.2：讀 agency-os/handoffs/2026-11-05-outbound-c16-2-handoff.md，從 §2 第 1 步開始；完成 = 結果判定＋測試資料 0 殘留＋監工台與 WORKLOG 更新。建議模型：Opus 5.5」
+**續接語**：「續做外聯 C16.2：讀 agency-os/handoffs/2026-11-05-outbound-c16-2-handoff.md，從 §0 第 1 步開始；完成 = 結果判定＋測試資料 0 殘留＋監工台與 WORKLOG 更新。建議模型：Opus 5.5」
+
+## 0. 2026-11-06 更新（先讀這段；§1–§2 是 11-05 的舊狀態）
+- 11-05 那次 200 封全部 `errors=40`、`firstError="The operation was aborted due to timeout"`＝無效（`agency-os/reports/outreach/c16-2-claim-consistency-2026-11-05.json`）。根因：免費 Gemini 每天每模型 500 次上限，用完後重試空等到 120 s 逾時。修正 b29c0aa31（已部署）：當天上限用完立刻回 `gemini_429_daily_quota`；route 加 `until` 固定樣本。
+- 重量：主機 `/root/c162-daily.sh`，`/etc/cron.d/c162` 每天 08:30 UTC 跑 4 批（約 360 次呼叫，留額度給管線），`until=2026-11-04T23:59:59Z`。有錯的批隔天重跑，第 3 次照收。10 批收齊寫 `/root/c162/DONE` 並自刪 cron。預計 11-08 收齊。進度 `sudo cat /root/c162/log`。舊結果在 `/root/c162/old-2026-11-05/`。
+- 已清：co_lead_inbox 520 列、co_search_cursors 17 列（0 殘留）。**未清**：289 筆名單與其信件、證據、profile（量測就是用這些信，量完才清）。
+- 監工台已更新（C16.2 說明、Gemini、搜尋游標）。WORKLOG 已寫。
+
+**剩下步驟**：
+1. `sudo cat /root/c162/log /root/c162/DONE` → DONE 在就加總 10 批（rate = Σagreed／Σn），覆寫 `c16-2-claim-consistency-2026-11-08.json`（新檔）。
+2. 照 §2 第 2 步判定；第 3 步只剩名單那部分（inbox／游標已清）。
+3. data.mjs C16.2 改文字或 done；build／check／發布；WORKLOG 一則。
 
 ## 1. 現況（2026-11-05 11:00 UTC）
 - 正式站 next-admin = 31e89c479（含外聯 1cf4e2274 以前全部）。外聯 AI：研究／事實核對／回信分類 = 免費 Gemini `gemini-3.5-flash-lite`（`NA/lib/outreach/ai-gemini.ts OUTREACH_JSON_MODEL`），OpenAI 平台帳戶額度用完（操作者選 Gemini，不儲值）；產信 AI 失敗會往下一階（81a1b43a0）。
