@@ -1,12 +1,62 @@
 diff --git a/crates/text/web-fonts.txt b/crates/text/web-fonts.txt
-index 7dbb8953b..5aef3c449 100644
+index 7dbb8953b..3da8e9dcb 100644
 --- a/crates/text/web-fonts.txt
 +++ b/crates/text/web-fonts.txt
-@@ -6,6 +6,7 @@
+@@ -6,6 +6,57 @@
  startup | Noto Sans Arabic | Regular
  startup | Noto Sans Thai | Regular
  startup | Noto Sans Georgian | Regular
-+startup | Noto Sans TC | Regular
++background | Noto Sans TC | Regular
++background | Noto Sans HK | Regular
++background | Noto Serif HK | Regular
++background | Noto Serif TC | Regular
++background | Abril Fatface | Regular
++background | Anton | Regular
++background | Archivo Black | Regular
++background | Bebas Neue | Regular
++background | Bitter | Regular
++background | Bungee | Regular
++background | Caveat | Regular
++background | Cinzel | Regular
++background | Comfortaa | Regular
++background | Cormorant | Regular
++background | Crimson Text | Regular
++background | DM Sans | Regular
++background | Dancing Script | Regular
++background | EB Garamond | Regular
++background | Fredoka | Regular
++background | Great Vibes | Regular
++background | Inter | Regular
++background | JetBrains Mono | Regular
++background | Kanit | Regular
++background | Lato | Regular
++background | Lobster | Regular
++background | Lora | Regular
++background | Manrope | Regular
++background | Merriweather | Regular
++background | Montserrat | Regular
++background | Mulish | Regular
++background | Nunito | Regular
++background | Open Sans | Regular
++background | Oswald | Regular
++background | PT Serif | Regular
++background | Pacifico | Regular
++background | Permanent Marker | Regular
++background | Playfair Display | Regular
++background | Poppins | Regular
++background | Quicksand | Regular
++background | Raleway | Regular
++background | Righteous | Regular
++background | Roboto | Regular
++background | Roboto Mono | Regular
++background | Rubik | Regular
++background | Sacramento | Regular
++background | Satisfy | Regular
++background | Shadows Into Light | Regular
++background | Source Code Pro | Regular
++background | Space Mono | Regular
++background | Teko | Regular
++background | Work Sans | Regular
  background | Cairo | Regular
  background | Tajawal | ExtraLight
  background | Tajawal | Light

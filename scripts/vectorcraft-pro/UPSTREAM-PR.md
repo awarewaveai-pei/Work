@@ -28,3 +28,33 @@ The promise resolves immediately (the call is synchronous under the hood) — a 
 only to match every other `window.vectorcraft` method.
 
 合併後：PIN.json `rev` 升到含該 commit 的版本，刪 `api-addfont.patch`，build.sh 的 patch 迴圈移除該檔。
+
+---
+
+# Upstream PR draft 2 — setTheme（分支疊在 addFont 分支上；patch 以 addFont 已套用為前提）
+
+分支：`feat/web-api-settheme`（base = `feat/web-api-addfont`；`git apply api-settheme.patch` 前先套 addFont）。
+
+## Title
+
+Web API: `setTheme()` lets an embedding page supply the UI's theme tokens
+
+## Body
+
+An embedder hosting VectorCraft in an `<iframe>` usually has its own palette; four
+brightness levels can sit close to it but never match it. `window.vectorcraft.setTheme(obj)`
+builds a token set — a light or dark base chosen by the given panel colour's luma, each
+given field (`theme::Tokens`' colour fields, `"#rrggbb"`, plus `radius`) overriding it —
+and installs it as a host override in `ui-egui`'s theme:
+
+- `theme::apply_with` now records the app's chosen brightness/accent/scheme and prefers
+  a host override when one is set, so the app's own re-applies (prefs, brightness menu)
+  keep the host's look; `theme::apply_tokens` is the extracted apply step.
+- `theme::set_host_tokens(ctx, Some(t))` applies at once; `None` clears the override and
+  restores the recorded app choice. The override lives in the egui context's data, so a
+  graphics restart (a new context) drops it and the page simply sets it again.
+- `setTheme` resolves with the field names applied; unknown fields or malformed values
+  reject listing every offence, so an embedder's mapping bugs surface at once.
+  `setTheme(null)` restores the app's own theme.
+
+合併後：同 addFont — PIN `rev` 升版、刪 `api-settheme.patch`、build.sh patch 迴圈移除（`awarewave-theme-receiver.js` 是我們自己的注入，不隨 PR 走、保留）。

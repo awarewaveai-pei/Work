@@ -29,7 +29,8 @@ powershell -ExecutionPolicy Bypass -File D:\Work\scripts\vectorcraft-pro\build.p
 |---|---|
 | `rev` | storytold/vectorcraft commit（`<rev前7碼>` = dist 目錄名） |
 | `craftFontsRev` | storytold/craft-fonts commit（CI/release 同一顆：`.github/workflows/ci.yml:25`） |
-| `notoSansTc` | 繁中字型：notofonts/noto-cjk 的 SubsetOTF/TC（OFL-1.1），url+sha256 釘死；licence 複製 craft-fonts 既有 `fonts/noto-sans-cjk-sc/OFL.txt`（同一 Noto CJK 專案同一份 OFL） |
+| `googleFontsRev` | google/fonts repo 釘定 commit（latin 字型來源） |
+| `webFonts[]` | 51 個字型（CJK 4：Noto Sans/Serif TC、Sans/Serif HK，來源 notofonts/noto-cjk 釘定 commit；latin 47，來源 google/fonts 釘定 commit），每個 url+sha256+licence(sha) 釘死，build.sh 下載進 craft-fonts checkout 並追加 manifest 列。清單來源 = 舊編輯器 `vector-editor.html:1101-1102@e8786bf3d`＋`editor-shared/blocks/fonts.js:3-4`；**Ubuntu 剔除**（UFL 授權，非 OFL/Apache），其餘 47/48 latin 全為 OFL 或 Apache-2.0（Permanent Marker、Satisfy = Apache） |
 
 升級：改 `rev`（或 `craftFontsRev`）→ 跑 `build.ps1` → 本機 smoke（下方「驗證」）→ 交 C2/C6 流程上線。patch `git apply --check` 失敗 = 上游改了該區 → 重排 patch 再跑。
 上線（主機 ks-aw-01，High）：`tar cf - <dist名> | ssh … 'sudo tar xf - -C /root/lobster-phase1/static/vector-pro'` → 主機 `sha256sum -c SHA256SUMS` → `ln -sfn <dist名> current` → `BASE_URL=https://app.aware-wave.com npx playwright test smoke/05-vector-pro.spec.ts --project=smoke`（`lobster-factory/infra/hetzner-phase1-core/tests`）。nginx／compose 只在第一次上線時改（已完成 2026-11-05），換版本不用動。
@@ -39,10 +40,19 @@ powershell -ExecutionPolicy Bypass -File D:\Work\scripts\vectorcraft-pro\build.p
 
 | 檔 | 做什麼 |
 |---|---|
-| `web-fonts.patch` | `crates/text/web-fonts.txt` 加 `startup \| Noto Sans TC \| Regular`（manifest 列由 build.sh 動態追加到 craft-fonts checkout） |
-| `api-addfont.patch` | `apps/vectorcraft-web/src/api.rs` `install()` 加 `addFont(bytes: Uint8Array) → Promise<number>`：`FontDb::global().add_font()`（同 `fonts.rs:71`）→ 回加入 face 數 + `request_repaint()`。C4 字型面板（Google Fonts 搜尋/上傳）靠它。上游 PR 文字見 `UPSTREAM-PR.md`；合併後改 PIN 刪補丁 |
+| `web-fonts.patch` | `crates/text/web-fonts.txt` 加 51 行 `background \| <family> \| Regular`（PIN `webFonts[]` 全部；manifest 列由 build.sh 動態追加到 craft-fonts checkout）。**startup vs background**（`crates/text/web-fonts.txt:2-4`）：startup 在 app 啟動前抓（擋首載，`apps/vectorcraft-web/src/fonts.rs:27-35`）；background 在啟動後抓（4 併發、不擋首載，`fonts.rs:38-60`）——上游**沒有**「點選才載」的真按需，background 是全部延後抓；CJK 大字型因此全走 background，首載只付 wasm |
+| `api-addfont.patch` | `apps/vectorcraft-web/src/api.rs` `install()` 加 `addFont(bytes: Uint8Array) → Promise<number>`：`FontDb::global().add_font()`（同 `fonts.rs:71`）→ 回加入 face 數 + `request_repaint()`。上游 PR 文字見 `UPSTREAM-PR.md`；合併後改 PIN 刪補丁 |
+| `api-settheme.patch` | ① `crates/ui-egui/src/theme.rs`：`apply_with` 拆出 `apply_tokens(ctx, t)`、記錄 `AppChoice`；新增 `set_host_tokens(ctx, Option<Tokens>)` 宿主覆寫（有值時 app 自己重套主題也用它，`None` 還原 app 自選）② `api.rs` 加 `setTheme(obj) → Promise<string[]>`：panel 色亮度（Rec.601 luma≥128→Light）選 `Tokens::for_brightness` 基底，39 個 Color32 欄＋`radius` 逐欄覆寫，未知欄/壞值全列出 reject；`setTheme(null)` 清除 |
+| `awarewave-theme-receiver.js` | **我們的**，非上游：build 注入 dist index.html `</body>` 前。協定（SSOT `NA/components/tools/AwareWaveThemeFrame.tsx`）：載入後向 parent 發 `awarewave:theme-ready` → 收 `{channel:'awarewave:theme', tokens:{'--card-bg':…}}`（只收同源）→ CSS 變數對應成 VectorCraft tokens（對應表在檔內，單一處）→ `setTheme` → 回 `awarewave:theme-applied`；rgb() 自動轉 #rrggbb |
 
-## 驗證（2026-11-05，rev 4cce336）
+## 驗證（2026-11-05 第二輪，dist `4cce336-b9af74d`）
+
+- 建置：`build.ps1` exit 0，179 檔、`SHA256SUMS -c` 全過、54 個字型目錄（51 PIN＋3 上游 startup）逐一驗在；wasm-opt 不變量 0% 增益。
+- `setTheme({panel:'#fbfaf2', app_bar:'#f4f2de', text:'#000000', accent:'#e9b384'})` → resolve `["accent","app_bar","panel","text"]`，整個 UI 變淺色（`smoke-settheme-light.jpg`）；壞輸入 reject 並全列（`bogus_field: unknown field; panel: expected "#rrggbb"`）；`setTheme({panel:'#8b0000'})` 紅→`setTheme(null)` 還原預設 MediumDark（截圖比對）。
+- receiver 協定：同源 `postMessage({channel:'awarewave:theme', tokens:{'--body-bg':'rgb(24,26,31)',…}})` → 收到 `awarewave:theme-applied` 回覆、UI 套上深色（rgb() 轉換 ✓）。
+- 字型：54 個 `/fonts/` 請求全 200、console 無 `web font` 失敗；`text.fontList` families 含抽查 16/16（TC/HK 4 個＋Lato/Caveat/Roboto/JetBrains Mono/Permanent Marker…）；`text.create`＋`text.setStyle {font:'Noto Serif TC'}` 畫布渲染明體「繁體明體字」、字元面板顯示 Noto Serif TC（`smoke-fonts-notoseriftc.jpg`）。注意：`text.fonts` 是「文件已用字型」，可選清單是 `text.fontList`。
+
+## 驗證（2026-11-05 第一輪，rev 4cce336）
 
 - 建置：`build.ps1` 一次通過（exit 0），dist 27 檔、`SHA256SUMS -c` 全過；wasm 89.3MB／gz 32.6MB。
   **上游文件的 17.5MB 是舊數字**：官方 release v0.21.0 的 web zip 實測 wasm = 87.4MB raw／31.9MB zip（`gh release download` 驗證），同量級。首載 ≈33MB（gz），R0-PLAN R2 的「7MB」假設過時。
