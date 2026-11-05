@@ -10,7 +10,8 @@ import { NextResponse } from "next/server";
 import { timingSafeEqual } from "@/lib/security/timingSafeEqual";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { grantFor, runForOrg } from "@/lib/entitlements/grant";
-import { checkClaimsVoted } from "@/lib/outreach/claim-check";
+import type { EvidenceItem } from "@/lib/outreach/brand-context";
+import { checkClaimsVoted, type Recipient } from "@/lib/outreach/claim-check";
 import { measureConsistency, type ConsistencySample } from "@/lib/outreach/claim-consistency";
 import { approvedEvidence, type LeadRow } from "@/lib/outreach/generate";
 
@@ -45,16 +46,20 @@ export async function POST(request: Request) {
   if (leadErr) return NextResponse.json({ ok: false, error: leadErr.message }, { status: 500 });
   const leads = new Map(((leadRows ?? []) as LeadRow[]).map((l) => [l.id, l]));
 
-  const samples: ConsistencySample[] = [];
+  const inputs: Array<{ messageId: string; body: string; evidence: EvidenceItem[]; recipient: Recipient; leadId: string }> = [];
   for (const m of rows) {
     const lead = leads.get(m.lead_id);
     if (!lead) continue;
     const evidence = await approvedEvidence(sb, lead);
     if (!evidence.length) continue;
-    samples.push({ messageId: m.id, organizationId: org,
-      run: async () => checkClaimsVoted({ body: m.body, evidence, recipient: { name: lead.name, website: lead.website ?? null },
-        grant: await grantFor("outreach.qa"), metadata: { lead_id: lead.id, purpose: "claim_consistency" } }) });
+    inputs.push({ messageId: m.id, body: m.body, evidence, recipient: { name: lead.name, website: lead.website ?? null }, leadId: lead.id });
   }
-  const report = await measureConsistency(samples, (o, fn) => runForOrg(o, ACTOR, fn));
+  // One billing scope and one grant for the whole run, like the pipeline tick: a grant per check was a database request
+  // per check, and the gateway answered 429.
+  const report = await runForOrg(org, ACTOR, async () => {
+    const grant = await grantFor("outreach.qa");
+    return measureConsistency(inputs.map((i): ConsistencySample => ({ messageId: i.messageId,
+      run: () => checkClaimsVoted({ body: i.body, evidence: i.evidence, recipient: i.recipient, grant, metadata: { lead_id: i.leadId, purpose: "claim_consistency" } }) })));
+  });
   return NextResponse.json({ ok: true, ...report });
 }
