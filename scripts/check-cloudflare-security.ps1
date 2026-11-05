@@ -89,6 +89,7 @@ $xmlrpcOk   = $false
 $wpLoginChallengeOk = $false
 $rateLimitRuleStatus = "unknown"
 $rateLimitAdminCarveout = "unknown"
+$rateLimitDoorGaps = @()
 $errorMsg   = ""
 # Any exception from the 3 API calls below means that specific check learned NOTHING this
 # run -- not just a 401. A connection failure (DNS/timeout/refused, $code stays $null) or a
@@ -189,6 +190,14 @@ if (-not $token) {
                 $expr -match '/wp-content/' -and
                 $expr -match '/wp-includes/'
             $rateLimitAdminCarveout = if ($hasAdminCarveout) { "present" } else { "missing" }
+            # Every product door (lib/portal/products.ts) is a login-gated SPA whose one page load is 50+ requests:
+            # under this rule (50 req/10s) its own user gets 429 (studio 2026-08-29, video 2026-11-05). Each door host
+            # must be excluded; nginx limits per IP behind it.
+            $productsTs = Join-Path $root "lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\portal\products.ts"
+            foreach ($m in [regex]::Matches((Get-Content -LiteralPath $productsTs -Raw -Encoding UTF8), 'subdomain:\s*"([a-z0-9-]+)"')) {
+                $doorHost = "$($m.Groups[1].Value).aware-wave.com"
+                if ($expr -notmatch [regex]::Escape("http.host ne `"$doorHost`"")) { $rateLimitDoorGaps += $doorHost }
+            }
         } else {
             $rateLimitRuleStatus = "missing"
             $rateLimitAdminCarveout = "missing"
@@ -307,6 +316,7 @@ if (-not $token) {
     # A released-address whitelist rule is a real posture defect (bypasses CF entirely for
     # that source) -- downgrade PASS, same treatment as $lockdownStatus -eq 'inactive' below.
     if ($releasedAddrStatus -eq "FOUND" -and $overall -eq "PASS") { $overall = "WARN" }
+    if ($rateLimitDoorGaps.Count -gt 0 -and $overall -eq "PASS") { $overall = "WARN" }
 }
 
 # Any blind check overrides PASS/WARN (never SKIP -- missing-token is a known, expected
@@ -368,6 +378,7 @@ $lines = @(
     "| xmlrpc.php block rule | $(if ($xmlrpcOk) { 'present' } elseif ($WpLoginProtectedByServerSide) { 'server-side (nginx/LLAR)' } else { 'MISSING' }) |",
     "| Scanner flood rate-limit rule | $rateLimitRuleStatus |",
     "| WP admin rate-limit carve-outs | $rateLimitAdminCarveout |",
+    "| Product doors not excluded from rate limit | $(if ($rateLimitDoorGaps.Count) { $rateLimitDoorGaps -join ', ' } else { 'none' }) |",
     "| Released-address access rules | $releasedAddrStatus$(if ($releasedAddrHits.Count -gt 0) { ': ' + ($releasedAddrHits -join '; ') }) |",
     "| Origin lockdown (ks-aw-01 nginx guard) | $lockdownStatus$(if ($lockdownStatus -eq 'inactive') { ' warning: direct-origin attacks possible' }) |",
     "| Direct-origin probe aware-wave (expect 403) | $(if ($lockdownAw) { $lockdownAw } else { 'N/A' }) |",
