@@ -58,7 +58,7 @@ B。決策：靜態檔由 nginx 供給、版本目錄 `<rev7>/`＋`current` syml
 |---|---|
 | C2.1 | 主機 `mkdir -p /root/lobster-phase1/static/vector-pro`；rsync `dist/<rev7>/` 上去（High：`# CONFIRMED-HIGH-RISK`）；`ln -sfn <rev7> current`；`SHA256SUMS -c` |
 | C2.2 | compose（`safe-infra-patch.sh compose <file> nginx`）：nginx volumes 加 `- /root/lobster-phase1/static/vector-pro:/srv/vector-pro:ro`；repo 對照檔 `INFRA/docker-compose.yml` 同步同一列 |
-| C2.3 | nginx（`safe-infra-patch.sh nginx <file> nginx`）：`location /vector-pro/ { alias /srv/vector-pro/; types { application/wasm wasm; } gzip_static on; location ~ \.(wasm\|js\|otf\|ttf)$ { expires 1y; add_header Cache-Control "public, immutable"; } location ~ index\.html$ { add_header Cache-Control "no-cache"; } }` 同時放進 **app.aware-wave.com 區塊與產品子網域區塊**（`default.conf:439` 一塊：social／tarot／studio／design…都是同一 next-admin 的 host 路由；兩塊都放，任何 door host 下 iframe 都同源），放在各自 `location /` 之前；repo `INFRA/nginx/default.conf` 同步 |
+| C2.3 | nginx（`safe-infra-patch.sh nginx <file>`）：`location ^~ /vector-pro/ { alias /srv/vector-pro/; types {wasm/js/html/otf/ttf/txt}; gzip_static on; location ~ \.(wasm\|js\|otf\|ttf)$ { expires 1y; } location ~ (/\|\.html)$ { expires -1; } }`。`^~`：產品區塊有 regex location，不加會被搶；用 `expires` 不用 `add_header`：巢狀 `add_header` 會丟掉伺服器層安全標頭。同時放進 **app.aware-wave.com 區塊與產品子網域區塊**（`default.conf:439` 起），各在自己的 `location /` 之前；repo `INFRA/nginx/default.conf` 已寫好（nginx:alpine `nginx -t` 通過） |
 | C2.4 | 驗證：`curl -sI https://app.aware-wave.com/vector-pro/current/index.html` 200；`curl -sI -H 'Accept-Encoding: gzip' …/<hash>.wasm` 回 `Content-Type: application/wasm`＋`Content-Encoding: gzip`；`docker exec lobster-nginx ls /srv/vector-pro/current` 有檔 |
 
 ### C3 app 門

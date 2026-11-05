@@ -33,6 +33,8 @@ services:
       - /etc/nginx/.htpasswd_studio:/etc/nginx/.htpasswd_studio:ro
       # Host log dir for fail2ban — nginx writes here, fail2ban reads from host path
       - /var/log/lobster-nginx:/var/log/nginx:rw
+      # VectorCraft web build (R0-PLAN C2): <rev7>/ dirs + current symlink, outside apps/ so sg-deploy --delete never touches it
+      - /root/lobster-phase1/static/vector-pro:/srv/vector-pro:ro
     networks:
       - lobster-net
     memswap_limit: 128M
