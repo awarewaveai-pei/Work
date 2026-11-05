@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import sharp from "sharp";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../lib/ops-role";
 import { getSupabaseReadClient, getSupabaseWriteClient } from "../../../../lib/supabase-server";
-import { buildDesignKey, isR2Configured, parseImageDataUrl, putDesignObject } from "../../../../lib/storage/r2";
+import { buildDesignKey, deleteDesignObject, isR2Configured, parseImageDataUrl, putDesignObject } from "../../../../lib/storage/r2";
+import { parseDesignSource, SOURCE_CONTENT_TYPE, sourceKeyFor, sourceKeyFromMetadata } from "../../../../lib/studio/design-source";
 import { deleteUnreferencedAsset } from "../../../../lib/content/r2-delete-guard";
 import { decodeCursor, listDesigns, type SortOrder, type TimeRange } from "../../../../lib/studio/designs-list";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, resolveTenant, toOrgAccessResponse } from "../../../../lib/tenant-guard";
@@ -107,6 +108,10 @@ interface SaveDesignBody {
    *  first row instead of adding a copy (the studio saves on every 「載入批次結果」). */
   batchJobId?: string;
   cardIndex?: number;
+  /** The original file behind the preview `image`: { name: "x.vectorcraft" | "x.svg", data: base64 }, <= MAX_SOURCE_BYTES, content-sniffed
+   *  (lib/studio/design-source.ts). Stored as its own R2 object; metadata gets source_key / source_name / source_bytes.
+   *  Named sourceFile because `source` above already means the originating tool. */
+  sourceFile?: { name: string; data: string };
 }
 
 /** Who saved or deletes: a customer is the user middleware authenticated (x-ops-user-id), never a body field; staff keep
@@ -176,6 +181,15 @@ export async function POST(request: Request) {
     catch { return NextResponse.json({ ok: false, error: "image must be a png/jpeg/webp base64 data URL" }, { status: 400 }); }
     parsed = p;
   }
+  let sourceFile: Extract<ReturnType<typeof parseDesignSource>, { ok: true }> | null = null;
+  if (body.sourceFile !== undefined && body.sourceFile !== null) {
+    const ps = parseDesignSource(body.sourceFile, MAX_SOURCE_BYTES);
+    if (!ps.ok) {
+      const f = ps as { ok: false; status: 400 | 413; error: string };
+      return NextResponse.json({ ok: false, error: f.error }, { status: f.status });
+    }
+    sourceFile = ps;
+  }
   let organizationId: string | null;
   try { organizationId = effectiveOrgId(request, body.organizationId ?? defaultOrganizationId()); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
@@ -242,6 +256,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: code }, { status: 502 });
   }
 
+  let sourceMeta: Record<string, unknown> = {};
+  if (sourceFile) {
+    const sourceKey = sourceKeyFor(objectKey, sourceFile.ext);
+    const up = await putDesignObject(sourceKey, sourceFile.buffer, SOURCE_CONTENT_TYPE);
+    if (!up.ok) {
+      await deleteDesignObject(objectKey); // preview just uploaded, never published: no reference scan needed
+      return NextResponse.json({ ok: false, error: (up as { ok: false; error: string }).error }, { status: 502 });
+    }
+    sourceMeta = { source_key: sourceKey, source_name: sourceFile.name, source_bytes: sourceFile.buffer.byteLength };
+  }
+
   const traceId = randomUUID(); // node:crypto import — Node 18 on SG has no crypto global
   const { data, error } = await supabase
     .from("media_assets")
@@ -266,6 +291,7 @@ export async function POST(request: Request) {
         brand: body.brand ?? null,
         style_tags: sanitizeStyleTags(body.styleTags),
         subject: body.subject?.trim() || null,
+        ...sourceMeta,
         ...(batchKey ? { batch_job_id: batchKey.job, card_index: batchKey.card } : {}),
         actor_role: resolved.role,
         role_source: resolved.source,
@@ -277,6 +303,7 @@ export async function POST(request: Request) {
 
   if (error) {
     console.error("[designs] media_assets insert failed:", error.message);
+    if (typeof sourceMeta.source_key === "string") await deleteDesignObject(sourceMeta.source_key); // no row will ever point at it
     return NextResponse.json({ ok: false, error: "insert_failed" }, { status: 500 });
   }
 
@@ -354,6 +381,17 @@ export async function DELETE(request: Request) {
       { status: r2Result.error === "asset_in_use" ? 409 : 502 });
   }
 
+  // The original file saved with the preview (sourceFile): same guarded delete. A failure keeps the row so a retry finishes the job
+  // (the preview delete above treats an already-gone object as ok).
+  const sourceKey = sourceKeyFromMetadata((asset as Record<string, unknown>).metadata);
+  if (sourceKey) {
+    const sr = await deleteUnreferencedAsset(sourceKey);
+    if ("error" in sr) {
+      console.error("[designs] source delete refused:", sr.error);
+      return NextResponse.json({ ok: false, error: sr.message, code: sr.error }, { status: sr.error === "asset_in_use" ? 409 : 502 });
+    }
+  }
+
   // Remove row from media_assets.
   const { error: deleteErr } = await supabase
     .from("media_assets")
@@ -374,7 +412,7 @@ export async function DELETE(request: Request) {
     target_type: "media_assets",
     target_id: assetId,
     trace_id: traceId,
-    payload: { object_key: asset.object_key, role_source: resolved.source },
+    payload: { object_key: asset.object_key, source_key: sourceKey, role_source: resolved.source },
   });
 
   return NextResponse.json({ ok: true });
