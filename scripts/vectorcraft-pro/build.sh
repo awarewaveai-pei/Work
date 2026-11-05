@@ -82,11 +82,12 @@ trap 'rm -rf "$STAGE"' EXIT
 rm -rf "$STAGE" && mkdir -p "$STAGE"
 cp -r "$DIST"/. "$STAGE"/
 cp "$SRC/NOTICE" "$SRC/LICENSE-MIT" "$SRC/LICENSE-APACHE" "$STAGE"/
-# Invariant: every root-level .js/.wasm filename carries a 16-hex content hash (the nginx
+# Invariant: every root-level .js/.wasm filename carries a content hash: Trunk's u64 in hex, NOT
+# zero-padded, so 12-16 digits (a 15-digit one happened 2026-11-06; same rule as photocraft-pro) (the nginx
 # immutable rule applies to all of them; index.html alone is no-cache).
 for f in "$STAGE"/*.js "$STAGE"/*.wasm; do
   [ -e "$f" ] || continue
-  basename "$f" | grep -qE '[0-9a-f]{16}' || { echo "FATAL: $(basename "$f") in dist root lacks a 16-hex content hash — immutable caching would pin it stale" >&2; exit 1; }
+  basename "$f" | grep -qE -- '-[0-9a-f]{12,16}(_bg)?\.(js|wasm)$' || { echo "FATAL: $(basename "$f") in dist root lacks a hex content hash — immutable caching would pin it stale" >&2; exit 1; }
 done
 { echo ""; echo "--- AwareWave build provenance ---"
   echo "storytold/vectorcraft @ $REV (MIT OR Apache-2.0)"

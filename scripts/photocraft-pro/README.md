@@ -86,6 +86,8 @@ PLAYWRIGHT_DIR=D:/Work/lobster-factory/infra/hetzner-phase1-core/tests node scri
 | 快速遮色片塗出的範圍 | `ex('select.editInQuickMaskMode',{on:true})` → 使用者塗 → `{on:false}` → 選取 → 同上一列 | 3（進、每筆、出各 1；改 `channel.options` 再 +1） | PhotoCraft 的快速遮色片**以白色＝選取**（實測：`indicates:'selected'`＋塗白 → 選取＝筆畫；預設模式先 `edit.fill black` 再塗白 → 選取＝筆畫）。預設前景是黑、無選取進 Q 時全為選取，**直接塗＝把塗到的排除**（選取＝整張扣筆畫），與舊編輯器「紅筆塗＝要改」相反 → 面板說明（C4.3）要寫成「按 Q，按 X 換白色再塗」，或轉接器在進 Q 時先 `channel.options {channel:'quickMask', indicates:'selected'}`（要在 Q 開啟中設才生效）＋前景改白 |
 | 圖層縮到符合／填滿畫布 | 取 `bounds b`、畫布 `W×H`（`ui.inspect().document` 或 `session.documents`）→ `s = min(W/b.w, H/b.h)`（填滿用 max）→ 目標框置中 → `ex('edit.transform',{layer:id, quad:[[x,y],[x+w,y],[x+w,y+h],[x,y+h]]})` | 1 | 實測 120×80 → 符合 `[0,16,400,268]`、填滿 `[-25,0,450,300]` |
 
+**整張存原始檔＝`.psd`**（`inv('file.saveAs')`；網頁版不出 `.pcraft`，`crates/ui-egui/src/app/files.rs:236-245`；主 session 2026-11-06 定案 My Designs 原始檔存 `.psd`，不加補丁）。
+
 做不到（需要決定，沒有自行加補丁）：
 
 1. **`.pcraft` 原生檔存不出來**。網頁版路徑型存檔全部關閉（`crates/engine/src/cmd/file_cmds.rs:76`「not available on the web (no file system)」，`file.saveACopy {path}`、`layer.exportAs {path}` 同）；互動式另存的副檔名由上游決定：文件沒有自己的路徑時，只有 `.pdn`→`pcraft`、`.kra`→`ora`，其餘一律 `.psd`（`crates/ui-egui/src/app/files.rs:236-245`）。網頁版開檔一律沒有路徑，連開一個 `.pcraft` 再另存也會變 `.psd`；網頁存檔對話框直接回建議檔名，使用者也改不了。選項：(a) My Designs 原始檔改存 `.psd`（零補丁，現在就能做；PhotoCraft 讀寫 PSD 含圖層，但 PhotoCraft 專有、PSD 表達不了的東西會降級）；(b) 接線補丁多一處：有宿主時 `FileDialogRequest::Save` 的回答由頁面指定副檔名（計畫外補丁，要操作者同意）；(c) 向上游提「網頁版 Save As 預設 `.pcraft`」。影響卡 C5.1／C5.2（W4 正在做 `.pcraft` 嗅探）。
