@@ -1,0 +1,17 @@
+{
+  "repo": "https://github.com/storytold/vectorcraft",
+  "rev": "4cce3363da5874340367d66a779ff18c239cb38a",
+  "craftFontsRepo": "https://github.com/storytold/craft-fonts",
+  "craftFontsRev": "b076417b5880bd4154bd22f00695b1d28c6bea83",
+  "notoSansTc": {
+    "family": "Noto Sans TC",
+    "style": "Regular",
+    "file": "fonts/noto-sans-tc/NotoSansTC-Regular.otf",
+    "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/SubsetOTF/TC/NotoSansTC-Regular.otf",
+    "sha256": "5bab0cb3c1cf89dde07c4a95a4054b195afbcfe784d69d75c340780712237537",
+    "source": "https://github.com/notofonts/noto-cjk/tree/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/SubsetOTF/TC",
+    "scripts": "Hant,Latn",
+    "licenseFrom": "fonts/noto-sans-cjk-sc/OFL.txt",
+    "licenseSha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2"
+  }
+}

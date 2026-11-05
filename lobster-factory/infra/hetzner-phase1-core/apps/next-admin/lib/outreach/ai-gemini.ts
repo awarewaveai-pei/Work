@@ -15,6 +15,10 @@ export interface GeminiResult {
 // Default model is resilient to deprecation: gemini-2.0-flash was retired by some projects, which
 // silently broke generation. gemini-flash-latest auto-tracks the current flash GA model; override
 // per-deploy with GEMINI_MODEL if a pinned version is ever needed.
+/** The model of outreach's JSON steps: research extraction, the fact check, reply classification. The platform's free
+ *  Gemini key (operator 2026-11-05: the OpenAI account ran out of credits; a paid key is not wanted). */
+export const OUTREACH_JSON_MODEL = GEMINI_LITE_MODEL;
+
 export const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-flash-latest";
 
 /** Google answers 503 "model overloaded" / 429 for one model while others serve (2026-11-03: flash-latest 503 for over

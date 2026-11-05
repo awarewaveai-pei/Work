@@ -16,6 +16,7 @@
 //   marks the row unprocessed and pushes. The cursor moves only after every page was read and no row is left pending.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { generateCheapJsonText } from "@/lib/ai/cheap-json";
+import { OUTREACH_JSON_MODEL } from "./ai-gemini";
 import type { Grant } from "@/lib/entitlements/can";
 import { addressOf, GmailNotFound, header, replyText, type GmailApi, type GmailMessage } from "./gmail-api";
 
@@ -401,7 +402,7 @@ reply_type 只能是其中一個：interested（有興趣想談）、pricing（�
  *  the row stays pending and is retried. */
 export async function classifyReply(reply: StoredReply, grant: Grant): Promise<Classification> {
   const res = await generateCheapJsonText({
-    route: "outreach/gmail-sync", system: CLASSIFY_SYSTEM, maxTokens: 300, grant, tool: "outreach",
+    route: "outreach/gmail-sync", model: OUTREACH_JSON_MODEL, system: CLASSIFY_SYSTEM, maxTokens: 300, grant, tool: "outreach",
     user: `主旨：${reply.subject ?? "（無）"}\n\n回信：\n${reply.reply_text}`, metadata: { lead_id: reply.lead_id, reply_id: reply.id },
   });
   if (res.ok === false) throw new Error(`classify: ${res.error}`);
