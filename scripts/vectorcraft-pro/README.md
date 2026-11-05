@@ -1,6 +1,6 @@
 # vectorcraft-pro 建置鏈（C1）
 
-把 [storytold/vectorcraft](https://github.com/storytold/vectorcraft)（MIT OR Apache-2.0）的 WASM 網頁版建成可部署的靜態目錄，含繁中字型與 `addFont` API 補丁。產出給 C2 rsync 到 ks-aw-01 `/root/lobster-phase1/static/vector-pro/`。
+把 [storytold/vectorcraft](https://github.com/storytold/vectorcraft)（MIT OR Apache-2.0）的 WASM 網頁版建成可部署的靜態目錄，含繁中與 51 個字型（建置時放進 VectorCraft 自己的字型庫）。產出給 C2 rsync 到 ks-aw-01 `/root/lobster-phase1/static/vector-pro/`。
 
 ## 一鍵建置
 
@@ -8,7 +8,7 @@
 powershell -ExecutionPolicy Bypass -File D:\Work\scripts\vectorcraft-pro\build.ps1
 ```
 
-輸出：`%LOCALAPPDATA%\awarewave\vectorcraft-dist\<rev前7碼>-<inputs前7碼>\`（`VECTORCRAFT_HOME` 環境變數可改 base）。目錄名含**全部輸入**的身份：`inputs7` = sha256(PIN.json＋兩個 patch) 前 7 碼——只改字型或 patch、`rev` 不變時也會得到新目錄，C6「保留最近 2 版」才守得住；組裝在 `.staging-*` 完成並通過 `SHA256SUMS -c` 後才原子換名，失敗不汙染既有 dist（codex oracle 2026-11-05 兩個 finding 的治本）。內容 = trunk 產物 + `fonts/`（SRI 命名）+ `NOTICE`（含 provenance）+ `LICENSE-*` + `SHA256SUMS`；`.wasm/.js/.otf/.ttf` 各帶預壓 `.gz`（nginx `gzip_static` 用）。
+輸出：`%LOCALAPPDATA%\awarewave\vectorcraft-dist\<rev前7碼>-<inputs前7碼>\`（`VECTORCRAFT_HOME` 環境變數可改 base）。目錄名含**全部輸入**的身份：`inputs7` = sha256(PIN.json＋patch) 前 7 碼——只改字型或 patch、`rev` 不變時也會得到新目錄，C6「保留最近 2 版」才守得住；組裝在 `.staging-*` 完成並通過 `SHA256SUMS -c` 後才原子換名，失敗不汙染既有 dist（codex oracle 2026-11-05 兩個 finding 的治本）。內容 = trunk 產物 + `fonts/`（SRI 命名）+ `NOTICE`（含 provenance）+ `LICENSE-*` + `SHA256SUMS`；`.wasm/.js/.otf/.ttf` 各帶預壓 `.gz`（nginx `gzip_static` 用）。
 
 ## 前置需求（一次性）
 
@@ -41,15 +41,12 @@ powershell -ExecutionPolicy Bypass -File D:\Work\scripts\vectorcraft-pro\build.p
 | 檔 | 做什麼 |
 |---|---|
 | `web-fonts.patch` | `crates/text/web-fonts.txt` 加 51 行 `background \| <family> \| Regular`（PIN `webFonts[]` 全部；manifest 列由 build.sh 動態追加到 craft-fonts checkout）。**startup vs background**（`crates/text/web-fonts.txt:2-4`）：startup 在 app 啟動前抓（擋首載，`apps/vectorcraft-web/src/fonts.rs:27-35`）；background 在啟動後抓（4 併發、不擋首載，`fonts.rs:38-60`）——上游**沒有**「點選才載」的真按需，background 是全部延後抓；CJK 大字型因此全走 background，首載只付 wasm |
-| `api-addfont.patch` | `apps/vectorcraft-web/src/api.rs` `install()` 加 `addFont(bytes: Uint8Array) → Promise<number>`：`FontDb::global().add_font()`（同 `fonts.rs:71`）→ 回加入 face 數 + `request_repaint()`。上游 PR 文字見 `UPSTREAM-PR.md`；合併後改 PIN 刪補丁 |
-| `api-settheme.patch` | ① `crates/ui-egui/src/theme.rs`：`apply_with` 拆出 `apply_tokens(ctx, t)`、記錄 `AppChoice`；新增 `set_host_tokens(ctx, Option<Tokens>)` 宿主覆寫（有值時 app 自己重套主題也用它，`None` 還原 app 自選）② `api.rs` 加 `setTheme(obj) → Promise<string[]>`：panel 色亮度（Rec.601 luma≥128→Light）選 `Tokens::for_brightness` 基底，39 個 Color32 欄＋`radius` 逐欄覆寫，未知欄/壞值全列出 reject；`setTheme(null)` 清除 |
-| `awarewave-theme-receiver.js` | **我們的**，非上游：build 注入 dist index.html `</body>` 前，檔名帶內容雜湊 `awarewave-theme-receiver-<sha256前16>.js`（nginx 對 /vector-pro/ 的 .js 一律 immutable 1y，無雜湊會釘舊檔一年；build.sh 另檢查 dist 根目錄所有 .js/.wasm 檔名含 16-hex，缺即 FATAL）。協定 SSOT：`NA/lib/theme/frame-theme.ts`（connectThemeFrame）。協定（SSOT `NA/components/tools/AwareWaveThemeFrame.tsx`）：載入後向 parent 發 `awarewave:theme-ready` → 收 `{channel:'awarewave:theme', tokens:{'--card-bg':…}}`（只收同源）→ CSS 變數對應成 VectorCraft tokens（對應表在檔內，單一處）→ `setTheme` → 回 `awarewave:theme-applied`；rgb() 自動轉 #rrggbb |
+
+已移除（2026-11-05 晚）：`api-addfont.patch`（字型面板取消後無人呼叫，`550764e16`）、`api-settheme.patch`＋`awarewave-theme-receiver.js`＋父頁 `lib/theme/frame-theme.ts`（操作者：Craft 編輯器不套 app 主題，用自己的深色／淺色）。線上 dist `4cce336-7303550` 建於移除前，仍帶 `addFont`／`setTheme` 與接收端，但已無人呼叫；下次升級重建即消失。
 
 ## 驗證（2026-11-05 第二輪，dist `4cce336-b9af74d`）
 
 - 建置：`build.ps1` exit 0，179 檔、`SHA256SUMS -c` 全過、54 個字型目錄（51 PIN＋3 上游 startup）逐一驗在；wasm-opt 不變量 0% 增益。
-- `setTheme({panel:'#fbfaf2', app_bar:'#f4f2de', text:'#000000', accent:'#e9b384'})` → resolve `["accent","app_bar","panel","text"]`，整個 UI 變淺色（`smoke-settheme-light.jpg`）；壞輸入 reject 並全列（`bogus_field: unknown field; panel: expected "#rrggbb"`）；`setTheme({panel:'#8b0000'})` 紅→`setTheme(null)` 還原預設 MediumDark（截圖比對）。
-- receiver 協定：同源 `postMessage({channel:'awarewave:theme', tokens:{'--body-bg':'rgb(24,26,31)',…}})` → 收到 `awarewave:theme-applied` 回覆、UI 套上深色（rgb() 轉換 ✓）。
 - 字型：54 個 `/fonts/` 請求全 200、console 無 `web font` 失敗；`text.fontList` families 含抽查 16/16（TC/HK 4 個＋Lato/Caveat/Roboto/JetBrains Mono/Permanent Marker…）；`text.create`＋`text.setStyle {font:'Noto Serif TC'}` 畫布渲染明體「繁體明體字」、字元面板顯示 Noto Serif TC（`smoke-fonts-notoseriftc.jpg`）。注意：`text.fonts` 是「文件已用字型」，可選清單是 `text.fontList`。
 
 ## 驗證（2026-11-05 第一輪，rev 4cce336）
@@ -61,7 +58,6 @@ powershell -ExecutionPolicy Bypass -File D:\Work\scripts\vectorcraft-pro\build.p
   - `await vectorcraft.request('ui.inspect')` 回 JSON（24 keys：documents/panes/tool/view…）。
   - 選單、新檔對話框、context bar 全繁中（`smoke-zh-hant-welcome.jpg`）。
   - `text.fonts` 含 `Noto Sans TC`（startup 字型已註冊）；`text.setStyle {font:'Noto Sans TC'}` 套用成功，畫布渲染「繁體中文嘸」60pt——「嘸」為 Big5 專屬字、JIS 字集（BIZ UDPGothic）沒有，證明用的是 Noto Sans TC（`smoke-zh-hant-notosans-tc.jpg`）。
-  - `addFont`（api-addfont.patch）：arial.ttf bytes → 回 `1`；垃圾 bytes → `0`；重複加 → `0`；皆 Promise 正常 resolve。
 - 已知限制：
   - CDP 合成輸入（`Input.insertText`）進不了 egui，headless 打不了 CJK；真人鍵盤走瀏覽器 IME composition 事件，為上游既有路徑（`docs/development.md` web shell 段）。本 smoke 以 `text.setText` 走 control API 驗 TC 字形渲染。
   - 瀏覽器分頁藏在背景時 rAF 暫停，`vectorcraft.request()` 的 promise 要等分頁回前景才 settle（egui 每 frame 才 poll replies）——C6.1 headless smoke 要記得 front/active。

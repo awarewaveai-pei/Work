@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-06（續1）向量專業版拿掉 app 主題連動＋畫布專業版定案與派工（W1–W4）
+
+- 根因：操作者看過上線畫面後定案「craftart 不要套主體，就原設定的黑色和淺色」，向量版已上線的主題連動一併拿掉；畫布專業版待決「照有星號的做」；三個舊面板「原有功能，加入就好」，由主 session 決定照原樣搬。
+- 向量版移除（未部署；下次 sg-deploy 上線）：
+  - 刪 `NA/lib/theme/frame-theme.ts`＋測試、`VectorProFrame.tsx` 的 `connectThemeFrame`／`data-theme-linked`、`INFRA/tests/e2e/smoke/05-vector-pro.spec.ts` 兩條主題測試。
+  - 刪 `scripts/vectorcraft-pro/{api-settheme.patch,awarewave-theme-receiver.js,smoke-settheme-light.jpg}`；另刪 `api-addfont.patch`＋`UPSTREAM-PR.md`（字型面板 `550764e16` 取消後無呼叫者）；`build.sh` 只剩 `web-fonts.patch`，16-hex 檔名不變量保留。線上 dist `4cce336-7303550` 仍帶舊程式但無人呼叫。
+  - Codex 2 條（皆成立已修）：M1 e2e 仍測已移除的 `fonts` 面板（`05-vector-pro.spec.ts:180`，刪該段）；M2 向量監工台 `data.mjs:42` 仍列 `api-addfont.patch`（改）。
+- 畫布專業版（`agency-os/handoffs/2026-11-05-photocraft-pro/R0-PLAN.md`，26 項）：不做 SVG 面板、不做舊 `.design.json` 匯入（刪 C7.2）；C4.3 三面板 `ai-fill`／`genfx`／`edge-mask` 照 `CanvasEditor.tsx:2596-2724` 原樣搬，唯一改變＝AI 範圍用 PhotoCraft 選取（Q 快速遮色片＝原紅筆）、擴圖方向改按鈕；posterize 也進 `editor-shared`。§8 派工表：W1 C1、W2 C3.1–3.3＋C4.1、W3 C4.3、W4 C5.1–5.2，檔案互不重疊。
+- 已派：W3 `pc-w3-panels`（Opus）、W4 `pc-w4-designs`（Sonnet），各自 worktree；W1、W2 待本 commit 後派（依賴向量版移除後的 `build.sh`／`VectorProFrame.tsx`）。
+- 驗證：`bash -n scripts/vectorcraft-pro/build.sh` ok；vitest vector-pro-dock／staff-tools／public-html-sri／lib/theme 89/90（失敗 1 條＝別的 session 未提交的 `app/(shell)/tools/seedstar/`，無關）；`tsc` 僅 2 個 `.next/types` 過期產物錯（舊 vector-editor 頁）；兩個監工台 `node check.mjs` 綠。
+- rollback：`git revert` 本 commit（向量版主題連動回來需重建 dist）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/studio/__tests__/vector-pro-dock.test.ts lib/portal/__tests__/staff-tools.test.ts lib/security/__tests__/public-html-sri.test.ts lib/theme | exit=1 | ms=5580
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n（Codex `agency-os/reports/oracle/2026-11-06-partialreview-7fb420ab.md`，2 條皆修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=connectThemeFrame | hits=4
 ## 2026-11-05（續21）video 自製範例上線：分鏡 12、模板 8、風格圖 14，著作權自有（de0e1836a，已部署）
 
 - 起因：#17 後 seedstar 參考員工限定，客戶看到空畫面。操作者同意生成（估 US$2.4、上限 4），實花 US$1.67（gpt-image-2 medium，34 張 WebP ≤60KB）。

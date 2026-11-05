@@ -13,7 +13,7 @@ export const META = {
 };
 
 export const COPY = {
-  sub: '把開源的 VectorCraft（Illustrator 的完整重製，工具、面板、快捷鍵都一樣）放進 app.aware-wave.com 當「向量（專業版）」；AwareWave 獨有的九項（尺寸範本、調色、去背、WebP、My Designs、QR、條碼、Mockup、批次匯出）做成右側圖示欄＋浮出面板，顏色跟 app 主題；字型灌進它自己的字型庫；舊設計轉檔後舊編輯器退場，只留一套。共 {total} 張卡、{items} 項工作，已完成 {itemsDone} 項。',
+  sub: '把開源的 VectorCraft（Illustrator 的完整重製，工具、面板、快捷鍵都一樣）放進 app.aware-wave.com 當「向量（專業版）」；AwareWave 獨有的九項（尺寸範本、調色、去背、WebP、My Designs、QR、條碼、Mockup、批次匯出）做成右側圖示欄＋浮出面板（圖示欄跟 app 主題；VectorCraft 本體用自己的深色／淺色）；字型灌進它自己的字型庫；舊設計轉檔後舊編輯器退場，只留一套。共 {total} 張卡、{items} 項工作，已完成 {itemsDone} 項。',
   updated: '更新於 {date}',
   nav: { now: '現況', steps: '卡片與工作', open: '待你決定', paths: '檔案' },
   now: { h: '現況', lead: '目前已做到與還沒做到的事（2026-11-05 查）。' },
@@ -24,7 +24,7 @@ export const COPY = {
 };
 
 export const NOW = [
-  { what: '在 app.aware-wave.com 用 Illustrator 一樣的工具列、面板、快捷鍵畫向量，整個畫面是 app 的主題色。', state: 'yes', ev: '2026-11-05 晚正式站實測：頁面把主題顏色傳給 VectorCraft，它回覆已套用；截圖全畫面米色底、橘色按鈕（工具列、面板、對話框都是）。改主題存檔後重開即套用。版本 4cce336-7303550，舊版目錄保留可切回。' },
+  { what: '在 app.aware-wave.com 用 Illustrator 一樣的工具列、面板、快捷鍵畫向量；VectorCraft 本體用它自己的深色或淺色。', state: 'yes', ev: '2026-11-05 上線（版本 4cce336-7303550）。2026-11-06 依妳的決定拿掉「app 主題傳給 VectorCraft」：頁面不再傳顏色、建置不再套主題與字型載入補丁；線上版本裡的舊程式已無人呼叫，下次重建即消失。' },
   { what: '介面與字型是繁體中文，字型在 VectorCraft 自己的字元面板選。', state: 'yes', ev: '字型庫 57 個家族（建置時放入 51 個檔，來源網址與校驗碼釘在 PIN.json）；實測 Noto Serif TC 套到中文、Playfair Display／Roboto／Montserrat／Noto Sans HK 套到英文都成功，缺字型數 0。' },
   { what: 'AwareWave 獨有的九項功能在專業版裡，右側一條圖示欄，點了才浮出面板。', state: 'yes', ev: '2026-11-05 晚正式站九項全部實測通過：範本、調色、去背（色鍵）、WebP、My Designs（存入後重開，文字完整）、QR、條碼、Mockup、批次匯出。AI 去背要付費，未跑。圖示欄寬 38，浮出面板不推擠畫布。' },
   { what: '舊的向量設計檔在專業版打得開，舊編輯器退場，只有一套。', state: 'yes', ev: '舊 .design.json 在 My Designs 面板「匯入舊專案」轉向量；舊 PNG 照常開；/tools/vector-editor 與 /vector-editor.html 轉到專業版（6740e006d）。' },
@@ -38,8 +38,8 @@ export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '建置鏈（本機）', plain: '例：在這台筆電按一個指令，就從 VectorCraft 原始碼建出可放網站的檔案（含繁中字型），並在本機瀏覽器開起來確認。',
     gate: '一個指令建出 dist/<版本>/；本機開 index.html?lang=zh-hant 選單是繁中、能打繁中字、程式介面回得了資料。', risk: 'Low（只動本機與 scripts/）', model: 'Opus 5.5｜vp-c1-build 完成；正在修 wasm 體積（89 MB，應約 17.5 MB）', status: 'done', commit: '0f1bdc062', depends: [],
     decided: '版本釘在固定 commit（PIN.json），升級要經 C6 流程。字型加 Noto Sans TC（開源 OFL）。',
-    what: 'rustup＋wasm32＋trunk；build.ps1：fetch 原始碼到 repo 外、套 web-fonts patch 與 api addFont patch、加 TC 字型、trunk build、產 SHA256SUMS、預壓 .gz；addFont 補丁同日開上游 PR',
-    files: ['scripts/vectorcraft-pro/PIN.json', 'scripts/vectorcraft-pro/build.ps1', 'scripts/vectorcraft-pro/web-fonts.patch', 'scripts/vectorcraft-pro/api-addfont.patch', 'scripts/vectorcraft-pro/README.md'],
+    what: 'rustup＋wasm32＋trunk；build.ps1：fetch 原始碼到 repo 外、套 web-fonts patch、加 TC 字型、trunk build、產 SHA256SUMS、預壓 .gz（addFont 與 setTheme 補丁已於 2026-11-06 移除）',
+    files: ['scripts/vectorcraft-pro/PIN.json', 'scripts/vectorcraft-pro/build.ps1', 'scripts/vectorcraft-pro/web-fonts.patch', 'scripts/vectorcraft-pro/README.md'],
     items: [
       done('C1.1', '筆電裝 Rust 工具鏈與 trunk，前置需求寫進 README。', '0f1bdc062'),
       done('C1.2', '一個建置腳本：抓固定版本的原始碼、加繁中字型、建出網頁版、算校驗碼、預先壓縮。', '0f1bdc062'),

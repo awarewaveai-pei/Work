@@ -136,12 +136,12 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
       <p class="plain">例：PhotoCraft 右邊多一條窄窄的圖示欄，點「去背」就浮出面板，選一個圖層按 AI 去背，那個圖層就換成去背後的樣子；不點的時候不佔畫面。</p>
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium（改共用層；向量版要保持不變）</span><span class="who">負責：Opus 5.5｜C4.1 工人 W2、C4.3 工人 W3、C4.2 與 C4.4 等 C1 試做結果</span></p>
       <p class="donewhen"><b>完成的樣子：</b>登入的自動測試把每個面板的主要按鈕按一次，每個都有實際效果；用 PhotoCraft 自己的「匯出」時瀏覽器真的收到檔案；向量版的同一份測試仍然全綠。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>C4.1</code> 圖示欄外殼改成兩個編輯器共用同一份，各自只帶自己的面板清單與尺寸。</span></li><li class="todo"><b>○</b><span><code>C4.2</code> 轉接器：把面板的要求翻成 PhotoCraft 的指令；第一次開啟設成繁中；PhotoCraft 自己的「另存、匯出」照常下載到電腦。</span></li><li class="todo"><b>○</b><span><code>C4.3</code> 三個新面板：AI 去除與生成填色、AI 擴圖、邊緣遮罩。</span></li><li class="todo"><b>○</b><span><code>C4.4</code> 測試：每個面板用到的功能轉接器都有；登入後每個面板按一次都有效果。</span></li></ul>
+      <ul class="items"><li class="todo"><b>○</b><span><code>C4.1</code> 圖示欄外殼改成兩個編輯器共用同一份，各自只帶自己的面板清單與尺寸。</span></li><li class="todo"><b>○</b><span><code>C4.2</code> 轉接器：把面板的要求翻成 PhotoCraft 的指令；第一次開啟設成繁中；PhotoCraft 自己的「另存、匯出」照常下載到電腦。</span></li><li class="todo"><b>○</b><span><code>C4.3</code> 三個面板照舊編輯器原樣搬：去除／生成填色（AI）、擴圖／色調分離、邊緣遮罩（筆刷邊）；只差在要改的範圍改用 PhotoCraft 的選取或按 Q 用它的筆刷塗。</span></li><li class="todo"><b>○</b><span><code>C4.4</code> 測試：每個面板用到的功能轉接器都有；登入後每個面板按一次都有效果。</span></li></ul>
       <details><summary>工程細節：C4 右側圖示欄與面板</summary>
-        <p>dock 外殼搬到 editor-shared 共用；ctx-photocraft.js 轉接器（含原生另存的代為下載、ctx.host）；新面板 ai-fill、outpaint、edge-mask（數學搬到 editor-shared 當唯一正本）；靜態測試與登入 e2e</p>
+        <p>dock 外殼搬到 editor-shared 共用；ctx-photocraft.js 轉接器（含原生另存的代為下載、ctx.host）；面板 ai-fill、genfx、edge-mask 照舊搬（數學與預設搬到 editor-shared 當唯一正本）；靜態測試與登入 e2e</p>
         <p><b>需先完成：</b><a href="#C1">C1</a>、<a href="#C3">C3</a></p>
         <p><b>已定案：</b>只做 PhotoCraft 沒有的：尺寸範本（含符合、填滿畫布）、調色預設、去背、AI 去除與生成填色、AI 擴圖、邊緣遮罩、WebP、My Designs、QR、條碼、Mockup、批次匯出。不做「轉存」面板（和 WebP 面板、原生匯出、My Designs 重複）。不做 SVG 匯出面板（妳 2026-11-06 定案：要向量檔用向量專業版）。不做字型面板。一條圖示欄加浮出面板，尺寸照 PhotoCraft 自己的面板；顏色只用 app 主題；不用下拉選單。</p>
-        <p><b>檔案：</b><code>NA/public/editor-shared/dock.js</code> <code>NA/public/photo-pro-dock/dock.js</code> <code>NA/public/editor-shared/ctx-photocraft.js</code> <code>NA/public/editor-shared/ctx-contract.md</code> <code>NA/public/editor-shared/blocks/ai-fill.js</code> <code>NA/public/editor-shared/blocks/outpaint.js</code> <code>NA/public/editor-shared/blocks/edge-mask.js</code> <code>INFRA/tests/e2e/smoke/06-photo-pro.spec.ts</code></p>
+        <p><b>檔案：</b><code>NA/public/editor-shared/dock.js</code> <code>NA/public/photo-pro-dock/dock.js</code> <code>NA/public/editor-shared/ctx-photocraft.js</code> <code>NA/public/editor-shared/ctx-contract.md</code> <code>NA/public/editor-shared/blocks/ai-fill.js</code> <code>NA/public/editor-shared/blocks/genfx.js</code> <code>NA/public/editor-shared/blocks/edge-mask.js</code> <code>INFRA/tests/e2e/smoke/06-photo-pro.spec.ts</code></p>
         <p><b>卡：</b><code>agency-os/handoffs/2026-11-05-photocraft-pro/R0-PLAN.md §6 C4</code></p>
       </details>
     </div></li><li class="step todo" id="C5">

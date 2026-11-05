@@ -11,7 +11,7 @@ OUT_BASE="${1:?output base dir required}"
 PIN="$SCRIPT_DIR/PIN.json"
 SRC="$HOME/awarewave/vectorcraft-src"
 FONTS="$HOME/awarewave/craft-fonts"
-PATCHES="web-fonts.patch api-addfont.patch api-settheme.patch"
+PATCHES="web-fonts.patch"
 
 [ -f "$HOME/.cargo/env" ] && source "$HOME/.cargo/env"
 for tool in cargo trunk git python3 sha256sum gzip; do
@@ -24,9 +24,9 @@ REV=$(pin "['rev']")
 CF_REPO=$(pin "['craftFontsRepo']")
 CF_REV=$(pin "['craftFontsRev']")
 REV7=${REV:0:7}
-# Dist dir identity covers EVERY build input, not just the vectorcraft rev: a font, patch or
-# receiver change with the same rev must get a new directory (C6 keeps the last 2 versions).
-INPUTS7=$(cat "$PIN" $(for p in $PATCHES; do echo "$SCRIPT_DIR/$p"; done) "$SCRIPT_DIR/awarewave-theme-receiver.js" | sha256sum | cut -c1-7)
+# Dist dir identity covers EVERY build input, not just the vectorcraft rev: a font or patch
+# change with the same rev must get a new directory (C6 keeps the last 2 versions).
+INPUTS7=$(cat "$PIN" $(for p in $PATCHES; do echo "$SCRIPT_DIR/$p"; done) | sha256sum | cut -c1-7)
 DIST_NAME="$REV7-$INPUTS7"
 
 checkout() { # checkout <dir> <repo> <rev>
@@ -75,8 +75,7 @@ while IFS='|' read -r FAM STYLE DIR FILE URL SHA LIC LFROM LURL LSHA SCRIPTS; do
     echo "$FAM | $STYLE | $DIR/$FILE | $SCRIPTS | $LIC | $DIR/$licname | $SHA | $URL" >> "$FONTS/fonts/manifest.txt"
 done < "$WF_TSV"
 
-# Patches: web-fonts.txt gets the fetched faces; api.rs gets addFont()+setTheme() (upstream
-# PRs pending — UPSTREAM-PR.md). Order matters: api-settheme stacks on api-addfont.
+# Patches: web-fonts.txt gets the fetched faces. Nothing else of upstream is changed.
 for p in $PATCHES; do
   git -C "$SRC" apply --check "$SCRIPT_DIR/$p" || { echo "FATAL: $p no longer applies at $REV — rebase the patch" >&2; exit 1; }
   git -C "$SRC" apply "$SCRIPT_DIR/$p"
@@ -121,23 +120,6 @@ trap 'rm -rf "$STAGE"' EXIT
 rm -rf "$STAGE" && mkdir -p "$STAGE"
 cp -r "$DIST"/. "$STAGE"/
 cp "$SRC/NOTICE" "$SRC/LICENSE-MIT" "$SRC/LICENSE-APACHE" "$STAGE"/
-# AwareWave theme receiver: ours, not upstream's — injected before </body>. The filename
-# carries the content hash: prod nginx serves /vector-pro/ *.js with expires 1y immutable,
-# so an unhashed name would pin a stale receiver in browsers for a year.
-RSHA16=$(sha256sum "$SCRIPT_DIR/awarewave-theme-receiver.js" | cut -c1-16)
-RNAME="awarewave-theme-receiver-$RSHA16.js"
-cp "$SCRIPT_DIR/awarewave-theme-receiver.js" "$STAGE/$RNAME"
-python3 - "$STAGE/index.html" "$RNAME" <<'EOF'
-import sys
-p, rname = sys.argv[1], sys.argv[2]
-s = open(p, encoding="utf8").read()
-tag = f'<script src="./{rname}"></script>'
-if tag not in s:
-    assert "</body>" in s, "index.html has no </body>"
-    s = s.replace("</body>", tag + "</body>", 1)
-    open(p, "w", encoding="utf8", newline="").write(s)
-EOF
-grep -q "$RNAME" "$STAGE/index.html" || { echo "FATAL: receiver not injected into index.html" >&2; exit 1; }
 # Invariant: every root-level .js/.wasm filename carries a 16-hex content hash (the nginx
 # immutable rule applies to all of them; index.html alone is no-cache).
 for f in "$STAGE"/*.js "$STAGE"/*.wasm; do
@@ -148,7 +130,7 @@ done
   echo "storytold/vectorcraft @ $REV (MIT OR Apache-2.0)"
   echo "storytold/craft-fonts @ $CF_REV (fonts under OFL-1.1, licence beside each font in fonts/)"
   echo "extra fonts from PIN.json webFonts[] (OFL-1.1 / Apache-2.0, licence beside each in fonts/)"
-  echo "local patches: $PATCHES + awarewave-theme-receiver.js (scripts/vectorcraft-pro/)"
+  echo "local patches: $PATCHES (scripts/vectorcraft-pro/)"
 } >> "$STAGE/NOTICE"
 find "$STAGE" \( -name '*.wasm' -o -name '*.js' -o -name '*.otf' -o -name '*.ttf' \) -exec gzip -k -9 {} \;
 ( cd "$STAGE" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS && sha256sum -c --quiet SHA256SUMS )

@@ -112,9 +112,9 @@ B。
 | `templates` | 既有；加「符合／填滿畫布」兩顆鈕（`CE:1059`），宿主有 `fitLayer` 才顯示 | `setArtboardSize`、`fitLayer` |
 | `color-grade` | 既有 | `selectedImage`、`replaceImage` |
 | `bg-remove` | 既有 | 同上 |
-| `ai-fill` | 新（`CE:1775-1916`；遮罩改用 PhotoCraft 的選取範圍） | `selectedImage`、`selectionMask`、`replaceImage` |
-| `outpaint` | 新（`CE:1489-1533`） | `exportArtboard`、`placeImage` |
-| `edge-mask` | 新（`CE:1535-1588`） | `selectedImage`、`replaceImage` |
+| `ai-fill` | 「🪄 去除／生成填色（AI）」照舊搬（`CE:1775-1916`：兩種模式、提示詞、套用）；只換塗的地方：範圍用 PhotoCraft 的選取（按 Q 快速遮色片用它的筆刷塗＝原本的紅筆） | `selectedImage`、`selectionMask`、`replaceImage` |
+| `genfx` | 「🖼 擴圖／🎚 色調分離」照舊搬（`CE:1446-1533`、面板 `:2646`）；擴圖方向改看得到的按鈕（原下拉 `:2659`） | `exportArtboard`、`placeImage`、`selectedImage`、`replaceImage` |
+| `edge-mask` | 「✂️ 邊緣遮罩（筆刷邊）」照舊搬（`CE:1535-1588`、面板 `:2680`） | `selectedImage`、`replaceImage` |
 | `webp` | 既有 | `exportArtboard` |
 | `my-designs` | 既有，改讀宿主設定（卡 C5.2） | `saveAs`、`exportArtboard`、`openFile`、`host` |
 | `qr`、`barcode` | 既有 | `placeSvg` |
@@ -124,7 +124,7 @@ B。
 |---|---|
 | C4.1 | dock 外殼共用：`NA/public/vector-pro-dock/dock.js:68` `mountDock` 與同目錄 `theme.css` 搬到 `NA/public/editor-shared/dock.js`／`dock.css`，參數 `{ makeCtx, panelIds, storeKey, sizes }`。尺寸只存在各編輯器 `dock.js` 的 `sizes`：`mountDock` 把它寫成 root 上的 `--vp-*`，`dock.css` 只用 `var()`、不放數值。`vector-pro-dock/dock.js` 只留自己的清單（`:14-24`）、`sizes`（現值：面板 310、最小 220、最大 720、圖示欄 38、分頁 33）、`applyDefaultWorkspace`（`:54`）。同卡改 `NA/lib/studio/__tests__/vector-pro-dock.test.ts:201-221`：讀 `editor-shared/dock.css`（零色碼、只用 globals token 的斷言照舊），尺寸斷言改對兩個 `dock.js` 的 `sizes`。向量版 e2e 仍綠 |
 | C4.2 | 新 `NA/public/photo-pro-dock/dock.js`：`panelIds`＝上表、`sizes = { rail: 36, button: 28, panel: 290, panelMin: 250, panelMax: 720, tab: 28, pad: 8 }`（`PC/crates/ui-egui/src/panels/dock.rs:37,73`、`panels/panel_docking.rs:89-91,561`、`widgets/panel.rs:53`）、`makeCtx = createPhotocraftCtx`；`NA/lib/public-asset-cache.ts:3` 加 `photo-pro-dock`、`NA/lib/portal/staff-tools.ts:62` 加 `/photo-pro-dock`。轉接器 `NA/public/editor-shared/ctx-photocraft.js`：照 C1.4 寫進契約的序列實作 `ctx-contract.md` 既有方法，另加契約三項：`selectionMask() → Blob\|null`、`fitLayer('fit'\|'fill')`（兩者選用：宿主沒有就不提供，面板以有無決定顯示）、`host = { id, label, sourceExt, sourceName, saveTag: { source, modelName, prompt }, listSources }`（畫布：`photocraft`／`畫布`／`.pcraft`／`design.pcraft`／`canvas`／`canvas`／`canvas edit`／`['canvas']`；`ctx-vectorcraft.js` 補同形狀：`vectorcraft`／`向量`／`.vectorcraft`／`design.vectorcraft`／`vector-pro`／`vector-pro`／`vector edit`／`['vector-editor','vector-pro']`）。bytes 進出走 `photocraft:open`／`photocraft:save`（依 `name` 配對，逾時 reject），一次一個（同 `ctx-vectorcraft.js:53`）。面板沒在等的 `photocraft:save`（使用者用原生 另存／匯出）由父頁以 `<a download>` 存到電腦，檔名＝訊息的 `name`。`ready()` 後第一次設 `interface.language = zh-hant`，之後尊重偏好 |
-| C4.3 | 三個新面板 `NA/public/editor-shared/blocks/{ai-fill,outpaint,edge-mask}.js`（`export default { id, title, icon, mount(ctx, body) }`）。數學與預設只留一處：`NA/lib/studio/edge-mask.ts` 的 `EDGE_MASK_STYLES`（`:145`）／`buildMaskSvg`（`:272`）／`applyEdgeMask`（`:309`）搬到 `NA/public/editor-shared/edge-mask.js`，`lib/studio/edge-mask.ts` 改成只加型別的門（照 `NA/lib/studio/editor-color-grade.ts:1-7`）；`NA/lib/studio/outpaint-presets.ts:9-22` 同樣搬 `NA/public/editor-shared/outpaint-presets.js`。API 不新增：`/api/tools/studio/inpaint`、`/api/tools/studio/genfill`（`CE:1503,1865`）。擴圖方向用看得到的按鈕（`CE:2659` 是下拉） |
+| C4.3 | 三個面板照舊編輯器原樣搬（操作者 2026-11-06：原有功能「加入就好」）：`NA/public/editor-shared/blocks/{ai-fill,genfx,edge-mask}.js`（`export default { id, title, icon, mount(ctx, body) }`；標題與控制項照 `CE:2596-2724`）。唯一改變：AI 去除／生成填色的範圍由 PhotoCraft 的選取給（`ctx.selectionMask()`；面板說明寫「用選取工具，或按 Q 用筆刷塗」），因為畫面歸 PhotoCraft；擴圖方向改按鈕（不用下拉）。數學與預設只留一處：`NA/lib/studio/edge-mask.ts`（`EDGE_MASK_STYLES` `:145`、`buildMaskSvg` `:272`、`applyEdgeMask` `:309`）、`NA/lib/studio/outpaint-presets.ts:9-22`、`NA/lib/studio/posterize.ts`（`quantizeRgb` `:11`、`posterizeDataUrl` `:27`）的實作搬到 `NA/public/editor-shared/{edge-mask,outpaint-presets,posterize}.js`，三個 `.ts` 改成只加型別的門（照 `NA/lib/studio/editor-color-grade.ts:1-7`）。API 不新增：`/api/tools/studio/inpaint`、`/api/tools/studio/genfill`（`CE:1503,1865`） |
 | C4.4 | 測試：(a) `NA/lib/studio/__tests__/photo-pro-dock.test.ts`：面板 id 與 `photo-pro-dock/dock.js` 清單相等；`blocks/*.js` 用到的每個 `ctx.<名稱>` 都在 `ctx-photocraft.js` 與 `ctx-contract.md`（選用項除外，且面板有判斷）；轉接器對 mock `photocraft`／postMessage 每個方法一條、參數型別照上游原始碼；每個模組複製成 `.mjs` 後 `node --check`；新檔零色碼。(b) 登入 e2e `INFRA/tests/e2e/smoke/06-photo-pro.spec.ts`：每個面板主要按鈕按一次並檢查效果（照 `05-vector-pro.spec.ts`）；原生 File › Export 後瀏覽器收到下載。合 main 前在 detached 整合工作樹跑 `tsc`＋vitest 全套 |
 
 ### C5 My Designs 原始檔
@@ -166,7 +166,7 @@ B。
 |---|---|---|---|
 | W1 | C1.1–C1.4 | Opus 5.5 | `scripts/craft-web-build/**`、`scripts/photocraft-pro/**`、`scripts/vectorcraft-pro/{build.sh,PIN.json,README.md}` |
 | W2 | C3.1–C3.3、C4.1 | Opus 5.5 | `NA/app/(full)/tools/{vector-pro,photo-pro}/**`、`NA/components/tools/ProEditorFrame.tsx`、`NA/next.config.ts`、`NA/app/sidebar-sections.ts`、`NA/lib/portal/{products,staff-tools}.ts`＋其測試、`NA/public/editor-shared/{dock.js,dock.css}`、`NA/public/vector-pro-dock/**`、`NA/lib/studio/__tests__/vector-pro-dock.test.ts`、`INFRA/tests/e2e/smoke/05-vector-pro.spec.ts` |
-| W3 | C4.3 | Opus 5.5 | `NA/public/editor-shared/blocks/{ai-fill,outpaint,edge-mask}.js`、`NA/public/editor-shared/{edge-mask,outpaint-presets}.js`、`NA/lib/studio/{edge-mask,outpaint-presets}.ts`＋新測試檔 |
+| W3 | C4.3 | Opus 5.5 | `NA/public/editor-shared/blocks/{ai-fill,genfx,edge-mask}.js`、`NA/public/editor-shared/{edge-mask,outpaint-presets,posterize}.js`、`NA/lib/studio/{edge-mask,outpaint-presets,posterize}.ts`＋新測試檔 |
 | W4 | C5.1、C5.2 | Sonnet（fullstack-engineer） | `NA/lib/studio/design-source.ts`＋測試、`NA/app/api/tools/designs/source.test.ts`、`NA/public/editor-shared/blocks/my-designs.js`、`NA/public/editor-shared/ctx-vectorcraft.js`、`NA/public/editor-shared/ctx-contract.md`＋新測試檔 |
 
 - 介面約定（跨工人）：頁框設 `window.__proEditor = { editor, frame }`；共用 `mountDock` 把 `frame: () => globalThis.__proEditor?.frame` 明確傳給 `makeCtx`（W2）；`ctx-vectorcraft.js` 移除 `globalThis.__vectorProFrame` 預設、`frame` 改必填（W4）；`ctx.host` 形狀見卡 C4.2（W4 先在向量轉接器與契約落地）。
