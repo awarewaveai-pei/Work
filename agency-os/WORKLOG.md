@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-05（續3）影音工作台 P6 L4：舊素材搬進主系統帳冊腳本（63b19bafb）
+
+- `VW/scripts/migrate-media-to-r2.cjs`＋`backend/migrate-media.cjs`：來源＝jobs.json 成功結果（帶 jobId，同 settle()）＋state 資產＋未引用 media；全走 `createMainSystem().ingest`；回填 state assetId；revision 變動拒寫；每次一份 report；--undo 只還原本機。
+- Codex 0a423982 四項：#1 舊任務成品漏登記（settle() 只在狀態改變時跑，api.cjs:666）→修；#2 重跑覆蓋 undo 報告→每次一份；#3 不改（一網址一資產＝線上 index，main-system.cjs:85）；#4 檢查與 rename 間的競態→需停服務，已上監工台 P6.9。
+- 工人：訂閱制 Agent tool（fullstack-engineer）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/migrate-media.cjs && tests/p6-main-system.cjs && tests/backend.cjs && tests/package-sources.cjs && tests/awarewave-files.cjs（VW） | exit=0 | ms=90000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n（Codex agency-os/reports/oracle/2026-11-05-partialreview-0a423982.md；2 修 2 說明；突變 revision 守衛、jobs 來源 紅→綠）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=migrate-report | hits=3
 ## 2026-11-05（續2）向量專業版上線：VectorCraft 嵌入 app、第二 dock 欄十面板、舊向量編輯器退場
 
 - 計畫／監工台：`agency-os/handoffs/2026-11-04-vectorcraft-pro/`（R0-PLAN §6、data.mjs → https://claude.ai/artifact/GKGxtNsXbW65SDhsHiTqRK）。四個工人 session 平行（C1／C3／C4 dock／C4 blocks），主 session 驗收＋整合＋C2＋部署。
