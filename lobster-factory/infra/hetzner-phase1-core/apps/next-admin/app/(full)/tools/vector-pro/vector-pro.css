@@ -1,0 +1,41 @@
+/* /tools/vector-pro layout only. Colours come from theme tokens (app/globals.css :root, edited at /tools/theme);
+   the failure line and the footer use the shared .build-alert / .form-hint classes. */
+.vp-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--body-bg);
+}
+.vp-page a { color: var(--accent-text); }
+
+.vp-stage {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.vp-frame {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  display: block;
+}
+.vp-dock {
+  flex: none;
+  height: 100%;
+  overflow: auto;
+}
+
+.vp-failure {
+  flex: 1;
+  margin: 16px;
+  align-self: flex-start;
+}
+
+.vp-foot {
+  flex: none;
+  margin-top: 0;
+  padding: 2px 8px;
+  border-top: 1px solid var(--card-border);
+}
+.vp-foot a { color: inherit; }

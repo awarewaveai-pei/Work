@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import "./vector-pro.css";
 
 // VectorCraft's web build is static files nginx serves at /vector-pro/ (R0-PLAN C2; locally next.config.ts rewrites
 // it to VECTOR_PRO_DEV_ORIGIN). NEXT_PUBLIC_* is baked in at build time.
@@ -54,25 +55,25 @@ export function VectorProFrame() {
   useEffect(() => { if (failure) window.__vectorProFrame = null; }, [failure]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "var(--body-bg)" }}>
+    <div className="vp-page">
       {failure ? (
-        <p style={{ flex: 1, margin: 0, padding: 16, color: "var(--text-primary)" }}>
-          {failure} 請改用 <a href={FALLBACK} style={{ color: "var(--accent-text)" }}>Canvas 編輯器</a>。
+        <p className="build-alert build-alert-warning vp-failure">
+          {failure} 請改用 <a href={FALLBACK}>Canvas 編輯器</a>。
         </p>
       ) : (
-        <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+        <div className="vp-stage">
           <iframe
             ref={frame}
             src={FRAME_SRC}
             title="向量（專業版）"
             onError={() => setFailure("專業版載入失敗。")}
-            style={{ flex: 1, minWidth: 0, height: "100%", border: "none", display: "block" }}
+            className="vp-frame"
           />
-          <aside id="vector-pro-dock" style={{ flex: "none", height: "100%", overflow: "auto" }} />
+          <aside id="vector-pro-dock" className="vp-dock" />
         </div>
       )}
-      <footer style={{ flex: "none", padding: "2px 8px", fontSize: 11, color: "var(--text-muted)", borderTop: "1px solid var(--card-border)" }}>
-        VectorCraft（開源）授權與第三方聲明：<a href={NOTICE_HREF} target="_blank" rel="noopener" style={{ color: "inherit" }}>NOTICE</a>
+      <footer className="form-hint vp-foot">
+        VectorCraft（開源）授權與第三方聲明：<a href={NOTICE_HREF} target="_blank" rel="noopener">NOTICE</a>
       </footer>
     </div>
   );
