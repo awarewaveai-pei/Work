@@ -1,3 +1,5 @@
+import { choiceGroup } from "../block-ui.js";
+
 // Block: 商品 Mockup 預覽. Moved as-is from public/vector-editor.html:1646-1713 (registerBlock 'mockup'; drawProduct/rr/render/download unchanged).
 // Only grabDesign changed: the old one cropped fabric objects' bounding box (:1655-1667); here the artboard PNG comes from
 // ctx.exportArtboard({format:'png',background:'transparent'}) and is cropped to its non-transparent bounds (grabDesignUrl, also used by batch-export.js).
@@ -27,11 +29,14 @@ export default {
   title: "商品 Mockup 預覽",
   mount(ctx, body) {
     body.innerHTML = ""
-      + '<div class="grid2"><div><label>商品</label><select class="form-select" id="mkProduct"><option value="tee">T 恤</option><option value="tote">帆布袋</option><option value="mug">馬克杯</option><option value="phone">手機殼</option><option value="poster">海報框</option></select></div><div><label>商品顏色</label><input id="mkColor" type="color" value="' + TEE + '"></div></div>'
+      + '<label>商品</label><div id="mkProduct"></div>'
+      + '<label>商品顏色</label><input id="mkColor" type="color" value="' + TEE + '">'
       + '<div class="row"><button class="btn btn-primary" id="mkGen">產生 Mockup</button><button class="btn btn-ghost" id="mkDl">下載 PNG</button></div>'
       + '<div id="mkOut" style="margin-top:8px;"></div>'
       + '<div class="info">把目前畫布的設計套到商品上。建議設計先去背（透明底）效果最好。</div>';
     let lastCanvas = null;
+    const product = choiceGroup([["tee", "T 恤"], ["tote", "帆布袋"], ["mug", "馬克杯"], ["phone", "手機殼"], ["poster", "海報框"]], "tee", () => { if (lastCanvas) render(); });
+    body.querySelector("#mkProduct").appendChild(product.el);
     function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
     function drawProduct(g, p, col) {
       g.fillStyle = col; g.strokeStyle = col; g.lineCap = "round";
@@ -63,7 +68,7 @@ export default {
       design.onload = () => {
         const cv = document.createElement("canvas"); cv.width = 500; cv.height = 540; const g = cv.getContext("2d");
         g.fillStyle = PAPER; g.fillRect(0, 0, 500, 540);
-        const pa = drawProduct(g, body.querySelector("#mkProduct").value, body.querySelector("#mkColor").value);
+        const pa = drawProduct(g, product.get(), body.querySelector("#mkColor").value);
         const ar = design.width / design.height, pr = pa.w / pa.h; let dw, dh;
         if (ar > pr) { dw = pa.w; dh = pa.w / ar; } else { dh = pa.h; dw = pa.h * ar; }
         g.drawImage(design, pa.x + (pa.w - dw) / 2, pa.y + (pa.h - dh) / 2, dw, dh);
@@ -76,7 +81,6 @@ export default {
     }
     body.querySelector("#mkGen").onclick = render;
     body.querySelector("#mkColor").oninput = () => { if (lastCanvas) render(); };
-    body.querySelector("#mkProduct").onchange = () => { if (lastCanvas) render(); };
     body.querySelector("#mkDl").onclick = () => { if (!lastCanvas) { alert("先產生 Mockup"); return; } const a = document.createElement("a"); a.href = lastCanvas.toDataURL("image/png"); a.download = "mockup.png"; a.click(); };
   },
 };
