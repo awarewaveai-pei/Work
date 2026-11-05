@@ -81,16 +81,20 @@ B。
 |---|---|
 | C2.1 | 主機 `mkdir -p /root/lobster-phase1/static/photo-pro`；先 `pgrep -f "^bash /root/lobster-phase1/scripts/[s]g-deploy"` 無人部署；rsync `dist/<版本>/` 上去（High：`# CONFIRMED-HIGH-RISK`）；`ln -sfn <版本> current`；`sha256sum -c SHA256SUMS` |
 | C2.2 | compose（`safe-infra-patch.sh compose <file> nginx`）：`INFRA/docker-compose.yml:37` 下加 `- /root/lobster-phase1/static/photo-pro:/srv/photo-pro:ro`；repo 對照檔同步 |
-| C2.3 | nginx（`safe-infra-patch.sh nginx <file>`）：在 `INFRA/nginx/default.conf:318` 與 `:490` 兩個 `/vector-pro/` 區塊之後各加表格下方那段（原樣照抄；regex 含大括號，必須有引號）。不變量：檔名帶內容雜湊（trunk 的 16 位 hex、分段檔）才 1 年，其餘（`index.html`、`app/photocraft-web.js`、`app/parts.txt`、`fonts/**`）每次重新驗證。不開 `gzip_static`（分段檔已是 gzip，由頁面自己解；`PC/packaging/web/README.md:74-79`） |
+| C2.3 | nginx（`safe-infra-patch.sh nginx <file>`）：`INFRA/nginx/default.conf` 頂層一張 `map $uri $photo_pro_cache`，app 區塊與產品子網域區塊各一段 `location ^~ /photo-pro/`（表格下方，原樣照抄）。不變量：檔名帶內容雜湊（trunk 12–16 位 hex，不補零；wasm 分段檔）才 `public, max-age=31536000, immutable`，其餘（`index.html`、`app/photocraft-web.js`、`app/parts.txt`、`fonts/**`）`private, no-cache`——`private` 是因為 Cloudflare 會把 `.js` 的 `no-cache` 改寫成 4 小時（2026-11-06 實測）。`add_header_inherit merge`（nginx ≥1.29.3，正式站 1.30.4）保住伺服器層安全標頭。不開 `gzip_static`（分段檔已是 gzip；`PC/packaging/web/README.md:74-79`） |
 | C2.4 | 驗：`curl -sI https://app.aware-wave.com/photo-pro/current/index.html` 200＋`Cache-Control: no-cache`；`…/app/parts.txt`、`…/app/photocraft-web.js`、`…/fonts/manifest.txt` 皆 `no-cache`；`…/app/<hash>.part-aa` 為 `max-age=31536000` 且無 `Content-Encoding`；`*_bg.wasm` 為 `application/wasm`；`docker exec lobster-nginx ls /srv/photo-pro/current` 有檔 |
 
 ```nginx
+map $uri $photo_pro_cache {
+    "~(-[0-9a-f]{12,16}(_bg)?\.(js|wasm)|\.part-[a-z]+)$" "public, max-age=31536000, immutable";
+    default "private, no-cache";
+}
     location ^~ /photo-pro/ {
         alias /srv/photo-pro/;
         types { application/wasm wasm; text/javascript js; text/html html; font/otf otf; font/ttf ttf; text/plain txt; }
         default_type application/octet-stream;
-        expires -1;
-        location ~ "(-[0-9a-f]{16}(_bg)?\.(js|wasm)|\.part-[a-z]+)$" { expires 1y; }
+        add_header_inherit merge;
+        add_header Cache-Control $photo_pro_cache always;
     }
 ```
 
