@@ -59,10 +59,11 @@ export const STEPS = [
     ] },
   { n: 3, code: 'C3', group: 'C', title: 'app 門', plain: '例：側欄「設計編輯器」多一項「向量（專業版）」，點開就是 Illustrator 介面；瀏覽器太舊時給一行說明並連回快速出稿。',
     gate: '登入後開 /tools/vector-pro 看到 VectorCraft；本機開發也能開（轉到 trunk serve）；產品登記測試全綠。', risk: 'Medium（改 products.ts 登記；頁面本身是 iframe）', model: 'Opus 5.5', status: 'not_started', depends: ['C2'],
-    what: 'page.tsx iframe＋WebGL 偵測＋NOTICE 連結；next.config 開發用 rewrite；products.ts nav／staffPaths；tsc＋四個測試',
+    decided: '全視窗開新分頁（操作者 2026-11-05：嵌在側欄旁可操作版面太小）：頁面放無側欄區，側欄連結開新分頁，登入照管。門的架構照 ADR 018：員工門＝app 這一頁；客戶門＝將來啟用既有的產品子網域 door（同一 next-admin、host 路由、products.ts 一列），不另建站；塔羅／studio／mockup 銜接走同 app 的 API 與 My Designs，不跨源。',
+    what: '無側欄區 app/(full)/tools/vector-pro/page.tsx（iframe＋右欄 dock 100vh）＋WebGL 偵測＋NOTICE 連結；側欄連結 target=_blank；next.config 開發用 rewrite；products.ts nav／staffPaths；tsc＋四個測試',
     files: ['NA/app/(shell)/tools/vector-pro/page.tsx', 'NA/next.config.*', 'NA/lib/portal/products.ts'],
     items: [
-      todo('C3.1', '新頁面嵌入專業版，失敗時給說明與回舊編輯器的連結。'),
+      todo('C3.1', '無側欄全視窗頁嵌入專業版，側欄點開新分頁；失敗時給說明與回舊編輯器的連結。'),
       todo('C3.2', '本機開發時把 /vector-pro/ 轉到本機建置伺服器，正式站不受影響。'),
       todo('C3.3', '設計編輯器的側欄加「向量（專業版）」，登記與權限測試全綠。'),
       todo('C3.4', '正式站登入實開一次，介面回得了資料，截圖存紀錄。'),

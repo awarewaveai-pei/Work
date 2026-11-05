@@ -58,14 +58,14 @@ B。決策：靜態檔由 nginx 供給、版本目錄 `<rev7>/`＋`current` syml
 |---|---|
 | C2.1 | 主機 `mkdir -p /root/lobster-phase1/static/vector-pro`；rsync `dist/<rev7>/` 上去（High：`# CONFIRMED-HIGH-RISK`）；`ln -sfn <rev7> current`；`SHA256SUMS -c` |
 | C2.2 | compose（`safe-infra-patch.sh compose <file> nginx`）：nginx volumes 加 `- /root/lobster-phase1/static/vector-pro:/srv/vector-pro:ro`；repo 對照檔 `INFRA/docker-compose.yml` 同步同一列 |
-| C2.3 | nginx（`safe-infra-patch.sh nginx <file> nginx`）：app.aware-wave.com 區塊加 `location /vector-pro/ { alias /srv/vector-pro/; types { application/wasm wasm; } gzip_static on; location ~ \.(wasm\|js\|otf\|ttf)$ { expires 1y; add_header Cache-Control "public, immutable"; } location ~ index\.html$ { add_header Cache-Control "no-cache"; } }`，放在 `location /` 之前；repo `INFRA/nginx/default.conf` 同步 |
+| C2.3 | nginx（`safe-infra-patch.sh nginx <file> nginx`）：`location /vector-pro/ { alias /srv/vector-pro/; types { application/wasm wasm; } gzip_static on; location ~ \.(wasm\|js\|otf\|ttf)$ { expires 1y; add_header Cache-Control "public, immutable"; } location ~ index\.html$ { add_header Cache-Control "no-cache"; } }` 同時放進 **app.aware-wave.com 區塊與產品子網域區塊**（`default.conf:439` 一塊：social／tarot／studio／design…都是同一 next-admin 的 host 路由；兩塊都放，任何 door host 下 iframe 都同源），放在各自 `location /` 之前；repo `INFRA/nginx/default.conf` 同步 |
 | C2.4 | 驗證：`curl -sI https://app.aware-wave.com/vector-pro/current/index.html` 200；`curl -sI -H 'Accept-Encoding: gzip' …/<hash>.wasm` 回 `Content-Type: application/wasm`＋`Content-Encoding: gzip`；`docker exec lobster-nginx ls /srv/vector-pro/current` 有檔 |
 
 ### C3 app 門
 
 | 卡號 | 做什麼 |
 |---|---|
-| C3.1 | 新檔 `NA/app/(shell)/tools/vector-pro/page.tsx`：iframe `src="/vector-pro/current/index.html?lang=zh-hant"`（`NEXT_PUBLIC_VECTOR_PRO_PATH` 可覆寫），`onError`／WebGL 偵測失敗顯示一行說明＋連到 `/tools/vector-editor`；頁尾一行 NOTICE 連結 |
+| C3.1 | **全視窗、無側欄**（操作者 2026-11-05：可操作版面太小）：新頁放 shell 外（app 已有 `(public)`／`(shell)` 分區，加無側欄區 `app/(full)/tools/vector-pro/page.tsx`，middleware 登入照管）；iframe `src="/vector-pro/current/index.html?lang=zh-hant"`（`NEXT_PUBLIC_VECTOR_PRO_PATH` 可覆寫）＋右欄 dock 排滿 100vh；側欄「向量（專業版）」連結 `target="_blank"` 開新分頁；`onError`／WebGL 偵測失敗顯示一行說明＋連到 `/tools/vector-editor`；頁尾一行 NOTICE 連結。**門的架構（30 年）**：員工門 = app 這一頁；客戶門 = 將來啟用既有 `products.ts` 的 design（或新 vector 列，`NEW_PRODUCT_ROWS` 標記一列＋`scripts/new-product.mjs`）子網域 door，同一個頁面元件被 host 路由到 door 下，**不另建站**；塔羅／studio／mockup 的銜接都是同 app 的 API 與 My Designs 資料，不跨源 |
 | C3.2 | `NA/next.config.*`：`rewrites()` 當 `VECTOR_PRO_DEV_ORIGIN` 有值時把 `/vector-pro/:path*` 轉到該 origin（本機 `trunk serve` 8766），正式站無此變數 = 不改行為 |
 | C3.3 | `NA/lib/portal/products.ts:73` design 門：`nav` 加 `{ path: "pro", name: "向量（專業版）", staff: "tools/vector-pro" }`，`staffPaths` 加 `tools/vector-pro`；`products.test`／`staff-tools.test`／`sidebar-coverage.test`／`npx tsc --noEmit` 綠 |
 | C3.4 | REALTEST：deploy 後登入開 `/tools/vector-pro`，`ui.inspect` 回 JSON（內建瀏覽器 javascript_tool），截圖存 WORKLOG |

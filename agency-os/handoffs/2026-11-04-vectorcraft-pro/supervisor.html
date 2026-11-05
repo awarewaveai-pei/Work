@@ -119,10 +119,11 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
       <p class="plain">例：側欄「設計編輯器」多一項「向量（專業版）」，點開就是 Illustrator 介面；瀏覽器太舊時給一行說明並連回快速出稿。</p>
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium（改 products.ts 登記；頁面本身是 iframe）</span><span class="who">負責：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>登入後開 /tools/vector-pro 看到 VectorCraft；本機開發也能開（轉到 trunk serve）；產品登記測試全綠。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>C3.1</code> 新頁面嵌入專業版，失敗時給說明與回舊編輯器的連結。</span></li><li class="todo"><b>○</b><span><code>C3.2</code> 本機開發時把 /vector-pro/ 轉到本機建置伺服器，正式站不受影響。</span></li><li class="todo"><b>○</b><span><code>C3.3</code> 設計編輯器的側欄加「向量（專業版）」，登記與權限測試全綠。</span></li><li class="todo"><b>○</b><span><code>C3.4</code> 正式站登入實開一次，介面回得了資料，截圖存紀錄。</span></li></ul>
+      <ul class="items"><li class="todo"><b>○</b><span><code>C3.1</code> 無側欄全視窗頁嵌入專業版，側欄點開新分頁；失敗時給說明與回舊編輯器的連結。</span></li><li class="todo"><b>○</b><span><code>C3.2</code> 本機開發時把 /vector-pro/ 轉到本機建置伺服器，正式站不受影響。</span></li><li class="todo"><b>○</b><span><code>C3.3</code> 設計編輯器的側欄加「向量（專業版）」，登記與權限測試全綠。</span></li><li class="todo"><b>○</b><span><code>C3.4</code> 正式站登入實開一次，介面回得了資料，截圖存紀錄。</span></li></ul>
       <details><summary>工程細節：C3 app 門</summary>
-        <p>page.tsx iframe＋WebGL 偵測＋NOTICE 連結；next.config 開發用 rewrite；products.ts nav／staffPaths；tsc＋四個測試</p>
+        <p>無側欄區 app/(full)/tools/vector-pro/page.tsx（iframe＋右欄 dock 100vh）＋WebGL 偵測＋NOTICE 連結；側欄連結 target=_blank；next.config 開發用 rewrite；products.ts nav／staffPaths；tsc＋四個測試</p>
         <p><b>需先完成：</b><a href="#C2">C2</a></p>
+        <p><b>已定案：</b>全視窗開新分頁（操作者 2026-11-05：嵌在側欄旁可操作版面太小）：頁面放無側欄區，側欄連結開新分頁，登入照管。門的架構照 ADR 018：員工門＝app 這一頁；客戶門＝將來啟用既有的產品子網域 door（同一 next-admin、host 路由、products.ts 一列），不另建站；塔羅／studio／mockup 銜接走同 app 的 API 與 My Designs，不跨源。</p>
         <p><b>檔案：</b><code>NA/app/(shell)/tools/vector-pro/page.tsx</code> <code>NA/next.config.*</code> <code>NA/lib/portal/products.ts</code></p>
         <p><b>卡：</b><code>agency-os/handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md §6 C3</code></p>
       </details>
