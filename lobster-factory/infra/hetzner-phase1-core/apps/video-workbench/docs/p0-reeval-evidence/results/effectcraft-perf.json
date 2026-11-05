@@ -1,0 +1,51 @@
+{
+ "A.Full": {
+  "wall": 8.015,
+  "compSeconds": 3.1666666666666665,
+  "ratio": 0.4,
+  "audioPosted": 21024,
+  "audioPlayed": 0,
+  "underruns": 0
+ },
+ "A.Half": {
+  "wall": 8.04,
+  "compSeconds": 7.933333333333334,
+  "ratio": 0.99,
+  "audioPosted": 391200,
+  "audioPlayed": 0,
+  "underruns": 0
+ },
+ "A.Quarter": {
+  "wall": 8.033,
+  "compSeconds": 7.933333333333334,
+  "ratio": 0.99,
+  "audioPosted": 392096,
+  "audioPlayed": 0,
+  "underruns": 512
+ },
+ "B.Full": {
+  "wall": 8.032,
+  "compSeconds": 1.8666666666666667,
+  "ratio": 0.23,
+  "audioPosted": 20640,
+  "audioPlayed": 0,
+  "underruns": 512
+ },
+ "B.Half": {
+  "wall": 8.025,
+  "compSeconds": 3.2,
+  "ratio": 0.4,
+  "audioPosted": 29728,
+  "audioPlayed": 0,
+  "underruns": 512
+ },
+ "B.Quarter": {
+  "wall": 8.125,
+  "compSeconds": 4.8,
+  "ratio": 0.59,
+  "audioPosted": 139168,
+  "audioPlayed": 0,
+  "underruns": 384
+ },
+ "lost": []
+}

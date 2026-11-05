@@ -1,0 +1,26 @@
+diff --git a/crates/text/build.rs b/crates/text/build.rs
+index 5ada2af6..7b4e3b80 100644
+--- a/crates/text/build.rs
++++ b/crates/text/build.rs
+@@ -48,7 +48,7 @@ fn main() {
+ 
+ /// The faces the web build embeds: the UI font and the Thai face.
+ fn wasm_keeps(family: &str, style: &str) -> bool {
+-    style == "Regular" && matches!(family, "BIZ UDPGothic" | "Noto Sans Thai")
++    style == "Regular" && matches!(family, "BIZ UDPGothic" | "Noto Sans Thai" | "Noto Sans TC" | "Noto Serif TC")
+ }
+ 
+ /// One `CraftFont { .. }` initialiser per manifest line, and the `(family, style)` pairs the web
+diff --git a/crates/text/src/fonts.rs b/crates/text/src/fonts.rs
+index 3b1a6ba7..7767e280 100644
+--- a/crates/text/src/fonts.rs
++++ b/crates/text/src/fonts.rs
+@@ -578,7 +578,7 @@ pub fn fallback_for(c: char, prefer: FaceId) -> FaceId {
+     // then the craft-fonts faces (Japanese): Mincho for serif text, Gothic otherwise, nearest weight
+     let serif = is_serif(&p.info.family);
+     let mut craft: Vec<&Arc<Face>> = faces.iter().filter(|f| f.info.origin == CRAFT_ORIGIN).collect();
+-    craft.sort_by_key(|f| (is_serif(&f.info.family) != serif, f.info.italic != p.info.italic, f.info.weight.abs_diff(p.info.weight)));
++    craft.sort_by_key(|f| (is_serif(&f.info.family) != serif, !f.info.family.ends_with(" TC"), f.info.italic != p.info.italic, f.info.weight.abs_diff(p.info.weight)));
+     for f in craft {
+         if f.has_char(c) {
+             return f.id;

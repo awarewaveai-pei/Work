@@ -1,0 +1,45 @@
+{
+ "adapter": {
+  "backend": "BrowserWebGpu",
+  "compositor": "gpu",
+  "webgpuAdapter": "nvidia blackwell"
+ },
+ "idle15s.lost": [],
+ "A": {
+  "wall": 8.135,
+  "playheadSeconds": 8,
+  "ratio": 0.98,
+  "shown": 167,
+  "dropped": 74,
+  "shownFps": 20.5,
+  "shownShare": 0.69,
+  "audioClock": true,
+  "uiFps": 64
+ },
+ "B": {
+  "wall": 8.091,
+  "playheadSeconds": 6.77,
+  "ratio": 0.84,
+  "shown": 92,
+  "dropped": 115,
+  "shownFps": 11.4,
+  "shownShare": 0.44,
+  "audioClock": true,
+  "uiFps": 65
+ },
+ "B.from4s": {
+  "wall": 5.082,
+  "shown": 122,
+  "dropped": 26
+ },
+ "soak": {
+  "seconds": 73.9,
+  "loops": 8,
+  "lost": [],
+  "info": {
+   "backend": "BrowserWebGpu",
+   "compositor": "gpu"
+  }
+ },
+ "lost": []
+}

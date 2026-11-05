@@ -1,0 +1,173 @@
+{
+ "ready": [
+  {
+   "type": "filmcraft:ready",
+   "version": "1",
+   "appVersion": "0.17.0",
+   "sameOrigin": true
+  },
+  {
+   "type": "filmcraft:dirty",
+   "dirty": false,
+   "sameOrigin": true
+  }
+ ],
+ "open.mp4": 0,
+ "open.wav": 0,
+ "open.srt": 0,
+ "media.status": [
+  [
+   1,
+   "a440.wav",
+   "online"
+  ],
+  [
+   13,
+   "src.mp4",
+   "online"
+  ]
+ ],
+ "seq": {
+  "ok": true,
+  "r": {
+   "sequence": 20
+  }
+ },
+ "title": {
+  "ok": true,
+  "r": {
+   "clip": 23,
+   "layer": 0
+  }
+ },
+ "saveAs": {
+  "ok": true,
+  "r": {
+   "backup": null,
+   "bytes": 12115,
+   "ms": 1.5,
+   "path": "/host.fcproj"
+  }
+ },
+ "export": {
+  "ok": true,
+  "r": {
+   "cancel": "jobs.cancel",
+   "job": 1,
+   "path": "/exports/host-out.mp4",
+   "poll": "jobs.list",
+   "warnings": []
+  }
+ },
+ "msgs": [
+  {
+   "type": "filmcraft:ready",
+   "version": "1",
+   "appVersion": "0.17.0",
+   "sameOrigin": true
+  },
+  {
+   "type": "filmcraft:dirty",
+   "dirty": false,
+   "sameOrigin": true
+  },
+  {
+   "type": "filmcraft:dirty",
+   "dirty": true,
+   "sameOrigin": true
+  },
+  {
+   "type": "filmcraft:save",
+   "name": "host.fcproj",
+   "saveAs": true,
+   "bytes": 12115,
+   "sameOrigin": true
+  },
+  {
+   "type": "filmcraft:dirty",
+   "dirty": false,
+   "sameOrigin": true
+  },
+  {
+   "type": "filmcraft:save",
+   "name": "host-out.mp4",
+   "saveAs": false,
+   "bytes": 159379,
+   "sameOrigin": true
+  }
+ ],
+ "saved.probe": {
+  "duration": "3.018005",
+  "streams": [
+   [
+    "video",
+    "h264",
+    960,
+    540
+   ],
+   [
+    "audio",
+    "aac",
+    null,
+    null
+   ]
+  ]
+ },
+ "downloads.browser": 0,
+ "reopen.projectOnly": [
+  [
+   "a440.wav",
+   "missing"
+  ],
+  [
+   "src.mp4",
+   "missing"
+  ]
+ ],
+ "reopen.afterMedia": [
+  [
+   "a440.wav",
+   "/files/a440.wav",
+   "online"
+  ],
+  [
+   "src.mp4",
+   "/files/src.mp4",
+   "online"
+  ],
+  [
+   "a440.wav",
+   "/files/a440.wav",
+   "online"
+  ],
+  [
+   "src.mp4",
+   "/files/src.mp4",
+   "online"
+  ]
+ ],
+ "reopen.missing": {
+  "ok": true,
+  "r": {
+   "missing": []
+  }
+ },
+ "reopen.msgs": [
+  {
+   "type": "filmcraft:ready",
+   "version": "1",
+   "appVersion": "0.17.0",
+   "sameOrigin": true
+  },
+  {
+   "type": "filmcraft:dirty",
+   "dirty": false,
+   "sameOrigin": true
+  },
+  {
+   "type": "filmcraft:dirty",
+   "dirty": true,
+   "sameOrigin": true
+  }
+ ]
+}

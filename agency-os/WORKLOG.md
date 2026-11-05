@@ -1,4 +1,29 @@
 # Worklog
+## 2026-11-06（續2）影音工作台：EffectCraft／FilmCraft 重評＋「一支影片一條線」計畫（只有文件與試建，等操作者選路線）
+
+- 起因：操作者 11-05 問「說好的 EffectCraft、FilmCraft 完整功能在 video.aware-wave.com 沒看到」＋「工具像零件」。handoff `agency-os/handoffs/2026-11-05-effectcraft-filmcraft-reeval.md` §3–§4。
+- 根因（為什麼沒看到）：11-02 P0 四閘不過 → 路線 C（全自製）。本輪重測：③ 字型、⑤ 焦點、② 重開都有解法；① 效能仍看顯示卡。
+- 產出（正式程式零改動；文件、證據與本條同一個 commit，監工台與總計畫兩列在緊接的下一個 commit）：
+  - 差距表＋五閘：`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/p0-reeval-gates-20261106.md`
+  - R0 計畫（三路線＋handoff §2b 四答）：同目錄 `engine-route-plan-20261106.md`
+  - 證據：同目錄 `p0-reeval-evidence/`（補丁 2、建置腳本 2、harness 9、結果 JSON 9、截圖 5，共約 616 KB）
+  - 監工台卡 RE＋待決 2「選路線」；總計畫 §0、§4 各加一列
+- 發現（細節只在閘檔）：
+  - C1 字型機制跟 VectorCraft 不同：兩個引擎沒有 `web-fonts.txt`。EffectCraft `include_bytes!`（`crates/text/src/fonts.rs:21-27`，`add_font_data` 無人呼叫）；FilmCraft 走 craft-fonts 的 `wasm_keeps`（`crates/text/build.rs:50-52`）。補丁各幾行，輸出第 120 格繁中（含 Big5 專屬字「嘸」）正確。
+  - C2 這台筆電瀏覽器預設把 WebGL2／WebGPU 都給 Intel UHD，`--force_high_performance_gpu` 才用 RTX 5060。11-02 的 54 秒 device lost 發生在 Intel 上（操作者的 Edge 同一張卡）。本輪 WebGPU 只在 NVIDIA 跑：兩引擎各約 2.5 分鐘無 device lost。
+  - C3 效能：內顯不開 WebGPU → FilmCraft 畫面約 0.3 fps、EffectCraft 完整測試片 Full 0.23 倍速；RTX 5060 WebGPU → FilmCraft 20–24 fps、EffectCraft 完整測試片 Full 0.28、Half 0.47。
+  - M1 FilmCraft main `46763a8` 有嵌入橋 `?host=parent`（還沒進 release）：送檔、存檔、輸出都走 `postMessage`，瀏覽器下載 0 次；SRT 直接匯入、`loudnessLufs:-16` 實量 −16.0 LUFS、SRT sidecar。
+  - M2 EffectCraft 重開素材離線的 bug 在 v0.21.1 還在；一個 `footage.relink` 連回全部 5 個。沒有嵌入橋、沒有 SRT 匯入。
+  - M3 焦點：原樣出不了 iframe；工作台在同源 `contentWindow` 掛 `keydown`（F6）可拿回，兩引擎都有效。
+  - m1 FilmCraft 介面沒有繁中（`crates/ui-egui/src/i18n.rs:177-178`）；兩引擎不跟主題、有下拉。
+  - m2 改過的版本不可帶 ArtCraft 名稱與標誌（兩個 README License 段）。
+- 建議：路線 B（並存：新增「專業剪輯」＝FilmCraft 先、「專業特效」＝EffectCraft 後；自製全留），三條路線都先做專案主線。等操作者選。
+- 沒測（閘檔 §3 末段）：有頭模式聲音與輸入法、Intel 內顯 WebGPU（不重跑，11-02 曾讓操作者 Edge 當掉）、一般桌機實機、長片／4K／>512 MiB、`filmcraft-cli` 主機輸出。
+- 避免再發生：判「引擎不能用」之前先查瀏覽器實際拿到哪張顯示卡（`harness/gpuinfo.cjs`）；WebGPU 試驗只在操作者的瀏覽器沒用到的那張卡上跑。
+- REALTEST_EVIDENCE: tool=Bash | cmd=wsl build-one.sh effectcraft＋filmcraft（BUILD-OK 520s／478s）；node ec-main.cjs、fc-main.cjs、perf.cjs ×4、embed.cjs ×2、fc-host.cjs（輸出以 ffprobe＋第 120 格解碼＋ebur128 核對）；node check.mjs | exit=0 | ms=1500000
+- REVIEW_WAIVED: DOC_ONLY -- 只有文件、證據與試建腳本（docs/p0-reeval-evidence/），正式程式零改動；兩份文件引用的本 repo 與上游行號已逐一 grep 核對並修正 5 處
+- ORACLE_WAIVED: 提交內的 .cjs／.sh 是試驗腳本證據，不被任何正式程式載入（docs/ 在 .dockerignore）；沒有可審的行為變更
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=engine-route-plan-20261106 | hits=9（data.mjs 2、supervisor.html 2、WORKLOG 2、creative-suite-plan 2、p0-reeval-gates 1；全是本輪新增的指標，沒有舊文件需要改口）
 ## 2026-11-06（續1）向量專業版拿掉 app 主題連動＋畫布專業版定案與派工（W1–W4）
 
 - 根因：操作者看過上線畫面後定案「craftart 不要套主體，就原設定的黑色和淺色」，向量版已上線的主題連動一併拿掉；畫布專業版待決「照有星號的做」；三個舊面板「原有功能，加入就好」，由主 session 決定照原樣搬。

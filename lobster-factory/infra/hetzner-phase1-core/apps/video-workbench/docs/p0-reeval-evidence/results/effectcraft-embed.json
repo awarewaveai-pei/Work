@@ -1,0 +1,38 @@
+{
+ "parent.coi": false,
+ "before": {
+  "workers": 0,
+  "heap": {
+   "Documents": 19,
+   "JSHeapUsedSize": 4976696
+  }
+ },
+ "frame.info": {
+  "backend": "Gl",
+  "coi": false,
+  "version": "0.21.1"
+ },
+ "during": {
+  "workers": 0,
+  "workerUrls": [],
+  "heap": {
+   "Documents": 23,
+   "JSHeapUsedSize": 8551280
+  }
+ },
+ "sidebar.click": "ok",
+ "sidebar.active": "toolsNav",
+ "focus.inFrame": "eng",
+ "focus.afterEscape": "eng",
+ "focus.afterTab": "eng",
+ "focus.inFrame2": "eng",
+ "focus.afterF6": "toolsNav",
+ "sidebar.activeAfterEnter": "toolsNav",
+ "after": {
+  "workers": 0,
+  "heap": {
+   "Documents": 8,
+   "JSHeapUsedSize": 5186124
+  }
+ }
+}

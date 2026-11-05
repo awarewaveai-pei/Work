@@ -1,0 +1,30 @@
+{
+ "A": {
+  "wall": 8.184,
+  "playheadSeconds": 7.77,
+  "ratio": 0.95,
+  "shown": 3,
+  "dropped": 230,
+  "shownFps": 0.4,
+  "shownShare": 0.01,
+  "audioClock": true,
+  "uiFps": 16
+ },
+ "B": {
+  "wall": 8.242,
+  "playheadSeconds": 7.23,
+  "ratio": 0.88,
+  "shown": 2,
+  "dropped": 223,
+  "shownFps": 0.2,
+  "shownShare": 0.01,
+  "audioClock": true,
+  "uiFps": 13
+ },
+ "B.from4s": {
+  "wall": 5.438,
+  "shown": 23,
+  "dropped": 120
+ },
+ "lost": []
+}

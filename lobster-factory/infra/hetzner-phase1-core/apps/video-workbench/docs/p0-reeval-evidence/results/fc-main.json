@@ -1,0 +1,883 @@
+{
+ "load": {
+  "ms": 839,
+  "load": {
+   "wasmMs": 354.6999999284744,
+   "readyMs": 770.6999999284744
+  },
+  "info": {
+   "backend": "Gl",
+   "compositor": "cpu",
+   "coi": false,
+   "opfs": true,
+   "webcodecs": [
+    "avc",
+    "vp9",
+    "av1"
+   ],
+   "threads": false
+  }
+ },
+ "fonts": "[{\"family\":\"BIZ UDPGothic\",\"styles\":[\"Regular\"]},{\"family\":\"Inter\",\"styles\":[\"Regular\",\"Medium\",\"SemiBold\",\"Bold\",\"Italic\"]},{\"family\":\"JetBrains Mono\",\"styles\":[\"Regular\"]},{\"family\":\"Noto Sans TC\",\"styles\":[\"Regular\"]},{\"family\":\"Noto Sans Thai\",\"styles\":[\"Regular\"]},{\"family\":\"Noto Serif\",\"styles\":[\"Regular\"]},{\"family\":\"Noto Serif TC\",\"styles\":[\"Regular\"]}]",
+ "import.src.mp4": {
+  "ok": true,
+  "r": {
+   "errors": [],
+   "items": [
+    1
+   ],
+   "paths": [
+    "/files/src.mp4"
+   ]
+  }
+ },
+ "import.src_hevc10.mov": {
+  "ok": true,
+  "r": {
+   "errors": [],
+   "items": [
+    2
+   ],
+   "paths": [
+    "/files/src_hevc10.mov"
+   ]
+  }
+ },
+ "import.logo.png": {
+  "ok": true,
+  "r": {
+   "errors": [],
+   "items": [
+    3
+   ],
+   "paths": [
+    "/files/logo.png"
+   ]
+  }
+ },
+ "import.a440.wav": {
+  "ok": true,
+  "r": {
+   "errors": [],
+   "items": [
+    4
+   ],
+   "paths": [
+    "/files/a440.wav"
+   ]
+  }
+ },
+ "import.a880.wav": {
+  "ok": true,
+  "r": {
+   "errors": [],
+   "items": [
+    5
+   ],
+   "paths": [
+    "/files/a880.wav"
+   ]
+  }
+ },
+ "import.ms": 5447,
+ "project.items": {
+  "ok": true,
+  "r": {
+   "bin": 0,
+   "columns": [
+    {
+     "name": "Name",
+     "width": 220
+    },
+    {
+     "name": "Frame Rate",
+     "width": 80
+    },
+    {
+     "name": "Media Start",
+     "width": 110
+    },
+    {
+     "name": "Media End",
+     "width": 110
+    },
+    {
+     "name": "Media Duration",
+     "width": 110
+    },
+    {
+     "name": "Video In Point",
+     "width": 110
+    },
+    {
+     "name": "Video Out Point",
+     "width": 110
+    },
+    {
+     "name": "Video Duration",
+     "width": 110
+    },
+    {
+     "name": "Video Info",
+     "width": 170
+    },
+    {
+     "name": "Audio Info",
+     "width": 170
+    },
+    {
+     "name": "Tape Name",
+     "width": 110
+    },
+    {
+     "name": "Description",
+     "width": 170
+    }
+   ],
+   "rows": [
+    {
+     "cells": {
+      "Audio Info": "44100 Hz - Mono",
+      "Description": "",
+      "Frame Rate": "",
+      "Media Duration": "00:00:09:23",
+      "Media End": "00:00:09:22",
+      "Media Start": "00:00:00:00",
+      "Name": "a440.wav",
+      "Tape Name": "",
+      "Video Duration": "",
+      "Video In Point": "",
+      "Video Info": "",
+      "Video Out Point": ""
+     },
+     "depth": 0,
+     "item": 4,
+     "label": "Caribbean",
+     "name": "a440.wav"
+    },
+    {
+     "cells": {
+      "Audio Info": "44100 Hz - Mono",
+      "Description": "",
+      "Frame Rate": "",
+      "Media Duration": "00:00:09:23",
+      "Media End": "00:00:09:22",
+      "Media Start": "00:00:00:00",
+      "Name": "a880.wav",
+      "Tape Name": "",
+      "Video Duration": "",
+      "Video In Point": "",
+      "Video Info": "",
+      "Video Out Point": ""
+     },
+     "depth": 0,
+     "item": 5,
+     "label": "Caribbean",
+     "name": "a880.wav"
+    },
+    {
+     "cells": {
+      "Audio Info": "",
+      "Description": "",
+      "Frame Rate": "29.97 fps",
+      "Media Duration": "00:00:04:29",
+      "Media End": "00:00:04:28",
+      "Media Start": "00:00:00:00",
+      "Name": "logo.png",
+      "Tape Name": "",
+      "Video Duration": "00:00:04:29",
+      "Video In Point": "00:00:00:00",
+      "Video Info": "512 x 512 (1.0000)",
+      "Video Out Point": "00:00:04:28"
+     },
+     "depth": 0,
+     "item": 3,
+     "label": "Lavender",
+     "name": "logo.png"
+    },
+    {
+     "cells": {
+      "Audio Info": "44100 Hz - Mono",
+      "Description": "",
+      "Frame Rate": "30 fps",
+      "Media Duration": "00:00:10:00",
+      "Media End": "00:00:09:29",
+      "Media Start": "00:00:00:00",
+      "Name": "src.mp4",
+      "Tape Name": "",
+      "Video Duration": "00:00:10:00",
+      "Video In Point": "00:00:00:00",
+      "Video Info": "1920 x 1080 (1.0000)",
+      "Video Out Point": "00:00:09:29"
+     },
+     "depth": 0,
+     "item": 1,
+     "label": "Iris",
+     "name": "src.mp4"
+    },
+    {
+     "cells": {
+      "Audio Info": "44100 Hz - Mono",
+      "Description": "",
+      "Frame Rate": "30 fps",
+      "Media Duration": "00:00:10:00",
+      "Media End": "00:00:09:29",
+      "Media Start": "00:00:00:00",
+      "Name": "src_hevc10.mov",
+      "Tape Name": "",
+      "Video Duration": "00:00:10:00",
+      "Video In Point": "00:00:00:00",
+      "Video Info": "1920 x 1080 (1.0000)",
+      "Video Out Point": "00:00:09:29"
+     },
+     "depth": 0,
+     "item": 2,
+     "label": "Iris",
+     "name": "src_hevc10.mov"
+    }
+   ],
+   "sort": {
+    "column": "Name",
+    "descending": false
+   }
+  }
+ },
+ "seq.new": {
+  "ok": true,
+  "r": {
+   "sequence": 12
+  }
+ },
+ "place.mp4": {
+  "ok": true,
+  "r": {
+   "clips": [
+    14,
+    15
+   ]
+  }
+ },
+ "place.mov": {
+  "ok": true,
+  "r": {
+   "clips": [
+    16
+   ]
+  }
+ },
+ "place.png": {
+  "ok": true,
+  "r": {
+   "clips": [
+    17
+   ]
+  }
+ },
+ "place.a440": {
+  "ok": true,
+  "r": {
+   "clips": [
+    18
+   ]
+  }
+ },
+ "place.a880": {
+  "ok": true,
+  "r": {
+   "clips": [
+    19
+   ]
+  }
+ },
+ "razor.f180": {
+  "ok": true,
+  "r": {
+   "cuts": 1
+  }
+ },
+ "title": {
+  "ok": true,
+  "r": {
+   "clip": 23,
+   "layer": 0
+  }
+ },
+ "import.srt": {
+  "ok": true,
+  "r": {
+   "errors": [],
+   "items": [],
+   "paths": [
+    "/files/zh.srt"
+   ]
+  }
+ },
+ "captions.style": {
+  "ok": true,
+  "r": null
+ },
+ "captions.list": {
+  "ok": true,
+  "r": {
+   "selection": [],
+   "tracks": [
+    {
+     "captions": [
+      {
+       "duration": "00:00:02:00",
+       "end": 635040000000,
+       "id": 26,
+       "in": "00:00:00:15",
+       "out": "00:00:02:15",
+       "settings": "",
+       "speaker": null,
+       "start": 127008000000,
+       "text": "歡迎來到覺知波。"
+      },
+      {
+       "duration": "00:00:02:00",
+       "end": 1270080000000,
+       "id": 27,
+       "in": "00:00:03:00",
+       "out": "00:00:05:00",
+       "settings": "",
+       "speaker": null,
+       "start": 762048000000,
+       "text": "他說：「今天，天氣很好。」"
+      },
+      {
+       "duration": "00:00:02:15",
+       "end": 2159136000000,
+       "id": 28,
+       "in": "00:00:06:00",
+       "out": "00:00:08:15",
+       "settings": "",
+       "speaker": null,
+       "start": 1524096000000,
+       "text": "第一行字幕，\n第二行字幕。"
+      }
+     ],
+     "enabled": true,
+     "format": "Subtitle",
+     "id": 25,
+     "label": "C1",
+     "language": "en",
+     "locked": false,
+     "name": "zh",
+     "style": {
+      "align": "center",
+      "anchor": "bottom",
+      "background": true,
+      "backgroundColor": "#000000bf",
+      "color": "#ffffffff",
+      "font": "Noto Serif TC",
+      "fontStyle": "Regular",
+      "lineSpacing": 1.25,
+      "margin": 0.07999999821186066,
+      "outline": 0,
+      "outlineColor": "#000000ff",
+      "size": 64
+     },
+     "syncLock": true
+    }
+   ]
+  }
+ },
+ "transition": {
+  "ok": true,
+  "r": {
+   "transitions": [
+    29,
+    30
+   ]
+  }
+ },
+ "play": {
+  "ok": true,
+  "r": {
+   "playhead": 0,
+   "playing": true
+  }
+ },
+ "play.samples": {
+  "wall": 10.165,
+  "samples": [
+   {
+    "sec": 0.7,
+    "uiFps": 28,
+    "audioClock": true,
+    "dropped": 18,
+    "loop": false,
+    "playing": true,
+    "preroll": false,
+    "shown": 3,
+    "speed": 1
+   },
+   {
+    "sec": 2.033,
+    "uiFps": 15,
+    "audioClock": true,
+    "dropped": 58,
+    "loop": false,
+    "playing": true,
+    "preroll": false,
+    "shown": 3,
+    "speed": 1
+   },
+   {
+    "sec": 2.967,
+    "uiFps": 11,
+    "audioClock": true,
+    "dropped": 94,
+    "loop": false,
+    "playing": true,
+    "preroll": false,
+    "shown": 3,
+    "speed": 1
+   },
+   {
+    "sec": 4.333,
+    "uiFps": 12,
+    "audioClock": true,
+    "dropped": 135,
+    "loop": false,
+    "playing": true,
+    "preroll": false,
+    "shown": 3,
+    "speed": 1
+   },
+   {
+    "sec": 5.6,
+    "uiFps": 16,
+    "audioClock": true,
+    "dropped": 173,
+    "loop": false,
+    "playing": true,
+    "preroll": false,
+    "shown": 3,
+    "speed": 1
+   },
+   {
+    "sec": 6.767,
+    "uiFps": 19,
+    "audioClock": true,
+    "dropped": 208,
+    "loop": false,
+    "playing": true,
+    "preroll": false,
+    "shown": 3,
+    "speed": 1
+   },
+   {
+    "sec": 7.967,
+    "uiFps": 18,
+    "audioClock": true,
+    "dropped": 244,
+    "loop": false,
+    "playing": true,
+    "preroll": false,
+    "shown": 3,
+    "speed": 1
+   },
+   {
+    "sec": 9.133,
+    "uiFps": 19,
+    "audioClock": true,
+    "dropped": 279,
+    "loop": false,
+    "playing": true,
+    "preroll": false,
+    "shown": 3,
+    "speed": 1
+   }
+  ]
+ },
+ "info.afterPlay": {
+  "backend": "Gl",
+  "compositor": "cpu",
+  "webcodecsStats": {
+   "framesDecoded": 306,
+   "fallbacks": 0,
+   "sources": 1
+  }
+ },
+ "fc-preview-t1": true,
+ "fc-preview-t4": true,
+ "fc-preview-t7": true,
+ "saveAs": {
+  "ok": true,
+  "r": {
+   "backup": null,
+   "bytes": 16754,
+   "ms": 5,
+   "path": "/reeval.fcproj"
+  }
+ },
+ "files": [
+  {
+   "kind": "blob",
+   "path": "/files/a440.wav",
+   "size": 882078
+  },
+  {
+   "kind": "blob",
+   "path": "/files/a880.wav",
+   "size": 882078
+  },
+  {
+   "kind": "blob",
+   "path": "/files/logo.png",
+   "size": 4081
+  },
+  {
+   "kind": "blob",
+   "path": "/files/src.mp4",
+   "size": 8445390
+  },
+  {
+   "kind": "blob",
+   "path": "/files/src_hevc10.mov",
+   "size": 5601257
+  },
+  {
+   "kind": "blob",
+   "path": "/files/zh.srt",
+   "size": 215
+  },
+  {
+   "kind": "memory",
+   "path": "/reeval.fcproj",
+   "size": 16754
+  }
+ ],
+ "fcproj.bytes": 16754,
+ "reload.info": {
+  "restoredMedia": 6,
+  "opfs": true
+ },
+ "reload.open": {
+  "ok": true,
+  "r": {
+   "migrated": false,
+   "missingMedia": 0,
+   "path": "/projects/reeval.fcproj",
+   "schemaVersion": 17
+  }
+ },
+ "reload.missing": {
+  "ok": true,
+  "r": {
+   "missing": []
+  }
+ },
+ "reload.status": {
+  "ok": true,
+  "r": [
+   {
+    "identity": {
+     "fingerprint": "349e92b3cf4f5176",
+     "size": 8445390
+    },
+    "item": 1,
+    "name": "src.mp4",
+    "path": "/files/src.mp4",
+    "proxy": null,
+    "status": "online"
+   },
+   {
+    "identity": {
+     "fingerprint": "b1e4d86c8a5b3964",
+     "size": 5601257
+    },
+    "item": 2,
+    "name": "src_hevc10.mov",
+    "path": "/files/src_hevc10.mov",
+    "proxy": null,
+    "status": "online"
+   },
+   {
+    "identity": {
+     "fingerprint": "2751117188e1f17d",
+     "size": 4081
+    },
+    "item": 3,
+    "name": "logo.png",
+    "path": "/files/logo.png",
+    "proxy": null,
+    "status": "online"
+   },
+   {
+    "identity": {
+     "fingerprint": "ae503fb9aa9ecca8",
+     "size": 882078
+    },
+    "item": 4,
+    "name": "a440.wav",
+    "path": "/files/a440.wav",
+    "proxy": null,
+    "status": "online"
+   },
+   {
+    "identity": {
+     "fingerprint": "5f09cb93b35ad3d5",
+     "size": 882078
+    },
+    "item": 5,
+    "name": "a880.wav",
+    "path": "/files/a880.wav",
+    "proxy": null,
+    "status": "online"
+   }
+  ]
+ },
+ "reload.status.afterHostReAdd": {
+  "ok": true,
+  "r": [
+   {
+    "identity": {
+     "fingerprint": "349e92b3cf4f5176",
+     "size": 8445390
+    },
+    "item": 1,
+    "name": "src.mp4",
+    "path": "/files/src.mp4",
+    "proxy": null,
+    "status": "online"
+   },
+   {
+    "identity": {
+     "fingerprint": "b1e4d86c8a5b3964",
+     "size": 5601257
+    },
+    "item": 2,
+    "name": "src_hevc10.mov",
+    "path": "/files/src_hevc10.mov",
+    "proxy": null,
+    "status": "online"
+   },
+   {
+    "identity": {
+     "fingerprint": "2751117188e1f17d",
+     "size": 4081
+    },
+    "item": 3,
+    "name": "logo.png",
+    "path": "/files/logo.png",
+    "proxy": null,
+    "status": "online"
+   },
+   {
+    "identity": {
+     "fingerprint": "ae503fb9aa9ecca8",
+     "size": 882078
+    },
+    "item": 4,
+    "name": "a440.wav",
+    "path": "/files/a440.wav",
+    "proxy": null,
+    "status": "online"
+   },
+   {
+    "identity": {
+     "fingerprint": "5f09cb93b35ad3d5",
+     "size": 882078
+    },
+    "item": 5,
+    "name": "a880.wav",
+    "path": "/files/a880.wav",
+    "proxy": null,
+    "status": "online"
+   },
+   {
+    "identity": {
+     "fingerprint": "349e92b3cf4f5176",
+     "size": 8445390
+    },
+    "item": 31,
+    "name": "src (2).mp4",
+    "path": "/files/src (2).mp4",
+    "proxy": null,
+    "status": "online"
+   },
+   {
+    "identity": {
+     "fingerprint": "b1e4d86c8a5b3964",
+     "size": 5601257
+    },
+    "item": 32,
+    "name": "src_hevc10 (2).mov",
+    "path": "/files/src_hevc10 (2).mov",
+    "proxy": null,
+    "status": "online"
+   },
+   {
+    "identity": {
+     "fingerprint": "2751117188e1f17d",
+     "size": 4081
+    },
+    "item": 33,
+    "name": "logo (2).png",
+    "path": "/files/logo (2).png",
+    "proxy": null,
+    "status": "online"
+   },
+   {
+    "identity": {
+     "fingerprint": "ae503fb9aa9ecca8",
+     "size": 882078
+    },
+    "item": 34,
+    "name": "a440 (2).wav",
+    "path": "/files/a440 (2).wav",
+    "proxy": null,
+    "status": "online"
+   },
+   {
+    "identity": {
+     "fingerprint": "5f09cb93b35ad3d5",
+     "size": 882078
+    },
+    "item": 35,
+    "name": "a880 (2).wav",
+    "path": "/files/a880 (2).wav",
+    "proxy": null,
+    "status": "online"
+   }
+  ]
+ },
+ "export": {
+  "ok": true,
+  "r": {
+   "cancel": "jobs.cancel",
+   "job": 1,
+   "path": "/exports/fc-out.mp4",
+   "poll": "jobs.list",
+   "warnings": []
+  }
+ },
+ "jobs.final": {
+  "ok": true,
+  "r": [
+   {
+    "done": 300,
+    "etaSeconds": null,
+    "finished": true,
+    "id": 1,
+    "label": "Export fc-out.mp4",
+    "offlineMedia": [],
+    "progress": 1,
+    "result": {
+     "bytes": 25411706,
+     "frames": 300,
+     "path": "/exports/fc-out.mp4",
+     "render_fps": 3.8364446899769047,
+     "seconds": 78.1974
+    },
+    "status": "Done in 78.2s",
+    "total": 300
+   }
+  ]
+ },
+ "export.ms": 78909,
+ "export.files": [
+  {
+   "kind": "memory",
+   "path": "/exports/fc-out.mp4",
+   "size": 25411706
+  },
+  {
+   "kind": "memory",
+   "path": "/exports/fc-out.srt",
+   "size": 202
+  },
+  {
+   "kind": "blob",
+   "path": "/files/a440 (2).wav",
+   "size": 882078
+  },
+  {
+   "kind": "blob",
+   "path": "/files/a440.wav",
+   "size": 882078
+  },
+  {
+   "kind": "blob",
+   "path": "/files/a880 (2).wav",
+   "size": 882078
+  },
+  {
+   "kind": "blob",
+   "path": "/files/a880.wav",
+   "size": 882078
+  },
+  {
+   "kind": "blob",
+   "path": "/files/logo (2).png",
+   "size": 4081
+  },
+  {
+   "kind": "blob",
+   "path": "/files/logo.png",
+   "size": 4081
+  },
+  {
+   "kind": "blob",
+   "path": "/files/src (2).mp4",
+   "size": 8445390
+  },
+  {
+   "kind": "blob",
+   "path": "/files/src.mp4",
+   "size": 8445390
+  },
+  {
+   "kind": "blob",
+   "path": "/files/src_hevc10 (2).mov",
+   "size": 5601257
+  },
+  {
+   "kind": "blob",
+   "path": "/files/src_hevc10.mov",
+   "size": 5601257
+  },
+  {
+   "kind": "blob",
+   "path": "/files/zh.srt",
+   "size": 215
+  },
+  {
+   "kind": "memory",
+   "path": "/projects/reeval.fcproj",
+   "size": 16754
+  }
+ ],
+ "out.probe": {
+  "duration": "10.005000",
+  "size": "25411706",
+  "streams": [
+   {
+    "type": "video",
+    "codec": "h264",
+    "w": 1920,
+    "h": 1080,
+    "fps": "30/1",
+    "frames": "300"
+   },
+   {
+    "type": "audio",
+    "codec": "aac",
+    "fps": "0/0",
+    "frames": "470",
+    "sr": "48000",
+    "ch": 2
+   }
+  ]
+ },
+ "out.meanVolumeDb": -18.4,
+ "downloads": [
+  "fc-dl-reeval.fcproj",
+  "fc-dl-fc-out.srt",
+  "fc-dl-fc-out.mp4"
+ ],
+ "lost": []
+}

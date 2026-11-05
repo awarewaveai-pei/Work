@@ -1,0 +1,23 @@
+diff --git a/crates/text/src/fonts.rs b/crates/text/src/fonts.rs
+index 5388629c..1aec862f 100644
+--- a/crates/text/src/fonts.rs
++++ b/crates/text/src/fonts.rs
+@@ -25,6 +25,9 @@ pub static INTER_BOLD: &[u8] = include_bytes!("../../../assets/fonts/Inter-Bold.
+ pub static INTER_ITALIC: &[u8] = include_bytes!("../../../assets/fonts/Inter-Italic.ttf");
+ pub static JETBRAINS_MONO_REGULAR: &[u8] = include_bytes!("../../../assets/fonts/JetBrainsMono-Regular.ttf");
+ pub static NOTO_SERIF_REGULAR: &[u8] = include_bytes!("../../../assets/fonts/NotoSerif-Regular.ttf");
++/// AwareWave build: Traditional Chinese faces, compiled in so the page and every worker have them.
++pub static NOTO_SANS_TC_REGULAR: &[u8] = include_bytes!("../../../assets/fonts/NotoSansTC-Regular.otf");
++pub static NOTO_SERIF_TC_REGULAR: &[u8] = include_bytes!("../../../assets/fonts/NotoSerifTC-Regular.otf");
+ 
+ /// The default family for new text.
+ pub const DEFAULT_FAMILY: &str = "Inter";
+@@ -322,7 +325,7 @@ fn db() -> &'static RwLock<Db> {
+     DB.get_or_init(|| {
+         let fallback = bundled_default_face();
+         let mut db = Db { faces: vec![fallback.clone()], fallback, scanned: false };
+-        for b in [INTER_MEDIUM, INTER_SEMIBOLD, INTER_BOLD, INTER_ITALIC, JETBRAINS_MONO_REGULAR, NOTO_SERIF_REGULAR] {
++        for b in [INTER_MEDIUM, INTER_SEMIBOLD, INTER_BOLD, INTER_ITALIC, JETBRAINS_MONO_REGULAR, NOTO_SERIF_REGULAR, NOTO_SANS_TC_REGULAR, NOTO_SERIF_TC_REGULAR] {
+             for n in read_faces_bytes(b) {
+                 push(&mut db, info_from(n, FaceData::Static(b), "bundled"));
+             }

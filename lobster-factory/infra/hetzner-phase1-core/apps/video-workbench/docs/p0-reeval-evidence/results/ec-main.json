@@ -1,0 +1,705 @@
+{
+ "load": {
+  "ms": 433,
+  "load": {
+   "wasmMs": 239.30000007152557,
+   "readyMs": 364.7000000476837
+  },
+  "info": {
+   "version": "0.21.1",
+   "backend": "Gl",
+   "gpu": {
+    "compositor": null,
+    "viewerOnGpu": false
+   },
+   "coi": false,
+   "storage": "opfs",
+   "frameWorkers": {
+    "workers": 2,
+    "alive": 2
+   }
+  }
+ },
+ "fonts": [
+  "Inter:bundled",
+  "JetBrains Mono:bundled",
+  "Noto Sans TC:bundled",
+  "Noto Serif:bundled",
+  "Noto Serif TC:bundled"
+ ],
+ "import.src.mp4": {
+  "ok": true,
+  "r": "/src.mp4"
+ },
+ "import.src_hevc10.mov": {
+  "ok": true,
+  "r": "/src_hevc10.mov"
+ },
+ "import.logo.png": {
+  "ok": true,
+  "r": "/logo.png"
+ },
+ "import.a440.wav": {
+  "ok": true,
+  "r": "/a440.wav"
+ },
+ "import.a880.wav": {
+  "ok": true,
+  "r": "/a880.wav"
+ },
+ "import.ms": 693,
+ "import.srt": {
+  "ok": true,
+  "r": "/zh.srt"
+ },
+ "comp.new": {
+  "ok": true,
+  "r": {
+   "comp": 6
+  }
+ },
+ "L.mp4": {
+  "ok": true,
+  "r": {
+   "layer": 7
+  }
+ },
+ "L.a440": {
+  "ok": true,
+  "r": {
+   "layer": 32
+  }
+ },
+ "L.a880": {
+  "ok": true,
+  "r": {
+   "layer": 57
+  }
+ },
+ "L.mov": {
+  "ok": true,
+  "r": {
+   "layer": 82
+  }
+ },
+ "L.png": {
+  "ok": true,
+  "r": {
+   "layer": 107
+  }
+ },
+ "L.title": {
+  "ok": true,
+  "r": {
+   "layer": 130
+  }
+ },
+ "L.cue1": {
+  "ok": true,
+  "r": {
+   "layer": 169
+  }
+ },
+ "L.cue2": {
+  "ok": true,
+  "r": {
+   "layer": 208
+  }
+ },
+ "L.cue3": {
+  "ok": true,
+  "r": {
+   "layer": 247
+  }
+ },
+ "SRT 1.io": [
+  [
+   "SRT 1",
+   0.5,
+   2.5
+  ]
+ ],
+ "SRT 2.io": [
+  [
+   "SRT 2",
+   3,
+   5
+  ]
+ ],
+ "SRT 3.io": [
+  [
+   "SRT 3",
+   6,
+   8.5
+  ]
+ ],
+ "play.Full": {
+  "wall": 6.216,
+  "compSeconds": 0.1,
+  "ratio": 0.02,
+  "samples": [
+   {
+    "t": 0,
+    "audio": false,
+    "lv": [
+     -48,
+     -48
+    ]
+   },
+   {
+    "t": 0,
+    "audio": false,
+    "lv": [
+     -48,
+     -48
+    ]
+   },
+   {
+    "t": 0,
+    "audio": false,
+    "lv": [
+     -48,
+     -48
+    ]
+   },
+   {
+    "t": 0,
+    "audio": false,
+    "lv": [
+     -48,
+     -48
+    ]
+   },
+   {
+    "t": 0.06666666666666667,
+    "audio": false,
+    "lv": [
+     -19.49740219116211,
+     -19.49740219116211
+    ]
+   },
+   {
+    "t": 0.1,
+    "audio": false,
+    "lv": [
+     -48,
+     -48
+    ]
+   }
+  ],
+  "audio": {
+   "backend": "worklet",
+   "baseLatency": 0.01,
+   "outputLatency": 0.04,
+   "played": 0,
+   "posted": 16288,
+   "sampleRate": 48000,
+   "state": "running",
+   "underruns": 0
+  }
+ },
+ "play.Half": {
+  "wall": 6.302,
+  "compSeconds": 0.5666666666666667,
+  "ratio": 0.09,
+  "samples": [
+   {
+    "t": 0,
+    "audio": true,
+    "lv": [
+     -48,
+     -48
+    ]
+   },
+   {
+    "t": 0.2,
+    "audio": false,
+    "lv": [
+     -33.35839080810547,
+     -33.35839080810547
+    ]
+   },
+   {
+    "t": 0.3,
+    "audio": false,
+    "lv": [
+     -48,
+     -48
+    ]
+   },
+   {
+    "t": 0.43333333333333335,
+    "audio": false,
+    "lv": [
+     -48,
+     -48
+    ]
+   },
+   {
+    "t": 0.5,
+    "audio": false,
+    "lv": [
+     -48,
+     -48
+    ]
+   },
+   {
+    "t": 0.5666666666666667,
+    "audio": false,
+    "lv": [
+     -48,
+     -48
+    ]
+   }
+  ],
+  "audio": {
+   "backend": "worklet",
+   "baseLatency": 0.01,
+   "outputLatency": 0.04,
+   "played": 0,
+   "posted": 15776,
+   "sampleRate": 48000,
+   "state": "running",
+   "underruns": 896
+  }
+ },
+ "play.Quarter": {
+  "wall": 6.249,
+  "compSeconds": 0.6,
+  "ratio": 0.1,
+  "samples": [
+   {
+    "t": 0,
+    "audio": false,
+    "lv": [
+     -48,
+     -48
+    ]
+   },
+   {
+    "t": 0.23333333333333334,
+    "audio": false,
+    "lv": [
+     -31.40140151977539,
+     -31.40140151977539
+    ]
+   },
+   {
+    "t": 0.36666666666666664,
+    "audio": false,
+    "lv": [
+     -48,
+     -48
+    ]
+   },
+   {
+    "t": 0.5,
+    "audio": false,
+    "lv": [
+     -48,
+     -48
+    ]
+   },
+   {
+    "t": 0.5333333333333333,
+    "audio": false,
+    "lv": [
+     -48,
+     -48
+    ]
+   },
+   {
+    "t": 0.6,
+    "audio": false,
+    "lv": [
+     -48,
+     -48
+    ]
+   }
+  ],
+  "audio": {
+   "backend": "worklet",
+   "baseLatency": 0.01,
+   "outputLatency": 0.04,
+   "played": 0,
+   "posted": 16288,
+   "sampleRate": 48000,
+   "state": "running",
+   "underruns": 512
+  }
+ },
+ "ec-preview-t1": {
+  "w": 1920,
+  "h": 1080
+ },
+ "ec-preview-t4": {
+  "w": 1920,
+  "h": 1080
+ },
+ "ec-preview-t7": {
+  "w": 1920,
+  "h": 1080
+ },
+ "save": {
+  "bytes": 206797,
+  "path": "/reeval.ecproj"
+ },
+ "ecproj.bytes": 206797,
+ "reload.stored": {
+  "backend": "opfs",
+  "files": [
+   "/a440.wav:882078",
+   "/a880.wav:882078",
+   "/logo.png:4081",
+   "/reeval.ecproj:206797",
+   "/src.mp4:8445390",
+   "/src_hevc10.mov:5601257",
+   "/zh.srt:215"
+  ]
+ },
+ "reload.open": {
+  "ok": true,
+  "r": {
+   "path": "/reeval.ecproj",
+   "repaired": [],
+   "savedBy": "0.21.1"
+  }
+ },
+ "comp.open": {
+  "ok": true,
+  "r": {
+   "comp": 6
+  }
+ },
+ "reload.same": true,
+ "reload.missing": {
+  "ok": true,
+  "r": {
+   "missing": [
+    {
+     "item": 1,
+     "name": "src.mp4",
+     "path": "/src.mp4"
+    },
+    {
+     "item": 2,
+     "name": "src_hevc10.mov",
+     "path": "/src_hevc10.mov"
+    },
+    {
+     "item": 3,
+     "name": "logo.png",
+     "path": "/logo.png"
+    },
+    {
+     "item": 4,
+     "name": "a440.wav",
+     "path": "/a440.wav"
+    },
+    {
+     "item": 5,
+     "name": "a880.wav",
+     "path": "/a880.wav"
+    }
+   ]
+  }
+ },
+ "reload.missing.afterHostReAdd": {
+  "ok": true,
+  "r": {
+   "missing": [
+    {
+     "item": 1,
+     "name": "src.mp4",
+     "path": "/src.mp4"
+    },
+    {
+     "item": 2,
+     "name": "src_hevc10.mov",
+     "path": "/src_hevc10.mov"
+    },
+    {
+     "item": 3,
+     "name": "logo.png",
+     "path": "/logo.png"
+    },
+    {
+     "item": 4,
+     "name": "a440.wav",
+     "path": "/a440.wav"
+    },
+    {
+     "item": 5,
+     "name": "a880.wav",
+     "path": "/a880.wav"
+    }
+   ]
+  }
+ },
+ "relink.src.mp4": {
+  "ok": true,
+  "r": {
+   "relinked": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "stillMissing": 0
+  }
+ },
+ "relink.src_hevc10.mov": {
+  "ok": true,
+  "r": {
+   "relinked": [
+    2
+   ],
+   "stillMissing": 0
+  }
+ },
+ "relink.logo.png": {
+  "ok": true,
+  "r": {
+   "relinked": [
+    3
+   ],
+   "stillMissing": 0
+  }
+ },
+ "relink.a440.wav": {
+  "ok": true,
+  "r": {
+   "relinked": [
+    4
+   ],
+   "stillMissing": 0
+  }
+ },
+ "relink.a880.wav": {
+  "ok": true,
+  "r": {
+   "relinked": [
+    5
+   ],
+   "stillMissing": 0
+  }
+ },
+ "reload.missing.afterRelink": {
+  "ok": true,
+  "r": {
+   "missing": []
+  }
+ },
+ "rq.add": {
+  "ok": true,
+  "r": {
+   "comp": 6,
+   "compName": "Main",
+   "extraOutputs": [],
+   "frames": 300,
+   "height": 1080,
+   "id": 1,
+   "index": 1,
+   "item": 1,
+   "last_output": null,
+   "logLabel": "Errors Only",
+   "logPath": "/reeval_out_RenderLog.txt",
+   "output": {
+    "alpha_mode": "Straight",
+    "audio": "On",
+    "audio_channels": 2,
+    "audio_format": "S16",
+    "audio_sample_rate": 48000,
+    "bitrate_kbps": 15000,
+    "channels": "Rgb",
+    "codec": {
+     "level": null,
+     "profile": "Main",
+     "quality": 70,
+     "rate_control": "Bitrate"
+    },
+    "crop": {
+     "bottom": 0,
+     "enabled": false,
+     "left": 0,
+     "right": 0,
+     "roi": null,
+     "top": 0,
+     "use_roi": false
+    },
+    "format": "H264",
+    "gif_loop": true,
+    "include_project_link": true,
+    "keyframe_interval": 0,
+    "name": "Custom",
+    "opus_application": "Audio",
+    "opus_bitrate_kbps": 192,
+    "output": "/reeval_out.mp4",
+    "prores_profile": "Hq",
+    "quality": 90,
+    "resize": {
+     "enabled": false,
+     "height": 1080,
+     "lock_aspect": true,
+     "quality": "High",
+     "width": 1920
+    },
+    "webm_bitrate": false,
+    "webm_codec": "Vp9"
+   },
+   "outputModuleSummary": "Custom",
+   "outputModules": 1,
+   "outputPath": "/reeval_out.mp4",
+   "postRenderAction": "None",
+   "render": true,
+   "renderSettingsSummary": "Best Settings",
+   "render_time": null,
+   "settings": {
+    "color_depth": "Current",
+    "effects": "Current",
+    "field_render": "Off",
+    "frame_blending": "OnForChecked",
+    "frame_rate": null,
+    "guide_layers": "AllOff",
+    "motion_blur": true,
+    "motion_blur_mode": "OnForChecked",
+    "name": "Best Settings",
+    "proxy_use": "UseNone",
+    "pulldown": "Off",
+    "quality": "Best",
+    "resolution": 1,
+    "skip_existing": false,
+    "solo": "Current",
+    "storage_overflow": true,
+    "time_span": {
+     "kind": "WorkArea"
+    }
+   },
+   "started": null,
+   "status": "Queued",
+   "statusLabel": "Queued",
+   "width": 1920
+  }
+ },
+ "rq.render": {
+  "ok": true,
+  "r": {
+   "items": [
+    {
+     "comp": 6,
+     "compName": "Main",
+     "extraOutputs": [],
+     "frames": 300,
+     "height": 1080,
+     "id": 1,
+     "index": 1,
+     "last_output": "/reeval_out.mp4",
+     "logLabel": "Errors Only",
+     "logPath": "/reeval_out_RenderLog.txt",
+     "output": {
+      "alpha_mode": "Straight",
+      "audio": "On",
+      "audio_channels": 2,
+      "audio_format": "S16",
+      "audio_sample_rate": 48000,
+      "bitrate_kbps": 15000,
+      "channels": "Rgb",
+      "codec": {
+       "level": null,
+       "profile": "Main",
+       "quality": 70,
+       "rate_control": "Bitrate"
+      },
+      "crop": {
+       "bottom": 0,
+       "enabled": false,
+       "left": 0,
+       "right": 0,
+       "roi": null,
+       "top": 0,
+       "use_roi": false
+      },
+      "format": "H264",
+      "gif_loop": true,
+      "include_project_link": true,
+      "keyframe_interval": 0,
+      "name": "Custom",
+      "opus_application": "Audio",
+      "opus_bitrate_kbps": 192,
+      "output": "/reeval_out.mp4",
+      "prores_profile": "Hq",
+      "quality": 90,
+      "resize": {
+       "enabled": false,
+       "height": 1080,
+       "lock_aspect": true,
+       "quality": "High",
+       "width": 1920
+      },
+      "webm_bitrate": false,
+      "webm_codec": "Vp9"
+     },
+     "outputModuleSummary": "Custom",
+     "outputModules": 1,
+     "outputPath": "/reeval_out.mp4",
+     "postRenderAction": "None",
+     "render": true,
+     "renderSettingsSummary": "Best Settings",
+     "render_time": 160.261,
+     "settings": {
+      "color_depth": "Current",
+      "effects": "Current",
+      "field_render": "Off",
+      "frame_blending": "OnForChecked",
+      "frame_rate": null,
+      "guide_layers": "AllOff",
+      "motion_blur": true,
+      "motion_blur_mode": "OnForChecked",
+      "name": "Best Settings",
+      "proxy_use": "UseNone",
+      "pulldown": "Off",
+      "quality": "Best",
+      "resolution": 1,
+      "skip_existing": false,
+      "solo": "Current",
+      "storage_overflow": true,
+      "time_span": {
+       "kind": "WorkArea"
+      }
+     },
+     "started": 1793896122,
+     "status": "Done",
+     "statusLabel": "Done",
+     "width": 1920
+    }
+   ],
+   "rendering": false
+  }
+ },
+ "render.ms": 161116,
+ "out.probe": {
+  "duration": "10.005000",
+  "size": "19742729",
+  "streams": [
+   {
+    "type": "video",
+    "codec": "h264",
+    "w": 1920,
+    "h": 1080,
+    "fps": "30/1",
+    "frames": "300"
+   },
+   {
+    "type": "audio",
+    "codec": "aac",
+    "fps": "0/0",
+    "frames": "470",
+    "sr": "48000",
+    "ch": 2
+   }
+  ]
+ },
+ "out.meanVolumeDb": -13,
+ "lost": []
+}

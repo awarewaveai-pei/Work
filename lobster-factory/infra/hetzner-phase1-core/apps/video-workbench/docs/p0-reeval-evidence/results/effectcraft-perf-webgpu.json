@@ -1,0 +1,76 @@
+{
+ "adapter": {
+  "backend": "BrowserWebGpu",
+  "gpu": {
+   "compositor": " (BrowserWebGpu)",
+   "viewerOnGpu": false
+  },
+  "webgpuAdapter": "nvidia blackwell"
+ },
+ "idle15s.lost": [],
+ "A.Full": {
+  "wall": 8.302,
+  "compSeconds": 5.533333333333333,
+  "ratio": 0.67,
+  "audioPosted": 88352,
+  "audioPlayed": 0,
+  "underruns": 4832
+ },
+ "A.Half": {
+  "wall": 8.033,
+  "compSeconds": 7.866666666666666,
+  "ratio": 0.98,
+  "audioPosted": 388256,
+  "audioPlayed": 0,
+  "underruns": 3808
+ },
+ "A.Quarter": {
+  "wall": 8.032,
+  "compSeconds": 7.866666666666666,
+  "ratio": 0.98,
+  "audioPosted": 388256,
+  "audioPlayed": 0,
+  "underruns": 16864
+ },
+ "B.Full": {
+  "wall": 8.662,
+  "compSeconds": 2.433333333333333,
+  "ratio": 0.28,
+  "audioPosted": 41984,
+  "audioPlayed": 0,
+  "underruns": 14848
+ },
+ "B.Half": {
+  "wall": 8.374,
+  "compSeconds": 3.966666666666667,
+  "ratio": 0.47,
+  "audioPosted": 119808,
+  "audioPlayed": 0,
+  "underruns": 91520
+ },
+ "B.Quarter": {
+  "wall": 8.625,
+  "compSeconds": 2.5,
+  "ratio": 0.29,
+  "audioPosted": 24576,
+  "audioPlayed": 0,
+  "underruns": 17376
+ },
+ "soak": {
+  "seconds": 72.8,
+  "loops": 8,
+  "lost": [],
+  "info": {
+   "backend": "BrowserWebGpu",
+   "gpu": {
+    "compositor": " (BrowserWebGpu)",
+    "viewerOnGpu": true
+   },
+   "frameWorkers": [
+    " (BrowserWebGpu)",
+    " (BrowserWebGpu)"
+   ]
+  }
+ },
+ "lost": []
+}
