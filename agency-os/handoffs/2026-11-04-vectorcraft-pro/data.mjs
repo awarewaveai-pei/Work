@@ -26,7 +26,7 @@ export const COPY = {
 export const NOW = [
   { what: '在 app.aware-wave.com 用 Illustrator 一樣的工具列、面板、快捷鍵畫向量。', state: 'yes', ev: '2026-11-05 上線：側欄 Vector Pro 開新分頁全視窗（bca9a846d）；正式站 playwright smoke：VectorCraft 開得起來、ui.inspect 回 JSON。' },
   { what: '介面與字型是繁體中文。', state: 'yes', ev: '介面 zh-hant；建置加 Noto Sans TC，本機實測罕用字「嘸」正常顯示（0f1bdc062）。' },
-  { what: 'AwareWave 獨有的十項功能在專業版裡，長在 Illustrator 版面的第二個 dock 欄。', state: 'no', ev: '修正中（2026-11-05 實測）：①重新打開 My Designs 設計失敗——R2 公開網域不給跨網域讀，改走既有同源代理；②dock 寫死 65 個色碼，改主題不會套用——改成 app 統一 class＋主題 token，VectorCraft 跟主題明暗。原有：十個面板模組＋dock 外殼（色值抽自真品 theme.rs）；換圖實測位置、大小、旋轉不變（3934f17f2）。' },
+  { what: 'AwareWave 獨有的十項功能在專業版裡，長在 Illustrator 版面的第二個 dock 欄。', state: 'yes', ev: '2026-11-05 正式站實測：dock 顏色、按鈕、字型全取主題 token（改主題即套用，零寫死色碼，測試守）；存入 My Designs 後可重新打開（文字與畫板完整）。收尾中：VectorCraft 本體每次開頁跟主題明暗（目前要手動切一次）。' },
   { what: '舊的向量設計檔在專業版打得開，舊編輯器退場，只有一套。', state: 'yes', ev: '舊 .design.json 在 My Designs 面板「匯入舊專案」轉向量；舊 PNG 照常開；/tools/vector-editor 與 /vector-editor.html 轉到專業版（6740e006d）。' },
   { what: '本機能建出網頁版。', state: 'yes', ev: '一個指令 build.ps1；wasm 89 MB 與上游 v0.21.0 同級，建置會驗證已最佳化（c9b541cae）。' },
 ];
@@ -80,13 +80,13 @@ export const STEPS = [
       done('C4.4', '測試：面板清單、轉接器每個方法、色值抽樣。', '3934f17f2'),
     ] },
   { n: 5, code: 'C5', group: 'E', title: '繁中與存檔', plain: '例：打開就是 Essentials Classic 工作區（上方有控制列）；打繁中字不缺字；按「存入 My Designs」在「我的設計」看得到，檔案可再開。',
-    gate: '繁中字截圖無缺字；存入後「我的設計」有縮圖；下載回來的檔可在專業版再開。', risk: 'Low（只用既有 designs API，不改 schema）', model: 'Opus 5.5', status: 'in_progress', depends: ['C4'],
+    gate: '繁中字截圖無缺字；存入後「我的設計」有縮圖；下載回來的檔可在專業版再開。', risk: 'Low（只用既有 designs API，不改 schema）', model: 'Opus 5.5', status: 'done', commit: 'eb3445421', depends: ['C4'],
     what: '首次載入切 Essentials Classic（之後尊重偏好）；my-designs 積木在 pro ctx：saveAs .vectorcraft＋PNG 預覽 → 既有 /api/tools/designs',
     files: ['NA/public/vector-pro-toolbox.js', 'NA/public/editor-shared/blocks/my-designs.js'],
     items: [
       done('C5.1', '預設工作區切成 Essentials Classic，只在第一次。', '3934f17f2'),
       done('C5.2', '存入 My Designs：原檔加縮圖；設計庫 API 加收原檔（只收向量檔、檢查內容），不改資料表。', 'ebcad8326'),
-      todo('C5.3', '實測：打繁中字、存入、看到縮圖、下載再開。'),
+      done('C5.3', '實測：打繁中字、存入、看到縮圖、下載再開。', 'eb3445421'),
     ] },
   { n: 6, code: 'C6', group: 'F', title: '驗收、升級流程、文件', plain: '例：VectorCraft 出新版時，改一個版本號、跑建置、跑 smoke、上傳、切 current；壞了切回上一版。每天 smoke 會確認專業版還開得起來。',
     gate: 'playwright smoke 有這一條且綠；README 寫清升級與回退；RUNNABLE_DEMOS 有一條；WORKLOG 有機械證據。', risk: 'Low', model: 'fullstack-engineer（Sonnet）', status: 'done', commit: '7fc2c4fe8', depends: ['C5'],
