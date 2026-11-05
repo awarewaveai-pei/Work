@@ -439,6 +439,7 @@ async function t3Upload(kind) {
   const stored = await VideoWorkbench.request("/uploads", {
     name: file.name,
     data: `data:${mime};base64,${btoa(binary)}`,
+    rightsConfirmed: VideoWorkbench.rightsConfirmed === true,
   });
   const asset = await VideoWorkbench.assets.save({
     ...stored,
@@ -474,7 +475,7 @@ function toolThreeDScreen(t) {
   if (!d)
     return (
       header +
-      `<div class="row">${t3B("新增場景", "new", { primary: true })}${t3B("匯入 GLB 模型", "upload-model")}</div><h3>所有場景</h3><div class="flow-choices">${t3.list.map((s) => t3B(`${s.title} · 第 ${s.revision} 版`, "open:" + s.id)).join("") || '<p class="note">還沒有 3D 場景。</p>'}</div>${t3MeshyPanel(meshy)}</div>`
+      `<div class="row">${t3B("新增場景", "new", { primary: true })}${t3B("匯入 GLB 模型", "upload-model")}${VideoWorkbench.rightsCheckbox()}</div><h3>所有場景</h3><div class="flow-choices">${t3.list.map((s) => t3B(`${s.title} · 第 ${s.revision} 版`, "open:" + s.id)).join("") || '<p class="note">還沒有 3D 場景。</p>'}</div>${t3MeshyPanel(meshy)}</div>`
     );
   const o = t3Obj(),
     info = o ? t3.bones.get(o.id) : null,
@@ -482,7 +483,7 @@ function toolThreeDScreen(t) {
     busy = !!t3.job;
   const saved = t3.list.find((s) => s.id === d.id);
   const top = `<div class="row">${t3B("所有場景", "list")}<label>場景名稱<input class="text-input" aria-label="場景名稱" data-t3-field="title" maxlength="100" value="${t3Esc(d.title)}"></label>${t3B(t3.dirty ? "儲存（有未儲存的修改）" : "儲存", "save", { primary: t3.dirty })}<span class="note" data-t3-revision>第 ${saved?.revision || 0} 版${t3.dirty ? "・未儲存" : ""}</span>${t3B("還原上一版", "restore", { disabled: !saved?.history.length })}</div>`;
-  const library = `<aside class="t3-col"><h3>場景物件</h3><div class="flow-choices">${d.objects.map((x) => t3B(x.asset.name || "模型", "obj:" + x.id, { pressed: x.id === t3.obj })).join("") || '<p class="note">場景是空的。</p>'}</div><div class="row">${t3B("匯入 GLB 模型", "upload-model")}</div><h3>3D 素材庫</h3><div class="flow-choices" data-t3-library></div>${t3MeshyPanel(meshy)}</aside>`;
+  const library = `<aside class="t3-col"><h3>場景物件</h3><div class="flow-choices">${d.objects.map((x) => t3B(x.asset.name || "模型", "obj:" + x.id, { pressed: x.id === t3.obj })).join("") || '<p class="note">場景是空的。</p>'}</div><div class="row">${t3B("匯入 GLB 模型", "upload-model")}</div>${VideoWorkbench.rightsCheckbox()}<h3>3D 素材庫</h3><div class="flow-choices" data-t3-library></div>${t3MeshyPanel(meshy)}</aside>`;
   const keys = [...d.camera.keys].sort((a, b) => a.frame - b.frame);
   const stage = `<section class="t3-stage"><div class="t3-canvas" data-t3-stage data-t3-ready="0"></div><p class="note">拖曳旋轉鏡頭、滾輪縮放、右鍵平移。燈光與 IK 為預覽近似，輸出以 Blender 渲染為準。</p><div class="row">${t3Num("目前影格", "frame", t3.frame, { step: 1, min: 0, max: out.frames - 1 })}${t3Num("視角（度）", "fov", d.camera.fov, { step: 1, min: 5, max: 120 })}${t3B("記錄鏡頭關鍵影格", "cam-key")}${t3B(t3.skeleton ? "隱藏骨架" : "顯示骨架", "skeleton", { pressed: t3.skeleton })}${t3B("地面陰影", "ground", { pressed: d.ground })}${t3B("指定角度截圖", "shot")}</div><div class="flow-choices" aria-label="鏡頭關鍵影格">${keys.map((k) => `<span class="chip">第 ${k.frame} 格 ${t3B("刪除", "cam-del:" + k.frame)}</span>`).join("") || '<span class="note">還沒有鏡頭關鍵影格：轉好鏡頭後按「記錄鏡頭關鍵影格」。</span>'}</div>
     <h3>輸出</h3><div class="row">${t3Num("寬", "out-width", out.width, { step: 2, min: 16, max: 1920 })}${t3Num("高", "out-height", out.height, { step: 2, min: 16, max: 1920 })}${t3Num("長度（格）", "out-frames", out.frames, { step: 1, min: 1, max: 1200 })}<div class="flow-choices" role="group" aria-label="影格率">${T3_FPS.map((f) => t3B(f.num + " fps", "fps:" + f.num, { pressed: f.num === out.fps.num })).join("")}</div></div>
@@ -507,7 +508,7 @@ function toolThreeDScreen(t) {
   const pose =
     o && info?.bones.length
       ? `<h3>骨架（${info.bones.length} 根）</h3><div class="flow-choices">${info.bones.map((b) => t3B(b.name, "bone:" + b.name, { pressed: b.name === t3.bone })).join("")}</div>${t3.bone ? `<p class="note">FK 旋轉「${t3Esc(t3.bone)}」：${t3Esc((o.pose?.[t3.bone] || [0, 0, 0]).join("°, "))}°</p><div class="flow-choices">${["X", "Y", "Z"].flatMap((a, j) => [t3B(`${a} −15°`, `rot:${j}:-15`), t3B(`${a} +15°`, `rot:${j}:15`)]).join("")}${t3B("重設此骨", "rot-reset")}</div><p class="note">IK（預覽近似；渲染時由 Blender 計算）：此骨頭起點移到目標，往上轉幾根父骨。</p><div class="row">${["x", "y", "z"].map((a, j) => t3Num(`IK 目標 ${a}`, `ik:${j}`, (o.ik?.find((k) => k.bone === t3.bone)?.target || info.ikDefault || [0, 1, 0])[j])).join("")}${t3Num("IK 父骨數", "ik-chain", o.ik?.find((k) => k.bone === t3.bone)?.chain || 2, { step: 1, min: 1, max: 8 })}</div><div class="row">${t3B("套用 IK", "ik-apply")}${t3B("移除 IK", "ik-del", { disabled: !o.ik?.some((k) => k.bone === t3.bone) })}</div>` : ""}
-    <h3>動作重定向</h3><div class="flow-choices" data-t3-motions></div><div class="row">${t3B("匯入動作（BVH／GLB）", "upload-motion")}</div>${t3.motion ? `<p class="note">動作：${t3Esc(t3.motion.name)}</p><label>骨骼對照（每行：動作骨骼=角色骨骼）<textarea class="text-input" rows="6" aria-label="骨骼對照" data-t3-field="bonemap">${t3Esc(t3.boneMapText)}</textarea></label>${t3B("套用動作（Blender 重定向）", "retarget", { disabled: busy || !engine.available })}` : ""}`
+    <h3>動作重定向</h3><div class="flow-choices" data-t3-motions></div><div class="row">${t3B("匯入動作（BVH／GLB）", "upload-motion")}</div>${VideoWorkbench.rightsCheckbox()}${t3.motion ? `<p class="note">動作：${t3Esc(t3.motion.name)}</p><label>骨骼對照（每行：動作骨骼=角色骨骼）<textarea class="text-input" rows="6" aria-label="骨骼對照" data-t3-field="bonemap">${t3Esc(t3.boneMapText)}</textarea></label>${t3B("套用動作（Blender 重定向）", "retarget", { disabled: busy || !engine.available })}` : ""}`
       : o
         ? '<p class="note">此模型沒有骨架。</p>'
         : "";

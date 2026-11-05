@@ -93,6 +93,24 @@ function parseMeta(raw: string | null): Meta | null {
   return out;
 }
 
+type ExistingRow = { id: unknown; object_url: unknown; metadata?: unknown };
+const isUpload = (e: unknown): e is { kind: "upload"; url: string; rightsConfirmed?: unknown } =>
+  !!e && typeof e === "object" && (e as { kind?: unknown }).kind === "upload" && typeof (e as { url?: unknown }).url === "string";
+
+/**
+ * Invariant: the only change ever made to a registered row's rights is an upload going unconfirmed -> confirmed (the
+ * uploader's own declaration over the same bytes: the row was found by org + checksum + origin); never the reverse,
+ * never another kind. Urls are not compared: an image re-upload gets a new workbench url for the same file.
+ * Returns the (possibly unchanged) confirmed list, or null when this request may not touch the row's rights.
+ * Renders already made from the upload keep the rights they inherited then; the user exports again to get the new ones.
+ */
+function confirmedUpload(current: unknown, incoming: unknown[] | undefined): { list: unknown[]; changed: boolean } | null {
+  if (!incoming?.length || !Array.isArray(current) || !current.length) return null;
+  if (!incoming.every((e) => isUpload(e) && e.rightsConfirmed === true) || !current.every(isUpload)) return null;
+  const changed = current.some((e) => e.rightsConfirmed !== true);
+  return { list: changed ? current.map((e) => ({ ...e, rightsConfirmed: true })) : current, changed };
+}
+
 /** Reads the body chunk by chunk, hashing as it goes, and stops at the cap (Content-Length can be absent or wrong). */
 async function readCapped(req: Request, cap: number): Promise<{ ok: true; buf: Buffer; sha: string } | { ok: false }> {
   if (!req.body) return { ok: true, buf: Buffer.alloc(0), sha: createHash("sha256").digest("hex") };
@@ -142,14 +160,30 @@ export async function POST(req: Request): Promise<Response> {
   if (!db) return fail(503, "db_unavailable");
   // Invariant: idempotency is by the caller's key, never by bytes alone (a row found by checksum may carry another origin).
   const findMine = () => {
-    const q = db.from("media_assets").select("id, object_url")
+    const q = db.from("media_assets").select("id, object_url, metadata")
       .eq("organization_id", organizationId).eq("checksum_sha256", body.sha).eq("asset_domain", origin);
     return (meta.vwJobId ? q.eq("metadata->>vwJobId", meta.vwJobId) : q.is("metadata->>vwJobId", null))
       .order("created_at", { ascending: true }).limit(1).maybeSingle();
   };
   const existing = await findMine();
   if (existing.error) return fail(502, "asset_lookup_failed", existing.error);
-  if (existing.data) return NextResponse.json({ ok: true, existing: true, assetId: existing.data.id, checksumSha256: body.sha, objectUrl: existing.data.object_url });
+  const answerExisting = async (row: ExistingRow): Promise<Response> => {
+    const meta0 = row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata) ? row.metadata as Record<string, unknown> : {};
+    const upgraded = confirmedUpload(meta0.rightsSources, meta.rightsSources);
+    if (upgraded?.changed) {
+      const up = await db.from("media_assets").update({ metadata: { ...meta0, rightsSources: upgraded.list } }).eq("id", row.id).eq("organization_id", organizationId);
+      if (up.error) return fail(502, "asset_rights_update_failed", up.error);
+    }
+    // Also when the row was already upgraded: a rights report that failed to store last time is written now (idempotent by
+    // report hash). Not ok unless it is stored: VW caches the confirmed upload on ok and never resends it.
+    if (upgraded && mime.startsWith("video/") && process.env.MEDIA_PRODUCTION_PERSISTENCE_ENABLED === "true") {
+      const { persistEditorialRightsQa } = await import("@/lib/content/video/editorial-rights-persist");
+      const rights = await persistEditorialRightsQa(db, { organizationId, candidateAssetId: String(row.id), candidateChecksum: body.sha });
+      if (rights.ok === false) return fail(502, "rights_qa_refresh_failed", { message: rights.error });
+    }
+    return NextResponse.json({ ok: true, existing: true, assetId: row.id, checksumSha256: body.sha, objectUrl: row.object_url });
+  };
+  if (existing.data) return answerExisting(existing.data);
 
   const { isR2Configured, r2PutObject } = await import("@/lib/storage/r2");
   const publicBase = (process.env.R2_VIDEO_PUBLIC_BASE ?? "").replace(/\/+$/, "");
@@ -191,7 +225,7 @@ export async function POST(req: Request): Promise<Response> {
     if (!inserted.error && inserted.data) break;
     // A concurrent retry of this same request committed first: answer with its row.
     const mine = await findMine();
-    if (mine.data) return NextResponse.json({ ok: true, existing: true, assetId: mine.data.id, checksumSha256: body.sha, objectUrl: mine.data.object_url });
+    if (mine.data) return answerExisting(mine.data);
     if (inserted.error?.code !== "23505") break;   // a version taken by another origin's row: take the next one
   }
   if (inserted.error || !inserted.data) return fail(502, "asset_registration_failed", inserted.error ?? { message: "no row returned" });

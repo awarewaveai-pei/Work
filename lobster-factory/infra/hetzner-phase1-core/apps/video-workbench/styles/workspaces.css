@@ -38,6 +38,20 @@
   font: inherit;
   min-width: 0;
 }
+/* Specific enough to win over ".workspace-page label" (grid) and the page's text-input rules. */
+label.rights-confirm,
+.workspace-page label.rights-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+label.rights-confirm input,
+.workspace-page label.rights-confirm input {
+  width: auto;
+  flex: none;
+  padding: 0;
+  min-width: 0;
+}
 .asset-upload-btn input {
   max-width: 250px;
 }

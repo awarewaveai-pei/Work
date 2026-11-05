@@ -43,7 +43,17 @@
     VideoWorkbench.showJob(job);
     return job;
   };
-  VideoWorkbench.uploadAsset = async (file) => {
+  // "I have the right to use this": the uploader's own declaration, sent as rightsConfirmed on /uploads. One state per
+  // page, every checkbox on the page shows it, default off. A file the program derives itself ({ derived: true }) never uses it.
+  VideoWorkbench.rightsConfirmed = false;
+  VideoWorkbench.rightsCheckbox = () =>
+    `<label class="rights-confirm"><input type="checkbox" data-rights-confirmed${VideoWorkbench.rightsConfirmed ? " checked" : ""}>我有權使用這些素材（自己拍攝、自己擁有或已取得授權）</label>`;
+  document.addEventListener("change", (e) => {
+    if (!e.target.matches?.("[data-rights-confirmed]")) return;
+    VideoWorkbench.rightsConfirmed = e.target.checked;
+    for (const box of document.querySelectorAll("[data-rights-confirmed]")) box.checked = e.target.checked;
+  });
+  VideoWorkbench.uploadAsset = async (file, { derived = false } = {}) => {
     const videoTypes = { mov: 'video/quicktime', mp4: 'video/mp4', m4v: 'video/mp4', webm: 'video/webm' };
     const extension = String(file.name || '').split('.').at(-1).toLowerCase();
     const type = /^(image|video|audio)\//.test(file.type) ? file.type : Object.hasOwn(videoTypes, extension) ? videoTypes[extension] : file.type;
@@ -56,7 +66,7 @@
       r.readAsDataURL(file);
     });
     const normalizedData = `data:${type};base64,${String(data).slice(String(data).indexOf(',') + 1)}`;
-    const asset = await VideoWorkbench.request("/uploads", { name: file.name, data: normalizedData });
+    const asset = await VideoWorkbench.request("/uploads", { name: file.name, data: normalizedData, rightsConfirmed: !derived && VideoWorkbench.rightsConfirmed === true });
     return VideoWorkbench.assets.save({
       ...asset,
       createdAt: new Date().toISOString(),
@@ -94,7 +104,7 @@
         selected = new Set(),
         query = "", source = "assets", durationFilter = "all";
       panel.innerHTML = VideoWorkbench.sanitize(
-        '<header><h2>選擇素材</h2><button data-picker-close>返回</button></header><div class="asset-controls"><input data-picker-search placeholder="搜尋素材名稱" aria-label="搜尋素材"><label class="asset-upload-btn">上傳素材<input data-picker-upload type="file" multiple></label></div><div data-picker-items class="asset-list"></div><footer><span data-picker-count>已選 0 個</span><button data-picker-confirm>加入選取素材</button></footer>',
+        '<header><h2>選擇素材</h2><button data-picker-close>返回</button></header><div class="asset-controls"><input data-picker-search placeholder="搜尋素材名稱" aria-label="搜尋素材"><label class="asset-upload-btn">上傳素材<input data-picker-upload type="file" multiple></label>' + VideoWorkbench.rightsCheckbox() + '</div><div data-picker-items class="asset-list"></div><footer><span data-picker-count>已選 0 個</span><button data-picker-confirm>加入選取素材</button></footer>',
       );
       document.body.append(panel);
       if (parityControls) {

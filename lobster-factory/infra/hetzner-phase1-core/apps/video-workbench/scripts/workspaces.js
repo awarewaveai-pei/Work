@@ -53,7 +53,7 @@
           a.name.toLowerCase().includes(search.toLowerCase()),
       );
       const removeBg = items.some((a) => VideoWorkbench.mediaKind(a) === "image") ? await VideoWorkbench.removeBgLabel() : null;
-      content = `<div class="workspace-actions"><label>搜尋素材<input id="workspaceSearch" value="${esc(search)}"></label><label>上傳素材<input id="workspaceUpload" type="file" accept="image/*,video/*,audio/*" multiple></label></div><div class="workspace-actions">${[
+      content = `<div class="workspace-actions"><label>搜尋素材<input id="workspaceSearch" value="${esc(search)}"></label><label>上傳素材<input id="workspaceUpload" type="file" accept="image/*,video/*,audio/*" multiple></label>${VideoWorkbench.rightsCheckbox()}</div><div class="workspace-actions">${[
         ["all", "全部"],
         ["image", "圖片／角色"],
         ["video", "影片"],

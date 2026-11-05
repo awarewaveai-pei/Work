@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // In-memory media_assets enforcing the unique index the route relies on (uq_media_assets_org_backend_key_version,
 // migrations 0011/0038) and eq filters; insertError forces any other insert failure (e.g. the asset_domain CHECK).
 type Row = Record<string, unknown>;
-const state = vi.hoisted(() => ({ rows: [] as Row[], insertError: null as null | { message: string }, inserts: [] as unknown[], db: true, beforeInsert: null as null | (() => void) }));
+const state = vi.hoisted(() => ({ rows: [] as Row[], updates: [] as Row[], insertError: null as null | { message: string }, inserts: [] as unknown[], db: true, beforeInsert: null as null | (() => void) }));
 const r2 = vi.hoisted(() => ({ puts: [] as string[], deletes: [] as string[] }));
 vi.mock("@/lib/supabase-server", () => ({
   getSupabaseWriteClient: () => (state.db ? { from: () => {
@@ -15,7 +15,14 @@ vi.mock("@/lib/supabase-server", () => ({
     // "metadata->>k" = PostgREST JSON path (text); is(k, null) = absent.
     const col = (r: Row, k: string) => (k.startsWith("metadata->>") ? (r.metadata as Row | undefined)?.[k.slice(11)] ?? null : r[k]);
     const match = (r: Row) => filters.every(([k, v]) => col(r, k) === v);
+    let patch: Row | null = null;
     const q = { select: () => q, limit: () => q,
+      update: (p: Row) => { patch = p; return q; },
+      then: (resolve: (v: unknown) => void) => {
+        const row = patch ? state.rows.find(match) : null;
+        if (row && patch) { Object.assign(row, patch); state.updates.push(patch); }
+        resolve({ error: null });
+      },
       order: (k: string, o?: { ascending?: boolean }) => { if (o?.ascending === false) desc = k; return q; },
       eq: (k: string, v: unknown) => { filters.push([k, v]); return q; },
       is: (k: string, v: unknown) => { filters.push([k, v]); return q; },
@@ -43,6 +50,11 @@ vi.mock("@/lib/storage/r2", () => ({
   r2PutObject: async (_b: string, key: string) => { r2.puts.push(key); return { ok: true }; },
   r2DeleteObject: async (_b: string, key: string) => { r2.deletes.push(key); return { ok: true }; },
 }));
+const qa = vi.hoisted(() => ({ rightsFail: false, calls: 0 }));
+vi.mock("@/lib/content/video/editorial-rights-persist", () => ({
+  persistEditorialRightsQa: async () => { qa.calls++; return qa.rightsFail ? { ok: false, status: 500, error: "qa_report_insert_failed" } : { ok: true, persisted: [], reports: [] }; },
+}));
+import { createHash } from "node:crypto";
 import { POST } from "./route";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
@@ -53,7 +65,7 @@ const post = (headers: Record<string, string>, body: Buffer = PNG) => POST(new R
 const auth = { authorization: "Bearer right-token" };
 
 beforeEach(() => {
-  Object.assign(state, { rows: [], insertError: null, inserts: [], db: true, beforeInsert: null });
+  Object.assign(state, { rows: [], updates: [], insertError: null, inserts: [], db: true, beforeInsert: null });
   Object.assign(r2, { puts: [], deletes: [] });
   vi.stubEnv("VW_INTERNAL_TOKEN", "right-token");
   vi.stubEnv("R2_VIDEO_PUBLIC_BASE", "https://videos.example");
@@ -144,6 +156,40 @@ describe("POST /api/internal/video/workbench/assets", () => {
       ["ai_generated", "job-2", 3, upload.objectUrl.replace("https://videos.example/", "")],
     ]);
     expect(r2.deletes).toEqual([]);
+  });
+
+  it("an upload registered unconfirmed becomes confirmed when sent again confirmed; never the reverse, never another kind", async () => {
+    const meta = (m: object) => ({ "x-vw-meta": Buffer.from(JSON.stringify(m)).toString("base64url") });
+    const src = (rightsConfirmed: boolean) => ({ rightsSources: [{ kind: "upload", rightsConfirmed, url: "/media/x/original.png" }] });
+    const up = (m: object) => post({ ...auth, "x-vw-origin": "real_footage", ...meta(m) });
+    const first = await (await up(src(false))).json();
+    expect((await up(src(false))).status).toBe(200);
+    expect(state.updates).toEqual([]);
+    expect((await (await up(src(true))).json()).assetId).toBe(first.assetId);
+    expect((state.rows[0].metadata as Row).rightsSources).toEqual(src(true).rightsSources);
+    expect(state.updates).toHaveLength(1);
+    await up(src(false));
+    expect((state.rows[0].metadata as Row).rightsSources).toEqual(src(true).rightsSources);
+    expect(state.updates).toHaveLength(1);
+    state.rows[0].metadata = { source: "video_workbench", rightsSources: [{ kind: "unknown", url: "/media/x/original.png" }] };
+    await up(src(true));
+    expect((state.rows[0].metadata as Row).rightsSources).toEqual([{ kind: "unknown", url: "/media/x/original.png" }]);
+  });
+
+  it("a confirmed re-upload of a video (new workbench url, same bytes) is ok only when the refreshed rights QA is stored", async () => {
+    vi.stubEnv("MEDIA_PRODUCTION_PERSISTENCE_ENABLED", "true");
+    Object.assign(qa, { rightsFail: true, calls: 0 });
+    const MP4 = Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from("ftypisom"), Buffer.alloc(16, 2)]);
+    const sha = createHash("sha256").update(MP4).digest("hex");
+    state.rows.push({ id: "v1", organization_id: ORG, checksum_sha256: sha, asset_domain: "real_footage", object_url: "u",
+      metadata: { source: "video_workbench", rightsSources: [{ kind: "upload", rightsConfirmed: false, url: "/generated/old.mp4" }] } });
+    const meta = { rightsSources: [{ kind: "upload", rightsConfirmed: true, url: "/generated/new.mp4" }] };
+    const send = () => post({ ...auth, "content-type": "video/mp4", "x-vw-origin": "real_footage", "x-vw-meta": Buffer.from(JSON.stringify(meta)).toString("base64url") }, MP4);
+    expect((await send()).status).toBe(502);
+    qa.rightsFail = false;
+    expect((await send()).status).toBe(200);
+    expect(qa.calls).toBe(2);
+    expect((state.rows[0].metadata as Row).rightsSources).toEqual([{ kind: "upload", rightsConfirmed: true, url: "/generated/old.mp4" }]);
   });
 
   it("concurrent same-content uploads: the race loser returns the winner's row and never deletes the shared object", async () => {

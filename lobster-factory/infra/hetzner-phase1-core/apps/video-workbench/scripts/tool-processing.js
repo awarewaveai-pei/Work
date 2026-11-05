@@ -41,6 +41,7 @@ async function submitTool() {
       const blob = await new Promise((r) => canvas.toBlob(r, "image/png"));
       files.ctaImage = await VideoWorkbench.uploadAsset(
         new File([blob], "cta.png", { type: "image/png" }),
+        { derived: true },
       );
     }
     const selected = files.src?.url;
@@ -86,6 +87,7 @@ async function submitTool() {
       const png = await new Promise((r) => canvas.toBlob(r, "image/png"));
       const reference = await VideoWorkbench.uploadAsset(
         new File([png], "region-source.png", { type: "image/png" }),
+        { derived: true },
       );
       ctx.fillStyle = "white";
       ctx.fillRect(0, 0, canvas.width, canvas.height);

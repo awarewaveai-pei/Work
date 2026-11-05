@@ -51,8 +51,8 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
   const near = (a, b, msg) => assert(Math.abs(a - b) < 1e-6, `${msg}: ${a} != ${b}`);
   const { signPermit } = await import(pathToFileURL(path.join(appDir, "lib/entitlements/permit.ts")).href);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vw-p6-main-"));
-  const calls = { openai: 0, theme: 0, permits: [], assets: [], jobs: [], usage: [] };
-  let permitMode = "allow", usageDown = false, assetsDown = false;
+  const calls = { openai: 0, theme: 0, permits: [], assets: [], jobs: [], usage: [], releaseText: [] };
+  let permitMode = "allow", usageDown = false, assetsDown = false, releaseTextDown = false;
   // next-admin, as its route files answer.
   async function fetchImpl(url, options = {}) {
     url = String(url);
@@ -81,6 +81,11 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
       calls.assets.push({ headers: options.headers, meta, bytes });
       const assetId = "aaaaaaaa-0000-4000-8000-" + String(calls.assets.length).padStart(12, "0");
       return Response.json({ ok: true, existing: false, assetId, checksumSha256: require("node:crypto").createHash("sha256").update(bytes).digest("hex"), objectUrl: "https://cdn.test/" + assetId, qa: {} }, { status: 201 });
+    }
+    if (url === BASE + "/api/internal/video/workbench/assets/release-text") {
+      if (releaseTextDown) return Response.json({ ok: false, error: "asset_lookup_failed" }, { status: 502 });
+      calls.releaseText.push(JSON.parse(options.body));
+      return Response.json({ ok: true, qa: {} });
     }
     if (url === BASE + "/api/internal/video/workbench/jobs") {
       calls.jobs.push(JSON.parse(options.body));
@@ -300,6 +305,76 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
     assert.deepEqual(upAsset.meta.rightsSources, [{ kind: "upload", rightsConfirmed: false, url: JSON.parse(up.body).url }]);
     assert.equal(JSON.parse(up.body).assetId, "aaaaaaaa-0000-4000-8000-" + String(calls.assets.length).padStart(12, "0"));
 
+    // 6e. Release text: what a render shows goes to next-admin once, from the job record only; no words = nothing sent.
+    {
+      const { releaseText } = require("../backend/release-text.cjs");
+      const text = (id, track, t, from, frames, extra = {}) => ({ id, kind: "text", track, text: t, startFrame: from, durationFrames: frames, ...extra });
+      const project = { title: "  春季新品  ", ratio: "16:9", timebase: { num: 30, den: 1 }, clips: [
+        text("t1", "T", "A", 0, 60), text("t2", "T", "B", 30, 60), text("t3", "T", "H", 0, 30, { hidden: true }), text("t4", "T", "B", 90, 30), text("t5", "T", "O", 0, 120, { opacity: 0 }),
+      ] };
+      const editor = releaseText({ input: { operation: "editor-export", settings: { project, quality: "720p" } } });
+      assert.equal(editor.title, "春季新品");
+      assert.equal(editor.script, "A\nB", "script = visible text, first appearance order, no duplicates, hidden and fully transparent clips left out");
+      assert.deepEqual(editor.captions, [{ startMs: 0, endMs: 1000, text: "A" }, { startMs: 1000, endMs: 2000, text: "A\nB" }, { startMs: 2000, endMs: 4000, text: "B" }]);
+      let end = 0;
+      for (const c of editor.captions) { assert(c.startMs >= end && c.endMs > c.startMs && c.text.trim(), "caption QA order rule"); end = c.endMs; }
+      const burn = releaseText({ input: { operation: "subtitle-burn", settings: { cues: [{ start: 0, end: 1.5, text: "嗨" }, { start: 1.5, end: 3, text: "再見" }] }, references: { src: { name: "旅行.mp4" } } } });
+      assert.deepEqual([burn.title, burn.script, burn.captions], ["旅行.mp4", "嗨\n再見", [{ startMs: 0, endMs: 1500, text: "嗨" }, { startMs: 1500, endMs: 3000, text: "再見" }]]);
+      assert.equal(releaseText({ input: { operation: "subtitle-burn", settings: { cues: [{ start: 0, end: 1, text: "x" }] } } }).title, "", "no source name = empty title, not invented");
+      assert.equal(releaseText({ type: "video", input: { type: "video", prompt: "一隻貓在跑" } }), null, "AI video has no words: nothing sent, prompt is not a script");
+      assert.equal(releaseText({ input: { operation: "remotion-template", settings: {} } }), null);
+
+      const seedDir = path.join(dir, "relsettle"), orgDir = path.join(seedDir, "orgs", ORG);
+      fs.mkdirSync(path.join(orgDir, "generated"), { recursive: true });
+      const seeded = ["a", "b", "c"].map((n) => {
+        fs.copyFileSync(path.join(dir, "clip.mp4"), path.join(orgDir, "generated", n + ".mp4"));
+        return { id: "seed-" + n, type: "video", status: "succeeded", createdAt: new Date().toISOString(), ledgerError: "x", result: { url: "/generated/" + n + ".mp4", origin: { kind: "render" } },
+          input: n === "b" ? { type: "video", prompt: "貓" } : { type: "video", operation: "editor-export", settings: { project, quality: "720p" } } };
+      });
+      fs.writeFileSync(path.join(orgDir, "jobs.json"), JSON.stringify(seeded));
+      const rt = createServer({ dataDir: seedDir, env, fetchImpl });
+      await new Promise((r) => rt.listen(0, "127.0.0.1", r));
+      const get = async (id) => JSON.parse((await request(rt.address().port, "GET", "/api/vw/generations/" + id, who())).body);
+      const a = await get("seed-a");
+      assert.equal(calls.releaseText.length, 1);
+      assert.deepEqual(calls.releaseText[0], { organizationId: ORG, assetId: a.result.assetId, checksumSha256: a.result.checksumSha256, title: "春季新品", script: "A\nB", captions: editor.captions });
+      assert.equal(a.result.releaseTextSent, true);
+      await get("seed-a");
+      assert.equal(calls.releaseText.length, 1, "送過就不再送");
+      await get("seed-b");
+      assert.equal(calls.releaseText.length, 1, "沒有文字的影片不送");
+      releaseTextDown = true;
+      const c1 = await get("seed-c");
+      assert.match(c1.releaseTextError, /送審文字登記失敗/);
+      assert.notEqual(c1.result.releaseTextSent, true);
+      assert.equal(calls.releaseText.length, 1);
+      releaseTextDown = false;
+      const c2 = await get("seed-c");
+      assert.equal(calls.releaseText.length, 2, "失敗後下次 GET 重送");
+      assert.deepEqual([c2.releaseTextError, c2.result.releaseTextSent], [undefined, true]);
+      rt.close();
+    }
+
+    // 6f. Upload rights: only a literal true from the upload dialog is recorded as confirmed; a retry of an unconfirmed
+    // upload with the box ticked is sent again so next-admin can upgrade the row (never the reverse).
+    {
+      const send = async (extra) => {
+        const r = await request(port, "POST", "/api/vw/uploads", who(), JSON.stringify({ data: "data:image/png;base64," + png.toString("base64"), name: "r.png", ...extra }));
+        assert.equal(r.status, 201, r.body);
+        return calls.assets.at(-1).meta.rightsSources[0].rightsConfirmed;
+      };
+      assert.deepEqual([await send({ rightsConfirmed: true }), await send({ rightsConfirmed: false }), await send({}), await send({ rightsConfirmed: "true" })], [true, false, false, false]);
+      const sent = [];
+      const main = require("../backend/main-system.cjs").createMainSystem({
+        env, appDir, orgId: ORG, dataDir: fs.mkdtempSync(path.join(dir, "rights-")),
+        inspect: { verifyOutput: async () => ({ ok: true, info: {} }), loudnessStats: async () => ({}) },
+        fetchImpl: async (_url, o) => { sent.push(JSON.parse(Buffer.from(o.headers["X-VW-Meta"], "base64url").toString("utf8")).rightsSources[0].rightsConfirmed); return Response.json({ ok: true, assetId: "bbbbbbbb-0000-4000-8000-00000000000" + sent.length, checksumSha256: "x" }, { status: 201 }); },
+      });
+      const mp4 = path.join(dir, "clip.mp4"), url = "/media/" + "a".repeat(64) + "/original.mp4";
+      for (const rightsConfirmed of [false, false, true, true, false]) await main.ingest({ url, file: mp4, origin: { kind: "upload", rightsConfirmed } });
+      assert.deepEqual(sent, [false, true], "未確認→已確認再送一次；其餘命中本機索引不送");
+    }
+
     // 7. Local mode: same requests, no main-system call at all.
     const localCalls = [];
     const local = createServer({ dataDir: path.join(dir, "local"), env: { OPENAI_API_KEY: "sk-test" }, fetchImpl: async (url, o) => {
@@ -375,6 +450,8 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
       for (const k of ["image", "video", "audio", "remove-bg", "3d", "render"]) assert(kinds.includes(`"${k}"`));
       for (const field of Object.keys(calls.permits[0])) assert(issuer.includes(field), "issuer 讀 " + field);
       assert.match(issuer, /video: "ENTITLEMENT_ISSUER_TOKEN_VIDEO"/);
+      const releaseText = read("app/api/internal/video/workbench/assets/release-text/route.ts");
+      for (const field of Object.keys(calls.releaseText[0])) assert(releaseText.includes("b." + field), "release-text route 讀 " + field);
       const usageLib = read("lib/entitlements/service-usage.ts");
       assert.match(read("app/api/internal/video/workbench/usage/route.ts"), /reportWorkbenchUsage\(body\)/);
       const askTable = read("lib/content/video/workbench-usage.ts");

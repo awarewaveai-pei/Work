@@ -68,6 +68,22 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       }
       persist();
     }
+    // The words a finished render shows (editor titles/text, burned subtitles) go to next-admin for editorial and caption QA;
+    // a failure is recorded and retried by the next GET. Renders without words send nothing.
+    if (job.status === "succeeded" && job.result?.assetId && job.result.checksumSha256 && job.result.releaseTextSent !== true) {
+      try {
+        const text = require("./release-text.cjs").releaseText(job);
+        if (text) {
+          await main.releaseText({ assetId: job.result.assetId, checksumSha256: job.result.checksumSha256, text });
+          job.result.releaseTextSent = true;
+          persist();
+        }
+        delete job.releaseTextError;
+      } catch (e) {
+        job.releaseTextError = publicError(e.message);
+        persist();
+      }
+    }
     // Paid work is charged once it delivered (job.paid = the permit's account, set at creation): the record goes to the
     // main-system usage outbox, which owns delivery and retries; usageReported = durably recorded, never queued twice.
     if (job.status === "succeeded" && job.paid && !job.usageReported) {
@@ -101,16 +117,14 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     fs.writeFileSync(tmp, JSON.stringify(value));
     fs.renameSync(tmp, file);
   };
+  // Invariant: a job still owing the main system something (asset registration, release text) is never pruned by the
+  // history limit; its retry lives only in this record.
+  const pending = (j) => ["queued", "running"].includes(j.status) || !!(j.ledgerError || j.releaseTextError);
   const persist = () => {
     const limit = Math.max(100, Number(vwEnv(env, "JOB_HISTORY_LIMIT")) || 2000),
-      terminal = jobs.filter((j) => !["queued", "running"].includes(j.status));
+      terminal = jobs.filter((j) => !pending(j));
     const keep = new Set(terminal.slice(-limit).map((j) => j.id));
-    writeJson(
-      ledgerFile,
-      jobs.filter(
-        (j) => keep.has(j.id) || ["queued", "running"].includes(j.status),
-      ),
-    );
+    writeJson(ledgerFile, jobs.filter((j) => keep.has(j.id) || pending(j)));
   };
   // The browser state (characters/projects/assets/jobs/preferences/selection) lives here, not in localStorage
   // (plan invariant 6). Same contract as shared/adapters.js HttpAdapter: GET /state, PUT /state. Writes carry
@@ -663,7 +677,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       }
       persist();
     }
-    if (main && (job.status !== before || (job.status === "succeeded" && job.ledgerError))) await settle(job);
+    if (main && (job.status !== before || (job.status === "succeeded" && (job.ledgerError || job.releaseTextError)))) await settle(job);
     return job;
   }
   async function remotionReady(input) {
@@ -813,7 +827,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           // Card P2: a colour LUT (.cube text) is a library asset like an image: checked here, stored as is.
           const buffer = Buffer.from(input.data.slice(input.data.indexOf(",") + 1), "base64");
           require("./editor-export.cjs").checkCube(buffer.toString("utf8"));
-          json(res, 201, await registered({ id: crypto.randomUUID(), url: output(buffer, "cube"), origin: { kind: "upload", rightsConfirmed: false }, name: String(input.name || "LUT"), kind: "lut", type: "application/x-cube", size: buffer.length }));
+          json(res, 201, await registered({ id: crypto.randomUUID(), url: output(buffer, "cube"), origin: { kind: "upload", rightsConfirmed: input.rightsConfirmed === true }, name: String(input.name || "LUT"), kind: "lut", type: "application/x-cube", size: buffer.length }));
           return true;
         }
         // Card P5: 3D models (GLB) and motions (BVH) go to the media store; checked there before they are kept.
@@ -821,7 +835,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         if (model) {
           const ext = model[1] === "model/gltf-binary" ? "glb" : "bvh";
           const buffer = Buffer.from(model[2], "base64");
-          json(res, 201, await registered({ ...(await mediaStore.ingest({ buffer, ext })), origin: { kind: "upload", rightsConfirmed: false }, name: String(input.name || (ext === "glb" ? "3D 模型" : "動作")), kind: ext === "glb" ? "model" : "motion", type: model[1], size: buffer.length }));
+          json(res, 201, await registered({ ...(await mediaStore.ingest({ buffer, ext })), origin: { kind: "upload", rightsConfirmed: input.rightsConfirmed === true }, name: String(input.name || (ext === "glb" ? "3D 模型" : "動作")), kind: ext === "glb" ? "model" : "motion", type: model[1], size: buffer.length }));
           return true;
         }
         const m =
@@ -852,7 +866,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
               : await mediaStore.ingest({ buffer, ext });
         json(res, 201, await registered({
           ...stored,
-          origin: { kind: "upload", rightsConfirmed: false },
+          origin: { kind: "upload", rightsConfirmed: input.rightsConfirmed === true },
           name: String(input.name || "素材"),
           kind,
           type: mime,

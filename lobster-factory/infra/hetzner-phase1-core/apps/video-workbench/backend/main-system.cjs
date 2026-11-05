@@ -134,7 +134,9 @@ function createMainSystem({ env, fetchImpl, appDir, dataDir, orgId, inspect = re
 
   // POST /api/internal/video/workbench/assets: body = the file bytes (streamed), metadata in X-VW-* headers.
   async function ingest({ url, file, origin, sources = [], costUsd, jobId, ratio }) {
-    if (index[url]) return { ...index[url], existing: true };
+    // An upload registered unconfirmed that is now sent confirmed goes through again (next-admin upgrades the row).
+    const sentUnconfirmed = (index[url]?.rightsSources || []).length > 0 && index[url].rightsSources.every((e) => e.kind === "upload" && e.url === url) && index[url].rightsSources.some((e) => e.rightsConfirmed !== true);
+    if (index[url] && !(origin?.kind === "upload" && origin.rightsConfirmed === true && sentUnconfirmed)) return { ...index[url], existing: true };
     const ext = path.extname(file || "").slice(1).toLowerCase(), mime = MIME[ext];
     if (!mime) return { skipped: "unsupported_type" };
     const domain = { ai_generated: "ai_generated", render: "workbench_render", upload: "real_footage", import: "real_footage" }[origin?.kind];
@@ -176,6 +178,25 @@ function createMainSystem({ env, fetchImpl, appDir, dataDir, orgId, inspect = re
     index[url] = { assetId: value.assetId, checksumSha256: value.checksumSha256, objectUrl: value.objectUrl, rightsSources: meta.rightsSources };
     saveIndex();
     return { ...index[url], existing: value.existing === true };
+  }
+
+  // POST /api/internal/video/workbench/assets/release-text: the words of a finished render (backend/release-text.cjs).
+  // Idempotent on next-admin's side, so a resend after a lost answer is safe.
+  async function releaseText({ assetId, checksumSha256, text }) {
+    let r;
+    try {
+      r = await fetchImpl(base + "/api/internal/video/workbench/assets/release-text", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+        body: JSON.stringify({ organizationId: org(), assetId, checksumSha256, title: text.title, script: text.script, captions: text.captions }),
+        signal: AbortSignal.timeout(60000),
+      });
+    } catch (e) {
+      if (e.status) throw e;
+      throw fail("主系統送審文字登記失敗：無法連線", 502);
+    }
+    const value = await answer(r);
+    if (!r.ok || value.ok !== true) throw fail("主系統送審文字登記失敗：" + String(value.error || r.status), 502);
   }
 
   // POST /api/internal/video/workbench/jobs {action:"upsert"}: one call per state change, in order per job.
@@ -295,7 +316,7 @@ function createMainSystem({ env, fetchImpl, appDir, dataDir, orgId, inspect = re
   if (outbox.length) flush();
   setInterval(flush, Number(env.VW_USAGE_RETRY_MS) > 0 ? Number(env.VW_USAGE_RETRY_MS) : 60000).unref();
 
-  return { ingest, mirror, permit, usage, flush, pendingUsage: () => outbox.length, idle: () => Promise.all([...chains.values(), flushing]) };
+  return { ingest, releaseText, mirror, permit, usage, flush, pendingUsage: () => outbox.length, idle: () => Promise.all([...chains.values(), flushing]) };
 }
 
 module.exports = { createMainSystem, configured, paidFeature, ledgerKind, localUrls, PAID_ROUTES, MIME, LOCAL_URL };
