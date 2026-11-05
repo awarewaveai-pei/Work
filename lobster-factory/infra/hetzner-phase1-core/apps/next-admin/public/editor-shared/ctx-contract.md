@@ -11,9 +11,7 @@
 | `replaceImage(id, blob)` | `{id}` | 換像素：中心、大小、旋轉、堆疊位置不變，新圖被選取（見下） |
 | `exportArtboard({format, ppi?, background?, quality?, artboard?, width?, height?})` | `Blob` | 整個畫板（`app.export` 不帶 path）；background `transparent/white/black/#rrggbb`；quality 0–1 或 0–100 皆轉成 0–100 整數（真品只收 u8）；WebP 一律無損 |
 | `setArtboardSize({width, height, unit, dpi?})` | `{width, height, created}` | 第一個畫板改尺寸（`artboard.setProps`，pt）；沒文件就 `file.new`；unit `mm/cm/in/pt/px`（px 以 dpi 換算） |
-| `setFont(family, style?)` | `{ids, warning?}` | 選取的文字套字型（`text.setStyle {font}`）；字型未載入時有 `warning`（畫成替代字型） |
 | `openFile(blob, name)` | `true` | 開成新文件分頁（`vectorcraft.openFile`，同拖檔到分頁列；格式看 `name` 副檔名） |
-| `addFont(bytes)` | 宿主回傳 | 字型檔加入字型庫；需 C1.4 補丁 `vectorcraft.addFont`，沒有就 reject |
 | `saveAs()` | `Blob` | 存成 `.vectorcraft`（`file.saveCopy` + `captureDownloads`，不改文件路徑） |
 | `ready()` | `true` | 等 `window.vectorcraft` 出現（預設 30 秒逾時） |
 | `info(msg)` / `busy(on)` | — | 面板狀態訊息／忙碌中，同步；dock 畫在浮出層底部（HTML 標籤會被去掉） |

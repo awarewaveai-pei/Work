@@ -12,12 +12,12 @@ const APP = path.resolve(__dirname, "..", "..", "..");
 const read = (rel: string) => fs.readFileSync(path.join(APP, rel), "utf8");
 
 describe("dock.js 面板註冊表", () => {
-  it("十個面板 id，順序同 R0-PLAN C4.2", () => {
+  it("九個面板 id，順序同 R0-PLAN C4.2（字型面板 2026-11-05 取消）", () => {
     const src = read("public/vector-pro-dock/dock.js");
     const m = src.match(/export const PANEL_IDS = Object\.freeze\(\[([\s\S]*?)\]\)/);
     expect(m).not.toBeNull();
     const ids = [...m![1].matchAll(/"([^"]+)"/g)].map((x) => x[1]);
-    expect(ids).toEqual(["templates", "fonts", "color-grade", "bg-remove", "webp", "my-designs", "qr", "barcode", "mockup", "batch-export"]);
+    expect(ids).toEqual(["templates", "color-grade", "bg-remove", "webp", "my-designs", "qr", "barcode", "mockup", "batch-export"]);
   });
 });
 
@@ -137,14 +137,6 @@ describe("ctx-vectorcraft.js 契約（mock vectorcraft）", () => {
     await expect(mockHost().ctx.setArtboardSize({ width: 0, height: 1, unit: "mm" })).rejects.toThrow(/尺寸/);
   });
 
-  it("setFont → text.setStyle {font}（選取的文字）", async () => {
-    const { ctx, calls } = mockHost({ "text.setStyle": () => ({ ids: [4] }) });
-    expect(await ctx.setFont("Noto Serif TC")).toEqual({ ids: [4] });
-    expect(calls[0]).toEqual(["execute", "text.setStyle", { font: "Noto Serif TC" }]);
-    await ctx.setFont("Noto Serif TC", "Bold");
-    expect(calls[1][2]).toEqual({ font: "Noto Serif TC", style: "Bold" });
-    await expect(ctx.setFont("")).rejects.toThrow(/字型名稱/);
-  });
 
   it("openFile → vectorcraft.openFile(name, bytes)；沒檔名就 reject", async () => {
     const got: [string, number[]][] = [];
@@ -154,13 +146,6 @@ describe("ctx-vectorcraft.js 契約（mock vectorcraft）", () => {
     await expect(ctx.openFile(new Blob(["x"]), "")).rejects.toThrow(/檔名/);
   });
 
-  it("addFont → vectorcraft.addFont；沒有 C1.4 補丁就 reject", async () => {
-    const got: Uint8Array[] = [];
-    const { ctx } = mockHost({}, { addFont: (b: Uint8Array) => (got.push(b), 1) });
-    expect(await ctx.addFont(new Uint8Array([1, 2]).buffer)).toBe(1);
-    expect([...got[0]]).toEqual([1, 2]);
-    await expect(mockHost().ctx.addFont(new Uint8Array([1]))).rejects.toThrow(/C1\.4/);
-  });
 
   it("saveAs → file.saveCopy 被 captureDownloads 攔下，讀回 bytes 後關閉攔截", async () => {
     const host = mockHost({
@@ -196,7 +181,11 @@ const ROOT_TOKENS = (() => {
   return new Set([...root.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]));
 })();
 const BLOCKS_DIR = "public/editor-shared/blocks";
-const blockFiles = () => fs.readdirSync(path.join(APP, BLOCKS_DIR)).filter((f) => f.endsWith(".js")).map((f) => `${BLOCKS_DIR}/${f}`);
+/** dock 會載入的面板（dock.js PANEL_IDS）；資料夾裡沒登記的檔不算面板。 */
+const blockFiles = () => {
+  const m = read("public/vector-pro-dock/dock.js").match(/export const PANEL_IDS = Object\.freeze\(\[([\s\S]*?)\]\)/);
+  return [...m![1].matchAll(/"([^"]+)"/g)].map((x) => `${BLOCKS_DIR}/${x[1]}.js`);
+};
 const HEX = /#[0-9a-fA-F]{3,8}\b/;
 const FUNC_COLOR = /\b(?:rgba?|hsla?)\(/;
 /** 只看樣式：style="…"、.style.x = …、cssText、fillStyle 以外的 CSS 文字（面板裡的 #ffffff 預設值、畫布 fillStyle 是資料不是樣式）。 */

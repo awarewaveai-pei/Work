@@ -10,10 +10,9 @@ import { createVectorcraftCtx } from "/editor-shared/ctx-vectorcraft.js";
 /** 面板模組所在（搬路徑只改這一處）。 */
 export const BLOCKS_BASE = "/editor-shared/blocks/";
 
-/** 十個我們獨有的面板，圖示欄由上而下的順序（R0-PLAN §6 C4.2）。 */
+/** 九個我們獨有的面板，圖示欄由上而下的順序（R0-PLAN §6 C4.2；字型面板 2026-11-05 取消，改用 VectorCraft 原生字型庫）。 */
 export const PANEL_IDS = Object.freeze([
   "templates",
-  "fonts",
   "color-grade",
   "bg-remove",
   "webp",

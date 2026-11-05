@@ -152,11 +152,6 @@ export function createVectorcraftCtx(opts = {}) {
       return base64ToBlob(r.dataBase64, MIME[format] || "application/octet-stream");
     }),
 
-    /** 字型檔 bytes 加進字型庫（需 C1.4 的 vectorcraft.addFont 補丁）。 */
-    addFont: op(async (api, bytes) => {
-      if (typeof api.addFont !== "function") throw new Error("addFont 不可用：此 VectorCraft 建置沒有 C1.4 字型補丁");
-      return api.addFont(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
-    }),
 
     /** 畫板改尺寸：第一個畫板 artboard.setProps {index:0, width, height}（engine cmd/layer.rs:158，pt）；
      *  沒有開啟的文件就 file.new 一份該尺寸（cmd/edit.rs:26）。unit：mm／cm／in／pt／px（px 以 dpi 換算）。 */
@@ -173,12 +168,6 @@ export function createVectorcraftCtx(opts = {}) {
       }
     }),
 
-    /** 選取的文字套字型：text.setStyle {font, style?}（engine cmd/typecmd.rs:122；不帶 ids = 選取）。
-     *  字型不可用時真品回 warning（畫成替代字型），一併回傳。 */
-    setFont: op(async (api, family, style) => {
-      if (!family) throw new Error("setFont 需要字型名稱");
-      return api.execute("text.setStyle", style ? { font: family, style } : { font: family });
-    }),
 
     /** 目前文件存成 .vectorcraft → Blob；用 Save a Copy，不改文件自己的路徑與標題。 */
     saveAs: op(async (api) => {
