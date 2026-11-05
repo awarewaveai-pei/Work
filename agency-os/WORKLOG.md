@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-05（續1）塔羅調色色相角度修正：HueRotation 不再收弧度
+
+- 操作者：「修的舊 bug」（CARD-05 worker 回報、範圍外）。根因：`app/(shell)/tools/canvas/fabric-filters.ts` 舊 `buildFabricImageFilters` 傳 `rotation: hue*π/180`，但 Fabric 7 自己算 `rad = rotation * Math.PI`（node_modules/fabric/dist/index.mjs:22012）→ π 乘兩次，30° 實際轉約 94°。使用者只有塔羅工作室：`components/tools/GradedPreview.tsx`（調色預覽）與 `tarot/renderPrintCard.ts`（印製卡／圖庫縮圖烘焙）。編輯器共用模組 `public/editor-shared/color-grade.js:345` 早就是 `hue/180`。
+- 修：`rotation: p.hue / 180`（滑桿 ±30°）。不變量「沒有任何來源把弧度傳給 HueRotation」→ 新測試 `lib/studio/__tests__/legacy-fabric-filters-hue.test.ts`：30° → 30/180、與共用模組同角度輸出相同、掃 app/lib/components/public 全部原始碼無 `HueRotation…rotation:…Math.PI`、守門 regex 自測（舊寫法紅、新寫法綠）。
+- 影響：之前已烘焙存檔的塔羅縮圖維持舊色（不回改）；之後的預覽與印製按設定角度正確渲染。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/studio/__tests__/legacy-fabric-filters-hue.test.ts 4/4；lib/studio＋tarot＋components/tools 234/234；tsc 0；Fabric 原始碼 index.mjs:22012 `const rad = this.rotation * Math.PI` 讀過確認 | exit=0 | ms=0
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n（agency-os/reports/oracle/2026-11-05-partialreview-e94f5ada.md）。F1 守門 regex 擋不到跨行建構式 → 改 `[^;]`／`[^,}]`（含換行），加跨行自測兩案，4/4 綠。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=HueRotation | hits=5（fabric-filters 已修 1、共用模組正確 1、既有測試 3；無其他 Math.PI 寫法）
 ## 2026-11-04（續22）向量專業版：研究 storytold/vectorcraft 原始碼 → 選嵌入路線，計畫 C1–C6＋監工台
 
 - 根因（操作者：「功能比我的齊全、更像 Illustrator，想補缺＋照它排版」→「要完整 Illustrator 功能與相同排版」）：Fabric.js 編輯器 7 工具 vs Illustrator 89 工具，補到齊＝重寫；真品有 MIT/Apache WASM 網頁版且明寫供 iframe（`apps/vectorcraft-web/src/api.rs:1-17` `window.vectorcraft`）。

@@ -19,7 +19,8 @@ export function buildFabricImageFilters(
   const out: object[] = [];
 
   if (p.hue !== 0 && F.HueRotation) {
-    out.push(new F.HueRotation({ rotation: (p.hue * Math.PI) / 180 }));
+    // Fabric multiplies rotation by π itself (rotation −1..1 = ±180°): degrees / 180, never radians (radians turned 30° into ~94°)
+    out.push(new F.HueRotation({ rotation: p.hue / 180 }));
   }
   if (p.saturation !== 1 && F.Saturation) {
     out.push(new F.Saturation({ saturation: clampN(p.saturation - 1, -1, 1) }));
