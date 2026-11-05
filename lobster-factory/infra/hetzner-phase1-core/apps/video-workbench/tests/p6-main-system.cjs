@@ -266,6 +266,15 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
       near(calls.usage.find((u) => u.job_id === speech.id).cost_usd, 4 * rates.OPENAI_TTS_RATES["gpt-4o-mini-tts"].usdPerMChars / 1e6, "語音任務");
     }
 
+    // 6d. Connected mode (HttpAdapter): the server's refusal message reaches the user, never a bare status code.
+    {
+      const vm = require("node:vm"), ctx = { window: {}, AbortController, setTimeout, clearTimeout,
+        fetch: async () => new Response(JSON.stringify({ error: { message: "OpenAI 額度不足" } }), { status: 503 }) };
+      vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../shared/adapters.js"), "utf8"), ctx);
+      const http = new ctx.window.VideoWorkbenchAdapters.HttpAdapter({ apiBaseUrl: "/api/vw", timeoutMs: 1000 });
+      await assert.rejects(http.request("/generations", "POST", {}), /OpenAI 額度不足/);
+    }
+
     // 6c. 送審與投遞 links to next-admin's /release for the registered asset; an undeliverable ratio gets no link.
     {
       const vm = require("node:vm");

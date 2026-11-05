@@ -120,10 +120,11 @@
           },
         );
         if (!res.ok) {
-          // Same /state contract as LocalAdapter: a 409 carries the host's current state for runtime.js to adopt.
-          const data = res.status === 409 ? await res.json().catch(() => ({})) : {};
+          // Same contract as LocalAdapter: the server's own message reaches the user (a refusal never shows as a bare
+          // status code), and a 409 carries the host's current state for runtime.js to adopt.
+          const data = await res.json().catch(() => ({}));
           throw Object.assign(
-            new ServiceError("HTTP_ERROR", `服務回應 ${res.status}`, res.status),
+            new ServiceError("HTTP_ERROR", data.error?.message || `服務回應 ${res.status}`, res.status),
             data.state ? { state: data.state } : {},
           );
         }
