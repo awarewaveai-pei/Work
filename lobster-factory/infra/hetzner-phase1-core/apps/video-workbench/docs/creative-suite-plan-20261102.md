@@ -15,6 +15,7 @@
 | 引擎升級＝獨立卡（釘版＋checksum 改動），不夾帶 | 本檔 v4 |
 | **圖片轉 3D（S4b，2026-11-03 操作者「好」）**：主力 Stability AI API（SPAR3D／SF3D，英國）＋本機 Stable Fast 3D（免費，RTX 5060 8 GB）；備援 Replicate TRELLIS（2026-11-03 改，沿用去背金鑰；原 fal TRELLIS.2）；**Meshy 停用**（營運實體疑在北京，adapter 保留不設預設）；綁骨／動作用 Blender（P5）＋S4b 補：生成模型 Rigify 自動人形骨架（非人形手動對位）、內建免費動作庫（CMU BVH）。卡排 P6 之後 | `docs/s4-image-to-3d-providers-20261103.md` |
 | **路線 = C**（P0 2026-11-02）：合成類 ③ 不能載入自備字型，繁中顯示 NO GLYPH（上游 web.md:68），另 ① WebGPU 54 s device lost、WebGL2 0.47× 即時，⑤ 焦點出不了 iframe；剪輯類 ② 重開後素材離線。重評條件：上游支援使用者字型時，`node scripts/vendor-effectcraft.cjs` 後重跑 P0（engines/effectcraft/VERSION.json 改版＝獨立卡） | `docs/p0-effectcraft-gate-20261102.md` |
+| **路線重評（2026-11-06，等操作者選；選定前路線仍為 C）**：③ 字型、⑤ 焦點、② 重開素材都有解法（建置時編入繁中字型、工作台側按鍵監聽、`footage.relink`）；① 效能仍看顯示卡（內顯不行，RTX 5060 的 WebGPU 可用且沒再斷線）。FilmCraft main 有嵌入橋 `?host=parent`。建議 B：並存，FilmCraft 先；三條路線都先做「一支影片一條線」專案主線 | `docs/engine-route-plan-20261106.md`、`docs/p0-reeval-gates-20261106.md` |
 
 ## 1. 現況與缺口（2026-11-02 查證，`file:line`）
 
@@ -73,6 +74,7 @@
 | P6 | 上線 video.aware-wave.com（High） | compose 服務＋七項清單（AGENTS §0）；HttpAdapter 接主系統身分；**四項明寫**：① 資產帳冊 → `media_assets`（補 `organization_id`／`workspace_id`；`.data/media` → R2 `storage_key` 搬移腳本；`rightsSources` 寫入）② 任務帳冊 → 新表（`video_jobs` 是 1h TTL 進度表，不可用）③ 比例 1:1／4:3 需 migration 放寬 0138:21 與 `platform-ratio.ts:28`（**High**，另卡先過 db-expert）④ 許可走 `can(主體, feature_key, actor)`（ADR 017 §4）；成果走 QA→release→delivery（`delivery-contract.ts`）→ Postiz＋WordPress；`RATIO_PREFERENCE` 決定投遞比例；成本接 `cost-model.ts`；Host／Origin（`backend/api.cjs:442-446`）改設定；內部名稱 SeedStar→video-workbench；Blender headless 容器先量 CPU 渲染 | sg-deploy 綠、smoke 過；一支成品從工作台 → Postiz 草稿 **與** WordPress 草稿全鏈通；`media_assets` 列含 checksum 與 rightsSources | Fable 規劃；Opus 執行；等操作者 go |
 | S4b | 圖片轉 3D 換供應商＋自動骨架 | 見 §0 圖片轉 3D 列：provider adapter（Stability API 主力、本機 SF3D 免費、Replicate TRELLIS 備援，Meshy 停用）；Blender Rigify 自動人形骨架；內建 CMU BVH 動作庫；一個 job id 只呼叫廠商一次 | 同 10 張圖三方式比品質定預設；人形模型自動綁骨＋套動作，保存重開可改 | Opus |
 | RV | 影片模型接 Replicate | 見 `docs/replicate-video-models-plan-20261105.md`：NA `MOTION_MODELS` 抽成無 import 的 `next-admin/lib/ai/video-motion-models.ts`，VW 經 `awarewave-files.txt` 直接讀（不建第二份清單）；每個任務依 `settings.model` 選 sora-2（OpenAI）或 Runway／Veo／Luma（Replicate）；價格只讀 `cost-model.ts` `VIDEO_MOTION_RATES`；模型按鈕顯示價格、不用下拉 | 舊專案 `sora-2` 送出內容與改前相同；假 fetch 測送出欄位＝NA `buildInput`、重開續輪詢、取消；真打一次 Runway 5 秒（US$0.25）成品可播、帳冊與用量記 `runwayml/gen4-turbo` | Opus |
+| RE | 引擎路線重評＋專案主線計畫 | 見 `docs/engine-route-plan-20261106.md`（R0 計畫）與 `docs/p0-reeval-gates-20261106.md`（差距表、五閘）：EffectCraft v0.21.1、FilmCraft main `46763a8` 各加繁中字型試建（補丁與腳本在 `docs/p0-reeval-evidence/`）；三條路線 A 取代／B 並存／C 自製補缺口各附 rollback；專案主線回答重評 handoff §2b 四問。不改正式程式、不部署 | 差距表、五閘證據、R0 計畫三份齊；操作者選路線後，才把該路線的卡加進本表 | Fable |
 
 ## 5. 機械閘門（每卡）
 

@@ -3,7 +3,7 @@
 
 export const META = {
   title: '影音工作台監工台',
-  updated: '2026-11-05',
+  updated: '2026-11-06',
   plan: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/creative-suite-plan-20261102.md',
   req: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/handoff/Claude_Code_handoff_20261102.md',
   worklog: 'agency-os/WORKLOG.md 2026-11-02 續19–續45',
@@ -35,6 +35,7 @@ export const NOW = [
   { what: '2D 角色骨架。', state: 'yes', ev: '2026-11-03 卡 P4：工具「角色綁定」，姿勢圖可當生成參考。' },
   { what: '3D。', state: 'yes', ev: '2026-11-03 卡 P5：工具「3D」，Blender 4.5.9 渲染回剪輯。圖片轉 3D 改走 S4b（Meshy 停用）。' },
   { what: '在 video.aware-wave.com 登入使用。', state: 'yes', ev: '2026-11-05 已上線：未登入回 401、偽造身分回 401、smoke 全綠；3D 用主機 CPU（Cycles）。送審缺口已補（P6.13）；全程投遞實測待你操作（P6.10）。' },
+  { what: 'EffectCraft、FilmCraft 的專業功能在站上用得到。', state: 'no', ev: '11-02 試驗沒過，所以站上的剪輯與動畫都是自製的。11-06 重新試過：字型、焦點、重開素材都有解法，可以做成「專業剪輯」「專業特效」兩個入口；等你選路線（卡 RE、待決 2）。' },
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
@@ -52,6 +53,7 @@ const P4 = '1c5bde805';
 const P5 = '646cc9778';
 const P6 = '9465bbc8c';
 const RV = 'd84f65ec5';
+const RE = '1c0dcce1f';
 
 export const STEPS = [
   { n: 1, code: '0', title: '切 4178 到 repo', plain: '例：打開 127.0.0.1:4178，角色頁出現「示範角色庫」，代表跑的是 repo 版；舊資料一筆不少。',
@@ -210,9 +212,21 @@ export const STEPS = [
       done('RV.3', '畫面：模型是五顆可見按鈕，每顆寫價格，生成按鈕也寫這次的費用；專案設定的下拉改成按鈕，選的模型會真的帶到生成頁；Runway 沒圖時按鈕不能按並寫原因；還原舊任務會帶回當時的模型。', RV),
       todo('RV.4', '上線後真打一次：Runway 5 秒、一張小圖，約 US$0.25；部署要你同意。'),
     ] },
+  { n: 15, code: 'RE', title: '引擎路線重評', plain: '例：你問「說好的 EffectCraft、FilmCraft 怎麼沒看到」。這張卡把兩個引擎的最新版重新試一遍，寫出三條路線給你選；也回答「工具像零件」要怎麼串成一條線。',
+    gate: '差距表、五個檢查的證據、計畫都寫好；你選定路線。', risk: 'Low', model: 'Fable', status: 'in_progress', depends: ['P0'], before: '待決 2',
+    result: '2026-11-06 兩個引擎都加上繁中字型重新建出網頁版並實測。11-02 卡住的字型、焦點、重開素材現在都有解法。剩效能：這台筆電的瀏覽器預設用內建顯示卡，FilmCraft 畫面每秒不到一格；改用 RTX 5060 時每秒二十格上下，連跑兩分半沒有再斷線。FilmCraft 新增了嵌入用的接口，成品可以直接交回工作台，不必下載。',
+    what: 'EffectCraft v0.21.1、FilmCraft main 46763a8 各加繁中字型試建；重跑五閘；三者差距表；三條路線各附 rollback；專案主線回答重評 handoff §2b 四問。不改正式程式',
+    files: ['VW/docs/engine-route-plan-20261106.md', 'VW/docs/p0-reeval-gates-20261106.md', 'VW/docs/p0-reeval-evidence/'],
+    items: [
+      done('RE.1', '差距表：EffectCraft、FilmCraft、現在自製的工具逐條比。剪輯是 FilmCraft 最完整，特效是 EffectCraft 最完整；骨架、3D 模型、AI 工具、送審只有自製的有。', RE),
+      done('RE.2', '五個檢查重跑：繁中字（輸出畫面正確）、嵌入後焦點（工作台加一個按鍵就能回側欄）、重開素材、輸出都過或有解法；效能要看顯示卡，沒有獨立顯卡的電腦跑不順。', RE),
+      done('RE.3', '計畫：三條路線的好處、代價、怎麼退回。建議「並存」：新增「專業剪輯」（FilmCraft，先做）與「專業特效」（EffectCraft，後做），現有工具全部留著。另寫「一支影片一條線」：從腳本到送審每一步用哪個工具、成品自動流到哪、前面改了後面怎麼知道。', RE),
+      todo('RE.4', '你選路線後，把那條路線的卡排進這一頁，每張卡寫到逐檔逐行才開工。'),
+    ] },
 ];
 
 // 操作者自己要決定或親手做的
 export const OPEN = [
   { n: 1, before: 'RV', what: 'RV.4：部署工作台與 app（High），之後用 Runway 5 秒、一張小圖真打一次，約 US$0.25。要你說可以部署。', src: 'AGENTS §3' },
+  { n: 2, before: 'RE', what: '選路線。A：FilmCraft、EffectCraft 直接取代自製的剪輯與動畫合成。B（建議）：兩個引擎做成「專業剪輯」「專業特效」入口，跟現有工具並存。C：不嵌入，繼續補自製的缺口。三條都會先做「一支影片一條線」。選之前要知道：FilmCraft 介面是英文；兩個引擎不跟站上的主題、裡面有下拉選單；沒有獨立顯卡的電腦跑不順；兩個都還在早期版本。', src: 'VW/docs/engine-route-plan-20261106.md §4、§5' },
 ];
