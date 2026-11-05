@@ -1,6 +1,6 @@
 // Block: 🎨 調色. Panel DOM from public/vector-editor.html:362-368 (#gradePanel / #cgFields / #cgHint / #cgReset / #cgSecs); section builder from :1361-1417 (cgInit) and :1350-1360 (cgAuto).
-// Math is NOT here: every number comes from the shared SSOT /editor-shared/color-grade.js (buildFilterSpecs, makeFilters, applyAuto, setPath ...). Only the two Fabric filter wrappers
-// (AwHsl/AwBlur, vector-editor.html:1364-1379) are re-registered so Fabric 5 can run the shared applyHslPixels/applyBlurPixels. Offscreen: selectedImage() -> Fabric 5 filters -> PNG -> replaceImage().
+// Math is NOT here: every number comes from the shared SSOT /editor-shared/color-grade.js (buildFilterSpecs, makeFilters, applyAuto, setPath ...). AwHsl/AwBlur are the shared
+// AW_FILTERS definitions, only wrapped in Fabric 5 classes here (Fabric 7 wraps the same ones in tools/canvas/fabric-filters.ts). Offscreen: selectedImage() -> Fabric 5 filters -> PNG -> replaceImage().
 import * as cg from "/editor-shared/color-grade.js";
 
 const FABRIC_URL = "https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"; // same pin + SRI as vector-editor.html:7
@@ -17,23 +17,17 @@ export function ensureFabric() {
     }
     const fabric = globalThis.fabric, F = fabric.Image.filters;
     if (!F.AwHsl) {
-      F.AwHsl = fabric.util.createClass(F.BaseFilter, {
-        type: "AwHsl",
-        initialize: function (o) { this.state = cg.sanitizeHsl(o && o.state); },
-        applyTo2d: function (opts) { cg.applyHslPixels(opts.imageData.data, this.state); },
-        isNeutralTransformation: function () { return !cg.hasAnyHsl(this.state); },
-        toObject: function () { return { type: this.type, state: this.state }; },
-      });
-      F.AwHsl.fromObject = F.BaseFilter.fromObject;
-      F.AwBlur = fabric.util.createClass(F.BaseFilter, {
-        type: "AwBlur",
-        initialize: function (o) { const b = o && o.blur; this.blur = (typeof b === "number" && isFinite(b)) ? Math.min(100, Math.max(0, b)) : 0; },
-        applyTo2d: function (opts) { cg.applyBlurPixels(opts.imageData, this.blur); },
-        isNeutralTransformation: function () { return this.blur === 0; },
-        toObject: function () { return { type: this.type, blur: this.blur }; },
-      });
-      F.AwBlur.fromObject = F.BaseFilter.fromObject;
-      fabric.filterBackend = new fabric.Canvas2dFilterBackend(); // like vector-editor.html:1381 -> same pixels as /tools/canvas
+      for (const [name, def] of Object.entries(cg.AW_FILTERS)) {
+        F[name] = fabric.util.createClass(F.BaseFilter, {
+          type: name,
+          initialize: function (o) { Object.assign(this, def.init(o)); },
+          applyTo2d: function (opts) { def.apply2d(this, opts.imageData); },
+          isNeutralTransformation: function () { return def.neutral(this); },
+          toObject: function () { return def.toObject(this); },
+        });
+        F[name].fromObject = F.BaseFilter.fromObject;
+      }
+      fabric.filterBackend = new fabric.Canvas2dFilterBackend(); // 2d backend -> same pixels as /tools/canvas
     }
     return fabric;
   })();

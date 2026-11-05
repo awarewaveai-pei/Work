@@ -41,6 +41,14 @@ export const hslNeutral = shared.hslNeutral as () => HslMixerState;
 export const sanitizeHsl = shared.sanitizeHsl as (raw: unknown) => HslMixerState;
 export const applyBlurPixels = shared.applyBlurPixels as (img: { data: Uint8ClampedArray; width: number; height: number }, blur: number) => void;
 export const applyHslPixels = shared.applyHslPixels as (data: Uint8ClampedArray, state: HslMixerState) => void;
+/** One AwHsl / AwBlur definition; each Fabric version wraps it in a class (see the shared file). */
+export type AwFilterDef = {
+  init: (o: Record<string, unknown> | undefined) => Record<string, unknown>;
+  apply2d: (f: Record<string, unknown>, imageData: ImageData) => void;
+  neutral: (f: Record<string, unknown>) => boolean;
+  toObject: (f: Record<string, unknown>) => Record<string, unknown>;
+};
+export const AW_FILTERS = shared.AW_FILTERS as Record<"AwHsl" | "AwBlur", AwFilterDef>;
 export const getPath = shared.getPath as (adj: AdjState, path: string) => number;
 export const setPath = shared.setPath as (adj: AdjState, path: string, v: number) => AdjState;
 export const limitOf = shared.limitOf as (path: string) => Limit;

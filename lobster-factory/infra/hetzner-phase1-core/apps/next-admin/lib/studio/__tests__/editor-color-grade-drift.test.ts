@@ -10,7 +10,7 @@ import {
   EFFECT_LIMITS, GRADE_LIMITS, GRADE_SECTIONS, PRESETS, applyAuto, applyBlurPixels, applyHslPixels, buildFilterSpecs, getPath, hslNeutral,
   isNeutralAdj, limitOf, makeFilters, neutralAdj, sanitizeAdj, setPath,
 } from "../editor-color-grade";
-import { buildFabricImageFilters } from "../../../app/(shell)/tools/canvas/fabric-filters";
+import { buildFabricImageFilters, ensureAwFilters } from "../../../app/(shell)/tools/canvas/fabric-filters";
 
 const APP = path.resolve(__dirname, "..", "..", "..");
 const read = (rel: string) => fs.readFileSync(path.join(APP, rel), "utf8");
@@ -129,6 +129,35 @@ describe("pixel math", () => {
     expect(a.grade.balCR).toBeLessThan(0); // too red → pull red down
     const flat = new Uint8ClampedArray([100, 100, 100, 255, 100, 100, 100, 255]);
     expect(applyAuto(neutralAdj(), "contrast", flat)).toEqual(neutralAdj());
+  });
+});
+
+describe("AwHsl / AwBlur: one definition (AW_FILTERS), wrapped per Fabric version", () => {
+  it("the Fabric 7 wrapper keeps the old fields, clamping, neutral check, toObject and registry names", () => {
+    const registered: string[] = [];
+    const ns = { filters: { BaseFilter: class {} }, classRegistry: { setClass: (_c: unknown, n?: string) => { registered.push(String(n)); } } };
+    const aw = ensureAwFilters(ns) as Record<string, new (o?: Record<string, unknown>) => { isNeutralState(): boolean; toObject(): unknown; applyTo2d(o: { imageData: unknown }): void }>;
+    expect(registered).toEqual(["AwHsl", "AwBlur"]);
+    expect((aw.AwHsl as unknown as { type: string }).type).toBe("AwHsl");
+    expect(new aw.AwBlur({ blur: 250 }).toObject()).toEqual({ type: "AwBlur", blur: 100 });
+    expect(new aw.AwBlur({ blur: Number.NaN }).isNeutralState()).toBe(true);
+    expect(new aw.AwBlur().toObject()).toEqual({ type: "AwBlur", blur: 0 });
+    const st = hslNeutral(); st.red.h = 20;
+    const h = new aw.AwHsl({ state: st });
+    expect(h.toObject()).toEqual({ type: "AwHsl", state: st });
+    expect(h.isNeutralState()).toBe(false);
+    expect(new aw.AwHsl().isNeutralState()).toBe(true);
+    const px = new Uint8ClampedArray([255, 0, 0, 255]), ref = new Uint8ClampedArray(px);
+    h.applyTo2d({ imageData: { data: px, width: 1, height: 1 } });
+    applyHslPixels(ref, st);
+    expect(Array.from(px)).toEqual(Array.from(ref));
+  });
+  it("no editor carries its own AwHsl / AwBlur body", () => {
+    for (const f of ["app/(shell)/tools/canvas/fabric-filters.ts", "public/editor-shared/blocks/color-grade.js"]) {
+      const src = read(f);
+      expect(src, f).toMatch(/AW_FILTERS/);
+      expect(src, f).not.toMatch(/applyHslPixels|applyBlurPixels|sanitizeHsl/);
+    }
   });
 });
 
