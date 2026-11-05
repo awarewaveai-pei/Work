@@ -121,19 +121,29 @@ trap 'rm -rf "$STAGE"' EXIT
 rm -rf "$STAGE" && mkdir -p "$STAGE"
 cp -r "$DIST"/. "$STAGE"/
 cp "$SRC/NOTICE" "$SRC/LICENSE-MIT" "$SRC/LICENSE-APACHE" "$STAGE"/
-# AwareWave theme receiver: ours, not upstream's — injected before </body>.
-cp "$SCRIPT_DIR/awarewave-theme-receiver.js" "$STAGE/awarewave-theme-receiver.js"
-python3 - "$STAGE/index.html" <<'EOF'
+# AwareWave theme receiver: ours, not upstream's — injected before </body>. The filename
+# carries the content hash: prod nginx serves /vector-pro/ *.js with expires 1y immutable,
+# so an unhashed name would pin a stale receiver in browsers for a year.
+RSHA16=$(sha256sum "$SCRIPT_DIR/awarewave-theme-receiver.js" | cut -c1-16)
+RNAME="awarewave-theme-receiver-$RSHA16.js"
+cp "$SCRIPT_DIR/awarewave-theme-receiver.js" "$STAGE/$RNAME"
+python3 - "$STAGE/index.html" "$RNAME" <<'EOF'
 import sys
-p = sys.argv[1]
+p, rname = sys.argv[1], sys.argv[2]
 s = open(p, encoding="utf8").read()
-tag = '<script src="./awarewave-theme-receiver.js"></script>'
+tag = f'<script src="./{rname}"></script>'
 if tag not in s:
     assert "</body>" in s, "index.html has no </body>"
     s = s.replace("</body>", tag + "</body>", 1)
     open(p, "w", encoding="utf8", newline="").write(s)
 EOF
-grep -q "awarewave-theme-receiver" "$STAGE/index.html" || { echo "FATAL: receiver not injected into index.html" >&2; exit 1; }
+grep -q "$RNAME" "$STAGE/index.html" || { echo "FATAL: receiver not injected into index.html" >&2; exit 1; }
+# Invariant: every root-level .js/.wasm filename carries a 16-hex content hash (the nginx
+# immutable rule applies to all of them; index.html alone is no-cache).
+for f in "$STAGE"/*.js "$STAGE"/*.wasm; do
+  [ -e "$f" ] || continue
+  basename "$f" | grep -qE '[0-9a-f]{16}' || { echo "FATAL: $(basename "$f") in dist root lacks a 16-hex content hash — immutable caching would pin it stale" >&2; exit 1; }
+done
 { echo ""; echo "--- AwareWave build provenance ---"
   echo "storytold/vectorcraft @ $REV (MIT OR Apache-2.0)"
   echo "storytold/craft-fonts @ $CF_REV (fonts under OFL-1.1, licence beside each font in fonts/)"

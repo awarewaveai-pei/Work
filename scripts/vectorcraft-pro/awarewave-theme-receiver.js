@@ -1,6 +1,8 @@
 // AwareWave theme receiver — injected into the VectorCraft dist index.html by build.sh
-// (<script> before </body>); no upstream Rust beyond api-settheme.patch's setTheme().
-// Protocol (SSOT: apps/next-admin/components/tools/AwareWaveThemeFrame.tsx):
+// (<script> before </body>, filename carries this file's sha256 for immutable caching);
+// no upstream Rust beyond api-settheme.patch's setTheme().
+// Protocol (SSOT: apps/next-admin/lib/theme/frame-theme.ts — the app side connects with
+// its connectThemeFrame; channel literals here must match its THEME_*_CHANNEL):
 //   child → parent {channel:'awarewave:theme-ready'}    when setTheme is callable
 //   parent → child {channel:'awarewave:theme', tokens:{'--card-bg':'#…', …}}  (same-origin only)
 //   child → parent {channel:'awarewave:theme-applied'}  after vectorcraft.setTheme resolves
