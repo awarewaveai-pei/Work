@@ -13,7 +13,7 @@ export type OutreachGrant = (feature: "outreach.draft" | "outreach.qa") => Promi
 import { buildBrandContext, composeBody, BrandContextError, type BrandProfile, type EvidenceItem } from "@/lib/outreach/brand-context";
 import { parseGenerationOutput, repairPrompt } from "@/lib/outreach/generation-schema";
 import { pickVariant, favouredLabel, decideSample, minConfidence, loadSampleContext, NEUTRAL_SAMPLE_CONTEXT, autoApproves, type ClaimCheck, type SampleContext } from "@/lib/outreach/review-policy";
-import { checkClaimsTwice, type Recipient } from "@/lib/outreach/claim-check";
+import { checkClaimsVoted, type Recipient } from "@/lib/outreach/claim-check";
 import { senderFor } from "@/lib/outreach/sender";
 
 // Cold Outreach -- write one lead's first emails and follow-ups (SPEC §5.3, D23). The one implementation: the messages
@@ -67,7 +67,7 @@ export async function autoDecision(a: { gate: "pass" | "warn" | "block"; sampled
   let claim: ClaimCheck | null = null;
   if (a.gate === "pass" && !a.sampled) {
     try {
-      claim = a.check ? await a.check() : await checkClaimsTwice({ body: a.body, evidence: a.evidence, recipient: a.recipient, grant: await a.grant("outreach.qa"), metadata: { lead_id: a.leadId } });
+      claim = a.check ? await a.check() : await checkClaimsVoted({ body: a.body, evidence: a.evidence, recipient: a.recipient, grant: await a.grant("outreach.qa"), metadata: { lead_id: a.leadId } });
     } catch (e) {
       claim = { verdict: "error", error: e instanceof Error ? e.message : "claim check failed" };
     }

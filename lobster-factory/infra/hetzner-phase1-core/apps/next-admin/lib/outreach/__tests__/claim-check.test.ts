@@ -1,7 +1,11 @@
 // The fact check's verdict is code's: code splits the email into sentences, the model labels every one, only a sentence
 // about the recipient needs evidence, and only an approved id that exists counts as evidence.
-import { describe, expect, it } from "vitest";
-import { parseClaimCheck, sentencesOf } from "../claim-check";
+import { describe, expect, it, vi } from "vitest";
+
+const ai = vi.hoisted(() => ({ replies: [] as string[], calls: 0 }));
+vi.mock("@/lib/ai/cheap-json", () => ({ generateCheapJsonText: async () => { ai.calls++; return { ok: true, raw: ai.replies.shift() ?? "", model: "gpt-5.4-mini" }; } }));
+
+const { checkClaimsVoted, parseClaimCheck, sentencesOf } = await import("../claim-check");
 
 const ids = new Set(["e1", "e2"]);
 const reply = (sentences: unknown[]) => JSON.stringify({ sentences });
@@ -42,5 +46,26 @@ describe("parseClaimCheck", () => {
     expect(parseClaimCheck(reply([{ n: 1, about: "other", evidence: null }]), ["x。"], ids).verdict).toBe("error");
     expect(parseClaimCheck('{"verdict":"supported"}', ["x。"], ids).verdict).toBe("error");
     expect(parseClaimCheck("ok", ["x。"], ids).verdict).toBe("error");
+  });
+});
+
+describe("checkClaimsVoted", () => {
+  const S = reply([{ n: 1, about: "recipient", evidence: ["e1"] }]), U = reply([{ n: 1, about: "recipient", evidence: [] }]);
+  const vote = async (...replies: string[]) => {
+    ai.replies = [...replies];
+    ai.calls = 0;
+    const r = await checkClaimsVoted({ body: "你們週末開課。", recipient: { name: "x", website: null }, grant: {} as never,
+      evidence: [{ id: "e1", claim: "週末開課", excerpt: null, source_url: "https://a.example", status: "approved" }] });
+    return [r.verdict, ai.calls];
+  };
+  it("two runs that agree decide; a third run is made only to break a tie, and the majority wins", async () => {
+    expect(await vote(S, S)).toEqual(["supported", 2]);
+    expect(await vote(U, U)).toEqual(["unsupported", 2]);
+    expect(await vote(S, U, S)).toEqual(["supported", 3]);
+    expect(await vote(S, U, U)).toEqual(["unsupported", 3]);
+  });
+  it("three different answers are doubt: never supported", async () => {
+    expect((await vote(S, U, "not json"))[0]).not.toBe("supported");
+    expect((await vote("not json", S, U))[0]).not.toBe("supported");
   });
 });

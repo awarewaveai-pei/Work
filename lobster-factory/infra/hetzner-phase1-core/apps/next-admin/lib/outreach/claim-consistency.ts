@@ -14,7 +14,7 @@ export interface ConsistencyReport {
   disagreements: Array<{ messageId: string; first: ClaimCheck["verdict"]; second: ClaimCheck["verdict"] }>;
 }
 
-const CONCURRENCY = 4;
+const CONCURRENCY = 8;
 
 export async function measureConsistency(samples: readonly ConsistencySample[], inOrg: <T>(org: string, fn: () => Promise<T>) => Promise<T>): Promise<ConsistencyReport> {
   const r: ConsistencyReport = { n: 0, agreed: 0, rate: 0, errors: 0, disagreements: [] };

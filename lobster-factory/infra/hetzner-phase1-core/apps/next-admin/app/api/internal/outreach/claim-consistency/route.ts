@@ -1,14 +1,16 @@
 // POST /api/internal/outreach/claim-consistency  { organizationId, limit? }
 //
 // Card C16.2: the latest first emails (both variants) of one organization, each fact-checked twice; answers the
-// consistency report (lib/outreach/claim-consistency.ts). It measures ONE check run against another: the vote approvals
-// use (checkClaimsTwice) would turn a flip into a stable "unsupported" and hide it (Codex 2026-11-04). Paid: two
-// outreach.qa calls per email, billed to that organization like the pipeline tick. Run by hand (OUTREACH_SYNC_TOKEN).
+// consistency report (lib/outreach/claim-consistency.ts) of the check approvals rest on: checkClaimsVoted, a majority
+// vote (R0-PLAN C16 「一致率實測與投票」). A single run against a single run measured 0.87-0.93 (reports of 2026-11-04); a
+// majority is symmetric, so unlike an AND of two runs it does not hide a flip as a stable "unsupported". Paid: four to
+// six outreach.qa calls per email, billed to that organization like the pipeline tick. Run by hand on the host
+// (127.0.0.1:3002, OUTREACH_SYNC_TOKEN): 200 emails take minutes, longer than the proxy's 300 s read timeout.
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "@/lib/security/timingSafeEqual";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { grantFor, runForOrg } from "@/lib/entitlements/grant";
-import { checkClaims } from "@/lib/outreach/claim-check";
+import { checkClaimsVoted } from "@/lib/outreach/claim-check";
 import { measureConsistency, type ConsistencySample } from "@/lib/outreach/claim-consistency";
 import { approvedEvidence, type LeadRow } from "@/lib/outreach/generate";
 
@@ -50,7 +52,7 @@ export async function POST(request: Request) {
     const evidence = await approvedEvidence(sb, lead);
     if (!evidence.length) continue;
     samples.push({ messageId: m.id, organizationId: org,
-      run: async () => checkClaims({ body: m.body, evidence, recipient: { name: lead.name, website: lead.website ?? null },
+      run: async () => checkClaimsVoted({ body: m.body, evidence, recipient: { name: lead.name, website: lead.website ?? null },
         grant: await grantFor("outreach.qa"), metadata: { lead_id: lead.id, purpose: "claim_consistency" } }) });
   }
   const report = await measureConsistency(samples, (o, fn) => runForOrg(o, ACTOR, fn));

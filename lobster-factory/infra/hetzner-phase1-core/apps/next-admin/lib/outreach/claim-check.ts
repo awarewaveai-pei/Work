@@ -57,11 +57,15 @@ export async function checkClaims(args: { body: string; evidence: EvidenceItem[]
   return parseClaimCheck(r.raw, sentences, new Set(approved.map((e) => e.id)));
 }
 
-/** The check an approval rests on (C16.2): two independent runs, supported only when both say so; otherwise the first
- *  run that did not, so a person sees why. One run flipped on 22 of 200 emails; a flip now lands with a person. */
-export async function checkClaimsTwice(args: Parameters<typeof checkClaims>[0]): Promise<ClaimCheck> {
+/** The check an approval rests on (C16.2): the majority of three runs, the third made only when the first two differ
+ *  (about 7% of emails, so two calls in practice). One run flips on 7-13% of emails, and across three measures of the
+ *  same 200 emails the flips fell on different emails (43 in all, 2 in every measure): noise, which a majority removes
+ *  and a bigger model is not needed for. Three different answers = doubt = the one that is not "supported". */
+export async function checkClaimsVoted(args: Parameters<typeof checkClaims>[0]): Promise<ClaimCheck> {
   const [a, b] = await Promise.all([checkClaims(args), checkClaims(args)]);
-  return a.verdict !== "supported" ? a : b;
+  if (a.verdict === b.verdict) return a;
+  const c = await checkClaims(args);
+  return [a, b].find((r) => r.verdict === c.verdict) ?? [a, b, c].find((r) => r.verdict !== "supported")!;
 }
 
 const KINDS = new Set(["recipient", "sender", "question", "courtesy"]);
