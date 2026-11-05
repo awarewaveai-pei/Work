@@ -147,7 +147,7 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
       <p class="plain">例：打開就是 Essentials Classic 工作區（上方有控制列）；打繁中字不缺字；按「存入 My Designs」在「我的設計」看得到，檔案可再開。</p>
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low（只用既有 designs API，不改 schema）</span><span class="who">負責：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>繁中字截圖無缺字；存入後「我的設計」有縮圖；下載回來的檔可在專業版再開。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>C5.1</code> 預設工作區切成 Essentials Classic，只在第一次。</span></li><li class="todo"><b>○</b><span><code>C5.2</code> 存入 My Designs：原檔加縮圖，用既有 API，不改資料表。</span></li><li class="todo"><b>○</b><span><code>C5.3</code> 實測：打繁中字、存入、看到縮圖、下載再開。</span></li></ul>
+      <ul class="items"><li class="todo"><b>○</b><span><code>C5.1</code> 預設工作區切成 Essentials Classic，只在第一次。</span></li><li class="todo"><b>○</b><span><code>C5.2</code> 存入 My Designs：原檔加縮圖；設計庫 API 加收原檔（只收向量檔、檢查內容），不改資料表。</span></li><li class="todo"><b>○</b><span><code>C5.3</code> 實測：打繁中字、存入、看到縮圖、下載再開。</span></li></ul>
       <details><summary>工程細節：C5 繁中與存檔</summary>
         <p>首次載入切 Essentials Classic（之後尊重偏好）；my-designs 積木在 pro ctx：saveAs .vectorcraft＋PNG 預覽 → 既有 /api/tools/designs</p>
         <p><b>需先完成：</b><a href="#C4">C4</a></p>
@@ -173,7 +173,7 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
       <p class="plain">例：以前在舊編輯器存的設計，在專業版的 My Designs 面板一樣打得開；轉完之後 /tools/vector-editor 自動跳到專業版，舊頁面刪掉，只剩一套。</p>
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium（刪舊頁；轉檔若要加欄位則 migration High）</span><span class="who">負責：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>舊設計轉檔數＝原數量；專業版開舊設計物件數與 SVG 一致；舊網址跳轉；舊頁、白名單、登記、相關測試都拆乾淨且全綠。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>C7.1</code> 把舊設計批次匯出成 SVG 存回 My Designs，數量對得上。</span></li><li class="todo"><b>○</b><span><code>C7.2</code> 專業版的 My Designs 面板打得開舊設計。</span></li><li class="todo"><b>○</b><span><code>C7.3</code> 舊網址跳轉到專業版；刪舊頁與相關設定、測試改好。</span></li><li class="todo"><b>○</b><span><code>C7.4</code> 文件與記憶更新。</span></li></ul>
+      <ul class="items"><li class="todo"><b>○</b><span><code>C7.1</code> 舊專案檔（.design.json，只存在妳電腦裡）在 My Designs 面板按「匯入舊專案」就轉成向量放進畫板；舊的 PNG 設計照常開。</span></li><li class="todo"><b>○</b><span><code>C7.2</code> 專業版的 My Designs 面板打得開舊設計。</span></li><li class="todo"><b>○</b><span><code>C7.3</code> 舊網址跳轉到專業版；刪舊頁與相關設定、測試改好。</span></li><li class="todo"><b>○</b><span><code>C7.4</code> 文件與記憶更新。</span></li></ul>
       <details><summary>工程細節：C7 舊設計轉檔、舊編輯器退場</summary>
         <p>convert-designs.mjs（playwright 用舊頁匯出 SVG 存回）；My Designs 面板開 SVG；vector-editor 頁改 redirect、刪 html、拆白名單與登記、改 e2e 與 drift 測試；文件與記憶</p>
         <p><b>需先完成：</b><a href="#C6">C6</a></p>

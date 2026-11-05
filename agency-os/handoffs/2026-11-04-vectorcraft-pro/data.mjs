@@ -85,7 +85,7 @@ export const STEPS = [
     files: ['NA/public/vector-pro-toolbox.js', 'NA/public/editor-shared/blocks/my-designs.js'],
     items: [
       todo('C5.1', '預設工作區切成 Essentials Classic，只在第一次。'),
-      todo('C5.2', '存入 My Designs：原檔加縮圖，用既有 API，不改資料表。'),
+      todo('C5.2', '存入 My Designs：原檔加縮圖；設計庫 API 加收原檔（只收向量檔、檢查內容），不改資料表。'),
       todo('C5.3', '實測：打繁中字、存入、看到縮圖、下載再開。'),
     ] },
   { n: 6, code: 'C6', group: 'F', title: '驗收、升級流程、文件', plain: '例：VectorCraft 出新版時，改一個版本號、跑建置、跑 smoke、上傳、切 current；壞了切回上一版。每天 smoke 會確認專業版還開得起來。',
@@ -104,7 +104,7 @@ export const STEPS = [
     what: 'convert-designs.mjs（playwright 用舊頁匯出 SVG 存回）；My Designs 面板開 SVG；vector-editor 頁改 redirect、刪 html、拆白名單與登記、改 e2e 與 drift 測試；文件與記憶',
     files: ['scripts/vectorcraft-pro/convert-designs.mjs', 'NA/app/(shell)/tools/vector-editor/page.tsx', 'NA/middleware.ts', 'NA/public/vector-editor.html', 'NA/lib/portal/products.ts'],
     items: [
-      todo('C7.1', '把舊設計批次匯出成 SVG 存回 My Designs，數量對得上。'),
+      todo('C7.1', '舊專案檔（.design.json，只存在妳電腦裡）在 My Designs 面板按「匯入舊專案」就轉成向量放進畫板；舊的 PNG 設計照常開。'),
       todo('C7.2', '專業版的 My Designs 面板打得開舊設計。'),
       todo('C7.3', '舊網址跳轉到專業版；刪舊頁與相關設定、測試改好。'),
       todo('C7.4', '文件與記憶更新。'),

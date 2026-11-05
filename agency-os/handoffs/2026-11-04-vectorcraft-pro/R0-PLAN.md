@@ -107,7 +107,7 @@ B。決策：靜態檔由 nginx 供給、版本目錄 `<rev7>/`＋`current` syml
 | 卡號 | 做什麼 |
 |---|---|
 | C5.1 | 預設工作區 Essentials Classic（control bar 開，`VC/crates/ui-egui/src/workspaces.rs:86`）：dock 欄載入後 `vectorcraft.request('ui.menu.invoke', {path:['Window','Workspace','Essentials Classic']})` 一次，之後尊重使用者偏好（`localStorage` 旗標）；dock 欄色值跟著 `ui.inspect` 的 brightness |
-| C5.2 | 「My Designs」面板（C4.2）：`captureDownloads(true)` → 「存入 My Designs」→ `execute('file.saveAs',{format:'vectorcraft'})`＋`app.export png` 預覽 → POST `NA/app/api/tools/designs/route.ts`（既有欄位；不改 schema，超限則拒並說明） |
+| C5.2 | 「My Designs」面板：存入＝`app.export png` 預覽（照舊 `image`）＋`source`＝`file.saveAs` 的 `.vectorcraft`。`/api/tools/designs` POST 加選填 `source:{name,data}`（`.vectorcraft`／`.svg`，≤20 MB，內容嗅探：gzip `1f8b` 或 JSON `format` = vectorcraft／drawcraft；`<svg`），R2 存 `application/octet-stream`，寫進既有 `metadata.source_key/source_name/source_bytes`，**不改 schema**；DELETE 連原始檔一起刪；開啟＝有 source 就 `openFile`，否則置入預覽圖 |
 | C5.3 | REALTEST：打繁中字、存入 My Designs、在「我的設計」看到縮圖、下載回 `.vectorcraft` 可再開 |
 
 ### C6 驗收、升級流程、文件
@@ -123,7 +123,7 @@ B。決策：靜態檔由 nginx 供給、版本目錄 `<rev7>/`＋`current` syml
 
 | 卡號 | 做什麼 |
 |---|---|
-| C7.1 | `scripts/vectorcraft-pro/convert-designs.mjs`：用 playwright 開舊 `/vector-editor.html` 逐一載入 My Designs 裡 `kind=vector` 的 `.design.json` → 既有「匯出 SVG（真實 cm）」→ 以同 id 存回 `designs` 的 `svg` 附件（不改 schema：用既有附件欄；沒有就加一個 nullable 欄的 migration 並記 High）；轉完數量＝原數量才算 |
+| C7.1 | **改**（2026-11-05 查證）：舊 `.design.json` 從未存上伺服器（`NA/public/vector-editor.html:1285` 只下載），My Designs 只有 PNG（`:1025`）→ 不做伺服器批次轉檔。My Designs 面板加「匯入舊專案（.design.json）」：本機選檔 → Fabric 5（`blocks/color-grade.js` `ensureFabric`）離屏 `loadFromJSON` → `toSVG()` → `placeSvg`；舊 PNG 設計照常以圖片開 |
 | C7.2 | `/tools/vector-pro` 的「My Designs」面板開舊設計時取 SVG → `openFile`；e2e：舊設計開得起來、物件數與 SVG 一致 |
 | C7.3 | `NA/app/(shell)/tools/vector-editor/page.tsx` 改 `redirect('/tools/vector-pro')`；`NA/middleware.ts:476` 白名單移除 `vector-editor.html`；`NA/public/vector-editor.html` 刪除；`products.ts` `staffPaths` 移除 `tools/vector-editor`；相關 e2e（card-01～06 取 vector frame 的）改成只跑 canvas；`editor-*-drift.test` 的 vector 端改指向 `blocks/color-grade.js`／`bg-remove.js` 面板；Canvas Editor（點陣）不動 |
 | C7.4 | 文件：RUNNABLE_DEMOS 舊條目改指專業版；記憶 `project_vector_editor_blocks.md` 更新；WORKLOG |
