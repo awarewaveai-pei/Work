@@ -69,6 +69,23 @@ TC_SHA16=${TC_SHA:0:16}
 DIST="$SRC/dist/web"
 [ -f "$DIST/index.html" ] || { echo "FATAL: no index.html in $DIST" >&2; exit 1; }
 ls "$DIST"/*.wasm >/dev/null || { echo "FATAL: no .wasm in $DIST" >&2; exit 1; }
+
+# Invariant: the shipped wasm went through wasm-opt (index.html data-wasm-opt="z").
+# Proof by idempotence: re-running -Oz on an already-optimized module shrinks it <2%;
+# if trunk silently skipped wasm-opt (version change, download failure), the gain is
+# large and we FAIL instead of shipping a bloated artifact. (Note: ~87-90MB IS the
+# correct optimized size — upstream docs' 17.5MB is stale; official v0.21.0 release
+# wasm measures 87.4MB raw.)
+WOPT=$(find "$HOME/.cache/trunk" -name wasm-opt -type f 2>/dev/null | head -1)
+[ -n "$WOPT" ] || { echo "FATAL: trunk's wasm-opt binary not found under ~/.cache/trunk — cannot prove the wasm was optimized" >&2; exit 1; }
+WASM=$(ls "$DIST"/*.wasm | head -1)
+"$WOPT" -Oz --enable-reference-types --enable-bulk-memory -o /tmp/wasm-opt-check.wasm "$WASM" || { echo "FATAL: wasm-opt verification run failed on $WASM" >&2; exit 1; }
+BEFORE=$(stat -c%s "$WASM"); AFTER=$(stat -c%s /tmp/wasm-opt-check.wasm); rm -f /tmp/wasm-opt-check.wasm
+if [ $((BEFORE - AFTER)) -gt $((BEFORE / 50)) ]; then
+  echo "FATAL: re-running wasm-opt -Oz shrank the wasm by >2% ($BEFORE -> $AFTER bytes): trunk did NOT run wasm-opt — do not ship" >&2
+  exit 1
+fi
+echo "wasm-opt invariant OK: $BEFORE -> $AFTER bytes on re-opt ($(( (BEFORE - AFTER) * 100 / BEFORE ))% gain, already optimized)"
 [ -f "$DIST/fonts/$TC_SHA16/NotoSansTC-Regular.otf" ] || { echo "FATAL: Noto Sans TC missing from dist/fonts/$TC_SHA16" >&2; exit 1; }
 
 # Assemble in a staging dir, verify, then swap in atomically: a failed build never

@@ -44,6 +44,7 @@ powershell -ExecutionPolicy Bypass -File D:\Work\scripts\vectorcraft-pro\build.p
 
 - 建置：`build.ps1` 一次通過（exit 0），dist 27 檔、`SHA256SUMS -c` 全過；wasm 89.3MB／gz 32.6MB。
   **上游文件的 17.5MB 是舊數字**：官方 release v0.21.0 的 web zip 實測 wasm = 87.4MB raw／31.9MB zip（`gh release download` 驗證），同量級。首載 ≈33MB（gz），R0-PLAN R2 的「7MB」假設過時。
+  **wasm-opt 有真的跑**（2026-11-05 查證）：對產出 wasm 手動重跑 `wasm-opt -Oz` 只縮 0.07%（89,270,053→89,204,797 bytes）= 已優化；build.sh 現在每次建置做同一驗證（重跑 -Oz 縮 >2% 即 FATAL，不默默出大檔），wasm 大小是真實程式量（section 構成：code 64.0MB + data 25.1MB，無 debug/name section）。
 - smoke（`python -m http.server 8899` 供 dist，瀏覽器開 `index.html?lang=zh-hant`）：
   - `await vectorcraft.request('ui.inspect')` 回 JSON（24 keys：documents/panes/tool/view…）。
   - 選單、新檔對話框、context bar 全繁中（`smoke-zh-hant-welcome.jpg`）。
