@@ -57,7 +57,7 @@ export function VectorProFrame() {
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "var(--body-bg)" }}>
       {failure ? (
         <p style={{ flex: 1, margin: 0, padding: 16, color: "var(--text-primary)" }}>
-          {failure} 請改用 <a href={FALLBACK} style={{ color: "var(--accent)" }}>Canvas 編輯器</a>。
+          {failure} 請改用 <a href={FALLBACK} style={{ color: "var(--accent-text)" }}>Canvas 編輯器</a>。
         </p>
       ) : (
         <div style={{ flex: 1, display: "flex", minHeight: 0 }}>

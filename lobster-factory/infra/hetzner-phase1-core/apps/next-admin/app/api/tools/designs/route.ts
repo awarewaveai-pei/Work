@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import sharp from "sharp";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../lib/ops-role";
 import { getSupabaseReadClient, getSupabaseWriteClient } from "../../../../lib/supabase-server";
-import { buildDesignKey, deleteDesignObject, isR2Configured, parseImageDataUrl, putDesignObject } from "../../../../lib/storage/r2";
+import { buildDesignKey, isR2Configured, parseImageDataUrl, putDesignObject } from "../../../../lib/storage/r2";
 import { parseDesignSource, SOURCE_CONTENT_TYPE, sourceKeyFor, sourceKeyFromMetadata } from "../../../../lib/studio/design-source";
 import { deleteUnreferencedAsset } from "../../../../lib/content/r2-delete-guard";
 import { decodeCursor, listDesigns, type SortOrder, type TimeRange } from "../../../../lib/studio/designs-list";
@@ -261,7 +261,7 @@ export async function POST(request: Request) {
     const sourceKey = sourceKeyFor(objectKey, sourceFile.ext);
     const up = await putDesignObject(sourceKey, sourceFile.buffer, SOURCE_CONTENT_TYPE);
     if (!up.ok) {
-      await deleteDesignObject(objectKey); // preview just uploaded, never published: no reference scan needed
+      await deleteUnreferencedAsset(objectKey); // the preview just uploaded: nothing references it yet, so the guard deletes it
       return NextResponse.json({ ok: false, error: (up as { ok: false; error: string }).error }, { status: 502 });
     }
     sourceMeta = { source_key: sourceKey, source_name: sourceFile.name, source_bytes: sourceFile.buffer.byteLength };
@@ -303,7 +303,7 @@ export async function POST(request: Request) {
 
   if (error) {
     console.error("[designs] media_assets insert failed:", error.message);
-    if (typeof sourceMeta.source_key === "string") await deleteDesignObject(sourceMeta.source_key); // no row will ever point at it
+    if (typeof sourceMeta.source_key === "string") await deleteUnreferencedAsset(sourceMeta.source_key); // no row will ever point at it
     return NextResponse.json({ ok: false, error: "insert_failed" }, { status: 500 });
   }
 

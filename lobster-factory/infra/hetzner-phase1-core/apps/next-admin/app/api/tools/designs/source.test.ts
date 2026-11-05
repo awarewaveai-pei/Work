@@ -7,7 +7,7 @@ const ASSET = "bbbbbbbb-0000-4000-8000-000000000002";
 const KEY = "designs/2026-11/11111111-1111-4111-8111-111111111111.png";
 const SRC_KEY = "designs/2026-11/11111111-1111-4111-8111-111111111111.vectorcraft";
 
-const st = vi.hoisted(() => ({ puts: [] as { key: string; type: string; bytes: number }[], rows: [] as { metadata: Record<string, unknown> }[], guardDeleted: [] as string[], r2Deleted: [] as string[] }));
+const st = vi.hoisted(() => ({ puts: [] as { key: string; type: string; bytes: number }[], rows: [] as { metadata: Record<string, unknown> }[], guardDeleted: [] as string[] }));
 
 vi.mock("sharp", () => ({ default: () => ({ metadata: async () => ({ format: "png" }) }) }));
 vi.mock("../../../../lib/ops-role", () => ({ resolveOpsRole: () => ({ role: "operator", source: "test" }), canCreateAiImageJob: () => true }));
@@ -26,7 +26,6 @@ vi.mock("../../../../lib/storage/r2", () => ({
   isR2Configured: () => true,
   buildDesignKey: () => KEY,
   parseImageDataUrl: () => ({ mime: "image/png", buffer: Buffer.from("png") }),
-  deleteDesignObject: async (k: string) => { st.r2Deleted.push(k); return { ok: true }; },
   putDesignObject: async (key: string, body: Buffer, type: string) => {
     st.puts.push({ key, type, bytes: body.length });
     return { ok: true, objectKey: key, publicUrl: `https://r2.test/${key}`, byteSize: body.length, checksumSha256: "x" };
@@ -59,7 +58,7 @@ const save = (sourceFile?: unknown) =>
 
 beforeEach(() => {
   vi.stubEnv("POD_DESIGNS_ENABLED", "true");
-  st.puts = []; st.rows = []; st.guardDeleted = []; st.r2Deleted = [];
+  st.puts = []; st.rows = []; st.guardDeleted = [];
 });
 
 describe("POST sourceFile", () => {
