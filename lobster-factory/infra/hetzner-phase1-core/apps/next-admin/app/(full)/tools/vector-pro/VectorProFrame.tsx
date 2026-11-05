@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { connectThemeFrame } from "@/lib/theme/frame-theme";
 import "./vector-pro.css";
 
 // VectorCraft's web build is static files nginx serves at /vector-pro/ (R0-PLAN C2; locally next.config.ts rewrites
@@ -26,6 +27,7 @@ function hasWebGL2(): boolean {
 export function VectorProFrame() {
   const frame = useRef<HTMLIFrameElement>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  const [themeLinked, setThemeLinked] = useState(false);
 
   useEffect(() => {
     if (!hasWebGL2()) {
@@ -44,7 +46,10 @@ export function VectorProFrame() {
     dock.src = DOCK_SRC;
     dock.onerror = () => console.warn(`[vector-pro] ${DOCK_SRC} did not load; running without the dock`);
     document.body.appendChild(dock);
+    // App theme → VectorCraft (same-origin iframe), the protocol in lib/theme/frame-theme.ts.
+    const stopTheme = frame.current ? connectThemeFrame(frame.current, window.location.origin, () => setThemeLinked(true)) : () => {};
     return () => {
+      stopTheme();
       live = false;
       window.__vectorProFrame = null;
       dock.remove();
@@ -68,6 +73,7 @@ export function VectorProFrame() {
             title="向量（專業版）"
             onError={() => setFailure("專業版載入失敗。")}
             className="vp-frame"
+            data-theme-linked={themeLinked ? "1" : undefined}
           />
           <aside id="vector-pro-dock" className="vp-dock" />
         </div>
