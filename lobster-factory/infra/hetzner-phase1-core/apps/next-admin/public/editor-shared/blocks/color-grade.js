@@ -105,7 +105,9 @@ export default {
     // 色彩混合器 HSL
     const hb = sec("hsl", "色彩混合器 HSL"), tabs = document.createElement("div"); tabs.className = "grid3"; hb.appendChild(tabs);
     [{ key: "all", label: "全部" }].concat(cg.HSL_RANGES).forEach((r) => { const b = document.createElement("button"); b.className = "tab"; b.dataset.cgHslTab = r.key; b.textContent = r.label;
-      if (r.color) b.style.setProperty("--swatch", r.color); // hue of the range, from the shared module; theme.css draws it b.onclick = () => { hslTab = r.key; paint(); }; tabs.appendChild(b); });
+      // hue of the range comes from the shared module; theme.css draws it from --swatch
+      if (r.color) b.style.setProperty("--swatch", r.color);
+      b.onclick = () => { hslTab = r.key; paint(); }; tabs.appendChild(b); });
     cg.HSL_AXES.forEach((a) => {
       const lb = document.createElement("label"); lb.innerHTML = a.label + ' <span data-cg-hsl-val="' + a.axis + '"></span>'; hb.appendChild(lb);
       const el = document.createElement("input"); el.type = "range"; el.dataset.cgHsl = a.axis; el.min = a.min; el.max = a.max; el.step = 1; el.value = 0;
