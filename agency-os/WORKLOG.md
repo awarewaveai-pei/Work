@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-06（續3）畫布專業版：C2 上線正式站＋W1–W4 四分支合進 main（2d94cb844，未部署 next-admin）
+
+- C2（`c9c7e3bb1`，操作者准）：主機 `/root/lobster-phase1/static/photo-pro/98bcbfa-f007c95`＋`current`（SHA256SUMS 全過）；compose 唯讀掛載、nginx app＋產品門兩區塊 `location ^~ /photo-pro/`；safe-infra-patch 備份 `docker-compose.yml.bak.safe-patch-20261105-181004`、`default.conf.bak.safe-patch-20261105-181324`。
+  - M1 Cloudflare 把 `.js` 的 `no-cache` 改寫成 `max-age=14400`（`app/photocraft-web.js` 無雜湊，升級後新 wasm 配舊 glue）→ `map $uri $photo_pro_cache`：帶雜湊 immutable 1y、其餘 `private, no-cache`；`add_header_inherit merge`（nginx 1.30.4）保住伺服器層安全標頭。
+- 合併：W1 C1（`a9916b47e`；`web-host-api.patch` 接上游 craft-web-api＋craft-web-host，上游 PR 草稿未送；snippets 打包 bug 繞道依上游 #10248）、W2 C3.1–3.3＋C4.1（共用 `ProEditorFrame`／`editor-shared/dock.js`）、W3 C4.3（三面板照舊搬）、W4 C5.1–5.2（`.psd` 原始檔、`ctx.host`）。
+  - C1 W1 spike：網頁版存不出 `.pcraft`（上游 `crates/ui-egui/src/app/files.rs:236-245`）→ 主 session 定 My Designs 原始檔＝`.psd`，不加補丁。
+  - M2 trunk 雜湊不補零（實測 15 位）→ 兩編輯器建置檢查與 nginx 皆 `{12,16}`。
+- 下一輪：W1 C4.2＋C4.4（`photo-pro-dock`、`ctx-photocraft.js`、e2e）；W2 C7.1 在分支準備，C4 完成後才合。
+- 驗證：整合樹（最新 main＋四分支）`tsc` 0 錯、vitest 502 files／4213 passed；curl 正式站 7 檔快取與安全標頭如上；nginx:1.30.4 `nginx -t` ok。
+- rollback：nginx／compose 用上述備份經 safe-infra-patch 還原；`current` 連結可刪；main 合併 `git revert -m1`。
+- REALTEST_EVIDENCE: tool=curl | cmd=curl -sI https://app.aware-wave.com/photo-pro/current/{index.html,app/parts.txt,app/photocraft-web.js,fonts/manifest.txt,app/photocraft-web-e984a24c02dc86d3.part-aa,photocraft-web-boot-7248af210d94afdd_bg.wasm} | exit=0 | ms=3000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/2m/0n（主 session 讀四分支 diff；各工人 commit 前已過 Codex 或 critic；M1、M2 皆修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=photo_pro_cache | hits=10
 ## 2026-11-06（續2）影音工作台：EffectCraft／FilmCraft 重評＋「一支影片一條線」計畫（只有文件與試建，等操作者選路線）
 
 - 起因：操作者 11-05 問「說好的 EffectCraft、FilmCraft 完整功能在 video.aware-wave.com 沒看到」＋「工具像零件」。handoff `agency-os/handoffs/2026-11-05-effectcraft-filmcraft-reeval.md` §3–§4。
