@@ -32,6 +32,8 @@
 | R8 | 退場刪到別人還在用的檔 | `fabric-filters.ts`、`editor-color-grade.ts`、`editor-bg-remove.ts`、`fabric` 依賴留著（`NA/components/tools/GradedPreview.tsx:22`、`NA/app/(shell)/tools/tarot/renderPrintCard.ts`）；刪檔前 grep 無 import |
 | R9 | 無 WebGPU／WebGL2 | 頁面偵測失敗顯示一行說明（同向量版）；退場後 fallback 不再指向舊編輯器 |
 | R10 | 授權 | Apache-2.0；`NOTICE`、`ATTRIBUTION.md` 隨 dist 放，頁尾連結 |
+| R11 | 有宿主時原生「另存／匯出」不再自己下載 → 檔案像是消失 | C4.2：面板沒在等的 `photocraft:save` 一律由父頁下載；e2e 驗 File › Export 後瀏覽器收到下載 |
+| R12 | 舊編輯器有、專業版改變做法的三項 | 執行期上傳字型 → 改建置時加（C6.2）；每張圖記住調色滑桿可回頭改（`CE` 的 `.adj`）→ 改用原生調整圖層（非破壞），面板「調色」是一次套用；`.design.json` → `.pcraft`（待決 3） |
 
 ## 4. 方案比較
 
@@ -74,7 +76,7 @@ B。定案（沿用操作者在向量版的決定，BRIEF §1）：全視窗開�
 | C3.3 | 登記：`NA/app/sidebar-sections.ts:69` 下加 Photo Pro（`href: '/tools/photo-pro'`、`newTab: true`）；`NA/lib/portal/products.ts:70` nav 加 `{ path: "photo", name: "畫布（專業版）", staff: "tools/photo-pro" }`、`:74` `staffPaths` 加 `tools/photo-pro`；`NA/lib/portal/staff-tools.ts:62` `pages` 加 `/photo-pro`、`/photo-pro-dock`；`NA/lib/public-asset-cache.ts:3` 加 `photo-pro-dock`。跑 `products.test`、`staff-tools.test`、`sidebar-coverage.test`、`npx tsc --noEmit`。不改 design 門的 `coming_soon` |
 | C3.4 | REALTEST：deploy 後登入開 `/tools/photo-pro`，`photocraft.request('ui.inspect')` 回 JSON（瀏覽器 javascript_tool），截圖存 WORKLOG；`fetch('/photo-pro-dock/dock.js',{cache:'reload'})` 回 `private, no-cache` |
 
-### C4 第二 dock 欄：同一套面板＋三個點陣專用新面板
+### C4 第二 dock 欄：同一套面板＋四個新面板
 
 對照表（哪些原生、哪些做成面板）在研究 §3，不重列。面板清單（圖示欄由上而下）：
 
@@ -87,23 +89,24 @@ B。定案（沿用操作者在向量版的決定，BRIEF §1）：全視窗開�
 | `outpaint` | 新（`CE:1489-1533`） | `exportArtboard`、`placeImage` |
 | `edge-mask` | 新（`CE:1535-1588`） | `selectedImage`、`replaceImage` |
 | `webp` | 既有 | `exportArtboard` |
-| `my-designs` | 既有（原始檔多一種 `.pcraft`） | `saveAs`、`exportArtboard`、`openFile` |
+| `my-designs` | 既有（改成依宿主設定，見 C5.2） | `saveAs`、`exportArtboard`、`openFile`、`host` |
+| `send-to` | 新（轉存：網頁用 WebP、印刷用、送到 Mockup；API 同 `NA/components/tools/OutputTrackBar.tsx:87`） | `exportArtboard` |
 | `qr`、`barcode` | 既有 | `placeSvg` |
 | `mockup`、`batch-export` | 既有 | `exportArtboard` |
 
 | 卡號 | 做什麼 |
 |---|---|
 | C4.1 | dock 外殼共用：`NA/public/vector-pro-dock/dock.js:68` `mountDock` 與同目錄 `theme.css` 搬到 `NA/public/editor-shared/dock.js`／`dock.css`，參數 `{ makeCtx, panelIds, storeKey, frame, sizes: { rail, button, panel, panelMin, panelMax, tab, pad } }`；`vector-pro-dock/dock.js` 只剩自己的清單（`:14-24`）、尺寸（`:26-28` 的 310／220／720、圖示欄 38）、`applyDefaultWorkspace`（`:54`）；新 `NA/public/photo-pro-dock/dock.js`：`panelIds` = 上表、`sizes = { rail: 36, button: 28, panel: 290, panelMin: 250, panelMax: 720, tab: 28, pad: 8 }`（`PC/crates/ui-egui/src/panels/dock.rs:37,73`、`panels/panel_docking.rs:89-91,561`、`widgets/panel.rs:53`）、`makeCtx = createPhotocraftCtx`。外觀只用統一 class 與主題 token，零色碼（測試守）。向量版 e2e 仍綠 |
-| C4.2 | 轉接器 `NA/public/editor-shared/ctx-photocraft.js`：照 C1.5 寫進契約的指令序列實作 `ctx-contract.md` 全部方法（`placeSvg`、`placeImage`、`selectedImage`、`replaceImage`、`exportArtboard`、`setArtboardSize`、`openFile`、`saveAs`、`ready`、`info`、`busy`）＋新增兩個：`selectionMask() → Blob\|null`、`fitLayer('fit'\|'fill')`（`ctx-vectorcraft.js` 同步補上或在契約標「此宿主不提供」，面板據此隱藏）。bytes 進出一律走 `photocraft:open`／`photocraft:save` 訊息（依 `name` 配對，逾時 reject）；呼叫排隊一次一個（同 `ctx-vectorcraft.js:53`）。語言：`ready()` 後第一次設 `interface.language = zh-hant`，之後尊重使用者偏好 |
-| C4.3 | 三個新面板 `NA/public/editor-shared/blocks/{ai-fill,outpaint,edge-mask}.js`（`export default { id, title, icon, mount(ctx, body) }`）。數學與預設值只留一處：`NA/lib/studio/edge-mask.ts:145-330` 的 `EDGE_MASK_STYLES`／`buildMaskSvg`／`applyEdgeMask` 搬到 `NA/public/editor-shared/edge-mask.js`，`lib/studio/edge-mask.ts` 改成只加型別的門（照 `NA/lib/studio/editor-color-grade.ts:1-7`）；`NA/lib/studio/outpaint-presets.ts:9-22` 同樣搬 `NA/public/editor-shared/outpaint-presets.js`。API 不新增：`/api/tools/studio/inpaint`、`/api/tools/studio/genfill`（`CE:1503,1865`）。面板內不用下拉（`CE:2659` 的擴圖方向 select 改成看得到的按鈕） |
-| C4.4 | 測試：(a) `NA/lib/studio/__tests__/photo-pro-dock.test.ts`：面板 id 與 `photo-pro-dock/dock.js` 清單相等；`blocks/*.js` 用到的每個 `ctx.<方法>(` 都在 `ctx-photocraft.js` 與 `ctx-contract.md`；`ctx-photocraft.js` 對 mock `photocraft`／postMessage 每個方法一條、參數型別照上游原始碼；每個模組真的被解析（複製成 `.mjs` 再 `node --check`）；新檔零色碼。(b) 登入 e2e `INFRA/tests/e2e/smoke/06-photo-pro.spec.ts`：每個面板主要按鈕按一次並檢查效果（照 `05-vector-pro.spec.ts`）。合 main 前在 detached 整合工作樹跑 `tsc`＋vitest 全套 |
+| C4.2 | 轉接器 `NA/public/editor-shared/ctx-photocraft.js`：照 C1.5 寫進契約的指令序列實作 `ctx-contract.md` 全部方法（`placeSvg`、`placeImage`、`selectedImage`、`replaceImage`、`exportArtboard`、`setArtboardSize`、`openFile`、`saveAs`、`ready`、`info`、`busy`）＋新增兩個：`selectionMask() → Blob\|null`、`fitLayer('fit'\|'fill')`（`ctx-vectorcraft.js` 同步補上或在契約標「此宿主不提供」，面板據此隱藏）。bytes 進出一律走 `photocraft:open`／`photocraft:save` 訊息（依 `name` 配對，逾時 reject）；呼叫排隊一次一個（同 `ctx-vectorcraft.js:53`）。語言：`ready()` 後第一次設 `interface.language = zh-hant`，之後尊重使用者偏好。**原生的另存／匯出要照常下載**：C1.3 之後有宿主時 PhotoCraft 的 Save As／Export As／Save a Copy 不再自己下載，而是發 `photocraft:save`；轉接器沒在等的（不是面板發起的）一律由父頁用 `<a download>` 存到使用者電腦，檔名照訊息的 `name`。契約加 `ctx.host = { id: 'photocraft', sourceExt: '.pcraft', sourceName: 'design.pcraft', saveTag: { source: 'canvas', modelName: 'canvas', prompt: 'canvas edit' }, listSources: ['canvas'] }`（`ctx-vectorcraft.js` 補同形狀：`.vectorcraft`／`vector-pro`／`['vector-editor','vector-pro']`） |
+| C4.3 | 四個新面板 `NA/public/editor-shared/blocks/{ai-fill,outpaint,edge-mask,send-to}.js`（`export default { id, title, icon, mount(ctx, body) }`）。數學與預設值只留一處：`NA/lib/studio/edge-mask.ts:145-330` 的 `EDGE_MASK_STYLES`／`buildMaskSvg`／`applyEdgeMask` 搬到 `NA/public/editor-shared/edge-mask.js`，`lib/studio/edge-mask.ts` 改成只加型別的門（照 `NA/lib/studio/editor-color-grade.ts:1-7`）；`NA/lib/studio/outpaint-presets.ts:9-22` 同樣搬 `NA/public/editor-shared/outpaint-presets.js`。API 不新增：`/api/tools/studio/inpaint`、`/api/tools/studio/genfill`（`CE:1503,1865`）。面板內不用下拉（`CE:2659` 的擴圖方向 select 改成看得到的按鈕）。`send-to`（轉存）三顆鈕：🌐 網頁用（`POST /api/tools/image/process` `mode=web` → WebP）、🖨 印刷用（`mode=print`＋`NA/lib/studio/print-destinations.ts` 的目的地，看得到的按鈕）、送到 Mockup（存入 My Designs 後開 `/tools/mockup?design=<id>`；`NA/app/(shell)/tools/mockup/MockupStudio.tsx:248` 的 `designRef` 加讀這個參數預選）；payload 形狀照 `OutputTrackBar.tsx:83-110`，不新增 API |
+| C4.4 | 測試：(a) `NA/lib/studio/__tests__/photo-pro-dock.test.ts`：面板 id 與 `photo-pro-dock/dock.js` 清單相等；`blocks/*.js` 用到的每個 `ctx.<方法>(` 都在 `ctx-photocraft.js` 與 `ctx-contract.md`；`ctx-photocraft.js` 對 mock `photocraft`／postMessage 每個方法一條、參數型別照上游原始碼；每個模組真的被解析（複製成 `.mjs` 再 `node --check`）；新檔零色碼。(b) 登入 e2e `INFRA/tests/e2e/smoke/06-photo-pro.spec.ts`：每個面板主要按鈕按一次並檢查效果（照 `05-vector-pro.spec.ts`）；另驗原生 File › Export 之後瀏覽器真的收到下載（R11）。合 main 前在 detached 整合工作樹跑 `tsc`＋vitest 全套 |
 
 ### C5 My Designs 原始檔與登入實測
 
 | 卡號 | 做什麼 |
 |---|---|
 | C5.1 | `NA/lib/studio/design-source.ts:6` `SOURCE_EXTS` 加 `.pcraft`；嗅探：ZIP 檔頭 `PK\x03\x04` 且含 `manifest.json` 項（`PC/book/src/formats/pcraft.md:3-15`）；`:38` 的錯誤訊息一起改。不改 schema（仍寫 `metadata.source_*`）。上限沿用現值；超過時面板顯示「檔案太大，改用 檔案 › 另存 下載」而不是靜默失敗 |
-| C5.2 | 「My Designs」面板：存入＝`exportArtboard` PNG 預覽＋`saveAs()` 的 `.pcraft`；開啟＝有原始檔就 `openFile`（讀檔走 `/api/tools/designs/download?url=`），否則以圖片開 |
+| C5.2 | 「My Designs」面板改成依宿主設定、兩個編輯器共用同一檔：`NA/public/editor-shared/blocks/my-designs.js:10` 的 `SOURCES`、`:60` 寫死的 `design.vectorcraft`／`vector-pro`、`:73` 的預設檔名、`:89` 的清單過濾，全部改讀 `ctx.host`（C4.2）。畫布專業版存入＝`exportArtboard` PNG 預覽＋`saveAs()` 的 `.pcraft`，`source: "canvas"`、`modelName: "canvas"`（與 `CE:2000` 相同 → 「我的設計」分頁、Mockup 的設計挑選 `?group=print`、發佈精靈照舊看得到，`NA/lib/studio/asset-group.ts:16`）。開啟＝有原始檔就 `openFile`（讀檔走 `/api/tools/designs/download?url=`），否則以圖片開。舊專案匯入（`:41`）依宿主：向量走既有 SVG 路徑，畫布走 C7.2 |
 | C5.3 | REALTEST（操作者的 Chrome）：打繁中字、存入 My Designs、在「我的設計」看到縮圖、再開回來圖層還在 |
 
 ### C6 驗收、升級流程、文件
@@ -111,7 +114,7 @@ B。定案（沿用操作者在向量版的決定，BRIEF §1）：全視窗開�
 | 卡號 | 做什麼 |
 |---|---|
 | C6.1 | `06-photo-pro.spec.ts` 納入 `/playwright smoke`（`--use-gl=angle --use-angle=swiftshader`，等 `window.photocraft`） |
-| C6.2 | `scripts/photocraft-pro/README.md`：前置需求、建置、升級（改 `PIN.json` → `build.ps1` → C1.5 smoke → rsync 新版本資料夾 → 切 `current` → C6.1 → 失敗切回）、保留最近 2 版、上游接好介面後刪補丁的步驟 |
+| C6.2 | `scripts/photocraft-pro/README.md`：前置需求、建置、升級（改 `PIN.json` → `build.ps1` → C1.5 smoke → rsync 新版本資料夾 → 切 `current` → C6.1 → 失敗切回）、保留最近 2 版、上游接好介面後刪補丁的步驟、**加一個字型的步驟**（改 `scripts/craft-web-build/fonts.json` → 重建 → 上傳；舊編輯器的執行期「＋上傳字型」`NA/components/tools/FontLibrary.tsx:108` 由這個步驟取代） |
 | C6.3 | `agency-os/docs/operations/RUNNABLE_DEMOS.md` 登記一條（開頁＋`ui.inspect`）；`agency-os/docs/architecture/decisions/ADR_INDEX.md` 加一列指向研究報告（不新開 ADR） |
 | C6.4 | WORKLOG：四行機械證據；記憶 `project_photocraft_pro_supervisor.md` 更新 |
 
@@ -119,7 +122,7 @@ B。定案（沿用操作者在向量版的決定，BRIEF §1）：全視窗開�
 
 | 卡號 | 做什麼 |
 |---|---|
-| C7.1 | 入口：`NA/components/tools/canvas-handoff.ts:94` `CANVAS_STAFF_HREF` 改 `/tools/photo-pro`；新頁載入後 `readCanvasSource()`（同檔）取到圖 → `ctx.openFile(blob, name)`，`CANVAS_NAME_KEY` 當檔名。五個呼叫端（`BannerStudio.tsx:1313`、`DesignsGallery.tsx:1295`、`StudioWorkbench.tsx:1707,1928`、`TarotStudio.tsx:2124`、`OutputTrackBar.tsx:178`）不改。門頁 `NA/app/design/canvas/page.tsx:6` 改載新頁元件。e2e：從「我的設計」按「在畫布開啟」→ 專業版裡有那張圖 |
+| C7.1 | 入口：`NA/components/tools/canvas-handoff.ts:94` `CANVAS_STAFF_HREF` 改 `/tools/photo-pro`；`openInCanvas`（`:98`）加選填第四參數 `source?: { url, name }`（可編輯原始檔），存進同一個交接。`ProEditorFrame`（C3.1）載入後 `readCanvasSource()`：有 `source` → 經 `/api/tools/designs/download?url=` 取檔 → `ctx.openFile(blob, name)`（圖層都在）；沒有 → 圖片 `ctx.openFile(blob, <CANVAS_NAME_KEY>.png)`。既有五個呼叫端（`BannerStudio.tsx:1313`、`StudioWorkbench.tsx:1707,1928`、`TarotStudio.tsx:2124`、`OutputTrackBar.tsx:178`、`DesignsGallery.tsx:1295`）前四個不改；`DesignsGallery.tsx:1295` 改成帶 `asset.source_url`＋`metadata.source_name`，並依副檔名選目的地（`.pcraft` 或沒有原始檔 → 畫布專業版；`.vectorcraft`／`.svg` → `/tools/vector-pro`，向量頁同樣由 `ProEditorFrame` 讀交接）。**新增第六個入口**：Mockup 結果圖加「在畫布編輯」鈕（`NA/app/(shell)/tools/mockup/MockupStudio.tsx:835` 與 `ModelMockupPanel.tsx:183` 的「存入 My Designs」旁，同一個 `openInCanvas`）。門頁 `NA/app/design/canvas/page.tsx:6` 改載新頁元件。e2e：從 Studio、塔羅、Banner、Mockup、我的設計（PNG 與有原始檔各一）按下去 → 專業版裡有那張圖／那份圖層 |
 | C7.2 | 舊專案檔（待決 3 回答「有」才做）：My Designs 面板加「匯入舊專案（.design.json）」：本機選檔 → Fabric 離屏 `loadFromJSON`（格式 `awarewave-design/1`，`CE:181`；先驗用哪個 Fabric 版本載得起 Fabric 7 的 JSON）→ 每個頂層物件各出一張透明 PNG → 依原順序 `placeImage`。文字會變成像素，面板上寫明 |
 | C7.3 | 退場（操作者在正式站用過專業版並說可以之後）：`NA/app/(shell)/tools/canvas/page.tsx` 改 `redirect('/tools/photo-pro')`；刪 `CE`；`fabric-filters.ts` 搬 `NA/lib/studio/fabric-filters.ts`（改 `NA/components/tools/GradedPreview.tsx:22` 等 import）；`NA/app/sidebar-sections.ts:68` 移除 Canvas Editor；`NA/lib/portal/products.ts:68` nav「畫布」改指 `tools/photo-pro`、`:74` `staffPaths` 移除 `tools/canvas`；`VectorProFrame`（C3.1 後為 `ProEditorFrame` 的 `fallback`）不再指向 `/tools/canvas`；`NA/lib/studio/canvas-fit.ts` 等只被 `CE` 用的模組 grep 無 import 才刪；`INFRA/tests/e2e/editor-merge/card-0{1..6}-*.mjs` 刪除或改跑專業版；`editor-*-drift.test`／`editor-filter-ownership.test` 的 canvas 端改指 `blocks/`。`fabric` 依賴保留 |
 | C7.4 | 文件：RUNNABLE_DEMOS 舊條目改指專業版；記憶 `project_pod_image_edit_feature.md`、`project_vector_editor_blocks.md` 更新；WORKLOG |

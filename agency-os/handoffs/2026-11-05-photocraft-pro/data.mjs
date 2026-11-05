@@ -13,7 +13,7 @@ export const META = {
 };
 
 export const COPY = {
-  sub: '把開源的 PhotoCraft（Photoshop 的重製，工具、面板、快捷鍵都一樣）放進 app.aware-wave.com 當「畫布（專業版）」；AwareWave 獨有而它沒有的功能（AI 去背、AI 去除與生成填色、AI 擴圖、邊緣遮罩、WebP、My Designs、尺寸範本、QR、條碼、Mockup、批次匯出、調色預設）做成右側一條圖示欄，點了才浮出面板；所有通往舊 Canvas Editor 的入口接到新版後，舊的退場，只留一套。共 {total} 張卡、{items} 項工作，已完成 {itemsDone} 項。目前只做完研究與計畫，還沒動任何程式。',
+  sub: '把開源的 PhotoCraft（Photoshop 的重製，工具、面板、快捷鍵都一樣）放進 app.aware-wave.com 當「畫布（專業版）」；AwareWave 獨有而它沒有的功能（AI 去背、AI 去除與生成填色、AI 擴圖、邊緣遮罩、轉存、WebP、My Designs、尺寸範本、QR、條碼、Mockup、批次匯出、調色預設）做成右側一條圖示欄，點了才浮出面板；所有通往舊 Canvas Editor 的入口接到新版後，舊的退場，只留一套。共 {total} 張卡、{items} 項工作，已完成 {itemsDone} 項。目前只做完研究與計畫，還沒動任何程式。',
   updated: '更新於 {date}',
   nav: { now: '現況', steps: '卡片與工作', open: '待你決定', paths: '檔案' },
   now: { h: '現況', lead: '目前已做到與還沒做到的事（2026-11-05 查）。' },
@@ -28,8 +28,8 @@ export const NOW = [
   { what: 'PhotoCraft 有網頁版，可以放進 app 的頁面裡。', state: 'yes', ev: '原始碼裡有 apps/photocraft-web；官方每版都發網頁版壓縮檔，約十三 MB（向量版是八十九 MB），首次載入會快很多。' },
   { what: '網頁版有現成的介面，讓右側面板能對它下指令（放圖進去、拿圖出來、匯出、存檔）。', state: 'no', ev: '這是和向量版最大的差別：VectorCraft 內建這個介面，PhotoCraft 的網頁版還沒有（main.rs 第 8 行自己寫明）。不過 PhotoCraft 團隊的共用函式庫今天剛合併了現成的兩個模組，PhotoCraft 只差「接上去」這一步。要不要自己先接 → 待決 1。' },
   { what: '介面有繁體中文、能用妳的字型。', state: 'no', ev: '繁中翻譯檔已經有（約三千條）；網頁版預設永遠顯示英文，要由這邊設成繁中。字型不用補丁：把字型檔和一份清單放在網站上，它就會出現在原生字型選單（沿用向量版那份字型清單）。等建置後才看得到實際效果。' },
-  { what: 'AwareWave 獨有的功能在專業版裡。', state: 'no', ev: '已逐項對照完：Canvas Editor 的功能大多數 PhotoCraft 原生就有而且更完整；它沒有的全部列進右側圖示欄。向量版已上線的九個面板可以直接共用，另外新做三個點陣專用面板（AI 去除與生成填色、AI 擴圖、邊緣遮罩）。' },
-  { what: '從 Studio、塔羅、Banner、我的設計按「在畫布開啟」會進到專業版，舊編輯器退場。', state: 'no', ev: '五個入口都經過同一個函式，改一處就全部接過去（卡 C7）。舊的專案檔只存在妳電腦、伺服器上只有 PNG，所以不需要批次轉檔。' },
+  { what: 'AwareWave 獨有的功能在專業版裡。', state: 'no', ev: '已逐項對照完：Canvas Editor 的功能大多數 PhotoCraft 原生就有而且更完整；它沒有的全部列進右側圖示欄。向量版已上線的九個面板可以直接共用，另外新做四個面板（AI 去除與生成填色、AI 擴圖、邊緣遮罩、轉存）。2026-11-05 第二次複查：舊編輯器全部控制項逐一比對，沒有漏列的功能；有三項做法會改變（上傳字型改成建置時加、調色改用原生調整圖層可回頭改、舊專案檔格式），寫在計畫風險 R12。' },
+  { what: '從 Studio、塔羅、Banner、Mockup、我的設計按一下就進專業版改圖；改完可以存入 My Designs、另存、轉存、匯出。', state: 'no', ev: '進來：Studio、塔羅、Banner、我的設計現在就有按鈕，都經過同一個函式，改一處全部接過去；Mockup 現在沒有直接的按鈕，計畫裡補上；從「我的設計」開有圖層的設計時會開原始檔，不是壓平的圖。出去：存入 My Designs（縮圖加原始檔）、原生的另存與匯出照常下載到電腦、轉存面板（網頁用 WebP、印刷用、送到 Mockup）。都在卡 C4、C5、C7。' },
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
@@ -78,8 +78,8 @@ export const STEPS = [
     files: ['NA/public/editor-shared/dock.js', 'NA/public/photo-pro-dock/dock.js', 'NA/public/editor-shared/ctx-photocraft.js', 'NA/public/editor-shared/ctx-contract.md', 'NA/public/editor-shared/blocks/ai-fill.js', 'NA/public/editor-shared/blocks/outpaint.js', 'NA/public/editor-shared/blocks/edge-mask.js', 'INFRA/tests/e2e/smoke/06-photo-pro.spec.ts'],
     items: [
       todo('C4.1', '圖示欄外殼改成兩個編輯器共用同一份，各自只帶自己的面板清單與尺寸。'),
-      todo('C4.2', '轉接器：把面板的要求翻成 PhotoCraft 的指令；第一次開啟設成繁中。'),
-      todo('C4.3', '三個新面板：AI 去除與生成填色、AI 擴圖、邊緣遮罩。'),
+      todo('C4.2', '轉接器：把面板的要求翻成 PhotoCraft 的指令；第一次開啟設成繁中；PhotoCraft 自己的「另存、匯出」照常下載到電腦。'),
+      todo('C4.3', '四個新面板：AI 去除與生成填色、AI 擴圖、邊緣遮罩、轉存（網頁用 WebP、印刷用、送到 Mockup）。'),
       todo('C4.4', '測試：每個面板用到的功能轉接器都有；登入後每個面板按一次都有效果。'),
     ] },
   { n: 5, code: 'C5', group: 'E', title: 'My Designs 存原始檔', plain: '例：在專業版按「存入 My Designs」，除了縮圖，也把含圖層的原始檔一起存；之後從「我的設計」開回來，圖層都還在。',
@@ -89,7 +89,7 @@ export const STEPS = [
     files: ['NA/lib/studio/design-source.ts', 'NA/public/editor-shared/blocks/my-designs.js'],
     items: [
       todo('C5.1', '設計庫接受 .pcraft 原始檔（檢查內容真的是這種檔）。'),
-      todo('C5.2', 'My Designs 面板：存縮圖加原始檔；開啟時有原始檔就用原始檔。'),
+      todo('C5.2', 'My Designs 面板：存縮圖加原始檔；開啟時有原始檔就用原始檔；存進去之後在「我的設計」、Mockup 的設計挑選、發佈精靈都照舊看得到。'),
       todo('C5.3', '妳在正式站實際存一次、開一次。'),
     ] },
   { n: 6, code: 'C6', group: 'F', title: '驗收、升級流程、文件', plain: '例：之後 PhotoCraft 出新版，照一份清單改一個版本號、跑一個指令、切一個連結就升級；出問題切回上一版。',
@@ -98,18 +98,18 @@ export const STEPS = [
     files: ['scripts/photocraft-pro/README.md', 'agency-os/docs/operations/RUNNABLE_DEMOS.md', 'agency-os/docs/architecture/decisions/ADR_INDEX.md'],
     items: [
       todo('C6.1', '登入冒煙測試納入例行檢查。'),
-      todo('C6.2', '升級、回退、日後拿掉補丁的步驟寫成文件。'),
+      todo('C6.2', '升級、回退、日後拿掉補丁、加一個新字型的步驟寫成文件。'),
       todo('C6.3', '登記可執行示範與決策索引。'),
       todo('C6.4', '工作紀錄與記憶更新。'),
     ] },
   { n: 7, code: 'C7', group: 'G', title: '入口改接、舊編輯器退場', plain: '例：在 Studio 或塔羅按「在畫布開啟」，直接進專業版並帶著那張圖；/tools/canvas 自動跳到專業版，舊頁面刪掉，只剩一套。',
-    gate: '五個入口都進到專業版且圖有帶過去；舊網址跳轉；舊頁與相關設定、測試拆乾淨且全綠；還在被別處使用的檔案一個都沒刪。', risk: 'Medium（刪舊頁；改五個工具共用的入口）', model: 'Opus 5.5', status: 'not_started', depends: ['C6'],
+    gate: '每個入口（Studio、塔羅、Banner、Mockup、我的設計）都進到專業版且圖有帶過去；舊網址跳轉；舊頁與相關設定、測試拆乾淨且全綠；還在被別處使用的檔案一個都沒刪。', risk: 'Medium（刪舊頁；改五個工具共用的入口）', model: 'Opus 5.5', status: 'not_started', depends: ['C6'],
     before: '待決 3 決定要不要做舊專案檔匯入',
     decided: '不留兩扇門。妳在正式站用過專業版、說可以之後才拆舊的。調色與去背的共用數學、fabric 套件保留（塔羅印刷與預覽還在用）。',
     what: 'CANVAS_STAFF_HREF 改指新頁、新頁讀交接的圖；門頁改載新元件；舊 .design.json 匯入（選做）；canvas 頁改 redirect、刪 CanvasEditor、搬 fabric-filters、拆側欄與登記、改 e2e 與 drift 測試；文件與記憶',
     files: ['NA/components/tools/canvas-handoff.ts', 'NA/app/design/canvas/page.tsx', 'NA/app/(shell)/tools/canvas/page.tsx', 'NA/app/(shell)/tools/canvas/CanvasEditor.tsx', 'NA/app/sidebar-sections.ts', 'NA/lib/portal/products.ts'],
     items: [
-      todo('C7.1', '五個「在畫布開啟」的入口改接到專業版，圖會帶過去。'),
+      todo('C7.1', '「在畫布開啟」的入口全部改接到專業版，圖會帶過去：Studio、塔羅、Banner、我的設計，加上新補的 Mockup；有圖層原始檔的設計開原始檔。'),
       todo('C7.2', '舊專案檔（.design.json，只存在妳電腦裡）可以匯入成圖層（待決 3 回答有才做）。'),
       todo('C7.3', '舊網址跳轉到專業版；刪舊頁與相關設定、測試改好。'),
       todo('C7.4', '文件與記憶更新。'),

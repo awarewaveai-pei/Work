@@ -1,4 +1,22 @@
 # Worklog
+## 2026-11-05（續13）畫布專業版計畫複查：功能無漏列；進出流程補五個缺口（只有文件）
+
+- 根因：第一版盤點靠面板標題＋函式清單，未逐項核對控制項，也沒沿「存入／另存／轉存／匯出」與 Mockup 入口走一遍 → 操作者問後複查。
+- 複查：`CanvasEditor.tsx` 全部 `title=`／按鈕字去重 144 個逐一對研究 §3，無漏列功能；grep `paste|clipboard|drop|snap|Arrow|wheel|dblclick` 無隱藏互動；函式本體仍未逐行讀。
+- 補進 R0-PLAN（卡號不變，28 項）：
+  - C1 `my-designs.js:10,60,73,89` 寫死向量版 → 改讀 `ctx.host`；畫布版沿用 `source:"canvas"`（`CanvasEditor.tsx:2000`），Mockup 挑選 `?group=print`（`MockupStudio.tsx:305`）、`asset-group.ts:16` 不變（C4.2、C5.2）。
+  - C2 有宿主時原生 Save As／Export 改發 `photocraft:save` → 父頁代為下載（C4.2、風險 R11、C4.4 e2e）。
+  - M1 `DesignsGallery.tsx:1295` 只傳 PNG → `openInCanvas` 加選填 `source`，依副檔名選編輯器（C7.1）。
+  - M2 Mockup 無直接進畫布的按鈕 → `MockupStudio.tsx:835`、`ModelMockupPanel.tsx:183` 旁補（C7.1）。
+  - M3 編輯後回不到網頁用／印刷用輸出軌 → 新面板 `send-to`，重用 `/api/tools/image/process`（`OutputTrackBar.tsx:83-110`），加「送到 Mockup」（C4.3）。
+  - m1 做法改變三項列風險 R12：執行期上傳字型→建置時加（C6.2 文件）、每圖可回頭改的調色→原生調整圖層、`.design.json`→`.pcraft`。
+- 驗證：`node check.mjs` 綠；監工台同網址重發（https://claude.ai/artifact/SdDBg3KBHF7A4b6ZSBCHGM）。
+- 避免再發生：盤點「保留功能」＝控制項全列表機械比對＋沿每條進出路徑走到底，兩者都做才算；已寫進研究報告 §6a。
+- rollback：`git revert` 本 commit。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd agency-os/handoffs/2026-11-05-photocraft-pro && node build.mjs && node check.mjs | exit=0 | ms=900
+- REVIEW_WAIVED: DOC_ONLY -- 計畫、報告、監工台資料；新增引用的行號逐一 grep 核對
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=openInCanvas | hits=28
+- ORACLE_WAIVED: 只有 .md 與監工台 data.mjs／supervisor.html，無執行期程式碼
 ## 2026-11-05（續12）畫布專業版（PhotoCraft）研究＋R0-PLAN＋監工台；G1 待操作者決定（只有文件，未動程式）
 
 - 根因／需求：操作者要 Canvas Editor 照向量專業版同模式換成 PhotoCraft（完整功能＋相同排版＋保留獨有功能做第二 dock 欄，只留一套）。

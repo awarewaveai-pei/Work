@@ -142,6 +142,17 @@ B 之外仍未知、要在本機 spike 才知道的（計畫 C1.5）：圖層像
 - 退場時不能刪的：`NA/app/(shell)/tools/canvas/fabric-filters.ts`（`NA/components/tools/GradedPreview.tsx:22`、`tarot/renderPrintCard.ts` 在用）、`fabric` 依賴（記憶 `project_pod_image_edit_feature.md`）、`lib/studio/editor-color-grade.ts`／`editor-bg-remove.ts`（同上兩處）。`NA/app/(full)/tools/vector-pro/VectorProFrame.tsx:13` 的 fallback 指向 `/tools/canvas`，要改。
 - 已上線可重用：`NA/app/(full)/`（無側欄路由，`NA/lib/portal/doors.ts:62`）、`NA/public/editor-shared/blocks/*.js` 9 個、`ctx-contract.md`、dock 外殼 `NA/public/vector-pro-dock/dock.js:68` `mountDock(root, makeCtx)`、`NA/lib/studio/design-source.ts:6`、`NA/lib/public-asset-cache.ts:3`、nginx `INFRA/nginx/default.conf:318,490`、compose `INFRA/docker-compose.yml:37`、主題協定 `NA/lib/theme/frame-theme.ts:20` `connectThemeFrame`（頻道名 `:8-10`）＋接收端 `scripts/vectorcraft-pro/awarewave-theme-receiver.js`、建置腳本 `scripts/vectorcraft-pro/build.sh`、字型清單 `scripts/vectorcraft-pro/PIN.json` `webFonts`（51 筆）、e2e `INFRA/tests/e2e/smoke/05-vector-pro.spec.ts`、監工台 `scripts/supervisor-kit/`。
 
+## 6a. 複查（2026-11-05 晚，操作者問「有徹底檢查嗎」「進出流程有計劃到嗎」）
+
+- 第一次盤點是面板標題＋函式清單＋部分段落，不是逐行。複查做法：`CE` 全部 `title=`／按鈕字去重後 144 個逐一對 §3 — 沒有漏列的功能；另 grep `paste|clipboard|drop|snap|Arrow|wheel|dblclick` — `CE` 沒有貼上、拖放、磁吸、方向鍵微調這類隱藏互動。函式本體仍未逐行讀。
+- 做法會改變的三項（不是消失）：執行期上傳字型（`NA/components/tools/FontLibrary.tsx:108`）→ 建置時加；每張圖記住調色滑桿（`CE` `.adj`）→ 原生調整圖層；`.design.json` → `.pcraft`。
+- 進出流程查到的五個計畫缺口（已補進 R0-PLAN）：
+  1. 「My Designs」面板寫死向量版（`NA/public/editor-shared/blocks/my-designs.js:10,60,73,89`）→ 改讀宿主設定；畫布版沿用 `source: "canvas"`（`CE:2000`），分組規則 `NA/lib/studio/asset-group.ts:16`、Mockup 挑選 `MockupStudio.tsx:305` `?group=print` 不變。
+  2. 有宿主時原生 Save As／Export 不再自己下載（C1.3 的接法）→ 父頁要代為下載，否則檔案像消失。
+  3. 「我的設計」的「Canvas 編輯」只傳 PNG（`DesignsGallery.tsx:1295`）→ 有原始檔時要傳原始檔並依副檔名選編輯器。
+  4. Mockup 工具沒有直接進畫布的按鈕（`MockupStudio.tsx`、`ModelMockupPanel.tsx` 無 `openInCanvas`）；輸入只從 My Designs 或上傳（`:585-593`）→ 補按鈕。
+  5. 編輯後沒有路回到「網頁用／印刷用」輸出軌（只在來源工具的 `NA/components/tools/OutputTrackBar.tsx:83-110`）→ 新面板「轉存」重用同一支 API `/api/tools/image/process`。
+
 ## 7. 下一步
 
 1. 操作者決定待決 1（G1：A／B／C）。選 B 才能動工。
