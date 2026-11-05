@@ -118,7 +118,7 @@ PhotoCraft 多出來、CE 沒有的（操作者需求 ①）：選取工具全�
 
 B 之外仍未知、要在本機 spike 才知道的（計畫 C1.5）：圖層像素進出的指令序列（置入成圖層、取作用中圖層像素、換圖層像素、取選取範圍當遮罩）。已知可用的積木：`edit.copy`／`edit.paste`／`edit.pasteSpecial.pasteInPlace`、`document.activate`、`layer.select`、`file.close`（`PC/crates/engine/src/cmd/atn_cmds/events.rs:869-1109`）。備案：補丁多掛一個把 bytes 推進 `place_inbox`（`web.rs:86`）的頁面函式。
 
-定案（2026-11-05）：B，並加兩條使補丁可管理——(1) 動工時先查上游是否已內建，已內建就釘那個 commit、零補丁；(2) 不另寫一份網頁殼（那等於複製上游 `web.rs`＋`preset_bridge.rs`＋`indexed_presets.rs` 共 1,232 行並永久跟版）。主題補丁縮到最小：只把 `theme.rs:1123` 的編譯條件從整個 `live` 模組移到 `LiveTokens`，由網頁殼呼叫 `apply_overrides`，不動 `control/dispatch.rs`。
+定案（2026-11-05）：B，並加兩條使補丁可管理——(1) 動工時先查上游是否已內建，已內建就釘那個 commit、零補丁；(2) 不另寫一份網頁殼（那等於複製上游 `web.rs`＋`preset_bridge.rs`＋`indexed_presets.rs` 共 1,232 行並永久跟版）。主題補丁取消：操作者 2026-11-05 晚改定「Craft 編輯器不套 app 主題，用原設定的深色／淺色」→ 不動 `theme.rs`、不注入接收端；我方圖示欄仍照 app 主題。向量版已上線的主題連動去留＝監工台待決 3。
 
 ## 5. 建置與承載（與 VectorCraft 的差異）
 

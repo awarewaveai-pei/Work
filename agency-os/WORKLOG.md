@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-05（續16）畫布專業版計畫：操作者改定「Craft 編輯器不套 app 主題」→ 拿掉主題補丁（只有文件）
+
+- 根因：操作者看了已上線的向量專業版畫面後改定：「craftart 不要套主體好了，就原設定的黑色和淺色就好」（推翻同日較早「直接套用主題」）。
+- 改 R0-PLAN（27 項，原 28）：刪主題卡（原 C1.4：`theme.rs` 編譯條件＋`set_host_tokens`＋`setTheme`）；C1.1 不再搬接收端、不抽 `theme-map.json`，驗收回到「向量版重建各檔雜湊相同」；C1.2 不注入接收端；spike 改號 C1.4；C2.3 不變量去掉接收端；C3.1 共用頁框不含主題連動，向量頁現有 `connectThemeFrame`（`VectorProFrame.tsx:50`）留在向量頁自己那層。補丁剩一個（接線，且 C1.3 先查上游是否已內建）。
+- 不動：向量版已上線的主題連動（`scripts/vectorcraft-pro/api-settheme.patch`、接收端）；去留列為監工台待決 3，由向量版那條線做。
+- 我方圖示欄仍照 app 主題（統一 class、零色碼）——操作者同日較早的規則未改。
+- 驗證：`node check.mjs` → `ok: 7 cards, 27 items bound to plan §6 (0 done), 3 open, page fresh`；改前備份計畫檔；改後 grep 章節與卡號列完整（§1–§7、C1.1–C7.4）。監工台同網址重發。
+- rollback：`git revert` 本 commit。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd agency-os/handoffs/2026-11-05-photocraft-pro && node build.mjs && node check.mjs | exit=0 | ms=900
+- REVIEW_WAIVED: DOC_ONLY -- 依操作者決定刪減計畫內容；讀回章節與卡號結構
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=theme-tokens.patch | hits=0
+- ORACLE_WAIVED: 只有 .md 與監工台 data.mjs／supervisor.html，無執行期程式碼
 ## 2026-11-05（續15）畫布專業版計畫定稿：逐條對操作者要求最後檢視＋獨立 critic（只有文件）
 
 - 根因：操作者要求「用所有條件做最後檢視」，並交代不畫蛇添足、不矛盾、不留難管理的補丁、需重寫自行評估。

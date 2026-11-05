@@ -20,7 +20,7 @@ export const COPY = {
   nav: { now: '現況', steps: '卡片與工作', open: '待你決定', paths: '檔案' },
   now: { h: '現況', lead: '目前已做到與還沒做到的事（2026-11-05 查）。' },
   steps: { h: '卡片與工作', lead: '依編號進行。每張卡列出所有工作，勾選代表完成。High 風險步驟（上傳正式站、改 nginx）經你同意才做。', count: '{done}／{total} 完成' },
-  open: { h: '待你決定', lead: '兩題都可以晚點答；不答就照有星號的做。', none: '目前沒有需要你決定的事。', count: '{n} 項', before: '需在第 {n} 張卡開始前決定', src: '出處' },
+  open: { h: '待你決定', lead: '都可以晚點答；不答就照有星號的做。', none: '目前沒有需要你決定的事。', count: '{n} 項', before: '需在第 {n} 張卡開始前決定', src: '出處' },
   paths: { h: '檔案', plan: '每項工作的做法', req: '研究與對照（為什麼選這條路）', track: '工作紀錄', self: '本頁來源', howto: '修改 data.mjs 後，執行 node build.mjs 和 node check.mjs，再重新發布同一網址。' },
   label: { yes: '可以', no: '還不行', todo: '未開始', doing: '進行中', done: '已完成', risk: '風險', who: '負責', evidence: '完成的樣子', details: '工程細節', depends: '需先完成', decided: '已定案', files: '檔案', item: '工作', card: '卡', doneAt: '完成於', group: '組', none: '無' },
 };
@@ -32,23 +32,22 @@ export const NOW = [
   { what: '右側面板能對 PhotoCraft 下指令（放圖進去、拿圖出來、匯出、存檔）。', state: 'no', ev: '這是和向量版最大的差別：PhotoCraft 的網頁版還沒有這個「遙控器」。它的團隊已經做好零件，只是還沒裝上。做法已定：動工時先看他們裝了沒，裝了就直接用；還沒裝就先幫它裝上，同時把裝法寄回給他們，他們裝好後這邊的就拿掉。' },
   { what: '放圖進圖層、取出圖層的圖、換掉圖層的圖，這幾個動作做得到。', state: 'no', ev: 'PhotoCraft 沒有現成的指令做這幾件事，要在本機實際試（卡 C1 的最後一項）。試出來做不到的會列出來回報，不會硬做。AI 去背、AI 填色、邊緣遮罩、調色面板都靠這幾個動作。' },
   { what: '從 Studio、塔羅、Banner、Mockup、我的設計按一下就進專業版改圖；改完可以存入 My Designs、另存、換格式、匯出。', state: 'no', ev: '進來：Studio、塔羅、Banner、我的設計現在就有按鈕，都經過同一個函式，改一處全部接過去；Mockup 現在沒有按鈕，計畫裡補上；有圖層的設計會開原始檔，不是壓平的圖。出去：存入 My Designs（縮圖加原始檔，Mockup 工具照舊選得到）；另存、換格式、匯出用 PhotoCraft 自己的選單，檔案照常下載到電腦。' },
-  { what: '介面是繁體中文、用妳的字型、顏色跟著 app 主題。', state: 'no', ev: '繁中翻譯檔已經有；字型沿用向量版那份清單，不用補丁；主題沿用向量版的傳遞方式。都要等建置後才看得到。' },
+  { what: '介面是繁體中文、用妳的字型。', state: 'no', ev: '繁中翻譯檔已經有；字型沿用向量版那份清單，不用補丁。要等建置後才看得到。PhotoCraft 的畫面用它自己的深色或淺色，不套 app 主題（妳 2026-11-05 晚上的決定）；右側那條圖示欄照舊跟著 app 主題。' },
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '建置鏈、介面、本機試做', plain: '例：在這台筆電按一個指令，就從 PhotoCraft 原始碼建出可放網站的檔案（含妳的字型）；接上讓面板能下指令的介面；在本機瀏覽器實際試「放圖進去、拿圖出來、換圖、匯出」做不做得到。',
-    gate: '一個指令建出網頁版；本機開起來是繁中、能打繁中字、顏色跟著主題；介面回得了資料；每個基本動作都有一組實測過的指令，做不到的列出來回報。', risk: 'Low（只動本機與 scripts/）', model: 'Opus 5.5', status: 'not_started', depends: [],
-    decided: '介面用 PhotoCraft 團隊自己的兩個共用模組，不自創、不另寫一份網頁外殼。動工時上游已內建就零補丁；否則釘一個只動網頁外殼的接線補丁並送回上游，上游內建後刪掉。補丁套不上時建置會停，正式站維持原版。版本釘在固定 commit；建置在 WSL；字型清單與向量版共用同一份。',
-    what: '共用建置函式、字型清單、主題接收端抽到 scripts/craft-web-build/；PIN.json＋build.sh；web-host-api.patch（craft-web-api＋craft-web-host 接進網頁殼）；theme-tokens.patch（放寬 apply_overrides 的編譯條件）；本機 smoke 與 ctx 指令序列 spike',
-    files: ['scripts/craft-web-build/lib.sh', 'scripts/craft-web-build/fonts.json', 'scripts/photocraft-pro/PIN.json', 'scripts/photocraft-pro/build.sh', 'scripts/photocraft-pro/web-host-api.patch', 'scripts/photocraft-pro/theme-tokens.patch', 'scripts/photocraft-pro/theme-map.json'],
+    gate: '一個指令建出網頁版；本機開起來是繁中、能打繁中字；介面回得了資料；每個基本動作都有一組實測過的指令，做不到的列出來回報。', risk: 'Low（只動本機與 scripts/）', model: 'Opus 5.5', status: 'not_started', depends: [],
+    decided: '介面用 PhotoCraft 團隊自己的兩個共用模組，不自創、不另寫一份網頁外殼。動工時上游已內建就零補丁；否則釘一個只動網頁外殼的接線補丁並送回上游，上游內建後刪掉。補丁套不上時建置會停，正式站維持原版。PhotoCraft 用自己的深色或淺色，不套 app 主題，所以不需要主題補丁。版本釘在固定 commit；建置在 WSL；字型清單與向量版共用同一份。',
+    what: '共用建置函式與字型清單抽到 scripts/craft-web-build/；PIN.json＋build.sh；web-host-api.patch（craft-web-api＋craft-web-host 接進網頁殼）；本機 smoke 與 ctx 指令序列 spike',
+    files: ['scripts/craft-web-build/lib.sh', 'scripts/craft-web-build/fonts.json', 'scripts/photocraft-pro/PIN.json', 'scripts/photocraft-pro/build.sh', 'scripts/photocraft-pro/web-host-api.patch'],
     items: [
-      todo('C1.1', '把向量版建置腳本裡可共用的步驟、字型清單、主題接收端搬到共用位置，兩個編輯器用同一份；向量版重建結果不變。'),
+      todo('C1.1', '把向量版建置腳本裡可共用的步驟與字型清單搬到共用位置，兩個編輯器用同一份；向量版重建結果不變。'),
       todo('C1.2', '一個建置腳本：抓固定版本的原始碼、套補丁、帶字型、建出網頁版、算校驗碼。'),
       todo('C1.3', '介面：先看上游是否已內建；沒有才加接線補丁，同一天送回上游。'),
-      todo('C1.4', '主題：讓 PhotoCraft 的畫面跟著 app 的主題顏色走，做法同向量版。'),
-      todo('C1.5', '本機開起來實測：繁中、字型、介面，以及放圖、取圖、換圖、匯出、取選取範圍、符合畫布這幾個動作；做不到的回報。'),
+      todo('C1.4', '本機開起來實測：繁中、字型、介面，以及放圖、取圖、換圖、匯出、取選取範圍、符合畫布這幾個動作；做不到的回報。'),
     ] },
   { n: 2, code: 'C2', group: 'B', title: '承載（正式站靜態檔）', plain: '例：建好的檔案放到主機一個獨立資料夾，由 nginx 直接供給，不經 next-admin，也不會被每天的自動部署刪掉；換版本只是把 current 指向新資料夾。',
     gate: '瀏覽器開 /photo-pro/current/index.html 回 200；檔名帶雜湊的檔才長時間快取，其餘每次都重新確認；nginx 容器內看得到檔案。', risk: 'High（上傳正式站、改 nginx 與 compose；走 safe-infra-patch 自動還原）', model: 'fullstack-engineer（Sonnet）；主 session 驗收', status: 'not_started', depends: ['C1'],
@@ -63,6 +62,7 @@ export const STEPS = [
     ] },
   { n: 3, code: 'C3', group: 'C', title: 'app 門', plain: '例：側欄多一項「畫布（專業版）」，點了開新分頁、全視窗，就是 Photoshop 的介面；瀏覽器太舊時顯示一行說明。',
     gate: '登入後開 /tools/photo-pro 看得到 PhotoCraft；介面回得了資料；相關測試與型別檢查全綠；向量專業版照常。', risk: 'Medium（改側欄與產品登記；向量頁改用共用外框）', model: 'fullstack-engineer（Sonnet）', status: 'not_started', depends: ['C2'],
+    before: '待決 3 決定向量專業版的主題連動去留',
     decided: '全視窗、開新分頁。頁面外框與向量版共用同一個元件。不動 design.aware-wave.com 的開關。',
     what: 'VectorProFrame 抽成共用 ProEditorFrame；新頁 (full)/tools/photo-pro；next.config rewrite（本機開發用）；側欄、products.ts、staff-tools.ts、public-asset-cache.ts 登記',
     files: ['NA/components/tools/ProEditorFrame.tsx', 'NA/app/(full)/tools/photo-pro/page.tsx', 'NA/next.config.ts', 'NA/app/sidebar-sections.ts', 'NA/lib/portal/products.ts', 'NA/lib/portal/staff-tools.ts', 'NA/lib/public-asset-cache.ts'],
@@ -130,5 +130,11 @@ export const OPEN = [
     options: [
       { k: '沒有', pick: true, t: '不做匯入功能。以前存在「我的設計」的圖照常能在專業版開。' },
       { k: '有', t: '做「匯入舊專案」：每個物件變成一個圖層放進去；文字會變成圖，不能再改字。' },
+    ] },
+  { n: 3, before: 'C3', src: '操作者 2026-11-05 晚',
+    what: '妳說 Craft 的編輯器不要套 app 主題。向量專業版已經上線的主題連動（顏色跟著 app 走）要不要也拿掉？',
+    options: [
+      { k: '也拿掉', pick: true, t: '兩個編輯器一致，都用自己的深色或淺色；向量版可以少一個補丁。由向量版那條線去做。' },
+      { k: '向量版維持', t: '向量版繼續跟著 app 主題，只有畫布專業版用自己的顏色。' },
     ] },
 ];
