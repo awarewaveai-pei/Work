@@ -4,7 +4,7 @@
 
 export const META = {
   title: '向量專業版監工台',
-  updated: '2026-11-04',
+  updated: '2026-11-05',
   plan: 'agency-os/handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md',
   req: 'agency-os/reports/decisions/2026-11-04-vector-editor-vs-vectorcraft.md',
   worklog: 'agency-os/WORKLOG.md 2026-11-04',
@@ -36,7 +36,7 @@ const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 
 export const STEPS = [
   { n: 1, code: 'C1', group: 'A', title: '建置鏈（本機）', plain: '例：在這台筆電按一個指令，就從 VectorCraft 原始碼建出可放網站的檔案（含繁中字型），並在本機瀏覽器開起來確認。',
-    gate: '一個指令建出 dist/<版本>/；本機開 index.html?lang=zh-hant 選單是繁中、能打繁中字、程式介面回得了資料。', risk: 'Low（只動本機與 scripts/）', model: 'Opus 5.5', status: 'not_started', depends: [],
+    gate: '一個指令建出 dist/<版本>/；本機開 index.html?lang=zh-hant 選單是繁中、能打繁中字、程式介面回得了資料。', risk: 'Low（只動本機與 scripts/）', model: 'Opus 5.5｜已派 session vp-c1-build（2026-11-05）', status: 'not_started', depends: [],
     decided: '版本釘在固定 commit（PIN.json），升級要經 C6 流程。字型加 Noto Sans TC（開源 OFL）。',
     what: 'rustup＋wasm32＋trunk；build.ps1：fetch 原始碼到 repo 外、套 web-fonts patch 與 api addFont patch、加 TC 字型、trunk build、產 SHA256SUMS、預壓 .gz；addFont 補丁同日開上游 PR',
     files: ['scripts/vectorcraft-pro/PIN.json', 'scripts/vectorcraft-pro/build.ps1', 'scripts/vectorcraft-pro/web-fonts.patch', 'scripts/vectorcraft-pro/api-addfont.patch', 'scripts/vectorcraft-pro/README.md'],
@@ -58,7 +58,7 @@ export const STEPS = [
       todo('C2.4', '用 curl 驗：頁面 200、wasm 型別與壓縮正確、容器內有檔。'),
     ] },
   { n: 3, code: 'C3', group: 'C', title: 'app 門', plain: '例：側欄「設計編輯器」多一項「向量（專業版）」，點開就是 Illustrator 介面；瀏覽器太舊時給一行說明並連回快速出稿。',
-    gate: '登入後開 /tools/vector-pro 看到 VectorCraft；本機開發也能開（轉到 trunk serve）；產品登記測試全綠。', risk: 'Medium（改 products.ts 登記；頁面本身是 iframe）', model: 'Opus 5.5', status: 'not_started', depends: ['C2'],
+    gate: '登入後開 /tools/vector-pro 看到 VectorCraft；本機開發也能開（轉到 trunk serve）；產品登記測試全綠。', risk: 'Medium（改 products.ts 登記；頁面本身是 iframe）', model: 'Opus 5.5｜已派 session vp-c3-door（2026-11-05，先做 C3.1–C3.3，C3.4 等 C2）', status: 'not_started', depends: ['C2'],
     decided: '全視窗開新分頁（操作者 2026-11-05：嵌在側欄旁可操作版面太小）：頁面放無側欄區，側欄連結開新分頁，登入照管。門的架構照 ADR 018：員工門＝app 這一頁；客戶門＝將來啟用既有的產品子網域 door（同一 next-admin、host 路由、products.ts 一列），不另建站；塔羅／studio／mockup 銜接走同 app 的 API 與 My Designs，不跨源。',
     what: '無側欄區 app/(full)/tools/vector-pro/page.tsx（iframe＋右欄 dock 100vh）＋WebGL 偵測＋NOTICE 連結；側欄連結 target=_blank；next.config 開發用 rewrite；products.ts nav／staffPaths；tsc＋四個測試',
     files: ['NA/app/(shell)/tools/vector-pro/page.tsx', 'NA/next.config.*', 'NA/lib/portal/products.ts'],
@@ -69,7 +69,7 @@ export const STEPS = [
       todo('C3.4', '正式站登入實開一次，介面回得了資料，截圖存紀錄。'),
     ] },
   { n: 4, code: 'C4', group: 'D', title: '第二 dock 欄：AwareWave 獨有的十個面板', plain: '例：畫面就是 Illustrator，右邊多一欄面板，顏色、分頁高度、收合方式都跟它的面板一樣；裡面是尺寸範本、字型、調色、去背、WebP、My Designs、QR、條碼、Mockup、批次匯出。真品本來就有的（描圖、弧形文字、裁切標記…）直接用它的。',
-    gate: '十個面板都在第二欄且外觀與真品面板一致（截圖並排）；調色與去背對一張選取的圖真的換圖且位置大小不變；字型面板搜到的 Google Fonts 能套到文字；測試守住十個面板清單與色值。', risk: 'Medium（新頁面；C4.3 換圖先做 spike，做不到就改契約）', model: 'Opus 5.5', status: 'not_started', depends: ['C3'],
+    gate: '十個面板都在第二欄且外觀與真品面板一致（截圖並排）；調色與去背對一張選取的圖真的換圖且位置大小不變；字型面板搜到的 Google Fonts 能套到文字；測試守住十個面板清單與色值。', risk: 'Medium（新頁面；C4.3 換圖先做 spike，做不到就改契約）', model: 'Opus 5.5＋Sonnet｜已派 session vp-c4-dock（外殼＋轉接器）與 vp-c4-blocks（十面板搬移）（2026-11-05）', status: 'not_started', depends: ['C3'],
     decided: '不 fork 加 Rust 面板（面板要用網路與 HTML，egui 放不下；上游說 panel plugins 不在 v1）。調色與去背的數學仍是 CARD-05 與 CARD-06 的同一份模組，不複製。',
     what: 'dock.js＋theme.css（色值抽自 theme.rs 四組；分頁 33、欄寬 310、圖示欄 38）；blocks/ 十檔；ctx-contract.md＋ctx-vectorcraft.js（placeSvg／placeImage／selectedImage／replaceImage／exportArtboard／addFont／saveAs）；dock 測試＋契約測試＋色值抽樣測試',
     files: ['NA/public/vector-pro/dock.js', 'NA/public/vector-pro/theme.css', 'NA/public/editor-shared/blocks/', 'NA/public/editor-shared/ctx-contract.md', 'NA/public/editor-shared/ctx-vectorcraft.js', 'NA/lib/studio/__tests__/vector-pro-dock.test.ts'],

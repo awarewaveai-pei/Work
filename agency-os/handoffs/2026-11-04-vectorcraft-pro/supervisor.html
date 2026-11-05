@@ -77,7 +77,7 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
 <div class="shell">
 <aside><div class="in">
   <h1>向量專業版監工台</h1>
-  <p class="upd">更新於 <span data-computed>2026-11-04</span></p>
+  <p class="upd">更新於 <span data-computed>2026-11-05</span></p>
   <div class="bar" data-computed><i class="d" style="width:0%"></i><i class="g" style="width:0%"></i></div>
   <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>0</span>／<span data-computed>7</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>1</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
@@ -89,7 +89,7 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
     <div class="n">1</div>
     <div class="b">
       <p class="plain">例：在這台筆電按一個指令，就從 VectorCraft 原始碼建出可放網站的檔案（含繁中字型），並在本機瀏覽器開起來確認。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low（只動本機與 scripts/）</span><span class="who">負責：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low（只動本機與 scripts/）</span><span class="who">負責：Opus 5.5｜已派 session vp-c1-build（2026-11-05）</span></p>
       <p class="donewhen"><b>完成的樣子：</b>一個指令建出 dist/&lt;版本&gt;/；本機開 index.html?lang=zh-hant 選單是繁中、能打繁中字、程式介面回得了資料。</p>
       <ul class="items"><li class="todo"><b>○</b><span><code>C1.1</code> 筆電裝 Rust 工具鏈與 trunk，前置需求寫進 README。</span></li><li class="todo"><b>○</b><span><code>C1.2</code> 一個建置腳本：抓固定版本的原始碼、加繁中字型、建出網頁版、算校驗碼、預先壓縮。</span></li><li class="todo"><b>○</b><span><code>C1.3</code> 本機開起來：繁中選單、能打繁中字、介面回得了資料，截圖存進 README。</span></li><li class="todo"><b>○</b><span><code>C1.4</code> 加一個「載入字型檔」的介面（約 15 行，補丁＋送回上游），讓字型面板能把 Google Fonts 字型塞進去。</span></li></ul>
       <details><summary>工程細節：C1 建置鏈（本機）</summary>
@@ -117,7 +117,7 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
     <div class="n">3</div>
     <div class="b">
       <p class="plain">例：側欄「設計編輯器」多一項「向量（專業版）」，點開就是 Illustrator 介面；瀏覽器太舊時給一行說明並連回快速出稿。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium（改 products.ts 登記；頁面本身是 iframe）</span><span class="who">負責：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium（改 products.ts 登記；頁面本身是 iframe）</span><span class="who">負責：Opus 5.5｜已派 session vp-c3-door（2026-11-05，先做 C3.1–C3.3，C3.4 等 C2）</span></p>
       <p class="donewhen"><b>完成的樣子：</b>登入後開 /tools/vector-pro 看到 VectorCraft；本機開發也能開（轉到 trunk serve）；產品登記測試全綠。</p>
       <ul class="items"><li class="todo"><b>○</b><span><code>C3.1</code> 無側欄全視窗頁嵌入專業版，側欄點開新分頁；失敗時給說明與回舊編輯器的連結。</span></li><li class="todo"><b>○</b><span><code>C3.2</code> 本機開發時把 /vector-pro/ 轉到本機建置伺服器，正式站不受影響。</span></li><li class="todo"><b>○</b><span><code>C3.3</code> 設計編輯器的側欄加「向量（專業版）」，登記與權限測試全綠。</span></li><li class="todo"><b>○</b><span><code>C3.4</code> 正式站登入實開一次，介面回得了資料，截圖存紀錄。</span></li></ul>
       <details><summary>工程細節：C3 app 門</summary>
@@ -131,7 +131,7 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
     <div class="n">4</div>
     <div class="b">
       <p class="plain">例：畫面就是 Illustrator，右邊多一欄面板，顏色、分頁高度、收合方式都跟它的面板一樣；裡面是尺寸範本、字型、調色、去背、WebP、My Designs、QR、條碼、Mockup、批次匯出。真品本來就有的（描圖、弧形文字、裁切標記…）直接用它的。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium（新頁面；C4.3 換圖先做 spike，做不到就改契約）</span><span class="who">負責：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium（新頁面；C4.3 換圖先做 spike，做不到就改契約）</span><span class="who">負責：Opus 5.5＋Sonnet｜已派 session vp-c4-dock（外殼＋轉接器）與 vp-c4-blocks（十面板搬移）（2026-11-05）</span></p>
       <p class="donewhen"><b>完成的樣子：</b>十個面板都在第二欄且外觀與真品面板一致（截圖並排）；調色與去背對一張選取的圖真的換圖且位置大小不變；字型面板搜到的 Google Fonts 能套到文字；測試守住十個面板清單與色值。</p>
       <ul class="items"><li class="todo"><b>○</b><span><code>C4.1</code> 第二 dock 欄：與 Illustrator 畫面並排、同色同尺寸、可收成圖示欄。</span></li><li class="todo"><b>○</b><span><code>C4.2</code> 十個面板各一個模組；六個從舊編輯器原樣搬，調色與去背沿用同一份數學。</span></li><li class="todo"><b>○</b><span><code>C4.3</code> 面板與編輯器之間的契約與轉接器；先用一張圖驗證「換圖後位置大小不變」。</span></li><li class="todo"><b>○</b><span><code>C4.4</code> 測試：面板清單、轉接器每個方法、色值抽樣。</span></li></ul>
       <details><summary>工程細節：C4 第二 dock 欄：AwareWave 獨有的十個面板</summary>
