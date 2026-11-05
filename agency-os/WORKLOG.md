@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-05（續17）video.aware-wave.com 分鏡靈感／模板牆／應用工具恢復：seedstar 參考資料員工限定＋兩層限流（31e89c479、26cc0cb2c、9caa6a21a）
+
+- 根因 C1：頁面寫死 `assets/image-*`、`assets/storyboards-data.json`（seedstar.ai 擷取，.gitignore:7-10／.dockerignore 排除，只在筆電）→ 主機 404；storyboards-boot `.json()` 丟錯、模板牆破圖。
+- 根因 C2：video 靜態檔與身分路徑共用 nginx `admin` 區（20r/s burst 60），一頁 6 frame×約 30 支程式 → 429。
+- 根因 C3：Cloudflare 規則 b8ffa72d（50 req/10s）未排除 video（新門）→ 分鏡 172 張圖＋程式被 429。同 2026-08-29 studio 類。
+- 修：backend/reference.cjs＋`GET /reference/<name>`（白名單、只給簽章 staff，其餘一律 404）；capabilities.reference 控 UI，客戶空狀態；seedstar 圖不再當預設生成參考；compose `VW_REFERENCE_DIR=/data/reference`；參考檔 194 圖＋1 資料檔 scp 到 volume；nginx 新 zone `vwasset` 120r/s burst 400；CF 規則排除 video（操作者同意，改前規則 scratchpad cf-rule-before.json）；check-cloudflare-security.ps1 列出 products.ts 每個未排除的門（今：hci、social、tarot、design、content、cs、collect、outreach → WARN，待操作者決定）。
+- 主機另有 session（P6.13）同時在改 video-workbench 多檔，未混入本 commit。
+- REALTEST_EVIDENCE: tool=Bash | cmd=瀏覽器 staff：分鏡 173 img、應用工具 15、模板牆 6 卡、4 frame 0 個 ≥400；curl /reference/* 未登入 401；容器內未簽章 404；check-cloudflare-security.ps1 跑完 video 不在缺口清單 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（Codex agency-os/reports/oracle/2026-11-05-partialreview-7ad7866d.md：F1 compose 主機本地→safe-infra-patch 套用；F2 舊草稿參考圖＝使用者自有（原行為）；F3 部分複製→整批複製並計數；突變：拿掉 staff 檢查→紅）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=assets/image- | hits=0
 ## 2026-11-05（續16）畫布專業版計畫：操作者改定「Craft 編輯器不套 app 主題」→ 拿掉主題補丁（只有文件）
 
 - 根因：操作者看了已上線的向量專業版畫面後改定：「craftart 不要套主體好了，就原設定的黑色和淺色就好」（推翻同日較早「直接套用主題」）。
