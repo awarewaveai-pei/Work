@@ -117,7 +117,7 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
     <div class="n">3</div>
     <div class="b">
       <p class="plain">例：側欄「設計編輯器」多一項「向量（專業版）」，點開就是 Illustrator 介面；瀏覽器太舊時給一行說明並連回快速出稿。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium（改 products.ts 登記；頁面本身是 iframe）</span><span class="who">負責：Opus 5.5｜派工失敗待重派（2026-11-05：worktree 無法建立，.claude 是連結）</span></p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium（改 products.ts 登記；頁面本身是 iframe）</span><span class="who">負責：Opus 5.5｜已派 session vp-c3-door-2（2026-11-05，先做 C3.1–C3.3，C3.4 等 C2）</span></p>
       <p class="donewhen"><b>完成的樣子：</b>登入後開 /tools/vector-pro 看到 VectorCraft；本機開發也能開（轉到 trunk serve）；產品登記測試全綠。</p>
       <ul class="items"><li class="todo"><b>○</b><span><code>C3.1</code> 無側欄全視窗頁嵌入專業版，側欄點開新分頁；失敗時給說明與回舊編輯器的連結。</span></li><li class="todo"><b>○</b><span><code>C3.2</code> 本機開發時把 /vector-pro/ 轉到本機建置伺服器，正式站不受影響。</span></li><li class="todo"><b>○</b><span><code>C3.3</code> 設計編輯器的側欄加「向量（專業版）」，登記與權限測試全綠。</span></li><li class="todo"><b>○</b><span><code>C3.4</code> 正式站登入實開一次，介面回得了資料，截圖存紀錄。</span></li></ul>
       <details><summary>工程細節：C3 app 門</summary>
@@ -131,7 +131,7 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
     <div class="n">4</div>
     <div class="b">
       <p class="plain">例：畫面就是 Illustrator，右邊多一欄面板，顏色、分頁高度、收合方式都跟它的面板一樣；裡面是尺寸範本、字型、調色、去背、WebP、My Designs、QR、條碼、Mockup、批次匯出。真品本來就有的（描圖、弧形文字、裁切標記…）直接用它的。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium（新頁面；C4.3 換圖先做 spike，做不到就改契約）</span><span class="who">負責：Opus 5.5＋Sonnet｜派工失敗待重派（2026-11-05：worktree 無法建立，.claude 是連結）</span></p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium（新頁面；C4.3 換圖先做 spike，做不到就改契約）</span><span class="who">負責：Opus 5.5＋Sonnet｜已派 session vp-c4-dock-2（外殼＋轉接器）與 vp-c4-blocks-2（十面板搬移）（2026-11-05）</span></p>
       <p class="donewhen"><b>完成的樣子：</b>十個面板都在第二欄且外觀與真品面板一致（截圖並排）；調色與去背對一張選取的圖真的換圖且位置大小不變；字型面板搜到的 Google Fonts 能套到文字；測試守住十個面板清單與色值。</p>
       <ul class="items"><li class="todo"><b>○</b><span><code>C4.1</code> 第二 dock 欄：與 Illustrator 畫面並排、同色同尺寸、可收成圖示欄。</span></li><li class="todo"><b>○</b><span><code>C4.2</code> 十個面板各一個模組；六個從舊編輯器原樣搬，調色與去背沿用同一份數學。</span></li><li class="todo"><b>○</b><span><code>C4.3</code> 面板與編輯器之間的契約與轉接器；先用一張圖驗證「換圖後位置大小不變」。</span></li><li class="todo"><b>○</b><span><code>C4.4</code> 測試：面板清單、轉接器每個方法、色值抽樣。</span></li></ul>
       <details><summary>工程細節：C4 第二 dock 欄：AwareWave 獨有的十個面板</summary>
