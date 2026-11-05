@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-05（續9）影音工作台 H6 續：圖片生成通、任務帳冊因 profiles 缺列寫不進（facdb592f）
+
+- OpenAI 儲值後，video.aware-wave.com 生成圖片成功：job 25b67cc8，成本 US$0.006；media_assets 774ac141（ai_generated、checksum、rightsSources gpt-image-2.5-flare、vwJobId、costUsd）；usageReported=true。
+- 間歇 503「使用許可驗證失敗」：新程序驗 3 次皆 OK，伺服器內原因被空 catch 吞掉 → facdb592f 改為記錄原因（已部署）；重試未再發生，待日誌觀察。
+- media_workbench_jobs 無列：ledgerSyncError「job_upsert_failed」。交易內重放 insert（已 rollback）→ FK media_workbench_jobs_created_by_fkey：created_by（x-ops-user-id＝auth user id）不在 profiles。auth.users 5 筆中 2 筆無 profiles、auth.users 無觸發器；migrations 中 17 處 references profiles(id) → 同類寫入對這兩個帳號全部失敗。治本＝觸發器＋補資料（身分 migration，High，待操作者同意＋db-expert）→ 監工台 P6.14。jobs/route.ts:85 寫入失敗未記錄原因，同卡補。
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec supabase-db psql（唯讀查 media_assets 774ac141；begin/insert/rollback 重放；auth.users×profiles 計數） | exit=0 | ms=30000
+- REVIEW_WAIVED: NA -- main-system.cjs 只把吞掉的錯誤寫入日誌，p6-main-system 綠
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=references profiles(id) | hits=17
 ## 2026-11-05（續8）影音工作台 H6 全程實測（部分）：OpenAI 額度為零、送審 QA 缺口、錯誤訊息修正（9fa2320f8）
 
 - 操作者在內建瀏覽器登入 video.aware-wave.com；工作台載入、許可（permit 200 allowed）、生成請求 202 皆通。
