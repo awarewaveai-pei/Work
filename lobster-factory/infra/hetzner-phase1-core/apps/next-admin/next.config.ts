@@ -13,6 +13,21 @@ const nextConfig: NextConfig = {
   // other build (local, CI) still checks.
   typescript: { ignoreBuildErrors: process.env.NEXT_TYPECHECK_DONE === "1" },
   eslint: { ignoreDuringBuilds: process.env.NEXT_TYPECHECK_DONE === "1" },
+  // /vector-pro/*: VectorCraft's web build. On the host nginx serves it before a request reaches this app, so production
+  // sets no VECTOR_PRO_DEV_ORIGIN and gets no rewrite. Locally it points at a static server (e.g. http://127.0.0.1:8766)
+  // whose root holds what nginx's alias /srv/vector-pro/ holds: /vector-pro/current/x -> <origin>/current/x.
+  // Our dock lives at /vector-pro-dock/ (public/), outside this prefix, so neither nginx nor this rewrite takes it.
+  // The old Vector Editor retired 2026-11-05 (R0-PLAN C7.3): its page and file answer with the professional editor.
+  async redirects() {
+    return [
+      { source: "/tools/vector-editor", destination: "/tools/vector-pro", permanent: true },
+      { source: "/vector-editor.html", destination: "/tools/vector-pro", permanent: true },
+    ];
+  },
+  async rewrites() {
+    const origin = process.env.VECTOR_PRO_DEV_ORIGIN?.trim().replace(/\/+$/, "");
+    return origin ? [{ source: "/vector-pro/:path*", destination: `${origin}/:path*` }] : [];
+  },
   webpack: (config) => {
     // @workflows alias: makes packages/workflows importable from next-admin routes.
     // In Docker build the monorepo root is outside the build context, so sg-deploy

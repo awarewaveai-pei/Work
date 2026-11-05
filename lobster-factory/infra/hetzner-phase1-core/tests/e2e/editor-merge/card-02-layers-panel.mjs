@@ -1,8 +1,10 @@
-// CARD-02 layers-panel union: drives /tools/canvas and /tools/vector-editor with 3 objects each, exercises every layer
+// CARD-02 layers-panel union: drives /tools/canvas with 3 objects each, exercises every layer
 // control and reads the real object props / stack order / undo history after each action (never screenshots alone).
-//   canvas: dev-only probe window.__cvTest = { canvas, fabric, undoStack }   vector: the page globals `canvas`, `history`, `hi`
+//   canvas: dev-only probe window.__cvTest = { canvas, fabric, undoStack }
 // Run (dev server first): node lobster-factory/infra/hetzner-phase1-core/tests/e2e/social/dev-server-no-supabase.mjs 3904
 //   cd lobster-factory/infra/hetzner-phase1-core/tests && node e2e/editor-merge/card-02-layers-panel.mjs [baseUrl] [outDir]
+// The old Vector Editor (public/vector-editor.html) retired 2026-11-05 (R0-PLAN C7.3): /tools/vector-editor redirects to
+// /tools/vector-pro, so only the Canvas Editor half of this card runs.
 import { chromium } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
@@ -227,79 +229,13 @@ async function suite(tag, page, env) {
   await ctx.close();
 }
 
-// ───────────────────────── Vector Editor ─────────────────────────
-{
-  const ctx = await browser.newContext({ viewport: { width: 1400, height: 1300 } });
-  const page = await ctx.newPage();
-  watch(page, "vector");
-  await page.goto(`${BASE}/tools/vector-editor`, { waitUntil: "domcontentloaded" });
-  await page.waitForFunction(() => [...document.querySelectorAll("iframe")].some((f) => f.src.includes("vector-editor.html")), null, { timeout: 90000 });
-  const frame = page.frames().find((f) => f.url().includes("vector-editor.html"));
-  await frame.waitForFunction(() => typeof canvas !== "undefined" && document.getElementById("lyr-group"));
-  await frame.evaluate(() => document.querySelectorAll("details").forEach((d) => { d.open = true; })); // panels ship collapsed
-  await frame.locator('[data-shape="rect"]').click();
-  await frame.locator('[data-shape="circle"]').click();
-  await frame.locator("#addText").click();
-  await frame.evaluate(() => {
-    const [rect, circle, text] = canvas.getObjects();
-    rect.set({ left: 100, top: 100 }); circle.set({ left: 600, top: 300 }); text.set({ left: 700, top: 450 });
-    [rect, circle, text].forEach((o) => { o.setCoords(); canvas.fire("object:modified", { target: o }); });
-    canvas.discardActiveObject(); canvas.requestRenderAll();
-  });
-  await page.waitForTimeout(300);
-
-  const env = {
-    state: () => frame.evaluate(() => canvas.getObjects().map((o) => ({ kind: String(o.type).toLowerCase().replace(/-/g, ""), name: o.name, visible: o.visible !== false, lockMovementX: !!o.lockMovementX, lockMovementY: !!o.lockMovementY,
-      lockScalingX: !!o.lockScalingX, lockScalingY: !!o.lockScalingY, lockRotation: !!o.lockRotation, hasControls: o.hasControls, selectable: o.selectable }))),
-    topSnap: () => frame.evaluate(() => JSON.parse(history[hi]).objects.map((o) => ({ kind: String(o.type).toLowerCase().replace(/-/g, ""), name: o.name, visible: o.visible !== false, lockMovementX: !!o.lockMovementX, lockScalingX: !!o.lockScalingX, lockRotation: !!o.lockRotation }))),
-    depth: () => frame.evaluate(() => history.length),
-    undo: async () => { await frame.locator("#btn-undo").click(); await page.waitForTimeout(400); },
-    selected: () => frame.evaluate(() => canvas.getActiveObjects().map((o) => String(o.type).toLowerCase().replace(/-/g, ""))),
-    discard: () => frame.evaluate(() => { canvas.discardActiveObject(); canvas.requestRenderAll(); }),
-    multiSelect: (kinds) => frame.evaluate((ks) => {
-      const objs = canvas.getObjects().filter((o) => ks.includes(String(o.type).toLowerCase().replace(/-/g, "")));
-      canvas.setActiveObject(new fabric.ActiveSelection(objs, { canvas })); canvas.requestRenderAll();
-    }, kinds),
-    groupBtn: (name) => frame.locator(name === "群組" ? "#lyr-group" : "#lyr-ungroup"),
-    extraGroupBtn: async () => (await frame.locator("#btn-group").count()) === 1 && (await frame.locator("#btn-ungroup").count()) === 1,
-    centers: async () => {
-      const b = await frame.locator("canvas.upper-canvas").boundingBox();
-      const p = await frame.evaluate(() => { const z = canvas.getZoom(); const out = {}; canvas.getObjects().forEach((o) => { const c = o.getCenterPoint(); out[String(o.type).toLowerCase().replace(/-/g, "")] = { x: c.x * z, y: c.y * z }; }); return out; });
-      const out = {}; for (const [k, v] of Object.entries(p)) out[k] = { x: b.x + v.x, y: b.y + v.y };
-      out.empty = { x: b.x + 6, y: b.y + 6 };
-      return out;
-    },
-    shrinkList: () => frame.locator("#layers").evaluate((el) => { el.style.maxHeight = "70px"; }),
-    rowVisible: (label) => frame.locator(".lyr", { hasText: label }).first().evaluate((row) => {
-      const box = row.parentElement; const rb = row.getBoundingClientRect(); const bb = box.getBoundingClientRect();
-      return rb.top >= bb.top - 1 && rb.bottom <= bb.bottom + 1;
-    }),
-    shot: async () => { await frame.locator("#layers").evaluate((el) => { el.style.maxHeight = "200px"; });
-      await frame.locator("#layers").locator("xpath=..").screenshot({ path: join(OUT, "card-02-vector.png") }); },
-  };
-  const rowsLoc = frame.locator(".lyr");
-  const rowBy = (label) => rowsLoc.filter({ hasText: label }).first();
-  const rows = {
-    count: (sel) => (sel ? rowsLoc.locator(sel).count() : rowsLoc.count()),
-    allLabels: async () => (await rowsLoc.locator(".nm").allTextContents()).map((s) => s.trim()),
-    sel: () => rowsLoc.evaluateAll((els) => els.map((e) => (e.classList.contains("sel") ? "1" : "0"))),
-  };
-  rows.allKinds = async () => (await rows.allLabels()).map((l) => (l.includes("矩形") ? "rect" : l.includes("圓") ? "circle" : l.includes("📝") ? "itext" : l.includes("群組") ? "group" : "?"));
-  await suite("vector", page, {
-    ...env, rows, rowBy,
-    btn: (row, title) => row.locator(`button[title="${title}"]`),
-    nameEl: (row) => row.locator(".nm"),
-  });
-  await ctx.close();
-}
-
 await browser.close();
 // dev server has no Supabase: its server-component theme fetch logs "supabase_unavailable" into the browser console
 // (and the matching 503 resource line); neither comes from the editors.
 const envNoise = (e) => /Failed to load resource|supabase_unavailable/.test(e);
 const consoleErrs = errors.filter((e) => !envNoise(e));
 const resourceErrs = errors.filter(envNoise);
-check("no console/page errors on either page", consoleErrs.length === 0, consoleErrs.join(" | "));
+check("no console/page errors on the page", consoleErrs.length === 0, consoleErrs.join(" | "));
 if (resourceErrs.length) console.log(`NOTE ${resourceErrs.length} failed resource loads (dev-server no-Supabase noise, excluded): ${resourceErrs.map((e) => e.slice(0, 90)).join(" | ")}`);
 const failed = results.filter((r) => !r.ok).length;
 console.log(`\n${results.length - failed}/${results.length} checks passed`);

@@ -3,7 +3,7 @@
 讓內容引擎的每個能力（搜尋源 / 生成 / 發佈…）變成**可抽換、可移植、可增刪**的積木。
 每個積木**自我註冊**、**只透過 `ctx` 溝通**、**整段可複製**、**刪掉那段即關閉**，不影響其他。
 
-> 本檔是契約正本。前端 canvas 積木實作見 [`public/vector-editor.html`](../../../public/vector-editor.html)（`AB.registerBlock`）；
+> 本檔是契約正本。前端積木實作見 [`public/editor-shared/blocks/`](../../../public/editor-shared/blocks/)（/tools/vector-pro 的 dock；舊 `public/vector-editor.html` 的 `AB.registerBlock` 已於 2026-11-05 退場）；
 > 後端積木骨架見同目錄 [`registry.ts`](./registry.ts)，搜尋積木家族見 [`../trending-sources.ts`](../trending-sources.ts)。
 
 ## 先看這裡
@@ -223,20 +223,20 @@ AI prompt 是獨立積木，不併進 `image/style-design-workbench`。改圖流
 
 | id / 名稱 | 狀態 | 入口 / 檔案 | 說明 |
 |---|---|---|---|
-| `qr` | `UI block` | `public/vector-editor.html` | QR Code（向量） |
-| `smart-guides` | `UI block` | `public/vector-editor.html` | 智慧磁吸對齊 |
-| `arc-text` | `UI block` | `public/vector-editor.html` | 環形 / 弧形文字 |
-| `crop-marks` | `UI block` | `public/vector-editor.html` | 出血 + 裁切標記 |
-| `templates` | `UI block` | `public/vector-editor.html` | 範本庫（尺寸預設） |
-| `mockup` | `UI block` | `public/vector-editor.html` | 商品 Mockup 預覽 |
-| `batch-export` | `UI block` | `public/vector-editor.html` | 批次多尺寸匯出 |
-| `barcode` | `UI block` | `public/vector-editor.html` | 條碼 Barcode（向量） |
-| `text-path` | `UI block` | `public/vector-editor.html` | 文字沿路徑 |
-| `simplify` | `UI block` | `public/vector-editor.html` | 路徑簡化 |
+| `qr` | `UI block` | `public/editor-shared/blocks/qr.js`（/tools/vector-pro dock） | QR Code（向量） |
+| `smart-guides` | `UI block` | 退場（2026-11-05 隨舊 `public/vector-editor.html` 刪除，未移植到 /tools/vector-pro dock） | 智慧磁吸對齊 |
+| `arc-text` | `UI block` | 退場（2026-11-05 隨舊 `public/vector-editor.html` 刪除，未移植到 /tools/vector-pro dock） | 環形 / 弧形文字 |
+| `crop-marks` | `UI block` | 退場（2026-11-05 隨舊 `public/vector-editor.html` 刪除，未移植到 /tools/vector-pro dock） | 出血 + 裁切標記 |
+| `templates` | `UI block` | `public/editor-shared/blocks/templates.js`（/tools/vector-pro dock） | 範本庫（尺寸預設） |
+| `mockup` | `UI block` | `public/editor-shared/blocks/mockup.js`（/tools/vector-pro dock） | 商品 Mockup 預覽 |
+| `batch-export` | `UI block` | `public/editor-shared/blocks/batch-export.js`（/tools/vector-pro dock） | 批次多尺寸匯出 |
+| `barcode` | `UI block` | `public/editor-shared/blocks/barcode.js`（/tools/vector-pro dock） | 條碼 Barcode（向量） |
+| `text-path` | `UI block` | 退場（2026-11-05 隨舊 `public/vector-editor.html` 刪除，未移植到 /tools/vector-pro dock） | 文字沿路徑 |
+| `simplify` | `UI block` | 退場（2026-11-05 隨舊 `public/vector-editor.html` 刪除，未移植到 /tools/vector-pro dock） | 路徑簡化 |
 | `canvas/shape` | `UI block` | `app/tools/canvas/CanvasEditor.tsx` | 基本形狀（rect/circle/line） |
 | `canvas/object-lock` | `UI block` | `app/tools/canvas/CanvasEditor.tsx` | 鎖定/解鎖物件移動、縮放、旋轉 |
-| `color-grade` | `UI block` | `public/editor-shared/color-grade.js`（Canvas Editor + Vector Editor 共用，`lib/studio/editor-color-grade.ts` 為型別入口） | 🎨 調色單一面板：預設風格/去白底、自動對比·色彩·色調、色階、色彩平衡、基本滑桿、Camera RAW、HSL 色彩混合器；`adj` 存在圖片上 |
-| `bg-remove` | `UI block` | `public/editor-shared/bg-remove.js`（Canvas Editor + Vector Editor 共用，`lib/studio/editor-bg-remove.ts` 為型別入口；色鍵 = `adj.removeColor`，在 `color-grade.js`） | 🪄 去背單一面板：去除指定顏色（吸色＋容差）、AI 去背（`/api/tools/studio/remove-bg`，原地換圖）、還原。原「去白底 / 去背」＋「AI 去背」兩積木已併入，Vector 不再有這兩個 `registerBlock` |
+| `color-grade` | `UI block` | `public/editor-shared/color-grade.js`（Canvas Editor + /tools/vector-pro 調色積木 `blocks/color-grade.js` 共用，`lib/studio/editor-color-grade.ts` 為型別入口） | 🎨 調色單一面板：預設風格/去白底、自動對比·色彩·色調、色階、色彩平衡、基本滑桿、Camera RAW、HSL 色彩混合器；`adj` 存在圖片上 |
+| `bg-remove` | `UI block` | `public/editor-shared/bg-remove.js`（Canvas Editor + /tools/vector-pro 去背積木 `blocks/bg-remove.js` 共用，`lib/studio/editor-bg-remove.ts` 為型別入口；色鍵 = `adj.removeColor`，在 `color-grade.js`） | 🪄 去背單一面板：去除指定顏色（吸色＋容差）、AI 去背（`/api/tools/studio/remove-bg`，原地換圖）、還原。原「去白底 / 去背」＋「AI 去背」兩積木已併入，舊 Vector Editor 已退場 |
 | `canvas/download` | `UI block` | `app/tools/canvas/CanvasEditor.tsx` | 下載 PNG（全尺寸）或 WebP（自動壓縮至 200KB）|
 | `ai/image-edit-prompt-panel` | `UI block` | `components/tools/ImageEditPromptPanel.tsx` | 共用 AI 修圖 prompt 面板；Tarot / Studio / Mockup 都掛這顆，不各寫一套 |
 | `tarot/output-track` | `UI block` | `app/tools/tarot/TarotStudio.tsx` | Tarot print/export outputs |

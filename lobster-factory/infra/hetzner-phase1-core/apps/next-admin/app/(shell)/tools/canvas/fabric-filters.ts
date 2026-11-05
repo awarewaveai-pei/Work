@@ -1,5 +1,5 @@
 import type { ColorGradeParams } from "@/lib/studio/color-grade";
-import { applyBlurPixels, applyHslPixels, hasAnyHsl, sanitizeHsl, type HslMixerState } from "@/lib/studio/editor-color-grade";
+import { AW_FILTERS } from "@/lib/studio/editor-color-grade";
 
 /**
  * Legacy ColorGradeParams → Fabric filters for Tarot print + Studio GradedPreview (the Sharp-shaped slider model).
@@ -64,37 +64,30 @@ let awFilters: Record<string, AwCtor> | null = null;
 
 /**
  * The pixel filters the 調色 spec builder names that Fabric does not ship (AwHsl = HSL mixer, AwBlur = edge-clamped blur), for Fabric 7.
- * Built lazily (BaseFilter exists only after the dynamic fabric import) and registered in classRegistry, so undo / design load and
- * the Vector Editor's own AwHsl / AwBlur round-trip through JSON. State lives on the instance → toObject carries it;
- * the pixel math is the shared applyHslPixels / applyBlurPixels.
+ * Built lazily (BaseFilter exists only after the dynamic fabric import) and registered in classRegistry, so undo and design load
+ * round-trip through JSON. Fields, pixel math and toObject come from the shared AW_FILTERS (editor-shared/color-grade.js);
+ * this only wraps each definition in a Fabric 7 class.
  */
 export function ensureAwFilters(fabricNS: unknown): Record<string, AwCtor> {
   if (awFilters) return awFilters;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ns = fabricNS as { filters: Record<string, any>; classRegistry?: { setClass: (c: unknown, name?: string) => void } };
   const Base = ns.filters.BaseFilter as new (o?: object) => object;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  class AwHsl extends (Base as any) {
-    static type = "AwHsl";
-    state: HslMixerState;
-    constructor(o?: { state?: unknown }) { super(); this.state = sanitizeHsl(o?.state); }
-    isNeutralState() { return !hasAnyHsl(this.state); }
-    applyTo2d(opts: { imageData: ImageData }) { applyHslPixels(opts.imageData.data, this.state); }
-    toObject() { return { type: "AwHsl", state: this.state }; }
-    static async fromObject(o: { state?: unknown }) { return new AwHsl(o); }
+  const made: Record<string, AwCtor> = {};
+  for (const [name, def] of Object.entries(AW_FILTERS)) {
+    const self = (f: unknown) => f as Record<string, unknown>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    class Aw extends (Base as any) {
+      static type = name;
+      constructor(o?: Record<string, unknown>) { super(); Object.assign(this, def.init(o)); }
+      isNeutralState() { return def.neutral(self(this)); }
+      applyTo2d(opts: { imageData: ImageData }) { def.apply2d(self(this), opts.imageData); }
+      toObject() { return def.toObject(self(this)); }
+      static async fromObject(o: Record<string, unknown>) { return new Aw(o); }
+    }
+    ns.classRegistry?.setClass(Aw, name);
+    made[name] = Aw as unknown as AwCtor;
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  class AwBlur extends (Base as any) {
-    static type = "AwBlur";
-    blur: number;
-    constructor(o?: { blur?: unknown }) { super(); this.blur = typeof o?.blur === "number" && Number.isFinite(o.blur) ? Math.min(100, Math.max(0, o.blur)) : 0; }
-    isNeutralState() { return this.blur === 0; }
-    applyTo2d(opts: { imageData: ImageData }) { applyBlurPixels(opts.imageData, this.blur); }
-    toObject() { return { type: "AwBlur", blur: this.blur }; }
-    static async fromObject(o: { blur?: unknown }) { return new AwBlur(o); }
-  }
-  ns.classRegistry?.setClass(AwHsl, "AwHsl");
-  ns.classRegistry?.setClass(AwBlur, "AwBlur");
-  awFilters = { AwHsl: AwHsl as unknown as AwCtor, AwBlur: AwBlur as unknown as AwCtor };
+  awFilters = made;
   return awFilters;
 }

@@ -1,7 +1,7 @@
 /**
  * Typed door to public/editor-shared/color-grade.js — the ONE place the 🎨 調色 math lives for both
- * /tools/canvas (Fabric 7, imports it here) and public/vector-editor.html (Fabric 5, loads the same file
- * as <script type="module">). Nothing is re-implemented in TS; this file only adds types.
+ * /tools/canvas (Fabric 7, imports it here) and the /tools/vector-pro 調色 block public/editor-shared/blocks/color-grade.js
+ * (Fabric 5, imports the same file as an ES module). Nothing is re-implemented in TS; this file only adds types.
  * drift guard: lib/studio/__tests__/editor-color-grade-drift.test.ts
  */
 import * as shared from "../../public/editor-shared/color-grade.js";
@@ -41,6 +41,14 @@ export const hslNeutral = shared.hslNeutral as () => HslMixerState;
 export const sanitizeHsl = shared.sanitizeHsl as (raw: unknown) => HslMixerState;
 export const applyBlurPixels = shared.applyBlurPixels as (img: { data: Uint8ClampedArray; width: number; height: number }, blur: number) => void;
 export const applyHslPixels = shared.applyHslPixels as (data: Uint8ClampedArray, state: HslMixerState) => void;
+/** One AwHsl / AwBlur definition; each Fabric version wraps it in a class (see the shared file). */
+export type AwFilterDef = {
+  init: (o: Record<string, unknown> | undefined) => Record<string, unknown>;
+  apply2d: (f: Record<string, unknown>, imageData: ImageData) => void;
+  neutral: (f: Record<string, unknown>) => boolean;
+  toObject: (f: Record<string, unknown>) => Record<string, unknown>;
+};
+export const AW_FILTERS = shared.AW_FILTERS as Record<"AwHsl" | "AwBlur", AwFilterDef>;
 export const getPath = shared.getPath as (adj: AdjState, path: string) => number;
 export const setPath = shared.setPath as (adj: AdjState, path: string, v: number) => AdjState;
 export const limitOf = shared.limitOf as (path: string) => Limit;

@@ -1,5 +1,5 @@
 // Drift guard for the 🎨 調色 union (CARD-05): the colour math is ONE file, public/editor-shared/color-grade.js, used by
-// /tools/canvas (via lib/studio/editor-color-grade.ts) and public/vector-editor.html (<script type="module">).
+// /tools/canvas (via lib/studio/editor-color-grade.ts) and the /tools/vector-pro dock block public/editor-shared/blocks/color-grade.js.
 // This test fails if (a) the shared limits drift from the Sharp-bake model, (b) the spec builder drifts from the legacy
 // params mapping it replaced, (c) either editor grows a private copy of the math again.
 import fs from "node:fs";
@@ -10,7 +10,7 @@ import {
   EFFECT_LIMITS, GRADE_LIMITS, GRADE_SECTIONS, PRESETS, applyAuto, applyBlurPixels, applyHslPixels, buildFilterSpecs, getPath, hslNeutral,
   isNeutralAdj, limitOf, makeFilters, neutralAdj, sanitizeAdj, setPath,
 } from "../editor-color-grade";
-import { buildFabricImageFilters } from "../../../app/(shell)/tools/canvas/fabric-filters";
+import { buildFabricImageFilters, ensureAwFilters } from "../../../app/(shell)/tools/canvas/fabric-filters";
 
 const APP = path.resolve(__dirname, "..", "..", "..");
 const read = (rel: string) => fs.readFileSync(path.join(APP, rel), "utf8");
@@ -132,21 +132,46 @@ describe("pixel math", () => {
   });
 });
 
+describe("AwHsl / AwBlur: one definition (AW_FILTERS), wrapped per Fabric version", () => {
+  it("the Fabric 7 wrapper keeps the old fields, clamping, neutral check, toObject and registry names", () => {
+    const registered: string[] = [];
+    const ns = { filters: { BaseFilter: class {} }, classRegistry: { setClass: (_c: unknown, n?: string) => { registered.push(String(n)); } } };
+    const aw = ensureAwFilters(ns) as Record<string, new (o?: Record<string, unknown>) => { isNeutralState(): boolean; toObject(): unknown; applyTo2d(o: { imageData: unknown }): void }>;
+    expect(registered).toEqual(["AwHsl", "AwBlur"]);
+    expect((aw.AwHsl as unknown as { type: string }).type).toBe("AwHsl");
+    expect(new aw.AwBlur({ blur: 250 }).toObject()).toEqual({ type: "AwBlur", blur: 100 });
+    expect(new aw.AwBlur({ blur: Number.NaN }).isNeutralState()).toBe(true);
+    expect(new aw.AwBlur().toObject()).toEqual({ type: "AwBlur", blur: 0 });
+    const st = hslNeutral(); st.red.h = 20;
+    const h = new aw.AwHsl({ state: st });
+    expect(h.toObject()).toEqual({ type: "AwHsl", state: st });
+    expect(h.isNeutralState()).toBe(false);
+    expect(new aw.AwHsl().isNeutralState()).toBe(true);
+    const px = new Uint8ClampedArray([255, 0, 0, 255]), ref = new Uint8ClampedArray(px);
+    h.applyTo2d({ imageData: { data: px, width: 1, height: 1 } });
+    applyHslPixels(ref, st);
+    expect(Array.from(px)).toEqual(Array.from(ref));
+  });
+  it("no editor carries its own AwHsl / AwBlur body", () => {
+    for (const f of ["app/(shell)/tools/canvas/fabric-filters.ts", "public/editor-shared/blocks/color-grade.js"]) {
+      const src = read(f);
+      expect(src, f).toMatch(/AW_FILTERS/);
+      expect(src, f).not.toMatch(/applyHslPixels|applyBlurPixels|sanitizeHsl/);
+    }
+  });
+});
+
 describe("no private copy of the math in either editor", () => {
-  const vector = read("public/vector-editor.html");
+  const block = read("public/editor-shared/blocks/color-grade.js");
   const canvasTsx = read("app/(shell)/tools/canvas/CanvasEditor.tsx");
   const filtersTs = read("app/(shell)/tools/canvas/fabric-filters.ts");
-  it("vector loads the shared module, carries adj in toObject, and has no old adjust block / local filter maths", () => {
-    expect(vector).toMatch(/<script type="module">[^<]*editor-shared\/color-grade\.js/);
-    expect(vector).toMatch(/const LAYER_PROPS=\[[^\]]*'adj'/);
-    expect(vector).not.toMatch(/id:'adjust'/);
-    expect(vector).not.toMatch(/new F\.(Brightness|Contrast|Saturation|HueRotation|BlendColor|Convolute|Noise)\(/);
-    expect(vector).not.toMatch(/rgbToHsl|PRESETS\s*=\s*\{/);
-    expect((vector.match(/<summary>🎨 調色<\/summary>/g) ?? []).length).toBe(1);
-    // the 調色 panel sits right after 圖層, then 去背 (CARD-06), then 匯出 (CARD-04 order)
-    expect(vector.indexOf("<summary>🗂 圖層</summary>")).toBeLessThan(vector.indexOf('id="gradePanel"'));
-    expect(vector.indexOf('id="gradePanel"')).toBeLessThan(vector.indexOf('<details id="bgPanel">'));
-    expect(vector.indexOf('<details id="bgPanel">')).toBeLessThan(vector.indexOf('<details id="exportPanel">'));
+  it("the vector-pro 調色 block imports the shared module and builds every filter from it, no local filter maths", () => {
+    expect(block).toMatch(/import \* as cg from "\/editor-shared\/color-grade\.js"/);
+    expect(block).toMatch(/cg\.makeFilters\(\(cls\) => F\[cls\], cg\.buildFilterSpecs\(adj\)\)/);
+    expect(block).toMatch(/cg\.GRADE_SECTIONS/);
+    expect(block).toMatch(/cg\.resetGradeAdj\(adj\)/);
+    expect(block).not.toMatch(/new F\.(Brightness|Contrast|Saturation|HueRotation|BlendColor|Convolute|Noise)\(/);
+    expect(block).not.toMatch(/rgbToHsl|PRESETS\s*=\s*[\[{]/);
   });
   it("canvas reads the shared module only; the old per-panel state and builders are gone", () => {
     expect(canvasTsx).toContain('from "@/lib/studio/editor-color-grade"');

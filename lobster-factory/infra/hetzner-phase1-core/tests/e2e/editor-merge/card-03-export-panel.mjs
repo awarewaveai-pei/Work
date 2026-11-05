@@ -1,9 +1,11 @@
-// CARD-03 export / project union: drives /tools/canvas and /tools/vector-editor with a text + a rect each and checks
+// CARD-03 export / project union: drives /tools/canvas with a text + a rect each and checks
 // every download by FILE CONTENT (magic bytes, svg root, pdf header, png size, alpha), the project round-trip
 // (reload page -> load file -> object count + meta), the 存入 My Designs request, and the zoom buttons.
-//   canvas: dev-only probe window.__cvTest = { canvas, fabric, undoStack }   vector: the page globals `canvas`, `realW`, ...
+//   canvas: dev-only probe window.__cvTest = { canvas, fabric, undoStack }
 // Run (dev server first): node lobster-factory/infra/hetzner-phase1-core/tests/e2e/social/dev-server-no-supabase.mjs 3904
 //   cd lobster-factory/infra/hetzner-phase1-core/tests && node e2e/editor-merge/card-03-export-panel.mjs [baseUrl] [outDir]
+// The old Vector Editor (public/vector-editor.html) retired 2026-11-05 (R0-PLAN C7.3): /tools/vector-editor redirects to
+// /tools/vector-pro, so only the Canvas Editor half of this card runs.
 import { chromium } from "@playwright/test";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -228,72 +230,13 @@ async function suite(tag, page, env) {
   await ctx.close();
 }
 
-// ───────────────────────── Vector Editor ─────────────────────────
-{
-  const ctx = await browser.newContext({ viewport: { width: 1400, height: 1500 }, acceptDownloads: true });
-  const page = await ctx.newPage();
-  watch(page, "vector");
-  let frame;
-  const open = async () => {
-    await page.goto(`${BASE}/tools/vector-editor`, { waitUntil: "domcontentloaded" });
-    await page.waitForFunction(() => [...document.querySelectorAll("iframe")].some((f) => f.src.includes("vector-editor.html")), null, { timeout: 90000 });
-    frame = page.frames().find((f) => f.url().includes("vector-editor.html"));
-    await frame.waitForFunction(() => typeof canvas !== "undefined" && document.getElementById("exportPdf") && typeof jspdf !== "undefined", null, { timeout: 60000 });
-    await frame.evaluate(() => document.querySelectorAll("details").forEach((d) => { d.open = true; })); // panels ship collapsed
-  };
-  await open();
-  const addTwo = async () => {
-    await frame.locator('[data-shape="rect"]').click();
-    await frame.locator("#addText").click();
-    await page.waitForTimeout(300);
-  };
-  await addTwo();
-  // 1) default name
-  check("vector 1 default file name is design-yyyymmdd-hhmm", /^design-\d{8}-\d{4}$/.test(await frame.locator("#fname").inputValue()), await frame.locator("#fname").inputValue());
-  const env = {
-    click: {
-      png: () => frame.locator("#exportPng").click(), webp: () => frame.locator("#exportWebp").click(),
-      svg: () => frame.locator("#exportSvg").click(), pdf: () => frame.locator("#exportPdf").click(),
-      saveProj: () => frame.locator("#saveProj").click(),
-      zoomOut: () => frame.locator("#zoomOut").click(), zoomIn: () => frame.locator("#zoomIn").click(),
-      zoom100: () => frame.locator("#zoom100").click(), zoomFit: () => frame.locator("#zoomFit").click(),
-      save: () => frame.locator("#saveDesign").click(),
-    },
-    setName: (n) => frame.locator("#fname").fill(n),
-    applySize: async (w, h, unit, dpi) => {
-      await frame.locator("#w").fill(String(w)); await frame.locator("#h").fill(String(h));
-      await frame.locator("#unit").selectOption(unit); await frame.locator("#dpi").selectOption(String(dpi));
-      await frame.locator("#setCanvas").click(); await page.waitForTimeout(400);
-    },
-    realSize: () => frame.evaluate(() => ({ w: realW, h: realH })),
-    setBg: async (v) => { await frame.locator("#bgColor").fill(v); await page.waitForTimeout(250); },
-    setTransparent: (on) => frame.locator("#transBg").setChecked(on),
-    oldShape: () => frame.evaluate(() => ({ _proj: 1, meta: canvas._meta, w: realW, h: realH, canvas: canvas.toJSON() })), // old vector file
-    reload: async () => { await open(); },
-    count: () => frame.evaluate(() => canvas.getObjects().length),
-    kinds: () => frame.evaluate(() => canvas.getObjects().map((o) => String(o.type).toLowerCase().replace(/-/g, ""))),
-    loadFile: async (path) => { await frame.locator("#loadProj").setInputFiles(path); await page.waitForTimeout(1200); },
-    uiState: () => frame.evaluate(() => ({ w: document.getElementById("w").value, h: document.getElementById("h").value, unit: document.getElementById("unit").value,
-      dpi: document.getElementById("dpi").value, bg: document.getElementById("bgColor").value, transparent: document.getElementById("transBg").checked })),
-    zoom: () => frame.evaluate(() => +canvas.getZoom().toFixed(3)),
-    zoomLabel: () => frame.locator("#zoomVal").textContent(),
-    screenSize: () => frame.evaluate(() => ({ w: canvas.getWidth(), h: canvas.getHeight() })),
-    saveLabel: async () => (await frame.locator("#saveDesign").textContent()).trim(),
-    shot: async () => { await frame.locator("#exportPanel").scrollIntoViewIfNeeded(); await frame.locator(".side").screenshot({ path: join(OUT, "card-03-vector.png") }); },
-  };
-  // vector: the shapes/text must exist again after every fresh page in the suite only where the suite adds none -> the
-  // suite reloads and loads files itself; the first run uses the two objects added above.
-  await suite("vector", page, env);
-  await ctx.close();
-}
-
 await browser.close();
 // dev server has no Supabase: its server-component theme fetch logs "supabase_unavailable" into the browser console
 // (and the matching 503 resource line); the 存入 My Designs step deliberately hits the no-DB route (503/500 resource line).
 const envNoise = (e) => /Failed to load resource|supabase_unavailable/.test(e);
 const consoleErrs = errors.filter((e) => !envNoise(e));
 const resourceErrs = errors.filter(envNoise);
-check("no console/page errors on either page", consoleErrs.length === 0, consoleErrs.join(" | "));
+check("no console/page errors on the page", consoleErrs.length === 0, consoleErrs.join(" | "));
 if (resourceErrs.length) console.log(`NOTE ${resourceErrs.length} failed resource loads (dev-server no-Supabase / no-DB noise, excluded): ${resourceErrs.map((e) => e.slice(0, 90)).join(" | ")}`);
 const failed = results.filter((r) => !r.ok).length;
 console.log(`\n${results.length - failed}/${results.length} checks passed`);

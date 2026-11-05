@@ -1,5 +1,5 @@
-// 🎨 調色 SSOT — the colour math of /tools/canvas (Fabric 7) and /vector-editor.html (Fabric 5), in ONE plain ES module
-// (no build step, no deps, no CDN). Vector loads it with <script type="module">; canvas imports it through
+// 🎨 調色 SSOT — the colour math of /tools/canvas (Fabric 7) and the /tools/vector-pro dock (Fabric 5), in ONE plain ES module
+// (no build step, no deps, no CDN). The dock block blocks/color-grade.js imports it; canvas imports it through
 // lib/studio/editor-color-grade.ts. Both sides turn the SAME `adj` object into the SAME ordered filter specs and only
 // differ in how a spec becomes a Fabric class (new fabric.filters[cls](opts) vs new fabric.Image.filters[cls](opts)).
 // drift guard: lib/studio/__tests__/editor-color-grade-drift.test.ts
@@ -377,6 +377,23 @@ export function buildFilterSpecs(rawAdj) {
   for (const l of adj.legacy) { const { type, ...opts } = l; add(type, Object.keys(opts).length ? opts : undefined); } // an old project's own filters, after everything the panels build
   return out;
 }
+/** The two pixel filters buildFilterSpecs names that Fabric does not ship, defined once. Each Fabric version only wraps
+ *  them in its own class syntax: Fabric 7 in app/(shell)/tools/canvas/fabric-filters.ts ensureAwFilters, Fabric 5 in
+ *  editor-shared/blocks/color-grade.js ensureFabric. `f` is the filter instance; init's fields are copied onto it. */
+export const AW_FILTERS = {
+  AwHsl: {
+    init: (o) => ({ state: sanitizeHsl(o && o.state) }),
+    apply2d: (f, imageData) => applyHslPixels(imageData.data, f.state),
+    neutral: (f) => !hasAnyHsl(f.state),
+    toObject: (f) => ({ type: "AwHsl", state: f.state }),
+  },
+  AwBlur: {
+    init: (o) => ({ blur: clampN(finite(o && o.blur, 0), 0, 100) }),
+    apply2d: (f, imageData) => applyBlurPixels(imageData, f.blur),
+    neutral: (f) => f.blur === 0,
+    toObject: (f) => ({ type: "AwBlur", blur: f.blur }),
+  },
+};
 /** specs → Fabric filter instances; `ctor(cls)` returns the editor's Fabric class for a name (null = skip). */
 export function makeFilters(ctor, specs) {
   const out = [];

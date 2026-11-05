@@ -116,23 +116,24 @@ describe("F3 — 還原 clears only the colour key", () => {
 
 describe("no ownership guessing anywhere", () => {
   it("isGradeFilter / param sniffing is gone from the shared module and both editors", () => {
-    for (const f of ["public/editor-shared/color-grade.js", "public/editor-shared/bg-remove.js", "public/vector-editor.html", "app/(shell)/tools/canvas/CanvasEditor.tsx", "lib/studio/editor-color-grade.ts"]) {
+    for (const f of ["public/editor-shared/color-grade.js", "public/editor-shared/bg-remove.js", "public/editor-shared/blocks/color-grade.js", "public/editor-shared/blocks/bg-remove.js", "app/(shell)/tools/canvas/CanvasEditor.tsx", "lib/studio/editor-color-grade.ts"]) {
       const src = read(f);
       expect(src, f).not.toMatch(/isGradeFilter/);
       expect(src, f).not.toMatch(/instanceof F\.RemoveColor|f\.type\s*===\s*["']RemoveColor|\.filter\(f\s*=>\s*!?\(?f instanceof/);
     }
   });
-  it("both editors rebuild the image's filters from buildFilterSpecs(adj) only — the vector keeps no 'foreign' filter list", () => {
-    const vector = read("public/vector-editor.html");
-    expect(vector).toMatch(/o\.filters=cg\.makeFilters\(cls=>F\[cls\], cg\.buildFilterSpecs\(adj\)\)/);
+  it("both editors build the image's filters from buildFilterSpecs(adj) only — the vector-pro block keeps no 'foreign' filter list", () => {
+    const vector = read("public/editor-shared/blocks/color-grade.js");
+    expect(vector).toMatch(/img\.filters = cg\.makeFilters\(\(cls\) => F\[cls\], cg\.buildFilterSpecs\(adj\)\)/);
     expect(vector).not.toMatch(/foreign/);
     expect(read("app/(shell)/tools/canvas/CanvasEditor.tsx")).toMatch(/target\.filters = makeFilters\(\(cls\) => aw\[cls\] \?\? F\[cls\], buildFilterSpecs\(adj\)\)/);
   });
-  it("both editors show an image through adoptAdj (legacy adoption), and 重設 is resetGradeAdj on both", () => {
-    const vector = read("public/vector-editor.html"), canvas = read("app/(shell)/tools/canvas/CanvasEditor.tsx");
-    expect(vector).toMatch(/cg\.adoptAdj\(o\.adj, o\.filters\)/);
+  // the vector-pro block grades a flattened copy of the pixels (no Fabric filters live on a VectorCraft image), so only the
+  // canvas adopts legacy filters; 重設 is resetGradeAdj on both
+  it("the canvas shows an image through adoptAdj (legacy adoption), and 重設 is resetGradeAdj on both editors", () => {
+    const vector = read("public/editor-shared/blocks/color-grade.js"), canvas = read("app/(shell)/tools/canvas/CanvasEditor.tsx");
     expect(canvas).toMatch(/adoptAdj\(img\.adj, img\.filters\)/);
-    expect(vector).toMatch(/cg\.resetGradeAdj\(cgAdj\)/);
+    expect(vector).toMatch(/cg\.resetGradeAdj\(adj\)/);
     expect(canvas).toMatch(/resetGradeAdj\(a\)/);
   });
 });

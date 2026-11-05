@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
-import { PLATFORM_PAGES, RESERVED_SUBDOMAINS, nextAdminProducts, productHost, servedNextAdminProducts } from "../doors";
+import { PLATFORM_PAGES, RESERVED_SUBDOMAINS, STAFF_ROUTE_GROUPS, nextAdminProducts, productHost, servedNextAdminProducts } from "../doors";
 import { STAFF_PLATFORM, covers } from "../staff-tools";
 import { BACK_OFFICE, STAFF_UTILITIES, LOGIN_SOURCES, PRODUCTS } from "../products";
 
@@ -92,7 +92,7 @@ describe("product registry", () => {
     const pageUrls = (dir: string, url: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
       e.isDirectory() ? (e.name.startsWith("_") ? [] : pageUrls(path.join(dir, e.name), e.name.startsWith("(") ? url : `${url}/${e.name}`))
         : e.name === "page.tsx" ? [url || "/"] : []);
-    const staffUrls = new Set(pageUrls(path.join(APP_DIR, "(shell)"), ""));
+    const staffUrls = new Set(STAFF_ROUTE_GROUPS.flatMap((g) => pageUrls(path.join(APP_DIR, g), "")));
     for (const p of nextAdminProducts()) {
       const nav = p.door.nav ?? [];
       expect(new Set(nav.map((n) => n.path)).size, p.key).toBe(nav.length);
@@ -139,13 +139,15 @@ describe("product registry", () => {
     }
   });
 
-  it("every directory under app/(shell)/{tools,ops} and app/(shell)/* maps to a product or a listed back-office or staff utility", () => {
+  it("every directory under app/<staff group>/{tools,ops} and app/<staff group>/* maps to a product or a listed back-office or staff utility", () => {
     // A `_` folder is private in the App Router (never a route): app/__tests__ failed this as a page with no product
     // and blocked sg-deploy's test gate (2026-10-23).
     const dirs = (d: string) => readdirSync(d, { withFileTypes: true }).filter((e) => e.isDirectory() && !e.name.startsWith("_")).map((e) => e.name);
-    const shell = path.join(APP_DIR, "(shell)");
-    const actual = [...dirs(shell).filter((n) => !["tools", "ops"].includes(n)),
-      ...["tools", "ops"].flatMap((group) => dirs(path.join(shell, group)).map((n) => `${group}/${n}`))];
+    const actual = [...new Set(STAFF_ROUTE_GROUPS.flatMap((g) => {
+      const shell = path.join(APP_DIR, g);
+      const sub = (group: string) => (existsSync(path.join(shell, group)) ? dirs(path.join(shell, group)) : []);
+      return [...dirs(shell).filter((n) => !["tools", "ops"].includes(n)), ...["tools", "ops"].flatMap((group) => sub(group).map((n) => `${group}/${n}`))];
+    }))];
     for (const dir of actual) {
       if (STAFF_PLATFORM.pages.some((p) => covers(p, `/${dir}`))) continue;   // every staff member's page: no cell owns it
       const owners = PRODUCTS.filter((p) => p.staffPaths.includes(dir));
@@ -219,6 +221,6 @@ describe("product registry", () => {
         }
       }
     };
-    for (const dir of Object.keys(STAFF_UTILITIES)) scan(path.join(APP_DIR, "(shell)", dir));
+    for (const dir of Object.keys(STAFF_UTILITIES)) for (const g of STAFF_ROUTE_GROUPS) if (existsSync(path.join(APP_DIR, g, dir))) scan(path.join(APP_DIR, g, dir));
   });
 });

@@ -5,7 +5,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { PUBLIC_API_PATHS } from "../../../middleware";
 import { BACK_OFFICE, PRODUCTS, STAFF_UTILITIES } from "../products";
-import { PLATFORM_APIS, doorApis, nextAdminProducts } from "../doors";
+import { PLATFORM_APIS, STAFF_ROUTE_GROUPS, doorApis, nextAdminProducts } from "../doors";
 import { STAFF_API_OWNERS, STAFF_PLATFORM, STAFF_TOOLS, covers, staffApisOf, toolsFor } from "../staff-tools";
 import ts from "typescript";
 import { ROOT, codeIndex, isRoute, scan } from "./code-scan";
@@ -63,7 +63,7 @@ function urls(dir: string, file: "page" | "route", base = ""): string[] {
 }
 
 const staffPages = () => [
-  ...urls(path.join(APP, "(shell)"), "page"),
+  ...STAFF_ROUTE_GROUPS.flatMap((g) => urls(path.join(APP, g), "page")),
   ...nextAdminProducts().flatMap((p) => urls(path.join(APP, p.door.page.slice(1)), "page", p.door.page)),
 ];
 const gatedApis = () => urls(path.join(APP, "api"), "route", "/api")
@@ -101,8 +101,8 @@ describe("staff tools", () => {
     const productOf = (api: string) => nextAdminProducts().filter((p) => doorApis(p).some((a) => covers(a, api))).map((p) => p.key);
     const problems: string[] = [];
     for (const tool of STAFF_TOOLS) {
-      // a page path is served from app/(shell)<path> on the staff door and from app<path> on a product door
-      const roots = tool.pages.flatMap((p) => [`app/(shell)${p}/`, `app${p}/`]);
+      // a page path is served from app/<staff group><path> on the staff door and from app<path> on a product door
+      const roots = tool.pages.flatMap((p) => [...STAFF_ROUTE_GROUPS.map((g) => `app/${g}${p}/`), `app${p}/`]);
       const files = INDEX.importClosure([...INDEX.files.keys()].filter((f) => roots.some((r) => f.startsWith(r)) && !isRoute(f)));
       for (const f of files) {
         const scan = INDEX.files.get(f)!;
@@ -223,7 +223,7 @@ describe("staff tools", () => {
   });
 });
 
-// public/editor-shared/*.js is loaded by /tools/canvas and the /vector-editor.html iframe (調色 math, CARD-05 2026-11-04):
+// public/editor-shared/*.js is loaded by /tools/canvas and the /tools/vector-pro dock blocks (調色 math, CARD-05 2026-11-04):
 // it must reach every signed-in staff member, or a staff member with only the design tool ticked loses 調色.
 describe("shared editor assets belong to every staff member", () => {
   it("/editor-shared/* is platform", () => {

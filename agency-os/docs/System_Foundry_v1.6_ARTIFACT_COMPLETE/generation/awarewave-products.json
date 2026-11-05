@@ -2414,6 +2414,11 @@
             "path": "mockup",
             "name": "模型圖",
             "staff": "tools/mockup"
+          },
+          {
+            "path": "pro",
+            "name": "向量（專業版）",
+            "staff": "tools/vector-pro"
           }
         ]
       },
@@ -2448,7 +2453,7 @@
         "tools/designs",
         "tools/mockup",
         "tools/banner",
-        "tools/vector-editor"
+        "tools/vector-pro"
       ]
     },
     {
@@ -2874,6 +2879,20 @@
         {
           "feature_key": "video.transcribe",
           "name": "語音轉字幕",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "video.bg-remove",
+          "name": "去背",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "video.3d",
+          "name": "圖片轉 3D",
           "limitKind": "QUOTA",
           "buyout": true,
           "billing": "credits"

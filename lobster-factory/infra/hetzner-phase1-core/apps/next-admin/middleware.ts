@@ -473,5 +473,5 @@ export const config = {
   // on isWrongHostForPortal for why a matcher-level exclusion would have silently skipped the
   // host check). `/portal/launcher` etc. reach the normal session gate below and get
   // x-ops-user-kind/x-ops-org-id for lib/tenant-guard.ts's requireClientOrg().
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|login|intake|api/auth|api/webhooks|api/internal|tarot-frames|edge-masks/|vector-editor.html).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|login|intake|api/auth|api/webhooks|api/internal|tarot-frames|edge-masks/).*)"],
 };
