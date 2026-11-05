@@ -1,4 +1,28 @@
 # Worklog
+## 2026-11-05（續15）畫布專業版計畫定稿：逐條對操作者要求最後檢視＋獨立 critic（只有文件）
+
+- 根因：操作者要求「用所有條件做最後檢視」，並交代不畫蛇添足、不矛盾、不留難管理的補丁、需重寫自行評估。
+- 定案（寫進 R0-PLAN §5）：
+  - 介面：用上游 `craft-web-api`＋`craft-web-host`，不自創、不另寫網頁殼（另寫＝複製上游 1,232 行並永久跟版）；卡 C1.3 動工先查上游是否已內建，已內建零補丁。
+  - 刪掉「轉存」面板（與 WebP 面板、原生 CMYK／出血 PDF、My Designs 重複）；待決由 3 題減為 2 題。
+  - 快取不變量：檔名帶內容雜湊才 1 年，其餘重新驗證（取代逐檔列舉）。
+- critic（Standard，約 55 處 file:line）10 條 Major，逐條 grep：9 條成立已修、1 條半不成立（`tab_strip` 可覆寫，`theme.rs:1363`）：
+  - M1 主題：頻道應為 `awarewave:theme`（`frame-theme.ts:8-10,22`），接收端呼叫 `window[api].setTheme`（`awarewave-theme-receiver.js:70`）→ C1.1 抽 `theme-map.json`（api＋對應表），C1.4 比照 `api-settheme.patch` 加 `set_host_tokens`＋`setTheme`。
+  - M2 C1.1 驗收自相矛盾（接收端雜湊必變）→ 改驗 wasm／字型／上游檔雜湊與對應值。
+  - M3 nginx regex 含 `{16}` 需引號；表格內 `\|` 會被照抄 → 移到 code block。
+  - M4 design 門加 nav 會讓 `products.test.ts:102` 紅 → C3.3 只加 staffPaths，門路徑沿用 `canvas`。
+  - M5 dock 尺寸寫在 `theme.css` 且被 `vector-pro-dock.test.ts:201-221` 斷言 → 尺寸只存各 `dock.js` 的 `sizes`，由 `mountDock` 寫成 CSS 變數。
+  - M6 `design-source.ts:44,57` 寫死 vectorcraft／svg → 改成由 `SOURCE_EXTS` 產生。
+  - M7 `my-designs.js:40,89,96` 漏改；`:89` 會讓向量版列出 `.pcraft`。
+  - M8 ctx 兩個擁有者 → 頁框只把交接掛到 `window.__proEditor.handoff`，由 dock 的 ctx 開檔。
+  - M9 交接不分編輯器、R2 網址未過 `toCanvasSrc`（`canvas-handoff.ts:134,162`）→ 加 `editor` 欄位。
+- 事故（已修）：修正腳本以「| C1.4 |」定位，命中 §1 對照表而吃掉前段 → 整份重寫；§1 表改寫「卡 C1.4」避免再撞。教訓：改表格列用行號或整檔重寫，不用列首字串定位。
+- 驗證：`node check.mjs` → `ok: 7 cards, 28 items bound to plan §6 (0 done), 2 open, page fresh`；新引用行號 17 處逐一印出核對；監工台同網址重發。
+- rollback：`git revert` 本 commit。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd agency-os/handoffs/2026-11-05-photocraft-pro && node build.mjs && node check.mjs | exit=0 | ms=900
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/10m/0n（9 修、1 半不成立）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=__vectorProFrame | hits=11
+- ORACLE_WAIVED: 只有 .md 與監工台 data.mjs／supervisor.html，無執行期程式碼；已由獨立 critic agent 審
 ## 2026-11-05（續14）向量專業版收尾：圖示欄、九面板修正、主題傳色、字型灌入，正式站實測全過
 
 - 操作者當天追加定案：右側只留一條圖示欄；統一 class＋主題 token；不要深淺色，VectorCraft 本體照 video 模式吃主題（接收補丁已核准）；字型灌進 VectorCraft 字型庫、取消我方字型面板。

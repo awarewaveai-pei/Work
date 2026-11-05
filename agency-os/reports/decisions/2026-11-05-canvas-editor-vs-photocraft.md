@@ -7,7 +7,7 @@
 ## 0. 結論
 
 - **真品**：`github.com/storytold/photocraft`，77,055★、Apache-2.0、2026-11-05 仍在推（`gh api`）。Photoshop 的 clean-room 重製，自評 alpha：廣度 ~76%、深度 55%、UI 40%、效能 25%（`PC/ROADMAP.md:22,53,54,58`）。
-- **G1（路線的閘）**：主線網頁版**沒有** `window.photocraft`（`PC/apps/photocraft-web/src/main.rs:8`）。但控制協定與傳輸無關（`PC/crates/ui-egui/src/control.rs:3`），app 已有入口 `with_control()`（`PC/crates/ui-egui/src/app/control.rs:5`），網頁殼只是沒接。上游共用函式庫已有兩個現成模組：`craft-web-api`（`window.<app>`，craft-libs#413，2026-11-05 09:28 UTC 合併）與 `craft-web-host`（`?host=parent` 開檔／存檔訊息）；PhotoCraft 兩個都還沒用。→ 三個選項見 §4，**要操作者選**。
+- **G1（路線的閘）**：主線網頁版**沒有** `window.photocraft`（`PC/apps/photocraft-web/src/main.rs:8`）。但控制協定與傳輸無關（`PC/crates/ui-egui/src/control.rs:3`），app 已有入口 `with_control()`（`PC/crates/ui-egui/src/app/control.rs:5`），網頁殼只是沒接。上游共用函式庫已有兩個現成模組：`craft-web-api`（`window.<app>`，craft-libs#413，2026-11-05 09:28 UTC 合併）與 `craft-web-host`（`?host=parent` 開檔／存檔訊息）；PhotoCraft 兩個都還沒用。→ 三個選項見 §4；操作者 2026-11-05 交由工程評估，定案見 §4 末。
 - **比向量版省的**：官方網頁版 zip 13 MB（v0.20.2；VectorCraft 是 89 MB）；字型用同源 `fonts/manifest.txt` 隨需下載，不需字型補丁；不用 SharedArrayBuffer。
 - **比向量版難的**：(1) 沒有現成 JS 介面；(2) 帶路徑的檔案指令在自動化下被拒（`PC/docs/control-protocol.md:190`），bytes 進出要走宿主訊息；(3) 沒有「置入 base64」「取出內嵌圖」這類指令，圖層像素進出要用指令序列，先 spike；(4) 網頁版語言 `auto` 永遠是英文（`PC/crates/ui-egui/src/i18n/system.rs:55-58`），要明確設 `zh-hant`；(5) Canvas Editor 有五個上游入口（§6）。
 - **PhotoCraft 沒有、要保留的**：AI 去背、AI 去除／生成填色、AI 擴圖、邊緣遮罩、WebP ≤200KB、My Designs、社群尺寸範本，加上向量版共用的 QR／條碼／Mockup／批次匯出／調色預設（§3）。
@@ -82,7 +82,7 @@
 | 邊緣遮罩 14 種筆刷邊（`CE:1535`，`NA/lib/studio/edge-mask.ts:145`） | 無同款 | **新面板「邊緣遮罩」** |
 | PNG 下載（`CE:1983`）、PDF 真實 cm（`:1956`） | Export As（png/jpg/webp/tif/tga/ico/jxl，`PC/crates/ui-egui/src/dialogs/export_dialog.rs:19`）；PDF 走 Save a Copy／`file.print {bleed, cornerCropMarks, output: pdf}`（`PC/crates/engine/src/cmd/print_cmds.rs:1554-1557`） | 原生 |
 | WebP ≤200KB 自動壓（`CE:2035-2062`） | WebP 有品質，無大小上限（`PC/crates/engine/src/cmd/web_cmds.rs:83` 只估大小） | **面板「匯出 WebP」沿用** |
-| SVG 下載（`CE:1949`） | 無 SVG 匯出（`PC/book/src/formats/svg.md:3`） | 待決 2（建議：向量出稿走已上線的向量專業版） |
+| SVG 下載（`CE:1949`） | 無 SVG 匯出（`PC/book/src/formats/svg.md:3`） | 待決 1（建議：向量出稿走已上線的向量專業版） |
 | 存入 My Designs（`CE:1989-2011`） | 無 | **面板「My Designs」沿用**；原始檔存 `.pcraft` |
 | 設計檔 `.design.json` 匯出／匯入（`CE:1709,1719`） | 原生 `.pcraft`（ZIP：`manifest.json`＋`tiles/`，`PC/book/src/formats/pcraft.md:3-15`）、PSD 讀寫 | 原生；舊檔見 §6 |
 | （向量版共用）QR、條碼、Mockup、批次多尺寸匯出 | 無（grep `qr code\|barcode` 非測試 0 筆；Mockup 只有 smart object 手做） | **四個面板沿用** |
@@ -118,6 +118,8 @@ PhotoCraft 多出來、CE 沒有的（操作者需求 ①）：選取工具全�
 
 B 之外仍未知、要在本機 spike 才知道的（計畫 C1.5）：圖層像素進出的指令序列（置入成圖層、取作用中圖層像素、換圖層像素、取選取範圍當遮罩）。已知可用的積木：`edit.copy`／`edit.paste`／`edit.pasteSpecial.pasteInPlace`、`document.activate`、`layer.select`、`file.close`（`PC/crates/engine/src/cmd/atn_cmds/events.rs:869-1109`）。備案：補丁多掛一個把 bytes 推進 `place_inbox`（`web.rs:86`）的頁面函式。
 
+定案（2026-11-05）：B，並加兩條使補丁可管理——(1) 動工時先查上游是否已內建，已內建就釘那個 commit、零補丁；(2) 不另寫一份網頁殼（那等於複製上游 `web.rs`＋`preset_bridge.rs`＋`indexed_presets.rs` 共 1,232 行並永久跟版）。主題補丁縮到最小：只把 `theme.rs:1123` 的編譯條件從整個 `live` 模組移到 `LiveTokens`，由網頁殼呼叫 `apply_overrides`，不動 `control/dispatch.rs`。
+
 ## 5. 建置與承載（與 VectorCraft 的差異）
 
 | 項 | PhotoCraft | 位置 |
@@ -151,12 +153,12 @@ B 之外仍未知、要在本機 spike 才知道的（計畫 C1.5）：圖層像
   2. 有宿主時原生 Save As／Export 不再自己下載（C1.3 的接法）→ 父頁要代為下載，否則檔案像消失。
   3. 「我的設計」的「Canvas 編輯」只傳 PNG（`DesignsGallery.tsx:1295`）→ 有原始檔時要傳原始檔並依副檔名選編輯器。
   4. Mockup 工具沒有直接進畫布的按鈕（`MockupStudio.tsx`、`ModelMockupPanel.tsx` 無 `openInCanvas`）；輸入只從 My Designs 或上傳（`:585-593`）→ 補按鈕。
-  5. 編輯後沒有路回到「網頁用／印刷用」輸出軌（只在來源工具的 `NA/components/tools/OutputTrackBar.tsx:83-110`）→ 新面板「轉存」重用同一支 API `/api/tools/image/process`。
+  5. 編輯後沒有路回到來源工具的「網頁用／印刷用」輸出軌（`NA/components/tools/OutputTrackBar.tsx:83-110`）→ 最後檢視後**不做**面板：網頁用與 WebP 面板重複；印刷用 PhotoCraft 原生有 CMYK 與出血 PDF（`PC/crates/engine/src/cmd/image_cmds.rs:1107`、`print_cmds.rs:1554-1557`）；送 Mockup 經 My Designs 已可（`MockupStudio.tsx:305`）。
 
 ## 7. 下一步
 
-1. 操作者決定待決 1（G1：A／B／C）。選 B 才能動工。
-2. 選 B → 照 R0-PLAN C1 開始；C1.5 的 spike 是第二個閘（圖層像素進出做不到幾項就回報幾項）。
+1. 操作者說開始 → 照 R0-PLAN C1；C1.3 第一步先查上游是否已內建介面。
+2. C1.5 的 spike 是閘（圖層像素進出做不到幾項就回報幾項）。
 3. 建議模型：C1（補丁＋spike）Opus 5.5；C2／C3／C6 fullstack-engineer（Sonnet）；C4 Opus 5.5；驗收 Fable。
 
 ## 8. 查證紀錄
@@ -164,4 +166,5 @@ B 之外仍未知、要在本機 spike 才知道的（計畫 C1.5）：圖層像
 - 版面（agent，63 次工具呼叫）抽查 8 處：`panels/title_bar.rs:25`、`panels/toolbar.rs:92,96`、`panels/panel_docking.rs:89-91,561`、`panels/dock.rs:37`、`theme.rs:225-244`、`i18n/system.rs:55-58`、`panels/status_bar.rs:7-9` — 全部相符。
 - 功能（agent，65 次工具呼叫）抽查 7 處：`ROADMAP.md:22`、`docs/plugins.md:183-187`、`crates/engine/src/cmd/web_cmds.rs:79-83`、`cutout_cmds.rs:1-6`、`type_extra_cmds.rs:964-967`、`docs/gaps.md:227-228`、`packaging/web/README.md:156-182` — 全部相符。
 - agent 自報不確定：選單項目數為靜態計數；`craft-ui` 分頁列畫法未見；上游文件彼此矛盾三處（工具數 `ROADMAP.md:22` vs `docs/gaps.md:68`；PDF 向量 `docs/file-format-parity.md:43` vs `docs/pdf-vector-export.md:5-7`；served 字型是否進 fallback）。
+- 計畫最後檢視（2026-11-05 晚）：獨立 critic 讀回約 55 處 file:line，報 10 條 Major；逐條 grep 後 9 條成立並修進 R0-PLAN（主題頻道與接收端、C1.1 驗收、nginx regex 引號、design 門 nav、dock 尺寸與向量版測試、`design-source.ts:44,57`、`my-designs.js:40,89,96`、ctx 單一擁有者、交接分編輯器），1 條的一半不成立（`tab_strip` 可覆寫，`PC/crates/ui-egui/src/theme.rs:1363`）。critic 未驗：craft-libs 的 `PageApi`／`Host` 簽名、`edge-mask.ts` 是否依賴 DOM。
 - 未驗：實際建置大小、WebGL2 下效能、`zh-hant` 實際觀感、§4 的 spike 項。
