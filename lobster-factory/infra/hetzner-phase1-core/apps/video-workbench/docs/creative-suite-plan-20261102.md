@@ -15,7 +15,7 @@
 | 引擎升級＝獨立卡（釘版＋checksum 改動），不夾帶 | 本檔 v4 |
 | **圖片轉 3D（S4b，2026-11-03 操作者「好」）**：主力 Stability AI API（SPAR3D／SF3D，英國）＋本機 Stable Fast 3D（免費，RTX 5060 8 GB）；備援 Replicate TRELLIS（2026-11-03 改，沿用去背金鑰；原 fal TRELLIS.2）；**Meshy 停用**（營運實體疑在北京，adapter 保留不設預設）；綁骨／動作用 Blender（P5）＋S4b 補：生成模型 Rigify 自動人形骨架（非人形手動對位）、內建免費動作庫（CMU BVH）。卡排 P6 之後 | `docs/s4-image-to-3d-providers-20261103.md` |
 | **路線 = C**（P0 2026-11-02）：合成類 ③ 不能載入自備字型，繁中顯示 NO GLYPH（上游 web.md:68），另 ① WebGPU 54 s device lost、WebGL2 0.47× 即時，⑤ 焦點出不了 iframe；剪輯類 ② 重開後素材離線。重評條件：上游支援使用者字型時，`node scripts/vendor-effectcraft.cjs` 後重跑 P0（engines/effectcraft/VERSION.json 改版＝獨立卡） | `docs/p0-effectcraft-gate-20261102.md` |
-| **路線重評（2026-11-06，等操作者選；選定前路線仍為 C）**：③ 字型、⑤ 焦點、② 重開素材都有解法（建置時編入繁中字型、工作台側按鍵監聽、`footage.relink`）；① 效能仍看顯示卡（內顯不行，RTX 5060 的 WebGPU 可用且沒再斷線）。FilmCraft main 有嵌入橋 `?host=parent`。建議 B：並存，FilmCraft 先；三條路線都先做「一支影片一條線」專案主線 | `docs/engine-route-plan-20261106.md`、`docs/p0-reeval-gates-20261106.md` |
+| **路線 = B（操作者 2026-11-06）**：FilmCraft、EffectCraft 做成「專業剪輯」「專業特效」入口，跟自製工具並存；先做專案主線。卡 PJ／FC／EC，規格 `docs/engine-route-plan-20261106.md` §9。重評結果：③ 字型、⑤ 焦點、② 重開素材都有解法（建置時編入繁中字型、工作台側按鍵監聽、`footage.relink`）；① 效能仍看顯示卡（內顯不行，RTX 5060 的 WebGPU 可用且沒再斷線）。FilmCraft main 有嵌入橋 `?host=parent`。建議 B：並存，FilmCraft 先；三條路線都先做「一支影片一條線」專案主線 | `docs/engine-route-plan-20261106.md`、`docs/p0-reeval-gates-20261106.md` |
 
 ## 1. 現況與缺口（2026-11-02 查證，`file:line`）
 
@@ -75,6 +75,9 @@
 | S4b | 圖片轉 3D 換供應商＋自動骨架 | 見 §0 圖片轉 3D 列：provider adapter（Stability API 主力、本機 SF3D 免費、Replicate TRELLIS 備援，Meshy 停用）；Blender Rigify 自動人形骨架；內建 CMU BVH 動作庫；一個 job id 只呼叫廠商一次 | 同 10 張圖三方式比品質定預設；人形模型自動綁骨＋套動作，保存重開可改 | Opus |
 | RV | 影片模型接 Replicate | 見 `docs/replicate-video-models-plan-20261105.md`：NA `MOTION_MODELS` 抽成無 import 的 `next-admin/lib/ai/video-motion-models.ts`，VW 經 `awarewave-files.txt` 直接讀（不建第二份清單）；每個任務依 `settings.model` 選 sora-2（OpenAI）或 Runway／Veo／Luma（Replicate）；價格只讀 `cost-model.ts` `VIDEO_MOTION_RATES`；模型按鈕顯示價格、不用下拉 | 舊專案 `sora-2` 送出內容與改前相同；假 fetch 測送出欄位＝NA `buildInput`、重開續輪詢、取消；真打一次 Runway 5 秒（US$0.25）成品可播、帳冊與用量記 `runwayml/gen4-turbo` | Opus |
 | RE | 引擎路線重評＋專案主線計畫 | 見 `docs/engine-route-plan-20261106.md`（R0 計畫）與 `docs/p0-reeval-gates-20261106.md`（差距表、五閘）：EffectCraft v0.21.1、FilmCraft main `46763a8` 各加繁中字型試建（補丁與腳本在 `docs/p0-reeval-evidence/`）；三條路線 A 取代／B 並存／C 自製補缺口各附 rollback；專案主線回答重評 handoff §2b 四問。不改正式程式、不部署 | 差距表、五閘證據、R0 計畫三份齊；操作者選路線後，才把該路線的卡加進本表 | Fable |
+| PJ | 專案主線：一支影片一條線 | 見 `docs/engine-route-plan-20261106.md` §6、§9 PJ：專案頁的「集」＝一支影片，底下掛剪輯檔、步驟紀錄、成片；舊剪輯專案原樣收進專案頁；工具做完自動寫回；來源改了標示要重做。等卡 RV.4 結束才動 `scripts/projects-0.js` | 舊資料測試（筆數相同、每筆能開、輸出設定相同）；照 §6 答 1 的例子走完，每一步成品自動出現在下一步 | 設計 Fable；做 Opus |
+| FC | 專業剪輯（FilmCraft 嵌入） | 見同檔 §9 FC.0–FC.4：建置鏈沿用 `scripts/craft-web-build/`；外框頁用上游嵌入橋 `?host=parent` 送檔、收存檔與輸出；輸出當成一筆已完成的任務，入帳與送審走現有路；主機靜態目錄＋nginx（High） | 送素材 → 存檔 → 重開 → 輸出 → 任務紀錄與主系統資產都有、帶來源紀錄 → 送審檢查過；瀏覽器下載零次；內顯電腦看到提醒 | 卡 FC.1 寫死可派；其餘 Opus；FC.4 等操作者 go |
+| EC | 專業特效（EffectCraft 嵌入） | 見同檔 §9 EC：FC 驗收後才開；建置鏈同型，另補嵌入橋（照 `scripts/photocraft-pro/web-host-api.patch` 的做法）；頁面與入帳沿用 FC 的外框與路由 | 同 FC 的流程在 EffectCraft 走通；重開專案素材不離線 | Opus |
 
 ## 5. 機械閘門（每卡）
 

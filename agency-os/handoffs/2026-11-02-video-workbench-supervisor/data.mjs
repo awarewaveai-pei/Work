@@ -35,7 +35,7 @@ export const NOW = [
   { what: '2D 角色骨架。', state: 'yes', ev: '2026-11-03 卡 P4：工具「角色綁定」，姿勢圖可當生成參考。' },
   { what: '3D。', state: 'yes', ev: '2026-11-03 卡 P5：工具「3D」，Blender 4.5.9 渲染回剪輯。圖片轉 3D 改走 S4b（Meshy 停用）。' },
   { what: '在 video.aware-wave.com 登入使用。', state: 'yes', ev: '2026-11-05 已上線：未登入回 401、偽造身分回 401、smoke 全綠；3D 用主機 CPU（Cycles）。送審缺口已補（P6.13）；全程投遞實測待你操作（P6.10）。' },
-  { what: 'EffectCraft、FilmCraft 的專業功能在站上用得到。', state: 'no', ev: '11-02 試驗沒過，所以站上的剪輯與動畫都是自製的。11-06 重新試過：字型、焦點、重開素材都有解法，可以做成「專業剪輯」「專業特效」兩個入口；等你選路線（卡 RE、待決 2）。' },
+  { what: 'EffectCraft、FilmCraft 的專業功能在站上用得到。', state: 'no', ev: '11-02 試驗沒過，所以站上的剪輯與動畫都是自製的。11-06 重新試過：字型、焦點、重開素材都有解法，你 11-06 選了「並存」：做成「專業剪輯」「專業特效」兩個入口，現有工具都留著。卡 FC 上線後這一列才會變成可以。' },
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
@@ -54,6 +54,7 @@ const P5 = '646cc9778';
 const P6 = '9465bbc8c';
 const RV = 'd84f65ec5';
 const RE = '1c0dcce1f';
+const RB = '28dff199c';
 
 export const STEPS = [
   { n: 1, code: '0', title: '切 4178 到 repo', plain: '例：打開 127.0.0.1:4178，角色頁出現「示範角色庫」，代表跑的是 repo 版；舊資料一筆不少。',
@@ -213,7 +214,8 @@ export const STEPS = [
       todo('RV.4', '上線後真打一次：Runway 5 秒、一張小圖，約 US$0.25；部署要你同意。'),
     ] },
   { n: 15, code: 'RE', title: '引擎路線重評', plain: '例：你問「說好的 EffectCraft、FilmCraft 怎麼沒看到」。這張卡把兩個引擎的最新版重新試一遍，寫出三條路線給你選；也回答「工具像零件」要怎麼串成一條線。',
-    gate: '差距表、五個檢查的證據、計畫都寫好；你選定路線。', risk: 'Low', model: 'Fable', status: 'in_progress', depends: ['P0'], before: '待決 2',
+    gate: '差距表、五個檢查的證據、計畫都寫好；你選定路線。', risk: 'Low', model: 'Fable', status: 'done', commit: RB, depends: ['P0'],
+    decided: '2026-11-06 你選路線 B（並存）：FilmCraft 做成「專業剪輯」、EffectCraft 做成「專業特效」，跟現有工具並存；先把一支影片串成一條線。',
     result: '2026-11-06 兩個引擎都加上繁中字型重新建出網頁版並實測。11-02 卡住的字型、焦點、重開素材現在都有解法。剩效能：這台筆電的瀏覽器預設用內建顯示卡，FilmCraft 畫面每秒不到一格；改用 RTX 5060 時每秒二十格上下，連跑兩分半沒有再斷線。FilmCraft 新增了嵌入用的接口，成品可以直接交回工作台，不必下載。',
     what: 'EffectCraft v0.21.1、FilmCraft main 46763a8 各加繁中字型試建；重跑五閘；三者差距表；三條路線各附 rollback；專案主線回答重評 handoff §2b 四問。不改正式程式',
     files: ['VW/docs/engine-route-plan-20261106.md', 'VW/docs/p0-reeval-gates-20261106.md', 'VW/docs/p0-reeval-evidence/'],
@@ -221,12 +223,44 @@ export const STEPS = [
       done('RE.1', '差距表：EffectCraft、FilmCraft、現在自製的工具逐條比。剪輯是 FilmCraft 最完整，特效是 EffectCraft 最完整；骨架、3D 模型、AI 工具、送審只有自製的有。', RE),
       done('RE.2', '五個檢查重跑：繁中字（輸出畫面正確）、嵌入後焦點（工作台加一個按鍵就能回側欄）、重開素材、輸出都過或有解法；效能要看顯示卡，沒有獨立顯卡的電腦跑不順。', RE),
       done('RE.3', '計畫：三條路線的好處、代價、怎麼退回。建議「並存」：新增「專業剪輯」（FilmCraft，先做）與「專業特效」（EffectCraft，後做），現有工具全部留著。另寫「一支影片一條線」：從腳本到送審每一步用哪個工具、成品自動流到哪、前面改了後面怎麼知道。', RE),
-      todo('RE.4', '你選路線後，把那條路線的卡排進這一頁，每張卡寫到逐檔逐行才開工。'),
+      done('RE.4', '你選了路線 B。卡 PJ、FC、EC 已排進這一頁；專業剪輯的五張小卡寫到逐檔逐行，另外兩組開卡前再補細節。', RB),
+    ] },
+  { n: 16, code: 'PJ', title: '一支影片一條線', plain: '例：做 30 秒商品短片。建專案、產生分鏡、每個鏡頭按「生成」，成品自動掛在那個鏡頭上；按「排成時間軸」就照鏡頭順序排好；配音、字幕自動放到對的軌道；輸出的成片上直接按「送審與投遞」。不用再回素材庫找檔案。',
+    gate: '舊的剪輯專案一筆不少、都能開、輸出設定不變；照上面的例子走一遍，每一步的成品自動出現在下一步。', risk: 'Medium', model: '設計 Fable；做 Opus', status: 'not_started', depends: ['RV', 'RE'],
+    what: '專案頁的「集」＝一支影片，底下掛剪輯檔、步驟紀錄、成片；舊剪輯專案原樣收進專案頁；工具做完自動寫回；來源改了標示要重做。等卡 RV.4 結束才動 projects-0.js',
+    files: ['VW/docs/engine-route-plan-20261106.md', 'VW/scripts/projects-0.js', 'VW/scripts/tools-editor.js', 'VW/scripts/tools-0.js'],
+    items: [
+      todo('PJ.1', '定好「每一步做了什麼」的紀錄格式；現有的剪輯專案自動收進專案頁，原檔不改。'),
+      todo('PJ.2', '一集的畫面上有一排步驟，顯示還沒做、做好了、要重做；工具做完，成品自動掛回這一集。'),
+      todo('PJ.3', '「排成時間軸」：照鏡頭順序與腳本秒數自動排好；配音、字幕自動放到對的軌道。'),
+      todo('PJ.4', '前面的步驟改了，後面的步驟顯示「要重做」；每支成片可以看到它是怎麼做出來的。'),
+    ] },
+  { n: 17, code: 'FC', title: '專業剪輯（FilmCraft）', plain: '例：在應用工具按「專業剪輯」，選幾支素材，進到 FilmCraft 的完整剪輯畫面（修剪工具、三十多種轉場、調色曲線與色輪、混音器）。按存檔，專案存回工作台；按輸出，成片直接進素材庫與任務紀錄，不用下載再上傳。',
+    gate: '送素材進去、存檔、關掉重開、輸出，成片在任務紀錄與素材庫都有，帶來源紀錄，送審檢查通過；沒有獨立顯示卡的電腦會先看到提醒。', risk: 'High', model: '建置可派工；頁面與入帳 Opus；上線等你同意', status: 'not_started', depends: ['RE'], before: '待決 3',
+    decided: '介面是英文、不跟站上的主題、裡面有下拉選單（引擎自己的畫面，改不了）。輸出最高 1080p；要 4K 或很長的片用一般剪輯。沒有獨立顯示卡的電腦會很卡，開啟前會提醒並可改用一般剪輯。',
+    what: '建置鏈沿用 scripts/craft-web-build；外框頁用上游嵌入橋 ?host=parent 送檔、收存檔與輸出；輸出當成一筆已完成的任務，入帳與送審走現有路；主機靜態目錄＋nginx',
+    files: ['VW/docs/engine-route-plan-20261106.md', 'scripts/filmcraft-pro/', 'VW/scripts/tools-engine-host.js', 'VW/scripts/tools-0.js', 'VW/backend/api.cjs', 'VW/backend/release-text.cjs', 'nginx/default.conf'],
+    items: [
+      todo('FC.1', '建置：固定 FilmCraft 的版本，加繁中字型，建出可上線的檔案；跟向量版、畫布版共用同一套建置工具。'),
+      todo('FC.0', '請你到場約十分鐘：開一個真的視窗，你聽播放有沒有聲音、用注音打幾個中文字、看一眼英文介面能不能接受。'),
+      todo('FC.2', '「專業剪輯」頁：選素材送進去、存檔存回工作台、按 F6 回到側欄、顯示卡不夠力時先提醒。'),
+      todo('FC.3', '輸出的成片自動進任務紀錄與素材庫，記下用了哪些素材；字幕一起帶出來，送審時用得到。'),
+      todo('FC.4', '上線到 video.aware-wave.com。要你說可以才做。'),
+    ] },
+  { n: 18, code: 'EC', title: '專業特效（EffectCraft）', plain: '例：在應用工具按「專業特效」，進到 EffectCraft 的完整畫面做片頭與特效（三百多個特效、曲線編輯器、表達式），做好的透明片段直接回到素材庫給剪輯用。',
+    gate: '跟專業剪輯同一套流程在 EffectCraft 走通；重開專案時素材不會離線。', risk: 'High', model: 'Opus；上線等你同意', status: 'not_started', depends: ['FC'],
+    decided: '專業剪輯驗收過才開始。EffectCraft 複雜合成的預覽即使用獨立顯示卡也不到即時，適合做短的片頭與特效片段。',
+    what: '建置鏈同 FC；另補嵌入橋補丁（照 scripts/photocraft-pro/web-host-api.patch 接 craft-web-host，上游已有就不補）；頁面與入帳沿用 FC 的外框與路由；重開後補 footage.relink',
+    files: ['VW/docs/engine-route-plan-20261106.md', 'scripts/effectcraft-pro/'],
+    items: [
+      todo('EC.1', '建置：固定版本、加繁中字型，並補上「成品交回工作台」的接口。'),
+      todo('EC.2', '「專業特效」頁：沿用專業剪輯的外框；重開專案時自動把素材接回來。'),
+      todo('EC.3', '成片入帳與上線。上線要你說可以才做。'),
     ] },
 ];
 
 // 操作者自己要決定或親手做的
 export const OPEN = [
   { n: 1, before: 'RV', what: 'RV.4：部署工作台與 app（High），之後用 Runway 5 秒、一張小圖真打一次，約 US$0.25。要你說可以部署。', src: 'AGENTS §3' },
-  { n: 2, before: 'RE', what: '選路線。A：FilmCraft、EffectCraft 直接取代自製的剪輯與動畫合成。B（建議）：兩個引擎做成「專業剪輯」「專業特效」入口，跟現有工具並存。C：不嵌入，繼續補自製的缺口。三條都會先做「一支影片一條線」。選之前要知道：FilmCraft 介面是英文；兩個引擎不跟站上的主題、裡面有下拉選單；沒有獨立顯卡的電腦跑不順；兩個都還在早期版本。', src: 'VW/docs/engine-route-plan-20261106.md §4、§5' },
+  { n: 3, before: 'FC', what: 'FC.0：請你到場約十分鐘。會開一個 FilmCraft 的視窗（只用獨立顯示卡，不會動到你正在用的瀏覽器），請你聽播放有沒有聲音、用注音打幾個中文字、看英文介面能不能接受。三樣都過才做「專業剪輯」頁。', src: 'VW/docs/engine-route-plan-20261106.md §9 FC.0' },
 ];

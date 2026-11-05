@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-06（續4）影音工作台：操作者選路線 B（並存）；卡 PJ／FC／EC 排進總計畫與監工台（只有文件）
+
+- 決定：操作者 2026-11-06 選 B。FilmCraft＝「專業剪輯」、EffectCraft＝「專業特效」，跟自製工具並存；先做專案主線。前情：同日（續2）。
+- 產出：規格 `lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/engine-route-plan-20261106.md` §9（`28dff199c`）；總計畫 §0 路線列改 B、§4 加 PJ／FC／EC 三列；監工台卡 RE 完成、加卡 PJ／FC／EC、待決 3（FC.0 要操作者到場）。
+- 選路線後才發現（已寫進 §9，不改路線）：
+  - M1 另一個 session 已建共用建置庫 `scripts/craft-web-build/`（`lib.sh`、`fonts.json`）→ FC.1 沿用，不寫第二套；FilmCraft 用自己的 craft-fonts checkout，不加入向量／畫布「不能同時建」的限制（`scripts/photocraft-pro/build.sh:13-14`）。
+  - M2 畫布版已用補丁替 PhotoCraft 接上 `craft-web-host`（`scripts/photocraft-pro/web-host-api.patch`）→ EffectCraft 沒有嵌入橋可照此補（EC.1）。
+- 設計決定：
+  - FC.3 引擎輸出＝一筆已完成的任務 → `settle()`／`register()`／`releaseText` 現有路徑不改（`backend/api.cjs:48-53,60-66,74-84`），只在 `release-text.cjs:43-48` 多認一種 operation。
+  - FC.2 引擎檔不存在時工具卡不顯示 → 程式可比靜態檔早上線。
+  - 預設：原檔 ≤512 MiB 且瀏覽器能解才送原檔，否則送預覽檔；專業剪輯輸出上限 1080p。
+- 還沒做：FC.1 起的實作；PJ.1 的逐行規格（要先讀完 `scripts/projects-0.js`，且等卡 RV.4）；監工台正本網址要從另一個帳號發布（本帳號副本已更新）。
+- REALTEST_WAIVED: DOC_ONLY -- 只改計畫文件與監工台資料；`node build.mjs && node check.mjs` → `ok: 18 cards bound to plan §4, 80 items (62 done), 2 open, page fresh`
+- REVIEW_WAIVED: DOC_ONLY -- 文件；§9 引用的行號逐一 grep 核對
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=tools-engine-host | hits=6（engine-route-plan §9 3、data.mjs 1、supervisor.html 1、本條 1；程式裡沒有＝檔案待建立，符合預期）
 ## 2026-11-06（續3）畫布專業版：C2 上線正式站＋W1–W4 四分支合進 main（2d94cb844，未部署 next-admin）
 
 - C2（`c9c7e3bb1`，操作者准）：主機 `/root/lobster-phase1/static/photo-pro/98bcbfa-f007c95`＋`current`（SHA256SUMS 全過）；compose 唯讀掛載、nginx app＋產品門兩區塊 `location ^~ /photo-pro/`；safe-infra-patch 備份 `docker-compose.yml.bak.safe-patch-20261105-181004`、`default.conf.bak.safe-patch-20261105-181324`。
