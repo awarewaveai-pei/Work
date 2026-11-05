@@ -1,7 +1,7 @@
 # ctx 契約（面板模組 ↔ 宿主編輯器）
 
 面板模組 `editor-shared/blocks/<id>.js`：`export default { id, title, icon, mount(ctx, body) }`；只用下列 ctx，不碰宿主物件。
-實作：`ctx-vectorcraft.js`（真品 VectorCraft，走 iframe `window.vectorcraft`）。除 `info`／`busy` 外都回 Promise、排隊一次一個，失敗 reject `Error`。測試守：面板呼叫的每個 `ctx.<方法>(` 都要在此表與實作中。
+實作：`ctx-vectorcraft.js`（真品 VectorCraft，走 iframe `window.vectorcraft`；`frame` 必填，由 dock 外殼傳入）。除 `info`／`busy`／`host` 外都回 Promise、排隊一次一個，失敗 reject `Error`。測試守：面板呼叫的每個 `ctx.<方法>(` 都要在此表與實作中。
 
 | 方法 | 回傳 | 語意（真品指令） |
 |---|---|---|
@@ -15,6 +15,32 @@
 | `saveAs()` | `Blob` | 存成 `.vectorcraft`（`file.saveCopy` + `captureDownloads`，不改文件路徑） |
 | `ready()` | `true` | 等 `window.vectorcraft` 出現（預設 30 秒逾時） |
 | `info(msg)` / `busy(on)` | — | 面板狀態訊息／忙碌中，同步；dock 畫在浮出層底部（HTML 標籤會被去掉） |
+| `host` | 物件（非函式，必備） | 宿主描述，見下「host」。面板要的編輯器專屬值（存檔標記、原始檔副檔名、清單過濾、文案）只讀這裡，不寫死編輯器名 |
+| `importLegacy(file)` | `{objects}` | **選用。** 舊專案檔（`.design.json`）轉成向量並置入（`placeSvg`）；`objects` = 轉入的物件數；失敗 reject `Error` |
+| `selectionMask()` | `Blob` 或 `null` | **選用。** 目前選取範圍轉成遮罩 PNG（選取處不透明）；沒有選取範圍 → `null` |
+| `fitLayer(mode)` | `{id}` | **選用。** `mode` = `'fit'`（縮到完整放進畫布）或 `'fill'`（縮到蓋滿畫布）；作用中圖層，位置置中、等比 |
+
+**選用 = 宿主沒有就不提供**（ctx 上沒有該屬性，不是丟錯的空函式）；面板以 `typeof ctx.<名稱> === "function"` 決定要不要顯示對應控制項，不得假設存在。必備項（上表其餘各列與 `host`）每個宿主都要有。
+
+## host
+
+```
+host = {
+  id,          // 宿主識別，例 "vectorcraft"
+  label,       // 給人看的短名，例 "向量"（用在「還沒有<label>編輯器存過的設計」）
+  sourceExt,   // 本宿主原生檔副檔名，含點，例 ".vectorcraft"；必為 lib/studio/design-source.ts SOURCE_EXTS 之一
+  sourceName,  // 存入 My Designs 時原始檔的預設檔名，例 "design.vectorcraft"（副檔名 = sourceExt）
+  saveTag: { source, modelName, prompt },  // POST /api/tools/designs 的同名欄位；source 同時是清單過濾用的 metadata.source
+  listSources, // 清單要列出的 metadata.source 陣列（含舊編輯器寫過的值）
+}
+```
+
+| 宿主 | id | label | sourceExt | sourceName | saveTag（source／modelName／prompt） | listSources |
+|---|---|---|---|---|---|---|
+| 向量（`ctx-vectorcraft.js`） | `vectorcraft` | 向量 | `.vectorcraft` | `design.vectorcraft` | `vector-pro`／`vector-pro`／`vector edit` | `['vector-editor','vector-pro']` |
+| 畫布（`ctx-photocraft.js`，卡 C4.2） | `photocraft` | 畫布 | `.pcraft` | `design.pcraft` | `canvas`／`canvas`／`canvas edit` | `['canvas']` |
+
+My Designs 清單過濾：列出 `metadata.source ∈ listSources`（沒有 metadata 的舊資料也列）的設計；有原始檔的，原始檔副檔名必須等於 `sourceExt`，否則別的編輯器的原始檔會列出卻開不了。
 
 ## replaceImage（spike 2026-11-05 通過，未降級）
 

@@ -40,14 +40,38 @@ export function toQuality(q) {
   return Math.round(Math.min(100, Math.max(0, n <= 1 ? n * 100 : n)));
 }
 
+// 匯入舊專案（.design.json → SVG）：原在 blocks/my-designs.js，宿主才有的能力（契約 importLegacy），逐字搬入。
+// 載入路徑 = vector-editor.html:1293-1317，normalizeV7Types :1288-1292，SVG 尺寸 = exportSvg :970-973；Fabric 走 /editor-shared/blocks/color-grade.js 的 ensureFabric()。
+// vector-editor.html:442-443
+const FABRIC_LOADER = "/editor-shared/blocks/color-grade.js";
+const toPx = (val, unit, dpi) => { if (unit === "px") return Math.round(val); const cm = unit === "mm" ? val / 10 : val; return Math.round(cm * dpi / 2.54); };
+const toCm = (val, unit, dpi) => (unit === "px" ? +(val * 2.54 / dpi).toFixed(2) : unit === "mm" ? val / 10 : val);
+// vector-editor.html:1288-1292 (/tools/canvas Fabric 7 type names -> Fabric 5)
+function normalizeV7Types(node) {
+  if (!node || typeof node !== "object") return;
+  if (typeof node.type === "string" && /^[A-Z]/.test(node.type)) node.type = node.type.replace(/^([A-Z])([A-Z])/, "$1-$2").replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase();
+  (node.objects || []).forEach(normalizeV7Types); if (node.clipPath) normalizeV7Types(node.clipPath);
+}
+
+/** 宿主描述（契約 host）：My Designs 面板的存檔標記與清單過濾只讀這裡，不寫死編輯器名。 */
+export const VECTORCRAFT_HOST = Object.freeze({
+  id: "vectorcraft",
+  label: "向量",
+  sourceExt: ".vectorcraft",
+  sourceName: "design.vectorcraft",
+  saveTag: Object.freeze({ source: "vector-pro", modelName: "vector-pro", prompt: "vector edit" }),
+  listSources: Object.freeze(["vector-editor", "vector-pro"]), // vector-editor = 舊編輯器寫過的 metadata.source
+});
+
 /**
- * @param {{frame?: () => (HTMLIFrameElement|undefined), timeoutMs?: number, pollMs?: number,
- *          onInfo?: (msg: string) => void, onBusy?: (on: boolean) => void}} [opts]
- *   frame：回傳宿主 iframe（預設 window.__vectorProFrame，門頁 page.tsx 提供）。
+ * @param {{frame: () => (HTMLIFrameElement|undefined), timeoutMs?: number, pollMs?: number,
+ *          onInfo?: (msg: string) => void, onBusy?: (on: boolean) => void}} opts
+ *   frame（必填）：回傳宿主 iframe；由 dock 外殼明確傳入（頁框掛的 window.__proEditor.frame），這裡不再有全域預設。
  *   onInfo／onBusy：面板的狀態訊息與忙碌顯示，由 dock 決定畫在哪。
  */
-export function createVectorcraftCtx(opts = {}) {
-  const frame = opts.frame || (() => globalThis.__vectorProFrame);
+export function createVectorcraftCtx(opts) {
+  const frame = opts?.frame;
+  if (typeof frame !== "function") throw new Error("createVectorcraftCtx 需要 opts.frame（回傳宿主 iframe 的函式）");
   const timeoutMs = opts.timeoutMs ?? 30000;
   const pollMs = opts.pollMs ?? 200;
   let queue = Promise.resolve(); // ctx 呼叫一次跑一個：選取與 captureDownloads 都是宿主全域狀態
@@ -91,7 +115,7 @@ export function createVectorcraftCtx(opts = {}) {
   }
 
   const ctx = {
-    host: "vectorcraft",
+    host: VECTORCRAFT_HOST,
     /** 面板狀態訊息（同步，不排隊）。 */
     info: (msg) => opts.onInfo?.(String(msg ?? "")),
     /** 面板告知忙碌中／結束（同步，不排隊）。 */
@@ -182,6 +206,28 @@ export function createVectorcraftCtx(opts = {}) {
         api.captureDownloads(false);
       }
     }),
+
+    /** 選用（向量宿主才有）：舊專案 .design.json → Fabric StaticCanvas → SVG → placeSvg；回 {objects} = 轉入的物件數。 */
+    importLegacy: async (file) => {
+      let sc = null;
+      try {
+        // 動態、站台絕對路徑：只有匯入舊專案才載入（含 Fabric 載入器），單元測試載入本檔時不解析（同 dock.js 對 /editor-shared/ 的寫法）。
+        const fabric = await (await import(/* @vite-ignore */ FABRIC_LOADER)).ensureFabric();
+        const data = JSON.parse(await file.text());
+        const mt = data.meta;
+        const okMeta = mt && ["cm", "mm", "px"].includes(mt.unit) && mt.wv > 0 && mt.hv > 0 && mt.dpi >= 1 && mt.dpi <= 2400;
+        const fab = data.json || data.canvas || data; normalizeV7Types(fab);
+        const realW = okMeta ? toPx(mt.wv, mt.unit, mt.dpi) : (+data.w || 1063), realH = okMeta ? toPx(mt.hv, mt.unit, mt.dpi) : (+data.h || 638);
+        sc = new fabric.StaticCanvas(null, { width: realW, height: realH, enableRetinaScaling: false });
+        await new Promise((res, rej) => { try { sc.loadFromJSON(fab, res); } catch (err) { rej(err); } });
+        if (okMeta && mt.transparent) sc.backgroundColor = ""; // 匯出透明底 was on
+        else if (okMeta && /^#[0-9a-f]{6}$/i.test(mt.bgColor || "")) sc.backgroundColor = mt.bgColor;
+        sc.renderAll();
+        const svg = sc.toSVG(okMeta ? { width: toCm(mt.wv, mt.unit, mt.dpi) + "cm", height: toCm(mt.hv, mt.unit, mt.dpi) + "cm", viewBox: { x: 0, y: 0, width: realW, height: realH } } : undefined);
+        await ctx.placeSvg(svg);
+        return { objects: sc.getObjects().length };
+      } finally { if (sc) sc.dispose(); }
+    },
   };
   return ctx;
 }
