@@ -1,0 +1,89 @@
+/* Craft 編輯器專業版共用 dock 外殼的版面（/editor-shared/dock.js 載入；向量版、畫布版共用）。
+ * 不變量：顏色、字型、字級、圓角只來自 app 主題 token（app/globals.css :root，app/layout.tsx 注入 <html style>；
+ *   SSOT app/(shell)/tools/theme/THEME_ARCHITECTURE_APPEARANCE.md），本檔零字面色；元件用 app 統一 class
+ *   （.btn .btn-primary .btn-secondary .btn-ghost／.form-input .form-select .form-textarea／.tab-bar .tab .tab--active／.card）。
+ * 尺寸：--vp-* 由 mountDock 依各編輯器 dock.js 的 SIZES 寫在 root（.vp-root）上，本檔只用 var()、不定義數值。
+ * 測試 lib/studio/__tests__/vector-pro-dock.test.ts 守。 */
+
+.vp-root {
+  /* 只有一條圖示欄：寬 rail、全高；iframe 吃滿其餘寬度 */
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 var(--vp-rail);
+  box-sizing: border-box;
+  width: var(--vp-rail);
+  height: 100%;
+  background: var(--card-bg);
+  border-left: 1px solid var(--border);
+  color: var(--text-primary);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+}
+.vp-root *, .vp-root *::before, .vp-root *::after { box-sizing: border-box; }
+
+/* ---- 圖示欄：圖示格 button ---- */
+.vp-icons { display: flex; flex-direction: column; align-items: center; padding-top: 4px; gap: 2px; }
+.vp-root .vp-icon {
+  width: var(--vp-button);
+  height: var(--vp-button);
+  padding: 0;
+  margin: 0;
+  border-radius: var(--radius-sm);
+  line-height: var(--vp-button);
+  text-align: center;
+}
+
+/* ---- 浮出層：全高、在圖示欄左側、蓋在 iframe 之上（不推擠）；寬 panel（拉 panelMin–panelMax） ---- */
+.vp-root .vp-flyout {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  width: var(--vp-panel);
+  min-width: var(--vp-panel-min);
+  max-width: var(--vp-panel-max);
+  padding: 0;
+  border-radius: 0;
+  overflow: hidden;
+  z-index: 50;
+  user-select: none;
+}
+.vp-root .vp-flyout[hidden] { display: none; }
+.vp-root .vp-tabs { flex: 0 0 var(--vp-tab); height: var(--vp-tab); flex-wrap: nowrap; background: var(--bg-subtle); }
+.vp-root .vp-tab { display: flex; align-items: center; gap: 6px; padding-block: 0; }
+.vp-bodies { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; }
+.vp-body { min-width: var(--vp-panel-min); padding: var(--vp-pad); user-select: text; }
+.vp-body[hidden] { display: none; }
+.vp-status { flex: 0 0 auto; min-height: 0; padding: 6px var(--vp-pad); border-top: 1px solid var(--border); color: var(--text-muted); font-size: var(--font-size-xs); }
+.vp-status:empty { display: none; }
+.vp-busy .vp-status { color: var(--accent-text); }
+.vp-error { color: var(--text-muted); font-size: var(--font-size-xs); }
+
+/* 浮出層左緣拉寬把手（craft-ui resize-left：寬 4） */
+.vp-resize { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; cursor: ew-resize; z-index: 2; touch-action: none; }
+.vp-resize:hover, .vp-resize.vp-active { background: var(--accent); }
+
+/* ---- 面板內版面 class（app 無對應者；只含版面，顏色只用 token） ---- */
+.vp-root .vp-body label { display: block; font-size: var(--font-size-xs); color: var(--text-muted); margin: 10px 0 4px; }
+.vp-root .vp-body .btn { width: 100%; margin-top: 8px; }
+.vp-root .vp-body .row { display: flex; gap: 6px; }
+.vp-root .vp-body .row > * { flex: 1; }
+.vp-root .vp-body .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.vp-root .vp-body .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+.vp-root .vp-body .info { font-size: var(--font-size-xs); color: var(--text-muted); margin-top: 6px; line-height: 1.6; }
+.vp-root .vp-body .busy { color: var(--accent-text); }
+.vp-root .vp-body .fontlist { max-height: 300px; overflow: auto; margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
+.vp-root .vp-body .fontrow {
+  flex: none; display: flex; flex-direction: column; gap: 1px; width: 100%; text-align: left; padding: 7px 11px;
+  background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius-sm); cursor: pointer; overflow: hidden;
+}
+.vp-root .vp-body .fontrow:hover { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
+.vp-root .vp-body .fname { font-size: var(--font-size-xs); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vp-root .vp-body .cgsec { margin-top: 8px; }
+/* 色彩混合器分頁底線 = 該色相範圍本身的顏色（資料色，不是 UI 主題色；blocks/color-grade.js 以 --swatch 設在按鈕上）。
+ * --swatch 是本檔唯一允許的非主題變數；作用中分頁仍用主題的 --tab-border-active。 */
+.vp-root .vp-body .cgsec .tab[data-cg-hsl-tab]:not(.tab--active) { border-bottom-color: var(--swatch, transparent); }
+.vp-root hr { border: 0; border-top: 1px solid var(--border); margin: var(--vp-pad) 0; }

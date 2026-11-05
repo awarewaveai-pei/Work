@@ -62,8 +62,8 @@ async function openPage(page: Page): Promise<void> {
     await page.locator('button[type="submit"]').click();
     await page.waitForURL(/\/tools\/vector-pro/, { timeout: 30_000 });
   }
-  // the dock is mounted by the page's effect: once it has panels, the page's dock is live
-  await page.waitForFunction(() => !!document.querySelector('#vector-pro-dock [data-panel]'), null, { timeout: 60_000 });
+  // the dock is mounted by the page's effect: once its icon rail has buttons, the page's dock is live
+  await page.waitForFunction(() => !!document.querySelector('#vector-pro-dock .vp-icon'), null, { timeout: 60_000 });
 }
 
 /** The VectorCraft iframe once the page has rendered it (the page is a client component: not there at domcontentloaded). */
@@ -131,7 +131,7 @@ test.describe('Vector Pro (VectorCraft) smoke', () => {
     });
 
     await openPage(page);
-    await page.waitForFunction(() => !!document.querySelector('#vector-pro-dock [data-panel]'), null, { timeout: 60_000 });
+    await page.waitForFunction(() => !!document.querySelector('#vector-pro-dock .vp-icon'), null, { timeout: 60_000 });
     const frame = await vcFrame(page);
     expect(frame, 'no /vector-pro/ iframe on the page').toBeTruthy();
     await inspect(frame!);
@@ -139,10 +139,11 @@ test.describe('Vector Pro (VectorCraft) smoke', () => {
       frame!.evaluate(([c, p]) => (window as unknown as VcWindow).vectorcraft.execute(c, p), [cmd, params] as const) as Promise<T>;
     const topLevel = async () => ((await vc('document.inspect')).layers as Array<{ children: Array<{ id: number; kind: string }> }>).flatMap((l) => l.children);
     const select = (id: number) => vc('select.set', { ids: [id] });
-    const body = (id: string) => page.locator(`#vector-pro-dock [data-panel="${id}"] .vp-body`);
+    // One icon rail; a panel's body is mounted on its first open and shown in the flyout (editor-shared/dock.js).
+    const body = (id: string) => page.locator(`#vector-pro-dock .vp-body[data-panel="${id}"]`);
     const openPanel = async (id: string) => {
-      const group = page.locator(`#vector-pro-dock [data-panel="${id}"]`);
-      if (!(await group.evaluate((g) => g.classList.contains('vp-open')))) await group.locator('.vp-tab').click();
+      if (!(await body(id).isVisible())) await page.locator(`#vector-pro-dock .vp-icon[data-panel-icon="${id}"]`).click();
+      await expect(body(id)).toBeVisible();
       await expect(body(id)).not.toBeEmpty();
     };
     const download = async (click: () => Promise<void>) => { const [d] = await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), click()]); return d; };

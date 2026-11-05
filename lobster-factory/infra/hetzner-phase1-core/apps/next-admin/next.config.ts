@@ -35,9 +35,13 @@ const nextConfig: NextConfig = {
       headers: [{ key: "Cache-Control", value: "private, no-cache" }],
     }));
   },
+  // Local dev only: the Craft editors' static web builds (nginx /vector-pro/, /photo-pro/ in prod) from a dev origin.
+  // Unset in prod = no rewrite.
   async rewrites() {
-    const origin = process.env.VECTOR_PRO_DEV_ORIGIN?.trim().replace(/\/+$/, "");
-    return origin ? [{ source: "/vector-pro/:path*", destination: `${origin}/:path*` }] : [];
+    return ([["VECTOR_PRO_DEV_ORIGIN", "vector-pro"], ["PHOTO_PRO_DEV_ORIGIN", "photo-pro"]] as const).flatMap(([env, prefix]) => {
+      const origin = process.env[env]?.trim().replace(/\/+$/, "");
+      return origin ? [{ source: `/${prefix}/:path*`, destination: `${origin}/:path*` }] : [];
+    });
   },
   webpack: (config) => {
     // @workflows alias: makes packages/workflows importable from next-admin routes.
