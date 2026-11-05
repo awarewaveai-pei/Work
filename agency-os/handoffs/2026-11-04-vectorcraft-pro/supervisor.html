@@ -78,11 +78,11 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
 <aside><div class="in">
   <h1>向量專業版監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-11-05</span></p>
-  <div class="bar" data-computed><i class="d" style="width:0%"></i><i class="g" style="width:0%"></i></div>
+  <div class="bar" data-computed><i class="d" style="width:0%"></i><i class="g" style="width:28.57142857142857%"></i></div>
   <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>0</span>／<span data-computed>7</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
-<p class="sub">把開源的 VectorCraft（Illustrator 的完整重製，工具、面板、快捷鍵都一樣）放進 app.aware-wave.com 當「向量（專業版）」；AwareWave 獨有的十項（尺寸範本、Google Fonts 字型、調色、去背、WebP、My Designs、QR、條碼、Mockup、批次匯出）做成第二個 dock 欄，長得跟它的面板一樣；舊設計轉檔後舊編輯器退場，只留一套。共 <span data-computed>7</span> 張卡、<span data-computed>27</span> 項工作，已完成 <span data-computed>0</span> 項。</p>
+<p class="sub">把開源的 VectorCraft（Illustrator 的完整重製，工具、面板、快捷鍵都一樣）放進 app.aware-wave.com 當「向量（專業版）」；AwareWave 獨有的十項（尺寸範本、Google Fonts 字型、調色、去背、WebP、My Designs、QR、條碼、Mockup、批次匯出）做成第二個 dock 欄，長得跟它的面板一樣；舊設計轉檔後舊編輯器退場，只留一套。共 <span data-computed>7</span> 張卡、<span data-computed>27</span> 項工作，已完成 <span data-computed>4</span> 項。</p>
 <section id="now"><h2>現況</h2><p class="lead">目前已做到與還沒做到的事（2026-11-04 查）。</p><ul class="yn"><li class="no"><b>還不行</b><span>在 app.aware-wave.com 用 Illustrator 一樣的工具列、面板、快捷鍵畫向量。<small>真品原始碼讀完（2026-11-04）：工具 89/92、Pathfinder 全套、文字轉外框、多畫板都在 code 裡；網頁版有 iframe 用的 window.vectorcraft 介面（apps/vectorcraft-web/src/api.rs:1-17）。還沒建置、沒上線。</small></span></li><li class="no"><b>還不行</b><span>介面與字型是繁體中文。<small>介面有 zh-hant（crates/ui-egui/src/i18n/zh-hant.tsv）；字型庫只有簡中 Noto Sans CJK SC，繁中 Noto Sans TC 要在 C1.2 自己加。</small></span></li><li class="no"><b>還不行</b><span>AwareWave 獨有的十項功能在專業版裡，長在 Illustrator 版面的第二個 dock 欄。<small>十項＝尺寸範本、Google Fonts 字型、調色、去背、WebP ≤200KB、My Designs、QR、條碼、Mockup、批次匯出（R0-PLAN §6 C4 對照表）；其餘功能真品原生都有。</small></span></li><li class="no"><b>還不行</b><span>舊的向量設計檔在專業版打得開，舊編輯器退場，只有一套。<small>C7：舊 .design.json 批次匯出成 SVG 存回 My Designs，專業版開 SVG；轉完才拆舊頁。在那之前舊編輯器照常可用（0a24f4c29）。</small></span></li><li class="no"><b>還不行</b><span>本機能建出網頁版。<small>本機沒有 rustup／cargo／trunk（2026-11-04 查）；C1.1 安裝。</small></span></li></ul></section>
 
 <section id="steps"><h2>卡片與工作</h2><p class="lead">依編號進行。每張卡列出所有工作，勾選代表完成。High 風險步驟（上傳正式站、改 nginx）經你同意才做。</p><ol class="steps"><li class="step todo" id="C1">
@@ -113,13 +113,13 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
         <p><b>檔案：</b><code>INFRA/docker-compose.yml</code> <code>INFRA/nginx/default.conf</code></p>
         <p><b>卡：</b><code>agency-os/handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md §6 C2</code></p>
       </details>
-    </div></li><li class="step todo" id="C3">
+    </div></li><li class="step doing" id="C3">
     <div class="n">3</div>
     <div class="b">
       <p class="plain">例：側欄「設計編輯器」多一項「向量（專業版）」，點開就是 Illustrator 介面；瀏覽器太舊時給一行說明並連回快速出稿。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium（改 products.ts 登記；頁面本身是 iframe）</span><span class="who">負責：Opus 5.5｜已派 session vp-c3-door-2（2026-11-05，先做 C3.1–C3.3，C3.4 等 C2）</span></p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-med">風險 Medium（改 products.ts 登記；頁面本身是 iframe）</span><span class="who">負責：Opus 5.5｜vp-c3-door-2 完成 C3.1–C3.3（分支 claude/vector-pro-door-634881，待與 C4 一起合併）；C3.4 等 C2</span></p>
       <p class="donewhen"><b>完成的樣子：</b>登入後開 /tools/vector-pro 看到 VectorCraft；本機開發也能開（轉到 trunk serve）；產品登記測試全綠。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>C3.1</code> 無側欄全視窗頁嵌入專業版，側欄點開新分頁；失敗時給說明與回舊編輯器的連結。</span></li><li class="todo"><b>○</b><span><code>C3.2</code> 本機開發時把 /vector-pro/ 轉到本機建置伺服器，正式站不受影響。</span></li><li class="todo"><b>○</b><span><code>C3.3</code> 設計編輯器的側欄加「向量（專業版）」，登記與權限測試全綠。</span></li><li class="todo"><b>○</b><span><code>C3.4</code> 正式站登入實開一次，介面回得了資料，截圖存紀錄。</span></li></ul>
+      <ul class="items"><li class="done"><b>✓</b><span><code>C3.1</code> 無側欄全視窗頁嵌入專業版，側欄點開新分頁；失敗時給說明與回舊編輯器的連結。 <small>完成於 <code>b29753811</code></small></span></li><li class="done"><b>✓</b><span><code>C3.2</code> 本機開發時把 /vector-pro/ 轉到本機建置伺服器，正式站不受影響。 <small>完成於 <code>b29753811</code></small></span></li><li class="done"><b>✓</b><span><code>C3.3</code> 設計編輯器的側欄加「向量（專業版）」，登記與權限測試全綠。 <small>完成於 <code>b29753811</code></small></span></li><li class="todo"><b>○</b><span><code>C3.4</code> 正式站登入實開一次，介面回得了資料，截圖存紀錄。</span></li></ul>
       <details><summary>工程細節：C3 app 門</summary>
         <p>無側欄區 app/(full)/tools/vector-pro/page.tsx（iframe＋右欄 dock 100vh）＋WebGL 偵測＋NOTICE 連結；側欄連結 target=_blank；next.config 開發用 rewrite；products.ts nav／staffPaths；tsc＋四個測試</p>
         <p><b>需先完成：</b><a href="#C2">C2</a></p>
@@ -127,18 +127,18 @@ ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
         <p><b>檔案：</b><code>NA/app/(shell)/tools/vector-pro/page.tsx</code> <code>NA/next.config.*</code> <code>NA/lib/portal/products.ts</code></p>
         <p><b>卡：</b><code>agency-os/handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md §6 C3</code></p>
       </details>
-    </div></li><li class="step todo" id="C4">
+    </div></li><li class="step doing" id="C4">
     <div class="n">4</div>
     <div class="b">
       <p class="plain">例：畫面就是 Illustrator，右邊多一欄面板，顏色、分頁高度、收合方式都跟它的面板一樣；裡面是尺寸範本、字型、調色、去背、WebP、My Designs、QR、條碼、Mockup、批次匯出。真品本來就有的（描圖、弧形文字、裁切標記…）直接用它的。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium（新頁面；C4.3 換圖先做 spike，做不到就改契約）</span><span class="who">負責：Opus 5.5＋Sonnet｜已派 session vp-c4-dock-2（外殼＋轉接器）與 vp-c4-blocks-2（十面板搬移）（2026-11-05）</span></p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-med">風險 Medium（新頁面；C4.3 換圖先做 spike，做不到就改契約）</span><span class="who">負責：Opus 5.5＋Sonnet｜已派 session vp-c4-dock-2（外殼＋轉接器）與 vp-c4-blocks-2（十面板搬移，分支 claude/vector-pro-blocks-644975 已驗收）（2026-11-05）</span></p>
       <p class="donewhen"><b>完成的樣子：</b>十個面板都在第二欄且外觀與真品面板一致（截圖並排）；調色與去背對一張選取的圖真的換圖且位置大小不變；字型面板搜到的 Google Fonts 能套到文字；測試守住十個面板清單與色值。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>C4.1</code> 第二 dock 欄：與 Illustrator 畫面並排、同色同尺寸、可收成圖示欄。</span></li><li class="todo"><b>○</b><span><code>C4.2</code> 十個面板各一個模組；六個從舊編輯器原樣搬，調色與去背沿用同一份數學。</span></li><li class="todo"><b>○</b><span><code>C4.3</code> 面板與編輯器之間的契約與轉接器；先用一張圖驗證「換圖後位置大小不變」。</span></li><li class="todo"><b>○</b><span><code>C4.4</code> 測試：面板清單、轉接器每個方法、色值抽樣。</span></li></ul>
+      <ul class="items"><li class="todo"><b>○</b><span><code>C4.1</code> 第二 dock 欄：與 Illustrator 畫面並排、同色同尺寸、可收成圖示欄。</span></li><li class="done"><b>✓</b><span><code>C4.2</code> 十個面板各一個模組；六個從舊編輯器原樣搬，調色與去背沿用同一份數學。 <small>完成於 <code>a6b062e93</code></small></span></li><li class="todo"><b>○</b><span><code>C4.3</code> 面板與編輯器之間的契約與轉接器；先用一張圖驗證「換圖後位置大小不變」。</span></li><li class="todo"><b>○</b><span><code>C4.4</code> 測試：面板清單、轉接器每個方法、色值抽樣。</span></li></ul>
       <details><summary>工程細節：C4 第二 dock 欄：AwareWave 獨有的十個面板</summary>
         <p>dock.js＋theme.css（色值抽自 theme.rs 四組；分頁 33、欄寬 310、圖示欄 38）；blocks/ 十檔；ctx-contract.md＋ctx-vectorcraft.js（placeSvg／placeImage／selectedImage／replaceImage／exportArtboard／addFont／saveAs）；dock 測試＋契約測試＋色值抽樣測試</p>
         <p><b>需先完成：</b><a href="#C3">C3</a></p>
         <p><b>已定案：</b>不 fork 加 Rust 面板（面板要用網路與 HTML，egui 放不下；上游說 panel plugins 不在 v1）。調色與去背的數學仍是 CARD-05 與 CARD-06 的同一份模組，不複製。</p>
-        <p><b>檔案：</b><code>NA/public/vector-pro/dock.js</code> <code>NA/public/vector-pro/theme.css</code> <code>NA/public/editor-shared/blocks/</code> <code>NA/public/editor-shared/ctx-contract.md</code> <code>NA/public/editor-shared/ctx-vectorcraft.js</code> <code>NA/lib/studio/__tests__/vector-pro-dock.test.ts</code></p>
+        <p><b>檔案：</b><code>NA/public/vector-pro-dock/dock.js</code> <code>NA/public/vector-pro-dock/theme.css</code> <code>NA/public/editor-shared/blocks/</code> <code>NA/public/editor-shared/ctx-contract.md</code> <code>NA/public/editor-shared/ctx-vectorcraft.js</code> <code>NA/lib/studio/__tests__/vector-pro-dock.test.ts</code></p>
         <p><b>卡：</b><code>agency-os/handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md §6 C4</code></p>
       </details>
     </div></li><li class="step todo" id="C5">
