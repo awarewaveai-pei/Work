@@ -1,4 +1,22 @@
 # Worklog
+## 2026-11-06（續6）影音工作台路線 B：FC.0 過（操作者實機）＋FC.1 FilmCraft 建置鏈完成（scripts/filmcraft-pro）
+
+- FC.0（操作者到場）：真的 Edge 視窗、WebGPU adapter `nvidia blackwell`（`--force_high_performance_gpu`）；操作者確認有聲音、注音打得進中文、英文介面可接受。機器紀錄 `audioClock: true`、無 device lost（`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/p0-reeval-evidence/results/fc0.json`）。
+- FC.1：`scripts/filmcraft-pro/`（`PIN.json`、`build.sh`、`build.ps1`、`tc-fonts.patch`、`no-artcraft-marks.patch`、`README.md`）。沿用 `scripts/craft-web-build/lib.sh`。產物 `%LOCALAPPDATA%\awarewave\filmcraft-dist\46763a8-b7f3040\`：16 檔、wasm 57,328,542 B、gz 29,355,329 B。初版由 `fullstack-engineer` 寫，主 session 驗收與修正。
+- critic（Deep）1c／1m／5n，全修：
+  - C1 上游把 ArtCraft 字標用 `include_bytes!` 編進 wasm（`crates/ui-egui/src/brand.rs:4-5`）；`docs/brand/LICENSE-brand.txt` 規定改過的版本必須移除。原本的整檔 sha256 比對抓不到（wasm-opt 切開資料段）。治本：`no-artcraft-marks.patch`＋共用函式 `craft_brand_scan`（每個標誌檔七段 64 bytes 在產物每個檔裡搜尋）放進 `scripts/craft-web-build/lib.sh`，關掉「標誌以任何形式進產物」這一類。
+  - M1 字型名單只讀 `matches!(family,` 那一行，上游折行就會漏掉授權檔 → 改讀整個 `fn wasm_keeps`，並斷言含兩個 TC 字型。
+  - m1 `CARGO_TARGET_DIR` 有設時會把上一次的舊產物當新的出貨 → `unset`＋建置前把舊 `dist` 移開。
+  - m2 wasm-opt 跑不起來時 xtask 靜默跳過 → PIN 釘 `wasmOpt`、先跑 `--version`、查 xtask 輸出真的有 wasm-opt 那行；NOTICE 記工具鏈版本。
+  - m3 管線失敗時無訊息退出 → 補明確 FATAL。 m4 `build.ps1` 的 `wslpath` 輸出被當 CP950 → 先設 UTF-8 並查 exit code。 m5 `.old.*` 目錄殘留不再讓建置失敗，也不會被當成產物。
+- 同類掃過（同一掃描法）：向量版 `4cce336-b9af74d`、畫布版 wasm 0 命中（已上線的兩個是乾淨的）；EffectCraft v0.21.1 命中 `artcraft-mark.png`（`crates/ui-egui/src/header.rs:906`）→ 已寫進卡 EC.1。向量版、畫布版的 build.sh 尚未呼叫這個檢查（別的 session 的檔，未動）。
+- 我另加：編進 wasm 的四個字型各附 OFL 授權檔（`licenses/`）。
+- 避免再發生：「改過的上游版本」出貨前一律跑位元組掃描，不靠檔名或整檔雜湊。
+- 剩餘：舊產物 `46763a8-08fe890`（含標誌）還在本機，沒上線，可手動刪。FC.2 可開工。
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/filmcraft-pro/build.ps1 → `OK: …/46763a8-b7f3040 (16 files…)`；`sha256sum -c SHA256SUMS`；`node fc-main.cjs`（FC_DIST=新產物）→ h264 1920×1080 300 格＋aac、`reload.missing: []`；PIN rev 改壞 → exit 1 且舊產物不變 | exit=0 | ms=900000
+- REVIEW_DONE: critic=Deep | verdict=fail→fixed | findings=1c/1m/5n（全修；突變證據：掃描對未套補丁的舊產物 exit 1、`HIT … artcraft-logo*.png`，對新產物 exit 0）
+- ORACLE_WAIVED: 只有建置工具（不在任何正式執行路徑上，FC.4 上線前另審）；critic Deep 已抓到並修掉 Critical，且有突變證據。為省一輪審查不跑 Codex，判斷是主 session 的
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=craft_brand_scan | hits=9（lib.sh 2、filmcraft-pro/build.sh 1、filmcraft-pro/README.md 2、engine-route-plan 2、本條 2；向量版與畫布版 build.sh 0＝尚未呼叫，已列在上面）
 ## 2026-11-06（續5）外聯 v2 C16.2：一致率量測無效（免費 Gemini 每日上限）→ 修正並改成三天分量；清 inbox／游標；監工台 v39
 
 **根因**

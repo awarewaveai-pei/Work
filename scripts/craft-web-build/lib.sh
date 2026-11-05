@@ -58,3 +58,45 @@ EOF
       echo "$FAM | $STYLE | $DIR/$FILE | $SCRIPTS | $LIC | $DIR/$licname | $SHA | $URL" >> "$FONTS/fonts/manifest.txt"
   done < "$WF_TSV"
 }
+# craft_brand_scan <upstream checkout> <file-or-dir>...
+# Upstream's docs/brand/LICENSE-brand.txt: a modified version must remove the ArtCraft Marks. A mark can
+# reach the build as a file OR compiled into the wasm (include_bytes!), where a whole-file hash never
+# matches (wasm-opt splits data segments). So: seven 64-byte windows of every brand file are searched
+# in every given file; any hit is FATAL. Pass the raw wasm too when the site ships it compressed or split.
+craft_brand_scan() {
+  local SRC=$1; shift
+  [ -d "$SRC/docs/brand" ] || { echo "FATAL: $SRC/docs/brand missing — cannot check the build for brand assets" >&2; exit 1; }
+  python3 - "$SRC/docs/brand" "$@" <<'EOF' || { echo "FATAL: the build contains ArtCraft brand assets (see HIT lines) — remove them with a patch" >&2; exit 1; }
+import os, sys
+wins = []
+for root, _, files in os.walk(sys.argv[1]):
+    for f in sorted(files):
+        if f.endswith((".txt", ".attribution")):  # licence text and sidecars are not marks
+            continue
+        b = open(os.path.join(root, f), "rb").read()
+        for k in range(1, 8):
+            w = b[len(b) * k // 8 : len(b) * k // 8 + 64]
+            if len(w) == 64 and len(set(w)) > 8:
+                wins.append((f, w))
+if not wins:
+    sys.exit("no brand windows: docs/brand holds no mark files?")
+def targets(args):
+    for a in args:
+        if os.path.isdir(a):
+            for root, _, files in os.walk(a):
+                for f in files:
+                    yield os.path.join(root, f)
+        elif os.path.isfile(a):
+            yield a
+        else:
+            sys.exit("brand scan: no such file or directory: " + a)
+bad = 0
+for p in targets(sys.argv[2:]):
+    data = open(p, "rb").read()
+    names = sorted({n for n, w in wins if w in data})
+    if names:
+        bad += 1
+        print("HIT", p, names, file=sys.stderr)
+sys.exit(1 if bad else 0)
+EOF
+}

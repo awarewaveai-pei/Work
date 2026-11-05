@@ -1,0 +1,29 @@
+{
+ "samples": [
+  {
+   "t": 60,
+   "sec": 0,
+   "audioClock": true,
+   "shown": 1,
+   "dropped": 0
+  },
+  {
+   "t": 69,
+   "sec": 1.23,
+   "audioClock": true,
+   "shown": 23,
+   "dropped": 8
+  }
+ ],
+ "adapter": {
+  "backend": "BrowserWebGpu",
+  "compositor": "gpu",
+  "webgpu": "nvidia blackwell"
+ },
+ "captions": [
+  "歡迎來到覺知波。",
+  "他說：「今天，天氣很好。」",
+  "第一行字幕，\n第二行字幕。"
+ ],
+ "lost": []
+}

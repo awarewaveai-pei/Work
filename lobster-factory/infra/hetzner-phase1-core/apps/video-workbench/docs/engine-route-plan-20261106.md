@@ -274,6 +274,11 @@
 
 回退：刪 `scripts/filmcraft-pro/`。
 
+**結果（2026-11-06）：完成。** 產物 `%LOCALAPPDATA%\awarewave\filmcraft-dist\46763a8-b7f3040\`（16 檔；wasm 57,328,542 B，gz 29,355,329 B）。跟上面規格不同的地方，以 `scripts/filmcraft-pro/README.md` 為準：
+- 多一個補丁 `no-artcraft-marks.patch`：上游把 ArtCraft 字標用 `include_bytes!` 編在 wasm 裡（`crates/ui-egui/src/brand.rs:4-5`），授權規定改過的版本必須移除。上面第 6 步的「整檔 sha256 比對」抓不到這種情況，改成共用函式 `craft_brand_scan`（位元組視窗掃描，放在 `scripts/craft-web-build/lib.sh`）。
+- `PIN.json` 多一欄 `wasmOpt`；另加防舊產物誤出貨、字型授權檔 `licenses/`。
+- 驗收：`harness/fc-main.cjs` 對新產物跑過，結果與 11-06 試建相同（h264 1920×1080 300 格＋aac、重開 0 離線、繁中正確）。
+
 ### FC.0 開工前的檢查（Low；要操作者在場約十分鐘）
 
 headless 測不到的三件事，用真的視窗、只在 NVIDIA 顯示卡上開（`--force_high_performance_gpu`，理由見閘檔 §3）：
@@ -286,6 +291,8 @@ headless 測不到的三件事，用真的視窗、只在 NVIDIA 顯示卡上開
 - **輸出上限**：專業剪輯輸出最高 1080p；4K 與很長的片用一般剪輯（伺服器用原檔輸出）。頁面上用一句話寫明。主機端 `filmcraft-cli` 用原檔輸出不在這一輪，操作者要 4K 時另開卡。
 
 三項任一不過 → FC.2 不開工，回報操作者。
+
+**結果（2026-11-06）：三項都過。** 操作者在真的 Edge 視窗（WebGPU，adapter `nvidia blackwell`）確認有聲音、注音打得進中文、英文介面可接受。機器紀錄：播放時 `audioClock: true`、沒有 device lost（`p0-reeval-evidence/results/fc0.json`，腳本 `harness/fc0.cjs`）。兩個預設照上面定案，FC.2 可以開工。
 
 ### FC.2 「專業剪輯」頁（Medium；Opus）
 
@@ -344,6 +351,6 @@ headless 測不到的三件事，用真的視窗、只在 NVIDIA 顯示卡上開
 
 ### EC（專業特效；FC.4 驗收後）
 
-- EC.1 建置鏈＋嵌入橋補丁：`scripts/effectcraft-pro/`，沿用 FC.1 的 `build.sh` 結構；補丁兩份：繁中字型（`VW/docs/p0-reeval-evidence/effectcraft-tc-fonts.patch`）、嵌入橋（照 `scripts/photocraft-pro/web-host-api.patch` 的做法接 `craft-web-host`）。先查上游是否已自己加了橋，有就不補。
+- EC.1 建置鏈＋嵌入橋補丁：`scripts/effectcraft-pro/`，沿用 FC.1 的 `build.sh` 結構（含 `craft_brand_scan`；EffectCraft v0.21.1 把 `artcraft-mark.png` 編在 wasm 裡，上游 `crates/ui-egui/src/header.rs:906`，要有移除補丁）；補丁另兩份：繁中字型（`VW/docs/p0-reeval-evidence/effectcraft-tc-fonts.patch`）、嵌入橋（照 `scripts/photocraft-pro/web-host-api.patch` 的做法接 `craft-web-host`）。先查上游是否已自己加了橋，有就不補。
 - EC.2 頁面：沿用 `tools-engine-host.js`，訊息前綴換成 `effectcraft:`；重開專案後補一個 `footage.relink`（閘檔 §3 ②）；`server.cjs:182-189` 的 COOP／COEP 路徑對到新的引擎目錄。
 - EC.3 入帳：沿用 FC.3 的路由，`engine: "effectcraft"`。

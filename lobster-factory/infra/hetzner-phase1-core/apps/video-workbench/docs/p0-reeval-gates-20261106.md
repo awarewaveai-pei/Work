@@ -90,9 +90,9 @@
 - ① 效能：還是最大的問題，而且取決於使用者的顯示卡。沒有獨立顯卡（或瀏覽器沒被設成用獨立顯卡）時，FilmCraft 的畫面幾乎不動、EffectCraft 只有簡單合成能半解析度即時。
 
 本輪沒測、照實列出：
-- 有頭模式（真的開視窗）的聲音與手感。headless 下 EffectCraft `audio.played` 一直是 0（11-02 的 G7 仍未驗）。
+- 有頭模式（真的開視窗）的聲音與手感：FilmCraft 已於同日補驗（FC.0，操作者確認有聲音，`results/fc0.json`）；EffectCraft 仍未驗，headless 下 `audio.played` 一直是 0（11-02 的 G7）。
 - Intel 內顯上的 WebGPU：沒有重跑。11-02 那次讓操作者的 Edge 當掉，這次只查了 adapter 名稱。
-- 真人鍵盤中文輸入法。VectorCraft 的經驗是 headless 打不進 egui（`scripts/vectorcraft-pro/README.md:62`）。
+- 真人鍵盤中文輸入法：FilmCraft 已於同日補驗（FC.0，操作者用注音打得進去）；EffectCraft 仍未驗。VectorCraft 的經驗是 headless 打不進 egui（`scripts/vectorcraft-pro/README.md:62`）。
 - 一般桌機沒有實機，「有獨立顯卡」那一列是用這台的 RTX 5060 代表。
 - 長片、4K、超過 512 MiB 的素材。
 - FilmCraft 的 `filmcraft-cli` 在 Linux 主機上無頭輸出（`docs/agents.md:64,124`）：這是「瀏覽器剪、伺服器用原檔輸出」的可能做法，沒試。

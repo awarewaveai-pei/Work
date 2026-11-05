@@ -1,0 +1,8 @@
+{
+  "repo": "https://github.com/storytold/filmcraft",
+  "rev": "46763a85d9777d3a60c2a557f359d988296d6a44",
+  "craftFontsRepo": "https://github.com/storytold/craft-fonts",
+  "craftFontsRev": "b076417b5880bd4154bd22f00695b1d28c6bea83",
+  "wasmBindgen": "0.2.129",
+  "wasmOpt": "version_131"
+}
