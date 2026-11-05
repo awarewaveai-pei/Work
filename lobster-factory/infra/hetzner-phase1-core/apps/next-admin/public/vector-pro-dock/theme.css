@@ -122,4 +122,7 @@
 #vector-pro-dock .vp-body .fname { font-size: var(--font-size-xs); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #vector-pro-dock .vp-body .fprev { font-size: var(--font-size-xl); line-height: 1.4; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #vector-pro-dock .vp-body .cgsec { margin-top: 8px; }
+/* 色彩混合器分頁底線 = 該色相範圍本身的顏色（資料色，不是 UI 主題色；blocks/color-grade.js 以 --swatch 設在按鈕上）。
+ * --swatch 是本檔唯一允許的非主題變數；作用中分頁仍用主題的 --tab-border-active。 */
+#vector-pro-dock .vp-body .cgsec .tab[data-cg-hsl-tab]:not(.tab--active) { border-bottom-color: var(--swatch, transparent); }
 #vector-pro-dock hr { border: 0; border-top: 1px solid var(--border); margin: var(--vp-pad) 0; }

@@ -4,7 +4,7 @@
 //     零字面色；面板用 app 統一 class，不用舊 vector-editor 的 act／ghost。
 import fs from "node:fs";
 import path from "node:path";
-import { transformSync } from "esbuild";
+import { build } from "esbuild";
 import { describe, expect, it } from "vitest";
 import { createVectorcraftCtx } from "../../../public/editor-shared/ctx-vectorcraft.js";
 
@@ -178,7 +178,8 @@ const unknownVars = (src: string, own: Set<string>) =>
 
 describe("dock 顏色只來自主題 token", () => {
   const css = read("public/vector-pro-dock/theme.css").replace(/\/\*[\s\S]*?\*\//g, "");
-  const own = new Set([...css.matchAll(/(--vp-[a-z0-9-]+)\s*:/g)].map((m) => m[1]));
+  // --swatch：色相範圍本身的顏色（資料色），由 blocks/color-grade.js 設在按鈕上；唯一允許的非主題變數
+  const own = new Set([...[...css.matchAll(/(--vp-[a-z0-9-]+)\s*:/g)].map((m) => m[1]), "--swatch"]);
   it("theme.css 無字面色（#hex／rgb()／hsl()），--vp-* 只放版面尺寸", () => {
     expect(css.match(HEX)).toBeNull();
     expect(css.match(FUNC_COLOR)).toBeNull();
@@ -202,8 +203,6 @@ describe("dock 顏色只來自主題 token", () => {
 describe("面板模組（editor-shared/blocks）用統一 class、樣式只用主題 token", () => {
   it.each(blockFiles())("%s", (f) => {
     const src = read(f);
-    // 語法錯 = 整個面板載入失敗（vitest 其他測試不會載入面板模組，2026-11-05 color-grade.js:108 行中註解吞掉程式）
-    expect(() => transformSync(src, { loader: "js", format: "esm" }), `${f} 語法錯`).not.toThrow();
     const classes = [...src.matchAll(/class(?:Name)?\s*[=:]\s*\\?["'`]([^"'`\\]*)/g)].flatMap((m) => m[1].split(/\s+/));
     expect(classes.filter((c) => c === "act" || c === "ghost"), "舊 class act→btn btn-primary、ghost→btn btn-secondary").toEqual([]);
     for (const snip of styleSnippets(src)) {
@@ -211,5 +210,45 @@ describe("面板模組（editor-shared/blocks）用統一 class、樣式只用�
       expect(snip.match(FUNC_COLOR), `${f} 樣式字面色：${snip}`).toBeNull();
     }
     expect(unknownVars(src, new Set()), `${f} 用了主題沒有的變數`).toEqual([]);
+  });
+});
+
+// ---- 每個瀏覽器模組都能載入（關整類：2026-11-05 blocks/color-grade.js:108 行中註解吞掉程式，
+//      color-grade／bg-remove／my-designs 三個面板整個載入失敗，而全套 vitest 是綠的，因為沒有測試載入面板模組） ----
+// 做法：esbuild 把模組連同它 import 的 /editor-shared/… 打包（站台絕對路徑對到 public/），再以 data: URL import。
+// 選 esbuild 而非 node --check（next-admin 無 "type":"module"，.js 會被當 CJS，import 語法誤判）或
+// vm.SourceTextModule（要 --experimental-vm-modules 旗標，vitest worker 沒開）；esbuild 已是依賴、同進程、
+// 錯誤訊息帶 file:line，而且連被 import 的檔案一起檢查。只載入模組本體，不執行 mount／不掛 dock（node 無 document）。
+const PUBLIC = path.join(APP, "public");
+async function loadModule(rel: string) {
+  const out = await build({
+    entryPoints: [path.join(APP, rel)],
+    bundle: true,
+    format: "esm",
+    platform: "neutral",
+    write: false,
+    logLevel: "silent",
+    plugins: [{
+      name: "site-root",
+      setup(b) {
+        b.onResolve({ filter: /^\/(editor-shared|vector-pro-dock)\// }, (a) => ({ path: path.join(PUBLIC, a.path) }));
+      },
+    }],
+  });
+  const code = out.outputFiles[0].text;
+  return import(/* @vite-ignore */ `data:text/javascript;base64,${Buffer.from(code).toString("base64")}`);
+}
+
+describe("瀏覽器模組都能被解析與載入成 ES module", () => {
+  it.each(["public/vector-pro-dock/dock.js", "public/editor-shared/ctx-vectorcraft.js"])("%s", async (rel) => {
+    const mod = await loadModule(rel);
+    expect(Object.keys(mod).length).toBeGreaterThan(0);
+  });
+  it.each(blockFiles())("%s：default export 有 id／title／mount", async (rel) => {
+    const mod = await loadModule(rel);
+    const d = mod.default;
+    expect(d?.id).toBe(path.basename(rel, ".js"));
+    expect(typeof d?.title).toBe("string");
+    expect(typeof d?.mount).toBe("function");
   });
 });
