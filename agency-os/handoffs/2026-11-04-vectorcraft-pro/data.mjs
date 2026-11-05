@@ -24,9 +24,9 @@ export const COPY = {
 };
 
 export const NOW = [
-  { what: '在 app.aware-wave.com 用 Illustrator 一樣的工具列、面板、快捷鍵畫向量。', state: 'yes', ev: '2026-11-05 上線：側欄 Vector Pro 開新分頁全視窗（bca9a846d）；正式站 playwright smoke：VectorCraft 開得起來、ui.inspect 回 JSON。' },
-  { what: '介面與字型是繁體中文。', state: 'yes', ev: '介面 zh-hant；建置加 Noto Sans TC，本機實測罕用字「嘸」正常顯示（0f1bdc062）。' },
-  { what: 'AwareWave 獨有的九項功能在專業版裡，右側一條圖示欄，點了才浮出面板。', state: 'yes', ev: '2026-11-05 晚 33883b57b 上線後正式站逐一實測：範本 A4 → 畫板 595×842 pt；QR、條碼各新增一個群組物件；調色、去背（色鍵）換圖成功；WebP 下載 image/webp；Mockup 出圖、無下拉選單；批次匯出兩檔。字型面板依操作者決定取消，字型改灌進 VectorCraft 自己的字型庫（建置中）。圖示欄寬 38，浮出面板不推擠畫布。' },
+  { what: '在 app.aware-wave.com 用 Illustrator 一樣的工具列、面板、快捷鍵畫向量，整個畫面是 app 的主題色。', state: 'yes', ev: '2026-11-05 晚正式站實測：頁面把主題顏色傳給 VectorCraft，它回覆已套用；截圖全畫面米色底、橘色按鈕（工具列、面板、對話框都是）。改主題存檔後重開即套用。版本 4cce336-7303550，舊版目錄保留可切回。' },
+  { what: '介面與字型是繁體中文，字型在 VectorCraft 自己的字元面板選。', state: 'yes', ev: '字型庫 57 個家族（建置時放入 51 個檔，來源網址與校驗碼釘在 PIN.json）；實測 Noto Serif TC 套到中文、Playfair Display／Roboto／Montserrat／Noto Sans HK 套到英文都成功，缺字型數 0。' },
+  { what: 'AwareWave 獨有的九項功能在專業版裡，右側一條圖示欄，點了才浮出面板。', state: 'yes', ev: '2026-11-05 晚正式站九項全部實測通過：範本、調色、去背（色鍵）、WebP、My Designs（存入後重開，文字完整）、QR、條碼、Mockup、批次匯出。AI 去背要付費，未跑。圖示欄寬 38，浮出面板不推擠畫布。' },
   { what: '舊的向量設計檔在專業版打得開，舊編輯器退場，只有一套。', state: 'yes', ev: '舊 .design.json 在 My Designs 面板「匯入舊專案」轉向量；舊 PNG 照常開；/tools/vector-editor 與 /vector-editor.html 轉到專業版（6740e006d）。' },
   { what: '本機能建出網頁版。', state: 'yes', ev: '一個指令 build.ps1；wasm 89 MB 與上游 v0.21.0 同級，建置會驗證已最佳化（c9b541cae）。' },
 ];
