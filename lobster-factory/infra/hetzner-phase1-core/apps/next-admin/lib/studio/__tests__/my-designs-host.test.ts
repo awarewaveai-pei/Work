@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 // My Designs panel (C5.2) reads every editor-specific value from ctx.host: one save and one list per host (vector, canvas),
-// and a vector host never lists a .pcraft original. The canvas host literal below is the C4.2 shape (ctx-contract.md "host").
+// and a vector host never lists a .psd original. The canvas host literal below is the C4.2 shape (ctx-contract.md "host").
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import myDesigns from "../../../public/editor-shared/blocks/my-designs.js";
 import { createVectorcraftCtx } from "../../../public/editor-shared/ctx-vectorcraft.js";
 
 const ID = "11111111-1111-4111-8111-111111111111";
 const VECTOR = createVectorcraftCtx({ frame: () => undefined }).host;
-const CANVAS = { id: "photocraft", label: "畫布", sourceExt: ".pcraft", sourceName: "design.pcraft",
+const CANVAS = { id: "photocraft", label: "畫布", sourceExt: ".psd", sourceName: "design.psd",
   saveTag: { source: "canvas", modelName: "canvas", prompt: "canvas edit" }, listSources: ["canvas"] };
 
 const asset = (n: number, source: string, ext?: string, name?: string) => ({
@@ -17,11 +17,11 @@ const asset = (n: number, source: string, ext?: string, name?: string) => ({
 });
 const ROWS = [
   asset(1, "vector-pro", ".vectorcraft"),
-  asset(2, "canvas", ".pcraft", "poster.pcraft"),
+  asset(2, "canvas", ".psd", "poster.psd"),
   asset(3, "tarot"),
   asset(4, "canvas"), // canvas preview only
   asset(5, "vector-editor"), // old vector editor, preview only
-  asset(6, "vector-pro", ".pcraft"), // right source tag, original this host cannot open -> hidden in both lists
+  asset(6, "vector-pro", ".psd"), // right source tag, original this host cannot open -> hidden in both lists
   asset(7, "canvas", ".vectorcraft"),
 ];
 
@@ -55,7 +55,7 @@ const rowsShown = (body: HTMLElement) => [...body.querySelectorAll("button.fontr
 
 describe.each([
   ["vector", VECTOR, "design.vectorcraft", { source: "vector-pro", modelName: "vector-pro", prompt: "vector edit" }, [1, 5], "還沒有向量編輯器存過的設計。"],
-  ["canvas", CANVAS, "design.pcraft", { source: "canvas", modelName: "canvas", prompt: "canvas edit" }, [2, 4], "還沒有畫布編輯器存過的設計。"],
+  ["canvas", CANVAS, "design.psd", { source: "canvas", modelName: "canvas", prompt: "canvas edit" }, [2, 4], "還沒有畫布編輯器存過的設計。"],
 ] as const)("%s host", (_n, host, sourceName, tag, listed, emptyText) => {
   it("saves the host's original-file name and tags", async () => {
     const { body } = mountPanel(host);
@@ -101,7 +101,7 @@ describe("open", () => {
     const [withSource, previewOnly] = [...body.querySelectorAll("button.fontrow")] as HTMLButtonElement[];
     withSource.click();
     await vi.waitFor(() => expect(ctx.openFile).toHaveBeenCalledTimes(1));
-    expect((ctx.openFile.mock.calls[0] as unknown[])[1]).toBe("poster.pcraft");
+    expect((ctx.openFile.mock.calls[0] as unknown[])[1]).toBe("poster.psd");
     previewOnly.click();
     await vi.waitFor(() => expect(ctx.placeImage).toHaveBeenCalledTimes(1));
   });

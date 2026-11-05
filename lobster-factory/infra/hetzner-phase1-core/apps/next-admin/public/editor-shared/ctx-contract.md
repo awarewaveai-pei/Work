@@ -38,7 +38,7 @@ host = {
 | 宿主 | id | label | sourceExt | sourceName | saveTag（source／modelName／prompt） | listSources |
 |---|---|---|---|---|---|---|
 | 向量（`ctx-vectorcraft.js`） | `vectorcraft` | 向量 | `.vectorcraft` | `design.vectorcraft` | `vector-pro`／`vector-pro`／`vector edit` | `['vector-editor','vector-pro']` |
-| 畫布（`ctx-photocraft.js`，卡 C4.2） | `photocraft` | 畫布 | `.pcraft` | `design.pcraft` | `canvas`／`canvas`／`canvas edit` | `['canvas']` |
+| 畫布（`ctx-photocraft.js`，卡 C4.2） | `photocraft` | 畫布 | `.psd` | `design.psd` | `canvas`／`canvas`／`canvas edit` | `['canvas']` |
 
 My Designs 清單過濾：列出 `metadata.source ∈ listSources`（沒有 metadata 的舊資料也列）的設計；有原始檔的，原始檔副檔名必須等於 `sourceExt`，否則別的編輯器的原始檔會列出卻開不了。
 

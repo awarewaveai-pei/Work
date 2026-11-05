@@ -1,5 +1,5 @@
 /**
- * Original file kept next to a My Designs preview image (POST /api/tools/designs `sourceFile`): a .vectorcraft, .svg or .pcraft.
+ * Original file kept next to a My Designs preview image (POST /api/tools/designs `sourceFile`): a .vectorcraft, .svg or .psd.
  * Stored as its own R2 object; the media_assets row keeps only metadata.source_key / source_name / source_bytes (no schema change).
  * The extension is a label, the bytes are checked (same rule as the image path in route.ts: a label never decides what the bucket hosts).
  */
@@ -20,33 +20,13 @@ export function isSvgFile(buf: Buffer): boolean {
 }
 
 /**
- * PhotoCraft project (.pcraft, storytold/photocraft book/src/formats/pcraft.md): a ZIP with a root `manifest.json`.
- * Checked on the ZIP central directory (the authoritative entry list), not by scanning for the name inside the data.
+ * Photoshop document (.psd / .psb): what PhotoCraft web saves interactively (upstream crates/ui-egui/src/app/files.rs:236-245).
+ * Header = "8BPS", u16 BE version (1 = PSD, 2 = PSB), 6 reserved zero bytes; 26 bytes minimum.
  */
-export function isPcraftFile(buf: Buffer): boolean {
-  if (buf.length < 22 || buf.readUInt32LE(0) !== 0x04034b50) return false; // local file header magic, bytes 50 4B 03 04
-  const eocdFloor = Math.max(0, buf.length - 22 - 0xffff);
-  let eocd = -1;
-  for (let i = buf.length - 22; i >= eocdFloor; i--) {
-    if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
-  }
-  if (eocd < 0) return false;
-  const count = buf.readUInt16LE(eocd + 10);
-  let p = buf.readUInt32LE(eocd + 16);
-  for (let n = 0; n < count; n++) {
-    if (p + 46 > buf.length || buf.readUInt32LE(p) !== 0x02014b50) return false;
-    const nameLen = buf.readUInt16LE(p + 28);
-    const next = p + 46 + nameLen + buf.readUInt16LE(p + 30) + buf.readUInt16LE(p + 32);
-    if (next > buf.length) return false;
-    if (buf.toString("utf8", p + 46, p + 46 + nameLen) === "manifest.json") {
-      // the entry must lead to a real local file header with the same name (a bare central-directory record is not a file)
-      const lh = buf.readUInt32LE(p + 42);
-      return lh + 30 + nameLen <= buf.length && buf.readUInt32LE(lh) === 0x04034b50 && buf.readUInt16LE(lh + 26) === nameLen
-        && buf.toString("utf8", lh + 30, lh + 30 + nameLen) === "manifest.json";
-    }
-    p = next;
-  }
-  return false;
+export function isPsdFile(buf: Buffer): boolean {
+  if (buf.length < 26 || buf.readUInt32BE(0) !== 0x38425053) return false; // "8BPS"
+  const version = buf.readUInt16BE(4);
+  return (version === 1 || version === 2) && buf.readUIntBE(6, 6) === 0;
 }
 
 /** extension -> content sniffer. The ONE place the accepted source formats are listed: SOURCE_EXTS, the error text and
@@ -54,7 +34,7 @@ export function isPcraftFile(buf: Buffer): boolean {
 const SOURCE_SNIFFERS = {
   ".vectorcraft": isNativeFile,
   ".svg": isSvgFile,
-  ".pcraft": isPcraftFile,
+  ".psd": isPsdFile,
 } as const satisfies Record<string, (buf: Buffer) => boolean>;
 export type SourceExt = keyof typeof SOURCE_SNIFFERS;
 export const SOURCE_EXTS = Object.keys(SOURCE_SNIFFERS) as readonly SourceExt[];
