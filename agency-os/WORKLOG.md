@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-05（續7）影音工作台上線 H4＋H5：video.aware-wave.com live、3D 走 CPU Cycles（a8c682b86／c09e37b72／7b76f9f6c）
+
+- H4：host compose 只插入 video-workbench 服務／video-net／volume（file 型 safe-infra-patch，backup docker-compose.yml.bak.safe-patch-20261105-054638）；首次 sg-deploy 關 smoke 回滾（nginx 未切）；nginx 套 repo 版（host＝repo L5 前版本，backup default.conf.bak.safe-patch-20261105-055001）；驗收 /healthz 200、/login 200、未登入 /api/vw/state 401、/ 302、偽造 X-VW-* 401、無發布 port；其他七個門 200；一般模式 redeploy 全綠＋rollback 快照。
+- H5 根因三層：①映像缺 libEGL（L5 只驗 `blender --version`）→ a8c682b86 補 EGL/Mesa＋gate 渲一格 Eevee；②無 GPU 的 Eevee 走 llvmpipe 80 s/格；③32 執行緒擠 3 核配額。→ c09e37b72：render.py engine=cycles（CPU 16 samples＋OIDN）、`-t os.availableParallelism()`、時間預算（格數×解析度，>3 h 送出即拒）、一次一支（第二支 409，時限不含排隊；Codex 645d1836）、gate 也渲一格 Cycles、compose cpus 12。實測 1080p 11.75 s/格（150 格約 29 min）、記憶體峰值 1.75 GB。
+- 失誤：blender-budget 測試靠筆電 runtime/blender 才綠，主機 gate 擋下（7b76f9f6c 修）；上機腳本未 set -e，gate 失敗後仍套 compose（短暫舊程式＋3D 開）→ 之後腳本一律 set -euo pipefail。
+- 未完：P6.10 全程投遞實測（操作者操作、付費）＋Uptime Kuma /healthz。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh video-workbench（gate＋Cycles 格＋smoke OK）; docker exec node h5-measure.cjs（10 格 1080p 117.5 s）; curl --resolve video.aware-wave.com /healthz /login /api/vw/state 偽造 header | exit=0 | ms=900000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n（Codex agency-os/reports/oracle/2026-11-05-partialreview-645d1836.md：排隊吃時限→一次一支；host compose 同步→已 safe-infra-patch；突變：超長拒絕、claim 守衛 紅→綠）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=VW_BLENDER_ENGINE | hits=3
+- 避免再發生：碰容器環境的改動，上機前先用同映像跑 Dockerfile.gate；上機腳本 set -euo pipefail。
 ## 2026-11-05（續6）影音工作台 P6.6 投遞＋P6.11 價目與 R2 孤兒清掃（1b869b8af）
 
 - P6.6：next-admin door 頁 /release 包 ReleaseDeliveryPanel（單一投遞 UI）；工作台按鈕＝先算好 href 的連結（await 後 window.open 會被當彈窗靜默擋）。比例＝入帳時記 metadata.ratio，只經 ratioOfAsset 讀（ratioOfUrl 改私有）；/api/video/assets 只在 includeWorkbench=1 回 workbench_render。
