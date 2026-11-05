@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-05（續18）影音工作台 P6.13：工作台成品能過送審 QA（1aaa139d5，已部署）
+
+- 根因：送審要 technical/caption/editorial/rights 四份皆 passed（next-admin lib/content/video/release-gate.ts:17）；VW 成品登記無 metadata.title/script（editorial-rights-persist.ts:31）、上傳寫死 rightsConfirmed:false 且無 UI、無人寫 caption QA（只有 finalize.ts:130／transcription.ts）。
+- 做法：VW backend/release-text.cjs 從工作紀錄取畫面上的字（editor-export 可見且不透明的文字片段、subtitle-burn cues；title＝專案名／來源檔名），切成不重疊時間軸；新路由 app/api/internal/video/workbench/assets/release-text（JSON body，不放 X-VW-Meta：Node 16KB header 上限）寫 title/script＋跑 editorial/rights＋caption QA，兩份報告都存成才回 ok（持久化關 503、寫失敗 502），VW settle 送一次、失敗重試；jobs.json 歷史上限不修剪仍欠主系統的工作。上傳加勾選框「我有權使用這些素材」（素材庫、選素材面板、3D 匯入），伺服器記 rightsConfirmed===true；既有未確認上傳列（org+checksum+origin）重傳勾選時只升不降，並補寫權利 QA。
+- 無字成品（AI 影片、模板、Blender）照實不能送審，不拿 prompt 頂替。
+- 未做：其他頁面上傳入口無勾選框（需到素材庫勾選重傳）；LUT 不登記主系統 → 用 LUT 的成品 rights 必敗（既有）；tests/media-ledger.cjs:155 舊斷言缺 costUsd（既有、不在部署閘）。全程投遞（P6.10）待操作者用員工帳號在 video.aware-wave.com 走一次。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin && sg-deploy.sh video-workbench（smoke 全綠，deployed 1aaa139d5）; lobster-video-workbench 內 fetch release-text 無 token 401、有 token 不存在資產 404、release-text.cjs 算出 captions | exit=0 | ms=420000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/6m/0n（Codex agency-os/reports/oracle/2026-11-05-partialreview-791420ef.md 4m＋2026-11-05-partialreview-7b3a41a9.md 2m，全修＋測；突變：拔 org 比對、拔只升不降、拔透明度過濾各紅→綠；本機 4178 勾選框橫排並切換 rightsConfirmed）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=rightsConfirmed: false|releaseTextSent|release-text | hits=29
 ## 2026-11-05（續17）video.aware-wave.com 分鏡靈感／模板牆／應用工具恢復：seedstar 參考資料員工限定＋兩層限流（31e89c479、26cc0cb2c、9caa6a21a）
 
 - 根因 C1：頁面寫死 `assets/image-*`、`assets/storyboards-data.json`（seedstar.ai 擷取，.gitignore:7-10／.dockerignore 排除，只在筆電）→ 主機 404；storyboards-boot `.json()` 丟錯、模板牆破圖。
