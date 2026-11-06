@@ -1,7 +1,7 @@
 // ctx 契約（ctx-contract.md）對真品 PhotoCraft 的實作：iframe 的 window.photocraft（控制通道）＋ ?host=parent 訊息
 // （photocraft:open 進、photocraft:save 出；scripts/photocraft-pro/web-host-api.patch）。每個方法的指令序列與 undo 步數
 // 在 ctx-contract.md「PhotoCraft 指令序列」（實測 2026-11-06）。網頁版沒有路徑型存檔：bytes 一律經「選單 → 存檔對話框 →
-// photocraft:save」，所以一次只跑一個方法（queue），存檔以副檔名配給等待者；暫用文件取唯一名字，關檔前以名字找回。
+// photocraft:save」，所以一次只跑一個方法（queue），存檔以副檔名配給等待者；暫用文件以內容命名（避開開著的文件名），關檔前以名字找回。
 // 測試：lib/studio/__tests__/photo-pro-dock.test.ts（mock photocraft＋postMessage，每個方法一條）。
 
 const MIME = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", psd: "image/vnd.adobe.photoshop" };
@@ -51,6 +51,91 @@ export function scaleFor(ppi, docPpi) {
   return Math.max(1, Math.min(100, Math.round((p / d) * 1000) / 10));
 }
 
+/** SVG 字體 → PhotoCraft 字體（網站字型庫 photo-pro fonts/manifest.txt 有的家族）。具名字體照給，沒有就由 PhotoCraft 換預設。 */
+const GENERIC_FONT = { monospace: "JetBrains Mono", "ui-monospace": "JetBrains Mono", "sans-serif": "Inter", "system-ui": "Inter", "ui-sans-serif": "Inter", serif: "PT Serif", "ui-serif": "PT Serif" };
+/** 算好的 fill（瀏覽器回 rgb 函式字串，0–255，可帶 alpha）× fill-opacity → type.create 的 [r,g,b,a]：**0–1 浮點**
+ *  （給 0–255 會被夾成 1＝白字，實測 2026-11-06）。漸層 url(#…) 等讀不出 → 黑。資料色，不是介面色。 */
+export function cssColorRgba(c, fillOpacity = 1) {
+  const m = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:\s*[,/]\s*([\d.]+)(%?))?/i.exec(String(c || ""));
+  const k = Number.isFinite(+fillOpacity) ? Math.max(0, Math.min(1, +fillOpacity)) : 1;
+  if (!m) return [0, 0, 0, k];
+  const a = m[4] === undefined ? 1 : Math.max(0, Math.min(1, m[5] ? +m[4] / 100 : +m[4]));
+  return [+m[1], +m[2], +m[3]].map((v) => Math.max(0, Math.min(255, v)) / 255).concat(a * k);
+}
+
+/**
+ * SVG 的 <text> 拆出來：PhotoCraft 網頁版匯入 SVG 時沒有字型可排文字（usvg 字型庫是空的，PC crates/io/src/svg.rs:126-136），
+ * 文字被丟掉並跳「needs a font」通知（同檔 :1006）。所以在瀏覽器量每段文字（文件像素座標＝SVG 視窗座標、字級、對齊、顏色、字體），
+ * 從 SVG 拿掉，回 { svg（無文字）, texts }，之後在暫用文件用 type.create 建成文字圖層（向量、可編輯，字型由網站供）。
+ * 限制：每段取第一個 x/y、tspan 攤平成一行、旋轉／斜切不帶過去。沒有 <text> → 原樣。
+ */
+export function splitSvgText(svg) {
+  if (!/<text[\s>]/i.test(svg) || typeof DOMParser === "undefined") return { svg, texts: [] };
+  const parsed = new DOMParser().parseFromString(svg, "image/svg+xml");
+  const root = parsed.documentElement;
+  if (root?.localName !== "svg") return { svg, texts: [] }; // 解析失敗：交給 PhotoCraft 回報
+  const live = document.importNode(root, true);
+  // 沒寫寬高（或寫 %）時 PhotoCraft 以 viewBox 為畫布；瀏覽器預設 300×150：量之前補成一樣
+  const vb = (root.getAttribute("viewBox") || "").trim().split(/[\s,]+/).map(Number);
+  for (const [k, i] of [["width", 2], ["height", 3]]) {
+    const v = root.getAttribute(k);
+    if ((!v || /%$/.test(v)) && vb.length === 4 && vb[i] > 0) live.setAttribute(k, String(vb[i]));
+  }
+  const box = document.createElement("div");
+  box.style.cssText = "position:fixed;left:-100000px;top:0;opacity:0;pointer-events:none"; // 不用 visibility：會被文字繼承
+  box.appendChild(live);
+  document.body.appendChild(box);
+  const texts = [];
+  try {
+    const originals = [...root.getElementsByTagNameNS("*", "text")];
+    [...live.getElementsByTagNameNS("*", "text")].forEach((t, i) => {
+      originals[i]?.remove();
+      const text = (t.textContent || "").replace(/\s+/g, " ").trim();
+      const cs = getComputedStyle(t);
+      const m = t.getCTM?.();
+      if (!text || !m || cs.display === "none" || cs.visibility === "hidden" || cs.fill === "none") return;
+      const first = (list) => (list?.baseVal?.numberOfItems ? list.baseVal.getItem(0).value : 0);
+      const x = first(t.x), y = first(t.y);
+      const scale = Math.sqrt(Math.abs(m.a * m.d - m.b * m.c)) || 1;
+      const family = String(cs.fontFamily || "").split(",")[0].trim().replace(/^["']|["']$/g, "");
+      texts.push({
+        text,
+        x: m.a * x + m.c * y + m.e,
+        y: m.b * x + m.d * y + m.f,
+        px: (parseFloat(cs.fontSize) || 16) * scale,
+        align: { middle: "center", end: "right" }[cs.textAnchor] || "left",
+        color: cssColorRgba(cs.fill, cs.fillOpacity * groupOpacity(t)),
+        font: GENERIC_FONT[family.toLowerCase()] || family || "Inter",
+        weight: Math.min(900, Math.max(100, parseInt(cs.fontWeight, 10) || 400)),
+        italic: cs.fontStyle === "italic" || cs.fontStyle === "oblique",
+      });
+    });
+  } finally {
+    box.remove();
+  }
+  return { svg: new XMLSerializer().serializeToString(root), texts };
+}
+
+/** 畫出來的透明度 = fill 的 alpha × fill-opacity × 自己與每個祖先的 opacity（opacity 不繼承，要一路乘上去）。 */
+function groupOpacity(el) {
+  let k = 1;
+  for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+    const o = parseFloat(getComputedStyle(n).opacity);
+    if (Number.isFinite(o)) k *= Math.max(0, Math.min(1, o));
+    if (n.localName === "svg" && !(n.parentElement && n.parentElement.closest?.("svg"))) break;
+  }
+  return k;
+}
+
+/** 圖層 PNG（修剪後範圍 bounds）貼進框 frame 的透明畫布：回框大小的 PNG。框＝bounds 時原樣回。 */
+async function padToFrame(png, bounds, frame) {
+  if (bounds[0] === frame[0] && bounds[1] === frame[1] && bounds[2] === frame[2] && bounds[3] === frame[3]) return png;
+  const bmp = await createImageBitmap(png);
+  const c = new OffscreenCanvas(frame[2], frame[3]);
+  c.getContext("2d").drawImage(bmp, bounds[0] - frame[0], bounds[1] - frame[1]);
+  return c.convertToBlob({ type: "image/png" });
+}
+
 /** 不透明底色：透明 PNG 疊在底色上，再以瀏覽器編碼成要的格式（PhotoCraft 的 Export As 只有「透明／攤平成白」）。 */
 async function onBackground(png, color, type, quality) {
   const bmp = await createImageBitmap(png);
@@ -86,7 +171,6 @@ export function createPhotocraftCtx(opts) {
   });
   let queue = Promise.resolve();
   let failed = null; // photocraft:failed（無 WebGPU／WebGL2）
-  let seq = 0;
   /** 等存檔的方法。photocraft:save 沒有 id，所以以副檔名配：交給第一個「這種檔我在等」的等待者；
    *  沒人在等這種檔（使用者按原生 另存／匯出，或等待者已逾時）→ 父頁下載，bytes 不丟。 */
   const waiters = [];
@@ -160,9 +244,21 @@ export function createPhotocraftCtx(opts) {
     const { layers } = await ex(api, "layer.list", { flat: true });
     return (layers || []).find((l) => l.active) || null;
   };
-  /** 暫用文件一律取唯一名字：關之前以名字找回它的 index（使用者在 iframe 裡開／關分頁也不會關錯），找不到就不關。 */
-  const tempName = (ext) => `awarewave-tmp-${Date.now().toString(36)}-${++seq}${ext ? `.${ext}` : ""}`;
-  const indexOf = async (api, name) => (await session(api)).documents.findIndex((d) => d.name === name);
+  /** 暫用文件的名字使用者看得到（開的那一下的分頁、狀態列「已開啟 …」），所以用內容自己的名字（例「條碼.svg」），
+   *  取的時候避開所有開著的文件名（重名加「 (2)」…）。關之前以名字找回 index（使用者在 iframe 裡開／關分頁也不會關錯）：
+   *  找不到就不關；同名不只一份（使用者中途開了同名檔）→ 不關、報錯，不猜。 */
+  async function tempName(api, base, ext) {
+    const names = new Set((await session(api)).documents.map((d) => d.name));
+    const e = ext ? `.${ext}` : "";
+    let name = `${base}${e}`;
+    for (let i = 2; names.has(name); i++) name = `${base} (${i})${e}`;
+    return name;
+  }
+  async function indexOf(api, name) {
+    const hits = (await session(api)).documents.map((d, i) => [d.name, i]).filter(([n]) => n === name);
+    if (hits.length > 1) throw new Error(`有 ${hits.length} 份「${name}」，分不出哪一份是暫用文件，沒有關閉`);
+    return hits.length ? hits[0][1] : -1;
+  }
   /** 使用者的文件：記 {index, name}，每次用之前重新找回（使用者可能在 iframe 裡開／關分頁，index 會位移）。
    *  原 index 名字對得上就用它，否則找唯一同名的；找不到或不唯一 → 中止，不猜。 */
   const targetRef = async (api) => {
@@ -219,18 +315,49 @@ export function createPhotocraftCtx(opts) {
     if (failed) throw error;
     return result;
   }
-  /** 開一份暫用文件，把它的圖層複製到 target，關掉暫用文件；回新圖層 ids。layerName 是新圖層名。 */
-  async function placeFrom(api, blob, ext, layerName, place) {
+  /** 剛開的文件（作用中）整理成「一個」頂層圖層：texts 建成文字圖層（splitSvgText），頂層多於一個就全部收進名為 name 的群組。
+   *  SVG 匯入把每個形狀拆成一個頂層 Shape 圖層（條碼＝底＋每一條），copyToDocument 只複製選取的圖層（PC crates/engine/src/cmd/
+   *  layer_copy_cmds.rs:162）：不收成一個，置入就只剩一條。只動暫用文件，使用者的文件 0 步。 */
+  async function asOneLayer(api, texts, name) {
+    if (texts.length) {
+      const res = (await doc(api)).resolution || 72;
+      for (const t of texts) {
+        await ex(api, "type.create", { x: t.x, y: t.y, text: t.text, size: Math.min(1296, Math.max(0.1, (t.px * 72) / res)), /* type.create 的範圍 0.1–1296 pt */ font: t.font, weight: t.weight, italic: t.italic, align: t.align, color: t.color, name: t.text });
+      }
+    }
+    const top = ((await ex(api, "layer.list", { flat: true })).layers || []).filter((l) => l.parent == null);
+    if (top.length > 1) {
+      await ex(api, "select.allLayers", {});
+      await ex(api, "layer.groupLayers", { name });
+    }
+  }
+  /** 開一份暫用文件（名＝layerName.ext），整理成一個圖層，複製到使用者的文件，關掉暫用文件；回 {ids}（一個）。
+   *  沒有文件時這張圖直接成為文件。texts：SVG 拆出的文字（點陣圖給 []）。place：copyToDocument 的位置參數，或在暫用文件
+   *  裡算出它的函式（placeImage 的 at）。回 {ids, offset（新圖 (0,0) 落點）}。 */
+  async function placeFrom(api, blob, ext, layerName, place, texts) {
     const s = await session(api);
     if (!s.documents.length) {
-      await open(api, blob, `${layerName}.${ext}`); // 沒有文件：這張圖就是文件
+      const name = `${layerName}.${ext}`;
+      await open(api, blob, name);
+      try {
+        await asOneLayer(api, texts, layerName);
+      } catch (err) {
+        // 整理到一半的文件不留給使用者（它就是這次置入的結果）：關掉再報錯
+        const i = await indexOf(api, name).catch(() => -1);
+        if (i >= 0) await ex(api, "file.close", { document: i, save: "discard" }).catch(() => {});
+        throw err;
+      }
       return { ids: ((await ex(api, "layer.list", {})).layers || []).map((l) => l.id) };
     }
     const ref = await targetRef(api);
-    const temp = tempName(ext);
+    const temp = await tempName(api, layerName, ext);
     await open(api, blob, temp);
-    const r = await withTemp(api, temp, ref, async () => ex(api, "layer.copyToDocument", { document: await resolveTarget(api, ref), ...place, name: layerName }));
-    return { ids: r.layers };
+    const r = await withTemp(api, temp, ref, async () => {
+      await asOneLayer(api, texts, layerName);
+      const where = typeof place === "function" ? await place() : place;
+      return ex(api, "layer.copyToDocument", { document: await resolveTarget(api, ref), ...where, name: layerName });
+    });
+    return { ids: r.layers, offset: r.offset };
   }
   /** 暫用文件（已是作用中）裁成 rect → Quick Export PNG（存檔名 = 文件名.png）。 */
   async function cropAndExport(api, [x, y, width, height]) {
@@ -258,25 +385,63 @@ export function createPhotocraftCtx(opts) {
     busy: (on) => opts.onBusy?.(!!on),
     ready: () => pc().then(() => true),
 
-    /** SVG 置入成 Shape 圖層（向量），置中、為作用中圖層。1 個 undo 步。 */
-    placeSvg: op((api, svg, name = "awarewave.svg") =>
-      placeFrom(api, new Blob([svg], { type: "image/svg+xml" }), "svg", baseName(name, "awarewave"), { center: true })),
+    /** SVG 置入成向量圖層，置中、為作用中圖層：一個形狀＝一個 Shape 圖層；多個形狀或有文字＝一個群組（Shape 圖層＋文字圖層，
+     *  見 splitSvgText／asOneLayer）。1 個 undo 步。 */
+    placeSvg: op((api, svg, name = "awarewave.svg") => {
+      const { svg: shapes, texts } = splitSvgText(String(svg));
+      return placeFrom(api, new Blob([shapes], { type: "image/svg+xml" }), "svg", baseName(name, "awarewave"), { center: true }, texts).then((r) => ({ ids: r.ids }));
+    }),
 
-    /** 點陣圖置入成新圖層，原像素大小、置中。1 個 undo 步。 */
-    placeImage: op((api, blob, name) => placeFrom(api, blob, extFor(name, blob, "png"), baseName(name, "awarewave"), { center: true })),
+    /** 點陣圖置入成新圖層，原像素大小；預設置中，1 個 undo 步。選用 o.at = [x, y]：圖片（整張、含透明邊）左上角落在文件像素
+     *  (x, y)：照 replaceImage，以暫用文件裡的修剪範圍 tb 算 copyToDocument 的 at（它對齊修剪範圍中心），回傳 offset 不等於
+     *  (x, y) 才整數平移（2 步）；並記下完整框，之後 selectedImage 讀回含透明邊的整張。沒有文件時這張圖就是文件，at 不用。 */
+    placeImage: op(async (api, blob, name, o = {}) => {
+      const layerName = baseName(name, "awarewave");
+      const at = Array.isArray(o?.at) && o.at.length === 2 && o.at.every(Number.isFinite) ? o.at.map(Math.round) : null;
+      if (!at || !(await session(api)).documents.length) return { ids: (await placeFrom(api, blob, extFor(name, blob, "png"), layerName, { center: true }, [])).ids };
+      const [x, y] = at;
+      let size;
+      const r = await placeFrom(api, blob, extFor(name, blob, "png"), layerName, async () => {
+        const d = await doc(api);
+        size = [d.width, d.height];
+        const tb = ((await ex(api, "layer.list", { flat: true })).layers || [])[0]?.bounds || [0, 0, d.width, d.height];
+        return { at: [x + tb[0] + tb[2] / 2, y + tb[1] + tb[3] / 2] };
+      }, []);
+      const nid = r.ids[0];
+      if (r.offset && (r.offset[0] !== x || r.offset[1] !== y)) await ex(api, "layer.translate", { layer: nid, dx: x - r.offset[0], dy: y - r.offset[1] });
+      const ref = await targetRef(api);
+      const placed = ((await ex(api, "layer.list", { flat: true })).layers || []).find((l) => l.id === nid);
+      if (placed?.bounds) frames.set(frameKey(ref, nid), { frame: [x, y, size[0], size[1]], trimmed: placed.bounds });
+      return { ids: r.ids };
+    }),
 
     /** 作用中的像素圖層 → {id, blob（圖片框 PNG）, transform [1,0,0,1,x,y], width, height}；非像素圖層或沒文件 → null。
-     *  圖片框＝replaceImage 換進來的完整框（含透明邊），其餘＝圖層 bounds。原文件 0 步。 */
+     *  圖片框＝replaceImage 換進來的完整框（含透明邊），其餘＝圖層 bounds。原文件 0 步。
+     *  不開暫用文件：圖層 › 快速轉存為 PNG（只出這個圖層的修剪範圍）再由瀏覽器貼進圖片框。轉存的尺寸≠修剪範圍（圖層樣式
+     *  外擴等）→ 退回「複製圖層成新文件 → 裁成框 → 轉存」。多選圖層時也走退回：快速轉存會每個選取圖層各出一張 PNG
+     *  （實測 2026-11-06），多的那幾張沒人等、會被當成使用者的匯出下載；不改使用者的圖層選取。 */
     selectedImage: op(async (api) => {
       if (!(await session(api)).documents.length) return null;
-      const l = await activeLayer(api);
+      const ls = (await ex(api, "layer.list", { flat: true })).layers || [];
+      const l = ls.find((x) => x.active) || null;
       if (!l || l.kind !== "Pixel" || !l.bounds) return null;
       const ref = await targetRef(api);
       const box = frameOf(ref, l);
-      const temp = tempName();
-      await ex(api, "layer.duplicate", { layer: l.id, document: "new", documentName: temp });
-      const blob = await withTemp(api, temp, ref, () => cropAndExport(api, box));
       const [x, y, width, height] = box;
+      let own = null;
+      if (ls.filter((x) => x.selected).length <= 1) {
+        own = (await savedBy(["png"], () => invoke(api, "layer.quickExportAsPng"))).blob;
+        const bmp = await createImageBitmap(own);
+        if (bmp.width !== l.bounds[2] || bmp.height !== l.bounds[3]) own = null;
+        bmp.close?.();
+      }
+      let blob;
+      if (own) blob = await padToFrame(own, l.bounds, box);
+      else {
+        const temp = await tempName(api, baseName(l.name, "layer"));
+        await ex(api, "layer.duplicate", { layer: l.id, document: "new", documentName: temp });
+        blob = await withTemp(api, temp, ref, () => cropAndExport(api, box));
+      }
       return { id: l.id, blob, transform: [1, 0, 0, 1, x, y], width, height };
     }),
 
@@ -289,7 +454,7 @@ export function createPhotocraftCtx(opts) {
       if (!old?.bounds) throw new Error(`找不到圖層 ${id}`);
       const [x, y, w, h] = frameOf(ref, old);
       await ex(api, "layer.select", { layer: id }); // 新圖層插在作用中圖層之上
-      const temp = tempName(EXT[blob.type] || "png");
+      const temp = await tempName(api, baseName(old.name, "layer"), EXT[blob.type] || "png");
       await open(api, blob, temp);
       let size, tb;
       const r = await withTemp(api, temp, ref, async () => {
@@ -392,7 +557,7 @@ export function createPhotocraftCtx(opts) {
       const l = await activeLayer(api);
       const ref = await targetRef(api);
       const frameRect = (l && frameOf(ref, l)) || [0, 0, d.width, d.height];
-      const temp = tempName();
+      const temp = await tempName(api, "選取範圍");
       await ex(api, "image.duplicate", { name: temp });
       return withTemp(api, temp, ref, async () => {
         await ex(api, "layer.new.layer", { name: "mask" });
@@ -404,13 +569,22 @@ export function createPhotocraftCtx(opts) {
       });
     }),
 
-    /** 選用：作用中圖層等比縮放、置中到畫布；'fit' 完整放進、'fill' 蓋滿。1 個 undo 步。 */
+    /** 選用：選取的圖層（多選＝合成一塊，同舊編輯器 CanvasEditor.tsx:1059）等比縮放、置中到畫布；'fit' 完整放進、'fill' 蓋滿。
+     *  沒有選取的圖層 → 作用中圖層。一次 edit.transform（layers＋rect＝合併範圍），1 個 undo 步。回 {id: 作用中圖層, ids}。 */
     fitLayer: op(async (api, mode = "fit") => {
-      const l = await activeLayer(api);
-      if (!l?.bounds) throw new Error("沒有作用中的圖層");
+      const ls = (await ex(api, "layer.list", { flat: true })).layers || [];
+      const byId = new Map(ls.map((l) => [l.id, l]));
+      const inSelected = (l) => { for (let p = byId.get(l.parent); p; p = byId.get(p.parent)) if (p.selected) return true; return false; };
+      const active = ls.find((l) => l.active);
+      let pick = ls.filter((l) => l.selected && l.bounds && !inSelected(l));
+      if (!pick.length && active?.bounds) pick = [active];
+      if (!pick.length) throw new Error("沒有選取的圖層");
+      const x0 = Math.min(...pick.map((l) => l.bounds[0])), y0 = Math.min(...pick.map((l) => l.bounds[1]));
+      const x1 = Math.max(...pick.map((l) => l.bounds[0] + l.bounds[2])), y1 = Math.max(...pick.map((l) => l.bounds[1] + l.bounds[3]));
       const d = await doc(api);
-      await ex(api, "edit.transform", { layer: l.id, quad: fitQuad(l.bounds, d.width, d.height, mode) });
-      return { id: l.id };
+      const ids = pick.map((l) => l.id);
+      await ex(api, "edit.transform", { layers: ids, rect: [x0, y0, x1, y1], quad: fitQuad([x0, y0, x1 - x0, y1 - y0], d.width, d.height, mode) });
+      return { id: active?.id ?? ids[0], ids };
     }),
   };
   return ctx;

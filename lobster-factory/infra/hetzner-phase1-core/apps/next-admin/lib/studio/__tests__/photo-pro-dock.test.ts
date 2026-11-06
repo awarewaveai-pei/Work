@@ -6,11 +6,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { build } from "esbuild";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createPhotocraftCtx, fitQuad, scaleFor, toPixels, toQuality } from "../../../public/editor-shared/ctx-photocraft.js";
+import { createPhotocraftCtx, cssColorRgba, fitQuad, scaleFor, toPixels, toQuality } from "../../../public/editor-shared/ctx-photocraft.js";
 
 const APP = path.resolve(__dirname, "..", "..", "..");
 const read = (rel: string) => fs.readFileSync(path.join(APP, rel), "utf8");
-const PANELS = ["templates", "color-grade", "bg-remove", "ai-fill", "genfx", "edge-mask", "webp", "my-designs", "qr", "barcode", "mockup", "batch-export"];
+const PANELS = ["templates", "color-grade", "bg-remove", "ai-fill", "genfx", "ai-edit", "edge-mask", "webp", "my-designs", "qr", "barcode", "mockup", "batch-export"];
 const OPTIONAL = ["importLegacy", "selectionMask", "fitLayer"]; // 契約「選用」：宿主沒有就不提供
 const PUBLIC = path.join(APP, "public");
 
@@ -29,7 +29,7 @@ async function loadModule(rel: string) {
 const listOf = (src: string) => [...src.match(/export const PANEL_IDS = Object\.freeze\(\[([\s\S]*?)\]\)/)![1].matchAll(/"([^"]+)"/g)].map((x) => x[1]);
 
 describe("photo-pro-dock/dock.js", () => {
-  it("面板清單 = R0-PLAN C4 表（12 個，順序同）", () => {
+  it("面板清單 = R0-PLAN C4 表＋ai-edit（13 個，順序同）", () => {
     expect(listOf(read("public/photo-pro-dock/dock.js"))).toEqual(PANELS);
   });
   it("SIZES = PhotoCraft Pro 版型（dock.rs:37,73；panel_docking.rs:89-91,561；panel.rs:53），鍵 = 外殼 SIZE_VARS", async () => {
@@ -98,6 +98,7 @@ function mockPc(handlers: Record<string, (p: any, s: any) => any> = {}, opts: Re
     "image.duplicate": (p) => (state.docs.push({ name: p.name }), state.active = state.docs.length - 1, { document: state.active, name: p.name }),
     "ui.menu.invoke": (p) => {
       if (p.id === "file.export.quickExportAsPng") save("x.png", "PNG");
+      if (p.id === "layer.quickExportAsPng") save("green.png", "PNG");
       if (p.id === "file.saveACopy") save("base copy.psd", "8BPS");
       return p.id === "file.export.exportAs" ? { dialog: 1 } : { fileDialog: "save" };
     },
@@ -116,6 +117,10 @@ function mockPc(handlers: Record<string, (p: any, s: any) => any> = {}, opts: Re
     state.docs.push({ name: m.name });
     state.active = state.docs.length - 1;
   };
+  // 圖層快速轉存的 PNG 尺寸（selectedImage 比對修剪範圍）與貼進框的畫布（padToFrame）
+  const draws: any[] = [];
+  (globalThis as any).createImageBitmap = async () => opts.bitmap ?? (() => { const l = state.layers.find((x: any) => x.active); return { width: l?.bounds?.[2], height: l?.bounds?.[3] }; })();
+  (globalThis as any).OffscreenCanvas = class { constructor(public w: number, public h: number) {} getContext() { return { drawImage: (_b: any, x: number, y: number) => draws.push([this.w, this.h, x, y]) }; } convertToBlob() { return Promise.resolve(new Blob(["PADDED"], { type: "image/png" })); } };
   const downloads: [string, string][] = [];
   const ctx: any = createPhotocraftCtx({
     frame: () => ({ contentWindow: cw }) as unknown as HTMLIFrameElement,
@@ -125,22 +130,76 @@ function mockPc(handlers: Record<string, (p: any, s: any) => any> = {}, opts: Re
     download: async (b: Blob, n: string) => downloads.push([n, await b.text()]),
     ...opts.ctx,
   });
-  return { ctx, calls, state, emit, save, downloads, cw };
+  return { ctx, calls, state, emit, save, downloads, cw, draws };
 }
 const names = (calls: Call[]) => calls.filter((c) => c[1] !== "ui.inspect").map((c) => `${c[0]} ${c[1]}`);
 afterEach(() => {
   delete (globalThis as any).window;
   delete (globalThis as any).createImageBitmap;
+  delete (globalThis as any).OffscreenCanvas;
 });
 
 describe("ctx-photocraft.js 契約（mock photocraft）", () => {
-  it("placeSvg → 開暫用文件、copyToDocument 置中到原文件、關暫用文件", async () => {
-    const { ctx, calls } = mockPc();
+  /** 暫用文件（不是 base.png 的作用中文件）的圖層 = tempLayers。 */
+  const onTemp = (tempLayers: any[]) => ({ "layer.list": (_p: any, s: any) => ({ layers: s.docs[s.active]?.name === "base.png" ? s.layers : tempLayers }) });
+
+  it("placeSvg → 開暫用文件（以內容命名）、copyToDocument 置中到原文件、關暫用文件", async () => {
+    const { ctx, calls } = mockPc(onTemp([{ id: 1, kind: "Shape", bounds: [0, 0, 9, 9], active: true }]));
     expect(await ctx.placeSvg("<svg/>")).toEqual({ ids: [99] });
-    expect(names(calls)).toEqual(["post photocraft:open", "execute layer.copyToDocument", "execute file.close", "execute document.activate"]);
-    expect(calls.find((c) => c[1] === "photocraft:open")![2]).toMatchObject({ name: expect.stringMatching(/^awarewave-tmp-.+\.svg$/), origin: ORIGIN });
+    expect(names(calls)).toEqual(["post photocraft:open", "execute layer.list", "execute layer.copyToDocument", "execute file.close", "execute document.activate"]);
+    expect(calls.find((c) => c[1] === "photocraft:open")![2]).toMatchObject({ name: "awarewave.svg", origin: ORIGIN });
     expect(calls.find((c) => c[1] === "layer.copyToDocument")![2]).toEqual({ document: 0, center: true, name: "awarewave" });
     expect(calls.find((c) => c[1] === "file.close")![2]).toEqual({ document: 1, save: "discard" });
+  });
+
+  it("placeSvg：暫用文件有多個頂層圖層（SVG 每個形狀一層）→ 全選收成一個群組再 copy（不然只剩作用中那一條）", async () => {
+    const shapes = [1, 2, 3].map((id) => ({ id, kind: "Shape", bounds: [id, 0, 2, 80], parent: null, active: id === 1 }));
+    const { ctx, calls } = mockPc(onTemp(shapes));
+    await ctx.placeSvg("<svg/>", "條碼.svg");
+    expect(names(calls)).toEqual(["post photocraft:open", "execute layer.list", "execute select.allLayers", "execute layer.groupLayers", "execute layer.copyToDocument", "execute file.close", "execute document.activate"]);
+    expect(calls.find((c) => c[1] === "layer.groupLayers")![2]).toEqual({ name: "條碼" });
+    expect(calls.find((c) => c[1] === "layer.copyToDocument")![2]).toEqual({ document: 0, center: true, name: "條碼" });
+  });
+
+  it("暫用文件名避開開著的文件；關之前同名不只一份 → 不關、reject（不猜哪份是暫用）", async () => {
+    const m = mockPc(onTemp([{ id: 1, kind: "Pixel", bounds: [0, 0, 1, 1], active: true }]));
+    m.state.docs.push({ name: "a.png" }, { name: "a (2).png" });
+    await m.ctx.placeImage(new Blob(["x"], { type: "image/png" }), "a.png");
+    expect(m.calls.find((c) => c[1] === "photocraft:open")![2].name).toBe("a (3).png");
+    const m2 = mockPc(onTemp([{ id: 1, kind: "Pixel", bounds: [0, 0, 1, 1], active: true }]), { onOpen: (st: any) => st.docs.push({ name: "a.png" }) });
+    await expect(m2.ctx.placeImage(new Blob(["x"], { type: "image/png" }), "a.png")).rejects.toThrow(/分不出哪一份/);
+    expect(m2.calls.some((c) => c[1] === "file.close")).toBe(false);
+  });
+
+  it("placeImage 帶 at：以暫用文件的修剪範圍算 copyToDocument 的 at；offset 偏了才平移；之後 selectedImage 讀整張框", async () => {
+    const tempLayers = [{ id: 1, kind: "Pixel", bounds: [10, 5, 180, 110], active: true }]; // 200×120 圖，四周透明
+    const m = mockPc({
+      ...onTemp(tempLayers),
+      "document.inspect": (_p: any, s: any) => (s.docs[s.active]?.name === "base.png" ? { width: 400, height: 300, resolution: 72 } : { width: 200, height: 120 }),
+      "layer.copyToDocument": (p: any, s: any) => {
+        s.active = p.document;
+        s.layers.forEach((l: any) => (l.active = false));
+        s.layers.push({ id: 99, name: p.name, kind: "Pixel", bounds: [p.at[0] - 90, p.at[1] - 55, 180, 110], active: true });
+        return { document: p.document, layers: [99], offset: [49, 70] };
+      },
+    });
+    expect(await m.ctx.placeImage(new Blob(["x"], { type: "image/png" }), "擴圖.png", { at: [50, 70] })).toEqual({ ids: [99] });
+    expect(m.calls.find((c) => c[1] === "layer.copyToDocument")![2]).toEqual({ document: 0, at: [150, 130], name: "擴圖" });
+    expect(m.calls.find((c) => c[1] === "layer.translate")![2]).toEqual({ layer: 99, dx: 1, dy: 0 });
+    const sel = await m.ctx.selectedImage();
+    expect(sel).toMatchObject({ id: 99, transform: [1, 0, 0, 1, 50, 70], width: 200, height: 120 });
+    // 不給 at → 照舊置中
+    const c = mockPc(onTemp([{ id: 1, kind: "Pixel", bounds: [0, 0, 9, 9], active: true }]));
+    await c.ctx.placeImage(new Blob(["x"], { type: "image/png" }), "a.png");
+    expect(c.calls.find((x) => x[1] === "layer.copyToDocument")![2]).toEqual({ document: 0, center: true, name: "a" });
+  });
+
+  it("沒有文件時整理失敗（例 type.create 拒絕）→ 剛開的文件關掉、reject，不留半成品", async () => {
+    const m = mockPc({ "layer.list": () => ({ layers: [{ id: 1, kind: "Shape", bounds: [0, 0, 1, 1], parent: null }, { id: 2, kind: "Shape", bounds: [0, 0, 1, 1], parent: null }] }), "select.allLayers": () => { throw new Error("group refused"); } });
+    m.state.docs = [];
+    await expect(m.ctx.placeSvg("<svg/>", "x.svg")).rejects.toThrow(/group refused/);
+    expect(m.calls.find((c) => c[1] === "file.close")![2]).toEqual({ document: 0, save: "discard" });
+    expect(m.state.docs).toEqual([]);
   });
 
   it("placeImage：沒有文件 → 這張圖就是文件；名稱跟 MIME", async () => {
@@ -152,21 +211,46 @@ describe("ctx-photocraft.js 契約（mock photocraft）", () => {
     expect(calls.some((c) => c[1] === "layer.copyToDocument")).toBe(false);
   });
 
-  it("selectedImage → 作用中像素圖層的範圍 PNG；非像素圖層 → null", async () => {
+  it("selectedImage → 圖層 › 快速轉存 PNG（不開暫用文件）；非像素圖層 → null", async () => {
     const { ctx, calls, state } = mockPc();
     const s = await ctx.selectedImage();
     expect(s).toMatchObject({ id: 6, transform: [1, 0, 0, 1, 40, 60], width: 120, height: 80 });
     expect(await s.blob.text()).toBe("PNG");
-    expect(calls.find((c) => c[1] === "layer.duplicate")![2]).toMatchObject({ layer: 6, document: "new", documentName: expect.stringMatching(/^awarewave-tmp-/) });
-    expect(calls.find((c) => c[1] === "image.crop")![2]).toEqual({ x: 40, y: 60, width: 120, height: 80 });
-    expect(calls.find((c) => c[1] === "file.close")![2]).toEqual({ document: 1, save: "discard" });
+    expect(names(calls)).toEqual(["execute layer.list", "request ui.menu.invoke"]);
+    expect(calls.find((c) => c[1] === "ui.menu.invoke")![2]).toEqual({ id: "layer.quickExportAsPng" });
     state.layers[1].kind = "Shape";
     expect(await ctx.selectedImage()).toBeNull();
   });
 
+  it("selectedImage：多選圖層 → 不用圖層快速轉存（每個選取圖層各出一張，多的會被下載），走副本；不改選取", async () => {
+    const { ctx, calls, state, downloads } = mockPc();
+    state.layers.forEach((l: any) => (l.selected = true));
+    expect(await (await ctx.selectedImage()).blob.text()).toBe("PNG");
+    expect(calls.some((c) => c[1] === "ui.menu.invoke" && c[2].id === "layer.quickExportAsPng")).toBe(false);
+    expect(calls.some((c) => c[1] === "layer.select")).toBe(false);
+    expect(calls.find((c) => c[1] === "layer.duplicate")![2]).toMatchObject({ layer: 6, document: "new" });
+    expect(downloads).toEqual([]);
+  });
+
+  it("SVG 文字顏色：0–1 浮點、帶 alpha 與 fill-opacity（給 0–255 會變白字）", () => {
+    expect(cssColorRgba("rgb(255, 0, 51)")).toEqual([1, 0, 0.2, 1]);
+    expect(cssColorRgba("rgba(255, 0, 0, 0.25)")).toEqual([1, 0, 0, 0.25]);
+    expect(cssColorRgba("rgb(255 0 0 / 50%)", 0.5)).toEqual([1, 0, 0, 0.25]);
+    expect(cssColorRgba("url(#g)")).toEqual([0, 0, 0, 1]);
+  });
+
+  it("selectedImage：轉存尺寸≠修剪範圍（圖層樣式外擴）→ 退回複製成新文件、裁框、轉存，關掉副本", async () => {
+    const { ctx, calls } = mockPc({}, { bitmap: { width: 130, height: 90 } });
+    const s = await ctx.selectedImage();
+    expect(await s.blob.text()).toBe("PNG");
+    expect(calls.find((c) => c[1] === "layer.duplicate")![2]).toMatchObject({ layer: 6, document: "new", documentName: "green" });
+    expect(calls.find((c) => c[1] === "image.crop")![2]).toEqual({ x: 40, y: 60, width: 120, height: 80 });
+    expect(calls.find((c) => c[1] === "file.close")![2]).toEqual({ document: 1, save: "discard" });
+  });
+
   /** 暫用文件 = 新圖 size，修剪範圍 tb（PhotoCraft bounds 只算不透明）；copyToDocument 回 offset = 新圖 (0,0) 落點。 */
   const replaceMock = (size: [number, number], tb: number[], offset: [number, number] = [40, 60]) => {
-    const isTemp = (s: any) => String(s.docs[s.active]?.name).startsWith("awarewave-tmp-");
+    const isTemp = (s: any) => s.docs[s.active]?.name !== "base.png";
     return mockPc({
       "document.inspect": (_p, s) => (isTemp(s) ? { width: size[0], height: size[1] } : { width: 400, height: 300, resolution: 72, hasSelection: s.hasSelection }),
       "layer.list": (_p, s) => ({ layers: isTemp(s) ? [{ id: 1, kind: "Pixel", bounds: tb }] : s.layers }),
@@ -199,8 +283,11 @@ describe("ctx-photocraft.js 契約（mock photocraft）", () => {
     expect(await m.ctx.replaceImage(6, new Blob(["a"], { type: "image/png" }))).toEqual({ id: 99 });
     expect(m.state.layers.map((l: any) => [l.id, l.bounds])).toEqual([[99, [50, 65, 100, 70]]]);
     m.state.layers[0].bounds = [55, 68, 100, 70]; // 使用者移動 (+5,+3)
-    expect(await m.ctx.selectedImage()).toMatchObject({ id: 99, transform: [1, 0, 0, 1, 45, 63], width: 120, height: 80 });
-    expect(m.calls.filter((c) => c[1] === "image.crop").at(-1)![2]).toEqual({ x: 45, y: 63, width: 120, height: 80 });
+    const sel = await m.ctx.selectedImage();
+    expect(sel).toMatchObject({ id: 99, transform: [1, 0, 0, 1, 45, 63], width: 120, height: 80 });
+    // 圖層轉存＝修剪範圍 100×70 → 貼進 120×80 的框，位置＝修剪範圍在框內的偏移 (10,5)
+    expect(m.draws.at(-1)).toEqual([120, 80, 10, 5]);
+    expect(await sel.blob.text()).toBe("PADDED");
     m.calls.length = 0;
     expect(await m.ctx.replaceImage(99, new Blob(["b"], { type: "image/png" }))).toEqual({ id: 100 });
     expect(m.calls.some((c) => c[1] === "edit.transform")).toBe(false);
@@ -260,13 +347,25 @@ describe("ctx-photocraft.js 契約（mock photocraft）", () => {
     expect(seq).toEqual(["execute image.duplicate", "execute layer.new.layer", "execute edit.fill", "execute select.inverse", "execute edit.fill", "execute select.deselect", "execute image.crop"]);
     expect(calls.filter((c) => c[1] === "edit.fill").map((c) => c[2].contents)).toEqual(["white", "black"]);
     expect(calls.find((c) => c[1] === "image.crop")![2]).toEqual({ x: 40, y: 60, width: 120, height: 80 });
+    expect(calls.find((c) => c[1] === "image.duplicate")![2]).toEqual({ name: "選取範圍" });
   });
 
-  it("fitLayer：等比置中的四角（fit／fill）", async () => {
+  it("fitLayer：沒有選取的圖層 → 作用中圖層；等比置中的四角（fit／fill）", async () => {
     const { ctx, calls } = mockPc();
-    expect(await ctx.fitLayer("fill")).toEqual({ id: 6 });
-    expect(calls.find((c) => c[1] === "edit.transform")![2]).toEqual({ layer: 6, quad: fitQuad([40, 60, 120, 80], 400, 300, "fill") });
+    expect(await ctx.fitLayer("fill")).toEqual({ id: 6, ids: [6] });
+    expect(calls.find((c) => c[1] === "edit.transform")![2]).toEqual({ layers: [6], rect: [40, 60, 160, 140], quad: fitQuad([40, 60, 120, 80], 400, 300, "fill") });
     expect(fitQuad([40, 60, 120, 80], 400, 300, "fit")).toEqual([[0, 16.666666666666657], [400, 16.666666666666657], [400, 283.33333333333337], [0, 283.33333333333337]]);
+  });
+
+  it("fitLayer：多選 → 合成一塊一起縮放（一次 edit.transform）；選了群組就不另算它裡面的圖層", async () => {
+    const { ctx, calls, state } = mockPc();
+    state.layers = [
+      { id: 7, name: "g", kind: "Group", bounds: [100, 100, 50, 50], parent: null, selected: true, active: true },
+      { id: 8, name: "in g", kind: "Shape", bounds: [100, 100, 50, 50], parent: 7, selected: true, active: false },
+      { id: 6, name: "green", kind: "Pixel", bounds: [40, 60, 120, 80], parent: null, selected: true, active: false },
+    ] as any;
+    expect(await ctx.fitLayer("fit")).toEqual({ id: 7, ids: [7, 6] });
+    expect(calls.find((c) => c[1] === "edit.transform")![2]).toEqual({ layers: [7, 6], rect: [40, 60, 160, 150], quad: fitQuad([40, 60, 120, 90], 400, 300, "fit") });
   });
 
   it("存檔沒人等 → 父頁下載；等的逾時 reject，之後才到的照樣下載（bytes 不丟）", async () => {
@@ -281,7 +380,7 @@ describe("ctx-photocraft.js 契約（mock photocraft）", () => {
   });
 
   it("存檔以副檔名配對：等 PNG 時插進來的 PSD（使用者按原生另存）→ 下載，PNG 照樣交給等待者", async () => {
-    const m = mockPc({ "ui.menu.invoke": (p: any) => { if (p.id === "file.export.quickExportAsPng") { m.save("user.psd", "8BPS"); m.save("x.png", "PNG"); } return {}; } });
+    const m = mockPc({ "ui.menu.invoke": (p: any) => { if (p.id === "layer.quickExportAsPng") { m.save("user.psd", "8BPS"); m.save("green.png", "PNG"); } return {}; } });
     const s = await m.ctx.selectedImage();
     expect(await s.blob.text()).toBe("PNG");
     await new Promise((r) => setTimeout(r, 0));

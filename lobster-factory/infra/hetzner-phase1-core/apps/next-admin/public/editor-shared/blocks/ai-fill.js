@@ -2,6 +2,7 @@
 // applyInpaint): pick 去除 or 生成填色 → (prompt) → 套用 → POST image+mask to /api/tools/studio/inpaint (bria eraser) or /genfill
 // (flux-fill-pro, + prompt) → replace the image. One change (operator 2026-11-06): the area is the host's own selection
 // (ctx.selectionMask — 選取工具, or Q quick mask with the host's own brush), not a red pen, so there is no brush-size slider here.
+// Second (operator 2026-11-06, prod test): the AI image is only taken inside the mask, the rest stays the source (keepOutsideMask).
 // Also exports the request / Blob helpers the other AI image blocks share (genfx.js, edge-mask.js), like color-grade.js exports applyAdjToBlob.
 import { OPS_ROLE_HEADER } from "/editor-shared/bg-remove.js";
 
@@ -76,6 +77,30 @@ export async function binaryMask(blob, w, h) {
   return any ? c.toDataURL("image/png") : null;
 }
 
+/** RGBA pixel arrays of equal length → out: AI pixel where the mask is selected (same rule as binaryMask), the original
+ *  pixel (alpha included) everywhere else. */
+export function mergeMasked(orig, ai, mask) {
+  const out = new Uint8ClampedArray(orig.length);
+  for (let i = 0; i < orig.length; i += 4) {
+    const on = ((0.299 * mask[i] + 0.587 * mask[i + 1] + 0.114 * mask[i + 2]) * mask[i + 3]) / 255 >= 128;
+    const src = on ? ai : orig;
+    out[i] = src[i]; out[i + 1] = src[i + 1]; out[i + 2] = src[i + 2]; out[i + 3] = src[i + 3];
+  }
+  return out;
+}
+/** The AI routes return a whole image (other size, holes filled, colours drifted); only the selected area may change.
+ *  → PNG Blob at the source's own size: AI result inside the mask, source pixels (transparency included) outside. */
+export async function keepOutsideMask(srcBlob, aiDataUrl, maskBlob) {
+  const src = await createImageBitmap(srcBlob);
+  const w = src.width, h = src.height;
+  const o = surface(src, w, h), a = surface(await createImageBitmap(dataUrlToBlob(aiDataUrl)), w, h);
+  const m = surface(await createImageBitmap(maskBlob), w, h);
+  const od = o.g.getImageData(0, 0, w, h);
+  od.data.set(mergeMasked(od.data, a.g.getImageData(0, 0, w, h).data, m.g.getImageData(0, 0, w, h).data));
+  o.g.putImageData(od, 0, 0);
+  return dataUrlToBlob(o.c.toDataURL("image/png"));
+}
+
 // Quick mask follows PhotoCraft (= Photoshop): white = selected. With no selection, Q starts all white, so painting white
 // changes nothing and painting with the default black EXCLUDES the strokes (measured on build 98bcbfa, W3 smoke 2026-11-06).
 // "Paint = change" is therefore: Q, paint black, Q, then Select › Inverse (Shift+Ctrl+I).
@@ -129,7 +154,7 @@ export default {
         if (!mask) { say("選取範圍是空的，請先" + AREA_HOW + "。"); return; }
         const r = mode === "fill" ? await postStudio(GENFILL_URL, { image: img.url, mask, prompt }) : await postStudio(INPAINT_URL, { image: img.url, mask });
         if (!r.ok) { say("⚠️ " + (r.error || (mode === "fill" ? "生成失敗，請重試" : "去除失敗，請重試"))); return; }
-        await ctx.replaceImage(sel.id, dataUrlToBlob(r.image));
+        await ctx.replaceImage(sel.id, await keepOutsideMask(sel.blob, r.image, maskBlob));
         say(mode === "fill" ? "✅ 生成填色完成" : "✅ 已去除選取範圍");
         mode = null;
       } catch (err) { say("⚠️ " + (err && err.message ? err.message : String(err))); }
