@@ -42,6 +42,12 @@ host = {
 
 My Designs 清單過濾：列出 `metadata.source ∈ listSources`（沒有 metadata 的舊資料也列）的設計；有原始檔的，原始檔副檔名必須等於 `sourceExt`，否則別的編輯器的原始檔會列出卻開不了。
 
+## 傳回（dock 外殼，C8.1；面板不用）
+
+- 交接（`components/tools/canvas-handoff.ts` `openInCanvas(..., ret)`）帶票 `ret={id,label}` 且開成功 → `dock.js` 在圖示欄頂端加「傳回 <label>」。
+- 按下：`ctx.exportArtboard({format:'png'})` → `BroadcastChannel('canvas-return')` 送 `{type:'return', id, image:<PNG data URL>}` → 2 秒內收到 `{type:'ack', id}` 顯示「已傳回 <label>」；否則 `blocks/my-designs.js` `saveToMyDesigns(ctx, png, {previewOnlyIfTooBig:true})`（同面板的存入：預覽＋`ctx.saveAs()` 原檔；原檔超過 20MB 只存預覽）並顯示「原分頁已關，已存進我的設計」；存也失敗 → PNG 下載到電腦。可重複按。
+- 原分頁：`components/tools/useCanvasReturn.ts`，只收自己發出的票、`onReturn(slot, image)` 回 `true` 才 ack。
+
 ## replaceImage（spike 2026-11-05 通過，未降級）
 
 1. `select.set {ids:[id]}` → `file.place {replace: true}`：真品原生「取代」，保留舊圖變形與堆疊位置，一個 undo 步（上游測試 `crates/engine/src/tests/place.rs:191`）。

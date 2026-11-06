@@ -1,27 +1,65 @@
-// canvas-handoff（R0-PLAN 2026-11-05-photocraft-pro C7.1）：交接表、editor 不符不取、開成功（done）才清。
+// canvas-handoff（R0-PLAN 2026-11-05-photocraft-pro C7.1、C8.1）：交接表；一律開新分頁、交接只走 IndexedDB 一筆＋?h=<id>；
+// 分頁被擋退回同分頁；editor 不符不取；開成功（done）才刪。
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  CANVAS_NAME_KEY, CANVAS_SOURCE_KEY, CANVAS_STAFF_HREF, CANVAS_TARGET_KEY,
-  canvasTarget, openInCanvas, readCanvasSource, takeCanvasHandoff,
+  CANVAS_STAFF_HREF, canvasTarget, issuedReturnTickets, openInCanvas, takeCanvasHandoff,
 } from "./canvas-handoff";
 
-class MemStorage {
-  private m = new Map<string, string>();
-  getItem(k: string) { return this.m.has(k) ? this.m.get(k)! : null; }
-  setItem(k: string, v: string) { this.m.set(k, String(v)); }
-  removeItem(k: string) { this.m.delete(k); }
-  get size() { return this.m.size; }
+/** Minimal IndexedDB: one store, put/get/delete/openKeyCursor, events fired on a microtask (enough for canvas-handoff.ts). */
+function fakeIndexedDB() {
+  const data = new Map<string, unknown>();
+  const later = (fn: () => void) => queueMicrotask(fn);
+  const db = {
+    objectStoreNames: { contains: () => true },
+    createObjectStore() {},
+    close() {},
+    transaction() {
+      const tx: Record<string, any> = {};
+      const complete = () => later(() => tx.oncomplete?.());
+      tx.objectStore = () => ({
+        put: (v: unknown, k: string) => { data.set(k, structuredClone(v)); complete(); return {}; },
+        delete: (k: string) => { data.delete(k); complete(); return {}; },
+        get: (k: string) => { const r: Record<string, any> = {}; later(() => { r.result = data.get(k); r.onsuccess?.(); }); return r; },
+        openKeyCursor: () => {
+          const keys = [...data.keys()];
+          let i = 0;
+          const r: Record<string, any> = {};
+          const step = () => later(() => {
+            r.result = i < keys.length ? { key: keys[i], continue: () => { i++; step(); } } : null;
+            r.onsuccess?.();
+            if (!r.result) complete();
+          });
+          step();
+          return r;
+        },
+      });
+      return tx;
+    },
+  };
+  return { data, api: { open() { const r: Record<string, any> = { result: db }; later(() => { r.onupgradeneeded?.(); r.onsuccess?.(); }); return r; } } };
 }
 
-let store: MemStorage;
+let idb: ReturnType<typeof fakeIndexedDB>;
+let tab: { opener: unknown; location: { href: string } } | null;
 const assign = vi.fn();
+const session = { setItem: vi.fn(), getItem: vi.fn(() => null), removeItem: vi.fn() };
+const loc = { assign, search: "" };
 beforeEach(() => {
-  store = new MemStorage();
+  idb = fakeIndexedDB();
+  tab = { opener: {}, location: { href: "" } };
   assign.mockReset();
-  vi.stubGlobal("sessionStorage", store);
-  vi.stubGlobal("window", { location: { assign } });
+  session.setItem.mockReset();
+  loc.search = "";
+  issuedReturnTickets.clear();
+  vi.stubGlobal("indexedDB", idb.api);
+  vi.stubGlobal("sessionStorage", session);
+  vi.stubGlobal("window", { open: vi.fn(() => tab), location: loc });
 });
 afterEach(() => vi.unstubAllGlobals());
+
+/** The editor tab's view: its URL carries the handoff id. */
+const editorSees = (url: string) => { loc.search = new URL(url, "http://x").search; };
+const idOf = (url: string) => new URL(url, "http://x").searchParams.get("h")!;
 
 describe("交接表 canvasTarget", () => {
   it.each([
@@ -39,63 +77,68 @@ describe("交接表 canvasTarget", () => {
 });
 
 describe("openInCanvas → takeCanvasHandoff", () => {
-  it("圖片交接給畫布：取到同源網址＋帶副檔名的檔名；開成功前不清（失敗可重試），done() 後全部清掉", async () => {
+  it("新分頁開到 ?h=<id>；交接只在 IndexedDB 一筆、不寫 sessionStorage；開成功前不刪（重新整理再試），done() 後刪", async () => {
     await openInCanvas("data:image/jpeg;base64,AAAA", "商品圖-月亮", "/tools/photo-pro");
-    expect(assign).toHaveBeenCalledWith("/tools/photo-pro");
+    expect(assign).not.toHaveBeenCalled();
+    expect(tab!.location.href).toMatch(/^\/tools\/photo-pro\?h=[0-9a-z]+-[0-9a-z]+$/);
+    expect(tab!.opener).toBeNull();
+    expect(session.setItem).not.toHaveBeenCalled();
+    expect([...idb.data.keys()]).toEqual([`handoff:${idOf(tab!.location.href)}`]);
+    editorSees(tab!.location.href);
     const h = await takeCanvasHandoff("photocraft");
     expect(h).toMatchObject({ url: "data:image/jpeg;base64,AAAA", name: "商品圖-月亮.jpg" });
-    expect(await takeCanvasHandoff("photocraft")).toMatchObject({ name: "商品圖-月亮.jpg" }); // 重新整理再試
+    expect(h!.ret).toBeUndefined();
+    expect(await takeCanvasHandoff("photocraft")).toMatchObject({ name: "商品圖-月亮.jpg" });
     h!.done();
-    expect(store.size).toBe(0);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(idb.data.size).toBe(0);
     expect(await takeCanvasHandoff("photocraft")).toBeNull();
   });
 
-  it("done() 不清掉之後才送來的新交接", async () => {
-    await openInCanvas("data:image/png;base64,AAAA", "舊", "/tools/photo-pro");
-    const old = await takeCanvasHandoff("photocraft");
-    await openInCanvas("data:image/png;base64,BBBB", "新", "/tools/photo-pro");
-    old!.done();
-    expect(await takeCanvasHandoff("photocraft")).toMatchObject({ url: "data:image/png;base64,BBBB", name: "新.png" });
+  it("分頁被擋（window.open 回 null）→ 同分頁開；票不登記（這頁會離開，傳回只能走 My Designs）", async () => {
+    tab = null;
+    await openInCanvas("data:image/png;base64,AAAA", "x", "/tools/photo-pro", undefined, { tool: "tarot", slot: "preview", label: "塔羅預覽" });
+    expect(assign).toHaveBeenCalledWith(expect.stringMatching(/^\/tools\/photo-pro\?h=/));
+    expect(issuedReturnTickets.size).toBe(0);
+    editorSees(assign.mock.calls[0][0]);
+    expect(await takeCanvasHandoff("photocraft")).toMatchObject({ name: "x.png", ret: { label: "塔羅預覽" } });
+  });
+
+  it("帶票：本分頁記住票，編輯器拿到 ret = { id, label }", async () => {
+    const ret = { tool: "tarot", slot: "preview", label: "塔羅預覽" };
+    await openInCanvas("data:image/png;base64,AAAA", "x", "/tools/photo-pro", undefined, ret);
+    const id = idOf(tab!.location.href);
+    expect(issuedReturnTickets.get(id)).toEqual(ret);
+    editorSees(tab!.location.href);
+    expect((await takeCanvasHandoff("photocraft"))!.ret).toEqual({ id, label: "塔羅預覽" });
   });
 
   it("有原始檔：開原始檔（走同源下載路由），不開預覽圖", async () => {
     const src = { url: "https://pub-x.r2.dev/a/src.vectorcraft", name: "design.vectorcraft" };
     await openInCanvas("https://pub-x.r2.dev/a/prev.png", "design", "/tools/vector-pro", src);
-    const h = await takeCanvasHandoff("vectorcraft");
-    expect(h).toMatchObject({
+    editorSees(tab!.location.href);
+    expect(await takeCanvasHandoff("vectorcraft")).toMatchObject({
       url: `/api/tools/designs/download?url=${encodeURIComponent(src.url)}`,
       name: "design.vectorcraft",
     });
-    h!.done();
-    expect(store.size).toBe(0);
   });
 
-  it("editor 不符不取：畫布交接留給畫布，向量頁拿不到也不清", async () => {
+  it("editor 不符不取也不刪：畫布交接留給畫布", async () => {
     await openInCanvas("data:image/png;base64,AAAA", "x", "/tools/photo-pro");
+    editorSees(tab!.location.href);
     expect(await takeCanvasHandoff("vectorcraft")).toBeNull();
-    expect(store.getItem(CANVAS_TARGET_KEY)).not.toBeNull();
-    expect(store.getItem(CANVAS_SOURCE_KEY)).toBe("data:image/png;base64,AAAA");
-    expect(await takeCanvasHandoff("photocraft")).toMatchObject({ url: "data:image/png;base64,AAAA", name: "x.png" });
+    expect(idb.data.size).toBe(1);
+    expect(await takeCanvasHandoff("photocraft")).toMatchObject({ name: "x.png" });
   });
 
-  it("target 有效但圖不在（寫入失敗或遺失）→ null 並清掉，不留一筆永遠開不了的交接", async () => {
-    store.setItem(CANVAS_TARGET_KEY, JSON.stringify({ id: "x", editor: "photocraft" }));
+  it("沒有 ?h= 或紀錄不在 → null；壞紀錄被刪", async () => {
     expect(await takeCanvasHandoff("photocraft")).toBeNull();
-    expect(store.size).toBe(0);
-  });
-
-  it("舊 Fabric 編輯器（readCanvasSource）不取專業版的交接", async () => {
-    await openInCanvas("data:image/png;base64,AAAA", undefined, "/tools/photo-pro");
-    expect(await readCanvasSource()).toBeNull();
-    expect(store.getItem(CANVAS_SOURCE_KEY)).not.toBeNull();
-  });
-
-  it("沒有交接 → null；壞掉的 target 被清掉、不交給任何人", async () => {
+    loc.search = "?h=nope";
     expect(await takeCanvasHandoff("photocraft")).toBeNull();
-    store.setItem(CANVAS_TARGET_KEY, "{bad");
-    store.setItem(CANVAS_SOURCE_KEY, "data:image/png;base64,AAAA");
-    store.setItem(CANVAS_NAME_KEY, "x");
+    idb.data.set("handoff:bad", "junk");
+    loc.search = "?h=bad";
     expect(await takeCanvasHandoff("photocraft")).toBeNull();
-    expect(store.size).toBe(0);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(idb.data.has("handoff:bad")).toBe(false);
   });
 });

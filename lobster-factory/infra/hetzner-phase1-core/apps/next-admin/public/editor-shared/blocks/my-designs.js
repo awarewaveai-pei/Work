@@ -19,6 +19,28 @@ async function uploadableDataUrl(png) {
 // The R2 public host sends no CORS headers, so a browser fetch of it fails ("Failed to fetch"): same-origin proxy (app/api/tools/designs/download/route.ts, host allowlist).
 const viaProxy = (publicUrl) => "/api/tools/designs/download?url=" + encodeURIComponent(publicUrl);
 const headers = { "Content-Type": "application/json", "x-ops-simulated-role": "operator" };
+/**
+ * 存入 My Designs＝預覽 PNG＋可編輯原檔（ctx.saveAs）。面板的「存入」與 dock 的「傳回」退路（editor-shared/dock.js，C8.1）共用這一個。
+ * png：已匯出的預覽（傳回時已有，不再匯出一次）；沒給就以 150 ppi 匯出。回 { ok: true, previewOnly? } 或 { ok: false, message }（給人看的原因）。
+ * opts.previewOnlyIfTooBig：原檔超過 20MB 時不拒絕，改只存預覽圖（傳回的退路用：圖一定要落地一處）→ previewOnly: true。
+ */
+export async function saveToMyDesigns(ctx, png, opts = {}) {
+  const host = ctx.host;
+  try {
+    const [preview, file] = await Promise.all([png ? Promise.resolve(png) : ctx.exportArtboard({ format: "png", ppi: 150 }), ctx.saveAs()]);
+    const tooBig = file.size > SOURCE_MAX_BYTES;
+    if (tooBig && !opts.previewOnlyIfTooBig) return { ok: false, message: "⚠️ 原檔超過 20MB 上限（" + Math.round(file.size / 1048576) + " MB），無法存入。請精簡內嵌圖片後再存。" };
+    const image = await uploadableDataUrl(await blobToDataUrl(preview));
+    if (!image) return { ok: false, message: "⚠️ 預覽圖太大（超過約 9MB 上限），請縮小畫板再存。" };
+    const sourceFile = tooBig ? undefined : { name: host.sourceName, data: (await blobToDataUrl(file)).split(",")[1] };
+    const res = await fetch("/api/tools/designs", { method: "POST", credentials: "same-origin", headers,
+      body: JSON.stringify({ image, sourceFile, prompt: host.saveTag.prompt, modelName: host.saveTag.modelName, source: host.saveTag.source }) });
+    const out = await res.json().catch(() => ({ ok: false, error: "HTTP " + res.status }));
+    return out.ok ? (tooBig ? { ok: true, previewOnly: true } : { ok: true }) : { ok: false, message: "⚠️ 儲存失敗：" + (out.error || ("HTTP " + res.status)) };
+  } catch (err) {
+    return { ok: false, message: "⚠️ 儲存失敗：" + (err?.message || err) };
+  }
+}
 export default {
   id: "my-designs",
   icon: "💾",
@@ -42,19 +64,10 @@ export default {
     }
     btn.onclick = async () => {
       setSaveSt("saving");
-      try {
-        const [png, file] = await Promise.all([ctx.exportArtboard({ format: "png", ppi: 150 }), ctx.saveAs()]);
-        if (file.size > SOURCE_MAX_BYTES) { setSaveSt("error"); info.innerHTML = "⚠️ 原檔超過 20MB 上限（" + Math.round(file.size / 1048576) + " MB），無法存入。請精簡內嵌圖片後再存。"; return; }
-        const image = await uploadableDataUrl(await blobToDataUrl(png));
-        if (!image) { setSaveSt("error"); info.innerHTML = "⚠️ 預覽圖太大（超過約 9MB 上限），請縮小畫板再存。"; return; }
-        const data = (await blobToDataUrl(file)).split(",")[1];
-        const res = await fetch("/api/tools/designs", { method: "POST", credentials: "same-origin", headers,
-          body: JSON.stringify({ image, sourceFile: { name: host.sourceName, data }, prompt: host.saveTag.prompt, modelName: host.saveTag.modelName, source: host.saveTag.source }) });
-        const out = await res.json().catch(() => ({ ok: false, error: "HTTP " + res.status }));
-        setSaveSt(out.ok ? "saved" : "error");
-        info.innerHTML = out.ok ? "✅ 已存入 My Designs（含可編輯原檔）" : "⚠️ 儲存失敗：" + esc(out.error || ("HTTP " + res.status));
-        if (out.ok) { setTimeout(() => setSaveSt("idle"), 4000); load(true); }
-      } catch (err) { setSaveSt("error"); info.innerHTML = "⚠️ 儲存失敗：" + esc(err.message); }
+      const r = await saveToMyDesigns(ctx);
+      setSaveSt(r.ok ? "saved" : "error");
+      info.textContent = r.ok ? "✅ 已存入 My Designs（含可編輯原檔）" : r.message;
+      if (r.ok) { setTimeout(() => setSaveSt("idle"), 4000); load(true); }
     };
     async function openAsset(a) {
       info.innerHTML = '<span class="busy">開啟中…</span>';

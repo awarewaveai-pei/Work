@@ -1,22 +1,21 @@
 /**
- * Canvas handoff — the source image is too large for a query string (base64 data URLs
- * are megabytes), so the studios stash it and CanvasEditor reads it back on mount.
+ * Canvas handoff: a tool sends an image (or a design's editable original) to a pro editor (PhotoCraft / VectorCraft).
  *
- * Transport: sessionStorage first (fast, fine for short R2/gallery URLs). Studio/Tarot/
- * Banner results are multi-MB base64 data URLs that BLOW the ~5MB sessionStorage quota —
- * setItem throws QuotaExceededError, which used to be swallowed → the editor opened blank
- * ("沒有把圖帶入 canvas"). So when sessionStorage fails we fall back to IndexedDB (no
- * practical size cap) and leave a sentinel flag. Readers check sessionStorage, then the flag → IndexedDB.
- * Tiny standalone module so importers don't pull in either component.
+ * R0-PLAN 2026-11-05-photocraft-pro C8.1: the editor always opens in a NEW tab, so the sender tab stays alive to take the
+ * edited image back ("傳回"). A new tab has no copy of the sender's sessionStorage, so the handoff is one IndexedDB record
+ * `handoff:<id>` = { editor, image | source, name, ret? } (IndexedDB is shared by every same-origin tab; no practical size
+ * cap) and the editor URL carries `?h=<id>`. A blocked popup falls back to the same tab (the sender then is gone, so a
+ * "傳回" lands in My Designs). Return path: useCanvasReturn.ts (sender) + public/editor-shared/dock.js (editor), over
+ * BroadcastChannel CANVAS_RETURN_CHANNEL; a ticket id is honoured only by the tab that issued it (issuedReturnTickets).
  *
- * Which editor (R0-PLAN 2026-11-05-photocraft-pro C7.1): one table, CANVAS_TARGETS, picks the editor from the design's
- * source file (.vectorcraft/.svg → VectorCraft, anything else or none → PhotoCraft). The handoff carries that editor id;
- * the pro editors' frame (ProEditorFrame) reads it with takeCanvasHandoff(editor) and leaves another editor's handoff
- * alone. It is cleared only once the editor has opened it (handoff.done()): a dock that fails to load, an editor that
- * is slow to start or a failed fetch leaves it for the next load; after a successful open a reload starts empty.
+ * Which editor (C7.1): one table, CANVAS_TARGETS, picks the editor from the design's source file (.vectorcraft/.svg ->
+ * VectorCraft, anything else or none -> PhotoCraft). ProEditorFrame reads the record with takeCanvasHandoff(editor) and
+ * leaves another editor's record alone; it is deleted only once the editor has opened it (handoff.done()).
  */
 
 import { bucketDownloadHref } from "@/lib/storage/download-href";
+// The four sessionStorage keys below are the OLD (pre-C8.1) handoff: nothing writes them any more. readCanvasSource
+// (Fabric CanvasEditor) still reads them until card C7.2 retires that editor.
 export const CANVAS_SOURCE_KEY = "canvas:source-image";
 /** Base filename (no extension) the editor uses for its 下載 PNG button. */
 export const CANVAS_NAME_KEY = "canvas:source-name";
@@ -24,6 +23,13 @@ export const CANVAS_NAME_KEY = "canvas:source-name";
 export const CANVAS_IDB_FLAG = "canvas:source-in-idb";
 /** JSON { editor, source? } of a handoff meant for a pro editor (absent = an old-style handoff for the Fabric editor). */
 export const CANVAS_TARGET_KEY = "canvas:target";
+
+/** BroadcastChannel name of the return path: editor -> `{type:"return", id, image}`, sender -> `{type:"ack", id}`. */
+export const CANVAS_RETURN_CHANNEL = "canvas-return";
+/** Where the edited image goes back to: the sending tool, its slot (tool-defined, e.g. "preview"), the button's label. */
+export type CanvasReturnTicket = { tool: string; slot: string; label: string };
+/** Tickets this tab issued (handoff id -> ticket). Memory only: a reload forgets them and a "傳回" then lands in My Designs. */
+export const issuedReturnTickets = new Map<string, CanvasReturnTicket>();
 
 export type CanvasEditorId = "photocraft" | "vectorcraft";
 /** A design's editable original (My Designs `source_url` + `metadata.source_name`). */
@@ -43,11 +49,12 @@ export function canvasTarget(sourceName?: string | null): { editor: CanvasEditor
 
 const IDB_DB = "canvas-handoff";
 const IDB_STORE = "kv";
-/** Fabric-editor handoffs (flag "1") used this one key. Pro-editor handoffs use `${IDB_IMAGE_KEY}:${id}`, named in the
- *  flag: IndexedDB is shared by every tab (sessionStorage is not), so one key per handoff keeps one tab's done() from
- *  deleting another tab's image. */
+/** Old Fabric-editor handoffs (flag "1") used this one key; readCanvasSource still reads it (until C7.2). */
 const IDB_IMAGE_KEY = "source-image";
-/** Pro-editor IDB images older than this were abandoned (never opened): openInCanvas prunes them. */
+/** One record per handoff, `${IDB_HANDOFF_PREFIX}<id>`: IndexedDB is shared by every tab, so one key per handoff keeps
+ *  one tab's done() from deleting another tab's record. */
+const IDB_HANDOFF_PREFIX = "handoff:";
+/** Records (and pre-C8.1 `source-image:<id>` images) older than this were abandoned (never opened): openInCanvas prunes them. */
 const IDB_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 function idbOpen(): Promise<IDBDatabase> {
@@ -61,7 +68,7 @@ function idbOpen(): Promise<IDBDatabase> {
   });
 }
 
-async function idbPut(key: string, value: string): Promise<void> {
+async function idbPut(key: string, value: unknown): Promise<void> {
   const db = await idbOpen();
   try {
     await new Promise<void>((resolve, reject) => {
@@ -76,13 +83,13 @@ async function idbPut(key: string, value: string): Promise<void> {
   }
 }
 
-async function idbGet(key: string): Promise<string | null> {
+async function idbGet(key: string): Promise<unknown> {
   const db = await idbOpen();
   try {
-    return await new Promise<string | null>((resolve, reject) => {
+    return await new Promise<unknown>((resolve, reject) => {
       const tx = db.transaction(IDB_STORE, "readonly");
       const r = tx.objectStore(IDB_STORE).get(key);
-      r.onsuccess = () => resolve((r.result as string | undefined) ?? null);
+      r.onsuccess = () => resolve(r.result ?? null);
       r.onerror = () => reject(r.error);
       tx.onabort = () => reject(tx.error); // don't hang readCanvasSource() if the read tx aborts
     });
@@ -91,7 +98,7 @@ async function idbGet(key: string): Promise<string | null> {
   }
 }
 
-/** Delete pro-editor images whose handoff id (base-36 time first) is older than IDB_MAX_AGE_MS. Best effort. */
+/** Delete handoff records whose id (base-36 time first) is older than IDB_MAX_AGE_MS. Best effort. */
 async function idbPrune(now: number): Promise<void> {
   try {
     const db = await idbOpen();
@@ -102,7 +109,7 @@ async function idbPrune(now: number): Promise<void> {
         req.onsuccess = () => {
           const cur = req.result;
           if (!cur) return;
-          const m = /^source-image:([0-9a-z]+)-/.exec(String(cur.key));
+          const m = /^(?:handoff|source-image):([0-9a-z]+)-/.exec(String(cur.key));
           if (m && now - parseInt(m[1], 36) > IDB_MAX_AGE_MS) tx.objectStore(IDB_STORE).delete(cur.key);
           cur.continue();
         };
@@ -137,58 +144,58 @@ async function idbDel(key: string): Promise<void> {
   }
 }
 
-/**
- * Stash the image (and an optional base filename for the editor's download) and navigate
- * to the editor. Full nav = clean fabric load. `baseName` carries the semantic
- * 產品-主圖名稱-風格 across the handoff so the canvas export isn't named canvas-design.png.
- *
- * Async: when the image overflows sessionStorage we MUST await the IndexedDB write before
- * navigating, otherwise window.location.assign would unload the page mid-write. Callers
- * invoke this fire-and-forget from onClick — the returned promise is harmless to ignore.
- */
 export const CANVAS_STAFF_HREF = canvasTarget().staffHref;
 
-/** `href` is where the target editor lives on this page: `useDoorHref(canvasTarget(source?.name).staffHref)` --
- *  CANVAS_STAFF_HREF for an image, /tools/vector-pro for a vector source; the design door's page there, null (hide the
- *  button) on a door without one. `source`: the design's editable original, opened instead of the image. */
-export async function openInCanvas(image: string, baseName: string | undefined, href: string, source?: CanvasSourceFile): Promise<void> {
-  let id = "";
+/** The IndexedDB record of one handoff. */
+type HandoffRecord = { editor: CanvasEditorId; image?: string; source?: CanvasSourceFile; name?: string; ret?: CanvasReturnTicket & { id: string } };
+
+/**
+ * Send `image` to the pro editor at `href` in a new tab: `useDoorHref(canvasTarget(source?.name).staffHref)` --
+ * CANVAS_STAFF_HREF for an image, /tools/vector-pro for a vector source; null (hide the button) on a door without one.
+ * `baseName`: 產品-主圖名稱-風格, the opened file's name. `source`: the design's editable original, opened instead of the
+ * image. `ret`: give the editor a "傳回 <label>" button; the edited PNG comes back to this tab's useCanvasReturn(ret.tool)
+ * as onReturn(ret.slot, dataUrl). Call it straight from the click handler: the tab is opened before the first await
+ * (popup blockers allow window.open only inside the click), then pointed at the editor once the record is written.
+ */
+export async function openInCanvas(
+  image: string,
+  baseName: string | undefined,
+  href: string,
+  source?: CanvasSourceFile,
+  ret?: CanvasReturnTicket,
+): Promise<void> {
+  // id: base-36 time first (idbPrune reads it), random after: each handoff is distinct.
+  const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  let tab: Window | null = null;
   try {
-    // id: each handoff is distinct, so done() of an earlier one never clears a later one (canvas-handoff.test.ts).
-    id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-    sessionStorage.setItem(CANVAS_TARGET_KEY, JSON.stringify({ id, editor: canvasTarget(source?.name).editor, ...(source ? { source } : {}) }));
+    tab = window.open("", "_blank");
   } catch {
-    /* sessionStorage unavailable → the editor finds no handoff (opens empty) */
+    tab = null; // blocked -> same tab below
   }
-  let stashed = false;
-  // Fast path: small payloads (short R2/gallery URLs) live in sessionStorage.
-  try {
-    sessionStorage.setItem(CANVAS_SOURCE_KEY, image);
-    sessionStorage.removeItem(CANVAS_IDB_FLAG);
-    stashed = true;
-  } catch {
-    /* quota exceeded for a large base64 data URL → fall back to IndexedDB below */
-  }
-  // Fallback: large data URLs go to IndexedDB (no practical size cap).
-  if (!stashed) {
+  if (tab) {
     try {
-      const key = id ? `${IDB_IMAGE_KEY}:${id}` : IDB_IMAGE_KEY;
-      await idbPrune(Date.now());
-      await idbPut(key, image);
-      sessionStorage.setItem(CANVAS_IDB_FLAG, id ? key : "1");
-      sessionStorage.removeItem(CANVAS_SOURCE_KEY);
-      stashed = true;
+      tab.opener = null; // the editor tab talks back over BroadcastChannel only
     } catch {
-      /* both transports failed → editor opens blank (previous behaviour, no worse) */
+      /* harmless */
     }
   }
+  const record: HandoffRecord = {
+    editor: canvasTarget(source?.name).editor,
+    ...(source ? { source } : { image }),
+    ...(baseName ? { name: baseName } : {}),
+    ...(ret ? { ret: { ...ret, id } } : {}),
+  };
+  let url = href;
   try {
-    if (baseName) sessionStorage.setItem(CANVAS_NAME_KEY, baseName);
-    else sessionStorage.removeItem(CANVAS_NAME_KEY);
+    await idbPrune(Date.now());
+    await idbPut(`${IDB_HANDOFF_PREFIX}${id}`, record);
+    url = `${href}${href.includes("?") ? "&" : "?"}h=${encodeURIComponent(id)}`;
+    if (ret && tab) issuedReturnTickets.set(id, ret); // same-tab fallback: this page unloads, nobody would answer
   } catch {
-    /* sessionStorage unavailable (private mode) — editor opens with default name */
+    /* IndexedDB unavailable -> the editor opens empty (no ?h=) */
   }
-  window.location.assign(href);
+  if (tab) tab.location.href = url;
+  else window.location.assign(url);
 }
 
 /**
@@ -206,7 +213,7 @@ export async function readCanvasSource(): Promise<string | null> {
       const value = await idbGet(IDB_IMAGE_KEY);
       sessionStorage.removeItem(CANVAS_IDB_FLAG);
       void idbDel(IDB_IMAGE_KEY);
-      return value;
+      return typeof value === "string" ? value : null;
     }
   } catch {
     /* storage unavailable → no handoff */
@@ -218,8 +225,10 @@ export async function readCanvasSource(): Promise<string | null> {
 export type ProEditorHandoff = {
   url: string;
   name: string;
-  /** Clear the handoff: call once the editor has opened it. A no-op if another handoff replaced it meanwhile. */
+  /** Delete the handoff record: call once the editor has opened it. */
   done: () => void;
+  /** Present when the sender asked for the edited image back: the dock shows "傳回 <label>" and posts `{type:"return", id}`. */
+  ret?: { id: string; label: string };
 };
 
 const IMAGE_EXT: Record<string, string> = { png: "png", jpg: "jpg", jpeg: "jpg", webp: "webp", gif: "gif" };
@@ -231,63 +240,45 @@ export function handoffImageName(image: string, base: string | null): string {
 }
 
 /**
- * A pro editor's side: read the pending handoff if it is addressed to `editor`, else leave it for its own editor and
- * return null. Nothing is cleared here: `done()` clears every key (sessionStorage and IndexedDB) once the editor has
- * opened it; an unreadable handoff is cleared at once (nobody can open it). The source file, when there is one, is opened
- * instead of the image; remote URLs go through the same-origin bucket download route (toCanvasSrc: the bucket is
- * cross-origin, so CORS blocks a direct fetch), data: URLs pass as they are.
+ * A pro editor's side: read the handoff named by this page's `?h=<id>` if it is addressed to `editor`, else leave it for
+ * its own editor and return null. Nothing is deleted here: `done()` deletes the record once the editor has opened it; an
+ * unreadable or empty record is deleted at once (nobody can open it); a failed read keeps it for the next load. The source
+ * file, when there is one, is opened instead of the image; remote URLs go through the same-origin bucket download route
+ * (toCanvasSrc: the bucket is cross-origin, so CORS blocks a direct fetch), data: URLs pass as they are.
  */
 export async function takeCanvasHandoff(editor: CanvasEditorId): Promise<ProEditorHandoff | null> {
+  let id: string | null = null;
   try {
-    const raw = sessionStorage.getItem(CANVAS_TARGET_KEY);
-    if (!raw) return null;
-    let target: { editor?: unknown; source?: { url?: unknown; name?: unknown } } | null = null;
-    try {
-      target = JSON.parse(raw);
-    } catch {
-      /* unreadable target = nobody's: cleared below */
-    }
-    if (target && target.editor !== editor) return null;
-    const inline = sessionStorage.getItem(CANVAS_SOURCE_KEY);
-    const flag = sessionStorage.getItem(CANVAS_IDB_FLAG);
-    const idbKey = flag ? (flag === "1" ? IDB_IMAGE_KEY : flag) : null;
-    const base = sessionStorage.getItem(CANVAS_NAME_KEY);
-    const clear = () => {
-      if (sessionStorage.getItem(CANVAS_TARGET_KEY) !== raw) return; // a newer handoff took its place
-      for (const k of [CANVAS_TARGET_KEY, CANVAS_SOURCE_KEY, CANVAS_IDB_FLAG, CANVAS_NAME_KEY]) sessionStorage.removeItem(k);
-      if (idbKey) void idbDel(idbKey);
-    };
-    if (!target) {
-      clear();
-      return null;
-    }
-    const done = () => {
-      try {
-        clear();
-      } catch {
-        /* storage gone: nothing left to clear */
-      }
-    };
-    const src = target.source;
-    if (src && typeof src.url === "string" && src.url && typeof src.name === "string" && src.name) {
-      return { url: toCanvasSrc(src.url), name: src.name, done };
-    }
-    let image = inline;
-    if (!image && idbKey) {
-      try {
-        image = await idbGet(idbKey);
-      } catch {
-        return null; // a failed read is not a missing image: keep the handoff for the next load
-      }
-    }
-    if (!image) {
-      clear(); // the image never landed or is gone: nobody can open this handoff
-      return null;
-    }
-    return { url: toCanvasSrc(image), name: handoffImageName(image, base), done };
+    id = new URLSearchParams(window.location.search).get("h");
   } catch {
-    return null; // storage unavailable → no handoff
+    return null;
   }
+  if (!id) return null;
+  const key = `${IDB_HANDOFF_PREFIX}${id}`;
+  let raw: unknown;
+  try {
+    raw = await idbGet(key);
+  } catch {
+    return null; // a failed read is not a missing record: keep it for the next load
+  }
+  if (raw == null) return null;
+  const rec = raw as Partial<HandoffRecord>;
+  if (typeof rec !== "object" || typeof rec.editor !== "string") {
+    void idbDel(key);
+    return null;
+  }
+  if (rec.editor !== editor) return null;
+  const done = () => void idbDel(key);
+  const ret = rec.ret && rec.ret.id === id && typeof rec.ret.label === "string" ? { ret: { id, label: rec.ret.label } } : {};
+  const src = rec.source;
+  if (src && typeof src.url === "string" && src.url && typeof src.name === "string" && src.name) {
+    return { url: toCanvasSrc(src.url), name: src.name, done, ...ret };
+  }
+  if (typeof rec.image !== "string" || !rec.image) {
+    void idbDel(key); // nothing to open
+    return null;
+  }
+  return { url: toCanvasSrc(rec.image), name: handoffImageName(rec.image, rec.name ?? null), done, ...ret };
 }
 
 /**
