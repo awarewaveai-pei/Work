@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-06（續21）影片剪輯 ED.3 屬性面板：逐檔實作規格（只寫文件，未改程式）
+
+- 新檔 `lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/ed3-properties-spec-20261106.md`：七個 commit 的順序（ED.3.0 舊專案黃金測試 → 3.4 輸出端 → 3.1 → 3.6 → 3.2 → 3.3 → 3.5），每處 file:line（基準 560172a7e）、新欄位與缺省行為、FFmpeg 濾鏡鏈、驗收抽格表、撞檔表。
+- 設計結論：效果三層＝近者覆蓋（延續 `editor-export.cjs:87`），寫入較大範圍時清掉較小範圍；舊專案不變靠參數快照＋framemd5；關鍵影格用 scale eval=frame → pad 固定尺寸 → rotate → overlay t 運算式；旁白時降低依 A1 片段時間。
+- 本機 FFmpeg 6.1.1 實驗（scratchpad，非 repo）：scale/pad eval=frame 量寬 100/150/198 與運算式相符；gradients＋blend 光漏、crop sin 震動、split＋blend 強度皆無警告。
+- 待操作者：Q1 三層覆蓋或疊加；Q2 分離音訊是否另存音訊檔（規格 §9）。
+- REALTEST_WAIVED: DOC_ONLY -- 只新增規格文件；FFmpeg 鏈的實驗記在規格 §3.4
+- REVIEW_WAIVED: DOC_ONLY -- 規格文件；code fence 成對（12 個）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=track\.filter（規格 G4 宣稱 UI 從未寫軌道濾鏡） | hits=0（VW/scripts 內 0 筆；主張成立）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=ed3-properties-spec\|transformKeys\|lightLeak\|filterStrength\|backgroundBlur | hits=2（規格本身、未 commit 的 progress 檔；另 vendor/three 兩檔是無關同名字串；新欄位名尚無程式使用，不會撞名）
 ## 2026-11-06（續20）影音工作台 EC.2＋EC.3：「專業特效」頁（EffectCraft）＋成品入帳，跟專業剪輯共用一份外框
 
 - 做了（`VW`＝`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`，細節在 `VW/docs/engine-route-plan-20261106.md` §9 EC 結果段）：
