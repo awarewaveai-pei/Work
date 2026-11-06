@@ -164,17 +164,58 @@ describe("ctx-photocraft.js 契約（mock photocraft）", () => {
     expect(await ctx.selectedImage()).toBeNull();
   });
 
-  it("replaceImage：新圖層插在舊圖層上、同名同中心、刪舊；尺寸不同才縮回舊框", async () => {
-    const same = mockPc();
-    (globalThis as any).createImageBitmap = async () => ({ width: 120, height: 80 });
-    expect(await same.ctx.replaceImage(6, new Blob(["n"], { type: "image/png" }))).toEqual({ id: 99 });
-    expect(names(same.calls)).toEqual(["execute layer.list", "execute layer.select", "post photocraft:open", "execute layer.copyToDocument", "execute file.close", "execute document.activate", "execute layer.delete"]);
-    expect(same.calls.find((c) => c[1] === "layer.copyToDocument")![2]).toEqual({ document: 0, at: [100, 100], name: "green" });
-    expect(same.calls.find((c) => c[1] === "layer.delete")![2]).toEqual({ layer: 6 });
-    const diff = mockPc();
-    (globalThis as any).createImageBitmap = async () => ({ width: 60, height: 40 });
-    await diff.ctx.replaceImage(6, new Blob(["n"], { type: "image/png" }));
-    expect(diff.calls.find((c) => c[1] === "edit.transform")![2]).toEqual({ layer: 99, quad: [[40, 60], [160, 60], [160, 140], [40, 140]] });
+  /** 暫用文件 = 新圖 size，修剪範圍 tb（PhotoCraft bounds 只算不透明）；copyToDocument 回 offset = 新圖 (0,0) 落點。 */
+  const replaceMock = (size: [number, number], tb: number[], offset: [number, number] = [40, 60]) => {
+    const isTemp = (s: any) => String(s.docs[s.active]?.name).startsWith("awarewave-tmp-");
+    return mockPc({
+      "document.inspect": (_p, s) => (isTemp(s) ? { width: size[0], height: size[1] } : { width: 400, height: 300, resolution: 72, hasSelection: s.hasSelection }),
+      "layer.list": (_p, s) => ({ layers: isTemp(s) ? [{ id: 1, kind: "Pixel", bounds: tb }] : s.layers }),
+      "layer.copyToDocument": (p, s) => (s.active = p.document, { document: p.document, layers: [99], offset }),
+      "layer.delete": (p, s) => (s.layers = s.layers.filter((l: any) => l.id !== p.layer), null),
+    });
+  };
+
+  it("replaceImage：新圖整張（含透明邊）對齊舊框、同名、刪舊；at 以修剪範圍算；同尺寸不縮放", async () => {
+    const m = replaceMock([120, 80], [10, 5, 100, 70]);
+    m.state.layers.push({ id: 99, name: "green", kind: "Pixel", bounds: [50, 65, 100, 70], active: false });
+    expect(await m.ctx.replaceImage(6, new Blob(["n"], { type: "image/png" }))).toEqual({ id: 99 });
+    expect(names(m.calls)).toEqual(["execute layer.list", "execute layer.select", "post photocraft:open", "execute document.inspect", "execute layer.list", "execute layer.copyToDocument", "execute file.close", "execute document.activate", "execute layer.delete", "execute layer.list"]);
+    expect(m.calls.find((c) => c[1] === "layer.copyToDocument")![2]).toEqual({ document: 0, at: [100, 100], name: "green" });
+    expect(m.calls.find((c) => c[1] === "layer.delete")![2]).toEqual({ layer: 6 });
+  });
+
+  it("replaceImage：換第二次以完整框為準（不縮回修剪範圍）；圖層被移動 → 框跟著平移；selectedImage 裁完整框", async () => {
+    const m = replaceMock([120, 80], [10, 5, 100, 70]);
+    let next = 99; // 每次 copy 一個新圖層 id，並照 offset＋tb 放進圖層清單（修剪範圍）
+    const copy = (p: any, s: any) => {
+      const id = next++;
+      s.layers.forEach((l: any) => (l.active = false));
+      s.layers.push({ id, name: p.name, kind: "Pixel", bounds: [p.at[0] - 50, p.at[1] - 35, 100, 70], active: true });
+      s.active = p.document;
+      return { document: p.document, layers: [id], offset: [40, 60] };
+    };
+    m.cw.photocraft.execute = ((orig) => (c: string, p: any) => (c === "layer.copyToDocument" ? (m.calls.push(["execute", c, p]), copy(p, m.state)) : orig(c, p)))(m.cw.photocraft.execute);
+    m.state.layers = [{ id: 6, name: "green", kind: "Pixel", bounds: [40, 60, 120, 80], active: true }];
+    expect(await m.ctx.replaceImage(6, new Blob(["a"], { type: "image/png" }))).toEqual({ id: 99 });
+    expect(m.state.layers.map((l: any) => [l.id, l.bounds])).toEqual([[99, [50, 65, 100, 70]]]);
+    m.state.layers[0].bounds = [55, 68, 100, 70]; // 使用者移動 (+5,+3)
+    expect(await m.ctx.selectedImage()).toMatchObject({ id: 99, transform: [1, 0, 0, 1, 45, 63], width: 120, height: 80 });
+    expect(m.calls.filter((c) => c[1] === "image.crop").at(-1)![2]).toEqual({ x: 45, y: 63, width: 120, height: 80 });
+    m.calls.length = 0;
+    expect(await m.ctx.replaceImage(99, new Blob(["b"], { type: "image/png" }))).toEqual({ id: 100 });
+    expect(m.calls.some((c) => c[1] === "edit.transform")).toBe(false);
+    expect(m.calls.find((c) => c[1] === "layer.copyToDocument")![2]).toMatchObject({ at: [105, 103] });
+    // offset (40,60) ≠ 框左上 (45,63) → 整數平移，不重取樣；舊圖層 99 刪掉，只剩 100
+    expect(m.calls.find((c) => c[1] === "layer.translate")![2]).toEqual({ layer: 100, dx: 5, dy: 3 });
+    expect(m.calls.find((c) => c[1] === "layer.delete")![2]).toEqual({ layer: 99 });
+    expect(m.state.layers.map((l: any) => l.id)).toEqual([100]);
+  });
+
+  it("replaceImage：尺寸不同 → edit.transform 把修剪範圍依「整張 → 框」比例縮進框", async () => {
+    const m = replaceMock([60, 40], [6, 4, 30, 20]);
+    await m.ctx.replaceImage(6, new Blob(["n"], { type: "image/png" }));
+    expect(m.calls.find((c) => c[1] === "edit.transform")![2]).toEqual({ layer: 99, quad: [[52, 68], [112, 68], [112, 108], [52, 108]] });
+    expect(m.calls.some((c) => c[1] === "layer.translate")).toBe(false);
   });
 
   it("exportArtboard：Export As 對話框欄位（WebP 有損、品質 0–1 → 1–100、ppi 不放大）", async () => {

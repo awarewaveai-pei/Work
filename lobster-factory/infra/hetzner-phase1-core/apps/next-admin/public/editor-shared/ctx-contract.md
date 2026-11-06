@@ -60,7 +60,7 @@ My Designs 清單過濾：列出 `metadata.source ∈ listSources`（沒有 meta
 |---|---|---|
 | `placeSvg` / `placeImage` | 開暫用文件 → `ex('layer.copyToDocument',{document:原, center:true, name})` → `ex('file.close',{document:暫, save:'discard'})` → `ex('document.activate')`。SVG 成 **Shape 圖層**（向量）；沒有文件時這張圖直接成為文件 | 1 |
 | `selectedImage` | 作用中圖層（`ex('layer.list',{flat:true})` 的 `active`，`kind` 須為 `Pixel`，否則 `null`）→ `ex('layer.duplicate',{layer, document:'new'})` → `ex('image.crop', bounds)` → `inv('file.export.quickExportAsPng')` → 等 save → 關暫用文件。`id`＝圖層 id；`transform`＝`[1,0,0,1,x,y]`；`blob`＝圖層範圍 PNG | 0 |
-| `replaceImage` | `ex('layer.select',{layer:id})` → 開新圖 → `ex('layer.copyToDocument',{document:原, at:舊中心, name:舊名})` → 關暫用 → 新圖尺寸≠舊範圍時 `ex('edit.transform',{layer:新, quad:舊範圍})` → `ex('layer.delete',{layer:id})`；回新 id | 2（尺寸不同 3） |
+| `replaceImage` | 框 F＝舊圖層的圖片框（見下）→ `ex('layer.select',{layer:id})` → 開新圖（暫用文件讀 `document.inspect` 尺寸、`layer.list` 修剪範圍 tb）→ `ex('layer.copyToDocument',{document:原, at:F 左上＋tb 中心, name:舊名})` → 關暫用 → 新圖尺寸≠F：`ex('edit.transform',{layer:新, quad:tb 依「整張→F」比例})`；同尺寸但回傳 `offset`≠F 左上：`ex('layer.translate',{layer:新, dx, dy})` → `ex('layer.delete',{layer:id})`；回新 id | 2（縮放或平移 3） |
 | `exportArtboard` | `inv('file.export.exportAs')` → `{dialog}` → `request('ui.dialog.set',{dialog, field, value})`：`format` png／jpg／webp、`sizing` scale（`scale`％）或 pixels（`width`／`height`）、`transparency`、WebP `lossless`、`quality` 1–100 → `request('ui.dialog.confirm')` → 等 save | 0 |
 | `setArtboardSize` | 有文件：`ex('image.canvasSize',{width, height, units:'px', anchor:'center'})`；沒有：`ex('file.new',{width, height, mode:'rgb', depth:8, background:'white'})`；mm／cm／in／pt 以 dpi 換成像素 | 1 |
 | `openFile` | `photocraft:open {name, bytes}` → 輪詢 `session.documents` 多一份 | 0（新分頁） |
@@ -76,7 +76,8 @@ PhotoCraft 專屬的決定與限制：
   - 預設模式先填黑再塗白 → 選取＝筆畫。
   - 預設前景是黑色，直接塗等於把塗到的地方排除。
 
-  所以「塗到的＝要改」的操作是：按 **Q** → 按 **X**（換成白色）塗 → 再按 **Q**。或照 Photoshop 習慣用黑色塗，離開 Q 後按 **Shift+Ctrl+I**（選取 › 反轉）。面板說明文字要寫這個。
+  所以「塗到的＝要改」的操作是：按 **Q** → 用黑色塗 → 再按 **Q** → 按 **Shift+Ctrl+I**（選取 › 反轉）。沒有先選取時 Q 起始全白，白色塗不會產生選取（實測 2026-11-06，W3 `tests/e2e/smoke/06b-photo-pro-ai-panels.spec.ts`）；面板說明文字寫這個（`blocks/ai-fill.js`）。
+- **`replaceImage` 的圖片框**：PhotoCraft 的圖層 bounds 只算不透明像素（透明邊會被修掉）；`copyToDocument` 的 `at` 對齊修剪後範圍的中心、回傳的 `offset`＝新圖 (0,0) 落點；`edit.transform` 把修剪後範圍映到 `quad`（實測 2026-11-06）。所以「大小不變」指**圖片框**：ctx 記下每個換進來的圖層的完整框（含透明邊；key＝文件名＋圖層 id），之後 `replaceImage`／`selectedImage`／`selectionMask` 都用這個框（`blob` 含透明邊）；換多次不累積縮放、不漂移。圖層被移動（修剪範圍同大小）→ 框跟著平移；大小變了（使用者變形、塗到透明邊）→ 改用 bounds。框記在 ctx 實例內，重新整理頁面後回到 bounds。
 - **`replaceImage` 的限制**：做法是新圖層加刪舊圖層，所以舊圖層的**圖層樣式、遮色片、混合模式、不透明度不帶過去**。圖層 id 會變，面板以回傳的 `id` 為準（`idAfterReplace`）。只換像素圖層。
 - **存檔沒有確認**：`photocraft:save` 不帶 `id`，PhotoCraft 送出就把文件標成已存。
   - 面板在等的存檔，`saveTimeoutMs`（預設 60 秒）逾時就 reject；觸發失敗（選單／對話框出錯）立刻撤回等待，不會吃掉下一筆。

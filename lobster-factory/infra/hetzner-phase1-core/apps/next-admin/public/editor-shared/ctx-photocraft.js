@@ -51,18 +51,6 @@ export function scaleFor(ppi, docPpi) {
   return Math.max(1, Math.min(100, Math.round((p / d) * 1000) / 10));
 }
 
-async function imageSize(blob) {
-  if (typeof createImageBitmap !== "function") return null;
-  try {
-    const bmp = await createImageBitmap(blob);
-    const s = [bmp.width, bmp.height];
-    bmp.close?.();
-    return s;
-  } catch {
-    return null;
-  }
-}
-
 /** 不透明底色：透明 PNG 疊在底色上，再以瀏覽器編碼成要的格式（PhotoCraft 的 Export As 只有「透明／攤平成白」）。 */
 async function onBackground(png, color, type, quality) {
   const bmp = await createImageBitmap(png);
@@ -249,6 +237,18 @@ export function createPhotocraftCtx(opts) {
     await ex(api, "image.crop", { x, y, width, height });
     return (await savedBy(["png"], () => invoke(api, "file.export.quickExportAsPng"))).blob;
   }
+  /** 圖片框：PhotoCraft 的圖層 bounds 只算不透明像素（透明邊被修掉）。replaceImage 換進來的圖記下它的完整框
+   *  {frame, trimmed}，key = 文件名#圖層 id；之後 selectedImage／selectionMask／replaceImage 都以這個框為準，換多次不縮放、
+   *  不漂移。圖層被使用者移動（修剪範圍同大小）→ 框跟著平移；大小變了（變形、塗到透明邊）→ 回到 bounds。 */
+  const frames = new Map();
+  const frameKey = (ref, id) => `${ref.name}#${id}`;
+  function frameOf(ref, l) {
+    const rec = frames.get(frameKey(ref, l.id));
+    const b = l.bounds;
+    if (!rec || !b || rec.trimmed[2] !== b[2] || rec.trimmed[3] !== b[3]) return b;
+    const dx = b[0] - rec.trimmed[0], dy = b[1] - rec.trimmed[1];
+    return [rec.frame[0] + dx, rec.frame[1] + dy, rec.frame[2], rec.frame[3]];
+  }
   const baseName = (name, fallback) => String(name || fallback).replace(/\.[^.]+$/, "") || fallback;
   const extFor = (name, blob, fallback) => (name && /\.[a-z0-9]+$/i.test(name) ? extOf(name) : EXT[blob.type] || fallback);
 
@@ -265,42 +265,59 @@ export function createPhotocraftCtx(opts) {
     /** 點陣圖置入成新圖層，原像素大小、置中。1 個 undo 步。 */
     placeImage: op((api, blob, name) => placeFrom(api, blob, extFor(name, blob, "png"), baseName(name, "awarewave"), { center: true })),
 
-    /** 作用中的像素圖層 → {id, blob（圖層範圍 PNG）, transform [1,0,0,1,x,y], width, height}；非像素圖層或沒文件 → null。原文件 0 步。 */
+    /** 作用中的像素圖層 → {id, blob（圖片框 PNG）, transform [1,0,0,1,x,y], width, height}；非像素圖層或沒文件 → null。
+     *  圖片框＝replaceImage 換進來的完整框（含透明邊），其餘＝圖層 bounds。原文件 0 步。 */
     selectedImage: op(async (api) => {
       if (!(await session(api)).documents.length) return null;
       const l = await activeLayer(api);
       if (!l || l.kind !== "Pixel" || !l.bounds) return null;
       const ref = await targetRef(api);
+      const box = frameOf(ref, l);
       const temp = tempName();
       await ex(api, "layer.duplicate", { layer: l.id, document: "new", documentName: temp });
-      const blob = await withTemp(api, temp, ref, () => cropAndExport(api, l.bounds));
-      const [x, y, width, height] = l.bounds;
+      const blob = await withTemp(api, temp, ref, () => cropAndExport(api, box));
+      const [x, y, width, height] = box;
       return { id: l.id, blob, transform: [1, 0, 0, 1, x, y], width, height };
     }),
 
-    /** 圖層 id 換成新像素：堆疊位置、中心、大小、名稱不變（新圖層＋刪舊圖層；尺寸不同再縮回舊框）。2–3 個 undo 步。
+    /** 圖層 id 換成新像素：新圖整張（含透明邊）對齊舊圖層的圖片框（frameOf），堆疊位置、名稱不變；尺寸不同才等比例縮進框。
+     *  新圖層＋刪舊圖層，2 個 undo 步（縮放 3）。換多次不累積縮放、不漂移。
      *  限制：舊圖層的圖層樣式、遮色片、混合模式不帶過去。中途失敗會撤掉新圖層，舊圖層不動。回 {id: 新圖層}。 */
     replaceImage: op(async (api, id, blob) => {
       const ref = await targetRef(api);
       const old = ((await ex(api, "layer.list", { flat: true })).layers || []).find((l) => l.id === id);
       if (!old?.bounds) throw new Error(`找不到圖層 ${id}`);
-      const [x, y, w, h] = old.bounds;
+      const [x, y, w, h] = frameOf(ref, old);
       await ex(api, "layer.select", { layer: id }); // 新圖層插在作用中圖層之上
-      const size = await imageSize(blob);
       const temp = tempName(EXT[blob.type] || "png");
       await open(api, blob, temp);
-      const r = await withTemp(api, temp, ref, async () =>
-        ex(api, "layer.copyToDocument", { document: await resolveTarget(api, ref), at: [x + w / 2, y + h / 2], name: old.name }));
+      let size, tb;
+      const r = await withTemp(api, temp, ref, async () => {
+        // copyToDocument 的 at 對齊「修剪後」範圍的中心（實測 2026-11-06）：以暫用文件裡的修剪範圍 tb 算 at，
+        // 新圖的 (0,0) 就落在框的左上角；回傳的 offset 即 (0,0) 落點。
+        const d = await doc(api);
+        size = [d.width, d.height];
+        tb = ((await ex(api, "layer.list", { flat: true })).layers || [])[0]?.bounds || [0, 0, d.width, d.height];
+        return ex(api, "layer.copyToDocument", { document: await resolveTarget(api, ref), at: [x + tb[0] + tb[2] / 2, y + tb[1] + tb[3] / 2], name: old.name });
+      });
       const nid = r.layers[0];
       try {
-        if (size && (size[0] !== w || size[1] !== h)) {
-          await ex(api, "edit.transform", { layer: nid, quad: [[x, y], [x + w, y], [x + w, y + h], [x, y + h]] });
+        if (size[0] !== w || size[1] !== h) {
+          // edit.transform 把圖層「修剪後」範圍映到 quad：把 tb 依「整張 → 框」的比例換算
+          const sx = w / size[0], sy = h / size[1];
+          const [qx, qy, qw, qh] = [x + tb[0] * sx, y + tb[1] * sy, tb[2] * sx, tb[3] * sy];
+          await ex(api, "edit.transform", { layer: nid, quad: [[qx, qy], [qx + qw, qy], [qx + qw, qy + qh], [qx, qy + qh]] });
+        } else if (r.offset && (r.offset[0] !== x || r.offset[1] !== y)) {
+          await ex(api, "layer.translate", { layer: nid, dx: x - r.offset[0], dy: y - r.offset[1] });
         }
         await ex(api, "layer.delete", { layer: id });
       } catch (err) {
         await ex(api, "layer.delete", { layer: nid }).catch(() => {});
         throw err;
       }
+      frames.delete(frameKey(ref, id));
+      const placed = ((await ex(api, "layer.list", { flat: true })).layers || []).find((l) => l.id === nid);
+      if (placed?.bounds) frames.set(frameKey(ref, nid), { frame: [x, y, w, h], trimmed: placed.bounds });
       return { id: nid };
     }),
 
@@ -373,8 +390,8 @@ export function createPhotocraftCtx(opts) {
       const d = await doc(api).catch(() => null);
       if (!d?.hasSelection) return null;
       const l = await activeLayer(api);
-      const frameRect = l?.bounds || [0, 0, d.width, d.height];
       const ref = await targetRef(api);
+      const frameRect = (l && frameOf(ref, l)) || [0, 0, d.width, d.height];
       const temp = tempName();
       await ex(api, "image.duplicate", { name: temp });
       return withTemp(api, temp, ref, async () => {
