@@ -31,6 +31,8 @@
     [...document.querySelectorAll("iframe")].some(
       (f) => f.contentWindow === source,
     );
+  // The timer only detects a parent that never answers: the parent acks at once, and from then on the work's own
+  // deadline (the adapter's fetch timeout) decides. A flat 15 s here failed every video upload (2026-11-06).
   const rpc = (action, payload) =>
     new Promise((resolve, reject) => {
       const id = crypto.randomUUID();
@@ -179,7 +181,8 @@
         return;
       }
       const p = pending.get(m.id);
-      if (p) {
+      if (p && m.ack) clearTimeout(p.timer);
+      else if (p) {
         clearTimeout(p.timer);
         pending.delete(m.id);
         m.error ? p.reject(new Error(m.error)) : p.resolve(m.payload);
@@ -187,6 +190,7 @@
       return;
     }
     if (!knownSource(event.source)) return;
+    event.source.postMessage({ channel: "vw:v1", id: m.id, ack: true }, event.origin);
     try {
       const payload = await perform(m.action, m.payload);
       event.source.postMessage(

@@ -278,11 +278,35 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
 
     // 6d. Connected mode (HttpAdapter): the server's refusal message reaches the user, never a bare status code.
     {
-      const vm = require("node:vm"), ctx = { window: {}, AbortController, setTimeout, clearTimeout,
-        fetch: async () => new Response(JSON.stringify({ error: { message: "OpenAI 額度不足" } }), { status: 503 }) };
+      // Minimal XMLHttpRequest stand-in: answers 503 with the server's own message.
+      class XMLHttpRequest {
+        upload = {};
+        open() {}
+        setRequestHeader() {}
+        send() {
+          setTimeout(() => Object.assign(this, { status: 503, responseText: JSON.stringify({ error: { message: "OpenAI 額度不足" } }) }).onload());
+        }
+        abort() { this.onabort?.(); }
+      }
+      const vm = require("node:vm"), ctx = { window: {}, setTimeout, clearTimeout, XMLHttpRequest };
       vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../shared/adapters.js"), "utf8"), ctx);
       const http = new ctx.window.VideoWorkbenchAdapters.HttpAdapter({ apiBaseUrl: "/api/vw", timeoutMs: 1000 });
       await assert.rejects(http.request("/generations", "POST", {}), /OpenAI 額度不足/);
+      // An upload that keeps moving outlives the write deadline: 5 progress events 400 ms apart, then 201, against a
+      // 1 s gatewayTimeoutMs. Only a deadline restarted by each event lets it finish (prod 499s, 2026-11-06).
+      ctx.XMLHttpRequest = class extends XMLHttpRequest {
+        send() {
+          let n = 0;
+          const tick = setInterval(() => {
+            if (++n <= 5) return this.upload.onprogress?.();
+            clearInterval(tick);
+            Object.assign(this, { status: 201, responseText: '{"id":"slow"}' }).onload();
+          }, 400);
+          this.abort = () => (clearInterval(tick), this.onabort?.());
+        }
+      };
+      const slow = new ctx.window.VideoWorkbenchAdapters.HttpAdapter({ apiBaseUrl: "/api/vw", timeoutMs: 100, gatewayTimeoutMs: 1000 });
+      assert.equal((await slow.request("/uploads", "POST", { data: "x" })).id, "slow");
     }
 
     // 6c. 送審與投遞 links to next-admin's /release for the registered asset; an undeliverable ratio gets no link.

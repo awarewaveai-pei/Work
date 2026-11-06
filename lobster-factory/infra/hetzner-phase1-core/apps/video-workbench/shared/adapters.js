@@ -105,33 +105,59 @@
     constructor(config) {
       this.config = config;
     }
-    async request(path, method = "GET", body) {
-      const controller = new AbortController(),
-        timer = setTimeout(() => controller.abort(), this.config.timeoutMs);
-      try {
-        const res = await fetch(
-          this.config.apiBaseUrl.replace(/\/$/, "") + path,
-          {
-            method,
-            credentials: "same-origin",
-            headers: { "Content-Type": "application/json" },
-            body: body === undefined ? undefined : JSON.stringify(body),
-            signal: controller.signal,
-          },
-        );
-        if (!res.ok) {
-          // Same contract as LocalAdapter: the server's own message reaches the user (a refusal never shows as a bare
-          // status code), and a 409 carries the host's current state for runtime.js to adopt.
-          const data = await res.json().catch(() => ({}));
-          throw Object.assign(
-            new ServiceError("HTTP_ERROR", data.error?.message || `服務回應 ${res.status}`, res.status),
-            data.state ? { state: data.state } : {},
-          );
-        }
-        return res.status === 204 ? null : await res.json();
-      } finally {
-        clearTimeout(timer);
-      }
+    // Deadlines measure silence, never size (a flat 15 s killed every video upload on a home uplink: nginx 499,
+    // 2026-11-06). A read gives up after timeoutMs without bytes. A write waits gatewayTimeoutMs (nginx
+    // proxy_read_timeout for this host), restarted by every upload progress event (XHR: fetch cannot report it):
+    // giving up does not stop the server, it only leaves the user not knowing whether it worked. A stalled
+    // upload is cut by nginx client_body_timeout and arrives here as an HTTP error.
+    request(path, method = "GET", body) {
+      const json = body === undefined ? undefined : JSON.stringify(body),
+        { timeoutMs } = this.config,
+        limit = json === undefined ? timeoutMs : this.config.gatewayTimeoutMs || 300000;
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        let timer,
+          timedOut = false;
+        const wait = (ms) => {
+          clearTimeout(timer);
+          timer = setTimeout(() => {
+            timedOut = true;
+            xhr.abort();
+          }, ms);
+        };
+        xhr.open(method, this.config.apiBaseUrl.replace(/\/$/, "") + path);
+        xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.upload.onprogress = () => wait(limit);
+        xhr.onabort = () =>
+          reject(new ServiceError(timedOut ? "TIMEOUT" : "ABORTED", timedOut ? `連線逾時：${Math.round(limit / 1000)} 秒沒有任何進度` : "連線已中斷"));
+        xhr.onerror = () => {
+          clearTimeout(timer);
+          reject(new ServiceError("NETWORK_ERROR", "網路連線失敗"));
+        };
+        xhr.onload = () => {
+          clearTimeout(timer);
+          let data;
+          try {
+            data = xhr.status === 204 ? null : JSON.parse(xhr.responseText);
+          } catch {
+            data = undefined;
+          }
+          if (xhr.status < 200 || xhr.status >= 300)
+            // Same contract as LocalAdapter: the server's own message reaches the user (a refusal never shows as a bare
+            // status code), and a 409 carries the host's current state for runtime.js to adopt.
+            reject(
+              Object.assign(
+                new ServiceError("HTTP_ERROR", data?.error?.message || `服務回應 ${xhr.status}`, xhr.status),
+                data?.state ? { state: data.state } : {},
+              ),
+            );
+          else if (data === undefined) reject(new ServiceError("BAD_RESPONSE", "服務回傳格式不正確", xhr.status));
+          else resolve(data);
+        };
+        xhr.onprogress = () => wait(limit); // the answer is arriving
+        wait(limit);
+        xhr.send(json === undefined ? null : json);
+      });
     }
     load() {
       return this.request("/state");

@@ -42,6 +42,10 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
     if (url.endsWith("/capabilities"))
       return r.fulfill({ json: { image: true, video: true, audio: true, models: { image: "host-image", video: "host-video", audio: "host-audio" } } });
     if (fail) return r.fulfill({ status: 503, json: { error: "unavailable" } });
+    if (url.endsWith("/uploads")) {
+      await new Promise((ok) => setTimeout(ok, 2500));
+      return r.fulfill({ status: 201, json: { id: "up1", url: "/assets/test-image-1.png", kind: "video", type: "video/mp4", name: "slow.mp4" } });
+    }
     if (url.endsWith("/cancel")) {
       job = { ...job, status: "cancelled" };
       return r.fulfill({ json: job });
@@ -117,9 +121,21 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
   );
   assert(!/onerror|onload|javascript|srcdoc|<svg|<iframe/.test(sanitized));
   console.log("PASS 注入內容與不安全網址移除");
+  // Upload slower than timeoutMs (1000), sent from a child frame: neither the page RPC nor the fetch may give up
+  // while the upload is still moving (prod 499s, 2026-11-06).
+  fail = false;
+  await p.evaluate(() => VideoWorkbench.navigate("tools"));
+  await p.waitForFunction(() => document.getElementById("toolsFrame").contentWindow?.VideoWorkbench?.uploadAsset, null, { timeout: 30000 });
+  const child = p.frames().find((f) => f.url().includes("pages/tools.html"));
+  const up = await child.evaluate(async () => {
+    const file = new File([new Uint8Array(200000)], "slow.mp4", { type: "video/mp4" });
+    return (await VideoWorkbench.uploadAsset(file)).id;
+  });
+  assert.equal(up, "up1");
+  console.log("PASS 慢速上傳不會頁面通訊逾時");
   fs.writeFileSync(
     process.env.EVIDENCE_DIR + "/services.json",
-    JSON.stringify({ passed: 5, requests }, null, 2),
+    JSON.stringify({ passed: 6, requests }, null, 2),
   );
   await b.close();
 })().catch((e) => {
