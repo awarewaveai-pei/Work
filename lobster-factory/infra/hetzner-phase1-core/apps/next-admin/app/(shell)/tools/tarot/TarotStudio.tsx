@@ -8,6 +8,8 @@ import GradedPreview from "@/components/tools/GradedPreview";
 import type { ImageEditPromptPanelProps } from "@/components/tools/ImageEditPromptPanel";
 import { buildSemanticFilename, buildSemanticBase } from "@/lib/studio/semantic-filename";
 import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
+import { useCanvasReturn } from "@/components/tools/useCanvasReturn";
+import { PREVIEW_SLOT, deckSlot, deckReturnIndex } from "./canvas-return-slot";
 import { useDoorHref } from "@/app/DoorContext";
 import { TAROT_CARDS, PREVIEW_CARD, buildCardPrompt, STYLE_PRESETS, resolveStylePrompt, type HeroKind, type Couple, type TarotCard } from "./cards";
 import { needsEnglish, translateForDeck } from "@/lib/tarot/translate";
@@ -436,6 +438,8 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
   // (startNewDeck / unlockStyle); bgJobRef mirrors bgJobId plus the deck that launched the job.
   const deckGenRef = useRef(0);
   const bgJobRef = useRef<{ id: string; deck: number } | null>(null);
+  // What the preview sent to the canvas was made with (C8.2): its 傳回 keeps these even if another preview came since.
+  const previewSentRef = useRef<{ model: TarotModel; seed: number | null; sig: string; prompt: string } | null>(null);
   function setBgJob(job: { id: string; deck: number } | null) {
     bgJobRef.current = job;
     setBgJobId(job?.id ?? null);
@@ -836,6 +840,96 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
     void postDesign(image, source, extra);
   }
 
+  // Back half of one card, shared by generateOne and the canvas 「傳回」: frame the (already graded) art, swap the slot's
+  // blob/url/art, clear its 「已存無框圖」 mark, save the framed card to the gallery. live() false mid-way → AbortError.
+  async function frameCardArt(card: TarotCard, index: number, artForPrint: string, live: () => boolean): Promise<void> {
+    const blob = await renderPrintCard(card, artForPrint, template);
+    const url = URL.createObjectURL(blob);
+    // Gallery-sized copy of the frameless art (capped WebP) for the on-demand "存無框圖" save —
+    // keeps a raw 2K PNG (which can exceed the gallery API's ~9MB limit → 413) safely under it,
+    // and shrinks what we retain in React state. The full-res artForPrint is still used for the
+    // printable card above; only this collected copy is capped.
+    const galleryArt = await toGalleryArt(artForPrint);
+    if (!live()) {
+      URL.revokeObjectURL(url);
+      throw new DOMException("stale card run", "AbortError");
+    }
+    // Save the colour-graded card to gallery (洞2 fix): previously saved raw resp.image BEFORE
+    // renderPrintCard, so the gallery always got the ungraded original. Now we convert the graded
+    // blob to a data URL and save that — gallery and download are always in sync.
+    // live() is re-checked inside the async read: stop can land between here and onload.
+    void new Promise<string>((res) => {
+      const reader = new FileReader();
+      reader.onload = () => res(reader.result as string);
+      reader.readAsDataURL(blob);
+    }).then((dataUrl) => {
+      if (!live()) return;
+      saveToGallery(dataUrl, "tarot", {
+        cardName: card.name,
+        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple, order: orderOf(lockedModel) }),
+      });
+    });
+    // Retain the gallery-sized frameless artwork so the large-view modal can save it to My Designs
+    // on demand — the user collects only the pictures she likes, no auto-flooding the gallery.
+    // revoke any prior url for this slot (retry case) before replacing
+    setBatch((prev) =>
+      prev.map((it, i) => {
+        if (i !== index) return it;
+        if (it.url) URL.revokeObjectURL(it.url);
+        return { ...it, status: "done", blob, url, art: galleryArt, error: undefined };
+      }),
+    );
+    // Fresh art for this slot — clear any prior "已存無框圖" mark so the new art can be saved.
+    setSavedArt((prev) => {
+      if (!prev.has(index)) return prev;
+      const next = new Set(prev);
+      next.delete(index);
+      return next;
+    });
+  }
+
+  // A new preview from an edit (AI 修圖 or canvas 「傳回」): replace the preview, drop the lock and the deck, save the
+  // graded copy. The save runs after return (a canvas 傳回 must answer the editor within ~2 s).
+  function applyPreviewEdit(image: string, m: { model: TarotModel; seed: number | null; sig: string; prompt?: string }) {
+    setSelectedModels(new Set<TarotModel>([m.model]));
+    setPreviewImage(image);
+    setLockedGradedPreview(null); // edit resets lock; graded set at next lockStyle()
+    setPreviewSeed(m.seed);
+    setPreviewSig(m.sig);
+    unlockStyle(); // also stops a running card loop — its deck is dropped below
+    setBatch((prev) => {
+      prev.forEach((it) => it.url && URL.revokeObjectURL(it.url));
+      return [];
+    });
+    const params = grade.neutral ? null : grade.params;
+    void (params ? applyGradeToDataUrl(image, params).catch(() => image) : Promise.resolve(image)).then((graded) =>
+      saveToGallery(graded, "tarot-preview-edit", { model: m.model, prompt: m.prompt }),
+    );
+  }
+
+  // Canvas 「傳回」 (C8.2). Preview: model and seed stay. Deck card: only while it is the same deck and the card is done;
+  // otherwise false → the editor saves to My Designs. The returned art is already graded (it was sent graded).
+  useCanvasReturn("tarot", (slot, image) => {
+    if (slot === PREVIEW_SLOT) {
+      const sent = previewSentRef.current; // model/seed/prompt of the preview that was sent, not of a newer one
+      if (!sent) return false;
+      applyPreviewEdit(image, { ...sent, sig: `${sent.sig.replace(/::canvas=1$/, "")}::canvas=1` });
+      return true;
+    }
+    const deck = deckGenRef.current;
+    const index = deckReturnIndex(slot, deck, batch);
+    if (index == null) return false;
+    const card = batch[index].card;
+    patchItem(index, { art: image });
+    void frameCardArt(card, index, image, () => deckGenRef.current === deck).catch((e) => {
+      // Already acked: the editor saved nothing, so the edit must land in My Designs here.
+      void postDesign(image, "tarot-art", { cardName: card.name });
+      if (deckGenRef.current !== deck) return;
+      setMessage(`「${card.name}」換上畫布改過的圖失敗（已改存進我的設計）：${e instanceof Error ? e.message : String(e)}`);
+    });
+    return true;
+  });
+
   // seedOverride: omit → use the locked deck seed (previewSeed) for first-fill consistency.
   // Pass an explicit fresh seed for *regeneration* — deterministic models (FLUX go_fast:false,
   // ideogram v2a/v3) reproduce the identical image from the same seed, so reusing previewSeed
@@ -865,50 +959,8 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
       const artForPrint = !grade.neutral
         ? await applyGradeToDataUrl(resp.image, grade.params).catch(() => resp.image)
         : resp.image;
-      const blob = await renderPrintCard(card, artForPrint, template);
-      const url = URL.createObjectURL(blob);
-      // Gallery-sized copy of the frameless art (capped WebP) for the on-demand "存無框圖" save —
-      // keeps a raw 2K PNG (which can exceed the gallery API's ~9MB limit → 413) safely under it,
-      // and shrinks what we retain in React state. The full-res artForPrint is still used for the
-      // printable card above; only this collected copy is capped.
-      const galleryArt = await toGalleryArt(artForPrint);
-      // Stopped or deck replaced during grade/render: drop the result (catch restores the slot).
-      if (!live()) {
-        URL.revokeObjectURL(url);
-        throw new DOMException("stale card run", "AbortError");
-      }
-      // Save the colour-graded card to gallery (洞2 fix): previously saved raw resp.image BEFORE
-      // renderPrintCard, so the gallery always got the ungraded original. Now we convert the graded
-      // blob to a data URL and save that — gallery and download are always in sync.
-      // live() is re-checked inside the async read: stop can land between here and onload.
-      void new Promise<string>((res) => {
-        const reader = new FileReader();
-        reader.onload = () => res(reader.result as string);
-        reader.readAsDataURL(blob);
-      }).then((dataUrl) => {
-        if (!live()) return;
-        saveToGallery(dataUrl, "tarot", {
-          cardName: card.name,
-          prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple, order: orderOf(lockedModel) }),
-        });
-      });
-      // Retain the gallery-sized frameless artwork so the large-view modal can save it to My Designs
-      // on demand — the user collects only the pictures she likes, no auto-flooding the gallery.
-      // revoke any prior url for this slot (retry case) before replacing
-      setBatch((prev) =>
-        prev.map((it, i) => {
-          if (i !== index) return it;
-          if (it.url) URL.revokeObjectURL(it.url);
-          return { ...it, status: "done", blob, url, art: galleryArt, error: undefined };
-        }),
-      );
-      // Fresh art for this slot — clear any prior "已存無框圖" mark so the new art can be saved.
-      setSavedArt((prev) => {
-        if (!prev.has(index)) return prev;
-        const next = new Set(prev);
-        next.delete(index);
-        return next;
-      });
+      // Stopped or deck replaced during grade/render: frameCardArt throws and the catch restores the slot.
+      await frameCardArt(card, index, artForPrint, live);
     } catch (e) {
       // Deck replaced: the slots this run knew are gone — write nothing.
       if (deckGenRef.current !== run.deck) return;
@@ -2120,8 +2172,14 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
                     type="button"
                     className="btn-secondary"
                     style={{ width: "100%", marginBottom: 10 }}
-                    onClick={() =>
-                      openInCanvas(
+                    onClick={() => {
+                      previewSentRef.current = {
+                        model: activeModel,
+                        seed: previewSeed,
+                        sig: previewSig ?? "",
+                        prompt: buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple, order: orderOf(activeModel) }),
+                      };
+                      void openInCanvas(
                         previewImage,
                         buildSemanticBase({
                           product: "塔羅卡",
@@ -2130,8 +2188,10 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
                           track: "編輯",
                         }),
                         canvasHref,
-                      )
-                    }
+                        undefined,
+                        { tool: "tarot", slot: PREVIEW_SLOT, label: "塔羅預覽" },
+                      );
+                    }}
                   >
                     ✏️ 在 Canvas 編輯
                   </button>}
@@ -2150,22 +2210,14 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
                       subject: subjectForPrompt.trim(),
                       refs: referenceImages.length,
                     }}
-                    onEditedImage={async (image, meta) => {
-                      setSelectedModels(new Set<TarotModel>([meta.model as TarotModel]));
-                      setPreviewImage(image);
-                      setLockedGradedPreview(null); // edit resets lock; graded set at next lockStyle()
-                      setPreviewSeed(meta.seed);
-                      setPreviewSig(`${meta.model}::${meta.prompt}::edit=1`);
-                      unlockStyle(); // also stops a running card loop — its deck is dropped below
-                      setBatch((prev) => {
-                        prev.forEach((it) => it.url && URL.revokeObjectURL(it.url));
-                        return [];
-                      });
-                      const gradedEdit = !grade.neutral
-                        ? await applyGradeToDataUrl(image, grade.params).catch(() => image)
-                        : image;
-                      saveToGallery(gradedEdit, "tarot-preview-edit", { model: meta.model, prompt: meta.prompt });
-                    }}
+                    onEditedImage={(image, meta) =>
+                      applyPreviewEdit(image, {
+                        model: meta.model as TarotModel,
+                        seed: meta.seed,
+                        sig: `${meta.model}::${meta.prompt}::edit=1`,
+                        prompt: meta.prompt,
+                      })
+                    }
                   />}
                 </>
               )}
@@ -2251,6 +2303,26 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
                   }}
                 >
                   {savingArt ? "儲存中…" : savedArt.has(viewIndex) ? "✓ 已存無框圖" : "🖼 存無框圖"}
+                </button>
+              )}
+              {canvasHref && batch[viewIndex].status === "done" && batch[viewIndex].art && (
+                <button
+                  className="btn-secondary"
+                  title="把這張圖（無框、已調色）送進畫布；改完按「傳回」會換掉這張牌"
+                  onClick={() => {
+                    const idx = viewIndex;
+                    const item = idx == null ? undefined : batch[idx];
+                    if (idx == null || !item?.art) return;
+                    void openInCanvas(
+                      item.art,
+                      buildSemanticBase({ product: "塔羅卡", subject: subjectText.trim() || undefined, style: stylePrompt.trim() || undefined, track: item.card.name }),
+                      canvasHref,
+                      undefined,
+                      { tool: "tarot", slot: deckSlot(deckGenRef.current, idx), label: `塔羅第 ${idx + 1} 張` },
+                    );
+                  }}
+                >
+                  ✏️ 在畫布編輯
                 </button>
               )}
               <button className="btn-secondary" onClick={() => setViewIndex(null)}>
