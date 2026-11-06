@@ -24,24 +24,28 @@ export const COPY = {
 export const NOW = [
   { what: '剪輯、分割、複製、刪除、多軌、轉場、濾鏡、匯出 1080p。', state: 'yes', ev: '既有功能，tests/tools-editor.cjs 真實匯出過。' },
   { what: '上傳大支影片不會「頁面通訊逾時」。', state: 'no', ev: '已修好並推上 main（6d3dda8f6），還沒部署到 video.aware-wave.com；部署要你說可以。' },
-  { what: '版面跟參考一樣（圖示側欄、可收合、整片設定、播放列）。', state: 'no', ev: '卡 ED.1。' },
+  { what: '版面跟參考一樣（圖示側欄、可收合、整片設定、播放列）。', state: 'yes', ev: '2026-11-06 卡 ED.1（9df955245），還沒部署到 video.aware-wave.com。參考沒有的片頭、調色、影格率、峰值表、多軌都還在，搬到對應位置。' },
   { what: '多選、磁吸、磁性主軌、波紋刪除、快捷鍵全套。', state: 'no', ev: '卡 ED.2。' },
   { what: '字幕辨識、翻譯、剪贅字在剪輯器裡完成。', state: 'no', ev: '卡 ED.10、ED.11；現在要跳去字幕工具。' },
   { what: '剪輯 Agent（打字叫它剪）。', state: 'no', ev: '卡 ED.13，最後做。' },
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
+const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 const VW = 'VW/scripts/tools-editor.js';
+const ED1 = '9df955245';
 
 export const STEPS = [
   { n: 1, code: 'ED.1', title: '版面骨架', plain: '例：左邊一排圖示（素材、文字、音訊…），按「«」收起來；右邊沒選片段時顯示整片設定；播放列有跳頭尾、前後一秒、循環、720P／1080P、全螢幕。',
-    gate: '每個新控制項在本機點過有反應；收合、拖寬重開後記得；既有剪輯測試全綠。', risk: 'Medium', model: 'Opus', status: 'not_started', depends: [],
+    gate: '每個新控制項在本機點過有反應；收合、拖寬重開後記得；既有剪輯測試全綠。', risk: 'Medium', model: 'Opus', status: 'in_progress', depends: [],
+    decided: '版型與功能跟參考一模一樣；參考沒有的功能保留並搬到對應位置；新建視窗多一張 4:3（2026-11-06）。',
     what: '圖示側欄＋收合拖寬、頂列（改名、比例、已儲存時間、總時長、匯出）、預覽播放列、檢查器收合拖寬、時間軸高度；不放剪輯 Agent 按鈕（ED.13 才加）',
     files: [VW, 'VW/styles/tools.css'],
     items: [
-      todo('ED.1.1', '左邊圖示側欄，可收起、可拖寬；右邊屬性欄同樣。'),
-      todo('ED.1.2', '頂列：改名、比例、「已儲存 幾點幾分」、總長度、匯出。'),
-      todo('ED.1.3', '播放列：跳頭尾、前後一秒、循環、預覽畫質、全螢幕；時間軸高度可拖。'),
+      done('ED.1.1', '左邊圖示側欄八格，可收起、可拖寬；右邊屬性欄同樣，大小重開後照舊。片頭搬進文字、調色搬進片段屬性。', ED1),
+      done('ED.1.2', '頂列：改名、比例、「已儲存 幾點幾分」、總長度、匯出；新建視窗有比例卡。空專案顯示從哪裡開始。', ED1),
+      done('ED.1.3', '播放列：跳頭尾、前後一秒、循環、全螢幕；時間尺可點選位置；時間軸高度可拖。播放中切換分頁或側欄不會停。', ED1),
+      todo('ED.1.4', '預覽畫質 720P／1080P：要先產生低解析度的預覽檔，才不會是假按鈕。'),
     ] },
   { n: 2, code: 'ED.2', title: '時間軸操作', plain: '例：按住 Shift 點三個片段一起拖；開「磁性主軌」後刪掉中間一段，後面自動補上；按 ? 跳出快捷鍵表。',
     gate: '快捷鍵表上每一個鍵都實際按過；多選拖曳、磁吸、波紋刪除各有指名測試。', risk: 'Medium', model: 'Opus', status: 'not_started', depends: ['ED.1'],

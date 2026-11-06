@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-06（續10）影片剪輯 ED.1 版面骨架＝參考工作台（9df955245）＋獨立監工台
+
+- 需求：操作者「版型和功能要跟 seedstar.ai/tools/editor 一模一樣」；參考沒有的功能保留、搬到對應位置；CSS 跟 app.aware-wave.com（主題 token）。規格 `apps/video-workbench/docs/editor-parity-spec-20261106.md` §1／§4；監工台 `agency-os/handoffs/2026-11-06-video-editor-parity-supervisor/`（Dz5uKTSs8RH1moVgbsh5u7）。
+- 做法：`toolEditorScreen` 拆 edTopbar／edRail／edPane／edPlayer／edInspector／edToolbar／edTimeline；版面大小存使用者偏好 `tools.editor.layout`，不進專案資料。片頭→文字、調色→片段屬性、影格率→整片設定、峰值表→音訊。
+- 順手關掉一類：`--bg` 從來不是主題 token（剪輯對話框透明）；新增 `tests/theme-tokens.cjs` 擋任何未定義 token。
+- 未做：預覽畫質 720P／1080P（要先有低解析度預覽檔）＝監工台 ED.1.4。未部署。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed1-layout.cjs（7 PASS，真 Edge）＋編輯器相關 18 檔 exit 0 | exit=0 | ms=5000
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/4m/0n（Codex gpt-6-sol 兩輪：播放終點、取消選取、儲存狀態、重畫停播；各有測試、突變紅後還原）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=data-ed-seek | hits=0
 ## 2026-11-06（續9）video.aware-wave.com 上傳素材「頁面通訊逾時」修正（6d3dda8f6）
 
 - 症狀：操作者回報上傳素材 → 「頁面通訊逾時」。nginx access.log 2026-11-06 01:18:27／01:18:56 UTC `POST /api/vw/uploads` 499（瀏覽器自己斷線）。
