@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-06（續14）影音工作台 EC.1：EffectCraft 網頁版建置鏈（EC.1a `56d3c1cad`）＋嵌入橋（EC.1b `b376094e5`）
+
+- 做了：`scripts/effectcraft-pro/`（結構同 `scripts/filmcraft-pro/`；釘 v0.21.1 `df4cc09`）。
+  - EC.1a：`tc-fonts.patch`（Noto Sans/Serif TC 編進 wasm）、`no-artcraft-marks.patch`（`header.rs` 拿掉 `artcraft-mark.png`，`paint_logo` 不畫）。字型檔由 build.sh 從補丁後 `fonts.rs` 的 `include_bytes!` 讀出、從 `fonts.json` 取檔（不另列清單）。
+  - EC.1b：上游 main `3102b6e6`（11-06）仍無 `host=parent` → `web-host-api.patch`：`craft-web-host`（craft-libs `2e2312dd`，同 FilmCraft）＋新 `src/host.rs`；`effectcraft:ready/open/save/dirty/failed`；saveAs 在下一 frame 判斷（引擎寫完才設 `session.path`，`crates/engine/src/cmd/file.rs` `save_to`）；嵌入模式比照 `?empty`。
+- 根因（建置中途踩到）：`checkout --force` 不刪未追蹤檔，中斷那次留下的 `src/host.rs` 讓 `git apply` 失敗 → build.sh checkout 後 `git clean -fdq`。`scripts/filmcraft-pro/build.sh` 有同一個潛在問題（目前它的補丁沒新增檔，不會踩到；`lib.sh` `checkout` 是共用函式，本卡邊界不改，回報監工）。
+- 已知上游 bug（README 已記）：重開專案素材離線，`footage.relink` 一次全連回（EC.2 處理）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=build.ps1（EC.1b）→ OK df4cc09-4fe4255 21 檔；sha256sum -c 過；craft_brand_scan 過（未補丁產物 HIT artcraft-mark.png） | exit=0 | ms=600000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node ec-host.cjs（scratchpad；headless Edge、WebGPU 關）→ ready（契約 1、app 0.21.1）→ open src.mp4 → saveAs host.ecproj saveAs:true、save 再收 false → 輸出 host-out.mp4 saveAs:false，ffprobe h264 1920x1080 90 格＋aac → 瀏覽器下載 0 → localhost 源 iframe 送的 open 被忽略；PASS | exit=0 | ms=180000
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：craft-web-host 拿掉 listen 的 origin/source 檢查（[patch] 指本機副本）重建 → ec-host FAIL（/evil.png 被匯入）→ 真產物重跑 PASS | exit=1 | ms=400000
+- REALTEST_EVIDENCE: tool=Bash | cmd=EC.1a：ec-main 精簡版 → text.fonts 兩個 TC bundled、h264 1920x1080 300 格＋aac、第 120 格繁中正確（見 56d3c1cad 訊息） | exit=0 | ms=300000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（external oracle = Codex CLI gpt-6-sol，`agency-os/reports/oracle/2026-11-06-partialreview-c099b87a.md`，files-reviewed 含三檔）
+- ORACLE_WAIVED: partial artifact（-Path 三檔＝本 commit 全部檔案）；變更只在 scripts/effectcraft-pro/
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=effectcraft-pro|effectcraft-dist | hits=8（本卡檔、規格文件、監工台、oracle artifact；無過時主張）
 ## 2026-11-06（續13）影音工作台 FC.2：「專業剪輯」頁（FilmCraft 嵌在工作台裡）
 
 - 做了（`VW`＝`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`）：
