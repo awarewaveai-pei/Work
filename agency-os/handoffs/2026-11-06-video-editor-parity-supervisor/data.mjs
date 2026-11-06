@@ -1,0 +1,155 @@
+// 影片剪輯補齊監工台 -- 唯一的狀態來源。改這裡 → `node build.mjs` → `node check.mjs` → 重新發布同一網址。
+// 做法正本：apps/video-workbench/docs/editor-parity-spec-20261106.md §3（check.mjs 驗卡號一一對應）。這裡只放狀態與白話。
+
+export const META = {
+  title: '影片剪輯補齊監工台',
+  updated: '2026-11-06',
+  plan: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/editor-parity-spec-20261106.md',
+  worklog: 'agency-os/WORKLOG.md 2026-11-06',
+  self: 'agency-os/handoffs/2026-11-06-video-editor-parity-supervisor/',
+  url: 'https://claude.ai/artifact/Dz5uKTSs8RH1moVgbsh5u7',
+};
+
+export const COPY = {
+  sub: '應用工具的「影片剪輯」補到跟參考工作台一樣：功能、流程、版面、快捷鍵相同，外觀用 AwareWave 主題。共 {total} 張卡、{items} 項工作，已完成 {itemsDone} 項。',
+  updated: '更新於 {date}',
+  nav: { now: '現況', steps: '卡片與工作', open: '待你決定', paths: '檔案' },
+  now: { h: '現況', lead: '剪輯器現在做得到與做不到的事（2026-11-06 實際打開查）。' },
+  steps: { h: '卡片與工作', lead: '依編號做。先做版面骨架，各分頁接著做，要付費服務的放最後。風險 High 的卡經你同意才上線。', count: '{done}／{total} 完成' },
+  open: { h: '待你決定', lead: '決定後，對應的卡才能開始。', none: '目前沒有需要你決定的事。', count: '{n} 項', before: '第 {n} 張卡開始前決定', src: '出處' },
+  paths: { h: '檔案', plan: '完整清單與每張卡的做法', track: '工作紀錄', self: '本頁來源', howto: '修改 data.mjs 後，執行 node build.mjs 和 node check.mjs，再重新發布到同一個網址。' },
+  label: { yes: '可以', no: '還不行', todo: '未開始', doing: '進行中', done: '已完成', risk: '風險', who: '負責', evidence: '完成的樣子', details: '工程細節', depends: '需先完成', none: '無', files: '檔案', card: '做法', doneAt: '完成於', decided: '已定', group: '可同時進行：' },
+};
+
+export const NOW = [
+  { what: '剪輯、分割、複製、刪除、多軌、轉場、濾鏡、匯出 1080p。', state: 'yes', ev: '既有功能，tests/tools-editor.cjs 真實匯出過。' },
+  { what: '上傳大支影片不會「頁面通訊逾時」。', state: 'no', ev: '已修好並推上 main（6d3dda8f6），還沒部署到 video.aware-wave.com；部署要你說可以。' },
+  { what: '版面跟參考一樣（圖示側欄、可收合、整片設定、播放列）。', state: 'no', ev: '卡 ED.1。' },
+  { what: '多選、磁吸、磁性主軌、波紋刪除、快捷鍵全套。', state: 'no', ev: '卡 ED.2。' },
+  { what: '字幕辨識、翻譯、剪贅字在剪輯器裡完成。', state: 'no', ev: '卡 ED.10、ED.11；現在要跳去字幕工具。' },
+  { what: '剪輯 Agent（打字叫它剪）。', state: 'no', ev: '卡 ED.13，最後做。' },
+];
+
+const todo = (id, plain) => ({ id, plain, status: 'todo' });
+const VW = 'VW/scripts/tools-editor.js';
+
+export const STEPS = [
+  { n: 1, code: 'ED.1', title: '版面骨架', plain: '例：左邊一排圖示（素材、文字、音訊…），按「«」收起來；右邊沒選片段時顯示整片設定；播放列有跳頭尾、前後一秒、循環、720P／1080P、全螢幕。',
+    gate: '每個新控制項在本機點過有反應；收合、拖寬重開後記得；既有剪輯測試全綠。', risk: 'Medium', model: 'Opus', status: 'not_started', depends: [],
+    what: '圖示側欄＋收合拖寬、頂列（改名、比例、已儲存時間、總時長、匯出）、預覽播放列、檢查器收合拖寬、時間軸高度；不放剪輯 Agent 按鈕（ED.13 才加）',
+    files: [VW, 'VW/styles/tools.css'],
+    items: [
+      todo('ED.1.1', '左邊圖示側欄，可收起、可拖寬；右邊屬性欄同樣。'),
+      todo('ED.1.2', '頂列：改名、比例、「已儲存 幾點幾分」、總長度、匯出。'),
+      todo('ED.1.3', '播放列：跳頭尾、前後一秒、循環、預覽畫質、全螢幕；時間軸高度可拖。'),
+    ] },
+  { n: 2, code: 'ED.2', title: '時間軸操作', plain: '例：按住 Shift 點三個片段一起拖；開「磁性主軌」後刪掉中間一段，後面自動補上；按 ? 跳出快捷鍵表。',
+    gate: '快捷鍵表上每一個鍵都實際按過；多選拖曳、磁吸、波紋刪除各有指名測試。', risk: 'Medium', model: 'Opus', status: 'not_started', depends: ['ED.1'],
+    what: '多選、磁吸開關、磁性主軌、波紋刪除、片段與樣式複製貼上、標記跳轉、縮放全套、片段縮圖與波形、軌道中文名／每軌＋／上下移、片段上音量與轉場鈕、快捷鍵表、說明、J/K/L',
+    files: [VW, 'VW/shared/editor-model.js'],
+    items: [
+      todo('ED.2.1', '多選與整組拖曳、複製貼上片段、複製貼上樣式。'),
+      todo('ED.2.2', '磁吸、磁性主軌、波紋刪除。'),
+      todo('ED.2.3', '縮放、標記跳轉、J／K／L 倒播快播、快捷鍵表。'),
+      todo('ED.2.4', '軌道中文名、每軌＋、上下移；片段顯示縮圖與聲音波形。'),
+    ] },
+  { n: 3, code: 'ED.3', title: '屬性面板', plain: '例：選一段影片，把濾鏡設成「只套這段」，加光漏和鏡頭震動，在第 2 秒和第 5 秒設關鍵影格讓它放大；輸出的片照樣有這些效果。',
+    gate: '每個新效果輸出一次真影片並抽畫面確認；舊專案打開輸出結果不變。', risk: 'High', model: '設計 Fable；做 Opus', status: 'not_started', depends: ['ED.1'],
+    what: '整片設定；片段：套用範圍三層、光漏、震動、遮罩、Transform＋關鍵影格、背景模糊／純色、分離音訊、旁白時自動降低；文字片段；數字欄位操作；editor-export.cjs 補輸出',
+    files: [VW, 'VW/backend/editor-export.cjs', 'VW/shared/editor-model.js'],
+    items: [
+      todo('ED.3.1', '沒選片段時的整片設定：比例、整片濾鏡、聲音、輸出資訊。'),
+      todo('ED.3.2', '影片片段：效果可選整片／此軌／此片段；光漏、震動、遮罩、背景模糊。'),
+      todo('ED.3.3', '變形與關鍵影格；分離音訊；旁白時自動降低。'),
+      todo('ED.3.4', '輸出端照做；舊專案輸出不變的測試。'),
+    ] },
+  { n: 4, code: 'ED.4', title: '素材分頁', plain: '例：素材分頁直接看到縮圖，篩「影片」，上面一組是「已使用」並標「已用 × 2」，按 ＋ 放到主視訊最後面。',
+    gate: '三個分頁、搜尋、篩選、已使用分組、收藏、拆出音軌都點過。', risk: 'Low', model: 'Sonnet', status: 'not_started', depends: ['ED.1'],
+    what: '我的素材庫／本次上傳／收藏、搜尋、類型篩選、已使用／未使用、已用×n、收藏星、縮圖長度解析度、加到指定軌、拆出音軌',
+    files: [VW, 'VW/shared/assets-ui.js'],
+    items: [
+      todo('ED.4.1', '縮圖格、三個分頁、搜尋、類型篩選。'),
+      todo('ED.4.2', '已使用／未使用、收藏、加到指定軌、拆出音軌。'),
+    ] },
+  { n: 5, code: 'ED.5', title: '文字分頁', plain: '例：文字分頁選「標價」，看到「限時優惠」「8 折起」的樣板預覽，按 ＋ 放到播放頭位置。',
+    gate: '每張自製樣板加入一次、輸出一次；不含參考網站的圖或字樣設計。', risk: 'Low', model: 'Sonnet', status: 'not_started', depends: ['ED.1'],
+    what: '自製樣板，數量與分類同參考（開場／標價／CTA／強調／片尾）、搜尋、純文字、品牌字型、文字動畫、雙擊或拖曳加入',
+    files: [VW],
+    items: [
+      todo('ED.5.1', '參考有的每種文字樣板都做一張自己設計的，分五類、有預覽、可搜尋。'),
+      todo('ED.5.2', '純文字、品牌字型、文字動畫；雙擊或拖曳加入。'),
+    ] },
+  { n: 6, code: 'ED.6', title: '音訊分頁', plain: '例：音訊分頁點「配樂」，從內建曲庫挑一首放進配樂軌，勾「旁白時配樂降低」，再用 AI 旁白念一段文案（先看價格）。',
+    gate: '分類、目標軌、內建曲庫、音訊設定五項、AI 旁白都點過；AI 旁白先顯示價格。', risk: 'Medium', model: 'Opus', status: 'not_started', depends: ['ED.1'], before: '待決 1',
+    decided: '內建曲庫用 AwareWave 的音樂工具生成自己的曲子（2026-11-06）；參考網站的曲子不能用。',
+    what: '依用途標籤分類、目標軌 A1／A2、內建庫、音訊設定（整體音量、對齊切點、旁白降 12 dB、循環延伸、響度）＋BPM 建議、AI 旁白接現有 spoken',
+    files: [VW, 'VW/backend/api.cjs'],
+    items: [
+      todo('ED.6.1', '六種分類、目標軌切換、內建曲庫（曲風、排序、試聽、加入）。'),
+      todo('ED.6.2', '音訊設定：整體音量、對齊切點、旁白時降低、循環、響度、建議 BPM。'),
+      todo('ED.6.3', 'AI 旁白：文字、聲音描述、語速音高音量，先顯示價格。'),
+      todo('ED.6.4', '生成自己的內建曲子（清單與費用先給你確認）。'),
+    ] },
+  { n: 7, code: 'ED.7', title: '轉場與貼圖', plain: '例：選「融接」按「套用全部剪點」，每個剪點都加上；上傳公司 Logo 當浮水印，下一個專案也還在。',
+    gate: '套用全部、預覽剪點、移除、曲線都輸出過；浮水印與品牌套件換專案還在。', risk: 'Low', model: 'Sonnet', status: 'not_started', depends: ['ED.1'],
+    what: '轉場套用全部 (n)、預覽剪點、移除、曲線；浮水印 PNG／SVG 帳號保留；品牌套件跨專案',
+    files: [VW, 'VW/shared/runtime.js'],
+    items: [
+      todo('ED.7.1', '轉場：套用全部剪點、預覽剪點、移除、曲線。'),
+      todo('ED.7.2', '浮水印（PNG／SVG）與品牌套件（色彩、字型、Logo），換專案還在。'),
+    ] },
+  { n: 8, code: 'ED.8', title: '匯出視窗', plain: '例：按匯出，選「TikTok / Reels」就自動是 9:16、1080P；勾「套用浮水印」；看到總長度與費用再按開始。',
+    gate: '五個平台預設各輸出一次，規格與標示相同。', risk: 'Low', model: 'Sonnet', status: 'not_started', depends: ['ED.1'],
+    what: '平台預設、自訂 1080P／720P、浮水印開關、總時長、預估費用',
+    files: [VW],
+    items: [
+      todo('ED.8.1', '平台預設與自訂畫質。'),
+      todo('ED.8.2', '浮水印開關、總長度、費用顯示。'),
+    ] },
+  { n: 9, code: 'ED.9', title: '專案列表頁', plain: '例：打開影片剪輯先看到專案卡（縮圖、比例、長度、更新日期），可搜尋、改名、刪除；卡上寫「屬於 專案 › 第 2 集」。',
+    gate: '舊剪輯專案一筆不少；搜尋、改名、刪除都點過；跟專案頁開到同一份剪輯檔。', risk: 'Low', model: 'Sonnet', status: 'not_started', depends: [],
+    decided: '列表頁照參考做，卡上多一行屬於哪一集；跟 PJ.1 一起對齊（2026-11-06）。',
+    what: '搜尋、專案卡、改名、刪除、空狀態；與 PJ.1 的集歸屬',
+    files: [VW, 'VW/docs/engine-route-plan-20261106.md'],
+    items: [
+      todo('ED.9.1', '專案卡（縮圖、比例、長度、更新日期）、搜尋、改名、刪除、空狀態。'),
+      todo('ED.9.2', '卡上顯示屬於哪一集，跟專案頁開同一份檔。'),
+    ] },
+  { n: 10, code: 'ED.10', title: '字幕', plain: '例：在剪輯器按「一鍵整片字幕」，先看價格，辨識完出現繁中字幕軌；再翻成英文成另一軌；樣式選「卡拉 OK」，字一個一個亮。',
+    gate: '辨識、翻譯先顯示價格；逐句編輯、分割、合併、匯出 SRT 都點過；逐字高亮輸出正確。', risk: 'High', model: '設計 Fable；做 Opus', status: 'not_started', depends: ['ED.1'],
+    what: '三分頁搬進剪輯器；每語言一軌；/transcriptions 改回逐字時間與分數、整片 V1＋A1 辨識、找回結果；翻譯接 /tools/subtitles/translate；逐字高亮／卡拉 OK 輸出',
+    files: [VW, 'VW/backend/api.cjs', 'VW/backend/editor-export.cjs'],
+    items: [
+      todo('ED.10.1', '逐句：新增、分割、合併、刪除、匯出 SRT；每種語言一條軌。'),
+      todo('ED.10.2', '樣式：八種（含逐字高亮、卡拉 OK）、字級、上下位置。'),
+      todo('ED.10.3', '辨識整片與翻譯，先顯示價格；找回已完成結果。'),
+    ] },
+  { n: 11, code: 'ED.11', title: '剪贅字', plain: '例：把停頓上限設 0.5 秒、勾「剪掉嗯、呃」，按估價再套用；畫面、旁白、字幕一起剪，配樂不斷。',
+    gate: '一支有「嗯」與長停頓的測試片剪完，字幕時間對得上、配樂連續。', risk: 'High', model: 'Opus', status: 'not_started', depends: ['ED.10'],
+    what: '用 ED.10 的逐字時間碼；停頓上限、語氣詞、語言、估價；V1＋A1＋字幕同剪、配樂連續',
+    files: [VW, 'VW/shared/editor-model.js'],
+    items: [
+      todo('ED.11.1', '停頓上限、剪語氣詞、語言、估價。'),
+      todo('ED.11.2', '畫面、旁白、字幕一起剪，配樂不斷。'),
+    ] },
+  { n: 12, code: 'ED.12', title: '特效裡的 AI 功能', plain: '例：選一段模糊的影片按「AI 畫質增強」，看價格後送出，完成後自動換掉原片段、剪輯設定不變。',
+    gate: '兩個功能都先顯示價格；替換後片段的剪輯設定不變。', risk: 'Medium', model: 'Opus', status: 'not_started', depends: ['ED.3'],
+    what: 'AI 畫質增強替換片段；從這裡重新生成（接現有增強與 reshoot）',
+    files: [VW, 'VW/backend/api.cjs'],
+    items: [
+      todo('ED.12.1', 'AI 畫質增強：先看價格，完成後換掉原片段。'),
+      todo('ED.12.2', '從這裡重新生成：以停住的畫面接著重生，取代失敗的後段。'),
+    ] },
+  { n: 13, code: 'ED.13', title: '剪輯 Agent', plain: '例：打「整片上字幕，配樂淡出讓位旁白」，它說要花多少，按確認後自動完成。',
+    gate: '五個快捷需求各實跑一次；每則訊息與每次生成都先告知費用。', risk: 'High', model: '設計 Fable；做 Opus', status: 'not_started', depends: ['ED.2', 'ED.3', 'ED.10'],
+    what: '浮動對話視窗、快捷需求、以工具呼叫改剪輯模型、每則扣點先告知',
+    files: [VW, 'VW/backend/api.cjs'],
+    items: [
+      todo('ED.13.1', '浮動對話視窗、新對話、快捷需求。'),
+      todo('ED.13.2', '照文字改剪輯；每次花費先告知。'),
+    ] },
+];
+
+export const OPEN = [
+  { n: 1, before: 'ED.6', what: '內建曲庫要生成哪些曲子、總共花多少：ED.6 開工前列清單給你確認。', src: 'editor-parity-spec §4 決定 2' },
+];
