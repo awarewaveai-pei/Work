@@ -393,6 +393,15 @@ function edChoices(label, action, value, options, text = (o) => o) {
     )
     .join("")}</div>`;
 }
+// Card ED.3.6: inspector groups fold like the reference (<details>) and show the current value in the header; which
+// groups are folded is the per-user layout preference (ed.layout.closed).
+function edGroup(name, value, body) {
+  return `<details class="editor-insp-group" data-ed-group="${esc(name)}" ${ed.layout.closed.includes(name) ? "" : "open"}><summary><b>${esc(name)}</b><span class="note">${esc(value)}</span></summary>${body}</details>`;
+}
+// Number fields take arithmetic (1920/2), ↑／↓ (Shift ×10, Alt ×0.1), Esc to restore, and scrubbing on the label.
+function edNumber(key, title, value, { min, max, step }) {
+  return `<label><span data-ed-num-label>${esc(title)}</span><input class="text-input" type="text" inputmode="decimal" data-ed-field="${esc(key)}" data-ed-num data-min="${min}" data-max="${max}" data-step="${step}" aria-label="${esc(title)}" value="${esc(value ?? "")}"></label>`;
+}
 const edPrevious = (p, c) =>
   p.clips.find(
     (o) =>
@@ -463,7 +472,6 @@ function edColorPane(p, c) {
     edLutRefresh().catch(VideoWorkbench.reportError);
   }
   return (
-    "<h3>調色</h3>" +
     Object.entries(EditorModel.COLOR)
       .map(([key, r]) =>
         edInput(
@@ -517,12 +525,14 @@ const edPanes = [
 ];
 // Panel sizes are a per-user preference (tools.editor.layout), never project data.
 const edLayoutLimits = { left: [200, 480], right: [240, 480], timeline: [110, 560] },
-  edLayoutDefault = { left: 294, right: 300, timeline: 150, leftOpen: true, rightOpen: true };
+  edLayoutDefault = { left: 294, right: 300, timeline: 150, leftOpen: true, rightOpen: true, closed: [] },
+  edGroupNames = ["畫面", "聲音", "文字與字幕", "輸出", "畫面效果", "變形", "背景", "播放速度", "音訊", "時間", "調色", "文字"];
 function edLayout(raw) {
   const l = { ...edLayoutDefault };
   for (const [k, [min, max]] of Object.entries(edLayoutLimits))
     if (Number.isFinite(raw?.[k])) l[k] = Math.min(max, Math.max(min, Math.round(raw[k])));
   for (const k of ["leftOpen", "rightOpen"]) if (typeof raw?.[k] === "boolean") l[k] = raw[k];
+  l.closed = Array.isArray(raw?.closed) ? raw.closed.filter((n) => edGroupNames.includes(n)) : [];
   return l;
 }
 const edColumns = (l = ed.layout) =>
@@ -616,15 +626,15 @@ function edProjectSettings(p) {
     names = Object.fromEntries(edCreateRatios.map(([r, name]) => [r, name])),
     percent = (key) => {
       const r = EditorModel.EFFECTS[key];
-      return edInput("fx-project:" + key, r.label + "（%）", Math.round((p[key] ?? r.neutral) * 100), "number", 'min="0" max="100" step="1"');
+      return edNumber("fx-project:" + key, r.label + "（%）", Math.round((p[key] ?? r.neutral) * 100), { min: 0, max: 100, step: 1 });
     },
     db = (id, title) =>
-      edTrack(p, id) ? edInput("track-db:" + id, title, EditorModel.volumeToDb(edTrack(p, id).volume).toFixed(1), "number", `min="${EditorModel.DB.min}" max="12" step="0.5"`) : "";
+      edTrack(p, id) ? edNumber("track-db:" + id, title, Number(EditorModel.volumeToDb(edTrack(p, id).volume).toFixed(1)), { min: EditorModel.DB.min, max: 12, step: 0.5 }) : "";
   return (
-    `<section class="editor-insp-group"><h4>畫面</h4><p class="note">畫面比例</p>${edChoices("畫面比例", "project-ratio", p.ratio, Object.keys(edRatios), (r) => r + " " + (names[r] || ""))}<p class="note">整片濾鏡</p>${edChoices("整片濾鏡", "project-filter", p.filter || "原始", edFilters)}${["filterStrength", "grain", "lightLeak", "shake"].map(percent).join("")}${edButton("更多特效與遮罩", "pane:特效")}</section>` +
-    `<section class="editor-insp-group"><h4>聲音</h4>${db("A2", "配樂（dB）")}${db("A1", "旁白（dB）")}${edButton("自動降低音量、循環、響度", "pane:音訊")}</section>` +
-    `<section class="editor-insp-group"><h4>文字與字幕</h4>${edButton("整軌字幕樣式", "pane:字幕")}${edButton("一鍵整片字幕", "pane:字幕")}${edButton("文字樣板", "pane:文字")}</section>` +
-    `<section class="editor-insp-group"><h4>輸出</h4><p class="note">${w} × ${h} · ${esc(Timebase.label(p.timebase))}　${edTotal().toFixed(1)}s · ${p.clips.length} 段</p><p class="note">影格率</p>${edChoices("影格率", "project-timebase", Timebase.label(p.timebase), Timebase.allowed.map(Timebase.label))}${edButton("匯出影片", "export", !p.clips.length)}</section>` +
+    edGroup("畫面", p.ratio, `<p class="note">畫面比例</p>${edChoices("畫面比例", "project-ratio", p.ratio, Object.keys(edRatios), (r) => r + " " + (names[r] || ""))}<p class="note">整片濾鏡</p>${edChoices("整片濾鏡", "project-filter", p.filter || "原始", edFilters)}${["filterStrength", "grain", "lightLeak", "shake"].map(percent).join("")}${edButton("更多特效與遮罩", "pane:特效")}`) +
+    edGroup("聲音", "", `${db("A2", "配樂（dB）")}${db("A1", "旁白（dB）")}${edButton("自動降低音量、循環、響度", "pane:音訊")}`) +
+    edGroup("文字與字幕", "", `${edButton("整軌字幕樣式", "pane:字幕")}${edButton("一鍵整片字幕", "pane:字幕")}${edButton("文字樣板", "pane:文字")}`) +
+    edGroup("輸出", Timebase.label(p.timebase), `<p class="note">${w} × ${h} · ${esc(Timebase.label(p.timebase))}　${edTotal().toFixed(1)}s · ${p.clips.length} 段</p><p class="note">影格率</p>${edChoices("影格率", "project-timebase", Timebase.label(p.timebase), Timebase.allowed.map(Timebase.label))}${edButton("匯出影片", "export", !p.clips.length)}`) +
     `<p class="note">點擊時間軸上的片段，這裡會變成該片段的屬性。</p>`
   );
 }
@@ -648,56 +658,82 @@ function edWriteEffect(p, c, key, value, scope) {
     for (const row of p.clips) if (row.track === c.track) delete row[key];
   } else c[key] = value;
 }
+// Card ED.3.6: the clip inspector in the reference's groups (spec ED.3.6); the 軌道 buttons are AwareWave's (compare
+// #47). Keep cpEditorClip last: later cards anchor after it.
 function edClipInspector(p, c) {
-  const kind = c.kind === "text" ? "text" : c.kind === "audio" ? "audio" : "video";
-  let html =
-    `<h4>${esc(edTrack(p, c.track)?.name || c.track)} 片段</h4><div class="flow-choices" role="group" aria-label="軌道">${p.tracks
-      .filter((t) => t.kind === kind)
-      .map(
-        (t) =>
-          `<button type="button" class="btn small ${t.id === c.track ? "selected" : ""}" data-ed-action="clip-track:${esc(t.id)}" aria-pressed="${t.id === c.track}">${esc(t.name)}</button>`,
-      )
-      .join("")}</div>` +
-    edInput("start", "時間軸起點（秒）", c.start, "number", 'min="0" step="0.1"') +
-    edInput("duration", "片段長度（秒）", c.duration, "number", 'min="0.05" step="0.1"');
-  if (["video", "audio"].includes(c.kind))
-    html +=
-      edInput("sourceStart", "素材起點（秒）", c.sourceStart, "number", 'min="0" step="0.1"') +
-      edInput("speed", "播放速度", c.speed, "number", 'min="0.25" max="4" step="0.25"') +
+  const kind = c.kind === "text" ? "text" : c.kind === "audio" ? "audio" : "video",
+    main = c.track === edMain(p),
+    time =
+      edInput("start", "時間軸起點（秒）", c.start, "number", 'min="0" step="0.1"') +
+      edInput("duration", "片段長度（秒）", c.duration, "number", 'min="0.05" step="0.1"') +
+      (["video", "audio"].includes(c.kind) ? edInput("sourceStart", "素材起點（秒）", c.sourceStart, "number", 'min="0" step="0.1"') : ""),
+    speed = edInput("speed", "播放速度", c.speed, "number", 'min="0.25" max="4" step="0.25"'),
+    audio =
       edInput("volume", "片段音量", c.volume, "number", 'min="0" max="4" step="0.1"') +
       edButton(c.muted ? "取消片段靜音" : "片段靜音", "toggle:muted") +
       edInput("fadeIn", "音訊淡入（秒）", c.fadeIn, "number", 'min="0" step="0.1"') +
-      edInput("fadeOut", "音訊淡出（秒）", c.fadeOut, "number", 'min="0" step="0.1"');
-  if (c.kind === "text")
-    html +=
-      `<label>文字內容<textarea data-ed-field="text" aria-label="文字內容" maxlength="4000">${esc(c.text)}</textarea></label>` +
-      edSelect("font", "字型", c.font, ["思源黑體", "思源宋體", "Arial", "Georgia", "等寬字"]) +
-      edInput("fontSize", "字級", c.fontSize, "number", 'min="8" max="300"') +
-      edSelect("align", "文字對齊", c.align, ["靠左", "置中", "靠右"]) +
-      edInput("color", "文字顏色", c.color, "color") +
-      edButton(c.bold ? "取消粗體" : "粗體", "toggle:bold") +
-      edButton(c.italic ? "取消斜體" : "斜體", "toggle:italic") +
-      edButton(c.backgroundColor ? "移除文字底色" : "加上文字底色", "text-background") +
-      (c.backgroundColor ? edInput("backgroundColor", "文字底色", c.backgroundColor, "color") : "") +
-      edSelect("animation", "文字動畫", c.animation, ["無", "淡入淡出", "彈出", "逐字顯示"]);
-  const main = c.track === edMain(p);
-  if (c.kind !== "audio")
-    html +=
+      edInput("fadeOut", "音訊淡出（秒）", c.fadeOut, "number", 'min="0" step="0.1"'),
+    transform =
       edInput("x", main ? "水平偏移（px）" : "水平位置（%）", c.x) +
       edInput("y", main ? "垂直偏移（px）" : "垂直位置（%）", c.y) +
       edInput("scale", "縮放", c.scale, "number", 'min="0.1" max="5" step="0.1"') +
       edInput("rotation", "旋轉角度", c.rotation, "number", 'min="-360" max="360"') +
       edInput("opacity", "不透明度", c.opacity, "number", 'min="0" max="1" step="0.1"') +
-      (edOverlay(p, c.track)
-        ? edInput("width", "疊加寬度（%）", c.width, "number", 'min="1" max="100"')
-        : main
-          ? edSelect("background", "背景", c.background || "黑色", ["黑色", "模糊", "純色"]) +
-            (c.background === "純色" ? edInput("backgroundColor", "背景顏色", c.backgroundColor || "#000000", "color") : "")
-          : "");
-  if (["video", "image"].includes(c.kind))
+      (edOverlay(p, c.track) ? edInput("width", "疊加寬度（%）", c.width, "number", 'min="1" max="100"') : ""),
+    groups = {
+      time: edGroup("時間", c.duration.toFixed(2) + "s", time),
+      speed: edGroup("播放速度", c.speed + "x", speed),
+      audio: edGroup("音訊", Math.round(c.volume * 100) + "%", audio),
+      transform: edGroup("變形", "×" + c.scale.toFixed(2), transform),
+    };
+  let html =
+    `<h4>${esc(edTrackLabel(p, edTrack(p, c.track)))} 片段</h4><div class="flow-choices" role="group" aria-label="軌道">${p.tracks
+      .filter((t) => t.kind === kind)
+      .map(
+        (t) =>
+          `<button type="button" class="btn small ${t.id === c.track ? "selected" : ""}" data-ed-action="clip-track:${esc(t.id)}" aria-pressed="${t.id === c.track}">${esc(t.name)}</button>`,
+      )
+      .join("")}</div>`;
+  if (kind === "text")
     html +=
-      `<section class="editor-insp-group"><h4>畫面效果</h4>${edSelect("filter", "片段濾鏡", c.filter || "原始", edFilters)}${edSelect("mask", "片段遮罩", c.mask || "無", ["無", "圓形", "圓角矩形", "三角形"])}${edInput("grain", "顆粒強度", c.grain || 0, "number", 'min="0" max="1" step="0.1"')}</section>` +
-      `<section class="editor-insp-group">${edColorPane(p, c)}</section>`;
+      edGroup(
+        "文字",
+        "",
+        `<label>文字內容<textarea data-ed-field="text" aria-label="文字內容" maxlength="4000">${esc(c.text)}</textarea></label>` +
+          edInput("fontSize", "字級", c.fontSize, "number", 'min="8" max="300"') +
+          edSelect("font", "字型", c.font, ["思源黑體", "思源宋體", "Arial", "Georgia", "等寬字"]) +
+          edButton(c.bold ? "取消粗體" : "粗體", "toggle:bold") +
+          edButton(c.italic ? "取消斜體" : "斜體", "toggle:italic") +
+          edSelect("align", "文字對齊", c.align, ["靠左", "置中", "靠右"]) +
+          edInput("color", "文字顏色", c.color, "color") +
+          edButton(c.backgroundColor ? "移除文字底色" : "加上文字底色", "text-background") +
+          (c.backgroundColor ? edInput("backgroundColor", "文字底色", c.backgroundColor, "color") : "") +
+          edSelect("animation", "文字動畫", c.animation, ["無", "淡入淡出", "彈出", "逐字顯示"]),
+      ) +
+      groups.transform +
+      groups.time;
+  else if (kind === "audio") html += groups.audio + groups.speed + groups.time;
+  else {
+    const background = c.background === "模糊" || c.background === "純色" ? c.background : "黑邊";
+    html +=
+      edGroup(
+        "畫面效果",
+        "",
+        `${edSelect("filter", "片段濾鏡", c.filter || "原始", edFilters)}${edSelect("mask", "片段遮罩", c.mask || "無", ["無", "圓形", "圓角矩形", "三角形"])}${edInput("grain", "顆粒強度", c.grain || 0, "number", 'min="0" max="1" step="0.1"')}`,
+      ) +
+      groups.transform +
+      (main
+        ? edGroup(
+            "背景",
+            background,
+            edSelect("background", "背景", c.background || "黑色", ["黑色", "模糊", "純色"]) +
+              (c.background === "純色" ? edInput("backgroundColor", "背景顏色", c.backgroundColor || "#000000", "color") : ""),
+          )
+        : "") +
+      (c.kind === "video" ? groups.speed + groups.audio : "") +
+      groups.time +
+      edGroup("調色", "", edColorPane(p, c));
+  }
   // Card P3: a clip rendered by the compositor links back to its source composition (scripts/tools-compositor.js).
   if (typeof cpEditorClip === "function") html += cpEditorClip(p, c);
   return html;
@@ -2435,6 +2471,65 @@ document.addEventListener("click", (e) => {
     edPaint();
   }
 });
+// Card ED.3.6: a folded group stays folded (toggle does not bubble, hence capture). Rendering an open <details> also
+// fires toggle; nothing changes then, so nothing is saved.
+document.addEventListener(
+  "toggle",
+  (e) => {
+    const name = e.target.dataset?.edGroup;
+    if (!name || !ed.layout || e.target.open !== ed.layout.closed.includes(name)) return;
+    ed.layout = { ...ed.layout, closed: e.target.open ? ed.layout.closed.filter((n) => n !== name) : [...ed.layout.closed, name] };
+    edLayoutSave();
+  },
+  true,
+);
+const edNumParse = (input) => {
+  try {
+    return EditorModel.evalNumber(input.value);
+  } catch (_) {
+    return Number(input.defaultValue) || 0; // an unfinished expression steps from the stored value
+  }
+};
+function edNumSet(input, value) {
+  const { min, max } = input.dataset;
+  input.value = String(Number(Math.min(Number(max), Math.max(Number(min), value)).toFixed(6)));
+}
+const edNumFactor = (e) => (e.shiftKey ? 10 : e.altKey ? 0.1 : 1);
+document.addEventListener("keydown", (e) => {
+  const input = e.target.closest?.("[data-ed-num]");
+  if (!input) return;
+  if (e.key === "Escape") {
+    input.value = input.defaultValue;
+    input.blur();
+    return;
+  }
+  if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+  e.preventDefault();
+  edNumSet(input, edNumParse(input) + (e.key === "ArrowUp" ? 1 : -1) * Number(input.dataset.step) * edNumFactor(e));
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+});
+// Dragging a number field's label: one step per 4 px, shown while dragging, committed once on release (one undo).
+let edScrub = null;
+document.addEventListener("pointerdown", (e) => {
+  const label = e.target.closest?.("[data-ed-num-label]"),
+    input = label?.parentElement.querySelector("[data-ed-num]");
+  if (!input) return;
+  e.preventDefault();
+  edScrub = { input, x: e.clientX, from: edNumParse(input), moved: false };
+});
+document.addEventListener("pointermove", (e) => {
+  if (!edScrub) return;
+  const steps = Math.trunc((e.clientX - edScrub.x) / 4);
+  if (!steps && !edScrub.moved) return;
+  edScrub.moved = true;
+  edNumSet(edScrub.input, edScrub.from + steps * Number(edScrub.input.dataset.step) * edNumFactor(e));
+});
+document.addEventListener("pointerup", () => {
+  const scrub = edScrub;
+  edScrub = null;
+  // Back where it started = no edit (an empty change would still clear redo).
+  if (scrub?.moved && scrub.input.value !== scrub.input.defaultValue) scrub.input.dispatchEvent(new Event("change", { bubbles: true }));
+});
 document.addEventListener("change", (e) => {
   const key = e.target.dataset.edField,
     p = edProject(),
@@ -2442,8 +2537,12 @@ document.addEventListener("change", (e) => {
   if (!key || !p) return;
   edCheckpoint();
   try {
-    const value =
-      e.target.type === "number" ? Number(e.target.value) : e.target.value;
+    const num = e.target.dataset.edNum !== undefined,
+      value = num
+        ? Math.min(Number(e.target.dataset.max), Math.max(Number(e.target.dataset.min), EditorModel.evalNumber(e.target.value)))
+        : e.target.type === "number"
+          ? Number(e.target.value)
+          : e.target.value;
     if (key.startsWith("project:")) p[key.slice(8)] = value;
     else if (key.startsWith("fx-project:")) {
       const name = key.slice(11),
