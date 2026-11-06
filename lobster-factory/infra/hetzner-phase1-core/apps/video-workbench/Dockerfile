@@ -25,8 +25,9 @@ WORKDIR /app
 COPY . .
 
 # postinstall = vendor-vision.cjs (copies from node_modules, SHA-256 checked) + vendor-ffprobe.cjs (skips off Windows).
+# The Craft engines (engines/filmcraft, engines/effectcraft) are not in the image: their pinned builds are served from the
+# host's static folder (card FC.4); without them the "專業剪輯／專業特效" cards simply stay hidden.
 RUN npm ci --omit=dev \
-    && node scripts/vendor-effectcraft.cjs \
     && node scripts/vendor-three.cjs
 
 RUN node -e "const fs=require('fs');const miss=require('./backend/appearance.cjs').runtimeFiles('.').filter((f)=>!fs.existsSync('.awarewave/'+f));if(miss.length){console.error('.awarewave/ is missing: '+miss.join(', '));process.exit(1)}"

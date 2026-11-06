@@ -1,12 +1,11 @@
 {
-  "version": "0.20.0",
-  "tag": "v0.20.0",
-  "commit": "720c67117ea232ef01631a368bb617012f4c63d6",
-  "asset": "effectcraft-web-0.20.0.zip",
-  "url": "https://github.com/storytold/effectcraft/releases/download/v0.20.0/effectcraft-web-0.20.0.zip",
-  "size": 21591778,
-  "zipSha256": "24189ed0dc8e9b5ed893dbd65b27f4f130ce5294b4a4f6b4cd506746f916c13e",
-  "sha256SumsUrl": "https://github.com/storytold/effectcraft/releases/download/v0.20.0/SHA256SUMS.txt",
-  "license": "Apache-2.0",
-  "fetchedAt": "2026-11-02"
+  "dist": "df4cc09-4fe4255",
+  "repo": "https://github.com/storytold/effectcraft",
+  "rev": "df4cc0932803f6183151083a5dfdd175f9d0a4ca",
+  "appVersion": "0.21.1",
+  "sha256SumsSha256": "f85dcb5b3b2b867ad82a53fe67a45353461b2c0ed9fab7f350d74db2facbf688",
+  "files": 20,
+  "buildScript": "scripts/effectcraft-pro/build.ps1",
+  "license": "MIT OR Apache-2.0 (engine); OFL-1.1 (embedded fonts, licenses/)",
+  "builtAt": "2026-11-06"
 }

@@ -7,6 +7,9 @@ docs/
 handoff/
 vendor/ffprobe/ffprobe.exe
 engines/effectcraft/web/
+engines/effectcraft/web.new/
+engines/filmcraft/web/
+engines/filmcraft/web.new/
 assets/image-*
 assets/storyboards-data.json
 assets/vision/vision_bundle.js

@@ -367,3 +367,12 @@ headless 測不到的三件事，用真的視窗、只在 NVIDIA 顯示卡上開
 - EC.1 建置鏈＋嵌入橋補丁：`scripts/effectcraft-pro/`，沿用 FC.1 的 `build.sh` 結構（含 `craft_brand_scan`；EffectCraft v0.21.1 把 `artcraft-mark.png` 編在 wasm 裡，上游 `crates/ui-egui/src/header.rs:906`，要有移除補丁）；補丁另兩份：繁中字型（`VW/docs/p0-reeval-evidence/effectcraft-tc-fonts.patch`）、嵌入橋（照 `scripts/photocraft-pro/web-host-api.patch` 的做法接 `craft-web-host`）。先查上游是否已自己加了橋，有就不補。
 - EC.2 頁面：沿用 `tools-engine-host.js`，訊息前綴換成 `effectcraft:`；重開專案後補一個 `footage.relink`（閘檔 §3 ②）；`server.cjs:182-189` 的 COOP／COEP 路徑對到新的引擎目錄。
 - EC.3 入帳：沿用 FC.3 的路由，`engine: "effectcraft"`。
+
+**EC.2＋EC.3 結果（2026-11-06）：完成。** 做法與跟上面不同的地方：
+- 外框只有一份：`scripts/tools-engine-host.js` 的 `ENGINES` 表（`edit-pro`＝FilmCraft、`fx-pro`＝EffectCraft：路徑、查詢字串、專案副檔名、改用哪個自製工具、怎麼輸出）。訊息只收自己引擎前綴、自己 iframe、同 origin。兩個引擎的專案都存 `tools.engine.projects`，用 envelope 的 `engine` 分；不是 JSON 的專案檔以 base64 原樣存。
+- EffectCraft iframe 加 `nosw`：工作台裡不註冊 service worker（它的快取會比引擎升級活得久）。
+- 重開：送完專案與素材後，輪詢 `footage.missing`，對一個是本頁送過的素材呼叫一次 `footage.relink`（上游已知問題）。實測重開後 `missing: []`。
+- 輸出：用目前開著的合成（`comp.info`），尺寸只收 1920×1080、1080×1920、1080×1350（可投遞的三種），Render Queue H.264＋AAC。透明輸出（ProRes 4444／PNG 序列）**還沒做**，之後另開卡。
+- 路由：`ENGINE_OUTPUT` 每個引擎各自的檢查：FilmCraft 要有聲且 −16 LUFS；EffectCraft 的 Render Queue 沒有響度設定、動態圖可以沒聲音，只要求畫面與尺寸。
+- 引擎檔：`scripts/vendor-craft.cjs` 一份複製驗證程式，`vendor-filmcraft.cjs`／`vendor-effectcraft.cjs` 各一行；EffectCraft 改讀 `effectcraft-dist/LATEST`，舊的下載官方 zip 刪掉，`engines/effectcraft/VERSION.json` 換成新產物。`Dockerfile` 不再在映像裡抓引擎（上線時引擎檔走主機靜態資料夾，FC.4 的做法），`.dockerignore` 兩個引擎的本機檔都排除。
+- 上線時要補（不在本卡）：主機 nginx 要有 `/engines/effectcraft/web/` 的 alias，並帶原本 `server.cjs:182-189` 的 COOP／COEP 標頭；FC.4 的 nginx 規劃只寫了 FilmCraft。

@@ -30,6 +30,16 @@ const TOOLS = [
     new: 1,
   },
   {
+    // Card EC.2: EffectCraft in the same frame (scripts/tools-engine-host.js); hidden while the engine files are absent.
+    id: "fx-pro",
+    cat: "剪輯成片",
+    icon: "◫",
+    name: "專業特效",
+    desc: "圖層、遮罩、關鍵影格與特效的專業合成引擎（英文介面，需要獨立顯示卡）",
+    io: "圖層 → 透明影片／成片",
+    new: 1,
+  },
+  {
     id: "rig",
     cat: "剪輯成片",
     icon: "✦",
@@ -297,7 +307,7 @@ function home() {
   }</div>`;
 }
 function screen(t) {
-  if (t.id === "edit-pro" && typeof toolEngineHostScreen === "function") return toolEngineHostScreen(t);
+  if (typeof engineFor === "function" && engineFor(t.id)) return toolEngineHostScreen(t);
   const workflow = typeof toolWorkflowScreen === "function" ? toolWorkflowScreen(t) : null;
   if (workflow !== null) return workflow;
   if (t.id === "edit")

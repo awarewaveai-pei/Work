@@ -1,4 +1,24 @@
 # Worklog
+## 2026-11-06（續20）影音工作台 EC.2＋EC.3：「專業特效」頁（EffectCraft）＋成品入帳，跟專業剪輯共用一份外框
+
+- 做了（`VW`＝`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`，細節在 `VW/docs/engine-route-plan-20261106.md` §9 EC 結果段）：
+  - `VW/scripts/tools-engine-host.js`：改成一份外框服務兩個引擎（`ENGINES` 表：`edit-pro`／`fx-pro`）。EffectCraft：iframe `?host=parent&nosw`、專案 `.ecproj`、重開後補一次 `footage.relink`、輸出用目前合成（三種可投遞尺寸）＋Render Queue H.264＋AAC。
+  - `VW/scripts/tools-0.js`：`TOOLS` 加 `fx-pro`「專業特效」，引擎檔不在就不顯示；`screen()` 改成看 `engineFor`。（同檔另有 PJ.1 session 的未提交改動，本 commit 只帶我的兩段。）
+  - `VW/backend/api.cjs`：`ENGINE_OUTPUT` 依引擎檢查（FilmCraft 有聲＋−16 LUFS；EffectCraft 只要畫面與尺寸）；收 `effectcraft`；暫存檔背壓等待不再累積 error listener（MaxListeners 警告）。
+  - `VW/scripts/vendor-craft.cjs`（新）一份複製驗證；`vendor-filmcraft.cjs`／`vendor-effectcraft.cjs` 各一行；EffectCraft 改讀 `effectcraft-dist/LATEST`（`df4cc09-4fe4255`，20 檔），舊的下載官方 zip 刪掉；`VW/engines/effectcraft/VERSION.json` 換新產物。
+  - `VW/Dockerfile` 拿掉映像內 `vendor-effectcraft.cjs`（Codex F1：新流程在映像裡會失敗；引擎檔上線走主機靜態資料夾）；`VW/.dockerignore`、`VW/.gitignore` 兩個引擎的本機檔都排除。
+  - 測試沒有另開檔：`VW/tests/fc2-engine-host.cjs` 兩個引擎各跑四項（多驗「別的引擎前綴不收」）；`VW/tests/fc3-engine-render.cjs` 多一段 EffectCraft。
+- 跟規格不同：透明輸出（ProRes 4444／PNG 序列）沒做，只出 H.264；EffectCraft 成片不驗響度（上游 Render Queue 沒有響度設定）。
+- 上線要補（不在本卡）：主機 nginx 要有 `/engines/effectcraft/web/` alias＋COOP／COEP（`server.cjs:182-189` 那組）；FC.4 規劃只寫了 FilmCraft。
+- 已知：重開後引擎素材庫同一支素材出現兩筆（跟 FilmCraft 一樣，引擎行為）；成品不在前端「歷史紀錄」，在素材庫。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/fc2-engine-host.cjs → 7 PASS（沒引擎檔兩張卡都不顯示；filmcraft／effectcraft 各：只收自己 iframe＋同 origin＋自己前綴、存檔進 tools.engine.projects 且自製剪輯不變、重開送回、F6 回側欄） | exit=0 | ms=8382
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/fc3-engine-render.cjs → 4 PASS（含 effectcraft：無聲畫面收、來源正好一個、無來源 400、壞檔拒） | exit=0 | ms=3078
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：來源清單檢查改成只對 filmcraft → fc3 前三段綠、effectcraft 段紅 → 還原後 4 PASS | exit=1 | ms=3000
+- REALTEST_EVIDENCE: tool=Bash | cmd=ec-real.cjs（真的 EffectCraft 0.21.1、隔離伺服器、headless）：上傳一支 mp4 → 專業特效 → 仍然開啟 → 加入素材 → comp＋圖層＋繁中標題 → Save As → `tools.engine.projects` engine=effectcraft → 重開 `footage.missing: []` → 輸出目前合成 → 15 秒「成片已存進素材庫」、任務 1 筆 succeeded（ratio 16:9、來源 1）、成品 h264 1920×1080＋aac 90 格、第 1 秒畫面有片段與繁中標題；瀏覽器下載 0、頁面錯誤 0；截圖 ec-page.png | exit=0 | ms=28192
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs → gate ok（10 PASS，含 storyboards-baseline、p6-main-system、backend）；node tests/effectcraft-serve.cjs PASS；node tests/p6-main-system.cjs PASS；node tests/test-isolation.cjs PASS；wfail.cjs（模擬 ENOSPC）→ 400、伺服器仍回 200 | exit=0 | ms=8119
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/1m/0n（external oracle = Codex CLI gpt-6-sol，read-only，artifact `agency-os/reports/oracle/2026-11-06-partialreview-4a847c16.md`；F1 Dockerfile 映像內 vendor 會失敗 → 已修）
+- ORACLE_WAIVED: 修 F1 只動 `Dockerfile` 拿掉一行與 `.dockerignore` 加兩行，沒有再跑一輪；`node tests/gate.cjs` 修後仍 ok
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=vendor-effectcraft | hits=9（Dockerfile 已拿掉；server.cjs:180、tests/effectcraft-serve.cjs、creative-suite-plan 歷史敘述、vendor-craft／vendor-effectcraft 本身與本條；沒有別的建置路徑呼叫它）
 ## 2026-11-06（續19）外聯手冊加注意事項／未完成；客戶頁「冷開發」分頁改接外聯 v2
 
 **根因**

@@ -127,6 +127,26 @@ function request(port, pathname, headers, body) {
     }
     assert.deepEqual({ assets: calls.assets.length, jobs: jobsOnDisk().length }, before);
     console.log("PASS silent / broken file -> refused, no job");
+
+    // 4. EffectCraft (card EC.3), same route: its Render Queue has no loudness setting and a motion piece may be silent, so a
+    // silent picture is accepted; the source list is required the same way; a broken file is refused.
+    const ec = { engine: "effectcraft", engineVersion: "0.21.1", title: "專業特效成片", ratio: "16:9", width: 1920, height: 1080, sources: [{ url: a.url, id: a.id, name: "來源甲.mp4" }] };
+    const ecOk = await send(ec, silent);
+    assert.equal(ecOk.status, 201, JSON.stringify(ecOk.body));
+    assert.equal(ecOk.body.input.settings.engine, "effectcraft");
+    assert.equal(ecOk.body.result.origin.engine, "effectcraft");
+    assert.deepEqual(calls.assets.at(-1).meta.rightsSources.map((s) => s.url), [a.url], "主系統收到的來源正好是那一個");
+    assert.equal(releaseText(ecOk.body).title, "專業特效成片");
+    const ecBefore = { assets: calls.assets.length, jobs: jobsOnDisk().length };
+    for (const sources of [undefined, []]) {
+      const r = await send({ ...ec, sources }, silent);
+      assert.equal(r.status, 400, "effectcraft 沒有來源清單要拒絕：" + JSON.stringify(r.body));
+      assert.match(r.body.error.message, /來源素材/);
+    }
+    const broken = await send(ec, crypto.randomBytes(4096));
+    assert.equal(broken.status, 400);
+    assert.deepEqual({ assets: calls.assets.length, jobs: jobsOnDisk().length }, ecBefore);
+    console.log("PASS effectcraft render -> one job with its source; no source list -> 400; broken -> refused");
   } finally {
     server.closeAllConnections();
     await new Promise((r) => server.close(r));

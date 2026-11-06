@@ -780,6 +780,13 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   // registers it with its sources (rights) and sends its release text. Body = X-VW-Meta-Length bytes of JSON metadata, then
   // the MP4 (streamed to disk; no 80 MB JSON limit, no header-size limit for long caption lists).
   const ENGINE_RATIOS = { "16:9": [1920, 1080], "9:16": [1080, 1920], "4:5": [1080, 1350], "1:1": [1080, 1080] };
+  // What each engine's render is checked for = what the frame asks it for (scripts/tools-engine-host.js engineExport):
+  // FilmCraft exports with sound at −16 LUFS; EffectCraft's Render Queue has no loudness setting and a motion piece may be
+  // silent, so only the picture is required (verifyOutput still checks size; the job's video stream is checked below).
+  const ENGINE_OUTPUT = {
+    filmcraft: { audio: true, audible: true, loudness: { target: -16, tolerance: 1, maxTruePeak: -1 } },
+    effectcraft: {},
+  };
   async function engineRender(req) {
     const bad = (message) => Object.assign(Error(message), { status: 400 });
     const metaBytes = Number(req.headers["x-vw-meta-length"]);
@@ -811,7 +818,11 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         if (bytes > limit) throw Object.assign(Error("成片檔太大"), { status: 413 });
         if (writeError) throw writeError;
         if (!file.write(rest))
-          await new Promise((resolve) => { file.once("drain", resolve); file.once("error", resolve); });
+          await new Promise((resolve) => {
+            const done = () => { file.off("drain", done); file.off("error", done); resolve(); };
+            file.on("drain", done);
+            file.on("error", done);
+          });
       }
       if (!meta || !bytes) throw bad("缺少成片檔");
       if (writeError) throw writeError;
@@ -819,7 +830,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       const { width, height } = meta;
       // Checked before it is stored: a silent or broken file never becomes an asset or a job.
       // The frame exports at −16 LUFS (tools-engine-host.js engineExport); same tolerance as the editor's master check.
-      const verification = await verifyOutput(tmp, { width, height, audio: true, audible: true, loudness: { target: -16, tolerance: 1, maxTruePeak: -1 } });
+      const verification = await verifyOutput(tmp, { width, height, ...ENGINE_OUTPUT[meta.engine] });
       if (!verification.ok || !verification.info?.video)
         throw bad("成片檢查沒過：" + (verification.findings.map((f) => f.message).join("；") || "沒有影像"));
       const stored = await mediaStore.ingest({ file: tmp, ext: "mp4" });
@@ -859,7 +870,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   // Every source must be a file this server holds (the rights record is built from them): no list, no render.
   function engineRenderMeta(meta) {
     const bad = (message) => Object.assign(Error(message), { status: 400 });
-    if (!meta || typeof meta !== "object" || meta.engine !== "filmcraft") throw bad("不支援的剪輯引擎");
+    if (!meta || typeof meta !== "object" || !Object.hasOwn(ENGINE_OUTPUT, meta.engine)) throw bad("不支援的引擎");
     meta.engineVersion = String(meta.engineVersion ?? "").slice(0, 40);
     meta.title = String(meta.title ?? "").trim().slice(0, 200);
     const size = ENGINE_RATIOS[meta.ratio];
