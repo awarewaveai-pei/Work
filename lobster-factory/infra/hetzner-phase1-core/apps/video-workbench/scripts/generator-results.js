@@ -76,8 +76,8 @@ async function generatorResultAction(payload) {
   VideoWorkbench.router.activate("generator"); close(); render();
   return { ok: true, mode: state.mode };
 }
+// Which tools exist is checked once, by the tools page (tools-0.js acceptAsset against TOOLS).
 async function generatorOpenTool(payload) {
-  if (!generatorResultTools.includes(payload.tool)) throw Error("未知工具");
   if (payload.asset && !VideoWorkbench.safeUrl(payload.asset.url)) throw Error("素材網址無效");
   if (payload.asset) payload = { ...payload, asset: generatorRestoredAsset(payload.asset, payload.tool === "region" ? "images" : "source") };
   VideoWorkbench.router.activate("tools");

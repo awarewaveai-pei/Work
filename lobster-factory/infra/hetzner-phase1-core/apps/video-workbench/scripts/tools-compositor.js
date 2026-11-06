@@ -1222,10 +1222,11 @@ async function cpPickMedia(l) {
 }
 async function cpChooseProject() {
   await cpEditorReady();
-  if (!ed.projects.length)
+  const list = edSpineList(); // card PJ.1: the episodes' edit files (tools-editor.js)
+  if (!list.length)
     throw Error("還沒有剪輯專案，請先到「影片剪輯」建立");
   const d = edDialog(
-    `<h3>放到哪個剪輯專案？</h3><p class="note">會加在該專案第一條疊加影片軌（主軌之上）的最後面；若沒有疊加軌會新增一條。</p><div class="flow-choices">${ed.projects.map((p) => `<button type="button" class="btn small" data-cp-project="${cpEsc(p.id)}">${cpEsc(p.title + " · " + p.ratio)}</button>`).join("")}</div>`,
+    `<h3>放到哪個剪輯專案？</h3><p class="note">會加在該專案第一條疊加影片軌（主軌之上）的最後面；若沒有疊加軌會新增一條。</p><div class="flow-choices">${list.map(({ project, episode, file }) => `<button type="button" class="btn small" data-cp-project="${cpEsc(file.id)}">${cpEsc("放到「" + project.title + " · " + episode.name + "」")}</button>`).join("")}</div>`,
   );
   return new Promise((resolve) => {
     d.addEventListener("close", () => resolve(null));

@@ -29,7 +29,7 @@ const { isolatedServer } = require("./isolated-server.cjs");
       edRender();
     });
     assert.equal(await insert.count(), 1, "project A offers its own title");
-    await page.getByRole("button", { name: "所有專案", exact: true }).click();
+    await page.getByRole("button", { name: "回到這一集", exact: true }).click();
     await newProject();
     assert.equal(await insert.count(), 0, "project B must not offer project A's title");
     assert.equal(await page.evaluate(() => ed.title.done), null);

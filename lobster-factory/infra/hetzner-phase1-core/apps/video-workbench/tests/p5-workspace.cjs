@@ -165,7 +165,7 @@ async function setField(page, label, value) {
     await setField(page, "寬", 320);
     await setField(page, "高", 180);
     await setField(page, "長度（格）", 24);
-    await page.getByRole("button", { name: "放到「P5 3D」", exact: true }).click();
+    await page.getByRole("button", { name: "放到「P5 3D · P5 3D」", exact: true }).click();
     await status(page, /已放到「P5 3D」的 V2 軌（第 0 格起）/);
     const rendered = (await page.evaluate(() => VideoWorkbench.assets.list())).filter((a) => a.origin?.engine === "blender-4.5.9" && a.kind === "video").at(-1);
     s = (await scenes(page)).find((x) => x.title === "揮手測試");

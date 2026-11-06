@@ -56,16 +56,39 @@ let state = {
   current: null,
   episode: 0,
 };
-try {
-  const s = JSON.parse(VideoWorkbench.storage.getItem(STORE) || "null");
-  if (s && Array.isArray(s.projects))
-    state = {
-      ...state,
-      ...s,
-    };
-  // 舊版新專案預設寫入不存在的「VideoWorkbench V3」；實際預設影片模型是 sora-2（index-0.js model.director）。
-  for (const p of state.projects) if (p?.settings?.model === "VideoWorkbench V3") p.settings.model = "sora-2";
-} catch {}
+// Card PJ.1: what only the top page changes (shared/episode-spine.js invariant) -- the episodes' spine fields and
+// the spine-open counter. This page writes everything else on every keystroke, and the top page echoes each write
+// back; comparing only these fields between snapshots means an echo never redraws (no lost focus) and a late echo
+// never rolls this page back.
+const spineSignature = (s) =>
+  JSON.stringify([
+    s?.open ?? 0,
+    (s?.projects || []).flatMap((p) => (p.episodes || []).filter((e) => e.edit || e.steps || e.outputs).map((e) => [p.id, e.id, e.edit ?? null, e.steps ?? null, e.outputs ?? null])),
+  ]);
+let spineSeen = "";
+function loadState() {
+  try {
+    const s = JSON.parse(VideoWorkbench.storage.getItem(STORE) || "null");
+    spineSeen = spineSignature(s);
+    if (s && Array.isArray(s.projects))
+      state = {
+        ...state,
+        ...s,
+      };
+    // 舊版新專案預設寫入不存在的「VideoWorkbench V3」；實際預設影片模型是 sora-2（index-0.js model.director）。
+    for (const p of state.projects) if (p?.settings?.model === "VideoWorkbench V3") p.settings.model = "sora-2";
+  } catch {}
+}
+loadState();
+document.addEventListener("vw:changed", () => {
+  let s = null;
+  try {
+    s = JSON.parse(VideoWorkbench.storage.getItem(STORE) || "null");
+  } catch {}
+  if (spineSignature(s) === spineSeen) return;
+  loadState();
+  if (!dialog) render();
+});
 let dialog = null;
 let selectedFileTarget = null;
 let modalDraft = {};
@@ -114,8 +137,19 @@ function renderWorkbench() {
   const total = e.shots.length;
   const menu = `<div class="row"><button class="btn small outline" data-action="preview">◉　預覽整集</button><button class="btn small outline" data-action="export">↓　匯出片段 · 0</button><button class="btn small outline" data-action="cover">▧　更換封面</button><button class="btn small outline" data-action="settings">☷　生成設定</button></div>`;
   $("workbench").innerHTML = VideoWorkbench.sanitize(
-    `<div class="work-nav"><button class="btn small outline" data-action="backHome">←　專案列表</button><span class="eyebrow" style="color:var(--text-muted)">AWAREWAVE · 專案</span><span class="quiet">本機專案 · AI 依 API 用量計費</span></div><div class="work-grid"><aside class="bible"><div class="eyebrow">— 製作聖經 · BIBLE</div><h2>${esc(p.title)}</h2><div class="quiet">${esc(p.type === "series" ? "短影集" : "單支影片")} · ${p.episodes.length} 集 · ${esc(p.ratio)}</div><div class="fixed">♙　卡司、場景與風格定義一次，在所有鏡頭間保持一致。</div>${["character", "scene", "prop"].map((k) => entityList(k, p)).join("")}<div class="entity-group"><div class="entity-header">◉　風格錨點</div><div class="style-record"><h3>${esc(STYLE_NAMES[p.style])}</h3><div class="muted">${esc(styleText(p))}</div></div></div><button class="btn" style="width:100%;margin-top:20px" data-action="settings">☷　生成設定　⌃</button><p class="tiny">風格與負面提示詞的專案／本集兩層設定，會合成後用於實際內容。</p></aside><main class="work-content"><div class="work-top"><div><div class="quiet">專案　›　${esc(p.title)}</div><h1>第 ${state.episode + 1} 集 · ${esc(state.episode === 0 ? p.title : e.name)}</h1><div class="tiny">${total} 個鏡頭 · 約 ${e.shots.reduce((v, s) => v + Number(s.seconds || 5), 0)} 秒 · ${esc(p.ratio)} · ${e.shots.filter((s) => s.image).length}/${total} 已生成</div></div><div class="work-actions"><button class="btn primary" data-action="storyboard">✧　AI 分鏡</button><button class="btn" data-action="batch">▤　批次生成</button><button class="btn" data-action="fullVideo">✧　帶入影片生成</button><div style="position:relative"><button class="btn" data-action="toggleMore">⋯　更多</button><div class="panel" id="more-menu" hidden style="position:absolute;right:0;top:43px;z-index:4;width:205px;padding:7px">${menu}</div></div></div></div><div class="outline-box"><label>□ 本集大綱</label><textarea data-bind="episode.outline" placeholder="用幾句話寫下這一集的故事：誰、在哪裡、發生什麼、怎麼收尾">${esc(e.outline)}</textarea><div class="tiny">AI 分鏡會從這裡開始。改了大綱之後可以重新分鏡。</div></div><div class="episode-tabs">${p.episodes.map((x, i) => `<button class="${i === state.episode ? "on" : ""}" data-action="episode" data-index="${i}">EP${i + 1}　${esc(x.name)} ${x.shots.length}</button>`).join("")}<button data-action="addEpisode" aria-label="新增一集">＋</button></div>${total ? `<div class="split" style="margin-bottom:16px"><strong>本集鏡頭 <span class="quiet">${total} 個</span></strong><button class="btn small primary" data-action="addShot">＋　新增鏡頭</button></div><div class="shot-grid">${e.shots.map((s, i) => `<div class="shot"><div class="split"><h3>鏡頭 ${String(i + 1).padStart(2, "0")}</h3><button class="btn small danger" data-action="deleteShot" data-index="${i}" title="刪除鏡頭">×</button></div>${s.image ? `<img src="${esc(s.image)}" alt="生成畫面" style="width:100%;max-height:220px;object-fit:contain">` : ""}<label>畫面描述</label><textarea data-bind="shot.${i}.text" placeholder="描述鏡頭內的動作與構圖">${esc(s.text)}</textarea>${shotControls(p, s, i)}<div class="row"><label style="margin:0">時長 <input aria-label="鏡頭時長" style="width:70px;padding:6px" type="number" min="1" max="120" data-bind="shot.${i}.seconds" value="${esc(s.seconds)}"></label><span class="tiny">秒</span><button class="btn small" data-action="shotGenerate" data-index="${i}">生成畫面</button></div></div>`).join("")}</div>` : `<div class="work-empty panel"><h3>這一集還沒有鏡頭，從這裡開始</h3><div class="step"><span class="circle">1</span><div><strong>先建立角色與場景</strong><p>每個角色、場景、道具都可以上傳參考圖。鏡頭鎖定它們之後，長相與環境才會每一鏡都一致。</p><button class="btn small outline" data-action="asset" data-kind="character">♧　建立角色</button></div></div><div class="step"><span class="circle">2</span><div><strong>寫下大綱，讓 AI 分鏡</strong><p>AI 導演會先問幾個問題，再把故事拆成一顆一顆鏡頭，你可以逐鏡修改後再建立。</p><button class="btn small outline" data-action="storyboard">✧　AI 分鏡</button></div></div><div class="step"><span class="circle">3</span><div><strong>或者自己加一顆鏡頭</strong><p>想手動控制每一鏡的細節與鏡頭，就直接開始寫。</p><button class="btn small outline" data-action="addShot">＋　新增鏡頭</button></div></div></div>`}</main></div>`,
+    `<div class="work-nav"><button class="btn small outline" data-action="backHome">←　專案列表</button><span class="eyebrow" style="color:var(--text-muted)">AWAREWAVE · 專案</span><span class="quiet">本機專案 · AI 依 API 用量計費</span></div><div class="work-grid"><aside class="bible"><div class="eyebrow">— 製作聖經 · BIBLE</div><h2>${esc(p.title)}</h2><div class="quiet">${esc(p.type === "series" ? "短影集" : "單支影片")} · ${p.episodes.length} 集 · ${esc(p.ratio)}</div><div class="fixed">♙　卡司、場景與風格定義一次，在所有鏡頭間保持一致。</div>${["character", "scene", "prop"].map((k) => entityList(k, p)).join("")}<div class="entity-group"><div class="entity-header">◉　風格錨點</div><div class="style-record"><h3>${esc(STYLE_NAMES[p.style])}</h3><div class="muted">${esc(styleText(p))}</div></div></div><button class="btn" style="width:100%;margin-top:20px" data-action="settings">☷　生成設定　⌃</button><p class="tiny">風格與負面提示詞的專案／本集兩層設定，會合成後用於實際內容。</p></aside><main class="work-content"><div class="work-top"><div><div class="quiet">專案　›　${esc(p.title)}</div><h1>第 ${state.episode + 1} 集 · ${esc(state.episode === 0 ? p.title : e.name)}</h1><div class="tiny">${total} 個鏡頭 · 約 ${e.shots.reduce((v, s) => v + Number(s.seconds || 5), 0)} 秒 · ${esc(p.ratio)} · ${e.shots.filter((s) => s.image).length}/${total} 已生成</div></div><div class="work-actions"><button class="btn primary" data-action="storyboard">✧　AI 分鏡</button><button class="btn" data-action="batch">▤　批次生成</button><button class="btn" data-action="fullVideo">✧　帶入影片生成</button><div style="position:relative"><button class="btn" data-action="toggleMore">⋯　更多</button><div class="panel" id="more-menu" hidden style="position:absolute;right:0;top:43px;z-index:4;width:205px;padding:7px">${menu}</div></div></div></div>${editFileRow(e)}<div class="outline-box"><label>□ 本集大綱</label><textarea data-bind="episode.outline" placeholder="用幾句話寫下這一集的故事：誰、在哪裡、發生什麼、怎麼收尾">${esc(e.outline)}</textarea><div class="tiny">AI 分鏡會從這裡開始。改了大綱之後可以重新分鏡。</div></div><div class="episode-tabs">${p.episodes.map((x, i) => `<button class="${i === state.episode ? "on" : ""}" data-action="episode" data-index="${i}">EP${i + 1}　${esc(x.name)} ${x.shots.length}</button>`).join("")}<button data-action="addEpisode" aria-label="新增一集">＋</button></div>${total ? `<div class="split" style="margin-bottom:16px"><strong>本集鏡頭 <span class="quiet">${total} 個</span></strong><button class="btn small primary" data-action="addShot">＋　新增鏡頭</button></div><div class="shot-grid">${e.shots.map((s, i) => `<div class="shot"><div class="split"><h3>鏡頭 ${String(i + 1).padStart(2, "0")}</h3><button class="btn small danger" data-action="deleteShot" data-index="${i}" title="刪除鏡頭">×</button></div>${s.image ? `<img src="${esc(s.image)}" alt="生成畫面" style="width:100%;max-height:220px;object-fit:contain">` : ""}<label>畫面描述</label><textarea data-bind="shot.${i}.text" placeholder="描述鏡頭內的動作與構圖">${esc(s.text)}</textarea>${shotControls(p, s, i)}<div class="row"><label style="margin:0">時長 <input aria-label="鏡頭時長" style="width:70px;padding:6px" type="number" min="1" max="120" data-bind="shot.${i}.seconds" value="${esc(s.seconds)}"></label><span class="tiny">秒</span><button class="btn small" data-action="shotGenerate" data-index="${i}">生成畫面</button></div></div>`).join("")}</div>` : `<div class="work-empty panel"><h3>這一集還沒有鏡頭，從這裡開始</h3><div class="step"><span class="circle">1</span><div><strong>先建立角色與場景</strong><p>每個角色、場景、道具都可以上傳參考圖。鏡頭鎖定它們之後，長相與環境才會每一鏡都一致。</p><button class="btn small outline" data-action="asset" data-kind="character">♧　建立角色</button></div></div><div class="step"><span class="circle">2</span><div><strong>寫下大綱，讓 AI 分鏡</strong><p>AI 導演會先問幾個問題，再把故事拆成一顆一顆鏡頭，你可以逐鏡修改後再建立。</p><button class="btn small outline" data-action="storyboard">✧　AI 分鏡</button></div></div><div class="step"><span class="circle">3</span><div><strong>或者自己加一顆鏡頭</strong><p>想手動控制每一鏡的細節與鏡頭，就直接開始寫。</p><button class="btn small outline" data-action="addShot">＋　新增鏡頭</button></div></div></div>`}</main></div>`,
   );
+}
+// Card PJ.1: the episode's edit file (spec §6). The title is read from the edit file itself, never copied here.
+function editFileRow(e) {
+  if (!e.edit)
+    return `<div class="row"><span class="tiny">還沒有剪輯檔。</span><button class="btn small outline" data-action="openEdit">建立剪輯檔</button></div>`;
+  let rows = [];
+  try {
+    rows = JSON.parse(VideoWorkbench.storage.getItem(e.edit.engine === "filmcraft" ? "tools.engine.projects" : "tools.editor.projects") || "[]");
+  } catch {}
+  const row = (Array.isArray(rows) ? rows : []).find((r) => EpisodeSpine.editId(r) === e.edit.projectId);
+  return `<div class="row"><span>${row ? "剪輯檔：" + esc(EpisodeSpine.editTitle(row)) : "找不到這一集的剪輯檔。"}</span><button class="btn small outline" data-action="openEdit">開啟剪輯</button></div>`;
 }
 function entityList(kind, p) {
   let labels = {
@@ -775,6 +809,22 @@ async function action(a, button) {
         VideoWorkbench.reportError(e);
       }
       break;
+    case "openEdit": {
+      const e = ep();
+      try {
+        await VideoWorkbench.generator.import({
+          intent: "open-tool",
+          tool: e.edit?.engine === "filmcraft" ? "edit-pro" : "edit",
+          link: { projectId: p.id, episodeId: e.id },
+          edit: e.edit || null,
+          title: e.name,
+          ratio: p.ratio,
+        });
+      } catch (err) {
+        VideoWorkbench.reportError(err);
+      }
+      break;
+    }
     case "saveEpisode": {
       let v = $("episode-name").value.trim();
       if (v) {

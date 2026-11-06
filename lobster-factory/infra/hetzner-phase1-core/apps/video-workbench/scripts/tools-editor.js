@@ -569,7 +569,7 @@ function edRatioSelect(p, label, visibleLabel) {
   return visibleLabel ? `<label>${label}${select}</label>` : select;
 }
 function edTopbar(p) {
-  return `<header class="editor-topbar"><div class="editor-topbar-group"><button type="button" class="btn small" data-ed-action="projects" aria-label="所有專案">← 專案</button><label class="editor-title"><input class="text-input" aria-label="專案名稱" data-ed-field="project:title" type="text" maxlength="100" value="${esc(p.title)}"><span aria-hidden="true">✎</span></label>${edRatioSelect(p, "輸出比例", false)}</div><span class="editor-saved" data-ed-saved role="status" data-state="${ed.save.state}">${esc(edSaveText())}</span><div class="editor-topbar-group">總時長：<b class="editor-total" data-ed-total>${edClockText(edTotal())}</b><button type="button" class="btn primary small" data-ed-action="export" aria-label="匯出" ${p.clips.length ? "" : "disabled"}>▷ 匯出</button></div></header>`;
+  return `<header class="editor-topbar"><div class="editor-topbar-group"><button type="button" class="btn small" data-ed-action="projects" aria-label="回到這一集">← 回到這一集</button><label class="editor-title"><input class="text-input" aria-label="專案名稱" data-ed-field="project:title" type="text" maxlength="100" value="${esc(p.title)}"><span aria-hidden="true">✎</span></label>${edRatioSelect(p, "輸出比例", false)}</div><span class="editor-saved" data-ed-saved role="status" data-state="${ed.save.state}">${esc(edSaveText())}</span><div class="editor-topbar-group">總時長：<b class="editor-total" data-ed-total>${edClockText(edTotal())}</b><button type="button" class="btn primary small" data-ed-action="export" aria-label="匯出" ${p.clips.length ? "" : "disabled"}>▷ 匯出</button></div></header>`;
 }
 function edRail() {
   const open = ed.layout.leftOpen;
@@ -774,6 +774,48 @@ function edTimeline(p) {
       "",
     )}<div class="editor-track"><div class="editor-track-name editor-track-add" title="影片軌最多 ${EditorModel.LIMITS.video} 條、音訊軌 ${EditorModel.LIMITS.audio} 條、文字軌 ${EditorModel.LIMITS.text} 條，合計最多 ${EditorModel.TOTAL} 條。第一條影片軌（${esc(edMain(p))}）是全畫面主軌，不能刪除。">${["video", "audio", "text"].map((kind) => edButton("新增" + EditorModel.NAME[kind] + "軌", "track-add:" + kind, !EditorModel.canAdd(p.tracks, kind))).join("")}</div></div></div>`;
 }
+// Card PJ.1: the list of edit files is the projects page's (an episode's edit points at one); ed.projects is only
+// their content. Also the target list of 放到剪輯 in tools-compositor.js and tools-3d.js.
+function edSpineProjects() {
+  try {
+    return JSON.parse(VideoWorkbench.storage.getItem("awarewave-projects-screenshot-frontend-v1") || "null")?.projects || [];
+  } catch (_) {
+    return [];
+  }
+}
+function edSpineList() {
+  return edSpineProjects().flatMap((project) =>
+    (project.episodes || [])
+      .map((episode, i) => ({ project, episode, n: i + 1, file: episode.edit?.engine === "workbench-editor" && ed.projects.find((p) => p.id === episode.edit.projectId) }))
+      .filter((x) => x.file),
+  );
+}
+function edOpen(id) {
+  ed.current = id;
+  ed.selected = null;
+  ed.picks.clear();
+  ed.scroll = { left: 0, top: 0 };
+  ed.time = 0;
+  ed.undo = [];
+  ed.redo = [];
+}
+// A new, empty edit file; opened and saved (the save adopts it into the projects page, shared/runtime.js).
+async function edCreate(title, ratio, id = crypto.randomUUID()) {
+  ed.projects.push({
+    id,
+    title: String(title || "").trim() || "未命名剪輯專案",
+    ratio: edRatios[ratio] ? ratio : "16:9",
+    timebase: { ...Timebase.DEFAULT },
+    clips: [],
+    assets: [],
+    tracks: EditorModel.normalizeTracks(null),
+    output: { loudness: EditorModel.LOUDNESS.neutral },
+    markers: [],
+  });
+  edOpen(id);
+  edRender();
+  await edSave();
+}
 function toolEditorScreen(t) {
   const p = edProject(),
     c = edClip();
@@ -781,7 +823,9 @@ function toolEditorScreen(t) {
   if (!p)
     return wfWrap(
       t,
-      `<h3>剪輯專案</h3><p class="note">保留原始素材；時間軸、文字與音軌獨立儲存。</p>${edButton("新建剪輯專案", "new")}<div class="flow-choices">${ed.projects.map((p) => edButton(p.title + " · " + p.ratio, "open:" + p.id)).join("")}</div>`,
+      `<h3>剪輯專案</h3><p class="note">保留原始素材；時間軸、文字與音軌獨立儲存。</p>${edButton("新建剪輯專案", "new")}<div class="flow-choices">${edSpineList()
+        .map(({ project, n, file }) => `<span>${edButton(file.title + " · " + file.ratio, "open:" + file.id)} <span class="muted">屬於 ${esc(project.title)} › 第 ${n} 集</span></span>`)
+        .join("")}</div>`,
     );
   const l = ed.layout;
   return `<div class="editor-app" data-tool-flow="edit" style="--ed-timeline:${l.timeline}px">${edTopbar(p)}<div class="editor-workspace" data-ed-workspace style="grid-template-columns:${edColumns()}">${edRail()}${l.leftOpen ? `<aside class="editor-library">${edPane(p, c)}</aside>${edResizer("left", "vertical", "調整面板寬度", l.left)}` : ""}${edPlayer(p)}${l.rightOpen ? `${edResizer("right", "vertical", "調整檢查器寬度", l.right)}<aside class="editor-inspector">${edInspector(p, c)}</aside>` : ""}</div>${edResizer("timeline", "horizontal", "調整時間軸高度", l.timeline)}${edToolbar(p, c)}${edTimeline(p)}</div>`;
@@ -1500,47 +1544,24 @@ async function edAction(action) {
     d.querySelector("form").onsubmit = async (e) => {
       e.preventDefault();
       const title = d.querySelector("[data-ed-create-title]").value,
-        ratio = d.querySelector("[data-ed-create-ratio]:checked").value,
-        id = crypto.randomUUID();
-      ed.projects.push({
-        id,
-        title: String(title).trim() || "未命名剪輯專案",
-        ratio,
-        timebase: { ...Timebase.DEFAULT },
-        clips: [],
-        assets: [],
-        tracks: EditorModel.normalizeTracks(null),
-        output: { loudness: EditorModel.LOUDNESS.neutral },
-        markers: [],
-      });
-      ed.current = id;
-      ed.selected = null;
-    ed.picks.clear();
-    ed.scroll = { left: 0, top: 0 };
-      ed.time = 0;
-      ed.undo = [];
-      ed.redo = [];
+        ratio = d.querySelector("[data-ed-create-ratio]:checked").value;
       d.close();
-      edRender();
-      await edSave();
+      await edCreate(title, ratio);
     };
     return;
   }
   if (action.startsWith("open:")) {
-    ed.current = action.slice(5);
-    ed.selected = null;
-    ed.picks.clear();
-    ed.scroll = { left: 0, top: 0 };
-    ed.time = 0;
-    ed.undo = [];
-    ed.redo = [];
+    edOpen(action.slice(5));
     edRender();
     return;
   }
+  // 回到這一集: the episode this file belongs to; a tools page opened on its own has no projects page, so the list.
   if (action === "projects") {
     ed.current = null;
     edRender();
     await edSave();
+    const hit = EpisodeSpine.findByEdit(edSpineProjects(), p?.id);
+    if (hit) await VideoWorkbench.spine.open({ projectId: hit.project.id, episodeId: hit.episode.id });
     return;
   }
   if (!p) return;

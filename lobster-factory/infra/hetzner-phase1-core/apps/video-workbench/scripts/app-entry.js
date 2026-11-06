@@ -20,7 +20,7 @@
     return;
   }
   try {
-    for (const file of ["config.js", "shared/models.js", "shared/adapters.js", "shared/purify.js", "shared/runtime.js", "shared/security.js", "shared/theme.js", "shared/jobs-view.js", "shared/workflows.js", "shared/assets-ui.js", "scripts/index-boot.js"]) {
+    for (const file of ["config.js", "shared/models.js", "shared/adapters.js", "shared/purify.js", "shared/episode-spine.js", "shared/runtime.js", "shared/security.js", "shared/theme.js", "shared/jobs-view.js", "shared/workflows.js", "shared/assets-ui.js", "scripts/index-boot.js"]) {
       await new Promise((resolve, reject) => {
         const script = document.createElement("script");
         script.src = new URL(file, document.baseURI).href;

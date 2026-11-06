@@ -310,13 +310,8 @@ function screen(t) {
   if (typeof engineFor === "function" && engineFor(t.id)) return toolEngineHostScreen(t);
   const workflow = typeof toolWorkflowScreen === "function" ? toolWorkflowScreen(t) : null;
   if (workflow !== null) return workflow;
-  if (t.id === "edit")
-    return `<div class="wrap">${header(t, "CUT", "選擇影片、設定起迄時間，匯出新的片段。原片不會修改。")}<div class="controls">${btn("＋ 新建剪輯專案", "newproject", "primary")}</div><div class="two-col">${stage("▣", "選擇影片", "可從共用素材庫選取或直接上傳。")}${side(label("起點（秒）") + input("trimStart", "0", "number") + label("終點（秒）") + input("trimEnd", "", "number") + btn("匯出片段", "submit", "primary"))}</div><div id="project-list"></div></div>`;
   let body = "";
   switch (t.id) {
-    case "edit":
-      body = `<div class="controls" style="margin-top:28px"><span class="eyebrow">WORKSPACE / READY　 ───────　 MULTI-TRACK · AI IMPORT · 4K READY</span>${btn("＋ 新建剪輯專案", "newproject", "primary")}</div><div class="workspace"><div class="ws-left">CUT<br><br><br><br><br><br><br><br><br><br>00</div><div class="ws-center"><span class="eyebrow">THE TIMELINE IS YOURS</span><span class="tool-icon">▣</span><h2>先放一個鏡頭，故事<br>就開始。</h2><p class="lead">建立空白剪輯專案，或從 AI 導演分鏡帶入第一個 sequence。</p>${btn("＋ 新建剪輯專案", "newproject", "primary")}</div><div class="ws-right">${[1, 2, 3, 4, 5].map((i) => `<div class="ws-bar">0${i}　━━━━</div>`).join("")}</div></div><div id="project-list" class="out"></div>`;
-      break;
     case "short":
       body = `<div class="two-col">${stage("✂", "選一支長影片", "從素材庫挑選或上傳影片（最長 120 分鐘）。原檔不會被修改。")} ${side(`<h3>使用方式</h3><ul class="instruction"><li>選一支長影片，讓 AI 自行判斷，或輸入指令（例如「挑出講到價格的段落」）找出適合剪成短影音的段落</li><li>點選每一段即可預覽模擬效果：16:9 影片會裁成 9:16，畫面跟著正在講話的人置中；也能選擇加上字幕</li><li>段落預設全選，一次產生多支短影音；可取消不想要的，選擇是否上字幕</li><li>也可以選「一支精華」：AI 從整支影片挑出精彩片刻，接成一支精華影片</li></ul>${label("剪輯指令（選填）")}${ta("shortPrompt", "例如：挑出講到價格的段落")}${label("產出模式")}${segmented("shortMode", ["多支短影音", "一支精華"], "多支短影音")}${label("字幕")}${segmented("shortCaption", ["開", "關"], "開")}${btn("分析影片", "submit", "primary")}`)}</div>`;
       break;
@@ -388,7 +383,6 @@ function render() {
   $("#app").innerHTML = VideoWorkbench.sanitize(
     tool ? screen(TOOLS.find((t) => t.id === tool)) : home(),
   );
-  if (tool === "edit" && document.getElementById('project-list')) renderProjects();
   if (tool === "upscale" && files.src && typeof toolWorkflowScreen !== "function")
     $("#app").insertAdjacentHTML(
       "beforeend",
@@ -521,17 +515,6 @@ async function openLibrary(id) {
     VideoWorkbench.reportError(e);
   }
 }
-function renderProjects() {
-  let a = JSON.parse(VideoWorkbench.storage.getItem("appToolProjects") || "[]");
-  $("#project-list").innerHTML = VideoWorkbench.sanitize(
-    a
-      .map(
-        (x) =>
-          `<div>▣ ${esc(x.title)}　<span class="muted">${esc(x.date)}</span></div>`,
-      )
-      .join(""),
-  );
-}
 let toolRegionObserver;
 function regionInstructionsPrompt() {
   const global = String(values.regionPrompt || "").trim();
@@ -624,14 +607,25 @@ VideoWorkbench.tools = {
     restoreToolDraft();
     if (payload.settings) values = structuredClone(payload.settings);
     if (payload.selection) selection = structuredClone(payload.selection);
-    if (tool === 'edit' && payload.project) {
+    // Card PJ.1: an episode opens its edit file or gets a new one; a restored job's copy becomes a project of its own.
+    if (tool === 'edit' && (payload.edit || payload.link || payload.project)) {
       if (ed.loading) await ed.loading;
       if (!ed.ready) await edLoadProjects();
-      const project = edNormalizeProject(structuredClone(payload.project));
-      // Restore a separate copy: saved job settings must not overwrite later edits.
-      project.id = crypto.randomUUID(); project.title = (project.title || '剪輯專案') + '（還原）';
-      project.assets ||= []; project.markers ||= []; // tracks: edNormalizeProject already made the P2 track array
-      ed.projects.push(project); ed.current = project.id; ed.selected = null; ed.undo = []; ed.redo = []; ed.time = 0; await edSave();
+      if (payload.edit?.projectId) {
+        if (!ed.projects.some((p) => p.id === payload.edit.projectId)) throw Error("找不到這一集的剪輯檔。");
+        edOpen(payload.edit.projectId);
+      } else if (payload.link) {
+        // Linked before the first save, so the save's adopt finds it taken and makes no project of its own.
+        const id = crypto.randomUUID();
+        await VideoWorkbench.spine.attachEdit({ ...payload.link, edit: { engine: "workbench-editor", projectId: id } });
+        await edCreate(payload.title, payload.ratio, id);
+      } else {
+        const project = edNormalizeProject(structuredClone(payload.project));
+        // Restore a separate copy: saved job settings must not overwrite later edits.
+        project.id = crypto.randomUUID(); project.title = (project.title || '剪輯專案') + '（還原）';
+        project.assets ||= []; project.markers ||= []; // tracks: edNormalizeProject already made the P2 track array
+        ed.projects.push(project); edOpen(project.id); await edSave();
+      }
     }
     if (payload.asset) {
       const asset = { ...payload.asset, type: payload.asset.type || VideoWorkbench.mediaKind(payload.asset) + "/" };
@@ -639,6 +633,9 @@ VideoWorkbench.tools = {
       if (tool === "region" && !payload.selection) selection.regions = [];
     }
     setToolHash("#" + tool); render(); saveDraft();
+    // An episode's FilmCraft file: open that file, not the engine's empty start (engine absent = its fallback screen).
+    const engine = typeof engineFor === "function" && engineFor(tool);
+    if (engine && payload.edit?.projectId && engineAvailable[engine.engine]) await engineOpenProject(payload.edit.projectId);
     return { ok: true, tool };
   },
 };
@@ -737,20 +734,6 @@ document.addEventListener("click", (e) => {
       .then(() => VideoWorkbench.notify("浮水印設定已保存"))
       .catch(VideoWorkbench.reportError);
     saveDraft();
-    return;
-  }
-  if (action === "newproject") {
-    let title = prompt("新剪輯專案名稱", "未命名剪輯專案");
-    if (title) {
-      let arr = JSON.parse(VideoWorkbench.storage.getItem("appToolProjects") || "[]");
-      arr.unshift({
-        title,
-        date: new Date().toLocaleString("zh-TW"),
-      });
-      VideoWorkbench.storage.setItem("appToolProjects", JSON.stringify(arr));
-      renderProjects();
-
-    }
     return;
   }
   if (action.startsWith("export:")) {

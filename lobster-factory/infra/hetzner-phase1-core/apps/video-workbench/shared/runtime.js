@@ -73,6 +73,21 @@
     db.projects = db.projects.map((p) => M.project(p));
     return missing;
   }
+  // Card PJ.1: every edit file not yet in an episode becomes a project (spec §3.1); the edit files are only read.
+  // Runs on load and on every write of an edit-file store, so a file saved by any engine joins at once.
+  const Spine = window.EpisodeSpine || null,
+    EDIT_STORES = ["tools.editor.projects", "tools.engine.projects"];
+  function spineAdopt() {
+    if (!Spine) return 0;
+    const r = Spine.adopt(db.projects, db.preferences["tools.editor.projects"], db.preferences["tools.engine.projects"]);
+    db.projects = r.projects.map(M.project);
+    return r.added;
+  }
+  async function spineChanged() {
+    await persist();
+    broadcast();
+    document.dispatchEvent(new CustomEvent("vw:changed"));
+  }
   const CONFLICT = "vw.conflict-reload";
   function persist() {
     queue = queue
@@ -116,8 +131,12 @@
         ...value.map(M.character),
       ];
     else if (key === "awarewave-projects-screenshot-frontend-v1") {
-      db.projects = value.projects.map(M.project);
-      db.selection = { current: value.current, episode: value.episode };
+      const next = value.projects.map(M.project);
+      // Card PJ.1: a child's whole-list write keeps the top page's spine fields (shared/episode-spine.js). Pages
+      // opened on their own without the spine script (characters, storyboards) are their own top page: no stale copy.
+      db.projects = child || !Spine ? next : Spine.keepSpine(db.projects, next);
+      // `open` = the spine-open counter, changed only here on the top page (scripts/projects-0.js spineSignature).
+      db.selection = { current: value.current, episode: value.episode, ...(db.selection?.open ? { open: db.selection.open } : {}) };
     } else db.preferences[key] = value;
   }
   function broadcast() {
@@ -148,6 +167,7 @@
       );
     if (action === "preference-set") {
       write(payload.key, payload.value);
+      if (EDIT_STORES.includes(payload.key)) spineAdopt();
       await persist();
       broadcast();
       document.dispatchEvent(new CustomEvent("vw:changed"));
@@ -160,6 +180,20 @@
       return db;
     }
     if (action === "generate") return generate(payload);
+    if (action === "spine-attach-edit") {
+      const hit = db.projects.find((p) => p.id === payload.projectId)?.episodes.find((e) => e.id === payload.episodeId);
+      if (!hit) throw new Error("找不到這一集");
+      hit.edit = { engine: payload.edit.engine, projectId: payload.edit.projectId };
+      await spineChanged();
+      return hit.edit;
+    }
+    if (action === "spine-open") {
+      const index = db.projects.find((p) => p.id === payload.projectId)?.episodes.findIndex((e) => e.id === payload.episodeId) ?? -1;
+      if (index < 0) throw new Error("找不到這一集");
+      db.selection = { current: payload.projectId, episode: index, open: (db.selection?.open || 0) + 1 };
+      await spineChanged();
+      return perform("navigate", { target: "projects" });
+    }
     if (action === "navigate") {
       document.getElementById(payload.target + "Nav")?.click();
       return true;
@@ -278,7 +312,8 @@
           if (!Number.isInteger(db.revision)) db.revision = 0;
           if (!Array.isArray(db.compositions)) db.compositions = []; // state saved before card P3
           if (!Array.isArray(db.scenes3d)) db.scenes3d = []; // state saved before card P5
-          if (normalizeAssets()) persist().catch(() => {});
+          const normalized = normalizeAssets();
+          if (spineAdopt() > 0 || normalized) persist().catch(() => {});
         }
         try {
           if (sessionStorage.getItem(CONFLICT)) {
@@ -568,6 +603,16 @@
     },
     navigate: (target) =>
       child ? rpc("navigate", { target }) : perform("navigate", { target }),
+    // Card PJ.1: the episode spine's actions; children ask the top page, which alone changes spine fields.
+    spine: Object.fromEntries(
+      [["attachEdit", "spine-attach-edit"], ["open", "spine-open"]].map(([name, action]) => [
+        name,
+        async (payload = {}) => {
+          await ready;
+          return child ? rpc(action, payload) : perform(action, payload);
+        },
+      ]),
+    ),
   };
   // storyboards-0.js is hash-protected and still calls the old global name.
   window.SeedStar = window.VideoWorkbench;

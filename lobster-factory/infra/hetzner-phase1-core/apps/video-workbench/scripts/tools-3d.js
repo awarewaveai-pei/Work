@@ -571,9 +571,9 @@ async function toolThreeDAfterRender() {
     await cpEditorReady();
     fill(
       "[data-t3-projects]",
-      ed.projects
-        .map((p) =>
-          t3B(`放到「${p.title}」`, "place:" + p.id, {
+      edSpineList() // card PJ.1: the episodes' edit files (tools-editor.js)
+        .map(({ project, episode, file }) =>
+          t3B(`放到「${project.title} · ${episode.name}」`, "place:" + file.id, {
             disabled: !!t3.job || !t3Engine().available,
           }),
         )
