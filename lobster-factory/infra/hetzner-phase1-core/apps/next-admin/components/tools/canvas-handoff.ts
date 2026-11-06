@@ -11,8 +11,9 @@
  *
  * Which editor (R0-PLAN 2026-11-05-photocraft-pro C7.1): one table, CANVAS_TARGETS, picks the editor from the design's
  * source file (.vectorcraft/.svg → VectorCraft, anything else or none → PhotoCraft). The handoff carries that editor id;
- * the pro editors' frame (ProEditorFrame) takes it with takeCanvasHandoff(editor) and leaves another editor's handoff
- * alone. A taken handoff is cleared (the editor opens it as a document; a reload starts empty).
+ * the pro editors' frame (ProEditorFrame) reads it with takeCanvasHandoff(editor) and leaves another editor's handoff
+ * alone. It is cleared only once the editor has opened it (handoff.done()): a dock that fails to load, an editor that
+ * is slow to start or a failed fetch leaves it for the next load; after a successful open a reload starts empty.
  */
 
 import { bucketDownloadHref } from "@/lib/storage/download-href";
@@ -42,7 +43,12 @@ export function canvasTarget(sourceName?: string | null): { editor: CanvasEditor
 
 const IDB_DB = "canvas-handoff";
 const IDB_STORE = "kv";
+/** Fabric-editor handoffs (flag "1") used this one key. Pro-editor handoffs use `${IDB_IMAGE_KEY}:${id}`, named in the
+ *  flag: IndexedDB is shared by every tab (sessionStorage is not), so one key per handoff keeps one tab's done() from
+ *  deleting another tab's image. */
 const IDB_IMAGE_KEY = "source-image";
+/** Pro-editor IDB images older than this were abandoned (never opened): openInCanvas prunes them. */
+const IDB_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 function idbOpen(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -85,6 +91,33 @@ async function idbGet(key: string): Promise<string | null> {
   }
 }
 
+/** Delete pro-editor images whose handoff id (base-36 time first) is older than IDB_MAX_AGE_MS. Best effort. */
+async function idbPrune(now: number): Promise<void> {
+  try {
+    const db = await idbOpen();
+    try {
+      await new Promise<void>((resolve) => {
+        const tx = db.transaction(IDB_STORE, "readwrite");
+        const req = tx.objectStore(IDB_STORE).openKeyCursor();
+        req.onsuccess = () => {
+          const cur = req.result;
+          if (!cur) return;
+          const m = /^source-image:([0-9a-z]+)-/.exec(String(cur.key));
+          if (m && now - parseInt(m[1], 36) > IDB_MAX_AGE_MS) tx.objectStore(IDB_STORE).delete(cur.key);
+          cur.continue();
+        };
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+        tx.onabort = () => resolve();
+      });
+    } finally {
+      db.close();
+    }
+  } catch {
+    /* best-effort cleanup */
+  }
+}
+
 async function idbDel(key: string): Promise<void> {
   try {
     const db = await idbOpen();
@@ -119,8 +152,11 @@ export const CANVAS_STAFF_HREF = canvasTarget().staffHref;
  *  CANVAS_STAFF_HREF for an image, /tools/vector-pro for a vector source; the design door's page there, null (hide the
  *  button) on a door without one. `source`: the design's editable original, opened instead of the image. */
 export async function openInCanvas(image: string, baseName: string | undefined, href: string, source?: CanvasSourceFile): Promise<void> {
+  let id = "";
   try {
-    sessionStorage.setItem(CANVAS_TARGET_KEY, JSON.stringify({ editor: canvasTarget(source?.name).editor, ...(source ? { source } : {}) }));
+    // id: each handoff is distinct, so done() of an earlier one never clears a later one (canvas-handoff.test.ts).
+    id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    sessionStorage.setItem(CANVAS_TARGET_KEY, JSON.stringify({ id, editor: canvasTarget(source?.name).editor, ...(source ? { source } : {}) }));
   } catch {
     /* sessionStorage unavailable → the editor finds no handoff (opens empty) */
   }
@@ -136,8 +172,10 @@ export async function openInCanvas(image: string, baseName: string | undefined, 
   // Fallback: large data URLs go to IndexedDB (no practical size cap).
   if (!stashed) {
     try {
-      await idbPut(IDB_IMAGE_KEY, image);
-      sessionStorage.setItem(CANVAS_IDB_FLAG, "1");
+      const key = id ? `${IDB_IMAGE_KEY}:${id}` : IDB_IMAGE_KEY;
+      await idbPrune(Date.now());
+      await idbPut(key, image);
+      sessionStorage.setItem(CANVAS_IDB_FLAG, id ? key : "1");
       sessionStorage.removeItem(CANVAS_SOURCE_KEY);
       stashed = true;
     } catch {
@@ -177,7 +215,12 @@ export async function readCanvasSource(): Promise<string | null> {
 }
 
 /** What a pro editor's dock opens: a same-origin URL to fetch and the file name to open it as. */
-export type ProEditorHandoff = { url: string; name: string };
+export type ProEditorHandoff = {
+  url: string;
+  name: string;
+  /** Clear the handoff: call once the editor has opened it. A no-op if another handoff replaced it meanwhile. */
+  done: () => void;
+};
 
 const IMAGE_EXT: Record<string, string> = { png: "png", jpg: "jpg", jpeg: "jpg", webp: "webp", gif: "gif" };
 
@@ -188,8 +231,9 @@ export function handoffImageName(image: string, base: string | null): string {
 }
 
 /**
- * A pro editor's side: take the pending handoff if it is addressed to `editor`, else leave it for its own editor and
- * return null. Taken = every key cleared (sessionStorage and IndexedDB). The source file, when there is one, is opened
+ * A pro editor's side: read the pending handoff if it is addressed to `editor`, else leave it for its own editor and
+ * return null. Nothing is cleared here: `done()` clears every key (sessionStorage and IndexedDB) once the editor has
+ * opened it; an unreadable handoff is cleared at once (nobody can open it). The source file, when there is one, is opened
  * instead of the image; remote URLs go through the same-origin bucket download route (toCanvasSrc: the bucket is
  * cross-origin, so CORS blocks a direct fetch), data: URLs pass as they are.
  */
@@ -205,17 +249,42 @@ export async function takeCanvasHandoff(editor: CanvasEditorId): Promise<ProEdit
     }
     if (target && target.editor !== editor) return null;
     const inline = sessionStorage.getItem(CANVAS_SOURCE_KEY);
-    const inIdb = sessionStorage.getItem(CANVAS_IDB_FLAG) === "1";
+    const flag = sessionStorage.getItem(CANVAS_IDB_FLAG);
+    const idbKey = flag ? (flag === "1" ? IDB_IMAGE_KEY : flag) : null;
     const base = sessionStorage.getItem(CANVAS_NAME_KEY);
-    for (const k of [CANVAS_TARGET_KEY, CANVAS_SOURCE_KEY, CANVAS_IDB_FLAG, CANVAS_NAME_KEY]) sessionStorage.removeItem(k);
-    const image = inline ?? (inIdb ? await idbGet(IDB_IMAGE_KEY).catch(() => null) : null);
-    if (inIdb) void idbDel(IDB_IMAGE_KEY);
-    if (!target) return null;
+    const clear = () => {
+      if (sessionStorage.getItem(CANVAS_TARGET_KEY) !== raw) return; // a newer handoff took its place
+      for (const k of [CANVAS_TARGET_KEY, CANVAS_SOURCE_KEY, CANVAS_IDB_FLAG, CANVAS_NAME_KEY]) sessionStorage.removeItem(k);
+      if (idbKey) void idbDel(idbKey);
+    };
+    if (!target) {
+      clear();
+      return null;
+    }
+    const done = () => {
+      try {
+        clear();
+      } catch {
+        /* storage gone: nothing left to clear */
+      }
+    };
     const src = target.source;
     if (src && typeof src.url === "string" && src.url && typeof src.name === "string" && src.name) {
-      return { url: toCanvasSrc(src.url), name: src.name };
+      return { url: toCanvasSrc(src.url), name: src.name, done };
     }
-    return image ? { url: toCanvasSrc(image), name: handoffImageName(image, base) } : null;
+    let image = inline;
+    if (!image && idbKey) {
+      try {
+        image = await idbGet(idbKey);
+      } catch {
+        return null; // a failed read is not a missing image: keep the handoff for the next load
+      }
+    }
+    if (!image) {
+      clear(); // the image never landed or is gone: nobody can open this handoff
+      return null;
+    }
+    return { url: toCanvasSrc(image), name: handoffImageName(image, base), done };
   } catch {
     return null; // storage unavailable → no handoff
   }

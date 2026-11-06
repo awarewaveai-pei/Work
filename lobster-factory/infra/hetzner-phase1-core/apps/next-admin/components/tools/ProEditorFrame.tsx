@@ -6,8 +6,8 @@ import "./pro-editor-frame.css";
 // One frame for every Craft editor (VectorCraft, PhotoCraft; agency-os/handoffs/2026-11-05-photocraft-pro/R0-PLAN.md C3.1):
 // the editor's static web build in an iframe + our dock beside it. The dock's only link to this page is
 // window.__proEditor = { editor, frame, handoff }; the dock script is a module the page loads and may be missing (it then
-// runs without the dock). handoff = the design another tool sent here (canvas-handoff.ts openInCanvas), taken once if it
-// is addressed to this editor; the dock opens it once the editor is ready (C7.1).
+// runs without the dock). handoff = the design another tool sent here (canvas-handoff.ts openInCanvas), read once if it
+// is addressed to this editor; the dock opens it once the editor is ready and then clears it (handoff.done(); C7.1).
 // No theme link: the Craft editors keep their own dark/light (operator 2026-11-06).
 
 export type ProEditorFrameProps = {
@@ -61,12 +61,12 @@ export function ProEditorFrame({ editor, frameSrc, dockSrc, dockId, fallback, ti
     }
     // An iframe fires no error on a 404, so ask for the entry file first.
     let live = true;
-    const reachable = fetch(frameSrc, { method: "HEAD", cache: "no-store" })
-      .then((r) => { if (live && !r.ok) setFailure(`專業版檔案讀不到（HTTP ${r.status}）。`); return r.ok; })
-      .catch(() => { if (live) setFailure("專業版檔案讀不到（網路錯誤）。"); return false; });
-    // The dock reads the frame from here. Its script may not be deployed yet: a failed load leaves the page as it is.
-    // The handoff is taken (and cleared) only once the editor's files answer: on a failure it stays for a retry.
-    handoff.current ??= reachable.then((ok) => (ok ? takeCanvasHandoff(editor) : null));
+    fetch(frameSrc, { method: "HEAD", cache: "no-store" })
+      .then((r) => { if (live && !r.ok) setFailure(`專業版檔案讀不到（HTTP ${r.status}）。`); })
+      .catch(() => { if (live) setFailure("專業版檔案讀不到（網路錯誤）。"); });
+    // The dock reads the frame from here. Its script may not be deployed yet: a failed load leaves the page as it is
+    // (and the handoff in storage: only the dock's successful open clears it).
+    handoff.current ??= takeCanvasHandoff(editor);
     window.__proEditor = { editor, frame: frame.current, handoff: handoff.current };
     const dock = document.createElement("script");
     dock.type = "module";
