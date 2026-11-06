@@ -34,8 +34,8 @@ const pass = (label) => {
     page.on("pageerror", (e) => errors.push(e.message));
     await page.route("**/*", (r) => (r.request().url().startsWith(base + "/") ? r.continue() : r.abort()));
     await page.goto(base + "/pages/tools.html#edit");
-    await page.getByRole("button", { name: "新增專案", exact: true }).click();
-    await page.getByLabel("專案標題").fill("軌道測試");
+    await page.getByRole("button", { name: "新建剪輯專案", exact: true }).click();
+    await page.getByLabel("專案名稱").fill("軌道測試");
     await page.getByRole("button", { name: "建立專案", exact: true }).click();
     await page.waitForSelector("[data-ed-stage]");
     const lanes = () => page.locator("[data-ed-lane]").evaluateAll((els) => els.map((e) => e.dataset.edLane));
@@ -72,20 +72,20 @@ const pass = (label) => {
     assert.equal(await page.locator('[data-ed-lane="A1"] [data-ed-clip]').count(), 1);
     pass("刪除空軌立即生效；有片段的軌道先確認，刪除後可一次復原軌道與片段");
 
-    // Panes and the export dialog: buttons and inputs only. Peak meter beside the player.
+    // Panes and the export dialog: buttons and inputs only. 調色 is in the clip inspector, the peak meter in 音訊 (card ED.1).
     await page.evaluate((a) => edAdd(a), asset);
     await page.waitForSelector('[data-ed-lane="V1"] [data-ed-clip]');
-    for (const pane of ["轉場", "調色", "音訊"]) {
+    for (const pane of ["轉場", "音訊"]) {
       await page.locator(`[data-ed-pane="${pane}"]`).click();
       assert.equal(await page.locator(".editor-library select").count(), 0, pane);
     }
     await page.locator('[data-ed-pane="轉場"]').click();
     assert.equal(await page.getByRole("group", { name: "轉場", exact: true }).getByRole("button").count(), 8);
-    await page.locator('[data-ed-pane="調色"]').click();
-    for (const label of ["曝光（EV）", "對比", "色溫（K）", "飽和度"]) assert.equal(await page.getByLabel(label, { exact: true }).count(), 1, label);
+    await page.locator('[data-ed-lane="V1"] [data-ed-clip]').first().click();
+    for (const label of ["曝光（EV）", "對比", "色溫（K）", "飽和度"]) assert.equal(await page.locator(".editor-inspector").getByLabel(label, { exact: true }).count(), 1, label);
     await page.locator('[data-ed-pane="音訊"]').click();
     assert.equal(await page.getByRole("group", { name: "響度目標", exact: true }).getByRole("button").count(), 3);
-    await page.getByRole("button", { name: "匯出影片", exact: true }).click();
+    await page.getByRole("button", { name: "匯出", exact: true }).click();
     await page.waitForSelector("dialog[open] [data-ed-export]");
     assert.equal(await page.locator("dialog[open] select").count(), 0);
     assert.equal(await page.locator('dialog[open] [data-ed-action^="quality:"]').count(), 3);
@@ -93,9 +93,9 @@ const pass = (label) => {
     assert.match(await page.locator("dialog[open]").innerText(), /來源低於 4K，會放大/);
     await page.waitForFunction(() => /適合投遞：.*youtube/.test(document.querySelector("dialog[open] [data-ed-delivery]")?.textContent || ""));
     await page.locator("dialog[open] [data-ed-close]").click();
-    assert.equal(await page.locator("[data-ed-peak]").count(), 1);
+    assert.equal(await page.locator(".editor-library [data-ed-peak]").count(), 1);
     assert.match(await page.locator("[data-ed-peak]").innerText(), /超過 −1 dB 會在輸出時自動壓低/);
-    pass("轉場（8 鈕）、調色、響度（3 鈕）分頁與匯出對話框（3 個畫質鈕、4K 放大提示、適合投遞）沒有下拉選單；播放器旁有峰值表");
+    pass("轉場（8 鈕）、響度（3 鈕）分頁與匯出對話框（3 個畫質鈕、4K 放大提示、適合投遞）沒有下拉選單；調色在片段屬性；峰值表在音訊分頁");
 
     // 設為入點 at an exact frame (16 then 下一格 = 17), kept after a reload.
     await page.locator('[data-ed-lane="V1"] [data-ed-clip]').click();
@@ -150,7 +150,7 @@ const pass = (label) => {
     assert.equal(migrated.clip.transitionFrames, 12);
     assert.equal(migrated.kept, true);
     await page.getByRole("button", { name: "舊五軌 · 16:9", exact: true }).click();
-    await page.getByRole("button", { name: "匯出影片", exact: true }).click();
+    await page.getByRole("button", { name: "匯出", exact: true }).click();
     await page.locator('dialog[open] [data-ed-action="quality:720p"]').click();
     await page.locator("dialog[open] [data-ed-export]").click();
     let result = null;

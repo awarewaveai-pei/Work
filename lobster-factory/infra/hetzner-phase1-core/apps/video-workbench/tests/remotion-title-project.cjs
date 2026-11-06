@@ -13,10 +13,10 @@ const { isolatedServer } = require("./isolated-server.cjs");
     await page.route("**/*", (r) => (r.request().url().startsWith(base + "/") ? r.continue() : r.abort()));
     await page.goto(base + "/pages/tools.html#edit");
     const newProject = async () => {
-      await page.getByRole("button", { name: "新增專案", exact: true }).click();
+      await page.getByRole("button", { name: "新建剪輯專案", exact: true }).click();
       await page.getByRole("button", { name: "建立專案", exact: true }).click();
       await page.waitForSelector("[data-ed-stage]");
-      await page.locator('[data-ed-pane="片頭"]').click();
+      await page.locator('[data-ed-pane="文字"]').click();
     };
     const insert = page.getByRole("button", { name: "放到時間軸開頭", exact: true });
     await newProject();

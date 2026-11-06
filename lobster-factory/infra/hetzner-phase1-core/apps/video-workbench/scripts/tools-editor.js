@@ -26,8 +26,19 @@ const ed = {
   luts: null,
   quality: "1080p",
   delivery: null,
+  // Card ED.1: panel sizes (tools.editor.layout), loop playback, and the top bar's save status.
+  layout: null,
+  loop: false,
+  save: { state: "saved", at: null, pending: 0 },
 };
-const edRatios = {
+const edCreateRatios = [
+    ["16:9", "橫屏", "YouTube、電視、簡報"],
+    ["9:16", "直屏", "TikTok、Reels、Shorts"],
+    ["1:1", "方形", "Instagram、Facebook 貼文"],
+    ["4:5", "直式貼文", "Instagram 動態、LinkedIn"],
+    ["4:3", "傳統", "簡報、舊式電視"],
+  ],
+  edRatios = {
     "16:9": [1920, 1080],
     "9:16": [1080, 1920],
     "1:1": [1080, 1080],
@@ -233,10 +244,24 @@ function edSave() {
     edSaved.set(p.id, { json, revision: p.revision });
     return ProjectEnvelope.wrap(native, { revision: p.revision || 0 });
   });
+  // The top bar says 已儲存 only when no queued write is left; a failed write stays visible until the next success.
+  ed.save = { ...ed.save, state: "saving", pending: ed.save.pending + 1 };
+  edSavePaint();
   ed.queue = ed.queue
     .catch(() => {})
     .then(() => VideoWorkbench.preferences.set("tools.editor.projects", copy));
-  ed.queue.catch(VideoWorkbench.reportError);
+  ed.queue
+    .then(
+      () => {
+        const pending = ed.save.pending - 1;
+        ed.save = pending ? { ...ed.save, pending } : { state: "saved", at: new Date(), pending };
+      },
+      (e) => {
+        ed.save = { ...ed.save, state: "error", pending: ed.save.pending - 1 };
+        VideoWorkbench.reportError(e);
+      },
+    )
+    .finally(edSavePaint);
   return ed.queue;
 }
 // First load after M3: the untouched pre-frames array is kept under its own key (never deleted), then converted.
@@ -263,6 +288,7 @@ async function edLoadProjects() {
       "tools.editor.projects.pre-tracks-" + stamp,
       list,
     );
+  ed.layout = edLayout(await VideoWorkbench.preferences.get("tools.editor.layout", null));
   ed.projects = list.map(edNormalizeProject);
   // Saved-copy marks come from the stored rows, so a converted project counts as changed and is written back.
   for (const [i, p] of ed.projects.entries()) {
@@ -288,9 +314,17 @@ function edStop() {
   ed.playing = false;
   cancelAnimationFrame(ed.raf);
   document.querySelectorAll("[data-ed-media]").forEach((m) => m.pause());
+  const play = document.querySelector('[data-ed-action="play"]');
+  if (play) play.textContent = "▶";
 }
 function edRender() {
   edStop();
+  render();
+}
+// View-only changes (panels, loop, pane, selection cleared) redraw without stopping playback: the old media
+// elements are paused so detached ones fall silent, and the running tick's edPaint makes and plays the new ones.
+function edRedraw() {
+  document.querySelectorAll("[data-ed-media]").forEach((m) => m.pause());
   render();
 }
 function edButton(title, action, disabled = false) {
@@ -371,7 +405,7 @@ function edTransitionPane(p, c) {
 async function edLutRefresh() {
   const rows = await VideoWorkbench.assets.list();
   ed.luts = rows.filter((a) => /\.cube$/i.test(a.url || ""));
-  if (tool === "edit" && ed.pane === "調色") edRender();
+  if (tool === "edit" && edClip()) edRender();
 }
 function edColorPane(p, c) {
   if (!c || !["video", "image"].includes(c.kind))
@@ -421,6 +455,206 @@ function edKeysPane(p, c) {
       "",
     )}<label>關鍵影格音量<input class="text-input" aria-label="關鍵影格音量" data-ed-key-gain type="number" min="0" max="4" step="0.1" value="1"></label>${edButton("在播放頭加入關鍵影格", "key-add")}`;
 }
+// Card ED.1: the reference editor's layout (docs/editor-parity-spec-20261106.md §1.2–1.6). Rail order as the reference;
+// 片頭 lives in 文字, 調色 in the clip inspector, 影格率 in 整片設定 › 輸出, the peak meter in 音訊 (operator 2026-11-06).
+const edPanes = [
+  ["素材", "▤"],
+  ["文字", "T"],
+  ["音訊", "♪"],
+  ["轉場", "⧉"],
+  ["特效", "✧"],
+  ["貼圖", "▣"],
+  ["字幕", "☰"],
+  ["剪贅字", "✂"],
+];
+// Panel sizes are a per-user preference (tools.editor.layout), never project data.
+const edLayoutLimits = { left: [200, 480], right: [240, 480], timeline: [110, 560] },
+  edLayoutDefault = { left: 294, right: 300, timeline: 150, leftOpen: true, rightOpen: true };
+function edLayout(raw) {
+  const l = { ...edLayoutDefault };
+  for (const [k, [min, max]] of Object.entries(edLayoutLimits))
+    if (Number.isFinite(raw?.[k])) l[k] = Math.min(max, Math.max(min, Math.round(raw[k])));
+  for (const k of ["leftOpen", "rightOpen"]) if (typeof raw?.[k] === "boolean") l[k] = raw[k];
+  return l;
+}
+const edColumns = (l = ed.layout) =>
+  ["58px", l.leftOpen && l.left + "px", l.leftOpen && "6px", "minmax(320px,1fr)", l.rightOpen && "6px", l.rightOpen && l.right + "px"]
+    .filter(Boolean)
+    .join(" ");
+function edLayoutSave() {
+  VideoWorkbench.preferences.set("tools.editor.layout", ed.layout).catch(VideoWorkbench.reportError);
+}
+const edTotal = () => Math.max(0, ...(edProject()?.clips || []).map((c) => c.start + c.duration)),
+  // Where playback stops or loops: the last clip's end (edEnd's 3 s minimum is for the empty timeline's width).
+  edPlayEnd = () => edTotal() || edEnd();
+function edClockText(seconds) {
+  const cs = Math.round(Math.max(0, seconds) * 100),
+    pad = (n) => String(n).padStart(2, "0");
+  return `${pad(Math.floor(cs / 6000))}:${pad(Math.floor(cs / 100) % 60)}.${pad(cs % 100)}`;
+}
+function edSaveText() {
+  if (ed.save.state === "saving") return "● 儲存中…";
+  if (ed.save.state === "error") return "● 儲存失敗";
+  return ed.save.at ? "● 已儲存 " + ed.save.at.toLocaleTimeString("zh-TW") : "● 已儲存";
+}
+function edSavePaint() {
+  const el = document.querySelector("[data-ed-saved]");
+  if (!el) return;
+  el.textContent = edSaveText();
+  el.dataset.state = ed.save.state;
+}
+function edIconButton(label, glyph, action, pressed) {
+  return `<button type="button" class="btn small editor-icon-btn${pressed ? " selected" : ""}" data-ed-action="${esc(action)}" aria-label="${esc(label)}" title="${esc(label)}"${pressed === undefined ? "" : ` aria-pressed="${pressed}"`}>${glyph}</button>`;
+}
+function edResizer(side, orientation, label, value) {
+  return `<div class="editor-resize editor-resize-${orientation}" data-ed-resize="${side}" role="separator" aria-orientation="${orientation}" aria-label="${label}" aria-valuenow="${value}" tabindex="0"></div>`;
+}
+function edPeakMeter() {
+  return `<div class="row editor-peak" data-ed-peak role="meter" aria-label="主輸出峰值" aria-valuemin="-60" aria-valuemax="0" aria-valuenow="-60"><span class="editor-peak-bar" style="display:inline-block;width:160px;height:8px;border:1px solid currentColor;position:relative"><i data-ed-peak-fill style="position:absolute;left:0;top:0;bottom:0;width:0;background:#4ade80"></i></span><span data-ed-peak-text>峰值 — dBFS</span><span class="note">播放時顯示；超過 −1 dB 會在輸出時自動壓低</span></div>`;
+}
+// Ratio choices read 「16:9 橫屏」 like the reference; the stored value stays the bare ratio.
+function edRatioSelect(p, label, visibleLabel) {
+  const names = Object.fromEntries(edCreateRatios.map(([r, name]) => [r, name])),
+    select = `<select class="text-input" aria-label="${label}" data-ed-field="project:ratio">${Object.keys(edRatios)
+      .map((r) => `<option value="${r}" ${r === p.ratio ? "selected" : ""}>${esc(r + " " + (names[r] || ""))}</option>`)
+      .join("")}</select>`;
+  return visibleLabel ? `<label>${label}${select}</label>` : select;
+}
+function edTopbar(p) {
+  return `<header class="editor-topbar"><div class="editor-topbar-group"><button type="button" class="btn small" data-ed-action="projects" aria-label="所有專案">← 專案</button><label class="editor-title"><input class="text-input" aria-label="專案名稱" data-ed-field="project:title" type="text" maxlength="100" value="${esc(p.title)}"><span aria-hidden="true">✎</span></label>${edRatioSelect(p, "輸出比例", false)}</div><span class="editor-saved" data-ed-saved role="status" data-state="${ed.save.state}">${esc(edSaveText())}</span><div class="editor-topbar-group">總時長：<b class="editor-total" data-ed-total>${edClockText(edTotal())}</b><button type="button" class="btn primary small" data-ed-action="export" aria-label="匯出" ${p.clips.length ? "" : "disabled"}>▷ 匯出</button></div></header>`;
+}
+function edRail() {
+  const open = ed.layout.leftOpen;
+  return `<nav class="editor-panes" aria-label="編輯面板">${edPanes
+    .map(
+      ([title, icon]) =>
+        `<button type="button" class="editor-pane-btn${ed.pane === title && open ? " selected" : ""}" data-ed-pane="${title}" aria-pressed="${ed.pane === title && open}"><span aria-hidden="true">${icon}</span>${title}</button>`,
+    )
+    .join("")}${edIconButton(open ? "收合左側面板" : "展開左側面板", open ? "«" : "»", "layout:left")}</nav>`;
+}
+function edPane(p, c) {
+  if (ed.pane === "素材")
+    return `<h3>素材</h3>${edButton("從素材庫加入", "library")}${edButton("上傳素材", "upload")}<p class="note">影片／圖片加入 V1，音訊加入 A1。可在屬性更換軌道。</p>${p.assets.map((a) => `<div class="editor-asset">${esc(a.name || "素材")}${edButton("加入時間軸", "asset:" + a.id)}</div>`).join("")}`;
+  if (ed.pane === "文字")
+    return `<h3>文字</h3>${["空白文字", "主標題", "副標題", "內文", "重點提示", "金句", "步驟", "章節", "下標", "開場", "結尾", "價格", "標籤", "品牌", "呼籲行動"].map((title, i) => edButton(title, "text:" + i)).join("")}<hr>${edTitlePane(p)}`;
+  if (ed.pane === "音訊")
+    return `<h3>音訊</h3>${edButton("選擇音訊", "library:audio")}${edButton("上傳音訊", "upload:audio")}<p class="note">每條音訊軌可獨立安排時間、音量、淡入淡出與音量均衡；音量＝片段音量 × 軌道音量（0 為靜音）。</p>${edLoudnessPane(p)}${edPeakMeter()}${c && ["video", "audio"].includes(c.kind) ? edKeysPane(p, c) : ""}`;
+  if (ed.pane === "轉場") return edTransitionPane(p, c);
+  if (ed.pane === "特效")
+    return '<h3>畫面效果</h3><p class="note">濾鏡、遮罩與顆粒在右側屬性面板調整：選取片段時設定該片段，未選取時是整片設定。光漏、鏡頭震動與關鍵影格尚未接入。</p>';
+  if (ed.pane === "貼圖")
+    return `<h3>貼圖／品牌圖</h3>${edButton("選擇圖片", "library:image")}${edButton("上傳透明 PNG", "upload:image")}<p class="note">以主影片軌之上的影片軌疊加圖片，可設定時間、位置、大小與透明度。</p>`;
+  if (ed.pane === "字幕")
+    return `<h3>字幕</h3>${edButton("匯入 SRT／VTT", "subtitles-import")}${edButton("下載 SRT", "subtitles-download:srt")}${edButton("下載 VTT", "subtitles-download:vtt")}${edButton("前往字幕工具", "subtitles-tool")}<p class="note">每段字幕為文字軌片段，可逐段修改。時間重疊的字幕分放在不同文字軌；下載時重疊部分合併成同一段（多行）。辨識與翻譯請至字幕工具處理後匯入。</p>`;
+  return "<h3>剪贅字</h3><p>自動剪贅字需要逐字時間戳服務，目前尚未接入。可分割後使用「刪除並前移」手動剪除。</p>";
+}
+function edPlayer(p) {
+  const [w, h] = edRatios[p.ratio];
+  // An empty project shows where to start instead of a black frame (reference: 「先放一個鏡頭，故事就開始。」).
+  const empty = p.clips.length
+    ? ""
+    : `<div class="editor-stage-empty"><b>先放一個鏡頭，故事就開始。</b><p class="note">從素材庫加入影片、圖片，會放到主視訊軌。</p>${edButton("更多素材", "library")}${edButton("加入文字", "text:0")}</div>`;
+  return `<section class="editor-player"><div class="editor-stage-frame" data-ed-stage-frame><div class="editor-stage" data-ed-stage style="--ed-aspect:${w}/${h};--ed-ar:${w / h}">${empty}</div></div><div class="editor-transport"><span class="editor-clock" data-ed-clock></span><div class="editor-transport-group">${edIconButton("跳至開頭", "⏮", "jump:start")}${edIconButton("後退 1 秒", "↺", "jump:-1")}${edIconButton("播放／暫停 (Space)", ed.playing ? "❚❚" : "▶", "play")}${edIconButton("前進 1 秒", "↻", "jump:1")}${edIconButton("跳至結尾", "⏭", "jump:end")}</div><div class="editor-transport-group">${edIconButton("循環播放", "⟲", "loop", ed.loop)}${edIconButton("全螢幕瀏覽 (F)", "⛶", "fullscreen")}${ed.layout.rightOpen ? "" : edIconButton("展開檢查器", "«", "layout:right")}</div></div></section>`;
+}
+function edInspector(p, c) {
+  const head = (title) =>
+    `<div class="editor-inspector-head"><b>${title}</b>${edIconButton("收合檢查器", "»", "layout:right")}</div>`;
+  return c ? head("選取對象") + edClipInspector(p, c) : head("整片設定") + edProjectSettings(p);
+}
+function edProjectSettings(p) {
+  const [w, h] = edRatios[p.ratio];
+  return `<section class="editor-insp-group"><h4>畫面</h4>${edRatioSelect(p, "畫面比例", true)}<p class="note">整片濾鏡</p>${edChoices("整片濾鏡", "project-filter", p.filter || "原始", edFilters)}</section><section class="editor-insp-group"><h4>輸出</h4>${edSelect("project:timebase", "影格率", Timebase.label(p.timebase), Timebase.allowed.map(Timebase.label))}<p class="note">${w} × ${h} · ${esc(Timebase.label(p.timebase))}　${edTotal().toFixed(1)}s · ${p.clips.length} 段</p>${edButton("匯出影片", "export", !p.clips.length)}</section><p class="note">點擊時間軸上的片段，這裡會變成該片段的屬性。</p>`;
+}
+function edClipInspector(p, c) {
+  const kind = c.kind === "text" ? "text" : c.kind === "audio" ? "audio" : "video";
+  let html =
+    `<h4>${esc(edTrack(p, c.track)?.name || c.track)} 片段</h4><div class="flow-choices" role="group" aria-label="軌道">${p.tracks
+      .filter((t) => t.kind === kind)
+      .map(
+        (t) =>
+          `<button type="button" class="btn small ${t.id === c.track ? "selected" : ""}" data-ed-action="clip-track:${esc(t.id)}" aria-pressed="${t.id === c.track}">${esc(t.name)}</button>`,
+      )
+      .join("")}</div>` +
+    edInput("start", "時間軸起點（秒）", c.start, "number", 'min="0" step="0.1"') +
+    edInput("duration", "片段長度（秒）", c.duration, "number", 'min="0.05" step="0.1"');
+  if (["video", "audio"].includes(c.kind))
+    html +=
+      edInput("sourceStart", "素材起點（秒）", c.sourceStart, "number", 'min="0" step="0.1"') +
+      edInput("speed", "播放速度", c.speed, "number", 'min="0.25" max="4" step="0.25"') +
+      edInput("volume", "片段音量", c.volume, "number", 'min="0" max="4" step="0.1"') +
+      edButton(c.muted ? "取消片段靜音" : "片段靜音", "toggle:muted") +
+      edInput("fadeIn", "音訊淡入（秒）", c.fadeIn, "number", 'min="0" step="0.1"') +
+      edInput("fadeOut", "音訊淡出（秒）", c.fadeOut, "number", 'min="0" step="0.1"');
+  if (c.kind === "text")
+    html +=
+      `<label>文字內容<textarea data-ed-field="text" aria-label="文字內容" maxlength="4000">${esc(c.text)}</textarea></label>` +
+      edSelect("font", "字型", c.font, ["思源黑體", "思源宋體", "Arial", "Georgia", "等寬字"]) +
+      edInput("fontSize", "字級", c.fontSize, "number", 'min="8" max="300"') +
+      edSelect("align", "文字對齊", c.align, ["靠左", "置中", "靠右"]) +
+      edInput("color", "文字顏色", c.color, "color") +
+      edButton(c.bold ? "取消粗體" : "粗體", "toggle:bold") +
+      edButton(c.italic ? "取消斜體" : "斜體", "toggle:italic") +
+      edButton(c.backgroundColor ? "移除文字底色" : "加上文字底色", "text-background") +
+      (c.backgroundColor ? edInput("backgroundColor", "文字底色", c.backgroundColor, "color") : "") +
+      edSelect("animation", "文字動畫", c.animation, ["無", "淡入淡出", "彈出", "逐字顯示"]);
+  const main = c.track === edMain(p);
+  if (c.kind !== "audio")
+    html +=
+      edInput("x", main ? "水平偏移（px）" : "水平位置（%）", c.x) +
+      edInput("y", main ? "垂直偏移（px）" : "垂直位置（%）", c.y) +
+      edInput("scale", "縮放", c.scale, "number", 'min="0.1" max="5" step="0.1"') +
+      edInput("rotation", "旋轉角度", c.rotation, "number", 'min="-360" max="360"') +
+      edInput("opacity", "不透明度", c.opacity, "number", 'min="0" max="1" step="0.1"') +
+      (edOverlay(p, c.track)
+        ? edInput("width", "疊加寬度（%）", c.width, "number", 'min="1" max="100"')
+        : main
+          ? edSelect("background", "背景", c.background || "黑色", ["黑色", "模糊", "純色"]) +
+            (c.background === "純色" ? edInput("backgroundColor", "背景顏色", c.backgroundColor || "#000000", "color") : "")
+          : "");
+  if (["video", "image"].includes(c.kind))
+    html +=
+      `<section class="editor-insp-group"><h4>畫面效果</h4>${edSelect("filter", "片段濾鏡", c.filter || "原始", edFilters)}${edSelect("mask", "片段遮罩", c.mask || "無", ["無", "圓形", "圓角矩形", "三角形"])}${edInput("grain", "顆粒強度", c.grain || 0, "number", 'min="0" max="1" step="0.1"')}</section>` +
+      `<section class="editor-insp-group">${edColorPane(p, c)}</section>`;
+  // Card P3: a clip rendered by the compositor links back to its source composition (scripts/tools-compositor.js).
+  if (typeof cpEditorClip === "function") html += cpEditorClip(p, c);
+  return html;
+}
+function edToolbar(p, c) {
+  return `<div class="editor-toolbar">${edButton("復原", "undo", !ed.undo.length)}${edButton("重做", "redo", !ed.redo.length)}${edButton("上一格", "frame:-1")}${edButton("下一格", "frame:1")}${edButton("設為入點", "set-in", !c)}${edButton("設為出點", "set-out", !c)}${edButton("分割", "split", !c)}${edButton("刪除", "delete", !c)}${edButton("刪除並前移", "ripple", !c)}${edButton("複製", "duplicate", !c)}${edButton("新增標記", "marker")}${edButton("主軌吸附排列", "compact")}<label class="editor-zoom">縮放<input type="range" min="10" max="100" value="${ed.zoom}" data-ed-zoom aria-label="時間軸縮放"><span>${ed.zoom} px/s</span></label></div>`;
+}
+const edLaneHint = (p, id, kind) =>
+  kind === "text"
+    ? "文字 — 從左側「文字」或「字幕」加入"
+    : kind === "audio"
+      ? "音訊 — 從左側「音訊」加入"
+      : id === edMain(p)
+        ? "主視訊 — 從左側「素材」加入影片／圖片"
+        : "疊加層 — 放 logo、浮水印或子畫面，疊在主視訊之上";
+// Ruler labels at least ~80 px apart.
+const edRulerStep = () => [0.5, 1, 2, 5, 10, 15, 30, 60, 120].find((s) => s * ed.zoom >= 80) || 300;
+function edTimeline(p) {
+  const width = Math.max(600, edEnd() * ed.zoom + 100),
+    step = edRulerStep(),
+    ticks = [];
+  // Lanes stretch to the panel width (CSS flex), so ticks run to the screen width at least.
+  for (let s = 0; s * ed.zoom < Math.max(width, screen.width); s += step)
+    ticks.push(`<span class="editor-tick" style="left:${s * ed.zoom}px">${edClockText(s)}</span>`);
+  const playhead = `<div class="editor-playhead" style="left:${ed.time * ed.zoom}px"></div>`;
+  return `<div class="editor-timeline"><div class="editor-track editor-ruler-row"><div class="editor-track-name"></div><div class="editor-ruler" data-ed-ruler role="slider" tabindex="0" aria-label="播放頭位置" aria-valuemin="0" aria-valuemax="${edEnd().toFixed(2)}" aria-valuenow="${ed.time.toFixed(2)}" style="width:${width}px">${ticks.join("")}${playhead}</div></div>${p.tracks
+    .map(
+      ({ id, kind, name, hidden, muted, normalize }) =>
+        `<div class="editor-track" data-ed-track="${esc(id)}"><div class="editor-track-name"><b>${esc(name)}</b>${edButton(hidden ? "顯示" : "隱藏", "track-hidden:" + id)}${kind !== "text" ? edButton(muted ? "開聲" : "靜音", "track-muted:" + id) : ""}${kind === "audio" ? edButton(normalize ? "取消均衡" : "均衡", "track-normalize:" + id) : ""}${id === edMain(p) ? "" : edButton("刪除軌道", "track-delete:" + id)}</div><div class="editor-track-lane" data-ed-lane="${esc(id)}" style="width:${width}px">${p.clips
+          .filter((c) => c.track === id)
+          .map(
+            (c) =>
+              `<button class="editor-clip ${ed.selected === c.id ? "selected" : ""}" data-ed-clip="${c.id}" style="left:${c.start * ed.zoom}px;width:${Math.max(8, c.duration * ed.zoom)}px" title="${esc(c.text || c.asset?.name || "片段")} · ${c.start.toFixed(2)}s / ${c.duration.toFixed(2)}s"><span>${esc(c.text || c.asset?.name || "片段")}</span><i data-ed-trim title="拖拉調整片段長度"></i></button>`,
+          )
+          .join("")}${p.clips.some((c) => c.track === id) ? "" : `<span class="editor-lane-hint">${edLaneHint(p, id, kind)}</span>`}${playhead}${(p.markers || []).map((time) => `<button class="editor-marker" data-ed-marker="${time}" style="left:${time * ed.zoom}px" title="跳至 ${time.toFixed(2)} 秒">◆</button>`).join("")}</div></div>`,
+    )
+    .join(
+      "",
+    )}<div class="editor-track"><div class="editor-track-name editor-track-add" title="影片軌最多 ${EditorModel.LIMITS.video} 條、音訊軌 ${EditorModel.LIMITS.audio} 條、文字軌 ${EditorModel.LIMITS.text} 條，合計最多 ${EditorModel.TOTAL} 條。第一條影片軌（${esc(edMain(p))}）是全畫面主軌，不能刪除。">${["video", "audio", "text"].map((kind) => edButton("新增" + EditorModel.NAME[kind] + "軌", "track-add:" + kind, !EditorModel.canAdd(p.tracks, kind))).join("")}</div></div></div>`;
+}
 function toolEditorScreen(t) {
   const p = edProject(),
     c = edClip();
@@ -428,190 +662,10 @@ function toolEditorScreen(t) {
   if (!p)
     return wfWrap(
       t,
-      `<h3>剪輯專案</h3><p class="note">保留原始素材；時間軸、文字與音軌獨立儲存。</p>${edButton("新增專案", "new")}<div class="flow-choices">${ed.projects.map((p) => edButton(p.title + " · " + p.ratio, "open:" + p.id)).join("")}</div>`,
+      `<h3>剪輯專案</h3><p class="note">保留原始素材；時間軸、文字與音軌獨立儲存。</p>${edButton("新建剪輯專案", "new")}<div class="flow-choices">${ed.projects.map((p) => edButton(p.title + " · " + p.ratio, "open:" + p.id)).join("")}</div>`,
     );
-  let pane = "";
-  if (ed.pane === "素材")
-    pane = `<h3>素材</h3>${edButton("從素材庫加入", "library")}${edButton("上傳素材", "upload")}<p class="note">影片／圖片加入 V1，音訊加入 A1。可在屬性更換軌道。</p>${p.assets.map((a) => `<div class="editor-asset">${esc(a.name || "素材")}${edButton("加入時間軸", "asset:" + a.id)}</div>`).join("")}`;
-  if (ed.pane === "文字")
-    pane = `<h3>文字</h3>${["空白文字", "主標題", "副標題", "內文", "重點提示", "金句", "步驟", "章節", "下標", "開場", "結尾", "價格", "標籤", "品牌", "呼籲行動"].map((title, i) => edButton(title, "text:" + i)).join("")}`;
-  if (ed.pane === "片頭") pane = edTitlePane(p);
-  if (ed.pane === "音訊")
-    pane = `<h3>音訊</h3>${edButton("選擇音訊", "library:audio")}${edButton("上傳音訊", "upload:audio")}<p class="note">每條音訊軌可獨立安排時間、音量、淡入淡出與音量均衡；音量＝片段音量 × 軌道音量（0 為靜音）。</p>${edLoudnessPane(p)}${c && ["video", "audio"].includes(c.kind) ? edKeysPane(p, c) : ""}`;
-  if (ed.pane === "轉場") pane = edTransitionPane(p, c);
-  if (ed.pane === "調色") pane = edColorPane(p, c);
-  if (ed.pane === "特效")
-    pane = `<h3>特效</h3>${edSelect("project:filter", "專案濾鏡", p.filter || "原始", edFilters)}${c ? edSelect("filter", "片段濾鏡", c.filter || "原始", edFilters) + edSelect("mask", "片段遮罩", c.mask || "無", ["無", "圓形", "圓角矩形", "三角形"]) + edInput("grain", "顆粒強度", c.grain || 0, "number", 'min="0" max="1" step="0.1"') : ""}<p class="note">光漏、鏡頭震動與關鍵影格尚未接入。</p>`;
-  if (ed.pane === "貼圖")
-    pane = `<h3>貼圖／品牌圖</h3>${edButton("選擇圖片", "library:image")}${edButton("上傳透明 PNG", "upload:image")}<p class="note">以主影片軌之上的影片軌疊加圖片，可設定時間、位置、大小與透明度。</p>`;
-  if (ed.pane === "字幕")
-    pane = `<h3>字幕</h3>${edButton("匯入 SRT／VTT", "subtitles-import")}${edButton("下載 SRT", "subtitles-download:srt")}${edButton("下載 VTT", "subtitles-download:vtt")}${edButton("前往字幕工具", "subtitles-tool")}<p class="note">每段字幕為文字軌片段，可逐段修改。時間重疊的字幕分放在不同文字軌；下載時重疊部分合併成同一段（多行）。辨識與翻譯請至字幕工具處理後匯入。</p>`;
-  if (ed.pane === "剪贅字")
-    pane =
-      "<h3>剪贅字</h3><p>自動剪贅字需要逐字時間戳服務，目前尚未接入。可分割後使用「刪除並前移」手動剪除。</p>";
-  let inspector = "<h3>片段屬性</h3><p>請點選時間軸片段。</p>";
-  if (c) {
-    const kind =
-      c.kind === "text" ? "text" : c.kind === "audio" ? "audio" : "video";
-    inspector =
-      "<h3>片段屬性</h3>" +
-      `<div class="flow-choices" role="group" aria-label="軌道">${p.tracks
-        .filter((t) => t.kind === kind)
-        .map(
-          (t) =>
-            `<button type="button" class="btn small ${t.id === c.track ? "selected" : ""}" data-ed-action="clip-track:${esc(t.id)}" aria-pressed="${t.id === c.track}">${esc(t.name)}</button>`,
-        )
-        .join("")}</div>` +
-      edInput(
-        "start",
-        "時間軸起點（秒）",
-        c.start,
-        "number",
-        'min="0" step="0.1"',
-      ) +
-      edInput(
-        "duration",
-        "片段長度（秒）",
-        c.duration,
-        "number",
-        'min="0.05" step="0.1"',
-      );
-    if (["video", "audio"].includes(c.kind))
-      inspector +=
-        edInput(
-          "sourceStart",
-          "素材起點（秒）",
-          c.sourceStart,
-          "number",
-          'min="0" step="0.1"',
-        ) +
-        edInput(
-          "speed",
-          "播放速度",
-          c.speed,
-          "number",
-          'min="0.25" max="4" step="0.25"',
-        ) +
-        edInput(
-          "volume",
-          "片段音量",
-          c.volume,
-          "number",
-          'min="0" max="4" step="0.1"',
-        ) +
-        edButton(c.muted ? "取消片段靜音" : "片段靜音", "toggle:muted") +
-        edInput(
-          "fadeIn",
-          "音訊淡入（秒）",
-          c.fadeIn,
-          "number",
-          'min="0" step="0.1"',
-        ) +
-        edInput(
-          "fadeOut",
-          "音訊淡出（秒）",
-          c.fadeOut,
-          "number",
-          'min="0" step="0.1"',
-        );
-    if (c.kind === "text")
-      inspector +=
-        `<label>文字內容<textarea data-ed-field="text" aria-label="文字內容" maxlength="4000">${esc(c.text)}</textarea></label>` +
-        edSelect("font", "字型", c.font, [
-          "思源黑體",
-          "思源宋體",
-          "Arial",
-          "Georgia",
-          "等寬字",
-        ]) +
-        edInput("fontSize", "字級", c.fontSize, "number", 'min="8" max="300"') +
-        edSelect("align", "文字對齊", c.align, ["靠左", "置中", "靠右"]) +
-        edInput("color", "文字顏色", c.color, "color") +
-        edButton(c.bold ? "取消粗體" : "粗體", "toggle:bold") +
-        edButton(c.italic ? "取消斜體" : "斜體", "toggle:italic") +
-        edButton(
-          c.backgroundColor ? "移除文字底色" : "加上文字底色",
-          "text-background",
-        ) +
-        (c.backgroundColor
-          ? edInput("backgroundColor", "文字底色", c.backgroundColor, "color")
-          : "") +
-        edSelect("animation", "文字動畫", c.animation, [
-          "無",
-          "淡入淡出",
-          "彈出",
-          "逐字顯示",
-        ]);
-    const main = c.track === edMain(p);
-    if (c.kind !== "audio")
-      inspector +=
-        edInput("x", main ? "水平偏移（px）" : "水平位置（%）", c.x) +
-        edInput("y", main ? "垂直偏移（px）" : "垂直位置（%）", c.y) +
-        edInput(
-          "scale",
-          "縮放",
-          c.scale,
-          "number",
-          'min="0.1" max="5" step="0.1"',
-        ) +
-        edInput(
-          "rotation",
-          "旋轉角度",
-          c.rotation,
-          "number",
-          'min="-360" max="360"',
-        ) +
-        edInput(
-          "opacity",
-          "不透明度",
-          c.opacity,
-          "number",
-          'min="0" max="1" step="0.1"',
-        ) +
-        (edOverlay(p, c.track)
-          ? edInput(
-              "width",
-              "疊加寬度（%）",
-              c.width,
-              "number",
-              'min="1" max="100"',
-            )
-          : main
-            ? edSelect("background", "背景", c.background || "黑色", [
-                "黑色",
-                "模糊",
-                "純色",
-              ]) +
-              (c.background === "純色"
-                ? edInput(
-                    "backgroundColor",
-                    "背景顏色",
-                    c.backgroundColor || "#000000",
-                    "color",
-                  )
-                : "")
-            : "");
-  }
-  // Card P3: a clip rendered by the compositor links back to its source composition (scripts/tools-compositor.js).
-  if (c && typeof cpEditorClip === "function") inspector += cpEditorClip(p, c);
-  const [w, h] = edRatios[p.ratio];
-  return wfWrap(
-    t,
-    `<div class="editor-heading">${edButton("所有專案", "projects")}${edInput("project:title", "專案名稱", p.title, "text", 'maxlength="100"')}${edSelect("project:ratio", "輸出比例", p.ratio, Object.keys(edRatios))}${edSelect("project:timebase", "影格率", Timebase.label(p.timebase), Timebase.allowed.map(Timebase.label))}${edButton("復原", "undo", !ed.undo.length)}${edButton("重做", "redo", !ed.redo.length)}${edButton("匯出影片", "export", !p.clips.length)}</div><div class="editor-workspace"><nav class="editor-panes">${["素材", "文字", "片頭", "音訊", "轉場", "特效", "調色", "貼圖", "字幕", "剪贅字"].map((title) => `<button class="btn ${ed.pane === title ? "selected" : ""}" data-ed-pane="${title}" aria-pressed="${ed.pane === title}">${title}</button>`).join("")}</nav><aside class="editor-library">${pane}</aside><section class="editor-player"><div class="editor-stage" data-ed-stage style="aspect-ratio:${w}/${h};width:min(100%,${(430 * w) / h}px)"></div><div class="row">${edButton("播放／暫停", "play")}<span data-ed-clock></span><input type="range" aria-label="播放位置" data-ed-seek min="0" max="${edEnd()}" step="0.01" value="${ed.time}"></div><div class="row editor-peak" data-ed-peak role="meter" aria-label="主輸出峰值" aria-valuemin="-60" aria-valuemax="0" aria-valuenow="-60"><span class="editor-peak-bar" style="display:inline-block;width:160px;height:8px;border:1px solid currentColor;position:relative"><i data-ed-peak-fill style="position:absolute;left:0;top:0;bottom:0;width:0;background:#4ade80"></i></span><span data-ed-peak-text>峰值 — dBFS</span><span class="note">超過 −1 dB 會在輸出時自動壓低</span></div><p class="note">預覽呈現片段、文字與基本變形；轉場以透明度、調色以 CSS 近似，濾鏡與文字動畫以匯出影片為準。</p></section><aside class="editor-inspector">${inspector}</aside></div><div class="row editor-toolbar">${edButton("上一格", "frame:-1")}${edButton("下一格", "frame:1")}${edButton("設為入點", "set-in", !c)}${edButton("設為出點", "set-out", !c)}${edButton("分割", "split", !c)}${edButton("複製", "duplicate", !c)}${edButton("刪除", "delete", !c)}${edButton("刪除並前移", "ripple", !c)}${edButton("主軌吸附排列", "compact")}${edButton("新增標記", "marker")}<label>時間軸縮放<input type="range" min="10" max="100" value="${ed.zoom}" data-ed-zoom></label></div><div class="row editor-track-add">${["video", "audio", "text"].map((kind) => edButton("新增" + EditorModel.NAME[kind] + "軌", "track-add:" + kind, !EditorModel.canAdd(p.tracks, kind))).join("")}<span class="note">影片軌最多 ${EditorModel.LIMITS.video} 條、音訊軌 ${EditorModel.LIMITS.audio} 條、文字軌 ${EditorModel.LIMITS.text} 條，合計最多 ${EditorModel.TOTAL} 條。第一條影片軌（${esc(edMain(p))}）是全畫面主軌（最底層、不能刪除），其後的影片軌依清單順序疊在上方。</span></div><div class="editor-timeline">${p.tracks
-      .map(
-        ({ id, kind, name, hidden, muted, normalize }) =>
-          `<div class="editor-track" data-ed-track="${esc(id)}"><div class="editor-track-name"><b>${esc(name)}</b>${edButton(hidden ? "顯示" : "隱藏", "track-hidden:" + id)}${kind !== "text" ? edButton(muted ? "開聲" : "靜音", "track-muted:" + id) : ""}${kind === "audio" ? edButton(normalize ? "取消均衡" : "均衡", "track-normalize:" + id) : ""}${id === edMain(p) ? "" : edButton("刪除軌道", "track-delete:" + id)}</div><div class="editor-track-lane" data-ed-lane="${esc(id)}" style="width:${Math.max(600, edEnd() * ed.zoom + 100)}px">${p.clips
-            .filter((c) => c.track === id)
-            .map(
-              (c) =>
-                `<button class="editor-clip ${ed.selected === c.id ? "selected" : ""}" data-ed-clip="${c.id}" style="left:${c.start * ed.zoom}px;width:${Math.max(8, c.duration * ed.zoom)}px" title="${esc(c.text || c.asset?.name || "片段")} · ${c.start.toFixed(2)}s / ${c.duration.toFixed(2)}s"><span>${esc(c.text || c.asset?.name || "片段")}</span><i data-ed-trim title="拖拉調整片段長度"></i></button>`,
-            )
-            .join(
-              "",
-            )}<div class="editor-playhead" style="left:${ed.time * ed.zoom}px"></div>${(p.markers || []).map((time) => `<button class="editor-marker" data-ed-marker="${time}" style="left:${time * ed.zoom}px" title="跳至 ${time.toFixed(2)} 秒">◆</button>`).join("")}</div></div>`,
-      )
-      .join("")}</div>`,
-  );
+  const l = ed.layout;
+  return `<div class="editor-app" data-tool-flow="edit" style="--ed-timeline:${l.timeline}px">${edTopbar(p)}<div class="editor-workspace" data-ed-workspace style="grid-template-columns:${edColumns()}">${edRail()}${l.leftOpen ? `<aside class="editor-library">${edPane(p, c)}</aside>${edResizer("left", "vertical", "調整面板寬度", l.left)}` : ""}${edPlayer(p)}${l.rightOpen ? `${edResizer("right", "vertical", "調整檢查器寬度", l.right)}<aside class="editor-inspector">${edInspector(p, c)}</aside>` : ""}</div>${edResizer("timeline", "horizontal", "調整時間軸高度", l.timeline)}${edToolbar(p, c)}${edTimeline(p)}</div>`;
 }
 // Remotion title templates (backend/remotion.cjs via /generations). The catalog comes from /capabilities; ratio
 // and fps follow the project, so nothing here is a second source of template ids or sizes.
@@ -640,7 +694,7 @@ async function edTitleRefresh() {
   ed.title.done = ed.title.jobId
     ? rows.find((a) => a.id === "job-" + ed.title.jobId) || null
     : null;
-  if (tool === "edit" && ed.pane === "片頭") edRender();
+  if (tool === "edit" && ed.pane === "文字") edRender();
 }
 function edTitlePane(p) {
   // The pane's state belongs to one project: another project's finished title must not be offered here.
@@ -1070,16 +1124,12 @@ function edPaint() {
     }
   }
   const clock = document.querySelector("[data-ed-clock]"),
-    seek = document.querySelector("[data-ed-seek]");
+    ruler = document.querySelector("[data-ed-ruler]");
   if (clock)
-    clock.textContent =
-      ed.time.toFixed(2) +
-      " / " +
-      edEnd().toFixed(2) +
-      " 秒 · 第 " +
-      edFrame(p) +
-      " 格";
-  if (seek) seek.value = ed.time;
+    clock.textContent = `${edClockText(ed.time)} / ${edClockText(edTotal())} · 第 ${edFrame(p)} 格`;
+  ruler?.setAttribute("aria-valuenow", ed.time.toFixed(2));
+  const play = document.querySelector('[data-ed-action="play"]');
+  if (play) play.textContent = ed.playing ? "❚❚" : "▶";
   document
     .querySelectorAll(".editor-playhead")
     .forEach((el) => (el.style.left = ed.time * ed.zoom + "px"));
@@ -1100,7 +1150,7 @@ function edDialog(content) {
   const d = document.createElement("dialog");
   d.className = "editor-dialog";
   d.innerHTML = VideoWorkbench.sanitize(
-    content + '<button class="btn" type="button" data-ed-close>關閉</button>',
+    '<button class="editor-dialog-close" type="button" data-ed-close aria-label="關閉">×</button>' + content,
   );
   document.body.append(d);
   d.querySelector("[data-ed-close]").onclick = () => d.close();
@@ -1159,21 +1209,24 @@ async function edAction(action) {
   if (action.startsWith("comp-") && typeof cpEditorAction === "function")
     return cpEditorAction(action, p, c);
   if (action === "new") {
+    // Card ED.1: the reference's 「新建剪輯專案」 -- name + a card per ratio (AwareWave also offers 4:3).
     const d = edDialog(
-      '<form><h3>新增剪輯專案</h3><label>專案標題<input data-ed-create-title class="text-input" aria-label="專案標題" maxlength="100" value="未命名專案" required></label><label>影片比例<select data-ed-create-ratio class="text-input" aria-label="影片比例">' +
-        Object.keys(edRatios)
-          .map((r) => "<option>" + r + "</option>")
-          .join("") +
-        '</select></label><button class="btn primary" type="submit">建立專案</button></form>',
+      `<form><h3>新建剪輯專案</h3><label>專案名稱<input data-ed-create-title class="text-input" aria-label="專案名稱" maxlength="100" value="未命名剪輯專案" required></label><fieldset class="editor-ratio-cards"><legend>畫面比例</legend>${edCreateRatios
+        .map(
+          ([r, name, use], i) =>
+            `<label class="editor-ratio-card"><input type="radio" name="ratio" value="${r}" data-ed-create-ratio ${i ? "" : "checked"}><i style="aspect-ratio:${edRatios[r].join("/")}" aria-hidden="true"></i><b>${r} ${name}</b><small>${edRatios[r].join(" × ")} · ${use}</small></label>`,
+        )
+        .join("")}</fieldset><div class="row"><button class="btn" type="button" data-ed-create-cancel>取消</button><button class="btn primary" type="submit">建立專案</button></div></form>`,
     );
+    d.querySelector("[data-ed-create-cancel]").onclick = () => d.close();
     d.querySelector("form").onsubmit = async (e) => {
       e.preventDefault();
       const title = d.querySelector("[data-ed-create-title]").value,
-        ratio = d.querySelector("[data-ed-create-ratio]").value,
+        ratio = d.querySelector("[data-ed-create-ratio]:checked").value,
         id = crypto.randomUUID();
       ed.projects.push({
         id,
-        title: String(title).trim() || "未命名專案",
+        title: String(title).trim() || "未命名剪輯專案",
         ratio,
         timebase: { ...Timebase.DEFAULT },
         clips: [],
@@ -1214,7 +1267,7 @@ async function edAction(action) {
       edStop();
       return;
     }
-    if (ed.time >= edEnd()) ed.time = 0;
+    if (ed.time >= edPlayEnd()) ed.time = 0;
     edAudioStart();
     ed.playing = true;
     let previous = performance.now();
@@ -1223,10 +1276,11 @@ async function edAction(action) {
         edStop();
         return;
       }
-      ed.time = Math.min(edEnd(), ed.time + (now - previous) / 1000);
+      ed.time = Math.min(edPlayEnd(), ed.time + (now - previous) / 1000);
       previous = now;
+      if (ed.time >= edPlayEnd() && ed.loop) ed.time = 0;
       edPaint();
-      if (ed.time >= edEnd()) edStop();
+      if (ed.time >= edPlayEnd()) edStop();
       else ed.raf = requestAnimationFrame(tick);
     };
     ed.raf = requestAnimationFrame(tick);
@@ -1471,6 +1525,30 @@ async function edAction(action) {
     edPaint();
     return;
   }
+  // Card ED.1: view actions (no undo step, no project change).
+  if (action.startsWith("jump:")) {
+    const to = action.slice(5);
+    ed.time = Math.min(edEnd(), Math.max(0, to === "start" ? 0 : to === "end" ? edTotal() : ed.time + Number(to)));
+    edPaint();
+    return;
+  }
+  if (action === "loop") {
+    ed.loop = !ed.loop;
+    edRedraw();
+    return;
+  }
+  if (action === "fullscreen") {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else await document.querySelector("[data-ed-stage-frame]")?.requestFullscreen();
+    return;
+  }
+  if (action.startsWith("layout:")) {
+    const key = action.slice(7) + "Open";
+    ed.layout = { ...ed.layout, [key]: !ed.layout[key] };
+    edLayoutSave();
+    edRedraw();
+    return;
+  }
   edCheckpoint();
   if (action === "marker")
     p.markers = [
@@ -1531,6 +1609,11 @@ async function edAction(action) {
       return;
     }
     p.tracks = p.tracks.filter((t) => t.id !== id);
+  }
+  if (action.startsWith("project-filter:")) {
+    const filter = action.slice(15);
+    if (!edFilters.includes(filter)) throw Error("濾鏡不存在");
+    p.filter = filter;
   }
   if (action.startsWith("loudness:"))
     p.output = { ...p.output, loudness: Number(action.slice(9)) };
@@ -1843,12 +1926,19 @@ document.addEventListener("click", (e) => {
   if (action) edAction(action.dataset.edAction).catch(VideoWorkbench.reportError);
   if (pane) {
     ed.pane = pane.dataset.edPane;
-    if (ed.pane === "片頭") ed.title.images = null;
-    edRender();
+    if (ed.pane === "文字") ed.title.images = null;
+    if (!ed.layout.leftOpen) {
+      ed.layout = { ...ed.layout, leftOpen: true };
+      edLayoutSave();
+    }
+    edRedraw();
   }
   if (clip) {
     ed.selected = clip.dataset.edClip;
     edRender();
+  } else if (ed.selected && e.target.matches("[data-ed-lane]")) {
+    ed.selected = null;
+    edRedraw();
   }
   if (marker) {
     ed.time = Number(marker.dataset.edMarker);
@@ -1906,11 +1996,6 @@ document.addEventListener("change", (e) => {
 document.addEventListener("input", (e) => {
   if (e.target.dataset.edTitleField)
     ed.title.fields[e.target.dataset.edTitleField] = e.target.value;
-  if (e.target.matches("[data-ed-seek]")) {
-    edStop();
-    ed.time = Number(e.target.value);
-    edPaint();
-  }
   if (e.target.matches("[data-ed-zoom]")) {
     ed.zoom = Number(e.target.value);
     edRender();
@@ -1966,13 +2051,87 @@ document.addEventListener("pointerdown", (e) => {
     edRender();
   };
 });
+// Card ED.1: panel and timeline-height separators. Drag or arrow keys resize; the size is saved on release.
+function edResize(side, delta) {
+  const [min, max] = edLayoutLimits[side];
+  ed.layout = { ...ed.layout, [side]: Math.min(max, Math.max(min, Math.round(delta))) };
+  const app = document.querySelector(".editor-app"),
+    workspace = document.querySelector("[data-ed-workspace]");
+  app?.style.setProperty("--ed-timeline", ed.layout.timeline + "px");
+  if (workspace) workspace.style.gridTemplateColumns = edColumns();
+  document.querySelector(`[data-ed-resize="${side}"]`)?.setAttribute("aria-valuenow", ed.layout[side]);
+  edPaint();
+}
+// Drag sign per separator: the left drawer grows rightwards, the inspector leftwards, the timeline upwards.
+const edResizeAxis = { left: ["clientX", 1], right: ["clientX", -1], timeline: ["clientY", -1] };
+function edSeekTo(ruler, clientX) {
+  edStop();
+  ed.time = Math.min(edEnd(), Math.max(0, (clientX - ruler.getBoundingClientRect().left) / ed.zoom));
+  edPaint();
+}
+document.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0) return;
+  const handle = e.target.closest("[data-ed-resize]"),
+    ruler = e.target.closest("[data-ed-ruler]");
+  if (ruler) {
+    edSeekTo(ruler, e.clientX);
+    ruler.setPointerCapture(e.pointerId);
+    ruler.onpointermove = (ev) => edSeekTo(ruler, ev.clientX);
+    ruler.onpointerup = ruler.onpointercancel = () => (ruler.onpointermove = ruler.onpointerup = ruler.onpointercancel = null);
+    return;
+  }
+  if (!handle) return;
+  const side = handle.dataset.edResize,
+    [axis, sign] = edResizeAxis[side],
+    from = e[axis],
+    start = ed.layout[side];
+  e.preventDefault();
+  handle.setPointerCapture(e.pointerId);
+  handle.onpointermove = (ev) => edResize(side, start + sign * (ev[axis] - from));
+  handle.onpointerup = handle.onpointercancel = () => {
+    handle.onpointermove = handle.onpointerup = handle.onpointercancel = null;
+    edLayoutSave();
+  };
+});
+document.addEventListener("fullscreenchange", () => tool === "edit" && edPaint());
 document.addEventListener("keydown", (e) => {
+  const handle = e.target.closest?.("[data-ed-resize]");
+  if (handle && /^Arrow/.test(e.key)) {
+    const side = handle.dataset.edResize,
+      [axis, sign] = edResizeAxis[side],
+      step = (axis === "clientX" ? { ArrowRight: 16, ArrowLeft: -16 } : { ArrowDown: 16, ArrowUp: -16 })[e.key];
+    if (step) {
+      e.preventDefault();
+      edResize(side, ed.layout[side] + sign * step);
+      edLayoutSave();
+    }
+    return;
+  }
   if (
     tool !== "edit" ||
     !edProject() ||
     e.target.closest("input,textarea,select,[contenteditable],dialog")
   )
     return;
+  if (e.key === "Escape" && ed.selected) {
+    ed.selected = null;
+    edRedraw();
+    return;
+  }
+  const key = e.key.toLowerCase(),
+    view =
+      key === "[" || (e.altKey && e.code === "Digit1")
+        ? "layout:left"
+        : key === "]" || (e.altKey && e.code === "Digit2")
+          ? "layout:right"
+          : key === "f" && !e.ctrlKey && !e.metaKey
+            ? "fullscreen"
+            : null;
+  if (view) {
+    e.preventDefault();
+    edAction(view).catch(VideoWorkbench.reportError);
+    return;
+  }
   const action =
     e.code === "Space"
       ? "play"

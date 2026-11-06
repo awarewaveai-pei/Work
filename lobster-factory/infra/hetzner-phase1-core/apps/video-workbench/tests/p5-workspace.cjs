@@ -65,9 +65,9 @@ async function setField(page, label, value) {
 
     // An editor project to place the render on (same UI path as the P3 round trip).
     await page.goto(base + "/pages/tools.html#edit");
-    await page.getByRole("button", { name: "新增專案", exact: true }).click();
-    await page.getByLabel("專案標題").fill("P5 3D");
-    await page.getByLabel("影片比例").selectOption("16:9");
+    await page.getByRole("button", { name: "新建剪輯專案", exact: true }).click();
+    await page.getByLabel("專案名稱").fill("P5 3D");
+    await page.getByRole("radio", { name: /^16:9 / }).check();
     await page.getByRole("button", { name: "建立專案", exact: true }).click();
     await page.waitForFunction(() => typeof ed !== "undefined" && ed.projects.some((p) => p.title === "P5 3D"));
 

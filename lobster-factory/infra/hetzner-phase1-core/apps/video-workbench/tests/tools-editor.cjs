@@ -56,12 +56,12 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "vw-editor-"));
         : r.abort(),
     );
     await page.goto(base + "/pages/tools.html#edit");
-    await page.getByRole("button", { name: "新增專案", exact: true }).click();
-    await page.getByLabel("專案標題").fill("時間軸測試");
-    await page.getByLabel("影片比例").selectOption("4:5");
+    await page.getByRole("button", { name: "新建剪輯專案", exact: true }).click();
+    await page.getByLabel("專案名稱").fill("時間軸測試");
+    await page.getByRole("radio", { name: /^4:5 / }).check();
     await page.getByRole("button", { name: "建立專案", exact: true }).click();
     await page.waitForSelector("[data-ed-stage]");
-    assert.equal(await page.locator("[data-ed-pane]").count(), 10);
+    assert.equal(await page.locator("[data-ed-pane]").count(), 8);
     assert.equal(await page.locator("[data-ed-lane]").count(), 5);
     await page.evaluate(async (asset) => edAdd(asset), {
       id: "fixture",
@@ -71,7 +71,7 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "vw-editor-"));
     });
     await page.getByLabel("片段長度（秒）").fill("2");
     await page.getByLabel("片段長度（秒）").press("Tab");
-    await page.locator("[data-ed-seek]").fill("1");
+    await page.locator("[data-ed-ruler]").click({ position: { x: await page.evaluate(() => ed.zoom), y: 8 } });
     await page.getByRole("button", { name: "分割", exact: true }).click();
     assert.equal(await page.locator("[data-ed-clip]").count(), 2);
     await page.getByRole("button", { name: "復原", exact: true }).click();
@@ -88,7 +88,7 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "vw-editor-"));
     await page.getByLabel("文字內容").press("Tab");
     await page.getByLabel("片段長度（秒）").fill("1");
     await page.getByLabel("片段長度（秒）").press("Tab");
-    await page.getByRole("button", { name: "匯出影片", exact: true }).click();
+    await page.getByRole("button", { name: "匯出", exact: true }).click();
     await page.locator('[data-ed-action="quality:720p"]').click();
     await page.locator("[data-ed-export]").click();
     await page.waitForFunction(

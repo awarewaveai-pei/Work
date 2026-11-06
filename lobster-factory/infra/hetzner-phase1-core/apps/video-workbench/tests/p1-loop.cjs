@@ -47,7 +47,7 @@ async function waitExportAsset(page) {
   throw Error("export asset never reached the library");
 }
 async function exportProject(page) {
-  await page.getByRole("button", { name: "匯出影片", exact: true }).click();
+  await page.getByRole("button", { name: "匯出", exact: true }).click();
   await page.locator('[data-ed-action="quality:720p"]').click();
   await page.locator("[data-ed-export]").click();
   return waitExportAsset(page);
@@ -62,9 +62,9 @@ async function exportProject(page) {
     page.on("pageerror", (e) => errors.push(e.message));
     await page.route("**/*", (r) => (r.request().url().startsWith(base + "/") ? r.continue() : r.abort()));
     await page.goto(base + "/pages/tools.html#edit");
-    await page.getByRole("button", { name: "新增專案", exact: true }).click();
-    await page.getByLabel("專案標題").fill("P1 迴圈");
-    await page.getByLabel("影片比例").selectOption("16:9");
+    await page.getByRole("button", { name: "新建剪輯專案", exact: true }).click();
+    await page.getByLabel("專案名稱").fill("P1 迴圈");
+    await page.getByRole("radio", { name: /^16:9 / }).check();
     await page.getByRole("button", { name: "建立專案", exact: true }).click();
     await page.waitForSelector("[data-ed-stage]");
 

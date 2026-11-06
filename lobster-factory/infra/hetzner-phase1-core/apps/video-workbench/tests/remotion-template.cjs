@@ -167,10 +167,10 @@ const configured = { REMOTION_SERVICE_URL: SERVICE, MEDIA_RENDER_AUTH_TOKEN: TOK
       page.on("pageerror", (e) => errors.push(e.message));
       await page.route("**/*", (r) => (r.request().url().startsWith(base + "/") ? r.continue() : r.abort()));
       await page.goto(base + "/pages/tools.html#edit");
-      await page.getByRole("button", { name: "新增專案", exact: true }).click();
+      await page.getByRole("button", { name: "新建剪輯專案", exact: true }).click();
       await page.getByRole("button", { name: "建立專案", exact: true }).click();
       await page.waitForSelector("[data-ed-stage]");
-      await page.locator('[data-ed-pane="片頭"]').click();
+      await page.locator('[data-ed-pane="文字"]').click();
       assert.equal(await page.locator(".editor-library select").count(), 0);
       assert.equal(await page.locator(".editor-library button", { hasText: "背景放大＋標題上滑" }).count(), 1);
       const generate = page.getByRole("button", { name: "產生片頭（免費）", exact: true });
