@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-06（續19）外聯手冊加注意事項／未完成；客戶頁「冷開發」分頁改接外聯 v2
+
+**根因**
+- C1：客戶頁「冷開發」分頁（舊 `ClientHubTabs.tsx` OutreachTab）只編輯每客戶 Supabase URL／key 與 `organizations.metadata.self_serve_enabled`（舊 `app/api/ops/clients/[slug]/outreach-config/route.ts`）；全 repo 無其他讀取者——外聯 v2 資料在平台庫依 organization_id 分、權限走 entitlements（`lib/portal/products.ts:95`）。分頁顯示無作用的設定，看不到客戶真實外聯狀態。
+
+**做了**
+- d0c0d2d82：`/tools/outreach/guide` 加「注意事項」「還沒做好的功能」兩段（文案 GPT：`agency-os/reports/oracle/2026-11-06-inspect-b68edc40.md`）。
+- a38e24a7f：新 `OutreachTab.tsx` ＋ 唯讀 `outreach-summary` API（員工可讀、客戶身分 403）：寄件信箱（today_claims／stageCap 同 SendersCard，草稿模式「—」）、收件匣待審、名單、本月信件／草稿／已寄、回信（kind reply）與退信、本月外聯花費（含免費筆數）、六項功能 verdictOf（infrastructure_error→讀取失敗）、帶 ?org= 的捷徑；讀取失敗不顯示 0。刪舊 route 與舊分頁；vault 與 metadata 資料未動。
+- Codex 審查 `agency-os/reports/oracle/2026-11-06-partialreview-2164ca65.md` 4 項全修（今日已寄來源、infra 錯誤≠未開通、待審含 high_quality／needs_data、回信排除退信）。
+- 正式站 awarewave-ops「冷開發」分頁實看：主信箱草稿模式、名單 289、本月信件 505、外聯花費 US$5.10、六項功能已開通（289／505 是 C16.2 測試資料，量完會清）。監工台 v42。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run app/api/ops/clients lib/outreach app/__tests__ (48 files 387 passed) + tsc 0 errors outside .next | exit=0 | ms=5000
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin (deployed 08076e969 incl. d0c0d2d82 a38e24a7f; npm test passed; smoke all OK) + browser /ops/clients/awarewave-ops 冷開發 分頁 | exit=0 | ms=240000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=outreach-config | hits=9
 ## 2026-11-06（續18）影音工作台：分鏡靈感保護基準更新＋保護檢查進部署閘（操作者「你決定」）
 
 - 根因：受保護六檔（handoff §2）的雜湊檢查只在兩支瀏覽器測試裡（`tests/sidebar-overlays.cjs:40-41`、`tests/generator-deep-actions.cjs:93-95`），部署閘 `tests/gate.cjs:6` 不跑 → `31e89c479`（storyboards-boot.js）、`1aaa139d5`（workspaces.css）、`de0e1836a`（storyboards.html、storyboards-0.js、storyboards-boot.js）改了受保護檔卻沒更新基準，照樣上線（FC.3 session 發現，續16）。
