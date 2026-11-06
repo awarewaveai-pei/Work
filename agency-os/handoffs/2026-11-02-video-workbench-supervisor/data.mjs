@@ -249,7 +249,7 @@ export const STEPS = [
       done('FC.0', '你到場確認過：播放有聲音、注音打得進中文、英文介面可以接受。視窗只用獨立顯示卡，全程沒有斷線。', FC1),
       done('FC.2', '應用工具多了「專業剪輯」：FilmCraft 嵌在工作台裡，素材從素材庫挑進去，存檔存回工作台、下次能重開；電腦沒有可用的獨立顯示卡時，開啟前先提醒，可改用一般剪輯。還沒上線（FC.4）。', 'dee7d0338'),
       done('FC.3', '專業剪輯的成片自動進任務紀錄與素材庫，記下用了哪些素材；字幕一起帶進送審。', 'e54d1c14e'),
-      todo('FC.4', '上線到 video.aware-wave.com。要你說可以才做。'),
+      todo('FC.4', '上線到 video.aware-wave.com：你已同意，等剪輯器 ED 線告一段落後與 RV.4 一起部署。'),
     ] },
   { n: 18, code: 'EC', title: '專業特效（EffectCraft）', plain: '例：在應用工具按「專業特效」，進到 EffectCraft 的完整畫面做片頭與特效（三百多個特效、曲線編輯器、表達式），做好的透明片段直接回到素材庫給剪輯用。',
     gate: '跟專業剪輯同一套流程在 EffectCraft 走通；重開專案時素材不會離線。', risk: 'High', model: 'Opus；上線等你同意', status: 'in_progress', depends: ['FC'],
@@ -266,5 +266,5 @@ export const STEPS = [
 // 操作者自己要決定或親手做的
 export const OPEN = [
   { n: 1, before: 'RV', what: 'RV.4：部署工作台與 app（High），之後用 Runway 5 秒、一張小圖真打一次，約 US$0.25。要你說可以部署。', src: 'AGENTS §3' },
-  { n: 4, before: 'FC', what: 'FC.4：把「專業剪輯」上線到 video.aware-wave.com（放引擎檔到主機、改 nginx、部署工作台）。要你說可以才做。', src: 'VW/docs/engine-route-plan-20261106.md §9 FC.4' },
+  { n: 4, before: 'FC', what: 'FC.4：你已同意上線（11-06）。但部署會把 main 上所有改動一起送上去，包括剪輯器做到一半的新版面（ED 線），所以你選了「等 ED 線告一段落再一起上」，到時連 RV.4 一起部署。輪到時我會再跟你確認一次部署範圍。', src: 'VW/docs/engine-route-plan-20261106.md §9 FC.4；影片剪輯監工台 ED 線' },
 ];
