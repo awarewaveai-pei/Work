@@ -8,6 +8,7 @@
 - **Claude Code project MCP**：根 `.mcp.json` 由 `mcp/registry.template.json` 同步產生；**不要手改生成檔**。共享 server、相對路徑與環境變數規則以 registry 為準；**勿**把明文 token 提交到 git。
 - **Codex MCP**：`%USERPROFILE%\.codex\config.toml` 的 managed block 由 `scripts\sync-mcp-config.ps1` 產生；其餘 user settings 保留。Claude Code 的 local/user scope 仍由 `~\.claude.json` 管理，`~\.claude\mcp.json` 必須維持空 server map。
 - **路徑**：LLM／Trigger／filesystem wrapper 等只在 `mcp/registry.template.json` 宣告，輸出到根 `.mcp.json` 與 Codex managed config；路徑用相對 repo root 或同步器可解析的環境變數，禁止寫死 `D:\Work\...` 或 `C:\Users\...`。
+- **stdio server 不經 `npx`**：套件以確切版本加進 `mcp-local-wrappers/package.json`（`npm install` 更新 lockfile），registry 用 `node ${workspaceRoot}\mcp-local-wrappers\node_modules\<套件>\<進入點>` 啟動；升級＝改版本號。`sync-mcp-config.ps1` 遇到啟用中的 server 經 `npx`（含藏在啟動腳本裡）或進入點不存在會直接失敗。
 - **monorepo root 必須能錨定**：在 Claude Code / Codex 開啟含 `scripts/`、`mcp-local-wrappers/` 與根 `.mcp.json` 的那一層；勿只開 `agency-os/`，否則相對路徑會指錯層級。
 - **Trigger.dev 自託管**：在 **`trigger`** 的 **`env`** 加上 **`TRIGGER_API_URL`**（公開 HTTPS 原點，例如 **`https://trigger.aware-wave.com`**，依你 Nginx／DNS 為準），並維持 vault 內 **`TRIGGER_ACCESS_TOKEN`**；`start-trigger-mcp.ps1` 會把此變數一併餵給內層 `npx … mcp`。  
 - **GitHub Copilot MCP**：`url` 建議 **`https://api.githubcopilot.com/mcp`**（**不要**結尾多一個 `/`）；Bearer 必須是 **Copilot MCP 允許的 GitHub token**（常見問題是拿一般 PAT 但帳號／權限不含 Copilot）。見 [GitHub 文件：Configure Copilot MCP](https://docs.github.com/en/copilot/how-tos/configure-personal-settings/configure-copilot-mcp)。
@@ -101,7 +102,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\sanitize-user-mcp-config.ps1
 ## Hetzner：Cloud API vs SSH
 
 - **Cloud API（機器／Floating IP／防火牆）**：**`awarewave-ops`** 內 **`hetzner`** 服務 + `HETZNER_API_TOKEN`（見 vault／`import-mcp`）。
-- **SSH（VPS 上跑指令／SFTP）**：專案 MCP 鍵 **`server-ssh`** → `npx -y mcp-server-ssh`。連線用工具 **`ssh_connect`**（host、user、port、金鑰路徑或密碼），**不要**把密碼寫進 `mcp.json`。
+- **SSH（VPS 上跑指令／SFTP）**：專案 MCP 鍵 **`server-ssh`** → `mcp-local-wrappers` 內鎖定版本的 `mcp-server-ssh`。連線用工具 **`ssh_connect`**（host、user、port、金鑰路徑或密碼），**不要**把密碼寫進 `mcp.json`。
 
 ## 入口（先記這幾個）
 

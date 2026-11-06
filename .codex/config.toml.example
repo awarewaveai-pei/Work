@@ -12,8 +12,8 @@ OAUTH_ENABLED = "false"
 JWT_TOKEN = "${WORDPRESS_JWT_TOKEN}"
 
 [mcp_servers.replicate]
-command = "cmd"
-args = ["/c", "npx", "-y", "replicate-mcp"]
+command = "node"
+args = ["C:\\path\\to\\monorepo\\mcp-local-wrappers\\node_modules\\replicate-mcp\\index.js"]
 enabled = true
 
 [mcp_servers.replicate.env]
@@ -26,16 +26,16 @@ bearer_token_env_var = "N8N_MCP_BEARER_TOKEN"
 enabled = false
 
 [mcp_servers.github]
-command = "cmd"
-args = ["/c", "npx", "-y", "@modelcontextprotocol/server-github"]
+command = "node"
+args = ["C:\\path\\to\\monorepo\\mcp-local-wrappers\\node_modules\\@modelcontextprotocol\\server-github\\dist\\index.js"]
 enabled = true
 
 [mcp_servers.github.env]
 GITHUB_PERSONAL_ACCESS_TOKEN = "${GITHUB_TOKEN}"
 
 [mcp_servers.work-global]
-command = "cmd"
-args = ["/c", "npx", "-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\YOUR_USER", "C:\\path\\to\\monorepo"]
+command = "node"
+args = ["C:\\path\\to\\monorepo\\mcp-local-wrappers\\node_modules\\@modelcontextprotocol\\server-filesystem\\dist\\index.js", "C:\\Users\\YOUR_USER", "C:\\path\\to\\monorepo"]
 enabled = true
 
 [mcp_servers.chatgpt-fast]

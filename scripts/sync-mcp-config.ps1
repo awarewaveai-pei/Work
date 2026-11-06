@@ -540,6 +540,29 @@ if (-not $registry.ContainsKey("servers")) {
 
 $servers = ConvertTo-PlainObject $registry["servers"]
 
+# Enabled stdio servers start from the pinned install in mcp-local-wrappers (package-lock.json), never through npx:
+# npx resolves the package on every launch (unpinned, needs the network) and stays alive as a wrapper process per
+# server per session. The launch script is read too, because a wrapper .ps1 hid the same call from the registry.
+foreach ($name in ($servers.Keys | Sort-Object)) {
+    $server = ConvertTo-PlainObject $servers[$name]
+    if ([string]$server["transport"] -ne "stdio" -or ($server.ContainsKey("enabled") -and -not [bool]$server["enabled"])) {
+        continue
+    }
+    $argv = @([string]$server["command"]) + @($server["args"] | ForEach-Object { Resolve-EnvValue -StringValue ([string]$_) -Mode "Concrete" })
+    $viaNpx = @($argv | Where-Object { $_ -match '(^|[\\/])npx(\.cmd|\.exe|\.ps1)?$' }).Count -gt 0
+    foreach ($file in @($argv | Where-Object { $_ -match '\.(ps1|mjs|js)$' })) {
+        if (-not (Test-Path -LiteralPath $file)) {
+            throw "MCP server '$name': $file not found -- run 'npm ci' in mcp-local-wrappers."
+        }
+        if ($file -notmatch '\\node_modules\\' -and (Get-Content -LiteralPath $file -Raw) -match '\bnpx\b') {
+            $viaNpx = $true
+        }
+    }
+    if ($viaNpx) {
+        throw "MCP server '$name' launches through npx. Add the package to mcp-local-wrappers/package.json at an exact version and start it with node."
+    }
+}
+
 if (-not $SkipWorkspaceConfig) {
     # .mcp.json — Claude Code project MCP; uses ${env:MONOREPO_ROOT} for portable script paths
     $claudeProjectServers = @{}

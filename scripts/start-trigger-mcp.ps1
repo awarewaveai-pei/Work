@@ -27,7 +27,11 @@ if (-not [string]::IsNullOrWhiteSpace($env:TRIGGER_API_URL)) {
     $u = $env:TRIGGER_API_URL.Replace("'", "''")
     $prefix = "`$env:TRIGGER_API_URL='$u'; "
 }
-$command = $prefix + "`$env:TRIGGER_ACCESS_TOKEN=`$env:$TokenName; npx -y trigger.dev@latest mcp --project-ref `"$ProjectRef`""
+$cli = Join-Path $PSScriptRoot "..\mcp-local-wrappers\node_modules\trigger.dev\dist\esm\index.js"
+if (-not (Test-Path -LiteralPath $cli)) {
+    throw "Missing $cli -- run 'npm ci' in mcp-local-wrappers."
+}
+$command = $prefix + "`$env:TRIGGER_ACCESS_TOKEN=`$env:$TokenName; node '$($cli.Replace("'", "''"))' mcp --project-ref `"$ProjectRef`""
 
 # Resolve powershell.exe by absolute path: when launched as an MCP server the child
 # process PATH may omit System32\WindowsPowerShell, so a bare `powershell` token raises

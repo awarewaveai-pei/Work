@@ -1,4 +1,20 @@
 # Worklog
+## 2026-11-06（續34）MCP 不再經 npx 啟動：套件鎖版本裝進 mcp-local-wrappers，sync 擋 npx
+
+- 根因：筆電記憶體 80%（44 GB）。8 個 session × 每個 stdio MCP 外包一層 `cmd /c npx -y` → 每伺服器多 3 個常駐程序（cmd／npx node／cmd），且套件未鎖版本、每次啟動重新解析。
+- 改：`mcp-local-wrappers/package.json` 加 7 套件確切版本（server-github 2025.4.8、airtable 0.5.4、replicate 0.9.0、mcp-server-ssh 1.0.3、resend 2.28.0、trigger.dev 4.8.3、server-filesystem 2.2.0）＝ 改動前 npx 快取實際跑的版本；root `@modelcontextprotocol/sdk` 由 `^1.27.1` 改 `1.27.1`（否則被新套件拉到 1.32.2，三個自家 wrapper 跟著換 SDK）。
+  - `mcp/registry.template.json`：5 個 server `cmd /c npx -y <pkg>` → `node ${workspaceRoot}\mcp-local-wrappers\node_modules\<pkg>\<entry>`。
+  - `scripts/start-trigger-mcp.ps1:30-34`：`npx -y trigger.dev@latest` → 鎖版本 CLI。`scripts/run-filesystem-mcp.ps1:19-24` 同理（Claude 已排除，Codex／Copilot／Gemini 用）。
+  - 不變量（`scripts/sync-mcp-config.ps1:541-564`）：啟用中的 stdio server 經 npx（argv 任一元素 leaf＝npx[.cmd|.exe|.ps1]，或其 .ps1/.mjs/.js 啟動腳本內含 npx）或進入點檔不存在 → sync throw。
+  - 文件：`mcp-add-server-quickstart.md` 加規則一行；inventory／playbook／`.codex/config.toml.example` 去 npx 寫法。
+- 實量（每 server 程序樹，啟動 6 秒）：github/airtable/replicate/ssh/resend 各 5 程序→2、198–238 MB→79–135 MB；6 server 合計 29→14 程序、1452→883 MB（每 session 省約 570 MB；trigger 仍經 vault 的 powershell，未動）。
+- 前次殘留：lockfile 既有 106 項只有 `hasown` 2.0.2→2.0.4（patch）。`scripts/patch-codex-user-mcp-config.ps1:51-55` 仍寫 npx，但只在 work-global 為 `command="cmd"` 時觸發，sync 產出不再符合，未動。
+- 未做：其餘 session 要重開才換成新啟動方式；換新機需在 `mcp-local-wrappers` 跑 `npm ci`（`machine-environment-audit.ps1:221-228` 已檢查）。
+- rollback：`git revert <commit>` → `scripts/sync-mcp-config.ps1` → 重開 session。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node mcp-probe.mjs .mcp.json (initialize+tools/list 10 servers; tool counts/versions = pre-change npx baseline: github 26, airtable 30, replicate 35, ssh 14, resend 136, trigger 55, fs 16) | exit=0 | ms=16000
+- REALTEST_EVIDENCE: tool=Bash | cmd=guard-mutation.ps1 (8 cases vs sync-mcp-config.ps1: npx arg / npx.cmd / full path / hidden in .ps1 / missing entry block; disabled / clean / npx-tool pass) | exit=0 | ms=40000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n（Codex `agency-os/reports/oracle/2026-11-06-partialreview-22cec3db.md`：npx.cmd 漏擋，成立已修，複審見同日 artifact）
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,runbooks,lobster-factory,.codex,mcp-local-wrappers,.claude | grep=npx.{0,40}(mcp-server-ssh|server-github|replicate-mcp|airtable-mcp-server|resend-mcp|server-filesystem|trigger\.dev@latest) | hits=1
 ## 2026-11-06（續33）畫布專業版 C8「傳回原工具」：塔羅、Studio、Banner 改完傳回原格（合進 main，未部署）
 
 - 操作者定案「補「傳回」」→ 計畫 R0-PLAN §6 C8（`8b2268396`）。不變量：傳回的圖一定落地一處（原格收下，或存 My Designs），不落錯格。

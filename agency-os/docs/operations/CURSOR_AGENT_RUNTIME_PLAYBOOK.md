@@ -63,7 +63,7 @@
 | `COPILOT_MCP_BEARER_TOKEN` | **copilot** HTTP MCP（`Authorization: Bearer ${env:…}`）；Claude／Codex 亦建議同名變數 |
 | `MONOREPO_ROOT` | Claude **work-global**（`.mcp.json`）與 Codex **`work-global`** 的 repo 根路徑（本機絕對路徑） |
 | `TRIGGER_PROJECT_REF` | **Codex／Claude** 的 `trigger` MCP（經 `start-trigger-mcp.ps1` 讀環境）；統一以 registry／sync script 與 **`TRIGGER_PROJECT_REF`** 環境為準 |
-| `TRIGGER_API_URL` | **自託管 Trigger** 的公開原點（例如 **`https://trigger…`**）；寫在 **`trigger` MCP 的 `env`**，供 `npx trigger.dev … mcp` 連到自架而非雲端預設 |
+| `TRIGGER_API_URL` | **自託管 Trigger** 的公開原點（例如 **`https://trigger…`**）；寫在 **`trigger` MCP 的 `env`**，供 trigger.dev CLI（`mcp-local-wrappers` 鎖定版本）的 `mcp` 連到自架而非雲端預設 |
 
 匯入／輪替流程：[`mcp-add-server-quickstart.md`](mcp-add-server-quickstart.md)、[`mcp-secrets-hardening-runbook.md`](mcp-secrets-hardening-runbook.md)。
 

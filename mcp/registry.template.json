@@ -149,12 +149,9 @@
                     "github":  {
                                    "enabled":  true,
                                    "transport":  "stdio",
-                                   "command":  "cmd",
+                                   "command":  "node",
                                    "args":  [
-                                                "/c",
-                                                "npx",
-                                                "-y",
-                                                "@modelcontextprotocol/server-github"
+                                                "${workspaceRoot}\\mcp-local-wrappers\\node_modules\\@modelcontextprotocol\\server-github\\dist\\index.js"
                                             ],
                                    "env":  {
                                                "GITHUB_PERSONAL_ACCESS_TOKEN":  "${env:GITHUB_PERSONAL_ACCESS_TOKEN}"
@@ -163,12 +160,9 @@
                     "airtable":  {
                                      "enabled":  true,
                                      "transport":  "stdio",
-                                     "command":  "cmd",
+                                     "command":  "node",
                                      "args":  [
-                                                  "/c",
-                                                  "npx",
-                                                  "-y",
-                                                  "@loticdigital/airtable-mcp-server"
+                                                  "${workspaceRoot}\\mcp-local-wrappers\\node_modules\\@loticdigital\\airtable-mcp-server\\build\\index.js"
                                               ],
                                      "env":  {
                                                  "AIRTABLE_API_KEY":  "${env:AIRTABLE_API_KEY}"
@@ -180,12 +174,9 @@
                                       "optional_env":  [
                                                            "REPLICATE_WEBHOOK_SIGNING_KEY"
                                                        ],
-                                      "command":  "cmd",
+                                      "command":  "node",
                                       "args":  [
-                                                   "/c",
-                                                   "npx",
-                                                   "-y",
-                                                   "replicate-mcp"
+                                                   "${workspaceRoot}\\mcp-local-wrappers\\node_modules\\replicate-mcp\\index.js"
                                                ],
                                       "env":  {
                                                   "REPLICATE_API_TOKEN":  "${env:REPLICATE_API_TOKEN}",
@@ -294,12 +285,9 @@
                     "server-ssh":  {
                                         "enabled":  true,
                                         "transport":  "stdio",
-                                        "command":  "cmd",
+                                        "command":  "node",
                                         "args":  [
-                                                     "/c",
-                                                     "npx",
-                                                     "-y",
-                                                     "mcp-server-ssh"
+                                                     "${workspaceRoot}\\mcp-local-wrappers\\node_modules\\mcp-server-ssh\\build\\index.js"
                                                  ]
                                     },
                     "resend":  {
@@ -309,12 +297,9 @@
                                                         "SENDER_EMAIL_ADDRESS",
                                                         "REPLY_TO_EMAIL_ADDRESSES"
                                                     ],
-                                   "command":  "cmd",
+                                   "command":  "node",
                                    "args":  [
-                                                "/c",
-                                                "npx",
-                                                "-y",
-                                                "resend-mcp"
+                                                "${workspaceRoot}\\mcp-local-wrappers\\node_modules\\resend-mcp\\dist\\index.js"
                                             ],
                                    "env":  {
                                                "RESEND_API_KEY":  "${env:RESEND_API_KEY}",
