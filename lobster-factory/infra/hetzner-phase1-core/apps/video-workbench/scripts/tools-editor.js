@@ -1397,7 +1397,7 @@ function edGrade(c) {
 }
 // Card ED.1.4: 720P plays preview720.* (backend/media-store.cjs preview(), made on first ask); 1080P plays previewUrl
 // (the original, or the proxy). asset url -> preview url | null (nothing smaller, or failed: keep previewUrl) |
-// Promise (asking; while the server answers { making } it asks again every 2 s).
+// Promise (asking; while the server answers { making } it asks again every 2 s). Pressing 720P re-asks the nulls.
 const edPreview720 = new Map();
 function edPlayUrl(asset) {
   const made = ed.layout.preview === "720P" && edPreview720.get(asset.url);
@@ -1425,12 +1425,10 @@ function edPreviewAsk(url) {
 }
 function edPreviewEnsure(p) {
   if (ed.layout.preview !== "720P") return;
-  for (const c of p.clips) {
-    const url = c.kind === "video" && c.asset?.url;
-    if (url && !edPreview720.has(url)) edPreviewAsk(url);
-  }
+  const urls = new Set(p.clips.filter((c) => c.kind === "video" && c.asset?.url).map((c) => c.asset.url));
+  for (const url of urls) if (!edPreview720.has(url)) edPreviewAsk(url);
   const note = document.querySelector("[data-ed-preview-note]"),
-    text = [...edPreview720.values()].some((v) => v instanceof Promise) ? "正在產生 720P 預覽檔…" : "";
+    text = [...urls].some((u) => edPreview720.get(u) instanceof Promise) ? "正在產生 720P 預覽檔…" : "";
   if (note && note.textContent !== text) note.textContent = text;
 }
 function edPaint() {
@@ -2114,6 +2112,8 @@ async function edAction(action) {
   }
   if (action.startsWith("preview:")) {
     ed.layout.preview = action === "preview:720P" ? "720P" : "1080P";
+    // Pressing 720P again retries the files that failed (null); a smaller source stays null after one cheap ask.
+    if (ed.layout.preview === "720P") for (const [url, made] of edPreview720) if (made === null) edPreview720.delete(url);
     edLayoutSave();
     edRedraw();
     return;

@@ -240,7 +240,9 @@ function createMediaStore({ dataDir }) {
       const entry = {};
       previewJobs.set(key, entry);
       previewQueue = previewQueue
-        .then(() => derive(dir, name, (tmp) => transcode(original, tmp, PREVIEW_SHORT, alpha, 23)))
+        // A hung ffmpeg must not stall the queue: killed after 2x the source length (at least 2 minutes).
+        .then(() => derive(dir, name, (tmp) =>
+          transcode(original, tmp, PREVIEW_SHORT, alpha, 23, AbortSignal.timeout(Math.max(120, 2 * (probe.duration || 0)) * 1000))))
         .then(() => previewJobs.delete(key), (e) => (entry.error = "720P 預覽檔產生失敗：" + String(e?.message || e).slice(-300)));
     }
     return { previewUrl: null, making: true };
