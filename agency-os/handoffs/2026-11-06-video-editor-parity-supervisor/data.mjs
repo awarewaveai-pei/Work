@@ -24,9 +24,9 @@ export const COPY = {
 export const NOW = [
   { what: '兩邊每個鍵都按過的對照表。', state: 'yes', ev: '2026-11-06 逐鍵對照：同 18、不同 17、缺 24、本機多 2；每一列都歸到卡（docs/editor-parity-compare-20261106.md）。' },
   { what: '剪輯、分割、複製、刪除、多軌、轉場、濾鏡、匯出 1080p。', state: 'yes', ev: '既有功能，tests/tools-editor.cjs 真實匯出過。' },
-  { what: '上傳大支影片不會「頁面通訊逾時」。', state: 'no', ev: '已修好並推上 main（6d3dda8f6），還沒部署到 video.aware-wave.com；部署要你說可以。' },
-  { what: '版面跟參考一樣（圖示側欄、可收合、整片設定、播放列）。', state: 'yes', ev: '2026-11-06 卡 ED.1（9df955245），還沒部署到 video.aware-wave.com。參考沒有的片頭、調色、影格率、峰值表、多軌都還在，搬到對應位置。' },
-  { what: '多選、磁吸、磁性主軌、波紋刪除、快捷鍵全套。', state: 'yes', ev: '2026-11-06 卡 ED.2（5b726b2eb），還沒部署到 video.aware-wave.com。tests/ed2-timeline.cjs 在真瀏覽器把每個新鍵實按一次。' },
+  { what: '上傳大支影片不會「頁面通訊逾時」。', state: 'yes', ev: '已修好，2026-11-06 上線（6d3dda8f6，部署 96ddd7f70）。' },
+  { what: '版面跟參考一樣（圖示側欄、可收合、整片設定、播放列）。', state: 'yes', ev: '2026-11-06 卡 ED.1（9df955245），2026-11-06 已上線（部署 96ddd7f70）。參考沒有的片頭、調色、影格率、峰值表、多軌都還在，搬到對應位置。' },
+  { what: '多選、磁吸、磁性主軌、波紋刪除、快捷鍵全套。', state: 'yes', ev: '2026-11-06 卡 ED.2（5b726b2eb），2026-11-06 已上線（部署 96ddd7f70）。tests/ed2-timeline.cjs 在真瀏覽器把每個新鍵實按一次。' },
   { what: '字幕辨識、翻譯、剪贅字在剪輯器裡完成。', state: 'no', ev: '卡 ED.10、ED.11；現在要跳去字幕工具。' },
   { what: '剪輯 Agent（打字叫它剪）。', state: 'no', ev: '卡 ED.13，最後做。' },
 ];

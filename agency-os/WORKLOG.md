@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-06（續37）影音工作台批次上線：專業剪輯＋專業特效＋PJ.1＋剪輯器 ED.1–ED.3（操作者「對，現在部署」）
+
+- 範圍：video-workbench `8239d222b` → `96ddd7f70`（FC.2/FC.3、EC.2/EC.3、PJ.1、ED.1–ED.3 含 ED.1.4、RV.1–RV.3、分鏡閘、uploads 修正）。
+- 主機引擎檔：`/root/lobster-phase1/static/video-engines/{filmcraft/46763a8-b7f3040,effectcraft/df4cc09-4fe4255}`＋`current` 連結；兩份 `SHA256SUMS` 雜湊＝`engines/*/VERSION.json` 的 `sha256SumsSha256`，`sha256sum -c` 全過。
+- compose：nginx 加唯讀掛載 `static/video-engines:/srv/video-engines:ro`；nginx：video 伺服器加 `^~ /engines/filmcraft/web/`、`^~ /engines/effectcraft/web/`（alias current、gzip_static、no-cache；EffectCraft 帶 COOP/COEP/CORP，`add_header_inherit merge` 保留 server 層安全標頭）。兩處都走 `safe-infra-patch.sh`（備份 `docker-compose.yml.bak.safe-patch-20261106-112658`、`default.conf.bak.safe-patch-20261106-112714`）；repo 對照檔同步（`96ddd7f70`）。
+- 第一次 sg-deploy 被部署閘擋（正確擋下，線上容器未動）：根因 `f3346c686` 我用 Windows CRLF 工作副本算 `storyboards-boot.js` 基準（39 個 CR），git 與主機是 LF。修（關掉整類）：`tests/storyboards-baseline.cjs` 先把 CRLF 換成 LF 再算雜湊，基準＝git 內容，跟 checkout 換行方式無關；boot.js 基準改 `93ea9ebd`。
+- 不變量：受保護檔基準＝提交內容；換行方式不同不算改動，內容一變就擋。
+- 回退：主機 `ln -sfn` 回上一版或刪 `current`（工具卡自動消失）；nginx／compose 用上列備份；程式 `sg-deploy` 自動回退或重部署 `8239d222b`。
+- 未驗：登入後實際打開專業剪輯／專業特效跑一次（送素材→存檔→重開→輸出）——這台筆電瀏覽器預設 Intel 內顯，WebGPU 只能在強制獨顯下測，不在操作者的瀏覽器代跑；RV.4 Runway 5 秒試跑（約 US$0.25）尚未打。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh video-workbench → gate passed、healthy 6s、smoke 8 項 OK、deployed 96ddd7f70；curl -I /engines/{filmcraft,effectcraft}/web/ 與 *_bg.wasm → 200 application/wasm gzip＋隔離標頭；/api/vw/state 401、/ 302、偽造 X-VW-* 401、%2e%2e 穿越 403；playwright-runner -Mode smoke → 34 passed 0 failed | exit=0 | ms=300000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（讀回 nginx 兩個 location 與 compose 一行；突變：boot.js 加一字元 → "storyboards-boot.js changed"，只改 CRLF → PASS）
+- ORACLE_WAIVED: nginx／compose 照既有 vector-pro／photo-pro 版型＋測試換行正規化一行；突變證據與線上 curl 已驗
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=video-engines | hits=6（nginx 3、compose 1、engine-route-plan 2，皆一致）
 ## 2026-11-06（續36）C8 傳回上線（8239d222b）＋正式站實測；塔羅改圖後誤報「設定已變更」修正（cfa56a546，未部署）
 
 - sg-deploy next-admin `8239d222b`（含 C8 與其他 session 已推 main 的 outreach Gemini key、客戶選單隱藏停用組織；無 migration）：healthy 15s、smoke 5/5 OK。
