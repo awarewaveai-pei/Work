@@ -10,7 +10,7 @@ import { createPhotocraftCtx, cssColorRgba, fitQuad, scaleFor, toPixels, toQuali
 
 const APP = path.resolve(__dirname, "..", "..", "..");
 const read = (rel: string) => fs.readFileSync(path.join(APP, rel), "utf8");
-const PANELS = ["templates", "color-grade", "bg-remove", "ai-fill", "genfx", "edge-mask", "webp", "my-designs", "qr", "barcode", "mockup", "batch-export"];
+const PANELS = ["templates", "color-grade", "bg-remove", "ai-fill", "genfx", "ai-edit", "edge-mask", "webp", "my-designs", "qr", "barcode", "mockup", "batch-export"];
 const OPTIONAL = ["importLegacy", "selectionMask", "fitLayer"]; // 契約「選用」：宿主沒有就不提供
 const PUBLIC = path.join(APP, "public");
 
@@ -29,7 +29,7 @@ async function loadModule(rel: string) {
 const listOf = (src: string) => [...src.match(/export const PANEL_IDS = Object\.freeze\(\[([\s\S]*?)\]\)/)![1].matchAll(/"([^"]+)"/g)].map((x) => x[1]);
 
 describe("photo-pro-dock/dock.js", () => {
-  it("面板清單 = R0-PLAN C4 表（12 個，順序同）", () => {
+  it("面板清單 = R0-PLAN C4 表＋ai-edit（13 個，順序同）", () => {
     expect(listOf(read("public/photo-pro-dock/dock.js"))).toEqual(PANELS);
   });
   it("SIZES = PhotoCraft Pro 版型（dock.rs:37,73；panel_docking.rs:89-91,561；panel.rs:53），鍵 = 外殼 SIZE_VARS", async () => {

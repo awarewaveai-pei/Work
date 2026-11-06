@@ -11,6 +11,7 @@ export const PANEL_IDS = Object.freeze([
   "bg-remove",
   "ai-fill",
   "genfx",
+  "ai-edit",
   "edge-mask",
   "webp",
   "my-designs",

@@ -1,4 +1,4 @@
-// R0-PLAN §6 C4.3：三個面板 blocks/{ai-fill,genfx,edge-mask}.js（照舊編輯器 CanvasEditor.tsx:2596-2721 原樣搬）。
+// R0-PLAN §6 C4.3：三個面板 blocks/{ai-fill,genfx,edge-mask}.js（照舊編輯器 CanvasEditor.tsx:2596-2721 原樣搬）＋ blocks/ai-edit.js（AI 修圖）。
 // 每個面板對 mock ctx 一條主要流程：按主要按鈕 → 呼叫了對的 ctx 方法與 API，參數形狀對；新檔零色碼；模組能解析載入。
 // 載入法同 vector-pro-dock.test.ts：esbuild 打包（/editor-shared/… 對到 public/）再 data: URL import；DOM 用 jsdom（手動掛，
 // 因為 esbuild 在 vitest jsdom 環境會撞 TextEncoder 不變量）。瀏覽器專屬的解碼／canvas 以最小替身代替（只回固定像素與 data URL）。
@@ -11,7 +11,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 const APP = path.resolve(__dirname, "..", "..", "..");
 const PUBLIC = path.join(APP, "public");
 const read = (rel: string) => fs.readFileSync(path.join(APP, rel), "utf8");
-const BLOCKS = ["ai-fill", "genfx", "edge-mask"].map((id) => `public/editor-shared/blocks/${id}.js`);
+const BLOCKS = ["ai-fill", "genfx", "edge-mask", "ai-edit"].map((id) => `public/editor-shared/blocks/${id}.js`);
 const NEW_FILES = [...BLOCKS, "public/editor-shared/edge-mask.js", "public/editor-shared/outpaint-presets.js", "public/editor-shared/posterize.js"];
 const OUT_PNG = "data:image/png;base64,T1VU"; // "OUT"
 const CANVAS_PNG = "data:image/png;base64,Q1ZT"; // "CVS"
@@ -32,17 +32,19 @@ let fetchMock: ReturnType<typeof vi.fn>;
 let maskPixels: number[] = [255, 255, 255, 255]; // RGBA the mask canvas reads back (repeated)
 let imageSrcs: string[] = []; // every Image.src the panels decode
 let draws: { op: string; args: number[] }[] = []; // every drawImage: composite mode at the time + x,y,w,h
+let bitmapSizes: { width: number; height: number }[] = []; // sizes createImageBitmap hands out in order (then 4×2)
+let bitmapBlobs: Blob[] = []; // every Blob decoded
 beforeAll(() => {
   dom = new JSDOM("<!doctype html><body></body>");
   const w = dom.window as any;
   for (const k of ["document", "window", "Image", "createImageBitmap", "fetch"]) saved[k] = g[k];
   g.document = w.document;
   g.window = w;
-  g.createImageBitmap = async () => ({ width: 4, height: 2 });
+  g.createImageBitmap = async (b: Blob) => { bitmapBlobs.push(b); return bitmapSizes.shift() ?? { width: 4, height: 2 }; };
   g.Image = class { onload: (() => void) | null = null; onerror: (() => void) | null = null; naturalWidth = 4; naturalHeight = 2; width = 4; height = 2; crossOrigin = "";
     set src(v: string) { imageSrcs.push(v); setTimeout(() => this.onload?.(), 0); } };
   w.HTMLCanvasElement.prototype.getContext = function () {
-    return { drawImage(...a: unknown[]) { draws.push({ op: this.globalCompositeOperation, args: a.slice(1) as number[] }); }, putImageData() {}, globalCompositeOperation: "source-over",
+    return { drawImage(...a: unknown[]) { draws.push({ op: this.globalCompositeOperation, args: a.slice(1) as number[] }); }, putImageData() {}, clearRect() {}, globalCompositeOperation: "source-over",
       getImageData: (_x: number, _y: number, cw: number, ch: number) => ({ data: Uint8ClampedArray.from({ length: cw * ch * 4 }, (_, i) => maskPixels[i % maskPixels.length]) }) };
   };
   w.HTMLCanvasElement.prototype.toDataURL = () => CANVAS_PNG;
@@ -52,6 +54,8 @@ beforeEach(() => {
   maskPixels = [255, 255, 255, 255];
   imageSrcs = [];
   draws = [];
+  bitmapSizes = [];
+  bitmapBlobs = [];
   fetchMock = vi.fn(async () => ({ status: 200, json: async () => ({ ok: true, image: OUT_PNG }) }));
   g.fetch = fetchMock;
 });
@@ -92,7 +96,17 @@ describe("ai-fill：去除／生成填色", () => {
     const [id, blob] = ctx.replaceImage.mock.calls[0] as unknown as [string, Blob];
     expect(id).toBe("L1");
     expect(blob.type).toBe("image/png");
-    expect(await blobText(blob)).toBe("OUT");
+    // not the raw AI image: keepOutsideMask decoded source, AI result and mask, and re-encoded the merge
+    expect(await blobText(blob)).toBe("CVS");
+    expect(await Promise.all(bitmapBlobs.map(blobText))).toEqual(expect.arrayContaining(["\u0001\u0002\u0003", "OUT", "\t"]));
+  });
+  it("mergeMasked：遮罩內取 AI 像素，遮罩外原圖像素（含透明）一個不變", async () => {
+    const { mergeMasked } = await loadModule(BLOCKS[0]);
+    const orig = Uint8ClampedArray.from([10, 20, 30, 255, 0, 0, 0, 0, 1, 2, 3, 128, 40, 50, 60, 255]);
+    const ai = Uint8ClampedArray.from([250, 120, 0, 255, 250, 120, 0, 255, 250, 120, 0, 255, 250, 120, 0, 255]);
+    // 3rd pixel selected; 4th white but 25% alpha (below the 50% rule) = not selected
+    const mask = Uint8ClampedArray.from([0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 64]);
+    expect([...mergeMasked(orig, ai, mask)]).toEqual([10, 20, 30, 255, 0, 0, 0, 0, 250, 120, 0, 255, 40, 50, 60, 255]);
   });
   it("生成填色：要 prompt；POST /genfill { image, mask, prompt }", async () => {
     const ctx = mockCtx();
@@ -142,7 +156,40 @@ describe("ai-fill：去除／生成填色", () => {
 });
 
 describe("genfx：擴圖／色調分離", () => {
-  it("擴圖：方向是看得到的按鈕（無 <select>）；POST /genfill { image, prompt, outpaint } → placeImage(新圖層)", async () => {
+  it("outpaintFrame：每個方向原圖在擴大畫布中的位置（原圖像素單位）", async () => {
+    const { outpaintFrame } = await loadModule(BLOCKS[1]);
+    expect(outpaintFrame("Zoom out 1.5x", 100, 80)).toEqual({ W: 150, H: 120, x: 25, y: 20 });
+    expect(outpaintFrame("Zoom out 2x", 100, 80)).toEqual({ W: 200, H: 160, x: 50, y: 40 });
+    expect(outpaintFrame("Make square", 100, 80)).toEqual({ W: 100, H: 100, x: 0, y: 10 });
+    expect(outpaintFrame("Left outpaint", 100, 80)).toEqual({ W: 200, H: 80, x: 100, y: 0 });
+    expect(outpaintFrame("Right outpaint", 100, 80)).toEqual({ W: 200, H: 80, x: 0, y: 0 });
+    expect(outpaintFrame("Top outpaint", 100, 80)).toEqual({ W: 100, H: 160, x: 0, y: 80 });
+    expect(outpaintFrame("Bottom outpaint", 100, 80)).toEqual({ W: 100, H: 160, x: 0, y: 0 });
+  });
+  it("meanDiff：只比原圖不透明的像素；完全相同 0、整片差 100 → 100", async () => {
+    const { meanDiff, MATCH_MAX_DIFF } = await loadModule(BLOCKS[1]);
+    const src = Uint8ClampedArray.from([10, 20, 30, 255, 99, 99, 99, 0]);
+    expect(meanDiff(Uint8ClampedArray.from([10, 20, 30, 255, 0, 0, 0, 255]), src)).toBe(0); // 2nd pixel transparent in src: ignored
+    expect(meanDiff(Uint8ClampedArray.from([110, 120, 130, 255, 0, 0, 0, 0]), src)).toBe(100);
+    expect(MATCH_MAX_DIFF).toBeLessThan(100);
+  });
+  it("擴圖對齊：結果縮回原圖比例（908×789＋向左 → 1440×625 → 1816×789），原圖像素貼回 (908,0)，新圖層左上＝原圖左上 − (908,0)", async () => {
+    const ctx = mockCtx();
+    const sel = await ctx.selectedImage();
+    ctx.selectedImage = vi.fn(async () => ({ ...sel, transform: [1, 0, 0, 1, 300, 190] })) as never;
+    const body = await mount(BLOCKS[1], ctx);
+    bitmapSizes = [{ width: 908, height: 789 }, { width: 908, height: 789 }, { width: 1440, height: 625 }]; // uploadable, source, result
+    q(body, "[data-gf-prompt]").value = "海邊草地";
+    q(body, '#gfDirs button[data-v="Left outpaint"]').click();
+    q(body, "[data-gf-outpaint]").click();
+    await vi.waitFor(() => expect(ctx.placeImage).toHaveBeenCalled());
+    // result at frame scale, then the source pasted back at (908,0)
+    expect(draws.map((d) => d.args).filter((a) => a.length !== 8).slice(-2)).toEqual([[0, 0, 1816, 789], [908, 0]]); // 8 args = content-check thumbnails
+    const [blob, name, opts] = ctx.placeImage.mock.calls[0] as unknown as [Blob, string, { at: number[] }];
+    expect([await blobText(blob), name, opts]).toEqual(["CVS", "擴圖.png", { at: [300 - 908, 190] }]);
+    expect(q(body, "[data-gf-msg]").textContent).toContain("✅");
+  });
+  it("擴圖：方向是看得到的按鈕（無 <select>）；POST /genfill { image, prompt, outpaint }；回傳形狀對不上 → 原樣 placeImage 並警告", async () => {
     const ctx = mockCtx();
     const body = await mount(BLOCKS[1], ctx);
     expect(body.querySelector("select")).toBeNull();
@@ -154,7 +201,8 @@ describe("genfx：擴圖／色調分離", () => {
     await vi.waitFor(() => expect(ctx.placeImage).toHaveBeenCalled());
     expect(fetchMock.mock.calls[0][0]).toBe("/api/tools/studio/genfill");
     expect(sentBody()).toEqual({ image: CANVAS_PNG, prompt: "海邊草地", outpaint: "Left outpaint" });
-    expect(await blobText((ctx.placeImage.mock.calls[0] as unknown as [Blob])[0])).toBe("OUT");
+    expect(await blobText((ctx.placeImage.mock.calls[0] as unknown as [Blob])[0])).toBe("OUT"); // 4×2 result vs 8×2 frame
+    expect(q(body, "[data-gf-msg]").textContent).toContain("對不上");
     expect(ctx.replaceImage).not.toHaveBeenCalled();
   });
   it("色調分離：色階滑桿 2–16 → posterize → replaceImage(同 id)，不打 API", async () => {
@@ -200,6 +248,53 @@ describe("edge-mask：邊緣遮罩", () => {
     expect([mx, my, mw, mh].map((n) => +n.toFixed(3))).toEqual([0.308, 0.154, 3.384, 1.692]);
     expect(q(body, '[data-em-style="mask-03"]').classList.contains("tab--active")).toBe(true);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("ai-edit：AI 修圖", () => {
+  it("ai-edit 模型與價錢＝STUDIO_MODEL_OPTIONS；每個都吃參考圖；比例規則＝nearestAspectRatio", async () => {
+    const { AI_EDIT_MODELS, nearestAspectRatio } = await loadModule(BLOCKS[3]);
+    const { STUDIO_MODEL_OPTIONS, nearestAspectRatio: ref, PRODUCT_COMPOSITE_MODELS } = await import("../model-options");
+    for (const m of AI_EDIT_MODELS as { value: string; label: string; costNt: number }[]) {
+      const s = STUDIO_MODEL_OPTIONS.find((o) => o.value === m.value);
+      expect(s, m.value).toBeDefined();
+      expect({ label: m.label, costNt: m.costNt }).toEqual({ label: s!.label, costNt: s!.costNt });
+      expect(s!.maxRefs).toBeGreaterThan(0);
+      expect(PRODUCT_COMPOSITE_MODELS).toContain(m.value);
+    }
+    for (const [w, h] of [[908, 789], [1000, 1000], [1920, 1080], [600, 900], [1200, 1500], [4, 2], [3, 10]]) expect(nearestAspectRatio(w, h)).toBe(ref(w, h));
+  });
+  it("每個模型一顆看得到的鈕並標價；按下 → POST /generate { model, prompt, referenceImages:[圖], aspectRatio } → placeImage，原圖不動", async () => {
+    const ctx = mockCtx();
+    const body = await mount(BLOCKS[3], ctx);
+    const btns = [...body.querySelectorAll("[data-ae-model]")] as HTMLButtonElement[];
+    expect(btns.map((b) => b.dataset.aeModel)).toEqual(["openai-25-edit", "nano-banana-2", "nano-banana-pro", "flux-kontext-pro"]);
+    for (const b of btns) expect(b.textContent).toMatch(/NT\$\d/);
+    q(body, "[data-ae-prompt]").value = "海邊";
+    btns[0].click();
+    await vi.waitFor(() => expect(q(body, "[data-ae-msg]").textContent).toContain("3 個字"));
+    expect(fetchMock).not.toHaveBeenCalled();
+    q(body, "[data-ae-prompt]").value = "把背景換成海邊";
+    btns[1].click();
+    btns[1].click();
+    await vi.waitFor(() => expect(ctx.placeImage).toHaveBeenCalled());
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/tools/studio/generate");
+    expect(sentInit().headers).toEqual({ "Content-Type": "application/json", "x-ops-simulated-role": "operator" });
+    expect(sentBody()).toEqual({ model: "nano-banana-2", prompt: "把背景換成海邊", referenceImages: [CANVAS_PNG], aspectRatio: "16:9" });
+    expect(ctx.replaceImage).not.toHaveBeenCalled();
+    expect((ctx.placeImage.mock.calls[0] as unknown[]).slice(1)).toEqual(["AI 修圖.png", { at: [0, 0] }]); // source's top-left
+    expect(q(body, "[data-ae-msg]").textContent).toContain("NT$2.2");
+  });
+  it("API 失敗 → 顯示錯誤、不置入、解除忙碌", async () => {
+    fetchMock.mockImplementation(async () => ({ status: 200, json: async () => ({ ok: false, error: "點數不足" }) }));
+    const ctx = mockCtx();
+    const body = await mount(BLOCKS[3], ctx);
+    q(body, "[data-ae-prompt]").value = "把背景換成海邊";
+    q(body, '[data-ae-model="openai-25-edit"]').click();
+    await vi.waitFor(() => expect(q(body, "[data-ae-msg]").textContent).toContain("點數不足"));
+    expect(ctx.placeImage).not.toHaveBeenCalled();
+    expect(ctx.busy).toHaveBeenLastCalledWith(false);
   });
 });
 
