@@ -80,12 +80,12 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
 <div class="shell">
 <aside><div class="in">
   <h1>畫布專業版監工台</h1>
-  <p class="upd">更新於 <span data-computed>2026-11-05</span></p>
-  <div class="bar" data-computed><i class="d" style="width:42.857142857142854%"></i><i class="g" style="width:42.857142857142854%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>3</span>／<span data-computed>7</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>1</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <p class="upd">更新於 <span data-computed>2026-11-06</span></p>
+  <div class="bar" data-computed><i class="d" style="width:37.5%"></i><i class="g" style="width:37.5%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>3</span>／<span data-computed>8</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
-<p class="sub">把開源的 PhotoCraft（Photoshop 的重製，工具、面板、快捷鍵都一樣）放進 app.aware-wave.com 當「畫布（專業版）」；AwareWave 有而它沒有的功能做成右側一條圖示欄，點了才浮出面板；Studio、塔羅、Banner、Mockup、我的設計都能一鍵把圖送進來改；舊 Canvas Editor 最後退場，只留一套。共 <span data-computed>7</span> 張卡、<span data-computed>26</span> 項工作，已完成 <span data-computed>18</span> 項。目前只有研究與計畫，還沒動任何程式。</p>
+<p class="sub">把開源的 PhotoCraft（Photoshop 的重製，工具、面板、快捷鍵都一樣）放進 app.aware-wave.com 當「畫布（專業版）」；AwareWave 有而它沒有的功能做成右側一條圖示欄，點了才浮出面板；Studio、塔羅、Banner、Mockup、我的設計都能一鍵把圖送進來改；舊 Canvas Editor 最後退場，只留一套。共 <span data-computed>8</span> 張卡、<span data-computed>30</span> 項工作，已完成 <span data-computed>18</span> 項。目前只有研究與計畫，還沒動任何程式。</p>
 <section id="now"><h2>現況</h2><p class="lead">目前已做到與還沒做到的事（2026-11-05 查）。</p><ul class="yn"><li class="yes"><b>可以</b><span>確認拿到的是真的 PhotoCraft，不是同名假貨。<small>storytold/photocraft：七萬七千多顆星、Apache-2.0、今天還在更新、官網 getartcraft.com 連到同一個地方。只複製原始碼來讀，沒有下載安裝檔、沒有執行。</small></span></li><li class="yes"><b>可以</b><span>PhotoCraft 有網頁版，可以放進 app 的頁面裡。<small>2026-11-06 已放上正式站：app.aware-wave.com/photo-pro/current/ 開得起來（14 MB 分段檔、一年快取；其餘每次重新確認）。頁面與側欄入口還沒合併上線。</small></span></li><li class="yes"><b>可以</b><span>舊 Canvas Editor 的每個功能，在專業版都有著落。<small>舊編輯器全部按鈕與控制項逐一比對過：大多數 PhotoCraft 原生就有而且更完整（調整、濾鏡、文字、形狀、圖層、印刷用 PDF、另存與換格式）；它沒有的全部排進右側面板。有三項做法會變：上傳字型改成建置時加進字型庫；調色要能回頭改請用原生的調整圖層；舊專案檔換成 PhotoCraft 的格式。</small></span></li><li class="yes"><b>可以</b><span>右側面板能對 PhotoCraft 下指令（放圖進去、拿圖出來、匯出、存檔）。<small>W1 已把 PhotoCraft 團隊自己的介面接上（一個只動網頁外殼的補丁，上游 PR 草稿已寫、未送出），本機實測可以下指令。</small></span></li><li class="yes"><b>可以</b><span>放圖進圖層、取出圖層的圖、換掉圖層的圖，這幾個動作做得到。<small>W1 本機實測全部做得到：開檔、匯出、放 SVG、放圖片、取圖層的圖、換圖層的圖（位置與順序不變）、選取轉遮罩、按 Q 塗出範圍、符合／填滿畫布。兩點差異已交給下一張卡：按 Q 塗的地方預設是「不選」，要反過來；換圖時圖層樣式不會帶過去。My Designs 的原始檔改存 .psd（網頁版存不出 PhotoCraft 自己的格式）。</small></span></li><li class="yes"><b>可以</b><span>從 Studio、塔羅、Banner、Mockup、我的設計按一下就進專業版改圖；改完可以存入 My Designs、另存、換格式、匯出。<small>2026-11-06 上線（85c27aaa4）：五個入口的「在畫布編輯」都進專業版，有原始檔的開原始檔；交接改成開成功才清，開不起來會顯示訊息。另存、換格式、匯出用 PhotoCraft 自己的選單，下載到電腦。等妳登入實際試一次（C3.4、C5.3）。</small></span></li><li class="yes"><b>可以</b><span>介面是繁體中文、用妳的字型。<small>W1 本機實測：開啟時自動切成繁中選單（之後尊重使用者自己改的語言），打繁中字用到 Noto Sans TC／Noto Serif TC；字型沿用向量版那份清單，不用補丁。PhotoCraft 的畫面用它自己的深色或淺色，不套 app 主題；右側圖示欄跟著 app 主題。</small></span></li></ul></section>
 
 <section id="steps"><h2>卡片與工作</h2><p class="lead">依編號進行。每張卡列出所有工作，勾選代表完成。High 風險步驟（上傳正式站、改 nginx）經你同意才做。</p><ol class="steps"><li class="step done" id="C1">
@@ -183,14 +183,28 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
       <ul class="items"><li class="done"><b>✓</b><span><code>C7.1</code> 入口全部改接到專業版，圖會帶過去：Studio、塔羅、Banner、我的設計，加上新補的 Mockup；有圖層原始檔的設計開原始檔。 <small>完成於 <code>85c27aaa4</code></small></span></li><li class="todo"><b>○</b><span><code>C7.2</code> 舊網址跳轉到專業版；刪舊頁與相關設定、測試改好。</span></li><li class="todo"><b>○</b><span><code>C7.3</code> 文件與記憶更新。</span></li></ul>
       <details><summary>工程細節：C7 入口改接、舊編輯器退場</summary>
         <p>openInCanvas 加選填的原始檔參數與目的地表；ProEditorFrame 讀交接；Mockup 加入口；門頁改載新元件；canvas 頁改 redirect、刪 CanvasEditor、搬 fabric-filters、拆側欄與登記、改測試；文件與記憶</p>
-        <p><b>需先完成：</b><a href="#C6">C6</a>；待決 1 決定要不要補「傳回原工具」</p>
+        <p><b>需先完成：</b><a href="#C6">C6</a></p>
         <p><b>已定案：</b>不留兩扇門。不做舊 .design.json 匯入（妳 2026-11-06 定案：沒有要再編輯的舊專案檔）。妳在正式站用過專業版、說可以之後才拆舊的。調色與去背的共用數學、fabric 套件保留（塔羅印刷與預覽還在用）。</p>
         <p><b>檔案：</b><code>NA/components/tools/canvas-handoff.ts</code> <code>NA/app/(shell)/tools/designs/DesignsGallery.tsx</code> <code>NA/app/(shell)/tools/mockup/MockupStudio.tsx</code> <code>NA/app/(shell)/tools/mockup/ModelMockupPanel.tsx</code> <code>NA/app/design/canvas/page.tsx</code> <code>NA/app/(shell)/tools/canvas/page.tsx</code> <code>NA/app/(shell)/tools/canvas/CanvasEditor.tsx</code> <code>NA/app/sidebar-sections.ts</code> <code>NA/lib/portal/products.ts</code></p>
         <p><b>卡：</b><code>agency-os/handoffs/2026-11-05-photocraft-pro/R0-PLAN.md §6 C7</code></p>
       </details>
+    </div></li><li class="step todo" id="C8">
+    <div class="n">8</div>
+    <div class="b">
+      <p class="plain">例：在塔羅按「在畫布編輯」，畫布開在新分頁；改好按右邊的「傳回塔羅」，塔羅那張預覽圖就換成改過的，接著生整套就照這張的樣子。原分頁關掉了，改好的圖就存進「我的設計」。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium（改各工具共用的入口）</span><span class="who">負責：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>塔羅預覽、整套裡的單張、Studio 結果與參考圖、Banner 商品圖與背景：送出、改、傳回後原格換成新圖；原分頁關掉時圖進「我的設計」；送錯格、圖不見各零次。</p>
+      <ul class="items"><li class="todo"><b>○</b><span><code>C8.1</code> 共用機制：畫布開新分頁、右邊「傳回」鈕、原分頁收回；收不回就存進「我的設計」。</span></li><li class="todo"><b>○</b><span><code>C8.2</code> 塔羅：預覽圖與整套裡的單張都能傳回。</span></li><li class="todo"><b>○</b><span><code>C8.3</code> Studio 結果與參考圖、Banner 商品圖與背景都能傳回。</span></li><li class="todo"><b>○</b><span><code>C8.4</code> 本機與正式站實際跑一次。</span></li></ul>
+      <details><summary>工程細節：C8 傳回原工具</summary>
+        <p>交接改走新分頁＋IndexedDB；原分頁收回的通道與「傳回」鈕；塔羅、Studio、Banner 接上；實測</p>
+        <p><b>需先完成：</b><a href="#C4">C4</a></p>
+        <p><b>已定案：</b>妳 2026-11-06 定案「補「傳回」」。一套機制三個工具共用；畫布一律開新分頁；整張 Banner 維持單向（它是合成圖，沒有一格能收回）。</p>
+        <p><b>檔案：</b><code>NA/components/tools/canvas-handoff.ts</code> <code>NA/components/tools/useCanvasReturn.ts</code> <code>NA/public/editor-shared/dock.js</code> <code>NA/app/(shell)/tools/tarot/TarotStudio.tsx</code> <code>NA/app/(shell)/tools/studio/StudioWorkbench.tsx</code> <code>NA/app/(shell)/tools/banner/BannerStudio.tsx</code></p>
+        <p><b>卡：</b><code>agency-os/handoffs/2026-11-05-photocraft-pro/R0-PLAN.md §6 C8</code></p>
+      </details>
     </div></li></ol></section>
 
-<section id="open"><h2>待你決定</h2><p class="lead">決定後，對應的卡才能開始。</p><ol class="open"><li><div class="n">1</div><div class="b"><p class="plain">從塔羅、Studio、Banner 把圖送進畫布改完之後，現在沒有路「傳回原工具」。塔羅最明顯：改好的預覽圖回不到塔羅，整套牌就不會照改過的樣子生成；整套裡的單張改完也放不回那一格。舊 Canvas Editor 本來也沒有這條路。Mockup 不受影響（它從「我的設計」挑圖）。要不要補「傳回」？</p><ul class="opts"><li class="pick"><b>補「傳回」 ★</b><span>畫布開在新分頁，原工具的分頁留著；右側欄多一顆「傳回 ○○」，按下去把改好的圖送回原本那一格（塔羅預覽、整套裡的某一張、Studio 的結果或參考圖、Banner 的商品圖或背景）。原分頁已關掉時改存進「我的設計」。</span></li><li class=""><b>先不補</b><span>維持現狀：改完存進「我的設計」或下載，再到原工具手動上傳。</span></li></ul><p class="meta"><a href="#C7" class="who">需在第 <span data-computed>7</span> 張卡開始前決定</a><span class="who">出處：操作者 2026-11-06「塔羅改完要可以傳回去」</span></p></div></li></ol></section>
+<section id="open"><h2>待你決定</h2><p class="lead">決定後，對應的卡才能開始。</p><p class="lead">目前沒有需要你決定的事。</p></section>
 
 <section id="paths"><h2>檔案</h2><div class="paths"><div><b>每項工作的做法</b><code>agency-os/handoffs/2026-11-05-photocraft-pro/R0-PLAN.md §6</code></div><div><b>研究與對照（為什麼選這條路）</b><code>agency-os/reports/decisions/2026-11-05-canvas-editor-vs-photocraft.md</code></div><div><b>工作紀錄</b><code>agency-os/WORKLOG.md 2026-11-05</code></div><div><b>本頁來源</b><span><code>agency-os/handoffs/2026-11-05-photocraft-pro/</code><br>修改 data.mjs 後，執行 node build.mjs 和 node check.mjs，再重新發布同一網址。</span></div></div></section>
 </main>

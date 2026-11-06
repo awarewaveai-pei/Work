@@ -156,6 +156,17 @@ map $uri $photo_pro_cache {
 | C7.2 | 退場（操作者在正式站用過並說可以之後）：`NA/app/(shell)/tools/canvas/page.tsx` 改 `redirect('/tools/photo-pro')`；刪 `CE`；`NA/app/(shell)/tools/canvas/fabric-filters.ts` 搬 `NA/lib/studio/fabric-filters.ts`（改 `GradedPreview.tsx:22` 等 import）；`NA/app/sidebar-sections.ts:68` 移除 Canvas Editor；`NA/lib/portal/products.ts:68` nav「畫布」的 `staff` 改 `tools/photo-pro`、`:74` `staffPaths` 移除 `tools/canvas`；向量頁的 `fallback` 不再指 `/tools/canvas`；只被 `CE` 用的模組（`NA/lib/studio/canvas-fit.ts` 等）grep 無 import 才刪；`INFRA/tests/e2e/editor-merge/card-0{1..6}-*.mjs` 刪除；`editor-*-drift.test`／`editor-filter-ownership.test` 的 canvas 端改指 `blocks/`。`fabric` 依賴保留 |
 | C7.3 | RUNNABLE_DEMOS 舊條目改指專業版；記憶 `project_pod_image_edit_feature.md`、`project_vector_editor_blocks.md` 更新；WORKLOG |
 
+### C8 傳回原工具（操作者 2026-11-06「補「傳回」」）
+
+不變量：從工具送進畫布、帶「傳回」票的圖，按「傳回」後一定落地一處——原分頁那一格收下，或（原分頁不在／那一格已不存在）存進 My Designs；不會兩處都沒有、不會落到別格。一套機制，三個工具共用。
+
+| 卡號 | 做什麼 |
+|---|---|
+| C8.1 | 機制（`NA/components/tools/canvas-handoff.ts`、`ProEditorFrame.tsx`、`NA/public/editor-shared/dock.js`＋`dock.css`、新檔 `NA/components/tools/useCanvasReturn.ts`、`ctx-contract.md`）：交接改成**一律開新分頁**、只走 IndexedDB 一筆 `handoff:<id>`（`{editor, image\|source, name, ret?}`），網址帶 `?h=<id>`（新分頁沒有原分頁的 sessionStorage）；分頁被擋時退回同分頁開。`openInCanvas(image, baseName, href, source?, ret?)`，`ret = { tool, slot, label }`。原分頁 `useCanvasReturn(tool, onReturn)` 記住自己發出的票（記憶體，重新整理即失效），收 `BroadcastChannel("canvas-return")` 的 `{id, image}`，`onReturn(slot, dataUrl)` 回 `true` 才回 `ack`。編輯器 dock 有票時圖示欄頂端多一顆「傳回 <label>」：`ctx.exportArtboard({format:"png"})` → 送出 → 等 ack（約 2 秒）→ 沒 ack 改存 My Designs（重用 `blocks/my-designs.js` 的存檔函式，抽成共用）並顯示「原分頁已關，已存進我的設計」。向量版同一個 dock，同樣有。單元測試：票對不上不收、slot 回 false 不 ack、沒 ack 走 My Designs、舊 sessionStorage 交接不再寫 |
+| C8.2 | 塔羅（`NA/app/(shell)/tools/tarot/TarotStudio.tsx`）：預覽圖（`:2124`）帶票 `slot=preview`；收回時與 AI 修圖 `onEditedImage`（`:2147-2168`）走**同一個函式**（抽出：換預覽圖、`setLockedGradedPreview(null)`、`unlockStyle()`、清整套、存 gallery），seed 不變。整套單張放大檢視（`:2224` 一帶）加「✏️ 在畫布編輯」送 `art`（無框、已調色），票 `slot=deck:<deckRun>:<index>`；收回時整套已換（deckRun 不同）→ 回 false；否則與 `generateOne`（`:843`）的後段同一個函式（抽出：`renderPrintCard` → 換 blob/url/art → 清「已存無框圖」記號 → 存 gallery），不再調色 |
+| C8.3 | Studio＋Banner：Studio 結果的兩顆「在畫布編輯」（`StudioWorkbench.tsx:1707,1928`）帶票 `slot=result:<model>`，收回換該模型結果的圖（同 `:1721` 的 setResults）；參考圖縮圖（`:1584`）加「✏️」送進畫布，收回換那一張。Banner（`BannerStudio.tsx`）商品圖與背景各加「在畫布編輯」，收回：商品圖＝`productImage` 與 `productOrig` 都換成新圖；背景＝`bgImage` 換新圖、`bgImageHasProduct` 不動；整張 Banner 的「在畫布編輯」（`:1313`）維持單向（無票） |
+| C8.4 | 實測：本機真 PhotoCraft（`--force_high_performance_gpu`），三工具各一條「送出 → 改 → 傳回 → 原格換掉」＋「關掉原分頁 → 傳回 → 進 My Designs」；正式站部署後主 session 用內建瀏覽器各跑一次 |
+
 ## 7. 驗證計畫（四動作）
 
 - 實測：卡 C1.4／C2.4／C3.4／C5.3／C6.1／C7.1 的 curl／瀏覽器／playwright 指令與輸出；驗收＝登入 e2e 每個面板與每個入口綠＋操作者在正式站用過。
@@ -176,3 +187,4 @@ map $uri $photo_pro_cache {
 - 介面約定（跨工人）：頁框設 `window.__proEditor = { editor, frame }`；共用 `mountDock` 把 `frame: () => globalThis.__proEditor?.frame` 明確傳給 `makeCtx`（W2）；`ctx-vectorcraft.js` 移除 `globalThis.__vectorProFrame` 預設、`frame` 改必填（W4）；`ctx.host` 形狀見卡 C4.2（W4 先在向量轉接器與契約落地）。
 - W2、W4 改動互相依賴，由主 session 在同一個 detached 整合工作樹一起合併、跑 `tsc`＋vitest 全套後才進 main。
 - 之後依序：C2（主 session，High）→ C4.2＋C4.4（回派 W1 或 W3）→ C3.4、C5.3（主 session＋操作者）→ C6 → C7。
+- C8（2026-11-06）：W5 先做 C8.1（Opus 5.5，只動 C8.1 列的檔）；commit 後 W6 塔羅 C8.2、W7 Studio＋Banner C8.3 從 W5 的 commit 開工，檔案不重疊；主 session 整合、C8.4、部署。
