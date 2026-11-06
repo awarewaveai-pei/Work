@@ -1,4 +1,21 @@
 # Worklog
+## 2026-11-06（續17）外聯花費進 AI Costs 頁（含免費呼叫）＋免費額度卡＋Cold Outreach 操作手冊
+
+**根因**
+- C1：外聯付費工具（Serper 找店家／找公司／找人、Apify IG／FB）直接 `hold.settle`（舊 `app/api/outreach/inbox/route.ts:158,218,251`、`lib/outreach/social-research.ts:194`），只扣錢包、不寫 `ai_call_logs`；`/ops/costs` 只讀 ai_call_logs → 這些花費看不到。
+- C2：免費呼叫（Hunter／Reoon／ZeroBounce 驗證、經濟部 GCIS）完全沒有紀錄；操作者「免費的也要寫」。
+
+**做了**
+- 495d47f80：`logToolCost`（kind tool；0 元＝退還 hold、不寫列，await）；4 處 settle 改走它；`settle-through-ledger.test.ts` 掃 app/ lib/，禁止 log-ai-call 與 entitlements 以外的 `.settle(`（關掉整類）。spend-report／CostsTabs 加「工具」類與外聯路由中文名。`FREE_QUOTAS`＋`free-quota.ts`＋`FreeQuotaCard`（Gemini lite 500／天 太平洋日、Reoon 20／天、ZeroBounce 100／月、Hunter 50／月；讀失敗顯示讀取失敗）。`/tools/outreach/guide` 操作手冊（文案 GPT：`agency-os/reports/oracle/2026-11-06-inspect-3a8eaa9b.md`），Cold Outreach 側欄第一項。
+- 5aba687a3：`logFreeCall`（0 元、metadata.free）；`verifyMailbox`／`findMailbox` 每次回應記一筆（`VerifierKey.billOrg`，不記 email／key）；GCIS 每次查詢記一筆；zero_cost 警示略過免費列；帳本 0 元工具列顯示「免費」；驗證額度用量 = max(帳本次數, 已存驗證結果)。
+- 監工台 NOW 加一列，v41。
+
+**Codex 審查**（`agency-os/reports/oracle/2026-11-06-partialreview-40e6e54d.md`）3 項全修：0 元退還改 await（避免下一個請求遇到舊 hold 而 402）；驗證額度只依存下結果、所有組織合計 → 文案註明＋5aba687a3 改依每次呼叫記帳。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/ai app/api/outreach lib/outreach app/api/internal/outreach (60 files 455 passed) + tsc 0 errors outside .next | exit=0 | ms=4000
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin (deployed 495d47f80 then 5aba687a3, smoke all OK) + browser /ops/costs 免費額度卡 Gemini 已用 214／500、/tools/outreach/guide 渲染正常 | exit=0 | ms=300000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=\.settle\( | hits=6
 ## 2026-11-06（續16）影音工作台 FC.3：專業剪輯的成片入帳與送審文字
 
 - 做了（`VW`＝`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`）：
