@@ -24,8 +24,11 @@ $baseWsl   = ConvertTo-WslPath $base
 wsl -d Ubuntu -e bash "$scriptWsl/build.sh" "$baseWsl"
 if ($LASTEXITCODE -ne 0) { throw "build.sh failed (exit $LASTEXITCODE)" }
 
-# Newest published dir (name = <rev7>-<inputs7>, computed in build.sh from PIN + fonts + patches).
-$dist = Get-ChildItem (Join-Path $base 'filmcraft-dist') -Directory |
-    Where-Object { $_.Name -notlike '.staging*' -and $_.Name -notlike '*.old.*' } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-Write-Host "dist: $($dist.FullName)"
-Get-ChildItem $dist.FullName | Select-Object Name, Length | Format-Table -AutoSize
+# The dist this run produced: build.sh writes its exact name to filmcraft-dist\LATEST after the swap.
+$latest = Join-Path $base 'filmcraft-dist\LATEST'
+if (-not (Test-Path -LiteralPath $latest)) { throw "build.sh did not write $latest" }
+$name = (Get-Content -LiteralPath $latest -Encoding UTF8 | Select-Object -First 1).Trim()
+$dist = Join-Path (Join-Path $base 'filmcraft-dist') $name
+if (-not $name -or -not (Test-Path -LiteralPath $dist -PathType Container)) { throw "dist named in LATEST not found: $dist" }
+Write-Host "dist: $dist"
+Get-ChildItem -LiteralPath $dist | Select-Object Name, Length | Format-Table -AutoSize

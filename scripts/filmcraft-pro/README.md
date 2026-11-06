@@ -10,7 +10,7 @@ powershell -ExecutionPolicy Bypass -File D:\Work\scripts\filmcraft-pro\build.ps1
 
 輸出：`%LOCALAPPDATA%\awarewave\filmcraft-dist\<rev前7碼>-<inputs前7碼>\`（`FILMCRAFT_HOME` 可改 base）。`inputs7` = sha256(`PIN.json`＋`scripts/craft-web-build/fonts.json`＋本資料夾所有 `*.patch`) 前 7 碼：改字型、補丁或任何釘都換新目錄。組裝在 `.staging-*` 完成、`SHA256SUMS -c` 通過才原子換名；建置失敗不動既有目錄。首次約 8 分鐘以上（含編譯）。
 
-內容＝`index.html`、`filmcraft_web.js`、`filmcraft_web_bg.wasm`、`audio-worklet.js`、`favicon.png`、`snippets/`＋`NOTICE`（末尾附 provenance）、`LICENSE-MIT`、`LICENSE-APACHE`＋`licenses/`（編進 wasm 的每個字型各一份 OFL 授權文字；名單由 build.sh 從補丁後的 `crates/text/build.rs` 讀出，不另列一份）＋`filmcraft_web_bg.wasm.gz`、`filmcraft_web.js.gz`＋`SHA256SUMS`。FilmCraft 檔名不帶 hash（用 `?v=` 查詢字串，上游 `packaging/web/README.md:19-21`），所以沒有 hash 檔名檢查，也不能對它們設長快取。
+內容＝`index.html`、`filmcraft_web.js`、`filmcraft_web_bg.wasm`、`audio-worklet.js`、`favicon.png`、`snippets/`＋`NOTICE`（末尾附 provenance）、`ATTRIBUTION.md`（NOTICE 指向它）、`LICENSE-MIT`、`LICENSE-APACHE`＋`licenses/`（編進 wasm 的每個字型各一份 OFL 授權文字；名單由 build.sh 從補丁後的 `crates/text/build.rs` 讀出，不另列一份）＋`filmcraft_web_bg.wasm.gz`、`filmcraft_web.js.gz`＋`SHA256SUMS`。FilmCraft 檔名不帶 hash（用 `?v=` 查詢字串，上游 `packaging/web/README.md:19-21`），所以沒有 hash 檔名檢查，也不能對它們設長快取。
 
 build.sh 機械檢查（任一不過即 FATAL，不出產物）：兩個 repo 能 checkout 到釘的 rev；補丁 `git apply --check`；wasm-bindgen 版本＝PIN；找得到 wasm-opt；`fonts.json` 每個字型 sha256 相符（`craft_web_fonts`）；四個必備檔在；wasm 內含 `NotoSansTC-Regular` 與 `NotoSerifTC-Regular`（bytes 搜尋）；dist 內任何檔的 sha256 不得等於上游 `docs/brand/` 內任何檔（品牌資產不出貨，R6）；`NOTICE`／`LICENSE-*` 在。
 
@@ -54,3 +54,4 @@ WSL Ubuntu＋rustup stable（含 `wasm32-unknown-unknown`）＋`git python3 curl
 - 編進 wasm 的字型名單從補丁後的 `fn wasm_keeps` 整個函式讀出（跨行也讀得到），並斷言含 Noto Sans TC、Noto Serif TC；每個字型的 OFL 授權檔放進 `licenses/`。
 - NOTICE 末尾記 `rustc -V`、wasm-bindgen、wasm-opt 版本。
 - `build.ps1` 先設 `[Console]::OutputEncoding` 為 UTF-8 再呼叫 `wslpath`（路徑含中文時不會被當成 CP950），並檢查它的 exit code。
+- `filmcraft-dist\LATEST`：build.sh 換名成功後寫入這次的產物目錄名；`build.ps1` 讀它來回報，不用修改時間猜（Codex 2026-11-06）。

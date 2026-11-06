@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-06（續8）FC.1 補跑 Codex 交叉審查：2 項發現全修（filmcraft-pro）
+
+- 前情：同日 FC.1 條目以 `ORACLE_WAIVED` 跳過 Codex；操作者告知 Codex 有額度 → 補審 commit `6cbcae4e5`。artifact `agency-os/reports/oracle/2026-11-06-partialreview-88f54f35.md`（files-reviewed 含全部 7 檔）。
+- F1（屬實）產物的 `NOTICE:13` 指向 `ATTRIBUTION.md`，產物卻沒附 → `scripts/filmcraft-pro/build.sh` 把 `ATTRIBUTION.md` 列為必附檔（缺就 FATAL）。
+- F2（屬實）`build.ps1` 用「修改時間最新的目錄」猜產物，舊目錄較新時會報錯目錄 → build.sh 換名成功後寫 `filmcraft-dist/LATEST`（先寫暫存再搬），build.ps1 讀它，找不到就 throw。不變量：回報的產物＝這次建置寫下的名字，不靠推測。
+- 產物 `46763a8-b7f3040` 已重建：17 檔（多 `ATTRIBUTION.md`），`SHA256SUMS` 變了；wasm 位元組數不變（57,328,542）。已通知用這份產物的 session 重新複製。
+- 另：hook 警告 `scripts/filmcraft-pro/*` 被 session 9c91c493 同時編輯＝誤判（`git diff --stat` 只有本條的 14＋／7−）；同一則警告裡的 `agency-os/handoffs/2026-10-31-outbound-os/*` 是那個 session 自己的改動，未動。
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/filmcraft-pro/build.ps1 → `OK: …/46763a8-b7f3040 (17 files…)`、`dist:` 行＝LATEST 內容；`ls ATTRIBUTION.md`；`sha256sum -c SHA256SUMS` | exit=0 | ms=240000
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/2m/0n（external oracle = Codex CLI gpt-6-sol，read-only；兩項逐一核對屬實後修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=filmcraft-dist | hits=17（都指向同一個產物根目錄；沒有別處用修改時間挑產物）
 ## 2026-11-06（續7）外聯 v2：b29c0aa31 的 Codex 審查補做；主信箱每日上限 20 → 100（操作者指示）
 
 - Codex 審查 b29c0aa31（artifact `agency-os/reports/oracle/2026-11-06-partialreview-a4fc104b.md`），2 項，判讀：

@@ -88,7 +88,8 @@ STAGE="$OUT_BASE/filmcraft-dist/.staging-$DIST_NAME.$$"
 trap 'rm -rf "$STAGE"' EXIT
 rm -rf "$STAGE" && mkdir -p "$STAGE"
 cp -r "$DIST"/. "$STAGE"/
-for f in NOTICE LICENSE-MIT LICENSE-APACHE; do
+# NOTICE refers the reader to ATTRIBUTION.md for the per-asset list, so that file ships with it.
+for f in NOTICE ATTRIBUTION.md LICENSE-MIT LICENSE-APACHE; do
   [ -f "$SRC/$f" ] || { echo "FATAL: $f missing from the upstream checkout" >&2; exit 1; }
   cp "$SRC/$f" "$STAGE/$f"
 done
@@ -124,4 +125,6 @@ if ! mv "$STAGE" "$OUT"; then
 fi
 rm -rf "$OLD" || echo "WARN: could not remove $OLD (a file is held open?); the new dist is in place" >&2
 trap - EXIT
+# The name of the dist this run produced, for build.ps1 (written whole, then moved into place).
+printf '%s\n' "$DIST_NAME" > "$OUT_BASE/filmcraft-dist/.latest.$$" && mv -f "$OUT_BASE/filmcraft-dist/.latest.$$" "$OUT_BASE/filmcraft-dist/LATEST"
 echo "OK: $OUT ($(find "$OUT" -type f | wc -l) files, $(du -sh "$OUT" | cut -f1) total; wasm $(stat -c%s "$OUT/filmcraft_web_bg.wasm") bytes raw, $(stat -c%s "$OUT/filmcraft_web_bg.wasm.gz") bytes gz)"
