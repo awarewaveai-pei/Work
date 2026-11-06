@@ -65,7 +65,7 @@ export const PRIVACY = "個人資料及經濟部登記的負責人姓名都屬�
 
 /** Not built yet (2026-11-06; copy by GPT, artifact 2026-11-06-inspect-b68edc40.md). Update when a card closes. */
 export const LIMITS: Array<{ t: string; d: string }> = [
-  { t: "每日三百封尚未啟用", d: "程式已完成，但須先購買次網域、開設並連接新寄件信箱；目前只有 awarewaveai@gmail.com，以草稿模式運作。" },
+  { t: "寄件信箱池尚未啟用", d: "程式已完成；要先買一個像品牌的網域、開兩個 Workspace 信箱並連上，才能每天自動寄 100 封。目前只有 awarewaveai@gmail.com，以草稿模式運作。" },
   { t: "事實核對仍在量測", d: "系統每天量測一部分，預計 2026-11-08 完成；同一封信判斷兩次的一致率須達 95% 才合格。" },
   { t: "兩週寄送驗收尚未開始", d: "抽樣與信件切角的成效，要等實際寄信滿兩週後才能驗收。" },
   { t: "找公司目前只限三類行業", d: "「找公司（經濟部）」目前只開放零售、批發、餐飲業（營業項目以 F 開頭）；要找其他行業，須先向經濟部寄告知書申請。" },
