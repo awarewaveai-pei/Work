@@ -187,7 +187,7 @@ type Output = { url: string; assetId: string; jobId: string; editRevision: numbe
 
 ### PJ.3 「排成時間軸」；配音、字幕自動上軌（Medium）
 
-前置：§8 Q1（旁白欄位）操作者回覆。下表照建議做法 A 寫。
+前置：§8 Q1 已決定（操作者 2026-11-06：要加旁白）→ 照做法 A。
 
 | 檔:行 | 動作 |
 |---|---|
