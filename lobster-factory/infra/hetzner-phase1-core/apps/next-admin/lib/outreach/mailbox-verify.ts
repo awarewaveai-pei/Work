@@ -10,6 +10,7 @@
 // running; ZeroBounce GET /v2/validate: status); no key was on hand to record a live answer (WORKLOG 2026-11-02).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { connectorSecretRef, getSecret } from "@/lib/secret-vault";
+import { logFreeCall } from "@/lib/ai/log-ai-call";
 import { guessEmails, splitLatinName, type KnownEmail } from "./email-guess";
 import { verifyEmails, type EmailStatus } from "./verify-email";
 
@@ -24,7 +25,12 @@ const REOON_TIMEOUT_MS = 90_000;
 /** How long one call to this provider may take. */
 export const timeoutOf = (provider: PaidProvider): number => (provider === "reoon" ? REOON_TIMEOUT_MS : TIMEOUT_MS);
 
-export interface VerifierKey { provider: PaidProvider; apiKey: string }
+/** billOrg = the organization whose call this is (not the key's owner), for the free-call row. */
+export interface VerifierKey { provider: PaidProvider; apiKey: string; billOrg?: string | null }
+const VENDOR: Record<PaidProvider, string> = { hunter: "Hunter", reoon: "Reoon", zerobounce: "ZeroBounce" };
+/** One row per response from a verifier (success or HTTP error): these calls spend a free quota, so they are recorded at cost 0. */
+const logCall = (key: VerifierKey, model: string, status: number) =>
+  void logFreeCall({ route: "outreach/verify-email", vendor: VENDOR[key.provider], model, organizationId: key.billOrg ?? null, tool: "outreach", metadata: { status } });
 export interface StoredVerdict { status: EmailStatus; provider: string | null; verified_at: string }
 
 /** A paid verdict from the last 90 days, or null (none, MX-only, or too old). */
@@ -76,6 +82,7 @@ export async function verifyMailbox(email: string, key: VerifierKey, fetcher: ty
       ? `https://emailverifier.reoon.com/api/v1/verify?${new URLSearchParams({ email, key: key.apiKey, mode: "power" })}`
       : `https://api.zerobounce.net/v2/validate?${new URLSearchParams({ api_key: key.apiKey, email, ip_address: "" })}`;
   const resp = await fetcher(url, { method: "GET", signal: AbortSignal.timeout(timeoutOf(key.provider)) });
+  logCall(key, `${key.provider}.verify`, resp.status);
   if (key.provider === "hunter" && resp.status === 202) throw new VerifyPending("hunter");
   if (!resp.ok) throw new Error(`${key.provider} verify ${resp.status}: ${(await resp.text().catch(() => "")).slice(0, 200).replace(key.apiKey, "***")}`);
   const j = await resp.json();
@@ -103,7 +110,7 @@ export async function verifierKeys(db: SupabaseClient, organizationId: string | 
       .sort((a, b) => PAID_PROVIDERS.indexOf(a.connector_name) - PAID_PROVIDERS.indexOf(b.connector_name));
     for (const c of rows) {
       const apiKey = await getSecret(connectorSecretRef(c.id));
-      if (apiKey) out.push({ provider: c.connector_name, apiKey });
+      if (apiKey) out.push({ provider: c.connector_name, apiKey, billOrg: organizationId });
     }
   }
   return out;
@@ -150,6 +157,7 @@ export async function findMailbox(domain: string, first: string, last: string, k
   if (key.provider !== "hunter") return null;
   const url = `https://api.hunter.io/v2/email-finder?${new URLSearchParams({ domain, first_name: first, last_name: last, api_key: key.apiKey })}`;
   const resp = await fetcher(url, { method: "GET", signal: AbortSignal.timeout(TIMEOUT_MS) });
+  logCall(key, "hunter.find", resp.status);
   if (resp.status === 202) throw new VerifyPending("hunter");
   if (!resp.ok) throw new Error(`hunter find ${resp.status}: ${(await resp.text().catch(() => "")).slice(0, 200).replace(key.apiKey, "***")}`);
   const j = (await resp.json()) as { data?: { email?: unknown; verification?: { status?: unknown } } };

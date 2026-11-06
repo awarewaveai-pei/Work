@@ -40,7 +40,7 @@ export interface SpendSummary {
   /** Rows priced with the fallback rate (model missing from cost-model.ts) — figure is a guess. */
   fallbackPricedCount: number;
   fallbackPricedUsd: number;
-  /** Rows logged with cost 0 (paid call with no rate) — real spend is missing from the total. */
+  /** Rows logged with cost 0 (paid call with no rate) — real spend is missing from the total. Rows flagged metadata.free (logFreeCall) are 0 on purpose. */
   zeroCostCount: number;
   byKind: Bucket[];
   byVendor: Bucket[];
@@ -101,7 +101,7 @@ export function summarizeSpend(rows: SpendRow[]): SpendSummary {
     inTok += r.input_tokens ?? 0;
     outTok += r.output_tokens ?? 0;
     if (r.metadata && r.metadata.rate_fallback === true) { fallbackPricedCount += 1; fallbackPricedUsd += usd; }
-    if (usd === 0) zeroCostCount += 1;
+    if (usd === 0 && r.metadata?.free !== true) zeroCostCount += 1;
     add(kind, k, usd);
     add(vendor, r.vendor ?? "unknown", usd);
     add(model, r.model || "unknown", usd);

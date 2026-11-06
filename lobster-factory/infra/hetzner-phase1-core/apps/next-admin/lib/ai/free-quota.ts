@@ -41,16 +41,30 @@ export function quotaWindowStartIso(q: FreeQuota, now: Date): string {
   return q.period === "day" ? utcDayStartIso(now) : utcMonthStartIso(now);
 }
 
-async function countUsed(db: SupabaseClient, q: FreeQuota, since: string): Promise<number | null> {
+/** Verifier usage: the call ledger (ai_call_logs, exact from 2026-11-06) or the stored verdicts (co_verified_emails, covers
+ *  the earlier days), whichever is larger. Both read failing = unknown, never 0. */
+export const verifierUsed = (ledger: number | null, stored: number | null): number | null =>
+  ledger === null && stored === null ? null : Math.max(ledger ?? 0, stored ?? 0);
+
+async function count(q: PromiseLike<{ count: number | null; error: unknown }>): Promise<number | null> {
   try {
-    const base = q.id === "gemini_lite"
-      ? db.from("ai_call_logs").select("id", { count: "exact", head: true }).like("model", `${GEMINI_LITE_MODEL}%`).gte("created_at", since)
-      : db.from("co_verified_emails").select("email", { count: "exact", head: true }).eq("provider", q.id).gte("verified_at", since);
-    const { count, error } = await base;
-    return error || count === null ? null : count;
+    const { count: n, error } = await q;
+    return error || n === null ? null : n;
   } catch {
     return null;
   }
+}
+
+async function countUsed(db: SupabaseClient, q: FreeQuota, since: string): Promise<number | null> {
+  if (q.id === "gemini_lite") {
+    return count(db.from("ai_call_logs").select("id", { count: "exact", head: true }).like("model", `${GEMINI_LITE_MODEL}%`).gte("created_at", since));
+  }
+  const models = q.id === "hunter" ? ["hunter.verify", "hunter.find"] : [`${q.id}.verify`];
+  const [ledger, stored] = await Promise.all([
+    count(db.from("ai_call_logs").select("id", { count: "exact", head: true }).in("model", models).gte("created_at", since)),
+    count(db.from("co_verified_emails").select("email", { count: "exact", head: true }).eq("provider", q.id).gte("verified_at", since)),
+  ]);
+  return verifierUsed(ledger, stored);
 }
 
 export async function loadFreeQuotaUsage(db: SupabaseClient, now: Date): Promise<QuotaUsage[]> {

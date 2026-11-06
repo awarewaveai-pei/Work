@@ -10,7 +10,7 @@ import { verifyEmails, type EmailStatus } from "@/lib/outreach/verify-email";
 import { findExisting } from "@/lib/outreach/existing-leads";
 import { discoverInput, discoverPlaces, creditsTwd, creditsUsd, DISCOVER_MAX_USD, LocationNotRecognized, MAX_PAGES, type PlacesCursor } from "@/lib/outreach/discover";
 import { loadCursor, saveCursor, searchKey, type SearchSource } from "@/lib/outreach/search-cursor";
-import { holdCost, logToolCost } from "@/lib/ai/log-ai-call";
+import { billedOrgId, holdCost, logFreeCall, logToolCost } from "@/lib/ai/log-ai-call";
 import { billedTo } from "@/lib/outreach/billing";
 import { grantFor } from "@/lib/entitlements/grant";
 import { EntitlementRequired } from "@/lib/entitlements/can";
@@ -211,8 +211,12 @@ export async function POST(req: Request): Promise<Response> {
     const hold = await holdCost(grant, creditsUsd(GCIS_MAX_SERPER_CREDITS));
     if (!hold) return NextResponse.json({ ok: false, error: "no_credits" }, { status: 402 });
     const usage: GcisUsage = { serperCredits: 0, gcisCalls: 0 };
-    const settle = () => logToolCost({ route: "outreach/gcis", model: "serper.search", vendor: "Serper", tool: "outreach", grant, hold,
-      costUsd: creditsUsd(usage.serperCredits), metadata: { provider: "serper", serper_credits: usage.serperCredits, source: "gcis" } });
+    const settle = async () => {
+      // The registry calls are free: one row per run, the count in metadata (free quota ledger, /ops/costs).
+      if (usage.gcisCalls > 0) void logFreeCall({ route: "outreach/gcis", vendor: "經濟部 GCIS", model: "gcis.opendata", organizationId: billedOrgId(grant), tool: "outreach", metadata: { gcis_calls: usage.gcisCalls } });
+      await logToolCost({ route: "outreach/gcis", model: "serper.search", vendor: "Serper", tool: "outreach", grant, hold,
+        costUsd: creditsUsd(usage.serperCredits), metadata: { provider: "serper", serper_credits: usage.serperCredits, source: "gcis" } });
+    };
     try {
       const found = await discoverCompanies(createProviderCall({ budget: createBudget({ fetches: 220, ms: 240_000 }), grant, timeoutMs: 20_000 }), usage, { item, itemDesc, county }, undefined, cur.from);
       await settle();

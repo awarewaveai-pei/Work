@@ -278,6 +278,34 @@ export async function logToolCost(args: Omit<LogImageCostArgs, "kind">): Promise
   await logImageCost({ ...args, kind: "tool" });
 }
 
+/** A call to a free vendor (a verifier's free quota, the GCIS open data): one kind "tool" row at cost 0, flagged
+ *  metadata.free so the spend report does not read it as a missing price. No grant, no charge. Never throws. */
+export async function logFreeCall(args: { route: string; vendor: string; model: string; organizationId: string | null;
+  tool?: string | null; metadata?: Record<string, unknown> }): Promise<void> {
+  try {
+    const supabase = getSupabaseWriteClient();
+    if (!supabase) return;
+    const { error } = await supabase.from("ai_call_logs").insert({
+      id: randomUUID(),
+      organization_id: args.organizationId,
+      route: args.route,
+      model: args.model,
+      vendor: args.vendor,
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_read_tokens: 0,
+      cache_write_tokens: 0,
+      cost_usd: 0,
+      actor_role: null,
+      job_id: null,
+      tool: args.tool ?? null,
+      kind: "tool",
+      metadata: { ...(args.metadata ?? {}), free: true },
+    });
+    if (error) console.warn(`[ai-cost] ${args.route} free call not recorded: ${error.message}`);
+  } catch { /* never break the caller */ }
+}
+
 /** A held call that never reached the provider's bill (refused, failed before work): the whole hold goes back. */
 export function releaseHold(hold: Hold | null | undefined, route: string): void {
   if (hold) void settleCall(hold, 0, route);

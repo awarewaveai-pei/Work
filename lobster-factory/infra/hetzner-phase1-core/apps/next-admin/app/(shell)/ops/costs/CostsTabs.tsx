@@ -420,6 +420,7 @@ const ROUTE_LABEL: Record<string, string> = {
   "outreach/gmail-sync":      "外聯：回信分類",
   "outreach/discover":        "外聯：找店家（地圖）",
   "outreach/gcis":            "外聯：找公司（經濟部＋Google）",
+  "outreach/verify-email":    "外聯：驗證 email（免費額度）",
   "outreach/people":          "外聯：找人",
   "outreach/social-research": "外聯：讀 IG／FB",
 };
@@ -493,7 +494,7 @@ function LedgerTab({ groups, groupCount, s, windowDays }: { groups: LedgerGroup[
                   <span style={{ fontSize: 12, color: "var(--text-primary)" }}>{routeLabel(r.route)}</span>
                   <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 8 }}>{r.model} · {KIND_LABEL[spendKind(r)]}</span>
                 </div>
-                <span style={{ textAlign: "right", fontSize: 12 }}>{NT(rowUsd)}</span>
+                <span style={{ textAlign: "right", fontSize: 12 }}>{rowUsd === 0 && spendKind(r) === "tool" ? "免費" : NT(rowUsd)}</span>
                 <span style={{ textAlign: "right", fontSize: 11, color: "var(--text-secondary)" }}>{USD(rowUsd)}</span>
                 <span />
                 <span />
