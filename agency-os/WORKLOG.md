@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-06（續26）影片剪輯 ED.3.1 整片設定＋ED.3.6 可收合分組與數字欄位（`afc1d90ba`、`6ded608d6`）
+
+- ED.3.1：沒選片段時右側＝畫面／聲音／文字與字幕／輸出四組；比例、影格率改可見按鈕；整片濾鏡強度／顆粒／光漏／震動（%）；配樂 A2／旁白 A1（dB）；捷徑開左側面板。`edWriteEffect` 實作規格 §4 寫入規則（整片清掉各軌與片段）。影格率重算搬成 `edSetTimebase`；原 change 分支唯一來源是被刪的下拉，一併刪（`VW`＝`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`，`VW/scripts/tools-editor.js`）。
+- 順手補（ED.3 前提）：剪輯器選項鈕選中樣式原本只掛 `.tool-flow`，剪輯器不在其下 → 轉場／LUT／比例鈕都看不出選中；`VW/styles/tools.css` 加 `.editor-app .flow-choices [aria-pressed="true"]`（token）。
+- ED.3.6：`edGroup`（details，標題顯示值）、`edNumber`（算式、↑↓、Shift×10、Alt×0.1、Esc 還原、拖標籤）；收合狀態存 layout 偏好；片段屬性依參考分組，欄位與控制項照舊（3.2／3.3／3.5 再換）。
+- 已知（規格順序，非缺陷）：3.1 後整片光漏／震動在預覽看不到，3.2 補預覽（Codex `-24f3d710`）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed3-inspector.cjs → 2 PASS（四組無下拉、9:16／25fps／光漏 40%／配樂 −6dB 寫入、未動不寫；收合重開仍收合、100/4→25%、↑→1%、Shift+↑→11%、Esc 還原；片段七組與標題值；截圖親眼看過） | exit=0 | ms=4828
+- REALTEST_EVIDENCE: tool=Bash | cmd=scratchpad/suite.sh（golden 9、effects 9、gate 10、sidebar-overlays、test-isolation、editor-render 8、p2-mix 9、p2-*、p3-review-fixes 8、media-contract 5、pj1-*、tools-editor、export-frame-check、ed2-timeline 20、p1-loop 4）全 exit 0 | exit=0 | ms=250000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/3m/0n（Codex `agency-os/reports/oracle/2026-11-06-partialreview-24f3d710.md` 1 項＝規格順序不改；`-288c93e0.md` 2 項：測試素材失敗時伺服器不關、拖回原值清掉重做 → 已修重跑）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=project:timebase\|edRatioSelect\|影格率 | hits=12（project:timebase 程式 0；edRatioSelect 仍給頂列用，規格 G2；影格率在測試、註解與片頭說明）
 ## 2026-11-06（續25）重複的 Soulful：停用＋選單排除停用客戶；「同 email 接回」不改程式（規則已存在）
 
 **根因**
