@@ -56,6 +56,7 @@ const RV = 'd84f65ec5';
 const RE = '1c0dcce1f';
 const RB = '28dff199c';
 const FC1 = '6cbcae4e5';
+const PJS = '7507aea7f';
 
 export const STEPS = [
   { n: 1, code: '0', title: '切 4178 到 repo', plain: '例：打開 127.0.0.1:4178，角色頁出現「示範角色庫」，代表跑的是 repo 版；舊資料一筆不少。',
@@ -227,10 +228,11 @@ export const STEPS = [
       done('RE.4', '你選了路線 B。卡 PJ、FC、EC 已排進這一頁；專業剪輯的五張小卡寫到逐檔逐行，另外兩組開卡前再補細節。', RB),
     ] },
   { n: 16, code: 'PJ', title: '一支影片一條線', plain: '例：做 30 秒商品短片。建專案、產生分鏡、每個鏡頭按「生成」，成品自動掛在那個鏡頭上；按「排成時間軸」就照鏡頭順序排好；配音、字幕自動放到對的軌道；輸出的成片上直接按「送審與投遞」。不用再回素材庫找檔案。',
-    gate: '舊的剪輯專案一筆不少、都能開、輸出設定不變；照上面的例子走一遍，每一步的成品自動出現在下一步。', risk: 'Medium', model: '設計 Fable；做 Opus', status: 'not_started', depends: ['RV', 'RE'],
+    gate: '舊的剪輯專案一筆不少、都能開、輸出設定不變；照上面的例子走一遍，每一步的成品自動出現在下一步。', risk: 'Medium', model: '設計 Fable；做 Opus', status: 'in_progress', depends: ['RV', 'RE'], before: '待決 3',
     what: '專案頁的「集」＝一支影片，底下掛剪輯檔、步驟紀錄、成片；舊剪輯專案原樣收進專案頁；工具做完自動寫回；來源改了標示要重做。等卡 RV.4 結束才動 projects-0.js',
-    files: ['VW/docs/engine-route-plan-20261106.md', 'VW/scripts/projects-0.js', 'VW/scripts/tools-editor.js', 'VW/scripts/tools-0.js'],
+    files: ['VW/docs/pj-project-spine-spec-20261106.md', 'VW/scripts/projects-0.js', 'VW/scripts/tools-editor.js', 'VW/scripts/tools-0.js'],
     items: [
+      done('PJ.0', '四張卡的施工圖寫好了：每一集掛著剪輯檔、每一步的紀錄和成片；舊的剪輯專案原封不動收進專案頁。還有一題要你決定（待決 3）。', PJS),
       todo('PJ.1', '定好「每一步做了什麼」的紀錄格式；現有的剪輯專案自動收進專案頁，原檔不改。'),
       todo('PJ.2', '一集的畫面上有一排步驟，顯示還沒做、做好了、要重做；工具做完，成品自動掛回這一集。'),
       todo('PJ.3', '「排成時間軸」：照鏡頭順序與腳本秒數自動排好；配音、字幕自動放到對的軌道。'),
@@ -263,4 +265,5 @@ export const STEPS = [
 // 操作者自己要決定或親手做的
 export const OPEN = [
   { n: 1, before: 'RV', what: 'RV.4：部署工作台與 app（High），之後用 Runway 5 秒、一張小圖真打一次，約 US$0.25。要你說可以部署。', src: 'AGENTS §3' },
+  { n: 3, before: 'PJ', what: '鏡頭卡要不要加一格「旁白」？現在鏡頭只有畫面描述，配音和字幕沒有台詞可以照著做。加了以後，AI 分鏡會一起寫旁白，你也可以自己改。建議要。', src: 'VW/docs/pj-project-spine-spec-20261106.md §8 Q1' },
 ];

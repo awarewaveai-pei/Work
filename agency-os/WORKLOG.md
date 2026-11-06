@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-06（續12）影音工作台 PJ 規格「一支影片一條線」（7507aea7f，只有文件）＋三個 app session 額度用完改派 SDK
+
+- 規格：`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/pj-project-spine-spec-20261106.md`（378 行；§1 資料格式＋新檔 `shared/episode-spine.js`、§2 PJ.1–PJ.4、§3 舊資料、§4 過期判斷、§5 每個 commit 可部署、§6 畫面文字、§7 檔案歸屬、§8 衝突）。session vw-pj-spec（Fable）寫，額度用完前 commit。
+- 已知缺口：file:line 只抽驗約 20 處（規格作者自述），實作卡開工前逐處 grep。
+- §8 要操作者決定 1 題：Q1 鏡頭卡加「旁白」格（`/director/shots` 只回 `text`、`seconds`，`backend/api.cjs:1179-1192`）→ 已列監工台待決。C4（FilmCraft 成片抓不到 `link`）屬 FC.3 補兩行，不放 PJ。C5 剪輯器「新增專案」比例是下拉（`scripts/tools-editor.js:1163-1167`），範圍外。
+- 三個 app session（FC.2＋FC.3、EC.1、PJ 規格）額度用完停下；操作者先前指示「其他 session 結束後改用 SDK API」→ FC.2、EC.1 改派 `cc.py`（Opus 5.5、每張 US$10 上限）。FC.2 留在共用工作目錄的未提交改動中，`shared/jobs-view.js`（+186）歸屬未定，交給 SDK 工人判斷。
+- REALTEST_WAIVED: DOC_ONLY -- 只有規格文件
+- REVIEW_WAIVED: DOC_ONLY -- 規格；實作卡開工時逐處 grep 驗行號
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=pj-project-spine-spec-20261106 | hits=4（progress 檔 1、本條 1、監工台 data.mjs 1、supervisor.html 1）
 ## 2026-11-06（續11）影片剪輯 ED.2 時間軸操作＝參考工作台（5b726b2eb）
 
 - 需求：卡 ED.2（規格 `apps/video-workbench/docs/editor-parity-spec-20261106.md` §1.4／§1.6；對照表 #14、#15、#17、#19、#22–#26、#29–#32；監工台 ED.2.1–ED.2.6）。2026-11-06 在參考工作台逐一讀過工具列提示、三則說明、快捷鍵表、軌道標頭、片段音量線、剪點「新增轉場效果」、縮放 10–200／預設 50／自適應全片（沒按扣點、匯出、送出、刪除）。
