@@ -221,6 +221,12 @@ function edNormalizeProject(raw) {
       normalized.volumeKeys = [];
     }
     if (!normalized.volumeKeys.length) delete normalized.volumeKeys;
+    try {
+      normalized.transformKeys = EditorModel.transformKeys(clip.transformKeys, undefined, overlay);
+    } catch (_) {
+      normalized.transformKeys = [];
+    }
+    if (!normalized.transformKeys.length) delete normalized.transformKeys;
     const patch = {};
     for (const [seconds, frames] of edTimeKeys) {
       if (Number.isSafeInteger(clip[frames])) patch[frames] = clip[frames];
@@ -234,7 +240,11 @@ function edNormalizeProject(raw) {
             : value;
       }
     }
-    return edTime(p, normalized, patch);
+    const timed = edTime(p, normalized, patch);
+    // Keys past the clip's end (older data) are cut at the end, like a trim (Codex ED.3.3 F2).
+    if ([...(timed.volumeKeys || []), ...(timed.transformKeys || [])].some((k) => k.frame > timed.durationFrames))
+      edWindowKeys(timed, { ...timed }, 0, timed.durationFrames);
+    return timed;
   });
   return p;
 }
@@ -644,8 +654,12 @@ function edProjectSettings(p) {
 function edSetTimebase(p, label) {
   const timebase = Timebase.fromLabel(label);
   if (!timebase) throw Error("不支援的影格率");
+  const ratio = Timebase.fps(timebase) / Timebase.fps(p.timebase);
   p.timebase = { num: timebase.num, den: timebase.den };
-  for (const row of p.clips) edTime(p, row, { start: row.start, duration: row.duration, sourceStart: row.sourceStart });
+  for (const row of p.clips) {
+    edTime(p, row, { start: row.start, duration: row.duration, sourceStart: row.sourceStart });
+    edRescaleKeys(row, ratio);
+  }
 }
 const edMainVisual = (p) => p.clips.filter((row) => row.track === edMain(p) && ["video", "image"].includes(row.kind));
 // Card ED.3 §4: an effect written at one scope clears the narrower layers, so what is set is what shows; reading is
@@ -660,6 +674,63 @@ function edWriteEffect(p, c, key, value, scope) {
     edTrack(p, c.track)[key] = value;
     for (const row of p.clips) if (row.track === c.track) delete row[key];
   } else c[key] = value;
+}
+// Card ED.3.3 變形 (video / image): with keyframes the fields show the value at the playhead and an edit sets a key
+// there; ◇ adds one with the current values, ◆ removes the one under the playhead.
+function edTransformFields(p, c) {
+  const overlay = edOverlay(p, c.track),
+    keys = c.transformKeys || [],
+    frame = edFrame(p) - c.startFrame,
+    t = edTransform(p, c),
+    onKey = keys.some((k) => k.frame === frame),
+    [min, max] = overlay ? EditorModel.TRANSFORM.overlay : EditorModel.TRANSFORM.main;
+  return (
+    `<div data-ed-transform>` +
+    edNumber("tf:scale", "縮放（×）", Number(t.scale.toFixed(3)), { min: 0.1, max: 5, step: 0.01 }) +
+    edNumber("tf:x", overlay ? "X（%）" : "X（px）", Number(t.x.toFixed(2)), { min, max, step: 1 }) +
+    edNumber("tf:y", overlay ? "Y（%）" : "Y（px）", Number(t.y.toFixed(2)), { min, max, step: 1 }) +
+    edNumber("tf:rotation", "旋轉（°）", Number(t.rotation.toFixed(2)), { min: -360, max: 360, step: 1 }) +
+    `</div>` +
+    edNumber("tf:opacity", "不透明度（%）", Math.round(c.opacity * 100), { min: 0, max: 100, step: 1 }) +
+    (overlay ? edInput("width", "疊加寬度（%）", c.width, "number", 'min="1" max="100"') : "") +
+    (onKey ? edButton("◆ 移除此關鍵影格", "tf-key-delete") : edButton("◇ 新增關鍵影格", "tf-key-add")) +
+    (keys.length ? edButton("清除全部關鍵影格", "tf-key-clear") + `<p class="note">關鍵影格 ${keys.length} 個</p>` : "")
+  );
+}
+// Scale / position / rotation at the playhead: keyframed when the clip has keys, else the static fields.
+function edTransform(p, c) {
+  return EditorModel.transformAt(c.transformKeys, edFrame(p) - c.startFrame) || { scale: c.scale, x: c.x, y: c.y, rotation: c.rotation };
+}
+// Card ED.3.3 音訊 extras: 分離音訊 (video) and 旁白時自動降低 (not on the narration track A1).
+function edAudioExtras(p, c) {
+  const detached = p.clips.some((o) => o.detachedFrom === c.id),
+    narration = !!edTrack(p, EditorModel.NARRATION);
+  return (
+    (c.kind === "video" ? edButton(detached ? "已分離到旁白軌" : "分離音訊", "detach-audio", detached) : "") +
+    (c.track === EditorModel.NARRATION
+      ? ""
+      : `<div class="flow-choices"><button type="button" class="btn small${c.duck ? " selected" : ""}" data-ed-action="toggle:duck" aria-pressed="${!!c.duck}"${narration ? "" : " disabled"}>旁白時自動降低</button></div>` +
+        (narration ? "" : `<p class="note">需要旁白 A1 軌</p>`))
+  );
+}
+// Narration (A1) clips that reach the mix, as ducking ranges for clip c (same rule as the export's inMix).
+function edDuckRanges(p, c) {
+  const intervals = p.clips
+    .filter((o) => {
+      const t = edTrack(p, o.track),
+        peak = o.volumeKeys?.length ? Math.max(...o.volumeKeys.map((k) => k.gain)) : o.volume;
+      return o.track === EditorModel.NARRATION && o.kind !== "image" && !o.hidden && !o.muted && t && !t.hidden && !t.muted && t.volume * peak > 0;
+    })
+    .map((o) => [o.start, o.start + o.duration]);
+  return EditorModel.duckRanges(c.start, c.duration, intervals);
+}
+// Keys travel with the clip when it is trimmed, split or shortened: both kinds, rebased to `from`, edges pinned.
+function edWindowKeys(next, src, from, to) {
+  if (src.volumeKeys?.length) next.volumeKeys = edKeysWindow(src.volumeKeys, from, to);
+  if (src.transformKeys?.length) next.transformKeys = edTransformWindow(src.transformKeys, from, to);
+}
+function edTransformWindow(keys, from, to) {
+  return edWindow(keys, from, to, (frame) => EditorModel.transformAt(keys, frame));
 }
 // Card ED.3.6: the clip inspector in the reference's groups (spec ED.3.6); the 軌道 buttons are AwareWave's (compare
 // #47). Keep cpEditorClip last: later cards anchor after it.
@@ -686,8 +757,8 @@ function edClipInspector(p, c) {
     groups = {
       time: edGroup("時間", c.duration.toFixed(2) + "s", time),
       speed: edGroup("播放速度", c.speed + "x", speed),
-      audio: edGroup("音訊", Math.round(c.volume * 100) + "%", audio),
-      transform: edGroup("變形", "×" + c.scale.toFixed(2), transform),
+      audio: edGroup("音訊", Math.round(c.volume * 100) + "%", audio + edAudioExtras(p, c)),
+      transform: edGroup("變形", "×" + c.scale.toFixed(2), kind === "video" ? edTransformFields(p, c) : transform),
     };
   let html =
     `<h4>${esc(edTrackLabel(p, edTrack(p, c.track)))} 片段</h4><div class="flow-choices" role="group" aria-label="軌道">${p.tracks
@@ -1144,6 +1215,7 @@ function edValidate(c) {
   for (const [key, r] of Object.entries(EditorModel.COLOR))
     if (c[key] !== undefined && (c[key] < r.min || c[key] > r.max))
       throw Error(`${r.label}需介於 ${r.min} 到 ${r.max}`);
+  if (c.transformKeys?.length) EditorModel.transformKeys(c.transformKeys, c.durationFrames, edOverlay(edProject(), c.track));
   if (
     !(c.startFrame >= 0) ||
     !(c.durationFrames >= 1) ||
@@ -1367,11 +1439,12 @@ function edPaint() {
       el.textContent = c.text;
       el.style.cssText = `position:absolute;left:${c.x}%;top:${c.y}%;transform:translate(-50%,-50%) rotate(${c.rotation}deg) scale(${c.scale});font-size:${(c.fontSize * stage.clientWidth) / edRatios[p.ratio][0]}px;color:${c.color};font-family:${{ 思源黑體: "sans-serif", 思源宋體: "serif", 等寬字: "monospace" }[c.font] || c.font};font-weight:${c.bold ? "bold" : "normal"};font-style:${c.italic ? "italic" : "normal"};text-align:${c.align === "靠左" ? "left" : c.align === "靠右" ? "right" : "center"};background:${c.backgroundColor || "transparent"};opacity:${c.opacity};white-space:pre-wrap;max-width:95%;z-index:${100 + layer}`;
     } else if (c.kind !== "audio") {
-      const shake = edShake(p, c);
+      const shake = edShake(p, c),
+        t = edTransform(p, c);
       el.style.cssText =
         (edOverlay(p, c.track)
-          ? `position:absolute;width:${c.width * c.scale}%;left:${c.x * (1 - (c.width * c.scale) / 100)}%;top:${c.y}%;transform:${shake}rotate(${c.rotation}deg);opacity:${c.opacity * fade};z-index:${layer}`
-          : `position:absolute;width:100%;height:100%;object-fit:contain;transform:${shake}translate(${(c.x * stage.clientWidth) / edRatios[p.ratio][0]}px,${(c.y * stage.clientHeight) / edRatios[p.ratio][1]}px) rotate(${c.rotation}deg) scale(${c.scale});opacity:${c.opacity * fade};z-index:${layer};background:${c.background === "純色" ? c.backgroundColor || "#000" : "#000"}`) +
+          ? `position:absolute;width:${c.width * t.scale}%;left:${t.x * (1 - (c.width * t.scale) / 100)}%;top:${t.y}%;transform:${shake}rotate(${t.rotation}deg);opacity:${c.opacity * fade};z-index:${layer}`
+          : `position:absolute;width:100%;height:100%;object-fit:contain;transform:${shake}translate(${(t.x * stage.clientWidth) / edRatios[p.ratio][0]}px,${(t.y * stage.clientHeight) / edRatios[p.ratio][1]}px) rotate(${t.rotation}deg) scale(${t.scale});opacity:${c.opacity * fade};z-index:${layer};background:${c.background === "純色" ? c.backgroundColor || "#000" : "#000"}`) +
         `;filter:${edFilter(p, c)}`;
       // Light leak: the export's radial gradient from the top-left corner, screen-blended (EditorModel.LIGHT_LEAK).
       const leak = EditorModel.effectValue(p, edTrack(p, c.track), c, "lightLeak");
@@ -1403,7 +1476,8 @@ function edPaint() {
           ed.time >= c.start + c.duration
             ? 0
             : (keyed ?? (Number.isFinite(c.volume) ? c.volume : 1)) *
-              (track?.volume ?? 1);
+              (track?.volume ?? 1) *
+              (c.duck && c.track !== EditorModel.NARRATION ? EditorModel.duckFactor(edDuckRanges(p, c), ed.time - c.start) : 1);
       // J reverse play: media cannot run backwards, so it stays paused, muted, and is seeked every paint.
       const reverse = ed.playing && ed.rate < 0;
       if (Math.abs(el.currentTime - target) > (reverse ? 0.04 : 0.2 * Math.abs(ed.rate)))
@@ -1419,6 +1493,16 @@ function edPaint() {
       } else el.volume = Math.max(0, Math.min(1, gain));
       if (ed.playing && !reverse) el.play().catch(() => {});
       else el.pause();
+    }
+  }
+  // Card ED.3.3: while the playhead moves, a keyframed clip's 變形 fields follow it (unless one is being typed in).
+  const sel = edClip(),
+    fields = document.querySelector("[data-ed-transform]");
+  if (sel?.transformKeys?.length && fields && !fields.contains(document.activeElement)) {
+    const t = edTransform(p, sel);
+    for (const [name, digits] of [["scale", 3], ["x", 2], ["y", 2], ["rotation", 2]]) {
+      const input = fields.querySelector(`[data-ed-field="tf:${name}"]`);
+      if (input) input.value = input.defaultValue = String(Number(t[name].toFixed(digits)));
     }
   }
   const clock = document.querySelector("[data-ed-clock]"),
@@ -2250,7 +2334,45 @@ async function edAction(action) {
       if (!value || c.track !== edMain(p)) throw Error("背景只用於主視訊軌");
       for (const row of edMainVisual(p)) row.background = value;
     }
-    if (action.startsWith("toggle:")) c[action.slice(7)] = !c[action.slice(7)];
+    if (action === "toggle:duck") {
+      if (c.duck) delete c.duck;
+      else c.duck = true;
+    } else if (action.startsWith("toggle:")) c[action.slice(7)] = !c[action.slice(7)];
+    if (action === "tf-key-add" || action === "tf-key-delete" || action === "tf-key-clear") {
+      const frame = edFrame(p) - c.startFrame,
+        keys = c.transformKeys || [];
+      if (action === "tf-key-clear") {
+        Object.assign(c, edTransform(p, c)); // the values at the playhead become the static ones
+        delete c.transformKeys;
+      } else {
+        if (frame < 0 || frame > c.durationFrames) throw Error("播放頭需位於片段內");
+        const rest = keys.filter((k) => k.frame !== frame),
+          next = action === "tf-key-add" ? [...rest, { frame, ...edTransform(p, c) }] : rest;
+        if (next.length) c.transformKeys = EditorModel.transformKeys(next, c.durationFrames, edOverlay(p, c.track));
+        else delete c.transformKeys;
+      }
+    }
+    if (action === "detach-audio") {
+      if (c.kind !== "video" || p.clips.some((o) => o.detachedFrom === c.id)) throw Error("這段已分離過音訊");
+      // Reuses the same video file as the sound source (spec §9 Q2); the export plays it as audio.
+      const track = edTrack(p, EditorModel.NARRATION) ? EditorModel.NARRATION : edTrackFor(p, "audio"),
+        sound = edTime(
+          p,
+          {
+            id: crypto.randomUUID(), kind: "audio", track, asset: c.asset, speed: c.speed, volume: c.volume, fadeIn: c.fadeIn, fadeOut: c.fadeOut,
+            ...(c.volumeKeys ? { volumeKeys: structuredClone(c.volumeKeys) } : {}),
+            detachedFrom: c.id,
+          },
+          { startFrame: c.startFrame, durationFrames: c.durationFrames, sourceStartFrame: c.sourceStartFrame },
+        );
+      try {
+        edNeighbours(p, sound);
+      } catch (_) {
+        throw Error("旁白軌在這段時間已有片段");
+      }
+      p.clips.push(sound);
+      c.muted = true;
+    }
     if (action === "text-background")
       c.backgroundColor = c.backgroundColor ? null : "#000000";
     if (action.startsWith("clip-track:")) {
@@ -2267,6 +2389,7 @@ async function edAction(action) {
         if (c.kind !== "text") {
           c.x = main ? 0 : 50;
           c.y = main ? 0 : 50;
+          if (c.transformKeys) c.transformKeys = c.transformKeys.map((k) => ({ ...k, x: c.x, y: c.y }));
         }
         c.track = id;
       }
@@ -2323,8 +2446,7 @@ async function edAction(action) {
           { ...c },
           { startFrame: frame, durationFrames: end - frame, sourceStartFrame },
         );
-        if (next.volumeKeys)
-          next.volumeKeys = edKeysWindow(c.volumeKeys, delta, c.durationFrames);
+        edWindowKeys(next, c, delta, c.durationFrames);
         edNeighbours(p, next);
         edValidate(next);
         Object.assign(c, next);
@@ -2334,8 +2456,7 @@ async function edAction(action) {
           { ...c },
           { durationFrames: frame - c.startFrame },
         );
-        if (next.volumeKeys)
-          next.volumeKeys = edKeysWindow(c.volumeKeys, 0, next.durationFrames);
+        edWindowKeys(next, c, 0, next.durationFrames);
         edNeighbours(p, next);
         edValidate(next);
         Object.assign(c, next);
@@ -2366,10 +2487,8 @@ async function edAction(action) {
       // The second half starts at a plain cut: the in-transition stays on the first half.
       delete copy.transition;
       delete copy.transitionFrames;
-      if (c.volumeKeys) {
-        copy.volumeKeys = edKeysWindow(c.volumeKeys, offset, c.durationFrames);
-        c.volumeKeys = edKeysWindow(c.volumeKeys, 0, offset);
-      }
+      edWindowKeys(copy, c, offset, c.durationFrames);
+      edWindowKeys(c, c, 0, offset);
       edTime(p, c, { durationFrames: offset });
       for (const row of [c, copy]) {
         row.fadeIn = Math.min(row.fadeIn, row.duration / 2);
@@ -2384,22 +2503,29 @@ async function edAction(action) {
 // Keys inside [from, to] of a clip, rebased to `from`, with the interpolated gain pinned at both new edges.
 function edKeysWindow(keys, from, to) {
   if (!keys?.length) return undefined;
-  const inside = keys
-    .filter((k) => k.frame > from && k.frame < to)
-    .map((k) => ({ frame: k.frame - from, gain: k.gain }));
+  return edWindow(keys, from, to, (frame) => ({ gain: EditorModel.gainAt(keys, frame) }));
+}
+// Keys inside (from, to) rebased to `from`; an edge gets a pinned key only when keys lie at or beyond it (before the
+// first and after the last key the value is held anyway), so a window never holds more keys than the clip had
+// (EditorModel.MAX_KEYS; Codex ED.3.3 F3).
+function edWindow(keys, from, to, valueAt) {
   return [
-    { frame: 0, gain: EditorModel.gainAt(keys, from) },
-    ...inside,
-    { frame: to - from, gain: EditorModel.gainAt(keys, to) },
+    ...(keys.some((k) => k.frame <= from) ? [{ frame: 0, ...valueAt(from) }] : []),
+    ...keys.filter((k) => k.frame > from && k.frame < to).map((k) => ({ ...k, frame: k.frame - from })),
+    ...(keys.some((k) => k.frame >= to) ? [{ frame: to - from, ...valueAt(to) }] : []),
   ];
+}
+// A new frame rate or speed moves keys with their time (both kinds); keys landing on one frame merge.
+function edRescaleKeys(c, ratio) {
+  for (const name of ["volumeKeys", "transformKeys"]) {
+    if (!c[name]?.length) continue;
+    const byFrame = new Map(c[name].map((k) => [Math.max(0, Math.min(c.durationFrames, Math.round(k.frame * ratio))), k]));
+    c[name] = [...byFrame].map(([frame, k]) => ({ ...k, frame })).sort((a, b) => a.frame - b.frame);
+  }
 }
 // A shorter clip keeps its volume curve up to the new end (keys past it would be outside the clip).
 function edFitKeys(before, next) {
-  if (
-    before.volumeKeys?.length &&
-    next.durationFrames !== before.durationFrames
-  )
-    next.volumeKeys = edKeysWindow(before.volumeKeys, 0, next.durationFrames);
+  if (next.durationFrames !== before.durationFrames) edWindowKeys(next, before, 0, next.durationFrames);
 }
 // Trimming or moving never covers a neighbour on the same track (handoff §4.2: 相鄰片段不被意外覆蓋).
 function edNeighbours(p, next) {
@@ -2647,6 +2773,18 @@ document.addEventListener("change", (e) => {
     } else if (c && c.track === edMain(p) && ["video", "image"].includes(c.kind) && ["backgroundBlur", "backgroundColor"].includes(key)) {
       // Reference: 背景 applies to every clip of the main track (僅 V1).
       for (const row of edMainVisual(p)) row[key] = key === "backgroundBlur" ? Math.round(value) : value;
+    } else if (key.startsWith("tf:") && c) {
+      const name = key.slice(3);
+      if (name === "opacity") c.opacity = value / 100;
+      else if (c.transformKeys?.length) {
+        const frame = edFrame(p) - c.startFrame;
+        if (frame < 0 || frame > c.durationFrames) throw Error("播放頭需位於片段內");
+        c.transformKeys = EditorModel.transformKeys(
+          [...c.transformKeys.filter((k) => k.frame !== frame), { frame, ...edTransform(p, c), [name]: value }],
+          c.durationFrames,
+          edOverlay(p, c.track),
+        );
+      } else c[name] = value;
     } else if (key.startsWith("track-db:")) {
       const track = edTrack(p, key.slice(9));
       if (!track || !Number.isFinite(value)) throw Error("請輸入有效數字");
@@ -2729,7 +2867,7 @@ function edDragStep(p, c, group, initial, trim, delta, snap) {
         media = ["video", "audio"].includes(i.kind);
       next = edTime(p, { ...i }, { startFrame: start, durationFrames: i.durationFrames - d, sourceStartFrame: media ? i.sourceStartFrame + Math.round(d * i.speed) : i.sourceStartFrame });
       if (next.sourceStartFrame < 0) throw Error("素材前面沒有更多畫格");
-      if (i.volumeKeys) next.volumeKeys = edKeysWindow(i.volumeKeys, d, i.durationFrames);
+      edWindowKeys(next, i, d, i.durationFrames);
     }
     if (next.durationFrames < 1) throw Error("片段太短");
     edNeighbours(p, next);

@@ -142,6 +142,50 @@ const pass = (m) => console.log("PASS " + m);
     await inspector.screenshot({ path: path.join(dir, "ed32-effects.png") });
     pass("ED.3.2：整片黑白清掉片段濾鏡、此軌光漏 30% 寫軌道、此片段震動 50% 只寫該段；背景模糊＋強度 30 套用主軌兩段；預覽灰階＋震動位移放大＋光漏層");
 
+    // ED.3.3: ◇ adds a key with the current values, editing a field off-key upserts one at the playhead (1920/2),
+    // ◆ removes the key under the playhead, a split gives each half its keys; 分離音訊; 旁白時自動降低.
+    const at = (seconds, id = "v1clip") =>
+        page.evaluate(
+          ([t, sel]) => {
+            ed.time = t;
+            ed.selected = sel;
+            edRender();
+          },
+          [seconds, id],
+        ),
+      keysOf = async (id) => clipOf(await project(), id).transformKeys;
+    await at(0);
+    await inspector.getByRole("button", { name: "◇ 新增關鍵影格" }).click();
+    await page.evaluate(() => ed.queue);
+    assert.deepEqual(await keysOf("v1clip"), [{ frame: 0, scale: 1, x: 0, y: 0, rotation: 0 }]);
+    await at(2);
+    await field("X（px）", "1920/2");
+    assert.deepEqual((await keysOf("v1clip")).map((k) => [k.frame, k.x]), [[0, 0], [50, 960]]);
+    await at(2);
+    await inspector.getByRole("button", { name: "◆ 移除此關鍵影格" }).click();
+    await page.evaluate(() => ed.queue);
+    assert.deepEqual((await keysOf("v1clip")).map((k) => k.frame), [0]);
+    await at(2);
+    await field("X（px）", 960);
+    await at(1);
+    await page.evaluate(() => edAction("split"));
+    await page.evaluate(() => ed.queue);
+    p = await project();
+    const halves = p.clips.filter((x) => x.track === "V1" && x.asset?.name === "測試片" && x.id !== "v1second").sort((a, b) => a.startFrame - b.startFrame);
+    assert.deepEqual(halves.map((h) => h.transformKeys.map((k) => [k.frame, k.x])), [[[0, 0], [25, 480]], [[0, 480], [25, 960]]]);
+    await at(5, "v1second");
+    await inspector.getByRole("button", { name: "分離音訊" }).click();
+    await page.evaluate(() => ed.queue);
+    await inspector.getByRole("button", { name: "旁白時自動降低" }).click();
+    await page.evaluate(() => ed.queue);
+    p = await project();
+    const sound = p.clips.find((x) => x.detachedFrom === "v1second");
+    assert.ok(sound && sound.track === "A1" && sound.kind === "audio" && sound.asset.url === clipUrl && sound.startFrame === 100 && sound.durationFrames === 50);
+    assert.ok(clipOf(p, "v1second").muted === true && clipOf(p, "v1second").duck === true);
+    assert.equal(await inspector.getByRole("button", { name: "已分離到旁白軌" }).isDisabled(), true);
+    for (const name of ["變形", "音訊"]) await inspector.locator(`[data-ed-group="${name}"]`).screenshot({ path: path.join(dir, `ed33-${name}.png`) });
+    pass("ED.3.3：◇ 新增 → 1 個關鍵影格；第 50 格 X 輸入 1920/2 → 960；◆ 移除；分割後兩半各自的關鍵影格（中點 480）；分離音訊到 A1（同一檔、原片靜音）；旁白時自動降低開");
+
     assert.deepEqual(errors, []);
   } finally {
     await browser.close();
