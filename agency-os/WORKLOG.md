@@ -1,4 +1,32 @@
 # Worklog
+## 2026-11-06（續15）畫布專業版第二批上線：圖示欄＋轉接器、三面板實測、入口改接（85c27aaa4 已部署）
+
+- 合併：W1 C4.2＋C4.4（`9fd934afd`，Codex 2 條修）、W3 實測修正（`974586105`）、SDK 卡 `f62ee1fbc`（US$2.68）、W2 C7.1（`ea220cdd1`，Codex：交接開成功才清）。
+  - C1 `replaceImage` 把新圖縮回舊圖層的「修剪後不透明範圍」（PhotoCraft 圖層 bounds 只算不透明像素）→ ctx 記住完整圖片框，尺寸相同只做整數平移；邊緣遮罩強度 55→90 不透明像素 13662→10889、換筆刷與直接套用 13662＝13662（判定未放寬）。
+  - M1 契約快速遮色片說明反了 → 「Q 黑色塗 → Q → Shift+Ctrl+I 反轉」（`ctx-contract.md`、`blocks/ai-fill.js`）。
+  - M2 W3 曾放寬 e2e 判定 → 主 session 要求附證據；中心偏移改成更嚴的精確判定（範圍＝原框＋遮罩不透明範圍）。
+- 派工通道：SDK 一張後操作者改回「現在開始都用訂閱制」。
+- 未完：C3.4／C5.3 操作者登入實測；C6；C7.2 退場分支（W4 `f0a5e9d4c`）待重接 W2 `ea220cdd1`，操作者用過才合；`scripts/photocraft-pro/SMOKE-W3.md` 仍寫 2 項 FAIL（已由 `f62ee1fbc` 修）。
+- 驗證：整合樹 tsc 0 錯、vitest 504 files／4269 passed；sg-deploy next-admin → deployed `85c27aaa4`、healthy 15s、smoke 全 OK；curl `/tools/photo-pro`、`/photo-pro-dock/dock.js` 等 307 到登入、資源 `private, no-cache`。
+- rollback：`git revert -m1` 四個 merge 後 sg-deploy；`CANVAS_STAFF_HREF` 一行改回 `/tools/canvas`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin | exit=0 | ms=300000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（Codex：W1 2 條、W2 交接一類、SDK 卡 1 條成立皆修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=CANVAS_STAFF_HREF | hits=26
+### 續15：影音工作台 PJ.1–PJ.4 專案主線逐檔規格（只有文件；7507aea7f＋本 commit）
+
+- 根因：剪輯器自己一份專案清單、專案頁一份、工具頁還有一份死清單 `appToolProjects`，三者互不相連；工具之間只能經素材庫交換（engine-route-plan §2、§6）。
+- 做法：規格 `lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/pj-project-spine-spec-20261106.md`。
+  - 「集」加 `edit`／`steps`／`outputs`，存在 `db.projects`。
+  - 主線欄位只由主頁 runtime 改（`keepSpine`）。原因：專案頁持有私有副本，整份寫回會蓋掉其他頁的寫入。
+  - 任務歸屬只從 `generate()` 一個入口帶 `input.link`。
+  - 過期判斷全工作台只用一個 `isStale`，動畫合成與骨架的兩處判斷也改用它。
+  - 舊剪輯專案由 runtime `adopt` 收進專案頁，原列不改、id 不變。
+- 操作者決定（2026-11-06）：鏡頭加「旁白」（Q1＝要，234c96681）；PJ.3 前置行已同步。
+- 避免再發生：規格 §7 列出檔案歸屬（RV.4、FC.2 先 commit；PJ.3 等 FC.3 commit）。
+- REALTEST_WAIVED: DOC_ONLY -- 只新增規格文件，不改程式
+- REVIEW_WAIVED: DOC_ONLY -- 規格；抽驗約 20 處 file:line，漂移 3 處已修（jobs-view.js 有另一 session 在改）
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/shared,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/backend | grep=EpisodeSpine|episode-spine | hits=0
+- BUGHUNT_SCOPE_NARROW: 只新增一份規格文件；規格裡的新識別符在程式中不該已存在（hits=0 即確認沒有撞名）
 ## 2026-11-06（續14）影音工作台 EC.1：EffectCraft 網頁版建置鏈（EC.1a `56d3c1cad`）＋嵌入橋（EC.1b `b376094e5`）
 
 - 做了：`scripts/effectcraft-pro/`（結構同 `scripts/filmcraft-pro/`；釘 v0.21.1 `df4cc09`）。
