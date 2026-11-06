@@ -10,8 +10,7 @@ import { verifyEmails, type EmailStatus } from "@/lib/outreach/verify-email";
 import { findExisting } from "@/lib/outreach/existing-leads";
 import { discoverInput, discoverPlaces, creditsTwd, creditsUsd, DISCOVER_MAX_USD, LocationNotRecognized, MAX_PAGES, type PlacesCursor } from "@/lib/outreach/discover";
 import { loadCursor, saveCursor, searchKey, type SearchSource } from "@/lib/outreach/search-cursor";
-import { holdCost } from "@/lib/ai/log-ai-call";
-import { creditsForCost } from "@/lib/entitlements/ledger";
+import { holdCost, logToolCost } from "@/lib/ai/log-ai-call";
 import { billedTo } from "@/lib/outreach/billing";
 import { grantFor } from "@/lib/entitlements/grant";
 import { EntitlementRequired } from "@/lib/entitlements/can";
@@ -154,10 +153,8 @@ export async function POST(req: Request): Promise<Response> {
     const hold = await holdCost(grant, DISCOVER_MAX_USD);
     if (!hold) return NextResponse.json({ ok: false, error: "no_credits" }, { status: 402 });
     let used = 0;
-    const settle = async () => {
-      try { await hold.settle(creditsForCost(creditsUsd(used)), { provider: "serper", serper_credits: used }); }
-      catch (e) { console.warn(`[outreach-discover] settle failed: ${String(e).slice(0, 200)}`); }
-    };
+    const settle = () => logToolCost({ route: "outreach/discover", model: "serper.places", vendor: "Serper", tool: "outreach", grant, hold,
+      costUsd: creditsUsd(used), metadata: { provider: "serper", serper_credits: used } });
     try {
       const found = await discoverPlaces(createProviderCall({ budget: createBudget({ fetches: MAX_PAGES, ms: 30_000 }), grant, timeoutMs: 20_000 }), input, undefined, cur.from);
       used = found.credits;
@@ -214,10 +211,8 @@ export async function POST(req: Request): Promise<Response> {
     const hold = await holdCost(grant, creditsUsd(GCIS_MAX_SERPER_CREDITS));
     if (!hold) return NextResponse.json({ ok: false, error: "no_credits" }, { status: 402 });
     const usage: GcisUsage = { serperCredits: 0, gcisCalls: 0 };
-    const settle = async () => {
-      try { await hold.settle(creditsForCost(creditsUsd(usage.serperCredits)), { provider: "serper", serper_credits: usage.serperCredits, source: "gcis" }); }
-      catch (e) { console.warn(`[outreach-gcis] settle failed: ${String(e).slice(0, 200)}`); }
-    };
+    const settle = () => logToolCost({ route: "outreach/gcis", model: "serper.search", vendor: "Serper", tool: "outreach", grant, hold,
+      costUsd: creditsUsd(usage.serperCredits), metadata: { provider: "serper", serper_credits: usage.serperCredits, source: "gcis" } });
     try {
       const found = await discoverCompanies(createProviderCall({ budget: createBudget({ fetches: 220, ms: 240_000 }), grant, timeoutMs: 20_000 }), usage, { item, itemDesc, county }, undefined, cur.from);
       await settle();
@@ -247,10 +242,8 @@ export async function POST(req: Request): Promise<Response> {
     const hold = await holdCost(grant, creditsUsd(PEOPLE_MAX_SERPER_CREDITS));
     if (!hold) return NextResponse.json({ ok: false, error: "no_credits" }, { status: 402 });
     const usage: PeopleUsage = { serperCredits: 0 };
-    const settle = async () => {
-      try { await hold.settle(creditsForCost(creditsUsd(usage.serperCredits)), { provider: "serper", serper_credits: usage.serperCredits, source: "people" }); }
-      catch (e) { console.warn(`[outreach-people] settle failed: ${String(e).slice(0, 200)}`); }
-    };
+    const settle = () => logToolCost({ route: "outreach/people", model: "serper.search", vendor: "Serper", tool: "outreach", grant, hold,
+      costUsd: creditsUsd(usage.serperCredits), metadata: { provider: "serper", serper_credits: usage.serperCredits, source: "people" } });
     let skipped = 0;
     try {
       const found = await searchPeople(createProviderCall({ budget: createBudget({ fetches: PEOPLE_MAX_SERPER_CREDITS, ms: 30_000 }), grant, timeoutMs: 20_000 }), usage, input, undefined, cur.from);

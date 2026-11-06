@@ -8,7 +8,7 @@
  * while image/video spend was already logged here — 2026-10-23).
  */
 
-export type SpendKind = "text" | "image" | "video";
+export type SpendKind = "text" | "image" | "video" | "tool";
 
 export interface SpendRow {
   id: string;
@@ -53,7 +53,7 @@ export interface SpendSummary {
 /** Rows written before migration 0046 have kind NULL (= text); video motion was logged as "image". */
 export function spendKind(r: Pick<SpendRow, "kind" | "route">): SpendKind {
   if (r.route.startsWith("video/")) return "video";
-  if (r.kind === "image" || r.kind === "video") return r.kind;
+  if (r.kind === "image" || r.kind === "video" || r.kind === "tool") return r.kind;
   return "text";
 }
 

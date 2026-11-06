@@ -23,8 +23,7 @@ import { ProviderCallError } from "@/lib/collect/net/providers";
 import { COLLECTED_PROVENANCE, screenForInjection } from "@/lib/collect/provenance";
 import type { RawDoc } from "@/lib/collect/types";
 import type { Grant } from "@/lib/entitlements/can";
-import { holdCost } from "@/lib/ai/log-ai-call";
-import { creditsForCost } from "@/lib/entitlements/ledger";
+import { holdCost, logToolCost } from "@/lib/ai/log-ai-call";
 import { isPlatformHost } from "./normalize";
 import { hostOf, pageEmailsOf, type FoundEmail } from "./research-extract";
 
@@ -191,8 +190,8 @@ async function apify(call: ProviderCall, grant: Grant, t: SocialTarget): Promise
     return { profile: apifyProfile(t.platform, t, await res.json()), costUsd: usd };
   } finally {
     // The actor ran (and was paid) once it answered, profile or not; a refused or failed call costs nothing.
-    await hold.settle(delivered ? creditsForCost(usd) : 0, { provider: t.platform === "instagram" ? "apify_instagram" : "apify_facebook" })
-      .catch((e) => console.warn(`[social-research] settle failed: ${String(e).slice(0, 200)}`));
+    await logToolCost({ route: "outreach/social-research", model: `apify.${t.platform}`, vendor: "Apify", tool: "outreach", grant, hold,
+      costUsd: delivered ? usd : 0, delivered, metadata: { provider: t.platform === "instagram" ? "apify_instagram" : "apify_facebook" } });
   }
 }
 

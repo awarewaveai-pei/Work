@@ -145,7 +145,7 @@ function EmptyState({ text }: { text: string }) {
 
 // ── Spend tab ──────────────────────────────────────────────────────────────────
 
-const KIND_LABEL: Record<SpendKind, string> = { text: "文字", image: "圖片", video: "影片" };
+const KIND_LABEL: Record<SpendKind, string> = { text: "文字", image: "圖片", video: "影片", tool: "工具" };
 
 function kindUsd(s: SpendSummary, k: SpendKind) {
   return s.byKind.find((b) => b.key === k) ?? { key: k, count: 0, usd: 0 };
@@ -414,6 +414,14 @@ const ROUTE_LABEL: Record<string, string> = {
   "content/syndicate":        "社群改寫",
   "content/humanize":         "人性化改寫",
   "content/market-analysis":  "市場分析",
+  "outreach/claim-check":     "外聯：事實核對",
+  "outreach/generate":        "外聯：寫信",
+  "outreach/research":        "外聯：研究網站",
+  "outreach/gmail-sync":      "外聯：回信分類",
+  "outreach/discover":        "外聯：找店家（地圖）",
+  "outreach/gcis":            "外聯：找公司（經濟部＋Google）",
+  "outreach/people":          "外聯：找人",
+  "outreach/social-research": "外聯：讀 IG／FB",
 };
 
 function routeLabel(route: string) {
@@ -613,13 +621,14 @@ function MonthlyTab({ months, orgNames, monthlyInfraUsd, note }: {
       <Card>
         <CardHead title="各月比較（Asia/Taipei 月份）" />
         <Table
-          head={["月份", "筆數", "文字", "圖片", "影片", "AI 合計 NT$", "AI 合計 USD"]}
+          head={["月份", "筆數", "文字", "圖片", "影片", "工具", "AI 合計 NT$", "AI 合計 USD"]}
           rows={months.map((x) => [
             x.month,
             x.summary.count.toLocaleString(),
             NT(kindUsd(x.summary, "text").usd),
             NT(kindUsd(x.summary, "image").usd),
             NT(kindUsd(x.summary, "video").usd),
+            NT(kindUsd(x.summary, "tool").usd),
             NT(x.summary.totalUsd),
             USD(x.summary.totalUsd),
           ])}

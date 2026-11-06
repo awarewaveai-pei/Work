@@ -87,6 +87,7 @@ export const DEFAULT_SECTIONS: NavSection[] = [
     id: 'cold-outreach',
     label: 'Cold Outreach',
     items: [
+      { type: 'link', href: '/tools/outreach/guide',      icon: '📖', label: 'Guide',              title: '外聯系統從設定到寄出的完整操作步驟' },
       { type: 'link', href: '/tools/outreach',            icon: '📣', label: 'Outreach Dashboard', title: '冷拜訪作戰中心' },
       { type: 'link', href: '/tools/outreach/inbox',      icon: '📥', label: 'Lead Inbox',         title: '名單收件匣（去重 + suppression）' },
       { type: 'link', href: '/tools/outreach/leads',      icon: '🎯', label: 'Leads',              title: '冷名單庫（三分數 + 優先級）' },

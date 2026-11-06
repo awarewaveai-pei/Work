@@ -52,6 +52,30 @@ describe("Codex 2026-10-25 review of 12dd0e699 (F3, F4)", () => {
   });
 });
 
+describe("logToolCost", () => {
+  const holdOf = () => ({ id: "h1", units: 3, settle: vi.fn(async (u: number) => ({ charged: u, shortfall: 0 })) });
+
+  it("a 0-cost tool call writes no row and settles its hold at 0", async () => {
+    const { logToolCost } = await import("../log-ai-call");
+    const { grant } = await creditsGrant();
+    const hold = holdOf();
+    await logToolCost({ route: "outreach/discover", model: "serper.places", vendor: "Serper", costUsd: 0, grant, hold: hold as never });
+    await settle();
+    expect(m.rows).toEqual([]);
+    expect(hold.settle).toHaveBeenCalledTimes(1);
+    expect(hold.settle).toHaveBeenCalledWith(0, expect.anything());
+  });
+
+  it("a tool call with a cost writes one kind tool row and settles the hold at its price", async () => {
+    const { logToolCost } = await import("../log-ai-call");
+    const { grant } = await creditsGrant();
+    const hold = holdOf();
+    await logToolCost({ route: "outreach/discover", model: "serper.places", vendor: "Serper", costUsd: 0.002, grant, hold: hold as never, metadata: { serper_credits: 2 } });
+    expect(m.rows).toEqual([expect.objectContaining({ id: "h1", kind: "tool", cost_usd: 0.002, metadata: expect.objectContaining({ serper_credits: 2 }) })]);
+    expect(hold.settle).toHaveBeenCalledWith(creditsForCost(0.002), expect.anything());
+  });
+});
+
 describe("ADR 017 4b-11: a delivered call is charged its cost", () => {
   it("prices 1 credit = NT$1 at 3x cost, rounded up, at least 1, nothing for a free call", () => {
     expect([0.0046, 0.25, 0.002, 0].map(creditsForCost)).toEqual([1, 24, 1, 0]);

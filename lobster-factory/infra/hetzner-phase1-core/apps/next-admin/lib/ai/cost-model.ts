@@ -285,3 +285,25 @@ export const OPENAI_TTS_RATES: Record<string, { usdPerMChars: number; label: str
   "tts-1": { usdPerMChars: 15, label: "TTS-1" },
   "tts-1-hd": { usdPerMChars: 30, label: "TTS-1 HD" },
 };
+
+/** Free quotas the agency runs on (shown on /ops/costs, counted by free-quota.ts). Gemini: 500 generateContent requests
+ *  per model per day on the platform key, reset at midnight US Pacific (429 quotaId GenerateRequestsPerDayPerProjectPerModel-FreeTier,
+ *  2026-11-05). Email verifiers: lib/outreach/mailbox-verify.ts. */
+export interface FreeQuota {
+  id: "gemini_lite" | "reoon" | "zerobounce" | "hunter";
+  label: string;
+  limit: number;
+  period: "day" | "month";
+  resetNote: string;
+  usedFor: string;
+}
+export const FREE_QUOTAS: readonly FreeQuota[] = [
+  { id: "gemini_lite", label: "Gemini 3.5 Flash-Lite", limit: 500, period: "day", resetNote: "美國太平洋時間午夜歸零（約台灣下午 3～4 點）",
+    usedFor: "外聯研究網站、事實核對、回信分類都用它；只算成功的呼叫。" },
+  { id: "reoon", label: "Reoon", limit: 20, period: "day", resetNote: "每天歸零（以 UTC 日計，台灣早上 8 點）",
+    usedFor: "寄信前驗證 email 收不收得到。依存下的驗證結果計：所有組織合計，重驗同一地址只算一次，實際用量可能更多。" },
+  { id: "zerobounce", label: "ZeroBounce", limit: 100, period: "month", resetNote: "每月 1 日歸零（以 UTC 月計）",
+    usedFor: "寄信前驗證 email 收不收得到。依存下的驗證結果計：所有組織合計，重驗同一地址只算一次，實際用量可能更多。" },
+  { id: "hunter", label: "Hunter", limit: 50, period: "month", resetNote: "每月 1 日歸零（以 UTC 月計）",
+    usedFor: "寄信前驗證 email 收不收得到，找 email 也共用這個額度。只依存下的驗證結果計：所有組織合計，找 email 的次數不在內，實際用量可能更多。" },
+];

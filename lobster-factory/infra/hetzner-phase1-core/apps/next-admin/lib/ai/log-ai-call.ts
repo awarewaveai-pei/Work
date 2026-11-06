@@ -222,24 +222,27 @@ export interface LogImageCostArgs {
   costUsd: number;
   jobId?: string | null;
   tool?: string | null;
-  /** "video" for per-scene video motion; defaults to "image". */
-  kind?: "image" | "video";
+  /** "video" for per-scene video motion, "tool" for a paid non-AI vendor call (Serper, Apify); defaults to "image". */
+  kind?: "image" | "video" | "tool";
   grant: Grant;
   /** false = the provider charged but the customer got nothing (logImageResult): our cost, recorded, not charged. */
   delivered?: boolean;
   /** The credits holdCost took before the call: settled here (the row id is the hold's). */
   hold?: Hold;
+  /** Extra row metadata (e.g. the vendor's own usage figure); the charge fields win on a clash. */
+  metadata?: Record<string, unknown>;
 }
 
 /** Best-effort per-call cost logger for image/video — one ai_call_logs row. Never throws. */
 export async function logImageCost(args: LogImageCostArgs): Promise<void> {
   try {
     const supabase = getSupabaseWriteClient();
-    if (!supabase) return;
+    if (!supabase && !args.hold) return;
     const id = args.hold?.id ?? randomUUID();
     const delivered = args.delivered !== false;
     const charge = args.hold ? await settleCall(args.hold, delivered ? creditsForCost(args.costUsd) : 0, args.route)
       : delivered ? await chargeCall(args.grant, args.costUsd, id, args.route) : {};
+    if (!supabase) return; // a held call is settled above even with no log client: a hold must never be left open
     const job = jobColumns(args.jobId);
     const { error } = await supabase.from("ai_call_logs").insert({
       id,
@@ -256,10 +259,23 @@ export async function logImageCost(args: LogImageCostArgs): Promise<void> {
       job_id: job.job_id,
       tool: args.tool ?? null,
       kind: args.kind ?? "image",
-      metadata: { ...(job.rawJobId ? { raw_job_id: job.rawJobId } : {}), ...charge },
+      metadata: { ...(args.metadata ?? {}), ...(job.rawJobId ? { raw_job_id: job.rawJobId } : {}), ...charge },
     });
     if (error) console.warn(`[ai-cost] ${args.route} image cost not recorded: ${error.message}`);
   } catch { /* never break the caller */ }
+}
+
+/** A paid non-AI vendor call (Serper, Apify): settles its hold and writes one kind "tool" ai_call_logs row. Never throws.
+ *  Every Hold.settle outside the entitlements layer goes through here or logImageCost (settle-through-ledger.test.ts). */
+export async function logToolCost(args: Omit<LogImageCostArgs, "kind">): Promise<void> {
+  // Nothing spent = nothing to record, like a text call with no tokens; a 0 row would trip the spend report's zero_cost
+  // warning (spend-report.ts). The hold still goes back, whole.
+  if (!(args.costUsd > 0)) {
+    // awaited, unlike releaseHold: the caller answers right after, and a next request must not meet the old hold (402)
+    if (args.hold) await settleCall(args.hold, 0, args.route);
+    return;
+  }
+  await logImageCost({ ...args, kind: "tool" });
 }
 
 /** A held call that never reached the provider's bill (refused, failed before work): the whole hold goes back. */

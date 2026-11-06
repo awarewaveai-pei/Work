@@ -4,7 +4,9 @@
 
 import Link from "next/link";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { INFRA_MONTHLY, TWD_RATE } from "@/lib/ai/cost-model";
+import { FREE_QUOTAS, INFRA_MONTHLY, TWD_RATE } from "@/lib/ai/cost-model";
+import { loadFreeQuotaUsage } from "@/lib/ai/free-quota";
+import { FreeQuotaCard } from "./FreeQuotaCard";
 import { loadOrgNames, loadSpendRows } from "@/lib/ai/spend-loader";
 import {
   groupLedger, liveSpend, monthlyReports, rowsSince, summarizeSpend, taipeiDayStartIso, taipeiMonthStartIso,
@@ -63,6 +65,10 @@ async function loadCosts(): Promise<CostsData> {
 
 export default async function CostsPage() {
   const data = await loadCosts();
+  const supabase = getSupabaseWriteClient();
+  const quotaUsage = supabase
+    ? await loadFreeQuotaUsage(supabase, new Date())
+    : FREE_QUOTAS.map((quota) => ({ quota, used: null }));
   const monthlyInfraUsd = INFRA_MONTHLY.reduce((s, i) => s + i.usdPerMonth, 0);
 
   return (
@@ -84,6 +90,7 @@ export default async function CostsPage() {
         </p>
       </div>
 
+      <FreeQuotaCard usage={quotaUsage} />
       <CostsTabs data={data} monthlyInfraUsd={monthlyInfraUsd} />
     </div>
   );
