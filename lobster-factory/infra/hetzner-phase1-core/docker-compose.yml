@@ -37,6 +37,8 @@ services:
       - /root/lobster-phase1/static/vector-pro:/srv/vector-pro:ro
       # PhotoCraft web build (photocraft-pro R0-PLAN C2): same layout as vector-pro
       - /root/lobster-phase1/static/photo-pro:/srv/photo-pro:ro
+      # Craft engines for video.aware-wave.com (video-workbench engine-route-plan §9 FC.4): same layout as vector-pro
+      - /root/lobster-phase1/static/video-engines:/srv/video-engines:ro
     networks:
       - lobster-net
     memswap_limit: 128M

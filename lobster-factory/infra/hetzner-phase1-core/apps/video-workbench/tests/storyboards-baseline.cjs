@@ -13,7 +13,9 @@ function checkStoryboardsBaseline(root = path.join(__dirname, "..")) {
   for (const [file, hash] of Object.entries(baseline)) {
     const full = path.join(root, file);
     if (LOCAL_ONLY.has(file) && !fs.existsSync(full)) continue;
-    assert.equal(crypto.createHash("sha256").update(fs.readFileSync(full)).digest("hex"), hash, file + " changed");
+    // Hash git's bytes (LF), not the checkout's: a CRLF working copy on Windows once baked a hash the deploy gate then refused.
+    const bytes = Buffer.from(fs.readFileSync(full).toString("latin1").replace(/\r\n/g, "\n"), "latin1");
+    assert.equal(crypto.createHash("sha256").update(bytes).digest("hex"), hash, file + " changed");
     checked++;
   }
   return checked;
