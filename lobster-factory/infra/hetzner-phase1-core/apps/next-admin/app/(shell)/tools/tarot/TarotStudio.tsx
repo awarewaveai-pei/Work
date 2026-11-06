@@ -913,7 +913,7 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
     if (slot === PREVIEW_SLOT) {
       const sent = previewSentRef.current; // model/seed/prompt of the preview that was sent, not of a newer one
       if (!sent) return false;
-      applyPreviewEdit(image, { ...sent, sig: `${sent.sig.replace(/::canvas=1$/, "")}::canvas=1` });
+      applyPreviewEdit(image, sent); // sig = the settings it was sent under: stale only if they changed since
       return true;
     }
     const deck = deckGenRef.current;
@@ -2214,7 +2214,7 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
                       applyPreviewEdit(image, {
                         model: meta.model as TarotModel,
                         seed: meta.seed,
-                        sig: `${meta.model}::${meta.prompt}::edit=1`,
+                        sig: sigOf(meta.model, effectiveEnglish, subjectForPrompt), // an edit keeps the current settings: not stale
                         prompt: meta.prompt,
                       })
                     }
