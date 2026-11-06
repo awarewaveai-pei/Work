@@ -196,7 +196,7 @@
   }
   // Card ED.2: 複製／貼上樣式 carries these fields between clips of the same group (reference: 濾鏡、特效、遮罩或文字樣式).
   const STYLE = {
-    visual: ["filter", "mask", "grain", ...Object.keys(COLOR), "lut"],
+    visual: ["filter", "mask", "grain", ...Object.keys(COLOR), "lut", "filterStrength", "lightLeak", "shake"],
     text: ["font", "fontSize", "bold", "italic", "align", "color", "backgroundColor", "animation"],
   };
   const styleGroup = (kind) =>
@@ -249,7 +249,129 @@
     candidates.sort((a, b) => a - b);
     return candidates.find(fits) ?? from;
   }
+  // Card ED.3: 畫面效果, resolved nearest-first: clip, then its track, then the project (§4 of docs/ed3-properties-spec-20261106.md).
+  const EFFECTS = {
+    filter: { neutral: "原始" },
+    filterStrength: { min: 0, max: 1, neutral: 1, label: "濾鏡強度" },
+    grain: { min: 0, max: 1, neutral: 0, label: "顆粒" },
+    lightLeak: { min: 0, max: 1, neutral: 0, label: "光漏" },
+    shake: { min: 0, max: 1, neutral: 0, label: "震動" },
+  };
+  const effectValue = (project, track, clip, key) =>
+    key === "filter"
+      ? clip?.filter || track?.filter || project?.filter || "原始" // same `||` chain as editor-export.cjs validateProject
+      : clip?.[key] ?? track?.[key] ?? project?.[key] ?? EFFECTS[key].neutral;
+  const LIGHT_LEAK = { rgb: [255, 160, 64], reach: 0.6 }; // effect colour (content, not UI chrome): export + preview
+  const SHAKE = { amplitude: 0.03, wx: 31, wy: 23, phase: 1, depth: 0.8 };
+  const shakeOffset = (t) => ({ dx: SHAKE.depth * Math.sin(SHAKE.wx * t), dy: SHAKE.depth * Math.sin(SHAKE.wy * t + SHAKE.phase) });
+  const TRANSFORM = { scale: [0.1, 5], rotation: [-360, 360], main: [-8000, 8000], overlay: [0, 100] };
+  // [{frame (from clip start), scale, x, y, rotation}], sorted, unique frames, inside the clip. Throws on bad input.
+  function transformKeys(raw, durationFrames, overlay) {
+    if (raw === undefined || raw === null) return [];
+    if (!Array.isArray(raw) || raw.length > MAX_KEYS) throw Error("變形關鍵影格無效");
+    const range = {
+      scale: TRANSFORM.scale,
+      rotation: TRANSFORM.rotation,
+      x: overlay ? TRANSFORM.overlay : TRANSFORM.main,
+      y: overlay ? TRANSFORM.overlay : TRANSFORM.main,
+    };
+    const keys = raw.map((k) => {
+      if (!k || !Number.isSafeInteger(k.frame) || k.frame < 0 || (durationFrames !== undefined && k.frame > durationFrames))
+        throw Error("變形關鍵影格位置無效");
+      const key = { frame: k.frame };
+      for (const [name, [min, max]] of Object.entries(range)) {
+        const v = Number(k[name]);
+        if (k[name] === null || k[name] === undefined || !Number.isFinite(v) || v < min || v > max)
+          throw Error("變形關鍵影格數值超出範圍");
+        key[name] = v;
+      }
+      return key;
+    });
+    keys.sort((a, b) => a.frame - b.frame);
+    if (keys.some((k, i) => i && k.frame === keys[i - 1].frame)) throw Error("變形關鍵影格不可重複");
+    return keys;
+  }
+  // Linear between keys per property, held before the first and after the last; null when there are no keys.
+  function transformAt(keys, frame) {
+    if (!keys?.length) return null;
+    const out = {};
+    for (const name of ["scale", "x", "y", "rotation"])
+      out[name] = gainAt(keys.map((k) => ({ frame: k.frame, gain: k[name] })), frame);
+    return out;
+  }
+  const NARRATION = "A1"; // 旁白 A1
+  const DUCK = { gain: Math.pow(10, -12 / 20), ramp: 0.2, maxRanges: 64 };
+  // Narration intervals (timeline seconds) -> ducking ranges in seconds from the clip's start: ranges closer than two
+  // ramps merge, only those whose ramps touch the clip stay, and past maxRanges the smallest gaps merge.
+  function duckRanges(clipStart, clipDuration, intervals) {
+    const merged = [];
+    for (const [a, b] of intervals.filter(([a, b]) => b > a).sort((p, q) => p[0] - q[0])) {
+      const last = merged.at(-1);
+      if (last && a - last[1] < 2 * DUCK.ramp) last[1] = Math.max(last[1], b);
+      else merged.push([a, b]);
+    }
+    const ranges = merged
+      .map(([a, b]) => [a - clipStart, b - clipStart])
+      .filter(([a, b]) => a < clipDuration + DUCK.ramp && b > -DUCK.ramp);
+    while (ranges.length > DUCK.maxRanges) {
+      let i = 0;
+      for (let j = 1; j < ranges.length - 1; j++) if (ranges[j + 1][0] - ranges[j][1] < ranges[i + 1][0] - ranges[i][1]) i = j;
+      ranges.splice(i, 2, [ranges[i][0], ranges[i + 1][1]]);
+    }
+    return ranges;
+  }
+  const duckFactor = (ranges, t) =>
+    1 - (1 - DUCK.gain) * Math.max(0, ...ranges.map(([a, b]) => Math.min(1, Math.max(0, Math.min((t - (a - DUCK.ramp)) / DUCK.ramp, (b + DUCK.ramp - t) / DUCK.ramp)))));
+  // Number fields accept arithmetic (1920/2): digits . + - * / ( ) only, parsed here; never eval / Function.
+  function evalNumber(text) {
+    const s = String(text ?? "").replace(/\s+/g, ""),
+      fail = () => {
+        throw Error("請輸入數字或算式");
+      };
+    if (!s || /[^\d.+\-*/()]/.test(s)) fail();
+    let i = 0;
+    const atom = () => {
+      if (s[i] === "-") return i++, -atom();
+      if (s[i] === "+") return i++, atom();
+      if (s[i] === "(") {
+        i++;
+        const v = sum();
+        if (s[i++] !== ")") fail();
+        return v;
+      }
+      const m = /^(\d+\.?\d*|\.\d+)/.exec(s.slice(i));
+      if (!m) fail();
+      i += m[0].length;
+      return Number(m[0]);
+    };
+    const product = () => {
+      let v = atom();
+      while (s[i] === "*" || s[i] === "/") v = s[i++] === "*" ? v * atom() : v / atom();
+      return v;
+    };
+    const sum = () => {
+      let v = product();
+      while (s[i] === "+" || s[i] === "-") v = s[i++] === "+" ? v + product() : v - product();
+      return v;
+    };
+    const v = sum();
+    if (i !== s.length || !Number.isFinite(v)) fail();
+    return v;
+  }
   const api = {
+    EFFECTS,
+    effectValue,
+    LIGHT_LEAK,
+    SHAKE,
+    shakeOffset,
+    TRANSFORM,
+    transformKeys,
+    transformAt,
+    NARRATION,
+    DUCK,
+    duckRanges,
+    duckFactor,
+    evalNumber,
     STYLE,
     styleGroup,
     DB,

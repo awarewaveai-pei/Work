@@ -205,6 +205,7 @@ function evalNumber(text)  // digits . + - * / ( ) and spaces only; recursive de
    }
    // then :486-490 (alphamerge with [plane]) unchanged
    ```
+   **實作更正（ED.3.4）**：光漏的 `[lit]`、`[leak]` 改 `format=gbrp`（不是 rgb24）。整張圖裡下游 `alphamerge` 讓 `blend` 協商成 YUV，screen 作用在色度平面 → 畫面變紫；單獨實驗時輸出是 rgb24 才沒現形。
    `seed=1` 必寫（gradients 預設亂數，會讓同一專案兩次輸出不同）。上面三種鏈（split＋blend 強度、gradients＋screen、scale＋crop sin 震動）已在本機 FFmpeg 6.1.1（`node_modules/ffmpeg-static`）實跑：無警告、畫面正確（2026-11-06 撰寫本檔時的實驗）。
 5. **變形關鍵影格**（只在 `clip.transformKeys.length`）：
    - `:405-412` 的 `scaledWidth/Height` 在有 key 時用 `scale = 1`（box 尺寸），其餘不變。

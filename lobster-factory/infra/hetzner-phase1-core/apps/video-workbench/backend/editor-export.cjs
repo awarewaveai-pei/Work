@@ -38,6 +38,10 @@ function frames(value, min, max, name) {
   if (!Number.isSafeInteger(value) || value < min || value > max) throw Error(name + "超出範圍");
   return value;
 }
+const fail = (message) => {
+  throw Error(message);
+};
+const textKeys = (c) => c.kind === "text" && Array.isArray(c.transformKeys) && c.transformKeys.length > 0;
 // Card M3 (plan §3 invariant 5): the client sends integer frames + the project timebase; seconds are derived here
 // only for FFmpeg arguments. A seconds-only payload (pre-M3 page or an old job retried) is refused, not guessed.
 function validateProject(raw, quality = "1080p") {
@@ -84,7 +88,9 @@ function validateProject(raw, quality = "1080p") {
       start = Timebase.toSeconds(startFrame, tb),
       duration = Timebase.toSeconds(durationFrames, tb),
       speed = number(c.speed, 1, 0.25, 4, "播放速度");
-    const filter = c.filter || track.filter || raw.filter || "原始";
+    // Card ED.3 §4: effect fields resolve nearest-first (clip, track, project); filter keeps its old `||` chain.
+    const fx = (key) => EditorModel.effectValue(raw, track, c, key),
+      filter = fx("filter");
     if (!Object.hasOwn(filters, filter)) throw Error("濾鏡不存在");
     if (
       c.mask &&
@@ -137,10 +143,16 @@ function validateProject(raw, quality = "1080p") {
       fadeOut: number(c.fadeOut, 0, 0, Math.min(10, duration / 2), "淡出"),
       width: number(c.width, 25, 1, 100, "疊加寬度"),
       filter,
-      grain: number(c.grain, 0, 0, 1, "顆粒"),
+      grain: number(fx("grain"), 0, 0, 1, "顆粒"),
+      filterStrength: number(fx("filterStrength"), 1, 0, 1, "濾鏡強度"),
+      lightLeak: number(fx("lightLeak"), 0, 0, 1, "光漏"),
+      shake: number(fx("shake"), 0, 0, 1, "震動"),
+      backgroundBlur: Math.round(number(c.backgroundBlur, 20, 2, 40, "背景模糊強度")),
+      duck: c.duck === true && c.track !== EditorModel.NARRATION, // narration never ducks under itself
       transition,
       transitionFrames: EditorModel.transitionFrames(c, tb),
       volumeKeys: EditorModel.volumeKeys(c.volumeKeys, durationFrames),
+      transformKeys: textKeys(c) ? fail("文字片段不支援變形關鍵影格") : EditorModel.transformKeys(c.transformKeys, durationFrames, overlay),
       ...Object.fromEntries(
         Object.entries(EditorModel.COLOR).map(([key, r]) => [key, number(c[key], r.neutral, r.min, r.max, r.label)]),
       ),
@@ -203,6 +215,7 @@ function frameChecks(project, indexed, width, height) {
     if (
       clip.kind !== "video" || clip.track !== project.mainTrack || clip.speed !== 1 || clip.opacity !== 1 || clip.scale !== 1 ||
       clip.x !== 0 || clip.y !== 0 || clip.rotation !== 0 || clip.grain !== 0 || clip.filter !== "原始" || EditorModel.graded(clip) ||
+      clip.lightLeak || clip.shake || clip.transformKeys.length || clip.filterStrength !== 1 ||
       (clip.mask && clip.mask !== "無") || clip.fadeIn || clip.fadeOut || clip.durationFrames < 2 * margin + 1 ||
       !rate || rate.num * tb.den !== tb.num * rate.den ||
       !metadata.displayWidth || metadata.displayWidth * height !== metadata.displayHeight * width
@@ -282,17 +295,25 @@ function gradeSteps(clip, lutFile) {
   if (lutFile) steps.push(`lut3d=file='${filterPath(lutFile)}'`);
   return steps;
 }
-// Volume keyframes -> a volume=eval=frame expression of t (seconds from the clip's start), linear between keys.
-function gainExpression(keys, fps, scale) {
-  const points = keys.map((k) => [k.frame / fps, k.gain * scale]);
+// [[time, value], ...] -> an FFmpeg expression of `v`, linear between points, held before the first and after the last.
+function piecewise(points, v) {
   let expr = String(points.at(-1)[1]);
   for (let i = points.length - 2; i >= 0; i--) {
     const [t0, g0] = points[i],
       [t1, g1] = points[i + 1];
-    expr = `if(lt(t,${t1}),${g0}+(${g1 - g0})*(t-${t0})/${t1 - t0},${expr})`;
+    expr = `if(lt(${v},${t1}),${g0}+(${g1 - g0})*(${v}-${t0})/${t1 - t0},${expr})`;
   }
-  return `if(lt(t,${points[0][0]}),${points[0][1]},${expr})`;
+  return `if(lt(${v},${points[0][0]}),${points[0][1]},${expr})`;
 }
+// Volume keyframes -> a volume=eval=frame expression of t (seconds from the clip's start), linear between keys.
+const gainExpression = (keys, fps, scale) => piecewise(keys.map((k) => [k.frame / fps, k.gain * scale]), "t");
+// Card ED.3 旁白時自動降低: same curve as EditorModel.duckFactor, t = seconds from the clip's start.
+function duckExpression(ranges) {
+  const r = EditorModel.DUCK.ramp,
+    w = ranges.map(([a, b]) => `clip(min((t-${a - r})/${r},(${b + r}-t)/${r}),0,1)`);
+  return `1-${1 - EditorModel.DUCK.gain}*${w.reduce((acc, x) => `max(${x},${acc})`)}`;
+}
+const even = (n) => Math.ceil(n / 2) * 2;
 const TRUE_PEAK_CEILING = -2; // dBTP for loudnorm and the limiter; the export must measure <= -1 dBTP after AAC.
 async function exportEditor(
   raw,
@@ -357,9 +378,14 @@ async function exportEditor(
     if (!sources.has(source))
       sources.set(source, await inspectMedia(source, signal));
     const metadata = sources.get(source);
+    // Card ED.3 分離音訊: audio detached from a video without sound adds nothing (silence), not an error. Only for the
+    // same video file as the project's video clip it came from (spec §9 Q2); anything else is still a type mismatch.
+    const silentDetached =
+      clip.kind === "audio" && !metadata.audio && !!metadata.video &&
+      project.clips.some((o) => o.id === clip.detachedFrom && o.kind === "video" && o.asset?.url === url);
     if (
       (clip.kind === "video" && !metadata.video) ||
-      (clip.kind === "audio" && !metadata.audio)
+      (clip.kind === "audio" && !metadata.audio && !silentDetached)
     )
       throw Error("素材類型與片段不符");
     if (
@@ -368,6 +394,7 @@ async function exportEditor(
       clip.sourceStart + clip.duration * clip.speed > metadata.duration + 0.15
     )
       throw Error("片段超出原始素材時長");
+    if (silentDetached) continue;
     const index = indexed.length + 2;
     if (clip.kind === "image") {
       const { pre, post } = handles(clip);
@@ -402,13 +429,15 @@ async function exportEditor(
               ) * 2,
             )
           : height;
-      const scaledWidth = Math.max(
+      const keys = clip.transformKeys,
+        staticScale = keys.length ? 1 : clip.scale, // keyframed: the box is scaled per frame further down
+        scaledWidth = Math.max(
           2,
-          Math.round((boxWidth * clip.scale) / 2) * 2,
+          Math.round((boxWidth * staticScale) / 2) * 2,
         ),
         scaledHeight = Math.max(
           2,
-          Math.round((boxHeight * clip.scale) / 2) * 2,
+          Math.round((boxHeight * staticScale) / 2) * 2,
         );
       // Handle frames for transitions come from the source; what the source lacks repeats its edge frame.
       const { pre, post } = handles(clip),
@@ -445,7 +474,7 @@ async function exportEditor(
           `${inputLabel}${prefix.join(",")},split=2[sharp${layer}][back${layer}]`,
         );
         graph.push(
-          `[back${layer}]scale=${scaledWidth}:${scaledHeight}:force_original_aspect_ratio=increase,crop=${scaledWidth}:${scaledHeight},boxblur=20:1[blur${layer}]`,
+          `[back${layer}]scale=${scaledWidth}:${scaledHeight}:force_original_aspect_ratio=increase,crop=${scaledWidth}:${scaledHeight},boxblur=${clip.backgroundBlur}:1[blur${layer}]`,
         );
         graph.push(
           `[sharp${layer}]scale=${scaledWidth}:${scaledHeight}:force_original_aspect_ratio=decrease,setsar=1[fit${layer}]`,
@@ -467,29 +496,63 @@ async function exportEditor(
           `pad=${scaledWidth}:${scaledHeight}:(ow-iw)/2:(oh-ih)/2:color=${overlay ? "black@0" : clip.background === "純色" && /^#[\da-f]{6}$/i.test(clip.backgroundColor || "") ? clip.backgroundColor : "black"}`,
         );
       steps.push("setsar=1", "format=rgba");
+      if (clip.shake) {
+        // Card ED.3 震動: zoom in by 2A, then move the crop window on two sines (EditorModel.shakeOffset).
+        const S = EditorModel.SHAKE,
+          a = S.amplitude * clip.shake;
+        steps.push(
+          `scale=${even(scaledWidth * (1 + 2 * a))}:${even(scaledHeight * (1 + 2 * a))}`,
+          `crop=${scaledWidth}:${scaledHeight}:x='(iw-ow)/2*(1+${S.depth}*sin(${S.wx}*t))':y='(ih-oh)/2*(1+${S.depth}*sin(${S.wy}*t+${S.phase}))'`,
+        );
+      }
       const grade = gradeSteps(clip, lutFile(clip));
-      if (filters[clip.filter] || clip.grain || grade.length) {
+      if (filters[clip.filter] || clip.grain || grade.length || clip.lightLeak) {
         // eq / exposure / lut3d drop alpha. Preserve the original alpha plane explicitly.
         graph.push(
           `${inputLabel}${steps.join(",")},split=2[color${layer}][alpha${layer}]`,
         );
         graph.push(`[alpha${layer}]alphaextract[plane${layer}]`);
-        const effects = [
-          ...grade,
-          filters[clip.filter],
-          clip.grain
-            ? `noise=alls=${Math.round(clip.grain * 30)}:allf=t+u`
-            : "",
-          "format=rgb24",
-        ].filter(Boolean);
-        graph.push(`[color${layer}]${effects.join(",")}[tinted${layer}]`);
+        const blend = filters[clip.filter] && clip.filterStrength < 1,
+          leak = clip.lightLeak > 0;
+        if (!blend && !leak) {
+          const effects = [
+            ...grade,
+            filters[clip.filter],
+            clip.grain
+              ? `noise=alls=${Math.round(clip.grain * 30)}:allf=t+u`
+              : "",
+            "format=rgb24",
+          ].filter(Boolean);
+          graph.push(`[color${layer}]${effects.join(",")}[tinted${layer}]`);
+        } else {
+          // Card ED.3: [color] -> grade -> (filter at strength) -> grain -> (light leak) -> rgb24 -> [tinted]
+          let cur = `[color${layer}]`,
+            pre = [...grade];
+          if (blend) {
+            graph.push(`${cur}${[...pre, "format=rgb24"].join(",")},split=2[base${layer}][fxin${layer}]`);
+            graph.push(`[fxin${layer}]${filters[clip.filter]},format=rgb24[fx${layer}]`);
+            graph.push(`[base${layer}][fx${layer}]blend=all_mode=normal:all_opacity=${clip.filterStrength}[mix${layer}]`);
+            cur = `[mix${layer}]`;
+            pre = [];
+          } else pre.push(filters[clip.filter]);
+          // blend works per plane: planar RGB (gbrp) keeps the screen mode in RGB; left to negotiation it picks YUV.
+          const post = [...pre, clip.grain ? `noise=alls=${Math.round(clip.grain * 30)}:allf=t+u` : "", leak ? "format=gbrp" : "format=rgb24"].filter(Boolean);
+          graph.push(`${cur}${post.join(",")}[${leak ? "lit" : "tinted"}${layer}]`);
+          if (leak) {
+            const L = EditorModel.LIGHT_LEAK,
+              hex = L.rgb.map((n) => n.toString(16).padStart(2, "0")).join("");
+            // seed=1: gradients is random by default, which would make two exports of one project differ.
+            graph.push(`gradients=s=${scaledWidth}x${scaledHeight}:r=${rate}:d=${Timebase.ffTime(frameCount, tb)}:c0=0x${hex}:c1=0x000000:nb_colors=2:type=radial:x0=0:y0=0:x1=${Math.round(scaledWidth * L.reach)}:y1=${Math.round(scaledHeight * L.reach)}:speed=0.01:seed=1,format=gbrp[leak${layer}]`);
+            graph.push(`[lit${layer}][leak${layer}]blend=all_mode=screen:all_opacity=${clip.lightLeak}:shortest=1[tinted${layer}]`);
+          }
+        }
         graph.push(
           `[tinted${layer}][plane${layer}]alphamerge[filtered${layer}]`,
         );
         inputLabel = `[filtered${layer}]`;
         steps.length = 0;
       }
-      if (clip.rotation)
+      if (clip.rotation && !keys.length)
         steps.push(
           `rotate=${clip.rotation}*PI/180:ow=rotw(iw):oh=roth(ih):c=none`,
         );
@@ -506,14 +569,41 @@ async function exportEditor(
         );
       }
       if (clip.opacity < 1) steps.push("colorchannelmixer=aa=" + clip.opacity);
-      const x = overlay
+      const enter = incoming.get(clip.id),
+        leave = outgoing.get(clip.id);
+      let x = overlay
           ? `(main_w-overlay_w)*${clip.x / 100}`
           : `(main_w-overlay_w)/2+${(clip.x * width) / project.baseWidth}`,
         y = overlay
           ? `(main_h-overlay_h)*${clip.y / 100}`
           : `(main_h-overlay_h)/2+${(clip.y * height) / project.baseHeight}`;
-      const enter = incoming.get(clip.id),
-        leave = outgoing.get(clip.id);
+      if (keys.length) {
+        // Card ED.3 變形關鍵影格: per-frame scale, padded to a fixed size (rotation fits inside), then rotate; the
+        // overlay position is an expression of the same keys. Clip stream time starts at the transition handle.
+        const curve = (name, v) => piecewise(keys.map((k) => [k.frame / fps, k[name]]), v),
+          T = `(t-${pre / fps})`,
+          S = curve("scale", T),
+          sMax = Math.max(...keys.map((k) => k.scale)),
+          turns = keys.some((k) => k.rotation),
+          pw = even(turns ? Math.hypot(boxWidth, boxHeight) * sMax : boxWidth * sMax),
+          ph = even(turns ? Math.hypot(boxWidth, boxHeight) * sMax : boxHeight * sMax);
+        steps.push(
+          `scale=w='max(2,2*trunc(${boxWidth}*(${S})/2))':h='max(2,2*trunc(${boxHeight}*(${S})/2))':eval=frame`,
+          `pad=w=${pw}:h=${ph}:x='(ow-iw)/2':y='(oh-ih)/2':color=black@0:eval=frame`,
+          ...(turns ? [`rotate=a='(${curve("rotation", T)})*PI/180':ow=iw:oh=ih:c=none`] : []),
+        );
+        // Transition chains overlay on a canvas that starts at the handle; elsewhere overlay t is timeline time.
+        const tau = `(t-${(!overlay && (enter || leave) ? pre : clip.startFrame) / fps})`,
+          X = curve("x", tau),
+          Y = curve("y", tau),
+          S2 = curve("scale", tau);
+        x = overlay
+          ? `(main_w-${boxWidth}*(${S2}))*(${X})/100-(overlay_w-${boxWidth}*(${S2}))/2`
+          : `(main_w-overlay_w)/2+(${X})*${width / project.baseWidth}`;
+        y = overlay
+          ? `(main_h-${boxHeight}*(${S2}))*(${Y})/100-(overlay_h-${boxHeight}*(${S2}))/2`
+          : `(main_h-overlay_h)/2+(${Y})*${height / project.baseHeight}`;
+      }
       if (!overlay && (enter || leave)) {
         // In a transition chain: flatten onto the black frame (the main track is the bottom layer, so this is
         // what it would show anyway), then xfade the chain and lay it on the timeline once.
@@ -632,11 +722,19 @@ async function exportEditor(
     // which the encoder flags below declare (plan §3 invariant 8: explicit colour space and range).
     graph.push(`${video}scale=in_color_matrix=bt601:out_color_matrix=bt709:in_range=tv:out_range=tv,format=yuv420p[videoout]`);
     let audioIndex = 0;
-    for (const { clip, metadata, index } of indexed) {
-      const track = getTrack(clip.track),
-        trackGain = !visible(clip) || clip.muted || track.muted ? 0 : track.volume,
-        peak = clip.volumeKeys.length ? Math.max(...clip.volumeKeys.map((k) => k.gain)) : clip.volume;
-      if (!metadata.audio || !(trackGain * peak) || clip.kind === "image") continue;
+    const gainOf = (clip) => {
+        const track = getTrack(clip.track);
+        return !visible(clip) || clip.muted || track.muted ? 0 : track.volume;
+      },
+      peakOf = (clip) => (clip.volumeKeys.length ? Math.max(...clip.volumeKeys.map((k) => k.gain)) : clip.volume),
+      // A clip joins the mix only when it can be heard; ducking (card ED.3) listens to narration by the same rule.
+      inMix = ({ clip, metadata }) => !!metadata.audio && gainOf(clip) * peakOf(clip) > 0 && clip.kind !== "image",
+      narration = indexed.filter((r) => r.clip.track === EditorModel.NARRATION && inMix(r)).map(({ clip: o }) => [o.start, o.start + o.duration]);
+    for (const row of indexed) {
+      const { clip, index } = row,
+        track = getTrack(clip.track),
+        trackGain = gainOf(clip);
+      if (!inMix(row)) continue;
       const steps = [
         `atrim=start=${Timebase.ffTime(clip.sourceStartFrame, tb)}:duration=${clip.duration * clip.speed}`,
         "asetpts=PTS-STARTPTS",
@@ -646,6 +744,11 @@ async function exportEditor(
           ? `volume=volume='${gainExpression(clip.volumeKeys, fps, trackGain)}':eval=frame`
           : "volume=" + clip.volume * trackGain,
       ];
+      if (clip.duck) {
+        // Card ED.3 旁白時自動降低: duck under every narration (A1) clip that reaches the mix; same rule as the preview.
+        const ranges = EditorModel.duckRanges(clip.start, clip.duration, narration);
+        if (ranges.length) steps.push(`volume=volume='${duckExpression(ranges)}':eval=frame`);
+      }
       if (clip.fadeIn) steps.push(`afade=t=in:st=0:d=${clip.fadeIn}`);
       if (clip.fadeOut)
         steps.push(
@@ -756,4 +859,4 @@ async function exportEditor(
     for (const temp of temporary) fs.rmSync(temp, { force: true });
   }
 }
-module.exports = { exportEditor, validateProject, ratios, filters, checkCube };
+module.exports = { exportEditor, validateProject, ratios, filters, checkCube, piecewise };
