@@ -58,9 +58,9 @@ export const STAFF_PLATFORM: { pages: readonly string[]; apis: readonly string[]
   // /no-access: where the gate sends a page it refuses (a loop otherwise). /editor-shared: static editor math (public/editor-shared/*.js,
   // no data) that /tools/canvas and the /tools/vector-pro dock blocks both load -- a restricted staff member must not lose 調色.
   // /vector-pro, /vector-pro-dock: static files /tools/vector-pro loads (the VectorCraft build nginx serves publicly, and
-  // locally next.config.ts rewrites; our dock in public/vector-pro-dock/). No data, like /editor-shared. /photo-pro: the
-  // same for /tools/photo-pro's PhotoCraft build.
-  pages: ["/$", "/no-access$", "/editor-shared", "/vector-pro", "/vector-pro-dock", "/photo-pro"],
+  // locally next.config.ts rewrites; our dock in public/vector-pro-dock/). No data, like /editor-shared. /photo-pro, /photo-pro-dock:
+  // the same for /tools/photo-pro (PhotoCraft build; our dock in public/photo-pro-dock/).
+  pages: ["/$", "/no-access$", "/editor-shared", "/vector-pro", "/vector-pro-dock", "/photo-pro", "/photo-pro-dock"],
   apis: [...PLATFORM_APIS, "/api/ops/build-id", "/api/ops/analytics-context"],
 };
 
