@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-06（續9）video.aware-wave.com 上傳素材「頁面通訊逾時」修正（6d3dda8f6）
+
+- 症狀：操作者回報上傳素材 → 「頁面通訊逾時」。nginx access.log 2026-11-06 01:18:27／01:18:56 UTC `POST /api/vw/uploads` 499（瀏覽器自己斷線）。
+- 根因：正式站 http 模式 `timeoutMs: 15000` 同時套在每個 fetch 與每個 iframe→主頁 RPC（`shared/runtime.js` rpc、`shared/adapters.js` HttpAdapter）。影片以 base64 JSON 上傳，家用上行 15 秒傳不完。
+- 不變量：前端期限量「沒有進度」，不量大小；包裝層不得比被包的工作先逾時。
+  - HttpAdapter 改 XHR：讀取 15 秒無資料即放棄；寫入等 `gatewayTimeoutMs` 300 秒（＝nginx video vhost `proxy_read_timeout`），每個上傳／下載進度事件重算；停滯上傳由 nginx `client_body_timeout` 斷。
+  - RPC：主頁收到即回 ack，子頁計時器只偵測「主頁沒回應」。
+- Codex 兩輪：R1 依大小放寬期限仍會切掉慢速上行（屬實，改設計）；R2 進度重算沒測（屬實，補 p6 測試）。artifact `agency-os/reports/oracle/2026-11-06-partialreview-dbdf370d.md`、`…-2f8b98c8.md`。
+- 既有紅燈（非本次）：`tests/host-adapter.cjs` 在 HEAD 就紅（期待 `/422/`，9fa2320f8 後顯示主機原文）。
+- 未部署：需 sg-deploy video-workbench（High）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/services.cjs（6/6，含「慢速上傳不會頁面通訊逾時」）＋node tests/p6-main-system.cjs（PASS，含 2 秒持續進度 vs 1 秒期限）；突變三次各紅後還原 | exit=0 | ms=7148
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/2m/0n（external oracle = Codex CLI gpt-6-sol，兩輪）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=timeoutMs | hits=68 files（各模組自有期限，非共用；VideoWorkbench HttpAdapter 只有 runtime.js:10 一個正式建構點＋2 個測試）
 ## 2026-11-06（續8）FC.1 補跑 Codex 交叉審查：2 項發現全修（filmcraft-pro）
 
 - 前情：同日 FC.1 條目以 `ORACLE_WAIVED` 跳過 Codex；操作者告知 Codex 有額度 → 補審 commit `6cbcae4e5`。artifact `agency-os/reports/oracle/2026-11-06-partialreview-88f54f35.md`（files-reviewed 含全部 7 檔）。
