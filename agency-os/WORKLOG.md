@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-06（續28）Soulful 開始用外聯：寄件信箱＋服務檔（操作者「你決定」）
+
+- 操作者在 Connectors 連 soulfulexpression01@gmail.com（org soulful-expression 2bf60452-…）。正式信箱 info@soulfulexpression.org（Hostinger，SPF hostinger、DMARC p=none）不寄開發信。
+- prod `co_sender_accounts` 1622a501-…：draft／daily_limit 20（連線預設）＋ `auto_draft=true`、display_name／signature_block＝Soulful Expression Art Therapy＋https://soulfulexpression.org。
+- prod `co_service_profiles` 9f73e483-…：「喜悅卡長輩藝術療癒團體課」（事實取自 org metadata.client_config.csFaq courses：6–8 人、90–120 分、60+）；對象長照／日照／社區關懷據點；forbidden_words 治癒、療效保證、根治、治療失智、取代醫療；compliance 不宣稱醫療效果；review_mode manual（健康相關，每封人看）。選這群的理由：喜悅卡是唯一有明確對象與形式的模組；機構對象避開對個人寄治療推銷。
+- 假設待驗：上課地點未定案（csFaq location「尚未定案」）——名單地區由操作者找名單時決定。
+- 監工台 NOW 加一列，v44。
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql update co_sender_accounts ... returning (soulfulexpression01@gmail.com|draft|20|t) + insert co_service_profiles returning (9f73e483|喜悅卡長輩藝術療癒團體課|manual) + browser service-profiles?org=Soulful 顯示 1 筆 | exit=0 | ms=3000
+- REVIEW_WAIVED: NA -- configuration rows, no code
+- BUGHUNT_WAIVED: NA -- data only
 ## 2026-11-06（續27）MONGOLIA-03 停用（操作者「確定不要」）
 
 - prod：`organizations` slug mongolia-03-6fc1c8 `status='inactive'`＋`metadata.inactive_reason`；選單自動排除（ca8d619e5）。紀錄保留、可改回。其 site_watch_target 已是 `enabled=false`，無排程，無需再動。
