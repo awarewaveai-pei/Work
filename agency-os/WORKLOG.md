@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-06（續7）外聯 v2：b29c0aa31 的 Codex 審查補做；主信箱每日上限 20 → 100（操作者指示）
+
+- Codex 審查 b29c0aa31（artifact `agency-os/reports/oracle/2026-11-06-partialreview-a4fc104b.md`），2 項，判讀：
+  - M1 `until` 擋不住期間刪信造成 offset 位移（`claim-consistency/route.ts:49`）：成立但不處理。這 252 封測試信只有本 session 會刪（量完才刪），其他人不會動；位移只影響樣本組成，不影響每封「判兩次是否一致」。
+  - M2 證據每天現讀、沒固定（`route.ts:61`）：不是缺陷。一致率是同一封信同一請求內兩次判斷比對，兩次用同一份證據；不同天的信用不同證據不影響每封的一致。
+- 主信箱 awarewaveai@gmail.com `co_sender_accounts.daily_limit` 20 → 100（操作者 2026-11-06「信件改每天寄100封就好」；草稿模式不變）。限制：免費 Gemini lite 每天 500 次、每封約 5 次 → 實際約 100 封封頂；C16.2 量測期間（每天約 360 次）只剩約 25 封；目前沒有新名單。監工台 NOW 列已註明，v40。
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql update co_sender_accounts set daily_limit=100 ... returning (awarewaveai@gmail.com|100|draft|t) | exit=0 | ms=900
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2m/0n
+- BUGHUNT_WAIVED: NA -- DB value change + review verdict, no code changed
 ## 2026-11-06（續6）影音工作台路線 B：FC.0 過（操作者實機）＋FC.1 FilmCraft 建置鏈完成（scripts/filmcraft-pro）
 
 - FC.0（操作者到場）：真的 Edge 視窗、WebGPU adapter `nvidia blackwell`（`--force_high_performance_gpu`）；操作者確認有聲音、注音打得進中文、英文介面可接受。機器紀錄 `audioClock: true`、無 device lost（`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/p0-reeval-evidence/results/fc0.json`）。
