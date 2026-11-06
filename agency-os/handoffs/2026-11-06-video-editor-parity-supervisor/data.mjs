@@ -63,6 +63,7 @@ export const STEPS = [
     ] },
   { n: 3, code: 'ED.3', title: '屬性面板', plain: '例：選一段影片，把濾鏡設成「只套這段」，加光漏和鏡頭震動，在第 2 秒和第 5 秒設關鍵影格讓它放大；輸出的片照樣有這些效果。',
     gate: '每個新效果輸出一次真影片並抽畫面確認；舊專案打開輸出結果不變。', risk: 'High', model: '設計 Fable；做 Opus', status: 'not_started', depends: ['ED.1'],
+    decided: '2026-11-06（你交給監工決定）：施工圖已寫好（docs/ed3-properties-spec-20261106.md，15d3aedf2）。整片、此軌、此片段三層同時有設定時，以最近的一層為準，因為全部疊加會讓舊專案的成片變樣。分離音訊沿用原影片檔，不另存一份。上線點：ED.1–ED.3 做完後，跟專業剪輯、專業特效一起部署，部署前再跟你確認。',
     what: '整片設定；片段：套用範圍三層、光漏、震動、遮罩、Transform＋關鍵影格、背景模糊／純色、分離音訊、旁白時自動降低；文字片段；數字欄位操作；editor-export.cjs 補輸出',
     files: [VW, 'VW/backend/editor-export.cjs', 'VW/shared/editor-model.js'],
     items: [
