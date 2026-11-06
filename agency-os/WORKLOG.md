@@ -1,4 +1,30 @@
 # Worklog
+## 2026-11-06（續16）影音工作台 FC.3：專業剪輯的成片入帳與送審文字
+
+- 做了（`VW`＝`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`）：
+  - `VW/backend/api.cjs` 新路由 `POST /api/vw/engine/renders`：請求內容＝`X-VW-Meta-Length` 位元組的 JSON 中繼資料＋MP4（串流寫暫存檔，不用 `body()`）。先驗中繼資料（引擎、比例與尺寸、來源清單必須是工作台持有的檔、字幕 ≤ 2000 句、`link` 只收一層 id）→ 再收影片 → `verifyOutput`（寬高、有聲、−16 ±1 LUFS、真峰值 ≤ −1）→ 進素材庫 → 建一筆 `succeeded` 任務（`input.operation="engine-render"`），交給現有 `settle()` 入帳與送審文字。上限 500 MiB＝主系統資產入口的預設。
+  - `VW/backend/release-text.cjs`：`fromCues(cues, title)` 共用，多認 `engine-render`。`VW/backend/main-system.cjs` `ledgerKind`：`engine-render`→`render`。`VW/shared/jobs-view.js`：這種任務不顯示「重新生成」。
+  - `VW/scripts/tools-engine-host.js`：外框加「輸出成片」16:9／9:16／4:5；每次輸出固定帶 `burnCaptions`、`captionSidecar:"srt"`、`loudnessLufs:-16`；MP4 與 SRT 兩個 save 配對（沒有字幕就等 5 秒只送影片），SRT 用 `SubtitleParse` 解析後送路由，成功就開任務視窗（成品進素材庫、送審按鈕在那裡）。舊格式素材（不是 `/media/…/original.*`、`/generated/…`）在「加入素材」就擋下。
+  - PJ 規格 §8 C4：中繼資料帶 `VideoWorkbench.spineLink(...)` 的結果（目前不存在＝null），路由原樣存 `input.link`。`shared/episode-spine.js` 沒有建（PJ.1 的）。
+  - `VW/docs/engine-route-plan-20261106.md` FC.3 結果段。
+- 跟規格不同：中繼資料不放標頭（長字幕會超過 nginx 每行 8 KB）；多燒字幕（送審文字把字幕當畫面字幕，畫面上就要有）；多驗 −16 LUFS（頁面寫了就要驗）。
+- 已知、不在本卡：
+  - 主機 nginx `nginx/system-sites/sg-stack.aware-wave.com.conf:45` `client_max_body_size 100m`：上線後超過 100 MB 的成片會在主機被擋 → 屬 FC.4（主機設定，High），FC.4 要一起調到 500m。
+  - 來源＝送進引擎的全部素材，可能多於時間軸實際用到的（嵌入橋沒有「時間軸用了哪些」的訊息）；對權利紀錄是安全的一側（不會漏）。
+  - 引擎裡的標題文字（graphics）不會進送審文字，只有 SRT 字幕會。
+  - 這種任務不出現在前端「歷史紀錄」（runtime 沒有收外部任務的入口）；成品在素材庫。
+- 分鏡六檔雜湊閘（監工要求附證據）：`node tests/sidebar-overlays.cjs` exit 1，`tests/sidebar-overlays.cjs:41:65`，`pages/storyboards.html` 實際 `0397e326…` ≠ 基準 `96cadc38…`。逐 commit 比對 `tests/storyboards-design-baseline.json`：`0d02453cc`（11-02，基準建立）五檔全符；第一個不符＝`31e89c479`（2026-11-05 18:12，`scripts/storyboards-boot.js`）；之後 `1aaa139d5`（＋`styles/workspaces.css`）、`de0e1836a`（＋`pages/storyboards.html`、`scripts/storyboards-0.js`）。基準未改。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/fc3-engine-render.cjs → 3 PASS（兩來源兩句字幕＋link → 一筆成功任務、主系統來源正好兩個、parentAssetIds 兩個、ratio 16x9、releaseText 標題＋兩句、input.link 原樣；無來源 → 400 不存；靜音／壞檔 → 拒、不建任務） | exit=0 | ms=1885
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：拿掉 api.cjs 來源清單檢查 → fc3 測試紅（`meta.sources is not iterable` 不符 /來源素材/）→ 還原後 3 PASS | exit=1 | ms=2700
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/p6-main-system.cjs PASS；node tests/fc2-engine-host.cjs 4 PASS | exit=0 | ms=3797
+- REALTEST_EVIDENCE: tool=Bash | cmd=fc3-real.cjs（真的 FilmCraft 0.17.0、隔離伺服器、headless）：加素材＋SRT 字幕兩句 → 存檔 → 按「輸出 16:9」→ 11 秒後「成片已存進素材庫」；任務 1 筆 succeeded、來源 1、cues 兩句、素材庫 1 筆、releaseText 標題＋兩句；成品 h264 1920×1080＋aac、−16.0 LUFS、真峰值 −13.3、0.5 秒畫面有燒入字幕；瀏覽器下載 0 | exit=0 | ms=23386
+- REALTEST_EVIDENCE: tool=Bash | cmd=wfail.cjs：暫存檔寫入模擬 ENOSPC → 400，伺服器之後仍回 200 | exit=0 | ms=3000
+- Codex 三輪（artifact `agency-os/reports/oracle/2026-11-06-partialreview-e6a0c515.md`、`-73fc41f4.md`、`-11fd317c.md`），8 項：
+  - 修 6：暫存檔寫入錯誤會讓伺服器退出（加 error handler）；字幕只出 SRT 沒燒（加 burnCaptions）；舊格式素材輸出後才被 400（加素材時擋）；字幕句數超過主系統 4000（改 ≤ 2000）；4 GiB 上限大於主系統 500 MiB（改 500 MiB）；沒驗 −16 LUFS（加驗）。
+  - 不改 2：主機 nginx 100m（FC.4）；來源是超集（權利安全側）。
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/8m/0n（external oracle = Codex CLI gpt-6-sol，read-only；6 修 2 判定不改，理由見上）
+- ORACLE_WAIVED: 第三輪（11fd317c）的兩項修正（上限 500 MiB、驗 −16 LUFS）之後沒再跑第四輪；改動兩行，fc3 3 PASS、p6 PASS、真引擎輸出實跑通過新檢查
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=engine-render | hits=21（api.cjs、release-text.cjs、main-system.cjs、jobs-view.js、tools-engine-host.js、fc3 測試、engine-route-plan、pj 規格；other sessions 無引用）
 ## 2026-11-06（續15）畫布專業版第二批上線：圖示欄＋轉接器、三面板實測、入口改接（85c27aaa4 已部署）
 
 - 合併：W1 C4.2＋C4.4（`9fd934afd`，Codex 2 條修）、W3 實測修正（`974586105`）、SDK 卡 `f62ee1fbc`（US$2.68）、W2 C7.1（`ea220cdd1`，Codex：交接開成功才清）。

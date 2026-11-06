@@ -43,7 +43,7 @@ function ledgerKind(job) {
   const op = job.input?.operation;
   if (op === "remove-bg") return "remove-bg";
   if (op === "meshy-image-to-3d") return "3d";
-  if (op === "remotion-template" || op === "blender-retarget" || op === "blender-render" || localTool(op)) return "render";
+  if (op === "remotion-template" || op === "blender-retarget" || op === "blender-render" || op === "engine-render" || localTool(op)) return "render";
   return ["image", "video", "audio"].includes(job.type) ? job.type : "render";
 }
 

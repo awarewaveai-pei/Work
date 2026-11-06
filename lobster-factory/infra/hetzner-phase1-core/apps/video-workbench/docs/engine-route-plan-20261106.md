@@ -340,6 +340,13 @@ headless 測不到的三件事，用真的視窗、只在 NVIDIA 顯示卡上開
 
 回退：拿掉路由與 `release-text.cjs` 的分支。已登記的成品是正常資產，不用清。
 
+**結果（2026-11-06）：完成。** 跟上面規格不同的地方：
+- 中繼資料不放標頭，放在請求內容最前面（`X-VW-Meta-Length` 個位元組的 JSON，後面接 MP4）：長字幕放標頭會超過 nginx 每行 8 KB 的上限。內容類型 `application/octet-stream`（跨站仍要預檢）。先驗中繼資料再收影片；影片先過 `verifyOutput`（寬高、有聲）才進素材庫。
+- 多收 `link`（PJ 規格 §8 C4），原樣存成 `input.link`；只收一層、值只能是 id 字串，不能長得像檔案網址（否則會被當成權利來源）。外框在 `VideoWorkbench.spineLink` 存在時才帶（PJ.1 之後）。
+- `main-system.cjs` `ledgerKind`：`engine-render` 記成 `render`（本機成品，不是 AI 影片）。`jobs-view.js`：這種任務不顯示「重新生成」。
+- 外框輸出比例按鈕：16:9、9:16、4:5（主系統可投遞的三種）。
+- 實測：真的 FilmCraft 輸出 3 秒 1080p → h264＋aac、−16.0 LUFS、SRT 兩句帶回 → 任務一筆、素材庫一筆、`releaseText` 標題＋兩句。成品不會出現在前端「歷史紀錄」（runtime 沒有收外部任務的入口），會進素材庫，送審按鈕在任務視窗。
+
 ### FC.4 上線（**High，要操作者說可以**）
 
 1. 主機：`/root/lobster-phase1/static/video-engines/filmcraft/<dist 名>/`，`current` 連結指向它（版面照 `/root/lobster-phase1/static/vector-pro`，`scripts/vectorcraft-pro/README.md:36-37`）。上傳後在主機 `sha256sum -c SHA256SUMS`。

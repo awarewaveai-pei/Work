@@ -137,7 +137,8 @@
               actions.append(button);
             };
             if (v.input?.prompt) action("複製提示詞", async () => { await navigator.clipboard.writeText(v.input.prompt); VideoWorkbench.notify("已複製提示詞"); });
-            if (v.input) action("重新生成（先還原設定）", () => VideoWorkbench.generator.import({ intent: "restore-job", job: v }));
+            // A professional-editor render (card FC.3) has no generator settings to restore.
+            if (v.input && v.input.operation !== "engine-render") action("重新生成（先還原設定）", () => VideoWorkbench.generator.import({ intent: "restore-job", job: v }));
             if (v.type === "image") {
               const asset = { id: "job-" + v.id, name: v.input?.prompt?.slice(0, 80) || "圖片成果", kind: "image", type: "image/png", url };
               action("用於生成（首幀）", () => VideoWorkbench.generator.import({ intent: "use-result", action: "first", asset }));

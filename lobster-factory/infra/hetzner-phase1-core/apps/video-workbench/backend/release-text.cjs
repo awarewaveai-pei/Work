@@ -33,16 +33,20 @@ function fromEditor(settings) {
   return { title: String(settings.project.title ?? ""), pieces };
 }
 
-function fromCues(job) {
-  const cues = job.input.settings.cues;
-  const pieces = cues.map((c) => ({ startMs: Math.round(c.start * 1000), endMs: Math.round(c.end * 1000), text: String(c.text).trim() })).filter((p) => p.text);
-  return { title: String(job.input.references?.src?.name ?? ""), pieces };
+// Subtitle burn and the professional editor's render (card FC.3) both carry cues in seconds.
+function fromCues(cues, title) {
+  const pieces = (cues || []).map((c) => ({ startMs: Math.round(c.start * 1000), endMs: Math.round(c.end * 1000), text: String(c.text).trim() })).filter((p) => p.text);
+  return { title: String(title ?? ""), pieces };
 }
 
 function releaseText(job) {
   const op = job?.input?.operation;
-  if (op !== "editor-export" && op !== "subtitle-burn") return null;
-  const { title, pieces } = op === "editor-export" ? fromEditor(job.input.settings || {}) : fromCues(job);
+  if (op !== "editor-export" && op !== "subtitle-burn" && op !== "engine-render") return null;
+  const settings = job.input.settings || {};
+  const { title, pieces } =
+    op === "editor-export" ? fromEditor(settings)
+    : op === "engine-render" ? fromCues(settings.cues, settings.title)
+    : fromCues(settings.cues, job.input.references?.src?.name);
   const script = [...new Set([...pieces].sort((a, b) => a.startMs - b.startMs).map((p) => p.text))].join("\n").slice(0, MAX_SCRIPT);
   return { title: title.trim().slice(0, MAX_TITLE), script, captions: timeline(pieces) };
 }

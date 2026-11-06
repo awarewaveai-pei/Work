@@ -776,6 +776,117 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       }),
     );
   }
+  // Card FC.3: a professional-editor render (FilmCraft in the browser) becomes one finished job, so the existing settle()
+  // registers it with its sources (rights) and sends its release text. Body = X-VW-Meta-Length bytes of JSON metadata, then
+  // the MP4 (streamed to disk; no 80 MB JSON limit, no header-size limit for long caption lists).
+  const ENGINE_RATIOS = { "16:9": [1920, 1080], "9:16": [1080, 1920], "4:5": [1080, 1350], "1:1": [1080, 1080] };
+  async function engineRender(req) {
+    const bad = (message) => Object.assign(Error(message), { status: 400 });
+    const metaBytes = Number(req.headers["x-vw-meta-length"]);
+    if (!Number.isInteger(metaBytes) || metaBytes < 2 || metaBytes > 2 * 1024 * 1024) throw bad("缺少成片資料");
+    // = the main system's asset intake default (next-admin app/api/internal/video/workbench/assets/route.ts:29): a larger
+    // file would become a "succeeded" job that can never be registered or released.
+    const limit = Number(vwEnv(env, "ENGINE_RENDER_BYTES")) || 500 * 1024 * 1024;
+    const tmp = path.join(dataDir, "tmp-engine-" + crypto.randomUUID() + ".mp4");
+    let head = Buffer.alloc(0), meta = null, file = null, bytes = 0, writeError = null;
+    try {
+      // destroyOnReturn:false: a refusal mid-stream must still answer 400 (a destroyed request takes the socket with it).
+      for await (const chunk of req.iterator({ destroyOnReturn: false })) {
+        let rest = chunk;
+        if (!meta) {
+          head = Buffer.concat([head, chunk]);
+          if (head.length < metaBytes) continue;
+          try {
+            meta = JSON.parse(head.subarray(0, metaBytes).toString("utf8"));
+          } catch {
+            throw bad("成片資料格式不正確");
+          }
+          engineRenderMeta(meta); // refused before any video byte is written
+          rest = head.subarray(metaBytes);
+          file = fs.createWriteStream(tmp);
+          // A write failure (disk full) must fail this request, not crash the server with an unhandled 'error'.
+          file.on("error", (e) => (writeError ||= e));
+        }
+        bytes += rest.length;
+        if (bytes > limit) throw Object.assign(Error("成片檔太大"), { status: 413 });
+        if (writeError) throw writeError;
+        if (!file.write(rest))
+          await new Promise((resolve) => { file.once("drain", resolve); file.once("error", resolve); });
+      }
+      if (!meta || !bytes) throw bad("缺少成片檔");
+      if (writeError) throw writeError;
+      await new Promise((resolve, reject) => file.end((e) => (e || writeError ? reject(e || writeError) : resolve())));
+      const { width, height } = meta;
+      // Checked before it is stored: a silent or broken file never becomes an asset or a job.
+      // The frame exports at −16 LUFS (tools-engine-host.js engineExport); same tolerance as the editor's master check.
+      const verification = await verifyOutput(tmp, { width, height, audio: true, audible: true, loudness: { target: -16, tolerance: 1, maxTruePeak: -1 } });
+      if (!verification.ok || !verification.info?.video)
+        throw bad("成片檢查沒過：" + (verification.findings.map((f) => f.message).join("；") || "沒有影像"));
+      const stored = await mediaStore.ingest({ file: tmp, ext: "mp4" });
+      const job = {
+        id: crypto.randomUUID(),
+        type: "video",
+        input: {
+          type: "video",
+          operation: "engine-render",
+          references: meta.sources.map((s) => ({ url: s.url, ...(typeof s.id === "string" ? { id: s.id } : {}), ...(typeof s.name === "string" ? { name: s.name.slice(0, 200) } : {}) })),
+          settings: { engine: meta.engine, engineVersion: meta.engineVersion, title: meta.title, ratio: meta.ratio, cues: meta.cues },
+          ...(meta.link ? { link: meta.link } : {}),
+        },
+        status: "succeeded",
+        progress: 100,
+        createdAt: new Date().toISOString(),
+        ...(main && req.vwIdentity?.userId ? { createdBy: req.vwIdentity.userId } : {}),
+      };
+      job.result = {
+        url: stored.url, previewUrl: stored.previewUrl, thumbUrl: stored.thumbUrl, width, height,
+        ...(Number.isFinite(verification.info.duration) ? { duration: verification.info.duration } : {}),
+        verification: { ok: true, findings: [] },
+        origin: { kind: "render", engine: meta.engine, engineVersion: meta.engineVersion, jobId: job.id, costUsd: 0 },
+      };
+      jobs.push(job);
+      persist();
+      await settle(job);
+      return job;
+    } catch (error) {
+      req.resume();
+      throw error;
+    } finally {
+      file?.destroy();
+      fs.rmSync(tmp, { force: true });
+    }
+  }
+  // Every source must be a file this server holds (the rights record is built from them): no list, no render.
+  function engineRenderMeta(meta) {
+    const bad = (message) => Object.assign(Error(message), { status: 400 });
+    if (!meta || typeof meta !== "object" || meta.engine !== "filmcraft") throw bad("不支援的剪輯引擎");
+    meta.engineVersion = String(meta.engineVersion ?? "").slice(0, 40);
+    meta.title = String(meta.title ?? "").trim().slice(0, 200);
+    const size = ENGINE_RATIOS[meta.ratio];
+    if (!size || meta.width !== size[0] || meta.height !== size[1]) throw bad("成片比例或尺寸不正確");
+    if (!Array.isArray(meta.sources) || !meta.sources.length || meta.sources.length > 200)
+      throw bad("缺少來源素材清單：成片要記下用了哪些素材");
+    for (const s of meta.sources)
+      if (!s || !mainSystemTools.LOCAL_URL.test(String(s.url || "")) || !fs.existsSync(localFile(s.url) || ""))
+        throw bad("來源素材不在工作台：" + String(s?.url || "").slice(0, 120));
+    // PJ spec §8 C4: which project/episode this render belongs to (VideoWorkbench.spineLink), stored as input.link as sent.
+    // Flat ids only: no nested data, and no value can look like a file url (localUrls would count it as a rights source).
+    if (meta.link != null) {
+      const entries = typeof meta.link === "object" && !Array.isArray(meta.link) ? Object.entries(meta.link) : null;
+      if (!entries || entries.length > 12 || entries.some(([k, v]) => !/^[A-Za-z]\w{0,39}$/.test(k) || (v !== null && !(typeof v === "string" && /^[\w:.-]{1,200}$/.test(v)))))
+        throw bad("專案歸屬格式不正確");
+    }
+    meta.link = meta.link ?? null;
+    const cues = meta.cues ?? [];
+    // ≤ 2000 lines: release-text.cjs timeline() turns n lines into at most 2n−1 entries, and next-admin's release-text
+    // route takes 4000 (app/api/internal/video/workbench/assets/release-text/route.ts:30).
+    if (!Array.isArray(cues) || cues.length > 2000) throw bad("字幕最多 2000 句");
+    meta.cues = cues.map((c) => {
+      const start = Number(c?.start), end = Number(c?.end);
+      if (!(start >= 0) || !(end > start) || typeof c.text !== "string") throw bad("字幕格式不正確");
+      return { start, end, text: c.text.slice(0, 4000) };
+    });
+  }
   async function body(req) {
     let bytes = 0,
       chunks = [];
@@ -823,9 +934,11 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         throw Object.assign(Error("不允許的主機"), { status: 403 });
       if (req.headers.origin && req.headers.origin !== (env.VW_PUBLIC_ORIGIN || "http://" + host))
         throw Object.assign(Error("不允許跨來源請求"), { status: 403 });
+      // Card FC.3: the engine render route streams bytes; application/octet-stream still needs a CORS preflight cross-site.
       if (
         req.method !== "GET" &&
-        !/^application\/json/.test(req.headers["content-type"] || "")
+        !/^application\/json/.test(req.headers["content-type"] || "") &&
+        !(route === "/engine/renders" && /^application\/octet-stream$/.test(req.headers["content-type"] || ""))
       )
         throw Object.assign(Error("需要 JSON 請求"), { status: 415 });
       if (req.method === "POST" && Object.hasOwn(mainSystemTools.PAID_ROUTES, route)) {
@@ -844,6 +957,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           reference: require("./reference.cjs").allowed(env, req) && require("./reference.cjs").present(env),
           // P6 L3: connected = finished videos open next-admin /release (same origin) for review and delivery.
           mainSystem: main ? { organizationId: orgId } : null });
+        return true;
+      }
+      if (req.method === "POST" && route === "/engine/renders") {
+        json(res, 201, await engineRender(req));
         return true;
       }
       if (req.method === "POST" && route === "/uploads") {

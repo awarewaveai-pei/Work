@@ -156,9 +156,16 @@ function engineShow() {
   status.dataset.engineStatus = "";
   status.setAttribute("role", "status");
   bar.append(status);
+  // Card FC.3: the frame starts every render itself, so each one carries the SRT sidecar and −16 LUFS.
+  const out = engineEl("div", "row");
+  out.append(engineEl("span", "note", "輸出成片："));
+  for (const ratio of Object.keys(ENGINE_RENDER_SIZES))
+    out.append(engineButton(ratio + "（" + ENGINE_RENDER_SIZES[ratio].join("×") + "）", "export:" + ratio));
   top.append(
     bar,
     engineEl("p", "note", "在剪輯畫面用 File › Save 存檔，專案會存進工作台。"),
+    out,
+    engineEl("p", "note", "成片會附字幕檔、音量調到 −16 LUFS，存進素材庫並記下用了哪些素材，可直接送審。"),
   );
   const list = engineEl("div", "out");
   list.dataset.engineProjects = "";
@@ -284,8 +291,13 @@ async function engineSourceUrl(asset) {
     `「${asset.name || "素材"}」超過 512 MB，專業剪輯打不開；請改用一般剪輯。`,
   );
 }
+// Only files the ledger can name (backend/main-system.cjs LOCAL_URL): a render must record its sources, and the render
+// route refuses any other url, so an older-format item is stopped here instead of after the export.
+const ENGINE_LEDGER_URL = /^\/(generated\/[a-f0-9-]+\.[a-z0-9]+|media\/[a-f0-9]{64}\/original\.[a-z0-9]+)$/;
 async function engineAddAsset(asset) {
   if (!VideoWorkbench.safeUrl(asset.url)) throw Error("素材網址無效");
+  if (!ENGINE_LEDGER_URL.test(asset.url))
+    throw Error(`「${asset.name || "素材"}」是舊格式的素材，請在素材庫重新上傳一次再加入。`);
   const known = eng.sent.find((s) => s.url === asset.url);
   const url =
     known?.sentUrl && (await engineSize(known.sentUrl)) <= ENGINE_OPEN_LIMIT
@@ -362,6 +374,7 @@ function engineSaveProject(name, bytes) {
 function engineOnSave(m) {
   const name = String(m.name || ""),
     bytes = m.bytes;
+  if (bytes instanceof ArrayBuffer && engineOnRenderFile(name, bytes)) return;
   if (!(bytes instanceof ArrayBuffer) || !/\.fcproj$/i.test(name)) return;
   // saveAs = this file becomes the document (Save As, first Save); a plain Save of the document keeps its own name.
   // Other saveAs:false files (Save a Copy, the schema backup) are not the document and are not stored.
@@ -442,6 +455,8 @@ document.addEventListener(
       if (act === "assets")
         return enginePickAssets().catch(VideoWorkbench.reportError);
       if (act === "new") return engineLeaveOk() && engineMount();
+      if (act.startsWith("export:"))
+        return engineExport(act.slice(7)).catch(VideoWorkbench.reportError);
       if (act.startsWith("open:"))
         return (
           engineLeaveOk() &&
@@ -466,3 +481,116 @@ document.addEventListener(
 window.addEventListener("beforeunload", (event) => {
   if (tool === "edit-pro" && engineUnsaved()) event.preventDefault();
 });
+// Card FC.3: a render = the frame asks the engine for an MP4 (+ SRT sidecar, −16 LUFS), then sends the file, its sources
+// and the caption lines to POST /api/vw/engine/renders, which records it as one finished job (ledger + release text).
+const ENGINE_RENDER_SIZES = {
+  "16:9": [1920, 1080],
+  "9:16": [1080, 1920],
+  "4:5": [1080, 1350],
+};
+const engineRenders = new Map(); // export base name -> { ratio, width, height, title, sources, video, srt, timer }
+async function engineExport(ratio) {
+  if (!eng.ready) throw Error("引擎還在載入");
+  if (!eng.sent.length) throw Error("先加入素材再輸出：成片要記下用了哪些素材");
+  const [width, height] = ENGINE_RENDER_SIZES[ratio];
+  const title = eng.doc
+    ? eng.doc.name.replace(/\.fcproj$/i, "")
+    : "專業剪輯成片";
+  const base =
+    (title.replace(/[\\/:*?"<>|]/g, "_").slice(0, 80) || "成片") +
+    "-" +
+    Date.now();
+  engineRenders.set(base, {
+    ratio,
+    width,
+    height,
+    title,
+    sources: eng.sent.map(({ id, url, name }) => ({ id, url, name })),
+    // PJ spec §8 C4: the project/episode this render belongs to, once PJ adds VideoWorkbench.spineLink.
+    link: typeof VideoWorkbench.spineLink === "function" ? VideoWorkbench.spineLink({ operation: "engine-render" }) : null,
+    video: null,
+    srt: null,
+    timer: null,
+  });
+  const r = await eng.frame.contentWindow.filmcraft.execute(
+    "file.exportMedia",
+    {
+      path: "/exports/" + base + ".mp4",
+      format: "h264",
+      width,
+      height,
+      fps: 30,
+      audio: true,
+      // Burned in as well: the release text reports these lines as on-screen captions, so they must be on screen.
+      burnCaptions: true,
+      captionSidecar: "srt",
+      loudnessLufs: -16,
+      wait: false,
+    },
+  );
+  if (r?.warnings?.length)
+    VideoWorkbench.notify("引擎提醒：" + r.warnings.join("；"));
+  engineStatus("輸出中…（在剪輯畫面可看進度）");
+}
+// The MP4 and its .srt arrive as two saves in either order; a project without captions sends no .srt.
+function engineOnRenderFile(name, bytes) {
+  const m = /^(.*)\.(mp4|srt)$/i.exec(name);
+  const job = m && engineRenders.get(m[1]);
+  if (!job) return false;
+  if (m[2].toLowerCase() === "srt") job.srt = new TextDecoder().decode(bytes);
+  else job.video = bytes;
+  clearTimeout(job.timer);
+  if (job.video)
+    job.timer = setTimeout(
+      () => engineSubmitRender(m[1]),
+      job.srt !== null ? 0 : 5000,
+    );
+  return true;
+}
+async function engineSubmitRender(base) {
+  const job = engineRenders.get(base);
+  engineRenders.delete(base);
+  try {
+    const cues = job.srt
+      ? SubtitleParse.parse(job.srt).map((c) => ({
+          start: c.startMs / 1000,
+          end: c.endMs / 1000,
+          text: c.text,
+        }))
+      : [];
+    const meta = new TextEncoder().encode(
+      JSON.stringify({
+        engine: "filmcraft",
+        engineVersion: eng.appVersion,
+        title: job.title,
+        ratio: job.ratio,
+        width: job.width,
+        height: job.height,
+        sources: job.sources,
+        link: job.link,
+        cues,
+      }),
+    );
+    engineStatus("成片入帳中…");
+    const api = String(window.VW_CONFIG?.apiBaseUrl || "/api/vw").replace(/\/$/, "");
+    const response = await fetch(api + "/engine/renders", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "X-VW-Meta-Length": String(meta.byteLength),
+      },
+      body: new Blob([meta, job.video]),
+    });
+    const value = await response.json().catch(() => ({}));
+    if (!response.ok)
+      throw Error(
+        value.error?.message || "成片入帳失敗（" + response.status + "）",
+      );
+    engineStatus("成片已存進素材庫");
+    VideoWorkbench.showJob(value);
+  } catch (error) {
+    engineStatus("成片沒有入帳");
+    VideoWorkbench.reportError(error);
+  }
+}
