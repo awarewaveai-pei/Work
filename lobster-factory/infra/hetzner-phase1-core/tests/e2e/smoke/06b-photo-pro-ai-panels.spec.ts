@@ -204,7 +204,8 @@ test.describe('Photo Pro AI panels on real PhotoCraft', () => {
     await check('ai-fill 說明寫的快速遮色片路徑：Q 用黑色塗 (120,70) 60×40 → Q → Shift+Ctrl+I 反轉 → 生成填色的遮罩白框＝塗到的地方', async () => {
       const inv = (await frame.evaluate(() => (window as any).photocraft.commands()) as any[]).find((c) => c.id === 'select.inverse');
       expect(String(inv?.shortcut), 'select.inverse shortcut').toMatch(/shift.*(ctrl|cmd).*i|(ctrl|cmd).*shift.*i/i);
-      await only('w3'); await select('w3');
+      // fresh gradient: the previous check painted (20,10) 60×40 green, which holds the "outside" probe point (50,30)
+      await only('w3'); await pc('layer.delete', { layer: (await byName('w3')).id }); await addImage('w3');
       await quickMaskPaint([120, 70, 60, 40], '#000000');
       await pc('select.inverse');
       await startMode('fill');
@@ -284,11 +285,22 @@ test.describe('Photo Pro AI panels on real PhotoCraft', () => {
         const p = (await probe([[0, 0], [100, 60]]))!;
         notes.push(`${id} ${p.w}×${p.h} opaque ${p.opaque} corner ${JSON.stringify(p.at[0])}`);
         expect(p.opaque, notes.at(-1)).toBeLessThan(IMG_W * IMG_H);
-        // the edge is transparent, so PhotoCraft's layer bounds shrink to the opaque part; the content must stay centred
+        // the edge is transparent, so PhotoCraft's layer bounds shrink to the opaque part; the whole result (transparent edge
+        // included) must sit exactly on the original frame B: bounds = B origin + the opaque box of the same mask (SSOT edge-mask.js)
         const nb = (await byName('w3')).bounds!;
-        const drift = [nb[0] + nb[2] / 2 - (B[0] + B[2] / 2), nb[1] + nb[3] / 2 - (B[1] + B[3] / 2)];
-        notes.push(`bounds ${JSON.stringify(nb)} centre drift ${JSON.stringify(drift)}`);
-        expect(Math.max(...drift.map(Math.abs)), notes.join(' | ')).toBeLessThanOrEqual(1); // measured 0.5 (rounding of an odd trimmed width)
+        const ob = await page.evaluate(async ([b64, id]) => {
+          const { applyEdgeMask } = await import('/editor-shared/edge-mask.js' as string);
+          const res = await applyEdgeMask('data:image/png;base64,' + b64, id, { amount: 55, seed: 7 });
+          const bmp = await createImageBitmap(await (await fetch(res.image)).blob());
+          const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height; const g = c.getContext('2d')!; g.drawImage(bmp, 0, 0);
+          const d = g.getImageData(0, 0, c.width, c.height).data;
+          let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
+          for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 0) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+          return [x0, y0, x1 - x0 + 1, y1 - y0 + 1];
+        }, [PNG.toString('base64'), id] as const);
+        const want = [B[0] + ob[0], B[1] + ob[1], ob[2], ob[3]];
+        notes.push(`bounds ${JSON.stringify(nb)} expected ${JSON.stringify(want)}`);
+        expect(nb, notes.join(' | ')).toEqual(want);
       }
       return notes.join(', ');
     });
