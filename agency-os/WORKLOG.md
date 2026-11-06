@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-06（續29）影片剪輯 ED.3.2／3.3／3.5：片段效果＋預覽、變形關鍵影格／分離音訊／旁白閃避、速度與時間組；ED.3 七張子卡完成（`61ac8cd09`、`8331ce93e`、`af1517238`）
+
+- ED.3.2：套用範圍三鈕＋濾鏡十六鈕＋強度／光漏／震動／顆粒（%）＋遮罩鈕；背景三鈕＋模糊強度寫主軌全部片段；預覽補濾鏡（CSS 依強度內插）、光漏層、震動。與規格不同：震動預覽位移 −A·d·100%（規格寫 50%；輸出裁切窗移 A·d 倍畫寬，I3 同數學）（`VW/scripts/tools-editor.js`，`VW`＝`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`）。
+- ED.3.3：變形四欄＋◇／◆／清除；兩種 key 跟著修剪／分割／入出點／左拖（`edWindowKeys`）；分離音訊到 A1（同一檔）；旁白時自動降低（預覽與輸出同一規則）。Codex 修：改影格率 key 跟著換算、載入裁掉超出片段的 key、分割不超過 32 個（音量 key 同類一起修，邊界只在需要時補點，保持值不變）。
+- ED.3.5：速度四鈕（長度跟著變、key 換算）、起點／長度／來源起點／來源終點、音量 dB、文字字型／對齊／動畫鈕＋套用此樣式到此軌／整片、取色；`edSelect` 無呼叫者已刪，檢查器 0 個下拉。規格漏列 `VW/tests/ed1-layout.cjs` 也用舊標籤，一併改。
+- 已知近似（不改）：CSS 濾鏡色彩只近似 FFmpeg（規格 §5）；預覽不知道素材有無音軌，從無聲影片分離的音訊在預覽會觸發閃避、輸出不會；提高速度可能讓主軌片段短於轉場→匯出照既有規則拒絕（轉場面板已提示）。
+- 範圍外發現：`VW/scripts/tools-engine-host.js:439` 的 beforeunload 在 `tools-0.js` 宣告 `tool` 前讀它 → 機器忙時 `tests/pj1-legacy-ui.cjs` 偶發 `tool is not defined`（加壓重現並取得 stack）；屬專業剪輯外框，本卡不可改。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed3-inspector.cjs → 6 PASS（範圍寫入規則、背景套主軌兩段、預覽灰階＋震動＋光漏；◇／1920/2→960／◆／分割兩半 key、分離音訊、閃避；2x→50 格、來源終點、−6dB、文字套用整片、取色；§7 C 舊專案存檔無新欄位；截圖親眼看過） | exit=0 | ms=9235
+- REALTEST_EVIDENCE: tool=Bash | cmd=scratchpad fix32.cjs／fix33.cjs（Edge 實測 Codex 修正：樣式複製帶走軌道濾鏡、疊加光漏貼齊框且吃透明度；24fps key 50→48、載入裁 60→50、32 key 分割仍 32） | exit=0 | ms=8000
+- REALTEST_EVIDENCE: tool=Bash | cmd=scratchpad/suite.sh ed35（golden 9、effects 9、gate 10、sidebar-overlays、test-isolation、editor-render 8、p2-mix 9、p2-*、p3-review-fixes 8、media-contract 5、pj1-legacy-ui 5、pj1-spine-unit 5、tools-editor、export-frame-check、ed2-timeline 20、p1-loop 4）全 exit 0 | exit=0 | ms=260000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/8m/0n（Codex `agency-os/reports/oracle/2026-11-06-partialreview-942aa9b2.md` 3 項修 2、`-adbe4bf2.md` 4 項修 3、`-e023141b.md` 1 項不改；不改的理由見上「已知近似」）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=edSelect(\|片段濾鏡\|字級\|時間軸起點（秒） | hits=7（compositor 自己的「字級」、測試 PASS 文字、兩份 docs 散文；剪輯器控制項 0）
 ## 2026-11-06（續28）Soulful 開始用外聯：寄件信箱＋服務檔（操作者「你決定」）
 
 - 操作者在 Connectors 連 soulfulexpression01@gmail.com（org soulful-expression 2bf60452-…）。正式信箱 info@soulfulexpression.org（Hostinger，SPF hostinger、DMARC p=none）不寄開發信。
