@@ -6,8 +6,9 @@ import "./pro-editor-frame.css";
 // One frame for every Craft editor (VectorCraft, PhotoCraft; agency-os/handoffs/2026-11-05-photocraft-pro/R0-PLAN.md C3.1):
 // the editor's static web build in an iframe + our dock beside it. The dock's only link to this page is
 // window.__proEditor = { editor, frame, handoff }; the dock script is a module the page loads and may be missing (it then
-// runs without the dock). handoff = the design another tool sent here (canvas-handoff.ts openInCanvas), read once if it
-// is addressed to this editor; the dock opens it once the editor is ready and then clears it (handoff.done(); C7.1).
+// runs without the dock). handoff = the design another tool sent here (canvas-handoff.ts openInCanvas: IndexedDB record
+// named by this page's ?h=<id>, C8.1), read once if it is addressed to this editor; the dock opens it once the editor is
+// ready and then clears it (handoff.done(); C7.1). handoff.ret = the sender wants the edit back: the dock adds "傳回".
 // No theme link: the Craft editors keep their own dark/light (operator 2026-11-06).
 
 export type ProEditorFrameProps = {

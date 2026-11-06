@@ -35,6 +35,9 @@
   text-align: center;
 }
 
+/* C8.1「傳回」鈕：圖示欄頂端，與面板圖示隔開 */
+.vp-root .vp-return { margin-bottom: 4px; }
+
 /* ---- 浮出層：全高、在圖示欄左側、蓋在 iframe 之上（不推擠）；寬 panel（拉 panelMin–panelMax） ---- */
 .vp-root .vp-flyout {
   position: fixed;

@@ -191,24 +191,99 @@ export async function mountDock(root, { makeCtx, panelIds, storeKey, sizes }) {
   document.addEventListener("keydown", (e) => e.key === "Escape" && close());
   window.addEventListener("resize", () => open && place());
 
-  openHandoff(ctx, (msg) => notice("帶入設計", msg), tag);
+  // C8.1：交接帶「傳回」票、且開成功 → 圖示欄頂端多一顆「傳回 <label>」（可重複按：改了再傳）
+  openHandoff(ctx, (msg) => notice("帶入設計", msg), tag).then((h) => {
+    if (!h?.ret) return;
+    const title = `傳回 ${h.ret.label}`;
+    const b = el("button", "btn btn-primary vp-icon vp-return", "↩");
+    b.type = "button";
+    b.title = title;
+    b.dataset.return = h.ret.id;
+    b.setAttribute("aria-label", title);
+    b.addEventListener("click", async () => {
+      b.disabled = true;
+      ctx.busy?.(true);
+      try {
+        await sendBack(ctx, h.ret, (msg) => notice(title, msg));
+      } finally {
+        ctx.busy?.(false);
+        b.disabled = false;
+      }
+    });
+    icons.prepend(b);
+  });
   return { ctx, panels, show, close };
 }
 
+/** C8.1 傳回：等原分頁 ack 的時間；過了就當原分頁不在，改存 My Designs。 */
+export const RETURN_ACK_MS = 2000;
+/** 頻道名 = components/tools/canvas-handoff.ts CANVAS_RETURN_CHANNEL。 */
+export const RETURN_CHANNEL = "canvas-return";
+
+const blobToDataUrl = (b) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(b); });
+
+/** 送出 {type:"return", id, image} 並等 {type:"ack", id}；ackMs 內沒有（或沒有 BroadcastChannel）→ false。 */
+export function postReturn(id, image, ackMs = RETURN_ACK_MS) {
+  if (typeof BroadcastChannel === "undefined") return Promise.resolve(false);
+  return new Promise((resolve) => {
+    const ch = new BroadcastChannel(RETURN_CHANNEL);
+    const finish = (ok) => { clearTimeout(timer); ch.close(); resolve(ok); };
+    const timer = setTimeout(() => finish(false), ackMs);
+    ch.onmessage = (e) => { if (e.data?.type === "ack" && e.data.id === id) finish(true); };
+    ch.postMessage({ type: "return", id, image });
+  });
+}
+
+/**
+ * C8.1 不變量：按「傳回」後圖一定落地一處——原分頁那一格收下（ack），或存進 My Designs。
+ * 匯出整張 PNG → postReturn → 沒 ack 就 save(ctx, png)（= blocks/my-designs.js saveToMyDesigns，與面板同一個）。
+ * report(msg) 顯示結果；回 "returned" | "saved" | "failed"。
+ * @param {{ exportArtboard: (o: object) => Promise<Blob> }} ctx
+ * @param {{ id: string, label: string }} ret
+ * @param {(msg: string) => void} [report]
+ * @param {{ ackMs?: number, save?: (ctx: object, png: Blob) => Promise<{ ok: boolean, message?: string }> }} [opts]
+ */
+export async function sendBack(ctx, ret, report, { ackMs = RETURN_ACK_MS, save } = {}) {
+  try {
+    report?.("傳回中…");
+    const png = await ctx.exportArtboard({ format: "png" });
+    if (await postReturn(ret.id, await blobToDataUrl(png), ackMs)) {
+      report?.(`✅ 已傳回 ${ret.label}`);
+      return "returned";
+    }
+    report?.("原分頁沒有回應，存進我的設計中…");
+    const saveFn = save ?? (await import(`${BLOCKS_BASE}my-designs.js`)).saveToMyDesigns;
+    const r = await saveFn(ctx, png);
+    if (r?.ok) {
+      report?.("原分頁已關，已存進我的設計");
+      return "saved";
+    }
+    report?.(`原分頁已關，存進我的設計失敗：${r?.message || "未知原因"}。請用「My Designs」面板或匯出另存。`);
+    return "failed";
+  } catch (err) {
+    console.error("[pro dock] 傳回失敗", err);
+    report?.(`❌ 傳回失敗：${err?.message || err}`);
+    return "failed";
+  }
+}
+
 /** C7.1：別的工具送來的設計（門頁的 __proEditor.handoff，canvas-handoff.ts openInCanvas）——編輯器就緒後開成文件，
- *  開成功才 done() 清掉交接；失敗（編輯器逾時、下載失敗、開檔失敗）交接留著，重新整理會再試，並用 report 顯示訊息。 */
+ *  開成功才 done() 清掉交接並回傳交接（C8.1 帶 ret 時 dock 加「傳回」鈕）；失敗（編輯器逾時、下載失敗、開檔失敗）交接留著，
+ *  重新整理會再試，並用 report 顯示訊息、回 null。 */
 export async function openHandoff(ctx, report, tag = "[pro dock]") {
   try {
     const h = await globalThis.__proEditor?.handoff;
-    if (!h) return;
+    if (!h) return null;
     await ctx.ready();
     const r = await fetch(h.url);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     await ctx.openFile(await r.blob(), h.name);
     h.done?.();
+    return h;
   } catch (err) {
     console.error(tag, "帶入的設計開不起來", err);
     report?.(`❌ 帶入的設計開不起來：${err?.message || err}。重新整理頁面會再試一次。`);
+    return null;
   }
 }
 
