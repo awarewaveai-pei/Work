@@ -40,6 +40,8 @@ const ed = {
   // Card ED.1: panel sizes (tools.editor.layout), loop playback, and the top bar's save status.
   layout: null,
   loop: false,
+  // Card ED.3.2: where 畫面效果 edits land (整片／此軌／此片段, spec §4); view state, not saved.
+  fxScope: "此片段",
   save: { state: "saved", at: null, pending: 0 },
 };
 let edLinePress = { id: null, at: 0 };
@@ -645,6 +647,7 @@ function edSetTimebase(p, label) {
   p.timebase = { num: timebase.num, den: timebase.den };
   for (const row of p.clips) edTime(p, row, { start: row.start, duration: row.duration, sourceStart: row.sourceStart });
 }
+const edMainVisual = (p) => p.clips.filter((row) => row.track === edMain(p) && ["video", "image"].includes(row.kind));
 // Card ED.3 §4: an effect written at one scope clears the narrower layers, so what is set is what shows; reading is
 // nearest-first (EditorModel.effectValue). The caller takes the undo checkpoint and commits.
 function edWriteEffect(p, c, key, value, scope) {
@@ -714,20 +717,30 @@ function edClipInspector(p, c) {
       groups.time;
   else if (kind === "audio") html += groups.audio + groups.speed + groups.time;
   else {
-    const background = c.background === "模糊" || c.background === "純色" ? c.background : "黑邊";
+    const background = c.background === "模糊" || c.background === "純色" ? c.background : "黑邊",
+      fx = (key) => EditorModel.effectValue(p, edTrack(p, c.track), c, key);
     html +=
       edGroup(
         "畫面效果",
         "",
-        `${edSelect("filter", "片段濾鏡", c.filter || "原始", edFilters)}${edSelect("mask", "片段遮罩", c.mask || "無", ["無", "圓形", "圓角矩形", "三角形"])}${edInput("grain", "顆粒強度", c.grain || 0, "number", 'min="0" max="1" step="0.1"')}`,
+        edChoices("套用範圍", "fx-scope", ed.fxScope, ["整片", "此軌", "此片段"]) +
+          `<p class="note">濾鏡</p>` +
+          edChoices("濾鏡", "fx:filter", fx("filter"), edFilters) +
+          ["filterStrength", "lightLeak", "shake", "grain"]
+            .map((key) => edNumber("fx:" + key, EditorModel.EFFECTS[key].label + "（%）", Math.round(fx(key) * 100), { min: 0, max: 100, step: 1 }))
+            .join("") +
+          `<p class="note">形狀遮罩</p>` +
+          edChoices("形狀遮罩", "mask", c.mask || "無", ["無", "圓形", "圓角矩形", "三角形"]),
       ) +
       groups.transform +
       (main
         ? edGroup(
             "背景",
             background,
-            edSelect("background", "背景", c.background || "黑色", ["黑色", "模糊", "純色"]) +
-              (c.background === "純色" ? edInput("backgroundColor", "背景顏色", c.backgroundColor || "#000000", "color") : ""),
+            `<p class="note">套用到主軌所有片段</p>` +
+              edChoices("背景", "background", background, ["黑邊", "模糊", "純色"]) +
+              (background === "模糊" ? edNumber("backgroundBlur", "模糊強度", c.backgroundBlur ?? 20, { min: 2, max: 40, step: 1 }) : "") +
+              (background === "純色" ? edInput("backgroundColor", "背景顏色", c.backgroundColor || "#000000", "color") : ""),
           )
         : "") +
       (c.kind === "video" ? groups.speed + groups.audio : "") +
@@ -1245,6 +1258,41 @@ function edPreviewSpans(p) {
   }
   return spans;
 }
+// Card ED.3.2 preview only (the export uses FFmpeg's filters): each filter as CSS functions [name, value, neutral];
+// strength k moves every value from neutral toward the filter's value.
+const edFilterCss = {
+  鮮豔: [["saturate", 1.4, 1], ["contrast", 1.08, 1]],
+  復古: [["sepia", 0.25, 0], ["saturate", 0.75, 1]],
+  黑白: [["grayscale", 1, 0]],
+  暖色: [["sepia", 0.15, 0]],
+  冷色: [["hue-rotate", 12, 0, "deg"], ["saturate", 0.95, 1]],
+  電影感: [["contrast", 1.15, 1], ["saturate", 0.8, 1], ["brightness", 0.975, 1]],
+  底片: [["contrast", 0.92, 1], ["saturate", 0.85, 1], ["brightness", 1.035, 1]],
+  黃金時刻: [["sepia", 0.3, 0], ["saturate", 1.1, 1]],
+  憂鬱: [["saturate", 0.6, 1], ["brightness", 0.97, 1], ["hue-rotate", 8, 0, "deg"]],
+  清新: [["saturate", 1.1, 1], ["brightness", 1.04, 1]],
+  賽博霓虹: [["saturate", 1.5, 1], ["contrast", 1.1, 1], ["hue-rotate", -15, 0, "deg"]],
+  黑色電影: [["grayscale", 1, 0], ["contrast", 1.3, 1], ["brightness", 0.96, 1]],
+  美食: [["saturate", 1.25, 1], ["brightness", 1.035, 1]],
+  人像: [["contrast", 1.02, 1], ["brightness", 1.025, 1], ["saturate", 0.95, 1]],
+  冷冽: [["hue-rotate", 15, 0, "deg"], ["contrast", 1.12, 1], ["saturate", 0.75, 1]],
+};
+function edFilter(p, c) {
+  if (ed.compare) return "none";
+  const fx = (key) => EditorModel.effectValue(p, edTrack(p, c.track), c, key),
+    k = fx("filterStrength"),
+    look = (edFilterCss[fx("filter")] || []).map(([f, v, n, unit = ""]) => `${f}(${Number((n + (v - n) * k).toFixed(4))}${unit})`),
+    grade = edGrade(c);
+  return [...look, ...(grade === "none" ? [] : [grade])].join(" ") || "none";
+}
+// Shake as a CSS transform prefix: the export zooms by 2A and moves its crop window by A·d(t) of the frame, so the
+// picture moves by −A·d(t) of its width / height (EditorModel.shakeOffset).
+function edShake(p, c) {
+  const a = EditorModel.SHAKE.amplitude * EditorModel.effectValue(p, edTrack(p, c.track), c, "shake");
+  if (!a) return "";
+  const { dx, dy } = EditorModel.shakeOffset(ed.time - c.start);
+  return `translate(${(-a * dx * 100).toFixed(3)}%,${(-a * dy * 100).toFixed(3)}%) scale(${1 + 2 * a}) `;
+}
 function edGrade(c) {
   if (ed.compare || !EditorModel.graded(c)) return "none";
   const k = c.temperature ?? 6500,
@@ -1281,8 +1329,8 @@ function edPaint() {
       );
     }),
     ids = new Set(active.map((c) => c.id));
-  stage.querySelectorAll("[data-ed-layer]").forEach((el) => {
-    if (!ids.has(el.dataset.edLayer)) {
+  stage.querySelectorAll("[data-ed-layer],[data-ed-leak]").forEach((el) => {
+    if (!ids.has(el.dataset.edLayer ?? el.dataset.edLeak)) {
       el.pause?.();
       el.remove();
     }
@@ -1319,11 +1367,27 @@ function edPaint() {
       el.textContent = c.text;
       el.style.cssText = `position:absolute;left:${c.x}%;top:${c.y}%;transform:translate(-50%,-50%) rotate(${c.rotation}deg) scale(${c.scale});font-size:${(c.fontSize * stage.clientWidth) / edRatios[p.ratio][0]}px;color:${c.color};font-family:${{ 思源黑體: "sans-serif", 思源宋體: "serif", 等寬字: "monospace" }[c.font] || c.font};font-weight:${c.bold ? "bold" : "normal"};font-style:${c.italic ? "italic" : "normal"};text-align:${c.align === "靠左" ? "left" : c.align === "靠右" ? "right" : "center"};background:${c.backgroundColor || "transparent"};opacity:${c.opacity};white-space:pre-wrap;max-width:95%;z-index:${100 + layer}`;
     } else if (c.kind !== "audio") {
+      const shake = edShake(p, c);
       el.style.cssText =
         (edOverlay(p, c.track)
-          ? `position:absolute;width:${c.width * c.scale}%;left:${c.x * (1 - (c.width * c.scale) / 100)}%;top:${c.y}%;transform:rotate(${c.rotation}deg);opacity:${c.opacity * fade};z-index:${layer}`
-          : `position:absolute;width:100%;height:100%;object-fit:contain;transform:translate(${(c.x * stage.clientWidth) / edRatios[p.ratio][0]}px,${(c.y * stage.clientHeight) / edRatios[p.ratio][1]}px) rotate(${c.rotation}deg) scale(${c.scale});opacity:${c.opacity * fade};z-index:${layer};background:${c.background === "純色" ? c.backgroundColor || "#000" : "#000"}`) +
-        `;filter:${edGrade(c)}`;
+          ? `position:absolute;width:${c.width * c.scale}%;left:${c.x * (1 - (c.width * c.scale) / 100)}%;top:${c.y}%;transform:${shake}rotate(${c.rotation}deg);opacity:${c.opacity * fade};z-index:${layer}`
+          : `position:absolute;width:100%;height:100%;object-fit:contain;transform:${shake}translate(${(c.x * stage.clientWidth) / edRatios[p.ratio][0]}px,${(c.y * stage.clientHeight) / edRatios[p.ratio][1]}px) rotate(${c.rotation}deg) scale(${c.scale});opacity:${c.opacity * fade};z-index:${layer};background:${c.background === "純色" ? c.backgroundColor || "#000" : "#000"}`) +
+        `;filter:${edFilter(p, c)}`;
+      // Light leak: the export's radial gradient from the top-left corner, screen-blended (EditorModel.LIGHT_LEAK).
+      const leak = EditorModel.effectValue(p, edTrack(p, c.track), c, "lightLeak");
+      let glow = stage.querySelector(`[data-ed-leak="${c.id}"]`);
+      if (!leak || ed.compare) glow?.remove();
+      else {
+        if (!glow) {
+          glow = document.createElement("div");
+          glow.dataset.edLeak = c.id;
+          stage.append(glow);
+        }
+        // The export lights the clip's own box, before its opacity: an overlay's glow sits on the overlay.
+        const L = EditorModel.LIGHT_LEAK,
+          box = edOverlay(p, c.track) ? `left:${el.offsetLeft}px;top:${el.offsetTop}px;width:${el.offsetWidth}px;height:${el.offsetHeight}px;transform:${el.style.transform}` : "inset:0";
+        glow.style.cssText = `position:absolute;${box};pointer-events:none;mix-blend-mode:screen;opacity:${leak * fade * c.opacity};background:radial-gradient(circle at 0 0, rgb(${L.rgb.join(",")}) 0, transparent ${L.reach * 100}%);z-index:${layer + 1}`;
+      }
     }
     if (["audio", "video"].includes(c.kind)) {
       const target = Math.max(0, c.sourceStart + (ed.time - c.start) * c.speed),
@@ -1943,6 +2007,12 @@ async function edAction(action) {
     edZoom(action.slice(5));
     return;
   }
+  if (action.startsWith("fx-scope:")) {
+    if (!["整片", "此軌", "此片段"].includes(action.slice(9))) return;
+    ed.fxScope = action.slice(9);
+    edRedraw();
+    return;
+  }
   // Card ED.3.1: 整片設定 shortcuts open a left pane (view only, no undo step).
   if (action.startsWith("pane:")) {
     if (!edPanes.some(([title]) => title === action.slice(5))) return;
@@ -2001,7 +2071,13 @@ async function edAction(action) {
     if (!group) throw Error("請先選取影片、圖片或文字片段");
     ed.styleClipboard = {
       group,
-      style: Object.fromEntries(EditorModel.STYLE[group].filter((k) => c[k] !== undefined).map((k) => [k, structuredClone(c[k])])),
+      // Effects are copied as they resolve on this clip (clip, track or project layer, ED.3 §4), so the look travels.
+      style: Object.fromEntries(
+        EditorModel.STYLE[group]
+          .map((k) => [k, Object.hasOwn(EditorModel.EFFECTS, k) ? EditorModel.effectValue(p, edTrack(p, c.track), c, k) : c[k]])
+          .filter(([, v]) => v !== undefined)
+          .map(([k, v]) => [k, structuredClone(v)]),
+      ),
     };
     edRedraw();
     return;
@@ -2160,6 +2236,20 @@ async function edAction(action) {
   if (action.startsWith("loudness:"))
     p.output = { ...p.output, loudness: Number(action.slice(9)) };
   if (c) {
+    if (action.startsWith("fx:")) {
+      const [, key, value] = action.split(":");
+      if (key !== "filter" || !edFilters.includes(value)) throw Error("濾鏡不存在");
+      edWriteEffect(p, c, key, value, ed.fxScope);
+    }
+    if (action.startsWith("mask:")) {
+      if (!["無", "圓形", "圓角矩形", "三角形"].includes(action.slice(5))) throw Error("遮罩不存在");
+      c.mask = action.slice(5);
+    }
+    if (action.startsWith("background:")) {
+      const value = { 黑邊: "黑色", 模糊: "模糊", 純色: "純色" }[action.slice(11)];
+      if (!value || c.track !== edMain(p)) throw Error("背景只用於主視訊軌");
+      for (const row of edMainVisual(p)) row.background = value;
+    }
     if (action.startsWith("toggle:")) c[action.slice(7)] = !c[action.slice(7)];
     if (action === "text-background")
       c.backgroundColor = c.backgroundColor ? null : "#000000";
@@ -2549,6 +2639,14 @@ document.addEventListener("change", (e) => {
         r = EditorModel.EFFECTS[name];
       if (!r || !Number.isFinite(value)) throw Error("請輸入有效數字");
       edWriteEffect(p, c, name, Math.min(r.max, Math.max(r.min, value / 100)), "整片");
+    } else if (key.startsWith("fx:") && c) {
+      const name = key.slice(3),
+        r = EditorModel.EFFECTS[name];
+      if (!r || name === "filter") throw Error("請輸入有效數字");
+      edWriteEffect(p, c, name, Math.min(r.max, Math.max(r.min, value / 100)), ed.fxScope);
+    } else if (c && c.track === edMain(p) && ["video", "image"].includes(c.kind) && ["backgroundBlur", "backgroundColor"].includes(key)) {
+      // Reference: 背景 applies to every clip of the main track (僅 V1).
+      for (const row of edMainVisual(p)) row[key] = key === "backgroundBlur" ? Math.round(value) : value;
     } else if (key.startsWith("track-db:")) {
       const track = edTrack(p, key.slice(9));
       if (!track || !Number.isFinite(value)) throw Error("請輸入有效數字");

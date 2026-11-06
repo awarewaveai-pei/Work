@@ -243,7 +243,7 @@ const pass = (m) => console.log("PASS " + m);
 
     // Style clipboard: filter from one V1 clip to another (Ctrl+Shift+C / V); text style likewise.
     await clip(v1a.id).click();
-    await page.locator(".editor-inspector").getByLabel("片段濾鏡").selectOption("黑白");
+    await page.locator(".editor-inspector").getByRole("group", { name: "濾鏡", exact: true }).getByRole("button", { name: "黑白" }).click();
     await key("Control+Shift+c");
     await clip(v1c.id).click();
     await key("Control+Shift+v");

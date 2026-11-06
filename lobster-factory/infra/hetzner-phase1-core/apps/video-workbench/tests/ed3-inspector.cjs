@@ -98,6 +98,50 @@ const pass = (m) => console.log("PASS " + m);
     await inspector.screenshot({ path: path.join(dir, "ed36-clip-groups.png") });
     pass("ED.3.6：組可收合且重開後仍收合；100/4 → 25%、↑ → 1%、Shift+↑ → 11%、Esc 還原且不寫入；片段七組標題值 ×1.00／黑邊／1x／100%／4.00s");
 
+    // ED.3.2 套用範圍 (spec §4): 整片 writes the project and clears clip values, 此軌 the track, 此片段 the clip; the
+    // panel shows the resolved value; 背景 goes to every main-track clip; the preview draws filter, leak and shake.
+    const fxGroup = inspector.locator('[data-ed-group="畫面效果"]'),
+      scope = (name) => fxGroup.getByRole("group", { name: "套用範圍" }).getByRole("button", { name }).click(),
+      clipOf = (q, id) => q.clips.find((x) => x.id === id);
+    await page.evaluate((url) => {
+      const p = edProject();
+      p.clips.push(edTime(p, { id: "v1second", kind: "video", track: "V1", asset: { id: "a1", url, name: "測試片", duration: 4 }, speed: 1, volume: 1, fadeIn: 0, fadeOut: 0, opacity: 1, scale: 1, x: 0, y: 0, rotation: 0, width: 25, filter: "復古" }, { startFrame: 100, durationFrames: 50, sourceStartFrame: 0 }));
+      edRender();
+    }, clipUrl);
+    await scope("整片");
+    await fxGroup.getByRole("group", { name: "濾鏡", exact: true }).getByRole("button", { name: "黑白" }).click();
+    p = await project();
+    assert.equal(p.filter, "黑白");
+    assert.ok(p.clips.every((x) => !("filter" in x)), "整片寫入後各片段沒有 filter");
+    assert.equal(await fxGroup.getByRole("group", { name: "濾鏡", exact: true }).getByRole("button", { name: "黑白" }).getAttribute("aria-pressed"), "true");
+    await scope("此軌");
+    await field("光漏（%）", 30);
+    await scope("此片段");
+    await field("震動（%）", 50);
+    p = await project();
+    assert.equal(p.tracks.find((t) => t.id === "V1").lightLeak, 0.3);
+    assert.ok(!("lightLeak" in clipOf(p, "v1clip")) && clipOf(p, "v1clip").shake === 0.5 && !("shake" in clipOf(p, "v1second")));
+    const background = inspector.locator('[data-ed-group="背景"]');
+    await background.getByRole("button", { name: "模糊" }).click();
+    await field("模糊強度", 30);
+    p = await project();
+    assert.ok(["v1clip", "v1second"].every((id) => clipOf(p, id).background === "模糊" && clipOf(p, id).backgroundBlur === 30), "背景套用到主軌所有片段");
+    await page.evaluate(() => {
+      ed.time = 0.5;
+      edPaint();
+    });
+    const look = await page.evaluate(() => {
+      const el = document.querySelector('[data-ed-layer="v1clip"]');
+      return { filter: el.style.filter, transform: el.style.transform, leak: !!document.querySelector('[data-ed-leak="v1clip"]') };
+    });
+    assert.match(look.filter, /grayscale\(1\)/);
+    assert.match(look.transform, /^translate\(.*\) scale\(1\.03\)/);
+    assert.ok(look.leak, "光漏預覽層");
+    await page.waitForFunction(() => document.querySelector('[data-ed-layer="v1clip"]').readyState >= 2);
+    await page.locator("[data-ed-stage]").screenshot({ path: path.join(dir, "ed32-preview.png") });
+    await inspector.screenshot({ path: path.join(dir, "ed32-effects.png") });
+    pass("ED.3.2：整片黑白清掉片段濾鏡、此軌光漏 30% 寫軌道、此片段震動 50% 只寫該段；背景模糊＋強度 30 套用主軌兩段；預覽灰階＋震動位移放大＋光漏層");
+
     assert.deepEqual(errors, []);
   } finally {
     await browser.close();
