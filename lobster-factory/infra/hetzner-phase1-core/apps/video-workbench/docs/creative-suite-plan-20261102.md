@@ -81,7 +81,7 @@
 
 ## 5. 機械閘門（每卡）
 
-分鏡六檔雜湊 `tests/storyboards-design-baseline.json`（`tests/generator-deep-actions.cjs:93`、`tests/sidebar-overlays.cjs:40` 驗）；不連 4178、不用擷取圖 `tests/test-isolation.cjs`；側欄 `tests/sidebar-overlays.cjs`；外觀 `tests/appearance.cjs`；輸出三步核對（M3 後成共用 helper，M1 先有 ffprobe 版）；四行證據進 WORKLOG。
+分鏡六檔雜湊 `tests/storyboards-design-baseline.json`（`tests/storyboards-baseline.cjs` 驗，部署閘 `tests/gate.cjs` 跑；改受保護檔＝同一 commit 有意更新基準）；不連 4178、不用擷取圖 `tests/test-isolation.cjs`；側欄 `tests/sidebar-overlays.cjs`；外觀 `tests/appearance.cjs`；輸出三步核對（M3 後成共用 helper，M1 先有 ffprobe 版）；四行證據進 WORKLOG。
 
 ## 6. 延後
 

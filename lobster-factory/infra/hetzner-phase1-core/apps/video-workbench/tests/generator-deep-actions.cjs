@@ -1,4 +1,4 @@
-const assert = require("node:assert/strict"), fs = require("node:fs"), os = require("node:os"), path = require("node:path"), crypto = require("node:crypto");
+const assert = require("node:assert/strict"), fs = require("node:fs"), os = require("node:os"), path = require("node:path");
 const { chromium } = require("playwright");
 const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "vw-deep-actions-"));
 (async () => {
@@ -90,8 +90,7 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "vw-deep-actions-"));
     await p.locator(".job-view details summary").click();
     await p.screenshot({ path: path.join(evidence, "result-actions.png"), fullPage: true });
     assert.deepEqual(errors, []);
-    const protectedFiles = JSON.parse(fs.readFileSync(path.join(__dirname, "storyboards-design-baseline.json"), "utf8"));
-    for (const [file, hash] of Object.entries(protectedFiles)) assert.equal(crypto.createHash("sha256").update(fs.readFileSync(path.join(__dirname, "..", file))).digest("hex"), hash, file + " changed");
+    require("./storyboards-baseline.cjs").checkStoryboardsBaseline();
     console.log("PASS 分鏡靈感五個原檔及共用 workspaces.css 雜湊完全不變");
     console.log("EVIDENCE " + evidence);
   } finally { await browser.close(); server.closeAllConnections(); await new Promise((r) => server.close(r)); }

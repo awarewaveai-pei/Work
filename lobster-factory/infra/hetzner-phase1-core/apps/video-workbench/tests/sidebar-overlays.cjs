@@ -1,4 +1,4 @@
-const assert = require('node:assert/strict'), fs = require('node:fs'), os = require('node:os'), path = require('node:path'), crypto = require('node:crypto');
+const assert = require('node:assert/strict'), fs = require('node:fs'), os = require('node:os'), path = require('node:path');
 const { chromium } = require('playwright');
 (async () => {
   const evidence = fs.mkdtempSync(path.join(os.tmpdir(), 'vw-sidebar-test-'));
@@ -37,8 +37,7 @@ const { chromium } = require('playwright');
     }
     await new Promise(r => setTimeout(r, 2200)); assert.equal(polls.length, 0, 'closed job kept polling');
     assert.deepEqual(errors, []);
-    const baseline = JSON.parse(fs.readFileSync(path.join(__dirname, 'storyboards-design-baseline.json'), 'utf8'));
-    for (const [name, hash] of Object.entries(baseline)) assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(__dirname, '..', name))).digest('hex'), hash);
+    require('./storyboards-baseline.cjs').checkStoryboardsBaseline();
     console.log('PASS 桌面／手機 11 個導覽入口在設定、素材預覽及任務浮層開啟後仍可點擊；切頁關閉浮層、取消素材選擇、停止任務視窗輪詢；分鏡靈感保護檔不變');
     console.log('EVIDENCE ' + evidence);
   } finally { await browser.close(); server.closeAllConnections(); await new Promise(r => server.close(r)); }

@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-06（續18）影音工作台：分鏡靈感保護基準更新＋保護檢查進部署閘（操作者「你決定」）
+
+- 根因：受保護六檔（handoff §2）的雜湊檢查只在兩支瀏覽器測試裡（`tests/sidebar-overlays.cjs:40-41`、`tests/generator-deep-actions.cjs:93-95`），部署閘 `tests/gate.cjs:6` 不跑 → `31e89c479`（storyboards-boot.js）、`1aaa139d5`（workspaces.css）、`de0e1836a`（storyboards.html、storyboards-0.js、storyboards-boot.js）改了受保護檔卻沒更新基準，照樣上線（FC.3 session 發現，續16）。
+- 決定（監工，操作者授權「你決定」）：接受現況為新基準。理由：三次都是操作者要的改動（P6.13／P6.17／P6.18）且已上線；內容只有文字與資料來源，分鏡頁版面樣式未動（workspaces.css 只新增 `label.rights-confirm` 規則）。退回會弄壞線上功能。
+- 修（關掉這一類）：新檔 `tests/storyboards-baseline.cjs`（純 node，`checkStoryboardsBaseline()`）→ 加進 `tests/gate.cjs` 清單（部署閘與 CI 都跑）；兩支瀏覽器測試改呼叫它（刪掉兩份重複的雜湊迴圈與用不到的 `crypto` 匯入）。`assets/storyboards-data.json` 不在 git 也不在映像（`.gitignore:10`、`.dockerignore`），只在存在的機器上檢查。
+- 基準 `tests/storyboards-design-baseline.json`：四檔換新雜湊（storyboards.html、storyboards-boot.js、storyboards-0.js、workspaces.css），兩檔不變。
+- 不變量：受保護檔一變，部署就擋，除非同一個 commit 有意更新基準。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs → 10 項 PASS 含 `storyboards-baseline.cjs`、`gate ok`；node tests/sidebar-overlays.cjs → PASS；突變：storyboards.html 加一個空白 → `node tests/storyboards-baseline.cjs` exit 1，還原 → PASS | exit=0 | ms=120000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（讀回四檔 diff；Codex 未跑：只是把既有檢查搬位置＋更新基準，突變證據已足）
+- ORACLE_WAIVED: 測試搬家＋基準更新，無行為邏輯；突變證據（改一位元組 → exit 1）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=storyboards-design-baseline | hits=11（9 處＋本條 2；計畫 §5 舊說法「兩支瀏覽器測試驗」已改指新檢查；HANDOFF.md:70、handoff:252、README.md:65 只指基準檔位置，仍正確）
 ## 2026-11-06（續17）外聯花費進 AI Costs 頁（含免費呼叫）＋免費額度卡＋Cold Outreach 操作手冊
 
 **根因**
