@@ -1,4 +1,11 @@
 # Worklog
+## 2026-11-06（續27）MONGOLIA-03 停用（操作者「確定不要」）
+
+- prod：`organizations` slug mongolia-03-6fc1c8 `status='inactive'`＋`metadata.inactive_reason`；選單自動排除（ca8d619e5）。紀錄保留、可改回。其 site_watch_target 已是 `enabled=false`，無排程，無需再動。
+- 其餘疑似測試客戶（E2E-Verify-0704、Test WP Webhook Co、Gift Walk 1030、EdD 論文研究）操作者未決定，不動。
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql update organizations set status='inactive' where slug='mongolia-03-6fc1c8' returning (mongolia-03-6fc1c8|inactive) | exit=0 | ms=900
+- REVIEW_WAIVED: NA -- one reversible status update, no code
+- BUGHUNT_WAIVED: NA -- data change only
 ## 2026-11-06（續26）影片剪輯 ED.3.1 整片設定＋ED.3.6 可收合分組與數字欄位（`afc1d90ba`、`6ded608d6`）
 
 - ED.3.1：沒選片段時右側＝畫面／聲音／文字與字幕／輸出四組；比例、影格率改可見按鈕；整片濾鏡強度／顆粒／光漏／震動（%）；配樂 A2／旁白 A1（dB）；捷徑開左側面板。`edWriteEffect` 實作規格 §4 寫入規則（整片清掉各軌與片段）。影格率重算搬成 `edSetTimebase`；原 change 分支唯一來源是被刪的下拉，一併刪（`VW`＝`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`，`VW/scripts/tools-editor.js`）。
