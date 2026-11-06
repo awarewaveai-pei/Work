@@ -139,7 +139,12 @@ export async function mountDock(root, { makeCtx, panelIds, storeKey, sizes }) {
   };
 
   let open = null;
+  let noticeShown = false; // 浮出層只顯示一則訊息（沒有面板開著），例如帶入的設計開不起來
   const close = () => {
+    if (noticeShown) {
+      noticeShown = false;
+      flyout.hidden = true;
+    }
     if (!open) return;
     open.button.classList.remove("tab--active");
     open.body.hidden = true;
@@ -171,12 +176,40 @@ export async function mountDock(root, { makeCtx, panelIds, storeKey, sizes }) {
   }
   // 點頁面其他地方（不在浮出層、不在圖示欄）收起；iframe 裡的點擊不會傳到這頁，畫布操作不會關掉面板
   document.addEventListener("pointerdown", (e) => {
-    if (open && !flyout.contains(e.target) && !icons.contains(e.target)) close();
+    if ((open || noticeShown) && !flyout.contains(e.target) && !icons.contains(e.target)) close();
   });
+  /** 沒開面板時也看得到的訊息：浮出層只放標題與狀態列。 */
+  const notice = (title, msg) => {
+    close();
+    for (const b of bodies.children) b.hidden = true;
+    tab.textContent = title;
+    status.textContent = String(msg ?? "");
+    flyout.hidden = false;
+    place();
+    noticeShown = true;
+  };
   document.addEventListener("keydown", (e) => e.key === "Escape" && close());
   window.addEventListener("resize", () => open && place());
 
+  openHandoff(ctx, (msg) => notice("帶入設計", msg), tag);
   return { ctx, panels, show, close };
+}
+
+/** C7.1：別的工具送來的設計（門頁的 __proEditor.handoff，canvas-handoff.ts openInCanvas）——編輯器就緒後開成文件，
+ *  開成功才 done() 清掉交接；失敗（編輯器逾時、下載失敗、開檔失敗）交接留著，重新整理會再試，並用 report 顯示訊息。 */
+export async function openHandoff(ctx, report, tag = "[pro dock]") {
+  try {
+    const h = await globalThis.__proEditor?.handoff;
+    if (!h) return;
+    await ctx.ready();
+    const r = await fetch(h.url);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    await ctx.openFile(await r.blob(), h.name);
+    h.done?.();
+  } catch (err) {
+    console.error(tag, "帶入的設計開不起來", err);
+    report?.(`❌ 帶入的設計開不起來：${err?.message || err}。重新整理頁面會再試一次。`);
+  }
 }
 
 /** 頁面就緒後把 dock 掛進 #rootId 一次（重複載入同一 script 不重掛）；掛好後以 mountDock 的結果呼叫 then。 */

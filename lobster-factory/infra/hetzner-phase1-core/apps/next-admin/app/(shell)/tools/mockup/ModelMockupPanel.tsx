@@ -6,7 +6,9 @@
 import { useMemo, useState } from "react";
 import { GARMENT_PLACEMENT } from "@/lib/studio/mockup-prompt";
 import { PHOTO_PRINT_MODELS, type StudioModel } from "@/lib/studio/model-options";
-import { buildUniqueFilename, extOfDataUrl } from "@/lib/studio/semantic-filename";
+import { buildSemanticBase, buildUniqueFilename, extOfDataUrl } from "@/lib/studio/semantic-filename";
+import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
+import { useDoorHref } from "@/app/DoorContext";
 import ImageLightbox from "./ImageLightbox";
 import { COLOR_LABEL, GENDER_LABEL, failureText, groupModels, inPairs, readJson, type LibraryPhoto, type Shot } from "./modelLibrary";
 
@@ -20,6 +22,7 @@ export default function ModelMockupPanel({ designRef, designName, photos, onOpen
   onOpenLibrary: () => void;
 }) {
   const models = useMemo(() => groupModels(photos), [photos]);
+  const canvasHref = useDoorHref(CANVAS_STAFF_HREF);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [placement, setPlacement] = useState("center-chest");
   const [designScale, setDesignScale] = useState(100);
@@ -182,6 +185,12 @@ export default function ModelMockupPanel({ designRef, designName, photos, onOpen
                       <button className="btn-secondary" style={{ fontSize: 11 }} disabled={r.saved === "saving" || r.saved === "saved"} onClick={() => void save(r.photo.id)}>
                         {r.saved === "saved" ? "已存 ✓" : r.saved === "saving" ? "儲存中…" : "存入 My Designs"}
                       </button>
+                      {canvasHref && (
+                        <button className="btn-secondary" style={{ fontSize: 11 }}
+                          onClick={() => { if (r.shot.status === "done") void openInCanvas(r.shot.image, buildSemanticBase({ product: "商品圖", subject: r.designName, style: "模特", track: r.photo.metadata?.preset_name ?? undefined }), canvasHref); }}>
+                          在畫布編輯
+                        </button>
+                      )}
                       <a className="btn-secondary" style={{ fontSize: 11 }} href={r.shot.image} download
                         onClick={(e) => { if (r.shot.status === "done") e.currentTarget.download = buildUniqueFilename({ product: "商品圖", subject: r.designName, style: "模特", track: r.photo.metadata?.preset_name ?? undefined }, extOfDataUrl(r.shot.image, "jpg"), "mockup"); }}>下載</a>
                     </div>

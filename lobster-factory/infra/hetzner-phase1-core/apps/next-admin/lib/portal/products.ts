@@ -65,7 +65,7 @@ const PRODUCT_DEFINITIONS = [
     features: [quota("studio.image", "圖片生成"), quota("studio.product-copy", "商品文案"), quota("studio.edit-prompt", "修圖提示詞"), quota("studio.remove-bg", "去背"), quota("studio.inpaint", "局部重繪"), quota("studio.fill", "生成填補"), quota("studio.upscale", "圖片放大")],
     accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/studio/MODULE_MANIFEST.json" }, staffPaths: ["tools/studio", "tools/publish"] },
   { key: "design", name: "設計編輯器", description: "編輯畫布、橫幅、模型圖與向量設計。", subdomain: "design", door: { app: "next-admin", page: "/design", api: ["/api/tools/presets", "/api/tools/printful/catalog"],
-      nav: [{ path: "", name: "我的設計", staff: "tools/designs" }, { path: "canvas", name: "畫布", staff: "tools/canvas" },
+      nav: [{ path: "", name: "我的設計", staff: "tools/designs" }, { path: "canvas", name: "畫布", staff: "tools/photo-pro" },
         { path: "banner", name: "橫幅", staff: "tools/banner" }, { path: "mockup", name: "模型圖", staff: "tools/mockup" },
         { path: "pro", name: "向量（專業版）", staff: "tools/vector-pro" }] },
     loginSources: ["local"], standalone: false, status: "coming_soon",

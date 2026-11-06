@@ -26,7 +26,9 @@ import {
   type ProductCategory,
   type ReferenceKind,
 } from "@/lib/studio/mockup-prompt";
-import { buildUniqueFilename, extOfDataUrl } from "@/lib/studio/semantic-filename";
+import { buildSemanticBase, buildUniqueFilename, extOfDataUrl } from "@/lib/studio/semantic-filename";
+import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
+import { useDoorHref } from "@/app/DoorContext";
 
 
 // 平拍 sends the design as a reference image: a model that takes none would ignore it, and Ideogram Character reads
@@ -282,6 +284,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
   const [selectedMockups, setSelectedMockups] = useState<Set<string>>(new Set());
   const [bulkSaving, setBulkSaving] = useState(false);
   const [gen, setGen] = useState<GenState>({ status: "idle" });
+  const canvasHref = useDoorHref(CANVAS_STAFF_HREF);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [promptOverride, setPromptOverride] = useState<string | null>(null);
   const inFlight = useRef(false);
@@ -834,6 +837,12 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
                 <button className="btn-primary" disabled={saveState === "saving" || saveState === "saved"} onClick={() => void saveMockup()}>
                   {saveState === "saved" ? "已存入 My Designs ✓" : saveState === "saving" ? "儲存中…" : "存入 My Designs"}
                 </button>
+                {canvasHref && (
+                  <button className="btn-secondary"
+                    onClick={() => void openInCanvas(gen.image!, buildSemanticBase({ product: "商品圖", subject: gen.fileMeta?.subject, style: "平拍", track: gen.fileMeta?.track }), canvasHref)}>
+                    在畫布編輯
+                  </button>
+                )}
                 <a className="btn-secondary" href={gen.image}
                   onClick={(e) => { e.currentTarget.download = buildUniqueFilename({ product: "商品圖", subject: gen.fileMeta?.subject, style: "平拍", track: gen.fileMeta?.track },extOfDataUrl(gen.image!, "png"), "mockup"); }}
                   download>下載合成圖</a>
