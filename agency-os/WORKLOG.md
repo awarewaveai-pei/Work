@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-06（續38）影音工作台 RV.4：正式站真打一次 Runway 5 秒（操作者「可以，現在打」）
+
+- 前置：`docker exec lobster-video-workbench printenv REPLICATE_API_TOKEN` 存在。操作者 Chrome 原本登入客戶帳號，`/api/video/workbench/session` 回 403 `product_not_held`（門禁照規矩擋，非部署問題）；操作者改用員工帳號登入。
+- 操作：生成影片 → 智能參考體 → 模型按鈕選「Runway Gen-4 Turbo · US$0.25（5 秒）」→ 沒圖時生成鈕停用並寫原因 → 選素材庫「示範角色・頭」→ 生成鈕「開始生成 · US$0.25」→ 任務 `65f90a4d-644d-4e11-8707-1974dbd50279` queued → succeeded。
+- 結果：`/generated/64222ca6-a196-4257-bad6-d2779af176e7.mp4` 播放 5.04 秒、1280×720、readyState 4、無錯誤；`main-system-assets.json` rightsSources `ai_generated` model `runwayml/gen4-turbo` provider Replicate；`jobs.json` `costUsd: 0.25`、`usageReported: true`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=Chrome 正式站實按生成＋video.play() 量測＋ssh docker exec node 讀 jobs.json／main-system-assets.json | exit=0 | ms=240000
+- REVIEW_WAIVED: NA -- 只執行驗收步驟，無程式改動
+- BUGHUNT_WAIVED: NA -- 無程式改動
 ## 2026-11-06（續37）影音工作台批次上線：專業剪輯＋專業特效＋PJ.1＋剪輯器 ED.1–ED.3（操作者「對，現在部署」）
 
 - 範圍：video-workbench `8239d222b` → `96ddd7f70`（FC.2/FC.3、EC.2/EC.3、PJ.1、ED.1–ED.3 含 ED.1.4、RV.1–RV.3、分鏡閘、uploads 修正）。

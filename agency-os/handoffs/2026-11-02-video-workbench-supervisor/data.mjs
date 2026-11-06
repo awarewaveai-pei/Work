@@ -205,7 +205,7 @@ export const STEPS = [
       todo('S4b.3', '人形模型自動綁骨架＋內建免費動作庫。'),
     ] },
   { n: 14, code: 'RV', title: '影片模型接 Replicate', plain: '例：在工作台選影片模型時，除了 sora-2，還能按「Runway Gen-4 Turbo · US$0.25（5 秒）」「Veo 3.1 Fast」「Veo 3.1」「Luma Ray 3.2」，價格寫在按鈕上；舊專案照樣用 sora-2。',
-    gate: '舊專案 sora-2 送出內容與改前相同；四個 Replicate 模型送出的欄位和 app 那份一致；真打一次 Runway 5 秒（US$0.25），成品能播，帳冊與用量記對模型和金額。', risk: 'Medium', model: 'Opus', status: 'in_progress', depends: ['P6'], before: '待決 1',
+    gate: '舊專案 sora-2 送出內容與改前相同；四個 Replicate 模型送出的欄位和 app 那份一致；真打一次 Runway 5 秒（US$0.25），成品能播，帳冊與用量記對模型和金額。', risk: 'Medium', model: 'Opus', status: 'done', commit: '96ddd7f70', depends: ['P6'],
     decided: '沿用 app（next-admin）已實測、已定價的四個模型，不另做研究：Runway（美）、Google Veo（美）、Luma（美）；不列中國公司的模型。模型清單只有一份，放在 app，工作台直接讀。',
     what: 'NA MOTION_MODELS 抽成無 import 的 lib/ai/video-motion-models.ts（VW 經 awarewave-files.txt 讀）；每個任務依 settings.model 選 OpenAI 或 Replicate；價格只讀 VIDEO_MOTION_RATES；模型與專案設定的下拉改成按鈕；Replicate 任務重開續輪詢、可取消',
     files: ['VW/docs/replicate-video-models-plan-20261105.md', 'NA/lib/tarot/video-motion-gen.ts', 'NA/lib/ai/cost-model.ts', 'VW/backend/generation-policy.cjs', 'VW/backend/api.cjs', 'VW/backend/provider-cost.cjs', 'VW/scripts/index-0.js', 'VW/scripts/projects-0.js'],
@@ -213,7 +213,7 @@ export const STEPS = [
       done('RV.1', 'app 的影片模型清單搬成工作台也能直接讀的一個檔，全系統只有這一份。Veo 價格查過：只分有沒有聲音、不分解析度，app 現在的價格是對的，沒有少算。', RV),
       done('RV.2', '工作台後端每個任務照選的模型送：sora-2 走 OpenAI（送出內容和以前一樣），其他四個走 Replicate；算錢、帳冊、用量都記實際跑的模型。重開機會接著等同一支影片；取消會叫 Replicate 停止計費，Replicate 不接受就照實說還在跑。', RV),
       done('RV.3', '畫面：模型是五顆可見按鈕，每顆寫價格，生成按鈕也寫這次的費用；專案設定的下拉改成按鈕，選的模型會真的帶到生成頁；Runway 沒圖時按鈕不能按並寫原因；還原舊任務會帶回當時的模型。', RV),
-      todo('RV.4', '已上線（11-06，96ddd7f70）。剩真打一次：Runway 5 秒、一張小圖，約 US$0.25。'),
+      done('RV.4', '11-06 在正式站用員工帳號真打一次：Runway Gen-4 Turbo 5 秒、一張示範圖，成品 1280×720、5 秒、能播；素材帳冊記 runwayml/gen4-turbo（Replicate），用量記 US$0.25 並已回報。', '96ddd7f70'),
     ] },
   { n: 15, code: 'RE', title: '引擎路線重評', plain: '例：你問「說好的 EffectCraft、FilmCraft 怎麼沒看到」。這張卡把兩個引擎的最新版重新試一遍，寫出三條路線給你選；也回答「工具像零件」要怎麼串成一條線。',
     gate: '差距表、五個檢查的證據、計畫都寫好；你選定路線。', risk: 'Low', model: 'Fable', status: 'done', commit: RB, depends: ['P0'],
@@ -266,6 +266,5 @@ export const STEPS = [
 
 // 操作者自己要決定或親手做的
 export const OPEN = [
-  { n: 1, before: 'RV', what: 'RV.4：工作台已上線（11-06）。剩在登入的工作台用 Runway 5 秒、一張小圖真打一次，約 US$0.25；你說可以就打。', src: 'AGENTS §3' },
   { n: 4, before: 'FC', what: '專業剪輯、專業特效已上線（11-06）。要在登入後實際跑一次：送素材、存檔、關掉重開、輸出。這台筆電的瀏覽器預設用內顯，要用獨立顯示卡開（之前內顯跑 WebGPU 讓 Edge 當掉），所以由你在開了獨顯的瀏覽器試，或指定讓我用獨顯模式代跑。', src: 'VW/docs/engine-route-plan-20261106.md §9 FC.4 第 4 步' },
 ];
