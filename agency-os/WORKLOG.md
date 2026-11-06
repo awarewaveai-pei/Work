@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-06（續33）畫布專業版 C8「傳回原工具」：塔羅、Studio、Banner 改完傳回原格（合進 main，未部署）
+
+- 操作者定案「補「傳回」」→ 計畫 R0-PLAN §6 C8（`8b2268396`）。不變量：傳回的圖一定落地一處（原格收下，或存 My Designs），不落錯格。
+- 合併：W5 C8.1 機制（`22ed7b89a`＋Codex F1 修 `22806d04c`）、W6 塔羅 C8.2（`72fd544b7`）、W7 Studio＋Banner C8.3（`e14e84341`）。
+  - C8.1：`openInCanvas(..., ret?)` 一律開新分頁、交接只走 IndexedDB `handoff:<id>`＋`?h=<id>`（擋分頁退同分頁）；`useCanvasReturn` 收 `BroadcastChannel("canvas-return")`，只收自己發的票、`onReturn` 回 true 才 ack；dock「傳回 <label>」等 ack 2 秒，沒 ack 存 My Designs（原檔 >20MB 只存預覽、存失敗下載 PNG）。
+  - C8.2：預覽與 AI 修圖共用 `applyPreviewEdit`；單張共用 `frameCardArt`（`generateOne` 後段抽出），整套換過或格子不是 done → false；ack 後框圖失敗改存 My Designs。
+  - C8.3：Studio 結果（以 model 找格）、參考圖（固定 id，不用 index）、Banner 商品圖（productImage＋productOrig）與背景；整張 Banner 維持單向。
+  - Codex 成立已修：W5 F1（大檔退路沒落地）；W6 F2（舊預覽傳回帶新預覽的 model/seed）、F3（ack 後框圖失敗遺失）；W7 生成迴圈用快照覆寫已傳回格、去背結果套到已換的商品圖。
+  - 不採用：W6 F1 同一套裡重生過的單張被較早的傳回覆蓋（傳回本就指那一格，重生圖已在 gallery）；W7 AI 合成背景後傳回商品圖被背景蓋住（與既有「換圖」相同，重新合成即可）。
+- 驗證：整合樹 tsc 0、vitest 514 files／4340 passed；main 快轉 `64f616b1c`；三工人各自真 PhotoCraft 實測 06c／06d／06d-studio-banner 全過（生成路由攔截，未花錢）。
+- 未完：部署（High，等操作者）；C8.4 正式站實測；單張送出的是 2048px WebP 0.9 無框圖（輕微壓縮）。
+- rollback：`git revert -m1` 三個 merge 後部署。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run (pc-integ, 含 W5/W6/W7) + 06c/06d/06d-studio-banner Playwright 真 PhotoCraft | exit=0 | ms=420000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/6m/0n（三工人 Codex；成立 6 條皆修、2 條不採用附理由；主 session 讀三份 diff）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=useCanvasReturn | hits=25
 ## 2026-11-06（續32）客戶 Gemini 金鑰：Codex 補審 4 項修正（0fcdc1b34，已部署）
 
 - Codex 審 23e25fcaa（`agency-os/reports/oracle/2026-11-06-partialreview-feb5d02b.md`）3 項＋審修正（`…-069b4239.md`）1 項，全修：

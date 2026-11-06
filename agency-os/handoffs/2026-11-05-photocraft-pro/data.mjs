@@ -114,14 +114,14 @@ export const STEPS = [
       todo('C7.3', '文件與記憶更新。'),
     ] },
   { n: 8, code: 'C8', group: 'H', title: '傳回原工具', plain: '例：在塔羅按「在畫布編輯」，畫布開在新分頁；改好按右邊的「傳回塔羅」，塔羅那張預覽圖就換成改過的，接著生整套就照這張的樣子。原分頁關掉了，改好的圖就存進「我的設計」。',
-    gate: '塔羅預覽、整套裡的單張、Studio 結果與參考圖、Banner 商品圖與背景：送出、改、傳回後原格換成新圖；原分頁關掉時圖進「我的設計」；送錯格、圖不見各零次。', risk: 'Medium（改各工具共用的入口）', model: 'Opus 5.5', status: 'not_started', depends: ['C4'],
+    gate: '塔羅預覽、整套裡的單張、Studio 結果與參考圖、Banner 商品圖與背景：送出、改、傳回後原格換成新圖；原分頁關掉時圖進「我的設計」；送錯格、圖不見各零次。', risk: 'Medium（改各工具共用的入口）', model: 'Opus 5.5', status: 'in_progress', depends: ['C4'],
     decided: '妳 2026-11-06 定案「補「傳回」」。一套機制三個工具共用；畫布一律開新分頁；整張 Banner 維持單向（它是合成圖，沒有一格能收回）。',
     what: '交接改走新分頁＋IndexedDB；原分頁收回的通道與「傳回」鈕；塔羅、Studio、Banner 接上；實測',
     files: ['NA/components/tools/canvas-handoff.ts', 'NA/components/tools/useCanvasReturn.ts', 'NA/public/editor-shared/dock.js', 'NA/app/(shell)/tools/tarot/TarotStudio.tsx', 'NA/app/(shell)/tools/studio/StudioWorkbench.tsx', 'NA/app/(shell)/tools/banner/BannerStudio.tsx'],
     items: [
-      todo('C8.1', '共用機制：畫布開新分頁、右邊「傳回」鈕、原分頁收回；收不回就存進「我的設計」。'),
-      todo('C8.2', '塔羅：預覽圖與整套裡的單張都能傳回。'),
-      todo('C8.3', 'Studio 結果與參考圖、Banner 商品圖與背景都能傳回。'),
+      done('C8.1', '共用機制：畫布開新分頁、右邊「傳回」鈕、原分頁收回；收不回就存進「我的設計」。', '22806d04c'),
+      done('C8.2', '塔羅：預覽圖與整套裡的單張都能傳回。', '72fd544b7'),
+      done('C8.3', 'Studio 結果與參考圖、Banner 商品圖與背景都能傳回。', 'e14e84341'),
       todo('C8.4', '本機與正式站實際跑一次。'),
     ] },
 ];
