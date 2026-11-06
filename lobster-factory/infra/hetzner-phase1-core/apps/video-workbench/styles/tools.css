@@ -749,20 +749,52 @@ body {
 .editor-clock { font-variant-numeric:tabular-nums;font-size:var(--font-size-sm); }
 .editor-icon-btn { min-width:32px;justify-content:center; }
 .editor-asset { border-bottom:1px solid var(--border);padding:8px 0;overflow-wrap:anywhere; }
-.editor-toolbar { display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:6px 12px;border-bottom:1px solid var(--border); }
-.editor-zoom { display:flex;align-items:center;gap:6px;margin-left:auto;font-size:var(--font-size-sm);color:var(--text-secondary); }
+.editor-toolbar { display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:6px 12px;border-bottom:1px solid var(--border); }
+/* Card ED.2: toolbar keys are icon + word; groups separated by a hairline like the reference. */
+.editor-toolbar-group { display:flex;align-items:center;gap:2px;padding-right:10px;border-right:1px solid var(--border-subtle); }
+.editor-toolbar-group:last-child { border-right:0;padding-right:0; }
+.editor-toolbar-end { margin-left:auto;gap:8px; }
+.editor-tool { display:inline-flex;align-items:center;gap:4px;border-color:transparent;background:transparent;color:var(--text-secondary); }
+.editor-tool:hover:not(:disabled) { background:var(--bg-hover);color:var(--text-primary); }
+.editor-tool.selected { border-color:var(--accent);background:var(--sidebar-active-bg);color:var(--text-primary); }
+.editor-toolbar .editor-icon-btn { border-color:transparent;background:transparent;color:var(--text-secondary); }
+.editor-toolbar .editor-icon-btn:hover:not(:disabled) { background:var(--bg-hover);color:var(--text-primary); }
+/* 磁吸／磁性主軌 are outlined switches: a frame when off, accent frame and text when on. */
+.editor-tool.editor-switch { border-color:var(--border); }
+.editor-tool.editor-switch.selected { border-color:var(--accent);background:transparent;color:var(--accent); }
+.editor-tool-icon { font-size:var(--font-size-sm);line-height:1; }
+.editor-picked { font-size:var(--font-size-sm);color:var(--text-secondary);white-space:nowrap;font-variant-numeric:tabular-nums; }
+.editor-zoom { display:flex;align-items:center;gap:4px;font-size:var(--font-size-sm);color:var(--text-secondary);white-space:nowrap; }
+.editor-zoom input { width:110px; }
 .editor-timeline { min-height:0;overflow:auto; }
 .editor-track { display:flex;min-width:max-content;border-bottom:1px solid var(--border); }
-.editor-track-name { width:180px;flex:none;padding:8px;position:sticky;left:0;z-index:5;background:var(--bg-subtle); }
+.editor-track-name { width:180px;flex:none;padding:6px 8px;position:sticky;left:0;z-index:5;background:var(--bg-subtle);display:flex;flex-direction:column;justify-content:center;gap:4px; }
 .editor-track-name .btn { padding:4px;font-size:11px;margin-left:4px; }
+.editor-track-label { display:flex;align-items:center;gap:6px;font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold,600);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.editor-track-label span { color:var(--text-muted); }
+.editor-track-tools { display:flex;flex-wrap:wrap;gap:2px; }
+.editor-track-name .editor-track-tools .btn { margin-left:0;min-width:22px;padding:2px 4px;border-color:transparent;background:transparent;color:var(--text-secondary); }
+.editor-track-name .editor-track-tools .btn:hover:not(:disabled),.editor-track-name .editor-track-tools .btn.selected { background:var(--bg-hover);color:var(--text-primary); }
+.editor-track-add { flex-direction:row;flex-wrap:wrap;align-items:center; }
 .editor-track-lane { position:relative;flex:1 0 auto;height:66px;background:var(--card-bg); }
 .editor-ruler-row { position:sticky;top:0;z-index:6; }
 .editor-ruler { position:relative;flex:1 0 auto;height:26px;background:var(--bg-subtle);cursor:pointer;touch-action:none; }
 .editor-tick { position:absolute;top:4px;padding-left:4px;border-left:1px solid var(--border);font-size:var(--font-size-xs);color:var(--text-muted);font-variant-numeric:tabular-nums;pointer-events:none; }
-.editor-clip { position:absolute;top:10px;height:44px;border:1px solid var(--border);border-radius:6px;background:var(--bg-hover);color:var(--text-primary);padding:5px 12px 5px 5px;overflow:hidden;text-align:left;touch-action:none;cursor:grab; }
+.editor-clip { position:absolute;top:10px;height:46px;box-sizing:border-box;display:flex;align-items:flex-start;gap:6px;border:1px solid var(--border);border-radius:6px;background:var(--bg-hover);color:var(--text-primary);padding:4px 10px;overflow:hidden;text-align:left;font-size:var(--font-size-xs);touch-action:none;cursor:grab;user-select:none; }
+.editor-clip:focus-visible { outline:2px solid var(--accent);outline-offset:1px; }
 .editor-clip.selected { border:2px solid var(--accent); }
-.editor-clip span { white-space:nowrap;pointer-events:none; }
-.editor-clip i { position:absolute;right:0;top:0;width:9px;height:100%;background:var(--accent);opacity:.4;cursor:ew-resize; }
+.editor-clip-name { white-space:nowrap;pointer-events:none;overflow:hidden;text-overflow:ellipsis; }
+.editor-clip-thumb { height:22px;width:auto;max-width:40px;flex:none;object-fit:cover;border-radius:3px;pointer-events:none; }
+.editor-clip-band { position:absolute;left:9px;right:9px;bottom:2px;height:18px;color:var(--accent); }
+.editor-clip-band canvas { position:absolute;inset:0;width:100%;height:100%;opacity:.6;pointer-events:none; }
+.editor-clip-volume { position:absolute;left:0;right:0;height:2px;margin-top:-1px;background:var(--text-primary);opacity:.7;cursor:ns-resize; }
+.editor-clip-volume::before { content:"";position:absolute;left:0;right:0;top:-4px;bottom:-4px; }
+.editor-clip-volume:hover,.editor-clip-volume:focus-visible { opacity:1;outline:none;height:3px; }
+.editor-trim { position:absolute;top:0;width:8px;height:100%;right:0;background:var(--accent);opacity:.35;cursor:ew-resize; }
+.editor-trim-start { left:0;right:auto; }
+.editor-clip:hover .editor-trim { opacity:.6; }
+.editor-cut { position:absolute;top:24px;z-index:3;width:20px;height:20px;margin-left:-10px;padding:0;border:1px solid var(--border);border-radius:50%;background:var(--card-bg);color:var(--text-secondary);font-size:var(--font-size-xs);line-height:1;cursor:pointer; }
+.editor-cut:hover,.editor-cut:focus-visible { border-color:var(--accent);color:var(--text-primary); }
 .editor-playhead { position:absolute;top:0;bottom:0;border-left:2px solid var(--accent);pointer-events:none;z-index:4; }
 .editor-marker { position:absolute;top:0;border:0;background:transparent;color:var(--accent);padding:0;z-index:4; }
 .editor-dialog { color:var(--text-primary);background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:24px;max-width:480px;max-height:85vh;overflow:auto; }
@@ -780,6 +812,14 @@ body {
 .editor-ratio-card i { display:block;height:30px;max-width:54px;border:2px solid currentColor;border-radius:3px; }
 .editor-ratio-card small { color:var(--text-secondary);font-size:var(--font-size-xs); }
 .editor-dialog::backdrop { background:rgba(0,0,0,.25); }
+.editor-help { max-width:420px; }
+.editor-help p { color:var(--text-secondary);line-height:1.6; }
+.editor-shortcuts-dialog { max-width:640px; }
+.editor-shortcuts h4 { margin:16px 0 6px;color:var(--text-secondary);font-size:var(--font-size-sm); }
+.editor-shortcuts dl { display:grid;grid-template-columns:1fr auto;gap:6px 16px;margin:0; }
+.editor-shortcuts dt { color:var(--text-primary); }
+.editor-shortcuts dd { margin:0;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px; }
+.editor-shortcuts kbd { padding:1px 6px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-subtle);font-family:inherit;font-size:var(--font-size-xs);white-space:nowrap; }
 .follow-source { position:relative; }
 .follow-source > video { display:block;width:100%;max-height:55vh;object-fit:contain; }
 [data-follow-crop] { position:absolute;border:2px solid var(--accent);box-shadow:0 0 0 1px #fff8;pointer-events:none; }

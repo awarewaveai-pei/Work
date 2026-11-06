@@ -318,7 +318,7 @@ async function exportEditor(
     if (clip.transition === "無") return;
     const previous = mainClips[i - 1];
     if (!previous || previous.startFrame + previous.durationFrames !== clip.startFrame)
-      throw Error("轉場只能放在主影片軌上相鄰（無空隙）的兩段之間，可先按「主軌吸附排列」");
+      throw Error("轉場只能放在主影片軌上相鄰（無空隙）的兩段之間，可開啟時間軸的「磁性主軌」補齊空隙");
     const before = Math.floor(clip.transitionFrames / 2),
       transition = { type: EditorModel.TRANSITIONS[clip.transition], frames: clip.transitionFrames, before, after: clip.transitionFrames - before, cut: clip.startFrame };
     incoming.set(clip.id, transition);

@@ -7,8 +7,19 @@ const ed = {
   selected: null,
   pane: "素材",
   time: 0,
-  zoom: 35,
+  zoom: 50,
   playing: false,
+  // Card ED.2: multi-select (ed.selected = the clip the inspector shows; ed.picks = the whole selection, see
+  // edPicked), J/K/L rate (negative = reverse, muted), in-memory clip and style clipboards, timeline switches.
+  picks: new Set(),
+  rate: 1,
+  clipboard: null,
+  styleClipboard: null,
+  snap: true,
+  magnet: true,
+  skipMagnet: false,
+  // The timeline's scroll position survives re-renders (a click on a clip used to jump it back to 0).
+  scroll: { left: 0, top: 0 },
   undo: [],
   redo: [],
   queue: Promise.resolve(),
@@ -31,6 +42,7 @@ const ed = {
   loop: false,
   save: { state: "saved", at: null, pending: 0 },
 };
+let edLinePress = { id: null, at: 0 };
 const edCreateRatios = [
     ["16:9", "橫屏", "YouTube、電視、簡報"],
     ["9:16", "直屏", "TikTok、Reels、Shorts"],
@@ -94,6 +106,12 @@ const edFilters = [
 ];
 const edProject = () => ed.projects.find((p) => p.id === ed.current),
   edClip = () => edProject()?.clips.find((c) => c.id === ed.selected),
+  // The selection: ed.picks while it holds ed.selected, else just ed.selected. Code that sets ed.selected to a new
+  // clip (add, split, duplicate) therefore selects that one clip without having to clear ed.picks itself.
+  edPicked = (p = edProject()) => {
+    const ids = ed.selected && ed.picks.has(ed.selected) ? ed.picks : new Set(ed.selected ? [ed.selected] : []);
+    return (p?.clips || []).filter((c) => ids.has(c.id));
+  },
   edEnd = () =>
     Math.max(3, ...(edProject()?.clips || []).map((c) => c.start + c.duration));
 // Card M3 (plan §3 invariant 5): stored clip time = integer frames at the project timebase. The seconds fields
@@ -289,6 +307,9 @@ async function edLoadProjects() {
       list,
     );
   ed.layout = edLayout(await VideoWorkbench.preferences.get("tools.editor.layout", null));
+  // Card ED.2: 磁吸 and 磁性主軌 are per-user switches (default on, as the reference), never project data.
+  const switches = await VideoWorkbench.preferences.get("tools.editor.timeline", null);
+  for (const k of ["snap", "magnet"]) ed[k] = typeof switches?.[k] === "boolean" ? switches[k] : true;
   ed.projects = list.map(edNormalizeProject);
   // Saved-copy marks come from the stored rows, so a converted project counts as changed and is written back.
   for (const [i, p] of ed.projects.entries()) {
@@ -310,8 +331,35 @@ function edCheckpoint() {
   if (ed.undo.length > 40) ed.undo.shift();
   ed.redo = [];
 }
+// Card ED.2: every committed edit goes through here. 磁性主軌 closes the main track's gaps when the edit changed its
+// clips (compared with the undo snapshot taken before the edit); other tracks stay where they are. A move or copy of
+// clips on several tracks sets ed.skipMagnet so their relative timing survives (reference behaviour).
+function edMagnet(p) {
+  const skip = ed.skipMagnet;
+  ed.skipMagnet = false;
+  const before = ed.undo.at(-1);
+  if (!ed.magnet || skip || !before || before.id !== p.id) return;
+  const main = edMain(p),
+    sig = (proj) =>
+      proj.clips
+        .filter((c) => c.track === main)
+        .map((c) => c.id + ":" + c.startFrame + ":" + c.durationFrames)
+        .sort()
+        .join(),
+    rows = p.clips.filter((c) => c.track === main);
+  if (sig(before) === sig(p)) return;
+  const known = new Set(before.clips.map((c) => c.id)),
+    starts = EditorModel.closeGaps(rows, new Set(rows.filter((c) => !known.has(c.id)).map((c) => c.id)));
+  for (const c of rows) if (starts.get(c.id) !== c.startFrame) edTime(p, c, { startFrame: starts.get(c.id) });
+}
+function edCommit(p) {
+  edMagnet(p);
+  edRender();
+  return edSave();
+}
 function edStop() {
   ed.playing = false;
+  ed.rate = 1;
   cancelAnimationFrame(ed.raf);
   document.querySelectorAll("[data-ed-media]").forEach((m) => m.pause());
   const play = document.querySelector('[data-ed-action="play"]');
@@ -357,7 +405,7 @@ const edPrevious = (p, c) =>
 function edTransitionIssue(p, c) {
   const previous = edPrevious(p, c);
   if (!previous)
-    return "前面沒有緊接（無空隙）的主軌片段，轉場無法輸出；可先按「主軌吸附排列」。";
+    return "前面沒有緊接（無空隙）的主軌片段，轉場無法輸出；可開啟時間軸的「磁性主軌」補齊空隙。";
   const frames = EditorModel.transitionFrames(c, p.timebase),
     before = Math.floor(frames / 2),
     after = frames - before,
@@ -503,8 +551,8 @@ function edSavePaint() {
   el.textContent = edSaveText();
   el.dataset.state = ed.save.state;
 }
-function edIconButton(label, glyph, action, pressed) {
-  return `<button type="button" class="btn small editor-icon-btn${pressed ? " selected" : ""}" data-ed-action="${esc(action)}" aria-label="${esc(label)}" title="${esc(label)}"${pressed === undefined ? "" : ` aria-pressed="${pressed}"`}>${glyph}</button>`;
+function edIconButton(label, glyph, action, pressed, disabled = false) {
+  return `<button type="button" class="btn small editor-icon-btn${pressed ? " selected" : ""}" data-ed-action="${esc(action)}" aria-label="${esc(label)}" title="${esc(label)}"${pressed === undefined ? "" : ` aria-pressed="${pressed}"`}${disabled ? " disabled" : ""}>${glyph}</button>`;
 }
 function edResizer(side, orientation, label, value) {
   return `<div class="editor-resize editor-resize-${orientation}" data-ed-resize="${side}" role="separator" aria-orientation="${orientation}" aria-label="${label}" aria-valuenow="${value}" tabindex="0"></div>`;
@@ -546,7 +594,7 @@ function edPane(p, c) {
     return `<h3>貼圖／品牌圖</h3>${edButton("選擇圖片", "library:image")}${edButton("上傳透明 PNG", "upload:image")}<p class="note">以主影片軌之上的影片軌疊加圖片，可設定時間、位置、大小與透明度。</p>`;
   if (ed.pane === "字幕")
     return `<h3>字幕</h3>${edButton("匯入 SRT／VTT", "subtitles-import")}${edButton("下載 SRT", "subtitles-download:srt")}${edButton("下載 VTT", "subtitles-download:vtt")}${edButton("前往字幕工具", "subtitles-tool")}<p class="note">每段字幕為文字軌片段，可逐段修改。時間重疊的字幕分放在不同文字軌；下載時重疊部分合併成同一段（多行）。辨識與翻譯請至字幕工具處理後匯入。</p>`;
-  return "<h3>剪贅字</h3><p>自動剪贅字需要逐字時間戳服務，目前尚未接入。可分割後使用「刪除並前移」手動剪除。</p>";
+  return "<h3>剪贅字</h3><p>自動剪贅字需要逐字時間戳服務，目前尚未接入。可分割後用「波紋刪除」（Alt+Delete）手動剪除。</p>";
 }
 function edPlayer(p) {
   const [w, h] = edRatios[p.ratio];
@@ -554,7 +602,7 @@ function edPlayer(p) {
   const empty = p.clips.length
     ? ""
     : `<div class="editor-stage-empty"><b>先放一個鏡頭，故事就開始。</b><p class="note">從素材庫加入影片、圖片，會放到主視訊軌。</p>${edButton("更多素材", "library")}${edButton("加入文字", "text:0")}</div>`;
-  return `<section class="editor-player"><div class="editor-stage-frame" data-ed-stage-frame><div class="editor-stage" data-ed-stage style="--ed-aspect:${w}/${h};--ed-ar:${w / h}">${empty}</div></div><div class="editor-transport"><span class="editor-clock" data-ed-clock></span><div class="editor-transport-group">${edIconButton("跳至開頭", "⏮", "jump:start")}${edIconButton("後退 1 秒", "↺", "jump:-1")}${edIconButton("播放／暫停 (Space)", ed.playing ? "❚❚" : "▶", "play")}${edIconButton("前進 1 秒", "↻", "jump:1")}${edIconButton("跳至結尾", "⏭", "jump:end")}</div><div class="editor-transport-group">${edIconButton("循環播放", "⟲", "loop", ed.loop)}${edIconButton("全螢幕瀏覽 (F)", "⛶", "fullscreen")}${ed.layout.rightOpen ? "" : edIconButton("展開檢查器", "«", "layout:right")}</div></div></section>`;
+  return `<section class="editor-player"><div class="editor-stage-frame" data-ed-stage-frame><div class="editor-stage" data-ed-stage style="--ed-aspect:${w}/${h};--ed-ar:${w / h}">${empty}</div></div><div class="editor-transport"><span class="editor-transport-group"><span class="editor-clock" data-ed-clock></span>${edIconButton("查看說明：播放快捷鍵", "ⓘ", "help:play")}</span><div class="editor-transport-group">${edIconButton("跳至開頭", "⏮", "jump:start")}${edIconButton("後退 1 秒", "↺", "jump:-1")}${edIconButton("播放／暫停 (Space)", ed.playing ? "❚❚" : "▶", "play")}${edIconButton("前進 1 秒", "↻", "jump:1")}${edIconButton("跳至結尾", "⏭", "jump:end")}</div><div class="editor-transport-group">${edIconButton("循環播放", "⟲", "loop", ed.loop)}${edIconButton("全螢幕瀏覽 (F)", "⛶", "fullscreen")}${ed.layout.rightOpen ? "" : edIconButton("展開檢查器", "«", "layout:right")}</div></div></section>`;
 }
 function edInspector(p, c) {
   const head = (title) =>
@@ -619,37 +667,108 @@ function edClipInspector(p, c) {
   if (typeof cpEditorClip === "function") html += cpEditorClip(p, c);
   return html;
 }
+// Card ED.2 (spec §1.6): toolbar keys are 「icon + word」 with the shortcut in the tooltip, as the reference; the frame
+// step and in/out keys are AwareWave extras kept icon-only at the end of the edit group (decision 3), so the bar
+// stays one row at 1600 px like the reference.
+function edTool(label, glyph, action, { title = label, disabled = false, pressed, switch: toggle = false } = {}) {
+  return `<button type="button" class="btn small editor-tool${toggle ? " editor-switch" : ""}${pressed ? " selected" : ""}" data-ed-action="${esc(action)}" title="${esc(title)}" ${disabled ? "disabled" : ""}${pressed === undefined ? "" : ` aria-pressed="${pressed}"`}><span class="editor-tool-icon" aria-hidden="true">${glyph}</span>${esc(label)}</button>`;
+}
+const edZoomLimits = { min: 10, max: 200, step: 15, initial: 50 };
 function edToolbar(p, c) {
-  return `<div class="editor-toolbar">${edButton("復原", "undo", !ed.undo.length)}${edButton("重做", "redo", !ed.redo.length)}${edButton("上一格", "frame:-1")}${edButton("下一格", "frame:1")}${edButton("設為入點", "set-in", !c)}${edButton("設為出點", "set-out", !c)}${edButton("分割", "split", !c)}${edButton("刪除", "delete", !c)}${edButton("刪除並前移", "ripple", !c)}${edButton("複製", "duplicate", !c)}${edButton("新增標記", "marker")}${edButton("主軌吸附排列", "compact")}<label class="editor-zoom">縮放<input type="range" min="10" max="100" value="${ed.zoom}" data-ed-zoom aria-label="時間軸縮放"><span>${ed.zoom} px/s</span></label></div>`;
+  const picked = edPicked(p),
+    group = c ? EditorModel.styleGroup(c.kind) : null,
+    pasteStyle = ed.styleClipboard && picked.some((x) => EditorModel.styleGroup(x.kind) === ed.styleClipboard.group);
+  return `<div class="editor-toolbar"><div class="editor-toolbar-group">${edTool("復原", "↶", "undo", { title: "復原 (Ctrl+Z)", disabled: !ed.undo.length })}${edTool("重做", "↷", "redo", { title: "重做 (Ctrl+Shift+Z / Ctrl+Y)", disabled: !ed.redo.length })}</div><div class="editor-toolbar-group">${edTool("分割", "✂", "split", { title: "在播放頭位置分割選取的片段 (S / Ctrl+B)", disabled: !c })}${edTool("刪除", "✕", "delete", { title: "刪除片段 (Delete / Backspace)", disabled: !picked.length })}${edTool("波紋刪除", "⇤", "ripple", { title: "波紋刪除：刪除後同一軌後面的片段補上 (Alt+Delete)", disabled: !picked.length })}${edTool("複製", "⧉", "duplicate", { title: "複製 (Ctrl+D)", disabled: !picked.length })}${edTool("字幕", "+", "subtitle-add", { title: "新增字幕：在播放頭加一段 3 秒文字" })}${edTool("標記", "◆", "marker", { title: "在播放頭加入／移除標記 (M)" })}${edIconButton("上一格", "◁", "frame:-1")}${edIconButton("下一格", "▷", "frame:1")}${edIconButton("設為入點", "⌊", "set-in", undefined, !c)}${edIconButton("設為出點", "⌋", "set-out", undefined, !c)}</div><div class="editor-toolbar-group">${edIconButton("複製樣式 (Ctrl+Shift+C)", "◐", "style-copy", undefined, !group)}${edIconButton("貼上樣式 (Ctrl+Shift+V)", "◑", "style-paste", undefined, !pasteStyle)}</div><div class="editor-toolbar-group">${edTool("磁吸", "⊓", "snap", { title: "磁吸對齊 (N)", pressed: ed.snap, switch: true })}${edTool("磁性主軌", "⇥", "magnet", { title: "磁性主軌：編輯後移除主視訊軌的空隙；跨軌多選移動／複製保留同步", pressed: ed.magnet, switch: true })}${edIconButton("查看說明：磁性時間軸與吸附", "ⓘ", "help:magnet")}${edIconButton("查看說明：多選與批次編輯", "ⓘ", "help:select")}</div><div class="editor-toolbar-group editor-toolbar-end"><span class="editor-picked" data-ed-picked title="Shift / Cmd / Ctrl 點選多個片段">已選 ${picked.length}</span>${edIconButton("鍵盤快捷鍵 (?)", "?", "shortcuts")}<span class="editor-zoom">縮放${edIconButton("縮小 (Ctrl+-)", "−", "zoom:out")}<input type="range" min="${edZoomLimits.min}" max="${edZoomLimits.max}" value="${ed.zoom}" data-ed-zoom aria-label="時間軸縮放"><span title="每秒顯示的像素寬度" data-ed-zoom-text>${ed.zoom} px/s</span>${edIconButton("放大 (Ctrl+=)", "+", "zoom:in")}${edIconButton("自適應全片 (Shift+Z)", "⇔", "zoom:fit")}</span></div></div>`;
 }
 const edLaneHint = (p, id, kind) =>
   kind === "text"
-    ? "文字 — 從左側「文字」或「字幕」加入"
+    ? "字幕 — 點 + 新增一段文字"
     : kind === "audio"
-      ? "音訊 — 從左側「音訊」加入"
+      ? edTrackLabel(p, edTrack(p, id)).split(" ")[0] + " — 點 + 加入音訊素材"
       : id === edMain(p)
-        ? "主視訊 — 從左側「素材」加入影片／圖片"
+        ? "主視訊 — 點 + 或從左側「素材」加入影片／圖片"
         : "疊加層 — 放 logo、浮水印或子畫面，疊在主視訊之上";
+// Reference track names: 字幕 / 文字、疊加 V2、主視訊 V1、旁白 A1、配樂 A2. A renamed track keeps its own name.
+function edTrackLabel(p, t) {
+  if (t.name && t.name !== t.id) return t.name;
+  if (t.kind === "text") return t.id === edFirst(p, "text") ? "字幕 / 文字" : "文字 " + t.id;
+  if (t.kind === "video") return (t.id === edMain(p) ? "主視訊 " : "疊加 ") + t.id;
+  return ({ A1: "旁白 ", A2: "配樂 " }[t.id] || "音訊 ") + t.id;
+}
+const edTrackNoun = (p, t) =>
+  t.kind === "text" ? "文字軌" : t.kind === "audio" ? "音訊軌" : t.id === edMain(p) ? "主視訊" : "疊加層";
+// Screen order, top to bottom: the highest layer first (text, then overlays down to the main track), then audio.
+// p.tracks keeps the layer order (index = z-order) and is never reordered for display.
+const edTrackOrder = (p) => [
+  ...p.tracks.filter((t) => t.kind !== "audio").reverse(),
+  ...p.tracks.filter((t) => t.kind === "audio"),
+];
+// The overlay above / below this one in layer order; the main track never moves (it is the first video track).
+function edOverlayNeighbour(p, id, dir) {
+  const videos = p.tracks.filter((t) => t.kind === "video"),
+    i = videos.findIndex((t) => t.id === id),
+    j = i + dir;
+  return i > 0 && j > 0 && j < videos.length ? videos[j] : null;
+}
+function edTrackHead(p, t) {
+  const label = edTrackLabel(p, t),
+    noun = edTrackNoun(p, t),
+    icon = { text: "T", video: t.id === edMain(p) ? "▣" : "◫", audio: "♪" }[t.kind],
+    add = t.kind === "text" ? "新增一段字幕" : `加入素材到「${label}」`,
+    overlay = edOverlay(p, t.id);
+  return `<div class="editor-track-name"><span class="editor-track-label" title="${esc(label)}"><span aria-hidden="true">${icon}</span>${esc(label)}</span><span class="editor-track-tools">${edIconButton(add, "+", "track-clip:" + t.id)}${t.id === edMain(p) ? "" : edIconButton("刪除軌道", "✕", "track-delete:" + t.id)}${edIconButton((t.hidden ? "顯示" : "隱藏") + noun, t.hidden ? "◌" : "◉", "track-hidden:" + t.id, t.hidden)}${overlay ? edIconButton("上移" + noun, "▲", "track-up:" + t.id, undefined, !edOverlayNeighbour(p, t.id, 1)) + edIconButton("下移" + noun, "▼", "track-down:" + t.id, undefined, !edOverlayNeighbour(p, t.id, -1)) : ""}${t.kind !== "text" ? edIconButton(t.muted ? "取消靜音" : "靜音軌道", t.muted ? "∅" : "♪", "track-muted:" + t.id, t.muted) : ""}${t.kind === "audio" ? edIconButton(t.normalize ? "取消均衡" : "均衡", "≋", "track-normalize:" + t.id, t.normalize) : ""}</span></div>`;
+}
+// Media made by backend/media-store.cjs keep thumb.jpg and waveform.json beside the original; assets saved before
+// those fields existed still find them from the /media/<sha256>/ url.
+function edMediaFile(a, name) {
+  const field = name === "thumb.jpg" ? a?.thumbUrl : a?.waveformUrl;
+  if (field) return field;
+  const m = /^(\/media\/[a-f0-9]{64}\/)[^/]+$/.exec(a?.url || "");
+  return m ? m[1] + name : null;
+}
+function edClipHtml(p, c, picked) {
+  const name = c.text || c.asset?.name || "片段",
+    selected = picked.has(c.id),
+    thumb = c.kind === "image" ? c.asset?.previewUrl || c.asset?.url : c.kind === "video" ? edMediaFile(c.asset, "thumb.jpg") : null,
+    sound = ["video", "audio"].includes(c.kind),
+    wave = sound ? edMediaFile(c.asset, "waveform.json") : null,
+    db = EditorModel.volumeToDb(c.volume),
+    dbText = (db <= EditorModel.DB.min ? "−∞" : db.toFixed(1)) + " dB",
+    // Line height inside the 18 px band: +6 dB at the top, -60 dB at the bottom.
+    top = Math.max(0, Math.round(((EditorModel.DB.max - db) / (EditorModel.DB.max - EditorModel.DB.min)) * 16)),
+    kind = { video: "影片", image: "圖片", audio: "音訊", text: "文字" }[c.kind] || "";
+  return `<div class="editor-clip editor-clip-${esc(c.kind)}${selected ? " selected" : ""}" data-ed-clip="${c.id}" role="button" tabindex="0" aria-pressed="${selected}" aria-label="${esc(name)}，${kind}片段，${selected ? "已選取" : "未選取"}，起點 ${c.start.toFixed(2)} 秒，時長 ${c.duration.toFixed(2)} 秒。按 Enter 選取；Shift／Ctrl＋Enter 加選。" title="${esc(name)} · ${c.start.toFixed(2)}s / ${c.duration.toFixed(2)}s" style="left:${c.start * ed.zoom}px;width:${Math.max(8, c.duration * ed.zoom)}px"><i class="editor-trim editor-trim-start" data-ed-trim="start" title="裁切起點"></i>${thumb ? `<img class="editor-clip-thumb" src="${esc(thumb)}" alt="" aria-hidden="true">` : c.kind === "video" && c.asset?.url ? `<video class="editor-clip-thumb" src="${esc((c.asset.previewUrl || c.asset.url) + "#t=" + (c.sourceStart + 0.1).toFixed(2))}" preload="metadata" muted playsinline aria-hidden="true"></video>` : ""}<span class="editor-clip-name">${esc(name)}</span>${sound ? `<span class="editor-clip-band">${wave ? `<canvas data-ed-wave="${esc(wave)}" aria-label="音訊波形"></canvas>` : ""}<i class="editor-clip-volume" data-ed-volume role="slider" tabindex="0" aria-label="片段音量" aria-valuemin="${EditorModel.DB.min}" aria-valuemax="${EditorModel.DB.max}" aria-valuenow="${db.toFixed(1)}" aria-valuetext="${dbText}" title="片段音量：${dbText}（上下拖曳調整，雙擊重設為 0 dB）" style="top:${top}px"></i></span>` : ""}<i class="editor-trim" data-ed-trim="end" title="裁切終點"></i></div>`;
+}
+// 新增轉場效果: a button on every cut between two touching main-track clips.
+function edCutButtons(p) {
+  const main = edMain(p);
+  return p.clips
+    .filter((c) => c.track === main && edPrevious(p, c))
+    .map(
+      (c) =>
+        `<button type="button" class="editor-cut" data-ed-action="cut:${c.id}" title="新增轉場效果" aria-label="新增轉場效果（剪點 ${c.start.toFixed(2)} 秒）" style="left:${c.start * ed.zoom}px">⧉</button>`,
+    )
+    .join("");
+}
 // Ruler labels at least ~80 px apart.
 const edRulerStep = () => [0.5, 1, 2, 5, 10, 15, 30, 60, 120].find((s) => s * ed.zoom >= 80) || 300;
 function edTimeline(p) {
   const width = Math.max(600, edEnd() * ed.zoom + 100),
     step = edRulerStep(),
     ticks = [];
-  // Lanes stretch to the panel width (CSS flex), so ticks run to the screen width at least.
-  for (let s = 0; s * ed.zoom < Math.max(width, screen.width); s += step)
+  // Lanes stretch to the panel width (CSS flex), so ticks run to the window width at least. Not screen.width:
+  // tools-0.js declares a global function screen(), which hides window.screen (the ruler had no ticks).
+  for (let s = 0; s * ed.zoom < Math.max(width, window.innerWidth); s += step)
     ticks.push(`<span class="editor-tick" style="left:${s * ed.zoom}px">${edClockText(s)}</span>`);
-  const playhead = `<div class="editor-playhead" style="left:${ed.time * ed.zoom}px"></div>`;
-  return `<div class="editor-timeline"><div class="editor-track editor-ruler-row"><div class="editor-track-name"></div><div class="editor-ruler" data-ed-ruler role="slider" tabindex="0" aria-label="播放頭位置" aria-valuemin="0" aria-valuemax="${edEnd().toFixed(2)}" aria-valuenow="${ed.time.toFixed(2)}" style="width:${width}px">${ticks.join("")}${playhead}</div></div>${p.tracks
+  const playhead = `<div class="editor-playhead" style="left:${ed.time * ed.zoom}px"></div>`,
+    picked = new Set(edPicked(p).map((c) => c.id));
+  return `<div class="editor-timeline" data-ed-timeline><div class="editor-track editor-ruler-row"><div class="editor-track-name"></div><div class="editor-ruler" data-ed-ruler role="slider" tabindex="0" aria-label="播放頭位置" aria-valuemin="0" aria-valuemax="${edEnd().toFixed(2)}" aria-valuenow="${ed.time.toFixed(2)}" style="width:${width}px">${ticks.join("")}${playhead}</div></div>${edTrackOrder(p)
     .map(
-      ({ id, kind, name, hidden, muted, normalize }) =>
-        `<div class="editor-track" data-ed-track="${esc(id)}"><div class="editor-track-name"><b>${esc(name)}</b>${edButton(hidden ? "顯示" : "隱藏", "track-hidden:" + id)}${kind !== "text" ? edButton(muted ? "開聲" : "靜音", "track-muted:" + id) : ""}${kind === "audio" ? edButton(normalize ? "取消均衡" : "均衡", "track-normalize:" + id) : ""}${id === edMain(p) ? "" : edButton("刪除軌道", "track-delete:" + id)}</div><div class="editor-track-lane" data-ed-lane="${esc(id)}" style="width:${width}px">${p.clips
-          .filter((c) => c.track === id)
-          .map(
-            (c) =>
-              `<button class="editor-clip ${ed.selected === c.id ? "selected" : ""}" data-ed-clip="${c.id}" style="left:${c.start * ed.zoom}px;width:${Math.max(8, c.duration * ed.zoom)}px" title="${esc(c.text || c.asset?.name || "片段")} · ${c.start.toFixed(2)}s / ${c.duration.toFixed(2)}s"><span>${esc(c.text || c.asset?.name || "片段")}</span><i data-ed-trim title="拖拉調整片段長度"></i></button>`,
-          )
-          .join("")}${p.clips.some((c) => c.track === id) ? "" : `<span class="editor-lane-hint">${edLaneHint(p, id, kind)}</span>`}${playhead}${(p.markers || []).map((time) => `<button class="editor-marker" data-ed-marker="${time}" style="left:${time * ed.zoom}px" title="跳至 ${time.toFixed(2)} 秒">◆</button>`).join("")}</div></div>`,
+      (t) =>
+        `<div class="editor-track" data-ed-track="${esc(t.id)}">${edTrackHead(p, t)}<div class="editor-track-lane" data-ed-lane="${esc(t.id)}" style="width:${width}px">${p.clips
+          .filter((c) => c.track === t.id)
+          .map((c) => edClipHtml(p, c, picked))
+          .join("")}${t.id === edMain(p) ? edCutButtons(p) : ""}${p.clips.some((c) => c.track === t.id) ? "" : `<span class="editor-lane-hint">${edLaneHint(p, t.id, t.kind)}</span>`}${playhead}${(p.markers || []).map((time) => `<button class="editor-marker" data-ed-marker="${time}" style="left:${time * ed.zoom}px" title="跳至 ${time.toFixed(2)} 秒">◆</button>`).join("")}</div></div>`,
     )
     .join(
       "",
@@ -774,8 +893,7 @@ async function edTitleInsert(p, asset) {
   p.clips.push(c);
   ed.selected = c.id;
   ed.time = 0;
-  edRender();
-  await edSave();
+  await edCommit(p);
 }
 async function edProbe(asset) {
   const kind = VideoWorkbench.mediaKind(asset);
@@ -871,8 +989,7 @@ async function edAdd(asset, track) {
   p.clips.push(c);
   ed.selected = c.id;
   ed.time = c.start;
-  edRender();
-  await edSave();
+  await edCommit(p);
 }
 function edValidate(c) {
   for (const key of [
@@ -1108,25 +1225,27 @@ function edPaint() {
             ? 0
             : (keyed ?? (Number.isFinite(c.volume) ? c.volume : 1)) *
               (track?.volume ?? 1);
-      if (Math.abs(el.currentTime - target) > 0.2)
+      // J reverse play: media cannot run backwards, so it stays paused, muted, and is seeked every paint.
+      const reverse = ed.playing && ed.rate < 0;
+      if (Math.abs(el.currentTime - target) > (reverse ? 0.04 : 0.2 * Math.abs(ed.rate)))
         try {
           el.currentTime = target;
         } catch (_) {}
-      el.playbackRate = c.speed;
-      el.muted = !!(c.muted || track?.muted);
+      el.playbackRate = Math.min(16, c.speed * Math.abs(ed.rate));
+      el.muted = !!(c.muted || track?.muted || reverse);
       const node = edAudioNode(el);
       if (node) {
         el.volume = 1;
         node.gain.value = gain;
       } else el.volume = Math.max(0, Math.min(1, gain));
-      if (ed.playing) el.play().catch(() => {});
+      if (ed.playing && !reverse) el.play().catch(() => {});
       else el.pause();
     }
   }
   const clock = document.querySelector("[data-ed-clock]"),
     ruler = document.querySelector("[data-ed-ruler]");
   if (clock)
-    clock.textContent = `${edClockText(ed.time)} / ${edClockText(edTotal())} · 第 ${edFrame(p)} 格`;
+    clock.textContent = `${edClockText(ed.time)} / ${edClockText(edTotal())} · ${ed.rate < 0 ? "倒播 " : ""}${Math.abs(ed.rate)}×`;
   ruler?.setAttribute("aria-valuenow", ed.time.toFixed(2));
   const play = document.querySelector('[data-ed-action="play"]');
   if (play) play.textContent = ed.playing ? "❚❚" : "▶";
@@ -1144,7 +1263,166 @@ function toolEditorAfterRender() {
       .catch(VideoWorkbench.reportError)
       .finally(() => (ed.loading = null));
   if (typeof cpEditorAfterRender === "function") cpEditorAfterRender();
+  const timeline = document.querySelector("[data-ed-timeline]");
+  if (timeline) {
+    timeline.scrollLeft = ed.scroll.left;
+    timeline.scrollTop = ed.scroll.top;
+    timeline.onscroll = () => (ed.scroll = { left: timeline.scrollLeft, top: timeline.scrollTop });
+  }
   edPaint();
+  edWaves();
+}
+// Card ED.2: clip waveforms from the asset's waveform.json (peaks over the whole source, media-store.cjs). Only the
+// part the clip plays is drawn. A missing file (no audio, older store) leaves the band empty.
+const edWaveCache = new Map();
+function edWaves() {
+  const p = edProject();
+  if (!p) return;
+  for (const canvas of document.querySelectorAll("canvas[data-ed-wave]")) {
+    const url = canvas.dataset.edWave,
+      c = p.clips.find((x) => x.id === canvas.closest("[data-ed-clip]")?.dataset.edClip);
+    if (!c) continue;
+    if (!edWaveCache.has(url))
+      edWaveCache.set(
+        url,
+        fetch(url)
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null),
+      );
+    edWaveCache.get(url).then((wave) => {
+      if (!wave?.peaks?.length || !canvas.isConnected) return;
+      const w = Math.max(1, Math.round(canvas.clientWidth)),
+        h = Math.max(1, Math.round(canvas.clientHeight)),
+        total = Number(wave.duration) || c.asset?.duration || 1,
+        from = (c.sourceStart / total) * wave.peaks.length,
+        span = ((c.duration * c.speed) / total) * wave.peaks.length,
+        g = canvas.getContext("2d");
+      canvas.width = w;
+      canvas.height = h;
+      g.fillStyle = getComputedStyle(canvas).color;
+      for (let x = 0; x < w; x++) {
+        const a = Math.floor(from + (x / w) * span),
+          b = Math.max(a + 1, Math.floor(from + ((x + 1) / w) * span));
+        let peak = 0;
+        for (let i = a; i < b && i < wave.peaks.length; i++) peak = Math.max(peak, wave.peaks[i] || 0);
+        const bar = Math.max(1, peak * h);
+        g.fillRect(x, (h - bar) / 2, 1, bar);
+      }
+    });
+  }
+}
+const edKindOf = (c) => (c.kind === "text" ? "text" : c.kind === "audio" ? "audio" : "video");
+function edFreeStart(p, group, from, skip = new Set()) {
+  const occupied = new Map();
+  for (const c of p.clips)
+    if (!skip.has(c.id)) occupied.set(c.track, [...(occupied.get(c.track) || []), [c.startFrame, c.startFrame + c.durationFrames]]);
+  return EditorModel.freeStart(group, occupied, Math.max(0, from));
+}
+// Paste (Ctrl+V, at the playhead) and multi-clip duplicate (Ctrl+D, after the selection): the copies keep their
+// relative timing and tracks, and go to the first time where none of them covers a clip already there. The copies
+// become the selection. Several tracks at once = the reference's 「跨軌多選複製」, which skips 磁性主軌.
+function edPlace(p, items, from) {
+  const rows = items.map(({ clip, offset }) => ({
+      clip,
+      offset,
+      track: edTrack(p, clip.track)?.kind === edKindOf(clip) ? clip.track : edTrackFor(p, edKindOf(clip)),
+    })),
+    start = edFreeStart(p, rows.map((r) => ({ track: r.track, offset: r.offset, durationFrames: r.clip.durationFrames })), from),
+    copies = rows.map((r) => {
+      const copy = edTime(p, { ...r.clip, id: crypto.randomUUID(), track: r.track }, { startFrame: start + r.offset });
+      // A copy starts at a plain cut, like the second half of a split.
+      delete copy.transition;
+      delete copy.transitionFrames;
+      edValidate(copy);
+      return copy;
+    });
+  for (const copy of copies) {
+    if (copy.asset && !p.assets.some((a) => a.id === copy.asset.id)) p.assets.push(copy.asset);
+    p.clips.push(copy);
+  }
+  if (new Set(rows.map((r) => r.track)).size > 1) ed.skipMagnet = true;
+  ed.picks = new Set(copies.map((x) => x.id));
+  ed.selected = copies.at(-1)?.id || null;
+}
+// −／＋ step 15 px/s, Ctrl+0 back to 50, 自適應全片 fits the whole cut in the visible lane width. With a clientX
+// (Ctrl+wheel) the time under the cursor stays under the cursor.
+function edZoom(to, clientX) {
+  const timeline = document.querySelector("[data-ed-timeline]"),
+    lane = timeline?.querySelector("[data-ed-lane]"),
+    head = timeline?.querySelector(".editor-track-name")?.offsetWidth || 0,
+    visible = timeline ? timeline.clientWidth - head : 900,
+    before = ed.zoom,
+    z = edZoomLimits,
+    next =
+      to === "in"
+        ? ed.zoom + z.step
+        : to === "out"
+          ? ed.zoom - z.step
+          : to === "reset"
+            ? z.initial
+            : to === "fit"
+              ? Math.floor((visible - 40) / Math.max(1, edTotal() || edEnd()))
+              : Number(to);
+  ed.zoom = Math.min(z.max, Math.max(z.min, Math.round(next) || z.initial));
+  if (timeline && lane && clientX !== undefined) {
+    const x = clientX - lane.getBoundingClientRect().left;
+    ed.scroll.left = Math.max(0, timeline.scrollLeft - x + (x / before) * ed.zoom);
+  } else if (to === "fit") ed.scroll.left = 0;
+  edRedraw();
+}
+// Two help notes (toolbar ⓘ) and the playback-keys note (transport ⓘ), in our own words.
+const edHelpText = {
+  magnet: ["磁性時間軸與吸附", "「磁吸」讓拖曳中的片段邊緣靠近其他片段邊緣、播放頭或標記時自動對齊（拖曳時按住 Shift 暫時不吸附）。「磁性主軌」在每次編輯後把主視訊軌的空隙補起來，其他軌道不動。同時選了不同軌道的片段一起移動或複製時，保留它們彼此的時間差，不補空隙。"],
+  select: ["多選與批次編輯", "按住 Shift、Cmd 或 Ctrl 點片段，可以加入或移出選取，再拖曳整組一起移動。Ctrl+A 全選、Ctrl+D 複製、Delete 刪除、Esc 取消選取。"],
+  play: ["播放快捷鍵", "L 向前播放、J 倒著播放、K 停止；連按 J 或 L 依序切換 1×、2×、4×。空白鍵切換播放與暫停。倒播時沒有聲音；這些速度只影響預覽，不會改變匯出影片。"],
+};
+function edHelp(key) {
+  const [title, text] = edHelpText[key] || [];
+  if (!title) return;
+  const d = edDialog(`<h3>${esc(title)}</h3><p>${esc(text)}</p><button type="button" class="btn small" data-ed-help-close>關閉說明</button>`);
+  d.classList.add("editor-help");
+  d.querySelector("[data-ed-help-close]").onclick = () => d.close();
+}
+// Card ED.2: the keyboard table lists only keys this editor handles (the numeric-field keys arrive with ED.3).
+const edShortcutRows = [
+  ["播放", [["播放／暫停", ["Space"]], ["倒播／停止／正播，連按切換 1×、2×、4×", ["J", "K", "L"]], ["播放頭前後 0.1 秒", ["←", "→"]], ["播放頭前後 1 秒", ["Shift+←", "Shift+→"]], ["跳到上一個／下一個標記", ["Alt+M", "Shift+M"]]]],
+  ["剪輯", [["在播放頭分割", ["S", "Ctrl+B"]], ["刪除選取片段", ["Delete", "Backspace"]], ["波紋刪除（後面片段補上）", ["Alt+Delete"]], ["在播放頭加入／移除標記", ["M"]], ["複製片段", ["Ctrl+D"]], ["複製／貼上片段", ["Ctrl+C", "Ctrl+V"]], ["複製／貼上樣式（濾鏡、遮罩、調色或文字樣式）", ["Ctrl+Shift+C", "Ctrl+Shift+V"]], ["復原／重做", ["Ctrl+Z", "Ctrl+Shift+Z", "Ctrl+Y"]], ["立即儲存", ["Ctrl+S"]]]],
+  ["選取", [["加入或取消選取", ["Shift+Click", "Ctrl+Click"]], ["全選", ["Ctrl+A"]], ["取消選取", ["Esc"]]]],
+  ["檢視", [["時間軸放大／縮小／重設", ["Ctrl+=", "Ctrl+-", "Ctrl+0"]], ["以游標為中心縮放（觸控板雙指開合）", ["Ctrl+滾輪"]], ["整條時間軸縮放到視窗寬度", ["Shift+Z"]], ["切換磁吸對齊", ["N"]], ["拖曳時暫時不吸附", ["Shift+拖曳"]], ["全螢幕預覽（再按一次或 Esc 離開）", ["F"]], ["收合／展開左側面板", ["[", "Alt+1"]], ["收合／展開檢查器", ["]", "Alt+2"]], ["開啟這份快捷鍵表", ["?"]]]],
+];
+function edShortcuts() {
+  edDialog(
+    `<h3>鍵盤快捷鍵</h3><div class="editor-shortcuts">${edShortcutRows
+      .map(
+        ([group, rows]) =>
+          `<h4>${esc(group)}</h4><dl>${rows.map(([what, keys]) => `<dt>${esc(what)}</dt><dd>${keys.map((k) => `<kbd>${esc(k)}</kbd>`).join("")}</dd>`).join("")}</dl>`,
+      )
+      .join("")}</div>`,
+  ).classList.add("editor-shortcuts-dialog");
+}
+function edPlay(rate) {
+  if (rate > 0 && ed.time >= edPlayEnd()) ed.time = 0;
+  if (rate < 0 && ed.time <= 0) ed.time = edPlayEnd();
+  edAudioStart();
+  ed.rate = rate;
+  if (ed.playing) return edPaint();
+  ed.playing = true;
+  let previous = performance.now();
+  const tick = (now) => {
+    if (!ed.playing || tool !== "edit") {
+      edStop();
+      return;
+    }
+    const end = edPlayEnd();
+    ed.time = Math.max(0, Math.min(end, ed.time + ((now - previous) / 1000) * ed.rate));
+    previous = now;
+    const atEdge = ed.rate > 0 ? ed.time >= end : ed.time <= 0;
+    if (atEdge && ed.loop) ed.time = ed.rate > 0 ? 0 : end;
+    edPaint();
+    if (atEdge && !ed.loop) edStop();
+    else ed.raf = requestAnimationFrame(tick);
+  };
+  ed.raf = requestAnimationFrame(tick);
 }
 function edDialog(content) {
   const d = document.createElement("dialog");
@@ -1237,6 +1515,8 @@ async function edAction(action) {
       });
       ed.current = id;
       ed.selected = null;
+    ed.picks.clear();
+    ed.scroll = { left: 0, top: 0 };
       ed.time = 0;
       ed.undo = [];
       ed.redo = [];
@@ -1249,6 +1529,8 @@ async function edAction(action) {
   if (action.startsWith("open:")) {
     ed.current = action.slice(5);
     ed.selected = null;
+    ed.picks.clear();
+    ed.scroll = { left: 0, top: 0 };
     ed.time = 0;
     ed.undo = [];
     ed.redo = [];
@@ -1263,27 +1545,18 @@ async function edAction(action) {
   }
   if (!p) return;
   if (action === "play") {
-    if (ed.playing) {
+    if (ed.playing) edStop();
+    else edPlay(1);
+    return;
+  }
+  // Card ED.2 J/K/L: L plays forward, J backwards (muted); pressing the same key again goes 1× → 2× → 4×. K stops.
+  // Preview only: the clips' speed and the export are untouched.
+  if (action.startsWith("rate:")) {
+    const dir = { j: -1, l: 1 }[action.slice(5)];
+    if (!dir) {
       edStop();
-      return;
-    }
-    if (ed.time >= edPlayEnd()) ed.time = 0;
-    edAudioStart();
-    ed.playing = true;
-    let previous = performance.now();
-    const tick = (now) => {
-      if (!ed.playing || tool !== "edit") {
-        edStop();
-        return;
-      }
-      ed.time = Math.min(edPlayEnd(), ed.time + (now - previous) / 1000);
-      previous = now;
-      if (ed.time >= edPlayEnd() && ed.loop) ed.time = 0;
       edPaint();
-      if (ed.time >= edPlayEnd()) edStop();
-      else ed.raf = requestAnimationFrame(tick);
-    };
-    ed.raf = requestAnimationFrame(tick);
+    } else edPlay(ed.playing && Math.sign(ed.rate) === dir ? dir * Math.min(4, Math.abs(ed.rate) * 2) : dir);
     return;
   }
   if (action.startsWith("library")) {
@@ -1361,6 +1634,11 @@ async function edAction(action) {
     if (from.length) {
       to.push(structuredClone(p));
       ed.projects[ed.projects.indexOf(p)] = from.pop();
+      // Reference: a redo comes back with nothing selected (undo keeps the selection).
+      if (action === "redo") {
+        ed.selected = null;
+        ed.picks.clear();
+      }
       edRender();
       await edSave();
     }
@@ -1549,19 +1827,174 @@ async function edAction(action) {
     edRedraw();
     return;
   }
-  edCheckpoint();
-  if (action === "marker")
-    p.markers = [
-      ...new Set([...(p.markers || []), Number(ed.time.toFixed(2))]),
-    ].sort((a, b) => a - b);
-  if (action === "compact") {
-    let t = 0;
-    for (const row of p.clips
-      .filter((c) => c.track === edMain(p))
-      .sort((a, b) => a.startFrame - b.startFrame)) {
-      edTime(p, row, { startFrame: t });
-      t += row.durationFrames;
+  // Card ED.2 view actions: no undo step, playback keeps running.
+  if (action === "snap" || action === "magnet") {
+    ed[action] = !ed[action];
+    VideoWorkbench.preferences
+      .set("tools.editor.timeline", { snap: ed.snap, magnet: ed.magnet })
+      .catch(VideoWorkbench.reportError);
+    // Turning 磁性主軌 on closes the main track's existing gaps at once (one undo step), so the transition hint
+    // 「開啟磁性主軌補齊空隙」 holds for an older project too (Codex ED.2 F3).
+    const rows = p.clips.filter((c) => c.track === edMain(p)),
+      starts = EditorModel.closeGaps(rows);
+    if (action === "magnet" && ed.magnet && rows.some((c) => starts.get(c.id) !== c.startFrame)) {
+      edCheckpoint();
+      for (const c of rows) edTime(p, c, { startFrame: starts.get(c.id) });
+      ed.skipMagnet = true;
+      await edCommit(p);
+      return;
     }
+    edRedraw();
+    return;
+  }
+  if (action.startsWith("zoom:")) {
+    edZoom(action.slice(5));
+    return;
+  }
+  if (action.startsWith("help:")) {
+    edHelp(action.slice(5));
+    return;
+  }
+  if (action === "shortcuts") {
+    edShortcuts();
+    return;
+  }
+  if (action === "select-all") {
+    ed.picks = new Set(p.clips.map((x) => x.id));
+    ed.selected = p.clips.at(-1)?.id || null;
+    edRedraw();
+    return;
+  }
+  if (action === "marker-prev" || action === "marker-next") {
+    const t = Number(ed.time.toFixed(2)),
+      marks = p.markers || [],
+      to = action === "marker-prev" ? marks.filter((m) => m < t).at(-1) : marks.find((m) => m > t);
+    if (to !== undefined) {
+      ed.time = to;
+      edPaint();
+    }
+    return;
+  }
+  if (action.startsWith("cut:")) {
+    // 新增轉場效果 on a cut: the transition belongs to the later clip, so that clip is selected and 轉場 opens.
+    if (!p.clips.some((x) => x.id === action.slice(4))) return;
+    ed.selected = action.slice(4);
+    ed.picks.clear();
+    ed.pane = "轉場";
+    if (!ed.layout.leftOpen) {
+      ed.layout = { ...ed.layout, leftOpen: true };
+      edLayoutSave();
+    }
+    edRedraw();
+    return;
+  }
+  if (action === "copy") {
+    const picked = edPicked(p);
+    if (!picked.length) return;
+    const base = Math.min(...picked.map((x) => x.startFrame));
+    ed.clipboard = picked.map((x) => ({ clip: structuredClone(x), offset: x.startFrame - base }));
+    return;
+  }
+  if (action === "style-copy") {
+    const group = c && EditorModel.styleGroup(c.kind);
+    if (!group) throw Error("請先選取影片、圖片或文字片段");
+    ed.styleClipboard = {
+      group,
+      style: Object.fromEntries(EditorModel.STYLE[group].filter((k) => c[k] !== undefined).map((k) => [k, structuredClone(c[k])])),
+    };
+    edRedraw();
+    return;
+  }
+  if (action === "save-now") {
+    await edSave();
+    return;
+  }
+  // ＋字幕 (toolbar) = the top text track's own ＋ (a text track is added first when the project has none).
+  if (action === "subtitle-add" || action.startsWith("track-clip:")) {
+    const sub = action === "subtitle-add";
+    if (sub) edCheckpoint();
+    const track = edTrack(p, sub ? edTrackFor(p, "text") : action.slice(11));
+    if (!track) return;
+    if (track.kind === "text") {
+      if (!sub) edCheckpoint();
+      const clip = edText("新文字", ed.time, 3, p, track.id),
+        free = edFreeStart(p, [{ track: track.id, offset: 0, durationFrames: clip.durationFrames }], clip.startFrame);
+      edTime(p, clip, { startFrame: free });
+      p.clips.push(clip);
+      ed.selected = clip.id;
+      await edCommit(p);
+      return;
+    }
+    const rows = await VideoWorkbench.pickAssets({ kind: track.kind === "audio" ? "audio" : "all" }),
+      a = rows[0];
+    if (!a || edProject() !== p) return;
+    const kind = VideoWorkbench.mediaKind(a);
+    if ((track.kind === "audio") !== (kind === "audio")) throw Error(track.kind === "audio" ? "音訊軌只能放音訊素材" : "影片軌只能放影片或圖片");
+    await edAdd(a, track.id);
+    return;
+  }
+  edCheckpoint();
+  // M: a marker at the playhead is removed, otherwise one is added (reference 「在播放頭加入／移除標記」).
+  if (action === "marker") {
+    const t = Number(ed.time.toFixed(2)),
+      marks = p.markers || [];
+    p.markers = marks.some((m) => Math.abs(m - t) < 0.005)
+      ? marks.filter((m) => Math.abs(m - t) >= 0.005)
+      : [...marks, t].sort((a, b) => a - b);
+  }
+  if (action.startsWith("track-up:") || action.startsWith("track-down:")) {
+    const [dir, id] = action.split(":"),
+      other = edOverlayNeighbour(p, id, dir === "track-up" ? 1 : -1);
+    if (!other) {
+      ed.undo.pop();
+      throw Error(dir === "track-up" ? "已是最上層的疊加層" : "已在主視訊軌上方第一層");
+    }
+    const i = p.tracks.findIndex((t) => t.id === id),
+      j = p.tracks.indexOf(other);
+    [p.tracks[i], p.tracks[j]] = [p.tracks[j], p.tracks[i]];
+  }
+  // Delete / ripple delete / duplicate / paste work on the whole selection.
+  if (action === "delete" || action === "ripple") {
+    const gone = edPicked(p);
+    if (!gone.length) {
+      ed.undo.pop();
+      return;
+    }
+    const ids = new Set(gone.map((x) => x.id));
+    p.clips = p.clips.filter((row) => !ids.has(row.id));
+    if (action === "ripple")
+      for (const r of [...gone].sort((a, b) => b.startFrame - a.startFrame))
+        for (const row of p.clips)
+          if (row.track === r.track && row.startFrame >= r.startFrame + r.durationFrames)
+            edTime(p, row, { startFrame: row.startFrame - r.durationFrames });
+    ed.selected = null;
+    ed.picks.clear();
+  }
+  // One clip keeps the original duplicate (the copy right after it); several go through edPlace.
+  const several = action === "duplicate" && edPicked(p).length > 1;
+  if (several) {
+    const picked = edPicked(p),
+      base = Math.min(...picked.map((x) => x.startFrame)),
+      end = Math.max(...picked.map((x) => x.startFrame + x.durationFrames));
+    edPlace(p, picked.map((x) => ({ clip: structuredClone(x), offset: x.startFrame - base })), end);
+  } else if (action === "paste") {
+    if (!ed.clipboard?.length) {
+      ed.undo.pop();
+      return;
+    }
+    edPlace(p, structuredClone(ed.clipboard), edFrame(p));
+  }
+  if (action === "style-paste") {
+    const s = ed.styleClipboard,
+      targets = edPicked(p).filter((x) => s && EditorModel.styleGroup(x.kind) === s.group);
+    if (!targets.length) {
+      ed.undo.pop();
+      throw Error("樣式只能貼到同類片段（影片／圖片，或文字）");
+    }
+    for (const x of targets)
+      for (const k of EditorModel.STYLE[s.group])
+        if (Object.hasOwn(s.style, k)) x[k] = structuredClone(s.style[k]);
+        else delete x[k];
   }
   if (/^track-(hidden|muted|normalize):/.test(action)) {
     const [property, id] = action.slice(6).split(":"),
@@ -1603,8 +2036,7 @@ async function edAction(action) {
         p.clips = p.clips.filter((row) => row.track !== id);
         p.tracks = p.tracks.filter((t) => t.id !== id);
         if (edClip()?.track === id || !edClip()) ed.selected = null;
-        edRender();
-        await edSave();
+        await edCommit(p);
       };
       return;
     }
@@ -1709,7 +2141,7 @@ async function edAction(action) {
         Object.assign(c, next);
       }
     }
-    if (action === "duplicate") {
+    if (action === "duplicate" && !several) {
       const copy = edTime(
         p,
         { ...structuredClone(c), id: crypto.randomUUID() },
@@ -1746,23 +2178,8 @@ async function edAction(action) {
       p.clips.push(copy);
       ed.selected = copy.id;
     }
-    if (action === "delete" || action === "ripple") {
-      p.clips = p.clips.filter((row) => row !== c);
-      if (action === "ripple")
-        p.clips
-          .filter(
-            (row) =>
-              row.track === c.track &&
-              row.startFrame >= c.startFrame + c.durationFrames,
-          )
-          .forEach((row) =>
-            edTime(p, row, { startFrame: row.startFrame - c.durationFrames }),
-          );
-      ed.selected = null;
-    }
   }
-  edRender();
-  await edSave();
+  await edCommit(p);
 }
 // Keys inside [from, to] of a clip, rebased to `from`, with the interpolated gain pinned at both new edges.
 function edKeysWindow(keys, from, to) {
@@ -1933,11 +2350,10 @@ document.addEventListener("click", (e) => {
     }
     edRedraw();
   }
-  if (clip) {
-    ed.selected = clip.dataset.edClip;
-    edRender();
-  } else if (ed.selected && e.target.matches("[data-ed-lane]")) {
+  // A clip is selected on pointerup (edSelectClip); a click on empty lane space clears the selection.
+  if (!clip && ed.selected && e.target.matches("[data-ed-lane]")) {
     ed.selected = null;
+    ed.picks.clear();
     edRedraw();
   }
   if (marker) {
@@ -1985,6 +2401,9 @@ document.addEventListener("change", (e) => {
       edValidate(next);
       Object.assign(c, next);
     }
+    // A project setting (frame rate re-snap, ratio, title) is not a timeline edit: 磁性主軌 leaves gaps alone.
+    if (key.startsWith("project:")) ed.skipMagnet = true;
+    edMagnet(p);
     edSave();
     edRender();
   } catch (error) {
@@ -1996,61 +2415,194 @@ document.addEventListener("change", (e) => {
 document.addEventListener("input", (e) => {
   if (e.target.dataset.edTitleField)
     ed.title.fields[e.target.dataset.edTitleField] = e.target.value;
-  if (e.target.matches("[data-ed-zoom]")) {
-    ed.zoom = Number(e.target.value);
-    edRender();
-  }
+  if (e.target.matches("[data-ed-zoom]")) edZoom(e.target.value);
 });
+// Card ED.2 selection: a plain click selects one clip; Shift／Ctrl／Cmd adds or removes it from the selection.
+function edSelectClip(id, add) {
+  if (add) {
+    const ids = new Set(edPicked().map((x) => x.id));
+    if (ids.has(id)) ids.delete(id);
+    else ids.add(id);
+    ed.picks = ids;
+    ed.selected = ids.has(id) ? id : [...ids].at(-1) || null;
+  } else {
+    ed.picks = new Set([id]);
+    ed.selected = id;
+  }
+}
+// 磁吸 targets: frame 0, the playhead, markers and the edges of every clip that is not being dragged.
+function edSnapFrames(p, moving) {
+  const out = [0, edFrame(p), ...(p.markers || []).map((m) => Timebase.toFrames(m, p.timebase))];
+  for (const c of p.clips) if (!moving.has(c.id)) out.push(c.startFrame, c.startFrame + c.durationFrames);
+  return out;
+}
+// One drag step: the trimmed clip, or the moved group (all by the same frame shift). Throws when the result would
+// cover a clip that is not moving or break a clip rule; the caller then keeps the last valid step.
+function edDragStep(p, c, group, initial, trim, delta, snap) {
+  const tol = Timebase.toFrames(8 / ed.zoom, p.timebase),
+    candidates = snap ? edSnapFrames(p, new Set(group.map((x) => x.id))) : [],
+    shift = (edges) => (snap ? EditorModel.snapShift(edges, candidates, tol) : 0);
+  if (trim) {
+    const i = initial.get(c.id);
+    let next;
+    if (trim === "end") {
+      let end = i.startFrame + i.durationFrames + delta;
+      end += shift([end]);
+      next = edTime(p, { ...i }, { durationFrames: end - i.startFrame });
+      edFitKeys(i, next);
+    } else {
+      // The left edge stops one frame before the right edge, which never moves (Codex ED.2 F4).
+      const last = i.startFrame + i.durationFrames - 1;
+      let start = Math.max(0, Math.min(last, i.startFrame + delta));
+      start = Math.max(0, Math.min(last, start + shift([start])));
+      const d = start - i.startFrame,
+        media = ["video", "audio"].includes(i.kind);
+      next = edTime(p, { ...i }, { startFrame: start, durationFrames: i.durationFrames - d, sourceStartFrame: media ? i.sourceStartFrame + Math.round(d * i.speed) : i.sourceStartFrame });
+      if (next.sourceStartFrame < 0) throw Error("素材前面沒有更多畫格");
+      if (i.volumeKeys) next.volumeKeys = edKeysWindow(i.volumeKeys, d, i.durationFrames);
+    }
+    if (next.durationFrames < 1) throw Error("片段太短");
+    edNeighbours(p, next);
+    edValidate(next);
+    return [next];
+  }
+  const first = Math.min(...group.map((x) => initial.get(x.id).startFrame));
+  delta = Math.max(delta, -first);
+  delta = Math.max(-first, delta + shift(group.flatMap((x) => [initial.get(x.id).startFrame + delta, initial.get(x.id).startFrame + initial.get(x.id).durationFrames + delta])));
+  const ids = new Set(group.map((x) => x.id)),
+    nexts = group.map((x) => edTime(p, { ...initial.get(x.id) }, { startFrame: initial.get(x.id).startFrame + delta }));
+  for (const next of nexts) {
+    const end = next.startFrame + next.durationFrames;
+    if (p.clips.some((o) => !ids.has(o.id) && o.track === next.track && o.startFrame < end && next.startFrame < o.startFrame + o.durationFrames))
+      throw Error("會蓋到同一軌的相鄰片段");
+    edValidate(next);
+  }
+  return nexts;
+}
 document.addEventListener("pointerdown", (e) => {
-  const button = e.target.closest("[data-ed-clip]");
-  if (!button || e.button !== 0) return;
+  if (e.button !== 0) return;
+  const volume = e.target.closest("[data-ed-volume]");
+  if (volume) return edVolumeDrag(e, volume);
+  edLinePress = { id: null, at: 0 }; // any other press breaks a double-click on the volume line
+  const el = e.target.closest("[data-ed-clip]");
+  if (!el) return;
   const p = edProject(),
-    c = p?.clips.find((c) => c.id === button.dataset.edClip);
+    c = p?.clips.find((x) => x.id === el.dataset.edClip);
   if (!c) return;
   edStop();
-  const initial = structuredClone(c),
-    startX = e.clientX,
-    trim = !!e.target.closest("[data-ed-trim]");
+  const trim = e.target.closest("[data-ed-trim]")?.dataset.edTrim || null,
+    add = e.shiftKey || e.ctrlKey || e.metaKey,
+    picked = edPicked(p),
+    // Dragging a clip that is part of the selection moves the whole selection; a trim is always one clip.
+    group = !trim && picked.some((x) => x.id === c.id) ? picked : [c],
+    initial = new Map(group.map((x) => [x.id, structuredClone(x)])),
+    startX = e.clientX;
   let moved = false;
-  button.setPointerCapture(e.pointerId);
-  button.onpointermove = (ev) => {
-    if (Math.abs(ev.clientX - startX) < 4 && !moved) return;
+  el.setPointerCapture(e.pointerId);
+  el.onpointermove = (ev) => {
+    if (!moved && Math.abs(ev.clientX - startX) < 4) return;
     moved = true;
-    const key = trim ? "duration" : "start",
-      next = edTime(
-        p,
-        { ...initial },
-        {
-          [key]: Math.max(0, initial[key] + (ev.clientX - startX) / ed.zoom),
-        },
-      );
     try {
-      edFitKeys(initial, next);
-      edNeighbours(p, next);
-      edValidate(next);
-      button.style.left = next.start * ed.zoom + "px";
-      button.style.width = next.duration * ed.zoom + "px";
-      Object.assign(c, next);
+      const nexts = edDragStep(p, c, group, initial, trim, Timebase.toFrames((ev.clientX - startX) / ed.zoom, p.timebase), ed.snap && !ev.shiftKey);
+      for (const next of nexts) {
+        Object.assign(p.clips.find((x) => x.id === next.id), next);
+        const node = document.querySelector(`[data-ed-clip="${next.id}"]`);
+        if (node) {
+          node.style.left = next.start * ed.zoom + "px";
+          node.style.width = Math.max(8, next.duration * ed.zoom) + "px";
+        }
+      }
     } catch (_) {}
   };
-  button.onpointerup = () => {
-    button.onpointermove = button.onpointerup = button.onpointercancel = null;
-    if (moved) {
-      const changed = structuredClone(c);
-      Object.assign(c, initial);
-      edCheckpoint();
-      Object.assign(c, changed);
-      edSave();
+  const end = () => (el.onpointermove = el.onpointerup = el.onpointercancel = null);
+  el.onpointerup = () => {
+    end();
+    if (!moved) {
+      edSelectClip(c.id, add);
+      edRedraw();
+      return;
     }
-    ed.selected = c.id;
-    edRender();
+    // Every step refused (it would cover a clip): nothing changed, so no undo step and the redo stack stays (Codex ED.2 F2).
+    const same = group.every((x) => ["startFrame", "durationFrames", "sourceStartFrame"].every((k) => x[k] === initial.get(x.id)[k]));
+    if (same) {
+      edRedraw();
+      return;
+    }
+    const changed = group.map((x) => structuredClone(x));
+    for (const x of group) Object.assign(x, initial.get(x.id));
+    edCheckpoint();
+    for (const x of changed) Object.assign(p.clips.find((y) => y.id === x.id), x);
+    // Several tracks moved together keep their relative timing: 磁性主軌 is skipped (reference).
+    if (new Set(group.map((x) => x.track)).size > 1) ed.skipMagnet = true;
+    if (!picked.some((x) => x.id === c.id) || trim) edSelectClip(c.id, false);
+    edCommit(p).catch(VideoWorkbench.reportError);
   };
-  button.onpointercancel = () => {
-    Object.assign(c, initial);
-    button.onpointermove = button.onpointerup = button.onpointercancel = null;
+  el.onpointercancel = () => {
+    end();
+    for (const x of group) Object.assign(x, initial.get(x.id));
     edRender();
   };
 });
+// The volume line on a clip: drag up / down (dB, -60..+6), double-click = 0 dB, arrow keys ±1 dB. One undo step.
+function edSetDb(p, c, db) {
+  // Already there (e.g. ↑ at the top): no undo step, and no 0.1 dB rounding of an older clip's exact gain.
+  if (Math.abs(EditorModel.volumeToDb(c.volume) - db) < 1e-9) return Promise.resolve();
+  edCheckpoint();
+  c.volume = EditorModel.dbToVolume(Math.round(db * 10) / 10);
+  edValidate(c);
+  edRender();
+  return edSave();
+}
+function edVolumeDrag(e, line) {
+  e.stopPropagation();
+  const p = edProject(),
+    c = p?.clips.find((x) => x.id === line.closest("[data-ed-clip]")?.dataset.edClip);
+  if (!c) return;
+  edStop();
+  const startY = e.clientY,
+    from = EditorModel.volumeToDb(c.volume),
+    { min, max } = EditorModel.DB,
+    // The 18 px band spans the 66 dB range; the line follows the pointer.
+    // Above +6 dB (an older clip) the line may stay where it is, never be pushed down to +6.
+    dbAt = (y) => Math.max(min, Math.min(Math.max(max, from), from - ((y - startY) / 16) * (max - min)));
+  let db = from,
+    moved = false;
+  const add = e.shiftKey || e.ctrlKey || e.metaKey;
+  line.setPointerCapture(e.pointerId);
+  line.onpointermove = (ev) => {
+    if (!moved && Math.abs(ev.clientY - startY) < 2) return;
+    moved = true;
+    db = dbAt(ev.clientY);
+    line.style.top = Math.max(0, Math.round(((max - db) / (max - min)) * 16)) + "px";
+    line.setAttribute("aria-valuenow", db.toFixed(1));
+  };
+  line.onpointerup = () => {
+    line.onpointermove = line.onpointerup = null;
+    // The line crosses the middle of the clip: a press that does not move it is a click on the clip.
+    // A second still press within 400 ms is the double-click that resets 0 dB (the first press re-renders the
+    // timeline, so the browser's own dblclick never reaches the new line).
+    if (!moved) {
+      const now = performance.now(),
+        again = edLinePress.id === c.id && now - edLinePress.at < 400;
+      edLinePress = again ? { id: null, at: 0 } : { id: c.id, at: now };
+      if (again) edSetDb(p, c, 0).catch(VideoWorkbench.reportError);
+      else {
+        edSelectClip(c.id, add);
+        edRedraw();
+      }
+    } else if (Math.abs(db - from) >= 0.05) edSetDb(p, c, db).catch(VideoWorkbench.reportError);
+  };
+}
+// Pinch on a trackpad arrives as Ctrl+wheel: zoom around the cursor.
+document.addEventListener(
+  "wheel",
+  (e) => {
+    if (!(e.ctrlKey || e.metaKey) || tool !== "edit" || !e.target.closest?.("[data-ed-timeline]")) return;
+    e.preventDefault();
+    edZoom(ed.zoom * Math.exp(-e.deltaY / 300), e.clientX);
+  },
+  { passive: false },
+);
 // Card ED.1: panel and timeline-height separators. Drag or arrow keys resize; the size is saved on release.
 function edResize(side, delta) {
   const [min, max] = edLayoutLimits[side];
@@ -2115,7 +2667,31 @@ document.addEventListener("keydown", (e) => {
     return;
   if (e.key === "Escape" && ed.selected) {
     ed.selected = null;
+    ed.picks.clear();
     edRedraw();
+    return;
+  }
+  // A focused clip: Enter selects it, Shift／Ctrl／Cmd+Enter adds it (reference clip keyboard).
+  const focusedClip = e.target.closest?.("[data-ed-clip]");
+  if (e.key === "Enter" && focusedClip && !e.target.closest("[data-ed-volume]")) {
+    e.preventDefault();
+    edSelectClip(focusedClip.dataset.edClip, e.shiftKey || e.ctrlKey || e.metaKey);
+    edRedraw();
+    document.querySelector(`[data-ed-clip="${focusedClip.dataset.edClip}"]`)?.focus();
+    return;
+  }
+  const line = e.target.closest?.("[data-ed-volume]");
+  if (line && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+    e.preventDefault();
+    const p = edProject(),
+      c = p.clips.find((x) => x.id === line.closest("[data-ed-clip]")?.dataset.edClip);
+    if (c) {
+      const now = EditorModel.volumeToDb(c.volume),
+        db = Math.max(EditorModel.DB.min, Math.min(Math.max(EditorModel.DB.max, now), now + (e.key === "ArrowUp" ? 1 : -1)));
+      edSetDb(p, c, db)
+        .then(() => document.querySelector(`[data-ed-clip="${c.id}"] [data-ed-volume]`)?.focus())
+        .catch(VideoWorkbench.reportError);
+    }
     return;
   }
   const key = e.key.toLowerCase(),
@@ -2132,20 +2708,36 @@ document.addEventListener("keydown", (e) => {
     edAction(view).catch(VideoWorkbench.reportError);
     return;
   }
-  const action =
-    e.code === "Space"
-      ? "play"
-      : e.key === "ArrowLeft" || e.key === "ArrowRight"
-        ? "frame:" + (e.key === "ArrowLeft" ? -1 : 1)
-        : e.key === "Delete"
-          ? "delete"
-          : e.key.toLowerCase() === "s"
-            ? "split"
-            : (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z"
-              ? e.shiftKey
-                ? "redo"
-                : "undo"
-              : null;
+  // Card ED.2: the reference's key table (edShortcutRows). Alt+M is read from e.code: on a Mac it types «µ».
+  const mod = e.ctrlKey || e.metaKey,
+    del = e.key === "Delete" || e.key === "Backspace",
+    action = mod
+      ? e.shiftKey && key === "c"
+        ? "style-copy"
+        : e.shiftKey && key === "v"
+          ? "style-paste"
+          : key === "z"
+            ? e.shiftKey
+              ? "redo"
+              : "undo"
+            : ({ y: "redo", c: "copy", v: "paste", d: "duplicate", a: "select-all", s: "save-now", b: "split", "=": "zoom:in", "+": "zoom:in", "-": "zoom:out", 0: "zoom:reset" })[key] || null
+      : e.altKey && del
+        ? "ripple"
+        : e.altKey && e.code === "KeyM"
+          ? "marker-prev"
+          : e.altKey
+            ? null
+            : del
+              ? "delete"
+              : e.code === "Space"
+                ? "play"
+                : e.key === "ArrowLeft" || e.key === "ArrowRight"
+                  ? "jump:" + (e.key === "ArrowLeft" ? "-" : "") + (e.shiftKey ? "1" : "0.1")
+                  : e.key === "?"
+                    ? "shortcuts"
+                    : e.shiftKey
+                      ? ({ m: "marker-next", z: "zoom:fit" })[key] || null
+                      : ({ s: "split", m: "marker", n: "snap", j: "rate:j", k: "rate:k", l: "rate:l" })[key] || null;
   if (action) {
     e.preventDefault();
     edAction(action).catch(VideoWorkbench.reportError);

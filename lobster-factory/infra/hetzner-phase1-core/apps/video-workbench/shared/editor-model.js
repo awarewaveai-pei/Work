@@ -194,7 +194,70 @@
       }
     return keys.at(-1).gain;
   }
+  // Card ED.2: 複製／貼上樣式 carries these fields between clips of the same group (reference: 濾鏡、特效、遮罩或文字樣式).
+  const STYLE = {
+    visual: ["filter", "mask", "grain", ...Object.keys(COLOR), "lut"],
+    text: ["font", "fontSize", "bold", "italic", "align", "color", "backgroundColor", "animation"],
+  };
+  const styleGroup = (kind) =>
+    kind === "text" ? "text" : kind === "video" || kind === "image" ? "visual" : null;
+  // Clip volume is stored as a gain (0..4 = up to +12 dB); the timeline's volume line spans -60 (silent) to +6 dB like
+  // the reference. A clip already above +6 dB keeps its gain: the line only clamps to the gain limit (Codex ED.2 F1).
+  const DB = { min: -60, max: 6 };
+  const volumeToDb = (v) =>
+    !(Number(v) > 0) ? DB.min : Math.max(DB.min, 20 * Math.log10(Number(v)));
+  const dbToVolume = (db) =>
+    Number(db) <= DB.min ? 0 : Math.min(4, Math.pow(10, Number(db) / 20));
+  // 磁性主軌: the main track's clips laid end to end from frame 0 in their current order; the tie-break keeps a new
+  // copy right after the clip it was made from. rows: [{id, startFrame, durationFrames}]; returns Map id -> startFrame.
+  function closeGaps(rows, first = new Set()) {
+    const order = [...rows].sort(
+      (a, b) =>
+        a.startFrame - b.startFrame ||
+        Number(first.has(b.id)) - Number(first.has(a.id)),
+    );
+    const out = new Map();
+    let t = 0;
+    for (const r of order) {
+      out.set(r.id, t);
+      t += r.durationFrames;
+    }
+    return out;
+  }
+  // 磁吸: the candidate nearest to any of the moving edges, if within `tolerance` frames; returns the frame shift.
+  function snapShift(edges, candidates, tolerance) {
+    let best = null;
+    for (const e of edges)
+      for (const c of candidates) {
+        const d = c - e;
+        if (Math.abs(d) <= tolerance && (best === null || Math.abs(d) < Math.abs(best))) best = d;
+      }
+    return best ?? 0;
+  }
+  // First start >= `from` where every range [start+offset, end+offset) of a pasted group misses the clips already on
+  // its track. group: [{track, offset, durationFrames}]; occupied: Map track -> [[start, end]].
+  function freeStart(group, occupied, from) {
+    const fits = (s) =>
+      group.every(({ track, offset, durationFrames }) =>
+        (occupied.get(track) || []).every(
+          ([a, b]) => s + offset + durationFrames <= a || s + offset >= b,
+        ),
+      );
+    const candidates = [from];
+    for (const { track, offset } of group)
+      for (const [, b] of occupied.get(track) || []) if (b - offset >= from) candidates.push(b - offset);
+    candidates.sort((a, b) => a - b);
+    return candidates.find(fits) ?? from;
+  }
   const api = {
+    STYLE,
+    styleGroup,
+    DB,
+    volumeToDb,
+    dbToVolume,
+    closeGaps,
+    snapShift,
+    freeStart,
     LIMITS,
     TOTAL,
     NAME,

@@ -78,6 +78,8 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "vw-editor-"));
     assert.equal(await page.locator("[data-ed-clip]").count(), 1);
     await page.getByRole("button", { name: "重做", exact: true }).click();
     assert.equal(await page.locator("[data-ed-clip]").count(), 2);
+    // Card ED.2: a redo comes back with nothing selected; the transition goes on the second half.
+    await page.locator("[data-ed-clip]").nth(1).click();
     await page.locator('[data-ed-pane="轉場"]').click();
     await page.getByRole("group", { name: "轉場", exact: true }).getByRole("button", { name: "溶解", exact: true }).click();
     await page.getByLabel("轉場秒數").fill("0.4");

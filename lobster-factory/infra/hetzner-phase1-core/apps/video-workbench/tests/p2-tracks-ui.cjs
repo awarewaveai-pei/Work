@@ -39,7 +39,9 @@ const pass = (label) => {
     await page.getByRole("button", { name: "建立專案", exact: true }).click();
     await page.waitForSelector("[data-ed-stage]");
     const lanes = () => page.locator("[data-ed-lane]").evaluateAll((els) => els.map((e) => e.dataset.edLane));
-    assert.deepEqual(await lanes(), ["V1", "V2", "T", "A1", "A2"]);
+    // Card ED.2: screen order is the reference's top-to-bottom (highest layer first); data order stays V1, V2, T, A1, A2.
+    assert.deepEqual(await lanes(), ["T", "V2", "V1", "A1", "A2"]);
+    assert.deepEqual(await page.evaluate(() => edProject().tracks.map((t) => t.id)), ["V1", "V2", "T", "A1", "A2"]);
 
     // Limits: 8 video, 8 audio, 4 text, 16 in all (= MediaTimelineV1); every add button is disabled at 16.
     for (const [label, adds] of [["新增影片軌", 6], ["新增音訊軌", 5]])
@@ -48,7 +50,7 @@ const pass = (label) => {
       assert.equal(await page.getByRole("button", { name: label, exact: true }).isDisabled(), true, label);
     const full = await lanes();
     assert.equal(full.length, 16);
-    assert.deepEqual(full.filter((id) => id[0] === "V"), ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8"]);
+    assert.deepEqual(full.filter((id) => id[0] === "V"), ["V8", "V7", "V6", "V5", "V4", "V3", "V2", "V1"]);
     assert.deepEqual(full.filter((id) => id[0] === "A"), ["A1", "A2", "A3", "A4", "A5", "A6", "A7"]);
     assert.deepEqual(full.filter((id) => id[0] === "T"), ["T"]);
     assert.equal(await page.locator('[data-ed-track="V1"]').getByRole("button", { name: "刪除軌道" }).count(), 0);
@@ -97,7 +99,9 @@ const pass = (label) => {
     assert.match(await page.locator("[data-ed-peak]").innerText(), /超過 −1 dB 會在輸出時自動壓低/);
     pass("轉場（8 鈕）、響度（3 鈕）分頁與匯出對話框（3 個畫質鈕、4K 放大提示、適合投遞）沒有下拉選單；調色在片段屬性；峰值表在音訊分頁");
 
-    // 設為入點 at an exact frame (16 then 下一格 = 17), kept after a reload.
+    // 設為入點 at an exact frame (16 then 下一格 = 17), kept after a reload. 磁性主軌 off (card ED.2): with it on, the
+    // trimmed main-track clip would move back to frame 0.
+    await page.getByRole("button", { name: "磁性主軌", exact: true }).click();
     await page.locator('[data-ed-lane="V1"] [data-ed-clip]').click();
     await page.evaluate(() => {
       ed.time = Timebase.toSeconds(16, edProject().timebase);
