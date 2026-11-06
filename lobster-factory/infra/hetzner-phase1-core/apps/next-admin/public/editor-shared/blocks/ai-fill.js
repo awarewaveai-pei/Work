@@ -76,7 +76,10 @@ export async function binaryMask(blob, w, h) {
   return any ? c.toDataURL("image/png") : null;
 }
 
-const AREA_HOW = "用選取工具框出範圍，或按 Q 用筆刷塗";
+// Quick mask follows PhotoCraft (= Photoshop): white = selected. With no selection, Q starts all white, so painting white
+// changes nothing and painting with the default black EXCLUDES the strokes (measured on build 98bcbfa, W3 smoke 2026-11-06).
+// "Paint = change" is therefore: Q, paint black, Q, then Select › Inverse (Shift+Ctrl+I).
+const AREA_HOW = "用選取工具框出範圍（或按 Q 用黑色塗 → 再按 Q → 按 Shift+Ctrl+I 反轉）";
 
 export default {
   id: "ai-fill",
@@ -101,8 +104,8 @@ export default {
       $("afStart").style.display = mode !== null ? "none" : ""; $("afStep").style.display = mode === null ? "none" : "";
       $("afPrompt").style.display = mode !== "fill" ? "none" : "";
       $("afHint").textContent = !hasMask ? "這個編輯器沒有選取範圍，無法使用此功能。"
-        : mode === "fill" ? AREA_HOW + "要重新生成的區域，填描述後按套用。"
-        : mode === "remove" ? AREA_HOW + "想清掉的物件，再按套用。"
+        : mode === "fill" ? "要重新生成的區域：" + AREA_HOW + "，填描述後按套用。"
+        : mode === "remove" ? "想清掉的物件：" + AREA_HOW + "，再按套用。"
         : "先在圖層選取一張圖片，再" + AREA_HOW + "。";
       $("afApply").textContent = busy ? "AI 處理中…" : mode === "fill" ? "✨ 套用生成" : "✅ 套用去除";
       $("afRemove").disabled = !hasMask; $("afFill").disabled = !hasMask;
