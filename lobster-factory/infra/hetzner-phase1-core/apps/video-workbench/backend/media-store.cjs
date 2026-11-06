@@ -214,26 +214,36 @@ function createMediaStore({ dataDir }) {
     const file = path.join(root, match[1], match[2]);
     return fs.existsSync(file) ? file : null;
   }
-  // Card ED.1.4: the editor's 720P preview (preview720.mp4 / .webm), made the first time it is asked for, through the
-  // same derive() and one job per file. null = nothing smaller to make (not a stored video, or short side <= 720):
-  // the editor keeps previewUrl. No request signal: other callers may be waiting on the same job.
-  async function preview(url) {
+  // Card ED.1.4: the editor's 720P preview (preview720.mp4 / .webm), made the first time it is asked for through the same
+  // derive(). The answer never waits for ffmpeg (a long source would outlive the HTTP timeout): { making: true } until
+  // the file exists, and the editor asks again. Jobs run one at a time (an editor asks for every clip at once).
+  // previewUrl null = nothing smaller to make (not a stored video, or short side <= 720): the editor keeps previewUrl.
+  const previewJobs = new Map();
+  let previewQueue = Promise.resolve();
+  function preview(url) {
     const original = fileFor(url),
       dir = original && path.dirname(original),
       probeFile = dir && path.join(dir, "probe.json");
-    if (!probeFile || !fs.existsSync(probeFile)) return null;
+    if (!probeFile || !fs.existsSync(probeFile)) return { previewUrl: null };
     const probe = JSON.parse(fs.readFileSync(probeFile, "utf8"));
-    if (!probe.video || Math.min(probe.displayWidth || 0, probe.displayHeight || 0) <= PREVIEW_SHORT) return null;
+    if (!probe.video || Math.min(probe.displayWidth || 0, probe.displayHeight || 0) <= PREVIEW_SHORT) return { previewUrl: null };
     const alpha = hasAlpha(probe),
       name = alpha ? "preview720.webm" : "preview720.mp4",
       key = path.basename(dir) + "/" + name;
-    let job = pending.get(key);
-    if (!job) {
-      job = derive(dir, name, (tmp) => transcode(original, tmp, PREVIEW_SHORT, alpha, 23)).finally(() => pending.delete(key));
-      pending.set(key, job);
+    if (fs.existsSync(path.join(dir, name))) return { previewUrl: "/media/" + key };
+    const job = previewJobs.get(key);
+    if (job?.error) {
+      previewJobs.delete(key); // reported once; the next ask tries again
+      return { previewUrl: null, error: job.error };
     }
-    await job;
-    return "/media/" + key;
+    if (!job) {
+      const entry = {};
+      previewJobs.set(key, entry);
+      previewQueue = previewQueue
+        .then(() => derive(dir, name, (tmp) => transcode(original, tmp, PREVIEW_SHORT, alpha, 23)))
+        .then(() => previewJobs.delete(key), (e) => (entry.error = "720P 預覽檔產生失敗：" + String(e?.message || e).slice(-300)));
+    }
+    return { previewUrl: null, making: true };
   }
   return { root, ingest, fileFor, preview };
 }

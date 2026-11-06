@@ -339,7 +339,7 @@ function evalNumber(text)  // digits . + - * / ( ) and spaces only; recursive de
 ## 11. ED.1.4 預覽畫質
 
 - **檔名**：同媒體目錄 `.data/media/<sha256>/preview720.mp4`（有透明通道的來源 `preview720.webm`，同 `proxy.webm` 做法）；短邊 720（橫片＝720 高），H.264 CRF 23 + AAC。來源短邊 ≤ 720 不產生，720P 直接用現有預覽。
-- **產生時機**：第一次選 720P 時，剪輯器對畫面上每支影片素材打 `POST /api/vw/media/preview {url}`；後端 `media-store.cjs` 用同一個 `derive()`（暫存檔＋rename、已存在就跳過、同一 sha 同時只轉一次）。上傳不產生：上傳不變慢，沒選 720P 的人不佔磁碟。
+- **產生時機**：第一次選 720P 時，剪輯器對畫面上每支影片素材打 `POST /api/vw/media/preview {url}`；後端 `media-store.cjs` 用同一個 `derive()`（暫存檔＋rename、已存在就跳過）；回覆不等轉檔（長片會超過 HTTP 300 秒逾時）：檔還沒好回 `{making:true}`，剪輯器每 2 秒再問；轉檔排隊一次一支（避免整片同時開多個 ffmpeg）。上傳不產生：上傳不變慢，沒選 720P 的人不佔磁碟。
 - **舊素材**：同一條路自動補（請求時才產生，不用批次腳本）；不在媒體庫的舊網址（`/generated/…`）回 `null`，照用原檔。
 - **剪輯器選檔**：`ed.layout.preview`（"720P"／"1080P"，存在既有的 `tools.editor.layout` 偏好，預設 1080P）。舞台圖層 src＝720P 且已有 `preview720` → 用它；否則 `previewUrl || url`（＝原檔或既有代理檔）。轉檔中照播原檔並顯示「正在產生 720P 預覽檔…」，好了換掉圖層、時間不跳。輸出永遠讀原檔（`editor-export.cjs` 不動）。
 - **磁碟**：720P 約原檔 1080P 的 30–40%（每分鐘約 20–30 MB）；只有選過 720P 的素材才有。

@@ -1396,26 +1396,38 @@ function edGrade(c) {
   return parts.join(" ");
 }
 // Card ED.1.4: 720P plays preview720.* (backend/media-store.cjs preview(), made on first ask); 1080P plays previewUrl
-// (the original, or the proxy). asset url -> preview url | null (nothing smaller: keep previewUrl) | Promise (making).
+// (the original, or the proxy). asset url -> preview url | null (nothing smaller, or failed: keep previewUrl) |
+// Promise (asking; while the server answers { making } it asks again every 2 s).
 const edPreview720 = new Map();
 function edPlayUrl(asset) {
   const made = ed.layout.preview === "720P" && edPreview720.get(asset.url);
   return typeof made === "string" ? made : asset.previewUrl || asset.url;
 }
+function edPreviewAsk(url) {
+  const done = (made) => {
+    edPreview720.set(url, made);
+    edPaint();
+  };
+  edPreview720.set(
+    url,
+    VideoWorkbench.request("/media/preview", { url }).then(
+      (r) => {
+        if (r?.making) return void setTimeout(() => edPreviewAsk(url), 2000);
+        if (r?.error) VideoWorkbench.reportError(Error(r.error));
+        done(r?.previewUrl || null);
+      },
+      (e) => {
+        VideoWorkbench.reportError(e);
+        done(null);
+      },
+    ),
+  );
+}
 function edPreviewEnsure(p) {
   if (ed.layout.preview !== "720P") return;
   for (const c of p.clips) {
     const url = c.kind === "video" && c.asset?.url;
-    if (!url || edPreview720.has(url)) continue;
-    edPreview720.set(
-      url,
-      VideoWorkbench.request("/media/preview", { url })
-        .then((r) => r?.previewUrl || null, (e) => (VideoWorkbench.reportError(e), null))
-        .then((made) => {
-          edPreview720.set(url, made);
-          edPaint();
-        }),
-    );
+    if (url && !edPreview720.has(url)) edPreviewAsk(url);
   }
   const note = document.querySelector("[data-ed-preview-note]"),
     text = [...edPreview720.values()].some((v) => v instanceof Promise) ? "正在產生 720P 預覽檔…" : "";
