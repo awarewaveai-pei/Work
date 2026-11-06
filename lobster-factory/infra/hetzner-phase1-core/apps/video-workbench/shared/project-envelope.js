@@ -21,11 +21,15 @@
     }
     return [...seen.values()];
   }
-  function wrap(native, { revision = 0 } = {}) {
+  // Card FC.2: another engine's project (FilmCraft) is wrapped the same way; unwrap below still refuses it in this editor.
+  function wrap(
+    native,
+    { revision = 0, engine = ENGINE, engineVersion = ENGINE_VERSION } = {},
+  ) {
     return {
       formatVersion: 1,
-      engine: ENGINE,
-      engineVersion: ENGINE_VERSION,
+      engine,
+      engineVersion,
       nativeProjectRef: null,
       native,
       assets: assetsOf(native),

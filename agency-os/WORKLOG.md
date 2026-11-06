@@ -1,4 +1,30 @@
 # Worklog
+## 2026-11-06（續13）影音工作台 FC.2：「專業剪輯」頁（FilmCraft 嵌在工作台裡）
+
+- 做了（`VW`＝`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`）：
+  - `VW/scripts/vendor-filmcraft.cjs`＋`VW/engines/filmcraft/VERSION.json`：從 `%LOCALAPPDATA%\awarewave\filmcraft-dist\46763a8-b7f3040\` 複製到 `VW/engines/filmcraft/web/`；`SHA256SUMS` 本身的雜湊要等於 VERSION.json、列出的 16 檔逐一驗、資料夾裡不准有沒列的檔；先複製到 `web.new` 驗過才換名。`VW/.gitignore` 加 `engines/filmcraft/web/`（引擎檔不進 git）。
+  - `VW/scripts/tools-engine-host.js`（新）：GPU 檢查（沒有 adapter 或 vendor 是 intel → 白話提醒＋「改用一般剪輯」「仍然開啟」）；iframe `?host=parent`；`message` 只收同 origin 且 `event.source` 是該 iframe；素材用現有選擇器 → 原檔 ≤ 512 MiB 且沒有預覽檔才送原檔，否則送預覽檔，記「檔名 → 資產 id／url／實際送出的 url」；`filmcraft:dirty` 顯示「尚未存檔」＋離開前確認；F6 把焦點交回外層側欄；`.fcproj` 原文照存（不重新序列化，避免大整數被改寫）包成 envelope 存 `tools.engine.projects`；重開＝專案檔先送、再送它用過的素材。iframe 放在 `#app` 旁邊（`#app` 每次重畫都過 sanitizer，會丟掉 iframe）。
+  - `VW/scripts/tools-0.js`：`TOOLS` 加 `edit-pro`；引擎頁 HEAD 不是 200 就不顯示這張卡；`screen()`／`render()` 各接一行。`VW/scripts/tools-boot.js` 載入新檔。`VW/shared/project-envelope.js` `wrap` 多收 `engine`／`engineVersion`（預設＝原常數，舊呼叫不變；`unwrap` 不動）。
+- 跟規格不同：專案的 `native` 存 `{ fcproj: <原文> }`，不是解析後的物件（理由同上：原文才保證重開時位元組一樣）。
+- 已知（不是本卡的缺陷）：重開時引擎素材庫會多一筆同名素材（舊的那筆重新連上＋新匯入一筆），11-06 的 `fc-host.json` 就有，引擎行為；引擎頂列有上游的 Discord 連結。
+- 機械閘：`tests/sidebar-overlays.cjs` **紅在分鏡六檔雜湊**，4 檔（`pages/storyboards.html`、`scripts/storyboards-0.js`、`scripts/storyboards-boot.js`：`de0e1836a`；`styles/workspaces.css`：`1aaa139d5`）是 11-05 別的 commit 改的、基準檔沒跟著更新；本卡沒碰這幾檔（`git status` 乾淨），同一測試其他斷言在雜湊前都過。基準要不要更新＝分鏡保護正本，留給做那兩個 commit 的人或操作者決定，本卡不動。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/fc2-engine-host.cjs（乾淨 checkout 也可跑）→ 4 PASS（沒引擎檔不顯示卡／只收自己 iframe 同 origin 的訊息／存檔進 tools.engine.projects、自製剪輯數量不變、重開送回／F6 回側欄） | exit=0 | ms=4593
+- REALTEST_EVIDENCE: tool=Bash | cmd=node fc2-real.cjs（真的 FilmCraft 0.17.0 產物、隔離伺服器、headless WebGPU 關閉）→ 上傳一支 mp4 → 專業剪輯 → 仍然開啟 → 加入素材 → `media.status` online → Save As → `tools.engine.projects` 1 筆 engine=filmcraft → 重開 `findMissing: []`、瀏覽器下載 0、頁面錯誤 0；截圖 fc2-real.png | exit=0 | ms=21570
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：拿掉 `tools-engine-host.js` message 監聽的 origin＋source 檢查 → `node tests/fc2-engine-host.cjs` 紅（別的視窗送來的 dirty 被採用，actual 尚未存檔）→ 還原後綠 | exit=1 | ms=8000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/test-isolation.cjs PASS；node tests/appearance.cjs PASS（2 項）；node tests/sidebar-overlays.cjs 只紅在分鏡雜湊（見上） | exit=0 | ms=11029
+- Codex 四輪（artifact `agency-os/reports/oracle/2026-11-06-partialreview-a32f1d02.md`、`-82218589.md`、`-b55b5779.md`、`-79ceb2a1.md`），7 項，6 修 1 不改：
+  - M1 重開送原檔、不是編輯時用的預覽檔 → 每筆素材記 `sentUrl`，重開送同一份。
+  - M2 預覽檔＝原檔時，超過 512 MiB 仍會送出 → 送出前一律 HEAD 查大小（加入、重加、重開三條路都查）。
+  - M3 重開時讀不到的素材從清單消失 → 清單＝專案的素材清單，讀不到的保留。
+  - M4 引擎說已存、工作台還沒存好就放行離開 → 不變量：未存＝引擎 dirty 或寫入中或上次被拒；狀態列顯示，離開／開新／開舊／關頁都先問。
+  - M5 重開／重加繞過大小檢查（同 M2 類，第三輪才關完整類）。
+  - M6 驗收測試在乾淨 checkout（沒有引擎檔）會逾時 → 假引擎頁連 HEAD 一起回 200，不再依賴本機產物。
+  - 不改：主側欄切到別頁不問未存檔——父頁只把工具區隱藏（`scripts/index-1.js:35-40`），工具頁與引擎 iframe 都還在，工作不會丟。
+  - 同一 reviewer 對同一檔連報，第三次修正前已寫不變量（上面 M4、M2／M5），寫在 `tools-engine-host.js` 開頭註解。
+- 監工通知（2026-11-06）：FC.1 產物重建（`33db8798d`，多 `ATTRIBUTION.md`）→ `vendor-filmcraft.cjs` 改讀 `filmcraft-dist/LATEST`，跟 VERSION.json 釘的不同就停；重新複製並驗過（16 檔＋SHA256SUMS）。
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/7m/0n（external oracle = Codex CLI gpt-6-sol，read-only；6 修 1 判不改）
+- ORACLE_WAIVED: 最後一輪（79ceb2a1）之後只改了 `tests/fc2-engine-host.cjs` 一行（假引擎頁回 200），程式本體在 79ceb2a1 已審；改後測試 4 PASS
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=ProjectEnvelope.wrap( | hits=4（tools-editor.js:234 與兩個測試＝舊呼叫，預設值不變；tools-engine-host.js 新呼叫）；`tools.engine.projects`／`edit-pro` 只在本卡檔與規格文件
 ## 2026-11-06（續12）影音工作台 PJ 規格「一支影片一條線」（7507aea7f，只有文件）＋三個 app session 額度用完改派 SDK
 
 - 規格：`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/pj-project-spine-spec-20261106.md`（378 行；§1 資料格式＋新檔 `shared/episode-spine.js`、§2 PJ.1–PJ.4、§3 舊資料、§4 過期判斷、§5 每個 commit 可部署、§6 畫面文字、§7 檔案歸屬、§8 衝突）。session vw-pj-spec（Fable）寫，額度用完前 commit。

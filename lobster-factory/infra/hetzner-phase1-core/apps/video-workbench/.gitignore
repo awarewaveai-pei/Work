@@ -22,6 +22,9 @@ vendor/ffprobe/ffprobe.exe
 
 # Downloaded on demand by scripts/vendor-effectcraft.cjs, SHA-256 checked against engines/effectcraft/VERSION.json (tracked).
 engines/effectcraft/web/
+# Copied by scripts/vendor-filmcraft.cjs from the scripts/filmcraft-pro build, checked against engines/filmcraft/VERSION.json (tracked).
+engines/filmcraft/web/
+engines/filmcraft/web.new/
 
 # Card P5: bytecode Blender may leave beside its job scripts (backend/blender.cjs also sets PYTHONDONTWRITEBYTECODE).
 backend/blender/__pycache__/

@@ -1,0 +1,11 @@
+{
+  "dist": "46763a8-b7f3040",
+  "repo": "https://github.com/storytold/filmcraft",
+  "rev": "46763a85d9777d3a60c2a557f359d988296d6a44",
+  "appVersion": "0.17.0",
+  "sha256SumsSha256": "d4ff6b7280e52cfd7f0360b2e41dccc33db88c7d20299c2d4587cb18216ddd6b",
+  "files": 16,
+  "buildScript": "scripts/filmcraft-pro/build.ps1",
+  "license": "MIT OR Apache-2.0 (engine); OFL-1.1 (embedded fonts, licenses/)",
+  "builtAt": "2026-11-06"
+}

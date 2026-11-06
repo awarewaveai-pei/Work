@@ -11,6 +11,16 @@ const TOOLS = [
     new: 1,
   },
   {
+    // Card FC.2: FilmCraft in a frame (scripts/tools-engine-host.js); hidden while the engine files are absent.
+    id: "edit-pro",
+    cat: "剪輯成片",
+    icon: "▦",
+    name: "專業剪輯",
+    desc: "多軌剪接、調色、混音與字幕的專業剪輯引擎（英文介面，需要獨立顯示卡）",
+    io: "多支素材 → 成片",
+    new: 1,
+  },
+  {
     id: "compose",
     cat: "剪輯成片",
     icon: "◩",
@@ -260,6 +270,7 @@ function header(t, prefix, desc) {
 function home() {
   let filtered = TOOLS.filter(
     (t) =>
+      (typeof engineToolVisible !== "function" || engineToolVisible(t)) &&
       (category === "全部" || t.cat === category) &&
       [t.name, t.desc].join(" ").includes(search),
   );
@@ -286,6 +297,7 @@ function home() {
   }</div>`;
 }
 function screen(t) {
+  if (t.id === "edit-pro" && typeof toolEngineHostScreen === "function") return toolEngineHostScreen(t);
   const workflow = typeof toolWorkflowScreen === "function" ? toolWorkflowScreen(t) : null;
   if (workflow !== null) return workflow;
   if (t.id === "edit")
@@ -374,6 +386,7 @@ function render() {
     );
   if (tool === "region" && files.image) setupRegionCanvas();
   if (typeof toolWorkflowAfterRender === "function") toolWorkflowAfterRender();
+  if (typeof toolEngineHostAfterRender === "function") toolEngineHostAfterRender();
   const unsupported = {
     sfx: "尚未設定配樂分離與畫面音效模型",
     music: "尚未設定音樂生成模型",
