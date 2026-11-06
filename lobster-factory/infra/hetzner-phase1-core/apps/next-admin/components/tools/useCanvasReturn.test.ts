@@ -57,8 +57,31 @@ describe("編輯器 sendBack", () => {
     const save = vi.fn(async () => ({ ok: true }));
     const report = vi.fn();
     expect(await sendBack(ctx, { id: "gone", label: "塔羅預覽" }, report, { ackMs: 100, save })).toBe("saved");
-    expect(save).toHaveBeenCalledWith(ctx, expect.any(Blob));
+    expect(save).toHaveBeenCalledWith(ctx, expect.any(Blob), { previewOnlyIfTooBig: true });
     expect(report).toHaveBeenLastCalledWith("原分頁已關，已存進我的設計");
+  });
+
+  it("沒 ack 且存檔失敗（網路／伺服器）→ PNG 下載到電腦，不會兩處都沒有", async () => {
+    const save = vi.fn(async () => ({ ok: false, message: "HTTP 500" }));
+    const download = vi.fn();
+    expect(await sendBack(ctx, { id: "gone", label: "塔羅預覽" }, vi.fn(), { ackMs: 50, save, download })).toBe("downloaded");
+    expect(download).toHaveBeenCalledWith(expect.any(Blob), "塔羅預覽.png");
+  });
+
+  it("沒 ack 時退路要求原檔過大只存預覽（不因 20MB 上限而失敗）", async () => {
+    const { saveToMyDesigns } = await import("../../public/editor-shared/blocks/my-designs.js");
+    const posts: any[] = [];
+    vi.stubGlobal("fetch", async (_u: string, init: RequestInit) => { posts.push(JSON.parse(String(init.body))); return { ok: true, status: 200, json: async () => ({ ok: true }) }; });
+    const big = { size: 21 * 1024 * 1024 } as Blob;
+    const host = { sourceName: "design.psd", saveTag: { source: "canvas", modelName: "canvas", prompt: "canvas edit" } };
+    const c = { host, saveAs: async () => big, exportArtboard: ctx.exportArtboard };
+    const save = vi.fn((cc: any, png: Blob, o: any) => saveToMyDesigns(cc, png, o));
+    const report = vi.fn();
+    expect(await sendBack(c, { id: "gone", label: "x" }, report, { ackMs: 50, save })).toBe("saved");
+    expect(posts[0].sourceFile).toBeUndefined();
+    expect(posts[0].image).toMatch(/^data:image\/png;base64,/);
+    expect(report).toHaveBeenLastCalledWith("原分頁已關，已存進我的設計（原檔超過 20MB，只存了預覽圖）");
+    expect(await saveToMyDesigns(c, new Blob(["p"], { type: "image/png" }))).toMatchObject({ ok: false }); // 面板照舊拒絕
   });
 
   it("有 ack → 不存 My Designs", async () => {

@@ -21,20 +21,22 @@ const viaProxy = (publicUrl) => "/api/tools/designs/download?url=" + encodeURICo
 const headers = { "Content-Type": "application/json", "x-ops-simulated-role": "operator" };
 /**
  * 存入 My Designs＝預覽 PNG＋可編輯原檔（ctx.saveAs）。面板的「存入」與 dock 的「傳回」退路（editor-shared/dock.js，C8.1）共用這一個。
- * png：已匯出的預覽（傳回時已有，不再匯出一次）；沒給就以 150 ppi 匯出。回 { ok: true } 或 { ok: false, message }（給人看的原因）。
+ * png：已匯出的預覽（傳回時已有，不再匯出一次）；沒給就以 150 ppi 匯出。回 { ok: true, previewOnly? } 或 { ok: false, message }（給人看的原因）。
+ * opts.previewOnlyIfTooBig：原檔超過 20MB 時不拒絕，改只存預覽圖（傳回的退路用：圖一定要落地一處）→ previewOnly: true。
  */
-export async function saveToMyDesigns(ctx, png) {
+export async function saveToMyDesigns(ctx, png, opts = {}) {
   const host = ctx.host;
   try {
     const [preview, file] = await Promise.all([png ? Promise.resolve(png) : ctx.exportArtboard({ format: "png", ppi: 150 }), ctx.saveAs()]);
-    if (file.size > SOURCE_MAX_BYTES) return { ok: false, message: "⚠️ 原檔超過 20MB 上限（" + Math.round(file.size / 1048576) + " MB），無法存入。請精簡內嵌圖片後再存。" };
+    const tooBig = file.size > SOURCE_MAX_BYTES;
+    if (tooBig && !opts.previewOnlyIfTooBig) return { ok: false, message: "⚠️ 原檔超過 20MB 上限（" + Math.round(file.size / 1048576) + " MB），無法存入。請精簡內嵌圖片後再存。" };
     const image = await uploadableDataUrl(await blobToDataUrl(preview));
     if (!image) return { ok: false, message: "⚠️ 預覽圖太大（超過約 9MB 上限），請縮小畫板再存。" };
-    const data = (await blobToDataUrl(file)).split(",")[1];
+    const sourceFile = tooBig ? undefined : { name: host.sourceName, data: (await blobToDataUrl(file)).split(",")[1] };
     const res = await fetch("/api/tools/designs", { method: "POST", credentials: "same-origin", headers,
-      body: JSON.stringify({ image, sourceFile: { name: host.sourceName, data }, prompt: host.saveTag.prompt, modelName: host.saveTag.modelName, source: host.saveTag.source }) });
+      body: JSON.stringify({ image, sourceFile, prompt: host.saveTag.prompt, modelName: host.saveTag.modelName, source: host.saveTag.source }) });
     const out = await res.json().catch(() => ({ ok: false, error: "HTTP " + res.status }));
-    return out.ok ? { ok: true } : { ok: false, message: "⚠️ 儲存失敗：" + (out.error || ("HTTP " + res.status)) };
+    return out.ok ? (tooBig ? { ok: true, previewOnly: true } : { ok: true }) : { ok: false, message: "⚠️ 儲存失敗：" + (out.error || ("HTTP " + res.status)) };
   } catch (err) {
     return { ok: false, message: "⚠️ 儲存失敗：" + (err?.message || err) };
   }

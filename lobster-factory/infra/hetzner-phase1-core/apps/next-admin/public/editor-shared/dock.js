@@ -220,6 +220,17 @@ export const RETURN_ACK_MS = 2000;
 /** 頻道名 = components/tools/canvas-handoff.ts CANVAS_RETURN_CHANNEL。 */
 export const RETURN_CHANNEL = "canvas-return";
 
+/** 最後一道落地：PNG 存到電腦。 */
+function downloadBlob(blob, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60_000);
+}
+
 const blobToDataUrl = (b) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(b); });
 
 /** 送出 {type:"return", id, image} 並等 {type:"ack", id}；ackMs 內沒有（或沒有 BroadcastChannel）→ false。 */
@@ -236,30 +247,38 @@ export function postReturn(id, image, ackMs = RETURN_ACK_MS) {
 
 /**
  * C8.1 不變量：按「傳回」後圖一定落地一處——原分頁那一格收下（ack），或存進 My Designs。
- * 匯出整張 PNG → postReturn → 沒 ack 就 save(ctx, png)（= blocks/my-designs.js saveToMyDesigns，與面板同一個）。
- * report(msg) 顯示結果；回 "returned" | "saved" | "failed"。
+ * 匯出整張 PNG → postReturn → 沒 ack 就 save(ctx, png, {previewOnlyIfTooBig})（= blocks/my-designs.js saveToMyDesigns，與面板同一個；
+ * 原檔超過 20MB 改只存預覽）→ 存也失敗（網路／伺服器）→ PNG 下載到電腦（最後一道落地）。
+ * report(msg) 顯示結果；回 "returned" | "saved" | "downloaded" | "failed"（"failed" = 連匯出都失敗，沒有圖可落地）。
  * @param {{ exportArtboard: (o: object) => Promise<Blob> }} ctx
  * @param {{ id: string, label: string }} ret
  * @param {(msg: string) => void} [report]
- * @param {{ ackMs?: number, save?: (ctx: object, png: Blob) => Promise<{ ok: boolean, message?: string }> }} [opts]
+ * @param {{ ackMs?: number, save?: (ctx: object, png: Blob, o: { previewOnlyIfTooBig: boolean }) => Promise<{ ok: boolean, previewOnly?: boolean, message?: string }>, download?: (png: Blob, name: string) => void }} [opts]
  */
-export async function sendBack(ctx, ret, report, { ackMs = RETURN_ACK_MS, save } = {}) {
+export async function sendBack(ctx, ret, report, { ackMs = RETURN_ACK_MS, save, download = downloadBlob } = {}) {
+  let png;
   try {
     report?.("傳回中…");
-    const png = await ctx.exportArtboard({ format: "png" });
+    png = await ctx.exportArtboard({ format: "png" });
     if (await postReturn(ret.id, await blobToDataUrl(png), ackMs)) {
       report?.(`✅ 已傳回 ${ret.label}`);
       return "returned";
     }
     report?.("原分頁沒有回應，存進我的設計中…");
-    const saveFn = save ?? (await import(`${BLOCKS_BASE}my-designs.js`)).saveToMyDesigns;
-    const r = await saveFn(ctx, png);
+    let r;
+    try {
+      const saveFn = save ?? (await import(`${BLOCKS_BASE}my-designs.js`)).saveToMyDesigns;
+      r = await saveFn(ctx, png, { previewOnlyIfTooBig: true });
+    } catch (err) {
+      r = { ok: false, message: err?.message || String(err) };
+    }
     if (r?.ok) {
-      report?.("原分頁已關，已存進我的設計");
+      report?.(r.previewOnly ? "原分頁已關，已存進我的設計（原檔超過 20MB，只存了預覽圖）" : "原分頁已關，已存進我的設計");
       return "saved";
     }
-    report?.(`原分頁已關，存進我的設計失敗：${r?.message || "未知原因"}。請用「My Designs」面板或匯出另存。`);
-    return "failed";
+    download(png, `${ret.label || "傳回"}.png`);
+    report?.(`原分頁已關，存進我的設計失敗（${r?.message || "未知原因"}），已把 PNG 下載到電腦。`);
+    return "downloaded";
   } catch (err) {
     console.error("[pro dock] 傳回失敗", err);
     report?.(`❌ 傳回失敗：${err?.message || err}`);
