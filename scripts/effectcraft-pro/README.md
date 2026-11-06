@@ -1,0 +1,49 @@
+# effectcraft-pro 建置鏈（EC.1）
+
+把 [storytold/effectcraft](https://github.com/storytold/effectcraft)（MIT OR Apache-2.0）的網頁版建成可部署的靜態目錄：上游自己的 `cargo xtask web`（不用 Trunk）。結構同 `scripts/filmcraft-pro/`；共用步驟在 `scripts/craft-web-build/lib.sh`。規格：`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/engine-route-plan-20261106.md` §9「EC」。
+
+## 一鍵建置
+
+```powershell
+powershell -ExecutionPolicy Bypass -File D:\Work\scripts\effectcraft-pro\build.ps1
+```
+
+輸出：`%LOCALAPPDATA%\awarewave\effectcraft-dist\<rev前7碼>-<inputs前7碼>\`（`EFFECTCRAFT_HOME` 可改 base），並把這次的目錄名寫進 `effectcraft-dist\LATEST`。`inputs7` = sha256(`PIN.json`＋`scripts/craft-web-build/fonts.json`＋本資料夾所有 `*.patch`) 前 7 碼。組裝在 `.staging-*`、`SHA256SUMS -c` 通過才原子換名；失敗不動既有目錄。首次約 10 分鐘。
+
+內容＝xtask 產物（`index.html`、`effectcraft_web.js`、`effectcraft_web_bg.wasm`、`worker.js`、`audio-worklet.js`、`sw.js`、`snippets/`、`manifest.webmanifest`、`favicon.svg`、`icon-256.png`、`icon-512.png`）＋`NOTICE`（末尾附 provenance）、`ATTRIBUTION.md`、`LICENSE-MIT`、`LICENSE-APACHE`＋`licenses/`（本建置加進 wasm 的字型各一份 OFL）＋`.wasm`／`.js` 的 `.gz`＋`SHA256SUMS`。
+
+build.sh 機械檢查（任一不過即 FATAL、不出產物）：兩個 repo checkout 到釘的 rev；補丁 `git apply --check`；wasm-bindgen＝PIN；wasm-opt＝PIN 且 xtask 輸出裡真的跑了；`fonts.json` 字型 sha256；六個必備檔＋`snippets/`；wasm 內含 `NotoSansTC-Regular`、`NotoSerifTC-Regular`；`craft_brand_scan`（上游 `docs/brand/` 的標誌不得出現在任何產物檔，含 wasm）；`NOTICE`／`ATTRIBUTION.md`／`LICENSE-*` 在。
+
+## 字型（跟 FilmCraft 不同）
+
+EffectCraft 不用 craft-fonts 的 `CRAFT_FONTS_DIR`：字型以 `include_bytes!` 編進 wasm（`crates/text/src/fonts.rs:21-27`），每個 worker 的引擎都有。build.sh 從補丁後的 `fonts.rs` 讀出 `include_bytes!` 的 `assets/fonts/*` 檔，上游沒附的（＝補丁加的）從 `fonts.json` 下載驗 sha256 後複製進 `$SRC/assets/fonts/`，不另列一份清單；先 `git clean` 該資料夾，舊檔不會被編進去。字型下載到自己的 craft-fonts checkout `~/awarewave/craft-fonts-effectcraft`（不碰向量版、畫布版共用的 `~/awarewave/craft-fonts`）。
+
+## 前置需求（一次性）
+
+WSL Ubuntu＋rustup stable（含 `wasm32-unknown-unknown`）＋`git python3 curl gzip`。wasm-bindgen CLI 由 build.sh 依 PIN 裝到 `~/awarewave/tools/wasm-bindgen-<版本>/`。wasm-opt 取自 `~/.cache/trunk/wasm-opt-<PIN wasmOpt>/`（找不到即 FATAL；補法：先跑一次 `scripts/photocraft-pro/build.ps1`）。原始碼在 `~/awarewave/effectcraft-src`，每次建置 `checkout --force` 還原上次的補丁。
+
+## PIN.json
+
+| 欄位 | 意義 |
+|---|---|
+| `repo` / `rev` | storytold/effectcraft 與 commit：tag v0.21.1（11-06 五閘試建的同一顆，`p0-reeval-gates-20261106.md` §1） |
+| `craftFontsRepo` / `craftFontsRev` | 只當 `fonts.json` 的下載目的地與授權檔來源（`licenseFrom`）；EffectCraft 上游 CI 不用 craft-fonts，沿用 FilmCraft 的同一顆 |
+| `wasmBindgen` | wasm-bindgen CLI 版本（上游 `docs/web.md:15`、`xtask/src/main.rs` `WASM_BINDGEN`） |
+| `wasmOpt` | `~/.cache/trunk/wasm-opt-<值>/`；xtask 在 wasm-opt 跑不起來時會靜默跳過最佳化，所以另查 xtask 輸出有 `$ "wasm-opt"` |
+
+## 補丁
+
+| 檔 | 做什麼 |
+|---|---|
+| `tc-fonts.patch` | `crates/text/src/fonts.rs`（1 檔 +4 −1）：Noto Sans TC、Noto Serif TC 兩個 static 列入內建清單（origin `bundled`）。來源紀錄 `video-workbench/docs/p0-reeval-evidence/effectcraft-tc-fonts.patch`；之後以本檔為準 |
+| `no-artcraft-marks.patch` | `crates/ui-egui/src/header.rs`：拿掉 `include_bytes!("../../../docs/brand/artcraft-mark.png")`，`paint_logo` 改成不畫（呼叫點：頁首 About 按鈕 `header.rs:41`、About 對話框 `panels/dialogs.rs:390`；按鈕還在、只是沒圖）。原因：上游 `docs/brand/LICENSE-brand.txt` 規定改過的版本必須移除 ArtCraft 標誌。未補丁的試建產物 `craft_brand_scan` → `HIT effectcraft_web_bg.wasm ['artcraft-mark.png']` |
+
+升級：先查上游是否已內建繁中字型／嵌入橋 → 改 `PIN.json` → `build.ps1`；`git apply --check` 失敗＝重排補丁，正式站不受影響。
+
+## 已知上游問題（不在這裡修）
+
+重開專案後素材全部離線：`footage.missing` 列出全部，但檔案都在；對其中一個呼叫一次 `footage.relink` 就全部連回（`p0-reeval-gates-20261106.md` §3 ②）。頁面（EC.2）重開專案後補這一個呼叫。
+
+## 回退
+
+刪 `scripts/effectcraft-pro/`；產物目錄與 WSL 內的原始碼不影響任何正式環境，可手動刪。

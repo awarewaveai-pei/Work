@@ -1,0 +1,8 @@
+{
+  "repo": "https://github.com/storytold/effectcraft",
+  "rev": "df4cc0932803f6183151083a5dfdd175f9d0a4ca",
+  "craftFontsRepo": "https://github.com/storytold/craft-fonts",
+  "craftFontsRev": "b076417b5880bd4154bd22f00695b1d28c6bea83",
+  "wasmBindgen": "0.2.129",
+  "wasmOpt": "version_131"
+}
