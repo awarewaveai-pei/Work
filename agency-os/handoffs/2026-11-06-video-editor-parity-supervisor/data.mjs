@@ -26,7 +26,7 @@ export const NOW = [
   { what: '剪輯、分割、複製、刪除、多軌、轉場、濾鏡、匯出 1080p。', state: 'yes', ev: '既有功能，tests/tools-editor.cjs 真實匯出過。' },
   { what: '上傳大支影片不會「頁面通訊逾時」。', state: 'no', ev: '已修好並推上 main（6d3dda8f6），還沒部署到 video.aware-wave.com；部署要你說可以。' },
   { what: '版面跟參考一樣（圖示側欄、可收合、整片設定、播放列）。', state: 'yes', ev: '2026-11-06 卡 ED.1（9df955245），還沒部署到 video.aware-wave.com。參考沒有的片頭、調色、影格率、峰值表、多軌都還在，搬到對應位置。' },
-  { what: '多選、磁吸、磁性主軌、波紋刪除、快捷鍵全套。', state: 'no', ev: '卡 ED.2。' },
+  { what: '多選、磁吸、磁性主軌、波紋刪除、快捷鍵全套。', state: 'yes', ev: '2026-11-06 卡 ED.2（5b726b2eb），還沒部署到 video.aware-wave.com。tests/ed2-timeline.cjs 在真瀏覽器把每個新鍵實按一次。' },
   { what: '字幕辨識、翻譯、剪贅字在剪輯器裡完成。', state: 'no', ev: '卡 ED.10、ED.11；現在要跳去字幕工具。' },
   { what: '剪輯 Agent（打字叫它剪）。', state: 'no', ev: '卡 ED.13，最後做。' },
 ];
@@ -35,6 +35,7 @@ const todo = (id, plain) => ({ id, plain, status: 'todo' });
 const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 const VW = 'VW/scripts/tools-editor.js';
 const ED1 = '9df955245';
+const ED2 = '5b726b2eb';
 
 export const STEPS = [
   { n: 1, code: 'ED.1', title: '版面骨架', plain: '例：左邊一排圖示（素材、文字、音訊…），按「«」收起來；右邊沒選片段時顯示整片設定；播放列有跳頭尾、前後一秒、循環、720P／1080P、全螢幕。',
@@ -49,16 +50,16 @@ export const STEPS = [
       todo('ED.1.4', '預覽畫質 720P／1080P：要先產生低解析度的預覽檔，才不會是假按鈕。'),
     ] },
   { n: 2, code: 'ED.2', title: '時間軸操作', plain: '例：按住 Shift 點三個片段一起拖；開「磁性主軌」後刪掉中間一段，後面自動補上；按 ? 跳出快捷鍵表。',
-    gate: '快捷鍵表上每一個鍵都實際按過；多選拖曳、磁吸、波紋刪除各有指名測試。', risk: 'Medium', model: 'Opus', status: 'not_started', depends: ['ED.1'],
+    gate: '快捷鍵表上每一個鍵都實際按過；多選拖曳、磁吸、波紋刪除各有指名測試。', risk: 'Medium', model: 'Opus', status: 'done', commit: ED2, depends: ['ED.1'],
     what: '多選、磁吸開關、磁性主軌、波紋刪除、片段與樣式複製貼上、標記跳轉、縮放全套、片段縮圖與波形、軌道中文名／每軌＋／上下移、片段上音量與轉場鈕、快捷鍵表、說明、J/K/L',
     files: [VW, 'VW/shared/editor-model.js'],
     items: [
-      todo('ED.2.1', '多選與整組拖曳、複製貼上片段、複製貼上樣式。'),
-      todo('ED.2.2', '磁吸、磁性主軌、波紋刪除。'),
-      todo('ED.2.3', '縮放、標記跳轉、J／K／L 倒播快播、快捷鍵表。'),
-      todo('ED.2.4', '軌道中文名、每軌＋、上下移；片段顯示縮圖與聲音波形。'),
-      todo('ED.2.6', '工具列每個鍵「圖示＋文字」；軌道標頭「圖示＋中文名」加 ＋、眼睛、上下移、靜音。'),
-      todo('ED.2.5', '對照差異：縮放改成 −／＋ 每次 15、自適應全片、預設 50 px/s；時間旁顯示倍速；重做後不保留選取；「刪除並前移」改名波紋刪除。'),
+      done('ED.2.1', '多選與整組拖曳、複製貼上片段、複製貼上樣式。', ED2),
+      done('ED.2.2', '磁吸、磁性主軌、波紋刪除。', ED2),
+      done('ED.2.3', '縮放、標記跳轉、J／K／L 倒播快播、快捷鍵表。', ED2),
+      done('ED.2.4', '軌道中文名、每軌＋、上下移；片段顯示縮圖與聲音波形。', ED2),
+      done('ED.2.6', '工具列每個鍵「圖示＋文字」（加＋字幕；複製／貼上樣式只有圖示；磁吸、磁性主軌是外框開關）；軌道標頭「圖示＋中文名」加 ＋、眼睛、上下移、靜音。', ED2),
+      done('ED.2.5', '對照差異：縮放改成 −／＋ 每次 15、自適應全片、預設 50 px/s；時間旁顯示倍速；重做後不保留選取；「刪除並前移」改名波紋刪除。', ED2),
     ] },
   { n: 3, code: 'ED.3', title: '屬性面板', plain: '例：選一段影片，把濾鏡設成「只套這段」，加光漏和鏡頭震動，在第 2 秒和第 5 秒設關鍵影格讓它放大；輸出的片照樣有這些效果。',
     gate: '每個新效果輸出一次真影片並抽畫面確認；舊專案打開輸出結果不變。', risk: 'High', model: '設計 Fable；做 Opus', status: 'not_started', depends: ['ED.1'],

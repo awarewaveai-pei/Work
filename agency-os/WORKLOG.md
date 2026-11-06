@@ -1,4 +1,20 @@
 # Worklog
+## 2026-11-06（續11）影片剪輯 ED.2 時間軸操作＝參考工作台（5b726b2eb）
+
+- 需求：卡 ED.2（規格 `apps/video-workbench/docs/editor-parity-spec-20261106.md` §1.4／§1.6；對照表 #14、#15、#17、#19、#22–#26、#29–#32；監工台 ED.2.1–ED.2.6）。2026-11-06 在參考工作台逐一讀過工具列提示、三則說明、快捷鍵表、軌道標頭、片段音量線、剪點「新增轉場效果」、縮放 10–200／預設 50／自適應全片（沒按扣點、匯出、送出、刪除）。
+- 做法（`scripts/tools-editor.js`、`shared/editor-model.js`、`styles/tools.css`）：
+  - 選取＝`ed.selected`（屬性面板那段）＋`ed.picks`；`edPicked()` 只在 picks 含 selected 時才算多選，既有「設 ed.selected＝新片段」的程式自動變單選，不必逐處清 picks。
+  - 每個提交的編輯走 `edCommit`→`edMagnet`：主軌片段跟 undo 快照比有變才補空隙（`EditorModel.closeGaps`），其他軌不動；跨軌移動／複製與專案設定（影格率換算）設 `ed.skipMagnet`。舊專案開啟、加標記、改影格率都不補。
+  - 拖曳 `edDragStep`：整組同位移、只檢查非移動片段的重疊；磁吸 `EditorModel.snapShift`（0、播放頭、標記、他段邊緣，8 px），Shift 不吸；新增左側裁切。貼上／多段 Ctrl+D `edPlace`＋`EditorModel.freeStart`（找第一個整組都不蓋到的位置）。樣式欄位 `EditorModel.STYLE`。
+  - 波紋刪除（Alt+Delete，取代「刪除並前移」；移除單次「主軌吸附排列」）、M 加／移除標記、Alt+M／Shift+M、←→ 0.1 秒、J／K／L（倒播靜音、只影響預覽）、縮放 −／＋ 15、Ctrl+=／-／0、Shift+Z、Ctrl+滾輪以游標為中心、Ctrl+S、＋字幕、? 快捷鍵表（只列真的有的鍵；數字欄位鍵等 ED.3）、三則說明（自己的文字）。
+  - 軌道顯示順序＝上到下圖層（字幕 / 文字、疊加 V2、主視訊 V1、旁白 A1、配樂 A2），資料順序不變；標頭圖示＋中文名＋＋／刪除／隱藏／上下移（疊加層）／靜音／均衡。片段：縮圖（thumb.jpg；舊素材從 /media/ 網址推；/generated/ 用影片首格）、波形（waveform.json，只畫片段播放的那段）、音量線（dB −60～+6，拖曳／雙擊 0 dB／↑↓）。重做後不保留選取。時間軸捲動位置跨重畫保留。
+- 順手關掉：時間尺從 ED.1 起沒有刻度——`tools-0.js` 的全域 `function screen()` 蓋掉 `window.screen`，`screen.width` 為 undefined；改用 `innerWidth`，`ed2-timeline` 檢查刻度。
+- 測試更新（行為本來就改了）：`p2-tracks-ui` 軌道畫面順序改上到下並另驗資料順序不變、設入點那段先關磁性主軌；`tools-editor` 重做後先點選後段再加轉場。
+- 與參考不同、留給後面的卡：剪點按鈕目前選「後段片段」開轉場分頁（參考是選剪點本身，ED.7 改）；軌道「＋」用素材挑選視窗（參考是素材分頁頂部提示，ED.4）；多選時屬性面板只顯示最後點的那段（參考可批次改樣式，ED.3）。未部署。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed2-timeline.cjs（20 PASS，真 Edge、隔離資料夾、真上傳素材、舊專案匯出 720p）＋ed1-layout／tools-editor／p1-loop／p2-tracks-ui／p3-roundtrip／remotion-template／editor-media-picker／theme-tokens | exit=0 | ms=82380
+- REVIEW_DONE: critic=Standard | verdict=warn→fixed | findings=0c/4m/0n（Codex gpt-6-sol：+12 dB 舊片段被音量線壓到 +6、被拒拖曳清掉重做、打開磁性主軌不補舊空隙、左裁切越過結尾；四條都修並各有 ed2-timeline 測試。oracle 報告檔中文亂碼（PS 5.1 讀 Codex 輸出用 CP950），依 file:line 與程式碼逐條重建驗證）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=主軌吸附排列 | hits=2（監工台 ED.2.5 與對照表敘述舊狀態，正確保留）
+- 操作者補充（2026-11-06 截圖，經主線 session 轉達）：工具列加「＋字幕」、複製／貼上樣式只有圖示、磁吸／磁性主軌外框開關樣式，已含在 5b726b2eb。
 ## 2026-11-06（續10）影片剪輯 ED.1 版面骨架＝參考工作台（9df955245）＋獨立監工台
 
 - 需求：操作者「版型和功能要跟 seedstar.ai/tools/editor 一模一樣」；參考沒有的功能保留、搬到對應位置；CSS 跟 app.aware-wave.com（主題 token）。規格 `apps/video-workbench/docs/editor-parity-spec-20261106.md` §1／§4；監工台 `agency-os/handoffs/2026-11-06-video-editor-parity-supervisor/`（Dz5uKTSs8RH1moVgbsh5u7）。
