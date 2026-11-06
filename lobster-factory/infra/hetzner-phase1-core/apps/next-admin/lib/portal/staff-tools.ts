@@ -26,7 +26,7 @@ export const STAFF_API_OWNERS: Readonly<Record<string, readonly string[]>> = {
   "/api/ops/clients/[slug]/cs-intents": ["cs"],
   "/api/ops/clients/[slug]/cs-knowledge": ["cs"],
   "/api/ops/clients/[slug]/cs-knowledge-folders": ["cs"],
-  "/api/ops/clients/[slug]/outreach-config": ["outreach"],
+  "/api/ops/clients/[slug]/outreach-summary": ["outreach"],
   "/api/ops/clients/[slug]/schedules": ["ops/schedules", "ops/clients"],
   "/api/ops/schedules": ["ops/schedules", "ops/clients"],
   "/api/cognitive-os/open": ["ops/clients", "collect", "cs"],

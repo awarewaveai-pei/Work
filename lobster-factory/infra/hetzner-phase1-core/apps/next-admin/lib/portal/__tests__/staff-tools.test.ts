@@ -35,7 +35,7 @@ const NEEDS_OTHER_TOOL: Readonly<Record<string, Readonly<Record<string, string>>
     "/api/ops/clients/[x]/collection-sources": "客戶中心的資料蒐集分頁用資料蒐集器的功能",
     "/api/ops/clients/[x]/cognitive-os-import": "客戶中心的資料蒐集分頁用資料蒐集器的功能",
     "/api/ops/clients/[x]/hci-import": "客戶中心的資料蒐集分頁用資料蒐集器的功能",
-    "/api/ops/clients/[x]/outreach-config": "客戶中心的開發信分頁用行銷開發信的功能",
+    "/api/ops/clients/[x]/outreach-summary": "客戶中心的開發信分頁用行銷開發信的功能",
   },
 };
 
@@ -106,7 +106,7 @@ describe("staff tools", () => {
       const files = INDEX.importClosure([...INDEX.files.keys()].filter((f) => roots.some((r) => f.startsWith(r)) && !isRoute(f)));
       for (const f of files) {
         const scan = INDEX.files.get(f)!;
-        // a template URL is judged by its route ("/api/ops/clients/[x]/outreach-config"), not by its leading text: the
+        // a template URL is judged by its route ("/api/ops/clients/[x]/outreach-summary"), not by its leading text: the
         // leading text names the broad owner and would hide the narrow one (Codex 2026-10-24, partialreview-2065404a)
         const templated = new Set(scan.templates.map((t) => t.prefix));
         const literal = scan.calls.filter((c) => !templated.has(c) || scan.calls.filter((x) => x === c).length > scan.templates.filter((t) => t.prefix === c).length);
