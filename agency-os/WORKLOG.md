@@ -12,6 +12,15 @@
 - REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin (deployed 0fcdc1b34; npm test passed; smoke all OK) | exit=0 | ms=240000
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=outreachJson|AiScope | hits=14
+## 2026-11-06（續31）影片剪輯 ED.1.4：預覽畫質 720P／1080P 播真的 720p 預覽檔（`836de9121`、`2edb0c645`、`87f6021ec`）
+
+- 規格 `VW/docs/ed3-properties-spec-20261106.md` §11（`VW`＝`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`）。`VW/backend/media-store.cjs` `transcode()` 合併 proxy 與新 `preview720.mp4|webm`（短邊 720）；`preview(url)` 第一次問才排隊做（同 `derive()`、一次一支、逾時 max(120s, 2×片長)），回覆不等轉檔（`{making}`）；`POST /api/vw/media/preview`；`server.cjs` 放行檔名。剪輯器播放列 720P／1080P 兩鈕（存 `tools.editor.layout`，預設 1080P），`edPlayUrl` 選舞台 src，製作中每 2 秒再問、照播原檔並顯示「正在產生 720P 預覽檔…」。輸出仍讀原檔（`editor-export.cjs` 未動）。
+- `VW/tests/ed1-layout.cjs:126` 期望值補 `closed: []`（ED.3.6 起就紅，未被發現）與 `preview`。
+- 範圍外：本 session 跑測試時 hook 報另一 session `9c91c493` 的 next-admin `lib/outreach/org-ai-key.ts`／`__tests__/org-ai-key.test.ts` 回到 HEAD——非本 session 動作。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed14-preview.cjs → 4 PASS（making 先回、之後 preview720.mp4 1280×720 可下載、並行共用、360p／非媒體庫回 null；Edge 實切 720P：提示＋照播原檔→換 preview720 videoHeight 720 同一秒；1080P 回原檔 videoHeight 1080；重開仍 720P；0 select；截圖看過） | exit=0 | ms=10144
+- REALTEST_EVIDENCE: tool=Bash | cmd=gate、sidebar-overlays、test-isolation、media-store、ed3-legacy-golden（9）、editor-render、media-contract、p2-mix、p2-review-fixes、p2-subtitles、p2-tracks-ui、ed1-layout 全 exit 0 | exit=0 | ms=290000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n（Codex `agency-os/reports/oracle/2026-11-06-partialreview-7a32bf39.md` 2 項全修→`2edb0c645`；`-c2b2cf87.md` 3 項全修→`87f6021ec`，第二次報先寫不變量 I1–I3 於 commit）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=preview720\|/media/preview\|edPlayUrl\|edPreview720\|rightOpen: false | hits=27（本卡檔案＋ed1-layout 一處已修）
 ## 2026-11-06（續30）客戶自己的 Gemini 金鑰用於所有外聯 AI 步驟
 
 **根因**：只有寫信（`NA/lib/outreach/generate.ts:153-190`）讀客戶 BYO Gemini；研究、事實核對（多數決 2–3 次）、回信分類（每封約 4／5 次呼叫）一律用平台免費金鑰（每天 500 次，所有客戶共用）→ 客戶申請金鑰幾乎不增加額度。
