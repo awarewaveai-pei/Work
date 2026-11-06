@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-06（續23）畫布專業版第三批上線（809a1ac9c）：條碼、AI 範圍、擴圖對齊、AI 修圖；正式站實測
+
+- 主 session 用操作者登入（內建瀏覽器）實測 12 面板 → 缺陷交 session A（`428d7835b`）、B（`45568c34b`，含 `placeImage {at}`），合併部署 `809a1ac9c`。
+  - C1 AI 去除／生成填色改到選取外：AI 回整張圖直接換上 → 只取遮罩內、遮罩外保留原像素；正式站真打：框 (100,100,300,200) 外的黃色與條碼不變。
+  - C2 條碼只剩 4×80 一條線（PhotoCraft SVG 匯入把整排 rect 併成一形狀、text 缺字型被丟）→ 修後正式站完整條碼＋文字，放成群組。
+  - M1 擴圖置中且高度不同 → `placeImage {at}`；正式站向右擴新圖層 [0,0,2160,1080] 與原圖對齊（畫布不自動放大）。
+  - M2 新面板 `ai-edit`（Studio 既有 `/api/tools/studio/generate`＋參考圖，按鈕標價）；正式站 Nano Banana 2 NT$2.2 加雲成功，新圖層。
+  - m1 範本庫補「符合／填滿畫布」；m2 面板動作時分頁閃現與狀態列訊息：需改 PhotoCraft 才能藏，主 session 依原則不加補丁（接受閃現）。
+- 驗證：整合樹 tsc 0、vitest 509 files／4310 passed；sg-deploy `809a1ac9c` healthy 16s、smoke 全 OK；正式站實測如上（AI 真打：去除、擴圖、AI 修圖各 1 次）。
+- 未完：C3.4／C5.3 由操作者自己用過；C6；C7.2 退場分支待重接；AI 去除框內補色與周圍略有色差（模型輸出，非範圍問題）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=sg-deploy.sh next-admin + 正式站內建瀏覽器實測 barcode/ai-fill/genfx/ai-edit | exit=0 | ms=600000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2m/0n（A、B 各自 Codex 兩到三輪，成立皆修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=ai-edit | hits=32
 ## 2026-11-06（續22）影音工作台 PJ.1：一支影片＝一集；舊剪輯專案收進專案頁（`71aea42f2`）
 
 - 根因：專案頁的「集」與剪輯器自己的清單（`tools.editor.projects`）互不相連，另有死清單 `appToolProjects`；剪輯檔不屬於任何一集。規格 `VW/docs/pj-project-spine-spec-20261106.md` §2 PJ.1（`VW`＝`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`）。
