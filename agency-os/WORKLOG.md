@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-06（續32）客戶 Gemini 金鑰：Codex 補審 4 項修正（0fcdc1b34，已部署）
+
+- Codex 審 23e25fcaa（`agency-os/reports/oracle/2026-11-06-partialreview-feb5d02b.md`）3 項＋審修正（`…-069b4239.md`）1 項，全修：
+  - M1 `billedOrgId` 是 root org（`NA/lib/entitlements/subject.ts:69-71`）→ 子 org 自己的金鑰沒被用。
+  - M2 查找用全域 write client，但自有外聯資料庫的客戶 connector 在自己的庫（`NA/lib/outreach/db-client.ts:23-25`）。
+  - M3 查詢錯誤被快取成「沒金鑰」5 分鐘。
+  - M4 快取只按 org id，兩個資料庫同 org id 會共用金鑰。
+- 現狀：`outreachJson(scope, args)`，`AiScope {db, organizationId}` 由呼叫端給（讀 lead／reply 的那個庫）；順序＝行動 org → 帳務 root → 平台金鑰；無 db＝平台。錯誤不快取。快取＝WeakMap 依資料庫再依 org。呼叫端：generate autoDecision、pipeline applyPolicy（`PipelineDeps.db`）、研究 sink、gmail-sync classifyReply＋route、claim-consistency route。
+- 部署時 hook 提示 video-workbench 兩檔「回到 HEAD」：該 session 已於 18:34 commit（87f6021ec），沒有遺失。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/ai lib/outreach lib/collect app/api/outreach app/api/internal/outreach (94 files 893 passed); mutation per-db cache→共用 map 指名測試紅、還原綠 | exit=0 | ms=9000
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin (deployed 0fcdc1b34; npm test passed; smoke all OK) | exit=0 | ms=240000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=outreachJson|AiScope | hits=14
 ## 2026-11-06（續30）客戶自己的 Gemini 金鑰用於所有外聯 AI 步驟
 
 **根因**：只有寫信（`NA/lib/outreach/generate.ts:153-190`）讀客戶 BYO Gemini；研究、事實核對（多數決 2–3 次）、回信分類（每封約 4／5 次呼叫）一律用平台免費金鑰（每天 500 次，所有客戶共用）→ 客戶申請金鑰幾乎不增加額度。
