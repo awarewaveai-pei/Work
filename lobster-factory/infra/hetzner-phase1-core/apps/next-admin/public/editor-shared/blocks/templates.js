@@ -18,5 +18,18 @@ export default {
     });
     body.appendChild(wrap);
     const note = document.createElement("div"); note.className = "info"; note.textContent = "套用會改畫布尺寸，不動現有物件。"; body.appendChild(note);
+    // 符合／填滿畫布（舊編輯器 CanvasEditor.tsx:1059、:2222-2223）：選用的 ctx.fitLayer，宿主沒有就不出現（向量版沒有）。
+    if (typeof ctx.fitLayer === "function") {
+      const fit = document.createElement("div"); fit.className = "grid2"; fit.style.marginTop = "6px";
+      [["fit", "符合畫布", "選取的圖層縮放到剛好放進畫布"], ["fill", "填滿畫布", "選取的圖層放大到填滿畫布（超出的部分在畫布外）"]].forEach(([mode, label, tip]) => {
+        const b = document.createElement("button"); b.className = "btn btn-ghost"; b.dataset.fit = mode; b.textContent = label; b.title = tip;
+        b.onclick = async () => {
+          try { await ctx.fitLayer(mode); ctx.info("✅ 已" + label); }
+          catch (e) { ctx.info("⚠️ " + label + "失敗：" + e.message); }
+        };
+        fit.appendChild(b);
+      });
+      body.appendChild(fit);
+    }
   },
 };

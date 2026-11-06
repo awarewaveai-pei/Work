@@ -6,7 +6,7 @@
 | 方法 | 回傳 | 語意（真品指令） |
 |---|---|---|
 | `placeSvg(svg, name?)` | `{ids}` | SVG 字串置入視窗中央、選取；成為一個群組（`file.place` 本就回一個群組，多於一個再 `object.group`） |
-| `placeImage(blob, name?)` | `{ids}` | 點陣圖內嵌置入、選取（同上） |
+| `placeImage(blob, name?, opts?)` | `{ids}` | 點陣圖內嵌置入、選取（同上）。**選用參數** `opts.at = [x, y]`：圖片（整張、含透明邊）左上角在文件裡的座標（文件像素）；宿主不支援或沒給 → 照舊置中（向量版不支援，忽略） |
 | `selectedImage()` | `{id, blob, transform, width, height}` 或 `null` | 唯一選取的內嵌圖片：原檔 bytes（`links.unembed` 不帶 path，不改文件）、`transform` = 圖片 xf `[a,b,c,d,e,f]`、像素寬高；沒選／多選／非圖片 → `null` |
 | `replaceImage(id, blob)` | `{id}` | 換像素：中心、大小、旋轉、堆疊位置不變，新圖被選取（見下） |
 | `exportArtboard({format, ppi?, background?, quality?, artboard?, width?, height?})` | `Blob` | 整個畫板（`app.export` 不帶 path）；background `transparent/white/black/#rrggbb`；quality 0–1 或 0–100 皆轉成 0–100 整數（真品只收 u8）；WebP 一律無損 |
@@ -18,7 +18,7 @@
 | `host` | 物件（非函式，必備） | 宿主描述，見下「host」。面板要的編輯器專屬值（存檔標記、原始檔副檔名、清單過濾、文案）只讀這裡，不寫死編輯器名 |
 | `importLegacy(file)` | `{objects}` | **選用。** 舊專案檔（`.design.json`）轉成向量並置入（`placeSvg`）；`objects` = 轉入的物件數；失敗 reject `Error` |
 | `selectionMask()` | `Blob` 或 `null` | **選用。** 目前選取範圍轉成遮罩 PNG（選取處不透明）；沒有選取範圍 → `null` |
-| `fitLayer(mode)` | `{id}` | **選用。** `mode` = `'fit'`（縮到完整放進畫布）或 `'fill'`（縮到蓋滿畫布）；作用中圖層，位置置中、等比 |
+| `fitLayer(mode)` | `{id, ids}` | **選用。** `mode` = `'fit'`（縮到完整放進畫布）或 `'fill'`（縮到蓋滿畫布）；選取的圖層（多選＝合成一塊；沒有選取＝作用中圖層），位置置中、等比。`id`＝作用中圖層、`ids`＝動到的圖層。範本庫有它才顯示「符合畫布／填滿畫布」 |
 
 **選用 = 宿主沒有就不提供**（ctx 上沒有該屬性，不是丟錯的空函式）；面板以 `typeof ctx.<名稱> === "function"` 決定要不要顯示對應控制項，不得假設存在。必備項（上表其餘各列與 `host`）每個宿主都要有。
 
@@ -54,19 +54,20 @@ My Designs 清單過濾：列出 `metadata.source ∈ listSources`（沒有 meta
 
 ## PhotoCraft（`ctx-photocraft.js`；實測 2026-11-06，dist `98bcbfa-f007c95`）
 
-網頁版沒有路徑型存檔（PC `crates/engine/src/cmd/file_cmds.rs:76`），bytes 一律走「選單 → 存檔對話框（網頁版直接用建議檔名）→ `photocraft:save {name, bytes}`」；開檔＝父頁 `postMessage({type:'photocraft:open', name, bytes})`。所以 ctx 一次只跑一個方法。`photocraft:save` 沒有 id，存檔以**副檔名**配給等待者（Quick Export＝`.png`、Save a Copy＝`.psd`、Export As＝所選格式）。暫用文件一律取唯一名字 `awarewave-tmp-*`，關檔前以名字找回 index、`save:'discard'` 只用在它身上；找不到就不關，使用者在 iframe 開／關分頁也不會關錯。`ex(c,p)`＝`photocraft.execute`；`inv(id)`＝`photocraft.request('ui.menu.invoke',{id})`；文件清單＝`request('ui.inspect').session`（`documents[]`、`active`）；`document.inspect`、`prefs.set` 是引擎指令（`execute`），`window.photocraft` 沒有 `docInspect`。
+網頁版沒有路徑型存檔（PC `crates/engine/src/cmd/file_cmds.rs:76`），bytes 一律走「選單 → 存檔對話框（網頁版直接用建議檔名）→ `photocraft:save {name, bytes}`」；開檔＝父頁 `postMessage({type:'photocraft:open', name, bytes})`。所以 ctx 一次只跑一個方法。`photocraft:save` 沒有 id，存檔以**副檔名**配給等待者（Quick Export＝`.png`、Save a Copy＝`.psd`、Export As＝所選格式）。**能不開暫用文件就不開**（`selectedImage` 走 圖層 › 快速轉存）；必須開的（匯入 bytes 只有 `photocraft:open` 一條路、選取遮罩要副本）以**內容的名字**命名（例「awarewave.svg」「選取範圍」「<圖層名>.png」），取名時避開所有開著的文件名（重名加「 (2)」…）：開的那一下分頁與狀態列「已開啟 …」顯示的是內容，不是內部暫存名。關檔前以名字找回 index、`save:'discard'` 只用在它身上；找不到就不關、同名不只一份就不關並報錯，使用者在 iframe 開／關分頁也不會關錯。`ex(c,p)`＝`photocraft.execute`；`inv(id)`＝`photocraft.request('ui.menu.invoke',{id})`；文件清單＝`request('ui.inspect').session`（`documents[]`、`active`）；`document.inspect`、`prefs.set` 是引擎指令（`execute`），`window.photocraft` 沒有 `docInspect`。
 
 | 方法 | 序列 | 原文件 undo |
 |---|---|---|
-| `placeSvg` / `placeImage` | 開暫用文件 → `ex('layer.copyToDocument',{document:原, center:true, name})` → `ex('file.close',{document:暫, save:'discard'})` → `ex('document.activate')`。SVG 成 **Shape 圖層**（向量）；沒有文件時這張圖直接成為文件 | 1 |
-| `selectedImage` | 作用中圖層（`ex('layer.list',{flat:true})` 的 `active`，`kind` 須為 `Pixel`，否則 `null`）→ `ex('layer.duplicate',{layer, document:'new'})` → `ex('image.crop', bounds)` → `inv('file.export.quickExportAsPng')` → 等 save → 關暫用文件。`id`＝圖層 id；`transform`＝`[1,0,0,1,x,y]`；`blob`＝圖層範圍 PNG | 0 |
+| `placeSvg` / `placeImage` | （SVG 先 `splitSvgText`，見下）開暫用文件 →（SVG 的文字）`ex('type.create',{x, y, text, size, font, weight, italic, align, color})` → 頂層多於一個：`ex('select.allLayers')` → `ex('layer.groupLayers',{name})` → `ex('layer.copyToDocument',{document:原, center:true, name})` → `ex('file.close',{document:暫, save:'discard'})` → `ex('document.activate')`。SVG 一個形狀＝一個 **Shape 圖層**；多個形狀或有文字＝一個**群組**（Shape＋文字圖層，向量、可編輯）；沒有文件時這張圖直接成為文件 | 1 |
+| `placeImage` 帶 `at` | 同上到 copy 前：暫用文件讀 `document.inspect` 尺寸、`layer.list` 修剪範圍 tb → `ex('layer.copyToDocument',{document:原, at:[x+tb 中心x, y+tb 中心y], name})`（`at` 對齊修剪範圍中心）→ 回傳 `offset`≠(x,y)：`ex('layer.translate',{layer, dx, dy})`。記下完整框（同 `replaceImage` 的圖片框），之後 `selectedImage` 讀回整張含透明邊 | 1（平移 2） |
+| `selectedImage` | 作用中圖層（`ex('layer.list',{flat:true})` 的 `active`，`kind` 須為 `Pixel`，否則 `null`）→ `inv('layer.quickExportAsPng')`（圖層 › 快速轉存為 PNG：只出這個圖層的修剪範圍，不開文件）→ 等 save → 瀏覽器貼進圖片框（框＝修剪範圍時原樣）。轉存尺寸≠修剪範圍（圖層樣式外擴等）→ 退回 `ex('layer.duplicate',{layer, document:'new'})` → `ex('image.crop', 框)` → `inv('file.export.quickExportAsPng')` → 關副本。`id`＝圖層 id；`transform`＝`[1,0,0,1,x,y]`；`blob`＝圖片框 PNG | 0 |
 | `replaceImage` | 框 F＝舊圖層的圖片框（見下）→ `ex('layer.select',{layer:id})` → 開新圖（暫用文件讀 `document.inspect` 尺寸、`layer.list` 修剪範圍 tb）→ `ex('layer.copyToDocument',{document:原, at:F 左上＋tb 中心, name:舊名})` → 關暫用 → 新圖尺寸≠F：`ex('edit.transform',{layer:新, quad:tb 依「整張→F」比例})`；同尺寸但回傳 `offset`≠F 左上：`ex('layer.translate',{layer:新, dx, dy})` → `ex('layer.delete',{layer:id})`；回新 id | 2（縮放或平移 3） |
 | `exportArtboard` | `inv('file.export.exportAs')` → `{dialog}` → `request('ui.dialog.set',{dialog, field, value})`：`format` png／jpg／webp、`sizing` scale（`scale`％）或 pixels（`width`／`height`）、`transparency`、WebP `lossless`、`quality` 1–100 → `request('ui.dialog.confirm')` → 等 save | 0 |
 | `setArtboardSize` | 有文件：`ex('image.canvasSize',{width, height, units:'px', anchor:'center'})`；沒有：`ex('file.new',{width, height, mode:'rgb', depth:8, background:'white'})`；mm／cm／in／pt 以 dpi 換成像素 | 1 |
 | `openFile` | `photocraft:open {name, bytes}` → 輪詢 `session.documents` 多一份 | 0（新分頁） |
 | `saveAs` | `inv('file.saveACopy')` → 等 save → **PSD**（網頁版存不出 `.pcraft`：PC `crates/ui-egui/src/app/files.rs:236-245`，無路徑一律 `.psd`；主 session 2026-11-06 定案原始檔＝`.psd`） | 0 |
 | `selectionMask` | 沒選取（`ex('document.inspect').hasSelection`）→ `null`；有：`ex('image.duplicate')`（副本帶選取）→ `layer.new.layer` → `edit.fill white` → `select.inverse` → `edit.fill black` → `select.deselect` → `image.crop` 作用中圖層範圍 → Quick Export PNG → 關副本 | 0（選取保留） |
-| `fitLayer` | 作用中圖層範圍 `b`、畫布 `W×H` → 等比 `min`（fit）／`max`（fill）、置中 → `ex('edit.transform',{layer, quad})` | 1 |
+| `fitLayer` | 選取的圖層（`layer.list` 的 `selected`，已選群組裡的不另算；沒有＝作用中圖層）合併範圍 `b`、畫布 `W×H` → 等比 `min`（fit）／`max`（fill）、置中 → `ex('edit.transform',{layers, rect:b 的 [x0,y0,x1,y1], quad})` | 1 |
 
 PhotoCraft 專屬的決定與限制：
 
@@ -84,5 +85,7 @@ PhotoCraft 專屬的決定與限制：
   - 沒有等待者在等「這種副檔名」的存檔（使用者按原生 另存／匯出、或等待者已逾時），由父頁以 `<a download>` 存到電腦，檔名＝訊息的 `name`，bytes 不丟。
   - 殘留風險：面板正在等 `.png` 時使用者剛好按原生 Quick Export PNG，兩筆同副檔名無法分辨（上游 `photocraft:save` 帶 id 後可關掉）。
 - 中途失敗：暫用文件一律關回（`finally`），錯誤原樣拋出；`replaceImage` 失敗會撤掉已加的新圖層，舊圖層不動。
+- **SVG 的文字（`splitSvgText`）**：PhotoCraft 網頁版匯入 SVG 時沒有字型可排文字（usvg 字型庫空，PC `crates/io/src/svg.rs:126-136`），`<text>` 會被丟並跳「needs a font」通知（同檔 `:1006`；2026-11-06 正式站條碼只剩一條線＋這個通知）。所以 ctx 在瀏覽器量每段文字（位置＝SVG 視窗座標＝暫用文件像素、字級×縮放、`text-anchor`→`align`、`fill`、字體：通用名 monospace／sans-serif／serif → 網站字型庫的 JetBrains Mono／Inter／PT Serif，具名照給），從 SVG 拿掉，在暫用文件用 `type.create` 建成文字圖層（字型用到才由網站下載，到了自動重排）。限制：每段取第一個 x/y、tspan 攤平成一行、旋轉／斜切不帶過去。
+- **暫用文件仍看得到的部分**：匯入只能走 `photocraft:open`（＝檔案 › 開啟：開成分頁、作用中、狀態列寫「已開啟 <名>」，PC `crates/ui-egui/src/app/files.rs:183`；控制 API 沒有清狀態列或不開分頁置入的方法）。所以 `placeSvg`／`placeImage`／`replaceImage` 開的那一下分頁會閃一下、狀態列留「已開啟 <內容名>」；`selectionMask` 的副本分頁也會閃一下。要完全不顯示，需在 `scripts/photocraft-pro/web-host-api.patch` 加一條把 bytes 直接放進目前文件的訊息（PhotoCraft 拖檔到畫布用的 `place_inbox`，PC `apps/photocraft-web/src/web.rs:483-491`；R0-PLAN C1.4 的備案）。
 - 啟動失敗（`photocraft:failed`，無 WebGPU／WebGL2）時，`ready()` 與所有方法 reject 帶原因。
 - 第一次 `ready()` 後介面設成繁中（`photo-pro-dock/dock.js` `applyDefaultLanguage`，localStorage 旗標），之後尊重使用者的偏好。

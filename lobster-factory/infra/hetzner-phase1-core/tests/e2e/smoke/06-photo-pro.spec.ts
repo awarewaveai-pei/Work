@@ -157,6 +157,20 @@ test.describe('Photo Pro (PhotoCraft) smoke', () => {
     await pc('file.close', { document: 1, save: 'discard' });
     await pc('document.activate', { document: 0 });
     const pixelId = async () => (await layers()).find((l) => l.kind === 'Pixel' && l.name === 'e2e')!.id;
+    // What PhotoCraft shows while the panels work (tab names, status bar, notices), sampled all along: no internal scratch
+    // name may appear, no SVG "needs a font" notice. maxDocs: the most documents open at once since the last reset.
+    const seen = new Set<string>();
+    let sampling = true, maxDocs = 0;
+    const sampler = (async () => {
+      while (sampling) {
+        const u = await frame!.evaluate(() => (window as unknown as PcWindow).photocraft.request('ui.inspect')).catch(() => null);
+        if (u) {
+          maxDocs = Math.max(maxDocs, u.session.documents.length);
+          for (const t of [...u.session.documents.map((d: { name: string }) => d.name), u.status, ...(u.notices ?? []).map((n: { title: string }) => n.title)]) if (t) seen.add(String(t));
+        }
+        await page.waitForTimeout(40);
+      }
+    })();
     const selectPixel = async () => pc('layer.select', { layer: await pixelId() });
     expect((await layers()).length, 'setup: background + e2e layer').toBe(2);
 
@@ -172,11 +186,37 @@ test.describe('Photo Pro (PhotoCraft) smoke', () => {
       expect((await active()).kind).toBe('Shape');
     });
 
-    await check('條碼：多一個 Shape 圖層', async () => {
+    await check('條碼：一個群組＝底＋每一條（Shape）＋底下文字（文字圖層），整條寬', async () => {
       await openPanel('barcode');
-      const before = (await layers()).length;
+      const top = async () => (await layers()).filter((l) => (l as Layer & { parent?: number | null }).parent == null);
+      const before = (await top()).length;
       await body('barcode').locator('#bcGo').click();
-      await expect.poll(async () => (await layers()).length, { timeout: 60_000 }).toBe(before + 1);
+      await expect.poll(async () => (await top()).length, { timeout: 60_000 }).toBe(before + 1);
+      const all = await layers() as (Layer & { parent?: number | null })[];
+      const g = all.find((l) => l.active)!;
+      expect(g.kind, 'the barcode lands as one group').toBe('Group');
+      const kids = all.filter((l) => l.parent === g.id);
+      expect(kids.filter((l) => l.kind === 'Shape').length, 'background + bars (2026-11-06 prod: one 4×80 bar)').toBeGreaterThan(20);
+      expect(kids.find((l) => l.kind === 'Type')?.name, 'the human-readable text').toBe('AWAREWAVE-001');
+      expect(g.bounds![2], `group ${JSON.stringify(g.bounds)}`).toBeGreaterThan(300);
+    });
+
+    await check('placeImage 帶 at：200×120 放在 (50,70) → 圖層框 [50,70,200,120]', async () => {
+      const before = (await layers()).length;
+      await page.evaluate(async () => {
+        const url = '/editor-shared/ctx-photocraft.js'; // served by the app, not a test import
+        const m = await import(url);
+        const c = m.createPhotocraftCtx({ frame: () => document.querySelector('iframe.vp-frame') as HTMLIFrameElement, download: () => {} });
+        const cv = new OffscreenCanvas(200, 120);
+        const g = cv.getContext('2d')!;
+        g.fillStyle = 'teal'; // test pixels, not UI colour
+        g.fillRect(0, 0, 200, 120);
+        await c.placeImage(await cv.convertToBlob({ type: 'image/png' }), 'at.png', { at: [50, 70] });
+      });
+      const placed = (await layers()).find((l) => l.name === 'at')!;
+      expect(placed?.bounds).toEqual([50, 70, 200, 120]);
+      await pc('layer.delete', { layer: placed.id });
+      expect((await layers()).length).toBe(before);
     });
 
     await check('調色：「黑白」套用後圖層換成新 id、名稱不變、位置不變', async () => {
@@ -245,10 +285,14 @@ test.describe('Photo Pro (PhotoCraft) smoke', () => {
       expect(buf.length).toBeLessThanOrEqual(200 * 1024);
     });
 
-    await check('Mockup：#mkOut 出現圖片', async () => {
+    await check('Mockup：#mkOut 出現圖片；讀圖層不開任何分頁（selectedImage＝圖層快速轉存）', async () => {
       await openPanel('mockup');
+      await selectPixel();
+      const docs = (await session()).documents.length;
+      maxDocs = 0;
       await body('mockup').locator('#mkGen').click();
       await expect(body('mockup').locator('#mkOut img')).toBeVisible({ timeout: 120_000 });
+      expect(maxDocs, 'documents open while reading the layer').toBe(docs);
     });
 
     await check('批次匯出：下載數＝勾選數', async () => {
@@ -287,6 +331,20 @@ test.describe('Photo Pro (PhotoCraft) smoke', () => {
       await expect.poll(size, { timeout: 60_000 }).not.toBe(before);
     });
 
+    await check('範本：符合畫布／填滿畫布（選取的圖層等比置中）', async () => {
+      await openPanel('templates');
+      await pc('document.activate', { document: 0 }); // My Designs left its reopened copy active; layers() reads document 0
+      const d = await pc('document.inspect');
+      await selectPixel();
+      const fitted = async () => (await layers()).find((l) => l.active)!.bounds!;
+      await clickUntil(body('templates').locator('[data-fit="fit"]'), page.locator('#photo-pro-dock .vp-status'), /已符合畫布/);
+      await expect.poll(async () => { const b = await fitted(); return (Math.abs(b[2] - d.width) <= 2 || Math.abs(b[3] - d.height) <= 2) && b[2] <= d.width + 2 && b[3] <= d.height + 2; }, { timeout: 60_000 }).toBe(true);
+      const f = await fitted();
+      expect(Math.abs(f[0] + f[2] / 2 - d.width / 2), `centred ${JSON.stringify(f)}`).toBeLessThanOrEqual(2);
+      await body('templates').locator('[data-fit="fill"]').click();
+      await expect.poll(async () => { const b = await fitted(); return b[2] >= d.width - 2 && b[3] >= d.height - 2; }, { timeout: 60_000 }).toBe(true);
+    });
+
     await check('原生 File › Quick Export PNG：父頁收到下載', async () => {
       const d = await download(() => frame!.evaluate(() => (window as unknown as PcWindow).photocraft.request('ui.menu.invoke', { id: 'file.export.quickExportAsPng' })).then(() => undefined));
       const buf = fs.readFileSync((await d.path())!);
@@ -294,13 +352,150 @@ test.describe('Photo Pro (PhotoCraft) smoke', () => {
       expect(buf.subarray(1, 4).toString('latin1')).toBe('PNG');
     });
 
-    await check('暫用文件都關掉了（沒有 awarewave-tmp-* 分頁留下）', async () => {
+    await check('原生 檔案 › 轉存為（JPEG）、另存新檔（PSD）：父頁收到下載', async () => {
+      const req = (m: string, p: Record<string, unknown>) => frame!.evaluate(([m2, p2]) => (window as unknown as PcWindow).photocraft.request(m2, p2), [m, p] as const);
+      const jpg = await download(async () => {
+        const { dialog } = await req('ui.menu.invoke', { id: 'file.export.exportAs' });
+        await req('ui.dialog.set', { dialog, field: 'format', value: 'jpg' });
+        await req('ui.dialog.confirm', { dialog });
+      });
+      expect(jpg.suggestedFilename()).toMatch(/\.jpg$/);
+      expect(fs.readFileSync((await jpg.path())!).subarray(0, 2).toString('hex'), 'JPEG magic').toBe('ffd8');
+      const psd = await download(async () => { await req('ui.menu.invoke', { id: 'file.saveAs' }); });
+      expect(psd.suggestedFilename()).toMatch(/\.psd$/);
+      expect(fs.readFileSync((await psd.path())!).subarray(0, 4).toString('latin1'), 'PSD magic').toBe('8BPS');
+    });
+
+    await check('暫用文件都關掉了；分頁、狀態列、通知從沒出現內部暫存名或「沒有字型」', async () => {
+      sampling = false;
+      await sampler;
       const names = (await session()).documents.map((d: { name: string }) => d.name);
-      expect(names.filter((n: string) => n.startsWith('awarewave-tmp-')), JSON.stringify(names)).toEqual([]);
+      // the test document + the design My Designs reopened, nothing else
+      expect(names.length, JSON.stringify(names)).toBe(2);
+      const bad = [...seen].filter((t) => /awarewave-tmp-|needs a font/i.test(t));
+      expect(bad, 'shown to the user').toEqual([]);
     });
 
     console.log(`\n[photo-pro panels]\n${results.join('\n')}\n[studio routes] ${studio.join(', ')}\n[console errors]\n${[...new Set(errors)].join('\n')}\n`);
     await page.screenshot({ path: screenshotPath('smoke-photo-pro-panels') });
+  });
+
+  // The five ways in (canvas-handoff.ts openInCanvas): each tool's 畫布 button lands in the right editor with that image.
+  // Paid generation and My Designs are answered by page.route; the design's original comes through the download route.
+  test('every entry opens its image in the right editor', async ({ page }) => {
+    test.skip(!CAN_OPEN_PAGE, 'Set OPS_TEST_EMAIL + OPS_TEST_PASSWORD (or PHOTO_PRO_NO_AUTH=1 on a dev server) to open the pages');
+    test.setTimeout(900_000);
+    const results: string[] = [];
+    const fail = (name: string, err: unknown) => {
+      const msg = String((err as Error)?.message ?? err).split('\n')[0];
+      results.push(`FAIL ${name}: ${msg}`);
+      expect.soft(msg, name).toBe('(no error)');
+    };
+    const dataUrl = `data:image/png;base64,${PNG.toString('base64')}`;
+    let psd: Buffer | null = null;
+    const fetched: string[] = [];
+    type Asset = { id: string; object_url: string; source_url?: string; metadata: Record<string, string> };
+    const assets = ([
+      { id: 'png-only', object_url: 'https://e2e.invalid/only.png', metadata: { source: 'studio', prompt: 'PNG only' } },
+      { id: 'psd', object_url: 'https://e2e.invalid/psd-prev.png', source_url: 'https://e2e.invalid/src.psd', metadata: { source: 'canvas', source_name: 'design.psd' } },
+      { id: 'vc', object_url: 'https://e2e.invalid/vc-prev.png', source_url: 'https://e2e.invalid/src.vectorcraft', metadata: { source: 'vector-pro', source_name: 'design.vectorcraft' } },
+    ] as Asset[]).map((a) => ({ object_key: a.id, mime_type: 'image/png', byte_size: 1, created_at: new Date().toISOString(), ...a }));
+    await page.route((u) => /^\/api\/tools\/(studio\/generate|tarot\/generate|tarot\/translate|designs|designs\/download)$/.test(u.pathname), async (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname.endsWith('/translate')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, english: 'tarot card' }) });
+      if (url.pathname.endsWith('/download')) {
+        const want = url.searchParams.get('url') ?? '';
+        fetched.push(want);
+        return route.fulfill(want.endsWith('.psd') && psd ? { status: 200, contentType: 'application/octet-stream', body: psd } : { status: 200, contentType: 'image/png', body: PNG });
+      }
+      if (url.pathname.endsWith('/designs')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, assets: route.request().method() === 'GET' ? assets : [], nextCursor: null, asset: { id: 'x' } }) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, image: dataUrl, seed: 1 }) });
+    });
+    /** After the click: the editor page, its frame's documents once one is open. */
+    const landed = async (path: RegExp) => {
+      await page.waitForURL(path, { timeout: 60_000 });
+      const frame = await pcFrame(page);
+      if (!/photo-pro/.test(page.url())) return null;
+      await inspect(frame!);
+      let docs: { name: string; width: number; height: number }[] = [];
+      await expect.poll(async () => (docs = (await frame!.evaluate(() => (window as unknown as PcWindow).photocraft.request('ui.inspect')) as any).session.documents).length, { timeout: 60_000 }).toBeGreaterThan(0);
+      await expect.poll(() => page.evaluate(() => Object.keys(sessionStorage).filter((k) => k.startsWith('canvas:'))), { message: 'handoff cleared once opened', timeout: 30_000 }).toEqual([]);
+      return docs;
+    };
+    const hydrated = () => page.waitForTimeout(6_000); // a click before React hydrates is lost
+    const entry = async (name: string, run: () => Promise<void>) => {
+      try { await run(); results.push(`PASS ${name}`); await page.screenshot({ path: screenshotPath(`smoke-photo-pro-entry-${name}`) }); }
+      catch (err) { fail(name, err); }
+    };
+
+    // An editable original to hand over: PhotoCraft's own Save a Copy of a small document.
+    await openPage(page);
+    const frame0 = await pcFrame(page);
+    await inspect(frame0!);
+    const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 120_000 }), frame0!.evaluate(async () => {
+      const pc = (window as unknown as PcWindow).photocraft;
+      await pc.execute('file.new', { width: 320, height: 200, background: 'white' });
+      await pc.request('ui.menu.invoke', { id: 'file.saveACopy' });
+    })]);
+    psd = fs.readFileSync((await dl.path())!);
+
+    await entry('studio', async () => {
+      await page.goto('/tools/studio', { waitUntil: 'domcontentloaded' });
+      await hydrated();
+      await page.locator('textarea').first().fill('一隻橘色的貓坐在窗邊');
+      await page.getByRole('button', { name: '生成', exact: true }).click();
+      await page.getByRole('button', { name: /快速編輯/ }).first().click({ timeout: 60_000 });
+      const docs = await landed(/\/tools\/photo-pro/);
+      expect(docs!.map((d) => [d.width, d.height])).toEqual([[96, 64]]);
+    });
+    await entry('tarot', async () => {
+      await page.goto('/tools/tarot', { waitUntil: 'domcontentloaded' });
+      await hydrated();
+      await page.getByRole('button', { name: /圖片模型/ }).click();
+      await page.getByRole('button', { name: /FLUX schnell/ }).click();
+      await page.getByRole('button', { name: /^風格/ }).click();
+      await page.getByRole('button', { name: '慕夏 Mucha' }).click();
+      await page.getByRole('button', { name: '生成風格預覽' }).click();
+      await page.getByRole('button', { name: /快速編輯/ }).click({ timeout: 60_000 });
+      await page.getByRole('button', { name: /在 Canvas 編輯/ }).click({ timeout: 60_000 });
+      const docs = await landed(/\/tools\/photo-pro/);
+      expect(docs!.map((d) => [d.width, d.height])).toEqual([[96, 64]]);
+    });
+    await entry('banner', async () => {
+      await page.goto('/tools/banner', { waitUntil: 'domcontentloaded' });
+      await hydrated();
+      await page.getByRole('button', { name: '在 Canvas Editor 開啟' }).click();
+      const docs = await landed(/\/tools\/photo-pro/);
+      expect(docs!.length).toBe(1);
+      expect(docs![0].name).toMatch(/^banner-.+\.png$/);
+    });
+    await entry('mockup', async () => {
+      await page.goto('/tools/mockup', { waitUntil: 'domcontentloaded' });
+      await hydrated();
+      await page.getByRole('button', { name: /^平\s*拍$/ }).click();
+      await page.getByRole('button', { name: /^平\s*拍$/ }).and(page.locator('.btn-primary')).waitFor({ timeout: 30_000 });
+      await page.locator('input[type=file]').first().setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: PNG });
+      await page.getByRole('button', { name: /合成 Mockup/ }).click({ timeout: 30_000 });
+      await page.getByRole('button', { name: '在畫布編輯' }).click({ timeout: 60_000 });
+      const docs = await landed(/\/tools\/photo-pro/);
+      expect(docs!.map((d) => [d.width, d.height])).toEqual([[96, 64]]);
+    });
+    for (const [i, a] of assets.entries()) {
+      await entry(`designs-${a.id}`, async () => {
+        fetched.length = 0;
+        await page.goto('/tools/designs', { waitUntil: 'domcontentloaded' });
+        await page.waitForSelector('.designs-kebab-btn', { timeout: 60_000 });
+        await hydrated();
+        await page.locator('.designs-kebab-btn').nth(i).click();
+        await page.locator('.designs-kebab-item', { hasText: /畫布編輯|向量編輯/ }).first().click();
+        const docs = await landed(a.id === 'vc' ? /\/tools\/vector-pro/ : /\/tools\/photo-pro/);
+        // the editor fetched the original when there is one, else the image
+        await expect.poll(() => fetched.join(' '), { timeout: 60_000 }).toContain(a.source_url ?? a.object_url);
+        if (a.id === 'png-only') expect(docs!.map((d) => [d.width, d.height])).toEqual([[96, 64]]);
+        if (a.id === 'psd') expect(docs!.map((d) => [d.name, d.width, d.height])).toEqual([['design.psd', 320, 200]]);
+      });
+    }
+    console.log(`\n[photo-pro entries]\n${results.join('\n')}\n`);
   });
 });
 

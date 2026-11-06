@@ -304,7 +304,12 @@ describe("面板呼叫的每個 ctx 方法都在轉接器與契約裡", () => {
     expect(called.size).toBeGreaterThan(5);
   });
   it.each([...calledCtxMethods().keys()].sort())("ctx.%s", (name) => {
-    expect(typeof ctx[name], `${name} 被 ${called.get(name)!.join("、")} 呼叫，轉接器沒有這個函式`).toBe("function");
     expect(contract, `${name} 沒寫進 ctx-contract.md`).toContain(`\`${name}(`);
+    // 契約「選用」：向量宿主可以沒有，呼叫它的面板要先判斷（例 templates.js 的 fitLayer 只在畫布出現）
+    if (!(name in ctx) && /\*\*選用。\*\*/.test(contract.split("\n").find((l) => l.startsWith(`| \`${name}(`)) ?? "")) {
+      for (const f of called.get(name)!) expect(read(`public/editor-shared/blocks/${f}`), `${f} 呼叫選用的 ${name} 前沒判斷`).toContain(`typeof ctx.${name}`);
+      return;
+    }
+    expect(typeof ctx[name], `${name} 被 ${called.get(name)!.join("、")} 呼叫，轉接器沒有這個函式`).toBe("function");
   });
 });
