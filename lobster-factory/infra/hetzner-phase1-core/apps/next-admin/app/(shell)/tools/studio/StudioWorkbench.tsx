@@ -24,6 +24,8 @@ import {
 import { tabStyle, chipStyle, actionPill, ghostBtn } from "@/components/tools/panel-primitives";
 import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
 import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
+import { useCanvasReturn } from "@/components/tools/useCanvasReturn";
+import { STUDIO_RETURN_TOOL, newRefImage, parseStudioSlot, refSlot, replaceRefImage, replaceResultImage, resultSlot, type StudioRefImage } from "./studio-canvas-return";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 import { useDoorHref } from "@/app/DoorContext";
 import { buildSemanticFilename, buildSemanticBase, type SemanticFileMeta } from "@/lib/studio/semantic-filename";
@@ -417,7 +419,7 @@ export default function StudioWorkbench() {
   const [prompt, setPrompt] = useState("");
   const [promptTouched, setPromptTouched] = useState(false);
   const [aspect, setAspect] = useState<AspectRatio>("1:1");
-  const [refImages, setRefImages] = useState<string[]>([]);
+  const [refImages, setRefImages] = useState<StudioRefImage[]>([]);
   const [refMode, setRefMode] = useState<RefMode>("none");
 
   // Multi-model results: one slot per selected model, updated incrementally
@@ -577,6 +579,42 @@ export default function StudioWorkbench() {
   const effectivePrompt = promptTouched ? prompt : assembledPrompt;
 
   const activeResult = results[activeIdx] ?? null;
+
+  // The model's image changed (AI 修圖 or 傳回 from the canvas): its 去背/邊框/mockup results belong to the old image.
+  const clearDerivedFor = useCallback((model: string) => {
+    setSaveStates((prev) => ({ ...prev, [model]: "idle" }));
+    setBgStates((prev) => ({ ...prev, [model]: "idle" }));
+    setOriginalImages((prev) => { const n = { ...prev }; delete n[model]; return n; });
+    setEdgeStates((prev) => ({ ...prev, [model]: "idle" }));
+    setEdgeOriginals((prev) => { const n = { ...prev }; delete n[model]; return n; });
+    setEdgeApplied((prev) => { const n = { ...prev }; delete n[model]; return n; });
+    setMockupState("idle"); setMockups([]); setSavedMockups({});
+  }, []);
+
+  // 傳回 (C8.3): answer within the dock's ~2 s ack wait -- decide from the latest render, place the image, return; the
+  // ref downscale runs after the answer.
+  const resultsRef = useRef(results);
+  resultsRef.current = results;
+  const refImagesRef = useRef(refImages);
+  refImagesRef.current = refImages;
+  useCanvasReturn(STUDIO_RETURN_TOOL, (slot, image) => {
+    const target = parseStudioSlot(slot);
+    if (target?.kind === "result") {
+      if (!replaceResultImage(resultsRef.current, target.model, image)) return false;
+      setResults((prev) => replaceResultImage(prev, target.model, image) ?? prev);
+      clearDerivedFor(target.model);
+      return true;
+    }
+    if (target?.kind === "ref") {
+      if (!replaceRefImage(refImagesRef.current, target.id, image)) return false;
+      setRefImages((prev) => replaceRefImage(prev, target.id, image) ?? prev);
+      void fetch(image).then((r) => r.blob()).then((b) => downscaleImageFile(new File([b], "ref.png", { type: b.type || "image/png" })))
+        .then((small) => setRefImages((prev) => prev.map((r) => (r.id === target.id && r.url === image ? { ...r, url: small } : r))))
+        .catch(() => { /* keep the full-size image */ });
+      return true;
+    }
+    return false;
+  });
   const selectedSearchDataModel = AI_TEXT_MODELS.find((model) => model.value === searchDataModel) ?? AI_TEXT_MODELS[0];
 
   const onPickProduct = useCallback((value: string) => {
@@ -750,7 +788,7 @@ export default function StudioWorkbench() {
     for (const f of picked) {
       try { urls.push(await downscaleImageFile(f)); } catch { /* skip */ }
     }
-    setRefImages((prev) => [...prev, ...urls].slice(0, maxRefs));
+    setRefImages((prev) => [...prev, ...urls.map(newRefImage)].slice(0, maxRefs));
   }, [maxRefs, refImages.length]);
 
   // Sequential multi-model generation (avoids API 429, results appear incrementally).
@@ -798,7 +836,7 @@ export default function StudioWorkbench() {
       if (genIdRef.current !== genId) break; // user re-clicked generate
       const m = modelList[i];
       const mOption = STUDIO_MODEL_OPTIONS.find((o) => o.value === m);
-      const refsForModel = effRefMode === "none" ? [] : refImages.slice(0, mOption?.maxRefs ?? 0);
+      const refsForModel = effRefMode === "none" ? [] : refImages.slice(0, mOption?.maxRefs ?? 0).map((r) => r.url);
 
       try {
         const res = await fetch("/api/tools/studio/generate", {
@@ -814,7 +852,8 @@ export default function StudioWorkbench() {
         slots[i] = { model: m, image: null, seed: null, error: err instanceof Error ? err.message : String(err), busy: false };
       }
 
-      if (genIdRef.current === genId) setResults([...slots]);
+      // only slot i: an earlier slot may already hold a 傳回 / AI 修圖 image the snapshot does not have
+      if (genIdRef.current === genId) { const done = slots[i]; setResults((prev) => prev.map((r, j) => (j === i ? done : r))); }
     }
 
     if (genIdRef.current === genId) setBusy(false);
@@ -1580,8 +1619,17 @@ export default function StudioWorkbench() {
                   {refImages.length > 0 && (
                     <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap" }}>
                       {refImages.map((r, i) => (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img key={i} src={r} alt={`ref-${i}`} style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 4, cursor: "pointer" }} title="點擊移除" onClick={() => setRefImages((prev) => prev.filter((_, j) => j !== i))} />
+                        <div key={r.id} style={{ position: "relative" }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={r.url} alt={`ref-${i}`} style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 4, cursor: "pointer", display: "block" }} title="點擊移除" onClick={() => setRefImages((prev) => prev.filter((x) => x.id !== r.id))} />
+                          {canvasHref && (
+                            <button type="button" className="btn-secondary" data-testid="studio-ref-canvas" title="在畫布編輯"
+                              style={{ position: "absolute", right: -4, bottom: -4, fontSize: 10, lineHeight: 1, padding: "2px 3px" }}
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); void openInCanvas(r.url, `參考圖-${i + 1}`, canvasHref, undefined, { tool: STUDIO_RETURN_TOOL, slot: refSlot(r.id), label: "Studio 參考圖" }); }}>
+                              ✏️
+                            </button>
+                          )}
+                        </div>
                       ))}
                     </div>
                   )}
@@ -1704,7 +1752,7 @@ export default function StudioWorkbench() {
                 {canvasHref && <button
                   className="btn-secondary"
                   style={{ width: "100%", marginBottom: 6 }}
-                  onClick={() => openInCanvas(activeResult.image, buildSemanticBase({ ...fileMeta, track: "編輯" }), canvasHref)}
+                  onClick={() => void openInCanvas(activeResult.image, buildSemanticBase({ ...fileMeta, track: "編輯" }), canvasHref, undefined, { tool: STUDIO_RETURN_TOOL, slot: resultSlot(activeResult.model), label: "Studio 結果" })}
                 >
                   ✏️ 快速編輯
                 </button>}
@@ -1719,13 +1767,7 @@ export default function StudioWorkbench() {
                     styleAnchor={{ model: activeResult.model, mode: refImages.length > 0 ? "image" : "text", stylePrompt: resolvedStylePrompt || effectivePrompt, subject: subject.trim(), refs: refImages.length, target: "pod-design" }}
                     onEditedImage={(image, meta) => {
                       setResults((prev) => prev.map((r, i) => i === activeIdx ? { ...r, image, seed: meta.seed } : r));
-                      setSaveStates((prev) => ({ ...prev, [activeResult.model]: "idle" }));
-                      setBgStates((prev) => ({ ...prev, [activeResult.model]: "idle" }));
-                      setOriginalImages((prev) => { const n = { ...prev }; delete n[activeResult.model]; return n; });
-                      setEdgeStates((prev) => ({ ...prev, [activeResult.model]: "idle" }));
-                      setEdgeOriginals((prev) => { const n = { ...prev }; delete n[activeResult.model]; return n; });
-                      setEdgeApplied((prev) => { const n = { ...prev }; delete n[activeResult.model]; return n; });
-                      setMockupState("idle"); setMockups([]); setSavedMockups({});
+                      clearDerivedFor(activeResult.model);
                     }}
                   />
                 </AccordionSection>
@@ -1925,7 +1967,7 @@ export default function StudioWorkbench() {
                 {canvasHref && <button
                   className="btn-secondary"
                   style={{ width: "100%", marginBottom: 6 }}
-                  onClick={() => openInCanvas(activeResult.image, buildSemanticBase({ ...fileMeta, track: "編輯" }), canvasHref)}
+                  onClick={() => void openInCanvas(activeResult.image, buildSemanticBase({ ...fileMeta, track: "編輯" }), canvasHref, undefined, { tool: STUDIO_RETURN_TOOL, slot: resultSlot(activeResult.model), label: "Studio 結果" })}
                 >
                   ✏️ 快速編輯
                 </button>}
@@ -1940,13 +1982,7 @@ export default function StudioWorkbench() {
                     styleAnchor={{ model: activeResult.model, mode: refImages.length > 0 ? "image" : "text", stylePrompt: resolvedStylePrompt || effectivePrompt, subject: subject.trim(), refs: refImages.length, target: "pod-design" }}
                     onEditedImage={(image, meta) => {
                       setResults((prev) => prev.map((r, i) => i === activeIdx ? { ...r, image, seed: meta.seed } : r));
-                      setSaveStates((prev) => ({ ...prev, [activeResult.model]: "idle" }));
-                      setBgStates((prev) => ({ ...prev, [activeResult.model]: "idle" }));
-                      setOriginalImages((prev) => { const n = { ...prev }; delete n[activeResult.model]; return n; });
-                      setEdgeStates((prev) => ({ ...prev, [activeResult.model]: "idle" }));
-                      setEdgeOriginals((prev) => { const n = { ...prev }; delete n[activeResult.model]; return n; });
-                      setEdgeApplied((prev) => { const n = { ...prev }; delete n[activeResult.model]; return n; });
-                      setMockupState("idle"); setMockups([]); setSavedMockups({});
+                      clearDerivedFor(activeResult.model);
                     }}
                   />
                 </AccordionSection>

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { roleHeader } from "@/lib/ops-role";
 import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
+import { useCanvasReturn } from "@/components/tools/useCanvasReturn";
+import { BANNER_RETURN_TOOL, applyBannerCanvasReturn } from "./banner-canvas-return";
 import { STUDIO_MODEL_OPTIONS, modelSupportsRefs, modelCompositesProduct, type StudioModel } from "@/lib/studio/model-options";
 import { STYLE_CATALOG } from "../tarot/tarotStyles";
 import { resolveStylePrompt } from "../tarot/cards";
@@ -1003,6 +1005,14 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   const [s, setS]         = useState<State>(INIT);
   const bgFileRef         = useRef<HTMLInputElement>(null);
   const productFileRef    = useRef<HTMLInputElement>(null);
+  // 傳回 (C8.3): decide from the latest render and place the image at once (the dock waits ~2 s for the ack).
+  const sRef = useRef(s);
+  sRef.current = s;
+  useCanvasReturn(BANNER_RETURN_TOOL, (slot, image) => {
+    if (!applyBannerCanvasReturn(sRef.current, slot, image)) return false;
+    setS((prev) => applyBannerCanvasReturn(prev, slot, image) ?? prev);
+    return true;
+  });
   const aiBgFileRef       = useRef<HTMLInputElement>(null);
   const colorRefFileRef   = useRef<HTMLInputElement>(null);
   const [aiBgStyleGroup, setAiBgStyleGroup] = useState("不指定");
@@ -1187,16 +1197,17 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
 
   async function removeProductBg() {
     if (!s.productOrig) return;
+    const orig = s.productOrig; // the product may be replaced (換圖 / 傳回) while this runs: then the cut-out is stale
     setS((prev) => ({ ...prev, productRemoving: true, error: null }));
     try {
       const res  = await fetch("/api/tools/studio/remove-bg", {
         method:  "POST",
         headers: { "Content-Type": "application/json", ...roleHeader("operator") },
-        body:    JSON.stringify({ image: s.productOrig }),
+        body:    JSON.stringify({ image: orig }),
       });
       const data = await res.json() as { ok: boolean; image?: string; error?: string };
       if (!data.ok || !data.image) throw new Error(data.error ?? "remove_bg_failed");
-      setS((prev) => ({ ...prev, productImage: data.image!, productRemoving: false }));
+      setS((prev) => (prev.productOrig === orig ? { ...prev, productImage: data.image!, productRemoving: false } : { ...prev, productRemoving: false }));
     } catch (err) {
       setS((prev) => ({ ...prev, productRemoving: false, error: String(err) }));
     }
@@ -1315,6 +1326,13 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
       setS((prev) => ({ ...prev, error: String(err) }));
     }
   }
+
+  const bgCanvasButton = s.bgImage && canvasHref ? (
+    <button className="btn btn-ghost" style={{ fontSize: 12, marginLeft: 6 }} data-testid="banner-bg-canvas"
+      onClick={() => void openInCanvas(s.bgImage!, `banner-${s.preset}-背景`, canvasHref, undefined, { tool: BANNER_RETURN_TOOL, slot: "bg", label: "Banner 背景" })}>
+      ✏️ 在畫布編輯
+    </button>
+  ) : null;
 
   return (
     <div className="page">
@@ -1488,6 +1506,12 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                     {s.productRemoving ? "去背中…" : s.productImage !== s.productOrig ? "✓ 已去背" : "一鍵去背"}
                   </button>
                 )}
+                {s.productImage && canvasHref && (
+                  <button className="btn btn-ghost" style={{ fontSize: 12 }} data-testid="banner-product-canvas"
+                    onClick={() => void openInCanvas(s.productImage!, `banner-${s.preset}-商品圖`, canvasHref, undefined, { tool: BANNER_RETURN_TOOL, slot: "product", label: "Banner 商品圖" })}>
+                    ✏️ 在畫布編輯
+                  </button>
+                )}
                 {s.productImage && (
                   <button className="btn btn-ghost" style={{ fontSize: 12, color: "var(--red)" }}
                     onClick={() => setS((prev) => ({ ...prev, productOrig: null, productImage: null, aiBgCompositeProduct: false, saved: false }))}>
@@ -1579,6 +1603,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                 <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => bgFileRef.current?.click()}>
                   {s.bgImage ? "✓ 已上傳，點此換圖" : "選擇圖片…"}
                 </button>
+                {bgCanvasButton}
               </div>
             )}
 
@@ -1800,6 +1825,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                       {s.aiBgCompositeProduct && s.productImage ? "✓ 已合成" : "✓ 背景已生成"}
                     </span>
                   )}
+                  {s.bgMode === "ai" && bgCanvasButton}
                 </div>
               </div>
             )}
