@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-06（續22）影音工作台 PJ.1：一支影片＝一集；舊剪輯專案收進專案頁（`71aea42f2`）
+
+- 根因：專案頁的「集」與剪輯器自己的清單（`tools.editor.projects`）互不相連，另有死清單 `appToolProjects`；剪輯檔不屬於任何一集。規格 `VW/docs/pj-project-spine-spec-20261106.md` §2 PJ.1（`VW`＝`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`）。
+- 做了：新檔 `VW/shared/episode-spine.js`（editId／editTitle／adopt／keepSpine／findByEdit）；`VW/shared/runtime.js` write 走 keepSpine、載入與每次寫剪輯內容庫時 adopt、動作 spine-attach-edit／spine-open；專案頁每集「剪輯檔」列＋開啟／建立；剪輯器清單改讀各集（按鈕名不變＋「屬於 專案 › 第 N 集」，對齊 ED.9 決定 1）、頂列「回到這一集」；acceptAsset 開該集剪輯檔（FilmCraft 引擎在時開那一份）；合成器／3D「放到剪輯」改列各集。刪：`tools-0.js` screen() 的 edit 舊畫面兩段、renderProjects、newproject（資料鍵留著）、generator-results 的重複工具白名單檢查。
+- 跟規格不同（現況為準）：① 行號全部位移（ED.1/ED.2/EC.2 後），插入點逐一 grep；② 專案頁重讀不用「主線簽章 vs 自己副本」，改「這次快照 vs 上次快照」且只比只有主頁會改的欄位（各集 edit/steps/outputs＋selection.open 計數器）——規格的比法在快速打字＋切集時會被舊回聲蓋掉；鏡頭 image/video 留到 PJ.2（PJ.1 仍由專案頁自己寫）；③ 沒有 `spine-adopt` 動作：adopt 掛在 runtime 寫剪輯內容庫那一處（Codex F2：FilmCraft 新存檔要重載才出現），建立剪輯檔先掛集再存檔；④ editId 依引擎分（FilmCraft 的 native 是引擎自己的文件，不能取 native.id）；EffectCraft 列不收；⑤ 「放到「P5 3D · P5 3D」」：收進來的專案名＝集名，字面重複，照規格。
+- 已知（非本卡）：`tests/media-contract.cjs:126` 在 HEAD（未含本改動，拋棄式 worktree）同樣紅（屬性面板「時間軸起點」），屬 ED 線；殘留目錄 `D:\tmp\vw-head`（已 prune，檔案被鎖）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/pj1-spine-unit.cjs → 5 PASS（三種舊列各成一專案、重跑 added=0、原列 deepEqual、keepSpine 保留 steps、刪集不復活） | exit=0 | ms=174
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/pj1-legacy-ui.cjs（隔離伺服器）→ 5 PASS（4 個專案、伺服器上兩個內容庫與種子 deepEqual、兩筆自製剪輯開到同一筆且 edNative＋quality 與搬前相同、回到這一集來回、FilmCraft acceptAsset ok、既有專案照舊無錯） | exit=0 | ms=4370
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變 A：adopt 在原列寫欄位 → unit 第 3 條紅＋UI 第 1 條紅；突變 B：keepSpine 直接回 next → unit 第 4 條紅；還原後全綠 | exit=1 | ms=5000
+- REALTEST_EVIDENCE: tool=Bash | cmd=gate、sidebar-overlays、test-isolation、appearance、p1-loop、p2-mix、p2-tracks-ui、p3-review-fixes、p3-roundtrip、p4-rig-ui、p5-workspace、remotion-title-project、scene-shots、fc2-engine-host、editor-restore、ed1-layout、ed2-timeline、generation-flows、interactions 全 exit 0；media-contract exit 1（HEAD 同紅） | exit=0 | ms=330000
+- REALTEST_EVIDENCE: tool=Bash | cmd=隔離伺服器截圖腳本（scratchpad shots.cjs）：舊剪輯收進專案頁 → 開啟剪輯 → 回到這一集 → 既有專案「建立剪輯檔」（比例 9:16、只掛該集、無重複專案）→ 剪輯清單「屬於 … › 第 1 集」；頁面錯誤 0 | exit=0 | ms=20000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n（Codex `agency-os/reports/oracle/2026-11-06-partialreview-de4d0562.md`：F1 FilmCraft 剪輯檔沒開到那一份、F2 FilmCraft 新存檔要重載才進專案頁；兩條對照 `tools-engine-host.js:316-320,372` 屬實，已修並重跑）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=renderProjects\|newproject\|appToolProjects\|所有專案\|spine.adopt | hits=4（只在規格文件與 progress 檔；程式 0）
 ## 2026-11-06（續21）影片剪輯 ED.3 屬性面板：逐檔實作規格（只寫文件，未改程式）
 
 - 新檔 `lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/ed3-properties-spec-20261106.md`：七個 commit 的順序（ED.3.0 舊專案黃金測試 → 3.4 輸出端 → 3.1 → 3.6 → 3.2 → 3.3 → 3.5），每處 file:line（基準 560172a7e）、新欄位與缺省行為、FFmpeg 濾鏡鏈、驗收抽格表、撞檔表。
