@@ -84,7 +84,7 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
   <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>0</span>／<span data-computed>13</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>1</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
-<p class="sub">應用工具的「影片剪輯」補到跟參考工作台一樣：功能、流程、版面、快捷鍵相同，外觀用 AwareWave 主題。共 <span data-computed>13</span> 張卡、<span data-computed>37</span> 項工作，已完成 <span data-computed>3</span> 項。</p>
+<p class="sub">應用工具的「影片剪輯」補到跟參考工作台一樣：功能、流程、版面、快捷鍵相同，外觀用 AwareWave 主題。共 <span data-computed>13</span> 張卡、<span data-computed>39</span> 項工作，已完成 <span data-computed>3</span> 項。</p>
 <section id="now"><h2>現況</h2><p class="lead">剪輯器現在做得到與做不到的事（2026-11-06 實際打開查）。</p><ul class="yn"><li class="yes"><b>可以</b><span>兩邊每個鍵都按過的對照表。<small>2026-11-06 逐鍵對照：同 18、不同 17、缺 24、本機多 2；每一列都歸到卡（docs/editor-parity-compare-20261106.md）。</small></span></li><li class="yes"><b>可以</b><span>剪輯、分割、複製、刪除、多軌、轉場、濾鏡、匯出 1080p。<small>既有功能，tests/tools-editor.cjs 真實匯出過。</small></span></li><li class="no"><b>還不行</b><span>上傳大支影片不會「頁面通訊逾時」。<small>已修好並推上 main（6d3dda8f6），還沒部署到 video.aware-wave.com；部署要你說可以。</small></span></li><li class="yes"><b>可以</b><span>版面跟參考一樣（圖示側欄、可收合、整片設定、播放列）。<small>2026-11-06 卡 ED.1（9df955245），還沒部署到 video.aware-wave.com。參考沒有的片頭、調色、影格率、峰值表、多軌都還在，搬到對應位置。</small></span></li><li class="no"><b>還不行</b><span>多選、磁吸、磁性主軌、波紋刪除、快捷鍵全套。<small>卡 ED.2。</small></span></li><li class="no"><b>還不行</b><span>字幕辨識、翻譯、剪贅字在剪輯器裡完成。<small>卡 ED.10、ED.11；現在要跳去字幕工具。</small></span></li><li class="no"><b>還不行</b><span>剪輯 Agent（打字叫它剪）。<small>卡 ED.13，最後做。</small></span></li></ul></section>
 
 <section id="steps"><h2>卡片與工作</h2><p class="lead">依編號做。先做版面骨架，各分頁接著做，要付費服務的放最後。風險 High 的卡經你同意才上線。</p><ol class="steps"><li class="step doing" id="ED.1">
@@ -107,7 +107,7 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
       <p class="plain">例：按住 Shift 點三個片段一起拖；開「磁性主軌」後刪掉中間一段，後面自動補上；按 ? 跳出快捷鍵表。</p>
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">負責：Opus</span></p>
       <p class="donewhen"><b>完成的樣子：</b>快捷鍵表上每一個鍵都實際按過；多選拖曳、磁吸、波紋刪除各有指名測試。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>ED.2.1</code> 多選與整組拖曳、複製貼上片段、複製貼上樣式。</span></li><li class="todo"><b>○</b><span><code>ED.2.2</code> 磁吸、磁性主軌、波紋刪除。</span></li><li class="todo"><b>○</b><span><code>ED.2.3</code> 縮放、標記跳轉、J／K／L 倒播快播、快捷鍵表。</span></li><li class="todo"><b>○</b><span><code>ED.2.4</code> 軌道中文名、每軌＋、上下移；片段顯示縮圖與聲音波形。</span></li><li class="todo"><b>○</b><span><code>ED.2.5</code> 對照差異：縮放改成 −／＋ 每次 15、自適應全片、預設 50 px/s；時間旁顯示倍速；重做後不保留選取；「刪除並前移」改名波紋刪除。</span></li></ul>
+      <ul class="items"><li class="todo"><b>○</b><span><code>ED.2.1</code> 多選與整組拖曳、複製貼上片段、複製貼上樣式。</span></li><li class="todo"><b>○</b><span><code>ED.2.2</code> 磁吸、磁性主軌、波紋刪除。</span></li><li class="todo"><b>○</b><span><code>ED.2.3</code> 縮放、標記跳轉、J／K／L 倒播快播、快捷鍵表。</span></li><li class="todo"><b>○</b><span><code>ED.2.4</code> 軌道中文名、每軌＋、上下移；片段顯示縮圖與聲音波形。</span></li><li class="todo"><b>○</b><span><code>ED.2.6</code> 工具列每個鍵「圖示＋文字」；軌道標頭「圖示＋中文名」加 ＋、眼睛、上下移、靜音。</span></li><li class="todo"><b>○</b><span><code>ED.2.5</code> 對照差異：縮放改成 −／＋ 每次 15、自適應全片、預設 50 px/s；時間旁顯示倍速；重做後不保留選取；「刪除並前移」改名波紋刪除。</span></li></ul>
       <details><summary>工程細節：ED.2 時間軸操作</summary>
         <p>多選、磁吸開關、磁性主軌、波紋刪除、片段與樣式複製貼上、標記跳轉、縮放全套、片段縮圖與波形、軌道中文名／每軌＋／上下移、片段上音量與轉場鈕、快捷鍵表、說明、J/K/L</p>
         <p><b>需先完成：</b><a href="#ED.1">ED.1</a></p>
@@ -120,7 +120,7 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
       <p class="plain">例：選一段影片，把濾鏡設成「只套這段」，加光漏和鏡頭震動，在第 2 秒和第 5 秒設關鍵影格讓它放大；輸出的片照樣有這些效果。</p>
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High</span><span class="who">負責：設計 Fable；做 Opus</span></p>
       <p class="donewhen"><b>完成的樣子：</b>每個新效果輸出一次真影片並抽畫面確認；舊專案打開輸出結果不變。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>ED.3.1</code> 沒選片段時的整片設定：比例、整片濾鏡、聲音、輸出資訊。</span></li><li class="todo"><b>○</b><span><code>ED.3.2</code> 影片片段：效果可選整片／此軌／此片段；光漏、震動、遮罩、背景模糊。</span></li><li class="todo"><b>○</b><span><code>ED.3.3</code> 變形與關鍵影格；分離音訊；旁白時自動降低。</span></li><li class="todo"><b>○</b><span><code>ED.3.4</code> 輸出端照做；舊專案輸出不變的測試。</span></li><li class="todo"><b>○</b><span><code>ED.3.5</code> 對照差異：播放速度改四顆鈕，2 倍時片段長度減半（現在長度不變）；濾鏡改十六顆鈕；背景模糊有強度；時間多「來源終點」；顏色有取色器。</span></li></ul>
+      <ul class="items"><li class="todo"><b>○</b><span><code>ED.3.1</code> 沒選片段時的整片設定：比例、整片濾鏡、聲音、輸出資訊。</span></li><li class="todo"><b>○</b><span><code>ED.3.6</code> 屬性分組可收合，標題右邊直接顯示目前值（變形 ×1.00、背景 黑邊、播放速度 1x、音訊 100%、時間 22.40s），跟參考一樣。</span></li><li class="todo"><b>○</b><span><code>ED.3.2</code> 影片片段：效果可選整片／此軌／此片段；光漏、震動、遮罩、背景模糊。</span></li><li class="todo"><b>○</b><span><code>ED.3.3</code> 變形與關鍵影格；分離音訊；旁白時自動降低。</span></li><li class="todo"><b>○</b><span><code>ED.3.4</code> 輸出端照做；舊專案輸出不變的測試。</span></li><li class="todo"><b>○</b><span><code>ED.3.5</code> 對照差異：播放速度改四顆鈕，2 倍時片段長度減半（現在長度不變）；濾鏡改十六顆鈕；背景模糊有強度；時間多「來源終點」；顏色有取色器。</span></li></ul>
       <details><summary>工程細節：ED.3 屬性面板</summary>
         <p>整片設定；片段：套用範圍三層、光漏、震動、遮罩、Transform＋關鍵影格、背景模糊／純色、分離音訊、旁白時自動降低；文字片段；數字欄位操作；editor-export.cjs 補輸出</p>
         <p><b>需先完成：</b><a href="#ED.1">ED.1</a></p>
