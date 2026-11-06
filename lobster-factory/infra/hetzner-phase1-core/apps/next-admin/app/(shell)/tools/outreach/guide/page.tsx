@@ -1,4 +1,4 @@
-import { FAQ, INTRO, PRIVACY, SECTIONS } from "./content";
+import { CAUTIONS, FAQ, INTRO, LIMITS, PRIVACY, SECTIONS } from "./content";
 
 export const metadata = { title: "Guide 操作手冊 · Cold Outreach" };
 
@@ -19,6 +19,8 @@ export default function OutreachGuidePage() {
           {SECTIONS.map((s, i) => (
             <a key={s.id} href={`#${s.id}`} style={link}>{i}. {s.title}</a>
           ))}
+          <a href="#cautions" style={link}>注意事項</a>
+          <a href="#limits" style={link}>還沒做好的功能</a>
           <a href="#faq" style={link}>常見問題</a>
           <a href="#privacy" style={link}>個資提醒</a>
         </nav>
@@ -33,6 +35,21 @@ export default function OutreachGuidePage() {
                     <div style={{ color: "var(--text-primary)", fontWeight: 600, marginBottom: 8 }}>{i}.{j + 1}　{st.do}</div>
                     <div style={muted}><span className="card-badge badge-gray" style={tag}>在哪裡</span>{st.where}</div>
                     <div style={muted}><span className="card-badge badge-green" style={tag}>例</span>{st.example}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+          {[{ id: "cautions", title: "注意事項", items: CAUTIONS, badge: "badge-yellow" }, { id: "limits", title: "還沒做好的功能", items: LIMITS, badge: "badge-gray" }].map((g) => (
+            <section key={g.id} id={g.id} style={{ scrollMarginTop: 80 }}>
+              <div className="section-title">{g.title}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {g.items.map((it) => (
+                  <div key={it.t} className="card">
+                    <div style={{ color: "var(--text-primary)", fontWeight: 600, marginBottom: 8 }}>
+                      <span className={`card-badge ${g.badge}`} style={tag}>{g.title === "注意事項" ? "注意" : "未完成"}</span>{it.t}
+                    </div>
+                    <p style={{ ...muted, margin: 0 }}>{it.d}</p>
                   </div>
                 ))}
               </div>
