@@ -77,7 +77,7 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
   const [firstPage, blockerRes, activeRes, pendingRes, failedRes] = await Promise.all([
     orgFilter
       ? Promise.resolve({ data: [] as Array<{ id: string; slug: string; name: string; color: string | null }>, count: 0, error: null })
-      : supabase.from("organizations").select("id,slug,name,color:metadata->>color", { count: "exact" }).order("created_at", { ascending: true }).limit(NAV_FIRST),
+      : supabase.from("organizations").select("id,slug,name,color:metadata->>color", { count: "exact" }).neq("status", "inactive").order("created_at", { ascending: true }).limit(NAV_FIRST),
     loadIntegrationBlockers(supabase, orgFilter),
     countOf("active"),
     countOf("pending"),

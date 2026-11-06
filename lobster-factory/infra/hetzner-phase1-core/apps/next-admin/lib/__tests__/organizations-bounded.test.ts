@@ -112,3 +112,15 @@ describe("organizations reads are bounded", () => {
     expect(found["app/api/content/sites/route.ts"]).toBeUndefined();
   });
 });
+
+// An inactive organization (status 'inactive': a closed or duplicate account, kept for its records) never shows in a
+// client picker: every first-page / search read of organizations filters it out (2026-11-06, the second Soulful).
+describe("client pickers hide inactive organizations", () => {
+  it("every organizations read limited to NAV_FIRST or NAV_SEARCH_LIMIT filters status inactive", () => {
+    const missing = ["app", "lib", "components"].flatMap((d) => sources(path.join(ROOT, d))).filter((f) => {
+      const text = readFileSync(f, "utf8");
+      return /from\("organizations"\)/.test(text) && /limit\(NAV_(FIRST|SEARCH_LIMIT)\)/.test(text) && !text.includes('neq("status", "inactive")');
+    }).map(posix);
+    expect(missing).toEqual([]);
+  });
+});

@@ -145,7 +145,7 @@ export async function listBrands(onlyIds: readonly string[]): Promise<Brand[]> {
 export async function searchBrands(q: string | null): Promise<{ brands: Brand[]; total: number }> {
   const term = orgSearchTerm(q);
   if (q !== null && q.trim() && !term) return { brands: [], total: 0 };
-  let query = db().from("organizations").select("id, slug, name, default_timezone", term ? undefined : { count: "exact" }).order("name");
+  let query = db().from("organizations").select("id, slug, name, default_timezone", term ? undefined : { count: "exact" }).neq("status", "inactive").order("name");
   query = term ? query.or(orgNameFilter(term)).limit(NAV_SEARCH_LIMIT) : query.limit(NAV_FIRST);
   const { data, error, count } = await query;
   if (error) fail(error, "brands");

@@ -130,6 +130,7 @@ export async function GET(request: Request) {
   const { data, error, count } = await supabase
     .from("organizations")
     .select("id,slug,name,type,status,metadata,created_at", { count: "exact" })
+    .neq("status", "inactive")
     .order("created_at", { ascending: true })
     .limit(NAV_FIRST);
 

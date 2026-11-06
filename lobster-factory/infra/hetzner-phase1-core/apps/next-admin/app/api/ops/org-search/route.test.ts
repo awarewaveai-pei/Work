@@ -12,6 +12,7 @@ vi.mock("@/lib/supabase-server", () => {
   const q = {
     select: (cols: string) => { calls.select.push(cols); return q; },
     order: () => q,
+    neq: () => q,
     or: (f: string) => { calls.or.push(f); return q; },
     limit: (n: number) => { calls.limit.push(n); return q; },
     then: (ok: (v: unknown) => unknown) => ok({ data: [ROW], error: null, count: 1 }),

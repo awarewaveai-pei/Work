@@ -25,7 +25,7 @@ async function loadClients(slug: string | undefined): Promise<{ clients: PickOrg
   const sb = getSupabaseWriteClient();
   if (!sb) return { clients: [], total: 0 };
   const [firstPage, asked] = await Promise.all([
-    sb.from("organizations").select(ORG_COLS, { count: "exact" }).order("created_at", { ascending: true }).limit(NAV_FIRST),
+    sb.from("organizations").select(ORG_COLS, { count: "exact" }).neq("status", "inactive").order("created_at", { ascending: true }).limit(NAV_FIRST),
     slug ? sb.from("organizations").select(ORG_COLS).eq("slug", slug).maybeSingle() : Promise.resolve({ data: null, error: null }),
   ]);
   if (firstPage.error || !firstPage.data) return { clients: [], total: 0 };

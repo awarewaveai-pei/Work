@@ -39,6 +39,7 @@ export async function GET(request: Request) {
   let query = supabase
     .from("organizations")
     .select(ORG_SEARCH_COLUMNS, q ? undefined : { count: "exact" })
+    .neq("status", "inactive")
     .order("created_at", { ascending: true });
   if (params.get("brandColors") === "1") query = query.or(HAS_BRAND);
   // a second or() is ANDed with the first (postgrest-js appends the param)

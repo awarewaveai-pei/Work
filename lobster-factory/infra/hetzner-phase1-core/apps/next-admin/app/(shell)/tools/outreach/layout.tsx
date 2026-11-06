@@ -17,6 +17,7 @@ export default async function OutreachLayout({ children }: { children: ReactNode
     const { data, count } = await supabase
       .from("organizations")
       .select("id, slug, name, color:metadata->>color", { count: "exact" })
+      .neq("status", "inactive")
       .order("created_at", { ascending: true })
       .limit(NAV_FIRST);
     orgs = (data ?? []).map(toPickOrg);

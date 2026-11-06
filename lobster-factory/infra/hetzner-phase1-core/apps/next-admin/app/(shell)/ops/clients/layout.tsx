@@ -14,6 +14,7 @@ export default async function ClientsLayout({ children }: { children: ReactNode 
     const { data, count } = await supabase
       .from("organizations")
       .select("slug, name, color:metadata->>color", { count: "exact" })
+      .neq("status", "inactive")
       .order("created_at", { ascending: true })
       .limit(NAV_FIRST);
     orgs = (data ?? []).map((row) => ({ slug: row.slug, name: row.name, color: orgColor(row.slug, row.color) }));
