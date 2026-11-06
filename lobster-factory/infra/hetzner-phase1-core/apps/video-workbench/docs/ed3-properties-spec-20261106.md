@@ -335,3 +335,12 @@ function evalNumber(text)  // digits . + - * / ( ) and spaces only; recursive de
 - R1 `gradients`、`scale eval=frame`、`pad eval=frame` 依賴 FFmpeg 新版。輸出用的是 npm `ffmpeg-static` 5.3.0 的執行檔（`backend/media.cjs:4`，`package.json:9`；不是 `Dockerfile:8` 裝的系統 ffmpeg）；本規格只在本機 Windows 版 6.1.1 實跑，正式機容器內 Linux 版未驗。ED.3.4 實作前先在容器跑 `node -e "console.log(require('ffmpeg-static'))"` 取路徑，再跑 `-filters | grep -E "gradients|blend"` 與 §3.4 第 5 點的一行實驗。
 - R2 x264 逐位元可重現依賴同一 FFmpeg 版本與 `-filter_complex_threads 1`（`:334-335`）；§7 B 在不同機器可能不同，A（參數快照）才是跨機器的主判準。
 - R3 `edClipInspector` 整段改寫會影響所有用 label 找欄位的既有測試；§3 已列出要改的行，實作後全跑 §8 的重跑清單。
+
+## 11. ED.1.4 預覽畫質
+
+- **檔名**：同媒體目錄 `.data/media/<sha256>/preview720.mp4`（有透明通道的來源 `preview720.webm`，同 `proxy.webm` 做法）；短邊 720（橫片＝720 高），H.264 CRF 23 + AAC。來源短邊 ≤ 720 不產生，720P 直接用現有預覽。
+- **產生時機**：第一次選 720P 時，剪輯器對畫面上每支影片素材打 `POST /api/vw/media/preview {url}`；後端 `media-store.cjs` 用同一個 `derive()`（暫存檔＋rename、已存在就跳過、同一 sha 同時只轉一次）。上傳不產生：上傳不變慢，沒選 720P 的人不佔磁碟。
+- **舊素材**：同一條路自動補（請求時才產生，不用批次腳本）；不在媒體庫的舊網址（`/generated/…`）回 `null`，照用原檔。
+- **剪輯器選檔**：`ed.layout.preview`（"720P"／"1080P"，存在既有的 `tools.editor.layout` 偏好，預設 1080P）。舞台圖層 src＝720P 且已有 `preview720` → 用它；否則 `previewUrl || url`（＝原檔或既有代理檔）。轉檔中照播原檔並顯示「正在產生 720P 預覽檔…」，好了換掉圖層、時間不跳。輸出永遠讀原檔（`editor-export.cjs` 不動）。
+- **磁碟**：720P 約原檔 1080P 的 30–40%（每分鐘約 20–30 MB）；只有選過 720P 的素材才有。
+- **回退**：`git revert` 該 commit；留下的 `preview720.*` 不被任何程式讀，可留可刪。

@@ -1027,6 +1027,12 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         }));
         return true;
       }
+      // Card ED.1.4: the editor's 720P preview file of a stored video (null = play previewUrl); made on first ask.
+      if (req.method === "POST" && route === "/media/preview") {
+        const input = await body(req);
+        json(res, 200, { previewUrl: await mediaStore.preview(String(input.url || "")) });
+        return true;
+      }
       if (req.method === "POST" && route === "/generations/quote") {
         const input = await body(req);
         jobInput(input);

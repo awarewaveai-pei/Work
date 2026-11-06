@@ -123,7 +123,7 @@ const pass = (m) => console.log("PASS " + m);
     assert.equal(await page.locator(".editor-inspector").count(), 0);
     await open();
     const layout = await page.evaluate(() => ed.layout);
-    assert.deepEqual(layout, { left: 344, right: 300, timeline: 166, leftOpen: false, rightOpen: false });
+    assert.deepEqual(layout, { left: 344, right: 300, timeline: 166, leftOpen: false, rightOpen: false, closed: [], preview: "1080P" });
     assert.equal(await page.locator(".editor-library").count(), 0);
     await page.keyboard.press("Alt+1");
     await page.keyboard.press("Alt+2");

@@ -538,7 +538,7 @@ const edPanes = [
 ];
 // Panel sizes are a per-user preference (tools.editor.layout), never project data.
 const edLayoutLimits = { left: [200, 480], right: [240, 480], timeline: [110, 560] },
-  edLayoutDefault = { left: 294, right: 300, timeline: 150, leftOpen: true, rightOpen: true, closed: [] },
+  edLayoutDefault = { left: 294, right: 300, timeline: 150, leftOpen: true, rightOpen: true, closed: [], preview: "1080P" },
   edGroupNames = ["畫面", "聲音", "文字與字幕", "輸出", "畫面效果", "變形", "背景", "播放速度", "音訊", "時間", "調色", "文字"];
 function edLayout(raw) {
   const l = { ...edLayoutDefault };
@@ -546,6 +546,7 @@ function edLayout(raw) {
     if (Number.isFinite(raw?.[k])) l[k] = Math.min(max, Math.max(min, Math.round(raw[k])));
   for (const k of ["leftOpen", "rightOpen"]) if (typeof raw?.[k] === "boolean") l[k] = raw[k];
   l.closed = Array.isArray(raw?.closed) ? raw.closed.filter((n) => edGroupNames.includes(n)) : [];
+  if (raw?.preview === "720P") l.preview = "720P";
   return l;
 }
 const edColumns = (l = ed.layout) =>
@@ -625,7 +626,7 @@ function edPlayer(p) {
   const empty = p.clips.length
     ? ""
     : `<div class="editor-stage-empty"><b>先放一個鏡頭，故事就開始。</b><p class="note">從素材庫加入影片、圖片，會放到主視訊軌。</p>${edButton("更多素材", "library")}${edButton("加入文字", "text:0")}</div>`;
-  return `<section class="editor-player"><div class="editor-stage-frame" data-ed-stage-frame><div class="editor-stage" data-ed-stage style="--ed-aspect:${w}/${h};--ed-ar:${w / h}">${empty}</div></div><div class="editor-transport"><span class="editor-transport-group"><span class="editor-clock" data-ed-clock></span>${edIconButton("查看說明：播放快捷鍵", "ⓘ", "help:play")}</span><div class="editor-transport-group">${edIconButton("跳至開頭", "⏮", "jump:start")}${edIconButton("後退 1 秒", "↺", "jump:-1")}${edIconButton("播放／暫停 (Space)", ed.playing ? "❚❚" : "▶", "play")}${edIconButton("前進 1 秒", "↻", "jump:1")}${edIconButton("跳至結尾", "⏭", "jump:end")}</div><div class="editor-transport-group">${edIconButton("循環播放", "⟲", "loop", ed.loop)}${edIconButton("全螢幕瀏覽 (F)", "⛶", "fullscreen")}${ed.layout.rightOpen ? "" : edIconButton("展開檢查器", "«", "layout:right")}</div></div></section>`;
+  return `<section class="editor-player"><div class="editor-stage-frame" data-ed-stage-frame><div class="editor-stage" data-ed-stage style="--ed-aspect:${w}/${h};--ed-ar:${w / h}">${empty}</div></div><div class="editor-transport"><span class="editor-transport-group"><span class="editor-clock" data-ed-clock></span>${edIconButton("查看說明：播放快捷鍵", "ⓘ", "help:play")}</span><div class="editor-transport-group">${edIconButton("跳至開頭", "⏮", "jump:start")}${edIconButton("後退 1 秒", "↺", "jump:-1")}${edIconButton("播放／暫停 (Space)", ed.playing ? "❚❚" : "▶", "play")}${edIconButton("前進 1 秒", "↻", "jump:1")}${edIconButton("跳至結尾", "⏭", "jump:end")}</div><div class="editor-transport-group">${edIconButton("循環播放", "⟲", "loop", ed.loop)}${edChoices("預覽畫質", "preview", ed.layout.preview, ["720P", "1080P"])}<span class="note" data-ed-preview-note role="status"></span>${edIconButton("全螢幕瀏覽 (F)", "⛶", "fullscreen")}${ed.layout.rightOpen ? "" : edIconButton("展開檢查器", "«", "layout:right")}</div></div></section>`;
 }
 function edInspector(p, c) {
   const head = (title) =>
@@ -1394,6 +1395,32 @@ function edGrade(c) {
     );
   return parts.join(" ");
 }
+// Card ED.1.4: 720P plays preview720.* (backend/media-store.cjs preview(), made on first ask); 1080P plays previewUrl
+// (the original, or the proxy). asset url -> preview url | null (nothing smaller: keep previewUrl) | Promise (making).
+const edPreview720 = new Map();
+function edPlayUrl(asset) {
+  const made = ed.layout.preview === "720P" && edPreview720.get(asset.url);
+  return typeof made === "string" ? made : asset.previewUrl || asset.url;
+}
+function edPreviewEnsure(p) {
+  if (ed.layout.preview !== "720P") return;
+  for (const c of p.clips) {
+    const url = c.kind === "video" && c.asset?.url;
+    if (!url || edPreview720.has(url)) continue;
+    edPreview720.set(
+      url,
+      VideoWorkbench.request("/media/preview", { url })
+        .then((r) => r?.previewUrl || null, (e) => (VideoWorkbench.reportError(e), null))
+        .then((made) => {
+          edPreview720.set(url, made);
+          edPaint();
+        }),
+    );
+  }
+  const note = document.querySelector("[data-ed-preview-note]"),
+    text = [...edPreview720.values()].some((v) => v instanceof Promise) ? "正在產生 720P 預覽檔…" : "";
+  if (note && note.textContent !== text) note.textContent = text;
+}
 function edPaint() {
   const p = edProject(),
     stage = document.querySelector("[data-ed-stage]");
@@ -1401,6 +1428,7 @@ function edPaint() {
     edStop();
     return;
   }
+  edPreviewEnsure(p);
   const spans = edPreviewSpans(p),
     order = new Map(p.tracks.map((t, i) => [t.id, i])),
     active = p.clips.filter((c) => {
@@ -1435,8 +1463,13 @@ function edPaint() {
       );
       el.dataset.edLayer = c.id;
       if (["audio", "video"].includes(c.kind)) el.dataset.edMedia = "";
-      if (c.kind !== "text") el.src = c.asset.previewUrl || c.asset.url;
       stage.append(el);
+    }
+    // A src change (720P file arrived, or 預覽畫質 switched) keeps the element; the seek below puts it back on ed.time.
+    const src = c.kind === "text" ? null : edPlayUrl(c.asset);
+    if (src && el.dataset.edSrc !== src) {
+      el.dataset.edSrc = src;
+      el.src = src;
     }
     const span = spans.get(c.id),
       fade =
@@ -2064,6 +2097,12 @@ async function edAction(action) {
   }
   if (action === "loop") {
     ed.loop = !ed.loop;
+    edRedraw();
+    return;
+  }
+  if (action.startsWith("preview:")) {
+    ed.layout.preview = action === "preview:720P" ? "720P" : "1080P";
+    edLayoutSave();
     edRedraw();
     return;
   }

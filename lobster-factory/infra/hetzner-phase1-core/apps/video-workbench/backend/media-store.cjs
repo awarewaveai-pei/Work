@@ -1,5 +1,6 @@
 // Content-addressed media files (plan §3 invariants 1/3/4): .data/media/<sha256>/ holds original.<ext>,
-// probe.json, proxy.mp4 (only when the browser cannot decode the original), thumb.jpg and waveform.json.
+// probe.json, proxy.mp4 (only when the browser cannot decode the original), thumb.jpg, waveform.json and, once the
+// editor asks for it, preview720.mp4.
 // The directory only de-duplicates bytes: every ingest returns a fresh asset id. Each file is written to a
 // temp name and renamed, and derivation for one sha256 runs once per process, so parallel ingests of the
 // same content never see a half-written file.
@@ -12,6 +13,7 @@ const ffmpeg = require("ffmpeg-static"),
   { run } = require("./media.cjs");
 const WAVEFORM_POINTS = 1000,
   WAVEFORM_RATE = 8000,
+  PREVIEW_SHORT = 720,
   EXT = /^[a-z0-9]{2,5}$/,
   // Card P5: 3D files are stored like media (content-addressed, fresh asset id) but are not probed by ffprobe.
   MODELS = new Set(["glb", "bvh"]);
@@ -40,6 +42,22 @@ function needsProxy(probe, ext) {
   return ext !== "mp4" || probe.videoCodec !== "h264" || probe.bitDepth > 8 || probe.pixFmt !== "yuv420p" || shortSide > 1080;
 }
 const hasAlpha = (probe) => !!probe.video && /^(rgba|bgra|argb|abgr|yuva|gbrap|ya)/.test(probe.pixFmt || "");
+// Browser-playable copy with the short side capped at `short` px (even sizes; portrait = width is the short side);
+// crf is the H.264 quality (the alpha WebM keeps CRF 30).
+// Card P3: an alpha source gets VP9 + alpha WebM (H.264 has no alpha), so the editor preview shows it transparent too.
+function transcode(original, tmp, short, alpha, crf, signal) {
+  const scale = `scale=w='if(lte(iw,ih),trunc(min(iw,${short})/2)*2,-2)':h='if(lte(iw,ih),-2,trunc(min(ih,${short})/2)*2)'`;
+  return run(
+    alpha
+      ? ["-y", "-hide_banner", "-i", original, "-map", "0:v:0", "-vf", scale + ",format=yuva420p",
+          "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-deadline", "realtime", "-cpu-used", "8", "-b:v", "0", "-crf", "30",
+          "-auto-alt-ref", "0", "-an", tmp]
+      : ["-y", "-hide_banner", "-i", original, "-map", "0:v:0", "-map", "0:a:0?", "-vf", scale,
+          "-c:v", "libx264", "-preset", "veryfast", "-crf", String(crf), "-pix_fmt", "yuv420p",
+          "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", tmp],
+    signal,
+  );
+}
 function createMediaStore({ dataDir }) {
   const root = path.join(dataDir, "media");
   fs.mkdirSync(root, { recursive: true });
@@ -127,30 +145,10 @@ function createMediaStore({ dataDir }) {
       fs.writeFileSync(tmp, JSON.stringify({ ...info, probe: undefined, ...info.probe }, null, 2));
     });
     const probe = JSON.parse(fs.readFileSync(path.join(dir, "probe.json"), "utf8"));
+    // Output always reads the original; the proxy is only what the editor plays.
     const proxy = needsProxy(probe, path.extname(originalName).slice(1)),
       alpha = hasAlpha(probe);
-    // Card P3: a source with an alpha channel (the compositor's PNG MOV) gets a VP9 + alpha WebM proxy instead, so
-    // the editor preview shows it transparent too (H.264 has no alpha). Output still reads the original.
-    if (proxy && alpha)
-      await derive(dir, "proxy.webm", (tmp) =>
-        run(
-          ["-y", "-hide_banner", "-i", original, "-map", "0:v:0",
-            "-vf", "scale=w='if(lte(iw,ih),trunc(min(iw,1080)/2)*2,-2)':h='if(lte(iw,ih),-2,trunc(min(ih,1080)/2)*2)',format=yuva420p",
-            "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-deadline", "realtime", "-cpu-used", "8", "-b:v", "0", "-crf", "30",
-            "-auto-alt-ref", "0", "-an", tmp],
-          signal,
-        ),
-      );
-    else if (proxy)
-      await derive(dir, "proxy.mp4", (tmp) =>
-        run(
-          ["-y", "-hide_banner", "-i", original, "-map", "0:v:0", "-map", "0:a:0?",
-            "-vf", "scale=w='if(lte(iw,ih),trunc(min(iw,1080)/2)*2,-2)':h='if(lte(iw,ih),-2,trunc(min(ih,1080)/2)*2)'",
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
-            "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", tmp],
-          signal,
-        ),
-      );
+    if (proxy) await derive(dir, alpha ? "proxy.webm" : "proxy.mp4", (tmp) => transcode(original, tmp, 1080, alpha, 20, signal));
     const visual = probe.video || /^(png|jpg|jpeg|webp|gif)$/.test(ext);
     if (visual)
       await derive(dir, "thumb.jpg", (tmp) =>
@@ -216,6 +214,27 @@ function createMediaStore({ dataDir }) {
     const file = path.join(root, match[1], match[2]);
     return fs.existsSync(file) ? file : null;
   }
-  return { root, ingest, fileFor };
+  // Card ED.1.4: the editor's 720P preview (preview720.mp4 / .webm), made the first time it is asked for, through the
+  // same derive() and one job per file. null = nothing smaller to make (not a stored video, or short side <= 720):
+  // the editor keeps previewUrl. No request signal: other callers may be waiting on the same job.
+  async function preview(url) {
+    const original = fileFor(url),
+      dir = original && path.dirname(original),
+      probeFile = dir && path.join(dir, "probe.json");
+    if (!probeFile || !fs.existsSync(probeFile)) return null;
+    const probe = JSON.parse(fs.readFileSync(probeFile, "utf8"));
+    if (!probe.video || Math.min(probe.displayWidth || 0, probe.displayHeight || 0) <= PREVIEW_SHORT) return null;
+    const alpha = hasAlpha(probe),
+      name = alpha ? "preview720.webm" : "preview720.mp4",
+      key = path.basename(dir) + "/" + name;
+    let job = pending.get(key);
+    if (!job) {
+      job = derive(dir, name, (tmp) => transcode(original, tmp, PREVIEW_SHORT, alpha, 23)).finally(() => pending.delete(key));
+      pending.set(key, job);
+    }
+    await job;
+    return "/media/" + key;
+  }
+  return { root, ingest, fileFor, preview };
 }
 module.exports = { createMediaStore, needsProxy, hasAlpha };
