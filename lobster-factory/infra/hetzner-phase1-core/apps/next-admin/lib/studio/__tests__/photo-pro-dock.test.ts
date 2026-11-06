@@ -111,6 +111,7 @@ function mockPc(handlers: Record<string, (p: any, s: any) => any> = {}, opts: Re
   cw.photocraft = { execute: (c: string, p: any) => run("execute", c, p), request: (m: string, p: any) => run("request", m, p) };
   cw.postMessage = (m: any, origin: string) => {
     calls.push(["post", m.type, { name: m.name, origin }]);
+    opts.onOpen?.(state); // the user acting in the iframe while an op runs
     if (opts.openAtFront) { state.docs.unshift({ name: m.name }); state.active = 0; return; }
     state.docs.push({ name: m.name });
     state.active = state.docs.length - 1;
@@ -262,12 +263,32 @@ describe("ctx-photocraft.js 契約（mock photocraft）", () => {
     expect(m.downloads).toEqual([]);
   });
 
-  it("暫用文件以名字找回再關：開在最前面時關 index 0，回到原文件（index 減 1 後）", async () => {
+  it("暫用文件開在最前面：copy 進原文件（此時 index 1）、關 index 0 的暫用文件、回到原文件（index 0）", async () => {
     const m = mockPc({}, { openAtFront: true });
     await m.ctx.placeImage(new Blob(["x"], { type: "image/png" }), "a.png");
-    expect(m.calls.find((c) => c[1] === "layer.copyToDocument")![2]).toMatchObject({ document: 0 });
+    expect(m.calls.find((c) => c[1] === "layer.copyToDocument")![2]).toMatchObject({ document: 1 });
     expect(m.calls.find((c) => c[1] === "file.close")![2]).toEqual({ document: 0, save: "discard" });
     expect(m.calls.find((c) => c[1] === "document.activate")![2]).toEqual({ document: 0 });
+  });
+
+  it("暫用文件關不掉（file.close 失敗）→ 方法 reject，不回報成功", async () => {
+    const m = mockPc({ "file.close": () => { throw new Error("close refused"); } });
+    await expect(m.ctx.placeImage(new Blob(["x"], { type: "image/png" }), "a.png")).rejects.toThrow(/沒有正確關閉.*close refused/);
+  });
+
+  it("操作中使用者關掉前面的分頁 → 以名字找回原文件（copy 與 activate 都用新 index）", async () => {
+    const m = mockPc({}, { onOpen: (st: any) => { st.docs.splice(0, 1); } });
+    m.state.docs = [{ name: "other.png" }, { name: "base.png", width: 400, height: 300 }];
+    m.state.active = 1;
+    await m.ctx.placeImage(new Blob(["x"], { type: "image/png" }), "a.png");
+    expect(m.calls.find((c) => c[1] === "layer.copyToDocument")![2]).toMatchObject({ document: 0 });
+    expect(m.calls.find((c) => c[1] === "document.activate")![2]).toEqual({ document: 0 });
+  });
+
+  it("操作中原文件被關掉 → 中止（不 copy 進別的文件）", async () => {
+    const m = mockPc({}, { onOpen: (st: any) => { st.docs.splice(0, 1); } });
+    await expect(m.ctx.placeImage(new Blob(["x"], { type: "image/png" }), "a.png")).rejects.toThrow(/已關閉或分頁變動/);
+    expect(m.calls.some((c) => c[1] === "layer.copyToDocument")).toBe(false);
   });
 
   it("selectionMask 中途失敗 → 副本照樣關掉、錯誤原樣拋出", async () => {

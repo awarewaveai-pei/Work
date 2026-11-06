@@ -175,6 +175,19 @@ export function createPhotocraftCtx(opts) {
   /** 暫用文件一律取唯一名字：關之前以名字找回它的 index（使用者在 iframe 裡開／關分頁也不會關錯），找不到就不關。 */
   const tempName = (ext) => `awarewave-tmp-${Date.now().toString(36)}-${++seq}${ext ? `.${ext}` : ""}`;
   const indexOf = async (api, name) => (await session(api)).documents.findIndex((d) => d.name === name);
+  /** 使用者的文件：記 {index, name}，每次用之前重新找回（使用者可能在 iframe 裡開／關分頁，index 會位移）。
+   *  原 index 名字對得上就用它，否則找唯一同名的；找不到或不唯一 → 中止，不猜。 */
+  const targetRef = async (api) => {
+    const s = await session(api);
+    return { index: s.active, name: s.documents[s.active]?.name };
+  };
+  async function resolveTarget(api, ref) {
+    const docs = (await session(api)).documents;
+    if (docs[ref.index]?.name === ref.name) return ref.index;
+    const same = docs.map((d, i) => [d.name, i]).filter(([n]) => n === ref.name);
+    if (same.length === 1) return (ref.index = same[0][1]);
+    throw new Error(`原本的文件「${ref.name}」已關閉或分頁變動，操作中止`);
+  }
 
   /** 交給 PhotoCraft 開成新文件（photocraft:open，同 File › Open）；等「這個名字的文件多一份」，回它的 index。 */
   async function open(api, blob, name) {
@@ -193,24 +206,30 @@ export function createPhotocraftCtx(opts) {
       await sleep(pollMs);
     }
   }
-  /** 在暫用文件（名字 temp）上做 fn，不論成敗都關掉它（不存）並回到使用者的文件 targetName／target。
-   *  關檔的錯不蓋掉 fn 的錯。 */
-  async function withTemp(api, temp, target, fn) {
+  /** 在暫用文件（名字 temp）上做 fn，不論成敗都關掉它（不存）並回到使用者的文件 ref。
+   *  fn 失敗 → 拋 fn 的錯（清理的錯只記 console）；fn 成功但清理失敗 → 拋清理的錯：暫用文件還開著／還是作用中時
+   *  不能回報成功，否則下一個操作會落在暫用文件上。 */
+  async function withTemp(api, temp, ref, fn) {
+    let result, error, failed = false;
     try {
-      return await fn();
-    } finally {
-      try {
-        const i = await indexOf(api, temp);
-        if (i >= 0) {
-          await ex(api, "file.close", { document: i, save: "discard" });
-          await ex(api, "document.activate", { document: i < target ? target - 1 : target });
-        } else {
-          console.warn(`[photocraft ctx] 找不到暫用文件 ${temp}，沒有關閉任何文件`);
-        }
-      } catch (err) {
-        console.warn("[photocraft ctx] 關閉暫用文件失敗", err);
-      }
+      result = await fn();
+    } catch (err) {
+      failed = true;
+      error = err;
     }
+    try {
+      const i = await indexOf(api, temp);
+      if (i >= 0) {
+        await ex(api, "file.close", { document: i, save: "discard" });
+        if (i < ref.index && (await session(api)).documents[ref.index - 1]?.name === ref.name) ref.index -= 1;
+      }
+      await ex(api, "document.activate", { document: await resolveTarget(api, ref) });
+    } catch (err) {
+      if (!failed) throw new Error(`暫用文件 ${temp} 沒有正確關閉：${err?.message || err}`);
+      console.warn("[photocraft ctx] 關閉暫用文件失敗", err);
+    }
+    if (failed) throw error;
+    return result;
   }
   /** 開一份暫用文件，把它的圖層複製到 target，關掉暫用文件；回新圖層 ids。layerName 是新圖層名。 */
   async function placeFrom(api, blob, ext, layerName, place) {
@@ -219,10 +238,10 @@ export function createPhotocraftCtx(opts) {
       await open(api, blob, `${layerName}.${ext}`); // 沒有文件：這張圖就是文件
       return { ids: ((await ex(api, "layer.list", {})).layers || []).map((l) => l.id) };
     }
-    const target = s.active;
+    const ref = await targetRef(api);
     const temp = tempName(ext);
     await open(api, blob, temp);
-    const r = await withTemp(api, temp, target, () => ex(api, "layer.copyToDocument", { document: target, ...place, name: layerName }));
+    const r = await withTemp(api, temp, ref, async () => ex(api, "layer.copyToDocument", { document: await resolveTarget(api, ref), ...place, name: layerName }));
     return { ids: r.layers };
   }
   /** 暫用文件（已是作用中）裁成 rect → Quick Export PNG（存檔名 = 文件名.png）。 */
@@ -251,10 +270,10 @@ export function createPhotocraftCtx(opts) {
       if (!(await session(api)).documents.length) return null;
       const l = await activeLayer(api);
       if (!l || l.kind !== "Pixel" || !l.bounds) return null;
-      const target = (await session(api)).active;
+      const ref = await targetRef(api);
       const temp = tempName();
       await ex(api, "layer.duplicate", { layer: l.id, document: "new", documentName: temp });
-      const blob = await withTemp(api, temp, target, () => cropAndExport(api, l.bounds));
+      const blob = await withTemp(api, temp, ref, () => cropAndExport(api, l.bounds));
       const [x, y, width, height] = l.bounds;
       return { id: l.id, blob, transform: [1, 0, 0, 1, x, y], width, height };
     }),
@@ -262,7 +281,7 @@ export function createPhotocraftCtx(opts) {
     /** 圖層 id 換成新像素：堆疊位置、中心、大小、名稱不變（新圖層＋刪舊圖層；尺寸不同再縮回舊框）。2–3 個 undo 步。
      *  限制：舊圖層的圖層樣式、遮色片、混合模式不帶過去。中途失敗會撤掉新圖層，舊圖層不動。回 {id: 新圖層}。 */
     replaceImage: op(async (api, id, blob) => {
-      const target = (await session(api)).active;
+      const ref = await targetRef(api);
       const old = ((await ex(api, "layer.list", { flat: true })).layers || []).find((l) => l.id === id);
       if (!old?.bounds) throw new Error(`找不到圖層 ${id}`);
       const [x, y, w, h] = old.bounds;
@@ -270,7 +289,8 @@ export function createPhotocraftCtx(opts) {
       const size = await imageSize(blob);
       const temp = tempName(EXT[blob.type] || "png");
       await open(api, blob, temp);
-      const r = await withTemp(api, temp, target, () => ex(api, "layer.copyToDocument", { document: target, at: [x + w / 2, y + h / 2], name: old.name }));
+      const r = await withTemp(api, temp, ref, async () =>
+        ex(api, "layer.copyToDocument", { document: await resolveTarget(api, ref), at: [x + w / 2, y + h / 2], name: old.name }));
       const nid = r.layers[0];
       try {
         if (size && (size[0] !== w || size[1] !== h)) {
@@ -354,10 +374,10 @@ export function createPhotocraftCtx(opts) {
       if (!d?.hasSelection) return null;
       const l = await activeLayer(api);
       const frameRect = l?.bounds || [0, 0, d.width, d.height];
-      const target = (await session(api)).active;
+      const ref = await targetRef(api);
       const temp = tempName();
       await ex(api, "image.duplicate", { name: temp });
-      return withTemp(api, temp, target, async () => {
+      return withTemp(api, temp, ref, async () => {
         await ex(api, "layer.new.layer", { name: "mask" });
         await ex(api, "edit.fill", { contents: "white" });
         await ex(api, "select.inverse", {});
