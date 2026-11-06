@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-06（續36）C8 傳回上線（8239d222b）＋正式站實測；塔羅改圖後誤報「設定已變更」修正（cfa56a546，未部署）
+
+- sg-deploy next-admin `8239d222b`（含 C8 與其他 session 已推 main 的 outreach Gemini key、客戶選單隱藏停用組織；無 migration）：healthy 15s、smoke 5/5 OK。
+- 正式站實測（內建瀏覽器、操作者登入）：內建瀏覽器擋新分頁 → 照設計退回同分頁。
+  - 退路：Banner 商品圖同分頁開 → 傳回 → 「原分頁已關，已存進我的設計」，My Designs 新增 `cbafc59d`（11:15，含 .psd）。
+  - 主路（原分頁的 `window.open` 換成記網址的假物件、第二分頁開該網址；票與原分頁皆真）：Banner 商品圖 ack；Studio 參考圖 ack 且縮圖同一張、中心 238,0,0（畫布疊紅）、角落原綠；塔羅預覽 ack、預覽中心紅、seed 8373332 不變、可鎖定進整套（FLUX schnell 生成 1 次 NT$0.1）。
+  - 未在正式站測：塔羅整套單張、Studio 結果、Banner 背景（本機真 PhotoCraft e2e 已過）。
+- M1 塔羅改圖後跳「風格或模型已變更，預覽仍是舊圖」：`previewStale`（`TarotStudio.tsx:397`）比 `previewSig` 與 `sigOf(現設定)`；AI 修圖存 `model::prompt::edit=1`、傳回存 `<sig>::canvas=1` 永不相等（AI 修圖原本就誤報）。修：傳回沿用送出時的 sig；AI 修圖存 `sigOf(meta.model, 現風格, 主角)`；後綴無其他讀者。
+- 測試資料：My Designs 留 06:11 與 11:15 兩筆 `design.psd` 測試設計，未刪（刪除需操作者決定）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin + 正式站內建瀏覽器傳回實測 banner/studio-ref/tarot-preview | exit=0 | ms=900000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/1m/0n（M1 自修；2 行）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=previewSig | hits=10
 ## 2026-11-06（續35）監工稽核外聯缺口：Soulful 隱私頁已填；AW 正式服務檔與第二個 Soulful 列待決
 
 - Soulful 服務檔 9f73e483 `privacy_url`＝https://soulfulexpression.org/privacy-policy/（curl 200，title「Privacy Policy - Soulful Expression」）。
