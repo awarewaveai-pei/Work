@@ -32,7 +32,7 @@ export const NOW = [
   { what: '右側面板能對 PhotoCraft 下指令（放圖進去、拿圖出來、匯出、存檔）。', state: 'yes', ev: 'W1 已把 PhotoCraft 團隊自己的介面接上（一個只動網頁外殼的補丁，上游 PR 草稿已寫、未送出），本機實測可以下指令。' },
   { what: '放圖進圖層、取出圖層的圖、換掉圖層的圖，這幾個動作做得到。', state: 'yes', ev: 'W1 本機實測全部做得到：開檔、匯出、放 SVG、放圖片、取圖層的圖、換圖層的圖（位置與順序不變）、選取轉遮罩、按 Q 塗出範圍、符合／填滿畫布。兩點差異已交給下一張卡：按 Q 塗的地方預設是「不選」，要反過來；換圖時圖層樣式不會帶過去。My Designs 的原始檔改存 .psd（網頁版存不出 PhotoCraft 自己的格式）。' },
   { what: '從 Studio、塔羅、Banner、Mockup、我的設計按一下就進專業版改圖；改完可以存入 My Designs、另存、換格式、匯出。', state: 'no', ev: '進來：Studio、塔羅、Banner、我的設計現在就有按鈕，都經過同一個函式，改一處全部接過去；Mockup 現在沒有按鈕，計畫裡補上；有圖層的設計會開原始檔，不是壓平的圖。出去：存入 My Designs（縮圖加原始檔，Mockup 工具照舊選得到）；另存、換格式、匯出用 PhotoCraft 自己的選單，檔案照常下載到電腦。' },
-  { what: '在設計裡打中文字，用得到妳的字型。', state: 'yes', ev: '字型沿用向量版那份清單，建置時放進 PhotoCraft 自己的字型庫，W1 本機實測打繁中字用到 Noto Sans TC／Noto Serif TC。介面用 PhotoCraft 預設的英文（妳 2026-11-06：看得懂英文，不用繁中）。PhotoCraft 的畫面用它自己的深色或淺色，不套 app 主題；右側圖示欄跟著 app 主題。' },
+  { what: '介面是繁體中文、用妳的字型。', state: 'yes', ev: 'W1 本機實測：開啟時自動切成繁中選單（之後尊重使用者自己改的語言），打繁中字用到 Noto Sans TC／Noto Serif TC；字型沿用向量版那份清單，不用補丁。PhotoCraft 的畫面用它自己的深色或淺色，不套 app 主題；右側圖示欄跟著 app 主題。' },
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
