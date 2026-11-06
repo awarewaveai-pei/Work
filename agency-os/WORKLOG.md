@@ -1,4 +1,21 @@
 # Worklog
+## 2026-11-06（續25）重複的 Soulful：停用＋選單排除停用客戶；「同 email 接回」不改程式（規則已存在）
+
+**根因**
+- C1：wp-member-7「Soulful Expression Art Therapy」= 2026-10-30 aware-wave.com 註冊禮（訂單 #46，`payment_events` wc:payment_complete:46:credit_pack）由 WP 會員 7 建立（`lib/entitlements/wp-customers.ts:53-66` 一個會員一個 org）；5 個訂閱全 canceled。與代操客戶 soulful-expression 同一家。
+- C2：客戶選單（7 處 NAV_FIRST／NAV_SEARCH_LIMIT 讀取）不看 `organizations.status`。
+- 「同 email 接回原客戶」規則已存在：`wp-customers.ts:115-133 adoptableClient`＋`:177-184`（email 屬於某 root customer org 的 client 帳號就接回）。這次沒接回是因為 soulful-expression 沒有用該 email 的 client 帳號——不是程式漏洞；改用名稱比對＝猜測，不做。
+
+**做了**
+- prod：wp-member-7 `status='inactive'`＋`metadata.inactive_reason`（可改回）；紀錄全保留。
+- ca8d619e5：7 處選單讀取加 `.neq("status","inactive")`；`lib/__tests__/organizations-bounded.test.ts` 擋缺此條件的新選單。已部署、正式站外聯選單只剩一個 Soulful。
+- 未動：E2E-Verify-0704、Test WP Webhook Co、MONGOLIA-03、Gift Walk 1030（wp-member-2）、EdD 論文研究——有真資料（cs 知識庫、站點、付款），停用要操作者點名。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql update organizations set status='inactive' where slug='wp-member-7' returning (wp-member-7|inactive) + sg-deploy ca8d619e5 npm test passed smoke OK + browser 外聯選單 Soulful 只 1 個 | exit=0 | ms=300000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/__tests__/organizations-bounded.test.ts app/api/ops lib/social app/__tests__ lib/outreach (76 files 567 passed) | exit=0 | ms=6000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- ORACLE_WAIVED: one-line query filter ×7 + scanner test; no logic branch to review beyond the test
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=limit\(NAV_FIRST\)|limit\(NAV_SEARCH_LIMIT\) | hits=7
 ## 2026-11-06（續24）影片剪輯 ED.3：media-contract 回歸修好、舊專案黃金測試、輸出端新效果（`4a3620f79`、`5d10097a0`、`c9574d507`）
 
 - C1 media-contract 紅（`VW/tests/media-contract.cjs:126` 0≠120）：根因＝ED.2（`5b726b2eb`）的「磁性主軌」預設開，測試把唯一的 V1 片段移到 4 秒，磁性主軌補空隙拉回 0；程式正確。拋棄式 worktree 定位：`6d3dda8f6`／`9df955245` 過、`5b726b2eb` 紅。修＝測試先按「磁性主軌」關掉並斷言 `ed.magnet===false`；斷言未放寬（`VW`＝`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`）。
