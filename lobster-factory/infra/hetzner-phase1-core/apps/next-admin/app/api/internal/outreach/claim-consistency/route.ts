@@ -67,7 +67,7 @@ export async function POST(request: Request) {
   const report = await runForOrg(org, ACTOR, async () => {
     const grant = await grantFor("outreach.qa");
     return measureConsistency(inputs.map((i): ConsistencySample => ({ messageId: i.messageId,
-      run: () => checkClaimsVoted({ body: i.body, evidence: i.evidence, recipient: i.recipient, grant, metadata: { lead_id: i.leadId, purpose: "claim_consistency" } }) })));
+      run: () => checkClaimsVoted({ body: i.body, evidence: i.evidence, recipient: i.recipient, grant, ai: { db: sb, organizationId: org }, metadata: { lead_id: i.leadId, purpose: "claim_consistency" } }) })));
   });
   return NextResponse.json({ ok: true, ...report });
 }

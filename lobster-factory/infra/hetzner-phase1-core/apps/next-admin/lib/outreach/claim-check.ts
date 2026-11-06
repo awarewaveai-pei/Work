@@ -3,8 +3,7 @@
 // Any doubt is "not supported": an unreadable reply, a failed call, a claim the model cannot tie to evidence -- all go to a
 // person. Billed to outreach.qa.
 import { OUTREACH_JSON_MODEL } from "./ai-gemini";
-import { outreachJson } from "./org-ai-key";
-import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { outreachJson, type AiScope } from "./org-ai-key";
 import type { Grant } from "@/lib/entitlements/can";
 import { fence, type EvidenceItem } from "./brand-context";
 import type { ClaimCheck } from "./review-policy";
@@ -30,14 +29,14 @@ export function sentencesOf(body: string): string[] {
  *  them gpt-5.4-mini held "您在經營 soulfulexpression 網站時…？" unsupported (C15.4 REALTEST, 7 of 18). */
 export interface Recipient { name: string | null; website: string | null }
 
-export async function checkClaims(args: { body: string; evidence: EvidenceItem[]; recipient: Recipient; grant: Grant; metadata?: Record<string, unknown> }): Promise<ClaimCheck> {
+export async function checkClaims(args: { body: string; evidence: EvidenceItem[]; recipient: Recipient; grant: Grant; /** whose Gemini key may serve the call; absent = the platform key */ ai?: AiScope; metadata?: Record<string, unknown> }): Promise<ClaimCheck> {
   const approved = args.evidence.filter((e) => e.status === "approved");
   const evidence = approved
     .map((e) => `[${e.id}] ${fence(e.claim)}${e.excerpt ? `（原文：${fence(e.excerpt)}）` : ""}`)
     .join("\n");
   const sentences = sentencesOf(args.body);
   if (!sentences.length) return { verdict: "error", error: "empty body" };
-  const r = await outreachJson(getSupabaseWriteClient(), {
+  const r = await outreachJson(args.ai, {
     route: "outreach/claim-check",
     // gpt-5.4-nano labelled questions and the signature as recipient claims (C15.4); gpt-5.4-mini until its account
     // ran out of credits (2026-11-05). The only fact gate before an automatic approval: re-measure on any model change.

@@ -68,8 +68,8 @@ async function syncOnce(): Promise<Response> {
     store: supabaseSyncStore(sb),
     gmailFor: async (connector) => gmailApi(await refresh(connector.id)),
     classify: (reply) => reply.organization_id
-      ? runForOrg(reply.organization_id, ACTOR, async () => classifyReply(reply, await grantFor("outreach.classify")))
-      : grantFor("outreach.classify").then((grant) => classifyReply(reply, grant)),
+      ? runForOrg(reply.organization_id, ACTOR, async () => classifyReply(reply, await grantFor("outreach.classify"), sb))
+      : grantFor("outreach.classify").then((grant) => classifyReply(reply, grant, sb)),
     notify: async (text) => { if (telegram) await telegram.sendText(text); },
     deadline: started + SYNC_BUDGET_MS,
   });

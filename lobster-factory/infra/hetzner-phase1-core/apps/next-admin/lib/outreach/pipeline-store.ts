@@ -184,6 +184,7 @@ export function pipelineDeps(sb: SupabaseClient, deadline: number): PipelineDeps
   const contexts = new Map<string, Promise<SampleContext>>();
   return {
     store: supabasePipelineStore(sb),
+    db: sb,
     deadline,
     runInOrg: (org, fn) => runForOrg(org, PIPELINE_ACTOR, fn),
     async research(lead) {

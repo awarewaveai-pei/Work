@@ -17,7 +17,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { OUTREACH_JSON_MODEL } from "./ai-gemini";
 import { outreachJson } from "./org-ai-key";
-import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import type { Grant } from "@/lib/entitlements/can";
 import { addressOf, GmailNotFound, header, replyText, type GmailApi, type GmailMessage } from "./gmail-api";
 
@@ -401,8 +400,8 @@ reply_type 只能是其中一個：interested（有興趣想談）、pricing（�
 
 /** The cheap model's reading of one reply (SPEC §5.6), billed to outreach.classify. A reply it cannot read is an error:
  *  the row stays pending and is retried. */
-export async function classifyReply(reply: StoredReply, grant: Grant): Promise<Classification> {
-  const res = await outreachJson(getSupabaseWriteClient(), {
+export async function classifyReply(reply: StoredReply, grant: Grant, db: SupabaseClient | null): Promise<Classification> {
+  const res = await outreachJson({ db, organizationId: reply.organization_id }, {
     route: "outreach/gmail-sync", model: OUTREACH_JSON_MODEL, system: CLASSIFY_SYSTEM, maxTokens: 300, grant, tool: "outreach",
     user: `主旨：${reply.subject ?? "（無）"}\n\n回信：\n${reply.reply_text}`, metadata: { lead_id: reply.lead_id, reply_id: reply.id },
   });

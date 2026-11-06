@@ -15,6 +15,7 @@
 // budget: those mailboxes' caps today x 1.5.
 // Cold Gate side: a do_not_contact or warm lead (isWarm: replied, opted out, Meta lead ad...) is never touched, whatever
 // the store returned. Work runs inside deps.runInOrg so every paid call bills that organization.
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { EntitlementRequired } from "@/lib/entitlements/can";
 import { grantFor } from "@/lib/entitlements/grant";
 import type { EvidenceItem } from "./brand-context";
@@ -82,6 +83,8 @@ export interface PipelineDeps {
   draft(messageId: string): Promise<{ status: number; error?: string; dailyLimitReached?: boolean }>;
   /** The paid fact check for a body; absent = the real outreach.qa call. */
   check?: (lead: PipelineLead, body: string, evidence: EvidenceItem[]) => Promise<ClaimCheck>;
+  /** The database the tick reads its leads from, where those organizations keep their connectors; absent = platform AI key. */
+  db?: SupabaseClient;
   now?: () => Date;
   /** Epoch ms after which no new lead starts. Research stops 80 s and writing 30 s before it. */
   deadline?: number;
@@ -223,7 +226,7 @@ async function applyPolicy(deps: PipelineDeps, org: string, lead: PipelineLead, 
   const ds = decideSample(ctx, { leadId: lead.id, pct: profile.review_sample_pct, industry: lead.industry, angle: keep.angle, minConfidence: minConfidence(evidence) });
   const sampled = ds.sampled;
   const d = await autoDecision({ gate: keep.quality_gate_status, sampled, body: keep.body, evidence, leadId: lead.id,
-    recipient: { name: lead.name, website: lead.website }, grant: (feature) => grantFor(feature),
+    recipient: { name: lead.name, website: lead.website }, grant: (feature) => grantFor(feature), ai: { db: deps.db ?? null, organizationId: org },
     ...(deps.check ? { check: () => deps.check!(lead, keep.body, evidence) } : {}) });
   const snapshot: Record<string, unknown> = { ...(keep.gate_snapshot ?? {}), sampled, sample: { weight: ds.weight, mean: ds.mean, p: ds.p, flags: ds.flags }, profile_id: profile.id, ...(d.claim ? { claim_check: d.claim } : {}) };
   let outcome: DecideResult;

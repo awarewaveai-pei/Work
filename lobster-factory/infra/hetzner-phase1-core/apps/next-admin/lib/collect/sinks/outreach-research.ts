@@ -114,7 +114,7 @@ export function createOutreachResearchSink(args: {
 
         if (Date.now() > args.deadline) { late++; skipped++; return; }
 
-        const r = await outreachJson(args.db, {
+        const r = await outreachJson({ db: args.db, organizationId: args.lead.organization_id }, {
           route: "outreach/research", model: OUTREACH_JSON_MODEL, system: CLAIMS_SYSTEM, user: claimsUser({ title: doc.title, text: doc.text, url: doc.canonicalUrl }),
           maxTokens: 600, grant: args.grant, tool: "outreach", metadata: { lead_id: args.lead.id, run_id: ctx.runId },
         });
