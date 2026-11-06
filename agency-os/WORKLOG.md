@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-06（續24）影片剪輯 ED.3：media-contract 回歸修好、舊專案黃金測試、輸出端新效果（`4a3620f79`、`5d10097a0`、`c9574d507`）
+
+- C1 media-contract 紅（`VW/tests/media-contract.cjs:126` 0≠120）：根因＝ED.2（`5b726b2eb`）的「磁性主軌」預設開，測試把唯一的 V1 片段移到 4 秒，磁性主軌補空隙拉回 0；程式正確。拋棄式 worktree 定位：`6d3dda8f6`／`9df955245` 過、`5b726b2eb` 紅。修＝測試先按「磁性主軌」關掉並斷言 `ed.magnet===false`；斷言未放寬（`VW`＝`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`）。
+- C2 ED.3.0：`VW/tests/ed3-legacy-golden.cjs`＋`VW/tests/fixtures/ed3-legacy/`（9 個舊專案；A＝每次 run() 參數逐字、B＝framemd5）。
+- C3 ED.3.4：`VW/shared/editor-model.js` 規格 §1.1；`VW/backend/editor-export.cjs` §3.4。與規格不同：光漏 blend 輸入用 `gbrp`（rgb24 在整張圖被協商成 YUV，screen 變紫），已寫回規格 §3.4 第 4 點。正式機容器 ffmpeg-static 7.0.2 有 gradients／blend／rotate，scale-eval＋pad＋rotate 鏈可跑（規格 R1 解除）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/media-contract.cjs → 5 PASS | exit=0 | ms=13671
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed3-legacy-golden.cjs → 9 PASS（record 後立即重跑可重現；ED.3.4 後仍 9 PASS） | exit=0 | ms=22495
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed3-effects.cjs → 9 PASS（濾鏡強度 R 250/162/72、範圍、光漏左上 217,135,53、震動差 0.00 vs 17.4、關鍵影格寬度／中心 ±4px、旋轉 1278→80px、模糊 σ 116→26、分離音訊 −16 LUFS／無音軌 −70、閃避低 11.5 dB；拼圖親眼看過） | exit=0 | ms=13003
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變（拋棄式 worktree）：boxblur 20→21 → golden 紅（印出 filter 段）；EFFECTS.filterStrength 中性 1→0.99 → golden 紅（第 2 專案改走 blend）；拿掉 frameChecks 跳過新效果 → 震動輸出 frame.mismatch；三者還原全綠 | exit=1 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=gate 10、sidebar-overlays、test-isolation、editor-render 8、p2-mix 9、p2-review-fixes、p2-subtitles、p2-tracks-ui、p3-review-fixes 8、media-contract 5、pj1-legacy-ui 5、pj1-spine-unit 5、tools-editor、export-frame-check、ed2-timeline 20、p1-loop 4 全 exit 0 | exit=0 | ms=290000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n（Codex 兩輪 `agency-os/reports/oracle/2026-11-06-partialreview-b9ec9b72.md`、`-ae436e85.md`：零音量旁白仍閃避、A1 自己閃避、detachedFrom 繞過類型檢查、極小疊加縮放寬 0、無聲分離音訊跳過時長檢查；全修，拋棄式腳本逐條實測）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=gainExpression\|effectValue\|duckRanges | hits=21（editor-export／editor-model／規格；compositor.js 的 effectValue 是它自己的區域函式，無關）
 ## 2026-11-06（續23）畫布專業版第三批上線（809a1ac9c）：條碼、AI 範圍、擴圖對齊、AI 修圖；正式站實測
 
 - 主 session 用操作者登入（內建瀏覽器）實測 12 面板 → 缺陷交 session A（`428d7835b`）、B（`45568c34b`，含 `placeImage {at}`），合併部署 `809a1ac9c`。
