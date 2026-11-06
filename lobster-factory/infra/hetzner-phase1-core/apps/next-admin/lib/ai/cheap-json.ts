@@ -23,6 +23,8 @@ interface CheapJsonTextArgs {
   /** OpenAI and Gemini models (a Claude model's parameters come from claudeParams). 0 for a judgment that must answer
    *  the same input the same way; unset = the vendor default. */
   temperature?: number;
+  /** Gemini only: the caller's own key; default = the platform's GEMINI_API_KEY. */
+  apiKey?: string;
 }
 
 const DEFAULT_TIMEOUT_MS = 600_000;
@@ -107,7 +109,7 @@ export function geminiRetryMs(body: string): number | null {
 /** The platform's free-tier Gemini key (operator 2026-11-05: the OpenAI account ran out of credits). JSON mode; the lite
  *  model refuses thinkingBudget 0, so no thinkingConfig. The key goes in the query string; never log the url. */
 async function generateGeminiJsonText(args: CheapJsonTextArgs): Promise<CheapJsonTextResult> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = args.apiKey ?? process.env.GEMINI_API_KEY;
   if (!apiKey) return { ok: false, status: 503, error: "GEMINI_API_KEY not configured" };
   try {
     const grant = args.grant ?? (await grantFor("ops.cheap-json"));
@@ -130,7 +132,11 @@ async function generateGeminiJsonText(args: CheapJsonTextArgs): Promise<CheapJso
       if (waitMs === null) return { ok: false, status: 502, error: "gemini_429_daily_quota" };
       await new Promise((r) => setTimeout(r, waitMs));
     }
-    if (!res.ok) return { ok: false, status: 502, error: `gemini_${res.status}` };
+    if (!res.ok) {
+      // Google answers a bad key 400 INVALID_ARGUMENT with reason API_KEY_INVALID (ai.google.dev troubleshooting); other 400s stay gemini_400.
+      const keyInvalid = res.status === 400 && /API_KEY_INVALID|API key not valid/i.test(await res.text().catch(() => ""));
+      return { ok: false, status: 502, error: keyInvalid ? "gemini_key_invalid" : `gemini_${res.status}` };
+    }
     const json = (await res.json()) as { usageMetadata?: GeminiUsageLike; candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
     const raw = (json.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("");
     void logAiCall({ route: args.route, model: GEMINI_LITE_MODEL, ...geminiUsageTokens(json.usageMetadata), grant, metadata: args.metadata, tool: args.tool });

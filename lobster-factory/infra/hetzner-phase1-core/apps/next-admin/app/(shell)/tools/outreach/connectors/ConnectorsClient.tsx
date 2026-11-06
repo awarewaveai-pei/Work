@@ -33,7 +33,7 @@ const taipei = (iso: string): string => new Date(iso).toLocaleString("zh-TW", { 
 const KNOWN: { name: string; type: string; label: string }[] = [
   { name: "claude",     type: "ai_generation",      label: "Claude（AI 生成 · 第 1 順位）" },
   { name: "openai",     type: "ai_generation",      label: "OpenAI（AI 生成 · 第 2 順位）" },
-  { name: "gemini",     type: "ai_generation",      label: "Gemini（AI 生成 · 客戶 BYO）" },
+  { name: "gemini",     type: "ai_generation",      label: "Gemini（客戶自己的額度 · 研究、查證、寫信、回信分類都用 · 客戶 BYO）" },
   { name: "gemini_agency", type: "ai_generation",   label: "Gemini 代理商額度（AI 生成 · 最後順位）" },
   { name: "hunter",     type: "email_verification", label: "Hunter（Email 驗證 · 每月免費 50 點 · 客戶 BYO）" },
   { name: "zerobounce", type: "email_verification", label: "ZeroBounce（Email 驗證 · 每月免費 100 筆 · 客戶 BYO）" },

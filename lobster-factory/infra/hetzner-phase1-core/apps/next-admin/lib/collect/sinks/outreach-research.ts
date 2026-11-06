@@ -10,8 +10,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RawDoc, SinkBlock, SinkCtx, SinkReport } from "@/lib/collect/types";
 import type { Grant } from "@/lib/entitlements/can";
-import { generateCheapJsonText } from "@/lib/ai/cheap-json";
 import { OUTREACH_JSON_MODEL } from "@/lib/outreach/ai-gemini";
+import { outreachJson } from "@/lib/outreach/org-ai-key";
 import { autoApproves, CLAIMS_SYSTEM, claimSupport, claimsUser, excerptOnPage, pageEmailsOf, verifiedClaims, type FoundEmail }
   from "@/lib/outreach/research-extract";
 import { hostOf } from "@/lib/outreach/research-extract";
@@ -114,7 +114,7 @@ export function createOutreachResearchSink(args: {
 
         if (Date.now() > args.deadline) { late++; skipped++; return; }
 
-        const r = await generateCheapJsonText({
+        const r = await outreachJson(args.db, {
           route: "outreach/research", model: OUTREACH_JSON_MODEL, system: CLAIMS_SYSTEM, user: claimsUser({ title: doc.title, text: doc.text, url: doc.canonicalUrl }),
           maxTokens: 600, grant: args.grant, tool: "outreach", metadata: { lead_id: args.lead.id, run_id: ctx.runId },
         });

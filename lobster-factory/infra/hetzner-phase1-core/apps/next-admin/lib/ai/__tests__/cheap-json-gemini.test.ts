@@ -50,6 +50,15 @@ describe("generateCheapJsonText on Gemini", () => {
     expect(geminiRetryMs("")).toBe(20_000);
   });
 
+  it("a 400 whose body says the key is invalid is gemini_key_invalid; any other 400 stays gemini_400", async () => {
+    process.env.GEMINI_API_KEY = "g-test";
+    const a = { route: "t", system: "s", user: "u", maxTokens: 10, model: GEMINI_LITE_MODEL, grant: {} as never };
+    vi.stubGlobal("fetch", async () => new Response('{"error":{"message":"API key not valid. Please pass a valid API key.","details":[{"reason":"API_KEY_INVALID"}]}}', { status: 400 }));
+    expect(await generateCheapJsonText(a)).toEqual({ ok: false, status: 502, error: "gemini_key_invalid" });
+    vi.stubGlobal("fetch", async () => new Response('{"error":{"message":"Invalid JSON payload"}}', { status: 400 }));
+    expect(await generateCheapJsonText(a)).toEqual({ ok: false, status: 502, error: "gemini_400" });
+  });
+
   it("the daily cap answers at once, without waiting or asking again", async () => {
     process.env.GEMINI_API_KEY = "g-test";
     let n = 0;
