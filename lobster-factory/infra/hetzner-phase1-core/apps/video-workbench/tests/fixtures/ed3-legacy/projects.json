@@ -1,0 +1,129 @@
+[
+  {
+    "name": "1 五種轉場（舊名＋transitionDuration 秒）16:9",
+    "project": {
+      "ratio": "16:9",
+      "timebase": { "num": 30, "den": 1 },
+      "clips": [
+        { "id": "c1", "kind": "video", "track": "V1", "asset": { "url": "src.mp4" }, "startFrame": 0, "durationFrames": 10, "sourceStartFrame": 0 },
+        { "id": "c2", "kind": "video", "track": "V1", "asset": { "url": "src.mp4" }, "startFrame": 10, "durationFrames": 10, "sourceStartFrame": 10, "transition": "融接", "transitionDuration": 0.2, "transitionCurve": "平滑" },
+        { "id": "c3", "kind": "video", "track": "V1", "asset": { "url": "src.mp4" }, "startFrame": 20, "durationFrames": 10, "sourceStartFrame": 20, "transition": "淡入淡出", "transitionDuration": 0.2 },
+        { "id": "c4", "kind": "video", "track": "V1", "asset": { "url": "src.mp4" }, "startFrame": 30, "durationFrames": 10, "sourceStartFrame": 30, "transition": "向左擦除", "transitionDuration": 0.2 },
+        { "id": "c5", "kind": "video", "track": "V1", "asset": { "url": "src.mp4" }, "startFrame": 40, "durationFrames": 10, "sourceStartFrame": 40, "transition": "向右擦除", "transitionDuration": 0.2 },
+        { "id": "c6", "kind": "video", "track": "V1", "asset": { "url": "src.mp4" }, "startFrame": 50, "durationFrames": 10, "sourceStartFrame": 50, "transition": "圓形裁切", "transitionDuration": 0.2 }
+      ]
+    }
+  },
+  {
+    "name": "2 三種遮罩＋模糊背景＋濾鏡＋顆粒＋旋轉 9:16",
+    "project": {
+      "ratio": "9:16",
+      "timebase": { "num": 30, "den": 1 },
+      "clips": [
+        { "id": "m1", "kind": "video", "track": "V1", "asset": { "url": "src.mp4" }, "startFrame": 0, "durationFrames": 15, "mask": "圓形", "background": "模糊", "filter": "鮮豔", "grain": 0.1, "rotation": 10 },
+        { "id": "m2", "kind": "video", "track": "V1", "asset": { "url": "src.mp4" }, "startFrame": 15, "durationFrames": 15, "sourceStartFrame": 15, "mask": "圓角矩形", "background": "模糊" },
+        { "id": "m3", "kind": "video", "track": "V1", "asset": { "url": "src.mp4" }, "startFrame": 30, "durationFrames": 15, "sourceStartFrame": 30, "mask": "三角形", "filter": "復古", "rotation": -20, "grain": null }
+      ]
+    }
+  },
+  {
+    "name": "3 純色背景＋裁切＋黑色背景 4:5",
+    "project": {
+      "ratio": "4:5",
+      "timebase": { "num": 30, "den": 1 },
+      "clips": [
+        { "id": "b1", "kind": "video", "track": "V1", "asset": { "url": "src.mp4" }, "startFrame": 0, "durationFrames": 15, "background": "純色", "backgroundColor": "#336699" },
+        { "id": "b2", "kind": "video", "track": "V1", "asset": { "url": "src.mp4" }, "startFrame": 15, "durationFrames": 15, "sourceStartFrame": 15, "fit": "裁切" },
+        { "id": "b3", "kind": "video", "track": "V1", "asset": { "url": "src.mp4" }, "startFrame": 30, "durationFrames": 15, "sourceStartFrame": 30, "background": "黑色" }
+      ]
+    }
+  },
+  {
+    "name": "4 整片濾鏡＋片段自己的濾鏡 4:3",
+    "project": {
+      "ratio": "4:3",
+      "timebase": { "num": 30, "den": 1 },
+      "filter": "黑白",
+      "clips": [
+        { "id": "f1", "kind": "video", "track": "V1", "asset": { "url": "src.mp4" }, "startFrame": 0, "durationFrames": 20 },
+        { "id": "f2", "kind": "video", "track": "V1", "asset": { "url": "src.mp4" }, "startFrame": 20, "durationFrames": 20, "sourceStartFrame": 20, "filter": "暖色" }
+      ]
+    }
+  },
+  {
+    "name": "5 調色四項＋LUT 16:9",
+    "project": {
+      "ratio": "16:9",
+      "timebase": { "num": 30, "den": 1 },
+      "clips": [
+        { "id": "g1", "kind": "video", "track": "V1", "asset": { "url": "src.mp4" }, "startFrame": 0, "durationFrames": 30, "exposure": 0.5, "temperature": 4500, "contrast": 1.2, "saturation": 0.8, "lut": { "url": "grade.cube", "name": "測試" } },
+        { "id": "g2", "kind": "video", "track": "V1", "asset": { "url": "src.mp4" }, "startFrame": 30, "durationFrames": 15, "sourceStartFrame": 30, "exposure": -0.3 }
+      ]
+    }
+  },
+  {
+    "name": "6 音量關鍵影格、淡入淡出、速度 0.5／2、片段靜音、軌道 muted／hidden／normalize 29.97",
+    "project": {
+      "ratio": "16:9",
+      "timebase": { "num": 30000, "den": 1001 },
+      "tracks": [
+        { "id": "V1" },
+        { "id": "V2", "hidden": true },
+        { "id": "T" },
+        { "id": "A1", "normalize": true, "volume": 0.8 },
+        { "id": "A2", "muted": true }
+      ],
+      "clips": [
+        { "id": "a1", "kind": "video", "track": "V1", "asset": { "url": "src.mp4" }, "startFrame": 0, "durationFrames": 30, "volumeKeys": [{ "frame": 0, "gain": 0.2 }, { "frame": 15, "gain": 1 }, { "frame": 30, "gain": 0.5 }], "fadeIn": 0.2, "fadeOut": 0.2 },
+        { "id": "a2", "kind": "video", "track": "V1", "asset": { "url": "src.mp4" }, "startFrame": 30, "durationFrames": 15, "sourceStartFrame": 30, "speed": 0.5 },
+        { "id": "a3", "kind": "video", "track": "V1", "asset": { "url": "src.mp4" }, "startFrame": 45, "durationFrames": 15, "sourceStartFrame": 60, "speed": 2 },
+        { "id": "a4", "kind": "video", "track": "V1", "asset": { "url": "src.mp4" }, "startFrame": 60, "durationFrames": 10, "sourceStartFrame": 20, "muted": true },
+        { "id": "h1", "kind": "video", "track": "V2", "asset": { "url": "src.mp4" }, "startFrame": 0, "durationFrames": 30, "width": 30 },
+        { "id": "t1", "kind": "audio", "track": "A1", "asset": { "url": "tone.wav" }, "startFrame": 0, "durationFrames": 60, "volume": 0.7 },
+        { "id": "t2", "kind": "audio", "track": "A2", "asset": { "url": "tone.wav" }, "startFrame": 0, "durationFrames": 60 }
+      ]
+    }
+  },
+  {
+    "name": "7 疊加層（x／y／width／opacity／rotation）與圖片 16:9",
+    "project": {
+      "ratio": "16:9",
+      "timebase": { "num": 30, "den": 1 },
+      "clips": [
+        { "id": "o1", "kind": "video", "track": "V1", "asset": { "url": "src.mp4" }, "startFrame": 0, "durationFrames": 45 },
+        { "id": "o2", "kind": "video", "track": "V2", "asset": { "url": "src.mp4" }, "startFrame": 0, "durationFrames": 30, "sourceStartFrame": 30, "x": 20, "y": 30, "width": 40, "opacity": 0.7, "rotation": 15 },
+        { "id": "o3", "kind": "image", "track": "V2", "asset": { "url": "still.png" }, "startFrame": 30, "durationFrames": 15, "x": 70, "y": 10, "width": 20 },
+        { "id": "o4", "kind": "image", "track": "V1", "asset": { "url": "still.png" }, "startFrame": 45, "durationFrames": 15, "scale": 0.8, "x": 40, "y": -20 }
+      ]
+    }
+  },
+  {
+    "name": "8 文字片段四種動畫、底色、三種對齊 16:9",
+    "project": {
+      "ratio": "16:9",
+      "timebase": { "num": 30, "den": 1 },
+      "clips": [
+        { "id": "v", "kind": "video", "track": "V1", "asset": { "url": "src.mp4" }, "startFrame": 0, "durationFrames": 60 },
+        { "id": "x1", "kind": "text", "track": "T", "text": "無動畫", "startFrame": 0, "durationFrames": 15, "animation": "無", "align": "靠左", "fontSize": 48 },
+        { "id": "x2", "kind": "text", "track": "T", "text": "淡入淡出", "startFrame": 15, "durationFrames": 15, "animation": "淡入淡出", "align": "置中", "backgroundColor": "#202020", "fontSize": 48 },
+        { "id": "x3", "kind": "text", "track": "T", "text": "彈出", "startFrame": 30, "durationFrames": 15, "animation": "彈出", "align": "靠右", "color": "#ffcc00", "bold": true, "fontSize": 48 },
+        { "id": "x4", "kind": "text", "track": "T", "text": "逐字顯示", "startFrame": 45, "durationFrames": 15, "animation": "逐字顯示", "italic": true, "font": "Arial", "fontSize": 48, "y": 20 }
+      ]
+    }
+  },
+  {
+    "name": "10 pre-P2 物件式 tracks（五軌）16:9",
+    "project": {
+      "ratio": "16:9",
+      "timebase": { "num": 30, "den": 1 },
+      "tracks": { "V1": { "volume": 1 }, "V2": {}, "T": {}, "A1": { "volume": 0.5 }, "A2": { "muted": true } },
+      "clips": [
+        { "id": "l1", "kind": "video", "track": "V1", "asset": { "url": "src.mp4" }, "startFrame": 0, "durationFrames": 45 },
+        { "id": "l2", "kind": "image", "track": "V2", "asset": { "url": "still.png" }, "startFrame": 10, "durationFrames": 20 },
+        { "id": "l3", "kind": "text", "track": "T", "text": "舊格式", "startFrame": 0, "durationFrames": 30 },
+        { "id": "l4", "kind": "audio", "track": "A1", "asset": { "url": "tone.wav" }, "startFrame": 0, "durationFrames": 45 },
+        { "id": "l5", "kind": "audio", "track": "A2", "asset": { "url": "tone.wav" }, "startFrame": 0, "durationFrames": 45 }
+      ]
+    }
+  }
+]
