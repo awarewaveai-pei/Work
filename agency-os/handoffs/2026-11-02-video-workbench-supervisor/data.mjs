@@ -228,8 +228,8 @@ export const STEPS = [
       done('RE.4', '你選了路線 B。卡 PJ、FC、EC 已排進這一頁；專業剪輯的五張小卡寫到逐檔逐行，另外兩組開卡前再補細節。', RB),
     ] },
   { n: 16, code: 'PJ', title: '一支影片一條線', plain: '例：做 30 秒商品短片。建專案、產生分鏡、每個鏡頭按「生成」，成品自動掛在那個鏡頭上；按「排成時間軸」就照鏡頭順序排好；配音、字幕自動放到對的軌道；輸出的成片上直接按「送審與投遞」。不用再回素材庫找檔案。',
-    gate: '舊的剪輯專案一筆不少、都能開、輸出設定不變；照上面的例子走一遍，每一步的成品自動出現在下一步。', risk: 'Medium', model: '設計 Fable；做 Opus', status: 'in_progress', depends: ['RV', 'RE'], before: '待決 5',
-    decided: '2026-11-06 你決定鏡頭卡加一格「旁白」：AI 分鏡會一起寫，你也可以自己改；配音和字幕照它做。',
+    gate: '舊的剪輯專案一筆不少、都能開、輸出設定不變；照上面的例子走一遍，每一步的成品自動出現在下一步。', risk: 'Medium', model: '設計 Fable；做 Opus', status: 'in_progress', depends: ['RV', 'RE'],
+    decided: '2026-11-06 你決定鏡頭卡加一格「旁白」：AI 分鏡會一起寫，你也可以自己改；配音和字幕照它做。分鏡靈感受保護檔：你交給我決定，11-05 那三次改動都是你要的、已上線，所以接受為新基準；並把這項檢查放進部署前的自動檢查，以後改到就會擋（f3346c686）。',
     what: '專案頁的「集」＝一支影片，底下掛剪輯檔、步驟紀錄、成片；舊剪輯專案原樣收進專案頁；工具做完自動寫回；來源改了標示要重做。等卡 RV.4 結束才動 projects-0.js',
     files: ['VW/docs/pj-project-spine-spec-20261106.md', 'VW/scripts/projects-0.js', 'VW/scripts/tools-editor.js', 'VW/scripts/tools-0.js'],
     items: [
@@ -267,5 +267,4 @@ export const STEPS = [
 export const OPEN = [
   { n: 1, before: 'RV', what: 'RV.4：部署工作台與 app（High），之後用 Runway 5 秒、一張小圖真打一次，約 US$0.25。要你說可以部署。', src: 'AGENTS §3' },
   { n: 4, before: 'FC', what: 'FC.4：把「專業剪輯」上線到 video.aware-wave.com（放引擎檔到主機、改 nginx、部署工作台）。要你說可以才做。', src: 'VW/docs/engine-route-plan-20261106.md §9 FC.4' },
-  { n: 5, before: 'PJ', what: '分鏡靈感的六個受保護檔在 11-05 被改過（seedstar 參考改成員工限定、放上自家範例，都是你要的改動），但保護清單的指紋沒跟著更新，所以檢查一直是紅的。要接受現在的樣子當新的基準嗎？（不接受就要把那三次改動退回）', src: 'agency-os/WORKLOG.md 2026-11-06 續16；commits 31e89c479、1aaa139d5、de0e1836a' },
 ];
