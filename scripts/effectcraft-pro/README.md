@@ -38,11 +38,31 @@ WSL Ubuntu＋rustup stable（含 `wasm32-unknown-unknown`）＋`git python3 curl
 | `tc-fonts.patch` | `crates/text/src/fonts.rs`（1 檔 +4 −1）：Noto Sans TC、Noto Serif TC 兩個 static 列入內建清單（origin `bundled`）。來源紀錄 `video-workbench/docs/p0-reeval-evidence/effectcraft-tc-fonts.patch`；之後以本檔為準 |
 | `no-artcraft-marks.patch` | `crates/ui-egui/src/header.rs`：拿掉 `include_bytes!("../../../docs/brand/artcraft-mark.png")`，`paint_logo` 改成不畫（呼叫點：頁首 About 按鈕 `header.rs:41`、About 對話框 `panels/dialogs.rs:390`；按鈕還在、只是沒圖）。原因：上游 `docs/brand/LICENSE-brand.txt` 規定改過的版本必須移除 ArtCraft 標誌。未補丁的試建產物 `craft_brand_scan` → `HIT effectcraft_web_bg.wasm ['artcraft-mark.png']` |
 
+| `web-host-api.patch` | 嵌入橋（上游 v0.21.1 與 main `3102b6e6`〔11-06〕都沒有 `?host=parent`）：`apps/effectcraft-web` 加依賴 `craft-web-host`（storytold/craft-libs `2e2312dd`，與 FilmCraft 同一顆；`Cargo.lock` 一併補）、新檔 `src/host.rs`，改 `app.rs`／`files.rs`／`lib.rs`。訊息與語意同 FilmCraft 的橋，前綴 `effectcraft:`，見下節 |
+
+## 嵌入橋（`?host=parent`）
+
+同源父頁以 iframe 開 `index.html?host=parent`（或畫布加 `data-host="page"`）；跨源父頁或沒有父頁＝一般模式（下載）。只聽同源父視窗本身送來的訊息（`craft-web-host` 的 origin＋source 檢查）。
+
+| 訊息 | 方向 | 內容 |
+|---|---|---|
+| `effectcraft:ready` | 引擎→父頁 | 已啟動並在聽；`file: false`＝請送 `bytes` |
+| `effectcraft:open` | 父頁→引擎 | `{name, bytes}`；`.ecproj` 照 File › Open，其他照拖入匯入；超過 512 MiB 拒收（狀態列＋`failed`） |
+| `effectcraft:save` | 引擎→父頁 | `{name, saveAs, bytes}`：原本會下載的每個檔（存檔、寫出的檔、Render Queue 輸出；多檔仍合成一個 `.zip`）。`saveAs: true`＝該檔成為文件本身（Save As、父頁沒送過的專案第一次存檔）；同名 Save、Save a Copy、輸出都是 `false`。判斷在下一個 frame 做（引擎寫完檔才設專案路徑，`crates/engine/src/cmd/file.rs` `save_to`） |
+| `effectcraft:dirty` | 引擎→父頁 | 未存變更出現／消失 |
+| `effectcraft:failed` | 引擎→父頁 | 啟動失敗或收不下檔案 |
+
+嵌入模式比照 `?empty`：不開示範專案、不還原上次、不跳復原提示；父頁負責送要編的檔、離開前提醒未存。
+
 升級：先查上游是否已內建繁中字型／嵌入橋 → 改 `PIN.json` → `build.ps1`；`git apply --check` 失敗＝重排補丁，正式站不受影響。
 
 ## 已知上游問題（不在這裡修）
 
 重開專案後素材全部離線：`footage.missing` 列出全部，但檔案都在；對其中一個呼叫一次 `footage.relink` 就全部連回（`p0-reeval-gates-20261106.md` §3 ②）。頁面（EC.2）重開專案後補這一個呼叫。
+
+## 其他防呆
+
+- `checkout --force` 不刪未追蹤檔：建置前 `git clean -fdq`（不碰 ignored 的 `target/`），否則上一次（或中斷的）補丁新增的 `src/host.rs` 會讓 `git apply` 失敗（2026-11-06 實際踩到）。
 
 ## 回退
 

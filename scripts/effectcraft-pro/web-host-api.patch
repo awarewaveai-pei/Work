@@ -1,0 +1,334 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index 63072c46..1cb6f19f 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -1199,6 +1199,15 @@ dependencies = [
+  "zip 9.1.3",
+ ]
+ 
++[[package]]
++name = "craft-web-host"
++version = "0.1.0"
++source = "git+https://github.com/storytold/craft-libs?rev=2e2312ddaf21bc3d85cd3395d0955c7d239306f6#2e2312ddaf21bc3d85cd3395d0955c7d239306f6"
++dependencies = [
++ "wasm-bindgen",
++ "web-sys",
++]
++
+ [[package]]
+ name = "crc32fast"
+ version = "1.5.2"
+@@ -1988,6 +1997,7 @@ version = "0.21.1"
+ name = "effectcraft-web"
+ version = "0.21.1"
+ dependencies = [
++ "craft-web-host",
+  "effectcraft-engine",
+  "effectcraft-export",
+  "effectcraft-expr",
+diff --git a/apps/effectcraft-web/Cargo.toml b/apps/effectcraft-web/Cargo.toml
+index 7743347a..bcdbf572 100644
+--- a/apps/effectcraft-web/Cargo.toml
++++ b/apps/effectcraft-web/Cargo.toml
+@@ -26,6 +26,8 @@ effectcraft-media = { workspace = true }
+ effectcraft-export = { workspace = true }
+ effectcraft-expr = { workspace = true }
+ effectcraft-ui-egui = { workspace = true }
++# `?host=parent`: the Craft family's host bridge (src/host.rs).
++craft-web-host = { git = "https://github.com/storytold/craft-libs", rev = "2e2312ddaf21bc3d85cd3395d0955c7d239306f6", version = "0.1.0" }
+ egui = { workspace = true }
+ eframe = { workspace = true, features = ["default_fonts", "wgpu"] }
+ log = { workspace = true }
+diff --git a/apps/effectcraft-web/src/app.rs b/apps/effectcraft-web/src/app.rs
+index 2882b16c..10448e30 100644
+--- a/apps/effectcraft-web/src/app.rs
++++ b/apps/effectcraft-web/src/app.rs
+@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
+ use effectcraft_engine::Session;
+ 
+ use crate::startup::Startup;
+-use crate::{api, audio, browse, config_file, diskcache, files, frames, persist, storage, worker};
++use crate::{api, audio, browse, config_file, diskcache, files, frames, host, persist, storage, worker};
+ use effectcraft_ui_egui::EffectcraftApp;
+ use serde_json::json;
+ use wasm_bindgen::prelude::*;
+@@ -127,8 +127,9 @@ impl eframe::App for WebApp {
+             set_document_title(&self.document_title);
+         }
+         api::poll_replies();
+-        // Render Queue outputs written this frame (here or by a worker) → downloads.
+-        files::flush_downloads();
++        // Render Queue outputs written this frame (here or by a worker) → downloads, or the host.
++        files::flush_downloads(self.app.session.path.as_deref());
++        host::post_dirty(self.app.session.is_dirty());
+         // The user's own work after a demo start is worth keeping too: turn the snapshot on.
+         if self.demo_start && (self.app.session.path.is_some() || self.app.session.is_dirty()) {
+             self.demo_start = false;
+@@ -247,7 +248,9 @@ pub async fn start(canvas_id: String) -> Result<(), JsValue> {
+     let doc = web_sys::window().and_then(|w| w.document()).ok_or("no document")?;
+     let canvas: web_sys::HtmlCanvasElement = doc.get_element_by_id(&canvas_id).ok_or("no canvas")?.dyn_into()?;
+     install_canvas_shortcuts(&canvas);
+-    let empty = query_flag("empty");
++    // `?host=parent` from a same-origin parent: it sends the document, so start like `?empty`.
++    let hosted = host::connect(&canvas);
++    let empty = query_flag("empty") || hosted;
+     let home = query_flag("home");
+     // Browser storage: settings, recent projects, imported media, saved projects, auto-saves and
+     // the last session come back.
+@@ -272,7 +275,7 @@ pub async fn start(canvas_id: String) -> Result<(), JsValue> {
+     diskcache::init();
+     storage::refresh();
+     let runner = eframe::WebRunner::new();
+-    runner
++    let started = runner
+         .start(
+             canvas,
+             eframe::WebOptions::default(),
+@@ -318,7 +321,7 @@ pub async fn start(canvas_id: String) -> Result<(), JsValue> {
+                 let mut app = EffectcraftApp::new(session);
+                 app.set_gpu_failure_bridge(gpu_failures);
+                 app.ui.start_screen = home;
+-                if let Some(r) = recovery.filter(|r| !restored && r.autosave.is_some()) {
++                if let Some(r) = recovery.filter(|r| !hosted && !restored && r.autosave.is_some()) {
+                     app.offer_recovery(r);
+                 }
+                 install_hooks(&mut app);
+@@ -338,7 +341,12 @@ pub async fn start(canvas_id: String) -> Result<(), JsValue> {
+                 Ok(Box::new(WebApp { app, persist: keep_session, demo_start: !empty && !keep_session, document_title: String::new() }))
+             }),
+         )
+-        .await?;
++        .await;
++    if let Err(e) = &started {
++        host::post_failed(&format!("EffectCraft failed to start: {e:?}"));
++    }
++    started?;
++    host::post_ready();
+     // Hide the loading message once the app runs.
+     if let Some(el) = doc.get_element_by_id("loading") {
+         el.remove();
+diff --git a/apps/effectcraft-web/src/files.rs b/apps/effectcraft-web/src/files.rs
+index f6aac5aa..65bf6bea 100644
+--- a/apps/effectcraft-web/src/files.rs
++++ b/apps/effectcraft-web/src/files.rs
+@@ -23,6 +23,9 @@ pub static STORE: LazyLock<Arc<Store>> = LazyLock::new(|| {
+ });
+ /// Render outputs written since the last [`flush_downloads`].
+ static OUTPUTS: Mutex<Vec<String>> = Mutex::new(Vec::new());
++/// Files written since the last [`flush_downloads`] in host mode: handed to the page there, once
++/// the frame's commands have set the session's project path (the `saveAs` rule, [`crate::host`]).
++static WRITTEN: Mutex<Vec<String>> = Mutex::new(Vec::new());
+ /// Saves that write to browser storage only (no download): `api.saveToBrowser`.
+ static QUIET: Mutex<Vec<String>> = Mutex::new(Vec::new());
+ 
+@@ -128,6 +131,11 @@ impl Services for WebServices {
+         if quiet || crate::is_worker() {
+             return Ok(());
+         }
++        if crate::host::is_hosted() {
++            WRITTEN.lock().unwrap_or_else(std::sync::PoisonError::into_inner).push(path.to_string());
++            crate::repaint();
++            return Ok(());
++        }
+         download(file_name(path), data).map_err(|e| std::io::Error::other(format!("download failed: {e:?}")))
+     }
+     fn store_file(&self, path: &str, data: &[u8]) -> std::io::Result<()> {
+@@ -186,21 +194,37 @@ pub fn export_sink() -> Arc<effectcraft_export::Sink> {
+     Arc::new(|path: &str, data: Vec<u8>| add_output(path, data.into()))
+ }
+ 
+-/// Download the render outputs written since the last call.
+-pub fn flush_downloads() {
++/// Download the render outputs written since the last call; in host mode hand them, and the files
++/// written since then, to the page. `project`: the session's project path now.
++pub fn flush_downloads(project: Option<&str>) {
++    let written = std::mem::take(&mut *WRITTEN.lock().unwrap_or_else(std::sync::PoisonError::into_inner));
++    for p in written {
++        if let Some(d) = get(&p) {
++            crate::host::save(&p, file_name(&p), &d, project);
++        }
++    }
+     let paths = std::mem::take(&mut *OUTPUTS.lock().unwrap_or_else(std::sync::PoisonError::into_inner));
+     let mut out: Vec<(String, Arc<[u8]>)> = paths.into_iter().filter_map(|p| get(&p).map(|d| (file_name(&p).to_string(), d))).collect();
+     out.sort_by(|a, b| a.0.cmp(&b.0));
+     out.dedup_by(|a, b| a.0 == b.0);
+     let r = match out.len() {
+         0 => return,
++        1 if crate::host::is_hosted() => {
++            crate::host::save(&out[0].0, &out[0].0, &out[0].1, None);
++            Ok(())
++        }
+         1 => download(&out[0].0, &out[0].1),
+         n => {
+             let first = &out[0].0;
+             let stem = first.rsplit_once('.').map_or(first.as_str(), |(s, _)| s).trim_end_matches(|c: char| c.is_ascii_digit() || c == '_');
+             let stem = if stem.is_empty() { "render" } else { stem };
+             log::info!("render: {n} files → {stem}.zip");
+-            download(&format!("{stem}.zip"), &zip_store(&out))
++            let zip = format!("{stem}.zip");
++            if crate::host::is_hosted() {
++                crate::host::save(&zip, &zip, &zip_store(&out), None);
++                return;
++            }
++            download(&zip, &zip_store(&out))
+         }
+     };
+     if let Err(e) = r {
+diff --git a/apps/effectcraft-web/src/host.rs b/apps/effectcraft-web/src/host.rs
+new file mode 100755
+index 00000000..e9e6b527
+--- /dev/null
++++ b/apps/effectcraft-web/src/host.rs
+@@ -0,0 +1,130 @@
++//! Host mode: a same-origin page framing EffectCraft with `?host=parent` (or running it in its own
++//! document with `data-host="page"` on the canvas) opens files in it and takes what it writes
++//! instead of the browser downloading. The messages and both transports are `craft-web-host`'s
++//! (storytold/craft-libs), the contract the other Craft web builds speak, with the `effectcraft:`
++//! prefix. Unframed, or framed by another origin, there is no bridge: the normal app with downloads.
++//!
++//! - `effectcraft:ready` once the app runs and listens (`file: false`: send `bytes`).
++//! - `effectcraft:open` `{ name, bytes }`: a `.ecproj` opens like File › Open, anything else
++//!   imports like a file dropped on the page. Over [`MAX_OPEN_BYTES`]: refused in the status bar.
++//! - `effectcraft:save` `{ name, saveAs, bytes }`: every file the app would otherwise download —
++//!   project saves, written files, Render Queue outputs (several as one `.zip`, as downloaded).
++//!   `saveAs: true` when the file becomes the document's file — the session adopted it as its
++//!   project path and the host doesn't already have it as the document (Save As; the first Save of
++//!   a project the host never sent). `false` for a Save under the document's own name and for
++//!   every copy (Save a Copy, renders).
++//! - `effectcraft:dirty` when unsaved changes appear or go away; `effectcraft:failed` when the app
++//!   can't start.
++//!
++//! In host mode the host sends the document to edit: no demo, no restored session, no recovery offer.
++
++use std::cell::RefCell;
++use std::rc::Rc;
++
++use craft_web_host::web::{FileData, Host, Message};
++
++const APP: &str = "effectcraft";
++
++/// The largest `effectcraft:open` payload, refused before any byte is copied (the Craft family's default).
++pub const MAX_OPEN_BYTES: f64 = (512u64 << 20) as f64;
++
++struct Bridge {
++    host: Rc<Host>,
++    /// The document file the host has: the project it opened here, and every file sent with `saveAs: true`.
++    document: Option<String>,
++}
++
++thread_local! {
++    static BRIDGE: RefCell<Option<Bridge>> = const { RefCell::new(None) };
++}
++
++/// Connect to the hosting page, if any, and hear its files. Returns whether the app is hosted.
++pub fn connect(canvas: &web_sys::Element) -> bool {
++    let Some(host) = Host::connect(APP, canvas).map(Rc::new) else { return false };
++    let reply_to = host.clone();
++    host.listen(move |message| {
++        if let Message::Open { name, data } = message {
++            open(&reply_to, name, data);
++        }
++    });
++    BRIDGE.with(|b| *b.borrow_mut() = Some(Bridge { host, document: None }));
++    true
++}
++
++pub fn is_hosted() -> bool {
++    BRIDGE.with(|b| b.borrow().is_some())
++}
++
++fn host() -> Option<Rc<Host>> {
++    BRIDGE.with(|b| b.borrow().as_ref().map(|b| b.host.clone()))
++}
++
++pub fn post_ready() {
++    if let Some(h) = host()
++        && let Err(e) = h.post_ready(env!("CARGO_PKG_VERSION"), false)
++    {
++        log::error!("couldn't tell the host EffectCraft is ready: {e}");
++    }
++}
++
++pub fn post_failed(error: &str) {
++    if let Some(h) = host() {
++        let _ = h.post_failed(error, None);
++    }
++}
++
++pub fn post_dirty(dirty: bool) {
++    if let Some(h) = host() {
++        h.post_dirty(dirty);
++    }
++}
++
++/// Hand a written file to the host. `project` = the session's project path after the frame's
++/// commands (a Save As adopts its path only after the write), for the `saveAs` rule.
++pub fn save(path: &str, name: &str, bytes: &[u8], project: Option<&str>) {
++    let Some(h) = host() else { return };
++    let before = BRIDGE.with(|b| b.borrow().as_ref().and_then(|b| b.document.clone()));
++    let save_as = before.as_deref() != Some(path) && project == Some(path);
++    match h.post_save(name, bytes, None, save_as) {
++        Ok(()) if save_as => set_document(path),
++        Ok(()) => {}
++        Err(e) => log::error!("couldn't hand {name} to the host: {e}"),
++    }
++}
++
++fn set_document(path: &str) {
++    BRIDGE.with(|b| {
++        if let Some(b) = b.borrow_mut().as_mut() {
++            b.document = Some(path.to_string());
++        }
++    });
++}
++
++/// A host's file: into the file table, then opened or imported like a dropped file.
++fn open(host: &Rc<Host>, name: String, data: FileData) {
++    if data.size() > MAX_OPEN_BYTES {
++        let why = format!("{name}: over the {} MiB host open limit", (MAX_OPEN_BYTES as u64) >> 20);
++        let _ = host.post_failed(&why, None);
++        return crate::post(move |app| app.ui.status = why);
++    }
++    let host = host.clone();
++    wasm_bindgen_futures::spawn_local(async move {
++        let bytes = match data {
++            FileData::Bytes(array) => Ok(array.to_vec()),
++            FileData::Blob(blob) => wasm_bindgen_futures::JsFuture::from(blob.array_buffer()).await.map(|b| js_sys::Uint8Array::new(&b).to_vec()),
++        };
++        let Ok(bytes) = bytes else {
++            let _ = host.post_failed(&format!("couldn't read {name}"), None);
++            return;
++        };
++        let path = crate::files::path_for(&name);
++        crate::files::put(&path, bytes.into());
++        crate::post(move |app| {
++            crate::open_or_import(app, vec![path.clone()]);
++            // The host's project opened: a Save of it goes out under its own name (`saveAs: false`).
++            if app.session.path.as_deref() == Some(path.as_str()) {
++                set_document(&path);
++            }
++        });
++    });
++}
+diff --git a/apps/effectcraft-web/src/lib.rs b/apps/effectcraft-web/src/lib.rs
+index e1bf8589..41176c9d 100644
+--- a/apps/effectcraft-web/src/lib.rs
++++ b/apps/effectcraft-web/src/lib.rs
+@@ -10,7 +10,7 @@
+ //! | config directory (settings, shortcuts, recent projects, auto-saves) | the same store ([`store::WebConfig`]) |
+ //! | rfd file dialogs | `<input type=file>` pickers; drop files on the page |
+ //! | Media Browser on the file system | browser storage and folders opened with the File System Access API (`browse`) |
+-//! | written files (Save, Render Queue) | browser downloads (several render files as one `.zip`) |
++//! | written files (Save, Render Queue) | browser downloads (several render files as one `.zip`), or the hosting page's (`host`) |
+ //! | frame render threads | frame workers, each with a project replica fed by diffs and its own WebGPU device (`frames`); `Frames::pump` on the UI thread without workers |
+ //! | disk cache folder | frames in the Origin Private File System, written by the frame workers (`diskcache`) |
+ //! | (none) | the storage manager: usage, quota, persistence, clearing (`storage`) |
+@@ -42,6 +42,8 @@ pub mod files;
+ #[cfg(target_arch = "wasm32")]
+ pub mod frames;
+ #[cfg(target_arch = "wasm32")]
++pub mod host;
++#[cfg(target_arch = "wasm32")]
+ pub mod persist;
+ #[cfg(target_arch = "wasm32")]
+ pub mod storage;
