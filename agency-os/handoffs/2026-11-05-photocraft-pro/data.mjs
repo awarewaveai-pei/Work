@@ -105,6 +105,7 @@ export const STEPS = [
     ] },
   { n: 7, code: 'C7', group: 'G', title: '入口改接、舊編輯器退場', plain: '例：在 Studio、塔羅、Banner、Mockup 或我的設計按「在畫布編輯」，直接進專業版並帶著那張圖；/tools/canvas 自動跳到專業版，舊頁面刪掉，只剩一套。',
     gate: '每個入口（Studio、塔羅、Banner、Mockup、我的設計）都進到對的編輯器且圖有帶過去；舊網址跳轉；舊頁與相關設定、測試拆乾淨且全綠；還在被別處使用的檔案一個都沒刪。', risk: 'Medium（刪舊頁；改各工具共用的入口）', model: 'Opus 5.5', status: 'in_progress', depends: ['C6'],
+    before: '待決 1 決定要不要補「傳回原工具」',
     decided: '不留兩扇門。不做舊 .design.json 匯入（妳 2026-11-06 定案：沒有要再編輯的舊專案檔）。妳在正式站用過專業版、說可以之後才拆舊的。調色與去背的共用數學、fabric 套件保留（塔羅印刷與預覽還在用）。',
     what: 'openInCanvas 加選填的原始檔參數與目的地表；ProEditorFrame 讀交接；Mockup 加入口；門頁改載新元件；canvas 頁改 redirect、刪 CanvasEditor、搬 fabric-filters、拆側欄與登記、改測試；文件與記憶',
     files: ['NA/components/tools/canvas-handoff.ts', 'NA/app/(shell)/tools/designs/DesignsGallery.tsx', 'NA/app/(shell)/tools/mockup/MockupStudio.tsx', 'NA/app/(shell)/tools/mockup/ModelMockupPanel.tsx', 'NA/app/design/canvas/page.tsx', 'NA/app/(shell)/tools/canvas/page.tsx', 'NA/app/(shell)/tools/canvas/CanvasEditor.tsx', 'NA/app/sidebar-sections.ts', 'NA/lib/portal/products.ts'],
@@ -115,4 +116,11 @@ export const STEPS = [
     ] },
 ];
 
-export const OPEN = [];
+export const OPEN = [
+  { n: 1, before: 'C7', src: '操作者 2026-11-06「塔羅改完要可以傳回去」',
+    what: '從塔羅、Studio、Banner 把圖送進畫布改完之後，現在沒有路「傳回原工具」。塔羅最明顯：改好的預覽圖回不到塔羅，整套牌就不會照改過的樣子生成；整套裡的單張改完也放不回那一格。舊 Canvas Editor 本來也沒有這條路。Mockup 不受影響（它從「我的設計」挑圖）。要不要補「傳回」？',
+    options: [
+      { k: '補「傳回」', pick: true, t: '畫布開在新分頁，原工具的分頁留著；右側欄多一顆「傳回 ○○」，按下去把改好的圖送回原本那一格（塔羅預覽、整套裡的某一張、Studio 的結果或參考圖、Banner 的商品圖或背景）。原分頁已關掉時改存進「我的設計」。' },
+      { k: '先不補', t: '維持現狀：改完存進「我的設計」或下載，再到原工具手動上傳。' },
+    ] },
+];

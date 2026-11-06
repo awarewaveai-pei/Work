@@ -82,7 +82,7 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
   <h1>畫布專業版監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-11-05</span></p>
   <div class="bar" data-computed><i class="d" style="width:42.857142857142854%"></i><i class="g" style="width:42.857142857142854%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>3</span>／<span data-computed>7</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>3</span>／<span data-computed>7</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>1</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
 <p class="sub">把開源的 PhotoCraft（Photoshop 的重製，工具、面板、快捷鍵都一樣）放進 app.aware-wave.com 當「畫布（專業版）」；AwareWave 有而它沒有的功能做成右側一條圖示欄，點了才浮出面板；Studio、塔羅、Banner、Mockup、我的設計都能一鍵把圖送進來改；舊 Canvas Editor 最後退場，只留一套。共 <span data-computed>7</span> 張卡、<span data-computed>26</span> 項工作，已完成 <span data-computed>18</span> 項。目前只有研究與計畫，還沒動任何程式。</p>
@@ -183,14 +183,14 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
       <ul class="items"><li class="done"><b>✓</b><span><code>C7.1</code> 入口全部改接到專業版，圖會帶過去：Studio、塔羅、Banner、我的設計，加上新補的 Mockup；有圖層原始檔的設計開原始檔。 <small>完成於 <code>85c27aaa4</code></small></span></li><li class="todo"><b>○</b><span><code>C7.2</code> 舊網址跳轉到專業版；刪舊頁與相關設定、測試改好。</span></li><li class="todo"><b>○</b><span><code>C7.3</code> 文件與記憶更新。</span></li></ul>
       <details><summary>工程細節：C7 入口改接、舊編輯器退場</summary>
         <p>openInCanvas 加選填的原始檔參數與目的地表；ProEditorFrame 讀交接；Mockup 加入口；門頁改載新元件；canvas 頁改 redirect、刪 CanvasEditor、搬 fabric-filters、拆側欄與登記、改測試；文件與記憶</p>
-        <p><b>需先完成：</b><a href="#C6">C6</a></p>
+        <p><b>需先完成：</b><a href="#C6">C6</a>；待決 1 決定要不要補「傳回原工具」</p>
         <p><b>已定案：</b>不留兩扇門。不做舊 .design.json 匯入（妳 2026-11-06 定案：沒有要再編輯的舊專案檔）。妳在正式站用過專業版、說可以之後才拆舊的。調色與去背的共用數學、fabric 套件保留（塔羅印刷與預覽還在用）。</p>
         <p><b>檔案：</b><code>NA/components/tools/canvas-handoff.ts</code> <code>NA/app/(shell)/tools/designs/DesignsGallery.tsx</code> <code>NA/app/(shell)/tools/mockup/MockupStudio.tsx</code> <code>NA/app/(shell)/tools/mockup/ModelMockupPanel.tsx</code> <code>NA/app/design/canvas/page.tsx</code> <code>NA/app/(shell)/tools/canvas/page.tsx</code> <code>NA/app/(shell)/tools/canvas/CanvasEditor.tsx</code> <code>NA/app/sidebar-sections.ts</code> <code>NA/lib/portal/products.ts</code></p>
         <p><b>卡：</b><code>agency-os/handoffs/2026-11-05-photocraft-pro/R0-PLAN.md §6 C7</code></p>
       </details>
     </div></li></ol></section>
 
-<section id="open"><h2>待你決定</h2><p class="lead">決定後，對應的卡才能開始。</p><p class="lead">目前沒有需要你決定的事。</p></section>
+<section id="open"><h2>待你決定</h2><p class="lead">決定後，對應的卡才能開始。</p><ol class="open"><li><div class="n">1</div><div class="b"><p class="plain">從塔羅、Studio、Banner 把圖送進畫布改完之後，現在沒有路「傳回原工具」。塔羅最明顯：改好的預覽圖回不到塔羅，整套牌就不會照改過的樣子生成；整套裡的單張改完也放不回那一格。舊 Canvas Editor 本來也沒有這條路。Mockup 不受影響（它從「我的設計」挑圖）。要不要補「傳回」？</p><ul class="opts"><li class="pick"><b>補「傳回」 ★</b><span>畫布開在新分頁，原工具的分頁留著；右側欄多一顆「傳回 ○○」，按下去把改好的圖送回原本那一格（塔羅預覽、整套裡的某一張、Studio 的結果或參考圖、Banner 的商品圖或背景）。原分頁已關掉時改存進「我的設計」。</span></li><li class=""><b>先不補</b><span>維持現狀：改完存進「我的設計」或下載，再到原工具手動上傳。</span></li></ul><p class="meta"><a href="#C7" class="who">需在第 <span data-computed>7</span> 張卡開始前決定</a><span class="who">出處：操作者 2026-11-06「塔羅改完要可以傳回去」</span></p></div></li></ol></section>
 
 <section id="paths"><h2>檔案</h2><div class="paths"><div><b>每項工作的做法</b><code>agency-os/handoffs/2026-11-05-photocraft-pro/R0-PLAN.md §6</code></div><div><b>研究與對照（為什麼選這條路）</b><code>agency-os/reports/decisions/2026-11-05-canvas-editor-vs-photocraft.md</code></div><div><b>工作紀錄</b><code>agency-os/WORKLOG.md 2026-11-05</code></div><div><b>本頁來源</b><span><code>agency-os/handoffs/2026-11-05-photocraft-pro/</code><br>修改 data.mjs 後，執行 node build.mjs 和 node check.mjs，再重新發布同一網址。</span></div></div></section>
 </main>
