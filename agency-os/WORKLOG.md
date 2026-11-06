@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-06（續30）客戶自己的 Gemini 金鑰用於所有外聯 AI 步驟
+
+**根因**：只有寫信（`NA/lib/outreach/generate.ts:153-190`）讀客戶 BYO Gemini；研究、事實核對（多數決 2–3 次）、回信分類（每封約 4／5 次呼叫）一律用平台免費金鑰（每天 500 次，所有客戶共用）→ 客戶申請金鑰幾乎不增加額度。
+
+**做了**（23e25fcaa，已部署）
+- `NA/lib/outreach/org-ai-key.ts`：`outreachGeminiKey`（該 org 自己啟用的 gemini connector；vault 名由 row id 推導；不用 agency 列；每 org 快取 5 分）＋`outreachJson`（org＝`billedOrgId(grant)`；先客戶金鑰，遇 gemini_429_daily_quota／gemini_key_invalid／gemini_403 改平台金鑰）。
+- `NA/lib/ai/cheap-json.ts`：Gemini 分支可帶 `apiKey`；400 API_KEY_INVALID → `gemini_key_invalid`。
+- 研究 sink、claim-check、gmail-sync classifyReply 改走 outreachJson；Connectors 的 Gemini 列文案改為「研究、查證、寫信、回信分類都用」。
+- 已知限制：`billedOrgId` 取 root org（`lib/entitlements/subject.ts:69`），子品牌自己的金鑰不會被用到；Soulful 是 root，不受影響。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/ai lib/outreach lib/collect app/api/outreach app/api/internal/outreach (94 files 889 passed) + tsc 0 errors outside .next | exit=0 | ms=8000
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin (deployed 23e25fcaa; npm test passed; smoke all OK) | exit=0 | ms=240000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/1n
+- ORACLE_WAIVED: codex quota blocked until 2026-11-06 18:16 (oracle-quota.ps1); independent critic agent review instead (tenant isolation, key secrecy, cache, fallback, attribution all verified with file:line)
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=generateCheapJsonText|OUTREACH_JSON_MODEL | hits=11
 ## 2026-11-06（續29）影片剪輯 ED.3.2／3.3／3.5：片段效果＋預覽、變形關鍵影格／分離音訊／旁白閃避、速度與時間組；ED.3 七張子卡完成（`61ac8cd09`、`8331ce93e`、`af1517238`）
 
 - ED.3.2：套用範圍三鈕＋濾鏡十六鈕＋強度／光漏／震動／顆粒（%）＋遮罩鈕；背景三鈕＋模糊強度寫主軌全部片段；預覽補濾鏡（CSS 依強度內插）、光漏層、震動。與規格不同：震動預覽位移 −A·d·100%（規格寫 50%；輸出裁切窗移 A·d 倍畫寬，I3 同數學）（`VW/scripts/tools-editor.js`，`VW`＝`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`）。
