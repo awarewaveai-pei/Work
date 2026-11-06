@@ -186,6 +186,70 @@ const pass = (m) => console.log("PASS " + m);
     for (const name of ["變形", "音訊"]) await inspector.locator(`[data-ed-group="${name}"]`).screenshot({ path: path.join(dir, `ed33-${name}.png`) });
     pass("ED.3.3：◇ 新增 → 1 個關鍵影格；第 50 格 X 輸入 1920/2 → 960；◆ 移除；分割後兩半各自的關鍵影格（中點 480）；分離音訊到 A1（同一檔、原片靜音）；旁白時自動降低開");
 
+    // ED.3.5: speed buttons change the length (source range kept), 來源終點, volume in dB, text choices + 套用到整片,
+    // 取色 next to colour fields, and no <select> left in the inspector.
+    await page.evaluate((url) => {
+      const p = edProject();
+      p.clips.push(edTime(p, { id: "speedclip", kind: "video", track: "V2", asset: { id: "a1", url, name: "測試片", duration: 4 }, speed: 1, volume: 1, fadeIn: 0, fadeOut: 0, opacity: 1, scale: 1, x: 50, y: 50, rotation: 0, width: 25 }, { startFrame: 0, durationFrames: 100, sourceStartFrame: 0 }));
+      ed.selected = "speedclip";
+      edRender();
+    }, clipUrl);
+    assert.equal(await inspector.locator("select").count(), 0);
+    await inspector.getByRole("group", { name: "播放速度" }).getByRole("button", { name: "2x" }).click();
+    await page.evaluate(() => ed.queue);
+    assert.deepEqual([clipOf(await project(), "speedclip").speed, clipOf(await project(), "speedclip").durationFrames], [2, 50]);
+    await field("來源終點", 2);
+    assert.equal(clipOf(await project(), "speedclip").durationFrames, 25);
+    await field("音量（dB）", -6);
+    assert.ok(Math.abs(clipOf(await project(), "speedclip").volume - Math.pow(10, -6 / 20)) < 1e-9);
+    for (const name of ["播放速度", "時間"]) await inspector.locator(`[data-ed-group="${name}"]`).screenshot({ path: path.join(dir, `ed35-${name}.png`) });
+    await page.evaluate(async () => {
+      await edAction("subtitle-add");
+      ed.time = 5;
+      await edAction("subtitle-add");
+    });
+    const texts = () => project().then((q) => q.clips.filter((x) => x.kind === "text"));
+    assert.equal(await inspector.locator("select").count(), 0);
+    await inspector.getByRole("group", { name: "字型" }).getByRole("button", { name: "Arial" }).click();
+    await inspector.getByRole("group", { name: "文字對齊" }).getByRole("button", { name: "靠右" }).click();
+    await inspector.getByRole("group", { name: "文字動畫" }).getByRole("button", { name: "彈出" }).click();
+    await field("字體大小", 72);
+    await inspector.getByRole("button", { name: "套用到整片" }).click();
+    await page.evaluate(() => ed.queue);
+    assert.deepEqual((await texts()).map((x) => [x.font, x.align, x.animation, x.fontSize]), [["Arial", "靠右", "彈出", 72], ["Arial", "靠右", "彈出", 72]]);
+    await inspector.locator('[data-ed-group="文字"]').screenshot({ path: path.join(dir, "ed35-文字.png") });
+    if (await page.evaluate(() => typeof window.EyeDropper === "function")) assert.ok((await inspector.getByRole("button", { name: "取色" }).count()) >= 1);
+    pass("ED.3.5：無下拉；速度 2x → 100 格變 50 格；來源終點 2 → 25 格；音量 −6 dB；字型／對齊／動畫按鈕＋字體大小 72 套用到整片兩段文字；顏色欄位旁有取色");
+
+    // §7 C: an old project opened and saved untouched gains none of the ED.3 fields.
+    const fresh = ["filterStrength", "lightLeak", "shake", "backgroundBlur", "transformKeys", "duck", "detachedFrom"];
+    await page.evaluate(async () => {
+      const rows = await VideoWorkbench.preferences.get("tools.editor.projects", []);
+      rows.push(
+        ProjectEnvelope.wrap(
+          { id: "pre-ed3", title: "ED3 前的舊專案", ratio: "16:9", timebase: { num: 30, den: 1 }, assets: [], markers: [], filter: "暖色",
+            tracks: [{ id: "V1", kind: "video" }, { id: "T", kind: "text" }, { id: "A1", kind: "audio" }],
+            clips: [
+              { id: "old1", kind: "image", track: "V1", asset: { url: "/assets/none.png", kind: "image" }, startFrame: 0, durationFrames: 60, sourceStartFrame: 0, grain: 0.2, background: "模糊" },
+              { id: "old2", kind: "text", track: "T", text: "舊字", startFrame: 0, durationFrames: 30, sourceStartFrame: 0 },
+            ] },
+          { revision: 0 },
+        ),
+      );
+      await VideoWorkbench.preferences.set("tools.editor.projects", rows);
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "ED3 前的舊專案 · 16:9", exact: true }).click();
+    await page.waitForSelector("[data-ed-stage]");
+    await page.locator("[data-ed-stage]").click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press("Control+s");
+    await page.waitForFunction(() => /^● 已儲存 \S/.test(document.querySelector("[data-ed-saved]").textContent));
+    const stored = (await page.evaluate(() => VideoWorkbench.preferences.get("tools.editor.projects", []))).find((e) => e.native.id === "pre-ed3").native,
+      owners = [stored, ...stored.tracks, ...stored.clips];
+    assert.deepEqual(owners.flatMap((o) => fresh.filter((k) => k in o)), [], "沒有新欄位");
+    assert.equal(stored.filter, "暖色");
+    pass("§7 C：舊專案開啟不動、Ctrl+S，專案／軌道／片段都沒有 ED.3 新欄位，原有濾鏡照舊");
+
     assert.deepEqual(errors, []);
   } finally {
     await browser.close();

@@ -119,8 +119,8 @@ const NTSC = { num: 30000, den: 1001 };
     // ED.2: the magnetic main track (on by default) closes V1 gaps, which would pull a lone clip back to 0.
     await page.getByRole("button", { name: "磁性主軌" }).click();
     assert.equal(await page.evaluate(() => ed.magnet), false);
-    await page.getByLabel("時間軸起點（秒）").fill("4");
-    await page.getByLabel("時間軸起點（秒）").press("Tab");
+    await page.getByLabel("起點", { exact: true }).fill("4");
+    await page.getByLabel("起點", { exact: true }).press("Tab");
     await page.evaluate(() => ed.queue);
     prefs = (await api("/state")).body.preferences;
     const stored = prefs["tools.editor.projects"].find((e) => e.native.id === projectId);

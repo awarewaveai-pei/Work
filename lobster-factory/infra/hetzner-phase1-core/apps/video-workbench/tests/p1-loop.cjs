@@ -70,10 +70,10 @@ async function exportProject(page) {
 
     await uploadThroughPane(page, "素材", "上傳素材", video);
     await page.waitForSelector('[data-ed-lane="V1"] [data-ed-clip]', { timeout: 60000 });
-    await page.getByLabel("片段長度（秒）").fill("2");
-    await page.getByLabel("片段長度（秒）").press("Tab");
-    await page.getByLabel("素材起點（秒）").fill("0.5");
-    await page.getByLabel("素材起點（秒）").press("Tab");
+    await page.getByLabel("長度", { exact: true }).fill("2");
+    await page.getByLabel("長度", { exact: true }).press("Tab");
+    await page.getByLabel("來源起點", { exact: true }).fill("0.5");
+    await page.getByLabel("來源起點", { exact: true }).press("Tab");
     await uploadThroughPane(page, "貼圖", "上傳透明 PNG", image);
     await page.waitForSelector('[data-ed-lane="V2"] [data-ed-clip]', { timeout: 60000 });
     await page.locator('[data-ed-pane="文字"]').click();

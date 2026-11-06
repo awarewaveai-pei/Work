@@ -393,8 +393,9 @@ function edButton(title, action, disabled = false) {
 function edInput(key, title, value, type = "number", attrs = "") {
   return `<label>${esc(title)}<input class="text-input" aria-label="${esc(title)}" data-ed-field="${key}" type="${type}" value="${esc(value ?? "")}" ${attrs}></label>`;
 }
-function edSelect(key, title, value, options) {
-  return `<label>${esc(title)}<select class="text-input" aria-label="${esc(title)}" data-ed-field="${key}">${options.map((o) => `<option ${o === value ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></label>`;
+// Card ED.3.5: a colour field gets 取色 where the browser has the EyeDropper API.
+function edColor(key, title, value) {
+  return edInput(key, title, value, "color") + (typeof window.EyeDropper === "function" ? edButton("取色", "eyedrop:" + key) : "");
 }
 // Card P2: choices are visible buttons (aria-pressed), never <select>.
 function edChoices(label, action, value, options, text = (o) => o) {
@@ -737,13 +738,19 @@ function edTransformWindow(keys, from, to) {
 function edClipInspector(p, c) {
   const kind = c.kind === "text" ? "text" : c.kind === "audio" ? "audio" : "video",
     main = c.track === edMain(p),
+    media = ["video", "audio"].includes(c.kind),
     time =
-      edInput("start", "時間軸起點（秒）", c.start, "number", 'min="0" step="0.1"') +
-      edInput("duration", "片段長度（秒）", c.duration, "number", 'min="0.05" step="0.1"') +
-      (["video", "audio"].includes(c.kind) ? edInput("sourceStart", "素材起點（秒）", c.sourceStart, "number", 'min="0" step="0.1"') : ""),
-    speed = edInput("speed", "播放速度", c.speed, "number", 'min="0.25" max="4" step="0.25"'),
+      edInput("start", "起點", c.start, "number", 'min="0" step="0.1"') +
+      edInput("duration", "長度", c.duration, "number", 'min="0.05" step="0.1"') +
+      (media
+        ? edInput("sourceStart", "來源起點", c.sourceStart, "number", 'min="0" step="0.1"') +
+          edInput("sourceEnd", "來源終點", Number((c.sourceStart + c.duration * c.speed).toFixed(3)), "number", 'min="0" step="0.1"') +
+          (c.asset?.duration ? `<p class="note">素材原始長度 ${Number(c.asset.duration.toFixed(2))}s</p>` : "")
+        : ""),
+    speeds = [0.5, 1, 1.5, 2],
+    speed = edChoices("播放速度", "speed", c.speed, speeds, (v) => v + "x") + (speeds.includes(c.speed) ? "" : `<p class="note">目前 ${c.speed}x</p>`),
     audio =
-      edInput("volume", "片段音量", c.volume, "number", 'min="0" max="4" step="0.1"') +
+      edNumber("volumeDb", "音量（dB）", Number(EditorModel.volumeToDb(c.volume).toFixed(1)), { min: EditorModel.DB.min, max: 12, step: 0.1 }) +
       edButton(c.muted ? "取消片段靜音" : "片段靜音", "toggle:muted") +
       edInput("fadeIn", "音訊淡入（秒）", c.fadeIn, "number", 'min="0" step="0.1"') +
       edInput("fadeOut", "音訊淡出（秒）", c.fadeOut, "number", 'min="0" step="0.1"'),
@@ -774,15 +781,20 @@ function edClipInspector(p, c) {
         "文字",
         "",
         `<label>文字內容<textarea data-ed-field="text" aria-label="文字內容" maxlength="4000">${esc(c.text)}</textarea></label>` +
-          edInput("fontSize", "字級", c.fontSize, "number", 'min="8" max="300"') +
-          edSelect("font", "字型", c.font, ["思源黑體", "思源宋體", "Arial", "Georgia", "等寬字"]) +
+          edInput("fontSize", "字體大小", c.fontSize, "number", 'min="8" max="300"') +
+          `<p class="note">字型</p>` +
+          edChoices("字型", "text-font", c.font, ["思源黑體", "思源宋體", "Arial", "Georgia", "等寬字"]) +
           edButton(c.bold ? "取消粗體" : "粗體", "toggle:bold") +
           edButton(c.italic ? "取消斜體" : "斜體", "toggle:italic") +
-          edSelect("align", "文字對齊", c.align, ["靠左", "置中", "靠右"]) +
-          edInput("color", "文字顏色", c.color, "color") +
+          `<p class="note">文字對齊</p>` +
+          edChoices("文字對齊", "text-align", c.align, ["靠左", "置中", "靠右"]) +
+          edColor("color", "文字顏色", c.color) +
           edButton(c.backgroundColor ? "移除文字底色" : "加上文字底色", "text-background") +
-          (c.backgroundColor ? edInput("backgroundColor", "文字底色", c.backgroundColor, "color") : "") +
-          edSelect("animation", "文字動畫", c.animation, ["無", "淡入淡出", "彈出", "逐字顯示"]),
+          (c.backgroundColor ? edColor("backgroundColor", "文字底色", c.backgroundColor) : "") +
+          `<p class="note">文字動畫</p>` +
+          edChoices("文字動畫", "text-animation", c.animation, ["無", "淡入淡出", "彈出", "逐字顯示"]) +
+          edButton("套用此樣式到此軌", "text-style:track") +
+          edButton("套用到整片", "text-style:all"),
       ) +
       groups.transform +
       groups.time;
@@ -811,7 +823,7 @@ function edClipInspector(p, c) {
             `<p class="note">套用到主軌所有片段</p>` +
               edChoices("背景", "background", background, ["黑邊", "模糊", "純色"]) +
               (background === "模糊" ? edNumber("backgroundBlur", "模糊強度", c.backgroundBlur ?? 20, { min: 2, max: 40, step: 1 }) : "") +
-              (background === "純色" ? edInput("backgroundColor", "背景顏色", c.backgroundColor || "#000000", "color") : ""),
+              (background === "純色" ? edColor("backgroundColor", "背景顏色", c.backgroundColor || "#000000") : ""),
           )
         : "") +
       (c.kind === "video" ? groups.speed + groups.audio : "") +
@@ -2091,6 +2103,14 @@ async function edAction(action) {
     edZoom(action.slice(5));
     return;
   }
+  if (action.startsWith("eyedrop:")) {
+    const { sRGBHex } = await new window.EyeDropper().open(),
+      input = document.querySelector(`[data-ed-field="${action.slice(8)}"]`);
+    if (!input) return;
+    input.value = sRGBHex;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    return;
+  }
   if (action.startsWith("fx-scope:")) {
     if (!["整片", "此軌", "此片段"].includes(action.slice(9))) return;
     ed.fxScope = action.slice(9);
@@ -2324,6 +2344,31 @@ async function edAction(action) {
       const [, key, value] = action.split(":");
       if (key !== "filter" || !edFilters.includes(value)) throw Error("濾鏡不存在");
       edWriteEffect(p, c, key, value, ed.fxScope);
+    }
+    // Card ED.3.5 播放速度: the source range stays, the clip's length follows (2x: 22.4 s -> 11.2 s); keys and
+    // fades move with it. 磁性主軌 re-lays the main track, so only other tracks check their neighbours.
+    if (action.startsWith("speed:")) {
+      const v = Number(action.slice(6));
+      if (![0.5, 1, 1.5, 2].includes(v)) throw Error("播放速度不存在");
+      const ratio = c.speed / v,
+        next = edTime(p, { ...c, speed: v }, { durationFrames: Math.max(1, Math.round(c.durationFrames * ratio)) });
+      edRescaleKeys(next, ratio);
+      next.fadeIn = Math.min(next.fadeIn, next.duration / 2);
+      next.fadeOut = Math.min(next.fadeOut, next.duration / 2);
+      if (!(ed.magnet && c.track === edMain(p))) edNeighbours(p, next);
+      edValidate(next);
+      Object.assign(c, next);
+    }
+    const textChoice = { "text-font:": "font", "text-align:": "align", "text-animation:": "animation" };
+    for (const [prefix, key] of Object.entries(textChoice)) if (action.startsWith(prefix)) c[key] = action.slice(prefix.length);
+    if (action === "text-style:track" || action === "text-style:all") {
+      if (c.kind !== "text") throw Error("請先選取文字片段");
+      for (const row of p.clips)
+        if (row.kind === "text" && row !== c && (action === "text-style:all" || row.track === c.track))
+          for (const key of EditorModel.STYLE.text) {
+            if (c[key] === undefined) delete row[key];
+            else row[key] = structuredClone(c[key]);
+          }
     }
     if (action.startsWith("mask:")) {
       if (!["無", "圓形", "圓角矩形", "三角形"].includes(action.slice(5))) throw Error("遮罩不存在");
@@ -2785,6 +2830,15 @@ document.addEventListener("change", (e) => {
           edOverlay(p, c.track),
         );
       } else c[name] = value;
+    } else if (key === "volumeDb" && c) {
+      c.volume = EditorModel.dbToVolume(value);
+    } else if (key === "sourceEnd" && c) {
+      // 來源終點 = 來源起點 + 長度 × 速度; moving it changes the length.
+      const next = edTime(p, { ...c }, { duration: (value - c.sourceStart) / c.speed });
+      edFitKeys(c, next);
+      edNeighbours(p, next);
+      edValidate(next);
+      Object.assign(c, next);
     } else if (key.startsWith("track-db:")) {
       const track = edTrack(p, key.slice(9));
       if (!track || !Number.isFinite(value)) throw Error("請輸入有效數字");

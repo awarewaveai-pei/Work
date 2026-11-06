@@ -69,8 +69,8 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "vw-editor-"));
       url: "/generated/" + name,
       type: "video/mp4",
     });
-    await page.getByLabel("片段長度（秒）").fill("2");
-    await page.getByLabel("片段長度（秒）").press("Tab");
+    await page.getByLabel("長度", { exact: true }).fill("2");
+    await page.getByLabel("長度", { exact: true }).press("Tab");
     await page.locator("[data-ed-ruler]").click({ position: { x: await page.evaluate(() => ed.zoom), y: 8 } });
     await page.getByRole("button", { name: "分割", exact: true }).click();
     assert.equal(await page.locator("[data-ed-clip]").count(), 2);
@@ -88,8 +88,8 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "vw-editor-"));
     await page.getByRole("button", { name: "主標題", exact: true }).click();
     await page.getByLabel("文字內容").fill("EXPORT TEST");
     await page.getByLabel("文字內容").press("Tab");
-    await page.getByLabel("片段長度（秒）").fill("1");
-    await page.getByLabel("片段長度（秒）").press("Tab");
+    await page.getByLabel("長度", { exact: true }).fill("1");
+    await page.getByLabel("長度", { exact: true }).press("Tab");
     await page.getByRole("button", { name: "匯出", exact: true }).click();
     await page.locator('[data-ed-action="quality:720p"]').click();
     await page.locator("[data-ed-export]").click();

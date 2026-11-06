@@ -62,8 +62,8 @@ const pass = (m) => console.log("PASS " + m);
 
     // Codex ED.1 F1: a 1 s project loops at 1 s, not at the empty timeline's 3 s minimum.
     await page.locator("[data-ed-clip]").first().click();
-    await page.getByLabel("片段長度（秒）").fill("1");
-    await page.getByLabel("片段長度（秒）").press("Tab");
+    await page.getByLabel("長度", { exact: true }).fill("1");
+    await page.getByLabel("長度", { exact: true }).press("Tab");
     await page.evaluate(() => (ed.time = 0.9));
     await page.getByRole("button", { name: "播放／暫停 (Space)", exact: true }).click();
     await page.waitForFunction(() => ed.playing && ed.time < 0.5, null, { timeout: 1500 }); // wrapping at 3 s would take 2.1 s
