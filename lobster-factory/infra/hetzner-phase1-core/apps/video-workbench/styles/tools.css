@@ -734,6 +734,7 @@ body {
 .editor-insp-group { border-top:1px solid var(--border-subtle);margin-top:12px;padding-top:4px; }
 .editor-inspector label { display:block;margin:10px 0; }
 .editor-inspector .text-input,.editor-inspector textarea { width:100%; }
+.editor-app .flow-choices [aria-pressed="true"] { border-color:var(--accent);background:var(--bg-hover); }
 .editor-resize { background:var(--border-subtle);touch-action:none; }
 .editor-resize:hover,.editor-resize:focus-visible { background:var(--accent);outline:none; }
 .editor-resize-vertical { cursor:col-resize; }

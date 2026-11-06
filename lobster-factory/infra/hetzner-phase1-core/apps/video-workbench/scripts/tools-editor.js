@@ -609,9 +609,44 @@ function edInspector(p, c) {
     `<div class="editor-inspector-head"><b>${title}</b>${edIconButton("收合檢查器", "»", "layout:right")}</div>`;
   return c ? head("選取對象") + edClipInspector(p, c) : head("整片設定") + edProjectSettings(p);
 }
+// Card ED.3.1: 整片設定 = the reference's four groups. Effects here are the project layer (spec §4); the two dB rows
+// are the 配樂 A2 / 旁白 A1 track volumes and only show when that track exists.
 function edProjectSettings(p) {
-  const [w, h] = edRatios[p.ratio];
-  return `<section class="editor-insp-group"><h4>畫面</h4>${edRatioSelect(p, "畫面比例", true)}<p class="note">整片濾鏡</p>${edChoices("整片濾鏡", "project-filter", p.filter || "原始", edFilters)}</section><section class="editor-insp-group"><h4>輸出</h4>${edSelect("project:timebase", "影格率", Timebase.label(p.timebase), Timebase.allowed.map(Timebase.label))}<p class="note">${w} × ${h} · ${esc(Timebase.label(p.timebase))}　${edTotal().toFixed(1)}s · ${p.clips.length} 段</p>${edButton("匯出影片", "export", !p.clips.length)}</section><p class="note">點擊時間軸上的片段，這裡會變成該片段的屬性。</p>`;
+  const [w, h] = edRatios[p.ratio],
+    names = Object.fromEntries(edCreateRatios.map(([r, name]) => [r, name])),
+    percent = (key) => {
+      const r = EditorModel.EFFECTS[key];
+      return edInput("fx-project:" + key, r.label + "（%）", Math.round((p[key] ?? r.neutral) * 100), "number", 'min="0" max="100" step="1"');
+    },
+    db = (id, title) =>
+      edTrack(p, id) ? edInput("track-db:" + id, title, EditorModel.volumeToDb(edTrack(p, id).volume).toFixed(1), "number", `min="${EditorModel.DB.min}" max="12" step="0.5"`) : "";
+  return (
+    `<section class="editor-insp-group"><h4>畫面</h4><p class="note">畫面比例</p>${edChoices("畫面比例", "project-ratio", p.ratio, Object.keys(edRatios), (r) => r + " " + (names[r] || ""))}<p class="note">整片濾鏡</p>${edChoices("整片濾鏡", "project-filter", p.filter || "原始", edFilters)}${["filterStrength", "grain", "lightLeak", "shake"].map(percent).join("")}${edButton("更多特效與遮罩", "pane:特效")}</section>` +
+    `<section class="editor-insp-group"><h4>聲音</h4>${db("A2", "配樂（dB）")}${db("A1", "旁白（dB）")}${edButton("自動降低音量、循環、響度", "pane:音訊")}</section>` +
+    `<section class="editor-insp-group"><h4>文字與字幕</h4>${edButton("整軌字幕樣式", "pane:字幕")}${edButton("一鍵整片字幕", "pane:字幕")}${edButton("文字樣板", "pane:文字")}</section>` +
+    `<section class="editor-insp-group"><h4>輸出</h4><p class="note">${w} × ${h} · ${esc(Timebase.label(p.timebase))}　${edTotal().toFixed(1)}s · ${p.clips.length} 段</p><p class="note">影格率</p>${edChoices("影格率", "project-timebase", Timebase.label(p.timebase), Timebase.allowed.map(Timebase.label))}${edButton("匯出影片", "export", !p.clips.length)}</section>` +
+    `<p class="note">點擊時間軸上的片段，這裡會變成該片段的屬性。</p>`
+  );
+}
+// Re-snap once: each clip keeps its time in seconds as closely as the new frame grid allows.
+function edSetTimebase(p, label) {
+  const timebase = Timebase.fromLabel(label);
+  if (!timebase) throw Error("不支援的影格率");
+  p.timebase = { num: timebase.num, den: timebase.den };
+  for (const row of p.clips) edTime(p, row, { start: row.start, duration: row.duration, sourceStart: row.sourceStart });
+}
+// Card ED.3 §4: an effect written at one scope clears the narrower layers, so what is set is what shows; reading is
+// nearest-first (EditorModel.effectValue). The caller takes the undo checkpoint and commits.
+function edWriteEffect(p, c, key, value, scope) {
+  const visual = (row) => ["video", "image"].includes(row.kind);
+  if (scope === "整片") {
+    p[key] = value;
+    for (const t of p.tracks) if (t.kind === "video") delete t[key];
+    for (const row of p.clips) if (visual(row)) delete row[key];
+  } else if (scope === "此軌") {
+    edTrack(p, c.track)[key] = value;
+    for (const row of p.clips) if (row.track === c.track) delete row[key];
+  } else c[key] = value;
 }
 function edClipInspector(p, c) {
   const kind = c.kind === "text" ? "text" : c.kind === "audio" ? "audio" : "video";
@@ -1872,6 +1907,15 @@ async function edAction(action) {
     edZoom(action.slice(5));
     return;
   }
+  // Card ED.3.1: 整片設定 shortcuts open a left pane (view only, no undo step).
+  if (action.startsWith("pane:")) {
+    if (!edPanes.some(([title]) => title === action.slice(5))) return;
+    ed.pane = action.slice(5);
+    ed.layout = { ...ed.layout, leftOpen: true };
+    edLayoutSave();
+    edRedraw();
+    return;
+  }
   if (action.startsWith("help:")) {
     edHelp(action.slice(5));
     return;
@@ -2066,7 +2110,16 @@ async function edAction(action) {
   if (action.startsWith("project-filter:")) {
     const filter = action.slice(15);
     if (!edFilters.includes(filter)) throw Error("濾鏡不存在");
-    p.filter = filter;
+    edWriteEffect(p, c, "filter", filter, "整片");
+  }
+  if (action.startsWith("project-ratio:")) {
+    if (!edRatios[action.slice(14)]) throw Error("比例不存在");
+    p.ratio = action.slice(14);
+    ed.skipMagnet = true;
+  }
+  if (action.startsWith("project-timebase:")) {
+    edSetTimebase(p, action.slice(17));
+    ed.skipMagnet = true;
   }
   if (action.startsWith("loudness:"))
     p.output = { ...p.output, loudness: Number(action.slice(9)) };
@@ -2391,18 +2444,17 @@ document.addEventListener("change", (e) => {
   try {
     const value =
       e.target.type === "number" ? Number(e.target.value) : e.target.value;
-    if (key === "project:timebase") {
-      const timebase = Timebase.fromLabel(value);
-      if (!timebase) throw Error("不支援的影格率");
-      // Re-snap once: each clip keeps its time in seconds as closely as the new frame grid allows.
-      p.timebase = { num: timebase.num, den: timebase.den };
-      for (const row of p.clips)
-        edTime(p, row, {
-          start: row.start,
-          duration: row.duration,
-          sourceStart: row.sourceStart,
-        });
-    } else if (key.startsWith("project:")) p[key.slice(8)] = value;
+    if (key.startsWith("project:")) p[key.slice(8)] = value;
+    else if (key.startsWith("fx-project:")) {
+      const name = key.slice(11),
+        r = EditorModel.EFFECTS[name];
+      if (!r || !Number.isFinite(value)) throw Error("請輸入有效數字");
+      edWriteEffect(p, c, name, Math.min(r.max, Math.max(r.min, value / 100)), "整片");
+    } else if (key.startsWith("track-db:")) {
+      const track = edTrack(p, key.slice(9));
+      if (!track || !Number.isFinite(value)) throw Error("請輸入有效數字");
+      track.volume = EditorModel.dbToVolume(value);
+    }
     else if (key === "transitionSeconds" && c) {
       // Card P2: the pane shows seconds; the clip stores whole frames inside the allowed range.
       const { min, max } = EditorModel.transitionLimits(p.timebase),

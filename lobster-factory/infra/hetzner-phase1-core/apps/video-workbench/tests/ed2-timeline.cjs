@@ -435,7 +435,7 @@ const pass = (m) => console.log("PASS " + m);
     assert.equal(await clip("o1").locator("img.editor-clip-thumb").getAttribute("src"), asset.thumbUrl, "舊素材從 /media/ 網址找到縮圖");
     await key("m");
     assert.deepEqual((await on("V1")).map((c) => c.start), [0, 90], "非主軌的編輯不補空隙");
-    await page.locator(".editor-inspector").getByLabel("影格率").selectOption("25 fps");
+    await page.locator(".editor-inspector").getByRole("group", { name: "影格率" }).getByRole("button", { name: "25 fps" }).click();
     assert.deepEqual((await on("V1")).map((c) => c.start), [0, 75], "改影格率只換算格數，不補空隙");
     await page.getByRole("button", { name: "匯出", exact: true }).click();
     await page.locator('[data-ed-action="quality:720p"]').click();
