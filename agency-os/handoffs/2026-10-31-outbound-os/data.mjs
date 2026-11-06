@@ -40,7 +40,7 @@ export const NOW = [
   { what: '暖名單同步到 FluentCRM。', state: 'yes', ev: '2026-11-04 C6.4：wp-bridge 有建聯絡人端點（packages/wp-bridge-plugin/includes/Http/RestController.php:107），aware-wave.com 與 Soulful 的 FluentCRM 各真同步一次，測試資料已清。' },
   { what: '看得到回覆率、會議數、成交數。', state: 'yes', ev: '2026-11-02 C7：外聯首頁一張表，依服務、版本、切角列寄出、退信、回覆、正向、會議、成交、失去與回覆率，可下載 CSV；沒有開信率。切角要等 C16 產信時填入才分得開。' },
   { what: '看得到外聯每一筆花費與免費額度用量，有操作手冊。', state: 'yes', ev: '2026-11-06：AI & 工具成本頁（側欄 AI MODELS & COSTS → AI Costs）記下外聯的 Google 搜尋費與 IG／FB 讀取費（495d47f80），免費的 email 驗證與經濟部查詢也每次記一筆 0 元（5aba687a3）；頁首「免費額度」卡顯示 Gemini 每天 500、Reoon 每天 20、ZeroBounce 每月 100、Hunter 每月 50 的已用量。Cold Outreach 側欄第一項「Guide」是從設定到寄出的操作手冊，含注意事項與還沒做好的功能（d0c0d2d82）。客戶頁（All Clients → 客戶 →「冷開發」分頁）改成顯示該客戶的寄件信箱、名單與信件數、本月外聯花費、開通的功能與捷徑；舊版沒作用的 Supabase／Self-serve 設定已移除（a38e24a7f）。' },
-  { what: 'Soulful 也能用外聯。', state: 'yes', ev: '2026-11-06：Soulful 連上 soulfulexpression01@gmail.com（草稿模式、每天 20 封、自動管線開、署名 Soulful＋官網；正式信箱 info@ 不寄開發信）。服務檔「喜悅卡長輩藝術療癒團體課」，對象長照中心、日照中心、社區關懷據點；健康相關用詞保守（禁「治癒」「療效保證」等），審核模式＝每封都給你看。還沒有名單：到 Lead Inbox 選 Soulful 找名單（例：日間照顧中心／台北市）。重複的第二個 Soulful（10-30 註冊禮建的）已停用。' },
+  { what: 'Soulful 也能用外聯。', state: 'yes', ev: '2026-11-06：Soulful 連上 soulfulexpression01@gmail.com（草稿模式、每天 20 封、自動管線開、署名 Soulful＋官網；正式信箱 info@ 不寄開發信）。服務檔「喜悅卡長輩藝術療癒團體課」，對象長照中心、日照中心、社區關懷據點；健康相關用詞保守（禁「治癒」「療效保證」等），審核模式＝每封都給你看；隱私頁 https://soulfulexpression.org/privacy-policy/ 已填（不是對方自己公開的 email，草稿要附它）。還沒有名單：到 Lead Inbox 選 Soulful 找名單（例：日間照顧中心／台北市）。重複的第二個 Soulful（10-30 註冊禮建的）已停用。' },
   { what: 'Gmail 連線不會自己斷。', state: 'yes', ev: 'C1.6：Google 應用程式已發布、重連完成。2026-11-04 手動跑同步：Gmail 連線 1 個、錯誤 0；Connectors 頁顯示上次同步成功時間。' },
 ];
 
@@ -255,7 +255,7 @@ export const STEPS = [
       done('C9.1', '把舊的觀察回填成證據列（migration 0156，11-03 已套正式庫，回填 1 列）。', C9),
       done('C9.2', '產信與評分只看證據；名單核准或手動建立時，觀察＋來源網址寫成已核准證據；沒附來源的觀察會被擋下並提示。', C9),
     ] },
-  { n: 17, code: 'C16', group: 'G', title: '自動化調校：抽得準、核得穩、越寫越好', waitFor: '等 C7 成效頁上線，而且真的寄了 2 週',
+  { n: 17, code: 'C16', group: 'G', before: 'AwareWave 正式服務檔（待決 1）；第二個 Soulful 保留或刪除（待決 2）', title: '自動化調校：抽得準、核得穩、越寫越好', waitFor: '等 C7 成效頁上線，而且真的寄了 2 週',
     plain: '例：全自動模式每天仍有 2% 的信給你看。現在是隨機抽；調校後優先抽新品牌、新產業、事實核對沒把握的、退信或負面回覆偏高的那類。事實核對換成判兩次結果一致的模型。哪種開場回覆率高，系統下次就多用那種。',
     gate: '同樣的抽查比例下，高風險的信被抽中機率至少是低風險的 2 倍。事實核對同一封信判兩次一致率達 95%，報告存檔。某品牌兩種切角各寄滿 30 封後，回覆率高的那種出現在下一封信的寫法裡。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['C7', 'C15'],
     decided: '自動化程度用三顆按鈕：手動、半自動（抽 10%）、全自動（抽 2%）。全自動不設 0%，留 2% 當模型走偏的警報。按鈕已在 C2 做好；這張卡只改「抽哪些」「核得穩不穩」「越寫越好」，要真資料才調得準。（規格 D24）',
@@ -270,4 +270,17 @@ export const STEPS = [
 ];
 
 // 操作者自己要決定或親手做的（agent 不能替她定）
-export const OPEN = [];
+export const OPEN = [
+  { n: 1, before: 'C16', src: '監工稽核 2026-11-06；aware-wave.com 實查',
+    what: 'AwareWave 還沒有正式的服務檔：唯一一份是 C16.2 量測用的測試檔，量完會刪。aware-wave.com 上沒有服務介紹可抄（首頁是 WordPress 預設文章、商店頁「即將推出」，只有隱私權與服務條款頁），所以要你確認下面這份草稿，或告訴我實際賣什麼、給誰、有沒有案例連結。',
+    options: [
+      { k: '照草稿', pick: true, t: '定位：替小型品牌建置與維護 WordPress 網站，並提供 AI 內容工具。對象：工作室、診所、教室、小型電商。賣點：一個人經營也能有專業維運與內容產出。證明連結：暫無（網站沒有案例頁）。隱私頁：https://aware-wave.com/privacy-policy/。' },
+      { k: '你改寫', t: '告訴我要改哪幾項，或直接給一句「賣什麼、給誰」。' },
+    ] },
+  { n: 2, before: 'C16', src: '監工稽核 2026-11-06；正式庫查 ee33a23c 各表引用',
+    what: '第二個 Soulful（wp-member-7，10-30 在 aware-wave.com 註冊送點時自動建立）已停用，選單看不到。它不是空的：有 1 筆付款（註冊禮訂單 #46）、扣點紀錄、5 個已取消的訂閱、1 個登入身分、1 個影片專案。建議保留停用、不刪；要刪的話會連這些紀錄一起刪，需要你同意。',
+    options: [
+      { k: '保留停用', pick: true, t: '紀錄都留著，之後要查帳還在。' },
+      { k: '刪除', t: '連付款與點數紀錄一起刪，不能復原。' },
+    ] },
+];

@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-06（續35）監工稽核外聯缺口：Soulful 隱私頁已填；AW 正式服務檔與第二個 Soulful 列待決
+
+- Soulful 服務檔 9f73e483 `privacy_url`＝https://soulfulexpression.org/privacy-policy/（curl 200，title「Privacy Policy - Soulful Expression」）。
+- AwareWave 正式服務檔：aware-wave.com 無服務內容可依（sitemap 只有首頁＝WP 預設文章、/start/ 轉址、/shop/「即將推出」、privacy-policy、terms-of-service）→ 草稿列監工台待決 1，等操作者確認；測試檔 c1620000-…0002 照原計畫 C16.2 量完再清。
+- ee33a23c（wp-member-7）非空：payment_events 1、media_credit_ledger 4、organization_product_subscriptions 5（canceled）、customer_identities 1、media_production_projects 1 等 → 已停用，刪除列待決 2（建議保留）。
+- 監工台 OPEN 兩項＋C16.before，v45。
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql update co_service_profiles set privacy_url=... returning (喜悅卡長輩藝術療癒團體課|https://soulfulexpression.org/privacy-policy/) + curl privacy pages 200 | exit=0 | ms=3000
+- REVIEW_WAIVED: NA -- one data field + supervisor text
+- BUGHUNT_WAIVED: NA -- no code
 ## 2026-11-06（續34）MCP 不再經 npx 啟動：套件鎖版本裝進 mcp-local-wrappers，sync 擋 npx
 
 - 根因：筆電記憶體 80%（44 GB）。8 個 session × 每個 stdio MCP 外包一層 `cmd /c npx -y` → 每伺服器多 3 個常駐程序（cmd／npx node／cmd），且套件未鎖版本、每次啟動重新解析。
