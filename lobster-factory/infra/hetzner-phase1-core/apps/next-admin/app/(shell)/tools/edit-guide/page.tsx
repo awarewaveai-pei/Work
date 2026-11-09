@@ -22,6 +22,10 @@ const P = {
   remove: "移除那三隻動物，延續後面的橘色布幔和王座。",
   add: "一個金色高腳酒杯放在扶手上。",
   whole: "把整張的光線調柔一點，邊緣修乾淨，維持原本的畫風與配色。",
+  /** Description box left empty: the server sends CONTEXT_FILL_PROMPT instead. */
+  blank: "（描述留空）",
+  /** The four characters that look like they ask for a context fill and do nothing. */
+  typed: "照周圍補",
 } as const;
 
 const LINE = "var(--card-border)";
@@ -57,12 +61,13 @@ function Note({ children }: { children: React.ReactNode }) {
 }
 
 /** What was typed into the description box for the runs that follow. */
-function Used({ text }: { text: string }) {
-  return <p style={{ margin: "0 0 10px", fontSize: 13.5, ...muted }}>這一組打的是：<b style={{ color: "var(--text-secondary)" }}>{text}</b></p>;
-}
-
-/** One run: the picture, which model made it, what that press cost, and what happened. */
-function Run({ src, model, cost, verdict, note }: { src: string; model: string; cost?: string; verdict: "good" | "bad" | "src"; note: string }) {
+/** One run: the picture, which model made it, what that press cost, what was typed, and what happened.
+ *  A result figure must carry its prompt; only the untouched source may omit it. */
+type RunProps = { src: string; model: string; note: string } & (
+  | { verdict: "src"; cost?: never; prompt?: never }
+  | { verdict: "good" | "bad"; cost: string; prompt: string }
+);
+function Run({ src, model, cost, verdict, note, prompt }: RunProps) {
   const tone = verdict === "good" ? "var(--accent-text)" : verdict === "bad" ? "var(--danger)" : "var(--text-muted)";
   return (
     <figure style={{ margin: 0, minWidth: 0 }}>
@@ -71,6 +76,13 @@ function Run({ src, model, cost, verdict, note }: { src: string; model: string; 
         <span style={{ fontWeight: 700, color: tone }}>{model}</span>
         {cost ? <span style={{ ...muted, fontVariantNumeric: "tabular-nums" }}>　{cost}</span> : null}
         <br /><span style={muted}>{note}</span>
+        {prompt ? (
+          <>
+            <br />
+            <span style={{ ...muted, opacity: 0.85 }}>指令：</span>
+            <span style={{ color: "var(--text-secondary)" }}>{prompt}</span>
+          </>
+        ) : null}
       </figcaption>
     </figure>
   );
@@ -148,8 +160,8 @@ export default function EditGuidePage() {
         <CopyPrompt text={CONTEXT_FILL_PROMPT} note="意思是：把框裡的全部清掉，照周圍的顏色、紋理、光線、線條接下去，不要加新東西。所以框多大就清多大。" />
         <p style={{ margin: "0 0 12px" }}>所以自己打「照周圍補」四個字反而沒用——模型只收到那四個字，不知道要清掉什麼：</p>
         <Grid min={250}>
-          <Run src="f-blank" model={labelOf("ideogram-4-5-edit-low")} cost={price("ideogram-4-5-edit-low")} verdict="good" note="描述留空：框裡的羊清掉，布幔接起來。" />
-          <Run src="f-typed" model={labelOf("ideogram-4-5-edit-low")} cost={price("ideogram-4-5-edit-low")} verdict="bad" note="自己打「照周圍補」：羊原封不動，錢照扣。" />
+          <Run src="f-blank" model={labelOf("ideogram-4-5-edit-low")} cost={price("ideogram-4-5-edit-low")} verdict="good" note="描述留空：框裡的羊清掉，布幔接起來。"  prompt={P.blank} />
+          <Run src="f-typed" model={labelOf("ideogram-4-5-edit-low")} cost={price("ideogram-4-5-edit-low")} verdict="bad" note="自己打「照周圍補」：羊原封不動，錢照扣。"  prompt={P.typed} />
         </Grid>
 
         <h3 style={h3}>框太小，露在框外的部分會留著</h3>
@@ -158,16 +170,16 @@ export default function EditGuidePage() {
         </p>
         <Grid min={200}>
           <Run src="a-src" model="原圖" verdict="src" note="框只蓋到三隻羊的中段。" />
-          <Run src="a-ideogram-low-1" model={labelOf("ideogram-4-5-edit-low")} cost={`${price("ideogram-4-5-edit-low")}・第一次`} verdict="bad" note="框內換了布料，羊還在。" />
-          <Run src="a-ideogram-low-2" model={labelOf("ideogram-4-5-edit-low")} cost={`${price("ideogram-4-5-edit-low")}・第二次`} verdict="bad" note="少了一隻，其餘留著。" />
-          <Run src="a-ideogram-medium-1" model={labelOf("ideogram-4-5-edit")} cost={`${price("ideogram-4-5-edit")}・第一次`} verdict="bad" note="和省的那檔差不多。" />
-          <Run src="a-ideogram-medium-2" model={labelOf("ideogram-4-5-edit")} cost={`${price("ideogram-4-5-edit")}・第二次`} verdict="bad" note="貴一倍，結果沒比較好。" />
-          <Run src="a-flux-fill-1" model={labelOf("flux-fill-pro")} cost={`${price("flux-fill-pro")}・第一次`} verdict="bad" note="塞進一塊不相干的風景。" />
-          <Run src="a-flux-fill-2" model={labelOf("flux-fill-pro")} cost={`${price("flux-fill-pro")}・第二次`} verdict="bad" note="這次塞進一個黃綠色的盆。" />
-          <Run src="a-gpt26-1" model={labelOf("openai-26-edit")} cost={`${price("openai-26-edit")}・第一次`} verdict="bad" note="清掉一部分，左邊那隻還在。" />
-          <Run src="a-gpt26-2" model={labelOf("openai-26-edit")} cost={`${price("openai-26-edit")}・第二次`} verdict="bad" note="這次幾乎沒動。" />
-          <Run src="a-eraser-1" model={labelOf("bria-eraser")} cost={`${price("bria-eraser")}・第一次`} verdict="bad" note="去除專用，一樣只能處理框內。" />
-          <Run src="a-eraser-2" model={labelOf("bria-eraser")} cost={`${price("bria-eraser")}・第二次`} verdict="bad" note="和第一次不同，都不乾淨。" />
+          <Run src="a-ideogram-low-1" model={labelOf("ideogram-4-5-edit-low")} cost={`${price("ideogram-4-5-edit-low")}・第一次`} verdict="bad" note="框內換了布料，羊還在。"  prompt={P.blank} />
+          <Run src="a-ideogram-low-2" model={labelOf("ideogram-4-5-edit-low")} cost={`${price("ideogram-4-5-edit-low")}・第二次`} verdict="bad" note="少了一隻，其餘留著。"  prompt={P.blank} />
+          <Run src="a-ideogram-medium-1" model={labelOf("ideogram-4-5-edit")} cost={`${price("ideogram-4-5-edit")}・第一次`} verdict="bad" note="和省的那檔差不多。"  prompt={P.blank} />
+          <Run src="a-ideogram-medium-2" model={labelOf("ideogram-4-5-edit")} cost={`${price("ideogram-4-5-edit")}・第二次`} verdict="bad" note="貴一倍，結果沒比較好。"  prompt={P.blank} />
+          <Run src="a-flux-fill-1" model={labelOf("flux-fill-pro")} cost={`${price("flux-fill-pro")}・第一次`} verdict="bad" note="塞進一塊不相干的風景。"  prompt={P.blank} />
+          <Run src="a-flux-fill-2" model={labelOf("flux-fill-pro")} cost={`${price("flux-fill-pro")}・第二次`} verdict="bad" note="這次塞進一個黃綠色的盆。"  prompt={P.blank} />
+          <Run src="a-gpt26-1" model={labelOf("openai-26-edit")} cost={`${price("openai-26-edit")}・第一次`} verdict="bad" note="清掉一部分，左邊那隻還在。"  prompt={P.blank} />
+          <Run src="a-gpt26-2" model={labelOf("openai-26-edit")} cost={`${price("openai-26-edit")}・第二次`} verdict="bad" note="這次幾乎沒動。"  prompt={P.blank} />
+          <Run src="a-eraser-1" model={labelOf("bria-eraser")} cost={`${price("bria-eraser")}・第一次`} verdict="bad" note="去除專用，一樣只能處理框內。"  prompt={P.blank} />
+          <Run src="a-eraser-2" model={labelOf("bria-eraser")} cost={`${price("bria-eraser")}・第二次`} verdict="bad" note="和第一次不同，都不乾淨。"  prompt={P.blank} />
         </Grid>
         <Note>這一排十次的教訓只有一句：<b>框要把整個東西包進去</b>。框一半，再貴的模型也救不回來。</Note>
 
@@ -175,8 +187,8 @@ export default function EditGuidePage() {
         <p style={{ margin: "0 0 10px" }}>把整組動物（含牠們站的那段布幔）都框進去，描述一樣留空，同一個模型連按兩次：</p>
         <Grid min={200}>
           <Run src="b-src" model="原圖" verdict="src" note="框住整組動物。" />
-          <Run src="b-gpt26-1" model={labelOf("openai-26-edit")} cost={`${price("openai-26-edit")}・第一次`} verdict="good" note="動物消失，布幔和座面完好。" />
-          <Run src="b-gpt26-2" model={labelOf("openai-26-edit")} cost={`${price("openai-26-edit")}・第二次`} verdict="bad" note="框裡全部清掉，連座面都沒了。" />
+          <Run src="b-gpt26-1" model={labelOf("openai-26-edit")} cost={`${price("openai-26-edit")}・第一次`} verdict="good" note="動物消失，布幔和座面完好。"  prompt={P.blank} />
+          <Run src="b-gpt26-2" model={labelOf("openai-26-edit")} cost={`${price("openai-26-edit")}・第二次`} verdict="bad" note="框裡全部清掉，連座面都沒了。"  prompt={P.blank} />
         </Grid>
         <p style={{ margin: "0 0 10px", ...muted }}>兩次都照指令做了，指令就是「把框裡清掉」。不滿意就再按一次，但會再扣一次。</p>
 
@@ -185,40 +197,37 @@ export default function EditGuidePage() {
           {labelOf("flux-2-klein-4b")} 和 {labelOf("flux-kontext-fast")} 沒有遮罩功能，面板是靠「只送選區周圍一塊、只把選區貼回來」讓它們也能局部填色。
           代價是<b>留空什麼都不會改</b>，一定要自己寫。
         </p>
-        <Used text={P.remove} />
         <Grid min={200}>
-          <Run src="c-klein-1" model={labelOf("flux-2-klein-4b")} cost={`${price("flux-2-klein-4b")}・第一次`} verdict="good" note="乾淨，布幔、王座、標題字都完好。" />
-          <Run src="c-klein-2" model={labelOf("flux-2-klein-4b")} cost={`${price("flux-2-klein-4b")}・第二次`} verdict="good" note="再按一次，結果一致。" />
-          <Run src="c-kontext-fast" model={labelOf("flux-kontext-fast")} cost={price("flux-kontext-fast")} verdict="good" note="同樣乾淨，筆觸最貼近原畫。" />
+          <Run src="c-klein-1" model={labelOf("flux-2-klein-4b")} cost={`${price("flux-2-klein-4b")}・第一次`} verdict="good" note="乾淨，布幔、王座、標題字都完好。"  prompt={P.remove} />
+          <Run src="c-klein-2" model={labelOf("flux-2-klein-4b")} cost={`${price("flux-2-klein-4b")}・第二次`} verdict="good" note="再按一次，結果一致。"  prompt={P.remove} />
+          <Run src="c-kontext-fast" model={labelOf("flux-kontext-fast")} cost={price("flux-kontext-fast")} verdict="good" note="同樣乾淨，筆觸最貼近原畫。"  prompt={P.remove} />
         </Grid>
         <h3 style={h3}>同樣這幾顆，描述留空就什麼都不會改</h3>
         <Grid min={190}>
           <Run src="g-src" model="原圖" verdict="src" note="框只蓋到羊的中段。" />
-          <Run src="g-klein" model={labelOf("flux-2-klein-4b")} cost={price("flux-2-klein-4b")} verdict="bad" note="留空：幾乎原圖照還。" />
-          <Run src="g-kontext-fast" model={labelOf("flux-kontext-fast")} cost={price("flux-kontext-fast")} verdict="bad" note="留空：羊原封不動。" />
-          <Run src="g-nano21" model="Nano Banana 2.1" cost="NT$1.08" verdict="bad" note="留空：構圖被重排，羊還在。因此沒有收進面板。" />
-          <Run src="g-ideogram-verylow" model="Ideogram 4.5 Edit（very_low 檔）" cost="NT$0.26" verdict="bad" note="最低畫質檔幾乎沒動作，所以面板不提供這一檔。" />
+          <Run src="g-klein" model={labelOf("flux-2-klein-4b")} cost={price("flux-2-klein-4b")} verdict="bad" note="留空：幾乎原圖照還。"  prompt={P.blank} />
+          <Run src="g-kontext-fast" model={labelOf("flux-kontext-fast")} cost={price("flux-kontext-fast")} verdict="bad" note="留空：羊原封不動。"  prompt={P.blank} />
+          <Run src="g-nano21" model="Nano Banana 2.1" cost="NT$1.08" verdict="bad" note="留空：構圖被重排，羊還在。因此沒有收進面板。"  prompt={P.blank} />
+          <Run src="g-ideogram-verylow" model="Ideogram 4.5 Edit（very_low 檔）" cost="NT$0.26" verdict="bad" note="最低畫質檔幾乎沒動作，所以面板不提供這一檔。"  prompt={P.blank} />
         </Grid>
 
         <h2 style={h2}>七、加東西：四顆的差別</h2>
         <p style={{ margin: "0 0 10px" }}>同一個框（王座右扶手），四顆按鈕各按一次：</p>
-        <Used text={P.add} />
         <Grid min={200}>
           <Run src="d-src" model="原圖" verdict="src" note="框住右邊扶手。" />
-          <Run src="d-ideogram-low" model={labelOf("ideogram-4-5-edit-low")} cost={price("ideogram-4-5-edit-low")} verdict="good" note="金杯大小合適、畫風一致，最划算。" />
-          <Run src="d-ideogram-medium" model={labelOf("ideogram-4-5-edit")} cost={price("ideogram-4-5-edit")} verdict="good" note="同樣好，但貴一倍。" />
-          <Run src="d-flux-fill" model={labelOf("flux-fill-pro")} cost={price("flux-fill-pro")} verdict="bad" note="給了白瓷杯，沒照「金色高腳」做。" />
-          <Run src="d-gpt26" model={labelOf("openai-26-edit")} cost={price("openai-26-edit")} verdict="bad" note="杯子偏小，像擺在後面。" />
+          <Run src="d-ideogram-low" model={labelOf("ideogram-4-5-edit-low")} cost={price("ideogram-4-5-edit-low")} verdict="good" note="金杯大小合適、畫風一致，最划算。"  prompt={P.add} />
+          <Run src="d-ideogram-medium" model={labelOf("ideogram-4-5-edit")} cost={price("ideogram-4-5-edit")} verdict="good" note="同樣好，但貴一倍。"  prompt={P.add} />
+          <Run src="d-flux-fill" model={labelOf("flux-fill-pro")} cost={price("flux-fill-pro")} verdict="bad" note="給了白瓷杯，沒照「金色高腳」做。"  prompt={P.add} />
+          <Run src="d-gpt26" model={labelOf("openai-26-edit")} cost={price("openai-26-edit")} verdict="bad" note="杯子偏小，像擺在後面。"  prompt={P.add} />
         </Grid>
 
         <h2 style={h2}>八、整張改圖：三顆的差別</h2>
         <p style={{ margin: "0 0 10px" }}>不用框，三顆按鈕各按一次：</p>
-        <Used text={P.whole} />
         <Grid min={200}>
           <Run src="e-src" model="原圖" verdict="src" note="注意背景的漩渦筆觸和下方的標題字。" />
-          <Run src="e-klein" model={labelOf("flux-2-klein-4b")} cost={price("flux-2-klein-4b")} verdict="bad" note="字完整，但筆觸被抹平、金箔厚度不見。" />
-          <Run src="e-kontext-fast" model={labelOf("flux-kontext-fast")} cost={price("flux-kontext-fast")} verdict="bad" note="畫風最像，字變成 HAT CRILES。" />
-          <Run src="e-kontext-pro" model={labelOf("flux-kontext-pro")} cost={price("flux-kontext-pro")} verdict="bad" note="細節最好，字變成 KING-BENTACIES。" />
+          <Run src="e-klein" model={labelOf("flux-2-klein-4b")} cost={price("flux-2-klein-4b")} verdict="bad" note="字完整，但筆觸被抹平、金箔厚度不見。"  prompt={P.whole} />
+          <Run src="e-kontext-fast" model={labelOf("flux-kontext-fast")} cost={price("flux-kontext-fast")} verdict="bad" note="畫風最像，字變成 HAT CRILES。"  prompt={P.whole} />
+          <Run src="e-kontext-pro" model={labelOf("flux-kontext-pro")} cost={price("flux-kontext-pro")} verdict="bad" note="細節最好，字變成 KING-BENTACIES。"  prompt={P.whole} />
         </Grid>
         <Note>圖上有字就別整張改。真要改，先把文字圖層關掉，改完再開回來。</Note>
 
