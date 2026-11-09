@@ -32,6 +32,8 @@
 - ORACLE_WAIVED: 跨模型審查是 Codex 的 scoped review（`-Path` 32 檔＝本輪全部來源檔），產出 `2026-11-09-partialreview-*.md`；閘只認 `-review-` 全樹檔名，而本樹另有其他 session 進行中的 seedstar／theme 未完成檔，不納入本輪審查範圍。
 - BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory,mcp,mcp-local-wrappers,.github,Projects/internal/ziwei-doushu | grep=mergeMasked\|binaryMask(\|GPT-Image-1 \|costNt: [0-9]\|claude-3-haiku-20240307\|claude-sonnet-4-20250514\|gpt-4.1-mini"\|dall-e-3 | hits=3（TarotStudio.tsx 第三份手抄表、model-specs.ts／model-comparison.ts 的 GPT-Image-1 標籤 → 本輪一併改掉；其餘為 .venv／WORKLOG-archive／.claude 外掛範例）
 
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin（部署 `a6e282286`，healthy 15s，smoke 五項全 OK）＋ docker exec 驗容器內 `image-models.js` 含三個新模型、`ai-fill.js` 含 fillSelection | exit=0 | ms=~330000
+
 **[剩餘風險]** gpt-4o-mini-tts 2027-01-06 關：video-workbench 配音要換 `gpt-realtime-2.1-mini`（不同 API），已標 retireOn，12/07 起每日探測會在 Slack 吵；正式站實測待部署後（操作者 2026-11-09 定案 B 全做 → sg-deploy）。
 
 **[rollback]** `git revert` 本輪 3 個 commit；舊 Canvas Editor 不帶 `model` 仍走 flux-fill-pro，資料表未動。
