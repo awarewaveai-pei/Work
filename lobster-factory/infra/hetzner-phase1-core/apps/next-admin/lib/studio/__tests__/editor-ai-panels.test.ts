@@ -113,7 +113,7 @@ describe("ai-fill：去除／生成填色", () => {
     // not the raw AI image: fillSelection decoded source, mask and AI result, blended and re-encoded
     expect(await blobText(blob)).toBe("CVS");
     expect(await Promise.all(bitmapBlobs.map(blobText))).toEqual(expect.arrayContaining(["\u0001\u0002\u0003", "OUT", "\t"]));
-    expect(q(body, "[data-af-msg]").textContent).toMatch(/✅.*Bria Eraser.*NT\$1\.3/);
+    expect(q(body, "[data-af-msg]").textContent).toMatch(/✅.*Bria Eraser.*NT\$1\.28/); // 0.04 × 32, two decimals
   });
   it("生成填色：fill 模型 = 目錄 modelsFor('fill')（工具在前）；prompt 可空；POST /genfill { image, mask, prompt, model }", async () => {
     const { modelsFor } = await loadModule("public/editor-shared/image-models.js");

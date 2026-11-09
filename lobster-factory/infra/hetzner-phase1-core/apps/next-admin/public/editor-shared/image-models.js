@@ -16,8 +16,8 @@
 
 /** USD → NT$ reference rate. The only copy. */
 export const TWD_RATE = 32;
-/** Price in NT$ to one decimal (0.003 → 0.1). */
-export const nt = (usd) => Math.round(usd * TWD_RATE * 10) / 10;
+/** Price in NT$, two decimals — one decimal rounded the cheapest row (US$0.001 = NT$0.03) down to NT$0.0 on the buttons. */
+export const nt = (usd) => Math.round(usd * TWD_RATE * 100) / 100;
 
 export const IMAGE_MODELS = Object.freeze([
   { value: "flux-schnell", label: "FLUX schnell", group: "BFL", vendor: "BFL/Replicate", usd: 0.003, maxRefs: 0, note: "最便宜，草稿用", uses: ["generate"] },
