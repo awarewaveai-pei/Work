@@ -123,7 +123,7 @@ describe("ai-fill：去除／生成填色", () => {
     const btns = [...body.querySelectorAll("[data-af-model]")];
     expect(btns.map((b) => (b as HTMLElement).dataset.afModel)).toEqual(modelsFor("fill").map((m: { value: string }) => m.value));
     // Ideogram first: the only fill model that honours an empty prompt (prod 2026-11-09, image-models.js comment)
-    expect(btns.map((b) => (b as HTMLElement).dataset.afModel)).toEqual(["ideogram-4-5-edit", "flux-fill-pro", "openai-26-edit"]);
+    expect(btns.map((b) => (b as HTMLElement).dataset.afModel)).toEqual(["ideogram-4-5-edit-low", "ideogram-4-5-edit", "flux-fill-pro", "openai-26-edit"]);
     btns.forEach(priced);
     btns.forEach((b) => noted(b, modelsFor("fill")));
     q(body, "[data-af-model=ideogram-4-5-edit]").click();
@@ -304,17 +304,19 @@ describe("edge-mask：邊緣遮罩", () => {
 });
 
 describe("ai-edit：AI 修圖", () => {
-  it("ai-edit 模型 = modelsFor('edit')；每個都在 STUDIO_MODEL_OPTIONS、吃參考圖、能合成商品；價錢 = nt(usd)；比例規則 = nearestAspectRatio", async () => {
+  it("ai-edit 模型 = modelsFor('edit')；每個都在 STUDIO_MODEL_OPTIONS、吃參考圖；價錢 = nt(usd)；比例規則 = nearestAspectRatio", async () => {
     const { AI_EDIT_MODELS, nearestAspectRatio } = await loadModule(BLOCKS[3]);
     const { STUDIO_MODEL_OPTIONS, nearestAspectRatio: ref, PRODUCT_COMPOSITE_MODELS, nt } = await import("../model-options");
-    expect((AI_EDIT_MODELS as { value: string }[]).map((m) => m.value)).toEqual(["flux-kontext-pro", "nano-banana-2", "nano-banana-pro", "openai-25-edit", "openai-26-edit"]);
+    expect((AI_EDIT_MODELS as { value: string }[]).map((m) => m.value)).toEqual(["flux-kontext-pro", "flux-2-klein-4b", "flux-kontext-fast", "nano-banana-2", "nano-banana-pro", "openai-25-edit", "openai-26-edit"]);
     for (const m of AI_EDIT_MODELS as { value: string; label: string; usd: number }[]) {
       const s = STUDIO_MODEL_OPTIONS.find((o) => o.value === m.value);
       expect(s, m.value).toBeDefined();
       expect({ label: m.label, costNt: nt(m.usd) }).toEqual({ label: s!.label, costNt: s!.costNt });
       expect(s!.maxRefs).toBeGreaterThan(0);
-      expect(PRODUCT_COMPOSITE_MODELS).toContain(m.value);
     }
+    // 「整張改順」 models are not product compositors: never measured at placing a product photo (model-options.ts).
+    expect(PRODUCT_COMPOSITE_MODELS).not.toContain("flux-2-klein-4b");
+    expect(PRODUCT_COMPOSITE_MODELS).not.toContain("flux-kontext-fast");
     for (const [w, h] of [[908, 789], [1000, 1000], [1920, 1080], [600, 900], [1200, 1500], [4, 2], [3, 10]]) expect(nearestAspectRatio(w, h)).toBe(ref(w, h));
   });
   it("每個模型一顆看得到的鈕、標價並寫出特色；按下 → POST /generate { model, prompt, referenceImages:[圖], aspectRatio } → placeImage，原圖不動", async () => {
@@ -322,7 +324,7 @@ describe("ai-edit：AI 修圖", () => {
     const ctx = mockCtx();
     const body = await mount(BLOCKS[3], ctx);
     const btns = [...body.querySelectorAll("[data-ae-model]")] as HTMLButtonElement[];
-    expect(btns.map((b) => b.dataset.aeModel)).toEqual(["flux-kontext-pro", "nano-banana-2", "nano-banana-pro", "openai-25-edit", "openai-26-edit"]);
+    expect(btns.map((b) => b.dataset.aeModel)).toEqual(["flux-kontext-pro", "flux-2-klein-4b", "flux-kontext-fast", "nano-banana-2", "nano-banana-pro", "openai-25-edit", "openai-26-edit"]);
     btns.forEach(priced);
     btns.forEach((b) => noted(b, AI_EDIT_MODELS as { value: string; note?: string }[]));
     q(body, "[data-ae-prompt]").value = "海邊";
@@ -330,8 +332,8 @@ describe("ai-edit：AI 修圖", () => {
     await vi.waitFor(() => expect(q(body, "[data-ae-msg]").textContent).toContain("3 個字"));
     expect(fetchMock).not.toHaveBeenCalled();
     q(body, "[data-ae-prompt]").value = "把背景換成海邊";
-    btns[1].click();
-    btns[1].click();
+    btns[3].click();
+    btns[3].click();
     await vi.waitFor(() => expect(ctx.placeImage).toHaveBeenCalled());
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe("/api/tools/studio/generate");

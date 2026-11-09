@@ -15,6 +15,8 @@ export type StudioModel =
   | "openai-high"
   | "openai-25-edit"
   | "openai-26-edit"
+  | "flux-2-klein-4b"
+  | "flux-kontext-fast"
   | "ideogram-v2a-turbo"
   | "ideogram-v3-balanced"
   | "ideogram-v4-turbo"
@@ -26,7 +28,7 @@ export type StudioModel =
   | "flux-2-max";
 
 /** Mask / canvas tools of the genfill and inpaint routes (image-models.js EDIT_TOOLS). */
-export type EditTool = "flux-fill-pro" | "ideogram-4-5-edit" | "bria-eraser" | "bria-expand";
+export type EditTool = "flux-fill-pro" | "ideogram-4-5-edit" | "ideogram-4-5-edit-low" | "bria-eraser" | "bria-expand";
 
 export type ModelUse = "generate" | "edit" | "fill" | "remove" | "outpaint";
 
@@ -102,6 +104,8 @@ export const PRODUCT_COMPOSITE_MODELS: readonly StudioModel[] = [
   "openai-high",
   "openai-25-edit",
   "openai-26-edit",
+  // flux-2-klein-4b / flux-kontext-fast are deliberately NOT here: added 2026-11-09 for 「整張改順」 only and never
+  // measured at placing a product photo into a scene; maxRefs 1 keeps them out of PHOTO_PRINT_MODELS too.
 ];
 
 export function modelCompositesProduct(model: StudioModel): boolean {

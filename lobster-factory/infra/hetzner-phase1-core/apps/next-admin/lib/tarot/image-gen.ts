@@ -38,6 +38,8 @@ export type TarotModel =
   | "openai-high"
   | "openai-25-edit"
   | "openai-26-edit"
+  | "flux-2-klein-4b"
+  | "flux-kontext-fast"
   | "ideogram-v2a-turbo"
   | "ideogram-v3-balanced"
   | "ideogram-v4-turbo"
@@ -219,6 +221,29 @@ export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
     },
   },
   // ── Google models via Replicate (no seed param on any of them) ────────────
+  // The two cheap whole-image editors (2026-11-09). klein: `images` + output_megapixels "1" holds the $0.001 price;
+  // kontext-fast (Pruna's distilled FLUX Kontext): `img_cond_path` is the image, and aspect_ratio defaults to the input's.
+  "flux-2-klein-4b": {
+    provider: "replicate",
+    slug: "black-forest-labs/flux-2-klein-4b",
+    supportsImg2img: true,
+    buildInput: ({ prompt, aspectRatio, seed, referenceImages }) => {
+      const input: Record<string, unknown> = {
+        prompt, seed, output_format: "png", output_megapixels: "1",
+        aspect_ratio: referenceImages.length > 0 ? "match_input_image" : aspectRatio,
+      };
+      if (referenceImages.length > 0) input.images = referenceImages;
+      return input;
+    },
+  },
+  "flux-kontext-fast": {
+    provider: "replicate",
+    slug: "prunaai/flux-kontext-fast",
+    supportsImg2img: true,
+    buildInput: ({ prompt, seed, referenceImages }) => ({
+      prompt, seed, img_cond_path: referenceImages[0], output_format: "png", aspect_ratio: "match_input_image",
+    }),
+  },
   "nano-banana-2": {
     provider: "replicate",
     slug: "google/nano-banana-2",

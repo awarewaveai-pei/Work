@@ -186,6 +186,22 @@ export const MODEL_SPECS: Record<TarotModel, ModelSpec> = {
     notes: "with an image the call goes to /images/edits",
     sources: [OPENAI_IMG, OPENAI_GUIDE],
   },
+  "flux-2-klein-4b": {
+    label: "FLUX 2 Klein 4B", vendor: "Black Forest Labs (Replicate)",
+    promptLimit: "no published limit", promptOrder: "content-first", referenceRole: "multimodal", usesDeckPreview: false,
+    rewrite: "none", seed: true, negativePrompt: NO_NEGATIVE_FLUX,
+    vendorOrder: "what to change, then what stays",
+    notes: "4-step distilled, sub-second; the cheapest whole-image edit on the panel. No mask: it repaints the whole image",
+    sources: ["https://replicate.com/black-forest-labs/flux-2-klein-4b"],
+  },
+  "flux-kontext-fast": {
+    label: "FLUX Kontext Fast", vendor: "Pruna (Replicate)",
+    promptLimit: "no published limit", promptOrder: "content-first", referenceRole: "multimodal", usesDeckPreview: false,
+    rewrite: "none", seed: true, negativePrompt: NO_NEGATIVE_FLUX,
+    vendorOrder: "what to change, then what stays",
+    notes: "Pruna's distilled FLUX Kontext: keeps the input's composition, no mask",
+    sources: ["https://replicate.com/prunaai/flux-kontext-fast"],
+  },
   "openai-26-edit": {
     label: "GPT-Image-2.6 修圖", vendor: "OpenAI",
     promptLimit: "32,000 characters", promptOrder: "style-second", referenceRole: "edit", usesDeckPreview: false,

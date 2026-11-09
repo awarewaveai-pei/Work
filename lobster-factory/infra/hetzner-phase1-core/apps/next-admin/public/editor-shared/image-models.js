@@ -21,6 +21,10 @@ export const IMAGE_MODELS = Object.freeze([
   { value: "flux-kontext-dev", label: "FLUX Kontext Dev", group: "BFL", vendor: "BFL/Replicate", usd: 0.045, maxRefs: 1, note: "參考圖融入新場景（開源版）", uses: ["generate"] },
   { value: "flux-kontext-pro", label: "FLUX Kontext Pro", group: "BFL", vendor: "BFL/Replicate", usd: 0.04, maxRefs: 1, note: "把參考圖的東西放進新場景", uses: ["generate", "edit"] },
   { value: "flux-2-max", label: "FLUX 2 Max", group: "BFL", vendor: "BFL/Replicate", usd: 0.07, maxRefs: 0, note: "BFL 最高畫質，純文字生圖", uses: ["generate"] },
+  // The two cheap whole-image editors (operator 2026-11-09). Measured the same day: neither takes a mask, so they are
+  // offered for 「整張改順」 only, never for 生成填色. 1 megapixel output keeps klein at its $0.001 price point.
+  { value: "flux-2-klein-4b", label: "FLUX 2 Klein 4B", group: "BFL", vendor: "BFL/Replicate", usd: 0.001, maxRefs: 1, note: "最便宜，整張快速改", uses: ["edit"] },
+  { value: "flux-kontext-fast", label: "FLUX Kontext Fast", group: "BFL", vendor: "Pruna/Replicate", usd: 0.01, maxRefs: 1, note: "很便宜，保留原圖構圖", uses: ["edit"] },
   { value: "ideogram-v2a-turbo", label: "Ideogram v2a Turbo", group: "Ideogram", vendor: "Ideogram/Replicate", usd: 0.025, maxRefs: 0, note: "快，文字排版清楚", uses: ["generate"] },
   { value: "ideogram-v3-balanced", label: "Ideogram v3 Balanced", group: "Ideogram", vendor: "Ideogram/Replicate", usd: 0.06, maxRefs: 0, note: "畫質與速度折衷", uses: ["generate"] },
   { value: "ideogram-v4-turbo", label: "Ideogram v4 Turbo", group: "Ideogram", vendor: "Ideogram/Replicate", usd: 0.03, maxRefs: 0, note: "v4 快版", uses: ["generate"] },
@@ -43,7 +47,10 @@ export const IMAGE_MODELS = Object.freeze([
  *  the only one that honours a context fill (an EMPTY prompt). Prod 2026-11-09: with an empty prompt flux-fill-pro replaced the
  *  selection with unrelated bands, Ideogram continued the surrounding artwork. */
 export const EDIT_TOOLS = Object.freeze([
-  { value: "ideogram-4-5-edit", label: "Ideogram 4.5 Edit", vendor: "Ideogram/Replicate", usd: 0.06, note: "留空就照周圍補，接縫最少（實測）", uses: ["fill"] }, // quality medium
+  // Ideogram's own quality tiers, one row each (replicate.com page 2026-11-09: very_low .008 / low .03 / medium .06 / high .22).
+  // 2026-11-09 on one real card, low removed the object as cleanly as medium and very_low barely changed the area.
+  { value: "ideogram-4-5-edit-low", label: "Ideogram 4.5 Edit（省）", vendor: "Ideogram/Replicate", usd: 0.03, note: "留空就照周圍補，最划算（實測）", uses: ["fill"] },
+  { value: "ideogram-4-5-edit", label: "Ideogram 4.5 Edit（細）", vendor: "Ideogram/Replicate", usd: 0.06, note: "同上，細節多再用這個", uses: ["fill"] },
   { value: "flux-fill-pro", label: "FLUX Fill Pro", vendor: "BFL/Replicate", usd: 0.05, note: "留空會自己發揮，建議寫描述", uses: ["fill", "outpaint"] },
   { value: "bria-eraser", label: "Bria Eraser", vendor: "Bria/Replicate", usd: 0.04, note: "只清掉東西，不會新增", uses: ["remove"] },
   { value: "bria-expand", label: "Bria Expand", vendor: "Bria/Replicate", usd: 0.04, note: "擴圖尺寸精準，不會走樣", uses: ["outpaint"] },

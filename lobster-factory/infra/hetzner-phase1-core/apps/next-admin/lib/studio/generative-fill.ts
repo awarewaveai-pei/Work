@@ -5,7 +5,8 @@
  * Models (public/editor-shared/image-models.js EDIT_TOOLS; versions pinned here = lib/ai/cost-model.ts MEDIA_MODELS):
  *   - flux-fill-pro      生成填色 {image, mask, prompt} and 擴圖 {image, prompt, outpaint:<preset>} (mask ignored; the model
  *                        returns the extended canvas resampled to ≤ ~1440 px)
- *   - ideogram-4-5-edit  生成填色, quality medium; its mask is the INVERSE convention (black = edit), inverted here
+ *   - ideogram-4-5-edit[-low]  生成填色 at Ideogram's own quality tier (low $0.03 / medium $0.06); its mask is the
+ *                        INVERSE convention (black = edit), inverted here
  *   - bria-expand        擴圖 at the exact canvas of the preset (outpaintFrame), up to 5000 px a side; no resampling
  * Mask convention everywhere outside this file: WHITE = fill / regenerate, BLACK = preserve (the inpaint mask painter and the
  * dock blocks produce that). `image`/`mask` are `format: uri` inputs → base64 data URLs work directly.
@@ -31,6 +32,7 @@ export const CONTEXT_FILL_PROMPT = "Remove everything inside the selected area a
 const VERSIONS = {
   "flux-fill-pro": "41c767bcbfffe54ef8f05eb4d0100f9314790f7fc43a7b88d73ec06839deddb9", // black-forest-labs/flux-fill-pro
   "ideogram-4-5-edit": "64d91a9b8a91a4e41d10fde3aa54ea4f68e7c5213d417139935178a5f4672c85", // ideogram-ai/ideogram-4-5-precise-edit
+  "ideogram-4-5-edit-low": "64d91a9b8a91a4e41d10fde3aa54ea4f68e7c5213d417139935178a5f4672c85", // same model, quality "low"
   "bria-expand": "e153045f0c4163bd76788ab927faef5123db349294d4695dac07af828786e5b9", // bria/expand-image
 } as const satisfies Partial<Record<EditTool, string>>;
 export type FillTool = keyof typeof VERSIONS;
@@ -106,12 +108,13 @@ export async function generativeFill(args: GenerativeFillInput): Promise<Generat
         input: { image: args.image, mask, prompt, output_format: "png", safety_tolerance: 5 },
         failCode: "genfill_failed",
       });
-    case "ideogram-4-5-edit": {
+    case "ideogram-4-5-edit":
+    case "ideogram-4-5-edit-low": {
       const inverted = await invertMask(mask);
       if (!inverted) return { ok: false, error: "invalid_mask" };
       return runReplicate(grant, {
-        version: VERSIONS["ideogram-4-5-edit"],
-        input: { image: args.image, mask: inverted, prompt, quality: "medium", num_images: 1 },
+        version: VERSIONS[model],
+        input: { image: args.image, mask: inverted, prompt, quality: model.endsWith("-low") ? "low" : "medium", num_images: 1 },
         failCode: "genfill_failed",
       });
     }

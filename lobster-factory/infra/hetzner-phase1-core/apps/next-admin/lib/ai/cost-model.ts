@@ -123,6 +123,8 @@ export const MEDIA_MODELS: Record<string, MediaModel> = {
   "black-forest-labs/flux-kontext-dev": { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
   "black-forest-labs/flux-kontext-pro": { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
   "black-forest-labs/flux-2-max":      { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
+  "black-forest-labs/flux-2-klein-4b": { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-11-09" },
+  "prunaai/flux-kontext-fast":         { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-11-09" },
   "ideogram-ai/ideogram-v2a-turbo":    { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
   "ideogram-ai/ideogram-v3-balanced":  { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
   "ideogram-ai/ideogram-v4-turbo":     { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
