@@ -151,6 +151,28 @@ function keysetOr(c: DesignCursor, order: SortOrder): string {
   return `created_at.${op}."${c.createdAt}",and(created_at.eq."${c.createdAt}",id.${op}.${c.id})`;
 }
 
+/**
+ * Facet counting is one request per key, so its burst grew with the catalog: 19 model keys + products + themes +
+ * brands + the time rows went out at once, and a page that fetches twice (React strict mode, a reload on top of an
+ * in-flight load) doubled that. Measured on the host 2026-11-09: the Supabase gateway answers a burst of 60 fine and
+ * starts returning 429 (an HTML error page, which surfaced as `count failed: <html>`) at 80. Nothing about a gallery
+ * needs that concurrency, so every count goes through one gate: the burst is now a constant, whatever the catalog holds.
+ */
+export const COUNT_CONCURRENCY = 8;
+let inFlight = 0;
+const waiting: Array<() => void> = [];
+/** Exported for lib/studio/__tests__/designs-facet-gate.test.ts. */
+export async function gated<T>(run: () => Promise<T>): Promise<T> {
+  if (inFlight >= COUNT_CONCURRENCY) await new Promise<void>((resolve) => waiting.push(resolve));
+  inFlight++;
+  try {
+    return await run();
+  } finally {
+    inFlight--;
+    waiting.shift()?.();
+  }
+}
+
 async function countWhere(
   supabase: Client,
   f: DesignListFilters,
@@ -158,11 +180,13 @@ async function countWhere(
   omit: FacetDim | undefined,
   extra?: (q: Query) => Query,
 ): Promise<number> {
-  const base = supabase.from("media_assets").select("id", { count: "exact", head: true });
-  const { q, ors } = applyFilters(base, f, now, omit);
-  const { count, error } = await finishOr(extra ? extra(q) : q, ors);
-  if (error) throw new Error(`count failed: ${error.message}`);
-  return count ?? 0;
+  return gated(async () => {
+    const base = supabase.from("media_assets").select("id", { count: "exact", head: true });
+    const { q, ors } = applyFilters(base, f, now, omit);
+    const { count, error } = await finishOr(extra ? extra(q) : q, ors);
+    if (error) throw new Error(`count failed: ${error.message}`);
+    return count ?? 0;
+  });
 }
 
 async function countMap(
@@ -189,7 +213,7 @@ async function distinctValues(supabase: Client, f: DesignListFilters, now: Date,
     const { q, ors } = applyFilters(supabase.from("media_assets").select(`v:${path}`), f, now, dim);
     let next = q.not(path, "is", null).neq(path, "");
     if (last !== null) next = next.gt(path, last);
-    const { data, error } = await finishOr(next, ors).order(path, { ascending: true }).limit(1);
+    const { data, error } = await gated(async () => await finishOr(next, ors).order(path, { ascending: true }).limit(1));
     if (error) throw new Error(`${dim} values failed: ${error.message}`);
     const v = ((data ?? []) as { v: unknown }[])[0]?.v;
     if (typeof v !== "string") break;
