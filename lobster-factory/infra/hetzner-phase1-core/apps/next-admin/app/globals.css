@@ -1,3 +1,5 @@
+@import "../public/awarewave/forms.css";
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -79,7 +81,7 @@
   --icon-infra-bg: #f5f3ff;
   --icon-ext-bg: #fffbeb;
   --icon-tools-bg: #fef2f2;
-  --form-input-bg: #ffffff;
+  --form-input-bg: var(--card-bg);
   --build-panel-bg: #ffffff;
   --build-panel-secondary-border: #dde2ef;
   --build-prerequisites-body-bg: #fafcff;
@@ -474,6 +476,9 @@ button.sidebar-link {
 .main {
   margin-left: var(--sidebar-w);
   flex: 1;
+  /* A flex item defaults to min-width:auto, so one unwrappable row (a long topbar line, a wide table) stretched the
+     whole shell past the window and the page scrolled sideways (2026-11-09, /tools/edit-guide). */
+  min-width: 0;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -541,6 +546,8 @@ button.sidebar-link {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 16px;
   position: sticky;
   top: 0;
   z-index: 10;
@@ -863,27 +870,6 @@ pre {
   text-transform: uppercase;
   margin-bottom: 6px;
 }
-.form-input,
-.form-select,
-.form-textarea {
-  width: 100%;
-  border: 1px solid var(--card-border);
-  border-radius: 8px;
-  padding: 9px 12px;
-  font-size: 14px;
-  color: var(--text-primary);
-  background: var(--form-input-bg);
-  transition: border-color .15s, box-shadow .15s;
-  outline: none;
-}
-.form-input:focus,
-.form-select:focus,
-.form-textarea:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-light);
-}
-.form-textarea { min-height: 80px; resize: vertical; }
-
 .form-hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
 
 .btn-primary {
