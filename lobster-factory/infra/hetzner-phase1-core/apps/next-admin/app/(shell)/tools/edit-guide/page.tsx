@@ -28,7 +28,7 @@ function Shot({ src, alt, tag, tone, caption }: { src: string; alt: string; tag?
     <figure style={{ margin: 0, minWidth: 0 }}>
       {tag ? (
         <span style={{ display: "inline-block", fontSize: 11.5, padding: "1px 8px", borderRadius: 999, marginBottom: 6,
-          border: "1px solid currentColor", color: tone === "bad" ? "var(--danger, var(--text-primary))" : "var(--accent)" }}>{tag}</span>
+          border: "1px solid currentColor", color: tone === "bad" ? "var(--danger, var(--text-primary))" : "var(--accent-text)" }}>{tag}</span>
       ) : null}
       <img src={src} alt={alt} style={{ display: "block", width: "100%", borderRadius: 8, border: "1px solid var(--card-border)" }} />
       <figcaption style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 6, lineHeight: 1.6 }}>{caption}</figcaption>
@@ -73,7 +73,7 @@ export default function EditGuidePage() {
       <div style={{ padding: "18px clamp(16px, 4vw, 32px) 64px", maxWidth: 820, lineHeight: 1.8, color: "var(--text-secondary)" }}>
         <p style={{ margin: "0 0 22px", color: "var(--text-muted)", fontSize: 14 }}>
           這一頁的每張圖都是用自家的塔羅牌真的跑出來的，不是示意圖。價格直接讀模型目錄，和
-          <Link href="/tools/photo-pro" style={{ color: "var(--accent)" }}> 畫布（專業版）</Link> 面板上的數字是同一份。
+          <Link href="/tools/photo-pro" style={{ color: "var(--accent-text)" }}> 畫布（專業版）</Link> 面板上的數字是同一份。
         </p>
 
         <h2 style={h2}>一、兩種改圖，先分清楚</h2>
@@ -88,7 +88,7 @@ export default function EditGuidePage() {
 
         <h2 style={h2}>二、不打字的「照周圍補」</h2>
         <Card>
-          <b style={{ color: "var(--accent)" }}>把描述欄留空就好，不要自己打「照周圍補」。</b>
+          <b style={{ color: "var(--accent-text)" }}>把描述欄留空就好，不要自己打「照周圍補」。</b>
           <div style={{ marginTop: 4 }}>
             留空的時候，系統會自動替妳送一段完整的英文指令給模型，意思是「把框起來的地方清掉，照周圍的顏色、紋理、光線、線條接下去，不要加新東西」。
             自己打那四個字，模型就只收到那四個字，看不懂要清掉什麼。
@@ -137,7 +137,7 @@ export default function EditGuidePage() {
             caption={<><b>{labelOf("flux-kontext-pro")}</b> {price("flux-kontext-pro")}：畫風同樣接近原作、細節更乾淨。但<b>標題字變成 KING-BENTACIES</b>。</>} />
         </div>
         <Card>
-          <b style={{ color: "var(--accent)" }}>整張改圖會把整張重畫，文字幾乎一定會壞。</b>
+          <b style={{ color: "var(--accent-text)" }}>整張改圖會把整張重畫，文字幾乎一定會壞。</b>
           <div style={{ marginTop: 4 }}>
             圖上有字（牌名、商品名、浮水印）就別用整張改圖，改用局部填色一塊一塊處理；真的要整張改，先把文字圖層關掉、改完再開回來。
           </div>
@@ -158,8 +158,8 @@ export default function EditGuidePage() {
 
         <p style={{ fontSize: 13.5, color: "var(--text-muted)", borderTop: "1px solid var(--card-border)", paddingTop: 14, marginTop: 36 }}>
           價格是 Replicate 2026-11-09 牌價換算新台幣（1 美元 = 32 元），按下去才扣、失敗不扣；每一次的實際金額記在
-          <Link href="/ops/costs" style={{ color: "var(--accent)" }}> AI Costs</Link>。
-          模型規格另見 <Link href="/tools/ai-models?tab=image-specs" style={{ color: "var(--accent)" }}>AI Models</Link>。
+          <Link href="/ops/costs" style={{ color: "var(--accent-text)" }}> AI Costs</Link>。
+          模型規格另見 <Link href="/tools/ai-models?tab=image-specs" style={{ color: "var(--accent-text)" }}>AI Models</Link>。
         </p>
       </div>
     </>
