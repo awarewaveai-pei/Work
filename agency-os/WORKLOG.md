@@ -1,4 +1,23 @@
 # Worklog
+## 2026-11-09（續2）改圖說明頁：按價排序、每張圖標模型、33 張付費實測全上架
+
+[根因] 操作者在 prod 上指出三件事：`三、按鈕一覽` 沒照金額排、`五、加東西長什麼樣` 四張結果擠成一條沒標是哪個模型、二十次付費實測只留在 scratchpad 沒上頁。三者同一個成因：頁面是手寫版面而不是從 catalog 推導 —— 表格直接印 `modelsFor(use)` 的作者順序，圖片是一條 `<img>` 帶一個共用 caption，實測結果靠我記得才會被放上去。
+
+[步驟]
+1. `app/(shell)/tools/edit-guide/page.tsx` 全頁重寫：`byPrice(use)` = `[...modelsFor(use)].sort((a,b)=>a.usd-b.usd)` 餵兩張表，填色與修圖各自由便宜到貴；新增 `Run` 元件，每張圖強制帶 model label、該次 NT$、good/bad/src 色與一行結論，頁面上不再有無名圖。
+2. 版面重排成八節：我要做什麼 / 三個步驟 / 按鈕一覽 / 留空是什麼意思 / 寫清楚指令 / 加東西 / 整張改圖 / 錢的規則。
+3. `public/guides/edit/` 換成 33 張系統命名圖（a-* 局部框十次、b-* 整框兩次、c-* 便宜模型寫指令、d-* 加東西四顆、e-* 整張改圖三顆、f-* 留空 vs 自己打字、g-* 便宜模型留空失敗），刪掉重寫後不再引用的 13 個舊檔名。
+4. label 與價格一律經 `labelOf()`／`price()` 從 `lib/studio/model-options.ts` 讀，頁面不寫死任何模型名或金額。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=javascript_tool on https://app.aware-wave.com/tools/edit-guide (deployed 07cdea2ae) | exit=0 | ms=900 — figures=33、broken=[]、fillTable 與 editTable 皆 NT$ 遞增、sideScroll=0
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0/0/0 — 讀回 prod DOM 的 h2 八節與兩張表列序，與 catalog `usd` 排序一致
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin/public/guides,agency-os,scripts | grep=guides/edit/ | hits=0 — 舊 13 個檔名（a0-crop/c0-frame/c3-add-row/d1-klein…）刪除後全 repo 無殘留引用
+- BUGHUNT_SCOPE_NARROW: 本次只動一個頁面與它的圖檔目錄，`.claude/` 與其他 downstream 無引用這些檔名
+- tsc --noEmit：本次改動 0 error（餘三筆為其他頁的 `.next/types` 陳舊產物）；vitest lib/studio lib/ai app/(shell)/tools = 72 files / 675 passed，2 failures 來自隔壁 session 未 commit 的 `app/(shell)/tools/seedstar/`，不在 main 上
+- sg-deploy：`07cdea2aec93cdc9e1965e44282f57d9e6e5fd37`，lobster-next-admin healthy after 15s，5/5 smoke OK
+
+[避免再發生] 頁面的「哪些模型、什麼價、什麼順序」永遠從 catalog 推導，不手寫；每張付費跑出來的圖都必須經 `Run` 元件，缺 model 或缺價就寫不出來。
 ## 2026-11-09（續1）畫布專業版 AI 填色像 Photoshop：裁區＋羽化、三個填色模型標價、模型目錄單一來源、停用模型 ID 全 repo 掃描
 
 **操作者**：「photo-pro 生成圖片有問題，無法像真正的 Photoshop」「要表示用哪個 AI 工具、費用（新台幣）、最好的改圖工具」「Claude／GPT 舊模型停了，很多地方要調」→ 方案 B 全做。
