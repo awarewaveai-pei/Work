@@ -5,7 +5,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { modelsFor, takesBlankPrompt } from "../model-options";
+import { modelsFor, takesBlankPrompt, takesChinese } from "../model-options";
 
 const panel = fs.readFileSync(path.join(process.cwd(), "public/editor-shared/blocks/ai-fill.js"), "utf8");
 
@@ -39,5 +39,24 @@ describe("blank description", () => {
 
   it("the panel no longer promises 可留空 for every button", () => {
     expect(panel).not.toMatch(/（可留空＝照周圍補）/);
+  });
+});
+
+describe("instruction language", () => {
+  it("every 填色 and 去除 button says whether a 繁中 instruction works", () => {
+    const undeclared = [...modelsFor("fill"), ...modelsFor("remove")].filter((m) => m.zh !== "ok" && m.zh !== "no");
+    expect(undeclared.map((m) => m.value)).toEqual([]);
+  });
+
+  it("Kontext Fast needs English; the other fill buttons take 繁中", () => {
+    const row = (v: string) => modelsFor("fill").find((m) => m.value === v)!;
+    expect(takesChinese(row("flux-kontext-fast")), "two 繁中 presses left the animals in place").toBe(false);
+    for (const v of ["ideogram-4-5-edit-low", "flux-2-klein-4b", "openai-26-edit"]) {
+      expect(takesChinese(row(v)), `${v} removed the animals from the 繁中 sentence`).toBe(true);
+    }
+  });
+
+  it("the panel tells her which language a button needs", () => {
+    expect(panel).toMatch(/takesChinese\(m\)/);
   });
 });

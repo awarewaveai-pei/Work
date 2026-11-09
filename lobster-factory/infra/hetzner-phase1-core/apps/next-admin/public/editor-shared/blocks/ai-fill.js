@@ -8,7 +8,7 @@
 // is no seam or colour step; (3) an empty prompt is allowed (the server fills from the surroundings).
 // Also exports the request / Blob helpers the other AI image blocks share (genfx.js, edge-mask.js, ai-edit.js).
 import { OPS_ROLE_HEADER } from "/editor-shared/bg-remove.js";
-import { modelsFor, nt, takesBlankPrompt } from "/editor-shared/image-models.js";
+import { modelsFor, nt, takesBlankPrompt, takesChinese } from "/editor-shared/image-models.js";
 import { modelButton } from "/editor-shared/block-ui.js";
 
 export const INPAINT_URL = "/api/tools/studio/inpaint";
@@ -226,7 +226,10 @@ export default {
       const models = $("afModels"); models.replaceChildren();
       for (const m of mode === "fill" ? FILL_MODELS : mode === "remove" ? REMOVE_MODELS : []) {
         const b = modelButton(m, nt, () => run(m));
-        if (mode === "fill") b.title = takesBlankPrompt(m) ? "描述可以留空＝照周圍補" : "這顆一定要寫描述";
+        if (mode === "fill") {
+          b.title = (takesBlankPrompt(m) ? "描述可以留空＝照周圍補" : "這顆一定要寫描述")
+            + (takesChinese(m) ? "；中文可以" : "；描述要寫英文（中文這顆讀不懂）");
+        }
         b.dataset.afModel = m.value;
         models.appendChild(b);
       }

@@ -27,8 +27,8 @@ export const IMAGE_MODELS = Object.freeze([
   { value: "flux-2-max", label: "FLUX 2 Max", group: "BFL", vendor: "BFL/Replicate", usd: 0.07, maxRefs: 0, note: "BFL 最高畫質，純文字生圖", uses: ["generate"] },
   // The two cheap whole-image editors (operator 2026-11-09). Measured the same day: neither takes a mask, so they are
   // offered for 「整張改順」 only, never for 生成填色. 1 megapixel output keeps klein at its $0.001 price point.
-  { value: "flux-2-klein-4b", label: "FLUX 2 Klein 4B", group: "BFL", vendor: "BFL/Replicate", usd: 0.001, maxRefs: 1, note: "最便宜；填色要寫清楚改什麼", uses: ["edit", "fill"], blank: "no" },
-  { value: "flux-kontext-fast", label: "FLUX Kontext Fast", group: "BFL", vendor: "Pruna/Replicate", usd: 0.01, maxRefs: 1, note: "很便宜；填色要寫清楚改什麼", uses: ["edit", "fill"], blank: "no" },
+  { value: "flux-2-klein-4b", label: "FLUX 2 Klein 4B", group: "BFL", vendor: "BFL/Replicate", usd: 0.001, maxRefs: 1, note: "最便宜；填色要寫清楚改什麼", uses: ["edit", "fill"], zh: "ok", blank: "no" },
+  { value: "flux-kontext-fast", label: "FLUX Kontext Fast", group: "BFL", vendor: "Pruna/Replicate", usd: 0.01, maxRefs: 1, note: "很便宜；填色要寫清楚改什麼", uses: ["edit", "fill"], zh: "no", blank: "no" },
   { value: "ideogram-v2a-turbo", label: "Ideogram v2a Turbo", group: "Ideogram", vendor: "Ideogram/Replicate", usd: 0.025, maxRefs: 0, note: "快，文字排版清楚", uses: ["generate"] },
   { value: "ideogram-v3-balanced", label: "Ideogram v3 Balanced", group: "Ideogram", vendor: "Ideogram/Replicate", usd: 0.06, maxRefs: 0, note: "畫質與速度折衷", uses: ["generate"] },
   { value: "ideogram-v4-turbo", label: "Ideogram v4 Turbo", group: "Ideogram", vendor: "Ideogram/Replicate", usd: 0.03, maxRefs: 0, note: "v4 快版", uses: ["generate"] },
@@ -43,10 +43,13 @@ export const IMAGE_MODELS = Object.freeze([
   // Measured 2026-11-01 on /v1/images/edits (high, 1024x1536, 2 refs): US$0.062. Keeps the unmasked pixels; prints follow fabric folds.
   { value: "openai-25-edit", label: "GPT-Image-2.5 修圖", group: "OpenAI", vendor: "OpenAI", usd: 0.06, maxRefs: 5, note: "印花貼合衣物皺褶（實測）", uses: ["generate", "edit"] },
   // gpt-image-2.6-sunburst (OpenAI 2026-11-09: "precise edits"), same token rates as 2.5; takes a mask on /images/edits.
-  { value: "openai-26-edit", label: "GPT-Image-2.6 修圖", group: "OpenAI", vendor: "OpenAI", usd: 0.06, maxRefs: 5, note: "指令跟得最緊，長描述最準", uses: ["generate", "edit", "fill"], blank: "ok" },
+  { value: "openai-26-edit", label: "GPT-Image-2.6 修圖", group: "OpenAI", vendor: "OpenAI", usd: 0.06, maxRefs: 5, note: "指令跟得最緊，長描述最準", uses: ["generate", "edit", "fill"], zh: "ok", blank: "ok" },
 ]);
 
-/** `blank` = what an EMPTY description does on a 生成填色 / 去除 button, the one place that answers 「這顆可以留空嗎」
+/** `zh` = does a 繁中 instruction work on this button, measured 2026-11-09 on one card with one sentence:
+ *  Ideogram 4.5 Edit low and FLUX 2 Klein 4B removed the object, FLUX Kontext Fast left it in place twice and
+ *  removed it from the same English sentence. "no" = write the instruction in English; the guide prints one.
+ *  `blank` = what an EMPTY description does on a 生成填色 / 去除 button, the one place that answers 「這顆可以留空嗎」
  *  (the guide prints it, ai-fill.js refuses to spend without it). Measured 2026-11-09 on one real card, WORKLOG 續1/續2:
  *    "ok" = the server sends CONTEXT_FILL_PROMPT and the masked area is redrawn from its surroundings
  *    "no" = the model takes no mask, so that instruction has no area to act on and the image comes back unchanged
@@ -59,10 +62,10 @@ export const IMAGE_MODELS = Object.freeze([
 export const EDIT_TOOLS = Object.freeze([
   // Ideogram's own quality tiers, one row each (replicate.com page 2026-11-09: very_low .008 / low .03 / medium .06 / high .22).
   // 2026-11-09 on one real card, low removed the object as cleanly as medium and very_low barely changed the area.
-  { value: "ideogram-4-5-edit-low", label: "Ideogram 4.5 Edit（省）", vendor: "Ideogram/Replicate", usd: 0.03, note: "留空就照周圍補，最划算（實測）", uses: ["fill"], blank: "ok" },
-  { value: "ideogram-4-5-edit", label: "Ideogram 4.5 Edit（細）", vendor: "Ideogram/Replicate", usd: 0.06, note: "同上，細節多再用這個", uses: ["fill"], blank: "ok" },
-  { value: "flux-fill-pro", label: "FLUX Fill Pro", vendor: "BFL/Replicate", usd: 0.05, note: "留空會自己發揮，建議寫描述", uses: ["fill", "outpaint"], blank: "ok" },
-  { value: "bria-eraser", label: "Bria Eraser", vendor: "Bria/Replicate", usd: 0.04, note: "只清掉東西，不會新增", uses: ["remove"], blank: "ok" },
+  { value: "ideogram-4-5-edit-low", label: "Ideogram 4.5 Edit（省）", vendor: "Ideogram/Replicate", usd: 0.03, note: "留空就照周圍補，最划算（實測）", uses: ["fill"], zh: "ok", blank: "ok" },
+  { value: "ideogram-4-5-edit", label: "Ideogram 4.5 Edit（細）", vendor: "Ideogram/Replicate", usd: 0.06, note: "同上，細節多再用這個", uses: ["fill"], zh: "ok", blank: "ok" },
+  { value: "flux-fill-pro", label: "FLUX Fill Pro", vendor: "BFL/Replicate", usd: 0.05, note: "留空會自己發揮，建議寫描述", uses: ["fill", "outpaint"], zh: "ok", blank: "ok" },
+  { value: "bria-eraser", label: "Bria Eraser", vendor: "Bria/Replicate", usd: 0.04, note: "只清掉東西，不會新增", uses: ["remove"], zh: "ok", blank: "ok" },
   { value: "bria-expand", label: "Bria Expand", vendor: "Bria/Replicate", usd: 0.04, note: "擴圖尺寸精準，不會走樣", uses: ["outpaint"] },
 ]);
 
@@ -70,6 +73,12 @@ export const EDIT_TOOLS = Object.freeze([
  *  inherit 「留空可以」 and charge for a no-op. */
 export function takesBlankPrompt(m) {
   return m != null && m.blank === "ok";
+}
+
+/** Does a 繁中 instruction work on this row? Unmeasured rows answer no, so the guide tells her to write English
+ *  rather than let her pay to find out. */
+export function takesChinese(m) {
+  return m != null && m.zh === "ok";
 }
 
 /** Rows that offer `use` ("edit" | "fill" | "remove" | "outpaint"): the purpose-built tools first, then the general models. */

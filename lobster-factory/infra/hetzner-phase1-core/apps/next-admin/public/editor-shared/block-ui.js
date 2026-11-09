@@ -30,6 +30,16 @@ export function modelButton(m, nt, onClick, kind = "btn-primary") {
   note.textContent = m.note || "";
   note.style.cssText = "opacity:.75;font-size:11px;";
   b.append(top, note);
+  // Which language this model's instruction has to be in (image-models.js `zh`, measured). On the button face, not
+  // in a tooltip: 2026-11-09 two 繁中 presses on a "no" model left the image unchanged and still billed.
+  if (m.zh === "ok" || m.zh === "no") {
+    const lang = document.createElement("small");
+    lang.textContent = m.zh === "ok" ? "指令：中文可以" : "指令：要寫英文";
+    lang.style.cssText = m.zh === "ok"
+      ? "opacity:.6;font-size:11px;"
+      : "font-size:11px;font-weight:700;color:var(--danger);";
+    b.append(lang);
+  }
   b.onclick = onClick;
   return b;
 }
