@@ -32,6 +32,7 @@ import { renderPrintCard, applyGradeToDataUrl, CARD_TEMPLATES, type CardTemplate
 // keeps the model union in sync with the server. maxRefs/cost stay local on purpose.
 import type { TarotModel } from "@/lib/tarot/image-gen";
 import { MODEL_SPECS, MAX_REFS_PER_REQUEST } from "@/lib/tarot/model-specs";
+import { STUDIO_MODEL_OPTIONS } from "@/lib/studio/model-options";
 
 // Each model gets the prompt order its reading limit needs (lib/tarot/model-specs.ts).
 const orderOf = (m: TarotModel) => MODEL_SPECS[m].promptOrder;
@@ -59,30 +60,20 @@ interface BatchItem {
   error?: string;
 }
 
-// Model menu, cheapest → priciest. costNt = rough NT$ per image (for the 78-card estimate).
-// maxRefs = how many reference images this model consumes (0 = text-only).
+// Model menu, cheapest → priciest: the tarot subset of the image-model catalog (lib/studio/model-options.ts → public/editor-shared/
+// image-models.js; labels and NT$ come from there, costNt feeds the 78-card estimate). maxRefs = reference images the model consumes.
 type ModelOption = { value: TarotModel; label: string; group: string; costNt: number; maxRefs: number };
-const MODEL_OPTIONS: ModelOption[] = [
-  // Budget
-  { value: "flux-schnell",         label: "FLUX schnell",         group: "BFL",      costNt: 0.1,  maxRefs: 0 },
-  // Ideogram
-  { value: "ideogram-v2a-turbo",   label: "Ideogram v2a Turbo",   group: "Ideogram", costNt: 1,    maxRefs: 0 },
-  { value: "ideogram-v3-balanced", label: "Ideogram v3 Balanced", group: "Ideogram", costNt: 2,    maxRefs: 0 },
-  { value: "ideogram-v4-turbo",    label: "Ideogram v4 Turbo",    group: "Ideogram", costNt: 1,    maxRefs: 0 },
-  { value: "ideogram-v4-quality",  label: "Ideogram v4 Quality",  group: "Ideogram", costNt: 3,    maxRefs: 0 },
-  { value: "ideogram-character",   label: "Ideogram Character",   group: "Ideogram", costNt: 5,    maxRefs: 1 },
-  // Creative
-  { value: "flux-dev",             label: "FLUX dev",             group: "BFL",      costNt: 1,    maxRefs: 1 },
-  { value: "flux-2-max",           label: "FLUX 2 Max",           group: "BFL",      costNt: 2.3,  maxRefs: 0 },
-  // Google
-  { value: "nano-banana-2",        label: "Nano Banana 2",        group: "Google+",  costNt: 2.2,  maxRefs: 14 },
-  { value: "nano-banana-pro",      label: "Nano Banana Pro",      group: "Google+",  costNt: 4.4,  maxRefs: 8 },
-  { value: "imagen-4",             label: "Imagen 4",             group: "Google+",  costNt: 1.3,  maxRefs: 0 },
-  // OpenAI
-  { value: "openai-low",           label: "GPT-Image-1 低",       group: "OpenAI",   costNt: 0.5,  maxRefs: 5 },
-  { value: "openai-medium",        label: "GPT-Image-1 中",       group: "OpenAI",   costNt: 1.3,  maxRefs: 5 },
-  { value: "openai-high",          label: "GPT-Image-1 高",       group: "OpenAI",   costNt: 5.5,  maxRefs: 5 },
+const TAROT_MENU: readonly TarotModel[] = [
+  "flux-schnell", // budget
+  "ideogram-v2a-turbo", "ideogram-v3-balanced", "ideogram-v4-turbo", "ideogram-v4-quality", "ideogram-character",
+  "flux-dev", "flux-2-max", // creative
+  "nano-banana-2", "nano-banana-pro", "imagen-4", // Google
+  "openai-low", "openai-medium", "openai-high",
 ];
+const MODEL_OPTIONS: ModelOption[] = TAROT_MENU.map((value) => {
+  const o = STUDIO_MODEL_OPTIONS.find((m) => m.value === value)!;
+  return { value, label: o.label, group: o.group, costNt: o.costNt, maxRefs: o.maxRefs };
+});
 
 const PRESET_LABELS = new Set(STYLE_PRESETS.map((p) => p.zh));
 

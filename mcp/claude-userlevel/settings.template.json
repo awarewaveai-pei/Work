@@ -2,7 +2,7 @@
   "_comment": "AwareWave Claude Code user-level settings template (cross-machine SSOT). Variables: ${USERPROFILE}, ${USERPROFILE_FORWARD}, ${MONOREPO_ROOT}, ${MONOREPO_ROOT_FORWARD}. Sync via scripts/sync-claude-userlevel.ps1.",
   "autoUpdatesChannel": "latest",
   "theme": "light",
-  "model": "claude-sonnet-4-6",
+  "model": "claude-opus-5-5",
   "_cleanupPeriodDays_comment": "Conversation transcript retention. Claude Code's DEFAULT IS 30 DAYS and silently deletes older .jsonl transcripts — 2026-08-16 this destroyed the content of 9 pinned sessions (2026-06-23 ~ 2026-07-04) while their titles stayed in the sidebar, which is why the loss went unnoticed. Unrecoverable: no recycle-bin copy, no backup, and history.jsonl stops at 2026-05-23. Pinning a session does NOT exempt it. Value 0 is rejected by Claude Code. Durable knowledge still belongs in WORKLOG/TASKS/ADR/memory — this setting only widens the window, it is not a substitute.",
   "cleanupPeriodDays": 365,
   "permissions": {

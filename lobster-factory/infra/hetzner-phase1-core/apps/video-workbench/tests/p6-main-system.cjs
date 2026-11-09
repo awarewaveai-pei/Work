@@ -268,7 +268,7 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
       // Image models are priced only when cost-model lists them (default model + its dated snapshot); a lookalike name is refused.
       costs.priceOf("image", require("../backend/generation-policy.cjs").models({}).image);
       costs.priceOf("image", "gpt-image-2.5-flare-2026-09-08");
-      assert.throws(() => costs.priceOf("image", "gpt-image-2.6-flare"), /尚無價目/, "未登記的新版本不得用名稱猜價");
+      assert.throws(() => costs.priceOf("image", "gpt-image-9-flare"), /尚無價目/, "未登記的新版本不得用名稱猜價"); // 2.6 got registered 2026-11-09
       for (const [kind, model] of [["video", "veo-x"], ["audio", "nope-tts"], ["image", "dall-e-3"], ["text", "mystery-1"], ["3d", undefined]])
         assert.throws(() => costs.priceOf(kind, model), /尚無價目/, kind);
       const speech = JSON.parse((await generate({ type: "spoken", prompt: "你好世界", idempotencyKey: "tts-1" })).body);

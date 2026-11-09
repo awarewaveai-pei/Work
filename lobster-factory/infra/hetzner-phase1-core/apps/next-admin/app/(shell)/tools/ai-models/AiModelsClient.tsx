@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { TWD_RATE } from "@/lib/ai/cost-model";
 import {
   TEXT_MODEL_COMPARISONS,
   CODING_TOOL_COMPARISONS,
@@ -62,7 +63,7 @@ const TEXT_SOURCE_LABEL: Record<string, string> = {
   grokBuild: "Grok Build",
 };
 
-const TWD = 32;
+const TWD = TWD_RATE;
 
 // Latency string → numeric rank (1=fastest). Shared by SearchCard and sortedSearch.
 const LATENCY_RANK: Record<string, number> = {

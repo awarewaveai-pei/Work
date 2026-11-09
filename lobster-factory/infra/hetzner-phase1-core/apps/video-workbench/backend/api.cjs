@@ -142,7 +142,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     provider: vm ? vm.provider : generationPolicy.provider,
     costUsd,
   });
-  const textModel = vwEnv(env, "TEXT_MODEL") || "gpt-4.1-mini";
+  const textModel = vwEnv(env, "TEXT_MODEL") || "gpt-5.4-mini"; // 4.1-mini shuts down 2027-01-14 (OpenAI deprecations)
   const key = () => {
     if (!env.OPENAI_API_KEY)
       throw Object.assign(

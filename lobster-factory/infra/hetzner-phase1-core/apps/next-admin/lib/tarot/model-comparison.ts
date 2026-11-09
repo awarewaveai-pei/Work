@@ -1,13 +1,15 @@
 import type { TarotModel } from "./image-gen";
+import { IMAGE_RATES } from "@/lib/ai/cost-model";
 
 export interface TarotModelComparison {
+  /** Per-image USD, from the catalog (tarotModelCostUsd). Not a field of the rows below. */
+  costUsd: number;
   id: TarotModel;
   label: string;
   provider: "BFL" | "Ideogram" | "Google+" | "OpenAI";
   tier: "preview" | "balanced" | "quality" | "character" | "editing";
   bestFor: string;
   avoidFor: string;
-  costUsd: number;
   publicPrice: string;
   speed: string;
   speedRank: 1 | 2 | 3 | 4; // 1=fastest
@@ -44,7 +46,13 @@ export const TAROT_MODEL_SOURCES = {
   openaiPricing: "https://openai.com/index/image-generation-api/",
 } as const;
 
-export const TAROT_MODEL_COMPARISONS: readonly TarotModelComparison[] = [
+/** Per-image USD comes from the catalog (public/editor-shared/image-models.js via IMAGE_RATES) -- this table used to carry
+ *  its own copy and drifted (flux-kontext-pro read 0.10 while Replicate charges 0.04, 2026-11-09). */
+export function tarotModelCostUsd(id: TarotModel): number {
+  return IMAGE_RATES[id]?.usd ?? 0;
+}
+
+const ROWS: readonly Omit<TarotModelComparison, "costUsd">[] = [
   {
     id: "flux-schnell",
     label: "FLUX schnell",
@@ -52,7 +60,6 @@ export const TAROT_MODEL_COMPARISONS: readonly TarotModelComparison[] = [
     tier: "preview",
     bestFor: "大量試 prompt、快速看構圖、低成本整套草稿",
     avoidFor: "需要角色一致、可讀文字、精細商用品質",
-    costUsd: 0.003,
     publicPrice: "Replicate on-demand",
     speed: "最快；1-4 steps，適合迭代",
     speedRank: 1,
@@ -75,7 +82,6 @@ export const TAROT_MODEL_COMPARISONS: readonly TarotModelComparison[] = [
     tier: "balanced",
     bestFor: "塔羅主風格定稿、插畫感、用一張圖帶風格",
     avoidFor: "大量低價預覽、需要多張角色參考",
-    costUsd: 0.025,
     publicPrice: "Replicate on-demand",
     speed: "中等；比 schnell 慢但品質穩",
     speedRank: 3,
@@ -98,7 +104,6 @@ export const TAROT_MODEL_COMPARISONS: readonly TarotModelComparison[] = [
     tier: "editing",
     bestFor: "Mockup 設計圖→衣服、in-context 圖片編修、平價高質感參考圖融合",
     avoidFor: "純文字生圖（沒有參考圖時效果平）",
-    costUsd: 0.045,
     publicPrice: "Replicate on-demand",
     speed: "中等",
     speedRank: 3,
@@ -121,7 +126,6 @@ export const TAROT_MODEL_COMPARISONS: readonly TarotModelComparison[] = [
     tier: "editing",
     bestFor: "高品質 Mockup、精細設計圖保真、商用主視覺",
     avoidFor: "便宜大量批次試稿",
-    costUsd: 0.10,
     publicPrice: "Replicate on-demand",
     speed: "中慢；品質取向",
     speedRank: 4,
@@ -144,7 +148,6 @@ export const TAROT_MODEL_COMPARISONS: readonly TarotModelComparison[] = [
     tier: "quality",
     bestFor: "高質感單張、細節/真實感、需要 prompt 理解力",
     avoidFor: "超低成本 78 張、需要本工具內多參考圖",
-    costUsd: 0.07,
     publicPrice: "Replicate：$0.04/run + $0.03/MP (1MP 估)",
     speed: "中慢；品質取向",
     speedRank: 4,
@@ -167,7 +170,6 @@ export const TAROT_MODEL_COMPARISONS: readonly TarotModelComparison[] = [
     tier: "preview",
     bestFor: "便宜快速、圖文混合草稿、海報感構圖",
     avoidFor: "需要 4:5 精準比例或最高品質",
-    costUsd: 0.025,
     publicPrice: "Ideogram API",
     speed: "快；Turbo 取向",
     speedRank: 2,
@@ -190,7 +192,6 @@ export const TAROT_MODEL_COMPARISONS: readonly TarotModelComparison[] = [
     tier: "balanced",
     bestFor: "品質/速度/成本平衡、需要文字穩定的牌面",
     avoidFor: "最便宜草稿或最高畫質輸出",
-    costUsd: 0.06,
     publicPrice: "Ideogram API (v3 Balanced)",
     speed: "中等；平衡取向",
     speedRank: 3,
@@ -213,7 +214,6 @@ export const TAROT_MODEL_COMPARISONS: readonly TarotModelComparison[] = [
     tier: "preview",
     bestFor: "v4 品質下的快速低價候選圖",
     avoidFor: "需要 seed 可重現、要最高 v4 品質",
-    costUsd: 0.03,
     publicPrice: "Ideogram API (v4 Turbo)",
     speed: "快；v4 最快/最便宜檔",
     speedRank: 2,
@@ -236,7 +236,6 @@ export const TAROT_MODEL_COMPARISONS: readonly TarotModelComparison[] = [
     tier: "quality",
     bestFor: "最終候選、文字/符號/裝飾邊框準確度",
     avoidFor: "快速大量重跑、需要 seed",
-    costUsd: 0.10,
     publicPrice: "Ideogram API (v4 Quality)",
     speed: "慢；v4 最高品質檔",
     speedRank: 4,
@@ -259,7 +258,6 @@ export const TAROT_MODEL_COMPARISONS: readonly TarotModelComparison[] = [
     tier: "character",
     bestFor: "真人/角色一致性、同一主角穿越不同牌面",
     avoidFor: "沒有清楚人臉參考圖、純風格參考",
-    costUsd: 0.15,
     publicPrice: "Ideogram API (Character, 按臉部參考計費)",
     speed: "中慢；需分析角色參考",
     speedRank: 4,
@@ -282,7 +280,6 @@ export const TAROT_MODEL_COMPARISONS: readonly TarotModelComparison[] = [
     tier: "editing",
     bestFor: "多參考圖融合、角色/物件混搭、快速編修",
     avoidFor: "只要最便宜文字生圖、嚴格 seed 重現",
-    costUsd: 0.067,
     publicPrice: "Replicate 2K 輸出",
     speed: "快到中等；Flash 取向，解析度越高越慢",
     speedRank: 2,
@@ -305,7 +302,6 @@ export const TAROT_MODEL_COMPARISONS: readonly TarotModelComparison[] = [
     tier: "quality",
     bestFor: "高保真設計、品牌/文字/資訊圖、複雜指令",
     avoidFor: "便宜預覽、需要 14 張都高保真的素材混合",
-    costUsd: 0.15,
     publicPrice: "Replicate 2K 輸出",
     speed: "慢於 Nano Banana 2；品質取向",
     speedRank: 4,
@@ -328,7 +324,6 @@ export const TAROT_MODEL_COMPARISONS: readonly TarotModelComparison[] = [
     tier: "balanced",
     bestFor: "乾淨高質感文字生圖、攝影/插畫基準圖",
     avoidFor: "需要 2:3 原生精準比例或參考圖",
-    costUsd: 0.04,
     publicPrice: "Replicate on-demand",
     speed: "中等；2K 輸出",
     speedRank: 3,
@@ -346,12 +341,11 @@ export const TAROT_MODEL_COMPARISONS: readonly TarotModelComparison[] = [
   },
   {
     id: "openai-low",
-    label: "GPT-Image-1 低",
+    label: "GPT-Image-2 低",
     provider: "OpenAI",
     tier: "preview",
     bestFor: "便宜預覽、需要參考圖但不追最高細節",
     avoidFor: "最終成品、精細文字與材質",
-    costUsd: 0.02,
     publicPrice: "OpenAI API (1024×1024 base)；portrait 依 token tiles",
     speed: "最快的 OpenAI 檔；低品質",
     speedRank: 2,
@@ -369,12 +363,11 @@ export const TAROT_MODEL_COMPARISONS: readonly TarotModelComparison[] = [
   },
   {
     id: "openai-medium",
-    label: "GPT-Image-1 中",
+    label: "GPT-Image-2 中",
     provider: "OpenAI",
     tier: "balanced",
     bestFor: "一般成品、參考圖編修、成本/品質平衡",
     avoidFor: "最高級印刷主視覺或最低成本批量",
-    costUsd: 0.07,
     publicPrice: "OpenAI API (1024×1024 base)；portrait 依 token tiles",
     speed: "中等",
     speedRank: 3,
@@ -392,12 +385,11 @@ export const TAROT_MODEL_COMPARISONS: readonly TarotModelComparison[] = [
   },
   {
     id: "openai-high",
-    label: "GPT-Image-1 高",
+    label: "GPT-Image-2 高",
     provider: "OpenAI",
     tier: "quality",
     bestFor: "高保真參考圖編修、需要語意理解的最終圖",
     avoidFor: "78 張全套大量生成、固定 seed 工作流",
-    costUsd: 0.19,
     publicPrice: "OpenAI API (1024×1024 base)；portrait 依 token tiles",
     speed: "慢；最高 compute/品質",
     speedRank: 4,
@@ -414,3 +406,6 @@ export const TAROT_MODEL_COMPARISONS: readonly TarotModelComparison[] = [
     sourceKeys: ["openaiImages", "openaiVision", "openaiPricing"],
   },
 ];
+
+export const TAROT_MODEL_COMPARISONS: readonly TarotModelComparison[] =
+  ROWS.map((r) => ({ ...r, costUsd: tarotModelCostUsd(r.id) }));

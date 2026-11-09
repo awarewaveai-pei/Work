@@ -51,12 +51,12 @@ async function testGemini(model, marker) {
 }
 
 const tests = [
-  ["chatgpt-fast", () => testOpenAI("gpt-4o-mini", "CHATGPT_FAST_OK")],
-  ["chatgpt-latest", () => testOpenAI("gpt-4.1", "CHATGPT_LATEST_OK")],
-  ["claude-fast", () => testAnthropic("claude-3-haiku-20240307", "CLAUDE_FAST_OK")],
-  ["claude-latest", () => testAnthropic("claude-sonnet-4-20250514", "CLAUDE_LATEST_OK")],
-  ["gemini-fast", () => testGemini("gemini-2.5-flash", "GEMINI_FAST_OK")],
-  ["gemini-latest", () => testGemini("gemini-2.5-pro", "GEMINI_LATEST_OK")],
+  ["chatgpt-fast", () => testOpenAI("gpt-5.4-mini", "CHATGPT_FAST_OK")],
+  ["chatgpt-latest", () => testOpenAI("gpt-5.5", "CHATGPT_LATEST_OK")],
+  ["claude-fast", () => testAnthropic("claude-haiku-5-5", "CLAUDE_FAST_OK")],
+  ["claude-latest", () => testAnthropic("claude-sonnet-5-5", "CLAUDE_LATEST_OK")],
+  ["gemini-fast", () => testGemini("gemini-3.5-flash-lite", "GEMINI_FAST_OK")],
+  ["gemini-latest", () => testGemini("gemini-flash-latest", "GEMINI_LATEST_OK")],
 ];
 
 for (const [name, fn] of tests) {

@@ -23,6 +23,8 @@
  *  My Designs Mockup tab, and the API filter all follow in lockstep (no drift). */
 export const MOCKUP_SOURCES = ["mockup", "printful-mockup"] as const;
 
+import { STUDIO_MODEL_OPTIONS } from "./model-options";
+
 /** Collapse a raw `metadata.source` into a coarse tool group (tarot / studio / mockup / …). */
 export function assetToolGroup(source: string | null | undefined): string {
   if (!source) return "unknown";
@@ -39,22 +41,8 @@ export const TAROT_SOURCES = ["tarot", "tarot-preview", "tarot-preview-edit", "t
 
 /** My Designs model chips. Keys = `metadata.model_name`; the /api/tools/designs counts use the same keys. */
 export const GALLERY_MODEL_LABELS: Record<string, string> = {
-  "flux-schnell": "FLUX schnell",
-  "flux-dev": "FLUX dev",
-  "flux-2-max": "FLUX 2 Max",
-  "ideogram-v2a-turbo": "Ideogram v2a Turbo",
-  "ideogram-v3-balanced": "Ideogram v3 Balanced",
-  "ideogram-v4-turbo": "Ideogram v4 Turbo",
-  "ideogram-v4-quality": "Ideogram v4 Quality",
-  "ideogram-character": "Ideogram Character",
-  "seedream-4.5": "Seedream 4.5",
-  "nano-banana-2": "Nano Banana 2",
-  "nano-banana-pro": "Nano Banana Pro",
-  "imagen-4": "Imagen 4",
-  "openai-low": "GPT-Image-1 低",
-  "openai-medium": "GPT-Image-1 中",
-  "openai-high": "GPT-Image-1 高",
-  "openai-25-edit": "GPT-Image-2.5 修圖",
+  ...Object.fromEntries(STUDIO_MODEL_OPTIONS.map((m) => [m.value, m.label])),
+  "seedream-4.5": "Seedream 4.5", // saved by an earlier Studio build; no longer offered
 };
 
 /** My Designs product chips. Key rule (client assetProduct + server filter in lib/studio/designs-list.ts):

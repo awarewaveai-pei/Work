@@ -8,7 +8,8 @@
 //   node scripts/probe-models.mjs --write-verified   stamp verifiedAt=today on rows that answered (laptop only)
 //   node scripts/probe-models.mjs --registry <file>  read TEXT_RATES from another copy of cost-model.ts
 //
-// Exit 1 = some active id AND its fallback both failed (an active id without a fallback -- every media row -- fails alone).
+// Exit 1 = some active id AND its fallback both failed (an active id without a fallback -- every media row -- fails alone),
+// or an active row's vendor-announced retireOn is within RETIRE_WARN_DAYS.
 // Keys come from ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY / REPLICATE_API_TOKEN only and are never printed.
 // Plain Node >= 20, no dependencies: the production image has no tsx, so the registry is read as text;
 // lib/ai/__tests__/model-registry.test.ts keeps this parser equal to the TS object.
@@ -25,9 +26,11 @@ const BUDGETS = [1, 16, 64];
 const TIMEOUT_MS = 60_000;
 
 /** TEXT_RATES rows as { id, vendor, status, fallback, verifiedAt }. */
-export const parseTextRates = (src) => parseTable(src, "TEXT_RATES", ["vendor", "status", "fallback", "verifiedAt"]);
-/** MEDIA_MODELS rows as { id, vendor, kind, status, version, verifiedAt }. */
-export const parseMediaModels = (src) => parseTable(src, "MEDIA_MODELS", ["vendor", "kind", "status", "version", "verifiedAt"]);
+export const parseTextRates = (src) => parseTable(src, "TEXT_RATES", ["vendor", "status", "fallback", "verifiedAt", "retireOn"]);
+/** MEDIA_MODELS rows as { id, vendor, kind, status, version, verifiedAt, retireOn }. */
+export const parseMediaModels = (src) => parseTable(src, "MEDIA_MODELS", ["vendor", "kind", "status", "version", "verifiedAt", "retireOn"]);
+/** Days before a row's vendor-announced shutdown (retireOn) at which an ACTIVE row counts as a failure. */
+export const RETIRE_WARN_DAYS = 30;
 
 /** Rows of `export const <name>` as { id, ...fields }; one row per `"id": { ... },` line. */
 function parseTable(src, name, fields) {
@@ -112,13 +115,19 @@ async function probe(row) {
   return last;
 }
 
-/** Active rows whose own probe and whose fallback's probe both failed. */
-export function hardFailures(rows, results) {
+/** Active rows whose own probe and whose fallback's probe both failed, plus active rows the vendor shuts down within
+ *  RETIRE_WARN_DAYS of `today` (YYYY-MM-DD) -- "<id> retires <date>" -- so the default moves before the id dies. */
+export function hardFailures(rows, results, today = new Date().toISOString().slice(0, 10)) {
   const byId = new Map(results.map((r) => [r.id, r]));
-  return rows
+  const dead = rows
     .filter((r) => r.status === "active" && byId.get(r.id) && !byId.get(r.id).ok)
     .filter((r) => !r.fallback || !byId.get(r.fallback)?.ok)
     .map((r) => r.id);
+  const limit = new Date(`${today}T00:00:00Z`).getTime() + RETIRE_WARN_DAYS * 86_400_000;
+  const retiring = rows
+    .filter((r) => r.status === "active" && r.retireOn && new Date(`${r.retireOn}T00:00:00Z`).getTime() <= limit)
+    .map((r) => `${r.id} retires ${r.retireOn}`);
+  return [...dead, ...retiring];
 }
 
 function writeVerified(file, ids, day) {

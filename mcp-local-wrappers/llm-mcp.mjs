@@ -13,7 +13,7 @@ function requiredEnv(name) {
 
 async function callOpenAI(prompt, model) {
   const apiKey = requiredEnv("OPENAI_API_KEY");
-  const chosenModel = model || process.env.OPENAI_MODEL || "gpt-4o-mini";
+  const chosenModel = model || process.env.OPENAI_MODEL || "gpt-5.4-mini";
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -61,7 +61,7 @@ async function callAnthropic(prompt, model) {
 
 async function callGemini(prompt, model) {
   const apiKey = requiredEnv("GEMINI_API_KEY");
-  const chosenModel = model || process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const chosenModel = model || process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(chosenModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const res = await fetch(url, {

@@ -8,7 +8,7 @@ import type { TarotModel } from "./image-gen";
 export type ReferenceRole =
   | "none"        // accepts no image
   | "init"        // img2img start image: the composition is inherited (flux-dev)
-  | "edit"        // the image is edited (gpt-image-1 /images/edits)
+  | "edit"        // the image is edited (gpt-image-2.x /images/edits)
   | "multimodal"  // general reference the prompt must explain (nano banana, flux-2-max)
   | "character";  // identity only: keeps who the figure is, not the layout (ideogram-character)
 
@@ -163,7 +163,7 @@ export const MODEL_SPECS: Record<TarotModel, ModelSpec> = {
     sources: ["https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/imagen/4-0-generate", "https://replicate.com/google/imagen-4"],
   },
   "openai-low": {
-    label: "GPT-Image-1 低", vendor: "OpenAI",
+    label: "GPT-Image-2 低", vendor: "OpenAI",
     promptLimit: "32,000 characters", promptOrder: "style-second", referenceRole: "edit", usesDeckPreview: false,
     rewrite: "none on the Images API", seed: false, negativePrompt: "no field",
     vendorOrder: "scene, subject, key details, constraints",
@@ -171,7 +171,7 @@ export const MODEL_SPECS: Record<TarotModel, ModelSpec> = {
     sources: [OPENAI_IMG, OPENAI_GUIDE],
   },
   "openai-medium": {
-    label: "GPT-Image-1 中", vendor: "OpenAI",
+    label: "GPT-Image-2 中", vendor: "OpenAI",
     promptLimit: "32,000 characters", promptOrder: "style-second", referenceRole: "edit", usesDeckPreview: false,
     rewrite: "none on the Images API", seed: false, negativePrompt: "no field",
     vendorOrder: "scene, subject, key details, constraints",
@@ -179,11 +179,19 @@ export const MODEL_SPECS: Record<TarotModel, ModelSpec> = {
     sources: [OPENAI_IMG, OPENAI_GUIDE],
   },
   "openai-high": {
-    label: "GPT-Image-1 高", vendor: "OpenAI",
+    label: "GPT-Image-2 高", vendor: "OpenAI",
     promptLimit: "32,000 characters", promptOrder: "style-second", referenceRole: "edit", usesDeckPreview: false,
     rewrite: "none on the Images API", seed: false, negativePrompt: "no field",
     vendorOrder: "scene, subject, key details, constraints",
     notes: "with an image the call goes to /images/edits",
+    sources: [OPENAI_IMG, OPENAI_GUIDE],
+  },
+  "openai-26-edit": {
+    label: "GPT-Image-2.6 修圖", vendor: "OpenAI",
+    promptLimit: "32,000 characters", promptOrder: "style-second", referenceRole: "edit", usesDeckPreview: false,
+    rewrite: "none on the Images API", seed: false, negativePrompt: "no field",
+    vendorOrder: "what to change, what stays identical, constraints",
+    notes: "gpt-image-2.6-sunburst via /images/edits; the one model that takes a mask (生成填色 in the pro editor), prompt-guided so the edit may spill past the mask's exact shape",
     sources: [OPENAI_IMG, OPENAI_GUIDE],
   },
   "openai-25-edit": {

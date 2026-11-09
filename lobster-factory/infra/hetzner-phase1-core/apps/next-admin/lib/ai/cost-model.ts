@@ -10,7 +10,7 @@
  * Sources (USD): text rows -- each row's `verifiedAt` is the last day scripts/probe-models.mjs got a real
  * answer from that id (prices: vendor list pages); Replicate per-image costUsd from
  * lib/tarot/model-comparison.ts; OpenAI image API. Currency:
- * NT$ via TWD_RATE (single source — mirrors app/tools/ai-models/page.tsx, keep in sync).
+ * NT$ via TWD_RATE (public/editor-shared/image-models.js). Image rows derive from that catalog (IMAGE_MODELS / EDIT_TOOLS).
  *
  * INFRA: Hetzner figures are the ACTUAL billed price from the Hetzner console PRICE field
  * (screenshots 2026-06-17), NOT the Hetzner API /v1/pricing list price — the API returns the
@@ -19,8 +19,10 @@
  * real from /zones API. Domains + other SaaS remain `estimate: true` (not in any API).
  */
 
-/** USD → NT$ reference rate. Mirrors app/tools/ai-models/page.tsx:12 — update both together. */
-export const TWD_RATE = 32;
+import { EDIT_TOOLS, IMAGE_MODELS, TWD_RATE } from "../../public/editor-shared/image-models.js";
+
+/** USD → NT$ reference rate: the one copy lives in public/editor-shared/image-models.js (browser and server read it). */
+export { TWD_RATE };
 
 /** Per-1M-token prices in USD. input/output billed separately; cache read ≈0.1×, write ≈1.25×. */
 export interface TextRate {
@@ -36,6 +38,8 @@ export interface TextRate {
   status: "active" | "legacy" | "retired";
   /** YYYY-MM-DD of the last successful real call by scripts/probe-models.mjs (`--write-verified`); absent = never probed OK. */
   verifiedAt?: string;
+  /** Vendor-announced shutdown date (YYYY-MM-DD). probe-models.mjs fails an active row within 30 days of it, so a default moves before the vendor pulls it. */
+  retireOn?: string;
   /**
    * An active key. Active rows: another vendor where one exists (an outage of one vendor must not take both out).
    * Legacy/retired rows: the same-vendor successor -- normalizeAiTextModel remaps a saved pick of this id to it.
@@ -51,7 +55,9 @@ export const TEXT_RATES: Record<string, TextRate> = {
   "claude-haiku-5-5":          { inputPerM: 0.1, outputPerM: 0.5, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Haiku 5.5", vendor: "Anthropic", status: "active", fallback: "gpt-5.4-nano", verifiedAt: "2026-10-28" },
   "claude-haiku-4-5-20251001": { inputPerM: 1, outputPerM: 5, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Haiku 4.5", vendor: "Anthropic", status: "legacy", fallback: "claude-haiku-5-5", verifiedAt: "2026-10-28" },
   "claude-haiku-4-5":          { inputPerM: 1, outputPerM: 5, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Haiku 4.5", vendor: "Anthropic", status: "legacy", fallback: "claude-haiku-5-5", verifiedAt: "2026-10-28" },
-  "claude-sonnet-4-6":         { inputPerM: 3, outputPerM: 15, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Sonnet 4.6", vendor: "Anthropic", status: "legacy", fallback: "claude-opus-5-5", verifiedAt: "2026-10-28" },
+  "claude-sonnet-4-6":         { inputPerM: 3, outputPerM: 15, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Sonnet 4.6", vendor: "Anthropic", status: "legacy", fallback: "claude-sonnet-5-5", verifiedAt: "2026-10-28" },
+  // Sonnet 5.5 (platform.claude.com models overview 2026-11-09, $2 / $10): the successor the deprecation page names for Sonnet 4.x.
+  "claude-sonnet-5-5":         { inputPerM: 2, outputPerM: 10, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Sonnet 5.5", vendor: "Anthropic", status: "active", fallback: "gpt-5.4" },
   "claude-opus-5-5":           { inputPerM: 4, outputPerM: 20, cacheReadMult: 0.05, cacheWriteMult: 1.25, label: "Claude Opus 5.5", vendor: "Anthropic", status: "active", fallback: "gpt-5.5", verifiedAt: "2026-10-28" },
   // Opus 5 = a classifier-fallback target of Opus 5.5 (lib/ai/gateway.ts); priced so a rescued call is not mispriced.
   "claude-opus-5":             { inputPerM: 5, outputPerM: 25, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Opus 5", vendor: "Anthropic", status: "legacy", fallback: "claude-opus-5-5", verifiedAt: "2026-10-28" },
@@ -62,11 +68,12 @@ export const TEXT_RATES: Record<string, TextRate> = {
   "gpt-5.4":                   { inputPerM: 2.5, outputPerM: 15, cacheReadMult: 0.1, cacheWriteMult: 1, label: "GPT-5.4", vendor: "OpenAI", status: "active", fallback: "claude-opus-5-5", verifiedAt: "2026-10-28" },
   "gpt-5.4-mini":              { inputPerM: 0.75, outputPerM: 4.5, cacheReadMult: 0.1, cacheWriteMult: 1, label: "GPT-5.4 mini", vendor: "OpenAI", status: "active", fallback: "claude-haiku-5-5", verifiedAt: "2026-10-28" },
   "gpt-5.4-nano":              { inputPerM: 0.2, outputPerM: 1.25, cacheReadMult: 0.1, cacheWriteMult: 1, label: "GPT-5.4 nano", vendor: "OpenAI", status: "active", fallback: "claude-haiku-5-5", verifiedAt: "2026-10-28" },
-  "gpt-4o":                    { inputPerM: 2.5, outputPerM: 10, cacheReadMult: 0.5, cacheWriteMult: 1, label: "GPT-4o", vendor: "OpenAI", status: "legacy", fallback: "gpt-5.4", verifiedAt: "2026-10-28" },
+  // OpenAI deprecations page 2026-11-09: gpt-4o, gpt-4o-mini, gpt-4.1 and gpt-4.1-mini shut down 2027-01-14.
+  "gpt-4o":                    { inputPerM: 2.5, outputPerM: 10, cacheReadMult: 0.5, cacheWriteMult: 1, label: "GPT-4o", vendor: "OpenAI", status: "legacy", fallback: "gpt-5.4", verifiedAt: "2026-10-28", retireOn: "2027-01-14" },
   // Former outreach default (lib/outreach/ai-openai.ts); kept for older cost-log rows.
-  "gpt-4o-mini":               { inputPerM: 0.15, outputPerM: 0.6, cacheReadMult: 0.5, cacheWriteMult: 1, label: "GPT-4o mini", vendor: "OpenAI", status: "legacy", fallback: "gpt-5.4-mini", verifiedAt: "2026-10-28" },
-  // video-workbench text routes default (apps/video-workbench backend/api.cjs VW_TEXT_MODEL). openai.com/api/pricing list price.
-  "gpt-4.1-mini":              { inputPerM: 0.4, outputPerM: 1.6, cacheReadMult: 0.25, cacheWriteMult: 1, label: "GPT-4.1 mini", vendor: "OpenAI", status: "active", fallback: "claude-haiku-5-5" },
+  "gpt-4o-mini":               { inputPerM: 0.15, outputPerM: 0.6, cacheReadMult: 0.5, cacheWriteMult: 1, label: "GPT-4o mini", vendor: "OpenAI", status: "legacy", fallback: "gpt-5.4-mini", verifiedAt: "2026-10-28", retireOn: "2027-01-14" },
+  // video-workbench text default until 2026-11-09 (now gpt-5.4-mini); kept for its cost-log rows until the shutdown.
+  "gpt-4.1-mini":              { inputPerM: 0.4, outputPerM: 1.6, cacheReadMult: 0.25, cacheWriteMult: 1, label: "GPT-4.1 mini", vendor: "OpenAI", status: "legacy", fallback: "gpt-5.4-mini", retireOn: "2027-01-14" },
   // lib/kb/config.ts KB_EMBEDDING. No fallback: stored vectors are bound to this model's 1536 dims.
   "text-embedding-3-small":    { inputPerM: 0.02, outputPerM: 0, cacheReadMult: 1, cacheWriteMult: 1, label: "OpenAI text-embedding-3-small", vendor: "OpenAI", status: "active", verifiedAt: "2026-10-28" },
   // Gemini Flash-Lite: lib/ai/gemini-models.ts GEMINI_LITE_MODEL (ops-inbox diagnostics, cs fallback). Google list price
@@ -81,29 +88,13 @@ export const TEXT_RATES: Record<string, TextRate> = {
 /** Fallback when an unknown text model id is logged — the app default model's rate. */
 export const FALLBACK_TEXT_MODEL = "claude-opus-5-5";
 
-/** Per-image price in USD. Keys = the app's image model ids (lib/tarot/image-gen.ts TAROT_MODELS). */
+/** Per-image price in USD, keyed by the app's model / tool id (what logImageCost receives). Rows come from the catalog
+ *  public/editor-shared/image-models.js (IMAGE_MODELS + EDIT_TOOLS); only the free Pexels rows live here. OpenAI rows are
+ *  token-billed (OPENAI_IMAGE_TOKEN_RATES): the logged cost comes from each response's usage, the catalog usd is the estimate. */
 export const IMAGE_RATES: Record<string, { usd: number; label: string; vendor: string }> = {
   "pexels-video":        { usd: 0,     label: "Pexels 真實影片 $0", vendor: "Pexels (免費)" },
   "pexels-all":          { usd: 0,     label: "Pexels 免費照片 $0", vendor: "Pexels (免費)" },
-  "flux-schnell":        { usd: 0.003, label: "FLUX schnell", vendor: "BFL/Replicate" },
-  "flux-dev":            { usd: 0.025, label: "FLUX dev", vendor: "BFL/Replicate" },
-  "flux-kontext-dev":    { usd: 0.045, label: "FLUX Kontext Dev", vendor: "BFL/Replicate" },
-  "flux-kontext-pro":    { usd: 0.10, label: "FLUX Kontext Pro", vendor: "BFL/Replicate" },
-  "flux-2-max":          { usd: 0.07, label: "FLUX 2 Max", vendor: "BFL/Replicate" },
-  "ideogram-v2a-turbo":  { usd: 0.025, label: "Ideogram v2a Turbo", vendor: "Ideogram/Replicate" },
-  "ideogram-v3-balanced":{ usd: 0.06, label: "Ideogram v3 Balanced", vendor: "Ideogram/Replicate" },
-  "ideogram-v4-turbo":   { usd: 0.03, label: "Ideogram v4 Turbo", vendor: "Ideogram/Replicate" },
-  "ideogram-v4-quality": { usd: 0.10, label: "Ideogram v4 Quality", vendor: "Ideogram/Replicate" },
-  "ideogram-character":  { usd: 0.15, label: "Ideogram Character", vendor: "Ideogram/Replicate" },
-  "nano-banana-2":       { usd: 0.067, label: "Nano Banana 2", vendor: "Google/Replicate" },
-  "nano-banana-pro":     { usd: 0.15, label: "Nano Banana Pro", vendor: "Google/Replicate" },
-  "imagen-4":            { usd: 0.04, label: "Imagen 4", vendor: "Google/Replicate" },
-  // gpt-image-2 bills by token (OPENAI_IMAGE_TOKEN_RATES): the logged cost comes from each response's usage; these per-image
-  // figures are only the estimate shown before generating.
-  "openai-low":          { usd: 0.02, label: "GPT-Image-2 low", vendor: "OpenAI" },
-  "openai-medium":       { usd: 0.07, label: "GPT-Image-2 medium", vendor: "OpenAI" },
-  "openai-high":         { usd: 0.19, label: "GPT-Image-2 high", vendor: "OpenAI" },
-  "openai-25-edit":      { usd: 0.06, label: "GPT-Image-2.5 Sunburst edit (high)", vendor: "OpenAI" },
+  ...Object.fromEntries([...IMAGE_MODELS, ...EDIT_TOOLS].map((m) => [m.value, { usd: m.usd, label: m.label, vendor: m.vendor }])),
 };
 
 /** Default image model the app uses for cheap drafts (lib/tarot/image-gen.ts default). */
@@ -122,6 +113,8 @@ export interface MediaModel {
   /** Pinned Replicate version the code sends (probe checks this version, not just the model). */
   version?: string;
   verifiedAt?: string;
+  /** Vendor-announced shutdown date; see TextRate.retireOn. */
+  retireOn?: string;
 }
 
 export const MEDIA_MODELS: Record<string, MediaModel> = {
@@ -135,6 +128,8 @@ export const MEDIA_MODELS: Record<string, MediaModel> = {
   "ideogram-ai/ideogram-v4-turbo":     { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
   "ideogram-ai/ideogram-v4-quality":   { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
   "ideogram-ai/ideogram-character":    { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
+  // 生成填色 with a mask (lib/studio/generative-fill.ts); quality medium = $0.06 (replicate.com page 2026-11-09).
+  "ideogram-ai/ideogram-4-5-precise-edit": { vendor: "Replicate", kind: "tool", status: "active", version: "64d91a9b8a91a4e41d10fde3aa54ea4f68e7c5213d417139935178a5f4672c85" },
   "google/nano-banana-2":              { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
   "google/nano-banana-pro":            { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
   "google/imagen-4":                   { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
@@ -143,9 +138,13 @@ export const MEDIA_MODELS: Record<string, MediaModel> = {
   "gpt-image-2.5-sunburst":            { vendor: "OpenAI", kind: "image", status: "active", verifiedAt: "2026-11-01" },
   // video-workbench default image model; same published token rates as gpt-image-2 (pricing page, 2026-11-05).
   "gpt-image-2.5-flare":               { vendor: "OpenAI", kind: "image", status: "active", verifiedAt: "2026-11-05" },
+  // 2.6 (pricing page 2026-11-09, same token rates): sunburst = precise edits, takes a mask (openai-26-edit in image-models.js).
+  "gpt-image-2.6-sunburst":            { vendor: "OpenAI", kind: "image", status: "active" },
+  "gpt-image-2.6-flare":               { vendor: "OpenAI", kind: "image", status: "active" },
   "whisper-1":                         { vendor: "OpenAI", kind: "tool", status: "active", verifiedAt: "2026-10-29" },
-  // video-workbench speech (OPENAI_TTS_RATES).
-  "gpt-4o-mini-tts":                   { vendor: "OpenAI", kind: "tool", status: "active" },
+  // video-workbench speech (OPENAI_TTS_RATES). OpenAI deprecations 2026-11-09: shuts down 2027-01-06, successor gpt-realtime-2.1-mini
+  // (a different API: the /audio/speech caller in video-workbench backend/api.cjs must move before then).
+  "gpt-4o-mini-tts":                   { vendor: "OpenAI", kind: "tool", status: "active", retireOn: "2027-01-06" },
   // video-service default until 2026-10-28; OpenAI: "The model 'dall-e-3' does not exist".
   "dall-e-3":                          { vendor: "OpenAI", kind: "image", status: "retired" },
   "runwayml/gen4-turbo":               { vendor: "Replicate", kind: "video", status: "active", verifiedAt: "2026-10-28" },
@@ -158,6 +157,7 @@ export const MEDIA_MODELS: Record<string, MediaModel> = {
   "851-labs/background-remover":       { vendor: "Replicate", kind: "tool", status: "active", version: "a029dff38972b5fda4ec5d75d7d1cd25aeff621d2cf4946a41055d7db66b80bc", verifiedAt: "2026-10-28" },
   "black-forest-labs/flux-fill-pro":   { vendor: "Replicate", kind: "tool", status: "active", version: "41c767bcbfffe54ef8f05eb4d0100f9314790f7fc43a7b88d73ec06839deddb9", verifiedAt: "2026-10-28" },
   "bria/eraser":                       { vendor: "Replicate", kind: "tool", status: "active", version: "2757d1ac2f1291af219f5f10e8ecba15e92e7c05253e2841295f3ba6bff6adc4", verifiedAt: "2026-10-28" },
+  "bria/expand-image":                 { vendor: "Replicate", kind: "tool", status: "active", version: "e153045f0c4163bd76788ab927faef5123db349294d4695dac07af828786e5b9" },
   "nightmareai/real-esrgan":           { vendor: "Replicate", kind: "tool", status: "active", version: "b3ef194191d13140337468c916c2c5b96dd0cb06dffc032a022a31807f6a5ea8", verifiedAt: "2026-10-28" },
 };
 
@@ -189,7 +189,7 @@ export const TRANSCRIBE_RATES: Record<"whisper-1", { usdPerMin: number; label: s
 export const TOOL_RATES: Record<string, { usd: number; label: string; vendor: string; estimate: boolean }> = {
   "bg-remove":   { usd: 0.011, label: "去背 (851-labs)", vendor: "Replicate", estimate: true },
   "upscale":     { usd: 0.005, label: "升頻 (real-esrgan, 每 pass)", vendor: "Replicate", estimate: true },
-  "inpaint":     { usd: 0.04, label: "去物件 (bria/eraser)", vendor: "Replicate", estimate: true },
+  "inpaint":     { usd: IMAGE_RATES["bria-eraser"].usd, label: "去物件 (bria/eraser)", vendor: "Replicate", estimate: false },
   // video-workbench image-to-3D (creative-suite-plan §0 2026-11-03; Meshy disabled). Prices: docs.stability.ai/pricing, replicate.com/firtoz/trellis.
   "3d-spar3d":   { usd: 0.04, label: "圖片轉 3D (Stability SPAR3D)", vendor: "Stability AI", estimate: false },
   "3d-sf3d":     { usd: 0.10, label: "圖片轉 3D (Stability SF3D)", vendor: "Stability AI", estimate: false },
@@ -271,7 +271,7 @@ export const OPENAI_IMAGE_MODEL = "gpt-image-2";
 export const OPENAI_IMAGE_TOKEN_RATES = { textInPerM: 5, imageInPerM: 8, imageOutPerM: 30 } as const;
 /** OpenAI image models billed at exactly OPENAI_IMAGE_TOKEN_RATES (pricing page, 2026-11-05). A model not listed here has
  *  no price: callers that charge by these rates refuse it rather than guess from its name. */
-export const OPENAI_TOKEN_PRICED_IMAGE_MODELS: readonly string[] = ["gpt-image-2", "gpt-image-2.5-sunburst", "gpt-image-2.5-flare"];
+export const OPENAI_TOKEN_PRICED_IMAGE_MODELS: readonly string[] = ["gpt-image-2", "gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2.6-sunburst", "gpt-image-2.6-flare"];
 
 /** OpenAI video (video-workbench /videos), USD per output second at 720p (openai.com/api/pricing). */
 export const OPENAI_VIDEO_RATES: Record<string, { usdPerSec: number; label: string }> = {

@@ -15,6 +15,7 @@ full_pipeline_v3.py
 
 import os
 import re
+import base64
 import json
 import shutil
 import asyncio
@@ -184,11 +185,13 @@ def fetch_pixabay_image(keyword, scene_id):
 def fetch_dalle_image(prompt, scene_id):
     try:
         response = openai_client.images.generate(
-            model="dall-e-3",
+            # dall-e-3 shut down 2026-05-12. GPT Image takes quality low/medium/high/auto, its own sizes,
+            # and answers with b64_json only (no url) -- the whole call shape changes with the id.
+            model="gpt-image-2",
             prompt=CARTOON_STYLE + prompt,
-            size="1792x1024", quality="standard", n=1,
+            size="1536x1024", quality="high", n=1,
         )
-        img_data = requests.get(response.data[0].url, timeout=30).content
+        img_data = base64.b64decode(response.data[0].b64_json)
         out = str(TEMP_DIR / f"scene_{scene_id}.png")
         with open(out, "wb") as f: f.write(img_data)
         return out
