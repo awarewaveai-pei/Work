@@ -1,30 +1,17 @@
 // Block: 🖼 擴圖／🎚 色調分離. Same panel as /tools/canvas CanvasEditor.tsx:2646-2677; flows from :1489-1530 (applyOutpaint) and
 // :1446-1484 (posterizeSelected). The direction list is a row of visible buttons (the canvas used a <select>; operator rule: no dropdowns).
-// Enum + labels from the SSOT /editor-shared/outpaint-presets.js, posterize maths from /editor-shared/posterize.js; nothing re-implemented.
+// Enum, labels and geometry from the SSOT /editor-shared/outpaint-presets.js, models + prices from /editor-shared/image-models.js
+// (rows with use "outpaint", one button each), posterize maths from /editor-shared/posterize.js; nothing re-implemented.
 // 擴圖 result is larger than the source by design, so it goes in with placeImage (a new layer at its own pixel size, the source stays
 // under it): ctx.replaceImage keeps the old size (ctx-contract.md) and would squash the new area back into the old box.
-import { OUTPAINT_PRESETS, OUTPAINT_LABELS } from "/editor-shared/outpaint-presets.js";
+import { OUTPAINT_PRESETS, OUTPAINT_LABELS, outpaintFrame } from "/editor-shared/outpaint-presets.js";
+import { modelsFor, nt } from "/editor-shared/image-models.js";
 import { posterizeDataUrl } from "/editor-shared/posterize.js";
 import { choiceGroup } from "/editor-shared/block-ui.js";
 import { GENFILL_URL, blobToDataUrl, dataUrlToBlob, postStudio, uploadableImage } from "./ai-fill.js";
 
-/** Where the source sits in the extended canvas of each flux-fill-pro preset, in source pixels: {W, H, x, y}.
- *  The model returns that canvas resampled to its own size (908×789 + Left → 1440×625 = 1816×789 × 0.793, prod 2026-11-06). */
-// Same order as OUTPAINT_PRESETS (the enum lives only there: editor-edge-mask-drift.test.ts); each direction is pinned by name
-// in editor-ai-panels.test.ts "outpaintFrame", so a reordered SSOT turns that red.
-const FRAMES = [
-  (w, h) => ({ W: w * 1.5, H: h * 1.5, x: w * 0.25, y: h * 0.25 }), // zoom out 1.5×
-  (w, h) => ({ W: w * 2, H: h * 2, x: w * 0.5, y: h * 0.5 }), // zoom out 2×
-  (w, h) => { const s = Math.max(w, h); return { W: s, H: s, x: (s - w) / 2, y: (s - h) / 2 }; }, // square
-  (w, h) => ({ W: w * 2, H: h, x: w, y: 0 }), // left
-  (w, h) => ({ W: w * 2, H: h, x: 0, y: 0 }), // right
-  (w, h) => ({ W: w, H: h * 2, x: 0, y: h }), // top
-  (w, h) => ({ W: w, H: h * 2, x: 0, y: 0 }), // bottom
-];
-export function outpaintFrame(preset, w, h) {
-  const i = OUTPAINT_PRESETS.indexOf(preset);
-  return i >= 0 && FRAMES[i] ? FRAMES[i](w, h) : null;
-}
+export const OUTPAINT_MODELS = modelsFor("outpaint");
+export { outpaintFrame };
 /** Model output may round each side (multiples of 16/32): accept 3% aspect drift, refuse anything else. */
 export const ASPECT_TOLERANCE = 0.03;
 
@@ -49,9 +36,9 @@ function thumb(img, sx, sy, sw, sh, tw, th) {
   return tg.getImageData(0, 0, tw, th).data;
 }
 
-/** Outpaint result → PNG at source scale: the result resized to the preset frame, the source pixels pasted back unchanged at
- *  (x, y). → {blob, x, y, width, height} (x, y = where the source's top-left sits in it), or null when the result's shape
- *  or content does not match the preset (then nothing can be aligned). */
+/** Outpaint result → PNG at source scale: the result resized to the preset frame (a no-op for bria-expand, which returns the
+ *  frame's exact size), the source pixels pasted back unchanged at (x, y). → {blob, x, y, width, height} (x, y = where the
+ *  source's top-left sits in it), or null when the result's shape or content does not match the preset (then nothing can be aligned). */
 export async function alignOutpaint(srcBlob, resultUrl, preset) {
   const src = await createImageBitmap(srcBlob), res = await createImageBitmap(dataUrlToBlob(resultUrl));
   const f = outpaintFrame(preset, src.width, src.height);
@@ -69,6 +56,8 @@ export async function alignOutpaint(srcBlob, resultUrl, preset) {
   return { blob: dataUrlToBlob(c.toDataURL("image/png")), x, y, width: W, height: H };
 }
 
+const price = (m) => "NT$" + nt(m.usd);
+
 export default {
   id: "genfx",
   icon: "🖼",
@@ -78,9 +67,10 @@ export default {
     body.innerHTML = '<fieldset id="gfFields" style="border:0;padding:0;margin:0;min-width:0;">'
       + '<div class="info">先在圖層選取一張圖片。</div>'
       + "<label>🖼 擴圖 Outpaint（AI 往外補畫面）</label>"
-      + '<input id="gfPrompt" class="form-input" data-gf-prompt placeholder="描述整體場景，例如：海邊草地">'
+      + '<input id="gfPrompt" class="form-input" data-gf-prompt placeholder="整體場景，例如：海邊草地（可留空＝照周圍補）">'
       + '<div id="gfDirs" style="margin-top:6px;"></div>'
-      + '<button type="button" class="btn btn-primary" id="gfOutpaint" data-gf-outpaint style="margin-top:6px;">套用擴圖</button>'
+      + '<div class="info" style="margin-top:6px;">按模型就開始（按下即扣點，結果放成新圖層，原圖保留）</div>'
+      + '<div class="row" id="gfModels" style="flex-wrap:wrap;"></div>'
       + '<div style="border-top:1px solid var(--card-border);margin-top:10px;padding-top:10px;">'
       + '<label>🎚 色調分離 Posterize　色階數 <span id="gfLevelsV" data-gf-levels-val>5</span></label>'
       + '<input id="gfLevels" data-gf-levels type="range" min="2" max="16" step="1" value="5">'
@@ -90,35 +80,38 @@ export default {
     const dir = choiceGroup(OUTPAINT_PRESETS.map((p) => [p, OUTPAINT_LABELS[p]]), OUTPAINT_PRESETS[0]); // canvas default "Zoom out 1.5x" (CE:324)
     $("gfDirs").appendChild(dir.el);
     const say = (msg, b) => { const el = $("gfMsg"); el.textContent = msg; el.classList.toggle("busy", !!b); };
-    const setBusy = (v) => {
-      busy = v; $("gfFields").disabled = v; $("gfOutpaint").textContent = v ? "AI 處理中…" : "套用擴圖";
-      if (typeof ctx.busy === "function") ctx.busy(v);
-    };
+    const setBusy = (v) => { busy = v; $("gfFields").disabled = v; if (typeof ctx.busy === "function") ctx.busy(v); };
+    for (const m of OUTPAINT_MODELS) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "btn btn-primary"; b.dataset.gfModel = m.value;
+      b.textContent = m.label + "　" + price(m);
+      b.onclick = () => outpaint(m);
+      $("gfModels").appendChild(b);
+    }
     $("gfLevels").oninput = (e) => { $("gfLevelsV").textContent = String(e.target.value); };
-    $("gfOutpaint").onclick = async () => {
+    async function outpaint(m) {
       if (busy) return;
       const prompt = $("gfPrompt").value.trim();
-      if (prompt.length < 2) { say("請先描述要生成的內容（prompt）"); return; }
       setBusy(true); // before any await: a second click while the host answers must not send a second paid request
       try {
         const sel = await ctx.selectedImage(); if (!sel) { say("先在圖層選取一張圖片。"); return; }
-        say("AI 處理中…", true);
+        say(m.label + " 擴圖中…", true);
         const img = await uploadableImage(sel.blob);
-        const r = await postStudio(GENFILL_URL, { image: img.url, prompt, outpaint: dir.get() });
+        const r = await postStudio(GENFILL_URL, { image: img.url, prompt, outpaint: dir.get(), model: m.value });
         if (!r.ok) { say("⚠️ " + (r.error || "擴圖失敗，請重試")); return; }
         const al = await alignOutpaint(sel.blob, r.image, dir.get());
         if (!al) {
           await ctx.placeImage(dataUrlToBlob(r.image), "擴圖.png");
-          say("⚠️ 擴圖完成，但回傳尺寸和方向對不上，已原樣置入為新圖層（原圖在下方）");
+          say("⚠️ 擴圖完成（" + m.label + "，" + price(m) + "），但回傳尺寸和方向對不上，已原樣置入為新圖層（原圖在下方）");
           return;
         }
         // at = the result's top-left in document px, so the source part lands exactly on the source layer
         const [, , , , tx, ty] = sel.transform;
         await ctx.placeImage(al.blob, "擴圖.png", { at: [tx - al.x, ty - al.y] });
-        say("✅ 擴圖完成，已置入為新圖層（原圖在下方）");
+        say("✅ 擴圖完成（" + m.label + "，" + price(m) + "），已置入為新圖層（原圖在下方）");
       } catch (err) { say("⚠️ " + (err && err.message ? err.message : String(err))); }
       finally { setBusy(false); }
-    };
+    }
     $("gfPosterize").onclick = async () => {
       if (busy) return;
       setBusy(true);

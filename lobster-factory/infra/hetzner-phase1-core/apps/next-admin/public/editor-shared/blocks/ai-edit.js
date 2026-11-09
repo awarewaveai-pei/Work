@@ -2,26 +2,13 @@
 // (app/(shell)/tools/studio/StudioWorkbench.tsx:804-808): POST /api/tools/studio/generate {model, prompt, referenceImages:[the
 // image], aspectRatio}; the reference is downscaled like Studio's downscaleImageFile (:269, 1024 px JPEG 0.85). One visible
 // button per model, each showing its price; the result goes in as a new layer (placeImage), the source layer stays.
+// Models and prices = the catalog /editor-shared/image-models.js (rows with use "edit"); nothing is copied here.
+import { modelsFor, nearestAspectRatio, nt } from "/editor-shared/image-models.js";
 import { dataUrlToBlob, postStudio } from "./ai-fill.js";
 
 export const GENERATE_URL = "/api/tools/studio/generate";
-
-/** Edit-capable Studio models (lib/studio/model-options.ts PRODUCT_COMPOSITE_MODELS ∩ maxRefs ≥ 1). label / costNt are copies of
- *  STUDIO_MODEL_OPTIONS (that file is TypeScript, the browser can't import it); drift guard:
- *  lib/studio/__tests__/editor-ai-panels.test.ts "ai-edit 模型與價錢＝STUDIO_MODEL_OPTIONS". */
-export const AI_EDIT_MODELS = Object.freeze([
-  { value: "openai-25-edit", label: "GPT-Image-2.5 修圖", costNt: 2 },
-  { value: "nano-banana-2", label: "Nano Banana 2", costNt: 2.2 },
-  { value: "nano-banana-pro", label: "Nano Banana Pro", costNt: 4.4 },
-  { value: "flux-kontext-pro", label: "FLUX Kontext Pro", costNt: 3.5 },
-]);
-
-/** Same table and rule as lib/studio/model-options.ts nearestAspectRatio (drift guard as above). */
-const ASPECTS = [["2:3", 2 / 3], ["3:4", 3 / 4], ["4:5", 4 / 5], ["1:1", 1], ["9:16", 9 / 16], ["3:2", 3 / 2], ["4:3", 4 / 3], ["16:9", 16 / 9]];
-export function nearestAspectRatio(width, height) {
-  const r = width / height;
-  return ASPECTS.reduce((best, o) => (Math.abs(o[1] - r) < Math.abs(best[1] - r) ? o : best))[0];
-}
+export const AI_EDIT_MODELS = modelsFor("edit");
+export { nearestAspectRatio };
 
 export const REF_MAX_DIM = 1024;
 const REF_QUALITY = 0.85;
@@ -45,7 +32,7 @@ export async function atSourceWidth(resultUrl, width) {
   return dataUrlToBlob(c.toDataURL("image/png"));
 }
 
-const price = (n) => "NT$" + n;
+const price = (m) => "NT$" + nt(m.usd);
 
 export default {
   id: "ai-edit",
@@ -64,7 +51,7 @@ export default {
     for (const m of AI_EDIT_MODELS) {
       const b = document.createElement("button");
       b.type = "button"; b.className = "btn btn-ghost"; b.dataset.aeModel = m.value;
-      b.textContent = m.label + "　" + price(m.costNt);
+      b.textContent = m.label + "　" + price(m);
       b.onclick = () => run(m);
       $("aeModels").appendChild(b);
     }
@@ -83,7 +70,7 @@ export default {
         if (!r.ok) { say("⚠️ " + (r.error || "修圖失敗，請重試")); return; }
         const [, , , , tx, ty] = sel.transform; // new layer on the source's top-left (same width)
         await ctx.placeImage(await atSourceWidth(r.image, ref.width), "AI 修圖.png", { at: [tx, ty] });
-        say("✅ 修圖完成（" + m.label + "，" + price(m.costNt) + "），已置入為新圖層（原圖在下方）");
+        say("✅ 修圖完成（" + m.label + "，" + price(m) + "），已置入為新圖層（原圖在下方）");
       } catch (err) { say("⚠️ " + (err && err.message ? err.message : String(err))); }
       finally { setBusy(false); }
     }
