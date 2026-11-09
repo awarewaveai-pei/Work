@@ -115,7 +115,7 @@ describe("ai-fill：去除／生成填色", () => {
     expect(await Promise.all(bitmapBlobs.map(blobText))).toEqual(expect.arrayContaining(["\u0001\u0002\u0003", "OUT", "\t"]));
     expect(q(body, "[data-af-msg]").textContent).toMatch(/✅.*Bria Eraser.*NT\$1\.28/); // 0.04 × 32, two decimals
   });
-  it("生成填色：fill 模型 = 目錄 modelsFor('fill')（工具在前）；prompt 可空；POST /genfill { image, mask, prompt, model }", async () => {
+  it("生成填色：fill 模型 = 目錄 modelsFor('fill')（由便宜到貴）；prompt 可空；POST /genfill { image, mask, prompt, model }", async () => {
     const { modelsFor } = await loadModule("public/editor-shared/image-models.js");
     const ctx = mockCtx();
     const body = await mount(BLOCKS[0], ctx);
@@ -123,7 +123,8 @@ describe("ai-fill：去除／生成填色", () => {
     const btns = [...body.querySelectorAll("[data-af-model]")];
     expect(btns.map((b) => (b as HTMLElement).dataset.afModel)).toEqual(modelsFor("fill").map((m: { value: string }) => m.value));
     // Ideogram first: the only fill model that honours an empty prompt (prod 2026-11-09, image-models.js comment)
-    expect(btns.map((b) => (b as HTMLElement).dataset.afModel)).toEqual(["ideogram-4-5-edit-low", "ideogram-4-5-edit", "flux-fill-pro", "flux-2-klein-4b", "flux-kontext-fast", "openai-26-edit"]);
+    // Cheapest first, one ordering rule for every panel and the guide (image-models.js modelsFor).
+    expect(btns.map((b) => (b as HTMLElement).dataset.afModel)).toEqual(["flux-2-klein-4b", "flux-kontext-fast", "ideogram-4-5-edit-low", "flux-fill-pro", "ideogram-4-5-edit", "openai-26-edit"]);
     btns.forEach(priced);
     btns.forEach((b) => noted(b, modelsFor("fill")));
     q(body, "[data-af-model=ideogram-4-5-edit]").click();
@@ -244,7 +245,7 @@ describe("genfx：擴圖／色調分離", () => {
     expect(dirs).toEqual(["Zoom out 1.5x", "Zoom out 2x", "Make square", "Left outpaint", "Right outpaint", "Top outpaint", "Bottom outpaint"]);
     const models = [...body.querySelectorAll("[data-gf-model]")];
     expect(models.map((b) => (b as HTMLElement).dataset.gfModel)).toEqual(modelsFor("outpaint").map((m: { value: string }) => m.value));
-    expect(models.map((b) => (b as HTMLElement).dataset.gfModel)).toEqual(["flux-fill-pro", "bria-expand"]);
+    expect(models.map((b) => (b as HTMLElement).dataset.gfModel)).toEqual(["bria-expand", "flux-fill-pro"]);
     models.forEach(priced);
     models.forEach((b) => noted(b, modelsFor("outpaint")));
     q(body, "[data-gf-prompt]").value = "海邊草地";
@@ -307,7 +308,7 @@ describe("ai-edit：AI 修圖", () => {
   it("ai-edit 模型 = modelsFor('edit')；每個都在 STUDIO_MODEL_OPTIONS、吃參考圖；價錢 = nt(usd)；比例規則 = nearestAspectRatio", async () => {
     const { AI_EDIT_MODELS, nearestAspectRatio } = await loadModule(BLOCKS[3]);
     const { STUDIO_MODEL_OPTIONS, nearestAspectRatio: ref, PRODUCT_COMPOSITE_MODELS, nt } = await import("../model-options");
-    expect((AI_EDIT_MODELS as { value: string }[]).map((m) => m.value)).toEqual(["flux-kontext-pro", "flux-2-klein-4b", "flux-kontext-fast", "nano-banana-2", "nano-banana-pro", "openai-25-edit", "openai-26-edit"]);
+    expect((AI_EDIT_MODELS as { value: string }[]).map((m) => m.value)).toEqual(["flux-2-klein-4b", "flux-kontext-fast", "flux-kontext-pro", "openai-25-edit", "openai-26-edit", "nano-banana-2", "nano-banana-pro"]);
     for (const m of AI_EDIT_MODELS as { value: string; label: string; usd: number }[]) {
       const s = STUDIO_MODEL_OPTIONS.find((o) => o.value === m.value);
       expect(s, m.value).toBeDefined();
@@ -324,7 +325,7 @@ describe("ai-edit：AI 修圖", () => {
     const ctx = mockCtx();
     const body = await mount(BLOCKS[3], ctx);
     const btns = [...body.querySelectorAll("[data-ae-model]")] as HTMLButtonElement[];
-    expect(btns.map((b) => b.dataset.aeModel)).toEqual(["flux-kontext-pro", "flux-2-klein-4b", "flux-kontext-fast", "nano-banana-2", "nano-banana-pro", "openai-25-edit", "openai-26-edit"]);
+    expect(btns.map((b) => b.dataset.aeModel)).toEqual(["flux-2-klein-4b", "flux-kontext-fast", "flux-kontext-pro", "openai-25-edit", "openai-26-edit", "nano-banana-2", "nano-banana-pro"]);
     btns.forEach(priced);
     btns.forEach((b) => noted(b, AI_EDIT_MODELS as { value: string; note?: string }[]));
     q(body, "[data-ae-prompt]").value = "海邊";
@@ -332,8 +333,10 @@ describe("ai-edit：AI 修圖", () => {
     await vi.waitFor(() => expect(q(body, "[data-ae-msg]").textContent).toContain("3 個字"));
     expect(fetchMock).not.toHaveBeenCalled();
     q(body, "[data-ae-prompt]").value = "把背景換成海邊";
-    btns[3].click();
-    btns[3].click();
+    // Click by model id, not by position: the button order follows the catalog's price sort and may move.
+    const nano = btns.find((b) => b.dataset.aeModel === "nano-banana-2")!;
+    nano.click();
+    nano.click();
     await vi.waitFor(() => expect(ctx.placeImage).toHaveBeenCalled());
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe("/api/tools/studio/generate");
@@ -365,7 +368,9 @@ describe("模型目錄 image-models.js = 唯一的價格與模型來源", () => 
     expect(TS_TOOLS).toEqual(EDIT_TOOLS);
     for (const m of [...IMAGE_MODELS, ...EDIT_TOOLS] as { value: string; usd: number; label: string; note?: string }[]) {
       expect(m.note, m.value + " needs a 特色 line").toBeTruthy();
-      expect(m.note!.length, m.value).toBeLessThanOrEqual(18);
+      // 20 繁中 chars wrap to two short lines on the narrowest dock button and still read; beyond that the
+      // button grows taller than the preview beside it (operator 2026-11-09 asked for clearer 特色 lines).
+      expect(m.note!.length, m.value).toBeLessThanOrEqual(20);
       expect(IMAGE_RATES[m.value], m.value).toEqual(expect.objectContaining({ usd: m.usd, label: m.label }));
     }
     for (const rel of BLOCKS) {

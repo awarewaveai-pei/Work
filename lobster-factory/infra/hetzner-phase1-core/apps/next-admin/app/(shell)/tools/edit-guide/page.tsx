@@ -15,8 +15,8 @@ const ROWS = [...STUDIO_MODEL_OPTIONS, ...EDIT_TOOLS];
 const find = (value: string) => ROWS.find((m) => m.value === value);
 const price = (value: string) => `NT$${nt(find(value)?.usd ?? 0).toFixed(2)}`;
 const labelOf = (value: string) => find(value)?.label ?? value;
-/** Catalog rows for one use, cheapest first — the order every list on this page uses. */
-const byPrice = (use: "fill" | "edit") => [...modelsFor(use)].sort((a, b) => a.usd - b.usd);
+/** modelsFor already returns cheapest first (image-models.js), which is the order every list here uses. */
+const byPrice = modelsFor;
 
 /** The four things that were typed into the description box. Every figure names the one that produced it. */
 const P = {

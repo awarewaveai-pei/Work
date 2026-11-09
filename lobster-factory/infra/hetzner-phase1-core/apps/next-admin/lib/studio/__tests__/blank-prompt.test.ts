@@ -43,9 +43,16 @@ describe("blank description", () => {
 });
 
 describe("instruction language", () => {
-  it("every 填色 and 去除 button says whether a 繁中 instruction works", () => {
-    const undeclared = [...modelsFor("fill"), ...modelsFor("remove")].filter((m) => m.zh !== "ok" && m.zh !== "no");
+  it("every 填色 button says whether a 繁中 instruction works", () => {
+    // 去除 and 擴圖 take no description, so they declare no language and show none on the button.
+    const undeclared = modelsFor("fill").filter((m) => m.zh !== "ok" && m.zh !== "no");
     expect(undeclared.map((m) => m.value)).toEqual([]);
+  });
+
+  it("the buttons that take no description declare no language", () => {
+    const noisy = [...modelsFor("remove"), ...modelsFor("outpaint")]
+      .filter((m) => m.uses.every((u) => u === "remove" || u === "outpaint") && m.zh !== undefined);
+    expect(noisy.map((m) => m.value)).toEqual([]);
   });
 
   it("Kontext Fast needs English; the other fill buttons take 繁中", () => {
