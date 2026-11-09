@@ -1,4 +1,30 @@
 # Worklog
+## 2026-11-09（續3）「我的設計」間歇 500 根因＝nginx 每 IP 限流；便宜填色兩顆、按鈕特色說明、頁面橫向捲動
+
+涵蓋 `a178b634a`…`376395ec8` 共十二個 commit（續1 之後、續2 之前），都已部署。
+
+[根因]
+- **C1「我的設計」間歇 500**：第一個假設是併發，加了 8 路閘門 —— 沒用（12 次呼叫 9 次 500）。真因在 `lib/studio/designs-list.ts`：facet 計數對每個 catalog key 各發一次 `head: true` count 請求，一次頁面載入約 40 個請求打 `supabase.aware-wave.com`，撞上 nginx `limit_req zone=general burst=50 nodelay`（30 r/s 每 IP）。PostgREST 關了 aggregate（PGRST123），所以原本只能靠 count 請求數堆出 facet。
+- **M1 按鈕看不出差別**：面板只印 label 與價格，沒有「什麼時候用這顆」。
+- **M2 最便宜的鈕顯示 NT$0.00**：`image-models.js` 的 `nt()` 只取到小數一位，Klein 4B US$0.001 × 32 = 0.032 四捨五入成 0.0。
+- **M3 說明頁與整個 app 會橫向捲動**：guide 的 grid `minmax(640px,1fr)` 撐寬，且 shell `.main` 沒有 `min-width:0`、`.topbar` 不換行，任何一個長標題就把整頁推寬。
+- **m1** `c1ea448c2` 把隔壁 session 未完成的表單重構一起推上 main（globals.css 整檔 commit 取工作區位元組）。
+
+[步驟]
+- C1：刪掉 `countWhere`／`countMap`／`distinctValues` 扇出，改 `scanScope()` 單次 keyset 分頁掃描（`FACET_SCAN_PAGE=1000`、`FACET_SCAN_MAX=20000`）＋記憶體內 `tally()`；新增 `lib/studio/__tests__/designs-facets.test.ts` 斷言不得再出現 `head: true`／三個舊函式、掃描有上限、`productOf` 為 `applyProduct` 的反函數。
+- M1：`block-ui.js` 新增 `modelButton(m, nt, onClick, kind)`，第一行 label＋NT$、第二行讀目錄的 `note`；去除／填色／修圖三個面板共用，特色文字只存在目錄一處。
+- M2：`nt()` 改兩位小數；測試 regex `/NT\$1\.3/` → `/NT\$1\.28/`。
+- M3：guide 改 `minmax(min(640px,100%),1fr)`；`app/globals.css` 加 `.main{min-width:0}` 與 `.topbar{flex-wrap:wrap;gap:6px 16px}`。
+- 新增兩顆便宜填色（`flux-2-klein-4b`、`flux-kontext-fast`，`uses:["edit","fill"]`、`maxRefs:1`）：它們沒有遮罩，靠既有的裁區＋羽化貼回路徑做局部填色，所以目錄 note 明寫「填色要寫清楚改什麼」；`PRODUCT_COMPOSITE_MODELS` 刻意不收，原因寫在該常數旁。
+- m1：用私有 index 只還原自己的兩個 hunk（`376395ec8`），隔壁 session 的改動留在工作區未 commit。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=15x GET /api/tools/studio/designs on prod after deploy | exit=0 | ms=488 — 15/15 回 200（修前 12 次有 9 次 500），中位數 488ms（修前 1065ms）
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0/0/0 — Codex 兩輪共 5 筆 CONFIRMED 全部修掉並複驗（`blendFeathered` 改預乘 alpha、`DEFAULT_MODEL_LITERAL` 字界 regex 並以突變測試證明會變紅、`.env.example` 與 MCP registry 的停用模型）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=countWhere\|countMap\|distinctValues\|head: true | hits=0 — 扇出函式與 count 請求全 repo 無殘留
+- 四筆實收對帳（`ai_call_logs`）：flux-fill-pro 0.05／NT$1.60、ideogram-4-5-edit 0.06／NT$1.92 ×2，與目錄牌價一致
+
+[避免再發生] 任何「每個 key 一個請求」的 facet 寫法都會撞限流：計數一律一次掃描＋記憶體彙總，測試直接禁掉 `head: true` 與三個舊函式名，寫回去就紅。共用檔案（globals.css）只能用 `git-partial-worktree-commit.py` 的私有 index commit，裸 pathspec commit 會掃走別的 session 的 hunk。
 ## 2026-11-09（續2）改圖說明頁：按價排序、每張圖標模型、33 張付費實測全上架
 
 [根因] 操作者在 prod 上指出三件事：`三、按鈕一覽` 沒照金額排、`五、加東西長什麼樣` 四張結果擠成一條沒標是哪個模型、二十次付費實測只留在 scratchpad 沒上頁。三者同一個成因：頁面是手寫版面而不是從 catalog 推導 —— 表格直接印 `modelsFor(use)` 的作者順序，圖片是一條 `<img>` 帶一個共用 caption，實測結果靠我記得才會被放上去。
