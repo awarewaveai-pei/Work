@@ -7,6 +7,10 @@
 // usd = per image, Replicate model page / OpenAI token rates (2026-11-09). OpenAI rows are token-billed: usd is the
 // estimate shown before generating; the logged cost comes from each response's usage.
 // note = the one line under the price on every model button (繁中, ≤18 chars): what this row is FOR. 實測 = measured here.
+// A row without a mask can still serve "fill": the panel sends only a crop around the selection and blends just the
+// selection back (blocks/ai-fill.js fillSelection), so the model only has to repaint that crop. It cannot guess WHAT to
+// change though, so those rows say so in their note (2026-11-09: FLUX 2 Klein 4B removed three animals cleanly at NT$0.03
+// when told what to remove, and left them untouched when the description was empty).
 // uses: generate = text→image (Studio/Tarot picker) · edit = whole image, reference in, instruction (AI 修圖) ·
 //       fill = masked region (生成填色) · remove = masked object removal (去除) · outpaint = extend the canvas (擴圖)
 
@@ -23,8 +27,8 @@ export const IMAGE_MODELS = Object.freeze([
   { value: "flux-2-max", label: "FLUX 2 Max", group: "BFL", vendor: "BFL/Replicate", usd: 0.07, maxRefs: 0, note: "BFL 最高畫質，純文字生圖", uses: ["generate"] },
   // The two cheap whole-image editors (operator 2026-11-09). Measured the same day: neither takes a mask, so they are
   // offered for 「整張改順」 only, never for 生成填色. 1 megapixel output keeps klein at its $0.001 price point.
-  { value: "flux-2-klein-4b", label: "FLUX 2 Klein 4B", group: "BFL", vendor: "BFL/Replicate", usd: 0.001, maxRefs: 1, note: "最便宜，整張快速改", uses: ["edit"] },
-  { value: "flux-kontext-fast", label: "FLUX Kontext Fast", group: "BFL", vendor: "Pruna/Replicate", usd: 0.01, maxRefs: 1, note: "很便宜，保留原圖構圖", uses: ["edit"] },
+  { value: "flux-2-klein-4b", label: "FLUX 2 Klein 4B", group: "BFL", vendor: "BFL/Replicate", usd: 0.001, maxRefs: 1, note: "最便宜；填色要寫清楚改什麼", uses: ["edit", "fill"] },
+  { value: "flux-kontext-fast", label: "FLUX Kontext Fast", group: "BFL", vendor: "Pruna/Replicate", usd: 0.01, maxRefs: 1, note: "很便宜；填色要寫清楚改什麼", uses: ["edit", "fill"] },
   { value: "ideogram-v2a-turbo", label: "Ideogram v2a Turbo", group: "Ideogram", vendor: "Ideogram/Replicate", usd: 0.025, maxRefs: 0, note: "快，文字排版清楚", uses: ["generate"] },
   { value: "ideogram-v3-balanced", label: "Ideogram v3 Balanced", group: "Ideogram", vendor: "Ideogram/Replicate", usd: 0.06, maxRefs: 0, note: "畫質與速度折衷", uses: ["generate"] },
   { value: "ideogram-v4-turbo", label: "Ideogram v4 Turbo", group: "Ideogram", vendor: "Ideogram/Replicate", usd: 0.03, maxRefs: 0, note: "v4 快版", uses: ["generate"] },

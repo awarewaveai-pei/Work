@@ -123,7 +123,7 @@ describe("ai-fill：去除／生成填色", () => {
     const btns = [...body.querySelectorAll("[data-af-model]")];
     expect(btns.map((b) => (b as HTMLElement).dataset.afModel)).toEqual(modelsFor("fill").map((m: { value: string }) => m.value));
     // Ideogram first: the only fill model that honours an empty prompt (prod 2026-11-09, image-models.js comment)
-    expect(btns.map((b) => (b as HTMLElement).dataset.afModel)).toEqual(["ideogram-4-5-edit-low", "ideogram-4-5-edit", "flux-fill-pro", "openai-26-edit"]);
+    expect(btns.map((b) => (b as HTMLElement).dataset.afModel)).toEqual(["ideogram-4-5-edit-low", "ideogram-4-5-edit", "flux-fill-pro", "flux-2-klein-4b", "flux-kontext-fast", "openai-26-edit"]);
     btns.forEach(priced);
     btns.forEach((b) => noted(b, modelsFor("fill")));
     q(body, "[data-af-model=ideogram-4-5-edit]").click();
