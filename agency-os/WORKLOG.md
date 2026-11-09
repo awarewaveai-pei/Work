@@ -1,4 +1,40 @@
 # Worklog
+## 2026-11-09（續1）畫布專業版 AI 填色像 Photoshop：裁區＋羽化、三個填色模型標價、模型目錄單一來源、停用模型 ID 全 repo 掃描
+
+**操作者**：「photo-pro 生成圖片有問題，無法像真正的 Photoshop」「要表示用哪個 AI 工具、費用（新台幣）、最好的改圖工具」「Claude／GPT 舊模型停了，很多地方要調」→ 方案 B 全做。
+
+**根因**（`public/editor-shared/blocks/ai-fill.js` 改前）：C1 整張圖送 flux-fill-pro，模型最多回 ~1440 px 再拉回原尺寸 → 選區內模糊；C2 遮罩 0/255 硬切、貼回也硬切 → 接縫色差；C3 prompt 強制 ≥2 字；C4 去除／填色／擴圖面板沒有模型名與價格、只有一個模型；M1 `inpaint/route.ts:47` 記帳 US$0.003，Replicate 實價 0.04（少 13×）；M2 價格表三份手抄（`model-options.ts` costNt、`cost-model.ts` IMAGE_RATES、`TarotStudio.tsx` MODEL_OPTIONS、`ai-edit.js` 再抄一份），按鈕寫「GPT-Image-1」實際送 gpt-image-2；M3 模型登記表只掃 next-admin＋video-service，`smoke-test.mjs` 還送已 404 的 `claude-3-haiku-20240307`／`claude-sonnet-4-20250514`，video-workbench 預設 `gpt-4.1-mini`（OpenAI 2027-01-14 關）。
+
+**廠商實況（2026-11-09 直接打 API）**：Anthropic 404 = claude-3-*、sonnet-4-20250514、opus-4-1-20250805（+ 快照 `claude-sonnet-4-6-20260101`）；sonnet-4-6／haiku-4-5／opus-4-8／opus-5／fable-5 仍 200，新 `claude-sonnet-5-5`（$2/$10）。OpenAI 404 = dall-e-2/3；`gpt-image-1` 列表仍 200 但公告 2026-10-23 關；gpt-4o／4o-mini／4.1／4.1-mini 2027-01-14 關、gpt-4o-mini-tts 2027-01-06 關；新 gpt-image-2.6-sunburst／flare。prod 10 天 log（全部容器）0 筆模型錯誤。Replicate 現價：flux-fill-pro 0.05、bria eraser/expand 0.04、flux-kontext-pro 0.04（舊表 0.10）、ideogram-4-5-precise-edit medium 0.06。
+
+**[已修改]**
+- 目錄 SSOT：新 `NA/public/editor-shared/image-models.js`（IMAGE_MODELS＋EDIT_TOOLS＋TWD_RATE＋nt()＋nearestAspectRatio）；`lib/studio/model-options.ts` 改成型別門；`lib/ai/cost-model.ts` IMAGE_RATES／TWD_RATE 由目錄導出、TOOL_RATES.inpaint 讀目錄；`asset-group.ts`／`AiModelsClient.tsx`／`TarotStudio.tsx`／`blocks/ai-edit.js` 的手抄表全刪、改讀目錄；`model-specs.ts`／`model-comparison.ts` 標籤 GPT-Image-1→2。
+- 登記表：`cost-model.ts` 加 claude-sonnet-5-5（active）、gpt-image-2.6-sunburst/flare、ideogram-ai/ideogram-4-5-precise-edit、bria/expand-image；gpt-4.1-mini→legacy；`retireOn` 欄（gpt-4o/4o-mini/4.1-mini 2027-01-14、gpt-4o-mini-tts 2027-01-06）；`scripts/probe-models.mjs` 解析 retireOn、active 列距關閉 ≤30 天列入 failures（主機每日 03:00 部署後探測 → Slack）。
+- 掃描擴全 repo：`lib/ai/__tests__/model-registry.test.ts` 新 (a') DEFAULT_ROOTS（video-workbench backend/scripts、meeting-service、mcp-local-wrappers、mcp/*.template.json、.github/workflows、claude-account.py）每個模型字面值必須是 active 列；(e') retireOn 規則測試。
+- 停用 ID 換掉：`mcp-local-wrappers/smoke-test.mjs`、`llm-mcp.mjs`、`mcp/registry.template.json`（已 `sync-mcp-config.ps1`）、`mcp/claude-userlevel/settings.template.json` model→claude-opus-5-5（merge 保留本機 `claude-sonnet-5`）、`.github/workflows/auto-repair-claude.yml`→claude-haiku-5-5、`video-workbench/backend/api.cjs`→gpt-5.4-mini、`video-service/.env.example`／`agency-os/docs/video_generator/full_pipeline_v3.py` dall-e-3→gpt-image-2、`Projects/internal/ziwei-doushu/lib/ai/models.ts` gpt-4o→gpt-5.4 系列（typecheck 0 錯、vitest 118 過）。
+- 後端：新 `lib/studio/replicate-run.ts`（三份重複的 start→poll→download 合一，錯誤碼不變）；`inpaint.ts`／`bg-remover.ts` 瘦成 input builder；`generative-fill.ts` 多模型（flux-fill-pro／ideogram-4-5-edit 遮罩反轉／bria-expand 精準畫布 ≤5000）＋空 prompt→CONTEXT_FILL_PROMPT；`outpaint-presets.js` 收進 outpaintFrame 幾何（genfx.js 的 FRAMES 刪）；`image-gen.ts` 加 openai-26-edit＋`mask`（白=改 → OpenAI 透明=改，sharp）；`genfill/route.ts` 收 `model`、prompt 可空、OpenAI 分支走 generateTarotImage（自己記帳）、Replicate 分支照目錄價 hold/log；`inpaint/route.ts` 價改讀目錄。
+- 前端：`blocks/ai-fill.js` fillSelection（選區 bbox → 50%／64–768 px 外擴、至少 512 邊、裁切送出 ≤1440、結果羽化 1.5%／2–12 px 貼回）、每模式一排模型鈕標 NT$；`blocks/genfx.js` 擴圖模型鈕（flux-fill-pro／bria-expand）。
+- 監工台 `agency-os/handoffs/2026-11-05-photocraft-pro/data.mjs` NOW 加一列，已重發 https://claude.ai/artifact/SdDBg3KBHF7A4b6ZSBCHGM。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scratchpad/realtest-fill.mjs（flux-fill-pro／ideogram-4-5-edit／bria-expand／gpt-image-2.6 edits 各真打一張，1024×768＋300×220 選區；輸出 PNG 逐張看過） | exit=0 | ms=88657
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit（0 錯；`.next/types` 殘留的 vector-editor 錯誤為陳舊建置產物，與本次無關）＋ npx vitest run lib/studio lib/ai lib/tarot app/api/tools/studio app/(shell)/tools/content → 51 files 532 passed | exit=0 | ms=~90000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/p6-main-system.cjs + tests/backend.cjs（video-workbench）PASS；ziwei-doushu npm run typecheck + vitest 118 passed | exit=0 | ms=~60000
+- 真打發現：bria/genfill 用脈絡 prompt 填成灰色色塊（它是「加物件」模型）→ 不收；gpt-image-2.6 遮罩修圖是 prompt 驅動，「seamlessly continue the surrounding scene」會把洞塗黑（3 次），改成指令句「Remove everything inside… continue the same colours…」同圖填得看不出 → 成為 CONTEXT_FILL_PROMPT。OpenAI 遮罩 RGB 給黑或給原圖都一樣，關鍵只在 prompt。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=5c/0m/0n（Codex gpt-6-sol 兩輪，artifacts `agency-os/reports/oracle/2026-11-09-partialreview-edf4a439.md`、`-13bfbff9.md`；5 個 CONFIRMED 全部當場修掉，第二輪只覆蓋第一輪的修正與 TarotStudio）
+  - C1 `full_pipeline_v3.py:189` 換了模型 ID 卻留 dall-e-3 的請求／回應契約（`quality="standard"`、`size="1792x1024"`、讀 `.url`）→ 改成 GPT Image 契約（quality high、1536x1024、b64_json，補 `import base64`）。
+  - C2 `blocks/ai-fill.js` blendFeathered 直式 alpha 混色：來源透明處半混會變半黑 → 改成 premultiply 混合再除回，測試改成透明來源半混＝AI 原色半透明。
+  - C3 `model-registry.test.ts` 的字面值要前後緊貼引號，`claude_args: "--model claude-haiku-5-5 …"` 整串被略過 → 改成詞界比對。突變證據：把 workflow 換回 `claude-3-haiku-20240307` → (a') 紅；換回 → 9 passed。
+  - C4（第二輪）`video-service/.env.example:9` 換了模型卻留 DALL-E 3 的 `IMAGE_SIZE=1792x1024`（gpt-image-2 不收）→ 改 1536x1024、註明合法尺寸（`config.py:34` 本來就是這個預設）。
+  - C5（第二輪）`mcp/registry.template.json` 我把 chatgpt-fast 設成 gpt-5.5、latest 設成 gpt-5.4（快的反而最貴），且與 smoke-test 不一致 → fast=gpt-5.4-mini、latest=gpt-5.5，兩邊同一組，已重跑 `sync-mcp-config.ps1`。
+  - **不變量**（五個 finding 同一類）：模型 ID 是一份契約（請求參數、回應格式、尺寸、價格、快慢層級），不是一個字串；換 ID 必須整份契約重看。機械化只到 ID 本身（registry test (a')）；尺寸／quality／fast-latest 對應仍靠人，故五個都出在「只換了字串」的檔案。
+  - 自行抓到並一併關掉：`lib/tarot/model-comparison.ts` 是第五份價格副本（`/tools/ai-models` 顯示 flux-kontext-pro US$0.10，實收 0.04）→ 改由 IMAGE_RATES 導出；`app/api/tools/studio/generate/route.ts` maxDuration 60 < OpenAI 修圖模型的 110 秒逾時 → 120（同 fabric-print；nginx proxy_read_timeout 300s）。
+- ORACLE_WAIVED: 跨模型審查是 Codex 的 scoped review（`-Path` 32 檔＝本輪全部來源檔），產出 `2026-11-09-partialreview-*.md`；閘只認 `-review-` 全樹檔名，而本樹另有其他 session 進行中的 seedstar／theme 未完成檔，不納入本輪審查範圍。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory,mcp,mcp-local-wrappers,.github,Projects/internal/ziwei-doushu | grep=mergeMasked\|binaryMask(\|GPT-Image-1 \|costNt: [0-9]\|claude-3-haiku-20240307\|claude-sonnet-4-20250514\|gpt-4.1-mini"\|dall-e-3 | hits=3（TarotStudio.tsx 第三份手抄表、model-specs.ts／model-comparison.ts 的 GPT-Image-1 標籤 → 本輪一併改掉；其餘為 .venv／WORKLOG-archive／.claude 外掛範例）
+
+**[剩餘風險]** gpt-4o-mini-tts 2027-01-06 關：video-workbench 配音要換 `gpt-realtime-2.1-mini`（不同 API），已標 retireOn，12/07 起每日探測會在 Slack 吵；正式站實測待部署後（操作者 2026-11-09 定案 B 全做 → sg-deploy）。
+
+**[rollback]** `git revert` 本輪 3 個 commit；舊 Canvas Editor 不帶 `model` 仍走 flux-fill-pro，資料表未動。
 ## 2026-11-06（續38）影音工作台 RV.4：正式站真打一次 Runway 5 秒（操作者「可以，現在打」）
 
 - 前置：`docker exec lobster-video-workbench printenv REPLICATE_API_TOKEN` 存在。操作者 Chrome 原本登入客戶帳號，`/api/video/workbench/session` 回 403 `product_not_held`（門禁照規矩擋，非部署問題）；操作者改用員工帳號登入。

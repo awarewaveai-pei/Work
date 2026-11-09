@@ -5,7 +5,7 @@
 
 export const META = {
   title: '畫布專業版監工台',
-  updated: '2026-11-06',
+  updated: '2026-11-09',
   plan: 'agency-os/handoffs/2026-11-05-photocraft-pro/R0-PLAN.md',
   req: 'agency-os/reports/decisions/2026-11-05-canvas-editor-vs-photocraft.md',
   worklog: 'agency-os/WORKLOG.md 2026-11-05',
@@ -32,6 +32,7 @@ export const NOW = [
   { what: '右側面板能對 PhotoCraft 下指令（放圖進去、拿圖出來、匯出、存檔）。', state: 'yes', ev: 'W1 已把 PhotoCraft 團隊自己的介面接上（一個只動網頁外殼的補丁，上游 PR 草稿已寫、未送出），本機實測可以下指令。' },
   { what: '放圖進圖層、取出圖層的圖、換掉圖層的圖，這幾個動作做得到。', state: 'yes', ev: 'W1 本機實測全部做得到：開檔、匯出、放 SVG、放圖片、取圖層的圖、換圖層的圖（位置與順序不變）、選取轉遮罩、按 Q 塗出範圍、符合／填滿畫布。兩點差異已交給下一張卡：按 Q 塗的地方預設是「不選」，要反過來；換圖時圖層樣式不會帶過去。My Designs 的原始檔改存 .psd（網頁版存不出 PhotoCraft 自己的格式）。' },
   { what: '從 Studio、塔羅、Banner、Mockup、我的設計按一下就進專業版改圖；改完可以存入 My Designs、另存、換格式、匯出。', state: 'yes', ev: '2026-11-06 上線（85c27aaa4）：五個入口的「在畫布編輯」都進專業版，有原始檔的開原始檔；交接改成開成功才清，開不起來會顯示訊息。另存、換格式、匯出用 PhotoCraft 自己的選單，下載到電腦。等妳登入實際試一次（C3.4、C5.3）。' },
+  { what: 'AI 去除／生成填色／擴圖像 Photoshop：只送選取範圍周圍一塊、全解析度生成、羽化貼回；每顆模型鈕都標 NT$。', state: 'yes', ev: '2026-11-09（妳：「生成圖片有問題，無法像真正的 Photoshop」）：以前整張送出、模型最多回 1440 px 再拉回、硬邊貼回；現在裁切＋羽化。生成填色三個模型：FLUX Fill Pro NT$1.6、Ideogram 4.5 Edit NT$1.9、GPT-Image-2.6 約 NT$1.5；去除 Bria Eraser NT$1.3；擴圖多了 Bria Expand NT$1.3（畫布尺寸精準、不再對位）。prompt 可留空＝照周圍補。五條路徑各真打一張都成功；Bria GenFill 試過填成灰塊，不收。' },
   { what: '介面是繁體中文、用妳的字型。', state: 'yes', ev: 'W1 本機實測：開啟時自動切成繁中選單（之後尊重使用者自己改的語言），打繁中字用到 Noto Sans TC／Noto Serif TC；字型沿用向量版那份清單，不用補丁。PhotoCraft 的畫面用它自己的深色或淺色，不套 app 主題；右側圖示欄跟著 app 主題。' },
 ];
 
