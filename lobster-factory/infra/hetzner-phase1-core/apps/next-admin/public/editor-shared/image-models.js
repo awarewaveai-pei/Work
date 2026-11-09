@@ -62,7 +62,7 @@ export const EDIT_TOOLS = Object.freeze([
   // 2026-11-09 on one real card, low removed the object as cleanly as medium and very_low barely changed the area.
   { value: "ideogram-4-5-edit-low", label: "Ideogram 4.5 Edit（省）", vendor: "Ideogram/Replicate", usd: 0.03, note: "預設用這顆。清東西、加東西都穩，接縫最少", uses: ["fill"], zh: "ok", blank: "ok" },
   { value: "ideogram-4-5-edit", label: "Ideogram 4.5 Edit（細）", vendor: "Ideogram/Replicate", usd: 0.06, note: "高畫質檔。省的那顆不夠細再用", uses: ["fill"], zh: "ok", blank: "ok" },
-  { value: "flux-fill-pro", label: "FLUX Fill Pro", vendor: "BFL/Replicate", usd: 0.05, note: "一定要寫描述，留空它會自己發揮", uses: ["fill", "outpaint"], zh: "ok", blank: "ok" },
+  { value: "flux-fill-pro", label: "FLUX Fill Pro", vendor: "BFL/Replicate", usd: 0.05, note: "建議寫描述。留空它會自己發揮", uses: ["fill", "outpaint"], zh: "ok", blank: "ok" },
   { value: "bria-eraser", label: "Bria Eraser", vendor: "Bria/Replicate", usd: 0.04, note: "只清掉東西，不會順手加東西。不用寫描述", uses: ["remove"], blank: "ok" },
   { value: "bria-expand", label: "Bria Expand", vendor: "Bria/Replicate", usd: 0.04, note: "擴圖尺寸精準，不會走樣。不用寫描述", uses: ["outpaint"] },
 ]);
