@@ -147,6 +147,7 @@ export const DEFAULT_SECTIONS: NavSection[] = [
       { type: 'link', href: '/ops/sellers',     icon: '⇄', label: 'Sellers',           title: '收銀台網站：登記、停用，每個網站一把鑰匙，由鑰匙查出賣家' },
       { type: 'link', href: '/ops/plans',       icon: '☰', label: 'Plans',             title: '方案：每個方案開通哪些功能、哪些用點數付（價格在 WooCommerce）' },
       { type: 'link', href: '/tools/ai-models', icon: '⚖', label: 'AI Models',         title: '模型比較（價格、速度、用途）＋圖片模型規格（能讀多長、參考圖、改寫）兩個分頁' },
+      { type: 'link', href: '/tools/edit-guide', icon: '🖼', label: 'Edit Guide',        title: '改圖怎麼挑：畫布專業版的 AI 面板什麼時候留空、什麼時候打字、每顆模型鈕差在哪（2026-11-09 實測對照圖）' },
       { type: 'link', href: '/ops/tools',       icon: '🧰', label: 'AI Tools & Alerts', title: '外部 AI 工具清單 + 事件通知管道' },
     ],
   },

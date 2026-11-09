@@ -52,6 +52,8 @@ export interface ImageModelRow<V extends string = StudioModel | EditTool> {
   label: string;
   vendor: string;
   usd: number;
+  /** The one 繁中 line under the price on every model button (image-models.js `note`). */
+  note: string;
   uses: readonly ModelUse[];
 }
 export interface StudioModelOption extends ImageModelRow<StudioModel> {

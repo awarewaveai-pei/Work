@@ -104,6 +104,7 @@ export interface StaffPage { name: string; why: string; tool?: string }
 export const STAFF_UTILITIES: Readonly<Record<string, StaffPage>> = {
   "tools/theme": { name: "後台外觀", why: "員工調整後台外觀，不呼叫付費 AI。" },
   "tools/ai-models": { name: "模型資料", why: "員工查閱模型資料，不呼叫付費 AI。" },
+  "tools/edit-guide": { name: "改圖怎麼挑", why: "說明頁：改圖面板怎麼用、每顆模型鈕差在哪，不呼叫付費 AI。" },
 };
 export const BACK_OFFICE: Readonly<Record<string, StaffPage>> = {
   "ops/clients": { name: "客戶", why: "員工管理客戶組織。" }, "ops/schedules": { name: "排程", why: "員工管理維護排程。" },
