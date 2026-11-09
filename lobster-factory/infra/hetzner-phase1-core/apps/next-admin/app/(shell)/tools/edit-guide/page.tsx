@@ -1,8 +1,11 @@
-// 改圖怎麼挑 — the explainer behind the photo-pro AI panels. Reading order: decide → steps → buttons (cheapest first) →
-// every run that was paid for, one labelled figure each, grouped by what was being tested. All runs 2026-11-09 on one of
-// the operator's own tarot cards (WORKLOG 續1). Model names and NT$ come from lib/studio/model-options.ts, never typed here.
+// 改圖怎麼挑 — the explainer behind the photo-pro AI panels. Reading order: decide → steps → what to type →
+// buttons (cheapest first) → every run that was paid for, one labelled figure each, grouped by what was tested.
+// All runs 2026-11-09 on one of the operator's own tarot cards (WORKLOG 續1/續2). Model names and NT$ come from
+// lib/studio/model-options.ts and the blank-prompt text from lib/studio/generative-fill.ts: never retyped here.
 import Link from "next/link";
 import { EDIT_TOOLS, STUDIO_MODEL_OPTIONS, modelsFor, nt } from "@/lib/studio/model-options";
+import { CONTEXT_FILL_PROMPT } from "@/lib/studio/fill-prompt";
+import { CopyPrompt } from "./CopyPrompt";
 
 export const metadata = { title: "改圖怎麼挑 · Lobster Factory" };
 
@@ -13,6 +16,13 @@ const price = (value: string) => `NT$${nt(find(value)?.usd ?? 0).toFixed(2)}`;
 const labelOf = (value: string) => find(value)?.label ?? value;
 /** Catalog rows for one use, cheapest first — the order the operator reads the buttons in. */
 const byPrice = (use: "fill" | "edit") => [...modelsFor(use)].sort((a, b) => a.usd - b.usd);
+
+/** The three prompts every run on this page used. Quoted beside each experiment so no figure is unexplained. */
+const P = {
+  remove: "移除那三隻動物，延續後面的橘色布幔和王座。",
+  add: "一個金色高腳酒杯放在扶手上。",
+  whole: "把整張的光線調柔一點，邊緣修乾淨，維持原本的畫風與配色。",
+} as const;
 
 const LINE = "var(--card-border)";
 const h2 = { fontSize: 19, fontWeight: 800, margin: "42px 0 10px", color: "var(--text-primary)" } as const;
@@ -46,9 +56,14 @@ function Note({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** What was typed into the description box for the runs that follow. */
+function Used({ text }: { text: string }) {
+  return <p style={{ margin: "0 0 10px", fontSize: 13.5, ...muted }}>這一組打的是：<b style={{ color: "var(--text-secondary)" }}>{text}</b></p>;
+}
+
 /** One run: the picture, which model made it, what that press cost, and what happened. */
 function Run({ src, model, cost, verdict, note }: { src: string; model: string; cost?: string; verdict: "good" | "bad" | "src"; note: string }) {
-  const tone = verdict === "good" ? "var(--accent-text)" : verdict === "bad" ? "var(--danger, var(--text-primary))" : "var(--text-muted)";
+  const tone = verdict === "good" ? "var(--accent-text)" : verdict === "bad" ? "var(--danger)" : "var(--text-muted)";
   return (
     <figure style={{ margin: 0, minWidth: 0 }}>
       <img src={`${SHOT}/${src}.jpg`} alt={`${model}：${note}`} style={{ display: "block", width: "100%", borderRadius: 8, border: `1px solid ${LINE}` }} />
@@ -79,7 +94,7 @@ export default function EditGuidePage() {
           firstCol={150}
           rows={[
             ["清掉一個東西", <>框住它 → 描述<b>留空</b></>, <>{labelOf("ideogram-4-5-edit-low")}　{price("ideogram-4-5-edit-low")}</>],
-            ["清掉，而且要最省", <>框住它 → <b>寫明</b>「移除⋯⋯，延續後面的⋯⋯」</>, <>{labelOf("flux-2-klein-4b")}　{price("flux-2-klein-4b")}</>],
+            ["清掉，而且要最省", <>框住它 → <b>寫明</b>移除什麼、後面接什麼</>, <>{labelOf("flux-2-klein-4b")}　{price("flux-2-klein-4b")}</>],
             ["加一個東西", <>框住要放的位置 → <b>寫</b>要生成什麼</>, <>{labelOf("ideogram-4-5-edit-low")}　{price("ideogram-4-5-edit-low")}</>],
             ["整張調順、換氛圍", <>不用框 → 寫一句要怎麼改</>, <>{labelOf("flux-kontext-fast")}　{price("flux-kontext-fast")}</>],
           ]}
@@ -89,11 +104,36 @@ export default function EditGuidePage() {
         <h2 style={h2}>二、三個步驟</h2>
         <ol style={{ margin: "0 0 16px", paddingLeft: "1.3em" }}>
           <li style={{ marginBottom: 6 }}><b>框</b>：矩形選取工具，或按 Q 用筆刷塗（塗黑 → 再按 Q → Shift+Ctrl+I 反轉）。</li>
-          <li style={{ marginBottom: 6 }}><b>寫或不寫</b>：加東西一定要寫；清東西只有 Ideogram 可以留空，其他模型都要寫。</li>
+          <li style={{ marginBottom: 6 }}><b>寫或不寫</b>：加東西一定要寫；清東西只有 Ideogram 可以留空，其他模型都要寫。句子照下一節複製。</li>
           <li><b>按模型</b>：按下去就扣點。不滿意再按一次，結果會不一樣，但也會再扣一次。</li>
         </ol>
 
-        <h2 style={h2}>三、按鈕一覽（由便宜排到貴）</h2>
+        <h2 style={h2}>三、指令怎麼寫（可以直接複製）</h2>
+        <p style={{ margin: "0 0 14px" }}>
+          三種句型就夠用。把角括號換成妳的東西，<b>中文直接寫，不用翻英文</b>——這一頁所有結果都是用中文句子跑出來的。
+        </p>
+
+        <h3 style={h3}>清掉一個東西</h3>
+        <CopyPrompt text="移除<要清掉的東西>，延續後面的<周圍是什麼>。" note="一定要講後面是什麼。不講，模型會自己發明一塊風景填進去。" />
+        <CopyPrompt text={P.remove} note="這一頁清動物那幾張用的就是這句。" />
+
+        <h3 style={h3}>加一個東西</h3>
+        <CopyPrompt text="一個<材質或顏色><東西>放在<位置>。" note="材質、顏色、大小寫進去。只寫「一個杯子」會拿到隨便一個杯子。" />
+        <CopyPrompt text={P.add} note="這一頁加酒杯那四張用的就是這句。" />
+
+        <h3 style={h3}>整張調順、換氛圍</h3>
+        <CopyPrompt text="<要改什麼>，維持原本的畫風與配色。" note="後半句不能省。省了模型會順手把畫風一起換掉。" />
+        <CopyPrompt text={P.whole} note="這一頁整張改圖那三張用的就是這句。" />
+
+        <h3 style={h3}>三條規則</h3>
+        <ol style={{ margin: "0 0 16px", paddingLeft: "1.3em" }}>
+          <li style={{ marginBottom: 6 }}><b>說要變成什麼，不要說不要什麼。</b>「不要有動物」常常被忽略，「延續後面的橘色布幔」才有用。</li>
+          <li style={{ marginBottom: 6 }}><b>一句話講一件事。</b>條件堆超過兩三件，只有 {labelOf("openai-26-edit")} 吃得住。</li>
+          <li><b>不要寫感覺。</b>「改好看一點」「修一下」模型不知道改什麼，會自己亂改，錢照扣。</li>
+        </ol>
+        <Note>唯一不用寫的情況是<b>描述整個留空</b>：系統會自動替妳送一段英文指令過去，下一節有原文和實測。</Note>
+
+        <h2 style={h2}>四、按鈕一覽（由便宜排到貴）</h2>
         <h3 style={h3}>🪄 生成填色（只重畫框內）</h3>
         <Table head={["按鈕", "每次", "什麼時候用"]} rows={byPrice("fill").map((m) => [m.label, `NT$${nt(m.usd).toFixed(2)}`, m.note])} />
         <h3 style={h3}>✏️ AI 修圖（重畫整張）</h3>
@@ -103,18 +143,17 @@ export default function EditGuidePage() {
           <b>擴圖</b> {labelOf("bria-expand")} {price("bria-expand")}（尺寸精準）與 {labelOf("flux-fill-pro")} {price("flux-fill-pro")}。
         </p>
 
-        <h2 style={h2}>四、留空是什麼意思</h2>
-        <p style={{ margin: "0 0 12px" }}>
-          留空不是留白、也不是透明，而是「把<b>框裡的東西</b>清掉，照周圍補回來」，所以框多大就清多大。
-          自己打「照周圍補」四個字反而沒用——模型只收到那四個字，不知道要清掉什麼：
-        </p>
+        <h2 style={h2}>五、留空是什麼意思</h2>
+        <p style={{ margin: "0 0 12px" }}>留空不是留白、也不是透明。描述欄空著按下去，系統會替妳送這一句英文過去：</p>
+        <CopyPrompt text={CONTEXT_FILL_PROMPT} note="意思是：把框裡的全部清掉，照周圍的顏色、紋理、光線、線條接下去，不要加新東西。所以框多大就清多大。" />
+        <p style={{ margin: "0 0 12px" }}>所以自己打「照周圍補」四個字反而沒用——模型只收到那四個字，不知道要清掉什麼：</p>
         <Grid min={250}>
           <Run src="f-blank" model={labelOf("ideogram-4-5-edit-low")} cost={price("ideogram-4-5-edit-low")} verdict="good" note="描述留空：框裡的羊清掉，布幔接起來。" />
           <Run src="f-typed" model={labelOf("ideogram-4-5-edit-low")} cost={price("ideogram-4-5-edit-low")} verdict="bad" note="自己打「照周圍補」：羊原封不動，錢照扣。" />
         </Grid>
 
         <h3 style={h3}>框太小，露在框外的部分會留著</h3>
-        <p style={{ margin: "0 0 12px" }}>
+        <p style={{ margin: "0 0 10px" }}>
           下面每一張都是同一個框（只蓋到羊的中段）、描述留空，每個模型各按兩次，共十次。沒有一次清乾淨——因為羊的身體超出框外：
         </p>
         <Grid min={200}>
@@ -133,7 +172,7 @@ export default function EditGuidePage() {
         <Note>這一排十次的教訓只有一句：<b>框要把整個東西包進去</b>。框一半，再貴的模型也救不回來。</Note>
 
         <h3 style={h3}>框對了，但每次結果仍然不同</h3>
-        <p style={{ margin: "0 0 12px" }}>把整組動物（含牠們站的那段布幔）都框進去，同一個模型連按兩次：</p>
+        <p style={{ margin: "0 0 10px" }}>把整組動物（含牠們站的那段布幔）都框進去，描述一樣留空，同一個模型連按兩次：</p>
         <Grid min={200}>
           <Run src="b-src" model="原圖" verdict="src" note="框住整組動物。" />
           <Run src="b-gpt26-1" model={labelOf("openai-26-edit")} cost={`${price("openai-26-edit")}・第一次`} verdict="good" note="動物消失，布幔和座面完好。" />
@@ -141,11 +180,12 @@ export default function EditGuidePage() {
         </Grid>
         <p style={{ margin: "0 0 10px", ...muted }}>兩次都照指令做了，指令就是「把框裡清掉」。不滿意就再按一次，但會再扣一次。</p>
 
-        <h2 style={h2}>五、寫清楚指令：最便宜的兩顆最穩</h2>
-        <p style={{ margin: "0 0 12px" }}>
+        <h2 style={h2}>六、寫清楚指令：最便宜的兩顆最穩</h2>
+        <p style={{ margin: "0 0 10px" }}>
           {labelOf("flux-2-klein-4b")} 和 {labelOf("flux-kontext-fast")} 沒有遮罩功能，面板是靠「只送選區周圍一塊、只把選區貼回來」讓它們也能局部填色。
-          代價是<b>留空什麼都不會改</b>；只要寫清楚（「移除那三隻動物，延續後面的橘色布幔和王座」），同一個框：
+          代價是<b>留空什麼都不會改</b>，一定要自己寫。
         </p>
+        <Used text={P.remove} />
         <Grid min={200}>
           <Run src="c-klein-1" model={labelOf("flux-2-klein-4b")} cost={`${price("flux-2-klein-4b")}・第一次`} verdict="good" note="乾淨，布幔、王座、標題字都完好。" />
           <Run src="c-klein-2" model={labelOf("flux-2-klein-4b")} cost={`${price("flux-2-klein-4b")}・第二次`} verdict="good" note="再按一次，結果一致。" />
@@ -160,8 +200,9 @@ export default function EditGuidePage() {
           <Run src="g-ideogram-verylow" model="Ideogram 4.5 Edit（very_low 檔）" cost="NT$0.26" verdict="bad" note="最低畫質檔幾乎沒動作，所以面板不提供這一檔。" />
         </Grid>
 
-        <h2 style={h2}>六、加東西：四顆的差別</h2>
-        <p style={{ margin: "0 0 12px" }}>同一個框（王座右扶手）、同一句「一個金色高腳酒杯放在扶手上」，中文直接寫就可以：</p>
+        <h2 style={h2}>七、加東西：四顆的差別</h2>
+        <p style={{ margin: "0 0 10px" }}>同一個框（王座右扶手），四顆按鈕各按一次：</p>
+        <Used text={P.add} />
         <Grid min={200}>
           <Run src="d-src" model="原圖" verdict="src" note="框住右邊扶手。" />
           <Run src="d-ideogram-low" model={labelOf("ideogram-4-5-edit-low")} cost={price("ideogram-4-5-edit-low")} verdict="good" note="金杯大小合適、畫風一致，最划算。" />
@@ -170,8 +211,9 @@ export default function EditGuidePage() {
           <Run src="d-gpt26" model={labelOf("openai-26-edit")} cost={price("openai-26-edit")} verdict="bad" note="杯子偏小，像擺在後面。" />
         </Grid>
 
-        <h2 style={h2}>七、整張改圖：三顆的差別</h2>
-        <p style={{ margin: "0 0 12px" }}>不用框，同一句「把整張的光線調柔一點，邊緣修乾淨，維持原本的畫風與配色」：</p>
+        <h2 style={h2}>八、整張改圖：三顆的差別</h2>
+        <p style={{ margin: "0 0 10px" }}>不用框，三顆按鈕各按一次：</p>
+        <Used text={P.whole} />
         <Grid min={200}>
           <Run src="e-src" model="原圖" verdict="src" note="注意背景的漩渦筆觸和下方的標題字。" />
           <Run src="e-klein" model={labelOf("flux-2-klein-4b")} cost={price("flux-2-klein-4b")} verdict="bad" note="字完整，但筆觸被抹平、金箔厚度不見。" />
@@ -180,7 +222,7 @@ export default function EditGuidePage() {
         </Grid>
         <Note>圖上有字就別整張改。真要改，先把文字圖層關掉，改完再開回來。</Note>
 
-        <h2 style={h2}>八、錢的規則</h2>
+        <h2 style={h2}>九、錢的規則</h2>
         <Table
           head={["情況", "扣款"]}
           firstCol={230}

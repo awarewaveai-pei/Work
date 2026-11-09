@@ -18,15 +18,13 @@ import { OUTPAINT_PRESETS, outpaintFrame, type OutpaintPreset } from "./outpaint
 import type { EditTool } from "./model-options";
 import { runReplicate, type ReplicateImageResult } from "./replicate-run";
 import { grantFor } from "@/lib/entitlements/grant";
+import { CONTEXT_FILL_PROMPT } from "./fill-prompt";
 
 // Re-export so existing server-side imports (the route) keep resolving from this module.
-export { OUTPAINT_PRESETS };
+export { OUTPAINT_PRESETS, CONTEXT_FILL_PROMPT };
 export type { OutpaintPreset };
 
-/** What the model draws when the operator leaves the prompt empty (Photoshop's prompt-less generative fill). Worded as an
- *  instruction: gpt-image-2.6's masking is prompt-driven and "seamlessly continue the surrounding scene" made it paint the hole
- *  BLACK (3 real runs 2026-11-09, WORKLOG); this wording filled it invisibly on the same input. flux / ideogram take either. */
-export const CONTEXT_FILL_PROMPT = "Remove everything inside the selected area and fill it with the background that surrounds it: continue the same colours, textures, lighting, lines and horizon from the neighbouring pixels so the edit is invisible. Do not add new objects.";
+
 
 /** The genfill route's Replicate models. Pinned 2026-06-15 (flux) / 2026-11-09 (the rest). */
 const VERSIONS = {
