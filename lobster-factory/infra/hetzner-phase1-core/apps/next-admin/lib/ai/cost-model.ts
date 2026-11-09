@@ -189,8 +189,8 @@ export const TRANSCRIBE_RATES: Record<"whisper-1", { usdPerMin: number; label: s
 };
 
 export const TOOL_RATES: Record<string, { usd: number; label: string; vendor: string; estimate: boolean }> = {
-  "bg-remove":   { usd: 0.011, label: "去背 (851-labs)", vendor: "Replicate", estimate: true },
-  "upscale":     { usd: 0.005, label: "升頻 (real-esrgan, 每 pass)", vendor: "Replicate", estimate: true },
+  "bg-remove":   { usd: 0.002, label: "去背 (851-labs)", vendor: "Replicate", estimate: true },
+  "upscale":     { usd: 0.002, label: "升頻 (real-esrgan, 每 pass)", vendor: "Replicate", estimate: true },
   "inpaint":     { usd: IMAGE_RATES["bria-eraser"].usd, label: "去物件 (bria/eraser)", vendor: "Replicate", estimate: false },
   // video-workbench image-to-3D (creative-suite-plan §0 2026-11-03; Meshy disabled). Prices: docs.stability.ai/pricing, replicate.com/firtoz/trellis.
   "3d-spar3d":   { usd: 0.04, label: "圖片轉 3D (Stability SPAR3D)", vendor: "Stability AI", estimate: false },

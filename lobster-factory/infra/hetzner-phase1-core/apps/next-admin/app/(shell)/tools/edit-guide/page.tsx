@@ -138,6 +138,27 @@ export default function EditGuidePage() {
             兩個 Ideogram 最像原畫風；FLUX 給的是白瓷杯，沒照「金色高腳」做；GPT 的杯子偏小。</>,
         }]} />
 
+        <h2 style={h2}>六、錢的規則</h2>
+        <Table
+          head={["情況", "扣款"]}
+          firstCol={230}
+          rows={[
+            ["按一次模型鈕", <>扣一次。<b>再按一次就再扣一次</b>，沒有「重試不收費」這種事。</>],
+            ["結果失敗（模型回錯誤、逾時）", <>不扣。點數在送出前先凍結，失敗就放回去。</>],
+            [<>{labelOf("openai-25-edit")} / {labelOf("openai-26-edit")} 跑完才出錯</>, <>會扣。這兩顆是 OpenAI 按 token 計價，伺服器算完就計費，之後才失敗也一樣。</>],
+            [<>{labelOf("openai-26-edit")} 的標價</>, <>是<b>估計值</b>。實測一次 US$0.0475（約 NT$1.52），比鈕上的 {price("openai-26-edit")} 少；長描述、大圖會更貴。</>],
+            ["其他模型的標價", <>是固定牌價，實收就是那個數字。</>],
+          ]}
+        />
+        <p style={{ margin: "0 0 10px" }}>
+          畫布裡其他會花錢的鈕：<b>去背</b> 約 NT$0.06、<b>升頻</b> 約 NT$0.06 一輪（最多兩輪）。這兩個按 GPU 秒數計價，所以是估計值。
+          色調分離、邊緣遮罩、尺寸範本、QR、條碼都在本機算，<b>完全不花錢</b>。
+        </p>
+        <Note>
+          每一筆實際金額都記在 <Link href="/ops/costs" style={{ color: "var(--accent-text)" }}>AI Costs</Link>，含模型、時間、route。
+          想知道今天花了多少，看那一頁，不要看這裡的牌價相加。
+        </Note>
+
         <p style={{ fontSize: 13.5, color: "var(--text-muted)", borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 36 }}>
           價格是 Replicate 2026-11-09 牌價換算新台幣（1 美元 = 32 元），按下去才扣、失敗不扣；實際金額記在
           <Link href="/ops/costs" style={{ color: "var(--accent-text)" }}> AI Costs</Link>。
