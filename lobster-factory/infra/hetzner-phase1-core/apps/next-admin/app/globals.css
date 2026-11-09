@@ -1,5 +1,3 @@
-@import "../public/awarewave/forms.css";
-
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -81,7 +79,7 @@
   --icon-infra-bg: #f5f3ff;
   --icon-ext-bg: #fffbeb;
   --icon-tools-bg: #fef2f2;
-  --form-input-bg: var(--card-bg);
+  --form-input-bg: #ffffff;
   --build-panel-bg: #ffffff;
   --build-panel-secondary-border: #dde2ef;
   --build-prerequisites-body-bg: #fafcff;
@@ -870,6 +868,27 @@ pre {
   text-transform: uppercase;
   margin-bottom: 6px;
 }
+.form-input,
+.form-select,
+.form-textarea {
+  width: 100%;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--form-input-bg);
+  transition: border-color .15s, box-shadow .15s;
+  outline: none;
+}
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+.form-textarea { min-height: 80px; resize: vertical; }
+
 .form-hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
 
 .btn-primary {
