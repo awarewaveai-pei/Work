@@ -9,6 +9,7 @@
 // Also exports the request / Blob helpers the other AI image blocks share (genfx.js, edge-mask.js, ai-edit.js).
 import { OPS_ROLE_HEADER } from "/editor-shared/bg-remove.js";
 import { modelsFor, nt } from "/editor-shared/image-models.js";
+import { modelButton } from "/editor-shared/block-ui.js";
 
 export const INPAINT_URL = "/api/tools/studio/inpaint";
 export const GENFILL_URL = "/api/tools/studio/genfill";
@@ -224,10 +225,8 @@ export default {
       $("afFields").disabled = busy;
       const models = $("afModels"); models.replaceChildren();
       for (const m of mode === "fill" ? FILL_MODELS : mode === "remove" ? REMOVE_MODELS : []) {
-        const b = document.createElement("button");
-        b.type = "button"; b.className = "btn btn-primary"; b.dataset.afModel = m.value;
-        b.textContent = m.label + "　" + price(m);
-        b.onclick = () => run(m);
+        const b = modelButton(m, nt, () => run(m));
+        b.dataset.afModel = m.value;
         models.appendChild(b);
       }
     }

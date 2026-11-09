@@ -4,6 +4,7 @@
 // button per model, each showing its price; the result goes in as a new layer (placeImage), the source layer stays.
 // Models and prices = the catalog /editor-shared/image-models.js (rows with use "edit"); nothing is copied here.
 import { modelsFor, nearestAspectRatio, nt } from "/editor-shared/image-models.js";
+import { modelButton } from "/editor-shared/block-ui.js";
 import { dataUrlToBlob, postStudio } from "./ai-fill.js";
 
 export const GENERATE_URL = "/api/tools/studio/generate";
@@ -49,10 +50,8 @@ export default {
     const say = (msg, b) => { const el = $("aeMsg"); el.textContent = msg; el.classList.toggle("busy", !!b); };
     const setBusy = (v) => { busy = v; $("aeFields").disabled = v; if (typeof ctx.busy === "function") ctx.busy(v); };
     for (const m of AI_EDIT_MODELS) {
-      const b = document.createElement("button");
-      b.type = "button"; b.className = "btn btn-ghost"; b.dataset.aeModel = m.value;
-      b.textContent = m.label + "　" + price(m);
-      b.onclick = () => run(m);
+      const b = modelButton(m, nt, () => run(m), "btn-ghost");
+      b.dataset.aeModel = m.value;
       $("aeModels").appendChild(b);
     }
     async function run(m) {

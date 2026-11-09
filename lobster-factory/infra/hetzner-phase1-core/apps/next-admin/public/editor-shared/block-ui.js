@@ -17,3 +17,19 @@ export function choiceGroup(options, value, onChange) {
   paint();
   return { el, get: () => cur, set: (v) => { cur = v; paint(); } };
 }
+
+/** A model button: 「<名稱>　NT$<價>」 and the row's note under it. `m` = a catalog row (image-models.js). */
+export function modelButton(m, nt, onClick, kind = "btn-primary") {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "btn " + kind;
+  b.style.cssText = "display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;line-height:1.3;";
+  const top = document.createElement("span");
+  top.textContent = m.label + "\u3000NT$" + nt(m.usd);
+  const note = document.createElement("small");
+  note.textContent = m.note || "";
+  note.style.cssText = "opacity:.75;font-size:11px;";
+  b.append(top, note);
+  b.onclick = onClick;
+  return b;
+}

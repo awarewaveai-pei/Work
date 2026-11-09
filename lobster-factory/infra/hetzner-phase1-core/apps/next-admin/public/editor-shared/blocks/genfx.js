@@ -6,6 +6,7 @@
 // under it): ctx.replaceImage keeps the old size (ctx-contract.md) and would squash the new area back into the old box.
 import { OUTPAINT_PRESETS, OUTPAINT_LABELS, outpaintFrame } from "/editor-shared/outpaint-presets.js";
 import { modelsFor, nt } from "/editor-shared/image-models.js";
+import { modelButton } from "/editor-shared/block-ui.js";
 import { posterizeDataUrl } from "/editor-shared/posterize.js";
 import { choiceGroup } from "/editor-shared/block-ui.js";
 import { GENFILL_URL, blobToDataUrl, dataUrlToBlob, postStudio, uploadableImage } from "./ai-fill.js";
@@ -82,10 +83,8 @@ export default {
     const say = (msg, b) => { const el = $("gfMsg"); el.textContent = msg; el.classList.toggle("busy", !!b); };
     const setBusy = (v) => { busy = v; $("gfFields").disabled = v; if (typeof ctx.busy === "function") ctx.busy(v); };
     for (const m of OUTPAINT_MODELS) {
-      const b = document.createElement("button");
-      b.type = "button"; b.className = "btn btn-primary"; b.dataset.gfModel = m.value;
-      b.textContent = m.label + "　" + price(m);
-      b.onclick = () => outpaint(m);
+      const b = modelButton(m, nt, () => outpaint(m));
+      b.dataset.gfModel = m.value;
       $("gfModels").appendChild(b);
     }
     $("gfLevels").oninput = (e) => { $("gfLevelsV").textContent = String(e.target.value); };
