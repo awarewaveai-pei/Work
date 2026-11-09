@@ -88,10 +88,10 @@ export default function EditGuidePage() {
 
         <h2 style={h2}>二、不打字的「照周圍補」</h2>
         <Card>
-          <b style={{ color: "var(--accent-text)" }}>把描述欄留空就好，不要自己打「照周圍補」。</b>
+          <b style={{ color: "var(--accent-text)" }}>留空＝把框裡的東西清掉，再照周圍的樣子補回來。</b>
           <div style={{ marginTop: 4 }}>
-            留空的時候，系統會自動替妳送一段完整的英文指令給模型，意思是「把框起來的地方清掉，照周圍的顏色、紋理、光線、線條接下去，不要加新東西」。
-            自己打那四個字，模型就只收到那四個字，看不懂要清掉什麼。
+            不是留白、也不是透明：系統會自動替妳送一段完整的英文指令給模型，意思是「把框起來的地方清掉，照周圍的顏色、紋理、光線、線條接下去，不要加新東西」。
+            所以<b>框多大就清多大</b>。自己打「照周圍補」那四個字反而沒用，模型只收到那四個字，不知道要清掉什麼。
           </div>
         </Card>
         <p style={{ margin: "0 0 12px" }}>同一塊選區（王座下那三隻羊）、同一個模型、同一天，差別只在描述欄：</p>
@@ -102,8 +102,31 @@ export default function EditGuidePage() {
             caption={<>羊原封不動。錢照扣，圖沒變。</>} />
         </div>
 
+        <h3 style={h3}>框的大小決定結果，這一步最重要</h3>
+        <p style={{ margin: "0 0 12px" }}>
+          框太小，露在框外的部分會原封不動留著；框太大，框裡本來想留的東西也會一起被清掉。2026-11-09 用同一張牌、同一個框、同一個模型連跑兩次，結果差這麼多：
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 16, margin: "0 0 14px" }}>
+          <Shot src={`${SHOT}/c0-frame.jpg`} alt="原圖：王座下有三隻羊，框住整組動物"
+            caption={<>原圖。框住整組動物（連同牠們站的那一段布幔）。</>} />
+          <Shot src={`${SHOT}/c1-animals-gone.jpg`} alt="第一次：三隻羊不見，布幔和王座完整留著"
+            caption={<>第一次：三隻羊乾淨消失，布幔和王座座面補得像原本就長這樣。</>} />
+          <Shot src={`${SHOT}/c2-all-gone.jpg`} alt="第二次：框內連布幔和座面都被清掉，剩下深色背景" tag="同一個框，第二次" tone="bad"
+            caption={<>第二次：框裡<b>所有東西</b>都被清掉了，連座面和布幔都沒了，只剩背景。</>} />
+        </div>
+        <p style={{ margin: "0 0 14px", color: "var(--text-muted)" }}>
+          兩次都「照指令做」了——指令就是「把框裡清掉」。差別只在模型每次對「框裡什麼算該留的背景」判斷不同。
+          所以：<b>框要剛好包住要刪的東西</b>，不要連旁邊想保留的一起框進去；不滿意就再按一次，每次結果都會不一樣。
+        </p>
+
         <h3 style={h3}>想加東西的時候才打字</h3>
         <p style={{ margin: "0 0 14px" }}>描述欄是用來說「要生成什麼」的。要加酒杯就寫「一個金色高腳酒杯放在扶手上」，中文可以。要清東西、要補背景，留空最準。</p>
+
+        <div style={{ margin: "0 0 16px" }}>
+          <Shot src={`${SHOT}/c3-add-row.jpg`} alt="四個模型各自生成的酒杯並排比較"
+            caption={<>同一個框、同一句「一個金色高腳酒杯放在扶手上」，左起：原圖、Ideogram（省）、Ideogram（細）、FLUX Fill Pro、GPT-Image-2.6。
+              兩個 Ideogram 給了最像原畫風的金杯；FLUX 給的是白瓷杯（沒照「金色高腳」做）；GPT-Image-2.6 的杯子偏小。</>} />
+        </div>
 
         <h3 style={h3}>生成填色的按鈕</h3>
         <Table
