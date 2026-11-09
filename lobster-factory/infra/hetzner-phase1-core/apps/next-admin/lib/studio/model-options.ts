@@ -55,6 +55,8 @@ export interface ImageModelRow<V extends string = StudioModel | EditTool> {
   /** The one 繁中 line under the price on every model button (image-models.js `note`). */
   note: string;
   uses: readonly ModelUse[];
+  /** What an EMPTY description does on this 填色 / 去除 button (image-models.js `blank`). Absent = unmeasured = treat as "no". */
+  blank?: "ok" | "no";
 }
 export interface StudioModelOption extends ImageModelRow<StudioModel> {
   group: string;
@@ -69,6 +71,9 @@ export const STUDIO_MODEL_OPTIONS: readonly StudioModelOption[] = (shared.IMAGE_
 export const EDIT_TOOLS = shared.EDIT_TOOLS as readonly ImageModelRow<EditTool>[];
 
 /** Catalog rows (models and tools) that offer `use`, with NT$ price. */
+/** Does an empty description do anything on this row? One implementation, in the browser catalog. */
+export const takesBlankPrompt = shared.takesBlankPrompt as (m: Pick<ImageModelRow, "blank">) => boolean;
+
 export function modelsFor(use: ModelUse): readonly (ImageModelRow & { costNt: number })[] {
   return (shared.modelsFor(use) as readonly ImageModelRow[]).map((m) => ({ ...m, costNt: nt(m.usd) }));
 }

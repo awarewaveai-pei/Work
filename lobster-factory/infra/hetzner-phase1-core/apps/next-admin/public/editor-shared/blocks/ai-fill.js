@@ -8,7 +8,7 @@
 // is no seam or colour step; (3) an empty prompt is allowed (the server fills from the surroundings).
 // Also exports the request / Blob helpers the other AI image blocks share (genfx.js, edge-mask.js, ai-edit.js).
 import { OPS_ROLE_HEADER } from "/editor-shared/bg-remove.js";
-import { modelsFor, nt } from "/editor-shared/image-models.js";
+import { modelsFor, nt, takesBlankPrompt } from "/editor-shared/image-models.js";
 import { modelButton } from "/editor-shared/block-ui.js";
 
 export const INPAINT_URL = "/api/tools/studio/inpaint";
@@ -206,7 +206,7 @@ export default {
       + '<div id="afStart"><div class="row" style="flex-wrap:wrap;"><button type="button" class="btn btn-ghost" id="afRemove" data-af-mode="remove">🪄 去除不要的部分</button>'
       + '<button type="button" class="btn btn-ghost" id="afFill" data-af-mode="fill">✨ 生成填色（選哪生哪）</button></div></div>'
       + '<div id="afStep">'
-      + '<input id="afPrompt" class="form-input" data-af-prompt placeholder="要生成什麼，例如：一片藍天（可留空＝照周圍補）">'
+      + '<input id="afPrompt" class="form-input" data-af-prompt placeholder="要生成什麼，例如：一片藍天">'
       + '<div class="info" style="margin-top:6px;">按模型就開始（按下即扣點）</div>'
       + '<div class="row" id="afModels" style="flex-wrap:wrap;"></div>'
       + '<div class="row" style="margin-top:6px;"><button type="button" class="btn btn-ghost" id="afCancel" data-af-cancel>✖ 取消</button></div></div>'
@@ -218,7 +218,7 @@ export default {
       $("afStart").style.display = mode !== null ? "none" : ""; $("afStep").style.display = mode === null ? "none" : "";
       $("afPrompt").style.display = mode !== "fill" ? "none" : "";
       $("afHint").textContent = !hasMask ? "這個編輯器沒有選取範圍，無法使用此功能。"
-        : mode === "fill" ? "要重新生成的區域：" + AREA_HOW + "，填描述（可留空）後按模型。"
+        : mode === "fill" ? "要重新生成的區域：" + AREA_HOW + "，寫描述後按模型；留空＝照周圍補，只有標「可留空」的鈕吃得住。"
         : mode === "remove" ? "想清掉的物件：" + AREA_HOW + "，再按模型。"
         : "先在圖層選取一張圖片，再" + AREA_HOW + "。";
       $("afRemove").disabled = !hasMask; $("afFill").disabled = !hasMask;
@@ -226,6 +226,7 @@ export default {
       const models = $("afModels"); models.replaceChildren();
       for (const m of mode === "fill" ? FILL_MODELS : mode === "remove" ? REMOVE_MODELS : []) {
         const b = modelButton(m, nt, () => run(m));
+        if (mode === "fill") b.title = takesBlankPrompt(m) ? "描述可以留空＝照周圍補" : "這顆一定要寫描述";
         b.dataset.afModel = m.value;
         models.appendChild(b);
       }
@@ -237,6 +238,12 @@ export default {
     async function run(m) {
       if (busy || !hasMask || !mode) return;
       const prompt = $("afPrompt").value.trim();
+      // Measured 2026-11-09: a model with no mask gets CONTEXT_FILL_PROMPT with no area to apply it to and returns the
+      // image untouched -- a full-price no-op. Refuse before the request rather than explain the charge afterwards.
+      if (mode === "fill" && !prompt && !takesBlankPrompt(m)) {
+        say("⚠️ " + m.label + " 不能留空，請寫要改成什麼（例如：移除那三隻動物，延續後面的橘色布幔）。");
+        return;
+      }
       setBusy(true); // before any await: a second click while the host answers must not send a second paid request
       try {
         const sel = await ctx.selectedImage(); if (!sel) { say("先在圖層選取一張圖片。"); return; }

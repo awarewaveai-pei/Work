@@ -3,7 +3,7 @@
 // All runs 2026-11-09 on one of the operator's own tarot cards (WORKLOG 續1/續2). Model names and NT$ come from
 // lib/studio/model-options.ts and the blank-prompt text from lib/studio/generative-fill.ts: never retyped here.
 import Link from "next/link";
-import { EDIT_TOOLS, STUDIO_MODEL_OPTIONS, modelsFor, nt } from "@/lib/studio/model-options";
+import { EDIT_TOOLS, STUDIO_MODEL_OPTIONS, modelsFor, nt, takesBlankPrompt } from "@/lib/studio/model-options";
 import { CONTEXT_FILL_PROMPT } from "@/lib/studio/fill-prompt";
 import { CopyPrompt } from "./CopyPrompt";
 
@@ -116,7 +116,7 @@ export default function EditGuidePage() {
         <h2 style={h2}>二、三個步驟</h2>
         <ol style={{ margin: "0 0 16px", paddingLeft: "1.3em" }}>
           <li style={{ marginBottom: 6 }}><b>框</b>：矩形選取工具，或按 Q 用筆刷塗（塗黑 → 再按 Q → Shift+Ctrl+I 反轉）。</li>
-          <li style={{ marginBottom: 6 }}><b>寫或不寫</b>：加東西一定要寫；清東西只有 Ideogram 可以留空，其他模型都要寫。句子照下一節複製。</li>
+          <li style={{ marginBottom: 6 }}><b>寫或不寫</b>：加東西一定要寫。清東西可以留空，但<b>只有一半的鈕吃得住</b>，哪幾顆看第四節的「留空」欄。句子照下一節複製。</li>
           <li><b>按模型</b>：按下去就扣點。不滿意再按一次，結果會不一樣，但也會再扣一次。</li>
         </ol>
 
@@ -143,11 +143,28 @@ export default function EditGuidePage() {
           <li style={{ marginBottom: 6 }}><b>一句話講一件事。</b>條件堆超過兩三件，只有 {labelOf("openai-26-edit")} 吃得住。</li>
           <li><b>不要寫感覺。</b>「改好看一點」「修一下」模型不知道改什麼，會自己亂改，錢照扣。</li>
         </ol>
-        <Note>唯一不用寫的情況是<b>描述整個留空</b>：系統會自動替妳送一段英文指令過去，下一節有原文和實測。</Note>
+        <Note>
+          唯一不用寫的情況是<b>描述整個留空</b>，而且<b>要用吃得住留空的鈕</b>：系統會自動替妳送一段英文指令過去，下一節有原文和實測。
+          不吃的那兩顆現在按下去會先擋下來，不會白扣錢。
+        </Note>
 
         <h2 style={h2}>四、按鈕一覽（由便宜排到貴）</h2>
         <h3 style={h3}>🪄 生成填色（只重畫框內）</h3>
-        <Table head={["按鈕", "每次", "什麼時候用"]} rows={byPrice("fill").map((m) => [m.label, `NT$${nt(m.usd).toFixed(2)}`, m.note])} />
+        <Table
+          head={["按鈕", "每次", "留空", "什麼時候用"]}
+          rows={byPrice("fill").map((m) => [
+            m.label,
+            `NT$${nt(m.usd).toFixed(2)}`,
+            takesBlankPrompt(m)
+              ? <span style={{ color: "var(--accent-text)", fontWeight: 700 }}>可以</span>
+              : <span style={{ color: "var(--danger)", fontWeight: 700 }}>不行</span>,
+            m.note,
+          ])}
+        />
+        <p style={{ margin: "0 0 10px", fontSize: 14 }}>
+          <b>「留空」欄就是在回答：描述空著按下去，這顆會不會動。</b>「不行」的那兩顆沒有遮罩功能，收到的指令沒有範圍可以套，
+          圖會原封不動回來——所以面板現在直接擋下來，不會扣錢。<b>去除不要的部分</b>（{labelOf("bria-eraser")}）本來就不用寫描述。
+        </p>
         <h3 style={h3}>✏️ AI 修圖（重畫整張）</h3>
         <Table head={["按鈕", "每次", "什麼時候用"]} rows={byPrice("edit").map((m) => [m.label, `NT$${nt(m.usd).toFixed(2)}`, m.note])} />
         <p style={{ margin: "0 0 10px", ...muted, fontSize: 14 }}>
@@ -156,7 +173,10 @@ export default function EditGuidePage() {
         </p>
 
         <h2 style={h2}>五、留空是什麼意思</h2>
-        <p style={{ margin: "0 0 12px" }}>留空不是留白、也不是透明。描述欄空著按下去，系統會替妳送這一句英文過去：</p>
+        <p style={{ margin: "0 0 12px" }}>
+          先講結論：<b>留空在吃得住的鈕上是有效的</b>，底下十二張留空的實測都真的動了。
+          它不是留白、也不是透明。描述欄空著按下去，系統會替妳送這一句英文過去：
+        </p>
         <CopyPrompt text={CONTEXT_FILL_PROMPT} note="意思是：把框裡的全部清掉，照周圍的顏色、紋理、光線、線條接下去，不要加新東西。所以框多大就清多大。" />
         <p style={{ margin: "0 0 12px" }}>所以自己打「照周圍補」四個字反而沒用——模型只收到那四個字，不知道要清掉什麼：</p>
         <Grid min={250}>
@@ -166,7 +186,8 @@ export default function EditGuidePage() {
 
         <h3 style={h3}>框太小，露在框外的部分會留著</h3>
         <p style={{ margin: "0 0 10px" }}>
-          下面每一張都是同一個框（只蓋到羊的中段）、描述留空，每個模型各按兩次，共十次。沒有一次清乾淨——因為羊的身體超出框外：
+          下面每一張都是同一個框（只蓋到羊的中段）、描述留空，每個模型各按兩次，共十次。十次都動了、也都沒清乾淨——
+          <b>問題出在框，不是出在留空</b>，因為羊的身體超出框外：
         </p>
         <Grid min={200}>
           <Run src="a-src" model="原圖" verdict="src" note="框只蓋到三隻羊的中段。" />
@@ -192,7 +213,7 @@ export default function EditGuidePage() {
         </Grid>
         <p style={{ margin: "0 0 10px", ...muted }}>兩次都照指令做了，指令就是「把框裡清掉」。不滿意就再按一次，但會再扣一次。</p>
 
-        <h2 style={h2}>六、寫清楚指令：最便宜的兩顆最穩</h2>
+        <h2 style={h2}>六、不吃留空的那兩顆：寫清楚就很好用</h2>
         <p style={{ margin: "0 0 10px" }}>
           {labelOf("flux-2-klein-4b")} 和 {labelOf("flux-kontext-fast")} 沒有遮罩功能，面板是靠「只送選區周圍一塊、只把選區貼回來」讓它們也能局部填色。
           代價是<b>留空什麼都不會改</b>，一定要自己寫。
@@ -202,7 +223,7 @@ export default function EditGuidePage() {
           <Run src="c-klein-2" model={labelOf("flux-2-klein-4b")} cost={`${price("flux-2-klein-4b")}・第二次`} verdict="good" note="再按一次，結果一致。"  prompt={P.remove} />
           <Run src="c-kontext-fast" model={labelOf("flux-kontext-fast")} cost={price("flux-kontext-fast")} verdict="good" note="同樣乾淨，筆觸最貼近原畫。"  prompt={P.remove} />
         </Grid>
-        <h3 style={h3}>同樣這幾顆，描述留空就什麼都不會改</h3>
+        <h3 style={h3}>同樣這幾顆，描述留空就什麼都不會改（所以面板現在不給按）</h3>
         <Grid min={190}>
           <Run src="g-src" model="原圖" verdict="src" note="框只蓋到羊的中段。" />
           <Run src="g-klein" model={labelOf("flux-2-klein-4b")} cost={price("flux-2-klein-4b")} verdict="bad" note="留空：幾乎原圖照還。"  prompt={P.blank} />
