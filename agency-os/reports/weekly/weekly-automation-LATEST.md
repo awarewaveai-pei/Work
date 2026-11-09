@@ -1,140 +1,109 @@
-# Weekly Summary 2026-11-02
+# Weekly Summary 2026-11-09
 
-> Period: 2026-10-27 → 2026-11-02 | Generated: 2026-11-02 01:10 UTC by remote-weekly-agent
+> Period: 2026-11-03 → 2026-11-09 | Generated: 2026-11-09 01:14 UTC by remote-weekly-agent
 
 ---
 
 ## Completed this week
 
-### ADR 017 賣家 / 客戶模型（2026-10-27～10-30）
-- **4c-2** 付款驗簽由網站自己的鑰匙決定（`b22ce2277`），提前部署 `77fd74a72`；0140/0141 套 prod
-- **4c-3** 外掛 aware-wave-store 1.1.0→1.2.0 發版，升級 aware-wave.com（另一 session）
-- **月結依買家付款月份**：migration 0142（`billing_try_timestamptz`＋7 天窗），`/ops/billing` 顯示上/下月並標「8 日起定案」（`24c1d9973`）
-- **4b-10** 員工客戶頁給/收產品與代理權，migration 0143（`66b612ead`）；真 DB 測試 harness `--suite staff-grants` 6/6
-- **content.aware-wave.com 產品門上線**（`e62dc2fcd`、`3f9bb4273`）
+### 影音工作台（Video Workbench）— 大批次上線（2026-11-06）
+- **ED.1.4** 預覽畫質 720P／1080P：剪輯器新增「正在產生 720P 預覽檔…」提示，播放中切換解析度即時生效（`836de9121`、`2edb0c645`、`87f6021ec`）
+- **ED.3.0** 舊專案黃金測試（9 個 fixture，逐 frame md5 鎖定）＋ **ED.3.4** 輸出端光漏/震動/顆粒/旋轉效果（`4a3620f79`、`5d10097a0`、`c9574d507`）
+- **ED.3.1** 整片設定（比例/影格率/濾鏡/音量四組右側面板）＋ **ED.3.6** 可收合分組與數字欄位（`afc1d90ba`、`6ded608d6`）
+- **ED.3.2** 片段濾鏡/光漏/震動/顆粒＋預覽、 **ED.3.3** 變形關鍵影格/分離音訊/旁白閃避、 **ED.3.5** 速度/音量/文字/取色；ED.3 七張子卡全部完成（`61ac8cd09`、`8331ce93e`、`af1517238`）
+- **EC.2＋EC.3**「專業特效」EffectCraft 頁上線，與專業剪輯共用外框，真實 EffectCraft 0.21.1 端到端實測（`VW/tests/ec-real.cjs` PASS；`71aea42f2` 後合進）
+- **PJ.1** 一支影片＝一集，舊剪輯專案收進專案頁，剪輯器清單改讀各集（`71aea42f2`）
+- **FC.2/FC.3、EC.2/EC.3、PJ.1、ED.1–ED.3** 整批 sg-deploy 至正式機（`96ddd7f70`），Playwright smoke 34 pass；引擎靜態檔 SHA256 鎖定驗證
+- **RV.4** 正式站實測：Runway Gen-4 Turbo 5 秒試跑成功，mp4 播放 5.04 s、1280×720，cost US$0.25
 
-### 影片 / 字幕 / 自動內容（2026-10-28～10-30，其他 session）
-- 影片工具重構 V1–V7；Whisper 自架上線；字幕雙引擎（影片聲音來源決定字幕引擎）
-- 自動內容 P9.1–P9.6 完成；AI 審核退回重做流程
-- aware-wave.com wp-login 加 Cloudflare challenge，管理員帳號不再外洩
+### 畫布專業版（PhotoCraft C8）
+- **C8「傳回原工具」** 三工人完成（W5/W6/W7）：Tarot 預覽/單張、Studio 結果/參考圖、Banner 商品圖/背景，不落錯格不遺失；合進 main（`64f616b1c`）
+- **C8 sg-deploy 正式站實測**（`8239d222b`）：Banner/Studio 參考圖/Tarot 預覽三條路徑傳回驗收全 PASS（`8239d222b`）
+- **第三批上線**（`809a1ac9c`）：條碼修復（PhotoCraft SVG rect→群組）、AI 去除框內保留原像素、擴圖 `placeImage {at}` 對齊、AI 修圖面板（Nano Banana 2）；正式站真打驗收
 
-### Social C27/C28 compose 漂移結案（2026-10-27）
-- 正式機補 8 個 META_* 宣告（safe-infra-patch.sh），三個功能開關維持 false；`check-deploy-drift.ps1` PASS / composeVarDrift 清空；Playwright smoke 26 pass
+### 外聯系統（Outreach）
+- **客戶自有 Gemini 金鑰** 適用所有外聯 AI 步驟（研究/查證/寫信/回信分類），不再只限寫信；`outreachGeminiKey` + `outreachJson`，Codex 補審 4 項全修（`0fcdc1b34`，已部署）
+- **外聯手冊＋客戶頁冷開發分頁** 改接外聯 v2 狀態（寄件信箱/名單/花費/功能開通），刪舊無用設定分頁（`08076e969`）
+- **Soulful 開始用外聯**：寄件信箱 soulfulexpression01@gmail.com 草稿模式、服務檔「喜悅卡長輩藝術療癒團體課」manual review（`9f73e483`）
+- 監工台稽核：Soulful 隱私頁填上（`9f73e483`），AW 正式服務檔待決
 
-### Soulful 常見問答暫時撤回（2026-10-27）
-- 價格／時間／地點／報名 8 條改為「尚未定案、轉真人」，等操作者確認正式資料
+### MCP 優化
+- **MCP 不再經 npx**：7 套件鎖版本裝進 `mcp-local-wrappers`，6 server 合計 29→14 程序、1452→883 MB（每 session 省 ~570 MB）；`sync-mcp-config.ps1` 加 guard 擋 npx 寫法（`同日 commit`）
 
-### 外聯系統 v2 C17 社群研究（2026-11-01）
-- **C17.1–C17.5**：Meta Business Discovery API + Apify（instagram-profile-scraper / facebook-pages-scraper），研究功能讀 IG/FB 社群頁；自介算宣告（自動核准），貼文一律待審；`providers.ts` 排除 Linktree/LINE/表單/短網址
-- **C17.6**：Apify 兩個 actor 真跑驗證；FB 粉專自動填 email（commit `77d0291d6`）
-- **C17.7**：社群頁官網回填到名單，並同次爬官網提取 email（commit `e824205b0`）；C17 全部 7 項完成
-- **關鍵發現**：台中 8 家瑜珈 IG 連的全是 Linktree/LINE/Google 表單，無一連自家官網
-
-### 外聯系統 v2 C11 寄件池（2026-11-01～11-02）
-- **C11.2–C11.4**：migration 0152 `co_sender_accounts`＋`co_send_claims`＋三個 PL/pgSQL 函式（`3eea12c73`，commit）；OAuth 連為寄件池信箱；每日信箱健康排程 `sender-health.ts`
-- **0152 套正式庫**（2026-11-02 續2）：APPLY_OK；回填、CHECK、免費信箱鍵驗證通過
-- **正式機 OUTREACH_SYNC_TOKEN + 排程**（2026-11-02 續3）：safe-infra-patch compose 套用 15s healthy；install-host-schedules.sh 裝 7 個排程含 `outreach_sender_health`（00:30 UTC）
-
-### 模特兒印製 AI 引擎換新（2026-11-01）
-- 研究 5 種做法（nano-banana-2 / 程式置換 / FASHN / FLUX VTO / gpt-image-2.5-sunburst），選定 **gpt-image-2.5-sunburst**（印花隨皺褶、人/姿勢/背景不動）約 NT$2/張（`openai-25-edit`）
-- 印花框改四角透視（homography）；路由加模型白名單，成功呼叫帶 `model` 回 `ai_call_logs`
-
-### sg-deploy（2026-11-01）
-- **ff3b374c1** 上線（模特兒印製 AI + outreach C1–C17.7 共 14 個 app commit）
-- 中途被 npm test 擋：`deleteDesignObject` 違反 `deleteUnreferencedAsset` 不變量、`nearestAspect` route 多餘匯出；修正後重部署，smoke 26 pass / 0 fail
-
-### Mockup Studio 全面升級（2026-11-01～11-02）
-- **模特流程拆兩頁**（續1）：ModelLibraryStudio（生模特兒圖含背景）+ ModelMockupPanel（選模特兒圖＋設計圖合成商品 mockup）
-- **模型選單改善**（續6）：合成需 maxRefs≥2，FLUX/Ideogram 不列；平拍只列 maxRefs>0；ImageLightbox 點圖全螢幕放大
-- **sg-deploy 591cc1699**（續4）：部署空窗 502 HTML 改為友善中文說明，不再顯示 JSON parse 錯誤
-
-### wp-bridge 0.20.0（2026-11-02）
-- **新端點 POST /asset-references**（續9）：刪圖前改走 bridge，不再需要應用程式密碼；搜 post_content/post_excerpt/all post meta（候選>500 → 拒刪）
-- Soulful 清掉 6 組舊應用程式密碼（留 Admin 的 wpmcp、WPVibe 兩組）
-- **裝上 Soulful + aware-wave.com**（續10）：兩站皆 0.19.0→0.20.0，health 200；升級腳本 billing 判斷修正（`aware_wave_payments_enabled='1'` 才擋，與 Settings.php:96 同判準）
-- aware-wave.com wp-bridge 重新啟用（10-30 曾停用，0.19.0 後不含收費，重啟安全）
-
-### 影音工作台品牌重整（2026-11-02）
-- 原始碼搬進 repo：`apps/seedstar`（121 檔）→ 操作者改名 `apps/video-workbench`
-- 畫面字樣全換：SeedStar→AWAREWAVE，模型初始值 sora-2，下載檔名 `awarewave-video-*`
-- `.gitignore`：第三方擷取素材（194 張 seedstar.ai 圖）不進 git；MediaPipe bundle 以 SHA-256 驗證
+### 其他維運
+- **重複 Soulful 停用**：wp-member-7 設 `status='inactive'`；7 處客戶選單加 `.neq("status","inactive")` guard（`ca8d619e5`，已部署）
+- **MONGOLIA-03 停用**（`mongolia-03-6fc1c8`，可改回）
+- **C8.3 Soulful 隱私頁**：`co_service_profiles.privacy_url` 填真實 URL（curl 200 驗證）
 
 ---
 
 ## Open tasks
 
-### A ⏰ 有外部時鐘
-- [ ] **員工逐工具權限：看 7 天「本來會擋」紀錄，決定是否開始擋**（≈2026-11-01，**已逾期**）— 操作者需先到 `/ops/staff` 勾工具，AI 再跑 docker logs 說明
-- [ ] **aware-wave.com DMARC 升級第三階段（p=quarantine → p=reject）**（≈2026-11-06）— 需查 10-23 後的 rua 報表（dmarc@aware-wave.com）
+### A. ⏰ 有外部時鐘（逾期 / 近期觸發）
+- **【≈2026-11-01 逾期】員工逐工具權限**：看 7 天 `[staff-tools]` 紀錄再決定要不要開始擋。需操作者到 `/ops/staff` 完成勾選
+- **【≈2026-11-06 觸發】DMARC 升級第三階段**（`p=quarantine → p=reject`）：10-23 起 rua 報表零未解釋失敗才改
 
-### B 🔒 卡在操作者
-- [ ] Soulful 網域轉 Cloudflare Registrar（無死線，2028 到期）
-- [ ] 社群管理平台 V1：樣稿 v16 定案後，C19–C31（G5 升級 Postiz）
-- [ ] 會議服務網路版安裝（三題決策待答：錄音授權/GPU 方案/客戶數）
-- [ ] Soulful 課程 AI 自動回覆：剩部署→匯入 json→客服分頁「開始考試」→操作者批准
-- [ ] **危機訊息 0104 上線後實測**（需操作者登入，驗 John Doe 情境）
-- [ ] Soulful 常見問答正式資料：操作者確認後更新 8 條
-- [ ] Chatwoot 排程：操作者到 `/ops/schedules` 勾 Soulful 這一格
+### B. 🔒 卡在你（需人工操作）
+- 買冷信次網域＋開池信箱（C11.1）：解鎖 C11.4/C8.5/C15.4
+- Soulful 網域轉 Cloudflare Registrar（付到 2028，無急迫性）
+- Postiz OAuth App Review（Meta IG+FB；Reddit/LinkedIn 卡資格）
+- POD A1 真實 e2e 瀏覽器驗收（操作者驅動）
+- Mockup Studio 功能異常：需操作者給截圖＋F12 console/network
+- Canvas 編輯器整輪瀏覽器實測（Redo、生成填色、群組/設計檔）
+- Soulful 常見問答正式資料（8 條待定案）
+- Chatwoot：操作者勾 Soulful 排程格 + 標籤/預設回覆/營業時間
 
-### C 🔒 卡在外部
-- [ ] Cognitive OS P4：報告核准角色與來源搜尋規模（待操作者決定）
-- [ ] 研究線三條（Cognitive OS Project 工作流）：操作者定門檻
-- [ ] Postiz OAuth app 審核：Meta App Review / Reddit / LinkedIn
-- [ ] 外聯 C11.4：對真實次網域真跑，等 C11.1 買好次網域
-- [ ] Meta App Review HUMAN_AGENT（客人 >24h 後無法回覆）
-- [ ] IG comments auto-reply / IG DM live test（需 Meta Advanced Access）
+### D–G. 可直接做（無阻塞）
+- **【F 產品】PhotoCraft（画布专业版）C1.1**：計畫 `handoffs/2026-11-05-photocraft-pro/R0-PLAN.md` 已定稿，等操作者說開始
+- **【F 產品】VectorCraft（向量專業版）C1.1**：計畫 `handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md` 定稿，等 go-ahead
+- **【F 產品】社群管理平台 V1 C19–C31**：樣稿 v16 定案後照 `SOCIAL_MANAGER_PLAN.md §1b` 開始
+- **【E 治理】`upsertIncidentAtomic`** collection 事件不走原子更新（`lib/collect/report-store.ts:166`）
+- **【G 基建】影片歸屬持久化** `outName → organization_id`（2026-08-25 開出）
+- **【G 基建】`/api/video/regenerate-image` 502**（2026-09-11 開出，需付費測試）
+- **【F 產品】ADR 017 第一個方案列**（plans 0 筆，訂閱付款前必須）
+- Soulful 課程類 AI 自動回覆：考試閘已寫好，剩部署→匯入→考試
+- 危機訊息「真人接手中也回一句」0104 上線後實測
+- Cognitive OS P4 決策：報告核准角色與來源搜尋規模
+- Research lines 操作者定門檻（P2 DOD 已 8/8）
 
-### D–G ▶️ 可直接做
-- [ ] 外聯系統 v2 後續卡片（C11 後、C18、C19 等）
-- [ ] POD A1 e2e（操作者驅動瀏覽器驗收）
-- [ ] ADR 017 第一個方案（plans 0 筆）；4b-6（WCS + 綠界）
-- [ ] Canvas 編輯器整輪瀏覽器實測（Redo / 生成填色 / 群組 / .design.json 存載）
-- [ ] Mockup Studio 診斷：操作者提供「什麼操作、F12 Network 截圖」
-- [ ] collection 事件改走 `upsertIncidentAtomic`（`lib/collect/report-store.ts:166`）
-- [ ] 生圖額度改三軸五對象（刪 `lib/tarot/quota.ts`，共用 `lib/ai/gateway.ts` 煞車）
-- [ ] `/api/video/regenerate-image` 502（REPLICATE env 已排除，卡操作者登入點一次「重新生成」）
-- [ ] provenance/author 到 sink 就斷（KB 側 K2e 三軸 locked 才做）
-- [ ] `queryAsTenant()` SET ROLE 缺 transaction 包裹（低風險，觸碰 RLS，需獨立確認）
-
-### H 🧊 只記錄
-- [ ] POD A2 confirm phase（金流紅線，測試結束 + 明示批准才做）
-- [ ] Composable AI Commerce OS（先預留，未授權動工）
+### H. 🧊 只記錄、不排工
+- POD A2 confirm（金流紅線，測試結束+操作者明示才做）
+- 會議服務網路版（待操作者下指令）
+- Composable AI Commerce OS（先預留）
+- `/api/hci/v1/cases` TOCTOU 窗口（非阻塞 minor）
+- mutability matrix SSOT 漂移（非阻塞）
 
 ---
 
 ## System health
 
-> 最後 integrated-status 生成：2026-10-30 02:00 UTC（本週已逾 3 天，建議重新生成）
+> 最新整合狀態報告：2026-10-30（`reports/status/integrated-status-LATEST.md`）；本週未重新執行 `/health`，以下基於 2026-11-06 部署驗收結果推斷。
 
-| 指標 | 狀態 |
-|------|------|
-| **最新 sg-deploy** | `591cc1699`（2026-11-02 16:37），npm test 3815 passed，smoke 5/5 ✅ |
-| **migration** | 套到 0152 sender_pool（2026-11-02 APPLY_OK）✅ |
-| **wp-bridge** | 0.20.0 裝上 Soulful + aware-wave.com ✅ |
-| **Playwright smoke** | 26 pass / 0 fail / 6 skip（2026-11-01 部署後）✅ |
-| **DMARC** | p=quarantine（第三階段 11-06 觸發）⚠ |
-| **Codex 額度** | 剩 ≤1%（多次 ORACLE_WAIVED）⚠ |
-| **integrated-status** | 需重新生成（3 天前）⚠ |
+- **next-admin**：最新部署 `96ddd7f70`（2026-11-06），sg-deploy healthy、Playwright smoke 34 pass；`check-deploy-drift.ps1` 無 `composeVarDrift`（2026-10-27 結案）
+- **video-workbench**：最新部署 `96ddd7f70`，smoke 8 項 OK，引擎靜態檔 SHA256 全過
+- **MCP servers**：6 個 server 改不走 npx，記憶體使用 ~883 MB（較前省 570 MB/session）
+- **外聯**：Soulful 開始草稿模式寄件；AW 測試資料（289 名單/505 信件）2026-11-06 C16.2 量完後待清
 
 ---
 
 ## Risks & blockers
 
-1. **員工工具擋截逾期**（高）：11-01 到期，操作者尚未到 `/ops/staff` 勾工具；shadow log 在主機 docker logs；擋截模式在 `enforce` 前不影響用戶。
-2. **DMARC 11-06 升段**（中）：需查 10-23 後的 rua 報表，零未解釋失敗才升；提醒已建日曆。
-3. **Codex 額度幾乎耗盡**（中）：本週多張卡 ORACLE_WAIVED；若下週繼續，oracle 品質降為書面自審。
-4. **外聯 C11.4 次網域**（中）：等 C11.1 買好網域；寄件池排程 11-02 首跑，`checked=0` 正常（目前 0 個信箱）。
-5. **Meta Advanced Access 待審**（中）：C27/C28 IG comments auto-reply / IG DM live test 功能已寫好但 OFF，等 Meta 審核通過才能開啟。
-6. **POD A1 e2e 未驗**（低）：操作者尚未瀏覽器點測一鍵上 Printful 流程。
-7. **Canvas / Mockup 畫面待實測**（低）：多個功能無登入 session，Claude 無法代測。
+| 風險 | 嚴重度 | 備註 |
+|---|---|---|
+| 員工工具權限逾期未評估 | 🟠 中 | 2026-11-01 應看 7 天紀錄，仍未動；操作者需主動看 `/ops/staff` |
+| DMARC 升級觸發（≈11-06）| 🟠 中 | 需操作者確認 rua 報表無未解釋失敗後才改 |
+| PhotoCraft / VectorCraft 計畫停在等開始 | 🟡 低 | 操作者說「開始」即可動工，計畫已完整 |
+| AW 正式服務檔待決（監工台 OPEN 兩項）| 🟡 低 | C16.2 測試資料量完後需清理 |
+| Soulful 常見問答 8 條暫撤 | 🟡 低 | 客服 AI 遇問題全轉真人，不影響安全但降低自動化率 |
+| Canvas 整輪瀏覽器實測待操作者 | 🟡 低 | 程式已部署，驗收債 |
 
 ---
 
 ## Memory highlights
 
-- **外聯研究核心發現**：真實台中瑜珈店 IG 全用 Linktree/LINE/表單，沒有自家官網；`PLATFORM_HOSTS` 新增 forms.gle/linktr.ee/lin.ee/page.line.me；已用 Soulful 粉專真查驗收。
-- **gpt-image-2.5-sunburst 選定**：5 種做法真打對比後，此模型是唯一做到「印花隨皺褶、人/背景不動、設計不變」的方案，約 NT$2/張（OpenAI edits API）。
-- **Soulful Wordfence 停用應用程式密碼**：造成刪圖失敗；wp-bridge 0.20.0 /asset-references 端點從根本解決此問題，不再依賴 WP REST auth。
-- **aware-wave.com wp-bridge 重新啟用**：10-30 停用原因記錄：操作者要 AW 與 app 完全切開；0.19.0 後 bridge 不含收費，重啟安全。
-- **影音工作台品牌切割**：SeedStar 是第三方品牌（seedstar.ai）；畫面全換成 AwareWave；第三方圖片/wasm 不進 git，MediaPipe 以 SHA-256 驗證。
-- **操作者指示**（本週新）：Codex 額度不夠就「自我審查」；Mockup 模特合成只列 maxRefs≥2 的模型（平拍邏輯相反）。
+- **2026-11-06 高密度工作日**：38 個 WORKLOG 連續條目，幾乎全為影音工作台（ED.3、EC、PJ）+ 畫布專業版（C8）的大批次完工＋部署；是本專案近幾週最高密度的一日
+- **MCP 記憶體優化**：每 session 節省 ~570 MB，改善多 session 並行時筆電 80% 記憶體壓力
+- **外聯系統正式啟動 Soulful 客戶**：第一個非 AwareWave 本身的客戶開始使用外聯草稿模式，里程碑
+- **客戶 BYO Gemini 金鑰**：研究/查證/回信分類全覆蓋，不再只限寫信；平台免費 API 500 次/天的壓力大幅降低
+- **ADR 017 客戶模型**：4b/4c 系列完成，但「第一個方案列」仍為 0 筆，訂閱付款路徑尚未開通
+- **PhotoCraft / VectorCraft**：R0 計畫已定稿，等操作者一聲令下即可開工

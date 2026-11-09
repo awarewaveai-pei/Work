@@ -30255,3 +30255,5 @@ WORKLOG 先前的 `REALTEST_WAIVED: Docker Desktop 未啟動` 是誠實的，但
 - ORACLE_ATTEMPT: standard Claude CLI review unavailable because `claude` is not on PATH; two bounded Claude SDK review attempts produced no response and were stopped. Local adversarial review plus typecheck, Vitest, Playwright, migration verification, visual render, and diff checks remain passing.
 - SYNC_REPAIR: committed the generated `.claude/skills/synced` bundle only as `7de686789` (`chore: sync generated Claude skills`); `check-claude-sync.ps1` now returns `PASS`.
 - DEPLOY_HOLD: production preflight found `infra/hetzner-phase1-core/DEPLOY_HOLD`; ADR017 step 2 prerequisites are not yet satisfied. Hold was preserved and no production deploy or override was attempted.
+## 2026-11-09
+- 01:14 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-11-09.md
