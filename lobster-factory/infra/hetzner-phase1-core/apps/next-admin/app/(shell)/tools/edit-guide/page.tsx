@@ -119,6 +119,22 @@ export default function EditGuidePage() {
           所以：<b>框要剛好包住要刪的東西</b>，不要連旁邊想保留的一起框進去；不滿意就再按一次，每次結果都會不一樣。
         </p>
 
+        <h3 style={h3}>最便宜的兩顆也做得到，但一定要寫清楚</h3>
+        <p style={{ margin: "0 0 12px" }}>
+          FLUX 2 Klein 4B 和 FLUX Kontext Fast 沒有遮罩功能，可是面板本來就只把選區周圍一塊送出去、再把選區貼回來，
+          所以它們照樣能做局部填色——前提是<b>描述不能留空</b>，要寫「移除那三隻動物，延續後面的橘色布幔和王座」這種話。
+          同一個框、同一句指令：
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 16, margin: "0 0 14px" }}>
+          <Shot src={`${SHOT}/d1-klein.jpg`} alt="FLUX 2 Klein 4B 的結果：三隻動物消失，布幔與王座完整"
+            caption={<><b>{labelOf("flux-2-klein-4b")}</b> {price("flux-2-klein-4b")}：動物乾淨消失，布幔、王座、標題字都完好。連跑兩次結果一致。</>} />
+          <Shot src={`${SHOT}/d2-kontext-fast.jpg`} alt="FLUX Kontext Fast 的結果：三隻動物消失，筆觸與原畫一致"
+            caption={<><b>{labelOf("flux-kontext-fast")}</b> {price("flux-kontext-fast")}：同樣乾淨，筆觸最貼近原畫。</>} />
+        </div>
+        <p style={{ margin: "0 0 14px", color: "var(--text-muted)" }}>
+          所以要省錢又要準：<b>自己寫清楚要改什麼</b>，用這兩顆；懶得想描述、想讓它自己看圖補，用 Ideogram 留空。
+        </p>
+
         <h3 style={h3}>想加東西的時候才打字</h3>
         <p style={{ margin: "0 0 14px" }}>描述欄是用來說「要生成什麼」的。要加酒杯就寫「一個金色高腳酒杯放在扶手上」，中文可以。要清東西、要補背景，留空最準。</p>
 
