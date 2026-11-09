@@ -6,10 +6,13 @@
  * now all run against the same predicate set (applyFilters), so the page, the total and every chip
  * count describe one collection.
  *
- * Counts are COUNT(*) per facet value (PostgREST HEAD + count=exact). PostgREST aggregates are not
- * enabled on this stack and a GROUP BY function would need a migration; the value sets are small
- * (fixed model / product keys, a handful of themes / brands), so one parallel round of HEAD counts
- * replaces the GROUP BY.
+ * Counting used to be one COUNT(*) request per facet value (PostgREST HEAD + count=exact) — about 40 per page load,
+ * growing with the model catalog. The host's nginx allows 30 req/s per IP with a burst of 50 on supabase.aware-wave.com
+ * (/etc/nginx/sites-enabled/supabase.aware-wave.com), so a page that loaded twice crossed it and PostgREST's 429 came
+ * back as `[designs] list failed: count failed:` with an empty body (2026-11-09). PostgREST aggregates are disabled on
+ * this stack (PGRST123 "Use of aggregate functions is not allowed"), so the counts are now tallied here: ONE scan of the
+ * scope's facet columns (216 rows on 2026-11-09), paged, then every facet computed in memory. One page load is one
+ * request whatever the catalog holds.
  */
 import { getDesignsPublicBase } from "../storage/r2";
 import { withSourceUrls } from "./design-source";
@@ -151,108 +154,125 @@ function keysetOr(c: DesignCursor, order: SortOrder): string {
   return `created_at.${op}."${c.createdAt}",and(created_at.eq."${c.createdAt}",id.${op}.${c.id})`;
 }
 
-/**
- * Facet counting is one request per key, so its burst grew with the catalog: 19 model keys + products + themes +
- * brands + the time rows went out at once, and a page that fetches twice (React strict mode, a reload on top of an
- * in-flight load) doubled that. Measured on the host 2026-11-09: the Supabase gateway answers a burst of 60 fine and
- * starts returning 429 (an HTML error page, which surfaced as `count failed: <html>`) at 80. Nothing about a gallery
- * needs that concurrency, so every count goes through one gate: the burst is now a constant, whatever the catalog holds.
- */
-export const COUNT_CONCURRENCY = 8;
-let inFlight = 0;
-const waiting: Array<() => void> = [];
-/** Exported for lib/studio/__tests__/designs-facet-gate.test.ts. */
-export async function gated<T>(run: () => Promise<T>): Promise<T> {
-  if (inFlight >= COUNT_CONCURRENCY) await new Promise<void>((resolve) => waiting.push(resolve));
-  inFlight++;
-  try {
-    return await run();
-  } finally {
-    inFlight--;
-    waiting.shift()?.();
+/** Rows scanned per request while tallying facets; PostgREST's own ceiling is higher, this keeps each response small. */
+const FACET_SCAN_PAGE = 1000;
+/** Hard stop, so a runaway scope cannot turn one page load into a long scan. Today's design scope is 216 rows. */
+export const FACET_SCAN_MAX = 20000;
+
+interface FacetRow {
+  created_at: string;
+  source: string | null;
+  model: string | null;
+  productType: string | null;
+  theme: string | null;
+  brand: string | null;
+}
+
+/** The product chip a row belongs to — the inverse of applyProduct, which the chips' counts must agree with. */
+export function productOf(row: FacetRow): string | null {
+  if (row.source && (TAROT_SOURCES as readonly string[]).includes(row.source)) return "tarot-card";
+  if (row.source && (MOCKUP_SOURCES as readonly string[]).includes(row.source)) return "mockup-composite";
+  if (row.source === "pod-studio") return row.productType;
+  return null;
+}
+
+/** Every row of the scope (org + tab), facet columns only, keyset-paged. */
+async function scanScope(supabase: Client, scope: DesignListFilters, now: Date): Promise<FacetRow[]> {
+  const out: FacetRow[] = [];
+  let cursor: DesignCursor | null = null;
+  while (out.length < FACET_SCAN_MAX) {
+    const { q, ors } = applyFilters(supabase.from("media_assets").select("id,created_at,metadata"), scope, now);
+    const all = cursor ? [...ors, keysetOr(cursor, "desc")] : ors;
+    const { data, error } = await finishOr(q, all)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(FACET_SCAN_PAGE);
+    if (error) throw new Error(`facet scan failed: ${error.message}`);
+    const rows = (data ?? []) as { id: string; created_at: string; metadata: Record<string, unknown> | null }[];
+    for (const r of rows) {
+      const m = r.metadata ?? {};
+      out.push({
+        created_at: r.created_at,
+        source: (m.source as string) ?? null,
+        model: (m.model_name as string) ?? null,
+        productType: (m.product_type as string) ?? null,
+        theme: (m.theme as string) ?? null,
+        brand: (m.brand as string) ?? null,
+      });
+    }
+    if (rows.length < FACET_SCAN_PAGE) break;
+    const last = rows[rows.length - 1];
+    cursor = { createdAt: last.created_at, id: last.id };
   }
+  return out;
 }
 
-async function countWhere(
-  supabase: Client,
-  f: DesignListFilters,
-  now: Date,
-  omit: FacetDim | undefined,
-  extra?: (q: Query) => Query,
-): Promise<number> {
-  return gated(async () => {
-    const base = supabase.from("media_assets").select("id", { count: "exact", head: true });
-    const { q, ors } = applyFilters(base, f, now, omit);
-    const { count, error } = await finishOr(extra ? extra(q) : q, ors);
-    if (error) throw new Error(`count failed: ${error.message}`);
-    return count ?? 0;
-  });
+/** Does this row pass every active filter except `omit`? Mirrors applyFilters' facet predicates exactly. */
+function passes(row: FacetRow, f: DesignListFilters, omit: FacetDim | undefined, cutoff: string | null): boolean {
+  if (omit !== "model" && f.model && row.model !== f.model) return false;
+  if (omit !== "product" && f.product && productOf(row) !== f.product) return false;
+  if (omit !== "theme" && f.theme && row.theme !== f.theme) return false;
+  if (omit !== "brand" && f.brand && row.brand !== f.brand) return false;
+  if (omit !== "time" && cutoff && row.created_at < cutoff) return false;
+  return true;
 }
 
-async function countMap(
-  supabase: Client,
-  f: DesignListFilters,
-  now: Date,
-  dim: FacetDim,
-  keys: string[],
-  narrow: (q: Query, key: string) => Query,
-): Promise<Record<string, number>> {
-  const counts = await Promise.all(keys.map((k) => countWhere(supabase, f, now, dim, (q) => narrow(q, k))));
-  return Object.fromEntries(keys.map((k, i) => [k, counts[i]]));
-}
-
-/** Distinct free-text values (theme / brand) in `f`; counted afterwards in the DB. A skip scan — each query
- *  fetches the next value above the last one — so a value is never missed however many rows share the earlier
- *  ones (a single `limit(2000)` read dropped every value past row 2000, Codex 2026-10-22). Up to
- *  MAX_FACET_VALUES + 1 one-row queries. */
-async function distinctValues(supabase: Client, f: DesignListFilters, now: Date, dim: "theme" | "brand"): Promise<string[]> {
-  const path = `metadata->>${dim}`;
-  const vals: string[] = [];
-  let last: string | null = null;
-  while (vals.length < MAX_FACET_VALUES) {
-    const { q, ors } = applyFilters(supabase.from("media_assets").select(`v:${path}`), f, now, dim);
-    let next = q.not(path, "is", null).neq(path, "");
-    if (last !== null) next = next.gt(path, last);
-    const { data, error } = await gated(async () => await finishOr(next, ors).order(path, { ascending: true }).limit(1));
-    if (error) throw new Error(`${dim} values failed: ${error.message}`);
-    const v = ((data ?? []) as { v: unknown }[])[0]?.v;
-    if (typeof v !== "string") break;
-    vals.push(v);
-    last = v;
+function tally(rows: FacetRow[], f: DesignListFilters, dim: FacetDim, keyOf: (r: FacetRow) => string | null,
+  keys: string[], cutoff: string | null): Record<string, number> {
+  const counts: Record<string, number> = Object.fromEntries(keys.map((k) => [k, 0]));
+  for (const row of rows) {
+    if (!passes(row, f, dim, cutoff)) continue;
+    const k = keyOf(row);
+    if (k !== null && k in counts) counts[k]++;
   }
-  return vals;
+  return counts;
+}
+
+/** Values of a free-text dimension present anywhere in the scope, newest first, capped like the old skip scan. */
+function presentValues(rows: FacetRow[], keyOf: (r: FacetRow) => string | null): string[] {
+  const seen: string[] = [];
+  for (const row of rows) {
+    const v = keyOf(row);
+    if (v && v !== "" && !seen.includes(v)) seen.push(v);
+    if (seen.length >= MAX_FACET_VALUES) break;
+  }
+  return seen.sort();
 }
 
 async function countFacets(supabase: Client, f: DesignListFilters, now: Date): Promise<{ total: number; facets: DesignFacets }> {
   // Scope = org + tab only. Which chips exist is decided here; the counts below apply the other filters.
   const scope: DesignListFilters = { ...f, model: null, product: null, theme: null, brand: null, time: null };
-  const present = (m: Record<string, number>) => Object.keys(m).filter((k) => m[k] > 0);
-  const [scopeProducts, themes, brands] = await Promise.all([
-    countMap(supabase, scope, now, "product", Object.keys(GALLERY_PRODUCT_LABELS), applyProduct),
-    distinctValues(supabase, scope, now, "theme"),
-    distinctValues(supabase, scope, now, "brand"),
-  ]);
+  const rows = await scanScope(supabase, scope, now);
+  const cutoff = f.time ? timeCutoff(f.time, f.tzOffsetMin, now) : null;
+  const countIf = (omit: FacetDim | undefined, extra?: (r: FacetRow) => boolean) =>
+    rows.reduce((n, r) => n + (passes(r, f, omit, cutoff) && (!extra || extra(r)) ? 1 : 0), 0);
+
+  const themes = presentValues(rows, (r) => r.theme);
+  const brands = presentValues(rows, (r) => r.brand);
+  const products = presentValues(rows, productOf).filter((k) => k in GALLERY_PRODUCT_LABELS);
   const ranges: TimeRange[] = ["today", "week", "month"];
-  const [total, model, product, theme, brand, timeAll, timeRanges, rowAll] = await Promise.all([
-    countWhere(supabase, f, now, undefined),
-    // Model chips are all shown (showEmpty): every model key is counted.
-    countMap(supabase, f, now, "model", Object.keys(GALLERY_MODEL_LABELS), (q, k) => q.eq("metadata->>model_name", k)),
-    countMap(supabase, f, now, "product", present(scopeProducts), applyProduct),
-    countMap(supabase, f, now, "theme", themes, (q, k) => q.eq("metadata->>theme", k)),
-    countMap(supabase, f, now, "brand", brands, (q, k) => q.eq("metadata->>brand", k)),
-    countWhere(supabase, f, now, "time"),
-    Promise.all(ranges.map((r) => countWhere(supabase, f, now, "time", (q) => q.gte("created_at", timeCutoff(r, f.tzOffsetMin, now))))),
-    Promise.all((["model", "product", "theme", "brand"] as const).map((d) => countWhere(supabase, f, now, d))),
-  ]);
+  const rangeCutoffs = ranges.map((r) => timeCutoff(r, f.tzOffsetMin, now));
+
   return {
-    total,
+    total: countIf(undefined),
     facets: {
-      model,
-      product,
-      theme,
-      brand,
-      time: { all: timeAll, today: timeRanges[0], week: timeRanges[1], month: timeRanges[2] },
-      all: { model: rowAll[0], product: rowAll[1], theme: rowAll[2], brand: rowAll[3] },
+      // Model chips are all shown (showEmpty): every model key is counted, present or not.
+      model: tally(rows, f, "model", (r) => r.model, Object.keys(GALLERY_MODEL_LABELS), cutoff),
+      product: tally(rows, f, "product", productOf, products, cutoff),
+      theme: tally(rows, f, "theme", (r) => r.theme, themes, cutoff),
+      brand: tally(rows, f, "brand", (r) => r.brand, brands, cutoff),
+      time: {
+        all: countIf("time"),
+        today: countIf("time", (r) => r.created_at >= rangeCutoffs[0]),
+        week: countIf("time", (r) => r.created_at >= rangeCutoffs[1]),
+        month: countIf("time", (r) => r.created_at >= rangeCutoffs[2]),
+      },
+      all: {
+        model: countIf("model"),
+        product: countIf("product"),
+        theme: countIf("theme"),
+        brand: countIf("brand"),
+      },
     },
   };
 }
