@@ -15,6 +15,7 @@ const CALLERS_LOG: Readonly<Record<string, string>> = {
   "lib/studio/bg-remover.ts": "removeBackground",
   "lib/studio/generative-fill.ts": "generativeFill",
   "lib/studio/inpaint.ts": "removeObject",
+  "lib/studio/replicate-run.ts": "runReplicate",
   "lib/tarot/video-motion-gen.ts": "generateVideoMotionBatch",
 };
 

@@ -1,7 +1,8 @@
 // Server-side image generation for the tarot print-file tool.
 // Models (provider keys in app env), cheapest → priciest:
 //   flux-schnell/dev  → Replicate BFL (text2img; dev adds img2img)
-//   openai-low/med/hi → OpenAI images (OPENAI_IMAGE_MODEL in lib/ai/cost-model.ts); openai-25-edit → gpt-image-2.5-sunburst (config.openaiModel)
+//   openai-low/med/hi → OpenAI images (OPENAI_IMAGE_MODEL in lib/ai/cost-model.ts); openai-25-edit → gpt-image-2.5-sunburst,
+//                       openai-26-edit → gpt-image-2.6-sunburst (config.openaiModel; the only model that takes `mask`)
 //   ideogram-*        → Ideogram via Replicate (v2a-turbo/v3-balanced/v4-turbo/v4-quality/character)
 //   nano-banana-2/pro → Google Gemini Image via Replicate
 //   imagen-4          → Google Imagen 4 via Replicate
@@ -9,6 +10,7 @@
 // Returns uniform `data:image/png;base64,...` so the client treats all models the same.
 // Prompts arrive in English: the studio translates non-English subject/style once per deck (lib/tarot/translate.ts), never here.
 
+import sharp from "sharp";
 import { getDesignsPublicBase } from "../storage/r2";
 import { MODEL_SPECS } from "./model-specs";
 import { providerUrl } from "@/lib/ai/gateway";
@@ -35,6 +37,7 @@ export type TarotModel =
   | "openai-medium"
   | "openai-high"
   | "openai-25-edit"
+  | "openai-26-edit"
   | "ideogram-v2a-turbo"
   | "ideogram-v3-balanced"
   | "ideogram-v4-turbo"
@@ -154,6 +157,8 @@ export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
   "openai-high": { provider: "openai", supportsImg2img: true, quality: "high" },
   // 25-35 s measured 2026-11-01 (4 edits, high, 2 refs); fabric-print route maxDuration 120.
   "openai-25-edit": { provider: "openai", supportsImg2img: true, quality: "high", openaiModel: "gpt-image-2.5-sunburst", timeoutMs: 110_000 },
+  // 2.6 sunburst (OpenAI 2026-11-09: "precise edits"); the genfill route's mask edit (TarotGenParams.mask).
+  "openai-26-edit": { provider: "openai", supportsImg2img: true, quality: "high", openaiModel: "gpt-image-2.6-sunburst", timeoutMs: 110_000 },
   // ── Ideogram via Replicate ────────────────────────────────────────────────
   // v2a/v3 keep seed support; v4 dropped seed entirely (live schema 2026-06-11).
   // Optional enum params (style_type/magic_prompt_option) omitted — defaults are fine and the
@@ -291,10 +296,13 @@ export interface TarotGenParams {
   prompt: string;
   /**
    * data: URLs of reference images for style transfer (where the model supports it).
-   * FLUX uses only the first; gpt-image-1 can consume several; nano-banana accepts up to 14.
+   * FLUX uses only the first; gpt-image-2 can consume several; nano-banana accepts up to 14.
    */
   referenceImages?: string[];
-  /** Reproducibility seed (most Replicate models; gpt-image-1 ignores it). */
+  /** Mask over referenceImages[0] (same pixel size), WHITE = change, as a PNG data URL. OpenAI /images/edits only (it wants
+   *  transparent = edit: converted in generateOpenai); other providers ignore it. */
+  mask?: string;
+  /** Reproducibility seed (most Replicate models; gpt-image-2 ignores it). */
   seed?: number | null;
   /** Output aspect ratio. Defaults to "2:3" (traditional tarot portrait). */
   aspectRatio?: AspectRatio;
@@ -601,6 +609,11 @@ async function generateOpenai(params: TarotGenParams, config: ModelConfig, signa
       if (!fetched) return { ok: false, error: "invalid_reference_image" };
       form.append("image[]", fetched.blob, `reference-${i}.${fetched.ext}`);
     }
+    if (params.mask) {
+      const mask = await openaiMask(params.mask);
+      if (!mask) return { ok: false, error: "invalid_mask" };
+      form.append("mask", new Blob([new Uint8Array(mask)], { type: "image/png" }), "mask.png");
+    }
     res = await fetch(providerUrl(grant, "openai", "/v1/images/edits"), {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}` },
@@ -629,6 +642,16 @@ async function generateOpenai(params: TarotGenParams, config: ModelConfig, signa
   const b64 = json.data?.[0]?.b64_json;
   if (!b64) return { ok: false, error: "openai_empty_output", billed: true, costUsd }; // a 200 from the images API is charged
   return { ok: true, image: `data:image/png;base64,${b64}`, seed: null, costUsd };
+}
+
+/** WHITE = change mask → the images API's RGBA mask whose TRANSPARENT pixels mark the area to edit (alpha = 255 − luminance). */
+async function openaiMask(maskDataUrl: string): Promise<Buffer | null> {
+  const parsed = parseDataUrl(maskDataUrl);
+  if (!parsed) return null;
+  const { data, info } = await sharp(parsed.buffer).removeAlpha().greyscale().raw().toBuffer({ resolveWithObject: true });
+  const rgba = Buffer.alloc(info.width * info.height * 4);
+  for (let i = 0; i < info.width * info.height; i++) rgba[i * 4 + 3] = 255 - data[i];
+  return sharp(rgba, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer();
 }
 
 interface OpenAiImageUsage {

@@ -12,7 +12,9 @@ import { getDesignsPublicBase } from "../../../../../lib/storage/r2";
 import { friendlyImageError as friendlyError } from "@/lib/studio/image-errors";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// Must cover the slowest model this route can run: the OpenAI edit models set timeoutMs 110_000
+// (lib/tarot/image-gen.ts TAROT_MODELS), same ceiling as fabric-print. nginx proxy_read_timeout is 300s.
+export const maxDuration = 120;
 
 interface GenerateBody {
   model?: string;

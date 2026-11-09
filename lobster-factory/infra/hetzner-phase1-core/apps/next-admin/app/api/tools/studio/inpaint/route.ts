@@ -4,12 +4,15 @@ import { withFeature } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
 import { removeObject } from "../../../../../lib/studio/inpaint";
 import { holdCost, logImageCost, releaseHold } from "../../../../../lib/ai/log-ai-call";
+import { imageCostUsd } from "../../../../../lib/ai/cost-calculator";
+import { IMAGE_RATES } from "../../../../../lib/ai/cost-model";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const MAX_IMAGE_CHARS = 12_000_000; // ~9 MB base64, same ceiling as remove-bg / designs save
 const DATA_URL_RE = /^data:image\/(png|jpe?g|webp);base64,/;
+const MODEL = "bria-eraser"; // the one 去除 tool (image-models.js EDIT_TOOLS uses "remove")
 
 // Library grantFor calls inherit this request's billing account and actor (ADR 018 §2 開門規則 2).
 export const POST = withFeature("studio.inpaint", handlePost);
@@ -40,11 +43,13 @@ async function handlePost(request: Request, grant: Grant) {
   }
 
   // Credits held before the provider runs (Grant.hold); every delivered call is charged, with or without a _jobId.
-  const hold = await holdCost(grant, 0.003);
+  // Price = the catalog row (public/editor-shared/image-models.js bria-eraser): this route logged US$0.003 until 2026-11-09, 13× under.
+  const costUsd = imageCostUsd(MODEL);
+  const hold = await holdCost(grant, costUsd);
   if (!hold) return NextResponse.json({ ok: false, error: "no_credits" });
   const result = await removeObject(body.image, body.mask).catch((e) => { releaseHold(hold, "tools/studio/inpaint"); throw e; });
   const jobId = typeof body._jobId === "string" ? body._jobId : null;
-  if (result.ok) void logImageCost({ route: "tools/studio/inpaint", model: "bria-eraser", vendor: "Replicate", costUsd: 0.003, jobId, tool: "canvas", grant, hold });
+  if (result.ok) void logImageCost({ route: "tools/studio/inpaint", model: MODEL, vendor: IMAGE_RATES[MODEL].vendor, costUsd, jobId, tool: "canvas", grant, hold });
   else releaseHold(hold, "tools/studio/inpaint");
   // HTTP 200 with ok:false on failure — same nginx error_page rationale as the other studio routes.
   return NextResponse.json(result);

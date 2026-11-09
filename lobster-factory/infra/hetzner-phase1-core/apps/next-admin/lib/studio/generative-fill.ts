@@ -1,140 +1,154 @@
 /**
- * Studio generative fill + outpaint behind a provider-neutral seam.
+ * Studio generative fill + outpaint behind a provider-neutral seam (the genfill route's Replicate models; the OpenAI mask
+ * edit, openai-26-edit, goes through lib/tarot/image-gen.ts instead -- the route branches).
  *
- * Implementation: Replicate `black-forest-labs/flux-fill-pro` — the PRO (proprietary, hosted)
- * FLUX Fill model. Unlike flux-fill-dev (non-commercial licence), pro is commercially usable
- * through Replicate's hosted terms, so it is safe for print-on-demand output.
- *
- * One model serves two features (same poll/fetch shape as inpaint.ts / bg-remover.ts):
- *   - 生成填色 generative fill — pass {image, mask, prompt}; mask convention WHITE = fill /
- *     regenerate, BLACK = preserve (identical orientation to the inpaint mask painter, so the
- *     same red-stroke → white-on-black extraction in CanvasEditor feeds both).
- *   - 擴圖 outpaint — pass {image, prompt, outpaint:"<preset>"}; the model extends the canvas in
- *     the chosen direction. When `outpaint` is set the mask is ignored (per the model schema).
- *
- * Version-pinned for reproducibility with an env override (GENFILL_VERSION). Reuses the same
- * REPLICATE_API_TOKEN. `image`/`mask` are `format: uri` inputs → base64 data URLs work directly.
+ * Models (public/editor-shared/image-models.js EDIT_TOOLS; versions pinned here = lib/ai/cost-model.ts MEDIA_MODELS):
+ *   - flux-fill-pro      生成填色 {image, mask, prompt} and 擴圖 {image, prompt, outpaint:<preset>} (mask ignored; the model
+ *                        returns the extended canvas resampled to ≤ ~1440 px)
+ *   - ideogram-4-5-edit  生成填色, quality medium; its mask is the INVERSE convention (black = edit), inverted here
+ *   - bria-expand        擴圖 at the exact canvas of the preset (outpaintFrame), up to 5000 px a side; no resampling
+ * Mask convention everywhere outside this file: WHITE = fill / regenerate, BLACK = preserve (the inpaint mask painter and the
+ * dock blocks produce that). `image`/`mask` are `format: uri` inputs → base64 data URLs work directly.
+ * Env overrides: GENFILL_VERSION (flux-fill-pro only, as before).
  */
 
-import { OUTPAINT_PRESETS, type OutpaintPreset } from "./outpaint-presets";
-import { providerUrl } from "@/lib/ai/gateway";
+import sharp from "sharp";
+import { OUTPAINT_PRESETS, outpaintFrame, type OutpaintPreset } from "./outpaint-presets";
+import type { EditTool } from "./model-options";
+import { runReplicate, type ReplicateImageResult } from "./replicate-run";
 import { grantFor } from "@/lib/entitlements/grant";
 
 // Re-export so existing server-side imports (the route) keep resolving from this module.
 export { OUTPAINT_PRESETS };
 export type { OutpaintPreset };
 
-const FLUX_FILL_PRO_VERSION_DEFAULT =
-  "41c767bcbfffe54ef8f05eb4d0100f9314790f7fc43a7b88d73ec06839deddb9"; // black-forest-labs/flux-fill-pro (pinned 2026-06-15)
+/** What the model draws when the operator leaves the prompt empty (Photoshop's prompt-less generative fill). Worded as an
+ *  instruction: gpt-image-2.6's masking is prompt-driven and "seamlessly continue the surrounding scene" made it paint the hole
+ *  BLACK (3 real runs 2026-11-09, WORKLOG); this wording filled it invisibly on the same input. flux / ideogram take either. */
+export const CONTEXT_FILL_PROMPT = "Remove everything inside the selected area and fill it with the background that surrounds it: continue the same colours, textures, lighting, lines and horizon from the neighbouring pixels so the edit is invisible. Do not add new objects.";
 
-const POLL_INTERVAL_MS = 2_000;
-const TIMEOUT_MS = 55_000; // route maxDuration is 60s — leave headroom
-const MAX_OUTPUT_BYTES = 20 * 1024 * 1024;
+/** The genfill route's Replicate models. Pinned 2026-06-15 (flux) / 2026-11-09 (the rest). */
+const VERSIONS = {
+  "flux-fill-pro": "41c767bcbfffe54ef8f05eb4d0100f9314790f7fc43a7b88d73ec06839deddb9", // black-forest-labs/flux-fill-pro
+  "ideogram-4-5-edit": "64d91a9b8a91a4e41d10fde3aa54ea4f68e7c5213d417139935178a5f4672c85", // ideogram-ai/ideogram-4-5-precise-edit
+  "bria-expand": "e153045f0c4163bd76788ab927faef5123db349294d4695dac07af828786e5b9", // bria/expand-image
+} as const satisfies Partial<Record<EditTool, string>>;
+export type FillTool = keyof typeof VERSIONS;
+export const BRIA_EXPAND_MAX_SIDE = 5000; // replicate.com/bria/expand-image canvas_size limit
 
-export type GenerativeFillResult =
-  | { ok: true; image: string } // data URL of the generated image
-  | { ok: false; error: string };
+export type GenerativeFillResult = ReplicateImageResult;
 
 export interface GenerativeFillInput {
+  /** Default flux-fill-pro (the /tools/canvas editor sends none). */
+  model?: FillTool;
   image: string; // base64 data URL of the source image
-  prompt: string; // what to generate in the filled / extended region
+  /** What to generate; empty → CONTEXT_FILL_PROMPT. */
+  prompt?: string;
   mask?: string; // base64 data URL; WHITE = fill (ignored when outpaint is set)
   outpaint?: OutpaintPreset; // when set, extend the canvas instead of mask-filling
 }
 
-interface PredictionResponse {
-  id: string;
-  status: "starting" | "processing" | "succeeded" | "failed" | "canceled";
-  output?: string | string[];
-  error?: string | null;
-  urls?: { get?: string };
+export function isFillTool(v: unknown): v is FillTool {
+  return typeof v === "string" && Object.hasOwn(VERSIONS, v);
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
+function dataUrlBuffer(dataUrl: string): Buffer | null {
+  const m = /^data:image\/[a-z+]+;base64,(.+)$/i.exec(dataUrl);
+  return m ? Buffer.from(m[1], "base64") : null;
+}
+const pngDataUrl = (buf: Buffer) => `data:image/png;base64,${buf.toString("base64")}`;
+
+/** Pixel size of a data-URL image (the route needs it for the OpenAI branch's aspect ratio); null when undecodable. */
+export async function imageSize(dataUrl: string): Promise<{ width: number; height: number } | null> {
+  const buf = dataUrlBuffer(dataUrl);
+  if (!buf) return null;
+  try {
+    const { width, height } = await sharp(buf).metadata();
+    return width && height ? { width, height } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** WHITE = change mask → the model's black = edit convention. */
+async function invertMask(maskDataUrl: string): Promise<string | null> {
+  const buf = dataUrlBuffer(maskDataUrl);
+  if (!buf) return null;
+  return pngDataUrl(await sharp(buf).removeAlpha().negate().png().toBuffer());
 }
 
 /**
  * Generate content into a masked region (生成填色) or extend the canvas (擴圖).
- * Exactly one of {mask, outpaint} steers the behaviour; if both are present the model
- * ignores the mask (outpaint wins, per its schema).
+ * Exactly one of {mask, outpaint} steers the behaviour; if both are present the mask is ignored (outpaint wins).
  */
 export async function generativeFill(args: GenerativeFillInput): Promise<GenerativeFillResult> {
   const grant = await grantFor("studio.fill");
-  const token = process.env.REPLICATE_API_TOKEN;
-  if (!token) return { ok: false, error: "missing_replicate" };
-  if (!args.prompt || args.prompt.trim().length < 2) return { ok: false, error: "prompt_required" };
+  const model: FillTool = args.model ?? "flux-fill-pro";
   if (!args.mask && !args.outpaint) return { ok: false, error: "mask_or_outpaint_required" };
-  const version = process.env.GENFILL_VERSION ?? FLUX_FILL_PRO_VERSION_DEFAULT;
+  const prompt = (args.prompt?.trim() || CONTEXT_FILL_PROMPT).slice(0, 1000);
 
-  // PNG keeps the masked-fill edges clean.
-  // safety_tolerance 5 = most permissive; avoids false-positive NSFW blocks on dark/gothic artwork.
-  const input: Record<string, unknown> = {
-    image: args.image,
-    prompt: args.prompt.trim().slice(0, 1000),
-    output_format: "png",
-    safety_tolerance: 5,
-  };
-  if (args.outpaint) input.outpaint = args.outpaint;
-  else if (args.mask) input.mask = args.mask;
-
-  const controller = new AbortController();
-  const killer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    let res: Response;
-    try {
-      res = await fetch(providerUrl(grant, "replicate", "/v1/predictions"), {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ version, input }),
-        signal: controller.signal,
-      });
-    } catch {
-      return { ok: false, error: controller.signal.aborted ? "generation_timeout" : "replicate_network_error" };
-    }
-    if (res.status === 429) return { ok: false, error: "replicate_429" };
-    if (!res.ok) return { ok: false, error: `replicate_${res.status}` };
-
-    let prediction: PredictionResponse;
-    try {
-      prediction = (await res.json()) as PredictionResponse;
-    } catch {
-      return { ok: false, error: "replicate_bad_json" };
-    }
-    const deadline = Date.now() + TIMEOUT_MS;
-    while (prediction.status === "starting" || prediction.status === "processing") {
-      if (Date.now() > deadline) return { ok: false, error: "generation_timeout" };
-      await sleep(POLL_INTERVAL_MS);
-      try {
-        const poll = await fetch(providerUrl(grant, "replicate", `/v1/predictions/${prediction.id}`), {
-          headers: { Authorization: `Bearer ${token}` },
-          signal: controller.signal,
-        });
-        if (!poll.ok) return { ok: false, error: `replicate_poll_${poll.status}` };
-        prediction = (await poll.json()) as PredictionResponse;
-      } catch {
-        return { ok: false, error: controller.signal.aborted ? "generation_timeout" : "replicate_poll_network_error" };
-      }
-    }
-    if (prediction.status !== "succeeded") {
-      return { ok: false, error: prediction.error ? String(prediction.error).slice(0, 200) : "genfill_failed" };
-    }
-
-    const out = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
-    if (!out) return { ok: false, error: "no_output" };
-    if (out.startsWith("data:image/")) return { ok: true, image: out };
-    if (!/^https:\/\/replicate\.delivery\//.test(out)) return { ok: false, error: "output_url_not_allowed" };
-    try {
-      const dl = await fetch(out, { signal: controller.signal });
-      if (!dl.ok) return { ok: false, error: `fetch_output_failed_${dl.status}` };
-      const ab = await dl.arrayBuffer();
-      if (ab.byteLength > MAX_OUTPUT_BYTES) return { ok: false, error: "output_too_large" };
-      const mime = dl.headers.get("content-type")?.startsWith("image/") ? dl.headers.get("content-type")! : "image/png";
-      return { ok: true, image: `data:${mime};base64,${Buffer.from(ab).toString("base64")}` };
-    } catch {
-      return { ok: false, error: controller.signal.aborted ? "generation_timeout" : "fetch_output_network_error" };
-    }
-  } finally {
-    clearTimeout(killer);
+  if (args.outpaint) {
+    if (model === "bria-expand") return expandBria(grant, args.image, prompt, args.outpaint);
+    if (model !== "flux-fill-pro") return { ok: false, error: "model_cannot_outpaint" };
+    // PNG keeps edges clean; safety_tolerance 5 = most permissive (no false-positive NSFW blocks on dark/gothic artwork).
+    return runReplicate(grant, {
+      version: process.env.GENFILL_VERSION ?? VERSIONS["flux-fill-pro"],
+      input: { image: args.image, prompt, outpaint: args.outpaint, output_format: "png", safety_tolerance: 5 },
+      failCode: "genfill_failed",
+    });
   }
+
+  const mask = args.mask!;
+  switch (model) {
+    case "flux-fill-pro":
+      return runReplicate(grant, {
+        version: process.env.GENFILL_VERSION ?? VERSIONS["flux-fill-pro"],
+        input: { image: args.image, mask, prompt, output_format: "png", safety_tolerance: 5 },
+        failCode: "genfill_failed",
+      });
+    case "ideogram-4-5-edit": {
+      const inverted = await invertMask(mask);
+      if (!inverted) return { ok: false, error: "invalid_mask" };
+      return runReplicate(grant, {
+        version: VERSIONS["ideogram-4-5-edit"],
+        input: { image: args.image, mask: inverted, prompt, quality: "medium", num_images: 1 },
+        failCode: "genfill_failed",
+      });
+    }
+    default:
+      return { ok: false, error: "model_cannot_fill" };
+  }
+}
+
+/** bria/expand-image: the preset's canvas (outpaintFrame) sent explicitly, so the result IS the frame (no resampling, the source
+ *  pixels land where the frame says). A frame over BRIA_EXPAND_MAX_SIDE shrinks the source first (whole frame scaled). */
+async function expandBria(grant: Awaited<ReturnType<typeof grantFor>>, image: string, prompt: string, preset: OutpaintPreset): Promise<GenerativeFillResult> {
+  const buf = dataUrlBuffer(image);
+  if (!buf) return { ok: false, error: "invalid_image" };
+  let src = sharp(buf);
+  let { width: w = 0, height: h = 0 } = await src.metadata();
+  if (!w || !h) return { ok: false, error: "invalid_image" };
+  let frame = outpaintFrame(preset, w, h)!;
+  const k = BRIA_EXPAND_MAX_SIDE / Math.max(frame.W, frame.H);
+  let input = image;
+  if (k < 1) {
+    w = Math.max(1, Math.floor(w * k));
+    h = Math.max(1, Math.floor(h * k));
+    src = src.resize(w, h);
+    input = pngDataUrl(await src.png().toBuffer());
+    frame = outpaintFrame(preset, w, h)!;
+  }
+  return runReplicate(grant, {
+    version: VERSIONS["bria-expand"],
+    input: {
+      image: input,
+      prompt,
+      aspect_ratio: "none",
+      canvas_size: [Math.round(frame.W), Math.round(frame.H)],
+      original_image_size: [w, h],
+      original_image_location: [Math.round(frame.x), Math.round(frame.y)],
+      preserve_alpha: true,
+    },
+    failCode: "genfill_failed",
+  });
 }
