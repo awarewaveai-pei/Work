@@ -18,7 +18,7 @@ const h3 = { fontSize: 15, fontWeight: 700, margin: "24px 0 8px", color: "var(--
 
 function Table({ head, rows, firstCol }: { head: string[]; rows: React.ReactNode[][]; firstCol?: number }) {
   return (
-    <div style={{ overflowX: "auto", margin: "0 0 14px" }}>
+    <div style={{ overflowX: "auto", maxWidth: "100%", margin: "0 0 14px" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, minWidth: 420 }}>
         <thead><tr>{head.map((h, i) => (
           <th key={h} style={{ textAlign: "left", padding: "7px 10px", borderBottom: `1px solid ${LINE}`, fontSize: 11.5,
@@ -45,7 +45,7 @@ function Note({ children }: { children: React.ReactNode }) {
 
 function Figs({ items, min = 230 }: { items: { src: string; alt: string; cap: React.ReactNode }[]; min?: number }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(${min}px, 1fr))`, gap: 14, margin: "0 0 16px" }}>
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(min(${min}px, 100%), 1fr))`, gap: 14, margin: "0 0 16px" }}>
       {items.map((f) => (
         <figure key={f.src} style={{ margin: 0, minWidth: 0 }}>
           <img src={f.src} alt={f.alt} style={{ display: "block", width: "100%", borderRadius: 8, border: `1px solid ${LINE}` }} />
