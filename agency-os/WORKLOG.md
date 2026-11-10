@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-10（續40）ED.4 追加：軌道＋改走素材分頁
+
+- 內容：`tools-editor.js` 的 `track-clip:` 非文字分支改呼叫 `edAssetsPickTrack(track.id)`（主 session 核准的共用檔範圍），舊 `pickAssets` 流程刪除（editor 內無其他呼叫點）；軌道種類檢查只留在 `edAssetsAdd` 一處。目標軌綁專案 id，換專案即失效；從素材分頁上傳也落在目標軌。`tests/ed2-timeline.cjs` 軌道＋段改走素材卡。
+- Codex 審查（d5d4c5b6）3 項皆成立並已修：換專案後目標軌殘留、上傳忽略目標軌、新測試用 V1（＝預設軌）驗不出差異→改驗第二條影片軌。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed4-assets.cjs；ed2-timeline／p2-tracks-ui／editor-media-picker／ed1-layout 皆綠 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/3m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=pickAssets | hits=40
+- ORACLE: agency-os/reports/oracle/2026-11-10-partialreview-d5d4c5b6.md
+- rollback：還原 tools-editor.js 該段與 assets.js 即回到上一版。
 ## 2026-11-10（續39）影音工作台 ED.7 轉場與貼圖
 
 - 做了什麼：轉場分頁（`scripts/editor-panes/transition.js`）＝只能點剪點才套用（提示「請先點選 V1 相鄰片段之間的剪點」）、五種效果（融接／淡入淡出／向左擦除／向右擦除／圓形裁切）、長度 0.1–2 秒且不超過左右片段各半、套用全部剪點 (n)、預覽剪點、移除轉場、曲線 線性／平滑／加速。貼圖分頁（`stickers.js`）＝新增浮水印（PNG／SVG→PNG，存帳戶素材庫，asset.watermark=true；使用中的存偏好 `tools.editor.watermark`）、專案貼圖清單＋加入疊加 V2、品牌套件（色彩／字型／Logo，偏好 `tools.editor.brandKit` = { colors, font, logo }，ED.5 文字分頁讀同一鍵）。

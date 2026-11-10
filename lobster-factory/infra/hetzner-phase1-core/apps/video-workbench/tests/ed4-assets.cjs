@@ -129,17 +129,29 @@ const pass = (m) => console.log("PASS " + m);
     pass("拆出音軌：影片聲音加到旁白軌");
 
     // From a track's ＋: banner on top, 取消 clears it, the pick goes to that track.
-    await page.evaluate(() => edAssetsPickTrack("A2"));
+    await page.locator('[data-ed-track="A2"]').getByRole("button", { name: "加入素材到「配樂 A2」", exact: true }).click();
     assert.match(await pane.innerText(), /選一個素材加入「配樂 A2」/);
     await pane.getByRole("button", { name: "取消", exact: true }).click();
     assert.doesNotMatch(await pane.innerText(), /選一個素材加入/);
-    await page.evaluate(() => edAssetsPickTrack("A2"));
+    await page.locator('[data-ed-track="A2"]').getByRole("button", { name: "加入素材到「配樂 A2」", exact: true }).click();
     await card("tone.wav").getByRole("button", { name: /按 Enter 加入主視訊末端/ }).click();
     await page.waitForFunction(() => edProject().clips.some((c) => c.track === "A2"));
     assert.doesNotMatch(await pane.innerText(), /選一個素材加入/);
-    await page.evaluate(() => edAssetsPickTrack("A2"));
+    await page.locator('[data-ed-track="A2"]').getByRole("button", { name: "加入素材到「配樂 A2」", exact: true }).click();
     await card("still.png").getByRole("button", { name: /^加入 / }).click();
     assert.equal(await page.evaluate(() => edProject().clips.filter((c) => c.kind === "image").length), 2, "圖片不能放進音訊軌");
+    // A second video track: its ＋ target gets the still, not the main track; an upload from the pane goes there too.
+    await page.getByRole("button", { name: "新增影片軌", exact: true }).click();
+    const v2 = await page.evaluate(() => edProject().tracks.filter((t) => t.kind === "video").at(-1).id);
+    assert.notEqual(v2, await page.evaluate(() => edMain(edProject())));
+    await page.locator(`[data-ed-track="${v2}"]`).getByRole("button", { name: /^加入素材到/ }).click();
+    assert.match(await pane.innerText(), new RegExp("選一個素材加入「疊加 " + v2 + "」"));
+    await card("still.png").getByRole("button", { name: /^加入 / }).click();
+    await page.waitForFunction((id) => edProject().clips.some((c) => c.track === id), v2);
+    // Codex: the target is dropped when another project opens.
+    await page.locator(`[data-ed-track="${v2}"]`).getByRole("button", { name: /^加入素材到/ }).click();
+    await page.evaluate(() => { edAssets.pickTrack.project = "other"; edRedraw(); });
+    assert.doesNotMatch(await pane.innerText(), /選一個素材加入/);
     pass("軌道＋：頂部「選一個素材加入『…』 取消」、取消、加到該軌、種類不符不加");
     // 音訊／貼圖 panes still reach library:/upload: with a kind (Codex finding 2).
     const imageChooser = page.waitForEvent("filechooser");

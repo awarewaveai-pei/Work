@@ -2255,12 +2255,8 @@ async function edAction(action) {
       await edCommit(p);
       return;
     }
-    const rows = await VideoWorkbench.pickAssets({ kind: track.kind === "audio" ? "audio" : "all" }),
-      a = rows[0];
-    if (!a || edProject() !== p) return;
-    const kind = VideoWorkbench.mediaKind(a);
-    if ((track.kind === "audio") !== (kind === "audio")) throw Error(track.kind === "audio" ? "音訊軌只能放音訊素材" : "影片軌只能放影片或圖片");
-    await edAdd(a, track.id);
+    // Card ED.4: the 素材 pane takes over; its next pick lands on this track (kind check in edAssetsAdd).
+    edAssetsPickTrack(track.id);
     return;
   }
   edCheckpoint();

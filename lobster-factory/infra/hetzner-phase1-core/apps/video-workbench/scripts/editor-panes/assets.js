@@ -57,7 +57,7 @@ async function edAssetsProbe() {
 }
 // Entry from a track's ＋: the pane opens with 「選一個素材加入『…』 取消」 and the next pick goes to that track.
 function edAssetsPickTrack(trackId) {
-  edAssets.pickTrack = trackId;
+  edAssets.pickTrack = { project: edProject()?.id, track: trackId };
   ed.pane = "素材";
   ed.layout = { ...ed.layout, leftOpen: true };
   edLayoutSave();
@@ -108,9 +108,9 @@ function edAssetsRepaint() {
     p = edProject();
   if (box && p) box.innerHTML = edAssetsList(p);
 }
-async function edAssetsAdd(a, p) {
-  const pick = edAssets.pickTrack,
-    track = pick && edTrack(p, pick) ? edTrack(p, pick) : null;
+// The track chosen with a track's ＋, only while it still belongs to the open project.
+const edAssetsTarget = (p) => (edAssets.pickTrack?.project === p.id ? edTrack(p, edAssets.pickTrack.track) || null : null);
+async function edAssetsAdd(a, p, track = edAssetsTarget(p)) {
   edAssets.pickTrack = null;
   if (track) {
     const kind = VideoWorkbench.mediaKind(a);
@@ -120,13 +120,15 @@ async function edAssetsAdd(a, p) {
   await edAdd(a, track?.id);
 }
 async function edAssetsUpload(p, files, kind) {
+  const target = edAssetsTarget(p);
+  edAssets.pickTrack = null;
   for (const file of files) {
     try {
       const a = await VideoWorkbench.uploadAsset(file);
       edAssets.session.add(a.id);
       // Kept from the old pane: an uploaded file also goes to the end of the main track (tests p3-roundtrip,
       // editor-media-picker); the reference's behaviour here is unverified.
-      if (edProject() === p) await edAdd(a, kind === "image" ? "overlay" : undefined);
+      if (edProject() === p) await (target ? edAssetsAdd(a, p, target) : edAdd(a, kind === "image" ? "overlay" : undefined));
     } catch (e) {
       VideoWorkbench.reportError(e);
     }
@@ -144,7 +146,7 @@ edRegisterPane("assets", {
   },
   render: (p, c) => {
     if (!edAssets.items) edAssetsLoad();
-    const pick = edAssets.pickTrack && edTrack(p, edAssets.pickTrack),
+    const pick = edAssetsTarget(p),
       count = edAssets.session.size;
     return `${pick ? `<p class="editor-asset-pick" role="status">選一個素材加入「${esc(edTrackLabel(p, pick))}」 ${edButton("取消", "assets-pick-cancel")}</p>` : ""}<div class="editor-asset-tabs" role="tablist" aria-label="素材來源">${edAssetsTabs
       .map(

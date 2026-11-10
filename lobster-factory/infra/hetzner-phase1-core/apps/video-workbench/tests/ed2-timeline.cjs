@@ -386,9 +386,8 @@ const pass = (m) => console.log("PASS " + m);
 
     // Track headers: + adds media to that track (picker), overlay up / down.
     await page.locator('[data-ed-track="V1"]').getByRole("button", { name: "加入素材到「主視訊 V1」", exact: true }).click();
-    const picker = page.locator('[role="dialog"][aria-label="選擇素材"]');
-    await picker.locator(`[data-picker-id="${asset.id}"]`).click();
-    await picker.locator("[data-picker-confirm]").click();
+    // Card ED.4: the 素材 pane opens with the track as target; its card adds there.
+    await page.locator(`[data-ed-asset="${asset.id}"] .editor-asset-main`).click();
     await page.waitForFunction(() => edProject().clips.filter((c) => c.track === "V1").length === 4);
     await page.getByRole("button", { name: "新增影片軌", exact: true }).click();
     assert.deepEqual((await page.locator(".editor-track-label").allTextContents()).slice(0, 4), ["T字幕 / 文字", "◫疊加 V3", "◫疊加 V2", "▣主視訊 V1"]);
