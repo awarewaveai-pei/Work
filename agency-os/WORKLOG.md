@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-10（續35）Gemini 預付儲值後拿掉配音暫時釘選；Stability 金鑰進正式站
+
+- 操作者儲值 Gemini（AwareWave-ColdEmail 專案、帳單帳戶 010DF4…，Paid 1，NT$300）。工作台容器內 generateContent → 200。
+- 移除 `VW_TTS_MODEL: gpt-4o-mini-tts`（主機 safe-infra-patch，備份 `docker-compose.yml.bak.safe-patch-20261110-072019`；repo 對照檔同步）→ 正式站 `/api/vw/capabilities` speech.defaultModel＝gemini-3.8-flash-lite-tts，OpenAI 仍可選。
+- 操作者「加」：`STABILITY_API_KEY` 由本機 User 環境變數經 ssh stdin 寫入主機 `.env`（未印值；備份 `.env.bak-stability-20261110`），safe-infra-patch 重建容器 → printenv 存在。
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-video-workbench node fetch generativelanguage generateContent → 200；safe-infra-patch PASS；capabilities speech.defaultModel gemini | exit=0 | ms=30000
+- REVIEW_WAIVED: NA -- 設定移除一行＋金鑰存在性
+- BUGHUNT_WAIVED: NA -- 設定變更
 ## 2026-11-10（續34）批次上線：next-admin＋工作台 469e589f0、whisper worker 重建、工作台環境變數（操作者「改好直接部署」）
 
 - 範圍：工作台 22ceb6e47→469e589f0（PJ.2–PJ.5、ED.0／ED.1.5／ED.3.8／ED.10 後端、EC.5、獨立整頁、P6.20 分段上傳、S4b、價目修正＋Sora 2／Imagen 4 移除、付費標價 NT$、配音／辨識多家並存＋免費優先）；next-admin 同版（價目、TWD_RATE）。

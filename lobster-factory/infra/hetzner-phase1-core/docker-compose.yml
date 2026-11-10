@@ -707,7 +707,6 @@ services:
       # The same key as next-admin: paid tier (Google Cloud project AwareWave-ColdEmail elite-thunder-508306-q3, billing linked;
       # prepaid -- 402 "prepayment credits are depleted" when the balance is empty). Empty = Gemini rows show 未啟用.
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      VW_TTS_MODEL: gpt-4o-mini-tts  # pinned while the Gemini prepaid balance is 402 (2026-11-10); remove after top-up
       VW_TRANSCRIBE_WORKER_URL: ${MEDIA_TRANSCRIBE_WORKER_URL:-}
       VW_TRANSCRIBE_WORKER_TOKEN: ${MEDIA_TRANSCRIBE_WORKER_TOKEN:-}
       REPLICATE_API_TOKEN: ${REPLICATE_API_TOKEN:-}
