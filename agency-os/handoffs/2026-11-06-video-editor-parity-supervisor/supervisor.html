@@ -80,11 +80,11 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
 <aside><div class="in">
   <h1>影片剪輯補齊監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-11-10</span></p>
-  <div class="bar" data-computed><i class="d" style="width:23.076923076923077%"></i><i class="g" style="width:0%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>3</span>／<span data-computed>13</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>1</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:30.76923076923077%"></i><i class="g" style="width:7.6923076923076925%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>4</span>／<span data-computed>13</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
-<p class="sub">應用工具的「影片剪輯」補到跟參考工作台一樣：功能、流程、版面、快捷鍵相同，外觀用 AwareWave 主題。共 <span data-computed>13</span> 張卡、<span data-computed>41</span> 項工作，已完成 <span data-computed>18</span> 項。</p>
+<p class="sub">應用工具的「影片剪輯」補到跟參考工作台一樣：功能、流程、版面、快捷鍵相同，外觀用 AwareWave 主題。共 <span data-computed>13</span> 張卡、<span data-computed>42</span> 項工作，已完成 <span data-computed>22</span> 項。</p>
 <section id="now"><h2>現況</h2><p class="lead">剪輯器現在做得到與做不到的事（2026-11-06 實際打開查）。</p><ul class="yn"><li class="yes"><b>可以</b><span>左側每個分頁、匯出視窗、專案列表各自一個檔，可以多個 session 同時做。<small>2026-11-10 ED.0（a98153452、25397763e、7c7976bcb、cd5ea376f）＋每卡樣式檔（a3deedf2e）；ED.2 偶發失敗已從根因修好，連跑 10 次全綠。</small></span></li><li class="yes"><b>可以</b><span>字幕後端：逐字時間、整片辨識、卡拉 OK／逐字高亮輸出、剪贅字資料。<small>2026-11-10 e28bcbc4d（未部署）；剪輯器裡的字幕分頁畫面是 ED.10 後半，還沒做。</small></span></li><li class="yes"><b>可以</b><span>兩邊每個鍵都按過的對照表。<small>2026-11-06 逐鍵對照：同 18、不同 17、缺 24、本機多 2；每一列都歸到卡（docs/editor-parity-compare-20261106.md）。</small></span></li><li class="yes"><b>可以</b><span>剪輯、分割、複製、刪除、多軌、轉場、濾鏡、匯出 1080p。<small>既有功能，tests/tools-editor.cjs 真實匯出過。</small></span></li><li class="yes"><b>可以</b><span>上傳大支影片不會「頁面通訊逾時」。<small>已修好，2026-11-06 上線（6d3dda8f6，部署 96ddd7f70）。</small></span></li><li class="yes"><b>可以</b><span>版面跟參考一樣（圖示側欄、可收合、整片設定、播放列）。<small>2026-11-06 卡 ED.1（9df955245），2026-11-06 已上線（部署 96ddd7f70）。參考沒有的片頭、調色、影格率、峰值表、多軌都還在，搬到對應位置。</small></span></li><li class="yes"><b>可以</b><span>多選、磁吸、磁性主軌、波紋刪除、快捷鍵全套。<small>2026-11-06 卡 ED.2（5b726b2eb），2026-11-06 已上線（部署 96ddd7f70）。tests/ed2-timeline.cjs 在真瀏覽器把每個新鍵實按一次。</small></span></li><li class="yes"><b>可以</b><span>屬性面板：整片／此軌／此片段效果、光漏、震動、關鍵影格、分離音訊、速度鈕，輸出照做。<small>2026-11-06 卡 ED.3（afc1d90ba–af1517238）；2026-11-10 部署 22ceb6e47，同時修好擋住部署的打包清單（f36751b79）。tests/ed3-inspector.cjs、ed3-effects.cjs 真輸出抽畫面。</small></span></li><li class="no"><b>還不行</b><span>字幕辨識、翻譯、剪贅字在剪輯器裡完成。<small>卡 ED.10、ED.11；現在要跳去字幕工具。</small></span></li><li class="no"><b>還不行</b><span>剪輯 Agent（打字叫它剪）。<small>卡 ED.13，最後做。</small></span></li></ul></section>
 
 <section id="steps"><h2>卡片與工作</h2><p class="lead">依編號做。先做版面骨架，各分頁接著做，要付費服務的放最後。風險 High 的卡經你同意才上線。</p><ol class="steps"><li class="step done" id="ED.1">
@@ -144,18 +144,19 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
         <p><b>檔案：</b><code>VW/scripts/tools-editor.js</code> <code>VW/shared/assets-ui.js</code></p>
         <p><b>做法：</b><code>lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/editor-parity-spec-20261106.md §3 ED.4</code></p>
       </details>
-    </div></li><li class="step todo" id="ED.5">
+    </div></li><li class="step doing" id="ED.5">
     <div class="n">5</div>
     <div class="b">
       <p class="plain">例：文字分頁選「標價」，看到「限時優惠」「8 折起」的樣板預覽，按 ＋ 放到播放頭位置。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Sonnet</span></p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Sonnet</span></p>
       <p class="donewhen"><b>完成的樣子：</b>每張自製樣板加入一次、輸出一次；不含參考網站的圖或字樣設計。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>ED.5.1</code> 參考有的每種文字樣板都做一張自己設計的，分五類、有預覽、可搜尋。</span></li><li class="todo"><b>○</b><span><code>ED.5.2</code> 純文字、品牌字型、文字動畫；雙擊或拖曳加入。加入空白文字的預設字改成「新文字」。</span></li></ul>
+      <ul class="items"><li class="done"><b>✓</b><span><code>ED.5.1</code> 參考有的每種文字樣板都有一張自己設計的，分類、預覽、搜尋；每張都真的輸出過一次（未部署）。 <small>完成於 <code>07022ba27</code></small></span></li><li class="done"><b>✓</b><span><code>ED.5.2</code> 純文字、品牌字型、文字動畫；按 ＋、雙擊或拖曳加入。加入空白文字的預設字改成「新文字」。 <small>完成於 <code>07022ba27</code></small></span></li><li class="todo"><b>○</b><span><code>ED.5.3</code> 預覽也播出文字動畫；輸出的文字底色跟預覽一致。兩處都在共用檔，等 ED.7 交完再改。</span></li></ul>
       <details><summary>工程細節：ED.5 文字分頁</summary>
         <p>自製樣板，數量與分類同參考（開場／標價／CTA／強調／片尾）、搜尋、純文字、品牌字型、文字動畫、雙擊或拖曳加入</p>
         <p><b>需先完成：</b><a href="#ED.1">ED.1</a></p>
         <p><b>檔案：</b><code>VW/scripts/tools-editor.js</code></p>
         <p><b>做法：</b><code>lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/editor-parity-spec-20261106.md §3 ED.5</code></p>
+        <p><b>完成於：</b><code>07022ba27</code></p>
       </details>
     </div></li><li class="step todo" id="ED.6">
     <div class="n">6</div>
@@ -163,11 +164,11 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
       <p class="plain">例：音訊分頁點「配樂」，從內建曲庫挑一首放進配樂軌，勾「旁白時配樂降低」，再用 AI 旁白念一段文案（先看價格）。</p>
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">負責：Opus</span></p>
       <p class="donewhen"><b>完成的樣子：</b>分類、目標軌、內建曲庫、音訊設定五項、AI 旁白都點過；AI 旁白先顯示價格。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>ED.6.1</code> 六種分類、目標軌切換、內建曲庫（曲風、排序、試聽、加入）。</span></li><li class="todo"><b>○</b><span><code>ED.6.2</code> 音訊設定：整體音量、對齊切點、旁白時降低、循環、響度、建議 BPM。</span></li><li class="todo"><b>○</b><span><code>ED.6.3</code> AI 旁白：文字、聲音描述、語速音高音量，先顯示價格。</span></li><li class="todo"><b>○</b><span><code>ED.6.4</code> 生成自己的內建曲子（清單與費用先給你確認）。</span></li></ul>
+      <ul class="items"><li class="todo"><b>○</b><span><code>ED.6.1</code> 六種分類、目標軌切換、內建曲庫（曲風、排序、試聽、加入）。</span></li><li class="todo"><b>○</b><span><code>ED.6.2</code> 音訊設定：整體音量、對齊切點、旁白時降低、循環、響度、建議 BPM。</span></li><li class="todo"><b>○</b><span><code>ED.6.3</code> AI 旁白：文字、聲音描述、語速音高音量，先顯示價格。</span></li><li class="todo"><b>○</b><span><code>ED.6.4</code> 內建曲庫清單：先放公眾領域（CC0）的音效與環境音，每首記來源與授權；下載前逐字讀一次授權條款。</span></li></ul>
       <details><summary>工程細節：ED.6 音訊分頁</summary>
         <p>依用途標籤分類、目標軌 A1／A2、內建庫、音訊設定（整體音量、對齊切點、旁白降 12 dB、循環延伸、響度）＋BPM 建議、AI 旁白接現有 spoken</p>
-        <p><b>需先完成：</b><a href="#ED.1">ED.1</a>；待決 1</p>
-        <p><b>已定：</b>內建曲庫用 AwareWave 的音樂工具生成自己的曲子（2026-11-06）；參考網站的曲子不能用。</p>
+        <p><b>需先完成：</b><a href="#ED.1">ED.1</a></p>
+        <p><b>已定：</b>2026-11-10：目前只有你自己用、不賣客戶，所以先走免費。音效與環境音用 Freesound 的公眾領域（CC0）檔案；配樂先用你自己上傳的免費音樂。曲庫是一份清單，每首記來源與授權；以後要賣客戶，再用 Lyria 生成 80 首（約 US$12.80）換進清單，程式不用改。參考網站的曲子不能用。ElevenLabs 不開。</p>
         <p><b>檔案：</b><code>VW/scripts/tools-editor.js</code> <code>VW/backend/api.cjs</code></p>
         <p><b>做法：</b><code>lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/editor-parity-spec-20261106.md §3 ED.6</code></p>
       </details>
@@ -197,19 +198,20 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
         <p><b>檔案：</b><code>VW/scripts/tools-editor.js</code></p>
         <p><b>做法：</b><code>lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/editor-parity-spec-20261106.md §3 ED.8</code></p>
       </details>
-    </div></li><li class="step todo" id="ED.9">
+    </div></li><li class="step done" id="ED.9">
     <div class="n">9</div>
     <div class="b">
       <p class="plain">例：打開影片剪輯先看到專案卡（縮圖、比例、長度、更新日期），可搜尋、改名、刪除；卡上寫「屬於 專案 › 第 2 集」。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Sonnet</span></p>
+      <p class="meta"><span class="pill st-done">已完成</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Sonnet</span></p>
       <p class="donewhen"><b>完成的樣子：</b>舊剪輯專案一筆不少；搜尋、改名、刪除都點過；跟專案頁開到同一份剪輯檔。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>ED.9.1</code> 專案卡（縮圖、比例、長度、更新日期）、搜尋、改名、刪除、空狀態。</span></li><li class="todo"><b>○</b><span><code>ED.9.2</code> 卡上顯示屬於哪一集，跟專案頁開同一份檔。</span></li></ul>
+      <ul class="items"><li class="done"><b>✓</b><span><code>ED.9.1</code> 專案卡（縮圖、比例、長度、更新日期）、搜尋、改名、刪除（先留備份）、空狀態（未部署）。 <small>完成於 <code>a64ee7b07</code></small></span></li><li class="done"><b>✓</b><span><code>ED.9.2</code> 卡上顯示屬於哪一集，跟專案頁開同一份檔；內容有改才更新日期。 <small>完成於 <code>a64ee7b07</code></small></span></li></ul>
       <details><summary>工程細節：ED.9 專案列表頁</summary>
         <p>搜尋、專案卡、改名、刪除、空狀態；與 PJ.1 的集歸屬</p>
         <p><b>需先完成：</b>無</p>
         <p><b>已定：</b>列表頁照參考做，卡上多一行屬於哪一集；跟 PJ.1 一起對齊（2026-11-06）。</p>
         <p><b>檔案：</b><code>VW/scripts/tools-editor.js</code> <code>VW/docs/engine-route-plan-20261106.md</code></p>
         <p><b>做法：</b><code>lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/editor-parity-spec-20261106.md §3 ED.9</code></p>
+        <p><b>完成於：</b><code>a64ee7b07</code></p>
       </details>
     </div></li><li class="step todo" id="ED.10">
     <div class="n">10</div>
@@ -265,7 +267,7 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
       </details>
     </div></li></ol></section>
 
-<section id="open"><h2>待你決定</h2><p class="lead">決定後，對應的卡才能開始。</p><ol class="open"><li><div class="n">1</div><div class="b"><p class="plain">內建曲庫選哪個方案。建議方案 B：配樂 80 首（Lyria，約 US$12.80）＋音效／環境音 36 個（ElevenLabs，最多約 US$8.64），合計約 US$21.44；要另開 ElevenLabs 付費方案。另有精簡、完整兩案。</p><p class="meta"><a href="#ED.6" class="who">第 <span data-computed>6</span> 張卡開始前決定</a><span class="who">出處：docs/ed6-music-library-proposal-20261110.md（b902eba04）</span></p></div></li></ol></section>
+<section id="open"><h2>待你決定</h2><p class="lead">決定後，對應的卡才能開始。</p><p class="lead">目前沒有需要你決定的事。</p></section>
 
 <section id="paths"><h2>檔案</h2><div class="paths"><div><b>完整清單與每張卡的做法</b><code>lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/editor-parity-spec-20261106.md §1、§3</code></div><div><b>工作紀錄</b><code>agency-os/WORKLOG.md 2026-11-06</code></div><div><b>本頁來源</b><span><code>agency-os/handoffs/2026-11-06-video-editor-parity-supervisor/</code><br>修改 data.mjs 後，執行 node build.mjs 和 node check.mjs，再重新發布到同一個網址。</span></div></div></section>
 </main>
