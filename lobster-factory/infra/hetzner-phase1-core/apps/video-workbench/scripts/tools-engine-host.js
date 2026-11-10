@@ -31,7 +31,7 @@ const ENGINES = {
     ext: "ecproj",
     eyebrow: "PRO FX",
     lead: "圖層、遮罩、關鍵影格與特效的專業合成。介面是英文；存檔與成片都回到工作台。",
-    notes: ["輸出用目前開著的合成，尺寸要是 1920×1080、1080×1920 或 1080×1350（可以送審的三種）；目前輸出 H.264，透明影片之後再加。"],
+    notes: ["輸出用目前開著的合成，尺寸要是 1920×1080、1080×1920 或 1080×1350（可以送審的三種）。「輸出透明片段」帶透明背景（ProRes 4444），回素材庫後可在剪輯器疊在別的影片上。"],
     fallback: ["compose", "改用動畫合成"],
     exportNote: "成片存進素材庫並記下用了哪些素材，可直接送審。",
     captions: false,
@@ -170,7 +170,7 @@ function engineShow() {
   if (cfg.engine === "filmcraft")
     for (const ratio of Object.keys(ENGINE_RENDER_SIZES))
       out.append(engineButton(ratio + "（" + ENGINE_RENDER_SIZES[ratio].join("×") + "）", "export:" + ratio));
-  else out.append(engineButton("輸出目前的合成", "export:comp"));
+  else out.append(engineButton("輸出目前的合成", "export:comp"), engineButton("輸出透明片段", "export:alpha"));
   top.append(bar, engineEl("p", "note", "在引擎畫面用 File › Save 存檔，專案會存進工作台。"), out, engineEl("p", "note", cfg.exportNote));
   const list = engineEl("div", "out");
   list.dataset.engineProjects = "";
@@ -448,6 +448,7 @@ async function engineExport(choice) {
   const cfg = eng.cfg;
   let ratio = choice,
     comp = null;
+  const alpha = cfg.engine === "effectcraft" && choice === "alpha"; // card EC.5
   if (cfg.engine === "effectcraft") {
     // The open composition decides the size; only the three deliverable sizes can become a release candidate.
     comp = await engineExec("comp.info", {});
@@ -464,6 +465,7 @@ async function engineExport(choice) {
     height,
     title,
     sources: eng.sent.map(({ id, url, name }) => ({ id, url, name })),
+    alpha,
     // PJ spec §8 C4: the project/episode this render belongs to, once PJ adds VideoWorkbench.spineLink.
     link: typeof VideoWorkbench.spineLink === "function" ? VideoWorkbench.spineLink({ operation: "engine-render" }) : null,
     captions: cfg.captions,
@@ -487,15 +489,17 @@ async function engineExport(choice) {
     });
     if (r?.warnings?.length) VideoWorkbench.notify("引擎提醒：" + r.warnings.join("；"));
   } else {
-    // Render Queue, H.264 + AAC (transparent ProRes 4444 / PNG sequence is a later card).
-    await engineExec("renderQueue.add", { comp: comp.comp ?? comp.id ?? comp.name, format: "h264", output: "/exports/" + base + ".mp4", audio: "on" });
+    // Render Queue: H.264 + AAC, or (card EC.5) RGB + Alpha, which upstream writes as ProRes 4444 in a MOV (a WebM's VP9
+    // alpha would be dropped by ffmpeg's own decoder when the editor exports).
+    const out = alpha ? { format: "prores", channels: "rgba", output: "/exports/" + base + ".mov" } : { format: "h264", output: "/exports/" + base + ".mp4" };
+    await engineExec("renderQueue.add", { comp: comp.comp ?? comp.id ?? comp.name, ...out, audio: "on" });
     await engineExec("renderQueue.render", { wait: false });
   }
   engineStatus("輸出中…（在引擎畫面可看進度）");
 }
-// The MP4 and (FilmCraft) its .srt arrive as two saves in either order; a project without captions sends no .srt.
+// The MP4 (MOV for a transparent clip) and (FilmCraft) its .srt arrive as two saves in either order; a project without captions sends no .srt.
 function engineOnRenderFile(name, bytes) {
-  const m = /^(.*)\.(mp4|srt)$/i.exec(name);
+  const m = /^(.*)\.(mp4|mov|srt)$/i.exec(name);
   const job = m && engineRenders.get(m[1]);
   if (!job) return false;
   if (m[2].toLowerCase() === "srt") job.srt = new TextDecoder().decode(bytes);
@@ -510,7 +514,7 @@ async function engineSubmitRender(base) {
   try {
     const cues = job.srt ? SubtitleParse.parse(job.srt).map((c) => ({ start: c.startMs / 1000, end: c.endMs / 1000, text: c.text })) : [];
     const meta = new TextEncoder().encode(
-      JSON.stringify({ engine: job.engine, engineVersion: eng.appVersion, title: job.title, ratio: job.ratio, width: job.width, height: job.height, sources: job.sources, link: job.link, cues }),
+      JSON.stringify({ engine: job.engine, engineVersion: eng.appVersion, title: job.title, ratio: job.ratio, width: job.width, height: job.height, sources: job.sources, link: job.link, cues, alpha: job.alpha }),
     );
     engineStatus("成片入帳中…");
     const api = String(window.VW_CONFIG?.apiBaseUrl || "/api/vw").replace(/\/$/, "");

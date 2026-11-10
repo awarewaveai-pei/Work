@@ -147,6 +147,20 @@ function request(port, pathname, headers, body) {
     assert.equal(broken.status, 400);
     assert.deepEqual({ assets: calls.assets.length, jobs: jobsOnDisk().length }, ecBefore);
     console.log("PASS effectcraft render -> one job with its source; no source list -> 400; broken -> refused");
+
+    // 5. Card EC.5: a transparent clip (ProRes 4444, as EffectCraft's renderQueue writes it) -> one .mov asset; the same
+    // format without an alpha plane -> refused, no job.
+    const prores = (name, pixFmt) => (execFileSync(ffmpeg, ["-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=1920x1080:rate=30,format=rgba,colorchannelmixer=aa=0.5", "-t", "1", "-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", pixFmt, path.join(dir, name)]), fs.readFileSync(path.join(dir, name)));
+    const alphaOk = await send({ ...ec, alpha: true }, prores("alpha.mov", "yuva444p10le"));
+    assert.equal(alphaOk.status, 201, JSON.stringify(alphaOk.body));
+    assert.match(alphaOk.body.result.url, /\.mov$/);
+    assert.equal(alphaOk.body.input.settings.alpha, true);
+    const alphaBefore = { assets: calls.assets.length, jobs: jobsOnDisk().length };
+    const noAlpha = await send({ ...ec, alpha: true }, prores("opaque.mov", "yuv444p10le"));
+    assert.equal(noAlpha.status, 400, JSON.stringify(noAlpha.body));
+    assert.match(noAlpha.body.error.message, /透明通道/);
+    assert.deepEqual({ assets: calls.assets.length, jobs: jobsOnDisk().length }, alphaBefore);
+    console.log("PASS effectcraft transparent clip with alpha -> .mov asset; without alpha -> refused, no job");
   } finally {
     server.closeAllConnections();
     await new Promise((r) => server.close(r));

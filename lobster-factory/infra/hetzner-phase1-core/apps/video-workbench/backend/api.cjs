@@ -823,6 +823,9 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     filmcraft: { audio: true, audible: true, loudness: { target: -16, tolerance: 1, maxTruePeak: -1 } },
     effectcraft: {},
   };
+  // Card EC.5: only EffectCraft renders a transparent clip (ProRes 4444 MOV); its alpha is checked like the compositor's.
+  const ENGINE_ALPHA = new Set(["effectcraft"]),
+    { hasAlpha } = require("./media-store.cjs");
   async function engineRender(req) {
     const bad = (message) => Object.assign(Error(message), { status: 400 });
     const metaBytes = Number(req.headers["x-vw-meta-length"]);
@@ -869,7 +872,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       const verification = await verifyOutput(tmp, { width, height, ...ENGINE_OUTPUT[meta.engine] });
       if (!verification.ok || !verification.info?.video)
         throw bad("成片檢查沒過：" + (verification.findings.map((f) => f.message).join("；") || "沒有影像"));
-      const stored = await mediaStore.ingest({ file: tmp, ext: "mp4" });
+      // A clip sent as transparent without an alpha plane would land on the timeline as a black box.
+      if (meta.alpha && !hasAlpha({ video: true, pixFmt: verification.info.probe.pixFmt }))
+        throw bad("成片檢查沒過：透明片段沒有透明通道（" + (verification.info.probe.pixFmt || "未知") + "）");
+      const stored = await mediaStore.ingest({ file: tmp, ext: meta.alpha ? "mov" : "mp4" });
       const job = {
         id: crypto.randomUUID(),
         type: "video",
@@ -877,7 +883,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           type: "video",
           operation: "engine-render",
           references: meta.sources.map((s) => ({ url: s.url, ...(typeof s.id === "string" ? { id: s.id } : {}), ...(typeof s.name === "string" ? { name: s.name.slice(0, 200) } : {}) })),
-          settings: { engine: meta.engine, engineVersion: meta.engineVersion, title: meta.title, ratio: meta.ratio, cues: meta.cues },
+          settings: { engine: meta.engine, engineVersion: meta.engineVersion, title: meta.title, ratio: meta.ratio, cues: meta.cues, ...(meta.alpha ? { alpha: true } : {}) },
           ...(meta.link ? { link: meta.link } : {}),
         },
         status: "succeeded",
@@ -909,6 +915,9 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     if (!meta || typeof meta !== "object" || !Object.hasOwn(ENGINE_OUTPUT, meta.engine)) throw bad("不支援的引擎");
     meta.engineVersion = String(meta.engineVersion ?? "").slice(0, 40);
     meta.title = String(meta.title ?? "").trim().slice(0, 200);
+    if (meta.alpha != null && typeof meta.alpha !== "boolean") throw bad("透明輸出格式不正確");
+    meta.alpha = meta.alpha === true;
+    if (meta.alpha && !ENGINE_ALPHA.has(meta.engine)) throw bad("這個引擎不支援透明輸出");
     const size = ENGINE_RATIOS[meta.ratio];
     if (!size || meta.width !== size[0] || meta.height !== size[1]) throw bad("成片比例或尺寸不正確");
     if (!Array.isArray(meta.sources) || !meta.sources.length || meta.sources.length > 200)

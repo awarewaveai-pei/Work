@@ -376,3 +376,10 @@ headless 測不到的三件事，用真的視窗、只在 NVIDIA 顯示卡上開
 - 路由：`ENGINE_OUTPUT` 每個引擎各自的檢查：FilmCraft 要有聲且 −16 LUFS；EffectCraft 的 Render Queue 沒有響度設定、動態圖可以沒聲音，只要求畫面與尺寸。
 - 引擎檔：`scripts/vendor-craft.cjs` 一份複製驗證程式，`vendor-filmcraft.cjs`／`vendor-effectcraft.cjs` 各一行；EffectCraft 改讀 `effectcraft-dist/LATEST`，舊的下載官方 zip 刪掉，`engines/effectcraft/VERSION.json` 換成新產物。`Dockerfile` 不再在映像裡抓引擎（上線時引擎檔走主機靜態資料夾，FC.4 的做法），`.dockerignore` 兩個引擎的本機檔都排除。
 - 上線時要補（不在本卡）：主機 nginx 要有 `/engines/effectcraft/web/` 的 alias，並帶原本 `server.cjs:182-189` 的 COOP／COEP 標頭；FC.4 的 nginx 規劃只寫了 FilmCraft。
+
+**EC.5 透明片段（2026-11-10）**：特效做的片頭／貼圖帶透明背景回素材庫，剪輯器疊在別的影片上。
+- 格式：`renderQueue.add {format:"prores", channels:"rgba"}`（上游 `crates/export/src/encode.rs:220` 遇 rgba 自動用 4444）→ ProRes 4444 MOV，實測 `yuva444p12le`，2 秒 1080p 標題 10 MB，抽格背景 alpha=0。不選 WebM VP9：alpha 在 BlockAdditional，ffmpeg 內建 vp9 解碼器丟 alpha，剪輯器輸出（讀原檔）會變黑底。
+- 外框：EffectCraft 輸出列多一顆「輸出透明片段」（`export:alpha`），meta 帶 `alpha: true`。
+- 入帳：`/engine/renders` 只收 EffectCraft 的 `alpha`；ffprobe pix_fmt 沒有 alpha（`media-store.cjs` `hasAlpha`，與動畫合成同一條判準）→ 400 不入帳；有 → 以 `.mov` 進素材庫，`input.settings.alpha = true`，來源清單照 EC.3。
+- 剪輯器：不改。素材庫對有 alpha 的原檔自動產 VP9 alpha `proxy.webm`／`preview720.webm`（P3、ED.1.4 同一條路），輸出讀原 MOV（ffmpeg 原生解 ProRes 4444 alpha）。
+- 限制：單次上傳經 Cloudflare 上限 100 MB（P6.20），約 20 秒以內的 1080p 透明片段。
