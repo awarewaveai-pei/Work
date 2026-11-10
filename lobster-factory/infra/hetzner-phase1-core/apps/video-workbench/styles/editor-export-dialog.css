@@ -1,1 +1,3 @@
 /* Styles owned by ED.8 scripts/editor-export-dialog.js (spec §3 檔案歸屬). Theme tokens only (tests/theme-tokens.cjs). */
+.editor-dialog .editor-export-actions { display:flex;justify-content:flex-end;gap:8px;margin-top:16px; }
+.editor-dialog [data-ed-export-body] .flow-choices { flex-wrap:wrap; }
