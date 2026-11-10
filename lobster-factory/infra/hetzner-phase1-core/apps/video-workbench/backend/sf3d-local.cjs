@@ -1,18 +1,28 @@
 // Card S4b: free image -> 3D on this computer with Stable Fast 3D (github.com/Stability-AI/stable-fast-3d), run as its own
-// process: VW_SF3D_PYTHON <VW_SF3D_DIR>/run.py <image> --output-dir <workdir>/out --texture-resolution 1024 -> out/0/mesh.glb.
-// Install steps: docs/s4-image-to-3d-providers-20261103.md §7. The child gets a minimal environment (no API keys) and
-// HF_HUB_OFFLINE=1: weights are downloaded once at install time, a job never goes online. One job at a time (8 GB VRAM);
-// cancel and timeout kill the whole process tree.
+// process inside WSL (Linux binaries are outside Windows Smart App Control, which blocks freshly built unsigned .pyd
+// files; WORKLOG 2026-11-10 續19). Install: scripts/sf3d/install-wsl.sh; docs/s4-image-to-3d-providers-20261103.md §7.
+//   wsl.exe -d <VW_SF3D_WSL> -- bash <VW_SF3D_ENTRY | scripts/sf3d/run-wsl.sh> <image> <out>   -> <out>/0/mesh.glb
+// The image and <out> sit in the job's workdir (the exchange folder, seen by Linux under /mnt/<drive>); wslPath() is the
+// one place a Windows path becomes a Linux one. The child gets no API keys; the entry runs offline. One job at a time
+// (8 GB VRAM). Cancel and timeout kill the Linux process group (pgid written by the entry) and then wsl.exe.
 const fs = require("node:fs"),
   path = require("node:path"),
-  { spawn } = require("node:child_process");
+  { spawn, spawnSync } = require("node:child_process");
 const { vwEnv } = require("./env-compat.cjs");
 const { killTree } = require("./blender.cjs");
 
 const TIMEOUT_MS = 600000;
+const ENTRY = path.join(__dirname, "..", "scripts", "sf3d", "run-wsl.sh");
+const WSL = path.join(process.env.SystemRoot || "C:\\Windows", "System32", "wsl.exe");
+// Configured = a WSL distro is named (VW_SF3D_WSL) on a Windows host with wsl.exe; the install itself is checked by the job.
 function installed(env) {
-  const python = vwEnv(env, "SF3D_PYTHON"), dir = vwEnv(env, "SF3D_DIR");
-  return python && dir && fs.existsSync(python) && fs.existsSync(path.join(dir, "run.py")) ? { python, dir } : null;
+  const distro = vwEnv(env, "SF3D_WSL");
+  return process.platform === "win32" && distro && fs.existsSync(WSL) ? { distro, entry: vwEnv(env, "SF3D_ENTRY") || ENTRY } : null;
+}
+function wslPath(p) {
+  const m = /^([A-Za-z]):[\\/](.*)$/.exec(path.resolve(p));
+  if (!m) throw Error("無法轉成 WSL 路徑：" + p);
+  return `/mnt/${m[1].toLowerCase()}/${m[2].replace(/\\/g, "/")}`;
 }
 let held = false;
 const claim = () => (held ? null : ((held = true), () => { held = false; }));
@@ -25,22 +35,19 @@ function run({ file, workdir, env, signal, onSpawn, timeoutMs = TIMEOUT_MS }) {
     if (signal?.aborted) return reject(Error("已取消"));
     const out = path.join(workdir, "out");
     fs.mkdirSync(out, { recursive: true });
-    const pass = (k) => (env[k] ? { [k]: env[k] } : {});
-    const child = spawn(sf3d.python, [path.join(sf3d.dir, "run.py"), file, "--output-dir", out, "--texture-resolution", "1024"], {
-      cwd: sf3d.dir,
-      env: {
-        PATH: env.PATH || process.env.PATH || "", SystemRoot: process.env.SystemRoot || "", TEMP: workdir, TMP: workdir, TMPDIR: workdir,
-        HF_HOME: env.HF_HOME || path.join(sf3d.dir, ".hf"), // weights downloaded there at install (docs §7)
-        ...pass("USERPROFILE"), ...pass("HOME"), ...pass("CUDA_VISIBLE_DEVICES"), // rembg's model cache is ~/.u2net
-        HF_HUB_OFFLINE: "1", PYTHONDONTWRITEBYTECODE: "1", PYTHONIOENCODING: "utf-8",
-      },
+    const child = spawn(WSL, ["-d", sf3d.distro, "--", "bash", wslPath(sf3d.entry), wslPath(file), wslPath(out)], {
+      env: { SystemRoot: process.env.SystemRoot || "", PATH: process.env.PATH || "", TEMP: workdir, TMP: workdir },
       windowsHide: true,
-      detached: process.platform !== "win32",
       stdio: ["ignore", "pipe", "pipe"],
     });
     onSpawn?.(child.pid);
     let log = "", stopped = null;
-    const stop = (reason) => ((stopped ||= reason), killTree(child));
+    const stop = (reason) => {
+      stopped ||= reason;
+      const pgid = Number(fs.readFileSync(path.join(out, "pgid"), { encoding: "utf8", flag: "a+" }).trim());
+      if (pgid > 1) spawnSync(WSL, ["-d", sf3d.distro, "--", "kill", "-KILL", "--", "-" + pgid], { windowsHide: true, stdio: "ignore", timeout: 15000 });
+      killTree(child);
+    };
     const onAbort = () => stop("cancelled");
     signal?.addEventListener("abort", onAbort, { once: true });
     const timer = setTimeout(() => stop("timeout"), timeoutMs);
@@ -57,4 +64,4 @@ function run({ file, workdir, env, signal, onSpawn, timeoutMs = TIMEOUT_MS }) {
     });
   });
 }
-module.exports = { installed, claim, run };
+module.exports = { installed, claim, run, wslPath };

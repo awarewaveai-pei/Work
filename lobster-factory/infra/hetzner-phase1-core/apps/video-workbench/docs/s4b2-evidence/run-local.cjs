@@ -1,6 +1,6 @@
 // Card S4b.2, free part: the same 10 images (results.json) through the local Stable Fast 3D way (image-to-3d,
 // method local-sf3d) on this laptop's RTX 5060, via the workbench's own job route into the local library (.data).
-// Needs VW_SF3D_PYTHON + VW_SF3D_DIR (docs §7). Adds runs["local-sf3d"] to results.json; no paid call.
+// Needs VW_SF3D_WSL (docs §7; ran 2026-11-10 on the Windows-native install that WSL replaced). Adds runs["local-sf3d"] to results.json; no paid call.
 // Run: node docs/s4b2-evidence/run-local.cjs
 const fs = require("node:fs"), path = require("node:path");
 const out = path.join(__dirname, "results.json"), results = JSON.parse(fs.readFileSync(out, "utf8"));

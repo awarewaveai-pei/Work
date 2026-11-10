@@ -1,6 +1,6 @@
 // Card S4b.1 (docs/s4-image-to-3d-providers-20261103.md §7): one image -> 3D button over three ways, price shown first.
 // (1) each way with a fake vendor reply: one job id = one vendor call (Stability sync GLB, Replicate TRELLIS prediction,
-//     local SF3D process = a fake run.py); a cancelled TRELLIS job's prediction is resumed by the next job, not re-sent;
+//     local SF3D process = a fake WSL entry script); a cancelled TRELLIS job's prediction is resumed by the next job, not re-sent;
 //     a job that already called the vendor never calls again.
 // (2) the page shows every way with its TOOL_RATES price and repeats the picked way's price on the 產生 button.
 // No real vendor call: fetchImpl is fake; the browser only renders the panel (no 3D viewer).
@@ -21,10 +21,11 @@ GLB.writeUInt32LE(2, 4);
 GLB.writeUInt32LE(20, 8);
 const png = "data:image/png;base64," + fs.readFileSync(path.join(__dirname, "..", "assets", "test-image-1.png")).toString("base64");
 
-// Fake local SF3D: node runs this "run.py" (CommonJS) like python would; it counts its runs and writes out/0/mesh.glb.
+// Fake local SF3D: an entry script WSL runs in place of scripts/sf3d/run-wsl.sh (same arguments: <image> <out>); it
+// counts its runs and writes <out>/0/mesh.glb. Needs WSL (Ubuntu), as the real way does; skipped without it.
+const wsl = process.platform === "win32" && require("node:child_process").spawnSync("wsl.exe", ["-d", "Ubuntu", "--", "true"]).status === 0;
 const sf3dDir = fs.mkdtempSync(path.join(os.tmpdir(), "vw-s4b-sf3d-"));
-fs.writeFileSync(path.join(sf3dDir, "run.py"), `const fs=require("fs"),p=require("path");const a=process.argv;const out=a[a.indexOf("--output-dir")+1];
-fs.appendFileSync(p.join(__dirname,"runs.txt"),"1");fs.mkdirSync(p.join(out,"0"),{recursive:true});fs.writeFileSync(p.join(out,"0","mesh.glb"),Buffer.from("${GLB.toString("base64")}","base64"));`);
+fs.writeFileSync(path.join(sf3dDir, "entry.sh"), `#!/usr/bin/env bash\nset -e\necho 1 >> "$(dirname "$0")/runs.txt"\nmkdir -p "$2/0"\necho ${GLB.toString("base64")} | base64 -d > "$2/0/mesh.glb"\n`);
 
 (async () => {
   const calls = [];
@@ -57,7 +58,7 @@ fs.appendFileSync(p.join(__dirname,"runs.txt"),"1");fs.mkdirSync(p.join(out,"0")
     if (url === "https://replicate.delivery/x/model.glb") return new Response(GLB, { status: 200 });
     throw Error("unexpected provider call " + url);
   };
-  const env = { STABILITY_API_KEY: "stability-test-only", REPLICATE_API_TOKEN: "replicate-test-only", VW_SF3D_PYTHON: process.execPath, VW_SF3D_DIR: sf3dDir, VW_3D_POLL_MS: "30" };
+  const env = { STABILITY_API_KEY: "stability-test-only", REPLICATE_API_TOKEN: "replicate-test-only", ...(wsl ? { VW_SF3D_WSL: "Ubuntu", VW_SF3D_ENTRY: path.join(sf3dDir, "entry.sh") } : {}), VW_3D_POLL_MS: "30" };
   const { base, dataDir } = await isolatedServer("vw-s4b-", { fetchImpl, env });
   const call = async (route, data, method = "POST", ok = true) => {
     const r = await fetch(base + "/api/vw" + route, { method, headers: { "Content-Type": "application/json" }, ...(data ? { body: JSON.stringify(data) } : {}) });
@@ -113,13 +114,14 @@ fs.appendFileSync(p.join(__dirname,"runs.txt"),"1");fs.mkdirSync(p.join(out,"0")
     assert.deepEqual([result.origin.taskId, resumed.vendorCall], ["p3", undefined]);
     pass("TRELLIS：每個任務一次 POST；取消 → Replicate cancel，立刻重送的新任務不接正在取消的 p1、自己送；仍在跑的舊預測被沿用，零次 POST；成本＝實際秒數×0.0014（20 秒 → 0.028）");
   }
-  // Local SF3D: one process run, free.
-  {
+  // Local SF3D (through WSL): one process run, free.
+  if (!wsl) console.log("SKIP local SF3D case: no WSL Ubuntu");
+  else {
     const done = await until((await job("local-sf3d")).id, ended);
     assert.equal(done.status, "succeeded", done.error);
-    assert.equal(fs.readFileSync(path.join(sf3dDir, "runs.txt"), "utf8"), "1");
+    assert.equal(fs.readFileSync(path.join(sf3dDir, "runs.txt"), "utf8").trim(), "1");
     assert.deepEqual([done.result.origin.provider, done.result.origin.costUsd], ["本機", 0]);
-    pass("本機 SF3D：獨立程序跑一次，輸出 GLB，免費");
+    pass("本機 SF3D（WSL）：獨立程序跑一次，輸出 GLB，免費");
   }
   // A job that already called the vendor never calls again (restart / double run).
   {
@@ -132,7 +134,7 @@ fs.appendFileSync(p.join(__dirname,"runs.txt"),"1");fs.mkdirSync(p.join(out,"0")
 
   // (2) prices on the page.
   const cap = await call("/capabilities", undefined, "GET");
-  assert.deepEqual(cap.imageTo3d.methods.map((m) => [m.id, m.usd, m.available]), [["stability-spar3d", 0.04, true], ["stability-sf3d", 0.1, true], ["local-sf3d", 0, true], ["replicate-trellis", 0.038, true]], "Meshy is not listed without its key");
+  assert.deepEqual(cap.imageTo3d.methods.map((m) => [m.id, m.usd, m.available]), [["stability-spar3d", 0.04, true], ["stability-sf3d", 0.1, true], ["local-sf3d", 0, wsl], ["replicate-trellis", 0.038, true]], "Meshy is not listed without its key");
   // Connected to the main system every paid way needs a USD price: Meshy (credits only) is listed but unavailable.
   const meshy = imageTo3d.capability({ MESHY_API_KEY: "k" }, { priced: true }).methods.find((m) => m.id === "meshy");
   assert.deepEqual([meshy.available, meshy.reason], [false, "無美元價目"]);
@@ -147,7 +149,7 @@ fs.appendFileSync(p.join(__dirname,"runs.txt"),"1");fs.mkdirSync(p.join(out,"0")
     await page.goto(base + "/pages/tools.html?r=1#3d");
     const ways = page.locator("[data-t3-methods] button");
     await ways.first().waitFor();
-    assert.deepEqual(await ways.allTextContents(), ["Stability SPAR3D · US$0.04", "Stability SF3D · US$0.1", "本機 SF3D · 免費", "Replicate TRELLIS · 約 US$0.038"]);
+    assert.deepEqual(await ways.allTextContents(), ["Stability SPAR3D · US$0.04", "Stability SF3D · US$0.1", wsl ? "本機 SF3D · 免費" : "本機 SF3D · 免費（未安裝）", "Replicate TRELLIS · 約 US$0.038"]);
     const go = page.locator('[data-t3-action="i3"]');
     assert.equal(await page.locator('[data-t3-action="i3-method:stability-spar3d"]').getAttribute("aria-pressed"), "true", "SPAR3D preselected (S4b.2)");
     assert.equal(await go.isDisabled(), true, "no image yet");

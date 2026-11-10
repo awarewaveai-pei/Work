@@ -1,4 +1,24 @@
 # Worklog
+## 2026-11-10（續25）影音工作台 S4b 本機 SF3D 改在 WSL 跑（不關智慧型應用程式控制）：安裝可重跑、取消殺整組、工作台按鈕實跑
+
+- 決定（監工）：不關智慧型應用程式控制（續19）；本機 SF3D 改成在 WSL Ubuntu 裡跑，GPU 走 Windows NVIDIA 驅動（WSL 內 `nvidia-smi` 看得到 RTX 5060）。adapter 介面不變，只換程序的啟動方式。
+- 做法：
+  - `backend/sf3d-local.cjs`：用 `wsl.exe -d <VW_SF3D_WSL> -- bash scripts/sf3d/run-wsl.sh <圖> <out>` 起程序，路徑轉換只在 `wslPath()` 一處，任務資料夾就是交換資料夾。
+  - 入口腳本 `run-wsl.sh` 用 setsid 開自己的程序群組並寫 `pgid`；取消／逾時時在 WSL 裡 kill 整組，再結束 wsl.exe（實測只結束 wsl.exe 也會帶走整組，但那是 WSL 的行為、不是保證，所以兩道都做）。
+  - `scripts/sf3d/install-wsl.sh` 可重跑：每次建在 `releases/<時間>`，能 import 又跑完一張圖才用一次 symlink 切換成 `current`；失敗就刪掉新的、保留舊的；現有的能用就跳過（`--force` 才重建）；保留前一版可回滾。token 用 `WSLENV=HF_TOKEN/u` 帶入，不落檔。
+- 移除（不留兩套）：Windows 端 `runtime/sf3d`（原始碼、`.venv`、`.hf` 權重，共 11 GB，gitignore）、`scripts/sf3d/install.cmd`、`build-ext.cmd`／`reinstall-baker.cmd`（在 runtime 內）、`VW_SF3D_PYTHON`／`VW_SF3D_DIR` 設定。沒動：VS Build Tools（系統層安裝，要不要移除由操作者決定）、Windows `~/.u2net`（168 MB，在 runtime 以外）。
+- 驗證：
+  - 第一次安裝 → `releases/20261110-124312`，安裝流程裡已實跑一張圖。
+  - 一般重跑 → `SF3D_INSTALLED kept`。
+  - `--force` → `releases/20261110-125113` 驗證後才切換，舊版保留。
+  - 失敗路徑（建置失敗保留舊版）沒有實際觸發過。
+- 守衛突變：拔掉「一次一個」→ `s4b-sf3d-local` 在 409 斷言轉紅；還原 → 轉綠。
+- 附帶發現：測試程序異常結束時，它開的 wsl.exe 與 Linux 程序會繼續跑完（約 20 秒，已手動清掉）；正常取消路徑不會。
+- 另一個 session（價格稽核，未 commit）把 `tools-3d.js` 的 `t3Usd` 改成 `VideoWorkbenchMoney`（新台幣），`s4b-image-to-3d` 的 US$ 價格斷言因此失敗；那一行不屬於本卡，要等他們一起改測試。
+- REALTEST_EVIDENCE: tool=Bash | cmd=wsl install-wsl.sh (fresh, re-run kept, --force swap) && node tests/s4b-sf3d-local.cjs (real WSL: 409, cancel kills pgid + wsl.exe, 3D page button -> GLB US$0) && node tests/s4b-image-to-3d.cjs (6/6 before the other session's NT$ edit) | exit=0 | ms=2400000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（Codex 額度用完：書面對抗自審＋突變證據；自審抓到「寫 pgid 前就取消」的風險，實測只結束 wsl.exe 也會帶走 Linux 程序群組，並更正腳本註解）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-10 14:03 (scripts/oracle-quota.ps1)
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/video-workbench,agency-os,scripts | grep=SF3D_PYTHON|SF3D_DIR|install\.cmd | hits=3（都在歷史 oracle 紀錄 2026-11-10-partialreview-24b44f47.md，保留）
 ## 2026-11-10（續24）影音工作台付費廠商替代方案調查（只查不改）
 
 - 產出：`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/vendor-alternatives-20261110.md`（8 類各一表＋建議換清單＋排除名單）。
