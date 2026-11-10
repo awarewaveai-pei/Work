@@ -3,7 +3,7 @@
 
 export const META = {
   title: '影音工作台監工台',
-  updated: '2026-11-06',
+  updated: '2026-11-10',
   plan: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/creative-suite-plan-20261102.md',
   req: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/handoff/Claude_Code_handoff_20261102.md',
   worklog: 'agency-os/WORKLOG.md 2026-11-02 續19–續45',
@@ -35,7 +35,7 @@ export const NOW = [
   { what: '2D 角色骨架。', state: 'yes', ev: '2026-11-03 卡 P4：工具「角色綁定」，姿勢圖可當生成參考。' },
   { what: '3D。', state: 'yes', ev: '2026-11-03 卡 P5：工具「3D」，Blender 4.5.9 渲染回剪輯。圖片轉 3D 改走 S4b（Meshy 停用）。' },
   { what: '在 video.aware-wave.com 登入使用。', state: 'yes', ev: '2026-11-05 已上線：未登入回 401、偽造身分回 401、smoke 全綠；3D 用主機 CPU（Cycles）。送審缺口已補（P6.13）；全程投遞實測待你操作（P6.10）。' },
-  { what: 'EffectCraft、FilmCraft 的專業功能在站上用得到。', state: 'no', ev: '11-02 試驗沒過，所以站上的剪輯與動畫都是自製的。11-06 重新試過：字型、焦點、重開素材都有解法，你 11-06 選了「並存」：做成「專業剪輯」「專業特效」兩個入口，現有工具都留著。卡 FC 上線後這一列才會變成可以。' },
+  { what: 'EffectCraft、FilmCraft 的專業功能在站上用得到。', state: 'yes', ev: '11-10 上線：應用工具的「專業剪輯」「專業特效」在正式站用獨顯實跑通過（FC.4、EC.4）；右側圖示直欄、拿掉 ArtCraft／Discord（FC.5）。沒有獨顯的電腦會先提醒。' },
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
@@ -197,6 +197,7 @@ export const STEPS = [
       done('P6.22', '價目全部對到「實際送出的請求」（廠商、模型、解析度等參數）；Sora 2、Imagen 4 移除，影片預設改 Veo 3.1 Fast；頁面價格改新台幣（匯率一處）。', 'e88ef493d'),
       done('P6.23', '配音、字幕多家並存、免費優先：字幕預設自家主機 whisper（免費、繁中、逐字時間），Gemini／OpenAI 付費可選；配音預設 Gemini（較便宜），OpenAI 可選到 2027-01-06 自動消失。', '670b89396'),
       done('P6.24', '11-10 批次上線 469e589f0（app＋工作台）：whisper 服務重建、工作台加 Gemini／whisper／Stability 設定；Gemini 儲值 NT$300 後配音預設恢復 Gemini（23eaf31a8）。ED.3.8 最後一個修正 d6ab0a1c6 尚未部署。', '469e589f0'),
+      done('P6.25', '11-10 上線 9a6df4a73：頁面腳本改同時下載（應用工具後段 8 秒→1 秒）；瀏覽器保留讀過的素材副本，同一支第二次不經網路（分組織、登出即清）。首屏前段仍約 6 秒（css/js 經 Cloudflare 逐一回應），已提案另查。', '9a6df4a73'),
       todo('P6.16', '（操作者 11-05 說先不用）主題改成 app 存檔才通知 video、使用者切回分頁時重讀，取代現在的「有人開頁面時最多 30 秒問 app 一次」。'),
       done('P6.13', '工作台成品能過送審：剪輯專案的文字或燒進去的字幕自動變成標題、腳本和字幕檢查的依據；上傳時可勾「我有權使用這些素材」。畫面上沒有任何字的影片照實不能送審。用調色檔（LUT）的成品權利檢查會不過（調色檔沒登記到 app），要另外處理。', '1aaa139d5'),
     ] },
@@ -256,6 +257,7 @@ export const STEPS = [
       done('FC.2', '應用工具多了「專業剪輯」：FilmCraft 嵌在工作台裡，素材從素材庫挑進去，存檔存回工作台、下次能重開；電腦沒有可用的獨立顯示卡時，開啟前先提醒，可改用一般剪輯。', 'dee7d0338'),
       done('FC.3', '專業剪輯的成片自動進任務紀錄與素材庫，記下用了哪些素材；字幕一起帶進送審。', 'e54d1c14e'),
       done('FC.4', '11-10 在正式站用獨顯（RTX 5060）實跑：送兩支素材、加繁中標題、存檔、重開（素材都在）、輸出 16:9；成片 1920×1080、有聲、7.2 秒，進任務紀錄與素材庫，來源正好是那兩支。217 格輸出約 8 分鐘。', '96ddd7f70'),
+      done('FC.5', '11-10 上線：上方工具列拿掉，改成右側圖示直欄（從素材庫加入、開新專案、比例、說明與專案），兩個引擎共用；引擎畫面拿掉 Discord 與 ArtCraft 社群連結，建置時掃描擋住再出現。', '2a1c45d2a'),
     ] },
   { n: 18, code: 'EC', title: '專業特效（EffectCraft）', plain: '例：在應用工具按「專業特效」，進到 EffectCraft 的完整畫面做片頭與特效（三百多個特效、曲線編輯器、表達式），做好的透明片段直接回到素材庫給剪輯用。',
     gate: '跟專業剪輯同一套流程在 EffectCraft 走通；重開專案時素材不會離線。', risk: 'High', model: 'Opus；上線等你同意', status: 'done', commit: '9b6bddb6c', depends: ['FC'],
