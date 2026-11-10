@@ -130,6 +130,14 @@
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（讀回 compose diff 7 行只在 video-workbench 區塊；測試修正一行）
 - ORACLE_WAIVED: 部署＋設定＋一行測試期望值，無新邏輯
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=VW_TTS_MODEL | hits=10（README、speech.cjs、repo compose、3 個測試、vendor-alternatives、oracle 報告、本條、主機 compose；全部一致）
+## 2026-11-10（續33）影音工作台 ED.3.8 第 2 輪 Codex（額度恢復後補審 539a80249..5b9947c04）
+
+- 補審範圍：05a57f369（剪輯器欄寬）、f9fdd9548（ED.3.8）、5b9947c04（generation-flows）；續21／22／28 記的 ORACLE_WAIVED 由本輪補上。
+- Codex 1 個（修，d6ab0a1c6 由監工代 commit）：`edBlurBack` 重畫前沒清 canvas，半透明 PNG 的模糊底圖每次重畫疊一層、越來越不透明（影片不透明、overdraw 蓋滿，不受影響）→ 畫前 `clearRect`。
+- 測：`tests/ed38-preview-fx.cjs` 加半透明 PNG（alpha 0.5）重畫 10 次透明度不變。突變：拿掉 clearRect → 191→254 紅 → 還原綠。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed38-preview-fx.cjs; ed3-inspector; tools-editor; ed2-timeline; ed1-layout; gate | exit=0 | ms=300000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n — Codex 第 2 輪（artifact 2026-11-10-partialreview-4c73d8ac），已修並加測
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=edBlurBack | hits=3
 ## 2026-11-10（續32）影音工作台：供應商清單「免費優先」一處規則；自架 Kokoro 配音實測未採用；Gemini 金鑰＝付費層（餘額用完）
 
 - 操作者：「使用免費和付費的 但是要先使用免費為主」。
