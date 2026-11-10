@@ -1,62 +1,62 @@
-# 影音工作台價目核對 2026-11-10（只查不改）
+# 影音工作台價目核對 2026-11-10（核對；修正見「修正紀錄」）
 
 查詢日一律 2026-11-10。我們 = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/` 下 `lib/ai/cost-model.ts`（CM）或 `public/editor-shared/image-models.js`（IM）；工作台經 `video-workbench/backend/provider-cost.cjs:5` 與 `generation-policy.cjs:6-20` 讀 CM。
 Replicate 價取自各模型頁內嵌 `billingConfig`（頁面原始碼；不是 UI 文字），URL = `https://replicate.com/<slug>`。✓ = 一致，✗ = 不一致，? = 查不到。
 
 ## 影片
 
-| 項目 | 我們（file:line） | 官方 | 單位 | 差異 | 來源 |
+| 項目 | 我們（file:line） | 官方 | 單位 | 差異 | 來源 | 呼叫端 file:line＋送出參數（NA＝next-admin，VW＝video-workbench） |
 |---|---|---|---|---|---|
-| Runway gen4-turbo | 0.05/s CM:176 | $0.05 | 每輸出秒（Replicate）；Runway 直連 5 credit/s×$0.01 | ✓（對照實扣 5s=$0.25 ✓） | replicate.com/runwayml/gen4-turbo；docs.dev.runwayml.com/guides/pricing |
-| Veo 3.1 Fast（generate_audio:false） | 0.10/s CM:177 | $0.10 無音訊／$0.15 有音訊 | 每輸出秒 | ✓ | replicate.com/google/veo-3.1-fast |
-| Veo 3.1（generate_audio:false） | 0.20/s CM:178 | $0.20 無音訊／$0.40 有音訊 | 每輸出秒 | ✓ | replicate.com/google/veo-3.1 |
-| Luma Ray 3.2（720p SDR 5s） | 0.06/s×5=0.30 CM:180 | $0.30（540p .15／1080p 1.20／HDR 720p .60） | 每支（解析度×動態範圍×秒數） | ✓ 僅 720p SDR 5s；工作台只開 5s（video-motion-models.ts:76） | replicate.com/luma/ray-3.2；docs.agents.lumalabs.ai/guides/pricing（720p 5s=100 credit，USD/credit 頁面未列） |
-| Sora 2（720p） | 0.10/s CM:282 | $0.10 | 每輸出秒 | 價 ✓；**官方頁標「Shut down Sep 24, 2026」** | developers.openai.com/api/docs/models/sora-2 |
-| Sora 2 Pro（720p） | 0.30/s CM:283 | $0.30（1024p .50／1080p .70） | 每輸出秒 | 價 ✓；同上標下線 | developers.openai.com/api/docs/models/sora-2-pro |
+| Runway gen4-turbo | 0.05/s CM:176 | $0.05 | 每輸出秒（Replicate）；Runway 直連 5 credit/s×$0.01 | ✓（對照實扣 5s=$0.25 ✓） | replicate.com/runwayml/gen4-turbo；docs.dev.runwayml.com/guides/pricing | NA/lib/ai/video-motion-models.ts:39-47（buildInput image＋duration 5/10）；呼叫 NA/lib/tarot/video-motion-gen.ts:64、VW/backend/replicate-video.cjs:35 |
+| Veo 3.1 Fast（generate_audio:false） | 0.10/s CM:177 | $0.10 無音訊／$0.15 有音訊 | 每輸出秒 | ✓ | replicate.com/google/veo-3.1-fast | video-motion-models.ts:57 generate_audio:false（官方預設 true＝$0.15）；VW 送 resolution 720p（replicate-video.cjs:35），NA 不送＝1080p，價不分解析度 ✓ |
+| Veo 3.1（generate_audio:false） | 0.20/s CM:178 | $0.20 無音訊／$0.40 有音訊 | 每輸出秒 | ✓ | replicate.com/google/veo-3.1 | video-motion-models.ts:68 generate_audio:false；同上 |
+| Luma Ray 3.2（720p SDR 5s） | 0.06/s×5=0.30 CM:180 | $0.30（540p .15／1080p 1.20／HDR 720p .60） | 每支（解析度×動態範圍×秒數） | ✓ 僅 720p SDR 5s；工作台只開 5s（video-motion-models.ts:76） | replicate.com/luma/ray-3.2；docs.agents.lumalabs.ai/guides/pricing（720p 5s=100 credit，USD/credit 頁面未列） | video-motion-models.ts:79 resolution 720p、duration 只開 5；hdr 不送＝schema 預設 false（SDR）✓ |
+| Sora 2（720p） | 0.10/s CM:282 | $0.10 | 每輸出秒 | 價 ✓；**官方頁標「Shut down Sep 24, 2026」**；已修（e88ef493d：移除，預設改 Veo 3.1 Fast） | developers.openai.com/api/docs/models/sora-2 | 已移除（原 VW/backend/api.cjs /videos） |
+| Sora 2 Pro（720p） | 0.30/s CM:283 | $0.30（1024p .50／1080p .70） | 每輸出秒 | 價 ✓；同上標下線；已修（e88ef493d：移除） | developers.openai.com/api/docs/models/sora-2-pro | 已移除；從未被呼叫 |
 
 ## 圖片生成／編輯（IM；Replicate 每張輸出）
 
-| 項目 | 我們 | 官方 | 差異 | 來源 slug |
+| 項目 | 我們 | 官方 | 差異 | 來源 slug | 呼叫端 file:line＋送出參數（NA＝next-admin，VW＝video-workbench） |
 |---|---|---|---|---|
-| flux-schnell | 0.003 IM:23 | $3/千張 | ✓ | black-forest-labs/flux-schnell |
-| flux-dev | 0.025 IM:24 | 0.025 | ✓ | black-forest-labs/flux-dev |
-| flux-kontext-dev | **0.045** IM:25 | **0.025** | ✗ 我們高 0.020 | black-forest-labs/flux-kontext-dev |
-| flux-kontext-pro | 0.04 IM:26 | 0.04 | ✓ | black-forest-labs/flux-kontext-pro |
-| flux-2-max | 0.07 IM:27 | $0.04/run + $0.03/輸出MP（+$0.03/輸入MP） | ✓ 僅 1MP 輸出、無參考圖；有輸入圖會更貴（maxRefs 0 故不會） | black-forest-labs/flux-2-max |
-| flux-2-klein-4b | 0.001 IM:30 | $1/千 輸入MP + $1/千 輸出MP | ✗ 單位不同：按 MP 計且輸入也收；1MP 輸入+1MP 輸出=0.002（我們低估最多 2×） | black-forest-labs/flux-2-klein-4b |
-| flux-kontext-fast | 0.01 IM:31 | 0.01 | ✓ | prunaai/flux-kontext-fast |
-| ideogram-v2a-turbo | 0.025 IM:32 | 0.025 | ✓ | ideogram-ai/ideogram-v2a-turbo |
-| ideogram-v3-balanced | 0.06 IM:33 | 0.06 | ✓ | ideogram-ai/ideogram-v3-balanced |
-| ideogram-v4-turbo | 0.03 IM:34 | 0.03 | ✓ | ideogram-ai/ideogram-v4-turbo |
-| ideogram-v4-quality | 0.10 IM:35 | 0.10 | ✓ | ideogram-ai/ideogram-v4-quality |
-| ideogram-character | 0.15 IM:36 | TURBO .10／DEFAULT .15／QUALITY .20 | ✓ 僅 DEFAULT 檔；呼叫端未釘檔位則可能偏 | ideogram-ai/ideogram-character |
-| nano-banana-2 | 0.067 IM:37 | 1K .067／2K .101／4K .151 | ✓ 僅 1K；Google 直連同價 | replicate.com/google/nano-banana-2；aistudio.google.com/docs/pricing |
-| nano-banana-pro | 0.15 IM:38 | 1K/2K .15／4K .30（Google 直連 $0.134／$0.24） | ✓ 僅 1K/2K（Replicate 價） | replicate.com/google/nano-banana-pro |
-| imagen-4 | 0.04 IM:39 | ? | ? Replicate `google/imagen-4`、`-fast` 皆 404；Gemini 定價頁未列 | — |
-| ideogram-4-5-edit-low | 0.03 IM:63 | low .03（very_low .008／medium .06／high .22） | ✓ | ideogram-ai/ideogram-4-5-precise-edit |
-| ideogram-4-5-edit（細） | 0.06 IM:64 | medium .06 | ✓（若實際呼叫 high=0.22 則差；未查呼叫端） | 同上 |
-| flux-fill-pro | 0.05 IM:65 | 0.05 | ✓ | black-forest-labs/flux-fill-pro |
-| bria-eraser / inpaint | 0.04 IM:66、CM:196 | 0.04 | ✓ | replicate.com/bria/eraser |
-| bria-expand | 0.04 IM:67 | 0.04 | ✓ | replicate.com/bria/expand-image |
-| openai-low/medium/high（gpt-image-2） | 0.02/0.07/0.19 IM:40-42 | ? 官方只列 token 價，無每張價 | ? 這三個是估算；實扣按 usage（見下） | — |
-| gpt-image-2 token 價 | 5／8／30 per 1M CM:275 | text in $5／image in $8／image out $30 | ✓；頁面標 Deprecated（無日期） | developers.openai.com/api/docs/models/gpt-image-2 |
-| gpt-image-2.5/2.6 sunburst/flare | 同 gpt-image-2 CM:278 | 官方列同費率 | ✓ | developers.openai.com/api/docs/pricing |
-| openai-25-edit／26-edit | 0.06 IM:44,46 | ? 無每張官方價（token 計） | ? 估算 | — |
+| flux-schnell | 0.003 IM:23 | $3/千張 | ✓ | black-forest-labs/flux-schnell | NA/lib/tarot/image-gen.ts:101、:470 megapixels 1、num_outputs 1 |
+| flux-dev | 0.025 IM:24 | 0.025 | ✓ | black-forest-labs/flux-dev | NA/lib/tarot/image-gen.ts:106、:470 megapixels 1、num_outputs 1 |
+| flux-kontext-dev | **0.045** IM:25 | **0.025** | ✗ 我們高 0.020；已修（e88ef493d：0.025） | black-forest-labs/flux-kontext-dev | NA/lib/tarot/image-gen.ts:115 1 張輸出 |
+| flux-kontext-pro | 0.04 IM:26 | 0.04 | ✓ | black-forest-labs/flux-kontext-pro | NA/lib/tarot/image-gen.ts:129 1 張輸出 |
+| flux-2-max | 0.07 IM:27 | $0.04/run + $0.03/輸出MP（+$0.03/輸入MP） | ✓ 僅 1MP 輸出、無參考圖；有輸入圖會更貴（maxRefs 0 故不會） | black-forest-labs/flux-2-max | NA/lib/tarot/image-gen.ts:272 resolution "1 MP"、不送參考圖 → 依 imageRunUsd（run＋輸出 MP）已修（e88ef493d） |
+| flux-2-klein-4b | 0.001 IM:30 | $1/千 輸入MP + $1/千 輸出MP | ✗ 單位不同：按 MP 計且輸入也收；1MP 輸入+1MP 輸出=0.002（我們低估最多 2×）；已修（e88ef493d：依實際輸入／輸出 MP 計） | black-forest-labs/flux-2-klein-4b | NA/lib/tarot/image-gen.ts:213-219 images＝參考圖、output_megapixels 1 |
+| flux-kontext-fast | 0.01 IM:31 | 0.01 | ✓ | prunaai/flux-kontext-fast | NA/lib/tarot/image-gen.ts:226 1 張輸出 |
+| ideogram-v2a-turbo | 0.025 IM:32 | 0.025 | ✓ | ideogram-ai/ideogram-v2a-turbo | NA/lib/tarot/image-gen.ts:156 1 張 |
+| ideogram-v3-balanced | 0.06 IM:33 | 0.06 | ✓ | ideogram-ai/ideogram-v3-balanced | NA/lib/tarot/image-gen.ts:166 1 張 |
+| ideogram-v4-turbo | 0.03 IM:34 | 0.03 | ✓ | ideogram-ai/ideogram-v4-turbo | NA/lib/tarot/image-gen.ts:176 resolution 依比例（價不分解析度） |
+| ideogram-v4-quality | 0.10 IM:35 | 0.10 | ✓ | ideogram-ai/ideogram-v4-quality | NA/lib/tarot/image-gen.ts:185 同上 |
+| ideogram-character | 0.15 IM:36 | TURBO .10／DEFAULT .15／QUALITY .20 | ✓ 僅 DEFAULT 檔；呼叫端未釘檔位則可能偏 | ideogram-ai/ideogram-character | NA/lib/tarot/image-gen.ts:195-205 rendering_speed "Default"＝DEFAULT 檔 ✓ |
+| nano-banana-2 | 0.067 IM:37 | 1K .067／2K .101／4K .151 | ✓ 僅 1K；Google 直連同價 | replicate.com/google/nano-banana-2；aistudio.google.com/docs/pricing | NA/lib/tarot/image-gen.ts:234-242 resolution "2K" → 官方 2K $0.101；目錄原 0.067（1K 價）✗ 已修（e88ef493d：0.101） |
+| nano-banana-pro | 0.15 IM:38 | 1K/2K .15／4K .30（Google 直連 $0.134／$0.24） | ✓ 僅 1K/2K（Replicate 價） | replicate.com/google/nano-banana-pro | NA/lib/tarot/image-gen.ts:251-259 resolution "2K" → 2K $0.15 ✓；allow_fallback_model false |
+| imagen-4 | 0.04 IM:39 | ? | ? Replicate `google/imagen-4`、`-fast` 皆 404；Gemini 定價頁未列；已修（e88ef493d：API slug 仍 200 但頁面 404、Google 已停用、無官方價 → 從清單移除，舊成本列保留可讀） | — | 已移除（原 NA/lib/tarot/image-gen.ts imagen-4、NA/app/api/internal/hosting/provision-staging/route.ts 改 ideogram-v4-turbo） |
+| ideogram-4-5-edit-low | 0.03 IM:63 | low .03（very_low .008／medium .06／high .22） | ✓ | ideogram-ai/ideogram-4-5-precise-edit | NA/lib/studio/generative-fill.ts:115 quality "low"、num_images 1 ✓ |
+| ideogram-4-5-edit（細） | 0.06 IM:64 | medium .06 | ✓（若實際呼叫 high=0.22 則差；未查呼叫端） | 同上 | generative-fill.ts:115 quality "medium" ✓（不送 high） |
+| flux-fill-pro | 0.05 IM:65 | 0.05 | ✓ | black-forest-labs/flux-fill-pro | generative-fill.ts:95、:105 1 張 |
+| bria-eraser / inpaint | 0.04 IM:66、CM:196 | 0.04 | ✓ | replicate.com/bria/eraser | NA/lib/studio/inpaint.ts:27-28 1 張 |
+| bria-expand | 0.04 IM:67 | 0.04 | ✓ | replicate.com/bria/expand-image | generative-fill.ts:143 1 張 |
+| openai-low/medium/high（gpt-image-2） | 0.02/0.07/0.19 IM:40-42 | ? 官方只列 token 價，無每張價 | ? 這三個是估算；實扣按 usage（見下） | — | NA/lib/tarot/image-gen.ts:601（edits）、:628（generations）quality low/medium/high、size 依比例、n 1；實扣按 usage |
+| gpt-image-2 token 價 | 5／8／30 per 1M CM:275 | text in $5／image in $8／image out $30 | ✓；頁面標 Deprecated（無日期） | developers.openai.com/api/docs/models/gpt-image-2 | 同上；VW/backend/api.cjs:571-577 size 依比例、n 1、不送 quality，實扣按 usage（:616 costs.imageUsd） |
+| gpt-image-2.5/2.6 sunburst/flare | 同 gpt-image-2 CM:278 | 官方列同費率 | ✓ | developers.openai.com/api/docs/pricing | VW 預設 gpt-image-2.5-flare（generation-policy.cjs models）；NA NA/lib/tarot/image-gen.ts:148-150 quality high |
+| openai-25-edit／26-edit | 0.06 IM:44,46 | ? 無每張官方價（token 計） | ? 估算 | — | NA/lib/tarot/image-gen.ts:148-150 quality high、n 1；實扣按 usage |
 
 ## 工具、語音、3D
 
-| 項目 | 我們 | 官方 | 單位 | 差異 | 來源 |
+| 項目 | 我們 | 官方 | 單位 | 差異 | 來源 | 呼叫端 file:line＋送出參數（NA＝next-admin，VW＝video-workbench） |
 |---|---|---|---|---|---|
-| 去背 851-labs/background-remover | **0.002** CM:194（bg-remove.cjs:5） | ~$0.00044／run（T4 約 2s，依輸入而變） | 每 GPU 秒計，頁面「約」 | ✗ 我們約 4.5×；為 estimate:true，向使用者收 0.002 | replicate.com/851-labs/background-remover |
-| 升頻 real-esrgan | 0.002 CM:195 | $2／千張 = 0.002 | 每輸出張 | ✓（每 pass） | replicate.com/nightmareai/real-esrgan |
-| 3D SPAR3D | 0.04 CM:198 | 4 credit，1 credit=$0.01 → 0.04 | 每次呼叫 | ✓ | docs.stability.ai/pricing |
-| 3D SF3D | 0.10 CM:199 | 10 credit → 0.10 | 每次 | ✓ | docs.stability.ai/pricing |
-| 3D TRELLIS | 0.038（0.0014/s）CM:200 | 約 $0.038／run；A100 80GB $0.0014/s | 每 GPU 秒（約 28s） | ✓ | replicate.com/firtoz/trellis；replicate.com/pricing |
-| Whisper whisper-1 | 0.006/min CM:189 | $0.006/min；頁面標 Deprecated（無日期） | 每音訊分 | ✓ | developers.openai.com/api/docs/pricing |
-| tts-1 | 15/1M 字元 CM:289 | $15/1M 字元 | 每百萬字元 | ✓ | 同上 |
-| tts-1-hd | 30/1M 字元 CM:290 | $30/1M 字元 | 每百萬字元 | ✓ | 同上 |
-| gpt-4o-mini-tts | **15/1M 字元** CM:288 | text in $0.6/1M token + audio out $12/1M token；無每字元價 | token 計 | ✗ 單位不同、我們的 15 無官方依據；頁面標 Deprecated | developers.openai.com/api/docs/models/gpt-4o-mini-tts |
-| Printful mockup／Pexels | 0 CM:203,95-96 | 未查（免費項，非付費 API） | — | — | — |
+| 去背 851-labs/background-remover | **0.002** CM:194（bg-remove.cjs:5） | ~$0.00044／run（T4 約 2s，依輸入而變） | 每 GPU 秒計，頁面「約」 | ✗ 我們約 4.5×；為 estimate:true，向使用者收 0.002；已修（e88ef493d：predict_time × $0.000225/s 實扣，估價 0.00044） | replicate.com/851-labs/background-remover | VW/backend/bg-remove.cjs:92、NA/lib/studio/bg-remover.ts:21 format png、rgba；按 predict_time 實扣（e88ef493d） |
+| 升頻 real-esrgan | 0.002 CM:195 | $2／千張 = 0.002 | 每輸出張 | ✓（每 pass） | replicate.com/nightmareai/real-esrgan | NA/lib/studio/upscaler.ts:92 scale、face_enhance false；最多 2 pass，每 pass 1 張 |
+| 3D SPAR3D | 0.04 CM:198 | 4 credit，1 credit=$0.01 → 0.04 | 每次呼叫 | ✓ | docs.stability.ai/pricing | VW/backend/image-to-3d.cjs:117-119 v2beta/3d/stable-point-aware-3d、texture_resolution 1024（固定點數） |
+| 3D SF3D | 0.10 CM:199 | 10 credit → 0.10 | 每次 | ✓ | docs.stability.ai/pricing | image-to-3d.cjs:117-119 v2beta/3d/stable-fast-3d、texture_resolution 1024 |
+| 3D TRELLIS | 0.038（0.0014/s）CM:200 | 約 $0.038／run；A100 80GB $0.0014/s | 每 GPU 秒（約 28s） | ✓ | replicate.com/firtoz/trellis；replicate.com/pricing | image-to-3d.cjs:20 TRELLIS_INPUT（texture_size 1024…）；按 predict_time 實扣 |
+| Whisper whisper-1 | 0.006/min CM:189 | $0.006/min；頁面標 Deprecated（無日期） | 每音訊分 | ✓ | developers.openai.com/api/docs/pricing | VW/backend/transcribe.cjs:9 whisper-1；按 ffprobe 秒數（api.cjs 語音辨識） |
+| tts-1 | 15/1M 字元 CM:289 | $15/1M 字元 | 每百萬字元 | ✓ | 同上 | 未被呼叫（NA video-cost.ts 只估價；VW 預設 gpt-4o-mini-tts） |
+| tts-1-hd | 30/1M 字元 CM:290 | $30/1M 字元 | 每百萬字元 | ✓ | 同上 | 未被呼叫 |
+| gpt-4o-mini-tts | **15/1M 字元** CM:288 | text in $0.6/1M token + audio out $12/1M token；無每字元價 | token 計 | ✗ 單位不同、我們的 15 無官方依據；頁面標 Deprecated；已修（e88ef493d：回應無 usage → 依官方規則估：文字 ≤1 token/字＋音訊 1 token/50ms（guides/realtime-costs），按鈕「約 /分鐘」） | developers.openai.com/api/docs/models/gpt-4o-mini-tts | VW/backend/api.cjs:540-542 model＝providerModels.audio（預設 gpt-4o-mini-tts）、mp3；無 usage → 字數＋音檔秒數估（e88ef493d） |
+| Printful mockup／Pexels | 0 CM:203,95-96 | 未查（免費項，非付費 API） | — | — | — | — |
 
 ## 文字（TEXT_RATES，工作台文字功能讀）
 
@@ -103,3 +103,10 @@ Replicate 價取自各模型頁內嵌 `billingConfig`（頁面原始碼；不是
 - 標價 = 按鈕 `data-paid="video.x"`，`shared/paid-price.js` 補上價格（按鈕自己已寫 US$ 就不補）；重做鈕用工作紀錄的 `paidFeature`。
 - 檢查器 `tests/paid-price.cjs`（在 `tests/gate.cjs`）：每種付費功能的呼叫點數 ≤ 標價按鈕數；動態呼叫上方要寫 `// paid: video.x | none`；原始碼不准寫死 `US$數字`。
 - 前端觸發點（29 處）：角色頁 `scripts/characters-0.js`（問題／人設／主圖／角色表／聲音／設定圖／試鏡／白底圖）；生成頁 `#send`（`generator-controls.js`）、導演對話與腳本（`generator-conversation.js`、`generator-director.js`）、分鏡圖（`index-0.js`）、商品提案／腳本（`generator-product.js`）；專案頁生成畫面／批次／AI 分鏡／AI 輔助（`projects-0.js`）；剪輯配音（`tools-editor.js`）；工具頁字幕辨識／翻譯、短影音分析、配音、歌詞、區域編輯、3D、去背（`tools-*.js`、`shared/assets-ui.js`）；任務紀錄重做（`workspaces.js`）。
+
+## 修正紀錄（2026-11-10，e88ef493d）
+
+- 上表 4 筆不一致、Sora 2／2 Pro、imagen-4 已修（各列「已修」）。按秒計價的 Replicate 模型（去背、TRELLIS）只走 `next-admin/lib/ai/cost-model.ts` `replicateRunUsd`。
+- 免費確認：OpenAI `GET /v1/models/sora-2`、`sora-2-pro` 回 `shutdown_date: 2026-09-24`；`gpt-4o-mini-tts` 回 `shutdown_date: 2027-01-06`。
+- gpt-image-2、whisper-1、tts-1／tts-1-hd：頁面標 Deprecated、無日期 → 待官方公布日期再換（本次不動）。
+- 依實際請求追呼叫端（監工 2026-11-10 追加）：每列「呼叫端」欄。追出 2 筆：nano-banana-2 送 2K（.101，原寫 1K 的 .067）、flux-2-max 是每次＋每 MP 計，皆已修。文字模型（TEXT_RATES）按回應 usage 實扣，不在此欄。
