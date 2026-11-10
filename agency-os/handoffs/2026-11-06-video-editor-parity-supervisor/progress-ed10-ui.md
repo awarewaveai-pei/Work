@@ -1,0 +1,3 @@
+- ED.10 畫面：`scripts/editor-panes/subtitles.js`（逐句／樣式／辨識翻譯、每語言一軌、找回結果、匯入取代此軌）＋`styles/editor-pane-subtitles.css`＋`tools-boot.js` 載入 `shared/transcript-words.js`（監工准）。
+- 測試 `tests/ed10-subtitles-ui.cjs` 7 項綠（含舊專案不變、逐字高亮真實匯出）；ed5-text、paid-price、theme-tokens 回歸綠。
+- 缺口（監工已記）：預覽不畫 subtitleStyle 八樣式，只有匯出畫。

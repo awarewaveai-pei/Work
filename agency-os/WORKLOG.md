@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-10（續48）ED.10 畫面：剪輯器「字幕」分頁＝逐句／樣式／辨識翻譯（照參考 §1.3）
+
+- 根因：字幕分頁只有匯入／下載／前往字幕工具，缺逐句編輯、每語言一軌、8 樣式、整片辨識與翻譯（`docs/editor-parity-compare-20261106.md:65`）；後端已在 e28bcbc4d／3679cd292／670b89396 做好。
+- 改動：`scripts/editor-panes/subtitles.js`（語言軌＝文字軌帶 `language`，舊軌顯示「原文字軌」且開啟不寫入；逐句新增／改起訖與文字／播放頭分割／合併下一句／刪除／匯出此軌 SRT；樣式 8 種＋字級＋垂直位置套全軌；辨識：先「查看費用」，價格（免費或 NT$）在畫面上才可開始，估價 key 不符或價格未載入就擋；完成自動放進該語言軌、分數 < 0.8 標需校對；找回已完成的字幕結果；匯入 SRT／VTT 取代此軌、影片（最後一個畫面片段）結尾後不匯入；翻譯：按鈕帶 `data-paid="video.script"` 價格＋批數，結果放獨立隱藏軌 `translatedFrom`，重翻只蓋自己那軌）。字的歸屬＝字的中點落在哪句（分割／裁切同一規則）。`styles/editor-pane-subtitles.css` 只用主題 token。`scripts/tools-boot.js` 載入 `../shared/transcript-words.js`（監工准；合併／分割用 `TranscriptWords.joinWords`，與匯出端 `spells` 同規則）。保留 `edImportCues`（`edSpineSubtitles` 仍用）。
+- 審查：Codex 5 項（`agency-os/reports/oracle/2026-11-10-partialreview-d3b7e700.md`）：F1 價格未載入仍可送付費辨識→已擋；F3 匯入上限被配樂拉長→改用畫面片段結尾；F4 翻譯來源顯示與送出不一致→同一函式 `edSubFrom`；F5 翻譯覆蓋既有同語言軌→`translatedFrom` 獨立軌；F2 時間軸左裁切不平移 `words`（`tools-editor.js` 裁切）→核心檔，不在本卡範圍，已回報監工。
+- 避免再發生：逐字時間的所有改時操作走 `edSubSet`；核心裁切要補同規則（監工另派）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed10-subtitles-ui.cjs（真 Edge、mock whisper、翻譯 route mock、真實 MP4 匯出抽格）7 PASS | exit=0 | ms=150000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed5-text.cjs 6 PASS；node tests/paid-price.cjs（28 paid call sites priced）；node tests/theme-tokens.cjs | exit=0 | ms=200000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/video-workbench,agency-os,scripts | grep=subtitles-import|subtitles-download|subtitles-tool|edImportCues | hits=3
+- BUGHUNT_SCOPE_NARROW: 改動只在 video-workbench 前端；舊動作名僅剩比對文件歷史列 `docs/editor-parity-compare-20261106.md:65`（2026-11-06 比對快照，不回改），edImportCues 兩處（定義＋tools-editor.js 呼叫）仍有效
+- ORACLE_WAIVED: 派工限 Codex 一輪；artifact 2026-11-10-partialreview-d3b7e700 已跑，之後的改動只是照其 F1/F3/F4/F5 修正，修正後 ed10-subtitles-ui 7 項重跑綠
 ## 2026-11-10（續47）FC.5 上線：兩個引擎新版切到正式站（操作者「可以，上正式站」）
 
 - 主機 `/root/lobster-phase1/static/video-engines/`：上傳 `filmcraft/46763a8-4265c64`、`effectcraft/df4cc09-e5261e3`（先放 `<dist>.upload-<時間>`，主機 `sha256sum -c` 全過、SHA256SUMS 雜湊＝`engines/*/VERSION.json` 才改名）；`current` 改指新版；擁有者改 root:root。不需要動 nginx／compose（alias 走 `current`），工作台不用重部署。

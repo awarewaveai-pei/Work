@@ -1,1 +1,29 @@
 /* Styles owned by ED.10 scripts/editor-panes/subtitles.js (spec §3 檔案歸屬). Theme tokens only (tests/theme-tokens.cjs). */
+.ed-sub-tabs { display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:8px; }
+.ed-sub-tabs .btn { min-width:0;padding-inline:2px;white-space:nowrap;font-size:12px; }
+.ed-sub-lanes { margin-bottom:4px; }
+.ed-sub-list { list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px; }
+.ed-sub-row { border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--card-bg);padding:6px;display:flex;flex-direction:column;gap:4px; }
+.ed-sub-row.selected { border-color:var(--accent); }
+.ed-sub-head { display:flex;align-items:center;gap:4px;flex-wrap:wrap; }
+.ed-sub-head label { display:flex;align-items:center;gap:2px;font-size:12px;color:var(--text-muted); }
+.ed-sub-head input { width:68px; }
+.ed-sub-row textarea { width:100%;resize:vertical;font-size:13px; }
+.ed-sub-review { font-size:11px;padding:1px 6px;border-radius:var(--radius-sm);color:var(--btn-primary-text);background:var(--red); }
+.ed-sub-styles { display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin:6px 0; }
+.ed-sub-style { display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--card-bg);color:var(--text-primary);font-size:12px;cursor:pointer; }
+.ed-sub-style.selected { border-color:var(--accent);box-shadow:0 0 0 1px var(--accent); }
+.ed-sub-style:disabled { opacity:.5;cursor:not-allowed; }
+/* The eight looks of the exporter, drawn with theme colours: light text, dark box, outline, highlight. */
+.ed-sub-sample { display:inline-block;padding:2px 8px;border-radius:var(--radius-sm);font-weight:var(--font-weight-semibold,600);background:var(--code-bg);color:var(--btn-primary-text); }
+.ed-sub-sample[data-look="白字暗底"] { background:var(--text-primary);color:var(--card-bg); }
+.ed-sub-sample[data-look="白底黑字"] { background:var(--card-bg);color:var(--text-primary);border:1px solid var(--border); }
+.ed-sub-sample[data-look="品牌色"] { color:var(--accent); }
+.ed-sub-sample[data-look="白字黑邊"] { color:var(--card-bg);-webkit-text-stroke:1px var(--text-primary); }
+.ed-sub-sample[data-look="黃字黑邊"] { color:var(--yellow);-webkit-text-stroke:1px var(--text-primary); }
+.ed-sub-sample[data-look="逐字高亮"] { background:var(--code-bg);color:var(--text-primary);text-decoration:underline var(--yellow) 3px; }
+.ed-sub-sample[data-look="卡拉 OK"] { background:linear-gradient(90deg,var(--yellow) 50%,var(--text-primary) 50%);-webkit-background-clip:text;background-clip:text;color:transparent; }
+.ed-sub-sample[data-look="色塊標題"] { background:var(--accent);color:var(--btn-primary-text); }
+.ed-sub-quote { margin:4px 0;font-size:13px; }
+.ed-sub-results { list-style:none;margin:6px 0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:12px; }
+.ed-sub-results li { display:flex;align-items:center;justify-content:space-between;gap:6px; }
