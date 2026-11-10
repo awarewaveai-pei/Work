@@ -192,6 +192,7 @@ export const STEPS = [
       done('P6.17', 'video 網站的分鏡靈感、模板牆、應用工具恢復：seedstar 參考資料（全部分鏡與圖片）放在主機資料區，只有員工看得到；客戶看到正常的空畫面。另修兩個限流：nginx 給 video 自己的限流區，Cloudflare 限速規則排除 video。', '9caa6a21a'),
       done('P6.18', '客戶看的範例已上線：自家原創的分鏡、模板與風格示意圖（著作權自有），所有人都看得到；員工另外看得到 seedstar 參考。實際花費 US$1.67。頁面上的 seedstar 擷取說明已拿掉。', 'de0e1836a'),
       done('P6.19', '其他產品子網域（hci、social、tarot、design、content、cs、collect、outreach）也排除在 Cloudflare 限速規則外，不會再因一頁載入太多被擋；檢查腳本會抓新加的子網域。', '9caa6a21a'),
+      todo('P6.20', '大檔上傳：video 站單次上傳上限是 100 MB（Cloudflare 與主機 nginx `sites-enabled/sg-stack.aware-wave.com:45`），影片又用 base64 傳、會膨脹三分之一，所以約 75 MB 以上的影片和專業剪輯成片傳不上去。改成分段上傳，不是調大上限（Cloudflare 擋在前面）。等 ED 線的素材頁（ED.4）提交後再派，避免同時改上傳程式。'),
       todo('P6.16', '（操作者 11-05 說先不用）主題改成 app 存檔才通知 video、使用者切回分頁時重讀，取代現在的「有人開頁面時最多 30 秒問 app 一次」。'),
       done('P6.13', '工作台成品能過送審：剪輯專案的文字或燒進去的字幕自動變成標題、腳本和字幕檢查的依據；上傳時可勾「我有權使用這些素材」。畫面上沒有任何字的影片照實不能送審。用調色檔（LUT）的成品權利檢查會不過（調色檔沒登記到 app），要另外處理。', '1aaa139d5'),
     ] },
