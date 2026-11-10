@@ -886,6 +886,15 @@ function edSpineList() {
       .filter((x) => x.file),
   );
 }
+// Card PJ.2: an export of this file is a cut of its episode (spec §2 PJ.2); the editor's other jobs (titles, templates)
+// it places on its own timeline, so they belong to no episode. Read from the job input = exactly what was rendered.
+function edSpineLink(input) {
+  if (input?.operation !== "editor-export") return null;
+  const hit = EpisodeSpine.findByEdit(edSpineProjects(), input.settings?.project?.id);
+  return hit
+    ? { projectId: hit.project.id, episodeId: hit.episode.id, tool: "edit", step: "export", target: "output", from: [{ slot: "edit", key: "rev:" + (input.settings.projectRevision ?? 0) }] }
+    : null;
+}
 function edOpen(id) {
   ed.current = id;
   ed.selected = null;

@@ -61,7 +61,8 @@ const STORE = "awarewave-projects-screenshot-frontend-v1";
     assert.deepEqual(stored.editor, [bare, wrapped]);
     assert.deepEqual(stored.engine, [film]);
     assert.equal(stored.projects.length, 4);
-    assert.deepEqual(stored.projects[0].episodes, existing.episodes);
+    // Card PJ.2 (spec §3.2): the one write to an existing project is an id for each old shot.
+    assert.deepEqual(stored.projects[0].episodes.map((e) => ({ ...e, shots: e.shots.map(({ id, ...s }) => (assert(id), s)) })), existing.episodes);
     console.log("PASS 舊資料：搬進 3 個專案（共 4 個），伺服器上 tools.editor.projects／tools.engine.projects 與種子完全相同，既有專案的集沒被改");
 
     await p.locator("#projectsNav").click();
@@ -72,7 +73,7 @@ const STORE = "awarewave-projects-screenshot-frontend-v1";
     for (const [id, title, clips] of [["bare-1", "舊裸專案", 1], ["env-2", "P2 專案", 2]]) {
       await f.locator(`[data-action=openProject][data-id="project-ed-${id}"]`).click();
       await f.getByText("剪輯檔：" + title, { exact: true }).waitFor();
-      await f.getByRole("button", { name: "開啟剪輯", exact: true }).click();
+      await f.locator('[data-step="6"]').getByRole("button", { name: "開啟剪輯", exact: true }).click(); // card PJ.2: steps 6-8 each have one
       await tools.locator("[data-ed-stage]").waitFor();
       const got = await p.evaluate(() => {
         const w = document.getElementById("toolsFrame").contentWindow;

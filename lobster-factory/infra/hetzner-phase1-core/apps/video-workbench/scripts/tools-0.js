@@ -213,7 +213,9 @@ let category = "全部",
   values = {},
   previewMode = "",
   modalCallback = null;
-let toolDrafts = {};
+let toolDrafts = {},
+  // Card PJ.2: the episode this tool was opened for ({projectId, episodeId, target?, from?}); null = on its own.
+  toolLink = null;
 try {
   toolDrafts = JSON.parse(
     VideoWorkbench.storage.getItem("awarewave_app_tools_state") || "{}",
@@ -224,6 +226,7 @@ function restoreToolDraft() {
   values = structuredClone(draft.values || {});
   files = structuredClone(draft.files || {});
   selection = structuredClone(draft.selection || {});
+  toolLink = draft.link ? structuredClone(draft.link) : null;
 }
 function val(k, f = "") {
   return values[k] ?? f;
@@ -448,7 +451,7 @@ function setToolHash(hash) {
   }
 }
 function saveDraft() {
-  if (tool) toolDrafts[tool] = { values, files, selection };
+  if (tool) toolDrafts[tool] = { values, files, selection, ...(toolLink ? { link: toolLink } : {}) };
   VideoWorkbench.storage.setItem(
     "awarewave_app_tools_state",
     JSON.stringify(toolDrafts),
@@ -607,6 +610,8 @@ VideoWorkbench.tools = {
     restoreToolDraft();
     if (payload.settings) values = structuredClone(payload.settings);
     if (payload.selection) selection = structuredClone(payload.selection);
+    // Card PJ.2: opened for an episode = its output goes back there; opened any other way = belongs to no episode.
+    toolLink = payload.link ? structuredClone(payload.link) : null;
     // Card PJ.1: an episode opens its edit file or gets a new one; a restored job's copy becomes a project of its own.
     if (tool === 'edit' && (payload.edit || payload.link || payload.project)) {
       if (ed.loading) await ed.loading;
@@ -659,6 +664,10 @@ document.addEventListener("click", (e) => {
   if (action.startsWith("open:")) {
     tool = action.slice(5);
     restoreToolDraft();
+    // Opened from the tools home: on its own (spec §6 答 2); saved now so no later restore (back, reload) brings
+    // the link back.
+    toolLink = null;
+    saveDraft();
     if (tool === "watermark")
       VideoWorkbench.preferences
         .get("tools.watermark", null)
@@ -796,3 +805,14 @@ tool = TOOLS.some((t) => t.id === location.hash.slice(1))
   : null;
 restoreToolDraft();
 render();
+// Card PJ.2: shared/runtime.js generate() asks this which episode a new job belongs to (spec §2 PJ.2); so does the
+// professional editor's render (scripts/tools-engine-host.js, spec §8 C4), whose output is a cut of the episode.
+// Its link stays flat strings: backend/api.cjs POST /engine/renders refuses anything else.
+VideoWorkbench.spineLink = (input) =>
+  tool === "edit"
+    ? edSpineLink(input)
+    : !toolLink
+      ? null
+      : tool === "edit-pro" && input?.operation === "engine-render"
+        ? { projectId: toolLink.projectId, episodeId: toolLink.episodeId, tool, step: "export", target: "output" }
+        : { ...toolLink, tool, step: EpisodeSpine.TOOL_STEP[tool] ?? null };

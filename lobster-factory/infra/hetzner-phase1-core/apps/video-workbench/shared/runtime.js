@@ -75,13 +75,14 @@
   }
   // Card PJ.1: every edit file not yet in an episode becomes a project (spec §3.1); the edit files are only read.
   // Runs on load and on every write of an edit-file store, so a file saved by any engine joins at once.
+  // Card PJ.2: the same pass names old shots that have no id (spec §3.2). Returns how much it changed.
   const Spine = window.EpisodeSpine || null,
     EDIT_STORES = ["tools.editor.projects", "tools.engine.projects"];
   function spineAdopt() {
     if (!Spine) return 0;
     const r = Spine.adopt(db.projects, db.preferences["tools.editor.projects"], db.preferences["tools.engine.projects"]);
     db.projects = r.projects.map(M.project);
-    return r.added;
+    return r.added + r.named;
   }
   async function spineChanged() {
     await persist();
@@ -187,6 +188,11 @@
       await spineChanged();
       return hit.edit;
     }
+    // Card PJ.2: a finished job back to its episode (shared/episode-spine.js settle; the same job twice = no change).
+    if (action === "spine-settle") {
+      if (Spine?.settle(db.projects, payload)) await spineChanged();
+      return true;
+    }
     if (action === "spine-open") {
       const index = db.projects.find((p) => p.id === payload.projectId)?.episodes.findIndex((e) => e.id === payload.episodeId) ?? -1;
       if (index < 0) throw new Error("找不到這一集");
@@ -239,6 +245,11 @@
     }
   });
   async function generate(input) {
+    // Card PJ.2: every job gets its episode here, the one entry point (the tools page answers, scripts/tools-0.js).
+    if (!input.link && typeof window.VideoWorkbench?.spineLink === "function") {
+      const link = window.VideoWorkbench.spineLink(input);
+      if (link) input = { ...input, link };
+    }
     if (child) return rpc("generate", input);
     const job = {
       id: crypto.randomUUID(),
@@ -369,6 +380,9 @@
         db.assets.push(M.asset(jobAsset(v)));
       running ||= watch(v);
     }
+    // Card PJ.2: every succeeded job linked to an episode lands there (spec §0 F5) -- also one whose asset already
+    // exists (the panel saved it, then its own settle failed); the asset is not proof the episode has it.
+    for (const j of db.jobs) if (Spine?.settle(db.projects, j)) changed = true;
     if (changed) {
       await persist().catch(reportError);
       broadcast();
@@ -604,8 +618,9 @@
     navigate: (target) =>
       child ? rpc("navigate", { target }) : perform("navigate", { target }),
     // Card PJ.1: the episode spine's actions; children ask the top page, which alone changes spine fields.
+    // Card PJ.2 adds settle(job).
     spine: Object.fromEntries(
-      [["attachEdit", "spine-attach-edit"], ["open", "spine-open"]].map(([name, action]) => [
+      [["attachEdit", "spine-attach-edit"], ["open", "spine-open"], ["settle", "spine-settle"]].map(([name, action]) => [
         name,
         async (payload = {}) => {
           await ready;

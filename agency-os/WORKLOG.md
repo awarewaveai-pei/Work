@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-10（續7）影音工作台 PJ.2：一集頁步驟列；任何工具做完自動寫回那一集
+
+- 做了（規格 `lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/pj-project-spine-spec-20261106.md` §2 PJ.2）：`shared/episode-spine.js` 加 `TOOL_STEP`／`settle`／`stepStates`、`adopt` 替舊鏡頭補 id、`keepSpine` 加抄 `shot.image/video`；`shared/runtime.js` `generate()` 唯一入口帶 `link`（`VideoWorkbench.spineLink`）、`spine-settle` 動作、補帳每輪對全部成功任務 `settle`；`shared/jobs-view.js` 面板成功也 `settle`；`scripts/tools-0.js` 工具記住從哪一集打開（首頁直接開＝清掉）；`scripts/tools-editor.js` `edSpineLink`（只有匯出算成片）；`scripts/projects-0.js` 11 步列、成片區、「修這張」、鏡頭圖改由主頁寫（刪 `onSuccess`）。
+- 不變量：集的主線欄位（steps/outputs/鏡頭畫面）只由主頁 runtime 的 `settle` 寫，同一 jobId 只記一次；面板開或關、素材存了沒，都由補帳收尾。
+- Codex 2 條（`agency-os/reports/oracle/2026-11-10-partialreview-e4182fef.md`）皆修：①專業剪輯輸出（`tools-engine-host.js:524` 的 `spineLink({operation:"engine-render"})`）原本只記步驟不成成片 → `edit-pro`＋`engine-render` 回 `step:"export",target:"output"`（扁平字串，過 `backend/api.cjs` link 檢查）；②面板存了素材但寫回失敗 → 補帳原本因素材已在而永遠跳過 → 改為每輪掃全部任務（新測 2b）。
+- 規格缺口照實做、未猜：§1.4 rule 5 `derivedFrom＝from[0].key` 與 §1.3 例子（匯出 derivedFrom=null）衝突 → 取 `slot:"export"` 的 key（兩者皆符）；第 11 步「送審」本頁看不到結果 → 一律「選用」；第 6–8 步照 §5 各一顆「開啟剪輯」，PJ.3 的備註未放。
+- 既有問題（非本卡）：`tests/scene-shots.cjs` 讀到 `scripts/editor-panes/` 目錄 → EISDIR（a98153452 起）；`tests/generation-flows.cjs` 區域拖曳在乾淨 HEAD 也 1/6 紅（同一數值）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/pj2-spine-settle.cjs（1 單元、2 面板關掉仍落地、2b 素材已存仍補、3 工具首頁單獨開不掛集）+ pj1-legacy-ui + pj1-spine-unit（拋棄式 worktree＝HEAD＋本 commit 內容） | exit=0 | ms=5613
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：刪 runtime 補帳 settle 那行 → pj2 第 2 條紅（「任務面板關掉後完成的鏡頭沒有拿到畫面」），還原 → 綠（拋棄式 worktree） | exit=1→0 | ms=5700
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/{p6-main-system,fc2-engine-host,generator-deep-actions,sidebar-overlays,test-isolation,appearance,gate}.cjs 全綠；scene-shots（跳過目錄的暫存副本）綠；generation-flows 2/3 綠、紅者與乾淨 HEAD 相同 | exit=0 | ms=15935
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n（Codex，兩條已修＋測試）
+- ORACLE_WAIVED: 共用工作樹有其他 session 未提交改動（runtime.js 另有 adopt() 重構），oracle 以 -Path 只審本卡七檔（artifact 標 PARTIAL）；修正後未再跑第二輪，改以新測 2b＋突變證據
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=editFileRow\|spineLink\|spine-settle\|stepStates\|TOOL_STEP\|edSpineLink\|toolLink | hits=43（規格／路線圖文件引用、tools-engine-host.js 與 api.cjs 的 C4 介面、本卡檔；editFileRow 0 殘留）
 ## 2026-11-10（續6）影音工作台 EC.5：專業特效輸出透明片段回素材庫
 
 - 根因／缺口：EC.2 只出 H.264（`tools-engine-host.js` engineExport 註解「透明之後另開卡」），特效片頭／貼圖疊不上剪輯。

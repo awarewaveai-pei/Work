@@ -63,6 +63,8 @@
       if (v.result?.url) {
         if (v.status === "succeeded") {
           VideoWorkbench.assets.save(VideoWorkbench.jobAsset(v)).catch(VideoWorkbench.reportError);
+          // Card PJ.2: back to its episode; a closed panel leaves it to the top page's reconcile (same settle, once).
+          VideoWorkbench.spine?.settle(v).catch(VideoWorkbench.reportError);
           if (options.onSuccess) {
             options.onSuccess(v);
             options.onSuccess = null;
