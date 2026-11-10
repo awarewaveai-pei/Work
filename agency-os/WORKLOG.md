@@ -1,4 +1,21 @@
 # Worklog
+## 2026-11-10（續45）FC.5：專業剪輯／專業特效拿掉 ArtCraft 名稱與 Discord（建置機器擋）；工作台按鈕改「從素材庫加入」
+
+- 根因：FC.1／EC.1 只擋標誌圖檔（`craft_brand_scan`），沒擋名稱。上游 `docs/brand/LICENSE-brand.txt`：ArtCraft 名稱也算標誌，改過的版本要拿掉、不可呈現成 ArtCraft 產品（可以純文字寫「based on FilmCraft by the ArtCraft team」）。舊產物 wasm：FilmCraft 239 處 artcraft／162 處 discord，EffectCraft 95／46，來源＝頁首 Discord 按鈕、Import／Home 的 Community 段、Help 選單、About、`links.rs` 常數，加上約 15 種語言的翻譯表。
+- 做了：
+  - `scripts/filmcraft-pro/no-artcraft-marks.patch`、`scripts/effectcraft-pro/no-artcraft-marks.patch`：原本只拿標誌，現在也拿掉 Discord 按鈕、Community 段、Help 的 Discord／ArtCraft 網站／getartcraft／Other ArtCraft Apps、About 的 ArtCraft 字樣與連結（EffectCraft 的 `APP_PAGE` 改指 GitHub）。GitHub 原始碼連結保留。
+  - `scripts/craft-web-build/debrand.py`（新）：套完補丁後刪翻譯表中提到 ArtCraft／Discord 的列（TSV 整行；Rust 字串 tuple，跨行也可）；認不出的殘留＝FATAL。FilmCraft 刪 120 列、EffectCraft 91 列。納入產物名稱的輸入雜湊。
+  - `scripts/craft-web-build/lib.sh` `craft_name_scan`：產物每個檔（`.gz` 先解壓）不得有 artcraft／discord，NOTICE／LICENSE-*／ATTRIBUTION.md／licenses/ 例外（授權規定的純文字署名）；兩個 build.sh 呼叫它（向量版、畫布版不呼叫，見下）。
+  - 新產物：FilmCraft `46763a8-4265c64`（16 檔）、EffectCraft `df4cc09-e5261e3`（20 檔）；`engines/*/VERSION.json` 釘新產物，本機 vendor 複製驗過。
+  - `scripts/tools-engine-host.js`：工具列「加入素材」→「從素材庫加入」（跟引擎內 Import＝從電腦加入分開）；同檔錯誤訊息一起改。其他「加入素材」字樣是剪輯器軌道與角色頁，不是這顆按鈕，沒動。
+  - 兩個 build README 補丁表、`engine-route-plan` R6 列更新。
+- 同類（不在本卡，交監工）：向量版產物 `vectorcraft-dist/4cce336-7303550` wasm 也有 artcraft／discord；畫布版 `photocraft-dist/98bcbfa-f007c95` 隨產物附了上游 `README.md`（有 ArtCraft／Discord）。兩條線各自開卡套同一套（debrand.py＋craft_name_scan 已可共用）。
+- 主機（High）：上傳兩份新產物到 `/root/lobster-phase1/static/video-engines/<engine>/<dist>/` 並切 `current`——**本 commit 不含，等操作者明確同意**（監工轉述的授權不算）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=craft_name_scan 對舊產物 46763a8-b7f3040、df4cc09-4fe4255 → HIT wasm＋wasm.gz、exit 1；build.ps1 兩個引擎 → debrand 120／91 列、「name scan: 6/12 files clean」、OK 46763a8-4265c64、df4cc09-e5261e3 | exit=0 | ms=345000
+- REALTEST_EVIDENCE: tool=Bash | cmd=fc5-shots.cjs（隔離伺服器、headless）→ FilmCraft Import 頁只剩四張匯入卡、頁首無 Discord；EffectCraft Home 無 Community 與 More ArtCraft apps、頁首只剩 GitHub 圖示（截圖 fc5-filmcraft.png／fc5-effectcraft.png 已看） | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs → gate ok（12）；node tests/fc2-engine-host.cjs → 16 PASS；node tests/effectcraft-serve.cjs PASS | exit=0 | ms=34000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（external oracle = Codex CLI gpt-6-sol，artifact `agency-os/reports/oracle/2026-11-10-partialreview-c57d033a.md`，files-reviewed 9 檔含新檔 debrand.py，packet 36.6KB）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=craft_name_scan | hits=6（lib.sh 定義、兩個 build.sh、effectcraft README、engine-route-plan R6、本條；向量版／畫布版 build.sh 0＝未呼叫，已列為同類待辦）
 ## 2026-11-10（續44）部署 video-workbench b25e1d0d2（Omni 影片預設、聲音設定、Nano Banana 2.1 計價）
 
 - 操作者：「現在部署」。DEPLOY_HOLD 無；`sg-deploy.sh video-workbench`：gate 過 → healthy 6s → HTTP smoke 8 端點全 OK；.deployed-commit 469e589f0 → b25e1d0d2。

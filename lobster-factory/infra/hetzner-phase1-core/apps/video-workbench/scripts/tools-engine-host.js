@@ -220,7 +220,7 @@ function engineShow() {
   // One compact bar above the engine: the engine gets the rest of the window.
   top.className = "engine-bar";
   const bar = engineEl("div", "row");
-  bar.append(engineEl("b", "", name), engineButton("加入素材", "assets", true), engineButton("開新專案", "new"));
+  bar.append(engineEl("b", "", name), engineButton("從素材庫加入", "assets", true), engineButton("開新專案", "new"));
   // The frame starts every render itself (FC.3 / EC.3), so each one is checked and recorded the same way.
   bar.append(engineEl("span", "note", "輸出成片："));
   if (cfg.engine === "filmcraft")
@@ -544,7 +544,7 @@ async function engineExport(choice) {
   if (!eng.ready) throw Error("引擎還在載入");
   const cfg = eng.cfg;
   if (!eng.sent.length && (cfg.engine !== "effectcraft" || (await engineFootageCount()) !== 0))
-    throw Error("先加入素材再輸出：成片要記下用了哪些素材");
+    throw Error("先從素材庫加入素材再輸出：成片要記下用了哪些素材");
   let ratio = choice,
     comp = null;
   const alpha = cfg.engine === "effectcraft" && choice === "alpha"; // card EC.5

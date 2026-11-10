@@ -108,3 +108,38 @@ for p in targets(sys.argv[2:]):
 sys.exit(1 if bad else 0)
 EOF
 }
+# craft_name_scan <dist dir>
+# Same licence, the name half: a modified build must not name ArtCraft nor send users to its community. Every file the
+# app serves (wasm, js, html, worklets) is searched, case-insensitively, for "artcraft" (getartcraft included) and
+# "discord"; any hit is FATAL. NOTICE, LICENSE-*, ATTRIBUTION.md and licenses/ are exempt: they keep upstream's
+# plain-text attribution ("based on FilmCraft by the ArtCraft team" is what the licence allows). The names are taken
+# out by no-artcraft-marks.patch (UI) and debrand.py (translation catalogs).
+craft_name_scan() {
+  python3 - "$1" <<'PY' || { echo "FATAL: the build still names ArtCraft/Discord (see HIT lines) — extend no-artcraft-marks.patch or debrand.py" >&2; exit 1; }
+import os, re, sys
+root = sys.argv[1]
+if not os.path.isdir(root):
+    sys.exit("name scan: no such directory: " + root)
+word = re.compile(rb"artcraft|discord", re.I)
+exempt = re.compile(r"^(NOTICE|LICENSE-[A-Z]+|ATTRIBUTION\.md|SHA256SUMS|licenses/.*|\.sha256sums-sha256)$")
+bad, files = 0, 0
+for d, _, names in os.walk(root):
+    for n in names:
+        rel = os.path.relpath(os.path.join(d, n), root).replace(os.sep, "/")
+        if exempt.match(rel):
+            continue
+        files += 1
+        data = open(os.path.join(d, n), "rb").read()
+        if n.endswith(".gz"):  # a compressed copy hides its text from a byte search
+            import gzip
+            data = gzip.decompress(data)
+        hits = {m.group(0).lower() for m in word.finditer(data)}
+        if hits:
+            bad += 1
+            print("HIT", rel, sorted(h.decode() for h in hits), file=sys.stderr)
+if not files:
+    sys.exit("name scan: nothing to scan in " + root)
+print(f"name scan: {files} files clean" if not bad else "", end="\n" if not bad else "")
+sys.exit(1 if bad else 0)
+PY
+}

@@ -12,7 +12,7 @@ powershell -ExecutionPolicy Bypass -File D:\Work\scripts\effectcraft-pro\build.p
 
 內容＝xtask 產物（`index.html`、`effectcraft_web.js`、`effectcraft_web_bg.wasm`、`worker.js`、`audio-worklet.js`、`sw.js`、`snippets/`、`manifest.webmanifest`、`favicon.svg`、`icon-256.png`、`icon-512.png`）＋`NOTICE`（末尾附 provenance）、`ATTRIBUTION.md`、`LICENSE-MIT`、`LICENSE-APACHE`＋`licenses/`（本建置加進 wasm 的字型各一份 OFL）＋`.wasm`／`.js` 的 `.gz`＋`SHA256SUMS`。
 
-build.sh 機械檢查（任一不過即 FATAL、不出產物）：兩個 repo checkout 到釘的 rev；補丁 `git apply --check`；wasm-bindgen＝PIN；wasm-opt＝PIN 且 xtask 輸出裡真的跑了；`fonts.json` 字型 sha256；六個必備檔＋`snippets/`；wasm 內含 `NotoSansTC-Regular`、`NotoSerifTC-Regular`；`craft_brand_scan`（上游 `docs/brand/` 的標誌不得出現在任何產物檔，含 wasm）；`NOTICE`／`ATTRIBUTION.md`／`LICENSE-*` 在。
+build.sh 機械檢查（任一不過即 FATAL、不出產物）：兩個 repo checkout 到釘的 rev；補丁 `git apply --check`；wasm-bindgen＝PIN；wasm-opt＝PIN 且 xtask 輸出裡真的跑了；`fonts.json` 字型 sha256；六個必備檔＋`snippets/`；wasm 內含 `NotoSansTC-Regular`、`NotoSerifTC-Regular`；`craft_brand_scan`（上游 `docs/brand/` 的標誌不得出現在任何產物檔，含 wasm）；`craft_name_scan`（產物除 NOTICE／LICENSE／ATTRIBUTION 外不得有 artcraft／discord 字樣，含 `.gz`）；`NOTICE`／`ATTRIBUTION.md`／`LICENSE-*` 在。
 
 ## 字型（跟 FilmCraft 不同）
 
@@ -36,7 +36,7 @@ WSL Ubuntu＋rustup stable（含 `wasm32-unknown-unknown`）＋`git python3 curl
 | 檔 | 做什麼 |
 |---|---|
 | `tc-fonts.patch` | `crates/text/src/fonts.rs`（1 檔 +4 −1）：Noto Sans TC、Noto Serif TC 兩個 static 列入內建清單（origin `bundled`）。來源紀錄 `video-workbench/docs/p0-reeval-evidence/effectcraft-tc-fonts.patch`；之後以本檔為準 |
-| `no-artcraft-marks.patch` | `crates/ui-egui/src/header.rs`：拿掉 `include_bytes!("../../../docs/brand/artcraft-mark.png")`，`paint_logo` 改成不畫（呼叫點：頁首 About 按鈕 `header.rs:41`、About 對話框 `panels/dialogs.rs:390`；按鈕還在、只是沒圖）。原因：上游 `docs/brand/LICENSE-brand.txt` 規定改過的版本必須移除 ArtCraft 標誌。未補丁的試建產物 `craft_brand_scan` → `HIT effectcraft_web_bg.wasm ['artcraft-mark.png']` |
+| `no-artcraft-marks.patch` | （FC.5 起也拿掉名字與社群連結：頁首 Discord 按鈕與 getartcraft 按鈕、Home 左欄 Community 與「More ArtCraft apps」、Help 選單 Discord／ArtCraft 網站／Other ArtCraft Apps、About 的 ArtCraft 字樣與連結；`APP_PAGE` 改指 GitHub。翻譯表的同類句子由 `scripts/craft-web-build/debrand.py` 刪）`crates/ui-egui/src/header.rs`：拿掉 `include_bytes!("../../../docs/brand/artcraft-mark.png")`，`paint_logo` 改成不畫（呼叫點：頁首 About 按鈕 `header.rs:41`、About 對話框 `panels/dialogs.rs:390`；按鈕還在、只是沒圖）。原因：上游 `docs/brand/LICENSE-brand.txt` 規定改過的版本必須移除 ArtCraft 標誌。未補丁的試建產物 `craft_brand_scan` → `HIT effectcraft_web_bg.wasm ['artcraft-mark.png']` |
 
 | `web-host-api.patch` | 嵌入橋（上游 v0.21.1 與 main `3102b6e6`〔11-06〕都沒有 `?host=parent`）：`apps/effectcraft-web` 加依賴 `craft-web-host`（storytold/craft-libs `2e2312dd`，與 FilmCraft 同一顆；`Cargo.lock` 一併補）、新檔 `src/host.rs`，改 `app.rs`／`files.rs`／`lib.rs`。訊息與語意同 FilmCraft 的橋，前綴 `effectcraft:`，見下節 |
 

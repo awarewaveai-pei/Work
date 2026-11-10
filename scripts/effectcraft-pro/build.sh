@@ -32,7 +32,7 @@ WOPT_VERSION=$(pin "['wasmOpt']")
 REV7=${REV:0:7}
 PATCHES=$(cd "$SCRIPT_DIR" && ls -1 ./*.patch 2>/dev/null | sed 's|^\./||' | sort || true)
 # Dist dir identity covers every build input: a font, patch or pin change gets a new directory.
-INPUTS7=$( (cat "$PIN" "$CRAFT_WEB_FONTS_JSON"; for p in $PATCHES; do cat "$SCRIPT_DIR/$p"; done) | sha256sum | cut -c1-7)
+INPUTS7=$( (cat "$PIN" "$CRAFT_WEB_FONTS_JSON" "$CRAFT_WEB_BUILD_DIR/debrand.py"; for p in $PATCHES; do cat "$SCRIPT_DIR/$p"; done) | sha256sum | cut -c1-7)
 DIST_NAME="$REV7-$INPUTS7"
 
 # wasm-bindgen CLI must equal the wasm-bindgen crate in Cargo.lock; kept apart from any other on PATH.
@@ -60,6 +60,8 @@ for p in $PATCHES; do
   git -C "$SRC" apply --check "$SCRIPT_DIR/$p" || { echo "FATAL: $p no longer applies at $REV — rebase the patch (or drop it if upstream has it)" >&2; exit 1; }
   git -C "$SRC" apply "$SCRIPT_DIR/$p"
 done
+# Translation rows that name ArtCraft/Discord go too (the UI showing them is removed by no-artcraft-marks.patch).
+python3 "$CRAFT_WEB_BUILD_DIR/debrand.py" "$SRC" crates/ui-egui/src/i18n.rs crates/ui-egui/src/i18n/ui.rs || exit 1
 
 # The fonts the patched crates/text/src/fonts.rs compiles in that upstream doesn't ship: each one's
 # file comes from fonts.json (sha256-checked above), so this is not a second list. checkout --force
@@ -101,6 +103,8 @@ done
 # ArtCraft marks must not ship in a modified build, as files or compiled into the wasm
 # (no-artcraft-marks.patch removes the include_bytes!; this proves it, and catches a new one).
 craft_brand_scan "$SRC" "$DIST"
+# ... and the ArtCraft name / its Discord nowhere in what the site serves (docs/brand/LICENSE-brand.txt).
+craft_name_scan "$DIST"
 
 # Assemble in a staging dir, verify, then swap in atomically: a failed build never touches the
 # existing dist, and a half-copied tree is never left under the real name.

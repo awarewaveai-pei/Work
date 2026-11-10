@@ -59,7 +59,7 @@
 | R3 | 嵌入橋只在 FilmCraft main，還沒進 release | A、B | 釘 main 的 commit。上游聲明訊息名稱是穩定介面（`packaging/web/README.md:168`） |
 | R4 | 大檔：橋 512 MiB、wasm 4 GiB；瀏覽器輸出只能用送進去的檔 | A、B | 開工前的閘 FC.0 決定：送預覽檔（最高 1080p），或主機用 `filmcraft-cli` 以原檔輸出（還沒試） |
 | R5 | FilmCraft 介面是英文；兩個引擎有下拉、不跟主題 | A、B | 操作者知情後才選。主題比照 VectorCraft 已定的做法：Craft 編輯器用自己的深色／淺色（`scripts/vectorcraft-pro/README.md:45`） |
-| R6 | 改過的版本不可帶 ArtCraft 名稱與標誌（兩個 README 的 License 段） | A、B | 建置時檢查產物沒有 `docs/brand/` 的檔；NOTICE 與授權照附 |
+| R6 | 改過的版本不可帶 ArtCraft 名稱與標誌（兩個 README 的 License 段） | A、B | 建置時檢查產物沒有 `docs/brand/` 的檔；NOTICE 與授權照附。FC.5（2026-11-10）起名字也擋：`no-artcraft-marks.patch` 拿掉 Discord 按鈕、Community 段、Help／About 的 ArtCraft 連結，`scripts/craft-web-build/debrand.py` 刪翻譯表同類句子，`craft_name_scan` 擋產物（NOTICE／LICENSE／ATTRIBUTION 除外）出現 artcraft／discord |
 | R7 | 兩套剪輯並存要維護兩套 | B | §5 寫明收斂條件；專案、素材庫、送審只有一套 |
 | R8 | 另一個 session 正在改 `scripts/projects-0.js`（卡 RV） | 全部 | 專案主線的卡排在 RV.4 之後 |
 | R9 | 瀏覽器的儲存空間不是正本，清掉就沒了 | A、B | 專案檔與成品一律交回伺服器帳冊；嵌入模式本來就不從瀏覽器還原 |

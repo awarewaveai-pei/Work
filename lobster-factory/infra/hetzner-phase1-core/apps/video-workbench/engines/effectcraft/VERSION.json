@@ -1,11 +1,11 @@
 {
-  "dist": "df4cc09-4fe4255",
+  "dist": "df4cc09-e5261e3",
   "repo": "https://github.com/storytold/effectcraft",
   "rev": "df4cc0932803f6183151083a5dfdd175f9d0a4ca",
   "appVersion": "0.21.1",
-  "sha256SumsSha256": "f85dcb5b3b2b867ad82a53fe67a45353461b2c0ed9fab7f350d74db2facbf688",
+  "sha256SumsSha256": "30f093b91747e579e9c31f2243ec16fb6306b22f847da7012d8a8bed27ee70ee",
   "files": 20,
   "buildScript": "scripts/effectcraft-pro/build.ps1",
   "license": "MIT OR Apache-2.0 (engine); OFL-1.1 (embedded fonts, licenses/)",
-  "builtAt": "2026-11-06"
+  "builtAt": "2026-11-10"
 }

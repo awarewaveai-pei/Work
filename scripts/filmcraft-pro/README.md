@@ -33,7 +33,7 @@ WSL Ubuntu＋rustup stable（含 `wasm32-unknown-unknown`）＋`git python3 curl
 
 | 檔 | 做什麼 |
 |---|---|
-| `no-artcraft-marks.patch` | 只動 `crates/ui-egui/src/brand.rs`：拿掉兩個 `include_bytes!`（ArtCraft 字標 PNG），兩個函式改回傳 `None`（呼叫點 `panels/dialogs.rs:470`、`panels/import_mode.rs:50` 本來就處理 `None`）。原因：上游 `docs/brand/LICENSE-brand.txt` 規定改過的版本必須移除 ArtCraft 標誌。升級時上游若新增別處的標誌，`craft_brand_scan` 會 FATAL |
+| `no-artcraft-marks.patch` | （FC.5 起也拿掉名字與社群連結：頁首 Discord 按鈕、Import 頁 Community 段、Help 選單 Discord／ArtCraft 網站／getartcraft.com、About 的 ArtCraft 字樣與連結；`links.rs`、`menus.rs`、`header.rs`、`panels/dialogs.rs`、`panels/import_mode.rs`。翻譯表裡的同類句子由 `scripts/craft-web-build/debrand.py` 在套完補丁後刪掉，建置最後 `craft_name_scan` 確認產物（NOTICE／LICENSE／ATTRIBUTION 除外）沒有 artcraft／discord 字樣）只動 `crates/ui-egui/src/brand.rs`：拿掉兩個 `include_bytes!`（ArtCraft 字標 PNG），兩個函式改回傳 `None`（呼叫點 `panels/dialogs.rs:470`、`panels/import_mode.rs:50` 本來就處理 `None`）。原因：上游 `docs/brand/LICENSE-brand.txt` 規定改過的版本必須移除 ArtCraft 標誌。升級時上游若新增別處的標誌，`craft_brand_scan` 會 FATAL |
 | `tc-fonts.patch` | 動 `crates/text/build.rs`、`crates/text/src/fonts.rs`（2 檔 +2 −2）：`wasm_keeps` 在上游原有的 BIZ UDPGothic、Noto Sans Thai 之外多點名 Noto Sans TC、Noto Serif TC（編進 wasm 的共四個）；fallback 排序讓 TC 字型排在日文字型前。來源紀錄：`video-workbench/docs/p0-reeval-evidence/filmcraft-tc-fonts.patch`（11-06）；之後以本檔為準 |
 
 升級：先查上游是否已內建繁中字型 → 改 `PIN.json` → `build.ps1`；`git apply --check` 失敗＝上游改了這兩個檔，重排補丁，正式站不受影響。
