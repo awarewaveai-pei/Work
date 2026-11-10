@@ -35,6 +35,7 @@ function paidFeature(input, type) {
   const op = input?.operation;
   if (op === "remove-bg") return "video.bg-remove";
   if (op === "meshy-image-to-3d") return "video.3d";
+  if (op === "editor-transcribe") return "video.transcribe"; // card ED.10 整片字幕
   if (op === "remotion-template" || op === "blender-retarget" || op === "blender-render" || localTool(op)) return null;
   return { image: "video.image", video: "video.motion", audio: "video.tts" }[type] || null;
 }
@@ -43,6 +44,7 @@ function ledgerKind(job) {
   const op = job.input?.operation;
   if (op === "remove-bg") return "remove-bg";
   if (op === "meshy-image-to-3d") return "3d";
+  if (op === "editor-transcribe") return "transcribe";
   if (op === "remotion-template" || op === "blender-retarget" || op === "blender-render" || op === "engine-render" || localTool(op)) return "render";
   return ["image", "video", "audio"].includes(job.type) ? job.type : "render";
 }

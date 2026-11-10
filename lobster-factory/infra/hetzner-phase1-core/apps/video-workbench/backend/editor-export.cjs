@@ -3,7 +3,8 @@ const fs = require("node:fs"),
 const { inspectMedia, verifyOutput } = require("./media-inspect.cjs"),
   { filterPath, assTime, assColor } = require("./subtitle-burn.cjs"),
   Timebase = require("../shared/timebase.js"),
-  EditorModel = require("../shared/editor-model.js");
+  EditorModel = require("../shared/editor-model.js"),
+  TranscriptWords = require("../shared/transcript-words.js");
 const ratios = {
   "16:9": [1920, 1080],
   "9:16": [1080, 1920],
@@ -41,6 +42,78 @@ function frames(value, min, max, name) {
 const fail = (message) => {
   throw Error(message);
 };
+// Card ED.10 (spec §1.3 字幕樣式): a subtitle clip may name one of eight looks. 逐字高亮 and 卡拉 OK move with the clip's
+// word times (words[] = { start, end, text }, seconds from the clip's own start); a clip without words, or whose words
+// no longer spell its text (the line was edited after recognition), burns as a still line in the same colours.
+const SUBTITLE_STYLES = ["白字暗底", "白底黑字", "品牌色", "白字黑邊", "黃字黑邊", "逐字高亮", "卡拉 OK", "色塊標題"];
+const WORD_STYLES = ["逐字高亮", "卡拉 OK"];
+const HIGHLIGHT = "#facc15";
+function subtitleWords(c, duration) {
+  if (c.words === undefined || c.words === null) return null;
+  if (!Array.isArray(c.words) || c.words.length > 200) throw Error("逐字時間最多 200 個字");
+  const words = c.words.map((w) => {
+    const start = Number(w?.start), end = Number(w?.end);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < start || typeof w.text !== "string" || !w.text.trim() || w.text.length > 200)
+      throw Error("逐字時間格式無效");
+    return { start: Math.min(start, duration), end: Math.min(end, duration), text: w.text.trim().replace(/\s+/g, " ") };
+  });
+  return words.sort((a, b) => a.start - b.start);
+}
+const spells = (words, text) => !!words?.length && TranscriptWords.joinWords(words.map((w) => w.text)).replace(/\s+/g, "") === text.replace(/\s+/g, "");
+const escapeAss = (text) => text.replace(/\\/g, "＼").replace(/{/g, "｛").replace(/}/g, "｝");
+// ASS look of one subtitle style: colours, box (BorderStyle 3) or outline, as Style line fields.
+function subtitleLook(clip, size, alpha) {
+  const outline = Math.max(1, Math.round(size * 0.06)), pad = Math.max(2, Math.round(size * 0.15));
+  const text = (hex) => assColor(hex, alpha);
+  const looks = {
+    白字暗底: { primary: "#ffffff", box: ["#000000", "60"] },
+    白底黑字: { primary: "#111111", box: ["#ffffff", "00"] },
+    品牌色: { primary: clip.color },
+    白字黑邊: { primary: "#ffffff" },
+    黃字黑邊: { primary: HIGHLIGHT },
+    逐字高亮: { primary: "#ffffff" },
+    "卡拉 OK": { primary: HIGHLIGHT, secondary: "#ffffff" }, // sung = primary, not yet sung = secondary
+    色塊標題: { primary: "#ffffff", box: [clip.backgroundColor || clip.color, "00"] },
+  };
+  const look = looks[clip.subtitleStyle];
+  const box = look.box && assColor(look.box[0], look.box[1]);
+  return {
+    primary: text(look.primary),
+    secondary: text(look.secondary || look.primary),
+    outlineColour: box || assColor("#000000", alpha),
+    back: box || assColor("#000000", "80"),
+    borderStyle: box ? 3 : 1,
+    outline: box ? pad : outline,
+    shadow: 0,
+  };
+}
+// Dialogue texts (with their own start/end, seconds from the clip start) for one subtitle clip.
+function subtitleEvents(clip) {
+  const words = clip.words, line = escapeAss(clip.text).replace(/\r?\n/g, "\\N");
+  if (!WORD_STYLES.includes(clip.subtitleStyle) || !spells(words, clip.text)) return [{ start: 0, end: clip.duration, text: line }];
+  const parts = words.map((w) => escapeAss(w.text)),
+    glue = (i) => (i && TranscriptWords.joinWords([words[i - 1].text, words[i].text]).length > words[i - 1].text.length + words[i].text.length ? " " : "");
+  if (clip.subtitleStyle === "卡拉 OK") {
+    // \kf = the word fills from secondary to primary over its own duration; \k with no text = the wait before it.
+    let at = 0, out = "";
+    words.forEach((w, i) => {
+      const wait = Math.round((w.start - at) * 100);
+      if (wait > 0) out += `{\\k${wait}}`;
+      out += glue(i) + `{\\kf${Math.max(1, Math.round((w.end - Math.max(w.start, at)) * 100))}}${parts[i]}`;
+      at = Math.max(at, w.end);
+    });
+    return [{ start: 0, end: clip.duration, text: out }];
+  }
+  // 逐字高亮: one event per word, from its start to the next word's start (the last to the clip end); before the first
+  // word the line shows unlit.
+  const lit = (k) => parts.map((p, i) => glue(i) + (i === k ? `{\\1c${assColor(HIGHLIGHT)}}${p}{\\1c${assColor("#ffffff")}}` : p)).join("");
+  const events = words[0].start > 0 ? [{ start: 0, end: words[0].start, text: lit(-1) }] : [];
+  words.forEach((w, i) => {
+    const end = i + 1 < words.length ? words[i + 1].start : clip.duration;
+    if (end > w.start) events.push({ start: w.start, end, text: lit(i) });
+  });
+  return events;
+}
 const textKeys = (c) => c.kind === "text" && Array.isArray(c.transformKeys) && c.transformKeys.length > 0;
 // Card M3 (plan §3 invariant 5): the client sends integer frames + the project timebase; seconds are derived here
 // only for FFmpeg arguments. A seconds-only payload (pre-M3 page or an old job retried) is refused, not guessed.
@@ -171,6 +244,9 @@ function validateProject(raw, quality = "1080p") {
         !["無", "淡入淡出", "彈出", "逐字顯示"].includes(c.animation)
       )
         throw Error("文字動畫無效");
+      if (c.subtitleStyle !== undefined && c.subtitleStyle !== null && !SUBTITLE_STYLES.includes(c.subtitleStyle))
+        throw Error("字幕樣式不存在");
+      clip.words = subtitleWords(c, duration);
     } else if (!c.asset || typeof c.asset.url !== "string")
       throw Error("片段缺少來源素材");
     return clip;
@@ -678,6 +754,20 @@ async function exportEditor(
           );
         const alignment =
           clip.align === "靠左" ? 4 : clip.align === "靠右" ? 6 : 5;
+        const animation =
+          clip.animation === "淡入淡出"
+            ? "\\fad(200,200)"
+            : clip.animation === "彈出"
+              ? "\\fscx50\\fscy50\\t(0,180,\\fscx100\\fscy100)"
+              : "";
+        const position = `{\\pos(${Math.round((width * clip.x) / 100)},${Math.round((height * clip.y) / 100)})${animation}}`;
+        if (clip.subtitleStyle) {
+          const look = subtitleLook(clip, size, alpha);
+          contents += `Style: S${index},${font},${size},${look.primary},${look.secondary},${look.outlineColour},${look.back},${clip.bold ? -1 : 0},${clip.italic ? -1 : 0},0,0,100,100,0,${-clip.rotation},${look.borderStyle},${look.outline},${look.shadow},${alignment},10,10,0,1\n`;
+          for (const e of subtitleEvents(clip))
+            events.push(`Dialogue: ${index},${assTime(clip.start + e.start)},${assTime(clip.start + e.end)},S${index},,0,0,0,,${position}${e.text}`);
+          return;
+        }
         contents += `Style: S${index},${font},${size},${color},${assColor(clip.color, "FF")},${background},${background},${clip.bold ? -1 : 0},${clip.italic ? -1 : 0},0,0,100,100,0,${-clip.rotation},${clip.backgroundColor ? 3 : 1},${clip.backgroundColor ? 5 : 0},0,${alignment},10,10,0,1\n`;
         let text = clip.text
           .replace(/\\/g, "＼")
@@ -699,14 +789,8 @@ async function exportEditor(
             .map((char) => (char === "\n" ? "\\N" : `{\\k${interval}}${char}`))
             .join("");
         } else text = text.replace(/\r?\n/g, "\\N");
-        const animation =
-          clip.animation === "淡入淡出"
-            ? "\\fad(200,200)"
-            : clip.animation === "彈出"
-              ? "\\fscx50\\fscy50\\t(0,180,\\fscx100\\fscy100)"
-              : "";
         events.push(
-          `Dialogue: ${index},${assTime(clip.start)},${assTime(clip.start + clip.duration)},S${index},,0,0,0,,{\\pos(${Math.round((width * clip.x) / 100)},${Math.round((height * clip.y) / 100)})${animation}}${text}`,
+          `Dialogue: ${index},${assTime(clip.start)},${assTime(clip.start + clip.duration)},S${index},,0,0,0,,${position}${text}`,
         );
       });
       contents +=
@@ -859,4 +943,4 @@ async function exportEditor(
     for (const temp of temporary) fs.rmSync(temp, { force: true });
   }
 }
-module.exports = { exportEditor, validateProject, ratios, filters, checkCube, piecewise };
+module.exports = { exportEditor, validateProject, ratios, filters, checkCube, piecewise, tempo, SUBTITLE_STYLES, subtitleEvents };

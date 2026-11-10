@@ -15,6 +15,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   const bgRemove = require("./bg-remove.cjs");
   const replicateVideo = require("./replicate-video.cjs");
   const costs = require("./provider-cost.cjs");
+  const transcribe = require("./transcribe.cjs"), TranscriptWords = require("../shared/transcript-words.js");
+  const transcriptsDir = path.join(dataDir, "transcripts");
   // Per-request spend of the sync paid routes (text, transcription): each handler call runs in its own meter.
   const meters = new (require("node:async_hooks").AsyncLocalStorage)();
   const spend = (usd) => { const m = meters.getStore(); if (m) m.costUsd += usd; };
@@ -332,6 +334,37 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         });
         if (signal.aborted) return;
         job.result = result;
+        job.progress = 100;
+        job.status = "succeeded";
+        persist();
+        return;
+      }
+      if (job.input.operation === "editor-transcribe") {
+        job.status = "running";
+        persist();
+        const result = await transcribe.transcribeProject(job.input.settings, {
+          localFile, inspect: require("./media-inspect.cjs").inspectMedia, run: mediaTools.run, tmpDir: dataDir, key: key(), fetchImpl, signal, costs,
+          maxBytes: Number(vwEnv(env, "TRANSCRIBE_CHUNK_BYTES")) || transcribe.UPLOAD_BYTES,
+          onProgress: (p) => {
+            job.progress = p;
+            persist();
+          },
+        });
+        if (signal.aborted) return;
+        // The full transcript is its own file (an hour of words is ~1 MB; jobs.json is rewritten on every change);
+        // the job keeps the summary. GET /editor/transcriptions/<job id> answers the file.
+        fs.mkdirSync(transcriptsDir, { recursive: true });
+        const summary = {
+          transcriptId: job.id, language: result.language, seconds: result.seconds, chunks: result.chunks,
+          segmentCount: result.segments.length, wordCount: result.words.length, reviewCount: result.segments.filter((x) => x.needsReview).length,
+        };
+        // The file is the record of a finished transcript: jobs.json drops old jobs past JOB_HISTORY_LIMIT, the file stays.
+        writeJson(path.join(transcriptsDir, job.id + ".json"), {
+          jobId: job.id, projectId: job.input.settings.projectId ?? null, requestedLanguage: job.input.settings.language || "自動偵測",
+          createdAt: new Date().toISOString(), ...summary, costUsd: result.costUsd,
+          segments: result.segments, words: result.words, srt: result.srt, skipped: result.skipped,
+        });
+        job.result = { ...summary, origin: { kind: "ai_generated", model: transcribe.MODEL, provider: "OpenAI", costUsd: result.costUsd } };
         job.progress = 100;
         job.status = "succeeded";
         persist();
@@ -712,7 +745,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   // download + verification; Blender has its own 30 min limit (blender.cjs); Meshy tasks take minutes.
   function jobTimeoutMs(input) {
     const op = input?.operation;
-    return op === "blender-retarget" || op === "blender-render" ? blender3d().timeoutMs(input) : op === "meshy-image-to-3d" ? 1200000 : op === "remotion-template" ? 780000 : 600000;
+    return op === "blender-retarget" || op === "blender-render" ? blender3d().timeoutMs(input) : op === "meshy-image-to-3d" ? 1200000 : op === "editor-transcribe" ? 1800000 : op === "remotion-template" ? 780000 : 600000;
   }
   // Validates, records and answers 202 before any provider call (runtime.js treats 501/503 as "never sent").
   async function start(input, res, extra, req) {
@@ -721,7 +754,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       isRemotion = input.operation === "remotion-template",
       isBlender = input.operation === "blender-retarget" || input.operation === "blender-render",
       isMeshy = input.operation === "meshy-image-to-3d",
-      parsed = isBlender
+      isTranscribe = input.operation === "editor-transcribe",
+      parsed = isTranscribe
+        ? (transcribe.plan(input.settings), key(), { type: "subtitle" })
+        : isBlender
         ? blender3d().request(input)
         : isMeshy
           ? meshy.request(input, { env, localFile })
@@ -732,13 +768,13 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           : isRemotion
             ? (remotion.request(input, imageReference), { type: "video" })
             : jobInput(input);
-    const videoModel = !isMedia && !isRemotion && !isBlender && !isMeshy && parsed.type === "video" ? generationPolicy.videoModelOf(input, env) : null;
+    const videoModel = !isMedia && !isRemotion && !isBlender && !isMeshy && !isTranscribe && parsed.type === "video" ? generationPolicy.videoModelOf(input, env) : null;
     if (videoModel?.provider === "Replicate") replicateVideo.token(env);
-    else if (!isMedia && !isRemoveBg && !isRemotion && !isBlender && !isMeshy) key();
+    else if (!isMedia && !isRemoveBg && !isRemotion && !isBlender && !isMeshy && !isTranscribe) key();
     const feature = main && mainSystemTools.paidFeature(input, parsed.type);
     // No paid call without a price: the model a paid job will run must be in next-admin's cost model.
-    if (feature) costs.priceOf({ "video.image": "image", "video.motion": "video", "video.tts": "audio", "video.bg-remove": "remove-bg" }[feature] || feature,
-      { "video.image": providerModels.image, "video.motion": videoModel?.id || providerModels.video, "video.tts": providerModels.audio }[feature]);
+    if (feature) costs.priceOf({ "video.image": "image", "video.motion": "video", "video.tts": "audio", "video.bg-remove": "remove-bg", "video.transcribe": "transcribe" }[feature] || feature,
+      { "video.image": providerModels.image, "video.motion": videoModel?.id || providerModels.video, "video.tts": providerModels.audio, "video.transcribe": transcribe.MODEL }[feature]);
     const paid = await requirePermit(req, feature);
     const release = isBlender ? blender3d().claim() : null;
     if (isBlender && !release) throw Object.assign(Error("3D 渲染進行中，請等目前的工作完成再送出"), { status: 409 });
@@ -1179,6 +1215,51 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         else throw Object.assign(Error("不支援此方法"), { status: 405 });
         return true;
       }
+      // Card ED.10 整片字幕: quote (free, no provider call) -> create (a job like any generation; charged when it succeeds)
+      // -> GET /generations/<id> -> GET /editor/transcriptions/<id> for the words. The list = 找回已完成的字幕結果.
+      if (req.method === "POST" && route === "/editor/transcriptions/quote") {
+        const input = await body(req);
+        json(res, 200, transcribe.quote(await transcribe.prepare(input.settings, { localFile, inspect: require("./media-inspect.cjs").inspectMedia }), costs,
+          Number(vwEnv(env, "TRANSCRIBE_CHUNK_BYTES")) || transcribe.UPLOAD_BYTES));
+        return true;
+      }
+      if (req.method === "POST" && route === "/editor/transcriptions") {
+        const { idempotencyKey, settings } = await body(req);
+        if (idempotencyKey !== undefined && (typeof idempotencyKey !== "string" || !idempotencyKey || idempotencyKey.length > 128))
+          throw Object.assign(Error("idempotencyKey 無效"), { status: 400 });
+        const existing = idempotencyKey && jobs.find((j) => j.idempotencyKey === idempotencyKey);
+        if (existing) {
+          json(res, 200, existing);
+          return true;
+        }
+        // The same checks as the quote, before the job exists: a clip that is not here is refused, not a failed job.
+        await transcribe.prepare(settings, { localFile, inspect: require("./media-inspect.cjs").inspectMedia });
+        await start({ type: "subtitle", operation: "editor-transcribe", prompt: "整片字幕", settings }, res, idempotencyKey ? { idempotencyKey } : {}, req);
+        return true;
+      }
+      if (req.method === "GET" && route === "/editor/transcriptions") {
+        const projectId = url.searchParams.get("projectId");
+        const files = fs.existsSync(transcriptsDir) ? fs.readdirSync(transcriptsDir).filter((f) => /^[\w-]+\.json$/.test(f)) : [];
+        const results = [];
+        for (const f of files) {
+          let t;
+          try { t = JSON.parse(fs.readFileSync(path.join(transcriptsDir, f), "utf8")); } catch { continue; } // a half-written file is skipped
+          if (projectId && t.projectId !== projectId) continue;
+          const { segments, words, srt, skipped, ...summary } = t;
+          results.push(summary);
+        }
+        results.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+        json(res, 200, { results: results.slice(0, 20) });
+        return true;
+      }
+      const transcript = /^\/editor\/transcriptions\/([\w-]+)$/.exec(route);
+      if (req.method === "GET" && transcript) {
+        const file = path.join(transcriptsDir, transcript[1] + ".json");
+        if (!fs.existsSync(file))
+          throw Object.assign(Error("找不到字幕結果"), { status: 404 });
+        json(res, 200, JSON.parse(fs.readFileSync(file, "utf8")));
+        return true;
+      }
       if (req.method === "POST" && route === "/director/script") {
         const input = await body(req);
         json(res, 200, {
@@ -1234,36 +1315,16 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           url = input.source?.url;
         const file = localFile(url);
         if (!file) throw Error("請先上傳音訊或影片");
-        const buffer = fs.readFileSync(file);
-        if (buffer.length > 25 * 1024 * 1024)
-          throw Error("語音辨識的檔案上限為25MB，請先裁短片段");
-        const form = new FormData();
-        form.append(
-          "file",
-          new Blob([buffer], { type: input.source.type || "audio/mpeg" }),
-          path.basename(file),
-        );
-        form.append("model", "whisper-1");
-        form.append("response_format", "srt");
-        const transcriptionLanguages = { 繁體中文: "zh", 簡體中文: "zh", English: "en", 日本語: "ja", 한국어: "ko", ภาษาไทย: "th" };
-        if (input.language && input.language !== "自動偵測") {
-          if (!transcriptionLanguages[input.language]) throw Error("語音辨識語言無效");
-          form.append("language", transcriptionLanguages[input.language]);
-        }
-        const r = await fetchImpl(
-          "https://api.openai.com/v1/audio/transcriptions",
-          {
-            method: "POST",
-            headers: { Authorization: "Bearer " + key() },
-            body: form,
-            signal: AbortSignal.timeout(180000),
-          },
-        );
-        if (!r.ok) throw Error("語音辨識失敗：" + r.status);
-        const srt = await r.text();
+        // Card ED.10: words:true answers segments + words with times and a score as well; without it the old SRT answer.
+        const words = input.words === true;
+        const answer = await transcribe.whisper({ buffer: fs.readFileSync(file), filename: path.basename(file), mime: input.source.type, language: input.language, words, key: key(), fetchImpl });
         // whisper-1 bills per audio minute and its srt answer carries no usage: the file's own duration (ffprobe).
-        if (main) spend(costs.transcribeUsd("whisper-1", (await require("./media-inspect.cjs").inspectMedia(file).catch(() => null))?.duration ?? 25 * 60));
-        json(res, 200, { srt });
+        if (main) spend(costs.transcribeUsd(transcribe.MODEL, (await require("./media-inspect.cjs").inspectMedia(file).catch(() => null))?.duration ?? 25 * 60));
+        if (!words) json(res, 200, { srt: answer });
+        else {
+          const result = transcribe.normalize(answer);
+          json(res, 200, { srt: transcribe.toSrt(result.segments), language: result.language, segments: result.segments, words: TranscriptWords.annotate(result.words) });
+        }
         return true;
       }
       if (req.method === 'POST' && route === '/tools/short/analyze') {
