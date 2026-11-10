@@ -1,13 +1,17 @@
 // Card P5: the two Blender operations of the /generations queue (history, cancel, retry, idempotencyKey as any job).
 //   blender-retarget: { references: { character: {url,id}, motion: {url,id} }, settings: { boneMap, sceneId?, sceneRevision? } }
 //     -> character GLB with the motion baked in, as a model asset.
+//   blender-autorig (card S4b): { references: { character: {url,id} }, settings: { motion?: <library id>, turn?, landmarks?, sceneId?, sceneRevision? } }
+//     -> the model with an automatic humanoid skeleton (Rigify metarig) and, with a motion, that motion baked in; result.rig
+//     = { sourceAssetId, turn, landmarks, motion } so the page can correct the joints and run it again from the same mesh.
 //   blender-render: { settings: { scene: <scenes3d doc>, width, height, frames, fps } }
 //     -> RGBA PNG sequence (Eevee, or Cycles on a CPU-only host) -> alpha MOV through the compositor's assembleAlphaMov -> video asset.
 // Inputs are copied into a per-job directory (<dataDir>/blender/<jobId>/) that is removed afterwards; the Python
 // scripts only see that directory. Results carry origin {kind:"render", engine:"blender-<pin>", sceneId,
 // sceneRevision, parentAssetId, sourceAssetIds} (plan invariant 2).
 const fs = require("node:fs"),
-  path = require("node:path");
+  path = require("node:path"),
+  crypto = require("node:crypto");
 const blender = require("./blender.cjs"),
   { assembleAlphaMov } = require("./compositor-render.cjs");
 const { vwEnv } = require("./env-compat.cjs");
@@ -23,6 +27,24 @@ const id = (v) => (typeof v === "string" && v ? v.slice(0, 100) : undefined);
 const FRAME_1080P_MS = 30000, MAX_RENDER_MS = 3 * 3600000;
 const renderBudgetMs = (st) => 120000 + Math.ceil(st.frames * (st.width * st.height / (1920 * 1080)) * FRAME_1080P_MS);
 const RETARGET_MS = 1800000;
+// Card S4b motion library (backend/blender/motions/index.json): CMU BVH files, one bone map onto the Rigify metarig.
+const MOTION_DIR = path.join(__dirname, "blender", "motions");
+const library = JSON.parse(fs.readFileSync(path.join(MOTION_DIR, "index.json"), "utf8"));
+const motions = library.motions.map(({ id, label }) => ({ id, label }));
+const TURNS = [0, 90, 180, 270];
+function motionFile(id) {
+  const m = library.motions.find((x) => x.id === id);
+  if (!m) throw bad("動作庫沒有這個動作");
+  const file = path.join(MOTION_DIR, m.file);
+  if (crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex") !== m.sha256) throw Error("動作庫檔案與登記不符：" + m.file);
+  return file;
+}
+function rigSettings(st = {}) {
+  if (st.motion != null) motionFile(st.motion);
+  if (st.turn != null && !TURNS.includes(st.turn)) throw bad("轉向只能是 0、90、180、270 度");
+  const marks = st.landmarks == null ? [] : Object.entries(st.landmarks);
+  if (st.landmarks != null && (typeof st.landmarks !== "object" || !marks.length || marks.length > 20 || !marks.every(([k, v]) => k.length <= 20 && vec(v)))) throw bad("關節點無效");
+}
 
 function createBlenderJobs({ dataDir, mediaStore, env }) {
   const root = path.join(dataDir, "blender");
@@ -65,6 +87,11 @@ function createBlenderJobs({ dataDir, mediaStore, env }) {
       if (!entries.length || entries.length > 200 || !entries.every(([k, v]) => typeof v === "string" && k && v && k.length <= 64 && v.length <= 64)) throw bad("骨骼對照表無效");
       return { type: "model" };
     }
+    if (input.operation === "blender-autorig") {
+      modelFile(input.references?.character, ["glb"], "模型");
+      rigSettings(input.settings);
+      return { type: "model" };
+    }
     scene(input);
     const st = input.settings, rate = `${st.fps?.num}/${st.fps?.den}`;
     if (![st.width, st.height].every((n) => Number.isInteger(n) && n >= 16 && n <= 1920 && n % 2 === 0)) throw bad("輸出尺寸無效（16–1920，偶數）");
@@ -103,6 +130,26 @@ function createBlenderJobs({ dataDir, mediaStore, env }) {
           origin: { kind: "render", engine: blender.ENGINE, operation: "retarget", ...(id(input.settings.sceneId) ? { sceneId: id(input.settings.sceneId) } : {}), ...(Number.isInteger(input.settings.sceneRevision) ? { sceneRevision: input.settings.sceneRevision } : {}), ...(id(character.id) ? { parentAssetId: character.id } : {}), sourceAssetIds: sources },
         };
       }
+      if (input.operation === "blender-autorig") {
+        const character = input.references.character, st = input.settings || {};
+        const out = await blender.runBlender({
+          script: "autorig.py", workdir: dir, env, signal, onSpawn,
+          onProgress: (done, total) => onProgress(Math.round((done / total) * 90)),
+          args: {
+            modelPath: copy(modelFile(character, ["glb"], "模型"), "model.glb"),
+            outPath: path.join(dir, "out.glb"),
+            ...(st.turn != null ? { turn: st.turn } : {}),
+            ...(st.landmarks ? { landmarks: st.landmarks } : {}),
+            ...(st.motion ? { motionPath: copy(motionFile(st.motion), "motion.bvh"), boneMap: library.boneMap } : {}),
+          },
+        });
+        const stored = await mediaStore.ingest({ file: path.join(dir, "out.glb"), ext: "glb", signal });
+        return {
+          ...stored, kind: "model", type: "model/gltf-binary",
+          rig: { ...(id(character.id) ? { sourceAssetId: character.id } : {}), sourceUrl: character.url, turn: out.turn, landmarks: out.landmarks, motion: st.motion || null, bones: out.bones, weighted: out.weighted, ...(out.frames ? { frames: out.frames } : {}) },
+          origin: { kind: "render", engine: blender.ENGINE, operation: "autorig", ...(st.motion ? { motion: st.motion } : {}), ...(id(st.sceneId) ? { sceneId: id(st.sceneId) } : {}), ...(Number.isInteger(st.sceneRevision) ? { sceneRevision: st.sceneRevision } : {}), ...(id(character.id) ? { parentAssetId: character.id } : {}), sourceAssetIds: [character.id].filter((v) => typeof v === "string" && v) },
+        };
+      }
       const s = scene(input), st = input.settings, framesDir = path.join(dir, "frames");
       await blender.runBlender({
         script: "render.py", workdir: dir, env, signal, onSpawn, timeoutMs: renderBudgetMs(st),
@@ -130,6 +177,6 @@ function createBlenderJobs({ dataDir, mediaStore, env }) {
   }
   // Whole-job limit (api.cjs): the Blender budget plus 10 min for copying inputs and assembling the MOV.
   const timeoutMs = (input) => (input?.operation === "blender-render" ? renderBudgetMs(input.settings) : RETARGET_MS) + 600000;
-  return { request, run, timeoutMs, claim: blender.claim, operations: ["blender-retarget", "blender-render"] };
+  return { request, run, timeoutMs, claim: blender.claim, motions, operations: ["blender-retarget", "blender-render", "blender-autorig"] };
 }
 module.exports = { createBlenderJobs };

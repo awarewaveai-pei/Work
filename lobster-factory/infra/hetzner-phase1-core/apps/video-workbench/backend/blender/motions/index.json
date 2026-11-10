@@ -1,0 +1,18 @@
+{
+  "source": "CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu), BVH conversion by Bruce Hahne, files copied unmodified from github.com/una-dinosauria/cmu-mocap data/<subject>/<id>.bvh (2026-11-10). Terms: \"This data is free for use in research and commercial projects worldwide\" (READMEFIRST.txt).",
+  "boneMap": {
+    "Hips": "spine", "LowerBack": "spine.001", "Spine": "spine.002", "Spine1": "spine.003", "Neck": "spine.004", "Neck1": "spine.005", "Head": "spine.006",
+    "LeftShoulder": "shoulder.L", "LeftArm": "upper_arm.L", "LeftForeArm": "forearm.L", "LeftHand": "hand.L",
+    "RightShoulder": "shoulder.R", "RightArm": "upper_arm.R", "RightForeArm": "forearm.R", "RightHand": "hand.R",
+    "LeftUpLeg": "thigh.L", "LeftLeg": "shin.L", "LeftFoot": "foot.L", "LeftToeBase": "toe.L",
+    "RightUpLeg": "thigh.R", "RightLeg": "shin.R", "RightFoot": "foot.R", "RightToeBase": "toe.R"
+  },
+  "motions": [
+    { "id": "cmu-02_01", "label": "走路", "file": "cmu/02_01.bvh", "sha256": "cf56db43157acc3d200b3d4215523f54d354a8926bea67e1f6c8031bd335ba7e" },
+    { "id": "cmu-09_01", "label": "跑步", "file": "cmu/09_01.bvh", "sha256": "90641ccca814b9d8d59f63576a548bb5612477364462d142a9f741268fbe3b78" },
+    { "id": "cmu-16_05", "label": "向前跳", "file": "cmu/16_05.bvh", "sha256": "a68f6c5e0db8ac7d5c6e7097fc4cb643a8204e0cce45fb66135eba168b518864" },
+    { "id": "cmu-13_26", "label": "揮手指揮", "file": "cmu/13_26.bvh", "sha256": "73ac49cfdb65ac0c85a4a931c2c408720ec7e125f2753a68d64e5f0322c3cab4" },
+    { "id": "cmu-05_02", "label": "跳舞", "file": "cmu/05_02.bvh", "sha256": "e0ed825644ba91538e1931673e24e0b7095c6caffe03cd647bf2df7de6a5e5fc" },
+    { "id": "cmu-77_02", "label": "站立", "file": "cmu/77_02.bvh", "sha256": "d6eef8f4ab182bef1bb5db0c46cbec0261b81a63ce1720b8a19777b7e79887a9" }
+  ]
+}

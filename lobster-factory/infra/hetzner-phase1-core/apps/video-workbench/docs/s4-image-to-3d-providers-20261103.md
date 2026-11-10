@@ -99,3 +99,17 @@ Meshy 方案額度：Premium $40/3,000cr、Ultra $100/8,000cr（help.meshy.ai �
 - **自動人形骨架**：Blender 任務 `blender-autorig`（`backend/blender/autorig.py`）：匯入無骨架 GLB → 量體型取 13 個關節點（可由頁面改）→ Rigify `human` metarig（去臉、去手指）對到關節點當變形骨架 → 自動權重（bone heat 失敗的頂點改最近骨段）→ 有選動作就用 `retarget.py` 同一套 delta 重定向 → GLB。不產生 Rigify 控制骨架：glTF 不帶約束，檢視器自己做 FK／IK。
 - **動作庫**：`backend/blender/motions/cmu/*.bvh`＋`index.json`（中文名、CMU 編號、CMU→metarig 骨名對照一份）。來源 una-dinosauria/cmu-mocap（Bruce Hahne BVH 轉檔；CMU：「free for use in research and commercial projects worldwide」）。BVH 依自身 frame time 換成場景 fps。
 - **保存重開可改**：場景物件存 `rig: {sourceAssetId, landmarks, motion}`；重開後可改關節點或動作，按「重新綁骨」從原始網格重跑，換成新 GLB、場景新版本。
+
+## 8. S4b.2 預估（2026-11-10，未執行，等操作者同意）
+
+10 張圖（§6 分組）× 三方式，價格查官方頁：
+
+| 方式 | 單價 | 10 張 | 來源 |
+|---|---|---|---|
+| Stability SPAR3D（API） | 4 credits = US$0.04（失敗不計費） | US$0.40 | https://docs.stability.ai/pricing ；https://docs.stability.ai/api-reference/3d/stable-point-aware-3d.md |
+| Replicate TRELLIS | 約 US$0.038（A100 US$0.0014/秒 × 約 28 秒；按秒計） | 約 US$0.38（若每張 60 秒 → US$0.84） | https://replicate.com/firtoz/trellis ；https://replicate.com/pricing |
+| 本機 SF3D | 0（電費除外） | US$0 | §3 |
+| **合計** | | **約 US$0.78（上限約 US$1.24）** | |
+| 選配：再加 Stability SF3D（API） | 10 credits = US$0.10 | +US$1.00 | 同 Stability 來源 |
+
+前置：本機 SF3D 尚未安裝（§7）；操作者需先在 Hugging Face 同意 `stabilityai/stable-fast-3d` 授權；Stability 帳戶先關訓練 opt-out（§5-2）。

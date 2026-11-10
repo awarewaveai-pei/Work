@@ -36,10 +36,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   const renders = () => (compositorRenders ||= require("./compositor-render.cjs").createCompositorRenders({ dataDir, mediaStore, output, limits: {
     requestBytes: Number(env.VW_COMPOSITOR_REQUEST_BYTES), frameBytes: Number(env.VW_COMPOSITOR_FRAME_BYTES),
     sessionBytes: Number(env.VW_COMPOSITOR_SESSION_BYTES), idleMs: Number(env.VW_COMPOSITOR_IDLE_MS) } }));
-  // Card P5: Blender jobs (retarget, render) and Meshy image -> 3D run in the /generations queue.
+  // Card P5: Blender jobs (retarget, render, autorig) and card S4b image -> 3D run in the /generations queue.
   let blenderJobs;
   const blender3d = () => (blenderJobs ||= require("./blender-jobs.cjs").createBlenderJobs({ dataDir, mediaStore, env }));
-  const meshy = require("./meshy.cjs");
+  const imageTo3d = require("./image-to-3d.cjs");
   // The one check for every url the client sends as a local file: /generated/<uuid>.<ext>,
   // /media/<sha256>/original.<ext> (only when stored) and, with assets, /assets/<name> and our own /examples/<name> (picked by the user, never a default).
   function localFile(url, { assets = false } = {}) {
@@ -338,7 +338,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   }
   async function finish(job, signal) {
     try {
-      if (job.input.operation === "blender-retarget" || job.input.operation === "blender-render") {
+      if (blender3d().operations.includes(job.input.operation)) {
         job.status = "running";
         persist();
         const result = await blender3d().run(job, {
@@ -390,20 +390,18 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         persist();
         return;
       }
-      if (job.input.operation === "meshy-image-to-3d") {
+      if (job.input.operation === "image-to-3d") {
         job.status = "running";
         persist();
-        // Never pay twice for one image: an earlier unfinished task for the same image is resumed (as remove-bg).
-        const src = job.input.references.image.url,
-          sent = JSON.stringify(meshy.options(job.input)),
-          // Reuse key = image + every option Meshy receives: a task made with other options is a different model.
-          earlier = jobs.findLast((j) => j !== job && j.input?.operation === "meshy-image-to-3d" && j.input.references?.image?.url === src && JSON.stringify(meshy.options(j.input)) === sent && j.meshyTaskId && j.status !== "succeeded");
-        const result = await meshy.run(job, {
-          env, fetchImpl, signal, mediaStore, localFile,
-          resumeId: earlier?.meshyTaskId,
-          pollMs: Number(env.VW_MESHY_POLL_MS) || 5000,
-          onTask: (id) => {
-            job.meshyTaskId = id;
+        // Never pay twice for one image: an earlier unfinished vendor task for the same image + method + options is
+        // resumed (as remove-bg). The key covers every option sent: a task made with other options is a different model.
+        const key = imageTo3d.reuseKey(job.input),
+          earlier = key && jobs.findLast((j) => j !== job && j.input?.operation === "image-to-3d" && imageTo3d.resumable(j) && imageTo3d.reuseKey(j.input) === key);
+        const result = await imageTo3d.run(job, {
+          env, fetchImpl, signal, mediaStore, localFile, dataDir, persist,
+          resumeId: earlier?.vendorTaskId,
+          onSpawn: (pid) => {
+            job.localPid = pid;
             persist();
           },
           onProgress: (p) => {
@@ -762,25 +760,25 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   }
   // One per-operation limit: the server aborts the job at it, and job.deadlineAt publishes it so a reloaded page
   // watches exactly as long (runtime.js reconcileJobs). Remotion polls up to 10 min itself, the extra minutes cover
-  // download + verification; Blender has its own 30 min limit (blender.cjs); Meshy tasks take minutes.
+  // download + verification; Blender has its own 30 min limit (blender.cjs); image -> 3D tasks take minutes.
   function jobTimeoutMs(input) {
     const op = input?.operation;
-    return op === "blender-retarget" || op === "blender-render" ? blender3d().timeoutMs(input) : op === "meshy-image-to-3d" ? 1200000 : op === "editor-transcribe" ? 1800000 : op === "remotion-template" ? 780000 : 600000;
+    return blender3d().operations.includes(op) ? blender3d().timeoutMs(input) : op === "image-to-3d" ? imageTo3d.TIMEOUT_MS : op === "editor-transcribe" ? 1800000 : op === "remotion-template" ? 780000 : 600000;
   }
   // Validates, records and answers 202 before any provider call (runtime.js treats 501/503 as "never sent").
   async function start(input, res, extra, req) {
     const isMedia = mediaTools.supported.includes(input.operation),
       isRemoveBg = input.operation === "remove-bg",
       isRemotion = input.operation === "remotion-template",
-      isBlender = input.operation === "blender-retarget" || input.operation === "blender-render",
-      isMeshy = input.operation === "meshy-image-to-3d",
+      isBlender = blender3d().operations.includes(input.operation),
+      isImageTo3d = input.operation === "image-to-3d",
       isTranscribe = input.operation === "editor-transcribe",
       parsed = isTranscribe
         ? (transcribe.plan(input.settings), key(), { type: "subtitle" })
         : isBlender
         ? blender3d().request(input)
-        : isMeshy
-          ? meshy.request(input, { env, localFile })
+        : isImageTo3d
+          ? imageTo3d.request(input, { env, localFile })
           : isMedia
         ? { type: input.operation === "separate" ? "audio" : input.operation === "image-output" ? "image" : "video" }
         : isRemoveBg
@@ -788,16 +786,16 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           : isRemotion
             ? (remotion.request(input, imageReference), { type: "video" })
             : jobInput(input);
-    const videoModel = !isMedia && !isRemotion && !isBlender && !isMeshy && !isTranscribe && parsed.type === "video" ? generationPolicy.videoModelOf(input, env) : null;
+    const videoModel = !isMedia && !isRemotion && !isBlender && !isImageTo3d && !isTranscribe && parsed.type === "video" ? generationPolicy.videoModelOf(input, env) : null;
     if (videoModel?.provider === "Replicate") replicateVideo.token(env);
-    else if (!isMedia && !isRemoveBg && !isRemotion && !isBlender && !isMeshy && !isTranscribe) key();
+    else if (!isMedia && !isRemoveBg && !isRemotion && !isBlender && !isImageTo3d && !isTranscribe) key();
     const feature = main && mainSystemTools.paidFeature(input, parsed.type);
     // No paid call without a price: the model a paid job will run must be in next-admin's cost model.
-    if (feature) costs.priceOf({ "video.image": "image", "video.motion": "video", "video.tts": "audio", "video.bg-remove": "remove-bg", "video.transcribe": "transcribe" }[feature] || feature,
-      { "video.image": providerModels.image, "video.motion": videoModel?.id || providerModels.video, "video.tts": providerModels.audio, "video.transcribe": transcribe.MODEL }[feature]);
+    if (feature) costs.priceOf({ "video.image": "image", "video.motion": "video", "video.tts": "audio", "video.bg-remove": "remove-bg", "video.transcribe": "transcribe", "video.3d": "3d" }[feature] || feature,
+      { "video.image": providerModels.image, "video.motion": videoModel?.id || providerModels.video, "video.tts": providerModels.audio, "video.transcribe": transcribe.MODEL, "video.3d": isImageTo3d && imageTo3d.rateKey(input) }[feature]);
     const paid = await requirePermit(req, feature);
-    const release = isBlender ? blender3d().claim() : null;
-    if (isBlender && !release) throw Object.assign(Error("3D 渲染進行中，請等目前的工作完成再送出"), { status: 409 });
+    const release = isBlender ? blender3d().claim() : isImageTo3d ? imageTo3d.claim(input) : null;
+    if ((isBlender || isImageTo3d) && !release) throw Object.assign(Error(isBlender ? "3D 渲染進行中，請等目前的工作完成再送出" : "本機 SF3D 正在處理另一張圖，請等它完成再送出"), { status: 409 });
     let job, controller, timeout;
     try {
       job = {
@@ -1040,7 +1038,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         });
       }
       if (req.method === "GET" && route === "/capabilities") {
-        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: require("./blender.cjs").capability(env), meshy: meshy.capability(env), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.publicCatalog,
+        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: { ...require("./blender.cjs").capability(env), motions: blender3d().motions }, imageTo3d: imageTo3d.capability(env, { priced: !!main }), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.publicCatalog,
           reference: require("./reference.cjs").allowed(env, req) && require("./reference.cjs").present(env),
           // P6 L3: connected = finished videos open next-admin /release (same origin) for review and delivery.
           mainSystem: main ? { organizationId: orgId } : null });
@@ -1231,6 +1229,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           job.status = "cancelled";
           controls.get(job.id)?.abort();
           if (job.replicateId) bgRemove.cancelPrediction({ id: job.replicateId, env, fetchImpl });
+          imageTo3d.cancel(job, { env, fetchImpl });
           persist();
           mirror(job);
           json(res, 200, job);

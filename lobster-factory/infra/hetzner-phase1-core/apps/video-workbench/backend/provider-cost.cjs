@@ -64,6 +64,7 @@ function priceOf(kind, model) {
   else if (kind === "audio") speechUsd(model, 0);
   else if (kind === "transcribe") transcribeUsd(model, 0);
   else if (kind === "remove-bg") toolUsd("bg-remove");
+  else if (kind === "3d") toolUsd(model); // card S4b: model = the TOOL_RATES key of the image -> 3D way
   else throw unpriced(kind);
 }
 

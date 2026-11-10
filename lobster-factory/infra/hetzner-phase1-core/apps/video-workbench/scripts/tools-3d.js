@@ -1,7 +1,7 @@
 // Card P5 (handoff 3D scope: models, skeleton, camera, lights, retargeting): the 「3D」 workspace (#3d).
 // Library (GLB in the media store) | viewer (scripts/viewer3d.mjs, three.js WebGL) | inspector. Scenes live in the
 // server ledger (VideoWorkbench.scenes3d) with a revision and the last 20 previous revisions, like P3 compositions.
-// Blender jobs (retarget, render) and Meshy image -> 3D go through the /generations queue (cancel/retry/history).
+// Blender jobs (retarget, render, autorig) and image -> 3D (card S4b) go through the /generations queue (cancel/retry/history).
 // The render is an alpha MOV that 放到剪輯時間軸 places like a composition (cpPlaceAsset). The viewer is a preview
 // (預覽近似: lights, IK); the Blender render is the output. Visible buttons/inputs only, no <select>.
 const t3 = {
@@ -21,8 +21,11 @@ const t3 = {
   bones: new Map(),
   motion: null,
   boneMapText: "",
-  meshyImage: null,
-  meshyTexture: true,
+  i3Image: null, // card S4b image -> 3D: the picked image and way (no way preselected until S4b.2 picks a default)
+  i3Method: null,
+  rigMotion: undefined, // card S4b autorig: undefined = keep the object's saved choice, null = no motion
+  rigTurn: undefined,
+  rigMark: null,
   skeleton: false,
   projects: [],
 };
@@ -392,19 +395,78 @@ async function t3Shot() {
   });
   t3.status = `已存成參考圖「${asset.name}」，可在生成頁的參考圖選用`;
 }
-async function t3Meshy() {
-  if (!t3.meshyImage) throw Error("先選一張圖片");
+const t3Usd = (m) =>
+  m.usd === 0
+    ? "免費"
+    : m.usd != null
+      ? `${m.estimate ? "約 " : ""}US$${m.usd}`
+      : `約 ${m.credits?.textured ?? "?"} 點額度`;
+async function t3ImageTo3d() {
+  const m = (VideoWorkbench.capabilities?.imageTo3d?.methods || []).find(
+    (x) => x.id === t3.i3Method,
+  );
+  if (!t3.i3Image) throw Error("先選一張圖片");
+  if (!m?.available) throw Error("先選一種可用的方式");
   const job = await VideoWorkbench.generations.create({
     type: "model",
-    operation: "meshy-image-to-3d",
+    operation: "image-to-3d",
     prompt: "圖片轉 3D",
-    references: { image: { url: t3.meshyImage.url, id: t3.meshyImage.id } },
-    settings: { texture: t3.meshyTexture },
+    references: { image: { url: t3.i3Image.url, id: t3.i3Image.id } },
+    settings: { method: m.id },
   });
-  const asset = await t3Wait(job, "Meshy 圖片轉 3D");
+  const asset = await t3Wait(job, `${m.label} 圖片轉 3D`);
   if (!t3.doc) t3.doc = t3New();
   t3AddObject(asset);
-  t3.status = `已產生 3D 模型「${asset.name}」並放進場景${asset.origin?.credits != null ? `（用掉 ${asset.origin.credits} 點 Meshy 額度）` : ""}`;
+  t3.status = `已產生 3D 模型「${asset.name}」並放進場景（${m.label}，${t3Usd(m)}）`;
+}
+// Card S4b: automatic humanoid skeleton (+ library motion). A rigged object keeps rig = {sourceAssetId, sourceUrl, turn,
+// landmarks, motion}: a re-run starts from the same unrigged mesh with the corrected joints, so the result stays editable.
+async function t3Autorig() {
+  const o = t3Obj();
+  if (!o) throw Error("先選一個模型");
+  const doc = await t3Ensure();
+  const rig = o.rig,
+    turn = t3.rigTurn !== undefined ? t3.rigTurn : rig?.turn,
+    motion = t3.rigMotion !== undefined ? t3.rigMotion : rig?.motion || null;
+  const job = await VideoWorkbench.generations.create({
+    type: "model",
+    operation: "blender-autorig",
+    prompt: "自動人形骨架",
+    references: {
+      character: rig
+        ? { url: rig.sourceUrl, id: rig.sourceAssetId }
+        : { url: o.asset.url, id: o.asset.id },
+    },
+    settings: {
+      ...(motion ? { motion } : {}),
+      ...(turn != null ? { turn } : {}),
+      // Joints are in the turned model's axes: a new turn measures them again.
+      ...(rig?.landmarks && turn === rig.turn ? { landmarks: rig.landmarks } : {}),
+      sceneId: doc.id,
+      sceneRevision: doc.revision,
+    },
+  });
+  const asset = await t3Wait(job, "自動人形骨架");
+  const target = t3JobObject(
+    job.input.settings.sceneId,
+    job.input.settings.sceneRevision,
+    o.id,
+  );
+  const r = asset.rig || {};
+  target.rig = {
+    sourceAssetId: r.sourceAssetId,
+    sourceUrl: r.sourceUrl,
+    turn: r.turn,
+    landmarks: r.landmarks,
+    motion: r.motion,
+  };
+  target.asset = { id: asset.id, url: asset.url, name: asset.name };
+  target.pose = {};
+  target.ik = [];
+  t3.rigMotion = t3.rigTurn = undefined;
+  t3Touch();
+  await t3Save();
+  t3.status = `已自動綁骨（${r.bones?.length || 0} 根骨骼${r.motion ? "，已套動作" : ""}），場景第 ${t3.doc.revision} 版`;
 }
 function t3AddObject(asset) {
   const o = {
@@ -463,7 +525,7 @@ async function t3PickMotion(asset) {
 function toolThreeDScreen(t) {
   t3Boot();
   const engine = t3Engine(),
-    meshy = VideoWorkbench.capabilities?.meshy || { available: false },
+    i3 = VideoWorkbench.capabilities?.imageTo3d,
     d = t3.doc;
   const banner = engine.available
     ? ""
@@ -475,7 +537,7 @@ function toolThreeDScreen(t) {
   if (!d)
     return (
       header +
-      `<div class="row">${t3B("新增場景", "new", { primary: true })}${t3B("匯入 GLB 模型", "upload-model")}${VideoWorkbench.rightsCheckbox()}</div><h3>所有場景</h3><div class="flow-choices">${t3.list.map((s) => t3B(`${s.title} · 第 ${s.revision} 版`, "open:" + s.id)).join("") || '<p class="note">還沒有 3D 場景。</p>'}</div>${t3MeshyPanel(meshy)}</div>`
+      `<div class="row">${t3B("新增場景", "new", { primary: true })}${t3B("匯入 GLB 模型", "upload-model")}${VideoWorkbench.rightsCheckbox()}</div><h3>所有場景</h3><div class="flow-choices">${t3.list.map((s) => t3B(`${s.title} · 第 ${s.revision} 版`, "open:" + s.id)).join("") || '<p class="note">還沒有 3D 場景。</p>'}</div>${t3ImageTo3dPanel(i3)}</div>`
     );
   const o = t3Obj(),
     info = o ? t3.bones.get(o.id) : null,
@@ -483,7 +545,7 @@ function toolThreeDScreen(t) {
     busy = !!t3.job;
   const saved = t3.list.find((s) => s.id === d.id);
   const top = `<div class="row">${t3B("所有場景", "list")}<label>場景名稱<input class="text-input" aria-label="場景名稱" data-t3-field="title" maxlength="100" value="${t3Esc(d.title)}"></label>${t3B(t3.dirty ? "儲存（有未儲存的修改）" : "儲存", "save", { primary: t3.dirty })}<span class="note" data-t3-revision>第 ${saved?.revision || 0} 版${t3.dirty ? "・未儲存" : ""}</span>${t3B("還原上一版", "restore", { disabled: !saved?.history.length })}</div>`;
-  const library = `<aside class="t3-col"><h3>場景物件</h3><div class="flow-choices">${d.objects.map((x) => t3B(x.asset.name || "模型", "obj:" + x.id, { pressed: x.id === t3.obj })).join("") || '<p class="note">場景是空的。</p>'}</div><div class="row">${t3B("匯入 GLB 模型", "upload-model")}</div>${VideoWorkbench.rightsCheckbox()}<h3>3D 素材庫</h3><div class="flow-choices" data-t3-library></div>${t3MeshyPanel(meshy)}</aside>`;
+  const library = `<aside class="t3-col"><h3>場景物件</h3><div class="flow-choices">${d.objects.map((x) => t3B(x.asset.name || "模型", "obj:" + x.id, { pressed: x.id === t3.obj })).join("") || '<p class="note">場景是空的。</p>'}</div><div class="row">${t3B("匯入 GLB 模型", "upload-model")}</div>${VideoWorkbench.rightsCheckbox()}<h3>3D 素材庫</h3><div class="flow-choices" data-t3-library></div>${t3ImageTo3dPanel(i3)}</aside>`;
   const keys = [...d.camera.keys].sort((a, b) => a.frame - b.frame);
   const stage = `<section class="t3-stage"><div class="t3-canvas" data-t3-stage data-t3-ready="0"></div><p class="note">拖曳旋轉鏡頭、滾輪縮放、右鍵平移。燈光與 IK 為預覽近似，輸出以 Blender 渲染為準。</p><div class="row">${t3Num("目前影格", "frame", t3.frame, { step: 1, min: 0, max: out.frames - 1 })}${t3Num("視角（度）", "fov", d.camera.fov, { step: 1, min: 5, max: 120 })}${t3B("記錄鏡頭關鍵影格", "cam-key")}${t3B(t3.skeleton ? "隱藏骨架" : "顯示骨架", "skeleton", { pressed: t3.skeleton })}${t3B("地面陰影", "ground", { pressed: d.ground })}${t3B("指定角度截圖", "shot")}</div><div class="flow-choices" aria-label="鏡頭關鍵影格">${keys.map((k) => `<span class="chip">第 ${k.frame} 格 ${t3B("刪除", "cam-del:" + k.frame)}</span>`).join("") || '<span class="note">還沒有鏡頭關鍵影格：轉好鏡頭後按「記錄鏡頭關鍵影格」。</span>'}</div>
     <h3>輸出</h3><div class="row">${t3Num("寬", "out-width", out.width, { step: 2, min: 16, max: 1920 })}${t3Num("高", "out-height", out.height, { step: 2, min: 16, max: 1920 })}${t3Num("長度（格）", "out-frames", out.frames, { step: 1, min: 1, max: 1200 })}<div class="flow-choices" role="group" aria-label="影格率">${T3_FPS.map((f) => t3B(f.num + " fps", "fps:" + f.num, { pressed: f.num === out.fps.num })).join("")}</div></div>
@@ -512,18 +574,42 @@ function toolThreeDScreen(t) {
       : o
         ? '<p class="note">此模型沒有骨架。</p>'
         : "";
-  const inspector = `<aside class="t3-col"><h3>燈光（最多 3 盞）</h3>${lights}${t3B("新增燈光", "light-add", { disabled: d.lights.length >= 3 })}${o ? `<h3>模型「${t3Esc(o.asset.name)}」</h3><div class="row">${["x", "y", "z"].map((a, j) => t3Num(`位置 ${a}`, `pos:${j}`, o.position[j])).join("")}</div><div class="row">${t3Num("旋轉（度）", "rotY", o.rotationY, { step: 5 })}${t3Num("縮放", "scale", o.scale, { step: 0.1, min: 0.01, max: 100 })}${t3B("從場景移除", "obj-del")}</div>${pose}` : ""}</aside>`;
+  const rigPanel = o ? t3RigPanel(o, info) : "";
+  const inspector = `<aside class="t3-col"><h3>燈光（最多 3 盞）</h3>${lights}${t3B("新增燈光", "light-add", { disabled: d.lights.length >= 3 })}${o ? `<h3>模型「${t3Esc(o.asset.name)}」</h3><div class="row">${["x", "y", "z"].map((a, j) => t3Num(`位置 ${a}`, `pos:${j}`, o.position[j])).join("")}</div><div class="row">${t3Num("旋轉（度）", "rotY", o.rotationY, { step: 5 })}${t3Num("縮放", "scale", o.scale, { step: 0.1, min: 0.01, max: 100 })}${t3B("從場景移除", "obj-del")}</div>${rigPanel}${pose}` : ""}</aside>`;
   return (
     header +
     top +
     `<div class="t3-layout">${library}${stage}${inspector}</div></div>`
   );
 }
-function t3MeshyPanel(meshy) {
-  const credits = t3.meshyTexture
-    ? "約 30 點 Meshy 額度（含貼圖）"
-    : "約 20 點 Meshy 額度（不含貼圖）";
-  return `<h3>圖片轉 3D（Meshy）</h3><div class="flow-choices" data-t3-images></div><div class="row">${t3B("含貼圖", "meshy-texture", { pressed: t3.meshyTexture })}</div><p class="note" data-t3-credits>${credits}</p>${t3B(meshy.available ? "產生 3D 模型" : "Meshy 金鑰未設定", "meshy", { disabled: !meshy.available || !t3.meshyImage || !!t3.job })}`;
+// Card S4b: every way on its own button with its price; the one 產生 button repeats the price of the picked way.
+function t3ImageTo3dPanel(cap) {
+  const methods = cap?.methods || [],
+    picked = methods.find((m) => m.id === t3.i3Method && m.available);
+  const ways =
+    methods
+      .map((m) =>
+        t3B(
+          `${m.label} · ${t3Usd(m)}${m.available ? "" : `（${m.reason}）`}`,
+          "i3-method:" + m.id,
+          { pressed: m.id === t3.i3Method, disabled: !m.available },
+        ),
+      )
+      .join("") || '<p class="note">沒有可用的方式。</p>';
+  return `<h3>圖片轉 3D</h3><div class="flow-choices" data-t3-images></div><div class="flow-choices" role="group" aria-label="圖片轉 3D 方式" data-t3-methods>${ways}</div>${t3B(picked ? `產生 3D 模型（${t3Usd(picked)}）` : "先選圖片與方式", "i3", { disabled: !picked || !t3.i3Image || !!t3.job })}`;
+}
+function t3RigPanel(o, info) {
+  const lib = t3Engine().motions || [],
+    rig = o.rig,
+    motion = t3.rigMotion !== undefined ? t3.rigMotion : rig?.motion || null,
+    turn = t3.rigTurn !== undefined ? t3.rigTurn : (rig?.turn ?? null);
+  if (info?.bones.length && !rig) return "";
+  const marks = rig?.landmarks ? Object.keys(rig.landmarks) : [];
+  const mark = t3.rigMark && rig?.landmarks?.[t3.rigMark];
+  const marksUi = marks.length
+    ? `<p class="note">關節點（綁骨時的模型座標，Y 向上）：選一個修正後按「重新綁骨」。</p><div class="flow-choices" data-t3-marks>${marks.map((k) => t3B(k, "rig-mark:" + k, { pressed: k === t3.rigMark })).join("")}</div>${mark ? `<div class="row">${["x", "y", "z"].map((a, j) => t3Num(`${t3.rigMark} ${a}`, `mark:${j}`, mark[j], { step: 0.01 })).join("")}</div>` : ""}`
+    : "";
+  return `<h3>自動人形骨架（Blender Rigify，免費）</h3><p class="note">人形模型自動放骨架並綁權重；非人形請匯入有骨架的模型。</p><div class="flow-choices" role="group" aria-label="動作庫">${t3B("不套動作", "rig-motion:", { pressed: !motion })}${lib.map((m) => t3B(m.label, "rig-motion:" + m.id, { pressed: motion === m.id })).join("")}</div><div class="flow-choices" role="group" aria-label="轉向">${t3B("自動轉向", "rig-turn:", { pressed: turn == null })}${[0, 90, 180, 270].map((d) => t3B(d + "°", "rig-turn:" + d, { pressed: turn === d })).join("")}</div>${marksUi}${t3B(rig ? "重新綁骨" : "自動綁骨", "autorig", { disabled: !!t3.job || !t3Engine().available })}`;
 }
 // Lists that need the asset library / editor projects are filled after render (both are async).
 async function toolThreeDAfterRender() {
@@ -558,8 +644,8 @@ async function toolThreeDAfterRender() {
       .filter((a) => a.kind === "image")
       .slice(-12)
       .map((a) =>
-        t3B("圖片：" + (a.name || "圖片"), "meshy-image:" + a.id, {
-          pressed: t3.meshyImage?.id === a.id,
+        t3B("圖片：" + (a.name || "圖片"), "i3-image:" + a.id, {
+          pressed: t3.i3Image?.id === a.id,
         }),
       )
       .join("") || '<p class="note">素材庫還沒有圖片。</p>',
@@ -670,10 +756,14 @@ async function t3Action(action) {
     return;
   } else if (name === "place") await t3Place(arg);
   else if (name === "shot") await t3Shot();
-  else if (name === "meshy-image")
-    t3.meshyImage = (await assets()).find((a) => a.id === arg);
-  else if (name === "meshy-texture") t3.meshyTexture = !t3.meshyTexture;
-  else if (name === "meshy") await t3Meshy();
+  else if (name === "i3-image")
+    t3.i3Image = (await assets()).find((a) => a.id === arg);
+  else if (name === "i3-method") t3.i3Method = arg;
+  else if (name === "i3") await t3ImageTo3d();
+  else if (name === "rig-motion") t3.rigMotion = arg || null;
+  else if (name === "rig-turn") t3.rigTurn = arg === "" ? null : Number(arg);
+  else if (name === "rig-mark") t3.rigMark = arg;
+  else if (name === "autorig") await t3Autorig();
   render();
 }
 function t3Field(el) {
@@ -699,6 +789,8 @@ function t3Field(el) {
   else if (name === "pos") o.position[Number(a)] = n;
   else if (f === "rotY") o.rotationY = n;
   else if (f === "scale") o.scale = Math.max(0.01, Math.min(100, n));
+  else if (name === "mark" && o.rig?.landmarks?.[t3.rigMark])
+    o.rig.landmarks = { ...o.rig.landmarks, [t3.rigMark]: o.rig.landmarks[t3.rigMark].map((v, j) => (j === Number(a) ? n : v)) };
   else return; // ik fields are read when 套用 IK is pressed
   if (f !== "frame") t3Touch();
   render();

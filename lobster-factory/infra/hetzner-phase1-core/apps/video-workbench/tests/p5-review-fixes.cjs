@@ -33,7 +33,7 @@ const json = (body, status = 200) => ({ status, contentType: "application/json",
         return new Response(JSON.stringify({ status: "IN_PROGRESS", progress: 10 }), { status: 200 });
       throw Error("unexpected provider call " + url);
     };
-    const { base } = await isolatedServer("vw-p5-fix-meshy-", { fetchImpl, env: { MESHY_API_KEY: "meshy-test-only", VW_MESHY_POLL_MS: "50" } });
+    const { base } = await isolatedServer("vw-p5-fix-meshy-", { fetchImpl, env: { MESHY_API_KEY: "meshy-test-only", VW_3D_POLL_MS: "50" } });
     const call = async (route, data, method = "POST") => {
       const r = await fetch(base + "/api/vw" + route, { method, headers: { "Content-Type": "application/json" }, ...(data ? { body: JSON.stringify(data) } : {}) });
       const v = await r.json();
@@ -42,7 +42,7 @@ const json = (body, status = 200) => ({ status, contentType: "application/json",
     };
     const data = "data:image/png;base64," + fs.readFileSync(path.join(__dirname, "..", "assets", "test-image-1.png")).toString("base64");
     const image = await call("/uploads", { name: "cup.png", data });
-    const meshyJob = (texture) => call("/generations", { type: "model", operation: "meshy-image-to-3d", prompt: "圖片轉 3D", references: { image: { url: image.url, id: "img" } }, settings: { texture } });
+    const meshyJob = (texture) => call("/generations", { type: "model", operation: "image-to-3d", prompt: "圖片轉 3D", references: { image: { url: image.url, id: "img" } }, settings: { method: "meshy", texture } });
     const until = async (id, ok) => {
       for (let i = 0; i < 200; i++) {
         const v = await call("/generations/" + id, undefined, "GET");
@@ -53,13 +53,13 @@ const json = (body, status = 200) => ({ status, contentType: "application/json",
     };
     const a = await meshyJob(true);
     assert.equal(Date.parse(a.deadlineAt) - Date.parse(a.createdAt), 1200000, "Meshy job publishes its server deadline");
-    await until(a.id, (v) => v.meshyTaskId === "task-1");
+    await until(a.id, (v) => v.vendorTaskId === "task-1");
     await call("/generations/" + a.id + "/cancel");
     const b = await meshyJob(false);
-    assert.equal((await until(b.id, (v) => v.meshyTaskId)).meshyTaskId, "task-2", "texture off must not reuse the textured task");
+    assert.equal((await until(b.id, (v) => v.vendorTaskId)).vendorTaskId, "task-2", "texture off must not reuse the textured task");
     await call("/generations/" + b.id + "/cancel");
     const c = await meshyJob(true);
-    assert.equal((await until(c.id, (v) => v.meshyTaskId)).meshyTaskId, "task-1", "same image + same options still resumes");
+    assert.equal((await until(c.id, (v) => v.vendorTaskId)).vendorTaskId, "task-1", "same image + same options still resumes");
     await call("/generations/" + c.id + "/cancel");
     assert.deepEqual(posts.map((p) => p.should_texture), [true, false]);
     pass("Meshy 重用鍵＝圖片＋送出的所有選項：含貼圖（取消）→ 不含貼圖 = 兩個遠端任務（should_texture true／false）；同選項再送 → 沿用 task-1；任務帶 deadlineAt");

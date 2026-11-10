@@ -157,6 +157,7 @@ export const MEDIA_MODELS: Record<string, MediaModel> = {
   "luma/ray-2-720p":                   { vendor: "Replicate", kind: "video", status: "retired" },
   "luma/ray-3.2":                      { vendor: "Replicate", kind: "video", status: "active", verifiedAt: "2026-10-28" },
   "851-labs/background-remover":       { vendor: "Replicate", kind: "tool", status: "active", version: "a029dff38972b5fda4ec5d75d7d1cd25aeff621d2cf4946a41055d7db66b80bc", verifiedAt: "2026-10-28" },
+  "firtoz/trellis":                    { vendor: "Replicate", kind: "tool", status: "active", version: "e8f6c45206993f297372f5436b90350817bd9b4a0d52d2a76df50c1c8afa2b3c", verifiedAt: "2026-11-10" },
   "black-forest-labs/flux-fill-pro":   { vendor: "Replicate", kind: "tool", status: "active", version: "41c767bcbfffe54ef8f05eb4d0100f9314790f7fc43a7b88d73ec06839deddb9", verifiedAt: "2026-10-28" },
   "bria/eraser":                       { vendor: "Replicate", kind: "tool", status: "active", version: "2757d1ac2f1291af219f5f10e8ecba15e92e7c05253e2841295f3ba6bff6adc4", verifiedAt: "2026-10-28" },
   "bria/expand-image":                 { vendor: "Replicate", kind: "tool", status: "active", version: "e153045f0c4163bd76788ab927faef5123db349294d4695dac07af828786e5b9" },
@@ -195,7 +196,7 @@ export const TOOL_RATES: Record<string, { usd: number; label: string; vendor: st
   // video-workbench image-to-3D (creative-suite-plan §0 2026-11-03; Meshy disabled). Prices: docs.stability.ai/pricing, replicate.com/firtoz/trellis.
   "3d-spar3d":   { usd: 0.04, label: "圖片轉 3D (Stability SPAR3D)", vendor: "Stability AI", estimate: false },
   "3d-sf3d":     { usd: 0.10, label: "圖片轉 3D (Stability SF3D)", vendor: "Stability AI", estimate: false },
-  "3d-trellis":  { usd: 0.036, label: "圖片轉 3D (TRELLIS, Replicate 按秒計)", vendor: "Replicate", estimate: true },
+  "3d-trellis":  { usd: 0.038, label: "圖片轉 3D (TRELLIS, Replicate 按秒計)", vendor: "Replicate", estimate: true }, // replicate.com/firtoz/trellis 2026-11-10: ~$0.038 (A100 $0.0014/s × ~28 s)
   // Printful mockup generator + product create are free; only fulfillment (per order) costs money,
   // and that is pass-through to the customer, not an app operating cost.
   "printful-mockup": { usd: 0, label: "Printful mockup", vendor: "Printful", estimate: false },

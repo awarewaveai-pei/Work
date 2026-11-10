@@ -11,6 +11,18 @@
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（Codex，②③已修＋測試斷言，①待檔案解鎖）
 - ORACLE_WAIVED: 修正在 oracle artifact 之後；改動限②③兩處，以新斷言（狀態回 hashes）＋全套重跑＋真瀏覽器重跑代替第二輪
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=uploads/sessions\|uploadChunked\|engineRenderFile\|storeUpload\|chunked-upload | hits=35（本卡檔、設計文件、本條 WORKLOG；舊 /engine/renders 引用留在 tools-engine-host.js／projects-0.js／tools-0.js 註解，路由仍在、正確）
+## 2026-11-10（續8）影音工作台 S4b.1＋S4b.3：圖片轉 3D 三方式同一按鈕標價、人形自動綁骨＋CMU 動作庫
+
+- 做法：一個 operation `image-to-3d`（`backend/image-to-3d.cjs`），`settings.method`＝Stability SPAR3D／SF3D、本機 SF3D（`backend/sf3d-local.cjs` 獨立程序、`HF_HUB_OFFLINE=1`、一次一個）、Replicate TRELLIS（釘版 e8f6c452，登記 `cost-model.ts` MEDIA_MODELS）；Meshy 保留只在有金鑰時列出。價格只讀 `TOOL_RATES`（3d-trellis 0.036→0.038，Replicate 頁 2026-11-10）；不預選方式（S4b.2 後定預設）。設計 `docs/s4-image-to-3d-providers-20261103.md` §7。
+- 不變量：一個 job id 最多一次付費呼叫——送出前寫 `job.vendorCall` 並落盤，已有就拒絕；非同步任務 `vendorTaskId` 跨 job 沿用；付費方式開跑前 `priceOf("3d", key)`；本機方式 `paidFeature`＝null。
+- 自動綁骨：Blender 任務 `blender-autorig`（`backend/blender/autorig.py`）：量 15 關節點 → Rigify human metarig（去臉／手指）→ bone heat＋最近骨段補權重 → `common.retarget(match_rest=True)`。動作庫 `backend/blender/motions/`（CMU 6 支，sha256 登記）。場景物件存 `rig`，關節點可改、重新綁骨從原網格重跑。
+- 實跑抓到並修：CMU 根骨 rest 在地面 → 位移基準改首格；CMU 腿 rest 外張 20° → delta 法雙腿交叉，加 `match_rest`（P5 重定向維持 delta）；BVH 依 Frame Time 換 24 fps（`use_fps_scale`）；Rigify 範本多一顆 widget 網格不進 GLB。
+- 未做：本機 SF3D 尚未安裝（需操作者在 Hugging Face 同意授權）；S4b.2 預估約 US$0.78（§8），等同意。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/s4b-image-to-3d.cjs && node tests/s4b-autorig.cjs (Blender 4.5.9 real) && node tests/p5-gate.cjs && node tests/p5-workspace.cjs && node tests/p5-review-fixes.cjs && node tests/backend.cjs && node tests/p6-main-system.cjs && npx vitest run lib/ai/__tests__/model-registry.test.ts | exit=0 | ms=1500000
+- Codex 3 項全修：compose 未傳 `STABILITY_API_KEY`（repo compose 已補；正式站 `.env`＋`safe-infra-patch` 待操作者，現容器 `printenv STABILITY_API_KEY` exit 1）；連主系統時 Meshy 無美元價目 → 顯示不可用；TRELLIS 取消後立刻重送不接正在取消的預測（`resumable()`，突變：拔守衛 → 測試紅，還原綠）。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（Codex `agency-os/reports/oracle/2026-11-10-partialreview-1c9d70e2.md`，3 項已修）
+- ORACLE_WAIVED: 共用工作樹有其他 session 未提交改動，oracle 以 -Path 只審本次檔案（artifact 標 PARTIAL）；api.cjs 只 commit 本卡 hunk
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/video-workbench,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib,agency-os,scripts | grep=meshy-image-to-3d|meshyTaskId|VW_MESHY_POLL_MS|capabilities.meshy | hits=2（main-system.cjs ledgerKind 讀舊紀錄＋註解，刻意保留）
 ## 2026-11-10（續7）影音工作台 PJ.2：一集頁步驟列；任何工具做完自動寫回那一集
 
 - 做了（規格 `lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/pj-project-spine-spec-20261106.md` §2 PJ.2）：`shared/episode-spine.js` 加 `TOOL_STEP`／`settle`／`stepStates`、`adopt` 替舊鏡頭補 id、`keepSpine` 加抄 `shot.image/video`；`shared/runtime.js` `generate()` 唯一入口帶 `link`（`VideoWorkbench.spineLink`）、`spine-settle` 動作、補帳每輪對全部成功任務 `settle`；`shared/jobs-view.js` 面板成功也 `settle`；`scripts/tools-0.js` 工具記住從哪一集打開（首頁直接開＝清掉）；`scripts/tools-editor.js` `edSpineLink`（只有匯出算成片）；`scripts/projects-0.js` 11 步列、成片區、「修這張」、鏡頭圖改由主頁寫（刪 `onSuccess`）。

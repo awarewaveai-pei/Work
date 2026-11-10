@@ -34,18 +34,18 @@ const localTool = (op) => require("./media.cjs").supported.includes(op);
 function paidFeature(input, type) {
   const op = input?.operation;
   if (op === "remove-bg") return "video.bg-remove";
-  if (op === "meshy-image-to-3d") return "video.3d";
+  if (op === "image-to-3d") return input.settings?.method === "local-sf3d" ? null : "video.3d"; // card S4b: the local way is free
   if (op === "editor-transcribe") return "video.transcribe"; // card ED.10 整片字幕
-  if (op === "remotion-template" || op === "blender-retarget" || op === "blender-render" || localTool(op)) return null;
+  if (op === "remotion-template" || op === "blender-retarget" || op === "blender-render" || op === "blender-autorig" || localTool(op)) return null;
   return { image: "video.image", video: "video.motion", audio: "video.tts" }[type] || null;
 }
 
 function ledgerKind(job) {
   const op = job.input?.operation;
   if (op === "remove-bg") return "remove-bg";
-  if (op === "meshy-image-to-3d") return "3d";
+  if (op === "image-to-3d" || op === "meshy-image-to-3d") return "3d"; // meshy-image-to-3d: jobs recorded before card S4b
   if (op === "editor-transcribe") return "transcribe";
-  if (op === "remotion-template" || op === "blender-retarget" || op === "blender-render" || op === "engine-render" || localTool(op)) return "render";
+  if (op === "remotion-template" || op === "blender-retarget" || op === "blender-render" || op === "blender-autorig" || op === "engine-render" || localTool(op)) return "render";
   return ["image", "video", "audio"].includes(job.type) ? job.type : "render";
 }
 

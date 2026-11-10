@@ -200,11 +200,12 @@ async function setField(page, label, value) {
     assert.equal(fs.existsSync(path.join(dataDir, "blender", jobId)), false, "job directory removed");
     pass("渲染中途取消：任務 cancelled、無成果資產、Blender 程序（pid " + pid + "）已結束、任務暫存目錄已刪");
 
-    // 7) no Meshy key: disabled
-    const disabled = page.getByRole("button", { name: "Meshy 金鑰未設定", exact: true });
+    // 7) no vendor keys: the paid ways are disabled and say why; Meshy (card S4b: disabled) is not offered at all
+    const disabled = page.getByRole("button", { name: "Stability SPAR3D · US$0.04（金鑰未設定）", exact: true });
     assert.equal(await disabled.isDisabled(), true);
+    assert.equal(await page.locator('[data-t3-action="i3-method:meshy"]').count(), 0);
     assert.deepEqual(errors, []);
-    pass("沒有 MESHY_API_KEY：按鈕停用並顯示「Meshy 金鑰未設定」");
+    pass("沒有金鑰：付費方式停用並顯示「（金鑰未設定）」；沒有 MESHY_API_KEY 時不列 Meshy");
   } finally {
     await browser.close().catch(() => {});
   }
@@ -224,7 +225,7 @@ async function setField(page, label, value) {
   };
   const browser2 = await chromium.launch({ channel: "msedge", headless: true, args: ["--disable-features=WebGPU"] });
   try {
-    const { base } = await isolatedServer("vw-p5-meshy-", { fetchImpl, env: { MESHY_API_KEY: "meshy-test-only", VW_MESHY_POLL_MS: "50" } });
+    const { base } = await isolatedServer("vw-p5-meshy-", { fetchImpl, env: { MESHY_API_KEY: "meshy-test-only", VW_3D_POLL_MS: "50" } });
     const page = await browser2.newPage({ viewport: { width: 1500, height: 1100 } }), errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await page.route("**/*", (r) => (r.request().url().startsWith(base + "/") ? r.continue() : r.abort()));
@@ -241,9 +242,9 @@ async function setField(page, label, value) {
     });
     await page.goto(base + "/pages/tools.html?m=1#3d");
     await page.getByRole("button", { name: "圖片：杯子.png", exact: true }).click();
-    assert.match(await page.locator("[data-t3-credits]").textContent(), /約 30 點 Meshy 額度（含貼圖）/);
-    await page.getByRole("button", { name: "產生 3D 模型", exact: true }).click();
-    await status(page, /已產生 3D 模型.*（用掉 30 點 Meshy 額度）/);
+    await page.getByRole("button", { name: "Meshy · 約 30 點額度", exact: true }).click();
+    await page.getByRole("button", { name: "產生 3D 模型（約 30 點額度）", exact: true }).click();
+    await status(page, /已產生 3D 模型.*（Meshy，約 30 點額度）/);
     const post = calls.find((c) => c.method === "POST");
     assert.equal(post.auth, "Bearer meshy-test-only");
     assert.match(post.body.image_url, /^data:image\/png;base64,/);
