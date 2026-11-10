@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-10（續38）ED.4 素材分頁（影片剪輯對齊 seedstar）
+
+- 根因／內容：左側「素材」分頁整個重做成參考版型：我的素材庫／本次上傳 (n)／收藏三分頁、搜尋（只重繪清單不掉焦點）、全部／影片／圖片／音訊、已使用／未使用兩組可收合、卡片（縮圖、☆、已用 × n、長度或靜圖、名稱、解析度、拆出音軌、＋；點卡片或 Enter 加到主視訊末端並選取）。收藏存使用者偏好 `tools.editor.assetFavorites`，不動素材資料。長度／解析度因素材庫紀錄沒有，改成每素材讀一次（edProbe，3 並行）。
+- 檔案：`scripts/editor-panes/assets.js`、`styles/editor-pane-assets.css`、`tests/ed4-assets.cjs`；`tests/editor-media-picker.cjs` 改走素材卡（參考版型沒有「從素材庫選取」鍵）。
+- 未完成（等主 session）：軌道的 ＋ 目前仍開舊挑選視窗；頂部「選一個素材加入『…』 取消」已做好（`edAssetsPickTrack(trackId)`），需 `tools-editor.js` 的 `track-clip:` 分支（非文字軌）改呼叫它。
+- Codex 審查 4 項：F1 軌道＋未接（同上，待共用檔）；F2 成立——音訊／貼圖分頁用 `library:audio`／`upload:image`，已還原 kind 後綴處理並加測試；F3 上傳未帶權利確認——舊分頁同樣行為，非本卡引入，未改；F4 測試標題誤導，已改名。
+- 注意：上傳素材仍會同時加到主軌末端（舊行為；p3-roundtrip／editor-media-picker 依賴），參考站此處行為未能驗證（Chrome 擴充在點「本次上傳」後凍結）。
+- 驗證結果：
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed4-assets.cjs (真 Edge、隔離資料夾；另跑 ed1-layout／ed2-timeline／editor-media-picker／p3-roundtrip／theme-tokens 皆綠) | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=edAssets | hits=81
+- ORACLE: agency-os/reports/oracle/2026-11-10-partialreview-d19eb5f7.md
+- 已知紅（非本卡）：tests/tools-editor.cjs 紅在「轉場 › 溶解」，ED.7 同時在改轉場分頁。
+- rollback：還原上述三檔與 editor-media-picker.cjs 即回到舊素材分頁。
 ## 2026-11-10（續37）影音工作台 ED.5 文字分頁
 
 - 做了什麼：`scripts/editor-panes/text.js` 文字分頁＝樣板／純文字／品牌字型三分頁；樣板：搜尋、全部／開場／標價／CTA／強調／片尾、「＋ 加入空白文字」（預設字「新文字」）、15 張自製樣板（顏色全走主題 token：卡片用 var(--…)，加入時解成當下實色寫進片段）、＋／雙擊／拖到文字軌（放在指針位置）加入、文字動畫四選一（套到之後加入的樣板）、說明文字；片頭（Remotion）區塊保留在樣板之後。品牌字型分頁只讀使用者偏好 `tools.editor.brandKit`（`{colors:[#rrggbb], font}`，ED.7 貼圖分頁寫），套用色彩／字型到選取文字。樣式 `styles/editor-pane-text.css`（窄欄 1 欄、寬欄 2 欄）。
