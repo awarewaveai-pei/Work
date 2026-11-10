@@ -384,3 +384,4 @@ headless 測不到的三件事，用真的視窗、只在 NVIDIA 顯示卡上開
 - 剪輯器：不改。素材庫對有 alpha 的原檔自動產 VP9 alpha `proxy.webm`／`preview720.webm`（P3、ED.1.4 同一條路），輸出讀原 MOV（ffmpeg 原生解 ProRes 4444 alpha）。
 - 限制：單次上傳經 Cloudflare 上限 100 MB（P6.20），約 20 秒以內的 1080p 透明片段。
 - 純文字片頭（監工 2026-11-10）：外框沒送過素材時問引擎 `project.summary`，類型都是 Composition／Folder／Solid（上游 `crates/project/src/item.rs` `type_name`）才送空來源清單＋`footage: 0`；路由只對 EffectCraft＋`footage: 0` 收空清單，權利紀錄為空（`main-system.cjs` `rightsFor`，同 Remotion 片頭）；有素材卻空清單照舊 400。送審規則不變。
+- 獨立整頁後（a849ec0cd）：FilmCraft 成片的 `link` 改由「擁有開著的檔的那一集」決定（`EpisodeSpine.findByEdit`，同 `tools-editor.js` edSpineLink），不再讀分頁草稿（上面 FC.3 的 `spineLink` 一行只剩 EffectCraft 用）；集數「開啟剪輯」開 `tools.html?full&project=<id>#edit-pro`。

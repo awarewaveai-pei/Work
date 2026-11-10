@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-10（續12）影音工作台 EC.5 收尾：tool TDZ、純文字片頭、media-ledger 紅；接手 b1be4b73（額度中斷）的引擎獨立整頁
+
+- 203bc3084 TDZ：tools-boot.js 先載 tools-engine-host.js 才載宣告 `let tool` 的 tools-0.js，事件處理器讀 `tool` 拋 `tool is not defined`（pj1 偶發紅）。`engineTool()`（typeof）用於 HEAD 既有三處處理器。fc2 test 0 擋住 tools-0 後觸發 click＋beforeunload；突變紅。
+- aa75ce620 純文字片頭（監工決定，照 Remotion 片頭先例）：外框沒送素材時問 `project.summary`，只有 Composition／Folder／Solid（上游 `crates/project/src/item.rs` type_name）才送空來源＋`footage: 0`；路由只對 EffectCraft＋`footage: 0` 收空清單，權利 `[]`（`main-system.cjs` rightsFor）。fc3 case 6；突變紅；真引擎：純文字透明片頭入帳、直接丟進引擎的檔被擋。Codex 3522b75e 兩條留監工：單獨片頭過不了送審（`editorial-rights-qa.ts:120-122`，同 Remotion 無來源片頭；疊進剪輯不加權利項）；`footage` 是客戶端自報（同來源清單）。
+- 960d18d25 media-ledger：9465bbc8c（11-03 16:24）把圖片計價寫進 origin.costUsd，測試（11-03 15:16 最後改）沒跟上，不在 gate 所以沒人看到。斷言改為 provider-cost.cjs 對該模型的精確價（>0），未放寬。
+- a849ec0cd 接手 b1be4b73（09:28 撞 5 小時額度，程式＋測試已完成、未審未 commit）：獨立整頁 `tools.html?full#<tool>`、顯卡警告分「內建晶片／沒給 WebGPU」不再說沒有獨立顯卡、FilmCraft 固定英文、runtime `VW_KEEP_PAGE_ON_CONFLICT`。Codex 三輪（ba2cffbc 2 → 1c723801 3 → e0b467db 1 → 0eb7f5bd 無），第三輪前寫不變量：引擎只在自己分頁、開什麼（檔、集）明確交付不靠草稿時序、進行中的工作（未存、輸出回傳中、上傳中）不無聲丟。修：集數「開啟剪輯」改開整頁帶 `&project=`、分頁按鈕補開該集的檔；FilmCraft 成片歸屬＝擁有該檔的那集（`EpisodeSpine.findByEdit`，同 edSpineLink）；輸出到伺服器回覆前都算未存；runtime `persistRedo` 讓單筆寫入（save／remove／spine-settle）在衝突後重做不丟。
+- 避免再發生：保留頁面衝突時單筆寫入一律 persistRedo（整包偏好由呼叫端讀改寫重做）；引擎分頁的歸屬與開檔只從檔案／URL 取得。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/fc2-engine-host.cjs (16 PASS) && node tests/fc3-engine-render.cjs (6 PASS) && node tests/pj1-legacy-ui.cjs && node tests/media-ledger.cjs && node tests/gate.cjs (HEAD-only worktree D:\Worktrees\ec5-check) + real FilmCraft/EffectCraft zh-TW Edge --force_high_performance_gpu | exit=0 | ms=1800000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/9m/0n（Codex 3522b75e 2 條留監工；ba2cffbc 2、1c723801 3、e0b467db 1 已修；0eb7f5bd 無）
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/video-workbench,agency-os,scripts | grep=engineOpenProject|VW_KEEP_PAGE_ON_CONFLICT|spineLink|engineUnsaved | hits=47
 ## 2026-11-10（續11）影音工作台 PJ.3：排成時間軸；配音、字幕照旁白自動上軌
 
 - 做了（規格 `lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/pj-project-spine-spec-20261106.md` §2 PJ.3、§8 Q1 做法 A）：鏡頭卡加「旁白」（`shot.line`，`scripts/projects-0.js`）；`backend/api.cjs` `/director/shots` 系統提示加 line、回傳帶 `line`；`scripts/tools-editor.js` 新 `edArrange`／`edSpineSubtitles`／`edSpineVoice`／`edPlaceSpine`／`edSpineButtons`／`edSpineAction`／`edIntent`，標題列三顆鈕（只在剪輯檔屬於某集時出現）；專案頁第 6／7／8 步帶 `editIntent`（arrange／voice／subtitle）開剪輯，第 7 步另加「配樂」（開 music 工具，`target` 為 null，畫面註明要自己放到音樂軌）；`scripts/tools-0.js` `acceptAsset` 開檔後呼叫 `edIntent`（規格 §7 未列此檔，但 intent 唯一入口在此，1 行）。
