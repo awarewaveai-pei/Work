@@ -3,7 +3,7 @@
 
 export const META = {
   title: '影片剪輯補齊監工台',
-  updated: '2026-11-06',
+  updated: '2026-11-10',
   plan: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/editor-parity-spec-20261106.md',
   worklog: 'agency-os/WORKLOG.md 2026-11-06',
   self: 'agency-os/handoffs/2026-11-06-video-editor-parity-supervisor/',
@@ -27,6 +27,7 @@ export const NOW = [
   { what: '上傳大支影片不會「頁面通訊逾時」。', state: 'yes', ev: '已修好，2026-11-06 上線（6d3dda8f6，部署 96ddd7f70）。' },
   { what: '版面跟參考一樣（圖示側欄、可收合、整片設定、播放列）。', state: 'yes', ev: '2026-11-06 卡 ED.1（9df955245），2026-11-06 已上線（部署 96ddd7f70）。參考沒有的片頭、調色、影格率、峰值表、多軌都還在，搬到對應位置。' },
   { what: '多選、磁吸、磁性主軌、波紋刪除、快捷鍵全套。', state: 'yes', ev: '2026-11-06 卡 ED.2（5b726b2eb），2026-11-06 已上線（部署 96ddd7f70）。tests/ed2-timeline.cjs 在真瀏覽器把每個新鍵實按一次。' },
+  { what: '屬性面板：整片／此軌／此片段效果、光漏、震動、關鍵影格、分離音訊、速度鈕，輸出照做。', state: 'yes', ev: '2026-11-06 卡 ED.3（afc1d90ba–af1517238）；2026-11-10 部署 22ceb6e47，同時修好擋住部署的打包清單（f36751b79）。tests/ed3-inspector.cjs、ed3-effects.cjs 真輸出抽畫面。' },
   { what: '字幕辨識、翻譯、剪贅字在剪輯器裡完成。', state: 'no', ev: '卡 ED.10、ED.11；現在要跳去字幕工具。' },
   { what: '剪輯 Agent（打字叫它剪）。', state: 'no', ev: '卡 ED.13，最後做。' },
 ];

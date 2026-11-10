@@ -1,4 +1,28 @@
 # Worklog
+## 2026-11-10（續1）影片工作台部署 22ceb6e47：ED.3 屬性面板上線；修好擋部署的打包清單（f36751b79）
+
+**操作者**：「沒做的檢查去做 並部署」。
+
+**根因**：第一次 `sg-deploy.sh video-workbench`（00:37Z）gate 紅 5 項，部署中止，線上容器沒變。21f1ed246 讓 next-admin `lib/ai/cost-model.ts:22` 引用 `public/editor-shared/image-models.js`，但 `apps/video-workbench/awarewave-files.txt` 沒列這個檔，映像的 `.awarewave/` 缺檔，結果 backend／tenancy／p6／replicate 測試都 ERR_MODULE_NOT_FOUND。`tests/awarewave-files.cjs` 有抓到，但兩處寫錯：把所有引用都改成 `.ts`（提示寫成 `image-models.js.ts`），也不檢查清單裡 `.js` 檔的引用。
+
+**做了**：
+- 檢查：ED.3 七個提交（afc1d90ba…af1517238、ED.1.4 836de9121／87f6021ec）都在 origin/main。
+- 測試：指定十個測試重跑。
+- 修正：清單加上 `image-models.js`；測試改為「有副檔名就保留、沒有才補 `.ts`」，清單裡的 `.js`／`.mjs` 也檢查引用。
+- 重新部署 22ceb6e47。
+- 監工台：現況加 ED.3 已上線一行，重新發布 Dz5uKTSs8RH1moVgbsh5u7（第 7 版）。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo sg-deploy.sh video-workbench → gate passed、healthy after 6s、smoke all endpoints OK、.deployed-commit a4b2341da → 22ceb6e47 | exit=0 | ms=79000
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-video-workbench node /tmp/cm.mjs（import .awarewave/lib/ai/cost-model.ts）→ cost-model ok 17；容器內 editor-model.js／tools-editor.js／editor-export.cjs md5 = main；curl https://video.aware-wave.com/shared/editor-model.js md5 cea5558b… 相同 | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/{ed1-layout,tools-editor,p1-loop,p2-tracks-ui,p2-mix,p3-roundtrip,remotion-template,editor-media-picker,theme-tokens,ed3-inspector,ed3-effects,ed3-legacy-golden}.cjs 全綠；ed2-timeline 連跑時第 153 行跨軌拖曳一次 [0,0]≠[60,60]，單獨重跑兩次綠（偶發，程式未改） | exit=0 | ms=110000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（突變：刪清單列 → awarewave-files.cjs 紅且提示正確路徑 → 還原綠）
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/video-workbench,agency-os,scripts | grep=image-models | hits=2（awarewave-files.txt、tests/awarewave-files.cjs 註解；引用端 next-admin lib/ai/cost-model.ts:22 在 scope 外）
+- ORACLE_WAIVED: 兩行清單／測試修正，突變證據已附；ED.3 本身 11-06 已過 Codex
+
+**剩餘風險**：ed2-timeline 跨軌拖曳在多測試連跑時偶發失敗，未治本。
+
+**rollback**：在主機用 a4b2341da 重跑 `sg-deploy.sh video-workbench`，或改用該次的 rollback 映像。
 ## 2026-11-09（續3）「我的設計」間歇 500 根因＝nginx 每 IP 限流；便宜填色兩顆、按鈕特色說明、頁面橫向捲動
 
 涵蓋 `a178b634a`…`376395ec8` 共十二個 commit（續1 之後、續2 之前），都已部署。
