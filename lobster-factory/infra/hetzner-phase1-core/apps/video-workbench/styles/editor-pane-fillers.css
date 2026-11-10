@@ -1,1 +1,4 @@
 /* Styles owned by ED.11 scripts/editor-panes/fillers.js (spec §3 檔案歸屬). Theme tokens only (tests/theme-tokens.cjs). */
+.ed-fc-check { display:flex;align-items:center;gap:6px;margin:6px 0; }
+.ed-fc-summary { margin:8px 0;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--card-bg);color:var(--text-primary);font-size:13px; }
+.ed-fc-quote { margin:6px 0;font-size:13px;color:var(--text-muted); }
