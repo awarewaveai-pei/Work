@@ -101,8 +101,10 @@ const other = (engine, ext) => `<!doctype html><script>const b = new TextEncoder
         return frame;
       };
       const box = await (await full.waitForSelector("#engine-host iframe")).boundingBox();
-      assert.equal(await full.locator(".engine-bar b").first().textContent(), e.tool === "edit-pro" ? "專業剪輯" : "專業特效", "上方那一列要有工具名稱");
-      assert(box.height > 950 * 0.75, "引擎要佔滿視窗：高 " + box.height);
+      // Card FC.5: no bar above the engine; a 44px icon rail on the right names the tool for screen readers.
+      assert.equal(await full.locator(".engine-rail").getAttribute("aria-label"), e.tool === "edit-pro" ? "專業剪輯" : "專業特效", "右邊圖示欄要帶工具名稱");
+      assert(box.height > 950 * 0.95, "引擎要佔滿視窗高度：高 " + box.height);
+      assert((await full.locator(".engine-rail").boundingBox()).width <= 48, "圖示欄寬度不超過 48px");
       let engine = await engineFrame();
       const status = () => full.locator("[data-engine-status]").textContent();
       const projects = async (key, engineName) => (await full.evaluate((k) => VideoWorkbench.preferences.get(k, []), key)).filter((r) => !engineName || r.engine === engineName);
@@ -140,18 +142,21 @@ const other = (engine, ext) => `<!doctype html><script>const b = new TextEncoder
       assert.equal(row.native[e.ext], '{"proj":1,"big":12345678901234567890}', "專案原文照存（大整數不被改寫）");
       assert.equal(row.title, "片頭");
       assert.equal((await projects("tools.editor.projects")).length, editorBefore, "自製剪輯的專案數不變");
-      await full.click(".engine-bar summary"); // the saved list sits folded under the bar
+      await full.click('[data-engine-act="panel"]'); // the saved list sits in the flyout beside the rail
+      await full.keyboard.press("Escape");
+      assert(await full.locator(".engine-flyout").isHidden(), "Esc 要關閉說明與專案面板");
+      await full.click('[data-engine-act="panel"]');
       await full.click(`[data-engine-act="open:${row.id}"]`);
       engine = await engineFrame();
       await post({ type: e.engine + ":ready", version: "1", appVersion: "9.9.9-test" });
       await engine.waitForFunction(([t, n]) => received.some((r) => r.type === t && r.name === n), [e.engine + ":open", `片頭.${e.ext}`]);
       console.log(`PASS ${e.engine}: save -> tools.engine.projects, editor projects unchanged, reopen sends it back`);
 
-      // 4. F6 inside the engine -> focus on the bar above it.
+      // 4. F6 inside the engine -> focus on the icon rail beside it.
       await engine.click("#inside");
       await full.keyboard.press("F6");
-      assert(await full.evaluate(() => !!document.activeElement?.closest(".engine-bar")), "F6 後焦點應在上方那一列");
-      console.log(`PASS ${e.engine}: F6 in the engine gives focus back to the bar`);
+      assert(await full.evaluate(() => !!document.activeElement?.closest(".engine-rail")), "F6 後焦點應在右邊圖示欄");
+      console.log(`PASS ${e.engine}: F6 in the engine gives focus back to the rail`);
 
       // 5. The workbench tab saves first; the engine tab's next save is redone on that state, without a reload.
       await full.evaluate(() => (window.notReloaded = true));
