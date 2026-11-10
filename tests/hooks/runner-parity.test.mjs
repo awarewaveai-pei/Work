@@ -395,6 +395,55 @@ test('parity: accumulator (PostToolUse) → batch-format consumes at Stop under 
   assert.equal(readFileSafe(accFile), null);
 });
 
+// Fake prettier package: --find-config-path succeeds only when a .prettierrc sits
+// in the file's directory chain; --write stamps each file so the test sees it.
+function makeFakePrettierProject(root, { config }) {
+  const pkgDir = path.join(root, 'node_modules', 'prettier');
+  fs.mkdirSync(path.join(pkgDir, 'bin'), { recursive: true });
+  fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify({ name: 'prettier', bin: './bin/prettier.cjs' }));
+  fs.writeFileSync(path.join(pkgDir, 'bin', 'prettier.cjs'), [
+    "const fs = require('fs'); const path = require('path');",
+    'const [flag, ...files] = process.argv.slice(2);',
+    "if (flag === '--find-config-path') {",
+    '  let d = path.dirname(path.resolve(files[0]));',
+    "  for (;;) { const c = path.join(d, '.prettierrc'); if (fs.existsSync(c)) { console.log(c); process.exit(0); }",
+    '    const up = path.dirname(d); if (up === d) break; d = up; }',
+    "  console.error('Can not find configure file'); process.exit(1);",
+    '}',
+    "if (flag === '--write') for (const f of files) fs.appendFileSync(f, '// FORMATTED\\n');",
+  ].join('\n'));
+  if (config) fs.writeFileSync(path.join(root, '.prettierrc'), '{}\n');
+  fs.mkdirSync(path.join(root, 'src'), { recursive: true });
+  const js = path.join(root, 'src', 'a.js');
+  fs.writeFileSync(js, 'const a=1;\n');
+  return js;
+}
+
+test('batch-format: formats only files whose own project declares a prettier config, resolved from the file not the cwd', () => {
+  const sid = freshSid('pbfc');
+  const cwd = makeTmpHome(); // session cwd has no prettier at all
+  const withCfg = makeFakePrettierProject(fs.mkdtempSync(path.join(os.tmpdir(), 'hooktest-cfg-')), { config: true });
+  const noCfg = makeFakePrettierProject(fs.mkdtempSync(path.join(os.tmpdir(), 'hooktest-nocfg-')), { config: false });
+  for (const f of [withCfg, noCfg]) {
+    assert.equal(run('PostToolUse', { session_id: sid, tool_name: 'Edit', tool_input: { file_path: f } }, { cwd }).status, 0);
+  }
+  assert.equal(run('Stop', { session_id: sid }, { cwd }).status, 0);
+  assert.match(fs.readFileSync(withCfg, 'utf8'), /FORMATTED/, 'project with .prettierrc must be formatted');
+  assert.equal(fs.readFileSync(noCfg, 'utf8'), 'const a=1;\n', 'prettier installed but no config → file untouched');
+});
+
+test('batch-format: a prettier config ABOVE the file\'s repo (e.g. D:\\.prettierrc) does not count', () => {
+  const sid = freshSid('pbfo');
+  const outer = fs.mkdtempSync(path.join(os.tmpdir(), 'hooktest-outer-'));
+  fs.writeFileSync(path.join(outer, '.prettierrc'), '{}\n');
+  const repo = path.join(outer, 'repo');
+  fs.mkdirSync(path.join(repo, '.git'), { recursive: true });
+  const js = makeFakePrettierProject(repo, { config: false });
+  assert.equal(run('PostToolUse', { session_id: sid, tool_name: 'Edit', tool_input: { file_path: js } }, { cwd: makeTmpHome() }).status, 0);
+  assert.equal(run('Stop', { session_id: sid }, { cwd: makeTmpHome() }).status, 0);
+  assert.equal(fs.readFileSync(js, 'utf8'), 'const a=1;\n', 'config outside the repo must not trigger formatting');
+});
+
 test('parity: SubagentStart injects the shared charter without echoing payload', () => {
   const r = run('SubagentStart', { agent_name: 'critic', private_note: 'must-not-echo' });
   assert.equal(r.status, 0);

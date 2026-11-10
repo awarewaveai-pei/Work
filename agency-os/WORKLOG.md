@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-10（續51）Stop hook batch-format：只排「專案自己宣告 prettier 設定」的檔
+
+- 根因：`mcp/claude-userlevel/hooks/rules/batch-format.js`（舊版 :19-24）對本回合改過的每個 JS/TS 檔跑 `<session cwd>/node_modules/.bin/prettier --write`，不看有沒有設定檔。video-workbench 有 prettier devDependency、無設定檔（120 欄風格），一行修改就把 `scripts/tools-editor.js` 用預設 80 欄整檔重排（+1300 行，壓縮後與 HEAD 相同），其他 ED worker 只能逐 hunk 提交。
+- 不變量：formatter 只碰所屬 repo 內有 prettier 設定的檔；prettier 從檔案往上找最近的 `node_modules/prettier`（`node <bin>` 直跑，不經 .cmd／shell），不看 session cwd；`--find-config-path` 找到的設定必須在檔案的 git repo 內（非 git 則 prettier 專案根內），擋 `D:\.prettierrc`／`~/.prettierrc` 越界（Codex F1）。無設定＝跳過，不猜預設。
+- 改檔：`batch-format.js`（`findPrettier`／`findRepoRoot`／`hasPrettierConfig`）；`tests/hooks/runner-parity.test.mjs` 新增 2 測試（假 prettier 套件：有設定照排、無設定不動、repo 外設定不算）；hooks README 兩份＋`TOOL_TRIGGER_MAP.md:406` 描述同步。tsc 部分未動。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scratchpad/e2e.mjs（暫存目錄 junction 到 video-workbench 真 prettier 3.9.10，經 runner PostToolUse→Stop）：無設定 changed=false、有 .prettierrc changed=true | exit=0 | ms=2897
+- REALTEST_EVIDENCE: tool=Bash | cmd=node --test tests/hooks/runner-parity.test.mjs 172/172；bash scripts/test-hooks.sh 393/394（唯一紅＝asset-mcp-refs 掃到 `.claude/skills/.trash/` 回收檔，與本卡無關） | exit=0 | ms=157428
+- 突變：拔 `configCache.get(dir)` 判斷 → 「無設定不動」測試紅；拔 repo 邊界 → 「repo 外設定不算」測試紅；還原皆綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n
+- ORACLE_WAIVED: Codex artifact `agency-os/reports/oracle/2026-11-10-partialreview-e77a438a.md` 唯一發現（repo 外設定檔被採用）已修，加測試＋突變證明，不再跑第二輪
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,.claude,tests | grep=batch-format|prettierBin | hits=10（README×2、TOOL_TRIGGER_MAP:406 已改；其餘為 manifest、accumulator 註解、歷史 WORKLOG／audit，不需改）
+- 同步：`scripts/sync-claude-userlevel.ps1 -Mode merge` RESULT PASS，`~/.claude/hooks/rules/batch-format.js` 與 repo 相同。
 ## 2026-11-10（續50）ED.10 收尾：時間軸裁切／分割後逐字時間與文字跟著片段（Codex F2，操作者「RISKS 要處理嗎」）
 
 - 根因：字幕片段 `words`（秒，從片段起點算）只有字幕分頁 `edSubSet` 會改；核心所有改片段時間窗的操作都走 `edWindowKeys`（`scripts/tools-editor.js:662`；呼叫點 :246 正規化、:2511 入點／左裁、:2521 出點、:2552-2553 分割、:2590 改速、:2821 拖曳），只處理音量／變形 key → 時間軸分割或裁切後逐字高亮錯位；只改 words 不改文字又讓匯出判定對不上、退成靜態（Codex 第二輪 F1）。

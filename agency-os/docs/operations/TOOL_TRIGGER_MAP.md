@@ -403,7 +403,7 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 
 | Rule | 作用 |
 |------|------|
-| `rules/batch-format.js` | Prettier format + tsc --noEmit 跑所有累積的 JS/TS 改動 |
+| `rules/batch-format.js` | Prettier format（只排所屬專案有 prettier 設定檔的檔，prettier 從檔案位置解析）+ tsc --noEmit 跑所有累積的 JS/TS 改動 |
 | `rules/check-console.js` | 偵測修改檔案中的 stray console.log |
 | `rules/cost-tracker.js` | 記錄 token 使用量與估算成本 |
 | `rules/session-summary.js` | 寫 session summary 到 ~/.claude/sessions/ |
