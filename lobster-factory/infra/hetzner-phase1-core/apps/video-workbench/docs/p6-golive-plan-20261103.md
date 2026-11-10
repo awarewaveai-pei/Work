@@ -109,6 +109,17 @@ HEAD 804594c93。只讀規劃；無 SSH／無改檔。回報繁中；brief 照�
 - 驗收：`bash -n PC/scripts/sg-deploy.sh PC/scripts/rollback-phase1.sh`；`bash scripts/test-hooks.sh` 不相干可略；sg-deploy 若有既有 bats/sh 測試（`PC/tests/`）跑之；`node scripts/verify-governance-pointers.mjs`（runbook 改動）。
 - rollback：revert。
 
+**P6.20 大檔分段上傳**（Medium；`backend/chunked-upload.cjs`）
+- 起因：正式站單次請求上限 100 MB（Cloudflare 免費方案硬上限＋主機 nginx `client_max_body_size 100m`），`/uploads` 送 base64 JSON（膨脹 1/3）→ 約 75 MB 以上影片傳不上；`/engine/renders` 原始位元組同樣卡 100 MB。調大上限無效，改分段。
+- 路由（都在 `/api/vw/` 下，身分＝既有 X-VW-* 簽章，server.cjs 已驗；每個組織一個 api 實例＝各自的 `<org>/uploads/`）：
+  - `POST /uploads/sessions` `{ size, type }` → 201 `{ id, chunkBytes, chunks, received: [] }`；`type` 只收存進素材庫（media store）的影音／GLB／BVH，圖片與 LUT 本來就小、留舊路。
+  - `GET /uploads/sessions/<id>` → 同上，`received` = 已收段號（續傳只補缺的段）。
+  - `POST /uploads/sessions/<id>/chunks/<n>`：原始位元組（`application/octet-stream`，不用 base64），`X-VW-Chunk-Sha256` = 該段 sha256；長度與雜湊不符 → 400、不留；同段重送覆蓋。
+  - `POST /uploads/sessions/<id>/complete` `{ name, rightsConfirmed }` → 依段號串接，串接時逐段重算 sha256 對回收件時的值，再走與舊 `/uploads` 同一個入庫＋登記函式（回應形狀相同）。成片：`{ render: <meta> }`（同 `/engine/renders` 的 meta 檢查）。
+- 數值：每段 16 MiB；單檔上限 `VW_UPLOAD_BYTES` 預設 500 MiB（= next-admin 素材登記上限）；每組織同時未完成總量 `VW_UPLOAD_OPEN_BYTES` 預設 2 GiB（超過 429）；閒置 `VW_UPLOAD_IDLE_MS` 預設 30 分鐘清掉；服務重啟清空（同合成渲染 session）。
+- 身分：session 記建立者 userId；別人的段、狀態、完成請求一律 404（不透露存在）。
+- 相容：舊 `/uploads`、`/engine/renders` 不變；前端只在檔案大於一段時改走分段。
+
 ### B. DB（High；另卡，先過 db-expert）
 
 **D1 migration 0159：任務帳冊表＋asset_domain**（High）
