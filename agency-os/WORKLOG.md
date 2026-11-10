@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-10（續6）影音工作台 EC.5：專業特效輸出透明片段回素材庫
+
+- 根因／缺口：EC.2 只出 H.264（`tools-engine-host.js` engineExport 註解「透明之後另開卡」），特效片頭／貼圖疊不上剪輯。
+- 做法：外框「輸出透明片段」→ `renderQueue.add {format:"prores", channels:"rgba"}`（上游 `crates/export/src/encode.rs:220` rgba→4444）→ `/engine/renders` 帶 `alpha:true`；路由只收 EffectCraft 的 alpha，ffprobe pix_fmt 無 alpha（`media-store.cjs` `hasAlpha`）→ 400 不入帳，有 → `.mov` 入素材庫、`settings.alpha`。剪輯器不改：素材庫自動產 VP9 alpha 預覽（P3 同路）。不選 WebM：ffmpeg 內建 vp9 解碼丟 alpha。規格 `docs/engine-route-plan-20261106.md` EC.5。
+- 實跑（隔離伺服器、Edge `--force_high_performance_gpu`、引擎 BrowserWebGpu）：按鈕 → job succeeded，原檔 `prores 4444 yuva444p12le` 1920×1080 2 s 12 MB，預覽 `proxy.webm` vp9 `alpha_mode=1`；抽格角落 RGBA (0,0,0,0)、字區 alpha 255。
+- 避免再發生：入帳路由對宣稱透明的成片機械檢查 alpha；同一判準 `hasAlpha` 與動畫合成共用。
+- 剩餘：任務面板用原檔 `.mov` 播（瀏覽器不解 ProRes，只見音軌），P3 合成 MOV 同樣，屬 `shared/jobs-view.js`（PJ.2 改動中）；單次上傳 100 MB 上限（P6.20）約 20 秒 1080p。
+- commit 9b6bddb6c。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/fc3-engine-render.cjs && node tests/fc2-engine-host.cjs && node tests/gate.cjs && node scratchpad/ec5/e2e.cjs (real EffectCraft, isolated server) | exit=0 | ms=900000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/0n（Codex 9a3b2870：純文字片頭無素材不能輸出＝EC.3 權利守衛，留給操作者決定，不在本卡改）
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/video-workbench,agency-os,scripts | grep=engine-render|renderQueue.add|hasAlpha | hits=32
 ## 2026-11-10（續5）Craft 網頁版建置：被打補丁的上游 checkout 一律先清掉未追蹤檔（`checkout_patched`）
 
 - 根因：`scripts/craft-web-build/lib.sh` `checkout()` 用 `checkout --force`，不清未追蹤檔；上次（或中斷的）補丁新建的檔會讓 `git apply` 拒絕或被編進產物。只有 `effectcraft-pro/build.sh:54-56` 自己補了 `git clean -fdq`，filmcraft／vectorcraft／photocraft 沒有（EC.1 worker 回報）。
