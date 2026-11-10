@@ -22,6 +22,8 @@ export const COPY = {
 };
 
 export const NOW = [
+  { what: '左側每個分頁、匯出視窗、專案列表各自一個檔，可以多個 session 同時做。', state: 'yes', ev: '2026-11-10 ED.0（a98153452、25397763e、7c7976bcb、cd5ea376f）＋每卡樣式檔（a3deedf2e）；ED.2 偶發失敗已從根因修好，連跑 10 次全綠。' },
+  { what: '字幕後端：逐字時間、整片辨識、卡拉 OK／逐字高亮輸出、剪贅字資料。', state: 'yes', ev: '2026-11-10 e28bcbc4d（未部署）；剪輯器裡的字幕分頁畫面是 ED.10 後半，還沒做。' },
   { what: '兩邊每個鍵都按過的對照表。', state: 'yes', ev: '2026-11-06 逐鍵對照：同 18、不同 17、缺 24、本機多 2；每一列都歸到卡（docs/editor-parity-compare-20261106.md）。' },
   { what: '剪輯、分割、複製、刪除、多軌、轉場、濾鏡、匯出 1080p。', state: 'yes', ev: '既有功能，tests/tools-editor.cjs 真實匯出過。' },
   { what: '上傳大支影片不會「頁面通訊逾時」。', state: 'yes', ev: '已修好，2026-11-06 上線（6d3dda8f6，部署 96ddd7f70）。' },
@@ -163,5 +165,5 @@ export const STEPS = [
 ];
 
 export const OPEN = [
-  { n: 1, before: 'ED.6', what: '內建曲庫要生成哪些曲子、總共花多少：ED.6 開工前列清單給你確認。', src: 'editor-parity-spec §4 決定 2' },
+  { n: 1, before: 'ED.6', what: '內建曲庫選哪個方案。建議方案 B：配樂 80 首（Lyria，約 US$12.80）＋音效／環境音 36 個（ElevenLabs，最多約 US$8.64），合計約 US$21.44；要另開 ElevenLabs 付費方案。另有精簡、完整兩案。', src: 'docs/ed6-music-library-proposal-20261110.md（b902eba04）' },
 ];
