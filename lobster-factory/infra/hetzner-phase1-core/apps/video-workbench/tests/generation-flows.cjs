@@ -135,7 +135,15 @@ const fs = require("node:fs"), os = require("node:os"), path = require("node:pat
       });
     const image = tools.locator("#stage img");
     await image.waitFor();
-    const box = await image.boundingBox();
+    // Opening a tool scrolls to the top smoothly (tools-0.js scrollTo + html scroll-behavior:smooth, ~170 ms): measure
+    // only once the picture has stopped moving, or the drag lands at a stale position.
+    let box = await image.boundingBox();
+    for (let still = 0; still < 3; ) {
+      await p.waitForTimeout(50);
+      const next = await image.boundingBox();
+      still = next.x === box.x && next.y === box.y ? still + 1 : 0;
+      box = next;
+    }
     await p.mouse.move(box.x + box.width * 0.8, box.y + box.height * 0.8);
     await p.mouse.down();
     await p.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.2);

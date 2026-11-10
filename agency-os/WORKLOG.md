@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-10（續28）影音工作台 generation-flows 區域拖曳紅：測試在平滑捲動中量圖片位置
+
+- 症狀：`tests/generation-flows.cjs` 區域移動／縮放斷言（原 :155／:159）在 main 8/8 紅。
+- 根因：開工具時 `scripts/tools-0.js:686` `scrollTo(0, 0)`＋`styles/tools.css:5` `scroll-behavior: smooth`，頁面約 170ms 平滑捲回頂；測試在捲動中 `boundingBox()`，拖曳座標落在舊位置（探針：圖片 top 340→301→…→402；選區 y 算成 0.02 而非 0.2、框畫在圖外）。兩行自 0d02453cc 就在 → 不是某 commit 弄壞，是測試與動畫競速；bisect：96f1f6eab 3/3 紅、父 42a276a10 2/3 紅，無單一起點。程式行為正確（真人不會在捲動中拖曳）→ 修測試。
+- 改：量圖片前等位置連續 3 次（50ms 間隔）不變；斷言、步驟不動。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/generation-flows.cjs x6 (0 0 0 0 0 0); node tests/gate.cjs | exit=0 | ms=240000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — 自審（測試 9 行）；突變：拿掉等待 → 3 次紅 2 次（:163／:167）→ 還原綠
+- ORACLE_WAIVED: 只改測試；Codex 額度至 14:03；以突變證據代替
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=scroll-behavior | hits=6
 ## 2026-11-10（續27）影音工作台測試：價格期望值改由頁面同一個格式化函式算（NT$ 改動 2fc0f3f83 的收尾）
 
 - 根因：`tests/pj3-arrange.cjs:88` 斷言配音按鈕全文不含標價（P6.21 後付費按鈕都帶價）；其他測試寫死 US$／NT$ 金額。
