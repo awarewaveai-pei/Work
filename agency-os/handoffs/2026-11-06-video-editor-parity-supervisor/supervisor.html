@@ -80,11 +80,11 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
 <aside><div class="in">
   <h1>影片剪輯補齊監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-11-10</span></p>
-  <div class="bar" data-computed><i class="d" style="width:30.76923076923077%"></i><i class="g" style="width:7.6923076923076925%"></i></div>
+  <div class="bar" data-computed><i class="d" style="width:30.76923076923077%"></i><i class="g" style="width:23.076923076923077%"></i></div>
   <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>4</span>／<span data-computed>13</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
-<p class="sub">應用工具的「影片剪輯」補到跟參考工作台一樣：功能、流程、版面、快捷鍵相同，外觀用 AwareWave 主題。共 <span data-computed>13</span> 張卡、<span data-computed>42</span> 項工作，已完成 <span data-computed>22</span> 項。</p>
+<p class="sub">應用工具的「影片剪輯」補到跟參考工作台一樣：功能、流程、版面、快捷鍵相同，外觀用 AwareWave 主題。共 <span data-computed>13</span> 張卡、<span data-computed>45</span> 項工作，已完成 <span data-computed>26</span> 項。</p>
 <section id="now"><h2>現況</h2><p class="lead">剪輯器現在做得到與做不到的事（2026-11-06 實際打開查）。</p><ul class="yn"><li class="yes"><b>可以</b><span>左側每個分頁、匯出視窗、專案列表各自一個檔，可以多個 session 同時做。<small>2026-11-10 ED.0（a98153452、25397763e、7c7976bcb、cd5ea376f）＋每卡樣式檔（a3deedf2e）；ED.2 偶發失敗已從根因修好，連跑 10 次全綠。</small></span></li><li class="yes"><b>可以</b><span>字幕後端：逐字時間、整片辨識、卡拉 OK／逐字高亮輸出、剪贅字資料。<small>2026-11-10 e28bcbc4d（未部署）；剪輯器裡的字幕分頁畫面是 ED.10 後半，還沒做。</small></span></li><li class="yes"><b>可以</b><span>兩邊每個鍵都按過的對照表。<small>2026-11-06 逐鍵對照：同 18、不同 17、缺 24、本機多 2；每一列都歸到卡（docs/editor-parity-compare-20261106.md）。</small></span></li><li class="yes"><b>可以</b><span>剪輯、分割、複製、刪除、多軌、轉場、濾鏡、匯出 1080p。<small>既有功能，tests/tools-editor.cjs 真實匯出過。</small></span></li><li class="yes"><b>可以</b><span>上傳大支影片不會「頁面通訊逾時」。<small>已修好，2026-11-06 上線（6d3dda8f6，部署 96ddd7f70）。</small></span></li><li class="yes"><b>可以</b><span>版面跟參考一樣（圖示側欄、可收合、整片設定、播放列）。<small>2026-11-06 卡 ED.1（9df955245），2026-11-06 已上線（部署 96ddd7f70）。參考沒有的片頭、調色、影格率、峰值表、多軌都還在，搬到對應位置。</small></span></li><li class="yes"><b>可以</b><span>多選、磁吸、磁性主軌、波紋刪除、快捷鍵全套。<small>2026-11-06 卡 ED.2（5b726b2eb），2026-11-06 已上線（部署 96ddd7f70）。tests/ed2-timeline.cjs 在真瀏覽器把每個新鍵實按一次。</small></span></li><li class="yes"><b>可以</b><span>屬性面板：整片／此軌／此片段效果、光漏、震動、關鍵影格、分離音訊、速度鈕，輸出照做。<small>2026-11-06 卡 ED.3（afc1d90ba–af1517238）；2026-11-10 部署 22ceb6e47，同時修好擋住部署的打包清單（f36751b79）。tests/ed3-inspector.cjs、ed3-effects.cjs 真輸出抽畫面。</small></span></li><li class="no"><b>還不行</b><span>字幕辨識、翻譯、剪贅字在剪輯器裡完成。<small>卡 ED.10、ED.11；現在要跳去字幕工具。</small></span></li><li class="no"><b>還不行</b><span>剪輯 Agent（打字叫它剪）。<small>卡 ED.13，最後做。</small></span></li></ul></section>
 
 <section id="steps"><h2>卡片與工作</h2><p class="lead">依編號做。先做版面骨架，各分頁接著做，要付費服務的放最後。風險 High 的卡經你同意才上線。</p><ol class="steps"><li class="step done" id="ED.1">
@@ -131,13 +131,13 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
         <p><b>做法：</b><code>lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/editor-parity-spec-20261106.md §3 ED.3</code></p>
         <p><b>完成於：</b><code>af1517238</code></p>
       </details>
-    </div></li><li class="step todo" id="ED.4">
+    </div></li><li class="step doing" id="ED.4">
     <div class="n">4</div>
     <div class="b">
       <p class="plain">例：素材分頁直接看到縮圖，篩「影片」，上面一組是「已使用」並標「已用 × 2」，按 ＋ 放到主視訊最後面。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Sonnet</span></p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Sonnet</span></p>
       <p class="donewhen"><b>完成的樣子：</b>三個分頁、搜尋、篩選、已使用分組、收藏、拆出音軌都點過。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>ED.4.1</code> 縮圖格、三個分頁、搜尋、類型篩選；點素材卡就加到主視訊末端並選取。</span></li><li class="todo"><b>○</b><span><code>ED.4.2</code> 已使用／未使用、收藏、加到指定軌、拆出音軌。</span></li></ul>
+      <ul class="items"><li class="done"><b>✓</b><span><code>ED.4.1</code> 縮圖格、三個分頁、搜尋、類型篩選；點素材卡就加到主視訊末端並選取（未部署）。 <small>完成於 <code>8c12108aa</code></small></span></li><li class="done"><b>✓</b><span><code>ED.4.2</code> 已使用／未使用、收藏、拆出音軌；按軌道＋就加到那條軌（舊的選素材視窗已刪）。 <small>完成於 <code>977eb2ef2</code></small></span></li><li class="todo"><b>○</b><span><code>ED.4.3</code> 對照參考再看兩處：上傳後是否自動放上時間軸；收藏與本次上傳沒有東西時的文字。</span></li></ul>
       <details><summary>工程細節：ED.4 素材分頁</summary>
         <p>我的素材庫／本次上傳／收藏、搜尋、類型篩選、已使用／未使用、已用×n、收藏星、縮圖長度解析度、加到指定軌、拆出音軌</p>
         <p><b>需先完成：</b><a href="#ED.1">ED.1</a></p>
@@ -150,7 +150,7 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
       <p class="plain">例：文字分頁選「標價」，看到「限時優惠」「8 折起」的樣板預覽，按 ＋ 放到播放頭位置。</p>
       <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Sonnet</span></p>
       <p class="donewhen"><b>完成的樣子：</b>每張自製樣板加入一次、輸出一次；不含參考網站的圖或字樣設計。</p>
-      <ul class="items"><li class="done"><b>✓</b><span><code>ED.5.1</code> 參考有的每種文字樣板都有一張自己設計的，分類、預覽、搜尋；每張都真的輸出過一次（未部署）。 <small>完成於 <code>07022ba27</code></small></span></li><li class="done"><b>✓</b><span><code>ED.5.2</code> 純文字、品牌字型、文字動畫；按 ＋、雙擊或拖曳加入。加入空白文字的預設字改成「新文字」。 <small>完成於 <code>07022ba27</code></small></span></li><li class="todo"><b>○</b><span><code>ED.5.3</code> 預覽也播出文字動畫；輸出的文字底色跟預覽一致。兩處都在共用檔，等 ED.7 交完再改。</span></li></ul>
+      <ul class="items"><li class="done"><b>✓</b><span><code>ED.5.1</code> 參考有的每種文字樣板都有一張自己設計的，分類、預覽、搜尋；每張都真的輸出過一次（未部署）。 <small>完成於 <code>07022ba27</code></small></span></li><li class="done"><b>✓</b><span><code>ED.5.2</code> 純文字、品牌字型、文字動畫；按 ＋、雙擊或拖曳加入。加入空白文字的預設字改成「新文字」。 <small>完成於 <code>07022ba27</code></small></span></li><li class="todo"><b>○</b><span><code>ED.5.3</code> 預覽也播出文字動畫；輸出的文字底色跟預覽一致。兩處都在共用檔，跟 ED.7.3、ED.10.4 併一張卡做。</span></li></ul>
       <details><summary>工程細節：ED.5 文字分頁</summary>
         <p>自製樣板，數量與分類同參考（開場／標價／CTA／強調／片尾）、搜尋、純文字、品牌字型、文字動畫、雙擊或拖曳加入</p>
         <p><b>需先完成：</b><a href="#ED.1">ED.1</a></p>
@@ -172,13 +172,13 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
         <p><b>檔案：</b><code>VW/scripts/tools-editor.js</code> <code>VW/backend/api.cjs</code></p>
         <p><b>做法：</b><code>lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/editor-parity-spec-20261106.md §3 ED.6</code></p>
       </details>
-    </div></li><li class="step todo" id="ED.7">
+    </div></li><li class="step doing" id="ED.7">
     <div class="n">7</div>
     <div class="b">
       <p class="plain">例：選「融接」按「套用全部剪點」，每個剪點都加上；上傳公司 Logo 當浮水印，下一個專案也還在。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Sonnet</span></p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Sonnet</span></p>
       <p class="donewhen"><b>完成的樣子：</b>套用全部、預覽剪點、移除、曲線都輸出過；浮水印與品牌套件換專案還在。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>ED.7.1</code> 轉場：套用全部剪點、預覽剪點、移除、曲線。</span></li><li class="todo"><b>○</b><span><code>ED.7.2</code> 浮水印（PNG／SVG）與品牌套件（色彩、字型、Logo），換專案還在。</span></li></ul>
+      <ul class="items"><li class="done"><b>✓</b><span><code>ED.7.1</code> 轉場：先點剪點才能套用，五種效果、套用全部剪點、預覽、移除、三種曲線，輸出照曲線走；舊專案只有存了曲線的那一段變（未部署）。 <small>完成於 <code>52fda4dfa</code></small></span></li><li class="done"><b>✓</b><span><code>ED.7.2</code> 浮水印（PNG／SVG）與品牌套件（色彩、字型、Logo），換專案還在；浮水印進輸出由 ED.8 做。 <small>完成於 <code>3ca146b0b</code></small></span></li><li class="todo"><b>○</b><span><code>ED.7.3</code> 預覽轉場也照曲線走（現在預覽固定線性），在共用檔，跟 ED.5.3、ED.10.4 併一張卡做。</span></li></ul>
       <details><summary>工程細節：ED.7 轉場與貼圖</summary>
         <p>轉場套用全部 (n)、預覽剪點、移除、曲線；浮水印 PNG／SVG 帳號保留；品牌套件跨專案</p>
         <p><b>需先完成：</b><a href="#ED.1">ED.1</a></p>
@@ -219,7 +219,7 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
       <p class="plain">例：在剪輯器按「一鍵整片字幕」，先看價格，辨識完出現繁中字幕軌；再翻成英文成另一軌；樣式選「卡拉 OK」，字一個一個亮。</p>
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High</span><span class="who">負責：設計 Fable；做 Opus</span></p>
       <p class="donewhen"><b>完成的樣子：</b>辨識、翻譯先顯示價格；逐句編輯、分割、合併、匯出 SRT 都點過；逐字高亮輸出正確。</p>
-      <ul class="items"><li class="todo"><b>○</b><span><code>ED.10.1</code> 逐句：新增、分割、合併、刪除、匯出 SRT；每種語言一條軌。</span></li><li class="todo"><b>○</b><span><code>ED.10.2</code> 樣式：八種（含逐字高亮、卡拉 OK）、字級、上下位置。</span></li><li class="todo"><b>○</b><span><code>ED.10.3</code> 辨識整片與翻譯，先顯示價格；找回已完成結果。</span></li></ul>
+      <ul class="items"><li class="todo"><b>○</b><span><code>ED.10.1</code> 逐句：新增、分割、合併、刪除、匯出 SRT；每種語言一條軌。</span></li><li class="todo"><b>○</b><span><code>ED.10.2</code> 樣式：八種（含逐字高亮、卡拉 OK）、字級、上下位置。</span></li><li class="todo"><b>○</b><span><code>ED.10.3</code> 辨識整片與翻譯，先顯示價格；找回已完成結果。</span></li><li class="todo"><b>○</b><span><code>ED.10.4</code> 預覽畫出八種字幕樣式（現在只有輸出會畫），在共用檔，跟 ED.5.3、ED.7.3 併一張卡做。</span></li></ul>
       <details><summary>工程細節：ED.10 字幕</summary>
         <p>三分頁搬進剪輯器；每語言一軌；/transcriptions 改回逐字時間與分數、整片 V1＋A1 辨識、找回結果；翻譯接 /tools/subtitles/translate；逐字高亮／卡拉 OK 輸出</p>
         <p><b>需先完成：</b><a href="#ED.1">ED.1</a></p>
