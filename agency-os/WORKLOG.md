@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-10（續21）影音工作台 ED.1.5 後續：剪輯器不再被頂列撐出視窗
+
+- 根因：`.editor-app` 單欄 grid 欄寬 `auto`，頂列（改前已約 1730px，ED.1.5 再加寬）把整個剪輯器撐得比視窗寬；頂列字一變（儲存中↔已儲存時間）時間軸寬度跟著變，`tests/ed2-timeline.cjs:319` 自適應全片量寬與重畫後不同而紅（換回 ED.1.5 前版本＝綠，HEAD 版＝紅）。
+- 改：`styles/tools.css` `.editor-app` 加 `grid-template-columns:minmax(0,1fr)`（關掉整類：任何內容都撐不寬剪輯器）；頂列 `flex-wrap:wrap`。1600／1280 寬度頂列＝視窗寬，1280 時原本被擠出的「匯出」看得到。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed2-timeline.cjs; ed1-layout; ed3-inspector; tools-editor; pj4-stale; gate; topbar width probe 1600->1600 1280->1280 | exit=0 | ms=300000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — 自審（二行 CSS）
+- ORACLE_WAIVED: Codex 額度用完至 14:03（oracle-quota 已設）；二行 CSS，以 ed2-timeline 前紅後綠為證
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=editor-app | hits=5
+- 未修（他人範圍）：`tests/pj3-arrange.cjs:88` 紅，配音按鈕多了「約 US$0.014／分鐘」，屬另一 session 的付費標價改動。
 ## 2026-11-10（續20）影音工作台 ED.1.5：頂列比例下拉改按鈕（§9 G2）
 
 - 改：`scripts/tools-editor.js` 新 `edRatioChoices`（`edChoices`＋action `project-ratio:<r>`），頂列與整片設定共用；刪 `edRatioSelect`。頂列顯示短字「16:9」（頂列改前已超寬約 1730px，含配音按鈕長字），整片設定保留「16:9 橫屏」。

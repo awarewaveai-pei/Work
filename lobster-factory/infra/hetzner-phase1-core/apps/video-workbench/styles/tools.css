@@ -709,9 +709,10 @@ body {
 .subtitle-cues > li.active { border-color:var(--accent); background:var(--bg-hover); }
 .subtitle-cues textarea { width:100%; min-height:72px; margin:10px 0; }
 .subtitle-cues .row > label { flex:1; min-width:100px; }
+/* Card ED.1.5: one column minmax(0,1fr) so no content (the wrapping top bar) widens the editor past the window. */
 /* Card ED.1: editor = full-height app (top bar, rail+drawer | preview | inspector, toolbar, timeline). Theme tokens only. */
-.editor-app { height:100dvh;display:grid;grid-template-rows:auto minmax(0,1fr) auto auto var(--ed-timeline,150px);background:var(--body-bg);color:var(--text-primary); }
-.editor-topbar { display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 12px;border-bottom:1px solid var(--border); }
+.editor-app { height:100dvh;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto auto var(--ed-timeline,150px);background:var(--body-bg);color:var(--text-primary); }
+.editor-topbar { display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;padding:8px 12px;border-bottom:1px solid var(--border); }
 .editor-topbar-group { display:flex;align-items:center;gap:8px;min-width:0;white-space:nowrap; }
 .editor-title { display:flex;align-items:center;gap:4px;color:var(--text-secondary); }
 .editor-title .text-input { font-weight:var(--font-weight-semibold,600);border-color:transparent;background:transparent;width:16ch; }
