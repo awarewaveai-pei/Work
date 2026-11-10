@@ -1,0 +1,3 @@
+- 已提交 e28bcbc4d（已推 main）＋WORKLOG 2026-11-10（續2）。已做：`backend/transcribe.cjs`（whisper 逐字＋分數、整片合成／分段／換算）、`shared/transcript-words.js`（語氣詞、停頓、剪除區間）、`api.cjs` 路由（/transcriptions words:true、/editor/transcriptions quote／建立／列表／取回）、`main-system.cjs` 計費種類、`editor-export.cjs` 8 字幕樣式＋逐字高亮／卡拉 OK；`tests/ed10-subtitles-backend.cjs` 8 項綠。
+- 回歸 7 個綠；Codex 3 項已修＋測試。
+- 未做：規格 §1.3 介面說明——`docs/editor-parity-spec-20261106.md` 被 ED.0 session 未提交兩行佔住（hook 擋）；全文在共用筆記 `ed10-backend-interface.md`，放開後貼上。

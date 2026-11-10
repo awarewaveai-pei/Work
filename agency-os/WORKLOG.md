@@ -1,4 +1,28 @@
 # Worklog
+## 2026-11-10（續2）ED.10 後端：逐字辨識＋分數、整片字幕任務、剪贅字資料、逐字高亮／卡拉 OK 燒錄（e28bcbc4d）
+
+**派工**：主 session（影片剪輯對齊 seedstar 監工）派 ED.10 後端；畫面另一張卡做。未部署。
+
+**根因**：`POST /transcriptions` 只向 whisper-1 要 SRT，沒有逐字時間（逐字高亮、卡拉 OK、剪贅字都要）、沒有可信分數（規格 §1.3 需校對 < 0.8），也不能整片辨識。
+
+**做了**（`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/`）：
+- `backend/transcribe.cjs`（新）：verbose_json＋word／segment 時間；分數＝1＋avg_logprob/5（0.8＝whisper 自己的 logprob_threshold −1.0），重複／無語音旗標上限 0.5。整片：V1＋A1 有聲片段混成一段單聲道 16kHz MP3（重疊混音、段間 1 秒靜音），超過 24MB 在段間靜音處切，時間依字所在的段換回時間軸。
+- `backend/api.cjs`：`/transcriptions` 加 `words:true`（舊呼叫者不變）；`/editor/transcriptions/quote`（免費）、`/editor/transcriptions`（任務 editor-transcribe，成功才扣＝估價）、依專案列表、依 id 取回（`dataDir/transcripts/<id>.json` 為紀錄本體）。
+- `backend/main-system.cjs`：editor-transcribe＝`video.transcribe`、帳冊 kind `transcribe`。
+- `shared/transcript-words.js`（新）：語氣詞、停頓、剪除區間（不跨錄音）、`joinWords`，給 ED.11。
+- `backend/editor-export.cjs`：文字片段 `subtitleStyle`（8 樣式）＋`words`；逐字對不上文字就靜態；無 `subtitleStyle` 的片段輸出逐位元相同。
+- Codex 3 項全屬實已修並各加測試：C1 任務被 JOB_HISTORY_LIMIT 清掉後結果找不回 → 列表／取回改讀字幕檔；C2 靜音片段仍被辨識 → 片段帶 muted／hidden／volume，同匯出 gainOf 規則跳過；C3 逐字文字含換行打斷 ASS 列 → 空白折成一格。
+- 規格 §1.3 介面說明：檔案被 ED.0 session 未提交的兩行佔住（hook 擋），內容先放共用筆記 `ed10-backend-interface.md`，待放開後貼上。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed10-subtitles-backend.cjs（mock 供應商；8 PASS：逐字格式、剪贅字資料、/transcriptions 新舊契約、估價不扣費、整片 6 秒合成＋時間換算、重啟＋任務紀錄被清仍可找回、分段、卡拉 OK／逐字高亮抽畫面） | exit=0 | ms=40000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/{p6-main-system,services,p2-mix,tools-editor,ed3-legacy-golden,backend,p2-subtitles}.cjs 全 exit 0（修 Codex 後 backend／p6／services 重跑仍 0） | exit=0 | ms=180000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（Codex agency-os/reports/oracle/2026-11-10-partialreview-4371a58c.md，3 項已修＋測試）
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/video-workbench,agency-os,scripts | grep=editor-transcribe | hits=7（api.cjs、main-system.cjs、oracle 報告；無其他呼叫者）
+
+**剩餘風險**：整片辨識分段時，第 2 段失敗則第 1 段的 OpenAI 費用由我們吸收（任務失敗不向使用者扣）；`shared/transcript-words.js` 需畫面 session 在頁面載入；真 whisper 未打（只用 mock）。
+
+**rollback**：`git revert e28bcbc4d`（新路由與檔案一起移除；舊 `/transcriptions` 呼叫不受影響）。
 ## 2026-11-10（續1）影片工作台部署 22ceb6e47：ED.3 屬性面板上線；修好擋部署的打包清單（f36751b79）
 
 **操作者**：「沒做的檢查去做 並部署」。
