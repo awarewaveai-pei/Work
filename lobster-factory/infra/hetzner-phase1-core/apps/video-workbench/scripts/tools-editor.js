@@ -262,17 +262,19 @@ const edSaved = new Map();
 // waits on the network to appear; a failed save is reported, the edit stays on screen and in memory.
 function edSave() {
   const copy = ed.projects.map((p) => {
-    const native = edNative(p),
-      json = JSON.stringify(native);
+    // Card ED.9: updatedAt stays out of the compared copy; it is stamped only when the content changed, so a save with no edit moves neither it nor the revision.
+    const { updatedAt, ...body } = edNative(p),
+      json = JSON.stringify(body);
     // Counted from the last saved copy, not the in-memory object: an undo snapshot must not move it backwards.
     const saved = edSaved.get(p.id);
+    if (saved && saved.stamp !== json) p.updatedAt = new Date().toISOString();
     p.revision = !saved
       ? p.revision || 0
       : saved.json === json
         ? saved.revision
         : saved.revision + 1;
-    edSaved.set(p.id, { json, revision: p.revision });
-    return ProjectEnvelope.wrap(native, { revision: p.revision || 0 });
+    edSaved.set(p.id, { json, stamp: json, revision: p.revision });
+    return ProjectEnvelope.wrap(p.updatedAt ? { ...body, updatedAt: p.updatedAt } : body, { revision: p.revision || 0 });
   });
   // The top bar says 已儲存 only when no queued write is left; a failed write stays visible until the next success.
   ed.save = { ...ed.save, state: "saving", pending: ed.save.pending + 1 };
@@ -325,12 +327,16 @@ async function edLoadProjects() {
   ed.projects = list.map(edNormalizeProject);
   // Saved-copy marks come from the stored rows, so a converted project counts as changed and is written back.
   for (const [i, p] of ed.projects.entries()) {
-    const stored = ProjectEnvelope.isEnvelope(list[i]) ? list[i].native : null;
+    const stored = ProjectEnvelope.isEnvelope(list[i]) ? list[i].native : null,
+      // Card ED.9: updatedAt is not part of the compared copy (see edSave).
+      noStamp = ({ updatedAt, ...rest }) => rest;
+    // stamp = the normalized content: converting an old format on load is not an edit, so it does not move 更新於.
     edSaved.set(p.id, {
+      stamp: JSON.stringify(noStamp(edNative(p))),
       json:
         legacyTracks && stored
-          ? JSON.stringify(stored)
-          : JSON.stringify(edNative(p)),
+          ? JSON.stringify(noStamp(stored))
+          : JSON.stringify(noStamp(edNative(p))),
       revision: p.revision,
     });
   }

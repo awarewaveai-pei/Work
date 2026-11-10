@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-10（續36）影音工作台 ED.9 專案列表頁
+
+- 做了什麼：`scripts/editor-project-list.js` 列表頁＝搜尋專案、新建、計數「n / n 個剪輯專案」、專案卡（第一格縮圖、比例徽章、草稿、總長、開啟編輯器 →、名稱、更新於、重新命名、刪除）、空狀態、「屬於 專案 › 第 N 集」。列出全部剪輯檔（不再只列掛在集上的）。刪除先確認，並把該專案備份到 `tools.editor.projects.deleted-<時間>`；不清集的 `edit` 連結（與 PJ.5 一致，集顯示「剪輯檔已刪除」可重建）。
+- 共用檔 `tools-editor.js` edSave／edLoadProjects（操作者側 session 同意）：`updatedAt` 排除在比對 json 外，內容有變才蓋時間；`edSaved.stamp` 另存正規化內容，舊格式轉換不算編輯（pj1-legacy-ui 曾因此紅，已修）。
+- Codex 1 輪（artifact `agency-os/reports/oracle/2026-11-10-partialreview-4274d5d0.md`）：m1 備份整份清單會累積且可能超過 80MB 上限 → 改只備份被刪那一筆；m2 刪除測試只看畫面 → 加重新整理後仍刪除、備份含該專案。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed9-project-list.cjs（真 Edge、隔離資料夾；＋ed1-layout／tools-editor／editor-restore／remotion-title-project／pj1–pj5／ed2／ed3／theme-tokens 全綠） | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n（兩點已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=edProjectListScreen|edSaved.set|updatedAt | hits=12
+- 未驗：`p3-roundtrip` 在本機紅（等 filechooser 逾時），位於 ED.4 session 正在改的 `editor-panes/assets.js`，非本卡檔。
 ## 2026-11-10（續35）Gemini 預付儲值後拿掉配音暫時釘選；Stability 金鑰進正式站
 
 - 操作者儲值 Gemini（AwareWave-ColdEmail 專案、帳單帳戶 010DF4…，Paid 1，NT$300）。工作台容器內 generateContent → 200。
