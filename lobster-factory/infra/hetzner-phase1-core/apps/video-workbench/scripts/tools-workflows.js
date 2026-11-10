@@ -25,8 +25,9 @@ function wfArea(key, title, max = 2000) {
 function wfCheck(key, title) {
   return `<label class="check"><input type="checkbox" data-key="${esc(key)}" data-flow-render ${values[key] ? "checked" : ""}>${esc(title)}</label>`;
 }
-function wfButton(title, action, disabled = false) {
-  return `<button type="button" class="btn" data-flow-action="${esc(action)}" ${disabled ? "disabled" : ""}>${esc(title)}</button>`;
+// paid = the feature key(s) shared/paid-price.js prices on the button.
+function wfButton(title, action, disabled = false, paid = "") {
+  return `<button type="button" class="btn" data-flow-action="${esc(action)}"${paid ? ` data-paid="${esc(paid)}"` : ""} ${disabled ? "disabled" : ""}>${esc(title)}</button>`;
 }
 function wfWrap(t, content) {
   return `<div class="wrap tool-flow" data-tool-flow="${t.id}">${header(t, t.id.toUpperCase())}${content}</div>`;
@@ -69,7 +70,7 @@ function toolWorkflowScreen(t) {
     content =
       wfSource() +
       (files.src
-        ? `<aside class="side"><h3>分析設定</h3><label>剪成</label>${wfChoice("shortMode", ["多支短影音", "一支精華"])}<label>挑選方式</label>${wfChoice("shortPick", ["AI 自動判斷", "依我的指令"])}${values.shortPick === "依我的指令" ? wfCheck("shortVisual", "依畫面內容找（AI 看畫面，不聽內容）") + wfArea("shortPrompt", "剪輯指令", 500) + `<div class="flow-choices">${(values.shortVisual ? ["產品特寫", "操作示範", "精彩動作", "風景空景"] : ["精華重點", "金句爆點", "教學步驟", "產品亮點", "幽默有梗"]).map((name) => wfButton(name, "short-preset:" + name)).join("")}</div>` : '<p class="note">分析整支影片，尋找能單獨成立的段落。</p>'}${values.shortMode === "多支短影音" ? wfSelect("shortLength", "每段長度", ["自動（20–60 秒）", "短（15–35 秒）", "中（30–60 秒）", "長（60–120 秒）"]) + wfSelect("shortCount", "建議數量", ["最多 3 段", "最多 5 段", "最多 8 段", "最多 10 段"]) : wfSelect("shortHighlightLength", "精華長度", ["約 30 秒", "約 60 秒", "約 90 秒"])}${wfSelect("shortLanguage", "語音辨識語言", wfLanguages())}${btn("匯入 SRT／VTT（免辨識）", "upload:subtitlefile")}${wfCheck("shortCaption", "輸出時加入字幕")}${wfStats()}${wfButton("開始分析", "short-analyze")}</aside>`
+        ? `<aside class="side"><h3>分析設定</h3><label>剪成</label>${wfChoice("shortMode", ["多支短影音", "一支精華"])}<label>挑選方式</label>${wfChoice("shortPick", ["AI 自動判斷", "依我的指令"])}${values.shortPick === "依我的指令" ? wfCheck("shortVisual", "依畫面內容找（AI 看畫面，不聽內容）") + wfArea("shortPrompt", "剪輯指令", 500) + `<div class="flow-choices">${(values.shortVisual ? ["產品特寫", "操作示範", "精彩動作", "風景空景"] : ["精華重點", "金句爆點", "教學步驟", "產品亮點", "幽默有梗"]).map((name) => wfButton(name, "short-preset:" + name)).join("")}</div>` : '<p class="note">分析整支影片，尋找能單獨成立的段落。</p>'}${values.shortMode === "多支短影音" ? wfSelect("shortLength", "每段長度", ["自動（20–60 秒）", "短（15–35 秒）", "中（30–60 秒）", "長（60–120 秒）"]) + wfSelect("shortCount", "建議數量", ["最多 3 段", "最多 5 段", "最多 8 段", "最多 10 段"]) : wfSelect("shortHighlightLength", "精華長度", ["約 30 秒", "約 60 秒", "約 90 秒"])}${wfSelect("shortLanguage", "語音辨識語言", wfLanguages())}${btn("匯入 SRT／VTT（免辨識）", "upload:subtitlefile")}${wfCheck("shortCaption", "輸出時加入字幕")}${wfStats()}${wfButton("開始分析", "short-analyze", false, "video.transcribe video.script")}</aside>`
         : '<aside class="side"><h3>使用方式</h3><p>選影片 → 分析並比較段落 → 調整起訖與裁切 → 確認輸出。</p></aside>');
   } else if (t.id === "follow") {
     return toolFollowScreen(t);

@@ -789,7 +789,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     const videoModel = !isMedia && !isRemotion && !isBlender && !isImageTo3d && !isTranscribe && parsed.type === "video" ? generationPolicy.videoModelOf(input, env) : null;
     if (videoModel?.provider === "Replicate") replicateVideo.token(env);
     else if (!isMedia && !isRemoveBg && !isRemotion && !isBlender && !isImageTo3d && !isTranscribe) key();
-    const feature = main && mainSystemTools.paidFeature(input, parsed.type);
+    // paidFeature on the job: the retry button prices a rerun from it (shared/paid-price.js); the permit needs main.
+    const paidFeature = mainSystemTools.paidFeature(input, parsed.type), feature = main && paidFeature;
     // No paid call without a price: the model a paid job will run must be in next-admin's cost model.
     if (feature) costs.priceOf({ "video.image": "image", "video.motion": "video", "video.tts": "audio", "video.bg-remove": "remove-bg", "video.transcribe": "transcribe", "video.3d": "3d" }[feature] || feature,
       { "video.image": providerModels.image, "video.motion": videoModel?.id || providerModels.video, "video.tts": providerModels.audio, "video.transcribe": transcribe.MODEL, "video.3d": isImageTo3d && imageTo3d.rateKey(input) }[feature]);
@@ -808,6 +809,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         ...extra,
         ...(main && req?.vwIdentity?.userId ? { createdBy: req.vwIdentity.userId } : {}),
         ...(paid ? { paid } : {}),
+        ...(paidFeature ? { paidFeature } : {}),
       };
       job.deadlineAt = new Date(Date.parse(job.createdAt) + jobTimeoutMs(input)).toISOString();
       jobs.push(job);
@@ -1038,7 +1040,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         });
       }
       if (req.method === "GET" && route === "/capabilities") {
-        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: { ...require("./blender.cjs").capability(env), motions: blender3d().motions }, imageTo3d: imageTo3d.capability(env, { priced: !!main }), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.publicCatalog,
+        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: { ...require("./blender.cjs").capability(env), motions: blender3d().motions }, imageTo3d: imageTo3d.capability(env, { priced: !!main }), prices: costs.displayPrices({ ...providerModels, text: textModel, transcribe: transcribe.MODEL }), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.publicCatalog,
           reference: require("./reference.cjs").allowed(env, req) && require("./reference.cjs").present(env),
           // P6 L3: connected = finished videos open next-admin /release (same origin) for review and delivery.
           mainSystem: main ? { organizationId: orgId } : null });

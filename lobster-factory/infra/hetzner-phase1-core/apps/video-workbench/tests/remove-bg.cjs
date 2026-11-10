@@ -82,7 +82,7 @@ const settle = async (call, id) => {
       await p.locator("#workspaceUpload").setInputFiles({ name: "去背來源.png", mimeType: "image/png", buffer: png });
       const card = p.locator(".workspace-card").filter({ hasText: "去背來源.png" });
       const button = card.locator("[data-asset-remove-bg]");
-      assert.equal((await button.textContent()).trim(), "去背 · 約 US$" + cost);
+      assert.equal((await button.textContent()).trim(), "去背 · 約 US$" + cost + "／張");
       await button.click();
       let saved;
       for (let i = 0; i < 100 && !saved; i++, await p.waitForTimeout(200))
@@ -95,7 +95,7 @@ const settle = async (call, id) => {
       assert.deepEqual(saved.result.origin, origin(saved.sourceId));
       assert.equal(saved.result.kind, "image");
       assert.deepEqual(errors, []);
-      console.log("PASS 素材庫按鈕顯示「去背 · 約 US$" + cost + "」，結果存成新素材（origin 指回原素材）");
+      console.log("PASS 素材庫按鈕顯示「去背 · 約 US$" + cost + "／張」，結果存成新素材（origin 指回原素材）");
     } finally {
       await browser.close();
     }

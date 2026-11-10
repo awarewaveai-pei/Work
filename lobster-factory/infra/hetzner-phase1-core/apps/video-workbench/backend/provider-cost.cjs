@@ -68,4 +68,16 @@ function priceOf(kind, model) {
   else throw unpriced(kind);
 }
 
-module.exports = { textUsd, imageUsd, videoUsd, speechUsd, transcribeUsd, toolUsd, priceOf };
+// Unit prices the buttons show before a click (capabilities.prices -> shared/paid-price.js), from the same functions the
+// charge uses. Text: one call at the 3000-token output cap plus a nominal 20000-char input. An unpriced model = null.
+function displayPrices({ text, image, audio, transcribe }) {
+  const at = (f) => { try { return f(); } catch { return null; } };
+  return {
+    "video.script": at(() => ({ usd: textUsd(text, null, { inputChars: 20000, maxOutputTokens: 3000 }), unit: "次", estimate: true })),
+    "video.image": at(() => ({ usd: imageUsd(image), unit: "張", estimate: true })),
+    "video.tts": at(() => ({ usd: speechUsd(audio, 1000), unit: "千字" })),
+    "video.transcribe": at(() => ({ usd: transcribeUsd(transcribe, 60), unit: "分鐘" })),
+  };
+}
+
+module.exports = { textUsd, imageUsd, videoUsd, speechUsd, transcribeUsd, toolUsd, priceOf, displayPrices };

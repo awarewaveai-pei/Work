@@ -96,6 +96,7 @@
             retry.onclick = async () => {
               retry.disabled = true;
               try {
+                // paid: none (only the size conversion runs again, no AI call)
                 const next = await VideoWorkbench.generations.retry(v);
                 closed = true; clearTimeout(timer); panel.remove(); VideoWorkbench.showJob(next);
               } catch (error) { retry.disabled = false; VideoWorkbench.reportError(error); }

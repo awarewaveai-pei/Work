@@ -208,6 +208,7 @@ function generatorSyncPrompt() {
   const block = generatorVideoMode() ? generatorVideoBlock() : "";
   send.disabled = generatorBusy || !n || !!block || (state.mode === "cartoon" && state.style < 0) || (state.mode === "reference" && state.refType === "first" && !state.refs.reference.firstFrame.length);
   send.title = block || "提交";
+  send.dataset.paid = state.mode === "image" ? "video.image" : state.mode === "spoken" ? "video.tts" : "video.motion"; // video modes carry their own price below
   send.textContent = generatorBusy ? "送出中…" : state.mode === "image" ? "生成圖片" : state.mode === "spoken" ? "生成配音" : `開始生成${generatorRatios().length > 1 ? ` · ${generatorRatios().length} 種比例` : ""} · ${generatorVideoPrice()}`;
   const c = VideoWorkbench.capabilities, status = $("providerStatus");
   if (c && status) {
@@ -262,6 +263,7 @@ async function generatorSubmit(payload) {
     for (const input of inputs) generatorValidation(input);
     const results = [];
     for (const input of inputs) {
+      // paid: video.image video.tts video.motion
       try { const job = await VideoWorkbench.generations.create(input); results.push({ ratio: input.settings.ratio, job }); }
       catch (error) { results.push({ ratio: input.settings.ratio, error: error.message }); }
     }

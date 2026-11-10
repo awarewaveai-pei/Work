@@ -352,7 +352,7 @@ function screen(t) {
       body = `<div class="two-col">${stage("◉", "選一支要保護肖像的影片", "從素材庫挑選，或上傳 MP4 / MOV / WebM 影片（最長 5 分鐘）。原片不會被修改。")} ${side(`<h3>保護設定</h3>${label("保護方式")}${segmented("privacyType", ["馬賽克", "模糊"], "馬賽克")}${label("強度")}${segmented("privacyStrength", ["低", "中", "高"], "中")}${cost(2, "／秒，最低以 10 秒計")}<p class="note">若處理失敗會全額退回點數。側臉、遮擋或太小的臉可能偵測不到，發布前請先檢查成品。</p>`)}</div>`;
       break;
     case "region":
-      body = `<div class="two-col"><div>${stage("▧", "先選一張圖片，接著在畫面上拖曳框出要修改的位置", "", "image")}<div class="out">已標記區域：<span id="regionCount">0</span>／8 <button class="btn small" data-act="resetRegions">清空區域</button></div></div>${side(`<h3>圖片 <span style="color:var(--red)">*</span> <span style="float:right" class="muted">0/1</span></h3>${btn("選擇圖片", "upload:image")}${label("修改區域")}<p class="note">還沒有框選任何區域。在左側圖片上拖曳即可新增；也可以只填寫整體修改指令。</p><div id="regionInstructions"></div>${label("整體修改指令（選填）")}${ta("regionPrompt", "套用到所有選取區域的補充指令")}${label("參數")}<div class="row"><span class="note">${esc(VideoWorkbench.capabilities?.models?.image || "服務端設定模型")}</span>${chips("regionQuality", ["1K", "2K", "4K"], "2K")}</div>${btn("生成區域編輯（API 計費）", "submit", "primary primary-wide")}<p class="note">圖片載入後，可在左側圖片上拖曳框選最多 8 個區域。</p>`)}</div>`;
+      body = `<div class="two-col"><div>${stage("▧", "先選一張圖片，接著在畫面上拖曳框出要修改的位置", "", "image")}<div class="out">已標記區域：<span id="regionCount">0</span>／8 <button class="btn small" data-act="resetRegions">清空區域</button></div></div>${side(`<h3>圖片 <span style="color:var(--red)">*</span> <span style="float:right" class="muted">0/1</span></h3>${btn("選擇圖片", "upload:image")}${label("修改區域")}<p class="note">還沒有框選任何區域。在左側圖片上拖曳即可新增；也可以只填寫整體修改指令。</p><div id="regionInstructions"></div>${label("整體修改指令（選填）")}${ta("regionPrompt", "套用到所有選取區域的補充指令")}${label("參數")}<div class="row"><span class="note">${esc(VideoWorkbench.capabilities?.models?.image || "服務端設定模型")}</span>${chips("regionQuality", ["1K", "2K", "4K"], "2K")}</div><button class="btn primary primary-wide" data-act="submit" data-paid="video.image">生成區域編輯（API 計費）</button><p class="note">圖片載入後，可在左側圖片上拖曳框選最多 8 個區域。</p>`)}</div>`;
       break;
     case "depth":
       body = `<div class="two-col">${stage("▱", "請先選取影片或直接上傳（最長支援 30 秒）", "支援 MP4 / MOV 影片。深度提取模型將自動重構空間三維幾何，生成黑白深度對照影片。")} ${side(`<h3>轉檔設定與費用</h3><p class="note" style="text-align:center">請先於左側上傳或選取影片</p>${cost(2, "／秒（最低 20 點、最高 60 點）")}<p class="note">* 雲端 GPU 高精度深度推計算。若轉檔失敗將全額自動退回點數。</p>`)}</div>`;
@@ -421,6 +421,7 @@ function render() {
     const b = document.createElement("button");
     b.className = "btn primary";
     b.textContent = "辨識字幕（API用量計費）";
+    b.dataset.paid = "video.transcribe";
     b.onclick = async () => {
       try {
         if (!files.src) throw Error("請先選取影片或音檔");

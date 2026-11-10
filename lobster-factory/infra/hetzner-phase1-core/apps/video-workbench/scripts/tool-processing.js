@@ -107,6 +107,7 @@ async function submitTool() {
       ).url;
       references = { images: [reference] };
     }
+    // paid: video.image (the region tool; the other tools reaching here run locally)
     const job = await VideoWorkbench.generations.create({
       type,
       prompt,

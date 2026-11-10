@@ -363,7 +363,7 @@ function styleButtons(value, fn) {
 function quickCreate() {
   openModal(
     "建立角色",
-    `<div style="text-align:center"><p style="color:var(--accent);font-size:calc(var(--font-size-xl) * 1.04167)">✧</p><b>描述一次，AI 幫你建立角色</b><p class="muted">用一句話描述角色，AI 產生人設與主圖草稿，你再微調。</p></div><textarea id="quickPrompt" class="input" rows="3" maxlength="2000" placeholder="用一句話描述這個角色，例如：二十歲雙馬尾少女，冷靜寡言"></textarea><p style="text-align:center" class="muted">風格</p>${styleButtons(quickStyle, "quickstyle")}<p class="muted">此風格會引導 AI 生成主參考圖、角色表與延伸角度素材；選「預設（寫實）」則使用寫實風格。</p><button class="btn" id="quickQuestions">✧ 問我幾個問題</button><div style="text-align:center;margin:14px 0"><button id="quickGenerate" class="btn primary">✧ 生成角色草稿（約 7 點）</button></div><div class="pills" style="justify-content:center"><button data-start="upload">↑ 上傳照片當基準</button><button data-start="library">▧ 用一張素材當基準</button><button data-start="manual">✎ 手動建立</button></div>`,
+    `<div style="text-align:center"><p style="color:var(--accent);font-size:calc(var(--font-size-xl) * 1.04167)">✧</p><b>描述一次，AI 幫你建立角色</b><p class="muted">用一句話描述角色，AI 產生人設與主圖草稿，你再微調。</p></div><textarea id="quickPrompt" class="input" rows="3" maxlength="2000" placeholder="用一句話描述這個角色，例如：二十歲雙馬尾少女，冷靜寡言"></textarea><p style="text-align:center" class="muted">風格</p>${styleButtons(quickStyle, "quickstyle")}<p class="muted">此風格會引導 AI 生成主參考圖、角色表與延伸角度素材；選「預設（寫實）」則使用寫實風格。</p><button class="btn" id="quickQuestions" data-paid="video.script">✧ 問我幾個問題</button><div style="text-align:center;margin:14px 0"><button id="quickGenerate" class="btn primary" data-paid="video.script">✧ 生成角色草稿</button></div><div class="pills" style="justify-content:center"><button data-start="upload">↑ 上傳照片當基準</button><button data-start="library">▧ 用一張素材當基準</button><button data-start="manual">✎ 手動建立</button></div>`,
     "",
     true,
   );
@@ -446,7 +446,7 @@ function fullEditor() {
     subtab === "basic"
       ? `<label>名稱 <span class="muted">0/120</span></label><input id="charName" class="input" maxlength="120" value="${esc(draft.name)}" placeholder="例如：女主角 小美"><label>角色設定 <span class="muted">0/2000</span></label><textarea id="charDescription" class="input" rows="5" maxlength="2000" placeholder="外觀、個性、服裝等，會用於生成">${esc(draft.description)}</textarea><label>風格</label>${styleButtons(style, "style")}<p class="muted">此風格會引導 AI 生成主參考圖、角色表與延伸角度素材；選「預設（寫實）」則使用寫實風格。<br>已有主圖時，角色表與延伸素材也會參考主圖外觀，若主圖風格不同，生成結果可能偏向主圖。</p><label>標籤</label><input id="charTags" class="input" value="${esc(draft.tags)}" placeholder="以逗號分隔，例如：女主角, 現代, 長髮">`
       : subtab === "wardrobe"
-        ? `<p class="muted">獨立保存的服裝與配件，不會改變角色主圖或臉部參考。</p><div class="seg" style="width:max-content"><button data-type="服裝" class="${wardrobeType === "服裝" ? "active" : ""}">服裝</button><button data-type="配件" class="${wardrobeType === "配件" ? "active" : ""}">配件</button></div><div class="thumbs">${(wardrobeType === "服裝" ? garments : accessories).map((src, i) => `<div class="thumb"><img src="${src}"><button data-remove-wardrobe="${i}">×</button></div>`).join("")}<div class="drop" style="width:132px;min-height:175px" data-upload="wardrobe">↑<br>上傳圖片</div></div><div class="box" style="margin-top:20px"><label>描述要生成的物件（白底）</label><textarea id="wardrobePrompt" class="input" rows="3" placeholder="例如：深藍色金邊制服外套，正面平鋪"></textarea><div style="text-align:right"><button class="btn primary" id="wardrobeGenerate">✧ AI 生成白底圖 · 5 點</button></div></div>`
+        ? `<p class="muted">獨立保存的服裝與配件，不會改變角色主圖或臉部參考。</p><div class="seg" style="width:max-content"><button data-type="服裝" class="${wardrobeType === "服裝" ? "active" : ""}">服裝</button><button data-type="配件" class="${wardrobeType === "配件" ? "active" : ""}">配件</button></div><div class="thumbs">${(wardrobeType === "服裝" ? garments : accessories).map((src, i) => `<div class="thumb"><img src="${src}"><button data-remove-wardrobe="${i}">×</button></div>`).join("")}<div class="drop" style="width:132px;min-height:175px" data-upload="wardrobe">↑<br>上傳圖片</div></div><div class="box" style="margin-top:20px"><label>描述要生成的物件（白底）</label><textarea id="wardrobePrompt" class="input" rows="3" placeholder="例如：深藍色金邊制服外套，正面平鋪"></textarea><div style="text-align:right"><button class="btn primary" id="wardrobeGenerate" data-paid="video.image">✧ AI 生成白底圖</button></div></div>`
         : `<div class="extensions"><button class="ext" data-extension="ai"><b>✧　AI 生成設定圖　›</b><small>用文字描述，AI 產生人設與參考圖</small></button><button class="ext" data-extension="angles"><b>▦　角色表(多角度・表情)　›</b><small>以主圖為基準，一次生成多角度／表情參考圖</small></button><button class="ext" data-extension="sheet"><b>▤　角色設定圖　›</b><small>生成一張可下載的角色介紹海報（含資料欄文字）</small></button><button class="ext" data-extension="voice"><b>◉　角色聲音　›</b><small>生成並選定角色的聲音，引用角色時可一起帶入</small></button><button class="ext" data-extension="test"><b>▷　試鏡(測試能否生成影片)　›</b><small>花少量點數實測這個角色能否順利生成影片</small></button></div>`;
   let left = `<div class="leftPane"><div class="muted">參考圖 <span style="float:right">${refs.length}/8</span></div><div class="drop big" data-upload="refs">${refs.length ? `<img class="photostage" src="${refs[0]}">` : "↑<br>上傳"}</div><div class="thumbs">${refs.map((src, i) => `<div class="thumb"><img src="${src}"><button data-remove-ref="${i}">×</button><span class="ref-tag" data-ref-tag="${i}">${refTag(i)}</span></div>`).join("")}<button class="btn" data-upload="refs">↑ 上傳</button><button class="btn" data-library="1">▧ 從素材庫選取</button></div><div class="box" style="margin-top:15px"><span class="muted">生成一致性</span><p class="smalltext">無遮擋直接引用</p></div></div>`;
   openModal(
@@ -568,7 +568,7 @@ function returnEditor() {
 function extendedAI() {
   openModal(
     "AI 生成設定圖",
-    `<p class="smalltext">用文字描述，AI 產生人設與參考圖</p><textarea id="aiPrompt" class="input" rows="4" placeholder="用一句話描述這個角色，例如：二十歲雙馬尾少女，冷靜寡言"></textarea><div style="margin-top:14px"><button class="btn" id="ask">問我幾個問題</button> <button class="btn" id="generateRole">AI 產生人設（API 計費）</button></div><p><button class="btn primary" id="generateMain">生成主圖（API 計費）</button></p>`,
+    `<p class="smalltext">用文字描述，AI 產生人設與參考圖</p><textarea id="aiPrompt" class="input" rows="4" placeholder="用一句話描述這個角色，例如：二十歲雙馬尾少女，冷靜寡言"></textarea><div style="margin-top:14px"><button class="btn" id="ask" data-paid="video.script">問我幾個問題</button> <button class="btn" id="generateRole" data-paid="video.script">AI 產生人設（API 計費）</button></div><p><button class="btn primary" id="generateMain" data-paid="video.image">生成主圖（API 計費）</button></p>`,
     `<button class="btn" id="backEdit">返回編輯</button>`,
   );
   $("modalInner").onclick = async (e) => {
@@ -604,7 +604,7 @@ function anglesPanel() {
   let choices = ["正面", "¾ 側", "側面", "背面", "微笑", "生氣"];
   openModal(
     "角色表（多角度・表情）",
-    `<p class="smalltext">以主圖為基準，一次生成多個角度或表情（每張單獨計費）。</p><div class="pills">${choices.map((a) => `<button data-angle="${a}" class="${angles.includes(a) ? "active" : ""}">${a}</button>`).join("")}</div><p><button class="btn primary" id="generateAngles">▧ 生成角色表（${angles.length} 張 · API 計費）</button></p>`,
+    `<p class="smalltext">以主圖為基準，一次生成多個角度或表情（每張單獨計費）。</p><div class="pills">${choices.map((a) => `<button data-angle="${a}" class="${angles.includes(a) ? "active" : ""}">${a}</button>`).join("")}</div><p><button class="btn primary" id="generateAngles" data-paid="video.image">▧ 生成角色表（${angles.length} 張 · API 計費）</button></p>`,
     `<button class="btn" id="backEdit">返回編輯</button>`,
   );
   $("modalInner").onclick = async (e) => {
@@ -622,7 +622,7 @@ function anglesPanel() {
 function voiceModal() {
   openModal(
     "角色聲音",
-    `<b>目前的角色聲音</b><p class="smalltext">可從素材庫選擇，或生成幾個候選聲音試聽，選一個存為角色聲音；也可以從素材庫選擇一段音訊。<br>之後在生成頁選這個角色時，可以把它的照片和聲音一起帶入（聲音會放進參考資訊）。</p><div class="noticeLine"><b>生成候選聲音</b><p class="smalltext">描述想要的聲音並輸入一句試聽台詞，AI 語音服務會唸出來。可以一次生成幾個候選，聽完選一個作為角色聲音。</p><label>聲音描述（選填）</label><input id="voiceDesc" class="input" placeholder="例如：低沉沙啞的中年男聲，語速偏慢"><label>試聽台詞</label><textarea class="input" id="voiceLine" rows="3">大家好，我是Jenny Hsu，很高興認識你，接下來的故事就交給我吧！</textarea><p><label><input type="checkbox" id="useAppearance" disabled title="目前語音服務不支援從照片推測聲線" style="width:auto"> 改用角色參考圖推測聲線（勾選後不套用文字聲音描述）</label></p><div class="pills">一次生成　${[1, 2, 3].map((n) => `<button data-voice-count="${n}" class="${voiceCount === n ? "active" : ""}">${n}</button>`).join("")}</div><p style="text-align:right"><button class="btn primary" id="generateVoice">✧ 生成 ${voiceCount} 個候選 · API 計費</button></p></div>`,
+    `<b>目前的角色聲音</b><p class="smalltext">可從素材庫選擇，或生成幾個候選聲音試聽，選一個存為角色聲音；也可以從素材庫選擇一段音訊。<br>之後在生成頁選這個角色時，可以把它的照片和聲音一起帶入（聲音會放進參考資訊）。</p><div class="noticeLine"><b>生成候選聲音</b><p class="smalltext">描述想要的聲音並輸入一句試聽台詞，AI 語音服務會唸出來。可以一次生成幾個候選，聽完選一個作為角色聲音。</p><label>聲音描述（選填）</label><input id="voiceDesc" class="input" placeholder="例如：低沉沙啞的中年男聲，語速偏慢"><label>試聽台詞</label><textarea class="input" id="voiceLine" rows="3">大家好，我是Jenny Hsu，很高興認識你，接下來的故事就交給我吧！</textarea><p><label><input type="checkbox" id="useAppearance" disabled title="目前語音服務不支援從照片推測聲線" style="width:auto"> 改用角色參考圖推測聲線（勾選後不套用文字聲音描述）</label></p><div class="pills">一次生成　${[1, 2, 3].map((n) => `<button data-voice-count="${n}" class="${voiceCount === n ? "active" : ""}">${n}</button>`).join("")}</div><p style="text-align:right"><button class="btn primary" id="generateVoice" data-paid="video.tts">✧ 生成 ${voiceCount} 個候選 · API 計費</button></p></div>`,
     `<button class="btn" id="audioLibrary">▱ 從素材庫選擇音訊</button><button class="btn" id="backEdit">關閉</button>`,
     true,
   );
@@ -655,7 +655,7 @@ function sheetModal() {
   openModal(
     "角色設定圖",
     `<p class="smalltext">填好角色資料後，一鍵生成完整設定圖——由擅長文字的模型（GPT Image 2 / Nano Banana Pro）以你的參考圖為基準，一次畫出多角度圖板與資料欄文字。</p><p class="smalltext">✧ 使用 Image 2.5 生成（這是圖片文字）</p><div class="formgrid">${fields.map(([a, p]) => `<div><label>${a}</label><input class="input" ${a === "生日" ? 'type="date"' : ""} maxlength="500" placeholder="${p}"></div>`).join("")}</div>`,
-    `<button class="btn" id="backEdit">關閉</button><button class="btn primary" id="sheetGenerate">▧ 生成設定圖（API 計費）</button>`,
+    `<button class="btn" id="backEdit">關閉</button><button class="btn primary" id="sheetGenerate" data-paid="video.image">▧ 生成設定圖（API 計費）</button>`,
   );
   $("modalFoot").onclick = (e) => {
     if (e.target.id === "sheetGenerate") requestCharacterAction("生成設定圖");
@@ -665,7 +665,7 @@ function sheetModal() {
 function testPanel() {
   openModal(
     "試鏡(測試能否生成影片)",
-    `<p class="smalltext">花少量點數實測這個角色能否順利生成影片</p><input id="testPrompt" class="input" placeholder="給一句指令，例如：轉頭微笑並看向鏡頭"><p><button class="btn">免費預檢</button> <button class="btn primary" id="testGenerate">生成 4 秒試鏡（API 計費）</button></p>`,
+    `<p class="smalltext">花少量點數實測這個角色能否順利生成影片</p><input id="testPrompt" class="input" placeholder="給一句指令，例如：轉頭微笑並看向鏡頭"><p><button class="btn">免費預檢</button> <button class="btn primary" id="testGenerate" data-paid="video.motion">生成 4 秒試鏡（API 計費）</button></p>`,
     `<button class="btn" id="backEdit">返回編輯</button>`,
   );
   $("modalInner").onclick = async (e) => {
@@ -706,6 +706,7 @@ async function requestCharacterAction(label) {
     const character = { ...draft, references: [...refs] },
       originalId = draft.id;
     for (const variant of variants) {
+      // paid: video.image video.tts video.motion
       const job = await VideoWorkbench.generations.create({
         type,
         operation:

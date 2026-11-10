@@ -1,4 +1,12 @@
 (function () {
+  // shared/paid-price.js (prices on paid buttons) loads from here, the one shared file every page loads
+  // (pages/storyboards.html is a protected file and cannot list it).
+  const pricesReady = new Promise((resolve) => {
+    if (window.VideoWorkbenchPrices) return resolve();
+    const s = Object.assign(document.createElement("script"), { src: new URL("paid-price.js", document.currentScript.src).href });
+    s.onload = s.onerror = resolve;
+    document.head.append(s);
+  });
   VideoWorkbench.speak = (text) => {
     if (!("speechSynthesis" in window))
       throw Error("此瀏覽器不支援系統語音試聽");
@@ -35,8 +43,9 @@
   let toolCosts;
   VideoWorkbench.removeBgLabel = async () => {
     toolCosts ||= VideoWorkbench.capabilities?.toolCosts || (await VideoWorkbench.request("/capabilities", undefined, "GET").catch(() => null))?.toolCosts;
-    const cost = toolCosts?.removeBackground;
-    return Number.isFinite(cost) ? "去背 · 約 US$" + cost : null;
+    await pricesReady;
+    const price = window.VideoWorkbenchPrices?.text("video.bg-remove", { toolCosts });
+    return price ? "去背 · " + price : null;
   };
   VideoWorkbench.removeBackground = async (asset) => {
     const job = await VideoWorkbench.generations.create({ type: "image", operation: "remove-bg", prompt: "去背", references: { src: { id: asset.id, url: asset.url } } });

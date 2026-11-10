@@ -806,7 +806,7 @@ document.addEventListener("click", (e) => {
     if (a === "director-storyboard") {
       modal(
         "生成分鏡圖",
-        '<p>依照目前腳本生成分鏡圖，確認後會產生圖片 API 用量費用。</p><p>選擇本次使用的參考圖，最多 4 張；其餘仍保留在導演草稿。</p>' + lookup("images").map((f, i) => `<label class="storyboard-reference-choice"><input type="checkbox" data-storyboard-reference="${i}" ${i < 4 ? "checked" : ""}>${safe(f.name || "參考圖 " + (i + 1))}</label>`).join("") + '<button class="box-cta" data-action="director-confirm-storyboard">確認生成分鏡圖</button><button class="minor" data-action="director-cancel">取消</button>',
+        '<p>依照目前腳本生成分鏡圖，確認後會產生圖片 API 用量費用。</p><p>選擇本次使用的參考圖，最多 4 張；其餘仍保留在導演草稿。</p>' + lookup("images").map((f, i) => `<label class="storyboard-reference-choice"><input type="checkbox" data-storyboard-reference="${i}" ${i < 4 ? "checked" : ""}>${safe(f.name || "參考圖 " + (i + 1))}</label>`).join("") + '<button class="box-cta" data-paid="video.image" data-action="director-confirm-storyboard">確認生成分鏡圖</button><button class="minor" data-action="director-cancel">取消</button>',
       );
     }
     if (a === "director-confirm-storyboard") {

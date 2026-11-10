@@ -384,6 +384,7 @@ async function toolOverlayAction(action, button) {
       );
       settings.ctaPos ??= 4;
       settings.watermarkPos ??= 4;
+      // paid: none (watermark / cta overlays run locally)
       const job = await VideoWorkbench.generations.create({
         type: "video",
         operation: currentTool,

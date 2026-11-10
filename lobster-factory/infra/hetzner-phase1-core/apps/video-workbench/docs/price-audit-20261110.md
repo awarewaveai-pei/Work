@@ -94,3 +94,12 @@ Replicate 價取自各模型頁內嵌 `billingConfig`（頁面原始碼；不是
 6. Haiku 5.5 超過 100K token 的價與 Fable 5.2 價：頁面抓取文字不完整。
 
 附註：Replicate 其餘「依 GPU 秒」的模型（bg-remove、TRELLIS）官方價是「約」，實扣依實際執行時間；S4b.2 實扣合計約 $0.755 無法分拆各項，未用來比對。未打任何付費 API；Replicate 頁面為公開頁面 GET。
+
+## 按鈕標價（機器檢查，2026-11-10）
+
+規則：每個會花錢的按鈕，按之前顯示 US$；數字只從 `/capabilities` 來（`backend/provider-cost.cjs` displayPrices＋toolCosts／videoModels／imageTo3d，全讀 next-admin `lib/ai/cost-model.ts`）。
+
+- 付費清單 = `backend/main-system.cjs` 的 `PAID_ROUTES`（文字 11 條＋`/transcriptions`）與 `paidFeature`（image／motion／tts／bg-remove／transcribe／3d）。
+- 標價 = 按鈕 `data-paid="video.x"`，`shared/paid-price.js` 補上價格（按鈕自己已寫 US$ 就不補）；重做鈕用工作紀錄的 `paidFeature`。
+- 檢查器 `tests/paid-price.cjs`（在 `tests/gate.cjs`）：每種付費功能的呼叫點數 ≤ 標價按鈕數；動態呼叫上方要寫 `// paid: video.x | none`；原始碼不准寫死 `US$數字`。
+- 前端觸發點（29 處）：角色頁 `scripts/characters-0.js`（問題／人設／主圖／角色表／聲音／設定圖／試鏡／白底圖）；生成頁 `#send`（`generator-controls.js`）、導演對話與腳本（`generator-conversation.js`、`generator-director.js`）、分鏡圖（`index-0.js`）、商品提案／腳本（`generator-product.js`）；專案頁生成畫面／批次／AI 分鏡／AI 輔助（`projects-0.js`）；剪輯配音（`tools-editor.js`）；工具頁字幕辨識／翻譯、短影音分析、配音、歌詞、區域編輯、3D、去背（`tools-*.js`、`shared/assets-ui.js`）；任務紀錄重做（`workspaces.js`）。

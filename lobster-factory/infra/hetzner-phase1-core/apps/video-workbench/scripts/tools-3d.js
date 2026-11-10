@@ -45,9 +45,9 @@ const t3Esc = (v) =>
 const t3B = (
   label,
   action,
-  { disabled = false, pressed, primary = false } = {},
+  { disabled = false, pressed, primary = false, paid = "" } = {},
 ) =>
-  `<button type="button" class="btn small${primary ? " primary" : ""}${pressed ? " selected" : ""}" data-t3-action="${t3Esc(action)}"${pressed === undefined ? "" : ` aria-pressed="${!!pressed}"`}${disabled ? " disabled" : ""}>${t3Esc(label)}</button>`;
+  `<button type="button" class="btn small${primary ? " primary" : ""}${pressed ? " selected" : ""}" data-t3-action="${t3Esc(action)}"${paid ? ` data-paid="${t3Esc(paid)}"` : ""}${pressed === undefined ? "" : ` aria-pressed="${!!pressed}"`}${disabled ? " disabled" : ""}>${t3Esc(label)}</button>`;
 const t3Num = (label, field, value, { step = 0.1, min, max } = {}) =>
   `<label class="t3-num">${t3Esc(label)}<input class="text-input" type="number" aria-label="${t3Esc(label)}" data-t3-field="${t3Esc(field)}" step="${step}"${min !== undefined ? ` min="${min}"` : ""}${max !== undefined ? ` max="${max}"` : ""} value="${t3Esc(value)}"></label>`;
 const t3Obj = () => t3.doc?.objects.find((o) => o.id === t3.obj) || null;
@@ -599,7 +599,7 @@ function t3ImageTo3dPanel(cap) {
         ),
       )
       .join("") || '<p class="note">沒有可用的方式。</p>';
-  return `<h3>圖片轉 3D</h3><div class="flow-choices" data-t3-images></div><div class="flow-choices" role="group" aria-label="圖片轉 3D 方式" data-t3-methods>${ways}</div>${t3B(picked ? `產生 3D 模型（${t3Usd(picked)}）` : "先選圖片與方式", "i3", { disabled: !picked || !t3.i3Image || !!t3.job })}`;
+  return `<h3>圖片轉 3D</h3><div class="flow-choices" data-t3-images></div><div class="flow-choices" role="group" aria-label="圖片轉 3D 方式" data-t3-methods>${ways}</div>${t3B(picked ? `產生 3D 模型（${t3Usd(picked)}）` : "先選圖片與方式", "i3", { disabled: !picked || !t3.i3Image || !!t3.job, paid: picked?.usd > 0 ? "video.3d" : "" })}`;
 }
 function t3RigPanel(o, info) {
   const lib = t3Engine().motions || [],

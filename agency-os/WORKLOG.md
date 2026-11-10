@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-10（續17）影音工作台：每個付費按鈕按前顯示 US$（機器檢查）
+
+- 根因：付費功能（文字 12 路由、圖片、影片、配音、字幕辨識、去背、3D）要不要標價靠各卡自律；只有影片／去背／3D 有價，其他寫「API 計費」或假點數（「約 7 點」「5 點」）。
+- 做了：`backend/provider-cost.cjs` displayPrices（同一組計費函式）→ `/capabilities.prices`；`shared/paid-price.js` 依按鈕 `data-paid="video.x"` 補價（由 `shared/assets-ui.js` 載入，每頁都有）；`backend/api.cjs` 任務記 `paidFeature` 給重做鈕；29 個付費呼叫點的按鈕補 `data-paid`；表在 `apps/video-workbench/docs/price-audit-20261110.md`「按鈕標價」節。
+- 檢查器 `tests/paid-price.cjs`（進 `tests/gate.cjs`）：付費清單取自 `backend/main-system.cjs`；每功能呼叫點數 ≤ 標價宣告數；動態 create 要 `// paid:` 註記；原始碼禁寫死 `US$數字`；7 種功能都要從真 `/capabilities` 算出 US$。
+- 突變：拿掉 `tools-subtitles.js` 字幕辨識鈕的 `video.transcribe` → 紅（3 呼叫點 vs 2 宣告）；還原綠。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs（含 paid-price，全綠）＋ node tests/remove-bg.cjs（去背 · 約 US$0.002／張）＋ playwright 實頁：生成頁 #send 圖片／配音／影片、工具頁字幕辨識、角色頁草稿鈕（價格 span 不吃點擊）、分鏡頁去背標價 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n（Codex `agency-os/reports/oracle/2026-11-10-partialreview-8a7ae8a2.md`；第二輪見下）
+  - m1 修：分鏡頁（受保護檔不能加 script）去背鈕會消失 → 改由 `assets-ui.js` 載入 `paid-price.js`，頁面不再各自列。
+  - m2 不修：部署前存的任務沒有 `paidFeature`，重做鈕無價（舊紀錄，逐漸消失）。
+  - m3 修（第二輪 F1 同類）：重做鈕帶 `data-paid-model`（任務的影片模型／3D 方式），影片與 3D 重做顯示該任務的價，不是預設或最低價。
+  - m4 不修：檢查器是每功能全域計數，同功能別處多一個宣告可抵掉一個漏標的按鈕（靜態無法把呼叫點連到按鈕）。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=displayPrices\|VideoWorkbenchPrices\|removeBgLabel\|toolCosts | hits=25（新函式定義與呼叫、remove-bg／p6 測試、文件；無遺漏呼叫點）
+- 第二輪 Codex（`agency-os/reports/oracle/2026-11-10-partialreview-ca5f4def.md`，0c/2m/0n）：F1 影片重做顯示預設模型價 → 已修（同上 m3）；F2 不修：`paid-price.js` 載入前或載入失敗的一瞬按鈕無價（同源小檔，失敗＝看不到價但仍可按）。
 ## 2026-11-10（續16）影音工作台價目核對（只查不改）
 
 - 做了：全面核對影音工作台讀的價目（`apps/next-admin/lib/ai/cost-model.ts`、`public/editor-shared/image-models.js`）對廠商官方價；表 `apps/video-workbench/docs/price-audit-20261110.md`。不改任何價格或程式。

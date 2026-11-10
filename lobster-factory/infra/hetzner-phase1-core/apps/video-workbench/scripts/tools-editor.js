@@ -387,8 +387,9 @@ function edRedraw() {
   document.querySelectorAll("[data-ed-media]").forEach((m) => m.pause());
   render();
 }
-function edButton(title, action, disabled = false) {
-  return `<button type="button" class="btn small" data-ed-action="${esc(action)}" ${disabled ? "disabled" : ""}>${esc(title)}</button>`;
+// paid = the feature key(s) shared/paid-price.js prices on the button.
+function edButton(title, action, disabled = false, paid = "") {
+  return `<button type="button" class="btn small" data-ed-action="${esc(action)}"${paid ? ` data-paid="${esc(paid)}"` : ""} ${disabled ? "disabled" : ""}>${esc(title)}</button>`;
 }
 function edInput(key, title, value, type = "number", attrs = "") {
   return `<label>${esc(title)}<input class="text-input" aria-label="${esc(title)}" data-ed-field="${key}" type="${type}" value="${esc(value ?? "")}" ${attrs}></label>`;
@@ -1066,7 +1067,7 @@ function edSpineButtons(p) {
   if (!hit) return "";
   const n = edLines(hit.episode).length,
     v = edUnvoiced(hit).length;
-  return `<span class="editor-topbar-group" data-ed-spine>${edButton("排成時間軸", "spine-arrange")}${edButton("用旁白產生字幕", "spine-subtitles", !n)}${edButton(`配音（照旁白逐句）· ${v} 句 × 每句依 API 用量計費`, "spine-voice", !v || ed.voicing)}${n ? "" : `<span class="tiny">${esc(edNoLines)}</span>`}</span>`;
+  return `<span class="editor-topbar-group" data-ed-spine>${edButton("排成時間軸", "spine-arrange")}${edButton("用旁白產生字幕", "spine-subtitles", !n)}${edButton(`配音（照旁白逐句）· ${v} 句 × 每句依 API 用量計費`, "spine-voice", !v || ed.voicing, "video.tts")}${n ? "" : `<span class="tiny">${esc(edNoLines)}</span>`}</span>`;
 }
 async function edSpineAction(action, p) {
   const hit = edSpineHit(p);
@@ -1124,7 +1125,7 @@ function edStaleNote(p, c) {
     ? edButton("換成新的", "spine-swap")
     : c.kind === "text"
       ? edButton("重新產生字幕", "spine-subtitles")
-      : edButton("重新配音這句 · 依 API 用量計費", "spine-revoice:" + c.slot.slice(5), ed.voicing);
+      : edButton("重新配音這句 · 依 API 用量計費", "spine-revoice:" + c.slot.slice(5), ed.voicing, "video.tts");
   return `<div data-ed-stale><p class="note">${esc(edStaleText(hit.episode, c))}</p>${fix}</div>`;
 }
 // 換成新的: the stale shot clip takes the shot's picture now, keeping its place and length (a shorter video plays its

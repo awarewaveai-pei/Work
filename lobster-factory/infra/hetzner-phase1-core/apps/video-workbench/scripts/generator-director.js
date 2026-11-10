@@ -92,7 +92,7 @@ function directorTheme() {
           "</button>",
       )
       .join("") +
-    '</div></div><button class="box-cta" data-action="director-generate-script">產生分鏡腳本 →</button></div>'
+    '</div></div><button class="box-cta" data-paid="video.script" data-action="director-generate-script">產生分鏡腳本 →</button></div>'
   );
 }
 function directorScript() {
