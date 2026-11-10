@@ -1,4 +1,25 @@
 # Worklog
+## 2026-11-10（續52）ED.11 剪贅字分頁：畫面、旁白、字幕一起剪，配樂不斷（819160be0）
+
+**派工**：影片剪輯對齊監工派 ED.11。未部署；未改共用檔。
+
+**根因**：剪贅字分頁只寫「尚未接入」（規格 §1.3 剪贅字、對照表 #59）。
+
+**做了**（`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/`）：
+- `scripts/editor-panes/fillers.js`：`FillerCut` 純函式（測試可 require）——取逐字最多的字幕軌、每字對到其下方的 V1／A1 片段；`plan` 用 `TranscriptWords.cutRanges`（只在同一段錄音內）換成影格；`apply` 把主視訊、疊加、旁白 A1、所有文字軌剪開補齊（來源起點含速度、音量／變形鍵從原片段取窗、轉場與淡入留第一段、淡出留最後段）；字幕逐字跟著聲音移、整句只剩被剪的字就整句刪；配樂（A1 以外的音訊軌）不剪，原本播到畫面結尾的收到新結尾；標記跟著移。超過匯出 64 段影音片段上限就不剪、專案不變。分頁：停頓最多保留滑桿（預設 0.5 秒）、剪掉贅字、說話語言；沒有逐字時間就用 ED.10 整片辨識（先估價），結果放隱藏字幕軌「逐字時間（剪贅字）」；「剪掉」是一步復原，略過磁性主軌（剪除本身已補齊各軌，磁性主軌只排 V1 會讓 A1 不同步）。
+- `styles/editor-pane-fillers.css`：只用主題 token。
+- 純函式放 fillers.js 而非 `shared/`：新 shared 檔要改 `tools-boot.js`（共用檔）載入；預覽與輸出讀的是同一份剪後專案，計算只跑一次。
+- Codex 4 項全屬實已修並加測試：C1 第二段起讀到第一段改過的音量鍵；C2 片段起點在剪除範圍時來源起點加兩次；C3 整句只剩被剪的字仍顯示原文；C4 剪後可能超過匯出 64 段上限。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed11-fillers.cjs（5 PASS：計畫、同剪、只剪同段錄音、Codex 修正、真實匯出 4.1 秒＋「好」音在字幕 1.5–2.5 秒＋配樂掃頻音高每取樣點＝原曲同一秒） | exit=0 | ms=30000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/{tools-editor,ed3-legacy-golden,theme-tokens}.cjs 全 exit 0（修 Codex 後 tools-editor 重跑 0） | exit=0 | ms=120000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n（Codex agency-os/reports/oracle/2026-11-10-partialreview-b408f3ba.md，4 項已修＋測試）
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/video-workbench,agency-os,scripts | grep=FillerCut | hits=25（fillers.js、ed11-fillers.cjs、progress-ed11.md、oracle 報告；無其他呼叫者）
+
+**剩餘風險**：匯出上限 64 在 fillers.js 與 editor-export.cjs 各一份（測試鎖住兩邊一致）；本機 main 與 origin 分岔（push 被拒後以 commit-tree 疊上 origin 推送，本機留 e4135cd7e）；畫面未用瀏覽器實點，只靠 tools-editor 開頁測試。
+
+**rollback**：`git revert 819160be0`。
 ## 2026-11-10（續51）Stop hook batch-format：只排「專案自己宣告 prettier 設定」的檔
 
 - 根因：`mcp/claude-userlevel/hooks/rules/batch-format.js`（舊版 :19-24）對本回合改過的每個 JS/TS 檔跑 `<session cwd>/node_modules/.bin/prettier --write`，不看有沒有設定檔。video-workbench 有 prettier devDependency、無設定檔（120 欄風格），一行修改就把 `scripts/tools-editor.js` 用預設 80 欄整檔重排（+1300 行，壓縮後與 HEAD 相同），其他 ED worker 只能逐 hunk 提交。
