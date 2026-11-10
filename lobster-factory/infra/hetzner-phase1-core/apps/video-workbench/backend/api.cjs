@@ -27,6 +27,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   const outputs = path.join(dataDir, "generated");
   fs.mkdirSync(outputs, { recursive: true });
   const mediaStore = require("./media-store.cjs").createMediaStore({ dataDir });
+  // Card P6.20: files above one request's size arrive in chunks (this org's own sessions and quota). Created with the api,
+  // so chunks left from before a restart are removed at start, not at this org's next upload.
+  const uploads = require("./chunked-upload.cjs").createChunkedUploads({ dataDir, limits: {
+    fileBytes: Number(vwEnv(env, "UPLOAD_BYTES")), openBytes: Number(vwEnv(env, "UPLOAD_OPEN_BYTES")), idleMs: Number(vwEnv(env, "UPLOAD_IDLE_MS")) } });
   // Card P3: compositor renders (frames from the page -> PNG MOV -> media store) and S3b reference stills.
   let compositorRenders;
   const renders = () => (compositorRenders ||= require("./compositor-render.cjs").createCompositorRenders({ dataDir, mediaStore, output, limits: {
@@ -55,6 +59,22 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   }
   // Upload-style responses: registered before the answer; a failed registration fails the request.
   const registered = async (asset) => (main ? { ...asset, ...(await register(asset.url, asset.origin)) } : asset);
+  // Every uploadable type. Images are kept as /generated files (bytes); the rest go to the media store, so only those can
+  // also arrive in chunks (card P6.20; images are small and stay on the one-request /uploads).
+  const UPLOAD_EXT = {
+    "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif",
+    "audio/mpeg": "mp3", "audio/wav": "wav", "audio/x-wav": "wav", "audio/mp4": "m4a",
+    "video/mp4": "mp4", "video/webm": "webm", "video/quicktime": "mov",
+    "model/gltf-binary": "glb", "application/x-bvh": "bvh",
+  };
+  const chunkedType = (type) => Object.hasOwn(UPLOAD_EXT, type) && !type.startsWith("image/");
+  // One library upload (bytes from /uploads or a joined chunked file): stored, registered, answered in one shape.
+  async function storeUpload({ type, buffer, file, size, name, rightsConfirmed }) {
+    const ext = UPLOAD_EXT[type], kind = ext === "glb" ? "model" : ext === "bvh" ? "motion" : type.split("/")[0];
+    const stored = kind === "image" ? { id: crypto.randomUUID(), url: output(buffer, ext) } : await mediaStore.ingest({ buffer, file, ext });
+    return registered({ ...stored, origin: { kind: "upload", rightsConfirmed: rightsConfirmed === true },
+      name: String(name || { model: "3D 模型", motion: "動作" }[kind] || "素材"), kind, type, size });
+  }
   const mirror = (job) => main?.mirror(job, (e) => {
     if (e) job.ledgerSyncError = publicError(e.message);
     else delete job.ledgerSyncError;
@@ -866,41 +886,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       if (!meta || !bytes) throw bad("缺少成片檔");
       if (writeError) throw writeError;
       await new Promise((resolve, reject) => file.end((e) => (e || writeError ? reject(e || writeError) : resolve())));
-      const { width, height } = meta;
-      // Checked before it is stored: a silent or broken file never becomes an asset or a job.
-      // The frame exports at −16 LUFS (tools-engine-host.js engineExport); same tolerance as the editor's master check.
-      const verification = await verifyOutput(tmp, { width, height, ...ENGINE_OUTPUT[meta.engine] });
-      if (!verification.ok || !verification.info?.video)
-        throw bad("成片檢查沒過：" + (verification.findings.map((f) => f.message).join("；") || "沒有影像"));
-      // A clip sent as transparent without an alpha plane would land on the timeline as a black box.
-      if (meta.alpha && !hasAlpha({ video: true, pixFmt: verification.info.probe.pixFmt }))
-        throw bad("成片檢查沒過：透明片段沒有透明通道（" + (verification.info.probe.pixFmt || "未知") + "）");
-      const stored = await mediaStore.ingest({ file: tmp, ext: meta.alpha ? "mov" : "mp4" });
-      const job = {
-        id: crypto.randomUUID(),
-        type: "video",
-        input: {
-          type: "video",
-          operation: "engine-render",
-          references: meta.sources.map((s) => ({ url: s.url, ...(typeof s.id === "string" ? { id: s.id } : {}), ...(typeof s.name === "string" ? { name: s.name.slice(0, 200) } : {}) })),
-          settings: { engine: meta.engine, engineVersion: meta.engineVersion, title: meta.title, ratio: meta.ratio, cues: meta.cues, ...(meta.alpha ? { alpha: true } : {}) },
-          ...(meta.link ? { link: meta.link } : {}),
-        },
-        status: "succeeded",
-        progress: 100,
-        createdAt: new Date().toISOString(),
-        ...(main && req.vwIdentity?.userId ? { createdBy: req.vwIdentity.userId } : {}),
-      };
-      job.result = {
-        url: stored.url, previewUrl: stored.previewUrl, thumbUrl: stored.thumbUrl, width, height,
-        ...(Number.isFinite(verification.info.duration) ? { duration: verification.info.duration } : {}),
-        verification: { ok: true, findings: [] },
-        origin: { kind: "render", engine: meta.engine, engineVersion: meta.engineVersion, jobId: job.id, costUsd: 0 },
-      };
-      jobs.push(job);
-      persist();
-      await settle(job);
-      return job;
+      return await engineRenderFile(meta, tmp, req);
     } catch (error) {
       req.resume();
       throw error;
@@ -908,6 +894,45 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       file?.destroy();
       fs.rmSync(tmp, { force: true });
     }
+  }
+  // A render file whose meta passed engineRenderMeta (streamed above, or P6.20 joined chunks) -> checked, stored, one job.
+  async function engineRenderFile(meta, tmp, req) {
+    const bad = (message) => Object.assign(Error(message), { status: 400 });
+    const { width, height } = meta;
+    // Checked before it is stored: a silent or broken file never becomes an asset or a job.
+    // The frame exports at −16 LUFS (tools-engine-host.js engineExport); same tolerance as the editor's master check.
+    const verification = await verifyOutput(tmp, { width, height, ...ENGINE_OUTPUT[meta.engine] });
+    if (!verification.ok || !verification.info?.video)
+      throw bad("成片檢查沒過：" + (verification.findings.map((f) => f.message).join("；") || "沒有影像"));
+    // A clip sent as transparent without an alpha plane would land on the timeline as a black box.
+    if (meta.alpha && !hasAlpha({ video: true, pixFmt: verification.info.probe.pixFmt }))
+      throw bad("成片檢查沒過：透明片段沒有透明通道（" + (verification.info.probe.pixFmt || "未知") + "）");
+    const stored = await mediaStore.ingest({ file: tmp, ext: meta.alpha ? "mov" : "mp4" });
+    const job = {
+      id: crypto.randomUUID(),
+      type: "video",
+      input: {
+        type: "video",
+        operation: "engine-render",
+        references: meta.sources.map((s) => ({ url: s.url, ...(typeof s.id === "string" ? { id: s.id } : {}), ...(typeof s.name === "string" ? { name: s.name.slice(0, 200) } : {}) })),
+        settings: { engine: meta.engine, engineVersion: meta.engineVersion, title: meta.title, ratio: meta.ratio, cues: meta.cues, ...(meta.alpha ? { alpha: true } : {}) },
+        ...(meta.link ? { link: meta.link } : {}),
+      },
+      status: "succeeded",
+      progress: 100,
+      createdAt: new Date().toISOString(),
+      ...(main && req.vwIdentity?.userId ? { createdBy: req.vwIdentity.userId } : {}),
+    };
+    job.result = {
+      url: stored.url, previewUrl: stored.previewUrl, thumbUrl: stored.thumbUrl, width, height,
+      ...(Number.isFinite(verification.info.duration) ? { duration: verification.info.duration } : {}),
+      verification: { ok: true, findings: [] },
+      origin: { kind: "render", engine: meta.engine, engineVersion: meta.engineVersion, jobId: job.id, costUsd: 0 },
+    };
+    jobs.push(job);
+    persist();
+    await settle(job);
+    return job;
   }
   // Every source must be a file this server holds (the rights record is built from them): no list, no render.
   function engineRenderMeta(meta) {
@@ -969,6 +994,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       ? host.startsWith(rule.slice(0, -1)) && /^\d+$/.test(host.slice(rule.length - 1))
       : host === rule);
   }
+  // Card P6.20: /uploads/sessions/<id>[/complete | /chunks/<n>].
+  const SESSION_ROUTE = /^\/uploads\/sessions\/([0-9a-f-]{36})(?:\/(complete|chunks\/(\d{1,6})))?$/;
   function json(res, status, value) {
     res.writeHead(status, {
       "Content-Type": "application/json; charset=utf-8",
@@ -993,11 +1020,12 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         throw Object.assign(Error("不允許的主機"), { status: 403 });
       if (req.headers.origin && req.headers.origin !== (env.VW_PUBLIC_ORIGIN || "http://" + host))
         throw Object.assign(Error("不允許跨來源請求"), { status: 403 });
-      // Card FC.3: the engine render route streams bytes; application/octet-stream still needs a CORS preflight cross-site.
+      // Card FC.3 / P6.20: the engine render and upload-chunk routes stream bytes; application/octet-stream still needs a
+      // CORS preflight cross-site.
       if (
         req.method !== "GET" &&
         !/^application\/json/.test(req.headers["content-type"] || "") &&
-        !(route === "/engine/renders" && /^application\/octet-stream$/.test(req.headers["content-type"] || ""))
+        !((route === "/engine/renders" || SESSION_ROUTE.exec(route)?.[3] !== undefined) && /^application\/octet-stream$/.test(req.headers["content-type"] || ""))
       )
         throw Object.assign(Error("需要 JSON 請求"), { status: 415 });
       if (req.method === "POST" && Object.hasOwn(mainSystemTools.PAID_ROUTES, route)) {
@@ -1032,47 +1060,33 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           return true;
         }
         // Card P5: 3D models (GLB) and motions (BVH) go to the media store; checked there before they are kept.
-        const model = /^data:(model\/gltf-binary|application\/x-bvh);base64,([\s\S]+)$/.exec(input.data || "");
-        if (model) {
-          const ext = model[1] === "model/gltf-binary" ? "glb" : "bvh";
-          const buffer = Buffer.from(model[2], "base64");
-          json(res, 201, await registered({ ...(await mediaStore.ingest({ buffer, ext })), origin: { kind: "upload", rightsConfirmed: input.rightsConfirmed === true }, name: String(input.name || (ext === "glb" ? "3D 模型" : "動作")), kind: ext === "glb" ? "model" : "motion", type: model[1], size: buffer.length }));
-          return true;
-        }
-        const m =
-            /^data:(image\/(?:png|jpeg|webp|gif)|audio\/[\w.+-]+|video\/[\w.+-]+);base64,([\s\S]+)$/.exec(
-              input.data || "",
-            );
-        if (!m) throw Error("不支援此素材格式");
-        const mime = m[1],
-          ext = {
-            "image/png": "png",
-            "image/jpeg": "jpg",
-            "image/webp": "webp",
-            "image/gif": "gif",
-            "audio/mpeg": "mp3",
-            "audio/wav": "wav",
-            "audio/x-wav": "wav",
-            "audio/mp4": "m4a",
-            "video/mp4": "mp4",
-            "video/webm": "webm",
-            "video/quicktime": "mov",
-          }[mime];
-        if (!ext) throw Error("不支援此素材格式");
-        const buffer = Buffer.from(m[2], "base64"),
-          kind = mime.split("/")[0],
-          stored =
-            kind === "image"
-              ? { id: crypto.randomUUID(), url: output(buffer, ext) }
-              : await mediaStore.ingest({ buffer, ext });
-        json(res, 201, await registered({
-          ...stored,
-          origin: { kind: "upload", rightsConfirmed: input.rightsConfirmed === true },
-          name: String(input.name || "素材"),
-          kind,
-          type: mime,
-          size: buffer.length,
-        }));
+        const m = /^data:(image\/(?:png|jpeg|webp|gif)|audio\/[\w.+-]+|video\/[\w.+-]+|model\/gltf-binary|application\/x-bvh);base64,([\s\S]+)$/.exec(input.data || "");
+        if (!m || !Object.hasOwn(UPLOAD_EXT, m[1])) throw Error("不支援此素材格式");
+        const buffer = Buffer.from(m[2], "base64");
+        json(res, 201, await storeUpload({ type: m[1], buffer, size: buffer.length, name: input.name, rightsConfirmed: input.rightsConfirmed }));
+        return true;
+      }
+      // Card P6.20: the same uploads (and engine renders) in chunks. { size, type } or { size, render: <engine meta> }:
+      // checked here, before any byte is sent; the render meta is checked again at complete (its sources may be gone).
+      if (req.method === "POST" && route === "/uploads/sessions") {
+        const input = await body(req), render = input.render != null;
+        if (render) engineRenderMeta(input.render);
+        else if (!chunkedType(input.type)) throw Object.assign(Error("不支援此素材格式"), { status: 400 });
+        json(res, 201, uploads.create({ size: input.size, info: render ? { render: input.render } : { type: input.type } }, req.vwIdentity?.userId));
+        return true;
+      }
+      const session = SESSION_ROUTE.exec(route);
+      if (session) {
+        const [, id, action, index] = session, owner = req.vwIdentity?.userId;
+        if (req.method === "GET" && !action) json(res, 200, uploads.status(id, owner));
+        else if (req.method === "POST" && index !== undefined)
+          json(res, 200, await uploads.chunk(id, Number(index), req, req.headers["x-vw-chunk-sha256"], owner));
+        else if (req.method === "POST" && action === "complete") {
+          const input = await body(req);
+          json(res, 201, await uploads.complete(id, owner, (file, info) => info.render
+            ? (engineRenderMeta(info.render), engineRenderFile(info.render, file, req))
+            : storeUpload({ type: info.type, file, size: fs.statSync(file).size, name: input.name, rightsConfirmed: input.rightsConfirmed })));
+        } else throw Object.assign(Error("不支援的請求"), { status: 405 });
         return true;
       }
       // Card ED.1.4: the editor's 720P preview file of a stored video: { previewUrl } | { making: true } (ask again).

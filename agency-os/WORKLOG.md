@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-10（續9）影音工作台 P6.20：大檔分段上傳
+
+- 根因：正式站單次請求上限 100 MB（Cloudflare 免費方案＋主機 nginx `client_max_body_size 100m`），`/uploads` 送 base64 JSON（膨脹 1/3）→ 約 75 MB 以上影片傳不上；`/engine/renders` 同樣卡 100 MB。調大上限無效（Cloudflare 在前），改分段。設計 `docs/p6-golive-plan-20261103.md`「P6.20 大檔分段上傳」（2d0673fa5）。
+- 做法：`backend/chunked-upload.cjs`：16 MiB 原始位元組、收件與組裝各驗一次分段 sha256、`GET` 狀態續傳、建立者 userId 不符＝404、每組織同時未完成上限 2 GiB、閒置 30 分清、重啟清。`backend/api.cjs`：`/uploads/sessions[/<id>[/chunks/<n>|/complete]]`；`storeUpload` 一個入庫函式（舊 `/uploads` 與分段共用）；`engineRender` 拆出 `engineRenderFile`，分段 `complete` 帶 `render` meta 共用同一檢查。`shared/assets-ui.js`：`uploadChunked`＋`uploadAsset` 影音大於一段走分段。
+- Codex 3 條（`agency-os/reports/oracle/2026-11-10-partialreview-707db766.md`）：②同名同大小同時間不同檔續傳會混 → 狀態回各段 sha256，頁面只跳過自己算出相同雜湊的段；③重啟後清理延遲到該組織下次上傳 → 上傳模組隨 api 建立；①專業剪輯成片前端仍走舊路 → 未改：`scripts/tools-engine-host.js` 另一 session 未提交（file-claims 擋），後端已備好，前端一行改成 `VideoWorkbench.uploadChunked(new Blob([job.video]), { render: meta })`，待該檔提交後接。
+- 避免再發生：大檔一律分段，單次請求不再接近前端上限；`p6-chunked-upload` 進部署閘 `tests/gate.cjs`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/p6-chunked-upload.cjs（110.6 MB 合成 MOV 7 段：中斷→狀態只列已收→只補缺段→組裝 sha256 相同→入素材庫＋主系統登記；同組織他人的段／狀態／完成皆 404） | exit=0 | ms=1762
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變（拋棄式 worktree D:/Worktrees/p620-mut＝HEAD＋本卡 blob）：拿掉 owner 檢查 → 紅「別人的段要被拒」；還原 → 綠 | exit=1→0 | ms=5000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/{backend,media-contract,fc3-engine-render,gate}.cjs 全綠；Playwright 真瀏覽器隔離伺服器 uploadAsset 40.5 MB → 3 段 → sha256 相同 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（Codex，②③已修＋測試斷言，①待檔案解鎖）
+- ORACLE_WAIVED: 修正在 oracle artifact 之後；改動限②③兩處，以新斷言（狀態回 hashes）＋全套重跑＋真瀏覽器重跑代替第二輪
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=uploads/sessions\|uploadChunked\|engineRenderFile\|storeUpload\|chunked-upload | hits=35（本卡檔、設計文件、本條 WORKLOG；舊 /engine/renders 引用留在 tools-engine-host.js／projects-0.js／tools-0.js 註解，路由仍在、正確）
 ## 2026-11-10（續7）影音工作台 PJ.2：一集頁步驟列；任何工具做完自動寫回那一集
 
 - 做了（規格 `lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/pj-project-spine-spec-20261106.md` §2 PJ.2）：`shared/episode-spine.js` 加 `TOOL_STEP`／`settle`／`stepStates`、`adopt` 替舊鏡頭補 id、`keepSpine` 加抄 `shot.image/video`；`shared/runtime.js` `generate()` 唯一入口帶 `link`（`VideoWorkbench.spineLink`）、`spine-settle` 動作、補帳每輪對全部成功任務 `settle`；`shared/jobs-view.js` 面板成功也 `settle`；`scripts/tools-0.js` 工具記住從哪一集打開（首頁直接開＝清掉）；`scripts/tools-editor.js` `edSpineLink`（只有匯出算成片）；`scripts/projects-0.js` 11 步列、成片區、「修這張」、鏡頭圖改由主頁寫（刪 `onSuccess`）。

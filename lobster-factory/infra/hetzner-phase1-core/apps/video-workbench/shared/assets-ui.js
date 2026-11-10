@@ -53,12 +53,58 @@
     VideoWorkbench.rightsConfirmed = e.target.checked;
     for (const box of document.querySelectorAll("[data-rights-confirmed]")) box.checked = e.target.checked;
   });
+  // Card P6.20: a file sent in raw chunks (backend/chunked-upload.cjs), so no request nears the 100 MB cap in front of
+  // video.aware-wave.com. open = { type } | { render: <engine meta> }; finish = the complete body. A failed chunk is tried
+  // three times; sending the same key again resumes its session and skips a chunk only when the server holds the same
+  // bytes (sha256), so a different file with the same name, size and date is never mixed in.
+  const openUploads = new Map();
+  VideoWorkbench.uploadChunked = async (blob, open, finish = {}, key = null) => {
+    let session = key && openUploads.has(key)
+      ? await VideoWorkbench.request("/uploads/sessions/" + openUploads.get(key), undefined, "GET").catch(() => null)
+      : null;
+    session ||= await VideoWorkbench.request("/uploads/sessions", { size: blob.size, ...open });
+    if (key) openUploads.set(key, session.id);
+    const api = String(window.VW_CONFIG?.apiBaseUrl || "/api/vw").replace(/\/$/, ""),
+      have = new Map(session.received.map((index, i) => [index, session.hashes[i]]));
+    for (let i = 0; i < session.chunks; i++) {
+      const bytes = await blob.slice(i * session.chunkBytes, (i + 1) * session.chunkBytes).arrayBuffer(),
+        hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
+      if (have.get(i) === hash) continue;
+      for (let attempt = 1; ; attempt++) {
+        try {
+          const response = await fetch(`${api}/uploads/sessions/${session.id}/chunks/${i}`, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/octet-stream", "X-VW-Chunk-Sha256": hash },
+            body: bytes,
+          });
+          if (response.ok) break;
+          const value = await response.json().catch(() => ({}));
+          throw Object.assign(Error(value.error?.message || "分段上傳失敗（" + response.status + "）"), { status: response.status });
+        } catch (error) {
+          if (attempt >= 3 || error.status === 404) throw error; // 404 = the session is gone; retrying cannot help
+          await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+        }
+      }
+    }
+    const done = await VideoWorkbench.request(`/uploads/sessions/${session.id}/complete`, finish);
+    if (key) openUploads.delete(key);
+    return done;
+  };
+  // Video and audio above one chunk (= the server's 16 MiB) go up in chunks; base64 JSON would pass 100 MB near 75 MB.
+  const CHUNKED_ABOVE = 16 * 1024 * 1024;
   VideoWorkbench.uploadAsset = async (file, { derived = false } = {}) => {
     const videoTypes = { mov: 'video/quicktime', mp4: 'video/mp4', m4v: 'video/mp4', webm: 'video/webm' };
     const extension = String(file.name || '').split('.').at(-1).toLowerCase();
     const type = /^(image|video|audio)\//.test(file.type) ? file.type : Object.hasOwn(videoTypes, extension) ? videoTypes[extension] : file.type;
     if (!/^(image|video|audio)\//.test(type))
       throw Error("請選擇圖片、影片或音訊");
+    const rightsConfirmed = !derived && VideoWorkbench.rightsConfirmed === true;
+    if (!type.startsWith("image/") && file.size > CHUNKED_ABOVE)
+      return VideoWorkbench.assets.save({
+        ...(await VideoWorkbench.uploadChunked(file, { type }, { name: file.name, rightsConfirmed }, [file.name, file.size, file.lastModified].join("|"))),
+        createdAt: new Date().toISOString(),
+      });
     const data = await new Promise((resolve, reject) => {
       const r = new FileReader();
       r.onload = () => resolve(r.result);
@@ -66,7 +112,7 @@
       r.readAsDataURL(file);
     });
     const normalizedData = `data:${type};base64,${String(data).slice(String(data).indexOf(',') + 1)}`;
-    const asset = await VideoWorkbench.request("/uploads", { name: file.name, data: normalizedData, rightsConfirmed: !derived && VideoWorkbench.rightsConfirmed === true });
+    const asset = await VideoWorkbench.request("/uploads", { name: file.name, data: normalizedData, rightsConfirmed });
     return VideoWorkbench.assets.save({
       ...asset,
       createdAt: new Date().toISOString(),
