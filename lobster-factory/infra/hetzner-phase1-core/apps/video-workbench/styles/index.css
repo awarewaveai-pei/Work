@@ -565,6 +565,13 @@ textarea::placeholder {
 .option.sel {
   background: var(--bg-hover);
 }
+/* Video model panel: the "when to use" line under each model button. */
+.option .model-note {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
 .chips {
   display: flex;
   gap: 6px;

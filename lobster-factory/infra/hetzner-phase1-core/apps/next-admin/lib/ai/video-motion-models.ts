@@ -33,6 +33,8 @@ export interface MotionConfig {
   durations: readonly number[];
   ratios: readonly ("16:9" | "9:16")[];
   requiresImage: boolean;
+  /** The output has a sound track. All four are silent: Veo is sent generate_audio:false, Runway and Luma make none. */
+  audio: boolean;
   buildInput: (opts: MotionInputOptions) => Record<string, unknown>;
 }
 
@@ -43,6 +45,7 @@ export const MOTION_MODELS: Record<VideoMotionModel, MotionConfig> = {
     durations: [5, 10],
     ratios: ["16:9", "9:16"],
     requiresImage: true,
+    audio: false,
     buildInput: ({ imageUrl, prompt, aspectRatio, durationSec }) => ({
       image: imageUrl, prompt, aspect_ratio: aspectRatio, duration: durationSec,
     }),
@@ -53,6 +56,7 @@ export const MOTION_MODELS: Record<VideoMotionModel, MotionConfig> = {
     durations: [4, 6, 8],
     ratios: ["16:9", "9:16"],
     requiresImage: false,
+    audio: false,
     buildInput: ({ imageUrl, prompt, aspectRatio, durationSec, resolution }) => ({
       ...(imageUrl ? { image: imageUrl } : {}), prompt, aspect_ratio: aspectRatio, duration: durationSec, generate_audio: false,
       ...(resolution ? { resolution } : {}),
@@ -64,6 +68,7 @@ export const MOTION_MODELS: Record<VideoMotionModel, MotionConfig> = {
     durations: [4, 6, 8],
     ratios: ["16:9", "9:16"],
     requiresImage: false,
+    audio: false,
     buildInput: ({ imageUrl, prompt, aspectRatio, durationSec, resolution }) => ({
       ...(imageUrl ? { image: imageUrl } : {}), prompt, aspect_ratio: aspectRatio, duration: durationSec, generate_audio: false,
       ...(resolution ? { resolution } : {}),
@@ -75,6 +80,7 @@ export const MOTION_MODELS: Record<VideoMotionModel, MotionConfig> = {
     durations: [5],
     ratios: ["16:9", "9:16"],
     requiresImage: false,
+    audio: false,
     buildInput: ({ imageUrl, prompt, aspectRatio, durationSec }) => ({
       ...(imageUrl ? { start_image: imageUrl } : {}), prompt, aspect_ratio: aspectRatio, duration: durationSec, resolution: "720p",
     }),

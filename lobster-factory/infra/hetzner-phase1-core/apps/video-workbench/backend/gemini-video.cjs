@@ -4,9 +4,9 @@
 const API = "https://generativelanguage.googleapis.com/v1beta/interactions";
 const MAX_VIDEO_BYTES = 80 * 1024 * 1024; // same cap as replicate-video.cjs
 
-// Omni takes any whole second 3-15 (default 10) and 16:9 or 9:16; output always has native audio.
+// Omni takes any whole second 3-15 (default 10) and 16:9 or 9:16; output always has native audio (no way to turn it off).
 const MODELS = Object.freeze({
-  "gemini-omni-1.2-flash": Object.freeze({ defaultDurationSec: 8, durations: Object.freeze([4, 6, 8, 10, 15]), ratios: Object.freeze(["16:9", "9:16"]), requiresImage: false }),
+  "gemini-omni-1.2-flash": Object.freeze({ defaultDurationSec: 8, durations: Object.freeze([4, 6, 8, 10, 15]), ratios: Object.freeze(["16:9", "9:16"]), requiresImage: false, audio: true }),
 });
 
 // 503 = nothing was sent (shared/runtime.js treats it as a safe rejection).

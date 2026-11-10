@@ -96,6 +96,13 @@ function generatorNormalizeSettings() {
   state.ratios = generatorRatios().filter((ratio) => allowed.includes(ratio));
   if (!state.ratios.length) state.ratios = [allowed[0] || "16:9"];
   state.ratio = state.ratios[0];
+  if (typeof vm.audio === "boolean") state.audio = vm.audio ? "有聲" : "靜音"; // the 聲音 chip always says what the model makes
+}
+// 聲音 chip -> the first model that can run here and makes (有聲) or does not make (靜音) sound; null = none can.
+function generatorModelForAudio(audio) {
+  const want = audio === "有聲", vm = generatorVideoModel();
+  if (vm.audio === want && vm.available !== false) return vm;
+  return VideoWorkbenchVideoModels.list(VideoWorkbench.capabilities).find((m) => m.audio === want && m.available !== false && !m.requiresImage) || null;
 }
 function generatorReferences() {
   const groups = state.refs[state.mode] || {};
@@ -236,7 +243,7 @@ function generatorValidation(input) {
     if (input.referenceMode === "first" && !input.references?.firstFrame?.length) throw Error("首尾幀參考必須先選擇首幀。");
     if (input.references?.lastFrame?.length && !caps.lastFrameReference) throw Error("目前影片服務尚未支援尾幀控制。");
     if (settings.subtitle === "開" && !caps.subtitles) throw Error("字幕燒錄尚未接入，請先關閉自動字幕。");
-    if (settings.audio === "靜音" && !caps.muteOutput) throw Error("此生成服務尚未支援靜音輸出。");
+    if (settings.audio === "靜音" && vm.audio) throw Error(vm.label + " 一定有聲音；要無聲影片，請把模型換成沒有聲音的（例如 Veo 3.1 Fast）。");
     if (settings.watermark !== "不套用" && !caps.generationWatermark) throw Error("請使用應用工具中的影片浮水印，生成服務尚未支援此選項。");
     const refs = Object.values(input.references || {}).flat();
     if (!caps.multiModalReferences && refs.some((r) => /^(video|audio)\//.test(r.type || "") || ["video", "audio"].includes(r.kind))) throw Error("目前影片服務只接受圖片參考；影片及音訊參考需要其他服務。");

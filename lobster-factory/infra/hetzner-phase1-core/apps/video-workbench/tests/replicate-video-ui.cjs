@@ -43,6 +43,10 @@ const fetchImpl = async () => { throw Error("Provider calls are forbidden in tes
       assert.equal(await p.locator("#send").isDisabled(), true, "Runway 沒有參考圖仍可送出");
       assert.match(await p.locator("#send").getAttribute("title"), /需要一張參考圖/);
       assert((await p.locator("#send").innerText()).includes(await shown("runway-gen4-turbo", 5)), "Runway 5 秒價格不對（時長應改成 5 秒）");
+      // A draft naming Omni with no Gemini key here: no model with sound can run, so 有聲 is disabled (Codex 2026-11-10).
+      await p.evaluate(() => { state.model[state.mode] = "gemini-omni-1.2-flash"; });
+      await p.locator('[data-panel="settings"]').first().click();
+      assert.equal(await p.locator('#popover [data-audio="有聲"]').isDisabled(), true, "沒有可用的有聲模型，有聲仍可點");
       // Restoring a Veo job brings back Veo (and its length), not the current model.
       await p.evaluate(() => generatorResultAction({ intent: "restore-job", job: { type: "video", input: { type: "video", mode: "reference", prompt: "還原測試", settings: { model: "veo-3-1-fast", ratio: "16:9", quality: "720p", duration: 6 } } } }));
       assert.match(await p.locator("#modelBtn").innerText(), /Veo 3\.1 Fast/, "還原任務沒有帶回原本的模型");
@@ -73,6 +77,42 @@ const fetchImpl = async () => { throw Error("Provider calls are forbidden in tes
       await browser.close();
     }
   }
+  // With a Gemini key: Omni is the default and 聲音 shows 有聲; 靜音 switches to Veo 3.1 Fast (no sound) and back; every
+  // model button carries its "when to use" line (first-time user, operator 2026-11-10).
+  {
+    const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
+    const { base } = await isolatedServer("vw-rv-ui-audio-", { fetchImpl, env: { ...env, GEMINI_API_KEY: "test-only-gemini" } });
+    const browser = await chromium.launch({ channel: "msedge", headless: true });
+    try {
+      const p = await browser.newPage(), errors = [];
+      p.setDefaultTimeout(15000);
+      p.on("pageerror", (e) => errors.push(e.message));
+      await p.route("**/*", (r) => (r.request().url().startsWith(base + "/") ? r.continue() : r.abort()));
+      await p.goto(base);
+      await p.waitForFunction(() => window.VideoWorkbench?.generator?.controlsReady && VideoWorkbench.capabilities?.videoModels);
+      await p.locator('[data-mode="reference"]').click();
+      assert.match(await p.locator("#modelBtn").innerText(), /Gemini Omni/, "有 Gemini 金鑰時預設不是 Omni");
+      assert.equal(await p.evaluate(() => state.audio), "有聲");
+      await p.locator('[data-panel="settings"]').first().click();
+      await p.locator('#popover [data-audio="靜音"]').click();
+      assert.match(await p.locator("#modelBtn").innerText(), /Veo 3\.1 Fast/, "選靜音沒有換成沒有聲音的模型");
+      assert.equal(await p.evaluate(() => state.audio), "靜音");
+      await p.locator('#popover [data-audio="有聲"]').click();
+      assert.match(await p.locator("#modelBtn").innerText(), /Gemini Omni/, "選有聲沒有換回有聲音的模型");
+      // Picking a silent model by hand moves the 聲音 chip to 靜音: the setting never says what the model cannot make.
+      await p.locator('[data-panel="model"]').first().click();
+      const notes = await p.locator("#popover [data-model] .model-note").allInnerTexts();
+      assert.equal(notes.length, await p.locator("#popover [data-model]").count(), "有模型按鈕沒有使用說明");
+      assert.match(await p.locator("#popover").innerText(), /要影片自帶聲音，選 Gemini Omni；要配自己的旁白或音樂，選 Veo 3\.1 Fast/);
+      await p.screenshot({ path: path.join(process.env.TEMP || __dirname, "vw-video-model-notes.png") });
+      await p.locator('#popover [data-model="veo-3-1"]').click();
+      assert.equal(await p.evaluate(() => state.audio), "靜音");
+      assert.deepEqual(errors, []);
+    } finally {
+      await browser.close();
+    }
+  }
+  console.log("PASS 有 Gemini 金鑰：預設 Omni＝有聲；選靜音自動換 Veo 3.1 Fast、選有聲換回；手選無聲模型聲音跟著變靜音；每顆模型按鈕有使用說明");
   console.log("PASS 畫面：模型是可見按鈕且每顆有價格、無下拉；Runway 沒圖不能送；預設 Veo 3.1 Fast；舊 Sora 任務／專案改用預設並提示");
   process.exit(0);
 })().catch((e) => {

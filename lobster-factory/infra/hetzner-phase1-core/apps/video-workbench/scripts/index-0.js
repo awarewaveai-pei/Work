@@ -597,7 +597,7 @@ function settings() {
   const dimensions = image ? c.imageOutputs?.[state.quality]?.[state.ratio] : state.ratio === "9:16" ? [720, 1280] : [1280, 720];
   if (state.mode === "reshoot") return generatorReshootSettings();
   if (spoken) return '<h3>輸出設定</h3><p>目前輸出配音音檔，比例、畫質及影片時長不適用。</p>';
-  return `<h3 class="pop-title">輸出設定</h3><p class="small-note">長寬比${image ? "" : " · 可複選，每個比例各產生一個任務"}</p><div class="chips">${["1:1", "16:9", "9:16", "4:5", "4:3"].map((x) => `<button data-ratio="${x}" aria-pressed="${generatorRatios().includes(x)}" class="${generatorRatios().includes(x) ? "on" : ""}" ${!ratios.includes(x) ? 'disabled title="目前服務不支援此比例"' : ''}>${x}</button>`).join("")}</div><p class="small-note">${image ? "解析度" : "畫質"}</p><div class="chips">${(image ? ["1K", "2K", "4K"] : qualities).map((x) => `<button data-quality="${x}" class="${x === state.quality ? "on" : ""}" aria-pressed="${x === state.quality}" ${!qualities.includes(x) ? 'disabled title="目前服務尚未支援此解析度"' : ''}>${x}</button>`).join("")}</div>${image ? '<p class="small-note">依所選比例置中裁切，保留供應商原圖。2K／4K 使用本機縮放，不代表新增 AI 細節。</p>' : `<p class="small-note">影片長度</p><div class="chips">${durations.map((x) => `<button data-gen-duration="${x}" class="${x === state.duration ? "on" : ""}" aria-pressed="${x === state.duration}">${x} 秒</button>`).join("")}</div><p class="small-note">聲音</p><div class="chips">${["有聲", "靜音"].map((x) => `<button data-audio="${x}" class="${x === state.audio ? "on" : ""}" ${x === "靜音" && !c.muteOutput ? 'disabled title="目前服務尚未支援靜音輸出"' : ''}>${x}</button>`).join("")}</div><p class="small-note">影片浮水印</p><div class="chips">${["不套用", "套用浮水印"].map((x) => `<button data-watermark="${x}" class="${x === state.watermark ? "on" : ""}" ${x !== "不套用" && !c.generationWatermark ? 'disabled title="請在應用工具中加入浮水印"' : ''}>${x}</button>`).join("")}</div>`}${dimensions ? `<p class="small-note" id="generatorOutputDimensions">輸出尺寸 · ${dimensions[0]} × ${dimensions[1]} px</p>` : ''}`;
+  return `<h3 class="pop-title">輸出設定</h3><p class="small-note">長寬比${image ? "" : " · 可複選，每個比例各產生一個任務"}</p><div class="chips">${["1:1", "16:9", "9:16", "4:5", "4:3"].map((x) => `<button data-ratio="${x}" aria-pressed="${generatorRatios().includes(x)}" class="${generatorRatios().includes(x) ? "on" : ""}" ${!ratios.includes(x) ? 'disabled title="目前服務不支援此比例"' : ''}>${x}</button>`).join("")}</div><p class="small-note">${image ? "解析度" : "畫質"}</p><div class="chips">${(image ? ["1K", "2K", "4K"] : qualities).map((x) => `<button data-quality="${x}" class="${x === state.quality ? "on" : ""}" aria-pressed="${x === state.quality}" ${!qualities.includes(x) ? 'disabled title="目前服務尚未支援此解析度"' : ''}>${x}</button>`).join("")}</div>${image ? '<p class="small-note">依所選比例置中裁切，保留供應商原圖。2K／4K 使用本機縮放，不代表新增 AI 細節。</p>' : `<p class="small-note">影片長度</p><div class="chips">${durations.map((x) => `<button data-gen-duration="${x}" class="${x === state.duration ? "on" : ""}" aria-pressed="${x === state.duration}">${x} 秒</button>`).join("")}</div><p class="small-note">聲音</p><div class="chips">${["有聲", "靜音"].map((x) => `<button data-audio="${x}" class="${x === state.audio ? "on" : ""}" ${generatorModelForAudio(x) ? '' : 'disabled title="目前沒有可用的' + (x === "有聲" ? "有聲音" : "沒有聲音") + '的影片模型"'}>${x}</button>`).join("")}</div><p class="small-note">影片浮水印</p><div class="chips">${["不套用", "套用浮水印"].map((x) => `<button data-watermark="${x}" class="${x === state.watermark ? "on" : ""}" ${x !== "不套用" && !c.generationWatermark ? 'disabled title="請在應用工具中加入浮水印"' : ''}>${x}</button>`).join("")}</div>`}${dimensions ? `<p class="small-note" id="generatorOutputDimensions">輸出尺寸 · ${dimensions[0]} × ${dimensions[1]} px</p>` : ''}`;
 }
 
 const skills = ["投流廣告", "種草文案", "品牌影片", "短劇植入", "出海在地化"];
@@ -613,11 +613,12 @@ async function panel(p) {
     if (generatorVideoMode()) {
       const seconds = Number(generatorVideoSeconds()), count = state.mode === "director" ? 1 : generatorRatios().length;
       return pop(
-        '<h3>影片模型</h3><p class="small-note">按鈕上是這次設定的費用（' + (count > 1 ? count + " 種比例、" : "") + "長度不支援時改用該模型的預設長度）。</p>" +
+        '<h3>影片模型</h3><p class="small-note">不知道選哪個：要影片自帶聲音，選 Gemini Omni；要配自己的旁白或音樂，選 Veo 3.1 Fast。</p>' +
+          '<p class="small-note">按鈕上是這次設定的費用（' + (count > 1 ? count + " 種比例、" : "") + "長度不支援時改用該模型的預設長度）。</p>" +
           VideoWorkbenchVideoModels.list(VideoWorkbench.capabilities).map((vm) => {
             const s = vm.durations.includes(seconds) ? seconds : vm.defaultDurationSec || vm.durations[0];
             const off = vm.available === false ? "尚未設定服務金鑰" : "";
-            return `<button class="option ${vm.id === generatorVideoModel().id ? "on" : ""}" data-model="${safe(vm.id)}" aria-pressed="${vm.id === generatorVideoModel().id}" ${off ? `disabled title="${off}"` : ""}><b>${safe(vm.label)}</b> · ${VideoWorkbenchVideoModels.priceText(vm, s, count)}（${s} 秒）<small>${safe(vm.vendor || vm.provider)}${vm.requiresImage ? " · 需要一張參考圖" : ""}${off ? " · " + off : ""}</small></button>`;
+            return `<button class="option ${vm.id === generatorVideoModel().id ? "on" : ""}" data-model="${safe(vm.id)}" aria-pressed="${vm.id === generatorVideoModel().id}" ${off ? `disabled title="${off}"` : ""}><b>${safe(vm.label)}</b> · ${VideoWorkbenchVideoModels.priceText(vm, s, count)}（${s} 秒）<small>${safe(vm.vendor || vm.provider)}${vm.requiresImage ? " · 需要一張參考圖" : ""}${off ? " · " + off : ""}</small>${vm.note ? `<small class="model-note">${safe(vm.note)}</small>` : ""}</button>`;
           }).join(""),
       );
     }
@@ -706,7 +707,14 @@ document.addEventListener("click", (e) => {
     close();
     render();
   } else if (t.dataset.audio) {
-    state.audio = t.dataset.audio;
+    const next = generatorVideoMode() ? generatorModelForAudio(t.dataset.audio) : null;
+    if (generatorVideoMode() && !next) VideoWorkbench.notify("目前沒有可用的" + (t.dataset.audio === "有聲" ? "有聲音" : "沒有聲音") + "的影片模型。");
+    else if (next && next.id !== generatorVideoModel().id) {
+      state.model[state.mode] = next.id;
+      VideoWorkbench.notify("聲音選「" + t.dataset.audio + "」，模型已換成 " + next.label + "。");
+    }
+    if (!generatorVideoMode()) state.audio = t.dataset.audio;
+    generatorNormalizeSettings();
     panel("settings");
     render();
   } else if (t.dataset.watermark) {

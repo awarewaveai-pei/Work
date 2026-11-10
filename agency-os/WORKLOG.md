@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-10（續43）影音工作台影片「聲音」設定與模型一致＋每個模型的使用說明
+
+- 根因：「聲音」有聲／靜音只是擺設——靜音一律被擋（`muteOutput:false`），有聲時 Veo 照樣出無聲片；換成 Omni（一定有聲）後，第一次用的人無從判斷該選哪個模型。
+- 改：
+  - C1 每個影片模型帶 `audio`（next-admin `lib/ai/video-motion-models.ts` MotionConfig 新欄位，四個 Replicate 模型皆 false；`gemini-video.cjs` Omni true）與 `note`（`generation-policy.cjs` VIDEO_NOTES，一句「什麼時候用」）。
+  - C2 不變量：聲音設定＝模型做得出的東西。選靜音／有聲 → 換成第一個可用的同類模型並提示（`generatorModelForAudio`，`scripts/generator-controls.js`）；手選模型 → 聲音跟著變（`generatorNormalizeSettings`）；沒有同類可用模型則該鈕停用。後端只擋「靜音＋有聲模型」；舊草稿「有聲＋無聲模型」照舊可跑。`muteOutput` 能力旗標刪除。
+  - m1 模型面板頂端一句「要影片自帶聲音選 Gemini Omni；要配自己的旁白或音樂選 Veo 3.1 Fast」；`styles/index.css` `.option .model-note`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/replicate-video-ui.cjs（Edge 實開頁面：預設 Omni＝有聲、選靜音換 Veo 3.1 Fast、選有聲換回、手選 veo-3-1 聲音變靜音、每顆模型鈕有說明；截圖 %TEMP%/vw-video-model-notes.png 已看）; node tests/{replicate-video,p6-main-system,backend,generation-flows,gate}.cjs; npx vitest run lib/ai/__tests__ lib/content lib/tarot (552); npx tsc --noEmit（僅既有 .next/types） | exit=0 | ms=300000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/0n — Codex（agency-os/reports/oracle/2026-11-10-partialreview-d9d13cdc.md）：草稿模型不可用時同類聲音鈕仍可點 → 已修（`generatorModelForAudio` 要求 available）＋UI 測試（無 Gemini 金鑰時有聲鈕停用）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=muteOutput|尚未支援靜音輸出 | hits=0
+- 既有失敗（非本次）：`tests/generate-parity.cjs` 已紅（斷言 Sora `/videos`，且另一 session 正在改此檔）；其第 176 行「audio 靜音 → 400」在本改後對無聲模型不再成立，留給改該檔的 session。
 ## 2026-11-10（續42）影音工作台換廠商第 3、4 項：影片預設 Gemini Omni 1.2 Flash、nano-banana-2 改 Nano Banana 2.1 直連
 
 - 根因：影片、圖片各只有一家寫死的供應商路徑（`api.cjs` 判斷 `provider === "Replicate"`；`image-gen.ts` nano-banana-2 走 Replicate），換更便宜、排名更高的廠商就必須改呼叫端。

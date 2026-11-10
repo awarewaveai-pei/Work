@@ -16,6 +16,15 @@ const models = (env) => ({ image: vwEnv(env, "IMAGE_MODEL") || "gpt-image-2.5-fl
 // Video models the vendor shut down (OpenAI GET /v1/models/sora-2: shutdown_date 2026-09-24). A saved setting or an
 // old job naming one runs the default; the page says so once (shared/models.js replaceRetired).
 const RETIRED_VIDEO_MODELS = Object.freeze({ "sora-2": "Sora 2", "sora-2-pro": "Sora 2 Pro" });
+// One line per video model under its button, for someone choosing for the first time (operator 2026-11-10: 「當作使用者是第一次使用」).
+// The 聲音 setting picks between the two kinds: 有聲 = a model with sound, 靜音 = one without (scripts/index-0.js).
+const VIDEO_NOTES = Object.freeze({
+  "gemini-omni-1.2-flash": "預設。影片自帶現場聲音（關不掉），比較便宜。會自己分成幾個鏡頭；要一個鏡頭拍到底，請在描述寫「一鏡到底，不要切鏡頭」。",
+  "veo-3-1-fast": "沒有聲音。要配自己的旁白或音樂時用：把聲音選「靜音」就會自動換成它。",
+  "veo-3-1": "沒有聲音。Veo 3.1 Fast 的完整版，價格是兩倍。",
+  "runway-gen4-turbo": "沒有聲音。最便宜，但一定要放一張圖當第一格畫面。",
+  "luma-ray-3-2": "沒有聲音。只能做 5 秒。",
+});
 // Video vendor modules by job.video.provider (each: token, create, status, download, cancel); null = none (an old Sora job).
 const VIDEO_VENDORS = Object.freeze({ Google: geminiVideo, Replicate: replicateVideo });
 const videoVendor = (provider) => (Object.hasOwn(VIDEO_VENDORS, provider) ? VIDEO_VENDORS[provider] : null);
@@ -24,7 +33,7 @@ const videoVendor = (provider) => (Object.hasOwn(VIDEO_VENDORS, provider) ? VIDE
 // when there is no Gemini key. VW_VIDEO_MODEL names the default when it can run. The default comes first in the list.
 // usdPerSec = the button price (provider-cost.cjs videoUsd, the same function the charge uses).
 function videoModels(env) {
-  const row = (id, m, extra) => ({ id, durations: [...m.durations], defaultDurationSec: m.defaultDurationSec, ratios: [...m.ratios], requiresImage: m.requiresImage, usdPerSec: videoUsd(id, 1), free: false, ...extra });
+  const row = (id, m, extra) => ({ id, durations: [...m.durations], defaultDurationSec: m.defaultDurationSec, ratios: [...m.ratios], requiresImage: m.requiresImage, audio: m.audio, note: VIDEO_NOTES[id] || "", usdPerSec: videoUsd(id, 1), free: false, ...extra });
   const rows = [
     ...Object.entries(geminiVideo.MODELS).map(([id, m]) => row(id, m, { label: GEMINI_VIDEO_RATES[id].label, vendor: "Google", provider: "Google", model: id, keyName: "GEMINI_API_KEY", available: !!env.GEMINI_API_KEY })),
     ...Object.entries(replicateVideo.MOTION_MODELS).sort(([a], [b]) => (b === "veo-3-1-fast") - (a === "veo-3-1-fast")).map(([id, m]) =>
@@ -54,7 +63,7 @@ function capabilities(env, localTools) {
     removeBackground: !!env.REPLICATE_API_TOKEN, toolCosts,
     // Pages show prices in NT$ at next-admin's one rate (image-models.js TWD_RATE); prices stay USD everywhere else.
     twdRate: TWD_RATE,
-    motionReference: false, subtitles: false, muteOutput: false, generationWatermark: false,
+    motionReference: false, subtitles: false, generationWatermark: false,
     spokespersonVideo: false, reshoot: false, advancedMedia: false, localTools,
   };
 }
@@ -78,7 +87,8 @@ function validate(input, type, env = process.env) {
   if (vm.requiresImage && !refs.length) throw Error(vm.label + " 需要一張參考圖當第一格畫面；請先加入圖片。");
   if (settings.quality && settings.quality !== "720p") throw Error("目前影片服務只支援 720p");
   if (settings.subtitle === "開") throw Error("字幕燒錄服務尚未接入，請先關閉自動字幕。");
-  if (settings.audio === "靜音") throw Error("目前生成服務尚未支援靜音輸出。");
+  // A saved 有聲 with a silent model is an old draft (before 2026-11-10 the setting did nothing): it runs as it always did.
+  if (settings.audio === "靜音" && vm.audio) throw Error(vm.label + " 一定有聲音；要無聲影片，請把模型換成沒有聲音的（例如 Veo 3.1 Fast）。");
   if (settings.watermark && settings.watermark !== "不套用") throw Error("生成服務尚未支援浮水印；請在影片完成後使用浮水印工具。");
 }
 function imageDimensions(settings) {
