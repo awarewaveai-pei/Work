@@ -26,6 +26,13 @@
 - **特效**：畫面效果說明（調整在檢查器）；AI 畫質增強（輸出畫質、查看費用；完成後替換片段並保留剪輯設定）；從這裡重新生成（播放頭停在最後正常畫面，以該格為首幀、原提示詞重生，接在切點後取代失敗段）。
 - **貼圖**：新增浮水印（PNG／SVG，SVG 轉 PNG，存帳戶素材庫、之後專案保留）、專案貼圖清單；品牌套件：品牌色彩（新增）、品牌字型（Arial／Noto Sans TC／Noto Serif TC／sans-serif／serif）＋套用至選取文字、品牌 Logo（從圖片素材選）、儲存品牌套件（帳號內跨專案）。
 - **字幕**：逐句／樣式／辨識翻譯；語言軌（繁體中文、English、日本語、原文字軌，各附段數）；清空此軌。逐句：新增字幕、每句起訖秒＋文字、播放頭分割、合併下一句、刪除此句、匯出此軌 SRT。樣式：套用到此軌、字級、垂直位置、8 樣式（白字暗底、白底黑字、品牌色、白字黑邊、黃字黑邊、逐字高亮、卡拉 OK、色塊標題；後兩種要逐字時間碼）。辨識翻譯：辨識語言（自動偵測建議＋6 語）、一鍵整片字幕（辨識 V1＋A1 所有有聲片段、合成一軌、取代同語言軌）估價、匯入 SRT／VTT（免費、取代該語言軌、片尾後不匯入）、翻譯既有字幕（來源軌→目標語言、保留時間、結果獨立軌預設隱藏）估價、找回已完成的字幕結果。分數 < 0.8 標記需校對。
+  - **ED.10 後端介面**（`backend/transcribe.cjs`、`backend/api.cjs`；前綴 `/api/vw`；錯誤＝`{ error: { message } }`＋4xx／5xx，503＝未設 OpenAI 金鑰或主系統無價目）。字＝`{ start, end, text, score, filler, pauseAfter, source?, track?, clipId? }`；句＝`{ start, end, text, score, needsReview, words }`，`needsReview`＝`score < 0.8` 或無分數。語言值＝`自動偵測`／`繁體中文`／`簡體中文`／`English`／`日本語`／`한국어`／`ภาษาไทย`。
+    - `POST /transcriptions` `{ source: { url, type }, language?, words: true }` → `{ srt, language, segments, words }`（單檔 ≤ 25MB，送出即扣費）；不帶 `words` 照舊只回 `{ srt }`。
+    - `POST /editor/transcriptions/quote` `{ settings }` → `{ seconds, costUsd, chunks, segments, skipped: [{ index, clipId, reason }], model }`；免費、不建任務。`settings`＝`{ projectId, language?, segments: [{ url, sourceStart, duration, start, speed?, track: "V1"|"A1", clipId, muted?, hidden?, volume? }] }`（`start`／`duration` 時間軸秒、`sourceStart` 來源秒；V1＋A1 片段全送，靜音／隱藏／音量 0／來源無聲由伺服器跳過）。
+    - `POST /editor/transcriptions` `{ settings, idempotencyKey? }` → 202 任務（`operation: "editor-transcribe"`）；按確認才送，成功才扣＝估價 `costUsd`。輪詢 `GET /generations/<id>`（取消／重試同其他任務）；`result`＝`{ transcriptId, language, seconds, chunks, segmentCount, wordCount, reviewCount, origin }`。
+    - `GET /editor/transcriptions/<jobId>` → `{ jobId, projectId, requestedLanguage, language, createdAt, seconds, segments, words, srt, skipped, … }`（時間＝時間軸秒）；`GET /editor/transcriptions?projectId=<id>` → `{ results: [最新 20 筆摘要] }`＝找回已完成的字幕結果（重開頁面仍在）。
+    - 剪贅字資料（ED.11）：`shared/transcript-words.js`（瀏覽器全域 `TranscriptWords`，頁面需自行載入）`annotate(words)`、`cutRanges(words, { maxPause, fillers })` → 要剪的 `[start, end]` 秒（只在同一段錄音內）、`joinWords(texts)`。
+    - 燒錄：文字片段加 `subtitleStyle`（上列 8 樣式名）＋`words: [{ start, end, text }]`（從片段起點算的秒，≤ 200 字）。逐字高亮／卡拉 OK 只在 `words` 拼回＝片段文字（忽略空白）時動態，文字改過即靜態。`品牌色`＝片段 `color`；`色塊標題` 底＝`backgroundColor`，無則 `color`。沒有 `subtitleStyle` 的文字片段輸出不變。
 - **剪贅字**：說明；停頓最多保留（滑桿，預設 0.5 秒；只剪同一段錄音內）、剪掉贅字（嗯、呃、um、uh）勾選、無逐字時間碼時先辨識（另計，結果成隱藏字幕軌，改秒數重剪不再辨識）、說話語言（自動＋6 語）、估價。主影片、旁白、字幕一起剪，配樂連續。
 
 ### 1.4 預覽區
