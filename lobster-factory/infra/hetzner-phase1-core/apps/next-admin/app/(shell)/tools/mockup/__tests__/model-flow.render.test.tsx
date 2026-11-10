@@ -73,7 +73,7 @@ describe("主頁 模特: 模特兒圖 + design → product mockups", () => {
     expect(screen.queryByRole("button", { name: /Imagen/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /^Nano Banana 2（/ }));
     fireEvent.click(screen.getAllByRole("checkbox")[0]);
-    fireEvent.click(screen.getByRole("button", { name: /合成（1 張，約 NT\$2）/ }));
+    fireEvent.click(screen.getByRole("button", { name: /合成（1 張，約 NT\$3）/ /* nano-banana-2 is sent at 2K: US$0.101 (price audit e88ef493d) */ }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(bodies(fetchMock)[0].model).toBe("nano-banana-2");
     fireEvent.click(await screen.findByAltText("商品 Mockup"));
