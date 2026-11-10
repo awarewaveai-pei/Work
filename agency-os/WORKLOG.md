@@ -1,4 +1,11 @@
 # Worklog
+## 2026-11-10（續16）影音工作台價目核對（只查不改）
+
+- 做了：全面核對影音工作台讀的價目（`apps/next-admin/lib/ai/cost-model.ts`、`public/editor-shared/image-models.js`）對廠商官方價；表 `apps/video-workbench/docs/price-audit-20261110.md`。不改任何價格或程式。
+- 結論：不一致 4 筆（flux-kontext-dev 0.045 vs 0.025；bg-remove 0.002 vs ~0.00044；gpt-4o-mini-tts 15/1M 字元 vs token 計；flux-2-klein-4b 按 MP 計輸入也收）、查不到 6 筆（imagen-4、openai 每張估價、gemini-flash-latest 等）；Sora 2／Pro 官方頁標 2026-09-24 已下線。影片（Runway/Veo/Luma）、3D（SPAR3D/SF3D/TRELLIS）、Whisper、tts-1、文字模型皆一致。改價交監工決定。
+- REALTEST_WAIVED: QUERY_ONLY -- 只查官方公開頁，不改程式、不打付費 API
+- REVIEW_WAIVED: DOC_ONLY -- 只新增一份核對表
+- BUGHUNT_WAIVED: DOC_ONLY -- 無程式或 symbol 改動
 ## 2026-11-10（續15）影音工作台 PJ.5：刪掉剪輯檔或專案之後不壞頁、不回魂
 
 - 根因：PJ.1 的 `adopt` 每次開頁把「沒有歸屬」的剪輯檔收成新專案；一集或一個專案被刪後，它的剪輯檔變成沒歸屬，下次開頁又被收回＝刪不掉。一集的 `edit` 指到 ED.9 刪掉的檔時，「開啟剪輯」丟「找不到這一集的剪輯檔」，無法重開。
