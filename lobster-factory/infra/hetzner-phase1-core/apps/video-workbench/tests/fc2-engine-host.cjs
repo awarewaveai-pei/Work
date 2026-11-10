@@ -44,6 +44,28 @@ const other = (engine, ext) => `<!doctype html><script>const b = new TextEncoder
     return { ctx, page, tools, errors };
   };
   try {
+    // 0. tools-0.js (which declares `tool`) loads after tools-engine-host.js (tools-boot.js): a click or a closing page in
+    // between must not throw "tool is not defined".
+    {
+      const ctx = await browser.newContext();
+      let release;
+      const held = new Promise((r) => (release = r));
+      await ctx.route((url) => url.pathname.endsWith("/scripts/tools-0.js"), async (route) => (await held, route.continue()));
+      const page = await ctx.newPage();
+      const errors = [];
+      page.on("pageerror", (err) => errors.push(err.message));
+      await page.goto(base + "/pages/tools.html");
+      await page.waitForFunction(() => typeof engineFor === "function" && typeof render === "undefined");
+      await page.evaluate(() => {
+        document.body.click();
+        window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
+      });
+      release();
+      await page.waitForFunction(() => typeof render === "function");
+      assert.deepEqual(errors, [], "tools-0 載入前的點擊／關頁不應拋錯");
+      await ctx.close();
+      console.log("PASS before tools-0 loads: a click and beforeunload do not throw");
+    }
     // 1. No engine files -> neither card.
     {
       const { ctx, tools, errors } = await context(true);

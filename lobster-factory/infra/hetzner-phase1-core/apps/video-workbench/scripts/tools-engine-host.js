@@ -38,13 +38,16 @@ const ENGINES = {
   },
 };
 const engineFor = (id) => ENGINES[id] || null;
+// The open tool, for event handlers: tools-0.js declares `tool` but loads after this file (tools-boot.js), so a click or a
+// closing page before it has run would throw "tool is not defined".
+const engineTool = () => (typeof tool === "undefined" ? null : tool);
 const engineAvailable = {}; // engine -> true / false (HEAD of its page); absent = not known yet
 for (const cfg of Object.values(ENGINES))
   fetch(cfg.root + "index.html", { method: "HEAD" })
     .then((r) => r.ok, () => false)
     .then((ok) => {
       engineAvailable[cfg.engine] = ok;
-      if (typeof render === "function" && (!tool || engineFor(tool)?.engine === cfg.engine)) render();
+      if (typeof render === "function" && (!engineTool() || engineFor(engineTool())?.engine === cfg.engine)) render();
     });
 const eng = {
   cfg: null, // ENGINES entry of the open tool
@@ -427,8 +430,8 @@ document.addEventListener(
       return;
     }
     // Leaving the tool while unsaved asks first (capture phase: before tools-0.js switches the page).
-    const leave = engineFor(tool) && event.target.closest?.("[data-act]");
-    if (leave && /^(home|open:)/.test(leave.dataset.act) && leave.dataset.act !== "open:" + tool && !engineLeaveOk()) {
+    const leave = engineFor(engineTool()) && event.target.closest?.("[data-act]");
+    if (leave && /^(home|open:)/.test(leave.dataset.act) && leave.dataset.act !== "open:" + engineTool() && !engineLeaveOk()) {
       event.preventDefault();
       event.stopPropagation();
     }
@@ -436,7 +439,7 @@ document.addEventListener(
   true,
 );
 window.addEventListener("beforeunload", (event) => {
-  if (engineFor(tool) && engineUnsaved()) event.preventDefault();
+  if (engineFor(engineTool()) && engineUnsaved()) event.preventDefault();
 });
 
 // Cards FC.3 / EC.3: a render = the frame asks the engine for an MP4, then sends the file, its sources and (FilmCraft) the
