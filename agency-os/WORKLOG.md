@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-10（續27）影音工作台測試：價格期望值改由頁面同一個格式化函式算（NT$ 改動 2fc0f3f83 的收尾）
+
+- 根因：`tests/pj3-arrange.cjs:88` 斷言配音按鈕全文不含標價（P6.21 後付費按鈕都帶價）；其他測試寫死 US$／NT$ 金額。
+- 改：pj3-arrange、p5-workspace、remove-bg、replicate-video-ui 的期望值改在頁面用 `VideoWorkbenchMoney`／`VideoWorkbenchPrices.text` 加 capabilities 算；paid-price 的格式斷言改由 `TWD_RATE` 推算，加「沒有匯率不顯示金額」。`tests/generation-flows.cjs` 補 `REPLICATE_API_TOKEN`（Sora 下線後影片只走 Replicate）。
+- 未修（原本就紅）：`tests/generation-flows.cjs` 區塊編輯拖曳／縮放斷言（:155／:159），在改動前的 44a5d0381 乾淨 worktree 也紅；與價格無關。`tests/s4b-image-to-3d.cjs` 由 vw-s4b 改（寫死 NT$ 值）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs; node tests/pj3-arrange.cjs; node tests/remove-bg.cjs; node tests/replicate-video-ui.cjs; node tests/p5-workspace.cjs; node tests/paid-price.cjs; node tests/{ed2-timeline,ed3-inspector,p4-rig-ui,pj2-spine-settle,pj4-stale,pj5-deleted-edit}.cjs | exit=0 | ms=600000
+- REVIEW_WAIVED: NA -- 只改測試期望值的來源，不改產品程式
+- ORACLE_WAIVED: 只動測試檔；codex 額度封鎖至 14:03
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/tests,agency-os,scripts | grep=US\$|NT\$ | hits=3（s4b 兩檔屬 vw-s4b）
 ## 2026-11-10（續26）影音工作台：頁面價錢改顯示新台幣（操作者「頁面顯示的價錢要用新台幣」）
 
 - 改：一個格式化函式 `video-workbench/shared/models.js` `VideoWorkbenchMoney`（NT$＝USD × `capabilities.twdRate`）；匯率只有一份：next-admin `public/editor-shared/image-models.js` `TWD_RATE` 經 `backend/generation-policy.cjs` capabilities 傳下。`paid-price.js`、`models.js` priceText、`tools-3d.js` 三處原本各寫 US$，改共用它。價目、帳冊、用量回報仍是 USD。

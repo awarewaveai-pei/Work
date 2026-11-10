@@ -7,7 +7,6 @@ const { isolatedServer } = require("./isolated-server.cjs");
 
 const nextAdmin = path.join(__dirname, "../../next-admin/lib");
 const version = /BG_REMOVER_VERSION_DEFAULT\s*=\s*"([0-9a-f]{64})"/.exec(fs.readFileSync(path.join(nextAdmin, "studio/bg-remover.ts"), "utf8"))[1];
-const TWD_RATE = Number(/export const TWD_RATE = ([\d.]+)/.exec(fs.readFileSync(path.join(nextAdmin, "../public/editor-shared/image-models.js"), "utf8"))[1]);
 const cost = Number(/"bg-remove":\s*\{\s*usd:\s*([\d.]+)/.exec(fs.readFileSync(path.join(nextAdmin, "ai/cost-model.ts"), "utf8"))[1]);
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jTioAAAAASUVORK5CYII=", "base64");
 const cutout = Buffer.concat([png, Buffer.from("cutout")]);
@@ -83,7 +82,9 @@ const settle = async (call, id) => {
       await p.locator("#workspaceUpload").setInputFiles({ name: "去背來源.png", mimeType: "image/png", buffer: png });
       const card = p.locator(".workspace-card").filter({ hasText: "去背來源.png" });
       const button = card.locator("[data-asset-remove-bg]");
-      assert.equal((await button.textContent()).trim(), "去背 · 約 NT$" + Number((cost * TWD_RATE).toPrecision(2)) + "／張");
+      const shown = await p.evaluate((usd) => VideoWorkbenchMoney(usd), cost); // the page's formatter, cost-model.ts price
+      assert.match(shown, /^NT\$\d/);
+      assert.equal((await button.textContent()).trim(), "去背 · 約 " + shown + "／張");
       await button.click();
       let saved;
       for (let i = 0; i < 100 && !saved; i++, await p.waitForTimeout(200))
@@ -96,7 +97,7 @@ const settle = async (call, id) => {
       assert.deepEqual(saved.result.origin, origin(saved.sourceId));
       assert.equal(saved.result.kind, "image");
       assert.deepEqual(errors, []);
-      console.log("PASS 素材庫按鈕顯示「去背 · 約 NT$" + Number((cost * TWD_RATE).toPrecision(2)) + "／張」，結果存成新素材（origin 指回原素材）");
+      console.log("PASS 素材庫按鈕顯示「去背 · 約 " + shown + "／張」，結果存成新素材（origin 指回原素材）");
     } finally {
       await browser.close();
     }

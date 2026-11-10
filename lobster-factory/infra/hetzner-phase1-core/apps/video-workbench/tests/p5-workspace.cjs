@@ -201,7 +201,10 @@ async function setField(page, label, value) {
     pass("渲染中途取消：任務 cancelled、無成果資產、Blender 程序（pid " + pid + "）已結束、任務暫存目錄已刪");
 
     // 7) no vendor keys: the paid ways are disabled and say why; Meshy (card S4b: disabled) is not offered at all
-    const disabled = page.getByRole("button", { name: "Stability SPAR3D · NT$1.28（金鑰未設定）", exact: true });
+    // Price text from the page's own formatter (shared/models.js VideoWorkbenchMoney) and capabilities, not a copy.
+    const spar3d = await page.evaluate(() => VideoWorkbenchMoney(VideoWorkbench.capabilities.imageTo3d.methods.find((m) => m.id === "stability-spar3d").usd));
+    assert.match(spar3d, /^NT\$\d/);
+    const disabled = page.getByRole("button", { name: "Stability SPAR3D · " + spar3d + "（金鑰未設定）", exact: true });
     assert.equal(await disabled.isDisabled(), true);
     assert.equal(await page.locator('[data-t3-action="i3-method:meshy"]').count(), 0);
     assert.deepEqual(errors, []);

@@ -118,9 +118,12 @@ for (const [f, text] of Object.entries(src))
     assert.match(window.VideoWorkbenchPrices.text("video.transcribe video.script", caps), /^NT\$[\d.]+／分鐘 \+ 約 NT\$[\d.]+／次$/);
     // NT$ = USD x next-admin TWD_RATE (image-models.js), the one rate.
     assert.equal(caps.twdRate, rates.TWD_RATE);
-    assert.equal(window.VideoWorkbenchMoney(0.8, caps), "NT$25.6");
-    assert.equal(window.VideoWorkbenchMoney(0.04, caps), "NT$1.28");
-    assert.equal(window.VideoWorkbenchMoney(0.00044, caps), "NT$0.014");
+    // Format: >= NT$10 one decimal, >= NT$0.1 two decimals, below that two significant digits.
+    const r = rates.TWD_RATE;
+    assert.equal(window.VideoWorkbenchMoney(0.8, caps), "NT$" + (0.8 * r).toFixed(1));
+    assert.equal(window.VideoWorkbenchMoney(0.04, caps), "NT$" + (0.04 * r).toFixed(2));
+    assert.equal(window.VideoWorkbenchMoney(0.00044, caps), "NT$" + Number((0.00044 * r).toPrecision(2)));
+    assert.equal(window.VideoWorkbenchMoney(0.04, {}), "", "沒有匯率就不顯示金額（不得退回美元）");
   } finally {
     server.close();
   }

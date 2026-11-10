@@ -3,7 +3,7 @@ const { chromium } = require("playwright"),
 const fs = require("node:fs"), os = require("node:os"), path = require("node:path");
 (async () => {
   const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "vw-generation-flows-"));
-  const server = require("../server.cjs").createServer({ dataDir: path.join(evidence, "data"), env: { OPENAI_API_KEY: "test-only" }, fetchImpl: async () => { throw Error("Provider forbidden"); } });
+  const server = require("../server.cjs").createServer({ dataDir: path.join(evidence, "data"), env: { OPENAI_API_KEY: "test-only", REPLICATE_API_TOKEN: "test-only" /* video = Replicate since Sora 2 shut down */ }, fetchImpl: async () => { throw Error("Provider forbidden"); } });
   await new Promise(r => server.listen(0, "127.0.0.1", r));
   const base = "http://127.0.0.1:" + server.address().port;
   const browser = await chromium.launch({ channel: "msedge" }),
