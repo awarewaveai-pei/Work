@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-10（續24）影音工作台付費廠商替代方案調查（只查不改）
+
+- 產出：`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/vendor-alternatives-20261110.md`（8 類各一表＋建議換清單＋排除名單）。
+- 發現：
+  - C1 OpenAI TTS（gpt-4o-mini-tts／tts-1）2027-01-06 下線；後繼 gpt-realtime-2.1-mini 為 Realtime API 且更貴 → 建議 Gemini 3.8 Flash-Lite TTS（AA Elo 1260，支援繁中）。
+  - C2 whisper-1 2027-02-26 下線；後繼 gpt-transcribe 不給時間戳（字幕用不了）→ 建議 Gemini 3.5 Transcribe（AA-WER 2.6% vs whisper-1 10.6%）；CM:148 whisper-1 未標 retireOn。
+  - m1 影片 Gemini Omni 1.2 Flash 直連 ≈$0.07/s 含音訊、Arena T2V #1（現 Veo 3.1 Fast #16）；m2 nano-banana-2 → Nano Banana 2.1 直連半價且排名較高。
+  - n1 prod jobs.json 7 筆（≈0 用量），省錢以假設用量估：約 $20/月。
+- REALTEST_WAIVED: QUERY_ONLY -- 只讀官方價目頁、排行榜與 prod jobs.json（唯讀 ssh），未打付費 API、未改程式
+- REVIEW_WAIVED: DOC_ONLY -- 只新增調查文件
+- BUGHUNT_WAIVED: DOC_ONLY -- 只新增調查文件，無程式改動
 ## 2026-11-10（續22）影音工作台 ED.3.8：預覽補遮罩、顆粒、背景模糊（§9 G1）
 
 - 改：`scripts/tools-editor.js` `edPaint` 讀輸出端同一組欄位（`c.mask`；`grain` 最近一層；主軌 `background`／`backgroundBlur`）。遮罩＝CSS `clip-path`（形狀同 `backend/editor-export.cjs` geq 條件）；顆粒＝兩張互補雜訊（`plus-lighter` 加、`difference` 減），不透明度 30·grain/255＝輸出端 ±30·grain；背景模糊＝畫面後方 canvas，cover 縮放，σ＝r/√3 換算到比例的 1080p 寬。輸出端不動。
