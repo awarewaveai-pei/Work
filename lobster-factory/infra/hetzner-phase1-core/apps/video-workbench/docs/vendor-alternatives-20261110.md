@@ -187,6 +187,35 @@ prod 的 `/data/orgs/39ad4149-…/jobs.json` 只有 7 筆（2026-11-05～11-10�
 - 用真實用量（目前 ≈ 0）算，實際省 ≈ $0。
 - 真正要做的是第 1、2 項，因為廠商要下線。
 
+## 實測結果與採用（2026-11-10，第 1、2 項已換）
+
+樣本：Gemini 3.8 Flash-Lite TTS 生成的繁中 3 段（一般口說 40.6 秒、「嗯／呃」與停頓 32.7 秒、中英夾雜 25.4 秒），付費實測合計 < US$0.02（金鑰目前是免費層）。
+
+**字幕：預設 A（主機 whisper large-v3）。** B 不符「繁體輸出」，但照監工決定並存可選（按鈕標價與缺點）。
+
+| | A 主機 whisper large-v3（CPU int8×8） | B Gemini 3.5 Transcribe |
+|---|---|---|
+| 一般口說 | 繁體，全對 | **簡體**輸出 |
+| 嗯／呃 | 只留第一個「嗯」，其餘贅字沒寫出來 | 簡體；贅字全丟 |
+| 中英夾雜 | 繁體，全對 | 繁體；「這次的」聽成「Test」 |
+| 指定 `cmn-Hant-TW` | — | 仍是簡體（官方語言表沒有繁體普通話） |
+| 逐字時間 | 有；英文被拆成片段（Work＋shop），worker 已併回 | 有（annotations） |
+| 速度 | 0.65 倍即時（40.6 秒音訊 61.7 秒） | 約 10 秒／段；常回 503 忙線 |
+| 費用 | 0 | ≈US$0.005／分鐘 |
+
+- 實作：`apps/video-whisper-worker/app.py` 新增 `POST /v1/transcribe`（同步、原始音訊、回 verbose_json 形狀）；`backend/transcribe.cjs` 單一清單 `ENGINES`：host（預設）／gemini／openai，頁面從 `/capabilities` 長出按鈕；過了 registry `retireOn` 的列自動消失、指名送出回 400。
+- Gemini 接頭：只回逐字（`start_index`／`end_index` 是 UTF-8 位元組位置），依標點／停頓切句；無信心分數；503 常見，接頭重試 2 次。
+- 工具頁（字幕、短影音分析）改送非同步任務：主機 whisper 約 1.5 倍片長，同步請求會被 nginx 300 秒切斷。
+- 兩者都不寫「嗯、呃」：ED.11 剪贅字只能靠停頓資料。
+
+**配音：換 Gemini 3.8 Flash-Lite TTS。** 試聽三句（`D:/tmp/vw-tts-stt/tts*.wav`，用主機 whisper 回聽）：
+- 多音字「銀行的行長／一行字／長大／長江」：辨識回來字全對。
+- 英文夾雜「Google Chrome、Gmail、PDF、Dropbox、iPhone」：全對。
+- 數字「1,234,567 元」：回聽成「1億234567」、只念 1.8 秒，疑似逐位念。**要人工試聽**；其餘數字（12.5%、11 月 20 日、3 點半、7 樓）正確。
+- 實作：`backend/speech.cjs` 單一清單 `MODELS`：Gemini（預設）／OpenAI 並存可選，各標價；OpenAI 列依 registry `retireOn` 2027-01-06 自動消失。舊 OpenAI 聲線對到 Gemini。價格 `cost-model.ts` GEMINI_TTS_RATES（回覆的 token 計費；2027-01-01 起加倍）。
+
+預設改指：`VW_TTS_MODEL`、`VW_TRANSCRIBE_ENGINE`（須是清單中未下線的列；否則用第一個已設定的列）。
+
 ## 已排除（中國公司或其控制的公司）
 
 AA 和 Arena 頁面不標國籍，以下依公開常識判斷，榜上出現也一律不用：

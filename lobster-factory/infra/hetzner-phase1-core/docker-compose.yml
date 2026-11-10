@@ -702,6 +702,11 @@ services:
       ENTITLEMENT_ISSUER_TOKEN_VIDEO: ${ENTITLEMENT_ISSUER_TOKEN_VIDEO:-}
       ENTITLEMENT_PUBLIC_KEYS: ${ENTITLEMENT_PUBLIC_KEYS:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # Speech = Gemini (backend/speech.cjs); captions = our whisper worker, same URL/token as next-admin (backend/transcribe.cjs).
+      # Pages offer every configured, not-yet-retired vendor; VW_TTS_MODEL / VW_TRANSCRIBE_ENGINE change the default.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      VW_TRANSCRIBE_WORKER_URL: ${MEDIA_TRANSCRIBE_WORKER_URL:-}
+      VW_TRANSCRIBE_WORKER_TOKEN: ${MEDIA_TRANSCRIBE_WORKER_TOKEN:-}
       REPLICATE_API_TOKEN: ${REPLICATE_API_TOKEN:-}
       STABILITY_API_KEY: ${STABILITY_API_KEY:-}  # card S4b image -> 3D (Stability SPAR3D / SF3D)
       MESHY_API_KEY: ${MESHY_API_KEY:-}

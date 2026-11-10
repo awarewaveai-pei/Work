@@ -1,15 +1,71 @@
 // Card ED.10: speech recognition with word times and a confidence score, for one file (/transcriptions words:true) and
 // for a whole editor project (the audible V1 + A1 clips mixed into one audio file, then mapped back to timeline time).
-// Provider = OpenAI whisper-1 (the only transcription model next-admin's cost model prices: TRANSCRIBE_RATES).
+// Engines = the one list of speech-to-text connectors (like next-admin video-motion-models.ts for video); pages draw them as
+// buttons from /capabilities (transcribe.engines). Adding or removing a vendor = one row + its call below. A row whose
+// next-admin registry retireOn (cost-model.ts MEDIA_MODELS) has come leaves the list and a job naming it is refused.
+// Default = VW_TRANSCRIBE_ENGINE when it names a live row, else the first configured row: our own whisper (2026-11-10 A/B,
+// docs/vendor-alternatives-20261110.md). Every connector answers whisper verbose_json shape, so normalize() reads all.
 const fs = require("node:fs"),
   path = require("node:path"),
   crypto = require("node:crypto");
 const TranscriptWords = require("../shared/transcript-words.js");
+const { vwEnv } = require("./env-compat.cjs");
+const rates = require(path.join(require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env), "lib/ai/cost-model.ts"));
 
-const MODEL = "whisper-1";
 const LANGUAGES = { 繁體中文: "zh", 簡體中文: "zh", English: "en", 日本語: "ja", 한국어: "ko", ภาษาไทย: "th" };
 // OpenAI's upload limit is 25 MB; a little under it so the multipart overhead never tips a chunk over.
 const UPLOAD_BYTES = 24 * 1024 * 1024;
+// The host worker runs ~0.65x real time on CPU (2026-11-10 A/B, 8 threads): chunks of ~5 min of the 32 kbit/s mix keep one
+// request near 8 minutes; HOST_SECONDS_PER_AUDIO_SECOND sizes the job limit.
+const HOST_UPLOAD_BYTES = 300 * 4000;
+const HOST_SECONDS_PER_AUDIO_SECOND = 2;
+// Gemini: word timestamps are limited to 30 minutes of audio per request (aistudio.google.com/docs/transcription): ~25 min.
+const GEMINI_UPLOAD_BYTES = 1500 * 4000;
+// note = what the page says beside the button (pros and cons, 2026-11-10 A/B with three Traditional-Chinese samples).
+const ENGINES = Object.freeze([
+  Object.freeze({ id: "host", model: "host-whisper-large-v3", provider: "AwareWave 主機", label: "自家主機 Whisper", uploadBytes: HOST_UPLOAD_BYTES,
+    note: "免費、較慢：要等約影片長度的 1.5 倍。聲音不送出主機、繁體輸出、逐字時間；「嗯、呃」多半不會寫進字幕。" }),
+  Object.freeze({ id: "gemini", model: "gemini-3.5-transcribe", provider: "Google", label: "Gemini 辨識", uploadBytes: GEMINI_UPLOAD_BYTES,
+    note: "快（30 秒的片約 10 秒）、逐字時間。中文常輸出簡體、沒有信心分數（每句都標需校對）；聲音送到 Google，尖峰時段可能忙線。" }),
+  Object.freeze({ id: "openai", model: "whisper-1", provider: "OpenAI", label: "OpenAI Whisper", uploadBytes: UPLOAD_BYTES,
+    note: "快、依分鐘計費、聲音送到 OpenAI。OpenAI 2027-02-26 停止服務。" }),
+]);
+const day = (at) => new Date(at ?? Date.now()).toISOString().slice(0, 10);
+const retireOn = (e) => rates.MEDIA_MODELS[e.model]?.retireOn || null;
+const live = (at) => ENGINES.filter((e) => !retireOn(e) || retireOn(e) > day(at));
+function defaultEngine(env = process.env, at) {
+  const list = live(at), wanted = vwEnv(env, "TRANSCRIBE_ENGINE");
+  return list.find((e) => e.id === wanted) || list.find((e) => available(e, env)) || list[0];
+}
+// The engine a job runs: its named live row, else the default. A retired or unknown name is refused, never swapped.
+function pick(id, env = process.env, at) {
+  if (id === undefined || id === null || id === "") return defaultEngine(env, at);
+  const e = live(at).find((x) => x.id === id);
+  if (!e) throw Object.assign(Error(ENGINES.some((x) => x.id === id) ? "此辨識服務已停止，請改選其他辨識方式" : "語音辨識方式無效"), { status: 400 });
+  return e;
+}
+const available = (engine, env) => { try { auth(engine, env); return true; } catch { return false; } };
+// What one call needs, checked before a job is recorded (503 = never sent).
+function auth(engine, env = process.env) {
+  const missing = (name) => Object.assign(Error("此電腦尚未設定 " + name + "；請先設定服務。"), { status: 503 });
+  if (engine.id === "openai" || engine.id === "gemini") {
+    const name = engine.id === "openai" ? "OPENAI_API_KEY" : "GEMINI_API_KEY";
+    if (!env[name]) throw missing(name);
+    return { key: env[name] };
+  }
+  const url = String(vwEnv(env, "TRANSCRIBE_WORKER_URL") || "").trim().replace(/\/+$/, ""),
+    token = String(vwEnv(env, "TRANSCRIBE_WORKER_TOKEN") || "").trim();
+  if (!/^https?:\/\/[\w.-]+(:\d+)?$/.test(url)) throw missing("VW_TRANSCRIBE_WORKER_URL");
+  if (!token) throw missing("VW_TRANSCRIBE_WORKER_TOKEN");
+  return { url, token };
+}
+// /capabilities: the live rows as the page needs them; price = provider-cost.cjs transcribePrice (same rule as the charge).
+function capability(env, priceOf, at) {
+  return {
+    defaultEngine: defaultEngine(env, at).id,
+    engines: live(at).map((e) => ({ id: e.id, model: e.model, provider: e.provider, label: e.label, note: e.note, retireOn: retireOn(e), available: available(e, env), price: priceOf(e.model) })),
+  };
+}
 const GAP = 1; // seconds of silence between two separate stretches of sound in the mixed file
 const MERGE = 0.3; // clips closer than this on the timeline are one stretch (a cut between two clips is not a pause)
 
@@ -66,18 +122,98 @@ function srtTime(seconds) {
 }
 const toSrt = (segments) => segments.map((s, i) => `${i + 1}\n${srtTime(s.start)} --> ${srtTime(s.end)}\n${s.text}\n`).join("\n");
 
-// One whisper-1 call. words=false keeps the old answer (SRT text); words=true asks for verbose_json with word and
-// segment timestamps and returns the parsed JSON.
-async function whisper({ buffer, filename, mime, language, words, key, fetchImpl, signal }) {
+// One call to the engine: whisper verbose_json shape { language, segments, words, usage? } from every connector.
+async function recognize({ engine = ENGINES[0], buffer, filename, mime, language, auth, fetchImpl, signal }) {
   if (buffer.length > 25 * 1024 * 1024) throw bad("語音辨識的檔案上限為25MB，請先裁短片段");
+  if (engine.id === "host") return host({ buffer, language, auth, fetchImpl, signal });
+  if (engine.id === "gemini") return gemini({ engine, buffer, mime, language, auth, fetchImpl, signal });
+  return whisper({ engine, buffer, filename, mime, language, key: auth.key, fetchImpl, signal });
+}
+async function host({ buffer, language, auth, fetchImpl, signal }) {
+  const query = new URLSearchParams({ language: languageCode(language) || "", traditional: language === "簡體中文" ? "0" : "1" });
+  // The worker takes one request at a time (next-admin's caption jobs share it) and one may carry 25 MB: a long wait.
+  const r = await fetchImpl(auth.url + "/v1/transcribe?" + query, {
+    method: "POST",
+    headers: { Authorization: "Bearer " + auth.token, "Content-Type": "application/octet-stream" },
+    body: buffer,
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(3600000)]) : AbortSignal.timeout(3600000),
+  });
+  if (!r.ok) throw Error("語音辨識失敗：主機 " + r.status);
+  const value = await r.json().catch(() => null);
+  if (!value || !Array.isArray(value.segments)) throw Error("語音辨識回覆格式無效");
+  return value;
+}
+// Google lists Mandarin only as cmn-Hans-CN (Simplified): 繁體中文 and 自動偵測 send no code.
+const GEMINI_LANGUAGES = { en: "en-US", ja: "ja-JP", ko: "ko-KR", th: "th-TH" };
+async function gemini({ engine, buffer, mime, language, auth, fetchImpl, signal }) {
+  const code = languageCode(language), lang = language === "簡體中文" ? "cmn-Hans-CN" : GEMINI_LANGUAGES[code];
+  const body = JSON.stringify({
+    model: "models/" + engine.model,
+    input: [{ type: "audio", data: buffer.toString("base64"), mime_type: mime || "audio/mpeg" }],
+    generation_config: { transcription_config: { mode: { type: "verbatim", timestamp_granularities: ["word"] }, ...(lang ? { language_codes: [lang] } : {}) } },
+  });
+  // 503 "high demand" / 429 came often on 2026-11-10 and passed within a minute: two more tries, 10 s then 20 s apart.
+  let r;
+  for (const wait of [0, 10000, 20000]) {
+    if (wait) await new Promise((resolve, reject) => {
+      const t = setTimeout(resolve, wait);
+      signal?.addEventListener("abort", () => { clearTimeout(t); reject(signal.reason); }, { once: true });
+    });
+    r = await fetchImpl("https://generativelanguage.googleapis.com/v1beta/interactions", {
+      method: "POST",
+      headers: { "x-goog-api-key": auth.key, "Content-Type": "application/json" },
+      body,
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(900000)]) : AbortSignal.timeout(900000),
+    });
+    if (r.status !== 503 && r.status !== 429) break;
+  }
+  const value = await r.json().catch(() => null);
+  if (!r.ok) throw Error("語音辨識失敗：Google " + r.status);
+  return fromGemini(value, code);
+}
+// Gemini answers text + word annotations ("0.100s" offsets, start_index/end_index into the text), no segments and no
+// confidence: a segment ends at sentence punctuation, a pause over 1 s, or 15 s; its text is the slice of the answer.
+function fromGemini(value, code) {
+  const part = (value?.steps || []).flatMap((s) => s?.content || []).find((c) => c?.type === "text");
+  if (!part) throw Error("語音辨識回覆格式無效");
+  // start_index / end_index are UTF-8 byte offsets (2026-11-10 reply: one CJK character = 3).
+  const bytes = Buffer.from(String(part.text || ""), "utf8"), slice = (from, to) => bytes.subarray(from, to).toString("utf8"),
+    sec = (v) => Number(String(v ?? "").replace(/s$/, ""));
+  const words = (part.annotations || []).filter((a) => a?.type === "word_info")
+    .map((a) => ({ word: String(a.text ?? ""), start: sec(a.start_offset), end: sec(a.end_offset), from: a.start_index, to: a.end_index }))
+    .filter((w) => w.word && Number.isFinite(w.start) && Number.isFinite(w.end));
+  const segments = [];
+  let current = null;
+  for (const w of words) {
+    if (current && (w.start - current.end > 1 || w.end - current.start > 15)) current = null;
+    if (!current) segments.push((current = { start: w.start, end: w.end, words: [] }));
+    current.end = w.end;
+    current.words.push(w);
+    // Punctuation lives in the text, not in the word annotations: look right after the word.
+    if (/[。！？.!?]$/.test(w.word) || (Number.isInteger(w.to) && /^\s*[。！？.!?]/.test(slice(w.to, w.to + 8)))) current = null;
+  }
+  return {
+    language: code,
+    usage: value.usage || null,
+    segments: segments.map((g) => {
+      // The sentence's slice of the text, with the punctuation that closes it.
+      const first = g.words[0], last = g.words.at(-1),
+        mark = Number.isInteger(last.to) ? /^[。！？.!?，,]/.exec(slice(last.to, last.to + 8))?.[0] || "" : "",
+        end = Number.isInteger(last.to) ? last.to + Buffer.byteLength(mark) : 0,
+        sliced = Number.isInteger(first.from) && end > first.from ? slice(first.from, end).trim() : "";
+      return { start: g.start, end: g.end, text: sliced || g.words.map((w) => w.word).join("") };
+    }),
+    words: words.map(({ word, start, end }) => ({ word, start, end })),
+  };
+}
+// whisper-1 (OpenAI, until 2027-02-26).
+async function whisper({ engine, buffer, filename, mime, language, key, fetchImpl, signal }) {
   const form = new FormData();
   form.append("file", new Blob([buffer], { type: mime || "audio/mpeg" }), filename);
-  form.append("model", MODEL);
-  form.append("response_format", words ? "verbose_json" : "srt");
-  if (words) {
-    form.append("timestamp_granularities[]", "word");
-    form.append("timestamp_granularities[]", "segment");
-  }
+  form.append("model", engine.model);
+  form.append("response_format", "verbose_json");
+  form.append("timestamp_granularities[]", "word");
+  form.append("timestamp_granularities[]", "segment");
   const code = languageCode(language);
   if (code) form.append("language", code);
   const r = await fetchImpl("https://api.openai.com/v1/audio/transcriptions", {
@@ -87,10 +223,14 @@ async function whisper({ buffer, filename, mime, language, words, key, fetchImpl
     signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(300000)]) : AbortSignal.timeout(180000),
   });
   if (!r.ok) throw Error("語音辨識失敗：" + r.status);
-  if (!words) return r.text();
   const value = await r.json().catch(() => null);
   if (!value || !Array.isArray(value.segments)) throw Error("語音辨識回覆格式無效");
   return value;
+}
+// Usage summed over chunks; one chunk without usage = null (the charge then uses the published estimate).
+function addUsage(total, usage) {
+  if (total === null || !usage || !Number.isFinite(Number(usage.total_output_tokens))) return null;
+  return { total_input_tokens: total.total_input_tokens + (Number(usage.total_input_tokens) || 0), total_output_tokens: total.total_output_tokens + Number(usage.total_output_tokens) };
 }
 
 // ---- Whole project ---------------------------------------------------------------------------------------------
@@ -195,21 +335,32 @@ async function prepare(settings, { localFile, inspect, signal }) {
   if (!audible.length) throw bad("沒有有聲片段可以辨識");
   return { audible, skipped, ...layout(audible) };
 }
-function quote(prepared, costs, maxBytes = UPLOAD_BYTES) {
+// Seconds of audio a whole-project run sends (0 for an invalid plan; start() rejects it anyway).
+function audioSeconds(settings) {
+  try { return layout(plan(settings)).seconds; } catch { return 0; }
+}
+// Job limit of a whole-project run (api.cjs jobTimeoutMs): 30 min, longer when the host worker needs it. The worker takes
+// one request at a time, so aheadSeconds = audio of the host runs already queued or running here waits first.
+function timeoutMs(settings, engine = ENGINES[0], aheadSeconds = 0) {
+  const base = 1800000;
+  if (engine.id !== "host") return base;
+  return Math.max(base, Math.ceil((audioSeconds(settings) + aheadSeconds) * HOST_SECONDS_PER_AUDIO_SECOND * 1000) + 600000);
+}
+function quote(prepared, costs, maxBytes = UPLOAD_BYTES, engine = ENGINES[0]) {
   // Mono 16 kHz MP3 at 32 kbit/s = 4000 bytes per second: the chunk count before the file exists.
   const estimated = prepared.seconds * 4000;
   return {
     seconds: prepared.seconds,
-    costUsd: costs.transcribeUsd(MODEL, prepared.seconds),
+    costUsd: costs.transcribeUsd(engine.model, prepared.seconds),
     chunks: chunks(prepared.groups, prepared.seconds, estimated, maxBytes).length,
     segments: prepared.audible.length,
     skipped: prepared.skipped,
-    model: MODEL,
+    model: engine.model,
   };
 }
 // Mixes the stretches into one mono 16 kHz MP3 (each clip delayed to its place in the file), splits it under the upload
 // limit, transcribes every chunk and maps every time back to the timeline.
-async function transcribeProject(settings, { localFile, inspect, run, tmpDir, key, fetchImpl, signal, costs, maxBytes = UPLOAD_BYTES, onProgress = () => {} }) {
+async function transcribeProject(settings, { localFile, inspect, run, tmpDir, engine = ENGINES[0], auth, fetchImpl, signal, costs, maxBytes = engine.uploadBytes, onProgress = () => {} }) {
   const prepared = await prepare(settings, { localFile, inspect, signal });
   const { audible, groups, seconds } = prepared;
   const stamp = crypto.randomUUID(), temporary = [];
@@ -230,14 +381,15 @@ async function transcribeProject(settings, { localFile, inspect, run, tmpDir, ke
     await run(["-y", "-hide_banner", ...inputs, "-filter_complex", graph.join(";"), "-map", "[out]", "-ac", "1", "-ar", "16000", "-c:a", "libmp3lame", "-b:a", "32k", mixed], signal);
     const parts = chunks(groups, seconds, fs.statSync(mixed).size, maxBytes);
     const segments = [], words = [];
-    let language = null;
+    let language = null, usage = { total_input_tokens: 0, total_output_tokens: 0 };
     for (const [i, [from, to]] of parts.entries()) {
       let file = mixed;
       if (parts.length > 1) {
         file = tmp(`part-${i}.mp3`);
         await run(["-y", "-hide_banner", "-ss", String(from), "-t", String(round(to - from)), "-i", mixed, "-ac", "1", "-ar", "16000", "-c:a", "libmp3lame", "-b:a", "32k", file], signal);
       }
-      const verbose = await whisper({ buffer: fs.readFileSync(file), filename: `project-${i}.mp3`, mime: "audio/mpeg", language: settings.language, words: true, key, fetchImpl, signal });
+      const verbose = await recognize({ engine, buffer: fs.readFileSync(file), filename: `project-${i}.mp3`, mime: "audio/mpeg", language: settings.language, auth, fetchImpl, signal });
+      usage = addUsage(usage, verbose.usage);
       const part = normalize(verbose, (t, mid) => (Number.isFinite(t) && Number.isFinite(mid) ? timelineOf(groups, from + t, from + mid) : null));
       language ||= part.language;
       segments.push(...part.segments);
@@ -263,7 +415,7 @@ async function transcribeProject(settings, { localFile, inspect, run, tmpDir, ke
       language,
       seconds,
       chunks: parts.length,
-      costUsd: costs.transcribeUsd(MODEL, seconds),
+      costUsd: costs.transcribeUsd(engine.model, seconds, usage),
       skipped: prepared.skipped,
       segments,
       words: annotated,
@@ -274,4 +426,4 @@ async function transcribeProject(settings, { localFile, inspect, run, tmpDir, ke
   }
 }
 
-module.exports = { MODEL, LANGUAGES, UPLOAD_BYTES, GAP, scoreOf, normalize, toSrt, whisper, plan, layout, timelineOf, chunks, prepare, quote, transcribeProject };
+module.exports = { ENGINES, live, pick, defaultEngine, auth, capability, LANGUAGES, UPLOAD_BYTES, HOST_UPLOAD_BYTES, GAP, scoreOf, normalize, toSrt, recognize, fromGemini, plan, layout, timelineOf, chunks, prepare, audioSeconds, timeoutMs, quote, transcribeProject };

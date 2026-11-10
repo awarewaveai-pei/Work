@@ -26,8 +26,32 @@ function wfCheck(key, title) {
   return `<label class="check"><input type="checkbox" data-key="${esc(key)}" data-flow-render ${values[key] ? "checked" : ""}>${esc(title)}</label>`;
 }
 // paid = the feature key(s) shared/paid-price.js prices on the button.
-function wfButton(title, action, disabled = false, paid = "") {
-  return `<button type="button" class="btn" data-flow-action="${esc(action)}"${paid ? ` data-paid="${esc(paid)}"` : ""} ${disabled ? "disabled" : ""}>${esc(title)}</button>`;
+function wfButton(title, action, disabled = false, paid = "", paidModel = "") {
+  return `<button type="button" class="btn" data-flow-action="${esc(action)}"${paid ? ` data-paid="${esc(paid)}"` : ""}${paidModel ? ` data-paid-model="${esc(paidModel)}"` : ""} ${disabled ? "disabled" : ""}>${esc(title)}</button>`;
+}
+// Speech models / transcription engines from /capabilities (speech.models, transcribe.engines: one list on the server,
+// backend/speech.cjs and transcribe.cjs) as visible buttons: name · price, and the chosen row's pros and cons under them.
+// The saved id counts only while its row is in the list (a retired row is gone); otherwise the default.
+function wfProviders(kind) {
+  const c = VideoWorkbench.capabilities;
+  return kind === "speech"
+    ? { rows: c?.speech?.models || [], fallback: c?.speech?.defaultModel, feature: "video.tts" }
+    : { rows: c?.transcribe?.engines || [], fallback: c?.transcribe?.defaultEngine, feature: "video.transcribe" };
+}
+function wfProviderCurrent(kind, saved) {
+  const { rows, fallback } = wfProviders(kind);
+  return rows.some((r) => r.id === saved) ? saved : fallback;
+}
+function wfProviderChoice(kind, key, title) {
+  const { rows, feature } = wfProviders(kind);
+  if (!rows.length) return "";
+  const current = wfProviderCurrent(kind, values[key]), row = rows.find((r) => r.id === current);
+  return `<label>${esc(title)}</label><div class="flow-choices" role="group">${rows
+    .map((r) => {
+      const price = window.VideoWorkbenchPrices?.text(feature, VideoWorkbench.capabilities, r.id) || "";
+      return `<button type="button" class="btn small ${r.id === current ? "selected" : ""}" data-flow-choice="${esc(key)}" data-flow-value="${esc(r.id)}" data-flow-multiple="false" aria-pressed="${r.id === current}"${r.available ? "" : " disabled"}>${esc(r.label)}${price ? " · " + esc(price) : ""}${r.available ? "" : "（未設定）"}</button>`;
+    })
+    .join("")}</div>${row ? `<p class="note">${esc(row.note)}</p>` : ""}`;
 }
 function wfWrap(t, content) {
   return `<div class="wrap tool-flow" data-tool-flow="${t.id}">${header(t, t.id.toUpperCase())}${content}</div>`;
@@ -70,7 +94,7 @@ function toolWorkflowScreen(t) {
     content =
       wfSource() +
       (files.src
-        ? `<aside class="side"><h3>分析設定</h3><label>剪成</label>${wfChoice("shortMode", ["多支短影音", "一支精華"])}<label>挑選方式</label>${wfChoice("shortPick", ["AI 自動判斷", "依我的指令"])}${values.shortPick === "依我的指令" ? wfCheck("shortVisual", "依畫面內容找（AI 看畫面，不聽內容）") + wfArea("shortPrompt", "剪輯指令", 500) + `<div class="flow-choices">${(values.shortVisual ? ["產品特寫", "操作示範", "精彩動作", "風景空景"] : ["精華重點", "金句爆點", "教學步驟", "產品亮點", "幽默有梗"]).map((name) => wfButton(name, "short-preset:" + name)).join("")}</div>` : '<p class="note">分析整支影片，尋找能單獨成立的段落。</p>'}${values.shortMode === "多支短影音" ? wfSelect("shortLength", "每段長度", ["自動（20–60 秒）", "短（15–35 秒）", "中（30–60 秒）", "長（60–120 秒）"]) + wfSelect("shortCount", "建議數量", ["最多 3 段", "最多 5 段", "最多 8 段", "最多 10 段"]) : wfSelect("shortHighlightLength", "精華長度", ["約 30 秒", "約 60 秒", "約 90 秒"])}${wfSelect("shortLanguage", "語音辨識語言", wfLanguages())}${btn("匯入 SRT／VTT（免辨識）", "upload:subtitlefile")}${wfCheck("shortCaption", "輸出時加入字幕")}${wfStats()}${wfButton("開始分析", "short-analyze", false, "video.transcribe video.script")}</aside>`
+        ? `<aside class="side"><h3>分析設定</h3><label>剪成</label>${wfChoice("shortMode", ["多支短影音", "一支精華"])}<label>挑選方式</label>${wfChoice("shortPick", ["AI 自動判斷", "依我的指令"])}${values.shortPick === "依我的指令" ? wfCheck("shortVisual", "依畫面內容找（AI 看畫面，不聽內容）") + wfArea("shortPrompt", "剪輯指令", 500) + `<div class="flow-choices">${(values.shortVisual ? ["產品特寫", "操作示範", "精彩動作", "風景空景"] : ["精華重點", "金句爆點", "教學步驟", "產品亮點", "幽默有梗"]).map((name) => wfButton(name, "short-preset:" + name)).join("")}</div>` : '<p class="note">分析整支影片，尋找能單獨成立的段落。</p>'}${values.shortMode === "多支短影音" ? wfSelect("shortLength", "每段長度", ["自動（20–60 秒）", "短（15–35 秒）", "中（30–60 秒）", "長（60–120 秒）"]) + wfSelect("shortCount", "建議數量", ["最多 3 段", "最多 5 段", "最多 8 段", "最多 10 段"]) : wfSelect("shortHighlightLength", "精華長度", ["約 30 秒", "約 60 秒", "約 90 秒"])}${wfSelect("shortLanguage", "語音辨識語言", wfLanguages())}${wfProviderChoice("transcribe", "shortEngine", "辨識方式")}${btn("匯入 SRT／VTT（免辨識）", "upload:subtitlefile")}${wfCheck("shortCaption", "輸出時加入字幕")}${wfStats()}${wfButton("開始分析", "short-analyze", false, "video.transcribe video.script", wfProviderCurrent("transcribe", values.shortEngine))}</aside>`
         : '<aside class="side"><h3>使用方式</h3><p>選影片 → 分析並比較段落 → 調整起訖與裁切 → 確認輸出。</p></aside>');
   } else if (t.id === "follow") {
     return toolFollowScreen(t);
@@ -118,6 +142,33 @@ function toolWorkflowScreen(t) {
   else return null;
   if (t.id === "short" && files.src) content += toolShortResults();
   return wfWrap(t, `<div class="two-col flow-layout">${content}</div>`);
+}
+// Speech-to-text of one file as a job (POST /editor/transcriptions -> poll -> the saved transcript), answering its SRT.
+// Not the sync /transcriptions: the host whisper worker takes ~1.5x the clip's length, longer than nginx keeps a request
+// open (300 s). The job also prices and permits like any paid job.
+async function wfMediaDuration(source) {
+  if (Number(source?.duration) > 0) return Number(source.duration);
+  return new Promise((resolve, reject) => {
+    const media = document.createElement(String(source?.type || "").startsWith("audio/") ? "audio" : "video"),
+      timer = setTimeout(() => done(reject, Error("無法讀取素材長度")), 15000);
+    const done = (f, v) => { clearTimeout(timer); media.removeAttribute("src"); f(v); };
+    media.preload = "metadata";
+    media.onloadedmetadata = () => (Number.isFinite(media.duration) && media.duration > 0 ? done(resolve, media.duration) : done(reject, Error("素材長度無效")));
+    media.onerror = () => done(reject, Error("無法讀取素材長度"));
+    media.src = source.previewUrl || source.url;
+  });
+}
+async function wfTranscribe(source, language, engine) {
+  const duration = await wfMediaDuration(source);
+  const job = await VideoWorkbench.request("/editor/transcriptions", {
+    idempotencyKey: crypto.randomUUID(),
+    settings: { language: language || "自動偵測", engine: wfProviderCurrent("transcribe", engine), segments: [{ url: source.url, sourceStart: 0, duration, start: 0 }] },
+  });
+  for (let current = job; current.status !== "succeeded"; current = await VideoWorkbench.generations.get(job.id)) {
+    if (["failed", "cancelled", "blocked"].includes(current.status)) throw Error(current.error || "語音辨識沒有完成");
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  return (await VideoWorkbench.request("/editor/transcriptions/" + encodeURIComponent(job.id), undefined, "GET")).srt;
 }
 function wfLanguages() {
   return [

@@ -97,7 +97,7 @@ function toolSubtitleScreen(t) {
   const preview = `<section class="subtitle-preview">${files.src ? `<div class="subtitle-video-box">${wfSource()}<div data-subtitle-overlay aria-live="off"></div></div><div class="row">${wfButton("倒退 0.1 秒", "subtitle-back")}${wfButton("前進 0.1 秒", "subtitle-forward")}<span data-subtitle-clock>0:00.000</span></div>` : wfChoice("subtitleSourceKind", ["影片", "音檔"]) + wfSource("src", values.subtitleSourceKind === "音檔" ? "audio" : "video")}<div class="row">${btn("匯入 SRT／VTT 字幕檔（免費）", "upload:subtitlefile")}${wfButton("SRT", "subtitle-download:srt", !cues.length)}${wfButton("VTT", "subtitle-download:vtt", !cues.length)}</div><details><summary>貼上或檢查字幕原文</summary>${ta("subtitleText", "貼上 SRT 或 VTT 時間碼與內容")}${wfButton("載入貼上的字幕", "subtitle-import-text")}</details>${values.subtitleImportError ? `<p role="alert">${esc(values.subtitleImportError)}</p>` : ""}</section>`;
   let body;
   if (!cues.length)
-    body = `<h3>產生字幕</h3>${wfSelect("subtitleLanguage", "辨識語言", wfLanguages())}<p>先選影片或音檔，辨識語音後逐行校對；也可免費匯入既有字幕檔。</p>${wfButton("辨識字幕（API 用量計費）", "subtitle-transcribe", !files.src, "video.transcribe")}`;
+    body = `<h3>產生字幕</h3>${wfSelect("subtitleLanguage", "辨識語言", wfLanguages())}<p>先選影片或音檔，辨識語音後逐行校對；也可免費匯入既有字幕檔。</p>${wfProviderChoice("transcribe", "subtitleEngine", "辨識方式")}${wfButton("辨識字幕", "subtitle-transcribe", !files.src, "video.transcribe", wfProviderCurrent("transcribe", values.subtitleEngine))}`;
   else if (values.subtitleTab === "校對")
     body = `<div class="row">${wfButton("在目前時間新增一行", "subtitle-add")}${wfButton("清除字幕重新開始", "subtitle-clear")}</div><ol class="subtitle-cues">${cues.map((cue, i) => `<li data-subtitle-row="${esc(cue.id)}"><button class="btn small" data-subtitle-seek="${i}" aria-label="從第 ${i + 1} 行播放">▶ ${i + 1}</button><div class="row"><label>開始<input class="text-input" data-subtitle-start="${i}" aria-label="第 ${i + 1} 行開始時間" value="${toolSubtitleStamp(cue.start)}"></label><label>結束<input class="text-input" data-subtitle-end="${i}" aria-label="第 ${i + 1} 行結束時間" value="${toolSubtitleStamp(cue.end)}"></label></div><textarea data-subtitle-text="${i}" aria-label="第 ${i + 1} 行字幕">${esc(values.subtitleFirstLine !== "原文" ? (translations[values.subtitleFirstLine]?.[cue.id] ?? cue.text) : cue.text)}</textarea><div class="row"><button class="btn small" data-subtitle-shift="${i}" data-delta="-0.1">整行往前移 0.1 秒</button><button class="btn small" data-subtitle-shift="${i}" data-delta="0.1">整行往後移 0.1 秒</button><button class="btn small" data-subtitle-delete="${i}">刪除這一行</button></div></li>`).join("")}</ol>`;
   else if (values.subtitleTab === "翻譯")
@@ -340,10 +340,7 @@ document.addEventListener("click", async (event) => {
       toolSubtitlePending = true;
       button.disabled = true;
       try {
-        const response = await VideoWorkbench.request("/transcriptions", {
-          source: originalFile,
-          language: values.subtitleLanguage,
-        });
+        const srt = await wfTranscribe(originalFile, values.subtitleLanguage, values.subtitleEngine);
         if (
           files.src !== originalFile ||
           values.subtitleText !== originalText
@@ -351,7 +348,7 @@ document.addEventListener("click", async (event) => {
           VideoWorkbench.notify("來源或字幕已改變，保留目前內容，請重新辨識。");
           return;
         }
-        values.subtitleCues = toolSubtitleParse(response.srt);
+        values.subtitleCues = toolSubtitleParse(srt);
         values.subtitleTranslations = {};
         delete values.subtitleImportError;
         toolSubtitleCommit();

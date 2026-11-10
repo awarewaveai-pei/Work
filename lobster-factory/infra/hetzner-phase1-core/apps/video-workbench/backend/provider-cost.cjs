@@ -39,17 +39,39 @@ function videoUsd(model, seconds) {
   if (!Object.hasOwn(rates.VIDEO_MOTION_RATES, model)) throw unpriced(model);
   return round(rates.VIDEO_MOTION_RATES[model].usdPerSec * tok(seconds));
 }
+// Gemini speech (cost-model.ts GEMINI_TTS_RATES): the reply's own token counts; no usage = the same published rules as
+// below (text <= 1 token per character, audio tokens per second). Price row = the day the call was made.
+function geminiSpeechUsd(rate, chars, audioSec, usage, at) {
+  const day = new Date(at ?? Date.now()).toISOString().slice(0, 10),
+    price = rate.prices.filter((p) => p.from <= day).at(-1) || rate.prices[0];
+  const counted = usage && Number.isFinite(Number(usage.total_output_tokens)),
+    seconds = Number(audioSec) > 0 ? Number(audioSec) : tok(chars) * 0.5,
+    textIn = counted ? tok(usage.total_input_tokens) : tok(chars),
+    audioOut = counted ? tok(usage.total_output_tokens) : seconds * rate.audioTokensPerSec;
+  return round((textIn * price.textInPerM + audioOut * price.audioOutPerM) / 1e6);
+}
 // Per-character models: chars only. Token-billed gpt-4o-mini-tts (cost-model.ts OPENAI_TTS_RATES): the published rules,
 // text <= 1 token per character + audio out per second of the returned audio. No measured duration (ffprobe failed) =
 // 0.5 s per character, above any normal reading pace.
-function speechUsd(model, chars, audioSec) {
+function speechUsd(model, chars, audioSec, usage = null, at = undefined) {
+  if (Object.hasOwn(rates.GEMINI_TTS_RATES, model)) return geminiSpeechUsd(rates.GEMINI_TTS_RATES[model], chars, audioSec, usage, at);
   const rate = rates.OPENAI_TTS_RATES[model];
   if (!rate) throw unpriced(model);
   if ("usdPerMChars" in rate) return round(rate.usdPerMChars * tok(chars) / 1e6);
   const seconds = Number(audioSec) > 0 ? Number(audioSec) : tok(chars) * 0.5;
   return round((tok(chars) * rate.textInPerM + seconds * rate.audioOutPerM * rate.audioTokensPerSec) / 1e6);
 }
-function transcribeUsd(model, seconds) {
+// Per audio minute (TRANSCRIBE_RATES: whisper-1, our host worker = 0), or token-billed Gemini (GEMINI_TRANSCRIBE_RATES):
+// the replies' usage when given (summed over chunks), else the published estimate (audio tokens per second in, text
+// tokens per minute out).
+function transcribeUsd(model, seconds, usage = null) {
+  const g = rates.GEMINI_TRANSCRIBE_RATES[model];
+  if (g) {
+    const counted = usage && Number.isFinite(Number(usage.total_output_tokens)),
+      audioIn = counted ? tok(usage.total_input_tokens) : tok(seconds) * g.audioTokensPerSec,
+      textOut = counted ? tok(usage.total_output_tokens) : (tok(seconds) / 60) * g.textTokensPerMin;
+    return round((audioIn * g.audioInPerM + textOut * g.textOutPerM) / 1e6);
+  }
   const rate = rates.TRANSCRIBE_RATES[model];
   if (!rate) throw unpriced(model);
   return round(rate.usdPerMin * tok(seconds) / 60);
@@ -71,21 +93,24 @@ function priceOf(kind, model) {
   else throw unpriced(kind);
 }
 
+const at = (f) => { try { return f(); } catch { return null; } };
+// One speech / transcription model's button price (capabilities speech.models[].price, transcribe.engines[].price).
+// Token-billed speech = per minute of audio out (text in, ~US$0.0006 per 1000 characters, left out), marked 約.
+const speechPrice = (audio) => at(() => ("usdPerMChars" in (rates.OPENAI_TTS_RATES[audio] || {}) ? { usd: speechUsd(audio, 1000), unit: "千字" }
+  : { usd: speechUsd(audio, 0, 60), unit: "分鐘", estimate: true }));
+const transcribePrice = (model) => at(() => ({ usd: transcribeUsd(model, 60), unit: "分鐘", ...(rates.GEMINI_TRANSCRIBE_RATES[model] ? { estimate: true } : {}) }));
 // Unit prices the buttons show before a click (capabilities.prices -> shared/paid-price.js), from the same functions the
 // charge uses. Text: one call at the 3000-token output cap plus a nominal 20000-char input. An unpriced model = null.
 function displayPrices({ text, image, audio, transcribe }) {
-  const at = (f) => { try { return f(); } catch { return null; } };
   return {
     "video.script": at(() => ({ usd: textUsd(text, null, { inputChars: 20000, maxOutputTokens: 3000 }), unit: "次", estimate: true })),
     "video.image": at(() => ({ usd: imageUsd(image), unit: "張", estimate: true })),
-    // Token-billed speech = per minute of audio out (text in, ~US$0.0006 per 1000 characters, left out), marked 約.
-    "video.tts": at(() => ("usdPerMChars" in rates.OPENAI_TTS_RATES[audio] ? { usd: speechUsd(audio, 1000), unit: "千字" }
-      : { usd: speechUsd(audio, 0, 60), unit: "分鐘", estimate: true })),
-    "video.transcribe": at(() => ({ usd: transcribeUsd(transcribe, 60), unit: "分鐘" })),
+    "video.tts": speechPrice(audio),
+    "video.transcribe": transcribePrice(transcribe),
   };
 }
 
 // Replicate models billed per GPU second (TOOL_RATES usdPerSec): the one function, next-admin cost-model.ts replicateRunUsd.
 const runUsd = (key, predictTimeSec) => rates.replicateRunUsd(key, predictTimeSec);
 
-module.exports = { textUsd, imageUsd, videoUsd, speechUsd, transcribeUsd, toolUsd, runUsd, priceOf, displayPrices };
+module.exports = { textUsd, imageUsd, videoUsd, speechUsd, transcribeUsd, toolUsd, runUsd, priceOf, displayPrices, speechPrice, transcribePrice };

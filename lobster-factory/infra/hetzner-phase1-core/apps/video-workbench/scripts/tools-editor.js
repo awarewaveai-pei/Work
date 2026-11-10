@@ -1005,7 +1005,6 @@ async function edSpineVoice(hit, only = null) {
           type: "audio",
           operation: "voice",
           prompt: line,
-          voice: "coral",
           instructions: "請以自然口語朗讀，不要省略或增加台詞。",
           settings: { voiceSpeed: 1, voicePitch: 0, voiceGain: 0 },
           link: { projectId: hit.project.id, episodeId: hit.episode.id, tool: "voice", step: "sound", target: "line:" + s.id, from: [{ slot: "line:" + s.id, key: line }] },

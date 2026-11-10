@@ -217,10 +217,16 @@ const spokenVoices = [
 ];
 
 const spokenCatalog = { characters: [], assets: [] };
-const spokenVoiceIds = ["coral", "onyx", "nova", "alloy", "shimmer", "coral"];
+// The persona cards above speak as these Gemini voices (backend/speech.cjs maps them when another model runs).
+const spokenVoiceIds = ["Kore", "Charon", "Puck", "Fenrir", "Sulafat", "Leda"];
+// Speech models and their voices from /capabilities (backend/speech.cjs; empty until it answers). The chosen model counts
+// only while it is in the list (a retired one is gone): otherwise the default.
+const speechModels = () => VideoWorkbench.capabilities?.speech?.models || [];
+const spokenSpeechModel = () => (speechModels().some((m) => m.id === state.speechModel) ? state.speechModel : VideoWorkbench.capabilities?.speech?.defaultModel);
+const speechVoices = () => speechModels().find((m) => m.id === spokenSpeechModel())?.voices || [];
 function spokenVoiceCode() {
   const i = spokenVoices.findIndex((v) => v.name === state.voice);
-  return i >= 0 ? spokenVoiceIds[i] : state.voice || "coral";
+  return i >= 0 ? spokenVoiceIds[i] : state.voice || speechVoices()[0]?.id || "";
 }
 function spokenCastName() {
   return (
@@ -365,16 +371,33 @@ function spokenWorkspace() {
     safe(state.spokenVisualDirection || "") +
     '</textarea><label>朗讀指示（選填）</label><textarea id="performance" class="field" placeholder="例如：自然溫暖，語速放慢">' +
     safe(state.performance || "") +
-    '</textarea><fieldset class="voice-options"><legend>內建配音聲音</legend>' +
-    ["coral", "alloy", "onyx", "nova", "shimmer"]
+    '</textarea><fieldset class="voice-options"><legend>配音服務</legend>' +
+    speechModels()
+      .map(
+        (m) =>
+          '<button type="button" class="minor" data-gen-speech-model="' +
+          safe(m.id) +
+          '" aria-pressed="' +
+          (spokenSpeechModel() === m.id) +
+          '"' +
+          (m.available ? "" : " disabled") +
+          ">" +
+          safe(m.label + (window.VideoWorkbenchPrices?.text("video.tts", VideoWorkbench.capabilities, m.id) ? " · " + window.VideoWorkbenchPrices.text("video.tts", VideoWorkbench.capabilities, m.id) : "")) +
+          "</button>",
+      )
+      .join("") +
+    '<p class="small-note">' +
+    safe(speechModels().find((m) => m.id === spokenSpeechModel())?.note || "") +
+    '</p></fieldset><fieldset class="voice-options"><legend>內建配音聲音</legend><p class="small-note">名稱後是音色特色；語氣與情緒寫在上方「朗讀指示」。</p>' +
+    speechVoices()
       .map(
         (v) =>
           '<button type="button" class="minor" data-gen-voice="' +
-          v +
+          safe(v.id) +
           '" aria-pressed="' +
-          (spokenVoiceCode() === v) +
+          (spokenVoiceCode() === v.id) +
           '">' +
-          v +
+          safe(v.label) +
           "</button>",
       )
       .join("") +
@@ -1045,7 +1068,7 @@ document.addEventListener("input", (e) => {
 $("send").onclick = () => {
   if (
     state.mode === "spoken" &&
-    !["coral", "alloy", "onyx", "nova", "shimmer"].includes(spokenVoiceCode())
+    spokenCatalog.assets.some((a) => a.id === spokenVoiceCode())
   ) {
     VideoWorkbench.reportError(
       Error("已保存聲音參考；聲音複製服務尚未接入，請選擇內建聲音生成配音。"),
@@ -1075,6 +1098,7 @@ $("send").onclick = () => {
     referenceMode: state.mode === "reference" ? state.refType : undefined,
     cartoonStyle: state.mode === "cartoon" && state.style >= 0 ? styles[state.style] : undefined,
     voice: state.mode === "spoken" ? spokenVoiceCode() : undefined,
+    speechModel: state.mode === "spoken" ? spokenSpeechModel() : undefined,
     cast:
       state.mode === "spoken"
         ? {

@@ -103,12 +103,25 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
     }
     throw Error("unexpected " + url);
   }
+  // Gemini speech (backend/speech.cjs): 0.2 s of 24 kHz mono 16-bit silence + the usage the charge must read.
+  const pcm = Buffer.alloc(9600), wav = Buffer.alloc(44);
+  wav.write("RIFF", 0); wav.writeUInt32LE(36 + pcm.length, 4); wav.write("WAVEfmt ", 8); wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20);
+  wav.writeUInt16LE(1, 22); wav.writeUInt32LE(24000, 24); wav.writeUInt32LE(48000, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34);
+  wav.write("data", 36); wav.writeUInt32LE(pcm.length, 40);
+  const GEMINI_USAGE = { total_input_tokens: 12, total_output_tokens: 50 };
+  const geminiCalls = [];
+  const withGemini = async (url, options = {}) => {
+    if (String(url) !== "https://generativelanguage.googleapis.com/v1beta/interactions") return fetchImpl(url, options);
+    assert.equal(options.headers["x-goog-api-key"], "gm-test");
+    geminiCalls.push(JSON.parse(options.body));
+    return Response.json({ status: "completed", usage: GEMINI_USAGE, steps: [{ type: "model_output", content: [{ type: "audio", mime_type: "audio/wav", data: Buffer.concat([wav, pcm]).toString("base64") }] }] });
+  };
   const env = {
-    OPENAI_API_KEY: "sk-test", VW_TRUST_PROXY_IDENTITY: "1", VW_ALLOWED_HOSTS: "127.0.0.1:*",
+    OPENAI_API_KEY: "sk-test", GEMINI_API_KEY: "gm-test", VW_TRUST_PROXY_IDENTITY: "1", VW_ALLOWED_HOSTS: "127.0.0.1:*",
     VW_INTERNAL_BASE: BASE + "/", VW_INTERNAL_TOKEN: "internal-secret",
     ENTITLEMENT_ISSUER_TOKEN_VIDEO: "issuer-secret", ENTITLEMENT_PUBLIC_KEYS: "k1:" + pair.publicKey.replace(/\n/g, "\\n"),
   };
-  const server = createServer({ dataDir: path.join(dir, "connected"), env, fetchImpl });
+  const server = createServer({ dataDir: path.join(dir, "connected"), env, fetchImpl: withGemini });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
   const port = server.address().port;
   const who = (extra = {}) => {
@@ -279,10 +292,16 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
       assert.throws(() => costs.priceOf("image", "gpt-image-9-flare"), /尚無價目/, "未登記的新版本不得用名稱猜價"); // 2.6 got registered 2026-11-09
       for (const [kind, model] of [["video", "veo-x"], ["audio", "nope-tts"], ["image", "dall-e-3"], ["text", "mystery-1"], ["3d", undefined]])
         assert.throws(() => costs.priceOf(kind, model), /尚無價目/, kind);
-      const speech = JSON.parse((await generate({ type: "spoken", prompt: "你好世界", idempotencyKey: "tts-1" })).body);
+      // Default speech = Gemini: the job's charge and usage report = the reply's token counts at today's price row.
+      const speech = JSON.parse((await generate({ type: "spoken", prompt: "你好世界", voice: "coral", idempotencyKey: "tts-1" })).body);
       await wait(() => calls.usage.some((u) => u.job_id === speech.id));
-      // The fake mp3 has no readable duration: 0.5 s per character stands in (provider-cost.cjs speechUsd).
-      near(calls.usage.find((u) => u.job_id === speech.id).cost_usd, (4 * tts.textInPerM + 4 * 0.5 * tts.audioTokensPerSec * tts.audioOutPerM) / 1e6, "語音任務");
+      const today = new Date().toISOString().slice(0, 10), gp = rates.GEMINI_TTS_RATES["gemini-3.8-flash-lite-tts"].prices.filter((p) => p.from <= today).at(-1);
+      near(calls.usage.find((u) => u.job_id === speech.id).cost_usd, (12 * gp.textInPerM + 50 * gp.audioOutPerM) / 1e6, "Gemini 語音任務＝回覆的 token");
+      assert.deepEqual([geminiCalls.at(-1).model, geminiCalls.at(-1).generation_config.speech_config[0].voice], ["gemini-3.8-flash-lite-tts", "Sulafat"], "舊 OpenAI 聲線 coral 對到 Gemini");
+      const refused = await generate({ type: "spoken", prompt: "你好世界", speechModel: "no-such-tts", idempotencyKey: "tts-bad" });
+      assert.equal(refused.status, 400, "不在清單的配音服務不建立任務");
+      // 2027 row: Google's doubled price applies from 2027-01-01; no usage = 1 token per character + 25 tokens per second.
+      near(costs.speechUsd("gemini-3.8-flash-lite-tts", 10, 4, null, "2027-01-02T00:00:00Z"), (10 * 1 + 4 * 25 * 12) / 1e6, "2027 價目與無 usage 估算");
     }
 
     // 6d. Connected mode (HttpAdapter): the server's refusal message reaches the user, never a bare status code.

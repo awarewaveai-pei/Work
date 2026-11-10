@@ -10,6 +10,7 @@ import hashlib
 import hmac
 import ipaddress
 import os
+import re
 import socket
 import tempfile
 import threading
@@ -18,12 +19,16 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 from faster_whisper import WhisperModel, decode_audio
+from starlette.concurrency import run_in_threadpool
 
 app = FastAPI(title="Video Whisper Worker", docs_url=None, redoc_url=None)
 MAX_BYTES = 500 * 1024 * 1024
+# POST /v1/transcribe (video-workbench, lobster-net): one audio chunk per request, answered in the request.
+SYNC_MAX_BYTES = 25 * 1024 * 1024
+SYNC_LANGUAGES = {"zh", "en", "ja", "ko", "th"}
 # A host install sets this to next-admin's internal address; the callback must then start with it.
 CALLBACK_BASE = os.environ.get("VIDEO_WHISPER_CALLBACK_BASE", "").rstrip("/")
 DEVICE = os.environ.get("VIDEO_WHISPER_DEVICE", "auto")  # auto | cuda | cpu
@@ -145,6 +150,55 @@ def _execute(job: Job) -> None:
             return
         except Exception:
             continue
+
+
+@app.post("/v1/transcribe")
+async def transcribe_sync(request: Request, authorization: str = Header(default=""), language: str = "", traditional: int = 1, model: str = "large-v3"):
+    """Raw audio body -> whisper verbose_json shape (segments + words, seconds) for video-workbench backend/transcribe.cjs
+    normalize(). language "" = detect; traditional=0 drops the Traditional-Chinese prompt (簡體中文 was asked)."""
+    require_token(authorization)
+    if language and language not in SYNC_LANGUAGES:
+        raise HTTPException(422, "unsupported language")
+    if not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", model):
+        raise HTTPException(422, "invalid model")
+    body = bytearray()
+    async for chunk in request.stream():
+        body += chunk
+        if len(body) > SYNC_MAX_BYTES:
+            raise HTTPException(413, "audio exceeds 25MB")
+    if not body:
+        raise HTTPException(422, "empty audio")
+    return await run_in_threadpool(_transcribe_bytes, bytes(body), language or None, traditional != 0, model)
+
+
+def _transcribe_bytes(data: bytes, language: str | None, traditional: bool, name: str) -> dict:
+    with _job_slot, tempfile.NamedTemporaryFile(suffix=".audio") as out:
+        out.write(data)
+        out.flush()
+        model, backend = get_model(name)
+        audio = decode_audio(out.name)
+        if language is None:
+            language, _, _ = model.detect_language(audio)
+        prompt = ZH_HANT_PROMPT if language == "zh" and traditional else None
+        segments, info = model.transcribe(audio, language=language, initial_prompt=prompt, word_timestamps=True, vad_filter=True, beam_size=1)
+        segments = list(segments)
+        return {"model": name, "backend": backend, "language": info.language, "duration": info.duration,
+                "segments": [{"id": i, "start": s.start, "end": s.end, "text": s.text, "avg_logprob": s.avg_logprob,
+                              "no_speech_prob": s.no_speech_prob, "compression_ratio": s.compression_ratio} for i, s in enumerate(segments)],
+                "words": merge_words([w for s in segments for w in (s.words or [])])}
+
+
+def merge_words(words) -> list[dict]:
+    """For zh/ja/th audio faster-whisper splits words on tokens, so an English word inside Chinese speech arrives in pieces
+    ("Work" + "shop,"). A piece with no leading space that continues ASCII letters/digits joins the previous word."""
+    out: list[dict] = []
+    for w in words:
+        text = w.word
+        if out and text and not text[0].isspace() and text[0].isascii() and text[0].isalnum() and out[-1]["word"][-1:].isascii() and out[-1]["word"][-1:].isalnum():
+            out[-1].update(end=w.end, word=out[-1]["word"] + text, probability=min(out[-1]["probability"], w.probability))
+        else:
+            out.append({"start": w.start, "end": w.end, "word": text, "probability": w.probability})
+    return out
 
 
 @app.get("/health")

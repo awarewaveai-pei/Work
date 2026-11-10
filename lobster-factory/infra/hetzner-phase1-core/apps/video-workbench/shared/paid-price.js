@@ -7,7 +7,8 @@
   // shared/models.js VideoWorkbenchMoney (NT$) at the rate of the capabilities the price came from.
   let from = null;
   const money = (usd) => window.VideoWorkbenchMoney(usd, from);
-  const unitText = (p) => (p && Number.isFinite(p.usd) && money(p.usd) ? `${p.estimate ? "約 " : ""}${money(p.usd)}／${p.unit}` : "");
+  // usd 0 = no vendor bill (our own whisper worker): said as 免費, not NT$0.
+  const unitText = (p) => (p && p.usd === 0 ? "免費" : p && Number.isFinite(p.usd) && money(p.usd) ? `${p.estimate ? "約 " : ""}${money(p.usd)}／${p.unit}` : "");
   // model = the video model / 3D way the action runs (data-paid-model; a rerun uses its job's), else the default.
   function one(feature, c, model) {
     if (!c) return "";
@@ -20,6 +21,9 @@
       const paid = (c.imageTo3d?.methods || []).map((m) => m.usd).filter((usd) => Number.isFinite(usd) && usd > 0);
       return paid.length ? money(Math.min(...paid)) + " 起／個" : "";
     }
+    // A chosen speech model / transcription engine (data-paid-model = its id): that row's own price from the list.
+    if (model && feature === "video.tts") return unitText(c.speech?.models?.find((m) => m.id === model)?.price);
+    if (model && feature === "video.transcribe") return unitText(c.transcribe?.engines?.find((e) => e.id === model)?.price);
     return unitText(c.prices?.[feature]);
   }
   // "" = no price known yet (capabilities not loaded) or a feature without a price.

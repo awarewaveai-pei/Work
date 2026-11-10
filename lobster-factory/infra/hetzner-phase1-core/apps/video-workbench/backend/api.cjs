@@ -16,6 +16,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   const replicateVideo = require("./replicate-video.cjs");
   const costs = require("./provider-cost.cjs");
   const transcribe = require("./transcribe.cjs"), TranscriptWords = require("../shared/transcript-words.js");
+  // Speech and speech-to-text: one list each (backend/speech.cjs, transcribe.cjs); every job names its own row (the
+  // page's buttons), none = the default. VW_TRANSCRIBE_CHUNK_BYTES overrides an engine's chunk size.
+  const speech = require("./speech.cjs");
+  const chunkBytes = (engine) => Number(vwEnv(env, "TRANSCRIBE_CHUNK_BYTES")) || engine.uploadBytes;
   const transcriptsDir = path.join(dataDir, "transcripts");
   // Per-request spend of the sync paid routes (text, transcription): each handler call runs in its own meter.
   const meters = new (require("node:async_hooks").AsyncLocalStorage)();
@@ -173,7 +177,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       );
     return env.OPENAI_API_KEY;
   };
-  const secrets = [env.OPENAI_API_KEY, env.REPLICATE_API_TOKEN, env.MEDIA_RENDER_AUTH_TOKEN, env.REMOTION_AUTH_TOKEN].filter((v) => typeof v === "string" && v.trim());
+  const secrets = [env.OPENAI_API_KEY, env.GEMINI_API_KEY, vwEnv(env, "TRANSCRIBE_WORKER_TOKEN"), env.REPLICATE_API_TOKEN, env.MEDIA_RENDER_AUTH_TOKEN, env.REMOTION_AUTH_TOKEN].filter((v) => typeof v === "string" && v.trim());
   const publicError = (message) =>
     secrets.reduce((text, secret) => text.replaceAll(secret.trim(), "[redacted]"), String(message)).slice(0, 800);
   for (const job of jobs)
@@ -366,9 +370,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       if (job.input.operation === "editor-transcribe") {
         job.status = "running";
         persist();
+        const engine = transcribe.pick(job.input.settings?.engine, env);
         const result = await transcribe.transcribeProject(job.input.settings, {
-          localFile, inspect: require("./media-inspect.cjs").inspectMedia, run: mediaTools.run, tmpDir: dataDir, key: key(), fetchImpl, signal, costs,
-          maxBytes: Number(vwEnv(env, "TRANSCRIBE_CHUNK_BYTES")) || transcribe.UPLOAD_BYTES,
+          localFile, inspect: require("./media-inspect.cjs").inspectMedia, run: mediaTools.run, tmpDir: dataDir, engine, auth: transcribe.auth(engine, env), fetchImpl, signal, costs,
+          maxBytes: chunkBytes(engine),
           onProgress: (p) => {
             job.progress = p;
             persist();
@@ -388,7 +393,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           createdAt: new Date().toISOString(), ...summary, costUsd: result.costUsd,
           segments: result.segments, words: result.words, srt: result.srt, skipped: result.skipped,
         });
-        job.result = { ...summary, origin: { kind: "ai_generated", model: transcribe.MODEL, provider: "OpenAI", costUsd: result.costUsd } };
+        job.result = { ...summary, origin: { kind: "ai_generated", model: engine.model, provider: engine.provider, costUsd: result.costUsd } };
         job.progress = 100;
         job.status = "succeeded";
         persist();
@@ -536,24 +541,21 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       job.status = "running";
       persist();
       if (type === "audio") {
-        const audio = await provider(
-          "/audio/speech",
-          {
-            model: providerModels.audio,
-            input: prompt,
-            voice: input.voice || "coral",
-            instructions:
-              input.instructions ||
-              input.settings?.voiceEmotion ||
-              "請以自然的繁體中文語氣朗讀。",
-            response_format: "mp3",
-          },
-          signal,
-          true,
-        );
-        job.result = { url: output(audio, "mp3") };
-        // No usage in the reply: priced from the characters sent and the length of the audio that came back.
-        job.costUsd = costs.speechUsd(providerModels.audio, prompt.length, (await require("./media-inspect.cjs").inspectMedia(path.join(dataDir, job.result.url.slice(1))).catch(() => null))?.duration);
+        // backend/speech.cjs: the job's model row (input.speechModel; none = default), its voice and its call.
+        const model = speech.pick(input.speechModel, env);
+        job.speech = { model: model.id, provider: model.vendor };
+        const spoken = await speech.synthesize(model, { text: prompt, voice: input.voice, style: input.instructions || input.settings?.voiceEmotion, env, fetchImpl, signal });
+        if (spoken.ext === "mp3") job.result = { url: output(spoken.audio, "mp3") };
+        else {
+          // WAV (Gemini, 24 kHz mono): the library and every voice step keep MP3.
+          const wav = path.join(outputs, crypto.randomUUID() + ".wav"), mp3 = crypto.randomUUID() + ".mp3";
+          fs.writeFileSync(wav, spoken.audio);
+          try { await mediaTools.run(["-y", "-hide_banner", "-i", wav, "-ac", "1", "-c:a", "libmp3lame", "-b:a", "128k", path.join(outputs, mp3)], signal); }
+          finally { fs.rmSync(wav, { force: true }); }
+          job.result = { url: "/generated/" + mp3 };
+        }
+        // Gemini: the reply's token counts. OpenAI: no usage, priced from the characters sent and the audio's length.
+        job.costUsd = costs.speechUsd(model.id, prompt.length, (await require("./media-inspect.cjs").inspectMedia(path.join(dataDir, job.result.url.slice(1))).catch(() => null))?.duration, spoken.usage);
         if (Number(input.settings?.voicePitch || 0) || Number(input.settings?.voiceGain || 0) || Number(input.settings?.voiceSpeed ?? 1) !== 1) {
           const destination = path.join(outputs, crypto.randomUUID() + '.mp3');
           await mediaTools.adjustVoice(path.join(dataDir, job.result.url.slice(1)), destination, { pitch: Number(input.settings.voicePitch || 0), gain: Number(input.settings.voiceGain || 0), speed: Number(input.settings.voiceSpeed ?? 1), signal });
@@ -653,7 +655,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         return;
       }
       if (signal.aborted) return;
-      job.result.origin = aiOrigin(type, job.costUsd);
+      job.result.origin = aiOrigin(type, job.costUsd, type === "audio" ? job.speech : undefined);
       job.status = "succeeded";
       job.progress = 100;
       persist();
@@ -716,9 +718,17 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   // One per-operation limit: the server aborts the job at it, and job.deadlineAt publishes it so a reloaded page
   // watches exactly as long (runtime.js reconcileJobs). Remotion polls up to 10 min itself, the extra minutes cover
   // download + verification; Blender has its own 30 min limit (blender.cjs); image -> 3D tasks take minutes.
+  // Host whisper runs one request at a time: a run's limit includes the host runs queued or running before it.
+  function hostTranscribeTimeout(input) {
+    const engine = transcribe.pick(input.settings?.engine, env), host = (i) => transcribe.pick(i.settings?.engine, env).id === "host";
+    const ahead = engine.id !== "host" ? 0 : jobs
+      .filter((j) => ["queued", "running"].includes(j.status) && j.input?.operation === "editor-transcribe" && j.input !== input && (() => { try { return host(j.input); } catch { return false; } })())
+      .reduce((sum, j) => sum + transcribe.audioSeconds(j.input.settings), 0);
+    return transcribe.timeoutMs(input.settings, engine, ahead);
+  }
   function jobTimeoutMs(input) {
     const op = input?.operation;
-    return blender3d().operations.includes(op) ? blender3d().timeoutMs(input) : op === "image-to-3d" ? imageTo3d.TIMEOUT_MS : op === "editor-transcribe" ? 1800000 : op === "remotion-template" ? 780000 : 600000;
+    return blender3d().operations.includes(op) ? blender3d().timeoutMs(input) : op === "image-to-3d" ? imageTo3d.TIMEOUT_MS : op === "editor-transcribe" ? hostTranscribeTimeout(input) : op === "remotion-template" ? 780000 : 600000;
   }
   // Validates, records and answers 202 before any provider call (runtime.js treats 501/503 as "never sent").
   async function start(input, res, extra, req) {
@@ -729,7 +739,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       isImageTo3d = input.operation === "image-to-3d",
       isTranscribe = input.operation === "editor-transcribe",
       parsed = isTranscribe
-        ? (transcribe.plan(input.settings), key(), { type: "subtitle" })
+        ? (transcribe.plan(input.settings), transcribe.auth(transcribe.pick(input.settings?.engine, env), env), { type: "subtitle" })
         : isBlender
         ? blender3d().request(input)
         : isImageTo3d
@@ -743,12 +753,13 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
             : jobInput(input);
     const videoModel = !isMedia && !isRemotion && !isBlender && !isImageTo3d && !isTranscribe && parsed.type === "video" ? generationPolicy.videoModelOf(input, env) : null;
     if (videoModel?.provider === "Replicate") replicateVideo.token(env);
+    else if (parsed.type === "audio" && !isMedia) speech.key(speech.pick(input.speechModel, env), env);
     else if (!isMedia && !isRemoveBg && !isRemotion && !isBlender && !isImageTo3d && !isTranscribe) key();
     // paidFeature on the job: the retry button prices a rerun from it (shared/paid-price.js); the permit needs main.
     const paidFeature = mainSystemTools.paidFeature(input, parsed.type), feature = main && paidFeature;
     // No paid call without a price: the model a paid job will run must be in next-admin's cost model.
     if (feature) costs.priceOf({ "video.image": "image", "video.motion": "video", "video.tts": "audio", "video.bg-remove": "remove-bg", "video.transcribe": "transcribe", "video.3d": "3d" }[feature] || feature,
-      { "video.image": providerModels.image, "video.motion": videoModel?.id || providerModels.video, "video.tts": providerModels.audio, "video.transcribe": transcribe.MODEL, "video.3d": isImageTo3d && imageTo3d.rateKey(input) }[feature]);
+      { "video.image": providerModels.image, "video.motion": videoModel?.id || providerModels.video, "video.tts": parsed.type === "audio" && speech.pick(input.speechModel, env).id, "video.transcribe": isTranscribe && transcribe.pick(input.settings?.engine, env).model, "video.3d": isImageTo3d && imageTo3d.rateKey(input) }[feature]);
     const paid = await requirePermit(req, feature);
     const release = isBlender ? blender3d().claim() : isImageTo3d ? imageTo3d.claim(input) : null;
     if ((isBlender || isImageTo3d) && !release) throw Object.assign(Error(isBlender ? "3D 渲染進行中，請等目前的工作完成再送出" : "本機 SF3D 正在處理另一張圖，請等它完成再送出"), { status: 409 });
@@ -766,11 +777,12 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         ...(paid ? { paid } : {}),
         ...(paidFeature ? { paidFeature } : {}),
       };
-      job.deadlineAt = new Date(Date.parse(job.createdAt) + jobTimeoutMs(input)).toISOString();
+      const limit = jobTimeoutMs(input); // once, before the job joins the queue (host transcription counts the runs ahead)
+      job.deadlineAt = new Date(Date.parse(job.createdAt) + limit).toISOString();
       jobs.push(job);
       persist();
       controller = new AbortController();
-      timeout = setTimeout(() => controller.abort(), jobTimeoutMs(input));
+      timeout = setTimeout(() => controller.abort(), limit);
       timeout.unref();
       controls.set(job.id, controller);
       mirror(job);
@@ -985,7 +997,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         throw Object.assign(Error("需要 JSON 請求"), { status: 415 });
       if (req.method === "POST" && Object.hasOwn(mainSystemTools.PAID_ROUTES, route)) {
         // A text/transcription call answers in this request: charged when it answered 2xx, one report per request.
-        if (main) route === "/transcriptions" ? costs.priceOf("transcribe", "whisper-1") : costs.priceOf("text", textModel);
+        if (main) route === "/transcriptions" ? costs.priceOf("transcribe", transcribe.defaultEngine(env).model) : costs.priceOf("text", textModel);
         const paid = await requirePermit(req, mainSystemTools.PAID_ROUTES[route]);
         const meter = meters.getStore();
         if (paid) res.once("finish", () => {
@@ -995,7 +1007,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         });
       }
       if (req.method === "GET" && route === "/capabilities") {
-        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: { ...require("./blender.cjs").capability(env), motions: blender3d().motions }, imageTo3d: imageTo3d.capability(env, { priced: !!main }), prices: costs.displayPrices({ ...providerModels, text: textModel, transcribe: transcribe.MODEL }), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.publicCatalog,
+        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: { ...require("./blender.cjs").capability(env), motions: blender3d().motions }, imageTo3d: imageTo3d.capability(env, { priced: !!main }), prices: costs.displayPrices({ ...providerModels, text: textModel, transcribe: transcribe.defaultEngine(env).model }), transcribe: transcribe.capability(env, costs.transcribePrice), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.publicCatalog,
           reference: require("./reference.cjs").allowed(env, req) && require("./reference.cjs").present(env),
           // P6 L3: connected = finished videos open next-admin /release (same origin) for review and delivery.
           mainSystem: main ? { organizationId: orgId } : null });
@@ -1052,8 +1064,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       }
       if (req.method === "POST" && route === "/generations/quote") {
         const input = await body(req);
-        jobInput(input);
-        key();
+        if (jobInput(input).type === "audio") speech.key(speech.pick(input.speechModel, env), env);
+        else key();
         json(res, 200, {
           credits: null,
           quoteId: crypto.randomUUID(),
@@ -1196,8 +1208,9 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       // -> GET /generations/<id> -> GET /editor/transcriptions/<id> for the words. The list = 找回已完成的字幕結果.
       if (req.method === "POST" && route === "/editor/transcriptions/quote") {
         const input = await body(req);
+        const engine = transcribe.pick(input.settings?.engine, env);
         json(res, 200, transcribe.quote(await transcribe.prepare(input.settings, { localFile, inspect: require("./media-inspect.cjs").inspectMedia }), costs,
-          Number(vwEnv(env, "TRANSCRIBE_CHUNK_BYTES")) || transcribe.UPLOAD_BYTES));
+          chunkBytes(engine), engine));
         return true;
       }
       if (req.method === "POST" && route === "/editor/transcriptions") {
@@ -1295,10 +1308,11 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         if (!file) throw Error("請先上傳音訊或影片");
         // Card ED.10: words:true answers segments + words with times and a score as well; without it the old SRT answer.
         const words = input.words === true;
-        const answer = await transcribe.whisper({ buffer: fs.readFileSync(file), filename: path.basename(file), mime: input.source.type, language: input.language, words, key: key(), fetchImpl });
-        // whisper-1 bills per audio minute and its srt answer carries no usage: the file's own duration (ffprobe).
-        if (main) spend(costs.transcribeUsd(transcribe.MODEL, (await require("./media-inspect.cjs").inspectMedia(file).catch(() => null))?.duration ?? 25 * 60));
-        if (!words) json(res, 200, { srt: answer });
+        const engine = transcribe.pick(input.engine, env);
+        const answer = await transcribe.recognize({ engine, buffer: fs.readFileSync(file), filename: path.basename(file), mime: input.source.type, language: input.language, auth: transcribe.auth(engine, env), fetchImpl });
+        // Per audio minute (host = 0) by the file's own duration (ffprobe), or Gemini's usage.
+        if (main) spend(costs.transcribeUsd(engine.model, (await require("./media-inspect.cjs").inspectMedia(file).catch(() => null))?.duration ?? 25 * 60, answer.usage));
+        if (!words) json(res, 200, { srt: transcribe.toSrt(transcribe.normalize(answer).segments) });
         else {
           const result = transcribe.normalize(answer);
           json(res, 200, { srt: transcribe.toSrt(result.segments), language: result.language, segments: result.segments, words: TranscriptWords.annotate(result.words) });

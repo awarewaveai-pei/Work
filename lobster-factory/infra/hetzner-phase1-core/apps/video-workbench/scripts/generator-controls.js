@@ -327,6 +327,7 @@ async function generatorControlsInit() {
       if (b.dataset.genJob) VideoWorkbench.showJob(await VideoWorkbench.generations.get(b.dataset.genJob));
       if (b.hasAttribute("data-gen-extract")) await generatorExtractAudio();
       if (b.dataset.genVoice) { state.voice = b.dataset.genVoice; render(); }
+      if (b.dataset.genSpeechModel) { state.speechModel = b.dataset.genSpeechModel; render(); }
       if (b.dataset.genDuration) {
         state.duration = Number(b.dataset.genDuration);
         if (state.mode === "director") state.directorLength = state.duration;

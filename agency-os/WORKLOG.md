@@ -1,4 +1,22 @@
 # Worklog
+## 2026-11-10（續29）影音工作台：配音／字幕辨識改多家並存（OpenAI gpt-4o-mini-tts 2027-01-06、whisper-1 2027-02-26 下線）
+
+- 根因：工作台配音只走 OpenAI `/audio/speech`、辨識只走 whisper-1，兩者 OpenAI 已公告下線（`docs/vendor-alternatives-20261110.md` 第 4、5 節）。
+- A/B（繁中 3 段，Gemini TTS 生成）：主機 whisper large-v3 繁體全對、0.65 倍即時；Gemini 3.5 Transcribe 輸出簡體（指定 cmn-Hant-TW 也是）、常 503 → 預設 A。結果寫回 vendor-alternatives「實測結果與採用」。
+- 配音試聽：多音字、英文夾雜回聽正確；「1,234,567 元」疑似逐位念，待人工試聽（`D:/tmp/vw-tts-stt/tts*.wav`）。
+- 改（監工方向：並存＋按鈕選）：
+  - `video-workbench/backend/speech.cjs`（新）配音清單 Gemini 3.8 Flash-Lite／OpenAI；`backend/transcribe.cjs` 辨識清單 主機 whisper／Gemini／OpenAI；過了 registry `retireOn` 的列不出現、指名送出 400。
+  - `video-whisper-worker/app.py` 新增同步 `POST /v1/transcribe`（回逐字，英文片段併回）。
+  - 計價：`next-admin/lib/ai/cost-model.ts` GEMINI_TTS_RATES（依呼叫日，2027 加倍）、GEMINI_TRANSCRIBE_RATES、TRANSCRIBE_RATES host=0、whisper-1 `retireOn: 2027-02-26`；`provider-cost.cjs` 依回覆 usage 計費；`paid-price.js` 0 元顯示「免費」。
+  - 頁面：配音頁、生成器口播、字幕、短影音四處用 `/capabilities` 清單長出按鈕（名稱·NT$價·優缺說明），聲線按鈕取代下拉。
+  - 字幕／短影音頁改送非同步任務（主機 1.5 倍片長 > nginx 300 秒）。
+  - next-admin AI Models 頁語音分頁：OpenAI 列標下線日、新增 Gemini 列（優缺含實測）。
+  - repo `docker-compose.yml` 工作台加 GEMINI_API_KEY、VW_TRANSCRIBE_WORKER_URL/TOKEN；`.env.example` 記變數名。主機未動。
+- Codex 兩輪：修 F1 主機辨識排隊逾時、F3 角色卡聲線對照；不修：>1 小時單檔（頁面已擋 20 分鐘）、指定預設缺金鑰回 503（刻意不換家）、next-admin 共用 worker 的排隊時間（用量≈0，見風險）。
+- 部署交接（未部署）：worker 重建 → 工作台 compose 加 3 變數 → sg-deploy；GEMINI 金鑰目前免費層（TTS 每分鐘 3 次）要開付費。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs; node tests/ed10-subtitles-backend.cjs; node tests/tools-workflows.cjs; node tests/p3-compositor-unit.cjs; npx vitest run lib/ai/__tests__/model-registry.test.ts lib/content/video/__tests__/transcription.test.ts; 主機拋棄式容器跑新 worker + 筆電 transcribe.recognize 經 SSH 隧道（stt3/stt2/tts3，401 錯 token）; Gemini 辨識真 API stt3 | exit=0 | ms=900000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n — Codex 兩輪 agency-os/reports/oracle/2026-11-10-partialreview-0a346f02.md、2026-11-10-partialreview-c09c1a0b.md；修 2、不修 3（理由如上）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=transcribe\.MODEL|transcribe\.whisper\( | hits=0
 ## 2026-11-10（續28）影音工作台 generation-flows 區域拖曳紅：測試在平滑捲動中量圖片位置
 
 - 症狀：`tests/generation-flows.cjs` 區域移動／縮放斷言（原 :155／:159）在 main 8/8 紅。

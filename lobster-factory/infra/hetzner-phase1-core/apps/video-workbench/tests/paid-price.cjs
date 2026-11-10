@@ -108,14 +108,17 @@ for (const [f, text] of Object.entries(src))
     const caps = await (await fetch(`http://127.0.0.1:${server.address().port}/api/vw/capabilities`)).json();
     const window = {};
     vm.runInNewContext(fs.readFileSync(path.join(root, "shared/models.js"), "utf8") + "\n" + fs.readFileSync(path.join(root, "shared/paid-price.js"), "utf8"), { window, crypto: globalThis.crypto });
-    for (const feature of FEATURES) if (!/^(約 )?NT\$\d/.test(window.VideoWorkbenchPrices.text(feature, caps))) problems.push(`${feature}: no NT$ price from /capabilities`);
+    for (const feature of FEATURES) if (!/^((約 )?NT\$\d|免費$)/.test(window.VideoWorkbenchPrices.text(feature, caps))) problems.push(`${feature}: no NT$ price (or 免費) from /capabilities`);
     // The shown numbers are next-admin's rates (not a copy): spot checks against cost-model.ts.
     const rates = require(path.join(require("../backend/appearance.cjs").resolveSource(root, process.env), "lib/ai/cost-model.ts"));
-    assert.equal(caps.prices["video.transcribe"].usd, rates.TRANSCRIBE_RATES["whisper-1"].usdPerMin);
-    const tts = rates.OPENAI_TTS_RATES[caps.models.audio]; // token-billed default: per minute of audio out, marked 約
-    assert.deepEqual(caps.prices["video.tts"], { usd: 60 * tts.audioTokensPerSec * tts.audioOutPerM / 1e6, unit: "分鐘", estimate: true });
+    // Default captions = our own whisper worker: no vendor bill, the button says 免費.
+    assert.equal(caps.prices["video.transcribe"].usd, rates.TRANSCRIBE_RATES["host-whisper-large-v3"].usdPerMin);
+    assert.equal(window.VideoWorkbenchPrices.text("video.transcribe", caps), "免費");
+    // Default speech = Gemini, token-billed: per minute of audio out at today's price row, marked 約.
+    const tts = rates.GEMINI_TTS_RATES[caps.models.audio], today = new Date().toISOString().slice(0, 10), tp = tts.prices.filter((p) => p.from <= today).at(-1);
+    assert.deepEqual(caps.prices["video.tts"], { usd: 60 * tts.audioTokensPerSec * tp.audioOutPerM / 1e6, unit: "分鐘", estimate: true });
     assert.equal(caps.prices["video.image"].usd, rates.IMAGE_RATES["openai-high"].usd);
-    assert.match(window.VideoWorkbenchPrices.text("video.transcribe video.script", caps), /^NT\$[\d.]+／分鐘 \+ 約 NT\$[\d.]+／次$/);
+    assert.match(window.VideoWorkbenchPrices.text("video.transcribe video.script", caps), /^免費 \+ 約 NT\$[\d.]+／次$/);
     // NT$ = USD x next-admin TWD_RATE (image-models.js), the one rate.
     assert.equal(caps.twdRate, rates.TWD_RATE);
     // Format: >= NT$10 one decimal, >= NT$0.1 two decimals, below that two significant digits.

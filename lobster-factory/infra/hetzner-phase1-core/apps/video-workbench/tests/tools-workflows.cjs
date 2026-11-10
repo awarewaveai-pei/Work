@@ -58,13 +58,17 @@ const evidence = fs.mkdtempSync(
     );
   const server = require("../server.cjs").createServer({
     dataDir,
-    env: { OPENAI_API_KEY: "test-only" },
+    // OpenAI speech and whisper-1 = the switch-back paths (the defaults are covered by p6-main-system and ed10).
+    env: { OPENAI_API_KEY: "test-only", VW_TTS_MODEL: "gpt-4o-mini-tts", VW_TRANSCRIBE_ENGINE: "openai" },
     fetchImpl: async (url, options) => {
       provider.push({ url, body: options.body });
       if (url.endsWith("/audio/speech"))
         return new Response(fs.readFileSync(audioFile));
+      // Tool pages transcribe one file as a job (scripts/tools-workflows.js wfTranscribe): whisper-1 verbose_json.
       if (url.endsWith("/audio/transcriptions"))
-        return new Response("1\n00:00:00,000 --> 00:00:02,000\n測試辨識\n");
+        return options.body.get("response_format") === "verbose_json"
+          ? Response.json({ language: "chinese", segments: [{ start: 0, end: 2, text: "測試辨識", avg_logprob: -0.1 }], words: [{ word: "測試", start: 0, end: 1 }, { word: "辨識", start: 1, end: 2 }] })
+          : new Response("1\n00:00:00,000 --> 00:00:02,000\n測試辨識\n");
       if (url.endsWith("/images/edits"))
         return Response.json({ data: [{ b64_json: png.toString("base64") }] });
       if (url.endsWith("/responses")) {

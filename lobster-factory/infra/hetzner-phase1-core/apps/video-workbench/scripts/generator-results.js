@@ -54,7 +54,7 @@ async function generatorResultAction(payload) {
       if (input.direction) state.productDirection = structuredClone(input.direction);
       state.productDuration = settings.duration || input.duration || 8;
     }
-    if (mode === "spoken") { state.voice = input.voice || ""; state.cast = input.cast?.id || ""; state.castName = input.cast?.name || ""; state.spokenVisualDirection = input.cast?.direction || ""; state.performance = input.instructions || ""; state.spokenPanel = "none"; }
+    if (mode === "spoken") { state.voice = input.voice || ""; state.speechModel = input.speechModel || ""; state.cast = input.cast?.id || ""; state.castName = input.cast?.name || ""; state.spokenVisualDirection = input.cast?.direction || ""; state.performance = input.instructions || ""; state.spokenPanel = "none"; }
     generatorNormalizeSettings();
     VideoWorkbench.router.activate("generator"); close(); render();
     return { ok: true, mode };

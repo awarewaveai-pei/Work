@@ -24,6 +24,21 @@ const toolSoundSamples = {
   機械運轉: "穩定的機械運轉聲",
   人群: "遠處人群交談的環境聲",
 };
+// The voices of the chosen speech model (/capabilities speech.models[].voices, backend/speech.cjs) as buttons; an id saved
+// under another model (an old draft) shows and sends that model's default.
+const toolVoiceModel = () => VideoWorkbench.capabilities?.speech?.models?.find((m) => m.id === wfProviderCurrent("speech", values.voiceModel));
+function toolVoiceCurrent() {
+  const model = toolVoiceModel();
+  return model?.voices.some((v) => v.id === values.voiceId) ? values.voiceId : model?.defaultVoice;
+}
+function toolVoiceChoices() {
+  const voices = toolVoiceModel()?.voices || [];
+  if (!voices.length) return "";
+  const current = toolVoiceCurrent();
+  return `<label>聲線</label><p class="note">名稱後是音色特色；語氣、情緒用上面的選項或描述，語速／音調／音量在進階調整。</p><div class="flow-choices" role="group">${voices
+    .map((v) => `<button type="button" class="btn small ${v.id === current ? "selected" : ""}" data-flow-choice="voiceId" data-flow-value="${esc(v.id)}" data-flow-multiple="false" aria-pressed="${v.id === current}">${esc(v.label)}</button>`)
+    .join("")}</div>`;
+}
 function toolVoiceScreen(t) {
   wfDefaults({
     voiceMode: "純聲音",
@@ -39,7 +54,7 @@ function toolVoiceScreen(t) {
     voiceSpeed: 1,
     voicePitch: 0,
     voiceGain: 0,
-    voiceId: "coral",
+    voiceId: "",
     voiceAsMusic: false,
   });
   const pure = values.voiceMode === "純聲音",
@@ -48,15 +63,15 @@ function toolVoiceScreen(t) {
     ? ""
     : `<label>素材種類</label>${wfChoice("voiceSourceKind", ["影片", "圖片"])}${wfSource("src", values.voiceSourceKind === "圖片" ? "image" : "video")}`;
   const preferences = !effect
-    ? `${wfButton("聲音設定（選填）", "voice-preferences")}<div ${values.voicePreferences ? "" : "hidden"}><label>性別</label>${wfChoice("voiceGender", ["男聲", "女聲", "中性"], true)}<label>年齡</label>${wfChoice("voiceAge", ["兒童", "少年", "青年", "中年", "長者"], true)}<label>音色／風格</label>${wfChoice("voiceTone", ["低沉磁性", "溫柔", "明亮清亮", "沙啞", "沉穩播報", "旁白解說", "耳語"], true)}<label>情緒</label>${wfChoice("voiceMood", ["平靜", "溫暖", "開心", "悲傷", "緊張", "興奮"], true)}${wfField("voiceDescription", "補充聲音描述（選填）")}${wfSelect("voiceId", "已接入聲線", ["coral", "alloy", "echo", "fable", "onyx", "nova", "shimmer"])}</div>`
+    ? `${wfButton("聲音設定（選填）", "voice-preferences")}<div ${values.voicePreferences ? "" : "hidden"}><label>性別</label>${wfChoice("voiceGender", ["男聲", "女聲", "中性"], true)}<label>年齡</label>${wfChoice("voiceAge", ["兒童", "少年", "青年", "中年", "長者"], true)}<label>音色／風格</label>${wfChoice("voiceTone", ["低沉磁性", "溫柔", "明亮清亮", "沙啞", "沉穩播報", "旁白解說", "耳語"], true)}<label>情緒</label>${wfChoice("voiceMood", ["平靜", "溫暖", "開心", "悲傷", "緊張", "興奮"], true)}${wfField("voiceDescription", "補充聲音描述（選填）")}${toolVoiceChoices()}</div>`
     : "";
-  const form = `<label>${effect ? "音效描述" : "台詞內容"}</label>${wfChoice("voiceScriptMode", ["台詞", "音效"])}${wfArea(effect ? "voiceSfxText" : "voiceText", effect ? "音效描述" : "台詞內容", 500)}<p class="note" id="voiceCount">${String(values[effect ? "voiceSfxText" : "voiceText"] || "").length}/500</p><div class="flow-choices">${Object.keys(
+  const form = `${!effect ? wfProviderChoice("speech", "voiceModel", "配音服務") : ""}<label>${effect ? "音效描述" : "台詞內容"}</label>${wfChoice("voiceScriptMode", ["台詞", "音效"])}${wfArea(effect ? "voiceSfxText" : "voiceText", effect ? "音效描述" : "台詞內容", 500)}<p class="note" id="voiceCount">${String(values[effect ? "voiceSfxText" : "voiceText"] || "").length}/500</p><div class="flow-choices">${Object.keys(
     effect ? toolSoundSamples : toolVoiceSamples,
   )
     .map((name) => wfButton(name, "voice-sample:" + name))
     .join(
       "",
-    )}</div>${preferences}<label>目標長度</label>${wfChoice("voiceDuration", ["3 秒", "5 秒", "10 秒", "15 秒", "30 秒", "60 秒", "120 秒"])}<p class="note">依台詞估算及調整語速；台詞較長時可能超出目標，會保留完整台詞。</p>${wfButton("進階 · 語速／音調／音量", "voice-advanced")}<div ${values.voiceAdvanced ? "" : "hidden"}>${wfField("voiceSpeed", "語速（倍）", "number", 'min="0.25" max="4" step="0.05"')}${wfField("voicePitch", "音調（半音）", "number", 'min="-12" max="12" step="1"')}${wfField("voiceGain", "音量（dB）", "number", 'min="-30" max="12" step="1"')}</div>${!pure ? wfCheck("voiceAsMusic", "當作配樂／旁白（鋪入音軌，不重新對口型）") : ""}<p class="note">${effect ? "音效生成尚未接入；不會將音效描述送到語音朗讀。" : !pure && !values.voiceAsMusic ? "照片／影片對嘴尚未接入；可選擇直接鋪入生成的旁白。" : "使用已接入語音服務，依 API 用量計費。"}</p>${wfButton(pure ? "產生聲音" : "開始配音", "voice-generate", effect || (!pure && (!files.src || !values.voiceAsMusic)), "video.tts")}`;
+    )}</div>${preferences}<label>目標長度</label>${wfChoice("voiceDuration", ["3 秒", "5 秒", "10 秒", "15 秒", "30 秒", "60 秒", "120 秒"])}<p class="note">依台詞估算及調整語速；台詞較長時可能超出目標，會保留完整台詞。</p>${wfButton("進階 · 語速／音調／音量", "voice-advanced")}<div ${values.voiceAdvanced ? "" : "hidden"}>${wfField("voiceSpeed", "語速（倍）", "number", 'min="0.25" max="4" step="0.05"')}${wfField("voicePitch", "音調（半音）", "number", 'min="-12" max="12" step="1"')}${wfField("voiceGain", "音量（dB）", "number", 'min="-30" max="12" step="1"')}</div>${!pure ? wfCheck("voiceAsMusic", "當作配樂／旁白（鋪入音軌，不重新對口型）") : ""}<p class="note">${effect ? "音效生成尚未接入；不會將音效描述送到語音朗讀。" : !pure && !values.voiceAsMusic ? "照片／影片對嘴尚未接入；可選擇直接鋪入生成的旁白。" : "使用已接入語音服務，依 API 用量計費。"}</p>${wfButton(pure ? "產生聲音" : "開始配音", "voice-generate", effect || (!pure && (!files.src || !values.voiceAsMusic)), "video.tts", wfProviderCurrent("speech", values.voiceModel))}`;
   return wfWrap(
     t,
     `${wfChoice("voiceMode", ["純聲音", "影片／圖片配音"])}${pure ? `<section class="side flow-wide">${form}</section>` : `<div class="two-col flow-layout">${source}<aside class="side">${form}</aside></div>`}`,
@@ -119,7 +134,8 @@ async function toolVoiceAction(action, button) {
       type: "audio",
       operation: "voice",
       prompt: text,
-      voice: settings.voiceId,
+      speechModel: wfProviderCurrent("speech", values.voiceModel),
+      voice: toolVoiceCurrent(),
       instructions,
       settings: { voiceSpeed: speed, voicePitch: pitch, voiceGain: gain },
     });

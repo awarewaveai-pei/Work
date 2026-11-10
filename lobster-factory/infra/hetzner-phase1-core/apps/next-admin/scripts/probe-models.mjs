@@ -78,10 +78,13 @@ async function probeMedia(row) {
   if (!key) return { ...base, ok: false, http: 0, ms: 0, budget: null, error: `${envName ?? "key"} not set` };
   const url = row.vendor === "OpenAI"
     ? `https://api.openai.com/v1/models/${encodeURIComponent(row.id)}`
-    : `https://api.replicate.com/v1/models/${row.id}${row.version ? `/versions/${row.version}` : ""}`;
+    : row.vendor === "Google"
+      ? `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(row.id)}`
+      : `https://api.replicate.com/v1/models/${row.id}${row.version ? `/versions/${row.version}` : ""}`;
+  const headers = row.vendor === "Google" ? { "x-goog-api-key": key } : { authorization: `Bearer ${key}` };
   const t0 = Date.now();
   try {
-    const resp = await fetch(url, { headers: { authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    const resp = await fetch(url, { headers, signal: AbortSignal.timeout(TIMEOUT_MS) });
     const text = await resp.text();
     return { ...base, ok: resp.ok, http: resp.status, ms: Date.now() - t0, budget: null, error: resp.ok ? null : text.split(key).join("***").slice(0, 200) };
   } catch (err) {

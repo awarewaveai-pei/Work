@@ -34,11 +34,7 @@ async function toolShortAnalyze() {
       ? toolSubtitleParse(values.subtitleText)
       : [];
     if (!cues.length) {
-      const response = await VideoWorkbench.request("/transcriptions", {
-        source,
-        language: values.shortLanguage,
-      });
-      cues = toolSubtitleParse(response.srt);
+      cues = toolSubtitleParse(await wfTranscribe(source, values.shortLanguage, values.shortEngine));
     }
     if (!cues.length)
       throw Error("沒有可分析的字幕，請匯入 SRT 或手動新增片段");

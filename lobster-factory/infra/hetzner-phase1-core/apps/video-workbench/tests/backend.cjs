@@ -15,7 +15,8 @@ const { createServer } = require("../server.cjs");
   let downloads = 0;
   const server = createServer({
     dataDir: dir,
-    env: { OPENAI_API_KEY: "test-only", REPLICATE_API_TOKEN: "test-only" },
+    // OpenAI speech and whisper-1 = the switch-back paths until 2027-01-06 / 2027-02-26 (defaults: tests/p6-main-system.cjs, ed10).
+    env: { OPENAI_API_KEY: "test-only", REPLICATE_API_TOKEN: "test-only", VW_TTS_MODEL: "gpt-4o-mini-tts", VW_TRANSCRIBE_ENGINE: "openai" },
     fetchImpl: async (url, options) => {
       calls.push({ url, body: options.body });
       if (url.endsWith("/responses"))
@@ -29,7 +30,7 @@ const { createServer } = require("../server.cjs");
       if (url.endsWith("/audio/speech"))
         return new Response(Buffer.from("test-audio"));
       if (url.endsWith("/audio/transcriptions"))
-        return new Response("1\n00:00:00,000 --> 00:00:00,500\n你好\n");
+        return Response.json({ language: "chinese", segments: [{ start: 0, end: 0.5, text: "你好", avg_logprob: -0.1 }], words: [{ word: "你好", start: 0, end: 0.5 }] });
       // Video = the default Replicate model (Veo 3.1 Fast); the first download fails once.
       if (/^https:\/\/api\.replicate\.com\/v1\/models\/.+\/predictions$/.test(url))
         return Response.json({ id: "video_fixture", status: "starting" });

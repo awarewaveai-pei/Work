@@ -9,6 +9,7 @@ const assert = require("node:assert/strict"),
   { spawnSync } = require("node:child_process"),
   ffmpeg = require("ffmpeg-static");
 const { createServer } = require("../server.cjs");
+const rates = require(path.join(require("../backend/appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env), "lib/ai/cost-model.ts"));
 const transcribe = require("../backend/transcribe.cjs"),
   TranscriptWords = require("../shared/transcript-words.js"),
   costs = require("../backend/provider-cost.cjs"),
@@ -50,17 +51,18 @@ const verbose = (list) => { const words = list.map(([word, start, end]) => ({ wo
 function mockProvider(answer) {
   const calls = [];
   const fetchImpl = async (url, options) => {
-    if (!url.endsWith("/audio/transcriptions")) throw Error("未預期的網路請求：" + url);
-    const form = options.body, file = form.get("file");
-    const bytes = Buffer.from(await file.arrayBuffer()), saved = path.join(dir, `sent-${calls.length}.mp3`);
+    const u = new URL(url);
+    if (u.origin + u.pathname !== "http://whisper.test:8421/v1/transcribe") throw Error("未預期的網路請求：" + url);
+    assert.equal(options.headers.Authorization, "Bearer worker-test");
+    const bytes = Buffer.from(options.body), saved = path.join(dir, `sent-${calls.length}.mp3`);
     fs.writeFileSync(saved, bytes);
-    calls.push({ format: form.get("response_format"), granularities: form.getAll("timestamp_granularities[]"), language: form.get("language"), bytes: bytes.length, saved });
-    return form.get("response_format") === "srt" ? new Response("1\n00:00:00,000 --> 00:00:00,500\n你好\n") : Response.json(answer(calls.length - 1));
+    calls.push({ language: u.searchParams.get("language"), traditional: u.searchParams.get("traditional"), bytes: bytes.length, saved });
+    return Response.json(answer(calls.length - 1));
   };
   return { calls, fetchImpl };
 }
 async function serve(fetchImpl, extraEnv = {}) {
-  const server = createServer({ dataDir, env: { OPENAI_API_KEY: "test-only", ...extraEnv }, fetchImpl });
+  const server = createServer({ dataDir, env: { VW_TRANSCRIBE_WORKER_URL: "http://whisper.test:8421/", VW_TRANSCRIBE_WORKER_TOKEN: "worker-test", ...extraEnv }, fetchImpl });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
   const base = "http://127.0.0.1:" + server.address().port + "/api/vw";
   const call = async (method, route, data) => {
@@ -92,6 +94,48 @@ async function serve(fetchImpl, extraEnv = {}) {
   assert.match(transcribe.toSrt(n.segments), /^1\n00:00:00,400 --> 00:00:01,600\n嗯 大家好\n\n2\n00:00:02,400 --> 00:00:03,700\n今天\n$/);
   pass("逐字結果：每句有起訖、文字、分數；分數 < 0.8 標需校對；字歸到所屬句；SRT 由句組成");
 
+  // 1b. The host worker's answer (apps/video-whisper-worker /v1/transcribe; numbers from the 2026-11-10 A/B run on ks-aw-01,
+  // English pieces already joined by its merge_words) reads the same way.
+  const hostAnswer = {
+    model: "large-v3", backend: "cpu/int8 x8", language: "zh", duration: 25.4,
+    segments: [{ id: 0, start: 0, end: 3.48, text: "這次的Workshop,我們會用Premiere Pro跟DaVinci Resolve做比較。", avg_logprob: -0.1305, no_speech_prob: 0.02, compression_ratio: 1.1 }],
+    words: [["這", 0, 0.22], ["次", 0.22, 0.34], ["的", 0.34, 0.44], ["Workshop,", 0.44, 0.84], ["我們", 0.9, 1.08], ["Premiere", 1.44, 1.78], [" Pro", 1.78, 1.94]].map(([word, start, end]) => ({ word, start, end, probability: 0.9 })),
+  };
+  const h = transcribe.normalize(hostAnswer);
+  assert.deepEqual([h.language, h.segments.length, h.segments[0].score, h.segments[0].needsReview], ["zh", 1, 0.97, false]);
+  assert.deepEqual(h.words.map((w) => [w.text, w.start, w.end]), [["這", 0, 0.22], ["次", 0.22, 0.34], ["的", 0.34, 0.44], ["Workshop,", 0.44, 0.84], ["我們", 0.9, 1.08], ["Premiere", 1.44, 1.78], ["Pro", 1.78, 1.94]]);
+  assert.equal(h.segments[0].words.length, 7);
+  pass("主機 whisper 回覆轉成 normalize() 格式：逐字起訖、句分數、字歸句");
+
+  // 1c. Gemini Transcribe (words only, "0.100s" offsets, UTF-8 byte indexes into the text, punctuation only in the text):
+  // sentences cut at 。 and at a pause over 1 s; no confidence = every sentence 需校對.
+  const geminiText = "大家好。今天 test";
+  const g = transcribe.normalize(transcribe.fromGemini({ usage: { total_input_tokens: 100, total_output_tokens: 20 }, steps: [{ content: [{ type: "text", text: geminiText, annotations: [
+    { type: "word_info", text: "大家", start_index: 0, end_index: 6, start_offset: "0.100s", end_offset: "0.400s" },
+    { type: "word_info", text: "好", start_index: 6, end_index: 9, start_offset: "0.400s", end_offset: "0.600s" },
+    { type: "word_info", text: "今天", start_index: 12, end_index: 18, start_offset: "0.700s", end_offset: "1s" },
+    { type: "word_info", text: "test", start_index: 19, end_index: 23, start_offset: "2.500s", end_offset: "2.800s" },
+  ] }] }] }, "zh"));
+  assert.deepEqual(g.segments.map((x) => [x.start, x.end, x.text, x.needsReview]), [[0.1, 0.6, "大家好。", true], [0.7, 1, "今天", true], [2.5, 2.8, "test", true]]);
+  assert.deepEqual(g.words.map((w) => [w.text, w.start, w.end]), [["大家", 0.1, 0.4], ["好", 0.4, 0.6], ["今天", 0.7, 1], ["test", 2.5, 2.8]]);
+  const gtr = rates.GEMINI_TRANSCRIBE_RATES["gemini-3.5-transcribe"];
+  near(costs.transcribeUsd("gemini-3.5-transcribe", 60, { total_input_tokens: 1500, total_output_tokens: 175 }), (1500 * gtr.audioInPerM + 175 * gtr.textOutPerM) / 1e6, 1e-12, "Gemini 依回覆 token 計費");
+  near(costs.transcribeUsd("gemini-3.5-transcribe", 60), (60 * gtr.audioTokensPerSec * gtr.audioInPerM + gtr.textTokensPerMin * gtr.textOutPerM) / 1e6, 1e-12, "沒有 usage 用官方估算");
+  pass("Gemini 辨識接頭：逐字換成句（標點／停頓切）、無分數＝需校對、依回覆 token 計費");
+
+  // 1d. The lists drop a row on its registry retireOn (whisper-1 2027-02-26, gpt-4o-mini-tts 2027-01-06): not offered,
+  // and a job naming it is refused (never silently swapped).
+  const speech = require("../backend/speech.cjs");
+  assert.deepEqual(transcribe.capability({}, () => null, "2027-02-25").engines.map((e) => e.id), ["host", "gemini", "openai"]);
+  assert.deepEqual(transcribe.capability({}, () => null, "2027-02-26").engines.map((e) => e.id), ["host", "gemini"]);
+  assert.throws(() => transcribe.pick("openai", {}, "2027-02-26"), (e) => e.status === 400 && /已停止/.test(e.message));
+  assert.equal(transcribe.pick("openai", {}, "2027-02-25").model, "whisper-1");
+  assert.equal(transcribe.pick(undefined, { VW_TRANSCRIBE_ENGINE: "openai" }, "2027-02-26").id, "host", "預設指到已下線的列 = 用清單第一列");
+  assert.deepEqual(speech.capability({}, () => null, "2027-01-05").models.map((m) => m.id), ["gemini-3.8-flash-lite-tts", "gpt-4o-mini-tts"]);
+  assert.deepEqual(speech.capability({}, () => null, "2027-01-06").models.map((m) => m.id), ["gemini-3.8-flash-lite-tts"]);
+  assert.throws(() => speech.pick("gpt-4o-mini-tts", {}, "2027-01-06"), (e) => e.status === 400 && /已停止/.test(e.message));
+  pass("過了 retireOn 的配音／辨識選項：不在清單（頁面按鈕由清單長出）、指名送出回 400");
+
   // 2. Filler and pause data for ED.11.
   const marked = TranscriptWords.annotate([{ start: 0, end: 0.3, text: "嗯嗯" }, { start: 0.4, end: 1, text: "你好" }, { start: 2.5, end: 3, text: "Umm," }, { start: 3.1, end: 3.5, text: "那個" }]);
   assert.deepEqual(marked.map((w) => [w.filler, w.pauseAfter]), [[true, 0.1], [false, 1.5], [true, 0.1], [false, null]]);
@@ -99,19 +143,22 @@ async function serve(fetchImpl, extraEnv = {}) {
   assert.deepEqual(TranscriptWords.cutRanges([{ start: 0, end: 1, text: "a", source: 0 }, { start: 3, end: 4, text: "b", source: 1 }], { maxPause: 0.5 }), []);
   pass("剪贅字資料：語氣詞（嗯嗯、Umm）標記、停頓秒數、不跨錄音的剪除區間");
 
-  // 3. Single file: words:true asks for word times; the old call keeps the old SRT contract.
+  // 3. Single file: words:true answers word times; the old call keeps the old SRT contract (built from the worker's segments).
   const single = mockProvider(() => verbose([["嗯", 0.4, 0.6], ["大家好", 0.8, 1.5]]));
   let s = await serve(single.fetchImpl);
   const old = await s.ok("POST", "/transcriptions", { source: { url: voice, type: "audio/wav" } });
   assert.deepEqual(Object.keys(old), ["srt"]);
-  assert.equal(single.calls[0].format, "srt");
+  assert.match(old.srt, /^1\n00:00:00,400 --> 00:00:01,600\n嗯 大家好\n$/);
+  assert.deepEqual([single.calls[0].language, single.calls[0].traditional], ["", "1"], "自動偵測：不指定語言、中文寫繁體");
   const rich = await s.ok("POST", "/transcriptions", { source: { url: voice, type: "audio/wav" }, words: true, language: "繁體中文" });
-  assert.deepEqual([single.calls[1].format, single.calls[1].granularities, single.calls[1].language], ["verbose_json", ["word", "segment"], "zh"]);
+  assert.deepEqual([single.calls[1].language, single.calls[1].traditional], ["zh", "1"]);
+  await s.ok("POST", "/transcriptions", { source: { url: voice, type: "audio/wav" }, words: true, language: "簡體中文" });
+  assert.deepEqual([single.calls[2].language, single.calls[2].traditional], ["zh", "0"], "簡體中文：不加繁體提示");
   assert.deepEqual(rich.words.map((w) => [w.start, w.end, w.text, w.filler]), [[0.4, 0.6, "嗯", true], [0.8, 1.5, "大家好", false]]);
   assert.equal(rich.segments[0].needsReview, false);
   assert.match(rich.srt, /00:00:00,400 --> 00:00:01,600/);
   await s.close();
-  pass("/transcriptions：words:true 回逐句＋逐字＋分數；舊呼叫者照舊只拿 SRT");
+  pass("/transcriptions（自家主機 whisper）：words:true 回逐句＋逐字＋分數；舊呼叫者照舊只拿 SRT；繁／簡提示照語言");
 
   // 4. Whole project: V1 0–2 s (source 1–3 s of a video with sound), A1 10–13 s (narration), a silent V1 clip skipped.
   const settings = {
@@ -131,7 +178,10 @@ async function serve(fetchImpl, extraEnv = {}) {
   const quote = await s.ok("POST", "/editor/transcriptions/quote", { settings });
   assert.deepEqual([quote.seconds, quote.segments, quote.chunks, quote.skipped.map((k) => k.clipId)], [6, 2, 1, ["mute", "muted", "zero"]]);
   assert.deepEqual(quote.skipped.map((k) => k.reason), ["沒有聲音", "已靜音", "已靜音"]);
-  near(quote.costUsd, costs.transcribeUsd("whisper-1", 6), 1e-9, "估價");
+  assert.equal(quote.costUsd, 0, "自家主機辨識不計費");
+  assert.equal((await s.call("POST", "/editor/transcriptions/quote", { settings: { ...settings, engine: "nope" } })).status, 400, "不在清單的辨識方式回 400");
+  assert.equal((await s.call("POST", "/editor/transcriptions", { settings: { ...settings, engine: "nope" } })).status, 400, "不在清單的辨識方式不建立任務");
+  assert.equal(quote.model, "host-whisper-large-v3");
   assert.equal(whole.calls.length, 0);
   assert.deepEqual((await s.ok("GET", "/editor/transcriptions?projectId=p-ed10")).results, []);
   pass("整片估價：不呼叫供應商、不建立任務；跳過無聲與靜音（同匯出規則）片段；秒數＝有聲段＋段間 1 秒");

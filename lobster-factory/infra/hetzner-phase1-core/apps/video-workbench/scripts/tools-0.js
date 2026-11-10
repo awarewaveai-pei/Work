@@ -420,17 +420,14 @@ function render() {
   if (tool === "subtitle" && typeof toolSubtitleScreen !== "function") {
     const b = document.createElement("button");
     b.className = "btn primary";
-    b.textContent = "辨識字幕（API用量計費）";
+    b.textContent = "辨識字幕";
     b.dataset.paid = "video.transcribe";
     b.onclick = async () => {
       try {
         if (!files.src) throw Error("請先選取影片或音檔");
         b.disabled = true;
         b.textContent = "辨識中…";
-        const r = await VideoWorkbench.request("/transcriptions", {
-          source: files.src,
-        });
-        setVal("subtitleText", r.srt);
+        setVal("subtitleText", await wfTranscribe(files.src));
         saveDraft();
         render();
       } catch (e) {

@@ -109,7 +109,7 @@ export const DEFAULT_IMAGE_MODEL = "flux-schnell";
  * image id in code that is missing here, and on code still calling a retired row. One row per line: the probe parses it.
  */
 export interface MediaModel {
-  vendor: "Replicate" | "OpenAI";
+  vendor: "Replicate" | "OpenAI" | "Google";
   kind: "image" | "video" | "tool";
   status: "active" | "retired";
   /** Pinned Replicate version the code sends (probe checks this version, not just the model). */
@@ -145,10 +145,15 @@ export const MEDIA_MODELS: Record<string, MediaModel> = {
   // 2.6 (pricing page 2026-11-09, same token rates): sunburst = precise edits, takes a mask (openai-26-edit in image-models.js).
   "gpt-image-2.6-sunburst":            { vendor: "OpenAI", kind: "image", status: "active" },
   "gpt-image-2.6-flare":               { vendor: "OpenAI", kind: "image", status: "active" },
-  "whisper-1":                         { vendor: "OpenAI", kind: "tool", status: "active", verifiedAt: "2026-10-29" },
+  // OpenAI deprecations: shuts down 2027-02-26. video-workbench now transcribes on our own whisper worker (backend/transcribe.cjs);
+  // whisper-1 stays as its switch-back (VW_TRANSCRIBE_ENGINE=openai) and next-admin's paid engine (lib/content/video/transcription.ts).
+  "whisper-1":                         { vendor: "OpenAI", kind: "tool", status: "active", verifiedAt: "2026-10-29", retireOn: "2027-02-26" },
   // video-workbench speech (OPENAI_TTS_RATES). OpenAI deprecations 2026-11-09: shuts down 2027-01-06, successor gpt-realtime-2.1-mini
   // (a different API: the /audio/speech caller in video-workbench backend/api.cjs must move before then).
   "gpt-4o-mini-tts":                   { vendor: "OpenAI", kind: "tool", status: "active", retireOn: "2027-01-06" },
+  // video-workbench speech and captions since 2026-11-10 (GEMINI_TTS_RATES / GEMINI_TRANSCRIBE_RATES; backend/speech.cjs, transcribe.cjs).
+  "gemini-3.8-flash-lite-tts":         { vendor: "Google", kind: "tool", status: "active", verifiedAt: "2026-11-10" },
+  "gemini-3.5-transcribe":             { vendor: "Google", kind: "tool", status: "active", verifiedAt: "2026-11-10" },
   // video-service default until 2026-10-28; OpenAI: "The model 'dall-e-3' does not exist".
   "dall-e-3":                          { vendor: "OpenAI", kind: "image", status: "retired" },
   "runwayml/gen4-turbo":               { vendor: "Replicate", kind: "video", status: "active", verifiedAt: "2026-10-28" },
@@ -186,9 +191,11 @@ export const VIDEO_MOTION_RATES: Record<import("./video-motion-models").VideoMot
  * Per-run prices for the studio editing tools (Replicate compute-billed; values are typical-run
  * estimates — Replicate bills by GPU-seconds so actual varies). upscale runs up to 2 passes.
  */
-/** Speech-to-text, USD per audio minute (openai.com/api/pricing, whisper-1 $0.006/min). Used by video captions. */
-export const TRANSCRIBE_RATES: Record<"whisper-1", { usdPerMin: number; label: string; vendor: string }> = {
+/** Speech-to-text, USD per audio minute (openai.com/api/pricing, whisper-1 $0.006/min). Used by video captions.
+ *  host-whisper-large-v3 = apps/video-whisper-worker on ks-aw-01 (CPU): no vendor bill. */
+export const TRANSCRIBE_RATES: Record<"whisper-1" | "host-whisper-large-v3", { usdPerMin: number; label: string; vendor: string }> = {
   "whisper-1": { usdPerMin: 0.006, label: "OpenAI Whisper", vendor: "OpenAI" },
+  "host-whisper-large-v3": { usdPerMin: 0, label: "Whisper large-v3（自家主機）", vendor: "AwareWave" },
 };
 
 // usdPerSec: billed per second of the vendor's reported run time (replicateRunUsd); usd is then the estimate shown before the run.
@@ -298,6 +305,23 @@ export const OPENAI_TTS_RATES: Record<string, TtsRate> = {
   "gpt-4o-mini-tts": { textInPerM: 0.6, audioOutPerM: 12, audioTokensPerSec: 20, label: "gpt-4o-mini-tts" },
   "tts-1": { usdPerMChars: 15, label: "TTS-1" },
   "tts-1-hd": { usdPerMChars: 30, label: "TTS-1 HD" },
+};
+
+/** Gemini speech (video-workbench backend/speech.cjs), aistudio.google.com/docs/pricing 2026-11-10, Standard tier, USD per 1M
+ *  tokens: text in, audio out; audio = 25 tokens per second. The reply carries usage (total_input_tokens, total_output_tokens).
+ *  Google doubles the price on 2027-01-01: prices[] = from-date rows, the last row whose from <= the day of the call applies. */
+/** Gemini speech-to-text (video-workbench backend/transcribe.cjs), aistudio.google.com/docs/pricing 2026-11-10, Standard tier:
+ *  audio in $2 and text out $12 per 1M tokens; Google's per-minute estimate uses 25 audio tokens per second and 175 text
+ *  tokens per minute (= $0.005/min). The reply's usage is what is charged. */
+export const GEMINI_TRANSCRIBE_RATES: Record<string, { label: string; audioInPerM: number; textOutPerM: number; audioTokensPerSec: number; textTokensPerMin: number }> = {
+  "gemini-3.5-transcribe": { label: "Gemini 3.5 Transcribe", audioInPerM: 2, textOutPerM: 12, audioTokensPerSec: 25, textTokensPerMin: 175 },
+};
+export type GeminiTtsRate = { label: string; audioTokensPerSec: number; prices: readonly { from: string; textInPerM: number; audioOutPerM: number }[] };
+export const GEMINI_TTS_RATES: Record<string, GeminiTtsRate> = {
+  "gemini-3.8-flash-lite-tts": { label: "Gemini 3.8 Flash-Lite TTS", audioTokensPerSec: 25, prices: [
+    { from: "2026-01-01", textInPerM: 0.5, audioOutPerM: 6 },
+    { from: "2027-01-01", textInPerM: 1, audioOutPerM: 12 },
+  ] },
 };
 
 /** Free quotas the agency runs on (shown on /ops/costs, counted by free-quota.ts). Gemini: 500 generateContent requests

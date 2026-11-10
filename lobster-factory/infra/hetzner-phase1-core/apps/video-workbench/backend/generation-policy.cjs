@@ -7,11 +7,12 @@ const provider = "OpenAI";
 // (lib/ai/cost-model.ts TOOL_RATES, Node type stripping), never copied here.
 const { TOOL_RATES, VIDEO_MOTION_RATES, TWD_RATE } = require(require("node:path").join(require("./appearance.cjs").resolveSource(require("node:path").join(__dirname, ".."), process.env), "lib/ai/cost-model.ts"));
 const replicateVideo = require("./replicate-video.cjs");
+const speech = require("./speech.cjs");
 const toolCosts = Object.freeze({ removeBackground: TOOL_RATES["bg-remove"].usd });
 // Default video model: needs no reference image, lowest price (price audit 2026-11-10). VW_VIDEO_MODEL may name another
 // next-admin motion id; anything else is ignored.
 const DEFAULT_VIDEO_MODEL = "veo-3-1-fast";
-const models = (env) => ({ image: vwEnv(env, "IMAGE_MODEL") || "gpt-image-2.5-flare", video: replicateVideo.isModel(vwEnv(env, "VIDEO_MODEL")) ? vwEnv(env, "VIDEO_MODEL") : DEFAULT_VIDEO_MODEL, audio: vwEnv(env, "TTS_MODEL") || "gpt-4o-mini-tts" });
+const models = (env) => ({ image: vwEnv(env, "IMAGE_MODEL") || "gpt-image-2.5-flare", video: replicateVideo.isModel(vwEnv(env, "VIDEO_MODEL")) ? vwEnv(env, "VIDEO_MODEL") : DEFAULT_VIDEO_MODEL, audio: speech.defaultModel(env).id });
 // Video models the vendor shut down (OpenAI GET /v1/models/sora-2: shutdown_date 2026-09-24). A saved setting or an
 // old job naming one runs the default; the page says so once (shared/models.js replaceRetired).
 const RETIRED_VIDEO_MODELS = Object.freeze({ "sora-2": "Sora 2", "sora-2-pro": "Sora 2 Pro" });
@@ -32,7 +33,9 @@ function videoModelOf(input, env) {
 function capabilities(env, localTools) {
   return {
     image: !!env.OPENAI_API_KEY, text: !!env.OPENAI_API_KEY,
-    audio: !!env.OPENAI_API_KEY, video: !!env.REPLICATE_API_TOKEN,
+    audio: speech.capability(env, () => null).models.some((m) => m.available), video: !!env.REPLICATE_API_TOKEN,
+    // The live speech models with voices and prices (backend/speech.cjs); pages draw them as buttons.
+    speech: speech.capability(env, require("./provider-cost.cjs").speechPrice),
     provider,
     models: models(env),
     videoModels: videoModels(env), retiredVideoModels: RETIRED_VIDEO_MODELS,
