@@ -27,13 +27,5 @@
   }
   document.getElementById("aw-storyboard-state").textContent = JSON.stringify({ cards });
   if (!cards.length) document.getElementById("empty").textContent = "還沒有分鏡資料";
-  for (const file of ["storyboards-0.js"]) {
-    await new Promise((resolve, reject) => {
-      const s = document.createElement("script");
-      s.src = "../scripts/" + file;
-      s.onload = resolve;
-      s.onerror = reject;
-      document.body.append(s);
-    });
-  }
+  await VideoWorkbench.loadScripts(["storyboards-0.js"], "../scripts/");
 })().catch(SeedStar.reportError);

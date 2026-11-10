@@ -11,6 +11,21 @@
 - BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/video-workbench,agency-os,scripts | grep=subtitles-import|subtitles-download|subtitles-tool|edImportCues | hits=3
 - BUGHUNT_SCOPE_NARROW: 改動只在 video-workbench 前端；舊動作名僅剩比對文件歷史列 `docs/editor-parity-compare-20261106.md:65`（2026-11-06 比對快照，不回改），edImportCues 兩處（定義＋tools-editor.js 呼叫）仍有效
 - ORACLE_WAIVED: 派工限 Codex 一輪；artifact 2026-11-10-partialreview-d3b7e700 已跑，之後的改動只是照其 F1/F3/F4/F5 修正，修正後 ed10-subtitles-ui 7 項重跑綠
+## 2026-11-10（續48）影音工作台：瀏覽器保留素材副本，同一份素材第二次不經網路
+
+- 根因：瀏覽器拿素材位元組只走工作台伺服器 `/media/<sha256>/<檔名>`、`/generated/<uuid>.<副檔名>`（`VW/server.cjs` 靜態段，`Cache-Control: no-store`），R2 正本從不直接給瀏覽器（`objectUrl` 只存在伺服器端 `VW/backend/main-system.cjs:180`）。台灣到歐洲每次約 300ms，同一支影片每次開都重抓。
+- 做了（`VW`＝`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`）：
+  - `VW/shared/media-cache.js`（新）核心：key＝不變身分（`media/<sha256>/<名>` 內容雜湊、`generated/<uuid>` 一次寫入），網址的主機、query（簽名）、hash 全忽略；條目 id＝身分範圍＋key；任何儲存錯誤／副本不見／讀不到 → 退回網路；Range 由副本切 206；Range 未命中先走網路、背景抓一次完整檔；上限 min(2GB, 配額一半)、單檔 ≤ 1/4，LRU 淘汰。
+  - `VW/scripts/media-cache-sw.js`（新）Service Worker（IndexedDB）：只攔同源 GET 的上述兩種路徑，其餘請求（頁面、API、引擎、next-admin）不碰。工作台頁面導覽時並行問 `GET /api/vw/identity`，素材讀取等它；換身分刪其他身分的副本；任何 /login、/logout 請求（含客戶端路由的 fetch）或素材回 401 → 全刪；身分確認超過 60 秒，下一次讀取先重問。
+  - `VW/backend/api.cjs` `/identity`：sha256(userId＋orgId) 前 32 碼，本機模式 `local`。`VW/server.cjs` 只對 SW 檔加 `Service-Worker-Allowed: /`（Cache-Control 未動）。`VW/shared/runtime.js` 只在 http 模式的頂層頁註冊。
+  - 選 SW 不選 shared 模組：`<video>`／`<img>` 的位元組不經 JS，只有 SW 一處攔得到全部讀取（剪輯器、素材庫、引擎橋 `tools-engine-host.js` fetch）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/media-cache.cjs → 換簽名網址命中（網路 1 次）、副本刪掉／儲存壞掉退回網路同內容、A 組織副本 B 讀不到（清除失敗時也一樣）、登出清空、LRU | exit=0 | ms=80
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：entryId 拿掉 scope → tests/media-cache.cjs 紅「org B must not hit org A's copy」；還原 → 綠 | exit=1→0 | ms=200
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/media-cache-browser.cjs（Edge、http 模式、/media 人工延遲 300ms、2.07MB mp4）→ 第一次 319ms 伺服器 1 次；換 query 第二次 7ms、伺服器 0 次、x-vw-media-cache: hit、transferSize 0；重新載入後 <video> 播放＋跳到 5s 110ms、伺服器 0 次 | exit=0 | ms=15000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs → gate ok（加入 media-cache） | exit=0 | ms=14000
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/1m/0n（external oracle = Codex CLI gpt-6-sol；第一輪 `agency-os/reports/oracle/2026-11-10-review-d0372529.md`：next-admin `LogoutButton.tsx:14-21` 用 router.replace 客戶端登出，SW 看不到導覽 → 修：任何 /login、/logout 請求都清空＋身分確認超過 60 秒先重問（`checkIdentity`/`maxAgeMs`），加測試；第二輪 `2026-11-10-review-8415e60e.md` NO FINDINGS，files-reviewed 8 檔含 4 新檔）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=serviceWorker|Service-Worker-Allowed|/api/vw/identity|media-cache | hits=27（全為本次新增檔與本條；先前無任何 SW）
+- 剩餘風險：Range 未命中時第一次播放會多抓一次完整檔（背景）；SW 範圍 "/" 也涵蓋同網域 next-admin 頁，但只對素材路徑 respondWith；未部署，交監工批次部署。
 ## 2026-11-10（續47）FC.5 上線：兩個引擎新版切到正式站（操作者「可以，上正式站」）
 
 - 主機 `/root/lobster-phase1/static/video-engines/`：上傳 `filmcraft/46763a8-4265c64`、`effectcraft/df4cc09-e5261e3`（先放 `<dist>.upload-<時間>`，主機 `sha256sum -c` 全過、SHA256SUMS 雜湊＝`engines/*/VERSION.json` 才改名）；`current` 改指新版；擁有者改 root:root。不需要動 nginx／compose（alias 走 `current`），工作台不用重部署。
@@ -56,6 +71,16 @@
 - REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh video-workbench; docker exec lobster-video-workbench node -e videoModels; playwright-runner.ps1 -Mode smoke（34 passed / 0 failed / 24 skipped，agency-os/reports/e2e/2026-11-10/smoke） | exit=0 | ms=86776
 - REVIEW_WAIVED: NA -- 部署既有已審 commit（f792960c6、510343ddd 各一輪 Codex）
 - BUGHUNT_WAIVED: NA -- 部署，無程式改動
+## 2026-11-10（續44）影音工作台頁面腳本改「並行下載、照序執行」
+
+- 根因：六個 `*-boot.js` 與 `app-entry.js` 逐檔 append `<script>` 並 await onload，32 檔串列＝32 次往返（主機歐洲、靜態檔 no-store），tools.html 約 8.4s。
+- 不變量：每頁腳本載入時間 ≈ 1 次往返＋最大檔，與檔數無關；執行順序不變。
+- 改：`shared/runtime.js` 新 `VideoWorkbench.loadScripts(files, base)`（一次 append 全部、`s.async = false`、`Promise.all`、任一檔 onerror reject 走原 reportError）；tools／characters／projects／storyboards／templates／index 六個 boot 改用它；`app-entry.js` 在 runtime 之前跑，就地寫同一規則。清單內容與 `/capabilities` 先後不動（腳本頂層可能讀 capabilities，保持先 await）。`tools-editor/follow/voice-music` 的 `new Promise` 是 media 載入，不動。`storyboards-design-baseline.json` 的 storyboards-boot.js hash 隨之更新（只動載入迴圈）。
+- 新測試 `tests/boot-script-loading.cjs`（入 gate）：假 document 驗一次插入全部、順序、async=false、onerror reject；六個 boot 無私有迴圈。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs（含 boot-script-loading）＋本機起工作台開 tools.html／index.html（Edge pane）：28 個腳本 startTime 6.9–65ms 同時發出、開字幕工具無 console error（僅既有 engines 404） | exit=0 | ms=60000
+- 突變：拿掉 `s.async = false` → boot-script-loading 紅；還原轉綠。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/1m/0n — Codex（agency-os/reports/oracle/2026-11-10-review-af45f5f9.md）：app-entry 的 async=false 測試被註解字面騙過 → 已修（只算程式行）並突變驗證（改 true → 紅）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=createElement\("script"\)|createElement\('script'\) | hits=7
 ## 2026-11-10（續43）影音工作台影片「聲音」設定與模型一致＋每個模型的使用說明
 
 - 根因：「聲音」有聲／靜音只是擺設——靜音一律被擋（`muteOutput:false`），有聲時 Veo 照樣出無聲片；換成 Omni（一定有聲）後，第一次用的人無從判斷該選哪個模型。
