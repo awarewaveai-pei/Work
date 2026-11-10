@@ -887,3 +887,12 @@ body {
 .tool-flow [data-t3-action][aria-pressed="true"],[data-tool-flow="3d"] [data-t3-action][aria-pressed="true"] { border-color:var(--accent);background:var(--bg-hover); }
 @media(max-width:1200px) { .t3-layout { grid-template-columns:200px minmax(260px,1fr); }.t3-layout > .t3-col:last-child { grid-column:1/3;max-height:480px; } }
 @media(max-width:700px) { .t3-layout { display:flex;flex-direction:column; } }
+/* Full-page engine tab (scripts/tools-engine-host.js ENGINE_FULL): one bar on top, the engine fills the rest of the window. */
+body.engine-full:has(#engine-host .engine-frame) { height:100vh;display:flex;flex-direction:column;overflow:hidden; }
+body.engine-full #engine-host { flex:1;min-height:0;display:flex;flex-direction:column; }
+.engine-page > div:not(.engine-bar) { max-width:900px;margin:0 auto;padding:24px 35px; }
+.engine-bar { padding:8px 16px;border-bottom:1px solid var(--border-subtle);max-height:40vh;overflow:auto; }
+.engine-bar .btn { padding:6px 12px; }
+.engine-bar details p { margin:4px 0; }
+.engine-warn p { margin:6px 0; }
+.engine-frame { flex:1;min-height:0;width:100%;border:0;display:block; }

@@ -89,6 +89,16 @@
     broadcast();
     document.dispatchEvent(new CustomEvent("vw:changed"));
   }
+  // A stored state becomes db (on load, and on a conflict that keeps the page). True = normalizing changed it.
+  function adopt(v) {
+    if (v.version !== 1) throw new Error("不支援的資料版本");
+    db = v;
+    if (!Number.isInteger(db.revision)) db.revision = 0;
+    if (!Array.isArray(db.compositions)) db.compositions = []; // state saved before card P3
+    if (!Array.isArray(db.scenes3d)) db.scenes3d = []; // state saved before card P5
+    const normalized = normalizeAssets();
+    return spineAdopt() > 0 || normalized;
+  }
   const CONFLICT = "vw.conflict-reload";
   function persist() {
     queue = queue
@@ -103,6 +113,14 @@
           // patching db: a stale copy saved later would overwrite the other tab (Codex 2026-11-02).
           if (e.status !== 409 || !e.state) throw e;
           adapter.cache?.(e.state);
+          // A page whose work lives outside db (the full-page engine tab, scripts/tools-engine-host.js) must not reload:
+          // it takes the other tab's state and rejects this write with .conflict; the caller redoes it on the new state.
+          if (window.VW_KEEP_PAGE_ON_CONFLICT) {
+            adopt(structuredClone(e.state));
+            broadcast();
+            document.dispatchEvent(new CustomEvent("vw:changed"));
+            throw Object.assign(new Error("另一個分頁已更新，已改用最新資料"), { conflict: true });
+          }
           try {
             sessionStorage.setItem(CONFLICT, "1");
           } catch {}
@@ -112,6 +130,18 @@
       });
     queue.catch(reportError);
     return queue;
+  }
+  // Saves a change already made to db that can be made again (an upsert or removal by id, a settle). On a page that keeps
+  // itself on a conflict (VW_KEEP_PAGE_ON_CONFLICT) db is then the other tab's state: the change is made on it and saved
+  // once more instead of being dropped. A whole-value write (preferences) is redone by its caller (read-modify-write).
+  async function persistRedo(redo) {
+    try {
+      await persist();
+    } catch (e) {
+      if (!e.conflict) throw e;
+      redo();
+      await persist();
+    }
   }
   function read(key) {
     if (key === "vw.characters")
@@ -190,7 +220,11 @@
     }
     // Card PJ.2: a finished job back to its episode (shared/episode-spine.js settle; the same job twice = no change).
     if (action === "spine-settle") {
-      if (Spine?.settle(db.projects, payload)) await spineChanged();
+      if (Spine?.settle(db.projects, payload)) {
+        await persistRedo(() => Spine.settle(db.projects, payload));
+        broadcast();
+        document.dispatchEvent(new CustomEvent("vw:changed"));
+      }
       return true;
     }
     if (action === "spine-open") {
@@ -317,15 +351,7 @@
         db = v;
       })
     : adapter.load().then((v) => {
-        if (v) {
-          if (v.version !== 1) throw new Error("不支援的資料版本");
-          db = v;
-          if (!Number.isInteger(db.revision)) db.revision = 0;
-          if (!Array.isArray(db.compositions)) db.compositions = []; // state saved before card P3
-          if (!Array.isArray(db.scenes3d)) db.scenes3d = []; // state saved before card P5
-          const normalized = normalizeAssets();
-          if (spineAdopt() > 0 || normalized) persist().catch(() => {});
-        }
+        if (v && adopt(v)) persist().catch(() => {});
         try {
           if (sessionStorage.getItem(CONFLICT)) {
             sessionStorage.removeItem(CONFLICT);
@@ -417,8 +443,9 @@
         throw new Error("未知資源");
       await ready;
       if (child) return rpc("entity-remove", { name, id });
-      db[name] = db[name].filter((x) => x.id !== id);
-      await persist();
+      const drop = () => (db[name] = db[name].filter((x) => x.id !== id));
+      drop();
+      await persistRedo(drop);
       broadcast();
     },
     list: async () => {
@@ -441,13 +468,14 @@
                   : "asset"
             ];
       const v = normalize(value);
-      const items = db[name],
-        i = items.findIndex((x) => x.id === v.id);
-      i < 0 ? items.push(v) : items.splice(i, 1, v);
-      {
-        await persist();
-        broadcast();
-      }
+      const put = () => {
+        const items = db[name],
+          i = items.findIndex((x) => x.id === v.id);
+        i < 0 ? items.push(v) : items.splice(i, 1, v);
+      };
+      put();
+      await persistRedo(put);
+      broadcast();
       return v;
     },
   });

@@ -6,6 +6,8 @@
 // packaging/web/README.md "The parent bridge"; EffectCraft scripts/effectcraft-pro/README.md (web-host-api.patch).
 // The frame lives beside #app, not inside it: tools-0.js re-renders #app through the sanitizer, which would drop an
 // iframe, and moving an iframe reloads it (unsaved work lost).
+// Full page (operator 2026-11-10): the engine runs only in its own tab, tools.html?full#<tool>, filling the window. Inside
+// the workbench shell the tool card opens (or refocuses) that tab; the shell never mounts an engine.
 const ENGINE_PROJECTS = "tools.engine.projects", // both engines' projects; each row's envelope names its engine
   ENGINE_OPEN_LIMIT = 512 * 1024 * 1024; // the bridge refuses a bigger host file
 // Render sizes = the ratios the main system can deliver (D6); the route checks the same table.
@@ -41,6 +43,39 @@ const engineFor = (id) => ENGINES[id] || null;
 // The open tool, for event handlers: tools-0.js declares `tool` but loads after this file (tools-boot.js), so a click or a
 // closing page before it has run would throw "tool is not defined".
 const engineTool = () => (typeof tool === "undefined" ? null : tool);
+const ENGINE_FULL = window.parent === window && new URLSearchParams(location.search).has("full");
+// This tab and the workbench tab share one stored state; a save clash must not reload away the engine's open work.
+if (ENGINE_FULL) {
+  window.VW_KEEP_PAGE_ON_CONFLICT = true;
+  document.body.classList.add("engine-full");
+}
+// One tab per engine: a second click refocuses it (window.open with a URL would reload it and drop unsaved work).
+// project = a saved project to open there (an episode's 開啟剪輯): that loads the tab, and the tab's own beforeunload asks
+// first when it holds unsaved work or a render.
+function engineOpenTab(id, project = null) {
+  const w = window.open("", "awarewave-engine-" + id);
+  if (!w) return VideoWorkbench.reportError(Error("瀏覽器擋了新分頁：請允許這個網站開新視窗，再按一次。"));
+  if (w.location.href === "about:blank" || project)
+    w.location.href = new URL("tools.html?full" + (project ? "&project=" + encodeURIComponent(project) : "") + "#" + id, location.href).href;
+  w.focus();
+}
+const ENGINE_START_PROJECT = ENGINE_FULL ? new URLSearchParams(location.search).get("project") : null;
+// Episodes as the projects page keeps them (EpisodeSpine reads this shape; scripts/tools-editor.js edSpineProjects).
+function engineEpisodes() {
+  try {
+    return JSON.parse(VideoWorkbench.storage.getItem("awarewave-projects-screenshot-frontend-v1") || "null")?.projects || [];
+  } catch (_) {
+    return [];
+  }
+}
+// The saved file of the episode this tool was opened for (tools-0.js toolLink), when it is this engine's: the tab button
+// opens it even when the episode's 開啟剪輯 could not (engine check still running, new tab blocked).
+function engineEpisodeFile(id) {
+  const link = typeof VideoWorkbench.spineLink === "function" ? VideoWorkbench.spineLink({}) : null,
+    project = link && engineEpisodes().find((p) => p.id === link.projectId),
+    edit = project?.episodes?.find((e) => e.id === link.episodeId)?.edit;
+  return edit?.engine === engineFor(id)?.engine ? edit.projectId : null;
+}
 const engineAvailable = {}; // engine -> true / false (HEAD of its page); absent = not known yet
 for (const cfg of Object.values(ENGINES))
   fetch(cfg.root + "index.html", { method: "HEAD" })
@@ -66,7 +101,8 @@ const eng = {
   saveFailed: false, // the last write was refused: the engine says "saved", the store does not have it
 };
 // Invariant: work may be let go only when the workbench store holds what the engine holds.
-const engineUnsaved = () => eng.dirty || eng.writes > 0 || eng.saveFailed;
+// A render still on its way back is unsaved work too: leaving would drop it.
+const engineUnsaved = () => eng.dirty || eng.writes > 0 || eng.saveFailed || engineRenders.size > 0;
 
 function engineToolVisible(t) {
   const cfg = engineFor(t.id);
@@ -75,19 +111,33 @@ function engineToolVisible(t) {
 
 function toolEngineHostScreen(t) {
   const cfg = engineFor(t.id);
-  return `<div class="wrap" style="padding-bottom:0">${header(t, cfg.eyebrow, cfg.lead)}${cfg.notes.map((n) => `<p class="note">${esc(n)}</p>`).join("")}<p class="note">游標在引擎畫面裡時，按 F6 回到左側選單。</p></div>`;
+  if (ENGINE_FULL) return ""; // the full page shows only the engine host (styles/tools.css body.engine-full)
+  return `<div class="wrap" style="padding-bottom:0">${header(t, cfg.eyebrow, cfg.lead)}${cfg.notes.map((n) => `<p class="note">${esc(n)}</p>`).join("")}</div>`;
 }
 
+// What the browser hands this page, not what the machine has: on a laptop with both chips Chrome / Edge give web pages the
+// built-in Intel chip unless Windows is told otherwise (measured 2026-11-06 on an RTX 5060 laptop). So the warning says
+// which of the two it is and how to switch, and never claims the computer has no graphics card.
 async function engineGpuCheck() {
   try {
-    const adapter = await Promise.race([navigator.gpu?.requestAdapter(), new Promise((r) => setTimeout(() => r(null), 5000))]);
-    if (!adapter) return "warn";
+    const adapter = await Promise.race([navigator.gpu?.requestAdapter({ powerPreference: "high-performance" }), new Promise((r) => setTimeout(() => r(null), 5000))]);
+    if (!adapter) return "none";
     const info = adapter.info || (await adapter.requestAdapterInfo?.()) || {};
-    return /intel/i.test(String(info.vendor || "")) ? "warn" : "ok";
+    return /intel/i.test(String(info.vendor || "")) ? "integrated" : "ok";
   } catch (_) {
-    return "warn";
+    return "none";
   }
 }
+const ENGINE_GPU_TEXT = {
+  integrated: "瀏覽器現在用的是內建顯示晶片（Intel），不是獨立顯示卡，這個引擎會很卡，瀏覽器也可能變慢。",
+  none: "瀏覽器沒有給這個網頁顯示卡加速（WebGPU），這個引擎會很卡，瀏覽器也可能變慢。",
+};
+const ENGINE_GPU_STEPS = [
+  "電腦有獨立顯示卡的話，可以讓瀏覽器改用它：",
+  "1. 開 Windows「設定」→「系統」→「顯示器」→「圖形」。",
+  "2. 在清單找到你用的瀏覽器（Chrome 或 Edge），選「高效能」。",
+  "3. 關掉瀏覽器的所有視窗，再打開這一頁。",
+];
 
 function engineEl(tag, className, text) {
   const el = document.createElement(tag);
@@ -116,7 +166,7 @@ function toolEngineHostAfterRender() {
   if (eng.cfg !== cfg) engineTeardown();
   eng.cfg = cfg;
   if (!eng.host) {
-    eng.host = engineEl("div", "wrap");
+    eng.host = engineEl("div", ENGINE_FULL ? "engine-page" : "wrap");
     eng.host.id = "engine-host";
     eng.host.style.paddingTop = "0";
     document.getElementById("app").after(eng.host);
@@ -131,7 +181,8 @@ function engineTeardown() {
 
 // Everything above the iframe is rebuilt here; the iframe itself is created once per document.
 function engineShow() {
-  const host = eng.host, cfg = eng.cfg;
+  const host = eng.host, cfg = eng.cfg,
+    name = TOOLS.find((t) => t.id === tool)?.name || cfg.eyebrow; // the card's name (tools-0.js TOOLS)
   [...host.children].forEach((c) => c !== eng.frame && c.remove());
   const top = engineEl("div");
   host.prepend(top);
@@ -143,6 +194,12 @@ function engineShow() {
     return;
   }
   if (available === undefined) return top.append(engineEl("p", "note", "正在確認引擎…"));
+  if (!ENGINE_FULL) {
+    const row = engineEl("div", "row");
+    row.append(engineButton("開啟" + name, "tab", true));
+    top.append(engineEl("p", "note", name + "在自己的分頁開啟，畫面最大。"), row);
+    return;
+  }
   if (!eng.forced && eng.gpu !== "ok") {
     if (eng.gpu === null) {
       eng.gpu = "checking";
@@ -152,35 +209,39 @@ function engineShow() {
       });
     }
     if (eng.gpu === "checking") return top.append(engineEl("p", "note", "正在檢查這台電腦的顯示卡…"));
-    const warn = engineEl("div", "out");
+    const warn = engineEl("div", "out engine-warn");
     warn.setAttribute("role", "alert");
-    warn.append(
-      engineEl("p", "", `這台電腦沒有可用的獨立顯示卡，這個引擎會很卡，瀏覽器也可能變慢。建議${cfg.fallback[1]}。`),
-      engineEl("div", "row"),
-    );
+    warn.append(engineEl("p", "", ENGINE_GPU_TEXT[eng.gpu] || ENGINE_GPU_TEXT.none));
+    for (const line of ENGINE_GPU_STEPS) warn.append(engineEl("p", "note", line));
+    warn.append(engineEl("p", "", `不想改設定的話，建議${cfg.fallback[1]}。`), engineEl("div", "row"));
     warn.lastChild.append(engineFallbackButton(true), engineButton("仍然開啟", "force"));
     return top.append(warn);
   }
+  // One compact bar above the engine: the engine gets the rest of the window.
+  top.className = "engine-bar";
   const bar = engineEl("div", "row");
-  bar.append(engineButton("加入素材", "assets", true), engineButton("開新專案", "new"));
+  bar.append(engineEl("b", "", name), engineButton("加入素材", "assets", true), engineButton("開新專案", "new"));
+  // The frame starts every render itself (FC.3 / EC.3), so each one is checked and recorded the same way.
+  bar.append(engineEl("span", "note", "輸出成片："));
+  if (cfg.engine === "filmcraft")
+    for (const ratio of Object.keys(ENGINE_RENDER_SIZES))
+      bar.append(engineButton(ratio + "（" + ENGINE_RENDER_SIZES[ratio].join("×") + "）", "export:" + ratio));
+  else bar.append(engineButton("輸出目前的合成", "export:comp"), engineButton("輸出透明片段", "export:alpha"));
   const status = engineEl("span", "note");
   status.dataset.engineStatus = "";
   status.setAttribute("role", "status");
   bar.append(status);
-  // The frame starts every render itself (FC.3 / EC.3), so each one is checked and recorded the same way.
-  const out = engineEl("div", "row");
-  out.append(engineEl("span", "note", "輸出成片："));
-  if (cfg.engine === "filmcraft")
-    for (const ratio of Object.keys(ENGINE_RENDER_SIZES))
-      out.append(engineButton(ratio + "（" + ENGINE_RENDER_SIZES[ratio].join("×") + "）", "export:" + ratio));
-  else out.append(engineButton("輸出目前的合成", "export:comp"), engineButton("輸出透明片段", "export:alpha"));
-  top.append(bar, engineEl("p", "note", "在引擎畫面用 File › Save 存檔，專案會存進工作台。"), out, engineEl("p", "note", cfg.exportNote));
-  const list = engineEl("div", "out");
+  const more = engineEl("details");
+  more.append(engineEl("summary", "note", "說明與已存的專案"));
+  for (const n of [...cfg.notes, "在引擎畫面用 File › Save 存檔，專案會存進工作台。", cfg.exportNote, "游標在引擎畫面裡時，按 F6 回到上面這一列。"])
+    more.append(engineEl("p", "note", n));
+  const list = engineEl("div");
   list.dataset.engineProjects = "";
-  top.append(list);
+  more.append(list);
+  top.append(bar, more);
   engineStatus();
   engineListProjects();
-  if (!eng.frame) engineMount();
+  if (!eng.frame) ENGINE_START_PROJECT ? engineOpenProject(ENGINE_START_PROJECT).catch(VideoWorkbench.reportError) : engineMount();
 }
 
 function engineStatus(text) {
@@ -216,7 +277,7 @@ function engineMount() {
   frame.title = engineFor(tool)?.eyebrow || "engine";
   frame.src = eng.cfg.root + "index.html" + eng.cfg.query;
   frame.allow = "autoplay; clipboard-read; clipboard-write";
-  frame.style.cssText = "width:100%;height:78vh;border:0;display:block";
+  frame.className = "engine-frame"; // fills the rest of the window (styles/tools.css)
   // F6 inside the engine gives focus back to the sidebar (the engine keeps Tab and Escape for itself).
   frame.addEventListener("load", () => {
     try {
@@ -232,11 +293,10 @@ function engineF6(event) {
   if (event.key !== "F6") return;
   event.preventDefault();
   event.stopPropagation();
-  const shell = window.parent !== window ? window.parent : window,
-    nav = shell.document.querySelector(".sidebar .nav.active") || shell.document.querySelector(".sidebar .nav") || document.querySelector("[data-act=home]");
+  // The full page has no sidebar: focus goes to the bar above the engine.
   eng.frame?.blur();
-  shell.focus();
-  nav?.focus();
+  window.focus();
+  eng.host?.querySelector(".engine-bar button")?.focus();
 }
 
 function engineSend(name, bytes) {
@@ -316,11 +376,15 @@ function engineSaveProject(name, bytes) {
   eng.saving = eng.saving
     .catch(() => {})
     .then(async () => {
-      const rows = await VideoWorkbench.preferences.get(ENGINE_PROJECTS, []),
-        old = rows.find((r) => r.id === doc.id),
-        envelope = ProjectEnvelope.wrap(native, { revision: old ? (old.revision || 0) + 1 : 0, engine: cfg.engine, engineVersion: eng.appVersion });
-      const row = { ...envelope, assets: sent, id: doc.id, name, title: name.replace(/\.[a-z]+$/i, ""), savedAt: new Date().toISOString() };
-      await VideoWorkbench.preferences.set(ENGINE_PROJECTS, old ? rows.map((r) => (r.id === doc.id ? row : r)) : [...rows, row]);
+      const write = async () => {
+        const rows = await VideoWorkbench.preferences.get(ENGINE_PROJECTS, []),
+          old = rows.find((r) => r.id === doc.id),
+          envelope = ProjectEnvelope.wrap(native, { revision: old ? (old.revision || 0) + 1 : 0, engine: cfg.engine, engineVersion: eng.appVersion });
+        const row = { ...envelope, assets: sent, id: doc.id, name, title: name.replace(/\.[a-z]+$/i, ""), savedAt: new Date().toISOString() };
+        await VideoWorkbench.preferences.set(ENGINE_PROJECTS, old ? rows.map((r) => (r.id === doc.id ? row : r)) : [...rows, row]);
+      };
+      // Another tab saved first (shared/runtime.js VW_KEEP_PAGE_ON_CONFLICT): the state is now theirs; redo once on it.
+      await write().catch((e) => (e.conflict ? write() : Promise.reject(e)));
       engineListProjects();
     })
     .then(
@@ -361,6 +425,10 @@ window.addEventListener("message", (event) => {
   if (type === "ready") {
     eng.ready = true;
     eng.appVersion = String(m.appVersion || m.version || "");
+    // FilmCraft follows the browser's languages and has only a Simplified Chinese catalog, which a zh-TW browser falls
+    // through to (its "zh" entry); the operator wants English, not Simplified (2026-11-10). EffectCraft has Traditional.
+    if (eng.cfg.engine === "filmcraft")
+      engineExec("app.language.english", {}).catch((e) => VideoWorkbench.reportError(Error("引擎介面沒有切成英文：" + e.message)));
     const queued = eng.queue.splice(0);
     for (const f of queued) engineSend(f.name, f.bytes);
   } else if (type === "dirty") eng.dirty = !!m.dirty;
@@ -373,6 +441,8 @@ window.addEventListener("message", (event) => {
 });
 
 async function engineOpenProject(id) {
+  // The engine runs only in its own tab: inside the workbench (tools-0.js acceptAsset) the project opens there.
+  if (!ENGINE_FULL) return engineOpenTab(engineTool(), id);
   const row = (await VideoWorkbench.preferences.get(ENGINE_PROJECTS, [])).find((r) => r.id === id && r.engine === eng.cfg.engine);
   if (!row) throw Error("找不到這個專案");
   engineMount();
@@ -423,11 +493,20 @@ document.addEventListener(
         eng.forced = true;
         return engineShow();
       }
+      if (act === "tab") return engineOpenTab(engineTool(), engineEpisodeFile(engineTool()));
       if (act === "assets") return enginePickAssets().catch(VideoWorkbench.reportError);
       if (act === "new") return engineLeaveOk() && engineMount();
       if (act.startsWith("export:")) return engineExport(act.slice(7)).catch(VideoWorkbench.reportError);
       if (act.startsWith("open:")) return engineLeaveOk() && engineOpenProject(act.slice(5)).catch(VideoWorkbench.reportError);
       return;
+    }
+    // Inside the workbench an engine card opens the engine's own tab instead of the tool screen (capture phase: before
+    // tools-0.js switches the page). The tool screen stays reachable by #edit-pro links and shows the same open button.
+    const card = !ENGINE_FULL && event.target.closest?.("[data-act^='open:']");
+    if (card && engineFor(card.dataset.act.slice(5))) {
+      event.preventDefault();
+      event.stopPropagation();
+      return engineOpenTab(card.dataset.act.slice(5));
     }
     // Leaving the tool while unsaved asks first (capture phase: before tools-0.js switches the page).
     const leave = engineFor(engineTool()) && event.target.closest?.("[data-act]");
@@ -444,6 +523,14 @@ window.addEventListener("beforeunload", (event) => {
 
 // Cards FC.3 / EC.3: a render = the frame asks the engine for an MP4, then sends the file, its sources and (FilmCraft) the
 // caption lines to POST /api/vw/engine/renders, which records it as one finished job (ledger + release text).
+// PJ spec §8 C4: a FilmCraft render is a cut of the episode that owns the open file (as edSpineLink in tools-editor.js),
+// read from the file and not from this tab's tool draft, which the workbench tab may have moved to another episode.
+// EffectCraft output belongs to the tool's episode (VideoWorkbench.spineLink, tools-0.js).
+function engineRenderLink() {
+  if (eng.cfg.engine !== "filmcraft") return typeof VideoWorkbench.spineLink === "function" ? VideoWorkbench.spineLink({ operation: "engine-render" }) : null;
+  const hit = eng.doc && EpisodeSpine.findByEdit(engineEpisodes(), eng.doc.id);
+  return hit ? { projectId: hit.project.id, episodeId: hit.episode.id, tool: "edit-pro", step: "export", target: "output" } : null;
+}
 const engineRenders = new Map(); // export base name -> { engine, ratio, width, height, title, sources, link, video, srt, timer }
 // Card EC.5: footage = every EffectCraft project item that is not made inside the engine (upstream crates/project/src/item.rs
 // type_name). A comp with none (a title of text, shapes, solids) has no source file, like a Remotion title.
@@ -479,33 +566,39 @@ async function engineExport(choice) {
     sources: eng.sent.map(({ id, url, name }) => ({ id, url, name })),
     alpha,
     // PJ spec §8 C4: the project/episode this render belongs to, once PJ adds VideoWorkbench.spineLink.
-    link: typeof VideoWorkbench.spineLink === "function" ? VideoWorkbench.spineLink({ operation: "engine-render" }) : null,
+    link: engineRenderLink(),
     captions: cfg.captions,
     video: null,
     srt: null,
     timer: null,
   });
-  if (cfg.engine === "filmcraft") {
-    const r = await engineExec("file.exportMedia", {
-      path: "/exports/" + base + ".mp4",
-      format: "h264",
-      width,
-      height,
-      fps: 30,
-      audio: true,
-      // Burned in as well: the release text reports these lines as on-screen captions, so they must be on screen.
-      burnCaptions: true,
-      captionSidecar: "srt",
-      loudnessLufs: -16,
-      wait: false,
-    });
-    if (r?.warnings?.length) VideoWorkbench.notify("引擎提醒：" + r.warnings.join("；"));
-  } else {
-    // Render Queue: H.264 + AAC, or (card EC.5) RGB + Alpha, which upstream writes as ProRes 4444 in a MOV (a WebM's VP9
-    // alpha would be dropped by ffmpeg's own decoder when the editor exports).
-    const out = alpha ? { format: "prores", channels: "rgba", output: "/exports/" + base + ".mov" } : { format: "h264", output: "/exports/" + base + ".mp4" };
-    await engineExec("renderQueue.add", { comp: comp.comp ?? comp.id ?? comp.name, ...out, audio: "on" });
-    await engineExec("renderQueue.render", { wait: false });
+  // A render the engine never started must not stay counted (engineUnsaved would ask on every leave).
+  try {
+    if (cfg.engine === "filmcraft") {
+      const r = await engineExec("file.exportMedia", {
+        path: "/exports/" + base + ".mp4",
+        format: "h264",
+        width,
+        height,
+        fps: 30,
+        audio: true,
+        // Burned in as well: the release text reports these lines as on-screen captions, so they must be on screen.
+        burnCaptions: true,
+        captionSidecar: "srt",
+        loudnessLufs: -16,
+        wait: false,
+      });
+      if (r?.warnings?.length) VideoWorkbench.notify("引擎提醒：" + r.warnings.join("；"));
+    } else {
+      // Render Queue: H.264 + AAC, or (card EC.5) RGB + Alpha, which upstream writes as ProRes 4444 in a MOV (a WebM's VP9
+      // alpha would be dropped by ffmpeg's own decoder when the editor exports).
+      const out = alpha ? { format: "prores", channels: "rgba", output: "/exports/" + base + ".mov" } : { format: "h264", output: "/exports/" + base + ".mp4" };
+      await engineExec("renderQueue.add", { comp: comp.comp ?? comp.id ?? comp.name, ...out, audio: "on" });
+      await engineExec("renderQueue.render", { wait: false });
+    }
+  } catch (error) {
+    engineRenders.delete(base);
+    throw error;
   }
   engineStatus("輸出中…（在引擎畫面可看進度）");
 }
@@ -514,6 +607,7 @@ function engineOnRenderFile(name, bytes) {
   const m = /^(.*)\.(mp4|mov|srt)$/i.exec(name);
   const job = m && engineRenders.get(m[1]);
   if (!job) return false;
+  if (job.submitting) return true; // already on its way to the server: a late file must not send it twice
   if (m[2].toLowerCase() === "srt") job.srt = new TextDecoder().decode(bytes);
   else job.video = bytes;
   clearTimeout(job.timer);
@@ -522,7 +616,8 @@ function engineOnRenderFile(name, bytes) {
 }
 async function engineSubmitRender(base) {
   const job = engineRenders.get(base);
-  engineRenders.delete(base);
+  // Counted (engineUnsaved) until the server has it: closing the tab during the upload asks first.
+  job.submitting = true;
   try {
     const cues = job.srt ? SubtitleParse.parse(job.srt).map((c) => ({ start: c.startMs / 1000, end: c.endMs / 1000, text: c.text })) : [];
     const meta = new TextEncoder().encode(
@@ -543,5 +638,7 @@ async function engineSubmitRender(base) {
   } catch (error) {
     engineStatus("成片沒有入帳");
     VideoWorkbench.reportError(error);
+  } finally {
+    engineRenders.delete(base);
   }
 }
