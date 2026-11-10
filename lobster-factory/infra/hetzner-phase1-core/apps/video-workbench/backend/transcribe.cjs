@@ -3,13 +3,14 @@
 // Engines = the one list of speech-to-text connectors (like next-admin video-motion-models.ts for video); pages draw them as
 // buttons from /capabilities (transcribe.engines). Adding or removing a vendor = one row + its call below. A row whose
 // next-admin registry retireOn (cost-model.ts MEDIA_MODELS) has come leaves the list and a job naming it is refused.
-// Default = VW_TRANSCRIBE_ENGINE when it names a live configured row, else the first configured row: our own whisper (2026-11-10 A/B,
-// docs/vendor-alternatives-20261110.md). Every connector answers whisper verbose_json shape, so normalize() reads all.
+// Order and default: backend/providers.cjs (free first) -- our own whisper is free (2026-11-10 A/B, docs/vendor-alternatives-20261110.md). Every connector answers whisper verbose_json shape, so normalize() reads all.
 const fs = require("node:fs"),
   path = require("node:path"),
   crypto = require("node:crypto");
 const TranscriptWords = require("../shared/transcript-words.js");
 const { vwEnv } = require("./env-compat.cjs");
+const providers = require("./providers.cjs");
+const { transcribePrice } = require("./provider-cost.cjs");
 const rates = require(path.join(require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env), "lib/ai/cost-model.ts"));
 
 const LANGUAGES = { 繁體中文: "zh", 簡體中文: "zh", English: "en", 日本語: "ja", 한국어: "ko", ภาษาไทย: "th" };
@@ -33,10 +34,12 @@ const ENGINES = Object.freeze([
 const day = (at) => new Date(at ?? Date.now()).toISOString().slice(0, 10);
 const retireOn = (e) => rates.MEDIA_MODELS[e.model]?.retireOn || null;
 const live = (at) => ENGINES.filter((e) => !retireOn(e) || retireOn(e) > day(at));
-function defaultEngine(env = process.env, at) {
-  const list = live(at), wanted = vwEnv(env, "TRANSCRIBE_ENGINE");
-  return list.find((e) => e.id === wanted && available(e, env)) || list.find((e) => available(e, env)) || list[0];
-}
+// Live rows with what providers.cjs decides by (order and default, free first; VW_TRANSCRIBE_ENGINE names the wanted row).
+const rows = (env, at) => live(at).map((e) => {
+  const price = transcribePrice(e.model);
+  return { e, id: e.id, available: available(e, env), free: price?.usd === 0, price };
+});
+const defaultEngine = (env = process.env, at) => providers.choose(rows(env, at), vwEnv(env, "TRANSCRIBE_ENGINE"))?.e;
 // The engine a job runs: its named live row, else the default. A retired or unknown name is refused, never swapped.
 function pick(id, env = process.env, at) {
   if (id === undefined || id === null || id === "") return defaultEngine(env, at);
@@ -59,11 +62,12 @@ function auth(engine, env = process.env) {
   if (!token) throw missing("VW_TRANSCRIBE_WORKER_TOKEN");
   return { url, token };
 }
-// /capabilities: the live rows as the page needs them; price = provider-cost.cjs transcribePrice (same rule as the charge).
-function capability(env, priceOf, at) {
+// /capabilities: the live rows in providers.cjs order; price = provider-cost.cjs transcribePrice (same rule as the charge).
+function capability(env, at) {
+  const list = rows(env, at);
   return {
-    defaultEngine: defaultEngine(env, at).id,
-    engines: live(at).map((e) => ({ id: e.id, model: e.model, provider: e.provider, label: e.label, note: e.note, retireOn: retireOn(e), available: available(e, env), price: priceOf(e.model) })),
+    defaultEngine: providers.choose(list, vwEnv(env, "TRANSCRIBE_ENGINE"))?.id,
+    engines: providers.order(list).map(({ e, available, free, price }) => ({ id: e.id, model: e.model, provider: e.provider, label: e.label, note: e.note, retireOn: retireOn(e), available, free, price })),
   };
 }
 const GAP = 1; // seconds of silence between two separate stretches of sound in the mixed file

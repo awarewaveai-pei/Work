@@ -1007,7 +1007,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         });
       }
       if (req.method === "GET" && route === "/capabilities") {
-        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: { ...require("./blender.cjs").capability(env), motions: blender3d().motions }, imageTo3d: imageTo3d.capability(env, { priced: !!main }), prices: costs.displayPrices({ ...providerModels, text: textModel, transcribe: transcribe.defaultEngine(env).model }), transcribe: transcribe.capability(env, costs.transcribePrice), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.publicCatalog,
+        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: { ...require("./blender.cjs").capability(env), motions: blender3d().motions }, imageTo3d: imageTo3d.capability(env, { priced: !!main }), prices: costs.displayPrices({ ...providerModels, text: textModel, transcribe: transcribe.defaultEngine(env).model }), transcribe: transcribe.capability(env), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.publicCatalog,
           reference: require("./reference.cjs").allowed(env, req) && require("./reference.cjs").present(env),
           // P6 L3: connected = finished videos open next-admin /release (same origin) for review and delivery.
           mainSystem: main ? { organizationId: orgId } : null });

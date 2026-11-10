@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-10（續32）影音工作台：供應商清單「免費優先」一處規則；自架 Kokoro 配音實測未採用；Gemini 金鑰＝付費層（餘額用完）
+
+- 操作者：「使用免費和付費的 但是要先使用免費為主」。
+- 改：`video-workbench/backend/providers.cjs`（新）一條規則——免費列在前；預設＝指定且可用 → 第一個可用免費 → 第一個可用付費。`speech.cjs`、`transcribe.cjs`、`image-to-3d.cjs`（移除 SPAR3D 寫死的 default）都用它；`shared/models.js` 照伺服器預設。
+- Gemini 金鑰：筆電與正式站同一把（sha256 前 12 碼相同）；監工證實專案 AwareWave-ColdEmail 已連帳單。14:30 實測回 402「prepayment credits are depleted」＝付費預付制、餘額用完，所有 Gemini 呼叫目前失敗，要操作者儲值。compose 改回 `GEMINI_API_KEY: ${GEMINI_API_KEY:-}`，刪 `VW_GEMINI_API_KEY`。官方速率表未列此 TTS 模型。
+- 自架免費配音：Kokoro-82M（Apache-2.0）主機 CPU 8 執行緒約 1.4–2.7 倍即時；中文多音字、數字對，中英夾雜壞（Gmail→「麥」）→ 不採用，細節寫進 `docs/vendor-alternatives-20261110.md`「免費配音（自架）實測」。
+- Codex 一輪 2 項不改：compose 要走 safe-infra-patch（已在部署清單）；本機 SF3D 忙碌時預設仍選它、送出回 409 有清楚訊息（只在筆電）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed10-subtitles-backend.cjs (1f 免費優先); node tests/gate.cjs; node tests/tools-workflows.cjs; node tests/s4b-image-to-3d.cjs; node tests/p5-workspace.cjs; 主機拋棄式容器 Kokoro 生成＋whisper 回聽; Gemini 402 實測 | exit=0 | ms=1800000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2m/0n — Codex agency-os/reports/oracle/2026-11-10-partialreview-0af2c00e.md，2 項皆不改（理由如上）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=VW_GEMINI_API_KEY | hits=2（只剩 WORKLOG 續30 歷史）
 ## 2026-11-10（續31）【資安】讀 AWARE_WAVE_CREDENTIALS.md 時三個值進入對話紀錄（監工 session）
 
 - 經過：查 Gemini 金鑰所屬專案時，以 Python 印「命中行＋後 28 行」並套長字串遮蔽；遮蔽漏掉 Serper.dev 登入密碼、Replicate webhook `whsec_…`、Airtable PAT 前半段（§8.1／8.2 表格）。

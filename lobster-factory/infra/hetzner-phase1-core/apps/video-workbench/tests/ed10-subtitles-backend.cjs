@@ -126,13 +126,13 @@ async function serve(fetchImpl, extraEnv = {}) {
   // 1d. The lists drop a row on its registry retireOn (whisper-1 2027-02-26, gpt-4o-mini-tts 2027-01-06): not offered,
   // and a job naming it is refused (never silently swapped).
   const speech = require("../backend/speech.cjs");
-  assert.deepEqual(transcribe.capability({}, () => null, "2027-02-25").engines.map((e) => e.id), ["host", "gemini", "openai"]);
-  assert.deepEqual(transcribe.capability({}, () => null, "2027-02-26").engines.map((e) => e.id), ["host", "gemini"]);
+  assert.deepEqual(transcribe.capability({}, "2027-02-25").engines.map((e) => e.id), ["host", "gemini", "openai"]);
+  assert.deepEqual(transcribe.capability({}, "2027-02-26").engines.map((e) => e.id), ["host", "gemini"]);
   assert.throws(() => transcribe.pick("openai", {}, "2027-02-26"), (e) => e.status === 400 && /已停止/.test(e.message));
   assert.equal(transcribe.pick("openai", {}, "2027-02-25").model, "whisper-1");
   assert.equal(transcribe.pick(undefined, { VW_TRANSCRIBE_ENGINE: "openai" }, "2027-02-26").id, "host", "預設指到已下線的列 = 用清單第一列");
-  assert.deepEqual(speech.capability({}, () => null, "2027-01-05").models.map((m) => m.id), ["gemini-3.8-flash-lite-tts", "gpt-4o-mini-tts"]);
-  assert.deepEqual(speech.capability({}, () => null, "2027-01-06").models.map((m) => m.id), ["gemini-3.8-flash-lite-tts"]);
+  assert.deepEqual(speech.capability({}, "2027-01-05").models.map((m) => m.id), ["gemini-3.8-flash-lite-tts", "gpt-4o-mini-tts"]);
+  assert.deepEqual(speech.capability({}, "2027-01-06").models.map((m) => m.id), ["gemini-3.8-flash-lite-tts"]);
   assert.throws(() => speech.pick("gpt-4o-mini-tts", {}, "2027-01-06"), (e) => e.status === 400 && /已停止/.test(e.message));
   pass("過了 retireOn 的配音／辨識選項：不在清單（頁面按鈕由清單長出）、指名送出回 400");
 
@@ -140,7 +140,7 @@ async function serve(fetchImpl, extraEnv = {}) {
   // falls to OpenAI, captions keep our whisper; the page rule (shared/models.js) never chooses an unavailable row, even a
   // saved one; a job naming Gemini is refused 503 before any provider call.
   const noGemini = { OPENAI_API_KEY: "test-only", VW_TRANSCRIBE_WORKER_URL: "http://whisper.test:8421", VW_TRANSCRIBE_WORKER_TOKEN: "worker-test" };
-  const sc = speech.capability(noGemini, () => null, "2026-11-10"), tc = transcribe.capability(noGemini, () => null, "2026-11-10");
+  const sc = speech.capability(noGemini, "2026-11-10"), tc = transcribe.capability(noGemini, "2026-11-10");
   assert.deepEqual([sc.defaultModel, sc.models.map((m) => [m.id, m.available])], ["gpt-4o-mini-tts", [["gemini-3.8-flash-lite-tts", false], ["gpt-4o-mini-tts", true]]]);
   assert.deepEqual([tc.defaultEngine, tc.engines.map((e) => [e.id, e.available])], ["host", [["host", true], ["gemini", false], ["openai", true]]]);
   assert.equal(speech.defaultModel({ ...noGemini, VW_TTS_MODEL: "gemini-3.8-flash-lite-tts" }, "2026-11-10").id, "gpt-4o-mini-tts", "指定的預設沒有金鑰也退到可用的");
@@ -162,6 +162,21 @@ async function serve(fetchImpl, extraEnv = {}) {
     assert.deepEqual(sent, []);
   }
   pass("沒有 Gemini 金鑰：Gemini 標未啟用不可選（存過的也不算）、配音預設退到 OpenAI、辨識仍是主機 whisper、指名送出 503 且不呼叫供應商");
+
+  // 1f. Free first (backend/providers.cjs, operator 2026-11-10 「先使用免費為主」): free and paid both available -> free rows
+  // first and the default is free; an env-named row wins only while it can run, else the first free row that can.
+  const providers = require("../backend/providers.cjs");
+  const mixed = [{ id: "paid-a", available: true, free: false }, { id: "free-a", available: true, free: true }, { id: "paid-b", available: true, free: false }, { id: "free-b", available: false, free: true }];
+  assert.deepEqual(providers.order(mixed).map((r) => r.id), ["free-a", "free-b", "paid-a", "paid-b"]);
+  assert.equal(providers.choose(mixed).id, "free-a");
+  assert.equal(providers.choose(mixed, "paid-b").id, "paid-b", "環境變數指定且可用：照指定");
+  assert.equal(providers.choose(mixed, "free-b").id, "free-a", "指定的不可用：退回第一個可用的免費");
+  assert.equal(providers.choose(mixed.map((r) => ({ ...r, available: r.free ? false : r.available }))).id, "paid-a", "沒有可用的免費：第一個可用的付費");
+  const allOn = { OPENAI_API_KEY: "k", GEMINI_API_KEY: "k", VW_TRANSCRIBE_WORKER_URL: "http://whisper.test:8421", VW_TRANSCRIBE_WORKER_TOKEN: "t" };
+  const tAll = transcribe.capability(allOn, "2026-11-10");
+  assert.deepEqual([tAll.defaultEngine, tAll.engines.map((e) => [e.id, e.free])], ["host", [["host", true], ["gemini", false], ["openai", false]]]);
+  assert.equal(transcribe.capability({ ...allOn, VW_TRANSCRIBE_ENGINE: "gemini" }, "2026-11-10").defaultEngine, "gemini");
+  pass("免費優先：免費與付費都可用時免費排前面且為預設；指定的可用才照指定，否則退回第一個可用的免費，再來才是付費");
 
   // 2. Filler and pause data for ED.11.
   const marked = TranscriptWords.annotate([{ start: 0, end: 0.3, text: "嗯嗯" }, { start: 0.4, end: 1, text: "你好" }, { start: 2.5, end: 3, text: "Umm," }, { start: 3.1, end: 3.5, text: "那個" }]);

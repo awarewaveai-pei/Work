@@ -33,9 +33,9 @@ function videoModelOf(input, env) {
 function capabilities(env, localTools) {
   return {
     image: !!env.OPENAI_API_KEY, text: !!env.OPENAI_API_KEY,
-    audio: speech.capability(env, () => null).models.some((m) => m.available), video: !!env.REPLICATE_API_TOKEN,
+    audio: speech.capability(env).models.some((m) => m.available), video: !!env.REPLICATE_API_TOKEN,
     // The live speech models with voices and prices (backend/speech.cjs); pages draw them as buttons.
-    speech: speech.capability(env, require("./provider-cost.cjs").speechPrice),
+    speech: speech.capability(env),
     provider,
     models: models(env),
     videoModels: videoModels(env), retiredVideoModels: RETIRED_VIDEO_MODELS,

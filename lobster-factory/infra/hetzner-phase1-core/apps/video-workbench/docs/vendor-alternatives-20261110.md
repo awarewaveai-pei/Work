@@ -189,7 +189,7 @@ prod 的 `/data/orgs/39ad4149-…/jobs.json` 只有 7 筆（2026-11-05～11-10�
 
 ## 實測結果與採用（2026-11-10，第 1、2 項已換）
 
-樣本：Gemini 3.8 Flash-Lite TTS 生成的繁中 3 段（一般口說 40.6 秒、「嗯／呃」與停頓 32.7 秒、中英夾雜 25.4 秒），付費實測合計 < US$0.02（金鑰目前是免費層）。
+樣本：Gemini 3.8 Flash-Lite TTS 生成的繁中 3 段（一般口說 40.6 秒、「嗯／呃」與停頓 32.7 秒、中英夾雜 25.4 秒），付費實測合計 < US$0.02。金鑰所在專案（AwareWave-ColdEmail）已連帳單、預付制；2026-11-10 14:30 實測回 402「prepayment credits are depleted」＝要儲值。
 
 **字幕：預設 A（主機 whisper large-v3）。** B 不符「繁體輸出」，但照監工決定並存可選（按鈕標價與缺點）。
 
@@ -215,6 +215,19 @@ prod 的 `/data/orgs/39ad4149-…/jobs.json` 只有 7 筆（2026-11-05～11-10�
 - 實作：`backend/speech.cjs` 單一清單 `MODELS`：Gemini（預設）／OpenAI 並存可選，各標價；OpenAI 列依 registry `retireOn` 2027-01-06 自動消失。舊 OpenAI 聲線對到 Gemini。價格 `cost-model.ts` GEMINI_TTS_RATES（回覆的 token 計費；2027-01-01 起加倍）。
 
 預設改指：`VW_TTS_MODEL`、`VW_TRANSCRIBE_ENGINE`（須是清單中未下線的列；否則用第一個已設定的列）。
+
+## 免費配音（自架）實測（2026-11-10，未採用）
+
+規則：清單「免費優先」（`backend/providers.cjs`，操作者「先使用免費為主」）——有可用的免費配音就會成為預設，所以先實測。
+
+- 試：**Kokoro-82M**（kokoro 0.9.4、misaki[zh] 0.9.4，**Apache-2.0**，hexgrad，https://huggingface.co/hexgrad/Kokoro-82M）。普通話聲線 zf_xiaoxiao、zm_yunjian。
+- 速度（主機拋棄式容器，CPU 8 執行緒，無 GPU）：7 秒句 3.4–5.4 秒、11.8 秒句 4.2–4.9 秒（約 1.4–2.7 倍即時）；載入 9.5 秒。
+- 回聽（主機 whisper）：
+  - 多音字「行長／一行／長大／長江」：對。
+  - 數字「1,234,567 元、12.5%、11 月 20 日 3 點半、7 樓」：對（比 Gemini 好）；「營收」聽成「迎收」，「B 會議室」的 B 不見。
+  - **中英夾雜壞**：Google Chrome →「Wallet Show Me」、Gmail →「麥」、Dropbox →「肉博」、iPhone →「以後內」、PDF 消失（misaki 中文前處理不認英文）。
+- 結論：**不採用**。工作台台詞常夾產品名與英文。若之後要用：中文句可，英文段要另走英文管線再接回，音色會換人，要另行評估。試聽檔 `D:/tmp/vw-tts-stt/kokoro/`。
+- 沒試（排除理由）：XTTS-v2（Coqui CPML，禁商用）、MMS-TTS（Meta，CC-BY-NC）、CosyVoice（阿里巴巴）、F5-TTS（上海交通大學）、ChatTTS（2noise）、MeloTTS（中文聲線品質與維護狀態未確認，本次未測）。
 
 ## 已排除（中國公司或其控制的公司）
 

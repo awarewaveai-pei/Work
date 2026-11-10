@@ -384,7 +384,7 @@ export const TTS_MODEL_COMPARISONS: readonly TtsModelComparison[] = [
     speedRank: 2,
     quality: "優",
     strengths: "AA 語音榜 1260 分（OpenAI TTS-1 HD 1106）；繁中多音字（行長、長江）、英文夾雜經語音辨識回測正確（未人工試聽）；語氣用一句文字描述控制；比 gpt-4o-mini-tts 便宜",
-    tradeoffs: "長數字可能逐位念（1,234,567 疑似念成一二三四…，2026-11-10 實測待人工試聽）；免費層每分鐘只能 3 次，正式用要開付費層；2027 起價格加倍",
+    tradeoffs: "長數字可能逐位念（1,234,567 疑似念成一二三四…，2026-11-10 實測待人工試聽）；官方速率表沒列此模型（免費層時曾回每分鐘 3 次）；我們的專案是付費預付制，餘額用完回 402；2027 起價格加倍",
     sourceKeys: ["geminiTts"],
   },
   {

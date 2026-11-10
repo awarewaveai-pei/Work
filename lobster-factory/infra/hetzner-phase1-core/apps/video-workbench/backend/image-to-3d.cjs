@@ -19,12 +19,12 @@ const TIMEOUT_MS = 1200000;
 const TRELLIS = { model: "firtoz/trellis", version: "e8f6c45206993f297372f5436b90350817bd9b4a0d52d2a76df50c1c8afa2b3c" };
 const TRELLIS_INPUT = { generate_model: true, generate_color: false, generate_normal: false, texture_size: 1024, mesh_simplify: 0.95, randomize_seed: false, seed: 0 };
 
-// The ways, in the order the page shows them. maxImage = the vendor's request limit. default: preselected on the page
-// (card S4b.2, docs/s4-image-to-3d-providers-20261103.md §8). facing: degrees the vendor's model is turned from glTF +Z
+// The ways. Page order and the preselected way: backend/providers.cjs (free first; the local SF3D is free). maxImage = the
+// vendor's request limit. facing: degrees the vendor's model is turned from glTF +Z
 // (measured on the S4b.2 run: SPAR3D and local SF3D face -Z; Stability's hosted SF3D was not run); the page passes it as
 // the autorig turn so a figure walks forwards.
 const METHODS = {
-  "stability-spar3d": { label: "Stability SPAR3D", vendor: "Stability AI", rate: "3d-spar3d", default: true, facing: 180, key: "STABILITY_API_KEY", endpoint: "stable-point-aware-3d", maxImage: 10 * 1024 * 1024 },
+  "stability-spar3d": { label: "Stability SPAR3D", vendor: "Stability AI", rate: "3d-spar3d", facing: 180, key: "STABILITY_API_KEY", endpoint: "stable-point-aware-3d", maxImage: 10 * 1024 * 1024 },
   "stability-sf3d": { label: "Stability SF3D", vendor: "Stability AI", rate: "3d-sf3d", key: "STABILITY_API_KEY", endpoint: "stable-fast-3d", maxImage: 10 * 1024 * 1024 },
   "local-sf3d": { label: "本機 SF3D", vendor: "本機", local: true, facing: 180, maxImage: 20 * 1024 * 1024 },
   "replicate-trellis": { label: "Replicate TRELLIS", vendor: "Replicate", rate: "3d-trellis", key: "REPLICATE_API_TOKEN", maxImage: 10 * 1024 * 1024 },
@@ -46,9 +46,10 @@ function capability(env, { priced = false } = {}) {
     .filter(([, m]) => !m.hiddenWithoutKey || env[m.key])
     .map(([id, m]) => {
       const reason = m.local ? (sf3dLocal.installed(env) ? null : "未安裝") : !env[m.key] ? "金鑰未設定" : priced && usdOf(m) == null ? "無美元價目" : null;
-      return { id, label: m.label, vendor: m.vendor, usd: usdOf(m), estimate: !!(m.rate && TOOL_RATES[m.rate].estimate), ...(id === "meshy" ? { credits: meshy.CREDITS } : {}), ...(m.default ? { default: true } : {}), ...(m.facing ? { facing: m.facing } : {}), available: !reason, ...(reason ? { reason } : {}) };
+      return { id, label: m.label, vendor: m.vendor, usd: usdOf(m), free: usdOf(m) === 0, estimate: !!(m.rate && TOOL_RATES[m.rate].estimate), ...(id === "meshy" ? { credits: meshy.CREDITS } : {}), ...(m.facing ? { facing: m.facing } : {}), available: !reason, ...(reason ? { reason } : {}) };
     });
-  return { methods };
+  const providers = require("./providers.cjs"), chosen = providers.choose(methods, null);
+  return { methods: providers.order(methods).map((m) => (m === chosen && m.available ? { ...m, default: true } : m)) };
 }
 
 function imageFile(input, localFile, m) {

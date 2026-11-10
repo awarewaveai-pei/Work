@@ -134,7 +134,9 @@ fs.writeFileSync(path.join(sf3dDir, "entry.sh"), `#!/usr/bin/env bash\nset -e\ne
 
   // (2) prices on the page.
   const cap = await call("/capabilities", undefined, "GET");
-  assert.deepEqual(cap.imageTo3d.methods.map((m) => [m.id, m.usd, m.available]), [["stability-spar3d", 0.04, true], ["stability-sf3d", 0.1, true], ["local-sf3d", 0, wsl], ["replicate-trellis", 0.038, true]], "Meshy is not listed without its key");
+  assert.deepEqual(cap.imageTo3d.methods.map((m) => [m.id, m.usd, m.available]), [["local-sf3d", 0, wsl], ["stability-spar3d", 0.04, true], ["stability-sf3d", 0.1, true], ["replicate-trellis", 0.038, true]], "free first (backend/providers.cjs); Meshy is not listed without its key");
+  // Preselected = the first free way that can run here, else the first paid one.
+  assert.equal(cap.imageTo3d.methods.find((m) => m.default)?.id, wsl ? "local-sf3d" : "stability-spar3d");
   // Connected to the main system every paid way needs a USD price: Meshy (credits only) is listed but unavailable.
   const meshy = imageTo3d.capability({ MESHY_API_KEY: "k" }, { priced: true }).methods.find((m) => m.id === "meshy");
   assert.deepEqual([meshy.available, meshy.reason], [false, "無美元價目"]);
@@ -149,15 +151,16 @@ fs.writeFileSync(path.join(sf3dDir, "entry.sh"), `#!/usr/bin/env bash\nset -e\ne
     await page.goto(base + "/pages/tools.html?r=1#3d");
     const ways = page.locator("[data-t3-methods] button");
     await ways.first().waitFor();
-    assert.deepEqual(await ways.allTextContents(), ["Stability SPAR3D · NT$1.28", "Stability SF3D · NT$3.20", wsl ? "本機 SF3D · 免費" : "本機 SF3D · 免費（未安裝）", "Replicate TRELLIS · 約 NT$1.22"]);
+    assert.deepEqual(await ways.allTextContents(), [wsl ? "本機 SF3D · 免費" : "本機 SF3D · 免費（未安裝）", "Stability SPAR3D · NT$1.28", "Stability SF3D · NT$3.20", "Replicate TRELLIS · 約 NT$1.22"]);
     const go = page.locator('[data-t3-action="i3"]');
-    assert.equal(await page.locator('[data-t3-action="i3-method:stability-spar3d"]').getAttribute("aria-pressed"), "true", "SPAR3D preselected (S4b.2)");
+    const preselected = wsl ? "local-sf3d" : "stability-spar3d"; // free first (backend/providers.cjs)
+    assert.equal(await page.locator(`[data-t3-action="i3-method:${preselected}"]`).getAttribute("aria-pressed"), "true", preselected + " preselected");
     assert.equal(await go.isDisabled(), true, "no image yet");
     await page.locator('[data-t3-action="i3-method:replicate-trellis"]').click();
     await page.getByRole("button", { name: "圖片：杯子.png", exact: true }).click();
     await page.waitForFunction(() => document.querySelector('[data-t3-action="i3"]')?.textContent === "產生 3D 模型（約 NT$1.22）");
     assert.equal(await page.locator('[data-t3-action="i3"]').isDisabled(), false);
-    pass("頁面：四種方式各自標價（含免費、約），預設選 SPAR3D；選 TRELLIS＋圖片後按鈕顯示「產生 3D 模型（約 NT$1.22）」（US$ × twdRate 32）");
+    pass("頁面：四種方式各自標價（含免費、約），免費的本機 SF3D 排第一且裝好時預設選它（否則 SPAR3D）；選 TRELLIS＋圖片後按鈕顯示「產生 3D 模型（約 NT$1.22）」（US$ × twdRate 32）");
   } finally {
     await browser.close();
   }

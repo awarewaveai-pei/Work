@@ -704,9 +704,9 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       # Speech = Gemini (backend/speech.cjs); captions = our whisper worker, same URL/token as next-admin (backend/transcribe.cjs).
       # Pages offer every configured, not-yet-retired vendor; VW_TTS_MODEL / VW_TRANSCRIBE_ENGINE change the default.
-      # Its own paid-tier key, not next-admin's GEMINI_API_KEY (free tier: Google may use the input). Empty = Gemini rows
-      # show 未啟用, speech defaults to OpenAI, captions keep our whisper.
-      GEMINI_API_KEY: ${VW_GEMINI_API_KEY:-}
+      # The same key as next-admin: paid tier (Google Cloud project AwareWave-ColdEmail elite-thunder-508306-q3, billing linked;
+      # prepaid -- 402 "prepayment credits are depleted" when the balance is empty). Empty = Gemini rows show 未啟用.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       VW_TRANSCRIBE_WORKER_URL: ${MEDIA_TRANSCRIBE_WORKER_URL:-}
       VW_TRANSCRIBE_WORKER_TOKEN: ${MEDIA_TRANSCRIBE_WORKER_TOKEN:-}
       REPLICATE_API_TOKEN: ${REPLICATE_API_TOKEN:-}

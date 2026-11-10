@@ -1,10 +1,12 @@
 // Text to speech: the one list of speech models (like next-admin video-motion-models.ts for video). Each row is one
 // connector -- vendor, key, voices, call; adding or removing a vendor = one row. Pages draw the rows as buttons from
 // /capabilities (speech.models). A row whose next-admin registry retireOn (cost-model.ts MEDIA_MODELS) has come leaves
-// the list and a job naming it is refused. A row without its key is listed available:false and refused (503). Default =
-// VW_TTS_MODEL when it names a live row with its key, else the first live row with its key (no GEMINI_API_KEY = OpenAI).
+// the list and a job naming it is refused. A row without its key is listed available:false and refused (503). Order and
+// default (VW_TTS_MODEL names the wanted row): backend/providers.cjs, free first.
 const path = require("node:path");
 const { vwEnv } = require("./env-compat.cjs");
+const providers = require("./providers.cjs");
+const { speechPrice } = require("./provider-cost.cjs");
 const rates = require(path.join(require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env), "lib/ai/cost-model.ts"));
 
 // aistudio.google.com/docs/speech-generation, 2026-11-10: the 30 prebuilt voices and Google's one-word description.
@@ -68,10 +70,12 @@ const MODELS = Object.freeze([
 const day = (at) => new Date(at ?? Date.now()).toISOString().slice(0, 10);
 const retireOn = (id) => rates.MEDIA_MODELS[id]?.retireOn || null;
 const live = (at) => MODELS.filter((m) => !retireOn(m.id) || retireOn(m.id) > day(at));
-function defaultModel(env, at) {
-  const list = live(at), wanted = vwEnv(env, "TTS_MODEL");
-  return list.find((m) => m.id === wanted && env[m.keyName]) || list.find((m) => env[m.keyName]) || list[0];
-}
+// Live rows with what providers.cjs decides by: can it run here, is it free (its button price is 0).
+const rows = (env, at) => live(at).map((m) => {
+  const price = speechPrice(m.id);
+  return { m, id: m.id, available: !!env[m.keyName], free: price?.usd === 0, price };
+});
+const defaultModel = (env, at) => providers.choose(rows(env, at), vwEnv(env, "TTS_MODEL"))?.m;
 // The model a job runs: its named live row, else the default. A retired or unknown name is refused, never swapped.
 function pick(id, env = process.env, at) {
   if (id === undefined || id === null || id === "") return defaultModel(env, at);
@@ -86,11 +90,12 @@ function key(model, env) {
   if (!env[model.keyName]) throw Object.assign(Error("此電腦尚未設定 " + model.keyName + "；請先設定服務。"), { status: 503 });
   return env[model.keyName];
 }
-// /capabilities: the live rows as the page needs them; price = provider-cost.cjs speechPrice (same rule as the charge).
-function capability(env, priceOf, at) {
+// /capabilities: the live rows in providers.cjs order; price = provider-cost.cjs speechPrice (same rule as the charge).
+function capability(env, at) {
+  const list = rows(env, at);
   return {
-    defaultModel: defaultModel(env, at).id,
-    models: live(at).map((m) => ({ id: m.id, vendor: m.vendor, label: m.label, note: m.note, retireOn: retireOn(m.id), available: !!env[m.keyName], voices: m.voices, defaultVoice: m.voices[0].id, price: priceOf(m.id) })),
+    defaultModel: providers.choose(list, vwEnv(env, "TTS_MODEL"))?.id,
+    models: providers.order(list).map(({ m, available, free, price }) => ({ id: m.id, vendor: m.vendor, label: m.label, note: m.note, retireOn: retireOn(m.id), available, free, voices: m.voices, defaultVoice: m.voices[0].id, price })),
   };
 }
 async function synthesize(model, { text, voice, style, env, fetchImpl, signal }) {
