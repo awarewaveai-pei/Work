@@ -24,6 +24,16 @@
 - REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh video-workbench; docker exec lobster-video-workbench node -e videoModels; playwright-runner.ps1 -Mode smoke（34 passed / 0 failed / 24 skipped，agency-os/reports/e2e/2026-11-10/smoke） | exit=0 | ms=86776
 - REVIEW_WAIVED: NA -- 部署既有已審 commit（f792960c6、510343ddd 各一輪 Codex）
 - BUGHUNT_WAIVED: NA -- 部署，無程式改動
+## 2026-11-10（續44）影音工作台頁面腳本改「並行下載、照序執行」
+
+- 根因：六個 `*-boot.js` 與 `app-entry.js` 逐檔 append `<script>` 並 await onload，32 檔串列＝32 次往返（主機歐洲、靜態檔 no-store），tools.html 約 8.4s。
+- 不變量：每頁腳本載入時間 ≈ 1 次往返＋最大檔，與檔數無關；執行順序不變。
+- 改：`shared/runtime.js` 新 `VideoWorkbench.loadScripts(files, base)`（一次 append 全部、`s.async = false`、`Promise.all`、任一檔 onerror reject 走原 reportError）；tools／characters／projects／storyboards／templates／index 六個 boot 改用它；`app-entry.js` 在 runtime 之前跑，就地寫同一規則。清單內容與 `/capabilities` 先後不動（腳本頂層可能讀 capabilities，保持先 await）。`tools-editor/follow/voice-music` 的 `new Promise` 是 media 載入，不動。`storyboards-design-baseline.json` 的 storyboards-boot.js hash 隨之更新（只動載入迴圈）。
+- 新測試 `tests/boot-script-loading.cjs`（入 gate）：假 document 驗一次插入全部、順序、async=false、onerror reject；六個 boot 無私有迴圈。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs（含 boot-script-loading）＋本機起工作台開 tools.html／index.html（Edge pane）：28 個腳本 startTime 6.9–65ms 同時發出、開字幕工具無 console error（僅既有 engines 404） | exit=0 | ms=60000
+- 突變：拿掉 `s.async = false` → boot-script-loading 紅；還原轉綠。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/1m/0n — Codex（agency-os/reports/oracle/2026-11-10-review-af45f5f9.md）：app-entry 的 async=false 測試被註解字面騙過 → 已修（只算程式行）並突變驗證（改 true → 紅）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=createElement\("script"\)|createElement\('script'\) | hits=7
 ## 2026-11-10（續43）影音工作台影片「聲音」設定與模型一致＋每個模型的使用說明
 
 - 根因：「聲音」有聲／靜音只是擺設——靜音一律被擋（`muteOutput:false`），有聲時 Veo 照樣出無聲片；換成 Omni（一定有聲）後，第一次用的人無從判斷該選哪個模型。
