@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-10（續22）影音工作台 ED.3.8：預覽補遮罩、顆粒、背景模糊（§9 G1）
+
+- 改：`scripts/tools-editor.js` `edPaint` 讀輸出端同一組欄位（`c.mask`；`grain` 最近一層；主軌 `background`／`backgroundBlur`）。遮罩＝CSS `clip-path`（形狀同 `backend/editor-export.cjs` geq 條件）；顆粒＝兩張互補雜訊（`plus-lighter` 加、`difference` 減），不透明度 30·grain/255＝輸出端 ±30·grain；背景模糊＝畫面後方 canvas，cover 縮放，σ＝r/√3 換算到比例的 1080p 寬。輸出端不動。
+- 近似誤差：遮罩在旋轉、震動之前切（輸出端之後）；顆粒是灰階、比雜訊暗的像素會變亮而非截到 0；模糊半徑以 1080p 為準（720p 輸出相對較糊）。
+- Codex 第 1 輪 2 個（都修）：暫停跳時間模糊底圖沒換影格 → 影片 seeked／loadeddata（圖 load）時重畫；半透明時底圖透出畫面 → 畫面範圍內清掉底圖。第 2 輪額度用完（至 14:03）→ 自審＋突變。
+- 測：新 `tests/ed38-preview-fx.cjs`：三項開啟像素變、關閉與原畫面逐像素相同；片段 grain 0 覆蓋整片；模糊 40 的標準差 < 2；暫停跳時間重畫；半透明不透出。突變：拔 seeked 重畫 → 指名斷言紅 → 還原綠。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed38-preview-fx.cjs; ed3-inspector; ed3-legacy-golden; tools-editor; ed2-timeline; pj4-stale; ed1-layout; gate | exit=0 | ms=600000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n — Codex 第 1 輪 2 個已修並加測
+- ORACLE_WAIVED: Codex 第 2 輪 usage limit（oracle-quota 設至 14:03）；書面自審＋突變證據（拔守衛→紅→還原→綠）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=data-ed-leak | hits=4
+- 未修（他人範圍）：`tests/pj3-arrange.cjs:88` 紅（配音按鈕價格字樣，另一 session）。
 ## 2026-11-10（續21）影音工作台 ED.1.5 後續：剪輯器不再被頂列撐出視窗
 
 - 根因：`.editor-app` 單欄 grid 欄寬 `auto`，頂列（改前已約 1730px，ED.1.5 再加寬）把整個剪輯器撐得比視窗寬；頂列字一變（儲存中↔已儲存時間）時間軸寬度跟著變，`tests/ed2-timeline.cjs:319` 自適應全片量寬與重畫後不同而紅（換回 ED.1.5 前版本＝綠，HEAD 版＝紅）。

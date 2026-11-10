@@ -1511,6 +1511,69 @@ function edPreviewEnsure(p) {
     text = [...urls].some((u) => edPreview720.get(u) instanceof Promise) ? "正在產生 720P 預覽檔…" : "";
   if (note && note.textContent !== text) note.textContent = text;
 }
+// Card ED.3.8 (spec ed3 §9 G1): the preview draws 形狀遮罩, 顆粒 and 背景模糊 from the export's own fields
+// (c.mask; grain nearest-first; c.background/c.backgroundBlur on the main track). Approximations: the mask is cut in
+// the clip's box before its rotation and shake (the export cuts after both); grain adds the export's ±30·grain
+// uniform noise (grey, not per channel; pixels darker than the noise lift instead of clamping at 0); the blur is a
+// Gaussian with the export box blur's σ (r/√3) at the ratio's 1080p width.
+function edMaskPath(c, el) {
+  if (c.mask === "圓形") return "ellipse(50% 50% at 50% 50%)";
+  if (c.mask === "三角形") return "polygon(50% 0, 100% 100%, 0 100%)";
+  if (c.mask === "圓角矩形") return `inset(0 round ${(Math.min(el.offsetWidth, el.offsetHeight) * 0.12).toFixed(1)}px)`;
+  return "none";
+}
+// Two complementary 128² tiles of the same noise: [added (plus-lighter), subtracted (difference)]; each pixel is in one.
+let edNoiseUrls = null;
+function edNoise() {
+  if (edNoiseUrls) return edNoiseUrls;
+  const tiles = [0, 1].map(() => {
+      const canvas = Object.assign(document.createElement("canvas"), { width: 128, height: 128 }),
+        ctx = canvas.getContext("2d");
+      return { canvas, ctx, img: ctx.createImageData(128, 128) };
+    });
+  for (let i = 0; i < 128 * 128 * 4; i += 4) {
+    const v = Math.floor(Math.random() * 256),
+      add = Math.random() < 0.5;
+    for (const [n, t] of tiles.entries()) {
+      t.img.data[i] = t.img.data[i + 1] = t.img.data[i + 2] = add === (n === 0) ? v : 0;
+      t.img.data[i + 3] = 255;
+    }
+  }
+  return (edNoiseUrls = tiles.map((t) => (t.ctx.putImageData(t.img, 0, 0), t.canvas.toDataURL())));
+}
+// A per-clip companion element (light leak, grain halves, blurred background), swept with the clip's layer in edPaint.
+function edSideLayer(stage, kind, id, tag = "div") {
+  let el = stage.querySelector(`[data-ed-${kind}="${id}"]`);
+  if (!el) {
+    el = document.createElement(tag);
+    el.dataset["ed" + kind[0].toUpperCase() + kind.slice(1)] = id;
+    stage.append(el);
+  }
+  return el;
+}
+function edBlurBack(p, c, el, stage, back) {
+  const k = 4, // drawn at quarter size: it is blurred anyway
+    W = Math.max(1, Math.round(stage.clientWidth / k)),
+    H = Math.max(1, Math.round(stage.clientHeight / k)),
+    sw = el.videoWidth || el.naturalWidth,
+    sh = el.videoHeight || el.naturalHeight,
+    ready = el.tagName === "VIDEO" ? el.readyState >= 2 : el.complete;
+  if (back.width !== W) back.width = W;
+  if (back.height !== H) back.height = H;
+  if (!sw || !sh || !ready) return;
+  const sigma = (((c.backgroundBlur ?? 20) / Math.sqrt(3)) * stage.clientWidth) / edRatios[p.ratio][0] / k,
+    m = Math.ceil(3 * sigma), // overdraw so the blur does not darken the edges (the export clamps them)
+    s = Math.max((W + 2 * m) / sw, (H + 2 * m) / sh),
+    ctx = back.getContext("2d");
+  ctx.filter = `blur(${sigma.toFixed(2)}px)`;
+  ctx.drawImage(el, (W - sw * s) / 2, (H - sh * s) / 2, sw * s, sh * s);
+  // The export fades the composed frame; here picture and copy fade apart, so under a see-through picture the copy is
+  // cut away (a transparent PNG then shows black there instead of the blur).
+  if (Number(el.style.opacity) < 1) {
+    const f = Math.min(W / sw, H / sh);
+    ctx.clearRect((W - sw * f) / 2, (H - sh * f) / 2, sw * f, sh * f);
+  }
+}
 function edPaint() {
   const p = edProject(),
     stage = document.querySelector("[data-ed-stage]");
@@ -1531,8 +1594,9 @@ function edPaint() {
       );
     }),
     ids = new Set(active.map((c) => c.id));
-  stage.querySelectorAll("[data-ed-layer],[data-ed-leak]").forEach((el) => {
-    if (!ids.has(el.dataset.edLayer ?? el.dataset.edLeak)) {
+  stage.querySelectorAll("[data-ed-layer],[data-ed-leak],[data-ed-grainadd],[data-ed-grainsub],[data-ed-back]").forEach((el) => {
+    const d = el.dataset;
+    if (!ids.has(d.edLayer ?? d.edLeak ?? d.edGrainadd ?? d.edGrainsub ?? d.edBack)) {
       el.pause?.();
       el.remove();
     }
@@ -1575,27 +1639,49 @@ function edPaint() {
       el.style.cssText = `position:absolute;left:${c.x}%;top:${c.y}%;transform:translate(-50%,-50%) rotate(${c.rotation}deg) scale(${c.scale});font-size:${(c.fontSize * stage.clientWidth) / edRatios[p.ratio][0]}px;color:${c.color};font-family:${{ 思源黑體: "sans-serif", 思源宋體: "serif", 等寬字: "monospace" }[c.font] || c.font};font-weight:${c.bold ? "bold" : "normal"};font-style:${c.italic ? "italic" : "normal"};text-align:${c.align === "靠左" ? "left" : c.align === "靠右" ? "right" : "center"};background:${c.backgroundColor || "transparent"};opacity:${c.opacity};white-space:pre-wrap;max-width:95%;z-index:${100 + layer}`;
     } else if (c.kind !== "audio") {
       const shake = edShake(p, c),
-        t = edTransform(p, c);
+        t = edTransform(p, c),
+        blur = !edOverlay(p, c.track) && c.background === "模糊";
       el.style.cssText =
         (edOverlay(p, c.track)
           ? `position:absolute;width:${c.width * t.scale}%;left:${t.x * (1 - (c.width * t.scale) / 100)}%;top:${t.y}%;transform:${shake}rotate(${t.rotation}deg);opacity:${c.opacity * fade};z-index:${layer}`
-          : `position:absolute;width:100%;height:100%;object-fit:contain;transform:${shake}translate(${(t.x * stage.clientWidth) / edRatios[p.ratio][0]}px,${(t.y * stage.clientHeight) / edRatios[p.ratio][1]}px) rotate(${t.rotation}deg) scale(${t.scale});opacity:${c.opacity * fade};z-index:${layer};background:${c.background === "純色" ? c.backgroundColor || "#000" : "#000"}`) +
+          : `position:absolute;width:100%;height:100%;object-fit:contain;transform:${shake}translate(${(t.x * stage.clientWidth) / edRatios[p.ratio][0]}px,${(t.y * stage.clientHeight) / edRatios[p.ratio][1]}px) rotate(${t.rotation}deg) scale(${t.scale});opacity:${c.opacity * fade};z-index:${layer};background:${c.background === "純色" ? c.backgroundColor || "#000" : blur ? "transparent" : "#000"}`) +
         `;filter:${edFilter(p, c)}`;
+      const mask = edMaskPath(c, el);
+      el.style.clipPath = mask;
+      // 背景模糊 (main track only, as the export): a cover-scaled blurred copy right under the picture, moved, faded and
+      // filtered with it.
+      let back = stage.querySelector(`[data-ed-back="${c.id}"]`);
+      if (!blur) back?.remove();
+      else {
+        if (!back) {
+          back = edSideLayer(stage, "back", c.id, "canvas");
+          el.before(back);
+        }
+        // Paused, a seek lands after this paint: redraw the copy when the new frame is there.
+        if (!el.edRepaint) {
+          el.edRepaint = () => edPaint();
+          for (const type of ["loadeddata", "seeked", "load"]) el.addEventListener(type, el.edRepaint);
+        }
+        edBlurBack(p, c, el, stage, back);
+        back.style.cssText = `position:absolute;inset:0;width:100%;height:100%;pointer-events:none;transform:${el.style.transform};opacity:${el.style.opacity};filter:${el.style.filter};clip-path:${mask};z-index:${layer}`;
+      }
       // Light leak: the export's radial gradient from the top-left corner, screen-blended (EditorModel.LIGHT_LEAK).
       const leak = EditorModel.effectValue(p, edTrack(p, c.track), c, "lightLeak");
-      let glow = stage.querySelector(`[data-ed-leak="${c.id}"]`);
-      if (!leak || ed.compare) glow?.remove();
+      // The export lights (and grains) the clip's own box, before its opacity and mask: an overlay's sits on the overlay.
+      const box = `${edOverlay(p, c.track) ? `left:${el.offsetLeft}px;top:${el.offsetTop}px;width:${el.offsetWidth}px;height:${el.offsetHeight}px;transform:${el.style.transform}` : "inset:0"};clip-path:${mask}`;
+      if (!leak || ed.compare) stage.querySelector(`[data-ed-leak="${c.id}"]`)?.remove();
       else {
-        if (!glow) {
-          glow = document.createElement("div");
-          glow.dataset.edLeak = c.id;
-          stage.append(glow);
-        }
-        // The export lights the clip's own box, before its opacity: an overlay's glow sits on the overlay.
-        const L = EditorModel.LIGHT_LEAK,
-          box = edOverlay(p, c.track) ? `left:${el.offsetLeft}px;top:${el.offsetTop}px;width:${el.offsetWidth}px;height:${el.offsetHeight}px;transform:${el.style.transform}` : "inset:0";
-        glow.style.cssText = `position:absolute;${box};pointer-events:none;mix-blend-mode:screen;opacity:${leak * fade * c.opacity};background:radial-gradient(circle at 0 0, rgb(${L.rgb.join(",")}) 0, transparent ${L.reach * 100}%);z-index:${layer + 1}`;
+        const L = EditorModel.LIGHT_LEAK;
+        edSideLayer(stage, "leak", c.id).style.cssText = `position:absolute;${box};pointer-events:none;mix-blend-mode:screen;opacity:${leak * fade * c.opacity};background:radial-gradient(circle at 0 0, rgb(${L.rgb.join(",")}) 0, transparent ${L.reach * 100}%);z-index:${layer + 1}`;
       }
+      // Grain: the export adds noise=alls=30·grain (uniform ±30·grain of 255, new every frame). A tile of 0..255 at
+      // opacity o adds (plus-lighter) or subtracts (difference) 0..255·o, so o = 30·grain/255.
+      const grain = EditorModel.effectValue(p, edTrack(p, c.track), c, "grain"),
+        offset = `${Math.floor(Math.random() * 128)}px ${Math.floor(Math.random() * 128)}px`;
+      for (const [n, kind] of ["grainadd", "grainsub"].entries())
+        if (!grain || ed.compare) stage.querySelector(`[data-ed-${kind}="${c.id}"]`)?.remove();
+        else
+          edSideLayer(stage, kind, c.id).style.cssText = `position:absolute;${box};pointer-events:none;mix-blend-mode:${n ? "difference" : "plus-lighter"};opacity:${((30 / 255) * grain * fade * c.opacity).toFixed(4)};background:url(${edNoise()[n]}) ${offset};z-index:${layer + 1}`;
     }
     if (["audio", "video"].includes(c.kind)) {
       const target = Math.max(0, c.sourceStart + (ed.time - c.start) * c.speed),

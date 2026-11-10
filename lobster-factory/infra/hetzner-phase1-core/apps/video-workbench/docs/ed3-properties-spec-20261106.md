@@ -258,7 +258,7 @@ function evalNumber(text)  // digits . + - * / ( ) and spaces only; recursive de
 | 光漏 | radial-gradient＋screen | gradients＋blend screen | 同色同範圍；輸出有慢速旋轉 |
 | 震動 | translate＋scale，同 `shakeOffset` | scale＋crop sin(t) | 同公式；轉場前置段有 ≤ 半個轉場的相位差 |
 | 關鍵影格 | `transformAt` | `piecewise` 運算式 | 同內插 |
-| 背景模糊強度 | 不畫（現況） | boxblur 半徑 | §9 G1 |
+| 背景模糊強度 | 主軌畫面後方模糊副本，σ＝r/√3（ED.3.8） | boxblur 半徑 | §9 G1 |
 | 旁白時降低 | `duckFactor` | `duckExpression` | 同公式 |
 
 ## 6. 與其他線的撞檔
@@ -315,7 +315,7 @@ function evalNumber(text)  // digits . + - * / ( ) and spaces only; recursive de
 
 ## 9. 發現的衝突與缺口
 
-- **G1 預覽本來就不畫濾鏡、遮罩、顆粒、背景模糊**：`edPaint` 只套 `edGrade`（`tools-editor.js:1211`），背景永遠黑（`:1210`）。ED.3.2 補濾鏡＋強度、光漏、震動的預覽；遮罩／顆粒／背景模糊的預覽不在 ED.3 卡內 → 回報監工決定歸哪張卡。
+- **G1 預覽本來就不畫濾鏡、遮罩、顆粒、背景模糊**：`edPaint` 只套 `edGrade`（`tools-editor.js:1211`），背景永遠黑（`:1210`）。ED.3.2 補濾鏡＋強度、光漏、震動的預覽；遮罩／顆粒／背景模糊的預覽不在 ED.3 卡內 → 回報監工決定歸哪張卡。→ 2026-11-10 ED.3.8 已補（`edMaskPath`／顆粒兩層雜訊／`edBlurBack`，近似誤差寫在 `tools-editor.js` 函式註解；測試 `tests/ed38-preview-fx.cjs`）。
 - **G2 頂列比例仍是下拉**（`edRatioSelect` `:564-570`，頂列 `:572`）。ED.3.1 的整片設定改按鈕；頂列屬 ED.1（PJ.1 正在改同一行）。建議 ED.1.4 或 PJ.1 收尾時一起改。→ 2026-11-10 ED.1.5 已改。
 - **G3 規格 §3 說 ED.3 要「補背景模糊輸出」**：模糊輸出早已存在（`editor-export.cjs:443-456`，`tests/editor-render.cjs:99` 有測）；ED.3 只補強度。
 - **G4 軌道層濾鏡**：輸出端早就讀 `track.filter`（`:87`），但 UI 從沒寫過（`tools-editor.js` 無 `track.filter`）；ED.3.2 的「此軌」第一次用到它。
