@@ -149,15 +149,15 @@ fs.writeFileSync(path.join(sf3dDir, "entry.sh"), `#!/usr/bin/env bash\nset -e\ne
     await page.goto(base + "/pages/tools.html?r=1#3d");
     const ways = page.locator("[data-t3-methods] button");
     await ways.first().waitFor();
-    assert.deepEqual(await ways.allTextContents(), ["Stability SPAR3D · US$0.04", "Stability SF3D · US$0.1", wsl ? "本機 SF3D · 免費" : "本機 SF3D · 免費（未安裝）", "Replicate TRELLIS · 約 US$0.038"]);
+    assert.deepEqual(await ways.allTextContents(), ["Stability SPAR3D · NT$1.28", "Stability SF3D · NT$3.20", wsl ? "本機 SF3D · 免費" : "本機 SF3D · 免費（未安裝）", "Replicate TRELLIS · 約 NT$1.22"]);
     const go = page.locator('[data-t3-action="i3"]');
     assert.equal(await page.locator('[data-t3-action="i3-method:stability-spar3d"]').getAttribute("aria-pressed"), "true", "SPAR3D preselected (S4b.2)");
     assert.equal(await go.isDisabled(), true, "no image yet");
     await page.locator('[data-t3-action="i3-method:replicate-trellis"]').click();
     await page.getByRole("button", { name: "圖片：杯子.png", exact: true }).click();
-    await page.waitForFunction(() => document.querySelector('[data-t3-action="i3"]')?.textContent === "產生 3D 模型（約 US$0.038）");
+    await page.waitForFunction(() => document.querySelector('[data-t3-action="i3"]')?.textContent === "產生 3D 模型（約 NT$1.22）");
     assert.equal(await page.locator('[data-t3-action="i3"]').isDisabled(), false);
-    pass("頁面：四種方式各自標價（含免費、約），預設選 SPAR3D；選 TRELLIS＋圖片後按鈕顯示「產生 3D 模型（約 US$0.038）」");
+    pass("頁面：四種方式各自標價（含免費、約），預設選 SPAR3D；選 TRELLIS＋圖片後按鈕顯示「產生 3D 模型（約 NT$1.22）」（US$ × twdRate 32）");
   } finally {
     await browser.close();
   }
