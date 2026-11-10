@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-10（續44）部署 video-workbench b25e1d0d2（Omni 影片預設、聲音設定、Nano Banana 2.1 計價）
+
+- 操作者：「現在部署」。DEPLOY_HOLD 無；`sg-deploy.sh video-workbench`：gate 過 → healthy 6s → HTTP smoke 8 端點全 OK；.deployed-commit 469e589f0 → b25e1d0d2。
+- prod 容器內 `generation-policy.videoModels(process.env)`：第一列 gemini-omni-1.2-flash audio=true avail=true 0.069504/s；Veo/Runway/Luma audio=false；五列皆有 note。
+- next-admin（nano-banana-2 → Nano Banana 2.1）未手動部署，走今晚 03:00 自動部署。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh video-workbench; docker exec lobster-video-workbench node -e videoModels; playwright-runner.ps1 -Mode smoke（34 passed / 0 failed / 24 skipped，agency-os/reports/e2e/2026-11-10/smoke） | exit=0 | ms=86776
+- REVIEW_WAIVED: NA -- 部署既有已審 commit（f792960c6、510343ddd 各一輪 Codex）
+- BUGHUNT_WAIVED: NA -- 部署，無程式改動
 ## 2026-11-10（續43）影音工作台影片「聲音」設定與模型一致＋每個模型的使用說明
 
 - 根因：「聲音」有聲／靜音只是擺設——靜音一律被擋（`muteOutput:false`），有聲時 Veo 照樣出無聲片；換成 Omni（一定有聲）後，第一次用的人無從判斷該選哪個模型。
