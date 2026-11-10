@@ -423,55 +423,6 @@ const edPrevious = (p, c) =>
       o.kind !== "text" &&
       o.startFrame + o.durationFrames === c.startFrame,
   );
-// What the transition at c's in point lacks: the export repeats the edge frame for any missing handle frames.
-function edTransitionIssue(p, c) {
-  const previous = edPrevious(p, c);
-  if (!previous)
-    return "前面沒有緊接（無空隙）的主軌片段，轉場無法輸出；可開啟時間軸的「磁性主軌」補齊空隙。";
-  const frames = EditorModel.transitionFrames(c, p.timebase),
-    before = Math.floor(frames / 2),
-    after = frames - before,
-    fps = Timebase.fps(p.timebase);
-  if (
-    frames - Math.floor(frames / 2) > c.durationFrames ||
-    before > previous.durationFrames
-  )
-    return "轉場太長：片段長度需大於轉場的一半。";
-  const shortIn = c.kind === "video" && c.sourceStartFrame / c.speed < before,
-    shortOut =
-      previous.kind === "video" &&
-      previous.asset?.duration &&
-      previous.sourceStart +
-        ((previous.durationFrames + after) / fps) * previous.speed >
-        previous.asset.duration;
-  return shortIn || shortOut ? "素材不足，以靜止畫格補足" : "";
-}
-function edTransitionPane(p, c) {
-  const head = `<h3>主影片軌轉場</h3><p class="note">選取主影片軌（${esc(edMain(p))}）上相鄰兩段中的後一段。轉場以剪點為中心：前段多播放後面的畫格、後段提前開始，各占一半，總長度不變。預覽以透明度近似，輸出為準。</p>`;
-  if (!c || c.track !== edMain(p))
-    return head + "<p>請先選取主影片軌片段。</p>";
-  const type = EditorModel.transitionName(c.transition) ?? "無",
-    frames = EditorModel.transitionFrames(c, p.timebase),
-    { min, max } = EditorModel.transitionLimits(p.timebase),
-    fps = Timebase.fps(p.timebase),
-    issue = type === "無" ? "" : edTransitionIssue(p, c);
-  return (
-    head +
-    edChoices("轉場", "transition", type, [
-      "無",
-      ...Object.keys(EditorModel.TRANSITIONS),
-    ]) +
-    edInput(
-      "transitionSeconds",
-      "轉場秒數",
-      Number((frames / fps).toFixed(3)),
-      "number",
-      `min="${(min / fps).toFixed(3)}" max="${(max / fps).toFixed(3)}" step="${(1 / fps).toFixed(4)}"`,
-    ) +
-    `<p class="note">${frames} 格（${min}–${max} 格）</p>` +
-    (issue ? `<p class="note" data-ed-transition-issue>${esc(issue)}</p>` : "")
-  );
-}
 async function edLutRefresh() {
   const rows = await VideoWorkbench.assets.list();
   ed.luts = rows.filter((a) => /\.cube$/i.test(a.url || ""));
@@ -509,33 +460,25 @@ function edColorPane(p, c) {
     `<p class="note">${ed.compare ? "預覽顯示調色前（近似）" : "預覽顯示調色後（近似）"}。輸出依序套用曝光、色溫、對比／飽和度、LUT，存成 BT.709、TV 範圍（16–235）並標記色彩空間；預覽以 CSS 近似。</p>`
   );
 }
-function edLoudnessPane(p) {
-  return `<h4>響度目標</h4>${edChoices("響度目標", "loudness", p.output.loudness, EditorModel.LOUDNESS.presets, (v) => v + " LUFS")}<p class="note">目前 ${p.output.loudness} LUFS。輸出時先量整段混音，再線性調到目標（誤差 ±1 LU），真峰值壓在 −1 dBTP 以下。−23 廣播、−16 一般網路、−14 串流平台。</p>`;
+// Card ED.0: the left panes register themselves, one file each (scripts/editor-panes/<id>.js, loaded right after this
+// file by tools-boot.js; rail order = load order = the reference's, spec §1.2–1.6; 片頭 lives in 文字, 調色 in the clip
+// inspector, 影格率 in 整片設定 › 輸出, the peak meter in 音訊, operator 2026-11-06). ed.pane holds the pane's title. Every action key belongs to one pane:
+// "x:" matches by prefix, "x" matches "x" and "x:…".
+const edPaneRegistry = new Map();
+function edRegisterPane(id, def) {
+  if (edPaneRegistry.has(id) || [...edPaneRegistry.values()].some((d) => d.title === def.title)) throw Error("剪輯面板重複登記：" + id);
+  const keys = Object.keys(def.actions || {}),
+    taken = keys.find((k) => edPaneAction(k.endsWith(":") ? k + "x" : k));
+  if (taken) throw Error("剪輯面板動作重複登記：" + taken);
+  edPaneRegistry.set(id, { id, ...def, actions: def.actions || {} });
 }
-function edKeysPane(p, c) {
-  const keys = c.volumeKeys || [],
-    fps = Timebase.fps(p.timebase);
-  return `<h4>音量關鍵影格（${esc(c.asset?.name || "片段")}）</h4><p class="note">有關鍵影格時取代片段音量，兩點之間線性變化；0 為靜音。</p>${keys
-    .map(
-      (k, i) =>
-        `<div class="row">第 ${k.frame} 格（${(k.frame / fps).toFixed(2)} 秒）· 音量 ${k.gain}${edButton("刪除", "key-delete:" + i)}</div>`,
-    )
-    .join(
-      "",
-    )}<label>關鍵影格音量<input class="text-input" aria-label="關鍵影格音量" data-ed-key-gain type="number" min="0" max="4" step="0.1" value="1"></label>${edButton("在播放頭加入關鍵影格", "key-add")}`;
+const edPaneDef = (title) => [...edPaneRegistry.values()].find((d) => d.title === title) || null;
+function edPaneAction(action) {
+  for (const d of edPaneRegistry.values())
+    for (const [key, run] of Object.entries(d.actions))
+      if (key.endsWith(":") ? action.startsWith(key) : action === key || action.startsWith(key + ":")) return run;
+  return null;
 }
-// Card ED.1: the reference editor's layout (docs/editor-parity-spec-20261106.md §1.2–1.6). Rail order as the reference;
-// 片頭 lives in 文字, 調色 in the clip inspector, 影格率 in 整片設定 › 輸出, the peak meter in 音訊 (operator 2026-11-06).
-const edPanes = [
-  ["素材", "▤"],
-  ["文字", "T"],
-  ["音訊", "♪"],
-  ["轉場", "⧉"],
-  ["特效", "✧"],
-  ["貼圖", "▣"],
-  ["字幕", "☰"],
-  ["剪贅字", "✂"],
-];
 // Panel sizes are a per-user preference (tools.editor.layout), never project data.
 const edLayoutLimits = { left: [200, 480], right: [240, 480], timeline: [110, 560] },
   edLayoutDefault = { left: 294, right: 300, timeline: 150, leftOpen: true, rightOpen: true, closed: [], preview: "1080P" },
@@ -581,9 +524,6 @@ function edIconButton(label, glyph, action, pressed, disabled = false) {
 function edResizer(side, orientation, label, value) {
   return `<div class="editor-resize editor-resize-${orientation}" data-ed-resize="${side}" role="separator" aria-orientation="${orientation}" aria-label="${label}" aria-valuenow="${value}" tabindex="0"></div>`;
 }
-function edPeakMeter() {
-  return `<div class="row editor-peak" data-ed-peak role="meter" aria-label="主輸出峰值" aria-valuemin="-60" aria-valuemax="0" aria-valuenow="-60"><span class="editor-peak-bar" style="display:inline-block;width:160px;height:8px;border:1px solid currentColor;position:relative"><i data-ed-peak-fill style="position:absolute;left:0;top:0;bottom:0;width:0;background:#4ade80"></i></span><span data-ed-peak-text>峰值 — dBFS</span><span class="note">播放時顯示；超過 −1 dB 會在輸出時自動壓低</span></div>`;
-}
 // Ratio choices read 「16:9 橫屏」 like the reference; the stored value stays the bare ratio.
 function edRatioSelect(p, label, visibleLabel) {
   const names = Object.fromEntries(edCreateRatios.map(([r, name]) => [r, name])),
@@ -597,28 +537,16 @@ function edTopbar(p) {
 }
 function edRail() {
   const open = ed.layout.leftOpen;
-  return `<nav class="editor-panes" aria-label="編輯面板">${edPanes
+  return `<nav class="editor-panes" aria-label="編輯面板">${[...edPaneRegistry.values()]
     .map(
-      ([title, icon]) =>
+      ({ title, icon }) =>
         `<button type="button" class="editor-pane-btn${ed.pane === title && open ? " selected" : ""}" data-ed-pane="${title}" aria-pressed="${ed.pane === title && open}"><span aria-hidden="true">${icon}</span>${title}</button>`,
     )
     .join("")}${edIconButton(open ? "收合左側面板" : "展開左側面板", open ? "«" : "»", "layout:left")}</nav>`;
 }
 function edPane(p, c) {
-  if (ed.pane === "素材")
-    return `<h3>素材</h3>${edButton("從素材庫加入", "library")}${edButton("上傳素材", "upload")}<p class="note">影片／圖片加入 V1，音訊加入 A1。可在屬性更換軌道。</p>${p.assets.map((a) => `<div class="editor-asset">${esc(a.name || "素材")}${edButton("加入時間軸", "asset:" + a.id)}</div>`).join("")}`;
-  if (ed.pane === "文字")
-    return `<h3>文字</h3>${["空白文字", "主標題", "副標題", "內文", "重點提示", "金句", "步驟", "章節", "下標", "開場", "結尾", "價格", "標籤", "品牌", "呼籲行動"].map((title, i) => edButton(title, "text:" + i)).join("")}<hr>${edTitlePane(p)}`;
-  if (ed.pane === "音訊")
-    return `<h3>音訊</h3>${edButton("選擇音訊", "library:audio")}${edButton("上傳音訊", "upload:audio")}<p class="note">每條音訊軌可獨立安排時間、音量、淡入淡出與音量均衡；音量＝片段音量 × 軌道音量（0 為靜音）。</p>${edLoudnessPane(p)}${edPeakMeter()}${c && ["video", "audio"].includes(c.kind) ? edKeysPane(p, c) : ""}`;
-  if (ed.pane === "轉場") return edTransitionPane(p, c);
-  if (ed.pane === "特效")
-    return '<h3>畫面效果</h3><p class="note">濾鏡、遮罩與顆粒在右側屬性面板調整：選取片段時設定該片段，未選取時是整片設定。光漏、鏡頭震動與關鍵影格尚未接入。</p>';
-  if (ed.pane === "貼圖")
-    return `<h3>貼圖／品牌圖</h3>${edButton("選擇圖片", "library:image")}${edButton("上傳透明 PNG", "upload:image")}<p class="note">以主影片軌之上的影片軌疊加圖片，可設定時間、位置、大小與透明度。</p>`;
-  if (ed.pane === "字幕")
-    return `<h3>字幕</h3>${edButton("匯入 SRT／VTT", "subtitles-import")}${edButton("下載 SRT", "subtitles-download:srt")}${edButton("下載 VTT", "subtitles-download:vtt")}${edButton("前往字幕工具", "subtitles-tool")}<p class="note">每段字幕為文字軌片段，可逐段修改。時間重疊的字幕分放在不同文字軌；下載時重疊部分合併成同一段（多行）。辨識與翻譯請至字幕工具處理後匯入。</p>`;
-  return "<h3>剪贅字</h3><p>自動剪贅字需要逐字時間戳服務，目前尚未接入。可分割後用「波紋刪除」（Alt+Delete）手動剪除。</p>";
+  // An unknown title falls through to the last pane, as the old if-chain did.
+  return (edPaneDef(ed.pane) || [...edPaneRegistry.values()].at(-1)).render(p, c);
 }
 function edPlayer(p) {
   const [w, h] = edRatios[p.ratio];
@@ -997,115 +925,6 @@ function toolEditorScreen(t) {
     );
   const l = ed.layout;
   return `<div class="editor-app" data-tool-flow="edit" style="--ed-timeline:${l.timeline}px">${edTopbar(p)}<div class="editor-workspace" data-ed-workspace style="grid-template-columns:${edColumns()}">${edRail()}${l.leftOpen ? `<aside class="editor-library">${edPane(p, c)}</aside>${edResizer("left", "vertical", "調整面板寬度", l.left)}` : ""}${edPlayer(p)}${l.rightOpen ? `${edResizer("right", "vertical", "調整檢查器寬度", l.right)}<aside class="editor-inspector">${edInspector(p, c)}</aside>` : ""}</div>${edResizer("timeline", "horizontal", "調整時間軸高度", l.timeline)}${edToolbar(p, c)}${edTimeline(p)}</div>`;
-}
-// Remotion title templates (backend/remotion.cjs via /generations). The catalog comes from /capabilities; ratio
-// and fps follow the project, so nothing here is a second source of template ids or sizes.
-const edTitleFormats = ["16:9", "9:16", "4:5", "1:1"],
-  edTitleFps = [24, 25, 30, 60];
-function edTitleTemplate() {
-  const list = VideoWorkbench.capabilities?.remotionTemplates || [];
-  return list.find((t) => t.id === ed.title.templateId) || list[0] || null;
-}
-function edTitleBlocked(p) {
-  if (!VideoWorkbench.capabilities?.remotion) return "片頭模板服務未設定";
-  if (!edTitleFormats.includes(p.ratio))
-    return "片頭模板不支援 " + p.ratio + " 比例";
-  if (!edTitleFps.includes(Timebase.fps(p.timebase)))
-    return "片頭模板只支援 24、25、30、60 fps";
-  if (!ed.title.image) return "請先選一張背景圖";
-  return "";
-}
-async function edTitleRefresh() {
-  const rows = await VideoWorkbench.assets.list();
-  ed.title.images = rows.filter(
-    (a) =>
-      VideoWorkbench.mediaKind(a) === "image" &&
-      /^\/(generated|media)\/[^?#]+\.(png|jpe?g|webp)$/i.test(a.url || ""),
-  );
-  ed.title.done = ed.title.jobId
-    ? rows.find((a) => a.id === "job-" + ed.title.jobId) || null
-    : null;
-  if (tool === "edit" && ed.pane === "文字") edRender();
-}
-function edTitlePane(p) {
-  // The pane's state belongs to one project: another project's finished title must not be offered here.
-  if (ed.title.projectId !== p.id)
-    ed.title = {
-      templateId: null,
-      fields: {},
-      image: null,
-      jobId: null,
-      images: null,
-      done: null,
-      projectId: p.id,
-    };
-  const t = edTitleTemplate(),
-    blocked = edTitleBlocked(p),
-    list = VideoWorkbench.capabilities?.remotionTemplates || [];
-  if (!ed.title.images) {
-    ed.title.images = [];
-    edTitleRefresh().catch(VideoWorkbench.reportError);
-  }
-  return `<h3>片頭</h3><p class="note">比例與影格率跟隨專案（${esc(p.ratio)} · ${esc(Timebase.label(p.timebase))}），長度 5 秒。</p><div class="flow-choices">${list
-    .map(
-      (x) =>
-        `<button type="button" class="btn small ${x.id === t?.id ? "selected" : ""}" data-ed-action="title-template:${esc(x.id)}" aria-pressed="${x.id === t?.id}">${esc(x.label)}</button>`,
-    )
-    .join("")}</div>${(t?.fields || [])
-    .map(
-      (f) =>
-        `<label>${esc(f.label)}<input class="text-input" aria-label="${esc(f.label)}" data-ed-title-field="${esc(f.key)}" maxlength="${f.max}" value="${esc(ed.title.fields[f.key] ?? "")}"></label>`,
-    )
-    .join("")}${
-    t
-      ? `<p class="note">${esc(t.image.label)}（從素材庫選擇）</p><div class="flow-choices">${
-          ed.title.images
-            .map(
-              (a) =>
-                `<button type="button" class="btn small ${ed.title.image?.id === a.id ? "selected" : ""}" data-ed-action="title-image:${esc(a.id)}" aria-pressed="${ed.title.image?.id === a.id}" title="${esc(a.name || "圖片")}"><img src="${esc(a.thumbUrl || a.url)}" alt="${esc(a.name || "圖片")}" width="64" height="40" style="object-fit:cover"></button>`,
-            )
-            .join("") || '<span class="note">素材庫沒有圖片，請先上傳。</span>'
-        }</div>`
-      : ""
-  }<button type="button" class="btn primary small" data-ed-action="title-generate" ${blocked ? "disabled" : ""}>產生片頭（免費）</button>${blocked ? `<p class="note" data-ed-title-blocked>${esc(blocked)}</p>` : ""}${ed.title.done ? edButton("放到時間軸開頭", "title-insert") : ""}`;
-}
-// Puts the finished title on V1 at frame 0; every clip on every track moves later by its length, so the
-// existing cut keeps its sync.
-async function edTitleInsert(p, asset) {
-  const a = await edProbe(asset);
-  if (!ed.projects.includes(p)) return;
-  edCheckpoint();
-  if (!p.assets.some((x) => x.id === a.id)) p.assets.push(a);
-  const c = edTime(
-    p,
-    {
-      id: crypto.randomUUID(),
-      kind: "video",
-      asset: a,
-      track: edMain(p),
-      speed: 1,
-      volume: 1,
-      fadeIn: 0,
-      fadeOut: 0,
-      opacity: 1,
-      scale: 1,
-      x: 0,
-      y: 0,
-      rotation: 0,
-      width: 25,
-    },
-    {
-      startFrame: 0,
-      duration: Math.min(3600, a.duration),
-      sourceStartFrame: 0,
-    },
-  );
-  for (const row of p.clips)
-    edTime(p, row, { startFrame: row.startFrame + c.durationFrames });
-  p.clips.push(c);
-  ed.selected = c.id;
-  ed.time = 0;
-  await edCommit(p);
 }
 async function edProbe(asset) {
   const kind = VideoWorkbench.mediaKind(asset);
@@ -1839,6 +1658,9 @@ async function edAction(action) {
     return;
   }
   if (!p) return;
+  // Card ED.0: a left pane's own actions live in its file (edRegisterPane).
+  const paneAction = edPaneAction(action);
+  if (paneAction) return paneAction(action, p, c);
   if (action === "play") {
     if (ed.playing) edStop();
     else edPlay(1);
@@ -1852,75 +1674,6 @@ async function edAction(action) {
       edStop();
       edPaint();
     } else edPlay(ed.playing && Math.sign(ed.rate) === dir ? dir * Math.min(4, Math.abs(ed.rate) * 2) : dir);
-    return;
-  }
-  if (action.startsWith("library")) {
-    const kind = action.split(":")[1],
-      rows = await VideoWorkbench.pickAssets({ kind: kind || "all" });
-    if (rows[0] && edProject() === p)
-      await edAdd(rows[0], kind === "image" ? "overlay" : undefined);
-    return;
-  }
-  if (action.startsWith("upload")) {
-    const kind = action.split(":")[1],
-      input = document.createElement("input");
-    input.type = "file";
-    input.accept =
-      kind === "image"
-        ? "image/*"
-        : kind === "audio"
-          ? "audio/*"
-          : ".mov,.mp4,.m4v,.webm,video/*,image/*,audio/*";
-    input.onchange = async () => {
-      try {
-        if (input.files?.[0]) {
-          const a = await VideoWorkbench.uploadAsset(input.files[0]);
-          if (edProject() === p)
-            await edAdd(a, kind === "image" ? "overlay" : undefined);
-        }
-      } catch (e) {
-        VideoWorkbench.reportError(e);
-      }
-    };
-    input.click();
-    return;
-  }
-  if (action.startsWith("asset:")) {
-    const a = p.assets.find((a) => String(a.id) === action.slice(6));
-    if (a) await edAdd(a);
-    return;
-  }
-  if (action.startsWith("text:")) {
-    edCheckpoint();
-    const i = Number(action.slice(5)),
-      c = edText(
-        [
-          "在這裡輸入文字",
-          "主標題",
-          "副標題",
-          "說明文字",
-          "重點提示",
-          "值得記住的一句話",
-          "步驟 1",
-          "第一章",
-          "內容說明",
-          "歡迎觀看",
-          "謝謝觀看",
-          "限時優惠",
-          "精選",
-          "品牌名稱",
-          "立即了解",
-        ][i],
-      );
-    if (i === 1) {
-      c.fontSize = 96;
-      c.bold = true;
-      c.y = 50;
-    }
-    p.clips.push(c);
-    ed.selected = c.id;
-    edRender();
-    await edSave();
     return;
   }
   if (action === "undo" || action === "redo") {
@@ -1939,110 +1692,8 @@ async function edAction(action) {
     }
     return;
   }
-  if (action.startsWith("title-template:")) {
-    ed.title.templateId = action.slice(15);
-    edRender();
-    return;
-  }
-  if (action.startsWith("title-image:")) {
-    ed.title.image =
-      ed.title.images?.find((a) => String(a.id) === action.slice(12)) || null;
-    edRender();
-    return;
-  }
-  if (action === "title-generate") {
-    const t = edTitleTemplate(),
-      blocked = edTitleBlocked(p);
-    if (!t || blocked) throw Error(blocked || "片頭模板服務未設定");
-    const job = await VideoWorkbench.generations.create({
-      type: "video",
-      operation: "remotion-template",
-      prompt: t.label,
-      settings: {
-        templateId: t.id,
-        fields: Object.fromEntries(
-          t.fields.map((f) => [f.key, String(ed.title.fields[f.key] || "")]),
-        ),
-        ratio: p.ratio,
-        fps: Timebase.fps(p.timebase),
-      },
-      references: { image: { url: ed.title.image.url, id: ed.title.image.id } },
-    });
-    ed.title.jobId = job.id;
-    ed.title.done = null;
-    edRender();
-    VideoWorkbench.showJob(job, {
-      onSuccess: () =>
-        setTimeout(() => edTitleRefresh().catch(VideoWorkbench.reportError), 300),
-      apply: async (v) => {
-        if (v.status !== "succeeded") return false;
-        await edTitleInsert(p, VideoWorkbench.jobAsset(v));
-      },
-      applyLabel: "放到時間軸開頭",
-    });
-    return;
-  }
-  if (action === "title-insert") {
-    if (ed.title.done && ed.title.projectId === p.id)
-      await edTitleInsert(p, ed.title.done);
-    return;
-  }
   if (action === "export") {
     edExportDialog(p);
-    return;
-  }
-  if (action === "subtitles-tool") {
-    tool = "subtitle";
-    restoreToolDraft();
-    setToolHash("#subtitle");
-    edRender();
-    return;
-  }
-  if (action === "subtitles-import") {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".srt,.vtt,text/plain";
-    input.onchange = async () => {
-      try {
-        if (!input.files?.[0]) return;
-        const cues = SubtitleParse.parse(await input.files[0].text());
-        edCheckpoint();
-        try {
-          edImportCues(p, cues);
-        } catch (error) {
-          ed.projects[ed.projects.indexOf(p)] = ed.undo.pop();
-          throw error;
-        }
-        edRender();
-        await edSave();
-      } catch (e) {
-        VideoWorkbench.reportError(e);
-      }
-    };
-    input.click();
-    return;
-  }
-  if (action.startsWith("subtitles-download")) {
-    const format = action.split(":")[1] || "srt",
-      cues = p.clips
-        .filter((c) => c.kind === "text" && c.text.trim())
-        .sort((a, b) => a.startFrame - b.startFrame)
-        .map((c) => ({
-          startMs: Math.round(c.start * 1000),
-          endMs: Math.round((c.start + c.duration) * 1000),
-          text: c.text,
-        }));
-    if (!cues.length) throw Error("沒有文字片段可下載");
-    const result = await VideoWorkbench.request("/subtitles/export", {
-        format,
-        cues,
-      }),
-      blob = new Blob([result.content], { type: "text/plain;charset=utf-8" }),
-      a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = p.title + "." + format;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 3000);
     return;
   }
   if (action === "color-compare") {
@@ -2170,7 +1821,7 @@ async function edAction(action) {
   }
   // Card ED.3.1: 整片設定 shortcuts open a left pane (view only, no undo step).
   if (action.startsWith("pane:")) {
-    if (!edPanes.some(([title]) => title === action.slice(5))) return;
+    if (!edPaneDef(action.slice(5))) return;
     ed.pane = action.slice(5);
     ed.layout = { ...ed.layout, leftOpen: true };
     edLayoutSave();
@@ -2388,8 +2039,6 @@ async function edAction(action) {
     edSetTimebase(p, action.slice(17));
     ed.skipMagnet = true;
   }
-  if (action.startsWith("loudness:"))
-    p.output = { ...p.output, loudness: Number(action.slice(9)) };
   if (c) {
     if (action.startsWith("fx:")) {
       const [, key, value] = action.split(":");
@@ -2490,13 +2139,6 @@ async function edAction(action) {
         c.track = id;
       }
     }
-    if (action.startsWith("transition:")) {
-      const name = EditorModel.transitionName(action.slice(11));
-      if (name === null) throw Error("轉場不存在");
-      c.transition = name;
-      c.transitionFrames = EditorModel.transitionFrames(c, p.timebase);
-      delete c.transitionDuration;
-    }
     if (action.startsWith("lut:")) {
       const asset = ed.luts?.find((a) => String(a.id) === action.slice(4));
       if (asset) c.lut = { id: asset.id, url: asset.url, name: asset.name };
@@ -2505,25 +2147,6 @@ async function edAction(action) {
     if (action === "color-reset") {
       for (const key of Object.keys(EditorModel.COLOR)) delete c[key];
       delete c.lut;
-    }
-    if (action === "key-add") {
-      const frame = edFrame(p) - c.startFrame,
-        gain = Number(document.querySelector("[data-ed-key-gain]")?.value ?? 1);
-      if (frame < 0 || frame > c.durationFrames)
-        throw Error("播放頭需位於片段內");
-      c.volumeKeys = EditorModel.volumeKeys(
-        [
-          ...(c.volumeKeys || []).filter((k) => k.frame !== frame),
-          { frame, gain },
-        ],
-        c.durationFrames,
-      );
-    }
-    if (action.startsWith("key-delete:")) {
-      c.volumeKeys = (c.volumeKeys || []).filter(
-        (_, i) => i !== Number(action.slice(11)),
-      );
-      if (!c.volumeKeys.length) delete c.volumeKeys;
     }
     // In / out at the playhead (frame-exact; the source is not touched): the other end stays where it is.
     if (action === "set-in" || action === "set-out") {
@@ -2637,58 +2260,6 @@ function edNeighbours(p, next) {
   )
     throw Error("會蓋到同一軌的相鄰片段，請先移開或縮短它");
 }
-// Subtitle import (card P2): each cue becomes a text clip; a cue overlapping one already on a text track goes to
-// the next text track (a new one is added when needed, up to the limit). One undo step for the whole file.
-function edImportCues(p, cues) {
-  edTrackFor(p, "text");
-  const placed = new Map(
-    p.tracks
-      .filter((t) => t.kind === "text")
-      .map((t) => [
-        t.id,
-        p.clips
-          .filter((c) => c.track === t.id)
-          .map((c) => [c.startFrame, c.startFrame + c.durationFrames]),
-      ]),
-  );
-  for (const cue of cues) {
-    const clip = edText(
-        cue.text,
-        cue.startMs / 1000,
-        (cue.endMs - cue.startMs) / 1000,
-        p,
-        edTrackFor(p, "text"),
-      ),
-      range = [clip.startFrame, clip.startFrame + clip.durationFrames];
-    let track = [...placed.keys()].find((id) =>
-      placed.get(id).every(([a, b]) => range[1] <= a || range[0] >= b),
-    );
-    if (!track) {
-      if (!EditorModel.canAdd(p.tracks, "text"))
-        throw Error(
-          `重疊的字幕超過 ${EditorModel.LIMITS.text} 層，無法再新增文字軌`,
-        );
-      track = EditorModel.nextId(p.tracks, "text");
-      p.tracks.splice(
-        p.tracks.findLastIndex((t) => t.kind === "text") + 1 || p.tracks.length,
-        0,
-        {
-          id: track,
-          kind: "text",
-          name: track,
-          hidden: false,
-          muted: false,
-          volume: 1,
-          normalize: false,
-        },
-      );
-      placed.set(track, []);
-    }
-    clip.track = track;
-    placed.get(track).push(range);
-    p.clips.push(clip);
-  }
-}
 // Export (card P2): quality buttons (720p / 1080p / 4K), the loudness target, a 4K upscale warning and the
 // platforms the project's ratio fits (main-system RATIO_PREFERENCE via /delivery-ratios).
 function edExportDialog(p) {
@@ -2765,7 +2336,7 @@ document.addEventListener("click", (e) => {
   if (action) edAction(action.dataset.edAction).catch(VideoWorkbench.reportError);
   if (pane) {
     ed.pane = pane.dataset.edPane;
-    if (ed.pane === "文字") ed.title.images = null;
+    edPaneDef(ed.pane)?.open?.();
     if (!ed.layout.leftOpen) {
       ed.layout = { ...ed.layout, leftOpen: true };
       edLayoutSave();
