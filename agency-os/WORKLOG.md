@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-10（續10）影音工作台 S4b.2：10 張圖 × SPAR3D／TRELLIS 實跑比品質，預設定 SPAR3D（實扣約 US$0.755）
+
+- 核准：監工 2026-11-10（操作者「需要決定的事都你決定」＋11-03 對 S4b「好」），上限 US$1.50。生圖改用已登記最便宜的 FLUX schnell（US$0.003）：工作台自己的 gpt-image-2.5-flare 不能選品質，10 張最高約 US$1.90 會超過上限。本機 SF3D 還沒跑，要等操作者在 Hugging Face 同意授權（補跑免費）。
+- 結果（`docs/s4-image-to-3d-providers-20261103.md` §8、`docs/s4b2-evidence/`）：SPAR3D 平均 5.6 秒、2.8 萬面、顏色和長相最貼原圖；TRELLIS 平均 31.1 秒、1.8 萬面，整體偏暗、人臉走樣。20 次全部成功。
+- 實扣：Stability 1025→985 credits = US$0.40；TRELLIS predict_time 232.5 秒 × US$0.0014 = US$0.325；FLUX US$0.03。帳上 SPAR3D 對得上；TRELLIS 這次照舊記固定 0.038（多記 US$0.055），歷史紀錄不改。
+- 程式（根因 → 修）：
+  - TRELLIS 帳上用估價 → 改按 `metrics.predict_time × TOOL_RATES.usdPerSec` 記帳。
+  - 方式表 `default`：頁面預選 SPAR3D。
+  - SPAR3D 模型面朝反向（`facing: 180`）：新模型自動綁骨時預設轉 180°；在別的物件選的轉向不會帶過來。
+  - SPAR3D 網格有 4350 條非流形邊，bone heat 0／8606：autorig 先焊接重複頂點，還不行就在體素重建副本上算權重再傳回。實跑 8606／8606，人物朝前走（`spar3d-autorig-walk.png`）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node docs/s4b2-evidence/run.cjs (real Stability + Replicate, 20/20 succeeded) && node docs/s4b2-evidence/analyze.cjs && autorig.py on real SPAR3D GLB turn 180 + CMU walk && node tests/s4b-image-to-3d.cjs && node tests/s4b-autorig.cjs && node tests/p5-workspace.cjs | exit=0 | ms=1800000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（Codex `agency-os/reports/oracle/2026-11-10-partialreview-90a82018.md`：預算守衛改用實際秒數校正、換物件清掉綁骨選擇、證據腳本保證關閉伺服器；三項已修）
+- ORACLE_WAIVED: 共用工作樹有其他 session 未提交改動，oracle 以 -Path 只審本次檔案（artifact 標 PARTIAL）
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/video-workbench,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib,agency-os,scripts | grep=i3Method|3d-trellis | hits=12（cost-model 1、image-to-3d 2、tools-3d 6、s4 文件 2、worklog-excerpt 1；無其他讀者）
 ## 2026-11-10（續9）影音工作台 P6.20：大檔分段上傳
 
 - 根因：正式站單次請求上限 100 MB（Cloudflare 免費方案＋主機 nginx `client_max_body_size 100m`），`/uploads` 送 base64 JSON（膨脹 1/3）→ 約 75 MB 以上影片傳不上；`/engine/renders` 同樣卡 100 MB。調大上限無效（Cloudflare 在前），改分段。設計 `docs/p6-golive-plan-20261103.md`「P6.20 大檔分段上傳」（2d0673fa5）。

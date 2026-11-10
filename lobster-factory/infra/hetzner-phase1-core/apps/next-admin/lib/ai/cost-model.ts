@@ -189,14 +189,15 @@ export const TRANSCRIBE_RATES: Record<"whisper-1", { usdPerMin: number; label: s
   "whisper-1": { usdPerMin: 0.006, label: "OpenAI Whisper", vendor: "OpenAI" },
 };
 
-export const TOOL_RATES: Record<string, { usd: number; label: string; vendor: string; estimate: boolean }> = {
+// usdPerSec: billed per second of the vendor's reported run time; usd is then the estimate shown before the run.
+export const TOOL_RATES: Record<string, { usd: number; label: string; vendor: string; estimate: boolean; usdPerSec?: number }> = {
   "bg-remove":   { usd: 0.002, label: "去背 (851-labs)", vendor: "Replicate", estimate: true },
   "upscale":     { usd: 0.002, label: "升頻 (real-esrgan, 每 pass)", vendor: "Replicate", estimate: true },
   "inpaint":     { usd: IMAGE_RATES["bria-eraser"].usd, label: "去物件 (bria/eraser)", vendor: "Replicate", estimate: false },
   // video-workbench image-to-3D (creative-suite-plan §0 2026-11-03; Meshy disabled). Prices: docs.stability.ai/pricing, replicate.com/firtoz/trellis.
   "3d-spar3d":   { usd: 0.04, label: "圖片轉 3D (Stability SPAR3D)", vendor: "Stability AI", estimate: false },
   "3d-sf3d":     { usd: 0.10, label: "圖片轉 3D (Stability SF3D)", vendor: "Stability AI", estimate: false },
-  "3d-trellis":  { usd: 0.038, label: "圖片轉 3D (TRELLIS, Replicate 按秒計)", vendor: "Replicate", estimate: true }, // replicate.com/firtoz/trellis 2026-11-10: ~$0.038 (A100 $0.0014/s × ~28 s)
+  "3d-trellis":  { usd: 0.038, label: "圖片轉 3D (TRELLIS, Replicate 按秒計)", vendor: "Replicate", estimate: true, usdPerSec: 0.0014 }, // replicate.com/firtoz/trellis + /pricing 2026-11-10: A100 80GB $0.0014/s, ~28 s
   // Printful mockup generator + product create are free; only fulfillment (per order) costs money,
   // and that is pass-through to the customer, not an app operating cost.
   "printful-mockup": { usd: 0, label: "Printful mockup", vendor: "Printful", estimate: false },

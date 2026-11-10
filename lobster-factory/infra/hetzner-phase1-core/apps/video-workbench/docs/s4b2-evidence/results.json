@@ -1,0 +1,487 @@
+{
+ "stabilityCreditsBefore": 1025,
+ "images": [
+  {
+   "n": 1,
+   "group": "人物",
+   "prompt": "full-body photo of a young woman standing straight facing the camera, arms slightly away from the body, casual clothes, plain white background, studio lighting",
+   "image": {
+    "url": "/generated/eba00539-6ee8-4ee7-af44-47fd152e6e83.png",
+    "assetId": "a0a4eba5-cb0a-4917-9a26-7b61dc2573cc",
+    "predictionId": "vfhzkazgbhrzt0d1rdhrytvymr",
+    "predictTime": 7.422492
+   },
+   "runs": {
+    "stability-spar3d": {
+     "jobId": "958c9892-97f9-493c-8ab3-dbd69e074ab6",
+     "status": "succeeded",
+     "seconds": 6.059,
+     "url": "/media/ce90b51c51a176bbc9c44b4b239c88156f61672815021acbdd2b3de325e3521a/original.glb",
+     "recordedUsd": 0.04,
+     "stats": {
+      "triangles": 17352,
+      "vertices": 11129,
+      "textures": [
+       "jpeg 1024×1024",
+       "jpeg 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 0.78
+     }
+    },
+    "replicate-trellis": {
+     "jobId": "ea4a1dcf-9aee-4f40-a57a-3b5464183dc4",
+     "status": "succeeded",
+     "seconds": 46.854,
+     "url": "/media/4b62d23178b4c38fea6be0a57495c2770675100650cdcbd01f1bf92cc3071527/original.glb",
+     "recordedUsd": 0.038,
+     "taskId": "vtmamj9ev9rnc0d1rdjb3mmq4r",
+     "predictTime": 18.077584428,
+     "stats": {
+      "triangles": 9050,
+      "vertices": 6653,
+      "textures": [
+       "png 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 1.37
+     }
+    }
+   }
+  },
+  {
+   "n": 2,
+   "group": "人物",
+   "prompt": "full-body photo of an older man standing facing the camera, arms relaxed at his sides, jacket and trousers, plain white background, studio lighting",
+   "image": {
+    "url": "/generated/a51ef469-8fe0-48ba-8155-c7b757168e25.png",
+    "assetId": "66f70ecb-9cf9-474f-8078-3b5938b0c612",
+    "predictionId": "3jcmhsz48nrzy0d1rdjaa83ffw",
+    "predictTime": 8.235898
+   },
+   "runs": {
+    "stability-spar3d": {
+     "jobId": "e048aa15-1fbe-434e-9202-d8c664657e07",
+     "status": "succeeded",
+     "seconds": 6.043,
+     "url": "/media/cdf8114a98b8ae73da4ed62eec806d63d010246c1862bb9cdc12df6bab115649/original.glb",
+     "recordedUsd": 0.04,
+     "stats": {
+      "triangles": 16684,
+      "vertices": 10473,
+      "textures": [
+       "jpeg 1024×1024",
+       "jpeg 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 0.68
+     }
+    },
+    "replicate-trellis": {
+     "jobId": "f075d3f2-1b34-467f-ae9f-b15e257f5ea0",
+     "status": "succeeded",
+     "seconds": 22.648,
+     "url": "/media/1edd6106244e8b0c4f5d975a516cbdc49f1eee194f03421cb28fbac61f7aa416/original.glb",
+     "recordedUsd": 0.038,
+     "taskId": "nr8zp1h0qsrn80d1rdjtcvmfbm",
+     "predictTime": 18.050306508,
+     "stats": {
+      "triangles": 7808,
+      "vertices": 5531,
+      "textures": [
+       "png 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 1.2
+     }
+    }
+   }
+  },
+  {
+   "n": 3,
+   "group": "產品",
+   "prompt": "a white running sneaker, three-quarter view, plain white background, product photo",
+   "image": {
+    "url": "/generated/08cfd8f5-4fad-47d4-8f56-db6f80b47c73.png",
+    "assetId": "0c2134ef-3b45-4acc-b617-bbde6582798b",
+    "predictionId": "e0g7gevmx1rzt0d1rdjt29d4qc",
+    "predictTime": 6.062311
+   },
+   "runs": {
+    "stability-spar3d": {
+     "jobId": "126feca9-3bcc-4499-af24-120890a4de7d",
+     "status": "succeeded",
+     "seconds": 4.566,
+     "url": "/media/5bd8808cdc3c411bc5734a90a91799f96baafc147bd60efa2102a969dd25ec98/original.glb",
+     "recordedUsd": 0.04,
+     "stats": {
+      "triangles": 21388,
+      "vertices": 12204,
+      "textures": [
+       "jpeg 1024×1024",
+       "jpeg 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 0.79
+     }
+    },
+    "replicate-trellis": {
+     "jobId": "71683394-12f8-42ed-a6f3-1416b0b1b009",
+     "status": "succeeded",
+     "seconds": 22.684,
+     "url": "/media/7d423b99a43410650bb0005c1a719a082ecb005142133eb9c4ada517b9bf4ea4/original.glb",
+     "recordedUsd": 0.038,
+     "taskId": "exh2tzx525rna0d1rdjsjn8ha0",
+     "predictTime": 20.705917954,
+     "stats": {
+      "triangles": 21200,
+      "vertices": 14374,
+      "textures": [
+       "png 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 1.5
+     }
+    }
+   }
+  },
+  {
+   "n": 4,
+   "group": "產品",
+   "prompt": "a ceramic coffee mug with a handle, plain white background, product photo",
+   "image": {
+    "url": "/generated/2bdadd29-bd42-4f08-853e-8fb5686d187c.png",
+    "assetId": "3aea1f8e-d738-4ad7-8d6e-b205605a45fb",
+    "predictionId": "23e1q7qzxsrzy0d1rdjtapqhr0",
+    "predictTime": 6.821702
+   },
+   "runs": {
+    "stability-spar3d": {
+     "jobId": "a527bf46-82b6-40e3-addb-cae36c1ba56e",
+     "status": "succeeded",
+     "seconds": 6.099,
+     "url": "/media/413b6e6c656b07a17504a67de7c03a848a2551efb82b2c68b93d0cfc5fa92289/original.glb",
+     "recordedUsd": 0.04,
+     "stats": {
+      "triangles": 53216,
+      "vertices": 33308,
+      "textures": [
+       "jpeg 1024×1024",
+       "jpeg 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 1.87
+     }
+    },
+    "replicate-trellis": {
+     "jobId": "28e72b4a-195e-4ea4-8bd2-2ba5f003c7a6",
+     "status": "succeeded",
+     "seconds": 28.719,
+     "url": "/media/cf2478178423eb27dde5cb34dc972e1cc558cf10ba7a9510a5c20fff9cc66b43/original.glb",
+     "recordedUsd": 0.038,
+     "taskId": "geh4yk9r8srnc0d1rdkbe35bxc",
+     "predictTime": 22.366432279,
+     "stats": {
+      "triangles": 27200,
+      "vertices": 15347,
+      "textures": [
+       "png 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 1.54
+     }
+    }
+   }
+  },
+  {
+   "n": 5,
+   "group": "硬表面",
+   "prompt": "a vintage film camera, three-quarter view, plain white background, product photo",
+   "image": {
+    "url": "/generated/c79f6d9e-55a7-4442-85d7-8e4f89b7beb7.png",
+    "assetId": "f2a41ca9-0dde-4220-b747-28739e7e8441",
+    "predictionId": "fjrfw053zhrzw0d1rdk8zxp3ng",
+    "predictTime": 4.869068
+   },
+   "runs": {
+    "stability-spar3d": {
+     "jobId": "88b5efbe-acea-4102-9fb4-13472d87e4f8",
+     "status": "succeeded",
+     "seconds": 6.043,
+     "url": "/media/0877cbaa277fe3705ab3274d6c4d2b036f4962f820132c8867b20d76e15ed77f/original.glb",
+     "recordedUsd": 0.04,
+     "stats": {
+      "triangles": 26424,
+      "vertices": 15474,
+      "textures": [
+       "jpeg 1024×1024",
+       "jpeg 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 0.95
+     }
+    },
+    "replicate-trellis": {
+     "jobId": "84a55ff6-2337-4a7c-9dca-d6817a9ac4a9",
+     "status": "succeeded",
+     "seconds": 28.716,
+     "url": "/media/35167148f52e20d858d8ebc924cd95a986b981d351221e11c1eeba128888515f/original.glb",
+     "recordedUsd": 0.038,
+     "taskId": "9k5mv36kqsrne0d1rdk9e9b78g",
+     "predictTime": 23.244397791,
+     "stats": {
+      "triangles": 19404,
+      "vertices": 14123,
+      "textures": [
+       "png 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 1.61
+     }
+    }
+   }
+  },
+  {
+   "n": 6,
+   "group": "硬表面",
+   "prompt": "a small quadcopter drone, three-quarter view, plain white background, product photo",
+   "image": {
+    "url": "/generated/5e0062e5-f7b1-423f-8015-917f7723f535.png",
+    "assetId": "9d8ebba2-f5ea-4e6a-942d-67994f38b44a",
+    "predictionId": "1n5hx3t4rxrzr0d1rdktd3r50w",
+    "predictTime": 5.574939
+   },
+   "runs": {
+    "stability-spar3d": {
+     "jobId": "90ec54cc-7354-413a-b732-b08f17f3a4f1",
+     "status": "succeeded",
+     "seconds": 4.578,
+     "url": "/media/f705b42839ccd120d272bd9eeb5dfea07ba98222a8b2816da860c1f033dd64f7/original.glb",
+     "recordedUsd": 0.04,
+     "stats": {
+      "triangles": 18512,
+      "vertices": 13431,
+      "textures": [
+       "jpeg 1024×1024",
+       "jpeg 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 0.87
+     }
+    },
+    "replicate-trellis": {
+     "jobId": "167ac418-cddf-4e6e-b473-bf15e089a36d",
+     "status": "succeeded",
+     "seconds": 24.238,
+     "url": "/media/7f3e0804d97ada6f9487855854bee11a6f492f329d34a9ad173a4952c0dcc6bd/original.glb",
+     "recordedUsd": 0.038,
+     "taskId": "9fsd2q3m09rnc0d1rdkvk9kjv0",
+     "predictTime": 17.384655401,
+     "stats": {
+      "triangles": 9131,
+      "vertices": 7235,
+      "textures": [
+       "png 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 1.33
+     }
+    }
+   }
+  },
+  {
+   "n": 7,
+   "group": "透明反光",
+   "prompt": "a clear glass wine bottle, plain white background, product photo",
+   "image": {
+    "url": "/generated/5de56043-cce4-4c15-b71c-4ff5933ac6cb.png",
+    "assetId": "ed562277-6da4-4211-a6c3-48fb2c56e9fc",
+    "predictionId": "nzwy6redhxrzr0d1rdks3sh1t4",
+    "predictTime": 6.466062
+   },
+   "runs": {
+    "stability-spar3d": {
+     "jobId": "cdc6b22e-d97a-4339-8001-98af72b27da4",
+     "status": "succeeded",
+     "seconds": 6.058,
+     "url": "/media/b926f2e795324e8ba193cd2610148295e19cd0c244e71a7040416b4e8962f72b/original.glb",
+     "recordedUsd": 0.04,
+     "stats": {
+      "triangles": 17468,
+      "vertices": 10758,
+      "textures": [
+       "jpeg 1024×1024",
+       "jpeg 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 0.73
+     }
+    },
+    "replicate-trellis": {
+     "jobId": "da5773af-13cc-463e-8e31-75ec4f972a64",
+     "status": "succeeded",
+     "seconds": 24.14,
+     "url": "/media/9528dd987c1fa7aa5d9047921055304312afb548628e4ee734b953b29a956500/original.glb",
+     "recordedUsd": 0.038,
+     "taskId": "0dd59rg0anrna0d1rdmbdan444",
+     "predictTime": 16.76239956,
+     "stats": {
+      "triangles": 6750,
+      "vertices": 4354,
+      "textures": [
+       "png 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 1.18
+     }
+    }
+   }
+  },
+  {
+   "n": 8,
+   "group": "透明反光",
+   "prompt": "a polished chrome kettle, plain white background, product photo",
+   "image": {
+    "url": "/generated/17e5110d-1102-4d59-a641-c3456caae9dc.png",
+    "assetId": "021bb8cd-1615-41b5-9220-6618d4a4501f",
+    "predictionId": "fngxpj3085rzw0d1rdm8s6ck70",
+    "predictTime": 5.777721
+   },
+   "runs": {
+    "stability-spar3d": {
+     "jobId": "ad2a3649-d04d-440c-905e-f9f07651e457",
+     "status": "succeeded",
+     "seconds": 6.035,
+     "url": "/media/a0995ea4ac5a82f20e77fa6c09b7774ea72f519faa3e7dda719fbcd6ebaac386/original.glb",
+     "recordedUsd": 0.04,
+     "stats": {
+      "triangles": 37064,
+      "vertices": 21993,
+      "textures": [
+       "jpeg 1024×1024",
+       "jpeg 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 1.33
+     }
+    },
+    "replicate-trellis": {
+     "jobId": "e073ae0c-4e8d-40c2-8077-fb2f102803f7",
+     "status": "succeeded",
+     "seconds": 49.77,
+     "url": "/media/a9ecceeb4db766579d6e29ec01d32a401ef92f969a5263f48f5f111868b89c7d/original.glb",
+     "recordedUsd": 0.038,
+     "taskId": "mk94f14j39rn80d1rdm8nfr2z0",
+     "predictTime": 44.226531233,
+     "stats": {
+      "triangles": 20556,
+      "vertices": 13493,
+      "textures": [
+       "png 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 1.63
+     }
+    }
+   }
+  },
+  {
+   "n": 9,
+   "group": "毛髮",
+   "prompt": "a fluffy long-haired cat sitting, facing the camera, plain white background",
+   "image": {
+    "url": "/generated/a151a474-d7e4-4e5e-9c5c-149305e6f13d.png",
+    "assetId": "23c610c2-8c62-469f-9ae6-15a7dcfd2342",
+    "predictionId": "r7cz50tnf1rzr0d1rdmvq1hb8r",
+    "predictTime": 7.364654
+   },
+   "runs": {
+    "stability-spar3d": {
+     "jobId": "43c106ff-c50f-462f-a3ab-c03aabf0a8e7",
+     "status": "succeeded",
+     "seconds": 4.529,
+     "url": "/media/edf9b81382d48ae2deb3b258fc2f23a0f2fedf0971648dd40148f68e82800fc3/original.glb",
+     "recordedUsd": 0.04,
+     "stats": {
+      "triangles": 36612,
+      "vertices": 21260,
+      "textures": [
+       "jpeg 1024×1024",
+       "jpeg 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 1.24
+     }
+    },
+    "replicate-trellis": {
+     "jobId": "6690a129-421f-4cf5-88a8-577220e5054d",
+     "status": "succeeded",
+     "seconds": 28.68,
+     "url": "/media/1ae4d217b6f3cd85f57fe11c6c75d2400e86d202ef6c95d1a52867bf2f2370e9/original.glb",
+     "recordedUsd": 0.038,
+     "taskId": "ah8fw1m991rna0d1rdmse02bp0",
+     "predictTime": 25.436537854,
+     "stats": {
+      "triangles": 25022,
+      "vertices": 17718,
+      "textures": [
+       "png 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 1.81
+     }
+    }
+   }
+  },
+  {
+   "n": 10,
+   "group": "毛髮",
+   "prompt": "head and shoulders portrait of a woman with long curly hair, facing the camera, plain white background",
+   "image": {
+    "url": "/generated/013a944d-c559-4fce-a378-1016fd240239.png",
+    "assetId": "508e2edb-34b3-47ba-bd52-2d492d00f09b",
+    "predictionId": "r2pmgtfnnxrzw0d1rdmvd0sqxr",
+    "predictTime": 6.133871
+   },
+   "runs": {
+    "stability-spar3d": {
+     "jobId": "0eff2833-b88c-4c82-8fa8-6547b0873819",
+     "status": "succeeded",
+     "seconds": 6.043,
+     "url": "/media/b2976d7bd4df9e3c95a32836f56a10260563d0cb6df31f9a633a81ce4970dbb8/original.glb",
+     "recordedUsd": 0.04,
+     "stats": {
+      "triangles": 32672,
+      "vertices": 21250,
+      "textures": [
+       "jpeg 1024×1024",
+       "jpeg 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 1.27
+     }
+    },
+    "replicate-trellis": {
+     "jobId": "01652730-1cc7-492d-b28e-30d22ab9bb95",
+     "status": "succeeded",
+     "seconds": 34.687,
+     "url": "/media/11f7821814a0c1adf79684e1cf64e75f0b513e9f3c97dac74274982d56299fe1/original.glb",
+     "recordedUsd": 0.038,
+     "taskId": "bjxqq39c6xrnc0d1rdn8cgvagc",
+     "predictTime": 26.20466065,
+     "stats": {
+      "triangles": 32798,
+      "vertices": 25957,
+      "textures": [
+       "png 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 1.86
+     }
+    }
+   }
+  }
+ ],
+ "stabilityCreditsAfter": 985,
+ "guardUpperUsd": 1.23
+}

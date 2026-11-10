@@ -93,23 +93,24 @@ Meshy 方案額度：Premium $40/3,000cr、Ultra $100/8,000cr（help.meshy.ai �
 現況：`backend/meshy.cjs:46` 唯一 adapter；`backend/api.cjs:373-397` 專為 `meshy-image-to-3d` 寫一段；`scripts/tools-3d.js:522` 面板只有 Meshy。價格已在 `next-admin/lib/ai/cost-model.ts:196-198` `TOOL_RATES`（3d-spar3d／3d-sf3d／3d-trellis）。
 
 - **一個 operation**：`image-to-3d`，`settings.method` ∈ `stability-spar3d`｜`stability-sf3d`｜`local-sf3d`｜`replicate-trellis`｜`meshy`。`backend/image-to-3d.cjs` = 方式表＋`capability(env)`＋`request()`＋`run()`；各 adapter 只實作 `run(job, ctx) → {buffer|file, origin}`。舊 `meshy-image-to-3d` 只留在 `main-system.cjs` ledgerKind 讀舊紀錄。
-- **價格來源**：只讀 `TOOL_RATES`（不另建表）；`local-sf3d` = 0；Meshy 無美元價目 → 只在設了 `MESHY_API_KEY` 時列出、顯示點數。`/capabilities.imageTo3d.methods[]` 帶 `usd`／`estimate`／`available`／`reason`，頁面每個方式按鈕與「產生」按鈕都顯示價格。**不預選**：預設等 S4b.2 比完再定。
+- **價格來源**：只讀 `TOOL_RATES`（不另建表）；`local-sf3d` = 0；Meshy 無美元價目 → 只在設了 `MESHY_API_KEY` 時列出、顯示點數。`/capabilities.imageTo3d.methods[]` 帶 `usd`／`estimate`／`available`／`reason`，頁面每個方式按鈕與「產生」按鈕都顯示價格。**預設 = SPAR3D**（S4b.2 結果，§8）。
 - **一個 job id 只呼叫廠商一次**：呼叫前寫 `job.vendorCall = {method, at}` 並 persist；`run()` 見到已有 `vendorCall` 直接失敗（不重送）。Stability 同步回 GLB（失敗不計費）；TRELLIS／Meshy 非同步：預測編號寫 `job.vendorTaskId`，同圖同選項的未完成任務跨 job 沿用（同 remove-bg）；取消 → Replicate cancel。
 - **本機 SF3D**：`backend/sf3d-local.cjs` 起獨立程序 `VW_SF3D_PYTHON <VW_SF3D_DIR>/run.py <圖> --output-dir <workdir> --texture-resolution 1024`；環境最小化＋`HF_HUB_OFFLINE=1`（權重安裝時先下載，執行期不上網）；一次一個（8 GB VRAM）；取消／逾時（10 分）殺整棵程序樹（沿用 `blender.cjs` `killTree`）。未設兩個變數 → 方式按鈕停用並顯示「未安裝」。安裝（一次，操作者需先在 Hugging Face 同意 `stabilityai/stable-fast-3d` 授權）：clone `Stability-AI/stable-fast-3d`、venv 裝 torch（CUDA 12.8，RTX 5060 需要）與 requirements、`huggingface-cli download stabilityai/stable-fast-3d`。ks-aw-01 無 GPU → 不設。
 - **自動人形骨架**：Blender 任務 `blender-autorig`（`backend/blender/autorig.py`）：匯入無骨架 GLB → 量體型取 13 個關節點（可由頁面改）→ Rigify `human` metarig（去臉、去手指）對到關節點當變形骨架 → 自動權重（bone heat 失敗的頂點改最近骨段）→ 有選動作就用 `retarget.py` 同一套 delta 重定向 → GLB。不產生 Rigify 控制骨架：glTF 不帶約束，檢視器自己做 FK／IK。
 - **動作庫**：`backend/blender/motions/cmu/*.bvh`＋`index.json`（中文名、CMU 編號、CMU→metarig 骨名對照一份）。來源 una-dinosauria/cmu-mocap（Bruce Hahne BVH 轉檔；CMU：「free for use in research and commercial projects worldwide」）。BVH 依自身 frame time 換成場景 fps。
 - **保存重開可改**：場景物件存 `rig: {sourceAssetId, landmarks, motion}`；重開後可改關節點或動作，按「重新綁骨」從原始網格重跑，換成新 GLB、場景新版本。
 
-## 8. S4b.2 預估（2026-11-10，未執行，等操作者同意）
+## 8. S4b.2 結果（2026-11-10 實跑，監工核准，上限 US$1.50）
 
-10 張圖（§6 分組）× 三方式，價格查官方頁：
+10 張 FLUX schnell 生成圖（§6 五類各 2，存本機素材庫）× 2 方式；本機 SF3D 待操作者在 Hugging Face 同意授權後補跑（免費）。證據：`docs/s4b2-evidence/`（`contact-sheet.jpg` 每列＝原圖｜SPAR3D 正面／45°｜TRELLIS 正面／45°；`results.json` 每張面數、貼圖、秒數、費用；`run.cjs`、`analyze.cjs` 可重跑）。
 
-| 方式 | 單價 | 10 張 | 來源 |
-|---|---|---|---|
-| Stability SPAR3D（API） | 4 credits = US$0.04（失敗不計費） | US$0.40 | https://docs.stability.ai/pricing ；https://docs.stability.ai/api-reference/3d/stable-point-aware-3d.md |
-| Replicate TRELLIS | 約 US$0.038（A100 US$0.0014/秒 × 約 28 秒；按秒計） | 約 US$0.38（若每張 60 秒 → US$0.84） | https://replicate.com/firtoz/trellis ；https://replicate.com/pricing |
-| 本機 SF3D | 0（電費除外） | US$0 | §3 |
-| **合計** | | **約 US$0.78（上限約 US$1.24）** | |
-| 選配：再加 Stability SF3D（API） | 10 credits = US$0.10 | +US$1.00 | 同 Stability 來源 |
+| 方式 | 平均秒數 | 平均三角面 | 貼圖 | 10 張實扣 | 帳上記錄 | 品質（看拼圖） |
+|---|---|---|---|---|---|---|
+| **Stability SPAR3D（預設）** | 5.6 | 27,739 | 2 張 JPEG 1024² | US$0.40（餘額 1025→985 credits） | US$0.40 | 顏色、長相、金屬反光最貼原圖；模型面朝 glTF −Z |
+| Replicate TRELLIS | 31.1 | 17,892 | 1 張 PNG 1024² | US$0.325（predict_time 232.5 s × US$0.0014） | US$0.38（舊：固定估價） | 幾何較銳利；整體偏暗、人臉走樣、金屬變霧面 |
+| 生圖 FLUX schnell | — | — | — | US$0.03（US$0.003 × 10） | 素材 origin | — |
+| **合計** | | | | **約 US$0.755** | | |
 
-前置：本機 SF3D 尚未安裝（§7）；操作者需先在 Hugging Face 同意 `stabilityai/stable-fast-3d` 授權；Stability 帳戶先關訓練 opt-out（§5-2）。
+理由：影片要的是「像原圖」（人物、商品），SPAR3D 每項都更貼原圖、快 5 倍、價差小。
+
+跟著修：TRELLIS 改按 `metrics.predict_time × TOOL_RATES["3d-trellis"].usdPerSec` 記帳（這次 10 筆照舊記 0.038，多記 US$0.055，未改歷史紀錄）；SPAR3D 模型面朝反向 → 方式表 `facing: 180`，自動綁骨預設轉 180°；SPAR3D 網格 bone heat 解不出（0／8606）→ 先焊接重複頂點，仍失敗就在體素重建副本上算權重再傳回（實跑 8606／8606，`docs/s4b2-evidence/spar3d-autorig-walk.png`）。

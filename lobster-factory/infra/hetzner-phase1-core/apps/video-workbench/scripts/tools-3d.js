@@ -21,7 +21,7 @@ const t3 = {
   bones: new Map(),
   motion: null,
   boneMapText: "",
-  i3Image: null, // card S4b image -> 3D: the picked image and way (no way preselected until S4b.2 picks a default)
+  i3Image: null, // card S4b image -> 3D: the picked image and way (null way = the default way, S4b.2: SPAR3D)
   i3Method: null,
   rigMotion: undefined, // card S4b autorig: undefined = keep the object's saved choice, null = no motion
   rigTurn: undefined,
@@ -426,7 +426,9 @@ async function t3Autorig() {
   if (!o) throw Error("先選一個模型");
   const doc = await t3Ensure();
   const rig = o.rig,
-    turn = t3.rigTurn !== undefined ? t3.rigTurn : rig?.turn,
+    // First rig of an image -> 3D model: turn by the way's facing (SPAR3D faces backwards), unless the user picked one.
+    facing = (VideoWorkbench.capabilities?.imageTo3d?.methods || []).find((m) => m.id === o.asset.method)?.facing,
+    turn = t3.rigTurn !== undefined ? t3.rigTurn : rig ? rig.turn : facing,
     motion = t3.rigMotion !== undefined ? t3.rigMotion : rig?.motion || null;
   const job = await VideoWorkbench.generations.create({
     type: "model",
@@ -471,7 +473,7 @@ async function t3Autorig() {
 function t3AddObject(asset) {
   const o = {
     id: t3Rid(),
-    asset: { id: asset.id, url: asset.url, name: asset.name },
+    asset: { id: asset.id, url: asset.url, name: asset.name, ...(asset.origin?.method ? { method: asset.origin.method } : {}) },
     position: [0, 0, 0],
     rotationY: 0,
     scale: 1,
@@ -584,8 +586,9 @@ function toolThreeDScreen(t) {
 }
 // Card S4b: every way on its own button with its price; the one 產生 button repeats the price of the picked way.
 function t3ImageTo3dPanel(cap) {
-  const methods = cap?.methods || [],
-    picked = methods.find((m) => m.id === t3.i3Method && m.available);
+  const methods = cap?.methods || [];
+  t3.i3Method ??= methods.find((m) => m.default && m.available)?.id || null; // card S4b.2 default
+  const picked = methods.find((m) => m.id === t3.i3Method && m.available);
   const ways =
     methods
       .map((m) =>
@@ -602,7 +605,8 @@ function t3RigPanel(o, info) {
   const lib = t3Engine().motions || [],
     rig = o.rig,
     motion = t3.rigMotion !== undefined ? t3.rigMotion : rig?.motion || null,
-    turn = t3.rigTurn !== undefined ? t3.rigTurn : (rig?.turn ?? null);
+    facing = (VideoWorkbench.capabilities?.imageTo3d?.methods || []).find((m) => m.id === o.asset.method)?.facing,
+    turn = t3.rigTurn !== undefined ? t3.rigTurn : rig ? rig.turn : (facing ?? null);
   if (info?.bones.length && !rig) return "";
   const marks = rig?.landmarks ? Object.keys(rig.landmarks) : [];
   const mark = t3.rigMark && rig?.landmarks?.[t3.rigMark];
@@ -690,7 +694,9 @@ async function t3Action(action) {
   else if (name === "upload-motion") await t3Upload("motion");
   else if (name === "add")
     t3AddObject((await assets()).find((a) => a.id === arg));
-  else if (name === "obj") ((t3.obj = arg), (t3.bone = null));
+  else if (name === "obj")
+    // Rig choices belong to the object they were made on (another object keeps its own saved or default turn).
+    ((t3.obj = arg), (t3.bone = null), (t3.rigMotion = t3.rigTurn = undefined), (t3.rigMark = null));
   else if (name === "obj-del")
     ((d.objects = d.objects.filter((x) => x.id !== t3.obj)),
       (t3.obj = d.objects[0]?.id || null),

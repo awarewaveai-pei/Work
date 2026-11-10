@@ -47,7 +47,7 @@ fs.appendFileSync(p.join(__dirname,"runs.txt"),"1");fs.mkdirSync(p.join(out,"0")
     }
     if (/^https:\/\/api\.replicate\.com\/v1\/predictions\/p\d+$/.test(url)) {
       const id = url.split("/").pop(), status = predictions[id];
-      return new Response(JSON.stringify({ id, status, output: status === "succeeded" ? { model_file: "https://replicate.delivery/x/model.glb" } : null }), { status: 200 });
+      return new Response(JSON.stringify({ id, status, output: status === "succeeded" ? { model_file: "https://replicate.delivery/x/model.glb" } : null, metrics: status === "succeeded" ? { predict_time: 20 } : {} }), { status: 200 });
     }
     if (/\/v1\/predictions\/p\d+\/cancel$/.test(url)) {
       const id = url.split("/").at(-2);
@@ -103,7 +103,7 @@ fs.appendFileSync(p.join(__dirname,"runs.txt"),"1");fs.mkdirSync(p.join(out,"0")
     assert.equal(done.status, "succeeded", done.error);
     assert.equal(count("POST https://api.replicate.com/v1/predictions"), 2, "one POST per job");
     assert.equal(count("POST https://api.replicate.com/v1/predictions/p1/cancel"), 1);
-    assert.deepEqual([done.result.origin.provider, done.result.origin.taskId, done.result.origin.costUsd], ["Replicate", "p2", 0.038]);
+    assert.deepEqual([done.result.origin.provider, done.result.origin.taskId, done.result.origin.costUsd], ["Replicate", "p2", 0.028], "20 s x US$0.0014 (metrics.predict_time)");
     predictions.p3 = "processing";
     setTimeout(() => (predictions.p3 = "succeeded"), 100);
     const resumed = { id: "r", input: { operation: "image-to-3d", references: { image: { url: image.url, id: "img" } }, settings: { method: "replicate-trellis" } } };
@@ -111,7 +111,7 @@ fs.appendFileSync(p.join(__dirname,"runs.txt"),"1");fs.mkdirSync(p.join(out,"0")
     const result = await imageTo3d.run(resumed, { env, fetchImpl, localFile, persist() {}, resumeId: "p3", mediaStore: { ingest: async () => ({ url: "/media/x/original.glb" }) }, onProgress() {} });
     assert.equal(count("POST https://api.replicate.com/v1/predictions"), 2, "resumed p3: no new POST");
     assert.deepEqual([result.origin.taskId, resumed.vendorCall], ["p3", undefined]);
-    pass("TRELLIS：每個任務一次 POST；取消 → Replicate cancel，立刻重送的新任務不接正在取消的 p1、自己送；仍在跑的舊預測被沿用，零次 POST；成本 0.038");
+    pass("TRELLIS：每個任務一次 POST；取消 → Replicate cancel，立刻重送的新任務不接正在取消的 p1、自己送；仍在跑的舊預測被沿用，零次 POST；成本＝實際秒數×0.0014（20 秒 → 0.028）");
   }
   // Local SF3D: one process run, free.
   {
@@ -149,13 +149,13 @@ fs.appendFileSync(p.join(__dirname,"runs.txt"),"1");fs.mkdirSync(p.join(out,"0")
     await ways.first().waitFor();
     assert.deepEqual(await ways.allTextContents(), ["Stability SPAR3D · US$0.04", "Stability SF3D · US$0.1", "本機 SF3D · 免費", "Replicate TRELLIS · 約 US$0.038"]);
     const go = page.locator('[data-t3-action="i3"]');
-    assert.equal(await go.textContent(), "先選圖片與方式");
-    assert.equal(await go.isDisabled(), true);
+    assert.equal(await page.locator('[data-t3-action="i3-method:stability-spar3d"]').getAttribute("aria-pressed"), "true", "SPAR3D preselected (S4b.2)");
+    assert.equal(await go.isDisabled(), true, "no image yet");
     await page.locator('[data-t3-action="i3-method:replicate-trellis"]').click();
     await page.getByRole("button", { name: "圖片：杯子.png", exact: true }).click();
     await page.waitForFunction(() => document.querySelector('[data-t3-action="i3"]')?.textContent === "產生 3D 模型（約 US$0.038）");
     assert.equal(await page.locator('[data-t3-action="i3"]').isDisabled(), false);
-    pass("頁面：四種方式各自標價（含免費、約），未選不預設；選 TRELLIS＋圖片後按鈕顯示「產生 3D 模型（約 US$0.038）」");
+    pass("頁面：四種方式各自標價（含免費、約），預設選 SPAR3D；選 TRELLIS＋圖片後按鈕顯示「產生 3D 模型（約 US$0.038）」");
   } finally {
     await browser.close();
   }

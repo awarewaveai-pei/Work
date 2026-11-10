@@ -55,8 +55,8 @@ const pass = (label) => (passed++, console.log("PASS " + label));
   assert.deepEqual(body.armature, ["Rig"]);
   // (The glTF importer adds an "Icosphere" bone display shape on import; it is not in the file.)
   assert.deepEqual(d1.meshes.filter((m) => m.name !== "Icosphere").map((m) => m.name), [body.name], "only the body mesh is exported");
-  // weighted = [vertices weighted by bone heat, vertices given their nearest bones]: autorig.py leaves none without a weight.
-  assert.ok(rig.weighted[0] >= 0.95 * (rig.weighted[0] + rig.weighted[1]), "bone heat solved the mesh: " + rig.weighted);
+  // weighted = [by bone heat, by the remeshed copy, by nearest bones]: the clean mannequin is solved by bone heat directly.
+  assert.ok(rig.weighted[0] >= 0.95 * (rig.weighted[0] + rig.weighted[1] + rig.weighted[2]), "bone heat solved the mesh: " + rig.weighted);
   assert.ok(Object.values(body.weights).every((w) => Object.keys(w).every((g) => rig.bones.includes(g))), "weights only on rig bones");
   assert.ok(d1.actions.length === 1, "one baked action: " + d1.actions);
   const pose = d1.poses["30"].Rig;

@@ -3,15 +3,17 @@
 # figure faces -Y like the motions -> 15 joint points (landmarks; measured from the mesh unless given) -> Rigify "human"
 # metarig without face, fingers, palm, breast, pelvis and heel bones, fitted to the joints, used as the deform skeleton
 # (no Rigify control rig: glTF carries no constraints and the viewer does FK/IK itself) -> automatic weights; vertices
-# bone heat leaves without a weight take their two nearest bones -> optional motion through common.retarget -> GLB.
+# bone heat cannot solve go through a voxel-remeshed copy, the rest take their two nearest bones -> optional motion
+# through common.retarget -> GLB.
 # Args: {workdir, modelPath, outPath, turn?: 0|90|180|270, landmarks?: {name: [x,y,z] glTF axes}, motionPath?, boneMap?}.
-# Result: {turn, landmarks (glTF axes, after the turn), bones, weighted: [heat, nearest], frames?}.
+# Result: {turn, landmarks (glTF axes, after the turn), bones, weighted: [bone heat, via remeshed copy, nearest bones], frames?}.
 import math
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 import addon_utils
+import bmesh
 import bpy
 from mathutils import Matrix, Vector
 
@@ -56,6 +58,14 @@ def join_meshes(objs):
         if o != body:
             bpy.data.objects.remove(o, do_unlink=True)
     body.name = "Body"
+    # Image -> 3D meshes split vertices along UV seams (S4b.2: SPAR3D 4350 open edges, bone heat solved 0 vertices);
+    # welding coincident vertices closes them (UVs live on loops, so they survive) and lets bone heat work.
+    h = max(body.dimensions) or 1.0
+    bm = bmesh.new()
+    bm.from_mesh(body.data)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-4 * h)
+    bm.to_mesh(body.data)
+    bm.free()
     return body
 
 
@@ -165,22 +175,62 @@ def segment_distance(p, a, b):
     return (a + ab * t - p).length
 
 
-def bind(body, arm):
-    """Automatic (bone heat) weights; any vertex left without a weight takes its two nearest bones (inverse square)."""
+def heat(obj, arm):
     bpy.ops.object.select_all(action="DESELECT")
-    body.select_set(True)
+    obj.select_set(True)
     arm.select_set(True)
     bpy.context.view_layer.objects.active = arm
     bpy.ops.object.parent_set(type="ARMATURE_AUTO")
+
+
+def weighted(v):
+    return any(g.weight > 0.001 for g in v.groups)
+
+
+def bind(body, arm, h):
+    """Automatic (bone heat) weights on the model. When bone heat leaves more than 5% of it unweighted (image -> 3D meshes:
+    S4b.2 SPAR3D solved 0 of 8606 vertices), the weights are solved on a voxel-remeshed copy (closed, one surface) and
+    copied back by nearest-face interpolation. Any vertex still without a weight takes its two nearest bones (inverse
+    square). Returns [vertices by bone heat, by the remeshed copy, by nearest bones]."""
+    heat(body, arm)
+    direct = sum(1 for v in body.data.vertices if weighted(v))
+    copied = 0
+    if direct < 0.95 * len(body.data.vertices):
+        proxy = body.copy()
+        proxy.data = body.data.copy()
+        bpy.context.scene.collection.objects.link(proxy)
+        proxy.parent = None
+        proxy.matrix_world = body.matrix_world.copy()
+        proxy.modifiers.clear()
+        proxy.vertex_groups.clear()
+        bpy.context.view_layer.objects.active = proxy
+        bpy.ops.object.select_all(action="DESELECT")
+        proxy.select_set(True)
+        remesh = proxy.modifiers.new("remesh", "REMESH")
+        remesh.mode, remesh.voxel_size = "VOXEL", h / 150
+        bpy.ops.object.modifier_apply(modifier=remesh.name)
+        heat(proxy, arm)
+        body.vertex_groups.clear()
+        bpy.context.view_layer.objects.active = body
+        bpy.ops.object.select_all(action="DESELECT")
+        body.select_set(True)
+        dt = body.modifiers.new("weights", "DATA_TRANSFER")
+        dt.object, dt.use_vert_data, dt.data_types_verts, dt.vert_mapping = proxy, True, {"VGROUP_WEIGHTS"}, "POLYINTERP_NEAREST"
+        dt.layers_vgroup_select_src, dt.layers_vgroup_select_dst = "ALL", "NAME"
+        bpy.ops.object.datalayout_transfer(modifier=dt.name)
+        bpy.ops.object.modifier_move_to_index(modifier=dt.name, index=0)
+        bpy.ops.object.modifier_apply(modifier=dt.name)
+        bpy.data.objects.remove(proxy, do_unlink=True)
+        copied = sum(1 for v in body.data.vertices if weighted(v))
+        direct = 0
     segments = [(b.name, arm.matrix_world @ b.head_local, arm.matrix_world @ b.tail_local) for b in arm.data.bones if b.use_deform]
     groups = {g.name: g for g in body.vertex_groups}
     for name, _, _ in segments:
         if name not in groups:
             groups[name] = body.vertex_groups.new(name=name)
-    heat = nearest = 0
+    nearest = 0
     for v in body.data.vertices:
-        if any(g.weight > 0.001 for g in v.groups):
-            heat += 1
+        if weighted(v):
             continue
         co = body.matrix_world @ v.co
         d = sorted((segment_distance(co, a, b), n) for n, a, b in segments)[:2]
@@ -188,7 +238,7 @@ def bind(body, arm):
         for (_, n), x in zip(d, w):
             groups[n].add([v.index], x / sum(w), "REPLACE")
         nearest += 1
-    return [heat, nearest]
+    return [direct, copied, nearest]
 
 
 def main():
@@ -215,7 +265,7 @@ def main():
         joints, h = measure(verts)
     arm = metarig()
     fit(arm, joints, h)
-    weighted = bind(body, arm)
+    weighted = bind(body, arm, h)
     out = {"turn": turn, "landmarks": {k: common.r(common.from_blender(joints[k]), 4) for k in LANDMARKS}, "bones": sorted(b.name for b in arm.data.bones), "weighted": weighted}
     if a.get("motionPath"):
         moved = common.retarget(arm, a["motionPath"], a["boneMap"], match_rest=True)
