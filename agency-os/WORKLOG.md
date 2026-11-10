@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-10（續47）FC.5 上線：兩個引擎新版切到正式站（操作者「可以，上正式站」）
+
+- 主機 `/root/lobster-phase1/static/video-engines/`：上傳 `filmcraft/46763a8-4265c64`、`effectcraft/df4cc09-e5261e3`（先放 `<dist>.upload-<時間>`，主機 `sha256sum -c` 全過、SHA256SUMS 雜湊＝`engines/*/VERSION.json` 才改名）；`current` 改指新版；擁有者改 root:root。不需要動 nginx／compose（alias 走 `current`），工作台不用重部署。
+- 回退：`ln -sfn 46763a8-b7f3040 filmcraft/current`、`ln -sfn df4cc09-4fe4255 effectcraft/current`（舊版都還在）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=tar|ssh 上傳＋sha256sum -c SHA256SUMS（SUMS-OK ×2，0cf16444…、30f093b9…）＋ln -sfn；readlink current → 46763a8-4265c64／df4cc09-e5261e3 | exit=0 | ms=40000
+- REALTEST_EVIDENCE: tool=curl | cmd=curl https://video.aware-wave.com/engines/{filmcraft,effectcraft}/web/SHA256SUMS → 200、雜湊＝新版；*_bg.wasm → 200 application/wasm gzip；下載正式站 wasm／js／index.html 掃 artcraft|discord → 0 命中（6 檔）；headless 截正式站 FilmCraft Import 頁、EffectCraft Home（無 Community、無 Discord），截圖已送操作者 | exit=0 | ms=60000
+- REVIEW_WAIVED: NA -- 只上線已審過的產物（程式審查見同日 續45）
+- BUGHUNT_WAIVED: NA -- 無程式改動
 ## 2026-11-10（續46）FC.5 之二：專業剪輯／專業特效上方工具列改成右側圖示直欄
 
 - 做了（`VW`＝`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`）：上方整列拿掉，引擎吃滿高度；右側 44px 圖示直欄（`VW/scripts/tools-engine-host.js` `engineRailButton`，SVG 線條用 currentColor）：從素材庫加入、開新專案、16:9／9:16／4:5（`aria-pressed` 選中）＋輸出成片（FilmCraft）；EffectCraft 為輸出目前合成／輸出透明片段；「說明與專案」從直欄左側滑出面板（狀態、說明、已存專案），再點或 Esc 關。提示寫完整名稱與像素。未存檔時說明鈕右上一個點。樣式 `VW/styles/tools.css` `.engine-rail*`／`.engine-flyout`，只用 token。
