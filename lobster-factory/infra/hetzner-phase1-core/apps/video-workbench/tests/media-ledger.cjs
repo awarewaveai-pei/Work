@@ -152,7 +152,10 @@ const open = async (context, base) => {
       assert.equal(again.json.id, first.json.id);
       const done = await settle(first.json.id, ["succeeded", "failed"]);
       assert.equal(done.status, "succeeded", done.error);
-      assert.deepEqual(done.result.origin, { kind: "ai_generated", model: "gpt-image-2.5-flare", provider: "OpenAI" });
+      // costUsd since 9465bbc8c (api.cjs imageUsd): the fake reply has no usage, so the price is the model's per-image estimate.
+      const costUsd = require("../backend/provider-cost.cjs").imageUsd("gpt-image-2.5-flare");
+      assert(costUsd > 0);
+      assert.deepEqual(done.result.origin, { kind: "ai_generated", model: "gpt-image-2.5-flare", provider: "OpenAI", costUsd });
       const ledger = JSON.parse(fs.readFileSync(path.join(dataDir, "jobs.json"), "utf8"));
       assert.equal(ledger.filter((j) => j.idempotencyKey === "ledger-key-1").length, 1);
       assert.equal(imageCalls, 1);
