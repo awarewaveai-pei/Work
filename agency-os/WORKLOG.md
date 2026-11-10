@@ -1,4 +1,33 @@
 # Worklog
+## 2026-11-10（續3）影片剪輯 ED.0：左側分頁拆檔＋匯出視窗／專案列表獨立檔；ED.2 跨軌拖曳偶發失敗根因（a98153452、25397763e、7c7976bcb）
+
+**派工**：監工 session 卡 ED.0。目標是讓 ED.4–ED.12 分給不同 session 同時做，各改各的檔。
+
+**根因**：
+- C1 拆檔：八個左側分頁的畫面原本都在 `edPane` 的 if 鏈裡，動作都在同一個 `edAction`（`scripts/tools-editor.js`，3258 行）。匯出視窗、專案列表也在同一檔。
+- C2 ED.2 偶發失敗：用加了記錄的測試副本抓到一次失敗（8 次中 1 次）。那次按下、移動、放開全打在 `.editor-ruler`，片段 box y=835（通過的那幾次是 701 或 782）。原因：測試的 `drag` 用 `scrollIntoViewIfNeeded`，它把停在黏性時間尺（27px）底下的片段當成「看得到」。於是按下變成拖播放頭，兩段片段都停在 0（第 153 行 [0,0]≠[60,60]）。和等待時間無關。
+
+**做了**：
+- `tools-editor.js`：加登記表 `edRegisterPane`／`edPaneDef`／`edPaneAction`。`edRail`、`edPane`、`pane:` 動作、側欄點擊都改查登記表。`edAction` 在 `if (!p) return` 之後先交給分頁自己的動作。分頁 id、標題、動作重複登記時直接丟錯。
+- `scripts/editor-panes/{assets,text,audio,transition,effects,stickers,subtitles,fillers}.js`：原樣搬移，未改內容。片頭→text.js；響度／關鍵影格／峰值表→audio.js；轉場→transition.js；字幕匯入→subtitles.js。會改資料的動作照舊順序：先 checkpoint，再改（原本在 `if (c)` 裡的仍在 `if (c)` 裡），最後 commit。
+- `scripts/editor-export-dialog.js`（ED.8）、`scripts/editor-project-list.js`（ED.9）各自成檔；`tools-boot.js` 依側欄順序載入。
+- `tests/ed2-timeline.cjs`：`drag` 先把片段捲到正中，並檢查按下點 `elementFromPoint` 確實是該片段。曾試過 `.editor-timeline` 加 scroll-padding，實測 Chrome 不可靠（垂直差 2px，水平不捲），已撤回。
+- `tests/p6-main-system.cjs:427` 的原始碼檢查改讀 editor-export-dialog.js。
+- 規格 §3 加一行「檔案歸屬」。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/{ed1-layout,ed3-effects,ed3-inspector,ed3-legacy-golden,tools-editor,p1-loop,p2-tracks-ui,p3-roundtrip,remotion-template,editor-media-picker,theme-tokens,p6-main-system}.cjs 全 exit 0；ed2-timeline 連跑 10 次全 exit 0（修前 12 次失敗 1 次） | exit=0 | ms=330000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（Codex gpt-6-sol，7f792b6ca..HEAD 限 ED.0 路徑，files-reviewed 含全部 14 檔：agency-os/reports/oracle/2026-11-10-partialreview-b0c5143f.md）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=edPanes | hits=0
+- ORACLE_WAIVED: Codex 審查用 -Path 限 ED.0 檔（同一區間有 ED.10 其他 session 的 commit），因此 artifact 標 PARTIAL；三個 code commit 已在審查前提交
+
+**剩餘風險**：
+- ED.6、ED.7 若要改 `library:audio`、`upload:image`，要動 assets.js（這兩個動作在素材頁），需先和 ED.4 協調；規格 §3 已寫。
+- 欄位 change 處理（`data-ed-title-field`、`transitionSeconds`）仍在 tools-editor.js 核心的 change 監聽裡，ED.5／ED.7 要改時會碰核心。
+
+**避免再發生**：自寫的滑鼠拖曳 helper 要先確認按下點打到的元素（`elementFromPoint`）；`scrollIntoViewIfNeeded` 不會考慮黏性表頭。
+
+**rollback**：`git revert 7c7976bcb 25397763e a98153452`（純搬移，舊專案資料未動）。
 ## 2026-11-10（續2）ED.10 後端：逐字辨識＋分數、整片字幕任務、剪贅字資料、逐字高亮／卡拉 OK 燒錄（e28bcbc4d）
 
 **派工**：主 session（影片剪輯對齊 seedstar 監工）派 ED.10 後端；畫面另一張卡做。未部署。
