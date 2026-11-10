@@ -20,12 +20,12 @@ assert.ok(reads >= 8, "expected the known runtime reads, found " + reads);
 
 for (const file of listed) {
   assert.ok(fs.existsSync(path.join(appDir, file)), `awarewave-files.txt lists ${file}, missing in next-admin`);
-  if (!file.endsWith(".ts")) continue;
+  if (!/\.(ts|js|mjs)$/.test(file)) continue; // a shipped .js module (cost-model.ts -> image-models.js) can import too
   // Type-only imports vanish under type stripping; every other relative import must ship too.
   const text = fs.readFileSync(path.join(appDir, file), "utf8");
   for (const [, kw, spec] of text.matchAll(/^\s*(import(?:\s+type)?|export)\b[^"']*?from\s+["'](\.{1,2}\/[^"']+)["']/gm)) {
     if (/^import\s+type$/.test(kw)) continue;
-    const dep = path.posix.normalize(path.posix.join(path.posix.dirname(file), spec)).replace(/(\.ts)?$/, ".ts");
+    const dep = path.posix.normalize(path.posix.join(path.posix.dirname(file), spec)).replace(/^(?!.*\.(?:ts|js|mjs|cjs)$)(.*)$/, "$1.ts"); // keep an explicit extension, else add .ts
     assert.ok(listed.has(dep), `${file} imports ${spec}; add ${dep} to awarewave-files.txt`);
   }
 }
