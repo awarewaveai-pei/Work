@@ -920,7 +920,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     if (meta.alpha && !ENGINE_ALPHA.has(meta.engine)) throw bad("這個引擎不支援透明輸出");
     const size = ENGINE_RATIOS[meta.ratio];
     if (!size || meta.width !== size[0] || meta.height !== size[1]) throw bad("成片比例或尺寸不正確");
-    if (!Array.isArray(meta.sources) || !meta.sources.length || meta.sources.length > 200)
+    // Card EC.5: an empty list only for an EffectCraft comp whose project the frame found free of footage (a title made in
+    // the engine); its rights record is then empty, as a Remotion title's (main-system.cjs rightsFor).
+    const ownOnly = meta.engine === "effectcraft" && meta.footage === 0;
+    if (!Array.isArray(meta.sources) || (!meta.sources.length && !ownOnly) || meta.sources.length > 200)
       throw bad("缺少來源素材清單：成片要記下用了哪些素材");
     for (const s of meta.sources)
       if (!s || !mainSystemTools.LOCAL_URL.test(String(s.url || "")) || !fs.existsSync(localFile(s.url) || ""))

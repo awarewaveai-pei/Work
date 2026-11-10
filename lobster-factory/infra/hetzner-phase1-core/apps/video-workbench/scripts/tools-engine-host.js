@@ -445,10 +445,19 @@ window.addEventListener("beforeunload", (event) => {
 // Cards FC.3 / EC.3: a render = the frame asks the engine for an MP4, then sends the file, its sources and (FilmCraft) the
 // caption lines to POST /api/vw/engine/renders, which records it as one finished job (ledger + release text).
 const engineRenders = new Map(); // export base name -> { engine, ratio, width, height, title, sources, link, video, srt, timer }
+// Card EC.5: footage = every EffectCraft project item that is not made inside the engine (upstream crates/project/src/item.rs
+// type_name). A comp with none (a title of text, shapes, solids) has no source file, like a Remotion title.
+const ENGINE_OWN_ITEMS = new Set(["Composition", "Folder", "Solid"]);
+async function engineFootageCount() {
+  const items = (await engineExec("project.summary", {}))?.items;
+  if (!Array.isArray(items)) throw Error("讀不到引擎專案裡的素材清單");
+  return items.filter((i) => !ENGINE_OWN_ITEMS.has(i.type)).length;
+}
 async function engineExport(choice) {
   if (!eng.ready) throw Error("引擎還在載入");
-  if (!eng.sent.length) throw Error("先加入素材再輸出：成片要記下用了哪些素材");
   const cfg = eng.cfg;
+  if (!eng.sent.length && (cfg.engine !== "effectcraft" || (await engineFootageCount()) !== 0))
+    throw Error("先加入素材再輸出：成片要記下用了哪些素材");
   let ratio = choice,
     comp = null;
   const alpha = cfg.engine === "effectcraft" && choice === "alpha"; // card EC.5
@@ -517,7 +526,7 @@ async function engineSubmitRender(base) {
   try {
     const cues = job.srt ? SubtitleParse.parse(job.srt).map((c) => ({ start: c.startMs / 1000, end: c.endMs / 1000, text: c.text })) : [];
     const meta = new TextEncoder().encode(
-      JSON.stringify({ engine: job.engine, engineVersion: eng.appVersion, title: job.title, ratio: job.ratio, width: job.width, height: job.height, sources: job.sources, link: job.link, cues, alpha: job.alpha }),
+      JSON.stringify({ engine: job.engine, engineVersion: eng.appVersion, title: job.title, ratio: job.ratio, width: job.width, height: job.height, sources: job.sources, link: job.link, cues, alpha: job.alpha, footage: job.sources.length ? undefined : 0 }),
     );
     engineStatus("成片入帳中…");
     const api = String(window.VW_CONFIG?.apiBaseUrl || "/api/vw").replace(/\/$/, "");

@@ -383,3 +383,4 @@ headless 測不到的三件事，用真的視窗、只在 NVIDIA 顯示卡上開
 - 入帳：`/engine/renders` 只收 EffectCraft 的 `alpha`；ffprobe pix_fmt 沒有 alpha（`media-store.cjs` `hasAlpha`，與動畫合成同一條判準）→ 400 不入帳；有 → 以 `.mov` 進素材庫，`input.settings.alpha = true`，來源清單照 EC.3。
 - 剪輯器：不改。素材庫對有 alpha 的原檔自動產 VP9 alpha `proxy.webm`／`preview720.webm`（P3、ED.1.4 同一條路），輸出讀原 MOV（ffmpeg 原生解 ProRes 4444 alpha）。
 - 限制：單次上傳經 Cloudflare 上限 100 MB（P6.20），約 20 秒以內的 1080p 透明片段。
+- 純文字片頭（監工 2026-11-10）：外框沒送過素材時問引擎 `project.summary`，類型都是 Composition／Folder／Solid（上游 `crates/project/src/item.rs` `type_name`）才送空來源清單＋`footage: 0`；路由只對 EffectCraft＋`footage: 0` 收空清單，權利紀錄為空（`main-system.cjs` `rightsFor`，同 Remotion 片頭）；有素材卻空清單照舊 400。送審規則不變。

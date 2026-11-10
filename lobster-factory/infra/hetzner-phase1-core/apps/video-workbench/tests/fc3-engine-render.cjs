@@ -161,6 +161,22 @@ function request(port, pathname, headers, body) {
     assert.match(noAlpha.body.error.message, /透明通道/);
     assert.deepEqual({ assets: calls.assets.length, jobs: jobsOnDisk().length }, alphaBefore);
     console.log("PASS effectcraft transparent clip with alpha -> .mov asset; without alpha -> refused, no job");
+
+    // 6. A title made only in EffectCraft (the frame found no footage in the engine project): empty source list accepted,
+    // rights recorded empty like a Remotion title; footage present (or FilmCraft) with an empty list -> 400, nothing stored.
+    const title = clip("title.mp4", ["-f", "lavfi", "-i", "color=c=red:size=1920x1080:rate=30", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"]);
+    const titleOnly = await send({ ...ec, sources: [], footage: 0 }, title);
+    assert.equal(titleOnly.status, 201, JSON.stringify(titleOnly.body));
+    assert.deepEqual(titleOnly.body.input.references, []);
+    assert.deepEqual(calls.assets.at(-1).meta.rightsSources, [], "沒有來源＝權利紀錄是空的");
+    const ownBefore = { assets: calls.assets.length, jobs: jobsOnDisk().length };
+    for (const bad of [{ ...ec, sources: [], footage: 2 }, { ...ec, sources: [] }, { ...meta, sources: [], footage: 0 }]) {
+      const r = await send(bad, bad.engine === "filmcraft" ? render : silent);
+      assert.equal(r.status, 400, JSON.stringify(r.body));
+      assert.match(r.body.error.message, /來源素材/);
+    }
+    assert.deepEqual({ assets: calls.assets.length, jobs: jobsOnDisk().length }, ownBefore);
+    console.log("PASS effectcraft title with no footage -> accepted, empty rights; footage or filmcraft with no list -> 400");
   } finally {
     server.closeAllConnections();
     await new Promise((r) => server.close(r));
