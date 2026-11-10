@@ -39,7 +39,7 @@ export const IMAGE_MODELS = Object.freeze([
   { value: "ideogram-v4-quality", label: "Ideogram v4 Quality", group: "Ideogram", vendor: "Ideogram/Replicate", usd: 0.10, maxRefs: 0, note: "v4 高畫質", uses: ["generate"] },
   { value: "ideogram-character", label: "Ideogram Character", group: "Ideogram", vendor: "Ideogram/Replicate", usd: 0.15, maxRefs: 1, note: "同一個角色不走樣", uses: ["generate"] },
   // Priced at the tier lib/tarot/image-gen.ts sends, resolution "2K" (replicate.com billingConfig 2026-11-10: 1K .067 / 2K .101 / 4K .151).
-  { value: "nano-banana-2", label: "Nano Banana 2", group: "Google+", vendor: "Google/Replicate", usd: 0.101, maxRefs: 14, note: "最多 14 張參考圖，便宜", uses: ["generate", "edit"] },
+  { value: "nano-banana-2", label: "Nano Banana 2.1", group: "Google+", vendor: "Google", usd: 0.057, maxRefs: 14, note: "最多 14 張參考圖，便宜", uses: ["generate", "edit"] },
   { value: "nano-banana-pro", label: "Nano Banana Pro", group: "Google+", vendor: "Google/Replicate", usd: 0.15, maxRefs: 8, note: "Google 最強，人物與文字穩", uses: ["generate", "edit"] },
   { value: "openai-low", label: "GPT-Image-2 低", group: "OpenAI", vendor: "OpenAI", usd: 0.02, maxRefs: 5, note: "最省，先看構圖", uses: ["generate"] },
   { value: "openai-medium", label: "GPT-Image-2 中", group: "OpenAI", vendor: "OpenAI", usd: 0.07, maxRefs: 5, note: "日常品質", uses: ["generate"] },

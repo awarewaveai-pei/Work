@@ -1,13 +1,15 @@
 // Card RV (docs/replicate-video-models-plan-20261105.md): a video job runs the model it names. Replicate models come
 // from next-admin lib/ai/video-motion-models.ts (fields compared with its buildInput, not a copy); sora-2 (shut down
-// 2026-09-24) and unknown ids run the default model. Fake fetchImpl only, no real provider call.
+// 2026-09-24) and unknown ids run the default model. Gemini Omni (backend/gemini-video.cjs) is the default when the Gemini
+// key is set, Veo 3.1 Fast otherwise (section 8). Fake fetchImpl only, no real provider call.
 const assert = require("node:assert/strict"), fs = require("node:fs"), path = require("node:path");
 const { isolatedServer } = require("./isolated-server.cjs");
 const { resolveSource } = require("../backend/appearance.cjs");
 
 const appDir = resolveSource(path.join(__dirname, ".."), process.env);
 const { MOTION_MODELS } = require(path.join(appDir, "lib/ai/video-motion-models.ts"));
-const { VIDEO_MOTION_RATES } = require(path.join(appDir, "lib/ai/cost-model.ts"));
+const { VIDEO_MOTION_RATES, GEMINI_VIDEO_RATES } = require(path.join(appDir, "lib/ai/cost-model.ts"));
+const OMNI = "gemini-omni-1.2-flash";
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jTioAAAAASUVORK5CYII=", "base64");
 const mp4 = Buffer.from("fake-mp4-bytes");
 
@@ -42,20 +44,21 @@ const video = (model, extra = {}) => ({ type: "video", mode: "reference", prompt
 
 (async () => {
   const env = { REPLICATE_API_TOKEN: "test-only-replicate" };
-  // 1. capabilities: every model with label, price per second and limits; the default (Veo 3.1 Fast) first.
+  // 1. capabilities without a Gemini key: Veo 3.1 Fast is the default and first; Omni listed, unavailable.
   {
     const { base } = await isolatedServer("vw-rv-caps-", { fetchImpl: fakeProviders().fetchImpl, env });
     const caps = (await api(base)("/capabilities")).body;
-    assert.deepEqual(caps.videoModels.map((m) => m.id), ["veo-3-1-fast", ...Object.keys(MOTION_MODELS).filter((id) => id !== "veo-3-1-fast")]);
+    assert.deepEqual(caps.videoModels.map((m) => m.id), ["veo-3-1-fast", OMNI, ...Object.keys(MOTION_MODELS).filter((id) => id !== "veo-3-1-fast")]);
     assert.equal(caps.models.video, "veo-3-1-fast");
     assert.equal(caps.videoModels[0].requiresImage, false);
     assert.deepEqual(caps.retiredVideoModels, { "sora-2": "Sora 2", "sora-2-pro": "Sora 2 Pro" });
-    for (const m of caps.videoModels) {
+    for (const m of caps.videoModels.filter((m) => m.id !== OMNI)) {
       assert.equal(m.usdPerSec, VIDEO_MOTION_RATES[m.id].usdPerSec, m.id + " 價格與 cost-model.ts 不同");
       assert.equal(m.model, MOTION_MODELS[m.id].slug);
       assert.equal(m.available, true);
     }
-    console.log("PASS capabilities：" + caps.videoModels.length + " 個影片模型，價格出自 cost-model.ts");
+    assert.equal(caps.videoModels.find((m) => m.id === OMNI).available, false);
+    console.log("PASS capabilities（無 Gemini 金鑰）：預設 Veo 3.1 Fast，Omni 列出但不可用，價格出自 cost-model.ts");
   }
   // 2. Each Replicate model: request body = next-admin buildInput; result saved; origin and cost = rate x seconds.
   for (const [id, m] of Object.entries(MOTION_MODELS)) {
@@ -162,6 +165,60 @@ const video = (model, extra = {}) => ({ type: "video", mode: "reference", prompt
     assert.equal(fake.calls.some((c) => c.url.startsWith("https://replicate.delivery")), false, "已取消仍下載成品");
   }
   console.log("PASS Replicate 拒絕取消時回 502、任務仍在進行；輪詢途中取消不會被蓋成成功");
+  // 8. Gemini Omni: default with the key; background interaction body; inline video saved; cost = the reply's usage.
+  {
+    // usage shaped as Google answered on 2026-11-10 (real 4 s call): video tokens by modality, thinking outside total_output_tokens.
+    const usage = { total_input_tokens: 40, total_output_tokens: 46336, total_thought_tokens: 500, output_tokens_by_modality: [{ modality: "video", tokens: 46336 }] };
+    let state = "in_progress";
+    const calls = [];
+    const fetchImpl = async (url, init = {}) => {
+      calls.push({ url, method: init.method || "GET", headers: init.headers, body: init.body });
+      const g = "https://generativelanguage.googleapis.com/v1beta/interactions";
+      if (url === g) return Response.json({ id: "v1_omni", status: "in_progress" });
+      if (url === g + "/v1_omni") return Response.json(state === "completed"
+        ? { id: "v1_omni", status: "completed", usage, steps: [{ type: "model_output", content: [{ type: "video", mime_type: "video/mp4", data: mp4.toString("base64") }] }] }
+        : { id: "v1_omni", status: state });
+      if (url === g + "/v1_omni/cancel") return Response.json({ id: "v1_omni", status: "cancelled" });
+      throw Error("unexpected provider url " + url);
+    };
+    const genv = { ...env, GEMINI_API_KEY: "test-only-gemini" };
+    const { base, dataDir } = await isolatedServer("vw-rv-omni-", { fetchImpl, env: genv });
+    const call = api(base);
+    const caps = (await call("/capabilities")).body;
+    assert.equal(caps.models.video, OMNI);
+    const omni = caps.videoModels[0];
+    assert.equal(omni.id, OMNI);
+    assert.equal(omni.usdPerSec, Math.round(GEMINI_VIDEO_RATES[OMNI].videoTokensPerSec * GEMINI_VIDEO_RATES[OMNI].outputPerM) / 1e6);
+    const ref = "data:image/png;base64," + png.toString("base64");
+    const sent = await call("/generations", video(OMNI, { duration: 8, input: { references: { images: [{ url: ref, type: "image/png" }] } } }));
+    assert.equal(sent.status, 202, JSON.stringify(sent.body));
+    for (let i = 0; i < 50 && !calls.some((c) => c.method === "POST"); i++) await new Promise((r) => setTimeout(r, 50));
+    const create = calls.find((c) => c.method === "POST");
+    assert.equal(create.headers["x-goog-api-key"], "test-only-gemini");
+    assert.deepEqual(JSON.parse(create.body), {
+      model: OMNI, background: true,
+      input: [{ type: "image", data: png.toString("base64"), mime_type: "image/png" }, { type: "text", text: "海邊日出，鏡頭慢慢推近" }],
+      response_format: { type: "video", aspect_ratio: "16:9", duration: "8s", resolution: "720p" },
+    });
+    assert.equal((await call("/generations/" + sent.body.id)).body.status, "running");
+    state = "completed";
+    const job = await settle(call, sent.body.id);
+    assert.equal(job.status, "succeeded", job.error);
+    assert.deepEqual(fs.readFileSync(path.join(dataDir, job.result.url.slice(1))), mp4);
+    assert.deepEqual(job.result.origin, { kind: "ai_generated", model: OMNI, provider: "Google", costUsd: Math.round(40 * 1.5 + 46336 * 12 + 500 * 9) / 1e6 });
+    // Cancel reaches Google's cancel endpoint.
+    state = "in_progress";
+    const second = await call("/generations", video(OMNI, { duration: 4 }));
+    for (let i = 0; i < 50 && !JSON.parse(fs.readFileSync(path.join(dataDir, "jobs.json"), "utf8")).find((j) => j.id === second.body.id)?.providerId; i++) await new Promise((r) => setTimeout(r, 50));
+    assert.equal((await call("/generations/" + second.body.id + "/cancel", {})).status, 200);
+    assert.ok(calls.some((c) => c.url.endsWith("/v1_omni/cancel") && c.method === "POST"), "取消沒有呼叫 Google cancel");
+    assert.equal(calls.some((c) => /replicate|openai/.test(c.url)), false, "Omni 任務呼叫了別家");
+    // A length Omni is not offered at is refused before any call.
+    const before = calls.length;
+    assert.equal((await call("/generations", video(OMNI, { duration: 5 }))).status, 400);
+    assert.equal(calls.length, before);
+  }
+  console.log("PASS Gemini Omni：有金鑰即預設；背景任務欄位正確；成品存檔；成本＝回覆 usage；取消叫 Google；5 秒送出前就拒");
   process.exit(0);
 })().catch((e) => {
   console.error(e);

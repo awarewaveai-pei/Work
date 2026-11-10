@@ -34,10 +34,14 @@ function imageUsd(model, usage) {
     text = d.text_tokens ?? (d.image_tokens === undefined ? usage.input_tokens : tok(usage.input_tokens) - tok(d.image_tokens));
   return round((tok(text) * r.textInPerM + tok(d.image_tokens) * r.imageInPerM + tok(usage.output_tokens) * r.imageOutPerM) / 1e6);
 }
-// next-admin video-motion ids (veo-3-1-fast...), per output second.
-function videoUsd(model, seconds) {
-  if (!Object.hasOwn(rates.VIDEO_MOTION_RATES, model)) throw unpriced(model);
-  return round(rates.VIDEO_MOTION_RATES[model].usdPerSec * tok(seconds));
+// next-admin video-motion ids (veo-3-1-fast...): per output second. Gemini video (GEMINI_VIDEO_RATES): the finished
+// interaction's usage (cost-model.ts geminiMediaUsd); no usage = seconds x the 720p video tokens per second.
+function videoUsd(model, seconds, usage = null) {
+  if (Object.hasOwn(rates.VIDEO_MOTION_RATES, model)) return round(rates.VIDEO_MOTION_RATES[model].usdPerSec * tok(seconds));
+  const rate = rates.GEMINI_VIDEO_RATES[model];
+  if (!rate) throw unpriced(model);
+  if (usage && Number.isFinite(Number(usage.total_output_tokens))) return round(rates.geminiMediaUsd(rate, usage));
+  return round(tok(seconds) * rate.videoTokensPerSec * rate.outputPerM / 1e6);
 }
 // Gemini speech (cost-model.ts GEMINI_TTS_RATES): the reply's own token counts; no usage = the same published rules as
 // below (text <= 1 token per character, audio tokens per second). Price row = the day the call was made.

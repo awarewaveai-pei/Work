@@ -138,12 +138,12 @@ export const MODEL_SPECS: Record<TarotModel, ModelSpec> = {
     sources: ["https://developer.ideogram.ai/api-reference/api-reference/generate-v3", "https://replicate.com/ideogram-ai/ideogram-character"],
   },
   "nano-banana-2": {
-    label: "Nano Banana 2", vendor: "Google Gemini (Replicate)",
+    label: "Nano Banana 2.1", vendor: "Google Gemini (direct)",
     promptLimit: "131,072 input tokens", promptOrder: "style-second", referenceRole: "multimodal", usesDeckPreview: false,
     rewrite: "none documented", seed: false, negativePrompt: "no field; use positive framing",
     vendorOrder: "subject + action + location + composition + style, as sentences",
     notes: "image_input: 'transform or use as reference'; the prompt must say what each image is for",
-    sources: [GOOGLE_NB, "https://replicate.com/google/nano-banana-2"],
+    sources: [GOOGLE_NB, "https://aistudio.google.com/docs/image-generation"],
   },
   "nano-banana-pro": {
     label: "Nano Banana Pro", vendor: "Google Gemini (Replicate)",

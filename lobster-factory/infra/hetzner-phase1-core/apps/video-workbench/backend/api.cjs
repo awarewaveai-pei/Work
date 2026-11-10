@@ -13,7 +13,6 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   appDir ||= require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), env);
   const generationPolicy = require("./generation-policy.cjs");
   const bgRemove = require("./bg-remove.cjs");
-  const replicateVideo = require("./replicate-video.cjs");
   const costs = require("./provider-cost.cjs");
   const transcribe = require("./transcribe.cjs"), TranscriptWords = require("../shared/transcript-words.js");
   // Speech and speech-to-text: one list each (backend/speech.cjs, transcribe.cjs); every job names its own row (the
@@ -184,7 +183,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     if (["queued", "running"].includes(job.status) && !job.providerId) {
       job.status = "failed";
       job.error = "服務重新啟動，任務已中斷；請從歷史記錄重新送出。";
-    } else if (["queued", "running"].includes(job.status) && job.video?.provider !== "Replicate") {
+    } else if (["queued", "running"].includes(job.status) && !generationPolicy.videoVendor(job.video?.provider)) {
       // A Sora job (OpenAI shut Sora 2 down 2026-09-24): nothing left to poll; a retry runs the default model.
       job.status = "failed";
       job.error = "Sora 2 已停止服務；請從歷史記錄重新送出，會改用目前的預設影片模型。";
@@ -645,7 +644,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           seconds = Number(input.duration || input.settings?.duration || 8);
         // Recorded before the call: refresh prices, labels and polls by what was sent, not by later settings.
         job.video = { id: vm.id, provider: vm.provider, model: vm.model, seconds };
-        job.providerId = await replicateVideo.create({
+        job.providerId = await generationPolicy.videoVendor(vm.provider).create({
           model: vm.id, prompt, ratio, seconds, env, fetchImpl, signal,
           ...(refs.length ? { imageUrl: imageReference(refs[0].url) } : {}),
         });
@@ -694,15 +693,16 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   }
   async function refreshOnce(job) {
     const before = job.status;
-    if (job.providerId && job.video?.provider === "Replicate" && ["queued", "running"].includes(job.status)) {
-      const result = await replicateVideo.status({ id: job.providerId, env, fetchImpl });
+    const vendor = generationPolicy.videoVendor(job.video?.provider);
+    if (job.providerId && vendor && ["queued", "running"].includes(job.status)) {
+      const result = await vendor.status({ id: job.providerId, env, fetchImpl });
       if (job.status === "cancelled") return job; // cancelled while this poll was in flight: the cancel wins
       job.status = result.status === "succeeded" ? "running" : result.status;
       if (result.error) job.error = publicError(result.error);
       if (result.status === "succeeded") {
-        const binary = await replicateVideo.download({ url: result.outputUrl, fetchImpl });
+        const { video, usage } = await vendor.download({ output: result.output, fetchImpl });
         if (job.status === "cancelled") return job;
-        job.result = { url: output(binary, "mp4"), origin: aiOrigin("video", costs.videoUsd(job.video.id, job.video.seconds), job.video) };
+        job.result = { url: output(video, "mp4"), origin: aiOrigin("video", costs.videoUsd(job.video.id, job.video.seconds, usage), job.video) };
         job.progress = 100;
         job.status = "succeeded";
       }
@@ -752,7 +752,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
             ? (remotion.request(input, imageReference), { type: "video" })
             : jobInput(input);
     const videoModel = !isMedia && !isRemotion && !isBlender && !isImageTo3d && !isTranscribe && parsed.type === "video" ? generationPolicy.videoModelOf(input, env) : null;
-    if (videoModel?.provider === "Replicate") replicateVideo.token(env);
+    if (videoModel) generationPolicy.videoVendor(videoModel.provider).token(env);
     else if (parsed.type === "audio" && !isMedia) speech.key(speech.pick(input.speechModel, env), env);
     else if (!isMedia && !isRemoveBg && !isRemotion && !isBlender && !isImageTo3d && !isTranscribe) key();
     // paidFeature on the job: the retry button prices a rerun from it (shared/paid-price.js); the permit needs main.
@@ -1187,9 +1187,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         } else if (req.method === "POST" && match[2]) {
           if (!["queued", "running"].includes(job.status))
             throw Object.assign(Error("任務已結束"), { status: 409 });
-          // Replicate video: cancelled only once Replicate accepts, so billing has really stopped.
-          if (job.providerId && job.video?.provider === "Replicate" && !(await replicateVideo.cancel({ id: job.providerId, env, fetchImpl })))
-            throw Object.assign(Error("Replicate 沒有接受取消，影片仍在生成並計費；請稍後再試。"), { status: 502 });
+          // Vendor video: cancelled only once the vendor accepts, so billing has really stopped.
+          const vendor = job.providerId && generationPolicy.videoVendor(job.video?.provider);
+          if (vendor && !(await vendor.cancel({ id: job.providerId, env, fetchImpl })))
+            throw Object.assign(Error(job.video.provider + " 沒有接受取消，影片仍在生成並計費；請稍後再試。"), { status: 502 });
           job.status = "cancelled";
           controls.get(job.id)?.abort();
           if (job.replicateId) bgRemove.cancelPrediction({ id: job.replicateId, env, fetchImpl });

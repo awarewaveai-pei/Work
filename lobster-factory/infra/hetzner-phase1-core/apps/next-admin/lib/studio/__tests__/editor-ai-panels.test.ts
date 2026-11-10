@@ -308,7 +308,7 @@ describe("ai-edit：AI 修圖", () => {
   it("ai-edit 模型 = modelsFor('edit')；每個都在 STUDIO_MODEL_OPTIONS、吃參考圖；價錢 = nt(usd)；比例規則 = nearestAspectRatio", async () => {
     const { AI_EDIT_MODELS, nearestAspectRatio } = await loadModule(BLOCKS[3]);
     const { STUDIO_MODEL_OPTIONS, nearestAspectRatio: ref, PRODUCT_COMPOSITE_MODELS, nt } = await import("../model-options");
-    expect((AI_EDIT_MODELS as { value: string }[]).map((m) => m.value)).toEqual(["flux-2-klein-4b", "flux-kontext-fast", "flux-kontext-pro", "openai-25-edit", "openai-26-edit", "nano-banana-2", "nano-banana-pro"]);
+    expect((AI_EDIT_MODELS as { value: string }[]).map((m) => m.value)).toEqual(["flux-2-klein-4b", "flux-kontext-fast", "flux-kontext-pro", "nano-banana-2", "openai-25-edit", "openai-26-edit", "nano-banana-pro"]);
     for (const m of AI_EDIT_MODELS as { value: string; label: string; usd: number }[]) {
       const s = STUDIO_MODEL_OPTIONS.find((o) => o.value === m.value);
       expect(s, m.value).toBeDefined();
@@ -325,7 +325,7 @@ describe("ai-edit：AI 修圖", () => {
     const ctx = mockCtx();
     const body = await mount(BLOCKS[3], ctx);
     const btns = [...body.querySelectorAll("[data-ae-model]")] as HTMLButtonElement[];
-    expect(btns.map((b) => b.dataset.aeModel)).toEqual(["flux-2-klein-4b", "flux-kontext-fast", "flux-kontext-pro", "openai-25-edit", "openai-26-edit", "nano-banana-2", "nano-banana-pro"]);
+    expect(btns.map((b) => b.dataset.aeModel)).toEqual(["flux-2-klein-4b", "flux-kontext-fast", "flux-kontext-pro", "nano-banana-2", "openai-25-edit", "openai-26-edit", "nano-banana-pro"]);
     btns.forEach(priced);
     btns.forEach((b) => noted(b, AI_EDIT_MODELS as { value: string; note?: string }[]));
     q(body, "[data-ae-prompt]").value = "海邊";

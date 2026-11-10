@@ -5,25 +5,33 @@ const imageOutputs = Object.fromEntries([["1K", 1024], ["2K", 2048], ["4K", 4096
 const provider = "OpenAI";
 // USD per run shown on the button before the click and charged after it: read from next-admin's cost SSOT
 // (lib/ai/cost-model.ts TOOL_RATES, Node type stripping), never copied here.
-const { TOOL_RATES, VIDEO_MOTION_RATES, TWD_RATE } = require(require("node:path").join(require("./appearance.cjs").resolveSource(require("node:path").join(__dirname, ".."), process.env), "lib/ai/cost-model.ts"));
+const { TOOL_RATES, VIDEO_MOTION_RATES, GEMINI_VIDEO_RATES, TWD_RATE } = require(require("node:path").join(require("./appearance.cjs").resolveSource(require("node:path").join(__dirname, ".."), process.env), "lib/ai/cost-model.ts"));
 const replicateVideo = require("./replicate-video.cjs");
+const geminiVideo = require("./gemini-video.cjs");
+const providers = require("./providers.cjs");
+const { videoUsd } = require("./provider-cost.cjs");
 const speech = require("./speech.cjs");
 const toolCosts = Object.freeze({ removeBackground: TOOL_RATES["bg-remove"].usd });
-// Default video model: needs no reference image, lowest price (price audit 2026-11-10). VW_VIDEO_MODEL may name another
-// next-admin motion id; anything else is ignored.
-const DEFAULT_VIDEO_MODEL = "veo-3-1-fast";
-const models = (env) => ({ image: vwEnv(env, "IMAGE_MODEL") || "gpt-image-2.5-flare", video: replicateVideo.isModel(vwEnv(env, "VIDEO_MODEL")) ? vwEnv(env, "VIDEO_MODEL") : DEFAULT_VIDEO_MODEL, audio: speech.defaultModel(env).id });
+const models = (env) => ({ image: vwEnv(env, "IMAGE_MODEL") || "gpt-image-2.5-flare", video: videoModels(env)[0].id, audio: speech.defaultModel(env).id });
 // Video models the vendor shut down (OpenAI GET /v1/models/sora-2: shutdown_date 2026-09-24). A saved setting or an
 // old job naming one runs the default; the page says so once (shared/models.js replaceRetired).
 const RETIRED_VIDEO_MODELS = Object.freeze({ "sora-2": "Sora 2", "sora-2-pro": "Sora 2 Pro" });
-// Video models a job can pick (card RV): next-admin's Replicate models (lib/ai/video-motion-models.ts), the default
-// first. usdPerSec is the price shown on the button and charged after the run.
+// Video vendor modules by job.video.provider (each: token, create, status, download, cancel); null = none (an old Sora job).
+const VIDEO_VENDORS = Object.freeze({ Google: geminiVideo, Replicate: replicateVideo });
+const videoVendor = (provider) => (Object.hasOwn(VIDEO_VENDORS, provider) ? VIDEO_VENDORS[provider] : null);
+// Video models a job can pick (card RV): Gemini (cheapest per second with audio, vendor-alternatives-20261110.md), then
+// next-admin's Replicate models (lib/ai/video-motion-models.ts) with Veo 3.1 Fast first, so providers.choose falls back to it
+// when there is no Gemini key. VW_VIDEO_MODEL names the default when it can run. The default comes first in the list.
+// usdPerSec = the button price (provider-cost.cjs videoUsd, the same function the charge uses).
 function videoModels(env) {
-  const first = models(env).video;
-  return Object.entries(replicateVideo.MOTION_MODELS).sort(([a], [b]) => (b === first) - (a === first)).map(([id, m]) => ({
-    id, label: VIDEO_MOTION_RATES[id].label, vendor: VIDEO_MOTION_RATES[id].vendor, provider: "Replicate", model: m.slug,
-    durations: [...m.durations], defaultDurationSec: m.defaultDurationSec, ratios: [...m.ratios], requiresImage: m.requiresImage, usdPerSec: VIDEO_MOTION_RATES[id].usdPerSec, available: !!env.REPLICATE_API_TOKEN,
-  }));
+  const row = (id, m, extra) => ({ id, durations: [...m.durations], defaultDurationSec: m.defaultDurationSec, ratios: [...m.ratios], requiresImage: m.requiresImage, usdPerSec: videoUsd(id, 1), free: false, ...extra });
+  const rows = [
+    ...Object.entries(geminiVideo.MODELS).map(([id, m]) => row(id, m, { label: GEMINI_VIDEO_RATES[id].label, vendor: "Google", provider: "Google", model: id, keyName: "GEMINI_API_KEY", available: !!env.GEMINI_API_KEY })),
+    ...Object.entries(replicateVideo.MOTION_MODELS).sort(([a], [b]) => (b === "veo-3-1-fast") - (a === "veo-3-1-fast")).map(([id, m]) =>
+      row(id, m, { label: VIDEO_MOTION_RATES[id].label, vendor: VIDEO_MOTION_RATES[id].vendor, provider: "Replicate", model: m.slug, keyName: "REPLICATE_API_TOKEN", available: !!env.REPLICATE_API_TOKEN })),
+  ];
+  const first = providers.choose(rows, vwEnv(env, "VIDEO_MODEL"));
+  return [first, ...rows.filter((r) => r !== first)].map(({ free, ...m }) => m);
 }
 // The model a video job runs: a known id, else the default (sora-2, an old project's "VideoWorkbench V3", no value).
 function videoModelOf(input, env) {
@@ -33,7 +41,7 @@ function videoModelOf(input, env) {
 function capabilities(env, localTools) {
   return {
     image: !!env.OPENAI_API_KEY, text: !!env.OPENAI_API_KEY,
-    audio: speech.capability(env).models.some((m) => m.available), video: !!env.REPLICATE_API_TOKEN,
+    audio: speech.capability(env).models.some((m) => m.available), video: videoModels(env).some((m) => m.available),
     // The live speech models with voices and prices (backend/speech.cjs); pages draw them as buttons.
     speech: speech.capability(env),
     provider,
@@ -82,4 +90,4 @@ function imageDimensions(settings) {
   const dimensions = imageOutputs[settings.quality]?.[settings.ratio];
   if (settings.imageLayout !== 'center-crop' || !Array.isArray(dimensions)) throw Error('圖片輸出設定無效'); return dimensions;
 }
-module.exports = { provider, models, videoModels, RETIRED_VIDEO_MODELS, videoModelOf, toolCosts, capabilities, validate, imageOutputs, imageDimensions };
+module.exports = { provider, models, videoModels, videoVendor, RETIRED_VIDEO_MODELS, videoModelOf, toolCosts, capabilities, validate, imageOutputs, imageDimensions };

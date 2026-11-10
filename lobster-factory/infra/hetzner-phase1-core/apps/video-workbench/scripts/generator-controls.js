@@ -228,7 +228,7 @@ function generatorValidation(input) {
   const settings = input.settings || {};
   if (type === "video" && caps) {
     const vm = VideoWorkbenchVideoModels.get(caps, settings.model);
-    if (vm.available === false && vm.provider !== "OpenAI") throw Error(vm.label + " 尚未設定服務金鑰（REPLICATE_API_TOKEN）；可以先儲存草稿。");
+    if (vm.available === false && vm.provider !== "OpenAI") throw Error(vm.label + " 尚未設定服務金鑰" + (vm.keyName ? "（" + vm.keyName + "）" : "") + "；可以先儲存草稿。");
     if (!vm.durations.includes(Number(settings.duration))) throw Error(vm.label + " 不支援這個時長（可選 " + vm.durations.join("、") + " 秒）");
     if (!vm.ratios.includes(settings.ratio)) throw Error("目前影片服務不支援 " + settings.ratio + "，請調整比例。");
     if (caps.videoQualities && !caps.videoQualities.includes(settings.quality)) throw Error("目前影片服務不支援此畫質");

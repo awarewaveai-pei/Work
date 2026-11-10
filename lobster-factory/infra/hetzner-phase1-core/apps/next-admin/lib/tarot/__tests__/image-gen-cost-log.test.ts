@@ -45,6 +45,26 @@ describe("generateTarotImage logs its cost", () => {
     expect(r).toMatchObject({ ok: true, costUsd: (100 * 5 + 1000 * 30) / 1_000_000 });
   });
 
+  it("nano-banana-2 runs Nano Banana 2.1 on Google directly, costed from its own usage; a non-PNG reply becomes PNG", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "g");
+    const sharp = (await import("sharp")).default;
+    const jpeg = (await sharp({ create: { width: 2, height: 2, channels: 3, background: "#fff" } }).jpeg().toBuffer()).toString("base64");
+    // usage as Google answered it on 2026-11-10 (real call): image tokens by modality, thinking outside total_output_tokens.
+    const usage = { total_input_tokens: 200, total_output_tokens: 1937, total_thought_tokens: 654, output_tokens_by_modality: [{ modality: "image", tokens: 1680 }] };
+    const fetchMock = vi.fn().mockResolvedValueOnce(json({ status: "completed", usage,
+      steps: [{ type: "model_output", content: [{ type: "image", mime_type: "image/jpeg", data: jpeg }] }] }));
+    vi.stubGlobal("fetch", fetchMock);
+    const r = await generateTarotImage({ model: "nano-banana-2", prompt: "p", aspectRatio: "4:5", referenceImages: ["data:image/png;base64,aGk="] }, grant);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toMatch(/\/v1beta\/interactions$/);
+    expect(init.headers).toMatchObject({ "x-goog-api-key": "g" });
+    expect(JSON.parse(String(init.body))).toEqual({ model: "gemini-nano-banana-2.1", store: false,
+      input: [{ type: "text", text: "p" }, { type: "image", mime_type: "image/png", data: "aGk=" }],
+      response_format: { type: "image", aspect_ratio: "4:5", image_size: "2K" } });
+    expect(r).toMatchObject({ ok: true, costUsd: (200 * 1.5 + 1680 * 30 + (257 + 654) * 7.5) / 1_000_000 });
+    expect((r as { image: string }).image).toMatch(/^data:image\/png;base64,iVBOR/);
+  });
+
   it("a prediction still running at our deadline is cancelled and logged as billed (F2)", async () => {
     vi.useFakeTimers();
     try {

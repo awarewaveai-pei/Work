@@ -187,6 +187,13 @@ prod 的 `/data/orgs/39ad4149-…/jobs.json` 只有 7 筆（2026-11-05～11-10�
 - 用真實用量（目前 ≈ 0）算，實際省 ≈ $0。
 - 真正要做的是第 1、2 項，因為廠商要下線。
 
+## 第 3、4 項已換（2026-11-10）
+
+- 影片：預設 `gemini-omni-1.2-flash`（`backend/gemini-video.cjs`，背景任務＋輪詢＋取消；`generation-policy.cjs` `videoVendor()` 依 provider 分派）；沒有 `GEMINI_API_KEY` 自動退回 Veo 3.1 Fast。實測 4 秒 9:16：35 秒出片，720×1280 h264＋AAC，usage 23,168 影片＋422 思考 token = US$0.282。
+- 圖片：`nano-banana-2` 改跑 Google `gemini-nano-banana-2.1` 2K（`next-admin/lib/tarot/image-gen.ts` `generateGemini`，`store:false`）。實測回 JPEG（程式轉 PNG），1,680 圖＋257 文字＋654 思考 token = US$0.057（按鈕標 0.057）。
+- 計價：Gemini 回覆的 usage 只有一條公式 `cost-model.ts` `geminiMediaUsd`（圖／影片 token、文字與思考 token 分開計）。
+- 回退：影片設 `VW_VIDEO_MODEL=veo-3-1-fast`；圖片把 `image-gen.ts` `nano-banana-2` 改回 Replicate `google/nano-banana-2`（git revert 本 commit）。
+
 ## 實測結果與採用（2026-11-10，第 1、2 項已換）
 
 樣本：Gemini 3.8 Flash-Lite TTS 生成的繁中 3 段（一般口說 40.6 秒、「嗯／呃」與停頓 32.7 秒、中英夾雜 25.4 秒），付費實測合計 < US$0.02。金鑰所在專案（AwareWave-ColdEmail）已連帳單、預付制；2026-11-10 14:30 實測回 402「prepayment credits are depleted」＝要儲值。

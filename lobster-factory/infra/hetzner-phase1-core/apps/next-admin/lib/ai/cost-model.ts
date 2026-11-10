@@ -134,7 +134,8 @@ export const MEDIA_MODELS: Record<string, MediaModel> = {
   "ideogram-ai/ideogram-character":    { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
   // 生成填色 with a mask (lib/studio/generative-fill.ts); quality medium = $0.06 (replicate.com page 2026-11-09).
   "ideogram-ai/ideogram-4-5-precise-edit": { vendor: "Replicate", kind: "tool", status: "active", version: "64d91a9b8a91a4e41d10fde3aa54ea4f68e7c5213d417139935178a5f4672c85" },
-  "google/nano-banana-2":              { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
+  // image-gen.ts "nano-banana-2" since 2026-11-10 (GEMINI_IMAGE_TOKEN_RATES); it replaced Replicate google/nano-banana-2.
+  "gemini-nano-banana-2.1":            { vendor: "Google", kind: "image", status: "active", verifiedAt: "2026-11-10" },
   "google/nano-banana-pro":            { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
   "google/imagen-4":                   { vendor: "Replicate", kind: "image", status: "retired" },
   "gpt-image-2":                       { vendor: "OpenAI", kind: "image", status: "active", verifiedAt: "2026-10-28" },
@@ -154,6 +155,8 @@ export const MEDIA_MODELS: Record<string, MediaModel> = {
   // video-workbench speech and captions since 2026-11-10 (GEMINI_TTS_RATES / GEMINI_TRANSCRIBE_RATES; backend/speech.cjs, transcribe.cjs).
   "gemini-3.8-flash-lite-tts":         { vendor: "Google", kind: "tool", status: "active", verifiedAt: "2026-11-10" },
   "gemini-3.5-transcribe":             { vendor: "Google", kind: "tool", status: "active", verifiedAt: "2026-11-10" },
+  // video-workbench default video model since 2026-11-10 (GEMINI_VIDEO_RATES; backend/gemini-video.cjs).
+  "gemini-omni-1.2-flash":             { vendor: "Google", kind: "video", status: "active", verifiedAt: "2026-11-10" },
   // video-service default until 2026-10-28; OpenAI: "The model 'dall-e-3' does not exist".
   "dall-e-3":                          { vendor: "OpenAI", kind: "image", status: "retired" },
   "runwayml/gen4-turbo":               { vendor: "Replicate", kind: "video", status: "active", verifiedAt: "2026-10-28" },
@@ -315,6 +318,33 @@ export const OPENAI_TTS_RATES: Record<string, TtsRate> = {
  *  tokens per minute (= $0.005/min). The reply's usage is what is charged. */
 export const GEMINI_TRANSCRIBE_RATES: Record<string, { label: string; audioInPerM: number; textOutPerM: number; audioTokensPerSec: number; textTokensPerMin: number }> = {
   "gemini-3.5-transcribe": { label: "Gemini 3.5 Transcribe", audioInPerM: 2, textOutPerM: 12, audioTokensPerSec: 25, textTokensPerMin: 175 },
+};
+/** Gemini image/video replies (Interactions API) -> USD from their own usage: media output tokens (output_tokens_by_modality
+ *  image|video) at outputPerM; the other output tokens plus thinking (total_thought_tokens, not inside total_output_tokens) at
+ *  textOutPerM. No by-modality list = all output at outputPerM (upper bound). Measured 2026-11-10: Nano Banana 2.1 2K = 1,680
+ *  image + 257 text out + 654 thought tokens; Omni 4 s 720p = 23,168 video + 422 thought tokens. */
+export type GeminiMediaRate = { inputPerM: number; outputPerM: number; textOutPerM: number };
+export interface GeminiMediaUsage {
+  total_input_tokens?: number; total_output_tokens?: number; total_thought_tokens?: number;
+  output_tokens_by_modality?: { modality?: string; tokens?: number }[];
+}
+export function geminiMediaUsd(rate: GeminiMediaRate, u: GeminiMediaUsage): number {
+  const n = (v: unknown) => Math.max(0, Number(v) || 0);
+  const out = n(u.total_output_tokens), byModality = u.output_tokens_by_modality;
+  const media = Array.isArray(byModality) ? byModality.filter((m) => m.modality === "image" || m.modality === "video").reduce((s, m) => s + n(m.tokens), 0) : out;
+  return (n(u.total_input_tokens) * rate.inputPerM + media * rate.outputPerM + (Math.max(0, out - media) + n(u.total_thought_tokens)) * rate.textOutPerM) / 1_000_000;
+}
+/** Gemini video (video-workbench backend/gemini-video.cjs), aistudio.google.com/docs/pricing 2026-11-10, Standard tier, USD per
+ *  1M tokens: text/image in $1.50, video out $12, text and thinking out $9; 720p = 5,792 video tokens per second (~$0.0695/s,
+ *  native audio included). The finished interaction's usage is charged (geminiMediaUsd). */
+export const GEMINI_VIDEO_RATES: Record<string, GeminiMediaRate & { label: string; videoTokensPerSec: number }> = {
+  "gemini-omni-1.2-flash": { label: "Gemini Omni 1.2 Flash", inputPerM: 1.5, outputPerM: 12, textOutPerM: 9, videoTokensPerSec: 5792 },
+};
+/** Gemini image (lib/tarot/image-gen.ts generateGemini), aistudio.google.com/docs/pricing 2026-11-10, Standard tier, USD per 1M
+ *  tokens: text/image in $1.50, image out $30, text and thinking out $7.50; 2K = 1,680 image tokens = $0.0504. The reply's
+ *  usage is charged (geminiMediaUsd); without it, image-models.js usd (0.057 = the measured 2K reply incl. thinking). */
+export const GEMINI_IMAGE_TOKEN_RATES: Record<string, GeminiMediaRate> = {
+  "gemini-nano-banana-2.1": { inputPerM: 1.5, outputPerM: 30, textOutPerM: 7.5 },
 };
 export type GeminiTtsRate = { label: string; audioTokensPerSec: number; prices: readonly { from: string; textInPerM: number; audioOutPerM: number }[] };
 export const GEMINI_TTS_RATES: Record<string, GeminiTtsRate> = {

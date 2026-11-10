@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-10（續42）影音工作台換廠商第 3、4 項：影片預設 Gemini Omni 1.2 Flash、nano-banana-2 改 Nano Banana 2.1 直連
+
+- 根因：影片、圖片各只有一家寫死的供應商路徑（`api.cjs` 判斷 `provider === "Replicate"`；`image-gen.ts` nano-banana-2 走 Replicate），換更便宜、排名更高的廠商就必須改呼叫端。
+- 改：
+  - C1 影片供應商可插拔：新 `video-workbench/backend/gemini-video.cjs`（Interactions API background；create/status/download/cancel，與 `replicate-video.cjs` 同契約：status→output、download→{video,usage}）；`generation-policy.cjs` `videoVendor()` 依 job.video.provider 分派、`videoModels()` 兩家同一清單、預設經 `providers.choose`（有 GEMINI_API_KEY＝Omni，否則 Veo 3.1 Fast）；`api.cjs` 四處 Replicate 寫死改分派。
+  - C2 nano-banana-2 → `gemini-nano-banana-2.1` 2K 直連（`next-admin/lib/tarot/image-gen.ts` `generateGemini`，store:false，JPEG 轉 PNG）；app id 不變（存檔、成本列沿用）。
+  - C3 Gemini usage 計價唯一公式 `cost-model.ts` `geminiMediaUsd`（圖／影片 token、文字＋思考 token 分價）；`GEMINI_VIDEO_RATES`、`GEMINI_IMAGE_TOKEN_RATES`；MEDIA_MODELS 加兩列、刪 Replicate google/nano-banana-2。
+  - m1 頁面「尚未設定金鑰」不再寫死 REPLICATE_API_TOKEN（rows 帶 keyName）；README:239,241 與 vendor-alternatives 文件更新。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scratchpad/omni-real.cjs（真打 Omni 4s 9:16：35s 出片，720x1280 h264+aac 4.03s，usage 23168 video+422 thought = $0.282）; node scratchpad/nb21-real.cjs（真打 NB2.1 2K：26s，JPEG，1680 image+257 text+654 thought = $0.057）; node tests/{replicate-video,replicate-video-ui,p6-main-system,backend,generation-flows,gate}.cjs; npx vitest run lib/studio lib/content app/(shell)/tools app/api/tools lib/tarot lib/ai/__tests__ (155 files 1140 tests); npx tsc --noEmit（僅既有 .next/types 3 錯，與本改無關） | exit=0 | ms=600000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/0n — Codex（agency-os/reports/oracle/2026-11-10-partialreview-845c8eb8.md）：Gemini 已計費無圖時結算 0＝設計如此（log-ai-call.ts:228 delivered:false＝我方成本、不向客人收，與 OpenAI 空圖同），駁回不改
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=replicateVideo\.isModel|DEFAULT_VIDEO_MODEL|result\.outputUrl|download\(\{ url|"google/nano-banana-2" | hits=1（video-workbench/.awarewave 為 gitignored 建置副本，部署重建）
+- 既有失敗（非本次）：`tests/generator-buttons.cjs:54` 在 HEAD 已紅（env {} 時預設模型無金鑰，先報金鑰錯而非字幕錯），乾淨 worktree 重現。
+- 上線：next-admin（NB2.1）推 main＝今晚 03:00 自動部署；工作台（Omni）要 sg-deploy video-workbench（交監工批次），容器已有 GEMINI_API_KEY（23eaf31a8）。
 ## 2026-11-10（續41）video-workbench ED.7 退件：重錄 ed3-legacy golden（轉場曲線現在真的套用）
 
 - 根因：3ca146b0b 讓 `backend/editor-export.cjs:405 curvedTransition` 真的使用 transitionCurve；舊專案存的曲線以前只驗證不輸出。golden 專案 1 clip c2（融接＋平滑）第 3 次 FFmpeg 由 `xfade=fade` 變 custom expr。

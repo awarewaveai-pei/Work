@@ -4,7 +4,8 @@
 //   openai-low/med/hi → OpenAI images (OPENAI_IMAGE_MODEL in lib/ai/cost-model.ts); openai-25-edit → gpt-image-2.5-sunburst,
 //                       openai-26-edit → gpt-image-2.6-sunburst (config.openaiModel; the only model that takes `mask`)
 //   ideogram-*        → Ideogram via Replicate (v2a-turbo/v3-balanced/v4-turbo/v4-quality/character)
-//   nano-banana-2/pro → Google Gemini Image via Replicate
+//   nano-banana-2     → Google Gemini Nano Banana 2.1, direct (half the price of Replicate's Nano Banana 2, ranked higher; 2026-11-10)
+//   nano-banana-pro   → Google Gemini Image via Replicate
 //   flux-2-max        → BFL Flux.2 Max via Replicate
 // Returns uniform `data:image/png;base64,...` so the client treats all models the same.
 // Prompts arrive in English: the studio translates non-English subject/style once per deck (lib/tarot/translate.ts), never here.
@@ -17,7 +18,7 @@ import type { Grant } from "@/lib/entitlements/can";
 import { holdCost, logImageResult } from "@/lib/ai/log-ai-call";
 import { imageCostUsd } from "@/lib/ai/cost-calculator";
 import { IMAGE_MODELS, imageRunUsd } from "../../public/editor-shared/image-models.js";
-import { OPENAI_IMAGE_MODEL, OPENAI_IMAGE_TOKEN_RATES } from "@/lib/ai/cost-model";
+import { GEMINI_IMAGE_TOKEN_RATES, OPENAI_IMAGE_MODEL, OPENAI_IMAGE_TOKEN_RATES, geminiMediaUsd, type GeminiMediaUsage } from "@/lib/ai/cost-model";
 
 const GEN_TIMEOUT_MS = 58_000; // default; a model sets ModelConfig.timeoutMs when its route allows more (app nginx proxy_read_timeout is 300s)
 // Replicate holds a "Prefer: wait" request up to this many seconds, then answers with the running prediction: shorter
@@ -61,7 +62,9 @@ export interface BuildInputParams {
 }
 
 interface ModelConfig {
-  provider: "flux" | "openai" | "replicate";
+  provider: "flux" | "openai" | "replicate" | "gemini";
+  /** Gemini model id (provider "gemini"; GEMINI_IMAGE_TOKEN_RATES key). */
+  geminiModel?: string;
   /** Replicate slug for legacy flux models (owner/name). */
   fluxModel?: string;
   /** Replicate slug for generic replicate models (owner/name). */
@@ -231,22 +234,11 @@ export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
       prompt, seed, img_cond_path: referenceImages[0], output_format: "png", aspect_ratio: "match_input_image",
     }),
   },
+  // App id kept (saved picks, cost rows); runs Nano Banana 2.1 at 2K like the Replicate Nano Banana 2 it replaced.
   "nano-banana-2": {
-    provider: "replicate",
-    slug: "google/nano-banana-2",
+    provider: "gemini",
+    geminiModel: "gemini-nano-banana-2.1",
     supportsImg2img: true,
-    buildInput: ({ prompt, aspectRatio, referenceImages }) => {
-      const input: Record<string, unknown> = {
-        prompt,
-        aspect_ratio: aspectRatio,
-        resolution: "2K",
-        output_format: "png",
-      };
-      if (referenceImages.length > 0) {
-        input.image_input = referenceImages;
-      }
-      return input;
-    },
   },
   "nano-banana-pro": {
     provider: "replicate",
@@ -645,6 +637,44 @@ async function generateOpenai(params: TarotGenParams, config: ModelConfig, signa
   return { ok: true, image: `data:image/png;base64,${b64}`, seed: null, costUsd };
 }
 
+// ── Google Gemini image, direct (Interactions API; aistudio.google.com/docs/image-generation, read 2026-11-10) ──────────
+// Up to 14 references; every AspectRatio here is offered; 2K = 1,680 output tokens. store:false = Google keeps no copy.
+async function generateGemini(params: TarotGenParams, config: ModelConfig, signal: AbortSignal, grant: Grant): Promise<TarotGenResult> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return { ok: false, error: "missing_gemini_api_key" };
+  if (!config.geminiModel) return { ok: false, error: "model_config_incomplete" };
+  const input: Record<string, unknown>[] = [{ type: "text", text: params.prompt }];
+  for (const ref of params.referenceImages ?? []) {
+    const own = parseDataUrl(ref) || !isAllowedInputUrl(ref) ? null : await ownDesignUrlToBlob(ref, signal);
+    const parsed = parseDataUrl(ref) ?? (own ? { mime: own.blob.type, buffer: Buffer.from(await own.blob.arrayBuffer()) } : null);
+    if (!parsed) return { ok: false, error: "invalid_reference_image" };
+    input.push({ type: "image", mime_type: parsed.mime, data: parsed.buffer.toString("base64") });
+  }
+  const res = await fetch(providerUrl(grant, "gemini", "/v1beta/interactions"), {
+    method: "POST",
+    headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: config.geminiModel, input, response_format: { type: "image", aspect_ratio: params.aspectRatio ?? "2:3", image_size: "2K" }, store: false }),
+    signal,
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    console.error(`[tarot] ${config.geminiModel} failed`, res.status, detail.slice(0, 500));
+    return { ok: false, error: `gemini_${res.status}` };
+  }
+  const json = (await res.json()) as { steps?: { content?: { type?: string; data?: string; mime_type?: string }[] }[]; usage?: GeminiMediaUsage };
+  const costUsd = geminiImageCostUsd(config.geminiModel, json.usage);
+  const part = (json.steps ?? []).flatMap((s) => s.content ?? []).find((c) => c.type === "image" && c.data);
+  if (!part?.data) return { ok: false, error: "gemini_empty_output", billed: true, costUsd };
+  const png = part.mime_type === "image/png" ? part.data : (await sharp(Buffer.from(part.data, "base64")).png().toBuffer()).toString("base64");
+  return { ok: true, image: `data:image/png;base64,${png}`, seed: null, costUsd };
+}
+
+/** The charge for one Gemini image reply, from its own usage (undefined when it reports none: the per-image price applies). */
+function geminiImageCostUsd(model: string, u: GeminiMediaUsage | undefined): number | undefined {
+  const r = GEMINI_IMAGE_TOKEN_RATES[model];
+  return r && u && Number.isFinite(Number(u.total_output_tokens)) ? geminiMediaUsd(r, u) : undefined;
+}
+
 /** WHITE = change mask → the images API's RGBA mask whose TRANSPARENT pixels mark the area to edit (alpha = 255 − luminance). */
 async function openaiMask(maskDataUrl: string): Promise<Buffer | null> {
   const parsed = parseDataUrl(maskDataUrl);
@@ -711,6 +741,7 @@ async function runGeneration(params: TarotGenParams, grant: Grant): Promise<Taro
   try {
     if (config.provider === "flux") return await generateFlux(params, config, controller.signal, grant);
     if (config.provider === "replicate") return await generateReplicate(params, config, controller.signal, grant);
+    if (config.provider === "gemini") return await generateGemini(params, config, controller.signal, grant);
     return await generateOpenai(params, config, controller.signal, grant);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);

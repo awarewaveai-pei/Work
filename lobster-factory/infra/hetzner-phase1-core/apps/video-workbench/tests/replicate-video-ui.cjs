@@ -30,7 +30,7 @@ const fetchImpl = async () => { throw Error("Provider calls are forbidden in tes
       assert(( await p.locator("#send").innerText()).includes(veo8), "Veo 3.1 Fast 8 秒的生成按鈕沒有價格");
       await p.locator('[data-panel="model"]').first().click();
       const buttons = p.locator("#popover [data-model]");
-      assert.equal(await buttons.count(), 4);
+      assert.equal(await buttons.count(), await p.evaluate(() => VideoWorkbench.capabilities.videoModels.length));
       // Each button: that model's length (the one it shows) x its rate x the ratios sent (index-0.js model panel).
       const count = await p.evaluate(() => (state.mode === "director" ? 1 : generatorRatios().length));
       for (const [i, text] of (await buttons.allInnerTexts()).entries()) {
