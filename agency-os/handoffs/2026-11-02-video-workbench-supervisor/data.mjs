@@ -252,7 +252,7 @@ export const STEPS = [
       done('FC.4', '11-10 在正式站用獨顯（RTX 5060）實跑：送兩支素材、加繁中標題、存檔、重開（素材都在）、輸出 16:9；成片 1920×1080、有聲、7.2 秒，進任務紀錄與素材庫，來源正好是那兩支。217 格輸出約 8 分鐘。', '96ddd7f70'),
     ] },
   { n: 18, code: 'EC', title: '專業特效（EffectCraft）', plain: '例：在應用工具按「專業特效」，進到 EffectCraft 的完整畫面做片頭與特效（三百多個特效、曲線編輯器、表達式），做好的透明片段直接回到素材庫給剪輯用。',
-    gate: '跟專業剪輯同一套流程在 EffectCraft 走通；重開專案時素材不會離線。', risk: 'High', model: 'Opus；上線等你同意', status: 'done', commit: '96ddd7f70', depends: ['FC'],
+    gate: '跟專業剪輯同一套流程在 EffectCraft 走通；重開專案時素材不會離線。', risk: 'High', model: 'Opus；上線等你同意', status: 'in_progress', depends: ['FC'],
     decided: '專業剪輯驗收過才開始。EffectCraft 複雜合成的預覽即使用獨立顯示卡也不到即時，適合做短的片頭與特效片段。',
     what: '建置鏈同 FC；另補嵌入橋補丁（照 scripts/photocraft-pro/web-host-api.patch 接 craft-web-host，上游已有就不補）；頁面與入帳沿用 FC 的外框與路由；重開後補 footage.relink',
     files: ['VW/docs/engine-route-plan-20261106.md', 'scripts/effectcraft-pro/'],
@@ -261,6 +261,7 @@ export const STEPS = [
       done('EC.2', '應用工具多了「專業特效」：跟專業剪輯共用同一份外框，重開專案時自動把素材接回來。透明輸出還沒做，先輸出一般影片。', 'cbe8f67f8'),
       done('EC.3', '專業特效的成片自動進任務紀錄與素材庫，記下用了哪些素材。', 'cbe8f67f8'),
       done('EC.4', '11-10 在正式站用獨顯實跑：送一支素材、建 1920×1080 合成加繁中標題、存檔、輸出；成片 3 秒進任務紀錄與素材庫，來源正確；重開後沒有離線素材。', '96ddd7f70'),
+      todo('EC.5', '透明輸出：特效做的片頭、貼圖帶透明背景回素材庫，剪輯器能疊在別的影片上（11-10 派工中）。'),
     ] },
 ];
 
