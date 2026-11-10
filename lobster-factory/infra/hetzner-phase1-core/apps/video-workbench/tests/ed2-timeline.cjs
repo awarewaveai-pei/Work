@@ -47,11 +47,15 @@ const pass = (m) => console.log("PASS " + m);
         await page.keyboard.press(k);
       },
       // Drag a clip by dx pixels in small steps; shift held during the move = no snapping.
+      // Centred, not scrollIntoViewIfNeeded: "if needed" counts a clip under the sticky ruler / track names as visible,
+      // and a press there seeks the playhead instead (ED.0: the 1-in-10 cross-track drag failure, both clips stayed at 0).
       drag = async (id, dx, { shift = false, at = 0.5, px } = {}) => {
-        await clip(id).scrollIntoViewIfNeeded();
+        await clip(id).evaluate((el) => el.scrollIntoView({ block: "center", inline: "center" }));
         const box = await clip(id).boundingBox(),
           x = px !== undefined ? box.x + px : box.x + box.width * at,
           y = box.y + 12;
+        // The press must land on the clip itself, not on the sticky ruler / track names over it (ED.0 flake).
+        assert.equal(await page.evaluate(([px, py]) => document.elementFromPoint(px, py)?.closest("[data-ed-clip]")?.dataset.edClip, [x, y]), id, "拖曳起點被時間尺或軌道名蓋住");
         await page.mouse.move(x, y);
         await page.mouse.down();
         if (shift) await page.keyboard.down("Shift");
