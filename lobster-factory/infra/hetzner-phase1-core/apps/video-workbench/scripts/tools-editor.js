@@ -916,13 +916,7 @@ function toolEditorScreen(t) {
   const p = edProject(),
     c = edClip();
   if (!ed.ready) return wfWrap(t, "<p>讀取剪輯專案…</p>");
-  if (!p)
-    return wfWrap(
-      t,
-      `<h3>剪輯專案</h3><p class="note">保留原始素材；時間軸、文字與音軌獨立儲存。</p>${edButton("新建剪輯專案", "new")}<div class="flow-choices">${edSpineList()
-        .map(({ project, n, file }) => `<span>${edButton(file.title + " · " + file.ratio, "open:" + file.id)} <span class="muted">屬於 ${esc(project.title)} › 第 ${n} 集</span></span>`)
-        .join("")}</div>`,
-    );
+  if (!p) return edProjectListScreen(t);
   const l = ed.layout;
   return `<div class="editor-app" data-tool-flow="edit" style="--ed-timeline:${l.timeline}px">${edTopbar(p)}<div class="editor-workspace" data-ed-workspace style="grid-template-columns:${edColumns()}">${edRail()}${l.leftOpen ? `<aside class="editor-library">${edPane(p, c)}</aside>${edResizer("left", "vertical", "調整面板寬度", l.left)}` : ""}${edPlayer(p)}${l.rightOpen ? `${edResizer("right", "vertical", "調整檢查器寬度", l.right)}<aside class="editor-inspector">${edInspector(p, c)}</aside>` : ""}</div>${edResizer("timeline", "horizontal", "調整時間軸高度", l.timeline)}${edToolbar(p, c)}${edTimeline(p)}</div>`;
 }
@@ -1623,26 +1617,7 @@ async function edAction(action) {
     c = edClip();
   if (action.startsWith("comp-") && typeof cpEditorAction === "function")
     return cpEditorAction(action, p, c);
-  if (action === "new") {
-    // Card ED.1: the reference's 「新建剪輯專案」 -- name + a card per ratio (AwareWave also offers 4:3).
-    const d = edDialog(
-      `<form><h3>新建剪輯專案</h3><label>專案名稱<input data-ed-create-title class="text-input" aria-label="專案名稱" maxlength="100" value="未命名剪輯專案" required></label><fieldset class="editor-ratio-cards"><legend>畫面比例</legend>${edCreateRatios
-        .map(
-          ([r, name, use], i) =>
-            `<label class="editor-ratio-card"><input type="radio" name="ratio" value="${r}" data-ed-create-ratio ${i ? "" : "checked"}><i style="aspect-ratio:${edRatios[r].join("/")}" aria-hidden="true"></i><b>${r} ${name}</b><small>${edRatios[r].join(" × ")} · ${use}</small></label>`,
-        )
-        .join("")}</fieldset><div class="row"><button class="btn" type="button" data-ed-create-cancel>取消</button><button class="btn primary" type="submit">建立專案</button></div></form>`,
-    );
-    d.querySelector("[data-ed-create-cancel]").onclick = () => d.close();
-    d.querySelector("form").onsubmit = async (e) => {
-      e.preventDefault();
-      const title = d.querySelector("[data-ed-create-title]").value,
-        ratio = d.querySelector("[data-ed-create-ratio]:checked").value;
-      d.close();
-      await edCreate(title, ratio);
-    };
-    return;
-  }
+  if (action === "new") return edNewProjectDialog();
   if (action.startsWith("open:")) {
     edOpen(action.slice(5));
     edRender();
@@ -2259,74 +2234,6 @@ function edNeighbours(p, next) {
     )
   )
     throw Error("會蓋到同一軌的相鄰片段，請先移開或縮短它");
-}
-// Export (card P2): quality buttons (720p / 1080p / 4K), the loudness target, a 4K upscale warning and the
-// platforms the project's ratio fits (main-system RATIO_PREFERENCE via /delivery-ratios).
-function edExportDialog(p) {
-  const [w, h] = edRatios[p.ratio],
-    k4 = [w * 2, h * 2],
-    small = p.clips.some(
-      (c) =>
-        ["video", "image"].includes(c.kind) &&
-        !(c.asset?.width >= k4[0] && c.asset?.height >= k4[1]),
-    );
-  const body = () => {
-    const delivery = ed.delivery?.ratios?.[p.ratio];
-    return `<h3>匯出影片</h3><p>${esc(p.ratio + " · MP4 · " + Timebase.label(p.timebase) + " · BT.709 TV 範圍 · 響度 " + p.output.loudness + " LUFS")}</p>${edChoices("畫質", "quality", ed.quality, Object.keys(EditorModel.QUALITIES), (q) => q + "（" + Math.round((w * EditorModel.QUALITIES[q]) / 2) * 2 + "×" + Math.round((h * EditorModel.QUALITIES[q]) / 2) * 2 + "）")}${ed.quality === "4K" && small ? '<p class="note" data-ed-upscale>來源低於 4K，會放大</p>' : ""}<p class="note" data-ed-delivery>適合投遞：${
-      !ed.delivery
-        ? "讀取中…"
-        : delivery?.platforms
-          ? esc(
-              delivery.platforms
-                .map((x) => x.platform + (x.preferred ? "（首選）" : ""))
-                .join("、"),
-            )
-          : esc(delivery?.note || "此比例尚不能投遞")
-    }</p><button class="btn primary" type="button" data-ed-export>開始匯出</button>`;
-  };
-  const d = edDialog(`<div data-ed-export-body>${body()}</div>`),
-    refresh = () => {
-      const box = d.querySelector("[data-ed-export-body]");
-      if (box) box.innerHTML = VideoWorkbench.sanitize(body());
-      wire();
-    };
-  if (!ed.delivery)
-    VideoWorkbench.request("/delivery-ratios", undefined, "GET")
-      .then((value) => {
-        ed.delivery = value;
-        refresh();
-      })
-      .catch(VideoWorkbench.reportError);
-  function wire() {
-    d.querySelectorAll('[data-ed-action^="quality:"]').forEach((b) => {
-      b.onclick = (e) => {
-        e.stopPropagation();
-        ed.quality = b.dataset.edAction.slice(8);
-        refresh();
-      };
-    });
-    d.querySelector("[data-ed-export]").onclick = async (e) => {
-      e.target.disabled = true;
-      try {
-        p.clips.forEach(edValidate);
-        const job = await VideoWorkbench.generations.create({
-          type: "video",
-          operation: "editor-export",
-          settings: {
-            quality: ed.quality,
-            project: edNative(p),
-            projectRevision: p.revision || 0,
-          },
-        });
-        d.close();
-        VideoWorkbench.showJob(job);
-      } catch (err) {
-        VideoWorkbench.reportError(err);
-        e.target.disabled = false;
-      }
-    };
-  }
-  wire();
 }
 document.addEventListener("click", (e) => {
   const action = e.target.closest("[data-ed-action]"),

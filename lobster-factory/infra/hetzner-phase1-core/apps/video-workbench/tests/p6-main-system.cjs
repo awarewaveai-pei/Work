@@ -424,7 +424,7 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
     const ratios = (await deliveryRatios(["16:9", "1:1", "4:3"])).ratios;
     assert.equal(ratios["16:9"].deliverable, true);
     for (const r of ["1:1", "4:3"]) assert.deepEqual([ratios[r].deliverable, ratios[r].note], [false, "此比例尚不能投遞"]);
-    assert.match(fs.readFileSync(path.join(__dirname, "../scripts/tools-editor.js"), "utf8"), /delivery\?\.note \|\| "此比例尚不能投遞"/);
+    assert.match(fs.readFileSync(path.join(__dirname, "../scripts/editor-export-dialog.js"), "utf8"), /delivery\?\.note \|\| "此比例尚不能投遞"/);
 
     // 8b. Container mode: config.js says http; the file on disk stays local. Costs come from next-admin cost-model.ts.
     const httpServer = createServer({ dataDir: path.join(dir, "http"), env: { VW_CONFIG_MODE: "http" }, fetchImpl });
