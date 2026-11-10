@@ -390,6 +390,19 @@ function duckExpression(ranges) {
   return `1-${1 - EditorModel.DUCK.gain}*${w.reduce((acc, x) => `max(${x},${acc})`)}`;
 }
 const even = (n) => Math.ceil(n / 2) * 2;
+// Card ED.7 轉場曲線: xfade progress P runs 1 -> 0, so T = 1 - P is the linear 0 -> 1 progress. 平滑 = smoothstep, 加速 = T^2.
+// Each effect is xfade's own, re-stated with the curved progress S (a hard-edged circle; slides have no curved form).
+const CURVED_TRANSITIONS = {
+  fade: (s) => `A*(1-${s})+B*${s}`,
+  fadeblack: (s) => {
+    const k = "if(between(PLANE,1,2),128,16)";
+    return `if(lt(${s},0.5),A*(1-2*${s})+${k}*2*${s},${k}*(2-2*${s})+B*(2*${s}-1))`;
+  },
+  wipeleft: (s) => `if(lt(X,W*${s}),B,A)`,
+  wiperight: (s) => `if(gt(X,W*(1-${s})),B,A)`,
+  circleopen: (s) => `if(lte(hypot(X-W/2,Y-H/2),hypot(W/2,H/2)*${s}),B,A)`,
+};
+const curvedTransition = (type, curve) => CURVED_TRANSITIONS[type](curve === "平滑" ? "(T*T*(3-2*T))" : "(T*T)").replaceAll("T", "(1-P)");
 const TRUE_PEAK_CEILING = -2; // dBTP for loudnorm and the limiter; the export must measure <= -1 dBTP after AAC.
 async function exportEditor(
   raw,
@@ -417,7 +430,9 @@ async function exportEditor(
     if (!previous || previous.startFrame + previous.durationFrames !== clip.startFrame)
       throw Error("轉場只能放在主影片軌上相鄰（無空隙）的兩段之間，可開啟時間軸的「磁性主軌」補齊空隙");
     const before = Math.floor(clip.transitionFrames / 2),
-      transition = { type: EditorModel.TRANSITIONS[clip.transition], frames: clip.transitionFrames, before, after: clip.transitionFrames - before, cut: clip.startFrame };
+      transition = { type: EditorModel.TRANSITIONS[clip.transition], frames: clip.transitionFrames, before, after: clip.transitionFrames - before, cut: clip.startFrame, curve: clip.transitionCurve || "線性" };
+    if (transition.curve !== "線性" && !Object.hasOwn(CURVED_TRANSITIONS, transition.type))
+      throw Error("此轉場效果不支援曲線，請把曲線改回「線性」");
     incoming.set(clip.id, transition);
     outgoing.set(previous.id, transition);
   });
@@ -695,7 +710,13 @@ async function exportEditor(
         chain.slice(1).forEach(({ clip: next, label }, i) => {
           const t = incoming.get(next.id),
             out = `[xfade${layer}_${i}]`;
-          graph.push(`${joined}${label}xfade=transition=${t.type}:duration=${Timebase.ffTime(t.frames, tb)}:offset=${Timebase.ffTime(t.cut - t.before - groupStart, tb)}${out}`);
+          const timing = `duration=${Timebase.ffTime(t.frames, tb)}:offset=${Timebase.ffTime(t.cut - t.before - groupStart, tb)}`;
+          if (t.curve === "線性") graph.push(`${joined}${label}xfade=transition=${t.type}:${timing}${out}`);
+          else {
+            // Card ED.7: xfade's own transitions are linear, so a curve re-states the effect with the remapped progress.
+            graph.push(`${joined}format=yuv420p[xa${layer}_${i}]`, `${label}format=yuv420p[xb${layer}_${i}]`);
+            graph.push(`[xa${layer}_${i}][xb${layer}_${i}]xfade=transition=custom:${timing}:expr='${curvedTransition(t.type, t.curve)}'${out}`);
+          }
           joined = out;
         });
         graph.push(`${joined}setpts=PTS+${groupStart}[group${layer}]`);

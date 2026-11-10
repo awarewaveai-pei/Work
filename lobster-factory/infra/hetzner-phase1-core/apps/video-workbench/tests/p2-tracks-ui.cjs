@@ -82,7 +82,7 @@ const pass = (label) => {
       assert.equal(await page.locator(".editor-library select").count(), 0, pane);
     }
     await page.locator('[data-ed-pane="轉場"]').click();
-    assert.equal(await page.getByRole("group", { name: "轉場", exact: true }).getByRole("button").count(), 8);
+    assert.equal(await page.getByRole("group", { name: "轉場", exact: true }).getByRole("button").count(), 5);
     await page.locator('[data-ed-lane="V1"] [data-ed-clip]').first().click();
     for (const label of ["曝光（EV）", "對比", "色溫（K）", "飽和度"]) assert.equal(await page.locator(".editor-inspector").getByLabel(label, { exact: true }).count(), 1, label);
     await page.locator('[data-ed-pane="音訊"]').click();
@@ -97,7 +97,7 @@ const pass = (label) => {
     await page.locator("dialog[open] [data-ed-close]").click();
     assert.equal(await page.locator(".editor-library [data-ed-peak]").count(), 1);
     assert.match(await page.locator("[data-ed-peak]").innerText(), /超過 −1 dB 會在輸出時自動壓低/);
-    pass("轉場（8 鈕）、響度（3 鈕）分頁與匯出對話框（3 個畫質鈕、4K 放大提示、適合投遞）沒有下拉選單；調色在片段屬性；峰值表在音訊分頁");
+    pass("轉場（5 鈕）、響度（3 鈕）分頁與匯出對話框（3 個畫質鈕、4K 放大提示、適合投遞）沒有下拉選單；調色在片段屬性；峰值表在音訊分頁");
 
     // 設為入點 at an exact frame (16 then 下一格 = 17), kept after a reload. 磁性主軌 off (card ED.2): with it on, the
     // trimmed main-track clip would move back to frame 0.

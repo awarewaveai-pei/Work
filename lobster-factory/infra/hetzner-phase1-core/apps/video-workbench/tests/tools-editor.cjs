@@ -79,13 +79,12 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "vw-editor-"));
     await page.getByRole("button", { name: "重做", exact: true }).click();
     assert.equal(await page.locator("[data-ed-clip]").count(), 2);
     // Card ED.2: a redo comes back with nothing selected; the transition goes on the second half.
-    await page.locator("[data-ed-clip]").nth(1).click();
-    await page.locator('[data-ed-pane="轉場"]').click();
-    await page.getByRole("group", { name: "轉場", exact: true }).getByRole("button", { name: "溶解", exact: true }).click();
+    await page.getByRole("button", { name: /^新增轉場效果/ }).click();
+    await page.getByRole("group", { name: "轉場", exact: true }).getByRole("button", { name: "融接", exact: true }).click();
     await page.getByLabel("轉場秒數").fill("0.4");
     await page.getByLabel("轉場秒數").press("Tab");
     await page.locator('[data-ed-pane="文字"]').click();
-    await page.getByRole("button", { name: "主標題", exact: true }).click();
+    await page.getByRole("button", { name: "＋ 加入空白文字", exact: true }).first().click();
     await page.getByLabel("文字內容").fill("EXPORT TEST");
     await page.getByLabel("文字內容").press("Tab");
     await page.getByLabel("長度", { exact: true }).fill("1");

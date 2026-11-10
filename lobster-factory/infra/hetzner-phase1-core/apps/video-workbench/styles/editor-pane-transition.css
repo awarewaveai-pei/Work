@@ -1,1 +1,5 @@
 /* Styles owned by ED.7 scripts/editor-panes/transition.js (spec §3 檔案歸屬). Theme tokens only (tests/theme-tokens.cjs). */
+.editor-transition-length { display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0 2px; }
+.editor-transition-length input { width:84px; }
+.editor-transition-actions { display:flex;flex-wrap:wrap;gap:4px;margin-top:10px; }
+.editor-library .flow-choices[aria-label="轉場"] .btn,.editor-library .flow-choices[aria-label="轉場曲線"] .btn { margin:2px; }

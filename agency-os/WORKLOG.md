@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-10（續39）影音工作台 ED.7 轉場與貼圖
+
+- 做了什麼：轉場分頁（`scripts/editor-panes/transition.js`）＝只能點剪點才套用（提示「請先點選 V1 相鄰片段之間的剪點」）、五種效果（融接／淡入淡出／向左擦除／向右擦除／圓形裁切）、長度 0.1–2 秒且不超過左右片段各半、套用全部剪點 (n)、預覽剪點、移除轉場、曲線 線性／平滑／加速。貼圖分頁（`stickers.js`）＝新增浮水印（PNG／SVG→PNG，存帳戶素材庫，asset.watermark=true；使用中的存偏好 `tools.editor.watermark`）、專案貼圖清單＋加入疊加 V2、品牌套件（色彩／字型／Logo，偏好 `tools.editor.brandKit` = { colors, font, logo }，ED.5 文字分頁讀同一鍵）。
+- 共用檔 `backend/editor-export.cjs` 只動轉場段：曲線非線性時 xfade 改 `custom` expr（CURVED_TRANSITIONS／curvedTransition，進度 P 為 1→0，T=1-P；平滑=smoothstep，加速=T²）；線性維持內建 xfade，輸出不變；推移＋曲線明確拒絕。
+- 舊測試跟著新介面：`tests/tools-editor.cjs` 先點剪點再按「融接」、`tests/p2-tracks-ui.cjs` 轉場按鈕 8→5。
+- Codex 1 輪（`codex-oracle -Path` 只審本卡檔）：F1 浮水印未進匯出＝ED.8 匯出視窗要做（不在本卡）；F2 成立——相鄰片段短於 0.1 秒時最短長度超過片段，匯出會拒絕 → edTrRange 最短長度不超過片段、2 格以下不給加、套用全部略過，加測。
+- 已知差異：黑場線性仍走內建（較快變黑），曲線版整段均勻淡出；圓形曲線版為硬邊。參考站截圖逾時，版型照規格 §1.3，未逐項對照。
+- 驗證結果：
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed7-transition-stickers.cjs（真 Edge、隔離資料夾；五種效果×平滑／加速真實匯出抽畫面；另 ed1-layout／ed2-timeline／tools-editor／p1-loop／p2-tracks-ui／p3-roundtrip／theme-tokens 綠） | exit=0 | ms=150000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/1n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=transitionCurve | hits=6
+- ORACLE: agency-os/reports/oracle/2026-11-10-partialreview-d7dff71f.md
+- rollback：還原 transition.js／stickers.js／兩個 CSS／editor-export.cjs 轉場段與兩個舊測試，刪 ed7 測試。
 ## 2026-11-10（續38）ED.4 素材分頁（影片剪輯對齊 seedstar）
 
 - 根因／內容：左側「素材」分頁整個重做成參考版型：我的素材庫／本次上傳 (n)／收藏三分頁、搜尋（只重繪清單不掉焦點）、全部／影片／圖片／音訊、已使用／未使用兩組可收合、卡片（縮圖、☆、已用 × n、長度或靜圖、名稱、解析度、拆出音軌、＋；點卡片或 Enter 加到主視訊末端並選取）。收藏存使用者偏好 `tools.editor.assetFavorites`，不動素材資料。長度／解析度因素材庫紀錄沒有，改成每素材讀一次（edProbe，3 並行）。

@@ -1,1 +1,12 @@
 /* Styles owned by ED.7 scripts/editor-panes/stickers.js (spec §3 檔案歸屬). Theme tokens only (tests/theme-tokens.cjs). */
+.editor-sticker-group { border-top:1px solid var(--border);padding:8px 0; }
+.editor-sticker-group h4,.editor-sticker-group h5 { margin:6px 0 4px; }
+.editor-sticker-row { display:flex;align-items:center;gap:6px;padding:4px 0; }
+.editor-sticker-thumb { width:36px;height:36px;object-fit:contain;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--code-bg);flex:none; }
+.editor-sticker-name { flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.editor-brand-colors { display:flex;flex-wrap:wrap;gap:6px; }
+.editor-brand-swatch { display:inline-flex;align-items:center;gap:4px;font-size:12px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:2px 4px; }
+.editor-brand-swatch i { width:16px;height:16px;border-radius:50%;border:1px solid var(--border);display:inline-block; }
+.editor-brand-add { display:flex;align-items:center;gap:4px;margin-top:6px; }
+.editor-brand-add input[type=color] { width:40px;height:30px;padding:0; }
+.editor-brand-save { display:flex;align-items:center;gap:8px;margin-top:10px; }
