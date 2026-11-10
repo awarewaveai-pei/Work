@@ -638,6 +638,9 @@ VideoWorkbench.tools = {
       if (tool === "region" && !payload.selection) selection.regions = [];
     }
     setToolHash("#" + tool); render(); saveDraft();
+    // Card PJ.3: the projects page's steps 6-8 say what to do once the episode's file is open (edIntent; not awaited:
+    // 排成時間軸 may wait on its confirm dialog).
+    if (tool === 'edit' && payload.editIntent) edIntent(payload.editIntent).catch(VideoWorkbench.reportError);
     // An episode's FilmCraft file: open that file, not the engine's empty start (engine absent = its fallback screen).
     const engine = typeof engineFor === "function" && engineFor(tool);
     if (engine && payload.edit?.projectId && engineAvailable[engine.engine]) await engineOpenProject(payload.edit.projectId);

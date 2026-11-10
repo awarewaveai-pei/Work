@@ -1320,7 +1320,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         const result = await text(
           "你是影片分鏡師，依大綱及提供的角色、場景、道具、風格生成 " +
             count +
-            " 個鏡頭。僅輸出 JSON：shots 陣列，每個元素含 text（繁體中文，具體畫面與動作）、seconds（數字秒數）。不可宣稱已生成圖片。",
+            " 個鏡頭。僅輸出 JSON：shots 陣列，每個元素含 text（繁體中文，具體畫面與動作）、seconds（數字秒數）、line（繁體中文，這一鏡要念的旁白一句，可空）。不可宣稱已生成圖片。",
           input,
           true,
         );
@@ -1331,6 +1331,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
             id: crypto.randomUUID(),
             text: String(s.text || ""),
             seconds: Math.max(1, Math.min(120, Number(s.seconds) || 5)),
+            line: String(s.line || ""),
           })),
         });
         return true;

@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-10（續11）影音工作台 PJ.3：排成時間軸；配音、字幕照旁白自動上軌
+
+- 做了（規格 `lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/pj-project-spine-spec-20261106.md` §2 PJ.3、§8 Q1 做法 A）：鏡頭卡加「旁白」（`shot.line`，`scripts/projects-0.js`）；`backend/api.cjs` `/director/shots` 系統提示加 line、回傳帶 `line`；`scripts/tools-editor.js` 新 `edArrange`／`edSpineSubtitles`／`edSpineVoice`／`edPlaceSpine`／`edSpineButtons`／`edSpineAction`／`edIntent`，標題列三顆鈕（只在剪輯檔屬於某集時出現）；專案頁第 6／7／8 步帶 `editIntent`（arrange／voice／subtitle）開剪輯，第 7 步另加「配樂」（開 music 工具，`target` 為 null，畫面註明要自己放到音樂軌）；`scripts/tools-0.js` `acceptAsset` 開檔後呼叫 `edIntent`（規格 §7 未列此檔，但 intent 唯一入口在此，1 行）。
+- 不變量：①`clip.slot` 只標「這一集放上的片段」，只由 PJ.3 三個函式設，`edPlace` 的複製品去掉 `slot/jobId` → 重排只動集的片段；集的 `line:` 片段重排時跟著鏡頭走。②付費配音只在按鈕點擊時送，每個（鏡頭 id、旁白文字）只送一次，`submitting/queued/running/succeeded` 都算已送（`blocked/failed` 不算）。③`p.spinePlaced` 記已放上的配音 jobId，復原／重做不倒帶 → 刪掉或復原的配音不會被自動放回。
+- 配音價：配音工具按鈕本身沒有數字（「依 API 用量計費」，`tools-voice-music.js`；後端 `costs.speechUsd` 依字數），按鈕寫「N 句 × 每句依 API 用量計費」，N＝還沒配過的句數。
+- Codex 三輪（`agency-os/reports/oracle/2026-11-10-partialreview-cc75d732.md`、`-834853ab.md`、`-de804371.md`）：修 5 條（復原後配音被放回、部分失敗重按重複計費、複製的鏡頭片段被重排刪掉、被拒收任務算已送、重排後配音字幕留舊時間），各附測試；不採 2 條：短於 seconds 的影片照實際長度排（留空隙會輸出黑畫面且磁性主軌下次編輯就收掉）；FilmCraft 集的第 6–8 步不作用（規格 §8 C4：FilmCraft 不做片段層級，PJ.3 只改自製剪輯器）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/pj3-arrange.cjs（5 條：/director/shots 帶 line；專案頁第 6 步開檔即排、第 7 步只停在付費鈕、短影片；手動與複製片段重排仍在；字幕起迄＝鏡頭片段；放配音兩次只一段、刪除／復原不回、重排跟著走；全程 0 個 POST /generations） | exit=0 | ms=3747
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/{p2-subtitles,tools-editor,voice-mix,p1-loop,pj2-spine-settle,ed2-timeline,gate}.cjs 全綠（PASS 數 7/1/1/4/4/20/11） | exit=0 | ms=51484
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/7m/0n（Codex 三輪，5 修 2 不採並寫明理由）
+- ORACLE_WAIVED: 第三輪 2 條修正後未跑第四輪（同一 reviewer 已三輪，修正皆有指名測試）；共用工作樹有他 session 未提交改動，oracle 以 -Path 只審本卡檔（artifact 標 PARTIAL）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=edArrange\|edSpineSubtitles\|edSpineVoice\|edPlaceSpine\|spinePlaced\|editIntent\|edIntent\|edUnvoiced\|edSpineHit | hits=61（本卡檔、規格、oracle 報告；無殘留舊名）
 ## 2026-11-10（續10）影音工作台 S4b.2：10 張圖 × SPAR3D／TRELLIS 實跑比品質，預設定 SPAR3D（實扣約 US$0.755）
 
 - 核准：監工 2026-11-10（操作者「需要決定的事都你決定」＋11-03 對 S4b「好」），上限 US$1.50。生圖改用已登記最便宜的 FLUX schnell（US$0.003）：工作台自己的 gpt-image-2.5-flare 不能選品質，10 張最高約 US$1.90 會超過上限。本機 SF3D 還沒跑，要等操作者在 Hugging Face 同意授權（補跑免費）。

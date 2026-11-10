@@ -533,7 +533,7 @@ function edRatioSelect(p, label, visibleLabel) {
   return visibleLabel ? `<label>${label}${select}</label>` : select;
 }
 function edTopbar(p) {
-  return `<header class="editor-topbar"><div class="editor-topbar-group"><button type="button" class="btn small" data-ed-action="projects" aria-label="回到這一集">← 回到這一集</button><label class="editor-title"><input class="text-input" aria-label="專案名稱" data-ed-field="project:title" type="text" maxlength="100" value="${esc(p.title)}"><span aria-hidden="true">✎</span></label>${edRatioSelect(p, "輸出比例", false)}</div><span class="editor-saved" data-ed-saved role="status" data-state="${ed.save.state}">${esc(edSaveText())}</span><div class="editor-topbar-group">總時長：<b class="editor-total" data-ed-total>${edClockText(edTotal())}</b><button type="button" class="btn primary small" data-ed-action="export" aria-label="匯出" ${p.clips.length ? "" : "disabled"}>▷ 匯出</button></div></header>`;
+  return `<header class="editor-topbar"><div class="editor-topbar-group"><button type="button" class="btn small" data-ed-action="projects" aria-label="回到這一集">← 回到這一集</button><label class="editor-title"><input class="text-input" aria-label="專案名稱" data-ed-field="project:title" type="text" maxlength="100" value="${esc(p.title)}"><span aria-hidden="true">✎</span></label>${edRatioSelect(p, "輸出比例", false)}</div>${edSpineButtons(p)}<span class="editor-saved" data-ed-saved role="status" data-state="${ed.save.state}">${esc(edSaveText())}</span><div class="editor-topbar-group">總時長：<b class="editor-total" data-ed-total>${edClockText(edTotal())}</b><button type="button" class="btn primary small" data-ed-action="export" aria-label="匯出" ${p.clips.length ? "" : "disabled"}>▷ 匯出</button></div></header>`;
 }
 function edRail() {
   const open = ed.layout.leftOpen;
@@ -895,6 +895,204 @@ function edSpineLink(input) {
     ? { projectId: hit.project.id, episodeId: hit.episode.id, tool: "edit", step: "export", target: "output", from: [{ slot: "edit", key: "rev:" + (input.settings.projectRevision ?? 0) }] }
     : null;
 }
+// Card PJ.3 (spec §2 PJ.3): 排成時間軸, 用旁白產生字幕, 配音（照旁白逐句）. A clip the episode put on the timeline carries
+// slot ("shot:<id>" | "line:<id>"); a clip without slot is the user's, and a redo never removes or moves it.
+const edSpineHit = (p) => (p ? EpisodeSpine.findByEdit(edSpineProjects(), p.id) : null),
+  edShotUrl = (s) => s?.video || s?.image || null,
+  edLines = (episode) => (episode?.shots || []).filter((s) => s?.id && String(s.line ?? "").trim()),
+  edShotClip = (p, id) => p.clips.find((c) => c.track === edMain(p) && c.slot === "shot:" + id),
+  edNoLines = "還沒有旁白。在鏡頭卡填『旁白』後才能配音和產生字幕。";
+// A clip of what the episode made, with edAdd's fields (overlay position on a non-main track).
+function edSpineClip(p, a, track, extra) {
+  const overlay = edOverlay(p, track);
+  return { id: crypto.randomUUID(), kind: a.kind, asset: a, track, speed: 1, volume: 1, fadeIn: 0, fadeOut: 0, opacity: 1, scale: 1, x: overlay ? 80 : 0, y: overlay ? 80 : 0, rotation: 0, width: 25, ...extra };
+}
+// Each shot with a picture becomes one main-track clip of shot.seconds in shot order, each starting where the previous
+// one ended -- or at the next gap the user's own clips leave free. A video shorter than shot.seconds plays its own
+// length and the next shot follows it: a kept gap would export as black and 磁性主軌 closes it on the next edit anyway.
+// One undo step; 磁性主軌 is skipped so the user's clips stay where they are.
+async function edArrange(p, episode) {
+  const shots = (episode?.shots || []).map((s, i) => [s, i + 1]).filter(([s]) => s?.id && edShotUrl(s));
+  if (!shots.length) throw Error("這一集還沒有鏡頭畫面。先在專案頁生成畫面。");
+  // The library id of a shot's picture is its job's asset (episode-spine settle); a picture set before PJ.2 has none.
+  const assets = await Promise.all(
+    shots.map(([s, n]) => {
+      const url = edShotUrl(s),
+        made = (episode.steps || []).findLast((x) => x.output?.url === url);
+      return edProbe({ id: made?.output.assetId || "shot-" + s.id, name: "鏡頭 " + n, url, kind: s.video ? "video" : "image", type: s.video ? "video/mp4" : "image/png" });
+    }),
+  );
+  if (edProject() !== p) return 0;
+  edCheckpoint();
+  const main = edMain(p);
+  p.clips = p.clips.filter((c) => !(c.track === main && c.slot));
+  let from = 0;
+  shots.forEach(([s], i) => {
+    const a = assets[i],
+      seconds = Math.max(1, Number(s.seconds) || 5),
+      frames = Math.max(1, Timebase.toFrames(a.kind === "video" && a.duration ? Math.min(seconds, a.duration) : seconds, p.timebase)),
+      c = edTime(p, edSpineClip(p, a, main, { slot: "shot:" + s.id }), {
+        startFrame: edFreeStart(p, [{ track: main, offset: 0, durationFrames: frames }], from),
+        durationFrames: frames,
+        sourceStartFrame: 0,
+      });
+    edValidate(c);
+    if (!p.assets.some((x) => x.id === a.id)) p.assets.push(a);
+    p.clips.push(c);
+    from = c.startFrame + c.durationFrames;
+  });
+  // The episode's line clips follow their shot: a voice-over starts with it, a subtitle spans it.
+  for (const c of p.clips.filter((x) => x.slot?.startsWith("line:"))) {
+    const shot = edShotClip(p, c.slot.slice(5));
+    if (shot) edTime(p, c, c.kind === "text" ? { startFrame: shot.startFrame, durationFrames: shot.durationFrames } : { startFrame: shot.startFrame });
+  }
+  ed.skipMagnet = true;
+  await edCommit(p);
+  return shots.length;
+}
+// One text clip per line, timed exactly as its shot's clip on the main track; the old line: clips are replaced.
+function edSpineSubtitles(p, episode) {
+  const lines = edLines(episode);
+  if (!lines.length) throw Error(edNoLines);
+  const cues = lines.map((s) => [s, edShotClip(p, s.id)]).filter(([, c]) => c);
+  if (!cues.length) throw Error("先按「排成時間軸」，字幕才有時間可以對。");
+  edCheckpoint();
+  p.clips = p.clips.filter((c) => !(c.kind === "text" && c.slot?.startsWith("line:")));
+  const before = new Set(p.clips.map((c) => c.id));
+  try {
+    edImportCues(p, cues.map(([s, c]) => ({ startMs: Math.round(c.start * 1000), endMs: Math.round((c.start + c.duration) * 1000), text: String(s.line).trim() })));
+  } catch (error) {
+    ed.projects[ed.projects.indexOf(p)] = ed.undo.pop();
+    throw error;
+  }
+  // edImportCues adds the clips in cue order; the frames are set from the shot clip so no rounding can shift them.
+  p.clips
+    .filter((c) => !before.has(c.id))
+    .forEach((t, i) => {
+      const [s, c] = cues[i];
+      t.slot = "line:" + s.id;
+      edTime(p, t, { startFrame: c.startFrame, durationFrames: c.durationFrames });
+    });
+  return edCommit(p);
+}
+// A line already voiced (a settled step, or a job for it that may have reached the provider: submitting, queued,
+// running, done) is not sent again, so a retry after a partial failure pays only for the lines still missing; a
+// refused (blocked) or failed job does not count; a changed line is a new key and is voiced again.
+const edUnvoiced = (hit, jobs = []) =>
+  edLines(hit.episode).filter((s) => {
+    const line = String(s.line).trim(),
+      same = (link) => link?.target === "line:" + s.id && link.from?.[0]?.key === line;
+    return (
+      !(hit.episode.steps || []).some((x) => x.step === "sound" && same(x)) &&
+      !jobs.some((j) => j.input?.link?.episodeId === hit.episode.id && same(j.input.link) && ["submitting", "queued", "running", "succeeded"].includes(j.status))
+    );
+  });
+// Paid: one voice job per line not voiced yet, with the voice tool's own job fields (tools-voice-music.js
+// voice-generate) at its defaults. Only on a click; the result is placed by edPlaceSpine when its job settles.
+async function edSpineVoice(hit) {
+  const lines = edLines(hit.episode);
+  if (!lines.length) throw Error(edNoLines);
+  if (lines.some((s) => String(s.line).trim().length > 500)) throw Error("每句旁白最多 500 字");
+  if (ed.voicing) return;
+  ed.voicing = true;
+  try {
+    const todo = edUnvoiced(hit, await VideoWorkbench.generations.list());
+    if (!todo.length) throw Error("每句旁白都已經配過音。改了旁白才會再配。");
+    for (const s of todo) {
+      const line = String(s.line).trim();
+      VideoWorkbench.showJob(
+        await VideoWorkbench.generations.create({
+          type: "audio",
+          operation: "voice",
+          prompt: line,
+          voice: "coral",
+          instructions: "請以自然口語朗讀，不要省略或增加台詞。",
+          settings: { voiceSpeed: 1, voicePitch: 0, voiceGain: 0 },
+          link: { projectId: hit.project.id, episodeId: hit.episode.id, tool: "voice", step: "sound", target: "line:" + s.id, from: [{ slot: "line:" + s.id, key: line }] },
+        }),
+      );
+    }
+  } finally {
+    ed.voicing = false;
+  }
+}
+// Every settled voice step of this episode not yet placed in this file goes to the first audio track at its shot
+// clip's start (a shot not on the timeline yet: placed after 排成時間軸). The one way a voice-over reaches the timeline,
+// whether its job finished with the panel open or closed. Runs are queued; p.spinePlaced keeps the placed jobIds, so a
+// voice-over is placed once and one the user deleted does not come back.
+function edPlaceSpine() {
+  return (ed.placing = (ed.placing || Promise.resolve()).then(edPlaceSpineNow).catch(VideoWorkbench.reportError));
+}
+async function edPlaceSpineNow() {
+  const p = edProject(),
+    hit = edSpineHit(p);
+  if (!hit) return 0;
+  const todo = (hit.episode.steps || [])
+    .filter((s) => s.step === "sound" && s.jobId && s.output?.url && String(s.target).startsWith("line:") && !(p.spinePlaced || []).includes(s.jobId))
+    .filter((s) => edShotClip(p, s.target.slice(5)));
+  if (!todo.length) return 0;
+  const assets = await Promise.all(todo.map((s) => edProbe({ id: s.output.assetId, name: "配音", url: s.output.url, kind: "audio", type: "audio/mpeg" })));
+  if (edProject() !== p) return 0;
+  // Read again after the probe's await: a 排成時間軸 in between moves or removes the shot clip.
+  const rows = todo.map((s, i) => [s, edShotClip(p, s.target.slice(5)), assets[i]]).filter(([s, shot]) => shot && !(p.spinePlaced || []).includes(s.jobId));
+  if (!rows.length) return 0;
+  edCheckpoint();
+  const track = edTrackFor(p, "audio");
+  for (const [s, shot, a] of rows) {
+    const c = edTime(p, edSpineClip(p, a, track, { slot: s.target, jobId: s.jobId }), { startFrame: shot.startFrame, duration: Math.min(3600, a.duration), sourceStart: 0 });
+    edValidate(c);
+    if (!p.assets.some((x) => x.id === a.id)) p.assets.push(a);
+    p.clips.push(c);
+    p.spinePlaced = [...(p.spinePlaced || []), s.jobId];
+  }
+  await edCommit(p);
+  return rows.length;
+}
+// The top bar's three buttons, shown only for a file that belongs to an episode; a reason beside them when there is
+// no line. The voice price is the voice tool's (it bills per API use, no fixed number), times the number of lines.
+function edSpineButtons(p) {
+  const hit = edSpineHit(p);
+  if (!hit) return "";
+  const n = edLines(hit.episode).length,
+    v = edUnvoiced(hit).length;
+  return `<span class="editor-topbar-group" data-ed-spine>${edButton("排成時間軸", "spine-arrange")}${edButton("用旁白產生字幕", "spine-subtitles", !n)}${edButton(`配音（照旁白逐句）· ${v} 句 × 每句依 API 用量計費`, "spine-voice", !v || ed.voicing)}${n ? "" : `<span class="tiny">${esc(edNoLines)}</span>`}</span>`;
+}
+async function edSpineAction(action, p) {
+  const hit = edSpineHit(p);
+  if (!hit) throw Error("找不到這一集的剪輯檔。");
+  if (action === "spine-voice") return edSpineVoice(hit);
+  if (action === "spine-subtitles") return edSpineSubtitles(p, hit.episode);
+  // 排成時間軸 again: say what moves first (spec §6).
+  if (p.clips.some((c) => c.track === edMain(p) && c.slot)) {
+    const ok = await new Promise((resolve) => {
+      const d = edDialog(`<form><h3>排成時間軸</h3><p>會重新排列由鏡頭排上去的片段。你自己加的片段不會動。</p><div class="row"><button class="btn" type="button" data-ed-spine-no>取消</button><button class="btn primary" type="submit">重新排列</button></div></form>`);
+      d.querySelector("[data-ed-spine-no]").onclick = () => d.close();
+      d.querySelector("form").onsubmit = (e) => {
+        e.preventDefault();
+        resolve(true);
+        d.close();
+      };
+      d.addEventListener("close", () => resolve(false));
+    });
+    if (!ok) return;
+  }
+  await edArrange(p, hit.episode);
+  return edPlaceSpine();
+}
+// The projects page's steps 6-8 open this file with what to do next (spec §2 PJ.3); the paid one stops at its button.
+async function edIntent(intent) {
+  const p = edProject();
+  if (!edSpineHit(p)) return;
+  if (intent === "arrange") return edSpineAction("spine-arrange", p);
+  if (intent === "subtitle") return edSpineAction("spine-subtitles", p);
+  if (intent === "voice") document.querySelector('[data-ed-action="spine-voice"]')?.focus();
+}
+document.addEventListener("vw:changed", () => {
+  if (typeof tool === "undefined" || tool !== "edit" || !edProject()) return;
+  const bar = document.querySelector("[data-ed-spine]");
+  if (bar) bar.outerHTML = VideoWorkbench.sanitize(edSpineButtons(edProject()));
+  edPlaceSpine();
+});
 function edOpen(id) {
   ed.current = id;
   ed.selected = null;
@@ -1411,6 +1609,11 @@ function toolEditorAfterRender() {
   }
   edPaint();
   edWaves();
+  // Card PJ.3: a file opened places the voice-overs that settled while it was closed (edPlaceSpine).
+  if (edProject() && ed.spineOpened !== ed.current) {
+    ed.spineOpened = ed.current;
+    edPlaceSpine();
+  }
 }
 // Card ED.2: clip waveforms from the asset's waveform.json (peaks over the whole source, media-store.cjs). Only the
 // part the clip plays is drawn. A missing file (no audio, older store) leaves the band empty.
@@ -1473,6 +1676,9 @@ function edPlace(p, items, from) {
       // A copy starts at a plain cut, like the second half of a split.
       delete copy.transition;
       delete copy.transitionFrames;
+      // Card PJ.3: a copy is the user's clip, not the episode's (a redo of 排成時間軸 removes only slot clips).
+      delete copy.slot;
+      delete copy.jobId;
       edValidate(copy);
       return copy;
     });
@@ -1642,6 +1848,7 @@ async function edAction(action) {
     return;
   }
   if (!p) return;
+  if (action.startsWith("spine-")) return edSpineAction(action, p);
   // Card ED.0: a left pane's own actions live in its file (edRegisterPane).
   const paneAction = edPaneAction(action);
   if (paneAction) return paneAction(action, p, c);
@@ -1665,7 +1872,11 @@ async function edAction(action) {
       to = action === "undo" ? ed.redo : ed.undo;
     if (from.length) {
       to.push(structuredClone(p));
-      ed.projects[ed.projects.indexOf(p)] = from.pop();
+      // Card PJ.3: spinePlaced records which voice-overs were placed, not timeline content; undo never rewinds it,
+      // or edPlaceSpine would put an undone voice-over straight back.
+      const back = from.pop();
+      if (p.spinePlaced) back.spinePlaced = p.spinePlaced;
+      ed.projects[ed.projects.indexOf(p)] = back;
       // Reference: a redo comes back with nothing selected (undo keeps the selection).
       if (action === "redo") {
         ed.selected = null;
