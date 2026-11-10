@@ -350,6 +350,9 @@
     broadcast();
     return job;
   }
+  // Browser media copy (scripts/media-cache-sw.js): only for the served workbench, where media crosses the network.
+  if (!child && config.mode === "http" && window.isSecureContext && "serviceWorker" in navigator)
+    navigator.serviceWorker.register("/scripts/media-cache-sw.js", { scope: "/" }).catch(() => {});
   const ready = child
     ? rpc("load").then((v) => {
         db = v;
@@ -483,6 +486,23 @@
       return v;
     },
   });
+  // Page boot scripts: all <script> tags go in at once so the downloads overlap (page load = one round trip + the biggest
+  // file, not one round trip per file); async = false makes the browser still run them in list order. A failed file rejects.
+  function loadScripts(files, base) {
+    return Promise.all(
+      files.map(
+        (file) =>
+          new Promise((resolve, reject) => {
+            const s = document.createElement("script");
+            s.async = false;
+            s.src = base + file;
+            s.onload = resolve;
+            s.onerror = () => reject(Error("無法載入 " + file));
+            document.body.append(s);
+          }),
+      ),
+    );
+  }
   window.VideoWorkbench = {
     request: (path, body, method = "POST") =>
       child
@@ -490,6 +510,7 @@
         : adapter.request(path, method, body),
     generator: { import: (payload) => rpc("generator-import", payload) },
     ready,
+    loadScripts,
     storage,
     reportError,
     models: M,

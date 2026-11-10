@@ -1006,6 +1006,13 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           catch (e) { console.error("[vw] usage not recorded:", route, e.message); }
         });
       }
+      // Browser media copy scope (shared/media-cache.js invariant 3): one opaque value per user + organization, so the
+      // service worker can keep identities apart without seeing the ids. Local mode has one identity.
+      if (req.method === "GET" && route === "/identity") {
+        const who = req.vwIdentity;
+        json(res, 200, { scope: who ? crypto.createHash("sha256").update(["vw-media-cache-v1", who.userId, who.orgId].join("\n")).digest("hex").slice(0, 32) : "local" });
+        return true;
+      }
       if (req.method === "GET" && route === "/capabilities") {
         json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: { ...require("./blender.cjs").capability(env), motions: blender3d().motions }, imageTo3d: imageTo3d.capability(env, { priced: !!main }), prices: costs.displayPrices({ ...providerModels, text: textModel, transcribe: transcribe.defaultEngine(env).model }), transcribe: transcribe.capability(env), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.publicCatalog,
           reference: require("./reference.cjs").allowed(env, req) && require("./reference.cjs").present(env),
