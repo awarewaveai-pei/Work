@@ -120,12 +120,9 @@ function edSubTrack(p) {
   const list = edSubTracks(p);
   return list.find((t) => t.id === edSubUi.track) || list[0] || null;
 }
-// Word times only count while they still spell the line (the exporter's rule): an edited line burns static.
-const edSubSpells = (c) =>
-  Array.isArray(c.words) &&
-  c.words.length > 0 &&
-  TranscriptWords.joinWords(c.words.map((w) => w.text)).replace(/\s+/g, "") ===
-    c.text.replace(/\s+/g, "");
+// Word times only count while they still spell the line (TranscriptWords.spells, the exporter's rule): an edited line
+// burns static.
+const edSubSpells = (c) => TranscriptWords.spells(c.words, c.text);
 const edSubAbs = (c) =>
   edSubSpells(c)
     ? c.words.map((w) => ({
@@ -134,17 +131,13 @@ const edSubAbs = (c) =>
         end: c.start + w.end,
       }))
     : null;
-// Sets a cue's timeline start/end (seconds) and keeps each word at its timeline time. A word belongs to the cue its
-// middle falls in (the same rule 播放頭分割 cuts the text by), so a split never leaves one word on both sides.
+// Sets a cue's timeline start/end (seconds) and keeps each word at its timeline time (EditorModel.wordsWindow: a word
+// belongs to the cue its middle falls in; 播放頭分割 cuts the text by the same rule).
 function edSubSet(p, c, start, end, abs = edSubAbs(c)) {
   edTime(p, c, { start, duration: Math.max(0, end - start) });
-  const kept = (abs || [])
-    .filter((w) => (w.start + w.end) / 2 >= c.start && (w.start + w.end) / 2 < edSubEnd(c))
-    .map((w) => ({
-      start: Math.max(0, w.start - c.start),
-      end: Math.min(c.duration, w.end - c.start),
-      text: w.text,
-    }));
+  const kept = EditorModel.wordsWindow(abs, c.start, edSubEnd(c)).map(
+    ({ start, end, text }) => ({ start, end, text }),
+  );
   if (kept.length && kept.length <= 200) c.words = kept;
   else delete c.words;
 }
@@ -514,12 +507,10 @@ edRegisterPane("subtitles", {
           rest = Object.assign(structuredClone(c), { id: crypto.randomUUID() });
         let head, tail;
         if (abs) {
-          head = TranscriptWords.joinWords(
-            abs.filter((w) => (w.start + w.end) / 2 < t).map((w) => w.text),
-          );
-          tail = TranscriptWords.joinWords(
-            abs.filter((w) => (w.start + w.end) / 2 >= t).map((w) => w.text),
-          );
+          const said = (from, to) =>
+            TranscriptWords.joinWords(EditorModel.wordsWindow(abs, from, to).map((w) => w.text));
+          head = said(c.start, t);
+          tail = said(t, end);
         } else {
           // No word times: cut the text where the playhead is, at a space when one is within three characters.
           const chars = [...c.text],

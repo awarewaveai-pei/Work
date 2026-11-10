@@ -59,7 +59,6 @@ function subtitleWords(c, duration) {
   });
   return words.sort((a, b) => a.start - b.start);
 }
-const spells = (words, text) => !!words?.length && TranscriptWords.joinWords(words.map((w) => w.text)).replace(/\s+/g, "") === text.replace(/\s+/g, "");
 const escapeAss = (text) => text.replace(/\\/g, "＼").replace(/{/g, "｛").replace(/}/g, "｝");
 // ASS look of one subtitle style: colours, box (BorderStyle 3) or outline, as Style line fields.
 function subtitleLook(clip, size, alpha) {
@@ -90,7 +89,7 @@ function subtitleLook(clip, size, alpha) {
 // Dialogue texts (with their own start/end, seconds from the clip start) for one subtitle clip.
 function subtitleEvents(clip) {
   const words = clip.words, line = escapeAss(clip.text).replace(/\r?\n/g, "\\N");
-  if (!WORD_STYLES.includes(clip.subtitleStyle) || !spells(words, clip.text)) return [{ start: 0, end: clip.duration, text: line }];
+  if (!WORD_STYLES.includes(clip.subtitleStyle) || !TranscriptWords.spells(words, clip.text)) return [{ start: 0, end: clip.duration, text: line }];
   const parts = words.map((w) => escapeAss(w.text)),
     glue = (i) => (i && TranscriptWords.joinWords([words[i - 1].text, words[i].text]).length > words[i - 1].text.length + words[i].text.length ? " " : "");
   if (clip.subtitleStyle === "卡拉 OK") {

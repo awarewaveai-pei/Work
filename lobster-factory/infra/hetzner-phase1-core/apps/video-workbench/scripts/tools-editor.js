@@ -662,6 +662,16 @@ function edDuckRanges(p, c) {
 function edWindowKeys(next, src, from, to) {
   if (src.volumeKeys?.length) next.volumeKeys = edKeysWindow(src.volumeKeys, from, to);
   if (src.transformKeys?.length) next.transformKeys = edTransformWindow(src.transformKeys, from, to);
+  // Word times are seconds (ED.10); src went through edTime, so duration / durationFrames is its timebase. A line its
+  // words spell loses the words cut away, so it still spells them (the export burns 逐字高亮 only then).
+  if (src.words?.length) {
+    const sec = src.duration / src.durationFrames,
+      words = EditorModel.wordsWindow(src.words, from * sec, to * sec);
+    if (words.length && words.length < src.words.length && TranscriptWords.spells(src.words, src.text))
+      next.text = TranscriptWords.joinWords(words.map((w) => w.text));
+    if (words.length) next.words = words;
+    else delete next.words;
+  }
 }
 function edTransformWindow(keys, from, to) {
   return edWindow(keys, from, to, (frame) => EditorModel.transformAt(keys, frame));

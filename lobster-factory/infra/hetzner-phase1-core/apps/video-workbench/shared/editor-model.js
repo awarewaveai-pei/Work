@@ -157,6 +157,13 @@
     presets: [-23, -16, -14],
   };
   const MAX_KEYS = 32;
+  // Card ED.10: a subtitle clip's word times (words[] = { start, end, text }, seconds from the clip start) seen through the
+  // window [from, to) of the old clip, rebased to `from`. A word belongs to the window its middle falls in, so a split or a
+  // trim never keeps one word on both sides. Every clip time-window change (trim, split, 入點／出點) goes through this.
+  const wordsWindow = (words, from, to) =>
+    (words || [])
+      .filter((w) => (w.start + w.end) / 2 >= from && (w.start + w.end) / 2 < to)
+      .map((w) => ({ ...w, start: Math.max(0, w.start - from), end: Math.min(to - from, w.end - from) }));
   // [{frame (from clip start), gain 0..4}], sorted, unique frames, inside the clip. Throws on bad input.
   function volumeKeys(raw, durationFrames) {
     if (raw === undefined || raw === null) return [];
@@ -389,6 +396,7 @@
     mainTrack,
     canAdd,
     nextId,
+    wordsWindow,
     kindOf: (id) => KIND[id?.[0]],
     TRANSITIONS,
     LEGACY_TRANSITIONS,

@@ -56,7 +56,12 @@
   const joinWords = (texts) =>
     texts.map((t) => String(t ?? "").trim()).filter(Boolean).reduce((line, t) =>
       !line || TIGHT.test(line.at(-1)) || TIGHT.test(t[0]) || /^[,.!?;:%)\]]/.test(t) ? line + t : line + " " + t, "");
-  const api = { FILLERS, REVIEW_THRESHOLD, isFiller, annotate, cutRanges, joinWords };
+  // Card ED.10: word times still describe a line only while they spell it (whitespace ignored). The exporter burns
+  // 逐字高亮／卡拉 OK only then; the editor rewrites the line from its words only then.
+  const spells = (words, text) =>
+    Array.isArray(words) && words.length > 0 &&
+    joinWords(words.map((w) => w.text)).replace(/\s+/g, "") === String(text ?? "").replace(/\s+/g, "");
+  const api = { FILLERS, REVIEW_THRESHOLD, isFiller, annotate, cutRanges, joinWords, spells };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.TranscriptWords = api;
 })(typeof globalThis === "object" ? globalThis : this);

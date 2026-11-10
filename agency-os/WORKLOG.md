@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-10（續50）ED.10 收尾：時間軸裁切／分割後逐字時間與文字跟著片段（Codex F2，操作者「RISKS 要處理嗎」）
+
+- 根因：字幕片段 `words`（秒，從片段起點算）只有字幕分頁 `edSubSet` 會改；核心所有改片段時間窗的操作都走 `edWindowKeys`（`scripts/tools-editor.js:662`；呼叫點 :246 正規化、:2511 入點／左裁、:2521 出點、:2552-2553 分割、:2590 改速、:2821 拖曳），只處理音量／變形 key → 時間軸分割或裁切後逐字高亮錯位；只改 words 不改文字又讓匯出判定對不上、退成靜態（Codex 第二輪 F1）。
+- 修法（一個規則、三處共用）：`shared/editor-model.js` `wordsWindow(words, from, to)`（字以中點歸屬、平移、夾在窗內）；`shared/transcript-words.js` `spells(words, text)`（原本匯出器與字幕分頁各寫一份，收成一處）；`edWindowKeys` 套 `wordsWindow`，拼得出文字的句子在字被切掉時改寫成剩下的字；`backend/editor-export.cjs`、`subtitles.js`（`edSubSet`、播放頭分割、`edSubSpells`）改用這兩個函式。沒有 `words` 的片段完全不變。
+- 不處理：預覽畫 8 種樣式＝監工 ED.10.4 卡；`docs/editor-parity-compare-20261106.md:65` 是 11-06 快照，不回改。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed10-subtitles-ui.cjs 8 PASS（新增：時間軸「設為入點」0.8 秒→文字「好」、逐字平移；「分割」1.0 秒→「大家」／「好」各自對上；真實 MP4 逐字高亮仍正確） | exit=0 | ms=160000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed10-subtitles-backend.cjs 10 PASS；node tests/ed2-timeline.cjs；node tests/ed3-inspector.cjs（分割後兩半關鍵影格） | exit=0 | ms=600000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/video-workbench,agency-os,scripts | grep=edWindowKeys|TranscriptWords.spells|wordsWindow | hits=18
+- BUGHUNT_SCOPE_NARROW: 改動只在 video-workbench；edWindowKeys 全部 7 個呼叫點都經同一函式，舊 `const spells` 已刪、無其他使用者
+- ORACLE_WAIVED: Codex 第二輪 artifact 2026-11-10-partialreview-f4fa64f6 的唯一發現（文字未跟字）已照修，修正後 ed10-subtitles-ui 8 項、ed10-subtitles-backend 10 項重跑綠
 ## 2026-11-10（續49）影音工作台 ED.8 匯出視窗
 
 - 做了什麼：`scripts/editor-export-dialog.js` 重寫——輸出到（TikTok／Reels、YouTube Shorts、YouTube 推薦、Instagram 貼文 1:1／4:5、自訂 720P／1080P／4K）選平台即帶入比例＋1080P；規格列、剪輯總時長、預估費用（本機輸出免費）、影片浮水印 不套用／套用（讀 `tools.editor.watermark`，未設定顯示「前往設定浮水印 ↗」開貼圖分頁）、取消／開始匯出。浮水印＝匯出專案副本多一條頂層影片軌＋整段 overlay 圖片（右下 x96 y95 寬 18% 不透明 0.85），專案本身不改、後端不改。影格率／響度仍在整片設定／音訊。

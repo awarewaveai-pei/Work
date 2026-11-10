@@ -138,6 +138,27 @@ const pass = (m) => console.log("PASS " + m);
     assert.match(srt, /00:00:02,500 --> 00:00:03,700\r?\n今天見/);
     pass("逐句：新增（播放頭、跟軌樣式）、改字、刪除、播放頭分割依逐字時間切成「大家／好」、合併回「大家好」兩個字、改起點、匯出此軌 SRT 時間與文字正確");
 
+    // 3b. The timeline's own tools (設為入點, 分割) move word times with the clip window (EditorModel.wordsWindow): a word
+    // stays with the side its middle is on, rebased to that side's start, and the line becomes the words still said (so the
+    // export keeps 逐字高亮). 「好」 starts at 0.6 s here: the split in 3 clamped
+    // it to the cut at 1.0 s before the merge.
+    const timeline = async (time, label) => {
+      await page.evaluate((t) => {
+        ed.selected = edProject().clips.find((c) => c.text === "大家好").id;
+        ed.time = t;
+        edRender();
+      }, time);
+      await page.getByRole("button", { name: label, exact: true }).click();
+      await page.evaluate(() => ed.queue);
+      const got = (await cues()).filter((c) => c.start < 2).map((c) => [c.text, c.start, c.words?.map((w) => [w.text, Math.round(w.start * 100) / 100, Math.round(w.end * 100) / 100])]);
+      await page.getByRole("button", { name: "復原", exact: true }).click();
+      return got;
+    };
+    assert.deepEqual(await timeline(0.8, "設為入點"), [["好", 0.8, [["好", 0.2, 0.7]]]]);
+    assert.deepEqual(await timeline(1.0, "分割"), [["大家", 0.4, [["大家", 0, 0.4]]], ["好", 1, [["好", 0, 0.5]]]]);
+    assert.deepEqual((await cues())[0].words.map((w) => w.text), ["大家", "好"], "復原後逐字時間回來");
+    pass("時間軸「設為入點」0.8 秒：「大家」移除、文字改成「好」、逐字時間平移 0.4 秒；「分割」1.0 秒：前半「大家」、後半「好」，文字與逐字時間各自對上；復原還原");
+
     // 4. 樣式: 逐字高亮 + 字級 on the whole track, then a real MP4: the yellow lit word moves right with time.
     await lib.getByRole("button", { name: "樣式", exact: true }).click();
     await lib.getByRole("button", { name: /逐字高亮$/ }).click();
