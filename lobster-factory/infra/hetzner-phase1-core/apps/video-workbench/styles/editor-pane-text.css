@@ -1,1 +1,13 @@
 /* Styles owned by ED.5 scripts/editor-panes/text.js (spec §3 檔案歸屬). Theme tokens only (tests/theme-tokens.cjs). */
+.ed-text-tabs { display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:8px; }
+.ed-text-tabs .btn { min-width:0;padding-inline:2px;white-space:nowrap;font-size:12px; }
+.ed-tpl-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px; }
+.ed-tpl { border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--card-bg);overflow:hidden;cursor:grab; }
+.ed-tpl:hover { border-color:var(--accent); }
+.ed-tpl-view { height:74px;display:flex;align-items:center;justify-content:center;background:var(--code-bg);padding:4px;text-align:center;overflow:hidden; }
+.ed-tpl-text { display:inline-block;max-width:100%;padding:2px 6px;line-height:1.25;white-space:pre-line;overflow:hidden; }
+.ed-tpl-foot { display:flex;align-items:center;justify-content:space-between;gap:4px;padding:6px; }
+.ed-tpl-foot span { display:flex;flex-direction:column;min-width:0; }
+.ed-tpl-foot b { font-size:12px;font-weight:var(--font-weight-semibold,600);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.ed-tpl-foot small { color:var(--text-muted);font-size:11px; }
+.ed-swatch { width:28px;height:28px;padding:0;border:1px solid var(--border); }

@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-10（續37）影音工作台 ED.5 文字分頁
+
+- 做了什麼：`scripts/editor-panes/text.js` 文字分頁＝樣板／純文字／品牌字型三分頁；樣板：搜尋、全部／開場／標價／CTA／強調／片尾、「＋ 加入空白文字」（預設字「新文字」）、15 張自製樣板（顏色全走主題 token：卡片用 var(--…)，加入時解成當下實色寫進片段）、＋／雙擊／拖到文字軌（放在指針位置）加入、文字動畫四選一（套到之後加入的樣板）、說明文字；片頭（Remotion）區塊保留在樣板之後。品牌字型分頁只讀使用者偏好 `tools.editor.brandKit`（`{colors:[#rrggbb], font}`，ED.7 貼圖分頁寫），套用色彩／字型到選取文字。樣式 `styles/editor-pane-text.css`（窄欄 1 欄、寬欄 2 欄）。
+- 測試檔：`tests/ed5-text.cjs`（真 Edge、隔離資料夾）；`ed1-layout`／`tools-editor`／`p1-loop` 的「空白文字／主標題」鈕名改成「＋ 加入空白文字」。
+- Codex 1 輪（artifact `agency-os/reports/oracle/2026-11-10-partialreview-2286d52b.md`）：m1 雙擊卡片上的＋多加一段 → 已修（dblclick 略過按鈕）並加測；m4 匯出測試只看像素差 → 改數「該片段字色」的像素。m2 預覽不播文字動畫（`tools-editor.js:1645`）、m3 匯出底色半透明 55（`editor-export.cjs:774`）是既有共用檔行為，非本卡檔，已回報主 session，未動。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed5-text.cjs（15 張各加一次、真匯出 720p MP4 逐張抽格；另 4178 實按＋） | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n（2 修、2 共用檔回報）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=在這裡輸入文字|edTextTemplates|主標題 | hits=3
+- 回歸：theme-tokens／ed1-layout／ed2-timeline／remotion-template／remotion-title-project 綠；`tools-editor` 先前綠，之後紅在 ED.7 轉場進行中；`p1-loop` 紅在 ED.4 素材分頁改鈕名「↥ 上傳素材」與加入流程（非本卡）。
+- rollback：還原 `text.js`、`editor-pane-text.css`、三個測試檔鈕名，刪 `ed5-text.cjs`。
 ## 2026-11-10（續36）影音工作台 ED.9 專案列表頁
 
 - 做了什麼：`scripts/editor-project-list.js` 列表頁＝搜尋專案、新建、計數「n / n 個剪輯專案」、專案卡（第一格縮圖、比例徽章、草稿、總長、開啟編輯器 →、名稱、更新於、重新命名、刪除）、空狀態、「屬於 專案 › 第 N 集」。列出全部剪輯檔（不再只列掛在集上的）。刪除先確認，並把該專案備份到 `tools.editor.projects.deleted-<時間>`；不清集的 `edit` 連結（與 PJ.5 一致，集顯示「剪輯檔已刪除」可重建）。

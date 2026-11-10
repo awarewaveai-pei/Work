@@ -108,47 +108,177 @@ async function edTitleInsert(p, asset) {
   ed.time = 0;
   await edCommit(p);
 }
+// ---- ED.5: 樣板／純文字／品牌字型 ----
+// Template looks are made of theme tokens only: the preview card paints them with var(--token), and a clip gets the
+// token's resolved #rrggbb when it is added (clips store hex; the exporter needs it). Categories and purposes follow
+// the reference (spec §1.3); wording, colours, type and composition are our own.
+const edTextTokens = {
+  light: "--btn-primary-text",
+  ink: "--text-primary",
+  paper: "--card-bg",
+  accent: "--accent",
+  gold: "--yellow",
+  red: "--red",
+  green: "--green",
+};
+const edTextCats = ["全部", "開場", "標價", "CTA", "強調", "片尾"],
+  edTextAnims = ["無", "淡入淡出", "彈出", "逐字顯示"],
+  // brand font name -> the clip font names the preview and the exporter know
+  edTextFontMap = { Arial: "Arial", "Noto Sans TC": "思源黑體", "Noto Serif TC": "思源宋體", "sans-serif": "思源黑體", serif: "思源宋體", Georgia: "Georgia" },
+  edTextDate = () => {
+    const d = new Date(),
+      n = (v) => String(v).padStart(2, "0");
+    return `${d.getFullYear()}.${n(d.getMonth() + 1)}.${n(d.getDate())}`;
+  };
+// fg/bg = token keys; x/y = % of the frame; size = font size on the project's base width.
+const edTextTemplates = [
+  { id: "headline-2", name: "大標 · 雙行", cat: "開場", text: "好故事\n從這一格開始", size: 64, bold: true, fg: "light", y: 46 },
+  { id: "label-light", name: "白底標籤", cat: "標價", text: "限時優惠", size: 44, bold: true, fg: "ink", bg: "paper", y: 50 },
+  { id: "chapter", name: "章節標", cat: "開場", text: "CHAPTER 01", size: 36, bold: true, font: "等寬字", fg: "light", bg: "accent", y: 18 },
+  { id: "headline-1", name: "單行標題", cat: "開場", text: "一個真實的故事", size: 72, bold: true, font: "思源宋體", fg: "light", y: 50 },
+  { id: "date", name: "日期戳", cat: "開場", text: edTextDate, size: 40, font: "等寬字", fg: "gold", bg: "ink", y: 90 },
+  { id: "cta", name: "行動呼籲", cat: "CTA", text: "馬上了解更多", size: 48, bold: true, fg: "light", bg: "accent", y: 82, anim: "彈出" },
+  { id: "follow", name: "追蹤提醒", cat: "CTA", text: "追蹤，不錯過下一集", size: 42, bold: true, fg: "gold", bg: "ink", y: 84 },
+  { id: "link", name: "連結提示", cat: "CTA", text: "連結在下方 ↓", size: 38, fg: "ink", bg: "paper", y: 88 },
+  { id: "discount", name: "折扣徽章", cat: "標價", text: "全面 8 折", size: 64, bold: true, fg: "ink", bg: "gold", x: 78, y: 22, anim: "彈出" },
+  { id: "new", name: "NEW 標籤", cat: "標價", text: "NEW", size: 40, bold: true, fg: "light", bg: "red", x: 14, y: 12 },
+  { id: "quote", name: "金句引言", cat: "強調", text: "「慢一點，反而更近」", size: 56, italic: true, font: "思源宋體", fg: "light", y: 50, anim: "淡入淡出" },
+  { id: "number", name: "數字強調", cat: "強調", text: "90%", size: 140, bold: true, fg: "gold", y: 50, anim: "彈出" },
+  { id: "end-title", name: "片尾標題", cat: "片尾", text: "感謝你看完", size: 80, bold: true, fg: "light", y: 50, anim: "淡入淡出" },
+  { id: "subscribe", name: "訂閱提醒", cat: "片尾", text: "訂閱並開啟通知", size: 44, bold: true, fg: "light", bg: "green", y: 80 },
+  { id: "slogan", name: "品牌標語", cat: "片尾", text: "你的品牌標語", size: 48, fg: "light", y: 50, brand: true },
+];
+const edTextUi = { tab: "樣板", q: "", cat: "全部", anim: "無", kit: undefined };
+const edTextLabel = (t) => (typeof t.text === "function" ? t.text() : t.text);
+// One probe element turns var(--token) into the theme's current colour; the browser resolves color-mix and friends.
+function edTokenHex(token) {
+  const probe = document.createElement("span");
+  probe.style.cssText = `position:absolute;visibility:hidden;color:var(${token})`;
+  document.body.append(probe);
+  const m = getComputedStyle(probe).color.match(/[\d.]+/g) || [0, 0, 0];
+  probe.remove();
+  return "#" + m.slice(0, 3).map((v) => Math.round(Number(v)).toString(16).padStart(2, "0")).join("");
+}
+// The brand kit is a per-user preference (tools.editor.brandKit, edited in the 貼圖 pane): { colors: ["#rrggbb"],
+// font: "Arial" | "Noto Sans TC" | ..., logo? }. This pane only reads it.
+async function edTextLoadKit() {
+  edTextUi.kit = null;
+  const kit = await VideoWorkbench.preferences.get("tools.editor.brandKit", null);
+  edTextUi.kit = kit && typeof kit === "object" ? kit : {};
+  if (tool === "edit" && ed.pane === "文字") edRender();
+}
+function edTextKit() {
+  const kit = edTextUi.kit || {};
+  return {
+    colors: (Array.isArray(kit.colors) ? kit.colors : []).filter((c) => /^#[\da-f]{6}$/i.test(c)),
+    font: typeof kit.font === "string" ? kit.font : "",
+  };
+}
+function edTextClip(p, t, start, track) {
+  const kit = edTextKit(),
+    c = edText(edTextLabel(t), start, 3, p, track);
+  c.fontSize = t.size;
+  c.bold = !!t.bold;
+  c.italic = !!t.italic;
+  c.font = t.font || c.font;
+  c.color = edTokenHex(edTextTokens[t.fg]);
+  c.backgroundColor = t.bg ? edTokenHex(edTextTokens[t.bg]) : null;
+  c.x = t.x ?? 50;
+  c.y = t.y ?? 50;
+  c.animation = edTextUi.anim !== "無" ? edTextUi.anim : t.anim || "無";
+  if (t.brand) {
+    if (kit.colors[0]) c.color = kit.colors[0];
+    if (edTextFontMap[kit.font]) c.font = edTextFontMap[kit.font];
+  }
+  return c;
+}
+async function edTextAdd(p, t, start = ed.time, track) {
+  edCheckpoint();
+  const c = t ? edTextClip(p, t, start, track) : edText("新文字", start, 3, p, track);
+  p.clips.push(c);
+  ed.selected = c.id;
+  ed.picks.clear();
+  edRender();
+  await edSave();
+}
+function edTextCard(t) {
+  const style = [
+    `color:var(${edTextTokens[t.fg]})`,
+    t.bg ? `background:var(${edTextTokens[t.bg]})` : "",
+    `font-weight:${t.bold ? 700 : 400}`,
+    t.italic ? "font-style:italic" : "",
+    t.font === "思源宋體" ? "font-family:serif" : t.font === "等寬字" ? "font-family:monospace" : "",
+    `font-size:${Math.max(11, Math.min(26, t.size / 4))}px`,
+  ]
+    .filter(Boolean)
+    .join(";");
+  return `<div class="ed-tpl" draggable="true" data-ed-tpl="${t.id}" title="${esc(t.name)}：雙擊或按＋加入播放頭"><div class="ed-tpl-view"><span class="ed-tpl-text" style="${esc(style)}">${esc(edTextLabel(t))}</span></div><div class="ed-tpl-foot"><span><b>${esc(t.name)}</b><small>${esc(t.cat)}</small></span><button type="button" class="btn small" data-ed-action="tpl:${t.id}" aria-label="加入「${esc(t.name)}」">＋</button></div></div>`;
+}
+function edTextTemplatesPane() {
+  const q = edTextUi.q.trim().toLowerCase(),
+    list = edTextTemplates.filter((t) => (edTextUi.cat === "全部" || t.cat === edTextUi.cat) && (!q || (t.name + t.cat + edTextLabel(t)).toLowerCase().includes(q))),
+    choice = (label, action, value, options) =>
+      `<div class="flow-choices" role="group" aria-label="${label}">${options.map((o) => `<button type="button" class="btn small ${o === value ? "selected" : ""}" data-ed-action="${action}:${o}" aria-pressed="${o === value}">${o}</button>`).join("")}</div>`;
+  return `<input class="text-input" type="search" aria-label="搜尋樣板" placeholder="搜尋樣板" data-ed-text-q value="${esc(edTextUi.q)}">${choice("樣板分類", "txt-cat", edTextUi.cat, edTextCats)}${edButton("＋ 加入空白文字", "text:0")}<h4>文字樣板</h4><div class="ed-tpl-grid">${list.map(edTextCard).join("") || '<p class="note">沒有符合的樣板。</p>'}</div><p class="note">雙擊、按 ＋ 加入播放頭，或拖到字幕軌。選取後在屬性面板調整文字樣式。</p><h4>文字動畫</h4>${choice("文字動畫", "txt-anim", edTextUi.anim, edTextAnims)}<p class="note">選了動畫，之後加入的樣板都用它；「無」＝各樣板自己的預設。</p>`;
+}
+function edTextBrandPane(c) {
+  const kit = edTextKit(),
+    text = c?.kind === "text";
+  return `<h3>品牌套件</h3><p class="note">品牌色彩與字型在「貼圖」分頁編輯並儲存；這裡直接套用到選取的文字。</p><h4>品牌色彩</h4>${
+    kit.colors.length
+      ? `<div class="flow-choices">${kit.colors.map((x) => `<button type="button" class="btn small ed-swatch" style="background:${x}" data-ed-action="brand-color:${x.slice(1)}" aria-label="套用色彩 ${x}" title="${x}" ${text ? "" : "disabled"}></button>`).join("")}</div>`
+      : '<p class="note">還沒有品牌色彩。</p>'
+  }<h4>品牌字型</h4>${
+    kit.font ? `<p class="note">${esc(kit.font)}</p>${edButton("套用至選取文字", "brand-font", !text || !edTextFontMap[kit.font])}` : '<p class="note">還沒有儲存品牌字型。</p>'
+  }${text ? "" : '<p class="note">先在時間軸選一段文字。</p>'}`;
+}
 edRegisterPane("text", {
   title: "文字",
   icon: "T",
-  render: (p, c) => `<h3>文字</h3>${["空白文字", "主標題", "副標題", "內文", "重點提示", "金句", "步驟", "章節", "下標", "開場", "結尾", "價格", "標籤", "品牌", "呼籲行動"].map((title, i) => edButton(title, "text:" + i)).join("")}<hr>${edTitlePane(p)}`,
-  // A fresh visit re-reads the library images (the 片頭 background list).
+  render: (p, c) => {
+    if (edTextUi.kit === undefined) edTextLoadKit().catch(VideoWorkbench.reportError);
+    const body =
+      edTextUi.tab === "樣板"
+        ? edTextTemplatesPane() + "<hr>" + edTitlePane(p)
+        : edTextUi.tab === "純文字"
+          ? edButton("＋ 加入空白文字", "text:0") + '<p class="note">雙擊、按 ＋ 加入播放頭，或拖到字幕軌。選取後在屬性面板調整文字樣式。</p>'
+          : edTextBrandPane(c);
+    return `<div class="ed-text-tabs" role="group" aria-label="文字類型">${["樣板", "純文字", "品牌字型"].map((t) => `<button type="button" class="btn small ${t === edTextUi.tab ? "selected" : ""}" data-ed-action="txt-tab:${t}" aria-pressed="${t === edTextUi.tab}">${t}</button>`).join("")}</div>${body}`;
+  },
+  // A fresh visit re-reads the library images (the 片頭 background list) and the brand kit.
   open: () => {
     ed.title.images = null;
+    edTextUi.kit = undefined;
   },
   actions: {
-    "text:": async (action, p) => {
+    "text:": async (action, p) => edTextAdd(p, null),
+    "tpl:": async (action, p) => edTextAdd(p, edTextTemplates.find((t) => t.id === action.slice(4))),
+    "txt-tab:": async (action) => {
+      edTextUi.tab = action.slice(8);
+      edRender();
+    },
+    "txt-cat:": async (action) => {
+      edTextUi.cat = action.slice(8);
+      edRender();
+    },
+    "txt-anim:": async (action) => {
+      edTextUi.anim = action.slice(9);
+      edRender();
+    },
+    "brand-color:": async (action, p, c) => {
+      if (c?.kind !== "text") return;
       edCheckpoint();
-      const i = Number(action.slice(5)),
-        c = edText(
-          [
-            "在這裡輸入文字",
-            "主標題",
-            "副標題",
-            "說明文字",
-            "重點提示",
-            "值得記住的一句話",
-            "步驟 1",
-            "第一章",
-            "內容說明",
-            "歡迎觀看",
-            "謝謝觀看",
-            "限時優惠",
-            "精選",
-            "品牌名稱",
-            "立即了解",
-          ][i],
-        );
-      if (i === 1) {
-        c.fontSize = 96;
-        c.bold = true;
-        c.y = 50;
-      }
-      p.clips.push(c);
-      ed.selected = c.id;
+      c.color = "#" + action.slice(12);
       edRender();
       await edSave();
-      return;
+    },
+    "brand-font": async (action, p, c) => {
+      const font = edTextFontMap[edTextKit().font];
+      if (c?.kind !== "text" || !font) return;
+      edCheckpoint();
+      c.font = font;
+      edRender();
+      await edSave();
     },
     "title-template:": async (action, p, c) => {
       ed.title.templateId = action.slice(15);
@@ -199,4 +329,41 @@ edRegisterPane("text", {
       return;
     },
   },
+});
+// Search box: filter the grid, keep the caret.
+document.addEventListener("input", (e) => {
+  if (!e.target.matches?.("[data-ed-text-q]")) return;
+  edTextUi.q = e.target.value;
+  const pos = e.target.selectionStart;
+  edRender();
+  const box = document.querySelector("[data-ed-text-q]");
+  box?.focus();
+  box?.setSelectionRange(pos, pos);
+});
+// Double-click a card = add at the playhead; dragging a card onto a text lane drops it where the pointer is.
+document.addEventListener("dblclick", (e) => {
+  const card = e.target.closest?.("[data-ed-tpl]"),
+    p = edProject();
+  // The ＋ button already added on each of its clicks; only the rest of the card counts as a double-click.
+  if (card && p && !e.target.closest("button")) edTextAdd(p, edTextTemplates.find((t) => t.id === card.dataset.edTpl)).catch(VideoWorkbench.reportError);
+});
+document.addEventListener("dragstart", (e) => {
+  const card = e.target.closest?.("[data-ed-tpl]");
+  if (!card) return;
+  e.dataTransfer.setData("text/x-ed-text-template", card.dataset.edTpl);
+  e.dataTransfer.effectAllowed = "copy";
+});
+document.addEventListener("dragover", (e) => {
+  if (e.dataTransfer?.types.includes("text/x-ed-text-template") && e.target.closest?.("[data-ed-lane]")) e.preventDefault();
+});
+document.addEventListener("drop", (e) => {
+  const id = e.dataTransfer?.getData("text/x-ed-text-template"),
+    lane = e.target.closest?.("[data-ed-lane]"),
+    p = edProject();
+  if (!id || !lane || !p) return;
+  e.preventDefault();
+  const track = lane.dataset.edLane;
+  if (edTrack(p, track)?.kind !== "text") return VideoWorkbench.reportError(Error("樣板只能放到字幕／文字軌"));
+  const start = Math.max(0, (e.clientX - lane.getBoundingClientRect().left) / ed.zoom);
+  edTextAdd(p, edTextTemplates.find((t) => t.id === id), start, track).catch(VideoWorkbench.reportError);
 });

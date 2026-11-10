@@ -77,7 +77,7 @@ async function exportProject(page) {
     await uploadThroughPane(page, "貼圖", "上傳透明 PNG", image);
     await page.waitForSelector('[data-ed-lane="V2"] [data-ed-clip]', { timeout: 60000 });
     await page.locator('[data-ed-pane="文字"]').click();
-    await page.getByRole("button", { name: "主標題", exact: true }).click();
+    await page.getByRole("button", { name: "＋ 加入空白文字", exact: true }).first().click();
     await page.getByLabel("文字內容").fill("P1 LOOP");
     await page.getByLabel("文字內容").press("Tab");
     const before = await page.evaluate(async () => {

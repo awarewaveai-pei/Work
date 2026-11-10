@@ -51,7 +51,7 @@ const pass = (m) => console.log("PASS " + m);
     pass("新建視窗：預設名稱、五張比例卡；建立後頂列、八格側欄、空專案引導");
 
     await page.locator('[data-ed-pane="文字"]').click();
-    await page.getByRole("button", { name: "空白文字", exact: true }).click();
+    await page.getByRole("button", { name: "＋ 加入空白文字", exact: true }).first().click();
     await page.waitForFunction(() => /^● 已儲存 \S/.test(document.querySelector("[data-ed-saved]").textContent));
     assert.equal(await page.locator("[data-ed-total]").textContent(), "00:03.00");
     pass("編輯後顯示「已儲存 時間」，總時長跟著片段");
