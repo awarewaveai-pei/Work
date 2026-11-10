@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-10（續41）video-workbench ED.7 退件：重錄 ed3-legacy golden（轉場曲線現在真的套用）
+
+- 根因：3ca146b0b 讓 `backend/editor-export.cjs:405 curvedTransition` 真的使用 transitionCurve；舊專案存的曲線以前只驗證不輸出。golden 專案 1 clip c2（融接＋平滑）第 3 次 FFmpeg 由 `xfade=fade` 變 custom expr。
+- 範圍證明：HEAD 與重錄後逐 key 比對，只有專案 `1 五種轉場 16:9` 的 args 第 3 次呼叫、framemd5 37/60 格變動；其餘 8 專案逐位元不變。語料中唯一非線性 transitionCurve = 專案 1/c2。
+- 預覽缺口（未改，共用檔）：`scripts/tools-editor.js:2246-2249` 預覽轉場只做線性 fade，`edPreviewSpans`（:1940）未帶曲線；需監工決定。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed3-legacy-golden.cjs | exit=0 | ms=20000
+- REVIEW_WAIVED: NA -- 僅重錄 fixture，差異已逐 key 證明
+- BUGHUNT_WAIVED: NA -- 無程式碼改動，只換快照
 ## 2026-11-10（續40）ED.4 追加：軌道＋改走素材分頁
 
 - 內容：`tools-editor.js` 的 `track-clip:` 非文字分支改呼叫 `edAssetsPickTrack(track.id)`（主 session 核准的共用檔範圍），舊 `pickAssets` 流程刪除（editor 內無其他呼叫點）；軌道種類檢查只留在 `edAssetsAdd` 一處。目標軌綁專案 id，換專案即失效；從素材分頁上傳也落在目標軌。`tests/ed2-timeline.cjs` 軌道＋段改走素材卡。
