@@ -21,11 +21,12 @@ const TRELLIS_INPUT = { generate_model: true, generate_color: false, generate_no
 
 // The ways, in the order the page shows them. maxImage = the vendor's request limit. default: preselected on the page
 // (card S4b.2, docs/s4-image-to-3d-providers-20261103.md §8). facing: degrees the vendor's model is turned from glTF +Z
-// (measured on the S4b.2 run: SPAR3D faces -Z); the page passes it as the autorig turn so a figure walks forwards.
+// (measured on the S4b.2 run: SPAR3D and local SF3D face -Z; Stability's hosted SF3D was not run); the page passes it as
+// the autorig turn so a figure walks forwards.
 const METHODS = {
   "stability-spar3d": { label: "Stability SPAR3D", vendor: "Stability AI", rate: "3d-spar3d", default: true, facing: 180, key: "STABILITY_API_KEY", endpoint: "stable-point-aware-3d", maxImage: 10 * 1024 * 1024 },
   "stability-sf3d": { label: "Stability SF3D", vendor: "Stability AI", rate: "3d-sf3d", key: "STABILITY_API_KEY", endpoint: "stable-fast-3d", maxImage: 10 * 1024 * 1024 },
-  "local-sf3d": { label: "本機 SF3D", vendor: "本機", local: true, maxImage: 20 * 1024 * 1024 },
+  "local-sf3d": { label: "本機 SF3D", vendor: "本機", local: true, facing: 180, maxImage: 20 * 1024 * 1024 },
   "replicate-trellis": { label: "Replicate TRELLIS", vendor: "Replicate", rate: "3d-trellis", key: "REPLICATE_API_TOKEN", maxImage: 10 * 1024 * 1024 },
   meshy: { label: "Meshy", vendor: "Meshy", key: "MESHY_API_KEY", hiddenWithoutKey: true, maxImage: 20 * 1024 * 1024 },
 };

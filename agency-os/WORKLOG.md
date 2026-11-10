@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-10（續18）影音工作台 S4b.2 補跑本機 SF3D：10 張免費、品質接近 SPAR3D，列免費選項；安裝腳本重跑時壞了一次（未解）
+
+- 系統層安裝：VS Build Tools 2022 VCTools（winget，`--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --passive`），操作者同意（監工轉述原話「好，裝」）。HF 授權由操作者在 peijingartstudio 帳號點；token 只從環境變數讀，沒有落檔。
+- 安裝（`runtime/sf3d`，gitignore，SF3D ff21fc4）：torch 2.11.0+cu128（RTX 5060 sm_120）；`gpytoolbox==0.2.0` 第 1 次失敗（sdist 缺 CMakeLists、Python 3.12 沒有 wheel）→ 改用 0.3.8 wheel；沒有 nvcc，texture_baker 只編 CPU 版，SF3D 把 CUDA 張量直接丟給它 → `scripts/sf3d/texture-baker-cpu.patch` 讓它繞 CPU 再搬回；權重放 `.hf`（`sf3d-local.cjs` 預設 HF_HOME），之後全程離線。
+- 結果：10／10 成功，平均 17.4 秒、2.2 萬面、峰值 6.2 GB、US$0。顏色、長相接近 SPAR3D，透明玻璃杯會消失；模型面朝 glTF −Z（`facing: 180`）。線上預設維持 SPAR3D，本機列免費選項（s4 文件 §8）。
+- 第 2 次失敗（照規則停下）：為了驗證 `scripts/sf3d/install.cmd`，在已可用的安裝上重跑，重編出的 uv_unwrapper 載入失敗：`ImportError: DLL load failed while importing _C: 找不到指定的程序。`（DLL 依賴與 texture_baker 相同：c10、torch_cpu、MSVCP140、VCRUNTIME140）。現在這台的本機 SF3D 不能用。腳本已改成「套件都能 import 就跳過建置」，原因未確認。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node docs/s4b2-evidence/run-local.cjs (10/10 real RTX 5060) && node docs/s4b2-evidence/analyze.cjs && node tests/s4b-sf3d-local.cjs (real process: 409, cancel kills pid, rerun succeeds; run before the reinstall) && node tests/s4b-image-to-3d.cjs | exit=0 | ms=1500000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（Codex `agency-os/reports/oracle/2026-11-10-partialreview-24b44f47.md`：重跑安裝不再重編、證據腳本重跑不重複加素材、分析只讀方式表內的紀錄；三項已修，DLL 載入失敗的根因仍未查明）
+- ORACLE_WAIVED: 共用工作樹有其他 session 未提交改動，oracle 以 -Path 只審本次檔案（artifact 標 PARTIAL；.cmd／.patch 未列入 files-reviewed，已自審）
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/video-workbench,agency-os,scripts | grep=local-sf3d | hits=16
 ## 2026-11-10（續17）影音工作台：每個付費按鈕按前顯示 US$（機器檢查）
 
 - 根因：付費功能（文字 12 路由、圖片、影片、配音、字幕辨識、去背、3D）要不要標價靠各卡自律；只有影片／去背／3D 有價，其他寫「API 計費」或假點數（「約 7 點」「5 點」）。

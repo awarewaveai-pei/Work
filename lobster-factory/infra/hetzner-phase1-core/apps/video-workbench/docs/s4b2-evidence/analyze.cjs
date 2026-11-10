@@ -1,10 +1,12 @@
 // Card S4b.2 evidence: per GLB triangles, vertices, textures (count, size, format), file size; renders (thumbs.py) and one
-// contact sheet: each row = input image | SPAR3D front | SPAR3D 45° | TRELLIS front | TRELLIS 45°. Reads/updates results.json.
+// contact sheet: each row = input image, then front and 45° of each way in METHODS. Reads/updates results.json.
 // Run after run.cjs: node docs/s4b2-evidence/analyze.cjs
 const fs = require("node:fs"), path = require("node:path"), os = require("node:os"), { spawnSync } = require("node:child_process");
 const app = path.join(__dirname, "..", ".."), data = path.join(app, ".data");
 const results = JSON.parse(fs.readFileSync(path.join(__dirname, "results.json"), "utf8"));
 const fileOf = (url) => path.join(data, url.slice(1));
+// Way -> camera yaw to its model's front (SPAR3D and local SF3D face glTF -Z, TRELLIS +Z).
+const METHODS = { "stability-spar3d": 180, "replicate-trellis": 0, "local-sf3d": 180 };
 
 function imageSize(buf, mime) {
   if (mime === "image/png") return [buf.readUInt32BE(16), buf.readUInt32BE(20)];
@@ -45,24 +47,24 @@ const thumbs = fs.mkdtempSync(path.join(os.tmpdir(), "s4b2-thumbs-"));
 const items = [];
 for (const row of results.images)
   for (const [method, run] of Object.entries(row.runs))
-    if (run.url) {
+    if (run.url && Object.hasOwn(METHODS, method)) {
       run.stats = glbStats(fileOf(run.url));
-      items.push(`${row.n}-${method}=${fileOf(run.url)}@${method === "stability-spar3d" ? 180 : 0}`);
+      items.push(`${row.n}-${method}=${fileOf(run.url)}@${METHODS[method]}`);
     }
 const blender = path.join(app, "runtime", "blender", "blender.exe");
 const r = spawnSync(blender, ["-b", "--factory-startup", "--python", path.join(__dirname, "thumbs.py"), "--", thumbs, ...items], { encoding: "utf8", maxBuffer: 64e6 });
 if (r.status !== 0) throw Error("thumbs failed: " + r.stderr.slice(-2000));
-// Contact sheet with ffmpeg: 5 columns x rows, 192 px tiles, a gray tile where a run failed.
+// Contact sheet with ffmpeg: 1 + 2 per way columns x rows, 192 px tiles, a gray tile where a run failed.
 const ffmpeg = require("ffmpeg-static"), tiles = [];
 for (const row of results.images) {
   tiles.push(fileOf(row.image.url));
-  for (const method of ["stability-spar3d", "replicate-trellis"])
+  for (const method of Object.keys(METHODS))
     for (const view of ["front", "side"]) {
       const f = path.join(thumbs, `${row.n}-${method}-${view}.png`);
       tiles.push(fs.existsSync(f) ? f : null);
     }
 }
-const inputs = [], filters = [], cols = 5, size = 192;
+const inputs = [], filters = [], cols = 1 + 2 * Object.keys(METHODS).length, size = 192;
 tiles.forEach((f, i) => {
   if (f) inputs.push("-i", f);
   else inputs.push("-f", "lavfi", "-i", `color=c=gray:s=${size}x${size}:d=1`);

@@ -30,7 +30,8 @@ function run({ file, workdir, env, signal, onSpawn, timeoutMs = TIMEOUT_MS }) {
       cwd: sf3d.dir,
       env: {
         PATH: env.PATH || process.env.PATH || "", SystemRoot: process.env.SystemRoot || "", TEMP: workdir, TMP: workdir, TMPDIR: workdir,
-        ...pass("HF_HOME"), ...pass("USERPROFILE"), ...pass("HOME"), ...pass("CUDA_VISIBLE_DEVICES"),
+        HF_HOME: env.HF_HOME || path.join(sf3d.dir, ".hf"), // weights downloaded there at install (docs §7)
+        ...pass("USERPROFILE"), ...pass("HOME"), ...pass("CUDA_VISIBLE_DEVICES"), // rembg's model cache is ~/.u2net
         HF_HUB_OFFLINE: "1", PYTHONDONTWRITEBYTECODE: "1", PYTHONIOENCODING: "utf-8",
       },
       windowsHide: true,

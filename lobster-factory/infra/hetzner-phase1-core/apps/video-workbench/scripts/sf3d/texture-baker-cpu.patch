@@ -1,0 +1,43 @@
+diff --git a/texture_baker/texture_baker/baker.py b/texture_baker/texture_baker/baker.py
+index 61e4425..23885b6 100644
+--- a/texture_baker/texture_baker/baker.py
++++ b/texture_baker/texture_baker/baker.py
+@@ -2,6 +2,16 @@ import torch
+ import torch.nn as nn
+ from torch import Tensor
+ 
++# AwareWave S4b: a build without nvcc registers only the CPU kernels; CUDA tensors then go through the CPU and back.
++_CUDA = torch._C._dispatch_has_kernel_for_dispatch_key("texture_baker_cpp::rasterize", "CUDA")
++
++
++def _call(op, *args):
++    device = next(a.device for a in args if isinstance(a, Tensor))
++    if device.type != "cuda" or _CUDA:
++        return op(*args)
++    return op(*[a.cpu() if isinstance(a, Tensor) else a for a in args]).to(device)
++
+ 
+ class TextureBaker(nn.Module):
+     def __init__(self):
+@@ -25,9 +35,7 @@ class TextureBaker(nn.Module):
+         Returns:
+             Tensor, bake_resolution bake_resolution 4, float: Rasterized map
+         """
+-        return torch.ops.texture_baker_cpp.rasterize(
+-            uv, face_indices.to(torch.int32), bake_resolution
+-        )
++        return _call(torch.ops.texture_baker_cpp.rasterize, uv, face_indices.to(torch.int32), bake_resolution)
+ 
+     def get_mask(self, rast: Tensor) -> Tensor:
+         """
+@@ -59,9 +67,7 @@ class TextureBaker(nn.Module):
+         Returns:
+             Tensor, bake_resolution bake_resolution 3, float: Interpolated attributes
+         """
+-        return torch.ops.texture_baker_cpp.interpolate(
+-            attr, face_indices.to(torch.int32), rast
+-        )
++        return _call(torch.ops.texture_baker_cpp.interpolate, attr, face_indices.to(torch.int32), rast)
+ 
+     def forward(
+         self,

@@ -46,6 +46,23 @@
       "metallicRoughnessMap": false,
       "megabytes": 1.37
      }
+    },
+    "local-sf3d": {
+     "jobId": "5f1a23af-b26f-4a25-a139-b43cd60117b2",
+     "status": "succeeded",
+     "seconds": 17.234,
+     "url": "/media/bff7ac4054df221cd886d7c3afc4d88af0311b275f21b1bf210861ce1c7e12e6/original.glb",
+     "recordedUsd": 0,
+     "stats": {
+      "triangles": 15048,
+      "vertices": 10020,
+      "textures": [
+       "jpeg 1024×1024",
+       "jpeg 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 0.72
+     }
     }
    }
   },
@@ -93,6 +110,23 @@
       ],
       "metallicRoughnessMap": false,
       "megabytes": 1.2
+     }
+    },
+    "local-sf3d": {
+     "jobId": "cffeadc1-d205-457b-afdd-0b2981678d90",
+     "status": "succeeded",
+     "seconds": 16.176,
+     "url": "/media/4e7c560991fca66ce3e8ba2376116a74764ff487b149571dac60dcf5da0edad4/original.glb",
+     "recordedUsd": 0,
+     "stats": {
+      "triangles": 14316,
+      "vertices": 8585,
+      "textures": [
+       "jpeg 1024×1024",
+       "jpeg 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 0.59
      }
     }
    }
@@ -142,6 +176,23 @@
       "metallicRoughnessMap": false,
       "megabytes": 1.5
      }
+    },
+    "local-sf3d": {
+     "jobId": "7150ee38-df9c-43fb-80d5-6faf6ec1cccc",
+     "status": "succeeded",
+     "seconds": 17.177,
+     "url": "/media/7bb224bc67fb493f12fc317809cae17149e845ffaff9abe1781867270698ac9f/original.glb",
+     "recordedUsd": 0,
+     "stats": {
+      "triangles": 18376,
+      "vertices": 10597,
+      "textures": [
+       "jpeg 1024×1024",
+       "jpeg 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 0.7
+     }
     }
    }
   },
@@ -189,6 +240,23 @@
       ],
       "metallicRoughnessMap": false,
       "megabytes": 1.54
+     }
+    },
+    "local-sf3d": {
+     "jobId": "d05ad59f-69c1-4839-af53-8bb564bb5579",
+     "status": "succeeded",
+     "seconds": 17.159,
+     "url": "/media/d2aa1b10e5c24b22c0a4f3af40cb98431ec806707d5d0fdaf5d7e82af620f51f/original.glb",
+     "recordedUsd": 0,
+     "stats": {
+      "triangles": 42640,
+      "vertices": 26010,
+      "textures": [
+       "jpeg 1024×1024",
+       "jpeg 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 1.53
      }
     }
    }
@@ -238,6 +306,23 @@
       "metallicRoughnessMap": false,
       "megabytes": 1.61
      }
+    },
+    "local-sf3d": {
+     "jobId": "06089d22-25f5-4b7d-975b-214995dbe85c",
+     "status": "succeeded",
+     "seconds": 17.178,
+     "url": "/media/257fba3a32c03c8ca02c36e55e8f1d41f4ca4aecfdfed46e5eab9c44a5b991ff/original.glb",
+     "recordedUsd": 0,
+     "stats": {
+      "triangles": 23952,
+      "vertices": 13657,
+      "textures": [
+       "jpeg 1024×1024",
+       "jpeg 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 0.84
+     }
     }
    }
   },
@@ -285,6 +370,23 @@
       ],
       "metallicRoughnessMap": false,
       "megabytes": 1.33
+     }
+    },
+    "local-sf3d": {
+     "jobId": "c8c405bd-da75-4d25-a6b3-5ecc48fd7751",
+     "status": "succeeded",
+     "seconds": 18.19,
+     "url": "/media/5acde71f4deb0a89da2a03be078c22ac58325b0ae5969675a88ccb2793fc1738/original.glb",
+     "recordedUsd": 0,
+     "stats": {
+      "triangles": 15140,
+      "vertices": 11524,
+      "textures": [
+       "jpeg 1024×1024",
+       "jpeg 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 0.76
      }
     }
    }
@@ -334,6 +436,23 @@
       "metallicRoughnessMap": false,
       "megabytes": 1.18
      }
+    },
+    "local-sf3d": {
+     "jobId": "630b7ef3-fd25-448a-bc5c-fcea1f21d571",
+     "status": "succeeded",
+     "seconds": 18.244,
+     "url": "/media/00b60c19dd56c72f5da661ba96925ed7dcafb0cdb026423ccaff486304956a5c/original.glb",
+     "recordedUsd": 0,
+     "stats": {
+      "triangles": 10380,
+      "vertices": 6368,
+      "textures": [
+       "jpeg 1024×1024",
+       "jpeg 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 0.48
+     }
     }
    }
   },
@@ -381,6 +500,23 @@
       ],
       "metallicRoughnessMap": false,
       "megabytes": 1.63
+     }
+    },
+    "local-sf3d": {
+     "jobId": "b7daa95a-080d-4691-8544-a0fc8cd7dbde",
+     "status": "succeeded",
+     "seconds": 18.202,
+     "url": "/media/75fbbbfdad0eb08688e66a55a950b2720624f9de234ab9c78fe28079dbaa2338/original.glb",
+     "recordedUsd": 0,
+     "stats": {
+      "triangles": 30096,
+      "vertices": 17404,
+      "textures": [
+       "jpeg 1024×1024",
+       "jpeg 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 1.05
      }
     }
    }
@@ -430,6 +566,23 @@
       "metallicRoughnessMap": false,
       "megabytes": 1.81
      }
+    },
+    "local-sf3d": {
+     "jobId": "6374fa01-be18-4a9d-baf1-f26e1a6d9866",
+     "status": "succeeded",
+     "seconds": 17.153,
+     "url": "/media/733b9c0bbbd57ccd8934b30e9ca63c9e28d0df2ef1d3fe241cbc8fe5d9a1f587/original.glb",
+     "recordedUsd": 0,
+     "stats": {
+      "triangles": 21864,
+      "vertices": 12522,
+      "textures": [
+       "jpeg 1024×1024",
+       "jpeg 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 0.78
+     }
     }
    }
   },
@@ -477,6 +630,23 @@
       ],
       "metallicRoughnessMap": false,
       "megabytes": 1.86
+     }
+    },
+    "local-sf3d": {
+     "jobId": "7e2b7b37-d19c-4b21-9d92-8be1e18592b1",
+     "status": "succeeded",
+     "seconds": 17.188,
+     "url": "/media/4306f7ccc77e69c1027be830090ad9dea261792611e90f8aecabd72fc52fb77b/original.glb",
+     "recordedUsd": 0,
+     "stats": {
+      "triangles": 27120,
+      "vertices": 17577,
+      "textures": [
+       "jpeg 1024×1024",
+       "jpeg 1024×1024"
+      ],
+      "metallicRoughnessMap": false,
+      "megabytes": 1.1
      }
     }
    }
