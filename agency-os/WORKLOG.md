@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-10（續30）影音工作台：沒有 Gemini 付費金鑰時配音退到 OpenAI、Gemini 標未啟用（續29 的補強）
+
+- 根因：存過的選擇若是沒金鑰的列仍被選中（`scripts/tools-workflows.js` wfProviderCurrent、`scripts/index-0.js` spokenSpeechModel 各自判斷），送出 503；`VW_TTS_MODEL` 指到沒金鑰的列時預設不退；compose 讓工作台吃到 next-admin 的免費層 `GEMINI_API_KEY`。
+- 改：選取規則收成一處 `shared/models.js` VideoWorkbenchProviders（只有清單內且 available 的列算選取）；`backend/speech.cjs`／`transcribe.cjs` 預設只取有金鑰的列；按鈕標「未啟用」；compose `GEMINI_API_KEY: ${VW_GEMINI_API_KEY:-}`（工作台獨立付費層金鑰，未填＝關）、`.env.example` 記名。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed10-subtitles-backend.cjs (1e 無金鑰); node tests/gate.cjs; node tests/tools-workflows.cjs | exit=0 | ms=600000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — 自審讀回 diff；屬續29 Codex 兩輪後的需求變更，不再加輪
+- ORACLE_WAIVED: 續29 已兩輪 Codex（上限）；本次為選取規則收斂＋compose 變數名
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=wfProviderCurrent|spokenSpeechModel|VW_GEMINI_API_KEY | hits=15
 ## 2026-11-10（續29）影音工作台：配音／字幕辨識改多家並存（OpenAI gpt-4o-mini-tts 2027-01-06、whisper-1 2027-02-26 下線）
 
 - 根因：工作台配音只走 OpenAI `/audio/speech`、辨識只走 whisper-1，兩者 OpenAI 已公告下線（`docs/vendor-alternatives-20261110.md` 第 4、5 節）。

@@ -5,6 +5,17 @@ window.VideoWorkbenchMoney = (usd, c = window.VideoWorkbench?.capabilities) => {
   if (!(rate > 0) || !Number.isFinite(n)) return "";
   return "NT$" + (n >= 10 ? n.toFixed(1) : n >= 0.1 ? n.toFixed(2) : String(Number(n.toPrecision(2))));
 };
+// Speech models / transcription engines (capabilities speech.models, transcribe.engines: the server's one list, which
+// already drops retired rows and marks rows without a key available:false). The one rule for which row a page shows as
+// chosen: the saved id while its row is listed AND available, else the server's default (itself the first available
+// row). A row without a key is shown 未啟用 and can never be the chosen one, so it is never sent.
+window.VideoWorkbenchProviders = {
+  rows: (kind, c = window.VideoWorkbench?.capabilities) => (kind === "speech" ? c?.speech?.models : c?.transcribe?.engines) || [],
+  current(kind, saved, c = window.VideoWorkbench?.capabilities) {
+    const rows = this.rows(kind, c), fallback = kind === "speech" ? c?.speech?.defaultModel : c?.transcribe?.defaultEngine;
+    return rows.some((r) => r.id === saved && r.available) ? saved : fallback;
+  },
+};
 (function () {
   const id = () => crypto.randomUUID();
   const asset = (v = {}, kind = "image") =>

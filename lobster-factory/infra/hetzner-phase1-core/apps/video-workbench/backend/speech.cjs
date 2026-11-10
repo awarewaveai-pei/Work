@@ -1,7 +1,8 @@
 // Text to speech: the one list of speech models (like next-admin video-motion-models.ts for video). Each row is one
 // connector -- vendor, key, voices, call; adding or removing a vendor = one row. Pages draw the rows as buttons from
 // /capabilities (speech.models). A row whose next-admin registry retireOn (cost-model.ts MEDIA_MODELS) has come leaves
-// the list and a job naming it is refused. Default = VW_TTS_MODEL when it names a live row, else the first configured row.
+// the list and a job naming it is refused. A row without its key is listed available:false and refused (503). Default =
+// VW_TTS_MODEL when it names a live row with its key, else the first live row with its key (no GEMINI_API_KEY = OpenAI).
 const path = require("node:path");
 const { vwEnv } = require("./env-compat.cjs");
 const rates = require(path.join(require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env), "lib/ai/cost-model.ts"));
@@ -69,7 +70,7 @@ const retireOn = (id) => rates.MEDIA_MODELS[id]?.retireOn || null;
 const live = (at) => MODELS.filter((m) => !retireOn(m.id) || retireOn(m.id) > day(at));
 function defaultModel(env, at) {
   const list = live(at), wanted = vwEnv(env, "TTS_MODEL");
-  return list.find((m) => m.id === wanted) || list.find((m) => env[m.keyName]) || list[0];
+  return list.find((m) => m.id === wanted && env[m.keyName]) || list.find((m) => env[m.keyName]) || list[0];
 }
 // The model a job runs: its named live row, else the default. A retired or unknown name is refused, never swapped.
 function pick(id, env = process.env, at) {

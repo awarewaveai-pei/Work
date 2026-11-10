@@ -3,7 +3,7 @@
 // Engines = the one list of speech-to-text connectors (like next-admin video-motion-models.ts for video); pages draw them as
 // buttons from /capabilities (transcribe.engines). Adding or removing a vendor = one row + its call below. A row whose
 // next-admin registry retireOn (cost-model.ts MEDIA_MODELS) has come leaves the list and a job naming it is refused.
-// Default = VW_TRANSCRIBE_ENGINE when it names a live row, else the first configured row: our own whisper (2026-11-10 A/B,
+// Default = VW_TRANSCRIBE_ENGINE when it names a live configured row, else the first configured row: our own whisper (2026-11-10 A/B,
 // docs/vendor-alternatives-20261110.md). Every connector answers whisper verbose_json shape, so normalize() reads all.
 const fs = require("node:fs"),
   path = require("node:path"),
@@ -35,7 +35,7 @@ const retireOn = (e) => rates.MEDIA_MODELS[e.model]?.retireOn || null;
 const live = (at) => ENGINES.filter((e) => !retireOn(e) || retireOn(e) > day(at));
 function defaultEngine(env = process.env, at) {
   const list = live(at), wanted = vwEnv(env, "TRANSCRIBE_ENGINE");
-  return list.find((e) => e.id === wanted) || list.find((e) => available(e, env)) || list[0];
+  return list.find((e) => e.id === wanted && available(e, env)) || list.find((e) => available(e, env)) || list[0];
 }
 // The engine a job runs: its named live row, else the default. A retired or unknown name is refused, never swapped.
 function pick(id, env = process.env, at) {

@@ -219,10 +219,10 @@ const spokenVoices = [
 const spokenCatalog = { characters: [], assets: [] };
 // The persona cards above speak as these Gemini voices (backend/speech.cjs maps them when another model runs).
 const spokenVoiceIds = ["Kore", "Charon", "Puck", "Fenrir", "Sulafat", "Leda"];
-// Speech models and their voices from /capabilities (backend/speech.cjs; empty until it answers). The chosen model counts
-// only while it is in the list (a retired one is gone): otherwise the default.
-const speechModels = () => VideoWorkbench.capabilities?.speech?.models || [];
-const spokenSpeechModel = () => (speechModels().some((m) => m.id === state.speechModel) ? state.speechModel : VideoWorkbench.capabilities?.speech?.defaultModel);
+// Speech models and their voices from /capabilities (backend/speech.cjs; empty until it answers); which one is chosen =
+// shared/models.js VideoWorkbenchProviders (one rule for every page).
+const speechModels = () => window.VideoWorkbenchProviders.rows("speech");
+const spokenSpeechModel = () => window.VideoWorkbenchProviders.current("speech", state.speechModel);
 const speechVoices = () => speechModels().find((m) => m.id === spokenSpeechModel())?.voices || [];
 function spokenVoiceCode() {
   const i = spokenVoices.findIndex((v) => v.name === state.voice);
@@ -382,7 +382,7 @@ function spokenWorkspace() {
           '"' +
           (m.available ? "" : " disabled") +
           ">" +
-          safe(m.label + (window.VideoWorkbenchPrices?.text("video.tts", VideoWorkbench.capabilities, m.id) ? " · " + window.VideoWorkbenchPrices.text("video.tts", VideoWorkbench.capabilities, m.id) : "")) +
+          safe(m.label + (window.VideoWorkbenchPrices?.text("video.tts", VideoWorkbench.capabilities, m.id) ? " · " + window.VideoWorkbenchPrices.text("video.tts", VideoWorkbench.capabilities, m.id) : "") + (m.available ? "" : "（未啟用）")) +
           "</button>",
       )
       .join("") +

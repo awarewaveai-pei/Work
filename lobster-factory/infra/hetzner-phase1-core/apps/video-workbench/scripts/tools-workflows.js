@@ -31,17 +31,11 @@ function wfButton(title, action, disabled = false, paid = "", paidModel = "") {
 }
 // Speech models / transcription engines from /capabilities (speech.models, transcribe.engines: one list on the server,
 // backend/speech.cjs and transcribe.cjs) as visible buttons: name · price, and the chosen row's pros and cons under them.
-// The saved id counts only while its row is in the list (a retired row is gone); otherwise the default.
+// Which row is chosen: shared/models.js VideoWorkbenchProviders (one rule for every page).
 function wfProviders(kind) {
-  const c = VideoWorkbench.capabilities;
-  return kind === "speech"
-    ? { rows: c?.speech?.models || [], fallback: c?.speech?.defaultModel, feature: "video.tts" }
-    : { rows: c?.transcribe?.engines || [], fallback: c?.transcribe?.defaultEngine, feature: "video.transcribe" };
+  return { rows: window.VideoWorkbenchProviders.rows(kind), feature: kind === "speech" ? "video.tts" : "video.transcribe" };
 }
-function wfProviderCurrent(kind, saved) {
-  const { rows, fallback } = wfProviders(kind);
-  return rows.some((r) => r.id === saved) ? saved : fallback;
-}
+const wfProviderCurrent = (kind, saved) => window.VideoWorkbenchProviders.current(kind, saved);
 function wfProviderChoice(kind, key, title) {
   const { rows, feature } = wfProviders(kind);
   if (!rows.length) return "";
@@ -49,7 +43,7 @@ function wfProviderChoice(kind, key, title) {
   return `<label>${esc(title)}</label><div class="flow-choices" role="group">${rows
     .map((r) => {
       const price = window.VideoWorkbenchPrices?.text(feature, VideoWorkbench.capabilities, r.id) || "";
-      return `<button type="button" class="btn small ${r.id === current ? "selected" : ""}" data-flow-choice="${esc(key)}" data-flow-value="${esc(r.id)}" data-flow-multiple="false" aria-pressed="${r.id === current}"${r.available ? "" : " disabled"}>${esc(r.label)}${price ? " · " + esc(price) : ""}${r.available ? "" : "（未設定）"}</button>`;
+      return `<button type="button" class="btn small ${r.id === current ? "selected" : ""}" data-flow-choice="${esc(key)}" data-flow-value="${esc(r.id)}" data-flow-multiple="false" aria-pressed="${r.id === current}"${r.available ? "" : " disabled"}>${esc(r.label)}${price ? " · " + esc(price) : ""}${r.available ? "" : "（未啟用）"}</button>`;
     })
     .join("")}</div>${row ? `<p class="note">${esc(row.note)}</p>` : ""}`;
 }

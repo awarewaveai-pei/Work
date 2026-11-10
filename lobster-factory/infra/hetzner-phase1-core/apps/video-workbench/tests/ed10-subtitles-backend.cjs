@@ -136,6 +136,33 @@ async function serve(fetchImpl, extraEnv = {}) {
   assert.throws(() => speech.pick("gpt-4o-mini-tts", {}, "2027-01-06"), (e) => e.status === 400 && /已停止/.test(e.message));
   pass("過了 retireOn 的配音／辨識選項：不在清單（頁面按鈕由清單長出）、指名送出回 400");
 
+  // 1e. No GEMINI_API_KEY (production until the paid tier is on): Gemini rows listed available:false, the speech default
+  // falls to OpenAI, captions keep our whisper; the page rule (shared/models.js) never chooses an unavailable row, even a
+  // saved one; a job naming Gemini is refused 503 before any provider call.
+  const noGemini = { OPENAI_API_KEY: "test-only", VW_TRANSCRIBE_WORKER_URL: "http://whisper.test:8421", VW_TRANSCRIBE_WORKER_TOKEN: "worker-test" };
+  const sc = speech.capability(noGemini, () => null, "2026-11-10"), tc = transcribe.capability(noGemini, () => null, "2026-11-10");
+  assert.deepEqual([sc.defaultModel, sc.models.map((m) => [m.id, m.available])], ["gpt-4o-mini-tts", [["gemini-3.8-flash-lite-tts", false], ["gpt-4o-mini-tts", true]]]);
+  assert.deepEqual([tc.defaultEngine, tc.engines.map((e) => [e.id, e.available])], ["host", [["host", true], ["gemini", false], ["openai", true]]]);
+  assert.equal(speech.defaultModel({ ...noGemini, VW_TTS_MODEL: "gemini-3.8-flash-lite-tts" }, "2026-11-10").id, "gpt-4o-mini-tts", "指定的預設沒有金鑰也退到可用的");
+  assert.throws(() => speech.key(speech.pick("gemini-3.8-flash-lite-tts", noGemini), noGemini), (e) => e.status === 503);
+  assert.throws(() => transcribe.auth(transcribe.pick("gemini", noGemini), noGemini), (e) => e.status === 503);
+  const pageWindow = {};
+  require("node:vm").runInNewContext(fs.readFileSync(path.join(__dirname, "../shared/models.js"), "utf8"), { window: pageWindow, crypto: globalThis.crypto });
+  const pageCaps = { speech: sc, transcribe: tc };
+  assert.equal(pageWindow.VideoWorkbenchProviders.current("speech", "gemini-3.8-flash-lite-tts", pageCaps), "gpt-4o-mini-tts", "存過的 Gemini 沒金鑰就不算選取");
+  assert.equal(pageWindow.VideoWorkbenchProviders.current("transcribe", "gemini", pageCaps), "host");
+  assert.equal(pageWindow.VideoWorkbenchProviders.current("speech", "gpt-4o-mini-tts", pageCaps), "gpt-4o-mini-tts");
+  {
+    const sent = [];
+    const s0 = await serve(async (url) => { sent.push(url); throw Error("不該呼叫供應商：" + url); }, { OPENAI_API_KEY: "test-only" });
+    const r = await s0.call("POST", "/generations", { type: "spoken", prompt: "你好", speechModel: "gemini-3.8-flash-lite-tts" });
+    assert.equal(r.status, 503, JSON.stringify(r.value));
+    assert.equal((await s0.call("GET", "/capabilities")).value.speech.defaultModel, "gpt-4o-mini-tts");
+    await s0.close();
+    assert.deepEqual(sent, []);
+  }
+  pass("沒有 Gemini 金鑰：Gemini 標未啟用不可選（存過的也不算）、配音預設退到 OpenAI、辨識仍是主機 whisper、指名送出 503 且不呼叫供應商");
+
   // 2. Filler and pause data for ED.11.
   const marked = TranscriptWords.annotate([{ start: 0, end: 0.3, text: "嗯嗯" }, { start: 0.4, end: 1, text: "你好" }, { start: 2.5, end: 3, text: "Umm," }, { start: 3.1, end: 3.5, text: "那個" }]);
   assert.deepEqual(marked.map((w) => [w.filler, w.pauseAfter]), [[true, 0.1], [false, 1.5], [true, 0.1], [false, null]]);
