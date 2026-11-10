@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-10（續34）批次上線：next-admin＋工作台 469e589f0、whisper worker 重建、工作台環境變數（操作者「改好直接部署」）
+
+- 範圍：工作台 22ceb6e47→469e589f0（PJ.2–PJ.5、ED.0／ED.1.5／ED.3.8／ED.10 後端、EC.5、獨立整頁、P6.20 分段上傳、S4b、價目修正＋Sora 2／Imagen 4 移除、付費標價 NT$、配音／辨識多家並存＋免費優先）；next-admin 同版（價目、TWD_RATE）。
+- 第一次 next-admin 部署被 npm test 擋（正確擋下）：`model-flow.render.test.tsx` 仍期待 1K 價 NT$2；e88ef493d 依實際送出的 2K 改為 US$0.101 → NT$3。修測試期望值（469e589f0），重部署通過。教訓：改 cost-model 的卡要跑 next-admin 全套 vitest，不只 lib/ai。
+- whisper：`apps/video-whisper-worker` 自有 compose 重建（rsync 排除 .env*，舊版備份 `apps/.video-whisper-worker.bak-20261110`）→ healthy。
+- 工作台 compose（safe-infra-patch，備份 `docker-compose.yml.bak.safe-patch-20261110-065802`）：GEMINI_API_KEY、VW_TRANSCRIBE_WORKER_URL／TOKEN、STABILITY_API_KEY（主機 .env 無此值 → 空，3D 退用 TRELLIS）、VW_TTS_MODEL=gpt-4o-mini-tts（Gemini 預付餘額 402，儲值後移除這行）。Gemini 金鑰屬 AwareWave-ColdEmail 專案，已連結帳單帳戶（操作者截圖）。
+- 待操作者：Gemini 儲值（冷拜訪同受影響）；是否把 Stability 金鑰加進主機 .env。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy next-admin → npm test 4358 pass、healthy 15s、smoke OK；sg-deploy video-workbench → healthy 6s、smoke 8 項 OK（未登入 401）；docker exec printenv 存在性檢查；正式站 /api/vw/capabilities：speech defaultModel gpt-4o-mini-tts、Gemini／OpenAI 兩列帶價；transcribe defaultEngine host（free）、gemini 標價 | exit=0 | ms=600000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（讀回 compose diff 7 行只在 video-workbench 區塊；測試修正一行）
+- ORACLE_WAIVED: 部署＋設定＋一行測試期望值，無新邏輯
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=VW_TTS_MODEL | hits=10（README、speech.cjs、repo compose、3 個測試、vendor-alternatives、oracle 報告、本條、主機 compose；全部一致）
 ## 2026-11-10（續32）影音工作台：供應商清單「免費優先」一處規則；自架 Kokoro 配音實測未採用；Gemini 金鑰＝付費層（餘額用完）
 
 - 操作者：「使用免費和付費的 但是要先使用免費為主」。
