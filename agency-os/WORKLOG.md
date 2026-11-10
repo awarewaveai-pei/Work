@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-10（續46）FC.5 之二：專業剪輯／專業特效上方工具列改成右側圖示直欄
+
+- 做了（`VW`＝`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`）：上方整列拿掉，引擎吃滿高度；右側 44px 圖示直欄（`VW/scripts/tools-engine-host.js` `engineRailButton`，SVG 線條用 currentColor）：從素材庫加入、開新專案、16:9／9:16／4:5（`aria-pressed` 選中）＋輸出成片（FilmCraft）；EffectCraft 為輸出目前合成／輸出透明片段；「說明與專案」從直欄左側滑出面板（狀態、說明、已存專案），再點或 Esc 關。提示寫完整名稱與像素。未存檔時說明鈕右上一個點。樣式 `VW/styles/tools.css` `.engine-rail*`／`.engine-flyout`，只用 token。
+- 共用判斷：照 VectorCraft Pro dock 的版型（直欄＋左側浮出）在工作台重寫，沒載入 next-admin 的 `editor-shared/dock.css`：工作台是另一個 origin／伺服器，那份樣式依賴 next-admin globals 的 class 與 `mountDock` 寫入的 `--vp-*` 尺寸。
+- 跟監工清單不同：比例鈕是「選」，另加一顆「輸出成片」才輸出（避免點比例就誤送輸出）；EffectCraft 不放比例鈕（比例由合成決定）。
+- Codex 三輪（`agency-os/reports/oracle/2026-11-10-partialreview-68ab2c31.md`、`-8f4c09c6.md`），3 項全修：選比例時整條重建 → 鍵盤焦點掉、「輸出中」被蓋（改成就地改屬性）；成片入帳後圓點不熄 → 不變量：圓點＝`engineUnsaved()`，它的每個輸入（`engineStatus` 的 dirty／writes／saveFailed、render 清單 set／delete）變動處都呼叫 `engineRailMark()`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/fc2-engine-host.cjs → 16 PASS（含直欄寬 ≤48、引擎高 ≥95%、Esc 關面板、F6 回直欄、面板裡開舊專案） | exit=0 | ms=23000
+- REALTEST_EVIDENCE: tool=Bash | cmd=fc5-rail.cjs（真 FilmCraft／EffectCraft、隔離伺服器）→ 存檔後重新整理、從面板開回「側欄測試」成功；1366 截圖面板開、1920 截圖 9:16 選中、直欄 44×1080、引擎 1876×1080；EffectCraft 1366 截圖；頁面錯誤 0 | exit=0 | ms=90000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs → gate ok | exit=0 | ms=10000
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/3m/0n（external oracle = Codex CLI gpt-6-sol）
+- ORACLE_WAIVED: 最後一項（圓點）修正後未再跑一輪：改動＝抽出 engineRailMark 並在 render 清單增刪處呼叫，fc2 16 PASS
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=engine-bar | hits=0（舊 class 已無引用）
 ## 2026-11-10（續45）FC.5：專業剪輯／專業特效拿掉 ArtCraft 名稱與 Discord（建置機器擋）；工作台按鈕改「從素材庫加入」
 
 - 根因：FC.1／EC.1 只擋標誌圖檔（`craft_brand_scan`），沒擋名稱。上游 `docs/brand/LICENSE-brand.txt`：ArtCraft 名稱也算標誌，改過的版本要拿掉、不可呈現成 ArtCraft 產品（可以純文字寫「based on FilmCraft by the ArtCraft team」）。舊產物 wasm：FilmCraft 239 處 artcraft／162 處 discord，EffectCraft 95／46，來源＝頁首 Discord 按鈕、Import／Home 的 Community 段、Help 選單、About、`links.rs` 常數，加上約 15 種語言的翻譯表。

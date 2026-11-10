@@ -151,6 +151,38 @@ function engineButton(text, act, primary = false) {
   b.dataset.engineAct = act;
   return b;
 }
+// Rail icons: line drawings in currentColor (the button's theme colour), 24-unit box.
+const ENGINE_ICONS = {
+  plus: "M12 5v14M5 12h14",
+  file: "M6 3h8l4 4v14H6zM14 3v4h4",
+  "ratio:16:9": "M3 7h18v10H3z",
+  "ratio:9:16": "M7 3h10v18H7z",
+  "ratio:4:5": "M6 4.5h12v15H6z",
+  export: "M12 15V4M7 9l5-5 5 5M5 19h14",
+  alpha: "M4 4h16v16H4zM4 12h8v8M12 4v8h8",
+  info: "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 11v6M12 7.5v.5",
+};
+function engineRailButton(icon, label, tip, act) {
+  const b = engineEl("button", "engine-rail-btn");
+  b.type = "button";
+  b.dataset.engineAct = act;
+  b.title = typeof tip === "function" ? tip() : tip;
+  b.setAttribute("aria-label", label);
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", ENGINE_ICONS[icon]);
+  svg.append(path);
+  b.append(svg);
+  return b;
+}
+function enginePanel(open = !eng.panel) {
+  eng.panel = open;
+  const fly = eng.host?.querySelector(".engine-flyout");
+  if (fly) fly.hidden = !open;
+  eng.host?.querySelector('[data-engine-act="panel"]')?.setAttribute("aria-expanded", String(open));
+}
 // The home-made tool to use instead goes through tools-0.js's own open:<tool> action.
 function engineFallbackButton(primary) {
   const [id, label] = eng.cfg.fallback;
@@ -217,28 +249,44 @@ function engineShow() {
     warn.lastChild.append(engineFallbackButton(true), engineButton("仍然開啟", "force"));
     return top.append(warn);
   }
-  // One compact bar above the engine: the engine gets the rest of the window.
-  top.className = "engine-bar";
-  const bar = engineEl("div", "row");
-  bar.append(engineEl("b", "", name), engineButton("從素材庫加入", "assets", true), engineButton("開新專案", "new"));
+  // Card FC.5: a narrow icon rail on the right edge (the VectorCraft Pro dock layout, rewritten with the workbench's own
+  // classes and tokens); the engine gets the whole height. Help, status and saved projects open in a flyout left of it.
+  host.classList.add("engine-stage");
+  top.className = "engine-rail";
+  top.setAttribute("role", "toolbar");
+  top.setAttribute("aria-orientation", "vertical");
+  top.setAttribute("aria-label", name);
+  top.append(engineRailButton("plus", "從素材庫加入", "從素材庫加入素材（引擎裡的 Import 是從電腦加入）", "assets"), engineRailButton("file", "開新專案", "開新專案（目前的專案先存檔）", "new"));
   // The frame starts every render itself (FC.3 / EC.3), so each one is checked and recorded the same way.
-  bar.append(engineEl("span", "note", "輸出成片："));
-  if (cfg.engine === "filmcraft")
-    for (const ratio of Object.keys(ENGINE_RENDER_SIZES))
-      bar.append(engineButton(ratio + "（" + ENGINE_RENDER_SIZES[ratio].join("×") + "）", "export:" + ratio));
-  else bar.append(engineButton("輸出目前的合成", "export:comp"), engineButton("輸出透明片段", "export:alpha"));
-  const status = engineEl("span", "note");
+  top.append(engineEl("hr"));
+  if (cfg.engine === "filmcraft") {
+    eng.ratio ||= "16:9";
+    for (const ratio of Object.keys(ENGINE_RENDER_SIZES)) {
+      const [w, h] = ENGINE_RENDER_SIZES[ratio];
+      const b = engineRailButton("ratio:" + ratio, ratio, `成片比例 ${ratio}（${w}×${h} 像素）`, "ratio:" + ratio);
+      b.setAttribute("aria-pressed", String(eng.ratio === ratio));
+      top.append(b);
+    }
+    top.append(engineRailButton("export", "輸出成片", () => `輸出成片 ${eng.ratio}（${ENGINE_RENDER_SIZES[eng.ratio].join("×")} 像素）：附字幕檔、音量 −16 LUFS，存進素材庫`, "export"));
+  } else
+    top.append(
+      engineRailButton("export", "輸出目前的合成", "輸出目前的合成（1920×1080、1080×1920 或 1080×1350 像素；H.264）", "export:comp"),
+      engineRailButton("alpha", "輸出透明片段", "輸出透明片段（目前的合成，含透明度）", "export:alpha"),
+    );
+  top.append(engineEl("hr"), engineRailButton("info", "說明與專案", "說明與專案：存檔狀態、說明、已存的專案", "panel"));
+  const fly = engineEl("aside", "engine-flyout");
+  fly.hidden = !eng.panel;
+  fly.setAttribute("aria-label", "說明與專案");
+  const status = engineEl("p", "engine-flyout-status");
   status.dataset.engineStatus = "";
   status.setAttribute("role", "status");
-  bar.append(status);
-  const more = engineEl("details");
-  more.append(engineEl("summary", "note", "說明與已存的專案"));
-  for (const n of [...cfg.notes, "在引擎畫面用 File › Save 存檔，專案會存進工作台。", cfg.exportNote, "游標在引擎畫面裡時，按 F6 回到上面這一列。"])
-    more.append(engineEl("p", "note", n));
+  fly.append(engineEl("b", "", name), status);
+  for (const n of [...cfg.notes, "在引擎畫面用 File › Save 存檔，專案會存進工作台。", cfg.exportNote, "游標在引擎畫面裡時，按 F6 回到右邊這一欄；按 Esc 關閉這個面板。"])
+    fly.append(engineEl("p", "note", n));
   const list = engineEl("div");
   list.dataset.engineProjects = "";
-  more.append(list);
-  top.append(bar, more);
+  fly.append(list);
+  top.append(fly);
   engineStatus();
   engineListProjects();
   if (!eng.frame) ENGINE_START_PROJECT ? engineOpenProject(ENGINE_START_PROJECT).catch(VideoWorkbench.reportError) : engineMount();
@@ -255,6 +303,15 @@ function engineStatus(text) {
       : eng.dirty ? "尚未存檔"
       : eng.doc ? "已存檔：" + eng.doc.name.replace(/\.[a-z]+$/i, "")
       : "");
+  engineRailMark();
+}
+// The rail has no room for words: the help button carries the status in its tooltip and a dot while engineUnsaved().
+// Called wherever an input of engineUnsaved() changes: engineStatus (dirty, writes, saveFailed) and the render list.
+function engineRailMark() {
+  const button = eng.host?.querySelector('[data-engine-act="panel"]');
+  if (!button) return;
+  button.title = "說明與專案：" + (eng.host.querySelector("[data-engine-status]")?.textContent || "存檔狀態、說明、已存的專案");
+  button.classList.toggle("engine-rail-attn", engineUnsaved());
 }
 
 async function engineListProjects() {
@@ -290,14 +347,23 @@ function engineMount() {
 }
 
 function engineF6(event) {
+  // Esc closes the help/projects flyout first (only while it is open: otherwise Esc stays the engine's own key).
+  if (event.key === "Escape" && eng.panel) {
+    event.preventDefault();
+    event.stopPropagation();
+    return enginePanel(false);
+  }
   if (event.key !== "F6") return;
   event.preventDefault();
   event.stopPropagation();
-  // The full page has no sidebar: focus goes to the bar above the engine.
+  // The full page has no sidebar: focus goes to the icon rail beside the engine.
   eng.frame?.blur();
   window.focus();
-  eng.host?.querySelector(".engine-bar button")?.focus();
+  eng.host?.querySelector(".engine-rail button")?.focus();
 }
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && eng.panel) enginePanel(false);
+});
 
 function engineSend(name, bytes) {
   if (!eng.ready) return eng.queue.push({ name, bytes });
@@ -496,6 +562,17 @@ document.addEventListener(
       if (act === "tab") return engineOpenTab(engineTool(), engineEpisodeFile(engineTool()));
       if (act === "assets") return enginePickAssets().catch(VideoWorkbench.reportError);
       if (act === "new") return engineLeaveOk() && engineMount();
+      if (act === "panel") return enginePanel();
+      // Choosing a ratio changes two attributes in place: rebuilding the rail would drop keyboard focus and the
+      // status a running render shows ("輸出中…").
+      if (act.startsWith("ratio:")) {
+        eng.ratio = act.slice(6);
+        for (const b of eng.host.querySelectorAll('[data-engine-act^="ratio:"]')) b.setAttribute("aria-pressed", String(b === button));
+        const exp = eng.host.querySelector('[data-engine-act="export"]');
+        if (exp) exp.title = `輸出成片 ${eng.ratio}（${ENGINE_RENDER_SIZES[eng.ratio].join("×")} 像素）：附字幕檔、音量 −16 LUFS，存進素材庫`;
+        return;
+      }
+      if (act === "export") return engineExport(eng.ratio).catch(VideoWorkbench.reportError);
       if (act.startsWith("export:")) return engineExport(act.slice(7)).catch(VideoWorkbench.reportError);
       if (act.startsWith("open:")) return engineLeaveOk() && engineOpenProject(act.slice(5)).catch(VideoWorkbench.reportError);
       return;
@@ -572,6 +649,7 @@ async function engineExport(choice) {
     srt: null,
     timer: null,
   });
+  engineRailMark();
   // A render the engine never started must not stay counted (engineUnsaved would ask on every leave).
   try {
     if (cfg.engine === "filmcraft") {
@@ -598,6 +676,7 @@ async function engineExport(choice) {
     }
   } catch (error) {
     engineRenders.delete(base);
+    engineRailMark();
     throw error;
   }
   engineStatus("輸出中…（在引擎畫面可看進度）");
@@ -645,5 +724,6 @@ async function engineSubmitRender(base) {
     VideoWorkbench.reportError(error);
   } finally {
     engineRenders.delete(base);
+    engineRailMark();
   }
 }
