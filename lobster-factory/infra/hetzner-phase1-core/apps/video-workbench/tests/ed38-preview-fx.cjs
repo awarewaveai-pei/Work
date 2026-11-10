@@ -16,6 +16,10 @@ const pass = (m) => console.log("PASS " + m);
   const clipUrl = "/generated/" + crypto.randomUUID() + ".mp4",
     made = spawnSync(ffmpeg, ["-y", "-hide_banner", "-f", "lavfi", "-i", "testsrc2=s=640x360:r=30:d=4", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", path.join(dataDir, clipUrl)], { encoding: "utf8", windowsHide: true });
   assert.equal(made.status, 0, made.stderr);
+  // A see-through PNG (alpha ≈ 0.5) for the blurred copy: repaints must not stack it up.
+  const pngUrl = "/generated/" + crypto.randomUUID() + ".png",
+    png = spawnSync(ffmpeg, ["-y", "-hide_banner", "-f", "lavfi", "-i", "color=c=red@0.5:s=320x180,format=rgba", "-frames:v", "1", path.join(dataDir, pngUrl)], { encoding: "utf8", windowsHide: true });
+  assert.equal(png.status, 0, png.stderr);
   const server = require("../server.cjs").createServer({ dataDir, env: {} });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
   const base = "http://127.0.0.1:" + server.address().port,
@@ -147,6 +151,27 @@ const pass = (m) => console.log("PASS " + m);
     assert.equal((await stats(off, await shot())).changed, 0, "背景回黑邊與原畫面相同");
     assert.equal(await page.locator('[data-ed-back="v1clip"]').count(), 0);
     pass("背景模糊：上方黑邊被模糊畫面填滿，強度 40 的標準差小於 2（同輸出端驗法）；暫停跳時間重畫；半透明不透出底圖；回黑邊與原畫面完全相同");
+
+    // Codex review 2: a see-through PNG's blurred copy keeps its alpha over repeated paints (canvas cleared each time).
+    const alphaAt = await page.evaluate(async (url) => {
+      const p = edProject();
+      p.clips.push(edTime(p, { id: "pngclip", kind: "image", track: "V1", asset: { id: "a2", url, name: "半透明", duration: 3 }, speed: 1, volume: 1, fadeIn: 0, fadeOut: 0, opacity: 1, scale: 1, x: 0, y: 0, rotation: 0, width: 25, background: "模糊", backgroundBlur: 20 }, { startFrame: 120, durationFrames: 60, sourceStartFrame: 0 }));
+      edRender();
+      ed.time = 4.5;
+      edPaint();
+      const img = document.querySelector('[data-ed-layer="pngclip"]');
+      await (img.complete ? null : new Promise((r) => img.addEventListener("load", r, { once: true })));
+      const read = () => {
+        edPaint();
+        const b = document.querySelector('[data-ed-back="pngclip"]');
+        return b.getContext("2d").getImageData(Math.floor(b.width / 2), Math.floor(b.height * 0.1), 1, 1).data[3];
+      };
+      const first = read();
+      for (let i = 0; i < 10; i++) read();
+      return [first, read()];
+    }, pngUrl);
+    assert.ok(alphaAt[0] > 0 && Math.abs(alphaAt[1] - alphaAt[0]) <= 2, "重畫 10 次後模糊底圖透明度不變 " + alphaAt);
+    pass("半透明 PNG 的模糊底圖重畫多次不會越疊越不透明");
 
     assert.deepEqual(errors, []);
     console.log("EVIDENCE " + dir);

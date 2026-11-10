@@ -1564,6 +1564,7 @@ function edBlurBack(p, c, el, stage, back) {
     m = Math.ceil(3 * sigma), // overdraw so the blur does not darken the edges (the export clamps them)
     s = Math.max((W + 2 * m) / sw, (H + 2 * m) / sh),
     ctx = back.getContext("2d");
+  ctx.clearRect(0, 0, W, H); // every paint redraws: a see-through PNG must not stack up
   ctx.filter = `blur(${sigma.toFixed(2)}px)`;
   ctx.drawImage(el, (W - sw * s) / 2, (H - sh * s) / 2, sw * s, sh * s);
   // The export fades the composed frame; here picture and copy fade apart, so under a see-through picture the copy is
