@@ -80,9 +80,13 @@
     EDIT_STORES = ["tools.editor.projects", "tools.engine.projects"];
   function spineAdopt() {
     if (!Spine) return 0;
-    const r = Spine.adopt(db.projects, db.preferences["tools.editor.projects"], db.preferences["tools.engine.projects"]);
+    // Card PJ.5: the edit files ever linked (EpisodeSpine.adopt `known`); stored only when it grew.
+    const known = db.preferences["spine.linkedEdits"],
+      r = Spine.adopt(db.projects, db.preferences["tools.editor.projects"], db.preferences["tools.engine.projects"], known);
     db.projects = r.projects.map(M.project);
-    return r.added + r.named;
+    const grew = r.known.length !== (Array.isArray(known) ? known.length : 0);
+    if (grew) db.preferences["spine.linkedEdits"] = r.known;
+    return r.added + r.named + (grew ? 1 : 0);
   }
   async function spineChanged() {
     await persist();

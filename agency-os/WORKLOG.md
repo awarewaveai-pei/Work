@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-10（續15）影音工作台 PJ.5：刪掉剪輯檔或專案之後不壞頁、不回魂
+
+- 根因：PJ.1 的 `adopt` 每次開頁把「沒有歸屬」的剪輯檔收成新專案；一集或一個專案被刪後，它的剪輯檔變成沒歸屬，下次開頁又被收回＝刪不掉。一集的 `edit` 指到 ED.9 刪掉的檔時，「開啟剪輯」丟「找不到這一集的剪輯檔」，無法重開。
+- 做了（規格 `docs/pj-project-spine-spec-20261106.md` §3.4，本卡新增）：`shared/episode-spine.js` `adopt(..., known)`：一個剪輯檔只在第一次被看到沒歸屬時收編，回傳新的 `known`；`shared/runtime.js` `spineAdopt` 存在 `preferences["spine.linkedEdits"]`，有變才多存；`scripts/projects-0.js` 剪輯檔不在 → 第 6 步「剪輯檔已刪除。」＋「建立剪輯檔」，開剪輯送 `edit: null`（走 tools-0.js 既有 attachEdit→edCreate）。`edit` 不先清：檔從備份救回能再連上。ED.9 檔未動。
+- 順手：`scripts/sync-mcp-config.ps1:557` 補 `-Encoding UTF8`（856b66950），verify-build-gates 的 CP950 關鍵閘本來紅，擋住所有 commit。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/pj5-deleted-edit.cjs（(a) 已刪→提示＋建新檔換 id；(b) ED.9 刪除鈕刪檔→重開兩次不多專案；(c) 拿掉專案→重開兩次不回來、檔仍在） | exit=0 | ms=3026
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/{pj1-spine-unit,pj1-legacy-ui,pj2-spine-settle,pj3-arrange,pj4-stale,gate}.cjs 全綠 | exit=0 | ms=30000
+- 突變：`adopt` 不看 `known` → 第 3 條紅（「刪掉的專案的剪輯檔又被收成專案」）；還原後綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n（Codex `agency-os/reports/oracle/2026-11-10-partialreview-effc24c1.md`）
+  - m1 不修：專案頁沒有「刪除專案／刪除一集」按鈕（`projects-0.js` 動作清單無刪除），測試 (c) 以整份寫回模擬。這是缺功能、不是本卡的錯；本卡在資料層關掉整類（任何寫回丟掉專案或集都不回魂）。要不要加刪除鈕由操作者決定。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=spine\.linkedEdits\|EpisodeSpine\.adopt\|Spine\.adopt\|剪輯檔已刪除 | hits=15（spine 定義、runtime、pj1 單元測試兩處呼叫不帶 known＝舊行為、projects-0、pj5 測試、規格、本條 WORKLOG）
 ## 2026-11-10（續14）影音工作台 PJ.4：過期提示、「這支成片是怎麼做的」、合成／骨架併入同一條過期規則
 
 - 做了（規格 `docs/pj-project-spine-spec-20261106.md` §2 PJ.4）：`shared/episode-spine.js` 加 `isStale`（全工作台唯一過期判斷）、`current`、`staleClip`、`outputStale`、`lineage`，`stepStates` 第 6–10 步接上「要重做」；`scripts/tools-editor.js` 過期片段虛線＋說明、屬性欄「換成新的」（`previousAssetIds`）／「重新產生字幕」／「重新配音這句 · 依 API 用量計費」（只送那一句、按了才送）、新配音接手同一句的過期片段、`vw:changed` 過期集合變了才重畫、`intent:"export"` 開匯出對話框；`scripts/projects-0.js` 成片「要重新輸出」「開啟<工具名>」＋「怎麼做的」對話框；`tools-compositor.js`（`cpOutdated`）、`tools-rig.js` 改用 `isStale`；`rig.js atVersion` 未動。

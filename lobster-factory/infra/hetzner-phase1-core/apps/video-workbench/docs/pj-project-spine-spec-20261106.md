@@ -270,6 +270,28 @@ type Output = { url: string; assetId: string; jobId: string; editRevision: numbe
 
 PJ.2 起另驗：舊鏡頭補了 id、原有 `image` 不變（併入 `pj2-spine-settle.cjs` 第 2 條的種子資料）。
 
+### 3.4 卡 PJ.5：刪掉剪輯檔或專案之後（監工 2026-11-10 加；Medium）
+
+刪除有兩處：剪輯器專案列表（ED.9，`scripts/editor-project-list.js` `edListDelete`，先備份到 `tools.editor.projects.deleted-<時間>` 再從 `tools.editor.projects` 拿掉）；專案頁刪專案／刪一集（整份 projects 寫回，`keepSpine` 不讓被刪的集復活）。不改 ED.9 的檔。
+
+不變量：**一個剪輯檔只在第一次被看到「沒有歸屬」時收編一次**。曾經掛在某一集的剪輯檔，那一集或那個專案被刪後，就只是剪輯器清單裡的一個檔，不再自動變回專案。
+
+| 情況 | 做法 |
+|---|---|
+| (a) 一集的 `edit` 指向已刪的剪輯檔 | `projects-0.js` 第 6 步寫「剪輯檔已刪除。」，按鈕「建立剪輯檔」；第 6–9 步的開剪輯按鈕送 `edit: null`（走 `tools-0.js` 既有的「先 attachEdit、再 edCreate」），新檔取代 `edit`。`edit` 欄位不先清掉：被刪的檔從備份救回時，這一集又連得上 |
+| (b) adopt 不收回已刪的列 | 已刪的列不在 `tools.editor.projects`，adopt 本來就看不到；真正會「回來」的是 (c) |
+| (c) 刪專案頁的專案（或一集） | 它的剪輯檔留在內容庫、沒有歸屬；舊 adopt 每次開頁都把它收成新專案＝刪不掉。`adopt(projects, editorRows, engineRows, known)` 多收一個 `known`（曾經掛過的剪輯檔 id），回傳新的 `known`＝`known`∪這次看到掛著的∪這次收編的；在 `known` 裡的不收編。runtime 把它存在 `db.preferences["spine.linkedEdits"]`（`spineAdopt`，`shared/runtime.js`），有變才多存一次 |
+
+舊資料：第一次跑時 `known` 是空的＝跟以前一樣，所有沒歸屬的列照收；之後只記不改原列（§3.1 原檔一位元不改）。
+
+測試 `tests/pj5-deleted-edit.cjs`（新）只測：
+1. (a) 剪輯檔刪掉後開專案頁：第 6 步「剪輯檔已刪除。」、沒有錯誤；按「建立剪輯檔」→ 開出新檔、這一集的 `edit` 換成新 id；
+2. (b) 剪輯器清單（ED.9 的刪除鈕）刪掉一集的剪輯檔 → 重開主頁兩次，內容庫沒有它、專案數不變；
+3. (c) 專案頁刪掉一個專案 → 重開主頁兩次，那個專案沒回來、它的剪輯檔仍在內容庫。**突變**：`adopt` 不看 `known` → 第 3 條紅。
+重跑：`pj1-*`、`pj2-spine-settle`、`pj3-arrange`、`pj4-stale`、`tests/gate.cjs`。
+
+回退：`git revert`；`spine.linkedEdits` 是多出的偏好鍵，舊程式不讀。
+
 ## 4. 過期判斷落在哪
 
 唯一規則：`EpisodeSpine.isStale(記下的 key, 位置現在的 key)`（`shared/episode-spine.js`）。用到它的只有：

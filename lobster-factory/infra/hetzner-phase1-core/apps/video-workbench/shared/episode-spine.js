@@ -24,12 +24,15 @@
 
   // Every edit file not yet linked to an episode becomes a project with one episode pointing at it (spec §2 PJ.1
   // "adopt 的輸入輸出形狀"). The rows are only read: the content stays where it is, byte for byte (spec §3.1).
-  function adopt(projects, editorRows, engineRows) {
-    const linked = new Set(
-      episodes(projects)
+  // Card PJ.5 (spec §3.4): an edit file is adopted once, the first time it is seen unlinked. `known` = the ids ever
+  // linked; a file whose episode or project was deleted is in it and stays a plain library file. The returned
+  // `known` adds what is linked now and what this run adopted.
+  function adopt(projects, editorRows, engineRows, known = []) {
+    const now = episodes(projects)
         .map(({ episode }) => episode.edit?.projectId)
         .filter(Boolean),
-    );
+      seen = new Set(Array.isArray(known) ? known : []),
+      linked = new Set([...seen, ...now]);
     // Card PJ.2 (spec §3.2): a step lands on a shot by its id; old shots without one get one here.
     let named = 0;
     const out = projects.map((p) =>
@@ -81,7 +84,7 @@
     // tools.engine.projects also holds EffectCraft compositions; only FilmCraft rows are edit files.
     for (const row of Array.isArray(engineRows) ? engineRows : [])
       if (row?.engine === "filmcraft") take(row, "filmcraft");
-    return { projects: out, added, skipped, named };
+    return { projects: out, added, skipped, named, known: [...seen, ...[...linked].filter((id) => !seen.has(id))] };
   }
 
   // The spine fields of every episode in `next` come from the same episode in `prev`; episodes and projects that

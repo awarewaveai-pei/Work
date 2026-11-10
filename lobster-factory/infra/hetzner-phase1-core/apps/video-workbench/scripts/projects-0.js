@@ -170,8 +170,9 @@ function episodeSteps(e) {
     button = (act, label, extra = "") => `<button class="btn small outline" data-action="${act}"${extra}>${label}</button>`,
     note = (text) => `<p class="tiny">${text}</p>`,
     row = e.edit && rows.find((r) => EpisodeSpine.editId(r) === e.edit.projectId),
-    editButton = button("openEdit", e.edit ? "開啟剪輯" : "建立剪輯檔", ' data-intent="arrange"'),
-    editFile = `<p class="tiny">${!e.edit ? "還沒有剪輯檔。" : row ? "剪輯檔：" + esc(EpisodeSpine.editTitle(row)) : "找不到這一集的剪輯檔。"}</p>`;
+    // Card PJ.5: an edit file deleted in the editor's list leaves e.edit pointing at nothing; the button makes a new one.
+    editButton = button("openEdit", row ? "開啟剪輯" : "建立剪輯檔", ' data-intent="arrange"'),
+    editFile = `<p class="tiny">${!e.edit ? "還沒有剪輯檔。" : row ? "剪輯檔：" + esc(EpisodeSpine.editTitle(row)) : "剪輯檔已刪除。"}</p>`;
   const body = [
     "",
     button("storyboard", "AI 分鏡"),
@@ -922,12 +923,15 @@ async function action(a, button) {
       break;
     case "openEdit": {
       const e = ep();
+      // Card PJ.5: a deleted file is not opened (it is gone) -- edit: null makes a new one and attaches it in its place
+      // (tools-0.js acceptAsset). e.edit is not cleared first: a file restored from its backup links up again.
+      const edit = e.edit && editRows(e).some((r) => EpisodeSpine.editId(r) === e.edit.projectId) ? e.edit : null;
       try {
         await VideoWorkbench.generator.import({
           intent: "open-tool",
-          tool: e.edit?.engine === "filmcraft" ? "edit-pro" : "edit",
+          tool: edit?.engine === "filmcraft" ? "edit-pro" : "edit",
           link: { projectId: p.id, episodeId: e.id },
-          edit: e.edit || null,
+          edit,
           title: e.name,
           ratio: p.ratio,
           ...(button?.dataset.intent ? { editIntent: button.dataset.intent } : {}),
