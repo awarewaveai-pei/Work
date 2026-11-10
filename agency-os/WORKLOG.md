@@ -1,4 +1,11 @@
 # Worklog
+## 2026-11-10（續20）影音工作台 ED.1.5：頂列比例下拉改按鈕（§9 G2）
+
+- 改：`scripts/tools-editor.js` 新 `edRatioChoices`（`edChoices`＋action `project-ratio:<r>`），頂列與整片設定共用；刪 `edRatioSelect`。頂列顯示短字「16:9」（頂列改前已超寬約 1730px，含配音按鈕長字），整片設定保留「16:9 橫屏」。
+- 測：`tests/ed1-layout.cjs` 加：`.editor-topbar select`＝0、鍵盤 Enter 改 1:1 寫回專案、整片設定與舞台比例同步。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed1-layout.cjs; node tests/ed3-inspector.cjs; node tests/tools-editor.cjs; node tests/ed2-timeline.cjs; node tests/gate.cjs | exit=0 | ms=420000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n — Codex：焦點按鈕按 Space 會觸發全域播放（剪輯器所有按鈕既有行為，Enter 可用），不修
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=edRatioSelect | hits=1
 ## 2026-11-10（續19）影音工作台 S4b 本機 SF3D 壞掉的根因：Windows「智慧型應用程式控制」封鎖重編的未簽章 .pyd（系統層，停下回報）
 
 - 症狀：重跑 `scripts/sf3d/install.cmd` 後出現 `ImportError: DLL load failed while importing _C: 找不到指定的程序。`（續18）。

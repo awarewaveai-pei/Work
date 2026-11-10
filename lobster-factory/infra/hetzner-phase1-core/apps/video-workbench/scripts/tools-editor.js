@@ -525,16 +525,14 @@ function edIconButton(label, glyph, action, pressed, disabled = false) {
 function edResizer(side, orientation, label, value) {
   return `<div class="editor-resize editor-resize-${orientation}" data-ed-resize="${side}" role="separator" aria-orientation="${orientation}" aria-label="${label}" aria-valuenow="${value}" tabindex="0"></div>`;
 }
-// Ratio choices read 「16:9 橫屏」 like the reference; the stored value stays the bare ratio.
-function edRatioSelect(p, label, visibleLabel) {
-  const names = Object.fromEntries(edCreateRatios.map(([r, name]) => [r, name])),
-    select = `<select class="text-input" aria-label="${label}" data-ed-field="project:ratio">${Object.keys(edRatios)
-      .map((r) => `<option value="${r}" ${r === p.ratio ? "selected" : ""}>${esc(r + " " + (names[r] || ""))}</option>`)
-      .join("")}</select>`;
-  return visibleLabel ? `<label>${label}${select}</label>` : select;
+// Card ED.1.5: ratio is the same visible button group in the top bar and in 整片設定 (one action, project-ratio:<r>);
+// 整片設定 reads 「16:9 橫屏」 like the reference; the crowded top bar shows the bare ratio, which is also the stored value.
+function edRatioChoices(p, label, short = false) {
+  const names = Object.fromEntries(edCreateRatios.map(([r, name]) => [r, name]));
+  return edChoices(label, "project-ratio", p.ratio, Object.keys(edRatios), (r) => (short ? r : r + " " + (names[r] || "")));
 }
 function edTopbar(p) {
-  return `<header class="editor-topbar"><div class="editor-topbar-group"><button type="button" class="btn small" data-ed-action="projects" aria-label="回到這一集">← 回到這一集</button><label class="editor-title"><input class="text-input" aria-label="專案名稱" data-ed-field="project:title" type="text" maxlength="100" value="${esc(p.title)}"><span aria-hidden="true">✎</span></label>${edRatioSelect(p, "輸出比例", false)}</div>${edSpineButtons(p)}<span class="editor-saved" data-ed-saved role="status" data-state="${ed.save.state}">${esc(edSaveText())}</span><div class="editor-topbar-group">總時長：<b class="editor-total" data-ed-total>${edClockText(edTotal())}</b><button type="button" class="btn primary small" data-ed-action="export" aria-label="匯出" ${p.clips.length ? "" : "disabled"}>▷ 匯出</button></div></header>`;
+  return `<header class="editor-topbar"><div class="editor-topbar-group"><button type="button" class="btn small" data-ed-action="projects" aria-label="回到這一集">← 回到這一集</button><label class="editor-title"><input class="text-input" aria-label="專案名稱" data-ed-field="project:title" type="text" maxlength="100" value="${esc(p.title)}"><span aria-hidden="true">✎</span></label>${edRatioChoices(p, "輸出比例", true)}</div>${edSpineButtons(p)}<span class="editor-saved" data-ed-saved role="status" data-state="${ed.save.state}">${esc(edSaveText())}</span><div class="editor-topbar-group">總時長：<b class="editor-total" data-ed-total>${edClockText(edTotal())}</b><button type="button" class="btn primary small" data-ed-action="export" aria-label="匯出" ${p.clips.length ? "" : "disabled"}>▷ 匯出</button></div></header>`;
 }
 function edRail() {
   const open = ed.layout.leftOpen;
@@ -566,7 +564,6 @@ function edInspector(p, c) {
 // are the 配樂 A2 / 旁白 A1 track volumes and only show when that track exists.
 function edProjectSettings(p) {
   const [w, h] = edRatios[p.ratio],
-    names = Object.fromEntries(edCreateRatios.map(([r, name]) => [r, name])),
     percent = (key) => {
       const r = EditorModel.EFFECTS[key];
       return edNumber("fx-project:" + key, r.label + "（%）", Math.round((p[key] ?? r.neutral) * 100), { min: 0, max: 100, step: 1 });
@@ -574,7 +571,7 @@ function edProjectSettings(p) {
     db = (id, title) =>
       edTrack(p, id) ? edNumber("track-db:" + id, title, Number(EditorModel.volumeToDb(edTrack(p, id).volume).toFixed(1)), { min: EditorModel.DB.min, max: 12, step: 0.5 }) : "";
   return (
-    edGroup("畫面", p.ratio, `<p class="note">畫面比例</p>${edChoices("畫面比例", "project-ratio", p.ratio, Object.keys(edRatios), (r) => r + " " + (names[r] || ""))}<p class="note">整片濾鏡</p>${edChoices("整片濾鏡", "project-filter", p.filter || "原始", edFilters)}${["filterStrength", "grain", "lightLeak", "shake"].map(percent).join("")}${edButton("更多特效與遮罩", "pane:特效")}`) +
+    edGroup("畫面", p.ratio, `<p class="note">畫面比例</p>${edRatioChoices(p, "畫面比例")}<p class="note">整片濾鏡</p>${edChoices("整片濾鏡", "project-filter", p.filter || "原始", edFilters)}${["filterStrength", "grain", "lightLeak", "shake"].map(percent).join("")}${edButton("更多特效與遮罩", "pane:特效")}`) +
     edGroup("聲音", "", `${db("A2", "配樂（dB）")}${db("A1", "旁白（dB）")}${edButton("自動降低音量、循環、響度", "pane:音訊")}`) +
     edGroup("文字與字幕", "", `${edButton("整軌字幕樣式", "pane:字幕")}${edButton("一鍵整片字幕", "pane:字幕")}${edButton("文字樣板", "pane:文字")}`) +
     edGroup("輸出", Timebase.label(p.timebase), `<p class="note">${w} × ${h} · ${esc(Timebase.label(p.timebase))}　${edTotal().toFixed(1)}s · ${p.clips.length} 段</p><p class="note">影格率</p>${edChoices("影格率", "project-timebase", Timebase.label(p.timebase), Timebase.allowed.map(Timebase.label))}${edButton("匯出影片", "export", !p.clips.length)}`) +

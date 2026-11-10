@@ -87,7 +87,7 @@ function evalNumber(text)  // digits . + - * / ( ) and spaces only; recursive de
   2. **聲音**：`配樂 dB`＝軌道 `A2` 的 `volume` 以 `EditorModel.volumeToDb` 顯示、`dbToVolume` 寫回（`editor-model.js:206-210`）；`旁白 dB`＝軌道 `A1`。該軌不存在就不顯示那一列。按鈕「自動降低音量、循環、響度」＝`pane:音訊`。
   3. **文字與字幕**：按鈕「整軌字幕樣式」「一鍵整片字幕」＝`pane:字幕`；「文字樣板」＝`pane:文字`（功能由 ED.5／ED.10 做，這裡只是捷徑，跟參考一樣）。
   4. **輸出**：`${w} × ${h} · ${fps}`、`${秒}s · ${段數} 段`（沿用 `:614` 的字）；`edChoices("影格率", "project-timebase", Timebase.label(p.timebase), Timebase.allowed.map(Timebase.label))`；`edButton("匯出影片", "export", …)`。
-- **刪除**：`:614` 的 `edRatioSelect(p, "畫面比例", true)` 與 `edSelect("project:timebase", …)` 兩個下拉。`edRatioSelect` 仍給頂列用（`:572`，ED.1／PJ.1 的範圍，見 §9 G2），不刪函式。
+- **刪除**：`:614` 的 `edRatioSelect(p, "畫面比例", true)` 與 `edSelect("project:timebase", …)` 兩個下拉。頂列後來由 ED.1.5 改成同一組按鈕（`edRatioChoices`），原 `edRatioSelect` 已刪（§9 G2）。
 - `edAction`（`:1484`）新增，放在 `project-filter:`（`:2045-2049`）旁邊：
   - `project-ratio:<r>`：`edRatios` 沒有就丟「比例不存在」；`p.ratio = r; ed.skipMagnet = true`。
   - `project-timebase:<label>`：把 change 處理器 `:2373-2383` 的重算邏輯**搬**成函式 `edSetTimebase(p, label)`，兩處都呼叫（不複製兩份）；`ed.skipMagnet = true`。
@@ -316,7 +316,7 @@ function evalNumber(text)  // digits . + - * / ( ) and spaces only; recursive de
 ## 9. 發現的衝突與缺口
 
 - **G1 預覽本來就不畫濾鏡、遮罩、顆粒、背景模糊**：`edPaint` 只套 `edGrade`（`tools-editor.js:1211`），背景永遠黑（`:1210`）。ED.3.2 補濾鏡＋強度、光漏、震動的預覽；遮罩／顆粒／背景模糊的預覽不在 ED.3 卡內 → 回報監工決定歸哪張卡。
-- **G2 頂列比例仍是下拉**（`edRatioSelect` `:564-570`，頂列 `:572`）。ED.3.1 的整片設定改按鈕；頂列屬 ED.1（PJ.1 正在改同一行）。建議 ED.1.4 或 PJ.1 收尾時一起改。
+- **G2 頂列比例仍是下拉**（`edRatioSelect` `:564-570`，頂列 `:572`）。ED.3.1 的整片設定改按鈕；頂列屬 ED.1（PJ.1 正在改同一行）。建議 ED.1.4 或 PJ.1 收尾時一起改。→ 2026-11-10 ED.1.5 已改。
 - **G3 規格 §3 說 ED.3 要「補背景模糊輸出」**：模糊輸出早已存在（`editor-export.cjs:443-456`，`tests/editor-render.cjs:99` 有測）；ED.3 只補強度。
 - **G4 軌道層濾鏡**：輸出端早就讀 `track.filter`（`:87`），但 UI 從沒寫過（`tools-editor.js` 無 `track.filter`）；ED.3.2 的「此軌」第一次用到它。
 - **G5 旁白時降低**依「A1 上有片段的時間」閃避，不是偵測人聲大小；A1 片段裡的空白段也會壓低。可預測、可逐格測；偵測人聲需 `sidechaincompress`，輸出不可預期，不採用。
