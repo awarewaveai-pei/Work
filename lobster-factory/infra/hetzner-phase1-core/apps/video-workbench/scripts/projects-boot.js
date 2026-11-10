@@ -6,13 +6,5 @@
       await (await fetch(item.url)).json(),
     );
   }
-  for (const file of ["projects-0.js"]) {
-    await new Promise((resolve, reject) => {
-      const s = document.createElement("script");
-      s.src = "../scripts/" + file;
-      s.onload = resolve;
-      s.onerror = reject;
-      document.body.append(s);
-    });
-  }
+  await VideoWorkbench.loadScripts(["projects-0.js"], "../scripts/");
 })().catch(VideoWorkbench.reportError);
