@@ -554,7 +554,7 @@ foreach ($name in ($servers.Keys | Sort-Object)) {
         if (-not (Test-Path -LiteralPath $file)) {
             throw "MCP server '$name': $file not found -- run 'npm ci' in mcp-local-wrappers."
         }
-        if ($file -notmatch '\\node_modules\\' -and (Get-Content -LiteralPath $file -Raw) -match '\bnpx\b') {
+        if ($file -notmatch '\\node_modules\\' -and (Get-Content -LiteralPath $file -Raw -Encoding UTF8) -match '\bnpx\b') {
             $viaNpx = $true
         }
     }
