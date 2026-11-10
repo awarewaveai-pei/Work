@@ -399,7 +399,7 @@ const t3Usd = (m) =>
   m.usd === 0
     ? "免費"
     : m.usd != null
-      ? `${m.estimate ? "約 " : ""}US$${m.usd}`
+      ? `${m.estimate ? "約 " : ""}${VideoWorkbenchMoney(m.usd)}`
       : `約 ${m.credits?.textured ?? "?"} 點額度`;
 async function t3ImageTo3d() {
   const m = (VideoWorkbench.capabilities?.imageTo3d?.methods || []).find(

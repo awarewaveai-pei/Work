@@ -1,10 +1,10 @@
-// Every paid action shows its US$ price before the click (operator 2026-11-10). Deploy gate: pure node, no browser.
+// Every paid action shows its price, in NT$, before the click (operator 2026-11-10). Deploy gate: pure node, no browser.
 // 1. The paid features are the "video.*" keys of backend/main-system.cjs (PAID_ROUTES + paidFeature): each must get a
-//    US$ text from shared/paid-price.js out of the real /capabilities (prices read from next-admin cost-model.ts).
+//    NT$ text from shared/paid-price.js out of the real /capabilities (prices read from next-admin cost-model.ts).
 // 2. Paid call sites in the frontend (a PAID_ROUTES path literal, generations.create, generations.retry) per feature
 //    never outnumber the buttons that declare that feature (a "video.x" literal, as in data-paid="video.x"). A create
 //    whose type/operation are not literals declares its features in a `// paid: video.x | none` line just above it.
-// 3. No US$ amount written into frontend source.
+// 3. No US$ / NT$ amount written into frontend source.
 const assert = require("node:assert/strict"), fs = require("node:fs"), os = require("node:os"), path = require("node:path"), vm = require("node:vm");
 const root = path.join(__dirname, "..");
 const mainSystem = require("../backend/main-system.cjs");
@@ -98,7 +98,7 @@ for (const feature of FEATURES) {
     problems.push(`${feature}: ${at.length} paid call site(s) but ${declared[feature]} priced button declaration(s) -- ${at.map((s) => s.where + " " + s.how).join("; ")}`);
 }
 for (const [f, text] of Object.entries(src))
-  for (const m of text.matchAll(/US\$\s*\d/g)) problems.push(`${f}:${lineOf(text, m.index)} US$ amount written into the source; read it from /capabilities`);
+  for (const m of text.matchAll(/(US|NT)\$\s*\d/g)) problems.push(`${f}:${lineOf(text, m.index)} money amount written into the source; read it from /capabilities`);
 
 (async () => {
   const { createServer } = require("../server.cjs");
@@ -108,14 +108,19 @@ for (const [f, text] of Object.entries(src))
     const caps = await (await fetch(`http://127.0.0.1:${server.address().port}/api/vw/capabilities`)).json();
     const window = {};
     vm.runInNewContext(fs.readFileSync(path.join(root, "shared/models.js"), "utf8") + "\n" + fs.readFileSync(path.join(root, "shared/paid-price.js"), "utf8"), { window, crypto: globalThis.crypto });
-    for (const feature of FEATURES) if (!/US\$\d/.test(window.VideoWorkbenchPrices.text(feature, caps))) problems.push(`${feature}: no US$ price from /capabilities`);
+    for (const feature of FEATURES) if (!/^(約 )?NT\$\d/.test(window.VideoWorkbenchPrices.text(feature, caps))) problems.push(`${feature}: no NT$ price from /capabilities`);
     // The shown numbers are next-admin's rates (not a copy): spot checks against cost-model.ts.
     const rates = require(path.join(require("../backend/appearance.cjs").resolveSource(root, process.env), "lib/ai/cost-model.ts"));
     assert.equal(caps.prices["video.transcribe"].usd, rates.TRANSCRIBE_RATES["whisper-1"].usdPerMin);
     const tts = rates.OPENAI_TTS_RATES[caps.models.audio]; // token-billed default: per minute of audio out, marked 約
     assert.deepEqual(caps.prices["video.tts"], { usd: 60 * tts.audioTokensPerSec * tts.audioOutPerM / 1e6, unit: "分鐘", estimate: true });
     assert.equal(caps.prices["video.image"].usd, rates.IMAGE_RATES["openai-high"].usd);
-    assert.match(window.VideoWorkbenchPrices.text("video.transcribe video.script", caps), /^US\$[\d.]+／分鐘 \+ 約 US\$[\d.]+／次$/);
+    assert.match(window.VideoWorkbenchPrices.text("video.transcribe video.script", caps), /^NT\$[\d.]+／分鐘 \+ 約 NT\$[\d.]+／次$/);
+    // NT$ = USD x next-admin TWD_RATE (image-models.js), the one rate.
+    assert.equal(caps.twdRate, rates.TWD_RATE);
+    assert.equal(window.VideoWorkbenchMoney(0.8, caps), "NT$25.6");
+    assert.equal(window.VideoWorkbenchMoney(0.04, caps), "NT$1.28");
+    assert.equal(window.VideoWorkbenchMoney(0.00044, caps), "NT$0.014");
   } finally {
     server.close();
   }

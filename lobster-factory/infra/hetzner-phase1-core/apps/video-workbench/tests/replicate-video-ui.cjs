@@ -23,17 +23,17 @@ const fetchImpl = async () => { throw Error("Provider calls are forbidden in tes
       await p.locator('[data-mode="reference"]').click();
       assert.match(await p.locator("#modelBtn").innerText(), /Veo 3\.1 Fast/, "預設不是 Veo 3.1 Fast");
       await p.locator("#prompt").fill("海邊日出");
-      assert.match(await p.locator("#send").innerText(), /US\$0\.80/, "Veo 3.1 Fast 8 秒的生成按鈕沒有價格");
+      assert.match(await p.locator("#send").innerText(), /NT\$25\.6/, "Veo 3.1 Fast 8 秒的生成按鈕沒有價格");
       await p.locator('[data-panel="model"]').first().click();
       const buttons = p.locator("#popover [data-model]");
       assert.equal(await buttons.count(), 4);
-      for (const text of await buttons.allInnerTexts()) assert.match(text, /US\$\d+\.\d\d/, "模型按鈕沒有價格：" + text);
+      for (const text of await buttons.allInnerTexts()) assert.match(text, /NT\$\d+(\.\d+)?/, "模型按鈕沒有價格：" + text);
       assert.equal(await p.locator("#popover select").count(), 0, "模型面板出現下拉選單");
       await p.locator('#popover [data-model="runway-gen4-turbo"]').click();
       assert.match(await p.locator("#modelBtn").innerText(), /Runway Gen-4 Turbo/);
       assert.equal(await p.locator("#send").isDisabled(), true, "Runway 沒有參考圖仍可送出");
       assert.match(await p.locator("#send").getAttribute("title"), /需要一張參考圖/);
-      assert.match(await p.locator("#send").innerText(), /US\$0\.25/, "Runway 5 秒價格不對（時長應改成 5 秒）");
+      assert.match(await p.locator("#send").innerText(), /NT\$8\.00/, "Runway 5 秒價格不對（時長應改成 5 秒）");
       // Restoring a Veo job brings back Veo (and its length), not the current model.
       await p.evaluate(() => generatorResultAction({ intent: "restore-job", job: { type: "video", input: { type: "video", mode: "reference", prompt: "還原測試", settings: { model: "veo-3-1-fast", ratio: "16:9", quality: "720p", duration: 6 } } } }));
       assert.match(await p.locator("#modelBtn").innerText(), /Veo 3\.1 Fast/, "還原任務沒有帶回原本的模型");
@@ -45,7 +45,7 @@ const fetchImpl = async () => { throw Error("Provider calls are forbidden in tes
       // Restoring an old Sora job runs the default model, with its price on the button.
       await p.evaluate(() => generatorResultAction({ intent: "restore-job", job: { type: "video", input: { type: "video", mode: "reference", prompt: "舊 Sora 任務", settings: { model: "sora-2", ratio: "16:9", quality: "720p", duration: 8 } } } }));
       assert.match(await p.locator("#modelBtn").innerText(), /Veo 3\.1 Fast/, "舊 Sora 任務沒有改用預設");
-      assert.match(await p.locator("#send").innerText(), /US\$0\.80/);
+      assert.match(await p.locator("#send").innerText(), /NT\$25\.6/);
       // An old project saved with Sora 2: opening it moves it to the default and shows one sentence.
       await p.evaluate(async () => {
         VideoWorkbench.storage.setItem("awarewave-projects-screenshot-frontend-v1", JSON.stringify({ projects: [{ id: "sora-old", title: "舊 Sora 專案", type: "single", ratio: "16:9", style: 1, customStyle: "", settings: { model: "sora-2", lockModel: true }, assets: { character: [], scene: [], prop: [] }, episodes: [{ id: "ep1", name: "第一集", outline: "", shots: [] }] }], current: null, episode: 0 }));

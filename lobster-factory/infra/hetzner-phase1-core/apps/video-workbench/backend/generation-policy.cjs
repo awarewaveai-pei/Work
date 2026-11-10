@@ -5,7 +5,7 @@ const imageOutputs = Object.fromEntries([["1K", 1024], ["2K", 2048], ["4K", 4096
 const provider = "OpenAI";
 // USD per run shown on the button before the click and charged after it: read from next-admin's cost SSOT
 // (lib/ai/cost-model.ts TOOL_RATES, Node type stripping), never copied here.
-const { TOOL_RATES, VIDEO_MOTION_RATES } = require(require("node:path").join(require("./appearance.cjs").resolveSource(require("node:path").join(__dirname, ".."), process.env), "lib/ai/cost-model.ts"));
+const { TOOL_RATES, VIDEO_MOTION_RATES, TWD_RATE } = require(require("node:path").join(require("./appearance.cjs").resolveSource(require("node:path").join(__dirname, ".."), process.env), "lib/ai/cost-model.ts"));
 const replicateVideo = require("./replicate-video.cjs");
 const toolCosts = Object.freeze({ removeBackground: TOOL_RATES["bg-remove"].usd });
 // Default video model: needs no reference image, lowest price (price audit 2026-11-10). VW_VIDEO_MODEL may name another
@@ -41,6 +41,8 @@ function capabilities(env, localTools) {
     maxVideoImages: 1, maxImageReferences: 4, multiModalReferences: false,
     imageQualities: Object.keys(imageOutputs), imageOutputs, imageExactOutput: true,
     removeBackground: !!env.REPLICATE_API_TOKEN, toolCosts,
+    // Pages show prices in NT$ at next-admin's one rate (image-models.js TWD_RATE); prices stay USD everywhere else.
+    twdRate: TWD_RATE,
     motionReference: false, subtitles: false, muteOutput: false, generationWatermark: false,
     spokespersonVideo: false, reshoot: false, advancedMedia: false, localTools,
   };

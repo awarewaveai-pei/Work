@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-10（續26）影音工作台：頁面價錢改顯示新台幣（操作者「頁面顯示的價錢要用新台幣」）
+
+- 改：一個格式化函式 `video-workbench/shared/models.js` `VideoWorkbenchMoney`（NT$＝USD × `capabilities.twdRate`）；匯率只有一份：next-admin `public/editor-shared/image-models.js` `TWD_RATE` 經 `backend/generation-policy.cjs` capabilities 傳下。`paid-price.js`、`models.js` priceText、`tools-3d.js` 三處原本各寫 US$，改共用它。價目、帳冊、用量回報仍是 USD。
+- 根因附帶：`shared/assets-ui.js` 去背標價只傳 `{ toolCosts }` 給標價函式，拿不到匯率 → 改傳整份 capabilities。
+- 測：`tests/paid-price.cjs` 改驗 NT$、原始碼禁寫死 US$／NT$ 金額、`twdRate`＝TWD_RATE、3 個換算值；remove-bg／replicate-video-ui／p5-workspace 標價字串改 NT$。
+- 未改：`tests/s4b-image-to-3d.cjs:152,158,160` 仍斷言 US$ ── 該段 vw-s4b session 改動中，已請它一併改成 NT$1.28／NT$3.20／約 NT$1.22。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs; node tests/paid-price.cjs; node tests/remove-bg.cjs; node tests/replicate-video-ui.cjs; node tests/p5-workspace.cjs; node tests/replicate-video.cjs | exit=0 | ms=600000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — 自審讀回 diff（9 檔 42+/23-）；找到並修 assets-ui 傳部分 capabilities
+- ORACLE_WAIVED: codex 額度封鎖至 14:03（oracle-quota exit 3）；改動為顯示格式，帳務數字不變
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/video-workbench,agency-os,scripts | grep=US\$ | hits=4（s4b 測試 3 行待 vw-s4b、s4b-sf3d-local 註解）
 ## 2026-11-10（續25）影音工作台 S4b 本機 SF3D 改在 WSL 跑（不關智慧型應用程式控制）：安裝可重跑、取消殺整組、工作台按鈕實跑
 
 - 決定（監工）：不關智慧型應用程式控制（續19）；本機 SF3D 改成在 WSL Ubuntu 裡跑，GPU 走 Windows NVIDIA 驅動（WSL 內 `nvidia-smi` 看得到 RTX 5060）。adapter 介面不變，只換程序的啟動方式。

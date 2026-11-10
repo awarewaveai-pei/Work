@@ -1,3 +1,10 @@
+// The one way a page shows money: NT$ at capabilities.twdRate (next-admin image-models.js TWD_RATE). Prices travel in USD
+// (cost-model.ts); only the text on the page is NT$. No rate yet (capabilities not loaded) = "" like an unknown price.
+window.VideoWorkbenchMoney = (usd, c = window.VideoWorkbench?.capabilities) => {
+  const rate = Number(c?.twdRate), n = Number(usd) * rate;
+  if (!(rate > 0) || !Number.isFinite(n)) return "";
+  return "NT$" + (n >= 10 ? n.toFixed(1) : n >= 0.1 ? n.toFixed(2) : String(Number(n.toPrecision(2))));
+};
 (function () {
   const id = () => crypto.randomUUID();
   const asset = (v = {}, kind = "image") =>
@@ -95,9 +102,9 @@
     return name + " 已停止服務，已改用 " + next.label;
   };
   const usd = (m, seconds, count = 1) => (Number.isFinite(m?.usdPerSec) ? m.usdPerSec * seconds * count : null);
-  const priceText = (m, seconds, count = 1) => {
+  const priceText = (m, seconds, count = 1, caps = window.VideoWorkbench?.capabilities) => {
     const v = usd(m, seconds, count);
-    return v === null ? "依實際用量" : "US$" + v.toFixed(2);
+    return v === null ? "依實際用量" : window.VideoWorkbenchMoney(v, caps);
   };
   window.VideoWorkbenchVideoModels = { list, get, usd, priceText, replaceRetired };
 })();

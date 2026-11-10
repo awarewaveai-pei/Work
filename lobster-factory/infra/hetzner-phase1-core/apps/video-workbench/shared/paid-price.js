@@ -4,11 +4,14 @@
 // price in when its own label has none. tests/paid-price.cjs holds paid call sites against these declarations.
 (function () {
   const caps = () => window.VideoWorkbench?.capabilities;
-  const money = (usd) => "US$" + (usd >= 0.1 ? usd.toFixed(2) : String(Number(usd.toPrecision(2))));
-  const unitText = (p) => (p && Number.isFinite(p.usd) ? `${p.estimate ? "約 " : ""}${money(p.usd)}／${p.unit}` : "");
+  // shared/models.js VideoWorkbenchMoney (NT$) at the rate of the capabilities the price came from.
+  let from = null;
+  const money = (usd) => window.VideoWorkbenchMoney(usd, from);
+  const unitText = (p) => (p && Number.isFinite(p.usd) && money(p.usd) ? `${p.estimate ? "約 " : ""}${money(p.usd)}／${p.unit}` : "");
   // model = the video model / 3D way the action runs (data-paid-model; a rerun uses its job's), else the default.
   function one(feature, c, model) {
     if (!c) return "";
+    from = c;
     if (feature === "video.bg-remove") return unitText({ usd: c.toolCosts?.removeBackground, unit: "張", estimate: true });
     if (feature === "video.motion") return unitText({ usd: window.VideoWorkbenchVideoModels?.get(c, model).usdPerSec, unit: "秒" });
     if (feature === "video.3d") {
@@ -24,7 +27,7 @@
   function mark(root = document) {
     for (const el of root.querySelectorAll("[data-paid]")) {
       const own = el.querySelector(":scope > .paid-price");
-      if (String(el.textContent).replace(own?.textContent || "", "").includes("US$")) { own?.remove(); continue; }
+      if (String(el.textContent).replace(own?.textContent || "", "").includes("NT$")) { own?.remove(); continue; }
       const t = text(el.dataset.paid, caps(), el.dataset.paidModel);
       if (!t) { own?.remove(); continue; }
       if (own?.textContent === " · " + t) continue;

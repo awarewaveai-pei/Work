@@ -40,11 +40,12 @@
   VideoWorkbench.mediaKind = kind;
   // Background removal (backend/bg-remove.cjs): the price comes from /capabilities (generation-policy.cjs toolCosts)
   // and is on the button before the click. The result is saved as a new library asset by showJob (jobs-view.js).
-  let toolCosts;
+  let caps;
   VideoWorkbench.removeBgLabel = async () => {
-    toolCosts ||= VideoWorkbench.capabilities?.toolCosts || (await VideoWorkbench.request("/capabilities", undefined, "GET").catch(() => null))?.toolCosts;
+    // The whole capabilities (toolCosts + twdRate): the price and the rate it is shown at come from one answer.
+    caps ||= VideoWorkbench.capabilities?.toolCosts ? VideoWorkbench.capabilities : await VideoWorkbench.request("/capabilities", undefined, "GET").catch(() => null);
     await pricesReady;
-    const price = window.VideoWorkbenchPrices?.text("video.bg-remove", { toolCosts });
+    const price = caps && window.VideoWorkbenchPrices?.text("video.bg-remove", caps);
     return price ? "去背 · " + price : null;
   };
   VideoWorkbench.removeBackground = async (asset) => {
