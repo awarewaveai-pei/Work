@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-10（續14）影音工作台 PJ.4：過期提示、「這支成片是怎麼做的」、合成／骨架併入同一條過期規則
+
+- 做了（規格 `docs/pj-project-spine-spec-20261106.md` §2 PJ.4）：`shared/episode-spine.js` 加 `isStale`（全工作台唯一過期判斷）、`current`、`staleClip`、`outputStale`、`lineage`，`stepStates` 第 6–10 步接上「要重做」；`scripts/tools-editor.js` 過期片段虛線＋說明、屬性欄「換成新的」（`previousAssetIds`）／「重新產生字幕」／「重新配音這句 · 依 API 用量計費」（只送那一句、按了才送）、新配音接手同一句的過期片段、`vw:changed` 過期集合變了才重畫、`intent:"export"` 開匯出對話框；`scripts/projects-0.js` 成片「要重新輸出」「開啟<工具名>」＋「怎麼做的」對話框；`tools-compositor.js`（`cpOutdated`）、`tools-rig.js` 改用 `isStale`；`rig.js atVersion` 未動。
+- 偏離規格（記一次）：`current("line:")` 取 trim 後的旁白（剪輯器配音／字幕都用 trim 後文字，不 trim 會永遠過期）；第 8 步「做好了」也認時間軸上帶 `slot` 的字幕片段（用旁白產生字幕不經任務，否則第 8 步永遠到不了「做好了」也就看不到「要重做」）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/pj4-stale.cjs（5 條：換圖→過期→換成新的、存檔→要重新輸出＋第 9 步要重做、改旁白→字幕／配音過期、lineage §1.3＝4 列、無 POST /generations 且任務筆數不變） | exit=0 | ms=3679
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/{pj1-spine-unit,pj1-legacy-ui,pj2-spine-settle,pj3-arrange,p3-review-fixes,p3-roundtrip,p4-rig-ui,p4-rig-unit,p4-review-fixes,gate}.cjs 全綠 | exit=0 | ms=86000
+- 突變：`isStale` 恆 false → `pj4-stale` 第 1 條逾時紅（等不到 `.editor-clip.stale`）；還原後綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n（Codex `agency-os/reports/oracle/2026-11-10-partialreview-a0c7a768.md`）
+  - m1 不修：「怎麼做的」沿 Step `sources` 追溯，`sources`＝匯出任務 input 的所有本機 url（規格 §1.2，與主系統 `parentAssetIds` 同規則，`backend/main-system.cjs` localUrls），剪輯檔素材庫裡換下來的舊圖也會列進來。只是顯示多列，不壞、不掉資料、不送任務；要精準得改 settle 與主系統的 sources 定義，另案。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=isStale\|staleClip\|outputStale\|EpisodeSpine\.lineage\|edShotAsset | hits=37（新函式定義與呼叫、pj4 測試、規格）；舊比較式 `revision > o.compositionRevision\|revision <= o.compositionRevision\|version > l.rigVersion` hits=0
+- 剩餘風險：使用者手改字幕片段文字也會被標「旁白改過了」（規格定的片段 key＝字幕 `text`）；專案頁要重繪才看得到剪輯存檔後的「要重新輸出」（回到這一集會重繪）。
 ## 2026-11-10（續13）影音工作台 P6.20 收尾：專業剪輯／特效成片走分段上傳
 
 - 做了：`scripts/tools-engine-host.js` `engineSubmitRender`：成片大於一段（`VideoWorkbench.chunkedAbove`＝16 MiB，`shared/assets-ui.js` 唯一門檻）→ `VideoWorkbench.uploadChunked(..., { render: meta })`（276fdec1c 的同一機制，伺服器同一套 `engineRenderMeta`＋`engineRenderFile`）；小成片照舊單次 `/engine/renders`。前續（續9）留下的 Codex ① 關閉。

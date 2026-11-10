@@ -151,7 +151,9 @@ const STEP_NAMES = ["專案", "腳本與分鏡", "鏡頭畫面", "修圖", "片�
   STEP_BADGE = { todo: "還沒做", done: "做好了", optional: "選用", stale: "要重做" },
   FINISH_TOOLS = [["watermark", "加浮水印"], ["cta", "CTA 按鈕"], ["upscale", "畫質增強"], ["enhance", "影音增強"], ["privacy", "肖像權保護"]],
   DERIVE_TOOLS = [["short", "剪成短影音"], ["follow", "人物跟拍"]],
-  TOOL_LABEL = Object.fromEntries([...FINISH_TOOLS, ...DERIVE_TOOLS]);
+  TOOL_LABEL = Object.fromEntries([...FINISH_TOOLS, ...DERIVE_TOOLS]),
+  // Card PJ.4: the tools' names as the tools page shows them (TOOLS in scripts/tools-0.js; that page is another frame).
+  TOOL_NAME = { generator: "鏡頭生成", region: "圖片局部編輯器", depth: "影片轉深度影片", compose: "動畫合成", rig: "角色綁定", "3d": "3D", edit: "影片剪輯", "edit-pro": "專業剪輯", voice: "配音生成", music: "音樂生成", sfx: "去配樂・重配音效", separate: "音軌分離", subtitle: "字幕與逐字稿", watermark: "影片浮水印", cta: "影片 CTA 按鈕", upscale: "畫質增強", enhance: "影音增強與消除字幕", privacy: "肖像權保護", short: "智能短影音剪輯", follow: "人物跟拍剪輯" };
 function editRows(e) {
   try {
     const rows = JSON.parse(VideoWorkbench.storage.getItem(e.edit?.engine === "filmcraft" ? "tools.engine.projects" : "tools.editor.projects") || "[]");
@@ -192,11 +194,21 @@ function episodeSteps(e) {
 const reviewLink = (o) => `<a class="btn small outline" data-review="${esc(o.jobId)}" aria-disabled="true">送審與投遞</a>`;
 function outputList(e) {
   const outputs = e.outputs,
-    toolOf = (o) => (e.steps || []).find((s) => s.jobId === o.jobId)?.tool;
+    rows = editRows(e),
+    cut = outputs.findLastIndex((x) => x.derivedFrom == null),
+    toolOf = (o) => (e.steps || []).find((s) => s.jobId === o.jobId)?.tool,
+    // Card PJ.4 (spec §2 PJ.4): a stale cut is exported again for free; a stale version made from an older cut only
+    // opens its tool on the newest cut (paid or needs settings, never sent from here).
+    redo = (o) =>
+      !EpisodeSpine.outputStale(e, o, rows)
+        ? ""
+        : o.derivedFrom == null
+          ? `<p class="tiny">剪輯改過了，要重新輸出。</p><button class="btn small outline" data-action="openEdit" data-intent="export">重新輸出</button>`
+          : `<p class="tiny">成片換過了，這一版要重做。</p><button class="btn small outline" data-action="outputTool" data-tool="${esc(toolOf(o))}" data-index="${cut}">開啟${esc(TOOL_NAME[toolOf(o)] || toolOf(o))}</button>`;
   return `<section class="panel" style="padding:12px;margin-bottom:16px" aria-label="成片"><strong>成片 ${outputs.length} 支</strong><div class="shot-grid" style="margin-top:10px">${outputs
     .map((o, i) => {
       const parent = o.derivedFrom ? outputs.findIndex((x) => x.url === o.derivedFrom) : -1;
-      return `<div class="shot" data-output="${i}"><video src="${esc(o.url)}" controls preload="metadata" style="width:100%;max-height:220px"></video><div class="tiny">${parent >= 0 ? `從第 ${parent + 1} 版${esc(TOOL_LABEL[toolOf(o)] || "")}` : `第 ${i + 1} 版`}</div><div class="row">${reviewLink(o)}${[...FINISH_TOOLS, ...DERIVE_TOOLS].map(([tool, label]) => `<button class="btn small outline" data-action="outputTool" data-tool="${tool}" data-index="${i}">${label}</button>`).join("")}</div></div>`;
+      return `<div class="shot" data-output="${i}"><video src="${esc(o.url)}" controls preload="metadata" style="width:100%;max-height:220px"></video><div class="tiny">${parent >= 0 ? `從第 ${parent + 1} 版${esc(TOOL_LABEL[toolOf(o)] || "")}` : `第 ${i + 1} 版`}</div>${redo(o)}<div class="row">${reviewLink(o)}<button class="btn small outline" data-action="lineage" data-index="${i}">怎麼做的</button>${[...FINISH_TOOLS, ...DERIVE_TOOLS].map(([tool, label]) => `<button class="btn small outline" data-action="outputTool" data-tool="${tool}" data-index="${i}">${label}</button>`).join("")}</div></div>`;
     })
     .join("")}</div></section>`;
 }
@@ -360,6 +372,27 @@ function renderDialog() {
         ? `<video src="${esc(latest.url)}" controls autoplay style="width:100%;max-height:60vh"></video>`
         : `<div class="note">${ep().shots.length ? "目前只有可編輯的鏡頭草稿，還沒有正式生成影片。" : "本集尚無鏡頭，無法預覽。"}</div>`,
       '<button class="btn" data-action="close">關閉</button>',
+    );
+  } else if (dialog.type === "lineage") {
+    // Card PJ.4: EpisodeSpine.lineage of this cut, one row per step of spec §6 with what that step made.
+    const o = ep().outputs?.[dialog.index],
+      thumb = (x) =>
+        x.kind === "image"
+          ? `<img src="${esc(x.url)}" alt="" style="width:64px;height:64px;object-fit:cover">`
+          : x.kind === "video"
+            ? `<video src="${esc(x.url)}" preload="metadata" muted style="width:96px;height:64px"></video>`
+            : `<span class="badge">音訊</span>`,
+      rows = o ? EpisodeSpine.lineage(ep(), o.url) : [];
+    html = modal(
+      "這支成片是怎麼做的",
+      rows.length
+        ? rows
+            .map(
+              (r) =>
+                `<div class="step" data-lineage-row><div><strong>${r.n ? `第 ${r.n} 步 ${STEP_NAMES[r.n - 1]}` : esc(r.tools.map((t) => TOOL_NAME[t] || t).join("、"))}</strong><p class="tiny">${esc(r.tools.map((t) => TOOL_NAME[t] || t).join("、"))} · ${esc(new Date(r.at).toLocaleString("zh-TW"))}</p><div class="row">${r.outputs.map(thumb).join("")}</div></div></div>`,
+            )
+            .join("")
+        : `<div class="note">這支成片沒有製作紀錄。</div>`,
     );
   } else if (dialog.type === "export") {
     html = modal(
@@ -804,6 +837,9 @@ async function action(a, button) {
       break;
     case "export":
       showDialog("export");
+      break;
+    case "lineage":
+      showDialog("lineage", { index });
       break;
     case "exportJson":
       downloadJson(

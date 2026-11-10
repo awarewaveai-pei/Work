@@ -180,29 +180,111 @@
     return true;
   }
 
-  // The 11 steps of spec §6, each "todo" | "done" | "optional" (PJ.4 adds "stale"). Read from what the episode has,
-  // so an episode without steps/outputs (spec §3.2) shows what its shots and edit file imply.
+  // Card PJ.4 (spec §4): the one staleness rule of the workbench. A key recorded when something was made against a
+  // place's key now; an unknown key now (place gone, engine without revisions) is never stale.
+  const isStale = (recordedKey, currentKey) => currentKey != null && recordedKey !== currentKey;
+  const editRow = (episode, editRows) =>
+    (episode?.edit && (Array.isArray(editRows) ? editRows : []).find((r) => editId(r) === episode.edit.projectId)) || null;
+  // The key a place has now (spec §2 PJ.4 table). A line is trimmed: the editor voices and subtitles the trimmed line.
+  function current(episode, slot, editRows) {
+    if (typeof slot !== "string") return null;
+    const shot = (id) => (episode?.shots || []).find((s) => s?.id === id);
+    if (slot.startsWith("shot:")) {
+      const s = shot(slot.slice(5));
+      return s?.video || s?.image || null;
+    }
+    if (slot.startsWith("line:")) {
+      const s = shot(slot.slice(5));
+      return s?.line == null ? null : String(s.line).trim();
+    }
+    if (slot === "edit") {
+      // A FilmCraft row has no revision (spec §8 C4); a bare pre-M3 row is revision 0 (ProjectEnvelope.unwrap).
+      const row = episode?.edit?.engine === "workbench-editor" ? editRow(episode, editRows) : null;
+      return row ? "rev:" + (own(row) && Number.isInteger(row.revision) ? row.revision : 0) : null;
+    }
+    if (slot === "export") return (episode?.outputs || []).findLast((o) => o.derivedFrom == null)?.url ?? null;
+    return null;
+  }
+  // What an episode clip in the edit file was made from: a shot clip its picture, a subtitle its text, a voice-over the
+  // line its job was sent with. A clip the user added has no slot and is never stale.
+  function staleClip(episode, clip) {
+    const slot = clip?.slot;
+    if (typeof slot !== "string") return false;
+    const key = slot.startsWith("shot:")
+      ? clip.asset?.url
+      : clip.kind === "text"
+        ? clip.text
+        : (episode?.steps || []).find((s) => s.jobId === clip.jobId)?.from?.[0]?.key;
+    return key != null && isStale(key, current(episode, slot));
+  }
+  const toolOf = (episode, o) => (episode?.steps || []).find((s) => s.jobId === o.jobId)?.tool ?? null;
+  // A cut (no derivedFrom) is stale when its edit file changed since; only the newest cut counts -- an older one is
+  // history, not work to redo. A version made from a cut (step 10, derive) is stale when the newest cut is another
+  // one and the same tool has not been run on the newest cut yet.
+  function outputStale(episode, o, editRows) {
+    const cut = current(episode, "export");
+    if (o?.derivedFrom == null)
+      return !!o && o.url === cut && o.editRevision != null && isStale("rev:" + o.editRevision, current(episode, "edit", editRows));
+    const tool = toolOf(episode, o);
+    return isStale(o.derivedFrom, cut) && !(episode.outputs || []).some((x) => x.derivedFrom === cut && toolOf(episode, x) === tool);
+  }
+  // "這支成片是怎麼做的": from the step that made outputUrl, back through every key and source url it used to the
+  // steps that made them; one row per step of spec §6 (two shots = one row), newest step first.
+  const STEP_NO = { shot: 3, retouch: 4, motion: 5, edit: 6, sound: 7, subtitle: 8, export: 9, finish: 10 };
+  function lineage(episode, outputUrl) {
+    const steps = episode?.steps || [],
+      made = (url) => steps.findLast((s) => s.output?.url === url),
+      seen = new Map();
+    for (let todo = [made(outputUrl)]; todo.length; ) {
+      const s = todo.shift();
+      if (!s || seen.has(s.id)) continue;
+      seen.set(s.id, s);
+      for (const url of [...(s.from || []).map((f) => f.key), ...(s.sources || [])]) todo.push(made(url));
+    }
+    const rows = new Map();
+    for (const s of seen.values()) {
+      const row = rows.get(s.step) || { step: s.step, n: STEP_NO[s.step] ?? null, tools: [], at: s.at, outputs: [] };
+      if (!row.tools.includes(s.tool)) row.tools.push(s.tool);
+      if (s.at > row.at) row.at = s.at;
+      if (s.output) row.outputs.push(s.output);
+      rows.set(s.step, row);
+    }
+    // A step outside the 11 (derive) is the last thing done to a cut, so it comes first.
+    return [...rows.values()].sort((a, b) => (b.n ?? 99) - (a.n ?? 99));
+  }
+
+  // The 11 steps of spec §6, each "todo" | "done" | "optional" | "stale". Read from what the episode has, so an episode
+  // without steps/outputs (spec §3.2) shows what its shots and edit file imply.
   function stepStates(episode, editRows) {
     const shots = episode?.shots || [],
-      made = (name) => (episode?.steps || []).some((s) => s.step === name),
-      editFound = !!episode?.edit && (Array.isArray(editRows) ? editRows : []).some((r) => editId(r) === episode.edit.projectId),
-      exported = (episode?.outputs || []).length > 0;
+      steps = episode?.steps || [],
+      outputs = episode?.outputs || [],
+      made = (name) => steps.some((s) => s.step === name),
+      row = editRow(episode, editRows),
+      // The edit file's clips: an editor envelope keeps them in native, a bare pre-M3 row is the project itself; a
+      // FilmCraft row's clips are the engine's own (spec §8 C4: no clip-level staleness there).
+      clips = episode?.edit?.engine === "workbench-editor" && row ? ((own(row) ? row.native : row)?.clips ?? []) : [],
+      staleIn = (test) => clips.some((c) => test(c) && staleClip(episode, c)),
+      // A line is voiced again by a newer step for it, so only each line's newest voice-over counts.
+      voices = new Map(steps.filter((s) => s.step === "sound" && String(s.target).startsWith("line:")).map((s) => [s.target, s])),
+      voiceStale = [...voices.values()].some((s) => s.from?.[0] && isStale(s.from[0].key, current(episode, s.target))),
+      or = (state, stale) => (stale && state === "done" ? "stale" : state);
     return [
       "done",
       shots.length ? "done" : "todo",
       shots.length && shots.every((s) => s?.image || s?.video) ? "done" : "todo",
       made("retouch") ? "done" : "optional",
       "optional", // spec §8 C6: a motion piece reaches the episode through 放到剪輯, never as a job of it
-      editFound ? "done" : "todo",
-      made("sound") ? "done" : "todo",
-      made("subtitle") ? "done" : "todo",
-      exported ? "done" : "todo",
-      made("finish") ? "done" : "optional",
+      or(row ? "done" : "todo", staleIn((c) => String(c.slot).startsWith("shot:"))),
+      or(made("sound") ? "done" : "todo", voiceStale || staleIn((c) => c.kind === "audio")),
+      or(made("subtitle") || clips.some((c) => c.kind === "text" && c.slot) ? "done" : "todo", staleIn((c) => c.kind === "text")),
+      or(outputs.length ? "done" : "todo", outputs.some((o) => o.derivedFrom == null && outputStale(episode, o, editRows))),
+      or(made("finish") ? "done" : "optional", outputs.some((o) => TOOL_STEP[toolOf(episode, o)] === "finish" && outputStale(episode, o, editRows))),
       "optional", // review is decided on the main system's /release page; this page cannot see the result
     ];
   }
 
-  const api = { editId, editTitle, adopt, keepSpine, findByEdit, TOOL_STEP, settle, stepStates };
+  const api = { editId, editTitle, adopt, keepSpine, findByEdit, TOOL_STEP, settle, current, isStale, staleClip, outputStale, lineage, stepStates };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.EpisodeSpine = api;
 })(typeof globalThis === "object" ? globalThis : this);

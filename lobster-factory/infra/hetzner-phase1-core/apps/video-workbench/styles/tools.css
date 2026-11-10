@@ -786,6 +786,8 @@ body {
 .editor-clip { position:absolute;top:10px;height:46px;box-sizing:border-box;display:flex;align-items:flex-start;gap:6px;border:1px solid var(--border);border-radius:6px;background:var(--bg-hover);color:var(--text-primary);padding:4px 10px;overflow:hidden;text-align:left;font-size:var(--font-size-xs);touch-action:none;cursor:grab;user-select:none; }
 .editor-clip:focus-visible { outline:2px solid var(--accent);outline-offset:1px; }
 .editor-clip.selected { border:2px solid var(--accent); }
+/* Card PJ.4: an episode clip whose shot or line changed since (EpisodeSpine.staleClip). */
+.editor-clip.stale:not(.selected) { border-style:dashed;border-color:var(--text-secondary); }
 .editor-clip-name { white-space:nowrap;pointer-events:none;overflow:hidden;text-overflow:ellipsis; }
 .editor-clip-thumb { height:22px;width:auto;max-width:40px;flex:none;object-fit:cover;border-radius:3px;pointer-events:none; }
 .editor-clip-band { position:absolute;left:9px;right:9px;bottom:2px;height:18px;color:var(--accent); }

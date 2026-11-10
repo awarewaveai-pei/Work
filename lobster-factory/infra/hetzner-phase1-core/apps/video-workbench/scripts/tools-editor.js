@@ -761,7 +761,7 @@ function edClipInspector(p, c) {
   }
   // Card P3: a clip rendered by the compositor links back to its source composition (scripts/tools-compositor.js).
   if (typeof cpEditorClip === "function") html += cpEditorClip(p, c);
-  return html;
+  return html + edStaleNote(p, c);
 }
 // Card ED.2 (spec §1.6): toolbar keys are 「icon + word」 with the shortcut in the tooltip, as the reference; the frame
 // step and in/out keys are AwareWave extras kept icon-only at the end of the edit group (decision 3), so the bar
@@ -822,8 +822,9 @@ function edMediaFile(a, name) {
   const m = /^(\/media\/[a-f0-9]{64}\/)[^/]+$/.exec(a?.url || "");
   return m ? m[1] + name : null;
 }
-function edClipHtml(p, c, picked) {
+function edClipHtml(p, c, picked, stale = new Map()) {
   const name = c.text || c.asset?.name || "片段",
+    old = stale.get(c.id),
     selected = picked.has(c.id),
     thumb = c.kind === "image" ? c.asset?.previewUrl || c.asset?.url : c.kind === "video" ? edMediaFile(c.asset, "thumb.jpg") : null,
     sound = ["video", "audio"].includes(c.kind),
@@ -833,7 +834,7 @@ function edClipHtml(p, c, picked) {
     // Line height inside the 18 px band: +6 dB at the top, -60 dB at the bottom.
     top = Math.max(0, Math.round(((EditorModel.DB.max - db) / (EditorModel.DB.max - EditorModel.DB.min)) * 16)),
     kind = { video: "影片", image: "圖片", audio: "音訊", text: "文字" }[c.kind] || "";
-  return `<div class="editor-clip editor-clip-${esc(c.kind)}${selected ? " selected" : ""}" data-ed-clip="${c.id}" role="button" tabindex="0" aria-pressed="${selected}" aria-label="${esc(name)}，${kind}片段，${selected ? "已選取" : "未選取"}，起點 ${c.start.toFixed(2)} 秒，時長 ${c.duration.toFixed(2)} 秒。按 Enter 選取；Shift／Ctrl＋Enter 加選。" title="${esc(name)} · ${c.start.toFixed(2)}s / ${c.duration.toFixed(2)}s" style="left:${c.start * ed.zoom}px;width:${Math.max(8, c.duration * ed.zoom)}px"><i class="editor-trim editor-trim-start" data-ed-trim="start" title="裁切起點"></i>${thumb ? `<img class="editor-clip-thumb" src="${esc(thumb)}" alt="" aria-hidden="true">` : c.kind === "video" && c.asset?.url ? `<video class="editor-clip-thumb" src="${esc((c.asset.previewUrl || c.asset.url) + "#t=" + (c.sourceStart + 0.1).toFixed(2))}" preload="metadata" muted playsinline aria-hidden="true"></video>` : ""}<span class="editor-clip-name">${esc(name)}</span>${sound ? `<span class="editor-clip-band">${wave ? `<canvas data-ed-wave="${esc(wave)}" aria-label="音訊波形"></canvas>` : ""}<i class="editor-clip-volume" data-ed-volume role="slider" tabindex="0" aria-label="片段音量" aria-valuemin="${EditorModel.DB.min}" aria-valuemax="${EditorModel.DB.max}" aria-valuenow="${db.toFixed(1)}" aria-valuetext="${dbText}" title="片段音量：${dbText}（上下拖曳調整，雙擊重設為 0 dB）" style="top:${top}px"></i></span>` : ""}<i class="editor-trim" data-ed-trim="end" title="裁切終點"></i></div>`;
+  return `<div class="editor-clip editor-clip-${esc(c.kind)}${selected ? " selected" : ""}${old ? " stale" : ""}" data-ed-clip="${c.id}" role="button" tabindex="0" aria-pressed="${selected}" aria-label="${esc(name)}，${kind}片段，${selected ? "已選取" : "未選取"}，起點 ${c.start.toFixed(2)} 秒，時長 ${c.duration.toFixed(2)} 秒。${old ? esc(old) : ""}按 Enter 選取；Shift／Ctrl＋Enter 加選。" title="${esc(name)} · ${c.start.toFixed(2)}s / ${c.duration.toFixed(2)}s${old ? " · " + esc(old) : ""}" style="left:${c.start * ed.zoom}px;width:${Math.max(8, c.duration * ed.zoom)}px"><i class="editor-trim editor-trim-start" data-ed-trim="start" title="裁切起點"></i>${thumb ? `<img class="editor-clip-thumb" src="${esc(thumb)}" alt="" aria-hidden="true">` : c.kind === "video" && c.asset?.url ? `<video class="editor-clip-thumb" src="${esc((c.asset.previewUrl || c.asset.url) + "#t=" + (c.sourceStart + 0.1).toFixed(2))}" preload="metadata" muted playsinline aria-hidden="true"></video>` : ""}<span class="editor-clip-name">${esc(name)}</span>${sound ? `<span class="editor-clip-band">${wave ? `<canvas data-ed-wave="${esc(wave)}" aria-label="音訊波形"></canvas>` : ""}<i class="editor-clip-volume" data-ed-volume role="slider" tabindex="0" aria-label="片段音量" aria-valuemin="${EditorModel.DB.min}" aria-valuemax="${EditorModel.DB.max}" aria-valuenow="${db.toFixed(1)}" aria-valuetext="${dbText}" title="片段音量：${dbText}（上下拖曳調整，雙擊重設為 0 dB）" style="top:${top}px"></i></span>` : ""}<i class="editor-trim" data-ed-trim="end" title="裁切終點"></i></div>`;
 }
 // 新增轉場效果: a button on every cut between two touching main-track clips.
 function edCutButtons(p) {
@@ -857,13 +858,15 @@ function edTimeline(p) {
   for (let s = 0; s * ed.zoom < Math.max(width, window.innerWidth); s += step)
     ticks.push(`<span class="editor-tick" style="left:${s * ed.zoom}px">${edClockText(s)}</span>`);
   const playhead = `<div class="editor-playhead" style="left:${ed.time * ed.zoom}px"></div>`,
-    picked = new Set(edPicked(p).map((c) => c.id));
+    picked = new Set(edPicked(p).map((c) => c.id)),
+    stale = edStaleClips(p);
+  ed.staleSeen = JSON.stringify([...stale]);
   return `<div class="editor-timeline" data-ed-timeline><div class="editor-track editor-ruler-row"><div class="editor-track-name"></div><div class="editor-ruler" data-ed-ruler role="slider" tabindex="0" aria-label="播放頭位置" aria-valuemin="0" aria-valuemax="${edEnd().toFixed(2)}" aria-valuenow="${ed.time.toFixed(2)}" style="width:${width}px">${ticks.join("")}${playhead}</div></div>${edTrackOrder(p)
     .map(
       (t) =>
         `<div class="editor-track" data-ed-track="${esc(t.id)}">${edTrackHead(p, t)}<div class="editor-track-lane" data-ed-lane="${esc(t.id)}" style="width:${width}px">${p.clips
           .filter((c) => c.track === t.id)
-          .map((c) => edClipHtml(p, c, picked))
+          .map((c) => edClipHtml(p, c, picked, stale))
           .join("")}${t.id === edMain(p) ? edCutButtons(p) : ""}${p.clips.some((c) => c.track === t.id) ? "" : `<span class="editor-lane-hint">${edLaneHint(p, t.id, t.kind)}</span>`}${playhead}${(p.markers || []).map((time) => `<button class="editor-marker" data-ed-marker="${time}" style="left:${time * ed.zoom}px" title="跳至 ${time.toFixed(2)} 秒">◆</button>`).join("")}</div></div>`,
     )
     .join(
@@ -901,6 +904,12 @@ const edSpineHit = (p) => (p ? EpisodeSpine.findByEdit(edSpineProjects(), p.id) 
   edShotUrl = (s) => s?.video || s?.image || null,
   edLines = (episode) => (episode?.shots || []).filter((s) => s?.id && String(s.line ?? "").trim()),
   edShotClip = (p, id) => p.clips.find((c) => c.track === edMain(p) && c.slot === "shot:" + id),
+  // The library id of a shot's picture is its job's asset (episode-spine settle); a picture set before PJ.2 has none.
+  edShotAsset = (episode, s, n) => {
+    const url = edShotUrl(s),
+      made = (episode.steps || []).findLast((x) => x.output?.url === url);
+    return { id: made?.output.assetId || "shot-" + s.id, name: "鏡頭 " + n, url, kind: s.video ? "video" : "image", type: s.video ? "video/mp4" : "image/png" };
+  },
   edNoLines = "還沒有旁白。在鏡頭卡填『旁白』後才能配音和產生字幕。";
 // A clip of what the episode made, with edAdd's fields (overlay position on a non-main track).
 function edSpineClip(p, a, track, extra) {
@@ -914,14 +923,7 @@ function edSpineClip(p, a, track, extra) {
 async function edArrange(p, episode) {
   const shots = (episode?.shots || []).map((s, i) => [s, i + 1]).filter(([s]) => s?.id && edShotUrl(s));
   if (!shots.length) throw Error("這一集還沒有鏡頭畫面。先在專案頁生成畫面。");
-  // The library id of a shot's picture is its job's asset (episode-spine settle); a picture set before PJ.2 has none.
-  const assets = await Promise.all(
-    shots.map(([s, n]) => {
-      const url = edShotUrl(s),
-        made = (episode.steps || []).findLast((x) => x.output?.url === url);
-      return edProbe({ id: made?.output.assetId || "shot-" + s.id, name: "鏡頭 " + n, url, kind: s.video ? "video" : "image", type: s.video ? "video/mp4" : "image/png" });
-    }),
-  );
+  const assets = await Promise.all(shots.map(([s, n]) => edProbe(edShotAsset(episode, s, n))));
   if (edProject() !== p) return 0;
   edCheckpoint();
   const main = edMain(p);
@@ -989,14 +991,14 @@ const edUnvoiced = (hit, jobs = []) =>
   });
 // Paid: one voice job per line not voiced yet, with the voice tool's own job fields (tools-voice-music.js
 // voice-generate) at its defaults. Only on a click; the result is placed by edPlaceSpine when its job settles.
-async function edSpineVoice(hit) {
+async function edSpineVoice(hit, only = null) {
   const lines = edLines(hit.episode);
   if (!lines.length) throw Error(edNoLines);
   if (lines.some((s) => String(s.line).trim().length > 500)) throw Error("每句旁白最多 500 字");
   if (ed.voicing) return;
   ed.voicing = true;
   try {
-    const todo = edUnvoiced(hit, await VideoWorkbench.generations.list());
+    const todo = edUnvoiced(hit, await VideoWorkbench.generations.list()).filter((s) => !only || s.id === only);
     if (!todo.length) throw Error("每句旁白都已經配過音。改了旁白才會再配。");
     for (const s of todo) {
       const line = String(s.line).trim();
@@ -1039,10 +1041,19 @@ async function edPlaceSpineNow() {
   edCheckpoint();
   const track = edTrackFor(p, "audio");
   for (const [s, shot, a] of rows) {
-    const c = edTime(p, edSpineClip(p, a, track, { slot: s.target, jobId: s.jobId }), { startFrame: shot.startFrame, duration: Math.min(3600, a.duration), sourceStart: 0 });
+    // Card PJ.4: the voice-over of a changed line (重新配音這句) takes over that line's stale clip -- its place, volume
+    // and fades -- instead of a second voice on top; the old asset stays referenced, as 換成新的 does.
+    const old = p.clips.find((x) => x.kind === "audio" && x.slot === s.target && x.jobId && EpisodeSpine.staleClip(hit.episode, x));
+    if (old) {
+      old.previousAssetIds = [...(old.previousAssetIds || []), old.asset.id];
+      old.asset = a;
+      old.jobId = s.jobId;
+      edTime(p, old, { duration: Math.min(3600, a.duration), sourceStart: 0 });
+    }
+    const c = old || edTime(p, edSpineClip(p, a, track, { slot: s.target, jobId: s.jobId }), { startFrame: shot.startFrame, duration: Math.min(3600, a.duration), sourceStart: 0 });
     edValidate(c);
     if (!p.assets.some((x) => x.id === a.id)) p.assets.push(a);
-    p.clips.push(c);
+    if (!old) p.clips.push(c);
     p.spinePlaced = [...(p.spinePlaced || []), s.jobId];
   }
   await edCommit(p);
@@ -1061,6 +1072,8 @@ async function edSpineAction(action, p) {
   const hit = edSpineHit(p);
   if (!hit) throw Error("找不到這一集的剪輯檔。");
   if (action === "spine-voice") return edSpineVoice(hit);
+  if (action.startsWith("spine-revoice:")) return edSpineVoice(hit, action.slice(14));
+  if (action === "spine-swap") return edSpineSwap(p, hit.episode, edClip());
   if (action === "spine-subtitles") return edSpineSubtitles(p, hit.episode);
   // 排成時間軸 again: say what moves first (spec §6).
   if (p.clips.some((c) => c.track === edMain(p) && c.slot)) {
@@ -1086,11 +1099,60 @@ async function edIntent(intent) {
   if (intent === "arrange") return edSpineAction("spine-arrange", p);
   if (intent === "subtitle") return edSpineAction("spine-subtitles", p);
   if (intent === "voice") document.querySelector('[data-ed-action="spine-voice"]')?.focus();
+  // Card PJ.4: 重新輸出 on a stale cut opens the export dialog (free; the user still presses 匯出).
+  if (intent === "export") edExportDialog(p);
+}
+// Card PJ.4 (spec §2 PJ.4): the episode clips that no longer match their shot or line (EpisodeSpine.staleClip, the
+// one staleness rule), with what to say. Read once per timeline draw.
+const edStaleText = (episode, c) =>
+  c.slot.startsWith("shot:")
+    ? `鏡頭 ${(episode.shots || []).findIndex((s) => s?.id === c.slot.slice(5)) + 1} 換過了。`
+    : c.kind === "text"
+      ? "旁白改過了。"
+      : "旁白改過了，這句要重新配音。";
+function edStaleClips(p) {
+  const hit = edSpineHit(p),
+    out = new Map();
+  for (const c of hit ? p.clips : []) if (EpisodeSpine.staleClip(hit.episode, c)) out.set(c.id, edStaleText(hit.episode, c));
+  return out;
+}
+// The selected stale clip's fix: free for a picture and subtitles, priced for a voice-over (sent only on the click).
+function edStaleNote(p, c) {
+  const hit = edSpineHit(p);
+  if (!hit || !EpisodeSpine.staleClip(hit.episode, c)) return "";
+  const fix = c.slot.startsWith("shot:")
+    ? edButton("換成新的", "spine-swap")
+    : c.kind === "text"
+      ? edButton("重新產生字幕", "spine-subtitles")
+      : edButton("重新配音這句 · 依 API 用量計費", "spine-revoice:" + c.slot.slice(5), ed.voicing);
+  return `<div data-ed-stale><p class="note">${esc(edStaleText(hit.episode, c))}</p>${fix}</div>`;
+}
+// 換成新的: the stale shot clip takes the shot's picture now, keeping its place and length (a shorter video plays its
+// own length); the old asset stays referenced (previousAssetIds, as tools-compositor.js comp-update) and 復原 brings
+// the old clip back whole.
+async function edSpineSwap(p, episode, c) {
+  const id = c?.slot?.startsWith("shot:") ? c.slot.slice(5) : null,
+    n = (episode.shots || []).findIndex((s) => s?.id === id),
+    clipId = c?.id;
+  if (n < 0 || !EpisodeSpine.staleClip(episode, c)) return;
+  const a = await edProbe(edShotAsset(episode, episode.shots[n], n + 1)),
+    clip = p.clips.find((x) => x.id === clipId);
+  if (edProject() !== p || !clip) return;
+  edCheckpoint();
+  if (!p.assets.some((x) => x.id === a.id)) p.assets.push(a);
+  clip.previousAssetIds = [...(clip.previousAssetIds || []), clip.asset.id];
+  clip.kind = a.kind;
+  clip.asset = a;
+  edTime(p, clip, { sourceStart: 0, ...(a.kind === "video" && a.duration && a.duration < clip.duration ? { duration: a.duration } : {}) });
+  edValidate(clip);
+  return edCommit(p);
 }
 document.addEventListener("vw:changed", () => {
   if (typeof tool === "undefined" || tool !== "edit" || !edProject()) return;
   const bar = document.querySelector("[data-ed-spine]");
   if (bar) bar.outerHTML = VideoWorkbench.sanitize(edSpineButtons(edProject()));
+  // Card PJ.4: a shot or line changed on the projects page marks its clips at once (redrawn only when that changes).
+  if (JSON.stringify([...edStaleClips(edProject())]) !== ed.staleSeen) edRedraw();
   edPlaceSpine();
 });
 function edOpen(id) {

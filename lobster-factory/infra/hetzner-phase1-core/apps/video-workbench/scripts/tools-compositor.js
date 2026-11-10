@@ -735,12 +735,14 @@ async function cpPlaceAsset(projectId, asset, duration) {
 
 // ---- editor side ----------------------------------------------------------------------------------------
 const cpLatest = (id) => cp.list.find((c) => c.id === id) || null;
+// Card PJ.4 (spec §4): the workbench's one staleness rule, on composition revisions.
+const cpOutdated = (o, latest) => EpisodeSpine.isStale("rev:" + o.compositionRevision, latest && "rev:" + latest.revision);
 function cpEditorClip(p, c) {
   const o = c.asset?.origin;
   if (o?.engine !== "workbench-compositor" || Number.isInteger(o.frame))
     return "";
   const latest = cpLatest(o.compositionId);
-  return `<div class="cp-source" data-cp-source><p class="note">來源：動畫合成${latest ? "「" + cpEsc(latest.title) + "」" : ""}第 ${o.compositionRevision} 版${c.previousAssetIds?.length ? `；先前版本 ${c.previousAssetIds.length} 個（可復原）` : ""}</p>${edButton("編輯來源合成", "comp-open")}${latest && latest.revision > o.compositionRevision ? edButton("有新版本：更新片段", "comp-update") : ""}</div>`;
+  return `<div class="cp-source" data-cp-source><p class="note">來源：動畫合成${latest ? "「" + cpEsc(latest.title) + "」" : ""}第 ${o.compositionRevision} 版${c.previousAssetIds?.length ? `；先前版本 ${c.previousAssetIds.length} 個（可復原）` : ""}</p>${edButton("編輯來源合成", "comp-open")}${cpOutdated(o, latest) ? edButton("有新版本：更新片段", "comp-update") : ""}</div>`;
 }
 function cpEditorAfterRender() {
   if (!cp.ready) cpBoot();
@@ -761,7 +763,7 @@ async function cpEditorAction(action, p, c) {
     const clipId = c.id;
     await cpLoad();
     const latest = cpLatest(o.compositionId);
-    if (!latest || latest.revision <= o.compositionRevision) return;
+    if (!cpOutdated(o, latest)) return;
     const asset = (await cpRendered(latest)) || (await cpRenderOutput(latest));
     const a = await edProbe(asset);
     const clip = p.clips.find((x) => x.id === clipId);

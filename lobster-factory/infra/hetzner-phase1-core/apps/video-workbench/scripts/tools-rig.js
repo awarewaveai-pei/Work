@@ -270,7 +270,8 @@ function rgInspector(l) {
   const { char, latest, rig } = rgRigForLayer(l);
   if (!rig)
     return `<p class="note cp-error" role="alert">找不到角色綁定（角色或第 ${rgEsc(l.rigVersion)} 版已刪除）</p>`;
-  const outdated = latest && latest.version > l.rigVersion,
+  // Card PJ.4 (spec §4): the workbench's one staleness rule, on rig versions (Rig.atVersion is a lookup, not this).
+  const outdated = EpisodeSpine.isStale("rev:" + l.rigVersion, latest && "rev:" + latest.version),
     rows = Rig.controls(rig)
       .map((c) => cpPropRow(l, c.name, c.label))
       .join("");
