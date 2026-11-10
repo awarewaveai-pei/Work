@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-10（續49）影音工作台 ED.8 匯出視窗
+
+- 做了什麼：`scripts/editor-export-dialog.js` 重寫——輸出到（TikTok／Reels、YouTube Shorts、YouTube 推薦、Instagram 貼文 1:1／4:5、自訂 720P／1080P／4K）選平台即帶入比例＋1080P；規格列、剪輯總時長、預估費用（本機輸出免費）、影片浮水印 不套用／套用（讀 `tools.editor.watermark`，未設定顯示「前往設定浮水印 ↗」開貼圖分頁）、取消／開始匯出。浮水印＝匯出專案副本多一條頂層影片軌＋整段 overlay 圖片（右下 x96 y95 寬 18% 不透明 0.85），專案本身不改、後端不改。影格率／響度仍在整片設定／音訊。
+- Codex 審查（一輪，`reports/oracle/2026-11-10-partialreview-7464bcf8.md`）：F1 非文字片段已 64 段時加浮水印會被後端拒絕 → 前端先擋並說明；F2 非同步載入完成後 refresh 會重建「開始匯出」並重新啟用 → 加 busy 旗標。皆已修。
+- 驗收：五平台預設各真實匯出，檔案尺寸＝視窗標示；套用浮水印抽 1 秒影格洋紅 21160 點、不套用 0 點；匯出前後 edNative 相同。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed8-export-dialog.cjs | exit=0 | ms=240000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=data-ed-export | hits=23
+- 相關回歸皆綠：ed3-legacy-golden（9 項）、p2-tracks-ui、p1-loop、tools-editor、ed7、theme-tokens。
 ## 2026-11-10（續48）ED.10 畫面：剪輯器「字幕」分頁＝逐句／樣式／辨識翻譯（照參考 §1.3）
 
 - 根因：字幕分頁只有匯入／下載／前往字幕工具，缺逐句編輯、每語言一軌、8 樣式、整片辨識與翻譯（`docs/editor-parity-compare-20261106.md:65`）；後端已在 e28bcbc4d／3679cd292／670b89396 做好。
