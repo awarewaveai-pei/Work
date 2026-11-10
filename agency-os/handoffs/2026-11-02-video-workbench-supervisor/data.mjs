@@ -240,7 +240,7 @@ export const STEPS = [
       todo('PJ.4', '前面的步驟改了，後面的步驟顯示「要重做」；每支成片可以看到它是怎麼做出來的。'),
     ] },
   { n: 17, code: 'FC', title: '專業剪輯（FilmCraft）', plain: '例：在應用工具按「專業剪輯」，選幾支素材，進到 FilmCraft 的完整剪輯畫面（修剪工具、三十多種轉場、調色曲線與色輪、混音器）。按存檔，專案存回工作台；按輸出，成片直接進素材庫與任務紀錄，不用下載再上傳。',
-    gate: '送素材進去、存檔、關掉重開、輸出，成片在任務紀錄與素材庫都有，帶來源紀錄，送審檢查通過；沒有獨立顯示卡的電腦會先看到提醒。', risk: 'High', model: '建置可派工；頁面與入帳 Opus；上線等你同意', status: 'in_progress', depends: ['RE'], before: '待決 4',
+    gate: '送素材進去、存檔、關掉重開、輸出，成片在任務紀錄與素材庫都有，帶來源紀錄，送審檢查通過；沒有獨立顯示卡的電腦會先看到提醒。', risk: 'High', model: '建置可派工；頁面與入帳 Opus；上線等你同意', status: 'done', commit: '96ddd7f70', depends: ['RE'],
     decided: '介面是英文、不跟站上的主題、裡面有下拉選單（引擎自己的畫面，改不了）。輸出最高 1080p；要 4K 或很長的片用一般剪輯。沒有獨立顯示卡的電腦會很卡，開啟前會提醒並可改用一般剪輯。',
     what: '建置鏈沿用 scripts/craft-web-build；外框頁用上游嵌入橋 ?host=parent 送檔、收存檔與輸出；輸出當成一筆已完成的任務，入帳與送審走現有路；主機靜態目錄＋nginx',
     files: ['VW/docs/engine-route-plan-20261106.md', 'scripts/filmcraft-pro/', 'VW/scripts/tools-engine-host.js', 'VW/scripts/tools-0.js', 'VW/backend/api.cjs', 'VW/backend/release-text.cjs', 'nginx/default.conf'],
@@ -249,10 +249,10 @@ export const STEPS = [
       done('FC.0', '你到場確認過：播放有聲音、注音打得進中文、英文介面可以接受。視窗只用獨立顯示卡，全程沒有斷線。', FC1),
       done('FC.2', '應用工具多了「專業剪輯」：FilmCraft 嵌在工作台裡，素材從素材庫挑進去，存檔存回工作台、下次能重開；電腦沒有可用的獨立顯示卡時，開啟前先提醒，可改用一般剪輯。', 'dee7d0338'),
       done('FC.3', '專業剪輯的成片自動進任務紀錄與素材庫，記下用了哪些素材；字幕一起帶進送審。', 'e54d1c14e'),
-      todo('FC.4', '已部署到 video.aware-wave.com（11-06，96ddd7f70）：引擎檔放在主機、比對過雜湊，nginx 新增路徑，部署閘與線上檢查全過。剩登入後實際跑一次（待決 4）。'),
+      done('FC.4', '11-10 在正式站用獨顯（RTX 5060）實跑：送兩支素材、加繁中標題、存檔、重開（素材都在）、輸出 16:9；成片 1920×1080、有聲、7.2 秒，進任務紀錄與素材庫，來源正好是那兩支。217 格輸出約 8 分鐘。', '96ddd7f70'),
     ] },
   { n: 18, code: 'EC', title: '專業特效（EffectCraft）', plain: '例：在應用工具按「專業特效」，進到 EffectCraft 的完整畫面做片頭與特效（三百多個特效、曲線編輯器、表達式），做好的透明片段直接回到素材庫給剪輯用。',
-    gate: '跟專業剪輯同一套流程在 EffectCraft 走通；重開專案時素材不會離線。', risk: 'High', model: 'Opus；上線等你同意', status: 'in_progress', depends: ['FC'],
+    gate: '跟專業剪輯同一套流程在 EffectCraft 走通；重開專案時素材不會離線。', risk: 'High', model: 'Opus；上線等你同意', status: 'done', commit: '96ddd7f70', depends: ['FC'],
     decided: '專業剪輯驗收過才開始。EffectCraft 複雜合成的預覽即使用獨立顯示卡也不到即時，適合做短的片頭與特效片段。',
     what: '建置鏈同 FC；另補嵌入橋補丁（照 scripts/photocraft-pro/web-host-api.patch 接 craft-web-host，上游已有就不補）；頁面與入帳沿用 FC 的外框與路由；重開後補 footage.relink',
     files: ['VW/docs/engine-route-plan-20261106.md', 'scripts/effectcraft-pro/'],
@@ -260,11 +260,10 @@ export const STEPS = [
       done('EC.1', 'EffectCraft 建置好了：固定版本、編入繁中字型、拿掉 ArtCraft 標誌；補上「成品交回工作台」的接口（上游沒有，自己補），實測存檔和輸出都直接交回、不下載。', 'b376094e5'),
       done('EC.2', '應用工具多了「專業特效」：跟專業剪輯共用同一份外框，重開專案時自動把素材接回來。透明輸出還沒做，先輸出一般影片。', 'cbe8f67f8'),
       done('EC.3', '專業特效的成片自動進任務紀錄與素材庫，記下用了哪些素材。', 'cbe8f67f8'),
-      todo('EC.4', '已跟專業剪輯同一次部署（11-06，96ddd7f70）：EffectCraft 的檔放在主機，nginx 路徑帶跨來源隔離標頭。剩登入後實際跑一次（待決 4）。'),
+      done('EC.4', '11-10 在正式站用獨顯實跑：送一支素材、建 1920×1080 合成加繁中標題、存檔、輸出；成片 3 秒進任務紀錄與素材庫，來源正確；重開後沒有離線素材。', '96ddd7f70'),
     ] },
 ];
 
 // 操作者自己要決定或親手做的
 export const OPEN = [
-  { n: 4, before: 'FC', what: '專業剪輯、專業特效已上線（11-06）。要在登入後實際跑一次：送素材、存檔、關掉重開、輸出。這台筆電的瀏覽器預設用內顯，要用獨立顯示卡開（之前內顯跑 WebGPU 讓 Edge 當掉），所以由你在開了獨顯的瀏覽器試，或指定讓我用獨顯模式代跑。', src: 'VW/docs/engine-route-plan-20261106.md §9 FC.4 第 4 步' },
 ];

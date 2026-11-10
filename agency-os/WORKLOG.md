@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-10（續4）影音工作台 FC.4／EC.4：正式站實跑專業剪輯＋專業特效（操作者「好」）
+
+- 環境：另開 Edge `--force_high_performance_gpu --user-data-dir=<scratchpad>` ＋ CDP 9333；WebGL／WebGPU 皆 RTX 5060（app 內瀏覽器窗格量到是 Intel UHD，不在那裡跑）。操作者自己登入員工帳號。
+- 專業剪輯（`tools.html?full#edit-pro`）：GPU 檢查通過、引擎 ready → 加入素材 IMG_4607.MOV＋video-65f90a4d（RV.4 成片）→ 引擎建 1920×1080 序列＋繁中標題 → File Save → 工作台「已存檔：實測成片」(`tools.engine.projects` 64324d18…) → 輸出 16:9 → job `17cb1c03-2e88-4349-bce4-998c4f60fc1d` succeeded，h264 1920×1080＋aac、7.244 s；`main-system-assets.json` rightsSources＝upload .mov＋runwayml/gen4-turbo（正好兩支）。重開專案 → 兩支 media online。
+- 專業特效（`#fx-pro`，iframe `?host=parent&nosw`）：加入 video-65f90a4d → comp 1920×1080 3 s＋繁中標題 → 存檔「已存檔：特效實測」→ 輸出 → job `e3e7745f-415f-426e-9304-123b2c7b17c1` succeeded，h264 1920×1080＋aac、3.008 s；rightsSources＝那一支。重開 → `footage.missing: []`。
+- 觀察（非缺陷）：FilmCraft 217 格 1080p 輸出約 8 分鐘（`jobs.list` 進度正常推進）；狀態列只寫「輸出中」不帶百分比。
+- REALTEST_EVIDENCE: tool=Bash | cmd=playwright connectOverCDP 9333 驅動正式站兩個引擎＋ssh docker exec node 讀 jobs.json／main-system-assets.json＋ffprobe 兩支成片 | exit=0 | ms=1500000
+- REVIEW_WAIVED: NA -- 只執行驗收步驟，無程式改動
+- BUGHUNT_WAIVED: NA -- 無程式改動
 ## 2026-11-10（續3）影片剪輯 ED.0：左側分頁拆檔＋匯出視窗／專案列表獨立檔；ED.2 跨軌拖曳偶發失敗根因（a98153452、25397763e、7c7976bcb）
 
 **派工**：監工 session 卡 ED.0。目標是讓 ED.4–ED.12 分給不同 session 同時做，各改各的檔。

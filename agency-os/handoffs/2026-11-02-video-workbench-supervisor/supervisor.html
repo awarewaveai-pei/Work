@@ -80,11 +80,11 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
 <aside><div class="in">
   <h1>影音工作台監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-11-06</span></p>
-  <div class="bar" data-computed><i class="d" style="width:72.22222222222221%"></i><i class="g" style="width:22.22222222222222%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>13</span>／<span data-computed>18</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>1</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:83.33333333333334%"></i><i class="g" style="width:11.11111111111111%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>15</span>／<span data-computed>18</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
-<p class="sub">影音工作台做成專業剪輯與動畫工具：剪輯、字幕、動畫合成、2D 角色骨架、3D，最後接進 video.aware-wave.com。共 <span data-computed>18</span> 張卡、<span data-computed>82</span> 項工作，已完成 <span data-computed>72</span> 項。</p>
+<p class="sub">影音工作台做成專業剪輯與動畫工具：剪輯、字幕、動畫合成、2D 角色骨架、3D，最後接進 video.aware-wave.com。共 <span data-computed>18</span> 張卡、<span data-computed>82</span> 項工作，已完成 <span data-computed>74</span> 項。</p>
 <section id="now"><h2>現況</h2><p class="lead">目前做得到與做不到的事（2026-11-02 查）。</p><ul class="yn"><li class="yes"><b>可以</b><span>程式在 repo 裡改，測試全綠。<small>apps/video-workbench 的測試全部通過（WORKLOG 11-02）。畫面上已沒有 SeedStar 字樣。</small></span></li><li class="yes"><b>可以</b><span>打開 127.0.0.1:4178 看到的是 repo 版。<small>2026-11-02 卡 0：舊資料 5 筆任務、17 個生成檔搬進 repo，角色頁出現「示範角色庫」。</small></span></li><li class="yes"><b>可以</b><span>手機拍的 HEVC MOV 能預覽。<small>2026-11-02 卡 M1：上傳後自動產 H.264 代理檔供預覽，輸出仍用原檔；同一支影片只存一份。</small></span></li><li class="yes"><b>可以</b><span>素材與專案存在伺服器，清瀏覽器資料不會不見。<small>2026-11-02 卡 M2，4178 已重啟：瀏覽器裡的 7 個素材、5 筆任務已搬到伺服器，每個素材都有來源標記；原版在瀏覽器另存備份。</small></span></li><li class="yes"><b>可以</b><span>剪輯能精確到影格、加減軌道、用多種轉場。<small>2026-11-02 卡 P2：軌道可增減、多種轉場、調色＋LUT、4K、混音響度 −16 LUFS。</small></span></li><li class="yes"><b>可以</b><span>輸出 720p 或 1080p 的 H.264 影片，含字幕與混音。<small>editor-export.cjs:182；比例有 16:9、9:16、1:1、4:5、4:3。</small></span></li><li class="yes"><b>可以</b><span>用模板做片頭（繁中可）。<small>2026-11-02 卡 P1：剪輯器「片頭」分頁，自架 Remotion 服務渲染，免費；成品進素材庫並記來源。</small></span></li><li class="yes"><b>可以</b><span>動畫合成（2D）。<small>2026-11-03 卡 P3：工具「動畫合成」，輸出透明影片回剪輯。</small></span></li><li class="yes"><b>可以</b><span>2D 角色骨架。<small>2026-11-03 卡 P4：工具「角色綁定」，姿勢圖可當生成參考。</small></span></li><li class="yes"><b>可以</b><span>3D。<small>2026-11-03 卡 P5：工具「3D」，Blender 4.5.9 渲染回剪輯。圖片轉 3D 改走 S4b（Meshy 停用）。</small></span></li><li class="yes"><b>可以</b><span>在 video.aware-wave.com 登入使用。<small>2026-11-05 已上線：未登入回 401、偽造身分回 401、smoke 全綠；3D 用主機 CPU（Cycles）。送審缺口已補（P6.13）；全程投遞實測待你操作（P6.10）。</small></span></li><li class="no"><b>還不行</b><span>EffectCraft、FilmCraft 的專業功能在站上用得到。<small>11-02 試驗沒過，所以站上的剪輯與動畫都是自製的。11-06 重新試過：字型、焦點、重開素材都有解法，你 11-06 選了「並存」：做成「專業剪輯」「專業特效」兩個入口，現有工具都留著。卡 FC 上線後這一列才會變成可以。</small></span></li></ul></section>
 
 <section id="steps"><h2>卡片與工作</h2><p class="lead">依編號一張一張做。EffectCraft 試驗（P0）的結果決定剪輯與動畫用哪個引擎。風險 High 的卡經你同意才執行。</p><ol class="steps"><li class="step done" id="0">
@@ -307,37 +307,39 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
         <p><b>檔案：</b><code>VW/docs/pj-project-spine-spec-20261106.md</code> <code>VW/scripts/projects-0.js</code> <code>VW/scripts/tools-editor.js</code> <code>VW/scripts/tools-0.js</code></p>
         <p><b>做法：</b><code>lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/creative-suite-plan-20261102.md §4 PJ</code></p>
       </details>
-    </div></li><li class="step doing" id="FC">
+    </div></li><li class="step done" id="FC">
     <div class="n">17</div>
     <div class="b">
       <p class="plain">例：在應用工具按「專業剪輯」，選幾支素材，進到 FilmCraft 的完整剪輯畫面（修剪工具、三十多種轉場、調色曲線與色輪、混音器）。按存檔，專案存回工作台；按輸出，成片直接進素材庫與任務紀錄，不用下載再上傳。</p>
-      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-high">風險 High</span><span class="who">負責：建置可派工；頁面與入帳 Opus；上線等你同意</span></p>
+      <p class="meta"><span class="pill st-done">已完成</span><span class="pill risk-high">風險 High</span><span class="who">負責：建置可派工；頁面與入帳 Opus；上線等你同意</span></p>
       <p class="donewhen"><b>完成的樣子：</b>送素材進去、存檔、關掉重開、輸出，成片在任務紀錄與素材庫都有，帶來源紀錄，送審檢查通過；沒有獨立顯示卡的電腦會先看到提醒。</p>
-      <ul class="items"><li class="done"><b>✓</b><span><code>FC.1</code> 建置完成：固定 FilmCraft 的版本、加繁中字型，一個指令建出可上線的檔案，跟向量版、畫布版共用同一套建置工具。審查時發現上游把 ArtCraft 的標誌編在程式裡，授權規定改過的版本要拿掉，已拿掉並加了自動檢查；已上線的向量版、畫布版查過沒有這個問題。 <small>完成於 <code>6cbcae4e5</code></small></span></li><li class="done"><b>✓</b><span><code>FC.0</code> 你到場確認過：播放有聲音、注音打得進中文、英文介面可以接受。視窗只用獨立顯示卡，全程沒有斷線。 <small>完成於 <code>6cbcae4e5</code></small></span></li><li class="done"><b>✓</b><span><code>FC.2</code> 應用工具多了「專業剪輯」：FilmCraft 嵌在工作台裡，素材從素材庫挑進去，存檔存回工作台、下次能重開；電腦沒有可用的獨立顯示卡時，開啟前先提醒，可改用一般剪輯。 <small>完成於 <code>dee7d0338</code></small></span></li><li class="done"><b>✓</b><span><code>FC.3</code> 專業剪輯的成片自動進任務紀錄與素材庫，記下用了哪些素材；字幕一起帶進送審。 <small>完成於 <code>e54d1c14e</code></small></span></li><li class="todo"><b>○</b><span><code>FC.4</code> 已部署到 video.aware-wave.com（11-06，96ddd7f70）：引擎檔放在主機、比對過雜湊，nginx 新增路徑，部署閘與線上檢查全過。剩登入後實際跑一次（待決 4）。</span></li></ul>
+      <ul class="items"><li class="done"><b>✓</b><span><code>FC.1</code> 建置完成：固定 FilmCraft 的版本、加繁中字型，一個指令建出可上線的檔案，跟向量版、畫布版共用同一套建置工具。審查時發現上游把 ArtCraft 的標誌編在程式裡，授權規定改過的版本要拿掉，已拿掉並加了自動檢查；已上線的向量版、畫布版查過沒有這個問題。 <small>完成於 <code>6cbcae4e5</code></small></span></li><li class="done"><b>✓</b><span><code>FC.0</code> 你到場確認過：播放有聲音、注音打得進中文、英文介面可以接受。視窗只用獨立顯示卡，全程沒有斷線。 <small>完成於 <code>6cbcae4e5</code></small></span></li><li class="done"><b>✓</b><span><code>FC.2</code> 應用工具多了「專業剪輯」：FilmCraft 嵌在工作台裡，素材從素材庫挑進去，存檔存回工作台、下次能重開；電腦沒有可用的獨立顯示卡時，開啟前先提醒，可改用一般剪輯。 <small>完成於 <code>dee7d0338</code></small></span></li><li class="done"><b>✓</b><span><code>FC.3</code> 專業剪輯的成片自動進任務紀錄與素材庫，記下用了哪些素材；字幕一起帶進送審。 <small>完成於 <code>e54d1c14e</code></small></span></li><li class="done"><b>✓</b><span><code>FC.4</code> 11-10 在正式站用獨顯（RTX 5060）實跑：送兩支素材、加繁中標題、存檔、重開（素材都在）、輸出 16:9；成片 1920×1080、有聲、7.2 秒，進任務紀錄與素材庫，來源正好是那兩支。217 格輸出約 8 分鐘。 <small>完成於 <code>96ddd7f70</code></small></span></li></ul>
       <details><summary>工程細節：FC 專業剪輯（FilmCraft）</summary>
         <p>建置鏈沿用 scripts/craft-web-build；外框頁用上游嵌入橋 ?host=parent 送檔、收存檔與輸出；輸出當成一筆已完成的任務，入帳與送審走現有路；主機靜態目錄＋nginx</p>
-        <p><b>需先完成：</b><a href="#RE">RE</a>；待決 4</p>
+        <p><b>需先完成：</b><a href="#RE">RE</a></p>
         <p><b>已定：</b>介面是英文、不跟站上的主題、裡面有下拉選單（引擎自己的畫面，改不了）。輸出最高 1080p；要 4K 或很長的片用一般剪輯。沒有獨立顯示卡的電腦會很卡，開啟前會提醒並可改用一般剪輯。</p>
         <p><b>檔案：</b><code>VW/docs/engine-route-plan-20261106.md</code> <code>scripts/filmcraft-pro/</code> <code>VW/scripts/tools-engine-host.js</code> <code>VW/scripts/tools-0.js</code> <code>VW/backend/api.cjs</code> <code>VW/backend/release-text.cjs</code> <code>nginx/default.conf</code></p>
         <p><b>做法：</b><code>lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/creative-suite-plan-20261102.md §4 FC</code></p>
+        <p><b>完成於：</b><code>96ddd7f70</code></p>
       </details>
-    </div></li><li class="step doing" id="EC">
+    </div></li><li class="step done" id="EC">
     <div class="n">18</div>
     <div class="b">
       <p class="plain">例：在應用工具按「專業特效」，進到 EffectCraft 的完整畫面做片頭與特效（三百多個特效、曲線編輯器、表達式），做好的透明片段直接回到素材庫給剪輯用。</p>
-      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-high">風險 High</span><span class="who">負責：Opus；上線等你同意</span></p>
+      <p class="meta"><span class="pill st-done">已完成</span><span class="pill risk-high">風險 High</span><span class="who">負責：Opus；上線等你同意</span></p>
       <p class="donewhen"><b>完成的樣子：</b>跟專業剪輯同一套流程在 EffectCraft 走通；重開專案時素材不會離線。</p>
-      <ul class="items"><li class="done"><b>✓</b><span><code>EC.1</code> EffectCraft 建置好了：固定版本、編入繁中字型、拿掉 ArtCraft 標誌；補上「成品交回工作台」的接口（上游沒有，自己補），實測存檔和輸出都直接交回、不下載。 <small>完成於 <code>b376094e5</code></small></span></li><li class="done"><b>✓</b><span><code>EC.2</code> 應用工具多了「專業特效」：跟專業剪輯共用同一份外框，重開專案時自動把素材接回來。透明輸出還沒做，先輸出一般影片。 <small>完成於 <code>cbe8f67f8</code></small></span></li><li class="done"><b>✓</b><span><code>EC.3</code> 專業特效的成片自動進任務紀錄與素材庫，記下用了哪些素材。 <small>完成於 <code>cbe8f67f8</code></small></span></li><li class="todo"><b>○</b><span><code>EC.4</code> 已跟專業剪輯同一次部署（11-06，96ddd7f70）：EffectCraft 的檔放在主機，nginx 路徑帶跨來源隔離標頭。剩登入後實際跑一次（待決 4）。</span></li></ul>
+      <ul class="items"><li class="done"><b>✓</b><span><code>EC.1</code> EffectCraft 建置好了：固定版本、編入繁中字型、拿掉 ArtCraft 標誌；補上「成品交回工作台」的接口（上游沒有，自己補），實測存檔和輸出都直接交回、不下載。 <small>完成於 <code>b376094e5</code></small></span></li><li class="done"><b>✓</b><span><code>EC.2</code> 應用工具多了「專業特效」：跟專業剪輯共用同一份外框，重開專案時自動把素材接回來。透明輸出還沒做，先輸出一般影片。 <small>完成於 <code>cbe8f67f8</code></small></span></li><li class="done"><b>✓</b><span><code>EC.3</code> 專業特效的成片自動進任務紀錄與素材庫，記下用了哪些素材。 <small>完成於 <code>cbe8f67f8</code></small></span></li><li class="done"><b>✓</b><span><code>EC.4</code> 11-10 在正式站用獨顯實跑：送一支素材、建 1920×1080 合成加繁中標題、存檔、輸出；成片 3 秒進任務紀錄與素材庫，來源正確；重開後沒有離線素材。 <small>完成於 <code>96ddd7f70</code></small></span></li></ul>
       <details><summary>工程細節：EC 專業特效（EffectCraft）</summary>
         <p>建置鏈同 FC；另補嵌入橋補丁（照 scripts/photocraft-pro/web-host-api.patch 接 craft-web-host，上游已有就不補）；頁面與入帳沿用 FC 的外框與路由；重開後補 footage.relink</p>
         <p><b>需先完成：</b><a href="#FC">FC</a></p>
         <p><b>已定：</b>專業剪輯驗收過才開始。EffectCraft 複雜合成的預覽即使用獨立顯示卡也不到即時，適合做短的片頭與特效片段。</p>
         <p><b>檔案：</b><code>VW/docs/engine-route-plan-20261106.md</code> <code>scripts/effectcraft-pro/</code></p>
         <p><b>做法：</b><code>lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/creative-suite-plan-20261102.md §4 EC</code></p>
+        <p><b>完成於：</b><code>96ddd7f70</code></p>
       </details>
     </div></li></ol></section>
 
-<section id="open"><h2>待你決定</h2><p class="lead">決定後，對應的卡才能開始。</p><ol class="open"><li><div class="n">4</div><div class="b"><p class="plain">專業剪輯、專業特效已上線（11-06）。要在登入後實際跑一次：送素材、存檔、關掉重開、輸出。這台筆電的瀏覽器預設用內顯，要用獨立顯示卡開（之前內顯跑 WebGPU 讓 Edge 當掉），所以由你在開了獨顯的瀏覽器試，或指定讓我用獨顯模式代跑。</p><p class="meta"><a href="#FC" class="who">第 <span data-computed>17</span> 張卡開始前決定</a><span class="who">出處：VW/docs/engine-route-plan-20261106.md §9 FC.4 第 4 步</span></p></div></li></ol></section>
+<section id="open"><h2>待你決定</h2><p class="lead">決定後，對應的卡才能開始。</p><p class="lead">目前沒有需要你決定的事。</p></section>
 
 <section id="paths"><h2>檔案</h2><div class="paths"><div><b>每張卡的做法</b><code>lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/creative-suite-plan-20261102.md §4</code></div><div><b>需求與驗收</b><code>lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/handoff/Claude_Code_handoff_20261102.md</code></div><div><b>工作紀錄</b><code>agency-os/WORKLOG.md 2026-11-02 續19–續45</code></div><div><b>本頁來源</b><span><code>agency-os/handoffs/2026-11-02-video-workbench-supervisor/</code><br>修改 data.mjs 後，執行 node build.mjs 和 node check.mjs，再重新發布到同一個網址。</span></div></div></section>
 </main>
