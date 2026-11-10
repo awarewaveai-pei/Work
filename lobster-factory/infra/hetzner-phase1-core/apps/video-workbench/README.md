@@ -236,9 +236,9 @@ Claude 首次審查提出成果還原與導演生命週期等五項問題，已�
 
 金鑰只讀取伺服器程序的 `OPENAI_API_KEY` 環境變數，沒有放在 HTML、JavaScript、ZIP 或 localStorage。設定或更換環境變數後，重開啟動視窗。
 
-可覆寫 `VW_TEXT_MODEL`、`VW_IMAGE_MODEL`、`VW_VIDEO_MODEL`、`VW_TTS_MODEL`。預設為 gpt-4.1-mini、gpt-image-2.5-flare、sora-2、gpt-4o-mini-tts。可使用的模型取決於該金鑰權限及供應商供應情況。實作依據：[OpenAI 官方文件](https://developers.openai.com/api/docs/guides/image-generation)。
+可覆寫 `VW_TEXT_MODEL`、`VW_IMAGE_MODEL`、`VW_VIDEO_MODEL`、`VW_TTS_MODEL`。預設為 gpt-5.4-mini、gpt-image-2.5-flare、veo-3-1-fast（Replicate，需 `REPLICATE_API_TOKEN`；`VW_VIDEO_MODEL` 只接受 next-admin `lib/ai/video-motion-models.ts` 的 id；Sora 2 已於 2026-09-24 停止服務）、gpt-4o-mini-tts。可使用的模型取決於該金鑰權限及供應商供應情況。實作依據：[OpenAI 官方文件](https://developers.openai.com/api/docs/guides/image-generation)。
 
-目前影片服務支援 4／8／12 秒、16:9 或 9:16、單張 PNG/JPEG/WebP 參考圖；不支援影片／音訊參考及人物聲音複製。口播頁目前輸出配音音檔，人物對嘴影片尚缺專用服務。語音辨識檔案上限 25MB。
+目前影片服務依模型支援的秒數（預設 Veo 3.1 Fast：4／6／8 秒）、16:9 或 9:16、單張 PNG/JPEG/WebP 參考圖；不支援影片／音訊參考及人物聲音複製。口播頁目前輸出配音音檔，人物對嘴影片尚缺專用服務。語音辨識檔案上限 25MB。
 
 ## 尚未完成的專用服務
 

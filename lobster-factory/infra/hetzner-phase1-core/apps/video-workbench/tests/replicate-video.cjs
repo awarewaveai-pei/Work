@@ -1,13 +1,13 @@
 // Card RV (docs/replicate-video-models-plan-20261105.md): a video job runs the model it names. Replicate models come
-// from next-admin lib/ai/video-motion-models.ts (fields compared with its buildInput, not a copy); sora-2 and unknown
-// ids still run the server's OpenAI model with the same request as before. Fake fetchImpl only, no real provider call.
+// from next-admin lib/ai/video-motion-models.ts (fields compared with its buildInput, not a copy); sora-2 (shut down
+// 2026-09-24) and unknown ids run the default model. Fake fetchImpl only, no real provider call.
 const assert = require("node:assert/strict"), fs = require("node:fs"), path = require("node:path");
 const { isolatedServer } = require("./isolated-server.cjs");
 const { resolveSource } = require("../backend/appearance.cjs");
 
 const appDir = resolveSource(path.join(__dirname, ".."), process.env);
 const { MOTION_MODELS } = require(path.join(appDir, "lib/ai/video-motion-models.ts"));
-const { VIDEO_MOTION_RATES, OPENAI_VIDEO_RATES } = require(path.join(appDir, "lib/ai/cost-model.ts"));
+const { VIDEO_MOTION_RATES } = require(path.join(appDir, "lib/ai/cost-model.ts"));
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jTioAAAAASUVORK5CYII=", "base64");
 const mp4 = Buffer.from("fake-mp4-bytes");
 
@@ -22,9 +22,6 @@ function fakeProviders({ replicateStatus = "succeeded", cancelOk = true, statusG
       return Response.json(replicateStatus === "succeeded" ? { id: "pred-v1", status: "succeeded", output: "https://replicate.delivery/x/out.mp4" } : { id: "pred-v1", status: replicateStatus });
     }
     if (url === "https://replicate.delivery/x/out.mp4") return new Response(mp4);
-    if (url === "https://api.openai.com/v1/videos") return Response.json({ id: "sora-job", status: "queued", progress: 0 });
-    if (url === "https://api.openai.com/v1/videos/sora-job") return Response.json({ id: "sora-job", status: "completed", seconds: "8" });
-    if (url === "https://api.openai.com/v1/videos/sora-job/content") return new Response(mp4);
     throw Error("unexpected provider url " + url);
   };
   return { calls, fetchImpl };
@@ -45,17 +42,19 @@ const video = (model, extra = {}) => ({ type: "video", mode: "reference", prompt
 
 (async () => {
   const env = { REPLICATE_API_TOKEN: "test-only-replicate" };
-  // 1. capabilities: every model with label, price per second and limits; sora-2 first (the default).
+  // 1. capabilities: every model with label, price per second and limits; the default (Veo 3.1 Fast) first.
   {
     const { base } = await isolatedServer("vw-rv-caps-", { fetchImpl: fakeProviders().fetchImpl, env });
     const caps = (await api(base)("/capabilities")).body;
-    assert.deepEqual(caps.videoModels.map((m) => m.id), ["sora-2", ...Object.keys(MOTION_MODELS)]);
-    for (const m of caps.videoModels.slice(1)) {
+    assert.deepEqual(caps.videoModels.map((m) => m.id), ["veo-3-1-fast", ...Object.keys(MOTION_MODELS).filter((id) => id !== "veo-3-1-fast")]);
+    assert.equal(caps.models.video, "veo-3-1-fast");
+    assert.equal(caps.videoModels[0].requiresImage, false);
+    assert.deepEqual(caps.retiredVideoModels, { "sora-2": "Sora 2", "sora-2-pro": "Sora 2 Pro" });
+    for (const m of caps.videoModels) {
       assert.equal(m.usdPerSec, VIDEO_MOTION_RATES[m.id].usdPerSec, m.id + " 價格與 cost-model.ts 不同");
       assert.equal(m.model, MOTION_MODELS[m.id].slug);
       assert.equal(m.available, true);
     }
-    assert.equal(caps.videoModels[0].usdPerSec, OPENAI_VIDEO_RATES["sora-2"].usdPerSec);
     console.log("PASS capabilities：" + caps.videoModels.length + " 個影片模型，價格出自 cost-model.ts");
   }
   // 2. Each Replicate model: request body = next-admin buildInput; result saved; origin and cost = rate x seconds.
@@ -80,7 +79,7 @@ const video = (model, extra = {}) => ({ type: "video", mode: "reference", prompt
     assert.equal(fake.calls.some((c) => c.url.startsWith("https://api.openai.com")), false, "Replicate 任務呼叫了 OpenAI");
   }
   console.log("PASS 四個 Replicate 模型：送出欄位＝NA buildInput、成品存檔、origin 與成本正確");
-  // 3. Old and unknown model values run OpenAI with the pre-RV request (model, seconds, size).
+  // 3. Old and unknown model values (an old Sora task resent, an old project's value, none) run the default model.
   for (const model of ["sora-2", "VideoWorkbench V3", undefined]) {
     const fake = fakeProviders();
     const { base } = await isolatedServer("vw-rv-sora-", { fetchImpl: fake.fetchImpl, env });
@@ -89,12 +88,11 @@ const video = (model, extra = {}) => ({ type: "video", mode: "reference", prompt
     assert.equal(sent.status, 202, JSON.stringify(sent.body));
     const job = await settle(call, sent.body.id);
     assert.equal(job.status, "succeeded", job.error);
-    const create = fake.calls.find((c) => c.url === "https://api.openai.com/v1/videos");
-    assert.deepEqual(JSON.parse(create.body), { model: "sora-2", prompt: "海邊日出，鏡頭慢慢推近", seconds: "8", size: "1280x720" });
-    assert.deepEqual(job.result.origin, { kind: "ai_generated", model: "sora-2", provider: "OpenAI", costUsd: 0.8 });
-    assert.equal(fake.calls.some((c) => c.url.includes("replicate")), false);
+    assert.equal(fake.calls.find((c) => c.url.includes("/v1/models/")).url, "https://api.replicate.com/v1/models/" + MOTION_MODELS["veo-3-1-fast"].slug + "/predictions");
+    assert.deepEqual(job.result.origin, { kind: "ai_generated", model: MOTION_MODELS["veo-3-1-fast"].slug, provider: "Replicate", costUsd: Math.round(8 * VIDEO_MOTION_RATES["veo-3-1-fast"].usdPerSec * 1e6) / 1e6 });
+    assert.equal(fake.calls.some((c) => c.url.startsWith("https://api.openai.com")), false);
   }
-  console.log("PASS 舊值 sora-2／VideoWorkbench V3／無值：照舊送 OpenAI，內容與改前相同");
+  console.log("PASS 舊值 sora-2／VideoWorkbench V3／無值：改用預設 Veo 3.1 Fast，價格照它");
   // 4. Refused before any call: Runway without an image, a length the model lacks, no Replicate token.
   {
     const fake = fakeProviders();

@@ -15,7 +15,7 @@ const { createServer } = require("../server.cjs");
   let downloads = 0;
   const server = createServer({
     dataDir: dir,
-    env: { OPENAI_API_KEY: "test-only" },
+    env: { OPENAI_API_KEY: "test-only", REPLICATE_API_TOKEN: "test-only" },
     fetchImpl: async (url, options) => {
       calls.push({ url, body: options.body });
       if (url.endsWith("/responses"))
@@ -30,22 +30,15 @@ const { createServer } = require("../server.cjs");
         return new Response(Buffer.from("test-audio"));
       if (url.endsWith("/audio/transcriptions"))
         return new Response("1\n00:00:00,000 --> 00:00:00,500\n你好\n");
-      if (url.endsWith("/videos"))
-        return Response.json({
-          id: "video_fixture",
-          status: "queued",
-          progress: 0,
-        });
-      if (url.endsWith("/videos/video_fixture/content"))
+      // Video = the default Replicate model (Veo 3.1 Fast); the first download fails once.
+      if (/^https:\/\/api\.replicate\.com\/v1\/models\/.+\/predictions$/.test(url))
+        return Response.json({ id: "video_fixture", status: "starting" });
+      if (url === "https://replicate.delivery/x/video.mp4")
         return ++downloads === 1
-          ? Response.json({ error: { message: "temporary" } }, { status: 503 })
+          ? Response.json({ detail: "temporary" }, { status: 503 })
           : new Response(Buffer.from("test-video"));
-      if (url.endsWith("/videos/video_fixture"))
-        return Response.json({
-          id: "video_fixture",
-          status: "completed",
-          progress: 100,
-        });
+      if (url === "https://api.replicate.com/v1/predictions/video_fixture")
+        return Response.json({ id: "video_fixture", status: "succeeded", output: "https://replicate.delivery/x/video.mp4" });
       throw Error("未預期的網路請求：" + url);
     },
   });

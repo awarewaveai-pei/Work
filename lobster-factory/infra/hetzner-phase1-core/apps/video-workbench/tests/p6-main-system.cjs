@@ -259,8 +259,16 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
     // 6b. Per provider kind: real cost from next-admin's tables; a model with no price is refused before the call.
     {
       const costs = require("../backend/provider-cost.cjs");
-      near(costs.videoUsd("sora-2", 8), 8 * rates.OPENAI_VIDEO_RATES["sora-2"].usdPerSec, "影片");
-      near(costs.speechUsd("gpt-4o-mini-tts", 1000), 1000 * rates.OPENAI_TTS_RATES["gpt-4o-mini-tts"].usdPerMChars / 1e6, "語音");
+      near(costs.videoUsd("veo-3-1-fast", 8), 8 * rates.VIDEO_MOTION_RATES["veo-3-1-fast"].usdPerSec, "影片");
+      assert.throws(() => costs.videoUsd("sora-2", 8), /尚無價目/, "Sora 2 已下線：不再計價");
+      const tts = rates.OPENAI_TTS_RATES["gpt-4o-mini-tts"];
+      near(costs.speechUsd("gpt-4o-mini-tts", 1000, 90), (1000 * tts.textInPerM + 90 * tts.audioTokensPerSec * tts.audioOutPerM) / 1e6, "語音（字數＋音檔秒數）");
+      near(costs.speechUsd("tts-1", 1000), 1000 * rates.OPENAI_TTS_RATES["tts-1"].usdPerMChars / 1e6, "tts-1 每字");
+      // Run-time-billed Replicate models: one function, predict_time x usdPerSec; no run time = the estimate.
+      near(costs.runUsd("bg-remove", 2.5), 2.5 * rates.TOOL_RATES["bg-remove"].usdPerSec, "去背按秒");
+      near(costs.runUsd("3d-trellis", 30), 30 * rates.TOOL_RATES["3d-trellis"].usdPerSec, "TRELLIS 按秒");
+      near(costs.runUsd("bg-remove", undefined), rates.TOOL_RATES["bg-remove"].usd, "沒有 predict_time = 估價");
+      assert.throws(() => costs.runUsd("upscale", 3), /not a run-time-billed/, "按張計價的工具不得走按秒");
       near(costs.transcribeUsd("whisper-1", 90), 1.5 * rates.TRANSCRIBE_RATES["whisper-1"].usdPerMin, "語音辨識");
       near(costs.toolUsd("bg-remove"), rates.TOOL_RATES["bg-remove"].usd, "去背");
       assert.equal(costs.imageUsd("gpt-image-2", undefined), rates.IMAGE_RATES["openai-high"].usd, "沒有 usage = 該模型固定價，不是 0");
@@ -273,7 +281,8 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
         assert.throws(() => costs.priceOf(kind, model), /尚無價目/, kind);
       const speech = JSON.parse((await generate({ type: "spoken", prompt: "你好世界", idempotencyKey: "tts-1" })).body);
       await wait(() => calls.usage.some((u) => u.job_id === speech.id));
-      near(calls.usage.find((u) => u.job_id === speech.id).cost_usd, 4 * rates.OPENAI_TTS_RATES["gpt-4o-mini-tts"].usdPerMChars / 1e6, "語音任務");
+      // The fake mp3 has no readable duration: 0.5 s per character stands in (provider-cost.cjs speechUsd).
+      near(calls.usage.find((u) => u.job_id === speech.id).cost_usd, (4 * tts.textInPerM + 4 * 0.5 * tts.audioTokensPerSec * tts.audioOutPerM) / 1e6, "語音任務");
     }
 
     // 6d. Connected mode (HttpAdapter): the server's refusal message reaches the user, never a bare status code.

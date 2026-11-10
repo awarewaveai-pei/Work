@@ -5,6 +5,7 @@ import type { Grant } from "@/lib/entitlements/can";
 import { removeBackground } from "../../../../../lib/studio/bg-remover";
 import { holdCost, logImageCost, releaseHold } from "../../../../../lib/ai/log-ai-call";
 import { toolCostUsd } from "../../../../../lib/ai/cost-calculator";
+import { replicateRunUsd } from "../../../../../lib/ai/cost-model";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -43,14 +44,13 @@ async function handlePost(request: Request, grant: Grant) {
   }
 
   // Credits held before the provider runs (Grant.hold); every delivered call is charged, with or without a _jobId.
-  // One number for the hold, the ledger and /ops/costs (TOOL_RATES "bg-remove"); the route used to carry its own.
-  const costUsd = toolCostUsd("bg-remove");
-  const hold = await holdCost(grant, costUsd);
+  // Held at the estimate (TOOL_RATES "bg-remove"), charged by the run time Replicate reports (replicateRunUsd).
+  const hold = await holdCost(grant, toolCostUsd("bg-remove"));
   if (!hold) return NextResponse.json({ ok: false, error: "no_credits" });
   const result = await removeBackground(body.image).catch((e) => { releaseHold(hold, "tools/studio/remove-bg"); throw e; });
   if (result.ok) {
     const jobId = typeof body._jobId === "string" ? body._jobId : null;
-    void logImageCost({ route: "tools/studio/remove-bg", model: "rembg", vendor: "Replicate", costUsd, jobId, tool: "studio", grant, hold });
+    void logImageCost({ route: "tools/studio/remove-bg", model: "rembg", vendor: "Replicate", costUsd: replicateRunUsd("bg-remove", result.predictSec), jobId, tool: "studio", grant, hold });
     return NextResponse.json(result);
   }
   releaseHold(hold, "tools/studio/remove-bg");

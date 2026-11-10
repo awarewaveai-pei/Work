@@ -151,10 +151,10 @@ function buildSeedScript(spec: WebsiteSpec): string[] {
 async function generateAndInstallHeroImage(conn: SshClient, slug: string, spec: WebsiteSpec): Promise<string> {
   if (!isR2Configured()) return "hero image skipped: R2 not configured";
   const style = (spec.design?.image_style || "warm natural light, soft handcrafted texture, atmospheric").slice(0, 200);
-  // imagen-4 (Google) over flux-schnell: flux-schnell renders gibberish pseudo-text on hero banners
-  // even with negative prompts; Imagen honours "no text" reliably for clean photographic heroes.
+  // Not flux-schnell: it renders gibberish pseudo-text on hero banners even with negative prompts. Ideogram v4 Turbo
+  // (US$0.03) took over from Imagen 4 on 2026-11-10 when Google discontinued Imagen 4 (no official Replicate price left).
   const prompt = `${style}. A wide cinematic hero banner photograph for ${spec.site_name || "a brand"}. Photorealistic, atmospheric, tasteful, high detail. Absolutely no text, no words, no letters, no captions, no signage, no logo, no watermark anywhere in the image.`;
-  const gen = await generateTarotImage({ model: "imagen-4", prompt, aspectRatio: "16:9",
+  const gen = await generateTarotImage({ model: "ideogram-v4-turbo", prompt, aspectRatio: "16:9",
     costLog: { route: "internal/hosting/provision-staging", tool: "hosting" } }, await grantFor("ops.staging-image"));
   if (!gen.ok) return `hero image gen failed: ${"error" in gen ? gen.error : "gen_failed"}`;
   const parsed = parseImageDataUrl(gen.image);

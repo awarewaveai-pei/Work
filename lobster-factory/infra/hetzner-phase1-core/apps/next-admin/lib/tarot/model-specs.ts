@@ -153,15 +153,6 @@ export const MODEL_SPECS: Record<TarotModel, ModelSpec> = {
     notes: "allow_fallback_model stays off: its fallback is a ByteDance model",
     sources: [GOOGLE_NB, "https://replicate.com/google/nano-banana-pro"],
   },
-  "imagen-4": {
-    label: "Imagen 4", vendor: "Google (Replicate)",
-    promptLimit: "no official limit found", promptOrder: "style-second", referenceRole: "none", usesDeckPreview: false,
-    rewrite: "Vertex rewrites by default (enhancePrompt); Replicate exposes no switch",
-    seed: false, negativePrompt: "not supported",
-    vendorOrder: "subject, context, style",
-    notes: "Google lists Imagen 4 as discontinued on Vertex (2026-06-30); still served on Replicate",
-    sources: ["https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/imagen/4-0-generate", "https://replicate.com/google/imagen-4"],
-  },
   "openai-low": {
     label: "GPT-Image-2 低", vendor: "OpenAI",
     promptLimit: "32,000 characters", promptOrder: "style-second", referenceRole: "edit", usesDeckPreview: false,

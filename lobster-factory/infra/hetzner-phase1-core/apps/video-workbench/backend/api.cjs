@@ -180,6 +180,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     if (["queued", "running"].includes(job.status) && !job.providerId) {
       job.status = "failed";
       job.error = "服務重新啟動，任務已中斷；請從歷史記錄重新送出。";
+    } else if (["queued", "running"].includes(job.status) && job.video?.provider !== "Replicate") {
+      // A Sora job (OpenAI shut Sora 2 down 2026-09-24): nothing left to poll; a retry runs the default model.
+      job.status = "failed";
+      job.error = "Sora 2 已停止服務；請從歷史記錄重新送出，會改用目前的預設影片模型。";
     }
   persist();
   async function provider(route, body, signal, binary = false) {
@@ -426,7 +430,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           earlier = jobs.findLast(
             (j) => j !== job && j.input?.operation === "remove-bg" && j.input.references?.src?.url === src && j.replicateId && j.status !== "succeeded",
           );
-        const buffer = await bgRemove.removeBackground({
+        const { buffer, predictSec } = await bgRemove.removeBackground({
           file: removeBgSource(job.input), env, fetchImpl, signal,
           resumeId: earlier?.replicateId,
           onPrediction: (id) => {
@@ -438,7 +442,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         const parentAssetId = job.input.references.src.id;
         job.result = {
           url: output(buffer, "png"),
-          origin: { kind: "ai_generated", model: bgRemove.modelLabel(env), provider: "Replicate", ...(typeof parentAssetId === "string" ? { parentAssetId } : {}), costUsd: generationPolicy.toolCosts.removeBackground },
+          origin: { kind: "ai_generated", model: bgRemove.modelLabel(env), provider: "Replicate", ...(typeof parentAssetId === "string" ? { parentAssetId } : {}), costUsd: costs.runUsd("bg-remove", predictSec) },
         };
         job.progress = 100;
         job.status = "succeeded";
@@ -548,7 +552,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           true,
         );
         job.result = { url: output(audio, "mp3") };
-        job.costUsd = costs.speechUsd(providerModels.audio, prompt.length);
+        // No usage in the reply: priced from the characters sent and the length of the audio that came back.
+        job.costUsd = costs.speechUsd(providerModels.audio, prompt.length, (await require("./media-inspect.cjs").inspectMedia(path.join(dataDir, job.result.url.slice(1))).catch(() => null))?.duration);
         if (Number(input.settings?.voicePitch || 0) || Number(input.settings?.voiceGain || 0) || Number(input.settings?.voiceSpeed ?? 1) !== 1) {
           const destination = path.join(outputs, crypto.randomUUID() + '.mp3');
           await mediaTools.adjustVoice(path.join(dataDir, job.result.url.slice(1)), destination, { pitch: Number(input.settings.voicePitch || 0), gain: Number(input.settings.voiceGain || 0), speed: Number(input.settings.voiceSpeed ?? 1), signal });
@@ -627,7 +632,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           )
         )
           throw Error(
-            "目前 Sora 介面僅支援單張圖片參考，影片／音訊參考需要專用服務。",
+            "目前影片服務僅支援單張圖片參考，影片／音訊參考需要專用服務。",
           );
         if (refs.length > 1)
           throw Error("目前影片服務僅支援單張參考圖，請移除其他圖片。");
@@ -638,32 +643,12 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           seconds = Number(input.duration || input.settings?.duration || 8);
         // Recorded before the call: refresh prices, labels and polls by what was sent, not by later settings.
         job.video = { id: vm.id, provider: vm.provider, model: vm.model, seconds };
-        if (vm.provider === "Replicate") {
-          job.providerId = await replicateVideo.create({
-            model: vm.id, prompt, ratio, seconds, env, fetchImpl, signal,
-            ...(refs.length ? { imageUrl: imageReference(refs[0].url) } : {}),
-          });
-          job.status = "queued";
-          job.progress = 0;
-          persist();
-          return;
-        }
-        const video = await provider(
-          "/videos",
-          {
-            model: vm.model,
-            prompt,
-            seconds: String(seconds),
-            size: ratio === "9:16" ? "720x1280" : "1280x720",
-            ...(refs.length
-              ? { input_reference: { image_url: imageReference(refs[0].url) } }
-              : {}),
-          },
-          signal,
-        );
-        job.providerId = video.id;
+        job.providerId = await replicateVideo.create({
+          model: vm.id, prompt, ratio, seconds, env, fetchImpl, signal,
+          ...(refs.length ? { imageUrl: imageReference(refs[0].url) } : {}),
+        });
         job.status = "queued";
-        job.progress = video.progress || 0;
+        job.progress = 0;
         persist();
         return;
       }
@@ -716,36 +701,6 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         const binary = await replicateVideo.download({ url: result.outputUrl, fetchImpl });
         if (job.status === "cancelled") return job;
         job.result = { url: output(binary, "mp4"), origin: aiOrigin("video", costs.videoUsd(job.video.id, job.video.seconds), job.video) };
-        job.progress = 100;
-        job.status = "succeeded";
-      }
-      persist();
-    } else if (job.providerId && ["queued", "running"].includes(job.status)) {
-      const result = await provider(
-        "/videos/" + encodeURIComponent(job.providerId),
-      );
-      job.status =
-        {
-          queued: "queued",
-          in_progress: "running",
-          completed: "running",
-          failed: "failed",
-          cancelled: "failed",
-          expired: "failed",
-          deleted: "failed",
-        }[result.status] || "failed";
-      if (job.status === "failed" && !result.error)
-        job.error = "影片供應商狀態：" + result.status;
-      job.progress = result.progress || 0;
-      if (result.error) job.error = result.error.message;
-      if (result.status === "completed") {
-        const binary = await provider(
-          "/videos/" + encodeURIComponent(job.providerId) + "/content",
-          undefined,
-          undefined,
-          true,
-        );
-        job.result = { url: output(binary, "mp4"), origin: aiOrigin("video", costs.videoUsd(job.video?.model || providerModels.video, Number(result.seconds) || Number(job.input.duration || job.input.settings?.duration || 8)), job.video) };
         job.progress = 100;
         job.status = "succeeded";
       }
@@ -1218,11 +1173,6 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           await remotionReady(job.input);
           await start(job.input, res, { retryOf: job.id, attempt: (job.attempt || 1) + 1 }, req);
         } else if (req.method === "POST" && match[2]) {
-          if (job.providerId && job.video?.provider !== "Replicate")
-            throw Object.assign(
-              Error("供應商已接收此影片任務，目前不能取消。"),
-              { status: 409 },
-            );
           if (!["queued", "running"].includes(job.status))
             throw Object.assign(Error("任務已結束"), { status: 409 });
           // Replicate video: cancelled only once Replicate accepts, so billing has really stopped.

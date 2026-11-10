@@ -64,7 +64,7 @@
         createdAt: Date.now(),
         cover: "",
         assets: [],
-        settings: { model: "sora-2", lockModel: true, videoPrompt: "" },
+        settings: { model: "", lockModel: true, videoPrompt: "" }, // "" = the default video model (shared/models.js get)
         episodes: [
           {
             id: "ep-ed-" + id,

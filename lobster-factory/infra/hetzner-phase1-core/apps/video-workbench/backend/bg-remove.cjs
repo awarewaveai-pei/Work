@@ -55,7 +55,8 @@ async function cancelPrediction({ id, env, fetchImpl }) {
   }).catch(() => {});
 }
 
-/** Transparent PNG of `file` (a local png/jpeg/webp). Throws on any provider failure; never returns partial output.
+/** Transparent PNG of `file` (a local png/jpeg/webp) as { buffer, predictSec } -- predictSec = Replicate's
+ *  metrics.predict_time, which the run is billed by. Throws on any provider failure; never returns partial output.
  *  resumeId: an earlier prediction for the same image that may still bill; it is polled instead of paying twice,
  *  and only a canceled/failed/unreadable one leads to a new prediction. onPrediction(id) records the id it uses. */
 async function removeBackground({ file, env, fetchImpl, signal, resumeId, onPrediction = () => {} }) {
@@ -106,7 +107,7 @@ async function removeBackground({ file, env, fetchImpl, signal, resumeId, onPred
   if (Number(download.headers?.get?.("content-length")) > MAX_OUTPUT_BYTES) throw Error("去背結果超過 20MB");
   const buffer = await capped(download);
   if (!buffer.subarray(0, 8).equals(PNG_SIGNATURE)) throw Error("去背結果不是 PNG 圖片");
-  return buffer;
+  return { buffer, predictSec: prediction.metrics?.predict_time };
 }
 
 module.exports = { removeBackground, cancelPrediction, token, mimeOf, modelLabel, BG_REMOVER_VERSION_DEFAULT };

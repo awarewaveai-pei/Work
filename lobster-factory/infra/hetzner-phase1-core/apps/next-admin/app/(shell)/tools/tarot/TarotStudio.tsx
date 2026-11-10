@@ -67,7 +67,7 @@ const TAROT_MENU: readonly TarotModel[] = [
   "flux-schnell", // budget
   "ideogram-v2a-turbo", "ideogram-v3-balanced", "ideogram-v4-turbo", "ideogram-v4-quality", "ideogram-character",
   "flux-dev", "flux-2-max", // creative
-  "nano-banana-2", "nano-banana-pro", "imagen-4", // Google
+  "nano-banana-2", "nano-banana-pro", // Google
   "openai-low", "openai-medium", "openai-high",
 ];
 const MODEL_OPTIONS: ModelOption[] = TAROT_MENU.map((value) => {

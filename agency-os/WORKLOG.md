@@ -10,6 +10,22 @@
 - REALTEST_WAIVED: QUERY_ONLY -- 只讀官方價目頁、排行榜與 prod jobs.json（唯讀 ssh），未打付費 API、未改程式
 - REVIEW_WAIVED: DOC_ONLY -- 只新增調查文件
 - BUGHUNT_WAIVED: DOC_ONLY -- 只新增調查文件，無程式改動
+## 2026-11-10（續23）價目修正：依實際送出的請求對官方價（核對表 42a276a10 的 4 筆＋Sora／imagen-4＋追呼叫端 2 筆）
+
+- 根因：價目以模型名對價目表列，沒對到程式實際送出的參數與計價單位（每 MP、每 GPU 秒、token、解析度檔位）。
+- 改（核對表 `video-workbench/docs/price-audit-20261110.md` 每列「已修」＋新欄「呼叫端 file:line＋送出參數」）：
+  - C1 flux-kontext-dev 0.045→0.025；nano-banana-2 實送 2K → 0.101（原 1K 價）。
+  - C2 每 MP 計價：`next-admin/public/editor-shared/image-models.js` `imageRunUsd`（run＋輸入 MP＋輸出 MP）；klein、flux-2-max 用；`lib/tarot/image-gen.ts` generateTarotImage 依送出的參考圖預扣、依回傳圖實扣。
+  - C3 按 GPU 秒：`lib/ai/cost-model.ts` `replicateRunUsd` 唯一函式（去背 $0.000225/s、TRELLIS）；next-admin remove-bg（`replicate-run.ts` 帶回 predict_time）與工作台 bg-remove／image-to-3d 共用。
+  - C4 gpt-4o-mini-tts：`/audio/speech` 無 usage（官方 reference 未列）→ 文字 ≤1 token/字＋音訊 1 token/50ms（guides/realtime-costs）×官方 token 價，秒數 ffprobe 量；按鈕「約 /分鐘」。刪無依據的 $15/1M 字元。
+  - C5 Sora 2／Pro：`GET /v1/models/sora-2` shutdown_date 2026-09-24 → 刪 OpenAI /videos 路徑與 OPENAI_VIDEO_RATES；預設 veo-3-1-fast（`generation-policy.cjs`）；重啟時殘留 Sora 任務標失敗；舊專案開啟 toast「Sora 2 已停止服務，已改用 Google Veo 3.1 Fast」；導演模式長度改讀模型 durations（critic M1）。
+  - C6 imagen-4：API slug 200 但頁面 404、Google 已停用、無官方價 → 移除；provision-staging 改 ideogram-v4-turbo；IMAGE_RATES 留標籤讓舊成本列可讀。
+  - C7 gpt-image-2／whisper-1／tts-1：Deprecated 無日期，不動（核對表記待公布）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit; npx vitest run lib/ai/__tests__/ lib/tarot lib/studio app/(shell)/tools/content app/api/tools/studio app/api/internal/hosting (53 files 545 tests); node tests/gate.cjs; node tests/replicate-video.cjs; node tests/backend.cjs; node tests/remove-bg.cjs; node tests/replicate-video-ui.cjs; node tests/p6-main-system.cjs | exit=0 | ms=900000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n — critic subagent：導演模式長度寫死 4/8/12（換 Veo 後 12 秒先付劇本錢再被拒），已修＋UI 測試
+- ORACLE_WAIVED: codex 額度封鎖至 14:03（oracle-quota exit 3）→ 獨立 critic subagent＋自審；新增測試：Sora 舊專案開啟改預設＋提示（replicate-video-ui）、按秒計價函式假 predict_time（p6-main-system 6b）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=OPENAI_VIDEO_RATES|imagen-4|usdPerMChars | hits=4（歷史計畫文件與 WORKLOG 不回改；IMAGE_RATES 舊標籤）
+- 未修：s4b-image-to-3d 本機 SF3D 步驟紅＝另一 session 改 `sf3d-local.cjs` 中（非本次）。
 ## 2026-11-10（續22）影音工作台 ED.3.8：預覽補遮罩、顆粒、背景模糊（§9 G1）
 
 - 改：`scripts/tools-editor.js` `edPaint` 讀輸出端同一組欄位（`c.mask`；`grain` 最近一層；主軌 `background`／`backgroundBlur`）。遮罩＝CSS `clip-path`（形狀同 `backend/editor-export.cjs` geq 條件）；顆粒＝兩張互補雜訊（`plus-lighter` 加、`difference` 減），不透明度 30·grain/255＝輸出端 ±30·grain；背景模糊＝畫面後方 canvas，cover 縮放，σ＝r/√3 換算到比例的 1080p 寬。輸出端不動。

@@ -5,37 +5,39 @@ const imageOutputs = Object.fromEntries([["1K", 1024], ["2K", 2048], ["4K", 4096
 const provider = "OpenAI";
 // USD per run shown on the button before the click and charged after it: read from next-admin's cost SSOT
 // (lib/ai/cost-model.ts TOOL_RATES, Node type stripping), never copied here.
-const { TOOL_RATES, OPENAI_VIDEO_RATES, VIDEO_MOTION_RATES } = require(require("node:path").join(require("./appearance.cjs").resolveSource(require("node:path").join(__dirname, ".."), process.env), "lib/ai/cost-model.ts"));
+const { TOOL_RATES, VIDEO_MOTION_RATES } = require(require("node:path").join(require("./appearance.cjs").resolveSource(require("node:path").join(__dirname, ".."), process.env), "lib/ai/cost-model.ts"));
 const replicateVideo = require("./replicate-video.cjs");
 const toolCosts = Object.freeze({ removeBackground: TOOL_RATES["bg-remove"].usd });
-const models = (env) => ({ image: vwEnv(env, "IMAGE_MODEL") || "gpt-image-2.5-flare", video: vwEnv(env, "VIDEO_MODEL") || "sora-2", audio: vwEnv(env, "TTS_MODEL") || "gpt-4o-mini-tts" });
-// Video models a job can pick (card RV): the server's OpenAI model (first, the default) plus next-admin's Replicate
-// models (lib/ai/video-motion-models.ts). usdPerSec is the price shown on the button and charged after the run.
+// Default video model: needs no reference image, lowest price (price audit 2026-11-10). VW_VIDEO_MODEL may name another
+// next-admin motion id; anything else is ignored.
+const DEFAULT_VIDEO_MODEL = "veo-3-1-fast";
+const models = (env) => ({ image: vwEnv(env, "IMAGE_MODEL") || "gpt-image-2.5-flare", video: replicateVideo.isModel(vwEnv(env, "VIDEO_MODEL")) ? vwEnv(env, "VIDEO_MODEL") : DEFAULT_VIDEO_MODEL, audio: vwEnv(env, "TTS_MODEL") || "gpt-4o-mini-tts" });
+// Video models the vendor shut down (OpenAI GET /v1/models/sora-2: shutdown_date 2026-09-24). A saved setting or an
+// old job naming one runs the default; the page says so once (shared/models.js replaceRetired).
+const RETIRED_VIDEO_MODELS = Object.freeze({ "sora-2": "Sora 2", "sora-2-pro": "Sora 2 Pro" });
+// Video models a job can pick (card RV): next-admin's Replicate models (lib/ai/video-motion-models.ts), the default
+// first. usdPerSec is the price shown on the button and charged after the run.
 function videoModels(env) {
-  const sora = models(env).video;
-  return [
-    { id: sora, label: OPENAI_VIDEO_RATES[sora]?.label || sora, vendor: "OpenAI", provider: "OpenAI", model: sora, durations: [4, 8, 12], defaultDurationSec: 8, ratios: ["16:9", "9:16"], requiresImage: false, usdPerSec: OPENAI_VIDEO_RATES[sora]?.usdPerSec ?? null, available: !!env.OPENAI_API_KEY },
-    ...Object.entries(replicateVideo.MOTION_MODELS).map(([id, m]) => ({
-      id, label: VIDEO_MOTION_RATES[id].label, vendor: VIDEO_MOTION_RATES[id].vendor, provider: "Replicate", model: m.slug,
-      durations: [...m.durations], defaultDurationSec: m.defaultDurationSec, ratios: [...m.ratios], requiresImage: m.requiresImage, usdPerSec: VIDEO_MOTION_RATES[id].usdPerSec, available: !!env.REPLICATE_API_TOKEN,
-    })),
-  ];
+  const first = models(env).video;
+  return Object.entries(replicateVideo.MOTION_MODELS).sort(([a], [b]) => (b === first) - (a === first)).map(([id, m]) => ({
+    id, label: VIDEO_MOTION_RATES[id].label, vendor: VIDEO_MOTION_RATES[id].vendor, provider: "Replicate", model: m.slug,
+    durations: [...m.durations], defaultDurationSec: m.defaultDurationSec, ratios: [...m.ratios], requiresImage: m.requiresImage, usdPerSec: VIDEO_MOTION_RATES[id].usdPerSec, available: !!env.REPLICATE_API_TOKEN,
+  }));
 }
-// The model a video job runs. Only a Replicate id picks Replicate; anything else (sora-2, an old project's
-// "VideoWorkbench V3", no value) runs the server's OpenAI model exactly as before card RV.
+// The model a video job runs: a known id, else the default (sora-2, an old project's "VideoWorkbench V3", no value).
 function videoModelOf(input, env) {
   const list = videoModels(env), id = input?.settings?.model ?? input?.model;
-  return (replicateVideo.isModel(id) && list.find((m) => m.id === id)) || list[0];
+  return list.find((m) => m.id === id) || list[0];
 }
 function capabilities(env, localTools) {
   return {
     image: !!env.OPENAI_API_KEY, text: !!env.OPENAI_API_KEY,
-    audio: !!env.OPENAI_API_KEY, video: !!env.OPENAI_API_KEY || !!env.REPLICATE_API_TOKEN,
+    audio: !!env.OPENAI_API_KEY, video: !!env.REPLICATE_API_TOKEN,
     provider,
     models: models(env),
-    videoModels: videoModels(env),
-    // Top-level video limits = the default (OpenAI) model; per-model limits are in videoModels.
-    videoDurations: [4, 8, 12], videoRatios: ["16:9", "9:16"], videoQualities: ["720p"],
+    videoModels: videoModels(env), retiredVideoModels: RETIRED_VIDEO_MODELS,
+    // Top-level video limits = the default model; per-model limits are in videoModels.
+    videoDurations: videoModels(env)[0].durations, videoRatios: videoModels(env)[0].ratios, videoQualities: ["720p"],
     maxVideoImages: 1, maxImageReferences: 4, multiModalReferences: false,
     imageQualities: Object.keys(imageOutputs), imageOutputs, imageExactOutput: true,
     removeBackground: !!env.REPLICATE_API_TOKEN, toolCosts,
@@ -58,8 +60,7 @@ function validate(input, type, env = process.env) {
   if (refs.some((r) => /^(audio|video)\//.test(r?.type || "") || ["audio", "video"].includes(r?.kind))) throw Error("目前影片服務僅支援圖片參考，影片／音訊參考需要專用服務。");
   if (refs.length > 1) throw Error("目前影片服務僅支援單張參考圖，請移除其他圖片。");
   const vm = videoModelOf(input, env), seconds = Number(input.duration || settings.duration || 8), ratio = settings.ratio || input.ratio || "16:9";
-  if (!vm.durations.includes(seconds))
-    throw Error(vm.provider === "OpenAI" ? "目前 Sora 支援 4、8、12 秒；請調整影片長度後送出。" : vm.label + " 支援 " + vm.durations.join("、") + " 秒；請調整影片長度後送出。");
+  if (!vm.durations.includes(seconds)) throw Error(vm.label + " 支援 " + vm.durations.join("、") + " 秒；請調整影片長度後送出。");
   if (!vm.ratios.includes(ratio)) throw Error("目前影片服務支援 16:9 或 9:16");
   if (vm.requiresImage && !refs.length) throw Error(vm.label + " 需要一張參考圖當第一格畫面；請先加入圖片。");
   if (settings.quality && settings.quality !== "720p") throw Error("目前影片服務只支援 720p");
@@ -76,4 +77,4 @@ function imageDimensions(settings) {
   const dimensions = imageOutputs[settings.quality]?.[settings.ratio];
   if (settings.imageLayout !== 'center-crop' || !Array.isArray(dimensions)) throw Error('圖片輸出設定無效'); return dimensions;
 }
-module.exports = { provider, models, videoModels, videoModelOf, toolCosts, capabilities, validate, imageOutputs, imageDimensions };
+module.exports = { provider, models, videoModels, RETIRED_VIDEO_MODELS, videoModelOf, toolCosts, capabilities, validate, imageOutputs, imageDimensions };

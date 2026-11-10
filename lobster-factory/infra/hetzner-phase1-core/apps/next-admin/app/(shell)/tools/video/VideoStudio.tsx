@@ -31,7 +31,7 @@ const VIDEO_STYLE_GROUPS = Array.from(new Set(VIDEO_STYLE_CATALOG.map((s) => s.g
 const IMAGE_VENDOR_GROUPS: Record<string, string[]> = {
   "FLUX":      ["flux-schnell", "flux-dev", "flux-kontext-dev", "flux-kontext-pro", "flux-2-max"],
   "Ideogram":  ["ideogram-v2a-turbo", "ideogram-v3-balanced", "ideogram-v4-turbo", "ideogram-v4-quality", "ideogram-character"],
-  "Google":    ["nano-banana-2", "nano-banana-pro", "imagen-4"],
+  "Google":    ["nano-banana-2", "nano-banana-pro"],
   "OpenAI":    ["openai-low", "openai-medium", "openai-high"],
 };
 function vendorForModel(model: string): string {

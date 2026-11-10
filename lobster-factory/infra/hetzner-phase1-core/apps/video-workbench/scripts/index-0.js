@@ -29,12 +29,13 @@ const placeholders = {
   spoken: "輸入要朗讀的台詞，輸出 AI 配音音檔……",
   image: "描述你想生成的圖片：主題、風格、構圖與光線……",
 };
+// Video modes start empty = the server's default video model (VideoWorkbenchVideoModels.get) until /capabilities answers.
 const model = {
-  director: "sora-2",
-  reference: "sora-2",
+  director: "",
+  reference: "",
   reshoot: "尚未設定",
-  cartoon: "sora-2",
-  product: "sora-2",
+  cartoon: "",
+  product: "",
   spoken: "gpt-4o-mini-tts",
   image: "gpt-image-2.5-flare",
 };
@@ -756,9 +757,9 @@ document.addEventListener("click", (e) => {
       }
     }
     if (a === "director-confirm-length") {
-      const length = Number($("directorCustomLength")?.value);
-      if (![4, 8, 12].includes(length)) {
-        VideoWorkbench.reportError(Error("目前影片支援 4、8、12 秒"));
+      const length = Number($("directorCustomLength")?.value), durations = generatorVideoModel("director").durations;
+      if (!durations.includes(length)) {
+        VideoWorkbench.reportError(Error("目前影片支援 " + durations.join("、") + " 秒"));
         return;
       }
       state.directorLength = length;

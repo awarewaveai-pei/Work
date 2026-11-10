@@ -12,7 +12,8 @@ const DEFAULT_TIMEOUT_MS = 55_000; // route maxDuration is 60s — leave headroo
 const MAX_OUTPUT_BYTES = 20 * 1024 * 1024;
 
 export type ReplicateImageResult =
-  | { ok: true; image: string } // data URL of the output image
+  /** image = data URL of the output; predictSec = Replicate metrics.predict_time (run-time-billed models charge by it). */
+  | { ok: true; image: string; predictSec?: number }
   | { ok: false; error: string };
 
 export interface ReplicateRun {
@@ -29,6 +30,7 @@ interface PredictionResponse {
   status: "starting" | "processing" | "succeeded" | "failed" | "canceled";
   output?: string | string[];
   error?: string | null;
+  metrics?: { predict_time?: number };
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -84,7 +86,8 @@ export async function runReplicate(grant: Grant, run: ReplicateRun): Promise<Rep
     const out = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
     if (!out) return { ok: false, error: "no_output" };
     // Replicate proxies outputs through replicate.delivery; sync mode may return a data URI.
-    if (out.startsWith("data:image/")) return { ok: true, image: out };
+    const predictSec = prediction.metrics?.predict_time;
+    if (out.startsWith("data:image/")) return { ok: true, image: out, predictSec };
     if (!/^https:\/\/replicate\.delivery\//.test(out)) return { ok: false, error: "output_url_not_allowed" };
     try {
       const dl = await fetch(out, { signal: controller.signal });
@@ -93,7 +96,7 @@ export async function runReplicate(grant: Grant, run: ReplicateRun): Promise<Rep
       if (ab.byteLength > MAX_OUTPUT_BYTES) return { ok: false, error: "output_too_large" };
       const type = dl.headers.get("content-type");
       const mime = type?.startsWith("image/") ? type : "image/png";
-      return { ok: true, image: `data:${mime};base64,${Buffer.from(ab).toString("base64")}` };
+      return { ok: true, image: `data:${mime};base64,${Buffer.from(ab).toString("base64")}`, predictSec };
     } catch {
       return { ok: false, error: timedOut("fetch_output_network_error") };
     }

@@ -6,7 +6,7 @@
 // (job.vendorTaskId); api.cjs passes an earlier unfinished task for the same image + method + options as resumeId.
 const fs = require("node:fs"),
   path = require("node:path");
-const { TOOL_RATES } = require(path.join(require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env), "lib/ai/cost-model.ts"));
+const { TOOL_RATES, replicateRunUsd } = require(path.join(require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env), "lib/ai/cost-model.ts"));
 const sf3dLocal = require("./sf3d-local.cjs"),
   meshy = require("./meshy.cjs"),
   { cancelPrediction } = require("./bg-remove.cjs");
@@ -141,11 +141,11 @@ async function trellis({ file, mime, env, fetchImpl, signal, resumeId, beforeCal
     const url = prediction.output?.model_file;
     // Only Replicate's delivery host, https only: the url comes from a provider reply (same rule as bg-remove.cjs).
     if (typeof url !== "string" || !/^https:\/\/replicate\.delivery\//.test(url)) throw Error("TRELLIS 結果網址不在允許範圍");
-    // Billed per second of predict_time (Replicate metrics); without it the estimate stands (usdOf).
-    const seconds = Number(prediction.metrics?.predict_time), perSec = TOOL_RATES["3d-trellis"].usdPerSec;
+    // Billed per second of predict_time (cost-model.ts replicateRunUsd); without it the estimate stands (usdOf).
+    const seconds = Number(prediction.metrics?.predict_time);
     return {
       buffer: await download(url),
-      origin: { provider: "Replicate", model: TRELLIS.model + ":" + TRELLIS.version.slice(0, 12), taskId: prediction.id, ...(seconds > 0 && perSec ? { costUsd: Math.round(seconds * perSec * 1e6) / 1e6, runSeconds: seconds } : {}) },
+      origin: { provider: "Replicate", model: TRELLIS.model + ":" + TRELLIS.version.slice(0, 12), taskId: prediction.id, ...(seconds > 0 ? { costUsd: replicateRunUsd("3d-trellis", seconds), runSeconds: seconds } : {}) },
     };
   };
   let p = null;

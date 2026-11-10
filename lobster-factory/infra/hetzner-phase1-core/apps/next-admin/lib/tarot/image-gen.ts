@@ -5,7 +5,6 @@
 //                       openai-26-edit → gpt-image-2.6-sunburst (config.openaiModel; the only model that takes `mask`)
 //   ideogram-*        → Ideogram via Replicate (v2a-turbo/v3-balanced/v4-turbo/v4-quality/character)
 //   nano-banana-2/pro → Google Gemini Image via Replicate
-//   imagen-4          → Google Imagen 4 via Replicate
 //   flux-2-max        → BFL Flux.2 Max via Replicate
 // Returns uniform `data:image/png;base64,...` so the client treats all models the same.
 // Prompts arrive in English: the studio translates non-English subject/style once per deck (lib/tarot/translate.ts), never here.
@@ -17,6 +16,7 @@ import { providerUrl } from "@/lib/ai/gateway";
 import type { Grant } from "@/lib/entitlements/can";
 import { holdCost, logImageResult } from "@/lib/ai/log-ai-call";
 import { imageCostUsd } from "@/lib/ai/cost-calculator";
+import { IMAGE_MODELS, imageRunUsd } from "../../public/editor-shared/image-models.js";
 import { OPENAI_IMAGE_MODEL, OPENAI_IMAGE_TOKEN_RATES } from "@/lib/ai/cost-model";
 
 const GEN_TIMEOUT_MS = 58_000; // default; a model sets ModelConfig.timeoutMs when its route allows more (app nginx proxy_read_timeout is 300s)
@@ -47,7 +47,6 @@ export type TarotModel =
   | "ideogram-character"
   | "nano-banana-2"
   | "nano-banana-pro"
-  | "imagen-4"
   | "flux-2-max";
 
 /** Canonical aspect ratio options. "2:3" is the traditional tarot portrait format. */
@@ -95,18 +94,6 @@ const IDEOGRAM_V4_RES: Record<AspectRatio, string> = {
   "4:3": "2048x1536",
   "3:4": "1536x2048",
   "16:9": "2560x1440",
-};
-
-// Imagen 4 natively exposes [1:1|9:16|16:9|3:4|4:3] — unsupported ones map to nearest.
-const IMAGEN4_AR: Record<AspectRatio, string> = {
-  "2:3": "3:4", // nearest portrait
-  "3:2": "4:3", // nearest landscape
-  "4:5": "3:4", // nearest portrait
-  "1:1": "1:1",
-  "9:16": "9:16",
-  "4:3": "4:3", // native
-  "3:4": "3:4", // native
-  "16:9": "16:9", // native
 };
 
 export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
@@ -221,7 +208,7 @@ export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
     },
   },
   // ── Google models via Replicate (no seed param on any of them) ────────────
-  // The two cheap whole-image editors (2026-11-09). klein: `images` + output_megapixels "1" holds the $0.001 price;
+  // The two cheap whole-image editors (2026-11-09). klein: `images` + output_megapixels "1" (billed per MP in and out, image-models.js);
   // kontext-fast (Pruna's distilled FLUX Kontext): `img_cond_path` is the image, and aspect_ratio defaults to the input's.
   "flux-2-klein-4b": {
     provider: "replicate",
@@ -279,17 +266,6 @@ export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
       }
       return input;
     },
-  },
-  "imagen-4": {
-    provider: "replicate",
-    slug: "google/imagen-4",
-    supportsImg2img: false,
-    buildInput: ({ prompt, aspectRatio }) => ({
-      prompt,
-      aspect_ratio: IMAGEN4_AR[aspectRatio], // only 5 native ratios
-      image_size: "2K",
-      output_format: "png",
-    }),
   },
   // ── BFL Flux.2 Max via Replicate ──────────────────────────────────────────
   // Live schema has a native aspect_ratio enum covering all five ratios — simpler than w×h.
@@ -694,14 +670,37 @@ function openaiImageCostUsd(u: OpenAiImageUsage | undefined): number | undefined
 /** Shared by tarot, studio, content and video: the caller asks for its own product's feature (e.g. grantFor("studio.image")). */
 export async function generateTarotImage(params: TarotGenParams, grant: Grant): Promise<TarotGenResult> {
   // Credits are held at the per-image price before the provider runs (Grant.hold); the settle uses the reported cost.
-  const hold = await holdCost(grant, imageCostUsd(params.model));
+  // A per-megapixel row (image-models.js imageRunUsd) is held for its real references + the 1 MP it asks for, and charged
+  // for the output it actually returned.
+  const mpRow = IMAGE_MODELS.find((m) => m.value === params.model && ("usdPerInputMp" in m || "usdPerOutputMp" in m));
+  // Only references the model is sent count (a text-only model ignores them).
+  const inputMp = mpRow && TAROT_MODELS[params.model]?.supportsImg2img ? await megapixels(params.referenceImages ?? []) : 0;
+  const hold = await holdCost(grant, mpRow ? imageRunUsd(mpRow, { inputMp, outputMp: 1 }) : imageCostUsd(params.model));
   if (!hold) return { ok: false, error: "no_credits" };
   const result = await runGeneration(params, grant);
+  if (mpRow && result.costUsd === undefined && (result.ok || ("billed" in result && result.billed)))
+    result.costUsd = imageRunUsd(mpRow, { inputMp, outputMp: result.ok ? await megapixels([result.image]) : 1 });
   // The one place an image's cost is logged: only here are all of its facts known -- whether the provider charged
   // (ok, or billed after a failed download), the model that ran, and the account the grant bills. Callers pass costLog.
   logImageResult(result, { route: params.costLog?.route ?? "tarot/image-gen", model: params.model, tool: params.costLog?.tool ?? "image",
     jobId: params.costLog?.jobId ?? null, grant, hold });
   return result;
+}
+
+/** Megapixels of images together, read from data-URL headers (sharp); one it cannot read (an https URL, a broken
+ *  header) counts as 1 MP, the size the per-megapixel rows are estimated at. */
+async function megapixels(images: readonly string[]): Promise<number> {
+  let mp = 0;
+  for (const url of images) {
+    const m = /^data:image\/[a-z+.-]+;base64,(.+)$/i.exec(url);
+    let size = 1;
+    try {
+      const { width, height } = m ? await sharp(Buffer.from(m[1], "base64")).metadata() : { width: 0, height: 0 };
+      if (width && height) size = (width * height) / 1_000_000;
+    } catch { /* stays 1 */ }
+    mp += size;
+  }
+  return mp;
 }
 
 async function runGeneration(params: TarotGenParams, grant: Grant): Promise<TarotGenResult> {

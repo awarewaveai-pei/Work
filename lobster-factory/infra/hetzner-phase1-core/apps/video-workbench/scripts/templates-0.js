@@ -35,7 +35,7 @@ const cats = [
   "最多讚",
 ];
 // The model actually called (backend/generation-policy.cjs via /capabilities, loaded in templates-boot.js).
-const videoModel = () => VideoWorkbench.capabilities?.models?.video || "sora-2";
+const videoModel = () => VideoWorkbenchVideoModels.get(VideoWorkbench.capabilities).id;
 // Third-party sample templates (their thumbnails are seedstar reference material): staff only, see backend/reference.cjs.
 const seedPresets = [
   {

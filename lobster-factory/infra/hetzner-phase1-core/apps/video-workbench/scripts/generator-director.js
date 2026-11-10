@@ -64,11 +64,13 @@ function directorInput() {
     '<div class="director-input-actions"><span class="small-note">素材可先上傳或從素材庫引用</span><button class="box-cta" data-action="director-start" ' + (!state.data.director.trim() ? 'disabled' : '') + '>開始對話生成　→</button></div>';
   return h;
 }
+// Lengths = the director's video model (generatorVideoModel), so a script is never paid for a length the model refuses.
 function directorLength() {
+  const durations = generatorVideoModel("director").durations;
   return (
-    '<div class="director-chat"><div class="director-chat-card"><h3>這部影片預計製作多長？</h3><p>目前影片服務支援 4、8、12 秒。已選擇 ' +
+    '<div class="director-chat"><div class="director-chat-card"><h3>這部影片預計製作多長？</h3><p>目前影片服務支援 ' + durations.join("、") + ' 秒。已選擇 ' +
     state.directorLength +
-    ' 秒。</p><div class="director-choice-row"><button data-action="director-length" data-value="4">4 秒</button><button data-action="director-length" data-value="8">8 秒</button><button data-action="director-length" data-value="12">12 秒</button></div>' +
+    ' 秒。</p><div class="director-choice-row">' + durations.map((d) => '<button data-action="director-length" data-value="' + d + '">' + d + ' 秒</button>').join("") + '</div>' +
     (state.directorCustomLength
       ? '<div class="director-custom-row"><input class="field" id="directorCustomLength" type="number" min="5" max="180" value="' +
         state.directorCustomLength +

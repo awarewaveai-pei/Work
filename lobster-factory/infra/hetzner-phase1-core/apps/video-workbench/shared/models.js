@@ -82,13 +82,22 @@
   const list = (caps) =>
     Array.isArray(caps?.videoModels) && caps.videoModels.length
       ? caps.videoModels
-      : [{ id: caps?.models?.video || "sora-2", label: caps?.models?.video || "sora-2", provider: "OpenAI", durations: caps?.videoDurations || [4, 8, 12], ratios: caps?.videoRatios || ["16:9", "9:16"], requiresImage: false, usdPerSec: null, defaultDurationSec: 8, available: caps?.video !== false }];
-  // Unknown or old values (sora-2 on a server whose default is another OpenAI model) = the default, like the server.
+      : [{ id: caps?.models?.video || "", label: caps?.models?.video || "影片模型", provider: "", durations: caps?.videoDurations || [4, 6, 8], ratios: caps?.videoRatios || ["16:9", "9:16"], requiresImage: false, usdPerSec: null, defaultDurationSec: 8, available: caps?.video !== false }];
+  // Unknown or old values (a shut-down sora-2, no value) = the default, like the server (generation-policy videoModelOf).
   const get = (caps, id) => list(caps).find((m) => m.id === id) || list(caps)[0];
+  // A saved setting naming a model the vendor shut down (capabilities.retiredVideoModels) is moved to the default;
+  // returns the one sentence the page shows, or null when nothing changed.
+  const replaceRetired = (caps, settings) => {
+    const name = settings && caps?.retiredVideoModels?.[settings.model];
+    if (!name) return null;
+    const next = get(caps);
+    settings.model = next.id;
+    return name + " 已停止服務，已改用 " + next.label;
+  };
   const usd = (m, seconds, count = 1) => (Number.isFinite(m?.usdPerSec) ? m.usdPerSec * seconds * count : null);
   const priceText = (m, seconds, count = 1) => {
     const v = usd(m, seconds, count);
     return v === null ? "依實際用量" : "US$" + v.toFixed(2);
   };
-  window.VideoWorkbenchVideoModels = { list, get, usd, priceText };
+  window.VideoWorkbenchVideoModels = { list, get, usd, priceText, replaceRetired };
 })();

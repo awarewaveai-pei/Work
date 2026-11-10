@@ -112,7 +112,8 @@ for (const [f, text] of Object.entries(src))
     // The shown numbers are next-admin's rates (not a copy): spot checks against cost-model.ts.
     const rates = require(path.join(require("../backend/appearance.cjs").resolveSource(root, process.env), "lib/ai/cost-model.ts"));
     assert.equal(caps.prices["video.transcribe"].usd, rates.TRANSCRIBE_RATES["whisper-1"].usdPerMin);
-    assert.equal(caps.prices["video.tts"].usd, rates.OPENAI_TTS_RATES[caps.models.audio].usdPerMChars / 1000);
+    const tts = rates.OPENAI_TTS_RATES[caps.models.audio]; // token-billed default: per minute of audio out, marked 約
+    assert.deepEqual(caps.prices["video.tts"], { usd: 60 * tts.audioTokensPerSec * tts.audioOutPerM / 1e6, unit: "分鐘", estimate: true });
     assert.equal(caps.prices["video.image"].usd, rates.IMAGE_RATES["openai-high"].usd);
     assert.match(window.VideoWorkbenchPrices.text("video.transcribe video.script", caps), /^US\$[\d.]+／分鐘 \+ 約 US\$[\d.]+／次$/);
   } finally {

@@ -79,11 +79,16 @@ function loadState() {
         ...state,
         ...s,
       };
-    // 舊版新專案預設寫入不存在的「VideoWorkbench V3」；實際預設影片模型是 sora-2（index-0.js model.director）。
-    for (const p of state.projects) if (p?.settings?.model === "VideoWorkbench V3") p.settings.model = "sora-2";
   } catch {}
 }
 loadState();
+// An opened project whose saved video model was shut down (Sora 2) moves to the default and says so once.
+function replaceRetiredModel() {
+  const note = VideoWorkbenchVideoModels.replaceRetired(VideoWorkbench.capabilities, project()?.settings);
+  if (!note) return;
+  save();
+  notify(note);
+}
 document.addEventListener("vw:changed", () => {
   let s = null;
   try {
@@ -502,7 +507,7 @@ function createProject() {
         ? [makeEpisode(1, title), makeEpisode(2)]
         : [makeEpisode(1, title)],
     settings: {
-      model: "sora-2",
+      model: VideoWorkbenchVideoModels.get(VideoWorkbench.capabilities).id,
       lockModel: true,
       videoPrompt: "",
     },
@@ -612,6 +617,7 @@ async function action(a, button) {
       state.episode = 0;
       save();
       render();
+      replaceRetiredModel();
       break;
     case "backHome":
       state.current = null;
@@ -1045,3 +1051,4 @@ document.addEventListener("change", (e) => {
   }
 });
 render();
+replaceRetiredModel();

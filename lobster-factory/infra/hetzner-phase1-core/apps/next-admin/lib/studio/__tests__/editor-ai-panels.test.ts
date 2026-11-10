@@ -344,7 +344,8 @@ describe("ai-edit：AI 修圖", () => {
     expect(sentBody()).toEqual({ model: "nano-banana-2", prompt: "把背景換成海邊", referenceImages: [CANVAS_PNG], aspectRatio: "16:9" });
     expect(ctx.replaceImage).not.toHaveBeenCalled();
     expect((ctx.placeImage.mock.calls[0] as unknown[]).slice(1)).toEqual(["AI 修圖.png", { at: [0, 0] }]); // source's top-left
-    expect(q(body, "[data-ae-msg]").textContent).toContain("NT$2.1"); // 0.067 × 32
+    const { IMAGE_MODELS, nt } = await loadModule("public/editor-shared/image-models.js");
+    expect(q(body, "[data-ae-msg]").textContent).toContain("NT$" + nt(IMAGE_MODELS.find((m: { value: string }) => m.value === "nano-banana-2").usd)); // the catalog price
   });
   it("API 失敗 → 顯示錯誤、不置入、解除忙碌", async () => {
     fetchMock.mockImplementation(async () => ({ status: 200, json: async () => ({ ok: false, error: "點數不足" }) }));

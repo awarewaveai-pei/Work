@@ -358,7 +358,7 @@ export const TTS_MODEL_COMPARISONS: readonly TtsModelComparison[] = [
     surface: "OpenAI API",
     bestFor: "高品質英文旁白、品牌語音、需要自訂指令的語氣控制",
     costPer1kCharsUsd: 0.015,
-    costNote: "TTS-1 $15/1M chars；HD $30/1M；gpt-4o-mini-tts ~$15/1M；1k字 = NT$0.48",
+    costNote: "TTS-1 $15/1M chars；HD $30/1M；gpt-4o-mini-tts 依 token 計，約 $0.0144/分鐘音訊（$12/1M 音訊 token × 每秒 20 token）＋文字 $0.6/1M token",
     languages: "57 語言；繁中表現普通",
     voiceCount: "6 基礎音色（Alloy/Echo/Nova/Shimmer…）",
     cloning: false,

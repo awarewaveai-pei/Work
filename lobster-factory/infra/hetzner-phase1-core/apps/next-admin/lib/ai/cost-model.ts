@@ -94,6 +94,8 @@ export const FALLBACK_TEXT_MODEL = "claude-opus-5-5";
 export const IMAGE_RATES: Record<string, { usd: number; label: string; vendor: string }> = {
   "pexels-video":        { usd: 0,     label: "Pexels 真實影片 $0", vendor: "Pexels (免費)" },
   "pexels-all":          { usd: 0,     label: "Pexels 免費照片 $0", vendor: "Pexels (免費)" },
+  // Left the catalog 2026-11-10 (Google discontinued Imagen 4; Replicate's page 404s, no official price): kept so old cost rows read.
+  "imagen-4":            { usd: 0.04,  label: "Imagen 4（已下架）", vendor: "Google/Replicate" },
   ...Object.fromEntries([...IMAGE_MODELS, ...EDIT_TOOLS].map((m) => [m.value, { usd: m.usd, label: m.label, vendor: m.vendor }])),
 };
 
@@ -134,7 +136,7 @@ export const MEDIA_MODELS: Record<string, MediaModel> = {
   "ideogram-ai/ideogram-4-5-precise-edit": { vendor: "Replicate", kind: "tool", status: "active", version: "64d91a9b8a91a4e41d10fde3aa54ea4f68e7c5213d417139935178a5f4672c85" },
   "google/nano-banana-2":              { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
   "google/nano-banana-pro":            { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
-  "google/imagen-4":                   { vendor: "Replicate", kind: "image", status: "active", verifiedAt: "2026-10-28" },
+  "google/imagen-4":                   { vendor: "Replicate", kind: "image", status: "retired" },
   "gpt-image-2":                       { vendor: "OpenAI", kind: "image", status: "active", verifiedAt: "2026-10-28" },
   // Same published token rates as gpt-image-2 (OPENAI_IMAGE_TOKEN_RATES); verified by 3 edits via Replicate 2026-11-01.
   "gpt-image-2.5-sunburst":            { vendor: "OpenAI", kind: "image", status: "active", verifiedAt: "2026-11-01" },
@@ -189,9 +191,9 @@ export const TRANSCRIBE_RATES: Record<"whisper-1", { usdPerMin: number; label: s
   "whisper-1": { usdPerMin: 0.006, label: "OpenAI Whisper", vendor: "OpenAI" },
 };
 
-// usdPerSec: billed per second of the vendor's reported run time; usd is then the estimate shown before the run.
+// usdPerSec: billed per second of the vendor's reported run time (replicateRunUsd); usd is then the estimate shown before the run.
 export const TOOL_RATES: Record<string, { usd: number; label: string; vendor: string; estimate: boolean; usdPerSec?: number }> = {
-  "bg-remove":   { usd: 0.002, label: "去背 (851-labs)", vendor: "Replicate", estimate: true },
+  "bg-remove":   { usd: 0.00044, label: "去背 (851-labs, Replicate 按秒計)", vendor: "Replicate", estimate: true, usdPerSec: 0.000225 }, // replicate.com/851-labs/background-remover 2026-11-10: T4 $0.000225/s, ~$0.00044/run
   "upscale":     { usd: 0.002, label: "升頻 (real-esrgan, 每 pass)", vendor: "Replicate", estimate: true },
   "inpaint":     { usd: IMAGE_RATES["bria-eraser"].usd, label: "去物件 (bria/eraser)", vendor: "Replicate", estimate: false },
   // video-workbench image-to-3D (creative-suite-plan §0 2026-11-03; Meshy disabled). Prices: docs.stability.ai/pricing, replicate.com/firtoz/trellis.
@@ -202,6 +204,16 @@ export const TOOL_RATES: Record<string, { usd: number; label: string; vendor: st
   // and that is pass-through to the customer, not an app operating cost.
   "printful-mockup": { usd: 0, label: "Printful mockup", vendor: "Printful", estimate: false },
 };
+
+/** USD of one Replicate run billed per GPU second (a TOOL_RATES row with usdPerSec): predict_time (the prediction's
+ *  metrics.predict_time) x usdPerSec. No run time reported = the row's estimate. The one function for every run-time-billed
+ *  Replicate model (next-admin and video-workbench). */
+export function replicateRunUsd(key: string, predictTimeSec: unknown): number {
+  const rate = TOOL_RATES[key];
+  if (!rate?.usdPerSec) throw new Error("not a run-time-billed tool: " + key);
+  const seconds = Number(predictTimeSec);
+  return seconds > 0 ? Math.round(seconds * rate.usdPerSec * 1e6) / 1e6 : rate.usd;
+}
 
 /**
  * Typical token usage per text feature — used by the slider estimator when NO real logged data
@@ -277,15 +289,13 @@ export const OPENAI_IMAGE_TOKEN_RATES = { textInPerM: 5, imageInPerM: 8, imageOu
  *  no price: callers that charge by these rates refuse it rather than guess from its name. */
 export const OPENAI_TOKEN_PRICED_IMAGE_MODELS: readonly string[] = ["gpt-image-2", "gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2.6-sunburst", "gpt-image-2.6-flare"];
 
-/** OpenAI video (video-workbench /videos), USD per output second at 720p (openai.com/api/pricing). */
-export const OPENAI_VIDEO_RATES: Record<string, { usdPerSec: number; label: string }> = {
-  "sora-2": { usdPerSec: 0.1, label: "Sora 2 (720p)" },
-  "sora-2-pro": { usdPerSec: 0.3, label: "Sora 2 Pro (720p)" },
-};
-
-/** OpenAI speech (video-workbench /audio/speech), USD per 1M input characters; binary response carries no usage. */
-export const OPENAI_TTS_RATES: Record<string, { usdPerMChars: number; label: string }> = {
-  "gpt-4o-mini-tts": { usdPerMChars: 15, label: "gpt-4o-mini-tts (~$15/1M chars, model-comparison.ts)" },
+/** OpenAI speech (video-workbench /audio/speech), developers.openai.com/api/docs/pricing 2026-11-10. tts-1 rows: USD per 1M
+ *  input characters. gpt-4o-mini-tts is token-billed (text in $0.60, audio out $12 per 1M tokens) and /audio/speech answers
+ *  with audio bytes only, no usage: its cost is estimated by the published rules -- audio out = 1 token per 50 ms
+ *  (developers.openai.com/api/docs/guides/realtime-costs, assistant audio) and text in <= 1 token per character. */
+export type TtsRate = { label: string; usdPerMChars: number } | { label: string; textInPerM: number; audioOutPerM: number; audioTokensPerSec: number };
+export const OPENAI_TTS_RATES: Record<string, TtsRate> = {
+  "gpt-4o-mini-tts": { textInPerM: 0.6, audioOutPerM: 12, audioTokensPerSec: 20, label: "gpt-4o-mini-tts" },
   "tts-1": { usdPerMChars: 15, label: "TTS-1" },
   "tts-1-hd": { usdPerMChars: 30, label: "TTS-1 HD" },
 };
