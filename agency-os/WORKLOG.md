@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-10（續31）【資安】讀 AWARE_WAVE_CREDENTIALS.md 時三個值進入對話紀錄（監工 session）
+
+- 經過：查 Gemini 金鑰所屬專案時，以 Python 印「命中行＋後 28 行」並套長字串遮蔽；遮蔽漏掉 Serper.dev 登入密碼、Replicate webhook `whsec_…`、Airtable PAT 前半段（§8.1／8.2 表格）。
+- 根因：同 2026-10-16（續30）——對機密檔印範圍、靠正則遮蔽；值的格式不一（含 `+`、`/`、短密碼），長度規則必漏。記憶 `feedback_never_print_secret_file_ranges` 已有規則，本次違反。
+- 處置：已告知操作者並建議輪換三項（Serper 改密碼、Replicate 重產 webhook signing secret、Airtable 撤銷重建 PAT），由她決定；記憶規則補「只抽單一具名非機密欄位、不印整行」。
+- 避免再發生：機密檔只用「擷取單一欄位」的正則（例：擁有者 email、專案名），不輸出整行或範圍。
+- REALTEST_WAIVED: NA -- 事件紀錄，無程式改動
+- REVIEW_WAIVED: NA -- 事件紀錄
+- BUGHUNT_WAIVED: NA -- 事件紀錄
 ## 2026-11-10（續30）影音工作台：沒有 Gemini 付費金鑰時配音退到 OpenAI、Gemini 標未啟用（續29 的補強）
 
 - 根因：存過的選擇若是沒金鑰的列仍被選中（`scripts/tools-workflows.js` wfProviderCurrent、`scripts/index-0.js` spokenSpeechModel 各自判斷），送出 503；`VW_TTS_MODEL` 指到沒金鑰的列時預設不退；compose 讓工作台吃到 next-admin 的免費層 `GEMINI_API_KEY`。
