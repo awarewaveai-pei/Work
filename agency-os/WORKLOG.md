@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-10（續48）影音工作台：瀏覽器保留素材副本，同一份素材第二次不經網路
+
+- 根因：瀏覽器拿素材位元組只走工作台伺服器 `/media/<sha256>/<檔名>`、`/generated/<uuid>.<副檔名>`（`VW/server.cjs` 靜態段，`Cache-Control: no-store`），R2 正本從不直接給瀏覽器（`objectUrl` 只存在伺服器端 `VW/backend/main-system.cjs:180`）。台灣到歐洲每次約 300ms，同一支影片每次開都重抓。
+- 做了（`VW`＝`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`）：
+  - `VW/shared/media-cache.js`（新）核心：key＝不變身分（`media/<sha256>/<名>` 內容雜湊、`generated/<uuid>` 一次寫入），網址的主機、query（簽名）、hash 全忽略；條目 id＝身分範圍＋key；任何儲存錯誤／副本不見／讀不到 → 退回網路；Range 由副本切 206；Range 未命中先走網路、背景抓一次完整檔；上限 min(2GB, 配額一半)、單檔 ≤ 1/4，LRU 淘汰。
+  - `VW/scripts/media-cache-sw.js`（新）Service Worker（IndexedDB）：只攔同源 GET 的上述兩種路徑，其餘請求（頁面、API、引擎、next-admin）不碰。工作台頁面導覽時並行問 `GET /api/vw/identity`，素材讀取等它；換身分刪其他身分的副本；任何 /login、/logout 請求（含客戶端路由的 fetch）或素材回 401 → 全刪；身分確認超過 60 秒，下一次讀取先重問。
+  - `VW/backend/api.cjs` `/identity`：sha256(userId＋orgId) 前 32 碼，本機模式 `local`。`VW/server.cjs` 只對 SW 檔加 `Service-Worker-Allowed: /`（Cache-Control 未動）。`VW/shared/runtime.js` 只在 http 模式的頂層頁註冊。
+  - 選 SW 不選 shared 模組：`<video>`／`<img>` 的位元組不經 JS，只有 SW 一處攔得到全部讀取（剪輯器、素材庫、引擎橋 `tools-engine-host.js` fetch）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/media-cache.cjs → 換簽名網址命中（網路 1 次）、副本刪掉／儲存壞掉退回網路同內容、A 組織副本 B 讀不到（清除失敗時也一樣）、登出清空、LRU | exit=0 | ms=80
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：entryId 拿掉 scope → tests/media-cache.cjs 紅「org B must not hit org A's copy」；還原 → 綠 | exit=1→0 | ms=200
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/media-cache-browser.cjs（Edge、http 模式、/media 人工延遲 300ms、2.07MB mp4）→ 第一次 319ms 伺服器 1 次；換 query 第二次 7ms、伺服器 0 次、x-vw-media-cache: hit、transferSize 0；重新載入後 <video> 播放＋跳到 5s 110ms、伺服器 0 次 | exit=0 | ms=15000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs → gate ok（加入 media-cache） | exit=0 | ms=14000
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/1m/0n（external oracle = Codex CLI gpt-6-sol；第一輪 `agency-os/reports/oracle/2026-11-10-review-d0372529.md`：next-admin `LogoutButton.tsx:14-21` 用 router.replace 客戶端登出，SW 看不到導覽 → 修：任何 /login、/logout 請求都清空＋身分確認超過 60 秒先重問（`checkIdentity`/`maxAgeMs`），加測試；第二輪 `2026-11-10-review-8415e60e.md` NO FINDINGS，files-reviewed 8 檔含 4 新檔）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=serviceWorker|Service-Worker-Allowed|/api/vw/identity|media-cache | hits=27（全為本次新增檔與本條；先前無任何 SW）
+- 剩餘風險：Range 未命中時第一次播放會多抓一次完整檔（背景）；SW 範圍 "/" 也涵蓋同網域 next-admin 頁，但只對素材路徑 respondWith；未部署，交監工批次部署。
 ## 2026-11-10（續47）FC.5 上線：兩個引擎新版切到正式站（操作者「可以，上正式站」）
 
 - 主機 `/root/lobster-phase1/static/video-engines/`：上傳 `filmcraft/46763a8-4265c64`、`effectcraft/df4cc09-e5261e3`（先放 `<dist>.upload-<時間>`，主機 `sha256sum -c` 全過、SHA256SUMS 雜湊＝`engines/*/VERSION.json` 才改名）；`current` 改指新版；擁有者改 root:root。不需要動 nginx／compose（alias 走 `current`），工作台不用重部署。
