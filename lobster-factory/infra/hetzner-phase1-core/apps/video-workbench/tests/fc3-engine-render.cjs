@@ -177,6 +177,30 @@ function request(port, pathname, headers, body) {
     }
     assert.deepEqual({ assets: calls.assets.length, jobs: jobsOnDisk().length }, ownBefore);
     console.log("PASS effectcraft title with no footage -> accepted, empty rights; footage or filmcraft with no list -> 400");
+
+    // 7. Card P6.20: a render above the 100 MB request cap arrives in chunks (/uploads/sessions with the render meta) and
+    // becomes exactly one job and one ledger entry, with the same bytes; a second complete finds nothing.
+    const big = clip("big.mp4", ["-f", "lavfi", "-i", "testsrc2=size=1920x1080:rate=30,noise=alls=100:allf=t", "-f", "lavfi", "-i", "sine=frequency=550:sample_rate=48000", "-af", "loudnorm=I=-16:TP=-2:LRA=7", "-qp", "0"]);
+    assert(big.length > 100 * 1024 * 1024, "合成成片要大於 100 MB：" + big.length);
+    const json = (route, value) => request(port, "/api/vw" + route, who({ "Content-Type": "application/json" }), JSON.stringify(value));
+    const bigBefore = { assets: calls.assets.length, renders: jobsOnDisk().filter((j) => j.input?.operation === "engine-render").length };
+    const session = await json("/uploads/sessions", { size: big.length, render: { ...meta, title: "大成片" } });
+    assert.equal(session.status, 201, JSON.stringify(session.body));
+    for (let i = 0; i < session.body.chunks; i++) {
+      const piece = big.subarray(i * session.body.chunkBytes, (i + 1) * session.body.chunkBytes);
+      const r = await request(port, `/api/vw/uploads/sessions/${session.body.id}/chunks/${i}`, who({ "Content-Type": "application/octet-stream", "X-VW-Chunk-Sha256": crypto.createHash("sha256").update(piece).digest("hex") }), piece);
+      assert.equal(r.status, 200, JSON.stringify(r.body));
+    }
+    const bigJob = await json(`/uploads/sessions/${session.body.id}/complete`, {});
+    assert.equal(bigJob.status, 201, JSON.stringify(bigJob.body));
+    assert.equal(bigJob.body.input.operation, "engine-render");
+    assert.equal(bigJob.body.input.settings.title, "大成片");
+    assert.equal(calls.assets.length, bigBefore.assets + 1, "大成片只登記一次");
+    assert.equal(crypto.createHash("sha256").update(calls.assets.at(-1).bytes).digest("hex"), crypto.createHash("sha256").update(big).digest("hex"), "登記的位元組＝原成片");
+    assert.equal(jobsOnDisk().filter((j) => j.input?.operation === "engine-render").length, bigBefore.renders + 1, "只多一個任務");
+    assert.equal((await json(`/uploads/sessions/${session.body.id}/complete`, {})).status, 404, "第二次完成找不到");
+    assert.equal(calls.assets.length, bigBefore.assets + 1);
+    console.log("PASS render above 100 MB in chunks -> one job, one ledger entry, same bytes");
   } finally {
     server.closeAllConnections();
     await new Promise((r) => server.close(r));

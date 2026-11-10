@@ -1,4 +1,11 @@
 # Worklog
+## 2026-11-10（續13）影音工作台 P6.20 收尾：專業剪輯／特效成片走分段上傳
+
+- 做了：`scripts/tools-engine-host.js` `engineSubmitRender`：成片大於一段（`VideoWorkbench.chunkedAbove`＝16 MiB，`shared/assets-ui.js` 唯一門檻）→ `VideoWorkbench.uploadChunked(..., { render: meta })`（276fdec1c 的同一機制，伺服器同一套 `engineRenderMeta`＋`engineRenderFile`）；小成片照舊單次 `/engine/renders`。前續（續9）留下的 Codex ① 關閉。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/fc3-engine-render.cjs（新第 7 條：>100 MB 無損雜訊 1080p 成片分段送達 → 一個任務、主系統登記一次、位元組 sha256 相同、第二次完成 404） | exit=0 | ms=40000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/{fc2-engine-host,p6-chunked-upload,gate}.cjs 全綠；真瀏覽器 uploadAsset 40.5 MB 3 段 sha256 相同 | exit=0 | ms=90000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（Codex `agency-os/reports/oracle/2026-11-10-partialreview-971a54ae.md`）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=chunkedAbove\|uploadChunked | hits=13（assets-ui.js 定義與使用、tools-engine-host.js、WORKLOG 兩條）
 ## 2026-11-10（續12）影音工作台 EC.5 收尾：tool TDZ、純文字片頭、media-ledger 紅；接手 b1be4b73（額度中斷）的引擎獨立整頁
 
 - 203bc3084 TDZ：tools-boot.js 先載 tools-engine-host.js 才載宣告 `let tool` 的 tools-0.js，事件處理器讀 `tool` 拋 `tool is not defined`（pj1 偶發紅）。`engineTool()`（typeof）用於 HEAD 既有三處處理器。fc2 test 0 擋住 tools-0 後觸發 click＋beforeunload；突變紅。

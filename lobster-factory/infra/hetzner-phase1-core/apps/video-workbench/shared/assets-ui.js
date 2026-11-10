@@ -91,8 +91,9 @@
     if (key) openUploads.delete(key);
     return done;
   };
-  // Video and audio above one chunk (= the server's 16 MiB) go up in chunks; base64 JSON would pass 100 MB near 75 MB.
-  const CHUNKED_ABOVE = 16 * 1024 * 1024;
+  // Video, audio and engine renders above one chunk (= the server's 16 MiB) go up in chunks; base64 JSON would pass
+  // 100 MB near 75 MB. Smaller files keep their one request.
+  const CHUNKED_ABOVE = (VideoWorkbench.chunkedAbove = 16 * 1024 * 1024);
   VideoWorkbench.uploadAsset = async (file, { derived = false } = {}) => {
     const videoTypes = { mov: 'video/quicktime', mp4: 'video/mp4', m4v: 'video/mp4', webm: 'video/webm' };
     const extension = String(file.name || '').split('.').at(-1).toLowerCase();

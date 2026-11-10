@@ -620,19 +620,24 @@ async function engineSubmitRender(base) {
   job.submitting = true;
   try {
     const cues = job.srt ? SubtitleParse.parse(job.srt).map((c) => ({ start: c.startMs / 1000, end: c.endMs / 1000, text: c.text })) : [];
-    const meta = new TextEncoder().encode(
-      JSON.stringify({ engine: job.engine, engineVersion: eng.appVersion, title: job.title, ratio: job.ratio, width: job.width, height: job.height, sources: job.sources, link: job.link, cues, alpha: job.alpha, footage: job.sources.length ? undefined : 0 }),
-    );
+    const meta = { engine: job.engine, engineVersion: eng.appVersion, title: job.title, ratio: job.ratio, width: job.width, height: job.height, sources: job.sources, link: job.link, cues, alpha: job.alpha, footage: job.sources.length ? undefined : 0 };
     engineStatus("成片入帳中…");
-    const api = String(window.VW_CONFIG?.apiBaseUrl || "/api/vw").replace(/\/$/, "");
-    const response = await fetch(api + "/engine/renders", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/octet-stream", "X-VW-Meta-Length": String(meta.byteLength) },
-      body: new Blob([meta, job.video]),
-    });
-    const value = await response.json().catch(() => ({}));
-    if (!response.ok) throw Error(value.error?.message || "成片入帳失敗（" + response.status + "）");
+    let value;
+    // Card P6.20: a render above one chunk goes up in chunks (shared/assets-ui.js uploadChunked; same checks on the
+    // server), so one above the 100 MB request cap still arrives; a smaller one keeps the single request.
+    if (job.video.byteLength > VideoWorkbench.chunkedAbove) value = await VideoWorkbench.uploadChunked(new Blob([job.video]), { render: meta });
+    else {
+      const head = new TextEncoder().encode(JSON.stringify(meta));
+      const api = String(window.VW_CONFIG?.apiBaseUrl || "/api/vw").replace(/\/$/, "");
+      const response = await fetch(api + "/engine/renders", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/octet-stream", "X-VW-Meta-Length": String(head.byteLength) },
+        body: new Blob([head, job.video]),
+      });
+      value = await response.json().catch(() => ({}));
+      if (!response.ok) throw Error(value.error?.message || "成片入帳失敗（" + response.status + "）");
+    }
     engineStatus("成片已存進素材庫");
     VideoWorkbench.showJob(value);
   } catch (error) {
