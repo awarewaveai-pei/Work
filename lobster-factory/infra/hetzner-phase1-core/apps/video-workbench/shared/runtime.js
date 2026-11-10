@@ -350,6 +350,9 @@
     broadcast();
     return job;
   }
+  // Browser media copy (scripts/media-cache-sw.js): only for the served workbench, where media crosses the network.
+  if (!child && config.mode === "http" && window.isSecureContext && "serviceWorker" in navigator)
+    navigator.serviceWorker.register("/scripts/media-cache-sw.js", { scope: "/" }).catch(() => {});
   const ready = child
     ? rpc("load").then((v) => {
         db = v;

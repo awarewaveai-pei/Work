@@ -180,6 +180,8 @@ function createServer({
       // EffectCraft Web (scripts/vendor-effectcraft.cjs): cross-origin isolated on its own path only,
       // so the rest of the workbench keeps loading cross-origin resources without CORP headers. Decided on the
       // resolved file, not the URL: an encoded /engines/effectcraft/%2e%2e/ path must not reach other files.
+      // The media copy worker lives under /scripts/ (the public prefix nginx forwards) but controls every page.
+      if (file === path.join(root, "scripts", "media-cache-sw.js")) headers["Service-Worker-Allowed"] = "/";
       if (file.startsWith(path.join(root, "engines", "effectcraft") + path.sep))
         Object.assign(headers, {
           "Cross-Origin-Opener-Policy": "same-origin",

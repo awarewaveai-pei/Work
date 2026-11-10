@@ -3,7 +3,7 @@
 // No network, no port 4178, no Blender: tests that need a browser or a host binary are not listed.
 const fs = require("node:fs"), path = require("node:path"), { spawnSync } = require("node:child_process");
 const root = path.join(__dirname, "..");
-const tests = ["awarewave-files", "tenancy", "p6-main-system", "replicate-video", "migrate-media", "package-sources", "backend", "blender-budget", "storyboards-baseline", "p6-chunked-upload", "paid-price", "boot-script-loading"];
+const tests = ["awarewave-files", "tenancy", "p6-main-system", "replicate-video", "migrate-media", "package-sources", "backend", "blender-budget", "storyboards-baseline", "p6-chunked-upload", "paid-price", "boot-script-loading", "media-cache"];
 const checks = [
   "server.cjs",
   ...fs.readdirSync(path.join(root, "backend")).filter((f) => f.endsWith(".cjs")).map((f) => "backend/" + f),
