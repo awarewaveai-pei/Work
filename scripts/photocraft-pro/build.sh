@@ -43,7 +43,7 @@ fi
 export PATH="$TRUNK_ROOT/bin:$PATH"
 [ "$(trunk --version)" = "trunk $TRUNK_VERSION" ] || { echo "FATAL: trunk on PATH is not $TRUNK_VERSION" >&2; exit 1; }
 
-checkout "$SRC" "$REPO" "$REV"
+checkout_patched "$SRC" "$REPO" "$REV"
 checkout "$FONTS" "$CF_REPO" "$CF_REV"
 WF_TSV=/tmp/awarewave-webfonts.$$.tsv
 craft_web_fonts "$FONTS" "$WF_TSV"

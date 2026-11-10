@@ -49,7 +49,7 @@ WOPT=$(find "$HOME/.cache/trunk/wasm-opt-$WOPT_VERSION" -name wasm-opt -type f 2
 "$WOPT" --version >/dev/null 2>&1 || { echo "FATAL: $WOPT does not run — the wasm would ship unoptimized" >&2; exit 1; }
 export PATH="$(dirname "$WOPT"):$PATH"
 
-checkout "$SRC" "$REPO" "$REV" || { echo "FATAL: cannot check out $REPO at $REV" >&2; exit 1; }
+checkout_patched "$SRC" "$REPO" "$REV" || { echo "FATAL: cannot check out $REPO at $REV" >&2; exit 1; }
 checkout "$FONTS" "$CF_REPO" "$CF_REV" || { echo "FATAL: cannot check out $CF_REPO at $CF_REV" >&2; exit 1; }
 WF_TSV=/tmp/awarewave-webfonts-filmcraft.$$.tsv
 craft_web_fonts "$FONTS" "$WF_TSV"

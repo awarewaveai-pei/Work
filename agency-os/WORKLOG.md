@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-10（續5）Craft 網頁版建置：被打補丁的上游 checkout 一律先清掉未追蹤檔（`checkout_patched`）
+
+- 根因：`scripts/craft-web-build/lib.sh` `checkout()` 用 `checkout --force`，不清未追蹤檔；上次（或中斷的）補丁新建的檔會讓 `git apply` 拒絕或被編進產物。只有 `effectcraft-pro/build.sh:54-56` 自己補了 `git clean -fdq`，filmcraft／vectorcraft／photocraft 沒有（EC.1 worker 回報）。
+- 修（關掉整類）：`lib.sh` 新增 `checkout_patched`＝`checkout`＋`git clean -fdq`（不加 -x：ignored 的 `target/` 保留）；四個 build.sh 的上游 `$SRC` 改用它，effectcraft 那段重複程式刪掉。craft-fonts checkout 仍用 `checkout`（它的未追蹤下載＝字型快取）。
+- 不變量：會被打補丁的 checkout，補丁前工作樹＝釘住的 rev＋ignored 快取，沒有別的。
+- REALTEST_EVIDENCE: tool=Bash | cmd=wsl bash scratchpad/test-checkout-patched.sh（暫存 repo：補丁殘留檔被刪、target/cache 保留、HEAD＝rev）→ PASS；bash -n 五個腳本 OK | exit=0 | ms=4000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（Codex `agency-os/reports/oracle/2026-11-10-partialreview-b156f76d.md`，files-reviewed＝五檔）
+- ORACLE_WAIVED: 共用工作樹有其他 session 未提交改動，oracle 以 -Path 只審本次五檔（artifact 標 PARTIAL）；審查範圍＝本 commit 全部檔案
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=checkout_patched\|git -C "\$SRC" clean | hits=7（lib.sh 註解＋定義 2、四個 build.sh 呼叫 4、effectcraft 的 assets/fonts 專用 clean 1，保留）
 ## 2026-11-10（續4）影音工作台 FC.4／EC.4：正式站實跑專業剪輯＋專業特效（操作者「好」）
 
 - 環境：另開 Edge `--force_high_performance_gpu --user-data-dir=<scratchpad>` ＋ CDP 9333；WebGL／WebGPU 皆 RTX 5060（app 內瀏覽器窗格量到是 Intel UHD，不在那裡跑）。操作者自己登入員工帳號。

@@ -18,6 +18,14 @@ checkout() { # checkout <dir> <repo> <rev>
   [ "$(git -C "$dir" rev-parse HEAD)" = "$rev" ] || { echo "FATAL: $dir not at $rev" >&2; exit 1; }
 }
 
+# checkout_patched <dir> <repo> <rev> — for a checkout the build patches. checkout --force keeps untracked
+# files, so a file an earlier (or interrupted) run's patch created would make `git apply` refuse or be compiled
+# in. Remove them; ignored ones (target/) stay. Not for craft-fonts: its untracked downloads are the font cache.
+checkout_patched() {
+  checkout "$@"
+  git -C "$1" clean -fdq
+}
+
 # craft_web_fonts <craft-fonts checkout> <tsv out>
 # Web fonts (fonts.json webFonts[]): download each into the craft-fonts checkout, verify its sha256
 # and its licence's, and append its manifest row. The checkout was just reset by checkout --force,

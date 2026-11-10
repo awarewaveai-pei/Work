@@ -31,7 +31,7 @@ REV7=${REV:0:7}
 INPUTS7=$(cat "$PIN" "$CRAFT_WEB_FONTS_JSON" $(for p in $PATCHES; do echo "$SCRIPT_DIR/$p"; done) | sha256sum | cut -c1-7)
 DIST_NAME="$REV7-$INPUTS7"
 
-checkout "$SRC" "$REPO" "$REV"
+checkout_patched "$SRC" "$REPO" "$REV"
 checkout "$FONTS" "$CF_REPO" "$CF_REV"
 
 WF_TSV=/tmp/awarewave-webfonts.$$.tsv
