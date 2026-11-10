@@ -1,4 +1,35 @@
 # Worklog
+## 2026-11-10（續52）ED.6 剪輯器「音訊」分頁＋所有組織共用的內建曲庫（/library/）
+
+- 根因：音訊分頁只有選擇／上傳、響度三鈕（`docs/editor-parity-compare-20261106.md:61`），缺用途分類、目標軌、內建曲庫、音訊設定、AI 旁白。內建音檔不能放在 per-org 的 `/media`：正式站每個組織各有自己的資料夾（`server.cjs:21`），媒體庫也各建一份（`backend/api.cjs:33`、`backend/media-store.cjs:211-215`）。
+- 改動：`scripts/editor-panes/audio.js`
+  - 六分類照用途標籤分，不看檔名；目標軌 A2／A1。
+  - 內建庫：曲風附數量、五種排序、試聽、＋ 加入。
+  - 音訊設定存在 `p.audioSettings`，只用既有欄位：ED.3 的 duck、帶 loopOf 的複本、目標軌音量；沒有這個欄位的舊專案不變。
+  - AI 旁白走既有的 voice 任務，價格由 `shared/paid-price.js` 在按下前顯示。
+- 共用曲庫：`backend/library.cjs`（檔名白名單、只准 GET／HEAD、任何已簽身分可讀；`VW_LIBRARY_DIR`，預設 `<資料目錄>/library`，正式站＝`/data/library`）。
+  - `server.cjs` 提供 `/library/`；`api.cjs` localFile 解析它。兩處都呼叫 `fromUrl`。
+  - `editor-export.cjs` 沒改：非 `/assets/` 的網址本來就走 `file(url)`＝localFile（`backend/editor-export.cjs:466`）。
+- 曲庫：`assets/audio-library.json`（36 個 Freesound CC0 音效／環境音，source＝頁面網址，license＝頁面原字樣「Creative Commons 0」，sec／lufs 由 ffmpeg 實測）。
+  - 音檔不進 git；原檔放在 `D:\tmp\ed6-audio-src`（42 檔，含 6 個備選）。
+  - `scripts/import-audio-library.cjs` 可重跑；已存在就跳過；清單先寫暫存檔再改名；缺檔時 exit 1。
+  - 操作者 2026-11-10 在本 session 回覆「下載」後才下載。FreePD 已關站。
+- 審查：Codex 三輪。
+  - 第一輪 4 項：循環超過 64 段、新配樂被舊複本擠開、影片變長後循環不跟、縮短段的關鍵影格。
+  - 第二輪 4 項：nginx 沒放行（屬部署）、預設資料夾不在磁碟區、清單非原子寫入、加入失敗卻已存庫。
+  - 第三輪 1 項：專案切走時仍存庫。同一 reviewer 第三次 → 不變量＝「只有片段真的加入並存檔後才存庫」；`edAudAdd` 改成回傳片段或 null，整類關閉。
+- 突變：拿掉 `/library` 的簽章檢查 → 未簽請求 404 變 200；拿掉 `if (!(await edAudAdd(...))) return` → 「專案切走」測試紅。還原後皆綠。
+- 部署（未做，交監工）：`nginx/default.conf:622` 加上 `library`，再把 `.data/library` 放到主機 `/data/library`。步驟見 `agency-os/handoffs/2026-11-06-video-editor-parity-supervisor/ed6-deploy-steps.md`。
+- 避免再發生：所有組織共用的唯讀檔一律走 `backend/library.cjs`，不寫進 per-org 的 media。
+- 未完：配樂 72 首候選（剔除 R1）要另外核准下載；8 首曲風名不副實的要試聽後重歸類；6 個疑慮音效要試聽（`ed6-music-candidates.md`）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed6-audio.cjs（真 Edge：六分類、目標軌、內建庫、設定五項＋BPM、AI 旁白價格不送出、真實匯出旁白下低 11.6 dB、循環延伸有聲、兩個組織讀取＋匯出、各種 404）9 PASS | exit=0 | ms=240000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/tenancy.cjs；node tests/paid-price.cjs（28 paid call sites priced）；node tests/ed1-layout.cjs；node tests/p2-tracks-ui.cjs；node tests/theme-tokens.cjs | exit=0 | ms=400000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node import-audio-library.cjs --from D:\tmp\ed6-audio-src（ITEMS 36 MISSING 0；重跑 ADDED 0）；真 Edge 開分頁：音效 24、環境音 12、試聽播放、HEAD /library/amb-a001.mp3 200 | exit=0 | ms=120000
+- 最後一次 ed6 全跑時：新加的「專案切走」檢查和前五段都通過，第 7 段真實匯出被別的 session 尚未 commit 的 `backend/editor-export.cjs:79` 語法錯誤擋住（不是本卡的檔）；同一段在前一次全跑已綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/9m/0n
+- ORACLE_WAIVED: 第三輪 Codex artifact 2026-11-10-partialreview-713a51be 的唯一發現已照不變量修正，並以對應測試＋突變證明（拔掉判斷即紅），不再跑第四輪
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=library\.cjs|/library/|audio-library\.json|edAudAdd|VW_LIBRARY_DIR | hits=66
+- BUGHUNT_SCOPE_NARROW: 命中都在本卡的檔、交接文件與 oracle 報告；`method-display-metadata.yaml`、`docs/seo/4_排名與搜尋外觀.md` 的 /library/ 是無關語境
 ## 2026-11-10（續51）Stop hook batch-format：只排「專案自己宣告 prettier 設定」的檔
 
 - 根因：`mcp/claude-userlevel/hooks/rules/batch-format.js`（舊版 :19-24）對本回合改過的每個 JS/TS 檔跑 `<session cwd>/node_modules/.bin/prettier --write`，不看有沒有設定檔。video-workbench 有 prettier devDependency、無設定檔（120 欄風格），一行修改就把 `scripts/tools-editor.js` 用預設 80 欄整檔重排（+1300 行，壓縮後與 HEAD 相同），其他 ED worker 只能逐 hunk 提交。

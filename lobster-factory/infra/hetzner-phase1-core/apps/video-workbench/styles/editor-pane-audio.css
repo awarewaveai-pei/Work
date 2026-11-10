@@ -1,1 +1,17 @@
 /* Styles owned by ED.6 scripts/editor-panes/audio.js (spec §3 檔案歸屬). Theme tokens only (tests/theme-tokens.cjs). */
+.ed-aud-cats { display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:8px; }
+.ed-aud-cats .btn { min-width:0;padding-inline:2px;white-space:nowrap;font-size:12px; }
+.ed-aud-list { list-style:none;margin:8px 0;padding:0;display:flex;flex-direction:column;gap:6px; }
+.ed-aud-item { display:flex;align-items:center;gap:6px;padding:6px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--card-bg); }
+.ed-aud-item:hover { border-color:var(--accent); }
+.ed-aud-body { display:flex;flex-direction:column;gap:2px;min-width:0;flex:1; }
+.ed-aud-body b { font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.ed-aud-body .note { margin:0;font-size:11px; }
+.ed-aud-empty { padding:12px;border:1px dashed var(--border);border-radius:var(--radius-sm);text-align:center; }
+.ed-aud-set { display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin:6px 0; }
+.ed-aud-set .note { margin:0 0 4px; }
+.ed-aud-voices { max-height:132px;overflow-y:auto; }
+.editor-peak-bar { display:inline-block;width:160px;height:8px;border:1px solid currentColor;position:relative; }
+.editor-peak-bar i { position:absolute;left:0;top:0;bottom:0;width:0;background:var(--green); }
+.ed-aud-vo label { display:flex;flex-direction:column;gap:4px;margin:6px 0; }
+.ed-aud-vo textarea { resize:vertical; }

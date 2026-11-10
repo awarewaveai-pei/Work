@@ -97,6 +97,16 @@ function createServer({
         res.end(req.method === "HEAD" ? undefined : body);
         return;
       }
+      if (pathname.startsWith("/library/")) {
+        // Card ED.6: the built-in audio library, one folder for every org (backend/library.cjs). Behind the proxy any signed
+        // identity reads it; unsigned, other methods and non-whitelisted or missing names are the same 404.
+        const found = (req.method === "GET" || req.method === "HEAD") && (!trustProxy || identity(req)) && require("./backend/library.cjs").fromUrl(env, pathname);
+        if (!found) throw Error();
+        const body = fs.readFileSync(found);
+        res.writeHead(200, { "Content-Type": "audio/mpeg", "Content-Length": body.length, "Cache-Control": "private", "X-Content-Type-Options": "nosniff" });
+        res.end(req.method === "HEAD" ? undefined : body);
+        return;
+      }
       let tenant = local;
       if (trustProxy && /^\/(api\/vw|media|generated)\//.test(pathname)) {
         tenant = identity(req);
