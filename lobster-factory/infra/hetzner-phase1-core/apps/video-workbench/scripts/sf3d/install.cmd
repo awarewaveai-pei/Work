@@ -2,8 +2,10 @@
 rem Card S4b: local Stable Fast 3D for the workbench (Windows, NVIDIA GPU). The steps run on 2026-11-10 on the RTX 5060
 rem laptop, in order. Needs: Python 3.12 (py launcher), git, Visual Studio 2022 Build Tools with the VCTools workload,
 rem HF_TOKEN in the environment of an account that accepted the stabilityai/stable-fast-3d licence.
-rem STATUS 2026-11-10: re-running this on a working install rebuilt uv_unwrapper, whose _C then failed to load
-rem ("DLL load failed while importing _C: the specified procedure could not be found"); not yet passing end to end.
+rem STATUS 2026-11-10: Windows Smart App Control (VerifiedAndReputablePolicyState=1, policy {0283ac0f-...}) blocks
+rem loading freshly built unsigned .pyd files (CodeIntegrity events 3077/3033; LoadLibrary error 4551, shown by Python as
+rem "DLL load failed ... procedure could not be found"). The first build loaded, the rebuild at 12:18 did not. A system
+rem setting decides this; the script cannot. Not passing end to end on a machine with Smart App Control on.
 rem Result: runtime\sf3d (gitignored) with .venv and .hf; then set VW_SF3D_PYTHON=<app>\runtime\sf3d\.venv\Scripts\python.exe
 rem and VW_SF3D_DIR=<app>\runtime\sf3d. docs/s4-image-to-3d-providers-20261103.md §7.
 setlocal

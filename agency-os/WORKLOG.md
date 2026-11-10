@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-10（續19）影音工作台 S4b 本機 SF3D 壞掉的根因：Windows「智慧型應用程式控制」封鎖重編的未簽章 .pyd（系統層，停下回報）
+
+- 症狀：重跑 `scripts/sf3d/install.cmd` 後出現 `ImportError: DLL load failed while importing _C: 找不到指定的程序。`（續18）。
+- 排除：靜態匯入全部找得到（uv_unwrapper `_C` 對 c10／torch_cpu／System32 MSVCP140 14.51／Python 自帶 VCRUNTIME140 14.42／python312 的匯出逐一比對，缺 0）；torch 仍是 2.11.0+cu128；PATH、venv 都沒變。
+- 根因：`LoadLibraryEx` 直接載入回 4551（ERROR_SYSTEM_INTEGRITY_POLICY_VIOLATION）。CodeIntegrity 事件 3077／3033 各 8 筆（12:18:53–12:27:35）：python.exe 載入 `runtime\sf3d\...\uv_unwrapper\_C.cp312-win_amd64.pyd`「did not meet the Enterprise signing level requirements」，Policy ID {0283ac0f-fff1-49ae-ada1-8a933130cad6}＝智慧型應用程式控制（`HKLM\...\CI\Policy VerifiedAndReputablePolicyState=1`＝強制）。12:18 重編後 texture_baker 的 `_C` 也一樣被擋；第一次編的版本可以載入，12:18 之前沒有封鎖事件。
+- 結論：能不能載入由系統安全設定決定，腳本改不了（自簽憑證不符信任等級）。照監工規則停下，沒有改任何系統設定。`install.cmd` 的 STATUS 註解已改成這個根因。
+- 可重跑的不變量（腳本已做第一步：套件都能 import 就不重建）：重建一律在暫存 venv 進行，驗證能 import 並跑完一張圖才換上，失敗就保留舊的——要等系統層決定後才能在這台驗證。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python LoadLibraryExW(_C.pyd) -> err 4551; Get-WinEvent Microsoft-Windows-CodeIntegrity/Operational (3077/3033 x8); dumpbin /imports vs /exports (missing 0); reg VerifiedAndReputablePolicyState=1 | exit=0 | ms=60000
+- REVIEW_WAIVED: NA -- 只做診斷，程式只改註解
+- BUGHUNT_WAIVED: NA -- 無程式改動
 ## 2026-11-10（續18）影音工作台 S4b.2 補跑本機 SF3D：10 張免費、品質接近 SPAR3D，列免費選項；安裝腳本重跑時壞了一次（未解）
 
 - 系統層安裝：VS Build Tools 2022 VCTools（winget，`--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --passive`），操作者同意（監工轉述原話「好，裝」）。HF 授權由操作者在 peijingartstudio 帳號點；token 只從環境變數讀，沒有落檔。
