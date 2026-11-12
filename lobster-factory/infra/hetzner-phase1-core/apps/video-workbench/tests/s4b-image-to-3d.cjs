@@ -25,7 +25,7 @@ const png = "data:image/png;base64," + fs.readFileSync(path.join(__dirname, ".."
 // counts its runs and writes <out>/0/mesh.glb. Needs WSL (Ubuntu), as the real way does; skipped without it.
 const wsl = process.platform === "win32" && require("node:child_process").spawnSync("wsl.exe", ["-d", "Ubuntu", "--", "true"]).status === 0;
 const sf3dDir = fs.mkdtempSync(path.join(os.tmpdir(), "vw-s4b-sf3d-"));
-fs.writeFileSync(path.join(sf3dDir, "entry.sh"), `#!/usr/bin/env bash\nset -e\necho 1 >> "$(dirname "$0")/runs.txt"\nmkdir -p "$2/0"\necho ${GLB.toString("base64")} | base64 -d > "$2/0/mesh.glb"\n`);
+fs.writeFileSync(path.join(sf3dDir, "entry.sh"), `#!/usr/bin/env bash\nset -e\n[ "$1" = --check ] && exit 0\necho 1 >> "$(dirname "$0")/runs.txt"\nmkdir -p "$2/0"\necho ${GLB.toString("base64")} | base64 -d > "$2/0/mesh.glb"\n`);
 
 (async () => {
   const calls = [];
@@ -151,16 +151,24 @@ fs.writeFileSync(path.join(sf3dDir, "entry.sh"), `#!/usr/bin/env bash\nset -e\ne
     await page.goto(base + "/pages/tools.html?r=1#3d");
     const ways = page.locator("[data-t3-methods] button");
     await ways.first().waitFor();
-    assert.deepEqual(await ways.allTextContents(), [wsl ? "本機 SF3D · 免費" : "本機 SF3D · 免費（未安裝）", "Stability SPAR3D · NT$1.28", "Stability SF3D · NT$3.20", "Replicate TRELLIS · 約 NT$1.22"]);
+    // Expected text from /capabilities (USD price, estimate, availability) through the page's one money formatter, so a
+    // rate or price-table change does not need this test edited; the formatter itself must give NT$.
+    const money = (usd) => page.evaluate((u) => VideoWorkbenchMoney(u), usd);
+    const price = async (m) => (m.usd === 0 ? "免費" : `${m.estimate ? "約 " : ""}${await money(m.usd)}`);
+    assert.match(await money(0.04), /^NT\$\d/);
+    const expected = [];
+    for (const m of cap.imageTo3d.methods) expected.push(`${m.label} · ${await price(m)}${m.available ? "" : `（${m.reason}）`}`);
+    assert.deepEqual(await ways.allTextContents(), expected);
     const go = page.locator('[data-t3-action="i3"]');
     const preselected = wsl ? "local-sf3d" : "stability-spar3d"; // free first (backend/providers.cjs)
     assert.equal(await page.locator(`[data-t3-action="i3-method:${preselected}"]`).getAttribute("aria-pressed"), "true", preselected + " preselected");
     assert.equal(await go.isDisabled(), true, "no image yet");
     await page.locator('[data-t3-action="i3-method:replicate-trellis"]').click();
     await page.getByRole("button", { name: "圖片：杯子.png", exact: true }).click();
-    await page.waitForFunction(() => document.querySelector('[data-t3-action="i3"]')?.textContent === "產生 3D 模型（約 NT$1.22）");
+    const trellisButton = `產生 3D 模型（${await price(cap.imageTo3d.methods.find((m) => m.id === "replicate-trellis"))}）`;
+    await page.waitForFunction((t) => document.querySelector('[data-t3-action="i3"]')?.textContent === t, trellisButton);
     assert.equal(await page.locator('[data-t3-action="i3"]').isDisabled(), false);
-    pass("頁面：四種方式各自標價（含免費、約），免費的本機 SF3D 排第一且裝好時預設選它（否則 SPAR3D）；選 TRELLIS＋圖片後按鈕顯示「產生 3D 模型（約 NT$1.22）」（US$ × twdRate 32）");
+    pass(`頁面：四種方式各自標價（含免費、約），免費的本機 SF3D 排第一且裝好時預設選它（否則 SPAR3D）；選 TRELLIS＋圖片後按鈕顯示「${trellisButton}」（價格＝/capabilities 美元 × twdRate，經 VideoWorkbenchMoney）`);
   } finally {
     await browser.close();
   }
