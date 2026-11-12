@@ -223,6 +223,13 @@ prod 的 `/data/orgs/39ad4149-…/jobs.json` 只有 7 筆（2026-11-05～11-10�
 
 預設改指：`VW_TTS_MODEL`、`VW_TRANSCRIBE_ENGINE`（須是清單中未下線的列；否則用第一個已設定的列）。
 
+## 免費配音：Edge TTS（2026-11-12 起預設，卡 TTS.2）
+
+- 舊 app（next-admin VideoStudio.tsx）有、新工作台漏掉的「Edge 免費」四個聲音補回：繁中女聲 zh-TW-HsiaoChenNeural、繁中男聲 zh-TW-YunJheNeural、English F en-US-JennyNeural、English M en-US-GuyNeural。
+- 走既有 video-service（`apps/video-service/server.py` 新增 `POST /tts`，沿用 renders 的 `pipeline._tts`、edge-tts 7.3.1），不另做第二份 Edge 實作；工作台接頭 `backend/speech.cjs` edge-tts。
+- **Edge 是非官方介面，微軟可能隨時擋；失敗時自動改用 Gemini，並照 Gemini 標示與收費**（`speech.cjs` synthesize fallback；`tests/ed10-subtitles-backend.cjs` 1g）。
+- 實測「這支 iPhone 16 Pro 的 Camera Control 很好用，AI 剪輯 workflow 更快」（主機 whisper 回聽）：女聲 iPhone 16 Pro／Camera Control／workflow 都對、不跳字，「AI」聽成「給 I」；男聲「AI 剪輯 workflow」聽成「該剪輯微博」（英文較弱）；英文兩聲全句對。每句 1.3–4.2 秒。
+
 ## 免費配音（自架）實測（2026-11-10，未採用）
 
 規則：清單「免費優先」（`backend/providers.cjs`，操作者「先使用免費為主」）——有可用的免費配音就會成為預設，所以先實測。

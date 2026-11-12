@@ -126,9 +126,11 @@ for (const [f, text] of Object.entries(src))
     // Default captions = our own whisper worker: no vendor bill, the button says 免費.
     assert.equal(caps.prices["video.transcribe"].usd, rates.TRANSCRIBE_RATES["host-whisper-large-v3"].usdPerMin);
     assert.equal(window.VideoWorkbenchPrices.text("video.transcribe", caps), "免費");
-    // Default speech = Gemini, token-billed: per minute of audio out at today's price row, marked 約.
-    const tts = rates.GEMINI_TTS_RATES[caps.models.audio], today = new Date().toISOString().slice(0, 10), tp = tts.prices.filter((p) => p.from <= today).at(-1);
-    assert.deepEqual(caps.prices["video.tts"], { usd: 60 * tts.audioTokensPerSec * tp.audioOutPerM / 1e6, unit: "分鐘", estimate: true });
+    // Default speech = Edge (free first, backend/providers.cjs); Gemini is a paid row priced per minute of audio out, 約.
+    assert.equal(caps.models.audio, "edge-tts");
+    assert.equal(window.VideoWorkbenchPrices.text("video.tts", caps), "免費");
+    const tts = rates.GEMINI_TTS_RATES["gemini-3.8-flash-lite-tts"], today = new Date().toISOString().slice(0, 10), tp = tts.prices.filter((p) => p.from <= today).at(-1);
+    assert.deepEqual(caps.speech.models.find((m) => m.id === "gemini-3.8-flash-lite-tts").price, { usd: 60 * tts.audioTokensPerSec * tp.audioOutPerM / 1e6, unit: "分鐘", estimate: true });
     assert.equal(caps.prices["video.image"].usd, rates.IMAGE_RATES["openai-high"].usd);
     assert.match(window.VideoWorkbenchPrices.text("video.transcribe video.script", caps), /^免費 \+ 約 NT\$[\d.]+／次$/);
     // NT$ = USD x next-admin TWD_RATE (image-models.js), the one rate.

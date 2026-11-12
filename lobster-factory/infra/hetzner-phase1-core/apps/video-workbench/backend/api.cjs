@@ -179,7 +179,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       );
     return env.OPENAI_API_KEY;
   };
-  const secrets = [env.OPENAI_API_KEY, env.GEMINI_API_KEY, vwEnv(env, "TRANSCRIBE_WORKER_TOKEN"), env.REPLICATE_API_TOKEN, env.MEDIA_RENDER_AUTH_TOKEN, env.REMOTION_AUTH_TOKEN].filter((v) => typeof v === "string" && v.trim());
+  const secrets = [env.OPENAI_API_KEY, env.GEMINI_API_KEY, vwEnv(env, "TRANSCRIBE_WORKER_TOKEN"), vwEnv(env, "TTS_SERVICE_TOKEN"), env.REPLICATE_API_TOKEN, env.MEDIA_RENDER_AUTH_TOKEN, env.REMOTION_AUTH_TOKEN].filter((v) => typeof v === "string" && v.trim());
   const publicError = (message) =>
     secrets.reduce((text, secret) => text.replaceAll(secret.trim(), "[redacted]"), String(message)).slice(0, 800);
   for (const job of jobs)
@@ -544,9 +544,9 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       persist();
       if (type === "audio") {
         // backend/speech.cjs: the job's model row (input.speechModel; none = default), its voice and its call.
-        const model = speech.pick(input.speechModel, env);
-        job.speech = { model: model.id, provider: model.vendor };
-        const spoken = await speech.synthesize(model, { text: prompt, voice: input.voice, style: input.instructions || input.settings?.voiceEmotion, env, fetchImpl, signal });
+        const spoken = await speech.synthesize(speech.pick(input.speechModel, env), { text: prompt, voice: input.voice, style: input.instructions || input.settings?.voiceEmotion, env, fetchImpl, signal }),
+          model = spoken.model; // the row that spoke: Edge, or Gemini when Edge failed (speech.cjs fallback)
+        job.speech = { model: model.id, provider: model.vendor, ...(spoken.fallbackFrom ? { fallbackFrom: spoken.fallbackFrom } : {}) };
         if (spoken.ext === "mp3") job.result = { url: output(spoken.audio, "mp3") };
         else {
           // WAV (Gemini, 24 kHz mono): the library and every voice step keep MP3.

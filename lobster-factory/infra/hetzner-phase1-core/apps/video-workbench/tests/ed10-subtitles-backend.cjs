@@ -131,8 +131,8 @@ async function serve(fetchImpl, extraEnv = {}) {
   assert.throws(() => transcribe.pick("openai", {}, "2027-02-26"), (e) => e.status === 400 && /已停止/.test(e.message));
   assert.equal(transcribe.pick("openai", {}, "2027-02-25").model, "whisper-1");
   assert.equal(transcribe.pick(undefined, { VW_TRANSCRIBE_ENGINE: "openai" }, "2027-02-26").id, "host", "預設指到已下線的列 = 用清單第一列");
-  assert.deepEqual(speech.capability({}, "2027-01-05").models.map((m) => m.id), ["gemini-3.8-flash-lite-tts", "gpt-4o-mini-tts"]);
-  assert.deepEqual(speech.capability({}, "2027-01-06").models.map((m) => m.id), ["gemini-3.8-flash-lite-tts"]);
+  assert.deepEqual(speech.capability({}, "2027-01-05").models.map((m) => m.id), ["edge-tts", "gemini-3.8-flash-lite-tts", "gpt-4o-mini-tts"]);
+  assert.deepEqual(speech.capability({}, "2027-01-06").models.map((m) => m.id), ["edge-tts", "gemini-3.8-flash-lite-tts"]);
   assert.throws(() => speech.pick("gpt-4o-mini-tts", {}, "2027-01-06"), (e) => e.status === 400 && /已停止/.test(e.message));
   pass("過了 retireOn 的配音／辨識選項：不在清單（頁面按鈕由清單長出）、指名送出回 400");
 
@@ -141,7 +141,7 @@ async function serve(fetchImpl, extraEnv = {}) {
   // saved one; a job naming Gemini is refused 503 before any provider call.
   const noGemini = { OPENAI_API_KEY: "test-only", VW_TRANSCRIBE_WORKER_URL: "http://whisper.test:8421", VW_TRANSCRIBE_WORKER_TOKEN: "worker-test" };
   const sc = speech.capability(noGemini, "2026-11-10"), tc = transcribe.capability(noGemini, "2026-11-10");
-  assert.deepEqual([sc.defaultModel, sc.models.map((m) => [m.id, m.available])], ["gpt-4o-mini-tts", [["gemini-3.8-flash-lite-tts", false], ["gpt-4o-mini-tts", true]]]);
+  assert.deepEqual([sc.defaultModel, sc.models.map((m) => [m.id, m.available])], ["gpt-4o-mini-tts", [["edge-tts", false], ["gemini-3.8-flash-lite-tts", false], ["gpt-4o-mini-tts", true]]]);
   assert.deepEqual([tc.defaultEngine, tc.engines.map((e) => [e.id, e.available])], ["host", [["host", true], ["gemini", false], ["openai", true]]]);
   assert.equal(speech.defaultModel({ ...noGemini, VW_TTS_MODEL: "gemini-3.8-flash-lite-tts" }, "2026-11-10").id, "gpt-4o-mini-tts", "指定的預設沒有金鑰也退到可用的");
   assert.throws(() => speech.key(speech.pick("gemini-3.8-flash-lite-tts", noGemini), noGemini), (e) => e.status === 503);
@@ -177,6 +177,56 @@ async function serve(fetchImpl, extraEnv = {}) {
   assert.deepEqual([tAll.defaultEngine, tAll.engines.map((e) => [e.id, e.free])], ["host", [["host", true], ["gemini", false], ["openai", false]]]);
   assert.equal(transcribe.capability({ ...allOn, VW_TRANSCRIBE_ENGINE: "gemini" }, "2026-11-10").defaultEngine, "gemini");
   pass("免費優先：免費與付費都可用時免費排前面且為預設；指定的可用才照指定，否則退回第一個可用的免費，再來才是付費");
+
+  // 1g. Edge (free, through video-service POST /tts) is the speech default when configured; when Edge fails the job is
+  // spoken by Gemini and labelled + charged as Gemini (the reply's usage), never as free.
+  {
+    const edgeEnv = { VW_TTS_SERVICE_URL: "http://video-service:8732", VW_TTS_SERVICE_TOKEN: "edge-test", GEMINI_API_KEY: "gm-test", OPENAI_API_KEY: "test-only" };
+    const cap = speech.capability(edgeEnv, "2026-11-12");
+    assert.deepEqual([cap.defaultModel, cap.models.map((m) => [m.id, m.free]), cap.models[0].voices.map((v) => v.id)],
+      ["edge-tts", [["edge-tts", true], ["gemini-3.8-flash-lite-tts", false], ["gpt-4o-mini-tts", false]], ["zh-TW-HsiaoChenNeural", "zh-TW-YunJheNeural", "en-US-JennyNeural", "en-US-GuyNeural"]]);
+    const pcm = Buffer.alloc(9600), wav = Buffer.alloc(44);
+    wav.write("RIFF", 0); wav.writeUInt32LE(36 + pcm.length, 4); wav.write("WAVEfmt ", 8); wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20);
+    wav.writeUInt16LE(1, 22); wav.writeUInt32LE(24000, 24); wav.writeUInt32LE(48000, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34);
+    wav.write("data", 36); wav.writeUInt32LE(pcm.length, 40);
+    const mp3 = Buffer.from(ff(["-f", "lavfi", "-i", "sine=frequency=300:duration=0.5", "-c:a", "libmp3lame", "-f", "mp3", "pipe:1"], true));
+    let edgeUp = true, edgeRefuses = false;
+    const sent = [];
+    const fetchSpeech = async (url, options) => {
+      sent.push(String(url));
+      if (String(url) === "http://video-service:8732/tts") {
+        assert.equal(options.headers["X-Render-Token"], "edge-test");
+        assert.equal(JSON.parse(options.body).voice, "zh-TW-YunJheNeural", "生成器的男聲角色（Charon）對到 Edge 雲哲");
+        if (edgeRefuses) return Response.json({ error: "text 過長" }, { status: 400 });
+        return edgeUp ? new Response(mp3, { headers: { "Content-Type": "audio/mpeg" } }) : Response.json({ error: "edge_tts_failed" }, { status: 502 });
+      }
+      if (String(url) === "https://generativelanguage.googleapis.com/v1beta/interactions") {
+        assert.equal(JSON.parse(options.body).generation_config.speech_config[0].voice, "Charon");
+        return Response.json({ usage: { total_input_tokens: 12, total_output_tokens: 50 }, steps: [{ content: [{ type: "audio", data: Buffer.concat([wav, pcm]).toString("base64") }] }] });
+      }
+      throw Error("未預期的網路請求：" + url);
+    };
+    const se = await serve(fetchSpeech, edgeEnv);
+    const free = await se.poll((await se.ok("POST", "/generations", { type: "spoken", prompt: "這支 iPhone 很好用", voice: "Charon" })));
+    assert.equal(free.status, "succeeded", free.error);
+    assert.deepEqual([free.result.origin.model, free.result.origin.provider, free.result.origin.costUsd], ["edge-tts", "Microsoft Edge", 0]);
+    edgeUp = false;
+    const fell = await se.poll((await se.ok("POST", "/generations", { type: "spoken", prompt: "這支 iPhone 很好用", voice: "Charon" })));
+    assert.equal(fell.status, "succeeded", fell.error);
+    const gp = rates.GEMINI_TTS_RATES["gemini-3.8-flash-lite-tts"].prices.filter((x) => x.from <= new Date().toISOString().slice(0, 10)).at(-1);
+    assert.deepEqual([fell.result.origin.model, fell.result.origin.provider], ["gemini-3.8-flash-lite-tts", "Google"], "Edge 失敗：標成 Gemini");
+    near(fell.result.origin.costUsd, (12 * gp.textInPerM + 50 * gp.audioOutPerM) / 1e6, 1e-12, "Edge 失敗：照 Gemini 實際用量計價");
+    assert.equal(fell.speech?.fallbackFrom ?? "edge-tts", "edge-tts");
+    // A request Edge refuses (4xx, e.g. text over its 2000 limit) is not a service failure: no paid fallback.
+    edgeRefuses = true;
+    const refused = await se.poll((await se.ok("POST", "/generations", { type: "spoken", prompt: "這支 iPhone 很好用", voice: "Charon" })));
+    assert.equal(refused.status, "failed");
+    await se.close();
+    assert.deepEqual(sent.map((u) => u.replace(/^https:\/\/generativelanguage.*/, "gemini")), ["http://video-service:8732/tts", "http://video-service:8732/tts", "gemini", "http://video-service:8732/tts"]);
+    const openaiRow = speech.MODELS.find((m) => m.id === "gpt-4o-mini-tts");
+    assert.deepEqual(["Charon", "Puck"].map((v) => speech.voiceFor(openaiRow, v)), ["onyx", "nova"], "Gemini→OpenAI 對照不被 Edge 對照蓋掉");
+  }
+  pass("Edge 免費配音：有設定時是預設（四個聲音）、免費；Edge 服務故障自動改走 Gemini，標成 Gemini、照 Gemini 用量計價；請求被拒（4xx）不改走付費");
 
   // 2. Filler and pause data for ED.11.
   const marked = TranscriptWords.annotate([{ start: 0, end: 0.3, text: "嗯嗯" }, { start: 0.4, end: 1, text: "你好" }, { start: 2.5, end: 3, text: "Umm," }, { start: 3.1, end: 3.5, text: "那個" }]);

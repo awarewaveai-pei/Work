@@ -1,8 +1,8 @@
 // Text to speech: the one list of speech models (like next-admin video-motion-models.ts for video). Each row is one
 // connector -- vendor, key, voices, call; adding or removing a vendor = one row. Pages draw the rows as buttons from
 // /capabilities (speech.models). A row whose next-admin registry retireOn (cost-model.ts MEDIA_MODELS) has come leaves
-// the list and a job naming it is refused. A row without its key is listed available:false and refused (503). Order and
-// default (VW_TTS_MODEL names the wanted row): backend/providers.cjs, free first.
+// the list and a job naming it is refused. A row without its credential is listed available:false and refused (503).
+// Order and default (VW_TTS_MODEL names the wanted row): backend/providers.cjs, free first -- Edge when configured.
 const path = require("node:path");
 const { vwEnv } = require("./env-compat.cjs");
 const providers = require("./providers.cjs");
@@ -18,11 +18,18 @@ const GEMINI_VOICES = Object.freeze([
   ["Pulcherrima", "直率"], ["Achird", "友善"], ["Zubenelgenubi", "隨性"], ["Vindemiatrix", "溫柔"], ["Sadachbia", "活潑"], ["Sadaltager", "知性"],
 ].map(([id, tone]) => Object.freeze({ id, label: id + " · " + tone })));
 const OPENAI_VOICES = Object.freeze(["coral", "alloy", "echo", "fable", "onyx", "nova", "shimmer"].map((id) => Object.freeze({ id, label: id })));
-// A voice saved under another model (old drafts, projects, retries) speaks as its nearest counterpart.
-const TO_GEMINI = Object.freeze({ coral: "Sulafat", alloy: "Zephyr", echo: "Puck", fable: "Iapetus", onyx: "Charon", nova: "Leda", shimmer: "Aoede" });
+// The four Edge voices the old app offered (next-admin VideoStudio.tsx VOICE_MODELS); 台灣腔 = zh-TW.
+const EDGE_VOICES = Object.freeze([
+  ["zh-TW-HsiaoChenNeural", "繁中女聲（曉臻）"], ["zh-TW-YunJheNeural", "繁中男聲（雲哲）"], ["en-US-JennyNeural", "English F（Jenny）"], ["en-US-GuyNeural", "English M（Guy）"],
+].map(([id, label]) => Object.freeze({ id, label })));
+// A voice saved under another model (old drafts, projects, retries, an Edge job falling back) speaks as its nearest counterpart.
+const OPENAI_TO_GEMINI = Object.freeze({ coral: "Sulafat", alloy: "Zephyr", echo: "Puck", fable: "Iapetus", onyx: "Charon", nova: "Leda", shimmer: "Aoede" });
+const TO_GEMINI = Object.freeze({ ...OPENAI_TO_GEMINI, "zh-TW-HsiaoChenNeural": "Sulafat", "zh-TW-YunJheNeural": "Charon", "en-US-JennyNeural": "Aoede", "en-US-GuyNeural": "Puck" });
+// To Edge: male voices to 雲哲, everything else to the default 曉臻.
+const TO_EDGE = Object.freeze(Object.fromEntries(["Charon", "Puck", "Fenrir", "Orus", "Iapetus", "Algenib", "Alnilam", "Gacrux", "onyx", "echo"].map((v) => [v, "zh-TW-YunJheNeural"])));
 // Gemini -> OpenAI: the inverse above plus the voices the generator's persona cards send (scripts/index-0.js spokenVoiceIds),
 // each to the OpenAI voice that persona used before 2026-11-10.
-const TO_OPENAI = Object.freeze({ ...Object.fromEntries(Object.entries(TO_GEMINI).map(([openai, gemini]) => [gemini, openai])), Kore: "coral", Puck: "nova", Fenrir: "alloy", Sulafat: "shimmer", Leda: "coral" });
+const TO_OPENAI = Object.freeze({ ...Object.fromEntries(Object.entries(OPENAI_TO_GEMINI).map(([openai, gemini]) => [gemini, openai])), Kore: "coral", Puck: "nova", Fenrir: "alloy", Sulafat: "shimmer", Leda: "coral" });
 const DEFAULT_STYLE = "請以自然的繁體中文語氣朗讀。";
 
 // Gemini (Interactions API): { audio: WAV 24 kHz mono 16-bit, usage } -- usage = Google's token counts, which the charge reads.
@@ -59,11 +66,36 @@ async function openai({ model, text, voice, style, apiKey, fetchImpl, signal }) 
   return { audio: Buffer.from(await r.arrayBuffer()), ext: "mp3", usage: null };
 }
 
-// note = what the page says beside the button (pros and cons; 2026-11-10 test, docs/vendor-alternatives-20261110.md).
+// Edge TTS through our video-service (apps/video-service server.py POST /tts, the same Edge path its renders use): MP3, free.
+async function edge({ text, voice, credential, fetchImpl, signal }) {
+  const r = await fetchImpl(credential.url + "/tts", {
+    method: "POST",
+    headers: { "X-Render-Token": credential.token, "Content-Type": "application/json" },
+    body: JSON.stringify({ text, voice }),
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(120000)]) : AbortSignal.timeout(120000),
+  });
+  // Only the service failing (5xx) may fall back to a paid row; a refused request (4xx, e.g. text over 2000) does not.
+  if (!r.ok) throw Object.assign(Error("Edge 配音失敗：" + r.status), { status: r.status >= 500 ? 502 : 400, fallback: r.status >= 500 });
+  const audio = Buffer.from(await r.arrayBuffer());
+  if (!audio.length) throw Object.assign(Error("Edge 配音沒有回傳音訊"), { status: 502, fallback: true });
+  return { audio, ext: "mp3", usage: null };
+}
+const keyed = (name) => (env) => env[name] || null;
+function edgeService(env) {
+  const url = String(vwEnv(env, "TTS_SERVICE_URL") || "").trim().replace(/\/+$/, ""), token = String(vwEnv(env, "TTS_SERVICE_TOKEN") || "").trim();
+  return /^https?:\/\/[\w.-]+(:\d+)?$/.test(url) && token ? { url, token } : null;
+}
+
+// note = what the page says beside the button (pros and cons; tests in docs/vendor-alternatives-20261110.md).
+// fallback = the row a failed call is retried on once (Edge is an unofficial interface Microsoft may block at any time);
+// the job is then labelled and charged as that row.
 const MODELS = Object.freeze([
-  Object.freeze({ id: "gemini-3.8-flash-lite-tts", vendor: "Google", label: "Gemini 語音", keyName: "GEMINI_API_KEY", voices: GEMINI_VOICES, toVoice: TO_GEMINI, call: gemini,
+  Object.freeze({ id: "edge-tts", vendor: "Microsoft Edge", label: "Edge 免費語音", credentialName: "VW_TTS_SERVICE_URL / VW_TTS_SERVICE_TOKEN", credential: edgeService, voices: EDGE_VOICES, toVoice: TO_EDGE, call: edge,
+    fallback: "gemini-3.8-flash-lite-tts",
+    note: "免費、台灣腔繁中；女聲中英夾雜念得清楚，男聲的英文較弱；語氣描述不生效。非官方介面，微軟可能隨時擋：擋了自動改用 Gemini，照 Gemini 收費。" }),
+  Object.freeze({ id: "gemini-3.8-flash-lite-tts", vendor: "Google", label: "Gemini 語音", credentialName: "GEMINI_API_KEY", credential: keyed("GEMINI_API_KEY"), voices: GEMINI_VOICES, toVoice: TO_GEMINI, call: gemini,
     note: "30 種聲線、繁中自然、語氣用一句話描述；長數字可能逐位念。2027 起價格加倍。" }),
-  Object.freeze({ id: "gpt-4o-mini-tts", vendor: "OpenAI", label: "OpenAI 語音", keyName: "OPENAI_API_KEY", voices: OPENAI_VOICES, toVoice: TO_OPENAI, call: openai,
+  Object.freeze({ id: "gpt-4o-mini-tts", vendor: "OpenAI", label: "OpenAI 語音", credentialName: "OPENAI_API_KEY", credential: keyed("OPENAI_API_KEY"), voices: OPENAI_VOICES, toVoice: TO_OPENAI, call: openai,
     note: "英文最自然、7 種聲線；繁中腔調偏大陸。OpenAI 2027-01-06 停止服務。" }),
 ]);
 
@@ -73,7 +105,7 @@ const live = (at) => MODELS.filter((m) => !retireOn(m.id) || retireOn(m.id) > da
 // Live rows with what providers.cjs decides by: can it run here, is it free (its button price is 0).
 const rows = (env, at) => live(at).map((m) => {
   const price = speechPrice(m.id);
-  return { m, id: m.id, available: !!env[m.keyName], free: price?.usd === 0, price };
+  return { m, id: m.id, available: !!m.credential(env), free: price?.usd === 0, price };
 });
 const defaultModel = (env, at) => providers.choose(rows(env, at), vwEnv(env, "TTS_MODEL"))?.m;
 // The model a job runs: its named live row, else the default. A retired or unknown name is refused, never swapped.
@@ -87,8 +119,9 @@ function voiceFor(model, id) {
   return (model.voices.find((v) => v.id === id) || model.voices.find((v) => v.id === model.toVoice[id]) || model.voices[0]).id;
 }
 function key(model, env) {
-  if (!env[model.keyName]) throw Object.assign(Error("此電腦尚未設定 " + model.keyName + "；請先設定服務。"), { status: 503 });
-  return env[model.keyName];
+  const credential = model.credential(env);
+  if (!credential) throw Object.assign(Error("此電腦尚未設定 " + model.credentialName + "；請先設定服務。"), { status: 503 });
+  return credential;
 }
 // /capabilities: the live rows in providers.cjs order; price = provider-cost.cjs speechPrice (same rule as the charge).
 function capability(env, at) {
@@ -98,8 +131,19 @@ function capability(env, at) {
     models: providers.order(list).map(({ m, available, free, price }) => ({ id: m.id, vendor: m.vendor, label: m.label, note: m.note, retireOn: retireOn(m.id), available, free, voices: m.voices, defaultVoice: m.voices[0].id, price })),
   };
 }
-async function synthesize(model, { text, voice, style, env, fetchImpl, signal }) {
-  return model.call({ model: model.id, text, voice: voiceFor(model, voice), style: style || DEFAULT_STYLE, apiKey: key(model, env), fetchImpl, signal });
+// Answers { audio, ext, usage, model: the row that spoke, fallbackFrom? }. A call that failed because the service did (the
+// connector marks error.fallback, or the network threw) is tried once on the row's fallback when it is live and configured,
+// never for a refused request or a cancelled job; the caller labels and charges `model`.
+async function synthesize(model, { text, voice, style, env, fetchImpl, signal, at }) {
+  const once = (m) => { const credential = key(m, env); return m.call({ model: m.id, text, voice: voiceFor(m, voice), style: style || DEFAULT_STYLE, apiKey: credential, credential, fetchImpl, signal }); };
+  try {
+    return { ...(await once(model)), model };
+  } catch (error) {
+    const serviceFailed = error?.fallback === true || error?.status === undefined;
+    const backup = model.fallback && serviceFailed && !signal?.aborted && live(at).find((m) => m.id === model.fallback && m.credential(env));
+    if (!backup) throw error;
+    return { ...(await once(backup)), model: backup, fallbackFrom: model.id };
+  }
 }
 
-module.exports = { MODELS, GEMINI_VOICES, OPENAI_VOICES, DEFAULT_STYLE, live, pick, defaultModel, voiceFor, key, capability, synthesize };
+module.exports = { MODELS, GEMINI_VOICES, OPENAI_VOICES, EDGE_VOICES, DEFAULT_STYLE, live, pick, defaultModel, voiceFor, key, capability, synthesize };

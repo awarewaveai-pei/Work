@@ -58,6 +58,7 @@ function geminiSpeechUsd(rate, chars, audioSec, usage, at) {
 // text <= 1 token per character + audio out per second of the returned audio. No measured duration (ffprobe failed) =
 // 0.5 s per character, above any normal reading pace.
 function speechUsd(model, chars, audioSec, usage = null, at = undefined) {
+  if ((rates.FREE_TTS_MODELS || []).includes(model)) return 0;
   if (Object.hasOwn(rates.GEMINI_TTS_RATES, model)) return geminiSpeechUsd(rates.GEMINI_TTS_RATES[model], chars, audioSec, usage, at);
   const rate = rates.OPENAI_TTS_RATES[model];
   if (!rate) throw unpriced(model);

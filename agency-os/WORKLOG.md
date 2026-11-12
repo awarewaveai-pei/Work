@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-12（續10）影音工作台 TTS.2：Edge 免費配音補回（四個聲音）、預設；Edge 故障自動改 Gemini 並照 Gemini 計價
+
+- 根因：舊 app（next-admin `VideoStudio.tsx:99-102`）有「Edge 免費」四個聲音，搬到工作台時漏掉；工作台配音清單只有 Gemini／OpenAI。
+- 選擇：正式站 `lobster-video-service` 在跑，且已是 Edge 唯一實作（`apps/video-service/pipeline.py:239` `_tts`），只缺單獨端點 → 新增 `POST /tts`（server.py，X-Render-Token、文字 ≤2000、聲音名檢查、回 audio/mpeg、Edge 故障 502），不另做 Node 版。token＝主機 `.env` VIDEO_SERVICE_SECRET（雜湊核對＝video-service RENDER_AUTH_TOKEN）。
+- 工作台：`backend/speech.cjs` 加 edge-tts 列（免費、`cost-model.ts` FREE_TTS_MODELS），免費優先規則下有設定即為預設；Edge 服務故障（5xx／連不上）改走 Gemini 一次，任務標 Gemini、照 Gemini 用量計價；4xx 不退（Codex F2）。修 Codex F3：Gemini→OpenAI 反向對照不被 Edge 對照蓋掉。compose 加 VW_TTS_SERVICE_URL／TOKEN。
+- 實測（主機拋棄式 video-service 容器呼叫新 /tts，主機 whisper 回聽）「這支 iPhone 16 Pro 的 Camera Control 很好用，AI 剪輯 workflow 更快」：女聲英文都在、不跳字（「AI」聽成「給 I」）；男聲「AI 剪輯 workflow」→「該剪輯微博」；英文兩聲全對。檔案 `$env:TEMP\vw-edge-tts\*.mp3`。
+- gate：主目錄 paid-price 紅＝另一 session 未提交的 `scripts/editor-panes/effects.js:249`；只含本次檔案的拋棄式 worktree gate 全綠。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed10-subtitles-backend.cjs (1g Edge 預設／故障退 Gemini／4xx 不退); node tests/gate.cjs (隔離 worktree); python -m unittest tests.test_tts_endpoint (主機拋棄式 video-service 容器); POST /tts 四聲音實呼叫＋401／400 | exit=0 | ms=1200000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n — Codex agency-os/reports/oracle/2026-11-12-partialreview-da8acaaf.md；修 F2、F3，F1（compose 走 safe-infra-patch）在部署清單
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=TO_GEMINI|OPENAI_TO_GEMINI|FREE_TTS_MODELS|VW_TTS_SERVICE | hits=12
 ## 2026-11-12（續9）git-parity-merge 中途失敗會丟掉其他 session 的未提交改動（事故＋修正）
 
 - 事故：D:\Work 對齊時 `scripts/git-parity-merge.py` 先把 10 個「本地有改、origin 也改」的檔寫回 HEAD，再把未追蹤檔 os.replace 到 C:\ 的 tempfile（repo 在 D:）→ WinError 17 當掉；合併結果只在記憶體。手動 ff 後這 10 檔＝origin 版本：WORKLOG.md、video-editor-parity-supervisor/data.mjs、supervisor.html、hetzner-phase1-core/.env.example、docker-compose.yml、next-admin lib/outreach/org-ai-key.ts（＋test）、video-workbench editor-panes/fillers.js、subtitles.js、tests/paid-price.cjs。沒推上去的本地改動無法確認（檔案歷史比對誤判太多）；已請監工 session 通知擁有者核對。AO-RESUME 每次開工都走這支腳本。

@@ -709,6 +709,9 @@ services:
       # The same key as next-admin: paid tier (Google Cloud project AwareWave-ColdEmail elite-thunder-508306-q3, billing linked;
       # prepaid -- 402 "prepayment credits are depleted" when the balance is empty). Empty = Gemini rows show 未啟用.
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # Free Edge speech through video-service POST /tts (its RENDER_AUTH_TOKEN = .env VIDEO_SERVICE_SECRET). Unset = Edge 未啟用.
+      VW_TTS_SERVICE_URL: http://video-service:8732
+      VW_TTS_SERVICE_TOKEN: ${VIDEO_SERVICE_SECRET:-}
       VW_TRANSCRIBE_WORKER_URL: ${MEDIA_TRANSCRIBE_WORKER_URL:-}
       VW_TRANSCRIBE_WORKER_TOKEN: ${MEDIA_TRANSCRIBE_WORKER_TOKEN:-}
       REPLICATE_API_TOKEN: ${REPLICATE_API_TOKEN:-}

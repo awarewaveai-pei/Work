@@ -346,6 +346,8 @@ export const GEMINI_VIDEO_RATES: Record<string, GeminiMediaRate & { label: strin
 export const GEMINI_IMAGE_TOKEN_RATES: Record<string, GeminiMediaRate> = {
   "gemini-nano-banana-2.1": { inputPerM: 1.5, outputPerM: 30, textOutPerM: 7.5 },
 };
+/** Speech with no vendor bill: Edge TTS through our video-service (video-workbench backend/speech.cjs "edge-tts"). */
+export const FREE_TTS_MODELS: readonly string[] = ["edge-tts"];
 export type GeminiTtsRate = { label: string; audioTokensPerSec: number; prices: readonly { from: string; textInPerM: number; audioOutPerM: number }[] };
 export const GEMINI_TTS_RATES: Record<string, GeminiTtsRate> = {
   "gemini-3.8-flash-lite-tts": { label: "Gemini 3.8 Flash-Lite TTS", audioTokensPerSec: 25, prices: [

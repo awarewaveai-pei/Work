@@ -103,6 +103,38 @@ def _r2_put(object_key: str, data: bytes, content_type: str, bucket: str, public
     return f"{public_base}/{object_key}"
 
 
+# POST /tts (video-workbench backend/speech.cjs "edge-tts"): one Edge TTS clip, answered in the request as audio/mpeg.
+# Same Edge path the renders use (pipeline._tts); voices = Edge neural names, text capped like one narration step.
+TTS_MAX_CHARS = 2000
+_TTS_VOICE = re.compile(r"^[a-z]{2,3}-[A-Z]{2}-[A-Za-z]+Neural$")
+
+
+def tts_request(payload: dict) -> tuple:
+    """(text, voice) or ValueError -- the checks before any Edge call."""
+    text = str(payload.get("text", "")).strip()
+    voice = str(payload.get("voice", "") or config.TTS_VOICE)
+    if not text:
+        raise ValueError("text 為必填")
+    if len(text) > TTS_MAX_CHARS:
+        raise ValueError(f"text 過長（{len(text)} > {TTS_MAX_CHARS}）")
+    if not _TTS_VOICE.match(voice):
+        raise ValueError("voice 無效")
+    return text, voice
+
+
+def synthesize_tts(text: str, voice: str) -> bytes:
+    import asyncio
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "tts.mp3")
+        asyncio.run(pipeline._tts(text, path, voice=voice))
+        with open(path, "rb") as f:
+            data = f.read()
+    if not data:
+        raise RuntimeError("edge_tts_empty")
+    return data
+
+
 def _authed(handler: "BaseHTTPRequestHandler") -> bool:
     """Compare the renderer token after the startup policy has validated it."""
     if not AUTH_REQUIRED:
@@ -743,6 +775,7 @@ class _Handler(BaseHTTPRequestHandler):
                     "openai_tts": bool(config.OPENAI_API_KEY),
                     "footage_render": True,
                     "caption_reburn": True,
+                    "tts": True,
                 },
                 "formats": list(config.FORMATS.keys()),
             })  # healthcheck 免認證
@@ -762,7 +795,7 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?")[0]
-        if path not in ("/render", "/generate-job", "/render-footage", "/reburn-captions"):
+        if path not in ("/render", "/generate-job", "/render-footage", "/reburn-captions", "/tts"):
             self._json(404, {"error": "not found"})
             return
         if not _authed(self):
@@ -811,6 +844,18 @@ class _Handler(BaseHTTPRequestHandler):
                 self._json(202, {"jobId": job_id})
             elif path == "/reburn-captions":
                 self._json(202, {"jobId": submit_reburn(payload)})
+            elif path == "/tts":
+                text, voice = tts_request(payload)
+                try:
+                    audio = synthesize_tts(text, voice)
+                except Exception as e:  # noqa: BLE001 -- Edge refused or unreachable: 502, the caller falls back
+                    self._json(502, {"error": f"edge_tts_failed: {type(e).__name__}"})
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "audio/mpeg")
+                self.send_header("Content-Length", str(len(audio)))
+                self.end_headers()
+                self.wfile.write(audio)
             else:
                 # /render — existing behaviour
                 job_id = submit_render(payload)
