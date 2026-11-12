@@ -73,6 +73,8 @@ async function waitExportAsset(page, known) {
     const chooser = page.waitForEvent("filechooser");
     await page.getByRole("button", { name: "上傳素材", exact: true }).click();
     await (await chooser).setFiles(video);
+    // Card ED.4: an upload only lands in 本次上傳; a double-click adds it to the main track.
+    await page.locator(".editor-library [data-ed-asset-add]").first().dblclick({ timeout: 60000 });
     await page.waitForSelector('[data-ed-lane="V1"] [data-ed-clip]', { timeout: 60000 });
     await page.evaluate(() => ed.queue);
 

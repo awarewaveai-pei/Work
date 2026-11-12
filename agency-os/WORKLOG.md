@@ -10,6 +10,22 @@
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=edFx | hits=84
 - ORACLE: agency-os/reports/oracle/2026-11-12-partialreview-a95372ac.md
 - rollback：git revert 本 commit。
+## 2026-11-12（續12）ED.4 素材分頁照參考站實際行為校正（讀參考站自身程式碼）
+
+- 依據：seedstar 剪輯頁 JS（素材卡 onDoubleClick／Enter、上傳 onUploaded 只進素材清單＋sessionStorage、拆出音軌 POST /audio/extract 另存音訊素材）與其 zh-Hant 字串。
+- 改：單擊不加入，雙擊／Enter／＋ 才加入；「上傳素材」只進素材庫與「本次上傳」（同分頁重新整理仍在），不再加到時間軸（音訊／貼圖分頁的 upload:kind 照舊加入）；拆出音軌＝另存音訊素材（同檔、同 origin、id=<影片id>#audio，不覆蓋改過名的）、不動時間軸；空狀態一律「無符合條件的素材」、載入失敗另有字；收藏鍵文字「加入最愛／移除最愛」；上傳鍵下加平台既有權利確認勾選（VideoWorkbench.rightsCheckbox，原本漏帶 rightsConfirmed）。
+- 同時修：載入進行中再要求載入會補跑一次（上傳後清單不再過期）；搜尋重繪也走 VideoWorkbench.sanitize。
+- 測試配合新手勢：p3-roundtrip、editor-media-picker、ed2-timeline 改為雙擊素材卡。
+- Codex b0a0544c 3 項皆成立已修：F1 軌道名未跳脫進卡片標籤；F2 重拆音軌覆蓋改過的名；F3 本次上傳數量含已刪素材。
+- Codex a6fadddd 2 項：無聲影片拆出音軌會讓匯出失敗→先查 probe；載入與上傳競速會刪掉新上傳的本次上傳 id→只刪載入前就在的 id。
+- Codex a88a5794／1f604aa8：透明影片預覽 proxy.webm 無聲（media-store transcode -an），原檔又被判不可靠播放。不變量：瀏覽器實際播放的檔（previewUrl||url）必須含聲音，單一判斷 edAssetsSplitBlocked，透明影片暫不拆。治本＝後端真的抽出音訊檔（參考站 POST /audio/extract），列監工決定。
+- Codex 3d0f778b：無發現。
+- 參考站有、規格未列、本卡未做：素材拖到軌道、影片卡滑過預覽、右鍵選單（加入播放頭位置）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed4-assets.cjs；ed2-timeline／editor-media-picker／p3-roundtrip／ed1-layout／p2-tracks-ui／tools-editor／theme-tokens 皆綠 | exit=0 | ms=70000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/7m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=edAssets | hits=114
+- ORACLE: agency-os/reports/oracle/2026-11-12-partialreview-3d0f778b.md
+- rollback：git revert 本 commit。
 ## 2026-11-12（續11）影音工作台 BOOT.2：「讀狀態」與「讀能力」同時發
 
 - 根因：`VideoWorkbench.ready`（/state）先完成，boot 檔才發 /capabilities（tools/projects/templates-boot 第一行、storyboards-boot、index-0.js、characters-0.js 各自再發一次），兩支 API 串列＝多一趟歐洲往返（量測：tools-0.js 開始載入 698ms → 399ms，本機對 /api/vw 加 300ms 延遲）。
