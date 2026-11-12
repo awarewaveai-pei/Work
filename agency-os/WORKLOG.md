@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-12（續6）影音工作台標價檢查器：涵蓋 /editor/transcriptions 這類「非 /generations 的付費工作路由」
+
+- 根因：`tests/paid-price.cjs` 只認 `PAID_ROUTES` 與 `generations.create`；POST `/editor/transcriptions`（整片字幕、剪贅字、工具頁辨識都走它）開付費工作卻不算呼叫點，新增不標價的呼叫不會紅。
+- 做了：檢查器從 `backend/api.cjs` 讀每個 `route === "/x"` 區塊的 `start({ type, operation })`，經 `paidFeature` 判定付費者一併計入（現為 `/editor/transcriptions` → video.transcribe）；剪輯 `sub-run`（`editor-panes/subtitles.js`）、`fc-run`（`editor-panes/fillers.js`）兩鈕補宣告 `video.transcribe`（標籤本來就顯示查到的價）。
+- 突變（拋棄式 worktree，HEAD＋本改動）：拿掉剪輯兩鈕、`tools-0` 後備鈕、短影音分析鈕的 transcribe 宣告 → 紅，列出三個 `/editor/transcriptions` 呼叫點；還原 → 綠。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/paid-price.cjs（worktree：7 features, 31 sites ok）＋ main 上 node tests/{p6-main-system,backend,p6-chunked-upload}.cjs 皆 exit 0 | exit=0 | ms=20000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/0n（Codex `agency-os/reports/oracle/2026-11-12-partialreview-a90139f8.md`）
+  - m1 不修：仍是每功能全域計數（6 宣告 vs 3 呼叫，含 `tools-workflows.js:36` 選供應商的字串），多一個未標價呼叫不一定紅＝已知風險①，靜態無法把呼叫點對到按鈕。
+- 現況：main 工作目錄跑此檢查器是紅的，原因是他人未 commit 的 `editor-panes/effects.js:249` 新增付費影片呼叫但按鈕無 `data-paid="video.motion"`（檢查器正確擋下）。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=editor/transcriptions | hits=40（api.cjs 路由、editor-panes 字幕／剪贅字、tools-workflows、測試、WORKLOG／文件；前端 POST 皆已計入，其餘為 GET／quote／文件）
 ## 2026-11-12（續5）影音工作台瀏覽器副本：影片第一次播放只下載一次
 
 - 根因：2026-11-10 續48 的副本對 `<video>`（Range 請求）未命中時，播放器走網路，背景再抓一次完整檔存副本 → 每支新影片從歐洲下載兩次。

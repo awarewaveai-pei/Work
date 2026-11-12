@@ -57,10 +57,22 @@ function topProp(arg, key) {
   return undefined;
 }
 
+// Routes that start a paid job outside /generations (e.g. POST /editor/transcriptions -> editor-transcribe): read from
+// backend/api.cjs, each `route === "/x"` block whose start({ type, operation }) literals paidFeature calls paid.
+const apiSource = fs.readFileSync(path.join(root, "backend/api.cjs"), "utf8");
+const JOB_ROUTES = {};
+for (const m of apiSource.matchAll(/route === "(\/[^"]+)"/g)) {
+  const next = apiSource.indexOf("route ===", m.index + 10), block = apiSource.slice(m.index, next < 0 ? undefined : next);
+  const s = /\bstart\(\{\s*type:\s*"([^"]+)",\s*operation:\s*"([^"]+)"/.exec(block);
+  const feature = s && mainSystem.paidFeature({ operation: s[2], settings: {} }, s[1]);
+  if (feature) JOB_ROUTES[m[1]] = feature;
+}
+assert.equal(JOB_ROUTES["/editor/transcriptions"], "video.transcribe", "paid job routes not found in backend/api.cjs");
+
 const sites = [], problems = [];
 const site = (feature, f, line, how) => sites.push({ feature, where: `${f}:${line}`, how });
 for (const [f, text] of Object.entries(src)) {
-  for (const [route, feature] of Object.entries(mainSystem.PAID_ROUTES))
+  for (const [route, feature] of Object.entries({ ...mainSystem.PAID_ROUTES, ...JOB_ROUTES }))
     for (const m of text.matchAll(new RegExp(`["'\`]${route.replace(/[/.]/g, "\\$&")}["'\`]`, "g"))) site(feature, f, lineOf(text, m.index), route);
   for (const m of text.matchAll(/generations\s*\.create\(/g)) {
     const line = lineOf(text, m.index), arg = callArg(text, m.index + m[0].length - 1);
