@@ -34,6 +34,23 @@
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — UPDATE returning 兩列 auto_draft=f，讀回選取程式 `pipeline-store.ts:66-70`
 - BUGHUNT_WAIVED: NA -- 無程式或文件字串改動，只改兩列 prod 資料
 - ORACLE_WAIVED: 無 source 檔改動
+## 2026-11-12（續2）影音工作台 tools.html 按需載入：開機只載清單＋外框，工具程式點開才載（7037d30a5）
+
+- 根因：`scripts/tools-boot.js` 開機一次載入 20 個工具的程式（剪輯器 153KB＋分頁、合成、綁定、3D…），工具清單要等全部載完才畫。改前正式站（台灣）點「應用工具」到看到清單 4648ms。
+- 做法：`tools-0.js` TOOLS 項加 `scripts`（照舊開機順序）；`render()` 是唯一入口（清單／#網址／popstate／acceptAsset／工具互切），未 `loaded` 先畫標題＋載入中，經 `VideoWorkbench.loadScripts` 載完再重畫。`loadScripts` 同一檔每頁只插一次。剪輯組（edit/compose/rig/3d/short）互相呼叫，同一組。
+- 刪除：tools-boot.js 開機清單 27 支工具檔。
+- 不變量：開機只有外框＋清單（gate 檢查）；每支工具檔都屬於某組且存在（gate）；同一檔不重複宣告。
+
+**驗證**
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/tools-lazy-load.cjs (Edge；18 工具 清單／#網址／hash+上一頁下一頁，無 page error) | exit=0 | ms=60000
+- 相關測試綠：gate 15/15；ed1-layout p1-loop p3-compositor-ui p4-rig-ui fc2-engine-host generation-flows editor-restore ed9-project-list pj3-arrange ed4-assets ed10-subtitles-ui p2-tracks-ui pj2-spine-settle。follow-tracking/follow-controls 因暫存素材 person.jpg 不在而紅（環境，與本改動無關）。
+- 突變：popstate 拿掉 render() → tools-lazy-load 逾時紅；還原綠。
+- pj3-arrange 時序：新時序下 1/3 紅（按鈕重畫後 paid-price.js 下一畫格才補價格，測試兩步讀）；未改 HEAD 3/3 綠。改成同一瞬間讀 → 5/5；ed10-subtitles-ui:198 同類一併改。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/3m/0n
+  - Codex `agency-os/reports/oracle/2026-11-12-review-bcd7811f.md`：F1 失敗重試修不好已執行的相依檔 → 拿掉重試（失敗維持，重整修復）；F2 acceptAsset 等載入時換工具會寫錯工具 → 等待移到改狀態前；F3 測試沒真的上一頁 → 補 popstate＋突變。三項同 commit 修。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=contentWindow\.(ed|cp|rg|t3|tool|VideoWorkbench) | hits=1
+  - 只有 generator-results.js:89 呼叫 acceptAsset（已等載入）；engine-host 的 edSpine* 只在註解。
+- 部署後待量：點「應用工具」到清單時間（監工）。
 ## 2026-11-12（續1）影音工作台：靜態檔帶版本號、在 Cloudflare 邊緣快取（tools.html 不再每檔回歐洲）（c20ed9691）
 
 **根因**（證據）：工作台所有靜態檔 `Cache-Control: no-store`（`server.cjs` 舊 :176）→ Cloudflare（Free、SSL=Full、無 Cache Rule、`cache_level=aggressive`、video A 記錄 proxied、無 cloudflared）每檔都從台灣接入的 **SIN** 節點回歐洲 origin。路徑：CF →(h2) 主機 nginx 443 → `127.0.0.1:8083` lobster-nginx → `video-workbench:4178`（upstream keepalive 16）。
