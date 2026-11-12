@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-12（續4）影音工作台：同一頁不混用兩個版本——舊版本號的檔回 404、頁面提示重新整理（143c04ad9）
+
+- 根因：按需載入（d4983b243）後，部署前開著的分頁點開新工具，會用舊 `?v=` 抓檔；伺服器只有新版，照樣回新檔 → 舊核心＋新剪輯器同頁。續1 RISKS 說「與改前相同」是錯的（改前開機一次載完）。
+- 做法：`static-version.cjs` `cachePolicy` = immutable｜stale｜no-store（取代 isImmutable）；stale → `server.cjs` 404 no-store。邊緣已快取的舊版同網址仍可服務舊分頁。`loadScripts` 與 `app-entry.js` 在帶版本頁面失敗時提示「請重新整理頁面」。缺 `?v=` 不變。
+- 不變量：一個頁面只執行自己版本的檔。
+
+**驗證**
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs + tests/tools-lazy-load.cjs（本機模式與帶版本模式） | exit=0 | ms=90000
+- 突變：stale 改回 no-store → static-version.cjs 紅；還原綠。
+- Edge 一次性：舊版工具頁點剪輯 → 錯誤含「請重新整理」；首頁 app-entry 新、子檔舊 → 畫面顯示「請重新整理頁面」。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/0n
+  - Codex `agency-os/reports/oracle/2026-11-12-review-32c511fe.md` F1：app-entry.js 失敗訊息仍叫人跑 start.cmd → 已改，同 commit。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=isImmutable | hits=3
+  - 3 處都在 WORKLOG 歷史紀錄（續1 與本條）；程式碼 0 引用。
 ## 2026-11-12（續3）開發信改走免費 Gemini 金鑰（OUTREACH_GEMINI_API_KEY），付費那把只留給影片／圖片
 
 - 觸發：操作者「開發信排程是維持免費」；新建免費專案 AwareWave-Outreach-Free（354624444562，不連帳單），原付費專案改名 AwareWave-Media（749365809116）。前因見同日「Google 帳單 NT$28.20 查因」一筆。
