@@ -1,4 +1,20 @@
 # Worklog
+## 2026-11-12（續1）Google 帳單 NT$28.20 查因＋暫停開發信自動草稿
+
+- 觸發：操作者收到 Google Cloud「$10 預算 100%」信，報表顯示 11/10–11/11 共 $28.20，問「儲值當天被用完」「11/11 沒開電腦為何被扣」，要求暫停開發信（仍在測試階段）。
+- 根因：
+  - C1 帳單幣別＝新台幣（報表只印「$」）：flash-lite 輸入 727,239 tok＝`ai_call_logs` 11/10–11/11 合計 727,236；× 官方 US$0.30/1M＝US$0.218，帳單 7.07＝×32.4；輸出 125,039 tok × US$2.50/1M＝US$0.313，帳單 10.13＝×32.4。合計 NT$28.20 ≈ US$0.87。幣別為推算，操作者尚未在帳戶設定頁確認。
+  - C2 11/10 把專案 AwareWave-ColdEmail 連上帳單（工作台要用 Gemini，本檔 11-10 續30 一帶），同一把 `GEMINI_API_KEY` 也在 `lobster-next-admin`（sha256 前 12 碼同 42c75f2f7952）→ 開發信呼叫由免費層改計費；當時未告知操作者這條線會開始收費。
+  - C3 11/11 的呼叫（台灣 16:00–18:00）：`/etc/cron.d/c162` → `/root/c162-daily.sh` 一次性一致率量測 329 次 `outreach/claim-check`（11/11 08:31 UTC 跑完第 10 批，寫 `/root/c162/DONE` 並自刪 cron）；`outreach_gmail_sync` 每 10 分內的 `runPipelineTick`（`app/api/internal/outreach/gmail-sync/route.ts:77`）71 次 `outreach/research`。
+  - C4 其餘：Omni 1.2 Flash 影片 NT$9.01、Nano Banana 2.1 NT$1.85＝11/10 接模型時的實測。
+- 改（prod 資料，操作者明示）：`co_sender_accounts.auto_draft` true→false，id `1e04842d-4acb-4126-9b2b-fdac97af4323`、`1622a501-9b08-4bc9-be86-5951b29ed73f`（`pipeline-store.ts:68` 的選取條件＝產品既有開關）。未動金鑰、compose、cron。
+- rollback：`update co_sender_accounts set auto_draft=true where id in (上列兩個)`。
+- 旁見：gmail-sync 回 `invalid_grant`（主 Gmail connector token 過期或被撤銷）；恢復開發信前要重新連結。
+- 避免再發生：把免費層金鑰連上帳單前，先 `docker exec <c> printenv GEMINI_API_KEY | sha256sum` 列出所有持有同一把的容器與其排程用量，並告知操作者每條線的月費。
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql 計數 pipeline 選取條件＝0；手動 POST /api/internal/outreach/gmail-sync → pipeline.orgs=0 researched=0 generated=0；`max(created_at) from ai_call_logs where vendor='Google'` 前後皆 2026-11-11 10:10:46 UTC | exit=0 | ms=20000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — UPDATE returning 兩列 auto_draft=f，讀回選取程式 `pipeline-store.ts:66-70`
+- BUGHUNT_WAIVED: NA -- 無程式或文件字串改動，只改兩列 prod 資料
+- ORACLE_WAIVED: 無 source 檔改動
 ## 2026-11-10（續52）ED.6 剪輯器「音訊」分頁＋所有組織共用的內建曲庫（/library/）
 
 - 根因：音訊分頁只有選擇／上傳、響度三鈕（`docs/editor-parity-compare-20261106.md:61`），缺用途分類、目標軌、內建曲庫、音訊設定、AI 旁白。內建音檔不能放在 per-org 的 `/media`：正式站每個組織各有自己的資料夾（`server.cjs:21`），媒體庫也各建一份（`backend/api.cjs:33`、`backend/media-store.cjs:211-215`）。
