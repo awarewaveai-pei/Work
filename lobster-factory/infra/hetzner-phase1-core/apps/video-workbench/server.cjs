@@ -30,6 +30,7 @@ function createServer({
   env = process.env,
   fetchImpl = fetch,
   awareWaveDir = require("./backend/appearance.cjs").resolveSource(root, env),
+  staticBuild,
 } = {}) {
   const createApi = (orgDir, orgId) => require("./backend/api.cjs").createApi({
     dataDir: orgDir,
@@ -68,6 +69,10 @@ function createServer({
     return forOrg(org);
   };
   const version = require("./package.json").version;
+  // Edge-cacheable static files (backend/static-version.cjs). Only where the files cannot change while the server runs (the
+  // container image); local start.cmd keeps no-store so an edited file is never pinned under an old ?v=.
+  const staticVersion = require("./backend/static-version.cjs");
+  const build = staticBuild !== undefined ? staticBuild : trustProxy ? staticVersion.buildId(root) : null;
   const server = http.createServer(async (req, res) => {
     let file;
     try {
@@ -159,6 +164,12 @@ function createServer({
         throw Error();
       const stat = fs.statSync(file);
       if (!stat.isFile()) throw Error();
+      if (build && boundary === root && /\.html$/i.test(file)) {
+        const body = Buffer.from(staticVersion.versionHtml(fs.readFileSync(file, "utf8"), build));
+        res.writeHead(200, { "Content-Type": types[".html"], "X-Content-Type-Options": "nosniff", "Cache-Control": "no-store", "Content-Length": body.length });
+        res.end(req.method === "HEAD" ? undefined : body);
+        return;
+      }
       const size = stat.size;
       const send = (start, end) => {
         if (req.method === "HEAD" || !size) {
@@ -173,7 +184,10 @@ function createServer({
       const headers = {
         "Content-Type": types[path.extname(file)] || "application/octet-stream",
         "X-Content-Type-Options": "nosniff",
-        "Cache-Control": "no-store",
+        "Cache-Control":
+          boundary === root && staticVersion.isImmutable(pathname, new URL(req.url, "http://localhost").search, build, file)
+            ? "public, max-age=31536000, immutable"
+            : "no-store",
         "Accept-Ranges": "bytes",
         "Content-Length": size,
       };

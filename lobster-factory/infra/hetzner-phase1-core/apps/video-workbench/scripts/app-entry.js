@@ -21,11 +21,12 @@
   }
   try {
     // runtime.js (VideoWorkbench.loadScripts) is not loaded yet, so the same rule is written out here: insert all tags at once,
-    // async = false keeps the list order while the downloads overlap.
+    // async = false keeps the list order while the downloads overlap. ?v=<build> as in loadScripts (edge-cacheable).
+    const build = document.documentElement.getAttribute("data-vw-build");
     await Promise.all(["config.js", "shared/models.js", "shared/adapters.js", "shared/purify.js", "shared/episode-spine.js", "shared/runtime.js", "shared/security.js", "shared/theme.js", "shared/jobs-view.js", "shared/workflows.js", "shared/assets-ui.js", "scripts/index-boot.js"].map((file) => new Promise((resolve, reject) => {
       const script = document.createElement("script");
       script.async = false;
-      script.src = new URL(file, document.baseURI).href;
+      script.src = new URL(file + (build ? "?v=" + encodeURIComponent(build) : ""), document.baseURI).href;
       script.onload = resolve;
       script.onerror = () => reject(Error("無法載入 " + file));
       document.body.append(script);

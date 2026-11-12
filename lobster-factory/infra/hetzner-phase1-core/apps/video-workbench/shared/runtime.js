@@ -488,14 +488,16 @@
   });
   // Page boot scripts: all <script> tags go in at once so the downloads overlap (page load = one round trip + the biggest
   // file, not one round trip per file); async = false makes the browser still run them in list order. A failed file rejects.
+  // ?v=<build> (server-injected data-vw-build, backend/static-version.cjs) lets the edge cache keep these files; absent = no-store as before.
   function loadScripts(files, base) {
+    const build = document.documentElement.getAttribute("data-vw-build");
     return Promise.all(
       files.map(
         (file) =>
           new Promise((resolve, reject) => {
             const s = document.createElement("script");
             s.async = false;
-            s.src = base + file;
+            s.src = base + file + (build ? "?v=" + encodeURIComponent(build) : "");
             s.onload = resolve;
             s.onerror = () => reject(Error("無法載入 " + file));
             document.body.append(s);
