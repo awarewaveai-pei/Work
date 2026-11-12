@@ -24,6 +24,7 @@ const PAID_ROUTES = Object.freeze({
   "/tools/short/analyze": "video.script", "/tools/music/lyrics": "video.script", "/tools/subtitles/translate": "video.script",
   "/assets/describe": "video.script", "/characters/questions": "video.script", "/characters/draft": "video.script",
   "/products/script": "video.script", "/products/proposals": "video.script", "/transcriptions": "video.transcribe",
+  "/editor/agent": "video.script", // card ED.13 剪輯 Agent
 });
 const LOCAL_URL = /^\/(generated\/[a-f0-9-]+\.[a-z0-9]+|media\/[a-f0-9]{64}\/original\.[a-z0-9]+)$/;
 

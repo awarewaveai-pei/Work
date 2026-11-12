@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-12（續14）影音工作台 ED.13 階段 1：剪輯 Agent 後端路由、操作清單驗證、浮動視窗
+
+- 改：新路由 `POST /api/vw/editor/agent`（`backend/editor-agent.cjs`；`backend/api.cjs` 加路由與 `/capabilities` 的 `editorAgent { ready }`）。一則訊息呼叫一次既有的文字入口 `text()`（JSON 模式），回 `{ reply, ops }`，由瀏覽器套用專案。`PAID_ROUTES` 加 `"/editor/agent": "video.script"`（`backend/main-system.cjs:27`），扣點、價目、許可沿用文字路由。
+- 監工決定（2026-11-12）：不新增 Anthropic 供應商、金鑰與計價，也不改用量冪等鍵。施工圖 §5 的 Anthropic 方案作廢；防止重複扣點改在瀏覽器：一次只送一則，不自動重送。
+- 驗證：`shared/editor-agent-plan.js`（後端與頁面共用）列出 22 個工具的參數型別與範圍白名單，一輪最多 50 個操作；遇到未知工具或欄位，整份作廢。清單不合格時回 502，不扣點。`summarize` 只送結構（id、種類、軌、時間、文字前 200 字），不含素材網址。`removal` 是破壞性門檻：一輪刪超過 3 段或超過總長 30%，要使用者確認。
+- 視窗：`scripts/editor-agent.js`＋`styles/editor-agent.css`（由 `tools-0.js` 載入、`pages/tools.html` 掛 css）。功能：可拖曳；新對話／重來／關閉；五個快捷需求；Enter 送出；傳送鍵用 `data-paid="video.script"` 標價。套用流程：先在副本跑完整份，任何一步失敗就整份不套用 → 過門檻確認 → 一次 `edCheckpoint` 換上 → `edCommit`。`propose_paid` 只顯示卡片，按了開字幕或剪贅字分頁，由該頁自己的標價按鈕執行。
+- 未完（階段 2）：頂列 Agent 按鈕與 `edAgentTools` 都在 `scripts/tools-editor.js`，等預覽補齊卡提交後再改；在那之前視窗沒有入口。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs（含新 ed13-agent）＋ node tests/ed13-agent.cjs（假 OpenAI responses、假 next-admin 許可與用量）；tests/paid-price.cjs、theme-tokens.cjs、p6-main-system.cjs、backend.cjs、awarewave-files.cjs、capabilities-boot.cjs、boot-script-loading.cjs 綠 | exit=0 | ms=20000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
+- Codex c732967c 2 項皆成立、已修：F1 新測試沒進部署閘→加進 `tests/gate.cjs`（gate 17/17 綠）；F2 刪除確認框開著時專案被改，確認後會蓋掉→確認後比對專案沒變才套用，否則整輪不套用
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=editor/agent | hits=8
+- ORACLE: agency-os/reports/oracle/2026-11-12-partialreview-c732967c.md
+- rollback：git revert 本 commit（路由、視窗、測試一起撤；無資料變更）。
 ## 2026-11-12（續13）影音工作台 ED.12：剪輯器「特效」分頁的畫質增強、從這裡重新生成
 
 - 改：`scripts/editor-panes/effects.js` 加兩功能，都走現有 job，未動共用檔。畫質增強＝工具頁的 upscale job（`backend/media.cjs:97`，本機、免費），整支素材升 1080p／2K／4K 後換掉片段素材，時間欄位不動。從這裡重新生成＝播放頭那一格截成 PNG（uploadAsset derived）當首幀＋片段原提示詞（asset.origin.prompt 或產生它的 job），以 referenceMode first 送影片生成；成功後在切點分割（呼叫 tools-editor.js 的 split），後段換新片、sourceStart 歸零，剪輯設定沿用。按鈕先標價（免費／NT$，Google 列加「約」），宣告 data-paid=video.motion。

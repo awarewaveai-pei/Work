@@ -1,0 +1,12 @@
+/* Styles owned by ED.13 scripts/editor-agent.js (剪輯 Agent floating window). Theme tokens only (tests/theme-tokens.cjs). */
+.editor-agent { position:fixed;right:24px;bottom:24px;z-index:20;display:flex;flex-direction:column;gap:8px;width:min(380px,calc(100vw - 32px));max-height:min(620px,calc(100vh - 48px));padding:12px;color:var(--text-primary);background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius); }
+.editor-agent-head { display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:move;user-select:none;touch-action:none; }
+.editor-agent-tools { display:flex;gap:4px; }
+.editor-agent-log { flex:1;min-height:80px;overflow:auto;display:flex;flex-direction:column;gap:6px; }
+.editor-agent-msg { padding:6px 8px;border-radius:var(--radius-sm);font-size:var(--font-size-sm);white-space:pre-wrap; }
+.editor-agent-msg.user { align-self:flex-end;max-width:85%;background:var(--sidebar-active-bg); }
+.editor-agent-msg.agent { align-self:flex-start;max-width:95%;background:var(--bg-subtle);border:1px solid var(--border-subtle); }
+.editor-agent-error { margin:4px 0 0;color:var(--red); }
+.editor-agent-card { margin-top:6px;padding:6px 8px;border:1px solid var(--accent);border-radius:var(--radius-sm); }
+.editor-agent textarea { width:100%;resize:vertical; }
+.editor-agent-send { display:flex;align-items:center;justify-content:flex-end;gap:8px; }
