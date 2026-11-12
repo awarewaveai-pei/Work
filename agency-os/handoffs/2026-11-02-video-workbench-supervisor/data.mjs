@@ -3,7 +3,7 @@
 
 export const META = {
   title: '影音工作台監工台',
-  updated: '2026-11-10',
+  updated: '2026-11-12',
   plan: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/creative-suite-plan-20261102.md',
   req: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/handoff/Claude_Code_handoff_20261102.md',
   worklog: 'agency-os/WORKLOG.md 2026-11-02 續19–續45',
@@ -198,6 +198,7 @@ export const STEPS = [
       done('P6.23', '配音、字幕多家並存、免費優先：字幕預設自家主機 whisper（免費、繁中、逐字時間），Gemini／OpenAI 付費可選；配音預設 Gemini（較便宜），OpenAI 可選到 2027-01-06 自動消失。', '670b89396'),
       done('P6.24', '11-10 批次上線 469e589f0（app＋工作台）：whisper 服務重建、工作台加 Gemini／whisper／Stability 設定；Gemini 儲值 NT$300 後配音預設恢復 Gemini（23eaf31a8）。ED.3.8 最後一個修正 d6ab0a1c6 尚未部署。', '469e589f0'),
       done('P6.25', '11-10 上線 9a6df4a73：頁面腳本改同時下載（應用工具後段 8 秒→1 秒）；瀏覽器保留讀過的素材副本，同一支第二次不經網路（分組織、登出即清）。首屏前段仍約 6 秒（css/js 經 Cloudflare 逐一回應），已提案另查。', '9a6df4a73'),
+      done('P6.26', '11-12 上線 8ebf9f507：靜態檔帶版本號存 Cloudflare 邊緣、工具點開才載入（應用工具首屏約 10 秒→約 2 秒，剩下是兩支 API）；Edge 免費配音補回（四個聲音、預設；Edge 掛了自動改 Gemini 照 Gemini 計價），video-service 重建＋compose 兩行（safe-infra-patch）；含另一帳號的 ED.8／ED.10／ED.11。', '8ebf9f507'),
       todo('P6.16', '（操作者 11-05 說先不用）主題改成 app 存檔才通知 video、使用者切回分頁時重讀，取代現在的「有人開頁面時最多 30 秒問 app 一次」。'),
       done('P6.13', '工作台成品能過送審：剪輯專案的文字或燒進去的字幕自動變成標題、腳本和字幕檢查的依據；上傳時可勾「我有權使用這些素材」。畫面上沒有任何字的影片照實不能送審。用調色檔（LUT）的成品權利檢查會不過（調色檔沒登記到 app），要另外處理。', '1aaa139d5'),
     ] },
