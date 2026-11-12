@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-12（續5）影音工作台瀏覽器副本：影片第一次播放只下載一次
+
+- 根因：2026-11-10 續48 的副本對 `<video>`（Range 請求）未命中時，播放器走網路，背景再抓一次完整檔存副本 → 每支新影片從歐洲下載兩次。
+- 改（`VW`＝`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`）：`VW/shared/media-cache.js` `teeWholeFile`：`<video>` 第一個請求是 `bytes=0-`，回應 206 涵蓋整檔（`bytes 0-(n-1)/n`）時把同一條資料流分兩路，一路給播放器、一路存副本。上限 256 MB（tee 會把較慢那一路沒讀的資料放記憶體）；更大的檔與非從頭的 Range 照舊背景補抓。`save()` 另外拒收比 Content-Length 短的內容（播放器離開／斷線），不會把半截檔存成副本。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/media-cache.cjs → 5 PASS（新增：bytes=0- 未命中 → 頁面拿到整檔 206、之後 Range 命中、網路只有 ["bytes=0-"]） | exit=0 | ms=90
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/media-cache-browser.cjs（Edge、/media 延遲 300ms）→ 從未讀過的 8 秒影片直接用 <video> 播：伺服器 1 次（bytes=0-）351ms；重新載入後播放＋跳到 7 秒：伺服器 0 次 161ms。關掉 tee 同測試＝2 次、紅；還原綠 | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs → gate ok | exit=0 | ms=15000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（external oracle = Codex CLI gpt-6-sol，`agency-os/reports/oracle/2026-11-12-review-4bfc150f.md`，files-reviewed 3 檔）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=teeWholeFile|TEE_MAX | hits=5（皆在 media-cache.js：常數、定義、呼叫、註解）
 ## 2026-11-12（續4）影音工作台：同一頁不混用兩個版本——舊版本號的檔回 404、頁面提示重新整理（143c04ad9）
 
 - 根因：按需載入（d4983b243）後，部署前開著的分頁點開新工具，會用舊 `?v=` 抓檔；伺服器只有新版，照樣回新檔 → 舊核心＋新剪輯器同頁。續1 RISKS 說「與改前相同」是錯的（改前開機一次載完）。
