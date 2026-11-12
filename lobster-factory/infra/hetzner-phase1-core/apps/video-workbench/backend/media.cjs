@@ -117,9 +117,12 @@ async function media(input, { file, output, signal }) {
       音量均衡: "loudnorm=I=-16:TP=-1.5:LRA=11",
       音質美化: "highpass=f=60,acompressor,alimiter",
     }[settings.enhanceOption || "人聲降噪"];
+    // 畫面 + AI 大模型增強 never reaches here: api.cjs runs it on backend/video-enhance.cjs (card ED.12.3).
     if (settings.enhanceType === "畫面" || !filter)
       throw Error(
-        "此處理需要專用 AI 模型；目前可使用人聲降噪、音量均衡與音質美化。",
+        settings.enhanceType === "畫面"
+          ? "這個畫面處理需要專用模型；目前可使用「AI 大模型增強」。"
+          : "此處理需要專用 AI 模型；目前可使用人聲降噪、音量均衡與音質美化。",
       );
     args.push("-c:v", "copy", "-af", filter, "-c:a", "aac");
   } else if (operation === "watermark" || operation === "cta") {

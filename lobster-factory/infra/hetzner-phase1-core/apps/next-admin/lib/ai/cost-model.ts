@@ -172,6 +172,8 @@ export const MEDIA_MODELS: Record<string, MediaModel> = {
   "bria/eraser":                       { vendor: "Replicate", kind: "tool", status: "active", version: "2757d1ac2f1291af219f5f10e8ecba15e92e7c05253e2841295f3ba6bff6adc4", verifiedAt: "2026-10-28" },
   "bria/expand-image":                 { vendor: "Replicate", kind: "tool", status: "active", version: "e153045f0c4163bd76788ab927faef5123db349294d4695dac07af828786e5b9" },
   "nightmareai/real-esrgan":           { vendor: "Replicate", kind: "tool", status: "active", version: "b3ef194191d13140337468c916c2c5b96dd0cb06dffc032a022a31807f6a5ea8", verifiedAt: "2026-10-28" },
+  // video-workbench AI 畫質增強 (VIDEO_ENHANCE_RATES; backend/video-enhance.cjs). Official model: called by name, no pinned version.
+  "topazlabs/video-upscale":           { vendor: "Replicate", kind: "tool", status: "active", verifiedAt: "2026-11-13" },
 };
 
 /**
@@ -214,6 +216,32 @@ export const TOOL_RATES: Record<string, { usd: number; label: string; vendor: st
   // and that is pass-through to the customer, not an app operating cost.
   "printful-mockup": { usd: 0, label: "Printful mockup", vendor: "Printful", estimate: false },
 };
+
+/** video-workbench AI 畫質增強 (topazlabs/video-upscale on Replicate, 30 fps out). Billed in units (the prediction's
+ *  metrics.unspecified_billing_metric) at usdPerUnit (replicate.com/topazlabs/video-upscale 2026-11-13: "$0.08 per unit").
+ *  The charge is the run's real units (videoEnhanceUsd); the estimate before the click is
+ *  max(minUnits, ceil(output seconds x unitsPerSec)). Measured 2026-11-13 (WORKLOG): 1 s→720p, 3 s→720p and 3 s→1080p
+ *  each billed 2 units. unitsPerSec = Replicate's cost guide ($0.027 / $0.093 / $0.373 per 5 s at 720p / 1080p / 4K)
+ *  read at the older $0.05 per unit, rounded up: the higher of the two readings, so the estimate errs high. 4K unmeasured. */
+export const VIDEO_ENHANCE_RATES = {
+  usdPerUnit: 0.08,
+  minUnits: 2,
+  resolutions: {
+    "720P":  { unitsPerSec: 0.11, target: "720p" },
+    "1080P": { unitsPerSec: 0.38, target: "1080p" },
+    "4K":    { unitsPerSec: 1.5,  target: "4k" },
+  },
+} as const;
+export type VideoEnhanceResolution = keyof typeof VIDEO_ENHANCE_RATES.resolutions;
+
+/** USD of one AI 畫質增強 run: the reported units when given, else the estimate for that many output seconds. */
+export function videoEnhanceUsd(resolution: string, outputSec: unknown, units?: unknown): number {
+  const r = VIDEO_ENHANCE_RATES, row = (r.resolutions as Record<string, { unitsPerSec: number }>)[resolution];
+  if (!row) throw new Error("not a priced AI 畫質增強 resolution: " + resolution);
+  const measured = Number(units),
+    counted = measured > 0 ? measured : Math.max(r.minUnits, Math.ceil(Math.max(0, Number(outputSec) || 0) * row.unitsPerSec - 1e-9));
+  return Math.round(counted * r.usdPerUnit * 1e6) / 1e6;
+}
 
 /** USD of one Replicate run billed per GPU second (a TOOL_RATES row with usdPerSec): predict_time (the prediction's
  *  metrics.predict_time) x usdPerSec. No run time reported = the row's estimate. The one function for every run-time-billed

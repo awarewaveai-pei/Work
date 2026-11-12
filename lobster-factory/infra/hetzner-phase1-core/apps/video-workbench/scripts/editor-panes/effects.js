@@ -1,13 +1,15 @@
 // Card ED.12 (docs/editor-parity-spec-20261106.md §1.3 特效): the 「特效」 left pane. Registered with edRegisterPane in
-// tools-editor.js. Two jobs that put a new picture under the selected video clip, both through existing job kinds:
-// - 畫質增強 = the tools' upscale job (backend/media.cjs upscale, local, free) on the clip's whole asset, so every
-//   source time still points at the same picture; 裁切、速度、效果、關鍵影格、轉場 stay as they are.
+// tools-editor.js. Jobs that put a new picture under the selected video clip, all through existing job kinds:
+// - 放大畫質（免費）= the tools' upscale job (backend/media.cjs upscale, local) and AI 畫質增強 = the tools' 畫面增強 job
+//   with AI 大模型增強 (backend/video-enhance.cjs, card ED.12.3, priced per output second). Both run on the clip's whole
+//   asset, so every source time still points at the same picture; 裁切、速度、效果、關鍵影格、轉場 stay as they are.
 // - 從這裡重新生成 = a video generation with the frame under the playhead as its first frame (referenceMode "first",
 //   backend/generation-policy.cjs validate), priced before the click; the clip is split at the playhead and the part
 //   after the cut plays the new video.
 // Nothing on the timeline changes until a job has succeeded; a failed or refused send leaves the clip as it was.
-const edFxUi = { quality: "1080p", model: "", seconds: 0, prompts: new Map(), found: new Map(), busy: false, caps: null, results: null };
-const edFxQualities = ["1080p", "2K", "4K"];
+const edFxUi = { quality: "1080p", model: "", seconds: 0, prompts: new Map(), found: new Map(), busy: false, caps: null, results: null, aiRes: "1080P", aiQuotes: new Map() };
+const edFxQualities = ["1080p", "2K", "4K"],
+  edFxAiRes = ["720P", "1080P", "4K"];
 const edFxVideo = (c) => (c?.kind === "video" && c.asset?.url ? c : null);
 function edFxCaps() {
   const c = VideoWorkbench.capabilities;
@@ -77,7 +79,59 @@ function edFxPrice(vm, seconds, caps) {
 }
 function edFxEnhanceHtml(c) {
   if (!edFxVideo(c)) return '<p class="note">先在時間軸選一段影片片段。</p>';
-  return `${edChoices("輸出畫質", "fx-quality", edFxUi.quality, edFxQualities)}<p class="note">本機高品質縮放：提高解析度，不會補出原片沒有的細節。整支素材處理完才替換，裁切、速度、效果、關鍵影格與轉場都不變。</p>${edButton("畫質增強 · 免費（本機處理）", "fx-enhance", edFxUi.busy)}`;
+  return `${edChoices("輸出畫質", "fx-quality", edFxUi.quality, edFxQualities)}<p class="note">本機高品質縮放：提高解析度，不會補出原片沒有的細節。整支素材處理完才替換，裁切、速度、效果、關鍵影格與轉場都不變。</p>${edButton("放大畫質 · 免費（本機處理）", "fx-enhance", edFxUi.busy)}`;
+}
+// AI 畫質增強: the server prices the run from the source's own length (POST /generations/quote -> provider-cost.cjs
+// enhanceUsd, the charge's function), one quote per asset and resolution; a refused source (over 20MB / 5 min) says why.
+const edFxAiInput = (c) => ({
+  type: "video",
+  operation: "enhance",
+  references: { src: { id: c.asset.id, url: c.asset.url } },
+  settings: { enhanceType: "畫面", enhanceOption: "AI 大模型增強", enhanceResolution: edFxUi.aiRes },
+});
+function edFxAiQuote(c) {
+  const key = c.asset.id + "|" + edFxUi.aiRes,
+    q = edFxUi.aiQuotes.get(key);
+  if (!q) {
+    edFxUi.aiQuotes.set(key, { pending: true });
+    VideoWorkbench.generations
+      .quote(edFxAiInput(c))
+      .then((r) => edFxUi.aiQuotes.set(key, { usd: Number(r.costUsd) }))
+      .catch((e) => edFxUi.aiQuotes.set(key, { error: e.message }))
+      .finally(() => tool === "edit" && edRedraw());
+  }
+  return q || { pending: true };
+}
+function edFxAiPrice(c) {
+  const q = edFxAiQuote(c),
+    text = Number.isFinite(q.usd) && edFxMoney(q.usd, edFxCaps());
+  return text ? "約 " + text : "";
+}
+function edFxAiHtml(c) {
+  if (!edFxVideo(c)) return '<p class="note">先在時間軸選一段影片片段。</p>';
+  const q = edFxAiQuote(c),
+    price = edFxAiPrice(c),
+    block = q.error || (q.pending ? "讀取價格…" : !price ? "價格還沒載入，請稍候。" : "");
+  return `${edChoices("AI 輸出畫質", "fx-ai-res", edFxUi.aiRes, edFxAiRes)}<p class="note">AI 補出細節（Topaz Labs）。處理整支素材（${Number(c.asset.duration || 0).toFixed(1)} 秒、最大 20MB），完成後替換片段，剪輯設定不變；失敗或取消不收費；實際扣點照供應商回報的用量。</p>${block ? `<p class="note" data-ed-fx-ai-block>${esc(block)}</p>` : ""}${edButton(`AI 畫質增強${price ? " · " + price : ""}`, "fx-ai-enhance", !!block || edFxUi.busy, "video.enhance")}`;
+}
+// One upscale job on the clip's whole asset (free or AI); the result swaps in by edFxEnhanceApply.
+async function edFxEnhanceJob(p, c, input) {
+  if (!edFxVideo(c)) throw Error("先在時間軸選一段影片片段");
+  if (edFxUi.busy) return;
+  edFxUi.busy = true;
+  try {
+    const sent = { projectId: p.id, clipId: c.id, assetId: c.asset.id };
+    // paid: video.enhance (AI 大模型增強; the free upscale is no paid feature, backend/main-system.cjs paidFeature)
+    const job = await VideoWorkbench.generations.create({
+      type: "video",
+      ...input,
+      references: { src: { id: c.asset.id, url: c.asset.url, name: c.asset.name, type: c.asset.type } },
+      editorFx: { kind: "enhance", ...sent },
+    });
+    edFxWatch(job, (v) => edFxEnhanceApply(p, sent, v), "替換片段");
+  } finally {
+    edFxUi.busy = false;
+  }
 }
 function edFxRegenHtml(p, c) {
   if (!edFxVideo(c)) return '<p class="note">先在時間軸選一段影片片段，把播放頭停在最後一格正常的畫面。</p>';
@@ -205,7 +259,7 @@ async function edFxResults(p) {
 function edFxResultsHtml(p) {
   const r = edFxUi.results?.projectId === p.id ? edFxUi.results.jobs : null;
   return `<h3>完成的結果</h3>${edButton("找回已完成的結果", "fx-results")}${
-    !r ? "" : r.length ? `<ul class="ed-fx-results">${r.map((j) => `<li><span>${j.input.editorFx.kind === "regen" ? "重新生成" : "畫質增強"} · ${esc(new Date(j.createdAt).toLocaleString())}</span>${edButton("替換", "fx-apply:" + j.id)}</li>`).join("")}</ul>` : '<p class="note">沒有尚未替換的結果。</p>'
+    !r ? "" : r.length ? `<ul class="ed-fx-results">${r.map((j) => `<li><span>${j.input.editorFx.kind === "regen" ? "重新生成" : j.input.operation === "enhance" ? "AI 畫質增強" : "放大畫質"} · ${esc(new Date(j.createdAt).toLocaleString())}</span>${edButton("替換", "fx-apply:" + j.id)}</li>`).join("")}</ul>` : '<p class="note">沒有尚未替換的結果。</p>'
   }`;
 }
 function edFxWatch(job, apply, label) {
@@ -220,7 +274,7 @@ edRegisterPane("effects", {
   title: "特效",
   icon: "✧",
   render: (p, c) =>
-    `<div class="ed-fx"><h3>畫面效果</h3><p class="note">濾鏡、遮罩、顆粒、光漏、鏡頭震動與關鍵影格在右側屬性面板調整：選取片段時設定該片段，未選取時是整片設定。</p><h3>畫質增強</h3>${edFxEnhanceHtml(c)}<h3>從這裡重新生成</h3>${edFxRegenHtml(p, c)}${edFxResultsHtml(p)}</div>`,
+    `<div class="ed-fx"><h3>畫面效果</h3><p class="note">濾鏡、遮罩、顆粒、光漏、鏡頭震動與關鍵影格在右側屬性面板調整：選取片段時設定該片段，未選取時是整片設定。</p><h3>放大畫質（免費）</h3>${edFxEnhanceHtml(c)}<h3>AI 畫質增強</h3>${edFxAiHtml(c)}<h3>從這裡重新生成</h3>${edFxRegenHtml(p, c)}${edFxResultsHtml(p)}</div>`,
   actions: {
     "fx-quality:": async (action) => {
       if (edFxQualities.includes(action.slice(11))) edFxUi.quality = action.slice(11);
@@ -247,24 +301,18 @@ edRegisterPane("effects", {
       await edFxResults(edProject());
       edRedraw();
     },
-    "fx-enhance": async (action, p, c) => {
-      if (!edFxVideo(c)) throw Error("先在時間軸選一段影片片段");
-      if (edFxUi.busy) return;
-      edFxUi.busy = true;
-      try {
-        const sent = { projectId: p.id, clipId: c.id, assetId: c.asset.id };
-        // paid: none (local upscale, backend/main-system.cjs paidFeature)
-        const job = await VideoWorkbench.generations.create({
-          type: "video",
-          operation: "upscale",
-          references: { src: { id: c.asset.id, url: c.asset.url, name: c.asset.name, type: c.asset.type } },
-          settings: { upscaleQuality: edFxUi.quality },
-          editorFx: { kind: "enhance", ...sent },
-        });
-        edFxWatch(job, (v) => edFxEnhanceApply(p, sent, v), "替換片段");
-      } finally {
-        edFxUi.busy = false;
-      }
+    "fx-ai-res:": async (action) => {
+      if (edFxAiRes.includes(action.slice(10))) edFxUi.aiRes = action.slice(10);
+      edRedraw();
+    },
+    // paid: none (local upscale, backend/main-system.cjs paidFeature)
+    "fx-enhance": (action, p, c) => edFxEnhanceJob(p, c, { operation: "upscale", settings: { upscaleQuality: edFxUi.quality } }),
+    "fx-ai-enhance": async (action, p, c) => {
+      // Sent only with a price on the button (shared/paid-price.js rule); the server charges the same rate on success.
+      if (!edFxVideo(c) || !edFxAiPrice(c)) throw Error("價格還沒載入，請稍候再按");
+      const { operation, settings } = edFxAiInput(c);
+      // paid: video.enhance
+      return edFxEnhanceJob(p, c, { operation, settings });
     },
     "fx-regen": async (action, p, c) => {
       if (!edFxVideo(c)) throw Error("先在時間軸選一段影片片段");

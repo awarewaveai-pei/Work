@@ -37,7 +37,7 @@ const mp4 = (file, color, size, seconds) => {
     if (url === "https://replicate.delivery/x/out.mp4") return new Response(out);
     throw Error("未預期的網路請求：" + url);
   };
-  const server = require("../server.cjs").createServer({ dataDir, env: { REPLICATE_API_TOKEN: "ed12-test-never-sent" }, fetchImpl });
+  const server = require("../server.cjs").createServer({ dataDir, env: { REPLICATE_API_TOKEN: "ed12-test-never-sent", VW_ENHANCE_POLL_MS: "20" }, fetchImpl });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
   const base = "http://127.0.0.1:" + server.address().port,
     browser = await chromium.launch({ channel: "msedge", headless: true });
@@ -70,7 +70,7 @@ const mp4 = (file, color, size, seconds) => {
     await select();
 
     // 1. Both buttons say their price before any click; the clip's own prompt is filled in.
-    assert.equal(await pane.locator('[data-ed-action="fx-enhance"]').innerText(), "畫質增強 · 免費（本機處理）");
+    assert.equal(await pane.locator('[data-ed-action="fx-enhance"]').innerText(), "放大畫質 · 免費（本機處理）");
     await page.waitForFunction(() => /NT\$/.test(document.querySelector('[data-ed-action="fx-regen"]')?.textContent || ""));
     const want = await page.evaluate(() => {
       const caps = VideoWorkbench.capabilities,
@@ -135,7 +135,7 @@ const mp4 = (file, color, size, seconds) => {
     assert.deepEqual(await clips(), reloaded);
     pass("找回已完成的結果：重新載入後仍可替換；失敗的任務不列出");
 
-    // 4. 畫質增強: a same-length 2K file replaces the asset; every edit field is unchanged.
+    // 4. 放大畫質（免費）: a same-length 2K file replaces the asset; every edit field is unchanged.
     await select();
     await pane.locator('[data-ed-action="fx-quality:2K"]').click();
     await pane.locator('[data-ed-action="fx-enhance"]').click();
@@ -144,7 +144,32 @@ const mp4 = (file, color, size, seconds) => {
     assert.deepEqual(editFields(up), editFields(reloaded[0]));
     assert.deepEqual(up.previousAssetIds, ["ed12-src"]);
     assert.equal(up.asset.height, 1440);
-    pass("畫質增強：換成 2K 檔，剪輯設定逐欄不變");
+    pass("放大畫質：換成 2K 檔，剪輯設定逐欄不變");
+
+    // 5. AI 畫質增強 (card ED.12.3): price before the click = the asset's seconds x the 1080P rate; a failed run leaves the
+    // clip; a succeeded run swaps the asset and every edit field stays.
+    await closeJobs();
+    await select();
+    const aiButton = pane.locator('[data-ed-action="fx-ai-enhance"]');
+    await page.waitForFunction(() => /^AI 畫質增強 · 約 NT\$[\d.]+$/.test(document.querySelector('[data-ed-action="fx-ai-enhance"]')?.textContent || ""));
+    // The button's price is the server's quote for this asset (provider-cost.cjs enhanceUsd of its 4 s at 1080P).
+    const aiWant = await page.evaluate((usd) => "AI 畫質增強 · 約 " + VideoWorkbenchMoney(usd, VideoWorkbench.capabilities), require("../backend/provider-cost.cjs").enhanceUsd("1080P", 4));
+    assert.equal(await aiButton.innerText(), aiWant);
+    const beforeAi = await clips();
+    fail = true;
+    await aiButton.click();
+    await page.waitForFunction(() => /failed/.test(document.querySelector(".job-view")?.textContent || ""), null, { timeout: 90000 });
+    assert.deepEqual(await clips(), beforeAi);
+    await closeJobs();
+    fail = false;
+    await select();
+    await pane.locator('[data-ed-action="fx-ai-enhance"]').click();
+    await page.waitForFunction((id) => edProject().clips[0].asset.id !== id, beforeAi[0].asset.id, { timeout: 90000 });
+    assert.equal(created.at(-1).input.target_resolution, "1080p");
+    const [ai] = await clips();
+    assert.deepEqual(editFields(ai), editFields(beforeAi[0]));
+    assert.deepEqual(ai.previousAssetIds, [...beforeAi[0].previousAssetIds, beforeAi[0].asset.id]);
+    pass("AI 畫質增強：先標價；失敗不動；成功替換、剪輯設定逐欄不變");
     assert.deepEqual(errors, []);
   } finally {
     await browser.close();

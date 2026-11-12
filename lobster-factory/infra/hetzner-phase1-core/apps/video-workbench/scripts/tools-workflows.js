@@ -104,9 +104,11 @@ function toolWorkflowScreen(t) {
         : ["畫質增強", "2 倍超解析", "AI 大模型增強", "去字幕"];
     if (!options.includes(values.enhanceOption))
       values.enhanceOption = options[0];
+    // AI 大模型增強 runs on backend/video-enhance.cjs, priced at these three only (an older draft may hold 2K).
+    if (!["720P", "1080P", "4K"].includes(values.enhanceResolution)) values.enhanceResolution = "1080P";
     content =
       wfSource() +
-      `<aside class="side"><h3>增強設定</h3>${wfChoice("enhanceType", ["音訊", "畫面"])}${wfChoice("enhanceOption", options)}${values.enhanceOption === "AI 大模型增強" ? wfSelect("enhanceResolution", "輸出解析度", ["720P", "1080P", "2K", "4K"]) : ""}${values.enhanceOption === "去字幕" ? '<p class="note">只移除燒入字幕，其他標題與 Logo 應保留；此功能需要專用修復服務。</p>' : ""}${wfStats()}${btn("開始增強", "submit", "primary")}</aside>`;
+      `<aside class="side"><h3>增強設定</h3>${wfChoice("enhanceType", ["音訊", "畫面"])}${wfChoice("enhanceOption", options)}${values.enhanceOption === "AI 大模型增強" ? wfSelect("enhanceResolution", "輸出解析度", ["720P", "1080P", "4K"]) : ""}${values.enhanceOption === "去字幕" ? '<p class="note">只移除燒入字幕，其他標題與 Logo 應保留；此功能需要專用修復服務。</p>' : ""}${wfStats()}${values.enhanceOption === "AI 大模型增強" ? '<button class="btn primary" data-act="submit" data-paid="video.enhance">開始增強</button>' : btn("開始增強", "submit", "primary")}</aside>`;
   } else if (t.id === "sfx") {
     content =
       wfSource() +

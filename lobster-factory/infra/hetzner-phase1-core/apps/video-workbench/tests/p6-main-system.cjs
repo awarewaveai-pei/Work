@@ -508,11 +508,11 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
       assert.match(read("app/api/internal/video/workbench/usage/route.ts"), /reportWorkbenchUsage\(body\)/);
       const askTable = read("lib/content/video/workbench-usage.ts");
       assert.match(askTable, /reportForService\("video"/);
-      for (const f of new Set([...Object.values(require("../backend/main-system.cjs").PAID_ROUTES), "video.image", "video.motion", "video.tts", "video.bg-remove", "video.3d"]))
+      for (const f of new Set([...Object.values(require("../backend/main-system.cjs").PAID_ROUTES), "video.image", "video.motion", "video.tts", "video.bg-remove", "video.3d", "video.enhance"]))
         assert(askTable.includes(`grantFor("${f}")`), "usage 路由能計費 " + f);
       for (const field of Object.keys(calls.usage[0])) assert(usageLib.includes(field), "service-usage 讀 " + field);
       const products = read("lib/portal/products.ts");
-      for (const f of ["video.image", "video.motion", "video.tts", "video.script", "video.transcribe", "video.bg-remove", "video.3d"]) assert(products.includes(`"${f}"`), "products.ts 登記 " + f);
+      for (const f of ["video.image", "video.motion", "video.tts", "video.script", "video.transcribe", "video.bg-remove", "video.3d", "video.enhance"]) assert(products.includes(`"${f}"`), "products.ts 登記 " + f);
     }
 
     // 8. Reference material (seedstar captures): signed staff only behind the proxy, local mode as before; the page code

@@ -20,6 +20,22 @@
 - ORACLE_WAIVED: Codex artifact 2026-11-13-partialreview-c0d26946 的唯一發現（換來源不重轉）已照不變量修正，並補指名測試；匯入腳本不屬於隱私／權限守衛，依規則不做突變
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=import-audio-library|\.import\.json | hits=21
 - BUGHUNT_SCOPE_NARROW: 改動只有清單資料與匯入腳本；呼叫者只有 tests/ed6-audio.cjs 和交接文件
+## 2026-11-13（續3）影音工作台 ED.12.3：真正的 AI 畫質增強（Topaz Labs，實際用量扣點）
+
+- 供應商：Topaz Labs（美國）`topazlabs/video-upscale`，Replicate 官方模型，走既有 REPLICATE_API_TOKEN。出處 https://replicate.com/topazlabs/video-upscale（$0.08 per unit；依輸出解析度＋fps 換算 units）。
+- 實測（2026-11-13，640×360 30fps 測試片，data URI）：1 秒→720p＝2 units；3 秒→720p＝2 units（輸出 1280×720、3.0 秒、30fps，跑 19 秒）；3 秒→1080p＝2 units（1920×1080）。4K 未測（預算不夠）。實測總花費約 US$0.48（3 次成功 × US$0.16；第 1 次 Files API 網址失敗、不計費）。
+- 根因（實測抓到）：Replicate Files API 的網址要授權，這個模型讀不到（`source.container is required`）；改送 data URI，與 bg-remove.cjs:88、image-to-3d.cjs:167 同法。repo 內沒有伺服器端短效簽名網址（postiz.ts:209 只是讀別人的 R2 網址），所以來源上限 20MB。
+- 計價（監工核准）：單價與公式只在 next-admin `lib/ai/cost-model.ts` VIDEO_ENHANCE_RATES＋videoEnhanceUsd：扣點＝回報的 units（metrics.unspecified_billing_metric）× US$0.08；估價＝max(2, ceil(秒數 × unitsPerSec))，unitsPerSec 720P 0.11／1080P 0.38／4K 1.5（Replicate 價目表以舊單價 $0.05/unit 反推、往上取整，蓋住三筆實測）；沒回報 units＝用估價扣並寫 log。provider-cost.cjs enhanceUsd 只讀它；POST /generations/quote 用同一函式報這支素材的價。只在成功時經 settle() 扣點。
+- 接法：job 沿用工具頁既有欄位（operation enhance＋enhanceType 畫面／enhanceOption AI 大模型增強／enhanceResolution），新模組 backend/video-enhance.cjs；api.cjs start() 送出前查來源（≤20MB、≤5 分鐘、解析度有價）與金鑰、priceOf 對照、finish() 新分支（同來源同解析度續接 replicateId、不重複付費）、jobTimeoutMs 40 分鐘、取消呼叫 Replicate cancel；main-system.cjs paidFeature＝video.enhance、ledgerKind＝video（jobs/route.ts KINDS 已有）；next-admin workbench-usage.ts ASK、products.ts:54 quota。media.cjs:120 其他畫面選項的錯誤訊息指向新選項。
+- 特效分頁：原免費放大改名「放大畫質（免費）」；新增「AI 畫質增強」720P／1080P／4K，按鈕顯示伺服器報價「約 NT$」，完成後替換片段（沿用 ED.12 的替換流程），剪輯設定不變。
+- Codex 36a8a2bd 5 項皆成立、已修：F1 服務重啟只把任務標失敗、Replicate 還在跑→重啟時呼叫 Replicate 取消；F2 同素材同解析度執行中的任務會共用 prediction、各扣一次→只接手「失敗」任務的 prediction，且只接手一次；F3 40 分鐘逾時沒停供應商→輪詢因任何原因中斷都呼叫取消；F4 工具頁 AI 大模型增強按鈕沒標價→加 data-paid=video.enhance（共用模組補「約 NT$…／次起」）；F5 工具頁 2K 必被拒→拿掉 2K，舊草稿的 2K 改回 1080P。
+- 未做：4K 估價未實測（估價取價目表較高的讀法）；工具頁按鈕只顯示最低價（次起），不是這支影片的報價。
+- 同類問題（未改，屬去背卡）：bg-remove 的續接條件 `status !== "succeeded"` 也會共用執行中的 prediction（api.cjs remove-bg 分支），去背 55 秒內結束，影響小。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed12-ai-enhance.cjs（7/7）；node tests/ed12-effects-ai.cjs（6/6，真 Edge）；paid-price（8 features）、p6-main-system、remove-bg、theme-tokens、tools-workflows、restored-ui 綠；next-admin tsc 原始碼 0 錯、vitest 57/58（失敗為他人未提交的 app/(shell)/tools/seedstar/）；真 API 3 次成功（見上） | exit=0 | ms=600000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps | grep=video.enhance | hits=17
+- ORACLE: agency-os/reports/oracle/2026-11-13-partialreview-36a8a2bd.md
+- rollback：git revert 本 commit（next-admin 價目與權限鍵一起回復）。
 ## 2026-11-13（續1）影音工作台 ED.13 階段 2：剪輯動作改成吃參數的函式、頂列剪輯 Agent 按鈕、驗收閘
 
 - 改：`scripts/tools-editor.js` 把 `edAction` 的分割、刪除／波紋刪除、複製、移軌、新增軌、比例、濾鏡、速度、遮罩、背景、旁白降低、變形關鍵影格、分離音訊、標記、新增文字，以及欄位淡入／淡出、音量，改成吃 (專案, 片段, 值) 的函式（`edSplitAt`、`edDeleteClips`、`edDuplicate`、`edMoveTrack`、`edAddTrack`、`edSetRatio`、`edSetFilter`、`edSetSpeed`、`edSetMask`、`edSetBackground`、`edSetDuck`、`edTransformKey`、`edDetachAudio`、`edToggleMarker`、`edAddText`、`edSetFades`、`edApplyDb`、`edSetLoudness`）。這些函式不讀播放頭和選取；按鈕帶播放頭／選取呼叫，Agent（`scripts/editor-agent.js` 的 `edAgentTools`）帶自己的值呼叫同一份。響度鍵（`editor-panes/audio.js`）改走 `edSetLoudness`，並補上範圍檢查。轉場與字幕匯入直接用分頁既有的 `edTrSet`、`edSubFill`。

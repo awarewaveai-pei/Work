@@ -13,6 +13,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   appDir ||= require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), env);
   const generationPolicy = require("./generation-policy.cjs");
   const bgRemove = require("./bg-remove.cjs");
+  const videoEnhance = require("./video-enhance.cjs");
   const costs = require("./provider-cost.cjs");
   const transcribe = require("./transcribe.cjs"), TranscriptWords = require("../shared/transcript-words.js");
   // Speech and speech-to-text: one list each (backend/speech.cjs, transcribe.cjs); every job names its own row (the
@@ -188,6 +189,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     if (["queued", "running"].includes(job.status) && !job.providerId) {
       job.status = "failed";
       job.error = "服務重新啟動，任務已中斷；請從歷史記錄重新送出。";
+      // Card ED.12.3: nothing polls an AI 畫質增強 run after a restart, so Replicate stops billing it (best effort).
+      if (job.replicateId && videoEnhance.isAi(job.input)) videoEnhance.cancelPrediction({ id: job.replicateId, env, fetchImpl });
     } else if (["queued", "running"].includes(job.status) && !generationPolicy.videoVendor(job.video?.provider)) {
       // A Sora job (OpenAI shut Sora 2 down 2026-09-24): nothing left to poll; a retry runs the default model.
       job.status = "failed";
@@ -348,6 +351,19 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       throw Object.assign(Error("去背只支援本機素材庫中的 PNG、JPEG、WebP 圖片"), { status: 400 });
     return file;
   }
+  // AI 畫質增強 (card ED.12.3, backend/video-enhance.cjs): a local video of this server, at most 20MB (it goes as a data:
+  // URI) and 5 minutes, at a priced resolution. Checked by the quote, before the job is recorded and again when it runs.
+  async function aiEnhanceSource(input, signal) {
+    const bad = (message) => Object.assign(Error(message), { status: 400 });
+    videoEnhance.resolutionOf(input);
+    const file = localFile(input.references?.src?.url, { assets: true });
+    if (!file || !videoEnhance.mimeOf(file) || !fs.existsSync(file)) throw bad("AI 畫質增強只支援本機素材庫中的 MP4、MOV、WebM 影片");
+    if (fs.statSync(file).size > videoEnhance.MAX_SOURCE_BYTES) throw bad("AI 畫質增強的來源影片最大 20MB");
+    const seconds = (await require("./media-inspect.cjs").inspectMedia(file, signal).catch(() => null))?.duration;
+    if (!(seconds > 0)) throw bad("讀不到影片長度");
+    if (seconds > videoEnhance.MAX_SOURCE_SECONDS) throw bad("AI 畫質增強一次最長 5 分鐘");
+    return { file, seconds };
+  }
   async function finish(job, signal) {
     try {
       if (blender3d().operations.includes(job.input.operation)) {
@@ -493,6 +509,47 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           url: stored.url, previewUrl: stored.previewUrl, thumbUrl: stored.thumbUrl, width: expect.width, height: expect.height,
           verification: { ok: true, findings: [] },
           origin: { kind: "render", engine: "remotion", templateId: job.input.settings.templateId, jobId: job.id, remotionJobId: job.remotionJobId, ...(typeof parentAssetId === "string" ? { parentAssetId } : {}), costUsd: 0 },
+        };
+        job.progress = 100;
+        job.status = "succeeded";
+        persist();
+        return;
+      }
+      if (videoEnhance.isAi(job.input)) {
+        job.status = "running";
+        persist();
+        // Never pay twice for one source: a failed earlier request for the same source and resolution (e.g. its download
+        // broke after Replicate finished) hands its prediction over, once -- a run still in progress is never shared, so
+        // one vendor run is charged to one job.
+        const src = job.input.references.src.url,
+          resolution = videoEnhance.resolutionOf(job.input),
+          earlier = jobs.findLast(
+            (j) => j !== job && videoEnhance.isAi(j.input) && j.input.references?.src?.url === src && j.input.settings.enhanceResolution === resolution && j.replicateId && j.status === "failed",
+          ),
+          name = crypto.randomUUID() + ".mp4",
+          dest = path.join(outputs, name);
+        const { units } = await videoEnhance.upscale({
+          file: (await aiEnhanceSource(job.input, signal)).file, resolution, dest, env, fetchImpl, signal,
+          resumeId: earlier?.replicateId,
+          onPrediction: (id) => {
+            job.replicateId = id;
+            if (earlier?.replicateId === id) delete earlier.replicateId; // handed over: no third job takes it
+            persist();
+          },
+        });
+        const info = await require("./media-inspect.cjs").inspectMedia(dest, signal).catch(() => null);
+        if (signal.aborted || !info?.video || !(info.duration > 0)) {
+          fs.rmSync(dest, { force: true });
+          if (signal.aborted) return;
+          throw Error("畫質增強結果不是可播放的影片");
+        }
+        const parentAssetId = job.input.references.src.id;
+        // Charged only through settle() on success (job.paid): the units Replicate reports; none reported = the estimate
+        // for the output's seconds (an upper bound), logged so the gap can be checked against the Replicate bill.
+        if (units === undefined) console.error("[vw] AI 畫質增強沒有回報 units，以估價扣點：", job.id, job.replicateId);
+        job.result = {
+          url: "/generated/" + name, width: info.width, height: info.height, duration: info.duration,
+          origin: { kind: "ai_generated", model: videoEnhance.MODEL, provider: "Replicate", ...(typeof parentAssetId === "string" ? { parentAssetId } : {}), costUsd: costs.enhanceUsd(resolution, info.duration, units) },
         };
         job.progress = 100;
         job.status = "succeeded";
@@ -733,6 +790,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   }
   function jobTimeoutMs(input) {
     const op = input?.operation;
+    if (videoEnhance.isAi(input)) return videoEnhance.TIMEOUT_MS;
     return blender3d().operations.includes(op) ? blender3d().timeoutMs(input) : op === "image-to-3d" ? imageTo3d.TIMEOUT_MS : op === "editor-transcribe" ? hostTranscribeTimeout(input) : op === "remotion-template" ? 780000 : 600000;
   }
   // Validates, records and answers 202 before any provider call (runtime.js treats 501/503 as "never sent").
@@ -756,6 +814,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           : isRemotion
             ? (remotion.request(input, imageReference), { type: "video" })
             : jobInput(input);
+    if (videoEnhance.isAi(input)) {
+      await aiEnhanceSource(input);
+      videoEnhance.token(env);
+    }
     const videoModel = !isMedia && !isRemotion && !isBlender && !isImageTo3d && !isTranscribe && parsed.type === "video" ? generationPolicy.videoModelOf(input, env) : null;
     if (videoModel) generationPolicy.videoVendor(videoModel.provider).token(env);
     else if (parsed.type === "audio" && !isMedia) speech.key(speech.pick(input.speechModel, env), env);
@@ -763,8 +825,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     // paidFeature on the job: the retry button prices a rerun from it (shared/paid-price.js); the permit needs main.
     const paidFeature = mainSystemTools.paidFeature(input, parsed.type), feature = main && paidFeature;
     // No paid call without a price: the model a paid job will run must be in next-admin's cost model.
-    if (feature) costs.priceOf({ "video.image": "image", "video.motion": "video", "video.tts": "audio", "video.bg-remove": "remove-bg", "video.transcribe": "transcribe", "video.3d": "3d" }[feature] || feature,
-      { "video.image": providerModels.image, "video.motion": videoModel?.id || providerModels.video, "video.tts": parsed.type === "audio" && speech.pick(input.speechModel, env).id, "video.transcribe": isTranscribe && transcribe.pick(input.settings?.engine, env).model, "video.3d": isImageTo3d && imageTo3d.rateKey(input) }[feature]);
+    if (feature) costs.priceOf({ "video.image": "image", "video.motion": "video", "video.tts": "audio", "video.bg-remove": "remove-bg", "video.transcribe": "transcribe", "video.3d": "3d", "video.enhance": "enhance" }[feature] || feature,
+      { "video.image": providerModels.image, "video.motion": videoModel?.id || providerModels.video, "video.tts": parsed.type === "audio" && speech.pick(input.speechModel, env).id, "video.transcribe": isTranscribe && transcribe.pick(input.settings?.engine, env).model, "video.3d": isImageTo3d && imageTo3d.rateKey(input), "video.enhance": input.settings?.enhanceResolution }[feature]);
     const paid = await requirePermit(req, feature);
     const release = isBlender ? blender3d().claim() : isImageTo3d ? imageTo3d.claim(input) : null;
     if ((isBlender || isImageTo3d) && !release) throw Object.assign(Error(isBlender ? "3D 渲染進行中，請等目前的工作完成再送出" : "本機 SF3D 正在處理另一張圖，請等它完成再送出"), { status: 409 });
@@ -1076,6 +1138,14 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       }
       if (req.method === "POST" && route === "/generations/quote") {
         const input = await body(req);
+        // Card ED.12.3: an AI 畫質增強 job is priced from its own source length (the estimate the charge never exceeds
+        // unless Replicate reports more units).
+        if (videoEnhance.isAi(input)) {
+          const { seconds } = await aiEnhanceSource(input);
+          videoEnhance.token(env);
+          json(res, 200, { quoteId: crypto.randomUUID(), costUsd: costs.enhanceUsd(videoEnhance.resolutionOf(input), seconds), estimate: true });
+          return true;
+        }
         if (jobInput(input).type === "audio") speech.key(speech.pick(input.speechModel, env), env);
         else key();
         json(res, 200, {
@@ -1205,7 +1275,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
             throw Object.assign(Error(job.video.provider + " 沒有接受取消，影片仍在生成並計費；請稍後再試。"), { status: 502 });
           job.status = "cancelled";
           controls.get(job.id)?.abort();
-          if (job.replicateId) bgRemove.cancelPrediction({ id: job.replicateId, env, fetchImpl });
+          if (job.replicateId) (videoEnhance.isAi(job.input) ? videoEnhance : bgRemove).cancelPrediction({ id: job.replicateId, env, fetchImpl });
           imageTo3d.cancel(job, { env, fetchImpl });
           persist();
           mirror(job);

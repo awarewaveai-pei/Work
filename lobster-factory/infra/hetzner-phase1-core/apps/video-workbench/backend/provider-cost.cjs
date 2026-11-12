@@ -81,6 +81,12 @@ function transcribeUsd(model, seconds, usage = null) {
   if (!rate) throw unpriced(model);
   return round(rate.usdPerMin * tok(seconds) / 60);
 }
+// AI 畫質增強 (topazlabs/video-upscale): the one function, next-admin cost-model.ts videoEnhanceUsd -- the run's reported
+// units when given (the charge), else the estimate for that many output seconds (the price before the click).
+function enhanceUsd(resolution, seconds, units) {
+  if (!Object.hasOwn(rates.VIDEO_ENHANCE_RATES.resolutions, resolution)) throw unpriced("video-upscale " + resolution);
+  return rates.videoEnhanceUsd(resolution, seconds, units);
+}
 const toolUsd = (key) => {
   if (!rates.TOOL_RATES[key]) throw unpriced(key);
   return rates.TOOL_RATES[key].usd;
@@ -94,6 +100,7 @@ function priceOf(kind, model) {
   else if (kind === "audio") speechUsd(model, 0);
   else if (kind === "transcribe") transcribeUsd(model, 0);
   else if (kind === "remove-bg") toolUsd("bg-remove");
+  else if (kind === "enhance") enhanceUsd(model, 0); // model = the job's enhanceResolution
   else if (kind === "3d") toolUsd(model); // card S4b: model = the TOOL_RATES key of the image -> 3D way
   else throw unpriced(kind);
 }
@@ -112,10 +119,12 @@ function displayPrices({ text, image, audio, transcribe }) {
     "video.image": at(() => ({ usd: imageUsd(image), unit: "張", estimate: true })),
     "video.tts": speechPrice(audio),
     "video.transcribe": transcribePrice(transcribe),
+    // The least one run costs; a run's own estimate comes from POST /generations/quote (its source length).
+    "video.enhance": at(() => ({ usd: enhanceUsd("720P", 0), unit: "次起", estimate: true })),
   };
 }
 
 // Replicate models billed per GPU second (TOOL_RATES usdPerSec): the one function, next-admin cost-model.ts replicateRunUsd.
 const runUsd = (key, predictTimeSec) => rates.replicateRunUsd(key, predictTimeSec);
 
-module.exports = { textUsd, imageUsd, videoUsd, speechUsd, transcribeUsd, toolUsd, runUsd, priceOf, displayPrices, speechPrice, transcribePrice };
+module.exports = { textUsd, imageUsd, videoUsd, speechUsd, transcribeUsd, enhanceUsd, toolUsd, runUsd, priceOf, displayPrices, speechPrice, transcribePrice };
