@@ -1,4 +1,39 @@
 # Worklog
+## 2026-11-12（續3）開發信改走免費 Gemini 金鑰（OUTREACH_GEMINI_API_KEY），付費那把只留給影片／圖片
+
+- 觸發：操作者「開發信排程是維持免費」；新建免費專案 AwareWave-Outreach-Free（354624444562，不連帳單），原付費專案改名 AwareWave-Media（749365809116）。前因見同日「Google 帳單 NT$28.20 查因」一筆。
+- 不變量：設了 `OUTREACH_GEMINI_API_KEY` 時，開發信的 AI 步驟不得落到計費的 `GEMINI_API_KEY`——沒有連接器、客戶金鑰被拒、每日額度用完，三種都停在免費那把（額度用完＝該次呼叫失敗，不是改走付費）。
+- 改：
+  - C1 `next-admin/lib/outreach/org-ai-key.ts` `onPlatformKey()`：`outreachJson` 兩個平台退路都帶 `OUTREACH_GEMINI_API_KEY`（研究、查證、回信分類共用這一處）；測試 `__tests__/org-ai-key.test.ts` 加一條。
+  - C2 repo `docker-compose.yml` next-admin 加 `OUTREACH_GEMINI_API_KEY`；`.env.example` 記名。
+  - C3 主機：`.env` 加該變數（備份 `.env.bak.outreach-key-20261112`）；compose 經 `safe-infra-patch.sh compose … next-admin`（備份 `docker-compose.yml.bak.safe-patch-20261112-121059`）。
+  - C4 產信階梯的 agency Gemini 連接器（`generate.ts:157` `gemini_agency`，vault `co_connector:bdee2903-…`）：`secret_put` 換成免費那把；換前雜湊＝主機 `GEMINI_API_KEY`（2e0218a682b5），換後＝免費（3146969fa9ef）。
+  - C5 本機 `mcp/user-env.ps1`、`AWARE_WAVE_CREDENTIALS.md` 記新金鑰與專案改名（皆不進 git）。
+- 部署：`sg-deploy.sh next-admin` → b7e3751cf，healthy 15s，smoke 全 OK。
+- 未改（仍讀計費的 `GEMINI_API_KEY`）：`lib/ops-inbox/ai/gemini.ts`、`lib/cs/llm.ts` 備援、`lib/tarot/image-gen.ts`（生圖本來就要付費）。11/10–11/11 帳單上的文字 token 全部對得上開發信，這三處沒有產生費用。
+- 開發信開關：`co_sender_accounts.auto_draft` 仍為 false（暫停），等操作者說恢復；主 Gmail connector token `invalid_grant`，恢復前要重連。產信第一階是平台 OpenAI 金鑰（`generate.ts:189`），那一步不是免費。
+- 事故揭露：查憑證筆記格式時，一條指令把 `AWARE_WAVE_CREDENTIALS.md` 第 918–922 行（OpenAI／Anthropic／xAI／Perplexity 金鑰）與新 Gemini 免費金鑰印進本 session 工具輸出；未進 git、未送其他服務；已告知操作者，輪換由操作者決定。避免再發生：讀該檔只用「先遮罩再印」的指令，遮罩規則涵蓋 `sk-`、`xai-`、`pplx-`、`AQ.`，不只 `AIza`。
+- rollback：`git revert b7e3751cf` 後 sg-deploy；vault `secret_put('co_connector:bdee2903-ee82-4b1b-8874-96637aa13126', <主機 GEMINI_API_KEY>)`；compose／.env 用上列備份。
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-next-admin printenv OUTREACH_GEMINI_API_KEY 雜湊＝主機 .env 免費金鑰；POST /api/internal/outreach/claim-consistency limit=1 → ok n=1 errors=0，ai_call_logs 新增 4 列 outreach/claim-check；本機新金鑰直打 generateContent 200；vitest org-ai-key 12/12；npx tsc --noEmit 乾淨 | exit=0 | ms=600000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — 自審＋突變（`onPlatformKey` 改成原樣回傳 → 新測試變紅，還原 → 12/12 綠）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=GEMINI_API_KEY | hits=38（next-admin 讀取點 6 處已逐一分類：開發信 1 處已改，其餘見「未改」）
+- ORACLE_WAIVED: 7 行金鑰選取＋1 條測試，突變已證；main checkout 與遠端分歧且混有其他 session 未提交改動，diff 擷取會夾帶別人的檔
+## 2026-11-12（續2）Google 帳單 NT$28.20 查因＋暫停開發信自動草稿
+
+- 觸發：操作者收到 Google Cloud「$10 預算 100%」信，報表顯示 11/10–11/11 共 $28.20，問「儲值當天被用完」「11/11 沒開電腦為何被扣」，要求暫停開發信（仍在測試階段）。
+- 根因：
+  - C1 帳單幣別＝新台幣（報表只印「$」）：flash-lite 輸入 727,239 tok＝`ai_call_logs` 11/10–11/11 合計 727,236；× 官方 US$0.30/1M＝US$0.218，帳單 7.07＝×32.4；輸出 125,039 tok × US$2.50/1M＝US$0.313，帳單 10.13＝×32.4。合計 NT$28.20 ≈ US$0.87。幣別為推算，操作者尚未在帳戶設定頁確認。
+  - C2 11/10 把專案 AwareWave-ColdEmail 連上帳單（工作台要用 Gemini，本檔 11-10 續30 一帶），同一把 `GEMINI_API_KEY` 也在 `lobster-next-admin`（sha256 前 12 碼同 42c75f2f7952）→ 開發信呼叫由免費層改計費；當時未告知操作者這條線會開始收費。
+  - C3 11/11 的呼叫（台灣 16:00–18:00）：`/etc/cron.d/c162` → `/root/c162-daily.sh` 一次性一致率量測 329 次 `outreach/claim-check`（11/11 08:31 UTC 跑完第 10 批，寫 `/root/c162/DONE` 並自刪 cron）；`outreach_gmail_sync` 每 10 分內的 `runPipelineTick`（`app/api/internal/outreach/gmail-sync/route.ts:77`）71 次 `outreach/research`。
+  - C4 其餘：Omni 1.2 Flash 影片 NT$9.01、Nano Banana 2.1 NT$1.85＝11/10 接模型時的實測。
+- 改（prod 資料，操作者明示）：`co_sender_accounts.auto_draft` true→false，id `1e04842d-4acb-4126-9b2b-fdac97af4323`、`1622a501-9b08-4bc9-be86-5951b29ed73f`（`pipeline-store.ts:68` 的選取條件＝產品既有開關）。未動金鑰、compose、cron。
+- rollback：`update co_sender_accounts set auto_draft=true where id in (上列兩個)`。
+- 旁見：gmail-sync 回 `invalid_grant`（主 Gmail connector token 過期或被撤銷）；恢復開發信前要重新連結。
+- 避免再發生：把免費層金鑰連上帳單前，先 `docker exec <c> printenv GEMINI_API_KEY | sha256sum` 列出所有持有同一把的容器與其排程用量，並告知操作者每條線的月費。
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql 計數 pipeline 選取條件＝0；手動 POST /api/internal/outreach/gmail-sync → pipeline.orgs=0 researched=0 generated=0；`max(created_at) from ai_call_logs where vendor='Google'` 前後皆 2026-11-11 10:10:46 UTC | exit=0 | ms=20000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — UPDATE returning 兩列 auto_draft=f，讀回選取程式 `pipeline-store.ts:66-70`
+- BUGHUNT_WAIVED: NA -- 無程式或文件字串改動，只改兩列 prod 資料
+- ORACLE_WAIVED: 無 source 檔改動
 ## 2026-11-12（續1）影音工作台：靜態檔帶版本號、在 Cloudflare 邊緣快取（tools.html 不再每檔回歐洲）（c20ed9691）
 
 **根因**（證據）：工作台所有靜態檔 `Cache-Control: no-store`（`server.cjs` 舊 :176）→ Cloudflare（Free、SSL=Full、無 Cache Rule、`cache_level=aggressive`、video A 記錄 proxied、無 cloudflared）每檔都從台灣接入的 **SIN** 節點回歐洲 origin。路徑：CF →(h2) 主機 nginx 443 → `127.0.0.1:8083` lobster-nginx → `video-workbench:4178`（upstream keepalive 16）。
