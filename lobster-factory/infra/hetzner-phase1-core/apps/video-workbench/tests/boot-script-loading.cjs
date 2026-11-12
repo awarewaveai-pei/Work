@@ -30,6 +30,9 @@ const loadScripts = new Function("document", m[0] + "\nreturn loadScripts;")(doc
   build = "abc123";
   loadScripts(["d.js"], "../scripts/");
   assert.equal(appended.at(-1).src, "../scripts/d.js?v=abc123", "server build (data-vw-build) is appended: edge-cacheable URL");
+  const refused = loadScripts(["e.js"], "../scripts/");
+  appended.at(-1).onerror(new Event("error"));
+  await assert.rejects(refused, /請重新整理頁面/, "a versioned page tells the user to reload (older-build files are refused)");
 
   for (const f of ["tools", "characters", "projects", "storyboards", "templates", "index"].map((n) => `scripts/${n}-boot.js`)) {
     const t = read(f);

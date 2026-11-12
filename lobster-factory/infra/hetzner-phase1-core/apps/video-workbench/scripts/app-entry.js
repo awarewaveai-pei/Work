@@ -19,10 +19,10 @@
     ]);
     return;
   }
+  // runtime.js (VideoWorkbench.loadScripts) is not loaded yet, so the same rule is written out here: insert all tags at once,
+  // async = false keeps the list order while the downloads overlap. ?v=<build> as in loadScripts (edge-cacheable).
+  const build = document.documentElement.getAttribute("data-vw-build");
   try {
-    // runtime.js (VideoWorkbench.loadScripts) is not loaded yet, so the same rule is written out here: insert all tags at once,
-    // async = false keeps the list order while the downloads overlap. ?v=<build> as in loadScripts (edge-cacheable).
-    const build = document.documentElement.getAttribute("data-vw-build");
     await Promise.all(["config.js", "shared/models.js", "shared/adapters.js", "shared/purify.js", "shared/episode-spine.js", "shared/runtime.js", "shared/security.js", "shared/theme.js", "shared/jobs-view.js", "shared/workflows.js", "shared/assets-ui.js", "scripts/index-boot.js"].map((file) => new Promise((resolve, reject) => {
       const script = document.createElement("script");
       script.async = false;
@@ -32,6 +32,7 @@
       document.body.append(script);
     })));
   } catch (error) {
-    message("工作台載入失敗", [error.message, "請確認整個壓縮檔已解壓縮，關閉舊版服務後，再執行這個資料夾的 start.cmd。"]);
+    // With a build (the hosted site) the usual cause is a deploy since this page loaded: older-build files are refused.
+    message("工作台載入失敗", [error.message, build ? "工作台剛更新或連線中斷，請重新整理頁面。" : "請確認整個壓縮檔已解壓縮，關閉舊版服務後，再執行這個資料夾的 start.cmd。"]);
   }
 })();

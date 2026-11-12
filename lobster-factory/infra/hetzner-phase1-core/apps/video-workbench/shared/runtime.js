@@ -506,7 +506,8 @@
               s.async = false;
               s.src = key + (build ? "?v=" + encodeURIComponent(build) : "");
               s.onload = resolve;
-              s.onerror = () => reject(Error("無法載入 " + file));
+              // With a build, the usual cause is a deploy since this page loaded: the server refuses older-build files.
+              s.onerror = () => reject(Error((build ? "工作台已更新或連線中斷，請重新整理頁面。" : "") + "無法載入 " + file));
               document.body.append(s);
             }),
           );

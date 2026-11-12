@@ -2,8 +2,9 @@
 // carries ?v=<build>, and a static file asked for with the CURRENT build gets `public, max-age=31536000, immutable`, so
 // Cloudflare keeps it at the edge instead of going back to the European origin for each file (from Taiwan that leg
 // queued the ~30 boot files 1-2.5 s deep, 2026-11-12). Invariant: a cached URL always names the bytes it holds. The build id
-// is a hash of the served files themselves, so any changed file changes every URL; a stale or missing ?v= is never cached.
-// HTML, config.js, /awarewave/*, /api, /media, /generated never reach isImmutable as cacheable.
+// is a hash of the served files themselves, so any changed file changes every URL; a missing ?v= is never cached, a stale one
+// is refused (one page never runs two builds).
+// HTML, config.js, /awarewave/*, /api, /media, /generated are always "no-store" (cachePolicy).
 const crypto = require("node:crypto"), fs = require("node:fs"), path = require("node:path");
 
 const DIRS = ["pages", "shared", "styles", "scripts", "vendor", "assets", "examples"];
@@ -38,9 +39,12 @@ function versionHtml(html, id) {
 }
 
 // pathname = decoded path; search = raw query string ("?v=..."). The service worker script keeps its own update check.
-function isImmutable(pathname, search, id, file) {
-  if (!id || !CACHEABLE.test(pathname) || /\.html$/i.test(file) || pathname === "/scripts/media-cache-sw.js") return false;
-  return new URLSearchParams(search).get("v") === id;
+// "immutable" = this build's bytes, cache for a year; "stale" = asked for by a page of an older build: the server only holds
+// this build, so it is refused (404) rather than mixing versions in one page (that page reloads); "no-store" = everything else.
+function cachePolicy(pathname, search, id, file) {
+  if (!id || !CACHEABLE.test(pathname) || /\.html$/i.test(file) || pathname === "/scripts/media-cache-sw.js") return "no-store";
+  const v = new URLSearchParams(search).get("v");
+  return v === null ? "no-store" : v === id ? "immutable" : "stale";
 }
 
-module.exports = { buildId, versionHtml, isImmutable };
+module.exports = { buildId, versionHtml, cachePolicy };

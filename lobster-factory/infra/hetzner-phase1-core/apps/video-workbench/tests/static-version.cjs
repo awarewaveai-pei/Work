@@ -1,5 +1,5 @@
 // Edge-cacheable static files (backend/static-version.cjs): container pages carry ?v=<build> on every local script/stylesheet,
-// a static file asked for with the current build is `immutable`, anything else (stale/missing ?v=, HTML, config.js,
+// a static file asked for with the current build is `immutable`, an older build's is 404, anything else (missing ?v=, HTML, config.js,
 // /awarewave/*, the service worker, local start.cmd mode) stays no-store. Invariant: a cached URL names the bytes it holds.
 const assert = require("node:assert/strict"), fs = require("node:fs"), os = require("node:os"), path = require("node:path"), http = require("node:http");
 const { createServer } = require("../server.cjs");
@@ -62,7 +62,8 @@ async function listen(options) {
         assert.equal(res.cc, url.pathname === "/config.js" ? "no-store" : "public, max-age=31536000, immutable", url.pathname);
       }
     }
-    assert.equal((await get(proxy.port, "/shared/runtime.js?v=0000000000000000")).cc, "no-store", "stale build is not cached");
+    const stale = await get(proxy.port, "/shared/runtime.js?v=0000000000000000");
+    assert.deepEqual([stale.status, stale.cc], [404, "no-store"], "an older build's file is refused, never served as this build's bytes");
     assert.equal((await get(proxy.port, "/shared/runtime.js")).cc, "no-store", "no build is not cached");
     assert.equal((await get(proxy.port, "/scripts/media-cache-sw.js?v=" + build)).cc, "no-store", "service worker keeps its own update check");
     assert.equal((await get(proxy.port, "/awarewave/theme.css?v=" + build)).cc, "no-store", "saved theme stays live");

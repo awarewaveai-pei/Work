@@ -164,6 +164,12 @@ function createServer({
         throw Error();
       const stat = fs.statSync(file);
       if (!stat.isFile()) throw Error();
+      const policy = boundary === root ? staticVersion.cachePolicy(pathname, new URL(req.url, "http://localhost").search, build, file) : "no-store";
+      if (policy === "stale") {
+        res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" });
+        res.end("Not found");
+        return;
+      }
       if (build && boundary === root && /\.html$/i.test(file)) {
         const body = Buffer.from(staticVersion.versionHtml(fs.readFileSync(file, "utf8"), build));
         res.writeHead(200, { "Content-Type": types[".html"], "X-Content-Type-Options": "nosniff", "Cache-Control": "no-store", "Content-Length": body.length });
@@ -184,10 +190,7 @@ function createServer({
       const headers = {
         "Content-Type": types[path.extname(file)] || "application/octet-stream",
         "X-Content-Type-Options": "nosniff",
-        "Cache-Control":
-          boundary === root && staticVersion.isImmutable(pathname, new URL(req.url, "http://localhost").search, build, file)
-            ? "public, max-age=31536000, immutable"
-            : "no-store",
+        "Cache-Control": policy === "immutable" ? "public, max-age=31536000, immutable" : "no-store",
         "Accept-Ranges": "bytes",
         "Content-Length": size,
       };
