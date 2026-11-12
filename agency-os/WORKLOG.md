@@ -20,6 +20,16 @@
 - ORACLE_WAIVED: Codex artifact 2026-11-13-partialreview-c0d26946 的唯一發現（換來源不重轉）已照不變量修正，並補指名測試；匯入腳本不屬於隱私／權限守衛，依規則不做突變
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=import-audio-library|\.import\.json | hits=21
 - BUGHUNT_SCOPE_NARROW: 改動只有清單資料與匯入腳本；呼叫者只有 tests/ed6-audio.cjs 和交接文件
+## 2026-11-13（續4）影音工作台 ED.12.3 補測：AI 畫質增強 1 秒 → 4K 實測
+
+- 實測（監工核准，預算 US$0.40）：640×360 30fps 測試片 1 秒，data URI → `topazlabs/video-upscale` target 4k；輸出 3840×2160、1.0 秒，跑 20 秒；metrics.unspecified_billing_metric＝2 units＝US$0.16（prediction f8qgf12bj5rmt0d1t2rvtdd5yg）。
+- 對照估價：cost-model.ts videoEnhanceUsd("4K", 1)＝max(2, ceil(1×1.5))＝2 units，與實測相同、沒有估低，估價不改。
+- ED.12.3 真 API 累計：成功 4 次 × US$0.16＝約 US$0.64（另 1 次 Files API 網址失敗、不計費）。
+- 未改：cost-model.ts 註解仍寫「4K unmeasured」（監工指示只在實測高於估價時才改程式）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scratchpad/ed123-calibrate.cjs <app> <dir> 1 4k（真 Replicate API） | exit=0 | ms=25000
+- REVIEW_WAIVED: DOC_ONLY -- 只新增 WORKLOG 實測紀錄，程式未改
+- BUGHUNT_WAIVED: DOC_ONLY -- 只新增 WORKLOG 實測紀錄，程式未改
+- rollback：git revert 本 commit。
 ## 2026-11-13（續3）影音工作台 ED.12.3：真正的 AI 畫質增強（Topaz Labs，實際用量扣點）
 
 - 供應商：Topaz Labs（美國）`topazlabs/video-upscale`，Replicate 官方模型，走既有 REPLICATE_API_TOKEN。出處 https://replicate.com/topazlabs/video-upscale（$0.08 per unit；依輸出解析度＋fps 換算 units）。
