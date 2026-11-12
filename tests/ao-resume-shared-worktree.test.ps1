@@ -200,6 +200,23 @@ try {
     Assert-Eq $r.Action 'fast-forward' 'P15 action'
     Assert-Eq (Read-File (Join-Path $f.Wt 'log.md')) "# Log`n## mine`n## theirs`n## old`n" 'P15 both entries kept'
 
+    # P16 a step fails after files were already rewritten (2026-11-12: a move of an untracked file failed after ten
+    # files went back to HEAD bytes) -> every local byte restored, HEAD unchanged, no backup directory left behind
+    $f = New-Fixture 'p16'
+    Set-File (Join-Path $f.Wt 'a.txt') "1`n2`n3`n4`n5`n"; G $f.Wt @('commit', '-qam', 'five') | Out-Null; G $f.Wt @('push', '-q', 'origin', 'main') | Out-Null
+    G $f.Other @('pull', '-q') | Out-Null
+    Set-File (Join-Path $f.Other 'c.txt') "c-origin`n"; Set-File (Join-Path $f.Other 'a.txt') "1`n2`n3`n4`nFIVE`n"
+    G $f.Other @('add', '-A') | Out-Null; G $f.Other @('commit', '-q', '-m', 'origin a+c') | Out-Null; G $f.Other @('push', '-q', 'origin', 'main') | Out-Null
+    Set-File (Join-Path $f.Wt 'a.txt') "ONE`n2`n3`n4`n5`n"; Set-File (Join-Path $f.Wt 'c.txt') "c-origin`n"
+    $headBefore = G $f.Wt @('rev-parse', 'HEAD')
+    $lock = [IO.File]::Open((Join-Path $f.Wt 'c.txt'), 'Open', 'Read', 'Read')   # readable, but the move of c.txt fails
+    try { $r = Invoke-SharedWorktreeParity -WorkRoot $f.Wt } finally { $lock.Dispose() }
+    Assert-True (-not $r.Ok) 'P16 not ok'
+    Assert-Eq (Read-File (Join-Path $f.Wt 'a.txt')) "ONE`n2`n3`n4`n5`n" 'P16 local edit restored after the failed step'
+    Assert-Eq (Read-File (Join-Path $f.Wt 'c.txt')) "c-origin`n" 'P16 untracked file still in place'
+    Assert-Eq (G $f.Wt @('rev-parse', 'HEAD')) $headBefore 'P16 HEAD unchanged'
+    Assert-Eq @(Get-ChildItem (Join-Path $f.Wt '.git') -Directory -Filter 'parity-merge-*').Count 0 'P16 backup directory removed after the restore'
+
     # ---------------- I3: hooks act on the MAIN checkout only (2026-09-27) ----------------
     # A linked worktree (git worktree add) has `.git` as a FILE. Accepting it as the root wrote hook
     # state / reports into D:\tmp\<wt> and ensure-claude-junction replaced the worktree's tracked

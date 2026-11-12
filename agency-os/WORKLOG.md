@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-12（續9）git-parity-merge 中途失敗會丟掉其他 session 的未提交改動（事故＋修正）
+
+- 事故：D:\Work 對齊時 `scripts/git-parity-merge.py` 先把 10 個「本地有改、origin 也改」的檔寫回 HEAD，再把未追蹤檔 os.replace 到 C:\ 的 tempfile（repo 在 D:）→ WinError 17 當掉；合併結果只在記憶體。手動 ff 後這 10 檔＝origin 版本：WORKLOG.md、video-editor-parity-supervisor/data.mjs、supervisor.html、hetzner-phase1-core/.env.example、docker-compose.yml、next-admin lib/outreach/org-ai-key.ts（＋test）、video-workbench editor-panes/fillers.js、subtitles.js、tests/paid-price.cjs。沒推上去的本地改動無法確認（檔案歷史比對誤判太多）；已請監工 session 通知擁有者核對。AO-RESUME 每次開工都走這支腳本。
+- 不變量：(1) 改任何工作樹檔前，要改的本地 bytes 先存進 `.git/parity-merge-*`（同磁碟）＋manifest.json；(2) 只碰要合併的路徑，新內容在備份目錄寫好再換名放入，不產生新工作樹路徑；(3) 任何失敗都還原，並如實回報 HEAD 是否已前進、備份在哪。
+- 修：`scripts/git-parity-merge.py` 依上；`scripts/lib/git-safe-ops.ps1` Invoke-SharedWorktreeParity 讀 JSON `backup`／`fastForwarded`：已快轉但合併檔未寫完 → Action `carry-failed`、訊息附備份路徑；不再一律說「nothing touched」。
+- 測：`tests/ao-resume-shared-worktree.test.ps1` P16（鎖住未追蹤檔使搬移在改檔後失敗 → 本地改動還原、HEAD 不動、備份目錄清掉）；突變（拔掉還原）在拋棄式 worktree 讓 P16 紅 2 條。
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File tests/ao-resume-shared-worktree.test.ps1 (91 passed 0 failed); mutation in D:/Worktrees/pm-mut (89 passed 2 failed, P16); bash scripts/test-hooks.sh (394 pass, 1 fail = untracked .claude/skills/.trash MCP refs, not this change) | exit=0 | ms=900000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n — Codex `agency-os/reports/oracle/2026-11-12-partialreview-27e9ccf8.md`（2）＋`03828cf9.md`（3），全修
+- ORACLE_WAIVED: 第 2 輪 3 條修在 artifact 之後（兩輪上限）；同 reviewer 連報 2 次，第 3 次修正前已寫上方不變量
+- BUGHUNT_DONE: scope=scripts,agency-os,tests | grep=git-parity-merge|ff-refused|Invoke-SharedWorktreeParity | hits=8
 ## 2026-11-12（續8）影音工作台 S4b 本機 SF3D 補完：安裝失敗保留舊版實測、Codex 補審 3 項修正、測試金額改用匯率算
 
 - 安裝失敗保留舊版（實測 3 次，`install-wsl.sh --force`）：

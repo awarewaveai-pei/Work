@@ -367,7 +367,7 @@ function Get-StaleSharedIndexPaths {
 # 8 stashes that were never restored.
 #
 # Returns [pscustomobject] Action / Ahead / Behind / Branch / TrackedDirty / Ok / Message
-#   Action : up-to-date | fast-forward | ahead | diverged | ff-refused | not-on-branch | fetch-failed
+#   Action : up-to-date | fast-forward | ahead | diverged | ff-refused | carry-failed | not-on-branch | fetch-failed
 #   Ok     : $true when no pull is pending after the call (up-to-date, ahead, fast-forward)
 #   TrackedDirty : count of `git status --porcelain --untracked-files=no` lines (info only)
 function Invoke-SharedWorktreeParity {
@@ -440,7 +440,15 @@ function Invoke-SharedWorktreeParity {
             } else {
                 $r.Action = 'ff-refused'
                 $why = if ($carry) { $carry.message } else { 'merge helper unavailable' }
-                $r.Message = "git refused the fast-forward and the local edits cannot be carried ($why); nothing touched. git: " + (($ff.Output | Where-Object { $_ }) -join ' | ')
+                # backup = the helper failed after changing files: the local edits are only in that directory.
+                $backup = if ($carry) { $carry.PSObject.Properties['backup'] } else { $null }
+                $state = if ($backup) { "LOCAL EDITS ARE NOT IN THE FILES: restore them from $($backup.Value) (manifest.json)" } else { 'nothing touched' }
+                if ($backup -and $carry.fastForwarded) {
+                    $r.Action = 'carry-failed'
+                    $r.Message = "fast-forwarded $($r.Behind) commit(s) to $Remote/$Branch, but carrying the local edits failed ($why); $state"
+                } else {
+                    $r.Message = "git refused the fast-forward and the local edits cannot be carried ($why); $state. git: " + (($ff.Output | Where-Object { $_ }) -join ' | ')
+                }
             }
         }
     }
