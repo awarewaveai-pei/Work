@@ -1,4 +1,24 @@
 # Worklog
+## 2026-11-12（續1）影音工作台：靜態檔帶版本號、在 Cloudflare 邊緣快取（tools.html 不再每檔回歐洲）（c20ed9691）
+
+**根因**（證據）：工作台所有靜態檔 `Cache-Control: no-store`（`server.cjs` 舊 :176）→ Cloudflare（Free、SSL=Full、無 Cache Rule、`cache_level=aggressive`、video A 記錄 proxied、無 cloudflared）每檔都從台灣接入的 **SIN** 節點回歐洲 origin。路徑：CF →(h2) 主機 nginx 443 → `127.0.0.1:8083` lobster-nginx → `video-workbench:4178`（upstream keepalive 16）。
+- 主機上 `curl --parallel` 20 檔：lobster-nginx 39ms、主機 nginx 443 93ms、經 CF（CDG）166ms → origin 不排隊。
+- 台灣筆電同 20 檔（CF-RAY …-SIN）：每檔 ttfb 1.33–2.57s 錯開；主機 access log 顯示請求抵達時已錯開約 1s → 排隊在 CF SIN→origin 這段，Free 方案無法調整。
+- 改前 Chrome（台灣）tools.html：ttfb 1906ms、DCL 9267ms、30 支 boot 檔最後一支 responseEnd 12100ms。
+
+**治本**：`backend/static-version.cjs`。build id = 靜態檔內容雜湊（任何檔改 → 全部網址換 → 部署後必拿新檔）。僅容器模式（`VW_TRUST_PROXY_IDENTITY=1`；本機 start.cmd 檔案會變，維持原樣）。HTML 注入 `data-vw-build`＋本地 `<script src>`／`<link rel=stylesheet>` 加 `?v=`；`VideoWorkbench.loadScripts`、`app-entry.js` 同樣加。帶「當前」build 的 shared|styles|scripts|vendor|assets|examples|pages 靜態檔回 `public, max-age=31536000, immutable`；舊／缺 `?v=`、HTML、config.js、/awarewave/*、media-cache SW、/api、/media、/generated 照舊 no-store。Cloudflare／nginx 不需改（快取鍵含 query）。`/engines/` 未動：nginx 直送、檔名無雜湊、`expires -1`、不在首屏。
+- 不變量：被快取的網址永遠對應它裝的位元組。
+
+**驗證**
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs (apps/video-workbench) | exit=0 | ms=21000
+- 突變：`isImmutable` 改成只看有沒有 `v` → `tests/static-version.cjs` 紅（stale build is not cached）；還原綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n
+  - Codex `agency-os/reports/oracle/2026-11-12-review-0f5be33f.md`：部署前開著的舊分頁用舊 `?v=` 在邊緣未命中時拿到新檔（混版）。查證屬實，但與改前相同（改前一律回最新），且該回應 no-store 不汙染快取 → 不修，列風險。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=loadScripts | hits=10
+  - 6 支 `*-boot.js` 全走 `VideoWorkbench.loadScripts`，`app-entry.js` 自帶同規則；無其他動態載入繞過。
+- 部署後待驗（監工）：強制重新整理確認 `?v=` 與 `cf-cache-status: HIT`，改後量測。
+
+**避免再發生**：靜態檔新增載入方式時必須走 `loadScripts` 或 HTML 標籤；`tests/static-version.cjs` 會檢查每頁每個本地 ref 都帶版本並回 immutable。
 ## 2026-11-10（續52）ED.11 剪贅字分頁：畫面、旁白、字幕一起剪，配樂不斷（819160be0）
 
 **派工**：影片剪輯對齊監工派 ED.11。未部署；未改共用檔。
