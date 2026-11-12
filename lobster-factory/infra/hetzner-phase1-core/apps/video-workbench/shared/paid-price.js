@@ -56,8 +56,8 @@
   };
   let loading;
   const load = () =>
-    (loading ||= window.VideoWorkbench?.request?.("/capabilities", undefined, "GET")
-      .then((c) => { window.VideoWorkbench.capabilities ||= c; later(); })
+    (loading ||= window.VideoWorkbench?.loadCapabilities?.()
+      .then(() => later())
       .catch(() => {}));
   new MutationObserver(later).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
   later();

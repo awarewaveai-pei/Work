@@ -515,6 +515,19 @@
       }),
     );
   }
+  // The /capabilities answer, asked once per page and sent at page start next to the state load (ready), not after it.
+  // Every reader (boot files, shared/*.js) awaits this one promise; VideoWorkbench.capabilities is set before it resolves.
+  // A failed request is asked again by the next caller.
+  let capabilitiesLoad;
+  function loadCapabilities() {
+    return (capabilitiesLoad ||= window.VideoWorkbench.request("/capabilities", undefined, "GET").then(
+      (c) => (window.VideoWorkbench.capabilities = c),
+      (error) => {
+        capabilitiesLoad = null;
+        throw error;
+      },
+    ));
+  }
   window.VideoWorkbench = {
     request: (path, body, method = "POST") =>
       child
@@ -523,6 +536,7 @@
     generator: { import: (payload) => rpc("generator-import", payload) },
     ready,
     loadScripts,
+    loadCapabilities,
     storage,
     reportError,
     models: M,
@@ -696,5 +710,6 @@
   };
   // storyboards-0.js is hash-protected and still calls the old global name.
   window.SeedStar = window.VideoWorkbench;
+  loadCapabilities().catch(() => {}); // in flight with the state load; the boot file asks again (and reports) if it failed
   ready.catch(reportError);
 })();

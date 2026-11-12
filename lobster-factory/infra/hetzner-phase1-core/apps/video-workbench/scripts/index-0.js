@@ -1209,9 +1209,8 @@ VideoWorkbench.generator.setDraft = (value) => {
   generatorNormalizeSettings();
   render();
 };
-VideoWorkbench.request("/capabilities", undefined, "GET")
+VideoWorkbench.loadCapabilities()
   .then((c) => {
-    VideoWorkbench.capabilities = c;
     if (c.models) {
       // A picked Replicate model stays; anything else becomes the server's default (card RV, same as the server).
       for (const mode of ["director", "reference", "cartoon", "product"]) state.model[mode] = VideoWorkbenchVideoModels.get(c, state.model[mode]).id;

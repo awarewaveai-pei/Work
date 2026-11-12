@@ -11,8 +11,7 @@
     console.warn("[video-workbench] storyboard examples unavailable:", error.message);
   }
   try {
-    const caps = await VideoWorkbench.request("/capabilities", undefined, "GET");
-    VideoWorkbench.capabilities = caps;
+    const caps = await VideoWorkbench.loadCapabilities();
     if (caps.reference) {
       const response = await fetch("/reference/storyboards-data.json");
       if (response.ok) {

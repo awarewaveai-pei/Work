@@ -43,7 +43,7 @@
   let caps;
   VideoWorkbench.removeBgLabel = async () => {
     // The whole capabilities (toolCosts + twdRate): the price and the rate it is shown at come from one answer.
-    caps ||= VideoWorkbench.capabilities?.toolCosts ? VideoWorkbench.capabilities : await VideoWorkbench.request("/capabilities", undefined, "GET").catch(() => null);
+    caps ||= VideoWorkbench.capabilities?.toolCosts ? VideoWorkbench.capabilities : await VideoWorkbench.loadCapabilities().catch(() => null);
     await pricesReady;
     const price = caps && window.VideoWorkbenchPrices?.text("video.bg-remove", caps);
     return price ? "去背 · " + price : null;

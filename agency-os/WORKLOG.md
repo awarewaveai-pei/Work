@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-12（續11）影音工作台 BOOT.2：「讀狀態」與「讀能力」同時發
+
+- 根因：`VideoWorkbench.ready`（/state）先完成，boot 檔才發 /capabilities（tools/projects/templates-boot 第一行、storyboards-boot、index-0.js、characters-0.js 各自再發一次），兩支 API 串列＝多一趟歐洲往返（量測：tools-0.js 開始載入 698ms → 399ms，本機對 /api/vw 加 300ms 延遲）。
+- 讀取點盤點（grep `capabilities`）：全站 30+ 處在 render／handler 裡同步讀 `VideoWorkbench.capabilities`（generator-controls.js、index-0.js、editor-panes/{audio,text}.js、tools-3d.js、tools-voice-music.js、tools-workflows.js、templates-0.js、projects-0.js、shared/{models,paid-price}.js），都假設「頁面腳本跑時已到」→ 不變量：用到的程式執行時 capabilities 已到，所以 boot 檔仍在載腳本前 await，只是請求不再排在 state 後面。
+- 改：`shared/runtime.js` 新 `VideoWorkbench.loadCapabilities()`（每頁只發一次、resolve 前設好 `.capabilities`、失敗下個呼叫者重發），runtime 載入完立刻呼叫一次（與 state 同時在飛）；tools/projects/templates-boot、storyboards-boot、characters-0.js、index-0.js、shared/{assets-ui,jobs-view,paid-price}.js 全改用它，刪掉各自的 request。templates-boot 的 examples fetch 也提前到最前（不再排在 state、capabilities 後）。`storyboards-design-baseline.json` hash 更新（受保護檔只動載入行）。
+- 新測試 `tests/capabilities-boot.cjs`（入 gate）：helper 一次請求／先設值再 resolve／失敗重發；runtime 載入即發；tools/projects/templates-boot 在 capabilities 回來前不載腳本（vm 假環境）；全站無人自己發 /capabilities。`tests/p6-main-system.cjs` 的 jobs-view 假環境補 loadCapabilities。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs＋Playwright(Edge, /api/vw 加 300ms)：舊版 state@67 → capabilities@374、tools-0.js 698ms；新版 state@71 capabilities@71、tools-0.js 399ms；tools.html 20 個工具逐一開啟全 loaded、無 pageerror／console error；index／projects／templates／storyboards／characters 五頁 capabilities=object、無錯誤 | exit=0 | ms=120000
+- 突變：tools-boot 拿掉 await／runtime 拿掉載入即發／helper 拿掉 `||=` → capabilities-boot 各自轉紅，還原轉綠。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/1m/0n — Codex（agency-os/reports/oracle/2026-11-12-review-bf33311e.md）：測試只涵蓋三個 boot 檔、沒涵蓋 index-boot 載入 index-0.js 時 capabilities 可能未到 → 查證：index-0.js 本來就不等（`const c = VideoWorkbench.capabilities || {}` 畫一次，到了再 `.then` render；characters-0.js 同理，未知＝無標籤），非本改動引入；已補測試鎖住這兩條「不等但到了會重畫」的路徑（3b）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=request\(["']/capabilities | hits=0
 ## 2026-11-12（續10）影音工作台 TTS.2：Edge 免費配音補回（四個聲音）、預設；Edge 故障自動改 Gemini 並照 Gemini 計價
 
 - 根因：舊 app（next-admin `VideoStudio.tsx:99-102`）有「Edge 免費」四個聲音，搬到工作台時漏掉；工作台配音清單只有 Gemini／OpenAI。

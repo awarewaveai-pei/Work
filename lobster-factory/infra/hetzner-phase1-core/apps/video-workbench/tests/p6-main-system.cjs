@@ -341,7 +341,7 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
     {
       const vm = require("node:vm");
       const ratios = { "16:9": { deliverable: true }, "1:1": { deliverable: false, note: "此比例尚不能投遞" } };
-      const ctx = { VideoWorkbench: { request: async (p) => (p === "/capabilities" ? { mainSystem: { organizationId: ORG } } : { ratios }) }, document: {}, URLSearchParams };
+      const ctx = { VideoWorkbench: { request: async () => ({ ratios }), loadCapabilities: async () => ({ mainSystem: { organizationId: ORG } }) }, document: {}, URLSearchParams };
       vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../shared/jobs-view.js"), "utf8"), ctx);
       const job = (ratio) => ({ result: { assetId: "a" }, input: { settings: { ratio } } });
       await assert.rejects(ctx.VideoWorkbench.deliveryUrl(job("1:1")), /尚不能投遞/);

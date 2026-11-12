@@ -3,7 +3,7 @@ const $ = (id) => document.getElementById(id);
 // /capabilities); each thumbnail says whether it is sent. Unknown until the capabilities arrive = no label.
 let sentRefs = null;
 const refTag = (i) => (Number.isInteger(sentRefs) ? (i < sentRefs ? "生成時送出" : "僅保存") : "");
-VideoWorkbench.request("/capabilities", undefined, "GET")
+VideoWorkbench.loadCapabilities()
   .then((c) => {
     sentRefs = Number.isInteger(c?.maxSentReferences) ? c.maxSentReferences : null;
     document.querySelectorAll("[data-ref-tag]").forEach((el) => (el.textContent = refTag(Number(el.dataset.refTag))));
