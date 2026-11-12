@@ -365,7 +365,79 @@
     if (i !== s.length || !Number.isFinite(v)) fail();
     return v;
   }
+  // Card ED.7.3: 轉場曲線 as one formula of the linear progress T (0 -> 1). The export writes it into FFmpeg's xfade
+  // expression; the preview evaluates the same text with T replaced by its progress.
+  const TRANSITION_CURVES = { 線性: "T", 平滑: "T*T*(3-2*T)", 加速: "T*T" };
+  const transitionProgress = (curve, t) =>
+    evalNumber((TRANSITION_CURVES[curve] || "T").replaceAll("T", Math.max(0, Math.min(1, t)).toFixed(9)));
+  // Card ED.5.3: 文字動畫 timings, burnt by the export as ASS tags and drawn by the preview. 淡入淡出 = \fad(ms, ms);
+  // 彈出 = \fscx/\fscy from `from` % to 100 % over `ms`; 逐字顯示 = one \k per character, `typeInterval` centiseconds each.
+  const TEXT_ANIMATION = { fadeMs: 200, pop: { from: 50, ms: 180 } };
+  const typeInterval = (text, duration) => {
+    const n = [...text].length;
+    return Math.max(1, Math.round((Math.min(duration * 0.6, Math.max(1, n * 0.06)) * 100) / Math.max(1, n)));
+  };
+  // Preview of one text clip's animation t seconds into it: opacity factor, scale factor, characters shown (a \k
+  // syllable turns visible at its start; line breaks take no time). Subtitle-styled clips do not type out.
+  function textAnimationAt(clip, t) {
+    const a = TEXT_ANIMATION,
+      out = { opacity: 1, scale: 1, shown: Infinity };
+    if (clip.animation === "淡入淡出") out.opacity = Math.max(0, Math.min(1, (t * 1000) / a.fadeMs, ((clip.duration - t) * 1000) / a.fadeMs));
+    if (clip.animation === "彈出") out.scale = (a.pop.from + (100 - a.pop.from) * Math.max(0, Math.min(1, (t * 1000) / a.pop.ms))) / 100;
+    if (clip.animation === "逐字顯示" && !clip.subtitleStyle) out.shown = Math.floor((t * 100) / typeInterval(clip.text, clip.duration)) + 1;
+    return out;
+  }
+  // Card ED.10.4: the eight 字幕樣式 (spec §1.3), burnt by the export and drawn by the preview. text = fill colour;
+  // secondary = 卡拉 OK's not-yet-sung colour; box = [colour, ASS transparency hex] behind the line, else a black outline.
+  // Outline and box padding are fractions of the font size.
+  const SUBTITLE_STYLES = ["白字暗底", "白底黑字", "品牌色", "白字黑邊", "黃字黑邊", "逐字高亮", "卡拉 OK", "色塊標題"];
+  const SUBTITLE_HIGHLIGHT = "#facc15";
+  const SUBTITLE_EDGE = { outline: 0.06, pad: 0.15 };
+  function subtitleLook(clip) {
+    const looks = {
+      白字暗底: { text: "#ffffff", box: ["#000000", "60"] },
+      白底黑字: { text: "#111111", box: ["#ffffff", "00"] },
+      品牌色: { text: clip.color },
+      白字黑邊: { text: "#ffffff" },
+      黃字黑邊: { text: SUBTITLE_HIGHLIGHT },
+      逐字高亮: { text: "#ffffff" },
+      "卡拉 OK": { text: SUBTITLE_HIGHLIGHT, secondary: "#ffffff" },
+      色塊標題: { text: "#ffffff", box: [clip.backgroundColor || clip.color, "00"] },
+    };
+    const look = looks[clip.subtitleStyle];
+    return look && { secondary: look.text, box: null, ...look };
+  }
+  // A plain (non-subtitle) text clip's 底色: a box this ASS transparency (0x55 = 2/3 opaque), padded `pad` output pixels.
+  const TEXT_BOX = { transparency: "55", pad: 5 };
+  // 逐字高亮／卡拉 OK: null = a still line (other style, no words, or words that no longer spell the line); else each
+  // word with the space before it and its window, seconds from the clip start: 逐字高亮 lights it over [from, to) (to =
+  // the next word's start, the last the clip end); 卡拉 OK fills it secondary -> text over [from, to) (from = after
+  // every earlier word).
+  function subtitleWordPlan(clip) {
+    const TW = typeof module === "object" && module.exports ? require("./transcript-words.js") : root.TranscriptWords,
+      words = clip.words;
+    if (!["逐字高亮", "卡拉 OK"].includes(clip.subtitleStyle) || !TW.spells(words, clip.text)) return null;
+    let at = 0;
+    return words.map((w, i) => {
+      const glue = i && TW.joinWords([words[i - 1].text, w.text]).length > words[i - 1].text.length + w.text.length ? " " : "";
+      if (clip.subtitleStyle === "逐字高亮") return { text: w.text, glue, from: w.start, to: i + 1 < words.length ? words[i + 1].start : clip.duration };
+      const from = Math.max(w.start, at);
+      at = Math.max(at, w.end);
+      return { text: w.text, glue, from, to: w.end };
+    });
+  }
   const api = {
+    TRANSITION_CURVES,
+    transitionProgress,
+    TEXT_ANIMATION,
+    typeInterval,
+    textAnimationAt,
+    SUBTITLE_STYLES,
+    SUBTITLE_HIGHLIGHT,
+    SUBTITLE_EDGE,
+    subtitleLook,
+    TEXT_BOX,
+    subtitleWordPlan,
     EFFECTS,
     effectValue,
     LIGHT_LEAK,

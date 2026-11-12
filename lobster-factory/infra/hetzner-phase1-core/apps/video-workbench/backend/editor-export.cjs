@@ -3,8 +3,7 @@ const fs = require("node:fs"),
 const { inspectMedia, verifyOutput } = require("./media-inspect.cjs"),
   { filterPath, assTime, assColor } = require("./subtitle-burn.cjs"),
   Timebase = require("../shared/timebase.js"),
-  EditorModel = require("../shared/editor-model.js"),
-  TranscriptWords = require("../shared/transcript-words.js");
+  EditorModel = require("../shared/editor-model.js");
 const ratios = {
   "16:9": [1920, 1080],
   "9:16": [1080, 1920],
@@ -42,12 +41,11 @@ function frames(value, min, max, name) {
 const fail = (message) => {
   throw Error(message);
 };
-// Card ED.10 (spec §1.3 字幕樣式): a subtitle clip may name one of eight looks. 逐字高亮 and 卡拉 OK move with the clip's
-// word times (words[] = { start, end, text }, seconds from the clip's own start); a clip without words, or whose words
-// no longer spell its text (the line was edited after recognition), burns as a still line in the same colours.
-const SUBTITLE_STYLES = ["白字暗底", "白底黑字", "品牌色", "白字黑邊", "黃字黑邊", "逐字高亮", "卡拉 OK", "色塊標題"];
-const WORD_STYLES = ["逐字高亮", "卡拉 OK"];
-const HIGHLIGHT = "#facc15";
+// Card ED.10 (spec §1.3 字幕樣式): a subtitle clip may name one of eight looks (EditorModel.subtitleLook, shared with the
+// preview). 逐字高亮 and 卡拉 OK move with the clip's word times (words[] = { start, end, text }, seconds from the clip's
+// own start); a clip without words, or whose words no longer spell its text (the line was edited after recognition),
+// burns as a still line in the same colours.
+const SUBTITLE_STYLES = EditorModel.SUBTITLE_STYLES;
 function subtitleWords(c, duration) {
   if (c.words === undefined || c.words === null) return null;
   if (!Array.isArray(c.words) || c.words.length > 200) throw Error("逐字時間最多 200 個字");
@@ -62,54 +60,38 @@ function subtitleWords(c, duration) {
 const escapeAss = (text) => text.replace(/\\/g, "＼").replace(/{/g, "｛").replace(/}/g, "｝");
 // ASS look of one subtitle style: colours, box (BorderStyle 3) or outline, as Style line fields.
 function subtitleLook(clip, size, alpha) {
-  const outline = Math.max(1, Math.round(size * 0.06)), pad = Math.max(2, Math.round(size * 0.15));
-  const text = (hex) => assColor(hex, alpha);
-  const looks = {
-    白字暗底: { primary: "#ffffff", box: ["#000000", "60"] },
-    白底黑字: { primary: "#111111", box: ["#ffffff", "00"] },
-    品牌色: { primary: clip.color },
-    白字黑邊: { primary: "#ffffff" },
-    黃字黑邊: { primary: HIGHLIGHT },
-    逐字高亮: { primary: "#ffffff" },
-    "卡拉 OK": { primary: HIGHLIGHT, secondary: "#ffffff" }, // sung = primary, not yet sung = secondary
-    色塊標題: { primary: "#ffffff", box: [clip.backgroundColor || clip.color, "00"] },
-  };
-  const look = looks[clip.subtitleStyle];
-  const box = look.box && assColor(look.box[0], look.box[1]);
+  const look = EditorModel.subtitleLook(clip),
+    box = look.box && assColor(look.box[0], look.box[1]);
   return {
-    primary: text(look.primary),
-    secondary: text(look.secondary || look.primary),
+    primary: assColor(look.text, alpha),
+    secondary: assColor(look.secondary, alpha), // 卡拉 OK: sung = primary, not yet sung = secondary
     outlineColour: box || assColor("#000000", alpha),
     back: box || assColor("#000000", "80"),
     borderStyle: box ? 3 : 1,
-    outline: box ? pad : outline,
+    outline: box ? Math.max(2, Math.round(size * EditorModel.SUBTITLE_EDGE.pad)) : Math.max(1, Math.round(size * EditorModel.SUBTITLE_EDGE.outline)),
     shadow: 0,
   };
 }
 // Dialogue texts (with their own start/end, seconds from the clip start) for one subtitle clip.
 function subtitleEvents(clip) {
-  const words = clip.words, line = escapeAss(clip.text).replace(/\r?\n/g, "\\N");
-  if (!WORD_STYLES.includes(clip.subtitleStyle) || !TranscriptWords.spells(words, clip.text)) return [{ start: 0, end: clip.duration, text: line }];
-  const parts = words.map((w) => escapeAss(w.text)),
-    glue = (i) => (i && TranscriptWords.joinWords([words[i - 1].text, words[i].text]).length > words[i - 1].text.length + words[i].text.length ? " " : "");
+  const plan = EditorModel.subtitleWordPlan(clip);
+  if (!plan) return [{ start: 0, end: clip.duration, text: escapeAss(clip.text).replace(/\r?\n/g, "\\N") }];
   if (clip.subtitleStyle === "卡拉 OK") {
-    // \kf = the word fills from secondary to primary over its own duration; \k with no text = the wait before it.
+    // \kf = the word fills from secondary to primary over its own window; \k with no text = the wait before it.
     let at = 0, out = "";
-    words.forEach((w, i) => {
-      const wait = Math.round((w.start - at) * 100);
+    for (const w of plan) {
+      const wait = Math.round((w.from - at) * 100);
       if (wait > 0) out += `{\\k${wait}}`;
-      out += glue(i) + `{\\kf${Math.max(1, Math.round((w.end - Math.max(w.start, at)) * 100))}}${parts[i]}`;
-      at = Math.max(at, w.end);
-    });
+      out += w.glue + `{\\kf${Math.max(1, Math.round((w.to - w.from) * 100))}}${escapeAss(w.text)}`;
+      at = Math.max(at, w.to);
+    }
     return [{ start: 0, end: clip.duration, text: out }];
   }
-  // 逐字高亮: one event per word, from its start to the next word's start (the last to the clip end); before the first
-  // word the line shows unlit.
-  const lit = (k) => parts.map((p, i) => glue(i) + (i === k ? `{\\1c${assColor(HIGHLIGHT)}}${p}{\\1c${assColor("#ffffff")}}` : p)).join("");
-  const events = words[0].start > 0 ? [{ start: 0, end: words[0].start, text: lit(-1) }] : [];
-  words.forEach((w, i) => {
-    const end = i + 1 < words.length ? words[i + 1].start : clip.duration;
-    if (end > w.start) events.push({ start: w.start, end, text: lit(i) });
+  // 逐字高亮: one event per word over its window; before the first word the line shows unlit.
+  const lit = (k) => plan.map((w, i) => w.glue + (i === k ? `{\\1c${assColor(EditorModel.SUBTITLE_HIGHLIGHT)}}${escapeAss(w.text)}{\\1c${assColor("#ffffff")}}` : escapeAss(w.text))).join("");
+  const events = plan[0].from > 0 ? [{ start: 0, end: plan[0].from, text: lit(-1) }] : [];
+  plan.forEach((w, i) => {
+    if (w.to > w.from) events.push({ start: w.from, end: w.to, text: lit(i) });
   });
   return events;
 }
@@ -389,7 +371,8 @@ function duckExpression(ranges) {
   return `1-${1 - EditorModel.DUCK.gain}*${w.reduce((acc, x) => `max(${x},${acc})`)}`;
 }
 const even = (n) => Math.ceil(n / 2) * 2;
-// Card ED.7 轉場曲線: xfade progress P runs 1 -> 0, so T = 1 - P is the linear 0 -> 1 progress. 平滑 = smoothstep, 加速 = T^2.
+// Card ED.7 轉場曲線 (formula in EditorModel.TRANSITION_CURVES, shared with the preview): xfade progress P runs 1 -> 0,
+// so T = 1 - P is the linear 0 -> 1 progress the formula reads.
 // Each effect is xfade's own, re-stated with the curved progress S (a hard-edged circle; slides have no curved form).
 const CURVED_TRANSITIONS = {
   fade: (s) => `A*(1-${s})+B*${s}`,
@@ -401,7 +384,7 @@ const CURVED_TRANSITIONS = {
   wiperight: (s) => `if(gt(X,W*(1-${s})),B,A)`,
   circleopen: (s) => `if(lte(hypot(X-W/2,Y-H/2),hypot(W/2,H/2)*${s}),B,A)`,
 };
-const curvedTransition = (type, curve) => CURVED_TRANSITIONS[type](curve === "平滑" ? "(T*T*(3-2*T))" : "(T*T)").replaceAll("T", "(1-P)");
+const curvedTransition = (type, curve) => CURVED_TRANSITIONS[type](`(${EditorModel.TRANSITION_CURVES[curve]})`).replaceAll("T", "(1-P)");
 const TRUE_PEAK_CEILING = -2; // dBTP for loudnorm and the limiter; the export must measure <= -1 dBTP after AAC.
 async function exportEditor(
   raw,
@@ -770,16 +753,17 @@ async function exportEditor(
         const color = assColor(clip.color, alpha),
           background = assColor(
             clip.backgroundColor || "#000000",
-            clip.backgroundColor ? "55" : "FF",
+            clip.backgroundColor ? EditorModel.TEXT_BOX.transparency : "FF",
           );
         const alignment =
           clip.align === "靠左" ? 4 : clip.align === "靠右" ? 6 : 5;
-        const animation =
-          clip.animation === "淡入淡出"
-            ? "\\fad(200,200)"
-            : clip.animation === "彈出"
-              ? "\\fscx50\\fscy50\\t(0,180,\\fscx100\\fscy100)"
-              : "";
+        const { fadeMs, pop } = EditorModel.TEXT_ANIMATION,
+          animation =
+            clip.animation === "淡入淡出"
+              ? `\\fad(${fadeMs},${fadeMs})`
+              : clip.animation === "彈出"
+                ? `\\fscx${pop.from}\\fscy${pop.from}\\t(0,${pop.ms},\\fscx100\\fscy100)`
+                : "";
         const position = `{\\pos(${Math.round((width * clip.x) / 100)},${Math.round((height * clip.y) / 100)})${animation}}`;
         if (clip.subtitleStyle) {
           const look = subtitleLook(clip, size, alpha);
@@ -788,23 +772,13 @@ async function exportEditor(
             events.push(`Dialogue: ${index},${assTime(clip.start + e.start)},${assTime(clip.start + e.end)},S${index},,0,0,0,,${position}${e.text}`);
           return;
         }
-        contents += `Style: S${index},${font},${size},${color},${assColor(clip.color, "FF")},${background},${background},${clip.bold ? -1 : 0},${clip.italic ? -1 : 0},0,0,100,100,0,${-clip.rotation},${clip.backgroundColor ? 3 : 1},${clip.backgroundColor ? 5 : 0},0,${alignment},10,10,0,1\n`;
+        contents += `Style: S${index},${font},${size},${color},${assColor(clip.color, "FF")},${background},${background},${clip.bold ? -1 : 0},${clip.italic ? -1 : 0},0,0,100,100,0,${-clip.rotation},${clip.backgroundColor ? 3 : 1},${clip.backgroundColor ? EditorModel.TEXT_BOX.pad : 0},0,${alignment},10,10,0,1\n`;
         let text = clip.text
           .replace(/\\/g, "＼")
           .replace(/{/g, "｛")
           .replace(/}/g, "｝");
         if (clip.animation === "逐字顯示") {
-          const interval = Math.max(
-            1,
-            Math.round(
-              (Math.min(
-                clip.duration * 0.6,
-                Math.max(1, [...text].length * 0.06),
-              ) *
-                100) /
-                Math.max(1, [...text].length),
-            ),
-          );
+          const interval = EditorModel.typeInterval(text, clip.duration);
           text = [...text]
             .map((char) => (char === "\n" ? "\\N" : `{\\k${interval}}${char}`))
             .join("");

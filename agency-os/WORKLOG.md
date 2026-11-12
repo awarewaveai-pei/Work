@@ -1,4 +1,24 @@
 # Worklog
+## 2026-11-12（續15）影音工作台 ED.5.3＋ED.7.3＋ED.10.4：剪輯器預覽改用輸出的同一套規則畫轉場曲線、文字動畫、底色、八種字幕樣式
+
+- 根因：預覽（`scripts/tools-editor.js` edPaint）自己另寫一套規則，輸出（`backend/editor-export.cjs`）燒錄 ASS／xfade。結果：預覽轉場固定線性；沒有文字動畫；底色不透明、沒留邊（輸出是 2/3 不透明、5px）；字幕樣式完全沒畫。兩邊對照時，又發現同一段文字繪製裡還有 4 個差異：
+  - 預覽字比輸出大約 12%：CSS 的字級是 em，ASS 的字級是字型上下總高。
+  - 字超過舞台半寬就折行：元素 `left:50%` 絕對定位，可用寬度只剩一半。
+  - 片段透明度連底框一起淡化；ASS 的底框有自己的透明度，不受影響。
+  - 靠左／靠右時錨點錯：預覽一律置中，ASS 以 x 為左緣或右緣（Codex 抓到）。
+- 改：
+  - `shared/editor-model.js` 新增：TRANSITION_CURVES（公式文字，輸出寫進 xfade、預覽用 evalNumber 算）、TEXT_ANIMATION／typeInterval／textAnimationAt、SUBTITLE_STYLES／subtitleLook／SUBTITLE_EDGE／SUBTITLE_HIGHLIGHT、TEXT_BOX、subtitleWordPlan。
+  - `editor-export.cjs` 改讀上面這些，不再自己留一份；ASS 輸出逐位元不變。
+  - `tools-editor.js`：edPreviewSpans 帶入曲線；新增 edPaintText，照 ASS 燒錄的方式畫：字級換算、折行寬、錨點、透明度、黑邊、底框、逐字高亮、卡拉 OK 填色、逐字顯示、淡入淡出、彈出。
+- 監工核准（操作者已授權監工）：解除三檔的 file-claims 鎖。這個鎖是本卡自己的 Codex 審查留下的。
+- 既有問題（不是本卡造成）：tests/ed10-subtitles-ui.cjs:101 等不到「開始整片辨識（免費）」按鈕，30 秒逾時。三檔換回 HEAD 版本重跑也一樣失敗，已交監工處理。
+- 未處理：字型對應兩邊不同（「等寬字」預覽在 Edge 中文環境是細明體，輸出是 Consolas，Linux 又不同）；字幕面板樣式小樣的 CSS 是第三份樣式定義，屬 ED.10 的檔。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/preview-parity.cjs（新，真 Edge 預覽截圖對真實輸出同一格，15 項）＋ ed3-legacy-golden（參數與 framemd5 逐格相同）、ed1-layout、ed2-timeline、ed5-text、ed7-transition-stickers、tools-editor、ed10-subtitles-backend | exit=0 | ms=240000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n
+- Codex 9412f05f F1（靠左／靠右錨點）成立、已修；preview-parity 補一個靠左案例，修前紅（0.381／0.494）、修後綠（0.497／0.494）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=subtitleWordPlan|TRANSITION_CURVES|textAnimationAt|SUBTITLE_EDGE|TEXT_BOX | hits=24
+- ORACLE: agency-os/reports/oracle/2026-11-12-partialreview-9412f05f.md
+- rollback：git revert 本 commit（預覽回舊畫法；輸出本來就不變；無資料變更）。
 ## 2026-11-12（續14）影音工作台 ED.13 階段 1：剪輯 Agent 後端路由、操作清單驗證、浮動視窗
 
 - 改：新路由 `POST /api/vw/editor/agent`（`backend/editor-agent.cjs`；`backend/api.cjs` 加路由與 `/capabilities` 的 `editorAgent { ready }`）。一則訊息呼叫一次既有的文字入口 `text()`（JSON 模式），回 `{ reply, ops }`，由瀏覽器套用專案。`PAID_ROUTES` 加 `"/editor/agent": "video.script"`（`backend/main-system.cjs:27`），扣點、價目、許可沿用文字路由。

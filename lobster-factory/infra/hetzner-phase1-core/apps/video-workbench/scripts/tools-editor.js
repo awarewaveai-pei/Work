@@ -1413,7 +1413,7 @@ function edMeter() {
   );
 }
 // Preview of the main-track transitions (output is authoritative): the outgoing clip stays on through the window,
-// the incoming one starts early and fades in over it.
+// the incoming one starts early and fades in over it, along the clip's 轉場曲線 (EditorModel.transitionProgress).
 function edPreviewSpans(p) {
   const spans = new Map(),
     main = edMain(p),
@@ -1430,6 +1430,7 @@ function edPreviewSpans(p) {
       ...(spans.get(c.id) || {}),
       from: c.start - before,
       fadeTo: c.start + after,
+      curve: c.transitionCurve || "線性",
     });
     spans.set(previous.id, {
       ...(spans.get(previous.id) || {}),
@@ -1590,6 +1591,70 @@ function edBlurBack(p, c, el, stage, back) {
     ctx.clearRect((W - sw * f) / 2, (H - sh * f) / 2, sw * f, sh * f);
   }
 }
+// Cards ED.5.3 / ED.10.4: a text clip drawn as the export burns it (backend/editor-export.cjs, ASS), from the same
+// EditorModel rules: 文字動畫, 字幕樣式, 逐字高亮／卡拉 OK word windows, 底色 box. As in ASS the clip opacity is the text's
+// (and outline's) alpha while a box keeps its own; 淡入淡出 fades the whole line. Edge sizes are output pixels at 1080p,
+// divided by the clip scale because the element is drawn before its scale transform. Lines wrap at the frame width less
+// the ASS 10 px side margins (a left:50% box would otherwise wrap at half the stage).
+const edRgba = (hex, a) => {
+  const n = parseInt(String(hex || "#000000").slice(1), 16);
+  return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${Number(a.toFixed(4))})`;
+};
+// An ASS font size is the font's ascent + descent (libass, as VSFilter); a CSS font-size is its em. CSS size per ASS size,
+// measured once per family.
+const edAssEmCache = new Map();
+function edAssEm(family) {
+  if (!edAssEmCache.has(family)) {
+    const ctx = document.createElement("canvas").getContext("2d");
+    ctx.font = `100px ${family}`;
+    const m = ctx.measureText("Hg"),
+      h = m.fontBoundingBoxAscent + m.fontBoundingBoxDescent;
+    edAssEmCache.set(family, h > 0 ? 100 / h : 1);
+  }
+  return edAssEmCache.get(family);
+}
+function edPaintText(p, c, el, stage, z) {
+  const k = stage.clientWidth / edRatios[p.ratio][0],
+    t = ed.time - c.start,
+    anim = EditorModel.textAnimationAt(c, t),
+    look = c.subtitleStyle ? EditorModel.subtitleLook(c) : null,
+    alpha = 1 - Math.round((1 - c.opacity) * 255) / 255,
+    size = Math.max(8, Math.round(c.fontSize * c.scale)),
+    px = (n) => `${((n * k) / c.scale).toFixed(2)}px`,
+    box = look ? look.box : c.backgroundColor ? [c.backgroundColor, EditorModel.TEXT_BOX.transparency] : null,
+    pad = look ? Math.max(2, Math.round(size * EditorModel.SUBTITLE_EDGE.pad)) : EditorModel.TEXT_BOX.pad,
+    stroke = look && !box ? Math.max(1, Math.round(size * EditorModel.SUBTITLE_EDGE.outline)) : 0,
+    fill = look ? look.text : c.color,
+    plan = look && EditorModel.subtitleWordPlan(c),
+    family = { 思源黑體: "sans-serif", 思源宋體: "serif", 等寬字: "monospace" }[c.font] || c.font,
+    span = (text, css) => Object.assign(document.createElement("span"), { textContent: text, style: css });
+  let parts = null;
+  if (plan && c.subtitleStyle === "逐字高亮") {
+    const lit = plan.findIndex((w) => t >= w.from && t < w.to);
+    parts = plan.flatMap((w, i) => [w.glue, span(w.text, `color:${edRgba(i === lit ? EditorModel.SUBTITLE_HIGHLIGHT : fill, alpha)}`)]);
+  } else if (plan) {
+    // 卡拉 OK: the word in its not-yet-sung colour, the sung colour laid over it cut to the part already sung.
+    parts = plan.flatMap((w) => {
+      const f = Math.max(0, Math.min(1, (t - w.from) / Math.max(0.01, w.to - w.from))) * 100,
+        word = span(w.text, `position:relative;color:${edRgba(look.secondary, alpha)}`);
+      if (f > 0) word.append(span(w.text, `position:absolute;left:0;top:0;white-space:nowrap;color:${edRgba(fill, alpha)};clip-path:inset(0 ${100 - f}% 0 0)`));
+      return [w.glue, word];
+    });
+  } else if (Number.isFinite(anim.shown)) {
+    const chars = [...c.text];
+    let cut = 0;
+    for (let shown = 0; cut < chars.length && (chars[cut] === "\n" || shown++ < anim.shown); ) cut++;
+    parts = [chars.slice(0, cut).join(""), span(chars.slice(cut).join(""), "color:transparent")];
+  }
+  if (parts) el.replaceChildren(...parts);
+  else el.textContent = c.text;
+  // ASS alignment 4 / 5 / 6 with \pos: x is the text's left edge / centre / right edge (a box pads around it), and the
+  // line rotates about that point.
+  const inset = box ? px(pad) : "0px",
+    [shift, origin] =
+      c.align === "靠左" ? [`calc(-1 * ${inset})`, inset] : c.align === "靠右" ? [`calc(${inset} - 100%)`, `calc(100% - ${inset})`] : ["-50%", "50%"];
+  el.style.cssText = `position:absolute;left:${c.x}%;top:${c.y}%;transform-origin:${origin} 50%;transform:translate(${shift},-50%) rotate(${c.rotation}deg) scale(${c.scale * anim.scale});font-size:${c.fontSize * k * edAssEm(family)}px;color:${edRgba(fill, alpha)};font-family:${family};font-weight:${c.bold ? "bold" : "normal"};font-style:${c.italic ? "italic" : "normal"};text-align:${c.align === "靠左" ? "left" : c.align === "靠右" ? "right" : "center"};background:${box ? edRgba(box[0], 1 - parseInt(box[1], 16) / 255) : "transparent"};padding:${box ? px(pad) : 0};-webkit-text-stroke:${stroke ? `${px(2 * stroke)} ${edRgba("#000000", alpha)}` : 0};paint-order:stroke fill;opacity:${anim.opacity};white-space:pre-wrap;width:max-content;max-width:${px(edRatios[p.ratio][0] - 20)};z-index:${z}`;
+}
 function edPaint() {
   const p = edProject(),
     stage = document.querySelector("[data-ed-stage]");
@@ -1644,16 +1709,11 @@ function edPaint() {
     const span = spans.get(c.id),
       fade =
         span?.fadeTo !== undefined && ed.time < span.fadeTo
-          ? Math.max(
-              0,
-              Math.min(1, (ed.time - span.from) / (span.fadeTo - span.from)),
-            )
+          ? EditorModel.transitionProgress(span.curve, (ed.time - span.from) / (span.fadeTo - span.from))
           : 1,
       layer = 10 + order.get(c.track) * 2 + (fade < 1 ? 1 : 0);
-    if (c.kind === "text") {
-      el.textContent = c.text;
-      el.style.cssText = `position:absolute;left:${c.x}%;top:${c.y}%;transform:translate(-50%,-50%) rotate(${c.rotation}deg) scale(${c.scale});font-size:${(c.fontSize * stage.clientWidth) / edRatios[p.ratio][0]}px;color:${c.color};font-family:${{ 思源黑體: "sans-serif", 思源宋體: "serif", 等寬字: "monospace" }[c.font] || c.font};font-weight:${c.bold ? "bold" : "normal"};font-style:${c.italic ? "italic" : "normal"};text-align:${c.align === "靠左" ? "left" : c.align === "靠右" ? "right" : "center"};background:${c.backgroundColor || "transparent"};opacity:${c.opacity};white-space:pre-wrap;max-width:95%;z-index:${100 + layer}`;
-    } else if (c.kind !== "audio") {
+    if (c.kind === "text") edPaintText(p, c, el, stage, 100 + layer);
+    else if (c.kind !== "audio") {
       const shake = edShake(p, c),
         t = edTransform(p, c),
         blur = !edOverlay(p, c.track) && c.background === "模糊";
