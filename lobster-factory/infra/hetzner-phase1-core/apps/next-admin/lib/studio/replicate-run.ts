@@ -8,7 +8,8 @@ import type { Grant } from "@/lib/entitlements/can";
  */
 
 const POLL_INTERVAL_MS = 2_000;
-const DEFAULT_TIMEOUT_MS = 55_000; // route maxDuration is 60s — leave headroom
+/** Route maxDuration is 60s — leave headroom. Also the longest run a per-second hold must cover (remove-bg). */
+export const DEFAULT_TIMEOUT_MS = 55_000;
 const MAX_OUTPUT_BYTES = 20 * 1024 * 1024;
 
 export type ReplicateImageResult =

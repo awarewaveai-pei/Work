@@ -700,16 +700,18 @@ function openaiImageCostUsd(u: OpenAiImageUsage | undefined): number | undefined
 /** Shared by tarot, studio, content and video: the caller asks for its own product's feature (e.g. grantFor("studio.image")). */
 export async function generateTarotImage(params: TarotGenParams, grant: Grant): Promise<TarotGenResult> {
   // Credits are held at the per-image price before the provider runs (Grant.hold); the settle uses the reported cost.
-  // A per-megapixel row (image-models.js imageRunUsd) is held for its real references + the 1 MP it asks for, and charged
-  // for the output it actually returned.
+  // A per-megapixel row (image-models.js imageRunUsd) is held for its measured references + the most output it can return
+  // (maxOutputMp), and charged for the output it actually returned.
   const mpRow = IMAGE_MODELS.find((m) => m.value === params.model && ("usdPerInputMp" in m || "usdPerOutputMp" in m));
   // Only references the model is sent count (a text-only model ignores them).
+  // Invariant: the hold covers the input this call is billed for, so a reference whose size cannot be read is not sent.
   const inputMp = mpRow && TAROT_MODELS[params.model]?.supportsImg2img ? await megapixels(params.referenceImages ?? []) : 0;
-  const hold = await holdCost(grant, mpRow ? imageRunUsd(mpRow, { inputMp, outputMp: 1 }) : imageCostUsd(params.model));
+  if (inputMp === null) return { ok: false, error: "invalid_reference_image" };
+  const hold = await holdCost(grant, mpRow ? imageRunUsd(mpRow, { inputMp, outputMp: mpRow.maxOutputMp ?? 1 }) : imageCostUsd(params.model));
   if (!hold) return { ok: false, error: "no_credits" };
   const result = await runGeneration(params, grant);
   if (mpRow && result.costUsd === undefined && (result.ok || ("billed" in result && result.billed)))
-    result.costUsd = imageRunUsd(mpRow, { inputMp, outputMp: result.ok ? await megapixels([result.image]) : 1 });
+    result.costUsd = imageRunUsd(mpRow, { inputMp, outputMp: (result.ok && (await megapixels([result.image]))) || 1 });
   // The one place an image's cost is logged: only here are all of its facts known -- whether the provider charged
   // (ok, or billed after a failed download), the model that ran, and the account the grant bills. Callers pass costLog.
   logImageResult(result, { route: params.costLog?.route ?? "tarot/image-gen", model: params.model, tool: params.costLog?.tool ?? "image",
@@ -717,18 +719,20 @@ export async function generateTarotImage(params: TarotGenParams, grant: Grant): 
   return result;
 }
 
-/** Megapixels of images together, read from data-URL headers (sharp); one it cannot read (an https URL, a broken
- *  header) counts as 1 MP, the size the per-megapixel rows are estimated at. */
-async function megapixels(images: readonly string[]): Promise<number> {
+/** Megapixels of images together, read from their own bytes (sharp): a data URL, or an own My Designs URL fetched
+ *  through the same SSRF guard the OpenAI path uses (ownDesignUrlToBlob). null = one could not be measured. */
+async function megapixels(images: readonly string[]): Promise<number | null> {
   let mp = 0;
   for (const url of images) {
-    const m = /^data:image\/[a-z+.-]+;base64,(.+)$/i.exec(url);
-    let size = 1;
     try {
-      const { width, height } = m ? await sharp(Buffer.from(m[1], "base64")).metadata() : { width: 0, height: 0 };
-      if (width && height) size = (width * height) / 1_000_000;
-    } catch { /* stays 1 */ }
-    mp += size;
+      const own = parseDataUrl(url) ? null : isAllowedInputUrl(url) ? await ownDesignUrlToBlob(url, AbortSignal.timeout(15_000)) : null;
+      const bytes = parseDataUrl(url)?.buffer ?? (own ? Buffer.from(await own.blob.arrayBuffer()) : null);
+      const { width, height } = bytes ? await sharp(bytes).metadata() : { width: 0, height: 0 };
+      if (!width || !height) return null;
+      mp += (width * height) / 1_000_000;
+    } catch {
+      return null;
+    }
   }
   return mp;
 }

@@ -2,12 +2,12 @@
 // failed, on the account the grant bills, with the caller's route.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const m = vi.hoisted(() => ({ logged: [] as Array<{ result: unknown; args: Record<string, unknown> }> }));
+const m = vi.hoisted(() => ({ logged: [] as Array<{ result: unknown; args: Record<string, unknown> }>, held: [] as number[] }));
 vi.mock("@/lib/ai/gateway", () => ({ providerUrl: (_g: unknown, _p: string, path: string) => `https://api.replicate.com${path}` }));
 vi.mock("@/lib/ai/log-ai-call", () => ({
   billedOrgId: (g: { subject?: { orgId: string } }) => g.subject?.orgId ?? null,
   logImageResult: (result: unknown, args: Record<string, unknown>) => { m.logged.push({ result, args }); },
-  holdCost: async () => ({ id: "hold-1", units: 0, settle: async () => ({ charged: 0, shortfall: 0 }) }), releaseHold: () => undefined,
+  holdCost: async (_g: unknown, usd: number) => (m.held.push(usd), { id: "hold-1", units: 0, settle: async () => ({ charged: 0, shortfall: 0 }) }), releaseHold: () => undefined,
 }));
 
 import { generateTarotImage } from "../image-gen";
@@ -15,7 +15,7 @@ import { generateTarotImage } from "../image-gen";
 const grant = { subject: { kind: "customer", orgId: "parent-org" } } as never;
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { "content-type": "application/json" } });
 
-beforeEach(() => { m.logged = []; vi.stubEnv("REPLICATE_API_TOKEN", "t"); });
+beforeEach(() => { m.logged = []; m.held = []; vi.stubEnv("REPLICATE_API_TOKEN", "t"); });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 describe("generateTarotImage logs its cost", () => {
@@ -84,5 +84,32 @@ describe("generateTarotImage logs its cost", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  // Codex 2026-11-12 F1: the hold covers the input billed per megapixel, so an own My Designs URL is measured from its bytes
+  // and a reference that cannot be measured is never sent.
+  it("klein: an own-design URL reference is held and charged at its real megapixels; an unreadable one is not sent", async () => {
+    vi.stubEnv("R2_DESIGNS_PUBLIC_BASE", "https://designs.example.test");
+    const sharp = (await import("sharp")).default;
+    const big = await sharp({ create: { width: 4000, height: 3000, channels: 3, background: "#fff" } }).png().toBuffer();
+    const out = (await sharp({ create: { width: 1024, height: 1024, channels: 3, background: "#000" } }).png().toBuffer());
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === "https://designs.example.test/designs/a.png") return new Response(new Uint8Array(big), { headers: { "content-type": "image/png" } });
+      if (url.includes("/predictions")) return json({ status: "succeeded", output: ["https://replicate.delivery/k.png"] });
+      if (url === "https://replicate.delivery/k.png") return new Response(new Uint8Array(out), { headers: { "content-type": "image/png" } });
+      throw new Error("unexpected " + url);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const r = await generateTarotImage({ model: "flux-2-klein-4b", prompt: "p", referenceImages: ["https://designs.example.test/designs/a.png"] }, grant);
+    expect(m.held).toEqual([Math.round((12 * 0.001 + 1.1 * 0.001) * 1e6) / 1e6]); // output held at maxOutputMp
+    expect((r as { costUsd: number }).costUsd).toBeLessThanOrEqual(m.held[0]);
+    expect(r).toMatchObject({ ok: true, costUsd: Math.round((12 * 0.001 + (1024 * 1024) / 1e6 * 0.001) * 1e6) / 1e6 });
+
+    m.held = [];
+    fetchMock.mockClear();
+    const refused = await generateTarotImage({ model: "flux-2-klein-4b", prompt: "p", referenceImages: ["https://elsewhere.test/a.png"] }, grant);
+    expect(refused).toEqual({ ok: false, error: "invalid_reference_image" });
+    expect(m.held).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

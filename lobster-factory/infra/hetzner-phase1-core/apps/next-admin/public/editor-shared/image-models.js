@@ -26,12 +26,12 @@ export const IMAGE_MODELS = Object.freeze([
   { value: "flux-kontext-pro", label: "FLUX Kontext Pro", group: "BFL", vendor: "BFL/Replicate", usd: 0.04, maxRefs: 1, note: "把參考圖的東西放進新場景", uses: ["generate", "edit"] },
   // flux-2-max bills $0.04 per run + $0.03 per output MP (+ $0.03 per input MP; maxRefs 0 sends none), replicate.com
   // billingConfig 2026-11-10; lib/tarot/image-gen.ts asks resolution "1 MP".
-  { value: "flux-2-max", label: "FLUX 2 Max", group: "BFL", vendor: "BFL/Replicate", usd: 0.07, usdPerRun: 0.04, usdPerInputMp: 0.03, usdPerOutputMp: 0.03, maxRefs: 0, note: "BFL 最高畫質，純文字生圖", uses: ["generate"] },
+  { value: "flux-2-max", label: "FLUX 2 Max", group: "BFL", vendor: "BFL/Replicate", usd: 0.07, usdPerRun: 0.04, usdPerInputMp: 0.03, usdPerOutputMp: 0.03, maxOutputMp: 1.1, maxRefs: 0, note: "BFL 最高畫質，純文字生圖", uses: ["generate"] },
   // The two cheap whole-image editors (operator 2026-11-09). Measured the same day: neither takes a mask, so they are
   // offered for 「整張改順」 only, never for 生成填色. klein bills per megapixel IN and OUT (replicate.com billingConfig
   // 2026-11-10: $1 per 1000 input MP + $1 per 1000 output MP): imageRunUsd prices each call from its real sizes; usd is
   // the button estimate for its one use, a ~1 MP reference in + the 1 MP output (output_megapixels "1").
-  { value: "flux-2-klein-4b", label: "FLUX 2 Klein 4B", group: "BFL", vendor: "BFL/Replicate", usd: 0.002, usdPerInputMp: 0.001, usdPerOutputMp: 0.001, maxRefs: 1, note: "最便宜，適合多試幾次。一定要寫描述", uses: ["edit", "fill"], zh: "ok", blank: "no" },
+  { value: "flux-2-klein-4b", label: "FLUX 2 Klein 4B", group: "BFL", vendor: "BFL/Replicate", usd: 0.002, usdPerInputMp: 0.001, usdPerOutputMp: 0.001, maxOutputMp: 1.1, maxRefs: 1, note: "最便宜，適合多試幾次。一定要寫描述", uses: ["edit", "fill"], zh: "ok", blank: "no" },
   { value: "flux-kontext-fast", label: "FLUX Kontext Fast", group: "BFL", vendor: "Pruna/Replicate", usd: 0.01, maxRefs: 1, note: "筆觸最貼近原畫。一定要寫描述", uses: ["edit", "fill"], zh: "no", blank: "no" },
   { value: "ideogram-v2a-turbo", label: "Ideogram v2a Turbo", group: "Ideogram", vendor: "Ideogram/Replicate", usd: 0.025, maxRefs: 0, note: "快，文字排版清楚", uses: ["generate"] },
   { value: "ideogram-v3-balanced", label: "Ideogram v3 Balanced", group: "Ideogram", vendor: "Ideogram/Replicate", usd: 0.06, maxRefs: 0, note: "畫質與速度折衷", uses: ["generate"] },
@@ -71,6 +71,8 @@ export const EDIT_TOOLS = Object.freeze([
   { value: "bria-expand", label: "Bria Expand", vendor: "Bria/Replicate", usd: 0.04, note: "擴圖尺寸精準，不會走樣。不用寫描述", uses: ["outpaint"] },
 ]);
 
+/** maxOutputMp = the most a "1 MP" request returns (sides snap to 16 px: 1024x1024 is 1.05 MP); the credit hold uses it,
+ *  the charge uses the image actually returned. */
 /** USD of one image from catalog row `m`. A per-megapixel row (usdPerRun + usdPerInputMp / usdPerOutputMp) is priced
  *  from the call's real sizes: inputMp = all reference images together, outputMp = the image returned; every other row is
  *  its per-image usd. The one price function for catalog rows (lib/tarot/image-gen.ts holds and charges through it). */
