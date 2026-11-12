@@ -31,7 +31,8 @@
   function mark(root = document) {
     for (const el of root.querySelectorAll("[data-paid]")) {
       const own = el.querySelector(":scope > .paid-price");
-      if (String(el.textContent).replace(own?.textContent || "", "").includes("NT$")) { own?.remove(); continue; }
+      // A label that already states its price (a quote's NT$ amount, or 免費 for usd 0) gets none added.
+      if (/NT\$|免費/.test(String(el.textContent).replace(own?.textContent || "", ""))) { own?.remove(); continue; }
       const t = text(el.dataset.paid, caps(), el.dataset.paidModel);
       if (!t) { own?.remove(); continue; }
       if (own?.textContent === " · " + t) continue;
