@@ -93,7 +93,7 @@ Meshy 方案額度：Premium $40/3,000cr、Ultra $100/8,000cr（help.meshy.ai �
 現況：`backend/meshy.cjs:46` 唯一 adapter；`backend/api.cjs:373-397` 專為 `meshy-image-to-3d` 寫一段；`scripts/tools-3d.js:522` 面板只有 Meshy。價格已在 `next-admin/lib/ai/cost-model.ts:196-198` `TOOL_RATES`（3d-spar3d／3d-sf3d／3d-trellis）。
 
 - **一個 operation**：`image-to-3d`，`settings.method` ∈ `stability-spar3d`｜`stability-sf3d`｜`local-sf3d`｜`replicate-trellis`｜`meshy`。`backend/image-to-3d.cjs` = 方式表＋`capability(env)`＋`request()`＋`run()`；各 adapter 只實作 `run(job, ctx) → {buffer|file, origin}`。舊 `meshy-image-to-3d` 只留在 `main-system.cjs` ledgerKind 讀舊紀錄。
-- **價格來源**：只讀 `TOOL_RATES`（不另建表）；`local-sf3d` = 0；Meshy 無美元價目 → 只在設了 `MESHY_API_KEY` 時列出、顯示點數。`/capabilities.imageTo3d.methods[]` 帶 `usd`／`estimate`／`available`／`reason`，頁面每個方式按鈕與「產生」按鈕都顯示價格。**預設 = SPAR3D**（S4b.2 結果，§8）。
+- **價格來源**：只讀 `TOOL_RATES`（不另建表）；`local-sf3d` = 0；Meshy 無美元價目 → 只在設了 `MESHY_API_KEY` 時列出、顯示點數。`/capabilities.imageTo3d.methods[]` 帶 `usd`／`estimate`／`available`／`reason`，頁面每個方式按鈕與「產生」按鈕都顯示價格。**預設**：`backend/providers.cjs` 免費優先（操作者 2026-11-10）——本機 SF3D 可用時預選它，否則 SPAR3D（S4b.2 付費方式中品質最好，§8）。
 - **一個 job id 只呼叫廠商一次**：呼叫前寫 `job.vendorCall = {method, at}` 並 persist；`run()` 見到已有 `vendorCall` 直接失敗（不重送）。Stability 同步回 GLB（失敗不計費）；TRELLIS／Meshy 非同步：預測編號寫 `job.vendorTaskId`，同圖同選項的未完成任務跨 job 沿用（同 remove-bg）；取消 → Replicate cancel。
 - **本機 SF3D（WSL）**：Windows 的「智慧型應用程式控制」會擋下現場編譯、沒有簽章的 .pyd（WORKLOG 11-10 續19），監工決定不關閉，所以本機 SF3D 跑在 WSL Ubuntu 裡（GPU 透過 Windows NVIDIA 驅動）。`backend/sf3d-local.cjs` 起 `wsl.exe -d <VW_SF3D_WSL> -- bash scripts/sf3d/run-wsl.sh <圖> <out>`：圖與 out 都放在任務資料夾（交換資料夾），`wslPath()` 是唯一做路徑轉換的地方；入口腳本用 setsid 開自己的程序群組並寫 `<out>/pgid`，取消／逾時就在 WSL 裡 `kill -KILL -<pgid>`，再結束 wsl.exe；一次一個（8 GB VRAM）；離線（`HF_HUB_OFFLINE=1`）。沒設 `VW_SF3D_WSL` → 按鈕顯示「未安裝」；ks-aw-01 不設。安裝：`set WSLENV=HF_TOKEN/u` 後 `wsl.exe -d Ubuntu -- bash scripts/sf3d/install-wsl.sh`（token 只從環境變數讀）。每次建置都放進 `~/awarewave-sf3d/releases/<時間>`，能 import 又跑完一張圖才把 `current` 換過去（一次 symlink 切換），失敗就刪掉新的、保留舊的；現有的能用就跳過（`--force` 才重建）；保留前一版可回滾。權重共用 `~/awarewave-sf3d/hf`。torch cu128；`gpytoolbox==0.3.8`（0.2.0 沒有 py3.12 wheel）；沒有 nvcc → texture_baker 只編 CPU 版＋`scripts/sf3d/texture-baker-cpu.patch`（CUDA 張量繞 CPU）。
 - **自動人形骨架**：Blender 任務 `blender-autorig`（`backend/blender/autorig.py`）：匯入無骨架 GLB → 量體型取 13 個關節點（可由頁面改）→ Rigify `human` metarig（去臉、去手指）對到關節點當變形骨架 → 自動權重（bone heat 失敗的頂點改最近骨段）→ 有選動作就用 `retarget.py` 同一套 delta 重定向 → GLB。不產生 Rigify 控制骨架：glTF 不帶約束，檢視器自己做 FK／IK。
@@ -112,6 +112,6 @@ Meshy 方案額度：Premium $40/3,000cr、Ultra $100/8,000cr（help.meshy.ai �
 | 生圖 FLUX schnell | — | — | — | US$0.03（US$0.003 × 10） | 素材 origin | — |
 | **合計** | | | | **約 US$0.755** | | |
 
-理由：影片要的是「像原圖」（人物、商品），SPAR3D 每項都更貼原圖、快 5 倍、價差小；本機 SF3D 品質接近但透明物失敗，列為免費選項，線上預設維持 SPAR3D。
+理由：影片要的是「像原圖」（人物、商品），SPAR3D 每項都更貼原圖、快 5 倍、價差小；本機 SF3D 品質接近但透明物失敗；預設依免費優先（本機可用時選它，正式站沒有 WSL 時是 SPAR3D）。
 
 跟著修：TRELLIS 改按 `metrics.predict_time × TOOL_RATES["3d-trellis"].usdPerSec` 記帳（這次 10 筆照舊記 0.038，多記 US$0.055，未改歷史紀錄）；SPAR3D 模型面朝反向 → 方式表 `facing: 180`，自動綁骨預設轉 180°；SPAR3D 網格 bone heat 解不出（0／8606）→ 先焊接重複頂點，仍失敗就在體素重建副本上算權重再傳回（實跑 8606／8606，`docs/s4b2-evidence/spar3d-autorig-walk.png`）。

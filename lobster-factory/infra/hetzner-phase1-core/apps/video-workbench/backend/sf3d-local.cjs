@@ -14,10 +14,20 @@ const { killTree } = require("./blender.cjs");
 const TIMEOUT_MS = 600000;
 const ENTRY = path.join(__dirname, "..", "scripts", "sf3d", "run-wsl.sh");
 const WSL = path.join(process.env.SystemRoot || "C:\\Windows", "System32", "wsl.exe");
-// Configured = a WSL distro is named (VW_SF3D_WSL) on a Windows host with wsl.exe; the install itself is checked by the job.
+// Available = a WSL distro is named (VW_SF3D_WSL) on a Windows host with wsl.exe AND the entry's --check finds an install
+// there (a named distro without one must not be offered, least of all preselected as the free way). The check starts
+// WSL, so its answer is kept for CHECK_MS: a fresh install shows up within a minute.
+const CHECK_MS = 60000, checks = new Map();
 function installed(env) {
-  const distro = vwEnv(env, "SF3D_WSL");
-  return process.platform === "win32" && distro && fs.existsSync(WSL) ? { distro, entry: vwEnv(env, "SF3D_ENTRY") || ENTRY } : null;
+  const distro = vwEnv(env, "SF3D_WSL"), entry = vwEnv(env, "SF3D_ENTRY") || ENTRY;
+  if (process.platform !== "win32" || !distro || !fs.existsSync(WSL)) return null;
+  const key = distro + "\0" + entry;
+  let c = checks.get(key);
+  if (!c || Date.now() - c.at > CHECK_MS) {
+    const r = spawnSync(WSL, ["-d", distro, "--", "bash", wslPath(entry), "--check"], { windowsHide: true, stdio: "ignore", timeout: 15000 });
+    checks.set(key, (c = { at: Date.now(), ok: r.status === 0 }));
+  }
+  return c.ok ? { distro, entry } : null;
 }
 function wslPath(p) {
   const m = /^([A-Za-z]):[\\/](.*)$/.exec(path.resolve(p));

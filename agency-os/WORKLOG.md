@@ -1,4 +1,22 @@
 # Worklog
+## 2026-11-12（續3）影音工作台 S4b 本機 SF3D 補完：安裝失敗保留舊版實測、Codex 補審 3 項修正、測試金額改用匯率算
+
+- 安裝失敗保留舊版（實測 3 次，`install-wsl.sh --force`）：
+  - ① GitHub `git clone` 傳輸中斷（真實網路錯誤）。
+  - ② 注入壞的 `PIP_INDEX_URL`，clone、補丁、建 venv 都完成後才在 pip 失敗。
+  - ③ 同樣做法、改用唯一目錄名之後再跑一次。
+  - 三次都印 `SF3D_INSTALL_FAILED: kept releases/20261110-125113`，`current` 沒變、新目錄已刪，現有版本能 import、`cuda=True`。
+- Codex 補審 WSL 那輪 commit 44a5d0381（`agency-os/reports/oracle/2026-11-12-partialreview-8666f2fc.md`），3 項都修：
+  - C1 同一秒兩次 `--force` 時，新目錄名和 `current` 相同，失敗清理會刪掉現用版本 → 改用 `mktemp -d <時間>-XXXX`，清理只會刪本次建的目錄。
+  - M1 設了 `VW_SF3D_WSL` 但沒裝好時仍顯示可用；在免費優先（670b89396）之下還會被預選 → 入口腳本加 `--check`，`installed()` 用它判斷，結果快取 60 秒。實測：沒裝 → 「未安裝」、預設 SPAR3D；裝好 → 預設本機。
+  - m1 實測測試寫死 Ubuntu → 改讀 `VW_SF3D_WSL`。
+- 測試金額：`s4b-image-to-3d` 不再寫死 NT$，改用 /capabilities 的美元價格經頁面的 `VideoWorkbenchMoney` 算出預期文字；另斷言格式化結果是 NT$。
+- 文件：s4 §7／§8 的「預設 = SPAR3D」改成免費優先（本機可用時選本機，正式站沒有 WSL 時是 SPAR3D）。
+- 量測陷阱：`wsl.exe -- bash -c '...; echo $?'` 的 `$?` 會在外層先展開，讀出的永遠是 0；結束碼要看 wsl.exe 本身的回傳值。
+- REALTEST_EVIDENCE: tool=Bash | cmd=wsl install-wsl.sh --force x3 (clone failure, pip failure after venv, pip failure with mktemp stage) && wsl run-wsl.sh --check (installed 0 / missing 1) && node tests/s4b-image-to-3d.cjs (6/6) && node tests/s4b-sf3d-local.cjs (2/2 real WSL) && capability with a not-installed entry -> local unavailable, default SPAR3D | exit=0 | ms=1500000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=1c/1m/1n（Codex `agency-os/reports/oracle/2026-11-12-partialreview-8666f2fc.md`，三項已修）
+- ORACLE_WAIVED: Codex 以 -DiffRef 44a5d0381 補審（artifact 標 PARTIAL）；本次修正只做實測，沒有再送審
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/video-workbench,agency-os,scripts | grep=--check|installed\(|VW_SF3D_WSL | hits=17（只計 SF3D／image-to-3d／s4b 相關的命中；其他 --check 是無關腳本）
 ## 2026-11-12（續2）計價補跑 Codex 審查（e88ef493d 當時額度被封）：預扣必須涵蓋最高可計費量
 
 - 不變量：一次呼叫的點數預扣 ≥ 這次可能被計的最高費用；結算照實際用量。違反時錢包餘額不足會留下短收。

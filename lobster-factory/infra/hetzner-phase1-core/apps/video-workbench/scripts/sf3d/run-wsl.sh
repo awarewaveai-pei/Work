@@ -5,8 +5,10 @@
 # Windows without relying on wsl.exe teardown (measured 2026-11-10: ending wsl.exe also ended the group, but that is
 # WSL behaviour, not a contract). Offline: weights come from the install's cache.
 set -euo pipefail
-if [ -z "${SF3D_SETSID:-}" ]; then SF3D_SETSID=1 exec setsid -w bash "$0" "$@"; fi
 ROOT=${SF3D_HOME:-$HOME/awarewave-sf3d}
+# --check: exit 0 only when an install is in place (backend/sf3d-local.cjs installed()).
+if [ "${1:-}" = "--check" ]; then test -x "$ROOT/current/.venv/bin/python" && test -f "$ROOT/current/src/run.py" && exit 0; exit 1; fi
+if [ -z "${SF3D_SETSID:-}" ]; then SF3D_SETSID=1 exec setsid -w bash "$0" "$@"; fi
 mkdir -p "$2"
 echo $$ > "$2/pgid"
 cd "$ROOT/current/src"

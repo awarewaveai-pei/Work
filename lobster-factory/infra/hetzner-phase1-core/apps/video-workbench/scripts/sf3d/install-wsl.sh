@@ -20,8 +20,10 @@ if [ "${1:-}" != "--force" ] && [ -x "$ROOT/current/.venv/bin/python" ] && "$ROO
   exit 0
 fi
 
-STAGE=$ROOT/releases/$(date +%Y%m%d-%H%M%S)
+# A fresh, unique directory (time + random suffix): two runs in the same second never share one, and the cleanup
+# below can only ever remove what this run created.
 mkdir -p "$ROOT/releases"
+STAGE=$(mktemp -d "$ROOT/releases/$(date +%Y%m%d-%H%M%S)-XXXX")
 trap 'rm -rf "$STAGE"; echo "SF3D_INSTALL_FAILED: kept $(readlink "$ROOT/current" 2>/dev/null || echo none)" >&2' ERR
 git clone -q https://github.com/Stability-AI/stable-fast-3d.git "$STAGE/src"
 git -C "$STAGE/src" checkout -q "$REV"

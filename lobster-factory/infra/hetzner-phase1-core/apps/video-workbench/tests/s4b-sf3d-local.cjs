@@ -9,9 +9,10 @@ const assert = require("node:assert/strict"),
   { chromium } = require("playwright");
 const { isolatedServer } = require("./isolated-server.cjs");
 
-const wsl = (...cmd) => spawnSync("wsl.exe", ["-d", "Ubuntu", "--", ...cmd], { encoding: "utf8", windowsHide: true });
+const DISTRO = process.env.VW_SF3D_WSL || "Ubuntu"; // the distro the workbench is configured with
+const wsl = (...cmd) => spawnSync("wsl.exe", ["-d", DISTRO, "--", ...cmd], { encoding: "utf8", windowsHide: true });
 if (process.platform !== "win32" || wsl("bash", "-c", "test -x ~/awarewave-sf3d/current/.venv/bin/python").status !== 0) {
-  console.log("SKIP s4b-sf3d-local: WSL install missing (scripts/sf3d/install-wsl.sh)");
+  console.log(`SKIP s4b-sf3d-local: no install in WSL distro ${DISTRO} (scripts/sf3d/install-wsl.sh)`);
   process.exit(0);
 }
 const winAlive = (pid) => spawnSync("tasklist", ["/FI", `PID eq ${pid}`, "/NH"], { encoding: "utf8" }).stdout.includes(String(pid));
@@ -19,7 +20,7 @@ const linuxAlive = (pgid) => wsl("kill", "-0", "--", "-" + pgid).status === 0;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 (async () => {
-  const { base, dataDir } = await isolatedServer("vw-s4b-sf3d-", { env: { VW_SF3D_WSL: "Ubuntu" } });
+  const { base, dataDir } = await isolatedServer("vw-s4b-sf3d-", { env: { VW_SF3D_WSL: DISTRO } });
   const call = async (route, data, method = "POST") => {
     const r = await fetch(base + "/api/vw" + route, { method, headers: { "Content-Type": "application/json" }, ...(data ? { body: JSON.stringify(data) } : {}) });
     return { status: r.status, body: await r.json() };
