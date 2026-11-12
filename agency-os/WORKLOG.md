@@ -91,7 +91,6 @@
 - ORACLE_WAIVED: 7 行金鑰選取＋1 條測試，突變已證；main checkout 與遠端分歧且混有其他 session 未提交改動，diff 擷取會夾帶別人的檔
 ## 2026-11-12（續2）Google 帳單 NT$28.20 查因＋暫停開發信自動草稿
 ## 2026-11-12（續7）計價補跑 Codex 審查（e88ef493d 當時額度被封）：預扣必須涵蓋最高可計費量
-## 2026-11-12（續2）計價補跑 Codex 審查（e88ef493d 當時額度被封）：預扣必須涵蓋最高可計費量
 
 - 不變量：一次呼叫的點數預扣 ≥ 這次可能被計的最高費用；結算照實際用量。違反時錢包餘額不足會留下短收。
 - C1（Codex 第 1 輪 F1）klein 參考圖若是 My Designs 網址，`megapixels()` 一律當 1 MP（12 MP 圖預扣 US$0.002，實際 US$0.013）→ 改成實際讀圖量尺寸（data URL 或經 `ownDesignUrlToBlob` SSRF 防護抓我們自己的圖），量不到就回 `invalid_reference_image`，不預扣、不送出（`lib/tarot/image-gen.ts` generateTarotImage／megapixels）。
