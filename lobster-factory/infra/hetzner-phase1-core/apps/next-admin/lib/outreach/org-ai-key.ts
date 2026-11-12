@@ -1,5 +1,5 @@
 // A client's own Gemini key (Connectors page, connector "gemini") serves every outreach AI step, so each client brings its
-// own daily quota. No client key (or it is refused / out of quota) = the platform key, the same client -> platform order as
+// own daily quota. No client key (or it is refused / out of quota) = the platform's outreach key (onPlatformKey), the same client -> platform order as
 // generation (generate.ts). The agency's "gemini" row is not read here: the agency fallback is the platform env key.
 // SECURITY: never log the key; a vault error is reported without its text.
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -51,10 +51,19 @@ async function scopeKey(scope: AiScope | undefined, grant: Grant | undefined): P
 
 const KEY_REFUSED = new Set(["gemini_429_daily_quota", "gemini_key_invalid", "gemini_403"]);
 
+type JsonArgs = Parameters<typeof generateCheapJsonText>[0];
+/** The platform key for outreach: OUTREACH_GEMINI_API_KEY, a key of a project without billing. GEMINI_API_KEY is billed
+ *  (the media tools share it since 2026-11-10), so outreach must not land on it: with the outreach key set, a spent
+ *  daily quota is an error for that call, never a paid one. Unset = cheap-json's default key. */
+function onPlatformKey(args: JsonArgs): JsonArgs {
+  const key = process.env.OUTREACH_GEMINI_API_KEY?.trim();
+  return key ? { ...args, apiKey: key } : args;
+}
+
 /** generateCheapJsonText on the lead's own Gemini key; the platform key when it has none or it is refused. */
 export async function outreachJson(scope: AiScope | undefined, args: Parameters<typeof generateCheapJsonText>[0]): Promise<CheapJsonTextResult> {
   const key = await scopeKey(scope, args.grant);
-  if (!key) return generateCheapJsonText(args);
+  if (!key) return generateCheapJsonText(onPlatformKey(args));
   const r = await generateCheapJsonText({ ...args, apiKey: key });
-  return r.ok === false && KEY_REFUSED.has(r.error) ? generateCheapJsonText(args) : r;
+  return r.ok === false && KEY_REFUSED.has(r.error) ? generateCheapJsonText(onPlatformKey(args)) : r;
 }
