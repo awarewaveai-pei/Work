@@ -1,4 +1,21 @@
 # Worklog
+## 2026-11-13（續5）影片剪輯 ED 線 13 張卡全部完成並上線（next-admin＋video-workbench 653a6e837、nginx /library/、曲庫 106 檔）
+
+- 觸發：操作者 2026-11-12「下載完後 你部署, 然後接著做,直到13張片完成…醒來要看到你完成13張卡片並部署上線」。監工 session 41c60c5d。
+- 卡片（SSOT `agency-os/handoffs/2026-11-06-video-editor-parity-supervisor/data.mjs`，49 項完成 49 項）：ED.4 78654f4db／ED.5＋7.3＋10.4 預覽 af652bbdf／ED.6 8378d30c3＋5e244170f／ED.8 4c54b797d／ED.9 a64ee7b07／ED.10 2f722426f＋51827cf5a＋01924ee2b／ED.11 819160be0／ED.12 77c827663＋619853d24／ED.13 5f6f2b0d0＋82174b71f。
+- 部署順序：nginx 先（正式站已含 library.cjs，只缺轉送）→ 音檔 → next-admin（video.enhance 權限與單價）→ video-workbench。
+  - nginx：`lobster-factory/infra/hetzner-phase1-core/nginx/default.conf:623` location 加 `library`，經 `safe-infra-patch.sh nginx`；備份 `/root/lobster-phase1/nginx/default.conf.bak.safe-patch-20261112-170719`。repo 對照檔同步改。
+  - 音檔：筆電 `.data/library`（106 檔、273 MB）→ 主機 `~/vw-library-stage` → `docker cp` 到 `lobster-video-workbench:/data/library`（磁碟區 `lobster-phase1_video_workbench_data`）。
+- 驗收（監工在 origin/main 暫存 worktree `D:\Worktrees\ed-accept` 重跑）：ed1–ed13、ed3-legacy-golden、preview-parity 等 21 支卡片測試全綠；gate 17 項；next-admin vitest 62 檔 332 項、tsc 0 錯。
+- 費用：ED.12.3 Topaz（Replicate）真 API 實測 4 次成功，共約 US$0.64（每次 2 units × US$0.08）；官網價目表比實際低約 10 倍，所以扣點照實際 units。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo sg-deploy.sh next-admin → gate passed、healthy 15s、smoke 5 項 OK、.deployed-commit 9804772b6 → 653a6e837 | exit=0 | ms=180000
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo sg-deploy.sh video-workbench → gate passed、healthy 6s、smoke 8 項 OK（vw api 未登入 401）、deployed 653a6e837 | exit=0 | ms=120000
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-video-workbench：/data/library 106 檔；清單 106 項經 library.fromUrl 全部解析（unresolved 0）；`/library/../etc/passwd` → null；ffprobe mus-m001.mp3 = 96.8 s；curl https://video.aware-wave.com/library/sfx-s001.mp3 未登入 → 401（同 /reference/） | exit=0 | ms=4000
+- REALTEST_EVIDENCE: tool=Bash | cmd=scripts/playwright-runner.ps1 -Mode smoke -SkipInstall → 34 passed／0 failed／24 skipped | exit=0 | ms=186000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n -- 各卡由工人 /codex-review（報告在 agency-os/reports/oracle/2026-11-1x-partialreview-*）；本條只有部署與 nginx 一行
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=api/vw\|media\|generated\|reference | hits=1（nginx/default.conf 唯一一處，已改）
+- 未做：登入瀏覽器實測（內建瀏覽器登入已失效，不可代輸密碼）→ 操作者醒來用 app 開剪輯器 › 音訊 › 配樂試聽、匯出一支片確認。
+- rollback：nginx 用上述備份經 safe-infra-patch 還原；程式在主機用 9804772b6 重跑 `sg-deploy.sh video-workbench`／`next-admin`；音檔留著不影響功能。
 ## 2026-11-13（續2）ED.6.5 內建配樂 70 首（OpenGameArt CC0）＋匯入腳本換來源一定重轉
 
 - 做了什麼：`assets/audio-library.json` 加 70 首配樂（mus-m001…m071，跳過 m052）。source＝曲目頁網址、license＝頁面原字樣「CC0」、sec／lufs 由 ffmpeg 實測。檔案放 `.data/library`（不進 git），原檔放 `D:\tmp\ed6-audio-src`。
