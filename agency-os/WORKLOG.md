@@ -34,7 +34,7 @@
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — UPDATE returning 兩列 auto_draft=f，讀回選取程式 `pipeline-store.ts:66-70`
 - BUGHUNT_WAIVED: NA -- 無程式或文件字串改動，只改兩列 prod 資料
 - ORACLE_WAIVED: 無 source 檔改動
-## 2026-11-12（續2）影音工作台 tools.html 按需載入：開機只載清單＋外框，工具程式點開才載（7037d30a5）
+## 2026-11-12（續2）影音工作台 tools.html 按需載入：開機只載清單＋外框，工具程式點開才載（d4983b243）
 
 - 根因：`scripts/tools-boot.js` 開機一次載入 20 個工具的程式（剪輯器 153KB＋分頁、合成、綁定、3D…），工具清單要等全部載完才畫。改前正式站（台灣）點「應用工具」到看到清單 4648ms。
 - 做法：`tools-0.js` TOOLS 項加 `scripts`（照舊開機順序）；`render()` 是唯一入口（清單／#網址／popstate／acceptAsset／工具互切），未 `loaded` 先畫標題＋載入中，經 `VideoWorkbench.loadScripts` 載完再重畫。`loadScripts` 同一檔每頁只插一次。剪輯組（edit/compose/rig/3d/short）互相呼叫，同一組。
