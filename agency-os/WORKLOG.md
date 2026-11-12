@@ -1,4 +1,25 @@
 # Worklog
+## 2026-11-13（續2）ED.6.5 內建配樂 70 首（OpenGameArt CC0）＋匯入腳本換來源一定重轉
+
+- 做了什麼：`assets/audio-library.json` 加 70 首配樂（mus-m001…m071，跳過 m052）。source＝曲目頁網址、license＝頁面原字樣「CC0」、sec／lufs 由 ffmpeg 實測。檔案放 `.data/library`（不進 git），原檔放 `D:\tmp\ed6-audio-src`。
+  - 剔除：R1 七首（上傳者可能不是原作者）；唐人街（頁面只有作者部落格、標籤 cinematic，作者同 R1）；m052 神祕重低音（來源回 404）。
+  - 重新歸類（照頁面描述與標籤）：晨光粒子、深藍鋼琴 → ambient_meditation；原創聖歌 → cinematic；大教堂留 gospel_soul，vocal 標 wordless。
+  - 剩下的全部都不短於 30 秒（最短 30.5），響度在 -23.6 到 -8.1 LUFS。
+  - 曲風分布：pop 12、cinematic 9、electronic 8、lofi 6、jazz_latin／acoustic_folk／rock／ambient_meditation 各 5、kids 3，其餘 1–2；guofeng_fusion 0。
+- 音效疑慮 6 項（照頁面描述）：
+  - 換成備選：s013（原檔是定音鼓邊擊，改用 ba-dum-tss）、s016（原檔是甩門，改用木門）、a012（原檔標籤有 wind，改用燒柴聲）。
+  - 保留並加 note「待人工試聽」：a006、a007、a008（備選對不上名稱，或一樣有人聲）。
+- 根因（Codex 2026-11-13 唯一發現）：`scripts/import-audio-library.cjs` 原本看到檔案已存在就跳過，所以清單換了來源後，別台機器會一直留著舊聲音。
+  - 不變量＝資料夾裡的檔必須是清單上那個來源轉出的。
+  - 修法：資料夾記 `.import.json`（{檔名: {source}}，不在 library.cjs 白名單，不會被網站提供）；檔案不存在、沒有紀錄、或紀錄的來源不同，就重新轉檔。
+  - 另加 `--list` 參數讓測試能用臨時清單。本機已經全部重建一次並寫好紀錄；重跑 ADDED 0。
+- 部署（未做，監工負責）：`agency-os/handoffs/2026-11-06-video-editor-parity-supervisor/ed6-deploy-steps.md` 已更新（106 個 mp3 約 285 MB，加 `.import.json`）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed6-audio.cjs 10 PASS（新增：同來源重跑不重轉、換來源重新匯入＝新檔並重量長度） | exit=0 | ms=250000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scripts/import-audio-library.cjs --from D:\tmp\ed6-audio-src → ITEMS 106 MISSING 0（重建 106，重跑 ADDED 0）；ffmpeg ebur128 量 70 首，沒有短於 30 秒或幾乎無聲的 | exit=0 | ms=600000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n
+- ORACLE_WAIVED: Codex artifact 2026-11-13-partialreview-c0d26946 的唯一發現（換來源不重轉）已照不變量修正，並補指名測試；匯入腳本不屬於隱私／權限守衛，依規則不做突變
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=import-audio-library|\.import\.json | hits=21
+- BUGHUNT_SCOPE_NARROW: 改動只有清單資料與匯入腳本；呼叫者只有 tests/ed6-audio.cjs 和交接文件
 ## 2026-11-13（續1）影音工作台 ED.13 階段 2：剪輯動作改成吃參數的函式、頂列剪輯 Agent 按鈕、驗收閘
 
 - 改：`scripts/tools-editor.js` 把 `edAction` 的分割、刪除／波紋刪除、複製、移軌、新增軌、比例、濾鏡、速度、遮罩、背景、旁白降低、變形關鍵影格、分離音訊、標記、新增文字，以及欄位淡入／淡出、音量，改成吃 (專案, 片段, 值) 的函式（`edSplitAt`、`edDeleteClips`、`edDuplicate`、`edMoveTrack`、`edAddTrack`、`edSetRatio`、`edSetFilter`、`edSetSpeed`、`edSetMask`、`edSetBackground`、`edSetDuck`、`edTransformKey`、`edDetachAudio`、`edToggleMarker`、`edAddText`、`edSetFades`、`edApplyDb`、`edSetLoudness`）。這些函式不讀播放頭和選取；按鈕帶播放頭／選取呼叫，Agent（`scripts/editor-agent.js` 的 `edAgentTools`）帶自己的值呼叫同一份。響度鍵（`editor-panes/audio.js`）改走 `edSetLoudness`，並補上範圍檢查。轉場與字幕匯入直接用分頁既有的 `edTrSet`、`edSubFill`。

@@ -44,6 +44,27 @@ function ff(args) {
   };  ff(["-f", "lavfi", "-i", "color=c=blue:s=320x180:r=30:d=6", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "ultrafast", path.join(generated, video)]);
   // Narration = a 1 kHz tone, so a 4 kHz high-pass hears only the sound effect under it.
   ff(["-f", "lavfi", "-i", "sine=frequency=1000:duration=1.5", "-c:a", "libmp3lame", path.join(generated, voice)]);
+  // Codex 2026-11-13：清單換了來源再匯入，資料夾裡的檔必須換成新來源轉出的（不因「檔案已存在」留下舊聲音）；同來源重跑不重轉。
+  {
+    const work = path.join(root, "import"),
+      originals = path.join(work, "orig"),
+      folder = path.join(work, "lib"),
+      list = path.join(work, "list.json"),
+      run = () => spawnSync(process.execPath, [path.join(__dirname, "../scripts/import-audio-library.cjs"), "--from", originals, "--to", folder, "--list", list], { encoding: "utf8", windowsHide: true }),
+      write = (source) => fs.writeFileSync(list, JSON.stringify({ genres: {}, items: [{ id: "x1", title: "測", usage: "sfx", file: "sfx-x1.mp3", source }] }));
+    fs.mkdirSync(originals, { recursive: true });
+    ff(["-f", "lavfi", "-i", "sine=frequency=300", "-t", "1", "-c:a", "libmp3lame", path.join(originals, "x1.mp3")]);
+    write("https://example.test/a");
+    assert.equal(run().status, 0);
+    const first = fs.readFileSync(path.join(folder, "sfx-x1.mp3"));
+    assert.doesNotMatch(run().stdout, /ADDED/, "同來源重跑不重轉");
+    ff(["-f", "lavfi", "-i", "sine=frequency=900", "-t", "2", "-c:a", "libmp3lame", path.join(originals, "x1.mp3")]);
+    write("https://example.test/b");
+    assert.match(run().stdout, /ADDED sfx-x1\.mp3/);
+    assert(!fs.readFileSync(path.join(folder, "sfx-x1.mp3")).equals(first), "換來源後是新檔");
+    assert.equal(JSON.parse(fs.readFileSync(list, "utf8")).items[0].sec, 2);
+    pass("匯入腳本：同來源重跑不重轉；清單換來源後重新匯入＝換成新檔並重量長度");
+  }
   // The AI 旁白 row needs a key to be selectable; the test never presses 產生旁白 (any POST /generations fails the test).
   const server = require("../server.cjs").createServer({ dataDir, env: { GEMINI_API_KEY: "ed6-test-never-sent", VW_LIBRARY_DIR: libraryDir } });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
