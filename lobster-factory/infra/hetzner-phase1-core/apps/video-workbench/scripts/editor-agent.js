@@ -2,8 +2,8 @@
 // Card ED.13 剪輯 Agent (docs/ed13-edit-agent-design-20261110.md; spec §1.8): a floating, draggable window. A message sends
 // the project summary to POST /editor/agent (the text price is on the send button before the click, data-paid) and gets
 // back a checked list of
-// editor operations. The list runs on a copy through the same tool functions the buttons use (edAgentTools, defined in
-// tools-editor.js); any failing step voids the whole round and the project stays as it was. A good round replaces the
+// editor operations. The list runs on a copy through the same tool functions the buttons use (edAgentTools below ->
+// tools-editor.js and the pane files); any failing step voids the whole round and the project stays as it was. A good round replaces the
 // project after one edCheckpoint, so one Ctrl+Z undoes it all. Paid work is only proposed: its card opens the pane whose
 // own priced button runs it. The conversation lives in memory only and is never saved with the project.
 const edAgent = { open: false, busy: false, turns: [], x: null, y: null, draft: "" };
@@ -63,16 +63,64 @@ function edAgentPaint() {
   const log = box.querySelector(".editor-agent-log");
   log.scrollTop = log.scrollHeight;
 }
-// Runs the plan on a copy; returns the copy and the proposals. Throws (project untouched) on the first failing step.
+const edAgentClip = (p, id) => {
+  const c = p.clips.find((x) => x.id === id);
+  if (!c) throw Error("找不到片段 " + id);
+  return c;
+};
+// Tool name (shared/editor-agent-plan.js TOOLS) -> the editor's own function, the one its button runs (tools-editor.js,
+// editor-panes/transition.js, editor-panes/subtitles.js). Each gets the round's copy; a truthy return = the step must
+// not close main-track gaps (磁性主軌), as its button sets ed.skipMagnet.
+const edAgentTools = {
+  split_clip: (p, a) => void edSplitAt(p, edAgentClip(p, a.clipId), Timebase.toFrames(a.atSec, p.timebase)),
+  delete_clips: (p, a) => edDeleteClips(p, new Set(a.clipIds.map((id) => edAgentClip(p, id).id)), !!a.ripple),
+  duplicate_clips: (p, a) => edDuplicate(p, a.clipIds.map((id) => edAgentClip(p, id))).skipMagnet,
+  move_clip_track: (p, a) => edMoveTrack(p, edAgentClip(p, a.clipId), a.trackId),
+  add_track: (p, a) => void edAddTrack(p, a.kind),
+  set_ratio: (p, a) => (edSetRatio(p, a.ratio), true),
+  set_timebase: (p, a) => (edSetTimebase(p, a.label), true),
+  set_loudness: (p, a) => edSetLoudness(p, a.lufs),
+  set_filter: (p, a) => edSetFilter(p, a.clipId ? edAgentClip(p, a.clipId) : null, a.name, a.scope),
+  set_speed: (p, a) => edSetSpeed(p, edAgentClip(p, a.clipId), a.rate),
+  set_mask: (p, a) => edSetMask(edAgentClip(p, a.clipId), a.value),
+  set_background: (p, a) => edSetBackground(p, edAgentClip(p, a.clipId), a.value),
+  set_volume_db: (p, a) => edApplyDb(edAgentClip(p, a.clipId), a.db),
+  set_fades: (p, a) => edSetFades(edAgentClip(p, a.clipId), { fadeIn: a.inSec, fadeOut: a.outSec }),
+  set_duck: (p, a) => edSetDuck(edAgentClip(p, a.clipId), a.on),
+  // The transition pane's own rules: only at a cut of the main track (edPrevious), length clamped by edTrSet.
+  set_transition: (p, a) => {
+    const c = edAgentClip(p, a.clipId),
+      name = EditorModel.transitionName(a.name);
+    if (c.track !== edMain(p) || !edPrevious(p, c)) throw Error("轉場只能放在主視訊軌兩段相接的剪點");
+    if (name === null) throw Error("轉場不存在");
+    if (name === "無") {
+      c.transition = "無";
+      delete c.transitionCurve;
+    } else edTrSet(p, c, name, c.transitionCurve || "線性", a.sec);
+  },
+  add_text: (p, a) => void edAddText(p, a.text, a.startSec, a.durSec, a.trackId),
+  // The SRT import's rules (字幕 pane): the language's own track is replaced, cues after the video's end are dropped.
+  import_cues: (p, a) => {
+    const id = edSubTracks(p).find((t) => t.language === a.language && !t.translatedFrom)?.id || edSubNewTrack(p, a.language, false);
+    edSubFill(p, id, a.cues, edSubLook(p, id), edSubLimit(p));
+  },
+  transform_key: (p, a) => edTransformKey(p, edAgentClip(p, a.clipId), a.op, a.frame ?? 0, a.values),
+  detach_audio: (p, a) => edDetachAudio(p, edAgentClip(p, a.clipId)),
+  // Adds only: a marker already there stays (the M key toggles).
+  add_marker: (p, a) => {
+    if (!(p.markers || []).some((m) => Math.abs(m - a.atSec) < 0.005)) edToggleMarker(p, a.atSec);
+  },
+};
+// Runs the plan on a copy, 磁性主軌 after each step as its button would; returns the copy and the proposals. Throws
+// (project untouched) on the first failing step.
 function edAgentDryRun(p, ops) {
   const copy = structuredClone(p),
     paid = [];
   ops.forEach((op, i) => {
     if (op.tool === "propose_paid") return void paid.push(op.args);
-    const run = typeof edAgentTools === "object" && edAgentTools[op.tool];
-    if (!run) throw Error(`第 ${i + 1} 步（${op.tool}）這個版本還不能執行，整份不套用`);
     try {
-      run(copy, op.args);
+      const before = structuredClone(copy);
+      if (!edAgentTools[op.tool](copy, op.args)) edMagnetFrom(copy, before);
     } catch (e) {
       throw Error(`第 ${i + 1} 步（${op.tool}）失敗，整份不套用：${e.message}`);
     }
@@ -103,6 +151,7 @@ async function edAgentApply(p, ops) {
   ed.projects[ed.projects.indexOf(p)] = copy;
   if (ed.selected && !copy.clips.some((c) => c.id === ed.selected)) ed.selected = null;
   ed.picks = new Set([...ed.picks].filter((id) => copy.clips.some((c) => c.id === id)));
+  ed.skipMagnet = true; // already applied step by step in the dry run
   await edCommit(copy);
   return { applied, paid };
 }

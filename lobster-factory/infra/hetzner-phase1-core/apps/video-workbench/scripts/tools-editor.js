@@ -355,8 +355,11 @@ function edCheckpoint() {
 function edMagnet(p) {
   const skip = ed.skipMagnet;
   ed.skipMagnet = false;
-  const before = ed.undo.at(-1);
-  if (!ed.magnet || skip || !before || before.id !== p.id) return;
+  if (!skip) edMagnetFrom(p, ed.undo.at(-1));
+}
+// The same rule against any earlier copy (card ED.13 runs it after each step of an agent round, on the round's copy).
+function edMagnetFrom(p, before) {
+  if (!ed.magnet || !before || before.id !== p.id) return;
   const main = edMain(p),
     sig = (proj) =>
       proj.clips
@@ -538,7 +541,7 @@ function edRatioChoices(p, label, short = false) {
   return edChoices(label, "project-ratio", p.ratio, Object.keys(edRatios), (r) => (short ? r : r + " " + (names[r] || "")));
 }
 function edTopbar(p) {
-  return `<header class="editor-topbar"><div class="editor-topbar-group"><button type="button" class="btn small" data-ed-action="projects" aria-label="回到這一集">← 回到這一集</button><label class="editor-title"><input class="text-input" aria-label="專案名稱" data-ed-field="project:title" type="text" maxlength="100" value="${esc(p.title)}"><span aria-hidden="true">✎</span></label>${edRatioChoices(p, "輸出比例", true)}</div>${edSpineButtons(p)}<span class="editor-saved" data-ed-saved role="status" data-state="${ed.save.state}">${esc(edSaveText())}</span><div class="editor-topbar-group">總時長：<b class="editor-total" data-ed-total>${edClockText(edTotal())}</b><button type="button" class="btn primary small" data-ed-action="export" aria-label="匯出" ${p.clips.length ? "" : "disabled"}>▷ 匯出</button></div></header>`;
+  return `<header class="editor-topbar"><div class="editor-topbar-group"><button type="button" class="btn small" data-ed-action="projects" aria-label="回到這一集">← 回到這一集</button><label class="editor-title"><input class="text-input" aria-label="專案名稱" data-ed-field="project:title" type="text" maxlength="100" value="${esc(p.title)}"><span aria-hidden="true">✎</span></label>${edRatioChoices(p, "輸出比例", true)}</div>${edSpineButtons(p)}<span class="editor-saved" data-ed-saved role="status" data-state="${ed.save.state}">${esc(edSaveText())}</span><button type="button" class="btn small" data-ed-action="agent" aria-label="剪輯 Agent">✦ 剪輯 Agent</button><div class="editor-topbar-group">總時長：<b class="editor-total" data-ed-total>${edClockText(edTotal())}</b><button type="button" class="btn primary small" data-ed-action="export" aria-label="匯出" ${p.clips.length ? "" : "disabled"}>▷ 匯出</button></div></header>`;
 }
 function edRail() {
   const open = ed.layout.leftOpen;
@@ -1298,7 +1301,7 @@ async function edAdd(asset, track) {
   ed.time = c.start;
   await edCommit(p);
 }
-function edValidate(c) {
+function edValidate(c, p = edProject()) {
   for (const key of [
     "start",
     "duration",
@@ -1323,7 +1326,7 @@ function edValidate(c) {
   for (const [key, r] of Object.entries(EditorModel.COLOR))
     if (c[key] !== undefined && (c[key] < r.min || c[key] > r.max))
       throw Error(`${r.label}需介於 ${r.min} 到 ${r.max}`);
-  if (c.transformKeys?.length) EditorModel.transformKeys(c.transformKeys, c.durationFrames, edOverlay(edProject(), c.track));
+  if (c.transformKeys?.length) EditorModel.transformKeys(c.transformKeys, c.durationFrames, edOverlay(p, c.track));
   if (
     !(c.startFrame >= 0) ||
     !(c.durationFrames >= 1) ||
@@ -1884,8 +1887,9 @@ function edFreeStart(p, group, from, skip = new Set()) {
   return EditorModel.freeStart(group, occupied, Math.max(0, from));
 }
 // Paste (Ctrl+V, at the playhead) and multi-clip duplicate (Ctrl+D, after the selection): the copies keep their
-// relative timing and tracks, and go to the first time where none of them covers a clip already there. The copies
-// become the selection. Several tracks at once = the reference's 「跨軌多選複製」, which skips 磁性主軌.
+// relative timing and tracks, and go to the first time where none of them covers a clip already there. Returns the
+// copies (the callers select them, edSelectPlaced) and whether they span several tracks = the reference's 「跨軌多選複製」,
+// which skips 磁性主軌.
 function edPlace(p, items, from) {
   const rows = items.map(({ clip, offset }) => ({
       clip,
@@ -1908,7 +1912,10 @@ function edPlace(p, items, from) {
     if (copy.asset && !p.assets.some((a) => a.id === copy.asset.id)) p.assets.push(copy.asset);
     p.clips.push(copy);
   }
-  if (new Set(rows.map((r) => r.track)).size > 1) ed.skipMagnet = true;
+  return { copies, skipMagnet: new Set(rows.map((r) => r.track)).size > 1 };
+}
+function edSelectPlaced({ copies, skipMagnet }) {
+  if (skipMagnet) ed.skipMagnet = true;
   ed.picks = new Set(copies.map((x) => x.id));
   ed.selected = copies.at(-1)?.id || null;
 }
@@ -2049,6 +2056,191 @@ function edText(
     ? edTime(p, clip, { start, duration, sourceStart: 0 })
     : { ...clip, start, duration, sourceStart: 0 };
 }
+// Card ED.13: the editor's edits as functions of (project, clip, values) -- they read neither the playhead nor the
+// selection. The buttons above call them with the playhead / selection; the 剪輯 Agent (scripts/editor-agent.js
+// edAgentTools) calls the same ones with its own values on a copy of the project. The caller takes the undo checkpoint
+// and commits; a throw leaves the caller to discard the edit.
+// Which clip kinds an edit applies to = the inspector groups that show it (edClipInspector): 畫面效果／變形關鍵影格 on
+// video and image, 播放速度 and 音訊 on video and audio. The buttons never reach another kind; the agent can name any clip.
+const edVisualKinds = ["video", "image"],
+  edSoundKinds = ["video", "audio"];
+function edNeedKind(c, kinds, what) {
+  if (!kinds.includes(c.kind)) throw Error(`${what}只用於${kinds.map((k) => ({ video: "影片", image: "圖片", audio: "音訊" })[k]).join("或")}片段`);
+}
+function edToggleMarker(p, seconds) {
+  const t = Number(Number(seconds).toFixed(2)),
+    marks = p.markers || [];
+  p.markers = marks.some((m) => Math.abs(m - t) < 0.005)
+    ? marks.filter((m) => Math.abs(m - t) >= 0.005)
+    : [...marks, t].sort((a, b) => a - b);
+}
+function edDeleteClips(p, ids, ripple) {
+  const gone = p.clips.filter((row) => ids.has(row.id));
+  p.clips = p.clips.filter((row) => !ids.has(row.id));
+  if (ripple)
+    for (const r of [...gone].sort((a, b) => b.startFrame - a.startFrame))
+      for (const row of p.clips)
+        if (row.track === r.track && row.startFrame >= r.startFrame + r.durationFrames)
+          edTime(p, row, { startFrame: row.startFrame - r.durationFrames });
+}
+// One clip: the copy right after it. Several: edPlace after the whole group. Returns edPlace's { copies, skipMagnet }.
+function edDuplicate(p, clips) {
+  if (clips.length === 1) {
+    const c = clips[0],
+      copy = edTime(p, { ...structuredClone(c), id: crypto.randomUUID() }, { startFrame: c.startFrame + c.durationFrames });
+    p.clips.push(copy);
+    return { copies: [copy], skipMagnet: false };
+  }
+  const base = Math.min(...clips.map((x) => x.startFrame)),
+    end = Math.max(...clips.map((x) => x.startFrame + x.durationFrames));
+  return edPlace(p, clips.map((x) => ({ clip: structuredClone(x), offset: x.startFrame - base })), end);
+}
+function edAddTrack(p, kind) {
+  if (!EditorModel.canAdd(p.tracks, kind)) throw Error((EditorModel.NAME[kind] || "") + "軌已達上限");
+  const id = EditorModel.nextId(p.tracks, kind),
+    // New tracks go after the last track of their kind: a new video track is the new top video layer.
+    at = p.tracks.findLastIndex((t) => t.kind === kind) + 1;
+  p.tracks.splice(at || p.tracks.length, 0, { id, kind, name: id, hidden: false, muted: false, volume: 1, normalize: false });
+  return id;
+}
+function edSetFilter(p, c, name, scope) {
+  if (!edFilters.includes(name)) throw Error("濾鏡不存在");
+  if (scope !== "整片" && !c) throw Error("請先選取片段");
+  if (scope !== "整片") edNeedKind(c, edVisualKinds, "濾鏡");
+  edWriteEffect(p, c, "filter", name, scope);
+}
+function edSetRatio(p, ratio) {
+  if (!edRatios[ratio]) throw Error("比例不存在");
+  p.ratio = ratio;
+}
+function edSetLoudness(p, lufs) {
+  const { min, max } = EditorModel.LOUDNESS;
+  if (!(Number(lufs) >= min && Number(lufs) <= max)) throw Error(`響度需介於 ${min} 到 ${max} LUFS`);
+  p.output = { ...p.output, loudness: Number(lufs) };
+}
+// Card ED.3.5 播放速度: the source range stays, the clip's length follows (2x: 22.4 s -> 11.2 s); keys and fades move
+// with it. 磁性主軌 re-lays the main track, so only other tracks check their neighbours.
+function edSetSpeed(p, c, v) {
+  if (![0.5, 1, 1.5, 2].includes(v)) throw Error("播放速度不存在");
+  edNeedKind(c, edSoundKinds, "播放速度");
+  const ratio = c.speed / v,
+    next = edTime(p, { ...c, speed: v }, { durationFrames: Math.max(1, Math.round(c.durationFrames * ratio)) });
+  edRescaleKeys(next, ratio);
+  next.fadeIn = Math.min(next.fadeIn, next.duration / 2);
+  next.fadeOut = Math.min(next.fadeOut, next.duration / 2);
+  if (!(ed.magnet && c.track === edMain(p))) edNeighbours(p, next);
+  edValidate(next, p);
+  Object.assign(c, next);
+}
+function edSetMask(c, value) {
+  edNeedKind(c, edVisualKinds, "遮罩");
+  if (!["無", "圓形", "圓角矩形", "三角形"].includes(value)) throw Error("遮罩不存在");
+  c.mask = value;
+}
+// Reference: 背景 applies to every clip of the main track (僅 V1).
+function edSetBackground(p, c, choice) {
+  const value = { 黑邊: "黑色", 模糊: "模糊", 純色: "純色" }[choice];
+  if (!value || c.track !== edMain(p)) throw Error("背景只用於主視訊軌");
+  for (const row of edMainVisual(p)) row.background = value;
+}
+function edSetDuck(c, on) {
+  edNeedKind(c, edSoundKinds, "旁白時自動降低");
+  if (on) c.duck = true;
+  else delete c.duck;
+}
+// fades = { fadeIn?, fadeOut? } seconds; edValidate holds the 10 s / half-length limits.
+function edSetFades(c, fades) {
+  edNeedKind(c, edSoundKinds, "淡入淡出");
+  const next = { ...c, ...Object.fromEntries(Object.entries(fades).filter(([, v]) => v !== undefined)) };
+  edValidate(next);
+  Object.assign(c, next);
+}
+// op add / delete / clear at `frame` (from the clip start). values (add only) override the scale/x/y/rotation there;
+// clear makes the values at `frame` the static ones.
+function edTransformKey(p, c, op, frame, values = {}) {
+  edNeedKind(c, edVisualKinds, "變形關鍵影格");
+  const at = EditorModel.transformAt(c.transformKeys, frame) || { scale: c.scale, x: c.x, y: c.y, rotation: c.rotation };
+  if (op === "clear") {
+    Object.assign(c, at);
+    delete c.transformKeys;
+    return;
+  }
+  if (!["add", "delete"].includes(op)) throw Error("關鍵影格操作不存在");
+  if (frame < 0 || frame > c.durationFrames) throw Error("播放頭需位於片段內");
+  const rest = (c.transformKeys || []).filter((k) => k.frame !== frame),
+    next = op === "add" ? [...rest, { frame, ...at, ...values }] : rest;
+  if (next.length) c.transformKeys = EditorModel.transformKeys(next, c.durationFrames, edOverlay(p, c.track));
+  else delete c.transformKeys;
+}
+// Reuses the same video file as the sound source (spec §9 Q2); the export plays it as audio.
+function edDetachAudio(p, c) {
+  if (c.kind !== "video" || p.clips.some((o) => o.detachedFrom === c.id)) throw Error("這段已分離過音訊");
+  const track = edTrack(p, EditorModel.NARRATION) ? EditorModel.NARRATION : edTrackFor(p, "audio"),
+    sound = edTime(
+      p,
+      {
+        id: crypto.randomUUID(), kind: "audio", track, asset: c.asset, speed: c.speed, volume: c.volume, fadeIn: c.fadeIn, fadeOut: c.fadeOut,
+        ...(c.volumeKeys ? { volumeKeys: structuredClone(c.volumeKeys) } : {}),
+        detachedFrom: c.id,
+      },
+      { startFrame: c.startFrame, durationFrames: c.durationFrames, sourceStartFrame: c.sourceStartFrame },
+    );
+  try {
+    edNeighbours(p, sound);
+  } catch (_) {
+    throw Error("旁白軌在這段時間已有片段");
+  }
+  p.clips.push(sound);
+  c.muted = true;
+}
+function edMoveTrack(p, c, id) {
+  const target = edTrack(p, id);
+  if (!target || target.kind !== edKindOf(c)) throw Error("片段與軌道類型不相符");
+  if (id === c.track) return;
+  const main = id === edMain(p);
+  if (c.kind !== "text") {
+    c.x = main ? 0 : 50;
+    c.y = main ? 0 : 50;
+    if (c.transformKeys) c.transformKeys = c.transformKeys.map((k) => ({ ...k, x: c.x, y: c.y }));
+  }
+  c.track = id;
+}
+// Cuts c at `frame` (timeline); returns the second half. The second half starts at a plain cut: the in-transition
+// stays on the first half.
+function edSplitAt(p, c, frame) {
+  const offset = frame - c.startFrame;
+  if (offset < 1 || offset > c.durationFrames - 1) throw Error("播放頭需位於片段內部");
+  const copy = edTime(
+    p,
+    { ...structuredClone(c), id: crypto.randomUUID() },
+    {
+      startFrame: c.startFrame + offset,
+      durationFrames: c.durationFrames - offset,
+      sourceStartFrame: c.sourceStartFrame + Math.round(offset * c.speed),
+    },
+  );
+  delete copy.transition;
+  delete copy.transitionFrames;
+  edWindowKeys(copy, c, offset, c.durationFrames);
+  edWindowKeys(c, c, 0, offset);
+  edTime(p, c, { durationFrames: offset });
+  for (const row of [c, copy]) {
+    row.fadeIn = Math.min(row.fadeIn, row.duration / 2);
+    row.fadeOut = Math.min(row.fadeOut, row.duration / 2);
+  }
+  p.clips.push(copy);
+  return copy;
+}
+// A text clip at `start` on a text track, moved later to the first free time there; returns it.
+function edAddText(p, text, start, duration, trackId) {
+  const track = edTrack(p, trackId ?? edTrackFor(p, "text"));
+  if (track?.kind !== "text") throw Error("文字只能放在文字軌");
+  const clip = edText(text, start, duration, p, track.id);
+  edTime(p, clip, { startFrame: edFreeStart(p, [{ track: track.id, offset: 0, durationFrames: clip.durationFrames }], clip.startFrame) });
+  edValidate(clip, p);
+  p.clips.push(clip);
+  return clip;
+}
 async function edAction(action) {
   const p = edProject(),
     c = edClip();
@@ -2111,6 +2303,10 @@ async function edAction(action) {
   }
   if (action === "export") {
     edExportDialog(p);
+    return;
+  }
+  if (action === "agent") {
+    edAgentOpen();
     return;
   }
   if (action === "color-compare") {
@@ -2317,11 +2513,7 @@ async function edAction(action) {
     if (!track) return;
     if (track.kind === "text") {
       if (!sub) edCheckpoint();
-      const clip = edText("新文字", ed.time, 3, p, track.id),
-        free = edFreeStart(p, [{ track: track.id, offset: 0, durationFrames: clip.durationFrames }], clip.startFrame);
-      edTime(p, clip, { startFrame: free });
-      p.clips.push(clip);
-      ed.selected = clip.id;
+      ed.selected = edAddText(p, "新文字", ed.time, 3, track.id).id;
       await edCommit(p);
       return;
     }
@@ -2331,13 +2523,7 @@ async function edAction(action) {
   }
   edCheckpoint();
   // M: a marker at the playhead is removed, otherwise one is added (reference 「在播放頭加入／移除標記」).
-  if (action === "marker") {
-    const t = Number(ed.time.toFixed(2)),
-      marks = p.markers || [];
-    p.markers = marks.some((m) => Math.abs(m - t) < 0.005)
-      ? marks.filter((m) => Math.abs(m - t) >= 0.005)
-      : [...marks, t].sort((a, b) => a - b);
-  }
+  if (action === "marker") edToggleMarker(p, ed.time);
   if (action.startsWith("track-up:") || action.startsWith("track-down:")) {
     const [dir, id] = action.split(":"),
       other = edOverlayNeighbour(p, id, dir === "track-up" ? 1 : -1);
@@ -2356,29 +2542,17 @@ async function edAction(action) {
       ed.undo.pop();
       return;
     }
-    const ids = new Set(gone.map((x) => x.id));
-    p.clips = p.clips.filter((row) => !ids.has(row.id));
-    if (action === "ripple")
-      for (const r of [...gone].sort((a, b) => b.startFrame - a.startFrame))
-        for (const row of p.clips)
-          if (row.track === r.track && row.startFrame >= r.startFrame + r.durationFrames)
-            edTime(p, row, { startFrame: row.startFrame - r.durationFrames });
+    edDeleteClips(p, new Set(gone.map((x) => x.id)), action === "ripple");
     ed.selected = null;
     ed.picks.clear();
   }
-  // One clip keeps the original duplicate (the copy right after it); several go through edPlace.
-  const several = action === "duplicate" && edPicked(p).length > 1;
-  if (several) {
-    const picked = edPicked(p),
-      base = Math.min(...picked.map((x) => x.startFrame)),
-      end = Math.max(...picked.map((x) => x.startFrame + x.durationFrames));
-    edPlace(p, picked.map((x) => ({ clip: structuredClone(x), offset: x.startFrame - base })), end);
-  } else if (action === "paste") {
+  if (action === "duplicate" && edPicked(p).length) edSelectPlaced(edDuplicate(p, edPicked(p)));
+  else if (action === "paste") {
     if (!ed.clipboard?.length) {
       ed.undo.pop();
       return;
     }
-    edPlace(p, structuredClone(ed.clipboard), edFrame(p));
+    edSelectPlaced(edPlace(p, structuredClone(ed.clipboard), edFrame(p)));
   }
   if (action === "style-paste") {
     const s = ed.styleClipboard,
@@ -2397,23 +2571,7 @@ async function edAction(action) {
       track = edTrack(p, id);
     if (track) track[property] = !track[property];
   }
-  if (action.startsWith("track-add:")) {
-    const kind = action.slice(10);
-    if (!EditorModel.canAdd(p.tracks, kind))
-      throw Error(EditorModel.NAME[kind] + "軌已達上限");
-    const id = EditorModel.nextId(p.tracks, kind),
-      // New tracks go after the last track of their kind: a new video track is the new top video layer.
-      at = p.tracks.findLastIndex((t) => t.kind === kind) + 1;
-    p.tracks.splice(at || p.tracks.length, 0, {
-      id,
-      kind,
-      name: id,
-      hidden: false,
-      muted: false,
-      volume: 1,
-      normalize: false,
-    });
-  }
+  if (action.startsWith("track-add:")) edAddTrack(p, action.slice(10));
   if (action.startsWith("track-delete:")) {
     const id = action.slice(13),
       track = edTrack(p, id),
@@ -2438,14 +2596,9 @@ async function edAction(action) {
     }
     p.tracks = p.tracks.filter((t) => t.id !== id);
   }
-  if (action.startsWith("project-filter:")) {
-    const filter = action.slice(15);
-    if (!edFilters.includes(filter)) throw Error("濾鏡不存在");
-    edWriteEffect(p, c, "filter", filter, "整片");
-  }
+  if (action.startsWith("project-filter:")) edSetFilter(p, c, action.slice(15), "整片");
   if (action.startsWith("project-ratio:")) {
-    if (!edRatios[action.slice(14)]) throw Error("比例不存在");
-    p.ratio = action.slice(14);
+    edSetRatio(p, action.slice(14));
     ed.skipMagnet = true;
   }
   if (action.startsWith("project-timebase:")) {
@@ -2455,23 +2608,12 @@ async function edAction(action) {
   if (c) {
     if (action.startsWith("fx:")) {
       const [, key, value] = action.split(":");
-      if (key !== "filter" || !edFilters.includes(value)) throw Error("濾鏡不存在");
-      edWriteEffect(p, c, key, value, ed.fxScope);
+      if (key !== "filter") throw Error("濾鏡不存在");
+      edSetFilter(p, c, value, ed.fxScope);
     }
     // Card ED.3.5 播放速度: the source range stays, the clip's length follows (2x: 22.4 s -> 11.2 s); keys and
     // fades move with it. 磁性主軌 re-lays the main track, so only other tracks check their neighbours.
-    if (action.startsWith("speed:")) {
-      const v = Number(action.slice(6));
-      if (![0.5, 1, 1.5, 2].includes(v)) throw Error("播放速度不存在");
-      const ratio = c.speed / v,
-        next = edTime(p, { ...c, speed: v }, { durationFrames: Math.max(1, Math.round(c.durationFrames * ratio)) });
-      edRescaleKeys(next, ratio);
-      next.fadeIn = Math.min(next.fadeIn, next.duration / 2);
-      next.fadeOut = Math.min(next.fadeOut, next.duration / 2);
-      if (!(ed.magnet && c.track === edMain(p))) edNeighbours(p, next);
-      edValidate(next);
-      Object.assign(c, next);
-    }
+    if (action.startsWith("speed:")) edSetSpeed(p, c, Number(action.slice(6)));
     const textChoice = { "text-font:": "font", "text-align:": "align", "text-animation:": "animation" };
     for (const [prefix, key] of Object.entries(textChoice)) if (action.startsWith(prefix)) c[key] = action.slice(prefix.length);
     if (action === "text-style:track" || action === "text-style:all") {
@@ -2483,75 +2625,16 @@ async function edAction(action) {
             else row[key] = structuredClone(c[key]);
           }
     }
-    if (action.startsWith("mask:")) {
-      if (!["無", "圓形", "圓角矩形", "三角形"].includes(action.slice(5))) throw Error("遮罩不存在");
-      c.mask = action.slice(5);
-    }
-    if (action.startsWith("background:")) {
-      const value = { 黑邊: "黑色", 模糊: "模糊", 純色: "純色" }[action.slice(11)];
-      if (!value || c.track !== edMain(p)) throw Error("背景只用於主視訊軌");
-      for (const row of edMainVisual(p)) row.background = value;
-    }
-    if (action === "toggle:duck") {
-      if (c.duck) delete c.duck;
-      else c.duck = true;
-    } else if (action.startsWith("toggle:")) c[action.slice(7)] = !c[action.slice(7)];
-    if (action === "tf-key-add" || action === "tf-key-delete" || action === "tf-key-clear") {
-      const frame = edFrame(p) - c.startFrame,
-        keys = c.transformKeys || [];
-      if (action === "tf-key-clear") {
-        Object.assign(c, edTransform(p, c)); // the values at the playhead become the static ones
-        delete c.transformKeys;
-      } else {
-        if (frame < 0 || frame > c.durationFrames) throw Error("播放頭需位於片段內");
-        const rest = keys.filter((k) => k.frame !== frame),
-          next = action === "tf-key-add" ? [...rest, { frame, ...edTransform(p, c) }] : rest;
-        if (next.length) c.transformKeys = EditorModel.transformKeys(next, c.durationFrames, edOverlay(p, c.track));
-        else delete c.transformKeys;
-      }
-    }
-    if (action === "detach-audio") {
-      if (c.kind !== "video" || p.clips.some((o) => o.detachedFrom === c.id)) throw Error("這段已分離過音訊");
-      // Reuses the same video file as the sound source (spec §9 Q2); the export plays it as audio.
-      const track = edTrack(p, EditorModel.NARRATION) ? EditorModel.NARRATION : edTrackFor(p, "audio"),
-        sound = edTime(
-          p,
-          {
-            id: crypto.randomUUID(), kind: "audio", track, asset: c.asset, speed: c.speed, volume: c.volume, fadeIn: c.fadeIn, fadeOut: c.fadeOut,
-            ...(c.volumeKeys ? { volumeKeys: structuredClone(c.volumeKeys) } : {}),
-            detachedFrom: c.id,
-          },
-          { startFrame: c.startFrame, durationFrames: c.durationFrames, sourceStartFrame: c.sourceStartFrame },
-        );
-      try {
-        edNeighbours(p, sound);
-      } catch (_) {
-        throw Error("旁白軌在這段時間已有片段");
-      }
-      p.clips.push(sound);
-      c.muted = true;
-    }
+    if (action.startsWith("mask:")) edSetMask(c, action.slice(5));
+    if (action.startsWith("background:")) edSetBackground(p, c, action.slice(11));
+    if (action === "toggle:duck") edSetDuck(c, !c.duck);
+    else if (action.startsWith("toggle:")) c[action.slice(7)] = !c[action.slice(7)];
+    if (action === "tf-key-add" || action === "tf-key-delete" || action === "tf-key-clear")
+      edTransformKey(p, c, action.slice(7), edFrame(p) - c.startFrame);
+    if (action === "detach-audio") edDetachAudio(p, c);
     if (action === "text-background")
       c.backgroundColor = c.backgroundColor ? null : "#000000";
-    if (action.startsWith("clip-track:")) {
-      const id = action.slice(11),
-        target = edTrack(p, id);
-      if (
-        !target ||
-        target.kind !==
-          (c.kind === "text" ? "text" : c.kind === "audio" ? "audio" : "video")
-      )
-        throw Error("片段與軌道類型不相符");
-      if (id !== c.track) {
-        const main = id === edMain(p);
-        if (c.kind !== "text") {
-          c.x = main ? 0 : 50;
-          c.y = main ? 0 : 50;
-          if (c.transformKeys) c.transformKeys = c.transformKeys.map((k) => ({ ...k, x: c.x, y: c.y }));
-        }
-        c.track = id;
-      }
-    }
+    if (action.startsWith("clip-track:")) edMoveTrack(p, c, action.slice(11));
     if (action.startsWith("lut:")) {
       const asset = ed.luts?.find((a) => String(a.id) === action.slice(4));
       if (asset) c.lut = { id: asset.id, url: asset.url, name: asset.name };
@@ -2594,41 +2677,7 @@ async function edAction(action) {
         Object.assign(c, next);
       }
     }
-    if (action === "duplicate" && !several) {
-      const copy = edTime(
-        p,
-        { ...structuredClone(c), id: crypto.randomUUID() },
-        { startFrame: c.startFrame + c.durationFrames },
-      );
-      p.clips.push(copy);
-      ed.selected = copy.id;
-    }
-    if (action === "split") {
-      const offset = Timebase.toFrames(ed.time, p.timebase) - c.startFrame;
-      if (offset < 1 || offset > c.durationFrames - 1)
-        throw Error("播放頭需位於片段內部");
-      const copy = edTime(
-        p,
-        { ...structuredClone(c), id: crypto.randomUUID() },
-        {
-          startFrame: c.startFrame + offset,
-          durationFrames: c.durationFrames - offset,
-          sourceStartFrame: c.sourceStartFrame + Math.round(offset * c.speed),
-        },
-      );
-      // The second half starts at a plain cut: the in-transition stays on the first half.
-      delete copy.transition;
-      delete copy.transitionFrames;
-      edWindowKeys(copy, c, offset, c.durationFrames);
-      edWindowKeys(c, c, 0, offset);
-      edTime(p, c, { durationFrames: offset });
-      for (const row of [c, copy]) {
-        row.fadeIn = Math.min(row.fadeIn, row.duration / 2);
-        row.fadeOut = Math.min(row.fadeOut, row.duration / 2);
-      }
-      p.clips.push(copy);
-      ed.selected = copy.id;
-    }
+    if (action === "split") ed.selected = edSplitAt(p, c, edFrame(p)).id;
   }
   await edCommit(p);
 }
@@ -2799,6 +2848,8 @@ document.addEventListener("change", (e) => {
       } else c[name] = value;
     } else if (key === "volumeDb" && c) {
       c.volume = EditorModel.dbToVolume(value);
+    } else if ((key === "fadeIn" || key === "fadeOut") && c) {
+      edSetFades(c, { [key]: value });
     } else if (key === "sourceEnd" && c) {
       // 來源終點 = 來源起點 + 長度 × 速度; moving it changes the length.
       const next = edTime(p, { ...c }, { duration: (value - c.sourceStart) / c.speed });
@@ -2977,10 +3028,14 @@ function edSetDb(p, c, db) {
   // Already there (e.g. ↑ at the top): no undo step, and no 0.1 dB rounding of an older clip's exact gain.
   if (Math.abs(EditorModel.volumeToDb(c.volume) - db) < 1e-9) return Promise.resolve();
   edCheckpoint();
-  c.volume = EditorModel.dbToVolume(Math.round(db * 10) / 10);
-  edValidate(c);
+  edApplyDb(c, db);
   edRender();
   return edSave();
+}
+function edApplyDb(c, db) {
+  edNeedKind(c, edSoundKinds, "音量");
+  c.volume = EditorModel.dbToVolume(Math.round(db * 10) / 10);
+  edValidate(c);
 }
 function edVolumeDrag(e, line) {
   e.stopPropagation();

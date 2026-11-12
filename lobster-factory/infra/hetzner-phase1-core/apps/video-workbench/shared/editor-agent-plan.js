@@ -127,13 +127,23 @@
       .map(([name, t]) => `- ${name}(${Object.entries(t.args).map(([k, s]) => k + (s.optional ? "?" : "") + ":" + s.type).join(", ")})：${t.doc}`)
       .join("\n");
   // Design §6 破壞性門檻: a round removing more than 3 clips, or clips covering more than 30% of the total, waits for a
-  // click. before / after = the clips ([{ id, start, duration }]) before and after the plan ran on a copy.
+  // click. before / after = the clips ([{ id, track, start, duration }]) before and after the plan ran on a copy. count =
+  // clips whose id is gone; seconds = timeline time no longer covered, summed per track (a clip split and then half
+  // deleted counts only the deleted half; a ripple move does not count).
+  const covered = (clips, track) => {
+    let sum = 0, end = -Infinity;
+    for (const c of clips.filter((x) => x.track === track).sort((a, b) => a.start - b.start)) {
+      sum += Math.max(0, c.start + c.duration - Math.max(c.start, end));
+      end = Math.max(end, c.start + c.duration);
+    }
+    return sum;
+  };
   function removal(before, after) {
     const kept = new Set(after.map((c) => c.id)),
-      gone = before.filter((c) => !kept.has(c.id)),
+      count = before.filter((c) => !kept.has(c.id)).length,
       total = Math.max(0, ...before.map((c) => c.start + c.duration)),
-      seconds = gone.reduce((s, c) => s + c.duration, 0);
-    return { count: gone.length, seconds, confirm: gone.length > 3 || (total > 0 && seconds > total * 0.3) };
+      seconds = [...new Set(before.map((c) => c.track))].reduce((s, t) => s + Math.max(0, covered(before, t) - covered(after, t)), 0);
+    return { count, seconds, confirm: count > 3 || (total > 0 && seconds > total * 0.3) };
   }
   const api = { MAX_OPS, TOOLS, validate, summarize, toolLines, removal };
   if (typeof module === "object" && module.exports) module.exports = api;

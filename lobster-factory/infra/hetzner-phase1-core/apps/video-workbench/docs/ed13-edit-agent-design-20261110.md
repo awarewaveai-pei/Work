@@ -62,6 +62,8 @@
 
 ## 5. 模型與扣點
 
+> **2026-11-12 監工決定，取代本節下列內容**：不接 Anthropic、不加 `VW_ANTHROPIC_API_KEY`、不另寫計價。Agent 走工作台唯一的文字入口 `text()`（`backend/api.cjs`，JSON 模式），價目、扣點與用量回報同其他 `PAID_ROUTES` 文字路由；傳送鍵以 `data-paid="video.script"` 標價；防重複扣點＝瀏覽器一次只送一則、不自動重送（不改用量冪等鍵）。實作：`backend/editor-agent.cjs`、`shared/editor-agent-plan.js`、`scripts/editor-agent.js`。
+
 - **模型**：預設 `claude-sonnet-5-5`（價格 `next-admin/lib/ai/cost-model.ts:60`，每百萬 token 輸入 $2、輸出 $10）。不接中國模型。用 Anthropic tool use，並設 `tool_choice` 強制只回工具呼叫。
 - **缺口 1**：video-workbench 目前只有 OpenAI 文字模型（`backend/api.cjs:145` `TEXT_MODEL` 預設 `gpt-5.4-mini`），後端沒有任何 `ANTHROPIC` 設定（grep 0 筆）。解法是新增環境變數 `VW_ANTHROPIC_API_KEY`，用 `vwEnv` 讀取。compose 要加這個變數，必須走 `safe-infra-patch.sh compose`（AGENTS §0），屬 High 等級。
 - **缺口 2**：`textUsd` 只認 OpenAI Responses 的 usage 格式（`backend/provider-cost.cjs:16-25`）。Anthropic 的欄位是 `input_tokens`／`output_tokens`／`cache_read_input_tokens`，要另寫 `anthropicTextUsd`（同一張 `TEXT_RATES`，不准複製價格）。

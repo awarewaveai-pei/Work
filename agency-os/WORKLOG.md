@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-13（續1）影音工作台 ED.13 階段 2：剪輯動作改成吃參數的函式、頂列剪輯 Agent 按鈕、驗收閘
+
+- 改：`scripts/tools-editor.js` 把 `edAction` 的分割、刪除／波紋刪除、複製、移軌、新增軌、比例、濾鏡、速度、遮罩、背景、旁白降低、變形關鍵影格、分離音訊、標記、新增文字，以及欄位淡入／淡出、音量，改成吃 (專案, 片段, 值) 的函式（`edSplitAt`、`edDeleteClips`、`edDuplicate`、`edMoveTrack`、`edAddTrack`、`edSetRatio`、`edSetFilter`、`edSetSpeed`、`edSetMask`、`edSetBackground`、`edSetDuck`、`edTransformKey`、`edDetachAudio`、`edToggleMarker`、`edAddText`、`edSetFades`、`edApplyDb`、`edSetLoudness`）。這些函式不讀播放頭和選取；按鈕帶播放頭／選取呼叫，Agent（`scripts/editor-agent.js` 的 `edAgentTools`）帶自己的值呼叫同一份。響度鍵（`editor-panes/audio.js`）改走 `edSetLoudness`，並補上範圍檢查。轉場與字幕匯入直接用分頁既有的 `edTrSet`、`edSubFill`。
+- 磁性主軌：`edMagnet` 拆出 `edMagnetFrom(p, before)`。Agent 在副本上每一步後各跑一次，跟按鈕逐次提交的結果相同。`edPlace` 改成回傳 `{ copies, skipMagnet }`，由呼叫端用 `edSelectPlaced` 選取，所以副本試跑不會動到畫面上的選取。
+- 片段種類：每個函式只接受檢查器有給這組控制項的種類（`edNeedKind`）。畫面效果／遮罩／變形關鍵影格限影片、圖片；速度、音量、淡入淡出、旁白降低限影片、音訊。按鈕本來就到不了別的種類，行為不變。
+- 破壞性門檻：`shared/editor-agent-plan.js` 的 `removal` 秒數改成「每軌少掉的覆蓋時間」，先分割再刪半段只算刪掉的那半。
+- 頂列加「✦ 剪輯 Agent」（`edTopbar`，動作 `agent`）。施工圖 §5 標註已被監工決定取代（不接 Anthropic）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed13-agent-ui.cjs（真 Edge、假模型，9/9：五個快捷各一次實際改到專案、傳送鍵送出前有 約 NT$、Ctrl+Z 一次還原 5 步、第 3 步失敗／未知工具／音訊加遮罩／不存在的 id 整輪不套用、確認前沒有辨識／翻譯請求、注入的刪除全部被確認框擋住）；突變：拿掉門檻後注入測試變紅、還原變綠；回歸 ed1-layout 8、ed2-timeline 20、ed3-legacy-golden 9、tools-editor（真匯出）、ed3-inspector 6、ed6-audio 9、ed7-transition-stickers 15、ed12-effects-ai 5、gate 17/17 綠 | exit=0 | ms=240000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
+- Codex b5fec2f6 2 項皆成立、已修：F1 Agent 可對音訊片段加遮罩（匯出時被略過）→ 整類改成函式自己檢查片段種類；F2「刪語氣詞與停頓」驗收的刪除放在下一則訊息→改成同一輪（分割＋刪除），並因此修正門檻秒數重複計算。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=edPlace( | hits=4
+- ORACLE: agency-os/reports/oracle/2026-11-13-partialreview-b5fec2f6.md
+- rollback：git revert 本 commit（純前端；專案資料格式不變）。
 ## 2026-11-12（續15）影音工作台 ED.5.3＋ED.7.3＋ED.10.4：剪輯器預覽改用輸出的同一套規則畫轉場曲線、文字動畫、底色、八種字幕樣式
 
 - 根因：預覽（`scripts/tools-editor.js` edPaint）自己另寫一套規則，輸出（`backend/editor-export.cjs`）燒錄 ASS／xfade。結果：預覽轉場固定線性；沒有文字動畫；底色不透明、沒留邊（輸出是 2/3 不透明、5px）；字幕樣式完全沒畫。兩邊對照時，又發現同一段文字繪製裡還有 4 個差異：

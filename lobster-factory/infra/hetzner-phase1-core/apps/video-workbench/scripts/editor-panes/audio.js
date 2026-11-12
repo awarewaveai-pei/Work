@@ -591,7 +591,7 @@ edRegisterPane("audio", {
     // Mutating: one undo step, then the shared commit (same order as the old edAction tail).
     "loudness:": async (action, p) => {
       edCheckpoint();
-      p.output = { ...p.output, loudness: Number(action.slice(9)) };
+      edSetLoudness(p, Number(action.slice(9)));
       await edCommit(p);
     },
     "key-add": async (action, p, c) => {
