@@ -5,7 +5,7 @@
       await (await fetch(item.url)).json(),
     );
   }
-  for (const file of [
+  await VideoWorkbench.loadScripts([
     "generator-product.js",
     "generator-director.js",
     "generator-library.js",
@@ -15,14 +15,6 @@
     "index-0.js",
     "workspaces.js",
     "index-1.js",
-  ]) {
-    await new Promise((resolve, reject) => {
-      const s = document.createElement("script");
-      s.src = "scripts/" + file;
-      s.onload = resolve;
-      s.onerror = reject;
-      document.body.append(s);
-    });
-  }
+  ], "scripts/");
   await generatorControlsInit();
 })().catch(VideoWorkbench.reportError);

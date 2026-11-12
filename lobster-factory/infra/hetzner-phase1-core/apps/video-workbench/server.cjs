@@ -30,6 +30,7 @@ function createServer({
   env = process.env,
   fetchImpl = fetch,
   awareWaveDir = require("./backend/appearance.cjs").resolveSource(root, env),
+  staticBuild,
 } = {}) {
   const createApi = (orgDir, orgId) => require("./backend/api.cjs").createApi({
     dataDir: orgDir,
@@ -68,6 +69,10 @@ function createServer({
     return forOrg(org);
   };
   const version = require("./package.json").version;
+  // Edge-cacheable static files (backend/static-version.cjs). Only where the files cannot change while the server runs (the
+  // container image); local start.cmd keeps no-store so an edited file is never pinned under an old ?v=.
+  const staticVersion = require("./backend/static-version.cjs");
+  const build = staticBuild !== undefined ? staticBuild : trustProxy ? staticVersion.buildId(root) : null;
   const server = http.createServer(async (req, res) => {
     let file;
     try {
@@ -169,6 +174,18 @@ function createServer({
         throw Error();
       const stat = fs.statSync(file);
       if (!stat.isFile()) throw Error();
+      const policy = boundary === root ? staticVersion.cachePolicy(pathname, new URL(req.url, "http://localhost").search, build, file) : "no-store";
+      if (policy === "stale") {
+        res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" });
+        res.end("Not found");
+        return;
+      }
+      if (build && boundary === root && /\.html$/i.test(file)) {
+        const body = Buffer.from(staticVersion.versionHtml(fs.readFileSync(file, "utf8"), build));
+        res.writeHead(200, { "Content-Type": types[".html"], "X-Content-Type-Options": "nosniff", "Cache-Control": "no-store", "Content-Length": body.length });
+        res.end(req.method === "HEAD" ? undefined : body);
+        return;
+      }
       const size = stat.size;
       const send = (start, end) => {
         if (req.method === "HEAD" || !size) {
@@ -183,13 +200,15 @@ function createServer({
       const headers = {
         "Content-Type": types[path.extname(file)] || "application/octet-stream",
         "X-Content-Type-Options": "nosniff",
-        "Cache-Control": "no-store",
+        "Cache-Control": policy === "immutable" ? "public, max-age=31536000, immutable" : "no-store",
         "Accept-Ranges": "bytes",
         "Content-Length": size,
       };
       // EffectCraft Web (scripts/vendor-effectcraft.cjs): cross-origin isolated on its own path only,
       // so the rest of the workbench keeps loading cross-origin resources without CORP headers. Decided on the
       // resolved file, not the URL: an encoded /engines/effectcraft/%2e%2e/ path must not reach other files.
+      // The media copy worker lives under /scripts/ (the public prefix nginx forwards) but controls every page.
+      if (file === path.join(root, "scripts", "media-cache-sw.js")) headers["Service-Worker-Allowed"] = "/";
       if (file.startsWith(path.join(root, "engines", "effectcraft") + path.sep))
         Object.assign(headers, {
           "Cross-Origin-Opener-Policy": "same-origin",

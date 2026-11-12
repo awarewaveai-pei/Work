@@ -1,5 +1,5 @@
 # Worklog
-## 2026-11-12（續3）影音工作台 S4b 本機 SF3D 補完：安裝失敗保留舊版實測、Codex 補審 3 項修正、測試金額改用匯率算
+## 2026-11-12（續8）影音工作台 S4b 本機 SF3D 補完：安裝失敗保留舊版實測、Codex 補審 3 項修正、測試金額改用匯率算
 
 - 安裝失敗保留舊版（實測 3 次，`install-wsl.sh --force`）：
   - ① GitHub `git clone` 傳輸中斷（真實網路錯誤）。
@@ -17,6 +17,60 @@
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=1c/1m/1n（Codex `agency-os/reports/oracle/2026-11-12-partialreview-8666f2fc.md`，三項已修）
 - ORACLE_WAIVED: Codex 以 -DiffRef 44a5d0381 補審（artifact 標 PARTIAL）；本次修正只做實測，沒有再送審
 - BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/video-workbench,agency-os,scripts | grep=--check|installed\(|VW_SF3D_WSL | hits=17（只計 SF3D／image-to-3d／s4b 相關的命中；其他 --check 是無關腳本）
+## 2026-11-12（續6）影音工作台標價檢查器：涵蓋 /editor/transcriptions 這類「非 /generations 的付費工作路由」
+
+- 根因：`tests/paid-price.cjs` 只認 `PAID_ROUTES` 與 `generations.create`；POST `/editor/transcriptions`（整片字幕、剪贅字、工具頁辨識都走它）開付費工作卻不算呼叫點，新增不標價的呼叫不會紅。
+- 做了：檢查器從 `backend/api.cjs` 讀每個 `route === "/x"` 區塊的 `start({ type, operation })`，經 `paidFeature` 判定付費者一併計入（現為 `/editor/transcriptions` → video.transcribe）；剪輯 `sub-run`（`editor-panes/subtitles.js`）、`fc-run`（`editor-panes/fillers.js`）兩鈕補宣告 `video.transcribe`（標籤本來就顯示查到的價）。
+- 突變（拋棄式 worktree，HEAD＋本改動）：拿掉剪輯兩鈕、`tools-0` 後備鈕、短影音分析鈕的 transcribe 宣告 → 紅，列出三個 `/editor/transcriptions` 呼叫點；還原 → 綠。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/paid-price.cjs（worktree：7 features, 31 sites ok）＋ main 上 node tests/{p6-main-system,backend,p6-chunked-upload}.cjs 皆 exit 0 | exit=0 | ms=20000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/0n（Codex `agency-os/reports/oracle/2026-11-12-partialreview-a90139f8.md`）
+  - m1 不修：仍是每功能全域計數（6 宣告 vs 3 呼叫，含 `tools-workflows.js:36` 選供應商的字串），多一個未標價呼叫不一定紅＝已知風險①，靜態無法把呼叫點對到按鈕。
+- 現況：main 工作目錄跑此檢查器是紅的，原因是他人未 commit 的 `editor-panes/effects.js:249` 新增付費影片呼叫但按鈕無 `data-paid="video.motion"`（檢查器正確擋下）。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=editor/transcriptions | hits=40（api.cjs 路由、editor-panes 字幕／剪贅字、tools-workflows、測試、WORKLOG／文件；前端 POST 皆已計入，其餘為 GET／quote／文件）
+## 2026-11-12（續5）影音工作台瀏覽器副本：影片第一次播放只下載一次
+
+- 根因：2026-11-10 續48 的副本對 `<video>`（Range 請求）未命中時，播放器走網路，背景再抓一次完整檔存副本 → 每支新影片從歐洲下載兩次。
+- 改（`VW`＝`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`）：`VW/shared/media-cache.js` `teeWholeFile`：`<video>` 第一個請求是 `bytes=0-`，回應 206 涵蓋整檔（`bytes 0-(n-1)/n`）時把同一條資料流分兩路，一路給播放器、一路存副本。上限 256 MB（tee 會把較慢那一路沒讀的資料放記憶體）；更大的檔與非從頭的 Range 照舊背景補抓。`save()` 另外拒收比 Content-Length 短的內容（播放器離開／斷線），不會把半截檔存成副本。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/media-cache.cjs → 5 PASS（新增：bytes=0- 未命中 → 頁面拿到整檔 206、之後 Range 命中、網路只有 ["bytes=0-"]） | exit=0 | ms=90
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/media-cache-browser.cjs（Edge、/media 延遲 300ms）→ 從未讀過的 8 秒影片直接用 <video> 播：伺服器 1 次（bytes=0-）351ms；重新載入後播放＋跳到 7 秒：伺服器 0 次 161ms。關掉 tee 同測試＝2 次、紅；還原綠 | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs → gate ok | exit=0 | ms=15000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（external oracle = Codex CLI gpt-6-sol，`agency-os/reports/oracle/2026-11-12-review-4bfc150f.md`，files-reviewed 3 檔）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=teeWholeFile|TEE_MAX | hits=5（皆在 media-cache.js：常數、定義、呼叫、註解）
+## 2026-11-12（續4）影音工作台：同一頁不混用兩個版本——舊版本號的檔回 404、頁面提示重新整理（143c04ad9）
+
+- 根因：按需載入（d4983b243）後，部署前開著的分頁點開新工具，會用舊 `?v=` 抓檔；伺服器只有新版，照樣回新檔 → 舊核心＋新剪輯器同頁。續1 RISKS 說「與改前相同」是錯的（改前開機一次載完）。
+- 做法：`static-version.cjs` `cachePolicy` = immutable｜stale｜no-store（取代 isImmutable）；stale → `server.cjs` 404 no-store。邊緣已快取的舊版同網址仍可服務舊分頁。`loadScripts` 與 `app-entry.js` 在帶版本頁面失敗時提示「請重新整理頁面」。缺 `?v=` 不變。
+- 不變量：一個頁面只執行自己版本的檔。
+
+**驗證**
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs + tests/tools-lazy-load.cjs（本機模式與帶版本模式） | exit=0 | ms=90000
+- 突變：stale 改回 no-store → static-version.cjs 紅；還原綠。
+- Edge 一次性：舊版工具頁點剪輯 → 錯誤含「請重新整理」；首頁 app-entry 新、子檔舊 → 畫面顯示「請重新整理頁面」。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/0n
+  - Codex `agency-os/reports/oracle/2026-11-12-review-32c511fe.md` F1：app-entry.js 失敗訊息仍叫人跑 start.cmd → 已改，同 commit。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=isImmutable | hits=3
+  - 3 處都在 WORKLOG 歷史紀錄（續1 與本條）；程式碼 0 引用。
+## 2026-11-12（續3）開發信改走免費 Gemini 金鑰（OUTREACH_GEMINI_API_KEY），付費那把只留給影片／圖片
+
+- 觸發：操作者「開發信排程是維持免費」；新建免費專案 AwareWave-Outreach-Free（354624444562，不連帳單），原付費專案改名 AwareWave-Media（749365809116）。前因見同日「Google 帳單 NT$28.20 查因」一筆。
+- 不變量：設了 `OUTREACH_GEMINI_API_KEY` 時，開發信的 AI 步驟不得落到計費的 `GEMINI_API_KEY`——沒有連接器、客戶金鑰被拒、每日額度用完，三種都停在免費那把（額度用完＝該次呼叫失敗，不是改走付費）。
+- 改：
+  - C1 `next-admin/lib/outreach/org-ai-key.ts` `onPlatformKey()`：`outreachJson` 兩個平台退路都帶 `OUTREACH_GEMINI_API_KEY`（研究、查證、回信分類共用這一處）；測試 `__tests__/org-ai-key.test.ts` 加一條。
+  - C2 repo `docker-compose.yml` next-admin 加 `OUTREACH_GEMINI_API_KEY`；`.env.example` 記名。
+  - C3 主機：`.env` 加該變數（備份 `.env.bak.outreach-key-20261112`）；compose 經 `safe-infra-patch.sh compose … next-admin`（備份 `docker-compose.yml.bak.safe-patch-20261112-121059`）。
+  - C4 產信階梯的 agency Gemini 連接器（`generate.ts:157` `gemini_agency`，vault `co_connector:bdee2903-…`）：`secret_put` 換成免費那把；換前雜湊＝主機 `GEMINI_API_KEY`（2e0218a682b5），換後＝免費（3146969fa9ef）。
+  - C5 本機 `mcp/user-env.ps1`、`AWARE_WAVE_CREDENTIALS.md` 記新金鑰與專案改名（皆不進 git）。
+- 部署：`sg-deploy.sh next-admin` → b7e3751cf，healthy 15s，smoke 全 OK。
+- 未改（仍讀計費的 `GEMINI_API_KEY`）：`lib/ops-inbox/ai/gemini.ts`、`lib/cs/llm.ts` 備援、`lib/tarot/image-gen.ts`（生圖本來就要付費）。11/10–11/11 帳單上的文字 token 全部對得上開發信，這三處沒有產生費用。
+- 開發信開關：`co_sender_accounts.auto_draft` 仍為 false（暫停），等操作者說恢復；主 Gmail connector token `invalid_grant`，恢復前要重連。產信第一階是平台 OpenAI 金鑰（`generate.ts:189`），那一步不是免費。
+- 事故揭露：查憑證筆記格式時，一條指令把 `AWARE_WAVE_CREDENTIALS.md` 第 918–922 行（OpenAI／Anthropic／xAI／Perplexity 金鑰）與新 Gemini 免費金鑰印進本 session 工具輸出；未進 git、未送其他服務；已告知操作者，輪換由操作者決定。避免再發生：讀該檔只用「先遮罩再印」的指令，遮罩規則涵蓋 `sk-`、`xai-`、`pplx-`、`AQ.`，不只 `AIza`。
+- rollback：`git revert b7e3751cf` 後 sg-deploy；vault `secret_put('co_connector:bdee2903-ee82-4b1b-8874-96637aa13126', <主機 GEMINI_API_KEY>)`；compose／.env 用上列備份。
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-next-admin printenv OUTREACH_GEMINI_API_KEY 雜湊＝主機 .env 免費金鑰；POST /api/internal/outreach/claim-consistency limit=1 → ok n=1 errors=0，ai_call_logs 新增 4 列 outreach/claim-check；本機新金鑰直打 generateContent 200；vitest org-ai-key 12/12；npx tsc --noEmit 乾淨 | exit=0 | ms=600000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — 自審＋突變（`onPlatformKey` 改成原樣回傳 → 新測試變紅，還原 → 12/12 綠）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=GEMINI_API_KEY | hits=38（next-admin 讀取點 6 處已逐一分類：開發信 1 處已改，其餘見「未改」）
+- ORACLE_WAIVED: 7 行金鑰選取＋1 條測試，突變已證；main checkout 與遠端分歧且混有其他 session 未提交改動，diff 擷取會夾帶別人的檔
+## 2026-11-12（續2）Google 帳單 NT$28.20 查因＋暫停開發信自動草稿
+## 2026-11-12（續7）計價補跑 Codex 審查（e88ef493d 當時額度被封）：預扣必須涵蓋最高可計費量
 ## 2026-11-12（續2）計價補跑 Codex 審查（e88ef493d 當時額度被封）：預扣必須涵蓋最高可計費量
 
 - 不變量：一次呼叫的點數預扣 ≥ 這次可能被計的最高費用；結算照實際用量。違反時錢包餘額不足會留下短收。
@@ -45,7 +99,7 @@
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — UPDATE returning 兩列 auto_draft=f，讀回選取程式 `pipeline-store.ts:66-70`
 - BUGHUNT_WAIVED: NA -- 無程式或文件字串改動，只改兩列 prod 資料
 - ORACLE_WAIVED: 無 source 檔改動
-## 2026-11-10（續52）ED.6 剪輯器「音訊」分頁＋所有組織共用的內建曲庫（/library/）
+## 2026-11-10（續53）ED.6 剪輯器「音訊」分頁＋所有組織共用的內建曲庫（/library/）
 
 - 根因：音訊分頁只有選擇／上傳、響度三鈕（`docs/editor-parity-compare-20261106.md:61`），缺用途分類、目標軌、內建曲庫、音訊設定、AI 旁白。內建音檔不能放在 per-org 的 `/media`：正式站每個組織各有自己的資料夾（`server.cjs:21`），媒體庫也各建一份（`backend/api.cjs:33`、`backend/media-store.cjs:211-215`）。
 - 改動：`scripts/editor-panes/audio.js`
@@ -76,6 +130,64 @@
 - ORACLE_WAIVED: 第三輪 Codex artifact 2026-11-10-partialreview-713a51be 的唯一發現已照不變量修正，並以對應測試＋突變證明（拔掉判斷即紅），不再跑第四輪
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=library\.cjs|/library/|audio-library\.json|edAudAdd|VW_LIBRARY_DIR | hits=66
 - BUGHUNT_SCOPE_NARROW: 命中都在本卡的檔、交接文件與 oracle 報告；`method-display-metadata.yaml`、`docs/seo/4_排名與搜尋外觀.md` 的 /library/ 是無關語境
+## 2026-11-12（續2）影音工作台 tools.html 按需載入：開機只載清單＋外框，工具程式點開才載（d4983b243）
+
+- 根因：`scripts/tools-boot.js` 開機一次載入 20 個工具的程式（剪輯器 153KB＋分頁、合成、綁定、3D…），工具清單要等全部載完才畫。改前正式站（台灣）點「應用工具」到看到清單 4648ms。
+- 做法：`tools-0.js` TOOLS 項加 `scripts`（照舊開機順序）；`render()` 是唯一入口（清單／#網址／popstate／acceptAsset／工具互切），未 `loaded` 先畫標題＋載入中，經 `VideoWorkbench.loadScripts` 載完再重畫。`loadScripts` 同一檔每頁只插一次。剪輯組（edit/compose/rig/3d/short）互相呼叫，同一組。
+- 刪除：tools-boot.js 開機清單 27 支工具檔。
+- 不變量：開機只有外框＋清單（gate 檢查）；每支工具檔都屬於某組且存在（gate）；同一檔不重複宣告。
+
+**驗證**
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/tools-lazy-load.cjs (Edge；18 工具 清單／#網址／hash+上一頁下一頁，無 page error) | exit=0 | ms=60000
+- 相關測試綠：gate 15/15；ed1-layout p1-loop p3-compositor-ui p4-rig-ui fc2-engine-host generation-flows editor-restore ed9-project-list pj3-arrange ed4-assets ed10-subtitles-ui p2-tracks-ui pj2-spine-settle。follow-tracking/follow-controls 因暫存素材 person.jpg 不在而紅（環境，與本改動無關）。
+- 突變：popstate 拿掉 render() → tools-lazy-load 逾時紅；還原綠。
+- pj3-arrange 時序：新時序下 1/3 紅（按鈕重畫後 paid-price.js 下一畫格才補價格，測試兩步讀）；未改 HEAD 3/3 綠。改成同一瞬間讀 → 5/5；ed10-subtitles-ui:198 同類一併改。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/3m/0n
+  - Codex `agency-os/reports/oracle/2026-11-12-review-bcd7811f.md`：F1 失敗重試修不好已執行的相依檔 → 拿掉重試（失敗維持，重整修復）；F2 acceptAsset 等載入時換工具會寫錯工具 → 等待移到改狀態前；F3 測試沒真的上一頁 → 補 popstate＋突變。三項同 commit 修。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=contentWindow\.(ed|cp|rg|t3|tool|VideoWorkbench) | hits=1
+  - 只有 generator-results.js:89 呼叫 acceptAsset（已等載入）；engine-host 的 edSpine* 只在註解。
+- 部署後待量：點「應用工具」到清單時間（監工）。
+## 2026-11-12（續1）影音工作台：靜態檔帶版本號、在 Cloudflare 邊緣快取（tools.html 不再每檔回歐洲）（c20ed9691）
+
+**根因**（證據）：工作台所有靜態檔 `Cache-Control: no-store`（`server.cjs` 舊 :176）→ Cloudflare（Free、SSL=Full、無 Cache Rule、`cache_level=aggressive`、video A 記錄 proxied、無 cloudflared）每檔都從台灣接入的 **SIN** 節點回歐洲 origin。路徑：CF →(h2) 主機 nginx 443 → `127.0.0.1:8083` lobster-nginx → `video-workbench:4178`（upstream keepalive 16）。
+- 主機上 `curl --parallel` 20 檔：lobster-nginx 39ms、主機 nginx 443 93ms、經 CF（CDG）166ms → origin 不排隊。
+- 台灣筆電同 20 檔（CF-RAY …-SIN）：每檔 ttfb 1.33–2.57s 錯開；主機 access log 顯示請求抵達時已錯開約 1s → 排隊在 CF SIN→origin 這段，Free 方案無法調整。
+- 改前 Chrome（台灣）tools.html：ttfb 1906ms、DCL 9267ms、30 支 boot 檔最後一支 responseEnd 12100ms。
+
+**治本**：`backend/static-version.cjs`。build id = 靜態檔內容雜湊（任何檔改 → 全部網址換 → 部署後必拿新檔）。僅容器模式（`VW_TRUST_PROXY_IDENTITY=1`；本機 start.cmd 檔案會變，維持原樣）。HTML 注入 `data-vw-build`＋本地 `<script src>`／`<link rel=stylesheet>` 加 `?v=`；`VideoWorkbench.loadScripts`、`app-entry.js` 同樣加。帶「當前」build 的 shared|styles|scripts|vendor|assets|examples|pages 靜態檔回 `public, max-age=31536000, immutable`；舊／缺 `?v=`、HTML、config.js、/awarewave/*、media-cache SW、/api、/media、/generated 照舊 no-store。Cloudflare／nginx 不需改（快取鍵含 query）。`/engines/` 未動：nginx 直送、檔名無雜湊、`expires -1`、不在首屏。
+- 不變量：被快取的網址永遠對應它裝的位元組。
+
+**驗證**
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs (apps/video-workbench) | exit=0 | ms=21000
+- 突變：`isImmutable` 改成只看有沒有 `v` → `tests/static-version.cjs` 紅（stale build is not cached）；還原綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n
+  - Codex `agency-os/reports/oracle/2026-11-12-review-0f5be33f.md`：部署前開著的舊分頁用舊 `?v=` 在邊緣未命中時拿到新檔（混版）。查證屬實，但與改前相同（改前一律回最新），且該回應 no-store 不汙染快取 → 不修，列風險。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=loadScripts | hits=10
+  - 6 支 `*-boot.js` 全走 `VideoWorkbench.loadScripts`，`app-entry.js` 自帶同規則；無其他動態載入繞過。
+- 部署後待驗（監工）：強制重新整理確認 `?v=` 與 `cf-cache-status: HIT`，改後量測。
+
+**避免再發生**：靜態檔新增載入方式時必須走 `loadScripts` 或 HTML 標籤；`tests/static-version.cjs` 會檢查每頁每個本地 ref 都帶版本並回 immutable。
+## 2026-11-10（續52）ED.11 剪贅字分頁：畫面、旁白、字幕一起剪，配樂不斷（819160be0）
+
+**派工**：影片剪輯對齊監工派 ED.11。未部署；未改共用檔。
+
+**根因**：剪贅字分頁只寫「尚未接入」（規格 §1.3 剪贅字、對照表 #59）。
+
+**做了**（`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/`）：
+- `scripts/editor-panes/fillers.js`：`FillerCut` 純函式（測試可 require）——取逐字最多的字幕軌、每字對到其下方的 V1／A1 片段；`plan` 用 `TranscriptWords.cutRanges`（只在同一段錄音內）換成影格；`apply` 把主視訊、疊加、旁白 A1、所有文字軌剪開補齊（來源起點含速度、音量／變形鍵從原片段取窗、轉場與淡入留第一段、淡出留最後段）；字幕逐字跟著聲音移、整句只剩被剪的字就整句刪；配樂（A1 以外的音訊軌）不剪，原本播到畫面結尾的收到新結尾；標記跟著移。超過匯出 64 段影音片段上限就不剪、專案不變。分頁：停頓最多保留滑桿（預設 0.5 秒）、剪掉贅字、說話語言；沒有逐字時間就用 ED.10 整片辨識（先估價），結果放隱藏字幕軌「逐字時間（剪贅字）」；「剪掉」是一步復原，略過磁性主軌（剪除本身已補齊各軌，磁性主軌只排 V1 會讓 A1 不同步）。
+- `styles/editor-pane-fillers.css`：只用主題 token。
+- 純函式放 fillers.js 而非 `shared/`：新 shared 檔要改 `tools-boot.js`（共用檔）載入；預覽與輸出讀的是同一份剪後專案，計算只跑一次。
+- Codex 4 項全屬實已修並加測試：C1 第二段起讀到第一段改過的音量鍵；C2 片段起點在剪除範圍時來源起點加兩次；C3 整句只剩被剪的字仍顯示原文；C4 剪後可能超過匯出 64 段上限。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed11-fillers.cjs（5 PASS：計畫、同剪、只剪同段錄音、Codex 修正、真實匯出 4.1 秒＋「好」音在字幕 1.5–2.5 秒＋配樂掃頻音高每取樣點＝原曲同一秒） | exit=0 | ms=30000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/{tools-editor,ed3-legacy-golden,theme-tokens}.cjs 全 exit 0（修 Codex 後 tools-editor 重跑 0） | exit=0 | ms=120000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n（Codex agency-os/reports/oracle/2026-11-10-partialreview-b408f3ba.md，4 項已修＋測試）
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/video-workbench,agency-os,scripts | grep=FillerCut | hits=25（fillers.js、ed11-fillers.cjs、progress-ed11.md、oracle 報告；無其他呼叫者）
+
+**剩餘風險**：匯出上限 64 在 fillers.js 與 editor-export.cjs 各一份（測試鎖住兩邊一致）；本機 main 與 origin 分岔（push 被拒後以 commit-tree 疊上 origin 推送，本機留 e4135cd7e）；畫面未用瀏覽器實點，只靠 tools-editor 開頁測試。
+
+**rollback**：`git revert 819160be0`。
 ## 2026-11-10（續51）Stop hook batch-format：只排「專案自己宣告 prettier 設定」的檔
 
 - 根因：`mcp/claude-userlevel/hooks/rules/batch-format.js`（舊版 :19-24）對本回合改過的每個 JS/TS 檔跑 `<session cwd>/node_modules/.bin/prettier --write`，不看有沒有設定檔。video-workbench 有 prettier devDependency、無設定檔（120 欄風格），一行修改就把 `scripts/tools-editor.js` 用預設 80 欄整檔重排（+1300 行，壓縮後與 HEAD 相同），其他 ED worker 只能逐 hunk 提交。
@@ -120,6 +232,21 @@
 - BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/video-workbench,agency-os,scripts | grep=subtitles-import|subtitles-download|subtitles-tool|edImportCues | hits=3
 - BUGHUNT_SCOPE_NARROW: 改動只在 video-workbench 前端；舊動作名僅剩比對文件歷史列 `docs/editor-parity-compare-20261106.md:65`（2026-11-06 比對快照，不回改），edImportCues 兩處（定義＋tools-editor.js 呼叫）仍有效
 - ORACLE_WAIVED: 派工限 Codex 一輪；artifact 2026-11-10-partialreview-d3b7e700 已跑，之後的改動只是照其 F1/F3/F4/F5 修正，修正後 ed10-subtitles-ui 7 項重跑綠
+## 2026-11-10（續48）影音工作台：瀏覽器保留素材副本，同一份素材第二次不經網路
+
+- 根因：瀏覽器拿素材位元組只走工作台伺服器 `/media/<sha256>/<檔名>`、`/generated/<uuid>.<副檔名>`（`VW/server.cjs` 靜態段，`Cache-Control: no-store`），R2 正本從不直接給瀏覽器（`objectUrl` 只存在伺服器端 `VW/backend/main-system.cjs:180`）。台灣到歐洲每次約 300ms，同一支影片每次開都重抓。
+- 做了（`VW`＝`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`）：
+  - `VW/shared/media-cache.js`（新）核心：key＝不變身分（`media/<sha256>/<名>` 內容雜湊、`generated/<uuid>` 一次寫入），網址的主機、query（簽名）、hash 全忽略；條目 id＝身分範圍＋key；任何儲存錯誤／副本不見／讀不到 → 退回網路；Range 由副本切 206；Range 未命中先走網路、背景抓一次完整檔；上限 min(2GB, 配額一半)、單檔 ≤ 1/4，LRU 淘汰。
+  - `VW/scripts/media-cache-sw.js`（新）Service Worker（IndexedDB）：只攔同源 GET 的上述兩種路徑，其餘請求（頁面、API、引擎、next-admin）不碰。工作台頁面導覽時並行問 `GET /api/vw/identity`，素材讀取等它；換身分刪其他身分的副本；任何 /login、/logout 請求（含客戶端路由的 fetch）或素材回 401 → 全刪；身分確認超過 60 秒，下一次讀取先重問。
+  - `VW/backend/api.cjs` `/identity`：sha256(userId＋orgId) 前 32 碼，本機模式 `local`。`VW/server.cjs` 只對 SW 檔加 `Service-Worker-Allowed: /`（Cache-Control 未動）。`VW/shared/runtime.js` 只在 http 模式的頂層頁註冊。
+  - 選 SW 不選 shared 模組：`<video>`／`<img>` 的位元組不經 JS，只有 SW 一處攔得到全部讀取（剪輯器、素材庫、引擎橋 `tools-engine-host.js` fetch）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/media-cache.cjs → 換簽名網址命中（網路 1 次）、副本刪掉／儲存壞掉退回網路同內容、A 組織副本 B 讀不到（清除失敗時也一樣）、登出清空、LRU | exit=0 | ms=80
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：entryId 拿掉 scope → tests/media-cache.cjs 紅「org B must not hit org A's copy」；還原 → 綠 | exit=1→0 | ms=200
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/media-cache-browser.cjs（Edge、http 模式、/media 人工延遲 300ms、2.07MB mp4）→ 第一次 319ms 伺服器 1 次；換 query 第二次 7ms、伺服器 0 次、x-vw-media-cache: hit、transferSize 0；重新載入後 <video> 播放＋跳到 5s 110ms、伺服器 0 次 | exit=0 | ms=15000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs → gate ok（加入 media-cache） | exit=0 | ms=14000
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/1m/0n（external oracle = Codex CLI gpt-6-sol；第一輪 `agency-os/reports/oracle/2026-11-10-review-d0372529.md`：next-admin `LogoutButton.tsx:14-21` 用 router.replace 客戶端登出，SW 看不到導覽 → 修：任何 /login、/logout 請求都清空＋身分確認超過 60 秒先重問（`checkIdentity`/`maxAgeMs`），加測試；第二輪 `2026-11-10-review-8415e60e.md` NO FINDINGS，files-reviewed 8 檔含 4 新檔）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=serviceWorker|Service-Worker-Allowed|/api/vw/identity|media-cache | hits=27（全為本次新增檔與本條；先前無任何 SW）
+- 剩餘風險：Range 未命中時第一次播放會多抓一次完整檔（背景）；SW 範圍 "/" 也涵蓋同網域 next-admin 頁，但只對素材路徑 respondWith；未部署，交監工批次部署。
 ## 2026-11-10（續47）FC.5 上線：兩個引擎新版切到正式站（操作者「可以，上正式站」）
 
 - 主機 `/root/lobster-phase1/static/video-engines/`：上傳 `filmcraft/46763a8-4265c64`、`effectcraft/df4cc09-e5261e3`（先放 `<dist>.upload-<時間>`，主機 `sha256sum -c` 全過、SHA256SUMS 雜湊＝`engines/*/VERSION.json` 才改名）；`current` 改指新版；擁有者改 root:root。不需要動 nginx／compose（alias 走 `current`），工作台不用重部署。
@@ -165,6 +292,16 @@
 - REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh video-workbench; docker exec lobster-video-workbench node -e videoModels; playwright-runner.ps1 -Mode smoke（34 passed / 0 failed / 24 skipped，agency-os/reports/e2e/2026-11-10/smoke） | exit=0 | ms=86776
 - REVIEW_WAIVED: NA -- 部署既有已審 commit（f792960c6、510343ddd 各一輪 Codex）
 - BUGHUNT_WAIVED: NA -- 部署，無程式改動
+## 2026-11-10（續44）影音工作台頁面腳本改「並行下載、照序執行」
+
+- 根因：六個 `*-boot.js` 與 `app-entry.js` 逐檔 append `<script>` 並 await onload，32 檔串列＝32 次往返（主機歐洲、靜態檔 no-store），tools.html 約 8.4s。
+- 不變量：每頁腳本載入時間 ≈ 1 次往返＋最大檔，與檔數無關；執行順序不變。
+- 改：`shared/runtime.js` 新 `VideoWorkbench.loadScripts(files, base)`（一次 append 全部、`s.async = false`、`Promise.all`、任一檔 onerror reject 走原 reportError）；tools／characters／projects／storyboards／templates／index 六個 boot 改用它；`app-entry.js` 在 runtime 之前跑，就地寫同一規則。清單內容與 `/capabilities` 先後不動（腳本頂層可能讀 capabilities，保持先 await）。`tools-editor/follow/voice-music` 的 `new Promise` 是 media 載入，不動。`storyboards-design-baseline.json` 的 storyboards-boot.js hash 隨之更新（只動載入迴圈）。
+- 新測試 `tests/boot-script-loading.cjs`（入 gate）：假 document 驗一次插入全部、順序、async=false、onerror reject；六個 boot 無私有迴圈。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs（含 boot-script-loading）＋本機起工作台開 tools.html／index.html（Edge pane）：28 個腳本 startTime 6.9–65ms 同時發出、開字幕工具無 console error（僅既有 engines 404） | exit=0 | ms=60000
+- 突變：拿掉 `s.async = false` → boot-script-loading 紅；還原轉綠。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/1m/0n — Codex（agency-os/reports/oracle/2026-11-10-review-af45f5f9.md）：app-entry 的 async=false 測試被註解字面騙過 → 已修（只算程式行）並突變驗證（改 true → 紅）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=createElement\("script"\)|createElement\('script'\) | hits=7
 ## 2026-11-10（續43）影音工作台影片「聲音」設定與模型一致＋每個模型的使用說明
 
 - 根因：「聲音」有聲／靜音只是擺設——靜音一律被擋（`muteOutput:false`），有聲時 Veo 照樣出無聲片；換成 Omni（一定有聲）後，第一次用的人無從判斷該選哪個模型。

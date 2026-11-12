@@ -28,7 +28,7 @@ const stubFetch = (...answers: Array<() => Response>) => {
 const keyOf = (u: string) => decodeURIComponent(u.split("key=")[1]);
 
 beforeEach(() => { process.env.GEMINI_API_KEY = "platform-key"; resetOrgAiKeyCache(); vault.get.mockReset(); });
-afterEach(() => { vi.unstubAllGlobals(); delete process.env.GEMINI_API_KEY; });
+afterEach(() => { vi.unstubAllGlobals(); delete process.env.GEMINI_API_KEY; delete process.env.OUTREACH_GEMINI_API_KEY; });
 
 describe("outreachJson", () => {
   it("uses the organization's own key when it has one", async () => {
@@ -44,6 +44,19 @@ describe("outreachJson", () => {
     await outreachJson(sc(db(null)), args);
     expect(urls.map(keyOf)).toEqual(["platform-key"]);
     expect(vault.get).not.toHaveBeenCalled();
+  });
+
+  it("with the outreach key set, the billed platform key is never used: not without a connector, not after a spent daily cap", async () => {
+    process.env.OUTREACH_GEMINI_API_KEY = "free-key";
+    stubFetch(() => ok("{}"));
+    await outreachJson(sc(db(null)), args);
+    expect(urls.map(keyOf)).toEqual(["free-key"]);
+    resetOrgAiKeyCache();
+    vault.get.mockResolvedValue("org-key");
+    const daily = () => new Response(JSON.stringify({ error: { details: [{ retryDelay: "35336s" }] } }), { status: 429 });
+    stubFetch(daily, daily);
+    expect(await outreachJson(sc(db({ id: "c1" })), args)).toMatchObject({ ok: false });
+    expect(urls.map(keyOf)).toEqual(["org-key", "free-key"]);
   });
 
   it("uses the platform key when neither the caller nor the grant names an organization", async () => {

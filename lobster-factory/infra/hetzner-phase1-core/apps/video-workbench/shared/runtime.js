@@ -350,6 +350,9 @@
     broadcast();
     return job;
   }
+  // Browser media copy (scripts/media-cache-sw.js): only for the served workbench, where media crosses the network.
+  if (!child && config.mode === "http" && window.isSecureContext && "serviceWorker" in navigator)
+    navigator.serviceWorker.register("/scripts/media-cache-sw.js", { scope: "/" }).catch(() => {});
   const ready = child
     ? rpc("load").then((v) => {
         db = v;
@@ -483,6 +486,35 @@
       return v;
     },
   });
+  // Page boot scripts: all <script> tags go in at once so the downloads overlap (page load = one round trip + the biggest
+  // file, not one round trip per file); async = false makes the browser still run them in list order. A failed file rejects.
+  // ?v=<build> (server-injected data-vw-build, backend/static-version.cjs) lets the edge cache keep these files; absent = no-store as before.
+  // Each file goes in once per page: asking again (a tool opened twice, tools-0.js TOOLS[].scripts) returns the same promise,
+  // so its top-level const/let is never declared twice. A failed file stays failed: the files after it have already run
+  // without it, so only a page reload repairs them (as with a failed page boot).
+  const scriptLoads = new Map();
+  function loadScripts(files, base) {
+    const build = document.documentElement.getAttribute("data-vw-build");
+    return Promise.all(
+      files.map((file) => {
+        const key = base + file;
+        if (!scriptLoads.has(key))
+          scriptLoads.set(
+            key,
+            new Promise((resolve, reject) => {
+              const s = document.createElement("script");
+              s.async = false;
+              s.src = key + (build ? "?v=" + encodeURIComponent(build) : "");
+              s.onload = resolve;
+              // With a build, the usual cause is a deploy since this page loaded: the server refuses older-build files.
+              s.onerror = () => reject(Error((build ? "工作台已更新或連線中斷，請重新整理頁面。" : "") + "無法載入 " + file));
+              document.body.append(s);
+            }),
+          );
+        return scriptLoads.get(key);
+      }),
+    );
+  }
   window.VideoWorkbench = {
     request: (path, body, method = "POST") =>
       child
@@ -490,6 +522,7 @@
         : adapter.request(path, method, body),
     generator: { import: (payload) => rpc("generator-import", payload) },
     ready,
+    loadScripts,
     storage,
     reportError,
     models: M,

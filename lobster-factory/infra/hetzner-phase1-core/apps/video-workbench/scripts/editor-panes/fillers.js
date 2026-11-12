@@ -193,7 +193,7 @@ else {
       q = ui.quote;
     return `<p class="note">這個專案還沒有逐字時間碼，要先辨識主視訊 V1 與旁白 A1（另計）。結果放進隱藏字幕軌「${esc(FillerCut.TRACK)}」，之後改停頓秒數重剪不必再辨識。</p><label>說話語言</label>${edChoices("說話語言", "fc-lang", ui.language, fcLangs)}${
       q
-        ? `<p class="ed-fc-quote">${q.segments} 段有聲片段，共 ${Math.round(q.seconds)} 秒 · ${esc(edSubPrice(q.costUsd))}</p>${edButton(`開始辨識（${edSubPrice(q.costUsd)}）`, "fc-run", running || !edSubPriced(q.costUsd))}`
+        ? `<p class="ed-fc-quote">${q.segments} 段有聲片段，共 ${Math.round(q.seconds)} 秒 · ${esc(edSubPrice(q.costUsd))}</p>${edButton(`開始辨識（${edSubPrice(q.costUsd)}）`, "fc-run", running || !edSubPriced(q.costUsd), "video.transcribe")}`
         : edButton("查看費用", "fc-quote", running)
     }${ui.job && ui.job.projectId === p.id ? `<p class="note" data-ed-fc-job>${esc(fcJobText())}</p>` : ""}`;
   }

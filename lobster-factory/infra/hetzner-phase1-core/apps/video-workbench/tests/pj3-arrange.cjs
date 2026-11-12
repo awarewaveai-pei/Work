@@ -89,7 +89,12 @@ const STORE = "awarewave-projects-screenshot-frontend-v1";
     await t.locator('[data-ed-action="spine-voice"] .paid-price').waitFor();
     const ttsPrice = await tools().evaluate(() => VideoWorkbenchPrices.text("video.tts"));
     assert.match(ttsPrice, /^(約 )?NT\$\d/, "配音按鈕的價格不是新台幣");
-    assert.equal(await t.locator('[data-ed-action="spine-voice"]').innerText(), "配音（照旁白逐句）· 2 句 × 每句依 API 用量計費 · " + ttsPrice, "已配過音的第 1 句不該再算錢");
+    // One snapshot: a re-render replaces the button and paid-price.js puts the price back on the next frame.
+    const voiceLabel = await (await tools().waitForFunction(() => {
+      const el = document.querySelector('[data-ed-action="spine-voice"]');
+      return el?.querySelector(".paid-price") && el.innerText;
+    })).jsonValue();
+    assert.equal(voiceLabel, "配音（照旁白逐句）· 2 句 × 每句依 API 用量計費 · " + ttsPrice, "已配過音的第 1 句不該再算錢");
     const arranged = () =>
       tools().evaluate(() => {
         const p = edProject();

@@ -371,6 +371,8 @@ services:
       OPS_INBOX_GEMINI_ENABLED: ${OPS_INBOX_GEMINI_ENABLED:-}
       OPS_INBOX_GEMINI_DAILY_LIMIT: ${OPS_INBOX_GEMINI_DAILY_LIMIT:-1400}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # Outreach only: a key of a Google project WITHOUT billing (free tier). GEMINI_API_KEY above is billed.
+      OUTREACH_GEMINI_API_KEY: ${OUTREACH_GEMINI_API_KEY:-}
       # Outreach: Gmail OAuth connector (app/api/outreach/{messages/gmail-draft,connectors/gmail/*}).
       # Was live on the server since before this file tracked it (2026-09-20 compose-drift audit) --
       # added here so a fresh deploy of this file no longer silently omits it.

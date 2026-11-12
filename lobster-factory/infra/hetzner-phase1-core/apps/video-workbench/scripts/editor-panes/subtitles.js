@@ -399,7 +399,7 @@ function edSubAiPane(p, t) {
         : r.requestedLanguage;
   return `<h4>辨識語言</h4>${edChoices("辨識語言", "sub-lang", edSubUi.language, ["自動偵測", ...edSubLangs])}<h4>一鍵整片字幕</h4><p class="note">辨識主視訊 V1 和旁白 A1 所有有聲片段，合成一軌；同語言的字幕軌會被取代。先看費用，確認才開始。</p>${
     q
-      ? `<p class="ed-sub-quote" data-ed-sub-quote>${q.segments} 段有聲片段，共 ${Math.round(q.seconds)} 秒 · ${edSubPrice(q.costUsd)}${q.skipped?.length ? `；略過 ${q.skipped.length} 段（${esc([...new Set(q.skipped.map((s) => s.reason))].join("、"))}）` : ""}</p>${edButton(`開始整片辨識（${edSubPrice(q.costUsd)}）`, "sub-run", running || !edSubPriced(q.costUsd))}`
+      ? `<p class="ed-sub-quote" data-ed-sub-quote>${q.segments} 段有聲片段，共 ${Math.round(q.seconds)} 秒 · ${edSubPrice(q.costUsd)}${q.skipped?.length ? `；略過 ${q.skipped.length} 段（${esc([...new Set(q.skipped.map((s) => s.reason))].join("、"))}）` : ""}</p>${edButton(`開始整片辨識（${edSubPrice(q.costUsd)}）`, "sub-run", running || !edSubPriced(q.costUsd), "video.transcribe")}`
       : edButton("查看費用", "sub-quote", running)
   }${job ? `<p class="note" data-ed-sub-job role="status">${esc(edSubJobText())}</p>` : ""}${edButton("找回已完成的字幕結果", "sub-results")}${
     edSubUi.results

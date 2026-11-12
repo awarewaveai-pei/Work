@@ -1,0 +1,3 @@
+- 完成：819160be0（origin/main）＋WORKLOG 2026-11-10（續52）；`fillers.js`（FillerCut 純函式＋分頁）、`editor-pane-fillers.css`、`tests/ed11-fillers.cjs` 5 項綠；未改共用檔。
+- 回歸 tools-editor、ed3-legacy-golden、theme-tokens 綠；Codex 4 項已修＋測試。
+- 注意：push 被拒後以 commit-tree 疊上 origin；本機 main 留 e4135cd7e（與 origin 分岔，內容相同）。
