@@ -13,7 +13,8 @@
   "use strict";
   const MEDIA = /^\/media\/([a-f0-9]{64})\/((?:original|proxy|preview720)\.[a-z0-9]{2,5}|thumb\.jpg|waveform\.json|probe\.json)$/,
     GENERATED = /^\/generated\/([a-f0-9-]{36}\.[a-z0-9]{2,5})$/,
-    GB = 1024 * 1024 * 1024;
+    GB = 1024 * 1024 * 1024,
+    TEE_MAX = 256 * 1024 * 1024;
 
   // Immutable identity of a same-origin media url, or null (not cached).
   function identityKey(url, origin) {
@@ -111,9 +112,11 @@
     function save(scope, key, response) {
       return serial(async () => {
         const { maxBytes, entryMaxBytes } = await limits();
-        if (Number(response.headers.get("content-length")) > entryMaxBytes) return;
+        const declared = Number(response.headers.get("content-length"));
+        if (declared > entryMaxBytes) return;
         const blob = await response.blob();
-        if (blob.size > entryMaxBytes || (await scopeReady) !== scope) return;
+        // A cut-short body (page left, network dropped) is never stored as the file.
+        if (blob.size > entryMaxBytes || (declared && blob.size !== declared) || (await scopeReady) !== scope) return;
         const record = { id: entryId(scope, key), scope, key, type: response.headers.get("content-type") || "", size: blob.size, lastUsed: now(), blob };
         try {
           await store.put(record);
@@ -175,8 +178,29 @@
       const response = await fetchImpl(request);
       if (response.status === 401) background(identify("logout"));
       else if (!rangeHeader && response.status === 200) background(save(scope, key, response.clone()));
-      else if (rangeHeader && (response.status === 206 || response.status === 200)) background(fill(scope, key, request.url));
+      else if (rangeHeader && (response.status === 206 || response.status === 200)) {
+        const teed = await teeWholeFile(scope, key, response, background);
+        if (teed) return teed;
+        background(fill(scope, key, request.url));
+      }
       return response;
+    }
+
+    // A <video>'s first request is "bytes=0-": the 206 answer is the whole file, so one download feeds both the page and
+    // the copy. Capped at TEE_MAX: tee() buffers whatever the slower side has not read yet in memory.
+    async function teeWholeFile(scope, key, response, background) {
+      const id = entryId(scope, key),
+        m = /^bytes 0-(\d+)\/(\d+)$/.exec(response.headers.get("content-range") || ""),
+        size = m && Number(m[1]) + 1 === Number(m[2]) ? Number(m[2]) : 0;
+      if (response.status !== 206 || !size || !response.body || fills.has(id)) return null;
+      const { entryMaxBytes } = await limits().catch(() => ({ entryMaxBytes: 0 }));
+      if (size > Math.min(entryMaxBytes, TEE_MAX)) return null;
+      const [page, copy] = response.body.tee();
+      const headers = { "Content-Type": response.headers.get("content-type") || "", "Content-Length": String(size) };
+      const job = save(scope, key, new Response(copy, { status: 200, headers })).finally(() => fills.delete(id));
+      fills.set(id, job);
+      background(job);
+      return new Response(page, { status: 206, statusText: response.statusText, headers: response.headers });
     }
 
     return { handles, respond, identify, flush: () => Promise.all([tail, ...fills.values()]) };

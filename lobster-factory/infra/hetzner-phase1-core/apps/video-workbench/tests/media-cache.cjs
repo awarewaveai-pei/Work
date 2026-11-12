@@ -132,6 +132,22 @@ const read = async (cache, url, headers = {}) => {
     assert.deepEqual([after.hit, asked, store.rows.size], [false, 2, 0], "stale identity is re-checked; signed out = no copy");
     console.log("PASS 身分超過 60 秒先重問；已登出就不給副本");
   }
+  // A <video>'s first read ("bytes=0-", answered 206 with the whole file) downloads once: the page and the copy share it.
+  {
+    const body = Buffer.from("whole-video-file-bytes"), calls = [];
+    const fetchImpl = async (input) => {
+      calls.push(typeof input === "string" ? "fill" : input.headers.get("range"));
+      return new Response(body, { status: 206, headers: { "Content-Type": "video/mp4", "Content-Length": String(body.length), "Content-Range": `bytes 0-${body.length - 1}/${body.length}` } });
+    };
+    const cache = createMediaCache({ store: memoryStore(), fetchImpl, origin: ORIGIN, limits });
+    await cache.identify("scope-A");
+    const first = await read(cache, BASE, { Range: "bytes=0-" });
+    assert.deepEqual([first.status, first.text, first.hit], [206, body.toString(), false]);
+    const again = await read(cache, BASE, { Range: "bytes=6-10" });
+    assert.deepEqual([again.hit, again.text], [true, "video"]);
+    assert.deepEqual(calls, ["bytes=0-"], "one network request, no background second download");
+    console.log("PASS 影片第一次播放只下載一次，同一份同時存成副本");
+  }
   console.log("media-cache ok");
 })().catch((error) => {
   console.error(error);
