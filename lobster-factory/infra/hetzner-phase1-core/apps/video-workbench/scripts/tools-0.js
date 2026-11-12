@@ -1,8 +1,26 @@
 "use strict";
 
+// Tool code loads when its tool opens: the page boots with the list and the frame only (scripts/tools-boot.js), and each
+// TOOLS entry names the files its screen needs (`scripts`, in the old boot order). The editing tools call into each other
+// (editor <-> compositor <-> rig <-> 3D, short -> editor/subtitles), so they share one group.
+const TOOL_SCRIPTS_SUBTITLE = ["../shared/subtitle-parse.js", "tools-subtitles.js"];
+const TOOL_SCRIPTS_EDIT = [
+  ...TOOL_SCRIPTS_SUBTITLE,
+  "../shared/timebase.js", "../shared/project-envelope.js", "../shared/editor-model.js", "tools-editor.js", "../shared/transcript-words.js",
+  "editor-panes/assets.js", "editor-panes/text.js", "editor-panes/audio.js", "editor-panes/transition.js", "editor-panes/effects.js",
+  "editor-panes/stickers.js", "editor-panes/subtitles.js", "editor-panes/fillers.js", "editor-export-dialog.js", "editor-project-list.js",
+  "tools-short.js", "../shared/rig.js", "../shared/compositor.js", "tools-rig.js", "tools-compositor.js", "tools-3d.js",
+];
+// tools-engine-host.js (boot) wraps engine files with ProjectEnvelope and reads a job's SRT with SubtitleParse.
+const TOOL_SCRIPTS_ENGINE = ["../shared/subtitle-parse.js", "../shared/project-envelope.js"];
+const TOOL_SCRIPTS_FOLLOW = ["../shared/follow-math.js", "tools-follow.js"];
+const TOOL_SCRIPTS_OVERLAY = ["tools-overlays.js"];
+const TOOL_SCRIPTS_VOICE = ["tools-voice-music.js"];
+
 const TOOLS = [
   {
     id: "edit",
+    scripts: TOOL_SCRIPTS_EDIT,
     cat: "剪輯成片",
     icon: "▣",
     name: "影片剪輯",
@@ -13,6 +31,7 @@ const TOOLS = [
   {
     // Card FC.2: FilmCraft in a frame (scripts/tools-engine-host.js); hidden while the engine files are absent.
     id: "edit-pro",
+    scripts: TOOL_SCRIPTS_ENGINE,
     cat: "剪輯成片",
     icon: "▦",
     name: "專業剪輯",
@@ -22,6 +41,7 @@ const TOOLS = [
   },
   {
     id: "compose",
+    scripts: TOOL_SCRIPTS_EDIT,
     cat: "剪輯成片",
     icon: "◩",
     name: "動畫合成",
@@ -32,6 +52,7 @@ const TOOLS = [
   {
     // Card EC.2: EffectCraft in the same frame (scripts/tools-engine-host.js); hidden while the engine files are absent.
     id: "fx-pro",
+    scripts: TOOL_SCRIPTS_ENGINE,
     cat: "剪輯成片",
     icon: "◫",
     name: "專業特效",
@@ -41,6 +62,7 @@ const TOOLS = [
   },
   {
     id: "rig",
+    scripts: TOOL_SCRIPTS_EDIT,
     cat: "剪輯成片",
     icon: "✦",
     name: "角色綁定",
@@ -50,6 +72,7 @@ const TOOLS = [
   },
   {
     id: "3d",
+    scripts: TOOL_SCRIPTS_EDIT,
     cat: "剪輯成片",
     icon: "◈",
     name: "3D",
@@ -59,6 +82,7 @@ const TOOLS = [
   },
   {
     id: "short",
+    scripts: TOOL_SCRIPTS_EDIT,
     cat: "剪輯成片",
     icon: "✂",
     name: "智能短影音剪輯",
@@ -68,6 +92,7 @@ const TOOLS = [
   },
   {
     id: "follow",
+    scripts: TOOL_SCRIPTS_FOLLOW,
     cat: "剪輯成片",
     icon: "♙",
     name: "人物跟拍剪輯",
@@ -77,6 +102,7 @@ const TOOLS = [
   },
   {
     id: "subtitle",
+    scripts: TOOL_SCRIPTS_SUBTITLE,
     cat: "剪輯成片",
     icon: "▤",
     name: "字幕與逐字稿",
@@ -112,6 +138,7 @@ const TOOLS = [
   },
   {
     id: "voice",
+    scripts: TOOL_SCRIPTS_VOICE,
     cat: "聲音",
     icon: "♩",
     name: "配音生成",
@@ -120,6 +147,7 @@ const TOOLS = [
   },
   {
     id: "music",
+    scripts: TOOL_SCRIPTS_VOICE,
     cat: "聲音",
     icon: "♫",
     name: "音樂生成",
@@ -137,6 +165,7 @@ const TOOLS = [
   },
   {
     id: "watermark",
+    scripts: TOOL_SCRIPTS_OVERLAY,
     cat: "品牌與合規",
     icon: "▣",
     name: "影片浮水印",
@@ -145,6 +174,7 @@ const TOOLS = [
   },
   {
     id: "cta",
+    scripts: TOOL_SCRIPTS_OVERLAY,
     cat: "品牌與合規",
     icon: "↗",
     name: "影片 CTA 按鈕",
@@ -378,8 +408,21 @@ function screen(t) {
     }[t.id] || "CUT",
   )}${body}</div>`;
 }
+// TOOLS[].scripts through VideoWorkbench.loadScripts (one insert per file); `loaded` lets render() skip the wait next time.
+function toolScripts(t) {
+  return VideoWorkbench.loadScripts(t.scripts || [], "../scripts/").then(() => (t.loaded = true));
+}
 function render() {
   if (typeof toolFollowBeforeRender === 'function') toolFollowBeforeRender();
+  // Every way into a tool (list, #hash, back/forward, acceptAsset, a tool switching to another) ends here: a tool whose
+  // code is not loaded yet shows its frame, then renders for real once loaded (if it is still the open tool).
+  const open = tool && TOOLS.find((t) => t.id === tool);
+  if (open && !open.loaded) {
+    document.title = open.name + " · AwareWave";
+    $("#app").innerHTML = VideoWorkbench.sanitize(`<div class="wrap">${header(open, "…")}<p class="note" role="status">載入中…</p></div>`);
+    toolScripts(open).then(() => tool === open.id && render(), VideoWorkbench.reportError);
+    return;
+  }
   document.title =
     (tool ? TOOLS.find((t) => t.id === tool).name : "應用工具") +
     " · AwareWave";
@@ -603,6 +646,9 @@ VideoWorkbench.tools = {
   async acceptAsset(payload) {
     if (!TOOLS.some((item) => item.id === payload.tool)) throw Error("工具不存在");
     if (payload.asset && !VideoWorkbench.safeUrl(payload.asset.url)) throw Error("素材網址無效");
+    // Before any state changes: the edit branch below calls the editor's functions, and a tool opened on the page while
+    // this waited must not receive this payload.
+    await toolScripts(TOOLS.find((t) => t.id === payload.tool));
     saveDraft();
     tool = payload.tool;
     restoreToolDraft();

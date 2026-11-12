@@ -6,5 +6,6 @@
       await (await fetch(item.url)).json(),
     );
   }
-  await VideoWorkbench.loadScripts(["../shared/subtitles.js","tool-processing.js","tools-workflows.js","tools-overlays.js","tools-voice-music.js","../shared/subtitle-parse.js","tools-subtitles.js","../shared/timebase.js","../shared/project-envelope.js","../shared/editor-model.js","tools-editor.js","../shared/transcript-words.js","editor-panes/assets.js","editor-panes/text.js","editor-panes/audio.js","editor-panes/transition.js","editor-panes/effects.js","editor-panes/stickers.js","editor-panes/subtitles.js","editor-panes/fillers.js","editor-export-dialog.js","editor-project-list.js","tools-short.js","../shared/follow-math.js","tools-follow.js","tools-engine-host.js","tools-0.js","../shared/rig.js","../shared/compositor.js","tools-rig.js","tools-compositor.js","tools-3d.js"], "../scripts/");
+  await VideoWorkbench.loadScripts(["../shared/subtitles.js","tool-processing.js","tools-workflows.js","tools-engine-host.js","tools-0.js"], "../scripts/");
+  // Each tool's own code loads when it opens: TOOLS[].scripts in tools-0.js.
 })().catch(VideoWorkbench.reportError);

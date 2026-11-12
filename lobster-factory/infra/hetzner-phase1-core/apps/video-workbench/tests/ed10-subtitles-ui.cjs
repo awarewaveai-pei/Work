@@ -195,8 +195,11 @@ const pass = (m) => console.log("PASS " + m);
     await lib.getByRole("button", { name: "辨識翻譯", exact: true }).click();
     const en = lib.getByRole("button", { name: /^翻譯成 English/ });
     assert.equal(await en.getAttribute("data-paid"), "video.script");
-    await page.waitForFunction(() => document.querySelector('[data-ed-action="sub-translate:English"] .paid-price'), null, { timeout: 10000 });
-    const priced = await en.innerText();
+    // One snapshot: a re-render replaces the button and paid-price.js puts the price back on the next frame.
+    const priced = await (await page.waitForFunction(() => {
+      const el = document.querySelector('[data-ed-action="sub-translate:English"]');
+      return el?.querySelector(".paid-price") && el.innerText;
+    }, null, { timeout: 10000 })).jsonValue();
     assert.match(priced, / · (約 )?NT\$[\d.]+／|免費/, "翻譯鈕先顯示價格：" + priced);
     assert.match(await lib.innerText(), /2 句分 1 批送出，每批計費一次/);
     assert.equal(translateCalls, 0);

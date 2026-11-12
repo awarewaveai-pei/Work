@@ -489,20 +489,29 @@
   // Page boot scripts: all <script> tags go in at once so the downloads overlap (page load = one round trip + the biggest
   // file, not one round trip per file); async = false makes the browser still run them in list order. A failed file rejects.
   // ?v=<build> (server-injected data-vw-build, backend/static-version.cjs) lets the edge cache keep these files; absent = no-store as before.
+  // Each file goes in once per page: asking again (a tool opened twice, tools-0.js TOOLS[].scripts) returns the same promise,
+  // so its top-level const/let is never declared twice. A failed file stays failed: the files after it have already run
+  // without it, so only a page reload repairs them (as with a failed page boot).
+  const scriptLoads = new Map();
   function loadScripts(files, base) {
     const build = document.documentElement.getAttribute("data-vw-build");
     return Promise.all(
-      files.map(
-        (file) =>
-          new Promise((resolve, reject) => {
-            const s = document.createElement("script");
-            s.async = false;
-            s.src = base + file + (build ? "?v=" + encodeURIComponent(build) : "");
-            s.onload = resolve;
-            s.onerror = () => reject(Error("無法載入 " + file));
-            document.body.append(s);
-          }),
-      ),
+      files.map((file) => {
+        const key = base + file;
+        if (!scriptLoads.has(key))
+          scriptLoads.set(
+            key,
+            new Promise((resolve, reject) => {
+              const s = document.createElement("script");
+              s.async = false;
+              s.src = key + (build ? "?v=" + encodeURIComponent(build) : "");
+              s.onload = resolve;
+              s.onerror = () => reject(Error("無法載入 " + file));
+              document.body.append(s);
+            }),
+          );
+        return scriptLoads.get(key);
+      }),
     );
   }
   window.VideoWorkbench = {
