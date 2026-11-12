@@ -4,8 +4,8 @@ import { withFeature } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
 import { removeBackground } from "../../../../../lib/studio/bg-remover";
 import { holdCost, logImageCost, releaseHold } from "../../../../../lib/ai/log-ai-call";
-import { toolCostUsd } from "../../../../../lib/ai/cost-calculator";
 import { replicateRunUsd } from "../../../../../lib/ai/cost-model";
+import { DEFAULT_TIMEOUT_MS } from "../../../../../lib/studio/replicate-run";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -44,8 +44,9 @@ async function handlePost(request: Request, grant: Grant) {
   }
 
   // Credits held before the provider runs (Grant.hold); every delivered call is charged, with or without a _jobId.
-  // Held at the estimate (TOOL_RATES "bg-remove"), charged by the run time Replicate reports (replicateRunUsd).
-  const hold = await holdCost(grant, toolCostUsd("bg-remove"));
+  // Held for the longest run this route waits for (the run timeout), charged by the run time Replicate reports
+  // (replicateRunUsd): a hold at the typical run would leave a long successful run partly unpaid.
+  const hold = await holdCost(grant, replicateRunUsd("bg-remove", DEFAULT_TIMEOUT_MS / 1000));
   if (!hold) return NextResponse.json({ ok: false, error: "no_credits" });
   const result = await removeBackground(body.image).catch((e) => { releaseHold(hold, "tools/studio/remove-bg"); throw e; });
   if (result.ok) {
