@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-12（續13）影音工作台 ED.12：剪輯器「特效」分頁的畫質增強、從這裡重新生成
+
+- 改：`scripts/editor-panes/effects.js` 加兩功能，都走現有 job，未動共用檔。畫質增強＝工具頁的 upscale job（`backend/media.cjs:97`，本機、免費），整支素材升 1080p／2K／4K 後換掉片段素材，時間欄位不動。從這裡重新生成＝播放頭那一格截成 PNG（uploadAsset derived）當首幀＋片段原提示詞（asset.origin.prompt 或產生它的 job），以 referenceMode first 送影片生成；成功後在切點分割（呼叫 tools-editor.js 的 split），後段換新片、sourceStart 歸零，剪輯設定沿用。按鈕先標價（免費／NT$，Google 列加「約」），宣告 data-paid=video.motion。
+- 找回：job input 記 `editorFx`（專案、片段、素材、切點）；面板「找回已完成的結果」列出本專案成功但未上時間軸的結果，可手動替換（重新載入或關掉任務面板後，自動替換就不會發生）。
+- 缺口：真正的 AI 畫質增強沒有後端供應商（`media.cjs:120` 畫面增強會丟錯；reshoot 回 501，`api.cjs:320`）；要接需另開後端＋計價卡，交監工決定。生成頁的 Gemini 影片價同樣沒標「約」（`shared/models.js` priceText），屬共用檔，未改。
+- Codex a95372ac 4 項皆成立、已修：F1 分割存檔期間改選片段→改以位置找後段；F2 分割後存檔失敗留半成品→分割＋替換視為一步，失敗回復分割（只回復自己的快照）；F3 Gemini 照用量計價→價格標「約」；F4 重新載入後不自動替換→加「找回已完成的結果」。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed12-effects-ai.cjs（真 Edge、假 Replicate，5/5）；tests/paid-price.cjs、tests/theme-tokens.cjs 綠 | exit=0 | ms=90000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=edFx | hits=84
+- ORACLE: agency-os/reports/oracle/2026-11-12-partialreview-a95372ac.md
+- rollback：git revert 本 commit。
 ## 2026-11-12（續11）影音工作台 BOOT.2：「讀狀態」與「讀能力」同時發
 
 - 根因：`VideoWorkbench.ready`（/state）先完成，boot 檔才發 /capabilities（tools/projects/templates-boot 第一行、storyboards-boot、index-0.js、characters-0.js 各自再發一次），兩支 API 串列＝多一趟歐洲往返（量測：tools-0.js 開始載入 698ms → 399ms，本機對 /api/vw 加 300ms 延遲）。
