@@ -10,10 +10,14 @@ window.VideoWorkbenchMoney = (usd, c = window.VideoWorkbench?.capabilities) => {
 // which row a page shows as chosen: the saved id (or a name the row lists in aliases: what older drafts saved) while its
 // row is listed AND available, else the server's default (itself the first available row). A row without a key is shown
 // 未啟用 and can never be the chosen one, so it is never sent.
+// kind: speech | music | transcribe | separate | sfx (the last two: capabilities audioTools, backend/audio-tools.cjs).
+const vwProviderList = (kind, c) => (kind === "speech" || kind === "music" ? c?.[kind] && { rows: c[kind].models, fallback: c[kind].defaultModel }
+  : kind === "transcribe" ? c?.transcribe && { rows: c.transcribe.engines, fallback: c.transcribe.defaultEngine }
+  : c?.audioTools?.[kind] && { rows: c.audioTools[kind].engines, fallback: c.audioTools[kind].defaultEngine }) || { rows: [], fallback: undefined };
 window.VideoWorkbenchProviders = {
-  rows: (kind, c = window.VideoWorkbench?.capabilities) => (kind === "speech" ? c?.speech?.models : kind === "music" ? c?.music?.models : c?.transcribe?.engines) || [],
+  rows: (kind, c = window.VideoWorkbench?.capabilities) => vwProviderList(kind, c).rows || [],
   current(kind, saved, c = window.VideoWorkbench?.capabilities) {
-    const rows = this.rows(kind, c), fallback = kind === "speech" ? c?.speech?.defaultModel : kind === "music" ? c?.music?.defaultModel : c?.transcribe?.defaultEngine;
+    const rows = this.rows(kind, c), fallback = vwProviderList(kind, c).fallback;
     const row = rows.find((r) => r.id === saved || (r.aliases || []).includes(saved));
     return row?.available ? row.id : fallback;
   },

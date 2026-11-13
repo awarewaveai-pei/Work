@@ -29,20 +29,17 @@ function wfCheck(key, title) {
 function wfButton(title, action, disabled = false, paid = "", paidModel = "") {
   return `<button type="button" class="btn" data-flow-action="${esc(action)}"${paid ? ` data-paid="${esc(paid)}"` : ""}${paidModel ? ` data-paid-model="${esc(paidModel)}"` : ""} ${disabled ? "disabled" : ""}>${esc(title)}</button>`;
 }
-// Speech / music models and transcription engines from /capabilities (speech.models, music.models, transcribe.engines: one
-// list on the server, backend/speech.cjs, music.cjs and transcribe.cjs) as visible buttons: name · price, and the chosen
-// row's pros and cons under them. Which row is chosen: shared/models.js VideoWorkbenchProviders (one rule for every page).
-function wfProviders(kind) {
-  return { rows: window.VideoWorkbenchProviders.rows(kind), feature: { speech: "video.tts", music: "video.music" }[kind] || "video.transcribe" };
-}
+// Vendor rows from /capabilities (speech.models, music.models, transcribe.engines, audioTools.separate / .sfx: one list on
+// the server each, backend/speech.cjs, music.cjs, transcribe.cjs, audio-tools.cjs) as visible buttons: name · the row's own
+// price, and the chosen row's pros and cons under them. Which row is chosen: shared/models.js VideoWorkbenchProviders.
 const wfProviderCurrent = (kind, saved) => window.VideoWorkbenchProviders.current(kind, saved);
 function wfProviderChoice(kind, key, title) {
-  const { rows, feature } = wfProviders(kind);
+  const rows = window.VideoWorkbenchProviders.rows(kind);
   if (!rows.length) return "";
   const current = wfProviderCurrent(kind, values[key]), row = rows.find((r) => r.id === current);
   return `<label>${esc(title)}</label><div class="flow-choices" role="group">${rows
     .map((r) => {
-      const price = window.VideoWorkbenchPrices?.text(feature, VideoWorkbench.capabilities, r.id) || "";
+      const price = window.VideoWorkbenchPrices?.unit(r.price, VideoWorkbench.capabilities) || "";
       return `<button type="button" class="btn small ${r.id === current ? "selected" : ""}" data-flow-choice="${esc(key)}" data-flow-value="${esc(r.id)}" data-flow-multiple="false" aria-pressed="${r.id === current}"${r.available ? "" : " disabled"}>${esc(r.label)}${price ? " · " + esc(price) : ""}${r.available ? "" : "（未啟用）"}</button>`;
     })
     .join("")}</div>${row ? `<p class="note">${esc(row.note)}</p>` : ""}`;
@@ -112,7 +109,7 @@ function toolWorkflowScreen(t) {
   } else if (t.id === "sfx") {
     content =
       wfSource() +
-      `<aside class="side"><h3>去配樂・重配音效</h3><p>保留對白、依畫面重新配置音效，影片最長 2 分鐘。</p>${wfArea("sfxPrompt", "想要的音效（選填）", 200)}${wfStats()}${btn("開始處理", "submit", "primary")}</aside>`;
+      `<aside class="side"><h3>去配樂・重配音效</h3><p>保留對白、去掉原配樂與音效，再依描述配上新音效；影片最長 2 分鐘。</p>${wfProviderChoice("sfx", "sfxEngine", "處理方式")}${wfArea("sfxPrompt", "想要的音效（選填，例如：雨打在窗上）", 200)}${wfStats()}${btn("開始處理", "submit", "primary")}</aside>`;
   } else if (t.id === "privacy") {
     wfDefaults({ privacyType: "馬賽克", privacyStrength: "中" });
     content =
@@ -128,7 +125,7 @@ function toolWorkflowScreen(t) {
   } else if (t.id === "separate") {
     content =
       wfSource() +
-      `<aside class="side"><h3>${files.src ? "來源影片" : "音軌分離說明"}</h3>${wfStats()}<p>輸出 MP3 · 48 kHz · 192 kbps · 立體聲，完成後加入素材庫。</p>${files.src ? btn("開始分離音軌", "submit", "primary") : ""}</aside>`;
+      `<aside class="side"><h3>${files.src ? "來源影片" : "音軌分離說明"}</h3>${wfStats()}${wfProviderChoice("separate", "separateEngine", "分離方式")}<p>輸出 MP3 · 48 kHz · 192 kbps，完成後加入素材庫。</p>${files.src ? btn("開始分離音軌", "submit", "primary") : ""}</aside>`;
   } else if (t.id === "upscale") {
     wfDefaults({ upscaleQuality: "1080p" });
     content = `<div class="row">${btn("上傳影片", "upload:src")}${btn("從素材庫選取", "library:src")}</div>${wfField("searchAssets", "搜尋影片名稱")}<div class="flow-video-gallery" data-flow-video-gallery></div>${files.src ? wfSource() + `<aside class="side"><h3>目標畫質</h3>${wfChoice("upscaleQuality", ["1080p", "2K", "4K"])}<p class="note">目前使用本機高品質縮放；不代表 AI 重建細節。</p>${wfStats()}${btn("開始處理", "submit", "primary")}</aside>` : '<p class="note">選一支影片開啟詳情，再選擇目標畫質與確認處理。</p>'}`;

@@ -23,6 +23,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   const speech = require("./speech.cjs");
   // 音樂生成: one list (backend/music.cjs); a job names its row in input.musicModel (an older draft's label resolves too).
   const music = require("./music.cjs");
+  const audioTools = require("./audio-tools.cjs"), elevenlabs = require("./elevenlabs.cjs");
   const imageEdit = require("./image-edit.cjs");
   const chunkBytes = (engine) => Number(vwEnv(env, "TRANSCRIBE_CHUNK_BYTES")) || engine.uploadBytes;
   const transcriptsDir = path.join(dataDir, "transcripts");
@@ -579,6 +580,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         persist();
         const result = await mediaTools.media(job.input, {
           signal,
+          env,
+          fetchImpl,
           file: (url) => {
             const file = localFile(url);
             if (!file) throw Error("請先從本機素材庫選擇檔案");
@@ -608,7 +611,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           persist();
           return;
         }
-        job.result = { url: result.url, ...(result.sourceUrl ? { sourceUrl: result.sourceUrl } : {}), ...(result.width ? { width: result.width, height: result.height } : {}), ...(result.verification ? { verification: result.verification } : {}), origin: { kind: "render", jobId: job.id, ...(typeof parentAssetId === "string" ? { parentAssetId } : {}) } };
+        // A vendor-made result (backend/audio-tools.cjs: ElevenLabs) records its model, provider and bill like music does.
+        const origin = result.ai ? { kind: "ai_generated", model: result.ai.model, provider: result.ai.provider, costUsd: result.ai.costUsd } : { kind: "render" };
+        job.result = { url: result.url, ...(result.sourceUrl ? { sourceUrl: result.sourceUrl } : {}), ...(result.width ? { width: result.width, height: result.height } : {}), ...(result.verification ? { verification: result.verification } : {}), origin: { ...origin, jobId: job.id, ...(typeof parentAssetId === "string" ? { parentAssetId } : {}) } };
+        if (result.ai) job.disclosure = "AI 處理聲音";
         job.progress = 100;
         job.status = "succeeded";
         persist();
@@ -865,6 +871,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   }
   // Validates, records and answers 202 before any provider call (runtime.js treats 501/503 as "never sent").
   async function start(input, res, extra, req) {
+    // The ElevenLabs plan decides an ElevenLabs row's price and whether it may run (cached; one call per 10 min at most).
+    if (elevenlabs.keyOf(env)) await elevenlabs.account(env, fetchImpl);
     // The region tool: the job records the image-edit row and size it runs (before validation, pricing and storing).
     const editModel = input?.operation === "region" ? imageEdit.request(input, env) : null;
     const isMedia = mediaTools.supported.includes(input.operation),
@@ -883,7 +891,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         : isImageTo3d
           ? imageTo3d.request(input, { env, localFile })
           : isMedia
-        ? { type: input.operation === "separate" ? "audio" : input.operation === "image-output" ? "image" : "video" }
+        ? (audioTools.handles(input) && audioTools.check(input, env), { type: input.operation === "separate" ? "audio" : input.operation === "image-output" ? "image" : "video" })
         : isRemoveBg
           ? (removeBgSource(input), bgRemove.token(env), { type: "image" })
           : isRemotion
@@ -1159,7 +1167,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         return true;
       }
       if (req.method === "GET" && route === "/capabilities") {
-        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: { ...require("./blender.cjs").capability(env), motions: blender3d().motions }, imageTo3d: imageTo3d.capability(env, { priced: !!main }), prices: costs.displayPrices({ ...providerModels, text: textModel, transcribe: transcribe.defaultEngine(env).model }), editorAgent: { ready: !!env.OPENAI_API_KEY }, transcribe: transcribe.capability(env), imageEdit: imageEdit.capability(env), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.publicCatalog,
+        await elevenlabs.account(env, fetchImpl); // the plan + credits the ElevenLabs rows price by (cached 10 min)
+        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: { ...require("./blender.cjs").capability(env), motions: blender3d().motions }, imageTo3d: imageTo3d.capability(env, { priced: !!main }), prices: costs.displayPrices({ ...providerModels, text: textModel, transcribe: transcribe.defaultEngine(env).model }), editorAgent: { ready: !!env.OPENAI_API_KEY }, transcribe: transcribe.capability(env), audioTools: audioTools.capability(env), imageEdit: imageEdit.capability(env), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.publicCatalog,
           reference: require("./reference.cjs").allowed(env, req) && require("./reference.cjs").present(env),
           // P6 L3: connected = finished videos open next-admin /release (same origin) for review and delivery.
           mainSystem: main ? { organizationId: orgId } : null });
@@ -1477,6 +1486,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         // Card ED.10: words:true answers segments + words with times and a score as well; without it the old SRT answer.
         const words = input.words === true;
         const engine = transcribe.pick(input.engine, env);
+        if (engine.provider === "ElevenLabs") await elevenlabs.account(env, fetchImpl); // its price follows the plan
         const answer = await transcribe.recognize({ engine, buffer: fs.readFileSync(file), filename: path.basename(file), mime: input.source.type, language: input.language, auth: transcribe.auth(engine, env), fetchImpl });
         // Per audio minute (host = 0) by the file's own duration (ffprobe), or Gemini's usage.
         if (main) spend(costs.transcribeUsd(engine.model, (await require("./media-inspect.cjs").inspectMedia(file).catch(() => null))?.duration ?? 25 * 60, answer.usage));

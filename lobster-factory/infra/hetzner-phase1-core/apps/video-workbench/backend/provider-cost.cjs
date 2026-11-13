@@ -76,11 +76,19 @@ function geminiSpeechUsd(rate, chars, audioSec, usage, at) {
     audioOut = counted ? tok(usage.total_output_tokens) : seconds * rate.audioTokensPerSec;
   return round((textIn * price.textInPerM + audioOut * price.audioOutPerM) / 1e6);
 }
+// ElevenLabs (cost-model.ts ELEVENLABS_RATES): US$0 while the account is on the free plan (the call spends its monthly
+// credits; backend/elevenlabs.cjs reads the plan), else the list price of `amount` (characters, or seconds of audio).
+function elevenUsd(model, amount) {
+  if (!Object.hasOwn(rates.ELEVENLABS_RATES || {}, model)) throw unpriced(model);
+  return require("./elevenlabs.cjs").freePlan() ? 0 : rates.elevenlabsListUsd(model, amount);
+}
+const isEleven = (model) => Object.hasOwn(rates.ELEVENLABS_RATES || {}, model);
 // Per-character models: chars only. Token-billed gpt-4o-mini-tts (cost-model.ts OPENAI_TTS_RATES): the published rules,
 // text <= 1 token per character + audio out per second of the returned audio. No measured duration (ffprobe failed) =
 // 0.5 s per character, above any normal reading pace.
 function speechUsd(model, chars, audioSec, usage = null, at = undefined) {
   if ((rates.FREE_TTS_MODELS || []).includes(model)) return 0;
+  if (isEleven(model)) return elevenUsd(model, chars);
   if (Object.hasOwn(rates.GEMINI_TTS_RATES, model)) return geminiSpeechUsd(rates.GEMINI_TTS_RATES[model], chars, audioSec, usage, at);
   const rate = rates.OPENAI_TTS_RATES[model];
   if (!rate) throw unpriced(model);
@@ -92,6 +100,7 @@ function speechUsd(model, chars, audioSec, usage = null, at = undefined) {
 // the replies' usage when given (summed over chunks), else the published estimate (audio tokens per second in, text
 // tokens per minute out).
 function transcribeUsd(model, seconds, usage = null) {
+  if (isEleven(model)) return elevenUsd(model, seconds);
   const g = rates.GEMINI_TRANSCRIBE_RATES[model];
   if (g) {
     const counted = usage && Number.isFinite(Number(usage.total_output_tokens)),
@@ -137,7 +146,7 @@ function priceOf(kind, model) {
 const at = (f) => { try { return f(); } catch { return null; } };
 // One speech / transcription model's button price (capabilities speech.models[].price, transcribe.engines[].price).
 // Token-billed speech = per minute of audio out (text in, ~US$0.0006 per 1000 characters, left out), marked 約.
-const speechPrice = (audio) => at(() => ("usdPerMChars" in (rates.OPENAI_TTS_RATES[audio] || {}) ? { usd: speechUsd(audio, 1000), unit: "千字" }
+const speechPrice = (audio) => at(() => ("usdPerMChars" in (rates.OPENAI_TTS_RATES[audio] || {}) || isEleven(audio) ? { usd: speechUsd(audio, 1000), unit: "千字" }
   : { usd: speechUsd(audio, 0, 60), unit: "分鐘", estimate: true }));
 // One music model's button price (capabilities music.models[].price): per song, or per minute.
 const musicPrice = (model) => at(() => (rates.MUSIC_RATES[model]?.usdPerSong !== undefined ? { usd: musicUsd(model), unit: "首" } : { usd: musicUsd(model, 60), unit: "分鐘" }));
@@ -159,4 +168,4 @@ function displayPrices({ text, image, audio, transcribe, music }) {
 // Replicate models billed per GPU second (TOOL_RATES usdPerSec): the one function, next-admin cost-model.ts replicateRunUsd.
 const runUsd = (key, predictTimeSec) => rates.replicateRunUsd(key, predictTimeSec);
 
-module.exports = { textUsd, imageUsd, geminiImageUsd, fillUsd, videoUsd, speechUsd, transcribeUsd, enhanceUsd, musicUsd, toolUsd, runUsd, priceOf, displayPrices, speechPrice, transcribePrice, musicPrice };
+module.exports = { elevenUsd, textUsd, imageUsd, geminiImageUsd, fillUsd, videoUsd, speechUsd, transcribeUsd, enhanceUsd, musicUsd, toolUsd, runUsd, priceOf, displayPrices, speechPrice, transcribePrice, musicPrice };

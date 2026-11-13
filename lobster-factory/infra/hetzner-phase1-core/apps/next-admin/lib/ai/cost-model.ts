@@ -256,6 +256,25 @@ export const MUSIC_RATES: Record<string, { label: string; vendor: "Google" | "El
   "music_v2_5":           { label: "Eleven Music v2.5", vendor: "ElevenLabs", usdPerMinute: 0.15 },
 };
 
+/** video-workbench ElevenLabs rows besides music (backend/elevenlabs.cjs), keyed by the id the vendor sees. List prices,
+ *  elevenlabs.io/pricing/api 2026-11-13: v2 Multilingual "$0.08" per 1K characters; Scribe v2 "$0.20" per hour; Sound
+ *  Effects "$0.12" per minute; Voice Isolator "$0.12" per minute. Used only when the account's plan is not free: on the
+ *  free plan a call spends the monthly credits and the bill is US$0 (backend/provider-cost.cjs elevenUsd). */
+export const ELEVENLABS_RATES: Record<string, { label: string; usdPerKChars?: number; usdPerMinute?: number }> = {
+  "eleven_multilingual_v2": { label: "ElevenLabs Multilingual v2", usdPerKChars: 0.08 },
+  "scribe_v2":              { label: "ElevenLabs Scribe v2", usdPerMinute: 0.2 / 60 },
+  "sound-generation":       { label: "ElevenLabs Sound Effects", usdPerMinute: 0.12 },
+  "audio-isolation":        { label: "ElevenLabs Voice Isolator", usdPerMinute: 0.12 },
+};
+
+/** USD of one ElevenLabs call at list price: characters x per-1K price, or seconds x per-minute price / 60. */
+export function elevenlabsListUsd(model: string, amount: unknown): number {
+  const rate = ELEVENLABS_RATES[model];
+  if (!rate) throw new Error("not a priced ElevenLabs model: " + model);
+  const n = Math.max(0, Number(amount) || 0);
+  return Math.round((rate.usdPerKChars !== undefined ? n / 1000 * rate.usdPerKChars : n / 60 * (rate.usdPerMinute ?? 0)) * 1e6) / 1e6;
+}
+
 /** USD of one music generation: the song price, or the per-minute price x seconds / 60. */
 export function musicUsd(model: string, seconds?: unknown): number {
   const rate = MUSIC_RATES[model];

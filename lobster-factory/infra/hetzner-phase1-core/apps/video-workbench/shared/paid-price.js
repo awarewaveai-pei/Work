@@ -48,7 +48,9 @@
       if (!own) el.append(span);
     }
   }
-  window.VideoWorkbenchPrices = { text, mark };
+  // One vendor row's own price (a /capabilities row's `price`): the provider buttons (scripts/tools-workflows.js).
+  const unit = (price, c = caps()) => { from = c; return c ? unitText(price) : ""; };
+  window.VideoWorkbenchPrices = { text, mark, unit };
   if (typeof document === "undefined" || typeof MutationObserver === "undefined") return;
   let queued = false;
   const later = () => {

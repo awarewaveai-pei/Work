@@ -7,6 +7,7 @@ const path = require("node:path");
 const { vwEnv } = require("./env-compat.cjs");
 const providers = require("./providers.cjs");
 const { speechPrice } = require("./provider-cost.cjs");
+const elevenlabs = require("./elevenlabs.cjs");
 const rates = require(path.join(require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env), "lib/ai/cost-model.ts"));
 
 // aistudio.google.com/docs/speech-generation, 2026-11-10: the 30 prebuilt voices and Google's one-word description.
@@ -22,11 +23,19 @@ const OPENAI_VOICES = Object.freeze(["coral", "alloy", "echo", "fable", "onyx", 
 const EDGE_VOICES = Object.freeze([
   ["zh-TW-HsiaoChenNeural", "繁中女聲（曉臻）"], ["zh-TW-YunJheNeural", "繁中男聲（雲哲）"], ["en-US-JennyNeural", "English F（Jenny）"], ["en-US-GuyNeural", "English M（Guy）"],
 ].map(([id, label]) => Object.freeze({ id, label })));
+// ElevenLabs premade voices (GET /v1/voices on the free plan, 2026-11-13): four women, four men, one neutral.
+const ELEVEN_VOICES = Object.freeze([
+  ["EXAVITQu4vr4xnSDxMaL", "Sarah · 沉穩女聲"], ["Xb7hH8MSUJpSbSDYk0k2", "Alice · 清晰女聲"], ["cgSgspJ2msm6clMCkdW9", "Jessica · 明亮女聲"], ["pFZP5JQG7iQjIQuC4Bku", "Lily · 柔和女聲"],
+  ["JBFqnCBsd6RMkjVDRZzb", "George · 溫暖男聲"], ["onwK4e9ZLuTAKqWW03F9", "Daniel · 播報男聲"], ["nPczCjzI2devNBz1zQrb", "Brian · 低沉男聲"], ["iP95p4xoKVk53GoZ742B", "Chris · 親切男聲"],
+  ["SAz9YHcvj6GT2YYXdXww", "River · 中性"],
+].map(([id, label]) => Object.freeze({ id, label })));
 // A voice saved under another model (old drafts, projects, retries, an Edge job falling back) speaks as its nearest counterpart.
 const OPENAI_TO_GEMINI = Object.freeze({ coral: "Sulafat", alloy: "Zephyr", echo: "Puck", fable: "Iapetus", onyx: "Charon", nova: "Leda", shimmer: "Aoede" });
 const TO_GEMINI = Object.freeze({ ...OPENAI_TO_GEMINI, "zh-TW-HsiaoChenNeural": "Sulafat", "zh-TW-YunJheNeural": "Charon", "en-US-JennyNeural": "Aoede", "en-US-GuyNeural": "Puck" });
 // To Edge: male voices to 雲哲, everything else to the default 曉臻.
 const TO_EDGE = Object.freeze(Object.fromEntries(["Charon", "Puck", "Fenrir", "Orus", "Iapetus", "Algenib", "Alnilam", "Gacrux", "onyx", "echo"].map((v) => [v, "zh-TW-YunJheNeural"])));
+// To ElevenLabs: the male voices above (and Edge's two men) to George, everything else to the default Sarah.
+const TO_ELEVEN = Object.freeze(Object.fromEntries([...Object.keys(TO_EDGE), "zh-TW-YunJheNeural", "en-US-GuyNeural"].map((v) => [v, "JBFqnCBsd6RMkjVDRZzb"])));
 // Gemini -> OpenAI: the inverse above plus the voices the generator's persona cards send (scripts/index-0.js spokenVoiceIds),
 // each to the OpenAI voice that persona used before 2026-11-10.
 const TO_OPENAI = Object.freeze({ ...Object.fromEntries(Object.entries(OPENAI_TO_GEMINI).map(([openai, gemini]) => [gemini, openai])), Kore: "coral", Puck: "nova", Fenrir: "alloy", Sulafat: "shimmer", Leda: "coral" });
@@ -80,6 +89,10 @@ async function edge({ text, voice, credential, fetchImpl, signal }) {
   if (!audio.length) throw Object.assign(Error("Edge 配音沒有回傳音訊"), { status: 502, fallback: true });
   return { audio, ext: "mp3", usage: null };
 }
+// ElevenLabs (backend/elevenlabs.cjs speak): MP3; no style control (the row's note says so).
+async function eleven({ model, text, voice, apiKey, fetchImpl, signal }) {
+  return { audio: await elevenlabs.speak({ apiKey, model, voice, text, fetchImpl: fetchImpl || fetch, signal }), ext: "mp3", usage: null };
+}
 const keyed = (name) => (env) => env[name] || null;
 function edgeService(env) {
   const url = String(vwEnv(env, "TTS_SERVICE_URL") || "").trim().replace(/\/+$/, ""), token = String(vwEnv(env, "TTS_SERVICE_TOKEN") || "").trim();
@@ -97,6 +110,9 @@ const MODELS = Object.freeze([
     note: "30 種聲線、繁中自然、語氣用一句話描述；長數字可能逐位念。2027 起價格加倍。" }),
   Object.freeze({ id: "gpt-4o-mini-tts", vendor: "OpenAI", label: "OpenAI 語音", credentialName: "OPENAI_API_KEY", credential: keyed("OPENAI_API_KEY"), voices: OPENAI_VOICES, toVoice: TO_OPENAI, call: openai,
     note: "英文最自然、7 種聲線；繁中腔調偏大陸。OpenAI 2027-01-06 停止服務。" }),
+  Object.freeze({ id: "eleven_multilingual_v2", vendor: "ElevenLabs", label: "ElevenLabs 語音", credentialName: "ELEVENLABS_API_KEY", credential: elevenlabs.keyOf, voices: ELEVEN_VOICES, toVoice: TO_ELEVEN, call: eleven,
+    // Last: on a paid plan its per-character price is above Gemini's; on the free plan providers.cjs puts it right after Edge.
+    note: "9 種聲線、中英文都能念；語氣描述不生效；聲音送到 ElevenLabs。免費方案每月有額度，用完會失敗、不收費。" }),
 ]);
 
 const day = (at) => new Date(at ?? Date.now()).toISOString().slice(0, 10);
@@ -123,12 +139,14 @@ function key(model, env) {
   if (!credential) throw Object.assign(Error("此電腦尚未設定 " + model.credentialName + "；請先設定服務。"), { status: 503 });
   return credential;
 }
+// An ElevenLabs row's note ends with the free credits left this month (backend/elevenlabs.cjs, cached plan).
+const withCredits = (m) => (m.vendor === "ElevenLabs" && elevenlabs.creditsNote() ? m.note + " " + elevenlabs.creditsNote() : m.note);
 // /capabilities: the live rows in providers.cjs order; price = provider-cost.cjs speechPrice (same rule as the charge).
 function capability(env, at) {
   const list = rows(env, at);
   return {
     defaultModel: providers.choose(list, vwEnv(env, "TTS_MODEL"))?.id,
-    models: providers.order(list).map(({ m, available, free, price }) => ({ id: m.id, vendor: m.vendor, label: m.label, note: m.note, retireOn: retireOn(m.id), available, free, voices: m.voices, defaultVoice: m.voices[0].id, price })),
+    models: providers.order(list).map(({ m, available, free, price }) => ({ id: m.id, vendor: m.vendor, label: m.label, note: withCredits(m), retireOn: retireOn(m.id), available, free, voices: m.voices, defaultVoice: m.voices[0].id, price })),
   };
 }
 // Answers { audio, ext, usage, model: the row that spoke, fallbackFrom? }. A call that failed because the service did (the
@@ -146,4 +164,4 @@ async function synthesize(model, { text, voice, style, env, fetchImpl, signal, a
   }
 }
 
-module.exports = { MODELS, GEMINI_VOICES, OPENAI_VOICES, EDGE_VOICES, DEFAULT_STYLE, live, pick, defaultModel, voiceFor, key, capability, synthesize };
+module.exports = { MODELS, GEMINI_VOICES, OPENAI_VOICES, EDGE_VOICES, ELEVEN_VOICES, DEFAULT_STYLE, live, pick, defaultModel, voiceFor, key, capability, synthesize };

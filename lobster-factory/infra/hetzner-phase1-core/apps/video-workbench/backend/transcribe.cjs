@@ -11,6 +11,7 @@ const TranscriptWords = require("../shared/transcript-words.js");
 const { vwEnv } = require("./env-compat.cjs");
 const providers = require("./providers.cjs");
 const { transcribePrice } = require("./provider-cost.cjs");
+const elevenlabs = require("./elevenlabs.cjs");
 const rates = require(path.join(require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env), "lib/ai/cost-model.ts"));
 
 const LANGUAGES = { 繁體中文: "zh", 簡體中文: "zh", English: "en", 日本語: "ja", 한국어: "ko", ภาษาไทย: "th" };
@@ -26,6 +27,9 @@ const GEMINI_UPLOAD_BYTES = 1500 * 4000;
 const ENGINES = Object.freeze([
   Object.freeze({ id: "host", model: "host-whisper-large-v3", provider: "AwareWave 主機", label: "自家主機 Whisper", uploadBytes: HOST_UPLOAD_BYTES,
     note: "免費、較慢：要等約影片長度的 1.5 倍。聲音不送出主機、繁體輸出、逐字時間；「嗯、呃」多半不會寫進字幕。" }),
+  // Free-plan check 2026-11-13: a 5 s clip, 200, 3 credits. Second: on a paid plan its list price is the lowest paid one.
+  Object.freeze({ id: "elevenlabs", model: "scribe_v2", provider: "ElevenLabs", label: "ElevenLabs Scribe", uploadBytes: UPLOAD_BYTES,
+    note: "快、逐字時間、每字信心分數；中文輸出簡體（2026-11-13 實測）；聲音送到 ElevenLabs。免費方案每月有額度，用完會失敗、不收費。" }),
   Object.freeze({ id: "gemini", model: "gemini-3.5-transcribe", provider: "Google", label: "Gemini 辨識", uploadBytes: GEMINI_UPLOAD_BYTES,
     note: "快（30 秒的片約 10 秒）、逐字時間。中文常輸出簡體、沒有信心分數（每句都標需校對）；聲音送到 Google，尖峰時段可能忙線。" }),
   Object.freeze({ id: "openai", model: "whisper-1", provider: "OpenAI", label: "OpenAI Whisper", uploadBytes: UPLOAD_BYTES,
@@ -51,6 +55,7 @@ const available = (engine, env) => { try { auth(engine, env); return true; } cat
 // What one call needs, checked before a job is recorded (503 = never sent).
 function auth(engine, env = process.env) {
   const missing = (name) => Object.assign(Error("此電腦尚未設定 " + name + "；請先設定服務。"), { status: 503 });
+  if (engine.id === "elevenlabs") return { key: elevenlabs.key(env) };
   if (engine.id === "openai" || engine.id === "gemini") {
     const name = engine.id === "openai" ? "OPENAI_API_KEY" : "GEMINI_API_KEY";
     if (!env[name]) throw missing(name);
@@ -67,7 +72,7 @@ function capability(env, at) {
   const list = rows(env, at);
   return {
     defaultEngine: providers.choose(list, vwEnv(env, "TRANSCRIBE_ENGINE"))?.id,
-    engines: providers.order(list).map(({ e, available, free, price }) => ({ id: e.id, model: e.model, provider: e.provider, label: e.label, note: e.note, retireOn: retireOn(e), available, free, price })),
+    engines: providers.order(list).map(({ e, available, free, price }) => ({ id: e.id, model: e.model, provider: e.provider, label: e.label, note: e.provider === "ElevenLabs" && elevenlabs.creditsNote() ? e.note + " " + elevenlabs.creditsNote() : e.note, retireOn: retireOn(e), available, free, price })),
   };
 }
 const GAP = 1; // seconds of silence between two separate stretches of sound in the mixed file
@@ -131,6 +136,7 @@ async function recognize({ engine = ENGINES[0], buffer, filename, mime, language
   if (buffer.length > 25 * 1024 * 1024) throw bad("語音辨識的檔案上限為25MB，請先裁短片段");
   if (engine.id === "host") return host({ buffer, language, auth, fetchImpl, signal });
   if (engine.id === "gemini") return gemini({ engine, buffer, mime, language, auth, fetchImpl, signal });
+  if (engine.id === "elevenlabs") return fromScribe(await elevenlabs.transcribe({ apiKey: auth.key, model: engine.model, buffer, filename, mime, language: languageCode(language), fetchImpl, signal }), languageCode(language));
   return whisper({ engine, buffer, filename, mime, language, key: auth.key, fetchImpl, signal });
 }
 async function host({ buffer, language, auth, fetchImpl, signal }) {
@@ -208,6 +214,34 @@ function fromGemini(value, code) {
       return { start: g.start, end: g.end, text: sliced || g.words.map((w) => w.word).join("") };
     }),
     words: words.map(({ word, start, end }) => ({ word, start, end })),
+  };
+}
+// ElevenLabs Scribe answers tokens (word / spacing / audio_event; punctuation is a "word" of its own) with a logprob each,
+// no segments: a segment ends at sentence punctuation, a pause over 1 s, or 15 s (as fromGemini); its text = its tokens
+// joined; avg_logprob = the mean of its words' logprob, so scoreOf() reads it like whisper's.
+function fromScribe(value, code) {
+  const tokens = (Array.isArray(value?.words) ? value.words : []).filter((t) => t && (t.type === "word" || t.type === "spacing") && Number.isFinite(Number(t.start)) && Number.isFinite(Number(t.end)));
+  const mark = (t) => /^[\s。！？.!?，,、；;：:]+$/.test(String(t.text));
+  const segments = [];
+  let current = null;
+  for (const t of tokens) {
+    const start = Number(t.start), end = Number(t.end), isWord = t.type === "word" && !mark(t);
+    if (isWord && current && (start - current.end > 1 || end - current.start > 15)) current = null;
+    if (!current) {
+      if (!isWord) continue; // spacing or punctuation before any word
+      segments.push((current = { start, end, text: "", logprobs: [], words: [] }));
+    }
+    current.text += String(t.text);
+    if (t.type !== "word") continue;
+    current.end = Math.max(current.end, end);
+    if (Number.isFinite(Number(t.logprob))) current.logprobs.push(Number(t.logprob));
+    if (isWord) current.words.push({ word: String(t.text), start, end });
+    else if (/[。！？.!?]/.test(String(t.text))) current = null;
+  }
+  return {
+    language: code || (typeof value?.language_code === "string" ? value.language_code : null),
+    segments: segments.map((g) => ({ start: g.start, end: g.end, text: g.text.trim(), ...(g.logprobs.length ? { avg_logprob: g.logprobs.reduce((a, b) => a + b, 0) / g.logprobs.length } : {}) })),
+    words: segments.flatMap((g) => g.words),
   };
 }
 // whisper-1 (OpenAI, until 2027-02-26).
@@ -430,4 +464,4 @@ async function transcribeProject(settings, { localFile, inspect, run, tmpDir, en
   }
 }
 
-module.exports = { ENGINES, live, pick, defaultEngine, auth, capability, LANGUAGES, UPLOAD_BYTES, HOST_UPLOAD_BYTES, GAP, scoreOf, normalize, toSrt, recognize, fromGemini, plan, layout, timelineOf, chunks, prepare, audioSeconds, timeoutMs, quote, transcribeProject };
+module.exports = { ENGINES, live, pick, defaultEngine, auth, capability, LANGUAGES, UPLOAD_BYTES, HOST_UPLOAD_BYTES, GAP, scoreOf, normalize, toSrt, recognize, fromGemini, fromScribe, plan, layout, timelineOf, chunks, prepare, audioSeconds, timeoutMs, quote, transcribeProject };

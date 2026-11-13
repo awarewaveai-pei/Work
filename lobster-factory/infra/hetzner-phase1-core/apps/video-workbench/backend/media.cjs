@@ -6,6 +6,7 @@ const binary = require("ffmpeg-static");
 const supported = [
   "edit",
   "separate",
+  "sfx", // backend/audio-tools.cjs (ElevenLabs only)
   "upscale",
   "watermark",
   "cta",
@@ -63,7 +64,10 @@ function run(args, signal) {
     });
   });
 }
-async function media(input, { file, output, signal }) {
+async function media(input, { file, output, signal, env, fetchImpl }) {
+  // 音軌分離 / 去配樂・重配音效 on a vendor row (backend/audio-tools.cjs); separate's free 原音軌 row stays below.
+  const audioTools = require("./audio-tools.cjs");
+  if (audioTools.handles(input) && !audioTools.runsLocally(input, env)) return audioTools.run(input, { file, output, signal, run, inspect: require("./media-inspect.cjs").inspectMedia, env, fetchImpl });
   if (input.operation === 'follow-track') return require('./follow.cjs').follow(input, { file, output, signal, run });
   if (input.operation === 'editor-export') return require('./editor-export.cjs').exportEditor(input.settings?.project, { file, output, signal, run }, input.settings?.quality);
   const source = file(input.references?.src?.url);
