@@ -693,6 +693,31 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
       assert(/exampleTemplates/.test(fs.readFileSync(path.join(__dirname, "..", "scripts/templates-0.js"), "utf8")), "模板牆併入自製模板");
     }
 
+    // 破框貼文動畫: a vendor run that completed is charged once whatever the job's end. Here a restart finds a job left
+    // finishing whose model file is gone: it ends failed, and its paid run still reaches usage, once.
+    {
+      const lostDir = path.join(dir, "breakout-lost"), orgDir = path.join(lostDir, "orgs", ORG);
+      fs.mkdirSync(path.join(orgDir, "generated"), { recursive: true });
+      fs.writeFileSync(path.join(orgDir, "jobs.json"), JSON.stringify([{
+        id: "breakout-lost", type: "video", status: "running", stage: "finishing", progress: 95, createdAt: new Date().toISOString(), providerId: "pred-x",
+        paid: { feature: "video.motion", billingOrgId: BILLING, userId: USER },
+        video: { id: "runway-gen4-turbo", provider: "Replicate", model: "runwayml/gen4-turbo", seconds: 5 },
+        input: { type: "video", operation: "breakout", prompt: "鯊魚", references: { firstFrame: [{ url: "/generated/f.png" }] }, settings: { outputRatio: "9:16", ratio: "9:16" } },
+        finishing: { url: "/generated/99999999-9999-9999-9999-999999999999.mp4", origin: { kind: "ai_generated", costUsd: 0.25 } },
+      }]));
+      const restarted = createServer({ dataDir: lostDir, env, fetchImpl });
+      await new Promise((r) => restarted.listen(0, "127.0.0.1", r));
+      // the first request opens the org (its restart pass runs right after); the job is read once usage went out
+      await request(restarted.address().port, "GET", "/api/vw/generations/breakout-lost", who());
+      await wait(() => calls.usage.some((u) => u.job_id === "breakout-lost"));
+      const lost = JSON.parse((await request(restarted.address().port, "GET", "/api/vw/generations/breakout-lost", who())).body);
+      assert.equal(lost.status, "failed");
+      assert.match(lost.error, /找不到模型生成的影片檔/);
+      await new Promise((r) => setTimeout(r, 100));
+      assert.deepEqual(calls.usage.filter((u) => u.job_id === "breakout-lost"), [{ organization_id: BILLING, feature_key: "video.motion", actor: "video:" + USER, job_id: "breakout-lost", cost_usd: 0.25 }], "破框：已付費的模型執行記一次用量");
+      restarted.close();
+    }
+
     console.log("PASS p6-main-system：許可→生成→資產帳冊→任務帳冊、拒絕不呼叫供應商、偽造許可拒絕、上傳入帳、本機模式不變、D6、欄位對照 L2");
   } finally {
     server.close();

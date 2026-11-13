@@ -137,11 +137,14 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         persist();
       }
     }
-    // Paid work is charged once it delivered (job.paid = the permit's account, set at creation): the record goes to the
-    // main-system usage outbox, which owns delivery and retries; usageReported = durably recorded, never queued twice.
-    if (job.status === "succeeded" && job.paid && !job.usageReported) {
+    // Paid work is charged once the vendor run it paid for completed (job.paid = the permit's account, set at creation):
+    // a delivered job, or a job that failed after its vendor run (job.finishing kept: 破框 finishing lost its file). The
+    // record goes to the main-system usage outbox, which owns delivery and retries; usageReported = durably recorded,
+    // never queued twice.
+    const ran = job.status === "succeeded" || (job.status === "failed" && !!job.finishing);
+    if (ran && job.paid && !job.usageReported) {
       try {
-        main.usage({ ...job.paid, jobId: job.id, costUsd: job.result?.origin?.costUsd });
+        main.usage({ ...job.paid, jobId: job.id, costUsd: job.result?.origin?.costUsd ?? job.finishing?.origin?.costUsd });
         job.usageReported = true;
         delete job.usageError;
       } catch (e) {
@@ -230,12 +233,12 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       if (job.status === "running" && job.stage === "finishing") {
         if (job.finishing?.url && fs.existsSync(path.join(dataDir, job.finishing.url.slice(1)))) finishBreakout(job);
         else {
+          // job.finishing stays: it records the vendor run that completed and was paid, so settle charges it once.
           delete job.stage;
-          delete job.finishing;
           job.status = "failed";
           job.error = "服務重新啟動後找不到模型生成的影片檔，無法完成貼文鎖定；請重新送出。";
           persist();
-          mirror(job);
+          settle(job).catch((e) => console.error("[vw] settle after a lost finishing file:", job.id, e.message));
         }
       }
   });
@@ -850,18 +853,23 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       )
       .then(
         (done) => {
+          // Cancel only asks the worker to stop: a finish that lands after it is dropped, as cancel promised the model file.
+          if (controller.signal.aborted) {
+            if (!done.untouched) fs.rm(path.join(outputs, name), { force: true }, () => {});
+            throw Error("已停止");
+          }
           // ratio = the file's own; readers of a job's ratio take result.ratio first
           job.result = { url: done.untouched ? made.url : "/generated/" + name, origin: made.origin, ratio: done.ratio, textLock: { restoredPixels: done.restored } };
           if (!done.untouched) fs.rm(src, { force: true }, (e) => e && console.error("[vw] model file left:", src, e.message));
         },
-        async (e) => {
-          job.result = {
-            url: made.url, origin: made.origin,
-            ratio: await breakout.fileRatio(src), // the model's file, measured, never assumed
-            note: (controller.signal.aborted ? "已停止貼文鎖定／裁切" : "貼文鎖定／裁切失敗：" + publicError(e.message)) + "；這是模型生成的原始影片（已計費）。",
-          };
-        },
       )
+      .catch(async (e) => {
+        job.result = {
+          url: made.url, origin: made.origin,
+          ratio: await breakout.fileRatio(src), // the model's file, measured, never assumed
+          note: (controller.signal.aborted ? "已停止貼文鎖定／裁切" : "貼文鎖定／裁切失敗：" + publicError(e.message)) + "；這是模型生成的原始影片（已計費）。",
+        };
+      })
       .finally(() => {
         controls.delete(job.id);
         delete job.stage;

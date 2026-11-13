@@ -176,11 +176,13 @@ const fetchImpl = async (url, init = {}) => {
   // Finishing runs outside the status request (api.cjs finishBreakout). breakout.finish is swapped for one the test
   // releases (api.cjs calls it through the module object).
   {
+    // stopsOnAbort = false plays a worker whose success is already on its way when the abort message is posted
     const realFinish = breakout.finish, runs = [];
+    let stopsOnAbort = true;
     breakout.finish = (opts) =>
       new Promise((resolve, reject) => {
         runs.push({ opts, resolve });
-        opts.signal.addEventListener("abort", () => reject(Error("已停止")));
+        if (stopsOnAbort) opts.signal.addEventListener("abort", () => reject(Error("已停止")));
       });
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const at = (b) => async (route, body) => {
@@ -220,6 +222,16 @@ const fetchImpl = async (url, init = {}) => {
       assert(!vendorUrls.slice(before).some((u) => u.endsWith("/cancel")), "cancel during finishing called the vendor");
       const kept = await until(async () => (await c2("/generations/" + two)).body, (v) => v.status === "succeeded");
       assert.match(kept.result.note, /已停止貼文鎖定.*原始影片/);
+      // 2b. the worker's success lands after the cancel: the model file is still what is delivered (cancel's promise)
+      stopsOnAbort = false;
+      const race = (await c2("/generations", job(runway2))).body.id;
+      const racing = await until(async () => (await c2("/generations/" + race)).body, (v) => v.stage === "finishing");
+      assert.equal((await c2("/generations/" + race + "/cancel", {})).status, 200);
+      runs[2].resolve({ ratio: "9:16", restored: 5 });
+      const raced = await until(async () => (await c2("/generations/" + race)).body, (v) => v.status === "succeeded");
+      assert.match(raced.result.note, /已停止貼文鎖定.*原始影片/, "a finish that landed after cancel was delivered");
+      assert.equal(raced.result.textLock, undefined);
+      stopsOnAbort = true;
       // 3. a restart resumes a finishing job; one whose model file is gone fails with a message
       const os = require("node:os"), dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "vw-breakout-restart-"));
       fs.mkdirSync(path.join(dataDir, "generated"));
@@ -235,8 +247,8 @@ const fetchImpl = async (url, init = {}) => {
       await new Promise((r) => restarted.listen(0, "127.0.0.1", r));
       restarted.unref();
       const c3 = at("http://127.0.0.1:" + restarted.address().port);
-      await until(async () => runs.length, (n) => n === 3);
-      runs[2].resolve({ ratio: "9:16", restored: 0, untouched: true });
+      await until(async () => runs.length, (n) => n === 4);
+      runs[3].resolve({ ratio: "9:16", restored: 0, untouched: true });
       assert.equal((await until(async () => (await c3("/generations/resume")).body, (v) => v.status !== "running")).status, "succeeded");
       const lost = (await c3("/generations/lost")).body;
       assert.equal(lost.status, "failed");
