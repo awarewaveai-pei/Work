@@ -1,4 +1,26 @@
 # Worklog
+## 2026-11-13（續8）影音工作台 P6.16：app 存檔就通知工作台＋切回分頁重讀，取代 30 秒輪詢
+
+- 根因：`video-workbench/backend/appearance.cjs` 的 `savedTheme` 每 30 秒到期才重抓 next-admin 主題；app 存檔後工作台最多舊 30 秒，已開分頁要重新整理才看得到。
+- 做法：
+  - next-admin `app/api/theme/route.ts` 存檔成功後 `await notifyVideoThemeSaved()`（新檔 `lib/theme/notify-video.ts`）：POST `${VW_SERVICE_URL}/api/internal/theme/invalidate`，Bearer `VW_INTERNAL_TOKEN`，2 秒逾時；任何失敗只 warn，不影響存檔回應。`VW_SERVICE_URL` 未設＝不通知。
+  - video `server.cjs`：`POST /api/internal/theme/invalidate`，token 以 sha256+timingSafeEqual 比對；缺／錯／非 POST＝401。nginx 對公開門已 404 `/api/internal`（`nginx/default.conf` video 區塊）。
+  - video `appearance.cjs`：刪 30 秒 TTL；快取到「收到通知」或「`theme.css?fresh` 且距上次抓 ≥1 秒」才重抓；通知會丟棄進行中的舊抓取；序號防舊回應蓋新；抓取失敗 1 秒後重試（Codex 第 1 輪 F2）。保留 10 分鐘上限，理由：通知漏掉且使用者從不切分頁時的天花板，不是新鮮度來源。
+  - video `shared/theme.js`：`visibilitychange`→visible 時抓 `/awarewave/theme.css?fresh=1`，把兩個 `:root` 區塊換進原本 @import 的 sheet（cascade 位置不變），再 `refresh()` 推給內嵌 iframe；無計時器。區塊切法與 `appearance.cjs` 同為 `[^}]*`（真 globals.css 註解含 `<`，Codex 第 2 輪抓到）。
+  - `docker-compose.yml` next-admin 加 `VW_SERVICE_URL: http://video-workbench:4178`（repo 對照用；prod 須 safe-infra-patch）。
+  - `THEME_ARCHITECTURE_APPEARANCE.md` 資料流補兩行。
+- 部署順序：next-admin 先上、video 舊版 → 通知打到舊 video 回 404，被忽略，舊版仍 30 秒 TTL。video 先上、next-admin 舊版 → 沒有通知，靠切回分頁＋10 分鐘上限。兩邊任一先上都不出錯。
+- 不變量分析（Codex 對 `appearance.cjs`／`theme.js` 新鮮度連報）：這一類的不變量＝「顯示中的主題 ≤ 下一次觸發點（通知、切回分頁）就等於 DB」。每個 finding 都是觸發點之間的時間窗；第 3 輪的亂序窗口仍在「下一次切回即恢復」範圍內，依監工裁示不修、列 RISKS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd apps/video-workbench && node tests/gate.cjs（含新 tests/p616-theme-refresh.cjs、改寫的 p6-main-system §8c） | exit=0 | ms=12800
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd apps/next-admin && npx vitest run app/api/theme/route.test.ts app/api/internal/theme/css/route.test.ts lib/theme（7 檔 26 測試） | exit=0 | ms=2810
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd apps/next-admin && npx tsc --noEmit | exit=0 | ms=4038
+- 突變：`server.cjs` 把 `ok` 改成只看 `req.method === "POST"` → p6-main-system 紅（「無 token 不得清快取」）→ 還原 → 綠。另 `theme.js` 換回 `[^{}<]*` → p616-theme-refresh 紅 → 還原 → 綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n
+  - Codex 三輪：`reports/oracle/2026-11-13-review-df795499.md`（3m：F1 compose 不隨 sg-deploy、F2 失敗鎖 10 分鐘已修、F3 1 秒 floor 取捨）、`-66993b35.md`（1m：globals.css 註解含 `<` 已修）、`-41a36948.md`（1m：連續切回亂序，列 RISKS 不修）。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=ttlMs|30 秒內不重抓|savedTheme(|notifyVideoThemeSaved|theme/invalidate|VW_SERVICE_URL | hits=24
+- 剩餘風險：(1) prod 的 `VW_SERVICE_URL` 要監工用 `scripts/safe-infra-patch.sh compose` 加進 next-admin 環境；未加前存檔不通知，靠切回分頁＋10 分鐘上限；`/check-drift` 會 WARN 直到加上。(2) 通知失敗且 1 秒內剛抓過時，切回分頁仍舊，下一次切回恢復。(3) 連續兩次切回、回應亂序時舊回應可能覆蓋新的，下一次切回恢復。
+- 避免再發生：前端解析伺服器產出的 CSS 時，測試一律用真實 `globals.css` 經 `appearance()` 產出的內容，不用手寫簡化樣本。
+- rollback：git revert 本 commit（兩端各自獨立，回退任一邊都相容）。
 ## 2026-11-13（續7）透明影片的預覽檔保留聲音（proxy.webm／preview720.webm＝VP9 透明＋Opus）
 
 - 根因：`backend/media-store.cjs` transcode 的透明分支帶 `-an`（2026-11 P3 `40c7b8ebd` 加入；commit 訊息和註解都沒寫理由，當時的來源是無聲的合成器輸出）。
