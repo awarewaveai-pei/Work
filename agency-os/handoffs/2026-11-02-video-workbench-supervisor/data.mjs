@@ -3,7 +3,7 @@
 
 export const META = {
   title: '影音工作台監工台',
-  updated: '2026-11-13',
+  updated: '2026-11-14',
   plan: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/creative-suite-plan-20261102.md',
   req: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/handoff/Claude_Code_handoff_20261102.md',
   worklog: 'agency-os/WORKLOG.md 2026-11-02 續19–續45',
@@ -186,7 +186,7 @@ export const STEPS = [
       done('P6.8', '容器映像、compose、nginx 設定檔（只寫檔）。工作台只認主系統簽過的身分，同網路的其他容器偽造不了。', '99a1250b6'),
       done('P6.12', '部署管線七項：部署前自動打包主系統檔、映像建好後跑測試閘、未登入呼叫必須被擋的煙霧測試、自動回滾、通知、CI；外觀檔 forms.css 已原樣提交。', '62acae78b'),
       done('P6.9', '上主機完成：video.aware-wave.com 已上線（未登入與偽造身分都擋、其他產品門正常）；3D 在主機用 CPU 的 Cycles 引擎，1080p 約 12 秒一格、五秒片約半小時，一次只跑一支，超過三小時的片送出即拒。', '7b76f9f6c'),
-      todo('P6.10', '全程實測：圖片生成、素材帳冊、任務帳冊、用量回報都已在正式環境實測通過；送審缺口已補（P6.13，已部署）。剩你用員工帳號走一次：剪一支有字幕的影片 → 匯出 → 送審與投遞 → 四項檢查通過 → 核准 → 社群與 WordPress 草稿。之後加 Uptime Kuma 監控 /healthz。'),
+      done('P6.10', '11-13 監工代你在正式站走完：剪輯（AI 影片＋字幕＋內建配樂）→ 匯出 → 送審四項 QA 全過 → 核准 16:9 → 3 個社群草稿＋WordPress 新草稿（測完已刪：社群你刪、WP 進垃圾桶）。途中修了：匯出成片沒登記（24eedbede）、QA 警告不說原因／嵌文章會碰已發布文章／影片縮圖破圖／垃圾桶永久刪除（4764ad95f）、缺字不再輸出方框（6c03f533f）。未完：中文字幕要等剪輯線的字型包；字型包上線前帶中文字幕的匯出會被擋下並說明缺字。', '4764ad95f'),
       done('P6.14', '每個登入帳號都有 profiles：新帳號自動建立（不給任何權限、不擋註冊），刪帳號時清掉個資；缺的兩筆已補，主機每十分鐘檢查一次，出錯發告警。工作台任務帳冊已能寫入。', '39f3a7dbd'),
       done('P6.15', '主題連動：在 app 存的外觀（顏色、圓角、字型名）video.aware-wave.com 也套用，最慢半分鐘生效；app 讀不到資料庫時 video 保留上一份，不會變回預設。變成獨立產品時不設連線，就用內建預設外觀，程式不用改。網路字型（Google Fonts）video 還不會另外載入，會用系統字型代替。', 'ff40c9be7'),
       done('P6.17', 'video 網站的分鏡靈感、模板牆、應用工具恢復：seedstar 參考資料（全部分鏡與圖片）放在主機資料區，只有員工看得到；客戶看到正常的空畫面。另修兩個限流：nginx 給 video 自己的限流區，Cloudflare 限速規則排除 video。', '9caa6a21a'),
